@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web UI 登录</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111827;
+            color: #f3f4f6;
+            font-family: "Segoe UI", sans-serif;
+            padding: 20px;
+        }
+        .card {
+            width: 100%;
+            max-width: 360px;
+            background: #1f2937;
+            border-radius: 18px;
+            padding: 28px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+        }
+        h1 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #8b5cf6;
+            font-size: 24px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #9ca3af;
+            font-size: 13px;
+        }
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid #4b5563;
+            background: #374151;
+            color: #f3f4f6;
+        }
+        .flash {
+            margin-bottom: 16px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: #ef4444;
+        }
+        button {
+            width: 100%;
+            margin-top: 18px;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Web UI 登录</h1>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <form method="POST" action="/login">
+            <input type="hidden" name="next" value="{{ next_url }}">
+            <label for="password">密码</label>
+            <input id="password" name="password" type="password" autofocus>
+            <button type="submit">登录</button>
+        </form>
+    </div>
+</body>
+</html>

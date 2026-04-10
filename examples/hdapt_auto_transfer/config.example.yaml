@@ -1,0 +1,190 @@
+category_mapping:
+  UHD原盘: Movie UHD-4K
+  影视2160p: Movie UHD-4K
+  BluRay原盘: Movies Blu-ray
+  电影1080i/p: Movies 1080p
+  电影720p: Movies 720p
+  电影DVDRip: Movies DVDRip
+  欧美剧720p: TV SERIES
+  欧美剧1080i/p: TV SERIES
+  高清日剧: TV SERIES
+  大陆港台剧1080i/p: TV SERIES
+  大陆港台剧720p: TV SERIES
+  高清韩剧: TV SERIES
+  欧美剧包: TV SERIES
+  日剧包: TV SERIES
+  韩剧包: TV SERIES
+  华语剧包: TV SERIES
+  纪录片720p: Documentaries
+  纪录片1080i/p: Documentaries
+  纪录片BluRay原盘: Documentaries
+  (电影原声&Game)OST: HQ Audio
+  无损音乐FLAC&APE: HQ Audio
+  补充音轨: HQ Audio
+  MV&演唱会: Music Videos
+  高清体育节目: SPORTS
+  高清动漫: Animations
+  动漫原盘: Animations
+  韩国综艺: TV SHOWS
+  日本综艺: TV SHOWS
+  高清综艺: TV SHOWS
+  MiniVideo: Misc
+  iPhone/iPad视频: Movies iPad
+cleanup_rules:
+  enabled: true
+  max_seed_time_hours: 48
+  min_seeders_for_deletion: 5
+  min_ratio_for_deletion: 1.1
+  low_speed_threshold_kb: 20
+  low_speed_time_minutes: 10
+concurrency:
+  max_active_downloads: 5
+  max_active_uploads: 40
+hdarea_mapping:
+  audio_codecs:
+    FLAC: 1
+    APE: 2
+    DTS: 3
+    DTS-HD MA/DTS XLL: 4
+    DD5.1/AC-3: 5
+    AAC: 6
+    TrueHD: 7
+    LPCM: 8
+    WAV: 9
+    TrueHD Atmos: 10
+    DD2.0/AC-3: 11
+    DTS:X: 12
+    DTS-HD HR/HRA: 13
+    DSD: 14
+    DDP Atmos: 15
+    DDP/E-AC-3: 16
+    MPEG: 17
+    Vorbis: 18
+    TTA: 19
+    AV3A: 20
+    MP3: 21
+    ALAC: 22
+    Other: 24
+    Opus: 25
+    WMA: 26
+    AC-4: 27
+    MPEG-H: 28
+    MQA: 29
+    # 代码内部使用的别名（兴容 processor.py / mteam.py / crawler.py 输出）
+    AC3: 5          # 对应 DD5.1/AC-3
+    DTS-HD MA: 4    # 对应 DTS-HD MA/DTS XLL
+  codecs:
+    MPEG-4: 1
+    VC-1: 2
+    Xvid: 3
+    MPEG-2: 4
+    Other: 5
+    H.265(x265/HEVC): 6
+    H.264(x264/AVC): 7
+    AV1: 8
+    VP8/9: 9
+    AVS: 10
+    # 代码内部别名（兴容 processor.py / mteam.py 输出）
+    x264: 7         # 对应 H.264(x264/AVC)
+    x265: 6         # 对应 H.265(x265/HEVC)
+  mediums:
+    Blu-ray: 1      # HDA 官方名称
+    HD DVD: 2
+    REMUX: 3
+    MiniBD: 4
+    HDTV: 5
+    DVDR: 6         # HDA 官方名称
+    Encode: 7
+    CD: 8
+    WEB-DL: 9
+    # 代码内部使用的别名（兼容 mteam.py / crawler.py 输出）
+    BluRay: 1       # 对应 Blu-ray
+    DVD: 6          # 对应 DVDR
+  standards:
+    1080p: 1
+    1080i: 2
+    720p: 3
+    SD: 4
+    4K: 5
+    # 代码内部别名（兴容 processor.py / mteam.py 输出）
+    2160p: 5        # 对应 4K
+  teams:
+    EPiC: 1
+    HDArea: 2
+    HDWING: 3
+    WiKi: 4
+    TTG: 5
+    other: 6
+    MTeam: 7
+    HDApad: 8
+    CHD: 9
+    HDAccess: 10
+    HDATV: 11
+    cXcY: 12
+    CMCT: 13
+    # 代码内部别名（实际无对应制作组的，均归入 other）
+    ARiN: 6
+    NGB: 6
+  types:
+    Movie UHD-4K: 300
+    Movies Blu-ray: 401
+    TV Series: 402
+    TV Shows: 403
+    Documentaries: 404
+    Animations: 405
+    Music Videos: 406
+    Sports: 407
+    HQ Audio: 408
+    Misc: 409
+    Movies 1080p: 410
+    Movies 720p: 411
+    Movies WEB-DL: 412
+    Movies HDTV: 413
+    Movies DVD: 414
+    Movies REMUX: 415
+    Movies 3D: 416
+    Movies iPad: 417
+    # 兼容旧键名别名
+    TV SERIES: 402
+    TV SHOWS: 403
+    SPORTS: 407
+    Movies DVDRip: 414
+metadata_api:
+  imdb_to_douban: https://doubaninfo.com/api/v1_douban.php?key=your_api_key_here&format&douban&url={imdb_id}
+qbittorrent:
+  host: http://192.168.1.100:8080/
+  max_global_upload_speed_mb: 200.0
+  max_torrent_upload_speed_mb: 80.0
+  use_super_seeding: true
+  password: 'your_qb_password'
+  save_path: /downloads/disk1
+  username: admin
+settings:
+  check_interval: 120
+  max_torrent_size_gb: 200.0
+  max_ttl_hours: 3
+  min_free_space_gb: 30
+  path_mapping:
+    /downloads/disk1: /app/data
+  temp_dir: /app/data/.pt_transfer
+sites:
+  hdarea:
+    cookie: your_hdarea_cookie_here
+    url: https://hdarea.club
+  mteam:
+    api_key: your_mteam_api_key_here
+    free_only: false
+    monitor_categories:
+    - '419'
+    monitor_urls:
+    - https://kp.m-team.cc/browse?team=44&team=9&team=43
+    url: https://api.m-team.cc
+  ttg:
+    cookie: your_ttg_cookie_here
+    monitor_urls:
+    - https://totheglory.im/browse.php?c=M&search_field=team%3A%22WiKi%22
+    - https://totheglory.im/browse.php?c=M&search_field=team%3A%22NGB%22
+    - https://totheglory.im/browse.php?c=M&search_field=team%3A%22ARiN%22
+    url: https://totheglory.im
+web_ui:
+  password: 'your_web_ui_password'
