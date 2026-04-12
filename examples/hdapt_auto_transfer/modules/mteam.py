@@ -263,8 +263,10 @@ class MTeamCrawler:
         if re.search(r'x265|HEVC', title, re.I): attrs['codec'] = 'x265'
         
         # 音频识别
-        if re.search(r'Atmos', title, re.I): attrs['audio'] = 'TrueHD Atmos'
+        if re.search(r'DDP.*Atmos|E-?AC-?3.*Atmos', title, re.I): attrs['audio'] = 'DDP Atmos'
+        elif re.search(r'Atmos', title, re.I): attrs['audio'] = 'TrueHD Atmos'
         elif re.search(r'TrueHD', title, re.I): attrs['audio'] = 'TrueHD'
+        elif re.search(r'DDP|E-?AC-?3', title, re.I): attrs['audio'] = 'DDP/E-AC-3'
         elif re.search(r'DD5\.1|AC3', title, re.I): attrs['audio'] = 'AC3'
         
         # 分辨率识别

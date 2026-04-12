@@ -5,7 +5,27 @@ import re
 import threading
 import requests
 import json
+import builtins
 from datetime import datetime, timezone, timedelta
+
+original_print = builtins.print
+
+def custom_print(*args, **kwargs):
+    original_print(*args, **kwargs)
+    try:
+        msg = " ".join(str(a) for a in args)
+        with open('pt_transfer.log', 'a', encoding='utf-8') as f:
+            f.write(msg + '\n')
+        # Rotate log if it gets too large (>1MB)
+        if os.path.exists('pt_transfer.log') and os.path.getsize('pt_transfer.log') > 1024 * 1024:
+            with open('pt_transfer.log', 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            with open('pt_transfer.log', 'w', encoding='utf-8') as f:
+                f.writelines(lines[-500:])
+    except Exception:
+        pass
+
+builtins.print = custom_print
 from modules.crawler import TTGCrawler
 from modules.mteam import MTeamCrawler
 from modules.client import QBManager

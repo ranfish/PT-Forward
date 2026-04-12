@@ -282,6 +282,41 @@
 
             <button type="submit">保存配置</button>
         </form>
+
+        <div class="section" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #374151;">
+            <div class="section-title">系统实时日志</div>
+            <textarea id="app_logs" class="url-area" readonly style="font-size: 13px; font-family: Consolas, monospace; background: #000; color: #4ade80; min-height: 400px;"></textarea>
+        </div>
     </div>
+    
+    <script>
+        const logArea = document.getElementById('app_logs');
+        let autoScroll = true;
+
+        logArea.addEventListener('scroll', () => {
+            // 如果用户向上滚动，取消自动滚动
+            if (logArea.scrollHeight - logArea.scrollTop > logArea.clientHeight + 20) {
+                autoScroll = false;
+            } else {
+                autoScroll = true;
+            }
+        });
+
+        function fetchLogs() {
+            fetch('/api/logs')
+                .then(res => res.json())
+                .then(data => {
+                    logArea.value = data.logs;
+                    if (autoScroll) {
+                        logArea.scrollTop = logArea.scrollHeight;
+                    }
+                })
+                .catch(err => console.error('获取日志失败:', err));
+        }
+
+        // 初始拉取并设置轮询，每2秒更新一次
+        fetchLogs();
+        setInterval(fetchLogs, 2000);
+    </script>
 </body>
 </html>
