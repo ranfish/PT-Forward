@@ -184,7 +184,18 @@ def clear_cache():
         flash(f"下发清除缓存指令失败: {str(e)}", "error")
     return redirect(url_for("index"))
 
-
+@app.route("/api/logs")
+@require_login
+def api_logs():
+    try:
+        log_path = "pt_transfer.log"
+        if not os.path.exists(log_path):
+            return {"logs": "暂无日志记录...\n"}
+        with open(log_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            return {"logs": "".join(lines[-300:])}
+    except Exception as e:
+        return {"logs": f"无法读取日志: {e}"}
 
 if __name__ == "__main__":
     config = load_config()

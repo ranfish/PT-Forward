@@ -89,26 +89,30 @@ class MediaProcessor:
                 elif track.track_type == 'Audio' and 'audio' not in attrs:
                     # 音频编码判断
                     fmt = (track.format or '').lower()
+                    codec_id = (track.codec_id or '').lower()
                     comm_name = (track.commercial_name or '').lower()
+                    format_profile = (getattr(track, 'format_profile', '') or getattr(track, 'format_info', '') or '').lower()
                     channels = str(getattr(track, 'channel_s', '') or getattr(track, 'channels', ''))
+                    
+                    audio_hints = f"{fmt} {codec_id} {comm_name} {format_profile}"
                     
                     if 'flac' in fmt: attrs['audio'] = 'FLAC'
                     elif 'ape' in fmt or 'monkeys' in fmt: attrs['audio'] = 'APE'
-                    elif 'dts' in fmt:
-                        if 'x' in comm_name: attrs['audio'] = 'DTS:X'
-                        elif 'hd' in comm_name and 'ma' in comm_name: attrs['audio'] = 'DTS-HD MA/DTS XLL'
-                        elif 'hd' in comm_name and ('hra' in comm_name or 'hr' in comm_name): attrs['audio'] = 'DTS-HD HR/HRA'
-                        elif 'ma' in comm_name or 'master' in comm_name: attrs['audio'] = 'DTS-HD MA/DTS XLL'
+                    elif 'dts' in audio_hints:
+                        if 'x' in comm_name or 'x' in format_profile: attrs['audio'] = 'DTS:X'
+                        elif 'hd' in audio_hints and 'ma' in audio_hints: attrs['audio'] = 'DTS-HD MA/DTS XLL'
+                        elif 'hd' in audio_hints and ('hra' in audio_hints or 'hr' in audio_hints): attrs['audio'] = 'DTS-HD HR/HRA'
+                        elif 'ma' in audio_hints or 'master' in audio_hints: attrs['audio'] = 'DTS-HD MA/DTS XLL'
                         else: attrs['audio'] = 'DTS'
-                    elif 'e-ac-3' in fmt or 'eac3' in fmt:
-                        if 'atmos' in comm_name: attrs['audio'] = 'DDP Atmos'
+                    elif 'e-ac-3' in audio_hints or 'eac3' in audio_hints or 'ddp' in audio_hints:
+                        if 'atmos' in audio_hints: attrs['audio'] = 'DDP Atmos'
                         else: attrs['audio'] = 'DDP/E-AC-3'
-                    elif 'ac-3' in fmt or 'ac3' in fmt:
+                    elif 'ac-3' in audio_hints or 'ac3' in audio_hints:
                         if '2' in channels: attrs['audio'] = 'DD2.0/AC-3'
                         else: attrs['audio'] = 'DD5.1/AC-3'
                     elif 'aac' in fmt: attrs['audio'] = 'AAC'
-                    elif 'truehd' in fmt or 'mlp' in fmt:  # TrueHD sometimes shows as MLP
-                        if 'atmos' in comm_name: attrs['audio'] = 'TrueHD Atmos'
+                    elif 'truehd' in audio_hints or 'mlp' in audio_hints:  # TrueHD sometimes shows as MLP
+                        if 'atmos' in audio_hints: attrs['audio'] = 'TrueHD Atmos'
                         else: attrs['audio'] = 'TrueHD'
                     elif 'pcm' in fmt: attrs['audio'] = 'LPCM'
                     elif 'wav' in fmt: attrs['audio'] = 'WAV'
