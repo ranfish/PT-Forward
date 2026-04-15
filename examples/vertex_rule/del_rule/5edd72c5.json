@@ -1,0 +1,15 @@
+{
+  "id": "5edd72c5",
+  "conditions": [
+    {
+      "key": "",
+      "compareType": "",
+      "value": ""
+    }
+  ],
+  "code": "(maindata, torrent) => {\n  const categoryList = [\"keep\"];\n  const { state, category, uploadSpeed, downloadSpeed } = torrent;\n  if (categoryList.indexOf(category) !== -1) {\n    return false;\n  }\n  if (\n    state == \"downloading\" &&\n    downloadSpeed >= util.calSize(10, \"MiB\") &&\n    downloadSpeed / uploadSpeed >= 1.8\n  ) {\n    return true;\n  }\n\n  return false;\n};",
+  "alias": "黑车2",
+  "fitTime": "20",
+  "deleteNum": "5",
+  "type": "javascript"
+}

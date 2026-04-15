@@ -1,0 +1,14 @@
+{
+  "id": "a740a793",
+  "conditions": [
+    {
+      "key": "",
+      "compareType": "",
+      "value": ""
+    }
+  ],
+  "code": "(maindata, torrent) => {\n  const categoryList = [\"keep\"];\n  const stateList = [\"downloading\", \"stalledDL\"];\n  const { state, uploadSpeed, progress, category, leecher } = torrent;\n  if (categoryList.indexOf(category) !== -1) {\n    return false;\n  }\n  if (\n    (moment().hour() >= 0 && moment().hour() <= 8) ||\n    maindata.leechingCount <= 10 ||\n    leecher >= 100\n  ) {\n    return false;\n  }\n  if (\n    stateList.indexOf(state) !== -1 &&\n    uploadSpeed <= util.calSize(250, \"KiB\") &&\n    progress >= 0.1\n  ) {\n    return true;\n  }\n\n  return false;\n};",
+  "alias": "慢车",
+  "fitTime": "40",
+  "type": "javascript"
+}

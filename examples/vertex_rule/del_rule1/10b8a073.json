@@ -1,0 +1,15 @@
+{
+  "id": "10b8a073",
+  "conditions": [
+    {
+      "key": "",
+      "compareType": "",
+      "value": ""
+    }
+  ],
+  "code": "// 慢车 持续时间60s\n// 下载状态，上传低于200kb，进度在10-100之间\n// 下载人数大于100的种子不删\n// 0点-7点，或者客户端下载种子数量小于等于10时不删种\n(maindata, torrent) => {\n  const categoryList = [\"不删\"];\n  const { state, upspeed, progress, ratio, category } = torrent.originProp;\n  if (categoryList.indexOf(category) !== -1 || torrent.leecher >= 100) {\n    return false;\n  }\n  if (\n    (moment().hour() >= 0 && moment().hour() <= 7) ||\n    maindata.leechingCount <= 15\n  ) {\n    return false;\n  }\n  if (\n    state === \"downloading\" &&\n    upspeed <= util.calSize(200, \"KiB\") &&\n    moment().unix() - torrent.addedTime >= 600\n  ) {\n    return true;\n  }\n  return false;\n};",
+  "alias": "慢车",
+  "fitTime": "120",
+  "type": "javascript",
+  "used": true
+}

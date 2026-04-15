@@ -1,0 +1,13 @@
+{
+  "id": "d3b17138",
+  "conditions": [
+    {
+      "key": "",
+      "compareType": "",
+      "value": ""
+    }
+  ],
+  "code": "(maindata, torrent) => {\n  const categoryList = [\"keep\"];\n  const stateList = [\"downloading\", \"stalledDL\"];\n  const { state, ratio, progress, category, uploadSpeed, downloadSpeed } =\n    torrent;\n  if (categoryList.indexOf(category) !== -1 || maindata.leechingCount <= 10) {\n    return false;\n  }\n  if (\n    stateList.indexOf(state) !== -1 &&\n    progress >= 0.2 &&\n    progress <= 0.3 &&\n    ratio <= 0.7 &&\n    uploadSpeed <= util.calSize(3, \"MiB\")\n  ) {\n    return true;\n  }\n\n  return false;\n};",
+  "alias": "低收益",
+  "type": "javascript"
+}

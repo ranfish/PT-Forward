@@ -1,0 +1,18 @@
+{
+  "id": "7a298ea8",
+  "conditions": [
+    {
+      "key": "ratio",
+      "compareType": "bigger",
+      "value": "4"
+    },
+    {
+      "key": "tracker",
+      "compareType": "includeIn",
+      "value": "tracker.totheglory.im"
+    }
+  ],
+  "code": "(maindata, torrent) => {\n  return false;\n}",
+  "alias": "黑种ttg",
+  "type": "normal"
+}

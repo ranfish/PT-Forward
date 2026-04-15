@@ -1,0 +1,14 @@
+{
+  "id": "909a4445",
+  "conditions": [
+    {
+      "key": "",
+      "compareType": "",
+      "value": ""
+    }
+  ],
+  "code": "// 黑车1\n(maindata, torrent) => {\n  const categoryList = [\"不删\"];\n  const ruleData = [\n    { down: 80, up: 60 },\n    { down: 70, up: 45 },\n    { down: 60, up: 35 },\n    { down: 50, up: 25 },\n    { down: 40, up: 20 },\n    { down: 20, up: 8 },\n    { down: 15, up: 5 },\n    { down: 10, up: 2 }\n  ];\n  const { state, upspeed, category, dlspeed } = torrent.originProp;\n  if (categoryList.indexOf(category) !== -1) {\n    return false;\n  }\n  for (const rule of ruleData) {\n    if (\n      state == \"downloading\" &&\n      dlspeed >= util.calSize(rule.down, \"MiB\") &&\n      upspeed <= util.calSize(rule.up, \"MiB\")\n    ) {\n      return true;\n    }\n  }\n  return false;\n};",
+  "alias": "黑车1",
+  "type": "javascript",
+  "used": true
+}

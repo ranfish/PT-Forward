@@ -1,0 +1,30 @@
+{
+  "id": "49981362",
+  "conditions": [
+    {
+      "key": "freeSpace",
+      "compareType": "smaller",
+      "value": "50*1024*1024*1024"
+    },
+    {
+      "key": "uploadSpeed",
+      "compareType": "smaller",
+      "value": "5*1024*1024"
+    },
+    {
+      "key": "category",
+      "compareType": "notContain",
+      "value": "不删"
+    },
+    {
+      "key": "progress",
+      "compareType": "bigger",
+      "value": "0.2"
+    }
+  ],
+  "code": "(maindata, torrent) => {\n  return false;\n}",
+  "alias": "无空间",
+  "type": "normal",
+  "deleteNum": "8",
+  "used": true
+}
