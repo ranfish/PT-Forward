@@ -1,0 +1,15 @@
+{
+  "id": "f79c5d48",
+  "conditions": [
+    {
+      "key": "",
+      "compareType": "",
+      "value": ""
+    }
+  ],
+  "code": "//删种\n// 0点-7点不删种\n(maindata, torrent) => {\n    const categoryList = [\"不删\"];\n    const { state, upspeed,category } =torrent.originProp;\n    if (categoryList.indexOf(category) !== -1) {\n      return false;\n    }\n    if (\n      (moment().hour() >= 0 && moment().hour() <= 7)\n    ) {\n      return false;\n    }\n    if (\n        (state == \"uploading\" || state === \"stalledUP\") &&\n        upspeed <= util.calSize(300, \"KiB\")\n    ) {\n        return true;\n    }\n    return false;\n};",
+  "type": "javascript",
+  "alias": "删种2",
+  "used": true,
+  "fitTime": "15"
+}

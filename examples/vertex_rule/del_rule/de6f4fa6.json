@@ -1,0 +1,13 @@
+{
+  "id": "de6f4fa6",
+  "conditions": [
+    {
+      "key": "",
+      "compareType": "",
+      "value": ""
+    }
+  ],
+  "code": "(maindata, torrent) => {\n  const categoryList = [\"keep\"];\n  const stateList = [\"downloading\", \"stalledDL\"];\n  const { state, addedTime, category, uploadSpeed } = torrent;\n  if (categoryList.indexOf(category) !== -1) {\n    return false;\n  }\n  if (\n    stateList.indexOf(state) !== -1 &&\n    moment().unix() - addedTime >= 57600 &&\n    uploadSpeed <= util.calSize(5, \"MiB\")\n  ) {\n    return true;\n  }\n\n  return false;\n};",
+  "type": "javascript",
+  "alias": "最长下载时间"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "91ae0fda",
+  "conditions": [
+    {
+      "key": "",
+      "compareType": "",
+      "value": ""
+    }
+  ],
+  "code": "(maindata, torrent) => {\n  const categoryList = [\"keep\"];\n  const stateList = [\"downloading\", \"stalledDL\"];\n  const { state, category, leecher, uploadSpeed, addedTime } = torrent;\n  if (categoryList.indexOf(category) !== -1) {\n    return false;\n  }\n  if (\n    stateList.indexOf(state) !== -1 &&\n    leecher <= 10 &&\n    uploadSpeed <= util.calSize(500, \"KiB\") &&\n    moment().unix() - addedTime >= 900\n  ) {\n    return true;\n  }\n\n  return false;\n};\n",
+  "alias": "下载人数少",
+  "type": "javascript"
+}
