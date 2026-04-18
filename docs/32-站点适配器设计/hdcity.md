@@ -1,10 +1,10 @@
-# HDCiTY (HDCity) 站点适配器设计
+# 城市 站点适配器设计
 
 ## 站点信息
 
 | 项目 | 内容 |
 |------|------|
-| 站点名称 | HDCiTY（高清城市） |
+| 站点名称 | 城市|
 | 站点地址 | https://hdcity.city（多镜像：hdcity.leniter.org / hdcity.work） |
 | 站点框架 | NexusPHP（深度定制，非标准） |
 | 主题 | ProCity（Material Design 风格） |

@@ -1,10 +1,10 @@
-# HDDolby 站点适配器设计
+# 不可杜 站点适配器设计
 
 ## 站点信息
 
 | 项目 | 内容 |
 |------|------|
-| 站点名称 | HDDolby |
+| 站点名称 | 不可杜|
 | 站点地址 | https://www.hddolby.com |
 | 论坛地址 | https://forums.orcinusorca.org |
 | Wiki 地址 | https://wiki.orcinusorca.org |

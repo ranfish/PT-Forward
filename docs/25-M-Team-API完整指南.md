@@ -1103,7 +1103,368 @@ def safe_api_call(client, func_name, *args, **kwargs):
 
 ## 📎 附录
 
-### A. OpenAPI定义文件信息
+### A. API 调用方法（开发参考）
+
+#### A.1 方式一：直接 HTTP 调用（测试环境 / 受信网络）
+
+适用于测试环境 `test2.m-team.cc`，或本机 IP 未被生产环境风控的场景。
+
+```bash
+# 获取分类列表
+curl -X POST "https://test2.m-team.cc/api/torrent/categoryList" \
+  -H "x-api-key: <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# 搜索种子（示例：电影分类，第1页，每页10条）
+curl -X POST "https://test2.m-team.cc/api/torrent/search" \
+  -H "x-api-key: <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "movie",
+    "categories": [419],
+    "pageNumber": 1,
+    "pageSize": 10
+  }'
+
+# 种子详情
+curl -X POST "https://test2.m-team.cc/api/torrent/detail" \
+  -H "x-api-key: <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"id": 12345}'
+
+# 生成下载令牌
+curl -X POST "https://test2.m-team.cc/api/torrent/genDlToken" \
+  -H "x-api-key: <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"id": 12345}'
+
+# 获取用户信息
+curl -X POST "https://test2.m-team.cc/api/member/profile" \
+  -H "x-api-key: <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+**请求间隔**: ≥2.5秒（M-Team 前端代码中使用 `await util.sleep(2500)` 控制搜索间隔）。
+
+#### A.2 方式二：Playwright 中转调用（生产环境，绕 IP 风控）
+
+生产环境 `api.m-team.io` 从部分 IP 段直接请求会被 nginx 拦截（302→Google），需通过 Playwright 无头浏览器中转。
+
+**前置条件**:
+
+```bash
+# 安装 Playwright
+npm install -g playwright
+npx playwright install chromium
+```
+
+**完整调用代码**:
+
+```javascript
+// mteam_api.js — M-Team API Playwright 中转调用
+// 用法: NODE_PATH=/path/to/node_modules node mteam_api.js
+
+const { chromium } = require('playwright');
+
+const CONFIG = {
+    auth: 'eyJhbGciOiJIUzUxMiJ9...',   // JWT Token（authorization header）
+    apiKey: '019d96eb-xxxx-xxxx-xxxx',   // x-api-key
+    apiBase: 'https://api.m-team.io/api', // 生产环境 API
+    webBase: 'https://kp.m-team.cc',      // Web 前端（用于建立浏览器上下文）
+};
+
+async function createClient() {
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                   'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                   'Chrome/131.0.0.0 Safari/537.36',
+        extraHTTPHeaders: {
+            'authorization': CONFIG.auth,
+            'x-api-key': CONFIG.apiKey,
+        },
+    });
+    const page = await context.newPage();
+
+    // 先访问 Web 前端，建立浏览器上下文和 cookie
+    await page.goto(CONFIG.webBase, {
+        waitUntil: 'domcontentloaded',
+        timeout: 15000,
+    }).catch(() => {});
+
+    return { browser, context, page };
+}
+
+async function apiCall(page, endpoint, body = {}) {
+    const result = await page.evaluate(async ({ ep, data, base }) => {
+        const resp = await fetch(base + '/' + ep, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        const text = await resp.text();
+        return { status: resp.status, body: text };
+    }, {
+        ep: endpoint,
+        data: body,
+        base: CONFIG.apiBase,
+    });
+
+    const parsed = JSON.parse(result.body);
+    if (parsed.code !== '0' && parsed.code !== 0 && parsed.code !== 'SUCCESS') {
+        throw new Error(`API error: code=${parsed.code} message=${parsed.message}`);
+    }
+    return parsed.data;
+}
+
+// 使用示例
+(async () => {
+    const { browser, page } = await createClient();
+
+    try {
+        // 获取分类列表
+        const categories = await apiCall(page, 'torrent/categoryList');
+        console.log('分类数:', categories.list.length);
+
+        // 获取视频编码列表
+        const videoCodecs = await apiCall(page, 'torrent/videoCodecList');
+        console.log('视频编码数:', videoCodecs.length);
+
+        // 搜索电影
+        const searchResult = await apiCall(page, 'torrent/search', {
+            mode: 'movie',
+            categories: [419],  // 电影/HD
+            pageNumber: 1,
+            pageSize: 10,
+        });
+        console.log('搜索结果数:', searchResult.data?.length || 0);
+
+    } finally {
+        await browser.close();
+    }
+})();
+```
+
+**关键注意事项**:
+
+1. **`extraHTTPHeaders` 是必需的**：Playwright 的 `browserContext.newContext({ extraHTTPHeaders })` 会将 headers 附加到该上下文的所有请求（包括 `page.evaluate` 内的 `fetch`）。这是绕过 IP 风控的关键——请求由 Chromium 浏览器内核发出，而非 Node.js HTTP 客户端。
+
+2. **两个认证 header 必须同时存在**：
+   - 仅 `authorization` → 401（Full authentication is required）
+   - 仅 `x-api-key` → 401
+   - 两者同时携带 → 成功（code=0）
+
+3. **JWT Token 过期处理**：JWT payload 中 `exp` 字段为 Unix 时间戳。过期后需重新登录获取新 Token。解码检查：
+   ```javascript
+   const payload = JSON.parse(
+       Buffer.from(token.split('.')[1], 'base64').toString()
+   );
+   if (Date.now() / 1000 > payload.exp) {
+       // Token 已过期，需刷新
+   }
+   ```
+
+4. **API Key 风控**：系统会检测异常使用模式（如高频请求、非浏览器环境），可能自动停用 API Key。停用后需用户在 Web 端重新生成。
+
+5. **请求频率控制**：搜索间隔 ≥2.5 秒，其他列表端点间隔 ≥1 秒。
+
+#### A.3 方式三：Go 语言调用（生产部署推荐）
+
+PT-Forward 为 Go 项目，推荐使用 `chromedp` 或 `rod` 作为 Playwright 的 Go 替代方案：
+
+```go
+// 使用 rod（Go 版 Playwright 替代）
+package mteam
+
+import (
+    "encoding/json"
+    "fmt"
+    "time"
+
+    "github.com/go-rod/rod"
+    "github.com/go-rod/rod/lib/launcher"
+)
+
+type MTeamAPIClient struct {
+    Auth    string
+    APIKey  string
+    APIBase string
+    WebBase string
+    browser *rod.Browser
+    page    *rod.Page
+}
+
+func NewClient(auth, apiKey string) (*MTeamAPIClient, error) {
+    c := &MTeamAPIClient{
+        Auth:    auth,
+        APIKey:  apiKey,
+        APIBase: "https://api.m-team.io/api",
+        WebBase: "https://kp.m-team.cc",
+    }
+
+    u, err := launcher.New().Headless(true).Launch()
+    if err != nil {
+        return nil, fmt.Errorf("launch browser: %w", err)
+    }
+
+    c.browser = rod.New().ControlURL(u).MustConnect()
+    headers := map[string]string{
+        "authorization": c.Auth,
+        "x-api-key":     c.APIKey,
+    }
+
+    c.page = c.browser.MustPage()
+    c.page.MustSetExtraHeaders(headers)
+    c.page.MustNavigate(c.WebBase).MustWaitStable()
+
+    return c, nil
+}
+
+func (c *MTeamAPIClient) Close() {
+    c.browser.MustClose()
+}
+
+type apiResponse struct {
+    Code    interface{} `json:"code"`
+    Message string      `json:"message"`
+    Data    json.RawMessage `json:"data"`
+}
+
+func (c *MTeamAPIClient) Call(endpoint string, body interface{}) (json.RawMessage, error) {
+    bodyJSON, _ := json.Marshal(body)
+    if bodyJSON == nil {
+        bodyJSON = []byte("{}")
+    }
+
+    script := fmt.Sprintf(`
+        const resp = await fetch('%s/%s', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '%s',
+        });
+        return await resp.text();
+    `, c.APIBase, endpoint, string(bodyJSON))
+
+    result, err := c.page.Eval(script)
+    if err != nil {
+        return nil, fmt.Errorf("eval fetch: %w", err)
+    }
+
+    var resp apiResponse
+    if err := json.Unmarshal([]byte(result.Value.String()), &resp); err != nil {
+        return nil, fmt.Errorf("parse response: %w", err)
+    }
+
+    if resp.Code != "0" && resp.Code != float64(0) && resp.Code != "SUCCESS" {
+        return nil, fmt.Errorf("API error: code=%v message=%s", resp.Code, resp.Message)
+    }
+
+    return resp.Data, nil
+}
+
+// 获取所有列表数据（启动时调用一次，缓存）
+func (c *MTeamAPIClient) FetchAllLists() error {
+    endpoints := []string{
+        "torrent/categoryList",
+        "torrent/videoCodecList",
+        "torrent/audioCodecList",
+        "torrent/sourceList",
+        "torrent/mediumList",
+        "torrent/standardList",
+        "torrent/processingList",
+        "torrent/teamList",
+    }
+    for _, ep := range endpoints {
+        if _, err := c.Call(ep, nil); err != nil {
+            return fmt.Errorf("fetch %s: %w", ep, err)
+        }
+        time.Sleep(2 * time.Second)
+    }
+    return nil
+}
+
+// 搜索种子
+func (c *MTeamAPIClient) Search(mode string, categories []int64, page, pageSize int) (json.RawMessage, error) {
+    return c.Call("torrent/search", map[string]interface{}{
+        "mode":       mode,
+        "categories": categories,
+        "pageNumber": page,
+        "pageSize":   pageSize,
+    })
+}
+
+// 上传种子（multipart/form-data 需特殊处理）
+func (c *MTeamAPIClient) Upload(form map[string]interface{}) (json.RawMessage, error) {
+    // Upload 需要 multipart/form-data，需在 page 中构造 FormData
+    // 此处为简化示例，实际实现需处理文件上传
+    return c.Call("torrent/createOredit", form)
+}
+```
+
+#### A.4 完整 API 端点速查表
+
+| 端点 | 方法 | 说明 | 认证 |
+|------|------|------|------|
+| `torrent/categoryList` | POST | 分类列表 | 需要 |
+| `torrent/videoCodecList` | POST | 视频编码列表 | 需要 |
+| `torrent/audioCodecList` | POST | 音频编码列表 | 需要 |
+| `torrent/sourceList` | POST | 来源列表 | 需要 |
+| `torrent/mediumList` | POST | 媒介列表 | 需要 |
+| `torrent/standardList` | POST | 分辨率列表 | 需要 |
+| `torrent/processingList` | POST | 地区列表 | 需要 |
+| `torrent/teamList` | POST | 制作组列表 | 需要 |
+| `torrent/search` | POST | 搜索种子 | 需要 |
+| `torrent/detail` | POST | 种子详情 | 需要 |
+| `torrent/createOredit` | POST | 上传/编辑种子 | 需要 |
+| `torrent/genDlToken` | POST | 生成下载令牌 | 需要 |
+| `torrent/files` | POST | 种子文件列表 | 需要 |
+| `torrent/peers` | POST | Peer 列表 | 需要 |
+| `torrent/mediaInfo` | POST | MediaInfo | 需要 |
+| `torrent/sayThank` | POST | 感谢 | 需要 |
+| `torrent/thanksStatus` | POST | 感谢状态 | 需要 |
+| `torrent/sendReward` | POST | 发送奖励 | 需要 |
+| `torrent/rewardStatus` | POST | 奖励状态 | 需要 |
+| `torrent/requestReseed` | POST | 请求续种 | 需要 |
+| `torrent/viewHits` | POST | 浏览量 | 需要 |
+| `torrent/collection` | POST | 收藏 | 需要 |
+| `member/profile` | POST | 用户资料 | 需要 |
+| `member/base` | POST | 用户基本信息 | 需要 |
+| `member/getUserTorrentList` | POST | 用户种子列表 | 需要 |
+| `tracker/myPeerStatus` | POST | Peer 状态 | 需要 |
+| `tracker/myPeerStatistics` | POST | Peer 统计 | 需要 |
+| `tracker/mybonus` | POST | 魔力值 | 需要 |
+| `rss/fetch` | GET | RSS 订阅 | URL token |
+| `subtitle/list` | POST | 字幕列表 | 需要 |
+| `subtitle/upload` | POST | 上传字幕 | 需要 |
+| `comment/post` | POST | 发表评论 | 需要 |
+| `comment/fetchList` | POST | 评论列表 | 需要 |
+
+#### A.5 响应格式规范
+
+所有端点返回统一 JSON 结构：
+
+```json
+{
+    "code": "0",        // "0" 或 0 表示成功，其他为错误
+    "message": "SUCCESS",
+    "data": { ... }     // 具体数据
+}
+```
+
+常见错误码：
+
+| code | message | 含义 |
+|------|---------|------|
+| `0` / `SUCCESS` | SUCCESS | 成功 |
+| `1` | key無效 | API Key 无效或已停用 |
+| `1` | 網頁端版本過低，請清除瀏覽器快取後重試 | User-Agent 或浏览器指纹不合规 |
+| `401` | Full authentication is required... | 缺少认证 header |
+
+---
+
+### B. OpenAPI定义文件信息
 
 | 属性 | 值 |
 |------|-----|
@@ -1115,12 +1476,13 @@ def safe_api_call(client, func_name, *args, **kwargs):
 | **获取时间** | 2026-04-12 |
 | **获取方式** | curl + x-api-key认证 |
 
-### B. 版本历史
+### C. 版本历史
 
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
 | v1.0 | 2026-04-12 | 初始版本（基于代码推断和网络搜索）|
 | v2.0 | 2026-04-12 | **重大更新**: 基于官方OpenAPI 3.1.0定义重写，新增363个端点、108个Schema、完整参数定义 |
+| v2.1 | 2026-04-16 | 新增附录A「API 调用方法（开发参考）」：curl/Playwright/Go 三种调用方式、端点速查表、响应格式规范 |
 
 ---
 

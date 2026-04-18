@@ -6,36 +6,66 @@
 
 | 站点 | 文档 | 状态 |
 |------|------|------|
-| 青蛙（QingWAP） | [qingwapt.md](./qingwapt.md) | ✅ 完成 |
-| HDFans | [hdfans.md](./hdfans.md) | ✅ 完成 |
-| 13City | [13city.md](./13city.md) | ✅ 完成 |
+| 青蛙 | [qingwapt.md](./qingwapt.md) | ✅ 完成 |
+| 红豆饭 | [hdfans.md](./hdfans.md) | ✅ 完成 |
+| 13城 | [13city.md](./13city.md) | ✅ 完成 |
 | GTK | [gtk.md](./gtk.md) | ✅ 完成 |
 | HDVideo | [hdvideo.md](./hdvideo.md) | ✅ 完成 |
-| NovaHD | [novahd.md](./novahd.md) | ✅ 完成 |
+| Nova高清 | [novahd.md](./novahd.md) | ✅ 完成 |
 | OKPT | [okpt.md](./okpt.md) | ✅ 完成 |
 | PTFans | [ptfans.md](./ptfans.md) | ✅ 完成 |
 | SBPT | [sbpt.md](./sbpt.md) | ✅ 完成 |
-| TLFBits (EastGame) | [eastgame.md](./eastgame.md) | ✅ 完成 |
-| alingPT | [aling.md](./aling.md) | ✅ 完成 |
-| OshenPT | [oshen.md](./oshen.md) | ✅ 完成 |
-| 百川PT (HITPT) | [hitpt.md](./hitpt.md) | ✅ 完成 |
-| 包子 (BaoZi) | [baozi.md](./baozi.md) | ✅ 完成 |
-| PTHome (铂金家) | [pthome.md](./pthome.md) | ✅ 完成 |
-| HDDolby | [hddolby.md](./hddolby.md) | ✅ 完成 |
-| SpringSunday (CMCT) | [springsunday.md](./springsunday.md) | ✅ 完成 |
-| 北洋园PT (TJUPT) | [tjupt.md](./tjupt.md) | ✅ 完成 |
-| 财神PT (CSPT) | [cspt.md](./cspt.md) | ✅ 完成 |
-| CHDBits | [chdbits.md](./chdbits.md) | ✅ 完成 |
-| HDCiTY | [hdcity.md](./hdcity.md) | ✅ 完成 |
-| 藏宝阁 (CBG) | [cangbao.md](./cangbao.md) | ✅ 完成 |
-| CarPT | [carpt.md](./carpt.md) | ✅ 完成 |
-| 传道院·PT (CDY) | [cdy.md](./cdy.md) | ✅ 完成 |
-| PTerClub | [pterclub.md](./pterclub.md) | 🚧 待完成 |
-| 朱雀 | [zhuque.md](./zhuque.md) | 🚧 待完成 |
-| 海胆 | [haidan.md](./haidan.md) | 🚧 待完成 |
-| 包子 | [baozi.md](./baozi.md) | 🚧 待完成 |
-| LuckPT | [luckpt.md](./luckpt.md) | 🚧 待完成 |
-| PTSKit | [ptskit.md](./ptskit.md) | 🚧 待完成 |
+| TLF | [eastgame.md](./eastgame.md) | ✅ 完成 |
+| 阿玲 | [aling.md](./aling.md) | ✅ 完成 |
+| 奥申 | [oshen.md](./oshen.md) | ✅ 完成 |
+| 百川 | [hitpt.md](./hitpt.md) | ✅ 完成 |
+| 包子 | [baozi.md](./baozi.md) | ✅ 完成 |
+| 铂金家 | [pthome.md](./pthome.md) | ✅ 完成 |
+| 不可杜 | [hddolby.md](./hddolby.md) | ✅ 完成 |
+| 不可说 | [springsunday.md](./springsunday.md) | ✅ 完成 |
+| 不可羊 | [tjupt.md](./tjupt.md) | ✅ 完成 |
+| 财神 | [cspt.md](./cspt.md) | ✅ 完成 |
+| 彩虹岛 | [chdbits.md](./chdbits.md) | ✅ 完成 |
+| 城市 | [hdcity.md](./hdcity.md) | ✅ 完成 |
+| 藏宝阁 | [cangbao.md](./cangbao.md) | ✅ 完成 |
+| 车站 | [carpt.md](./carpt.md) | ✅ 完成 |
+| 传道院 | [cdy.md](./cdy.md) | ✅ 完成 |
+| 大青虫 | [cyanbug.md](./cyanbug.md) | ✅ 完成 |
+| 碟粉 | [discfan.md](./discfan.md) | ✅ 完成 |
+| 冬樱 | [wintersakura.md](./wintersakura.md) | ✅ 完成 |
+| 分享站 | [itzmx.md](./itzmx.md) | ✅ 完成（仅目标站） |
+| 轨道炮 | [railgunpt.md](./railgunpt.md) | ✅ 完成（仅目标站） |
+| 海胆 | [haidan.md](./haidan.md) | ✅ 完成（仅目标站） |
+| 海豚 | [dicmusic.md](./dicmusic.md) | ✅ 完成（Gazelle框架·纯音乐） |
+| 憨憨 | [hhanclub.md](./hhanclub.md) | ✅ 完成（仅源站·全站官种） |
+| 馒头 | [mteam.md](./mteam.md) | ✅ 完成（mTorrent自研SPA+API） |
+| 好大 | [hdarea.md](./hdarea.md) | ✅ 完成（目标站·29音频编码） |
+| 好多油 | [hdupt.md](./hdupt.md) | ✅ 完成（媒介TV/电影分开·UHD独立） |
+| 好学 | [hxpt.md](./hxpt.md) | ✅ 完成（教育专题·字段全部重定义） |
+| 皇后 | [opencd.md](./opencd.md) | ✅ 完成（NexusPHP定制·纯音乐·候选制） |
+| 家园 | [hdhome.md](./hdhome.md) | ✅ 完成（双区域·8K分类·候选制·豆瓣ID） |
+| 咖啡 | [ptcafe.md](./ptcafe.md) | ✅ 完成（source_sel=地区·30制作组·18音频·OPUS/OGG） |
+| 克隆 | [hdclone.md](./hdclone.md) | ✅ 完成（极简字段·无source/audio·短剧·AV1） |
+| 库非 | [kufei.md](./kufei.md) | ✅ 完成（Cloudflare·16分类·17媒介·22音频·游戏/电子书） |
+| 昆仑 | [yhpp.md](./yhpp.md) | ✅ 完成（processing_sel=地区·19媒介·23音频·29制作组·19标签） |
+| 垃圾堆 | [lajidui.md](./lajidui.md) | ✅ 完成（Cloudflare·processing_sel=文件格式·source_sel=地区·16分类·2K分辨率） |
+| 聆音 | [soulvoice.md](./soulvoice.md) | ✅ 完成（双模式影视+阅听·电子书/有声书·字段语义按模式切换） |
+| 龙之家 | [dragonhd.md](./dragonhd.md) | ✅ 完成（繁体中文·AV分类·无标签·2K/1440p·极简字段） |
+| 萝莉 | [xloli.md](./xloli.md) | ✅ 完成（动漫向·双区域综合+9KG·禁止9KG·13动漫制作组·舞台演出·OPUS） |
+| 末日 | [agsv.md](./agsv.md) | ✅ 完成（Cloudflare·种审制·27黑名单·双区域综合+学习·大包规则·ALAC/M4A） |
+| 慕雪阁 | [muxuege.md](./muxuege.md) | ✅ 完成（HDR10编码·TXT/PDF编码·540p·47制作组·31标签·无音频编码） |
+| 南洋 | [nanyangpt.md](./nanyangpt.md) | ✅ 完成（NYPT框架·极简发布·无质量下拉框·禁止蓝光原盘·剧集dupe·豆瓣链接） |
+| 柠檬不甜 | [lemonhd.md](./lemonhd.md) | ✅ 完成（双语分类·4K/8K独立媒介·3D分类·PT-Gen四来源·匿名发布·5倍上传） |
+| 农场 | [farmm.md](./farmm.md) | ✅ 完成（Cloudflare·双区域种子+特别·source_sel=地区·processing_sel=年级/分级·17媒介·15编码·20音频·1440p·儿童教育特色） |
+| 朋友 | [keepfrds.md](./keepfrds.md) | ✅ 完成（**仅源站**·全站官种·Cloudflare·HEVC细分5级·8K·19分类·转载须24h后·黑名单制作组） |
+| 葡萄 | [sjtu.md](./sjtu.md) | ✅ 完成（教育网·28分类按地区细分·编码含音频·禁止HEVC/10bit·黑名单组·豆瓣链接·校园原创） |
+| 浦园 | [njtupt.md](./njtupt.md) | ✅ 完成（教育网·演出分类·资料分类·MediaInfo字段·PT-Gen四来源·极简质量字段·标准规则） |
+| 麒麟 | [hdkyl.md](./hdkyl.md) | ✅ 完成（种审制·27黑名单组·processing_sel=年份·source_sel=地区19个·19音频·2K/480p·官种/驻站标签·MediaInfo·短剧） |
+| 人人 | [audiences.md](./audiences.md) | ✅ 完成（Cloudflare·候选制·0day命名·无制作组/来源/地区字段·HDR三标签·Trump共存规则·Web-DL/WebRip·爆米花系统） |
+| 朱雀 | [zhuque.md](./zhuque.md) | ✅ 完成（**TNode框架**·Vue SPA+REST API·CSRF Token·TMDb必填·H264/x264四分·ID分段体系·无音频编码·标签逗号分隔） |
+| 肉丝 | [rousi.md](./rousi.md) | ✅ 完成（**自研框架**·Vue SPA+REST JSON API·Passkey认证·UUID种子·Base64截图·Markdown描述·动态属性·11分类·9KG专区·wiki规则待补充） |
+| 幸运 | [luckpt.md](./luckpt.md) | 🚧 待完成 |
+| 拾刻 | [ptskit.md](./ptskit.md) | 🚧 待完成 |
 
 ## 设计原则
 
@@ -78,12 +108,12 @@ internal/publish/
 │   ├── registry.go                   // 钩子注册表
 │   ├── qingwapt.go                  // QingWapHook 青蛙站点
 │   ├── hdfans.go                    // HDFansHook HDFans 站点
-│   ├── pterclub.go                  // PTerClubHook PTerClub 站点
+│   ├── audiences.go                  // AudiencesHook 人人 站点
 │   ├── zhuque.go                    // ZhuqueHook 朱雀站点
 │   ├── haidan.go                    // HaidanHook 海胆站点
 │   ├── baozi.go                     // BaoziHook 包子站点
-│   ├── luckpt.go                    // LuckPTHook LuckPT 站点
-│   ├── ptskit.go                    // PTSKitHook PTSKit 站点
+│   ├── luckpt.go                    // LuckPTHook 幸运 站点
+│   ├── ptskit.go                    // PTSKitHook 拾刻 站点
 │   └── ...                          // 其他站点
 └── ...
 ```
@@ -142,4 +172,4 @@ internal/publish/
 ---
 
 *文档维护：PT-Forward 开发团队*
-*最后更新：2026-04-16*
+*最后更新：2026-04-17*

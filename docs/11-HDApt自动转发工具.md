@@ -1003,9 +1003,337 @@ PT-Forward 可以借鉴 HDApt Auto Transfer 的以下设计：
 
 ---
 
-## 十、总结
+## 十、字段映射架构深度分析
 
-### 10.1 项目优势
+### 10.1 四层映射流水线
+
+```
+源站原始数据 → 中间属性名（字符串） → config.yaml 映射表 → HDArea 表单数字 ID
+```
+
+| 层级 | 职责 | 代码位置 |
+|------|------|----------|
+| L1 源站爬虫 | 提取原始数据，产出 `attrs` dict + `hda_type_key` | `mteam.py` / `crawler.py` |
+| L2 MediaProcessor | 从实际文件 MediaInfo 覆盖 codec 和 audio | `processor.py` |
+| L3 config.yaml | 中间名称 → HDArea 表单 ID 的查找表 | `config.example.yaml` |
+| L4 HDUploader | 最终查找 + POST 表单 | `uploader.py` |
+
+### 10.2 分类映射（Category）
+
+#### M-Team 分类 ID → `hda_type_key`（`mteam.py`）
+
+| M-Team cat ID | 中文名 | → hda_type_key | 备注 |
+|---------------|--------|----------------|------|
+| 401 | 电影/SD | Movies 720p / Movies DVD | 标题含 DVD → DVD |
+| 419 | 电影/HD | Movies 1080p / UHD-4K / 720p | 标题正则辅助 |
+| 420 | 电影/DVDiSo | Movies DVD | |
+| 421 | 电影/Blu-Ray | Movies Blu-ray | forced_medium=BluRay |
+| 439 | 电影/Remux | Movies REMUX | forced_medium=REMUX |
+| 403,402,438,435 | 影剧/综艺 | TV Series | 438→BluRay, 435→DVD |
+| 404 | 纪录 | Documentaries | |
+| 442 | 教育影片 | Documentaries | |
+| 434 | Music(无损) | HQ Audio | |
+| 427 | 有声书 | HQ Audio | |
+| 406 | 演唱 | Music Videos | |
+| 405 | 动画 | Animations | |
+| 407 | 运动 | Sports | |
+
+#### TTG 分类文本 → `hda_type_key`（`crawler.py`）
+
+| TTG 分类 | → hda_type_key |
+|----------|----------------|
+| UHD原盘, 影视2160p | Movie UHD-4K |
+| BluRay原盘 | Movies Blu-ray |
+| 电影1080i/p | Movies 1080p |
+| 电影720p | Movies 720p |
+| 欧美剧720p/1080i/p, 大陆港台剧... | TV SERIES |
+| 纪录片* | Documentaries |
+| MV&演唱会 | Music Videos |
+| 无损音乐FLAC&APE, OST | HQ Audio |
+| 高清体育节目 | SPORTS |
+| 高清动漫, 动漫原盘 | Animations |
+| 综艺类 | TV SHOWS |
+
+#### `hda_type_key` → HDArea 表单 ID（`config.yaml`）
+
+| hda_type_key | HDA type ID |
+|--------------|-------------|
+| Movie UHD-4K | 300 |
+| Movies Blu-ray | 401 |
+| TV Series / TV SERIES | 402 |
+| TV Shows / TV SHOWS | 403 |
+| Documentaries | 404 |
+| Animations | 405 |
+| Music Videos | 406 |
+| Sports / SPORTS | 407 |
+| HQ Audio | 408 |
+| Misc | 409 |
+| Movies 1080p | 410 |
+| Movies 720p | 411 |
+| Movies WEB-DL | 412 |
+| Movies HDTV | 413 |
+| Movies DVD / DVDRip | 414 |
+| Movies REMUX | 415 |
+| Movies 3D | 416 |
+| Movies iPad | 417 |
+
+### 10.3 视频编码映射（VideoCodec）
+
+#### M-Team API `videoCodec` → 内部名称（`mteam.py`）
+
+| M-Team ID | 名称 | 内部名称 |
+|-----------|------|----------|
+| 1 | H.264(x264/AVC) | x264 |
+| 16 | H.265(x265/HEVC) | x265 |
+| 2 | VC-1 | VC-1 |
+| 4 | MPEG-2 | MPEG-2 |
+| 3 | Xvid | Xvid |
+| 19 | VP8/9 | VP8/9 |
+| 21 | AV1 | AV1 |
+| 22 | AVS | AVS |
+
+#### MediaInfo → 内部名称（`processor.py`，覆盖 L1）
+
+| MediaInfo format | 内部名称 |
+|------------------|----------|
+| HEVC/H265/X265 | H.265(x265/HEVC) |
+| AVC/H264/X264 | H.264(x264/AVC) |
+| AV1 | AV1 |
+| VP8/VP9 | VP8/9 |
+| AVS | AVS |
+| MPEG-2/MPEG-Video | MPEG-2 |
+| Xvid | Xvid |
+| VC-1/VC1 | VC-1 |
+| MP4/MPEG-4 | MPEG-4 |
+| 其他 | Other |
+
+#### 内部名称 → HDArea `codec_sel` ID（`config.yaml`）
+
+| 内部名称 | HDA ID |
+|----------|--------|
+| MPEG-4 | 1 |
+| VC-1 | 2 |
+| Xvid | 3 |
+| MPEG-2 | 4 |
+| Other | 5 |
+| H.265(x265/HEVC) / x265 | 6 |
+| H.264(x264/AVC) / x264 | 7 |
+| AV1 | 8 |
+| VP8/9 | 9 |
+| AVS | 10 |
+
+### 10.4 音频编码映射（AudioCodec）
+
+#### M-Team API `audioCodec` → 内部名称（`mteam.py`）
+
+| M-Team ID | 名称 | 内部名称 |
+|-----------|------|----------|
+| 6 | AAC | AAC |
+| 8 | AC3(DD) | AC3 |
+| 3 | DTS | DTS |
+| 11 | DTS-HD MA | DTS-HD MA |
+| 12 | E-AC3(DDP) | DDP/E-AC-3 |
+| 13 | E-AC3 Atoms(DDP Atmos) | DDP Atmos |
+| 9 | TrueHD | TrueHD |
+| 10 | TrueHD Atmos | TrueHD Atmos |
+| 14 | LPCM | LPCM |
+| 15 | WAV | WAV |
+| 1 | FLAC | FLAC |
+| 2 | APE | APE |
+| 4 | MP2/3 | MP3 |
+| 5 | OGG | Vorbis |
+| 7 | Other | Other |
+
+#### MediaInfo → 内部名称（`processor.py`，覆盖 L1，最详细）
+
+| MediaInfo 条件 | 内部名称 |
+|----------------|----------|
+| FLAC | FLAC |
+| APE / Monkeys | APE |
+| DTS + X/XLL | DTS:X |
+| DTS + HD + MA/Master | DTS-HD MA/DTS XLL |
+| DTS + HD + HRA/HR | DTS-HD HR/HRA |
+| DTS (其他) | DTS |
+| E-AC-3/EAC3/DDP + Atmos | DDP Atmos |
+| E-AC-3/EAC3/DDP (无 Atmos) | DDP/E-AC-3 |
+| AC-3/AC3 + 2ch | DD2.0/AC-3 |
+| AC-3/AC3 (其他) | DD5.1/AC-3 |
+| AAC | AAC |
+| TrueHD/MLP + Atmos | TrueHD Atmos |
+| TrueHD/MLP (无 Atmos) | TrueHD |
+| PCM | LPCM |
+| WAV | WAV |
+| DSD | DSD |
+| MPEG + H | MPEG-H |
+| MPEG (其他) | MPEG |
+| Vorbis | Vorbis |
+| TTA | TTA |
+| AV3A | AV3A |
+| MP3 | MP3 |
+| ALAC | ALAC |
+| Opus | Opus |
+| WMA | WMA |
+| AC-4/AC4 | AC-4 |
+| MQA | MQA |
+
+#### 内部名称 → HDArea `audiocodec_sel` ID（`config.yaml`）
+
+| 内部名称 | HDA ID |
+|----------|--------|
+| FLAC | 1 |
+| APE | 2 |
+| DTS | 3 |
+| DTS-HD MA/DTS XLL / DTS-HD MA | 4 |
+| DD5.1/AC-3 / AC3 | 5 |
+| AAC | 6 |
+| TrueHD | 7 |
+| LPCM | 8 |
+| WAV | 9 |
+| TrueHD Atmos | 10 |
+| DD2.0/AC-3 | 11 |
+| DTS:X | 12 |
+| DTS-HD HR/HRA | 13 |
+| DSD | 14 |
+| DDP Atmos | 15 |
+| DDP/E-AC-3 | 16 |
+| MPEG | 17 |
+| Vorbis | 18 |
+| TTA | 19 |
+| AV3A | 20 |
+| MP3 | 21 |
+| Other | 24 |
+| Opus | 25 |
+| WMA | 26 |
+| AC-4 | 27 |
+| MPEG-H | 28 |
+| MQA | 29 |
+
+### 10.5 分辨率映射（Standard）
+
+#### 标题正则 → 内部名称（两个爬虫共享）
+
+```python
+if re.search(r'2160p|4K', title): '2160p'
+elif re.search(r'1080i', title):  '1080i'
+elif re.search(r'720p', title):   '720p'
+else:                             '1080p'
+```
+
+#### 内部名称 → HDArea `standard_sel` ID（`config.yaml`）
+
+| 内部名称 | HDA ID |
+|----------|--------|
+| 1080p | 1 |
+| 1080i | 2 |
+| 720p | 3 |
+| SD | 4 |
+| 4K / 2160p | 5 |
+
+### 10.6 媒介映射（Medium）
+
+#### 标题正则 → 内部名称（两个爬虫共享）
+
+```python
+if 'HDTV' in title:            'HDTV'
+elif 'WEB-DL/WEB' in title:    'WEB-DL'
+elif 'BluRay' + codec in title: 'Encode'
+elif 'BluRay' no codec:        'BluRay'
+elif 'REMUX' in title:         'REMUX'
+else:                          'Encode'
+```
+
+M-Team 额外：分类 ID 强制覆盖（421→BluRay, 439→REMUX, 401+DVD→DVD）
+
+#### 内部名称 → HDArea `medium_sel` ID（`config.yaml`）
+
+| 内部名称 | HDA ID |
+|----------|--------|
+| Blu-ray / BluRay | 1 |
+| HD DVD | 2 |
+| REMUX / REMUX | 3 |
+| MiniBD | 4 |
+| HDTV | 5 |
+| DVDR / DVD | 6 |
+| Encode | 7 |
+| CD | 8 |
+| WEB-DL | 9 |
+
+### 10.7 制作组映射（Team）
+
+#### 标题正则 → 内部名称
+
+| 源站 | 匹配的制作组 |
+|------|-------------|
+| TTG | WiKi, NGB, ARiN, TTG |
+| M-Team | WiKi, MTeam |
+
+#### 内部名称 → HDArea `team_sel` ID（`config.yaml`）
+
+| 内部名称 | HDA ID |
+|----------|--------|
+| EPiC | 1 |
+| HDArea | 2 |
+| HDWING | 3 |
+| WiKi | 4 |
+| TTG | 5 |
+| other / ARiN / NGB | 6 |
+| MTeam | 7 |
+| HDApad | 8 |
+| CHD | 9 |
+| HDAccess | 10 |
+| HDATV | 11 |
+| cXcY | 12 |
+| CMCT | 13 |
+
+### 10.8 关键设计决策
+
+| 决策 | 原因 |
+|------|------|
+| **分辨率用标题，不用 MediaInfo** | 裁剪视频像素不标准（main.py:488-490 已注释掉） |
+| **编码/音频用 MediaInfo 覆盖标题** | 文件元数据比标题更准确 |
+| **种子文件重命名为 ASCII `pt_auto_upload.torrent`** | NexusPHP 不支持非 ASCII 文件名 |
+| **去除 4 字节 emoji** | NexusPHP MySQL utf8（非 utf8mb4）会截断 |
+| **config.yaml 外置映射表** | 不改代码即可调整映射，支持别名 |
+| **映射表使用别名** | 如 `x264` → 7 和 `H.264(x264/AVC)` → 7 指向同一 ID |
+
+### 10.9 M-Team vs TTG 源站差异
+
+| 维度 | M-Team | TTG |
+|------|--------|-----|
+| 数据源 | JSON API | HTML 表格 + RSS XML |
+| 认证 | x-api-key header | Cookie |
+| 分类输入 | 数字 ID（419, 401...） | 中文文本（电影1080i/p...） |
+| 编码精度 | API videoCodec/audioCodec 字段 | 仅标题正则 |
+| 媒介判断 | 分类 ID 可强制覆盖 | 仅标题正则 |
+| 下载方式 | genDlToken 两步获取临时 URL | 直接 GET + Cookie |
+| IMDb/豆瓣 | API 字段 imdb/douban | HTML 详情页抓取 |
+| 标题处理 | API 返回干净标题 | RSS 需修复 `{@}` bug、剥离体积后缀 |
+
+### 10.10 上传表单字段汇总
+
+HDArea `takeupload.php` 接收的完整表单：
+
+| 字段 | 类型 | 说明 | 映射来源 |
+|------|------|------|----------|
+| `file` | file | 种子文件 | 源站下载 |
+| `name` | text | 标题（英文部分） | 标题拆分 |
+| `small_descr` | text | 副标题（中文部分） | 标题拆分/源站 |
+| `url` | text | IMDb 链接 | 源站 API/抓取 |
+| `dburl` | text | 豆瓣 ID | 源站 API/抓取 |
+| `descr` | textarea | 简介（BBCode） | 豆瓣简介+截图+MediaInfo |
+| `type` | select | 分类 ID | hda_type_key 查表 |
+| `medium_sel` | select | 媒介 ID | medium 查表 |
+| `codec_sel` | select | 视频编码 ID | codec 查表 |
+| `audiocodec_sel` | select | 音频编码 ID | audio 查表 |
+| `standard_sel` | select | 分辨率 ID | resolution 查表 |
+| `team_sel` | select | 制作组 ID | team 查表 |
+| `uplver` | checkbox | 匿名发布（固定 yes） | 硬编码 |
+
+---
+
+## 十一、总结
+
+### 11.1 项目优势
 
 1. **全流程自动化**: 从抓取到发布完全无人值守
 2. **精准编码映射**: MediaInfo 智能解析，低出错率
@@ -1015,7 +1343,7 @@ PT-Forward 可以借鉴 HDApt Auto Transfer 的以下设计：
 6. **Docker 部署**: 一键构建和启动
 7. **配置热重载**: 无需重启即可更新配置
 
-### 10.2 与 PT-Forward 互补
+### 11.2 与 PT-Forward 互补
 
 | 场景 | 推荐方案 |
 |------|----------|
@@ -1024,7 +1352,7 @@ PT-Forward 可以借鉴 HDApt Auto Transfer 的以下设计：
 | 需要可视化配置 | HDApt Auto Transfer |
 | 需要灵活扩展 | PT-Forward |
 
-### 10.3 集成建议
+### 11.3 集成建议
 
 PT-Forward 可以集成 HDApt Auto Transfer 的以下功能：
 

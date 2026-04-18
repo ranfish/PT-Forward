@@ -1,10 +1,10 @@
-# TLFBits (EastGame) 站点适配器设计
+# TLF 站点适配器设计
 
 ## 站点信息
 
 | 项目 | 内容 |
 |------|------|
-| 站点名称 | TLFBits (EastGame) |
+| 站点名称 | TLF|
 | 站点地址 | https://pt.eastgame.org |
 | 站点框架 | NexusPHP |
 | 主题 | BlueGene |
