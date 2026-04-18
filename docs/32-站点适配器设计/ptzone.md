@@ -1,10 +1,10 @@
-# PTZone 站点适配器设计
+# PT地带 站点适配器设计
 
 ## 站点信息
 
 | 项目 | 内容 |
 |------|------|
-| 站点名称 | PTZone |
+| 站点名称 | PT地带|
 | 站点地址 | https://ptzone.xyz |
 | 站点框架 | NexusPHP |
 | 特殊规则 | 标准NexusPHP站点，Cloudflare防护 |

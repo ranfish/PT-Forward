@@ -1,8 +1,8 @@
-# 13City 站点适配器
+# 13城 站点适配器设计
 
 ## 站点信息
 
-- **站点名称**: 13City
+- **站点名称**: 13城
 - **站点地址**: https://13city.org
 - **框架**: NexusPHP
 - **Tracker URL**: https://tracker.13city.org/announce.php

@@ -1,8 +1,8 @@
-# GTK 站点适配器
+# GTK 站点适配器设计
 
 ## 站点信息
 
-- **站点名称**: PT GTK
+- **站点名称**: GTK
 - **站点地址**: https://pt.gtkpw.xyz
 - **框架**: NexusPHP
 - **域名变更**: 旧域名 pt.gtk.pw，当前域名 pt.gtkpw.xyz

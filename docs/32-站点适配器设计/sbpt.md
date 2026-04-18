@@ -4,7 +4,7 @@
 
 | 项目 | 内容 |
 |------|------|
-| 站点名称 | SBPT |
+| 站点名称 | SBPT|
 | 站点地址 | https://sbpt.link |
 | 站点框架 | NexusPHP |
 | 主题 | BlueGene |

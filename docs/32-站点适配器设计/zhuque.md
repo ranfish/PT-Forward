@@ -1,0 +1,306 @@
+# 朱雀 站点适配器设计
+
+## 站点信息
+
+| 项目 | 内容 |
+|------|------|
+| 站点名称 | 朱雀 |
+| 站点地址 | https://zhuque.in |
+| 站点框架 | **TNode**（Vue.js SPA + REST API，非 NexusPHP/UNIT3D） |
+| 前端技术 | Vue 3 + Ant Design Vue + Webpack |
+| 官方组 | -ZWEX（后缀标识） |
+| 特殊规则 | SPA 无传统 HTML 表单；API 驱动发布；TMDb 必填；CSRF Token 认证；禁止合集/跨季打包；禁止分集（非官组）；0day 命名法；种审制 |
+
+---
+
+## 一、发布 API 分析
+
+**发布接口**: `POST /api/torrent/upload`（multipart/form-data）
+
+**选项数据接口**: `GET /api/torrent/option`（JSON）
+
+**CSRF Token 来源**: 发布页 HTML `<meta name="x-csrf-token" content="...">`，需在请求头中携带 `x-csrf-token`。
+
+### 1.1 请求头
+
+```
+Content-Type: multipart/form-data
+x-csrf-token: {从 meta 标签获取}
+X-Requested-With: XMLHttpRequest
+Accept: application/json, text/plain, */*
+Referer: https://zhuque.in/torrent/upload
+Origin: https://zhuque.in
+```
+
+### 1.2 表单字段
+
+| 字段名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `torrent` | file | ✓ | 种子文件（multipart file field） |
+| `title` | string | ✓ | 标题 |
+| `category` | string | ✓ | 分类 ID（如 "501"） |
+| `medium` | string | ✓ | 媒介 ID（如 "309"） |
+| `videoCoding` | string | ✓ | 视频编码 ID（如 "103"） |
+| `resolution` | string | ✓ | 分辨率 ID（如 "403"） |
+| `subtitle` | string | - | 副标题 |
+| `mediainfo` | string | - | MediaInfo 文本 |
+| `tmdbid` | string | 条件必填 | TMDb ID（数字字符串，有词条则必填） |
+| `tmdbtype` | string | - | TMDb 类型："0"=电影，"1"=剧集 |
+| `anonymous` | string | - | 匿名发布："true"/"false" |
+| `confirm` | string | ✓ | 固定值 "true" |
+| `zwex` | string | - | 固定值 "0" |
+| `tags` | string | - | 标签 ID，逗号分隔（如 "603,613"） |
+| `screenshot` | string | - | 截图 URL，换行分隔 |
+| `note` | string | - | 备注（可含 IMDb/豆瓣链接） |
+
+注意：
+- 字段名使用 **camelCase**（如 `videoCoding`），与 NexusPHP 的 `codec_sel` 完全不同。
+- **无音频编码字段**——TNode 框架不区分音频编码。
+- **无来源/处理方式/制作组字段**。
+- `tmdbid` 和 `tmdbtype` 用于关联 TMDb 元数据，由站点自动获取影片信息。
+
+### 1.3 响应格式
+
+成功：
+```json
+{ "status": 200, "data": { "code": "UPLOAD_SUCCESS", "id": "<torrent_id>" } }
+```
+
+种子已存在：
+```json
+{ "code": "TORRENT_ALREADY_UPLOAD" }
+```
+
+详情页 URL 模式：`/torrent/info/{id}`
+
+下载 URL 模式：`/api/torrent/download/{id}/{torrentKey}`
+
+---
+
+## 二、选项值映射
+
+> 数据来源：`GET /api/torrent/option`
+
+选项使用 **ID 分段**体系：编码 100-199、媒介 300-399、分辨率 400-499、分类 500-599、标签 600-699。
+
+### 2.1 分类（category）— 5个（ID: 501-599）
+
+| ID | 显示名称 |
+|----|----------|
+| 501 | 电影 |
+| 502 | 剧集 |
+| 503 | 动画 |
+| 504 | 节目 |
+| 599 | 其它 |
+
+注意：**有独立动画分类(503)**——与 NexusPHP 站点通过标签区分动画不同。节目(504)可能含综艺/纪录片。
+
+### 2.2 媒介（medium）— 10个（ID: 301-399）
+
+| ID | 显示名称 |
+|----|----------|
+| 301 | UHD Blu-ray |
+| 302 | UHD Blu-ray DIY |
+| 303 | Blu-ray |
+| 304 | Blu-ray DIY |
+| 305 | Remux |
+| 306 | Encode |
+| 307 | UHDTV |
+| 308 | HDTV |
+| 309 | WEB-DL |
+| 399 | Other |
+
+注意：
+- 有 **UHDTV(307)** 独立选项——其他站点少见。
+- 有 **UHD Blu-ray DIY(302)** 和 **Blu-ray DIY(304)**——DIY 与原盘区分。
+- 无 DVD、CD、Track 选项。
+
+### 2.3 视频编码（videoCoding）— 5个（ID: 101-199）
+
+| ID | 显示名称 |
+|----|----------|
+| 101 | H264 |
+| 102 | H265 |
+| 103 | x264 |
+| 104 | x265 |
+| 199 | Other |
+
+注意：
+- **区分 H264/H265（封装原编码）与 x264/x265（压制编码）**——这是朱雀的独特设计，大部分 NexusPHP 站点不区分。
+- 无 AV1、VC-1、MPEG-2、H.266/VVC。
+- ID 使用三位数（101-199），非 NexusPHP 的个位数。
+
+### 2.4 分辨率（resolution）— 5个（ID: 401-499）
+
+| ID | 显示名称 |
+|----|----------|
+| 401 | 720p |
+| 402 | 1080i |
+| 403 | 1080p |
+| 404 | 2160p |
+| 499 | Other |
+
+注意：无 8K、SD、480p 分辨率。分辨率使用标准命名（如 2160p 而非 4K）。
+
+### 2.5 标签（tags）— 9个（ID: 601-699）
+
+| ID | 显示名称 | 说明 |
+|----|----------|------|
+| 601 | 官方 | 官方制作组资源 |
+| 602 | 禁转 | 禁止转载 |
+| 603 | 国语 | 国语配音 |
+| 604 | 中字 | 中文字幕 |
+| 611 | 杜比视界 | Dolby Vision |
+| 613 | HDR10 | HDR10 标准 |
+| 614 | 特效字幕 | 特效字幕 |
+| 621 | 完结 | 剧集完结 |
+| 622 | 分集 | 分集发布 |
+
+注意：
+- 标签提交格式为**逗号分隔的 ID 字符串**（如 `"603,613"`），非 NexusPHP 的 checkbox 数组。
+- **无粤语标签**、无首发/应求标签。
+- HDR 仅细分杜比视界(611)和 HDR10(613)，无 HDR10+。
+- 有特效字幕(614)——较少见。
+
+---
+
+## 三、缺失字段（对比 NexusPHP）
+
+| 字段 | 说明 |
+|------|------|
+| `audiocodec_sel` | 无音频编码字段 |
+| `source_sel` | 无来源字段 |
+| `processing_sel` | 无处理方式/地区字段 |
+| `team_sel` | 无制作组下拉（靠标题中的小组名或 -ZWEX 后缀） |
+| `pt_gen` | 无 PT-Gen（通过 TMDb API 自动获取） |
+| `url`（IMDb） | 无 IMDb 链接字段（通过 TMDb 关联） |
+| `douban_id` | 无独立豆瓣字段（可在 `note` 中提及） |
+
+---
+
+## 四、发布规则要点
+
+### 4.1 禁止内容
+
+- **R18/成人内容**禁止发布。
+- 禁止包含 `.exe`、`.bat`、`.sh` 等可执行程序文件的种子。
+- 原则上不允许发布来自**公网 BT** 的资源。
+- **禁止跨季与合集打包**（管理组特批除外）[重要]。
+- **不允许自行拆分合集种子后发布**。
+- **非官组用户不允许发布分集内容** [2023-11-27 新增]。
+
+### 4.2 标题命名（英文 0day 命名法）
+
+主标题**不能含有中文**，各部分用空格间隔：
+
+- **电影**：`英文名 发行年份 分辨率 媒介 视频编码 音频编码-制作组`
+- **剧集**：`英文名 发行年份 季 分辨率 媒介 视频编码 音频编码-制作组`
+- 示例：`Run for Young 2020 S01 1080p Bilibili WEB-DL H264 AAC-ZWEX`
+
+注意：标题中包含**平台名**（如 `Bilibili`）和**音频编码**（如 `AAC`），这些信息不在表单字段中体现。
+
+### 4.3 副标题
+
+至少包含影片中文名，剧集类资源**必须**包含季、集信息。可增加其他重要信息。
+示例：`风犬少年的天空 第一季 全 16 集 *Bilibili 水印*`
+
+### 4.4 分类说明
+
+| 分类 ID | 分类名 | 说明 |
+|---------|--------|------|
+| 501 | 电影 | 电影 |
+| 502 | 剧集 | 电视剧 |
+| 503 | 动画 | 动画 |
+| 504 | 节目 | 综艺、纪录片等 |
+| 599 | 其它 | 不在上述范围内的其它资源 |
+
+### 4.5 标签使用
+
+- `DOVI/HDR10` 标签根据 MediaInfo 中 `HDR Format` 一栏确定；原盘根据 BDInfo 中 video 部分确定。
+- 其余标签按实际情况勾选。
+
+### 4.6 TMDb 信息
+
+若种子资源在 TMDb 中有词条则**必须填写**，否则可不填。
+
+### 4.7 截图要求
+
+- **至少三张原始分辨率截图**。
+- 不允许添加非原始分辨率图片（如站点 Logo、缩略图等）。
+- 一行一张，仅填写图片地址。
+- 支持外链图床，不允许使用有防盗功能的图床。
+
+### 4.8 媒体信息
+
+- **非原盘**：填写完整 MediaInfo。
+- **原盘**：填写完整 BDInfo（需删除转载 BDInfo 中多余的 BBCode 代码）。
+
+### 4.9 备注信息
+
+可填写原站制作说明、转载来源、IMDb 链接等有效内容或资源的特殊事项。
+
+### 4.10 做种要求
+
+- 发布者必须保证上传速度与做种时间，做种时间不足 **24 小时**或故意低速上传会被警告甚至取消上传权限。
+
+### 4.11 种审制
+
+- 发布后有审核流程，审核不通过需在 **7 天内**完成修改。
+- 超期未修改将扣除该种已获得的上传量。
+- 修改后可举报种子加速重审。
+
+### 4.12 促销规则
+
+- 新上传种子自动获得 **24 小时** ↑1x/↓0x 优惠。
+- 发布者始终享有 ↑2x 优惠。
+
+### 4.13 违规处罚
+
+- 重复发布、上传合集等违规种子将被删除并**扣除已获得的上传量**（保证不低于 1.2 分享率）。
+
+---
+
+## 五、与其他框架对比
+
+| 特征 | NexusPHP | TNode（朱雀） |
+|------|----------|---------------|
+| 发布方式 | HTML 表单 POST | REST API POST multipart |
+| 字段名风格 | snake_case（`codec_sel`） | camelCase（`videoCoding`） |
+| CSRF | 无 / cookie 内嵌 | `x-csrf-token` 请求头 |
+| 选项获取 | HTML `<option>` 标签 | JSON API `/api/torrent/option` |
+| 元数据 | PT-Gen / 手动填 | TMDb API 自动获取 |
+| 标签提交 | checkbox 数组 | 逗号分隔 ID 字符串 |
+| 响应格式 | HTML 重定向 | JSON |
+| 分类 | type=数字 | category=三位数字符串 |
+| 编码区分 | H.264/H.265 合一 | H264/x264/H265/x265 四分 |
+
+---
+
+## 六、适配器设计注意事项
+
+### 6.1 认证流程
+
+1. GET `/torrent/upload` → 解析 HTML 获取 CSRF token
+2. POST `/api/torrent/upload` → 携带 `x-csrf-token` + cookie + multipart form
+
+### 6.2 字段映射特点
+
+| 特点 | 说明 |
+|------|------|
+| ID 分段体系 | 编码 1xx、媒介 3xx、分辨率 4xx、分类 5xx、标签 6xx |
+| H264/x264 区分 | 需根据源资源判断是原编码(H264)还是压制编码(x264) |
+| TMDb 条件必填 | 有 TMDb 词条时必须填写 `tmdbid` 和 `tmdbtype` |
+| 标签逗号分隔 | 非数组，直接拼接 ID 字符串 |
+| 无音频编码 | 音频信息只能通过标题或 mediainfo 传递 |
+| 非官组禁止分集 | 非官组用户不允许发布分集内容，仅官组(-ZWEX)可以 |
+| 禁止合集打包 | 除管理组特批外禁止跨季与合集打包 |
+
+### 6.3 Cloudflare 防护
+
+当前未发现 Cloudflare TLS 指纹问题（SPA 渲染，API 请求正常返回）。
+
+### 6.4 PTNexus 参考实现
+
+- 配置文件：`examples/PTNexus/server/configs/zhuque.yaml`
+- 发布器：`examples/PTNexus/server/internal/service/publish/publisher/sites/zhuque.go`
+- 站点数据：`examples/PTNexus/server/sites_data.json`（含 `-ZWEX` 后缀标识）

@@ -1,10 +1,10 @@
-# SpringSunday (CMCT) 站点适配器设计
+# 不可说 站点适配器设计
 
 ## 站点信息
 
 | 项目 | 内容 |
 |------|------|
-| 站点名称 | SpringSunday |
+| 站点名称 | 不可说|
 | 官方组 | CMCT、CMCTV |
 | 站点地址 | https://springsunday.net |
 | Wiki 地址 | https://wiki.hdcmct.org |
