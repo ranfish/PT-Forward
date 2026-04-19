@@ -1097,7 +1097,362 @@ func TestQingWapHook_ValidateFileSpecs(t *testing.T) {
 - 杜比视界：https://wiki.qingwapt.org/docs/guides/content-creation/dv
 - 自查助手（油猴插件）：https://greasyfork.org/zh-CN/scripts/490095-qingwa-torrent-assistant
 
+## 审核脚本完整逆向分析
+
+### 脚本信息
+
+| 项目 | 内容 |
+|------|------|
+| 名称 | qingwa-torrent-assistant |
+| 来源 | Greasyfork #490095 |
+| 版本 | 1.1.1 |
+| 作者 | QingWaPT-Official |
+| 致谢 | 不可说-Torrent-Assistant, 末日-Torrent-Assistant |
+| 大小 | 1886 行 / 82KB（含 Greasyfork HTML 包装，实际 JS 约 1350 行） |
+| 运行页面 | `upload.php*`（发布页） |
+| 权限 | GM_xmlhttpRequest / GM_setValue / GM_getValue |
+
+> **基于不可说/末日审核脚本改写**，结构与 Agsv-Torrent-Assistant 高度相似，但规则针对青蛙站定制。
+
+### 常量映射
+
+#### 分类 (cat_constant)
+
+| ID | 名称 |
+|----|------|
+| 401 | 电影 |
+| 402 | 剧集 |
+| 403 | 综艺 |
+| 404 | 纪录片 |
+| 405 | 动漫 |
+| 406 | MV |
+| 407 | 体育 |
+| 408 | 音乐 |
+| 409 | 其他 |
+| 412 | 短剧 |
+
+> **注意**：音乐(408)和其他(409)分类**跳过大部分校验规则**（仅音乐额外检查采样频率和比特率）。
+
+#### 媒介 (type_constant)
+
+| ID | 名称 | 标题匹配 |
+|----|------|---------|
+| 1 | UHD Blu-ray | `uhd.*blu-?ray` |
+| 8 | Blu-ray | `blu-?ray`（无 x264/5、非 remux） |
+| 9 | Remux | `remux` |
+| 10 | Encode | `bluray/blu-ray` + `x26[45]`（Encode 格式） |
+| 7 | WEB-DL | `web-?dl`（无 x264/5） |
+| 4 | HDTV | `hdtv` |
+| 11 | MiniBD | `minibd` |
+| 2 | DVD | `dvd`（无 x264/5） |
+| 3 | CD | - |
+| 5 | Track | - |
+| 6 | Other | - |
+
+> **关键区分**：原盘 `Blu-ray`（连字符）vs 压制 `BluRay`（无连字符）。Encode 类标题须用 `BluRay`。
+
+#### 视频编码 (encode_constant)
+
+| ID | 名称 | 标题匹配 |
+|----|------|---------|
+| 1 | H.264/AVC | `x264\|h264\|h.264\|avc` |
+| 6 | H.265/HEVC | `x265\|h265\|h.265\|hevc` |
+| 2 | VC-1 | `vc-?1` |
+| 4 | MPEG-2 | `mpeg-?2` |
+| 7 | AV1 | `av1` |
+| 3 | MPEG-4 | `mpeg-?4` |
+| 8 | VP9 | `vp9` |
+| 5 | Other | - |
+
+> **命名规范严格**：原盘用 AVC/HEVC，WEB 用 H.264/H.265，Encode 用 x264/x265。HEVC≠H.265 视媒介类型区分。
+
+#### 音频编码 (audio_constant)
+
+| ID | 名称 | 标题匹配关键词 |
+|----|------|--------------|
+| 6 | DTS:X | `dts.x\|dts-x\|dtsx` |
+| 11 | DDP | `ddp\|dd+\|e-?ac3\|dolby digital plus` |
+| 14 | TrueHD Atmos | `truehd.*atmos` |
+| 12 | TrueHD | `truehd` |
+| 19 | Atmos | `atmos` |
+| 16 | DTS-HD MA | `dts-hd.?ma\|dtshdma` |
+| 17 | DTS-HD HR | `dts-hd.?hr\|dtshdhr` |
+| 2 | DTS | `dts`（排除 dts-hd 等） |
+| 1 | DD | `ac-?3\|dd[^p+\|dolby digital[^+]` |
+| 4 | FLAC | `flac` |
+| 3 | AAC | `aac` |
+| 5 | LPCM | `lpcm\|pcm` |
+| 7 | ALAC | `alac` |
+| 8 | WAV | `wave?\b` |
+| 9 | OGG | `ogg` |
+| 10 | OPUS | `opus` |
+| 13 | MPEG | `mp[23]` |
+| 15 | AV3A | `av3a` |
+| 18 | USAC | `usac` |
+| 20 | M4A | `m4a` |
+| 21 | ADPCM | `adpcm` |
+| 22 | Other | - |
+
+> **DD vs DDP 严格区分**：AC3=DD，E-AC3=DDP。标题禁止写 AC3/E-AC3，必须写 DD/DDP。
+
+#### 分辨率 (resolution_constant)
+
+| ID | 名称 | 标题匹配 |
+|----|------|---------|
+| 6 | 8K | `8k\|4320p` |
+| 7 | 4K | `2160p\|4k[.\| ]`（排除 remastered） |
+| 1 | 1080p | `1080p` |
+| 2 | 1080i | `1080i` |
+| 3 | 720p | `720p` |
+| 4 | SD | `480p\|576p\|sd` |
+| 5 | Other | - |
+
+> **P 小写强制**：标题中 `1080P` → 错误，应为 `1080p`。`4K` 在标题中应改为 `2160p`。
+
+#### 制作组 (group_constant)
+
+| ID | 名称 | 匹配 |
+|----|------|------|
+| 6 | FROG | 标题含 `frog` |
+| 7 | FROGE | 标题含 `froge` |
+| 8 | FROGWeb | 标题含 `frogweb` |
+| 9 | GodDramas | 标题含 `goddramas` |
+| 5 | Other | 其他 |
+
+> **官组检测**：标题含 `frog`/`froge`/`frogweb`/`Loong@QingWa` → `officialSeed=true`。
+
+### 标题解析算法
+
+#### 解析流程
+
+```
+1. 标题转小写 → title_lowercase
+2. 排除年份/季集后的干扰
+3. 位置约束校验：
+   ├── 分辨率 须在 来源 前 → 否则报错
+   ├── HDR 须在 视频编码 前 → 否则报错
+   └── 视频编码 须在 音频 前 → 否则报错
+4. 正则匹配链（按优先级）：
+   ├── 分辨率 → resolution_constant
+   ├── 来源类型 → type_constant
+   ├── 视频编码 → encode_constant
+   ├── 音频编码 → audio_constant（取最高规格）
+   └── 制作组 → group_constant
+```
+
+#### HDR 检测与交叉验证
+
+```
+1. 标题含 hdr10+ → 标签须含 hdr10+
+2. 标题含 hdr（非 hdr10+）→ 标签须含 hdr
+3. 标签含 hdr10+ → 标题须含 hdr10+
+4. 标签含 hdr → 标题须含 hdr
+5. MediaInfo HDR Format 字段与标题/标签双向验证
+```
+
+### 校验规则 — 共 44+ 项
+
+#### 分类级特殊规则
+
+| 分类 | 规则 |
+|------|------|
+| 音乐(408) | 跳过大部分校验；主标题须含采样频率(`khz`)；主标题须含比特率(`bit`) |
+| 其他(409) | 跳过所有校验规则 |
+| 官方音乐种子 | 跳过所有检查（`officialSeed && cat===408`） |
+
+#### 标题校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 1 | 标题含中文 | `[\u4e00-\u9fa5]` | 错误 |
+| 2 | Complete 需删除（非蓝光原盘） | `complete` 在标题中 | 错误 |
+| 3 | 季集应在年份前 | `S\d{2}` 位置检查 | 错误 |
+| 4 | HDR10 应为 HDR | `hdr10`（非 HDR10+）→ 应写 HDR | 错误 |
+| 5 | HDR10+ 标签与标题交叉验证 | 标签 vs 标题 | 错误 |
+| 6 | HDR 标签与标题交叉验证 | 标签 vs 标题 | 错误 |
+| 7 | WEB 资源 HEVC→H.265 | `hevc` in WEB 类型 | 错误 |
+| 8 | 电影类别不应含 S**E** | `s\d{2}e\d{2}` + cat=401 | 错误 |
+| 9 | 剧集类别必须含 S**E** | `!s\d{2}e\d{2}` + cat=402 | 错误 |
+| 10 | WEB 资源 AVC→H.264 | `avc` in WEB 类型 | 错误 |
+| 11 | HDTV 资源 HEVC→H265 | `hevc` in HDTV 类型 | 错误 |
+| 12 | HDTV 资源 AVC→H264 | `avc` in HDTV 类型 | 错误 |
+| 13 | 禁发小组（28+组） | 正则匹配黑名单 | 错误 |
+| 14 | 分辨率 P→p | `\d+P` 大写检测 | 错误 |
+| 15 | AC3→DD | `ac3` in 标题 | 错误 |
+| 16 | 删除 HQ/FPS/EDR/SDR/10bit/4K(→2160p) | 关键词检测 | 错误 |
+| 17 | 来源须在编码前 | 位置校验 | 错误 |
+| 18 | 分辨率须在来源前 | 位置校验 | 错误 |
+| 19 | 缺少分辨率/来源/编码/音频 | 完整性检查 | 错误 |
+| 20 | 视频编码须在音频前 | 位置校验 | 错误 |
+| 21 | 蓝光原盘标题格式 | `Blu-ray` vs `BluRay` | 错误 |
+| 22 | Encode 标题格式 | `BluRay`（无连字符） | 错误 |
+| 23 | Atmos 应在声道后 | `atmos` 位置校验 | 错误 |
+| 24 | 声道数标示错误 | `7\.1`/`5\.1` 格式检查 | 错误 |
+
+#### 字段选择校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 25 | 副标题为空 | `!subtitle` | 错误 |
+| 26 | 未选分类 | `!cat` | 错误 |
+| 27 | 未选媒介 | `!type` | 错误 |
+| 28 | 未选编码 | `!encode` | 错误 |
+| 29 | 未选音频 | `!audio` | 错误 |
+| 30 | 未选分辨率 | `!resolution` | 错误 |
+| 31 | 标题与选择字段不一致（媒介） | 标题解析 vs 用户选择 | 错误 |
+| 32 | 标题与选择字段不一致（编码） | 标题解析 vs 用户选择 | 错误 |
+| 33 | 标题与选择字段不一致（音频） | 标题解析 vs 用户选择 | 错误 |
+| 34 | 标题与选择字段不一致（分辨率） | 标题解析 vs 用户选择 | 错误 |
+| 35 | 官种标签/制作组双向验证 | 官组检测 vs 选择 | 错误 |
+| 36 | 未选择制作组 | `!group` | 错误 |
+
+#### 标签与 MI 交叉校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 37 | HLG 需添加 HDR 标签 | 标签检查 | 错误 |
+| 38 | 国语/粤语/中字 标签与 MI 交叉验证 | MI 语言检测 vs 标签 | 错误 |
+| 39 | HDR/HDR10+/杜比视界 标签与 MI 交叉验证 | MI HDR Format vs 标签 | 错误 |
+| 40 | VCB-Studio 标签校验 | 制作组 vs 标签 | 错误 |
+| 41 | Remux 标签校验 | 媒介 vs 标签 | 错误 |
+| 42 | 完结/分集/合集标签与季集交叉验证 | 标题 S**E** vs 标签 | 错误 |
+
+#### 简介与媒体信息校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 43 | 简介无 IMDb/豆瓣链接 | 链接检测 | 警告 |
+| 44 | MediaInfo 含 BBCode | `[b]\|[color]` 等标签 | 错误 |
+| 45 | 简介含 MediaInfo（应在独立栏） | `#kdescr` 内容检测 | 错误 |
+| 46 | 原盘 MI 用 BDInfo/非原盘用 MediaInfo | 媒介类型 vs MI 格式 | 错误 |
+| 47 | 蓝光原盘必须选 DIY 或原生原盘标签 | 媒介=原盘 + `!diy && !native` | 错误 |
+| 48 | 缺少海报/截图 | `#kposter img` + `#ktorrentscreenshots img` | 错误 |
+| 49 | MediaInfo 栏为空/不正确 | 空值或格式校验 | 错误 |
+| 50 | 官组标题编码应为 x264/x265 | `officialSeed && !x264/x265` | 错误 |
+
+#### 警告类规则
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| W1 | SD/Other 分辨率 | resolution=4 or 5 | 警告 |
+| W2 | 简介无 IMDb/豆瓣链接 | 链接检测 | 警告 |
+| W3 | 异常图片（高度≤24px） | `img.height() <= 24` | 警告 |
+
+### 禁发制作组（28+组）
+
+```
+FGT, NSBC, BATWEB, GPTHD, DreamHD, BlackTV, CatWEB, Xiaomi, Huawei,
+MOMOWEB, DDHDTV, SeeWeb, TagWeb, SonyHD, MiniHD, BitsTV, ALT,
+LelveTV, NukeHD, ZeroTV, HotTV, EntTV, GameHD, SmY, SeeHD, ParkHD,
+VeryPSP, DWR, XLMV, XJCTV, Mp4Ba, Huluwa, CTRLHD(非CtrlHD),
+HotWEB, TBMaxUB, BestWEB, DBD-Raws, Skymoon/天月/HKACG, c.c动漫,
+猎户发布组/orion origin, 爪爪字幕组/ZhuaZhuaStudio
+```
+
+### UI 功能
+
+| 功能 | 说明 |
+|------|------|
+| 错误提示框 | 红色背景 `#EA2027`，显示所有错误 |
+| 通过提示框 | 绿色背景 `#8BC34A`，显示"此种子未检测到错误" |
+| 警告提示框 | 黄色，显示警告信息 |
+| 图片加载等待 | 30 秒超时，加载完成后检查异常图片 |
+| 快捷键 F4 | 一键通过/驳回（根据是否有错误） |
+| 快捷键 F3 | 关闭窗口 |
+| 审核页自动操作 | 自动点击通过/驳回按钮，自动填写错误信息 |
+| 错误信息翻译 | 自动将技术错误转为用户友好提示 |
+
+## 转载发布自动填写优化方案
+
+### 标题自动处理
+
+```
+1. 确保标题全部英文（移除中文、全角字符）
+2. 按青蛙命名规范重构标题：
+   剧名 年份 其他信息 分辨率 来源类型 规格 HDR bit 视频编码 音频 声道数 Atmos 音轨数-制作组
+3. 原盘用 Blu-ray（连字符），Encode 用 BluRay（无连字符）
+4. 原盘编码用 AVC/HEVC，WEB 用 H.264/H.265，Encode 用 x264/x265
+5. P 小写（1080p 非 1080P），4K 改为 2160p
+6. AC3→DD，E-AC3→DDP
+7. 移除源站前缀标签（如 [馒头]、[HDArea] 等）
+8. Complete 需删除（非蓝光原盘）
+9. x264 10bit 须写为 Hi10P x264
+```
+
+### 副标题自动处理
+
+```
+1. 禁止为空（必填）
+2. 建议格式：中文名 | 外文名 | 包含内容等
+3. 优先从 PT-Gen/豆瓣获取中文名
+```
+
+### 质量字段自动选择
+
+```
+从源站标题解析：
+1. 媒介(type)：
+   UHD Blu-ray → 1, Blu-ray → 8, Remux → 9, Encode → 10,
+   WEB-DL → 7, HDTV → 4, MiniBD → 11, DVD → 2, CD → 3, Track → 5, Other → 6
+2. 编码(encode)：
+   H.264/AVC → 1, H.265/HEVC → 6, VC-1 → 2, MPEG-2 → 4,
+   AV1 → 7, MPEG-4 → 3, VP9 → 8, Other → 5
+3. 音频(audio)：按匹配优先级
+   DTS:X → 6, TrueHD Atmos → 14, DDP → 11, TrueHD → 12,
+   DTS-HD MA → 16, DTS-HD HR → 17, DTS → 2, DD → 1,
+   FLAC → 4, AAC → 3, LPCM → 5, ALAC → 7, WAV → 8,
+   OPUS → 10, AV3A → 15, USAC → 18, Other → 22
+4. 分辨率(resolution)：
+   8K → 6, 4K/2160p → 7, 1080p → 1, 1080i → 2,
+   720p → 3, SD → 4, Other → 5
+5. 制作组(group)：
+   FROG → 6, FROGE → 7, FROGWeb → 8, GodDramas → 9, Other → 5
+
+注意 remastered 排除在 4K 检测之外
+```
+
+### 标签自动选择
+
+```
+1. HDR：MI 含 HDR Format（非 DV）→ 勾选 HDR
+2. HDR10+：MI 含 HDR10+ → 勾选 HDR10+（必须同时选 HDR）
+3. 杜比视界：MI 含 Dolby Vision → 勾选杜比视界
+4. 国语：MI 音频语言含 Chinese → 勾选国语
+5. 粤语：MI 音频语言含 Chinese/Yue/Cantonese → 勾选粤语
+6. 中字：MI 字幕语言含 Chinese → 勾选中字
+7. VCB-Studio：制作组含 VCB-Studio → 勾选
+8. DIY：标题/副标题含 DIY → 勾选
+9. 原生原盘：媒介为原盘且未修改 → 勾选
+10. Remux：媒介为 Remux → 勾选
+11. 完结：标题含 S01-S** 或季集完整 → 勾选
+12. 分集：标题仅含部分集数 → 勾选（需申请）
+13. 系列合集：多季/多部合集 → 勾选
+```
+
+### MediaInfo 处理
+
+```
+1. 非蓝光原盘用 MediaInfo，蓝光原盘用 BDInfo
+2. MediaInfo 须英文（禁止中文 MI）
+3. MediaInfo 禁止包含 BBCode 标签
+4. MediaInfo 应在独立栏位，禁止放入简介
+5. 简介中禁止包含 MediaInfo 内容
+```
+
+### 简介自动构建
+
+```
+1. IMDb/豆瓣链接（至少一个，否则警告）
+2. 海报图片
+3. PT-Gen 生成的简介内容
+4. 至少 3 张视频截图
+5. 蓝光原盘使用 BDInfo quick summary
+6. 原出处简介用 quote 标签包裹：
+   [quote]资源简介[/quote]
+```
+
 ---
 
 *文档维护：PT-Forward 开发团队*
-*最后更新：2026-04-16*
+*最后更新：2026-04-19*
+*数据来源：upload.php + Wiki发布规则 + qingwa-torrent-assistant.js v1.1.1 (1886行/82KB)*
