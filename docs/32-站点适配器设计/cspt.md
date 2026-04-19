@@ -645,5 +645,410 @@ TypeField:      "type",
 
 ---
 
-*数据来源: upload.php HTML (2026-04-16), Wiki规则 (2025-11-05更新), 油猴脚本 v1.5.11*
-*文档创建: 2026-04-16*
+## 审核脚本完整逆向分析
+
+### 脚本信息
+
+| 项目 | 内容 |
+|------|------|
+| 名称 | CS-Torrent-Assistant-New |
+| 来源 | Greasyfork #544521 |
+| 版本 | 1.5.11 |
+| 作者 | Exception & 7ommy & wiiii & shun |
+| 大小 | 1615 行 / 73KB |
+| 运行页面 | `details.php*`（详情页）+ `edit.php*`（编辑页）+ 审核弹窗页 |
+| 权限 | GM_setValue / GM_getValue / GM_registerMenuCommand / GM_xmlhttpRequest |
+| 基于上游 | SpringSunday-Torrent-Assistant（经 Agsv-Torrent-Assistant 改写） |
+| 域名 | cspt.top / cspt.cc / cspt.date（三域名通用） |
+
+> **注意**：该脚本基于末日脚本改写，结构高度相似但**所有字段 ID 完全不同**（媒介/编码/音频/分辨率 ID 全部重编）。
+
+### 常量映射
+
+#### 分类 (categoryMapping) — 18+2 个
+
+| ID | 英文名称 | 中文名称 |
+|----|---------|---------|
+| 401 | Movie | 电影 |
+| 402 | TV Series | 电视剧 |
+| 403 | TV Shows | 综艺 |
+| 404 | Documentaries | 纪录片 |
+| 405 | Anime | 动漫/动画 |
+| 406 | MV | - |
+| 407 | Sports | 体育 |
+| 408 | Audio | 音频 |
+| 409 | Misc | 其他 |
+| 411 | Music | - |
+| 412 | Software | - |
+| 413 | Game | - |
+| 415 | E-Book | - |
+| 416 | Comic | - |
+| 417 | Education | - |
+| 418 | Picture | - |
+| 419 | Playlet | 短剧 |
+| 410 | - | 短剧（中文名映射） |
+
+> **注意**：支持英文名和中文名双向匹配。419(Playlet)和410(短剧)两个 ID 都映射到短剧。410 仅中文名匹配使用。
+
+#### 媒介 (type_constant)
+
+| ID | 名称 | 标题匹配 |
+|----|------|---------|
+| 10 | UHD Blu-ray | `uhd blu-ray`/`uhd bluray`/` uhd ` |
+| 11 | Blu-ray | `blu-ray`/`bluray`（无 uhD/264/265） |
+| 12 | Remux | `remux` |
+| 13 | Encode | `av1`/`encode`/`264`/`265`/`bluray`+编码词 |
+| 14 | WEB-DL | `web-dl`/`webdl`/`webrip`/`web-rip` |
+| 15 | HDTV | `hdtv` |
+| 16 | DVD | `dvd` |
+| 17 | CD | `cd` |
+| 18 | Track | `track` |
+| 19 | Other | 默认值 |
+
+> **关键差异**：ID 从 10 起始（非标准 1）。WEB-DL 和 WEBRip 合并为同一 ID(14)。AV1 标题优先检测为 Encode(13)。含 264/265 的标题检测为 Encode 而非 Blu-ray。
+
+#### 视频编码 (encode_constant)
+
+| ID | 名称 | 标题匹配 |
+|----|------|---------|
+| 6 | H.264/AVC | `264`/`avc` |
+| 7 | H.265/HEVC | `265`/`hevc` |
+| 8 | VC-1 | `vc`/`vc-1` |
+| 9 | MPEG-2 | `mpeg2`/`mpeg-2` |
+| 10 | AV1 | `av1`/`av-1` |
+| 11 | Other | - |
+
+#### 音频编码 (audio_constant) — 16 个
+
+| ID | 名称 | 标题匹配 |
+|----|------|---------|
+| 22 | FLAC | `flac` |
+| 14 | LPCM | `lpcm` |
+| 12 | DDP/E-AC3 | ` ddp`/` dd+`/`E-?AC-?3` |
+| 9 | AAC | `aac` |
+| 13 | DD/AC3 | ` ac3`/` dd` |
+| 11 | TrueHD Atmos | `truehd`+`atmos` |
+| 17 | DTS-HD MA | `dts-hd ma`/`dts-hdma`/`dts-hd` |
+| 16 | DTS:X | `dts:x`/`dtsx`/`dts-x` |
+| 18 | DTS | `dts`（排除 dts-x） |
+| 8 | ALAC | `alac` |
+| 10 | APE | `ape` |
+| 15 | TrueHD | `truehd`（无 atmos） |
+| 19 | M4A | `m4a` |
+| 20 | WAV | `wav` |
+| 21 | MP3 | `mp3` |
+| 23 | Other | 默认值 |
+
+> **注意**：ID 编号与所有其他站点完全不同。FLAC=22, DTS=18, AAC=9。ALAC(8) 和 APE(10) 在 DTS 之前匹配（与末日不同）。
+
+#### 分辨率 (resolution_constant)
+
+| ID | 名称 | 标题匹配 |
+|----|------|---------|
+| 5 | 480p/480i | `480p`/`480i` |
+| 6 | 720p/720i | `720p`/`720i` |
+| 7 | 1080p/1080i | `1080p`/`1080i` |
+| 8 | 4K/2160p/2160i | `4k`/`2160p`/`2160i`/`uhd` |
+| 9 | 8K/4320p/4320i | `8k`/`4320p`/`4320i` |
+| 10 | Other | 默认值 |
+| 11 | 2K/1440p/1440i | `1440p`/`1440i` |
+
+> **注意**：ID 从 5 起始，非连续。2K/1440p(11) 独立 ID。480p(5) 在 720p(6) 之前检测。
+
+#### 地区 (area_constant) — 空定义（同末日）
+
+```
+area_constant = {} // 空对象，不检测地区
+```
+
+#### 制作组 (group_constant) — 8 个
+
+| ID | 名称 |
+|----|------|
+| 4 | WiKi |
+| 3 | MySiLU |
+| 1 | HDS |
+| 2 | CHD |
+| 5 | Other |
+| 7 | rainweb |
+| 6 | rain |
+| 8 | Tangweb |
+
+> **注意**：跨站制作组（WiKi/MySiLU/HDS/CHD 为知名压制组）。rain/rainweb/Tangweb 为财神相关官组。
+
+### 官组检测逻辑
+
+```
+标题含 "csweb" 或 "cspt" → officialSeed (AGSVPT 官种)
+标题含 "goddramas"         → godDramaSeed (驻站短剧)
+标题含 "agsvmus"           → officialMusicSeed (音乐官种)
+标题含 "hares"             → haresSeed (白兔/方舟)
+```
+
+> **注意**：official_tags 可配置（`config.official_tags = ["csweb", "cspt"]`）。财神复用了末日的 AGSVPT/AGSVMUSIC/GodDramas/Hares 检测代码但含义可能不同。
+
+### 禁止图床
+
+```
+rains3.com, img.m-team.cc, totheglory.im/details, i.miji.bid, duan.red
+```
+
+### 简介内容检测
+
+```
+简介含 IMDb/豆瓣/TMDb 链接 → dbUrl=true（检查已注释，不强制）
+简介含 MediaInfo 关键词 → isBriefContainsInfo=true
+简介含 "禁止转载" → isBriefContainsForbidReseed=true
+简介含 "片名" 或 "译名" → isBriefContainsMovieBrief=true（缺失则报错）
+简介类别字段 → 检测儿童/喜剧关键词 → 与标签交叉验证
+```
+
+### 标签-简介类别交叉验证（财神独有）
+
+```
+1. 从简介"类别"或"Keywords"字段提取关键词
+2. 检测是否含儿童类关键词：儿童/animated/child/kids
+3. 检测是否含喜剧类关键词：喜剧/搞笑/comedy/funny
+4. 与标签区的"儿童"/"喜剧"标签交叉验证
+5. 不一致 → 错误
+```
+
+### 标题解析算法
+
+```
+1. 获取 h1#top 文本
+2. 清除后缀标签（同末日）
+3. 检测「禁转」→ exclusive=1
+4. 标题转小写 → title_lowercase
+5. 正则匹配链：
+   ├── 媒介(type)：
+   │   WEB-DL/WEBRip→14, Remux→12, AV1→Encode(13),
+   │   bluray(无uhd/264/265)→Blu-ray(11), HDTV→15,
+   │   encode/264/265→Encode(13), UHD Blu-ray→10,
+   │   DVD→16, CD→17, Track→18, Other→19
+   ├── 编码(encode)：264/avc→6, 265/hevc→7, vc-1→8, mpeg2→9, av1→10
+   ├── 音频(audio)：flac→22, lpcm→14, ddp/eac3→12, aac→9, ac3/dd→13,
+   │   truehd+atmos→11, dts-hd ma→17, dts:x→16, dts→18,
+   │   alac→8, ape→10, truehd→15, m4a→19, wav→20, mp3→21, other→23
+   ├── 分辨率(resolution)：
+   │   1440p→11, 1080p/i→7, 720p/i→6, 480p/i→5,
+   │   4k/2160p/uhd→8, 8k/4320p→9, Other→10
+   ├── 完结：`complete` → title_is_complete
+   ├── 分集：`S\d+E\d+` → title_is_episode
+   └── 制作组检测：csweb/cspt/goddramas/agsvmus/hares
+```
+
+> **关键差异**：媒介检测优先级与末日完全不同。WEB-DL/WEBRip 优先级最高(14)。AV1 关键词触发 Encode(13)。含 264/265 的标题优先判定为 Encode 而非 Blu-ray。
+
+### 校验规则 — 共 30+ 项
+
+#### 标题校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 1 | 禁止图床图片 | 域名匹配 banPictureBed | 错误 |
+| 2 | 标题含中文/非ASCII | `[^\x00-\xff]`（排除特殊符号） | 错误 |
+| 3 | 不信任制作组 | 关键词列表（含 Quark/mp4/mkv） | 错误 |
+
+#### 副标题/标签/分类校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 4 | 副标题为空 | `!subtitle` | 错误 |
+| 5 | 标签为空 | `hasBQ` | 错误 |
+| 6 | 儿童 标签与简介类别不一致 | `bqByz1` | 错误 |
+| 7 | 喜剧 标签与简介类别不一致 | `bqByz2` | 错误 |
+| 8 | 副标题含"动画"但未选 Anime | `isSubtitleAnime && cat!==405` | 错误 |
+| 9 | 未选择分类 | `!cat` | 错误 |
+| 10 | 完结剧集未选完结标签 | `title_is_complete && !is_complete` | 错误 |
+
+#### 字段选择校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 11 | 未选择媒介 | `!type` | 错误 |
+| 12 | 标题媒介与选择不一致 | `title_type !== type` | 错误 |
+| 13 | 未选择视频编码 | `!encode` | 错误 |
+| 14 | 标题编码与选择不一致 | `title_encode !== encode` | 错误 |
+| 15 | 未选择音频编码 | `!audio` | 错误 |
+| 16 | 标题音频与选择不一致 | `title_audio !== audio` | 错误 |
+| 17 | 未选择分辨率 | `!resolution` | 错误 |
+| 18 | 标题分辨率与选择不一致 | `title_resolution !== resolution` | 错误 |
+
+#### 简介与媒体信息校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 19 | 未填写影片简介 | `!isBriefContainsMovieBrief`（缺"片名"/"译名"） | 错误 |
+| 20 | 官种媒体信息未解析 | `officialSeed && short===full` | 错误 |
+| 21 | MediaInfo 含 BBCode | `[/b]/[/color]` 等标签 | 错误 |
+| 22 | 简介含 MediaInfo | `isBriefContainsInfo` | 错误 |
+| 23 | 缺少海报或截图 | `imgCount < 2` | 错误 |
+| 24 | MediaInfo 栏为空 | `isMediainfoEmpty` | 错误 |
+| 25 | 官种 MI 含 x264 但标题无 x264 | MI vs 标题交叉验证 | 错误 |
+| 26 | 官种 MI 含 x265 但标题无 x265 | MI vs 标题交叉验证 | 错误 |
+
+#### 标签与制作组校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 27 | 官种未选制作组 | `officialSeed && !isGroupSelected` | 错误 |
+| 28 | GodDramas 禁转但未选禁转标签 | 简介含"禁止转载" | 错误 |
+| 29 | GodDramas 未选短剧分类 | `godDramaSeed && cat!==419` | 错误 |
+| 30 | GodDramas 未选驻站标签 | `godDramaSeed && !isTagResident` | 错误 |
+| 31 | 非官种选了官方标签 | `!officialSeed && isOfficialSeedLabel` | 错误 |
+| 32 | 官种未选官方标签 | `officialSeed && !isOfficialSeedLabel` | 错误 |
+| 33 | 分集未选分集标签 | `!isEpisode && (title_is_episode\|subtitle_is_episode)` | 错误 |
+| 34 | 非方舟选了方舟标签 | `isTagArcProj && !haresSeed` | 错误 |
+| 35 | 方舟未选方舟标签 | `!isTagArcProj && haresSeed` | 错误 |
+| 36 | Hares 制作组选择错误 | `haresSeed && category!==23` | 错误 |
+| 37 | 非 Hares 选了 Hares | `!haresSeed && category===23` | 错误 |
+
+#### 音乐分类特殊规则
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 38 | 音乐标题缺采样频率 | `cat===411 && !khz` | 错误 |
+| 39 | 音乐标题缺比特率 | `cat===411 && !bit` | 错误 |
+
+#### 警告类规则
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| W1 | 低分辨率请检查高清版 | `resolution∈{8,4}` 且非官种 | 警告 |
+| W2 | MI 含中字但未选中字标签 | `isTextChinese && !isTagTextChinese` | 警告 |
+| W3 | 大于 1T 未选大包标签 | `isBiggerThan1T && !isTagBigTorrent` | 警告 |
+| W4 | 简介含冗余图片 | 特定图片 URL 检测 | 警告 |
+| W5 | 图片加载失败 | `height <= 24` | 警告 |
+| W6 | 图片加载 30 秒超时 | 计时器 | 警告 |
+
+### 分类级跳过校验
+
+```
+以下分类清空所有错误和警告：
+- 413(Game) / 418(Picture) / 415(E-Book) / 412(Software) / 411(Music) / 408(Audio) / 406(MV)
+
+音乐官种 (officialMusicSeed)：
+- 清空所有错误，仅检查"是否选择了制作组"
+
+Music(411) 在清空后额外检查：
+- 主标题缺少采样频率(khz)
+- 主标题缺少比特率(bit)
+```
+
+### 不信任制作组（22+关键词）
+
+```
+FGT, Hao4K, Mp4Ba, RARBG, GPTHD, SeeWeb, DreamHD, BlackTV, Xiaomi,
+Huawei, MomoHD, DDHDTV, NukeHD, TagWeb, SonyHD, MiniHD, BitsTV,
+ALT, BATWEB, DBD-Raws, XunLei, ZeroTV, LelveTV, Quark, mp4, mkv
+```
+
+> **注意**：Quark（夸克网盘转存组）、mp4、mkv 被列为不信任关键词，这是财神站的特殊规则。
+
+### UI 功能
+
+| 功能 | 说明 |
+|------|------|
+| 错误/警告双提示框 | 红色(#F44336)错误 + 黄色(#ffdd59)警告 |
+| 提示框位置可配置 | 3种位置 |
+| 一键通过按钮（API 模式） | 通过 GM_xmlhttpRequest 直接 POST API，无需打开弹窗 |
+| CSRF Token 自动获取 | GET 审核页获取 `_token`，POST 到 `/web/torrent-approval` |
+| 审核按钮放大 | 可切换 |
+| 快捷键 F4 | 一键通过 |
+| 快捷键 F3 | 关闭窗口 |
+| 图片链接显示 | 种审模式在图片前添加可点击链接 |
+| 自动关闭页面 | 可切换 |
+| 清空备注按钮 | 审核弹窗中添加 |
+| 移动端适配 | 自动调整按钮大小 |
+| 脚本菜单 | 3个菜单命令 |
+| edit.php 支持 | 编辑页面也可运行检查 |
+| 图片加载检测 | 30秒超时 + 异常高度(≤24px)检测 |
+
+> **关键差异**：财神使用**API 直接审核**（POST JSON），而非其他站的弹窗点击模式。审核接口为 `/web/torrent-approval`，需 CSRF `_token`。
+
+## 转载发布自动填写优化方案
+
+### 标题自动处理
+
+```
+1. 确保标题无中文/非ASCII字符
+2. 移除源站后缀标签
+3. WEB-DL 和 WEBRip 均选 WEB-DL(14)
+4. AV1 关键词 → Encode(13) 媒介
+5. 含 x264/x265 的标题 → Encode(13) 而非 Blu-ray(11)
+6. 纯 bluray（无编码词/无UHD）→ Blu-ray(11)
+7. UHD Blu-ray(10) 独立媒介
+8. 检测禁转标记并选禁转标签
+```
+
+### 副标题自动处理
+
+```
+1. 禁止为空（必填）
+2. 副标题含"动画" → 分类须选 Anime(405)
+3. 副标题含"第X集" → 须选分集标签
+4. 优先从 PT-Gen/豆瓣获取中文名
+```
+
+### 质量字段自动选择
+
+```
+从源站标题解析（注意所有 ID 与其他站完全不同）：
+1. 媒介(type)：
+   WEB-DL/WEBRip→14, Remux→12, AV1→Encode(13),
+   Blu-ray(无编码词)→11, HDTV→15, Encode(含264/265)→13,
+   UHD Blu-ray→10, DVD→16, CD→17, Track→18, Other→19
+2. 编码(encode)：
+   H.264/AVC→6, H.265/HEVC→7, VC-1→8, MPEG-2→9, AV1→10, Other→11
+3. 音频(audio)：按匹配优先级
+   FLAC→22, LPCM→14, DDP/E-AC3→12, AAC→9, DD/AC3→13,
+   TrueHD Atmos→11, DTS-HD MA→17, DTS:X→16, DTS→18,
+   ALAC→8, APE→10, TrueHD→15, M4A→19, WAV→20, MP3→21, Other→23
+4. 分辨率(resolution)：
+   480p/i→5, 720p/i→6, 1080p/i→7, 4K/2160p/UHD→8,
+   8K/4320p→9, 2K/1440p→11, Other→10
+5. 制作组(group)：
+   WiKi→4, MySiLU→3, HDS→1, CHD→2, rain→6, rainweb→7,
+   Tangweb→8, Other→5
+```
+
+### 标签自动选择
+
+```
+1. 官方：标题含 csweb/cspt → 勾选官方标签
+2. 驻站：标题含 goddramas → 勾选驻站标签
+3. 方舟：标题含 hares → 勾选方舟标签
+4. 中字：MI Text Language 含 Chinese → 警告级建议勾选
+5. 大包：种子体积 > 1TB → 警告级建议勾选
+6. 分集：标题含 S**E** 或副标题含"第X集" → 勾选
+7. 完结：标题含 complete + cat∈{402,403,404} → 勾选
+8. 禁转：标题含"禁转" 或 GodDramas 含"禁止转载" → 勾选
+9. 儿童：简介类别含儿童关键词 → 勾选（交叉验证）
+10. 喜剧：简介类别含喜剧关键词 → 勾选（交叉验证）
+```
+
+### MediaInfo 处理
+
+```
+1. MediaInfo 须放入独立栏位（禁止在简介中包含）
+2. MediaInfo 禁止含 BBCode 标签
+3. 官种必须解析（短格式≠原始格式）
+4. 从 MI 提取音频/字幕语言用于标签自动选择
+5. 简介中禁止包含冗余图片
+6. 禁止使用 rains3.com/img.m-team.cc/totheglory.im/i.miji.bid/duan.red 图床
+```
+
+### 简介要求
+
+```
+1. 简介必须包含"片名"或"译名"字段（影片简介必填）
+2. 简介禁止包含 MediaInfo 内容
+3. 至少 2 张图片（海报+截图）
+4. IMDb/豆瓣/TMDb 链接检查已注释（不强制）
+```
+
+---
+
+*数据来源: upload.php HTML (2026-04-16), Wiki规则 (2025-11-05更新), CS-Torrent-Assistant-New v1.5.11 (1615行/73KB)*
+*文档更新: 2026-04-19*

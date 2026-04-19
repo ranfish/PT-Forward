@@ -276,3 +276,4 @@ GTK 发布页内置了 PT-Gen 获取按钮（`btn-get-pt-gen`），支持从 IMD
 
 *分析时间：2026-04-16*
 *数据来源：https://pt.gtkpw.xyz/upload.php 发布页面 HTML 分析*
+
