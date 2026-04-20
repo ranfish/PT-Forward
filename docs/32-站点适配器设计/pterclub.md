@@ -522,5 +522,404 @@ IF 原盘 DIY → 勾选 diy(DIY原盘)
 
 ---
 
-*数据来源: upload.php (92140字节) + Wiki上传规则 (12281字节) + Wiki DUPE规则 (11334字节) + 种子检查脚本 (185066字节) + 论坛规则 (112756字节)*
-*文档创建: 2026-04-19*
+## 审核脚本完整逆向分析
+
+### 脚本信息
+
+| 项目 | 内容 |
+|------|------|
+| 名称 | PTerClub Torrent Checker |
+| 来源 | Greasyfork #522428 |
+| 版本 | 1.0.22 |
+| 作者 | PTerClub-Helpers |
+| 大小 | 2245 行 / 141KB |
+| 运行页面 | `details.php?id=*`（详情页，支持 pterclub.com/net） |
+| 权限 | GM_xmlhttpRequest / GM_setValue / GM_getValue |
+| 外部连接 | greasyfork.org（版本检查） |
+
+> **注意**：这是目前分析过的**最大审核脚本**（141KB），也是架构最独特的 — 使用结构化 TORRENT_INFO 对象存储所有解析数据，而非其他站的简单变量对比。
+
+### 架构设计（与其他站完全不同）
+
+```
+TORRENT_INFO = {
+    titleinfo:  { /* 从标题解析的所有字段 */ },
+    tableinfo:  { /* 从页面表格提取的所有字段 */ },
+    descrinfo:  { /* 从简介提取的所有字段 */ },
+    mediainfo:  { /* 从 MediaInfo 解析的所有字段 */ },
+    bdinfo:     { /* 从 BDInfo 解析的所有字段 */ },
+    results:    { /* 综合判断后的最终结果 */ }
+}
+```
+
+**核心差异**：不使用常量映射表（cat_constant/type_constant 等），而是通过 MediaInfo/BDInfo 深度解析 + 标题正则提取 + 简介豆瓣信息 三方交叉验证来确定质量/分类/地区。
+
+### 白名单制作组
+
+```
+FRDS, CMCT, EPiC, WiKi, TTG, QHstudIo, DBTV, CHD, HDH, PbK, MTeam,
+HDChina, Dream, TLF, BMDru, PuTao, GodDramas, OPS
+```
+
+### 禁止图床（15+ 个）
+
+```
+imgur.com, loli.net, ibb.co, ax1x.com, picgd.com, p.sda1.dev,
+gifyu.com, i.duan.red, z4a.net, helloimg.com, chdbits.co,
+ubitspho.top, ik.jcwsr.top, stonestudio2015.com, img.m-team.cc, cmct.xyz
+```
+
+> **gifyu 限制**：首图禁止使用 gifyu 图床（其他位置可以）。
+
+### 标题解析算法（最复杂）
+
+```
+1. 获取 h1#top 文本，分离主标题和免费信息
+2. 台标检测：CCTV-4K/8K, CHC, CWJDTV, Jade(粤语标签时)
+3. REMUX 检测
+4. 媒介(Source)检测（优先级）：
+   Blu-ray → WEBRip → WEB-DL/WEB → HDTVRip → U?HDTV → DVDRip
+   → DVD+PAL/NTSC → DVD+Remux
+5. 视频编码检测：HEVC/AVC/x264/x265/H.264/H.265/Xvid/VC-1/MPEG-2/AV1/VP9/AVS2/AVS3/AVS+
+6. 分辨率检测：480p-4320p → 8K→4K → 480i/576i/1080i
+7. 音频对象检测：Atmos/DDPA
+8. 标题拆分（以 Source 为界）：
+   title[0] = 片名+年份+季数+集数+日期
+   title[1] = 制作组+音频编码+音频通道+HDR+HQ+FPS
+9. 音频编码检测（从 title[1]）：DTS-HD MA/HR/DDP/LPCM/DTS:X/MP2/EAC3/FLAC/TrueHD/AAC/OPUS → DTS/DD/PCM/AC3
+10. 音频通道检测：X.Y 格式
+11. 制作组检测：从 title[1] 以 - 分隔取最后段，特殊处理 ￡FRDS
+12. 日期/季数/集数/片名/年份 逐步提取
+13. 后置媒介检测：片名中含 WEB → WEB-DL
+14. FPS/HDR(HDR10+/HDR Vivid/HDR10/HLG)/DV/10bit/MiniBD/3D 检测
+```
+
+### 质量判定算法（核心逻辑）
+
+```
+BDInfo 存在时：
+  MiniBD → Encode
+  BDInfo 2160p → UHD (Blu-ray)
+  BDInfo 1080p → BD (Blu-ray)
+
+MediaInfo 存在时（多级判断）：
+  Remux → REMUX
+  Blu-ray + x264/x265/AV1 → Encode
+  Blu-ray + 白名单组(FRDS/beAst/WScode/Dream/WiKi/CMCT/...) → Encode
+  WEB-DL + FRDS → Encode
+  WEB-DL → WEB-DL
+  WEBRip → Encode
+  HDTVRip → Encode
+  HDTV → HDTV
+  DVDRip / Xvid/DivX → Encode
+  DVD + VOB/ISO → DVD
+```
+
+> **关键差异**：猫站通过制作组白名单判断 Encode，而非简单依赖编码关键词。FRDS 等组即使标题写 Blu-ray 也判定为 Encode。
+
+### 分类判定算法（从简介豆瓣信息）
+
+```
+1. 简介"类型"含"纪录片" → 纪录片
+2. 副标题含"演唱会" → 舞台演出
+3. 简介"类型"含"动画" → 动画
+4. 简介"类型"含"综艺/真人秀/脱口秀" → 综艺
+5. 简介有集数 / 副标题含"短剧" / 有分集 → 电视剧
+6. 其他 → 电影
+```
+
+### 地区判定算法（从简介产地 vs 页面选择交叉验证）
+
+```
+从简介"制片/产地/国家/地区"字段提取产地，与页面"地区"下拉选择交叉验证：
+- 大陆 ← 中国/中国大陆/China
+- 香港 ← 香港/Hong Kong
+- 台湾 ← 台湾/Taiwan
+- 欧美 ← 60+欧美国家名
+- 日本 ← 日本/Japan
+- 韩国 ← 韩国/Korean
+- 印度 ← 印度/India
+- 其它 ← 阿联酋/约旦/泰国/苏联/南非/埃及/马来西亚/新加坡等
+```
+
+### MediaInfo 深度解析
+
+#### 视频解析
+```
+Format → AVC/HEVC/AV1/VP9/VC-1/MPEG-2/AVS2/AVS3/CAVS
+HDR Format → DV/HDR10+/HDR Vivid/HDR10/HLG
+Transfer characteristics → PQ=HDR10, HLG
+Bit rate → kbps 转换
+Frame rate → 24/25/30/60/120 FPS
+Width/Height → 像素级分辨率
+Bit depth → 8/10 bit
+Scan type → Interlaced/MBAFF → i 后缀
+Writing library → x264/x265/XviD/DivX
+Standard → NTSC/PAL
+```
+
+#### 分辨率推断（从宽高差值）
+```
+width - height > (4096-1248) → 4320p
+width - height > (1920-672) 或 height==2160 → 2160p
+width - height > (1280-480) 或 height==1080 → 1080p
+width - height > (1024-520) 或 width∈(1260,1280] 或 height==720 → 720p
+height ∈ (480,576] → 576p
+height ∈ (350,480] → 480p
++ 扫描类型 → p/i 后缀
+```
+
+#### 音频解析（完整流解析，支持多音轨）
+```
+MLP FBA 16-ch → TrueHD Atmos
+DTS XLL X → DTS:X 7.1
+MLP FBA → TrueHD
+DTS XLL/ES XLL → DTS-HD MA
+DTS XBR → DTS-HD HR
+DTS LBR → DTSE
+E-AC-3 JOC → DDP Atmos
+E-AC-3 → DDP
+AC-3 → DD
+PCM → LPCM
+AV3A → AV3A
+Opus → Opus
+FLAC → FLAC
+AAC → AAC
+DTS → DTS
+MPEG Audio + Layer 2/3 → MP2/MP3
+
+Channel layout → 逐步计数 (L/R/C/LFE/Ls/Rs/Lb/Rb/Cb/Lss/Rss) → X.Y
+音轨语言 Title/Language → 国语/粤语/Chinese/Cantonese/Mandarin
+```
+
+#### 字幕解析
+```
+Text Language Chinese/Mandarin → 中字
+Text Language English → 英字
+Title 含 cht&eng/中英/chs&eng/简*双语/繁*双语 → 中字+英字
+```
+
+### BDInfo 深度解析
+
+```
+Video 行 → AVC/HEVC/VC-1/MPEG-2 + kbps + resolution + HDR/HDR10+
+DV 行 → Dolby Vision + kbps
+Subtitle 行 → Chinese/Mandarin/English
+Audio 行 → TrueHD Atmos/DTS-HD MA/DTS-HD HR/DTS/DDP/DD/LPCM
+DIY 检测 → 副标题含 "DIY"
+```
+
+### 简介信息提取
+
+```
+片名/名字 → moviename
+译名/又名/别名 → moviename（追加）
+IMDb 链接 → imdburl
+豆瓣链接 → doubanurl
+制片/产地/国家/地区 → area（<30字符）
+语言 → lang
+集数 → chapters（纯数字）
+类型/类别 → categorys（所有类别）
+首映/上映日期/年代/年份 → publishdate（提取4位年份）
+```
+
+### 校验规则 — 共 40+ 项
+
+#### 标题完整性校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 1 | 主标题缺少来源 | `titleinfo.source == ''` | 错误 |
+| 2 | 主标题缺少视频编码 | `titleinfo.vcodec == ''`（DVD 豁免） | 错误 |
+| 3 | 主标题缺少分辨率 | `titleinfo.resolution == ''`（DVD 豁免） | 错误 |
+| 4 | 首图是 gifyu 图床 | 首图 URL 匹配 | 错误 |
+
+#### 类型/质量/地区校验（"必有"系列）
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 5 | 必有 1：类型选择错误 | 豆瓣推断 vs 页面选择 | 错误 |
+| 6 | 必有 2：质量选择错误 | MI/BDInfo 推断 vs 页面选择 | 错误 |
+| 7 | 必有 3：地区不一致 | 简介产地 vs 页面选择 | 错误 |
+
+#### 标题命名规范校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 8 | 标题含 BDRip/BDMV/中文 | 正则匹配（排除制作组） | 错误 |
+| 9 | 标题含多余点号 | `.` in 残余标题 | 错误 |
+| 10 | 音频通道错误 | 2.05.1 | 错误 |
+| 11 | 音频对象错误 | TrueHD 非 7.1 + Atmos | 错误 |
+| 12 | 制作组含空格 | 疑似含扩展名 | 错误 |
+| 13 | 标题含多余括号 | `(.*?)` | 错误 |
+| 14 | 主标题含连续空格 | `\s{2,}` | 错误 |
+| 15 | 片名与简介不匹配 | 简介片名 vs 标题片名 | 错误 |
+| 16 | 标题缺少年份（电影） | 电影 + `!year` | 错误 |
+| 17 | 年份/季数/日期至少缺一个 | 全空 | 错误 |
+| 18 | 季数不一致 | 标题 vs 副标题 | 错误 |
+| 19 | 集数不一致 | 标题 vs 副标题 | 错误 |
+
+#### MI/BDInfo 交叉验证
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 20 | 分辨率不一致 | 标题 vs MI/BDInfo | 错误 |
+| 21 | 视频编码不一致 | 标题 vs MI/BDInfo | 错误 |
+| 22 | 音频编码不一致 | 标题 vs MI/BDInfo | 错误 |
+| 23 | 音频通道不一致 | 标题 vs MI/BDInfo | 错误 |
+| 24 | HDR 不一致 | 标题 vs MI | 错误 |
+| 25 | DV 信息缺失 | 标题有 DV 但 MI 无 | 错误 |
+| 26 | 10bit 不一致 | 标题 vs MI | 错误 |
+| 27 | FPS 不一致 | 标题 vs MI | 错误 |
+| 28 | DVD 制式不一致 | 标题 vs MI Standard | 错误 |
+| 29 | 媒介与质量不匹配 | Source vs Quality 交叉验证 | 错误 |
+| 30 | 缺少 MediaInfo/BDInfo | 两者+infosp 全空 | 错误 |
+| 31 | Info 中含有图片 | img 标签检测 | 错误 |
+
+#### 标签交叉验证
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 32 | 粤语标签错误 | MI 粤语 vs 标签 | 错误 |
+| 33 | 缺少粤语标签 | MI 有粤语但无标签 | 错误 |
+| 34 | 港产片缺国语/粤语标签 | 地区=香港 | 错误 |
+| 35 | 国语标签错误 | MI 国语 vs 标签 | 错误 |
+| 36 | 缺少国语标签 | MI 有国语或地区=大陆/台湾 | 错误 |
+| 37 | 缺少语言标签 | 地区=大陆/港/台但无国语/粤语 | 错误 |
+| 38 | 中字标签缺失/错误 | MI 字幕 vs 标签（区分原盘/非原盘） | 错误 |
+| 39 | 英字标签检查 | MI 英字 vs 标签 | 警告 |
+| 40 | DIY 标签缺失/错误 | BDInfo DIY vs 标签 | 错误 |
+
+#### 链接与内容校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 41 | IMDb 链接为空（非华语） | 非大陆/港/台地区 | 错误 |
+| 42 | IMDb 链接不一致 | 页面 vs 简介 | 错误 |
+| 43 | 豆瓣链接为空 | 页面为空 | 错误 |
+| 44 | 豆瓣链接不一致 | 页面 vs 简介 | 错误 |
+
+#### 文件与重复校验
+
+| # | 规则 | 检测方式 | 错误等级 |
+|---|------|---------|---------|
+| 45 | 错误文件数量 | 文件数 vs 集数（非原盘/非GodDramas） | 错误 |
+| 46 | 包含多余文件 | 原盘:非clpi/mpls/m2ts/pad; DVD:非vob/iso/ifo/bup; 其他:非mkv/mp4等 | 错误 |
+| 47 | 重复种子 | 相关资源表:大小+制作组+3D格式 | 错误 |
+| 48 | BDInfo 码率为 0 | BDInfo video bitrates | 错误 |
+| 49 | REPACK 种子 | 标题含 REPACK | 提示 |
+| 50 | 黑名单图床 | 简介图片 URL 匹配 | 错误 |
+
+### 合作组提示
+
+```
+AdBlue, AREY, BdC, BMDru, CatEDU, c0kE, Dave, doraemon, iFT, JKCT,
+KMX, Lislander, MZABI, nLiBRA, RO, Telesto, XPcl, ZTR, GodDramas
+```
+
+> 这些组发布时脚本会显示"合作组"提示，但不一定报错。
+
+### 单集豁免
+
+```
+副标题含"第X集/话/期"（非范围）→ error.push("不审核单集") → 脚本直接 return
+```
+
+## 转载发布自动填写优化方案
+
+### 标题自动处理
+
+```
+1. 确保标题无中文、无 BDRip/BDMV、无全角字符
+2. 确保标题以空格分隔（非点号）
+3. 确保包含来源(Blu-ray/WEB-DL/HDTV等)
+4. 确保包含视频编码（DVD 豁免）
+5. 确保包含分辨率（DVD 豁免）
+6. 电影标题必须包含年份
+7. 剧集标题必须包含季数（S01）或日期
+8. REMUX 必须大写
+9. Atmos 须配合 7.1
+10. 4K→2160p, 8K→4320p
+11. 移除多余括号、连续空格、多余点号
+12. 制作组后缀不含空格
+13. 台标前置：CCTV-4K/8K/CHC/CWJDTV/Jade(粤语)
+14. 检测 REPACK 标记
+```
+
+### 副标题自动处理
+
+```
+1. 禁止为空（必填）
+2. 副标题含集数范围 → 须在标题体现
+3. 副标题含"演唱会" → 分类为舞台演出
+4. 副标题含"短剧" → 分类为电视剧
+5. 季数从副标题"第X季"提取（支持中文数字 1-25）
+6. 优先从 PT-Gen/豆瓣获取中文名
+```
+
+### 质量字段自动选择
+
+```
+通过 MI/BDInfo 深度解析确定（非简单标题匹配）：
+1. 质量(zhiliang)：
+   UHD(BDInfo 2160p) → BD(BDInfo 1080p) → Encode(MiniBD/Blu-ray+x264/x265)
+   → Encode(Blu-ray+白名单组) → Encode(WEB-DL+FRDS) → WEB-DL
+   → Encode(WEBRip) → Encode(HDTVRip) → HDTV → Encode(DVDRip) → DVD
+   → REMUX(Remux标记)
+2. 来源(source)：
+   Blu-ray → WEBRip → WEB-DL → HDTVRip → HDTV → DVDRip → DVD
+3. 编码(vcodec)：
+   原盘: AVC/HEVC/VC-1/MPEG-2
+   Encode: x264/x265/AV1/VP9/VC-1/AVS2/AVS3/AVS+/XviD
+   特殊: MPEG-2/AV1/VP9/VC-1 直接用格式名
+4. 分辨率：从 MI width-height 差值推断 + scan type → p/i
+5. 音频：从 MI Audio 流逐一解析 format+channels+object+language
+```
+
+### 标签自动选择
+
+```
+1. 国语：MI/BDInfo 音频含 Chinese/Mandarin 或标题含国配/普通话 + 非大陆地区
+2. 粤语：MI/BDInfo 音频含 Cantonese 或标题含粤语/粤配
+3. 中字：MI 字幕含 Chinese + 非原盘时地区=大陆/港/台也触发
+4. 英字：MI 字幕含 English
+5. DIY：副标题含 DIY + 原盘
+6. 语言标签必选：地区=大陆/港/台 必须有国语或粤语
+7. 字幕检查：无任何字幕信息时提示检查
+```
+
+### MediaInfo/BDInfo 处理
+
+```
+1. 原盘用 BDInfo，非原盘用 MediaInfo（强制）
+2. 两者+infosp 全空 → 错误
+3. Info 中禁止包含图片
+4. BDInfo 码率不能为 0
+5. 支持多种 MediaInfo 格式：标准/中文/FRDS NFO/CMCT NFO/TLF NFO 等
+6. 支持多种 BDInfo 格式：Disc Title/Disc Label/DISC INFO
+7. 支持非标准 info（infosp）：小组发布信息/General Information 等
+```
+
+### 链接处理
+
+```
+1. IMDb 链接：非华语片必填，页面与简介须一致
+2. 豆瓣链接：必填（GodDramas 豁免），页面与简介须一致
+3. 两者都为空时 → 错误
+4. IMDb 豁免条件：地区=大陆/台湾/香港
+```
+
+### 文件结构检查
+
+```
+原盘(BD/UHD)：仅允许 .clpi/.mpls/.m2ts（BDMV 目录内）
+DVD：仅允许 .vob/.iso/.ifo/.bup
+其他：仅允许 .mkv/.mp4/.vob/.m2ts/.ts/.avi/.mov/.nfo/.md5
+白名单组额外允许：.jpg/.png/.txt/.ass
+文件数量须与集数匹配（非原盘/非GodDramas）
+```
+
+---
+
+*数据来源: upload.php (92140字节) + Wiki上传规则 (12281字节) + Wiki DUPE规则 (11334字节) + 种子检查脚本 PTerClub Torrent Checker v1.0.22 (2245行/141KB) + 论坛规则 (112756字节)*
+*文档更新: 2026-04-19*

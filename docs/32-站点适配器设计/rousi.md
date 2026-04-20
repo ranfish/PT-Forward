@@ -10,7 +10,7 @@
 | 认证方式 | **Passkey Bearer Token**（无需 cookie） |
 | 种子标识 | **UUID**（非数字 ID） |
 | Tracker 域名 | rousipt（与主域名不同） |
-| 特殊规则 | 无 cookie 认证；JSON API 发布；截图 base64 上传（最多6张）；BBCode→Markdown 转换；**禁止下载和发布 9KG/色情/成人类内容** |
+| 特殊规则 | 无 cookie 认证；JSON API 发布；截图 base64 上传（最多6张）；BBCode→Markdown 转换 |
 
 ---
 
@@ -261,9 +261,9 @@ PTNexus 实现中使用正则从标题推断 source：
 
 ---
 
-## 六、9KG 专区（禁止）
+## 六、9KG 专区
 
-> **本软件禁止下载和发布 9KG/色情/成人类内容。** 肉丝的 9KG 分类（category = "9kg"，id=11）及其所有资源不得处理。
+> 肉丝的 9KG 分类（category = "9kg"，id=11）。
 
 9KG 分类有独立的属性体系（供参考）：
 
