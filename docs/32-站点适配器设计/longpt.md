@@ -34,7 +34,7 @@
 - **无匿名发布、无 PT-Gen 豆瓣**：只有 IMDb url 字段
 - **官组体系**：LongA/LongWeb/LongPT/WiKi/RL/CMCT/HHWEB
 - **发布者双倍上传**
-- **9KG/成人内容禁止**：本软件禁止下载和发布此类内容
+
 
 ## 发布权限
 

@@ -2,7 +2,7 @@
 
 > **⛔ 禁止下载"特——别"版块内容、禁止发布"特别区"类型。**
 >
-> **⛔ 9KG/成人内容禁止规则适用** — 本站含成人向分类（old/middle/men and women/youth），根据项目规则禁止发布此类内容。
+> 本站含成人向分类（old/middle/men and women/youth）。
 
 ## 站点信息
 

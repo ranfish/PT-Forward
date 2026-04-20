@@ -33,7 +33,7 @@
 - **发布者双倍上传**：发布者获得双倍上传量
 - **白名单图床**：files.ptlgs.org / cmct.xyz / ssdforum.org / gifyu.com / imgbox.com / pixhost.to / ptpimg.me
 - **独立Wiki**：https://wiki.ptlgs.org 发布规则文档
-- **9KG/成人内容禁止**：本软件禁止下载和发布此类内容
+
 - **黑名单制作组**：禁止发布 FGT/NSBC/BATWEB/GPTHD/DreamHD/BlackTV/CatWEB/Xiaomi/Huawei/MOMOWEB/DDHDTV/SeeWeb/TagWeb/SonyHD/MiniHD/BitsTV/CTRLHD/ALT/NukeHD/ZeroTV/HotTV/EntTV/GameHD/SmY/SeeHD/VeryPSP/DWR/XLMV/XJCTV/Mp4Ba/GodDramas/FRDS/BeiTai/Ying/VCB-Studio 等31+组的资源
 - **字幕组分类**：分类含"字幕组"(411)，为字幕资源专用
 

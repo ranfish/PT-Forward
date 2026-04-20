@@ -218,7 +218,7 @@
 | 7 | AilMWeb(流媒体组) |
 | 8 | AilMTV(电视录制组) |
 | 14 | AilMUpscale(超分视频组) |
-| 15 | CatEDU(部分禁转) |
+| 15 | CatEDU |
 | 22 | Red Leaves (红叶) |
 | 5 | Other |
 
@@ -232,7 +232,7 @@
 | 26 | AilMWeb(流媒体组) |
 | 27 | AilMTV(电视录制组) |
 | 29 | AilMUpscale(超分视频组) |
-| 30 | CatEDU(部分禁转) |
+| 30 | CatEDU |
 | 21 | Red Leaves (红叶) |
 | 24 | Other |
 

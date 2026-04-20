@@ -7,7 +7,7 @@
 | 站点名称 | PTFans|
 | 站点地址 | https://ptfans.cc |
 | 站点框架 | NexusPHP |
-| 特殊规则 | 双分类模式（综合区mode=4 / 特别区9KG mode=5），**不下载也不发布到特别区** |
+| 特殊规则 | 双分类模式（综合区mode=4 / 特别区9KG mode=5） |
 
 ---
 
@@ -35,7 +35,7 @@
 PTFans 有两套分类，通过 `data-mode` 区分：
 
 - **mode=4（综合区）**：影视、学习、书籍等常规资源 — **PT-Forward 只使用此模式**
-- **mode=5（特别区/9KG）**：成人内容 — **PT-Forward 不下载也不发布**
+- **mode=5（特别区/9KG）**：成人内容
 
 ### 1.3 综合区类型（`type` mode=4）— 18个
 
@@ -152,7 +152,7 @@ PTFans 有两套分类，通过 `data-mode` 区分：
 2. **编码区分原盘/压制** — Bluray(AVC)(4) vs H.264(x264)(1)，Bluray(HEVC)(5) vs H.265(x265)(2)
 3. **制作组极少** — 仅 HDS/CHD/MySiLU/WiKi/Other，都是国内老牌组
 4. **媒介值7和8重复** — 都显示 "Encode"，需注意避免选错
-5. **9KG特别区** — mode=5 的12个分类全为成人内容，PT-Forward 不应触碰
+5. **9KG特别区** — mode=5 的12个分类全为成人内容
 
 ---
 
@@ -168,7 +168,7 @@ site:
   upload_action: "takeupload.php"
 
   restricted_modes:
-    - 5  # 9KG特别区 - 不下载也不发布
+    - 5  # 9KG特别区
 
   mappings:
     type:
@@ -275,12 +275,9 @@ PTFans 的分类ID不遵循常见规律：
 - 电视剧=404（非常规，通常是402）
 - 综艺=405（非常规，通常是403）
 
-### 4.4 9KG特别区过滤
+### 4.4 9KG特别区
 
-PT-Forward 在 RSS 订阅和发布时必须过滤 mode=5 的内容：
-- RSS 中识别到的 9KG 分类种子应跳过
-- 发布目标站点不应选择 PTFans 的 mode=5 分类
-- 种子详情页如果属于特别区也应跳过
+PTFans mode=5 包含 12 个成人内容分类。
 
 ---
 

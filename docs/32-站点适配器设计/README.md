@@ -60,7 +60,7 @@
 | 朋友 | [keepfrds.md](./keepfrds.md) | ✅ 完成（**仅源站**·全站官种·Cloudflare·HEVC细分5级·8K·19分类·转载须24h后·黑名单制作组） |
 | 葡萄 | [sjtu.md](./sjtu.md) | ✅ 完成（教育网·28分类按地区细分·编码含音频·禁止HEVC/10bit·黑名单组·豆瓣链接·校园原创） |
 | 浦园 | [njtupt.md](./njtupt.md) | ✅ 完成（教育网·演出分类·资料分类·MediaInfo字段·PT-Gen四来源·极简质量字段·标准规则） |
-| 麒麟 | [hdkyl.md](./hdkyl.md) | ✅ 完成（种审制·27黑名单组·processing_sel=年份·source_sel=地区19个·19音频·2K/480p·官种/驻站标签·MediaInfo·短剧） |
+| 麒麟 | [hdkyl.md](./hdkyl.md) | ✅ 完成（种审制·**审核脚本完整逆向 HDKylin-Torrent-Assistant v1.3.15 1364行/58KB→20+校验规则·改自不可说SpringSunday脚本·22黑名单组(当前注释)·UHD Blu-ray独立(24)·AV1脚本BUG(encode=12不存在)·6分类跳过全部校验(音乐/电子书/图片/漫画/游戏/软件)·官种+驻站+麒麟火三标签联动·GodDramas驻站短剧特殊规则·MediaInfo宽泛检测(9种格式)·processing_sel=年份·source_sel=地区22个·19音频含Atmos/DTS:X/DDP·**含完整转载自动填写优化方案**） |
 | 人人 | [audiences.md](./audiences.md) | ✅ 完成（Cloudflare·候选制·0day命名·无制作组/来源/地区字段·HDR三标签·Trump共存规则·Web-DL/WebRip·爆米花系统） |
 | 朱雀 | [zhuque.md](./zhuque.md) | ✅ 完成（**TNode框架**·Vue SPA+REST API·CSRF Token·TMDb必填·H264/x264四分·ID分段体系·无音频编码·标签逗号分隔） |
 | 肉丝 | [rousi.md](./rousi.md) | ✅ 完成（**自研框架**·Vue SPA+REST JSON API·Passkey认证·UUID种子·Base64截图·Markdown描述·动态属性·11分类·9KG专区禁止） |
@@ -70,7 +70,7 @@
 | 蝴蝶 | [hamster.md](./hamster.md) | ✅ 完成 |
 | PT地带 | [ptzone.md](./ptzone.md) | ✅ 完成 |
 | 幸运 | [luckpt.md](./luckpt.md) | ✅ 完成（Cloudflare·**LuckAudit预审核系统100分制·含完整审核规则逆向分析+转载自动填写优化方案**·17条审核规则·6站组·短剧分类·8K·AV1·最小1GB·HDR四标签·中字/国语智能检测·标题-MI交叉验证） |
-| 猫 | [pterclub.md](./pterclub.md) | ✅ 完成（**极简字段3下拉框·种子检查脚本完整逆向185KB JS→23项验证规则**·标题命名规范7种类型·质量/分类/地区判定算法·音频语言/字幕检测·DUPE规则·图床黑名单·独立Wiki·标签checkbox非tags数组） |
+| 猫 | [pterclub.md](./pterclub.md) | ✅ 完成（**极简字段3下拉框·PTerClub Torrent Checker v1.0.22 完整逆向2245行/141KB→40+校验规则·TORRENT_INFO结构化对象三方交叉验证(标题+MI+豆瓣)·分辨率从宽高差值推断·制作组白名单决定质量等级·多音轨完整流解析·标题命名7种类型·音频格式映射表·17制作组白名单·9编码组·DUPE规则·图床黑名单·独立Wiki·标签checkbox非tags数组·含转载方案**） |
 | 套套哥 | [ttg.md](./ttg.md) | ✅ 完成（自研框架·56混合分类·无质量字段无标签·禁转=nodistr·team=type重复·标题正则解析·[TTG]前缀清理） |
 | 趟平 | [tangpt.md](./tangpt.md) | ✅ 完成（standard_sel含8K·32制作组·19音频含AV3V·30标签含NSFW·AV1·站组TPWEB） |
 | 太乙 | [tey.md](./tey.md) | ✅ 完成（韩国资源特色·standard_sel含8K·极简媒介5种·Atmos三分·站组Tey·PT-Gen+MediaInfo） |
@@ -98,7 +98,7 @@
 | 优堡 | [ubits.md](./ubits.md) | ✅ 完成（**仅源站**·Cloudflare·官组极活跃UBits/UBWEB/UBTV·种审制·9分类·10媒介·9编码含AVS·14音频Atmos/DTS:X独立·分辨率含1440p·10地区含泰/印/俄·4制作组·17标签含原生原盘/高分国剧·IMDb+PT-Gen·禁止删除原站标识） |
 | 幼儿园 | [u2.md](./u2.md) | ✅ 完成（**仅源站**·动漫站·**深度定制NexusPHP无标准下拉菜单**·自由文本输入框·标题系统自动拼接·四大分类anime/manga/music/other·候选制严格·UCoin经济系统·AniDB集成·音频逐级缩进·媒介含BDRip/DVDRip/Remux/Live·编码含AV1/HEVC/AVC/VCE/NVENC/QSV·分辨率含1080i/SD·全站无PT-Gen/豆瓣/IMDb） |
 | 在脚下 | [hdroute.md](./hdroute.md) | ✅ 完成（**仅源站**·**自研框架**·老牌原盘/高清站·**普通用户仅能发原盘**·Uploader制·独特"最高音轨"字段·三段式标题(中文+一句+英文)·9分类含电影音轨·7媒介·7编码含MVC·5分辨率ID不连续含4K2K·9音频含LPCM·音轨复选框(国语/粤语/中字/DIY)·无标签·无制作组下拉·拒绝转发标记·IMDb得分+编号·预告片仅优酷/土豆·CKEditor·2013建站） |
-| 织梦 | [zmpt.md](./zmpt.md) | ✅ 完成（源站+发布站·Cloudflare·种审制·**审核脚本完整逆向(Greasyfork #552769 v2026.03.08 17项校验规则)**·7站组ZmWeb/ZmPT/ZmMusic/ZmAudio/DYZ-Movie/GodDramas/RL·9分类含短剧/有声书/游戏·10媒介含MiniBD·6分辨率含8K/2K·10音频含ALAC/WAV/OGG·7制作组·11分类ID非连续(401-427)·分辨率ID非标准(1080p=1/4K=5/720p=8)·转载来源检测Map(50+站别名)·HDR/杜比/中字/国语标签与MI交叉验证·标题严格校验(中文/分辨率P小写/年份/编码)·认领2000种·全站随机促销·宝可梦主题·电力值经济系统·**含完整转载自动填写优化方案**） |
+| 织梦 | [zmpt.md](./zmpt.md) | ✅ 完成（源站+发布站·Cloudflare·种审制·**审核脚本完整逆向 zmpt-check-tool v2026.03.08 2696行/117KB→20+校验规则·五层递进HDR检测·54站转载来源Map·国语标签三方交叉验证·原盘DIY文件结构检测·中文字幕13种标识·中文音频8种标识·PT-Gen自建端点**·7站组·9分类含短剧/有声书/游戏·10媒介含MiniBD·6分辨率含8K/2K·10音频含ALAC/WAV/OGG·7制作组·11分类ID非连续·分辨率ID非标准·**含完整转载自动填写优化方案·标题清洗9规则·标签自动选择8项·简介自动构建含引用关键词**·认领2000种·全站随机促销·宝可梦主题·电力值经济系统） |
 | 自然 | [zrpt.md](./zrpt.md) | ⚠️ 部分完成（纪录片特色站·建站2025·规则与织梦同模板·**上传表单未获取(审核拒绝达上限)**·9分类为纪录片题材(军事/生物/美食/人文/宇宙/音乐/体育/其它)·分类ID非连续(401-412)·全站Free(2025-09~2026-06)·发布者双倍上传） |
 | 劳改所 | [ptlgs.md](./ptlgs.md) | ✅ 完成（源站+发布站·Cloudflare·**种审制·官方审核脚本完整逆向(ptlgs-Torrent-Assistant v1.1.43 830行 29+项校验规则·含种审员模式额外15项)**·10次候选制·豆瓣优先建库·7官组DYZ-WEB/DYZ-Movie/DYZ-TV/Eleph/beAst/ZmWeb·字幕组分类(411)·11媒介ID非标准(Blu-ray=14)·5编码无AV1·11音频DTS=19非标准·6分辨率无8K·19标签含HLG/SDR/3D/驻站/独家·**31+黑名单制作组**·白名单图床7个·独立Wiki·禁止超分/补帧/机翻·**含完整转载自动填写优化方案**） |
 | 我爱电影 | [52movie.md](./52movie.md) | ⚠️ 部分完成（**规则与织梦/自然完全同模板(模板B组)**·Cloudflare·候选制·**上传表单未获取(账户无发布权限)**·独立字幕区·认领1000种·签到500魔力·游戏类仅上传员·建站2024） |
