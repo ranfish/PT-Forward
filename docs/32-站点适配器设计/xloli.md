@@ -16,6 +16,8 @@
 
 **重要约束**：
 - 适配器只使用综合区（browsecat，data-mode=4）的分类
+- ⛔ **全局禁止（§30.3）**：9KG 区（specialcat，data-mode=6）被全局策略屏蔽，**禁止下载和发布**
+- YAML 配置中 `skip_modes: ["special"]`，启动时由 RequiredSkips 审计（§30.4.2）
 
 ---
 
