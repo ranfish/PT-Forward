@@ -26,9 +26,9 @@
 | `pt_gen` | text | - | PT-Gen 链接（支持 IMDb/豆瓣/Bangumi/indienova） |
 | `descr` | textarea | ✓ | 简介（BBCode，20行） |
 | `technical_info` | textarea | - | MediaInfo/BDInfo（8行） |
-| `uplver` | checkbox | - | 匿名发布（未在表单中看到，但规则未明确排除） |
+| `uplver` | checkbox | - | 匿名发布（value="yes"，**默认勾选**） |
 
-注意：alingPT 无 `url`（IMDb链接）和 `nfo` 字段。PT-Gen 支持4种来源（IMDb/豆瓣/Bangumi/indienova），是已分析站点中最多的。MediaInfo/BDInfo 有详细的使用说明。
+注意：alingPT 无 `url`（IMDb链接）和 `nfo` 字段。PT-Gen 支持4种来源（IMDb/豆瓣/Bangumi/indienova），是已分析站点中最多的。MediaInfo/BDInfo 有详细的使用说明。匿名发布默认勾选——转种时如不需匿名需主动取消勾选。
 
 ### 1.2 质量选择字段
 
@@ -205,18 +205,44 @@
 - 发布组打包资源
 - 打包要求：相同媒介、相同分辨率、相同编码格式、相同发布组
 
-### 3.5 促销规则
+### 3.5 账号保留规则
+
+| 条件 | 规则 |
+|------|------|
+| Veteran User 及以上 | 永远保留 |
+| 封存账号 | 不会被删除 |
+| 未封存账号 | 连续 **200** 天不登录删除 |
+| 无流量账号 | 连续 **60** 天不登录删除 |
+
+### 3.6 促销规则
 
 - **所有新种一律 free 3天**
 - 关注度高的种子由管理员设为促销
 
-### 3.6 认领规则
+### 3.7 认领规则
 
-- 发布30天后可认领
-- 一个种子30个上限
-- 最多认领无限
-- 达标标准：180小时 / 10倍体积
-- 达标奖励1倍，不达标扣300，主动放弃扣200
+| 项目 | 规则 |
+|------|------|
+| 可认领时间 | 种子发布 30 天后 |
+| 每种子认领上限 | 30 人 |
+| 每用户认领上限 | 无限 |
+| 达标标准 | 180 小时 或 10 倍体积 |
+| 达标奖励 | 正常魔力 1 倍 |
+| 不达标惩罚 | 扣 300 魔力 |
+| 主动放弃惩罚 | 扣 200 魔力 |
+
+### 3.8 站点特殊政策（论坛"入站必读" topicid=1）
+
+- **不黑种、不限盒子、不需要报备、不管多 IP、无 HR、允许 QBEE**
+- 原则上不限速，但超速会被系统/手动封号（超速阈值不公布）
+- 超速被封号：除非付费否则不解封
+- 存在超速不计规则（具体数值不公布）
+- 禁止发布含以下副档名的文件：`bat exe vbs cmd com scr js jse wsf wsh ps1 sh dll sys msi reg`
+- 压缩包不禁止（因种子可能含原声带/专辑），但需注意解压安全
+- pt 交流区 Power User 及以上可见
+- Telegram 公告频道：https://t.me/alingPT
+- Telegram 群：https://t.me/+zVttq_WUHo9kOGEy
+- 站长明确表示"新站刚开，规则变动频繁"
 
 ---
 
@@ -238,6 +264,8 @@ site:
     source_as_region: "source_sel用作地区选择，含11个细分地区"
     new_seed_free: "所有新种free 3天"
     pt_gen_multi_source: "PT-Gen支持IMDb/豆瓣/Bangumi/indienova四种来源"
+    uplver_default_checked: "匿名发布默认勾选，转种时需注意"
+    no_hr: "无HR规则，不限盒子，不限速（超速除外）"
 
   mappings:
     type:
@@ -309,12 +337,12 @@ site:
     tags: "tags[4][]"
     technical_info: "technical_info"
     pt_gen: "pt_gen"
+    anonymous: "uplver"
 
   missing_fields:
     - "audiocodec_sel"
     - "nfo"
-    - "url"
-```
+    - "url"```
 
 ---
 
@@ -353,4 +381,5 @@ alingPT 的 PT-Gen 支持最广泛的来源：
 ---
 
 *分析时间：2026-04-16*
-*数据来源：https://pt.aling.de/upload.php + rules.php*
+*最后更新：2026-04-22*
+*数据来源：https://pt.aling.de/forums.php?action=viewtopic&forumid=1&topicid=1 + https://pt.aling.de/rules.php + https://pt.aling.de/upload.php*

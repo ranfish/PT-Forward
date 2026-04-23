@@ -25,6 +25,7 @@
 | `small_descr` | text | - | 副标题 |
 | `nfo` | file | - | NFO 文件 |
 | `descr` | textarea | ✓ | 简介（BBCode，20行） |
+| `uplver` | checkbox | - | 匿名发布（value="yes"） |
 
 ### 1.2 质量选择字段
 
@@ -123,7 +124,6 @@
 - `technical_info` — 无 MediaInfo 输入框
 - `pt_gen` — 无 PTGen 链接输入框
 - `url` — 无 IMDb 链接输入框
-- `uplver` — 无匿名发布选项
 
 ---
 
@@ -218,6 +218,16 @@
 
 游戏类资源只有**上传员**及以上等级用户才能自由上传，其他用户必须先在候选区提交候选。
 
+### 3.7 账号保留规则
+
+| 条件 | 规则 |
+|------|------|
+| Veteran User 及以上 | 永远保留 |
+| Elite User 及以上 | 封存账号后不会被删除 |
+| 封存账号 | 连续 400 天不登录删除 |
+| 未封存账号 | 连续 150 天不登录删除 |
+| 无流量账号 | 连续 100 天不登录删除 |
+
 ---
 
 ## 四、站点适配器配置参考
@@ -299,6 +309,7 @@ site:
     standard: "standard_sel[4]"
     team: "team_sel[4]"
     tags: "tags[4][]"
+    anonymous: "uplver"
 
   missing_fields:
     - "audiocodec_sel"
@@ -306,7 +317,6 @@ site:
     - "technical_info"
     - "pt_gen"
     - "url"
-    - "uplver"
 
   quirks:
     codec_h265_value: "H.265/HEVC值为10（非连续）"
@@ -337,9 +347,9 @@ H.265/HEVC 的值为 **10**（而非6），转种映射时需注意。
 - 无 `url`：IMDb 链接写入简介
 - 无 `pt_gen`：无 PTGen 辅助
 - 无 `technical_info`：MediaInfo 写入简介
-- 无 `uplver`：无法匿名发布
 
 ---
 
 *分析时间：2026-04-16*
-*数据来源：https://www.oshen.win/upload.php + rules.php*
+*最后更新：2026-04-22*
+*数据来源：https://www.oshen.win/rules.php + https://www.oshen.win/upload.php 发布页面 HTML 分析*
