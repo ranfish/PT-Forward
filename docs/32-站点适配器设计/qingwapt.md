@@ -24,7 +24,7 @@
 #### 基本格式
 
 ```
-剧名 年份 其他信息 分辨率 地区码 来源类型 规格 HDR类型 bit信息 视频编码 音频编码 声道数 对象信息 音轨数-制作组
+剧名 季集信息 年份 其他信息 分辨率 地区码 内容分发方 片源类型 规格 HDR类型 bit信息 视频编码 音频编码 声道数 对象信息 音轨数-制作组
 ```
 
 #### 示例
@@ -242,6 +242,8 @@ Atmos / Auro3D（DTS:X 不需要标注）。省略则视为不存在。
 **特殊情况**：
 - 动漫区如果蓝光对 TV 版作出了极大幅度的修正，TV 资源将予以保留
 - 某些上古旧番的高清版仅有 WEB-DL，此情况下 WEB-DL 也将和蓝光或 DVD 一起保留
+- **动漫区额外规定**：已发售并放流蓝光盘的日本动画，不允许再发布 WEB-DL 和 WEBRip 资源
+- **WEB-DL 特殊规则**：同一个影视资源，在有官种（官方首发）的情况下，将不接受分辨率/质量相同或更低的 WEB-DL 种子资源
 
 #### 合集打包规则
 
@@ -257,16 +259,23 @@ Atmos / Auro3D（DTS:X 不需要标注）。省略则视为不存在。
 
 - **当然不准转载禁转种**
 - **已有完结的种子禁止发布单集资源**
+- **禁止转载发布未完结分集** — 未完结剧集只接受增量包，不接受分集转载
 - **禁止转载超分处理/补帧资源**
 - **禁止转载黑名单制作组的资源**
 - **不建议转载找不到出处的资源** — 可以加 -NoGroup 或者 -NoGrp，但请自担责任
 - **不建议转载灰名单制作组的资源**
-- **禁止转载机翻资源**
+- **禁止转载简易机翻资源**
 - **请直接上传原种** — 以便辅种
 - **编辑需要** — 如果确有编辑需要，请在简介中明确注明增补内容
   - 注意，"添加了字幕""修正了不规范的名字"并不是合理的"编辑需要"
 - **标题和副标题需符合本站规范** — 即使是转载，标题也应修改成本站对应的格式
 - **务必写明种子出处** — 实在找不到的也不强求
+
+**重要补充规则**：
+- **本站禁止发布剧集的分集**（PT-Forward 适配器层面强制执行，即使 Wiki 标签规则说"需要申请"可使用分集标签，自动转发不应涉及分集资源）
+- 分集标签(18)仅限手动申请通过后使用，自动转发流程中**不得勾选**
+- 建议把预览图下载到自己电脑重新上传到网站附件或图床
+- 源站简介如果无法达到本站对应分区的简介标准，则按要求补充简介
 
 原出处简介推荐用 quote 标签括起来：
 ```
@@ -295,6 +304,27 @@ Atmos / Auro3D（DTS:X 不需要标注）。省略则视为不存在。
 - **特殊符号** — 不可包含（斜杠、引号等）
 - **点号结尾** — 点号不能出现在文件/文件夹末尾
 
+### 3.5 压缩包规则
+
+- **禁止使用非常见压缩格式**（以标准版 7-zip 能解压为限，含 zstd）
+- **禁止带密码**
+- **禁止"假装是 zip"的格式**（快压/好压等）
+- 不推荐 RAR5 格式（兼容性问题）
+- 不推荐 zip 格式（unicode 支持不好）
+- 超过 4GB 压缩包建议分卷（非硬性要求）
+- RAR 恢复记录设置在 **5% 以下**
+
+### 3.6 做种规则
+
+- 上传者必须实际拥有上传文件（可存本地或盒子）
+- **本站对盒子暂无任何限制，也无需报备**
+- **最小上传速度 300KB/s**，故意低速将警告/封禁
+- **免费期 48 小时**内不可撤种；完成数 ≥ 3 后方可撤种
+- 基本出种前（做种数 ≥ 3 并持续 **6 小时**），非做种状态不超过 24 小时
+- 发布后 **7 天内无人下载**，允许撤种
+- **禁止将视频打压缩包发布**
+- 软件类资源请打压缩包发布（尤其小文件多的）
+
 ### 4. 自查流程
 
 1. 安装站内大佬写的自查插件
@@ -306,7 +336,86 @@ Atmos / Auro3D（DTS:X 不需要标注）。省略则视为不存在。
 7. **MediaInfo** — 检查 MediaInfo 信息
 8. **类型 & 质量 & 标签** — 检查类型、质量和标签
 
-### 5. 各分区发布要求
+### 5.5 转种自查指南（Forum 197）
+
+**来源**: topicid=197（转种自查指南v0.1，作者 playboy）
+
+#### 检查一：允许的资源
+- 官种转种（非禁转）大部分可直接转
+- BT/网盘资源一般不被允许（稀缺资源可 PM 管理组）
+- **跨季打包和多分辨率打包不被允许**
+- 已完结剧集**禁止发布单集**
+- 未完结剧集从第一集开始发
+- **动漫区额外规定**：已发售并放流蓝光盘的，不允许再发布 WEB-DL 和 WEBRip 资源（适用于日本动画）
+
+#### 检查二：种子文件
+- 可直接上传源站点种子，站点会自动洗种
+
+#### 检查三：主标题
+- 按标题规范重新修改
+
+#### 检查四：副标题 & IMDb & PT-Gen & NFO
+- 前两项（副标题/IMDb）复制源站点
+- NFO 不需要填写
+
+#### 检查五：简介（错误最多）
+- **顺序**：感谢词 → 说明 → PT-Gen 内容（海报→基本信息→简介）→ 截图
+- 感谢词用 `[quote]` 框起来
+- 说明单独用 `[quote]` 框起来，位于感谢词后海报前
+- VCB 资源：感谢词替代为官网作品链接，说明替代为官网作品说明
+- 截图确保未裂，至少一张，推荐 PNG 原图
+- 推荐图床：pixhost / imgbox / ImgBB / freeimage
+- 多余内容删除（如源站广告）
+- **MediaInfo 不要放在简介里**（删除并移至专属栏位）
+
+#### 检查六：MediaInfo
+- 压制资源：重新生成 MediaInfo（不推荐引用源站的，可能简化或中文导致排版异常）
+- 原盘资源：使用 BDInfo 生成
+- 留空将百分百被打回
+
+#### 检查七：类型 & 质量 & 标签
+- 类型选对应资源（**动漫电影也算动漫**）
+- 媒介辨别：
+  - UHD Blu-ray：来源 UHD 且编码 HEVC/AVC，分辨率一般 4K
+  - Blu-ray：来源 Blu-ray 且编码 AVC，分辨率一般 1080p
+  - Remux：标题含 Remux
+  - WEB-DL：标题含 WEB-DL
+  - Encode：来源 BluRay 且编码 x264/x265
+
+### 5.6 流媒体厂商缩写名（Forum 208 附件1）
+
+**来源**: topicid=208 附件1（~170 个厂商）
+
+常见缩写：
+
+| 缩写 | 厂商 |
+|------|------|
+| AMZN | Amazon/Prime Video |
+| NF | Netflix |
+| DSNP | Disney+ |
+| HMAX | HBO Max |
+| HBO | HBO |
+| ATVP | Apple TV+ |
+| HULU | Hulu |
+| PCOK | Peacock |
+| PMTP | Paramount+ |
+| CR | Crunchyroll |
+| iT | iTunes |
+| iP | BBC iPlayer |
+| DSCP | Discovery+ |
+| MAX | Max（原 HBO Max 更名） |
+| STAR | Disney+ Hotstar |
+| MY5 | Channel 5 |
+| CRAV | Crave |
+| HIDI | Hidive |
+| CC | Criterion Channel |
+| MUBI | Mubi |
+| STAN | Stan |
+| BFI | BFI Player |
+| ALL4 | Channel 4 |
+| RED | YouTube Premium/Red |
+
+> 完整列表见 Forum 208 附件1。适配器解析标题时需匹配这些缩写来识别 WEB 来源。
 
 #### 所有视频分区
 
@@ -334,7 +443,9 @@ Atmos / Auro3D（DTS:X 不需要标注）。省略则视为不存在。
 - 软件/游戏务必带版本号，零碎文件打成压缩包
 - 严禁夹带私货
 
-### 发布页面分析
+### 发布页面分析（2026-04-22 Playwright 实际采集）
+
+> 用户 ranfish 已登录，页面标题 `青蛙 :: 发布 - Powered by NexusPHP`，表单共 49 个元素。
 
 #### 基本信息
 
@@ -342,128 +453,178 @@ Atmos / Auro3D（DTS:X 不需要标注）。省略则视为不存在。
 |------|------|
 | 表单地址 | https://www.qingwapt.com/takeupload.php |
 | 表单方法 | POST multipart/form-data |
-| 表单字段数 | 49 个 |
 | 站点框架 | NexusPHP |
+| Tracker URL | https://tracker.qingwapt.com/announce.php |
 
-#### 关键字段说明
+#### 核心字段（8 个数据字段）
 
-| 字段名称 | 类型 | 说明 |
-|----------|------|------|
-| `name` | text | 主标题（必须符合视频标题命名规范） |
-| `small_descr` | text | 副标题 |
-| `type` | select-one | 分类类型（电影/剧集/动画等） |
-| `url` | text | IMDB 链接 |
-| `pt_gen` | text | PT-Gen 链接或内容 |
-| `descr` | textarea | 简介/描述正文 |
-| `tagcount` | int | 标签数量 |
-| `color` | int | 标题颜色 |
-| `font` | int | 标题字体 |
-| `size` | int | 种子大小（字节） |
-| `IMG` | file | 图片上传 |
-| `list` | file | 图片列表上传 |
-| `quote` | textarea | 引用内容 |
-| `md` | textarea | Markdown 内容 |
-| `b` | checkbox | 匿名发布（NexusPHP uplver） |
-| `i` | checkbox | IMDB 图片上传 |
-| `u` | checkbox | 上传中 |
-| `upload-descr-btn-preview` | button | 描述预览按钮 |
+| 字段 name | 类型 | 必填 | 说明 |
+|-----------|------|------|------|
+| `file` | file | 是 | 种子文件（id=torrent） |
+| `name` | text | 是 | 主标题（id=name，必须符合 0day 命名规范） |
+| `small_descr` | text | 否 | 副标题（建议填写，审核脚本检查为空报错） |
+| `url` | text | 否 | IMDb 链接 |
+| `pt_gen` | text | 否 | PT-Gen 链接（支持 imdb/douban/tmdb/bangumi/indienova） |
+| `nfo` | file | 否 | NFO 文件上传 |
+| `descr` | textarea | 是 | 简介正文（id=descr，BBCode 编辑器） |
+| `technical_info` | textarea | 否 | **MediaInfo/BDInfo 独立栏位**（无 id，与 descr 分离） |
 
-#### 发布页面表单字段完整列表
+> **重要发现**：`technical_info` 是独立于 `descr` 的 textarea，用于填写 MediaInfo 或 BDInfo。审核脚本检查此栏位为空或不含正确格式时报错。这比猫站（MediaInfo 放在 descr 的 hide 标签中）更清晰。
 
-```go
-// 青蛙站点发布表单字段完整列表
-const QingWapPublishFields = []string{
-    // 必填字段
-    "file",           // 种子文件（必须）
-    "name",          // 主标题（必须）
-    "type",          // 分类（必须）
-    "small_descr",   // 副标题
-    "descr",         // 简介/描述正文（必须）
-    
-    // 可选字段
-    "url",           // IMDB 链接
-    "pt_gen",       // PT-Gen 内容或链接
-    "nfo",           // NFO 文件
-    "tagcount",      // 标签数量
-    "color",         // 标题颜色
-    "font",          // 标题字体
-    "size",          // 种子大小
-    "list",          // 图片列表上传
-    "quote",         // 引用内容
-    "md",            // Markdown 内容
-    
-    // 发布控制字段
-    "b",             // 匿名发布（NexusPHP uplver）
-    "i",             // IMDB 图片上传
-    "u",             // 上传中
-    "upload-descr-btn-preview", // 描述预览按钮
-}
-```
+#### 下拉选择字段（6 个 + 3 个格式字段）
 
-#### 与标准 NexusPHP 表单字段对比
+**分类 type（10 个选项）**：
 
-| 标准 NexusPHP 字段 | 青蛙对应字段 | 说明 |
-|---------------------|--------------|------|
-| `file` | `file` | 完全相同 |
-| `name` | `name` | 完全相同 |
-| `small_descr` | `small_descr` | 完全相同 |
-| `type` | `type` | 完全相同 |
-| `url` | `url` | 完全相同 |
-| `pt_gen` | `pt_gen` | 完全相同 |
-| `descr` | `descr` | 完全相同 |
-| `nfo` | `nfo` | 完全相同 |
-| `b` | `b` | 完全相同 |
-| `i` | `i` | 完全相同 |
-| `u` | `u` | 完全相同 |
+| ID | 名称 |
+|----|------|
+| 401 | 电影 |
+| 402 | 剧集 |
+| 403 | 综艺 |
+| 405 | 动漫 |
+| 404 | 纪录片 |
+| 406 | MV |
+| 407 | 体育 |
+| 408 | 音乐 |
+| 412 | 短剧 |
+| 409 | 其他 |
 
-#### 青蛙站点特殊字段
+> 注意：403=综艺，405=动漫，与猫站 403=动画、405=综艺 **不同**。青蛙 402=剧集、404=纪录片，猫站 402=纪录片、404=电视剧。
 
-| 字段 | 特殊说明 |
-|------|----------|
-| `tagcount` | 青蛙特有字段，控制标签显示数量 |
-| `color` | 标题颜色 |
-| `font` | 标题字体 |
-| `list` | 图片列表上传（青蛙特有） |
-| `quote` | 引用内容（青蛙特有） |
-| `md` | Markdown 内容（青蛙特有） |
+**媒介 source_sel[4]（11 个选项）**：
 
-#### 发布页面截图说明
+| ID | 名称 |
+|----|------|
+| 1 | UHD Blu-ray |
+| 8 | Blu-ray |
+| 9 | Remux |
+| 10 | Encode |
+| 7 | WEB-DL |
+| 4 | HDTV |
+| 2 | DVD |
+| 3 | CD |
+| 11 | MiniBD |
+| 5 | Track |
+| 6 | Other |
 
-青蛙站点发布页面截图已获取（已清理）：
-- `/tmp/qingwapt_upload_page.png` - 发布页面基础截图
-- `/tmp/qingwapt_upload_page_detailed.png` - 发布页面完整截图
+> **注意**：字段名带 `[4]` 后缀（如 `source_sel[4]`），是 NexusPHP 动态字段——`[4]` 表示当前默认分类（电影）。切换分类时后缀会变化。
 
-#### 发布流程与表单映射
+**视频编码 codec_sel[4]（8 个选项）**：
 
-发布流水线中的字段映射阶段（§11.10 字段映射）：
+| ID | 名称 |
+|----|------|
+| 1 | H.264/AVC |
+| 6 | H.265/HEVC |
+| 2 | VC-1 |
+| 4 | MPEG-2 |
+| 7 | AV1 |
+| 3 | MPEG-4 |
+| 8 | VP9 |
+| 5 | Other |
 
-1. **标准化参数映射** — `standardized_params.type` → `type` 字段
-2. **站点配置映射** — 根据 `site_config.mappings.type` 映射到具体分类值
-3. **表单字段构造** — 构建完整的 `formFields` map[string]string
-4. **发布表单提交** - 提交到 `takeupload.php`
-5. **匿名发布处理** — 应用 `b` 字段（§21.14 匿名发布配置）
+**音频编码 audiocodec_sel[4]（18 个选项）**：
 
-#### 示例表单字段值
+| ID | 名称 |
+|----|------|
+| 9 | DTS:X |
+| 14 | DTS |
+| 10 | DTS-HD MA |
+| 21 | DTS-HD HRA |
+| 11 | TrueHD Atmos |
+| 12 | TrueHD |
+| 13 | LPCM |
+| 15 | DD/AC3 |
+| 16 | DDP/E-AC3 |
+| 1 | FLAC |
+| 17 | AAC |
+| 18 | APE |
+| 19 | WAV |
+| 4 | MP3 |
+| 8 | M4A |
+| 20 | OPUS |
+| 22 | AV3A |
+| 7 | Other |
 
-```go
-// 发布表单字段示例
-formFields := map[string]string{
-    "name":          "The Last 10 Years 2022 1080p BluRay x265 DD 5.1-CMCT",
-    "small_descr":   "2022 1080p BluRay x265 DD 5.1-CMCT",
-    "type":          "movie",                    // 根据 mapping 映射到具体值
-    "url":           "https://www.imdb.com/title/tt0090080/",
-    "pt_gen":       "https://qingwapt.com/ptgen?title=The+Last+10+Years&year=2022",
-    "descr":         "简介内容...",
-    "nfo":           "NFO 内容...",
-    "b":             "yes",                   // 匿名发布
-    "i":             "",                     // 不上传 IMDB 图片
-    "u":             "",                     // 不显示上传中状态
-    "tagcount":      "3",                   // 标签数量
-    "color":         "0",                    // 标题颜色（0=默认）
-    "font":          "0",                    // 标题字体（0=默认）
-    "size":          "0",                    // 自动计算
-}
-```
+**分辨率 standard_sel[4]（8 个选项）**：
+
+| ID | 名称 |
+|----|------|
+| 6 | 8K/4320p |
+| 7 | 4K/2160p |
+| 8 | 2K/1440p |
+| 1 | 1080p |
+| 2 | 1080i |
+| 3 | 720p |
+| 4 | SD |
+| 5 | Other |
+
+**制作组 team_sel[4]（5 个选项）**：
+
+| ID | 名称 |
+|----|------|
+| 6 | FROG |
+| 7 | FROGE |
+| 8 | FROGWeb |
+| 10 | CatEDU |
+| 5 | Other |
+
+### 官组后缀
+
+FROG / FROGE / FROGWeb
+
+> 注意：审核脚本中提到 GodDramas（id=9），但发布页面制作组选项中**没有** GodDramas。标题含 `frog`/`froge`/`frogweb` → `officialSeed=true`。
+
+#### 标签 tags[4][]（16 个 checkbox）
+
+| value | 标签名 | 对应 Wiki 标签 |
+|-------|--------|---------------|
+| 2 | VCB-Studio | VCB-Studio 小组作品 |
+| 17 | 儿童片 | 适合儿童观看 |
+| 19 | LGBTQ+ | — |
+| 1 | 禁转 | 不希望被转载 |
+| 6 | 中字 | 内嵌/内封/外挂中文字幕 |
+| 20 | 特效字幕 | 带特效字幕 |
+| 5 | 国语 | 含国语（普通话）音轨 |
+| 8 | 粤语 | 含粤语音轨 |
+| 14 | 完结 | 完结剧集 |
+| 10 | 系列合集 | 多季/系列电影打包 |
+| 11 | 原生原盘 | 未经修改的原盘 |
+| 4 | DIY | DIY 资源 |
+| 15 | 杜比视界 | 含杜比视界 |
+| 12 | HDR | 含 HDR10 |
+| 13 | HDR10+ | 含 HDR10+（须同时选 HDR） |
+| 7 | Remux | Remux 资源 |
+
+> Wiki 标签页列出的"官方"、"驻站"、"零魔"标签不在 checkbox 中（系统自动判断）。
+
+#### 其他字段
+
+| 字段 | 说明 |
+|------|------|
+| `uplver` | 匿名发布 checkbox（value=yes） |
+| `color` | 标题颜色下拉（40 色） |
+| `font` | 标题字体下拉（20 种） |
+| `size` | 标题字号下拉（1-7） |
+| `tagcount` | BBCode 编辑器"关闭所有标签"按钮 |
+| `b/i/u/url/IMG/list/quote/md` | BBCode 编辑器工具栏按钮 |
+
+#### 与猫站发布页的关键差异
+
+| 对比项 | 猫站 (PTerClub) | 青蛙 (QingWaPT) |
+|--------|-----------------|-----------------|
+| MediaInfo | 放在 `descr` 的 `[hide=MediaInfo]` 中 | **独立 `technical_info` 字段** |
+| 豆瓣链接 | 独立 `douban` 字段 | 无独立字段，用 `pt_gen` |
+| 地区选择 | `team_sel`（大陆/香港/台湾/欧美/韩国/日本/印度/其他） | **无地区选择字段** |
+| 质量/媒介 | `source_sel`（15 选项，含 FLAC/WAV/ISO/PDF 等） | `source_sel[4]`（11 选项，纯视频媒介） |
+| 视频编码 | **无独立字段** | `codec_sel[4]`（8 选项） |
+| 音频编码 | **无独立字段** | `audiocodec_sel[4]`（18 选项） |
+| 分辨率 | **无独立字段** | `standard_sel[4]`（8 选项） |
+| 制作组 | **无独立字段** | `team_sel[4]`（5 选项） |
+| 标签 | 11 个独立 name checkbox | `tags[4][]` 数组 checkbox（16 个） |
+| 引用发布 | `referid` 字段 | **无引用字段** |
+| 分类 ID | 402=纪录片，404=电视剧 | 402=剧集，404=纪录片 |
+| NFO | **无** | 有 `nfo` file 字段 |
+
+> **核心差异**：猫站只有 3 个下拉框（type/source_sel/team_sel），标题中的编码、分辨率、音频等纯靠文本匹配审核。青蛙站有 7 个下拉框，标题和下拉必须同时匹配。
 
 ---
 
@@ -1090,11 +1251,16 @@ func TestQingWapHook_ValidateFileSpecs(t *testing.T) {
 - 重复和合集规则：https://wiki.qingwapt.org/docs/rules/content-rules/duplicate-collection
 - 制种和转种规则：https://wiki.qingwapt.org/docs/rules/content-rules/torrent-transfer
 - 黑名单和灰名单：https://wiki.qingwapt.org/docs/rules/content-rules/blacklist
+- 发布和做种规则：https://wiki.qingwapt.org/docs/rules/content-rules/publish-seed
 - 标签规则：https://wiki.qingwapt.org/docs/rules/content-rules/tags
 - 分区发布规则：https://wiki.qingwapt.org/docs/rules/content-rules/category-rules
 - MediaInfo和BDInfo教程：https://wiki.qingwapt.org/docs/rules/content-rules/upload-tutorials
 - 影片参数详解：https://wiki.qingwapt.org/docs/guides/content-creation/mediainf
 - 杜比视界：https://wiki.qingwapt.org/docs/guides/content-creation/dv
+- 流媒体厂商缩写：https://wiki.qingwapt.org/docs/guides/content-creation/streaming
+- Forum 205: 发种规范 v1.02（Dupe/制种/转种/压缩包/发布/做种/分区规则）
+- Forum 208: 视频标题命名规范 v1.05（含 ~170 流媒体厂商缩写附件）
+- Forum 197: 转种自查指南 v0.1（7 步自查流程）
 - 自查助手（油猴插件）：https://greasyfork.org/zh-CN/scripts/490095-qingwa-torrent-assistant
 
 ## 审核脚本完整逆向分析
@@ -1108,8 +1274,8 @@ func TestQingWapHook_ValidateFileSpecs(t *testing.T) {
 | 版本 | 1.1.1 |
 | 作者 | QingWaPT-Official |
 | 致谢 | 不可说-Torrent-Assistant, 末日-Torrent-Assistant |
-| 大小 | 1886 行 / 82KB（含 Greasyfork HTML 包装，实际 JS 约 1350 行） |
-| 运行页面 | `upload.php*`（发布页） |
+| 大小 | 1353 行 |
+| 运行页面 | `details.php*`（种子详情/审核页） |
 | 权限 | GM_xmlhttpRequest / GM_setValue / GM_getValue |
 
 > **基于不可说/末日审核脚本改写**，结构与 Agsv-Torrent-Assistant 高度相似，但规则针对青蛙站定制。
@@ -1170,28 +1336,25 @@ func TestQingWapHook_ValidateFileSpecs(t *testing.T) {
 
 | ID | 名称 | 标题匹配关键词 |
 |----|------|--------------|
-| 6 | DTS:X | `dts.x\|dts-x\|dtsx` |
-| 11 | DDP | `ddp\|dd+\|e-?ac3\|dolby digital plus` |
-| 14 | TrueHD Atmos | `truehd.*atmos` |
-| 12 | TrueHD | `truehd` |
-| 19 | Atmos | `atmos` |
-| 16 | DTS-HD MA | `dts-hd.?ma\|dtshdma` |
-| 17 | DTS-HD HR | `dts-hd.?hr\|dtshdhr` |
-| 2 | DTS | `dts`（排除 dts-hd 等） |
-| 1 | DD | `ac-?3\|dd[^p+\|dolby digital[^+]` |
-| 4 | FLAC | `flac` |
-| 3 | AAC | `aac` |
-| 5 | LPCM | `lpcm\|pcm` |
-| 7 | ALAC | `alac` |
-| 8 | WAV | `wave?\b` |
-| 9 | OGG | `ogg` |
-| 10 | OPUS | `opus` |
-| 13 | MPEG | `mp[23]` |
-| 15 | AV3A | `av3a` |
-| 18 | USAC | `usac` |
-| 20 | M4A | `m4a` |
-| 21 | ADPCM | `adpcm` |
-| 22 | Other | - |
+| 9 | DTS:X | `dts.x`/`dts-x`/`dtsx` |
+| 11 | TrueHD Atmos | `truehd.*atmos` |
+| 12 | TrueHD | `truehd`（排除 atmos） |
+| 10 | DTS-HD MA | `dts-hd.?ma`/`dtshdma` |
+| 3 | DTS-HD HRA | `dts-hd.?hr`/`dtshdhr` |
+| 14 | DTS | `dts`（排除 dts-hd 等） |
+| 16 | DDP/E-AC3 | `ddp`/`dd+`/`e-?ac3`/`dolby digital plus` |
+| 15 | DD/AC3 | `ac-?3`/`dd[^p]`/`dolby digital[^+]` |
+| 13 | LPCM | `lpcm`/`pcm` |
+| 1 | FLAC | `flac` |
+| 17 | AAC | `aac` |
+| 18 | APE | `ape` |
+| 19 | WAV | `wav` |
+| 4 | MP3 | `mp3` |
+| 8 | M4A | `m4a` |
+| 20 | OPUS | `opus` |
+| 22 | AV3A | `av3a` |
+| 23 | USAC | `usac`（映射到 AAC 组检测） |
+| 7 | Other | - |
 
 > **DD vs DDP 严格区分**：AC3=DD，E-AC3=DDP。标题禁止写 AC3/E-AC3，必须写 DD/DDP。
 
@@ -1264,7 +1427,7 @@ func TestQingWapHook_ValidateFileSpecs(t *testing.T) {
 
 | # | 规则 | 检测方式 | 错误等级 |
 |---|------|---------|---------|
-| 1 | 标题含中文 | `[\u4e00-\u9fa5]` | 错误 |
+| 1 | 标题含中文或全角字符 | `[\u4e00-\u9fa5\uff01-\uff60]` | 错误 |
 | 2 | Complete 需删除（非蓝光原盘） | `complete` 在标题中 | 错误 |
 | 3 | 季集应在年份前 | `S\d{2}` 位置检查 | 错误 |
 | 4 | HDR10 应为 HDR | `hdr10`（非 HDR10+）→ 应写 HDR | 错误 |
@@ -1330,6 +1493,16 @@ func TestQingWapHook_ValidateFileSpecs(t *testing.T) {
 | 49 | MediaInfo 栏为空/不正确 | 空值或格式校验 | 错误 |
 | 50 | 官组标题编码应为 x264/x265 | `officialSeed && !x264/x265` | 错误 |
 
+#### 审核脚本额外规则（从实际代码逆向）
+
+| # | 规则 | 说明 |
+|---|------|------|
+| 51 | DVD+720p 交叉检查 | 标题含 DVD 且分辨率=720p → 警告"请检查分辨率是否错标" |
+| 52 | USAC→AAC 分组映射 | `title.includes('USAC')` 映射到 AAC 组（title_audio=17） |
+| 53 | `officialMusicSeed` 独立路径 | 标题含 `frogmus` → 清空所有错误，仅检查制作组选择（预留功能） |
+| 54 | 分辨率匹配含隔行变体 | `720i`/`2160i`/`4320i`/`uhd`（裸关键词）也有匹配逻辑 |
+| 55 | 标签校验精确逻辑 | `title_ES>=1`（无 S##E##）→须有完结标签；`title_ES==0`（有 S##E##）→须有分集标签；非多季→不得有合集标签 |
+
 #### 警告类规则
 
 | # | 规则 | 检测方式 | 错误等级 |
@@ -1345,7 +1518,8 @@ FGT, NSBC, BATWEB, GPTHD, DreamHD, BlackTV, CatWEB, Xiaomi, Huawei,
 MOMOWEB, DDHDTV, SeeWeb, TagWeb, SonyHD, MiniHD, BitsTV, ALT,
 LelveTV, NukeHD, ZeroTV, HotTV, EntTV, GameHD, SmY, SeeHD, ParkHD,
 VeryPSP, DWR, XLMV, XJCTV, Mp4Ba, Huluwa, CTRLHD(非CtrlHD),
-HotWEB, TBMaxUB, BestWEB, DBD-Raws, Skymoon/天月/HKACG, c.c动漫,
+HotWEB, TBMaxUB, BestWEB, RARBG, Hao4K, MOMOHD,
+DBD-Raws, Skymoon/天月/HKACG, c.c动漫,
 猎户发布组/orion origin, 爪爪字幕组/ZhuaZhuaStudio
 ```
 
@@ -1454,5 +1628,386 @@ HotWEB, TBMaxUB, BestWEB, DBD-Raws, Skymoon/天月/HKACG, c.c动漫,
 ---
 
 *文档维护：PT-Forward 开发团队*
-*最后更新：2026-04-19*
-*数据来源：upload.php + Wiki发布规则 + qingwa-torrent-assistant.js v1.1.1 (1886行/82KB)*
+*最后更新：2026-04-22 — 补充 W.10 盒子规则 + 下载规则摘要（Playwright 采集）*
+*数据来源：upload.php + Wiki发布规则 + qingwa-torrent-assistant.js v1.1.1 (1886行/82KB) + 官方 Wiki Playwright 采集*
+
+---
+
+## 官方 Wiki 采集（2026-04-22 Playwright 抓取）
+
+> 来源：`https://wiki.qingwapt.org` — Nuxt Content SPA，需 Playwright 渲染才能获取页面内容。
+> CookieCloud 对接程序从 `.qingwapt.org` 域获取 cookie，但 Wiki 页面为公开内容，无需登录。
+
+### W.1 发种规则总览和标题命名规范
+
+> 来源：`https://wiki.qingwapt.org/docs/rules/content-rules/upload-title`
+
+**基本要求**：
+- 原盘、DIY 资源请务必带 BDInfo，WEB、TV、压制资源请务必带 MediaInfo
+- 标题要符合下面的 0day 规范
+- 违规种子将被打回修改
+- 转种请勿重新制种
+- 种子通过审核后其他用户才能够连接上该种 tracker，未审和拒绝状态只有发种人可以连接
+
+**视频标题命名规范（0day 命名法）**：
+
+青蛙使用 0day 命名法（+少量改动）进行命名，这是一套较为严格的命名法。
+
+**基本格式**：
+
+```
+剧名 季集信息 年份 其他信息 分辨率 地区码 内容分发方 片源类型 规格 HDR类型 bit信息 视频编码 音频编码 声道数 对象信息 音轨数-制作组
+```
+
+**官方示例**：
+
+```
+Dan Da Dan S01 2024 1080p BluRay x265 FLAC 2.0-FROGE
+（Encode资源，规格为空，非HDR不写HDR类型，x265不写bit信息）
+
+Gannibal S02 2025 2160p DSNP WEB-DL DV H.265 DDP 5.1-FROGE
+（WEB-DL资源，流媒体产商简写DSNP，HDR类型为DV，视频编码为H.265）
+
+Maze Runner: The Scorch Trials 2015 1080p FRA Blu-ray AVC DTS-HD MA 7.1-GMB
+（Blu-ray资源，地区码为FRA，视频编码为AVC）
+
+Sidonia no Kishi 2014-2015 1080p BluRay Hi10P x264 FLAC 2.0-VCB-Studio
+（x264 10bit要写为【Hi10P x264】）
+
+Clannad S01-S02+MOVIE REPACK 1080p / 480p BluRay / DVDRip Hi10P x264 FLAC 5.1-mawen1250&fch1993
+（多季合集有DVD有BD，多个分辨率压制的情况）
+
+Saki S01-S03 BluRay 1080p / 720p Hi10P x264 FLAC 2.0-VCB-Studio
+（无重名可以省略年份）
+```
+
+**剧名**：
+- 主标题推荐使用英文名，别名与中文名填入副标题
+- 英文名可从 IMDB 获取（搜索框搜索后在条目页面查看）
+- 豆瓣条目的"又名"中也有对应的英文名可供参考
+- 动画可使用 MyAnimeList 的罗马音式标题
+
+**季集信息**：
+- 单季合集：加季度编号（即使只有1季也得写上 S01）
+- 多季合集：S0a-S0b（季度≥10不写前导0，如 S08-S12）
+- 分集：S##E## 或 S01E03-E05
+- 每季剧名后缀不同时写为 `XXX Series`（多见于动漫区，如 Monogatati Series）
+
+**年份**：
+- 有重名时**必须**填写
+- 无重名时可省略
+- 多季合集填写 `最早年份-最晚年份`（必填）
+- 单集综艺/体育节目填写完整年月日（如 20240326）
+
+**其他信息（按优先级检查）**：
+
+| 优先级 | 项目 | 说明 |
+|--------|------|------|
+| 1 | 剪辑版本 | Director's Cut、Uncensored、Extended、Unrated、Uncut 等。**需官方盖章**，如不是完结合集都能叫 Complete Edition 得官方确认 |
+| 2 | 2in1 | 同时含2个剪辑版本，3in1 同理（多见于原盘资源） |
+| 3 | 版本 | 20th Anniversary Edition、Remaster、4K Remaster、Limited Edition |
+| 4 | 特殊比例 | IMAX、Open Matte、MAR |
+| 5 | Hybrid | 仅当由两个或更多来源组成时注明（如不含 DV 层的原始视频添加了其他源的 DV 层） |
+| 6 | REPACK/V2 | 文件有改动+主要视频**未**重新转码（增补CD/扫图/重压特典等） |
+| 7 | RERIP | 主要视频文件**被**重新转码 |
+| 8 | PROPER | 原盘抓取有问题，重新发布（仅原盘资源） |
+| 9 | MiniBD | CMCT 特色资源（大小写不做强制规定） |
+
+**分辨率**：
+- 从 MediaInfo 的 Video - Height 和 Scan type 组合
+- 注意：p 小写（1080p 非 1080P），不要使用 4K/2K
+- 黑边裁切导致非标准分辨率（如716p）时可写 720p 或实际值
+- DVD 原盘/Remux 可由制式（NTSC/PAL）代替
+
+**地区码**：
+- 仅原盘类填写（ITA/USA/JPN/HKG/TWN 等）
+- 无法判定时可省略，不做强制要求
+
+**内容分发方**：
+- 原盘：标准收藏（CC）、电影大师（MOC）、华纳档案馆（WAC）等（详见 Wiki 发行商页）
+- WEB-DL：流媒体厂商缩写名（详见 Wiki 流媒体缩写页）
+- HDTV：电视台缩写（无法找到来源时可省略）
+
+**片源类型（按媒介严格区分）**：
+
+| 媒介 | 允许值 |
+|------|--------|
+| 原盘 | Blu-ray / 3D Blu-ray / UHD Blu-ray / Modded Blu-ray / Custom BluRay / NTSC DVD5 / NTSC DVD9 / PAL DVD5 / PAL DVD9 / HD DVD |
+| 压制(Encode) | BluRay / 3D BluRay / UHD BluRay / DVDRip / HDDVDRip |
+| WEB | **此项省略**，填写流媒体厂商缩写名 |
+| HDTV | 填写电视台名称，无法找到来源时可省略 |
+
+> **关键区分**：原盘 `Blu-ray`（连字符）vs 压制 `BluRay`（无连字符）。通行规则。
+
+**规格**：Remux / WEB-DL / WEBRip / HDTV / UHDTV / HOU / HSBS。原盘类不填。Remux/WEBRip 大小写不做强制。
+
+**HDR 类型**：HDR / HDR10+ / DV / DV HDR / DV HDR10+ / HLG / PQ10 / HDR vivid。SDR 不填。DV 也可写作 DoVi。
+
+**bit 信息**：仅当 Format=AVC 且 Bit depth=10bit 时写 `Hi10P`。x265 10bit 只写 x265（不写 10bit）。
+
+**视频编码（按媒介严格区分）**：
+
+| 媒介 | 允许值 |
+|------|--------|
+| 蓝光原盘/REMUX | AVC / HEVC / MPEG-2 / VC-1 |
+| DVD 原盘 | 可省略 |
+| WEB | H.264 / H.265 / MPEG-2 / VC-1 / VP9 / AVS+ / AVS3 / AV1 |
+| HDTV | H264 / H265 / MPEG2 / VP9 / AVS+ / AVS3 / AV1 |
+| 压制(Encode) | x264 / x265 / AV1 / MPEG-2 / VP9 |
+
+> **严禁混用**：原盘 AVC/HEVC，压制 x264/x265。WEB/HDTV 若 MediaInfo Writing library 明确有 x264/x265 也可写。
+> H264=H.264，H265=H.265，MPEG2=MPEG-2。
+
+**音频编码和声道数**：
+- 多音轨仅标最高规格的音轨
+- 声道数保留1位小数（L R=2.0，L R LFE=2.1，L R C LFE Ls Rs=5.1）
+- AAC/MP2/MP3 且 2.0 时可省略声道数
+- 合集中多部影片音轨规格不一可用 `/` 分开
+- 评论音轨不计入
+
+**标题写法对照**：DD=AC3, DDP=E-AC3/DD+。标题中**不应**写作 AC3/E-AC3，必须写 DD/DDP。
+
+**对象信息**：Atmos / Auro3D。DTS:X 不需额外标注。省略视为不存在。
+
+**音轨数**：正片多条音轨时写 XAudio（X为数字），仅 1 条不写。仅对压制(Encode)类强制要求。
+
+**制作组**：
+- 本站首发：`-你的名字@QingWa`
+- 多站官组转种：`-组名`（如 `-VCB-Studio`）
+- 个人他站转种：`-发布者@原站名`
+- 匿名他站转种：`-Anonymous@原站名`
+- 来源不明：留空或 `-NOGROUP` / `-NoGroup` / `-NoGrp`
+- Scene 资源：可省略
+- **严正警告**：务必认真对待，没写/写 NoGroup 后正主找上门将无条件处罚
+
+**对 PT-Forward 的影响**：
+- Wiki 确认了完整字段顺序：剧名→季集→年份→其他→分辨率→地区码→**内容分发方**→片源类型→规格→HDR→bit→视频编码→音频编码→声道→对象→音轨数→制作组
+- 注意 **内容分发方** 在片源类型**前**，这是之前文档未明确强调的（§31.10.26 规则 #38 SourcePlatform 在 Medium 前已覆盖）
+- 剧名中的冒号必须保留（如 `Maze Runner: The Scorch Trials`）
+- 完结剧集不在标题写 Complete，用标签
+- REPACK vs RERIP vs PROPER 三种更新场景已明确区分
+
+### W.2 标签规则
+
+> 来源：`https://wiki.qingwapt.org/docs/rules/content-rules/tags`
+
+| 标签 | 说明 |
+|------|------|
+| 官方 | 官方组成员发布带官方后缀的资源，普通用户无需选择 |
+| 驻站 | 驻站组成员发布带驻站小组后缀的资源，普通用户无需选择 |
+| VCB-Studio | VCB-Studio 小组的作品 |
+| 国语 | 含国语（普通话）音轨 |
+| 粤语 | 含粤语音轨 |
+| 中字 | 内嵌中文硬字幕、内封中文软字幕或种子文件内包含外挂中文字幕 |
+| 特效字幕 | 带有特效字幕的视频 |
+| DIY | DIY 资源（Custom Disc） |
+| 原生原盘 | 未经修改的原盘资源（蓝光原盘、DVD原盘） |
+| Remux | 由原盘提取未经重编码的 Remux 资源 |
+| 分集 | 连载中剧集的其中一集或某几集（需申请） |
+| 完结 | 完结的**剧集**，电影类不要选择 |
+| 杜比视界 | 含有杜比视界的视频 |
+| HDR | 含有 HDR10（静态）的视频 |
+| HDR10+ | 含有 HDR10+（动态）的视频，**必须同时选择 HDR 标签** |
+| 儿童片 | 适合儿童观看的家庭片与教育片 |
+| 禁转 | 官方组、驻站组或发布者自制的不希望被他人转载的资源 |
+| 系列合集 | 多季合一或系列电影打包的资源 |
+| 零魔 | 系统自动判断（做种数/完成数≥3 且做种数>50），不参与魔力计算 |
+
+### W.3 重复和合集规则
+
+> 来源：`https://wiki.qingwapt.org/docs/rules/content-rules/duplicate-collection`
+
+**重复判定总则**：
+- 被代替资源将会被删除
+- 完结资源将代替分集资源
+- 跨季资源将代替相同来源和品质的单季资源
+- 跨季资源将代替季数被覆盖的跨季资源（如 S01-S08 代替 S01-S07）
+- 高清资源代替完全重复的低清资源
+- 各个压制版允许共存
+- 压制版与原盘允许共存
+- 各个 DIY 原盘资源允许共存
+- 蓝光资源代替更低清晰度且完全重复的 WEB/HDTV 资源
+- **特殊**：动漫区蓝光对 TV 版极大幅度修正时 TV 资源保留；上古旧番高清仅有 WEB-DL 时也保留
+- **WEB-DL 特殊规则**：同一个影视资源，在有官种（官方首发）的情况下，将不接受分辨率/质量相同或更低的 WEB-DL 种子资源
+
+**合集打包规则**：
+- 电影类只允许发行商官方原盘合集，允许衍生品（DIY/Remux/Encode）
+- 发布官方原盘合集及其衍生建议简介加蓝光合集封面
+- **严禁**导演/演员/IMDb Top 250/豆瓣 Top 250 等私人合集（违反可能处罚）
+- 禁止跨季不同分辨率打包发布（VCB 豁免）
+
+### W.4 制种和转种规则
+
+> 来源：`https://wiki.qingwapt.org/docs/rules/content-rules/torrent-transfer`
+
+**制种总则**：
+- 禁止发布非官方的超分处理/补帧资源
+- 违规但有价值的资源可联系管理组破例
+- 制种时不要加入广告文件、病毒、木马、种中种、无关文件
+- 不允许发布涉及暴恐/肢解/虐待/色情/政治的违法资源
+- 文件名/目录名控制在 100 中文/200 英文之内
+- 文件和文件夹名字不可包含特殊符号（斜杠、单双引号），点号不可出现在末尾
+- 分块大小控制在 16MB 以下
+- 即使单文件也推荐套一层文件夹制种
+- 文件夹名字不要用"新建文件夹"等摆烂名
+
+**转种总则**：
+- 不准转载禁转种
+- 已有完结的种子禁止发布同质单集资源
+- **禁止转载发布未完结分集** — 未完结剧集只接受增量包，不接受分集转载
+- 禁止转载非官方超分/补帧资源
+- 禁止转载黑名单制作组资源
+- 不建议转载找不到出处的资源（可加 -NoGroup，自担责任）
+- 不建议转载灰名单制作组资源
+- 禁止转载简易机翻资源
+- 请直接上传原种以便辅种
+- 编辑需要须在简介注明增补内容（"添加字幕"/"修正名字"不是合理编辑需要）
+- 标题和副标题需符合本站规范
+- 务必写明种子出处
+- 原出处简介推荐用 `[quote]资源简介[/quote]`
+- 建议把预览图下载后重新传到网站附件或图床
+- 源站简介无法达到分区标准则按要求补充
+
+### W.5 发布和做种规则
+
+> 来源：`https://wiki.qingwapt.org/docs/rules/content-rules/publish-seed`
+
+**压缩包总则**：
+- 禁止使用 zstd 等非常见压缩格式（以标准版 7-zip 能解压为限）
+- 禁止带密码
+- 禁止"假装是 zip 但只能以特定压缩软件解压"的格式（如快压/好压）
+- 不推荐 RAR5 格式（会导致一系列问题）
+- 不推荐 zip 格式（Unicode 支持不好）
+- 超过 4GB 的压缩包建议分卷（非硬性要求）
+- RAR 恢复记录请设置在 5% 以下
+
+**发布总则**：
+- 标题请使用 0day 命名法
+- 副标题请填写任何有助于搜索的信息（多语言译名、作品特征 tag）
+- 必须有至少 1 张预览图（建议用海报，禁止用缩略图作第一张）
+- 注意第一张预览图会作为海报加载到首页
+
+**做种总则**：
+- 上传者必须实际拥有所上传的文件
+- 上传速度至少 300KB/s（故意低速将警告甚至封禁）
+- 做种时间须满足免费期 48 小时
+- 在其他人完成前（完成数≥3）撤种将处罚
+- 发布后基本保证出种（做种数≥3 持续 12h）前，非做种状态须在 24h 以内
+- 7 天内无人下载允许撤种
+
+**资源打包规则**：
+- 禁止将视频打压缩包发布
+- 软件类资源请打压缩包（特别是小文件极多的情况）
+
+### W.6 分区发布规则
+
+> 来源：`https://wiki.qingwapt.org/docs/rules/content-rules/category-rules`
+
+**所有视频分区**：
+- 压制资源须在 MediaInfo 栏提供完整 MediaInfo
+- 蓝光原盘须在 MediaInfo 栏提供 BDInfo（建议 quick summary）
+- 正确选择媒介、视频编码、音频编码、分辨率、制作组
+- 标题使用 0day 命名法（参照标题规范）
+- **副标题可包含**：片名中译（建议用豆瓣名，可含民间名）| 片名原名（如日语名）| 包含内容 | 其他有价值信息 | 槽点
+- 简介须包含：资源引用 + 海报 + 介绍（可用 PTGen）+ **至少 3 张视频截图**
+- **简介中禁止包含 MediaInfo**（原种有也需删除）
+- 禁止发布过短视频（抖音短视频合集，短剧除外）
+
+**音乐区（暂不审核）**：
+- 禁止发布有损音乐
+- 允许合集（歌手/公司/组合/社团/作曲者），禁止个人精选
+- 标题无格式要求，包含码率、作者、专辑名即可
+- 简介须有预览图（如专辑封面）
+- Log/频谱图至少含一项（优先 Log）
+
+**其他区（暂不审核）**：
+- 游戏/软件/电子书等
+- 转种可用原标题，非转种自行处理
+- 软件/游戏务必带版本号，零碎文件打压缩包
+- 严禁夹带私货
+
+**其他问题**：
+- 管理员可能根据规范编辑种子信息
+- 请勿改变或去除管理员修改
+- 不规范种子可能被删除
+
+### W.7 黑名单和灰名单
+
+> 来源：`https://wiki.qingwapt.org/docs/rules/content-rules/blacklist`
+
+**黑名单（禁止转载）**：
+
+| 制作组 | 原因 |
+|--------|------|
+| DBD-Raws | 盗用资源、超分、劣迹斑斑 |
+| Skymoon/天月/HKACG | 反华组 |
+| c.c动漫 | 改名组 |
+| 猎户发布组/orion origin、爪爪字幕组/ZhuaZhuaStudio | 机翻组 |
+| 盗转/改名发布组 | FGT/NSBC/BATWEB 等 28+ 组（详见审核脚本） |
+
+**灰名单（不建议转载）**：
+
+| 制作组 | 原因 |
+|--------|------|
+| 异域11番小队、加刘景长 | 低码率 |
+| Reinforce | 高体积渣画质 |
+
+### W.8 流媒体厂商缩写名（参考数据）
+
+> 来源：`https://wiki.qingwapt.org/docs/guides/content-creation/streaming`
+
+共 170+ 条流媒体缩写映射，以下列出常见项：
+
+| 流媒体 | 标题写法 |
+|--------|---------|
+| Amazon/Prime Video | AMZN |
+| Apple TV+ | ATVP |
+| BBC iPlayer | iP |
+| Crunchy Roll | CR |
+| Disney+ | DSNP |
+| HBO Max | HMAX |
+| HBO | HBO |
+| Hulu | HULU |
+| iTunes | iT |
+| Netflix | NF |
+| Paramount+ | PMTP |
+| Peacock | PCOK |
+| Showtime | SHO |
+| Star+ | STRP |
+| Starz | STZ |
+
+### W.9 常见碟片发行商（参考数据）
+
+> 来源：`https://wiki.qingwapt.org/docs/guides/content-creation/distributor`
+
+| 发行商 | 系列/品牌 | 写作 | 中文名 | 简写 |
+|--------|----------|------|--------|------|
+| The Criterion Collection | - | Criterion | 标准收藏 | CC |
+| Eureka Entertainment | Masters of Cinema | - | 电影大师 | MoC |
+| Warner Bros. | Warner Archive Collection | - | 华纳档案 | WAC |
+
+以下一般不出现在标题，但建议在副标题注明：Arrow Films（箭影）、Curzon（人造眼）、BFI（英国电影协会）、Vinegar Syndrome（醋酸综合征）、Shout! Factory（尖叫工厂）、Studio Canal（映欧嘉纳）、Kino Lorber 等。
+
+### W.10 盒子规则
+
+> 来源：`https://wiki.qingwapt.org/docs/rules/download-rules#盒子规则`
+
+| 规则 | 说明 |
+|------|------|
+| 无限制 | 站点目前对盒子的使用**没有任何限制**，也无需报备 |
+| 未来可能变化 | 不排除将来对盒子有所限制的可能性 |
+| 禁止大量跳车 | 无论家宽还是盒子，大量跳车行为不允许 |
+| 禁止恶意限速 | 无论家宽还是盒子，恶意限速行为不允许 |
+| 分享率上限 | 账号等级提升有分享率上限限制，过于依赖短期盒子产生高上传会影响等级提升 |
+
+#### 下载规则摘要（同页面采集）
+
+| 项目 | 规则 |
+|------|------|
+| 分享率 | 要求参考账号规则，过低会禁止下载权限/警告/封禁 |
+| H&R | 目前**未开启** H&R 考核，但建议尽可能多保种 |
+| 新种促销 | 发布后 **2 天之内为 Free**（不计下载量） |
+| 禁用客户端 | **Transmission 3.x 禁用**，需升级至 4.0.5+ |
+| 推荐客户端 | qBittorrent 或 Transmission（不推荐最新版） |
+
+> **对 PT-Forward 的影响**：青蛙站对盒子无限制，PT-Forward 转发行为不受盒子规则约束。但需注意 Transmission 版本限制——如果 PT-Forward 使用 Transmission 做种，版本必须在 4.0.5 以上或使用 qBittorrent。

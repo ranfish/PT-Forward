@@ -32,8 +32,6 @@
 | NFO文件 | `nfo` | 否 | |
 | 简介 | `descr` | 是 | BBCode |
 | MediaInfo | `technical_info` | 否 | |
-| 描述 | `description` | 否 | |
-| 关键词 | `keywords` | 否 | |
 | 类型 | `type` | 是 | |
 | 分辨率 | `standard_sel[4]` | 否 | |
 | 媒介 | `medium_sel[4]` | 否 | |
@@ -137,9 +135,44 @@
 - **无 source_sel**（来源）
 - **无 processing_sel**（处理方式）
 - **无匿名发布（uplver）**
+- **无 description/keywords 字段**
 - **媒介极简**：仅 5 种（WEB-DL/HDTV/DVDR/CD/Track），无 Blu-ray/Remux/Encode
 - **编码极简**：仅 5 种，无 AV1/VVC
 - **制作组极少**：仅 5 个（Tey/CHD/MySiLU/WiKi/Other）
+
+## 站点规则
+
+### 盒子规则
+
+- 使用盒子需及时登记备案（IPv4/IPv6 都需登记）
+- **普通用户默认限速 200Mbps**
+- 超速会被系统自动禁用下载权限
+
+### H&R 规则
+
+从用户信息可见：`H&R: [种子区: 0/0/10 特别区: 0/0/10]`
+- 种子区和特别区各有独立的 H&R 记录，上限各 10 个
+
+### 认领系统
+
+从用户信息可见：`认领: [0/1000]`
+- 每人最多认领 1000 个种子
+
+### 促销类型（spstate）
+
+| 值 | 名称 |
+|----|------|
+| 1 | 普通 |
+| 2 | 免费 |
+| 3 | 2X |
+| 4 | 2X免费 |
+| 5 | 50% |
+| 6 | 2X 50% |
+| 7 | 30% |
+
+### 种子审核系统
+
+有审核流程：approval_status（未审/通过/拒绝）
 
 ## 特殊说明
 
@@ -151,4 +184,5 @@
 6. **站组 Tey**：制作组含站组 Tey(1)
 7. **标签含韩国特色**：短剧、零魔、国配、粤语、纯享
 8. **PT-Gen + MediaInfo 齐全**：有 pt_gen 和 technical_info 字段
-9. **description + keywords**：有额外的 description 和 keywords 字段
+9. **盒子限速 200Mbps**：普通用户默认限速，盒子需登记备案
+10. **双区 H&R**：种子区和特别区各有独立 H&R 配额

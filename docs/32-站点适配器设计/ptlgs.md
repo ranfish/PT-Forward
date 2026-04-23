@@ -22,7 +22,8 @@
 | 建站时间 | 2024年 |
 
 ## Tracker URL
-`https://ptlgs.org/announce.php`
+- 主域名：`https://ptlgs.org/announce.php`
+- 短域名：`https://ptl.gs/announce.php`（上传页显示的短域名，等效）
 
 ## 站点特色
 
@@ -31,11 +32,43 @@
 - **豆瓣优先建库**：采用豆瓣建库，优先使用豆瓣链接；内置豆瓣搜索代理 `douban-search.ptl.gs`
 - **10次候选制**：所有用户需通过10次候选后才能直接发布资源
 - **发布者双倍上传**：发布者获得双倍上传量
-- **白名单图床**：files.ptlgs.org / cmct.xyz / ssdforum.org / gifyu.com / imgbox.com / pixhost.to / ptpimg.me
+- **白名单图床**：files.ptlgs.org / cmct.xyz / static.ssdforum.org / static.hdcmct.org / ssdforum.org / gifyu.com / imgbox.com / pixhost.to / ptpimg.me（wiki 列出：本站官方图床(暂仅限官组) / pixhost / ptpimg / imgbox / gifyu / SSDForum图床）
 - **独立Wiki**：https://wiki.ptlgs.org 发布规则文档
 
 - **黑名单制作组**：禁止发布 FGT/NSBC/BATWEB/GPTHD/DreamHD/BlackTV/CatWEB/Xiaomi/Huawei/MOMOWEB/DDHDTV/SeeWeb/TagWeb/SonyHD/MiniHD/BitsTV/CTRLHD/ALT/NukeHD/ZeroTV/HotTV/EntTV/GameHD/SmY/SeeHD/VeryPSP/DWR/XLMV/XJCTV/Mp4Ba/GodDramas/FRDS/BeiTai/Ying/VCB-Studio 等31+组的资源
 - **字幕组分类**：分类含"字幕组"(411)，为字幕资源专用
+
+## HR 规则
+
+| 项目 | 内容 |
+|------|------|
+| HR 标志 | 种子列表中的 HR 标志 |
+| 做种要求 | 官方种子下载完成后需累计做种 **72 小时**，即使上传量已大于种子体积 |
+| 缓冲机制 | 下载完成后 **360 小时**内完成标准即算合格（给小水管/无法每天开机用户缓冲） |
+| 豁免 | 工作组和 VIP 等级用户免疫 HR 要求 |
+| HP 机制 | 每位用户初始 **10 点 HP**，每个未完成 HR 的种子扣 **1 点 HP** |
+| 封禁线 | 违规累计超过 **10 个** → 自动封禁账号 |
+
+## 上传总则
+
+### 基本规则
+
+1. 上传者必须对上传的文件拥有合法传播权
+2. 上传者必须保证上传速度与做种时间 — **做种时间不足 48 小时**或故意低速上传 → 警告甚至取消上传权限
+3. 发布者获得 **双倍上传量**
+4. 所发种子必须符合资源规则
+5. 违规但有价值的资源 → 告知管理组，可能破例允许
+
+### 行为规范
+
+- **非 LGS 小组成员**禁止使用 LGS 官组名称作为标识和后缀
+- 转载资源不得随意去掉/篡改原创小组的标识后缀，禁止张冠李戴
+- 同一版本转发如无必要，禁止随意修改原始文件夹名/文件名/增减内容后重新做种
+- 禁止发布涉及暴恐/肢解/虐待/色情/政治的违法资源和截图 → 警告+删种，**超3次封禁账号**
+- 禁止加入广告文件、病毒、木马、种中种、无关文件
+- 即使发布单文件，也推荐套一层文件夹制种
+- 文件夹命名规范：禁止"新建文件夹"等摆烂名，尽量使用影片英文名/中文名
+- **刷流判定**：短时间内发布大量种子或恶意利用限时优惠规则 → 删种+警告直至取消发布权限
 
 ## 发布权限
 
@@ -212,15 +245,39 @@
 - 审核脚本检查：中文字符检测（`概览`/`概要`开头判定为中文 MI）、空格数量（<30 判定排版错误）
 
 ### 截图
-- 至少3张原始截图（官组要求 PNG 原图）
+- **官方发布**：至少 **3 张 PNG 原图**（审核脚本仅检查 >=1 张，但规则要求 >=3 张）
 - 转种可为缩略图
-- 特效字幕种子必须包含至少2张反映特效效果的截图
-- 白名单图床：files.ptlgs.org / cmct.xyz / ssdforum.org / gifyu.com / imgbox.com / pixhost.to / ptpimg.me
+- 截图内容必须包含**影视正片有效信息**，**片头不视为有效信息**
+- 特效字幕种子必须包含至少 **2 张**反映特效效果的截图
+- 不得加入广告、制作组 logo 等与资源截图不相关的图片
+- 白名单图床：files.ptlgs.org(暂仅限官组) / cmct.xyz / static.ssdforum.org / static.hdcmct.org / ssdforum.org / gifyu.com / imgbox.com / pixhost.to / ptpimg.me
 
 ### 海报
 - 必填，图床地址
 - 支持一键转存官方图床
 - 禁止使用防盗链图床（如 tu.totheglory.im）
+
+### 附加信息栏规范
+
+1. 若种子无豆瓣或 IMDb 链接 → 务必在本栏填入资源介绍
+2. 转载、致谢等信息可在此添加
+3. 若有规范的影片参数（info block）且能补充 MediaInfo 不含的信息 → 允许粘贴
+4. 支持 BBCode，避免字体过大、多次引用等造成观感不适
+5. **只保留致谢信息、制作信息、禁转信息**，其他（截图、简介等）应删除（已在豆瓣信息中展示）
+
+### 致谢格式
+
+官方发布：
+```
+[quote][b][color=blue]LGS官组作品，感谢原制作者发布。[/color][/b][/quote]
+```
+
+联合发布示例（Dajiao & LGS）：
+```
+[quote][color=#FF99FF][b]Dajiao[/color] & [color=#555555]LGS[/color] 联合发布，感谢原制作者[/b][/quote]
+```
+
+无豆瓣信息时，可添加简单 IMDb 信息（Title / Genres / 国家 / Date / Rating / Link / Directors / Actors）
 
 ## 转种总则
 
@@ -425,7 +482,7 @@
 | 24 | MediaInfo 格式错误（<30字符） | `mediainfo_s.length < 30` | 错误(含提示) |
 | 25 | 标题检测到制作组但未选择 | `title_group && !group` | 错误 |
 | 26 | 截图不足1张 | `imageCount < 1` | 错误 |
-| 27 | 截图不在白名单图床 | 域名匹配 pichost_list | 错误 |
+| 27 | 截图不在白名单图床 | 域名匹配 pichost_list（9个域名：files.ptlgs.org/cmct.xyz/static.ssdforum.org/static.hdcmct.org/ssdforum.org/gifyu.com/imgbox.com/pixhost.to/ptpimg.me） | 错误 |
 | 28 | 豆瓣分类与选择分类不一致 | `douban_cat !== cat` | 错误 |
 | 29 | 选了"动画"标签但豆瓣无动画类别 | `is_anime && !isani` | 错误 |
 
@@ -518,7 +575,71 @@
 4. 海报禁止使用防盗链图床
 ```
 
+## 审核脚本差异与注意事项
+
+### 脚本标签名 vs 上传页标签名
+
+脚本在 **details 页面**检测标签文本时，使用的匹配字串与上传页 checkbox 标签名不完全一致：
+
+| 标签 ID | 上传页显示 | 脚本检测 | 说明 |
+|---------|-----------|---------|------|
+| 5 | 国语 | `国配` | 详情页可能显示为"国配" |
+| 9 | 原盘 | `原生` | 详情页可能显示为"原生" |
+| — | 不存在 | `HLG` | 上传页无此标签，脚本仍检测 |
+| — | 不存在 | `cc` | 上传页无此标签，脚本仍检测 |
+| — | 不存在 | `动画` | 上传页无此标签，脚本仍检测 |
+
+**适配器影响**：
+- 上传表单的标签 ID 和显示名以上传页为准（19 个标签，见标签系统章节）
+- HLG / CC / 动画标签在上传页**不存在**，可能是：
+  - 已从上传页移除但脚本未同步更新
+  - 或为种审员手动添加的系统标签
+- 转载时无需选择这些标签
+
+### 脚本检测逻辑中的死代码
+
+**音频臃肿检测（E13）**：
+```
+条件：(高端音频) AND (resolution ∈ {2,3,4,5}) AND (type ∈ {6,8,9,10})
+```
+
+| 变量 | 脚本检查值 | 实际存在值 | 有效值 |
+|------|-----------|-----------|--------|
+| resolution | 2/3/4/**5** | 1/2/3/4/6/7 | 2/3/4（1080i/720p/SD） |
+| type | **6**/8/**9**/**10** | 1/2/3/4/5/7/8/11/12/14/15 | 仅 8（Remux） |
+| audio | 1/**2**/6 | 1/6/7/8/9/10/11/12/13/14/19 | 1(WAV)/6(MP3) |
+
+**结论**：音频臃肿检测实际仅对 **Remux + 1080i/720p/SD + 高端音频/WAV/MP3** 生效。type===6/9/10 和 resolution===5 和 audio===2 均为不存在的 ID（死代码）。
+
+### 豆瓣分类判定：电影无映射
+
+脚本豆瓣分类逻辑：
+- 豆瓣类型="电视剧" → 综艺(403)/纪录片(404)/剧集(402)
+- 豆瓣类型≠"电视剧" → 纪录片(404)/**其他(409)**
+
+**电影被归入"其他(409)"**，但交叉验证检查条件 `douban_cat <= 408` 排除了 409，因此电影分类**不会被脚本交叉验证**。这意味着用户将电影误选为其他分类时，脚本不会报错。
+
+### 截图检查差异
+
+- **Wiki 规则**：官方发布至少 3 张 PNG 原图
+- **脚本检查**：`imageCount < 1`（仅要求 >=1 张）
+- 适配器应遵循 Wiki 规则（>=3 张），脚本检查是最低门槛
+
+### 中文字幕检测细节
+
+脚本检测中文字幕的完整逻辑（四路或检测）：
+1. 字幕区 `img[title="简体中文"]` 存在 → true
+2. 字幕区第一个链接文本含 `chs` 或 `cht` → true
+3. MediaInfo 含 `字\s*幕.*?Chinese`（支持中文MI"字幕"关键字）→ true
+4. MediaInfo 含 `字\s*幕.*?Mandarin` → true
+5. MediaInfo 含 `Subtitle:\s*?Chinese`（英文MI）→ true
+
+中文音轨检测：
+1. 非 DVD：MediaInfo 含 `音\s频:.*?chinese.*?(字\s幕)` → true
+2. DVD(type=1)：MediaInfo 含 `Audio:\s?Chinese` → true
+
 ---
 
 *文档创建：2026-04-19*
-*数据来源：upload.php (70490字节) + Wiki发布规则 (17301字节) + ptlgs-Torrent-Assistant.js v1.1.43 (830行/37KB)*
+*最后更新：2026-04-22*
+*数据来源：upload.php (70490字节) + Wiki发布规则 (3488字节) + Wiki HR规则 (551字节) + 论坛#67 (2441字节) + ptlgs-Torrent-Assistant.js v1.1.43 (830行/37KB)*
