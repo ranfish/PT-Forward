@@ -108,6 +108,10 @@
 | 劳改所 | [ptlgs.md](./ptlgs.md) | ✅ 完成（源站+发布站·Cloudflare·**种审制·官方审核脚本完整逆向(ptlgs-Torrent-Assistant v1.1.43 830行 29+项校验规则·含种审员模式额外15项·**含脚本差异分析(标签名不一致/死代码/电影豆瓣无映射/截图检查宽松)**)**·10次候选制·豆瓣优先建库·7官组DYZ-WEB/DYZ-Movie/DYZ-TV/Eleph/beAst/ZmWeb·字幕组分类(411)·11媒介ID非标准(Blu-ray=14)·5编码无AV1·11音频DTS=19非标准·6分辨率无8K·19标签·**HR规则:72h做种/360h缓冲/10HP封禁线**·**上传总则:48h做种/双倍上传/刷流判定/禁止违法资源(3次封禁)**·**31+黑名单制作组**·白名单图床9个·独立Wiki·禁止超分/补帧/机翻·**含完整转载自动填写优化方案**） |
 | 我爱电影 | [52movie.md](./52movie.md) | ⚠️ 部分完成（**规则与织梦/自然完全同模板(模板B组)**·Cloudflare·候选制·**上传表单未获取(账户无发布权限)**·独立字幕区·认领1000种·签到500魔力·游戏类仅上传员·建站2024） |
 | 龙PT | [longpt.md](./longpt.md) | ✅ 完成（**标准NexusPHP规则模板(与垃圾堆/克隆/库非/昆仑同源)**·Cloudflare·候选制·11媒介含**UHD Blu-ray独立**+**UHD Remux独立**·6编码含AV1·18音频含DDP/AV3A/DTS:X/Atmos/ALAC/WAV/OGG/M4A·7分辨率含8K/2K(非标ID)·8制作组LongA/LongWeb/LongPT/WiKi/RL/CMCT/HHWEB·16标签含英字/臻彩MAX/去广告纯享版·**促销:5档随机+>20GB免费+BR免费+每季首集免费+7天时限+1个月永久2x**·Dupe优先级(BR>HDTV>DVD>TV)+动漫特例+DVD5保留+断种45天/18月豁免·资源打包规则·字幕区规则·管理组退休待遇·游戏仅上传员·发布者双倍上传·签到1000魔力·建站2024） |
+| 莫妮卡 | [monikadesign.md](./monikadesign.md) | ✅ 完成（**Unit3D(Laravel)框架**·聚焦日本动画/电影/剧集/ACG音乐·TMDB ID必填·MAL ID动画必填·CSRF Token·动画不接受Remux·PT Encode白名单(PTer/WiKi)·黑名单发布组·181发行商·21地区·独立海报/横幅/MediaInfo/BDInfo字段·发布后审核队列·分类按内容类型(Anime TV/Anime Movie/TV/Movie/Game)） |
+| 猪猪 | [piggo.md](./piggo.md) | ✅ 完成（**仅发布站·禁止做源站·仅限儿童动画资源·全站官种禁转**·NexusPHP深度定制·儿童专区(IMDB分级过滤)·3D专题·独立Tracker子域名·画质字段(DV/HDR10+/HDR10/SDR)·Cloudflare·建站2022） |
+| 烧包 | [ptsbao.md](./ptsbao.md) | ✅ 完成（**source_sel有80个细分来源**·processing_sel区分处理方式·80+级用户等级(宫廷风命名)·官组FFans系列·H&R规则·禁止猪猪字幕组动漫资源·data-mode=1） |
+| UltraHD | [ultrahd.md](./ultrahd.md) | ⛔ 不适合（**几乎全站禁转**·仅接受韩国产地影视作品·内容范围过窄·转发价值极低） |
 
 ## 设计原则
 
@@ -214,4 +218,4 @@ internal/publish/
 ---
 
 *文档维护：PT-Forward 开发团队*
-*最后更新：2026-04-22*
+*最后更新：2026-04-23*
