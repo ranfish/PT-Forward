@@ -1,0 +1,21 @@
+version: "3.8"
+services:
+  pt-forward:
+    image: pt-forward:latest
+    build: .
+    container_name: pt-forward
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./configs:/config
+      - ./data:/data
+    environment:
+      - TZ=Asia/Shanghai
+      - PTF_LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8765/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

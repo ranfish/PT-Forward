@@ -1,0 +1,54 @@
+server:
+  host: "0.0.0.0"
+  port: 8765
+  mode: "release"
+  cors_origins: []
+
+database:
+  driver: "sqlite"
+  sqlite_path: "./data/pt-forward.db"
+  max_open_conns: 10
+  max_idle_conns: 5
+  log_level: "warn"
+
+log:
+  directory: "./logs"
+  level: "info"
+  max_size_mb: 10
+  max_age_days: 30
+  max_backups: 10
+  compress: true
+  format: "json"
+
+scheduler:
+  max_workers: 3
+  task_timeout_min: 10
+  http_timeout_sec: 30
+
+security:
+  rate_limit_enabled: true
+  rate_limit_global: 100
+  rate_limit_write: 30
+  rate_limit_download: 10
+  login_max_retries: 5
+  login_lockout_min: 5
+
+memory:
+  max_total_mb: 256
+  warn_percent: 0.7
+
+cookiecloud:
+  enabled: false
+  sync_interval: 60
+
+data_cleanup:
+  torrent_event_retain_days: 7
+  publish_result_retain_days: 30
+  seen_record_retain_days: 30
+  notification_retain_days: 30
+  publish_task_retain_days: 30
+  torrent_file_retain_days: 7
+  reseed_match_retain_days: 90
+  ptgen_cache_retain_days: 90
+  seeding_archive_retain_days: 30
+  audit_log_retain_days: 90
