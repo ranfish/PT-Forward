@@ -1,0 +1,172 @@
+package scheduler
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+func TestRegistry_Register(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.List()) != 1 {
+		t.Error("should have 1 task")
+	}
+}
+
+func TestRegistry_DuplicateRegister(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+	err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+	if err == nil {
+		t.Error("expected error for duplicate")
+	}
+}
+
+func TestRegistry_Trigger(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	called := 0
+	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error {
+		called++
+		return nil
+	})
+
+	r.Trigger(context.Background(), "test")
+	if called != 1 {
+		t.Errorf("expected 1 call, got %d", called)
+	}
+
+	entry, _ := r.Get("test")
+	if entry.SuccessCount != 1 {
+		t.Errorf("expected 1 success, got %d", entry.SuccessCount)
+	}
+}
+
+func TestRegistry_TriggerNotFound(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	err := r.Trigger(context.Background(), "missing")
+	if err == nil {
+		t.Error("expected error for missing task")
+	}
+}
+
+func TestRegistry_TriggerPaused(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+	r.Pause("test")
+
+	err := r.Trigger(context.Background(), "test")
+	if err == nil {
+		t.Error("expected error for paused task")
+	}
+}
+
+func TestRegistry_TriggerError(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error {
+		return errors.New("fail")
+	})
+
+	r.Trigger(context.Background(), "test")
+
+	entry, _ := r.Get("test")
+	if entry.ErrorCount != 1 {
+		t.Errorf("expected 1 error, got %d", entry.ErrorCount)
+	}
+	if entry.LastError != "fail" {
+		t.Errorf("expected 'fail', got %q", entry.LastError)
+	}
+}
+
+func TestRegistry_PauseResume(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+
+	r.Pause("test")
+	entry, _ := r.Get("test")
+	if !entry.Paused {
+		t.Error("should be paused")
+	}
+
+	r.Resume("test")
+	entry, _ = r.Get("test")
+	if entry.Paused {
+		t.Error("should be resumed")
+	}
+}
+
+func TestRegistry_Unregister(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+
+	r.Unregister("test")
+	if len(r.List()) != 0 {
+		t.Error("should have 0 tasks")
+	}
+}
+
+func TestRegistry_PauseAll(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	r.Register("t1", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+	r.Register("t2", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+
+	r.PauseAll()
+	for _, entry := range r.List() {
+		if !entry.Paused {
+			t.Errorf("task %s should be paused", entry.Name)
+		}
+	}
+}
+
+func TestNormalizeSchedule(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"*/5 * * * *", "0 */5 * * * *"},
+		{"0 */2 * * *", "0 0 */2 * * *"},
+		{"0 0 * * *", "0 0 0 * * *"},
+		{"0 */6 * * *", "0 0 */6 * * *"},
+		{"0 3 * * *", "0 0 3 * * *"},
+		{"0 * * * * *", "0 * * * * *"},
+		{"", "0 */5 * * * *"},
+	}
+
+	for _, tt := range tests {
+		got := normalizeSchedule(tt.input)
+		if got != tt.expect {
+			t.Errorf("normalizeSchedule(%q) = %q, want %q", tt.input, got, tt.expect)
+		}
+	}
+}
+
+func TestRegistry_CronExecution(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	called := make(chan struct{}, 1)
+
+	r.Register("fast", "test", "* * * * * *", func(_ context.Context) error {
+		select {
+		case called <- struct{}{}:
+		default:
+		}
+		return nil
+	})
+
+	ctx := context.Background()
+	r.Start(ctx)
+	defer r.Stop()
+
+	r.Trigger(ctx, "fast")
+
+	select {
+	case <-called:
+	case <-time.After(3 * time.Second):
+		t.Error("handler should have been triggered")
+	}
+}

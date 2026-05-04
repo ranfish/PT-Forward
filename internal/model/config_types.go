@@ -1,0 +1,399 @@
+package model
+
+// §33.1.2 — DiscountLevel 枚举（Sprint 91 canonical）
+
+type DiscountLevel string
+
+const (
+	DiscountNone      DiscountLevel = "NONE"
+	DiscountFree      DiscountLevel = "FREE"
+	Discount2xUp      DiscountLevel = "2XUP"
+	Discount2xFree    DiscountLevel = "2XFREE"
+	DiscountPercent25 DiscountLevel = "PERCENT_25"
+	DiscountPercent30 DiscountLevel = "PERCENT_30"
+	DiscountPercent50 DiscountLevel = "PERCENT_50"
+	Discount2x50      DiscountLevel = "2X50"
+	DiscountPercent70 DiscountLevel = "PERCENT_70"
+	DiscountPercent75 DiscountLevel = "PERCENT_75"
+	DiscountCustom    DiscountLevel = "CUSTOM"
+)
+
+// §33.1.55 — SideLoadStatus 枚举（Sprint 89）
+type SideLoadStatus string
+
+const (
+	SideLoadNotRequired SideLoadStatus = "not_required"
+	SideLoadPending     SideLoadStatus = "pending"
+	SideLoading         SideLoadStatus = "downloading"
+	SideLoadCompleted   SideLoadStatus = "completed"
+	SideLoadFailed      SideLoadStatus = "failed"
+)
+
+// §33.1.56 — MemberStatus 枚举（Sprint 89）
+type MemberStatus string
+
+const (
+	MemberStatusNew              MemberStatus = "new"
+	MemberStatusUploaded         MemberStatus = "uploaded"
+	MemberStatusUploading        MemberStatus = "uploading"
+	MemberStatusInjected         MemberStatus = "injected"
+	MemberStatusSeedingConfirmed MemberStatus = "seeding_confirmed"
+	MemberStatusDownloading      MemberStatus = "downloading"
+	MemberStatusPaused           MemberStatus = "paused"
+	MemberStatusError            MemberStatus = "error"
+	MemberStatusBanned           MemberStatus = "banned"
+	MemberStatusDeleted          MemberStatus = "deleted"
+)
+
+// §33.1.57 — ClientSelectionMode 枚举（Sprint 89）
+type ClientSelectionMode string
+
+const (
+	SelectionFixed      ClientSelectionMode = "fixed"
+	SelectionMostSpace  ClientSelectionMode = "most_space"
+	SelectionLeastLoad  ClientSelectionMode = "least_load"
+	SelectionRoundRobin ClientSelectionMode = "round_robin"
+)
+
+// §33.1.58 — PublishGroupStatus 枚举（Sprint 89）
+type PublishGroupStatus string
+
+const (
+	GroupActive          PublishGroupStatus = "active"
+	GroupPublishing      PublishGroupStatus = "publishing"
+	GroupMonitoring      PublishGroupStatus = "monitoring"
+	GroupPartiallyPaused PublishGroupStatus = "partially_paused"
+	GroupAllPaused       PublishGroupStatus = "all_paused"
+	GroupDeleting        PublishGroupStatus = "deleting"
+	GroupDeleted         PublishGroupStatus = "deleted"
+	GroupPublishFailed   PublishGroupStatus = "publish_failed"
+)
+
+// §33.1.59a — PublishCandidateStatus 枚举（Sprint 91）
+type PublishCandidateStatus string
+
+const (
+	CandidatePending     PublishCandidateStatus = "pending"
+	CandidateDownloading PublishCandidateStatus = "downloading"
+	CandidateCompleted   PublishCandidateStatus = "completed"
+	CandidatePublishing  PublishCandidateStatus = "publishing"
+	CandidateDone        PublishCandidateStatus = "done"
+	CandidateFailed      PublishCandidateStatus = "failed"
+	CandidateSkipped     PublishCandidateStatus = "skipped"
+	CandidateOrphan      PublishCandidateStatus = "orphan"
+)
+
+// §33.1.59b — ReseedMatchStatus 枚举（Sprint 91）
+type ReseedMatchStatus string
+
+const (
+	MatchStatusMatched   ReseedMatchStatus = "matched"
+	MatchStatusInjecting ReseedMatchStatus = "injecting"
+	MatchStatusInjected  ReseedMatchStatus = "injected"
+	MatchStatusFailed    ReseedMatchStatus = "failed"
+	MatchStatusSkipped   ReseedMatchStatus = "skipped"
+)
+
+// §33.1.59c — SeedingTorrentStatus 枚举（Sprint 91）
+type SeedingTorrentStatus string
+
+const (
+	SeedingStatusSeeding       SeedingTorrentStatus = "seeding"
+	SeedingStatusPausedFreeEnd SeedingTorrentStatus = "paused_free_end"
+	SeedingStatusPausedRule    SeedingTorrentStatus = "paused_rule"
+	SeedingStatusDeleting      SeedingTorrentStatus = "deleting"
+	SeedingStatusDeleteFailed  SeedingTorrentStatus = "delete_failed"
+	SeedingStatusDeleted       SeedingTorrentStatus = "deleted"
+	SeedingStatusArchived      SeedingTorrentStatus = "archived"
+)
+
+// §33.1.59d — PublishCandidateRole 枚举（Sprint 94）
+type PublishCandidateRole string
+
+const (
+	RoleDownload PublishCandidateRole = "download"
+	RoleSource   PublishCandidateRole = "source"
+	RoleManual   PublishCandidateRole = "manual"
+)
+
+// §33.1.62 — MediaInfoFormat 枚举（Sprint 90）
+type MediaInfoFormat string
+
+const (
+	MediaInfoFormatBBCode   MediaInfoFormat = "bbcode"
+	MediaInfoFormatMarkdown MediaInfoFormat = "markdown"
+	MediaInfoFormatHTML     MediaInfoFormat = "html"
+)
+
+// §33.1.63 — ReseedTaskStatus 枚举（Sprint 90）
+type ReseedTaskStatus string
+
+const (
+	ReseedTaskIdle       ReseedTaskStatus = "idle"
+	ReseedTaskRunning    ReseedTaskStatus = "running"
+	ReseedTaskCancelling ReseedTaskStatus = "cancelling"
+	ReseedTaskCompleted  ReseedTaskStatus = "completed"
+	ReseedTaskCancelled  ReseedTaskStatus = "cancelled"
+	ReseedTaskFailed     ReseedTaskStatus = "failed"
+)
+
+// §33.1.80 — PublishTaskStatus 枚举（Sprint 96）
+type PublishTaskStatus string
+
+const (
+	PublishTaskPending    PublishTaskStatus = "pending"
+	PublishTaskChecked    PublishTaskStatus = "checked"
+	PublishTaskPublishing PublishTaskStatus = "publishing"
+	PublishTaskCompleted  PublishTaskStatus = "completed"
+	PublishTaskFailed     PublishTaskStatus = "failed"
+)
+
+// §33.1.81 — PublishTaskType 枚举（Sprint 96）
+type PublishTaskType string
+
+const (
+	PublishTaskTypeManual     PublishTaskType = "manual"
+	PublishTaskTypeAuto       PublishTaskType = "auto"
+	PublishTaskTypeReschedule PublishTaskType = "reschedule"
+)
+
+// §33.1.83 — PublishResultStatus 枚举（Sprint 97b）
+type PublishResultStatus string
+
+const (
+	PublishResultSkipped    PublishResultStatus = "skipped"
+	PublishResultPublishing PublishResultStatus = "publishing"
+	PublishResultCompleted  PublishResultStatus = "completed"
+	PublishResultFailed     PublishResultStatus = "failed"
+)
+
+// §33.1.79 — WS 事件枚举（Sprint 94）
+type TaskStatus string
+
+const (
+	TaskStatusPending   TaskStatus = "pending"
+	TaskStatusRunning   TaskStatus = "running"
+	TaskStatusPaused    TaskStatus = "paused"
+	TaskStatusCompleted TaskStatus = "completed"
+	TaskStatusFailed    TaskStatus = "failed"
+	TaskStatusCancelled TaskStatus = "cancelled"
+)
+
+type TaskType string
+
+const (
+	TaskTypeRSSFetch  TaskType = "rss_fetch"
+	TaskTypeReseed    TaskType = "reseed"
+	TaskTypePublish   TaskType = "publish"
+	TaskTypeLifecycle TaskType = "lifecycle"
+)
+
+type LogLevel string
+
+const (
+	LogLevelDebug LogLevel = "debug"
+	LogLevelInfo  LogLevel = "info"
+	LogLevelWarn  LogLevel = "warn"
+	LogLevelError LogLevel = "error"
+)
+
+type DownloaderStatus string
+
+const (
+	DownloaderStatusOnline  DownloaderStatus = "online"
+	DownloaderStatusOffline DownloaderStatus = "offline"
+)
+
+type TorrentAction string
+
+const (
+	TorrentActionAdded     TorrentAction = "added"
+	TorrentActionCompleted TorrentAction = "completed"
+	TorrentActionDeleted   TorrentAction = "deleted"
+)
+
+type NotificationType string
+
+const (
+	NotificationTypeSuccess NotificationType = "success"
+	NotificationTypeWarning NotificationType = "warning"
+	NotificationTypeError   NotificationType = "error"
+	NotificationTypeInfo    NotificationType = "info"
+)
+
+type NotificationCategory string
+
+const (
+	NotificationCategoryReseed  NotificationCategory = "reseed"
+	NotificationCategoryPublish NotificationCategory = "publish"
+	NotificationCategoryRSS     NotificationCategory = "rss"
+	NotificationCategorySystem  NotificationCategory = "system"
+	NotificationCategoryAuth    NotificationCategory = "auth"
+)
+
+type PublishStepStatus string
+
+const (
+	PublishStepStatusRunning   PublishStepStatus = "running"
+	PublishStepStatusCompleted PublishStepStatus = "completed"
+	PublishStepStatusFailed    PublishStepStatus = "failed"
+)
+
+type DiskWarningLevel string
+
+const (
+	DiskWarningLevelWarning  DiskWarningLevel = "warning"
+	DiskWarningLevelCritical DiskWarningLevel = "critical"
+)
+
+type SeedingDecision string
+
+const (
+	SeedingDecisionKeep   SeedingDecision = "keep"
+	SeedingDecisionPause  SeedingDecision = "pause"
+	SeedingDecisionDelete SeedingDecision = "delete"
+)
+
+// §33.1.91 — RequestPriority 枚举（Sprint 105）
+type RequestPriority int
+
+const (
+	PriorityPublish     RequestPriority = 0
+	PrioritySeeding     RequestPriority = 1
+	PriorityReseed      RequestPriority = 2
+	PriorityRSS         RequestPriority = 3
+	PriorityMaintenance RequestPriority = 4
+)
+
+// §8.1.2 — RSS 策略枚举
+type HashStrategy string
+
+const (
+	HashGuid       HashStrategy = "guid"
+	HashBencode    HashStrategy = "bencode"
+	HashFakeFromID HashStrategy = "fake_from_id"
+	HashXMLTag     HashStrategy = "xml_tag"
+	HashURLParam   HashStrategy = "link_param"
+	HashGuidSuffix HashStrategy = "guid_suffix"
+	HashNone       HashStrategy = "none"
+)
+
+type SizeStrategy string
+
+const (
+	SizeEnclosure  SizeStrategy = "enclosure"
+	SizeDescRegex  SizeStrategy = "desc_regex"
+	SizeTitleRegex SizeStrategy = "title_regex"
+	SizeBencode    SizeStrategy = "bencode"
+	SizeXMLTag     SizeStrategy = "xml_tag"
+	SizeNone       SizeStrategy = "none"
+)
+
+type IDStrategy string
+
+const (
+	IDQueryParam  IDStrategy = "query_param"
+	IDPathSegment IDStrategy = "path_segment"
+	IDGuidRegex   IDStrategy = "guid_regex"
+	IDLinkRegex   IDStrategy = "link_regex"
+	IDGuidText    IDStrategy = "guid_text"
+	IDNone        IDStrategy = "none"
+)
+
+// §8.8.2 — CompareType 枚举
+type CompareType string
+
+const (
+	CompareEquals       CompareType = "equals"
+	CompareBigger       CompareType = "bigger"
+	CompareSmaller      CompareType = "smaller"
+	CompareContain      CompareType = "contain"
+	CompareIncludeIn    CompareType = "include_in"
+	CompareNotContain   CompareType = "not_contain"
+	CompareNotIncludeIn CompareType = "not_include_in"
+	CompareRegExp       CompareType = "regexp"
+	CompareNotRegExp    CompareType = "not_regexp"
+)
+
+// §15.4 — DecisionType 枚举（16 种决策类型）
+type DecisionType string
+
+const (
+	DecisionMatch                DecisionType = "MATCH"
+	DecisionMatchSizeOnly        DecisionType = "MATCH_SIZE_ONLY"
+	DecisionMatchPartial         DecisionType = "MATCH_PARTIAL"
+	DecisionReleaseGroupMismatch DecisionType = "RELEASE_GROUP_MISMATCH"
+	DecisionResolutionMismatch   DecisionType = "RESOLUTION_MISMATCH"
+	DecisionSourceMismatch       DecisionType = "SOURCE_MISMATCH"
+	DecisionProperRepackMismatch DecisionType = "PROPER_REPACK_MISMATCH"
+	DecisionFuzzySizeMismatch    DecisionType = "FUZZY_SIZE_MISMATCH"
+	DecisionSizeMismatch         DecisionType = "SIZE_MISMATCH"
+	DecisionFileTreeMismatch     DecisionType = "FILE_TREE_MISMATCH"
+	DecisionPartialSizeMismatch  DecisionType = "PARTIAL_SIZE_MISMATCH"
+	DecisionSameInfoHash         DecisionType = "SAME_INFO_HASH"
+	DecisionAlreadyExists        DecisionType = "INFO_HASH_ALREADY_EXISTS"
+	DecisionDownloadFailed       DecisionType = "DOWNLOAD_FAILED"
+	DecisionNoDownloadLink       DecisionType = "NO_DOWNLOAD_LINK"
+	DecisionBlockedRelease       DecisionType = "BLOCKED_RELEASE"
+)
+
+type Framework string
+
+const (
+	FrameworkNexusPHP  Framework = "nexusphp"
+	FrameworkUnit3D    Framework = "unit3d"
+	FrameworkGazelle   Framework = "gazelle"
+	FrameworkMTeam     Framework = "mteam"
+	FrameworkTNode     Framework = "tnode"
+	FrameworkLuminance Framework = "luminance"
+	FrameworkRousi     Framework = "rousi"
+	FrameworkGeneric   Framework = "generic"
+)
+
+var AllFrameworks = []Framework{
+	FrameworkNexusPHP,
+	FrameworkUnit3D,
+	FrameworkGazelle,
+	FrameworkMTeam,
+	FrameworkTNode,
+	FrameworkLuminance,
+	FrameworkRousi,
+	FrameworkGeneric,
+}
+
+var FrameworkLabels = map[Framework]string{
+	FrameworkNexusPHP:  "NexusPHP",
+	FrameworkUnit3D:    "UNIT3D",
+	FrameworkGazelle:   "Gazelle",
+	FrameworkMTeam:     "M-Team",
+	FrameworkTNode:     "TNode",
+	FrameworkLuminance: "Luminance",
+	FrameworkRousi:     "Rousi",
+	FrameworkGeneric:   "Generic",
+}
+
+func ValidFramework(s string) bool {
+	_, ok := FrameworkLabels[Framework(s)]
+	return ok
+}
+
+type AuthType string
+
+const (
+	AuthTypeCookie  AuthType = "cookie"
+	AuthTypeAPIKey  AuthType = "apikey"
+	AuthTypePasskey AuthType = "passkey"
+)
+
+var AllAuthTypes = []AuthType{AuthTypeCookie, AuthTypeAPIKey, AuthTypePasskey}
+
+var AuthTypeLabels = map[AuthType]string{
+	AuthTypeCookie:  "Cookie",
+	AuthTypeAPIKey:  "API Key",
+	AuthTypePasskey: "Passkey",
+}
+
+func ValidAuthType(s string) bool {
+	_, ok := AuthTypeLabels[AuthType(s)]
+	return ok
+}

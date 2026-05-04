@@ -92,7 +92,7 @@
 | 下水道 | [sewerpt.md](./sewerpt.md) | ✅ 完成（极简制作组2个·19音频含AV3A/ALAC/OPUS·无AV1·2K/8K分辨率·16标签含冷门低分/粤语/短剧/高码率·PT-Gen独立字段·冷门低分+粤语特色分区） |
 | 蟹黄堡 | [crabpt.md](./crabpt.md) | ✅ 完成（种审制·source_sel替代medium_sel·双mode影视+书籍·mode6文档编码EPUB/AZW3·37制作组含重复·37影视标签+34书籍标签含网文·processing_sel=地区含印度·H.266/VVC·0DAY英文标题强制·站组XHB·独立Wiki） |
 | 杏坛 | [xingtan.md](./xingtan.md) | ✅ 完成（学术资源专题·90+学科分类·source_sel=载体类型·processing_sel=文件格式27种含CAJ/UVZ/DJVU·无影视质量字段·新增author/publisher/ISBN字段·无匿名发布） |
-| 星空 | [starspace.md](./starspace.md) | ✅ 完成（**FireFly自研框架**·双发布系统视频+音乐·字段tr_前缀·来源层级编码s11-s54·分类字符串ID·HDR独立下拉·Gazelle风格音乐·禁止DIY/Remux·压制仅WiKi/CMCT·站组Ying系列） |
+| 影 | [starspace.md](./starspace.md) | ✅ 完成（**FireFly自研框架**·双发布系统视频+音乐·字段tr_前缀·来源层级编码s11-s54·分类字符串ID·HDR独立下拉·Gazelle风格音乐·禁止DIY/Remux·压制仅WiKi/CMCT·站组Ying系列） |
 | 星湾 | [xingwan.md](./xingwan.md) | ✅ 完成（**仅下载站**·建设初期·NexusPHP·开放注册·无发布权限·不做源站和目标站） |
 | 星陨阁 | [xingyungept.md](./xingyungept.md) | ✅ 完成（FHD/UHD媒介独立·编码极简6种含AV1·19音频含AV3V/ALAC/OPUS·8K·站组Starfall系列+rain·24标签含超分/补帧/高帧率/高码率·短剧分类·PT-Gen·Tracker独立子域名） |
 | 熊猫 | [pandapt.md](./pandapt.md) | ✅ 完成（双mode种子区+特别区·制作组ID按mode不同·12媒介含UHDTV·13音频含AV3A·8地区含印度/东南亚·25+黑名单制作组·认领系统3倍魔力·H&R手动模式·短剧分类·横竖屏标签·TMDB独立字段·候选区修改7天时限） |
@@ -101,6 +101,7 @@
 | 壹吧 | [1ptba.md](./1ptba.md) | ✅ 完成（Cloudflare·教育特色·**特别区9KG禁止发布·只允许种子区mode=4**·种子最小1GB·Redis后端·source_sel=媒介来源·codec_sel混合音视频·8K·processing_sel仅Raw/Encode·6制作组HDS/CHD/MySiLU/WiKi·21标签含特效/音乐系列·双mode种子区+特别区·认领1000种·**H&R 5天/24h·分享率≥1.8免·≥8次ban·20000魔力消除·30天停止检查**·**促销4档随机(50%/20%/25%/5%)·>30GB免费·BR原盘免费&2x·3天时限·2个月永久2X·PT-Gen·MediaInfo独立字段·YouTube链接·IMDb必填·管理组退休待遇·字幕区规则·发布者双倍上传） |
 | 樱花 | [ying.md](./ying.md) | ✅ 完成（新站2025·Redis后端·单mode无特别区·无音频编码字段·无地区·**媒介ID非标准UHD=1/BD=2**·**分辨率ID非标准4K=1/1080p=2**·编码含AV1·分辨率含8K·6制作组含YHWeb·18标签含韩剧/超分/零魔·PT-Gen·MediaInfo独立字段·**促销6档随机(10%/5%/5%/3%/1%)·>20GB/BR原盘/每季首集自动Free·7天时限·1个月永久2X**·资源打包规则·字幕区规则·管理组退休待遇·签到500魔力·发布者双倍上传·uplver默认勾选） |
 | 优堡 | [ubits.md](./ubits.md) | ✅ 完成（**仅源站**·Cloudflare·Redis后端·**静默模式已开启**·官组极活跃UBits/UBWEB/UBTV·种审制·**候选积分制(<10自动候选)·2025.04.11后类型/MediaInfo/质量区域必填**·9分类·10媒介·9编码含AVS·14音频Atmos/DTS:X独立·分辨率含1440p·10地区含泰/印/俄·4制作组·18标签含原生原盘/高分国剧/特效字幕·**标签互斥:原生原盘/DIY/菜单修改三选一·连载/合集二选一·DV可与任意HDR共存**·IMDb+豆瓣必填+PT-Gen·**促销:官种2x&Free48h/非官种Free12h/原生原盘2x&Free24h·2天后永久50%或2x&50%**·**与不可说互斥禁止互相转载**·**黑名单:HDSky/CMCT全系列禁止**·**盒子5x分享率上限+125MB/s限速**·禁止ISO封装非3D·禁止拆包/跳车刷流·账号保留90/60/45天·认领1090/10000·签到500魔力·独立Tracker子域名t.ubits.club·发布者双倍上传·禁止删除原站标识） |
+| 野马 | [yemapt.md](./yemapt.md) | ✅ 完成（**自研SPA框架(Umi.js+Ant Design)**·REST JSON API发布·**简介Markdown非BBCode**·字段值字符串非数字ID·17分类(影视8+综合4+音频2+教育3)·10媒介·9分辨率含2K/8K·10视频编码含VVC·15音频含Atmos/DDP/Opus·8地区·11制作组·12标签·**H&R发布者可选开启(不可修改)·7天/24h考核·免罪20000积分·发布者30%回馈·≥10次ban·免疫规则(L10/契约/野马之友)**·**盒子:不享受上传促销·非自发3x上传限额计0**·**发布做种强制:上架72h内须做种24h否则处罚**·**发布奖励:前30种500积分·发布人24h/30d/365d做种积分10/5/1·发布人双倍上传**·Level 6免候选·Level 9永久保留·一天100种限制·种子最大3MB·CookieCloud域名yemapt.org） |
 | 幼儿园 | [u2.md](./u2.md) | ✅ 完成（**仅源站**·动漫外番特色站·**深度定制NexusPHP无标准下拉菜单**·自由文本输入框·标题系统自动拼接·四大分类anime/manga/music/other·**候选制严格·自动通过投票评分系统**·UCoin经济系统·魔法促销·**促销仅1%/1%随机无自动促销**·多语言界面(中/英/俄/繁)·AniDB必填·NFO支持·海报poster字段·API支持·PT适宜原则·**发布者禁限条款三要素体系(适用对象/适用条件/豁免条件)**·**Dupe:质量提升/质量相同/无法修正三类**·合集规则5.1-5.8·原盘须BDMV文件夹(3D/MGVC除外BDISO)·转载须保留原文件名·蓝光无用文件须移除·奖惩条例·字幕zip/rar/7z英文文件名·账号保留600/90/120天·反作弊联盟·建站2008） |
 | 在脚下 | [hdroute.md](./hdroute.md) | ✅ 完成（**仅源站（仅采集数据，不作为源站和发布站）**·**自研框架**·老牌原盘/高清站·**所有HDR/R2HD后缀及官方资源均为禁转（不论是否标注）**·普通用户仅能发原盘·Uploader制·独特"最高音轨"字段·三段式标题(中文+一句+英文)·9分类含电影音轨·7媒介·7编码含MVC·5分辨率ID不连续含4K2K·9音频含LPCM·音轨复选框(国语/粤语/中字/DIY)·6种优惠类型·无标签·无制作组下拉·IMDb得分+编号·预告片仅优酷/土豆·CKEditor·2013建站） |
 | 织梦 | [zmpt.md](./zmpt.md) | ✅ 完成（源站+发布站·Cloudflare·种审制·**审核脚本完整逆向 zmpt-check-tool v2026.03.08 2697行/117KB→20+校验规则·五层递进HDR检测·54站转载来源Map·国语标签三方交叉验证·原盘DIY文件结构检测·中文字幕13种标识·中文音频8种标识·PT-Gen自建端点**·7站组·9分类含短剧/有声书/游戏·10媒介含MiniBD·6分辨率含8K/2K·10音频含ALAC/WAV/OGG·7制作组·11分类ID非连续·分辨率ID非标准·**16标签含完整ID映射(驻站/禁转/粤语/无损/首发/短剧/汉化/原创)·注意:上传页无'原盘'标签但审种脚本检测原盘**·**含完整转载自动填写优化方案·标题清洗9规则·标签自动选择8项·简介自动构建含引用关键词**·**字幕区规则(srt/ssa/ass/cue/zip/rar)·管理组退休待遇·超速封禁细化**·认领1000种·全站随机促销·宝可梦主题·电力值经济系统） |
@@ -218,4 +219,15 @@ internal/publish/
 ---
 
 *文档维护：PT-Forward 开发团队*
-*最后更新：2026-04-23*
+*最后更新：2026-05-04*
+
+## UploadTorrent 适配器实现状态
+
+| 站点 | 适配器文件 | UploadTorrent 状态 | 特殊处理 |
+|------|-----------|-------------------|---------|
+| 朱雀 | adapter_tnode.go | ✅ 已完成 | REST API `POST /api/torrent/upload`，CSRF Token，camelCase 字段名(category/medium/videoCoding/resolution)，TMDb，标签逗号分隔 |
+| 莫妮卡 | adapter_unit3d.go | ✅ 已完成 | CSRF `_token`，`category_id`/`type_id`/`resolution_id`，TMDB/MAL ID，181发行商，21地区 |
+| 海豚 | adapter_gazelle.go | ✅ 已完成 | 字符串值字段(media/format/bitrate)，Gazelle艺人系统，remaster版本，Log Checker |
+| 套套哥 | adapter_generic.go (uploadTTG) | ✅ 已完成 | 仅 `type` 分类(58个)，无媒介/编码/分辨率字段，`file`字段名，`nodistr`禁转，`imdb_c`/`douban_id` |
+| 影 | adapter_generic.go (uploadStarSpace) | ✅ 已完成 | 双发布系统(video_upload.php + music_upload.php)，`tr_`前缀字段名，独立checkbox标签，HDR下拉 |
+| 野马 | adapter_generic.go (uploadYemaPT) | ✅ 已完成 | REST JSON API `POST /api/torrent/add`，`showName`/`shortDesc`/`categoryId`，Markdown简介，字符串值字段 |

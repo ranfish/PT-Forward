@@ -1,0 +1,32 @@
+version: "2"
+
+issues:
+  exclude-dirs:
+    - web/node_modules
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  settings:
+    errcheck:
+      check-type-assertions: false
+      exclude-functions:
+        - encoding/json.Encoder.Encode
+        - fmt.Sscanf
+    staticcheck:
+      checks:
+        - all
+        - -QF1002
+        - -QF1003
+        - -ST1000
+        - -ST1021
+        - -ST1003
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck

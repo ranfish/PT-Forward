@@ -1,0 +1,1044 @@
+package api
+
+import (
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/site"
+	"go.uber.org/zap"
+)
+
+type SiteHandler struct {
+	repo   *site.Repository
+	logger *zap.Logger
+}
+
+func NewSiteHandler(repo *site.Repository, logger *zap.Logger) *SiteHandler {
+	return &SiteHandler{repo: repo, logger: logger}
+}
+
+type createSiteRequest struct {
+	Name      string `json:"name"`
+	Domain    string `json:"domain"`
+	BaseURL   string `json:"baseUrl"`
+	Framework string `json:"framework"`
+	AuthType  string `json:"authType,omitempty"`
+
+	Passkey     string `json:"passkey,omitempty"`
+	Cookie      string `json:"cookie,omitempty"`
+	APIKey      string `json:"apiKey,omitempty"`
+	BearerToken string `json:"bearerToken,omitempty"`
+	AuthKey     string `json:"authKey,omitempty"`
+	AuthHash    string `json:"authHash,omitempty"`
+	UserID      int    `json:"userId,omitempty"`
+	RSSKey      string `json:"rssKey,omitempty"`
+
+	HashStrategy     string `json:"hashStrategy,omitempty"`
+	SizeStrategy     string `json:"sizeStrategy,omitempty"`
+	IDStrategy       string `json:"idStrategy,omitempty"`
+	IDPattern        string `json:"idPattern,omitempty"`
+	HashXMLTagName   string `json:"hashXmlTagName,omitempty"`
+	SizeXMLTagName   string `json:"sizeXmlTagName,omitempty"`
+	HashURLParamName string `json:"hashUrlParamName,omitempty"`
+	SizeDescRegex    string `json:"sizeDescRegex,omitempty"`
+	SizeTitleRegex   string `json:"sizeTitleRegex,omitempty"`
+	SizeBaseUnit     int    `json:"sizeBaseUnit,omitempty"`
+
+	DownloadMode        string `json:"downloadMode,omitempty"`
+	DownloadURLTemplate string `json:"downloadUrlTemplate,omitempty"`
+	DownloadPagePattern string `json:"downloadPagePattern,omitempty"`
+
+	RequiresSideLoading bool `json:"requiresSideLoading"`
+
+	IsSource               bool `json:"isSource"`
+	IsTarget               bool `json:"isTarget"`
+	ParticipateAutoPublish bool `json:"participateAutoPublish"`
+
+	CookieCloudSync   bool   `json:"cookieCloudSync"`
+	CookieCloudDomain string `json:"cookieCloudDomain,omitempty"`
+	Enabled           bool   `json:"enabled"`
+
+	AlternativeDomains string `json:"alternativeDomains,omitempty"`
+
+	OverrideRSSURL   string `json:"overrideRssUrl,omitempty"`
+	OverrideSavePath string `json:"overrideSavePath,omitempty"`
+
+	ProxyURL      string `json:"proxyUrl,omitempty"`
+	SkipSSLVerify bool   `json:"skipSslVerify"`
+}
+
+type updateSiteRequest struct {
+	Name      *string `json:"name,omitempty"`
+	Domain    *string `json:"domain,omitempty"`
+	BaseURL   *string `json:"baseUrl,omitempty"`
+	Framework *string `json:"framework,omitempty"`
+	AuthType  *string `json:"authType,omitempty"`
+
+	Passkey     *string `json:"passkey,omitempty"`
+	Cookie      *string `json:"cookie,omitempty"`
+	APIKey      *string `json:"apiKey,omitempty"`
+	BearerToken *string `json:"bearerToken,omitempty"`
+	AuthKey     *string `json:"authKey,omitempty"`
+	AuthHash    *string `json:"authHash,omitempty"`
+	UserID      *int    `json:"userId,omitempty"`
+	RSSKey      *string `json:"rssKey,omitempty"`
+
+	HashStrategy     *string `json:"hashStrategy,omitempty"`
+	SizeStrategy     *string `json:"sizeStrategy,omitempty"`
+	IDStrategy       *string `json:"idStrategy,omitempty"`
+	IDPattern        *string `json:"idPattern,omitempty"`
+	HashXMLTagName   *string `json:"hashXmlTagName,omitempty"`
+	SizeXMLTagName   *string `json:"sizeXmlTagName,omitempty"`
+	HashURLParamName *string `json:"hashUrlParamName,omitempty"`
+	SizeDescRegex    *string `json:"sizeDescRegex,omitempty"`
+	SizeTitleRegex   *string `json:"sizeTitleRegex,omitempty"`
+	SizeBaseUnit     *int    `json:"sizeBaseUnit,omitempty"`
+
+	DownloadMode        *string `json:"downloadMode,omitempty"`
+	DownloadURLTemplate *string `json:"downloadUrlTemplate,omitempty"`
+	DownloadPagePattern *string `json:"downloadPagePattern,omitempty"`
+
+	RequiresSideLoading *bool `json:"requiresSideLoading,omitempty"`
+
+	IsSource               *bool `json:"isSource,omitempty"`
+	IsTarget               *bool `json:"isTarget,omitempty"`
+	ParticipateAutoPublish *bool `json:"participateAutoPublish,omitempty"`
+
+	CookieCloudSync    *bool   `json:"cookieCloudSync,omitempty"`
+	CookieCloudDomain  *string `json:"cookieCloudDomain,omitempty"`
+	AlternativeDomains *string `json:"alternativeDomains,omitempty"`
+	Enabled            *bool   `json:"enabled,omitempty"`
+
+	OverrideRSSURL   *string `json:"overrideRssUrl,omitempty"`
+	OverrideSavePath *string `json:"overrideSavePath,omitempty"`
+
+	ProxyURL      *string `json:"proxyUrl,omitempty"`
+	SkipSSLVerify *bool   `json:"skipSslVerify,omitempty"`
+}
+
+type updateCredentialsRequest struct {
+	Passkey     *string `json:"passkey,omitempty"`
+	Cookie      *string `json:"cookie,omitempty"`
+	APIKey      *string `json:"apiKey,omitempty"`
+	BearerToken *string `json:"bearerToken,omitempty"`
+	AuthKey     *string `json:"authKey,omitempty"`
+	AuthHash    *string `json:"authHash,omitempty"`
+	UserID      *int    `json:"userId,omitempty"`
+	RSSKey      *string `json:"rssKey,omitempty"`
+}
+
+type siteResponse struct {
+	ID        uint      `json:"id"`
+	Name      string    `json:"name"`
+	Domain    string    `json:"domain"`
+	BaseURL   string    `json:"baseUrl"`
+	Framework string    `json:"framework"`
+	AuthType  string    `json:"authType"`
+	Enabled   bool      `json:"enabled"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+
+	IsSource               bool `json:"isSource"`
+	IsTarget               bool `json:"isTarget"`
+	ParticipateAutoPublish bool `json:"participateAutoPublish"`
+
+	HashStrategy     string `json:"hashStrategy"`
+	SizeStrategy     string `json:"sizeStrategy"`
+	IDStrategy       string `json:"idStrategy"`
+	IDPattern        string `json:"idPattern"`
+	HashXMLTagName   string `json:"hashXmlTagName,omitempty"`
+	SizeXMLTagName   string `json:"sizeXmlTagName,omitempty"`
+	HashURLParamName string `json:"hashUrlParamName,omitempty"`
+	SizeDescRegex    string `json:"sizeDescRegex,omitempty"`
+	SizeTitleRegex   string `json:"sizeTitleRegex,omitempty"`
+	SizeBaseUnit     int    `json:"sizeBaseUnit,omitempty"`
+
+	DownloadMode        string `json:"downloadMode"`
+	DownloadURLTemplate string `json:"downloadUrlTemplate,omitempty"`
+	DownloadPagePattern string `json:"downloadPagePattern,omitempty"`
+	RequiresSideLoading bool   `json:"requiresSideLoading"`
+
+	CookieCloudSync   bool       `json:"cookieCloudSync"`
+	CookieCloudDomain string     `json:"cookieCloudDomain,omitempty"`
+	LastSyncAt        *time.Time `json:"lastSyncAt,omitempty"`
+
+	AlternativeDomains string `json:"alternativeDomains,omitempty"`
+
+	OverrideRSSURL   string `json:"overrideRssUrl,omitempty"`
+	OverrideSavePath string `json:"overrideSavePath,omitempty"`
+
+	ProxyURL      string `json:"proxyUrl,omitempty"`
+	SkipSSLVerify bool   `json:"skipSslVerify"`
+
+	HasPasskey     bool `json:"hasPasskey"`
+	HasCookie      bool `json:"hasCookie"`
+	HasAPIKey      bool `json:"hasApiKey"`
+	HasBearerToken bool `json:"hasBearerToken"`
+	HasAuthKey     bool `json:"hasAuthKey"`
+	HasAuthHash    bool `json:"hasAuthHash"`
+	HasRSSKey      bool `json:"hasRssKey"`
+
+	UserID int `json:"userId,omitempty"`
+
+	UploadBytes   int64      `json:"uploadBytes"`
+	DownloadBytes int64      `json:"downloadBytes"`
+	SeedingPoints float64    `json:"seedingPoints"`
+	SeedingSize   int64      `json:"seedingSize"`
+	SeedingCount  int        `json:"seedingCount"`
+	UserClass     string     `json:"userClass,omitempty"`
+	Ratio         float64    `json:"ratio"`
+	BonusPoints   float64    `json:"bonusPoints"`
+	StatsSyncedAt *time.Time `json:"statsSyncedAt,omitempty"`
+
+	FrameworkDetected bool   `json:"frameworkDetected"`
+	FrameworkVerified bool   `json:"frameworkVerified"`
+	DetectionDetail   string `json:"detectionDetail,omitempty"`
+}
+
+func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
+	return siteResponse{
+		ID:        s.ID,
+		Name:      s.Name,
+		Domain:    s.Domain,
+		BaseURL:   s.BaseURL,
+		Framework: s.Framework,
+		AuthType:  s.AuthType,
+		Enabled:   s.Enabled,
+		CreatedAt: s.CreatedAt,
+		UpdatedAt: s.UpdatedAt,
+
+		IsSource:               s.IsSource,
+		IsTarget:               s.IsTarget,
+		ParticipateAutoPublish: s.ParticipateAutoPublish,
+
+		HashStrategy:     s.HashStrategy,
+		SizeStrategy:     s.SizeStrategy,
+		IDStrategy:       s.IDStrategy,
+		IDPattern:        s.IDPattern,
+		HashXMLTagName:   s.HashXMLTagName,
+		SizeXMLTagName:   s.SizeXMLTagName,
+		HashURLParamName: s.HashURLParamName,
+		SizeDescRegex:    s.SizeDescRegex,
+		SizeTitleRegex:   s.SizeTitleRegex,
+		SizeBaseUnit:     s.SizeBaseUnit,
+
+		DownloadMode:        s.DownloadMode,
+		DownloadURLTemplate: s.DownloadURLTemplate,
+		DownloadPagePattern: s.DownloadPagePattern,
+		RequiresSideLoading: s.RequiresSideLoading,
+
+		CookieCloudSync:   s.CookieCloudSync,
+		CookieCloudDomain: s.CookieCloudDomain,
+		LastSyncAt:        s.LastSyncAt,
+
+		AlternativeDomains: s.AlternativeDomains,
+
+		OverrideRSSURL:   s.OverrideRSSURL,
+		OverrideSavePath: s.OverrideSavePath,
+
+		ProxyURL:      s.ProxyURL,
+		SkipSSLVerify: s.SkipSSLVerify,
+
+		HasPasskey:     s.Passkey != "",
+		HasCookie:      s.Cookie != "",
+		HasAPIKey:      s.APIKey != "",
+		HasBearerToken: s.BearerToken != "",
+		HasAuthKey:     s.AuthKey != "",
+		HasAuthHash:    s.AuthHash != "",
+		HasRSSKey:      s.RSSKey != "",
+
+		UserID: s.UserID,
+
+		UploadBytes:   s.UploadBytes,
+		DownloadBytes: s.DownloadBytes,
+		SeedingPoints: s.SeedingPoints,
+		SeedingSize:   s.SeedingSize,
+		SeedingCount:  s.SeedingCount,
+		UserClass:     s.UserClass,
+		Ratio:         s.Ratio,
+		BonusPoints:   s.BonusPoints,
+		StatsSyncedAt: s.StatsSyncedAt,
+
+		FrameworkDetected: s.FrameworkDetected,
+		FrameworkVerified: s.FrameworkVerified,
+		DetectionDetail:   s.DetectionDetail,
+	}
+}
+
+var validFrameworks = map[string]bool{
+	string(model.FrameworkNexusPHP):  true,
+	string(model.FrameworkUnit3D):    true,
+	string(model.FrameworkGazelle):   true,
+	string(model.FrameworkMTeam):     true,
+	string(model.FrameworkTNode):     true,
+	string(model.FrameworkLuminance): true,
+	string(model.FrameworkRousi):     true,
+	string(model.FrameworkGeneric):   true,
+}
+
+func (h *SiteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.handleRouteByPath(w, r)
+}
+
+func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	trimmed := strings.TrimRight(path, "/")
+
+	if trimmed == "/api/v1/sites" {
+		if r.Method == http.MethodGet {
+			h.handleList(w, r)
+			return
+		}
+		if r.Method == http.MethodPost {
+			h.handleCreate(w, r)
+			return
+		}
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+
+	remaining := strings.TrimPrefix(trimmed, "/api/v1/sites/")
+	if remaining == "" || remaining == "/" {
+		if r.Method == http.MethodGet {
+			h.handleList(w, r)
+		} else if r.Method == http.MethodPost {
+			h.handleCreate(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
+	remaining = strings.TrimPrefix(path, "/api/v1/sites/")
+	remaining = strings.TrimRight(remaining, "/")
+	parts := strings.SplitN(remaining, "/", 3)
+
+	if len(parts) == 1 {
+		switch r.Method {
+		case http.MethodGet:
+			h.handleGet(w, r)
+		case http.MethodPut:
+			h.handleUpdate(w, r)
+		case http.MethodDelete:
+			h.handleDelete(w, r)
+		default:
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
+	idStr := parts[0]
+	subResource := parts[1]
+
+	switch subResource {
+	case "test":
+		h.handleTest(w, r, idStr)
+	case "detect":
+		h.handleDetect(w, r, idStr)
+	case "credentials":
+		if r.Method == http.MethodPut {
+			h.handleUpdateCredentials(w, r, idStr)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+	case "stats":
+		if r.Method == http.MethodGet {
+			h.handleGetStats(w, r, idStr)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+	case "overrides":
+		h.handleOverrides(w, r, idStr)
+	default:
+		Error(w, http.StatusNotFound, 40400, "路径不存在")
+	}
+}
+
+func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
+	sites, err := h.repo.List(r.Context())
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询站点失败")
+		return
+	}
+
+	items := make([]siteResponse, 0, len(sites))
+	for i := range sites {
+		items = append(items, h.toResponse(&sites[i]))
+	}
+
+	Success(w, map[string]interface{}{
+		"items": items,
+		"total": len(items),
+	})
+}
+
+func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
+	var req createSiteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+
+	if req.Name == "" || req.Domain == "" || req.BaseURL == "" {
+		Error(w, http.StatusBadRequest, 40001, "name, domain, baseUrl 为必填项")
+		return
+	}
+
+	if req.Framework == "" {
+		req.Framework = "generic"
+	}
+	if !validFrameworks[req.Framework] {
+		Error(w, http.StatusBadRequest, 40001, "framework 必须为 nexusphp/unit3d/gazelle/mteam/tnode/luminance/rousi/generic")
+		return
+	}
+
+	if req.AuthType == "" {
+		req.AuthType = "cookie"
+	}
+	if !model.ValidAuthType(req.AuthType) {
+		Error(w, http.StatusBadRequest, 40001, "authType 必须为 cookie/apikey/passkey")
+		return
+	}
+
+	exists, _ := h.repo.ExistsByDomain(r.Context(), req.Domain, 0)
+	if exists {
+		Error(w, http.StatusConflict, 40900, "站点域名已存在")
+		return
+	}
+	exists, _ = h.repo.ExistsByName(r.Context(), req.Name, 0)
+	if exists {
+		Error(w, http.StatusConflict, 40900, "站点名称已存在")
+		return
+	}
+
+	s := model.Site{
+		Name:      req.Name,
+		Domain:    req.Domain,
+		BaseURL:   req.BaseURL,
+		Framework: req.Framework,
+		AuthType:  req.AuthType,
+		Enabled:   req.Enabled,
+
+		Passkey:     req.Passkey,
+		Cookie:      req.Cookie,
+		APIKey:      req.APIKey,
+		BearerToken: req.BearerToken,
+		AuthKey:     req.AuthKey,
+		AuthHash:    req.AuthHash,
+		UserID:      req.UserID,
+		RSSKey:      req.RSSKey,
+
+		HashStrategy:     defaultStr(req.HashStrategy, "guid"),
+		SizeStrategy:     defaultStr(req.SizeStrategy, "enclosure"),
+		IDStrategy:       defaultStr(req.IDStrategy, "query_param"),
+		IDPattern:        req.IDPattern,
+		HashXMLTagName:   req.HashXMLTagName,
+		SizeXMLTagName:   req.SizeXMLTagName,
+		HashURLParamName: req.HashURLParamName,
+		SizeDescRegex:    req.SizeDescRegex,
+		SizeTitleRegex:   req.SizeTitleRegex,
+		SizeBaseUnit:     req.SizeBaseUnit,
+
+		DownloadMode:        defaultStr(req.DownloadMode, "template"),
+		DownloadURLTemplate: req.DownloadURLTemplate,
+		DownloadPagePattern: req.DownloadPagePattern,
+		RequiresSideLoading: req.RequiresSideLoading,
+
+		IsSource:               req.IsSource,
+		IsTarget:               req.IsTarget,
+		ParticipateAutoPublish: req.ParticipateAutoPublish,
+
+		CookieCloudSync:   req.CookieCloudSync,
+		CookieCloudDomain: req.CookieCloudDomain,
+
+		AlternativeDomains: req.AlternativeDomains,
+
+		OverrideRSSURL:   req.OverrideRSSURL,
+		OverrideSavePath: req.OverrideSavePath,
+
+		ProxyURL:      req.ProxyURL,
+		SkipSSLVerify: req.SkipSSLVerify,
+	}
+
+	if err := h.repo.Create(r.Context(), &s); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "创建站点失败")
+		return
+	}
+
+	h.logger.Info("site created", zap.String("name", s.Name), zap.String("domain", s.Domain))
+	Success(w, h.toResponse(&s))
+}
+
+func (h *SiteHandler) handleGet(w http.ResponseWriter, r *http.Request) {
+	id, err := h.extractID(r.URL.Path, "/api/v1/sites/")
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的站点 ID")
+		return
+	}
+
+	s, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		Error(w, http.StatusNotFound, 12001, "站点不存在")
+		return
+	}
+
+	Success(w, h.toResponse(s))
+}
+
+func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	id, err := h.extractID(r.URL.Path, "/api/v1/sites/")
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的站点 ID")
+		return
+	}
+
+	s, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		Error(w, http.StatusNotFound, 12001, "站点不存在")
+		return
+	}
+
+	var req updateSiteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+
+	if req.Name != nil {
+		exists, _ := h.repo.ExistsByName(r.Context(), *req.Name, id)
+		if exists {
+			Error(w, http.StatusConflict, 40900, "站点名称已存在")
+			return
+		}
+		s.Name = *req.Name
+	}
+	if req.Domain != nil {
+		exists, _ := h.repo.ExistsByDomain(r.Context(), *req.Domain, id)
+		if exists {
+			Error(w, http.StatusConflict, 40900, "站点域名已存在")
+			return
+		}
+		s.Domain = *req.Domain
+	}
+	if req.BaseURL != nil {
+		s.BaseURL = *req.BaseURL
+	}
+	if req.Framework != nil {
+		if !validFrameworks[*req.Framework] {
+			Error(w, http.StatusBadRequest, 40001, "不支持的 framework")
+			return
+		}
+		s.Framework = *req.Framework
+	}
+	if req.AuthType != nil {
+		if !model.ValidAuthType(*req.AuthType) {
+			Error(w, http.StatusBadRequest, 40001, "不支持的 authType")
+			return
+		}
+		s.AuthType = *req.AuthType
+	}
+	if req.Enabled != nil {
+		s.Enabled = *req.Enabled
+	}
+	if req.IsSource != nil {
+		s.IsSource = *req.IsSource
+	}
+	if req.IsTarget != nil {
+		s.IsTarget = *req.IsTarget
+	}
+	if req.ParticipateAutoPublish != nil {
+		s.ParticipateAutoPublish = *req.ParticipateAutoPublish
+	}
+	if req.CookieCloudSync != nil {
+		s.CookieCloudSync = *req.CookieCloudSync
+	}
+	if req.CookieCloudDomain != nil {
+		s.CookieCloudDomain = *req.CookieCloudDomain
+	}
+	if req.AlternativeDomains != nil {
+		s.AlternativeDomains = *req.AlternativeDomains
+	}
+	if req.HashStrategy != nil {
+		s.HashStrategy = *req.HashStrategy
+	}
+	if req.SizeStrategy != nil {
+		s.SizeStrategy = *req.SizeStrategy
+	}
+	if req.IDStrategy != nil {
+		s.IDStrategy = *req.IDStrategy
+	}
+	if req.IDPattern != nil {
+		s.IDPattern = *req.IDPattern
+	}
+	if req.HashXMLTagName != nil {
+		s.HashXMLTagName = *req.HashXMLTagName
+	}
+	if req.SizeXMLTagName != nil {
+		s.SizeXMLTagName = *req.SizeXMLTagName
+	}
+	if req.HashURLParamName != nil {
+		s.HashURLParamName = *req.HashURLParamName
+	}
+	if req.SizeDescRegex != nil {
+		s.SizeDescRegex = *req.SizeDescRegex
+	}
+	if req.SizeTitleRegex != nil {
+		s.SizeTitleRegex = *req.SizeTitleRegex
+	}
+	if req.SizeBaseUnit != nil {
+		s.SizeBaseUnit = *req.SizeBaseUnit
+	}
+	if req.DownloadMode != nil {
+		s.DownloadMode = *req.DownloadMode
+	}
+	if req.DownloadURLTemplate != nil {
+		s.DownloadURLTemplate = *req.DownloadURLTemplate
+	}
+	if req.DownloadPagePattern != nil {
+		s.DownloadPagePattern = *req.DownloadPagePattern
+	}
+	if req.RequiresSideLoading != nil {
+		s.RequiresSideLoading = *req.RequiresSideLoading
+	}
+	if req.OverrideRSSURL != nil {
+		s.OverrideRSSURL = *req.OverrideRSSURL
+	}
+	if req.OverrideSavePath != nil {
+		s.OverrideSavePath = *req.OverrideSavePath
+	}
+	if req.ProxyURL != nil {
+		s.ProxyURL = *req.ProxyURL
+	}
+	if req.SkipSSLVerify != nil {
+		s.SkipSSLVerify = *req.SkipSSLVerify
+	}
+
+	if err := h.repo.Update(r.Context(), s); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "更新站点失败")
+		return
+	}
+
+	h.logger.Info("site updated", zap.String("name", s.Name))
+	Success(w, h.toResponse(s))
+}
+
+func (h *SiteHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := h.extractID(r.URL.Path, "/api/v1/sites/")
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的站点 ID")
+		return
+	}
+
+	s, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		Error(w, http.StatusNotFound, 12001, "站点不存在")
+		return
+	}
+
+	if err := h.repo.Delete(r.Context(), id); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "删除站点失败")
+		return
+	}
+
+	h.logger.Info("site deleted", zap.String("name", s.Name))
+	Success(w, nil)
+}
+
+func (h *SiteHandler) handleTest(w http.ResponseWriter, r *http.Request, idStr string) {
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的站点 ID")
+		return
+	}
+
+	s, err := h.repo.GetByID(r.Context(), uint(id))
+	if err != nil {
+		Error(w, http.StatusNotFound, 12001, "站点不存在")
+		return
+	}
+
+	ok, message := h.testSiteConnection(s)
+	Success(w, map[string]interface{}{
+		"ok":      ok,
+		"message": message,
+	})
+}
+
+func (h *SiteHandler) handleDetect(w http.ResponseWriter, r *http.Request, idStr string) {
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的站点 ID")
+		return
+	}
+
+	s, err := h.repo.GetByID(r.Context(), uint(id))
+	if err != nil {
+		Error(w, http.StatusNotFound, 12001, "站点不存在")
+		return
+	}
+
+	result := h.detectFramework(s)
+	Success(w, result)
+}
+
+func (h *SiteHandler) handleUpdateCredentials(w http.ResponseWriter, r *http.Request, idStr string) {
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的站点 ID")
+		return
+	}
+
+	_, err = h.repo.GetByID(r.Context(), uint(id))
+	if err != nil {
+		Error(w, http.StatusNotFound, 12001, "站点不存在")
+		return
+	}
+
+	var req updateCredentialsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+
+	creds := map[string]interface{}{}
+	if req.Passkey != nil {
+		creds["passkey"] = *req.Passkey
+	}
+	if req.Cookie != nil {
+		creds["cookie"] = *req.Cookie
+	}
+	if req.APIKey != nil {
+		creds["api_key"] = *req.APIKey
+	}
+	if req.BearerToken != nil {
+		creds["bearer_token"] = *req.BearerToken
+	}
+	if req.AuthKey != nil {
+		creds["auth_key"] = *req.AuthKey
+	}
+	if req.AuthHash != nil {
+		creds["auth_hash"] = *req.AuthHash
+	}
+	if req.UserID != nil {
+		creds["user_id"] = *req.UserID
+	}
+	if req.RSSKey != nil {
+		creds["rss_key"] = *req.RSSKey
+	}
+
+	if len(creds) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "未提供任何凭据字段")
+		return
+	}
+
+	if err := h.repo.UpdateCredentials(r.Context(), uint(id), creds); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "更新凭据失败")
+		return
+	}
+
+	updated, _ := h.repo.GetByID(r.Context(), uint(id))
+	h.logger.Info("site credentials updated", zap.String("domain", updated.Domain))
+	Success(w, h.toResponse(updated))
+}
+
+func (h *SiteHandler) handleGetStats(w http.ResponseWriter, r *http.Request, idStr string) {
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的站点 ID")
+		return
+	}
+
+	s, err := h.repo.GetByID(r.Context(), uint(id))
+	if err != nil {
+		Error(w, http.StatusNotFound, 12001, "站点不存在")
+		return
+	}
+
+	Success(w, map[string]interface{}{
+		"uploadBytes":   s.UploadBytes,
+		"downloadBytes": s.DownloadBytes,
+		"seedingPoints": s.SeedingPoints,
+		"seedingSize":   s.SeedingSize,
+		"seedingCount":  s.SeedingCount,
+		"userClass":     s.UserClass,
+		"ratio":         s.Ratio,
+		"bonusPoints":   s.BonusPoints,
+		"statsSyncedAt": s.StatsSyncedAt,
+	})
+}
+
+func (h *SiteHandler) testSiteConnection(s *model.Site) (bool, string) {
+	client := buildSiteHTTPClient(s, 10*time.Second)
+	req, err := http.NewRequest("GET", s.BaseURL, nil)
+	if err != nil {
+		return false, "构造请求失败: " + err.Error()
+	}
+	if s.Cookie != "" {
+		req.Header.Set("Cookie", s.Cookie)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, "连接失败: " + err.Error()
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode >= 400 {
+		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
+	return true, "连接成功"
+}
+
+func (h *SiteHandler) detectFramework(s *model.Site) *model.DetectResult {
+	client := buildSiteHTTPClient(s, 15*time.Second)
+	req, err := http.NewRequest("GET", s.BaseURL, nil)
+	if err != nil {
+		return &model.DetectResult{
+			Framework:       s.Framework,
+			Confidence:      0,
+			DetectionDetail: "无法访问站点: " + err.Error(),
+		}
+	}
+	if s.Cookie != "" {
+		req.Header.Set("Cookie", s.Cookie)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return &model.DetectResult{
+			Framework:       s.Framework,
+			Confidence:      0,
+			DetectionDetail: "无法访问站点: " + err.Error(),
+		}
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body := make([]byte, 64*1024)
+	n, _ := resp.Body.Read(body)
+	bodyStr := string(body[:n])
+
+	framework := "generic"
+	confidence := 0.3
+	detail := ""
+
+	if strings.Contains(bodyStr, "NexusPHP") || strings.Contains(bodyStr, "nexusphp") {
+		framework = "nexusphp"
+		confidence = 0.9
+		detail = "检测到 NexusPHP 标识"
+	} else if strings.Contains(bodyStr, "UNIT3D") || strings.Contains(bodyStr, "unit3d") {
+		framework = "unit3d"
+		confidence = 0.9
+		detail = "检测到 Unit3D 标识"
+	} else if strings.Contains(bodyStr, "Gazelle") || strings.Contains(bodyStr, "gazelle") {
+		framework = "gazelle"
+		confidence = 0.9
+		detail = "检测到 Gazelle 标识"
+	} else if strings.Contains(bodyStr, "M-Team") || strings.Contains(bodyStr, "mteam") {
+		framework = "mteam"
+		confidence = 0.9
+		detail = "检测到 M-Team 标识"
+	} else if strings.Contains(bodyStr, "TNode") || strings.Contains(bodyStr, "tnode") || strings.Contains(bodyStr, "朱雀") {
+		framework = "tnode"
+		confidence = 0.9
+		detail = "检测到 TNode 标识"
+	} else if strings.Contains(bodyStr, "Luminance") || strings.Contains(bodyStr, "luminance") {
+		framework = "luminance"
+		confidence = 0.9
+		detail = "检测到 Luminance 标识"
+	} else if strings.Contains(bodyStr, "Rousi") || strings.Contains(bodyStr, "rousi") {
+		framework = "rousi"
+		confidence = 0.9
+		detail = "检测到 Rousi 标识"
+	} else if strings.Contains(bodyStr, "Nexus") {
+		framework = "nexusphp"
+		confidence = 0.7
+		detail = "检测到 Nexus 字样（可能是 NexusPHP）"
+	} else {
+		detail = "未能识别框架，使用 generic"
+	}
+
+	defaults := model.FrameworkDefaults{
+		HashStrategy: frameworkDefaultHash(framework),
+		SizeStrategy: frameworkDefaultSize(framework),
+		IDStrategy:   frameworkDefaultID(framework),
+	}
+	switch framework {
+	case "nexusphp", "mteam":
+		defaults.DownloadURLTemplate = s.BaseURL + "/download.php?id={id}&passkey={passkey}"
+	case "unit3d":
+		defaults.IDPattern = `\/torrent\/(\d+)`
+		defaults.DownloadURLTemplate = s.BaseURL + "/torrent/download/{id}"
+	case "gazelle":
+		defaults.DownloadURLTemplate = s.BaseURL + "/torrents.php?action=download&id={id}&authkey={authkey}&torrent_pass={passkey}"
+	case "luminance":
+		defaults.DownloadURLTemplate = s.BaseURL + "/torrents.php?action=download&id={id}&authkey={authkey}&torrent_pass={passkey}"
+	case "tnode":
+		defaults.DownloadURLTemplate = s.BaseURL + "/download.php?id={id}&passkey={passkey}"
+	case "rousi":
+		defaults.IDPattern = "uuid"
+		defaults.DownloadURLTemplate = s.BaseURL + "/api/torrent/{id}/download/{passkey}"
+	}
+
+	return &model.DetectResult{
+		Framework:       framework,
+		Confidence:      confidence,
+		DetectionDetail: detail,
+		Defaults:        defaults,
+	}
+}
+
+func (h *SiteHandler) extractID(path string, prefix string) (uint, error) {
+	p := strings.TrimPrefix(path, prefix)
+	p = strings.TrimRight(p, "/")
+	n, err := strconv.ParseUint(p, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("invalid id")
+	}
+	return uint(n), nil
+}
+
+func defaultStr(val, def string) string {
+	if val == "" {
+		return def
+	}
+	return val
+}
+
+func buildSiteHTTPClient(s *model.Site, timeout time.Duration) *http.Client {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: s.SkipSSLVerify,
+		},
+	}
+	if s.ProxyURL != "" {
+		if pu, err := url.Parse(s.ProxyURL); err == nil {
+			transport.Proxy = http.ProxyURL(pu)
+		}
+	}
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+	}
+}
+
+func frameworkDefaultHash(fw string) string {
+	switch fw {
+	case "gazelle", "luminance":
+		return "xml_tag"
+	case "unit3d":
+		return "fake_from_id"
+	default:
+		return "guid"
+	}
+}
+
+func frameworkDefaultSize(fw string) string {
+	switch fw {
+	case "unit3d":
+		return "desc_regex"
+	case "gazelle", "luminance":
+		return "xml_tag"
+	default:
+		return "enclosure"
+	}
+}
+
+func frameworkDefaultID(fw string) string {
+	switch fw {
+	case "unit3d", "gazelle":
+		return "link_regex"
+	default:
+		return "query_param"
+	}
+}
+
+func (h *SiteHandler) handleOverrides(w http.ResponseWriter, r *http.Request, idStr string) {
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "invalid site id")
+		return
+	}
+
+	var site model.Site
+	if err := h.repo.DB().First(&site, id).Error; err != nil {
+		Error(w, http.StatusNotFound, 40400, "站点不存在")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		h.handleListOverrides(w, r, site.Name)
+	case http.MethodPut:
+		h.handleUpsertOverride(w, r, site.Name)
+	case http.MethodDelete:
+		h.handleDeleteOverride(w, r, site.Name)
+	default:
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+	}
+}
+
+func (h *SiteHandler) handleListOverrides(w http.ResponseWriter, _ *http.Request, siteName string) {
+	var overrides []model.SiteConfigOverride
+	h.repo.DB().Where("site_name = ?", siteName).Find(&overrides)
+	Success(w, map[string]interface{}{
+		"items": overrides,
+		"total": len(overrides),
+	})
+}
+
+func (h *SiteHandler) handleUpsertOverride(w http.ResponseWriter, r *http.Request, siteName string) {
+	var req struct {
+		FieldPath  string `json:"fieldPath"`
+		FieldValue string `json:"fieldValue"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.FieldPath == "" {
+		Error(w, http.StatusBadRequest, 40001, "fieldPath 为必填项")
+		return
+	}
+
+	var existing model.SiteConfigOverride
+	err := h.repo.DB().
+		Where("site_name = ? AND field_path = ?", siteName, req.FieldPath).
+		First(&existing).Error
+
+	if err != nil {
+		override := model.SiteConfigOverride{
+			SiteName:   siteName,
+			FieldPath:  req.FieldPath,
+			FieldValue: req.FieldValue,
+			Source:     "web_ui",
+		}
+		if err := h.repo.DB().Create(&override).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "创建覆盖失败")
+			return
+		}
+		Success(w, map[string]interface{}{"id": override.ID, "message": "覆盖已创建"})
+	} else {
+		if err := h.repo.DB().Model(&existing).
+			Update("field_value", req.FieldValue).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "更新覆盖失败")
+			return
+		}
+		Success(w, map[string]interface{}{"id": existing.ID, "message": "覆盖已更新"})
+	}
+}
+
+func (h *SiteHandler) handleDeleteOverride(w http.ResponseWriter, r *http.Request, siteName string) {
+	fieldPath := r.URL.Query().Get("fieldPath")
+	q := h.repo.DB().Where("site_name = ?", siteName)
+	if fieldPath != "" {
+		q = q.Where("field_path = ?", fieldPath)
+	}
+	result := q.Delete(&model.SiteConfigOverride{})
+	Success(w, map[string]interface{}{
+		"deleted": result.RowsAffected,
+	})
+}
