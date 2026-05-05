@@ -1,8 +1,0 @@
-requests
-beautifulsoup4
-lxml
-pyyaml
-qbittorrent-api
-flask
-pymediainfo
-pillow
