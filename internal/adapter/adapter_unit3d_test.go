@@ -28,7 +28,7 @@ func TestUnit3D_DownloadTorrent_OK(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer ak1" {
 			t.Error("missing Bearer token")
 		}
-		w.Write(payload)
+		_, _ = w.Write(payload)
 	}))
 	defer srv.Close()
 
@@ -70,7 +70,7 @@ func TestUnit3D_DownloadTorrent_CustomPath(t *testing.T) {
 		if r.URL.Path != "/torrents/download/42" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 	defer srv.Close()
 
@@ -98,7 +98,7 @@ func TestUnit3D_GetTorrentDetail_API(t *testing.T) {
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(apiResp)
+		_ = json.NewEncoder(w).Encode(apiResp)
 	}))
 	defer srv.Close()
 
@@ -126,7 +126,7 @@ func TestUnit3D_GetTorrentDetail_API(t *testing.T) {
 
 func TestUnit3D_GetTorrentDetail_Web(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html><title>Web Title :: Site</title>
+		_, _ = w.Write([]byte(`<html><title>Web Title :: Site</title>
 		info_hash: aabbccddeeff00112233445566778899aabbccdd
 		<td>Size<td>2 GB</td></td>
 		</html>`))
@@ -148,7 +148,7 @@ func TestUnit3D_GetTorrentDetail_Web(t *testing.T) {
 
 func TestUnit3D_DetectDiscount_Free(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html>This torrent is freeleech!</html>`))
+		_, _ = w.Write([]byte(`<html>This torrent is freeleech!</html>`))
 	}))
 	defer srv.Close()
 
@@ -167,7 +167,7 @@ func TestUnit3D_DetectDiscount_Free(t *testing.T) {
 
 func TestUnit3D_DetectDiscount_2xFree(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html>freeleech and double upload</html>`))
+		_, _ = w.Write([]byte(`<html>freeleech and double upload</html>`))
 	}))
 	defer srv.Close()
 
@@ -186,7 +186,7 @@ func TestUnit3D_DetectDiscount_2xFree(t *testing.T) {
 
 func TestUnit3D_DetectDiscount_2xUp(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html>double upload bonus</html>`))
+		_, _ = w.Write([]byte(`<html>double upload bonus</html>`))
 	}))
 	defer srv.Close()
 
@@ -205,7 +205,7 @@ func TestUnit3D_DetectDiscount_2xUp(t *testing.T) {
 
 func TestUnit3D_DetectDiscount_None(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html>Normal torrent</html>`))
+		_, _ = w.Write([]byte(`<html>Normal torrent</html>`))
 	}))
 	defer srv.Close()
 
@@ -241,7 +241,7 @@ func TestUnit3D_GetPreciseSLData_API(t *testing.T) {
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(apiResp)
+		_ = json.NewEncoder(w).Encode(apiResp)
 	}))
 	defer srv.Close()
 
@@ -260,7 +260,7 @@ func TestUnit3D_GetPreciseSLData_API(t *testing.T) {
 
 func TestUnit3D_GetPreciseSLData_Web(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html>Seeders<td>12</td>Leechers<td>4</td></html>`))
+		_, _ = w.Write([]byte(`<html>Seeders<td>12</td>Leechers<td>4</td></html>`))
 	}))
 	defer srv.Close()
 
@@ -280,13 +280,13 @@ func TestUnit3D_GetPreciseSLData_Web(t *testing.T) {
 func TestUnit3D_UploadTorrent_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
-			w.Write([]byte(`<html><meta name="csrf-token" content="test-csrf-token"></html>`))
+			_, _ = w.Write([]byte(`<html><meta name="csrf-token" content="test-csrf-token"></html>`))
 			return
 		}
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		w.Write([]byte(`<html>success redirect to /torrents/999</html>`))
+		_, _ = w.Write([]byte(`<html>success redirect to /torrents/999</html>`))
 	}))
 	defer srv.Close()
 
@@ -321,7 +321,7 @@ func TestUnit3D_UploadTorrent_EmptyData(t *testing.T) {
 
 func TestUnit3D_UploadTorrent_Fail(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html><span class="error">Upload rejected</span></html>`))
+		_, _ = w.Write([]byte(`<html><span class="error">Upload rejected</span></html>`))
 	}))
 	defer srv.Close()
 
@@ -346,7 +346,7 @@ func TestUnit3D_GetTorrentInfoHash_API(t *testing.T) {
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(apiResp)
+		_ = json.NewEncoder(w).Encode(apiResp)
 	}))
 	defer srv.Close()
 

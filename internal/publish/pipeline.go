@@ -3,6 +3,7 @@ package publish
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -85,7 +86,7 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 		return nil, err
 	}
 
-	eligible, reason := p.CheckPublishEligibility(&candidate, "")
+	eligible, reason := p.CheckPublishEligibility(ctx, &candidate, "")
 	if !eligible {
 		_ = p.UpdateCandidateStatus(ctx, id, model.CandidateSkipped, reason)
 		return nil, &model.AppError{Code: 40001, Message: fmt.Sprintf("发布合规检查未通过: %s", reason)}
@@ -137,6 +138,11 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 	for _, targetSite := range targetSites {
 		if ctx.Err() != nil {
 			break
+		}
+
+		if eligible, reason := p.CheckPublishEligibility(ctx, &candidate, targetSite); !eligible {
+			p.logger.Info("目标站发布排除", zap.String("target", targetSite), zap.String("reason", reason))
+			continue
 		}
 
 		targetConfig, err := p.siteProvider.GetSiteConfig(ctx, targetSite)
@@ -242,6 +248,14 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 			if ptgenResult.DoubanURL != "" {
 				pubReq.DoubanLink = ptgenResult.DoubanURL
 			}
+			if ptgenResult.TMDbURL != "" {
+				if tmdbID := extractTMDBID(ptgenResult.TMDbURL); tmdbID != "" {
+					if pubReq.ExtraFields == nil {
+						pubReq.ExtraFields = make(map[string]string)
+					}
+					pubReq.ExtraFields["tmdb_id"] = tmdbID
+				}
+			}
 		}
 
 		if sourceDetail != nil {
@@ -263,6 +277,8 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 			pubReq.MediaInfo = sourceDetail.MediaInfo
 			pubReq.Screenshots = sourceDetail.Screenshots
 		}
+
+		p.mapFieldValues(ctx, targetSite, pubReq.FormFields)
 
 		resp, err := targetAdapter.UploadTorrent(ctx, targetConfig, pubReq)
 		if err != nil {
@@ -370,7 +386,7 @@ func (p *Pipeline) ListResults(ctx context.Context, candidateID uint, limit int)
 	return results, err
 }
 
-func (p *Pipeline) CheckPublishEligibility(candidate *model.PublishCandidate, targetSite string) (bool, string) {
+func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model.PublishCandidate, targetSite string) (bool, string) {
 	title := candidate.TorrentName
 
 	blockedKeywords := []string{"禁转", "独占", "谢绝转载", "限时禁转", "严禁转载"}
@@ -384,6 +400,16 @@ func (p *Pipeline) CheckPublishEligibility(candidate *model.PublishCandidate, ta
 	for _, group := range blockedGroups {
 		if strings.Contains(title, group) {
 			return false, fmt.Sprintf("禁止转载小组资源: %s", group)
+		}
+	}
+
+	if targetSite != "" && candidate.SourceSite != "" {
+		var exclusion model.PublishExclusion
+		err := p.db.WithContext(ctx).
+			Where("target_site = ? AND source_site = ?", targetSite, candidate.SourceSite).
+			First(&exclusion).Error
+		if err == nil {
+			return false, fmt.Sprintf("源站 %s → 目标站 %s 存在发布排除规则", candidate.SourceSite, targetSite)
 		}
 	}
 
@@ -405,7 +431,7 @@ func (p *Pipeline) ProcessPending(ctx context.Context) error {
 	for i := range candidates {
 		c := &candidates[i]
 
-		eligible, reason := p.CheckPublishEligibility(c, "")
+		eligible, reason := p.CheckPublishEligibility(ctx, c, "")
 		if !eligible {
 			if err := p.UpdateCandidateStatus(ctx, c.ID, model.CandidateSkipped, reason); err != nil {
 				p.logger.Warn("update candidate status failed",
@@ -516,6 +542,15 @@ func (p *Pipeline) queryPTGen(ctx context.Context, title string) (*model.PTGenRe
 		return nil, err
 	}
 	return result, nil
+}
+
+func extractTMDBID(tmdbURL string) string {
+	re := regexp.MustCompile(`(?:themoviedb\.org|tmdb\.org)/(?:movie|tv)/(\d+)`)
+	m := re.FindStringSubmatch(tmdbURL)
+	if len(m) > 1 {
+		return m[1]
+	}
+	return ""
 }
 
 func (p *Pipeline) CreateGroup(ctx context.Context, candidateID uint, sourceHash, sourceSite, sourceTorrentID string) (*model.PublishGroup, error) {
@@ -736,28 +771,114 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 			return p.failMember(ctx, member, StepUpload, fmt.Sprintf("获取目标站适配器失败: %v", adpErr))
 		}
 
+		title := group.SourceTorrentID
+		if sourceDetail != nil && sourceDetail.Title != "" {
+			title = sourceDetail.Title
+		}
+
+		if member.LastCompletedStep < StepDedup {
+			if title != "" && title != group.SourceTorrentID {
+				dedupResults, dedupErr := targetAdapter.SearchTorrents(ctx, targetConfig, title, nil)
+				if dedupErr == nil {
+					for _, dr := range dedupResults {
+						if dr.Size > 0 && sourceDetail != nil && dr.Size == sourceDetail.Size {
+							p.logger.Info("目标站已存在相同资源，跳过发布",
+								zap.String("target", member.SiteName),
+								zap.String("title", dr.Title),
+								zap.Int64("size", dr.Size),
+							)
+							p.advanceStep(ctx, member, StepDedup)
+							return nil
+						}
+					}
+				}
+			}
+			p.advanceStep(ctx, member, StepDedup)
+		}
+
+		descriptionText := ""
+		if sourceDetail != nil {
+			descriptionText = sourceDetail.Description
+		}
+
+		var imdbLink, doubanLink string
+
+		if member.LastCompletedStep < StepRender {
+			descData := &model.DescriptionData{
+				SourceSite: group.SourceSite,
+			}
+			if sourceDetail != nil {
+				descData.MediaInfoText = sourceDetail.MediaInfo
+				descData.Screenshots = sourceDetail.Screenshots
+			}
+
+			ptgenResult, ptgenErr := p.queryPTGen(ctx, title)
+			if ptgenErr == nil && ptgenResult != nil {
+				descData.PosterURL = ptgenResult.PosterURL
+				if ptgenResult.RawBBCode != "" {
+					descData.PTGenBody = ptgenResult.RawBBCode
+				}
+				imdbLink = ptgenResult.IMDBURL
+				doubanLink = ptgenResult.DoubanURL
+			}
+
+			if descriptionText == "" && descData.PTGenBody != "" {
+				descriptionText = descData.PTGenBody
+			}
+
+			var descConfig model.SiteDescConfig
+			siteInfo, siteInfoErr := p.siteProvider.GetSiteInfo(ctx, member.SiteName)
+			if siteInfoErr == nil && siteInfo != nil {
+				siteConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, siteInfo.BaseURL)
+				if cfgErr == nil && siteConfig != nil {
+					descConfig = siteConfig.Publish.Description
+				}
+			}
+
+			if descConfig.Format != "" || descConfig.TemplateOverride != "" {
+				renderer := description.NewRenderer(descConfig.Format)
+				if rendered, err := renderer.Render(descData, descConfig); err == nil && rendered != "" {
+					descriptionText = rendered
+				}
+			}
+
+			p.advanceStep(ctx, member, StepRender)
+		}
+
 		pubReq := &model.PublishRequest{
 			TorrentData:     torrentData,
-			Title:           group.SourceTorrentID,
+			Title:           title,
+			Description:     descriptionText,
 			SourceSite:      group.SourceSite,
 			SourceInfoHash:  group.SourceHash,
 			SourceTorrentID: group.SourceTorrentID,
 			TargetSite:      member.SiteName,
 			FormFields:      make(map[string]string),
+			IMDbLink:        imdbLink,
+			DoubanLink:      doubanLink,
 		}
 
 		if sourceDetail != nil {
-			pubReq.Title = sourceDetail.Title
-			pubReq.Description = sourceDetail.Description
 			pubReq.MediaInfo = sourceDetail.MediaInfo
 			pubReq.Screenshots = sourceDetail.Screenshots
 			if sourceDetail.Category != "" {
 				pubReq.FormFields["category"] = sourceDetail.Category
 			}
+			if sourceDetail.Source != "" {
+				pubReq.FormFields["source"] = sourceDetail.Source
+			}
+			if sourceDetail.Resolution != "" {
+				pubReq.FormFields["resolution"] = sourceDetail.Resolution
+			}
+			if sourceDetail.Codec != "" {
+				pubReq.FormFields["codec"] = sourceDetail.Codec
+			}
 			if sourceDetail.IMDbID != "" {
 				pubReq.FormFields["imdb"] = sourceDetail.IMDbID
 			}
 		}
+
+		p.mapFieldValues(ctx, member.SiteName, pubReq.FormFields)
 
 		resp, uploadErr := targetAdapter.UploadTorrent(ctx, targetConfig, pubReq)
 		if uploadErr != nil {
@@ -793,4 +914,55 @@ func (p *Pipeline) failMember(ctx context.Context, member *model.PublishGroupMem
 		"status_at":  &now,
 	})
 	return fmt.Errorf("step %d: %s", step, reason)
+}
+
+func (p *Pipeline) mapFieldValues(ctx context.Context, targetSite string, fields map[string]string) {
+	var mappings []model.SiteFieldMapping
+	if err := p.db.WithContext(ctx).
+		Where("site_name = ?", targetSite).
+		Find(&mappings).Error; err != nil || len(mappings) == 0 {
+		return
+	}
+
+	fieldMap := make(map[string]map[string]string)
+	for _, m := range mappings {
+		if _, ok := fieldMap[m.FieldType]; !ok {
+			fieldMap[m.FieldType] = make(map[string]string)
+		}
+		fieldMap[m.FieldType][m.SourceValue] = m.TargetValue
+	}
+
+	mapKey := func(fieldType, value string) string {
+		if m, ok := fieldMap[fieldType]; ok {
+			if mapped, ok := m[value]; ok {
+				return mapped
+			}
+		}
+		return value
+	}
+
+	if v, ok := fields["category"]; ok {
+		fields["category"] = mapKey("cat", v)
+	}
+	if v, ok := fields["resolution"]; ok {
+		mapped := mapKey("standard_sel", v)
+		if mapped == v {
+			mapped = mapKey("resolution", v)
+		}
+		fields["resolution"] = mapped
+	}
+	if v, ok := fields["codec"]; ok {
+		mapped := mapKey("codec_sel", v)
+		if mapped == v {
+			mapped = mapKey("videoCodec", v)
+		}
+		fields["codec"] = mapped
+	}
+	if v, ok := fields["source"]; ok {
+		mapped := mapKey("source_sel", v)
+		if mapped == v {
+			mapped = mapKey("source", v)
+		}
+		fields["source"] = mapped
+	}
 }

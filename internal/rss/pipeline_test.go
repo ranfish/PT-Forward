@@ -153,7 +153,9 @@ func TestPipelineIntegration_FilterReject(t *testing.T) {
 	})
 
 	seedingEngine := seeding.NewEngine(db, logger)
-	seedingEngine.Start(context.Background())
+	if err := seedingEngine.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	publishPipeline := publish.NewPipeline(db, logger)
 
 	dispatcher := event.NewDispatcher(logger)

@@ -43,7 +43,7 @@ func TestHub_ClientReceive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	time.Sleep(50 * time.Millisecond)
 
@@ -72,7 +72,9 @@ func TestHub_ClientReceive(t *testing.T) {
 		t.Fatalf("read broadcast: %v", err)
 	}
 	var wsMsg2 WSMessage
-	json.Unmarshal(msg2, &wsMsg2)
+	if err := json.Unmarshal(msg2, &wsMsg2); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
 	if wsMsg2.Type != "task.created" {
 		t.Errorf("expected task.created, got %s", wsMsg2.Type)
 	}
@@ -96,29 +98,37 @@ func TestHub_Subscribe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	time.Sleep(50 * time.Millisecond)
 
-	conn.WriteJSON(map[string]interface{}{
+	if err := conn.WriteJSON(map[string]interface{}{
 		"type":     "client.subscribe",
 		"channels": []string{"dashboard"},
-	})
+	}); err != nil {
+		t.Fatalf("write json: %v", err)
+	}
 	time.Sleep(50 * time.Millisecond)
 
-	conn.WriteJSON(map[string]interface{}{
+	if err := conn.WriteJSON(map[string]interface{}{
 		"type": "client.ping",
-	})
+	}); err != nil {
+		t.Fatalf("write ping: %v", err)
+	}
 
 	var foundPong bool
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			break
 		}
 		var wsMsg WSMessage
-		json.Unmarshal(msg, &wsMsg)
+		if err := json.Unmarshal(msg, &wsMsg); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
 		if wsMsg.Type == "server.pong" {
 			foundPong = true
 			break
@@ -160,7 +170,9 @@ func TestNewWSMessage(t *testing.T) {
 	}
 
 	var payload map[string]string
-	json.Unmarshal(msg.Payload, &payload)
+	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
 	if payload["foo"] != "bar" {
 		t.Errorf("expected foo=bar, got %v", payload)
 	}

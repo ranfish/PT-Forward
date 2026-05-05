@@ -17,7 +17,9 @@ func setupProviderDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(&model.Site{})
+	if err := db.AutoMigrate(&model.Site{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 
@@ -318,5 +320,76 @@ func TestProvider_SiteToConfig_FieldMapping(t *testing.T) {
 	}
 	if config.Passkey != "p1" {
 		t.Errorf("passkey mismatch")
+	}
+}
+
+func TestDefaultPaths(t *testing.T) {
+	tests := []struct {
+		framework string
+		upload    string
+		browse    string
+	}{
+		{"nexusphp", "/upload.php", "/browse.php"},
+		{"unit3d", "/upload", "/torrents"},
+		{"gazelle", "/upload.php", "/torrents.php"},
+		{"tnode", "/api/torrent/upload", "/torrent/list"},
+		{"mteam", "/upload.php", "/browse"},
+		{"rousi", "/api/v1/torrents", "/api/v1/torrents"},
+		{"generic", "/upload.php", "/browse.php"},
+	}
+	for _, tt := range tests {
+		p := defaultPaths(tt.framework)
+		if p.Upload != tt.upload {
+			t.Errorf("defaultPaths(%q).Upload = %q, want %q", tt.framework, p.Upload, tt.upload)
+		}
+		if p.Browse != tt.browse {
+			t.Errorf("defaultPaths(%q).Browse = %q, want %q", tt.framework, p.Browse, tt.browse)
+		}
+	}
+}
+
+func TestDefaultPublishConfig(t *testing.T) {
+	np := defaultPublishConfig("nexusphp")
+	if np.FormFields["category"] != "type" {
+		t.Errorf("nexusphp category should map to type, got %q", np.FormFields["category"])
+	}
+	if np.FormFields["codec"] != "codec_sel" {
+		t.Errorf("nexusphp codec should map to codec_sel, got %q", np.FormFields["codec"])
+	}
+
+	mt := defaultPublishConfig("mteam")
+	if mt.FormFields["codec"] != "videoCodec" {
+		t.Errorf("mteam codec should map to videoCodec, got %q", mt.FormFields["codec"])
+	}
+
+	u3d := defaultPublishConfig("unit3d")
+	if u3d.FormFields["category"] != "category_id" {
+		t.Errorf("unit3d category should map to category_id, got %q", u3d.FormFields["category"])
+	}
+
+	gz := defaultPublishConfig("gazelle")
+	if gz.FormFields["codec"] != "format" {
+		t.Errorf("gazelle codec should map to format, got %q", gz.FormFields["codec"])
+	}
+}
+
+func TestSiteToConfig_Paths(t *testing.T) {
+	s := &model.Site{Domain: "test.com", Framework: "nexusphp", BaseURL: "https://test.com"}
+	config := siteToConfig(s)
+
+	if config.Paths.Upload != "/upload.php" {
+		t.Errorf("nexusphp upload path: got %q", config.Paths.Upload)
+	}
+	if config.Paths.TakeUpload != "/takeupload.php" {
+		t.Errorf("nexusphp takeupload path: got %q", config.Paths.TakeUpload)
+	}
+}
+
+func TestSiteToConfig_PublishFormFields(t *testing.T) {
+	s := &model.Site{Domain: "test.com", Framework: "mteam", BaseURL: "https://test.com"}
+	config := siteToConfig(s)
+
+	if config.Publish.FormFields["standard"] != "standard" {
+		t.Errorf("mteam standard mapping: got %q", config.Publish.FormFields["standard"])
 	}
 }

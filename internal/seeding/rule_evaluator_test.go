@@ -17,10 +17,12 @@ func setupRuleEvalTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.DeleteRule{},
 		&model.SeedingTorrentRecord{},
-	)
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 

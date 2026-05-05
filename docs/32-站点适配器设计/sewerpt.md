@@ -16,6 +16,113 @@
 | NFO | 是（nfo 文件上传） |
 | PT-Gen | 是（pt_gen 字段，有"获取简介"按钮） |
 
+## 上传表单
+
+> **表单**: method=POST, enctype=multipart/form-data, action=takeupload.php
+
+### 类型选择
+
+| 区域 | select name | data-mode |
+|------|-------------|-----------|
+| 种子区 | `browsecat` | 4 |
+
+#### browsecat（data-mode=4）— 7 个
+
+| 值 | 显示名称 |
+|----|----------|
+| 401 | 电影 |
+| 402 | 电视剧 |
+| 403 | 综艺 |
+| 404 | 纪录片 |
+| 405 | 动漫 |
+| 408 | 音乐 |
+| 409 | 其他 |
+
+### 基础字段
+
+| 字段名 | 字段类型 | 必填 | 说明 |
+|--------|----------|------|------|
+| `file` | file | ✓ | 种子文件 |
+| `name` | text | ✓ | 标题 |
+| `small_descr` | text | - | 副标题 |
+| `url` | text | - | IMDb 链接 |
+| `pt_gen` | text | - | PT-Gen |
+| `nfo` | file | - | NFO 文件 |
+| `descr` | textarea | ✓ | 简介（BBCode） |
+| `uplver` | checkbox | - | 匿名发布 |
+
+> **注意**：无 `technical_info` 字段（MediaInfo 在简介中附带）。
+
+### 质量字段（[4] 后缀，种子区 mode=4）
+
+#### 媒介 medium_sel[4]（9 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | Blu-ray |
+| 2 | HD DVD |
+| 3 | Remux |
+| 4 | MiniBD |
+| 5 | HDTV |
+| 6 | DVDR |
+| 7 | Encode |
+| 8 | CD |
+| 10 | WEB-DL |
+
+#### 编码 codec_sel[4]（6 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | AVC |
+| 2 | VC-1 |
+| 3 | Xvid |
+| 4 | MPEG-2 |
+| 5 | Other |
+| 6 | HEVC |
+
+#### 音频编码 audiocodec_sel[4]（18 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | FLAC |
+| 2 | APE |
+| 3 | DTS |
+| 4 | MP3 |
+| 5 | OGG |
+| 6 | AAC |
+| 7 | Other |
+| 8 | AC3 |
+| 9 | ALAC |
+| 10 | WAV |
+| 11 | E-AC3 |
+| 12 | TrueHD Atmos |
+| 13 | TrueHD |
+| 14 | DTS-HD MA |
+| 15 | DTS:X |
+| 16 | LPCM |
+| 17 | AV3A |
+| 18 | OPUS |
+
+#### 分辨率 standard_sel[4]（6 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | 1080p/1080i |
+| 2 | 480p |
+| 3 | 720p |
+| 4 | 2K/1440p |
+| 5 | 4K/2160p |
+| 6 | 8K/4320p |
+
+#### 制作组 team_sel[4]（2 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | SewageWeb |
+| 5 | Other |
+
+> **注意**：制作组仅 2 个选项（SewageWeb/Other），极简配置。
+
 ## Tracker URL
 `https://sewerpt.com/announce.php`
 

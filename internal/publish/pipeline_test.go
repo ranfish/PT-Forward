@@ -2,6 +2,7 @@ package publish
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -16,7 +17,9 @@ func setupPipelineTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(&model.PublishTask{}, &model.PublishCandidate{}, &model.PublishResultRecord{})
+	if err := db.AutoMigrate(&model.PublishTask{}, &model.PublishCandidate{}, &model.PublishResultRecord{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 
@@ -50,9 +53,13 @@ func TestPipeline_UpdateTaskStatus(t *testing.T) {
 	ctx := context.Background()
 
 	task := &model.PublishTask{Type: model.PublishTaskTypeManual, SourceSiteID: 1}
-	p.CreateTask(ctx, task)
+	if err := p.CreateTask(ctx, task); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
 
-	p.UpdateTaskStatus(ctx, task.ID, model.PublishTaskPublishing)
+	if err := p.UpdateTaskStatus(ctx, task.ID, model.PublishTaskPublishing); err != nil {
+		t.Fatalf("update status: %v", err)
+	}
 
 	got, _ := p.GetTask(ctx, task.ID)
 	if got.Status != model.PublishTaskPublishing {
@@ -64,8 +71,12 @@ func TestPipeline_ListTasks(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateTask(ctx, &model.PublishTask{Type: model.PublishTaskTypeManual, SourceSiteID: 1})
-	p.CreateTask(ctx, &model.PublishTask{Type: model.PublishTaskTypeAuto, SourceSiteID: 2})
+	if err := p.CreateTask(ctx, &model.PublishTask{Type: model.PublishTaskTypeManual, SourceSiteID: 1}); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+	if err := p.CreateTask(ctx, &model.PublishTask{Type: model.PublishTaskTypeAuto, SourceSiteID: 2}); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
 
 	tasks, total, err := p.ListTasks(ctx, 0, 10)
 	if err != nil {
@@ -92,7 +103,9 @@ func TestPipeline_CandidateCRUD(t *testing.T) {
 		PublishStatus:   model.CandidatePending,
 		Role:            model.RoleDownload,
 	}
-	p.CreateCandidate(ctx, candidate)
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	got, err := p.GetCandidate(ctx, candidate.ID)
 	if err != nil {
@@ -102,7 +115,9 @@ func TestPipeline_CandidateCRUD(t *testing.T) {
 		t.Errorf("expected Test.Torrent, got %s", got.TorrentName)
 	}
 
-	p.MarkDownloadCompleted(ctx, candidate.ID, "/data/torrents", "/data/torrents/test.torrent")
+	if err := p.MarkDownloadCompleted(ctx, candidate.ID, "/data/torrents", "/data/torrents/test.torrent"); err != nil {
+		t.Fatalf("mark download completed: %v", err)
+	}
 	got2, _ := p.GetCandidate(ctx, candidate.ID)
 	if !got2.DownloadCompleted {
 		t.Error("should be completed")
@@ -130,7 +145,7 @@ func TestPipeline_CheckEligibility(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			candidate := &model.PublishCandidate{TorrentName: tt.title}
-			ok, _ := p.CheckPublishEligibility(candidate, "target")
+			ok, _ := p.CheckPublishEligibility(context.Background(), candidate, "target")
 			if ok != tt.allowed {
 				t.Errorf("eligibility(%q) = %v, want %v", tt.title, ok, tt.allowed)
 			}
@@ -187,10 +202,12 @@ func TestPipeline_DeleteCandidate(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "test", PublishStatus: model.CandidatePending,
-	})
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	if err := p.DeleteCandidate(ctx, 1); err != nil {
 		t.Fatalf("delete: %v", err)
@@ -206,10 +223,12 @@ func TestPipeline_PublishCandidate(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "Good Movie", PublishStatus: model.CandidatePending,
-	})
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	candidate, err := p.PublishCandidate(ctx, 1)
 	if err != nil {
@@ -224,10 +243,12 @@ func TestPipeline_PublishCandidate_Ineligible(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "禁转 Movie", PublishStatus: model.CandidatePending,
-	})
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	_, err := p.PublishCandidate(ctx, 1)
 	if err == nil {
@@ -239,10 +260,12 @@ func TestPipeline_ProcessPending_Skipped(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "独占 Content", PublishStatus: model.CandidatePending,
-	})
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	if err := p.ProcessPending(ctx); err != nil {
 		t.Fatalf("process: %v", err)
@@ -258,11 +281,13 @@ func TestPipeline_ProcessPending_Done(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "Normal Movie", PublishStatus: model.CandidatePending,
 		DownloadCompleted: true,
-	})
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	if err := p.ProcessPending(ctx); err != nil {
 		t.Fatalf("process: %v", err)
@@ -278,14 +303,18 @@ func TestPipeline_ResultCRUD(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "test", PublishStatus: model.CandidatePending,
-	})
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
-	p.CreateResult(ctx, &model.PublishResultRecord{
+	if err := p.CreateResult(ctx, &model.PublishResultRecord{
 		CandidateID: 1, TargetSite: "target1", Status: "success",
-	})
+	}); err != nil {
+		t.Fatalf("create result: %v", err)
+	}
 
 	results, err := p.ListResults(ctx, 1, 10)
 	if err != nil {
@@ -314,10 +343,12 @@ func TestPipeline_PublishCandidate_ForbiddenKeyword(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p.CreateCandidate(ctx, &model.PublishCandidate{
+			if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 				SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 				TorrentName: tt.title, PublishStatus: model.CandidatePending,
-			})
+			}); err != nil {
+				t.Fatalf("create candidate: %v", err)
+			}
 
 			_, err := p.PublishCandidate(ctx, 1)
 			if err == nil {
@@ -326,10 +357,12 @@ func TestPipeline_PublishCandidate_ForbiddenKeyword(t *testing.T) {
 
 			db := setupPipelineTestDB(t)
 			p2 := NewPipeline(db, zap.NewNop())
-			p2.CreateCandidate(ctx, &model.PublishCandidate{
+			if err := p2.CreateCandidate(ctx, &model.PublishCandidate{
 				SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 				TorrentName: tt.title, PublishStatus: model.CandidatePending,
-			})
+			}); err != nil {
+				t.Fatalf("create candidate: %v", err)
+			}
 		})
 	}
 }
@@ -342,7 +375,9 @@ func TestPipeline_ProcessPending_Orphan(t *testing.T) {
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "Old Movie", PublishStatus: model.CandidatePending,
 	}
-	p.CreateCandidate(ctx, candidate)
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	p.db.Model(&model.PublishCandidate{}).Where("id = ?", candidate.ID).
 		Update("created_at", "2020-01-01T00:00:00Z")
@@ -361,18 +396,24 @@ func TestPipeline_ListPending(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "p1", PublishStatus: model.CandidatePending,
-	})
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s2", SourceTorrentID: "t2", InfoHash: "ih2",
 		TorrentName: "p2", PublishStatus: model.CandidateDone,
-	})
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s3", SourceTorrentID: "t3", InfoHash: "ih3",
 		TorrentName: "p3", PublishStatus: "downloading",
-	})
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	pending, err := p.ListPendingCandidates(ctx, 100)
 	if err != nil {
@@ -411,7 +452,9 @@ func TestPipeline_ListTasks_Pagination(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 	for i := 0; i < 5; i++ {
-		p.CreateTask(ctx, &model.PublishTask{Type: model.PublishTaskTypeAuto, SourceSiteID: uint(i + 1)})
+		if err := p.CreateTask(ctx, &model.PublishTask{Type: model.PublishTaskTypeAuto, SourceSiteID: uint(i + 1)}); err != nil {
+			t.Fatalf("create task: %v", err)
+		}
 	}
 	tasks, total, err := p.ListTasks(ctx, 2, 2)
 	if err != nil {
@@ -428,7 +471,9 @@ func TestPipeline_ListTasks_Pagination(t *testing.T) {
 func TestPipeline_DeleteTask(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
-	p.CreateTask(ctx, &model.PublishTask{Type: model.PublishTaskTypeManual, SourceSiteID: 1})
+	if err := p.CreateTask(ctx, &model.PublishTask{Type: model.PublishTaskTypeManual, SourceSiteID: 1}); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
 
 	tasks, _, _ := p.ListTasks(ctx, 0, 10)
 	if len(tasks) != 1 {
@@ -439,11 +484,15 @@ func TestPipeline_DeleteTask(t *testing.T) {
 func TestPipeline_MarkDownloadCompleted(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "test", PublishStatus: model.CandidatePending,
-	})
-	p.MarkDownloadCompleted(ctx, 1, "/data/torrents", "/data/torrents/test.torrent")
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
+	if err := p.MarkDownloadCompleted(ctx, 1, "/data/torrents", "/data/torrents/test.torrent"); err != nil {
+		t.Fatalf("mark download completed: %v", err)
+	}
 	got, _ := p.GetCandidate(ctx, 1)
 	if !got.DownloadCompleted {
 		t.Error("expected download completed")
@@ -457,10 +506,12 @@ func TestPipeline_UpdateCandidateStatus(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "test", PublishStatus: model.CandidatePending,
-	})
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	if err := p.UpdateCandidateStatus(ctx, 1, model.CandidateFailed, "download error"); err != nil {
 		t.Fatalf("update status: %v", err)
@@ -481,14 +532,16 @@ func setupPipelineTestDBWithGroups(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.PublishTask{},
 		&model.PublishCandidate{},
 		&model.PublishResultRecord{},
 		&model.PublishGroup{},
 		&model.PublishGroupMember{},
 		&model.PublishGroupStatusHistory{},
-	)
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 
@@ -550,9 +603,15 @@ func TestPipeline_ListGroups(t *testing.T) {
 	p := NewPipeline(setupPipelineTestDBWithGroups(t), zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateGroup(ctx, 1, "h1", "s1", "t1")
-	p.CreateGroup(ctx, 2, "h2", "s2", "t2")
-	p.CreateGroup(ctx, 3, "h3", "s3", "t3")
+	if _, err := p.CreateGroup(ctx, 1, "h1", "s1", "t1"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := p.CreateGroup(ctx, 2, "h2", "s2", "t2"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err := p.CreateGroup(ctx, 3, "h3", "s3", "t3"); err != nil {
+		t.Fatalf("create group: %v", err)
+	}
 
 	groups, total, err := p.ListGroups(ctx, 1, 2)
 	if err != nil {
@@ -591,16 +650,20 @@ func TestPipeline_ListGroupMembers(t *testing.T) {
 
 	group, _ := p.CreateGroup(ctx, 1, "h1", "s1", "t1")
 
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih001",
 		SiteName: "site-a",
 		Status:   model.MemberStatusNew,
-	})
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih002",
 		SiteName: "site-b",
 		Status:   model.MemberStatusNew,
-	})
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
 
 	members, err := p.ListGroupMembers(ctx, group.ID)
 	if err != nil {
@@ -637,7 +700,9 @@ func TestPipeline_UpdateMemberStatus(t *testing.T) {
 		SiteName: "site-a",
 		Status:   model.MemberStatusNew,
 	}
-	p.AddGroupMember(ctx, group.ID, member)
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
 
 	if err := p.UpdateMemberStatus(ctx, member.ID, model.MemberStatusUploaded, ""); err != nil {
 		t.Fatalf("UpdateMemberStatus: %v", err)
@@ -654,12 +719,16 @@ func TestPipeline_TransitionGroupLifecycle_AllDone(t *testing.T) {
 	ctx := context.Background()
 
 	group, _ := p.CreateGroup(ctx, 1, "h1", "s1", "t1")
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih001", SiteName: "site-a", Status: model.MemberStatusUploaded,
-	})
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih002", SiteName: "site-b", Status: model.MemberStatusSeedingConfirmed,
-	})
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
 
 	if err := p.TransitionGroupLifecycle(ctx, group.ID); err != nil {
 		t.Fatalf("TransitionGroupLifecycle: %v", err)
@@ -676,12 +745,16 @@ func TestPipeline_TransitionGroupLifecycle_AnyFailed(t *testing.T) {
 	ctx := context.Background()
 
 	group, _ := p.CreateGroup(ctx, 1, "h1", "s1", "t1")
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih001", SiteName: "site-a", Status: model.MemberStatusUploaded,
-	})
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih002", SiteName: "site-b", Status: model.MemberStatusError,
-	})
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
 
 	if err := p.TransitionGroupLifecycle(ctx, group.ID); err != nil {
 		t.Fatalf("TransitionGroupLifecycle: %v", err)
@@ -704,8 +777,12 @@ func TestPipeline_TransitionGroupLifecycle_AllPaused(t *testing.T) {
 	m2 := &model.PublishGroupMember{
 		InfoHash: "ih002", SiteName: "site-b", Status: model.MemberStatusPaused, Paused: true,
 	}
-	p.AddGroupMember(ctx, group.ID, m1)
-	p.AddGroupMember(ctx, group.ID, m2)
+	if err := p.AddGroupMember(ctx, group.ID, m1); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
+	if err := p.AddGroupMember(ctx, group.ID, m2); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
 
 	if err := p.TransitionGroupLifecycle(ctx, group.ID); err != nil {
 		t.Fatalf("TransitionGroupLifecycle: %v", err)
@@ -722,12 +799,16 @@ func TestPipeline_TransitionGroupLifecycle_AnyPublishing(t *testing.T) {
 	ctx := context.Background()
 
 	group, _ := p.CreateGroup(ctx, 1, "h1", "s1", "t1")
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih001", SiteName: "site-a", Status: model.MemberStatusNew,
-	})
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih002", SiteName: "site-b", Status: model.MemberStatusUploading,
-	})
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
 
 	if err := p.TransitionGroupLifecycle(ctx, group.ID); err != nil {
 		t.Fatalf("TransitionGroupLifecycle: %v", err)
@@ -744,12 +825,16 @@ func TestPipeline_TransitionGroupLifecycle_NoChange(t *testing.T) {
 	ctx := context.Background()
 
 	group, _ := p.CreateGroup(ctx, 1, "h1", "s1", "t1")
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih001", SiteName: "site-a", Status: model.MemberStatusNew,
-	})
-	p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
+	if err := p.AddGroupMember(ctx, group.ID, &model.PublishGroupMember{
 		InfoHash: "ih002", SiteName: "site-b", Status: model.MemberStatusNew,
-	})
+	}); err != nil {
+		t.Fatalf("add group member: %v", err)
+	}
 
 	if err := p.TransitionGroupLifecycle(ctx, group.ID); err != nil {
 		t.Fatalf("TransitionGroupLifecycle: %v", err)
@@ -794,11 +879,13 @@ func TestPipeline_ProcessPending_CompletedCandidate(t *testing.T) {
 	p := NewPipeline(db, zap.NewNop())
 	ctx := context.Background()
 
-	p.CreateCandidate(ctx, &model.PublishCandidate{
+	if err := p.CreateCandidate(ctx, &model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1", InfoHash: "ih1",
 		TorrentName: "Normal Movie", PublishStatus: model.CandidateCompleted,
 		DownloadCompleted: false,
-	})
+	}); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
 
 	if err := p.ProcessPending(ctx); err != nil {
 		t.Fatalf("ProcessPending: %v", err)
@@ -820,5 +907,863 @@ func TestPipeline_ListResults_Empty(t *testing.T) {
 	}
 	if len(results) != 0 {
 		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}
+
+type mockPublishSiteProvider struct {
+	getSiteInfoFn   func(ctx context.Context, name string) (*model.SiteInfo, error)
+	getSiteConfigFn func(ctx context.Context, domain string) (*model.SiteConfig, error)
+	getAdapterFn    func(ctx context.Context, domain string) (model.SiteAdapter, error)
+	listSitesFn     func(ctx context.Context) ([]*model.SiteInfo, error)
+}
+
+func (m *mockPublishSiteProvider) GetSiteInfo(ctx context.Context, name string) (*model.SiteInfo, error) {
+	if m.getSiteInfoFn != nil {
+		return m.getSiteInfoFn(ctx, name)
+	}
+	return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+}
+
+func (m *mockPublishSiteProvider) GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error) {
+	if m.getSiteConfigFn != nil {
+		return m.getSiteConfigFn(ctx, domain)
+	}
+	return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+}
+
+func (m *mockPublishSiteProvider) GetSiteDefault(ctx context.Context, domain string) (*model.SiteDefault, error) {
+	return nil, nil
+}
+
+func (m *mockPublishSiteProvider) GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error) {
+	if m.getAdapterFn != nil {
+		return m.getAdapterFn(ctx, domain)
+	}
+	return &mockPublishAdapter{}, nil
+}
+
+func (m *mockPublishSiteProvider) ListSites(ctx context.Context) ([]*model.SiteInfo, error) {
+	if m.listSitesFn != nil {
+		return m.listSitesFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockPublishSiteProvider) GetSiteInfoByURL(ctx context.Context, baseURL string) (*model.SiteInfo, error) {
+	return nil, nil
+}
+
+func (m *mockPublishSiteProvider) DetectFramework(ctx context.Context, domain string) (*model.DetectResult, error) {
+	return nil, nil
+}
+
+type mockPublishAdapter struct {
+	downloadFn func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error)
+	detailFn   func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error)
+	uploadFn   func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error)
+	searchFn   func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error)
+}
+
+func (m *mockPublishAdapter) Framework() string { return "mock" }
+func (m *mockPublishAdapter) ParseRSS(ctx context.Context, feedURL string, config *model.SiteConfig) ([]*model.RSSTorrentEvent, error) {
+	return nil, nil
+}
+func (m *mockPublishAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+	if m.downloadFn != nil {
+		return m.downloadFn(ctx, config, torrentID)
+	}
+	return []byte("d8:announce27:http://tracker.example.com4:infod6:lengthi13e4:name8:test.txt12:piece lengthi262144e6:pieces20:00000000000000000000ee"), nil
+}
+func (m *mockPublishAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
+	if m.detailFn != nil {
+		return m.detailFn(ctx, config, torrentID)
+	}
+	return &model.TorrentDetail{
+		Title:       "Test Movie 2024 1080p BluRay",
+		Description: "[b]Test Description[/b]",
+		Category:    "movies",
+		Source:      "blu-ray",
+		Resolution:  "1080p",
+		Codec:       "x264",
+		IMDbID:      "tt1234567",
+		MediaInfo:   "mediainfo text",
+		Screenshots: []string{"https://img.example.com/1.jpg"},
+	}, nil
+}
+func (m *mockPublishAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
+	return nil, nil
+}
+func (m *mockPublishAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
+	return nil, nil
+}
+func (m *mockPublishAdapter) DetectDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
+	return nil, nil
+}
+func (m *mockPublishAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
+	return nil, nil
+}
+func (m *mockPublishAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+	if m.uploadFn != nil {
+		return m.uploadFn(ctx, config, req)
+	}
+	return &model.PublishResponse{TorrentID: "new-torrent-123", DetailURL: "https://target.com/torrents/123"}, nil
+}
+func (m *mockPublishAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	if m.searchFn != nil {
+		return m.searchFn(ctx, config, query, opts)
+	}
+	return nil, nil
+}
+func (m *mockPublishAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+	return "", nil
+}
+func (m *mockPublishAdapter) SupportsSearchByPiecesHash() bool { return false }
+
+func TestPipeline_PublishCandidate_E2E_Success(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	uploadCalled := false
+	adapter := &mockPublishAdapter{
+		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+			uploadCalled = true
+			if req.Title != "Test Movie 2024 1080p BluRay" {
+				t.Errorf("unexpected title: %s", req.Title)
+			}
+			if req.SourceSite != "source_site" {
+				t.Errorf("unexpected source site: %s", req.SourceSite)
+			}
+			if req.TargetSite != "target_site" {
+				t.Errorf("unexpected target site: %s", req.TargetSite)
+			}
+			if len(req.TorrentData) == 0 {
+				t.Error("torrent data should not be empty")
+			}
+			return &model.PublishResponse{TorrentID: "pub-001", DetailURL: "https://target.com/t/001"}, nil
+		},
+		searchFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return nil, nil
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+		getSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	candidate := &model.PublishCandidate{
+		SourceSite:      "source_site",
+		SourceTorrentID: "src-torrent-1",
+		InfoHash:        "abc123",
+		TorrentName:     "Test Movie 2024 1080p BluRay",
+		Size:            1073741824,
+		TargetSites:     "target_site",
+		PublishStatus:   model.CandidatePending,
+	}
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatalf("create candidate: %v", err)
+	}
+
+	result, err := p.PublishCandidate(ctx, candidate.ID)
+	if err != nil {
+		t.Fatalf("PublishCandidate: %v", err)
+	}
+	if !uploadCalled {
+		t.Error("upload should have been called")
+	}
+	if result.PublishStatus != model.CandidateDone {
+		t.Errorf("expected done, got %s", result.PublishStatus)
+	}
+
+	results, _ := p.ListResults(ctx, candidate.ID, 10)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != model.PublishResultCompleted {
+		t.Errorf("expected completed, got %s", results[0].Status)
+	}
+	if results[0].TorrentID != "pub-001" {
+		t.Errorf("expected pub-001, got %s", results[0].TorrentID)
+	}
+}
+
+func TestPipeline_PublishCandidate_E2E_Dedup(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	adapter := &mockPublishAdapter{
+		searchFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return []*model.SeedingSearchResult{
+				{TorrentID: "existing-1", Title: query, Size: 1073741824},
+			}, nil
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+		getSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	candidate := &model.PublishCandidate{
+		SourceSite:      "source",
+		SourceTorrentID: "t1",
+		InfoHash:        "ih1",
+		TorrentName:     "Dedup Movie",
+		Size:            1073741824,
+		TargetSites:     "target",
+		PublishStatus:   model.CandidatePending,
+	}
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := p.PublishCandidate(ctx, candidate.ID)
+	if err != nil {
+		t.Logf("dedup publish result: %v", err)
+	}
+
+	results, _ := p.ListResults(ctx, candidate.ID, 10)
+	hasSkipped := false
+	for _, r := range results {
+		if r.Status == model.PublishResultSkipped {
+			hasSkipped = true
+		}
+	}
+	if !hasSkipped {
+		t.Error("expected at least one skipped result for dedup")
+	}
+}
+
+func TestPipeline_PublishCandidate_E2E_UploadFail(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	adapter := &mockPublishAdapter{
+		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+			return nil, fmt.Errorf("upload failed: server error")
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	candidate := &model.PublishCandidate{
+		SourceSite:      "source",
+		SourceTorrentID: "t1",
+		InfoHash:        "ih1",
+		TorrentName:     "Fail Movie",
+		Size:            1073741824,
+		TargetSites:     "target",
+		PublishStatus:   model.CandidatePending,
+	}
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatal(err)
+	}
+
+	result, _ := p.PublishCandidate(ctx, candidate.ID)
+	if result.PublishStatus != model.CandidateFailed {
+		t.Errorf("expected failed, got %s", result.PublishStatus)
+	}
+
+	results, _ := p.ListResults(ctx, candidate.ID, 10)
+	if len(results) == 0 {
+		t.Fatal("expected at least 1 result")
+	}
+	if results[0].Status != model.PublishResultFailed {
+		t.Errorf("expected failed result, got %s", results[0].Status)
+	}
+}
+
+func TestPipeline_PublishCandidate_NoProvider(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	candidate := &model.PublishCandidate{
+		SourceSite:      "source",
+		SourceTorrentID: "t1",
+		InfoHash:        "ih1",
+		TorrentName:     "Normal Movie",
+		TargetSites:     "target",
+		PublishStatus:   model.CandidatePending,
+	}
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := p.PublishCandidate(ctx, candidate.ID)
+	if err != nil {
+		t.Fatalf("PublishCandidate without provider: %v", err)
+	}
+	if result.PublishStatus != model.CandidatePublishing {
+		t.Errorf("expected publishing (no provider), got %s", result.PublishStatus)
+	}
+}
+
+func TestPipeline_PublishCandidate_MultipleTargets(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	uploadCount := 0
+	adapter := &mockPublishAdapter{
+		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+			uploadCount++
+			return &model.PublishResponse{
+				TorrentID: fmt.Sprintf("pub-%d", uploadCount),
+				DetailURL: fmt.Sprintf("https://%s/t/%d", req.TargetSite, uploadCount),
+			}, nil
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+		getSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	candidate := &model.PublishCandidate{
+		SourceSite:      "source",
+		SourceTorrentID: "t1",
+		InfoHash:        "ih1",
+		TorrentName:     "Multi Target Movie",
+		Size:            1073741824,
+		TargetSites:     "target1,target2,target3",
+		PublishStatus:   model.CandidatePending,
+	}
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := p.PublishCandidate(ctx, candidate.ID)
+	if err != nil {
+		t.Fatalf("PublishCandidate: %v", err)
+	}
+	if uploadCount != 3 {
+		t.Errorf("expected 3 uploads, got %d", uploadCount)
+	}
+	if result.PublishStatus != model.CandidateDone {
+		t.Errorf("expected done, got %s", result.PublishStatus)
+	}
+
+	results, _ := p.ListResults(ctx, candidate.ID, 10)
+	if len(results) != 3 {
+		t.Errorf("expected 3 results, got %d", len(results))
+	}
+}
+
+func TestPipeline_PublishCandidate_E2E_DownloadFail(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	adapter := &mockPublishAdapter{
+		downloadFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+			return nil, fmt.Errorf("download failed: 404")
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	candidate := &model.PublishCandidate{
+		SourceSite:      "source",
+		SourceTorrentID: "t1",
+		InfoHash:        "ih1",
+		TorrentName:     "Normal Movie",
+		Size:            1073741824,
+		TargetSites:     "target",
+		PublishStatus:   model.CandidatePending,
+	}
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := p.PublishCandidate(ctx, candidate.ID)
+	if err == nil {
+		t.Error("expected error for download failure")
+	}
+}
+
+func TestPipeline_PublishCandidate_NoTargetSites(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return &mockPublishAdapter{}, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	candidate := &model.PublishCandidate{
+		SourceSite:      "source",
+		SourceTorrentID: "t1",
+		InfoHash:        "ih1",
+		TorrentName:     "Normal Movie",
+		Size:            1073741824,
+		TargetSites:     "",
+		PublishStatus:   model.CandidatePending,
+	}
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := p.PublishCandidate(ctx, candidate.ID)
+	if err != nil {
+		t.Fatalf("PublishCandidate: %v", err)
+	}
+	if result.PublishStatus != model.CandidatePublishing {
+		t.Errorf("expected publishing, got %s", result.PublishStatus)
+	}
+}
+
+func TestPipeline_PublishCandidate_GetSourceConfigFail(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return nil, fmt.Errorf("config not found for %s", domain)
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return &mockPublishAdapter{}, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	candidate := &model.PublishCandidate{
+		SourceSite:      "source",
+		SourceTorrentID: "t1",
+		InfoHash:        "ih1",
+		TorrentName:     "Normal Movie",
+		TargetSites:     "target",
+		PublishStatus:   model.CandidatePending,
+	}
+	if err := p.CreateCandidate(ctx, candidate); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := p.PublishCandidate(ctx, candidate.ID)
+	if err != nil {
+		t.Logf("expected graceful handling: %v", err)
+	}
+	if result != nil && result.PublishStatus == model.CandidateDone {
+		t.Error("should not be done when source config fails")
+	}
+}
+
+func TestPipeline_ProcessMemberWithResume_E2E(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	uploadCalled := false
+	adapter := &mockPublishAdapter{
+		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+			uploadCalled = true
+			return &model.PublishResponse{TorrentID: "uploaded-001"}, nil
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "source_hash", "source_site", "src-t-1")
+	if err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: group.ID,
+		SiteName:       "target_site",
+		Status:         model.MemberStatusNew,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatalf("AddGroupMember: %v", err)
+	}
+
+	var dbMember model.PublishGroupMember
+	db.Where("id = ?", member.ID).First(&dbMember)
+
+	if err := p.ProcessMemberWithResume(ctx, &dbMember); err != nil {
+		t.Fatalf("ProcessMemberWithResume: %v", err)
+	}
+	if !uploadCalled {
+		t.Error("upload should have been called")
+	}
+
+	db.Where("id = ?", member.ID).First(&dbMember)
+	if dbMember.Status != model.MemberStatusUploaded {
+		t.Errorf("expected uploaded, got %s", dbMember.Status)
+	}
+	if dbMember.TorrentID != "uploaded-001" {
+		t.Errorf("expected uploaded-001, got %s", dbMember.TorrentID)
+	}
+}
+
+func TestPipeline_ProcessMemberWithResume_NoGroup(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	member := &model.PublishGroupMember{SiteName: "target", Status: model.MemberStatusNew}
+	if err := p.ProcessMemberWithResume(ctx, member); err == nil {
+		t.Error("expected error for member without group")
+	}
+}
+
+func TestPipeline_ProcessMemberWithResume_NoProvider(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "hash", "site", "t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: group.ID,
+		SiteName:       "target",
+		Status:         model.MemberStatusNew,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatal(err)
+	}
+
+	var dbMember model.PublishGroupMember
+	db.Where("id = ?", member.ID).First(&dbMember)
+
+	if err := p.ProcessMemberWithResume(ctx, &dbMember); err == nil {
+		t.Error("expected error without site provider")
+	}
+}
+
+func TestPipeline_ProcessMemberWithResume_DownloadFail(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	adapter := &mockPublishAdapter{
+		downloadFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+			return nil, fmt.Errorf("download timeout")
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "hash", "source_site", "t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: group.ID,
+		SiteName:       "target",
+		Status:         model.MemberStatusNew,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatal(err)
+	}
+
+	var dbMember model.PublishGroupMember
+	db.Where("id = ?", member.ID).First(&dbMember)
+
+	if err := p.ProcessMemberWithResume(ctx, &dbMember); err == nil {
+		t.Error("expected error for download failure")
+	}
+
+	db.Where("id = ?", member.ID).First(&dbMember)
+	if dbMember.Status != model.MemberStatusError {
+		t.Errorf("expected error status, got %s", dbMember.Status)
+	}
+}
+
+func TestPipeline_ProcessMemberWithResume_UploadFail(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	adapter := &mockPublishAdapter{
+		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+			return nil, fmt.Errorf("upload rejected: duplicate")
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "hash", "source_site", "t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: group.ID,
+		SiteName:       "target",
+		Status:         model.MemberStatusNew,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatal(err)
+	}
+
+	var dbMember model.PublishGroupMember
+	db.Where("id = ?", member.ID).First(&dbMember)
+
+	if err := p.ProcessMemberWithResume(ctx, &dbMember); err == nil {
+		t.Error("expected error for upload failure")
+	}
+
+	db.Where("id = ?", member.ID).First(&dbMember)
+	if dbMember.Status != model.MemberStatusError {
+		t.Errorf("expected error status, got %s", dbMember.Status)
+	}
+}
+
+func TestPipeline_ProcessMemberWithResume_ResumeFromStep(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	uploadCalled := false
+	adapter := &mockPublishAdapter{
+		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+			uploadCalled = true
+			return &model.PublishResponse{TorrentID: "resumed-001"}, nil
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+		},
+		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "hash", "source_site", "t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID:    group.ID,
+		SiteName:          "target",
+		Status:            model.MemberStatusNew,
+		LastCompletedStep: 2,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatal(err)
+	}
+
+	var dbMember model.PublishGroupMember
+	db.Where("id = ?", member.ID).First(&dbMember)
+
+	if err := p.ProcessMemberWithResume(ctx, &dbMember); err != nil {
+		t.Fatalf("ProcessMemberWithResume: %v", err)
+	}
+	if !uploadCalled {
+		t.Error("upload should have been called (skipped download+detail)")
+	}
+}
+
+func TestPipeline_SetSiteProvider(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+	p.SetSiteProvider(nil)
+}
+
+func setupPipelineTestDBWithMappings(t *testing.T) *gorm.DB {
+	t.Helper()
+	db := setupPipelineTestDBWithGroups(t)
+	if err := db.AutoMigrate(&model.SiteFieldMapping{}, &model.PublishExclusion{}); err != nil {
+		t.Fatalf("migrate mappings: %v", err)
+	}
+	return db
+}
+
+func TestPipeline_mapFieldValues(t *testing.T) {
+	db := setupPipelineTestDBWithMappings(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	mappings := []model.SiteFieldMapping{
+		{SiteName: "目标站", FieldType: "cat", SourceValue: "Movies(电影)", TargetValue: "401"},
+		{SiteName: "目标站", FieldType: "standard_sel", SourceValue: "1080p", TargetValue: "2"},
+		{SiteName: "目标站", FieldType: "codec_sel", SourceValue: "H.265", TargetValue: "1"},
+		{SiteName: "目标站", FieldType: "source_sel", SourceValue: "Blu-ray", TargetValue: "1"},
+	}
+	for _, m := range mappings {
+		if err := db.Create(&m).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	fields := map[string]string{
+		"category":   "Movies(电影)",
+		"resolution": "1080p",
+		"codec":      "H.265",
+		"source":     "Blu-ray",
+	}
+
+	p.mapFieldValues(ctx, "目标站", fields)
+
+	if fields["category"] != "401" {
+		t.Errorf("category: got %q, want 401", fields["category"])
+	}
+	if fields["resolution"] != "2" {
+		t.Errorf("resolution: got %q, want 2", fields["resolution"])
+	}
+	if fields["codec"] != "1" {
+		t.Errorf("codec: got %q, want 1", fields["codec"])
+	}
+	if fields["source"] != "1" {
+		t.Errorf("source: got %q, want 1", fields["source"])
+	}
+}
+
+func TestPipeline_mapFieldValues_NoMappings(t *testing.T) {
+	db := setupPipelineTestDBWithMappings(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	fields := map[string]string{
+		"category":   "Movies(电影)",
+		"resolution": "1080p",
+	}
+
+	p.mapFieldValues(ctx, "不存在的站", fields)
+
+	if fields["category"] != "Movies(电影)" {
+		t.Errorf("should remain unchanged without mappings, got %q", fields["category"])
+	}
+	if fields["resolution"] != "1080p" {
+		t.Errorf("should remain unchanged without mappings, got %q", fields["resolution"])
+	}
+}
+
+func TestExtractTMDBID(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"https://www.themoviedb.org/movie/12345", "12345"},
+		{"https://www.themoviedb.org/tv/67890", "67890"},
+		{"https://themoviedb.org/movie/42-some-slug", "42"},
+		{"https://example.com/not-tmdb", ""},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := extractTMDBID(tt.input)
+		if got != tt.want {
+			t.Errorf("extractTMDBID(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestPipeline_CheckPublishEligibility_Exclusion(t *testing.T) {
+	db := setupPipelineTestDBWithMappings(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	exclusion := model.PublishExclusion{TargetSite: "目标站", SourceSite: "源站A"}
+	if err := db.Create(&exclusion).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	candidate := &model.PublishCandidate{TorrentName: "Normal Title", SourceSite: "源站A"}
+
+	ok, reason := p.CheckPublishEligibility(ctx, candidate, "目标站")
+	if ok {
+		t.Error("should be excluded")
+	}
+	if reason == "" {
+		t.Error("reason should not be empty")
+	}
+
+	ok, _ = p.CheckPublishEligibility(ctx, candidate, "其他站")
+	if !ok {
+		t.Error("should not be excluded for other target")
+	}
+}
+
+func TestPipeline_PublishCandidate_NotFound(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	_, err := p.PublishCandidate(ctx, 999)
+	if err == nil {
+		t.Error("expected error for non-existent candidate")
 	}
 }

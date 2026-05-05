@@ -52,7 +52,9 @@ func TestRepository_GetByDomain(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Create(ctx, &model.Site{Domain: "test.com", Name: "Test", BaseURL: "https://test.com", Framework: "generic"})
+	if err := repo.Create(ctx, &model.Site{Domain: "test.com", Name: "Test", BaseURL: "https://test.com", Framework: "generic"}); err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := repo.GetByDomain(ctx, "test.com")
 	if err != nil {
@@ -67,7 +69,9 @@ func TestRepository_GetByName(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Create(ctx, &model.Site{Domain: "site.net", Name: "MySite", BaseURL: "https://site.net", Framework: "nexusphp"})
+	if err := repo.Create(ctx, &model.Site{Domain: "site.net", Name: "MySite", BaseURL: "https://site.net", Framework: "nexusphp"}); err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := repo.GetByName(ctx, "MySite")
 	if err != nil {
@@ -82,8 +86,12 @@ func TestRepository_List(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Create(ctx, &model.Site{Domain: "a.com", Name: "Alpha", BaseURL: "https://a.com", Framework: "generic"})
-	repo.Create(ctx, &model.Site{Domain: "b.com", Name: "Bravo", BaseURL: "https://b.com", Framework: "nexusphp"})
+	if err := repo.Create(ctx, &model.Site{Domain: "a.com", Name: "Alpha", BaseURL: "https://a.com", Framework: "generic"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Create(ctx, &model.Site{Domain: "b.com", Name: "Bravo", BaseURL: "https://b.com", Framework: "nexusphp"}); err != nil {
+		t.Fatal(err)
+	}
 
 	sites, err := repo.List(ctx)
 	if err != nil {
@@ -99,10 +107,14 @@ func TestRepository_Update(t *testing.T) {
 	ctx := context.Background()
 
 	site := &model.Site{Domain: "u.com", Name: "Up", BaseURL: "https://u.com", Framework: "generic"}
-	repo.Create(ctx, site)
+	if err := repo.Create(ctx, site); err != nil {
+		t.Fatal(err)
+	}
 
 	site.Framework = "unit3d"
-	repo.Update(ctx, site)
+	if err := repo.Update(ctx, site); err != nil {
+		t.Fatal(err)
+	}
 
 	got, _ := repo.GetByID(ctx, site.ID)
 	if got.Framework != "unit3d" {
@@ -115,9 +127,13 @@ func TestRepository_Delete(t *testing.T) {
 	ctx := context.Background()
 
 	site := &model.Site{Domain: "d.com", Name: "Del", BaseURL: "https://d.com", Framework: "generic"}
-	repo.Create(ctx, site)
+	if err := repo.Create(ctx, site); err != nil {
+		t.Fatal(err)
+	}
 
-	repo.Delete(ctx, site.ID)
+	if err := repo.Delete(ctx, site.ID); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := repo.GetByID(ctx, site.ID)
 	if err == nil {
@@ -129,7 +145,9 @@ func TestRepository_ExistsByDomain(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Create(ctx, &model.Site{Domain: "exists.com", Name: "Exists", BaseURL: "https://exists.com", Framework: "generic"})
+	if err := repo.Create(ctx, &model.Site{Domain: "exists.com", Name: "Exists", BaseURL: "https://exists.com", Framework: "generic"}); err != nil {
+		t.Fatal(err)
+	}
 
 	exists, _ := repo.ExistsByDomain(ctx, "exists.com", 0)
 	if !exists {
@@ -147,7 +165,9 @@ func TestRepository_ExistsByDomain_ExcludeID(t *testing.T) {
 	ctx := context.Background()
 
 	site := &model.Site{Domain: "exc.com", Name: "Exc", BaseURL: "https://exc.com", Framework: "generic"}
-	repo.Create(ctx, site)
+	if err := repo.Create(ctx, site); err != nil {
+		t.Fatal(err)
+	}
 
 	exists, _ := repo.ExistsByDomain(ctx, "exc.com", site.ID)
 	if exists {
@@ -159,7 +179,9 @@ func TestRepository_ExistsByName(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Create(ctx, &model.Site{Domain: "n.com", Name: "ByName", BaseURL: "https://n.com", Framework: "generic"})
+	if err := repo.Create(ctx, &model.Site{Domain: "n.com", Name: "ByName", BaseURL: "https://n.com", Framework: "generic"}); err != nil {
+		t.Fatal(err)
+	}
 
 	exists, _ := repo.ExistsByName(ctx, "ByName", 0)
 	if !exists {
@@ -177,7 +199,9 @@ func TestRepository_UpdateCredentials(t *testing.T) {
 	ctx := context.Background()
 
 	site := &model.Site{Domain: "c.com", Name: "Creds", BaseURL: "https://c.com", Framework: "nexusphp"}
-	repo.Create(ctx, site)
+	if err := repo.Create(ctx, site); err != nil {
+		t.Fatal(err)
+	}
 
 	err := repo.UpdateCredentials(ctx, site.ID, map[string]interface{}{
 		"passkey": "new_pk_123",
@@ -197,7 +221,9 @@ func TestRepository_UpdateStats(t *testing.T) {
 	ctx := context.Background()
 
 	site := &model.Site{Domain: "s.com", Name: "Stats", BaseURL: "https://s.com", Framework: "generic"}
-	repo.Create(ctx, site)
+	if err := repo.Create(ctx, site); err != nil {
+		t.Fatal(err)
+	}
 
 	err := repo.UpdateStats(ctx, site.ID, map[string]interface{}{
 		"upload_bytes":  int64(123456),

@@ -17,7 +17,9 @@ func setupEngineTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(&model.SeedingTorrentRecord{})
+	if err := db.AutoMigrate(&model.SeedingTorrentRecord{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 
@@ -35,7 +37,9 @@ func TestEngine_StartEmpty(t *testing.T) {
 func TestEngine_AddAndRemoveRecord(t *testing.T) {
 	db := setupEngineTestDB(t)
 	e := NewEngine(db, zap.NewNop())
-	e.Start(context.Background())
+	if err := e.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	record := &model.SeedingTorrentRecord{
 		ClientID:  "client-1",
@@ -72,7 +76,9 @@ func TestEngine_AddAndRemoveRecord(t *testing.T) {
 func TestEngine_DuplicateRecord(t *testing.T) {
 	db := setupEngineTestDB(t)
 	e := NewEngine(db, zap.NewNop())
-	e.Start(context.Background())
+	if err := e.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	r1 := &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}
 	r2 := &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "2"}
@@ -98,11 +104,19 @@ func TestEngine_MissingFields(t *testing.T) {
 func TestEngine_ListByClient(t *testing.T) {
 	db := setupEngineTestDB(t)
 	e := NewEngine(db, zap.NewNop())
-	e.Start(context.Background())
+	if err := e.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
-	e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"})
-	e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"})
-	e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"})
+	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"}); err != nil {
+		t.Fatal(err)
+	}
 
 	records, err := e.ListByClient(context.Background(), "c1")
 	if err != nil {
@@ -119,13 +133,15 @@ func setupEngineTestDBFull(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.SeedingTorrentRecord{},
 		&model.SeedingClientConfig{},
 		&model.DownloaderSpeedSnapshot{},
 		&model.SiteTrafficDaily{},
 		&model.DeleteRule{},
-	)
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 
@@ -169,11 +185,19 @@ func TestEngine_StartWithRecords(t *testing.T) {
 func TestEngine_TotalActiveCount(t *testing.T) {
 	db := setupEngineTestDB(t)
 	e := NewEngine(db, zap.NewNop())
-	e.Start(context.Background())
+	if err := e.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
-	e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"})
-	e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"})
-	e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"})
+	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"}); err != nil {
+		t.Fatal(err)
+	}
 
 	if e.TotalActiveCount() != 3 {
 		t.Errorf("expected 3, got %d", e.TotalActiveCount())
@@ -183,9 +207,13 @@ func TestEngine_TotalActiveCount(t *testing.T) {
 func TestEngine_PauseForFreeEnd(t *testing.T) {
 	db := setupEngineTestDB(t)
 	e := NewEngine(db, zap.NewNop())
-	e.Start(context.Background())
+	if err := e.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
-	e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"})
+	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := e.PauseForFreeEnd(context.Background(), "c1", "h1"); err != nil {
 		t.Fatal(err)
@@ -223,7 +251,9 @@ func TestEngine_CleanupStale_DeletesOld(t *testing.T) {
 	})
 
 	e := NewEngine(db, zap.NewNop())
-	e.Start(ctx)
+	if err := e.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	deleted, err := e.CleanupStale(ctx)
 	if err != nil {
@@ -256,7 +286,9 @@ func TestEngine_CleanupStale_PausesFreeExpired(t *testing.T) {
 	})
 
 	e := NewEngine(db, zap.NewNop())
-	e.Start(ctx)
+	if err := e.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	affected, err := e.CleanupStale(ctx)
 	if err != nil {
@@ -276,7 +308,9 @@ func TestEngine_CleanupStale_PausesFreeExpired(t *testing.T) {
 func TestEngine_OnTorrents(t *testing.T) {
 	db := setupEngineTestDB(t)
 	e := NewEngine(db, zap.NewNop())
-	e.Start(context.Background())
+	if err := e.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	events := []model.TorrentEvent{
 		{
@@ -307,7 +341,9 @@ func TestEngine_OnTorrents(t *testing.T) {
 func TestEngine_OnTorrents_NoSourceID(t *testing.T) {
 	db := setupEngineTestDB(t)
 	e := NewEngine(db, zap.NewNop())
-	e.Start(context.Background())
+	if err := e.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	events := []model.TorrentEvent{
 		{

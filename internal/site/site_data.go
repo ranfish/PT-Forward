@@ -296,7 +296,7 @@ var seedSites = []SiteSeedData{
 			StandardSel:   []SelectOption{{"1", "8K"}, {"2", "4K"}, {"3", "1080p"}, {"4", "1080i"}, {"5", "Other"}},
 			AudioCodec:    []SelectOption{{"1", "FLAC"}, {"2", "APE"}, {"3", "DTS-HD/DTS"}, {"4", "MP3"}, {"5", "OGG"}, {"6", "AAC"}, {"7", "DDP/E-AC3"}, {"8", "TrueHD"}, {"9", "TrueHD Atmos"}, {"10", "LPCM"}, {"11", "Other"}, {"12", "DD/AC3"}},
 			TeamSel:       []SelectOption{{"10", "rainweb"}, {"19", "QHstudIo"}, {"18", "HDSWEB"}, {"17", "WiKi"}, {"16", "UBits"}, {"15", "ADWeb"}, {"14", "ZmWeb"}, {"13", "UBWEB"}, {"12", "SewageWeb"}, {"11", "Other"}, {"1", "13City"}, {"9", "PTerWEB"}, {"8", "QHstudIo"}, {"7", "MTeam"}, {"6", "FRDS"}, {"5", "CHDWEB"}, {"4", "HHWEB"}, {"3", "52pt"}, {"2", "AilMWeb"}},
-			ProcessingSel: []SelectOption{{"1", "中国（含港澳台）"}, {"2", "日本"}, {"3", "泰国"}, {"4", "印度"}, {"5", "韩国"}, {"6", "欧美"}, {"7", "Other（其他）​"}},
+			ProcessingSel: []SelectOption{{"1", "中国（含港澳台）"}, {"2", "日本"}, {"3", "泰国"}, {"4", "印度"}, {"5", "韩国"}, {"6", "欧美"}, {"7", "Other（其他）"}},
 			Tags:          []SelectOption{{"1", "禁转"}, {"2", "首发"}, {"9", "完结"}, {"8", "分集"}, {"13", "粤语"}, {"10", "多语"}, {"5", "国语"}, {"6", "中字"}, {"14", "中英双字"}, {"12", "4K"}, {"11", "1080p"}, {"7", "HDR"}, {"4", "DIY"}, {"19", "红叶转载"}, {"15", "有声图书"}},
 		},
 	},
@@ -560,7 +560,7 @@ var seedSites = []SiteSeedData{
 	},
 	{
 		Domain: "piggo.me", Name: "二师兄", BaseURL: "https://piggo.me",
-		Framework: "nexusphp", IsSource: true, IsTarget: false,
+		Framework: "nexusphp", IsSource: false, IsTarget: true,
 		Form: SiteFormConfig{
 			Category:      []SelectOption{{"907", "纪录片"}, {"910", "读书绘本"}, {"911", "音乐"}, {"905", "有声读物"}, {"909", "儿童电影"}, {"908", "儿童剧集"}},
 			MediumSel:     []SelectOption{{"11", "Untouched"}, {"3", "Remux"}, {"7", "Encode"}, {"5", "DIY"}, {"8", "Other"}},
@@ -721,7 +721,7 @@ var seedSites = []SiteSeedData{
 			StandardSel: []SelectOption{{"1", "8K"}, {"2", "4K"}, {"3", "1080p"}, {"4", "1080i"}, {"5", "720p"}},
 			AudioCodec:  []SelectOption{{"2", "DTS-HDMA:X 7.1"}, {"3", "DTS-HDMA"}, {"4", "DTS"}, {"5", "TrueHD Atmos"}, {"6", "TrueHD"}, {"7", "E-AC3 Atmos(DDP Atmos)"}, {"8", "E-AC3(DDP)"}, {"9", "AC3(DD)"}, {"10", "AAC"}, {"1", "Other"}},
 			TeamSel:     []SelectOption{{"1", "Tey"}, {"2", "CHD"}, {"3", "MySiLU"}, {"4", "WiKi"}, {"5", "Other"}},
-			Tags:        []SelectOption{{"2", "完结"}, {"3", "连载"}, {"4", "禁转"}, {"5", "首发"}, {"6", "中字"}, {"11", "杜比"}, {"10", "10bit"}, {"7", "HDR"}, {"8", "短剧"}, {"9", "零魔"}, {"15", "纯享"}, {"14", "粤语"}, {"13", "国配"}, {"12", "DIY​"}},
+			Tags:        []SelectOption{{"2", "完结"}, {"3", "连载"}, {"4", "禁转"}, {"5", "首发"}, {"6", "中字"}, {"11", "杜比"}, {"10", "10bit"}, {"7", "HDR"}, {"8", "短剧"}, {"9", "零魔"}, {"15", "纯享"}, {"14", "粤语"}, {"13", "国配"}, {"12", "DIY"}},
 		},
 	},
 	{
@@ -818,11 +818,13 @@ var seedSites = []SiteSeedData{
 		Domain: "springsunday.net", Name: "不可说", BaseURL: "https://springsunday.net",
 		Framework: "nexusphp", IsSource: true, IsTarget: true,
 		Form: SiteFormConfig{
+			Category:    []SelectOption{{"501", "Movies(电影)"}, {"502", "TV Series(剧集)"}, {"503", "Docs(纪录)"}, {"505", "TV Shows(综艺)"}, {"506", "Sports(体育)"}, {"507", "MV(音乐视频)"}, {"508", "Music(音乐)"}, {"510", "Audio(有声)"}, {"509", "Other(其他类型)"}},
 			MediumSel:   []SelectOption{{"1", "Blu-ray"}, {"4", "Remux"}, {"2", "MiniBD"}, {"6", "BDRip"}, {"7", "WEB-DL"}, {"8", "WEBRip"}, {"5", "HDTV"}, {"9", "TVRip"}, {"3", "DVD"}, {"10", "DVDRip"}, {"11", "CD"}, {"99", "Other"}},
 			CodecSel:    []SelectOption{{"1", "H.265/HEVC"}, {"2", "H.264/AVC"}, {"3", "VC-1"}, {"4", "MPEG-2"}, {"5", "AV1"}, {"99", "Other"}},
 			StandardSel: []SelectOption{{"1", "2160p"}, {"2", "1080p"}, {"3", "1080i"}, {"4", "720p"}, {"5", "SD"}, {"99", "Other"}},
 			AudioCodec:  []SelectOption{{"1", "DTS-HD"}, {"2", "TrueHD"}, {"6", "LPCM"}, {"3", "DTS"}, {"11", "E-AC-3"}, {"4", "AC-3"}, {"5", "AAC"}, {"7", "FLAC"}, {"8", "APE"}, {"9", "WAV"}, {"10", "MP3"}, {"12", "OPUS"}, {"13", "AV3A"}, {"99", "Other"}},
 			SourceSel:   []SelectOption{{"1", "Mainland(大陆)"}, {"2", "Hongkong(香港)"}, {"3", "Taiwan(台湾)"}, {"4", "West(欧美)"}, {"5", "Japan(日本)"}, {"6", "Korea(韩国)"}, {"7", "India(印度)"}, {"8", "Russia(俄国)"}, {"9", "Thailand(泰国)"}, {"99", "Other(其他地区)"}},
+			Tags:        []SelectOption{{"exclusive", "禁转"}, {"animation", "动画"}, {"pack", "合集"}, {"untouched", "原生"}, {"selfpurchase", "自购"}, {"mandarin", "国配"}, {"subtitlezh", "中字"}, {"subtitlesp", "特效字幕"}, {"selfcompile", "自译"}, {"dovi", "DoVi"}, {"hdr10", "HDR10"}, {"hdr10plus", "HDR10+"}, {"hdrvivid", "菁彩HDR"}, {"hlg", "HLG"}, {"cc", "CC"}, {"3d", "3D"}, {"request", "应求"}},
 		},
 	},
 	{
@@ -1035,7 +1037,7 @@ var seedSites = []SiteSeedData{
 	},
 	{
 		Domain: "www.hddolby.com", Name: "不可杜", BaseURL: "https://www.hddolby.com",
-		Framework: "nexusphp", IsSource: true, IsTarget: false,
+		Framework: "nexusphp", IsSource: true, IsTarget: true,
 		Form: SiteFormConfig{
 			Category:    []SelectOption{{"401", "Movies/电影"}, {"402", "TV Series/电视剧"}, {"403", "TV Shows/综艺"}, {"404", "Documentaries/纪录片"}, {"405", "Animations/动漫"}, {"406", "Music Videos/音乐视频"}, {"407", "Sports/体育"}, {"408", "HQ Audio/高品质音频"}, {"409", "Misc/其他"}, {"410", "Concert/演唱会"}, {"411", "Other/其他"}},
 			MediumSel:   []SelectOption{{"1", "Blu-ray"}, {"2", "HD DVD"}, {"3", "Remux"}, {"4", "MiniBD"}, {"5", "HDTV"}, {"6", "DVDR"}, {"7", "Encode"}, {"8", "WEB-DL"}, {"9", "Track"}, {"10", "CD"}, {"11", "Other"}, {"12", "UHD Blu-ray"}},
@@ -1315,7 +1317,7 @@ var seedSites = []SiteSeedData{
 	},
 	{
 		Domain: "www.htpt.cc", Name: "海棠", BaseURL: "https://www.htpt.cc",
-		Framework: "nexusphp", IsSource: true, IsTarget: true,
+		Framework: "nexusphp", IsSource: false, IsTarget: false,
 		Form: SiteFormConfig{
 			Category:    []SelectOption{{"1", "相声"}, {"4091", "评书"}, {"4097", "戏曲"}, {"4098", "鼓/琴"}, {"4099", "小曲"}, {"4101", "小品"}, {"4100", "其他"}, {"4102", "视频"}},
 			CodecSel:    []SelectOption{{"1", "H.264/AVC/x264"}, {"10", "H.265/HEVC/X.265"}, {"11", "MP3/音频/M4A"}},
@@ -1325,7 +1327,7 @@ var seedSites = []SiteSeedData{
 	},
 	{
 		Domain: "www.ptlao.top", Name: "忘年桥", BaseURL: "https://www.ptlao.top",
-		Framework: "nexusphp", IsSource: true, IsTarget: true,
+		Framework: "nexusphp", IsSource: false, IsTarget: false,
 		Form: SiteFormConfig{
 			Category:    []SelectOption{{"410", "old"}, {"411", "middle"}, {"412", "men and women"}, {"413", "youth"}},
 			MediumSel:   []SelectOption{{"9", "Track"}, {"8", "CD"}, {"6", "DVDR"}, {"5", "HDTV"}, {"4", "MiniBD"}, {"7", "Encode"}, {"3", "Remux"}, {"2", "Blu-ray"}, {"1", "UHD"}, {"10", "Other"}, {"11", "WEB-DL"}},
@@ -1336,9 +1338,25 @@ var seedSites = []SiteSeedData{
 	},
 	{
 		Domain: "www.pttime.org", Name: "时间", BaseURL: "https://www.pttime.org",
-		Framework: "nexusphp", IsSource: true, IsTarget: true,
+		Framework: "nexusphp", IsSource: true, IsTarget: false,
 		Form: SiteFormConfig{
 			Category: []SelectOption{{"401", "Movies(电影)"}, {"402", "TV Series(连续剧)"}, {"403", "TV Shows(综艺)"}, {"404", "Documentaries(纪录片)"}, {"405", "Sport(体育)"}, {"406", "ACG(动漫)"}, {"407", "Baby(婴幼儿童)"}, {"408", "Music(音乐)"}, {"409", "Art(曲艺)"}, {"411", "Knowledge(知识)"}, {"412", "School(应试)"}, {"420", "Code(编程)"}, {"421", "Games(游戏)"}, {"422", "Software(软件)"}, {"423", "Resource(素材)"}, {"430", "Other(其它)"}},
+			Tags: []SelectOption{
+				{"jz", "禁转"}, {"xz", "限转"}, {"xpt", "限转PT"}, {"yq", "应求"}, {"xs", "新手"},
+				{"dwj", "原盘或ISO"}, {"sk", "4K(+)"}, {"vr", "3D或VR"}, {"dbsj", "杜比视界"},
+				{"zz", "中字"}, {"zy", "中英双字"}, {"yz", "英字"}, {"qt", "其他字幕"},
+				{"wzz", "无中字"}, {"hj", "合集"}, {"diy", "DIY/自压/原创"}, {"short", "短剧"},
+				{"jzm", "禁转(音乐)"}, {"xzm", "限转(音乐)"}, {"xptm", "限转PT(音乐)"},
+				{"yqm", "应求(音乐)"}, {"xsm", "新手(音乐)"}, {"yym", "英语"}, {"yuem", "粤语"},
+				{"fym", "方言"}, {"hym", "韩语"}, {"rym", "日语"}, {"eym", "俄语"},
+				{"ydym", "印语"}, {"wym", "其他音轨"}, {"hj2", "合辑"}, {"jx", "精选"},
+				{"zj", "专辑"}, {"dq", "单曲"}, {"ep", "迷你专辑"}, {"zhy", "重混音"},
+				{"sz", "私制唱片"}, {"ly", "录音样带"}, {"qtlx", "其他"}, {"mp3", "MP3"},
+				{"flac", "FLAC"}, {"ape", "APE"}, {"wav", "WAV"}, {"dsd", "DSD/DTS"},
+				{"pcm", "PCM"}, {"mqa", "MQA"}, {"dbqjs", "杜比全景声"},
+				{"mv", "MV"}, {"ych", "演唱会"}, {"ysjq", "影视金曲"},
+				{"wlrq", "网络热曲"}, {"zhg", "整轨"}, {"fg", "分轨"}, {"dwjm", "原盘(音乐)"},
+			},
 		},
 	},
 	{
@@ -1420,7 +1438,36 @@ var seedSites = []SiteSeedData{
 	},
 	{
 		Domain: "xingwan.cc", Name: "星湾", BaseURL: "https://xingwan.cc",
-		Framework: "nexusphp", IsSource: true, IsTarget: false,
+		Framework: "nexusphp", IsSource: false, IsTarget: false,
+		Form: SiteFormConfig{
+			Category: []SelectOption{
+				{"401", "电影 Movies"}, {"402", "电视剧 TV Series"}, {"403", "综艺 TV Shows"},
+				{"404", "纪录片 Documentaries"}, {"405", "动漫 Animations"},
+				{"406", "音乐视频 Music Videos"}, {"407", "体育 Sports"},
+				{"408", "无损音乐 HQ Audio"}, {"409", "其他杂项 Misc"},
+				{"410", "短剧 ShortDrama"}, {"411", "游戏 Games"},
+				{"412", "软件 Software"}, {"413", "电子书 Ebooks"}, {"416", "漫画 Comics"},
+			},
+			MediumSel: []SelectOption{
+				{"10", "Blu-ray / BD"}, {"11", "Remux"}, {"12", "Encode"},
+				{"13", "WEB-DL"}, {"14", "WEBRip"}, {"15", "HDTV"},
+				{"16", "DVD / DVDR"}, {"17", "MiniBD"}, {"18", "HD DVD"},
+				{"19", "CD"}, {"20", "Track / Soundtrack"}, {"21", "Other"},
+			},
+			CodecSel: []SelectOption{
+				{"1", "H.264 / AVC"}, {"6", "H.265 / HEVC"}, {"7", "AV1"},
+				{"8", "VC-1"}, {"9", "MPEG-2"}, {"10", "VP9"},
+				{"11", "Xvid"}, {"12", "DivX"}, {"13", "ProRes"},
+				{"14", "DNxHD / DNxHR"}, {"15", "Other"},
+			},
+			StandardSel: []SelectOption{
+				{"5", "SD"}, {"6", "720p"}, {"7", "1080p"}, {"8", "1080i"},
+				{"9", "2K"}, {"10", "1440p / QHD"}, {"11", "2160p / 4K UHD"},
+				{"12", "4K Remux"}, {"13", "8K"}, {"14", "3D SBS"},
+				{"15", "3D HSBS"}, {"16", "3D MVC"}, {"17", "IMAX"},
+				{"18", "VR 180"}, {"19", "VR 360"}, {"20", "Other"},
+			},
+		},
 	},
 	{
 		Domain: "xingtan.one", Name: "杏坛", BaseURL: "https://xingtan.one",
@@ -1594,6 +1641,58 @@ var seedSites = []SiteSeedData{
 			StandardSel:   []SelectOption{{"Other", "Other"}, {"NTSC", "NTSC"}, {"PAL", "PAL"}, {"480p", "480p"}, {"576p", "576p"}, {"720p", "720p"}, {"1080i", "1080i"}, {"1080p", "1080p"}, {"2160p", "2160p"}},
 			ProcessingSel: []SelectOption{{"---", "---"}, {"Encode", "Encode"}, {"Remux", "Remux"}, {"DIY", "DIY"}, {"Untouched", "Untouched"}},
 			Tags:          []SelectOption{{"动作", "动作"}, {"冒险", "冒险"}, {"动画", "动画"}, {"艺术", "艺术"}, {"亚洲", "亚洲"}, {"传记", "传记"}, {"喜剧", "喜剧"}, {"犯罪", "犯罪"}, {"邪典", "邪典"}, {"纪录片", "纪录片"}, {"剧情", "剧情"}, {"实验", "实验"}, {"家庭", "家庭"}, {"奇幻", "奇幻"}, {"黑色电影", "黑色电影"}, {"历史", "历史"}, {"恐怖", "恐怖"}, {"lgbt", "lgbt"}, {"武侠", "武侠"}, {"音乐", "音乐"}, {"音乐剧", "音乐剧"}, {"悬疑", "悬疑"}, {"演出", "演出"}, {"政治", "政治"}, {"爱情", "爱情"}, {"科幻", "科幻"}, {"短片", "短片"}, {"默片", "默片"}, {"体育", "体育"}, {"惊悚", "惊悚"}, {"video.art", "video.art"}, {"战争", "战争"}, {"西部", "西部"}},
+		},
+	},
+	{
+		Domain: "api.m-team.cc", Name: "馒头", BaseURL: "https://api.m-team.cc",
+		Framework: "mteam", AuthType: "apikey", IsSource: true, IsTarget: true,
+		CookieCloudDomain:  "m-team.cc",
+		AlternativeDomains: `["m-team.cc","kp.m-team.cc"]`,
+		Form: SiteFormConfig{
+			Category: []SelectOption{
+				{"401", "电影"}, {"402", "剧集"}, {"403", "纪录片"}, {"404", "动漫"},
+				{"405", "综艺"}, {"406", "音乐"}, {"407", "体育"}, {"408", "其他"},
+				{"409", "游戏"}, {"419", "有声书"}, {"420", "电子书"},
+				{"421", "漫画"}, {"422", "杂志"}, {"423", "学习"},
+				{"427", "演唱会"}, {"434", "微卫星"}, {"435", "音乐MV"},
+				{"438", "软件"}, {"439", "资讯"}, {"441", "戏剧"},
+				{"442", "体育赛事"}, {"448", "短剧"}, {"449", "AI"},
+			},
+			CodecSel: []SelectOption{
+				{"1", "H.264"}, {"2", "VC-1"}, {"3", "Xvid"}, {"4", "MPEG-2"},
+				{"16", "H.265"}, {"19", "AV1"}, {"21", "VP8/9"}, {"22", "AVS"},
+			},
+			AudioCodec: []SelectOption{
+				{"1", "FLAC"}, {"2", "APE"}, {"3", "DTS"}, {"4", "MP2/3"},
+				{"5", "OGG"}, {"6", "AAC"}, {"7", "Other"}, {"8", "AC3"},
+				{"9", "TrueHD"}, {"10", "TrueHD Atmos"}, {"11", "DTS-HD MA"},
+				{"12", "E-AC3"}, {"13", "E-AC3 Atmos"}, {"14", "LPCM"}, {"15", "WAV"},
+			},
+			SourceSel: []SelectOption{
+				{"1", "Bluray"}, {"3", "DVD"}, {"4", "Remux"}, {"5", "HDTV"},
+				{"6", "Other"}, {"8", "Web-DL"}, {"10", "CD"},
+			},
+			MediumSel: []SelectOption{
+				{"1", "Blu-ray"}, {"2", "HD DVD"}, {"3", "Remux"}, {"4", "MiniBD"},
+				{"5", "HDTV"}, {"6", "DVDR"}, {"7", "Encode"}, {"8", "CD"},
+				{"9", "Track"}, {"10", "Web-DL"},
+			},
+			StandardSel: []SelectOption{
+				{"1", "1080p"}, {"2", "1080i"}, {"3", "720p"}, {"5", "SD"},
+				{"6", "4K"}, {"7", "8K"},
+			},
+			ProcessingSel: []SelectOption{
+				{"1", "CN"}, {"2", "US/EU"}, {"3", "HK/TW"}, {"4", "JP"},
+				{"5", "KR"}, {"6", "OT"},
+			},
+			TeamSel: []SelectOption{
+				{"6", "BMDru"}, {"8", "Pack"}, {"9", "MTeam"}, {"19", "CNHK"},
+				{"23", "TnP"}, {"25", "CatEDU"}, {"26", "ARiC"}, {"30", "7³ACG"},
+				{"31", "JKCT"}, {"34", "QHstudIo"}, {"35", "G00DB0Y"}, {"36", "D0"},
+				{"40", "HBO"}, {"41", "REE"}, {"43", "TPTV"}, {"44", "MWeb"},
+				{"45", "CTRL"}, {"48", "ZTR"}, {"49", "126811"}, {"57", "DST"},
+				{"59", "StarfallWeb"}, {"61", "RRS"}, {"62", "lijiang-tv"},
+			},
 		},
 	},
 }

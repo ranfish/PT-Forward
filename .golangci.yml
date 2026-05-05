@@ -1,9 +1,5 @@
 version: "2"
 
-issues:
-  exclude-dirs:
-    - web/node_modules
-
 linters:
   enable:
     - errcheck
@@ -26,6 +22,9 @@ linters:
         - -ST1021
         - -ST1003
   exclusions:
+    paths:
+      - web/node_modules
+      - frontend/dist
     rules:
       - path: _test\.go
         linters:

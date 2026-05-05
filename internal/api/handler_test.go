@@ -75,6 +75,9 @@ func setupTestEnv(t *testing.T) *testEnv {
 		&model.SeedingClientState{},
 		&model.FreezeEventRecord{},
 		&model.SiteConfigOverride{},
+		&model.CookieCloudConfig{},
+		&model.CookieCloudSyncHistory{},
+		&model.PTGenCache{},
 		setting.Setting{},
 	}
 	for _, m := range models {
@@ -141,9 +144,12 @@ func (e *testEnv) doRequest(method, path string, body interface{}) *httptest.Res
 	return w
 }
 
-func parseResponse(w *httptest.ResponseRecorder) Response {
+func parseResponse(t *testing.T, w *httptest.ResponseRecorder) Response {
+	t.Helper()
 	var resp Response
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	return resp
 }
 
@@ -156,7 +162,7 @@ func TestAuth_Login_Success(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	if resp.Code != 0 {
 		t.Errorf("expected code 0, got %d", resp.Code)
 	}
@@ -207,7 +213,7 @@ func TestAuth_Status(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	if data["initialized"] != true {
 		t.Error("should be initialized")
@@ -219,7 +225,7 @@ func TestAuth_RefreshToken(t *testing.T) {
 
 	loginBody := map[string]string{"username": "admin", "password": "TestP@ss1"}
 	loginW := env.doRequest("POST", "/api/v1/auth/login", loginBody)
-	loginResp := parseResponse(loginW)
+	loginResp := parseResponse(t, loginW)
 	loginData := loginResp.Data.(map[string]interface{})
 	refreshToken := loginData["refreshToken"].(string)
 
@@ -315,7 +321,7 @@ func TestSettings_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("get: expected 200, got %d", w.Code)
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	if data["value"] != "PT-Forward" {
 		t.Errorf("expected PT-Forward, got %v", data["value"])
@@ -358,7 +364,7 @@ func TestSites_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create: expected 200/201, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	siteID := data["id"].(float64)
 
@@ -366,7 +372,7 @@ func TestSites_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("list: expected 200, got %d", w.Code)
 	}
-	listResp := parseResponse(w)
+	listResp := parseResponse(t, w)
 	listData, _ := listResp.Data.(map[string]interface{})
 	items, _ := listData["items"].([]interface{})
 	if len(items) != 1 {
@@ -409,7 +415,7 @@ func TestFilters_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create: expected 200/201, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	ruleID := data["id"].(float64)
 
@@ -445,7 +451,7 @@ func TestDownloaders_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create: expected 200/201, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	clientID := data["id"].(float64)
 
@@ -479,7 +485,7 @@ func TestNotifications_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create: expected 200/201, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	chID := data["id"].(float64)
 
@@ -522,7 +528,7 @@ func TestRSS_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create: expected 200/201, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	subID := data["id"].(float64)
 
@@ -603,7 +609,7 @@ func TestSeedingConfigs_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	configID := data["id"].(float64)
 
@@ -653,7 +659,7 @@ func TestDeleteRules_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	ruleID := data["id"].(float64)
 
@@ -686,7 +692,7 @@ func TestReseedTasks_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	taskID := data["id"].(float64)
 
@@ -741,7 +747,9 @@ func TestDashboard_Overview(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	data := resp["data"].(map[string]interface{})
 	if _, ok := data["sites"]; !ok {
 		t.Error("expected sites field")
@@ -787,7 +795,9 @@ func TestSystem_Info(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	data := resp["data"].(map[string]interface{})
 	if data["version"] != "test" {
 		t.Errorf("expected version=test, got %v", data["version"])
@@ -853,7 +863,9 @@ func TestSeeding_Stats(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
 	data := resp["data"].(map[string]interface{})
 	if _, ok := data["activeRecords"]; !ok {
 		t.Error("expected activeRecords field")
@@ -878,7 +890,9 @@ func TestSeeding_ScoringDryrun(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
 	data := resp["data"].(map[string]interface{})
 	if _, ok := data["effectiveScore"]; !ok {
 		t.Error("expected effectiveScore field")
@@ -904,7 +918,9 @@ func TestRSS_Dryrun(t *testing.T) {
 	}
 
 	var subResp map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&subResp)
+	if err := json.NewDecoder(w.Body).Decode(&subResp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
 	subData := subResp["data"].(map[string]interface{})
 	subID := uint(subData["id"].(float64))
 
@@ -920,7 +936,7 @@ func TestSystem_Ping(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, ok := resp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatal("data not map")
@@ -947,7 +963,7 @@ func TestSettings_BackupRestore(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("backup: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, ok := resp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatal("data not map")
@@ -970,7 +986,7 @@ func TestDashboard_Trends(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, ok := resp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatal("data not map")
@@ -997,7 +1013,7 @@ func TestFingerprint_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("list after create: expected 200, got %d", w.Code)
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data := resp.Data.(map[string]interface{})
 	if data["total"] != float64(1) {
 		t.Errorf("expected total 1, got %v", data["total"])
@@ -1085,7 +1101,7 @@ func TestLifecycle_Config(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("backpressure: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, ok := resp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatal("data not map")
@@ -1101,7 +1117,7 @@ func TestSeeding_Status(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, ok := resp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatal("data not map")
@@ -1212,7 +1228,9 @@ func TestSeeding_ScoringConfigAndLogs(t *testing.T) {
 		t.Fatalf("create sub: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var subResp map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&subResp)
+	if err := json.NewDecoder(w.Body).Decode(&subResp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
 	subData := subResp["data"].(map[string]interface{})
 	subID := uint(subData["id"].(float64))
 
@@ -1261,7 +1279,7 @@ func TestPublish_GroupsAndLifecycle(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("get group: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, ok := resp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatal("data not map")
@@ -1376,7 +1394,9 @@ func TestFilter_SubscriptionsRules(t *testing.T) {
 		t.Fatalf("create sub: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var subResp map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&subResp)
+	if err := json.NewDecoder(w.Body).Decode(&subResp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
 	subData := subResp["data"].(map[string]interface{})
 	subID := uint(subData["id"].(float64))
 
@@ -1403,7 +1423,7 @@ func TestSystem_HealthFull(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, ok := resp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatal("expected map")
@@ -1423,7 +1443,7 @@ func TestSystem_InfoFull(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, ok := resp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatal("expected map")
@@ -1467,7 +1487,9 @@ func TestSystem_NotFound(t *testing.T) {
 
 func TestCredentialDetector_CheckNow(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	db.AutoMigrate(&model.Site{})
+	if err := db.AutoMigrate(&model.Site{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
 	hub := NewHub()
 	d := NewCredentialDetector(db, zap.NewNop(), hub)
 
@@ -1481,7 +1503,9 @@ func TestCredentialDetector_CheckNow(t *testing.T) {
 
 func TestCredentialDetector_NoCredentials(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	db.AutoMigrate(&model.Site{})
+	if err := db.AutoMigrate(&model.Site{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	d := NewCredentialDetector(db, zap.NewNop(), nil)
 
 	db.Create(&model.Site{
@@ -1494,7 +1518,9 @@ func TestCredentialDetector_NoCredentials(t *testing.T) {
 
 func TestCredentialDetector_RunCancel(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	db.AutoMigrate(&model.Site{})
+	if err := db.AutoMigrate(&model.Site{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	d := NewCredentialDetector(db, zap.NewNop(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1570,7 +1596,7 @@ func TestDeleteRule_CreateAndList(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("list: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	items, _ := data["items"].([]interface{})
 	if len(items) != 1 {
@@ -1701,7 +1727,9 @@ func TestErrorWithDetail(t *testing.T) {
 		t.Errorf("expected 400, got %d", w.Code)
 	}
 	var resp Response
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
 	if resp.Code != 40001 {
 		t.Errorf("expected 40001, got %d", resp.Code)
 	}
@@ -1723,7 +1751,7 @@ func TestSiteOverrides_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create site: expected 200/201, got %d: %s", w.Code, w.Body.String())
 	}
-	resp := parseResponse(w)
+	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
 	siteID := data["id"].(float64)
 
@@ -1731,7 +1759,7 @@ func TestSiteOverrides_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("list overrides: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	listResp := parseResponse(w)
+	listResp := parseResponse(t, w)
 	listData, _ := listResp.Data.(map[string]interface{})
 	if listData["total"].(float64) != 0 {
 		t.Errorf("expected 0 overrides initially, got %v", listData["total"])
@@ -1750,7 +1778,7 @@ func TestSiteOverrides_CRUD(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("list overrides after upsert: expected 200, got %d", w.Code)
 	}
-	listResp = parseResponse(w)
+	listResp = parseResponse(t, w)
 	listData, _ = listResp.Data.(map[string]interface{})
 	if listData["total"].(float64) != 1 {
 		t.Errorf("expected 1 override, got %v", listData["total"])
@@ -1766,7 +1794,7 @@ func TestSiteOverrides_CRUD(t *testing.T) {
 	}
 
 	w = env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d/overrides", int(siteID)), nil)
-	listResp = parseResponse(w)
+	listResp = parseResponse(t, w)
 	listData, _ = listResp.Data.(map[string]interface{})
 	if listData["total"].(float64) != 1 {
 		t.Errorf("expected still 1 override after update, got %v", listData["total"])
@@ -1778,7 +1806,7 @@ func TestSiteOverrides_CRUD(t *testing.T) {
 	}
 
 	w = env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d/overrides", int(siteID)), nil)
-	listResp = parseResponse(w)
+	listResp = parseResponse(t, w)
 	listData, _ = listResp.Data.(map[string]interface{})
 	if listData["total"].(float64) != 0 {
 		t.Errorf("expected 0 after delete, got %v", listData["total"])
@@ -1790,5 +1818,392 @@ func TestSiteOverrides_CRUD(t *testing.T) {
 	})
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("empty fieldPath: expected 400, got %d", w.Code)
+	}
+}
+
+func TestCookieCloud_GetConfig_Empty(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("GET", "/api/v1/cookiecloud/config", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, ok := resp.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("data not map")
+	}
+	if data["serverUrl"] != "" {
+		t.Errorf("expected empty serverUrl, got %v", data["serverUrl"])
+	}
+	if data["syncEnabled"] != false {
+		t.Error("expected syncEnabled false")
+	}
+}
+
+func TestCookieCloud_UpdateConfig_Create(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("PUT", "/api/v1/cookiecloud/config", map[string]interface{}{
+		"serverUrl":   "https://cc.example.com",
+		"uuid":        "test-uuid-123",
+		"password":    "test-password",
+		"syncEnabled": true,
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCookieCloud_GetConfig_AfterCreate(t *testing.T) {
+	env := setupTestEnv(t)
+	env.doRequest("PUT", "/api/v1/cookiecloud/config", map[string]interface{}{
+		"serverUrl":   "https://cc.example.com",
+		"uuid":        "test-uuid-123",
+		"password":    "test-password",
+		"syncEnabled": true,
+	})
+	w := env.doRequest("GET", "/api/v1/cookiecloud/config", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, ok := resp.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("data not map")
+	}
+	if data["serverUrl"] != "https://cc.example.com" {
+		t.Errorf("expected https://cc.example.com, got %v", data["serverUrl"])
+	}
+	if data["hasPassword"] != true {
+		t.Error("expected hasPassword true")
+	}
+	if data["syncEnabled"] != true {
+		t.Error("expected syncEnabled true")
+	}
+}
+
+func TestCookieCloud_UpdateConfig_Update(t *testing.T) {
+	env := setupTestEnv(t)
+	env.doRequest("PUT", "/api/v1/cookiecloud/config", map[string]interface{}{
+		"serverUrl":   "https://cc.example.com",
+		"uuid":        "test-uuid-123",
+		"password":    "test-password",
+		"syncEnabled": true,
+	})
+	w := env.doRequest("PUT", "/api/v1/cookiecloud/config", map[string]interface{}{
+		"serverUrl": "https://cc2.example.com",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	w = env.doRequest("GET", "/api/v1/cookiecloud/config", nil)
+	resp := parseResponse(t, w)
+	data, _ := resp.Data.(map[string]interface{})
+	if data["serverUrl"] != "https://cc2.example.com" {
+		t.Errorf("expected updated serverUrl, got %v", data["serverUrl"])
+	}
+}
+
+func TestCookieCloud_Sync_NoSites(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("POST", "/api/v1/cookiecloud/sync", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCookieCloud_ListHistory_Empty(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("GET", "/api/v1/cookiecloud/history", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, ok := resp.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("data not map")
+	}
+	items, ok := data["items"].([]interface{})
+	if !ok {
+		t.Fatal("items not array")
+	}
+	if len(items) != 0 {
+		t.Errorf("expected 0 items, got %d", len(items))
+	}
+}
+
+func TestCookieCloud_TestConnection_NoConfig(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("POST", "/api/v1/cookiecloud/test", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestCookieCloud_BadMethod(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("DELETE", "/api/v1/cookiecloud/config", nil)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", w.Code)
+	}
+}
+
+func TestCookieCloud_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("GET", "/api/v1/cookiecloud/nonexistent", nil)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestPTGen_Query_EmptyQuery(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("POST", "/api/v1/ptgen/query", map[string]interface{}{
+		"query": "",
+	})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestPTGen_Query_BadJSON(t *testing.T) {
+	env := setupTestEnv(t)
+	req := httptest.NewRequest("POST", "/api/v1/ptgen/query", bytes.NewReader([]byte("not json")))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+env.token)
+	w := httptest.NewRecorder()
+	env.mux.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestPTGen_ListCache_Empty(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("GET", "/api/v1/ptgen/cache", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, ok := resp.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("data not map")
+	}
+	items, ok := data["items"].([]interface{})
+	if !ok {
+		t.Fatal("items not array")
+	}
+	if len(items) != 0 {
+		t.Errorf("expected 0 items, got %d", len(items))
+	}
+}
+
+func TestPTGen_CleanCache(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("DELETE", "/api/v1/ptgen/cache", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPTGen_BadMethod(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("PUT", "/api/v1/ptgen/query", nil)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", w.Code)
+	}
+}
+
+func TestPTGen_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("GET", "/api/v1/ptgen/nonexistent", nil)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestPublish_GetTask_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("GET", "/api/v1/publish/tasks/99999", nil)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	if resp.Code != 40400 {
+		t.Errorf("expected code 40400, got %d", resp.Code)
+	}
+}
+
+func TestPublish_DeleteTask_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("DELETE", "/api/v1/publish/tasks/99999", nil)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	if resp.Code != 40400 {
+		t.Errorf("expected code 40400, got %d", resp.Code)
+	}
+}
+
+func TestPublish_GetCandidate_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("GET", "/api/v1/publish/candidates/99999", nil)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	if resp.Code != 40400 {
+		t.Errorf("expected code 40400, got %d", resp.Code)
+	}
+}
+
+func TestFilter_Update(t *testing.T) {
+	env := setupTestEnv(t)
+
+	createBody := map[string]interface{}{
+		"name":     "FilterUpdTest",
+		"ruleType": "accept",
+		"enabled":  true,
+		"conditions": []map[string]interface{}{
+			{"key": "title", "compare_type": "contain", "value": "HD"},
+		},
+	}
+	w := env.doRequest("POST", "/api/v1/filters/rules", createBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, _ := resp.Data.(map[string]interface{})
+	ruleID := data["id"].(float64)
+
+	updateBody := map[string]interface{}{
+		"name":    "FilterUpdModified",
+		"enabled": false,
+	}
+	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/filters/rules/%d", int(ruleID)), updateBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("update: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp = parseResponse(t, w)
+	data, _ = resp.Data.(map[string]interface{})
+	if data["name"] != "FilterUpdModified" {
+		t.Errorf("expected FilterUpdModified, got %v", data["name"])
+	}
+	if data["enabled"] != false {
+		t.Errorf("expected enabled false, got %v", data["enabled"])
+	}
+}
+
+func TestFilter_Update_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("PUT", "/api/v1/filters/rules/99999", map[string]interface{}{
+		"name": "NotExist",
+	})
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDeleteRule_CreateAndUpdate(t *testing.T) {
+	env := setupTestEnv(t)
+
+	w := env.doRequest("POST", "/api/v1/seeding/delete-rules", map[string]interface{}{
+		"alias":      "UpdDelRule",
+		"priority":   5,
+		"enabled":    true,
+		"action":     "delete",
+		"deleteNum":  1,
+		"removeData": false,
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, _ := resp.Data.(map[string]interface{})
+	ruleID := data["id"].(float64)
+
+	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/seeding/delete-rules/%d", int(ruleID)), map[string]interface{}{
+		"alias":    "UpdDelRuleMod",
+		"priority": 20,
+		"enabled":  false,
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("update: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp = parseResponse(t, w)
+	data, _ = resp.Data.(map[string]interface{})
+	if data["alias"] != "UpdDelRuleMod" {
+		t.Errorf("expected UpdDelRuleMod, got %v", data["alias"])
+	}
+}
+
+func TestDeleteRule_Update_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	w := env.doRequest("PUT", "/api/v1/seeding/delete-rules/99999", map[string]interface{}{
+		"alias": "NotExist",
+	})
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSettings_SetAndGet(t *testing.T) {
+	env := setupTestEnv(t)
+
+	w := env.doRequest("PUT", "/api/v1/settings/setgetkey", map[string]string{"value": "setgetval"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("set: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, _ := resp.Data.(map[string]interface{})
+	if data["key"] != "setgetkey" {
+		t.Errorf("expected key setgetkey, got %v", data["key"])
+	}
+
+	w = env.doRequest("GET", "/api/v1/settings/setgetkey", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("get: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp = parseResponse(t, w)
+	data, _ = resp.Data.(map[string]interface{})
+	if data["value"] != "setgetval" {
+		t.Errorf("expected setgetval, got %v", data["value"])
+	}
+}
+
+func TestRSS_CreateAndUpdate(t *testing.T) {
+	env := setupTestEnv(t)
+
+	env.db.Create(&model.Site{Name: "rssupd", Domain: "rssupd.com", BaseURL: "https://rssupd.com", Framework: "nexusphp", Enabled: true, Passkey: "pk"})
+
+	createBody := map[string]interface{}{
+		"name":     "RSSUpdTest",
+		"enabled":  true,
+		"urls":     []string{"https://rssupd.com/rss"},
+		"siteName": "rssupd",
+	}
+	w := env.doRequest("POST", "/api/v1/rss/subscriptions", createBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, _ := resp.Data.(map[string]interface{})
+	subID := data["id"].(float64)
+
+	updateBody := map[string]interface{}{
+		"name":    "RSSUpdModified",
+		"enabled": false,
+	}
+	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/rss/subscriptions/%d", int(subID)), updateBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("update: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp = parseResponse(t, w)
+	data, _ = resp.Data.(map[string]interface{})
+	if data["name"] != "RSSUpdModified" {
+		t.Errorf("expected RSSUpdModified, got %v", data["name"])
+	}
+	if data["enabled"] != false {
+		t.Errorf("expected enabled false, got %v", data["enabled"])
 	}
 }

@@ -38,7 +38,9 @@ func TestDispatcher_RegisterAndDispatch(t *testing.T) {
 	d.Register("rss", h2)
 
 	events := []model.TorrentEvent{{TorrentID: "1"}, {TorrentID: "2"}}
-	d.Dispatch(context.Background(), "rss", events)
+	if err := d.Dispatch(context.Background(), "rss", events); err != nil {
+		t.Fatal(err)
+	}
 
 	if h1.called != 1 {
 		t.Errorf("h1 called %d times, want 1", h1.called)
@@ -95,7 +97,9 @@ func TestDispatcher_WSBroadcast(t *testing.T) {
 		{ID: 1, SiteName: "site1", TorrentID: "t1", Title: "Test", Size: 1024},
 		{ID: 2, SiteName: "site2", TorrentID: "t2", Title: "Test2", Size: 2048},
 	}
-	d.Dispatch(context.Background(), "rss", events)
+	if err := d.Dispatch(context.Background(), "rss", events); err != nil {
+		t.Fatal(err)
+	}
 
 	if ws.count.Load() != 2 {
 		t.Errorf("expected 2 WS broadcasts, got %d", ws.count.Load())
@@ -107,7 +111,9 @@ func TestDispatcher_WSBroadcast_NilEvents(t *testing.T) {
 	ws := &mockWSBroadcaster{}
 	d.SetWSBroadcaster(ws)
 
-	d.Dispatch(context.Background(), "rss", nil)
+	if err := d.Dispatch(context.Background(), "rss", nil); err != nil {
+		t.Fatal(err)
+	}
 	if ws.count.Load() != 0 {
 		t.Errorf("expected 0 WS broadcasts for nil events, got %d", ws.count.Load())
 	}
@@ -119,7 +125,9 @@ func TestDispatcher_WSBroadcast_EventType(t *testing.T) {
 	d.SetWSBroadcaster(ws)
 
 	events := []model.TorrentEvent{{ID: 1, SiteName: "s", TorrentID: "t"}}
-	d.Dispatch(context.Background(), "rss", events)
+	if err := d.Dispatch(context.Background(), "rss", events); err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
 
 	last := ws.last.Load().(map[string]interface{})
 	if last["type"] != "torrent.added" {

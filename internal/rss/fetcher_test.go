@@ -40,7 +40,7 @@ func TestFetch_OK(t *testing.T) {
 			t.Error("User-Agent header should be set")
 		}
 		w.Header().Set("Content-Type", "application/xml")
-		w.Write([]byte(sampleRSS))
+		_, _ = w.Write([]byte(sampleRSS))
 	}))
 	defer srv.Close()
 
@@ -72,7 +72,7 @@ func TestFetch_HTTPError(t *testing.T) {
 
 func TestFetch_InvalidXML(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte("not xml at all"))
+		_, _ = w.Write([]byte("not xml at all"))
 	}))
 	defer srv.Close()
 
@@ -122,7 +122,9 @@ func TestParseItems_GuidTextID(t *testing.T) {
 </channel></rss>`
 
 	var feed RSSFeed
-	xml.Unmarshal([]byte(rss), &feed)
+	if err := xml.Unmarshal([]byte(rss), &feed); err != nil {
+		t.Fatal(err)
+	}
 
 	site := &model.Site{IDStrategy: "guid_text"}
 	sub := &model.RSSSubscription{Name: "s", SiteName: "x"}
@@ -143,7 +145,9 @@ func TestParseItems_SkipEmpty(t *testing.T) {
 </channel></rss>`
 
 	var feed RSSFeed
-	xml.Unmarshal([]byte(rss), &feed)
+	if err := xml.Unmarshal([]byte(rss), &feed); err != nil {
+		t.Fatal(err)
+	}
 
 	site := &model.Site{IDStrategy: "query_param", IDPattern: "id"}
 	sub := &model.RSSSubscription{Name: "s", SiteName: "x"}

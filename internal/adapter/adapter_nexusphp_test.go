@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -38,7 +39,7 @@ func TestNexusPHP_DownloadTorrent_OK(t *testing.T) {
 			t.Error("missing cookie")
 		}
 		w.Header().Set("Content-Type", "application/x-bittorrent")
-		w.Write(payload)
+		_, _ = w.Write(payload)
 	}))
 	defer srv.Close()
 
@@ -74,7 +75,7 @@ func TestNexusPHP_DownloadTorrent_Forbidden(t *testing.T) {
 func TestNexusPHP_DownloadTorrent_HTML(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte("<html>error</html>"))
+		_, _ = w.Write([]byte("<html>error</html>"))
 	}))
 	defer srv.Close()
 
@@ -90,7 +91,7 @@ func TestNexusPHP_DownloadTorrent_HTML(t *testing.T) {
 
 func TestNexusPHP_GetTorrentDetail_OK(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html><title>Movie 2024 1080p</title>
+		_, _ = w.Write([]byte(`<html><title>Movie 2024 1080p</title>
 		<td>info_hash</td><td>aabbccddeeff00112233445566778899aabbccdd</td>
 		<td>大小<td>2.5 GB</td></td>
 		<td>分类<td>电影</td></td>
@@ -142,7 +143,7 @@ func TestNexusPHP_GetTorrentDetail_ServerError(t *testing.T) {
 
 func TestNexusPHP_DetectDiscount_Free(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html><span class="pro_free">Free</span></html>`))
+		_, _ = w.Write([]byte(`<html><span class="pro_free">Free</span></html>`))
 	}))
 	defer srv.Close()
 
@@ -161,7 +162,7 @@ func TestNexusPHP_DetectDiscount_Free(t *testing.T) {
 
 func TestNexusPHP_DetectDiscount_2xUp(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html><span class="pro_2up">2xUp</span></html>`))
+		_, _ = w.Write([]byte(`<html><span class="pro_2up">2xUp</span></html>`))
 	}))
 	defer srv.Close()
 
@@ -180,7 +181,7 @@ func TestNexusPHP_DetectDiscount_2xUp(t *testing.T) {
 
 func TestNexusPHP_DetectDiscount_API(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`{"discount": "free"}`))
+		_, _ = w.Write([]byte(`{"discount": "free"}`))
 	}))
 	defer srv.Close()
 
@@ -202,7 +203,7 @@ func TestNexusPHP_DetectDiscount_API(t *testing.T) {
 
 func TestNexusPHP_DetectDiscount_None(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html>Normal torrent</html>`))
+		_, _ = w.Write([]byte(`<html>Normal torrent</html>`))
 	}))
 	defer srv.Close()
 
@@ -235,7 +236,7 @@ func TestNexusPHP_DetectHR(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.Write([]byte(tt.html))
+				_, _ = w.Write([]byte(tt.html))
 			}))
 			defer srv.Close()
 
@@ -263,7 +264,7 @@ func TestNexusPHP_UploadTorrent_Success(t *testing.T) {
 		if r.Header.Get("Cookie") != "sid=test" {
 			t.Error("missing cookie")
 		}
-		w.Write([]byte(`<html>上传成功 <a href="details.php?id=789">查看</a></html>`))
+		_, _ = w.Write([]byte(`<html>上传成功 <a href="details.php?id=789">查看</a></html>`))
 	}))
 	defer srv.Close()
 
@@ -322,7 +323,7 @@ func TestNexusPHP_SearchTorrents_OK(t *testing.T) {
 		if r.URL.Query().Get("search") != "test" {
 			t.Error("missing search param")
 		}
-		w.Write([]byte(`<html>
+		_, _ = w.Write([]byte(`<html>
 		<tr class="torrent-row"><td><a href="details.php?id=10">Movie A</a></td><td>1.5 GB</td></tr>
 		<tr class="torrent-row"><td><a href="details.php?id=20">Movie B</a></td><td>700 MB</td></tr>
 		</html>`))
@@ -351,7 +352,7 @@ func TestNexusPHP_SearchTorrents_WithCategory(t *testing.T) {
 		if cat != "123" {
 			t.Errorf("expected cat=123, got %s", cat)
 		}
-		w.Write([]byte(`<html></html>`))
+		_, _ = w.Write([]byte(`<html></html>`))
 	}))
 	defer srv.Close()
 
@@ -367,7 +368,7 @@ func TestNexusPHP_SearchTorrents_WithCategory(t *testing.T) {
 
 func TestNexusPHP_GetTorrentInfoHash_OK(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html><title>Test</title>
+		_, _ = w.Write([]byte(`<html><title>Test</title>
 		<td>info_hash</td><td>aaBBccDDeeFF00112233445566778899aaBBccDD</td></html>`))
 	}))
 	defer srv.Close()
@@ -394,7 +395,7 @@ func TestNexusPHP_SupportsSearchByPiecesHash(t *testing.T) {
 
 func TestNexusPHP_GetBatchSLData(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html>Seeders: 10, Leechers: 5</html>`))
+		_, _ = w.Write([]byte(`<html>Seeders: 10, Leechers: 5</html>`))
 	}))
 	defer srv.Close()
 
@@ -501,12 +502,16 @@ func TestPool_GetWithFramework(t *testing.T) {
 
 func TestPool_Rebuild(t *testing.T) {
 	pool := NewPool(NewFactory(zap.NewNop()), zap.NewNop())
-	pool.Get(context.Background(), "test.com", "generic")
+	if _, err := pool.Get(context.Background(), "test.com", "generic"); err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
 	if pool.Count() != 1 {
 		t.Error("expected 1")
 	}
 
-	pool.Rebuild(context.Background(), "test.com")
+	if err := pool.Rebuild(context.Background(), "test.com"); err != nil {
+		t.Fatalf("Rebuild failed: %v", err)
+	}
 	if pool.Count() != 0 {
 		t.Error("expected 0 after rebuild")
 	}
@@ -514,8 +519,12 @@ func TestPool_Rebuild(t *testing.T) {
 
 func TestPool_Remove(t *testing.T) {
 	pool := NewPool(NewFactory(zap.NewNop()), zap.NewNop())
-	pool.Get(context.Background(), "a.com", "generic")
-	pool.Get(context.Background(), "b.com", "generic")
+	if _, err := pool.Get(context.Background(), "a.com", "generic"); err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if _, err := pool.Get(context.Background(), "b.com", "generic"); err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
 	if pool.Count() != 2 {
 		t.Error("expected 2")
 	}
@@ -528,8 +537,12 @@ func TestPool_Remove(t *testing.T) {
 
 func TestPool_Close(t *testing.T) {
 	pool := NewPool(NewFactory(zap.NewNop()), zap.NewNop())
-	pool.Get(context.Background(), "x.com", "generic")
-	pool.Close(context.Background())
+	if _, err := pool.Get(context.Background(), "x.com", "generic"); err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if err := pool.Close(context.Background()); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
 	if pool.Count() != 0 {
 		t.Error("expected 0 after close")
 	}
@@ -540,4 +553,85 @@ func TestPool_Start(t *testing.T) {
 	if err := pool.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestIsMusicCategory(t *testing.T) {
+	tests := []struct {
+		cat  string
+		want bool
+	}{
+		{"406", true},
+		{"408", true},
+		{"409", true},
+		{"401", false},
+		{"402", false},
+		{"music", true},
+		{"HQ Audio", true},
+		{"音频", true},
+		{"Movies", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		got := isMusicCategory(tt.cat)
+		if got != tt.want {
+			t.Errorf("isMusicCategory(%q) = %v, want %v", tt.cat, got, tt.want)
+		}
+	}
+}
+
+func TestNexusPHPUpload_MusicRouting(t *testing.T) {
+	var uploadPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uploadPath = r.URL.Path
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `details.php?id=1`)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+
+	t.Run("music category routes to takeupload", func(t *testing.T) {
+		config := &model.SiteConfig{
+			Domain: srv.URL,
+			Cookie: "session=test",
+			SiteDefault: model.SiteDefault{
+				Paths: model.SitePathsConfig{
+					Upload:     "/upload.php",
+					TakeUpload: "/upload_music.php",
+				},
+			},
+		}
+		req := &model.PublishRequest{
+			TorrentData: []byte("d4:infod6:lengthi0eee"),
+			Title:       "Test",
+			FormFields:  map[string]string{"category": "408"},
+		}
+		_, _ = a.UploadTorrent(context.Background(), config, req)
+		if uploadPath != "/upload_music.php" {
+			t.Errorf("expected /upload_music.php, got %s", uploadPath)
+		}
+	})
+
+	t.Run("non-music category uses default upload", func(t *testing.T) {
+		config := &model.SiteConfig{
+			Domain: srv.URL,
+			Cookie: "session=test",
+			SiteDefault: model.SiteDefault{
+				Paths: model.SitePathsConfig{
+					Upload:     "/upload.php",
+					TakeUpload: "/upload_music.php",
+				},
+			},
+		}
+		req := &model.PublishRequest{
+			TorrentData: []byte("d4:infod6:lengthi0eee"),
+			Title:       "Test",
+			FormFields:  map[string]string{"category": "401"},
+		}
+		_, _ = a.UploadTorrent(context.Background(), config, req)
+		if uploadPath != "/upload.php" {
+			t.Errorf("expected /upload.php, got %s", uploadPath)
+		}
+	})
 }

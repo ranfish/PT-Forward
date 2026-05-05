@@ -298,6 +298,13 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	if config.Paths.Upload != "" {
 		uploadPath = config.Paths.Upload
 	}
+
+	if cat, ok := req.FormFields["category"]; ok && config.Paths.TakeUpload != "" {
+		if isMusicCategory(cat) {
+			uploadPath = config.Paths.TakeUpload
+		}
+	}
+
 	uploadURL := baseURL + uploadPath
 
 	var buf bytes.Buffer
@@ -330,8 +337,23 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 		_ = writer.WriteField("anonymity", "1")
 	}
 
+	npFieldMap := map[string]string{
+		"category":   "type",
+		"source":     "source_sel",
+		"resolution": "standard_sel",
+		"codec":      "codec_sel",
+		"audioCodec": "audiocodec_sel",
+		"medium":     "medium_sel",
+		"team":       "team_sel",
+		"processing": "processing_sel",
+	}
+
 	for k, v := range req.FormFields {
-		_ = writer.WriteField(k, v)
+		if mapped, ok := npFieldMap[k]; ok {
+			_ = writer.WriteField(mapped, v)
+		} else {
+			_ = writer.WriteField(k, v)
+		}
 	}
 
 	if err := writer.Close(); err != nil {
@@ -551,4 +573,18 @@ func extractTags(html string) []string {
 		tags = append(tags, strings.TrimSpace(m[1]))
 	}
 	return tags
+}
+
+var musicCategoryIDs = map[string]bool{
+	"406": true,
+	"408": true,
+	"409": true,
+}
+
+func isMusicCategory(cat string) bool {
+	if musicCategoryIDs[cat] {
+		return true
+	}
+	lower := strings.ToLower(cat)
+	return strings.Contains(lower, "music") || strings.Contains(lower, "音频") || strings.Contains(lower, "hq audio")
 }

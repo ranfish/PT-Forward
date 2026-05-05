@@ -104,7 +104,9 @@ func TestRepository_ListHistory(t *testing.T) {
 	ctx := context.Background()
 
 	ch := &model.NotificationChannel{Type: "webhook", Name: "wh", Enabled: true, Healthy: true}
-	repo.Create(ctx, ch)
+	if err := repo.Create(ctx, ch); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 
 	for i := 0; i < 5; i++ {
 		db.Create(&model.NotificationHistory{

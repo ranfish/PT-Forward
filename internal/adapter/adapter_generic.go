@@ -788,13 +788,16 @@ func (a *GenericAdapter) uploadStarSpaceMusic(ctx context.Context, config *model
 	if v, ok := req.FormFields["cat"]; ok {
 		_ = writer.WriteField("release_type", v)
 	}
-	if v, ok := req.FormFields["codec_sel"]; ok {
+	if v := resolveField(req.FormFields, "category", "cat"); v != "" {
+		_ = writer.WriteField("release_type", v)
+	}
+	if v := resolveField(req.FormFields, "codec_sel", "codec"); v != "" {
 		_ = writer.WriteField("format", v)
 	}
-	if v, ok := req.FormFields["audiocodec_sel"]; ok {
+	if v := resolveField(req.FormFields, "audiocodec_sel", "audioCodec"); v != "" {
 		_ = writer.WriteField("bitrate", v)
 	}
-	if v, ok := req.FormFields["medium_sel"]; ok {
+	if v := resolveField(req.FormFields, "medium_sel", "medium"); v != "" {
 		_ = writer.WriteField("media", v)
 	}
 

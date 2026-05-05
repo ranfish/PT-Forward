@@ -27,7 +27,7 @@ func TestGazelle_DownloadTorrent_OK(t *testing.T) {
 		if r.URL.Query().Get("passkey") != "pk1" {
 			t.Error("missing passkey")
 		}
-		w.Write(payload)
+		_, _ = w.Write(payload)
 	}))
 	defer srv.Close()
 
@@ -49,7 +49,7 @@ func TestGazelle_DownloadTorrent_AuthKey(t *testing.T) {
 		if r.URL.Query().Get("authkey") != "ak1" {
 			t.Error("missing authkey")
 		}
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 	defer srv.Close()
 
@@ -98,7 +98,9 @@ func TestGazelle_GetTorrentDetail_API(t *testing.T) {
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(apiResp)
+		if err := json.NewEncoder(w).Encode(apiResp); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -123,7 +125,7 @@ func TestGazelle_GetTorrentDetail_API(t *testing.T) {
 
 func TestGazelle_GetTorrentDetail_Web(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html><title>Web Movie :: Site</title>
+		_, _ = w.Write([]byte(`<html><title>Web Movie :: Site</title>
 		info_hash: aabbccddeeff00112233445566778899aabbccdd
 		<td>Size<td>1.5 GB</td></td>
 		</html>`))
@@ -175,7 +177,9 @@ func TestGazelle_GetPreciseSLData_API(t *testing.T) {
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(apiResp)
+		if err := json.NewEncoder(w).Encode(apiResp); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -197,7 +201,7 @@ func TestGazelle_GetPreciseSLData_API(t *testing.T) {
 
 func TestGazelle_GetPreciseSLData_Web(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html>Seeders<td>15</td>Leechers<td>3</td></html>`))
+		_, _ = w.Write([]byte(`<html>Seeders<td>15</td>Leechers<td>3</td></html>`))
 	}))
 	defer srv.Close()
 
@@ -219,7 +223,7 @@ func TestGazelle_UploadTorrent_Success(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		w.Write([]byte(`<html>success <a href="torrents.php?torrentid=555">view</a></html>`))
+		_, _ = w.Write([]byte(`<html>success <a href="torrents.php?torrentid=555">view</a></html>`))
 	}))
 	defer srv.Close()
 
@@ -253,7 +257,7 @@ func TestGazelle_UploadTorrent_EmptyData(t *testing.T) {
 
 func TestGazelle_UploadTorrent_Fail(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html><span class="error">Duplicate torrent</span></html>`))
+		_, _ = w.Write([]byte(`<html><span class="error">Duplicate torrent</span></html>`))
 	}))
 	defer srv.Close()
 
@@ -278,7 +282,9 @@ func TestGazelle_GetTorrentInfoHash_OK(t *testing.T) {
 				"group":   map[string]interface{}{"name": "T", "category": map[string]interface{}{"name": "M"}},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer srv.Close()
 
