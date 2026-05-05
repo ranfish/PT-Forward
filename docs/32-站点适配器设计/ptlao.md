@@ -21,6 +21,124 @@
 | PT-Gen | 是（pt_gen） |
 | 认领系统 | 是（上限 1000） |
 
+## 上传表单
+
+> **表单**: method=POST, enctype=multipart/form-data, action=takeupload.php
+
+### 双区域类型选择
+
+| 区域 | select name | data-mode | 说明 |
+|------|-------------|-----------|------|
+| 种子区 | `browsecat` | 4 | **✅ 仅允许发布到此区** |
+| 特别区 | `specialcat` | 5 | **⛔ 禁止发布** |
+
+#### 种子区 browsecat（data-mode=4）— 9 个
+
+| 值 | 显示名称 |
+|----|----------|
+| 401 | Movies |
+| 402 | TV Series |
+| 403 | TV Shows |
+| 404 | Documentaries |
+| 405 | Animations |
+| 406 | Music Videos |
+| 407 | Sports |
+| 408 | HQ Audio |
+| 409 | Misc |
+
+#### 特别区 specialcat（data-mode=5）— 4 个
+
+| 值 | 显示名称 |
+|----|----------|
+| 410 | old |
+| 411 | middle |
+| 412 | men and women |
+| 413 | youth |
+
+> **注意**：特别区分类全部为成人向内容（old/middle/men and women/youth），禁止发布。
+
+### 基础字段
+
+| 字段名 | 字段类型 | 必填 | 说明 |
+|--------|----------|------|------|
+| `file` | file | ✓ | 种子文件 |
+| `name` | text | ✓ | 标题 |
+| `small_descr` | text | - | 副标题 |
+| `url` | text | - | IMDb 链接 |
+| `pt_gen` | text | - | PT-Gen |
+| `nfo` | file | - | NFO 文件 |
+| `price` | number | - | 价格 |
+| `descr` | textarea | ✓ | 简介（BBCode） |
+| `technical_info` | textarea | - | MediaInfo |
+| `uplver` | checkbox | - | 匿名发布 |
+
+> **注意**：有 `price` 字段（number 类型），用于设置种子价格。
+
+### 质量字段（[4] 后缀，种子区 mode=4）
+
+#### 媒介 medium_sel[4]（11 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | Blu-ray |
+| 2 | HD DVD |
+| 3 | Remux |
+| 4 | MiniBD |
+| 5 | HDTV |
+| 6 | DVDR |
+| 7 | Encode |
+| 8 | CD |
+| 9 | Track |
+| 10 | 4K UHD Remux |
+| 11 | WEB-DL |
+
+#### 编码 codec_sel[4]（6 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | H.264 |
+| 2 | VC-1 |
+| 3 | Xvid |
+| 4 | MPEG-2 |
+| 5 | Other |
+| 8 | H.265(HEVC) |
+
+#### 分辨率 standard_sel[4]（5 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | 1080p |
+| 2 | 1080i |
+| 3 | 720p |
+| 4 | SD |
+| 5 | 4k/2160p |
+
+#### 制作组 team_sel[4]（6 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | HDS |
+| 2 | CHD |
+| 3 | MySiLU |
+| 4 | WiKi |
+| 5 | Other |
+| 6 | PTL |
+
+#### 标签 tags[4][]（10 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | 禁转 |
+| 2 | 首发 |
+| 3 | 官方 |
+| 4 | DIY |
+| 5 | 国语 |
+| 6 | 中字 |
+| 7 | HDR |
+| 12 | 首发禁转 |
+| 13 | 原创 |
+| 14 | 同性 |
+
 ## Tracker URL
 `https://ptlao.top/announce.php`
 

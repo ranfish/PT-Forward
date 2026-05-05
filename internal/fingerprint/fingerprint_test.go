@@ -16,7 +16,9 @@ func setupFingerprintDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(&model.ContentFingerprint{})
+	if err := db.AutoMigrate(&model.ContentFingerprint{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
 	return db
 }
 
@@ -256,7 +258,9 @@ func TestRepository_GetBySiteAndTorrentID(t *testing.T) {
 		TorrentID:  "42",
 		PiecesHash: "def456",
 	}
-	repo.Save(ctx, fp)
+	if err := repo.Save(ctx, fp); err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := repo.GetBySiteAndTorrentID(ctx, "site1", "42")
 	if err != nil {
@@ -331,15 +335,21 @@ func TestRepository_FindByPiecesHash(t *testing.T) {
 	repo := NewRepository(db, zap.NewNop())
 	ctx := context.Background()
 
-	repo.Save(ctx, &model.ContentFingerprint{
+	if err := repo.Save(ctx, &model.ContentFingerprint{
 		InfoHash: "h1", SiteName: "s1", TorrentID: "1", PiecesHash: "shared_hash", TotalSize: 100,
-	})
-	repo.Save(ctx, &model.ContentFingerprint{
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Save(ctx, &model.ContentFingerprint{
 		InfoHash: "h2", SiteName: "s2", TorrentID: "2", PiecesHash: "shared_hash", TotalSize: 200,
-	})
-	repo.Save(ctx, &model.ContentFingerprint{
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Save(ctx, &model.ContentFingerprint{
 		InfoHash: "h3", SiteName: "s3", TorrentID: "3", PiecesHash: "different_hash", TotalSize: 300,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	results, err := repo.FindByPiecesHash(ctx, "shared_hash")
 	if err != nil {

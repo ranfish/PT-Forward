@@ -18,11 +18,13 @@ func setupWatcherTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.PublishCandidate{},
 		&model.PublishResultRecord{},
 		&model.ClientConfig{},
-	)
+	); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
 	return db
 }
 
@@ -141,7 +143,9 @@ func TestWatcher_PollDetectsCompletion(t *testing.T) {
 	}
 	db.Create(&candidate)
 
-	w.Watch(context.Background(), "client1", "hash1", candidate.ID)
+	if err := w.Watch(context.Background(), "client1", "hash1", candidate.ID); err != nil {
+		t.Fatal(err)
+	}
 
 	w.watchStore.Range(func(key, _ any) bool {
 		watchKey := key.(string)
@@ -256,7 +260,9 @@ func TestWatcher_MultipleWatches(t *testing.T) {
 	w := NewCompletionWatcher(db, nil, nil, zap.NewNop())
 
 	for i := 0; i < 10; i++ {
-		w.Watch(context.Background(), "client", "hash", uint(i))
+		if err := w.Watch(context.Background(), "client", "hash", uint(i)); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if w.ActiveWatchCount() != 1 {
@@ -264,7 +270,9 @@ func TestWatcher_MultipleWatches(t *testing.T) {
 	}
 
 	for i := 0; i < 5; i++ {
-		w.Watch(context.Background(), "client", "hash"+string(rune('a'+i)), uint(i))
+		if err := w.Watch(context.Background(), "client", "hash"+string(rune('a'+i)), uint(i)); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if w.ActiveWatchCount() != 6 {

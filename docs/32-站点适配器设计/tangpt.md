@@ -16,6 +16,111 @@
 | 审核系统 | 是（approval_status: 未审/通过/拒绝） |
 | 认领系统 | 是（上限 1000） |
 
+## 上传表单
+
+> **表单**: method=POST, enctype=multipart/form-data, action=takeupload.php
+
+### 类型选择
+
+| 区域 | select name | data-mode |
+|------|-------------|-----------|
+| 种子区 | `browsecat` | 4 |
+
+#### browsecat（data-mode=4）— 9 个
+
+| 值 | 显示名称 |
+|----|----------|
+| 401 | 电影 |
+| 402 | 电视剧 |
+| 403 | 综艺 |
+| 404 | 纪录片 |
+| 405 | 动漫 |
+| 406 | MV |
+| 407 | 体育 |
+| 409 | 音乐 |
+| 414 | 其他 |
+
+### 基础字段
+
+| 字段名 | 字段类型 | 必填 | 说明 |
+|--------|----------|------|------|
+| `file` | file | ✓ | 种子文件 |
+| `name` | text | ✓ | 标题 |
+| `small_descr` | text | - | 副标题 |
+| `url` | text | - | IMDb 链接 |
+| `nfo` | file | - | NFO 文件 |
+| `descr` | textarea | ✓ | 简介（BBCode） |
+| `technical_info` | textarea | - | MediaInfo |
+| `uplver` | checkbox | - | 匿名发布 |
+
+> **注意**：无 `pt_gen` 字段，无 `team_sel` 选择器。
+
+### 质量字段（[4] 后缀，种子区 mode=4）
+
+#### 媒介 medium_sel[4]（11 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | Blu-ray |
+| 2 | HD DVD |
+| 3 | Remux |
+| 4 | MiniBD |
+| 5 | HDTV |
+| 6 | DVDR |
+| 7 | Encode |
+| 8 | CD |
+| 9 | Other |
+| 10 | UHD Blu-ray |
+| 11 | WEB-DL |
+
+#### 编码 codec_sel[4]（8 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | H.264/AVC |
+| 2 | VC-1 |
+| 3 | Xvid |
+| 4 | MPEG-2 |
+| 5 | Other |
+| 6 | H.265/HEVC |
+| 7 | AV1 |
+| 10 | VP8/9 |
+
+#### 分辨率 standard_sel[4]（7 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | 1080i/1080P |
+| 2 | 720i/720P |
+| 3 | 480i/480P |
+| 4 | 2K/1440P |
+| 5 | 4K/2160P |
+| 6 | 8K/4320P |
+| 7 | Other |
+
+#### 音频编码 audiocodec_sel[4]（19 个）
+
+| 值 | 显示名称 |
+|----|----------|
+| 1 | FLAC |
+| 2 | APE |
+| 4 | MP3 |
+| 5 | OGG |
+| 6 | AAC |
+| 7 | Other |
+| 8 | AV3V |
+| 9 | TrueHD Atmos |
+| 10 | DDP/E-AC3 |
+| 11 | DD/AC3 |
+| 12 | TrueHD |
+| 13 | WAV |
+| 14 | DTS |
+| 15 | DTS:X |
+| 16 | DTS-HD MA |
+| 17 | M4A |
+| 18 | OPUS |
+| 19 | LPCM |
+
 ## Tracker URL
 `https://www.tangpt.top/announce.php`
 

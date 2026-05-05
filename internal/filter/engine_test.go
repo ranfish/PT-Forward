@@ -154,7 +154,7 @@ func TestMatchRule_NoConditions(t *testing.T) {
 
 func TestEngine_MatchAccept(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
-	repo.Create(context.Background(), &model.FilterRule{
+	if err := repo.Create(context.Background(), &model.FilterRule{
 		Name:     "test",
 		RuleType: "accept",
 		Priority: 10,
@@ -162,7 +162,9 @@ func TestEngine_MatchAccept(t *testing.T) {
 			{Key: "title", CompareType: model.CompareContain, Value: "HD"},
 		},
 		Enabled: true,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	engine := NewEngine(repo, nil)
 	result, err := engine.Match(context.Background(), &EvalContext{Title: "HD-Movie"})
@@ -179,7 +181,7 @@ func TestEngine_MatchAccept(t *testing.T) {
 
 func TestEngine_MatchReject(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
-	repo.Create(context.Background(), &model.FilterRule{
+	if err := repo.Create(context.Background(), &model.FilterRule{
 		Name:     "block",
 		RuleType: "reject",
 		Priority: 5,
@@ -187,7 +189,9 @@ func TestEngine_MatchReject(t *testing.T) {
 			{Key: "title", CompareType: model.CompareRegExp, Value: `[xX]265`},
 		},
 		Enabled: true,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	engine := NewEngine(repo, nil)
 	result, err := engine.Match(context.Background(), &EvalContext{Title: "Movie x265"})
@@ -204,7 +208,7 @@ func TestEngine_MatchReject(t *testing.T) {
 
 func TestEngine_NoMatch(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
-	repo.Create(context.Background(), &model.FilterRule{
+	if err := repo.Create(context.Background(), &model.FilterRule{
 		Name:     "test",
 		RuleType: "accept",
 		Priority: 10,
@@ -212,7 +216,9 @@ func TestEngine_NoMatch(t *testing.T) {
 			{Key: "title", CompareType: model.CompareEquals, Value: "exact"},
 		},
 		Enabled: true,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	engine := NewEngine(repo, nil)
 	result, err := engine.Match(context.Background(), &EvalContext{Title: "other"})
@@ -226,20 +232,24 @@ func TestEngine_NoMatch(t *testing.T) {
 
 func TestEngine_RejectPriority(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
-	repo.Create(context.Background(), &model.FilterRule{
+	if err := repo.Create(context.Background(), &model.FilterRule{
 		Name: "reject-x265", RuleType: "reject", Priority: 5,
 		Conditions: []model.RuleCondition{
 			{Key: "title", CompareType: model.CompareContain, Value: "x265"},
 		},
 		Enabled: true,
-	})
-	repo.Create(context.Background(), &model.FilterRule{
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Create(context.Background(), &model.FilterRule{
 		Name: "accept-hd", RuleType: "accept", Priority: 10,
 		Conditions: []model.RuleCondition{
 			{Key: "title", CompareType: model.CompareContain, Value: "HD"},
 		},
 		Enabled: true,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	engine := NewEngine(repo, nil)
 	result, _ := engine.Match(context.Background(), &EvalContext{Title: "HD x265 Movie"})

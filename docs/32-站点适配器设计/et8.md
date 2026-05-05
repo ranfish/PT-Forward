@@ -15,6 +15,134 @@
 | NFO | 是 |
 | IMDb | 是 |
 
+## 上传表单
+
+**提交地址**: `takeupload.php`（POST multipart/form-data）
+
+> **ET8 为教育特色站**（TorrentCCF），所有字段名均为裸名（无 `[N]` 后缀）。`source_sel` 语义为**学科分类**而非来源媒介。分类 ID 为非标准编号（624-635）。
+
+### 基础字段
+
+| 字段名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `file` | file | 是 | 种子文件 |
+| `name` | text | 是 | 标题 |
+| `small_descr` | text | 否 | 副标题 |
+| `url` | text | 否 | IMDb 链接 |
+| `nfo` | file | 否 | NFO 文件 |
+| `descr` | textarea | 是 | 简介（BBCode） |
+| `type` | select | 是 | 分类 |
+| `uplver` | checkbox | 否 | 匿名发布 |
+
+### 分类 `type`（9 个，非标准 ID）
+
+| ID | 名称 |
+|----|------|
+| 624 | 纪录片 |
+| 628 | Elearning - 杂项学习 |
+| 629 | Elearning - 电子书/小说 |
+| 630 | Elearning - 电子书/非小说 |
+| 631 | Elearning - 杂志 |
+| 632 | Elearning - 漫画 |
+| 633 | Elearning - 有声书 |
+| 634 | Elearning - 公开课 |
+| 635 | Elearning - 视频教程 |
+
+> 9 个分类中 8 个为 Elearning 系列，仅 624 为纪录片。无电影/剧集/综艺等常规影视分类。
+
+### 学科分类 `source_sel`（14 个，语义=学科非来源媒介）
+
+| ID | 名称 |
+|----|------|
+| 1 | 信息技术 |
+| 2 | 自然科学 |
+| 3 | 社会科学 |
+| 4 | 哲学 |
+| 5 | 法律 |
+| 6 | 军事政治 |
+| 7 | 经济 |
+| 8 | 文体教育/少儿教育 |
+| 9 | 文体教育/非少儿教育 |
+| 10 | 语言文字 |
+| 11 | 文学艺术 |
+| 12 | 历史地理 |
+| 13 | 医学卫生 |
+| 14 | 其他 |
+
+### 媒介 `medium_sel`（17 个，含电子书格式）
+
+| ID | 名称 |
+|----|------|
+| 1 | BluRay |
+| 3 | HDRip |
+| 4 | DVDRip |
+| 5 | Remux |
+| 6 | HDTV |
+| 7 | DVDR |
+| 8 | Other |
+| 9 | WEB-DL |
+| 10 | UHD Bluray |
+| 11 | Encode |
+| 12 | PDF |
+| 13 | EPUB |
+| 14 | AZW3 |
+| 15 | MOBI |
+| 16 | TXT |
+| 17 | Pictures |
+
+### 编码 `codec_sel`
+
+| ID | 名称 |
+|----|------|
+| 1 | H.264 |
+| 2 | VC-1 |
+| 3 | Xvid |
+| 4 | MPEG-2 |
+| 5 | Other |
+| 6 | x265 |
+| 7 | x264 |
+| 8 | H265/HEVC |
+
+### 音频编码 `audiocodec_sel`
+
+| ID | 名称 |
+|----|------|
+| 1 | FLAC |
+| 2 | APE |
+| 3 | DTS |
+| 4 | AC3 |
+| 5 | MP3 |
+| 6 | AAC |
+| 7 | Other |
+| 8 | DTS-HD |
+| 9 | TrueHD |
+| 10 | LPCM |
+| 11 | WAV |
+
+### 分辨率 `standard_sel`（字段名非 resolution_sel）
+
+| ID | 名称 |
+|----|------|
+| 1 | 1080p |
+| 2 | 1080i |
+| 3 | 720p |
+| 4 | SD |
+| 5 | 2160/4K |
+
+### 制作组 `team_sel`
+
+| ID | 名称 |
+|----|------|
+| 1 | TorrentCCF/TCCF |
+| 2 | TLF |
+| 3 | BMDru |
+| 4 | CatEDU |
+| 5 | MADFOX |
+| 6 | 个人原创 |
+| 7 | 其他 |
+
+> ET8 所有质量字段均为裸名（`source_sel`/`medium_sel`/`codec_sel`/`audiocodec_sel`/`standard_sel`/`team_sel`），无 `[N]` 后缀。注意 `source_sel` 语义为学科分类而非来源媒介。
+
 ## Tracker URL
 `https://t.et8.org/announce.php`
 

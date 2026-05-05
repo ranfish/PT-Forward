@@ -22,7 +22,9 @@ func TestRegistry_Register(t *testing.T) {
 
 func TestRegistry_DuplicateRegister(t *testing.T) {
 	r := NewRegistry(zap.NewNop())
-	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+	if err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
 	err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
 	if err == nil {
 		t.Error("expected error for duplicate")
@@ -32,12 +34,16 @@ func TestRegistry_DuplicateRegister(t *testing.T) {
 func TestRegistry_Trigger(t *testing.T) {
 	r := NewRegistry(zap.NewNop())
 	called := 0
-	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error {
+	if err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error {
 		called++
 		return nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
-	r.Trigger(context.Background(), "test")
+	if err := r.Trigger(context.Background(), "test"); err != nil {
+		t.Fatal(err)
+	}
 	if called != 1 {
 		t.Errorf("expected 1 call, got %d", called)
 	}
@@ -58,8 +64,12 @@ func TestRegistry_TriggerNotFound(t *testing.T) {
 
 func TestRegistry_TriggerPaused(t *testing.T) {
 	r := NewRegistry(zap.NewNop())
-	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
-	r.Pause("test")
+	if err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Pause("test"); err != nil {
+		t.Fatal(err)
+	}
 
 	err := r.Trigger(context.Background(), "test")
 	if err == nil {
@@ -69,11 +79,13 @@ func TestRegistry_TriggerPaused(t *testing.T) {
 
 func TestRegistry_TriggerError(t *testing.T) {
 	r := NewRegistry(zap.NewNop())
-	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error {
+	if err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error {
 		return errors.New("fail")
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
-	r.Trigger(context.Background(), "test")
+	_ = r.Trigger(context.Background(), "test")
 
 	entry, _ := r.Get("test")
 	if entry.ErrorCount != 1 {
@@ -86,15 +98,21 @@ func TestRegistry_TriggerError(t *testing.T) {
 
 func TestRegistry_PauseResume(t *testing.T) {
 	r := NewRegistry(zap.NewNop())
-	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+	if err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
 
-	r.Pause("test")
+	if err := r.Pause("test"); err != nil {
+		t.Fatal(err)
+	}
 	entry, _ := r.Get("test")
 	if !entry.Paused {
 		t.Error("should be paused")
 	}
 
-	r.Resume("test")
+	if err := r.Resume("test"); err != nil {
+		t.Fatal(err)
+	}
 	entry, _ = r.Get("test")
 	if entry.Paused {
 		t.Error("should be resumed")
@@ -103,9 +121,13 @@ func TestRegistry_PauseResume(t *testing.T) {
 
 func TestRegistry_Unregister(t *testing.T) {
 	r := NewRegistry(zap.NewNop())
-	r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+	if err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
 
-	r.Unregister("test")
+	if err := r.Unregister("test"); err != nil {
+		t.Fatal(err)
+	}
 	if len(r.List()) != 0 {
 		t.Error("should have 0 tasks")
 	}
@@ -113,10 +135,16 @@ func TestRegistry_Unregister(t *testing.T) {
 
 func TestRegistry_PauseAll(t *testing.T) {
 	r := NewRegistry(zap.NewNop())
-	r.Register("t1", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
-	r.Register("t2", "rss", "*/5 * * * *", func(_ context.Context) error { return nil })
+	if err := r.Register("t1", "rss", "*/5 * * * *", func(_ context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Register("t2", "rss", "*/5 * * * *", func(_ context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
 
-	r.PauseAll()
+	if err := r.PauseAll(); err != nil {
+		t.Fatal(err)
+	}
 	for _, entry := range r.List() {
 		if !entry.Paused {
 			t.Errorf("task %s should be paused", entry.Name)
@@ -150,19 +178,29 @@ func TestRegistry_CronExecution(t *testing.T) {
 	r := NewRegistry(zap.NewNop())
 	called := make(chan struct{}, 1)
 
-	r.Register("fast", "test", "* * * * * *", func(_ context.Context) error {
+	if err := r.Register("fast", "test", "* * * * * *", func(_ context.Context) error {
 		select {
 		case called <- struct{}{}:
 		default:
 		}
 		return nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
-	r.Start(ctx)
-	defer r.Stop()
+	if err := r.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := r.Stop(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-	r.Trigger(ctx, "fast")
+	if err := r.Trigger(ctx, "fast"); err != nil {
+		t.Fatal(err)
+	}
 
 	select {
 	case <-called:

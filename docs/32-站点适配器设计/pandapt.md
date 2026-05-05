@@ -18,6 +18,42 @@
 | 认领系统 | 是（新种1天后可认领，3倍魔力） |
 | H&R | 手动模式（发布者自行决定是否勾选） |
 
+## 上传表单
+
+**提交地址**: `takeupload.php`（POST multipart/form-data）
+
+**双分类选择器**: 种子区（`browsecat`，data-mode=4）+ 特别区（`specialcat`，data-mode=5）
+
+**字段后缀**: `[4]`（种子区）/ `[5]`（特别区），由 `data-mode` 属性联动切换
+
+### 种子区字段（data-mode=4）
+
+| 字段 | name | 类型 | 必填 | 说明 |
+|------|------|------|------|------|
+| 种子文件 | `file` | file | 是 | |
+| 标题 | `name` | text | 否 | 不填使用种子文件名 |
+| 副标题 | `small_descr` | text | 否 | 自定义标签用[]包裹 |
+| TMDB链接 | `tmdb` | text | 否 | data-pt-gen="tmdb" |
+| IMDb链接 | `url` | text | 否 | data-pt-gen="url" |
+| 豆瓣ID/链接 | `pt_gen` | text | 否 | data-pt-gen="pt_gen"，有获取简介按钮 |
+| NFO文件 | `nfo` | file | 否 | |
+| 简介 | `descr` | textarea | 是 | BBCode |
+| MediaInfo | `technical_info` | textarea | 否 | |
+| 类型 | `type` | select | 是 | 双 select 联动（browsecat + specialcat） |
+| 媒介 | `medium_sel[4]` | select | 否 | |
+| 分辨率 | `standard_sel[4]` | select | 否 | 仅种子区 |
+| 编码 | `codec_sel[4]` | select | 否 | |
+| 音频编码 | `audiocodec_sel[4]` | select | 否 | |
+| 地区 | `source_sel[4]` | select | 否 | |
+| 制作组 | `team_sel[4]` | select | 否 | |
+| 标签 | `tags[4][]` | checkbox | 否 | 多选 |
+| 匿名发布 | `uplver` | checkbox | 否 | |
+
+> **注意**：
+> - 有独立 `tmdb` 字段（非标准 NexusPHP 字段）
+> - `pt_gen` 字段带自动获取简介按钮（data-pt-gen="pt_gen"）
+> - 种子区/特别区通过 `browsecat`/`specialcat` 双 select 联动，切换时 `data-mode` 变化导致所有质量字段后缀改变
+
 ## Tracker URL
 `https://tracker.pandapt.net/announce.php`
 

@@ -96,7 +96,7 @@ func TestAuthManager_Login_Lockout(t *testing.T) {
 	createAdminUser(t, db, "Admin@123")
 
 	for i := 0; i < 5; i++ {
-		mgr.Login(context.Background(), "admin", "wrong", "10.0.0.1")
+		_, _ = mgr.Login(context.Background(), "admin", "wrong", "10.0.0.1")
 	}
 
 	_, err := mgr.Login(context.Background(), "admin", "Admin@123", "10.0.0.1")
@@ -361,7 +361,7 @@ func TestAccessTokenClaims_MapClaims(t *testing.T) {
 func TestEvictOldestIfNeeded(t *testing.T) {
 	mgr, _ := newAuthManager(t)
 	for i := 0; i < 12; i++ {
-		mgr.IssueTokenPair()
+		_, _ = mgr.IssueTokenPair()
 	}
 	mgr.mu.RLock()
 	count := len(mgr.refreshTokens)

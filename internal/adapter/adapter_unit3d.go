@@ -436,6 +436,10 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 		"cat":          "category_id",
 		"source_sel":   "type_id",
 		"standard_sel": "resolution_id",
+		"category":     "category_id",
+		"source":       "type_id",
+		"resolution":   "resolution_id",
+		"codec":        "codec_id",
 	}
 	for srcType, targetName := range fieldMapping {
 		if v, ok := req.FormFields[srcType]; ok {
@@ -452,17 +456,23 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	if malID, ok := req.ExtraFields["mal_id"]; ok {
 		_ = writer.WriteField("mal_id", malID)
 	}
+	if tvdbID, ok := req.ExtraFields["tvdb_id"]; ok {
+		_ = writer.WriteField("tvdb_id", tvdbID)
+	}
+	if bgmID, ok := req.ExtraFields["bgm_id"]; ok {
+		_ = writer.WriteField("bgm_id", bgmID)
+	}
 
 	for k, v := range req.FormFields {
 		switch k {
-		case "cat", "source_sel", "standard_sel":
+		case "cat", "source_sel", "standard_sel", "category", "source", "resolution", "codec":
 			continue
 		}
 		_ = writer.WriteField(k, v)
 	}
 	for k, v := range req.ExtraFields {
 		switch k {
-		case "tmdb_id", "mal_id":
+		case "tmdb_id", "mal_id", "tvdb_id", "bgm_id":
 			continue
 		}
 		_ = writer.WriteField(k, v)

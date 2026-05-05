@@ -19,10 +19,12 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.RSSSubscription{},
 		&model.ClientConfig{},
-	)
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 

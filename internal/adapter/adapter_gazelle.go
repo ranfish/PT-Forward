@@ -319,6 +319,10 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 		"medium_sel":     "media",
 		"codec_sel":      "format",
 		"audiocodec_sel": "bitrate",
+		"category":       "releasetype",
+		"medium":         "media",
+		"codec":          "format",
+		"audioCodec":     "bitrate",
 	}
 	for srcType, targetName := range gazelleFields {
 		if v, ok := req.FormFields[srcType]; ok {

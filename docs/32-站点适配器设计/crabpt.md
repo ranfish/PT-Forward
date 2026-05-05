@@ -20,6 +20,155 @@
 | 货币 | 蟹币值（魔力值） |
 | 签到 | 2000 蟹币/天 |
 
+## 上传表单
+
+**提交地址**: `takeupload.php`（POST multipart/form-data）
+
+> **双 type select 体系**: 种子区 `browsecat`（data-mode=4）+ 特别区 `specialcat`（data-mode=6），质量字段名带 `[4]`/`[6]` 后缀区分 mode。adapter 需根据分类所属区域发送对应的 type select name。
+
+### 基础字段
+
+| 字段名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `file` | file | 是 | 种子文件 |
+| `name` | text | 是 | 标题（0DAY 英文规范） |
+| `small_descr` | text | 是 | 副标题 |
+| `url` | text | 条件 | IMDb 链接（电影电视剧必填） |
+| `nfo` | file | 否 | NFO 文件 |
+| `descr` | textarea | 是 | 简介（BBCode） |
+| `technical_info` | textarea | 条件 | MediaInfo（电影资源必须） |
+| `uplver` | checkbox | 否 | 匿名发布 |
+
+### 分类 — 种子区 `browsecat`（data-mode=4）
+
+| ID | 名称 |
+|----|------|
+| 401 | 电影 |
+| 402 | 电视剧 |
+| 403 | 综艺 |
+| 404 | 纪录片 |
+| 405 | 动漫 |
+| 406 | MV |
+| 407 | 体育 |
+| 408 | 音乐 |
+| 409 | 其他 |
+| 413 | 短剧 |
+
+### 分类 — 特别区 `specialcat`（data-mode=6）
+
+| ID | 名称 |
+|----|------|
+| 410 | 电子书 |
+| 411 | 有声书 |
+| 412 | 学习 |
+| 414 | 游戏 |
+| 415 | 漫画 |
+
+### 质量字段（mode=4 影视，`[4]` 后缀）
+
+**source_sel[4]**（替代 medium_sel）
+
+| ID | 名称 |
+|----|------|
+| 1 | Other |
+| 2 | BluRay |
+| 3 | UHD Blu-ray |
+| 4 | Remux |
+| 5 | Encode |
+| 6 | WEB-DL |
+| 7 | HDTV |
+| 8 | CD |
+| 9 | MVC |
+| 10 | ProRes |
+| 11 | Xvid |
+
+**standard_sel[4]**
+
+| ID | 名称 |
+|----|------|
+| 1 | Other |
+| 2 | 720p |
+| 3 | 1080p/1080i |
+| 4 | 4K/2160p |
+| 5 | 8K |
+
+**codec_sel[4]**
+
+| ID | 名称 |
+|----|------|
+| 1 | Other |
+| 2 | AVC/H.264/x264 |
+| 3 | HEVC/H.265/x265 |
+| 4 | H.266/VVC |
+| 5 | VP9 |
+| 6 | AV1 |
+| 14 | VC-1 |
+| 15 | MPEG |
+
+**audiocodec_sel[4]**
+
+| ID | 名称 |
+|----|------|
+| 1 | Other |
+| 2 | AAC |
+| 3 | DD/AC3 |
+| 4 | DDP/E-AC3 |
+| 5 | DTS |
+| 6 | TrueHD |
+| 7 | LPCM |
+| 8 | DTS:X |
+| 9 | MPEG |
+| 10 | FLAC |
+| 11 | WAV |
+| 12 | APE |
+| 15 | DTS-HD |
+| 16 | ALAC |
+| 17 | DTS-HD MA |
+| 21 | OGG |
+| 23 | DSD |
+| 24 | Opus |
+| 26 | Atmos |
+
+**team_sel[4]**
+
+| ID | 名称 |
+|----|------|
+| 1 | Other |
+| 2 | CHD |
+| 3 | HDS |
+| 4 | WiKi |
+| 5 | OurBits |
+| 6 | XHB |
+| 7 | FRDS |
+| 8 | HHWEB |
+| 9 | UBits |
+| 10 | Audiences |
+| 11 | DYZ-WEB |
+| 12 | DYZ-Movie |
+| 13 | DYZ-TV |
+| 15 | AGSVWEB |
+| 16 | ZmWeb |
+
+**processing_sel[4]**
+
+| ID | 名称 |
+|----|------|
+| 1 | 其他 |
+| 2 | 中国大陆 |
+| 3 | 港台 |
+| 4 | 欧美 |
+| 5 | 日本 |
+| 6 | 韩国 |
+| 7 | 印度 |
+
+### 标签 tags[4][]（checkbox 多选）
+
+**基础属性**: 禁转, 自购, DIY, 国语, 粤语, 中字, 完结, 分集, 特效字幕, HDR, Dolby Vision, Dolby Atmos, 合集大包, 未完结, 驻站, Audiences, AGSV
+
+**影视类型**: 剧情, 喜剧, 动作, 爱情, 科幻, 动画, 悬疑, 惊悚, 恐怖, 纪录片, 历史, 战争, 犯罪, 奇幻, 冒险, 灾难, 武侠
+
+> 详细标签 ID 映射见「标签」章节。
+
 ## Tracker URL
 
 `https://crabpt.vip/announce.php`

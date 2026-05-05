@@ -16,7 +16,9 @@ func setupManagerDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(&model.ClientConfig{}, &model.ClientPathMapping{})
+	if err := db.AutoMigrate(&model.ClientConfig{}, &model.ClientPathMapping{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 
@@ -102,7 +104,9 @@ func TestManager_Reload(t *testing.T) {
 		Enabled: true,
 	})
 
-	m.LoadClients(context.Background())
+	if err := m.LoadClients(context.Background()); err != nil {
+		t.Fatalf("LoadClients: %v", err)
+	}
 	if m.ConnectedCount() != 1 {
 		t.Errorf("expected 1, got %d", m.ConnectedCount())
 	}
@@ -129,7 +133,9 @@ func TestManager_GetByDBID(t *testing.T) {
 	}
 	db.Create(cfg)
 
-	m.LoadClients(context.Background())
+	if err := m.LoadClients(context.Background()); err != nil {
+		t.Fatalf("LoadClients: %v", err)
+	}
 
 	_, gotCfg, err := m.GetByDBID(context.Background(), cfg.ID)
 	if err != nil {

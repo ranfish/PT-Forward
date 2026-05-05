@@ -37,7 +37,7 @@
 | 龟站 | [kamept.md](./kamept.md) | ⛔ 不做支持（9KG/成人内容为主·双区域系统(种子区19+特别区8)·字段语义完全重定义(source_sel=马赛克类型/team_sel=中文字幕/medium_sel=原始语言/processing_sel=同人·官方)·无Tracker URL·KameGen工具·候选制·认领系统） |
 | 轨道炮 | [railgunpt.md](./railgunpt.md) | ✅ 完成（**仅目标站·只允许发布至种子区(mode=4)·禁止特别区(mode=5)**·14种子分类含下架视频备份(420)/漫画(419)/学习(411)·无官组·游戏类需候选·完整Dupe规则·10随机促销+2自动促销·认领1000种·全站Free限免中） |
 | 海胆 | [haidan.md](./haidan.md) | ✅ 完成（仅目标站·独立Tracker子域名·durl豆瓣链接·season/episode独立字段·team_suffix文本输入·tag_list[]字段名·540P分辨率·做种人数动态促销(1-7人免费)·魔力购买置顶/免费·禁止<200MB资源·电子书允许） |
-| 海豹 | [gpw.md](./gpw.md) | ⚠️ 仅规则记录（**GazellePW框架**·纯电影站(PTP模式)·**槽位制(25种可替代标记)**·禁止剧集/体育/MV·40+制作组黑名单·版本信息标签体系(3D/CC/MOC/HDR10+/DV/Atmos/DTS:X)·外挂字幕系统·SPA+MDX规则页面·分享率动态计算·做种积分公式） |
+| 海豹 | [gpw.md](./gpw.md) | ✅ 完成（**GazellePW框架**·纯电影站(PTP模式)·**槽位制(25种可替代标记)**·禁止剧集/体育/MV·40+制作组黑名单·版本信息标签体系(3D/CC/MOC/HDR10+/DV/Atmos/DTS:X)·外挂字幕系统·SPA+MDX规则页面·分享率动态计算·做种积分公式） |
 | 海棠 | [htpt.md](./htpt.md) | ⚠️ 仅规则记录（**戏曲类特色站·不适合做源站和发布站**·8戏曲分类(相声/评书/戏曲/鼓琴/小曲/小品/二人转/小剧种)·codec_sel含MP3/M4A·仅官组HTPT·标签拼音缩写(jz/gf/yq/gq/mp3/mp4/gc)·须转MP4/MP3格式(唱戏机)·新发100%免费7天后永久50%·官组禁转·禁止VIP付费内容） |
 | 海豚 | [dicmusic.md](./dicmusic.md) | ✅ 完成（**Gazelle框架·纯音乐**·15音乐分类·10媒介(字符串值)·6格式·12比特率·70流派标签·艺人+重要性系统·Log Checker·MQA严格禁止·GSC/SAE/SPGM/AIGM垃圾规则·SACD禁止ISO·WEB须购买截图·FLAC须lv8压缩·首种<2GB免惩·完整有损替代优先级链） |
 | 憨憨 | [hhanclub.md](./hhanclub.md) | ✅ 完成（**仅源站·全站官种**·盒子100%计量(黑种)·72h内上传限3倍·超速100MB/s封禁·6大云服务商封禁·H&R 20天/72h·5次警告封禁·消除需50万憨豆·制作组黑名单FGT/Hao4K/Mp4Ba/RARBG·禁止未完结分集·禁止AI插帧·禁止HDR+DV合并·音乐仅官组·标题0day命名·憨豆货币） |

@@ -208,7 +208,7 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	payload := map[string]interface{}{
 		"torrent":     base64.StdEncoding.EncodeToString(req.TorrentData),
 		"title":       req.Title,
-		"category":    req.FormFields["cat"],
+		"category":    resolveField(req.FormFields, "cat", "category"),
 		"description": req.Description,
 		"subtitle":    req.Subtitle,
 	}
@@ -241,8 +241,20 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	if req.IMDbLink != "" {
 		attributes["imdb"] = req.IMDbLink
 	}
+	if req.DoubanLink != "" {
+		attributes["douban"] = req.DoubanLink
+	}
+	if tmdb, ok := req.ExtraFields["tmdb_id"]; ok && tmdb != "" {
+		attributes["tmdb"] = tmdb
+	}
 	if len(attributes) > 0 {
 		payload["attributes"] = attributes
+	}
+
+	if len(req.Screenshots) > 0 {
+		images := make([]string, 0, len(req.Screenshots))
+		images = append(images, req.Screenshots...)
+		payload["images"] = images
 	}
 
 	bodyBytes, err := json.Marshal(payload)
@@ -302,4 +314,13 @@ func (a *RousiAdapter) GetTorrentInfoHash(ctx context.Context, config *model.Sit
 		return "", fmt.Errorf("未找到 info_hash")
 	}
 	return detail.InfoHash, nil
+}
+
+func resolveField(fields map[string]string, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := fields[k]; ok && v != "" {
+			return v
+		}
+	}
+	return ""
 }

@@ -51,8 +51,12 @@ func TestRepository_Delete(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Set(ctx, "to_delete", "value")
-	repo.Delete(ctx, "to_delete")
+	if err := repo.Set(ctx, "to_delete", "value"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Delete(ctx, "to_delete"); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := repo.Get(ctx, "to_delete")
 	if err == nil {
@@ -64,8 +68,12 @@ func TestRepository_Set_Overwrite(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Set(ctx, "key", "v1")
-	repo.Set(ctx, "key", "v2")
+	if err := repo.Set(ctx, "key", "v1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Set(ctx, "key", "v2"); err != nil {
+		t.Fatal(err)
+	}
 
 	val, _ := repo.Get(ctx, "key")
 	if val != "v2" {
@@ -77,9 +85,15 @@ func TestRepository_ListByPrefix(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Set(ctx, "app.name", "PT-Forward")
-	repo.Set(ctx, "app.version", "1.0")
-	repo.Set(ctx, "other.key", "value")
+	if err := repo.Set(ctx, "app.name", "PT-Forward"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Set(ctx, "app.version", "1.0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Set(ctx, "other.key", "value"); err != nil {
+		t.Fatal(err)
+	}
 
 	result, err := repo.ListByPrefix(ctx, "app.")
 	if err != nil {
@@ -100,8 +114,12 @@ func TestRepository_ListByPrefix_EmptyPrefix(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Set(ctx, "a", "1")
-	repo.Set(ctx, "b", "2")
+	if err := repo.Set(ctx, "a", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Set(ctx, "b", "2"); err != nil {
+		t.Fatal(err)
+	}
 
 	result, err := repo.ListByPrefix(ctx, "")
 	if err != nil {
@@ -116,8 +134,12 @@ func TestRepository_ListAll(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
 	ctx := context.Background()
 
-	repo.Set(ctx, "k1", "v1")
-	repo.Set(ctx, "k2", "v2")
+	if err := repo.Set(ctx, "k1", "v1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Set(ctx, "k2", "v2"); err != nil {
+		t.Fatal(err)
+	}
 
 	result, err := repo.ListAll(ctx)
 	if err != nil {

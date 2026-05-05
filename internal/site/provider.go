@@ -135,6 +135,14 @@ func (p *Provider) applyOverrides(ctx context.Context, siteName string, config *
 			config.RSS.IDStrategy = model.IDStrategy(o.FieldValue)
 		case "id_pattern":
 			config.RSS.IDPattern = o.FieldValue
+		case "paths.upload":
+			config.Paths.Upload = o.FieldValue
+		case "paths.takeupload":
+			config.Paths.TakeUpload = o.FieldValue
+		case "paths.browse":
+			config.Paths.Browse = o.FieldValue
+		case "paths.detail":
+			config.Paths.Detail = o.FieldValue
 		}
 	}
 }
@@ -277,10 +285,15 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		defs = adapter.FrameworkDefaults["generic"]
 	}
 
+	paths := defaultPaths(s.Framework)
+	pub := defaultPublishConfig(s.Framework)
+
 	return &model.SiteConfig{
 		SiteDefault: model.SiteDefault{
 			Domain:    s.Domain,
 			Framework: s.Framework,
+			Paths:     paths,
+			Publish:   pub,
 			RSS: model.SiteRSSConfig{
 				HashStrategy: model.HashStrategy(defs.HashStrategy),
 				SizeStrategy: model.SizeStrategy(defs.SizeStrategy),
@@ -303,5 +316,110 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 
 		ProxyURL:      s.ProxyURL,
 		SkipSSLVerify: s.SkipSSLVerify,
+	}
+}
+
+func defaultPaths(framework string) model.SitePathsConfig {
+	switch framework {
+	case "nexusphp":
+		return model.SitePathsConfig{
+			Browse:     "/browse.php",
+			Detail:     "/details.php",
+			Upload:     "/upload.php",
+			TakeUpload: "/takeupload.php",
+			RSS:        "/torrss.php",
+		}
+	case "unit3d":
+		return model.SitePathsConfig{
+			Browse: "/torrents",
+			Detail: "/torrents/{id}",
+			Upload: "/upload",
+			RSS:    "/rss",
+		}
+	case "gazelle":
+		return model.SitePathsConfig{
+			Browse: "/torrents.php",
+			Detail: "/torrents.php?torrentid={id}",
+			Upload: "/upload.php",
+			RSS:    "/feeds.php",
+		}
+	case "tnode":
+		return model.SitePathsConfig{
+			Browse: "/torrent/list",
+			Detail: "/torrent/info/{id}",
+			Upload: "/api/torrent/upload",
+			RSS:    "/rss",
+		}
+	case "mteam":
+		return model.SitePathsConfig{
+			Browse:     "/browse",
+			Detail:     "/detail/{id}",
+			Upload:     "/upload.php",
+			TakeUpload: "/upload_music.php",
+			RSS:        "/api/rss",
+		}
+	case "rousi":
+		return model.SitePathsConfig{
+			Browse: "/api/v1/torrents",
+			Detail: "/api/v1/torrents/{uuid}",
+			Upload: "/api/v1/torrents",
+			RSS:    "/rss",
+		}
+	default:
+		return model.SitePathsConfig{
+			Browse: "/browse.php",
+			Detail: "/details.php",
+			Upload: "/upload.php",
+			RSS:    "/rss",
+		}
+	}
+}
+
+func defaultPublishConfig(framework string) model.SitePublishFullConfig {
+	switch framework {
+	case "mteam":
+		return model.SitePublishFullConfig{
+			FormFields: map[string]string{
+				"category": "category",
+				"source":   "source",
+				"medium":   "medium",
+				"standard": "standard",
+				"codec":    "videoCodec",
+				"team":     "team",
+			},
+		}
+	case "unit3d":
+		return model.SitePublishFullConfig{
+			FormFields: map[string]string{
+				"category":   "category_id",
+				"resolution": "resolution_id",
+				"source":     "type_id",
+				"codec":      "codec_id",
+			},
+		}
+	case "nexusphp":
+		return model.SitePublishFullConfig{
+			FormFields: map[string]string{
+				"category":   "type",
+				"source":     "source_sel",
+				"resolution": "standard_sel",
+				"codec":      "codec_sel",
+				"medium":     "medium_sel",
+				"audioCodec": "audiocodec_sel",
+				"team":       "team_sel",
+				"processing": "processing_sel",
+			},
+		}
+	case "gazelle":
+		return model.SitePublishFullConfig{
+			FormFields: map[string]string{
+				"category":   "releasetype",
+				"medium":     "media",
+				"codec":      "format",
+				"audioCodec": "bitrate",
+			},
+		}
+	default:
+		return model.SitePublishFullConfig{}
 	}
 }

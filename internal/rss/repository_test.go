@@ -54,9 +54,13 @@ func TestRepository_SoftDelete(t *testing.T) {
 	ctx := context.Background()
 
 	sub := &model.RSSSubscription{Name: "del-sub", SiteName: "s", URLs: []string{"https://x.com/rss"}}
-	repo.Create(ctx, sub)
+	if err := repo.Create(ctx, sub); err != nil {
+		t.Fatal(err)
+	}
 
-	repo.Delete(ctx, sub.ID)
+	if err := repo.Delete(ctx, sub.ID); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := repo.GetByID(ctx, sub.ID)
 	if err == nil {
@@ -68,8 +72,12 @@ func TestRepository_List(t *testing.T) {
 	repo := NewRepository(setupRepoTestDB(t))
 	ctx := context.Background()
 
-	repo.Create(ctx, &model.RSSSubscription{Name: "b-sub", SiteName: "s1", URLs: []string{"https://x.com/rss"}})
-	repo.Create(ctx, &model.RSSSubscription{Name: "a-sub", SiteName: "s2", URLs: []string{"https://y.com/rss"}})
+	if err := repo.Create(ctx, &model.RSSSubscription{Name: "b-sub", SiteName: "s1", URLs: []string{"https://x.com/rss"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Create(ctx, &model.RSSSubscription{Name: "a-sub", SiteName: "s2", URLs: []string{"https://y.com/rss"}}); err != nil {
+		t.Fatal(err)
+	}
 
 	subs, err := repo.List(ctx)
 	if err != nil {
@@ -87,7 +95,9 @@ func TestRepository_ListActive(t *testing.T) {
 	repo := NewRepository(setupRepoTestDB(t))
 	ctx := context.Background()
 
-	repo.Create(ctx, &model.RSSSubscription{Name: "active", SiteName: "s", URLs: []string{"https://x.com/rss"}, Enabled: true, Paused: false})
+	if err := repo.Create(ctx, &model.RSSSubscription{Name: "active", SiteName: "s", URLs: []string{"https://x.com/rss"}, Enabled: true, Paused: false}); err != nil {
+		t.Fatal(err)
+	}
 
 	subs, err := repo.ListActive(ctx)
 	if err != nil {
@@ -105,7 +115,9 @@ func TestRepository_ExistsByName(t *testing.T) {
 	repo := NewRepository(setupRepoTestDB(t))
 	ctx := context.Background()
 
-	repo.Create(ctx, &model.RSSSubscription{Name: "unique", SiteName: "s", URLs: []string{"https://x.com/rss"}})
+	if err := repo.Create(ctx, &model.RSSSubscription{Name: "unique", SiteName: "s", URLs: []string{"https://x.com/rss"}}); err != nil {
+		t.Fatal(err)
+	}
 
 	exists, _ := repo.ExistsByName(ctx, "unique", 0)
 	if !exists {
@@ -152,9 +164,15 @@ func TestRepository_ListSeenBySite(t *testing.T) {
 	ctx := context.Background()
 
 	since := time.Now().Add(-time.Hour)
-	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "s1", TorrentID: "1", SubscriptionID: "1", Status: "seen"})
-	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "s1", TorrentID: "2", SubscriptionID: "1", Status: "seen"})
-	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "s2", TorrentID: "3", SubscriptionID: "1", Status: "seen"})
+	if err := repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "s1", TorrentID: "1", SubscriptionID: "1", Status: "seen"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "s1", TorrentID: "2", SubscriptionID: "1", Status: "seen"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "s2", TorrentID: "3", SubscriptionID: "1", Status: "seen"}); err != nil {
+		t.Fatal(err)
+	}
 
 	seen, err := repo.ListSeenBySite(ctx, "s1", since)
 	if err != nil {

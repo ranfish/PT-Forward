@@ -17,7 +17,7 @@ func TestInitLogger_JSON(t *testing.T) {
 	if logger == nil {
 		t.Fatal("logger should not be nil")
 	}
-	logger.Sync()
+	_ = logger.Sync()
 }
 
 func TestInitLogger_Console(t *testing.T) {
@@ -31,7 +31,7 @@ func TestInitLogger_Console(t *testing.T) {
 	if logger == nil {
 		t.Fatal("logger should not be nil")
 	}
-	logger.Sync()
+	_ = logger.Sync()
 }
 
 func TestInitLogger_InvalidLevel(t *testing.T) {
@@ -45,7 +45,7 @@ func TestInitLogger_InvalidLevel(t *testing.T) {
 	if logger == nil {
 		t.Fatal("should fallback to info level")
 	}
-	logger.Sync()
+	_ = logger.Sync()
 }
 
 func TestInitLogger_WithFile(t *testing.T) {
@@ -59,7 +59,7 @@ func TestInitLogger_WithFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	logger.Info("test message")
-	logger.Sync()
+	_ = logger.Sync()
 
 	logFile := filepath.Join(dir, "pt-forward.log")
 	if _, err := os.Stat(logFile); os.IsNotExist(err) {

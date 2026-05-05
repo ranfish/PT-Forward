@@ -20,7 +20,9 @@ func setupPTGenDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(&model.PTGenCache{})
+	if err := db.AutoMigrate(&model.PTGenCache{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 
@@ -67,7 +69,7 @@ func TestProvider_Query_RemoteSuccess(t *testing.T) {
 	p := NewProvider(db, zap.NewNop())
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"chinese_title": "测试电影",
 			"foreign_title": "Test Movie",
 			"year":          "2024",
@@ -82,7 +84,9 @@ func TestProvider_Query_RemoteSuccess(t *testing.T) {
 			"region":        []string{"中国大陆"},
 			"genre":         []string{"剧情"},
 			"director":      []string{"张三"},
-		})
+		}); err != nil {
+			t.Errorf("encode response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -130,11 +134,13 @@ func TestProvider_Query_CacheSaveAndReuse(t *testing.T) {
 	called := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called++
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"chinese_title": "缓存测试",
 			"poster":        "https://example.com/p.jpg",
 			"bbcode":        "[b]test[/b]",
-		})
+		}); err != nil {
+			t.Errorf("encode response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -201,7 +207,7 @@ func TestProvider_QueryEndpoint_Error(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal error"))
+		_, _ = w.Write([]byte("internal error"))
 	}))
 	defer server.Close()
 

@@ -152,8 +152,8 @@ func normalizeDomain(d string) string {
 }
 
 func DomainMatches(cookieDomain, target string) bool {
-	cd := strings.TrimPrefix(cookieDomain, ".")
-	td := strings.TrimPrefix(target, ".")
+	cd := normalizeDomain(cookieDomain)
+	td := normalizeDomain(target)
 	if cd == td || cd == strings.TrimPrefix(td, "www.") {
 		return true
 	}

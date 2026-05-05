@@ -48,25 +48,52 @@ func (a *MTeamAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 }
 
 func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-	u := resolveBaseURL(config) + "/api/torrent/download"
-	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader("id="+torrentID))
+	tokenURL := resolveBaseURL(config) + "/api/torrent/genDlToken"
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader("id="+torrentID))
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, fmt.Errorf("构造 genDlToken 请求失败: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	a.setAPIHeaders(req, config.APIKey)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("API 下载失败: %w", err)
+		return nil, fmt.Errorf("genDlToken 请求失败: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API 下载 HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("genDlToken HTTP %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
+	var tokenResp struct {
+		Data string `json:"data"`
+	}
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
+		return nil, fmt.Errorf("解析 genDlToken 响应失败: %w", err)
+	}
+	if tokenResp.Data == "" {
+		return nil, fmt.Errorf("genDlToken 返回空下载链接")
+	}
+
+	dlReq, err := http.NewRequestWithContext(ctx, "GET", tokenResp.Data, nil)
+	if err != nil {
+		return nil, fmt.Errorf("构造下载请求失败: %w", err)
+	}
+	a.setAPIHeaders(dlReq, config.APIKey)
+
+	dlResp, err := a.doer.Client.Do(dlReq)
+	if err != nil {
+		return nil, fmt.Errorf("下载种子失败: %w", err)
+	}
+	defer func() { _ = dlResp.Body.Close() }()
+
+	if dlResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("下载种子 HTTP %d", dlResp.StatusCode)
+	}
+
+	return io.ReadAll(dlResp.Body)
 }
 
 func (a *MTeamAdapter) downloadViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
@@ -400,6 +427,141 @@ func (a *MTeamAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		return nil, fmt.Errorf("种子文件数据为空")
 	}
 
+	if config.APIKey != "" {
+		return a.uploadViaAPI(ctx, config, req)
+	}
+	return a.uploadViaWeb(ctx, config, req)
+}
+
+func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+	baseURL := resolveBaseURL(config)
+	uploadURL := baseURL + "/api/torrent/createOredit"
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
+	if err != nil {
+		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+	}
+	if _, err := fileWriter.Write(req.TorrentData); err != nil {
+		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+	}
+
+	if req.Title != "" {
+		_ = writer.WriteField("name", req.Title)
+	}
+	if req.Subtitle != "" {
+		_ = writer.WriteField("smallDescr", req.Subtitle)
+	}
+	if req.Description != "" {
+		_ = writer.WriteField("descr", req.Description)
+	}
+	if req.Anonymous {
+		_ = writer.WriteField("anonymous", "true")
+	}
+	if req.IMDbLink != "" {
+		_ = writer.WriteField("imdb", req.IMDbLink)
+	}
+	if req.DoubanLink != "" {
+		_ = writer.WriteField("douban", req.DoubanLink)
+	}
+	if req.MediaInfo != "" {
+		_ = writer.WriteField("mediainfo", req.MediaInfo)
+	}
+
+	if v, ok := req.FormFields["category"]; ok {
+		_ = writer.WriteField("category", v)
+	}
+	if v, ok := req.FormFields["source"]; ok {
+		_ = writer.WriteField("source", v)
+	}
+	if v, ok := req.FormFields["medium"]; ok {
+		_ = writer.WriteField("medium", v)
+	}
+	if v, ok := req.FormFields["standard"]; ok {
+		_ = writer.WriteField("standard", v)
+	}
+	if v, ok := req.FormFields["videoCodec"]; ok {
+		_ = writer.WriteField("videoCodec", v)
+	}
+	if v, ok := req.FormFields["audioCodec"]; ok {
+		_ = writer.WriteField("audioCodec", v)
+	}
+	if v, ok := req.FormFields["team"]; ok {
+		_ = writer.WriteField("team", v)
+	}
+	if v, ok := req.FormFields["processing"]; ok {
+		_ = writer.WriteField("processing", v)
+	}
+
+	for k, v := range req.ExtraFields {
+		_ = writer.WriteField(k, v)
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
+	if err != nil {
+		return nil, fmt.Errorf("构造请求失败: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
+	a.setAPIHeaders(httpReq, config.APIKey)
+
+	resp, err := a.doer.Client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("上传请求失败: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode == http.StatusForbidden {
+		return &model.PublishResponse{Success: false, ErrorMessage: "403 Forbidden: API Key 无效或权限不足"}, nil
+	}
+
+	var apiResp struct {
+		Data struct {
+			ID interface{} `json:"id"`
+		} `json:"data"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &apiResp); err == nil {
+		if apiResp.Data.ID != nil {
+			torrentID := fmt.Sprintf("%v", apiResp.Data.ID)
+			return &model.PublishResponse{
+				Success:    true,
+				TorrentID:  torrentID,
+				DetailURL:  baseURL + "/detail/" + torrentID,
+				TargetSite: config.Domain,
+			}, nil
+		}
+		if apiResp.Message != "" {
+			return &model.PublishResponse{Success: false, ErrorMessage: apiResp.Message}, nil
+		}
+	}
+
+	html := string(body)
+	if idMatch := regexp.MustCompile(`(?:details|detail)\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
+		torrentID := idMatch[1]
+		return &model.PublishResponse{
+			Success:    true,
+			TorrentID:  torrentID,
+			DetailURL:  baseURL + "/details.php?id=" + torrentID,
+			TargetSite: config.Domain,
+		}, nil
+	}
+
+	if strings.Contains(html, "成功") || strings.Contains(html, "succeeded") {
+		return &model.PublishResponse{Success: true, TargetSite: config.Domain}, nil
+	}
+
+	return &model.PublishResponse{Success: false, ErrorMessage: fmt.Sprintf("上传失败: HTTP %d", resp.StatusCode)}, nil
+}
+
+func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	baseURL := resolveBaseURL(config)
 	uploadPath := "/upload.php"
 	if config.Paths.Upload != "" {

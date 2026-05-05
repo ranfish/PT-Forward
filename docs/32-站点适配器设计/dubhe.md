@@ -17,6 +17,32 @@
 | 认领系统 | 是（上限 1000） |
 | 小游戏 | 是（接流星/星际矿工/火星幸运局/星尘农场） |
 
+## 上传表单
+
+**提交地址**: `takeupload.php`（POST multipart/form-data）
+
+**字段模式**: `data-mode='4'`，所有质量字段使用 `[4]` 后缀
+
+| 字段 | name | 类型 | 必填 | 说明 |
+|------|------|------|------|------|
+| 种子文件 | `file` | file | 是 | |
+| 标题 | `name` | text | 是 | |
+| 副标题 | `small_descr` | text | 否 | |
+| IMDb链接 | `url` | text | 否 | |
+| NFO文件 | `nfo` | file | 否 | |
+| 种子售价 | `price` | number | 否 | 最大值 30，30% 税率 |
+| 简介 | `descr` | textarea | 是 | BBCode |
+| MediaInfo | `technical_info` | textarea | 否 | |
+| 类型 | `type` | select | 是 | data-mode='4' |
+| 媒介 | `medium_sel[4]` | select | 否 | |
+| 编码 | `codec_sel[4]` | select | 否 | |
+| 分辨率 | `standard_sel[4]` | select | 否 | |
+| 制作组 | `team_sel[4]` | select | 否 | |
+| 标签 | `tags[4][]` | checkbox | 否 | 多选 |
+| 匿名发布 | `uplver` | checkbox | 否 | |
+
+> **注意**：`price` 种子售价字段为非常规字段，最大值 30，发布时收取 30% 税率。
+
 ## Tracker URL
 `https://dubhe.site/announce.php`
 

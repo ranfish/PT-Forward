@@ -19,7 +19,9 @@ func setupIYUUDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(&model.IYUUConfig{}, &model.IYUUSiteMapping{})
+	if err := db.AutoMigrate(&model.IYUUConfig{}, &model.IYUUSiteMapping{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
 	return db
 }
 
@@ -44,7 +46,9 @@ func TestService_Ping_Success(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]any{"ret": 200, "msg": "ok", "data": []any{}})
+		if err := json.NewEncoder(w).Encode(map[string]any{"ret": 200, "msg": "ok", "data": []any{}}); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -69,7 +73,9 @@ func TestService_Ping_Error(t *testing.T) {
 	createTestConfig(t, db)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{"ret": 400, "msg": "token invalid"})
+		if err := json.NewEncoder(w).Encode(map[string]any{"ret": 400, "msg": "token invalid"}); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -86,7 +92,7 @@ func TestService_QueryReseed_Success(t *testing.T) {
 	createTestConfig(t, db)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"ret": 200,
 			"msg": "ok",
 			"data": map[string]any{
@@ -94,7 +100,9 @@ func TestService_QueryReseed_Success(t *testing.T) {
 					{"sid": 1, "torrent_id": 42, "info_hash": "def456"},
 				},
 			},
-		})
+		}); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -138,14 +146,16 @@ func TestService_GetSiteList_Success(t *testing.T) {
 	createTestConfig(t, db)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"ret": 200,
 			"msg": "ok",
 			"data": []map[string]any{
 				{"sid": 1, "nickname": "SiteA", "base_url": "https://sitea.com", "site": "sitea"},
 				{"sid": 2, "nickname": "SiteB", "base_url": "https://siteb.com", "site": "siteb"},
 			},
-		})
+		}); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -176,12 +186,16 @@ func TestService_ReportExisting(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req map[string]any
-		json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
 		sids, ok := req["sid"].([]any)
 		if !ok || len(sids) != 2 {
 			t.Errorf("expected 2 sids, got %v", req["sid"])
 		}
-		json.NewEncoder(w).Encode(map[string]any{"ret": 200, "msg": "ok"})
+		if err := json.NewEncoder(w).Encode(map[string]any{"ret": 200, "msg": "ok"}); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -207,7 +221,9 @@ func TestService_SendNotification(t *testing.T) {
 	createTestConfig(t, db)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{"ret": 200, "msg": "ok"})
+		if err := json.NewEncoder(w).Encode(map[string]any{"ret": 200, "msg": "ok"}); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -224,7 +240,7 @@ func TestService_GetSeededSites(t *testing.T) {
 	createTestConfig(t, db)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"ret": 200,
 			"msg": "ok",
 			"data": map[string]any{

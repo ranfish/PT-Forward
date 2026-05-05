@@ -17,6 +17,48 @@
 | PT-Gen | 是（外部工具，结果粘贴到简介） |
 | 种子检查脚本 | 是（Greasyfork: pterclub-torrent-checker v1.0.22） |
 
+## 上传表单
+
+**提交地址**: `takeupload.php`（POST multipart/form-data）
+
+**字段后缀**: 无（裸名，如 `source_sel` 而非 `source_sel[4]`）
+
+**极简质量字段**: 全站仅 `type`、`source_sel`、`team_sel` 三个下拉框
+
+| 字段 | name | 类型 | 必填 | 说明 |
+|------|------|------|------|------|
+| 引用ID | `referid` | text | 否 | 转载引用 |
+| 种子文件 | `file` | file | 是 | |
+| 标题 | `name` | text | 是 | 0DAY 英文命名规范 |
+| 副标题 | `small_descr` | text | 是 | 中文名 + 附加信息 |
+| IMDb链接 | `url` | text | 是（非华语区） | |
+| 豆瓣链接 | `douban` | text | 是 | 独立字段 |
+| 简介 | `descr` | textarea | 是 | BBCode（WYSIBB 编辑器） |
+| 类型 | `type` | select | 是 | |
+| 质量/来源 | `source_sel` | select | 是 | |
+| 地区 | `team_sel` | select | 是 | **字段名为 team_sel 但实际含义是地区** |
+| 禁转 | `jinzhuan` | checkbox | 否 | |
+| 官方 | `guanfang` | checkbox | 否 | **disabled**（仅管理员） |
+| 国语 | `guoyu` | checkbox | 否 | |
+| 粤语 | `yueyu` | checkbox | 否 | |
+| 中字 | `zhongzi` | checkbox | 否 | |
+| 英字 | `ensub` | checkbox | 否 | |
+| 应求 | `yingqiu` | checkbox | 否 | |
+| DIY原盘 | `diy` | checkbox | 否 | |
+| 原创 | `pr` | checkbox | 否 | |
+| 自购 | `bim` | checkbox | 否 | |
+| MV母盘 | `mp` | checkbox | 否 | |
+| 匿名发布 | `uplver` | checkbox | 否 | |
+| offer | `offer` | hidden | - | |
+| has_allowed_offer | `has_allowed_offer` | hidden | - | |
+
+> **注意**：
+> - `team_sel` 字段名为制作组但实际是**地区选择器**（大陆/香港/台湾/欧美/韩国/日本/印度/其它）
+> - 标签为独立 checkbox（非 `tags[]` 数组），每个标签有独立 name
+> - 无 `medium_sel`、`codec_sel`、`standard_sel`、`audiocodec_sel`，所有技术细节通过标题和简介中的 MediaInfo 表达
+> - 含隐藏字段 `offer` 和 `has_allowed_offer`
+> - `guanfang`（官方）checkbox 为 disabled，仅管理组可操作
+
 ## Tracker URL
 `https://tracker.pterclub.net/announce`
 

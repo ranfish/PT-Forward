@@ -18,14 +18,16 @@ func setupReseedDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.ReseedTask{},
 		&model.ReseedMatch{},
 		&model.ReseedNegativeCache{},
 		&model.ContentFingerprint{},
 		&model.SeedingTorrentRecord{},
 		&model.SearchCache{},
-	)
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 
@@ -58,7 +60,9 @@ func TestEngine_UpdateTask(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	task := &model.ReseedTask{Name: "up-task", Enabled: true, ClientIDs: "c1"}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	task.Enabled = false
 	task.Name = "updated"
@@ -80,7 +84,9 @@ func TestEngine_DeleteTask(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	task := &model.ReseedTask{Name: "del-task", Enabled: true, ClientIDs: "c1"}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	if err := e.DeleteTask(context.Background(), task.ID); err != nil {
 		t.Fatalf("delete: %v", err)
@@ -97,7 +103,9 @@ func TestEngine_RunTaskWithRecords(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	task := &model.ReseedTask{Name: "run-task", Enabled: true, ClientIDs: "c1"}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	db.Create(&model.SeedingTorrentRecord{
 		ClientID: "c1", InfoHash: "ih1", SiteName: "site1",
@@ -117,9 +125,15 @@ func TestEngine_RunEnabledTasks(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "enabled1", Enabled: true, ClientIDs: "c1"})
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "disabled", Enabled: false, ClientIDs: "c1"})
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "enabled2", Enabled: true, ClientIDs: "c2"})
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "enabled1", Enabled: true, ClientIDs: "c1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "disabled", Enabled: false, ClientIDs: "c1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "enabled2", Enabled: true, ClientIDs: "c2"}); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := e.RunEnabledTasks(context.Background()); err != nil {
 		t.Fatalf("run enabled: %v", err)
@@ -130,7 +144,9 @@ func TestEngine_MatchRetry(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "rt", Enabled: true})
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "rt", Enabled: true}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 	db.Create(&model.ReseedMatch{
 		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
@@ -313,8 +329,12 @@ func TestEngine_ListTasks(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "b-task", Enabled: true, ClientIDs: "c1"})
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "a-task", Enabled: true, ClientIDs: "c1"})
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "b-task", Enabled: true, ClientIDs: "c1"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "a-task", Enabled: true, ClientIDs: "c1"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	tasks, err := e.ListTasks(context.Background())
 	if err != nil {
@@ -362,7 +382,9 @@ func TestEngine_RunTask_EmptyClientIDs(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	task := &model.ReseedTask{Name: "empty-clients", Enabled: true, ClientIDs: ""}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	result, err := e.RunTask(context.Background(), task)
 	if err != nil {
@@ -381,7 +403,9 @@ func TestEngine_RunTask_SourceSiteFilter(t *testing.T) {
 		Name: "filtered", Enabled: true, ClientIDs: "c1",
 		SourceSiteIDs: "site1",
 	}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	db.Create(&model.SeedingTorrentRecord{
 		ClientID: "c1", InfoHash: "ih1", SiteName: "site1",
@@ -434,8 +458,12 @@ func TestEngine_StartStop(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "auto1", Enabled: true, ClientIDs: "c1"})
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "disabled", Enabled: false, ClientIDs: "c1"})
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "auto1", Enabled: true, ClientIDs: "c1"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "disabled", Enabled: false, ClientIDs: "c1"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	ctx := context.Background()
 	if err := e.Start(ctx); err != nil {
@@ -449,8 +477,12 @@ func TestEngine_RunEnabledTasks2(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "task1", Enabled: true, ClientIDs: "c1"})
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "task2", Enabled: true, ClientIDs: ""})
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "task1", Enabled: true, ClientIDs: "c1"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "task2", Enabled: true, ClientIDs: ""}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	err := e.RunEnabledTasks(context.Background())
 	if err != nil {
@@ -537,7 +569,9 @@ func TestEngine_RunTask_Canceled(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	task := &model.ReseedTask{Name: "cancel-test", Enabled: true, ClientIDs: "c1"}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	db.Create(&model.SeedingTorrentRecord{
 		ClientID: "c1", InfoHash: "ih1", SiteName: "site1",
@@ -605,8 +639,12 @@ func TestEngine_GetNegativeCacheByHashes(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	e.SetNegativeCache(context.Background(), "ih1", "site1", "reason1", "method1", 3, 24*time.Hour)
-	e.SetNegativeCache(context.Background(), "ih2", "site2", "reason2", "method2", 3, 24*time.Hour)
+	if err := e.SetNegativeCache(context.Background(), "ih1", "site1", "reason1", "method1", 3, 24*time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.SetNegativeCache(context.Background(), "ih2", "site2", "reason2", "method2", 3, 24*time.Hour); err != nil {
+		t.Fatal(err)
+	}
 
 	entries, err := e.GetNegativeCacheByHashes(context.Background(), []string{"ih1", "ih2"})
 	if err != nil {
@@ -919,7 +957,9 @@ func (m *mockIYUUService) SendNotification(ctx context.Context, text, desp strin
 func setupReseedDBWithIYUU(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := setupReseedDB(t)
-	db.AutoMigrate(&model.IYUUSiteMapping{})
+	if err := db.AutoMigrate(&model.IYUUSiteMapping{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
 	return db
 }
 
@@ -983,7 +1023,9 @@ func TestEngine_RunTask_DuplicateExists(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 	task := &model.ReseedTask{Name: "dup-task", Enabled: true, ClientIDs: "c1"}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	db.Create(&model.SeedingTorrentRecord{
 		ClientID: "c1", InfoHash: "ih_dup", SiteName: "site1",
@@ -1273,7 +1315,9 @@ func TestEngine_injectMatch_FailSiteInfo(t *testing.T) {
 	}
 	db.Create(match)
 	task := &model.ReseedTask{Name: "inj-fail", Enabled: true}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	err := e.injectMatch(context.Background(), match, task)
 	if err == nil {
@@ -1332,7 +1376,9 @@ func TestEngine_injectMatch_Success(t *testing.T) {
 	}
 	db.Create(match)
 	task := &model.ReseedTask{Name: "inj-ok", Enabled: true, ReseedCategory: "cross-seed"}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	err := e.injectMatch(context.Background(), match, task)
 	if err != nil {
@@ -1394,7 +1440,9 @@ func TestEngine_injectMatch_AlreadyExists(t *testing.T) {
 	}
 	db.Create(match)
 	task := &model.ReseedTask{Name: "inj-exists", Enabled: true}
-	e.CreateTask(context.Background(), task)
+	if err := e.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
 
 	err := e.injectMatch(context.Background(), match, task)
 	if err == nil {

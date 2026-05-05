@@ -17,6 +17,171 @@
 | 保种组 | 是（认领上限 2000） |
 | 新手考核 | 是 |
 
+## 上传表单
+
+**提交地址**: `takeupload.php`（POST multipart/form-data）
+
+> **HDSky 所有字段名均为裸名**（无 `[N]` 后缀）。拥有独立豆瓣链接字段 `url_douban`。标签系统使用 `option_sel[]` checkbox 数组（非 `tags`）。
+
+### 基础字段
+
+| 字段名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `file` | file | 是 | 种子文件 |
+| `name` | text | 是 | 标题 |
+| `small_descr` | text | 否 | 副标题 |
+| `url` | text | 否 | IMDb 链接 |
+| `url_douban` | text | 否 | 豆瓣链接（独立字段） |
+| `nfo` | file | 否 | NFO 文件 |
+| `descr` | textarea | 是 | 简介（BBCode） |
+| `type` | select | 是 | 分类 |
+| `uplver` | checkbox | 否 | 匿名发布 |
+
+### 分类 `type`（17 个）
+
+| ID | 名称 |
+|----|------|
+| 401 | Movies/电影 |
+| 402 | TV Series/剧集(分集) |
+| 403 | TV Shows/综艺 |
+| 404 | Documentaries/纪录片 |
+| 405 | Animations/动漫 |
+| 406 | Music Videos/音乐MV |
+| 407 | Sports/体育 |
+| 408 | HQ Audio/无损音乐 |
+| 409 | Misc/其他 |
+| 410 | iPad/iPad影视 |
+| 411 | TV Series/剧集(合集) |
+| 412 | TV Series/海外剧集(分集) |
+| 413 | TV Series/海外剧集(合集) |
+| 414 | TV Shows/海外综艺(分集) |
+| 415 | TV Shows/海外综艺(合集) |
+| 416 | Shortplay/短剧 |
+
+> 分类含海外拆分：海外剧集(412/413)和海外综艺(414/415)各分集/合集独立分类。短剧独立分类(416)。
+
+### 媒介 `medium_sel`（16 个）
+
+| ID | 名称 |
+|----|------|
+| 1 | Blu-ray |
+| 2 | HD DVD |
+| 3 | Remux |
+| 4 | MiniBD |
+| 5 | HDTV |
+| 6 | DVDR |
+| 7 | Encode |
+| 8 | CD |
+| 9 | Track |
+| 11 | WEB-DL |
+| 12 | Blu-ray/DIY |
+| 13 | UHD Blu-ray |
+| 14 | UHD Blu-ray/DIY |
+| 15 | SACD |
+| 16 | 3D Blu-ray |
+
+### 编码 `codec_sel`（13 个）
+
+| ID | 名称 |
+|----|------|
+| 1 | H.264/AVC |
+| 2 | VC-1 |
+| 3 | Xvid |
+| 4 | MPEG-2 |
+| 10 | x264 |
+| 11 | Other |
+| 12 | HEVC |
+| 13 | x265 |
+| 14 | MVC |
+| 15 | ProRes |
+| 16 | AV1 |
+| 17 | VP9 |
+
+> 区分 H.264/AVC(1) 与 x264(10)、HEVC(12) 与 x265(13)。
+
+### 音频编码 `audiocodec_sel`（23 个）
+
+| ID | 名称 |
+|----|------|
+| 1 | FLAC |
+| 2 | APE |
+| 3 | DTS |
+| 4 | MP3 |
+| 5 | OGG |
+| 6 | AAC |
+| 7 | Other |
+| 10 | DTS-HDMA |
+| 11 | TrueHD |
+| 12 | AC3/DD |
+| 13 | LPCM |
+| 14 | DTS-HD HR |
+| 15 | WAV |
+| 16 | DTS-HDMA:X 7.1 |
+| 17 | TrueHD Atmos |
+| 18 | DSD |
+| 19 | PCM |
+| 20 | E-AC3 |
+| 21 | DDP Atmos |
+| 22 | Opus |
+| 23 | ALAC |
+
+### 分辨率 `standard_sel`（6 个）
+
+| ID | 名称 |
+|----|------|
+| 1 | 2K/1080p |
+| 2 | 1080i |
+| 3 | 720p |
+| 4 | SD |
+| 5 | 4K/2160p |
+| 6 | 8K/4320P |
+
+### 制作组 `team_sel`（18 个）
+
+| ID | 名称 |
+|----|------|
+| 1 | HDS重编码/remux |
+| 6 | HDSky原盘DIY |
+| 9 | HDSTV电视录制 |
+| 18 | HDSPad移动视频 |
+| 22 | HDSCD无损音乐 |
+| 24 | Original自制 |
+| 25 | AREA11韩剧 |
+| 26 | Autoseed |
+| 27 | Other |
+| 28 | HDS3D |
+| 30 | BMDru |
+| 31 | HDSWEB |
+| 33 | Request |
+| 34 | HDSpecial |
+| 35 | HDSWEB合集 |
+| 36 | HDSAB有声书 |
+| 37 | HDSWEB补档 |
+
+> 制作组以站组为主（HDS/HDSky/HDSTV/HDSPad/HDSCD/HDS3D/HDSWEB/HDSAB），外部组仅 BMDru/AREA11。注意 HDSWEB 有三个不同用途 ID（31/35/37）。
+
+### 标签 `option_sel[]`（checkbox 多选）
+
+| ID | 名称 | 转发相关 |
+|----|------|---------|
+| 1 | 首发 | |
+| 2 | **禁转** | **全局禁转标记** |
+| 5 | 国语 | |
+| 6 | 中字 | |
+| 9 | HDR10 | |
+| 11 | 粤语 | |
+| 12 | 官组 | |
+| 13 | DIY | |
+| 14 | 自制 | |
+| 15 | Dolby Vision | |
+| 16 | HLG | |
+| 17 | HDR10+ | |
+| 18 | SL-HDR1 | |
+| 19 | 应求 | |
+| 20 | 特效 | |
+
+> 完整标签列表（含 Atmos/DTS-X/DoVi+HDR/限转/DIY纯净版/全景声国语/原生原盘/临境声国语/无广告/去头尾广告纯净版）见「标签 option_sel[]」章节。标签含禁转(2)和限转(25)可用于判断转载限制。
+
 ## Tracker URL
 `https://tracker.hdsky.me/announce.php`
 

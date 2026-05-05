@@ -1,4 +1,4 @@
-.PHONY: build run test vet lint clean reset-password docker frontend
+.PHONY: build run test vet lint clean reset-password docker frontend golangci-lint tidy fmt
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BINARY  := pt-forward
@@ -24,8 +24,8 @@ test:
 vet:
 	go vet ./...
 
-lint: vet
-	@echo "lint OK"
+lint:
+	golangci-lint run ./...
 
 clean:
 	rm -f $(BINARY)
@@ -37,8 +37,7 @@ reset-password: build-api
 docker:
 	docker build -t pt-forward:$(VERSION) .
 
-golangci-lint:
-	golangci-lint run ./...
+golangci-lint: lint
 
 tidy:
 	go mod tidy

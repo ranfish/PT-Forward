@@ -287,6 +287,10 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		"codec_sel":      "videoCoding",
 		"standard_sel":   "resolution",
 		"audiocodec_sel": "",
+		"category":       "category",
+		"medium":         "medium",
+		"codec":          "videoCoding",
+		"resolution":     "resolution",
 	}
 	for srcType, targetName := range fieldMapping {
 		if targetName == "" {
@@ -303,7 +307,8 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 
 	for k, v := range req.FormFields {
 		switch k {
-		case "cat", "medium_sel", "codec_sel", "standard_sel", "audiocodec_sel", "tags":
+		case "cat", "medium_sel", "codec_sel", "standard_sel", "audiocodec_sel", "tags",
+			"category", "medium", "codec", "resolution":
 			continue
 		}
 		_ = writer.WriteField(k, v)
