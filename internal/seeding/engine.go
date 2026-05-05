@@ -65,7 +65,7 @@ func (e *Engine) Stop(_ context.Context) error {
 	return nil
 }
 
-func (e *Engine) AddSeedingRecord(record *model.SeedingTorrentRecord) error {
+func (e *Engine) AddSeedingRecord(ctx context.Context, record *model.SeedingTorrentRecord) error {
 	if record.ClientID == "" || record.InfoHash == "" {
 		return &model.AppError{Code: 40001, Message: "client_id and info_hash are required"}
 	}
@@ -81,17 +81,17 @@ func (e *Engine) AddSeedingRecord(record *model.SeedingTorrentRecord) error {
 	e.mu.Unlock()
 
 	record.Status = model.SeedingStatusSeeding
-	return e.db.Create(record).Error
+	return e.db.WithContext(ctx).Create(record).Error
 }
 
-func (e *Engine) RemoveSeedingRecord(clientID, infoHash string) error {
+func (e *Engine) RemoveSeedingRecord(ctx context.Context, clientID, infoHash string) error {
 	key := recordKey(clientID, infoHash)
 
 	e.mu.Lock()
 	delete(e.recordMap, key)
 	e.mu.Unlock()
 
-	return e.db.Model(&model.SeedingTorrentRecord{}).
+	return e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
 		Where("client_id = ? AND info_hash = ?", clientID, infoHash).
 		Update("status", model.SeedingStatusDeleted).Error
 }
@@ -147,7 +147,7 @@ func (e *Engine) PauseForFreeEnd(ctx context.Context, clientID, infoHash string)
 	}
 	e.mu.Unlock()
 
-	return e.db.Model(&model.SeedingTorrentRecord{}).
+	return e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
 		Where("client_id = ? AND info_hash = ?", clientID, infoHash).
 		Updates(map[string]interface{}{
 			"status":         model.SeedingStatusPausedFreeEnd,
@@ -190,7 +190,7 @@ func (e *Engine) OnTorrents(ctx context.Context, events []model.TorrentEvent) er
 			record.HRSeedTimeH = ev.HRSeedTimeH
 		}
 
-		if err := e.AddSeedingRecord(record); err != nil {
+		if err := e.AddSeedingRecord(ctx, record); err != nil {
 			e.logger.Debug("skip adding seeding record (may already exist)",
 				zap.String("info_hash", ev.InfoHash),
 				zap.Error(err),
@@ -359,11 +359,13 @@ func (e *Engine) CollectTrafficStats(ctx context.Context) error {
 	for _, clientID := range clients {
 		dlClient, err := e.clientProvider.Get(clientID)
 		if err != nil {
+			e.logger.Debug("获取下载器失败，跳过", zap.String("clientID", clientID), zap.Error(err))
 			continue
 		}
 
 		md, err := dlClient.GetMainData(ctx)
 		if err != nil {
+			e.logger.Debug("获取下载器数据失败，跳过", zap.String("clientID", clientID), zap.Error(err))
 			continue
 		}
 
@@ -423,7 +425,7 @@ func (e *Engine) collectSiteTrafficDaily(ctx context.Context, clientID string, m
 			_ = e.db.WithContext(ctx).Create(entry).Error
 			siteTraffic[siteName] = entry
 		} else {
-			e.db.Model(&existing).Updates(map[string]interface{}{
+			e.db.WithContext(ctx).Model(&existing).Updates(map[string]interface{}{
 				"seeding_count": count,
 			})
 			siteTraffic[siteName] = &existing

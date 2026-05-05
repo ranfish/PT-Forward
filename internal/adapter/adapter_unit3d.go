@@ -138,7 +138,7 @@ func (a *Unit3DAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return nil, fmt.Errorf("403 Forbidden: 权限不足或 cookie 过期")
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 cookie 过期"}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
@@ -383,7 +383,7 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 		return nil, err
 	}
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	baseURL := resolveBase(config)
@@ -499,7 +499,7 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
-		return &model.PublishResponse{Success: false, ErrorMessage: "403 Forbidden: 权限不足或 CSRF token 过期"}, nil
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 CSRF token 过期"}
 	}
 
 	if idMatch := regexp.MustCompile(`/torrents/(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
@@ -523,7 +523,7 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 		errMsg = strings.TrimSpace(m[1])
 	}
 
-	return &model.PublishResponse{Success: false, ErrorMessage: errMsg}, nil
+	return nil, &model.AppError{Code: 15001, Message: errMsg}
 }
 
 func (a *Unit3DAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteConfig, pageURL string) (string, error) {

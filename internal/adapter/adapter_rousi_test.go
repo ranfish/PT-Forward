@@ -3,6 +3,7 @@ package adapter
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -574,15 +575,14 @@ func TestRousiAdapter_UploadTorrent_ApiError(t *testing.T) {
 		TorrentData: []byte("d4:infod6:lengthi0eee"),
 		Title:       "Dup",
 	})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error for API error")
 	}
-	if resp.Success {
-		t.Error("expected failure for API error")
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != 15001 {
+		t.Fatalf("expected AppError 15001, got %v", err)
 	}
-	if resp.ErrorMessage == "" {
-		t.Error("expected error message")
-	}
+	_ = resp
 }
 
 func TestRousiAdapter_UploadTorrent_NoData(t *testing.T) {

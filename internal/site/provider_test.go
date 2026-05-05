@@ -393,3 +393,48 @@ func TestSiteToConfig_PublishFormFields(t *testing.T) {
 		t.Errorf("mteam standard mapping: got %q", config.Publish.FormFields["standard"])
 	}
 }
+
+func TestSiteToConfig_BearerToken(t *testing.T) {
+	s := &model.Site{
+		Domain:      "test.com",
+		Framework:   "nexusphp",
+		BaseURL:     "https://test.com",
+		BearerToken: "bt-secret",
+		Passkey:     "pk1",
+	}
+	config := siteToConfig(s)
+
+	if config.BearerToken != "bt-secret" {
+		t.Errorf("BearerToken not propagated: got %q", config.BearerToken)
+	}
+	if config.Passkey != "pk1" {
+		t.Errorf("Passkey not propagated: got %q", config.Passkey)
+	}
+}
+
+func TestSiteToConfig_AuthConfig(t *testing.T) {
+	s := &model.Site{
+		Domain:       "test.com",
+		Framework:    "mteam",
+		BaseURL:      "https://test.com",
+		DownloadMode: "api",
+	}
+	config := siteToConfig(s)
+
+	if config.Auth.DownloadMode != "api" {
+		t.Errorf("Auth.DownloadMode not propagated: got %q", config.Auth.DownloadMode)
+	}
+}
+
+func TestSiteToConfig_AuthConfig_Default(t *testing.T) {
+	s := &model.Site{
+		Domain:    "test.com",
+		Framework: "nexusphp",
+		BaseURL:   "https://test.com",
+	}
+	config := siteToConfig(s)
+
+	if config.Auth.DownloadMode != "" {
+		t.Errorf("empty DownloadMode should remain empty, got %q", config.Auth.DownloadMode)
+	}
+}

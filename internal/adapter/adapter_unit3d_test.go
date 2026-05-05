@@ -3,6 +3,7 @@ package adapter
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -330,11 +331,15 @@ func TestUnit3D_UploadTorrent_Fail(t *testing.T) {
 	config := &model.SiteConfig{Domain: srv.URL}
 
 	result, err := a.UploadTorrent(context.Background(), config, &model.PublishRequest{TorrentData: []byte("data")})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error for upload failure")
 	}
-	if result.Success {
-		t.Error("expected failure")
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != 15001 {
+		t.Fatalf("expected AppError 15001, got %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil result")
 	}
 }
 

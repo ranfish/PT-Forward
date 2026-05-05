@@ -202,7 +202,7 @@ func (a *RousiAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteC
 
 func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	payload := map[string]interface{}{
@@ -285,15 +285,11 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %w", err)
+		return nil, &model.AppError{Code: 15001, Message: "解析响应失败", Cause: err}
 	}
 
 	if result.Code != 0 {
-		return &model.PublishResponse{
-			Success:      false,
-			ErrorMessage: fmt.Sprintf("API 错误(code=%d): %s", result.Code, result.Message),
-			TargetSite:   config.Domain,
-		}, nil
+		return nil, &model.AppError{Code: 15001, Message: fmt.Sprintf("API 错误(code=%d): %s", result.Code, result.Message)}
 	}
 
 	uuid := result.Data.UUID

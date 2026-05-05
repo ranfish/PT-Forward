@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -418,15 +419,14 @@ func TestTNodeAdapter_UploadTorrent_Duplicate(t *testing.T) {
 	resp, err := a.UploadTorrent(context.Background(), config, &model.PublishRequest{
 		TorrentData: []byte("d4:infod6:lengthi0eee"),
 	})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error for duplicate")
 	}
-	if resp.Success {
-		t.Error("expected failure for duplicate")
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != 14001 {
+		t.Fatalf("expected AppError 14001, got %v", err)
 	}
-	if !resp.IsExisting {
-		t.Error("expected IsExisting=true for duplicate")
-	}
+	_ = resp
 }
 
 func TestTNodeAdapter_UploadTorrent_HtmlSuccess(t *testing.T) {

@@ -147,8 +147,8 @@ func (p *Provider) applyOverrides(ctx context.Context, siteName string, config *
 	}
 }
 
-func (p *Provider) GetSiteDefault(_ context.Context, domain string) (*model.SiteDefault, error) {
-	site, err := p.repo.GetByDomain(context.Background(), domain)
+func (p *Provider) GetSiteDefault(ctx context.Context, domain string) (*model.SiteDefault, error) {
+	site, err := p.repo.GetByDomain(ctx, domain)
 	if err != nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
@@ -216,8 +216,8 @@ func (p *Provider) GetSiteInfoByURL(ctx context.Context, baseURL string) (*model
 	return siteToInfo(&site), nil
 }
 
-func (p *Provider) DetectFramework(_ context.Context, domain string) (*model.DetectResult, error) {
-	site, err := p.repo.GetByDomain(context.Background(), domain)
+func (p *Provider) DetectFramework(ctx context.Context, domain string) (*model.DetectResult, error) {
+	site, err := p.repo.GetByDomain(ctx, domain)
 	if err != nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
@@ -292,8 +292,11 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		SiteDefault: model.SiteDefault{
 			Domain:    s.Domain,
 			Framework: s.Framework,
-			Paths:     paths,
-			Publish:   pub,
+			Auth: model.SiteAuthConfig{
+				DownloadMode: s.DownloadMode,
+			},
+			Paths:   paths,
+			Publish: pub,
 			RSS: model.SiteRSSConfig{
 				HashStrategy: model.HashStrategy(defs.HashStrategy),
 				SizeStrategy: model.SizeStrategy(defs.SizeStrategy),
@@ -302,17 +305,18 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 				URLTemplate:  defs.DownloadURLTemplate,
 			},
 		},
-		Domain:   s.Domain,
-		Enabled:  s.Enabled,
-		IsSource: s.IsSource,
-		IsTarget: s.IsTarget,
-		Passkey:  s.Passkey,
-		Cookie:   s.Cookie,
-		APIKey:   s.APIKey,
-		AuthKey:  s.AuthKey,
-		AuthHash: s.AuthHash,
-		UserID:   s.UserID,
-		RSSKey:   s.RSSKey,
+		Domain:      s.Domain,
+		Enabled:     s.Enabled,
+		IsSource:    s.IsSource,
+		IsTarget:    s.IsTarget,
+		Passkey:     s.Passkey,
+		Cookie:      s.Cookie,
+		APIKey:      s.APIKey,
+		AuthKey:     s.AuthKey,
+		AuthHash:    s.AuthHash,
+		UserID:      s.UserID,
+		RSSKey:      s.RSSKey,
+		BearerToken: s.BearerToken,
 
 		ProxyURL:      s.ProxyURL,
 		SkipSSLVerify: s.SkipSSLVerify,
@@ -400,14 +404,20 @@ func defaultPublishConfig(framework string) model.SitePublishFullConfig {
 	case "nexusphp":
 		return model.SitePublishFullConfig{
 			FormFields: map[string]string{
-				"category":   "type",
-				"source":     "source_sel",
-				"resolution": "standard_sel",
-				"codec":      "codec_sel",
-				"medium":     "medium_sel",
-				"audioCodec": "audiocodec_sel",
-				"team":       "team_sel",
-				"processing": "processing_sel",
+				"category":      "type",
+				"source":        "source_sel",
+				"resolution":    "standard_sel",
+				"codec":         "codec_sel",
+				"audioCodec":    "audiocodec_sel",
+				"medium":        "medium_sel",
+				"team":          "team_sel",
+				"processing":    "processing_sel",
+				"music_artist":  "artists",
+				"music_album":   "album",
+				"music_year":    "year",
+				"music_format":  "format_type",
+				"music_medium":  "medium_type",
+				"music_publish": "publish_type",
 			},
 		}
 	case "gazelle":
@@ -417,6 +427,12 @@ func defaultPublishConfig(framework string) model.SitePublishFullConfig {
 				"medium":     "media",
 				"codec":      "format",
 				"audioCodec": "bitrate",
+			},
+		}
+	case "rousi":
+		return model.SitePublishFullConfig{
+			Description: model.SiteDescConfig{
+				Format: "markdown",
 			},
 		}
 	default:

@@ -78,7 +78,11 @@ func (e *Engine) Trigger(ctx context.Context, subID uint) error {
 		return &model.AppError{Code: 13003, Message: "订阅已禁用"}
 	}
 
-	go e.fetchOnce(context.Background(), sub)
+	fetchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	go func() {
+		defer cancel()
+		e.fetchOnce(fetchCtx, sub)
+	}()
 	return nil
 }
 

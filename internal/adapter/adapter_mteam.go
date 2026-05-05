@@ -424,7 +424,7 @@ func (a *MTeamAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, t
 
 func (a *MTeamAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	if config.APIKey != "" {
@@ -519,7 +519,7 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode == http.StatusForbidden {
-		return &model.PublishResponse{Success: false, ErrorMessage: "403 Forbidden: API Key 无效或权限不足"}, nil
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: API Key 无效或权限不足"}
 	}
 
 	var apiResp struct {
@@ -558,7 +558,7 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 		return &model.PublishResponse{Success: true, TargetSite: config.Domain}, nil
 	}
 
-	return &model.PublishResponse{Success: false, ErrorMessage: fmt.Sprintf("上传失败: HTTP %d", resp.StatusCode)}, nil
+	return nil, &model.AppError{Code: 15001, Message: fmt.Sprintf("上传失败: HTTP %d", resp.StatusCode)}
 }
 
 func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
@@ -620,7 +620,7 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
-		return &model.PublishResponse{Success: false, ErrorMessage: "403 Forbidden: 权限不足或 cookie 过期"}, nil
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 cookie 过期"}
 	}
 
 	if idMatch := regexp.MustCompile(`(?:details|detail)\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
@@ -642,7 +642,7 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 		errMsg = strings.TrimSpace(m[1])
 	}
 
-	return &model.PublishResponse{Success: false, ErrorMessage: errMsg}, nil
+	return nil, &model.AppError{Code: 15001, Message: errMsg}
 }
 
 func (a *MTeamAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
