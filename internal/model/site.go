@@ -294,33 +294,6 @@ type FrameworkDefaults struct {
 	DownloadURLTemplate string `json:"download_url_template"`
 }
 
-// §33.1.59f — SiteFormMapping: 表单字段名翻译映射
-type SiteFormMapping map[FormFieldKey]string
-
-// §33.1.59e — FormFieldKey: 发布表单标准字段枚举
-type FormFieldKey string
-
-const (
-	FieldTitle       FormFieldKey = "title"
-	FieldSubtitle    FormFieldKey = "subtitle"
-	FieldDescription FormFieldKey = "description"
-	FieldCategory    FormFieldKey = "category"
-	FieldType        FormFieldKey = "type"
-	FieldMedium      FormFieldKey = "medium"
-	FieldResolution  FormFieldKey = "resolution"
-	FieldVideo       FormFieldKey = "video"
-	FieldAudio       FormFieldKey = "audio"
-	FieldPoster      FormFieldKey = "poster"
-	FieldScreenshot  FormFieldKey = "screenshot"
-	FieldNFO         FormFieldKey = "nfo"
-	FieldAnonymous   FormFieldKey = "anonymous"
-	FieldSource      FormFieldKey = "source"
-	FieldTag         FormFieldKey = "tag"
-	FieldTeam        FormFieldKey = "team"
-	FieldBonusTrack  FormFieldKey = "bonus_track"
-	FieldTVEpisode   FormFieldKey = "tv_episode"
-)
-
 // §33.1.47 — PublishExclusion: 发布源站互斥
 type PublishExclusion struct {
 	ID         uint      `json:"id" gorm:"primaryKey;autoIncrement"`

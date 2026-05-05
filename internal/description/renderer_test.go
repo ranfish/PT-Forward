@@ -188,6 +188,14 @@ func TestFormatScreenshots(t *testing.T) {
 	}
 }
 
+func TestFormatScreenshots_Markdown(t *testing.T) {
+	r := NewRenderer("markdown")
+	result := r.FormatScreenshots([]string{"https://a.com/1.jpg"}, "markdown")
+	if !strings.Contains(result, "![](https://a.com/1.jpg)") {
+		t.Errorf("expected markdown screenshots, got %s", result)
+	}
+}
+
 func TestRenderer_Poster(t *testing.T) {
 	r := NewRenderer("bbcode")
 	data := &model.DescriptionData{PosterURL: "https://example.com/p.jpg"}

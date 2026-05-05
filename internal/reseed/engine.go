@@ -83,8 +83,7 @@ func (e *Engine) startTask(parentCtx context.Context, task *model.ReseedTask) {
 	}
 	ctx, cancel := context.WithCancel(parentCtx)
 	e.tasks[task.ID] = cancel
-	_ = ctx
-	e.db.Model(task).Updates(map[string]interface{}{
+	e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
 		"status":     model.ReseedTaskIdle,
 		"updated_at": time.Now(),
 	})
@@ -149,7 +148,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 	e.mu.Unlock()
 
 	start := time.Now()
-	e.db.Model(task).Updates(map[string]interface{}{
+	e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
 		"status":     model.ReseedTaskRunning,
 		"updated_at": start,
 	})
@@ -167,7 +166,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 		} else if result.Failed > 0 && result.Matched == 0 {
 			status = model.ReseedTaskFailed
 		}
-		e.db.Model(task).Updates(map[string]interface{}{
+		e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
 			"status":     status,
 			"updated_at": time.Now(),
 		})
@@ -463,11 +462,13 @@ func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAda
 		var err error
 		fp, err = e.fpRepo.GetByInfoHashAndSite(ctx, rec.InfoHash, rec.SiteName)
 		if err != nil {
+			e.logger.Debug("Layer2 指纹查询失败", zap.String("site", rec.SiteName), zap.String("info_hash", rec.InfoHash), zap.Error(err))
 			return nil
 		}
 	} else {
 		var fpModel model.ContentFingerprint
 		if err := e.db.WithContext(ctx).Where("info_hash = ? AND site_name = ?", rec.InfoHash, rec.SiteName).First(&fpModel).Error; err != nil {
+			e.logger.Debug("Layer2 DB查询失败", zap.String("site", rec.SiteName), zap.String("info_hash", rec.InfoHash), zap.Error(err))
 			return nil
 		}
 		fp = &fpModel
@@ -523,6 +524,7 @@ func (e *Engine) matchLayer3Fingerprint(ctx context.Context, rec model.SeedingTo
 		var err error
 		sourceFP, err = e.fpRepo.GetByInfoHashAndSite(ctx, rec.InfoHash, rec.SiteName)
 		if err != nil {
+			e.logger.Debug("Layer3 源指纹查询失败", zap.String("site", rec.SiteName), zap.String("info_hash", rec.InfoHash), zap.Error(err))
 			return nil
 		}
 	} else {
@@ -530,6 +532,7 @@ func (e *Engine) matchLayer3Fingerprint(ctx context.Context, rec model.SeedingTo
 		if err := e.db.WithContext(ctx).
 			Where("info_hash = ? AND site_name = ?", rec.InfoHash, rec.SiteName).
 			First(&fp).Error; err != nil {
+			e.logger.Debug("Layer3 源指纹DB查询失败", zap.String("site", rec.SiteName), zap.String("info_hash", rec.InfoHash), zap.Error(err))
 			return nil
 		}
 		sourceFP = &fp
@@ -543,6 +546,7 @@ func (e *Engine) matchLayer3Fingerprint(ctx context.Context, rec model.SeedingTo
 	if e.fpRepo != nil {
 		candidates, err := e.fpRepo.FindCandidatesBySite(ctx, siteName, rec.InfoHash, sourceFP.PiecesHash, sourceFP.TotalSize, 10)
 		if err != nil {
+			e.logger.Debug("Layer3 候选查询失败", zap.String("site", siteName), zap.Error(err))
 			return nil
 		}
 		targetFPs = candidates
@@ -821,34 +825,34 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		return fmt.Errorf("site provider or client provider not configured")
 	}
 
-	e.db.Model(match).Updates(map[string]interface{}{
+	e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
 		"status":     model.MatchStatusInjecting,
 		"updated_at": time.Now(),
 	})
 
 	targetSiteInfo, err := e.siteProvider.GetSiteInfo(ctx, match.TargetSite)
 	if err != nil {
-		return e.failMatch(match, fmt.Sprintf("获取目标站信息失败: %v", err))
+		return e.failMatch(ctx, match, fmt.Sprintf("获取目标站信息失败: %v", err))
 	}
 
 	targetConfig, err := e.siteProvider.GetSiteConfig(ctx, targetSiteInfo.BaseURL)
 	if err != nil {
-		return e.failMatch(match, fmt.Sprintf("获取目标站配置失败: %v", err))
+		return e.failMatch(ctx, match, fmt.Sprintf("获取目标站配置失败: %v", err))
 	}
 
 	targetAdapter, err := e.siteProvider.GetAdapter(ctx, targetSiteInfo.BaseURL)
 	if err != nil {
-		return e.failMatch(match, fmt.Sprintf("获取目标站适配器失败: %v", err))
+		return e.failMatch(ctx, match, fmt.Sprintf("获取目标站适配器失败: %v", err))
 	}
 
 	torrentData, err := targetAdapter.DownloadTorrent(ctx, targetConfig, match.TargetTorrentID)
 	if err != nil {
-		return e.failMatch(match, fmt.Sprintf("下载目标种子失败: %v", err))
+		return e.failMatch(ctx, match, fmt.Sprintf("下载目标种子失败: %v", err))
 	}
 
 	dlClient, err := e.clientProvider.Get(match.ClientID)
 	if err != nil {
-		return e.failMatch(match, fmt.Sprintf("获取下载器客户端失败: %v", err))
+		return e.failMatch(ctx, match, fmt.Sprintf("获取下载器客户端失败: %v", err))
 	}
 
 	opts := model.AddTorrentOptions{
@@ -859,18 +863,18 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 
 	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)
 	if err != nil {
-		return e.failMatch(match, fmt.Sprintf("注入种子到下载器失败: %v", err))
+		return e.failMatch(ctx, match, fmt.Sprintf("注入种子到下载器失败: %v", err))
 	}
 
 	if addResult != nil && addResult.InfoHash != "" {
 		exists, _ := dlClient.CheckExists(ctx, addResult.InfoHash)
 		if exists {
-			return e.failMatch(match, "种子已存在于下载器中")
+			return e.failMatch(ctx, match, "种子已存在于下载器中")
 		}
 	}
 
 	now := time.Now()
-	return e.db.Model(match).Updates(map[string]interface{}{
+	return e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
 		"status":           model.MatchStatusInjected,
 		"target_info_hash": addResult.InfoHash,
 		"injected_at":      &now,
@@ -878,7 +882,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	}).Error
 }
 
-func (e *Engine) failMatch(match *model.ReseedMatch, reason string) error {
+func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason string) error {
 	match.RetryCount++
 	match.FailReason = reason
 
@@ -890,7 +894,7 @@ func (e *Engine) failMatch(match *model.ReseedMatch, reason string) error {
 		decisionType = model.DecisionBlockedRelease
 	}
 
-	e.db.Model(match).Updates(map[string]interface{}{
+	e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
 		"status":        model.MatchStatusFailed,
 		"decision_type": string(decisionType),
 		"fail_reason":   reason,

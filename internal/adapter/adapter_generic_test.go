@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -309,11 +310,15 @@ func TestGenericAdapter_UploadTorrent_ServerError(t *testing.T) {
 
 	req := &model.PublishRequest{TorrentData: []byte("d4:infod...e")}
 	result, err := a.UploadTorrent(context.Background(), config, req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error for 500")
 	}
-	if result.Success {
-		t.Error("expected Success=false for 500")
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != 15001 {
+		t.Fatalf("expected AppError 15001, got %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil result")
 	}
 }
 
@@ -331,14 +336,15 @@ func TestGenericAdapter_UploadTorrent_Forbidden(t *testing.T) {
 
 	req := &model.PublishRequest{TorrentData: []byte("d4:infod...e")}
 	result, err := a.UploadTorrent(context.Background(), config, req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error for 403")
 	}
-	if result.Success {
-		t.Error("expected Success=false for 403")
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != 14003 {
+		t.Fatalf("expected AppError 14003, got %v", err)
 	}
-	if result.ErrorMessage == "" {
-		t.Error("expected error message for 403")
+	if result != nil {
+		t.Error("expected nil result")
 	}
 }
 
@@ -393,12 +399,14 @@ func TestGenericAdapter_UploadTorrent_Duplicate(t *testing.T) {
 
 	req := &model.PublishRequest{TorrentData: []byte("d4:infod...e")}
 	result, err := a.UploadTorrent(context.Background(), config, req)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error for duplicate")
 	}
-	if result.Success {
-		t.Error("expected Success=false for duplicate")
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != 15001 {
+		t.Fatalf("expected AppError 15001, got %v", err)
 	}
+	_ = result
 }
 
 func TestGenericAdapter_DownloadTorrent_NotFound(t *testing.T) {

@@ -23,6 +23,11 @@ type SiteFormConfig struct {
 	ProcessingSel []SelectOption
 	SourceSel     []SelectOption
 	Tags          []SelectOption
+
+	MusicFormatSel  []SelectOption
+	MusicMediumSel  []SelectOption
+	MusicPublishSel []SelectOption
+	MusicTags       []SelectOption
 }
 
 type SiteSeedData struct {
@@ -31,6 +36,7 @@ type SiteSeedData struct {
 	BaseURL            string
 	Framework          string
 	AuthType           string
+	DownloadMode       string
 	IsSource           bool
 	IsTarget           bool
 	CookieCloudDomain  string
@@ -319,11 +325,14 @@ var seedSites = []SiteSeedData{
 		Domain: "audiences.me", Name: "人人", BaseURL: "https://audiences.me",
 		Framework: "nexusphp", IsSource: true, IsTarget: true,
 		Form: SiteFormConfig{
-			Category:    []SelectOption{{"401", "电影"}, {"402", "剧集"}, {"403", "综艺"}, {"406", "纪录片"}, {"408", "音乐"}, {"404", "有声书"}, {"405", "电子书"}, {"407", "体育"}, {"410", "游戏"}, {"412", "学习"}, {"409", "其他"}},
-			MediumSel:   []SelectOption{{"12", "UHD Blu-ray 原盘"}, {"13", "UHD Blu-ray DIY"}, {"1", "Blu-ray 原盘"}, {"14", "Blu-ray DIY"}, {"3", "REMUX"}, {"15", "Encode"}, {"5", "HDTV"}, {"10", "WEB-DL"}, {"2", "DVD 原盘"}, {"8", "CD"}, {"9", "Track"}, {"11", "Other"}},
-			CodecSel:    []SelectOption{{"6", "H.265(HEVC)"}, {"1", "H.264(AVC)"}, {"2", "VC-1"}, {"4", "MPEG-2"}, {"7", "AV1"}, {"5", "Other"}},
-			StandardSel: []SelectOption{{"10", "8K"}, {"5", "4K"}, {"1", "1080p"}, {"2", "1080i"}, {"3", "720p"}, {"4", "SD"}, {"11", "None"}},
-			AudioCodec:  []SelectOption{{"25", "DTS:X"}, {"26", "TrueHD Atmos"}, {"19", "DTS-HD MA"}, {"20", "TrueHD"}, {"21", "LPCM"}, {"3", "DTS"}, {"18", "DD/AC3"}, {"27", "OPUS"}, {"6", "AAC"}, {"1", "FLAC"}, {"2", "APE"}, {"22", "WAV"}, {"23", "MP3"}, {"24", "M4A"}, {"7", "Other"}},
+			Category:        []SelectOption{{"401", "电影"}, {"402", "剧集"}, {"403", "综艺"}, {"406", "纪录片"}, {"408", "音乐"}, {"404", "有声书"}, {"405", "电子书"}, {"407", "体育"}, {"410", "游戏"}, {"412", "学习"}, {"409", "其他"}},
+			MediumSel:       []SelectOption{{"12", "UHD Blu-ray 原盘"}, {"13", "UHD Blu-ray DIY"}, {"1", "Blu-ray 原盘"}, {"14", "Blu-ray DIY"}, {"3", "REMUX"}, {"15", "Encode"}, {"5", "HDTV"}, {"10", "WEB-DL"}, {"2", "DVD 原盘"}, {"8", "CD"}, {"9", "Track"}, {"11", "Other"}},
+			CodecSel:        []SelectOption{{"6", "H.265(HEVC)"}, {"1", "H.264(AVC)"}, {"2", "VC-1"}, {"4", "MPEG-2"}, {"7", "AV1"}, {"5", "Other"}},
+			StandardSel:     []SelectOption{{"10", "8K"}, {"5", "4K"}, {"1", "1080p"}, {"2", "1080i"}, {"3", "720p"}, {"4", "SD"}, {"11", "None"}},
+			AudioCodec:      []SelectOption{{"25", "DTS:X"}, {"26", "TrueHD Atmos"}, {"19", "DTS-HD MA"}, {"20", "TrueHD"}, {"21", "LPCM"}, {"3", "DTS"}, {"18", "DD/AC3"}, {"27", "OPUS"}, {"6", "AAC"}, {"1", "FLAC"}, {"2", "APE"}, {"22", "WAV"}, {"23", "MP3"}, {"24", "M4A"}, {"7", "Other"}},
+			MusicFormatSel:  []SelectOption{{"1", "FLAC分轨"}, {"2", "WAV整轨"}, {"3", "DSD"}, {"400", "ISO"}},
+			MusicMediumSel:  []SelectOption{{"1", "CD"}, {"2", "DVD"}, {"3", "黑胶"}, {"4", "WEB"}, {"5", "未知媒介"}, {"6", "SACD"}, {"7", "Blu-ray"}},
+			MusicPublishSel: []SelectOption{{"1", "专辑"}, {"2", "EP"}, {"3", "单曲"}, {"4", "精选"}, {"5", "集锦"}, {"6", "音乐会"}, {"7", "重混"}, {"8", "原声"}},
 		},
 	},
 	{
@@ -781,12 +790,15 @@ var seedSites = []SiteSeedData{
 		Domain: "pthome.net", Name: "铂金家", BaseURL: "https://pthome.net",
 		Framework: "nexusphp", IsSource: true, IsTarget: true,
 		Form: SiteFormConfig{
-			Category:    []SelectOption{{"401", "电影"}, {"404", "纪录片"}, {"405", "动漫"}, {"402", "电视剧"}, {"403", "综艺"}, {"407", "体育"}, {"408", "音乐"}, {"410", "游戏"}, {"411", "软件"}, {"412", "学习"}, {"409", "其他"}},
-			MediumSel:   []SelectOption{{"12", "UHD Blu-ray"}, {"13", "UHD Blu-ray/DIY"}, {"1", "Blu-ray(原盘)"}, {"14", "Blu-ray/DIY"}, {"3", "REMUX"}, {"5", "HDTV"}, {"15", "encode"}, {"10", "WEB-DL"}, {"2", "DVD(原盘)"}, {"8", "CD"}, {"9", "Track"}, {"11", "Other"}},
-			CodecSel:    []SelectOption{{"6", "H.265(HEVC)"}, {"1", "H.264(AVC)"}, {"2", "VC-1"}, {"4", "MPEG-2"}, {"5", "Other"}},
-			StandardSel: []SelectOption{{"10", "8K"}, {"5", "4K"}, {"1", "1080p"}, {"2", "1080i"}, {"3", "720p"}, {"4", "SD"}, {"11", "None"}},
-			AudioCodec:  []SelectOption{{"19", "DTS-HD MA"}, {"20", "TrueHD"}, {"21", "LPCM"}, {"3", "DTS"}, {"18", "DD/AC3"}, {"6", "AAC"}, {"1", "FLAC"}, {"2", "APE"}, {"22", "WAV"}, {"23", "MP3"}, {"24", "M4A"}, {"7", "Other"}},
-			TeamSel:     []SelectOption{{"19", "PTHome"}, {"21", "PTH"}, {"20", "PTHweb"}, {"22", "PTHtv"}, {"23", "PTHAudio"}, {"24", "PTHeBook"}, {"25", "PTHmusic"}, {"5", "Other"}},
+			Category:        []SelectOption{{"401", "电影"}, {"404", "纪录片"}, {"405", "动漫"}, {"402", "电视剧"}, {"403", "综艺"}, {"407", "体育"}, {"408", "音乐"}, {"410", "游戏"}, {"411", "软件"}, {"412", "学习"}, {"409", "其他"}},
+			MediumSel:       []SelectOption{{"12", "UHD Blu-ray"}, {"13", "UHD Blu-ray/DIY"}, {"1", "Blu-ray(原盘)"}, {"14", "Blu-ray/DIY"}, {"3", "REMUX"}, {"5", "HDTV"}, {"15", "encode"}, {"10", "WEB-DL"}, {"2", "DVD(原盘)"}, {"8", "CD"}, {"9", "Track"}, {"11", "Other"}},
+			CodecSel:        []SelectOption{{"6", "H.265(HEVC)"}, {"1", "H.264(AVC)"}, {"2", "VC-1"}, {"4", "MPEG-2"}, {"5", "Other"}},
+			StandardSel:     []SelectOption{{"10", "8K"}, {"5", "4K"}, {"1", "1080p"}, {"2", "1080i"}, {"3", "720p"}, {"4", "SD"}, {"11", "None"}},
+			AudioCodec:      []SelectOption{{"19", "DTS-HD MA"}, {"20", "TrueHD"}, {"21", "LPCM"}, {"3", "DTS"}, {"18", "DD/AC3"}, {"6", "AAC"}, {"1", "FLAC"}, {"2", "APE"}, {"22", "WAV"}, {"23", "MP3"}, {"24", "M4A"}, {"7", "Other"}},
+			TeamSel:         []SelectOption{{"19", "PTHome"}, {"21", "PTH"}, {"20", "PTHweb"}, {"22", "PTHtv"}, {"23", "PTHAudio"}, {"24", "PTHeBook"}, {"25", "PTHmusic"}, {"5", "Other"}},
+			MusicFormatSel:  []SelectOption{{"1", "FLAC分轨"}, {"2", "WAV整轨"}, {"3", "DSD"}, {"400", "ISO"}},
+			MusicMediumSel:  []SelectOption{{"1", "CD"}, {"2", "DVD"}, {"3", "黑胶"}, {"4", "WEB"}, {"5", "未知媒介"}, {"6", "SACD"}, {"7", "Blu-ray"}},
+			MusicPublishSel: []SelectOption{{"1", "专辑"}, {"2", "EP"}, {"3", "单曲"}, {"4", "精选"}, {"5", "集锦"}, {"6", "音乐会"}, {"7", "重混"}, {"8", "原声"}},
 		},
 	},
 	{
@@ -1135,7 +1147,7 @@ var seedSites = []SiteSeedData{
 	},
 	{
 		Domain: "rousi.pro", Name: "肉丝", BaseURL: "https://rousi.pro",
-		Framework: "rousi", AuthType: "passkey", IsSource: true, IsTarget: true,
+		Framework: "rousi", AuthType: "passkey", DownloadMode: "passkey", IsSource: true, IsTarget: true,
 		Form: SiteFormConfig{
 			Category: []SelectOption{
 				{"movie", "电影"}, {"tv", "电视剧"}, {"documentary", "纪录片"},
@@ -1645,7 +1657,7 @@ var seedSites = []SiteSeedData{
 	},
 	{
 		Domain: "api.m-team.cc", Name: "馒头", BaseURL: "https://api.m-team.cc",
-		Framework: "mteam", AuthType: "apikey", IsSource: true, IsTarget: true,
+		Framework: "mteam", AuthType: "apikey", DownloadMode: "api", IsSource: true, IsTarget: true,
 		CookieCloudDomain:  "m-team.cc",
 		AlternativeDomains: `["m-team.cc","kp.m-team.cc"]`,
 		Form: SiteFormConfig{
@@ -1726,7 +1738,7 @@ func SeedSites(db *gorm.DB) error {
 			SizeStrategy:        defs.SizeStrategy,
 			IDStrategy:          defs.IDStrategy,
 			IDPattern:           defs.IDPattern,
-			DownloadMode:        "template",
+			DownloadMode:        defaultDownloadMode(s.DownloadMode),
 			DownloadURLTemplate: defs.DownloadURLTemplate,
 			RequiresSideLoading: defs.RequiresSideLoading,
 		}
@@ -1746,18 +1758,29 @@ func defaultAuthType(s string) string {
 	return "cookie"
 }
 
+func defaultDownloadMode(s string) string {
+	if s != "" {
+		return s
+	}
+	return "template"
+}
+
 func SeedFieldMappings(db *gorm.DB) error {
 	for _, s := range seedSites {
 		fieldTypes := map[string][]SelectOption{
-			"cat":            s.Form.Category,
-			"medium_sel":     s.Form.MediumSel,
-			"codec_sel":      s.Form.CodecSel,
-			"standard_sel":   s.Form.StandardSel,
-			"audiocodec_sel": s.Form.AudioCodec,
-			"team_sel":       s.Form.TeamSel,
-			"processing_sel": s.Form.ProcessingSel,
-			"source_sel":     s.Form.SourceSel,
-			"tags":           s.Form.Tags,
+			"cat":               s.Form.Category,
+			"medium_sel":        s.Form.MediumSel,
+			"codec_sel":         s.Form.CodecSel,
+			"standard_sel":      s.Form.StandardSel,
+			"audiocodec_sel":    s.Form.AudioCodec,
+			"team_sel":          s.Form.TeamSel,
+			"processing_sel":    s.Form.ProcessingSel,
+			"source_sel":        s.Form.SourceSel,
+			"tags":              s.Form.Tags,
+			"music_format_sel":  s.Form.MusicFormatSel,
+			"music_medium_sel":  s.Form.MusicMediumSel,
+			"music_publish_sel": s.Form.MusicPublishSel,
+			"music_tags":        s.Form.MusicTags,
 		}
 
 		for fieldType, options := range fieldTypes {
@@ -1786,5 +1809,34 @@ func SeedFieldMappings(db *gorm.DB) error {
 		}
 	}
 
+	return nil
+}
+
+var defaultExclusions = []struct {
+	TargetSite string
+	SourceSite string
+}{
+	{"铂金家", "家园"},
+	{"家园", "铂金家"},
+	{"优堡", "不可说"},
+	{"不可说", "优堡"},
+}
+
+func SeedExclusions(db *gorm.DB) error {
+	for _, e := range defaultExclusions {
+		var existing model.PublishExclusion
+		err := db.Where("target_site = ? AND source_site = ?", e.TargetSite, e.SourceSite).First(&existing).Error
+		if err == nil {
+			continue
+		}
+
+		exclusion := &model.PublishExclusion{
+			TargetSite: e.TargetSite,
+			SourceSite: e.SourceSite,
+		}
+		if err := db.Create(exclusion).Error; err != nil {
+			return fmt.Errorf("create exclusion %s↔%s: %w", e.TargetSite, e.SourceSite, err)
+		}
+	}
 	return nil
 }

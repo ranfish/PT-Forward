@@ -284,7 +284,7 @@ func (a *GazelleAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig,
 
 func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	baseURL := resolveBase(config)
@@ -411,7 +411,7 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
-		return &model.PublishResponse{Success: false, ErrorMessage: "403 Forbidden: 权限不足"}, nil
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足"}
 	}
 
 	if idMatch := regexp.MustCompile(`torrents\.php\?torrentid=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
@@ -445,7 +445,7 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 		errMsg = strings.TrimSpace(m[1])
 	}
 
-	return &model.PublishResponse{Success: false, ErrorMessage: errMsg}, nil
+	return nil, &model.AppError{Code: 15001, Message: errMsg}
 }
 
 func (a *GazelleAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {

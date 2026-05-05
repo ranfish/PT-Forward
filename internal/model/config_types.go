@@ -167,105 +167,54 @@ const (
 	PublishResultFailed     PublishResultStatus = "failed"
 )
 
-// §33.1.79 — WS 事件枚举（Sprint 94）
-type TaskStatus string
+type Framework string
 
 const (
-	TaskStatusPending   TaskStatus = "pending"
-	TaskStatusRunning   TaskStatus = "running"
-	TaskStatusPaused    TaskStatus = "paused"
-	TaskStatusCompleted TaskStatus = "completed"
-	TaskStatusFailed    TaskStatus = "failed"
-	TaskStatusCancelled TaskStatus = "cancelled"
+	FrameworkNexusPHP  Framework = "nexusphp"
+	FrameworkUnit3D    Framework = "unit3d"
+	FrameworkGazelle   Framework = "gazelle"
+	FrameworkMTeam     Framework = "mteam"
+	FrameworkTNode     Framework = "tnode"
+	FrameworkLuminance Framework = "luminance"
+	FrameworkRousi     Framework = "rousi"
+	FrameworkGeneric   Framework = "generic"
 )
 
-type TaskType string
+var FrameworkLabels = map[Framework]string{
+	FrameworkNexusPHP:  "NexusPHP",
+	FrameworkUnit3D:    "UNIT3D",
+	FrameworkGazelle:   "Gazelle",
+	FrameworkMTeam:     "M-Team",
+	FrameworkTNode:     "TNode",
+	FrameworkLuminance: "Luminance",
+	FrameworkRousi:     "Rousi",
+	FrameworkGeneric:   "Generic",
+}
+
+func ValidFramework(s string) bool {
+	_, ok := FrameworkLabels[Framework(s)]
+	return ok
+}
+
+type AuthType string
 
 const (
-	TaskTypeRSSFetch  TaskType = "rss_fetch"
-	TaskTypeReseed    TaskType = "reseed"
-	TaskTypePublish   TaskType = "publish"
-	TaskTypeLifecycle TaskType = "lifecycle"
+	AuthTypeCookie  AuthType = "cookie"
+	AuthTypeAPIKey  AuthType = "apikey"
+	AuthTypePasskey AuthType = "passkey"
 )
 
-type LogLevel string
+var AuthTypeLabels = map[AuthType]string{
+	AuthTypeCookie:  "Cookie",
+	AuthTypeAPIKey:  "API Key",
+	AuthTypePasskey: "Passkey",
+}
 
-const (
-	LogLevelDebug LogLevel = "debug"
-	LogLevelInfo  LogLevel = "info"
-	LogLevelWarn  LogLevel = "warn"
-	LogLevelError LogLevel = "error"
-)
+func ValidAuthType(s string) bool {
+	_, ok := AuthTypeLabels[AuthType(s)]
+	return ok
+}
 
-type DownloaderStatus string
-
-const (
-	DownloaderStatusOnline  DownloaderStatus = "online"
-	DownloaderStatusOffline DownloaderStatus = "offline"
-)
-
-type TorrentAction string
-
-const (
-	TorrentActionAdded     TorrentAction = "added"
-	TorrentActionCompleted TorrentAction = "completed"
-	TorrentActionDeleted   TorrentAction = "deleted"
-)
-
-type NotificationType string
-
-const (
-	NotificationTypeSuccess NotificationType = "success"
-	NotificationTypeWarning NotificationType = "warning"
-	NotificationTypeError   NotificationType = "error"
-	NotificationTypeInfo    NotificationType = "info"
-)
-
-type NotificationCategory string
-
-const (
-	NotificationCategoryReseed  NotificationCategory = "reseed"
-	NotificationCategoryPublish NotificationCategory = "publish"
-	NotificationCategoryRSS     NotificationCategory = "rss"
-	NotificationCategorySystem  NotificationCategory = "system"
-	NotificationCategoryAuth    NotificationCategory = "auth"
-)
-
-type PublishStepStatus string
-
-const (
-	PublishStepStatusRunning   PublishStepStatus = "running"
-	PublishStepStatusCompleted PublishStepStatus = "completed"
-	PublishStepStatusFailed    PublishStepStatus = "failed"
-)
-
-type DiskWarningLevel string
-
-const (
-	DiskWarningLevelWarning  DiskWarningLevel = "warning"
-	DiskWarningLevelCritical DiskWarningLevel = "critical"
-)
-
-type SeedingDecision string
-
-const (
-	SeedingDecisionKeep   SeedingDecision = "keep"
-	SeedingDecisionPause  SeedingDecision = "pause"
-	SeedingDecisionDelete SeedingDecision = "delete"
-)
-
-// §33.1.91 — RequestPriority 枚举（Sprint 105）
-type RequestPriority int
-
-const (
-	PriorityPublish     RequestPriority = 0
-	PrioritySeeding     RequestPriority = 1
-	PriorityReseed      RequestPriority = 2
-	PriorityRSS         RequestPriority = 3
-	PriorityMaintenance RequestPriority = 4
-)
-
-// §8.1.2 — RSS 策略枚举
 type HashStrategy string
 
 const (
@@ -300,7 +249,6 @@ const (
 	IDNone        IDStrategy = "none"
 )
 
-// §8.8.2 — CompareType 枚举
 type CompareType string
 
 const (
@@ -315,7 +263,6 @@ const (
 	CompareNotRegExp    CompareType = "not_regexp"
 )
 
-// §15.4 — DecisionType 枚举（16 种决策类型）
 type DecisionType string
 
 const (
@@ -336,64 +283,3 @@ const (
 	DecisionNoDownloadLink       DecisionType = "NO_DOWNLOAD_LINK"
 	DecisionBlockedRelease       DecisionType = "BLOCKED_RELEASE"
 )
-
-type Framework string
-
-const (
-	FrameworkNexusPHP  Framework = "nexusphp"
-	FrameworkUnit3D    Framework = "unit3d"
-	FrameworkGazelle   Framework = "gazelle"
-	FrameworkMTeam     Framework = "mteam"
-	FrameworkTNode     Framework = "tnode"
-	FrameworkLuminance Framework = "luminance"
-	FrameworkRousi     Framework = "rousi"
-	FrameworkGeneric   Framework = "generic"
-)
-
-var AllFrameworks = []Framework{
-	FrameworkNexusPHP,
-	FrameworkUnit3D,
-	FrameworkGazelle,
-	FrameworkMTeam,
-	FrameworkTNode,
-	FrameworkLuminance,
-	FrameworkRousi,
-	FrameworkGeneric,
-}
-
-var FrameworkLabels = map[Framework]string{
-	FrameworkNexusPHP:  "NexusPHP",
-	FrameworkUnit3D:    "UNIT3D",
-	FrameworkGazelle:   "Gazelle",
-	FrameworkMTeam:     "M-Team",
-	FrameworkTNode:     "TNode",
-	FrameworkLuminance: "Luminance",
-	FrameworkRousi:     "Rousi",
-	FrameworkGeneric:   "Generic",
-}
-
-func ValidFramework(s string) bool {
-	_, ok := FrameworkLabels[Framework(s)]
-	return ok
-}
-
-type AuthType string
-
-const (
-	AuthTypeCookie  AuthType = "cookie"
-	AuthTypeAPIKey  AuthType = "apikey"
-	AuthTypePasskey AuthType = "passkey"
-)
-
-var AllAuthTypes = []AuthType{AuthTypeCookie, AuthTypeAPIKey, AuthTypePasskey}
-
-var AuthTypeLabels = map[AuthType]string{
-	AuthTypeCookie:  "Cookie",
-	AuthTypeAPIKey:  "API Key",
-	AuthTypePasskey: "Passkey",
-}
-
-func ValidAuthType(s string) bool {
-	_, ok := AuthTypeLabels[AuthType(s)]
-	return ok
-}

@@ -47,7 +47,7 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return nil, fmt.Errorf("403 Forbidden: cookie 可能已过期")
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
@@ -55,7 +55,7 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 
 	contentType := resp.Header.Get("Content-Type")
 	if strings.Contains(contentType, "text/html") {
-		return nil, fmt.Errorf("返回了 HTML 页面而非种子文件，下载链接可能有误")
+		return nil, &model.AppError{Code: 15001, Message: "返回了 HTML 页面而非种子文件，下载链接可能有误"}
 	}
 
 	return io.ReadAll(resp.Body)
@@ -287,7 +287,7 @@ func (a *NexusPHPAdapter) DetectHR(ctx context.Context, config *model.SiteConfig
 
 func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	baseURL := config.Domain
@@ -348,11 +348,27 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 		"processing": "processing_sel",
 	}
 
+	musicCat := ""
+	if cat, ok := req.FormFields["category"]; ok {
+		musicCat = cat
+	}
+	isMusic := isMusicCategory(musicCat)
+
 	for k, v := range req.FormFields {
-		if mapped, ok := npFieldMap[k]; ok {
-			_ = writer.WriteField(mapped, v)
+		if isMusic {
+			if mapped, ok := npMusicFieldMap[k]; ok {
+				_ = writer.WriteField(mapped, v)
+			} else if mapped, ok := npFieldMap[k]; ok && k == "category" {
+				_ = writer.WriteField(mapped, v)
+			} else {
+				_ = writer.WriteField(k, v)
+			}
 		} else {
-			_ = writer.WriteField(k, v)
+			if mapped, ok := npFieldMap[k]; ok {
+				_ = writer.WriteField(mapped, v)
+			} else {
+				_ = writer.WriteField(k, v)
+			}
 		}
 	}
 
@@ -381,7 +397,7 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
-		return &model.PublishResponse{Success: false, ErrorMessage: "403 Forbidden: 权限不足或 cookie 过期"}, nil
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
 	}
 
 	if idMatch := regexp.MustCompile(`(?:details|detail)\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
@@ -406,7 +422,7 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 		errMsg = strings.TrimSpace(m[1])
 	}
 
-	return &model.PublishResponse{Success: false, ErrorMessage: errMsg}, nil
+	return nil, &model.AppError{Code: 15001, Message: errMsg}
 }
 
 func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
@@ -579,6 +595,16 @@ var musicCategoryIDs = map[string]bool{
 	"406": true,
 	"408": true,
 	"409": true,
+}
+
+var npMusicFieldMap = map[string]string{
+	"music_artist":  "artists",
+	"music_album":   "album",
+	"music_year":    "year",
+	"music_format":  "format_type",
+	"music_medium":  "medium_type",
+	"music_publish": "publish_type",
+	"cover_url":     "cover_url",
 }
 
 func isMusicCategory(cat string) bool {

@@ -48,7 +48,7 @@ func TestEngine_AddAndRemoveRecord(t *testing.T) {
 		TorrentID: "42",
 		Status:    model.SeedingStatusSeeding,
 	}
-	if err := e.AddSeedingRecord(record); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), record); err != nil {
 		t.Fatal(err)
 	}
 
@@ -64,7 +64,7 @@ func TestEngine_AddAndRemoveRecord(t *testing.T) {
 		t.Errorf("expected 42, got %s", got.TorrentID)
 	}
 
-	if err := e.RemoveSeedingRecord("client-1", "abc123"); err != nil {
+	if err := e.RemoveSeedingRecord(context.Background(), "client-1", "abc123"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -83,10 +83,10 @@ func TestEngine_DuplicateRecord(t *testing.T) {
 	r1 := &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}
 	r2 := &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "2"}
 
-	if err := e.AddSeedingRecord(r1); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), r1); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(r2); err == nil {
+	if err := e.AddSeedingRecord(context.Background(), r2); err == nil {
 		t.Error("expected error for duplicate")
 	}
 }
@@ -96,7 +96,7 @@ func TestEngine_MissingFields(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	r := &model.SeedingTorrentRecord{ClientID: "", InfoHash: "h1"}
-	if err := e.AddSeedingRecord(r); err == nil {
+	if err := e.AddSeedingRecord(context.Background(), r); err == nil {
 		t.Error("expected error for empty client_id")
 	}
 }
@@ -108,13 +108,13 @@ func TestEngine_ListByClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -189,13 +189,13 @@ func TestEngine_TotalActiveCount(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -211,7 +211,7 @@ func TestEngine_PauseForFreeEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e.AddSeedingRecord(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
 		t.Fatal(err)
 	}
 

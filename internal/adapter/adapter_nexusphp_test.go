@@ -2,9 +2,11 @@ package adapter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -302,11 +304,15 @@ func TestNexusPHP_UploadTorrent_Forbidden(t *testing.T) {
 	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
 
 	result, err := a.UploadTorrent(context.Background(), config, &model.PublishRequest{TorrentData: []byte("data")})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error for 403")
 	}
-	if result.Success {
-		t.Error("expected failure")
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != 14003 {
+		t.Fatalf("expected AppError 14003, got %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil result")
 	}
 }
 
@@ -632,6 +638,70 @@ func TestNexusPHPUpload_MusicRouting(t *testing.T) {
 		_, _ = a.UploadTorrent(context.Background(), config, req)
 		if uploadPath != "/upload.php" {
 			t.Errorf("expected /upload.php, got %s", uploadPath)
+		}
+	})
+}
+
+func TestNexusPHPUpload_MusicFieldMapping(t *testing.T) {
+	var receivedFields url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseMultipartForm(10 << 20)
+		receivedFields = r.MultipartForm.Value
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `details.php?id=1`)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{
+		Domain: srv.URL,
+		Cookie: "session=test",
+		SiteDefault: model.SiteDefault{
+			Paths: model.SitePathsConfig{
+				Upload:     "/upload.php",
+				TakeUpload: "/upload_music.php",
+			},
+		},
+	}
+
+	t.Run("music fields mapped to upload_music form names", func(t *testing.T) {
+		req := &model.PublishRequest{
+			TorrentData: []byte("d4:infod6:lengthi0eee"),
+			Title:       "Test Album",
+			FormFields: map[string]string{
+				"category":      "408",
+				"music_artist":  "SomeArtist",
+				"music_album":   "GreatAlbum",
+				"music_year":    "2024",
+				"music_format":  "1",
+				"music_medium":  "1",
+				"music_publish": "1",
+			},
+		}
+		_, _ = a.UploadTorrent(context.Background(), config, req)
+
+		if v := receivedFields.Get("type"); v != "408" {
+			t.Errorf("category not mapped to type: got %q", v)
+		}
+		if v := receivedFields.Get("artists"); v != "SomeArtist" {
+			t.Errorf("music_artist not mapped to artists: got %q", v)
+		}
+		if v := receivedFields.Get("album"); v != "GreatAlbum" {
+			t.Errorf("music_album not mapped to album: got %q", v)
+		}
+		if v := receivedFields.Get("year"); v != "2024" {
+			t.Errorf("music_year not mapped to year: got %q", v)
+		}
+		if v := receivedFields.Get("format_type"); v != "1" {
+			t.Errorf("music_format not mapped to format_type: got %q", v)
+		}
+		if v := receivedFields.Get("medium_type"); v != "1" {
+			t.Errorf("music_medium not mapped to medium_type: got %q", v)
+		}
+		if v := receivedFields.Get("publish_type"); v != "1" {
+			t.Errorf("music_publish not mapped to publish_type: got %q", v)
 		}
 	})
 }

@@ -55,7 +55,7 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return nil, fmt.Errorf("403 Forbidden: cookie 可能已过期")
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
@@ -63,7 +63,7 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 
 	contentType := resp.Header.Get("Content-Type")
 	if strings.Contains(contentType, "text/html") {
-		return nil, fmt.Errorf("返回了 HTML 页面而非种子文件，下载链接可能有误")
+		return nil, &model.AppError{Code: 15001, Message: "返回了 HTML 页面而非种子文件，下载链接可能有误"}
 	}
 
 	return io.ReadAll(resp.Body)
@@ -322,7 +322,7 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	}
 
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	var buf bytes.Buffer
@@ -367,7 +367,7 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
-		return &model.PublishResponse{Success: false, ErrorMessage: "403 Forbidden: 权限不足"}, nil
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足"}
 	}
 
 	if idMatch := regexp.MustCompile(`(?:details|detail|torrent)\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
@@ -389,7 +389,7 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 		errMsg = strings.TrimSpace(m[1])
 	}
 
-	return &model.PublishResponse{Success: false, ErrorMessage: errMsg}, nil
+	return nil, &model.AppError{Code: 15001, Message: errMsg}
 }
 
 func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
@@ -529,7 +529,7 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 
 func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	baseURL := resolveBase(config)
@@ -613,7 +613,7 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
-		return &model.PublishResponse{Success: false, ErrorMessage: "403 Forbidden: 权限不足"}, nil
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足"}
 	}
 
 	if idMatch := regexp.MustCompile(`/t/(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
@@ -635,12 +635,12 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 		errMsg = strings.TrimSpace(m[1])
 	}
 
-	return &model.PublishResponse{Success: false, ErrorMessage: errMsg}, nil
+	return nil, &model.AppError{Code: 15001, Message: errMsg}
 }
 
 func (a *GenericAdapter) uploadStarSpace(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	isMusic := false
@@ -848,7 +848,7 @@ func (a *GenericAdapter) doStarSpaceUpload(httpReq *http.Request, config *model.
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
-		return &model.PublishResponse{Success: false, ErrorMessage: "403 Forbidden"}, nil
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden"}
 	}
 
 	if idMatch := regexp.MustCompile(`(?:details|torrent)\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
@@ -870,12 +870,12 @@ func (a *GenericAdapter) doStarSpaceUpload(httpReq *http.Request, config *model.
 		errMsg = strings.TrimSpace(m[1])
 	}
 
-	return &model.PublishResponse{Success: false, ErrorMessage: errMsg}, nil
+	return nil, &model.AppError{Code: 15001, Message: errMsg}
 }
 
 func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	baseURL := resolveBase(config)
@@ -1011,7 +1011,7 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 		if errMsg == "" {
 			errMsg = fmt.Sprintf("上传失败: showType=%d", result.ShowType)
 		}
-		return &model.PublishResponse{Success: false, ErrorMessage: errMsg}, nil
+		return nil, &model.AppError{Code: 15001, Message: errMsg}
 	}
 
 	html := string(body)
@@ -1019,10 +1019,7 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 		return &model.PublishResponse{Success: true, TargetSite: config.Domain}, nil
 	}
 
-	return &model.PublishResponse{
-		Success:      false,
-		ErrorMessage: fmt.Sprintf("上传失败: HTTP %d", resp.StatusCode),
-	}, nil
+	return nil, &model.AppError{Code: 15001, Message: fmt.Sprintf("上传失败: HTTP %d", resp.StatusCode)}
 }
 
 func extractIMDbIDGeneric(link string) string {

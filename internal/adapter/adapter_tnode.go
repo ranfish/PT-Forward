@@ -48,7 +48,7 @@ func (a *TNodeAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return nil, fmt.Errorf("403 Forbidden: cookie 可能已过期")
+		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
@@ -56,7 +56,7 @@ func (a *TNodeAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 
 	ct := resp.Header.Get("Content-Type")
 	if strings.Contains(ct, "text/html") {
-		return nil, fmt.Errorf("返回了 HTML 页面而非种子文件")
+		return nil, &model.AppError{Code: 15001, Message: "返回了 HTML 页面而非种子文件"}
 	}
 
 	return io.ReadAll(resp.Body)
@@ -225,7 +225,7 @@ func (a *TNodeAdapter) GetTorrentInfoHash(ctx context.Context, config *model.Sit
 
 func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	if len(req.TorrentData) == 0 {
-		return nil, fmt.Errorf("种子文件数据为空")
+		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
 	baseURL := config.Domain
@@ -358,11 +358,7 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 			}, nil
 		}
 		if result.Code == "TORRENT_ALREADY_UPLOAD" {
-			return &model.PublishResponse{
-				Success:      false,
-				IsExisting:   true,
-				ErrorMessage: "种子已存在",
-			}, nil
+			return nil, &model.AppError{Code: 14001, Message: "种子已存在"}
 		}
 		errMsg := result.Message
 		if errMsg == "" {
@@ -371,7 +367,7 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		if errMsg == "" {
 			errMsg = fmt.Sprintf("上传失败: HTTP %d", resp.StatusCode)
 		}
-		return &model.PublishResponse{Success: false, ErrorMessage: errMsg}, nil
+		return nil, &model.AppError{Code: 15001, Message: errMsg}
 	}
 
 	html := string(body)
@@ -379,10 +375,7 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 		return &model.PublishResponse{Success: true, TargetSite: config.Domain}, nil
 	}
 
-	return &model.PublishResponse{
-		Success:      false,
-		ErrorMessage: fmt.Sprintf("上传失败: HTTP %d", resp.StatusCode),
-	}, nil
+	return nil, &model.AppError{Code: 15001, Message: fmt.Sprintf("上传失败: HTTP %d", resp.StatusCode)}
 }
 
 func (a *TNodeAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteConfig, pageURL string) (string, error) {

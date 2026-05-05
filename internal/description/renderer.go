@@ -39,7 +39,11 @@ func (r *Renderer) Render(data *model.DescriptionData, config model.SiteDescConf
 	}
 
 	if data.PTGenBody != "" {
-		sections = append(sections, data.PTGenBody)
+		body := data.PTGenBody
+		if format == "markdown" {
+			body = BBCodeToMarkdown(body)
+		}
+		sections = append(sections, body)
 	}
 
 	if data.MediaInfoText != "" {
@@ -54,7 +58,7 @@ func (r *Renderer) Render(data *model.DescriptionData, config model.SiteDescConf
 	}
 
 	if len(data.Screenshots) > 0 {
-		screenshots := r.FormatScreenshots(data.Screenshots)
+		screenshots := r.FormatScreenshots(data.Screenshots, format)
 		if screenshots != "" {
 			sections = append(sections, r.renderSection("截图", screenshots, format))
 		}
@@ -79,17 +83,29 @@ func (r *Renderer) FormatMediaInfo(rawText string, format model.MediaInfoFormat)
 	return r.wrapCode(strings.TrimSpace(rawText), string(format))
 }
 
-func (r *Renderer) FormatScreenshots(urls []string) string {
+func (r *Renderer) FormatScreenshots(urls []string, format ...string) string {
 	if len(urls) == 0 {
 		return ""
 	}
 
+	f := "bbcode"
+	if len(format) > 0 && format[0] != "" {
+		f = format[0]
+	}
+
 	var parts []string
-	for _, url := range urls {
-		if url == "" {
+	for _, u := range urls {
+		if u == "" {
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("[img]%s[/img]", url))
+		switch f {
+		case "markdown":
+			parts = append(parts, fmt.Sprintf("![](%s)", u))
+		case "html":
+			parts = append(parts, fmt.Sprintf(`<img src="%s" />`, u))
+		default:
+			parts = append(parts, fmt.Sprintf("[img]%s[/img]", u))
+		}
 	}
 	return strings.Join(parts, "\n")
 }
@@ -143,7 +159,7 @@ func (r *Renderer) applyTemplate(template string, data *model.DescriptionData, f
 	result = strings.ReplaceAll(result, "{{statement}}", data.Statement)
 	result = strings.ReplaceAll(result, "{{ptgen}}", data.PTGenBody)
 	result = strings.ReplaceAll(result, "{{mediainfo}}", r.FormatMediaInfo(data.MediaInfoText, model.MediaInfoFormat(format)))
-	result = strings.ReplaceAll(result, "{{screenshots}}", r.FormatScreenshots(data.Screenshots))
+	result = strings.ReplaceAll(result, "{{screenshots}}", r.FormatScreenshots(data.Screenshots, format))
 	result = strings.ReplaceAll(result, "{{source_site}}", data.SourceSite)
 	return result
 }
