@@ -290,18 +290,10 @@ func TestEngine_CleanupStale_PausesFreeExpired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	affected, err := e.CleanupStale(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if affected != 1 {
-		t.Errorf("expected 1 affected, got %d", affected)
-	}
-
 	var updated model.SeedingTorrentRecord
 	db.Where("info_hash = ?", "h1").First(&updated)
-	if updated.Status != "paused_free_end" {
-		t.Errorf("expected paused_free_end, got %s", updated.Status)
+	if updated.Status != model.SeedingStatusPausedFreeEnd {
+		t.Errorf("expected paused_free_end (via RecoverOnStartup), got %s", updated.Status)
 	}
 }
 

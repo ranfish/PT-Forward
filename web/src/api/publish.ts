@@ -31,12 +31,6 @@ export const publishApi = {
   getGroup(id: number) {
     return client.get(`/publish/groups/${id}`)
   },
-  createGroup(data: any) {
-    return client.post('/publish/groups', data)
-  },
-  updateGroup(id: number, data: any) {
-    return client.put(`/publish/groups/${id}`, data)
-  },
   deleteGroup(id: number) {
     return client.delete(`/publish/groups/${id}`)
   },

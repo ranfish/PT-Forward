@@ -22,32 +22,32 @@ type TorrentMeta struct {
 
 func ComputeFromTorrent(data []byte) (*TorrentMeta, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("empty torrent data")
+		return nil, fpError(ErrFPCompute, "empty torrent data", nil)
 	}
 
 	d, err := decodeBencode(data)
 	if err != nil {
-		return nil, fmt.Errorf("bencode decode: %w", err)
+		return nil, fpError(ErrFPCompute, "bencode decode", err)
 	}
 
 	root, ok := d.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("torrent root is not a dictionary")
+		return nil, fpError(ErrFPCompute, "torrent root is not a dictionary", nil)
 	}
 
 	info, ok := root["info"]
 	if !ok {
-		return nil, fmt.Errorf("missing info dictionary")
+		return nil, fpError(ErrFPCompute, "missing info dictionary", nil)
 	}
 
 	infoDict, ok := info.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("info is not a dictionary")
+		return nil, fpError(ErrFPCompute, "info is not a dictionary", nil)
 	}
 
 	infoHash, err := computeInfoHash(infoDict)
 	if err != nil {
-		return nil, fmt.Errorf("info hash: %w", err)
+		return nil, fpError(ErrFPCompute, "info hash", err)
 	}
 
 	piecesHash := computePiecesHash(infoDict)

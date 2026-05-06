@@ -15,17 +15,17 @@ func EnsureAdminUser(ctx context.Context, repo model.AuthRepository, logger *zap
 		return nil
 	}
 	if err != gorm.ErrRecordNotFound {
-		return fmt.Errorf("check admin user: %w", err)
+		return authError(ErrAuthInit, "check admin user", err)
 	}
 
 	password, err := GenerateRandomPassword(8)
 	if err != nil {
-		return fmt.Errorf("generate random password: %w", err)
+		return authError(ErrAuthInit, "generate random password", err)
 	}
 
 	hash, err := HashPassword(password)
 	if err != nil {
-		return fmt.Errorf("hash password: %w", err)
+		return authError(ErrAuthInit, "hash password", err)
 	}
 
 	user := &model.User{
@@ -34,7 +34,7 @@ func EnsureAdminUser(ctx context.Context, repo model.AuthRepository, logger *zap
 		PasswordHash: hash,
 	}
 	if err := repo.Create(ctx, user); err != nil {
-		return fmt.Errorf("create admin user: %w", err)
+		return authError(ErrAuthInit, "create admin user", err)
 	}
 
 	fmt.Println("========================================")

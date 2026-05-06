@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -13,12 +15,17 @@ import (
 )
 
 type IYUUHandler struct {
-	db     *gorm.DB
-	logger *zap.Logger
+	db      *gorm.DB
+	logger  *zap.Logger
+	iyuuSvc IYUUQueryService
 }
 
-func NewIYUUHandler(db *gorm.DB, logger *zap.Logger) *IYUUHandler {
-	return &IYUUHandler{db: db, logger: logger}
+type IYUUQueryService interface {
+	QueryReseed(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error)
+}
+
+func NewIYUUHandler(db *gorm.DB, logger *zap.Logger, iyuuSvc IYUUQueryService) *IYUUHandler {
+	return &IYUUHandler{db: db, logger: logger, iyuuSvc: iyuuSvc}
 }
 
 func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -183,10 +190,21 @@ func (h *IYUUHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.iyuuSvc == nil {
+		Error(w, http.StatusServiceUnavailable, 50301, "IYUU 服务未配置")
+		return
+	}
+
+	results, err := h.iyuuSvc.QueryReseed(r.Context(), req.InfoHashes)
+	if err != nil {
+		h.logger.Warn("IYUU query failed", zap.Error(err))
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("IYUU 查询失败: %v", err))
+		return
+	}
+
 	Success(w, map[string]interface{}{
-		"results": []model.IYUUReseedResult{},
-		"total":   0,
-		"message": "IYUU 服务连接未实现，请先配置 Token",
+		"results": results,
+		"total":   len(results),
 	})
 }
 

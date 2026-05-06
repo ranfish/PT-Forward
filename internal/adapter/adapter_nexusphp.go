@@ -3,7 +3,6 @@ package adapter
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -28,7 +27,7 @@ func NewNexusPHPAdapter(doer *HTTPDoer, logger *zap.Logger) *NexusPHPAdapter {
 func (a *NexusPHPAdapter) Framework() string { return "nexusphp" }
 
 func (a *NexusPHPAdapter) ParseRSS(_ context.Context, _ string, _ *model.SiteConfig) ([]*model.RSSTorrentEvent, error) {
-	return nil, fmt.Errorf("ParseRSS: use RSS fetcher instead")
+	return nil, parseError("ParseRSS: use RSS fetcher instead", nil)
 }
 
 func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
@@ -36,13 +35,13 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("下载失败: %w", err)
+		return nil, downloadError("下载失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -50,7 +49,7 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	contentType := resp.Header.Get("Content-Type")
@@ -66,23 +65,23 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("请求详情页失败: %w", err)
+		return nil, networkError("请求详情页失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, networkError("读取响应失败", err)
 	}
 
 	html := string(body)
@@ -127,23 +126,23 @@ func (a *NexusPHPAdapter) GetPreciseSLData(ctx context.Context, config *model.Si
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("请求详情页失败: %w", err)
+		return nil, networkError("请求详情页失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, networkError("读取响应失败", err)
 	}
 
 	html := string(body)
@@ -229,21 +228,9 @@ func (a *NexusPHPAdapter) detectDiscountPage(ctx context.Context, config *model.
 	body, _ := io.ReadAll(resp.Body)
 	html := strings.ToLower(string(body))
 
-	if strings.Contains(html, "class=\"pro_free2up\"") || strings.Contains(html, "pro_free2up") {
-		return &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}, nil
-	}
-	if strings.Contains(html, "class=\"pro_2up\"") || strings.Contains(html, "pro_2up") {
-		return &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}, nil
-	}
-	if strings.Contains(html, "class=\"pro_free\"") || strings.Contains(html, "pro_free") {
-		return &model.DiscountResult{Level: model.DiscountFree}, nil
-	}
-	if strings.Contains(html, "class=\"pro_50p\"") || strings.Contains(html, "pro_50p") {
-		return &model.DiscountResult{Level: model.DiscountPercent50}, nil
-	}
-
-	if strings.Contains(html, "免费") || strings.Contains(html, "free") {
-		return &model.DiscountResult{Level: model.DiscountFree}, nil
+	result := DetectDiscountFromHTML(html, &config.DiscountDetection)
+	if result.Level != model.DiscountNone {
+		return result, nil
 	}
 
 	return &model.DiscountResult{Level: model.DiscountNone}, nil
@@ -279,7 +266,7 @@ func (a *NexusPHPAdapter) DetectHR(ctx context.Context, config *model.SiteConfig
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
-		result.SeedTimeH = 72
+		result.SeedTimeH = config.HR.SeedTimeH()
 	}
 
 	return result, nil
@@ -310,12 +297,12 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 
-	fileWriter, err := writer.CreateFormFile("torrent", "upload.torrent")
+	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	if req.Title != "" {
@@ -330,11 +317,8 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	if req.IMDbLink != "" {
 		_ = writer.WriteField("url", req.IMDbLink)
 	}
-	if req.DoubanLink != "" {
-		_ = writer.WriteField("douban_url", req.DoubanLink)
-	}
 	if req.Anonymous {
-		_ = writer.WriteField("anonymity", "1")
+		_ = writer.WriteField("uplver", "1")
 	}
 
 	npFieldMap := map[string]string{
@@ -346,6 +330,13 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 		"medium":     "medium_sel",
 		"team":       "team_sel",
 		"processing": "processing_sel",
+		"douban":     "douban",
+	}
+
+	for k, v := range config.Publish.FormFields {
+		if _, exists := npFieldMap[k]; exists {
+			npFieldMap[k] = v
+		}
 	}
 
 	musicCat := ""
@@ -373,25 +364,25 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, networkError("读取响应失败", err)
 	}
 
 	html := string(body)
@@ -441,23 +432,23 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 
 	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造搜索请求失败: %w", err)
+		return nil, searchError("构造搜索请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("搜索请求失败: %w", err)
+		return nil, searchError("搜索请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, networkError("读取响应失败", err)
 	}
 
 	return parseNexusPHPBrowse(string(body), config), nil
@@ -469,12 +460,25 @@ func (a *NexusPHPAdapter) GetTorrentInfoHash(ctx context.Context, config *model.
 		return "", err
 	}
 	if detail.InfoHash == "" {
-		return "", fmt.Errorf("未在详情页找到 info_hash")
+		return "", notFoundError("未在详情页找到 info_hash")
 	}
 	return detail.InfoHash, nil
 }
 
 func (a *NexusPHPAdapter) SupportsSearchByPiecesHash() bool { return false }
+
+func (a *NexusPHPAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
+	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
+	if err != nil {
+		return false, nil
+	}
+	for _, r := range results {
+		if r.TorrentID == torrentID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
 func buildURL(domain, path, torrentID, passkey string) string {
 	u := domain

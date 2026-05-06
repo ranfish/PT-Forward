@@ -33,7 +33,7 @@ func (m *Manager) LoadClients(ctx context.Context) error {
 	if err := m.db.WithContext(ctx).
 		Where("deleted_at = ? AND enabled = ?", time.Time{}, true).
 		Find(&configs).Error; err != nil {
-		return fmt.Errorf("load client configs: %w", err)
+		return clientError(ErrClientConfigParse, "load client configs", err)
 	}
 
 	m.mu.Lock()
@@ -89,7 +89,7 @@ func (m *Manager) Get(clientID string) (model.DownloaderClient, error) {
 
 	c, ok := m.clients[clientID]
 	if !ok {
-		return nil, fmt.Errorf("client %q not found or not connected", clientID)
+		return nil, clientError(ErrClientConnection, fmt.Sprintf("client %q not found or not connected", clientID), nil)
 	}
 	return c, nil
 }
@@ -110,7 +110,7 @@ func (m *Manager) GetByDBID(ctx context.Context, id uint) (model.DownloaderClien
 	if err := m.db.WithContext(ctx).
 		Where("id = ? AND deleted_at = ? AND enabled = ?", id, time.Time{}, true).
 		First(&cfg).Error; err != nil {
-		return nil, nil, fmt.Errorf("client config not found: %w", err)
+		return nil, nil, clientError(ErrClientConnection, "client config not found", err)
 	}
 
 	client, err := m.Get(cfg.Name)
@@ -150,7 +150,7 @@ func (m *Manager) createClient(cfg *model.ClientConfig, paths []model.SharedPath
 	case "transmission":
 		return transmission.NewTRClient(cfg, paths, m.logger)
 	default:
-		return nil, fmt.Errorf("unsupported client type: %s", cfg.Type)
+		return nil, clientError(ErrClientConfigParse, fmt.Sprintf("unsupported client type: %s", cfg.Type), nil)
 	}
 }
 

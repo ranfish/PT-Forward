@@ -53,7 +53,7 @@ func (e *Engine) SetIYUUService(svc model.IYUUService) {
 func (e *Engine) Start(ctx context.Context) error {
 	var tasks []model.ReseedTask
 	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&tasks).Error; err != nil {
-		return fmt.Errorf("load reseed tasks: %w", err)
+		return reseedError(ErrReseedDB, "load reseed tasks", err)
 	}
 
 	for i := range tasks {
@@ -679,6 +679,47 @@ func (e *Engine) DeleteTask(ctx context.Context, id uint) error {
 	return e.db.WithContext(ctx).Delete(&model.ReseedTask{}, id).Error
 }
 
+func (e *Engine) ListByClientID(ctx context.Context, clientID string) ([]model.ReseedTask, error) {
+	var tasks []model.ReseedTask
+	err := e.db.WithContext(ctx).
+		Where("client_ids LIKE ?", "%"+clientID+"%").
+		Find(&tasks).Error
+	return tasks, err
+}
+
+func (e *Engine) ListEnabled(ctx context.Context) ([]model.ReseedTask, error) {
+	var tasks []model.ReseedTask
+	err := e.db.WithContext(ctx).
+		Where("enabled = ? AND status IN ?", true, []model.ReseedTaskStatus{model.ReseedTaskIdle, model.ReseedTaskRunning}).
+		Find(&tasks).Error
+	return tasks, err
+}
+
+func (e *Engine) BatchSaveMatches(ctx context.Context, matches []*model.ReseedMatch) error {
+	return e.db.WithContext(ctx).Create(matches).Error
+}
+
+func (e *Engine) FindPendingRetry(ctx context.Context, limit int) ([]model.ReseedMatch, error) {
+	var matches []model.ReseedMatch
+	err := e.db.WithContext(ctx).
+		Where("status = ? AND retry_count < max_retries AND next_retry_at <= ?", model.MatchStatusFailed, time.Now()).
+		Order("next_retry_at ASC").
+		Limit(limit).
+		Find(&matches).Error
+	return matches, err
+}
+
+func (e *Engine) UpdateMatchStatus(ctx context.Context, id uint, status string, failReason string) error {
+	return e.db.WithContext(ctx).
+		Model(&model.ReseedMatch{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"status":      status,
+			"fail_reason": failReason,
+			"updated_at":  time.Now(),
+		}).Error
+}
+
 func (e *Engine) SaveMatch(ctx context.Context, match *model.ReseedMatch) error {
 	return e.db.WithContext(ctx).Create(match).Error
 }
@@ -764,7 +805,7 @@ func (e *Engine) FlushNegativeCache(ctx context.Context) (int64, error) {
 func (e *Engine) RunEnabledTasks(ctx context.Context) error {
 	var tasks []model.ReseedTask
 	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&tasks).Error; err != nil {
-		return fmt.Errorf("query enabled reseed tasks: %w", err)
+		return reseedError(ErrReseedDB, "query enabled reseed tasks", err)
 	}
 
 	if len(tasks) == 0 {
@@ -822,7 +863,7 @@ func checkPublishEligibility(title string) bool {
 
 func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task *model.ReseedTask) error {
 	if e.siteProvider == nil || e.clientProvider == nil {
-		return fmt.Errorf("site provider or client provider not configured")
+		return reseedError(ErrReseedConfig, "site provider or client provider not configured", nil)
 	}
 
 	e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
@@ -901,7 +942,7 @@ func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason
 		"retry_count":   match.RetryCount,
 		"updated_at":    time.Now(),
 	})
-	return fmt.Errorf("%s", reason)
+	return reseedError(ErrReseedGeneric, reason, nil)
 }
 
 func hasMatchMethod(methodsStr, method string) bool {

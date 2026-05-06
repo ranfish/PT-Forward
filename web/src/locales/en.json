@@ -60,7 +60,9 @@
     "ptgen": "PTGen Movie Info",
     "seedingDashboard": "Overview",
     "tracker": "Tracker",
-    "lifecycle": "Lifecycle"
+    "lifecycle": "Lifecycle",
+    "scheduler": "Scheduled Tasks",
+    "systemHealth": "System Monitor"
   },
   "dashboard": {
     "title": "Dashboard",

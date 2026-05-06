@@ -82,27 +82,6 @@ func TestValidate_LoginLockoutMin(t *testing.T) {
 	}
 }
 
-func TestValidate_MemoryMaxTotalMB(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Memory.MaxTotalMB = -1
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected error for negative max_total_mb")
-	}
-}
-
-func TestValidate_MemoryWarnPercent(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Memory.WarnPercent = 0
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected error for warn_percent 0")
-	}
-
-	cfg.Memory.WarnPercent = 1.5
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected error for warn_percent > 1")
-	}
-}
-
 func TestDefaultConfig_Values(t *testing.T) {
 	cfg := DefaultConfig()
 	if cfg.Server.Port != 8765 {

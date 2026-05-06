@@ -11,6 +11,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/rss"
+	"github.com/ranfish/pt-forward/internal/scheduler"
 	"github.com/ranfish/pt-forward/internal/seeding"
 	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/site"
@@ -38,6 +39,7 @@ type Router struct {
 	lifecycleHandler   *LifecycleHandler
 	cookiecloudHandler *CookieCloudHandler
 	ptgenHandler       *PTGenHandler
+	schedulerHandler   *SchedulerHandler
 	wsHandler          *WSHandler
 	hub                *Hub
 	authManager        *auth.AuthManager
@@ -47,7 +49,7 @@ type Router struct {
 	rateLimitMW        func(http.Handler) http.Handler
 }
 
-func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, appVersion string, logger *zap.Logger) *Router {
+func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, logger *zap.Logger) *Router {
 	siteRepo := site.NewRepository(db)
 	rssRepo := rss.NewRepository(db)
 	filterRepo := filter.NewRepository(db)
@@ -62,9 +64,9 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 	return &Router{
 		authHandler:        NewAuthHandler(authManager),
 		clientHandler:      NewClientHandler(db, logger, clientMgr),
-		siteHandler:        NewSiteHandler(siteRepo, logger),
+		siteHandler:        NewSiteHandler(siteRepo, logger, db),
 		rssHandler:         NewRSSHandler(rssRepo, rssEngine, db, logger),
-		filterHandler:      NewFilterHandler(filterRepo, filterEng, logger),
+		filterHandler:      NewFilterHandler(filterRepo, filterEng, db, logger),
 		notifyHandler:      NewNotifyHandler(notifyRepo, notifyService, logger),
 		settingsHandler:    NewSettingsHandler(settingsRepo, logger),
 		seedingHandler:     NewSeedingHandler(db, logger, seedingEngine),
@@ -73,12 +75,13 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		publishHandler:     NewPublishHandler(publishPipeline, logger, db),
 		dashboardHandler:   NewDashboardHandler(db, logger, appVersion, dashChecker),
 		systemHandler:      NewSystemHandler(appVersion, db, clientMgr, logger),
-		iyuuHandler:        NewIYUUHandler(db, logger),
+		iyuuHandler:        NewIYUUHandler(db, logger, iyuuSvc),
 		fingerprintHandler: NewFingerprintHandler(db, logger),
 		trackerHandler:     NewTrackerHandler(db, logger),
 		lifecycleHandler:   NewLifecycleHandler(db, logger),
 		cookiecloudHandler: NewCookieCloudHandler(db, logger),
 		ptgenHandler:       NewPTGenHandler(db, logger),
+		schedulerHandler:   NewSchedulerHandler(taskRegistry, logger),
 		wsHandler:          NewWSHandler(hub, authManager, nil),
 		hub:                hub,
 		authManager:        authManager,
@@ -123,6 +126,7 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.HandleFunc("/api/v1/auth/status", rt.public(rt.authHandler.HandleStatus))
 	mux.HandleFunc("/api/v1/auth/refresh", rt.public(rt.authHandler.HandleRefresh))
 	mux.HandleFunc("/api/v1/system/ping", rt.public(rt.systemHandler.HandlePing))
+	mux.HandleFunc("/healthz", rt.public(rt.systemHandler.HandlePing))
 
 	mux.Handle("/api/v1/auth/password", rt.protected(rt.authHandler.HandlePassword))
 	mux.Handle("/api/v1/auth/profile", rt.protected(rt.authHandler.HandleProfile))
@@ -131,9 +135,21 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/downloaders", dlHandler)
 	mux.Handle("/api/v1/downloaders/", dlHandler)
 
+	publishTargetHandler := rt.corsMW(rt.rateLimitMW(rt.authMW(rt.secMW(http.HandlerFunc(rt.clientHandler.handlePublishTargets)))))
+	mux.Handle("/api/v1/downloaders/publish-targets", publishTargetHandler)
+
 	siteHandler := rt.corsMW(rt.rateLimitMW(rt.authMW(rt.secMW(http.HandlerFunc(rt.siteHandler.ServeHTTP)))))
 	mux.Handle("/api/v1/sites", siteHandler)
 	mux.Handle("/api/v1/sites/", siteHandler)
+
+	freezeStatusHandler := rt.corsMW(rt.rateLimitMW(rt.authMW(rt.secMW(http.HandlerFunc(rt.siteHandler.handleFreezeStatus)))))
+	mux.Handle("/api/v1/httpclient/freeze-status", freezeStatusHandler)
+
+	circuitStatusHandler := rt.corsMW(rt.rateLimitMW(rt.authMW(rt.secMW(http.HandlerFunc(rt.siteHandler.handleCircuitStatus)))))
+	mux.Handle("/api/v1/httpclient/circuit-status", circuitStatusHandler)
+
+	exclusionHandler := rt.corsMW(rt.rateLimitMW(rt.authMW(rt.secMW(http.HandlerFunc(rt.siteHandler.handleExclusions)))))
+	mux.Handle("/api/v1/publish/exclusions", exclusionHandler)
 
 	rssHandler := rt.corsMW(rt.rateLimitMW(rt.authMW(rt.secMW(http.HandlerFunc(rt.rssHandler.ServeHTTP)))))
 	mux.Handle("/api/v1/rss/subscriptions", rssHandler)
@@ -254,6 +270,10 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/ptgen/query/", ptgenHandler)
 	mux.Handle("/api/v1/ptgen/cache", ptgenHandler)
 	mux.Handle("/api/v1/ptgen/cache/", ptgenHandler)
+
+	schedulerHandler := rt.corsMW(rt.rateLimitMW(rt.authMW(rt.secMW(http.HandlerFunc(rt.schedulerHandler.ServeHTTP)))))
+	mux.Handle("/api/v1/scheduler/tasks", schedulerHandler)
+	mux.Handle("/api/v1/scheduler/tasks/", schedulerHandler)
 }
 
 func (rt *Router) public(fn http.HandlerFunc) http.HandlerFunc {

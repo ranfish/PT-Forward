@@ -9,16 +9,20 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/ptgen"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 type Pipeline struct {
-	db           *gorm.DB
-	logger       *zap.Logger
-	siteProvider model.SiteInfoProvider
-	ptgen        *ptgen.Provider
+	db                *gorm.DB
+	logger            *zap.Logger
+	siteProvider      model.SiteInfoProvider
+	clientProvider    model.DownloaderProvider
+	ptgen             *ptgen.Provider
+	completionWatcher model.CompletionWatcher
+	notifyService     *notification.Service
 }
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
@@ -27,6 +31,18 @@ func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
 
 func (p *Pipeline) SetSiteProvider(sp model.SiteInfoProvider) {
 	p.siteProvider = sp
+}
+
+func (p *Pipeline) SetClientProvider(cp model.DownloaderProvider) {
+	p.clientProvider = cp
+}
+
+func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
+	p.completionWatcher = w
+}
+
+func (p *Pipeline) SetNotifyService(ns *notification.Service) {
+	p.notifyService = ns
 }
 
 func (p *Pipeline) CreateTask(ctx context.Context, task *model.PublishTask) error {
@@ -52,6 +68,10 @@ func (p *Pipeline) ListTasks(ctx context.Context, offset, limit int) ([]model.Pu
 		Offset(offset).Limit(limit).
 		Find(&tasks).Error
 	return tasks, total, err
+}
+
+func (p *Pipeline) Update(ctx context.Context, task *model.PublishTask) error {
+	return p.db.WithContext(ctx).Save(task).Error
 }
 
 func (p *Pipeline) UpdateTaskStatus(ctx context.Context, id uint, status model.PublishTaskStatus) error {
@@ -88,7 +108,9 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 
 	eligible, reason := p.CheckPublishEligibility(ctx, &candidate, "")
 	if !eligible {
-		_ = p.UpdateCandidateStatus(ctx, id, model.CandidateSkipped, reason)
+		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateSkipped, reason); err != nil {
+			p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
+		}
 		return nil, &model.AppError{Code: 40001, Message: fmt.Sprintf("发布合规检查未通过: %s", reason)}
 	}
 
@@ -117,7 +139,9 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 
 	torrentData, err := sourceAdapter.DownloadTorrent(ctx, sourceConfig, candidate.SourceTorrentID)
 	if err != nil {
-		_ = p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("下载源种子失败: %v", err))
+		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("下载源种子失败: %v", err)); err != nil {
+			p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
+		}
 		return nil, &model.AppError{Code: 50001, Message: "下载源种子失败", Cause: err}
 	}
 
@@ -174,14 +198,16 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 							zap.String("title", dr.Title),
 							zap.Int64("size", dr.Size),
 						)
-						_ = p.CreateResult(ctx, &model.PublishResultRecord{
+						if err := p.CreateResult(ctx, &model.PublishResultRecord{
 							CandidateID:  id,
 							SourceSite:   candidate.SourceSite,
 							TargetSite:   targetSite,
 							TorrentID:    dr.TorrentID,
 							Status:       model.PublishResultSkipped,
 							ErrorMessage: fmt.Sprintf("去重匹配: %s (size=%d)", dr.Title, dr.Size),
-						})
+						}); err != nil {
+							p.logger.Warn("记录发布结果失败", zap.Error(err))
+						}
 						dedupSkip = true
 						break
 					}
@@ -271,11 +297,27 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 			if sourceDetail.Codec != "" {
 				pubReq.FormFields["codec"] = sourceDetail.Codec
 			}
+			if sourceDetail.AudioCodec != "" {
+				pubReq.FormFields["audioCodec"] = sourceDetail.AudioCodec
+			}
+			if sourceDetail.Processing != "" {
+				pubReq.FormFields["processing"] = sourceDetail.Processing
+			}
+			if sourceDetail.ReleaseGroup != "" {
+				pubReq.FormFields["team"] = sourceDetail.ReleaseGroup
+			}
+			if sourceDetail.Region != "" {
+				pubReq.FormFields["region"] = sourceDetail.Region
+			}
 			if sourceDetail.IMDbID != "" {
 				pubReq.FormFields["imdb"] = sourceDetail.IMDbID
 			}
 			pubReq.MediaInfo = sourceDetail.MediaInfo
 			pubReq.Screenshots = sourceDetail.Screenshots
+		}
+
+		if pubReq.DoubanLink != "" && pubReq.FormFields["douban"] == "" {
+			pubReq.FormFields["douban"] = pubReq.DoubanLink
 		}
 
 		p.mapFieldValues(ctx, targetSite, pubReq.FormFields)
@@ -288,26 +330,30 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 			)
 			lastErr = err
 
-			_ = p.CreateResult(ctx, &model.PublishResultRecord{
+			if err := p.CreateResult(ctx, &model.PublishResultRecord{
 				CandidateID:  id,
 				SourceSite:   candidate.SourceSite,
 				TargetSite:   targetSite,
 				TorrentID:    candidate.SourceTorrentID,
 				Status:       model.PublishResultFailed,
 				ErrorMessage: err.Error(),
-			})
+			}); err != nil {
+				p.logger.Warn("记录发布结果失败", zap.Error(err))
+			}
 			continue
 		}
 
 		publishedCount++
-		_ = p.CreateResult(ctx, &model.PublishResultRecord{
+		if err := p.CreateResult(ctx, &model.PublishResultRecord{
 			CandidateID: id,
 			SourceSite:  candidate.SourceSite,
 			TargetSite:  targetSite,
 			TorrentID:   resp.TorrentID,
 			Status:      model.PublishResultCompleted,
 			PublishURL:  resp.DetailURL,
-		})
+		}); err != nil {
+			p.logger.Warn("记录发布结果失败", zap.Error(err))
+		}
 	}
 
 	if publishedCount > 0 {
@@ -403,6 +449,10 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 		}
 	}
 
+	if candidate.HasHR {
+		return false, "源站种子存在 H&R (Hit and Run) 标记，跳过发布"
+	}
+
 	if targetSite != "" && candidate.SourceSite != "" {
 		var exclusion model.PublishExclusion
 		err := p.db.WithContext(ctx).
@@ -419,7 +469,7 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 func (p *Pipeline) ProcessPending(ctx context.Context) error {
 	candidates, err := p.ListPendingCandidates(ctx, 100)
 	if err != nil {
-		return fmt.Errorf("list pending candidates: %w", err)
+		return publishError(ErrPublishDB, "list pending candidates", err)
 	}
 
 	if len(candidates) == 0 {
@@ -483,6 +533,71 @@ func (p *Pipeline) ProcessPending(ctx context.Context) error {
 	return nil
 }
 
+func (p *Pipeline) ProcessPendingGroups(ctx context.Context) error {
+	var groups []model.PublishGroup
+	err := p.db.WithContext(ctx).
+		Where("status IN ?", []model.PublishGroupStatus{
+			model.GroupActive,
+			model.GroupPublishing,
+		}).Find(&groups).Error
+	if err != nil {
+		return publishError(ErrPublishDB, "list active groups", err)
+	}
+
+	if len(groups) == 0 {
+		return nil
+	}
+
+	p.logger.Debug("processing pending groups", zap.Int("count", len(groups)))
+
+	for i := range groups {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		group := &groups[i]
+
+		var members []model.PublishGroupMember
+		if err := p.db.WithContext(ctx).
+			Where("publish_group_id = ? AND status IN ?",
+				group.ID,
+				[]model.MemberStatus{
+					model.MemberStatusNew,
+					model.MemberStatusUploading,
+					model.MemberStatusInjected,
+				},
+			).Find(&members).Error; err != nil {
+			p.logger.Warn("query pending members failed",
+				zap.Uint("groupID", group.ID),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		for j := range members {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if err := p.ProcessMemberWithResume(ctx, &members[j]); err != nil {
+				p.logger.Warn("process member failed",
+					zap.Uint("groupID", group.ID),
+					zap.Uint("memberID", members[j].ID),
+					zap.String("site", members[j].SiteName),
+					zap.Error(err),
+				)
+			}
+		}
+
+		if err := p.TransitionGroupLifecycle(ctx, group.ID); err != nil {
+			p.logger.Warn("transition group lifecycle failed",
+				zap.Uint("groupID", group.ID),
+				zap.Error(err),
+			)
+		}
+	}
+
+	return nil
+}
+
 func parseTargetSites(s string) []string {
 	if s == "" {
 		return nil
@@ -512,6 +627,7 @@ func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) 
 			TorrentName:     ev.Title,
 			Size:            ev.Size,
 			Discount:        ev.Discount,
+			HasHR:           ev.HasHR,
 			PublishStatus:   model.CandidatePending,
 			Role:            model.RoleDownload,
 		}
@@ -521,6 +637,13 @@ func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) 
 				zap.String("torrent", ev.TorrentID),
 				zap.Error(err),
 			)
+		} else if p.completionWatcher != nil && candidate.ClientID != "" && candidate.InfoHash != "" {
+			if err := p.completionWatcher.SubmitCandidate(ctx, *candidate); err != nil {
+				p.logger.Warn("submit candidate to watcher failed",
+					zap.Uint("id", candidate.ID),
+					zap.Error(err),
+				)
+			}
 		}
 	}
 	return nil
@@ -708,36 +831,37 @@ func (p *Pipeline) addStatusHistory(ctx context.Context, groupID uint, memberHas
 }
 
 const (
-	StepDownload    = 1
-	StepDetail      = 2
-	StepDedup       = 3
-	StepRender      = 4
-	StepUpload      = 5
-	StepConfirmSeed = 6
+	StepDownload = 1
+	StepDetail   = 2
+	StepDedup    = 3
+	StepRender   = 4
+	StepUpload   = 5
+	_            = 6
+	StepHRDetect = 7
 )
 
 func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.PublishGroupMember) error {
 	if member.PublishGroupID == 0 {
-		return fmt.Errorf("member has no group")
+		return publishError(ErrPublishConfig, "member has no group", nil)
 	}
 
 	var group model.PublishGroup
 	if err := p.db.WithContext(ctx).First(&group, member.PublishGroupID).Error; err != nil {
-		return fmt.Errorf("load group: %w", err)
+		return publishError(ErrPublishDB, "load group", err)
 	}
 
 	if p.siteProvider == nil {
-		return fmt.Errorf("site provider not configured")
+		return publishError(ErrPublishConfig, "site provider not configured", nil)
 	}
 
 	sourceConfig, err := p.siteProvider.GetSiteConfig(ctx, group.SourceSite)
 	if err != nil {
-		return fmt.Errorf("get source config: %w", err)
+		return publishError(ErrPublishConfig, "get source config", err)
 	}
 
 	sourceAdapter, err := p.siteProvider.GetAdapter(ctx, group.SourceSite)
 	if err != nil {
-		return fmt.Errorf("get source adapter: %w", err)
+		return publishError(ErrPublishConfig, "get source adapter", err)
 	}
 
 	var torrentData []byte
@@ -873,9 +997,25 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 			if sourceDetail.Codec != "" {
 				pubReq.FormFields["codec"] = sourceDetail.Codec
 			}
+			if sourceDetail.AudioCodec != "" {
+				pubReq.FormFields["audioCodec"] = sourceDetail.AudioCodec
+			}
+			if sourceDetail.Processing != "" {
+				pubReq.FormFields["processing"] = sourceDetail.Processing
+			}
+			if sourceDetail.ReleaseGroup != "" {
+				pubReq.FormFields["team"] = sourceDetail.ReleaseGroup
+			}
+			if sourceDetail.Region != "" {
+				pubReq.FormFields["region"] = sourceDetail.Region
+			}
 			if sourceDetail.IMDbID != "" {
 				pubReq.FormFields["imdb"] = sourceDetail.IMDbID
 			}
+		}
+
+		if pubReq.DoubanLink != "" && pubReq.FormFields["douban"] == "" {
+			pubReq.FormFields["douban"] = pubReq.DoubanLink
 		}
 
 		p.mapFieldValues(ctx, member.SiteName, pubReq.FormFields)
@@ -894,7 +1034,125 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 		p.advanceStep(ctx, member, StepUpload)
 	}
 
+	if member.LastCompletedStep < StepHRDetect {
+		p.detectHR(ctx, member)
+	}
+
+	p.notifyPublishResult(ctx, member)
+
 	return nil
+}
+
+func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMember) {
+	if member.TorrentID == "" {
+		p.advanceStep(ctx, member, StepHRDetect)
+		return
+	}
+
+	targetConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, member.SiteName)
+	if cfgErr != nil {
+		p.logger.Warn("HR 检测: 获取目标站配置失败", zap.Error(cfgErr))
+		p.advanceStep(ctx, member, StepHRDetect)
+		return
+	}
+
+	targetAdapter, adpErr := p.siteProvider.GetAdapter(ctx, member.SiteName)
+	if adpErr != nil {
+		p.logger.Warn("HR 检测: 获取目标站适配器失败", zap.Error(adpErr))
+		p.advanceStep(ctx, member, StepHRDetect)
+		return
+	}
+
+	hrResult, hrErr := targetAdapter.DetectHR(ctx, targetConfig, member.TorrentID)
+	if hrErr != nil {
+		p.logger.Warn("HR 检测失败",
+			zap.String("site", member.SiteName),
+			zap.String("torrentID", member.TorrentID),
+			zap.Error(hrErr),
+		)
+		p.advanceStep(ctx, member, StepHRDetect)
+		return
+	}
+
+	if hrResult != nil && hrResult.HasHR {
+		hrSeedStart := time.Now()
+		seedTimeH := hrResult.SeedTimeH
+		if seedTimeH <= 0 {
+			seedTimeH = 72
+		}
+		p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
+			"hr_protected":      true,
+			"hr_min_seed_hours": seedTimeH,
+			"hr_min_ratio":      hrResult.MinRatio,
+			"hr_seed_start":     &hrSeedStart,
+			"hr_site":           member.SiteName,
+		})
+		member.HRProtected = true
+		member.HRSeedStart = &hrSeedStart
+		member.HRMinSeedHours = seedTimeH
+
+		hrTag := fmt.Sprintf("PROTECTED_HR_%s", member.SiteName)
+		if p.clientProvider != nil && member.ClientID != "" && member.InfoHash != "" {
+			if dl, dlErr := p.clientProvider.Get(member.ClientID); dlErr == nil {
+				if tagErr := dl.SetTorrentTags(ctx, member.InfoHash, []string{hrTag}); tagErr != nil {
+					p.logger.Warn("设置 HR 保护标签失败",
+						zap.String("clientID", member.ClientID),
+						zap.String("infoHash", member.InfoHash),
+						zap.Error(tagErr),
+					)
+				}
+			}
+		}
+		p.logger.Info("HR 检测: 种子已标记为 HR 保护",
+			zap.Uint("memberID", member.ID),
+			zap.String("site", member.SiteName),
+			zap.Int("seedTimeH", seedTimeH),
+		)
+	}
+	p.advanceStep(ctx, member, StepHRDetect)
+}
+
+func (p *Pipeline) notifyPublishResult(ctx context.Context, member *model.PublishGroupMember) {
+	if p.notifyService == nil {
+		return
+	}
+
+	var group model.PublishGroup
+	if err := p.db.WithContext(ctx).First(&group, member.PublishGroupID).Error; err != nil {
+		return
+	}
+
+	var level, title, body string
+	switch member.Status {
+	case model.MemberStatusUploaded:
+		level = "publish.success"
+		title = fmt.Sprintf("发布成功 → %s", member.SiteName)
+		body = fmt.Sprintf("种子 %s 已成功发布到 %s", group.SourceTorrentID, member.SiteName)
+		if member.TorrentID != "" {
+			body += fmt.Sprintf("（TorrentID: %s）", member.TorrentID)
+		}
+		if member.HRProtected {
+			body += fmt.Sprintf("\n⚠️ HR 保护: 需保种 %d 小时", member.HRMinSeedHours)
+		}
+	case model.MemberStatusError:
+		level = "publish.error"
+		title = fmt.Sprintf("发布失败 → %s", member.SiteName)
+		body = fmt.Sprintf("种子 %s 发布到 %s 失败", group.SourceTorrentID, member.SiteName)
+		if member.LastError != "" {
+			body += fmt.Sprintf(": %s", member.LastError)
+		}
+	default:
+		return
+	}
+
+	msg := model.FormattedMessage{
+		Title:   title,
+		Message: body,
+		Level:   level,
+	}
+	if err := p.notifyService.Send(ctx, msg); err != nil {
+		p.logger.Warn("发布通知发送失败", zap.Error(err))
+	}
 }
 
 func (p *Pipeline) advanceStep(ctx context.Context, member *model.PublishGroupMember, step int) {
@@ -913,7 +1171,7 @@ func (p *Pipeline) failMember(ctx context.Context, member *model.PublishGroupMem
 		"error_at":   &now,
 		"status_at":  &now,
 	})
-	return fmt.Errorf("step %d: %s", step, reason)
+	return publishError(ErrPublishGeneric, fmt.Sprintf("step %d: %s", step, reason), nil)
 }
 
 func (p *Pipeline) mapFieldValues(ctx context.Context, targetSite string, fields map[string]string) {

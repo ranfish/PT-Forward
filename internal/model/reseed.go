@@ -116,6 +116,7 @@ type ReseedNegativeCache struct {
 func (ReseedNegativeCache) TableName() string { return "reseed_negative_caches" }
 
 // §33.1.18 — ReseedSource: 辅种过滤参数
+// v2: reserved — 待实现时激活
 type ReseedSource struct {
 	InfoHash string `json:"info_hash" gorm:"size:40;index"`
 	Title    string `json:"title" gorm:"size:500"`
@@ -125,6 +126,7 @@ type ReseedSource struct {
 }
 
 // §33.1.19 — IYUUCandidate: IYUU 匹配候选
+// v2: reserved — 待实现时激活
 type IYUUCandidate struct {
 	Sid            int    `json:"sid"`
 	Site           string `json:"site" gorm:"size:50"`
@@ -136,6 +138,7 @@ type IYUUCandidate struct {
 }
 
 // §33.1.20 — ReseedDecision: 辅种决策结果
+// v2: reserved — 待实现时激活
 type ReseedDecision struct {
 	TargetSite  string       `json:"target_site" gorm:"size:50"`
 	TorrentID   int          `json:"torrent_id"`

@@ -1,11 +1,9 @@
 package adapter
 
 import (
-	"crypto/tls"
 	"net/http"
-	"net/url"
-	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -16,26 +14,16 @@ type HTTPDoer struct {
 
 func NewHTTPDoer() *HTTPDoer {
 	return &HTTPDoer{
-		Client: &http.Client{Timeout: 30 * time.Second},
+		Client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{}),
 	}
 }
 
 func NewHTTPDoerWithSite(proxyURL string, skipSSLVerify bool) *HTTPDoer {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: skipSSLVerify,
-		},
-	}
-	if proxyURL != "" {
-		if pu, err := url.Parse(proxyURL); err == nil {
-			transport.Proxy = http.ProxyURL(pu)
-		}
-	}
 	return &HTTPDoer{
-		Client: &http.Client{
-			Timeout:   30 * time.Second,
-			Transport: transport,
-		},
+		Client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+			ProxyURL:      proxyURL,
+			SkipSSLVerify: skipSSLVerify,
+		}),
 	}
 }
 

@@ -44,6 +44,7 @@ type HRResult struct {
 }
 
 // §33.1.36 — RawTorrent: 源站原始种子数据
+// v2: reserved — 待实现时激活
 type RawTorrent struct {
 	SiteName      string    `json:"site_name"`
 	TorrentID     string    `json:"torrent_id"`
@@ -130,6 +131,7 @@ type DescriptionData struct {
 }
 
 // §33.1.28 — PublishStepResult: 21 步中间产物容器
+// v2: reserved — 待实现时激活
 type PublishStepResult struct {
 	TargetSite     string
 	TorrentID      string
@@ -159,13 +161,44 @@ func (e *AppError) Error() string { return e.Message }
 func (e *AppError) Unwrap() error { return e.Cause }
 
 // §33.1.86 — RateLimitConfig: 搜索速率控制配置
+// v2: reserved — 待实现时激活
 type RateLimitConfig struct {
 	MaxConcurrency int           `yaml:"max_concurrency"`
 	MinInterval    time.Duration `yaml:"min_interval"`
 }
 
-// §33.1.88 — MemoryConfig: 全局内存预算配置
-type MemoryConfig struct {
-	MaxTotalMB  int     `yaml:"max_total_mb"`
-	WarnPercent float64 `yaml:"warn_percent"`
+type UploadForm struct {
+	Fields []UploadFormField `json:"fields"`
+}
+
+type UploadFormField struct {
+	Name        string   `json:"name"`
+	Label       string   `json:"label"`
+	Type        string   `json:"type"`
+	Required    bool     `json:"required"`
+	Options     []string `json:"options,omitempty"`
+	Placeholder string   `json:"placeholder,omitempty"`
+	Value       string   `json:"value,omitempty"`
+}
+
+type EditForm struct {
+	TorrentID   string            `json:"torrent_id"`
+	Title       string            `json:"title"`
+	Description string            `json:"description"`
+	Fields      map[string]string `json:"fields"`
+}
+
+type PublishDedupResult struct {
+	TorrentID string `json:"torrent_id"`
+	Title     string `json:"title"`
+	Size      int64  `json:"size"`
+	InfoHash  string `json:"info_hash"`
+}
+
+type ListOptions struct {
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
+	SortBy   string `json:"sort_by"`
+	SortDir  string `json:"sort_dir"`
+	Search   string `json:"search"`
 }

@@ -20,11 +20,6 @@ log:
   compress: true
   format: "json"
 
-scheduler:
-  max_workers: 3
-  task_timeout_min: 10
-  http_timeout_sec: 30
-
 security:
   rate_limit_enabled: true
   rate_limit_global: 100
@@ -33,13 +28,19 @@ security:
   login_max_retries: 5
   login_lockout_min: 5
 
-memory:
-  max_total_mb: 256
-  warn_percent: 0.7
-
 cookiecloud:
   enabled: false
   sync_interval: 60
+
+notification:
+  enabled: true
+  max_retries: 3
+  retry_interval_s: 30
+  batch_size: 10
+
+iyuu:
+  enabled: false
+  api_base: "https://iyuu.cn"
 
 data_cleanup:
   torrent_event_retain_days: 7

@@ -2,7 +2,6 @@ package event
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -56,7 +55,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, eventType string, events []mo
 				zap.String("event_type", eventType),
 				zap.Error(err),
 			)
-			lastErr = fmt.Errorf("handler failed: %w", err)
+			lastErr = eventError(ErrEventHandler, "handler failed", err)
 		}
 	}
 

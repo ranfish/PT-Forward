@@ -18,6 +18,89 @@ const (
 	DiscountCustom    DiscountLevel = "CUSTOM"
 )
 
+func (d DiscountLevel) DownloadRatio() float64 {
+	switch d {
+	case DiscountFree, Discount2xFree:
+		return 0.0
+	case Discount2x50:
+		return 0.5
+	case DiscountPercent25:
+		return 0.25
+	case DiscountPercent30:
+		return 0.3
+	case DiscountPercent50:
+		return 0.5
+	case DiscountPercent70:
+		return 0.7
+	case DiscountPercent75:
+		return 0.75
+	default:
+		return 1.0
+	}
+}
+
+func (d DiscountLevel) UploadRatio() float64 {
+	switch d {
+	case Discount2xFree, Discount2x50:
+		return 2.0
+	case Discount2xUp:
+		return 2.0
+	default:
+		return 1.0
+	}
+}
+
+func (d DiscountLevel) IsFree() bool {
+	return d.DownloadRatio() == 0.0
+}
+
+func (d DiscountLevel) IsFreeOrDiscount() bool {
+	return d.DownloadRatio() < 1.0 || d.UploadRatio() > 1.0
+}
+
+func (d DiscountLevel) PriorityValue() int {
+	switch d {
+	case Discount2xFree:
+		return 7
+	case DiscountFree:
+		return 6
+	case Discount2xUp:
+		return 5
+	case Discount2x50:
+		return 4
+	case DiscountPercent25:
+		return 3
+	case DiscountPercent30:
+		return 3
+	case DiscountPercent50:
+		return 2
+	case DiscountPercent70:
+		return 1
+	case DiscountPercent75:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func (d DiscountLevel) IsValid() bool {
+	switch d {
+	case DiscountNone, DiscountFree, Discount2xUp, Discount2xFree,
+		DiscountPercent25, DiscountPercent30, DiscountPercent50,
+		Discount2x50, DiscountPercent70, DiscountPercent75, DiscountCustom:
+		return true
+	default:
+		return false
+	}
+}
+
+func NewDiscountLevelFromBool(isFree bool) DiscountLevel {
+	if isFree {
+		return DiscountFree
+	}
+	return DiscountNone
+}
+
 // §33.1.55 — SideLoadStatus 枚举（Sprint 89）
 type SideLoadStatus string
 

@@ -2,7 +2,6 @@ package dispatcher
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -23,20 +22,30 @@ const (
 )
 
 type TorrentDispatcher struct {
-	db        *gorm.DB
-	clientMgr *client.Manager
-	logger    *zap.Logger
-	handlers  map[Role]model.EventHandler
-	mu        sync.RWMutex
+	db             *gorm.DB
+	clientMgr      *client.Manager
+	clientSelector *ClientSelector
+	logger         *zap.Logger
+	handlers       map[Role]model.EventHandler
+	mu             sync.RWMutex
 }
 
 func NewTorrentDispatcher(db *gorm.DB, clientMgr *client.Manager, logger *zap.Logger) *TorrentDispatcher {
-	return &TorrentDispatcher{
-		db:        db,
-		clientMgr: clientMgr,
-		logger:    logger,
-		handlers:  make(map[Role]model.EventHandler),
+	var selector *ClientSelector
+	if clientMgr != nil {
+		selector = NewClientSelector(clientMgr, logger)
 	}
+	return &TorrentDispatcher{
+		db:             db,
+		clientMgr:      clientMgr,
+		clientSelector: selector,
+		logger:         logger,
+		handlers:       make(map[Role]model.EventHandler),
+	}
+}
+
+func (d *TorrentDispatcher) SetClientSelector(selector *ClientSelector) {
+	d.clientSelector = selector
 }
 
 func (d *TorrentDispatcher) RegisterHandler(role Role, handler model.EventHandler) {
@@ -52,7 +61,7 @@ func (d *TorrentDispatcher) OnTorrents(ctx context.Context, events []model.Torre
 
 	eventsByRole, err := d.enrichAndRoute(ctx, events)
 	if err != nil {
-		return fmt.Errorf("enrich and route events: %w", err)
+		return dispatcherError(ErrDispatcherRoute, "enrich and route events", err)
 	}
 
 	d.mu.RLock()
@@ -103,10 +112,23 @@ func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.T
 			continue
 		}
 
-		clientCfg, err := d.getClientConfig(ctx, sub.ClientID)
+		selectedClient := sub.ClientID
+		if d.clientSelector != nil {
+			if chosen, err := d.clientSelector.Select(ctx, sub); err == nil {
+				selectedClient = chosen
+			} else {
+				d.logger.Warn("client selector failed, using fixed client",
+					zap.String("subscription", sub.Name),
+					zap.String("fixed_client", sub.ClientID),
+					zap.Error(err),
+				)
+			}
+		}
+
+		clientCfg, err := d.getClientConfig(ctx, selectedClient)
 		if err != nil {
 			d.logger.Debug("client config not found, skipping event",
-				zap.String("client_id", sub.ClientID),
+				zap.String("client_id", selectedClient),
 				zap.String("site", ev.SiteName),
 				zap.Error(err),
 			)
@@ -118,7 +140,7 @@ func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.T
 		if ev.Metadata == nil {
 			ev.Metadata = make(map[string]any)
 		}
-		ev.Metadata["client_name"] = sub.ClientID
+		ev.Metadata["client_name"] = selectedClient
 		ev.Metadata["client_role"] = string(role)
 		ev.Metadata["subscription_id"] = ev.SourceID
 

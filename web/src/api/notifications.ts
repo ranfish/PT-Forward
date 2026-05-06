@@ -19,7 +19,7 @@ export const notificationsApi = {
   test(id: number) {
     return client.post(`/notifications/channels/${id}/test`)
   },
-  listHistory(channelId?: number, limit = 50) {
-    return client.get('/notifications/history', { params: { channelId, limit } })
+  listHistory(channelId: number, limit = 50) {
+    return client.get(`/notifications/channels/${channelId}/history`, { params: { limit } })
   },
 }

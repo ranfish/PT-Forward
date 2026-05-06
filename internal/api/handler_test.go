@@ -17,6 +17,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/rss"
+	"github.com/ranfish/pt-forward/internal/scheduler"
 	"github.com/ranfish/pt-forward/internal/seeding"
 	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
@@ -26,11 +27,12 @@ import (
 )
 
 type testEnv struct {
-	db          *gorm.DB
-	authManager *auth.AuthManager
-	router      *Router
-	mux         *http.ServeMux
-	token       string
+	db           *gorm.DB
+	authManager  *auth.AuthManager
+	router       *Router
+	mux          *http.ServeMux
+	token        string
+	taskRegistry *scheduler.Registry
 }
 
 func setupTestEnv(t *testing.T) *testEnv {
@@ -98,8 +100,9 @@ func setupTestEnv(t *testing.T) *testEnv {
 	reseedEngine := reseed.NewEngine(db, logger)
 	publishPipeline := publish.NewPipeline(db, logger)
 	seedingEngine := seeding.NewEngine(db, logger)
+	taskRegistry := scheduler.NewRegistry(logger)
 
-	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, nil, "test", logger)
+	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, nil, taskRegistry, &mockIYUUQueryService{}, "test", logger)
 	mux := http.NewServeMux()
 	router.Register(mux, []string{"*"}, true, 120)
 
@@ -122,6 +125,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 		t.Fatalf("issue token: %v", err)
 	}
 	env.token = pair.AccessToken
+	env.taskRegistry = taskRegistry
 
 	return env
 }
@@ -2206,4 +2210,163 @@ func TestRSS_CreateAndUpdate(t *testing.T) {
 	if data["enabled"] != false {
 		t.Errorf("expected enabled false, got %v", data["enabled"])
 	}
+}
+
+func TestScheduler_ListTasks(t *testing.T) {
+	env := setupTestEnv(t)
+
+	_ = env.taskRegistry.Register("test_task_1", "test", "*/5 * * * *", func(taskCtx context.Context) error {
+		return nil
+	})
+
+	w := env.doRequest("GET", "/api/v1/scheduler/tasks", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			Items []struct {
+				Name string `json:"name"`
+			} `json:"items"`
+			Total int `json:"total"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Data.Total != 1 {
+		t.Errorf("expected 1 task, got %d", resp.Data.Total)
+	}
+	if len(resp.Data.Items) != 1 || resp.Data.Items[0].Name != "test_task_1" {
+		t.Errorf("unexpected items: %+v", resp.Data.Items)
+	}
+}
+
+func TestScheduler_GetTask(t *testing.T) {
+	env := setupTestEnv(t)
+
+	_ = env.taskRegistry.Register("test_task_2", "test", "*/5 * * * *", func(taskCtx context.Context) error {
+		return nil
+	})
+
+	w := env.doRequest("GET", "/api/v1/scheduler/tasks/test_task_2", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			Name string `json:"name"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Data.Name != "test_task_2" {
+		t.Errorf("expected test_task_2, got %s", resp.Data.Name)
+	}
+}
+
+func TestScheduler_GetTask_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+
+	w := env.doRequest("GET", "/api/v1/scheduler/tasks/nonexistent", nil)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestScheduler_PauseResume(t *testing.T) {
+	env := setupTestEnv(t)
+
+	_ = env.taskRegistry.Register("test_task_3", "test", "*/5 * * * *", func(taskCtx context.Context) error {
+		return nil
+	})
+
+	w := env.doRequest("POST", "/api/v1/scheduler/tasks/test_task_3/pause", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("pause: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	task, _ := env.taskRegistry.Get("test_task_3")
+	if !task.Paused {
+		t.Error("task should be paused")
+	}
+
+	w = env.doRequest("POST", "/api/v1/scheduler/tasks/test_task_3/resume", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("resume: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	task, _ = env.taskRegistry.Get("test_task_3")
+	if task.Paused {
+		t.Error("task should not be paused after resume")
+	}
+}
+
+func TestScheduler_Trigger(t *testing.T) {
+	env := setupTestEnv(t)
+
+	_ = env.taskRegistry.Register("test_task_4", "test", "*/5 * * * *", func(taskCtx context.Context) error {
+		return nil
+	})
+
+	w := env.doRequest("POST", "/api/v1/scheduler/tasks/test_task_4/trigger", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("trigger: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	task, _ := env.taskRegistry.Get("test_task_4")
+	if task.SuccessCount != 1 {
+		t.Errorf("expected 1 success, got %d", task.SuccessCount)
+	}
+}
+
+func TestScheduler_Reschedule(t *testing.T) {
+	env := setupTestEnv(t)
+
+	_ = env.taskRegistry.Register("test_task_5", "test", "*/5 * * * *", func(taskCtx context.Context) error {
+		return nil
+	})
+
+	w := env.doRequest("PUT", "/api/v1/scheduler/tasks/test_task_5/schedule", map[string]interface{}{
+		"schedule": "*/10 * * * *",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("reschedule: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	task, _ := env.taskRegistry.Get("test_task_5")
+	if task.Schedule != "*/10 * * * *" {
+		t.Errorf("expected schedule */10 * * * *, got %q", task.Schedule)
+	}
+}
+
+func TestScheduler_Reschedule_InvalidCron(t *testing.T) {
+	env := setupTestEnv(t)
+
+	_ = env.taskRegistry.Register("test_task_6", "test", "*/5 * * * *", func(taskCtx context.Context) error {
+		return nil
+	})
+
+	w := env.doRequest("PUT", "/api/v1/scheduler/tasks/test_task_6/schedule", map[string]interface{}{
+		"schedule": "invalid",
+	})
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+
+	task, _ := env.taskRegistry.Get("test_task_6")
+	if task.Schedule != "*/5 * * * *" {
+		t.Errorf("schedule should not change on invalid input, got %q", task.Schedule)
+	}
+}
+
+type mockIYUUQueryService struct{}
+
+func (m *mockIYUUQueryService) QueryReseed(_ context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error) {
+	return []*model.IYUUReseedResult{}, nil
 }

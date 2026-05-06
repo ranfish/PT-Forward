@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,16 +18,16 @@ import (
 type ClientHandler struct {
 	db        *gorm.DB
 	logger    *zap.Logger
-	clientMgr DownloaderProvider
+	clientMgr ClientManager
 }
 
-type DownloaderProvider interface {
+type ClientManager interface {
 	Get(clientID string) (model.DownloaderClient, error)
 	Reload(ctx context.Context) error
 	ConnectedCount() int
 }
 
-func NewClientHandler(db *gorm.DB, logger *zap.Logger, clientMgr DownloaderProvider) *ClientHandler {
+func NewClientHandler(db *gorm.DB, logger *zap.Logger, clientMgr ClientManager) *ClientHandler {
 	return &ClientHandler{db: db, logger: logger, clientMgr: clientMgr}
 }
 
@@ -97,11 +96,15 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	page, size := parsePagination(r)
+
+	var total int64
+	h.db.Model(&model.ClientConfig{}).Where("deleted_at = ?", time.Time{}).Count(&total)
+
 	var clients []model.ClientConfig
-	if err := h.db.Where("deleted_at = ?", time.Time{}).Find(&clients).Error; err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询下载器失败")
-		return
-	}
+	h.db.Where("deleted_at = ?", time.Time{}).
+		Offset(offset(page, size)).Limit(size).
+		Find(&clients)
 
 	items := make([]downloaderResponse, 0, len(clients))
 	for i := range clients {
@@ -110,9 +113,11 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 		items = append(items, h.toResponse(&clients[i], mappings))
 	}
 
-	Success(w, map[string]interface{}{
-		"items": items,
-		"total": len(items),
+	Success(w, PaginatedResult{
+		Items: items,
+		Total: total,
+		Page:  page,
+		Size:  size,
 	})
 }
 
@@ -485,7 +490,7 @@ func extractIDFromPath(path string, prefix string, suffixes ...string) (uint, er
 	p = strings.TrimSuffix(p, "/")
 	n, err := strconv.ParseUint(p, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("invalid id")
+		return 0, apiError(ErrAPIInvalidID, "invalid id", nil)
 	}
 	return uint(n), nil
 }
@@ -658,4 +663,117 @@ func (h *ClientHandler) handleMaindata(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 	Success(w, md)
+}
+
+func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		var targets []model.ClientPublishTarget
+		if err := h.db.WithContext(r.Context()).Find(&targets).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 500, "failed to list publish targets")
+			return
+		}
+		Success(w, targets)
+
+	case http.MethodPost:
+		var req struct {
+			ClientID        uint   `json:"client_id"`
+			SiteName        string `json:"site_name"`
+			CategoryMapping string `json:"category_mapping"`
+			SourceMapping   string `json:"source_mapping"`
+			CodecMapping    string `json:"codec_mapping"`
+			AutoPublish     bool   `json:"auto_publish"`
+			NotifyOnPublish bool   `json:"notify_on_publish"`
+			Enabled         bool   `json:"enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			return
+		}
+		if req.ClientID == 0 || req.SiteName == "" {
+			Error(w, http.StatusBadRequest, 400, "client_id and site_name are required")
+			return
+		}
+		target := model.ClientPublishTarget{
+			ClientID:        req.ClientID,
+			SiteName:        req.SiteName,
+			CategoryMapping: req.CategoryMapping,
+			SourceMapping:   req.SourceMapping,
+			CodecMapping:    req.CodecMapping,
+			AutoPublish:     req.AutoPublish,
+			NotifyOnPublish: req.NotifyOnPublish,
+			Enabled:         req.Enabled,
+		}
+		if err := h.db.WithContext(r.Context()).Create(&target).Error; err != nil {
+			if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "UNIQUE") {
+				Error(w, http.StatusConflict, 409, "publish target already exists")
+				return
+			}
+			Error(w, http.StatusInternalServerError, 500, "failed to create publish target")
+			return
+		}
+		Success(w, target)
+
+	case http.MethodPut:
+		var req struct {
+			ID              uint   `json:"id"`
+			CategoryMapping string `json:"category_mapping"`
+			SourceMapping   string `json:"source_mapping"`
+			CodecMapping    string `json:"codec_mapping"`
+			AutoPublish     *bool  `json:"auto_publish"`
+			NotifyOnPublish *bool  `json:"notify_on_publish"`
+			Enabled         *bool  `json:"enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			return
+		}
+		var target model.ClientPublishTarget
+		if err := h.db.WithContext(r.Context()).First(&target, req.ID).Error; err != nil {
+			Error(w, http.StatusNotFound, 404, "publish target not found")
+			return
+		}
+		updates := map[string]interface{}{}
+		if req.CategoryMapping != "" {
+			updates["category_mapping"] = req.CategoryMapping
+		}
+		if req.SourceMapping != "" {
+			updates["source_mapping"] = req.SourceMapping
+		}
+		if req.CodecMapping != "" {
+			updates["codec_mapping"] = req.CodecMapping
+		}
+		if req.AutoPublish != nil {
+			updates["auto_publish"] = *req.AutoPublish
+		}
+		if req.NotifyOnPublish != nil {
+			updates["notify_on_publish"] = *req.NotifyOnPublish
+		}
+		if req.Enabled != nil {
+			updates["enabled"] = *req.Enabled
+		}
+		if len(updates) > 0 {
+			h.db.WithContext(r.Context()).Model(&target).Updates(updates)
+		}
+		h.db.WithContext(r.Context()).First(&target, req.ID)
+		Success(w, target)
+
+	case http.MethodDelete:
+		var req struct {
+			ID uint `json:"id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			return
+		}
+		result := h.db.WithContext(r.Context()).Delete(&model.ClientPublishTarget{}, req.ID)
+		if result.RowsAffected == 0 {
+			Error(w, http.StatusNotFound, 404, "publish target not found")
+			return
+		}
+		Success(w, map[string]string{"status": "deleted"})
+
+	default:
+		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+	}
 }

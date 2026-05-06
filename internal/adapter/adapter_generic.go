@@ -30,7 +30,7 @@ func NewGenericAdapter(framework string, doer *HTTPDoer, logger *zap.Logger) *Ge
 func (a *GenericAdapter) Framework() string { return a.framework }
 
 func (a *GenericAdapter) ParseRSS(_ context.Context, _ string, _ *model.SiteConfig) ([]*model.RSSTorrentEvent, error) {
-	return nil, fmt.Errorf("ParseRSS: use RSS fetcher instead")
+	return nil, parseError("ParseRSS: use RSS fetcher instead", nil)
 }
 
 func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
@@ -39,18 +39,18 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 		u = buildGenericDownloadURL(config, torrentID)
 	}
 	if u == "" {
-		return nil, fmt.Errorf("no download URL configured for %s", a.framework)
+		return nil, configError(fmtES("no download URL configured for %s", a.framework))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("下载失败: %w", err)
+		return nil, downloadError("下载失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -58,7 +58,7 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	contentType := resp.Header.Get("Content-Type")
@@ -72,28 +72,28 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
 	u := buildGenericURL(config, config.Paths.Detail, torrentID)
 	if u == "" {
-		return nil, fmt.Errorf("未配置详情页路径 (paths.detail)")
+		return nil, configError("未配置详情页路径 (paths.detail)")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("请求详情页失败: %w", err)
+		return nil, networkError("请求详情页失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, networkError("读取响应失败", err)
 	}
 
 	html := string(body)
@@ -136,28 +136,28 @@ func (a *GenericAdapter) GetBatchSLData(ctx context.Context, config *model.SiteC
 func (a *GenericAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
 	u := buildGenericURL(config, config.Paths.Detail, torrentID)
 	if u == "" {
-		return nil, fmt.Errorf("未配置详情页路径 (paths.detail)")
+		return nil, configError("未配置详情页路径 (paths.detail)")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("请求详情页失败: %w", err)
+		return nil, networkError("请求详情页失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, networkError("读取响应失败", err)
 	}
 
 	html := string(body)
@@ -245,17 +245,9 @@ func (a *GenericAdapter) detectDiscountGenericPage(ctx context.Context, config *
 	body, _ := io.ReadAll(resp.Body)
 	html := strings.ToLower(string(body))
 
-	if strings.Contains(html, "pro_free2up") || strings.Contains(html, "2xfree") {
-		return &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}, nil
-	}
-	if strings.Contains(html, "pro_2up") || strings.Contains(html, "2xup") {
-		return &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}, nil
-	}
-	if strings.Contains(html, "pro_free") || strings.Contains(html, "免费") || strings.Contains(html, "free") {
-		return &model.DiscountResult{Level: model.DiscountFree}, nil
-	}
-	if strings.Contains(html, "pro_50p") || strings.Contains(html, "50%") {
-		return &model.DiscountResult{Level: model.DiscountPercent50}, nil
+	result := DetectDiscountFromHTML(html, &config.DiscountDetection)
+	if result.Level != model.DiscountNone {
+		return result, nil
 	}
 
 	return &model.DiscountResult{Level: model.DiscountNone}, nil
@@ -294,7 +286,7 @@ func (a *GenericAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
-		result.SeedTimeH = 72
+		result.SeedTimeH = config.HR.SeedTimeH()
 	}
 
 	return result, nil
@@ -318,7 +310,7 @@ func (a *GenericAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
 	uploadURL := buildGenericURL(config, config.Paths.Upload, "")
 	if uploadURL == "" {
-		return nil, fmt.Errorf("未配置上传路径 (paths.upload)")
+		return nil, configError("未配置上传路径 (paths.upload)")
 	}
 
 	if len(req.TorrentData) == 0 {
@@ -328,12 +320,12 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 
-	fileWriter, err := writer.CreateFormFile("torrent", "upload.torrent")
+	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	if req.Title != "" {
@@ -347,19 +339,19 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -395,7 +387,7 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 	u := buildGenericURL(config, config.Paths.Browse, "")
 	if u == "" {
-		return nil, fmt.Errorf("未配置浏览页路径 (paths.browse)")
+		return nil, configError("未配置浏览页路径 (paths.browse)")
 	}
 
 	if strings.Contains(u, "?") {
@@ -409,23 +401,23 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造搜索请求失败: %w", err)
+		return nil, searchError("构造搜索请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("搜索请求失败: %w", err)
+		return nil, searchError("搜索请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, networkError("读取响应失败", err)
 	}
 
 	return parseGenericBrowse(string(body), config), nil
@@ -437,12 +429,25 @@ func (a *GenericAdapter) GetTorrentInfoHash(ctx context.Context, config *model.S
 		return "", err
 	}
 	if detail.InfoHash == "" {
-		return "", fmt.Errorf("未在详情页找到 info_hash")
+		return "", notFoundError("未在详情页找到 info_hash")
 	}
 	return detail.InfoHash, nil
 }
 
 func (a *GenericAdapter) SupportsSearchByPiecesHash() bool { return false }
+
+func (a *GenericAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
+	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
+	if err != nil {
+		return false, nil
+	}
+	for _, r := range results {
+		if r.TorrentID == torrentID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
 func buildGenericURL(config *model.SiteConfig, pathTpl, torrentID string) string {
 	if pathTpl == "" {
@@ -543,10 +548,10 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	if req.Title != "" {
@@ -593,19 +598,19 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -671,10 +676,10 @@ func (a *GenericAdapter) uploadStarSpaceVideo(ctx context.Context, config *model
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	_ = writer.WriteField("tid", "0")
@@ -739,12 +744,12 @@ func (a *GenericAdapter) uploadStarSpaceVideo(ctx context.Context, config *model
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
@@ -761,10 +766,10 @@ func (a *GenericAdapter) uploadStarSpaceMusic(ctx context.Context, config *model
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	_ = writer.WriteField("tid", "0")
@@ -824,12 +829,12 @@ func (a *GenericAdapter) uploadStarSpaceMusic(ctx context.Context, config *model
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
@@ -840,7 +845,7 @@ func (a *GenericAdapter) uploadStarSpaceMusic(ctx context.Context, config *model
 func (a *GenericAdapter) doStarSpaceUpload(httpReq *http.Request, config *model.SiteConfig) (*model.PublishResponse, error) {
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -889,10 +894,10 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 
 	fileWriter, err := writer.CreateFormFile("files", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	if req.Title != "" {
@@ -963,19 +968,19 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 

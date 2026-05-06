@@ -3,6 +3,7 @@ package fingerprint
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -16,7 +17,10 @@ func setupFingerprintDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.ContentFingerprint{}); err != nil {
+	if err := db.AutoMigrate(
+		&model.ContentFingerprint{},
+		&model.SeedingTorrentRecord{},
+	); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	return db
@@ -410,4 +414,56 @@ func buildTestTorrentMultiFile(t *testing.T) []byte {
 		t.Fatalf("encode test torrent: %v", err)
 	}
 	return encoded
+}
+
+func TestRepository_CleanupOrphans(t *testing.T) {
+	db := setupFingerprintDB(t)
+	repo := NewRepository(db, zap.NewNop())
+	ctx := context.Background()
+
+	active := &model.ContentFingerprint{
+		InfoHash:   "active_hash_1",
+		SiteName:   "site1",
+		PiecesHash: "pieces1",
+		TotalSize:  1000,
+	}
+	if err := db.Create(active).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	old := &model.ContentFingerprint{
+		InfoHash:   "orphan_hash_1",
+		SiteName:   "site1",
+		PiecesHash: "pieces2",
+		TotalSize:  2000,
+	}
+	if err := db.Create(old).Error; err != nil {
+		t.Fatal(err)
+	}
+	db.Model(old).Update("updated_at", time.Now().AddDate(0, 0, -40))
+
+	seedRec := &model.SeedingTorrentRecord{
+		InfoHash: "active_hash_1",
+		SiteName: "site1",
+	}
+	if err := db.Create(seedRec).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	deleted, err := repo.CleanupOrphans(ctx, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 {
+		t.Errorf("expected 1 orphan deleted, got %d", deleted)
+	}
+
+	var remaining []model.ContentFingerprint
+	db.Find(&remaining)
+	if len(remaining) != 1 {
+		t.Errorf("expected 1 remaining (active), got %d", len(remaining))
+	}
+	if remaining[0].InfoHash != "active_hash_1" {
+		t.Errorf("expected active_hash_1 to remain, got %s", remaining[0].InfoHash)
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
@@ -717,197 +718,6 @@ func TestEngine_FlushNegativeCache(t *testing.T) {
 	}
 }
 
-type mockSiteProvider struct {
-	getSiteInfoFn      func(ctx context.Context, siteName string) (*model.SiteInfo, error)
-	getSiteConfigFn    func(ctx context.Context, domain string) (*model.SiteConfig, error)
-	getSiteDefaultFn   func(ctx context.Context, domain string) (*model.SiteDefault, error)
-	getAdapterFn       func(ctx context.Context, domain string) (model.SiteAdapter, error)
-	listSitesFn        func(ctx context.Context) ([]*model.SiteInfo, error)
-	getSiteInfoByURLFn func(ctx context.Context, baseURL string) (*model.SiteInfo, error)
-	detectFrameworkFn  func(ctx context.Context, domain string) (*model.DetectResult, error)
-}
-
-func (m *mockSiteProvider) GetSiteInfo(ctx context.Context, siteName string) (*model.SiteInfo, error) {
-	if m.getSiteInfoFn != nil {
-		return m.getSiteInfoFn(ctx, siteName)
-	}
-	return nil, nil
-}
-func (m *mockSiteProvider) GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error) {
-	if m.getSiteConfigFn != nil {
-		return m.getSiteConfigFn(ctx, domain)
-	}
-	return nil, nil
-}
-func (m *mockSiteProvider) GetSiteDefault(ctx context.Context, domain string) (*model.SiteDefault, error) {
-	if m.getSiteDefaultFn != nil {
-		return m.getSiteDefaultFn(ctx, domain)
-	}
-	return nil, nil
-}
-func (m *mockSiteProvider) GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error) {
-	if m.getAdapterFn != nil {
-		return m.getAdapterFn(ctx, domain)
-	}
-	return nil, nil
-}
-func (m *mockSiteProvider) ListSites(ctx context.Context) ([]*model.SiteInfo, error) {
-	if m.listSitesFn != nil {
-		return m.listSitesFn(ctx)
-	}
-	return nil, nil
-}
-func (m *mockSiteProvider) GetSiteInfoByURL(ctx context.Context, baseURL string) (*model.SiteInfo, error) {
-	if m.getSiteInfoByURLFn != nil {
-		return m.getSiteInfoByURLFn(ctx, baseURL)
-	}
-	return nil, nil
-}
-func (m *mockSiteProvider) DetectFramework(ctx context.Context, domain string) (*model.DetectResult, error) {
-	if m.detectFrameworkFn != nil {
-		return m.detectFrameworkFn(ctx, domain)
-	}
-	return nil, nil
-}
-
-type mockSiteAdapter struct {
-	searchTorrentsFn     func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error)
-	getTorrentInfoHashFn func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error)
-	downloadTorrentFn    func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error)
-}
-
-func (m *mockSiteAdapter) Framework() string { return "mock" }
-func (m *mockSiteAdapter) ParseRSS(ctx context.Context, feedURL string, config *model.SiteConfig) ([]*model.RSSTorrentEvent, error) {
-	return nil, nil
-}
-func (m *mockSiteAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-	if m.downloadTorrentFn != nil {
-		return m.downloadTorrentFn(ctx, config, torrentID)
-	}
-	return nil, nil
-}
-func (m *mockSiteAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	return nil, nil
-}
-func (m *mockSiteAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
-	return nil, nil
-}
-func (m *mockSiteAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	return nil, nil
-}
-func (m *mockSiteAdapter) DetectDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
-	return nil, nil
-}
-func (m *mockSiteAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
-	return nil, nil
-}
-func (m *mockSiteAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-	return nil, nil
-}
-func (m *mockSiteAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-	if m.searchTorrentsFn != nil {
-		return m.searchTorrentsFn(ctx, config, query, opts)
-	}
-	return nil, nil
-}
-func (m *mockSiteAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
-	if m.getTorrentInfoHashFn != nil {
-		return m.getTorrentInfoHashFn(ctx, config, torrentID)
-	}
-	return "", nil
-}
-func (m *mockSiteAdapter) SupportsSearchByPiecesHash() bool { return false }
-
-type mockDownloaderProvider struct {
-	getClientFn   func(clientID string) (model.DownloaderClient, error)
-	listClientsFn func() []string
-}
-
-func (m *mockDownloaderProvider) Get(clientID string) (model.DownloaderClient, error) {
-	if m.getClientFn != nil {
-		return m.getClientFn(clientID)
-	}
-	return nil, nil
-}
-func (m *mockDownloaderProvider) ListClients() []string {
-	if m.listClientsFn != nil {
-		return m.listClientsFn()
-	}
-	return nil
-}
-
-type mockDownloaderClient struct {
-	addFromFileFn func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error)
-	checkExistsFn func(ctx context.Context, infoHash string) (bool, error)
-}
-
-func (m *mockDownloaderClient) GetName() string                           { return "mock" }
-func (m *mockDownloaderClient) GetRole() string                           { return "seeding" }
-func (m *mockDownloaderClient) GetReseedTargetID() string                 { return "" }
-func (m *mockDownloaderClient) GetID() uint                               { return 1 }
-func (m *mockDownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
-func (m *mockDownloaderClient) GetTorrentByHash(ctx context.Context, hash string) (*model.TorrentInfo, error) {
-	return nil, nil
-}
-func (m *mockDownloaderClient) GetSeedingTorrents(ctx context.Context) ([]*model.TorrentInfo, error) {
-	return nil, nil
-}
-func (m *mockDownloaderClient) GetTorrentsByPath(ctx context.Context, savePath string) ([]*model.TorrentInfo, error) {
-	return nil, nil
-}
-func (m *mockDownloaderClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
-	return nil, nil
-}
-func (m *mockDownloaderClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.Maindata, int, error) {
-	return nil, 0, nil
-}
-func (m *mockDownloaderClient) AddFromFile(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
-	if m.addFromFileFn != nil {
-		return m.addFromFileFn(ctx, data, opts)
-	}
-	return &model.AddResult{}, nil
-}
-func (m *mockDownloaderClient) ExportTorrent(ctx context.Context, hash string) ([]byte, error) {
-	return nil, nil
-}
-func (m *mockDownloaderClient) DeleteTorrent(ctx context.Context, hash string, deleteFiles bool) error {
-	return nil
-}
-func (m *mockDownloaderClient) BatchDeleteTorrents(ctx context.Context, hashes []string, deleteFiles bool) error {
-	return nil
-}
-func (m *mockDownloaderClient) PauseTorrent(ctx context.Context, hash string) error  { return nil }
-func (m *mockDownloaderClient) ResumeTorrent(ctx context.Context, hash string) error { return nil }
-func (m *mockDownloaderClient) Reannounce(ctx context.Context, hash string) error    { return nil }
-func (m *mockDownloaderClient) Recheck(ctx context.Context, hash string) error       { return nil }
-func (m *mockDownloaderClient) SetTorrentTags(ctx context.Context, hash string, tags []string) error {
-	return nil
-}
-func (m *mockDownloaderClient) RemoveTorrentTags(ctx context.Context, hash string, tags []string) error {
-	return nil
-}
-func (m *mockDownloaderClient) SetCategory(ctx context.Context, hash string, category string) error {
-	return nil
-}
-func (m *mockDownloaderClient) SetSavePath(ctx context.Context, hash string, savePath string) error {
-	return nil
-}
-func (m *mockDownloaderClient) SetSuperSeeding(ctx context.Context, hash string, enable bool) error {
-	return nil
-}
-func (m *mockDownloaderClient) SetUploadLimit(ctx context.Context, infoHash string, limitBytesPerSec int64) error {
-	return nil
-}
-func (m *mockDownloaderClient) PauseAllDownloads(ctx context.Context) error     { return nil }
-func (m *mockDownloaderClient) ResumeAllDownloads(ctx context.Context) error    { return nil }
-func (m *mockDownloaderClient) GetFreeSpace(ctx context.Context) (int64, error) { return 0, nil }
-func (m *mockDownloaderClient) CheckExists(ctx context.Context, infoHash string) (bool, error) {
-	if m.checkExistsFn != nil {
-		return m.checkExistsFn(ctx, infoHash)
-	}
-	return false, nil
-}
-
 type mockIYUUService struct {
 	queryReseedFn      func(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error)
 	getSeededSitesFn   func(ctx context.Context, infoHash string) ([]string, error)
@@ -1061,27 +871,27 @@ func TestEngine_findCandidates_WithProvider(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	adapter := &mockSiteAdapter{
-		searchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return []*model.SeedingSearchResult{
 				{TorrentID: "target_t1", Size: 1073741824},
 			}, nil
 		},
-		getTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+		GetTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 			return "ih1", nil
 		},
 	}
 
-	sp := &mockSiteProvider{
-		listSitesFn: func(ctx context.Context) ([]*model.SiteInfo, error) {
+	sp := &mocks.SiteInfoProvider{
+		ListSitesFn: func(ctx context.Context) ([]*model.SiteInfo, error) {
 			return []*model.SiteInfo{
 				{Name: "target_site", BaseURL: "https://target.example.com", Enabled: true},
 			}, nil
 		},
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
 			return &model.SiteConfig{Enabled: true}, nil
 		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
 			return adapter, nil
 		},
 	}
@@ -1105,13 +915,13 @@ func TestEngine_matchLayer1InfoHash_Found(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	adapter := &mockSiteAdapter{
-		searchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return []*model.SeedingSearchResult{
 				{TorrentID: "t1", Size: 1000},
 			}, nil
 		},
-		getTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+		GetTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 			return "abc123", nil
 		},
 	}
@@ -1132,7 +942,7 @@ func TestEngine_matchLayer1InfoHash_Found(t *testing.T) {
 func TestEngine_matchLayer1InfoHash_EmptyHash(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
-	adapter := &mockSiteAdapter{}
+	adapter := &mocks.SiteAdapter{}
 	rec := model.SeedingTorrentRecord{InfoHash: "", SiteName: "site1"}
 	c := e.matchLayer1InfoHash(context.Background(), adapter, &model.SiteConfig{}, rec, "site2")
 	if c != nil {
@@ -1143,8 +953,8 @@ func TestEngine_matchLayer1InfoHash_EmptyHash(t *testing.T) {
 func TestEngine_matchLayer1InfoHash_SearchError(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
-	adapter := &mockSiteAdapter{
-		searchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return nil, fmt.Errorf("search error")
 		},
 	}
@@ -1166,8 +976,8 @@ func TestEngine_matchLayer2SizeTitle_WithDB(t *testing.T) {
 		TotalSize: 1073741824,
 	})
 
-	adapter := &mockSiteAdapter{
-		searchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return []*model.SeedingSearchResult{
 				{TorrentID: "t_target", Size: 1073741824},
 			}, nil
@@ -1190,7 +1000,7 @@ func TestEngine_matchLayer2SizeTitle_WithDB(t *testing.T) {
 func TestEngine_matchLayer2SizeTitle_NoFingerprint(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
-	adapter := &mockSiteAdapter{}
+	adapter := &mocks.SiteAdapter{}
 	rec := model.SeedingTorrentRecord{InfoHash: "nonexist", SiteName: "site1"}
 	c := e.matchLayer2SizeTitle(context.Background(), adapter, &model.SiteConfig{}, rec, "site2", 1.0)
 	if c != nil {
@@ -1209,8 +1019,8 @@ func TestEngine_matchLayer2SizeTitle_SizeMismatch(t *testing.T) {
 		TotalSize: 1073741824,
 	})
 
-	adapter := &mockSiteAdapter{
-		searchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return []*model.SeedingSearchResult{
 				{TorrentID: "t1", Size: 2147483648},
 			}, nil
@@ -1297,14 +1107,14 @@ func TestEngine_injectMatch_NoProvider(t *testing.T) {
 func TestEngine_injectMatch_FailSiteInfo(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
-	e.SetSiteProvider(&mockSiteProvider{
-		getSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return nil, fmt.Errorf("site not found")
 		},
 	})
-	e.SetClientProvider(&mockDownloaderProvider{
-		getClientFn: func(clientID string) (model.DownloaderClient, error) {
-			return &mockDownloaderClient{}, nil
+	e.SetClientProvider(&mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
+			return &mocks.DownloaderClient{}, nil
 		},
 	})
 
@@ -1337,32 +1147,32 @@ func TestEngine_injectMatch_Success(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	adapter := &mockSiteAdapter{
-		downloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+	adapter := &mocks.SiteAdapter{
+		DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
 			return []byte("fake torrent data"), nil
 		},
 	}
-	sp := &mockSiteProvider{
-		getSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+	sp := &mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{Name: "target_site", BaseURL: "https://target.example.com"}, nil
 		},
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
 			return &model.SiteConfig{Enabled: true}, nil
 		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
 			return adapter, nil
 		},
 	}
-	client := &mockDownloaderClient{
-		addFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
+	client := &mocks.DownloaderClient{
+		AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
 			return &model.AddResult{InfoHash: "new_hash_123"}, nil
 		},
-		checkExistsFn: func(ctx context.Context, infoHash string) (bool, error) {
+		CheckExistsFn: func(ctx context.Context, infoHash string) (bool, error) {
 			return false, nil
 		},
 	}
-	cp := &mockDownloaderProvider{
-		getClientFn: func(clientID string) (model.DownloaderClient, error) {
+	cp := &mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
 			return client, nil
 		},
 	}
@@ -1401,32 +1211,32 @@ func TestEngine_injectMatch_AlreadyExists(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	adapter := &mockSiteAdapter{
-		downloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+	adapter := &mocks.SiteAdapter{
+		DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
 			return []byte("fake"), nil
 		},
 	}
-	sp := &mockSiteProvider{
-		getSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+	sp := &mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{Name: "target_site", BaseURL: "https://target.example.com"}, nil
 		},
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
 			return &model.SiteConfig{Enabled: true}, nil
 		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
 			return adapter, nil
 		},
 	}
-	client := &mockDownloaderClient{
-		addFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
+	client := &mocks.DownloaderClient{
+		AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
 			return &model.AddResult{InfoHash: "existing_hash"}, nil
 		},
-		checkExistsFn: func(ctx context.Context, infoHash string) (bool, error) {
+		CheckExistsFn: func(ctx context.Context, infoHash string) (bool, error) {
 			return true, nil
 		},
 	}
-	cp := &mockDownloaderProvider{
-		getClientFn: func(clientID string) (model.DownloaderClient, error) {
+	cp := &mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
 			return client, nil
 		},
 	}
@@ -1467,8 +1277,8 @@ func TestEngine_queryIYUU_WithResults(t *testing.T) {
 		SiteDomain: "https://target.example.com",
 		SiteName:   "target_site",
 	})
-	e.SetSiteProvider(&mockSiteProvider{
-		getSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{Name: "target_site", BaseURL: "https://target.example.com"}, nil
 		},
 	})
@@ -1525,8 +1335,8 @@ func TestEngine_queryIYUU_ExcludedSites(t *testing.T) {
 		SiteDomain: "https://excluded.example.com",
 		SiteName:   "excluded_site",
 	})
-	e.SetSiteProvider(&mockSiteProvider{
-		getSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{Name: siteName}, nil
 		},
 	})
@@ -1559,8 +1369,8 @@ func TestEngine_queryIYUU_SameSite(t *testing.T) {
 		SiteDomain: "https://source.example.com",
 		SiteName:   "source_site",
 	})
-	e.SetSiteProvider(&mockSiteProvider{
-		getSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{Name: siteName}, nil
 		},
 	})
@@ -1593,8 +1403,8 @@ func TestEngine_iyuuSidToSite_WithMapping(t *testing.T) {
 		SiteDomain: "https://site5.example.com",
 		SiteName:   "site5",
 	})
-	e.SetSiteProvider(&mockSiteProvider{
-		getSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{Name: siteName}, nil
 		},
 	})
@@ -1623,11 +1433,11 @@ func TestEngine_iyuuSidToSite_FallbackByURL(t *testing.T) {
 		SiteDomain: "https://site7.example.com",
 		SiteName:   "site7",
 	})
-	e.SetSiteProvider(&mockSiteProvider{
-		getSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return nil, fmt.Errorf("not found by name")
 		},
-		getSiteInfoByURLFn: func(ctx context.Context, baseURL string) (*model.SiteInfo, error) {
+		GetSiteInfoByURLFn: func(ctx context.Context, baseURL string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{Name: "site7"}, nil
 		},
 	})
@@ -1641,23 +1451,23 @@ func TestEngine_iyuuSidToSite_FallbackByURL(t *testing.T) {
 func TestEngine_findCandidates_ExcludedAndDisabled(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
-	e.SetSiteProvider(&mockSiteProvider{
-		listSitesFn: func(ctx context.Context) ([]*model.SiteInfo, error) {
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		ListSitesFn: func(ctx context.Context) ([]*model.SiteInfo, error) {
 			return []*model.SiteInfo{
 				{Name: "excluded", BaseURL: "https://ex.example.com", Enabled: true},
 				{Name: "disabled", BaseURL: "https://dis.example.com", Enabled: false},
 				{Name: "source_site", BaseURL: "https://src.example.com", Enabled: true},
 			}, nil
 		},
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
 			return &model.SiteConfig{Enabled: true}, nil
 		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return &mockSiteAdapter{
-				searchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return &mocks.SiteAdapter{
+				SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 					return []*model.SeedingSearchResult{{TorrentID: "t1", Size: 100}}, nil
 				},
-				getTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+				GetTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 					return "", nil
 				},
 			}, nil
@@ -1676,22 +1486,22 @@ func TestEngine_findCandidates_WithTargetSites(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	adapter := &mockSiteAdapter{
-		searchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return []*model.SeedingSearchResult{{TorrentID: "t1", Size: 1000}}, nil
 		},
-		getTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+		GetTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 			return "ih_match", nil
 		},
 	}
-	e.SetSiteProvider(&mockSiteProvider{
-		getSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{Name: siteName, BaseURL: "https://" + siteName + ".com", Enabled: true}, nil
 		},
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
 			return &model.SiteConfig{Enabled: true}, nil
 		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
 			return adapter, nil
 		},
 	})

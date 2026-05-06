@@ -3,56 +3,85 @@ package seeding
 import (
 	"math"
 	"time"
+
+	"github.com/ranfish/pt-forward/internal/model"
 )
 
 type ScoreInput struct {
 	Seeders       int
 	Leechers      int
-	UploadBytes   int64
-	SeedTimeHours float64
 	AgeHours      float64
 	Size          int64
-	IsFree        bool
+	Discount      model.DiscountLevel
 	HalfLifeHours float64
+	SiteWeight    float64
 }
 
 type ScoreResult struct {
-	Score            float64
-	LeecherSeedRatio float64
-	DecayFactor      float64
-	EffectiveScore   float64
+	Score          float64
+	DemandScore    float64
+	UploadValue    float64
+	RecencyFactor  float64
+	EffectiveScore float64
+}
+
+func uploadValueFromDiscount(d model.DiscountLevel) float64 {
+	switch d {
+	case model.DiscountFree:
+		return 1.0
+	case model.Discount2xFree:
+		return 2.0
+	case model.Discount2xUp:
+		return 1.5
+	case model.Discount2x50:
+		return 1.75
+	case model.DiscountPercent25:
+		return 0.875
+	case model.DiscountPercent30:
+		return 0.85
+	case model.DiscountPercent50:
+		return 0.75
+	case model.DiscountPercent70:
+		return 0.65
+	case model.DiscountPercent75:
+		return 0.625
+	default:
+		return 0.5
+	}
 }
 
 func CalculateScore(input ScoreInput) ScoreResult {
-	if input.Seeders <= 0 {
-		input.Seeders = 1
+	if input.HalfLifeHours <= 0 {
+		input.HalfLifeHours = 2.0
+	}
+	if input.SiteWeight <= 0 {
+		input.SiteWeight = 1.0
 	}
 
-	leecherRatio := float64(input.Leechers) / float64(input.Seeders)
-
-	uploadWeight := 1.0
-	if input.UploadBytes > 0 && input.Size > 0 {
-		uploadWeight = float64(input.UploadBytes) / float64(input.Size)
+	demandScore := 0.0
+	if input.Leechers == 0 && input.Seeders == 0 {
+		demandScore = 0
+	} else if input.Seeders == 0 && input.Leechers > 0 {
+		demandScore = 99999
+	} else if input.Leechers == 0 {
+		demandScore = 0
+	} else {
+		demandScore = float64(input.Leechers) / float64(input.Seeders)
 	}
 
-	decay := 1.0
-	if input.HalfLifeHours > 0 && input.AgeHours > 0 {
-		decay = math.Pow(0.5, input.AgeHours/input.HalfLifeHours)
-	}
+	uploadValue := uploadValueFromDiscount(input.Discount)
 
-	freeMultiplier := 1.0
-	if input.IsFree {
-		freeMultiplier = 1.5
-	}
+	recencyFactor := 1.0 / (1.0 + input.AgeHours/input.HalfLifeHours)
 
-	rawScore := leecherRatio * uploadWeight * freeMultiplier
-	effectiveScore := rawScore * decay
+	rawScore := demandScore * uploadValue * input.SiteWeight
+	effectiveScore := rawScore * recencyFactor
 
 	return ScoreResult{
-		Score:            rawScore,
-		LeecherSeedRatio: leecherRatio,
-		DecayFactor:      decay,
-		EffectiveScore:   effectiveScore,
+		Score:          rawScore,
+		DemandScore:    demandScore,
+		UploadValue:    uploadValue,
+		RecencyFactor:  recencyFactor,
+		EffectiveScore: effectiveScore,
 	}
 }
 
@@ -64,6 +93,11 @@ type CleanupCandidate struct {
 	AgeHours      float64
 	IsFree        bool
 	HasHR         bool
+	HRSeedTimeH   int
+	HRStrategy    string
+	Discount      model.DiscountLevel
+	UploadSpeed   int64
+	FreeEndAt     *time.Time
 }
 
 type CleanupWeights struct {
@@ -84,39 +118,58 @@ func DefaultCleanupWeights() CleanupWeights {
 
 func CalculateCleanupScore(candidate CleanupCandidate, weights CleanupWeights) float64 {
 	seedScore := 0.0
-	if candidate.SeedTimeHours > 720 {
+	maxSeedHours := 720.0
+	if candidate.SeedTimeHours >= maxSeedHours {
 		seedScore = 1.0
 	} else {
-		seedScore = candidate.SeedTimeHours / 720.0
+		seedScore = candidate.SeedTimeHours / maxSeedHours
 	}
 
-	freeBonus := 0.0
-	if candidate.IsFree {
-		freeBonus = 0.5
-	}
+	uploadValue := uploadValueFromDiscount(candidate.Discount)
 
 	hrPenalty := 0.0
-	if candidate.HasHR {
+	if candidate.HasHR && !hrReleased(candidate) {
 		hrPenalty = 1.0
 	}
 
+	speedScore := 0.0
+	if candidate.SeedTimeHours > 0 {
+		speedScore = math.Min(float64(candidate.UploadSpeed)/1024.0/1024.0, 1.0)
+	}
+
 	score := weights.SeedHours*seedScore +
-		weights.Ratio*freeBonus -
+		weights.UploadSpeed*speedScore +
+		weights.Ratio*uploadValue -
 		hrPenalty -
 		weights.DiskUsage*(1.0/(1.0+candidate.AgeHours/168.0))
 
 	return score
 }
 
+func hrReleased(candidate CleanupCandidate) bool {
+	if !candidate.HasHR {
+		return true
+	}
+	if candidate.HRStrategy == "ignore" {
+		return true
+	}
+	if candidate.HRSeedTimeH <= 0 {
+		return false
+	}
+	return candidate.SeedTimeHours >= float64(candidate.HRSeedTimeH)
+}
+
 func ShouldCleanup(candidate CleanupCandidate, minScore float64, minAgeHours float64) bool {
 	if candidate.AgeHours < minAgeHours {
 		return false
 	}
-	if candidate.HasHR {
+	if candidate.HasHR && !hrReleased(candidate) {
 		return false
 	}
 	if candidate.IsFree {
-		return false
+		if candidate.FreeEndAt == nil || candidate.FreeEndAt.After(time.Now()) {
+			return false
+		}
 	}
 	return candidate.Score < minScore
 }

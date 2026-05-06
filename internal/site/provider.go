@@ -3,6 +3,7 @@ package site
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/ranfish/pt-forward/internal/adapter"
@@ -143,6 +144,14 @@ func (p *Provider) applyOverrides(ctx context.Context, siteName string, config *
 			config.Paths.Browse = o.FieldValue
 		case "paths.detail":
 			config.Paths.Detail = o.FieldValue
+		default:
+			if strings.HasPrefix(o.FieldPath, "publish.form_fields.") {
+				key := strings.TrimPrefix(o.FieldPath, "publish.form_fields.")
+				if config.Publish.FormFields == nil {
+					config.Publish.FormFields = make(map[string]string)
+				}
+				config.Publish.FormFields[key] = o.FieldValue
+			}
 		}
 	}
 }
@@ -320,6 +329,7 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 
 		ProxyURL:      s.ProxyURL,
 		SkipSSLVerify: s.SkipSSLVerify,
+		HRStrategy:    s.HRStrategy,
 	}
 }
 

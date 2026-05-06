@@ -41,6 +41,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&CookieCloudSyncHistory{},
 		&CookieCloudConfig{},
 		&FreezeEventRecord{},
+		&ScoringLog{},
 		&IYUUConfig{},
 		&IYUUSiteMapping{},
 		&OperationAuditLog{},

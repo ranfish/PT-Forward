@@ -13,15 +13,15 @@ import (
 type TaskFunc func(ctx context.Context) error
 
 type TaskEntry struct {
-	Name         string
-	Type         string
-	Schedule     string
-	Handler      TaskFunc
-	LastRunAt    *time.Time
-	LastError    string
-	SuccessCount int64
-	ErrorCount   int64
-	Paused       bool
+	Name         string     `json:"name"`
+	Type         string     `json:"type"`
+	Schedule     string     `json:"schedule"`
+	Handler      TaskFunc   `json:"-"`
+	LastRunAt    *time.Time `json:"last_run_at"`
+	LastError    string     `json:"last_error"`
+	SuccessCount int64      `json:"success_count"`
+	ErrorCount   int64      `json:"error_count"`
+	Paused       bool       `json:"paused"`
 }
 
 type Registry struct {
@@ -48,7 +48,7 @@ func (r *Registry) Register(name, taskType, schedule string, handler TaskFunc) e
 	defer r.mu.Unlock()
 
 	if _, exists := r.tasks[name]; exists {
-		return fmt.Errorf("task %q already registered", name)
+		return schedulerError(ErrSchedulerDuplicate, fmt.Sprintf("task %q already registered", name), nil)
 	}
 
 	entry := &TaskEntry{
@@ -69,7 +69,7 @@ func (r *Registry) Register(name, taskType, schedule string, handler TaskFunc) e
 	})
 	if err != nil {
 		delete(r.tasks, name)
-		return fmt.Errorf("invalid cron schedule %q: %w", schedule, err)
+		return schedulerError(ErrSchedulerSchedule, fmt.Sprintf("invalid cron schedule %q", schedule), err)
 	}
 	r.ids[name] = id
 
@@ -81,7 +81,7 @@ func (r *Registry) Unregister(name string) error {
 	defer r.mu.Unlock()
 
 	if _, exists := r.tasks[name]; !exists {
-		return fmt.Errorf("task %q not found", name)
+		return schedulerError(ErrSchedulerNotFound, fmt.Sprintf("task %q not found", name), nil)
 	}
 
 	if id, ok := r.ids[name]; ok {
@@ -98,11 +98,11 @@ func (r *Registry) Trigger(ctx context.Context, name string) error {
 	r.mu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("task %q not found", name)
+		return schedulerError(ErrSchedulerNotFound, fmt.Sprintf("task %q not found", name), nil)
 	}
 
 	if entry.Paused {
-		return fmt.Errorf("task %q is paused", name)
+		return schedulerError(ErrSchedulerPaused, fmt.Sprintf("task %q is paused", name), nil)
 	}
 
 	return r.runTask(ctx, entry)
@@ -114,7 +114,7 @@ func (r *Registry) Pause(name string) error {
 
 	entry, exists := r.tasks[name]
 	if !exists {
-		return fmt.Errorf("task %q not found", name)
+		return schedulerError(ErrSchedulerNotFound, fmt.Sprintf("task %q not found", name), nil)
 	}
 	entry.Paused = true
 	return nil
@@ -126,9 +126,43 @@ func (r *Registry) Resume(name string) error {
 
 	entry, exists := r.tasks[name]
 	if !exists {
-		return fmt.Errorf("task %q not found", name)
+		return schedulerError(ErrSchedulerNotFound, fmt.Sprintf("task %q not found", name), nil)
 	}
 	entry.Paused = false
+	return nil
+}
+
+func (r *Registry) Reschedule(name, schedule string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	entry, exists := r.tasks[name]
+	if !exists {
+		return schedulerError(ErrSchedulerNotFound, fmt.Sprintf("task %q not found", name), nil)
+	}
+
+	scheduleStr := normalizeSchedule(schedule)
+	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	if _, err := parser.Parse(scheduleStr); err != nil {
+		return schedulerError(ErrSchedulerSchedule, fmt.Sprintf("invalid cron schedule %q", schedule), err)
+	}
+
+	if oldID, ok := r.ids[name]; ok {
+		r.cron.Remove(oldID)
+	}
+
+	newID, err := r.cron.AddFunc(scheduleStr, func() {
+		if entry.Paused {
+			return
+		}
+		r.runTask(context.Background(), entry) //nolint:errcheck
+	})
+	if err != nil {
+		return schedulerError(ErrSchedulerSchedule, fmt.Sprintf("failed to reschedule %q", name), err)
+	}
+
+	r.ids[name] = newID
+	entry.Schedule = schedule
 	return nil
 }
 
@@ -159,7 +193,7 @@ func (r *Registry) Get(name string) (*TaskEntry, error) {
 
 	entry, exists := r.tasks[name]
 	if !exists {
-		return nil, fmt.Errorf("task %q not found", name)
+		return nil, schedulerError(ErrSchedulerNotFound, fmt.Sprintf("task %q not found", name), nil)
 	}
 	return entry, nil
 }

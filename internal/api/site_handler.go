@@ -1,27 +1,28 @@
 package api
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/site"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type SiteHandler struct {
 	repo   *site.Repository
+	db     *gorm.DB
 	logger *zap.Logger
 }
 
-func NewSiteHandler(repo *site.Repository, logger *zap.Logger) *SiteHandler {
-	return &SiteHandler{repo: repo, logger: logger}
+func NewSiteHandler(repo *site.Repository, logger *zap.Logger, db *gorm.DB) *SiteHandler {
+	return &SiteHandler{repo: repo, db: db, logger: logger}
 }
 
 type createSiteRequest struct {
@@ -356,26 +357,37 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		}
 	case "overrides":
 		h.handleOverrides(w, r, idStr)
+	case "freeze":
+		h.handleDomainFreezeByID(w, r, idStr)
 	default:
 		Error(w, http.StatusNotFound, 40400, "路径不存在")
 	}
 }
 
 func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
-	sites, err := h.repo.List(r.Context())
-	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询站点失败")
-		return
-	}
+	page, size := parsePagination(r)
+
+	var total int64
+	h.db.Model(&model.Site{}).
+		Where("enabled = ? OR enabled = ?", true, false).
+		Count(&total)
+
+	var sites []model.Site
+	h.db.Where("enabled = ? OR enabled = ?", true, false).
+		Order("name ASC").
+		Offset(offset(page, size)).Limit(size).
+		Find(&sites)
 
 	items := make([]siteResponse, 0, len(sites))
 	for i := range sites {
 		items = append(items, h.toResponse(&sites[i]))
 	}
 
-	Success(w, map[string]interface{}{
-		"items": items,
-		"total": len(items),
+	Success(w, PaginatedResult{
+		Items: items,
+		Total: total,
+		Page:  page,
+		Size:  size,
 	})
 }
 
@@ -896,7 +908,7 @@ func (h *SiteHandler) extractID(path string, prefix string) (uint, error) {
 	p = strings.TrimRight(p, "/")
 	n, err := strconv.ParseUint(p, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("invalid id")
+		return 0, apiError(ErrAPIInvalidID, "invalid id", nil)
 	}
 	return uint(n), nil
 }
@@ -909,20 +921,12 @@ func defaultStr(val, def string) string {
 }
 
 func buildSiteHTTPClient(s *model.Site, timeout time.Duration) *http.Client {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: s.SkipSSLVerify,
-		},
-	}
-	if s.ProxyURL != "" {
-		if pu, err := url.Parse(s.ProxyURL); err == nil {
-			transport.Proxy = http.ProxyURL(pu)
-		}
-	}
-	return &http.Client{
-		Timeout:   timeout,
-		Transport: transport,
-	}
+	return httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+		Domain:        s.Domain,
+		Timeout:       timeout,
+		ProxyURL:      s.ProxyURL,
+		SkipSSLVerify: s.SkipSSLVerify,
+	})
 }
 
 func frameworkDefaultHash(fw string) string {
@@ -1041,4 +1045,146 @@ func (h *SiteHandler) handleDeleteOverride(w http.ResponseWriter, r *http.Reques
 	Success(w, map[string]interface{}{
 		"deleted": result.RowsAffected,
 	})
+}
+
+func (h *SiteHandler) handleDomainFreezeByID(w http.ResponseWriter, r *http.Request, idStr string) {
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40000, "invalid site id")
+		return
+	}
+	s, err := h.repo.GetByID(r.Context(), uint(id))
+	if err != nil {
+		Error(w, http.StatusNotFound, 40400, "站点不存在")
+		return
+	}
+	h.handleDomainFreeze(w, r, s.Domain)
+}
+
+func (h *SiteHandler) handleFreezeStatus(w http.ResponseWriter, r *http.Request) {
+	statuses := httpclient.GlobalLimiter.GetDomainStatuses()
+	Success(w, statuses)
+}
+
+func (h *SiteHandler) handleCircuitStatus(w http.ResponseWriter, r *http.Request) {
+	if httpclient.GlobalCircuitBreaker == nil {
+		Success(w, map[string]interface{}{})
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		statuses := httpclient.GlobalCircuitBreaker.GetAllCircuitStatuses()
+		Success(w, statuses)
+
+	case http.MethodPost:
+		var req struct {
+			Domain string `json:"domain"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			return
+		}
+		if req.Domain == "" {
+			Error(w, http.StatusBadRequest, 400, "domain is required")
+			return
+		}
+		httpclient.GlobalCircuitBreaker.ResetCircuit(req.Domain)
+		Success(w, map[string]string{"status": "reset", "domain": req.Domain})
+
+	default:
+		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+	}
+}
+
+func (h *SiteHandler) handleDomainFreeze(w http.ResponseWriter, r *http.Request, domain string) {
+	switch r.Method {
+	case http.MethodPost:
+		var req struct {
+			Duration string `json:"duration"`
+			Reason   string `json:"reason"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			return
+		}
+		dur, err := time.ParseDuration(req.Duration)
+		if err != nil {
+			Error(w, http.StatusBadRequest, 400, "invalid duration format")
+			return
+		}
+		httpclient.GlobalLimiter.ManualFreeze(domain, dur, req.Reason)
+		Success(w, map[string]string{"status": "frozen", "domain": domain})
+
+	case http.MethodDelete:
+		httpclient.GlobalLimiter.ManualUnfreeze(domain)
+		Success(w, map[string]string{"status": "unfrozen", "domain": domain})
+
+	case http.MethodGet:
+		status := httpclient.GlobalLimiter.GetFreezeStatus(domain)
+		Success(w, status)
+
+	default:
+		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+	}
+}
+
+func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		var exclusions []model.PublishExclusion
+		if err := h.db.WithContext(r.Context()).Find(&exclusions).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 500, "failed to list exclusions")
+			return
+		}
+		Success(w, exclusions)
+
+	case http.MethodPost:
+		var req struct {
+			TargetSite string `json:"target_site"`
+			SourceSite string `json:"source_site"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			return
+		}
+		if req.TargetSite == "" || req.SourceSite == "" {
+			Error(w, http.StatusBadRequest, 400, "target_site and source_site are required")
+			return
+		}
+		exclusion := model.PublishExclusion{
+			TargetSite: req.TargetSite,
+			SourceSite: req.SourceSite,
+		}
+		if err := h.db.WithContext(r.Context()).Create(&exclusion).Error; err != nil {
+			if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "UNIQUE") {
+				Error(w, http.StatusConflict, 409, "exclusion already exists")
+				return
+			}
+			Error(w, http.StatusInternalServerError, 500, "failed to create exclusion")
+			return
+		}
+		Success(w, exclusion)
+
+	case http.MethodDelete:
+		var req struct {
+			TargetSite string `json:"target_site"`
+			SourceSite string `json:"source_site"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			return
+		}
+		result := h.db.WithContext(r.Context()).
+			Where("target_site = ? AND source_site = ?", req.TargetSite, req.SourceSite).
+			Delete(&model.PublishExclusion{})
+		if result.RowsAffected == 0 {
+			Error(w, http.StatusNotFound, 404, "exclusion not found")
+			return
+		}
+		Success(w, map[string]string{"status": "deleted"})
+
+	default:
+		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+	}
 }

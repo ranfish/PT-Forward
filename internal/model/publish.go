@@ -23,6 +23,7 @@ type PublishCandidate struct {
 
 	Discount  DiscountLevel `json:"discount" gorm:"size:20;default:'NONE'"`
 	FreeEndAt *time.Time    `json:"free_end_at"`
+	HasHR     bool          `json:"has_hr" gorm:"default:false"`
 
 	DownloadCompleted bool                   `json:"download_completed" gorm:"default:false"`
 	CompletedAt       *time.Time             `json:"completed_at"`
