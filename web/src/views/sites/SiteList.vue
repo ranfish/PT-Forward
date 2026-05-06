@@ -4,14 +4,14 @@
       <a-space>
         <a-input-search
           v-model:value="searchText"
-          placeholder="搜索站点"
+          :placeholder="t('common.search')"
           style="width: 240px"
           @search="pagination.fetch(1)"
         />
       </a-space>
       <a-button type="primary" @click="openModal()">
         <template #icon><PlusOutlined /></template>
-        添加站点
+        {{ t('site.addSite') }}
       </a-button>
     </div>
 
@@ -24,7 +24,7 @@
         pageSize: pagination.pageSize.value,
         total: pagination.total.value,
         showSizeChanger: true,
-        showTotal: (total: number) => `共 ${total} 条`,
+        showTotal: (total: number) => t('common.totalCount', { total }),
       }"
       row-key="id"
       @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
@@ -41,16 +41,16 @@
         <template v-if="column.key === 'hasCookie'">
           <a-badge
             :status="hasAnyCredential(record) ? 'success' : 'default'"
-            :text="hasAnyCredential(record) ? '已配置' : '未配置'"
+            :text="hasAnyCredential(record) ? t('common.configured') : t('common.notConfigured')"
           />
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button type="link" size="small" @click="$router.push(`/sites/${record.id}`)">详情</a-button>
-            <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
-            <a-button type="link" size="small" @click="testConnection(record.id)">测试</a-button>
-            <a-popconfirm title="确定删除该站点？" @confirm="handleDelete(record.id)">
-              <a-button type="link" danger size="small">删除</a-button>
+            <a-button type="link" size="small" @click="$router.push(`/sites/${record.id}`)">{{ t('common.detail') }}</a-button>
+            <a-button type="link" size="small" @click="openModal(record)">{{ t('common.edit') }}</a-button>
+            <a-button type="link" size="small" @click="testConnection(record.id)">{{ t('common.test') }}</a-button>
+            <a-popconfirm :title="t('site.deleteSiteConfirm')" @confirm="handleDelete(record.id)">
+              <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
           </a-space>
         </template>
@@ -59,39 +59,39 @@
 
     <a-modal
       v-model:open="modalVisible"
-      :title="editingSite ? '编辑站点' : '添加站点'"
+      :title="editingSite ? t('site.editSite') : t('site.addSite')"
       @ok="handleSubmit"
       :confirm-loading="submitting"
     >
       <a-form :model="form" layout="vertical">
-        <a-form-item label="域名" name="domain" :rules="[{ required: true, message: '请输入域名' }]">
+        <a-form-item :label="t('site.domain')" name="domain" :rules="[{ required: true, message: t('site.domainRequired') }]">
           <a-input v-model:value="form.domain" :disabled="!!editingSite" placeholder="例如: pterclub.net" />
         </a-form-item>
-        <a-form-item label="名称" name="name" :rules="[{ required: true, message: '请输入名称' }]">
+        <a-form-item :label="t('common.name')" name="name" :rules="[{ required: true, message: t('common.nameRequired') }]">
           <a-input v-model:value="form.name" placeholder="站点显示名称" />
         </a-form-item>
-        <a-form-item label="站点 URL" name="baseUrl" :rules="[{ required: true, message: '请输入站点 URL' }]">
+        <a-form-item :label="t('site.siteUrl')" name="baseUrl" :rules="[{ required: true, message: t('site.siteUrlRequired') }]">
           <a-input v-model:value="form.baseUrl" placeholder="例如: https://pterclub.net" />
         </a-form-item>
-        <a-form-item label="框架" name="framework">
+        <a-form-item :label="t('site.framework')" name="framework">
           <a-select v-model:value="form.framework" placeholder="选择框架">
-            <a-select-opt-group label="主流框架">
+            <a-select-opt-group :label="t('site.mainstreamFrameworks')">
               <a-select-option value="nexusphp">NexusPHP</a-select-option>
               <a-select-option value="unit3d">UNIT3D</a-select-option>
               <a-select-option value="gazelle">Gazelle</a-select-option>
             </a-select-opt-group>
-            <a-select-opt-group label="自研/特殊">
+            <a-select-opt-group :label="t('site.specialFrameworks')">
               <a-select-option value="mteam">M-Team (馒头)</a-select-option>
               <a-select-option value="rousi">Rousi (肉丝)</a-select-option>
               <a-select-option value="tnode">TNode (朱雀)</a-select-option>
               <a-select-option value="luminance">Luminance</a-select-option>
             </a-select-opt-group>
-            <a-select-opt-group label="其他">
+            <a-select-opt-group :label="t('site.otherFrameworks')">
               <a-select-option value="generic">通用 (Generic)</a-select-option>
             </a-select-opt-group>
           </a-select>
         </a-form-item>
-        <a-form-item label="认证方式" name="authType">
+        <a-form-item :label="t('site.authType')" name="authType">
           <a-select v-model:value="form.authType" placeholder="选择认证方式">
             <a-select-option value="cookie">Cookie</a-select-option>
             <a-select-option value="apikey">API Key</a-select-option>
@@ -116,8 +116,11 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
+import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
 import { usePagination } from '@/composables/usePagination'
+
+const { t } = useI18n()
 
 const searchText = ref('')
 const modalVisible = ref(false)
@@ -209,7 +212,7 @@ async function handleSubmit() {
     } else {
       await sitesApi.create(form)
     }
-    message.success('操作成功')
+    message.success(t('common.operationSuccess'))
     modalVisible.value = false
     pagination.fetch()
   } catch (e: any) {
@@ -222,7 +225,7 @@ async function handleSubmit() {
 async function handleDelete(id: number) {
   try {
     await sitesApi.delete(id)
-    message.success('删除成功')
+    message.success(t('common.deleteSuccess'))
     pagination.fetch()
   } catch (e: any) {
     message.error(e.message)
@@ -232,7 +235,7 @@ async function handleDelete(id: number) {
 async function testConnection(id: number) {
   try {
     await sitesApi.testConnection(id)
-    message.success('连接测试成功')
+    message.success(t('site.connectionTestSuccess'))
   } catch (e: any) {
     message.error(e.message)
   }

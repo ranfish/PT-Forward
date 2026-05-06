@@ -123,6 +123,7 @@ type ChannelNotifier interface {
 	Test(ctx context.Context) error
 }
 
+// Deprecated: SitePublisher is reserved for v2. Use SiteAdapter methods directly.
 type SitePublisher interface {
 	Publish(ctx context.Context, req *PublishRequest) (*PublishResponse, error)
 	GetUploadForm(ctx context.Context, config *SiteConfig) (*UploadForm, error)
@@ -131,10 +132,12 @@ type SitePublisher interface {
 	SubmitEdit(ctx context.Context, torrentID string, newDesc string, config *SiteConfig) error
 }
 
+// Deprecated: Publisher is reserved for v2. Use SiteAdapter.UploadTorrent directly.
 type Publisher interface {
 	Publish(ctx context.Context, req *PublishRequest) (*PublishResponse, error)
 }
 
+// Deprecated: SourceFetcher is reserved for v2. Use SiteAdapter methods directly.
 type SourceFetcher interface {
 	FetchDetail(ctx context.Context, site *SiteConfig, torrentID string, cookie string) (*RawTorrent, error)
 	DownloadTorrent(ctx context.Context, site *SiteConfig, torrentID string, cookie string, passkey string) ([]byte, error)
@@ -150,34 +153,34 @@ type FingerprintRepository interface {
 }
 
 type ReseedTaskRepository interface {
-	GetByID(ctx context.Context, id uint) (*ReseedTask, error)
-	List(ctx context.Context) ([]ReseedTask, error)
+	GetTask(ctx context.Context, id uint) (*ReseedTask, error)
+	ListTasks(ctx context.Context) ([]ReseedTask, error)
 	ListByClientID(ctx context.Context, clientID string) ([]ReseedTask, error)
 	ListEnabled(ctx context.Context) ([]ReseedTask, error)
-	Create(ctx context.Context, task *ReseedTask) error
-	Update(ctx context.Context, task *ReseedTask) error
-	Delete(ctx context.Context, id uint) error
+	CreateTask(ctx context.Context, task *ReseedTask) error
+	UpdateTask(ctx context.Context, task *ReseedTask) error
+	DeleteTask(ctx context.Context, id uint) error
 }
 
 type ReseedMatchRepository interface {
-	BatchSave(ctx context.Context, matches []*ReseedMatch) error
-	FindByInfoHash(ctx context.Context, infoHash string) ([]ReseedMatch, error)
+	BatchSaveMatches(ctx context.Context, matches []*ReseedMatch) error
+	FindMatchesByInfoHash(ctx context.Context, infoHash string) ([]ReseedMatch, error)
 	FindPendingRetry(ctx context.Context, limit int) ([]ReseedMatch, error)
-	UpdateStatus(ctx context.Context, id uint, status string, failReason string) error
+	UpdateMatchStatus(ctx context.Context, id uint, status string, failReason string) error
 }
 
 type SeedingRuleRepository interface {
-	List(ctx context.Context) ([]*SeedingClientConfig, error)
-	GetByID(ctx context.Context, id uint) (*SeedingClientConfig, error)
-	Create(ctx context.Context, cfg *SeedingClientConfig) error
-	Update(ctx context.Context, cfg *SeedingClientConfig) error
-	Delete(ctx context.Context, id uint) error
+	ListConfigs(ctx context.Context) ([]*SeedingClientConfig, error)
+	GetConfigByID(ctx context.Context, id uint) (*SeedingClientConfig, error)
+	CreateConfig(ctx context.Context, cfg *SeedingClientConfig) error
+	UpdateConfig(ctx context.Context, cfg *SeedingClientConfig) error
+	DeleteConfig(ctx context.Context, id uint) error
 }
 
 type PublishTaskRepository interface {
-	List(ctx context.Context, opts ListOptions) ([]*PublishTask, int64, error)
-	GetByID(ctx context.Context, id uint) (*PublishTask, error)
-	Create(ctx context.Context, task *PublishTask) error
+	ListTasks(ctx context.Context, offset, limit int) ([]PublishTask, int64, error)
+	GetTask(ctx context.Context, id uint) (*PublishTask, error)
+	CreateTask(ctx context.Context, task *PublishTask) error
 	Update(ctx context.Context, task *PublishTask) error
-	UpdateStatus(ctx context.Context, id uint, status PublishTaskStatus) error
+	UpdateTaskStatus(ctx context.Context, id uint, status PublishTaskStatus) error
 }

@@ -63,7 +63,7 @@ func (p *Pipeline) ListTasks(ctx context.Context, offset, limit int) ([]model.Pu
 	var tasks []model.PublishTask
 	var total int64
 
-	p.db.Model(&model.PublishTask{}).Count(&total)
+	p.db.WithContext(ctx).Model(&model.PublishTask{}).Count(&total)
 	err := p.db.WithContext(ctx).Order("created_at DESC").
 		Offset(offset).Limit(limit).
 		Find(&tasks).Error
@@ -687,7 +687,7 @@ func (p *Pipeline) CreateGroup(ctx context.Context, candidateID uint, sourceHash
 	if err := p.db.WithContext(ctx).Create(group).Error; err != nil {
 		return nil, &model.AppError{Code: 50001, Message: "创建发布组失败", Cause: err}
 	}
-	p.addStatusHistory(ctx, group.ID, "", model.MemberStatusNew, "创建发布组")
+	p.addStatusHistory(ctx, group.ID, "", model.MemberStatusNew, model.MemberStatusNew, "创建发布组")
 	return group, nil
 }
 
@@ -702,7 +702,7 @@ func (p *Pipeline) GetGroup(ctx context.Context, id uint) (*model.PublishGroup, 
 func (p *Pipeline) ListGroups(ctx context.Context, offset, limit int) ([]model.PublishGroup, int64, error) {
 	var groups []model.PublishGroup
 	var total int64
-	p.db.Model(&model.PublishGroup{}).Count(&total)
+	p.db.WithContext(ctx).Model(&model.PublishGroup{}).Count(&total)
 	err := p.db.WithContext(ctx).Order("created_at DESC").Offset(offset).Limit(limit).Find(&groups).Error
 	return groups, total, err
 }
@@ -736,11 +736,11 @@ func (p *Pipeline) UpdateGroupStatus(ctx context.Context, groupID uint, status m
 		updates["last_error"] = reason
 	}
 
-	if err := p.db.Model(&group).Updates(updates).Error; err != nil {
+	if err := p.db.WithContext(ctx).Model(&group).Updates(updates).Error; err != nil {
 		return err
 	}
 
-	p.addStatusHistory(ctx, groupID, "", model.MemberStatus(oldStatus), fmt.Sprintf("%s → %s: %s", oldStatus, status, reason))
+	p.addStatusHistory(ctx, groupID, "", model.MemberStatus(oldStatus), model.MemberStatus(status), reason)
 	return nil
 }
 
@@ -817,12 +817,12 @@ func (p *Pipeline) TransitionGroupLifecycle(ctx context.Context, groupID uint) e
 	return nil
 }
 
-func (p *Pipeline) addStatusHistory(ctx context.Context, groupID uint, memberHash string, from model.MemberStatus, reason string) {
+func (p *Pipeline) addStatusHistory(ctx context.Context, groupID uint, memberHash string, from model.MemberStatus, to model.MemberStatus, reason string) {
 	history := &model.PublishGroupStatusHistory{
 		PublishGroupID: groupID,
 		MemberHash:     memberHash,
 		OldStatus:      from,
-		NewStatus:      from,
+		NewStatus:      to,
 		Reason:         reason,
 	}
 	if err := p.db.WithContext(ctx).Create(history).Error; err != nil {

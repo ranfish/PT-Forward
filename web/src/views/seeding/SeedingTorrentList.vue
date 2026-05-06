@@ -3,28 +3,28 @@
     <div style="margin-bottom: 16px; display: flex; gap: 12px">
       <a-input-search
         v-model:value="filters.search"
-        placeholder="搜索种子名称"
+        :placeholder="t('downloader.searchTorrent')"
         style="width: 300px"
         @search="pagination.fetch(1)"
       />
       <a-select
         v-model:value="filters.site"
-        placeholder="筛选站点"
+        :placeholder="t('seeding.filterSite')"
         allow-clear
         style="width: 200px"
         @change="pagination.fetch(1)"
       />
       <a-select
         v-model:value="filters.status"
-        placeholder="筛选状态"
+        :placeholder="t('seeding.filterStatus')"
         allow-clear
         style="width: 150px"
         @change="pagination.fetch(1)"
       >
-        <a-select-option value="seeding">做种中</a-select-option>
-        <a-select-option value="paused_free_end">免费到期暂停</a-select-option>
-        <a-select-option value="paused_rule">规则暂停</a-select-option>
-        <a-select-option value="downloading">下载中</a-select-option>
+        <a-select-option value="seeding">{{ t('seeding.seedingStatus') }}</a-select-option>
+        <a-select-option value="paused_free_end">{{ t('seeding.pausedFreeEnd') }}</a-select-option>
+        <a-select-option value="paused_rule">{{ t('seeding.pausedRule') }}</a-select-option>
+        <a-select-option value="downloading">{{ t('seeding.downloadingStatus') }}</a-select-option>
       </a-select>
     </div>
 
@@ -37,7 +37,7 @@
         pageSize: pagination.pageSize.value,
         total: pagination.total.value,
         showSizeChanger: true,
-        showTotal: (total: number) => `共 ${total} 条`,
+        showTotal: (total: number) => t('common.totalCount', { total }),
       }"
       row-key="id"
       @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
@@ -49,6 +49,26 @@
             :text="record.status"
           />
         </template>
+        <template v-if="column.key === 'actions'">
+          <a-space>
+            <a-button
+              v-if="record.status !== 'seeding'"
+              type="link"
+              size="small"
+              @click="handleResume(record.id)"
+            >
+              {{ t('common.resume') }}
+            </a-button>
+            <a-button
+              v-if="record.status === 'seeding'"
+              type="link"
+              size="small"
+              @click="handlePause(record.id)"
+            >
+              {{ t('common.pause') }}
+            </a-button>
+          </a-space>
+        </template>
       </template>
     </a-table>
   </div>
@@ -56,9 +76,12 @@
 
 <script setup lang="ts">
 import { reactive, onMounted } from 'vue'
+import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { seedingApi } from '@/api/seeding'
 import { usePagination } from '@/composables/usePagination'
 
+const { t } = useI18n()
 const filters = reactive({
   search: '',
   site: undefined as string | undefined,
@@ -75,11 +98,32 @@ const columns = [
   { title: 'HR', dataIndex: 'has_hr', key: 'has_hr', width: 60 },
   { title: '来源', dataIndex: 'source', key: 'source', width: 80 },
   { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 180 },
+  { title: '操作', key: 'actions', width: 100 },
 ]
 
 const pagination = usePagination((page, size) =>
   seedingApi.listRecords(page, size),
 )
+
+async function handleResume(recordId: number) {
+  try {
+    await seedingApi.resumeRecord(recordId)
+    message.success(t('common.resumed'))
+    pagination.fetch()
+  } catch (e: any) {
+    message.error(e.message)
+  }
+}
+
+async function handlePause(recordId: number) {
+  try {
+    await seedingApi.pauseRecord(recordId)
+    message.success(t('common.paused'))
+    pagination.fetch()
+  } catch (e: any) {
+    message.error(e.message)
+  }
+}
 
 onMounted(() => pagination.fetch())
 </script>

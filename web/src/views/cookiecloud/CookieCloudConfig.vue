@@ -1,35 +1,35 @@
 <template>
   <div>
-    <a-page-header title="CookieCloud" sub-title="浏览器 Cookie 自动同步" />
+    <a-page-header title="CookieCloud" :sub-title="t('cookiecloud.subtitle')" />
 
     <a-spin :spinning="loading">
       <a-form :model="form" layout="vertical" style="max-width: 600px">
-        <a-form-item label="服务器地址">
+        <a-form-item :label="t('cookiecloud.serverUrl')">
           <a-input v-model:value="form.serverUrl" placeholder="https://cookiecloud.example.com" />
         </a-form-item>
-        <a-form-item label="UUID">
+        <a-form-item :label="t('cookiecloud.uuid')">
           <a-input v-model:value="form.uuid" placeholder="CookieCloud UUID" />
         </a-form-item>
-        <a-form-item label="密码">
+        <a-form-item :label="t('common.password')">
           <a-input-password v-model:value="form.password" placeholder="CookieCloud 密码" />
         </a-form-item>
-        <a-form-item label="加密方式">
+        <a-form-item :label="t('cookiecloud.cryptoType')">
           <a-select v-model:value="form.cryptoType" style="width: 200px">
             <a-select-option value="legacy">Legacy</a-select-option>
             <a-select-option value="aes-256-gcm">AES-256-GCM</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="自动同步">
+        <a-form-item :label="t('cookiecloud.autoSync')">
           <a-switch v-model:checked="form.syncEnabled" />
         </a-form-item>
-        <a-form-item label="同步间隔（分钟）">
+        <a-form-item :label="t('cookiecloud.syncInterval')">
           <a-input-number v-model:value="form.syncInterval" :min="10" :max="1440" style="width: 200px" />
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" :loading="saving" @click="handleSave">保存</a-button>
-            <a-button :loading="testing" @click="handleTest">测试连接</a-button>
-            <a-button :loading="syncing" @click="handleSync">立即同步</a-button>
+            <a-button type="primary" :loading="saving" @click="handleSave">{{ t('common.save') }}</a-button>
+            <a-button :loading="testing" @click="handleTest">{{ t('site.testConnection') }}</a-button>
+            <a-button :loading="syncing" @click="handleSync">{{ t('cookiecloud.syncNow') }}</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -37,7 +37,7 @@
 
     <a-divider />
 
-    <a-card title="同步历史">
+    <a-card :title="t('cookiecloud.syncHistory')">
       <a-table
         :columns="historyColumns"
         :data-source="histories"
@@ -51,7 +51,7 @@
           <template v-if="column.key === 'status'">
             <a-badge
               :status="record.status === 'completed' ? 'success' : record.status === 'failed' ? 'error' : 'processing'"
-              :text="record.status === 'completed' ? '成功' : record.status === 'failed' ? '失败' : '运行中'"
+              :text="record.status === 'completed' ? t('cookiecloud.completed') : record.status === 'failed' ? t('cookiecloud.failed') : t('cookiecloud.running')"
             />
           </template>
           <template v-if="column.key === 'sync_duration'">
@@ -69,7 +69,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { cookiecloudApi } from '@/api/cookiecloud'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -136,9 +139,9 @@ async function handleSave() {
   saving.value = true
   try {
     await cookiecloudApi.saveConfig(form)
-    message.success('保存成功')
+    message.success(t('common.saveSuccess'))
   } catch (e: any) {
-    message.error(e?.response?.data?.message || '保存失败')
+    message.error(e?.response?.data?.message || t('common.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -148,9 +151,9 @@ async function handleTest() {
   testing.value = true
   try {
     await cookiecloudApi.test()
-    message.success('连接测试成功')
+    message.success(t('cookiecloud.connectionTestSuccess'))
   } catch (e: any) {
-    message.error(e?.response?.data?.message || '连接测试失败')
+    message.error(e?.response?.data?.message || t('cookiecloud.connectionTestFailed'))
   } finally {
     testing.value = false
   }
@@ -161,10 +164,10 @@ async function handleSync() {
   try {
     const resp = await cookiecloudApi.sync()
     const data = resp.data?.data || {}
-    message.success(`同步完成：${data.synced_sites || 0} 个站点已同步`)
+    message.success(t('cookiecloud.syncCompleted', { count: data.synced_sites || 0 }))
     fetchHistory()
   } catch (e: any) {
-    message.error(e?.response?.data?.message || '同步失败')
+    message.error(e?.response?.data?.message || t('cookiecloud.syncFailed'))
   } finally {
     syncing.value = false
   }

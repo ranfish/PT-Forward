@@ -682,7 +682,11 @@ func (e *Engine) DeleteTask(ctx context.Context, id uint) error {
 func (e *Engine) ListByClientID(ctx context.Context, clientID string) ([]model.ReseedTask, error) {
 	var tasks []model.ReseedTask
 	err := e.db.WithContext(ctx).
-		Where("client_ids LIKE ?", "%"+clientID+"%").
+		Where("client_ids = ? OR client_ids LIKE ? OR client_ids LIKE ? OR client_ids LIKE ?",
+			clientID,
+			clientID+",%",
+			"%,"+clientID+",%",
+			"%,"+clientID).
 		Find(&tasks).Error
 	return tasks, err
 }
@@ -902,16 +906,16 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		Paused:   false,
 	}
 
-	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)
-	if err != nil {
-		return e.failMatch(ctx, match, fmt.Sprintf("注入种子到下载器失败: %v", err))
+	if len(torrentData) == 0 {
+		return e.failMatch(ctx, match, "种子数据为空")
 	}
 
-	if addResult != nil && addResult.InfoHash != "" {
-		exists, _ := dlClient.CheckExists(ctx, addResult.InfoHash)
-		if exists {
+	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)
+	if err != nil {
+		if strings.Contains(err.Error(), "already") || strings.Contains(err.Error(), "exist") {
 			return e.failMatch(ctx, match, "种子已存在于下载器中")
 		}
+		return e.failMatch(ctx, match, fmt.Sprintf("注入种子到下载器失败: %v", err))
 	}
 
 	now := time.Now()

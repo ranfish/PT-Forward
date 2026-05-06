@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a-card title="Tracker 成员">
+    <a-card :title="t('tracker.title')">
       <a-table
         :columns="memberColumns"
         :data-source="members"
@@ -15,7 +15,7 @@
             <a-tag :color="memberStatusColor(record.status)">{{ record.status }}</a-tag>
           </template>
           <template v-if="column.key === 'paused'">
-            <a-tag :color="record.paused ? 'orange' : 'green'">{{ record.paused ? '暂停' : '活跃' }}</a-tag>
+            <a-tag :color="record.paused ? 'orange' : 'green'">{{ record.paused ? t('tracker.pausedStatus') : t('tracker.active') }}</a-tag>
           </template>
           <template v-if="column.key === 'info_hash'">
             <a-button type="link" size="small" @click="viewMember(record.info_hash)">{{ record.info_hash?.substring(0, 16) }}...</a-button>
@@ -24,7 +24,7 @@
       </a-table>
     </a-card>
 
-    <a-card title="状态变更历史" style="margin-top: 16px">
+    <a-card :title="t('tracker.statusHistory')" style="margin-top: 16px">
       <a-table
         :columns="historyColumns"
         :data-source="histories"
@@ -40,7 +40,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { trackerApi } from '@/api/tracker'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const historyLoading = ref(false)

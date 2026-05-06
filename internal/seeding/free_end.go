@@ -103,7 +103,7 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 	m.mu.Unlock()
 
 	var current model.SeedingTorrentRecord
-	if err := m.db.Where("client_id = ? AND info_hash = ?", record.ClientID, record.InfoHash).First(&current).Error; err != nil {
+	if err := m.db.WithContext(context.Background()).Where("client_id = ? AND info_hash = ?", record.ClientID, record.InfoHash).First(&current).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return
 		}
@@ -134,7 +134,9 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 	if m.client != nil {
 		dlClient, err := m.client.Get(record.ClientID)
 		if err == nil {
-			_ = dlClient.PauseTorrent(ctx, record.InfoHash)
+			if err := dlClient.PauseTorrent(ctx, record.InfoHash); err != nil {
+				m.logger.Warn("free end monitor: downloader pause failed", zap.Error(err))
+			}
 		}
 	}
 

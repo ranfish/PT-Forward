@@ -4,7 +4,7 @@
       <a-col :span="6">
         <a-card>
           <a-statistic
-            title="站点 (在线/总数)"
+            :title="t('dashboard.sitesOnline')"
             :value="`${overview.sites?.online || 0} / ${overview.sites?.total || 0}`"
             :value-style="{ color: '#1890ff' }"
           >
@@ -15,7 +15,7 @@
       <a-col :span="6">
         <a-card>
           <a-statistic
-            title="下载器 (在线/总数)"
+            :title="t('dashboard.downloadersOnline')"
             :value="`${overview.downloaders?.online || 0} / ${overview.downloaders?.total || 0}`"
             :value-style="{ color: '#52c41a' }"
           >
@@ -26,7 +26,7 @@
       <a-col :span="6">
         <a-card>
           <a-statistic
-            title="做种中"
+            :title="t('dashboard.seedingTorrents')"
             :value="overview.torrents?.seeding || 0"
             :value-style="{ color: '#faad14' }"
           >
@@ -37,7 +37,7 @@
       <a-col :span="6">
         <a-card>
           <a-statistic
-            title="待发布"
+            :title="t('dashboard.pendingPublish')"
             :value="overview.publish?.pendingCount || 0"
             :value-style="{ color: '#722ed1' }"
           >
@@ -50,17 +50,17 @@
     <a-row :gutter="16" style="margin-bottom: 24px">
       <a-col :span="6">
         <a-card>
-          <a-statistic title="辅种今日/累计" :value="`${overview.reseed?.todayCount || 0} / ${overview.reseed?.totalCount || 0}`" />
+          <a-statistic :title="t('dashboard.reseedTodayTotal')" :value="`${overview.reseed?.todayCount || 0} / ${overview.reseed?.totalCount || 0}`" />
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic title="发布今日/累计" :value="`${overview.publish?.todayCount || 0} / ${overview.publish?.totalCount || 0}`" />
+          <a-statistic :title="t('dashboard.publishTodayTotal')" :value="`${overview.publish?.todayCount || 0} / ${overview.publish?.totalCount || 0}`" />
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic title="下载中种子" :value="overview.torrents?.downloading || 0" />
+          <a-statistic :title="t('dashboard.downloadingTorrents')" :value="overview.torrents?.downloading || 0" />
         </a-card>
       </a-col>
       <a-col :span="6">
@@ -70,11 +70,11 @@
       </a-col>
     </a-row>
 
-    <a-card title="近 7 天趋势" style="margin-bottom: 24px">
+    <a-card :title="t('dashboard.trends7d')" style="margin-bottom: 24px">
       <div ref="chartRef" style="height: 320px; width: 100%"></div>
     </a-card>
 
-    <a-card title="最近活动">
+    <a-card :title="t('dashboard.recentActivity')">
       <a-table
         :columns="activityColumns"
         :data-source="activities"
@@ -89,6 +89,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import * as echarts from 'echarts'
 import {
@@ -100,6 +101,7 @@ import {
 import { dashboardApi } from '@/api/dashboard'
 import { useWebSocketStore } from '@/stores/websocket'
 
+const { t } = useI18n()
 const loading = ref(false)
 const overview = ref<any>({})
 const activities = ref<any[]>([])

@@ -8,14 +8,14 @@ import (
 )
 
 type Config struct {
-	Server       model.ServerConfig       `yaml:"server" mapstructure:"server"`
-	Database     model.DatabaseConfig     `yaml:"database" mapstructure:"database"`
-	Log          model.LogConfig          `yaml:"log" mapstructure:"log"`
-	Notification model.NotificationConfig `yaml:"notification" mapstructure:"notification"`
-	Security     model.SecurityConfig     `yaml:"security" mapstructure:"security"`
-	CookieCloud  model.CookieCloudConfig  `yaml:"cookiecloud" mapstructure:"cookiecloud"`
-	DataCleanup  model.DataCleanupConfig  `yaml:"data_cleanup" mapstructure:"data_cleanup"`
-	IYUU         model.IYUUSection        `yaml:"iyuu" mapstructure:"iyuu"`
+	Server       model.ServerConfig          `yaml:"server" mapstructure:"server"`
+	Database     model.DatabaseConfig        `yaml:"database" mapstructure:"database"`
+	Log          model.LogConfig             `yaml:"log" mapstructure:"log"`
+	Notification model.NotificationConfig    `yaml:"notification" mapstructure:"notification"`
+	Security     model.SecurityConfig        `yaml:"security" mapstructure:"security"`
+	CookieCloud  model.CookieCloudYAMLConfig `yaml:"cookiecloud" mapstructure:"cookiecloud"`
+	DataCleanup  model.DataCleanupConfig     `yaml:"data_cleanup" mapstructure:"data_cleanup"`
+	IYUU         model.IYUUSection           `yaml:"iyuu" mapstructure:"iyuu"`
 }
 
 func (c *Config) Validate() error {

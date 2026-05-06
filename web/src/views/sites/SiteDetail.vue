@@ -2,34 +2,34 @@
   <div>
     <a-page-header :title="site.name || site.domain" @back="$router.push('/sites')">
       <template #tags>
-        <a-tag v-if="needsCookie && site.hasCookie" color="green">Cookie 有效</a-tag>
-        <a-tag v-else-if="needsCookie" color="red">Cookie 未配置</a-tag>
-        <a-tag v-if="needsApiKey && site.hasApiKey" color="green">API Key 有效</a-tag>
-        <a-tag v-else-if="needsApiKey" color="red">API Key 未配置</a-tag>
-        <a-tag v-if="needsPasskey && site.hasPasskey" color="green">Passkey 有效</a-tag>
-        <a-tag v-else-if="needsPasskey" color="red">Passkey 未配置</a-tag>
+        <a-tag v-if="needsCookie && site.hasCookie" color="green">{{ t('site.cookieValid') }}</a-tag>
+        <a-tag v-else-if="needsCookie" color="red">{{ t('site.cookieNotConfigured') }}</a-tag>
+        <a-tag v-if="needsApiKey && site.hasApiKey" color="green">{{ t('site.apiKeyValid') }}</a-tag>
+        <a-tag v-else-if="needsApiKey" color="red">{{ t('site.apiKeyNotConfigured') }}</a-tag>
+        <a-tag v-if="needsPasskey && site.hasPasskey" color="green">{{ t('site.passkeyValid') }}</a-tag>
+        <a-tag v-else-if="needsPasskey" color="red">{{ t('site.passkeyNotConfigured') }}</a-tag>
       </template>
     </a-page-header>
 
     <a-spin :spinning="loading">
       <a-descriptions bordered :column="2" style="margin-bottom: 24px">
-        <a-descriptions-item label="域名">{{ site.domain }}</a-descriptions-item>
-        <a-descriptions-item label="名称">{{ site.name }}</a-descriptions-item>
+        <a-descriptions-item :label="t('site.domain')">{{ site.domain }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.name')">{{ site.name }}</a-descriptions-item>
         <a-descriptions-item label="URL">{{ site.baseUrl }}</a-descriptions-item>
-        <a-descriptions-item label="框架">
+        <a-descriptions-item :label="t('site.framework')">
           <a-tag :color="frameworkColors[site.framework] || 'default'">
             {{ frameworkLabels[site.framework] || site.framework }}
           </a-tag>
         </a-descriptions-item>
-        <a-descriptions-item label="认证方式">{{ authLabel }}</a-descriptions-item>
-        <a-descriptions-item v-if="needsCookie" label="Cookie">{{ site.hasCookie ? '已配置' : '未配置' }}</a-descriptions-item>
-        <a-descriptions-item v-if="needsApiKey" label="API Key">{{ site.hasApiKey ? '已配置' : '未配置' }}</a-descriptions-item>
-        <a-descriptions-item v-if="needsPasskey" label="Passkey">{{ site.hasPasskey ? '已配置' : '未配置' }}</a-descriptions-item>
-        <a-descriptions-item label="最后同步">{{ site.lastSyncAt || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="创建时间">{{ site.createdAt || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('site.authType')">{{ authLabel }}</a-descriptions-item>
+        <a-descriptions-item v-if="needsCookie" label="Cookie">{{ site.hasCookie ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
+        <a-descriptions-item v-if="needsApiKey" label="API Key">{{ site.hasApiKey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
+        <a-descriptions-item v-if="needsPasskey" label="Passkey">{{ site.hasPasskey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
+        <a-descriptions-item :label="t('site.lastSync')">{{ site.lastSyncAt || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.createdAt')">{{ site.createdAt || '-' }}</a-descriptions-item>
       </a-descriptions>
 
-      <a-card title="凭证管理" style="margin-bottom: 24px">
+      <a-card :title="t('site.credentialManagement')" style="margin-bottom: 24px">
         <a-form :model="credForm" layout="vertical" style="max-width: 500px">
           <a-form-item v-if="needsCookie" label="Cookie">
             <a-textarea v-model:value="credForm.cookie" :rows="4" placeholder="输入新的 Cookie" />
@@ -41,17 +41,17 @@
             <a-input v-model:value="credForm.passkey" placeholder="输入 Passkey" />
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" @click="updateCredentials">保存凭证</a-button>
+            <a-button type="primary" @click="updateCredentials">{{ t('site.saveCredentials') }}</a-button>
           </a-form-item>
         </a-form>
       </a-card>
 
-      <a-card title="站点配置覆盖" style="margin-bottom: 24px">
+      <a-card :title="t('site.siteConfigOverride')" style="margin-bottom: 24px">
         <template #extra>
           <a-space>
-            <a-button size="small" @click="showOverrideEditor = true">编辑覆盖配置</a-button>
-            <a-popconfirm v-if="hasOverrides" title="确认删除所有覆盖配置？" @confirm="deleteOverrides">
-              <a-button size="small" danger>删除覆盖</a-button>
+            <a-button size="small" @click="showOverrideEditor = true">{{ t('site.editOverrideConfig') }}</a-button>
+            <a-popconfirm v-if="hasOverrides" :title="t('site.deleteAllOverrideConfirm')" @confirm="deleteOverrides">
+              <a-button size="small" danger>{{ t('site.deleteOverride') }}</a-button>
             </a-popconfirm>
           </a-space>
         </template>
@@ -65,17 +65,17 @@
             </a-descriptions-item>
           </a-descriptions>
         </div>
-        <a-empty v-else description="暂无覆盖配置（使用全局默认值）" />
+        <a-empty v-else :description="t('site.noOverrideConfig')" />
       </a-card>
 
       <a-modal
         v-model:open="showOverrideEditor"
-        title="编辑站点配置覆盖"
+        :title="t('site.editOverrideConfig')"
         :confirm-loading="overrideSaving"
         width="640px"
         @ok="saveOverrides"
       >
-        <a-alert message="覆盖配置为 JSON 格式，仅修改需要覆盖的字段" type="info" show-icon style="margin-bottom: 16px" />
+        <a-alert :message="t('site.overrideConfigHint')" type="info" show-icon style="margin-bottom: 16px" />
         <a-textarea v-model:value="overrideJSON" :rows="12" placeholder='{"upload_rule": "...", "download_prefix": "..."}' />
       </a-modal>
     </a-spin>
@@ -86,7 +86,10 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const siteId = Number(route.params.id)
@@ -144,7 +147,7 @@ async function updateCredentials() {
     if (credForm.passkey) payload.passkey = credForm.passkey
     if (credForm.apiKey) payload.apiKey = credForm.apiKey
     await sitesApi.updateCredentials(siteId, payload)
-    message.success('凭证已更新')
+    message.success(t('site.credentialsUpdated'))
     credForm.cookie = ''
     credForm.passkey = ''
     credForm.apiKey = ''
@@ -185,14 +188,14 @@ async function saveOverrides() {
   try {
     const parsed = JSON.parse(overrideJSON.value)
     await sitesApi.updateOverrides(siteId, parsed)
-    message.success('覆盖配置已保存')
+    message.success(t('site.overrideConfigSaved'))
     showOverrideEditor.value = false
     fetchOverrides()
   } catch (e: any) {
     if (e instanceof SyntaxError) {
-      message.error('JSON 格式错误')
+      message.error(t('common.jsonFormatError'))
     } else {
-      message.error(e?.response?.data?.message || '保存失败')
+      message.error(e?.response?.data?.message || t('common.saveFailed'))
     }
   } finally {
     overrideSaving.value = false
@@ -202,11 +205,11 @@ async function saveOverrides() {
 async function deleteOverrides() {
   try {
     await sitesApi.deleteOverrides(siteId)
-    message.success('覆盖配置已删除')
+    message.success(t('site.overrideConfigDeleted'))
     overrideData.value = {}
     overrideJSON.value = '{}'
   } catch (e: any) {
-    message.error(e?.response?.data?.message || '删除失败')
+    message.error(e?.response?.data?.message || t('common.deleteFailed'))
   }
 }
 

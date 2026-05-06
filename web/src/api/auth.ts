@@ -21,13 +21,4 @@ export const authApi = {
   changePassword(oldPassword: string, newPassword: string) {
     return client.put('/auth/password', { oldPassword, newPassword })
   },
-  getProfile() {
-    return client.get('/auth/profile')
-  },
-  updateProfile(displayName: string) {
-    return client.put('/auth/profile', { displayName })
-  },
-  isInitialized() {
-    return client.get('/auth/status')
-  },
 }

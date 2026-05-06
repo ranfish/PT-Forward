@@ -64,3 +64,8 @@ type IYUUSection struct {
 	Enabled bool   `yaml:"enabled"     mapstructure:"enabled"`
 	APIBase string `yaml:"api_base"    mapstructure:"api_base"`
 }
+
+type CookieCloudYAMLConfig struct {
+	Enabled      bool `yaml:"enabled"        mapstructure:"enabled"`
+	SyncInterval int  `yaml:"sync_interval"  mapstructure:"sync_interval"`
+}

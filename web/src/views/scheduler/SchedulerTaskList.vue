@@ -1,7 +1,7 @@
 <template>
   <div>
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end">
-      <a-button @click="fetchTasks">刷新</a-button>
+      <a-button @click="fetchTasks">{{ t('common.refresh') }}</a-button>
     </div>
 
     <a-table
@@ -14,7 +14,7 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
-          <a-tag :color="record.paused ? 'orange' : 'green'">{{ record.paused ? '已暂停' : '运行中' }}</a-tag>
+          <a-tag :color="record.paused ? 'orange' : 'green'">{{ record.paused ? t('common.paused') : t('common.running') }}</a-tag>
         </template>
         <template v-if="column.key === 'last_run_at'">
           {{ record.last_run_at ? new Date(record.last_run_at).toLocaleString() : '-' }}
@@ -34,10 +34,10 @@
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button size="small" @click="triggerTask(record)" :disabled="record.paused">触发</a-button>
-            <a-button v-if="record.paused" size="small" type="primary" @click="resumeTask(record)">恢复</a-button>
-            <a-button v-else size="small" @click="pauseTask(record)">暂停</a-button>
-            <a-button size="small" @click="openReschedule(record)">调期</a-button>
+            <a-button size="small" @click="triggerTask(record)" :disabled="record.paused">{{ t('common.trigger') }}</a-button>
+            <a-button v-if="record.paused" size="small" type="primary" @click="resumeTask(record)">{{ t('common.resume') }}</a-button>
+            <a-button v-else size="small" @click="pauseTask(record)">{{ t('common.pause') }}</a-button>
+            <a-button size="small" @click="openReschedule(record)">{{ t('scheduler.reschedule') }}</a-button>
           </a-space>
         </template>
       </template>
@@ -45,18 +45,18 @@
 
     <a-modal
       v-model:open="rescheduleVisible"
-      title="修改调度周期"
+      :title="t('scheduler.editSchedule')"
       @ok="doReschedule"
       :confirm-loading="rescheduleLoading"
     >
       <a-form :label-col="{ span: 6 }">
-        <a-form-item label="任务名称">
+        <a-form-item :label="t('scheduler.taskName')">
           <a-input :value="rescheduleTarget?.name" disabled />
         </a-form-item>
-        <a-form-item label="当前周期">
+        <a-form-item :label="t('scheduler.currentPeriod')">
           <a-input :value="rescheduleTarget?.schedule" disabled />
         </a-form-item>
-        <a-form-item label="新周期">
+        <a-form-item :label="t('scheduler.newPeriod')">
           <a-input v-model:value="newSchedule" placeholder="例: */5 * * * *（支持 5/6 位 cron）" />
         </a-form-item>
       </a-form>
@@ -67,7 +67,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { schedulerApi, type SchedulerTask } from '@/api/scheduler'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const tasks = ref<SchedulerTask[]>([])
@@ -94,7 +97,7 @@ async function fetchTasks() {
     const resp = await schedulerApi.list()
     tasks.value = resp.data?.data?.items || []
   } catch {
-    message.error('获取任务列表失败')
+    message.error(t('scheduler.fetchTaskListFailed'))
   } finally {
     loading.value = false
   }
@@ -103,30 +106,30 @@ async function fetchTasks() {
 async function triggerTask(task: SchedulerTask) {
   try {
     await schedulerApi.trigger(task.name)
-    message.success(`已触发 ${task.name}`)
+    message.success(t('scheduler.taskTriggered', { name: task.name }))
     await fetchTasks()
   } catch {
-    message.error('触发失败')
+    message.error(t('scheduler.triggerFailed'))
   }
 }
 
 async function pauseTask(task: SchedulerTask) {
   try {
     await schedulerApi.pause(task.name)
-    message.success(`已暂停 ${task.name}`)
+    message.success(t('scheduler.taskPaused', { name: task.name }))
     await fetchTasks()
   } catch {
-    message.error('暂停失败')
+    message.error(t('scheduler.pauseFailed'))
   }
 }
 
 async function resumeTask(task: SchedulerTask) {
   try {
     await schedulerApi.resume(task.name)
-    message.success(`已恢复 ${task.name}`)
+    message.success(t('scheduler.taskResumed', { name: task.name }))
     await fetchTasks()
   } catch {
-    message.error('恢复失败')
+    message.error(t('scheduler.resumeFailed'))
   }
 }
 
@@ -141,11 +144,11 @@ async function doReschedule() {
   rescheduleLoading.value = true
   try {
     await schedulerApi.reschedule(rescheduleTarget.value.name, newSchedule.value)
-    message.success('调度周期已更新')
+    message.success(t('scheduler.scheduleUpdated'))
     rescheduleVisible.value = false
     await fetchTasks()
   } catch {
-    message.error('修改失败，请检查 cron 表达式')
+    message.error(t('scheduler.rescheduleFailed'))
   } finally {
     rescheduleLoading.value = false
   }

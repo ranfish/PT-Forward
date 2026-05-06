@@ -1062,8 +1062,27 @@ func (h *SiteHandler) handleDomainFreezeByID(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *SiteHandler) handleFreezeStatus(w http.ResponseWriter, r *http.Request) {
-	statuses := httpclient.GlobalLimiter.GetDomainStatuses()
-	Success(w, statuses)
+	switch r.Method {
+	case http.MethodGet:
+		statuses := httpclient.GlobalLimiter.GetDomainStatuses()
+		Success(w, statuses)
+	case http.MethodDelete:
+		var req struct {
+			Domain string `json:"domain"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			return
+		}
+		if req.Domain == "" {
+			Error(w, http.StatusBadRequest, 400, "domain is required")
+			return
+		}
+		httpclient.GlobalLimiter.ManualUnfreeze(req.Domain)
+		Success(w, map[string]string{"status": "unfrozen", "domain": req.Domain})
+	default:
+		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+	}
 }
 
 func (h *SiteHandler) handleCircuitStatus(w http.ResponseWriter, r *http.Request) {

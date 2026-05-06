@@ -8,16 +8,16 @@
 
     <a-spin :spinning="loading">
       <a-descriptions bordered :column="2" style="margin-bottom: 24px">
-        <a-descriptions-item label="名称">{{ task.name }}</a-descriptions-item>
-        <a-descriptions-item label="状态">{{ task.status }}</a-descriptions-item>
-        <a-descriptions-item label="源站点">{{ task.source_site_ids }}</a-descriptions-item>
-        <a-descriptions-item label="目标站点">{{ task.target_site_ids }}</a-descriptions-item>
-        <a-descriptions-item label="下载器">{{ task.client_ids }}</a-descriptions-item>
-        <a-descriptions-item label="创建时间">{{ task.created_at || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.name')">{{ task.name }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.status')">{{ task.status }}</a-descriptions-item>
+        <a-descriptions-item :label="t('reseed.sourceSite')">{{ task.source_site_ids }}</a-descriptions-item>
+        <a-descriptions-item :label="t('reseed.targetSite')">{{ task.target_site_ids }}</a-descriptions-item>
+        <a-descriptions-item :label="t('reseed.client')">{{ task.client_ids }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.createdAt')">{{ task.created_at || '-' }}</a-descriptions-item>
       </a-descriptions>
 
       <a-tabs v-model:activeKey="activeTab">
-        <a-tab-pane key="matches" tab="匹配结果">
+        <a-tab-pane key="matches" :tab="t('reseed.matchResults')">
           <a-table
             :columns="matchColumns"
             :data-source="matches"
@@ -39,21 +39,21 @@
                   @click="retryMatch(record.id)"
                   :disabled="record.status !== 'failed'"
                 >
-                  重试
+                  {{ t('reseed.retry') }}
                 </a-button>
               </template>
             </template>
           </a-table>
         </a-tab-pane>
-        <a-tab-pane key="negative" tab="否定缓存">
+        <a-tab-pane key="negative" :tab="t('reseed.negativeCache')">
           <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center">
             <a-input v-model:value="negDeleteInfoHash" placeholder="InfoHash" style="width: 320px" />
-            <a-input v-model:value="negDeleteSite" placeholder="站点（可选）" style="width: 200px" />
-            <a-popconfirm title="确定删除该否定缓存？" @confirm="deleteNegativeCache">
-              <a-button type="primary" danger :disabled="!negDeleteInfoHash">删除</a-button>
+            <a-input v-model:value="negDeleteSite" :placeholder="t('reseed.siteOptional')" style="width: 200px" />
+            <a-popconfirm :title="t('reseed.deleteNegativeCacheConfirm')" @confirm="deleteNegativeCache">
+              <a-button type="primary" danger :disabled="!negDeleteInfoHash">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
           </div>
-          <a-empty description="否定缓存通过上方表单按 InfoHash 删除" />
+          <a-empty :description="t('reseed.deleteNegativeCacheDesc')" />
         </a-tab-pane>
       </a-tabs>
     </a-spin>
@@ -62,12 +62,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { reseedApi } from '@/api/reseed'
 
 const route = useRoute()
 const taskId = Number(route.params.id)
+const { t } = useI18n()
 
 const loading = ref(false)
 const matchesLoading = ref(false)
@@ -121,7 +123,7 @@ async function fetchMatches() {
 async function retryMatch(matchId: number) {
   try {
     await reseedApi.retryMatch(taskId, matchId)
-    message.success('重试已触发')
+    message.success(t('reseed.retryTriggered'))
     fetchMatches()
   } catch (e: any) {
     message.error(e.message)
@@ -132,7 +134,7 @@ async function deleteNegativeCache() {
   if (!negDeleteInfoHash.value) return
   try {
     await reseedApi.deleteNegativeCache(taskId, negDeleteInfoHash.value, negDeleteSite.value || undefined)
-    message.success('已删除')
+    message.success(t('common.deleted'))
     negDeleteInfoHash.value = ''
     negDeleteSite.value = ''
   } catch (e: any) {

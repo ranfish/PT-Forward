@@ -22,12 +22,6 @@ export const sitesApi = {
   updateCredentials(id: number, data: any) {
     return client.put(`/sites/${id}/credentials`, data)
   },
-  detect(id: number) {
-    return client.post(`/sites/${id}/detect`)
-  },
-  getStats(id: number) {
-    return client.get(`/sites/${id}/stats`)
-  },
   getOverrides(id: number) {
     return client.get(`/sites/${id}/overrides`)
   },

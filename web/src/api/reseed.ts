@@ -10,9 +10,6 @@ export const reseedApi = {
   createTask(data: any) {
     return client.post('/reseed/tasks', data)
   },
-  updateTask(id: number, data: any) {
-    return client.put(`/reseed/tasks/${id}`, data)
-  },
   deleteTask(id: number) {
     return client.delete(`/reseed/tasks/${id}`)
   },

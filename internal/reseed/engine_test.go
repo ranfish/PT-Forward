@@ -1229,10 +1229,7 @@ func TestEngine_injectMatch_AlreadyExists(t *testing.T) {
 	}
 	client := &mocks.DownloaderClient{
 		AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
-			return &model.AddResult{InfoHash: "existing_hash"}, nil
-		},
-		CheckExistsFn: func(ctx context.Context, infoHash string) (bool, error) {
-			return true, nil
+			return nil, fmt.Errorf("torrent already exists in client")
 		},
 	}
 	cp := &mocks.DownloaderProvider{

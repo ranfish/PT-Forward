@@ -13,8 +13,8 @@
         style="width: 320px"
         @pressEnter="handleSearch"
       />
-      <a-button type="primary" @click="handleSearch">搜索</a-button>
-      <a-button @click="resetSearch">重置</a-button>
+      <a-button type="primary" @click="handleSearch">{{ t('common.search') }}</a-button>
+      <a-button @click="resetSearch">{{ t('common.reset') }}</a-button>
     </div>
 
     <a-table
@@ -33,8 +33,8 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'actions'">
-          <a-popconfirm title="确定删除该指纹？" @confirm="handleDelete(record.id)">
-            <a-button type="link" danger size="small">删除</a-button>
+          <a-popconfirm :title="t('fingerprint.deleteConfirm')" @confirm="handleDelete(record.id)">
+            <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
           </a-popconfirm>
         </template>
       </template>
@@ -45,8 +45,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { fingerprintsApi } from '@/api/fingerprints'
 import { usePagination } from '@/composables/usePagination'
+
+const { t } = useI18n()
 
 const searchMode = ref(false)
 const searchLoading = ref(false)
@@ -96,7 +99,7 @@ function resetSearch() {
 async function handleDelete(id: number) {
   try {
     await fingerprintsApi.delete(id)
-    message.success('删除成功')
+    message.success(t('common.deleteSuccess'))
     if (searchMode.value) {
       handleSearch()
     } else {

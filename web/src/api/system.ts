@@ -1,9 +1,6 @@
 import client from './client'
 
 export const systemApi = {
-  ping() {
-    return client.get('/system/ping')
-  },
   health() {
     return client.get('/system/health')
   },
