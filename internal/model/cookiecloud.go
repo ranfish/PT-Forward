@@ -31,6 +31,8 @@ type CookieCloudConfig struct {
 	LastSyncAt   *time.Time `json:"last_sync_at"`
 }
 
+func (CookieCloudConfig) TableName() string { return "cookie_cloud_configs" }
+
 // CookieCloudSyncHistory — CookieCloud 同步历史
 type CookieCloudSyncHistory struct {
 	ID           uint                   `json:"id" gorm:"primaryKey;autoIncrement"`

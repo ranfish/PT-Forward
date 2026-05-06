@@ -1,12 +1,12 @@
 <template>
   <div>
     <a-tabs v-model:activeKey="activeTab">
-      <a-tab-pane key="candidates" tab="候选列表">
+      <a-tab-pane key="candidates" :tab="t('publish.candidates')">
         <div style="margin-bottom: 16px; display: flex; justify-content: space-between">
           <a-space>
             <a-input-search
               v-model:value="candidateSearch"
-              placeholder="搜索标题"
+              :placeholder="t('common.search')"
               style="width: 300px"
               @search="fetchCandidates"
             />
@@ -17,7 +17,7 @@
           :columns="candidateColumns"
           :data-source="candidates"
           :loading="candidatesLoading"
-          :pagination="{ current: candidatePage, pageSize: 20, total: candidateTotal, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }"
+          :pagination="{ current: candidatePage, pageSize: 20, total: candidateTotal, showSizeChanger: true, showTotal: (total: number) => `共 ${total} 条` }"
           row-key="id"
           size="small"
           @change="(pag: any) => { candidatePage = pag.current; fetchCandidates() }"
@@ -31,10 +31,10 @@
             <template v-if="column.key === 'actions'">
               <a-space>
                 <a-button type="link" size="small" @click="manualPublish(record.id)" :disabled="record.publish_status === 'completed'">
-                  发布
+                  {{ t('publish.publishAction') }}
                 </a-button>
-                <a-popconfirm title="确定删除？" @confirm="deleteCandidate(record.id)">
-                  <a-button type="link" danger size="small">删除</a-button>
+                <a-popconfirm :title="t('publish.deleteConfirm')" @confirm="deleteCandidate(record.id)">
+                  <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
                 </a-popconfirm>
               </a-space>
             </template>
@@ -42,7 +42,7 @@
         </a-table>
       </a-tab-pane>
 
-      <a-tab-pane key="groups" tab="发布组">
+      <a-tab-pane key="groups" :tab="t('publish.groups')">
         <a-table
           :columns="groupColumns"
           :data-source="groups"
@@ -59,9 +59,9 @@
             </template>
             <template v-if="column.key === 'actions'">
               <a-space>
-                <a-button type="link" size="small" @click="$router.push(`/publish/groups/${record.id}`)">详情</a-button>
-                <a-popconfirm title="确定删除？" @confirm="deleteGroup(record.id)">
-                  <a-button type="link" danger size="small">删除</a-button>
+                <a-button type="link" size="small" @click="$router.push(`/publish/groups/${record.id}`)">{{ t('common.detail') }}</a-button>
+                <a-popconfirm :title="t('publish.deleteConfirm')" @confirm="deleteGroup(record.id)">
+                  <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
                 </a-popconfirm>
               </a-space>
             </template>
@@ -74,9 +74,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
 
+const { t } = useI18n()
 const activeTab = ref('candidates')
 const candidateSearch = ref('')
 const candidatesLoading = ref(false)
@@ -134,7 +136,7 @@ async function fetchGroups() {
 async function manualPublish(id: number) {
   try {
     await publishApi.manualPublish(id)
-    message.success('已触发发布')
+    message.success(t('publish.publishTriggered'))
     fetchCandidates()
   } catch (e: any) {
     message.error(e.message)
@@ -144,7 +146,7 @@ async function manualPublish(id: number) {
 async function deleteCandidate(id: number) {
   try {
     await publishApi.deleteCandidate(id)
-    message.success('已删除')
+    message.success(t('common.deleted'))
     fetchCandidates()
   } catch (e: any) {
     message.error(e.message)
@@ -154,7 +156,7 @@ async function deleteCandidate(id: number) {
 async function deleteGroup(id: number) {
   try {
     await publishApi.deleteGroup(id)
-    message.success('已删除')
+    message.success(t('common.deleted'))
     fetchGroups()
   } catch (e: any) {
     message.error(e.message)

@@ -3,35 +3,35 @@
     <a-row :gutter="16" style="margin-bottom: 24px">
       <a-col :span="6">
         <a-card>
-          <a-statistic title="总上传量" :value="formatSize(overview.totalUploadBytes || 0)" :value-style="{ color: '#52c41a' }">
+          <a-statistic :title="t('seeding.totalUpload')" :value="formatSize(overview.totalUploadBytes || 0)" :value-style="{ color: '#52c41a' }">
             <template #prefix><CloudUploadOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic title="总下载量" :value="formatSize(overview.totalDownloadBytes || 0)" :value-style="{ color: '#1890ff' }">
+          <a-statistic :title="t('seeding.totalDownload')" :value="formatSize(overview.totalDownloadBytes || 0)" :value-style="{ color: '#1890ff' }">
             <template #prefix><CloudDownloadOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic title="今日新增" :value="overview.todayAdded || 0" :value-style="{ color: '#faad14' }">
+          <a-statistic :title="t('seeding.todayAdded')" :value="overview.todayAdded || 0" :value-style="{ color: '#faad14' }">
             <template #prefix><ClockCircleOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic title="全局分享率" :value="overview.globalRatio || 0" :precision="2" :value-style="{ color: '#722ed1' }">
+          <a-statistic :title="t('seeding.globalRatio')" :value="overview.globalRatio || 0" :precision="2" :value-style="{ color: '#722ed1' }">
             <template #prefix><PieChartOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
     </a-row>
 
-    <a-card title="站点统计" style="margin-bottom: 24px">
+    <a-card :title="t('seeding.siteStats')" style="margin-bottom: 24px">
       <a-table
         :columns="siteColumns"
         :data-source="siteStats"
@@ -42,7 +42,7 @@
       />
     </a-card>
 
-    <a-card title="种子排行">
+    <a-card :title="t('seeding.torrentRanking')">
       <a-table
         :columns="torrentColumns"
         :data-source="torrentStats"
@@ -58,6 +58,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import {
   CloudUploadOutlined,
   CloudDownloadOutlined,
@@ -66,6 +67,7 @@ import {
 } from '@ant-design/icons-vue'
 import { seedingApi } from '@/api/seeding'
 
+const { t } = useI18n()
 const siteLoading = ref(false)
 const torrentLoading = ref(false)
 const overview = ref<any>({})

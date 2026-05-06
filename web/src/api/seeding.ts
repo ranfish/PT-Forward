@@ -10,6 +10,12 @@ export const seedingApi = {
   updateConfig(id: number, data: any) {
     return client.put(`/seeding/configs/${id}`, data)
   },
+  createConfig(data: any) {
+    return client.post('/seeding/configs', data)
+  },
+  deleteConfig(id: number) {
+    return client.delete(`/seeding/configs/${id}`)
+  },
   listRecords(page = 1, size = 20) {
     return client.get('/seeding/records', { params: { page, size } })
   },
@@ -25,14 +31,11 @@ export const seedingApi = {
   getTorrents(page = 1, size = 20) {
     return client.get('/seeding/torrents', { params: { page, size } })
   },
-  getScoringConfig() {
-    return client.get('/seeding/scoring-config')
+  resumeRecord(id: number) {
+    return client.post(`/seeding/records/${id}/resume`)
   },
-  getScoringLogs(page = 1, size = 20) {
-    return client.get('/seeding/scoring-logs', { params: { page, size } })
-  },
-  dryrun(data: any) {
-    return client.post('/seeding/scoring-dryrun', data)
+  pauseRecord(id: number) {
+    return client.post(`/seeding/records/${id}/pause`)
   },
 }
 

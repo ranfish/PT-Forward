@@ -210,7 +210,7 @@ func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, tor
 	now := time.Now()
 	var matches []RuleMatch
 	for _, rule := range rules {
-		matched := re.matchRule(rule, records, torrentMap, freeSpace, now, globalUpSpeed, globalDownSpeed)
+		matched := re.matchRule(ctx, rule, records, torrentMap, freeSpace, now, globalUpSpeed, globalDownSpeed)
 		if len(matched) > 0 {
 			matches = append(matches, RuleMatch{
 				Rule:     rule,
@@ -231,13 +231,13 @@ func (re *RuleEvaluator) EvaluateRulesSimple(ctx context.Context, clientID strin
 	return re.EvaluateRules(ctx, clientID, nil, -1)
 }
 
-func (re *RuleEvaluator) fillScoringContext(rc *RuleContext) {
+func (re *RuleEvaluator) fillScoringContext(ctx context.Context, rc *RuleContext) {
 	if re.db == nil {
 		return
 	}
 
 	var latest model.ScoringLog
-	err := re.db.Where("client_id = ? AND info_hash = ?",
+	err := re.db.WithContext(ctx).Where("client_id = ? AND info_hash = ?",
 		rc.Record.ClientID, rc.Record.InfoHash).
 		Order("created_at DESC").
 		First(&latest).Error
@@ -246,18 +246,18 @@ func (re *RuleEvaluator) fillScoringContext(rc *RuleContext) {
 	}
 
 	var cycleLog model.ScoringLog
-	err = re.db.Where("client_id = ? AND info_hash = ?",
+	err = re.db.WithContext(ctx).Where("client_id = ? AND info_hash = ?",
 		rc.Record.ClientID, rc.Record.InfoHash).
 		Order("created_at DESC").
 		First(&cycleLog).Error
 	if err == nil {
 		var cycleCount int64
-		re.db.Model(&model.ScoringLog{}).
+		re.db.WithContext(ctx).Model(&model.ScoringLog{}).
 			Where("cycle_id = ?", cycleLog.CycleID).
 			Count(&cycleCount)
 
 		var rank int64
-		re.db.Model(&model.ScoringLog{}).
+		re.db.WithContext(ctx).Model(&model.ScoringLog{}).
 			Where("cycle_id = ? AND score <= ?", cycleLog.CycleID, cycleLog.Score).
 			Count(&rank)
 		rc.ScoringRank = int(rank)
@@ -266,14 +266,14 @@ func (re *RuleEvaluator) fillScoringContext(rc *RuleContext) {
 
 	cutoff := time.Now().Add(-72 * time.Hour)
 	var lowCount int64
-	re.db.Model(&model.ScoringLog{}).
+	re.db.WithContext(ctx).Model(&model.ScoringLog{}).
 		Where("client_id = ? AND info_hash = ? AND score < ? AND created_at > ?",
 			rc.Record.ClientID, rc.Record.InfoHash, 5.0, cutoff).
 		Count(&lowCount)
 	rc.LowScoreCount = int(lowCount)
 }
 
-func (re *RuleEvaluator) matchRule(rule model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64) []model.SeedingTorrentRecord {
+func (re *RuleEvaluator) matchRule(ctx context.Context, rule model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64) []model.SeedingTorrentRecord {
 	if rule.Conditions == "" && rule.Expr == "" {
 		return nil
 	}
@@ -300,7 +300,7 @@ func (re *RuleEvaluator) matchRule(rule model.DeleteRule, records []model.Seedin
 			GlobalDownloadSpeed: globalDownSpeed,
 		}
 
-		re.fillScoringContext(rc)
+		re.fillScoringContext(ctx, rc)
 
 		if useExpr {
 			ok, err := evalExpr(rule.Expr, rc)

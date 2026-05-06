@@ -3,7 +3,7 @@
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end">
       <a-button type="primary" @click="openModal()">
         <template #icon><PlusOutlined /></template>
-        添加通知渠道
+        {{ t('settings.notifications.addChannel') }}
       </a-button>
     </div>
 
@@ -23,10 +23,10 @@
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
-            <a-button type="link" size="small" @click="testChannel(record.id)">测试</a-button>
-            <a-popconfirm title="确定删除该渠道？" @confirm="handleDelete(record.id)">
-              <a-button type="link" danger size="small">删除</a-button>
+            <a-button type="link" size="small" @click="openModal(record)">{{ t('common.edit') }}</a-button>
+            <a-button type="link" size="small" @click="testChannel(record.id)">{{ t('common.test') }}</a-button>
+            <a-popconfirm :title="t('settings.notifications.deleteConfirm')" @confirm="handleDelete(record.id)">
+              <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
           </a-space>
         </template>
@@ -35,15 +35,15 @@
 
     <a-modal
       v-model:open="modalVisible"
-      :title="editingChannel ? '编辑通知渠道' : '添加通知渠道'"
+      :title="editingChannel ? t('settings.notifications.editChannel') : t('settings.notifications.addChannel')"
       @ok="handleSubmit"
       :confirm-loading="submitting"
     >
       <a-form :model="form" layout="vertical">
-        <a-form-item label="名称" name="name" :rules="[{ required: true, message: '请输入名称' }]">
+        <a-form-item :label="t('settings.notifications.channelName')" name="name" :rules="[{ required: true, message: t('settings.notifications.channelNameRequired') }]">
           <a-input v-model:value="form.name" placeholder="渠道名称" />
         </a-form-item>
-        <a-form-item label="类型" name="type" :rules="[{ required: true, message: '请选择类型' }]">
+        <a-form-item :label="t('settings.notifications.channelType')" name="type" :rules="[{ required: true, message: t('settings.notifications.channelTypeRequired') }]">
           <a-select v-model:value="form.type" placeholder="选择通知类型">
             <a-select-option value="telegram">Telegram</a-select-option>
             <a-select-option value="bark">Bark</a-select-option>
@@ -52,7 +52,7 @@
             <a-select-option value="dingtalk">钉钉</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="配置" name="config">
+        <a-form-item :label="t('settings.notifications.channelConfig')" name="config">
           <a-textarea v-model:value="form.config" :rows="4" placeholder="JSON 格式的渠道配置" />
         </a-form-item>
       </a-form>
@@ -63,8 +63,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { notificationsApi } from '@/api/notifications'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const modalVisible = ref(false)
@@ -117,7 +120,7 @@ async function handleSubmit() {
     } else {
       await notificationsApi.create(payload)
     }
-    message.success('操作成功')
+    message.success(t('common.operationSuccess'))
     modalVisible.value = false
     fetchChannels()
   } catch (e: any) {
@@ -130,7 +133,7 @@ async function handleSubmit() {
 async function handleDelete(id: number) {
   try {
     await notificationsApi.delete(id)
-    message.success('删除成功')
+    message.success(t('common.deleteSuccess'))
     fetchChannels()
   } catch (e: any) {
     message.error(e.message)
@@ -140,7 +143,7 @@ async function handleDelete(id: number) {
 async function testChannel(id: number) {
   try {
     await notificationsApi.test(id)
-    message.success('测试通知已发送')
+    message.success(t('settings.notifications.testSent'))
   } catch (e: any) {
     message.error(e.message)
   }
@@ -149,7 +152,7 @@ async function testChannel(id: number) {
 async function toggleChannel(record: any) {
   try {
     await notificationsApi.update(record.id, { ...record, enabled: !record.enabled })
-    message.success('状态已切换')
+    message.success(t('settings.notifications.statusToggled'))
     fetchChannels()
   } catch (e: any) {
     message.error(e.message)

@@ -45,10 +45,12 @@
             <template #icon><CopyOutlined /></template>
             <span>{{ t('nav.reseed') }}</span>
           </a-menu-item>
-          <a-menu-item key="/publish" @click="$router.push('/publish')">
+          <a-sub-menu key="publish-sub">
             <template #icon><SendOutlined /></template>
-            <span>{{ t('nav.publish') }}</span>
-          </a-menu-item>
+            <template #title>{{ t('nav.publish') }}</template>
+            <a-menu-item key="/publish" @click="$router.push('/publish')">{{ t('publish.candidates') }}</a-menu-item>
+            <a-menu-item key="/publish/exclusions" @click="$router.push('/publish/exclusions')">{{ t('nav.publishExclusions') }}</a-menu-item>
+          </a-sub-menu>
           <a-menu-item key="/iyuu" @click="$router.push('/iyuu')">
             <template #icon><ApiOutlined /></template>
             <span>{{ t('nav.iyuu') }}</span>
@@ -79,6 +81,14 @@
           <a-menu-item key="/system" @click="$router.push('/system')">
             <template #icon><DashboardOutlined /></template>
             <span>{{ t('nav.systemHealth') }}</span>
+          </a-menu-item>
+          <a-menu-item key="/events" @click="$router.push('/events')">
+            <template #icon><UnorderedListOutlined /></template>
+            <span>{{ t('nav.torrentEvents') }}</span>
+          </a-menu-item>
+          <a-menu-item key="/httpclient" @click="$router.push('/httpclient')">
+            <template #icon><StopOutlined /></template>
+            <span>{{ t('nav.freezeStatus') }}</span>
           </a-menu-item>
           <a-menu-item key="/fingerprints" @click="$router.push('/fingerprints')">
             <template #icon><SafetyOutlined /></template>
@@ -153,6 +163,8 @@ import {
   ClusterOutlined,
   HeartOutlined,
   FieldTimeOutlined,
+  UnorderedListOutlined,
+  StopOutlined,
 } from '@ant-design/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
@@ -180,6 +192,11 @@ watch(
     if (path.startsWith('/seeding')) {
       if (!openKeys.value.includes('seeding-sub')) {
         openKeys.value = [...openKeys.value, 'seeding-sub']
+      }
+    }
+    if (path.startsWith('/publish')) {
+      if (!openKeys.value.includes('publish-sub')) {
+        openKeys.value = [...openKeys.value, 'publish-sub']
       }
     }
     if (path.startsWith('/settings')) {

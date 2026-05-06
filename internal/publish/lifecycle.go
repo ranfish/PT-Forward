@@ -294,12 +294,12 @@ func (m *LifecycleManager) transitionGroupStatus(ctx context.Context, group *mod
 	}
 }
 
-func (m *LifecycleManager) reloadSettingsFromDB(_ context.Context) {
+func (m *LifecycleManager) reloadSettingsFromDB(ctx context.Context) {
 	var settings []struct {
 		Key   string `gorm:"column:key"`
 		Value string `gorm:"column:value"`
 	}
-	m.db.Table("system_settings").
+	m.db.WithContext(ctx).Table("system_settings").
 		Where("key LIKE ?", "lifecycle.%").
 		Find(&settings)
 

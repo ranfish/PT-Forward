@@ -8,23 +8,23 @@
       </template>
       <template #extra>
         <a-space>
-          <a-button @click="pauseGroup" :disabled="group.status !== 'active'">暂停</a-button>
-          <a-button type="primary" @click="resumeGroup" :disabled="group.status !== 'paused'">恢复</a-button>
+          <a-button @click="pauseGroup" :disabled="group.status !== 'active'">{{ t('common.pause') }}</a-button>
+          <a-button type="primary" @click="resumeGroup" :disabled="group.status !== 'paused'">{{ t('common.resume') }}</a-button>
         </a-space>
       </template>
     </a-page-header>
 
     <a-spin :spinning="loading">
       <a-descriptions bordered :column="2" style="margin-bottom: 24px">
-        <a-descriptions-item label="源站点">{{ group.source_site }}</a-descriptions-item>
-        <a-descriptions-item label="源 Hash">{{ group.source_hash }}</a-descriptions-item>
-        <a-descriptions-item label="候选 ID">{{ group.candidate_id }}</a-descriptions-item>
-        <a-descriptions-item label="状态">{{ group.status }}</a-descriptions-item>
-        <a-descriptions-item label="创建时间">{{ group.created_at || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="更新时间">{{ group.updated_at || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('publish.sourceSite')">{{ group.source_site }}</a-descriptions-item>
+        <a-descriptions-item :label="t('publish.sourceHash')">{{ group.source_hash }}</a-descriptions-item>
+        <a-descriptions-item :label="t('publish.candidateId')">{{ group.candidate_id }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.status')">{{ group.status }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.createdAt')">{{ group.created_at || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.updatedAt')">{{ group.updated_at || '-' }}</a-descriptions-item>
       </a-descriptions>
 
-      <a-card title="成员列表">
+      <a-card :title="t('publish.memberList')">
         <a-table
           :columns="memberColumns"
           :data-source="members"
@@ -48,12 +48,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
 
 const route = useRoute()
 const groupId = Number(route.params.id)
+const { t } = useI18n()
 
 const loading = ref(false)
 const membersLoading = ref(false)
@@ -96,7 +98,7 @@ async function fetchMembers() {
 async function pauseGroup() {
   try {
     await publishApi.pauseGroup(groupId)
-    message.success('已暂停')
+    message.success(t('common.paused'))
     fetchGroup()
   } catch (e: any) {
     message.error(e.message)
@@ -106,7 +108,7 @@ async function pauseGroup() {
 async function resumeGroup() {
   try {
     await publishApi.resumeGroup(groupId)
-    message.success('已恢复')
+    message.success(t('common.resumed'))
     fetchGroup()
   } catch (e: any) {
     message.error(e.message)

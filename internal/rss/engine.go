@@ -144,7 +144,7 @@ func (e *Engine) Trigger(ctx context.Context, subID uint) error {
 		return &model.AppError{Code: 13003, Message: "订阅已禁用"}
 	}
 
-	fetchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	fetchCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	go func() {
 		defer cancel()
 		e.fetchOnce(fetchCtx, sub)
@@ -217,7 +217,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 		}
 
 		var site model.Site
-		if err := e.db.Where("name = ? OR domain = ?", sub.SiteName, sub.SiteName).First(&site).Error; err != nil {
+		if err := e.db.WithContext(ctx).Where("name = ? OR domain = ?", sub.SiteName, sub.SiteName).First(&site).Error; err != nil {
 			e.logger.Warn("site not found for subscription",
 				zap.String("subscription", sub.Name),
 				zap.String("site", sub.SiteName))
@@ -410,11 +410,13 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 
 	adapter, err := e.siteProvider.GetAdapter(ctx, siteName)
 	if err != nil {
+		e.logger.Debug("获取适配器失败，跳过HR/折扣检测", zap.String("site", siteName), zap.Error(err))
 		return
 	}
 
 	config, err := e.siteProvider.GetSiteConfig(ctx, siteName)
 	if err != nil {
+		e.logger.Debug("获取站点配置失败，跳过HR/折扣检测", zap.String("site", siteName), zap.Error(err))
 		return
 	}
 

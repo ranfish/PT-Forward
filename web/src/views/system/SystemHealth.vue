@@ -2,48 +2,48 @@
   <div>
     <a-row :gutter="16" style="margin-bottom: 16px">
       <a-col :span="8">
-        <a-card title="服务状态" size="small">
+        <a-card :title="t('system.serviceStatus')" size="small">
           <a-descriptions :column="1" size="small">
-            <a-descriptions-item label="状态">
+            <a-descriptions-item :label="t('common.status')">
               <a-tag :color="health.status === 'healthy' ? 'green' : 'red'">{{ health.status || '-' }}</a-tag>
             </a-descriptions-item>
-            <a-descriptions-item label="版本">{{ health.version || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="运行时间">{{ health.uptime || '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('system.version')">{{ health.version || '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('system.uptime')">{{ health.uptime || '-' }}</a-descriptions-item>
           </a-descriptions>
         </a-card>
       </a-col>
       <a-col :span="8">
-        <a-card title="数据库" size="small">
+        <a-card :title="t('system.database')" size="small">
           <a-descriptions :column="1" size="small">
-            <a-descriptions-item label="状态">
+            <a-descriptions-item :label="t('common.status')">
               <a-tag :color="health.db_status === 'ok' ? 'green' : 'red'">{{ health.db_status || '-' }}</a-tag>
             </a-descriptions-item>
-            <a-descriptions-item label="信息">{{ health.db_message || '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('system.info')">{{ health.db_message || '-' }}</a-descriptions-item>
           </a-descriptions>
         </a-card>
       </a-col>
       <a-col :span="8">
-        <a-card title="下载器" size="small">
+        <a-card :title="t('nav.downloaders')" size="small">
           <a-descriptions :column="1" size="small">
-            <a-descriptions-item label="已连接">{{ health.connected_clients ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('system.connectedClients')">{{ health.connected_clients ?? '-' }}</a-descriptions-item>
           </a-descriptions>
         </a-card>
       </a-col>
     </a-row>
 
-    <a-card title="运行信息" size="small" style="margin-bottom: 16px">
+    <a-card :title="t('system.runtimeInfo')" size="small" style="margin-bottom: 16px">
       <a-descriptions :column="2" size="small" v-if="info">
-        <a-descriptions-item label="Go 版本">{{ info.go_version || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="操作系统">{{ info.os || '-' }}/{{ info.arch || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="CPU 核数">{{ info.cpu_count || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('system.goVersion')">{{ info.go_version || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('system.os')">{{ info.os || '-' }}/{{ info.arch || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('system.cpuCount')">{{ info.cpu_count || '-' }}</a-descriptions-item>
         <a-descriptions-item label="Goroutines">{{ info.goroutines || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="内存使用">{{ formatBytes(info.mem_alloc) }}</a-descriptions-item>
-        <a-descriptions-item label="堆内存">{{ formatBytes(info.heap_alloc) }}</a-descriptions-item>
+        <a-descriptions-item :label="t('system.memoryUsage')">{{ formatBytes(info.mem_alloc) }}</a-descriptions-item>
+        <a-descriptions-item :label="t('system.heapMemory')">{{ formatBytes(info.heap_alloc) }}</a-descriptions-item>
       </a-descriptions>
     </a-card>
 
     <div style="text-align: right; margin-bottom: 16px">
-      <a-button @click="fetchAll">刷新</a-button>
+      <a-button @click="fetchAll">{{ t('common.refresh') }}</a-button>
     </div>
   </div>
 </template>
@@ -51,7 +51,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { systemApi } from '@/api/system'
+
+const { t } = useI18n()
 
 const health = ref<any>({})
 const info = ref<any>(null)

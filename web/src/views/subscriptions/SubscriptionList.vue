@@ -3,7 +3,7 @@
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end">
       <a-button type="primary" @click="openModal()">
         <template #icon><PlusOutlined /></template>
-        添加订阅
+        {{ t('subscription.addSubscription') }}
       </a-button>
     </div>
 
@@ -16,7 +16,7 @@
         pageSize: pagination.pageSize.value,
         total: pagination.total.value,
         showSizeChanger: true,
-        showTotal: (total: number) => `共 ${total} 条`,
+        showTotal: (total: number) => t('common.totalCount', { total }),
       }"
       row-key="id"
       @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
@@ -27,11 +27,11 @@
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button type="link" size="small" @click="$router.push(`/subscriptions/${record.id}`)">详情</a-button>
-            <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
-            <a-button type="link" size="small" @click="triggerFetch(record.id)">触发</a-button>
-            <a-popconfirm title="确定删除该订阅？" @confirm="handleDelete(record.id)">
-              <a-button type="link" danger size="small">删除</a-button>
+            <a-button type="link" size="small" @click="$router.push(`/subscriptions/${record.id}`)">{{ t('common.detail') }}</a-button>
+            <a-button type="link" size="small" @click="openModal(record)">{{ t('common.edit') }}</a-button>
+            <a-button type="link" size="small" @click="triggerFetch(record.id)">{{ t('common.trigger') }}</a-button>
+            <a-popconfirm :title="t('subscription.deleteSubscriptionConfirm')" @confirm="handleDelete(record.id)">
+              <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
           </a-space>
         </template>
@@ -40,21 +40,21 @@
 
     <a-modal
       v-model:open="modalVisible"
-      :title="editingRecord ? '编辑订阅' : '添加订阅'"
+      :title="editingRecord ? t('subscription.editSubscription') : t('subscription.addSubscription')"
       @ok="handleSubmit"
       :confirm-loading="submitting"
     >
       <a-form :model="form" layout="vertical">
-        <a-form-item label="名称" name="name" :rules="[{ required: true, message: '请输入名称' }]">
+        <a-form-item :label="t('common.name')" name="name" :rules="[{ required: true, message: t('common.nameRequired') }]">
           <a-input v-model:value="form.name" placeholder="订阅名称" />
         </a-form-item>
-        <a-form-item label="站点" name="siteName" :rules="[{ required: true, message: '请输入站点' }]">
+        <a-form-item :label="t('common.site')" name="siteName" :rules="[{ required: true, message: t('common.siteRequired') }]">
           <a-input v-model:value="form.siteName" placeholder="站点名称" />
         </a-form-item>
-        <a-form-item label="RSS 地址" name="urls" :rules="[{ required: true, message: '请输入 RSS 地址' }]">
+        <a-form-item :label="t('subscription.url')" name="urls" :rules="[{ required: true, message: t('subscription.urlRequired') }]">
           <a-textarea v-model:value="form.urls" placeholder="RSS 地址，每行一个" :rows="3" />
         </a-form-item>
-        <a-form-item label="Cron 表达式" name="cron">
+        <a-form-item :label="t('subscription.cronExpression')" name="cron">
           <a-input v-model:value="form.cron" placeholder="例如: */15 * * * *" />
         </a-form-item>
       </a-form>
@@ -66,8 +66,11 @@
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
+import { useI18n } from 'vue-i18n'
 import { subscriptionsApi } from '@/api/subscriptions'
 import { usePagination } from '@/composables/usePagination'
+
+const { t } = useI18n()
 
 const modalVisible = ref(false)
 const submitting = ref(false)
@@ -108,7 +111,7 @@ async function handleSubmit() {
     } else {
       await subscriptionsApi.create({ ...form, urls: form.urls.split('\n').filter(u => u.trim()) })
     }
-    message.success('操作成功')
+    message.success(t('common.operationSuccess'))
     modalVisible.value = false
     pagination.fetch()
   } catch (e: any) {
@@ -121,7 +124,7 @@ async function handleSubmit() {
 async function handleDelete(id: number) {
   try {
     await subscriptionsApi.delete(id)
-    message.success('删除成功')
+    message.success(t('common.deleteSuccess'))
     pagination.fetch()
   } catch (e: any) {
     message.error(e.message)
@@ -135,7 +138,7 @@ async function toggleSubscription(record: any) {
     } else {
       await subscriptionsApi.resume(record.id)
     }
-    message.success('状态已切换')
+    message.success(t('subscription.statusToggled'))
     pagination.fetch()
   } catch (e: any) {
     message.error(e.message)
@@ -145,7 +148,7 @@ async function toggleSubscription(record: any) {
 async function triggerFetch(id: number) {
   try {
     await subscriptionsApi.trigger(id)
-    message.success('已触发抓取')
+    message.success(t('subscription.fetchTriggered'))
   } catch (e: any) {
     message.error(e.message)
   }

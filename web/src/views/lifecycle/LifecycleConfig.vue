@@ -3,50 +3,50 @@
     <a-row :gutter="16" style="margin-bottom: 24px">
       <a-col :span="6">
         <a-card>
-          <a-statistic title="队列深度" :value="backpressure.queue_depth || 0" />
+          <a-statistic :title="t('lifecycle.queueDepth')" :value="backpressure.queue_depth || 0" />
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic title="活跃发布" :value="backpressure.active_publishes || 0" />
+          <a-statistic :title="t('lifecycle.activePublishes')" :value="backpressure.active_publishes || 0" />
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic title="最大并发" :value="backpressure.max_concurrent_publishes || 0" />
+          <a-statistic :title="t('lifecycle.maxConcurrent')" :value="backpressure.max_concurrent_publishes || 0" />
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic title="是否限流">
+          <a-statistic :title="t('lifecycle.throttled')">
             <template #formatter>
-              <a-tag :color="backpressure.is_throttled ? 'red' : 'green'">{{ backpressure.is_throttled ? '是' : '否' }}</a-tag>
+              <a-tag :color="backpressure.is_throttled ? 'red' : 'green'">{{ backpressure.is_throttled ? t('common.yes') : t('common.no') }}</a-tag>
             </template>
           </a-statistic>
         </a-card>
       </a-col>
     </a-row>
 
-    <a-card title="生命周期配置">
+    <a-card :title="t('lifecycle.title')">
       <a-spin :spinning="loading">
         <a-form :model="config" layout="vertical">
-          <a-form-item label="暂停做种者">
+          <a-form-item :label="t('lifecycle.pauseSeeders')">
             <a-switch v-model:checked="config.pauseSeeders" />
           </a-form-item>
-          <a-form-item label="删除做种者">
+          <a-form-item :label="t('lifecycle.deleteSeeders')">
             <a-switch v-model:checked="config.deleteSeeders" />
           </a-form-item>
-          <a-form-item label="做种保留时间（小时）">
+          <a-form-item :label="t('lifecycle.seedRetentionHours')">
             <a-input-number v-model:value="config.deleteSeedHours" :min="0" style="width: 200px" />
           </a-form-item>
-          <a-form-item label="检查间隔">
+          <a-form-item :label="t('lifecycle.checkInterval')">
             <a-input v-model:value="config.checkInterval" placeholder="如 5m" style="width: 200px" />
           </a-form-item>
-          <a-form-item label="最大并发检查数">
+          <a-form-item :label="t('lifecycle.maxConcurrentChecks')">
             <a-input-number v-model:value="config.maxConcurrentChecks" :min="1" style="width: 200px" />
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" @click="saveConfig" :loading="saving">保存配置</a-button>
+            <a-button type="primary" @click="saveConfig" :loading="saving">{{ t('common.saveConfig') }}</a-button>
           </a-form-item>
         </a-form>
       </a-spin>
@@ -57,7 +57,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { lifecycleApi } from '@/api/lifecycle'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -101,7 +104,7 @@ async function saveConfig() {
   saving.value = true
   try {
     await lifecycleApi.updateConfig(config)
-    message.success('配置已保存')
+    message.success(t('common.configSaved'))
   } catch (e: any) {
     message.error(e.message)
   } finally {

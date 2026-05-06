@@ -321,7 +321,7 @@ func (e *Engine) Evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 		freeSpace = maindata.FreeSpace
 	}
 
-	e.updateEMA(clientID, maindata, torrentMap)
+	e.updateEMA(ctx, clientID, maindata, torrentMap)
 
 	var cascadeRules []model.DeleteRule
 	if cfg != nil && cfg.DeleteRuleIDs != "" {
@@ -375,7 +375,7 @@ func (e *Engine) Evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 		candidate.Score = score
 
 		if score < 5.0 {
-			e.db.Create(&model.ScoringLog{
+			e.db.WithContext(ctx).Create(&model.ScoringLog{
 				CycleID:  cycleID,
 				ClientID: clientID,
 				InfoHash: rec.InfoHash,
@@ -508,9 +508,9 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 	return []*model.SeedingCandidate{}, nil
 }
 
-func (e *Engine) Clear(ctx context.Context, subscriptionID string) error {
+func (e *Engine) Clear(ctx context.Context, clientID string) error {
 	return e.db.WithContext(ctx).
-		Where("client_id = ? AND source = ?", subscriptionID, "rss").
+		Where("client_id = ? AND source = ?", clientID, "rss").
 		Delete(&model.SeedingTorrentRecord{}).Error
 }
 
@@ -637,7 +637,7 @@ func (e *Engine) applyConfig(cfg *model.SeedingClientConfig, defaultScore float6
 	return minScore, minAgeHours, weights
 }
 
-func (e *Engine) updateEMA(clientID string, maindata *model.Maindata, torrentMap map[string]*model.TorrentInfo) {
+func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model.Maindata, torrentMap map[string]*model.TorrentInfo) {
 	var totalUp, totalDown int64
 	for _, ti := range torrentMap {
 		totalUp += ti.UploadSpeed
@@ -664,7 +664,7 @@ func (e *Engine) updateEMA(clientID string, maindata *model.Maindata, torrentMap
 	e.mu.Unlock()
 
 	var dbState model.SeedingClientState
-	err := e.db.Where("client_id = ?", clientID).First(&dbState).Error
+	err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&dbState).Error
 	if err != nil {
 		dbState = model.SeedingClientState{
 			ClientID:         clientID,
@@ -672,9 +672,9 @@ func (e *Engine) updateEMA(clientID string, maindata *model.Maindata, torrentMap
 			AvgDownloadSpeed: state.DownloadSpeed,
 			Initialized:      true,
 		}
-		e.db.Create(&dbState)
+		e.db.WithContext(ctx).Create(&dbState)
 	} else {
-		e.db.Model(&dbState).Updates(map[string]interface{}{
+		e.db.WithContext(ctx).Model(&dbState).Updates(map[string]interface{}{
 			"avg_upload_speed":   state.UploadSpeed,
 			"avg_download_speed": state.DownloadSpeed,
 			"initialized":        true,

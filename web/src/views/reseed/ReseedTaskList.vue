@@ -3,7 +3,7 @@
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end">
       <a-button type="primary" @click="openModal()">
         <template #icon><PlusOutlined /></template>
-        创建任务
+        {{ t('reseed.addTask') }}
       </a-button>
     </div>
 
@@ -27,11 +27,11 @@
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button type="link" size="small" @click="$router.push(`/reseed/tasks/${record.id}`)">详情</a-button>
-            <a-button type="link" size="small" @click="triggerTask(record.id)" :disabled="record.status === 'running'">触发</a-button>
-            <a-button type="link" size="small" @click="cancelTask(record.id)" :disabled="record.status !== 'running'">取消</a-button>
-            <a-popconfirm title="确定删除该任务？" @confirm="handleDelete(record.id)">
-              <a-button type="link" danger size="small">删除</a-button>
+            <a-button type="link" size="small" @click="$router.push(`/reseed/tasks/${record.id}`)">{{ t('common.detail') }}</a-button>
+            <a-button type="link" size="small" @click="triggerTask(record.id)" :disabled="record.status === 'running'">{{ t('common.trigger') }}</a-button>
+            <a-button type="link" size="small" @click="cancelTask(record.id)" :disabled="record.status !== 'running'">{{ t('common.cancel') }}</a-button>
+            <a-popconfirm :title="t('reseed.deleteTaskConfirm')" @confirm="handleDelete(record.id)">
+              <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
           </a-space>
         </template>
@@ -40,22 +40,22 @@
 
     <a-modal
       v-model:open="modalVisible"
-      title="创建辅种任务"
+      :title="t('reseed.createReseedTask')"
       @ok="handleSubmit"
       :confirm-loading="submitting"
     >
       <a-form :model="form" layout="vertical">
-        <a-form-item label="任务名称" name="name" :rules="[{ required: true, message: '请输入任务名称' }]">
-          <a-input v-model:value="form.name" placeholder="辅种任务名称" />
+        <a-form-item :label="t('reseed.taskName')" name="name" :rules="[{ required: true, message: t('reseed.pleaseEnterTaskName') }]">
+          <a-input v-model:value="form.name" :placeholder="t('reseed.taskNamePlaceholder')" />
         </a-form-item>
-        <a-form-item label="下载器 ID" name="clientIds" :rules="[{ required: true, message: '请输入下载器 ID' }]">
-          <a-input v-model:value="form.clientIds" placeholder="逗号分隔的下载器 ID" />
+        <a-form-item :label="t('reseed.clientId')" name="clientIds" :rules="[{ required: true, message: t('reseed.pleaseEnterClientId') }]">
+          <a-input v-model:value="form.clientIds" :placeholder="t('reseed.clientIdPlaceholder')" />
         </a-form-item>
-        <a-form-item label="源站点 ID" name="sourceSiteIds" :rules="[{ required: true, message: '请输入源站点' }]">
-          <a-input v-model:value="form.sourceSiteIds" placeholder="逗号分隔的源站点域名" />
+        <a-form-item :label="t('reseed.sourceSiteIds')" name="sourceSiteIds" :rules="[{ required: true, message: t('reseed.pleaseEnterSourceSite') }]">
+          <a-input v-model:value="form.sourceSiteIds" :placeholder="t('reseed.sourceSiteIdsPlaceholder')" />
         </a-form-item>
-        <a-form-item label="目标站点 ID" name="targetSiteIds" :rules="[{ required: true, message: '请输入目标站点' }]">
-          <a-input v-model:value="form.targetSiteIds" placeholder="逗号分隔的目标站点域名" />
+        <a-form-item :label="t('reseed.targetSiteIds')" name="targetSiteIds" :rules="[{ required: true, message: t('reseed.pleaseEnterTargetSite') }]">
+          <a-input v-model:value="form.targetSiteIds" :placeholder="t('reseed.targetSiteIdsPlaceholder')" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -64,11 +64,13 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { reseedApi } from '@/api/reseed'
 import { usePagination } from '@/composables/usePagination'
 
+const { t } = useI18n()
 const modalVisible = ref(false)
 const submitting = ref(false)
 
@@ -104,7 +106,7 @@ async function handleSubmit() {
   submitting.value = true
   try {
     await reseedApi.createTask(form)
-    message.success('任务已创建')
+    message.success(t('reseed.taskCreated'))
     modalVisible.value = false
     pagination.fetch()
   } catch (e: any) {
@@ -117,7 +119,7 @@ async function handleSubmit() {
 async function triggerTask(id: number) {
   try {
     await reseedApi.triggerTask(id)
-    message.success('任务已触发')
+    message.success(t('reseed.taskTriggered'))
     pagination.fetch()
   } catch (e: any) {
     message.error(e.message)
@@ -127,7 +129,7 @@ async function triggerTask(id: number) {
 async function cancelTask(id: number) {
   try {
     await reseedApi.cancelTask(id)
-    message.success('任务已取消')
+    message.success(t('reseed.taskCancelled'))
     pagination.fetch()
   } catch (e: any) {
     message.error(e.message)
@@ -137,7 +139,7 @@ async function cancelTask(id: number) {
 async function handleDelete(id: number) {
   try {
     await reseedApi.deleteTask(id)
-    message.success('删除成功')
+    message.success(t('common.deleted'))
     pagination.fetch()
   } catch (e: any) {
     message.error(e.message)

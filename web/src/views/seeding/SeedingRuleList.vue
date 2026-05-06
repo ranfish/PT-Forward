@@ -3,7 +3,7 @@
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end">
       <a-button type="primary" @click="openModal()">
         <template #icon><PlusOutlined /></template>
-        添加规则
+        {{ t('seeding.addRule') }}
       </a-button>
     </div>
 
@@ -20,10 +20,10 @@
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
-            <a-button type="link" size="small" @click="testRule(record.id)">测试</a-button>
-            <a-popconfirm title="确定删除该规则？" @confirm="handleDelete(record.id)">
-              <a-button type="link" danger size="small">删除</a-button>
+            <a-button type="link" size="small" @click="openModal(record)">{{ t('common.edit') }}</a-button>
+            <a-button type="link" size="small" @click="testRule(record.id)">{{ t('common.test') }}</a-button>
+            <a-popconfirm :title="t('seeding.deleteRuleConfirm')" @confirm="handleDelete(record.id)">
+              <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
           </a-space>
         </template>
@@ -32,34 +32,34 @@
 
     <a-modal
       v-model:open="modalVisible"
-      :title="editingRule ? '编辑规则' : '添加规则'"
+      :title="editingRule ? t('seeding.editRule') : t('seeding.addRule')"
       @ok="handleSubmit"
       :confirm-loading="submitting"
       width="640px"
     >
       <a-form :model="form" layout="vertical">
-        <a-form-item label="规则别名" name="alias" :rules="[{ required: true, message: '请输入规则别名' }]">
-          <a-input v-model:value="form.alias" placeholder="规则别名" />
+        <a-form-item :label="t('seeding.ruleAlias')" name="alias" :rules="[{ required: true, message: t('seeding.pleaseInputRuleAlias') }]">
+          <a-input v-model:value="form.alias" :placeholder="t('seeding.ruleAlias')" />
         </a-form-item>
-        <a-form-item label="类型" name="type">
-          <a-select v-model:value="form.type" placeholder="选择类型">
-            <a-select-option value="normal">普通</a-select-option>
+        <a-form-item :label="t('common.type')" name="type">
+          <a-select v-model:value="form.type" :placeholder="t('common.selectType')">
+            <a-select-option value="normal">{{ t('seeding.normalRule') }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="条件 (JSON)" name="conditions">
-          <a-textarea v-model:value="form.conditions" :rows="3" placeholder='如 [{"field":"seed_time","op":"gt","value":720}]' />
+        <a-form-item :label="t('seeding.conditionsJson')" name="conditions">
+          <a-textarea v-model:value="form.conditions" :rows="3" placeholder='[{"field":"seed_time","op":"gt","value":720}]' />
         </a-form-item>
-        <a-form-item label="表达式" name="expr">
-          <a-input v-model:value="form.expr" placeholder="CEL 表达式（可选）" />
+        <a-form-item :label="t('seeding.expression')" name="expr">
+          <a-input v-model:value="form.expr" :placeholder="t('seeding.celExpressionOptional')" />
         </a-form-item>
-        <a-form-item label="动作" name="action">
-          <a-select v-model:value="form.action" placeholder="选择动作">
-            <a-select-option value="delete">删除种子</a-select-option>
-            <a-select-option value="pause">暂停种子</a-select-option>
-            <a-select-option value="limit_speed">限速</a-select-option>
+        <a-form-item :label="t('seeding.action')" name="action">
+          <a-select v-model:value="form.action" :placeholder="t('seeding.selectAction')">
+            <a-select-option value="delete">{{ t('seeding.deleteTorrent') }}</a-select-option>
+            <a-select-option value="pause">{{ t('seeding.pauseTorrent') }}</a-select-option>
+            <a-select-option value="limit_speed">{{ t('seeding.limitSpeed') }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="优先级" name="priority">
+        <a-form-item :label="t('seeding.priority')" name="priority">
           <a-input-number v-model:value="form.priority" :min="0" style="width: 100%" />
         </a-form-item>
       </a-form>
@@ -70,9 +70,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { deleteRulesApi } from '@/api/seeding'
 
+const { t } = useI18n()
 const loading = ref(false)
 const modalVisible = ref(false)
 const submitting = ref(false)
@@ -135,7 +137,7 @@ async function handleSubmit() {
     } else {
       await deleteRulesApi.create(form)
     }
-    message.success('操作成功')
+    message.success(t('common.operationSuccess'))
     modalVisible.value = false
     fetchRules()
   } catch (e: any) {
@@ -148,7 +150,7 @@ async function handleSubmit() {
 async function handleDelete(id: number) {
   try {
     await deleteRulesApi.delete(id)
-    message.success('删除成功')
+    message.success(t('common.deleted'))
     fetchRules()
   } catch (e: any) {
     message.error(e.message)
@@ -159,7 +161,7 @@ async function testRule(id: number) {
   try {
     const resp = await deleteRulesApi.test(id)
     const result = resp.data.data
-    message.success(`匹配 ${result?.matched?.length || 0} / ${result?.total || 0} 个种子`)
+    message.success(t('seeding.matchedResult', { matched: result?.matched?.length || 0, total: result?.total || 0 }))
   } catch (e: any) {
     message.error(e.message)
   }
@@ -168,7 +170,7 @@ async function testRule(id: number) {
 async function toggleRule(record: any) {
   try {
     await deleteRulesApi.update(record.id, { ...record, enabled: !record.enabled })
-    message.success('状态已切换')
+    message.success(t('common.statusToggled'))
     fetchRules()
   } catch (e: any) {
     message.error(e.message)

@@ -3,7 +3,7 @@
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end">
       <a-button type="primary" @click="openModal()">
         <template #icon><PlusOutlined /></template>
-        添加规则
+        {{ t('settings.filterRules.addRule') }}
       </a-button>
     </div>
 
@@ -29,9 +29,9 @@
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
-            <a-popconfirm title="确定删除该规则？" @confirm="handleDelete(record.id)">
-              <a-button type="link" danger size="small">删除</a-button>
+            <a-button type="link" size="small" @click="openModal(record)">{{ t('common.edit') }}</a-button>
+            <a-popconfirm :title="t('settings.filterRules.deleteConfirm')" @confirm="handleDelete(record.id)">
+              <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
           </a-space>
         </template>
@@ -40,38 +40,38 @@
 
     <a-modal
       v-model:open="modalVisible"
-      :title="editingRule ? '编辑规则' : '添加规则'"
+      :title="editingRule ? t('settings.filterRules.editRule') : t('settings.filterRules.addRule')"
       @ok="handleSubmit"
       :confirm-loading="submitting"
       width="640px"
     >
       <a-form :model="form" layout="vertical">
-        <a-form-item label="规则名称" name="name" :rules="[{ required: true, message: '请输入规则名称' }]">
+        <a-form-item :label="t('settings.filterRules.ruleName')" name="name" :rules="[{ required: true, message: t('settings.filterRules.ruleNameRequired') }]">
           <a-input v-model:value="form.name" placeholder="规则名称" />
         </a-form-item>
-        <a-form-item label="规则类型" name="ruleType">
-          <a-select v-model:value="form.ruleType" placeholder="选择规则类型">
-            <a-select-option value="accept">接受</a-select-option>
-            <a-select-option value="reject">拒绝</a-select-option>
-            <a-select-option value="accept_and_reject">接受且拒绝</a-select-option>
+        <a-form-item :label="t('settings.filterRules.ruleType')" name="ruleType">
+          <a-select v-model:value="form.ruleType" :placeholder="t('settings.filterRules.selectRuleType')">
+            <a-select-option value="accept">{{ t('settings.filterRules.accept') }}</a-select-option>
+            <a-select-option value="reject">{{ t('settings.filterRules.reject') }}</a-select-option>
+            <a-select-option value="accept_and_reject">{{ t('settings.filterRules.acceptAndReject') }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="条件 (JSON)" name="conditions">
+        <a-form-item :label="t('settings.filterRules.conditions')" name="conditions">
           <a-textarea v-model:value="form.conditions" :rows="3" placeholder='如 [{"field":"title","op":"contains","value":"关键词"}]' />
         </a-form-item>
-        <a-form-item label="保存路径" name="savePath">
+        <a-form-item :label="t('settings.filterRules.savePath')" name="savePath">
           <a-input v-model:value="form.savePath" placeholder="留空使用默认" />
         </a-form-item>
-        <a-form-item label="分类" name="category">
+        <a-form-item :label="t('settings.filterRules.category')" name="category">
           <a-input v-model:value="form.category" placeholder="留空使用默认" />
         </a-form-item>
-        <a-form-item label="标签" name="tags">
+        <a-form-item :label="t('settings.filterRules.tags')" name="tags">
           <a-input v-model:value="form.tags" placeholder="逗号分隔" />
         </a-form-item>
-        <a-form-item label="优先级" name="priority">
+        <a-form-item :label="t('settings.filterRules.priority')" name="priority">
           <a-input-number v-model:value="form.priority" :min="0" style="width: 100%" />
         </a-form-item>
-        <a-form-item label="启用" name="enabled">
+        <a-form-item :label="t('common.enable')" name="enabled">
           <a-switch v-model:checked="form.enabled" />
         </a-form-item>
       </a-form>
@@ -82,9 +82,12 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { filterRulesApi } from '@/api/filter-rules'
 import { usePagination } from '@/composables/usePagination'
+
+const { t } = useI18n()
 
 const modalVisible = ref(false)
 const submitting = ref(false)
@@ -140,7 +143,7 @@ async function handleSubmit() {
     } else {
       await filterRulesApi.create(form)
     }
-    message.success('操作成功')
+    message.success(t('common.operationSuccess'))
     modalVisible.value = false
     pagination.fetch()
   } catch (e: any) {
@@ -153,7 +156,7 @@ async function handleSubmit() {
 async function handleDelete(id: number) {
   try {
     await filterRulesApi.delete(id)
-    message.success('删除成功')
+    message.success(t('common.deleteSuccess'))
     pagination.fetch()
   } catch (e: any) {
     message.error(e.message)
