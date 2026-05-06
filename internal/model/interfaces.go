@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"time"
 )
 
 type SiteAdapter interface {
@@ -18,6 +17,7 @@ type SiteAdapter interface {
 	SearchTorrents(ctx context.Context, config *SiteConfig, query string, opts *SearchOptions) ([]*SeedingSearchResult, error)
 	GetTorrentInfoHash(ctx context.Context, config *SiteConfig, torrentID string) (string, error)
 	SupportsSearchByPiecesHash() bool
+	VerifyExists(ctx context.Context, config *SiteConfig, torrentID string) (bool, error)
 }
 
 type EventHandler interface {
@@ -112,14 +112,72 @@ type ContentFingerprintRepository interface {
 	Save(ctx context.Context, fp *ContentFingerprint) error
 }
 
-type SearchCacheEntry struct {
-	ID         uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	Site       string    `json:"site" gorm:"size:100;not null;index"`
-	CleanTitle string    `json:"clean_title" gorm:"size:500;not null"`
-	TotalSize  int64     `json:"total_size"`
-	Results    string    `json:"results" gorm:"type:text"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+type SeedingCollector interface {
+	Add(ctx context.Context, clientID string, event *TorrentEvent) error
+	Flush(ctx context.Context, subscriptionID string) ([]*SeedingCandidate, error)
+	Clear(ctx context.Context, subscriptionID string) error
 }
 
-func (SearchCacheEntry) TableName() string { return "search_cache_entries" }
+type ChannelNotifier interface {
+	Send(ctx context.Context, msg FormattedMessage) error
+	Test(ctx context.Context) error
+}
+
+type SitePublisher interface {
+	Publish(ctx context.Context, req *PublishRequest) (*PublishResponse, error)
+	GetUploadForm(ctx context.Context, config *SiteConfig) (*UploadForm, error)
+	SearchTorrent(ctx context.Context, keyword string, config *SiteConfig) ([]PublishDedupResult, error)
+	GetEditForm(ctx context.Context, torrentID string, config *SiteConfig) (*EditForm, error)
+	SubmitEdit(ctx context.Context, torrentID string, newDesc string, config *SiteConfig) error
+}
+
+type Publisher interface {
+	Publish(ctx context.Context, req *PublishRequest) (*PublishResponse, error)
+}
+
+type SourceFetcher interface {
+	FetchDetail(ctx context.Context, site *SiteConfig, torrentID string, cookie string) (*RawTorrent, error)
+	DownloadTorrent(ctx context.Context, site *SiteConfig, torrentID string, cookie string, passkey string) ([]byte, error)
+	VerifyExists(ctx context.Context, site *SiteConfig, torrentID string, cookie string) (bool, error)
+}
+
+type FingerprintRepository interface {
+	GetByInfoHash(ctx context.Context, infoHash string) (*ContentFingerprint, error)
+	Save(ctx context.Context, fp *ContentFingerprint) error
+	GetSearchCache(ctx context.Context, site, cleanTitle string, totalSize int64) (*SearchCache, error)
+	SaveSearchCache(ctx context.Context, site, cleanTitle string, totalSize int64, results []Candidate) error
+	BatchSave(ctx context.Context, fps []*ContentFingerprint) error
+}
+
+type ReseedTaskRepository interface {
+	GetByID(ctx context.Context, id uint) (*ReseedTask, error)
+	List(ctx context.Context) ([]ReseedTask, error)
+	ListByClientID(ctx context.Context, clientID string) ([]ReseedTask, error)
+	ListEnabled(ctx context.Context) ([]ReseedTask, error)
+	Create(ctx context.Context, task *ReseedTask) error
+	Update(ctx context.Context, task *ReseedTask) error
+	Delete(ctx context.Context, id uint) error
+}
+
+type ReseedMatchRepository interface {
+	BatchSave(ctx context.Context, matches []*ReseedMatch) error
+	FindByInfoHash(ctx context.Context, infoHash string) ([]ReseedMatch, error)
+	FindPendingRetry(ctx context.Context, limit int) ([]ReseedMatch, error)
+	UpdateStatus(ctx context.Context, id uint, status string, failReason string) error
+}
+
+type SeedingRuleRepository interface {
+	List(ctx context.Context) ([]*SeedingClientConfig, error)
+	GetByID(ctx context.Context, id uint) (*SeedingClientConfig, error)
+	Create(ctx context.Context, cfg *SeedingClientConfig) error
+	Update(ctx context.Context, cfg *SeedingClientConfig) error
+	Delete(ctx context.Context, id uint) error
+}
+
+type PublishTaskRepository interface {
+	List(ctx context.Context, opts ListOptions) ([]*PublishTask, int64, error)
+	GetByID(ctx context.Context, id uint) (*PublishTask, error)
+	Create(ctx context.Context, task *PublishTask) error
+	Update(ctx context.Context, task *PublishTask) error
+	UpdateStatus(ctx context.Context, id uint, status PublishTaskStatus) error
+}

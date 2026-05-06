@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -65,18 +64,18 @@ func bytesToKey(salt, data []byte, h hash.Hash, keyLen, bl int) (key, iv []byte)
 func pkcs7Strip(data []byte, blockSize int) ([]byte, error) {
 	length := len(data)
 	if length == 0 {
-		return nil, errors.New("pkcs7: data is empty")
+		return nil, ccError(ErrCCCrypto, "pkcs7: data is empty", nil)
 	}
 	if length%blockSize != 0 {
-		return nil, errors.New("pkcs7: data is not block-aligned")
+		return nil, ccError(ErrCCCrypto, "pkcs7: data is not block-aligned", nil)
 	}
 	padLen := int(data[length-1])
 	if padLen > blockSize || padLen == 0 {
-		return nil, errors.New("pkcs7: invalid padding")
+		return nil, ccError(ErrCCCrypto, "pkcs7: invalid padding", nil)
 	}
 	ref := bytes.Repeat([]byte{byte(padLen)}, padLen)
 	if !bytes.HasSuffix(data, ref) {
-		return nil, errors.New("pkcs7: invalid padding")
+		return nil, ccError(ErrCCCrypto, "pkcs7: invalid padding", nil)
 	}
 	return data[:length-padLen], nil
 }
@@ -84,23 +83,23 @@ func pkcs7Strip(data []byte, blockSize int) ([]byte, error) {
 func decryptCryptoJSAES(password, ciphertext string) ([]byte, error) {
 	rawEncrypted, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
-		return nil, fmt.Errorf("base64 decode: %w", err)
+		return nil, ccError(ErrCCCrypto, "base64 decode", err)
 	}
 	if len(rawEncrypted) < 17 || len(rawEncrypted)%blockLen != 0 || string(rawEncrypted[:8]) != "Salted__" {
-		return nil, errors.New("invalid ciphertext")
+		return nil, ccError(ErrCCCrypto, "invalid ciphertext", nil)
 	}
 	salt := rawEncrypted[8:16]
 	encrypted := rawEncrypted[16:]
 	key, iv := bytesToKey(salt, []byte(password), md5.New(), aes256KeyLen, blockLen)
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("aes cipher: %w", err)
+		return nil, ccError(ErrCCCrypto, "aes cipher", err)
 	}
 	decrypted := make([]byte, len(encrypted))
 	cipher.NewCBCDecrypter(block, iv).CryptBlocks(decrypted, encrypted)
 	decrypted, err = pkcs7Strip(decrypted, blockLen)
 	if err != nil {
-		return nil, fmt.Errorf("pkcs7 strip (wrong password?): %w", err)
+		return nil, ccError(ErrCCCrypto, "pkcs7 strip (wrong password?)", err)
 	}
 	return decrypted, nil
 }
@@ -111,35 +110,35 @@ func FetchAndDecrypt(serverURL, uuid, password string) (map[string][]CookieData,
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("http request: %w", err)
+		return nil, ccError(ErrCCHTTP, "http request", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("server returned status %d", resp.StatusCode)
+		return nil, ccError(ErrCCHTTP, fmt.Sprintf("server returned status %d", resp.StatusCode), nil)
 	}
 
 	var body struct {
 		Encrypted string `json:"encrypted"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return nil, fmt.Errorf("parse json: %w", err)
+		return nil, ccError(ErrCCParse, "parse json", err)
 	}
 	if body.Encrypted == "" {
-		return nil, errors.New("no encrypted data in response")
+		return nil, ccError(ErrCCParse, "no encrypted data in response", nil)
 	}
 
 	keyPassword := md5String(uuid, "-", password)[:16]
 	decrypted, err := decryptCryptoJSAES(keyPassword, body.Encrypted)
 	if err != nil {
-		return nil, fmt.Errorf("decrypt: %w", err)
+		return nil, ccError(ErrCCCrypto, "decrypt", err)
 	}
 
 	var result struct {
 		CookieData map[string][]CookieData `json:"cookie_data"`
 	}
 	if err := json.Unmarshal(decrypted, &result); err != nil {
-		return nil, fmt.Errorf("parse decrypted json: %w", err)
+		return nil, ccError(ErrCCParse, "parse decrypted json", err)
 	}
 
 	return result.CookieData, nil

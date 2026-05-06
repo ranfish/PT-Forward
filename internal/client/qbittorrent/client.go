@@ -38,7 +38,7 @@ type QBClient struct {
 func NewQBClient(cfg *model.ClientConfig, sharedPaths []model.SharedPathMapping, logger *zap.Logger) (*QBClient, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		return nil, fmt.Errorf("create cookie jar: %w", err)
+		return nil, qbError(ErrQBNetwork, "create cookie jar", err)
 	}
 
 	baseURL := strings.TrimRight(cfg.URL, "/")
@@ -209,12 +209,12 @@ func (c *QBClient) newErr(code int, msg string) *model.AppError {
 func computeInfoHash(torrentData []byte) (string, error) {
 	idx := bytes.Index(torrentData, []byte("4:info"))
 	if idx == -1 {
-		return "", fmt.Errorf("info dict not found in torrent data")
+		return "", qbError(ErrQBParse, "info dict not found in torrent data", nil)
 	}
 	infoStart := idx + 6
 	end, err := findBencodeEnd(torrentData, infoStart)
 	if err != nil {
-		return "", fmt.Errorf("parse info dict: %w", err)
+		return "", qbError(ErrQBParse, "parse info dict", err)
 	}
 	h := sha1.Sum(torrentData[infoStart:end])
 	return hex.EncodeToString(h[:]), nil
@@ -222,13 +222,13 @@ func computeInfoHash(torrentData []byte) (string, error) {
 
 func findBencodeEnd(data []byte, pos int) (int, error) {
 	if pos >= len(data) {
-		return 0, fmt.Errorf("position out of bounds")
+		return 0, qbError(ErrQBParse, "position out of bounds", nil)
 	}
 	switch data[pos] {
 	case 'i':
 		end := bytes.IndexByte(data[pos:], 'e')
 		if end == -1 {
-			return 0, fmt.Errorf("unterminated integer")
+			return 0, qbError(ErrQBParse, "unterminated integer", nil)
 		}
 		return pos + end + 1, nil
 	case 'l', 'd':
@@ -241,14 +241,14 @@ func findBencodeEnd(data []byte, pos int) (int, error) {
 			cur = end
 		}
 		if cur >= len(data) {
-			return 0, fmt.Errorf("unterminated container")
+			return 0, qbError(ErrQBParse, "unterminated container", nil)
 		}
 		return cur + 1, nil
 	default:
 		if data[pos] >= '0' && data[pos] <= '9' {
 			colon := bytes.IndexByte(data[pos:], ':')
 			if colon == -1 {
-				return 0, fmt.Errorf("invalid string")
+				return 0, qbError(ErrQBParse, "invalid string", nil)
 			}
 			length, err := strconv.Atoi(string(data[pos : pos+colon]))
 			if err != nil {
@@ -256,11 +256,11 @@ func findBencodeEnd(data []byte, pos int) (int, error) {
 			}
 			strEnd := pos + colon + 1 + length
 			if strEnd > len(data) {
-				return 0, fmt.Errorf("string exceeds data")
+				return 0, qbError(ErrQBParse, "string exceeds data", nil)
 			}
 			return strEnd, nil
 		}
-		return 0, fmt.Errorf("unexpected char %c at pos %d", data[pos], pos)
+		return 0, qbError(ErrQBParse, fmt.Sprintf("unexpected char %c at pos %d", data[pos], pos), nil)
 	}
 }
 

@@ -38,7 +38,7 @@ func (s *SyncService) SyncAll(ctx context.Context) (*model.CookieCloudSyncHistor
 		history.Status = "failed"
 		history.ErrorMessage = err.Error()
 		s.db.Save(history)
-		return history, fmt.Errorf("query sites: %w", err)
+		return history, ccError(ErrCCSync, "query sites", err)
 	}
 
 	if len(sites) == 0 {
@@ -137,13 +137,13 @@ func (s *SyncService) SyncAll(ctx context.Context) (*model.CookieCloudSyncHistor
 func (s *SyncService) getConfig(ctx context.Context) (*model.CookieCloudConfig, error) {
 	var cfg model.CookieCloudConfig
 	if err := s.db.WithContext(ctx).First(&cfg).Error; err != nil {
-		return nil, fmt.Errorf("cookie cloud config not found: %w", err)
+		return nil, ccError(ErrCCConfig, "cookie cloud config not found", err)
 	}
 	if !cfg.SyncEnabled {
-		return nil, fmt.Errorf("cookie cloud sync is disabled")
+		return nil, ccError(ErrCCConfig, "cookie cloud sync is disabled", nil)
 	}
 	if cfg.ServerURL == "" || cfg.UUID == "" || cfg.Password == "" {
-		return nil, fmt.Errorf("cookie cloud config incomplete (url/uuid/password required)")
+		return nil, ccError(ErrCCConfig, "cookie cloud config incomplete (url/uuid/password required)", nil)
 	}
 	return &cfg, nil
 }

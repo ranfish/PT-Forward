@@ -13,7 +13,7 @@ func decodeBencode(data []byte) (any, error) {
 
 func decodeValue(data []byte, pos int) (any, int, error) {
 	if pos >= len(data) {
-		return nil, pos, fmt.Errorf("unexpected end of data at pos %d", pos)
+		return nil, pos, fpError(ErrFPBencode, fmt.Sprintf("unexpected end of data at pos %d", pos), nil)
 	}
 
 	switch data[pos] {
@@ -27,13 +27,13 @@ func decodeValue(data []byte, pos int) (any, int, error) {
 		if data[pos] >= '0' && data[pos] <= '9' {
 			return decodeString(data, pos)
 		}
-		return nil, pos, fmt.Errorf("unexpected byte %q at pos %d", data[pos], pos)
+		return nil, pos, fpError(ErrFPBencode, fmt.Sprintf("unexpected byte %q at pos %d", data[pos], pos), nil)
 	}
 }
 
 func decodeDict(data []byte, pos int) (any, int, error) {
 	if data[pos] != 'd' {
-		return nil, pos, fmt.Errorf("expected 'd' at pos %d", pos)
+		return nil, pos, fpError(ErrFPBencode, fmt.Sprintf("expected 'd' at pos %d", pos), nil)
 	}
 	pos++
 
@@ -41,23 +41,23 @@ func decodeDict(data []byte, pos int) (any, int, error) {
 	for pos < len(data) && data[pos] != 'e' {
 		key, newPos, err := decodeString(data, pos)
 		if err != nil {
-			return nil, pos, fmt.Errorf("dict key: %w", err)
+			return nil, pos, fpError(ErrFPBencode, "dict key", err)
 		}
 		keyStr, ok := key.(string)
 		if !ok {
-			return nil, pos, fmt.Errorf("dict key is not a string")
+			return nil, pos, fpError(ErrFPBencode, "dict key is not a string", nil)
 		}
 
 		value, newPos, err := decodeValue(data, newPos)
 		if err != nil {
-			return nil, pos, fmt.Errorf("dict value for key %q: %w", keyStr, err)
+			return nil, pos, fpError(ErrFPBencode, fmt.Sprintf("dict value for key %q", keyStr), err)
 		}
 		result[keyStr] = value
 		pos = newPos
 	}
 
 	if pos >= len(data) {
-		return nil, pos, fmt.Errorf("unterminated dict")
+		return nil, pos, fpError(ErrFPBencode, "unterminated dict", nil)
 	}
 	pos++
 
@@ -66,7 +66,7 @@ func decodeDict(data []byte, pos int) (any, int, error) {
 
 func decodeList(data []byte, pos int) (any, int, error) {
 	if data[pos] != 'l' {
-		return nil, pos, fmt.Errorf("expected 'l' at pos %d", pos)
+		return nil, pos, fpError(ErrFPBencode, fmt.Sprintf("expected 'l' at pos %d", pos), nil)
 	}
 	pos++
 
@@ -74,14 +74,14 @@ func decodeList(data []byte, pos int) (any, int, error) {
 	for pos < len(data) && data[pos] != 'e' {
 		value, newPos, err := decodeValue(data, pos)
 		if err != nil {
-			return nil, pos, fmt.Errorf("list item: %w", err)
+			return nil, pos, fpError(ErrFPBencode, "list item", err)
 		}
 		result = append(result, value)
 		pos = newPos
 	}
 
 	if pos >= len(data) {
-		return nil, pos, fmt.Errorf("unterminated list")
+		return nil, pos, fpError(ErrFPBencode, "unterminated list", nil)
 	}
 	pos++
 
@@ -90,19 +90,19 @@ func decodeList(data []byte, pos int) (any, int, error) {
 
 func decodeInt(data []byte, pos int) (any, int, error) {
 	if data[pos] != 'i' {
-		return nil, pos, fmt.Errorf("expected 'i' at pos %d", pos)
+		return nil, pos, fpError(ErrFPBencode, fmt.Sprintf("expected 'i' at pos %d", pos), nil)
 	}
 	pos++
 
 	end := bytes.IndexByte(data[pos:], 'e')
 	if end < 0 {
-		return nil, pos, fmt.Errorf("unterminated int")
+		return nil, pos, fpError(ErrFPBencode, "unterminated int", nil)
 	}
 	end += pos
 
 	var val int64
 	if _, err := fmt.Sscanf(string(data[pos:end]), "%d", &val); err != nil {
-		return nil, pos, fmt.Errorf("parse int: %w", err)
+		return nil, pos, fpError(ErrFPBencode, "parse int", err)
 	}
 
 	return val, end + 1, nil
@@ -111,19 +111,19 @@ func decodeInt(data []byte, pos int) (any, int, error) {
 func decodeString(data []byte, pos int) (any, int, error) {
 	colon := bytes.IndexByte(data[pos:], ':')
 	if colon < 0 {
-		return nil, pos, fmt.Errorf("missing colon in string at pos %d", pos)
+		return nil, pos, fpError(ErrFPBencode, fmt.Sprintf("missing colon in string at pos %d", pos), nil)
 	}
 	colon += pos
 
 	var length int
 	if _, err := fmt.Sscanf(string(data[pos:colon]), "%d", &length); err != nil {
-		return nil, pos, fmt.Errorf("parse string length: %w", err)
+		return nil, pos, fpError(ErrFPBencode, "parse string length", err)
 	}
 
 	start := colon + 1
 	end := start + length
 	if end > len(data) {
-		return nil, pos, fmt.Errorf("string extends beyond data")
+		return nil, pos, fpError(ErrFPBencode, "string extends beyond data", nil)
 	}
 
 	return string(data[start:end]), end, nil
@@ -168,7 +168,7 @@ func encodeValue(buf *bytes.Buffer, v any) error {
 		}
 		buf.WriteByte('e')
 	default:
-		return fmt.Errorf("unsupported type: %T", v)
+		return fpError(ErrFPEncode, fmt.Sprintf("unsupported type: %T", v), nil)
 	}
 	return nil
 }

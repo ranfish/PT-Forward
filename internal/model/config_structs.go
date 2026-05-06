@@ -30,12 +30,6 @@ type LogConfig struct {
 	Format     string `yaml:"format"       mapstructure:"format"`
 }
 
-type SchedulerConfig struct {
-	MaxWorkers     int `yaml:"max_workers"       mapstructure:"max_workers"`
-	TaskTimeoutMin int `yaml:"task_timeout_min"  mapstructure:"task_timeout_min"`
-	HTTPTimoutSec  int `yaml:"http_timeout_sec"  mapstructure:"http_timeout_sec"`
-}
-
 type SecurityConfig struct {
 	EncryptionKey     string `yaml:"encryption_key"       mapstructure:"encryption_key"`
 	RateLimitEnabled  bool   `yaml:"rate_limit_enabled"   mapstructure:"rate_limit_enabled"`
@@ -44,14 +38,6 @@ type SecurityConfig struct {
 	RateLimitDownload int    `yaml:"rate_limit_download"  mapstructure:"rate_limit_download"`
 	LoginMaxRetries   int    `yaml:"login_max_retries"    mapstructure:"login_max_retries"`
 	LoginLockoutMin   int    `yaml:"login_lockout_min"    mapstructure:"login_lockout_min"`
-}
-
-type SiteMonitorConfig struct {
-	Enabled          bool `yaml:"enabled"            mapstructure:"enabled"`
-	IntervalMin      int  `yaml:"interval_min"       mapstructure:"interval_min"`
-	TimeoutSec       int  `yaml:"timeout_sec"        mapstructure:"timeout_sec"`
-	MaxConcurrent    int  `yaml:"max_concurrent"     mapstructure:"max_concurrent"`
-	CookieWarningMin int  `yaml:"cookie_warning_min" mapstructure:"cookie_warning_min"`
 }
 
 type NotificationConfig struct {
@@ -72,12 +58,6 @@ type DataCleanupConfig struct {
 	PTGenCacheRetainDays     int `yaml:"ptgen_cache_retain_days"     mapstructure:"ptgen_cache_retain_days"`
 	SeedingArchiveRetainDays int `yaml:"seeding_archive_retain_days" mapstructure:"seeding_archive_retain_days"`
 	AuditLogRetainDays       int `yaml:"audit_log_retain_days"       mapstructure:"audit_log_retain_days"`
-}
-
-type StatsConfig struct {
-	Enabled          bool `yaml:"enabled"             mapstructure:"enabled"`
-	CollectIntervalS int  `yaml:"collect_interval_s"  mapstructure:"collect_interval_s"`
-	RetainDays       int  `yaml:"retain_days"         mapstructure:"retain_days"`
 }
 
 type IYUUSection struct {

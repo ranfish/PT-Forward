@@ -398,7 +398,7 @@ func parseUintParam(path, prefix string) (uint, error) {
 	last := parts[len(parts)-1]
 	n, err := strconv.ParseUint(last, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid ID: %s", last)
+		return 0, apiError(ErrAPIInvalidID, fmt.Sprintf("invalid ID: %s", last), nil)
 	}
 	return uint(n), nil
 }
@@ -426,40 +426,46 @@ func (h *SeedingHandler) handleScoringDryrun(w http.ResponseWriter, r *http.Requ
 	var req struct {
 		Seeders       int     `json:"seeders"`
 		Leechers      int     `json:"leechers"`
-		UploadBytes   int64   `json:"uploadBytes"`
-		SeedTimeHours float64 `json:"seedTimeHours"`
 		AgeHours      float64 `json:"ageHours"`
 		Size          int64   `json:"size"`
-		IsFree        bool    `json:"isFree"`
+		Discount      string  `json:"discount"`
+		HalfLifeHours float64 `json:"halfLifeHours"`
+		SiteWeight    float64 `json:"siteWeight"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 		return
 	}
 
+	discount := model.DiscountLevel(req.Discount)
+	if discount == "" {
+		discount = model.DiscountNone
+	}
+
 	result := seeding.CalculateScore(seeding.ScoreInput{
 		Seeders:       req.Seeders,
 		Leechers:      req.Leechers,
-		UploadBytes:   req.UploadBytes,
-		SeedTimeHours: req.SeedTimeHours,
 		AgeHours:      req.AgeHours,
 		Size:          req.Size,
-		IsFree:        req.IsFree,
-		HalfLifeHours: 168,
+		Discount:      discount,
+		HalfLifeHours: req.HalfLifeHours,
+		SiteWeight:    req.SiteWeight,
 	})
 
+	isFree := discount == model.DiscountFree || discount == model.Discount2xFree
 	shouldCleanup := seeding.ShouldCleanup(seeding.CleanupCandidate{
-		Score:         result.EffectiveScore,
-		SeedTimeHours: req.SeedTimeHours,
-		AgeHours:      req.AgeHours,
-		IsFree:        req.IsFree,
+		Score:    result.EffectiveScore,
+		AgeHours: req.AgeHours,
+		IsFree:   isFree,
+		Discount: discount,
 	}, 0.3, 72)
 
 	Success(w, map[string]interface{}{
 		"score":          result.Score,
 		"effectiveScore": result.EffectiveScore,
-		"decayFactor":    result.DecayFactor,
-		"leecherRatio":   result.LeecherSeedRatio,
+		"demandScore":    result.DemandScore,
+		"uploadValue":    result.UploadValue,
+		"recencyFactor":  result.RecencyFactor,
 		"shouldCleanup":  shouldCleanup,
 	})
 }
@@ -549,12 +555,15 @@ func (h *SeedingHandler) handleListRules(w http.ResponseWriter, _ *http.Request)
 
 func (h *SeedingHandler) handleCreateRule(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Alias      string `json:"alias"`
-		Priority   int    `json:"priority"`
-		Enabled    bool   `json:"enabled"`
-		Type       string `json:"type"`
-		Conditions string `json:"conditions"`
-		Action     string `json:"action"`
+		Alias           string `json:"alias"`
+		Priority        int    `json:"priority"`
+		Enabled         bool   `json:"enabled"`
+		Type            string `json:"type"`
+		Conditions      string `json:"conditions"`
+		Expr            string `json:"expr"`
+		Action          string `json:"action"`
+		CascadeDelete   bool   `json:"cascade_delete"`
+		CascadeMaxDepth int    `json:"cascade_max_depth"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -571,13 +580,23 @@ func (h *SeedingHandler) handleCreateRule(w http.ResponseWriter, r *http.Request
 		req.Action = "delete"
 	}
 
+	if req.Type == "expr" && req.Expr != "" {
+		if err := seeding.ValidateExpr(req.Expr); err != nil {
+			Error(w, http.StatusBadRequest, 14003, "表达式语法错误: "+err.Error())
+			return
+		}
+	}
+
 	rule := model.DeleteRule{
-		Alias:      req.Alias,
-		Priority:   req.Priority,
-		Enabled:    req.Enabled,
-		Type:       req.Type,
-		Conditions: req.Conditions,
-		Action:     req.Action,
+		Alias:           req.Alias,
+		Priority:        req.Priority,
+		Enabled:         req.Enabled,
+		Type:            req.Type,
+		Conditions:      req.Conditions,
+		Expr:            req.Expr,
+		Action:          req.Action,
+		CascadeDelete:   req.CascadeDelete,
+		CascadeMaxDepth: req.CascadeMaxDepth,
 	}
 	if err := h.db.Create(&rule).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "创建规则失败")
@@ -702,11 +721,21 @@ func (h *SeedingHandler) handleUpdateRule(w http.ResponseWriter, r *http.Request
 	}
 
 	updates := make(map[string]interface{})
-	for _, field := range []string{"alias", "priority", "enabled", "type", "conditions", "action"} {
+	for _, field := range []string{"alias", "priority", "enabled", "type", "conditions", "action", "expr", "cascade_delete", "cascade_max_depth"} {
 		if v, ok := req[field]; ok {
 			updates[field] = v
 		}
 	}
+
+	if exprVal, ok := req["expr"].(string); ok && exprVal != "" {
+		if typeVal, _ := req["type"].(string); typeVal == "expr" || rule.Type == "expr" {
+			if err := seeding.ValidateExpr(exprVal); err != nil {
+				Error(w, http.StatusBadRequest, 14003, "表达式语法错误: "+err.Error())
+				return
+			}
+		}
+	}
+
 	updates["updated_at"] = time.Now()
 
 	if len(updates) > 1 {
@@ -744,30 +773,59 @@ func (h *SeedingHandler) handleTestRule(w http.ResponseWriter, r *http.Request, 
 	matched := false
 	reason := "未匹配"
 
-	if rule.Expr != "" && req.TorrentName != "" {
-		if strings.Contains(strings.ToLower(req.TorrentName), strings.ToLower(rule.Expr)) {
-			matched = true
-			reason = "表达式匹配: " + rule.Expr
+	if rule.Type == "expr" && rule.Expr != "" {
+		if err := seeding.ValidateExpr(rule.Expr); err != nil {
+			reason = "表达式语法错误: " + err.Error()
+		} else {
+			rc := &seeding.RuleContext{
+				Record: &model.SeedingTorrentRecord{
+					SiteName: "test",
+					Status:   model.SeedingStatusSeeding,
+					Discount: model.DiscountNone,
+					HasHR:    false,
+					IsFree:   false,
+				},
+				Torrent: &model.TorrentInfo{
+					Name:        req.TorrentName,
+					TotalSize:   req.Size,
+					NumComplete: req.Seeders,
+				},
+				FreeSpace: -1,
+				Now:       time.Now(),
+			}
+			ok, err := seeding.EvalExprForTest(rule.Expr, rc)
+			if err != nil {
+				reason = "表达式求值错误: " + err.Error()
+			} else if ok {
+				matched = true
+				reason = "表达式匹配: " + rule.Expr
+			}
 		}
 	}
 
 	if !matched && rule.Conditions != "" {
-		var conditions map[string]interface{}
-		if err := json.Unmarshal([]byte(rule.Conditions), &conditions); err == nil {
-			if kw, ok := conditions["keyword"].(string); ok && kw != "" && req.TorrentName != "" {
-				if strings.Contains(strings.ToLower(req.TorrentName), strings.ToLower(kw)) {
-					matched = true
-					reason = "关键词匹配: " + kw
-				}
-			}
-			if !matched {
-				if minSize, ok := conditions["minSize"].(float64); ok && minSize > 0 && req.Size > 0 {
-					if req.Size >= int64(minSize) {
-						matched = true
-						reason = fmt.Sprintf("大小匹配: %d >= %.0f", req.Size, minSize)
-					}
-				}
-			}
+		rc := &seeding.RuleContext{
+			Record: &model.SeedingTorrentRecord{
+				SiteName:  "test",
+				Status:    model.SeedingStatusSeeding,
+				Discount:  model.DiscountNone,
+				IsFree:    false,
+				HasHR:     false,
+				ClientID:  "test",
+				TorrentID: "test",
+			},
+			Torrent: &model.TorrentInfo{
+				Name:        req.TorrentName,
+				TotalSize:   req.Size,
+				NumComplete: req.Seeders,
+			},
+			FreeSpace: -1,
+			Now:       time.Now(),
+		}
+		conditions := seeding.ParseConditions(rule.Conditions)
+		if seeding.MatchContext(rc, conditions) {
+			matched = true
+			reason = fmt.Sprintf("条件匹配: %d 个条件", len(conditions))
 		}
 	}
 

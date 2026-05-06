@@ -1744,7 +1744,7 @@ func SeedSites(db *gorm.DB) error {
 		}
 
 		if err := db.Create(site).Error; err != nil {
-			return fmt.Errorf("create site %s: %w", s.Domain, err)
+			return siteError(ErrSiteSeed, fmt.Sprintf("create site %s", s.Domain), err)
 		}
 	}
 
@@ -1803,7 +1803,7 @@ func SeedFieldMappings(db *gorm.DB) error {
 					TargetValue: opt.Value,
 				}
 				if err := db.Create(mapping).Error; err != nil {
-					return fmt.Errorf("create mapping %s/%s/%s: %w", s.Name, fieldType, opt.Label, err)
+					return siteError(ErrSiteSeed, fmt.Sprintf("create mapping %s/%s/%s", s.Name, fieldType, opt.Label), err)
 				}
 			}
 		}
@@ -1835,7 +1835,36 @@ func SeedExclusions(db *gorm.DB) error {
 			SourceSite: e.SourceSite,
 		}
 		if err := db.Create(exclusion).Error; err != nil {
-			return fmt.Errorf("create exclusion %s↔%s: %w", e.TargetSite, e.SourceSite, err)
+			return siteError(ErrSiteSeed, fmt.Sprintf("create exclusion %s↔%s", e.TargetSite, e.SourceSite), err)
+		}
+	}
+	return nil
+}
+
+var defaultFormFieldOverrides = []struct {
+	SiteName   string
+	FieldPath  string
+	FieldValue string
+}{
+	{"家园", "publish.form_fields.douban", "douban_id"},
+	{"天空", "publish.form_fields.douban", "url_douban"},
+}
+
+func SeedFormFieldOverrides(db *gorm.DB) error {
+	for _, o := range defaultFormFieldOverrides {
+		var existing model.SiteConfigOverride
+		err := db.Where("site_name = ? AND field_path = ?", o.SiteName, o.FieldPath).First(&existing).Error
+		if err == nil {
+			continue
+		}
+
+		override := &model.SiteConfigOverride{
+			SiteName:   o.SiteName,
+			FieldPath:  o.FieldPath,
+			FieldValue: o.FieldValue,
+		}
+		if err := db.Create(override).Error; err != nil {
+			return siteError(ErrSiteSeed, fmt.Sprintf("create override %s/%s", o.SiteName, o.FieldPath), err)
 		}
 	}
 	return nil

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -21,7 +21,14 @@ type Fetcher struct {
 
 func NewFetcher(logger *zap.Logger) *Fetcher {
 	return &Fetcher{
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{}),
+		logger: logger,
+	}
+}
+
+func NewFetcherWithClient(client *http.Client, logger *zap.Logger) *Fetcher {
+	return &Fetcher{
+		client: client,
 		logger: logger,
 	}
 }
@@ -29,24 +36,24 @@ func NewFetcher(logger *zap.Logger) *Fetcher {
 func (f *Fetcher) Fetch(ctx context.Context, url string) (*RSSFeed, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, rssError(ErrRSSNetwork, "构造请求失败", err)
 	}
 	req.Header.Set("User-Agent", "PT-Forward/1.0")
 
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("请求失败: %w", err)
+		return nil, rssError(ErrRSSNetwork, "请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, rssError(ErrRSSNetwork, "读取响应失败", err)
 	}
 
 	var feed RSSFeed
 	if err := xml.Unmarshal(data, &feed); err != nil {
-		return nil, fmt.Errorf("解析 XML 失败: %w", err)
+		return nil, rssError(ErrRSSParse, "解析 XML 失败", err)
 	}
 
 	return &feed, nil

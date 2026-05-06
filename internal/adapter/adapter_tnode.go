@@ -37,13 +37,13 @@ func (a *TNodeAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("下载失败: %w", err)
+		return nil, downloadError("下载失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -51,7 +51,7 @@ func (a *TNodeAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	ct := resp.Header.Get("Content-Type")
@@ -67,23 +67,23 @@ func (a *TNodeAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("请求详情页失败: %w", err)
+		return nil, networkError("请求详情页失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, networkError("读取响应失败", err)
 	}
 
 	html := string(body)
@@ -178,7 +178,7 @@ func (a *TNodeAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
-		result.SeedTimeH = 72
+		result.SeedTimeH = config.HR.SeedTimeH()
 	}
 	return result, nil
 }
@@ -218,7 +218,7 @@ func (a *TNodeAdapter) GetTorrentInfoHash(ctx context.Context, config *model.Sit
 		return "", err
 	}
 	if detail.InfoHash == "" {
-		return "", fmt.Errorf("未在详情页找到 info_hash")
+		return "", notFoundError("未在详情页找到 info_hash")
 	}
 	return detail.InfoHash, nil
 }
@@ -235,7 +235,7 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 
 	csrfToken, err := a.fetchCSRFToken(ctx, config, baseURL+"/torrent/upload")
 	if err != nil {
-		return nil, fmt.Errorf("获取 CSRF token 失败: %w", err)
+		return nil, authError("获取 CSRF token 失败", err)
 	}
 
 	uploadURL := baseURL + "/api/torrent/upload"
@@ -245,10 +245,10 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 
 	fileWriter, err := writer.CreateFormFile("torrent", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	if req.Title != "" {
@@ -315,12 +315,12 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	httpReq.Header.Set("x-csrf-token", csrfToken)
@@ -332,7 +332,7 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -387,7 +387,7 @@ func (a *TNodeAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteCon
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("请求页面失败: %w", err)
+		return "", networkError("请求页面失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -404,7 +404,7 @@ func (a *TNodeAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteCon
 		return m[1], nil
 	}
 
-	return "", fmt.Errorf("未在页面中找到 CSRF token")
+	return "", notFoundError("未在页面中找到 CSRF token")
 }
 
 func buildDomainURL(config *model.SiteConfig, path, torrentID, passkey string) string {
@@ -417,4 +417,17 @@ func buildDomainURL(config *model.SiteConfig, path, torrentID, passkey string) s
 		u += "&passkey=" + passkey
 	}
 	return u
+}
+
+func (a *TNodeAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
+	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
+	if err != nil {
+		return false, nil
+	}
+	for _, r := range results {
+		if r.TorrentID == torrentID {
+			return true, nil
+		}
+	}
+	return false, nil
 }

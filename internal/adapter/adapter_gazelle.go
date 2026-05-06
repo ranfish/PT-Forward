@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -43,18 +42,18 @@ func (a *GazelleAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("下载失败: %w", err)
+		return nil, downloadError("下载失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	return io.ReadAll(resp.Body)
@@ -104,7 +103,7 @@ func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteCon
 		} `json:"response"`
 	}
 	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil {
-		return nil, fmt.Errorf("解析 API 响应失败: %w", err)
+		return nil, parseError("解析 API 响应失败", err)
 	}
 
 	t := result.Response.Torrent
@@ -212,7 +211,7 @@ func (a *GazelleAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
-		result.SeedTimeH = 72
+		result.SeedTimeH = config.HR.SeedTimeH()
 	}
 	return result, nil
 }
@@ -249,7 +248,7 @@ func (a *GazelleAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig,
 		} `json:"response"`
 	}
 	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %w", err)
+		return nil, parseError("解析响应失败", err)
 	}
 	return &model.SLData{Seeders: result.Response.Torrent.Seeders, Leechers: result.Response.Torrent.Leechers}, nil
 }
@@ -298,10 +297,10 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 
 	fileWriter, err := writer.CreateFormFile("file_input", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	if req.Title != "" {
@@ -391,19 +390,19 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -454,7 +453,20 @@ func (a *GazelleAdapter) GetTorrentInfoHash(ctx context.Context, config *model.S
 		return "", err
 	}
 	if detail.InfoHash == "" {
-		return "", fmt.Errorf("未找到 info_hash")
+		return "", notFoundError("未找到 info_hash")
 	}
 	return detail.InfoHash, nil
+}
+
+func (a *GazelleAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
+	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
+	if err != nil {
+		return false, nil
+	}
+	for _, r := range results {
+		if r.TorrentID == torrentID {
+			return true, nil
+		}
+	}
+	return false, nil
 }

@@ -138,7 +138,13 @@ func (h *LifecycleHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case strings.HasSuffix(trimmed, "/lifecycle/backpressure"):
-		h.handleBackpressure(w, r)
+		if r.Method == http.MethodGet {
+			h.handleBackpressure(w, r)
+		} else if r.Method == http.MethodPut {
+			h.handleUpdateBackpressure(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
 		return
 	}
 
@@ -175,10 +181,10 @@ func (h *LifecycleHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	if v, ok := req["pauseSeeders"]; ok {
-		h.saveSetting(r, "lifecycle.pause_seeders", boolToStr(v))
+		h.saveSetting(r, "lifecycle.pause_seeders", interfaceToStr(v))
 	}
 	if v, ok := req["deleteSeeders"]; ok {
-		h.saveSetting(r, "lifecycle.delete_seeders", boolToStr(v))
+		h.saveSetting(r, "lifecycle.delete_seeders", interfaceToStr(v))
 	}
 	if v, ok := req["deleteSeedHours"]; ok {
 		h.saveSetting(r, "lifecycle.delete_seed_hours", interfaceToStr(v))
@@ -204,6 +210,23 @@ func (h *LifecycleHandler) handleBackpressure(w http.ResponseWriter, _ *http.Req
 		}
 	}
 
+	pauseOnPressure := true
+	if val, err := h.getSettingFromDB("lifecycle_backpressure"); err == nil && val != "" {
+		var cfg map[string]interface{}
+		if json.Unmarshal([]byte(val), &cfg) == nil {
+			if v, ok := cfg["max_concurrent"]; ok {
+				if n, err := parseInt64(fmt.Sprintf("%.0f", v)); err == nil && n > 0 {
+					maxConcurrent = n
+				}
+			}
+			if v, ok := cfg["pause_on_pressure"]; ok {
+				if b, ok := v.(bool); ok {
+					pauseOnPressure = b
+				}
+			}
+		}
+	}
+
 	Success(w, map[string]interface{}{
 		"queueDepth":             0,
 		"maxQueueDepth":          256,
@@ -211,7 +234,36 @@ func (h *LifecycleHandler) handleBackpressure(w http.ResponseWriter, _ *http.Req
 		"maxConcurrentPublishes": maxConcurrent,
 		"bandwidthLimitKB":       0,
 		"isThrottled":            activePublishes >= maxConcurrent,
+		"pauseOnPressure":        pauseOnPressure,
 	})
+}
+
+func (h *LifecycleHandler) handleUpdateBackpressure(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		MaxConcurrent   *int  `json:"max_concurrent"`
+		PauseOnPressure *bool `json:"pause_on_pressure"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+
+	existing := map[string]interface{}{}
+	if val, err := h.getSettingFromDB("lifecycle_backpressure"); err == nil && val != "" {
+		_ = json.Unmarshal([]byte(val), &existing)
+	}
+
+	if req.MaxConcurrent != nil {
+		existing["max_concurrent"] = *req.MaxConcurrent
+	}
+	if req.PauseOnPressure != nil {
+		existing["pause_on_pressure"] = *req.PauseOnPressure
+	}
+
+	data, _ := json.Marshal(existing)
+	h.saveSetting(nil, "lifecycle_backpressure", string(data))
+
+	Success(w, existing)
 }
 
 func (h *LifecycleHandler) getSetting(r *http.Request, key string) (string, error) {
@@ -236,16 +288,6 @@ func (h *LifecycleHandler) saveSetting(_ *http.Request, key, value string) {
 	} else {
 		h.db.Model(&s).Update("value", value)
 	}
-}
-
-func boolToStr(v interface{}) string {
-	if b, ok := v.(bool); ok {
-		if b {
-			return "true"
-		}
-		return "false"
-	}
-	return "false"
 }
 
 func interfaceToStr(v interface{}) string {

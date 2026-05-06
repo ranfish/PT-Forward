@@ -28,6 +28,6 @@ export const authApi = {
     return client.put('/auth/profile', { displayName })
   },
   isInitialized() {
-    return client.get('/auth/initialized')
+    return client.get('/auth/status')
   },
 }

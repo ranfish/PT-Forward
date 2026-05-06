@@ -14,12 +14,14 @@ import (
 )
 
 type Engine struct {
-	fetcher    *Fetcher
-	repo       *Repository
-	db         *gorm.DB
-	logger     *zap.Logger
-	filterEng  *filter.Engine
-	dispatcher *event.Dispatcher
+	fetcher      *Fetcher
+	repo         *Repository
+	db           *gorm.DB
+	logger       *zap.Logger
+	filterEng    *filter.Engine
+	dispatcher   *event.Dispatcher
+	siteProvider model.SiteInfoProvider
+	diskBudget   *DiskBudgetManager
 
 	mu    sync.RWMutex
 	tasks map[uint]context.CancelFunc
@@ -27,12 +29,76 @@ type Engine struct {
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 	return &Engine{
-		fetcher: NewFetcher(logger),
-		repo:    NewRepository(db),
-		db:      db,
-		logger:  logger,
-		tasks:   make(map[uint]context.CancelFunc),
+		fetcher:    NewFetcher(logger),
+		repo:       NewRepository(db),
+		db:         db,
+		logger:     logger,
+		diskBudget: NewDiskBudgetManager(logger),
+		tasks:      make(map[uint]context.CancelFunc),
 	}
+}
+
+func (e *Engine) siteHRStrategy(ctx context.Context, siteName string) string {
+	if e.siteProvider == nil {
+		return "protect"
+	}
+	config, err := e.siteProvider.GetSiteConfig(ctx, siteName)
+	if err != nil || config == nil {
+		return "protect"
+	}
+	if config.HRStrategy == "skip" || config.HRStrategy == "ignore" {
+		return config.HRStrategy
+	}
+	return "protect"
+}
+
+func (e *Engine) checkDiskBudget(ctx context.Context, sub *model.RSSSubscription, size int64) error {
+	clientProvider := e.siteProvider
+	if clientProvider == nil {
+		return nil
+	}
+
+	cp, ok := clientProvider.(interface {
+		GetDownloaderClient(ctx context.Context, clientID string) (model.DownloaderClient, error)
+	})
+	if !ok {
+		return nil
+	}
+
+	dlClient, err := cp.GetDownloaderClient(ctx, sub.ClientID)
+	if err != nil {
+		return nil
+	}
+
+	md, err := dlClient.GetMainData(ctx)
+	if err != nil {
+		return nil
+	}
+
+	freeSpace := md.FreeSpace
+	minGB := sub.DiskBudgetMinGB
+	minBytes := int64(minGB * 1024 * 1024 * 1024)
+	effectiveFree := freeSpace - minBytes - e.diskBudget.ReservedBytes(sub.ClientID)
+
+	if effectiveFree < size {
+		return rssError(ErrRSSDisk, fmt.Sprintf("磁盘预算不足: 可用 %d 字节, 需要 %d 字节 (保留 %.1fGB)", effectiveFree, size, minGB), nil)
+	}
+
+	ticket, err := e.diskBudget.Reserve(sub.ClientID, size, effectiveFree, 10*time.Minute)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		time.Sleep(30 * time.Second)
+		e.diskBudget.Release(ticket)
+	}()
+
+	return nil
+}
+
+func (e *Engine) SetSiteProvider(sp model.SiteInfoProvider) {
+	e.siteProvider = sp
 }
 
 func (e *Engine) SetFilterEngine(fe *filter.Engine) {
@@ -214,6 +280,15 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				event.MatchedRule = &matchResult.RuleName
 			}
 
+			e.detectHRAndDiscount(ctx, event, sub.SiteName)
+
+			if event.HasHR && e.siteHRStrategy(ctx, sub.SiteName) == "skip" {
+				e.logger.Debug("torrent skipped by HR skip strategy",
+					zap.String("torrent", event.TorrentID),
+					zap.String("site", sub.SiteName))
+				continue
+			}
+
 			te := model.TorrentEvent{
 				SourceID:        uintToString(sub.ID),
 				SiteName:        event.SiteName,
@@ -234,7 +309,20 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				te.FreeEndAt = event.FreeEndAt
 			}
 			if event.HasHR {
-				te.HRSeedTimeH = 0
+				te.HRSeedTimeH = event.HRSeedTimeH
+				if te.HRSeedTimeH == 0 {
+					te.HRSeedTimeH = 72
+				}
+			}
+
+			if sub.DiskBudgetEnabled && sub.ClientID != "" && e.siteProvider != nil {
+				if err := e.checkDiskBudget(ctx, sub, event.Size); err != nil {
+					e.logger.Debug("torrent skipped by disk budget",
+						zap.String("torrent", event.TorrentID),
+						zap.Int64("size", event.Size),
+						zap.Error(err))
+					continue
+				}
 			}
 
 			torrentEvents = append(torrentEvents, te)
@@ -313,4 +401,41 @@ func splitCron(cron string) []string {
 
 func uintToString(n uint) string {
 	return fmt.Sprintf("%d", n)
+}
+
+func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorrentEvent, siteName string) {
+	if e.siteProvider == nil || event.TorrentID == "" {
+		return
+	}
+
+	adapter, err := e.siteProvider.GetAdapter(ctx, siteName)
+	if err != nil {
+		return
+	}
+
+	config, err := e.siteProvider.GetSiteConfig(ctx, siteName)
+	if err != nil {
+		return
+	}
+
+	if hrResult, err := adapter.DetectHR(ctx, config, event.TorrentID); err == nil && hrResult != nil {
+		event.HasHR = hrResult.HasHR
+		if hrResult.HasHR {
+			event.HRSeedTimeH = hrResult.SeedTimeH
+			if event.HRSeedTimeH == 0 {
+				event.HRSeedTimeH = 72
+			}
+		}
+	}
+
+	if discResult, err := adapter.DetectDiscount(ctx, config, event.TorrentID); err == nil && discResult != nil {
+		if discResult.Level != model.DiscountNone {
+			event.IsFree = discResult.Level == model.DiscountFree ||
+				discResult.Level == model.Discount2xFree ||
+				discResult.Level == model.Discount2x50
+			if discResult.FreeEndAt != nil {
+				event.FreeEndAt = discResult.FreeEndAt
+			}
+		}
+	}
 }

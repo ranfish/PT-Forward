@@ -3,8 +3,10 @@ package publish
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
@@ -150,6 +152,25 @@ func TestPipeline_CheckEligibility(t *testing.T) {
 				t.Errorf("eligibility(%q) = %v, want %v", tt.title, ok, tt.allowed)
 			}
 		})
+	}
+}
+
+func TestPipeline_CheckEligibility_HR(t *testing.T) {
+	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
+
+	normal := &model.PublishCandidate{TorrentName: "Movie.2024.1080p.BluRay", HasHR: false}
+	ok, _ := p.CheckPublishEligibility(context.Background(), normal, "target")
+	if !ok {
+		t.Error("non-HR candidate should be eligible")
+	}
+
+	hr := &model.PublishCandidate{TorrentName: "Movie.2024.1080p.BluRay", HasHR: true}
+	ok, reason := p.CheckPublishEligibility(context.Background(), hr, "target")
+	if ok {
+		t.Error("HR candidate should not be eligible")
+	}
+	if !strings.Contains(reason, "H&R") {
+		t.Errorf("reason should mention H&R, got: %s", reason)
 	}
 }
 
@@ -911,113 +932,36 @@ func TestPipeline_ListResults_Empty(t *testing.T) {
 }
 
 type mockPublishSiteProvider struct {
-	getSiteInfoFn   func(ctx context.Context, name string) (*model.SiteInfo, error)
-	getSiteConfigFn func(ctx context.Context, domain string) (*model.SiteConfig, error)
-	getAdapterFn    func(ctx context.Context, domain string) (model.SiteAdapter, error)
-	listSitesFn     func(ctx context.Context) ([]*model.SiteInfo, error)
-}
-
-func (m *mockPublishSiteProvider) GetSiteInfo(ctx context.Context, name string) (*model.SiteInfo, error) {
-	if m.getSiteInfoFn != nil {
-		return m.getSiteInfoFn(ctx, name)
-	}
-	return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
-}
-
-func (m *mockPublishSiteProvider) GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error) {
-	if m.getSiteConfigFn != nil {
-		return m.getSiteConfigFn(ctx, domain)
-	}
-	return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-}
-
-func (m *mockPublishSiteProvider) GetSiteDefault(ctx context.Context, domain string) (*model.SiteDefault, error) {
-	return nil, nil
-}
-
-func (m *mockPublishSiteProvider) GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error) {
-	if m.getAdapterFn != nil {
-		return m.getAdapterFn(ctx, domain)
-	}
-	return &mockPublishAdapter{}, nil
-}
-
-func (m *mockPublishSiteProvider) ListSites(ctx context.Context) ([]*model.SiteInfo, error) {
-	if m.listSitesFn != nil {
-		return m.listSitesFn(ctx)
-	}
-	return nil, nil
-}
-
-func (m *mockPublishSiteProvider) GetSiteInfoByURL(ctx context.Context, baseURL string) (*model.SiteInfo, error) {
-	return nil, nil
-}
-
-func (m *mockPublishSiteProvider) DetectFramework(ctx context.Context, domain string) (*model.DetectResult, error) {
-	return nil, nil
+	*mocks.SiteInfoProvider
 }
 
 type mockPublishAdapter struct {
-	downloadFn func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error)
-	detailFn   func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error)
-	uploadFn   func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error)
-	searchFn   func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error)
+	*mocks.SiteAdapter
 }
 
-func (m *mockPublishAdapter) Framework() string { return "mock" }
-func (m *mockPublishAdapter) ParseRSS(ctx context.Context, feedURL string, config *model.SiteConfig) ([]*model.RSSTorrentEvent, error) {
-	return nil, nil
-}
-func (m *mockPublishAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-	if m.downloadFn != nil {
-		return m.downloadFn(ctx, config, torrentID)
+func newMockPublishAdapter() *mockPublishAdapter {
+	a := &mocks.SiteAdapter{}
+	a.DownloadTorrentFn = func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+		return []byte("d8:announce27:http://tracker.example.com4:infod6:lengthi13e4:name8:test.txt12:piece lengthi262144e6:pieces20:00000000000000000000ee"), nil
 	}
-	return []byte("d8:announce27:http://tracker.example.com4:infod6:lengthi13e4:name8:test.txt12:piece lengthi262144e6:pieces20:00000000000000000000ee"), nil
-}
-func (m *mockPublishAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	if m.detailFn != nil {
-		return m.detailFn(ctx, config, torrentID)
+	a.GetTorrentDetailFn = func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
+		return &model.TorrentDetail{
+			Title:       "Test Movie 2024 1080p BluRay",
+			Description: "[b]Test Description[/b]",
+			Category:    "movies",
+			Source:      "blu-ray",
+			Resolution:  "1080p",
+			Codec:       "x264",
+			IMDbID:      "tt1234567",
+			MediaInfo:   "mediainfo text",
+			Screenshots: []string{"https://img.example.com/1.jpg"},
+		}, nil
 	}
-	return &model.TorrentDetail{
-		Title:       "Test Movie 2024 1080p BluRay",
-		Description: "[b]Test Description[/b]",
-		Category:    "movies",
-		Source:      "blu-ray",
-		Resolution:  "1080p",
-		Codec:       "x264",
-		IMDbID:      "tt1234567",
-		MediaInfo:   "mediainfo text",
-		Screenshots: []string{"https://img.example.com/1.jpg"},
-	}, nil
-}
-func (m *mockPublishAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
-	return nil, nil
-}
-func (m *mockPublishAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	return nil, nil
-}
-func (m *mockPublishAdapter) DetectDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
-	return nil, nil
-}
-func (m *mockPublishAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
-	return nil, nil
-}
-func (m *mockPublishAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-	if m.uploadFn != nil {
-		return m.uploadFn(ctx, config, req)
+	a.UploadTorrentFn = func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+		return &model.PublishResponse{TorrentID: "new-torrent-123", DetailURL: "https://target.com/torrents/123"}, nil
 	}
-	return &model.PublishResponse{TorrentID: "new-torrent-123", DetailURL: "https://target.com/torrents/123"}, nil
+	return &mockPublishAdapter{SiteAdapter: a}
 }
-func (m *mockPublishAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-	if m.searchFn != nil {
-		return m.searchFn(ctx, config, query, opts)
-	}
-	return nil, nil
-}
-func (m *mockPublishAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
-	return "", nil
-}
-func (m *mockPublishAdapter) SupportsSearchByPiecesHash() bool { return false }
 
 func TestPipeline_PublishCandidate_E2E_Success(t *testing.T) {
 	db := setupPipelineTestDBWithGroups(t)
@@ -1025,36 +969,49 @@ func TestPipeline_PublishCandidate_E2E_Success(t *testing.T) {
 
 	uploadCalled := false
 	adapter := &mockPublishAdapter{
-		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-			uploadCalled = true
-			if req.Title != "Test Movie 2024 1080p BluRay" {
-				t.Errorf("unexpected title: %s", req.Title)
-			}
-			if req.SourceSite != "source_site" {
-				t.Errorf("unexpected source site: %s", req.SourceSite)
-			}
-			if req.TargetSite != "target_site" {
-				t.Errorf("unexpected target site: %s", req.TargetSite)
-			}
-			if len(req.TorrentData) == 0 {
-				t.Error("torrent data should not be empty")
-			}
-			return &model.PublishResponse{TorrentID: "pub-001", DetailURL: "https://target.com/t/001"}, nil
-		},
-		searchFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-			return nil, nil
+		SiteAdapter: &mocks.SiteAdapter{
+			DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+				return []byte("d8:announce27:http://tracker.example.com4:infod6:lengthi13e4:name8:test.txt12:piece lengthi262144e6:pieces20:00000000000000000000ee"), nil
+			},
+			GetTorrentDetailFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
+				return &model.TorrentDetail{
+					Title:       "Test Movie 2024 1080p BluRay",
+					Description: "[b]Test Description[/b]",
+				}, nil
+			},
+			UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+				uploadCalled = true
+				if req.Title != "Test Movie 2024 1080p BluRay" {
+					t.Errorf("unexpected title: %s", req.Title)
+				}
+				if req.SourceSite != "source_site" {
+					t.Errorf("unexpected source site: %s", req.SourceSite)
+				}
+				if req.TargetSite != "target_site" {
+					t.Errorf("unexpected target site: %s", req.TargetSite)
+				}
+				if len(req.TorrentData) == 0 {
+					t.Error("torrent data should not be empty")
+				}
+				return &model.PublishResponse{TorrentID: "pub-001", DetailURL: "https://target.com/t/001"}, nil
+			},
+			SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+				return nil, nil
+			},
 		},
 	}
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return adapter, nil
-		},
-		getSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
-			return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
+			GetSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
+				return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1101,22 +1058,26 @@ func TestPipeline_PublishCandidate_E2E_Dedup(t *testing.T) {
 	p := NewPipeline(db, zap.NewNop())
 
 	adapter := &mockPublishAdapter{
-		searchFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-			return []*model.SeedingSearchResult{
-				{TorrentID: "existing-1", Title: query, Size: 1073741824},
-			}, nil
+		SiteAdapter: &mocks.SiteAdapter{
+			SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+				return []*model.SeedingSearchResult{
+					{TorrentID: "existing-1", Title: query, Size: 1073741824},
+				}, nil
+			},
 		},
 	}
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return adapter, nil
-		},
-		getSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
-			return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
+			GetSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
+				return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1157,17 +1118,21 @@ func TestPipeline_PublishCandidate_E2E_UploadFail(t *testing.T) {
 	p := NewPipeline(db, zap.NewNop())
 
 	adapter := &mockPublishAdapter{
-		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-			return nil, fmt.Errorf("upload failed: server error")
+		SiteAdapter: &mocks.SiteAdapter{
+			UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+				return nil, fmt.Errorf("upload failed: server error")
+			},
 		},
 	}
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return adapter, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1232,24 +1197,28 @@ func TestPipeline_PublishCandidate_MultipleTargets(t *testing.T) {
 
 	uploadCount := 0
 	adapter := &mockPublishAdapter{
-		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-			uploadCount++
-			return &model.PublishResponse{
-				TorrentID: fmt.Sprintf("pub-%d", uploadCount),
-				DetailURL: fmt.Sprintf("https://%s/t/%d", req.TargetSite, uploadCount),
-			}, nil
+		SiteAdapter: &mocks.SiteAdapter{
+			UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+				uploadCount++
+				return &model.PublishResponse{
+					TorrentID: fmt.Sprintf("pub-%d", uploadCount),
+					DetailURL: fmt.Sprintf("https://%s/t/%d", req.TargetSite, uploadCount),
+				}, nil
+			},
 		},
 	}
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return adapter, nil
-		},
-		getSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
-			return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
+			GetSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
+				return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1290,17 +1259,21 @@ func TestPipeline_PublishCandidate_E2E_DownloadFail(t *testing.T) {
 	p := NewPipeline(db, zap.NewNop())
 
 	adapter := &mockPublishAdapter{
-		downloadFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-			return nil, fmt.Errorf("download failed: 404")
+		SiteAdapter: &mocks.SiteAdapter{
+			DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+				return nil, fmt.Errorf("download failed: 404")
+			},
 		},
 	}
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return adapter, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1330,11 +1303,13 @@ func TestPipeline_PublishCandidate_NoTargetSites(t *testing.T) {
 	p := NewPipeline(db, zap.NewNop())
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return &mockPublishAdapter{}, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return newMockPublishAdapter(), nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1367,11 +1342,13 @@ func TestPipeline_PublishCandidate_GetSourceConfigFail(t *testing.T) {
 	p := NewPipeline(db, zap.NewNop())
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return nil, fmt.Errorf("config not found for %s", domain)
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return &mockPublishAdapter{}, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return nil, fmt.Errorf("config not found for %s", domain)
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return newMockPublishAdapter(), nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1404,18 +1381,22 @@ func TestPipeline_ProcessMemberWithResume_E2E(t *testing.T) {
 
 	uploadCalled := false
 	adapter := &mockPublishAdapter{
-		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-			uploadCalled = true
-			return &model.PublishResponse{TorrentID: "uploaded-001"}, nil
+		SiteAdapter: &mocks.SiteAdapter{
+			UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+				uploadCalled = true
+				return &model.PublishResponse{TorrentID: "uploaded-001"}, nil
+			},
 		},
 	}
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return adapter, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1497,17 +1478,21 @@ func TestPipeline_ProcessMemberWithResume_DownloadFail(t *testing.T) {
 	p := NewPipeline(db, zap.NewNop())
 
 	adapter := &mockPublishAdapter{
-		downloadFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-			return nil, fmt.Errorf("download timeout")
+		SiteAdapter: &mocks.SiteAdapter{
+			DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+				return nil, fmt.Errorf("download timeout")
+			},
 		},
 	}
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return adapter, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1545,17 +1530,21 @@ func TestPipeline_ProcessMemberWithResume_UploadFail(t *testing.T) {
 	p := NewPipeline(db, zap.NewNop())
 
 	adapter := &mockPublishAdapter{
-		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-			return nil, fmt.Errorf("upload rejected: duplicate")
+		SiteAdapter: &mocks.SiteAdapter{
+			UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+				return nil, fmt.Errorf("upload rejected: duplicate")
+			},
 		},
 	}
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return adapter, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1594,18 +1583,22 @@ func TestPipeline_ProcessMemberWithResume_ResumeFromStep(t *testing.T) {
 
 	uploadCalled := false
 	adapter := &mockPublishAdapter{
-		uploadFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-			uploadCalled = true
-			return &model.PublishResponse{TorrentID: "resumed-001"}, nil
+		SiteAdapter: &mocks.SiteAdapter{
+			UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+				uploadCalled = true
+				return &model.PublishResponse{TorrentID: "resumed-001"}, nil
+			},
 		},
 	}
 
 	sp := &mockPublishSiteProvider{
-		getSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain, Enabled: true}, nil
-		},
-		getAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return adapter, nil
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
 		},
 	}
 	p.SetSiteProvider(sp)
@@ -1765,5 +1758,257 @@ func TestPipeline_PublishCandidate_NotFound(t *testing.T) {
 	_, err := p.PublishCandidate(ctx, 999)
 	if err == nil {
 		t.Error("expected error for non-existent candidate")
+	}
+}
+
+func TestPipeline_ProcessMemberWithResume_HRDetected(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	var setTagsCalls [][]string
+	mockDL := &mocks.DownloaderClient{
+		SetTorrentTagsFn: func(ctx context.Context, hash string, tags []string) error {
+			setTagsCalls = append(setTagsCalls, tags)
+			return nil
+		},
+	}
+	p.SetClientProvider(&mocks.DownloaderProvider{Client: mockDL})
+
+	adapter := &mockPublishAdapter{
+		SiteAdapter: &mocks.SiteAdapter{
+			UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+				return &model.PublishResponse{TorrentID: "hr-torrent-001", InfoHash: "newhash123"}, nil
+			},
+			DetectHRFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
+				return &model.HRResult{HasHR: true, SeedTimeH: 48, MinRatio: 1.0}, nil
+			},
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "source_hash", "source_site", "src-t-1")
+	if err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: group.ID,
+		SiteName:       "hr_target",
+		ClientID:       "test-client",
+		InfoHash:       "abc123",
+		Status:         model.MemberStatusNew,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatalf("AddGroupMember: %v", err)
+	}
+
+	var dbMember model.PublishGroupMember
+	db.Where("id = ?", member.ID).First(&dbMember)
+
+	if err := p.ProcessMemberWithResume(ctx, &dbMember); err != nil {
+		t.Fatalf("ProcessMemberWithResume: %v", err)
+	}
+
+	db.Where("id = ?", member.ID).First(&dbMember)
+	if !dbMember.HRProtected {
+		t.Error("member should be HR protected")
+	}
+	if dbMember.HRMinSeedHours != 48 {
+		t.Errorf("expected 48 seed hours, got %d", dbMember.HRMinSeedHours)
+	}
+	if dbMember.HRSeedStart == nil {
+		t.Error("HR seed start should be set")
+	}
+	if dbMember.HRSite != "hr_target" {
+		t.Errorf("expected hr_site=hr_target, got %s", dbMember.HRSite)
+	}
+
+	if len(setTagsCalls) != 1 {
+		t.Fatalf("expected 1 SetTorrentTags call, got %d", len(setTagsCalls))
+	}
+	expectedTag := "PROTECTED_HR_hr_target"
+	if setTagsCalls[0][0] != expectedTag {
+		t.Errorf("expected tag %s, got %s", expectedTag, setTagsCalls[0][0])
+	}
+}
+
+func TestPipeline_ProcessMemberWithResume_NoHR(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	mockDL := &mocks.DownloaderClient{}
+	p.SetClientProvider(&mocks.DownloaderProvider{Client: mockDL})
+
+	adapter := &mockPublishAdapter{
+		SiteAdapter: &mocks.SiteAdapter{
+			UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+				return &model.PublishResponse{TorrentID: "no-hr-001"}, nil
+			},
+			DetectHRFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
+				return &model.HRResult{HasHR: false}, nil
+			},
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "source_hash", "source_site", "src-t-1")
+	if err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: group.ID,
+		SiteName:       "nohr_target",
+		ClientID:       "test-client",
+		InfoHash:       "abc123",
+		Status:         model.MemberStatusNew,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatalf("AddGroupMember: %v", err)
+	}
+
+	var dbMember model.PublishGroupMember
+	db.Where("id = ?", member.ID).First(&dbMember)
+
+	if err := p.ProcessMemberWithResume(ctx, &dbMember); err != nil {
+		t.Fatalf("ProcessMemberWithResume: %v", err)
+	}
+
+	db.Where("id = ?", member.ID).First(&dbMember)
+	if dbMember.HRProtected {
+		t.Error("member should NOT be HR protected when no HR detected")
+	}
+}
+
+func TestPipeline_ProcessPendingGroups_NoActiveGroups(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	if err := p.ProcessPendingGroups(ctx); err != nil {
+		t.Fatalf("ProcessPendingGroups: %v", err)
+	}
+}
+
+func TestPipeline_ProcessPendingGroups_ProcessesMembers(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	uploadCalled := false
+	adapter := &mockPublishAdapter{
+		SiteAdapter: &mocks.SiteAdapter{
+			UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
+				uploadCalled = true
+				return &model.PublishResponse{TorrentID: "pg-001"}, nil
+			},
+			DetectHRFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
+				return &model.HRResult{HasHR: false}, nil
+			},
+		},
+	}
+
+	sp := &mockPublishSiteProvider{
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
+			GetSiteInfoFn: func(ctx context.Context, name string) (*model.SiteInfo, error) {
+				return &model.SiteInfo{Name: name, BaseURL: "https://" + name + ".com"}, nil
+			},
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "source_hash", "source_site", "src-t-1")
+	if err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: group.ID,
+		SiteName:       "target_site",
+		ClientID:       "test-client",
+		InfoHash:       "abc123",
+		Status:         model.MemberStatusNew,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatalf("AddGroupMember: %v", err)
+	}
+
+	if err := p.ProcessPendingGroups(ctx); err != nil {
+		t.Fatalf("ProcessPendingGroups: %v", err)
+	}
+	if !uploadCalled {
+		t.Error("upload should have been called")
+	}
+
+	var updated model.PublishGroupMember
+	db.Where("id = ?", member.ID).First(&updated)
+	if updated.Status != model.MemberStatusUploaded {
+		t.Errorf("expected uploaded, got %s", updated.Status)
+	}
+
+	var updatedGroup model.PublishGroup
+	db.First(&updatedGroup, group.ID)
+	if updatedGroup.Status != model.GroupMonitoring {
+		t.Errorf("expected monitoring, got %s", updatedGroup.Status)
+	}
+}
+
+func TestPipeline_ProcessPendingGroups_SkipsCompletedMembers(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "hash", "site", "t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: group.ID,
+		SiteName:       "target",
+		Status:         model.MemberStatusUploaded,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := p.ProcessPendingGroups(ctx); err != nil {
+		t.Fatalf("ProcessPendingGroups: %v", err)
+	}
+
+	var updatedGroup model.PublishGroup
+	db.First(&updatedGroup, group.ID)
+	if updatedGroup.Status != model.GroupMonitoring {
+		t.Errorf("all-uploaded group should transition to monitoring, got %s", updatedGroup.Status)
 	}
 }

@@ -51,19 +51,19 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 	tokenURL := resolveBaseURL(config) + "/api/torrent/genDlToken"
 	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader("id="+torrentID))
 	if err != nil {
-		return nil, fmt.Errorf("构造 genDlToken 请求失败: %w", err)
+		return nil, networkError("构造 genDlToken 请求失败", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	a.setAPIHeaders(req, config.APIKey)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("genDlToken 请求失败: %w", err)
+		return nil, networkError("genDlToken 请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("genDlToken HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("genDlToken HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, _ := io.ReadAll(resp.Body)
@@ -71,26 +71,26 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 		Data string `json:"data"`
 	}
 	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return nil, fmt.Errorf("解析 genDlToken 响应失败: %w", err)
+		return nil, parseError("解析 genDlToken 响应失败", err)
 	}
 	if tokenResp.Data == "" {
-		return nil, fmt.Errorf("genDlToken 返回空下载链接")
+		return nil, downloadError("genDlToken 返回空下载链接", nil)
 	}
 
 	dlReq, err := http.NewRequestWithContext(ctx, "GET", tokenResp.Data, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造下载请求失败: %w", err)
+		return nil, networkError("构造下载请求失败", err)
 	}
 	a.setAPIHeaders(dlReq, config.APIKey)
 
 	dlResp, err := a.doer.Client.Do(dlReq)
 	if err != nil {
-		return nil, fmt.Errorf("下载种子失败: %w", err)
+		return nil, downloadError("下载种子失败", err)
 	}
 	defer func() { _ = dlResp.Body.Close() }()
 
 	if dlResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("下载种子 HTTP %d", dlResp.StatusCode)
+		return nil, httpError(fmtES("下载种子 HTTP %d", dlResp.StatusCode), nil)
 	}
 
 	return io.ReadAll(dlResp.Body)
@@ -104,18 +104,18 @@ func (a *MTeamAdapter) downloadViaWeb(ctx context.Context, config *model.SiteCon
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("下载失败: %w", err)
+		return nil, downloadError("下载失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	return io.ReadAll(resp.Body)
@@ -163,7 +163,7 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("解析 API 响应失败: %w", err)
+		return nil, parseError("解析 API 响应失败", err)
 	}
 
 	d := result.Data
@@ -325,7 +325,7 @@ func (a *MTeamAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 		}
 
 		if rawResult.Data.Status.HR {
-			return &model.HRResult{HasHR: true, SeedTimeH: 72}, nil
+			return &model.HRResult{HasHR: true, SeedTimeH: config.HR.SeedTimeH()}, nil
 		}
 		return &model.HRResult{HasHR: false}, nil
 	}
@@ -353,7 +353,7 @@ func (a *MTeamAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
-		result.SeedTimeH = 72
+		result.SeedTimeH = config.HR.SeedTimeH()
 	}
 	return result, nil
 }
@@ -388,7 +388,7 @@ func (a *MTeamAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, t
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %w", err)
+		return nil, parseError("解析响应失败", err)
 	}
 
 	return &model.SLData{Seeders: result.Data.Seeders, Leechers: result.Data.Leechers}, nil
@@ -442,10 +442,10 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	if req.Title != "" {
@@ -500,19 +500,19 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	a.setAPIHeaders(httpReq, config.APIKey)
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -572,12 +572,12 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 
-	fileWriter, err := writer.CreateFormFile("torrent", "upload.torrent")
+	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
-		return nil, fmt.Errorf("创建表单文件字段失败: %w", err)
+		return nil, uploadError("创建表单文件字段失败", err)
 	}
 	if _, err := fileWriter.Write(req.TorrentData); err != nil {
-		return nil, fmt.Errorf("写入种子数据失败: %w", err)
+		return nil, networkError("写入种子数据失败", err)
 	}
 
 	if req.Title != "" {
@@ -593,26 +593,32 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 		_ = writer.WriteField("url", req.IMDbLink)
 	}
 	if req.Anonymous {
-		_ = writer.WriteField("anonymity", "1")
+		_ = writer.WriteField("uplver", "1")
+	}
+	if req.DoubanLink != "" {
+		_ = writer.WriteField("douban", req.DoubanLink)
+	}
+	if req.MediaInfo != "" {
+		_ = writer.WriteField("mediainfo", req.MediaInfo)
 	}
 	for k, v := range req.FormFields {
 		_ = writer.WriteField(k, v)
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭 multipart writer 失败: %w", err)
+		return nil, networkError("关闭 multipart writer 失败", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -651,7 +657,7 @@ func (a *MTeamAdapter) GetTorrentInfoHash(ctx context.Context, config *model.Sit
 		return "", err
 	}
 	if detail.InfoHash == "" {
-		return "", fmt.Errorf("未找到 info_hash")
+		return "", notFoundError("未找到 info_hash")
 	}
 	return detail.InfoHash, nil
 }
@@ -662,4 +668,17 @@ func resolveBaseURL(config *model.SiteConfig) string {
 		u = "https://" + u
 	}
 	return strings.TrimRight(u, "/")
+}
+
+func (a *MTeamAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
+	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
+	if err != nil {
+		return false, nil
+	}
+	for _, r := range results {
+		if r.TorrentID == torrentID {
+			return true, nil
+		}
+	}
+	return false, nil
 }

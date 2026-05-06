@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/client"
+	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
@@ -86,20 +87,20 @@ func TestDispatcher_RoutesByRole(t *testing.T) {
 	var downloadEvents []model.TorrentEvent
 
 	d.RegisterHandler(RoleSeeding, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			seedingMu.Lock()
 			seedingEvents = append(seedingEvents, events...)
 			seedingMu.Unlock()
 			return nil
-		},
+		}},
 	})
 	d.RegisterHandler(RoleDownload, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			downloadMu.Lock()
 			downloadEvents = append(downloadEvents, events...)
 			downloadMu.Unlock()
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -145,10 +146,10 @@ func TestDispatcher_SkipsInvalidSourceID(t *testing.T) {
 
 	var called bool
 	d.RegisterHandler(RoleSeeding, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			called = true
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -169,10 +170,10 @@ func TestDispatcher_SkipsMissingSubscription(t *testing.T) {
 
 	var called bool
 	d.RegisterHandler(RoleSeeding, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			called = true
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -195,10 +196,10 @@ func TestDispatcher_SkipsMissingClient(t *testing.T) {
 
 	var called bool
 	d.RegisterHandler(RoleSeeding, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			called = true
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -231,10 +232,10 @@ func TestDispatcher_SkipsDisabledSubscription(t *testing.T) {
 
 	var called bool
 	d.RegisterHandler(RoleSeeding, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			called = true
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -266,10 +267,10 @@ func TestDispatcher_SkipsDisabledClient(t *testing.T) {
 
 	var called bool
 	d.RegisterHandler(RoleDownload, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			called = true
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -308,9 +309,9 @@ func TestDispatcher_HandlerError(t *testing.T) {
 	d := newTestDispatcher(t, db)
 
 	d.RegisterHandler(RoleSeeding, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			return &model.AppError{Code: 50001, Message: "internal error"}
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -332,12 +333,12 @@ func TestDispatcher_SourceRoleRoutesToSourceHandler(t *testing.T) {
 	var mu sync.Mutex
 	var gotEvents []model.TorrentEvent
 	d.RegisterHandler(RoleSource, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			mu.Lock()
 			gotEvents = append(gotEvents, events...)
 			mu.Unlock()
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -367,10 +368,10 @@ func TestDispatcher_MetadataEnrichment(t *testing.T) {
 
 	var got *model.TorrentEvent
 	d.RegisterHandler(RoleDownload, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			got = &events[0]
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -404,10 +405,10 @@ func TestDispatcher_MultipleRolesSameSubscription(t *testing.T) {
 
 	var count int
 	d.RegisterHandler(RoleSeeding, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			count += len(events)
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -455,7 +456,7 @@ func TestDispatcher_ConcurrentRegister(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			d.RegisterHandler(RoleSeeding, &mockHandler{
-				fn: func(ctx context.Context, events []model.TorrentEvent) error { return nil },
+				EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error { return nil }},
 			})
 		}()
 	}
@@ -480,10 +481,10 @@ func TestDispatcher_SoftDeletedSubscription(t *testing.T) {
 
 	var called bool
 	d.RegisterHandler(RoleSeeding, &mockHandler{
-		fn: func(ctx context.Context, events []model.TorrentEvent) error {
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
 			called = true
 			return nil
-		},
+		}},
 	})
 
 	events := []model.TorrentEvent{
@@ -498,10 +499,180 @@ func TestDispatcher_SoftDeletedSubscription(t *testing.T) {
 	}
 }
 
-type mockHandler struct {
-	fn func(ctx context.Context, events []model.TorrentEvent) error
+func TestDispatcher_ClientSelectorIntegration(t *testing.T) {
+	db := setupTestDB(t)
+
+	sub := &model.RSSSubscription{
+		Name:             "selector-sub",
+		Enabled:          true,
+		SiteName:         "testsite",
+		ClientID:         "qb-default",
+		URLs:             []string{"http://example.com/rss"},
+		CandidateClients: []string{"qb-default", "qb-bigspace"},
+		ClientSelection:  model.SelectionMostSpace,
+	}
+	sub.ID = 1
+	if err := db.Create(sub).Error; err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	createClientConfig(t, db, "qb-default", "seeding")
+	createClientConfig(t, db, "qb-bigspace", "seeding")
+
+	selectorClients := map[string]model.DownloaderClient{
+		"qb-default": &mocks.DownloaderClient{Name: "qb-default", GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
+			return &model.Maindata{FreeSpace: 1 * 1024 * 1024 * 1024}, nil
+		}},
+		"qb-bigspace": &mocks.DownloaderClient{Name: "qb-bigspace", GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
+			return &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024}, nil
+		}},
+	}
+	provider := &mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
+			return selectorClients[clientID], nil
+		},
+	}
+
+	d := newTestDispatcher(t, db)
+	d.SetClientSelector(NewClientSelector(provider, zap.NewNop()))
+
+	var mu sync.Mutex
+	var gotEvents []model.TorrentEvent
+	d.RegisterHandler(RoleSeeding, &mockHandler{
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
+			mu.Lock()
+			gotEvents = append(gotEvents, events...)
+			mu.Unlock()
+			return nil
+		}},
+	})
+
+	events := []model.TorrentEvent{
+		{SourceID: "1", SiteName: "testsite", TorrentID: "100", Title: "test torrent"},
+	}
+
+	if err := d.OnTorrents(context.Background(), events); err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(gotEvents) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(gotEvents))
+	}
+	selectedClient := GetClientName(&gotEvents[0])
+	if selectedClient != "qb-bigspace" {
+		t.Errorf("most_space should select qb-bigspace (100GB), got %s", selectedClient)
+	}
 }
 
-func (h *mockHandler) OnTorrents(ctx context.Context, events []model.TorrentEvent) error {
-	return h.fn(ctx, events)
+func TestDispatcher_ClientSelectorFixedFallback(t *testing.T) {
+	db := setupTestDB(t)
+
+	sub := &model.RSSSubscription{
+		Name:            "fixed-sub",
+		Enabled:         true,
+		SiteName:        "testsite",
+		ClientID:        "qb-default",
+		URLs:            []string{"http://example.com/rss"},
+		ClientSelection: model.SelectionFixed,
+	}
+	sub.ID = 1
+	if err := db.Create(sub).Error; err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	createClientConfig(t, db, "qb-default", "download")
+
+	d := newTestDispatcher(t, db)
+	d.SetClientSelector(NewClientSelector(nil, zap.NewNop()))
+
+	var mu sync.Mutex
+	var gotEvents []model.TorrentEvent
+	d.RegisterHandler(RoleDownload, &mockHandler{
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
+			mu.Lock()
+			gotEvents = append(gotEvents, events...)
+			mu.Unlock()
+			return nil
+		}},
+	})
+
+	events := []model.TorrentEvent{
+		{SourceID: "1", SiteName: "testsite", TorrentID: "200"},
+	}
+
+	if err := d.OnTorrents(context.Background(), events); err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(gotEvents) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(gotEvents))
+	}
+	if GetClientName(&gotEvents[0]) != "qb-default" {
+		t.Errorf("fixed mode should use sub.ClientID, got %s", GetClientName(&gotEvents[0]))
+	}
+}
+
+func TestDispatcher_ClientSelectorAllUnhealthy(t *testing.T) {
+	db := setupTestDB(t)
+
+	sub := &model.RSSSubscription{
+		Name:             "unhealthy-sub",
+		Enabled:          true,
+		SiteName:         "testsite",
+		ClientID:         "qb-default",
+		URLs:             []string{"http://example.com/rss"},
+		CandidateClients: []string{"qb-default", "qb-dead"},
+		ClientSelection:  model.SelectionMostSpace,
+	}
+	sub.ID = 1
+	if err := db.Create(sub).Error; err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	createClientConfig(t, db, "qb-default", "seeding")
+
+	provider := &mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
+			return nil, &model.AppError{Code: 50000, Message: "unhealthy"}
+		},
+	}
+
+	d := newTestDispatcher(t, db)
+	d.SetClientSelector(NewClientSelector(provider, zap.NewNop()))
+
+	var mu sync.Mutex
+	var gotEvents []model.TorrentEvent
+	d.RegisterHandler(RoleSeeding, &mockHandler{
+		EventHandler: &mocks.EventHandler{Fn: func(ctx context.Context, events []model.TorrentEvent) error {
+			mu.Lock()
+			gotEvents = append(gotEvents, events...)
+			mu.Unlock()
+			return nil
+		}},
+	})
+
+	events := []model.TorrentEvent{
+		{SourceID: "1", SiteName: "testsite", TorrentID: "300"},
+	}
+
+	if err := d.OnTorrents(context.Background(), events); err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(gotEvents) != 1 {
+		t.Fatalf("expected 1 event (fallback to fixed), got %d", len(gotEvents))
+	}
+	if GetClientName(&gotEvents[0]) != "qb-default" {
+		t.Errorf("all unhealthy should fallback to sub.ClientID, got %s", GetClientName(&gotEvents[0]))
+	}
+}
+
+type mockHandler struct {
+	*mocks.EventHandler
 }

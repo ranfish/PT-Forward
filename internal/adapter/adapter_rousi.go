@@ -41,18 +41,18 @@ func (a *RousiAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 	u := resolveBaseURL(config) + "/api/torrent/" + torrentID + "/download/" + config.Passkey
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("下载失败: %w", err)
+		return nil, downloadError("下载失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	return io.ReadAll(resp.Body)
@@ -62,13 +62,13 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	u := resolveBaseURL(config) + "/api/v1/torrents/" + torrentID
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	a.setAuthHeaders(req, config.Passkey)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("请求详情失败: %w", err)
+		return nil, networkError("请求详情失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -76,7 +76,7 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 		return nil, nil
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, _ := io.ReadAll(resp.Body)
@@ -95,7 +95,7 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %w", err)
+		return nil, parseError("解析响应失败", err)
 	}
 
 	d := result.Data
@@ -259,20 +259,20 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 
 	bodyBytes, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("序列化请求失败: %w", err)
+		return nil, networkError("序列化请求失败", err)
 	}
 
 	u := resolveBaseURL(config) + "/api/v1/torrents"
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader(string(bodyBytes)))
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, networkError("构造请求失败", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	a.setAuthHeaders(httpReq, config.Passkey)
 
 	resp, err := a.doer.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("上传请求失败: %w", err)
+		return nil, uploadError("上传请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -307,7 +307,7 @@ func (a *RousiAdapter) GetTorrentInfoHash(ctx context.Context, config *model.Sit
 		return "", err
 	}
 	if detail == nil || detail.InfoHash == "" {
-		return "", fmt.Errorf("未找到 info_hash")
+		return "", notFoundError("未找到 info_hash")
 	}
 	return detail.InfoHash, nil
 }
@@ -319,4 +319,17 @@ func resolveField(fields map[string]string, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func (a *RousiAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
+	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
+	if err != nil {
+		return false, nil
+	}
+	for _, r := range results {
+		if r.TorrentID == torrentID {
+			return true, nil
+		}
+	}
+	return false, nil
 }

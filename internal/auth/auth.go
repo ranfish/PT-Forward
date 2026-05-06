@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -71,7 +70,7 @@ func (l *loginLimiter) CheckLocked(ip string) error {
 		return nil
 	}
 	if a.count >= 5 && time.Now().Before(a.lockedUntil) {
-		return fmt.Errorf("登录已锁定，请 %s 后重试", time.Until(a.lockedUntil).Round(time.Minute))
+		return authError(ErrAuthLogin, fmt.Sprintf("登录已锁定，请 %s 后重试", time.Until(a.lockedUntil).Round(time.Minute)), nil)
 	}
 	return nil
 }
@@ -136,7 +135,7 @@ func NewAuthManagerWithSettings(repo model.AuthRepository, settingRepo SettingSt
 	if key == nil {
 		key = make([]byte, 32)
 		if _, err := rand.Read(key); err != nil {
-			return nil, fmt.Errorf("JWT signing key generation failed: %w", err)
+			return nil, authError(ErrAuthJWT, "JWT signing key generation failed", err)
 		}
 		if settingRepo != nil {
 			ctx := context.Background()
@@ -259,7 +258,7 @@ func (m *AuthManager) IssueTokenPair() (*TokenPair, error) {
 	}
 	accessToken, err := m.signToken(accessClaims.MapClaims())
 	if err != nil {
-		return nil, fmt.Errorf("sign access token: %w", err)
+		return nil, authError(ErrAuthJWT, "sign access token", err)
 	}
 
 	refreshClaims := jwt.MapClaims{
@@ -271,7 +270,7 @@ func (m *AuthManager) IssueTokenPair() (*TokenPair, error) {
 	}
 	refreshToken, err := m.signToken(refreshClaims)
 	if err != nil {
-		return nil, fmt.Errorf("sign refresh token: %w", err)
+		return nil, authError(ErrAuthJWT, "sign refresh token", err)
 	}
 
 	m.mu.Lock()
@@ -360,7 +359,7 @@ func (m *AuthManager) SetPassword(ctx context.Context, password string) error {
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
-		return fmt.Errorf("bcrypt hash: %w", err)
+		return authError(ErrAuthPassword, "bcrypt hash", err)
 	}
 	user, err := m.repo.GetByUsername(ctx, "admin")
 	if err != nil {
@@ -388,7 +387,7 @@ func (m *AuthManager) ResetPassword(ctx context.Context, password string) error 
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
-		return fmt.Errorf("bcrypt hash: %w", err)
+		return authError(ErrAuthPassword, "bcrypt hash", err)
 	}
 	user, err := m.repo.GetByUsername(ctx, "admin")
 	if err != nil {
@@ -418,7 +417,7 @@ func (m *AuthManager) signToken(claims jwt.MapClaims) (string, error) {
 func (m *AuthManager) parseToken(tokenStr string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			return nil, authError(ErrAuthToken, fmt.Sprintf("unexpected signing method: %v", t.Header["alg"]), nil)
 		}
 		return m.signingKey, nil
 	})
@@ -427,7 +426,7 @@ func (m *AuthManager) parseToken(tokenStr string) (jwt.MapClaims, error) {
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		return nil, errors.New("invalid token claims")
+		return nil, authError(ErrAuthToken, "invalid token claims", nil)
 	}
 	return claims, nil
 }
@@ -449,7 +448,7 @@ func (m *AuthManager) evictOldestIfNeeded() {
 
 func validatePasswordStrength(password string) error {
 	if len(password) < 8 {
-		return fmt.Errorf("密码长度至少 8 位")
+		return authError(ErrAuthPassword, "密码长度至少 8 位", nil)
 	}
 	var hasUpper, hasLower, hasDigit, hasSpecial bool
 	for _, c := range password {
@@ -465,7 +464,7 @@ func validatePasswordStrength(password string) error {
 		}
 	}
 	if !hasUpper || !hasLower || !hasDigit || !hasSpecial {
-		return fmt.Errorf("密码必须包含大写字母、小写字母、数字和特殊符号")
+		return authError(ErrAuthPassword, "密码必须包含大写字母、小写字母、数字和特殊符号", nil)
 	}
 	return nil
 }
@@ -474,7 +473,7 @@ func GenerateRandomPassword(length int) (string, error) {
 	b := make([]byte, length)
 	randBytes := make([]byte, length)
 	if _, err := rand.Read(randBytes); err != nil {
-		return "", fmt.Errorf("random password generation failed: %w", err)
+		return "", authError(ErrAuthPassword, "random password generation failed", err)
 	}
 	for i := range b {
 		b[i] = randomPasswordChars[int(randBytes[i])%len(randomPasswordChars)]
@@ -485,7 +484,7 @@ func GenerateRandomPassword(length int) (string, error) {
 func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
-		return "", fmt.Errorf("bcrypt hash: %w", err)
+		return "", authError(ErrAuthPassword, "bcrypt hash", err)
 	}
 	return string(hash), nil
 }

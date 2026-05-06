@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -258,20 +257,29 @@ func (h *RSSHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *RSSHandler) handleList(w http.ResponseWriter, r *http.Request) {
-	subs, err := h.repo.List(r.Context())
-	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询订阅失败")
-		return
-	}
+	page, size := parsePagination(r)
+
+	var total int64
+	h.db.Model(&model.RSSSubscription{}).
+		Where("deleted_at = ?", time.Time{}).
+		Count(&total)
+
+	var subs []model.RSSSubscription
+	h.db.Where("deleted_at = ?", time.Time{}).
+		Order("name ASC").
+		Offset(offset(page, size)).Limit(size).
+		Find(&subs)
 
 	items := make([]rssResponse, 0, len(subs))
 	for i := range subs {
 		items = append(items, h.toResponse(&subs[i]))
 	}
 
-	Success(w, map[string]interface{}{
-		"items": items,
-		"total": len(items),
+	Success(w, PaginatedResult{
+		Items: items,
+		Total: total,
+		Page:  page,
+		Size:  size,
 	})
 }
 
@@ -551,7 +559,7 @@ func (h *RSSHandler) extractID(path string, prefix string) (uint, error) {
 	p = strings.TrimRight(p, "/")
 	n, err := strconv.ParseUint(p, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("invalid id")
+		return 0, apiError(ErrAPIInvalidID, "invalid id", nil)
 	}
 	return uint(n), nil
 }

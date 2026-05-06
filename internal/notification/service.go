@@ -37,7 +37,7 @@ func (s *Service) Send(ctx context.Context, msg model.FormattedMessage) error {
 	if err := s.db.WithContext(ctx).
 		Where("enabled = ?", true).
 		Find(&channels).Error; err != nil {
-		return fmt.Errorf("查询通知通道失败: %w", err)
+		return notifyError(ErrNotifyChannel, "查询通知通道失败", err)
 	}
 
 	if len(channels) == 0 {
@@ -72,7 +72,7 @@ func (s *Service) Send(ctx context.Context, msg model.FormattedMessage) error {
 		if success {
 			s.resetFailures(ctx, ch)
 		} else {
-			lastErr = fmt.Errorf("%s: %s", ch.Name, errMsg)
+			lastErr = notifyError(ErrNotifyChannel, fmt.Sprintf("%s: %s", ch.Name, errMsg), nil)
 			s.incrementFailures(ctx, ch)
 
 			if ch.FailoverGroupID != "" {
@@ -126,7 +126,7 @@ func (s *Service) Dispatch(ctx context.Context, event string, msg model.Formatte
 		if success {
 			s.resetFailures(ctx, ch)
 		} else {
-			lastErr = fmt.Errorf("%s: %s", ch.Name, errMsg)
+			lastErr = notifyError(ErrNotifyChannel, fmt.Sprintf("%s: %s", ch.Name, errMsg), nil)
 			s.incrementFailures(ctx, ch)
 		}
 	}
@@ -144,6 +144,10 @@ func (s *Service) Test(ctx context.Context) error {
 }
 
 func (s *Service) sendToChannel(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
+	timeout := s.channelTimeout(ch)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	switch ch.Type {
 	case "telegram":
 		return s.sendTelegram(ctx, ch, msg)
@@ -158,6 +162,13 @@ func (s *Service) sendToChannel(ctx context.Context, ch *model.NotificationChann
 	default:
 		return false, "不支持的通知类型: " + ch.Type
 	}
+}
+
+func (s *Service) channelTimeout(ch *model.NotificationChannel) time.Duration {
+	if ch.TimeoutMs > 0 {
+		return time.Duration(ch.TimeoutMs) * time.Millisecond
+	}
+	return 15 * time.Second
 }
 
 func (s *Service) sendTelegram(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {

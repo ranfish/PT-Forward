@@ -3,7 +3,6 @@ package fingerprint
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -90,7 +89,7 @@ func (r *Repository) ComputeAndSave(ctx context.Context, siteName, torrentID str
 	fp.UpdatedAt = time.Now()
 
 	if err := r.Save(ctx, fp); err != nil {
-		return nil, fmt.Errorf("save fingerprint: %w", err)
+		return nil, fpError(ErrFPRepo, "save fingerprint", err)
 	}
 
 	r.logger.Info("fingerprint computed",
@@ -161,6 +160,37 @@ func (r *Repository) populateParsed(fp *model.ContentFingerprint) {
 	}
 }
 
+func (r *Repository) BatchSave(ctx context.Context, fps []*model.ContentFingerprint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return tx.Create(&fps).Error
+	})
+}
+
+func (r *Repository) CleanupOrphans(ctx context.Context, maxAgeDays int) (int64, error) {
+	if maxAgeDays <= 0 {
+		maxAgeDays = 30
+	}
+	cutoff := time.Now().AddDate(0, 0, -maxAgeDays)
+
+	result := r.db.WithContext(ctx).
+		Where("updated_at < ? AND info_hash NOT IN (?)",
+			cutoff,
+			r.db.Table("seeding_torrent_records").Select("info_hash"),
+		).
+		Delete(&model.ContentFingerprint{})
+	if result.Error != nil {
+		return 0, fpError(ErrFPRepo, "cleanup orphan fingerprints", result.Error)
+	}
+
+	if result.RowsAffected > 0 {
+		r.logger.Info("cleaned up orphan fingerprints",
+			zap.Int64("count", result.RowsAffected),
+			zap.Int("max_age_days", maxAgeDays),
+		)
+	}
+	return result.RowsAffected, nil
+}
+
 func (r *Repository) GetSearchCache(ctx context.Context, site, cleanTitle string, totalSize int64) (*model.SearchCache, error) {
 	var cache model.SearchCache
 	err := r.db.WithContext(ctx).
@@ -176,7 +206,7 @@ func (r *Repository) GetSearchCache(ctx context.Context, site, cleanTitle string
 func (r *Repository) SaveSearchCache(ctx context.Context, site, cleanTitle string, totalSize int64, results []model.Candidate) error {
 	resultsJSON, err := json.Marshal(results)
 	if err != nil {
-		return fmt.Errorf("marshal search results: %w", err)
+		return fpError(ErrFPRepo, "marshal search results", err)
 	}
 
 	cache := &model.SearchCache{

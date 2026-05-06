@@ -201,7 +201,7 @@ func TestMTeamAdapter_UploadTorrent_OK(t *testing.T) {
 		if r.FormValue("name") != "Test Upload" {
 			t.Errorf("unexpected name: %s", r.FormValue("name"))
 		}
-		file, _, err := r.FormFile("torrent")
+		file, _, err := r.FormFile("file")
 		if err != nil {
 			t.Fatalf("form file: %v", err)
 		}

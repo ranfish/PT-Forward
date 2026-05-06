@@ -10,16 +10,18 @@ import (
 	"github.com/ranfish/pt-forward/internal/filter"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type FilterHandler struct {
 	repo      *filter.Repository
 	filterEng *filter.Engine
+	db        *gorm.DB
 	logger    *zap.Logger
 }
 
-func NewFilterHandler(repo *filter.Repository, filterEng *filter.Engine, logger *zap.Logger) *FilterHandler {
-	return &FilterHandler{repo: repo, filterEng: filterEng, logger: logger}
+func NewFilterHandler(repo *filter.Repository, filterEng *filter.Engine, db *gorm.DB, logger *zap.Logger) *FilterHandler {
+	return &FilterHandler{repo: repo, filterEng: filterEng, db: db, logger: logger}
 }
 
 type createFilterRequest struct {
@@ -135,20 +137,29 @@ func (h *FilterHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request
 }
 
 func (h *FilterHandler) handleList(w http.ResponseWriter, r *http.Request) {
-	rules, err := h.repo.List(r.Context())
-	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询规则失败")
-		return
-	}
+	page, size := parsePagination(r)
+
+	var total int64
+	h.db.Model(&model.FilterRule{}).
+		Where("deleted_at = ?", time.Time{}).
+		Count(&total)
+
+	var rules []model.FilterRule
+	h.db.Where("deleted_at = ?", time.Time{}).
+		Order("priority ASC, id ASC").
+		Offset(offset(page, size)).Limit(size).
+		Find(&rules)
 
 	items := make([]filterResponse, 0, len(rules))
 	for i := range rules {
 		items = append(items, h.toResponse(&rules[i]))
 	}
 
-	Success(w, map[string]interface{}{
-		"items": items,
-		"total": len(items),
+	Success(w, PaginatedResult{
+		Items: items,
+		Total: total,
+		Page:  page,
+		Size:  size,
 	})
 }
 

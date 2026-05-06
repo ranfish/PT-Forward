@@ -59,6 +59,7 @@ type RSSTorrentEvent struct {
 	IsFree      bool           `json:"is_free"`
 	FreeEndAt   *time.Time     `json:"free_end_at"`
 	HasHR       bool           `json:"has_hr"`
+	HRSeedTimeH int            `json:"hr_seed_time_h"`
 	MatchedRule *string        `json:"matched_rule"`
 	TorrentData []byte         `json:"-"`
 	Metadata    map[string]any `json:"metadata"`
@@ -137,7 +138,7 @@ type RSSSubscription struct {
 	ScoringConfig SeedingScoringConfig `json:"scoring_config" gorm:"embedded"`
 
 	DiskGuardEnabled   bool       `json:"disk_guard_enabled" gorm:"default:true"`
-	DiskGuardThreshold float64    `json:"disk_guard_threshold" gorm:"default:0.05"`
+	DiskGuardThreshold float64    `json:"disk_guard_threshold" gorm:"default:1073741824"`
 	Paused             bool       `json:"paused" gorm:"default:false"`
 	PauseReason        string     `json:"pause_reason" gorm:"size:50"`
 	PausedAt           *time.Time `json:"paused_at"`
@@ -157,6 +158,7 @@ type SLData struct {
 }
 
 // §33.1.8 — PendingScoringEntry: 免费等待→评分管道
+// v2: reserved — 待实现时激活
 type PendingScoringEntry struct {
 	SubscriptionID string        `json:"subscription_id"`
 	TorrentID      string        `json:"torrent_id"`
@@ -173,6 +175,7 @@ type PendingScoringEntry struct {
 }
 
 // §33.1.13 — ScoredCandidate: 刷流管道评分增强候选
+// v2: reserved — 待实现时激活
 type ScoredCandidate struct {
 	SubscriptionID    string        `json:"subscription_id"`
 	ClientID          string        `json:"client_id"`

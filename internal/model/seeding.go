@@ -86,6 +86,7 @@ type SeedingClientState struct {
 func (SeedingClientState) TableName() string { return "seeding_client_states" }
 
 // §33.1.76 — SeedingCandidate: 刷流候选
+// v2: reserved — 待实现时激活
 type SeedingCandidate struct {
 	SubscriptionID string        `json:"subscription_id"`
 	ClientID       string        `json:"client_id"`
@@ -94,6 +95,7 @@ type SeedingCandidate struct {
 }
 
 // §33.1.78 — SeedingTorrentView: 刷流种子 API 聚合视图
+// v2: reserved — 待实现时激活
 type SeedingTorrentView struct {
 	ID            uint      `json:"id"`
 	InfoHash      string    `json:"info_hash"`
@@ -236,3 +238,18 @@ type CleanupScoreWeights struct {
 	Ratio       float64 `json:"ratio"`
 	DiskUsage   float64 `json:"disk_usage"`
 }
+
+type ScoringLog struct {
+	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	CycleID   string    `json:"cycle_id" gorm:"size:30;index;not null"`
+	ClientID  string    `json:"client_id" gorm:"size:50;index;not null"`
+	InfoHash  string    `json:"info_hash" gorm:"size:40;index;not null"`
+	SiteName  string    `json:"site_name" gorm:"size:100"`
+	Score     float64   `json:"score"`
+	Demand    float64   `json:"demand"`
+	UploadVal float64   `json:"upload_val"`
+	Recency   float64   `json:"recency"`
+	CreatedAt time.Time `json:"created_at" gorm:"index"`
+}
+
+func (ScoringLog) TableName() string { return "scoring_logs" }

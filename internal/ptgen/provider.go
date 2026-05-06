@@ -87,7 +87,7 @@ func (p *Provider) queryRemote(ctx context.Context, query string) (*model.PTGenR
 		return result, nil
 	}
 
-	return nil, fmt.Errorf("all PTGen endpoints failed: %w", lastErr)
+	return nil, ptgenError(ErrPTGenRemote, "all PTGen endpoints failed", lastErr)
 }
 
 func (p *Provider) queryEndpoint(ctx context.Context, endpoint, query string) (*model.PTGenResult, error) {
@@ -102,22 +102,22 @@ func (p *Provider) queryEndpoint(ctx context.Context, endpoint, query string) (*
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request %s: %w", endpoint, err)
+		return nil, ptgenError(ErrPTGenRemote, fmt.Sprintf("request %s", endpoint), err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
+		return nil, ptgenError(ErrPTGenResponse, "read response", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
+		return nil, ptgenError(ErrPTGenResponse, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)), nil)
 	}
 
 	var raw map[string]any
 	if err := json.Unmarshal(respBody, &raw); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+		return nil, ptgenError(ErrPTGenResponse, "decode response", err)
 	}
 
 	result := &model.PTGenResult{Source: endpoint}

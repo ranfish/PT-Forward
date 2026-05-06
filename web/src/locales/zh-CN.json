@@ -60,7 +60,9 @@
     "ptgen": "PTGen 影片信息",
     "seedingDashboard": "总览",
     "tracker": "Tracker 管理",
-    "lifecycle": "生命周期"
+    "lifecycle": "生命周期",
+    "scheduler": "定时任务",
+    "systemHealth": "系统监控"
   },
   "dashboard": {
     "title": "仪表盘",

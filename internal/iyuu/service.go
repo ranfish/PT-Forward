@@ -31,10 +31,10 @@ func NewService(db *gorm.DB, logger *zap.Logger) *Service {
 func (s *Service) getConfig(ctx context.Context) (*model.IYUUConfig, error) {
 	var cfg model.IYUUConfig
 	if err := s.db.WithContext(ctx).First(&cfg).Error; err != nil {
-		return nil, fmt.Errorf("iyuu config not found: %w", err)
+		return nil, iyuuError(ErrIYUUConfig, "iyuu config not found", err)
 	}
 	if cfg.Token == "" {
-		return nil, fmt.Errorf("iyuu token is empty")
+		return nil, iyuuError(ErrIYUUConfig, "iyuu token is empty", nil)
 	}
 	return &cfg, nil
 }
@@ -48,21 +48,21 @@ func (s *Service) Ping(ctx context.Context) error {
 	url := cfg.BaseURL + "/App.Api/sites?token=" + cfg.Token
 	resp, err := s.doGet(ctx, url)
 	if err != nil {
-		return fmt.Errorf("ping failed: %w", err)
+		return iyuuError(ErrIYUUHTTP, "ping failed", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("IYUU returned HTTP %d", resp.StatusCode)
+		return iyuuError(ErrIYUUHTTP, fmt.Sprintf("IYUU returned HTTP %d", resp.StatusCode), nil)
 	}
 
 	var result iyuuResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+		return iyuuError(ErrIYUUAPI, "decode response", err)
 	}
 
 	if result.Ret != 200 {
-		return fmt.Errorf("IYUU error: %s", result.Msg)
+		return iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU error: %s", result.Msg), nil)
 	}
 
 	return nil
@@ -86,11 +86,11 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 
 	var resp iyuuReseedResponse
 	if err := s.doPost(ctx, cfg.BaseURL+"/App.Api/reseed.Query", payload, &resp); err != nil {
-		return nil, fmt.Errorf("query reseed: %w", err)
+		return nil, iyuuError(ErrIYUUHTTP, "query reseed", err)
 	}
 
 	if resp.Ret != 200 {
-		return nil, fmt.Errorf("IYUU query error: %s", resp.Msg)
+		return nil, iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU query error: %s", resp.Msg), nil)
 	}
 
 	results := make([]*model.IYUUReseedResult, 0, len(resp.Data))
@@ -141,17 +141,17 @@ func (s *Service) GetSiteList(ctx context.Context) ([]model.IYUUSite, error) {
 	url := cfg.BaseURL + "/App.Api/sites?token=" + cfg.Token
 	resp, err := s.doGet(ctx, url)
 	if err != nil {
-		return nil, fmt.Errorf("get site list: %w", err)
+		return nil, iyuuError(ErrIYUUHTTP, "get site list", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	var result iyuuSitesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode sites response: %w", err)
+		return nil, iyuuError(ErrIYUUAPI, "decode sites response", err)
 	}
 
 	if result.Ret != 200 {
-		return nil, fmt.Errorf("IYUU sites error: %s", result.Msg)
+		return nil, iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU sites error: %s", result.Msg), nil)
 	}
 
 	sites := make([]model.IYUUSite, 0, len(result.Data))
@@ -188,11 +188,11 @@ func (s *Service) ReportExisting(ctx context.Context, sidList []int) error {
 
 	var resp iyuuResponse
 	if err := s.doPost(ctx, cfg.BaseURL+"/App.Api/reseed.ReportExisting", payload, &resp); err != nil {
-		return fmt.Errorf("report existing: %w", err)
+		return iyuuError(ErrIYUUHTTP, "report existing", err)
 	}
 
 	if resp.Ret != 200 {
-		return fmt.Errorf("IYUU report error: %s", resp.Msg)
+		return iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU report error: %s", resp.Msg), nil)
 	}
 
 	return nil
@@ -212,11 +212,11 @@ func (s *Service) SendNotification(_ context.Context, text, desp string) error {
 
 	var resp iyuuResponse
 	if err := s.doPost(context.Background(), cfg.BaseURL+"/+api/send", payload, &resp); err != nil {
-		return fmt.Errorf("send notification: %w", err)
+		return iyuuError(ErrIYUUHTTP, "send notification", err)
 	}
 
 	if resp.Ret != 200 {
-		return fmt.Errorf("IYUU notification error: %s", resp.Msg)
+		return iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU notification error: %s", resp.Msg), nil)
 	}
 
 	return nil
@@ -254,7 +254,7 @@ func (s *Service) doPost(ctx context.Context, url string, payload any, result an
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
+		return iyuuError(ErrIYUUHTTP, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)), nil)
 	}
 
 	return json.Unmarshal(respBody, result)

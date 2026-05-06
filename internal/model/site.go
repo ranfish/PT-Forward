@@ -56,6 +56,7 @@ type Site struct {
 
 	OverrideRSSURL   string `json:"override_rss_url,omitempty" gorm:"size:500"`
 	OverrideSavePath string `json:"override_save_path,omitempty" gorm:"size:500"`
+	HRStrategy       string `json:"hr_strategy" gorm:"size:20;not null;default:'protect'"`
 
 	ProxyURL      string `json:"proxy_url,omitempty" gorm:"size:500"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify" gorm:"default:false"`
@@ -203,7 +204,15 @@ type SiteDiscountDetectionConfig struct {
 }
 
 type SiteHRConfig struct {
-	Selectors []string `yaml:"selectors"`
+	DefaultSeedTimeH int      `yaml:"default_seed_time_h"`
+	Selectors        []string `yaml:"selectors"`
+}
+
+func (h SiteHRConfig) SeedTimeH() int {
+	if h.DefaultSeedTimeH > 0 {
+		return h.DefaultSeedTimeH
+	}
+	return 72
 }
 
 type SiteSourceParseConfig struct {
@@ -264,6 +273,7 @@ type SiteConfig struct {
 	IsSource        bool   `json:"is_source"`
 	IsTarget        bool   `json:"is_target"`
 	CookieCloudSync bool   `json:"cookie_cloud_sync"`
+	HRStrategy      string `json:"hr_strategy"`
 
 	Passkey     string `json:"passkey,omitempty"`
 	Cookie      string `json:"cookie,omitempty"`

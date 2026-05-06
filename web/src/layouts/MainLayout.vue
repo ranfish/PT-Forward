@@ -69,9 +69,17 @@
             <template #icon><HeartOutlined /></template>
             <span>{{ t('nav.lifecycle') }}</span>
           </a-menu-item>
+          <a-menu-item key="/scheduler" @click="$router.push('/scheduler')">
+            <template #icon><FieldTimeOutlined /></template>
+            <span>{{ t('nav.scheduler') }}</span>
+          </a-menu-item>
         </a-menu-item-group>
 
         <a-menu-item-group :title="'系统'">
+          <a-menu-item key="/system" @click="$router.push('/system')">
+            <template #icon><DashboardOutlined /></template>
+            <span>{{ t('nav.systemHealth') }}</span>
+          </a-menu-item>
           <a-menu-item key="/fingerprints" @click="$router.push('/fingerprints')">
             <template #icon><SafetyOutlined /></template>
             <span>{{ t('nav.fingerprints') }}</span>
@@ -144,6 +152,7 @@ import {
   VideoCameraOutlined,
   ClusterOutlined,
   HeartOutlined,
+  FieldTimeOutlined,
 } from '@ant-design/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'

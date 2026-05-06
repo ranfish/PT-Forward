@@ -68,7 +68,7 @@ func (c *TRClient) GetSharedPaths() []model.SharedPathMapping { return c.sharedP
 func (c *TRClient) rpcCall(ctx context.Context, method string, args interface{}) (*rpcResponse, error) {
 	body, err := json.Marshal(rpcRequest{Method: method, Arguments: args})
 	if err != nil {
-		return nil, fmt.Errorf("marshal rpc request: %w", err)
+		return nil, trError(ErrTRParse, "marshal rpc request", err)
 	}
 
 	resp, err := c.doRPCCall(ctx, body)
