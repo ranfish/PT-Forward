@@ -364,13 +364,6 @@ func TestEngine_Trigger_Success(t *testing.T) {
 	eng, db := newEngineWithDB(t)
 	makeSite(db, t, "testsit", "testsit.com")
 
-	require.NoError(t, db.Create(&model.FilterRule{
-		Name: "accept-all", RuleType: "accept", Enabled: true, Priority: 1,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareRegExp, Value: ".*"},
-		},
-	}).Error)
-
 	srv := serveRssWithItems(t, rssItem(
 		"Ubuntu 24.04",
 		"https://testsit.com/download.php?id=100",
@@ -394,9 +387,6 @@ func TestEngine_Trigger_Success(t *testing.T) {
 		},
 	})
 	eng.SetDispatcher(d)
-
-	fe := filter.NewEngine(filter.NewRepository(db), zap.NewNop())
-	eng.SetFilterEngine(fe)
 
 	require.NoError(t, eng.Trigger(context.Background(), sub.ID))
 	time.Sleep(500 * time.Millisecond)
@@ -481,13 +471,6 @@ func TestEngine_FetchOnce_HappyPath(t *testing.T) {
 	eng, db := newEngineWithDB(t)
 	makeSite(db, t, "testsit", "testsit.com")
 
-	require.NoError(t, db.Create(&model.FilterRule{
-		Name: "accept-all", RuleType: "accept", Enabled: true, Priority: 1,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareRegExp, Value: ".*"},
-		},
-	}).Error)
-
 	srv := serveRssWithItems(t, rssItem(
 		"Ubuntu 24.04 LTS",
 		"https://testsit.com/download.php?id=501",
@@ -508,7 +491,6 @@ func TestEngine_FetchOnce_HappyPath(t *testing.T) {
 		},
 	})
 	eng.SetDispatcher(d)
-	eng.SetFilterEngine(filter.NewEngine(filter.NewRepository(db), zap.NewNop()))
 
 	eng.fetchOnce(context.Background(), sub)
 
@@ -652,13 +634,6 @@ func TestEngine_FetchOnce_NoFilterMatch(t *testing.T) {
 	eng, db := newEngineWithDB(t)
 	makeSite(db, t, "testsit", "testsit.com")
 
-	require.NoError(t, db.Create(&model.FilterRule{
-		Name: "accept-linux", RuleType: "accept", Enabled: true, Priority: 1,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareContain, Value: "Linux"},
-		},
-	}).Error)
-
 	srv := serveRssWithItems(t, rssItem(
 		"Windows 11 Pro",
 		"https://testsit.com/download.php?id=900",
@@ -669,7 +644,6 @@ func TestEngine_FetchOnce_NoFilterMatch(t *testing.T) {
 
 	sub := makeSub(db, t, "nomatch-sub", "testsit", []string{srv.URL})
 	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
-	eng.SetFilterEngine(filter.NewEngine(filter.NewRepository(db), zap.NewNop()))
 
 	dispatchCount := 0
 	d := event.NewDispatcher(zap.NewNop())
@@ -682,19 +656,12 @@ func TestEngine_FetchOnce_NoFilterMatch(t *testing.T) {
 	eng.SetDispatcher(d)
 
 	eng.fetchOnce(context.Background(), sub)
-	require.Equal(t, 0, dispatchCount)
+	require.Equal(t, 1, dispatchCount)
 }
 
 func TestEngine_FetchOnce_MultipleItems(t *testing.T) {
 	eng, db := newEngineWithDB(t)
 	makeSite(db, t, "testsit", "testsit.com")
-
-	require.NoError(t, db.Create(&model.FilterRule{
-		Name: "accept-all", RuleType: "accept", Enabled: true, Priority: 1,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareRegExp, Value: ".*"},
-		},
-	}).Error)
 
 	items := rssItem("Torrent A", "https://testsit.com/download.php?id=101", "101",
 		"aaa111bbb222ccc333ddd444eee555fff666aaa1", "1000") +
@@ -706,7 +673,6 @@ func TestEngine_FetchOnce_MultipleItems(t *testing.T) {
 	srv := serveRssWithItems(t, items)
 	sub := makeSub(db, t, "multi-sub", "testsit", []string{srv.URL})
 	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
-	eng.SetFilterEngine(filter.NewEngine(filter.NewRepository(db), zap.NewNop()))
 
 	var dispatched []model.TorrentEvent
 	d := event.NewDispatcher(zap.NewNop())
@@ -726,13 +692,6 @@ func TestEngine_FetchOnce_MultipleURLs(t *testing.T) {
 	eng, db := newEngineWithDB(t)
 	makeSite(db, t, "testsit", "testsit.com")
 
-	require.NoError(t, db.Create(&model.FilterRule{
-		Name: "accept-all", RuleType: "accept", Enabled: true, Priority: 1,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareRegExp, Value: ".*"},
-		},
-	}).Error)
-
 	srv1 := serveRssWithItems(t, rssItem("Feed1 Item", "https://testsit.com/download.php?id=201", "201",
 		"ddd444eee555fff666aaa111bbb222ccc333ddd4", "1000"))
 	srv2 := serveRssWithItems(t, rssItem("Feed2 Item", "https://testsit.com/download.php?id=202", "202",
@@ -741,7 +700,6 @@ func TestEngine_FetchOnce_MultipleURLs(t *testing.T) {
 	sub := makeSub(db, t, "multiurl-sub", "testsit", []string{srv1.URL, srv2.URL})
 	client := srv1.Client()
 	eng.fetcher = NewFetcherWithClient(client, zap.NewNop())
-	eng.SetFilterEngine(filter.NewEngine(filter.NewRepository(db), zap.NewNop()))
 
 	var dispatched []model.TorrentEvent
 	d := event.NewDispatcher(zap.NewNop())
@@ -809,13 +767,6 @@ func TestEngine_FetchOnce_HRIgnore(t *testing.T) {
 	eng, db := newEngineWithDB(t)
 	makeSite(db, t, "testsit", "testsit.com")
 
-	require.NoError(t, db.Create(&model.FilterRule{
-		Name: "accept-all", RuleType: "accept", Enabled: true, Priority: 1,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareRegExp, Value: ".*"},
-		},
-	}).Error)
-
 	adapter := &mocks.SiteAdapter{
 		DetectHRFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
 			return &model.HRResult{HasHR: true, SeedTimeH: 72}, nil
@@ -837,7 +788,6 @@ func TestEngine_FetchOnce_HRIgnore(t *testing.T) {
 		"aaa777bbb888ccc999ddd000aaa111bbb222ccc3", "1000"))
 	sub := makeSub(db, t, "hr-ignore-sub", "testsit", []string{srv.URL})
 	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
-	eng.SetFilterEngine(filter.NewEngine(filter.NewRepository(db), zap.NewNop()))
 
 	var dispatched []model.TorrentEvent
 	d := event.NewDispatcher(zap.NewNop())
@@ -859,18 +809,10 @@ func TestEngine_FetchOnce_NoDispatcher(t *testing.T) {
 	eng, db := newEngineWithDB(t)
 	makeSite(db, t, "testsit", "testsit.com")
 
-	require.NoError(t, db.Create(&model.FilterRule{
-		Name: "accept-all", RuleType: "accept", Enabled: true, Priority: 1,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareRegExp, Value: ".*"},
-		},
-	}).Error)
-
 	srv := serveRssWithItems(t, rssItem("Some Torrent", "https://testsit.com/download.php?id=401", "401",
 		"bbb888ccc999ddd000aaa111bbb222ccc333ddd4", "1000"))
 	sub := makeSub(db, t, "nodispatch-sub", "testsit", []string{srv.URL})
 	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
-	eng.SetFilterEngine(filter.NewEngine(filter.NewRepository(db), zap.NewNop()))
 
 	require.NotPanics(t, func() {
 		eng.fetchOnce(context.Background(), sub)
@@ -884,13 +826,6 @@ func TestEngine_FetchOnce_NoDispatcher(t *testing.T) {
 func TestEngine_FetchOnce_FreeTorrent(t *testing.T) {
 	eng, db := newEngineWithDB(t)
 	makeSite(db, t, "testsit", "testsit.com")
-
-	require.NoError(t, db.Create(&model.FilterRule{
-		Name: "accept-all", RuleType: "accept", Enabled: true, Priority: 1,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareRegExp, Value: ".*"},
-		},
-	}).Error)
 
 	freeEnd := time.Now().Add(24 * time.Hour)
 	adapter := &mocks.SiteAdapter{
@@ -914,7 +849,6 @@ func TestEngine_FetchOnce_FreeTorrent(t *testing.T) {
 		"ccc999ddd000aaa111bbb222ccc333ddd444eee5", "1000"))
 	sub := makeSub(db, t, "free-sub", "testsit", []string{srv.URL})
 	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
-	eng.SetFilterEngine(filter.NewEngine(filter.NewRepository(db), zap.NewNop()))
 
 	var dispatched []model.TorrentEvent
 	d := event.NewDispatcher(zap.NewNop())
@@ -936,13 +870,6 @@ func TestEngine_FetchOnce_MixedSeenAndNew(t *testing.T) {
 	eng, db := newEngineWithDB(t)
 	makeSite(db, t, "testsit", "testsit.com")
 
-	require.NoError(t, db.Create(&model.FilterRule{
-		Name: "accept-all", RuleType: "accept", Enabled: true, Priority: 1,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareRegExp, Value: ".*"},
-		},
-	}).Error)
-
 	items := rssItem("Old Torrent", "https://testsit.com/download.php?id=501", "501",
 		"ddd000aaa111bbb222ccc333ddd444eee555fff6", "1000") +
 		rssItem("New Torrent", "https://testsit.com/download.php?id=502", "502",
@@ -951,7 +878,6 @@ func TestEngine_FetchOnce_MixedSeenAndNew(t *testing.T) {
 	srv := serveRssWithItems(t, items)
 	sub := makeSub(db, t, "mix-sub", "testsit", []string{srv.URL})
 	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
-	eng.SetFilterEngine(filter.NewEngine(filter.NewRepository(db), zap.NewNop()))
 
 	require.NoError(t, eng.repo.MarkSeen(context.Background(), &model.RSSTorrentSeen{
 		SiteName: "testsit", TorrentID: "501", SubscriptionID: uintToString(sub.ID), Status: "seen",

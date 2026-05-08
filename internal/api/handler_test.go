@@ -3932,8 +3932,8 @@ func TestSite_Test_WithHTTPServer(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	if data["ok"] != true {
-		t.Errorf("expected ok=true, got %v", data["ok"])
+	if data["ok"] != false {
+		t.Errorf("expected ok=false (no cookie), got %v", data["ok"])
 	}
 }
 

@@ -72,6 +72,7 @@ func TestValidate_InvalidLogLevel(t *testing.T) {
 
 func TestValidate_LoginMaxRetries(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Security.LoginLockoutEnabled = true
 	cfg.Security.LoginMaxRetries = 0
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error for login_max_retries < 1")
@@ -80,9 +81,20 @@ func TestValidate_LoginMaxRetries(t *testing.T) {
 
 func TestValidate_LoginLockoutMin(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Security.LoginLockoutEnabled = true
 	cfg.Security.LoginLockoutMin = 0
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error for login_lockout_min < 1")
+	}
+}
+
+func TestValidate_LoginLockoutDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Security.LoginLockoutEnabled = false
+	cfg.Security.LoginMaxRetries = 0
+	cfg.Security.LoginLockoutMin = 0
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected no error when lockout disabled, got %v", err)
 	}
 }
 

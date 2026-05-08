@@ -48,6 +48,7 @@ type Site struct {
 	CookieCloudSync    bool       `json:"cookie_cloud_sync" gorm:"default:false"`
 	CookieCloudDomain  string     `json:"cookie_cloud_domain,omitempty" gorm:"size:200"`
 	AlternativeDomains string     `json:"alternative_domains,omitempty" gorm:"type:text"`
+	MirrorDomain       string     `json:"mirror_domain,omitempty" gorm:"size:200"`
 	LastSyncAt         *time.Time `json:"last_sync_at"`
 
 	IsSource               bool `json:"is_source" gorm:"default:false"`

@@ -26,23 +26,22 @@
 
     <a-spin :spinning="loading">
       <a-descriptions bordered :column="2" style="margin-bottom: 24px">
-        <a-descriptions-item :label="t('site.domain')">{{ site.domain }}</a-descriptions-item>
         <a-descriptions-item :label="t('common.name')">{{ site.name }}</a-descriptions-item>
-        <a-descriptions-item label="URL">{{ site.baseUrl }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.framework')">
           <a-tag :color="frameworkColors[site.framework] || 'default'">
             {{ frameworkLabels[site.framework] || site.framework }}
           </a-tag>
         </a-descriptions-item>
         <a-descriptions-item :label="t('site.authType')">{{ authLabel }}</a-descriptions-item>
+        <a-descriptions-item v-if="site.mirrorDomain" label="镜像域名">{{ site.mirrorDomain }}</a-descriptions-item>
         <a-descriptions-item v-if="needsCookie" label="Cookie">{{ site.hasCookie ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
         <a-descriptions-item v-if="needsApiKey" label="API Key">{{ site.hasApiKey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
         <a-descriptions-item v-if="needsPasskey" label="Passkey">{{ site.hasPasskey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
         <a-descriptions-item label="启用"><a-badge :status="site.enabled ? 'success' : 'default'" :text="site.enabled ? '是' : '否'" /></a-descriptions-item>
         <a-descriptions-item label="角色">{{ [site.isSource ? '源站' : '', site.isTarget ? '目标站' : ''].filter(Boolean).join(', ') || '-' }}</a-descriptions-item>
         <a-descriptions-item label="参与自动发布">{{ site.participateAutoPublish ? '是' : '否' }}</a-descriptions-item>
-        <a-descriptions-item label="CookieCloud 同步">{{ site.cookieCloudSync ? '是' : '否' }}</a-descriptions-item>
-        <a-descriptions-item v-if="site.cookieCloudSync" label="CookieCloud 域名">{{ site.cookieCloudDomain || '-' }}</a-descriptions-item>
+        <a-descriptions-item v-if="needsCookie" label="CookieCloud 同步">{{ site.cookieCloudSync ? '是' : '否' }}</a-descriptions-item>
+        <a-descriptions-item v-if="needsCookie && site.cookieCloudSync" label="CookieCloud 域名">{{ site.cookieCloudDomain || '-' }}</a-descriptions-item>
         <a-descriptions-item label="Hash 策略">{{ site.hashStrategy || '-' }}</a-descriptions-item>
         <a-descriptions-item label="Size 策略">{{ site.sizeStrategy || '-' }}</a-descriptions-item>
         <a-descriptions-item label="ID 策略">{{ site.idStrategy || '-' }}</a-descriptions-item>
@@ -74,6 +73,9 @@
 
       <a-card title="站点设置" style="margin-bottom: 24px">
         <a-form :model="settingsForm" layout="vertical" style="max-width: 500px">
+          <a-form-item label="镜像域名">
+            <a-input v-model:value="settingsForm.mirrorDomain" placeholder="例如: mirror.pterclub.net（留空使用原始域名）" />
+          </a-form-item>
           <a-row :gutter="16">
             <a-col :span="12">
               <a-form-item label="启用">
@@ -98,7 +100,7 @@
               </a-form-item>
             </a-col>
           </a-row>
-          <a-row :gutter="16">
+          <a-row v-if="needsCookie" :gutter="16">
             <a-col :span="12">
               <a-form-item label="CookieCloud 同步">
                 <a-switch v-model:checked="settingsForm.cookieCloudSync" />
@@ -231,6 +233,7 @@ const settingsForm = reactive({
   isSource: false,
   isTarget: false,
   participateAutoPublish: true,
+  mirrorDomain: '',
   cookieCloudSync: false,
   cookieCloudDomain: '',
   overrideRssUrl: '',
@@ -288,6 +291,7 @@ async function fetchSite() {
       isSource: site.value.isSource || false,
       isTarget: site.value.isTarget || false,
       participateAutoPublish: site.value.participateAutoPublish !== undefined ? site.value.participateAutoPublish : true,
+      mirrorDomain: site.value.mirrorDomain || '',
       cookieCloudSync: site.value.cookieCloudSync || false,
       cookieCloudDomain: site.value.cookieCloudDomain || '',
       overrideRssUrl: site.value.overrideRssUrl || '',
@@ -329,6 +333,7 @@ async function updateSettings() {
       isSource: settingsForm.isSource,
       isTarget: settingsForm.isTarget,
       participateAutoPublish: settingsForm.participateAutoPublish,
+      mirrorDomain: settingsForm.mirrorDomain,
       cookieCloudSync: settingsForm.cookieCloudSync,
       cookieCloudDomain: settingsForm.cookieCloudDomain,
       overrideRssUrl: settingsForm.overrideRssUrl,

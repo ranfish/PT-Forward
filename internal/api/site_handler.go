@@ -115,6 +115,7 @@ type updateSiteRequest struct {
 	CookieCloudSync    *bool   `json:"cookieCloudSync,omitempty"`
 	CookieCloudDomain  *string `json:"cookieCloudDomain,omitempty"`
 	AlternativeDomains *string `json:"alternativeDomains,omitempty"`
+	MirrorDomain       *string `json:"mirrorDomain,omitempty"`
 	Enabled            *bool   `json:"enabled,omitempty"`
 
 	OverrideRSSURL   *string `json:"overrideRssUrl,omitempty"`
@@ -171,6 +172,7 @@ type siteResponse struct {
 	LastSyncAt        *time.Time `json:"lastSyncAt,omitempty"`
 
 	AlternativeDomains string `json:"alternativeDomains,omitempty"`
+	MirrorDomain       string `json:"mirrorDomain,omitempty"`
 
 	OverrideRSSURL   string `json:"overrideRssUrl,omitempty"`
 	OverrideSavePath string `json:"overrideSavePath,omitempty"`
@@ -240,6 +242,7 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		LastSyncAt:        s.LastSyncAt,
 
 		AlternativeDomains: s.AlternativeDomains,
+		MirrorDomain:       s.MirrorDomain,
 
 		OverrideRSSURL:   s.OverrideRSSURL,
 		OverrideSavePath: s.OverrideSavePath,
@@ -366,15 +369,19 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 
 func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	page, size := parsePagination(r)
+	search := r.URL.Query().Get("search")
+
+	query := h.db.Model(&model.Site{})
+	if search != "" {
+		like := "%" + search + "%"
+		query = query.Where("name LIKE ? OR domain LIKE ?", like, like)
+	}
 
 	var total int64
-	h.db.Model(&model.Site{}).
-		Where("enabled = ? OR enabled = ?", true, false).
-		Count(&total)
+	query.Count(&total)
 
 	var sites []model.Site
-	h.db.Where("enabled = ? OR enabled = ?", true, false).
-		Order("name ASC").
+	query.Order("name ASC").
 		Offset(offset(page, size)).Limit(size).
 		Find(&sites)
 
@@ -576,6 +583,18 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.AlternativeDomains != nil {
 		s.AlternativeDomains = *req.AlternativeDomains
+	}
+	if req.MirrorDomain != nil {
+		s.MirrorDomain = *req.MirrorDomain
+	}
+	if req.Passkey != nil && *req.Passkey != "" {
+		s.Passkey = *req.Passkey
+	}
+	if req.Cookie != nil && *req.Cookie != "" {
+		s.Cookie = *req.Cookie
+	}
+	if req.APIKey != nil && *req.APIKey != "" {
+		s.APIKey = *req.APIKey
 	}
 	if req.HashStrategy != nil {
 		s.HashStrategy = *req.HashStrategy
@@ -787,14 +806,40 @@ func (h *SiteHandler) handleGetStats(w http.ResponseWriter, r *http.Request, idS
 }
 
 func (h *SiteHandler) testSiteConnection(s *model.Site) (bool, string) {
-	client := buildSiteHTTPClient(s, 10*time.Second)
+	switch s.AuthType {
+	case "cookie":
+		if s.Cookie == "" {
+			return false, "未配置 Cookie"
+		}
+	case "apikey":
+		if s.APIKey == "" {
+			return false, "未配置 API Key"
+		}
+	case "passkey":
+		if s.Passkey == "" {
+			return false, "未配置 Passkey"
+		}
+	}
+
+	client := buildSiteHTTPClient(s, 15*time.Second)
+
+	switch s.AuthType {
+	case "cookie":
+		return h.testCookieAuth(client, s)
+	case "apikey":
+		return h.testAPIKeyAuth(client, s)
+	case "passkey":
+		return h.testPasskeyAuth(client, s)
+	}
+	return h.testCookieAuth(client, s)
+}
+
+func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, string) {
 	req, err := http.NewRequest("GET", s.BaseURL, nil)
 	if err != nil {
 		return false, "构造请求失败: " + err.Error()
 	}
-	if s.Cookie != "" {
-		req.Header.Set("Cookie", s.Cookie)
-	}
+	req.Header.Set("Cookie", s.Cookie)
 	resp, err := client.Do(req)
 	if err != nil {
 		return false, "连接失败: " + err.Error()
@@ -803,6 +848,123 @@ func (h *SiteHandler) testSiteConnection(s *model.Site) (bool, string) {
 	if resp.StatusCode >= 400 {
 		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
+
+	body := make([]byte, 128*1024)
+	n, _ := resp.Body.Read(body)
+	bodyStr := string(body[:n])
+	lower := strings.ToLower(bodyStr)
+
+	loginIndicators := []string{
+		`type="password"`,
+		`name="password"`,
+		`id="password"`,
+		`name="login"`,
+		`action="login"`,
+		`action="/login"`,
+		`action="/takelogin"`,
+		`action="takelogin"`,
+		`please login`,
+		`please log in`,
+		`you must login`,
+		`you must log in`,
+		`请先登录`,
+		`login_return`,
+		`login_form`,
+	}
+	for _, indicator := range loginIndicators {
+		if strings.Contains(lower, indicator) {
+			return false, "Cookie 无效或已过期（页面返回登录表单）"
+		}
+	}
+
+	return true, "连接成功"
+}
+
+func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, string) {
+	testURL := s.BaseURL
+	if s.Framework == "mteam" {
+		testURL = strings.TrimRight(s.BaseURL, "/") + "/api/member/profile"
+	}
+	req, err := http.NewRequest("POST", testURL, nil)
+	if err != nil {
+		return false, "构造请求失败: " + err.Error()
+	}
+	req.Header.Set("x-api-key", s.APIKey)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "application/json")
+
+	noRedirectClient := &http.Client{
+		Timeout:   client.Timeout,
+		Transport: client.Transport,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := noRedirectClient.Do(req)
+	if err != nil {
+		return false, "连接失败: " + err.Error()
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body := make([]byte, 64*1024)
+	n, _ := resp.Body.Read(body)
+	bodyStr := string(body[:n])
+
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return false, "API Key 无效或已过期"
+	}
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		return false, "API Key 无效或已过期（被重定向）"
+	}
+	if resp.StatusCode >= 400 {
+		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
+
+	lower := strings.ToLower(bodyStr)
+
+	if strings.Contains(lower, `"code":1`) || strings.Contains(lower, `"code":401`) || strings.Contains(lower, `"code":403`) {
+		return false, "API Key 无效或已过期"
+	}
+	if strings.Contains(lower, `"error"`) || strings.Contains(lower, "無效") || strings.Contains(lower, "无效") {
+		return false, "API Key 无效或已过期"
+	}
+
+	return true, "连接成功"
+}
+
+func (h *SiteHandler) testPasskeyAuth(client *http.Client, s *model.Site) (bool, string) {
+	req, err := http.NewRequest("GET", strings.TrimRight(s.BaseURL, "/")+"/api/v1/torrents", nil)
+	if err != nil {
+		return false, "构造请求失败: " + err.Error()
+	}
+	req.Header.Set("Authorization", "Bearer "+s.Passkey)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, "连接失败: " + err.Error()
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return false, "Passkey 无效"
+	}
+	if resp.StatusCode >= 400 {
+		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
+
+	body := make([]byte, 64*1024)
+	n, _ := resp.Body.Read(body)
+	bodyStr := string(body[:n])
+	lower := strings.ToLower(bodyStr)
+
+	if strings.Contains(lower, `"code":401`) || strings.Contains(lower, `"code":403`) {
+		return false, "Passkey 无效"
+	}
+	if strings.Contains(lower, "缺少认证") || strings.Contains(lower, "unauthorized") || strings.Contains(lower, "invalid") {
+		return false, "Passkey 无效"
+	}
+
 	return true, "连接成功"
 }
 

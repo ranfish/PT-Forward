@@ -538,6 +538,18 @@ func (p *Pipeline) ProcessPending(ctx context.Context) error {
 				zap.Error(err),
 			)
 		}
+
+		if c.Role == model.RoleDownload && !c.DownloadCompleted {
+			if err := p.processDownloadCandidate(ctx, c); err != nil {
+				p.logger.Warn("download candidate failed",
+					zap.Uint("id", c.ID),
+					zap.String("source_site", c.SourceSite),
+					zap.String("torrent_id", c.SourceTorrentID),
+					zap.Error(err),
+				)
+				_ = p.UpdateCandidateStatus(ctx, c.ID, model.CandidateFailed, err.Error())
+			}
+		}
 	}
 
 	return nil
@@ -642,6 +654,7 @@ func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) 
 		}
 
 		candidate := &model.PublishCandidate{
+			SubscriptionID:  ev.SourceID,
 			SourceSite:      ev.SiteName,
 			SourceTorrentID: ev.TorrentID,
 			InfoHash:        ev.InfoHash,
@@ -1270,4 +1283,80 @@ func (p *Pipeline) mapFieldValues(ctx context.Context, targetSite string, fields
 		}
 		fields["source"] = mapped
 	}
+}
+
+func (p *Pipeline) processDownloadCandidate(ctx context.Context, c *model.PublishCandidate) error {
+	if p.siteProvider == nil || p.clientProvider == nil {
+		return fmt.Errorf("site provider or client provider not configured")
+	}
+
+	var sub struct {
+		SavePath  string `gorm:"column:save_path"`
+		Category  string `gorm:"column:category"`
+		AddPaused bool   `gorm:"column:add_paused"`
+		AutoTMM   bool   `gorm:"column:auto_tmm"`
+	}
+	subQuery := p.db.WithContext(ctx).Table("rss_subscriptions").
+		Select("save_path, category, add_paused, auto_tmm").
+		Where("id = ? AND deleted_at = ?", c.SubscriptionID, time.Time{})
+	if err := subQuery.First(&sub).Error; err != nil {
+		return fmt.Errorf("get subscription settings: %w", err)
+	}
+
+	var site model.Site
+	if err := p.db.WithContext(ctx).Where("name = ?", c.SourceSite).First(&site).Error; err != nil {
+		return fmt.Errorf("get site info: %w", err)
+	}
+
+	sourceConfig, err := p.siteProvider.GetSiteConfig(ctx, site.Domain)
+	if err != nil {
+		return fmt.Errorf("get source site config: %w", err)
+	}
+	sourceAdapter, err := p.siteProvider.GetAdapter(ctx, site.Domain)
+	if err != nil {
+		return fmt.Errorf("get source adapter: %w", err)
+	}
+
+	torrentData, err := sourceAdapter.DownloadTorrent(ctx, sourceConfig, c.SourceTorrentID)
+	if err != nil {
+		return fmt.Errorf("download torrent: %w", err)
+	}
+
+	dlClient, err := p.clientProvider.Get(c.ClientID)
+	if err != nil {
+		return fmt.Errorf("get downloader %s: %w", c.ClientID, err)
+	}
+
+	opts := model.AddTorrentOptions{
+		SavePath: sub.SavePath,
+		Category: sub.Category,
+		Paused:   sub.AddPaused,
+		AutoTMM:  sub.AutoTMM,
+	}
+
+	result, err := dlClient.AddFromFile(ctx, torrentData, opts)
+	if err != nil {
+		return fmt.Errorf("add torrent to downloader: %w", err)
+	}
+
+	_ = p.UpdateCandidateStatus(ctx, c.ID, model.CandidateDownloading, "")
+
+	p.logger.Info("torrent added to downloader",
+		zap.String("client", c.ClientID),
+		zap.String("source_site", c.SourceSite),
+		zap.String("torrent_id", c.SourceTorrentID),
+		zap.String("name", c.TorrentName),
+		zap.String("info_hash", func() string {
+			if result != nil {
+				return result.InfoHash
+			}
+			return ""
+		}()),
+	)
+
+	if p.completionWatcher != nil && result != nil && result.InfoHash != "" {
+		_ = p.completionWatcher.Watch(ctx, c.ClientID, result.InfoHash, c.ID)
+	}
+
+	return nil
 }

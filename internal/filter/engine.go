@@ -46,32 +46,19 @@ func (e *Engine) Match(ctx context.Context, evalCtx *EvalContext) (*MatchResult,
 		return nil, err
 	}
 
+	if len(rules) == 0 {
+		return &MatchResult{Matched: false}, nil
+	}
+
 	for i := range rules {
 		rule := &rules[i]
-		if rule.RuleType == "reject" {
-			if matchRule(rule, evalCtx) {
-				return &MatchResult{
-					Matched:  true,
-					RuleName: rule.Name,
-					RuleType: rule.RuleType,
-					Reject:   true,
-				}, nil
-			}
-			continue
-		}
-
-		if rule.RuleType == "accept" || rule.RuleType == "accept_and_reject" {
-			if matchRule(rule, evalCtx) {
-				return &MatchResult{
-					Matched:  true,
-					RuleName: rule.Name,
-					RuleType: rule.RuleType,
-					SavePath: rule.SavePath,
-					Category: rule.Category,
-					Tags:     rule.Tags,
-					Reject:   false,
-				}, nil
-			}
+		if matchRule(rule, evalCtx) {
+			return &MatchResult{
+				Matched:  true,
+				RuleName: rule.Name,
+				RuleType: "reject",
+				Reject:   true,
+			}, nil
 		}
 	}
 
