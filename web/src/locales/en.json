@@ -111,7 +111,7 @@
     "settings": "Settings",
     "notifications": "Notifications",
     "authSettings": "Auth Settings",
-    "filterRules": "Filter Rules",
+    "filterRules": "Global Exclusion Rules",
     "iyuu": "IYUU Reseed",
     "cookiecloud": "CookieCloud",
     "ptgen": "PTGen Movie Info",

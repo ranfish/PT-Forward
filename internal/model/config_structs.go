@@ -31,13 +31,14 @@ type LogConfig struct {
 }
 
 type SecurityConfig struct {
-	EncryptionKey     string `yaml:"encryption_key"       mapstructure:"encryption_key"`
-	RateLimitEnabled  bool   `yaml:"rate_limit_enabled"   mapstructure:"rate_limit_enabled"`
-	RateLimitGlobal   int    `yaml:"rate_limit_global"    mapstructure:"rate_limit_global"`
-	RateLimitWrite    int    `yaml:"rate_limit_write"     mapstructure:"rate_limit_write"`
-	RateLimitDownload int    `yaml:"rate_limit_download"  mapstructure:"rate_limit_download"`
-	LoginMaxRetries   int    `yaml:"login_max_retries"    mapstructure:"login_max_retries"`
-	LoginLockoutMin   int    `yaml:"login_lockout_min"    mapstructure:"login_lockout_min"`
+	EncryptionKey       string `yaml:"encryption_key"       mapstructure:"encryption_key"`
+	RateLimitEnabled    bool   `yaml:"rate_limit_enabled"   mapstructure:"rate_limit_enabled"`
+	RateLimitGlobal     int    `yaml:"rate_limit_global"    mapstructure:"rate_limit_global"`
+	RateLimitWrite      int    `yaml:"rate_limit_write"     mapstructure:"rate_limit_write"`
+	RateLimitDownload   int    `yaml:"rate_limit_download"  mapstructure:"rate_limit_download"`
+	LoginMaxRetries     int    `yaml:"login_max_retries"     mapstructure:"login_max_retries"`
+	LoginLockoutMin     int    `yaml:"login_lockout_min"     mapstructure:"login_lockout_min"`
+	LoginLockoutEnabled bool   `yaml:"login_lockout_enabled" mapstructure:"login_lockout_enabled"`
 }
 
 type NotificationConfig struct {

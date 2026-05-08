@@ -58,24 +58,33 @@ type loginAttempt struct {
 }
 
 type loginLimiter struct {
-	attempts map[string]*loginAttempt
-	mu       sync.RWMutex
+	enabled    bool
+	maxRetries int
+	lockoutMin int
+	attempts   map[string]*loginAttempt
+	mu         sync.RWMutex
 }
 
 func (l *loginLimiter) CheckLocked(ip string) error {
+	if !l.enabled {
+		return nil
+	}
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	a, ok := l.attempts[ip]
 	if !ok {
 		return nil
 	}
-	if a.count >= 5 && time.Now().Before(a.lockedUntil) {
+	if a.count >= l.maxRetries && time.Now().Before(a.lockedUntil) {
 		return authError(ErrAuthLogin, fmt.Sprintf("登录已锁定，请 %s 后重试", time.Until(a.lockedUntil).Round(time.Minute)), nil)
 	}
 	return nil
 }
 
 func (l *loginLimiter) RecordFailure(ip string) {
+	if !l.enabled {
+		return
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	a := l.attempts[ip]
@@ -83,12 +92,12 @@ func (l *loginLimiter) RecordFailure(ip string) {
 		a = &loginAttempt{}
 		l.attempts[ip] = a
 	}
-	if a.count >= 5 && time.Now().After(a.lockedUntil) {
+	if a.count >= l.maxRetries && time.Now().After(a.lockedUntil) {
 		a.count = 0
 	}
 	a.count++
-	if a.count >= 5 {
-		a.lockedUntil = time.Now().Add(5 * time.Minute)
+	if a.count >= l.maxRetries {
+		a.lockedUntil = time.Now().Add(time.Duration(l.lockoutMin) * time.Minute)
 	}
 }
 
@@ -150,7 +159,10 @@ func NewAuthManagerWithSettings(repo model.AuthRepository, settingRepo SettingSt
 		signingKey:    key,
 		refreshTokens: make(map[string]time.Time),
 		loginLimiter: &loginLimiter{
-			attempts: make(map[string]*loginAttempt),
+			enabled:    true,
+			maxRetries: 5,
+			lockoutMin: 5,
+			attempts:   make(map[string]*loginAttempt),
 		},
 		repo:        repo,
 		settingRepo: settingRepo,
@@ -162,6 +174,16 @@ func NewAuthManagerWithSettings(repo model.AuthRepository, settingRepo SettingSt
 	}
 
 	return mgr, nil
+}
+
+func (m *AuthManager) ConfigureLoginLockout(enabled bool, maxRetries, lockoutMin int) {
+	m.loginLimiter.enabled = enabled
+	if maxRetries > 0 {
+		m.loginLimiter.maxRetries = maxRetries
+	}
+	if lockoutMin > 0 {
+		m.loginLimiter.lockoutMin = lockoutMin
+	}
 }
 
 func (m *AuthManager) loadRefreshTokens(ctx context.Context) {

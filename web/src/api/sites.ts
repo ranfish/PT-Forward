@@ -1,8 +1,8 @@
 import client from './client'
 
 export const sitesApi = {
-  list(page = 1, size = 20) {
-    return client.get('/sites', { params: { page, size } })
+  list(page = 1, size = 20, search = '') {
+    return client.get('/sites', { params: { page, size, search } })
   },
   get(id: number) {
     return client.get(`/sites/${id}`)

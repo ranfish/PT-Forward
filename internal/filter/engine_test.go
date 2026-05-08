@@ -176,8 +176,8 @@ func TestEngine_MatchAccept(t *testing.T) {
 	if !result.Matched {
 		t.Error("should match")
 	}
-	if result.Reject {
-		t.Error("accept rule should not reject")
+	if !result.Reject {
+		t.Error("global rules now always reject on match")
 	}
 }
 
@@ -308,9 +308,8 @@ func TestEngine_MatchAcceptAndReject(t *testing.T) {
 	engine := NewEngine(repo, nil)
 	result, err := engine.Match(context.Background(), &EvalContext{Title: "HD-Movie"})
 	require.NoError(t, err)
-	assert.True(t, result.Matched, "should match accept_and_reject rule")
-	assert.Equal(t, "accept_and_reject", result.RuleType)
-	assert.False(t, result.Reject, "accept_and_reject should not set Reject flag")
+	assert.True(t, result.Matched, "should match rule")
+	assert.True(t, result.Reject, "global rules always reject on match")
 }
 
 func TestEngine_MatchAcceptWithSavePathCategoryTags(t *testing.T) {
@@ -332,9 +331,8 @@ func TestEngine_MatchAcceptWithSavePathCategoryTags(t *testing.T) {
 	result, err := engine.Match(context.Background(), &EvalContext{Title: "HD-Movie"})
 	require.NoError(t, err)
 	require.True(t, result.Matched)
-	assert.Equal(t, "/downloads/hd", result.SavePath)
-	assert.Equal(t, "movies", result.Category)
-	assert.Equal(t, "hd,4k", result.Tags)
+	assert.True(t, result.Reject, "global rules always reject on match")
+	assert.Equal(t, "accept-fields", result.RuleName)
 }
 
 func TestGetField_Uploader(t *testing.T) {

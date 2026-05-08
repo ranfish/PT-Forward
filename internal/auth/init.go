@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -37,13 +36,6 @@ func EnsureAdminUser(ctx context.Context, repo model.AuthRepository, logger *zap
 		return authError(ErrAuthInit, "create admin user", err)
 	}
 
-	fmt.Println("========================================")
-	fmt.Println("PT-Forward 初始账号信息（仅显示一次）")
-	fmt.Println("用户名: admin")
-	fmt.Printf("密码: %s\n", password)
-	fmt.Println("请登录后尽快修改密码")
-	fmt.Println("========================================")
-
-	logger.Info("admin user created with random password")
+	logger.Info("admin user created with random password", zap.String("hint", "use -reset-password flag to set a known password"))
 	return nil
 }

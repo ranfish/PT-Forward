@@ -35,11 +35,13 @@ func (c *Config) Validate() error {
 	if !validLogLevels[strings.ToLower(c.Log.Level)] {
 		return configError(ErrConfigValidate, fmt.Sprintf("log.level must be debug/info/warn/error, got %q", c.Log.Level), nil)
 	}
-	if c.Security.LoginMaxRetries < 1 {
-		return configError(ErrConfigValidate, fmt.Sprintf("security.login_max_retries must be >= 1, got %d", c.Security.LoginMaxRetries), nil)
-	}
-	if c.Security.LoginLockoutMin < 1 {
-		return configError(ErrConfigValidate, fmt.Sprintf("security.login_lockout_min must be >= 1, got %d", c.Security.LoginLockoutMin), nil)
+	if c.Security.LoginLockoutEnabled {
+		if c.Security.LoginMaxRetries < 1 {
+			return configError(ErrConfigValidate, fmt.Sprintf("security.login_max_retries must be >= 1, got %d", c.Security.LoginMaxRetries), nil)
+		}
+		if c.Security.LoginLockoutMin < 1 {
+			return configError(ErrConfigValidate, fmt.Sprintf("security.login_lockout_min must be >= 1, got %d", c.Security.LoginLockoutMin), nil)
+		}
 	}
 	return nil
 }
@@ -69,12 +71,13 @@ func DefaultConfig() *Config {
 			Format:     "json",
 		},
 		Security: model.SecurityConfig{
-			RateLimitEnabled:  true,
-			RateLimitGlobal:   100,
-			RateLimitWrite:    30,
-			RateLimitDownload: 10,
-			LoginMaxRetries:   5,
-			LoginLockoutMin:   5,
+			RateLimitEnabled:    true,
+			RateLimitGlobal:     100,
+			RateLimitWrite:      30,
+			RateLimitDownload:   10,
+			LoginMaxRetries:     5,
+			LoginLockoutMin:     5,
+			LoginLockoutEnabled: true,
 		},
 	}
 }

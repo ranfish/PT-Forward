@@ -161,12 +161,18 @@ func (d *TorrentDispatcher) getSubscription(ctx context.Context, id uint) (*mode
 	return &sub, nil
 }
 
-func (d *TorrentDispatcher) getClientConfig(ctx context.Context, clientName string) (*model.ClientConfig, error) {
+func (d *TorrentDispatcher) getClientConfig(ctx context.Context, clientID string) (*model.ClientConfig, error) {
 	var cfg model.ClientConfig
-	err := d.db.WithContext(ctx).
-		Where("name = ? AND deleted_at = ? AND enabled = ?", clientName, time.Time{}, true).
-		First(&cfg).Error
-	if err != nil {
+	q := d.db.WithContext(ctx).Where("deleted_at = ? AND enabled = ?", time.Time{}, true)
+
+	idNum, idErr := strconv.ParseUint(clientID, 10, 64)
+	if idErr == nil {
+		q = q.Where("name = ? OR id = ?", clientID, uint(idNum))
+	} else {
+		q = q.Where("name = ?", clientID)
+	}
+
+	if err := q.First(&cfg).Error; err != nil {
 		return nil, err
 	}
 	return &cfg, nil

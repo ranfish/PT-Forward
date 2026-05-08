@@ -142,15 +142,6 @@ func TestPipelineIntegration_FilterReject(t *testing.T) {
 			{Key: "title", CompareType: model.CompareContain, Value: "XXX"},
 		},
 	})
-	db.Create(&model.FilterRule{
-		Name:     "accept-all",
-		RuleType: "accept",
-		Enabled:  true,
-		Priority: 2,
-		Conditions: []model.RuleCondition{
-			{Key: "title", CompareType: model.CompareRegExp, Value: ".*"},
-		},
-	})
 
 	seedingEngine := seeding.NewEngine(db, logger)
 	if err := seedingEngine.Start(context.Background()); err != nil {
@@ -189,9 +180,9 @@ func TestPipelineIntegration_FilterReject(t *testing.T) {
 		t.Fatalf("match2: %v", err)
 	}
 	if result2.Reject {
-		t.Error("expected accept for Ubuntu content")
+		t.Error("expected no reject for Ubuntu content")
 	}
-	if !result2.Matched {
-		t.Error("expected match for Ubuntu content")
+	if result2.Matched {
+		t.Error("expected no match for Ubuntu content (no reject rule matched)")
 	}
 }

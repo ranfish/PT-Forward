@@ -78,8 +78,9 @@ type RSSSubscription struct {
 	SiteName string   `json:"site_name" gorm:"size:50;not null;index"`
 	Cron     string   `json:"cron" gorm:"size:100;default:'*/5 * * * *'"`
 
-	AcceptRuleIDs []uint `json:"accept_rule_ids" gorm:"type:json;serializer:json"`
-	RejectRuleIDs []uint `json:"reject_rule_ids" gorm:"type:json;serializer:json"`
+	AcceptRuleIDs []uint          `json:"accept_rule_ids" gorm:"type:json;serializer:json"`
+	RejectRuleIDs []uint          `json:"reject_rule_ids" gorm:"type:json;serializer:json"`
+	Conditions    []RuleCondition `json:"conditions" gorm:"type:text;serializer:json"`
 
 	ClientID  string `json:"client_id" gorm:"size:50;index"`
 	SavePath  string `json:"save_path" gorm:"size:500"`

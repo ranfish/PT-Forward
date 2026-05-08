@@ -111,7 +111,7 @@
     "settings": "系统设置",
     "notifications": "通知设置",
     "authSettings": "认证设置",
-    "filterRules": "过滤规则",
+    "filterRules": "全局排除规则",
     "iyuu": "IYUU 辅种",
     "cookiecloud": "CookieCloud",
     "ptgen": "PTGen 影片信息",

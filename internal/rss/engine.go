@@ -144,7 +144,7 @@ func (e *Engine) Trigger(ctx context.Context, subID uint) error {
 		return &model.AppError{Code: 13003, Message: "订阅已禁用"}
 	}
 
-	fetchCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	fetchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	go func() {
 		defer cancel()
 		e.fetchOnce(fetchCtx, sub)
@@ -244,6 +244,64 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				}
 			}
 
+			e.detectHRAndDiscount(ctx, event, site.Domain)
+
+			if sub.ScrapeFree && !event.IsFree {
+				e.logger.Debug("torrent skipped: not free",
+					zap.String("torrent", event.TorrentID),
+					zap.Bool("free", event.IsFree))
+				continue
+			}
+
+			if event.HasHR && e.siteHRStrategy(ctx, sub.SiteName) == "skip" {
+				e.logger.Debug("torrent skipped by HR skip strategy",
+					zap.String("torrent", event.TorrentID),
+					zap.String("site", sub.SiteName))
+				continue
+			}
+
+			if len(sub.Conditions) > 0 {
+				evalCtx := &filter.EvalContext{
+					Title:    event.Title,
+					Size:     event.Size,
+					SiteName: event.SiteName,
+					Free:     event.IsFree,
+				}
+				allMatch := true
+				for _, cond := range sub.Conditions {
+					if !filter.MatchConditionExport(cond, evalCtx) {
+						allMatch = false
+						break
+					}
+				}
+				if !allMatch {
+					e.logger.Debug("torrent skipped by subscription conditions",
+						zap.String("torrent", event.TorrentID))
+					continue
+				}
+			}
+
+			if e.filterEng != nil {
+				matchResult, err := e.filterEng.Match(ctx, &filter.EvalContext{
+					Title:    event.Title,
+					Size:     event.Size,
+					SiteName: event.SiteName,
+					Free:     event.IsFree,
+				})
+				if err != nil {
+					e.logger.Warn("filter match failed",
+						zap.String("torrent", event.TorrentID),
+						zap.Error(err))
+					continue
+				}
+				if matchResult.Matched && matchResult.Reject {
+					e.logger.Debug("torrent rejected by global exclusion rule",
+						zap.String("torrent", event.TorrentID),
+						zap.String("rule", matchResult.RuleName))
+					continue
+				}
+			}
+
 			seen := &model.RSSTorrentSeen{
 				SiteName:       event.SiteName,
 				TorrentID:      event.TorrentID,
@@ -261,43 +319,6 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			}
 
 			newCount++
-
-			if e.filterEng != nil {
-				matchResult, err := e.filterEng.Match(ctx, &filter.EvalContext{
-					Title:    event.Title,
-					Size:     event.Size,
-					SiteName: event.SiteName,
-					Free:     event.IsFree,
-				})
-				if err != nil {
-					e.logger.Warn("filter match failed",
-						zap.String("torrent", event.TorrentID),
-						zap.Error(err))
-					continue
-				}
-				if matchResult.Reject {
-					e.logger.Debug("torrent rejected by filter rule",
-						zap.String("torrent", event.TorrentID),
-						zap.String("rule", matchResult.RuleName))
-					continue
-				}
-				if !matchResult.Matched {
-					e.logger.Debug("torrent did not match any filter rule",
-						zap.String("torrent", event.TorrentID))
-					continue
-				}
-
-				event.MatchedRule = &matchResult.RuleName
-			}
-
-			e.detectHRAndDiscount(ctx, event, sub.SiteName)
-
-			if event.HasHR && e.siteHRStrategy(ctx, sub.SiteName) == "skip" {
-				e.logger.Debug("torrent skipped by HR skip strategy",
-					zap.String("torrent", event.TorrentID),
-					zap.String("site", sub.SiteName))
-				continue
-			}
 
 			te := model.TorrentEvent{
 				SourceID:        uintToString(sub.ID),

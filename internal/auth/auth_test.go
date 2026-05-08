@@ -321,7 +321,7 @@ func TestEnsureAdminUser_AlreadyExists(t *testing.T) {
 }
 
 func TestLoginLimiter(t *testing.T) {
-	limiter := &loginLimiter{attempts: make(map[string]*loginAttempt)}
+	limiter := &loginLimiter{enabled: true, maxRetries: 5, lockoutMin: 5, attempts: make(map[string]*loginAttempt)}
 
 	if err := limiter.CheckLocked("1.1.1.1"); err != nil {
 		t.Error("should not be locked initially")
@@ -338,6 +338,17 @@ func TestLoginLimiter(t *testing.T) {
 	limiter.RecordSuccess("1.1.1.1")
 	if err := limiter.CheckLocked("1.1.1.1"); err != nil {
 		t.Error("should be unlocked after success")
+	}
+}
+
+func TestLoginLimiter_Disabled(t *testing.T) {
+	limiter := &loginLimiter{enabled: false, maxRetries: 5, lockoutMin: 5, attempts: make(map[string]*loginAttempt)}
+
+	for i := 0; i < 10; i++ {
+		limiter.RecordFailure("1.1.1.1")
+	}
+	if err := limiter.CheckLocked("1.1.1.1"); err != nil {
+		t.Error("should never be locked when disabled")
 	}
 }
 

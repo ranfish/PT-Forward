@@ -124,6 +124,8 @@ type rssResponse struct {
 
 	SkipSameSize    bool `json:"skipSameSize"`
 	AddCountPerHour int  `json:"addCountPerHour"`
+
+	Conditions []model.RuleCondition `json:"conditions,omitempty"`
 }
 
 func (h *RSSHandler) toResponse(s *model.RSSSubscription) rssResponse {
@@ -163,6 +165,8 @@ func (h *RSSHandler) toResponse(s *model.RSSSubscription) rssResponse {
 
 		SkipSameSize:    s.SkipSameSize,
 		AddCountPerHour: s.AddCountPerHour,
+
+		Conditions: s.Conditions,
 	}
 }
 
@@ -598,8 +602,9 @@ func (h *RSSHandler) handleUpdateRules(w http.ResponseWriter, r *http.Request, i
 	}
 
 	var req struct {
-		AcceptRuleIDs []uint `json:"acceptRuleIds"`
-		RejectRuleIDs []uint `json:"rejectRuleIds"`
+		AcceptRuleIDs []uint                `json:"acceptRuleIds"`
+		RejectRuleIDs []uint                `json:"rejectRuleIds"`
+		Conditions    []model.RuleCondition `json:"conditions"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -614,6 +619,7 @@ func (h *RSSHandler) handleUpdateRules(w http.ResponseWriter, r *http.Request, i
 
 	sub.AcceptRuleIDs = req.AcceptRuleIDs
 	sub.RejectRuleIDs = req.RejectRuleIDs
+	sub.Conditions = req.Conditions
 	if err := h.repo.Update(r.Context(), sub); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新规则失败")
 		return
@@ -623,5 +629,6 @@ func (h *RSSHandler) handleUpdateRules(w http.ResponseWriter, r *http.Request, i
 	Success(w, map[string]interface{}{
 		"acceptRuleIds": req.AcceptRuleIDs,
 		"rejectRuleIds": req.RejectRuleIDs,
+		"conditions":    req.Conditions,
 	})
 }

@@ -479,6 +479,7 @@ func TestPipeline_ProcessPending_NormalPending(t *testing.T) {
 		InfoHash:        "ih1",
 		TorrentName:     "Normal Movie",
 		PublishStatus:   model.CandidatePending,
+		Role:            model.RoleSource,
 	}
 	if err := p.CreateCandidate(ctx, candidate); err != nil {
 		t.Fatal(err)
