@@ -601,7 +601,7 @@ func TestMTeamAdapter_DetectHR(t *testing.T) {
 func TestMTeamAdapter_GetPreciseSLData_API(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":{"seeders":10,"leechers":5}}`))
+		_, _ = w.Write([]byte(`{"data":{"status":{"seeders":10,"leechers":5}}}`))
 	}))
 	defer srv.Close()
 
@@ -730,6 +730,182 @@ func TestMTeamAdapter_UploadViaWeb(t *testing.T) {
 	}
 }
 
+func TestMTeamAdapter_SearchTorrents_API(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/torrent/search" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != "POST" {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.Header.Get("x-api-key") != "mykey" {
+			t.Errorf("expected x-api-key header, got %s", r.Header.Get("x-api-key"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"code":"0","data":{"data":[{"id":"123","name":"Test Torrent","size":1073741824,"status":{"seeders":10,"leechers":2,"discount":"FREE"}},{"id":"456","name":"Another Torrent","size":536870912,"status":{"seeders":5,"leechers":1,"discount":""}}]}}`)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "mykey"}
+	results, err := a.SearchTorrents(context.Background(), config, "test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if results[0].TorrentID != "123" {
+		t.Errorf("expected torrent ID 123, got %s", results[0].TorrentID)
+	}
+	if results[0].Title != "Test Torrent" {
+		t.Errorf("unexpected title: %s", results[0].Title)
+	}
+	if results[0].Size != 1073741824 {
+		t.Errorf("unexpected size: %d", results[0].Size)
+	}
+	if results[0].Seeders != 10 {
+		t.Errorf("expected 10 seeders, got %d", results[0].Seeders)
+	}
+	if results[1].TorrentID != "456" {
+		t.Errorf("expected torrent ID 456, got %s", results[1].TorrentID)
+	}
+}
+
+func TestMTeamAdapter_VerifyExists_Found(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"code":"0","data":{"data":[{"id":"42","name":"Found","size":0,"status":{"seeders":0,"leechers":0,"discount":""}}]}}`)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "mykey"}
+	found, err := a.VerifyExists(context.Background(), config, "42")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Error("expected found")
+	}
+}
+
+func TestMTeamAdapter_VerifyExists_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"code":"0","data":{"data":[{"id":"99","name":"Other","size":0,"status":{"seeders":0,"leechers":0,"discount":""}}]}}`)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "mykey"}
+	found, err := a.VerifyExists(context.Background(), config, "42")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found {
+		t.Error("expected not found")
+	}
+}
+
+func TestMTeamAdapter_DiscountViaWeb_Free(t *testing.T) {
+	html := `<html><body><td class="pro_free">免费</td></body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/details.php" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(html))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	result, err := a.DetectDiscount(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Level != model.DiscountFree {
+		t.Errorf("expected free, got %s", result.Level)
+	}
+}
+
+func TestMTeamAdapter_DiscountViaWeb_2xFree(t *testing.T) {
+	html := `<html><body><td class="pro_free2up">2x免费</td></body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(html))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	result, err := a.DetectDiscount(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Level != model.Discount2xFree {
+		t.Errorf("expected 2xfree, got %s", result.Level)
+	}
+	if result.Multiplier != 2.0 {
+		t.Errorf("expected multiplier 2.0, got %f", result.Multiplier)
+	}
+}
+
+func TestMTeamAdapter_DiscountViaWeb_None(t *testing.T) {
+	html := `<html><body><td class="normal">Normal</td></body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(html))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	result, err := a.DetectDiscount(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Level != model.DiscountNone {
+		t.Errorf("expected none, got %s", result.Level)
+	}
+}
+
+func TestMTeamAdapter_SLViaWeb_OK(t *testing.T) {
+	html := `<html><body>
+	<tr><td>做种人数: <span>20</span></td></tr>
+	<tr><td>下载人数: <span>8</span></td></tr>
+	</body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(html))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	sl, err := a.GetPreciseSLData(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sl.Seeders != 20 {
+		t.Errorf("expected 20 seeders, got %d", sl.Seeders)
+	}
+	if sl.Leechers != 8 {
+		t.Errorf("expected 8 leechers, got %d", sl.Leechers)
+	}
+}
+
 func TestMTeamAdapter_GenDlToken_EmptyData(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/torrent/genDlToken" {
@@ -746,5 +922,150 @@ func TestMTeamAdapter_GenDlToken_EmptyData(t *testing.T) {
 	_, err := a.DownloadTorrent(context.Background(), config, "1")
 	if err == nil {
 		t.Error("expected error for empty download URL")
+	}
+}
+
+func TestTNode_VerifyExists_Found(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>
+		<tr><td><a href="details.php?id=42">Found Torrent</a></td></tr>
+		</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewTNodeAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	config.Paths.Browse = "/browse.php"
+
+	found, err := a.VerifyExists(context.Background(), config, "42")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Error("expected found=true")
+	}
+}
+
+func TestTNode_VerifyExists_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>
+		<tr><td><a href="details.php?id=99">Other Torrent</a></td></tr>
+		</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewTNodeAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	config.Paths.Browse = "/browse.php"
+
+	found, err := a.VerifyExists(context.Background(), config, "42")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found {
+		t.Error("expected found=false")
+	}
+}
+
+func TestFlexInt_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  int64
+	}{
+		{"number", `42`, 42},
+		{"string number", `"123"`, 123},
+		{"empty string", `""`, 0},
+		{"whitespace", `  `, 0},
+		{"invalid string", `"abc"`, 0},
+		{"zero", `0`, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var f flexInt
+			err := f.UnmarshalJSON([]byte(tt.input))
+			if err != nil && tt.name != "whitespace" && tt.name != "invalid string" {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if int64(f) != tt.want {
+				t.Errorf("flexInt.UnmarshalJSON(%q) = %d, want %d", tt.input, int64(f), tt.want)
+			}
+		})
+	}
+}
+
+func TestMTeam_DetectHR_API_HR(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"status":{"hr":true}}}`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectHR(context.Background(), &model.SiteConfig{Domain: srv.URL, APIKey: "test-key"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.HasHR {
+		t.Error("expected HasHR=true")
+	}
+}
+
+func TestMTeam_DetectHR_API_NoHR(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"status":{"hr":false}}}`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectHR(context.Background(), &model.SiteConfig{Domain: srv.URL, APIKey: "test-key"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.HasHR {
+		t.Error("expected HasHR=false")
+	}
+}
+
+func TestMTeam_DetectHR_Web_HR(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>Hit and Run Policy</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectHR(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.HasHR {
+		t.Error("expected HasHR=true")
+	}
+}
+
+func TestMTeam_DetectHR_Web_NoHR(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>normal torrent details</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectHR(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.HasHR {
+		t.Error("expected HasHR=false")
 	}
 }

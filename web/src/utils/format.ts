@@ -1,30 +1,43 @@
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 2 : 0) + ' ' + units[i]
+export function formatBytes(bytes?: number): string {
+  if (!bytes) return '-'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let i = 0
+  let val = bytes
+  while (val >= 1024 && i < units.length - 1) {
+    val /= 1024
+    i++
+  }
+  return `${val.toFixed(i === 0 ? 0 : i >= 3 ? 2 : 1)} ${units[i]}`
 }
 
-export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  const s = Math.floor(ms / 1000)
-  if (s < 60) return `${s}s`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ${s % 60}s`
-  const h = Math.floor(m / 60)
-  return `${h}h ${m % 60}m`
+export function formatSpeed(bytes?: number): string {
+  if (!bytes) return '0 B/s'
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s']
+  let i = 0
+  let val = bytes
+  while (val >= 1024 && i < units.length - 1) {
+    val /= 1024
+    i++
+  }
+  return `${val.toFixed(1)} ${units[i]}`
 }
 
-export function formatTime(ts: string): string {
-  if (!ts) return '-'
-  return new Date(ts).toLocaleString('zh-CN')
+export function formatTime(t?: string): string {
+  if (!t) return '-'
+  return new Date(t).toLocaleString()
 }
 
-export function formatRelativeTime(ts: string): string {
-  if (!ts) return '-'
-  const diff = Date.now() - new Date(ts).getTime()
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
-  return `${Math.floor(diff / 86400000)} 天前`
+export function formatDurationNs(ns?: number): string {
+  if (!ns) return '-'
+  const ms = ns / 1000000
+  if (ms < 1000) return `${ms.toFixed(0)}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
+export function formatDurationSec(seconds?: number): string {
+  if (!seconds) return '-'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
 }

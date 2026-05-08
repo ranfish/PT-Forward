@@ -263,3 +263,33 @@ func TestDiscountLevel_Methods(t *testing.T) {
 		t.Error("NewDiscountLevelFromBool(false) should be NONE")
 	}
 }
+
+func TestTimeWindow_Contains(t *testing.T) {
+	tw := TimeWindow{StartHour: 8, EndHour: 20, Days: []string{"Mon", "Tue", "Wed"}}
+
+	monday10am := time.Date(2026, 5, 4, 10, 0, 0, 0, time.UTC)
+	if !tw.Contains(monday10am) {
+		t.Error("Mon 10am should be in window")
+	}
+
+	monday7am := time.Date(2026, 5, 4, 7, 0, 0, 0, time.UTC)
+	if tw.Contains(monday7am) {
+		t.Error("Mon 7am should not be in window (before start)")
+	}
+
+	monday20pm := time.Date(2026, 5, 4, 20, 0, 0, 0, time.UTC)
+	if tw.Contains(monday20pm) {
+		t.Error("Mon 20:00 should not be in window (at end)")
+	}
+
+	sunday10am := time.Date(2026, 5, 3, 10, 0, 0, 0, time.UTC)
+	if tw.Contains(sunday10am) {
+		t.Error("Sun 10am should not be in window (day not in list)")
+	}
+
+	twNoDays := TimeWindow{StartHour: 0, EndHour: 24}
+	thursday := time.Date(2026, 5, 7, 15, 30, 0, 0, time.UTC)
+	if !twNoDays.Contains(thursday) {
+		t.Error("Any time should be in window with no day restriction")
+	}
+}

@@ -1,24 +1,22 @@
 import client from './client'
 
-export interface LoginRequest {
-  username: string
-  password: string
-}
-
-export interface TokenPair {
-  accessToken: string
-  refreshToken: string
-  expiresIn: number
-}
-
 export const authApi = {
-  login(data: LoginRequest) {
-    return client.post<{ data: TokenPair }>('/auth/login', data)
+  status() {
+    return client.get('/auth/status')
   },
-  refreshToken(refreshToken: string) {
-    return client.post<{ data: TokenPair }>('/auth/refresh', { refreshToken })
+  setup(data: { username: string; password: string }) {
+    return client.post('/auth/setup', data)
+  },
+  login(data: { username: string; password: string }) {
+    return client.post('/auth/login', data)
   },
   changePassword(oldPassword: string, newPassword: string) {
     return client.put('/auth/password', { oldPassword, newPassword })
+  },
+  getProfile() {
+    return client.get('/auth/profile')
+  },
+  updateProfile(data: { username?: string; password?: string }) {
+    return client.put('/auth/profile', data)
   },
 }

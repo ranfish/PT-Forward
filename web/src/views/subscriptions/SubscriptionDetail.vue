@@ -11,7 +11,7 @@
         <a-descriptions-item :label="t('common.status')">
           <a-badge :status="subscription.enabled ? 'success' : 'default'" :text="subscription.enabled ? t('common.enabled') : t('common.disabled')" />
         </a-descriptions-item>
-        <a-descriptions-item :label="t('common.createdAt')">{{ subscription.created_at || subscription.createdAt || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.createdAt')">{{ subscription.createdAt || '-' }}</a-descriptions-item>
       </a-descriptions>
 
       <a-tabs v-model:activeKey="activeTab">
@@ -21,10 +21,10 @@
               <a-input v-model:value="configForm.name" />
             </a-form-item>
             <a-form-item :label="t('subscription.url')">
-              <a-input v-model:value="configForm.url" />
+              <a-textarea v-model:value="configForm.urls" :rows="3" placeholder="每行一个 RSS URL" />
             </a-form-item>
-            <a-form-item :label="t('subscription.fetchInterval')">
-              <a-input-number v-model:value="configForm.interval" :min="1" style="width: 100%" />
+            <a-form-item label="Cron">
+              <a-input v-model:value="configForm.cron" placeholder="如 */5 * * * *" />
             </a-form-item>
             <a-form-item>
               <a-button type="primary" @click="saveConfig">{{ t('common.saveConfig') }}</a-button>
@@ -53,6 +53,16 @@
             size="small"
           />
         </a-tab-pane>
+        <a-tab-pane key="rules" :tab="t('subscription.rules')">
+          <a-form layout="vertical" style="max-width: 600px">
+            <a-form-item :label="t('subscription.rulesJson')">
+              <a-textarea v-model:value="rulesJSON" :rows="10" />
+            </a-form-item>
+            <a-form-item>
+              <a-button type="primary" @click="saveRules" :loading="rulesSaving">{{ t('common.save') }}</a-button>
+            </a-form-item>
+          </a-form>
+        </a-tab-pane>
       </a-tabs>
     </a-spin>
   </div>
@@ -78,7 +88,9 @@ const dryrunResults = ref<any[]>([])
 const history = ref<any[]>([])
 const activeTab = ref('config')
 
-const configForm = reactive({ name: '', url: '', interval: 15 })
+const configForm = reactive({ name: '', urls: '', cron: '' })
+const rulesJSON = ref('{}')
+const rulesSaving = ref(false)
 
 const dryrunColumns = [
   { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
@@ -98,7 +110,14 @@ async function fetchSubscription() {
   try {
     const resp = await subscriptionsApi.get(id)
     subscription.value = resp.data.data || {}
-    Object.assign(configForm, { name: subscription.value.name, url: subscription.value.url, interval: subscription.value.interval || 15 })
+    Object.assign(configForm, {
+      name: subscription.value.name,
+      urls: Array.isArray(subscription.value.urls) ? subscription.value.urls.join('\n') : (subscription.value.urls || ''),
+      cron: subscription.value.cron || '',
+    })
+    if (subscription.value.rules) {
+      rulesJSON.value = JSON.stringify(subscription.value.rules, null, 2)
+    }
   } catch (e: any) {
     message.error(e.message)
   } finally {
@@ -108,7 +127,11 @@ async function fetchSubscription() {
 
 async function saveConfig() {
   try {
-    await subscriptionsApi.update(id, configForm)
+    const payload: any = { ...configForm }
+    if (typeof payload.urls === 'string') {
+      payload.urls = payload.urls.split('\n').map((u: string) => u.trim()).filter(Boolean)
+    }
+    await subscriptionsApi.update(id, payload)
     message.success(t('common.configSaved'))
     fetchSubscription()
   } catch (e: any) {
@@ -119,7 +142,17 @@ async function saveConfig() {
 async function runDryrun() {
   dryrunLoading.value = true
   try {
-    message.info(t('subscription.dryrunInDevelopment'))
+    const resp = await subscriptionsApi.dryrun(id)
+    const data = resp.data.data || {}
+    dryrunResults.value = (data.recentTorrents || []).map((torrent: any) => ({
+      title: torrent.title || torrent.name || '-',
+      size: torrent.size ? (torrent.size / 1073741824).toFixed(2) + ' GB' : '-',
+      matched: torrent.matched ? t('common.yes') : t('common.no'),
+      reason: torrent.reason || '-',
+    }))
+    message.success(t('subscription.dryrunComplete', { count: data.total || 0 }))
+  } catch (e: any) {
+    message.error(e.message)
   } finally {
     dryrunLoading.value = false
   }
@@ -128,9 +161,35 @@ async function runDryrun() {
 async function fetchHistory() {
   historyLoading.value = true
   try {
+    const resp = await subscriptionsApi.get(id)
+    const sub = resp.data.data || {}
+    history.value = (sub.recentFetches || []).map((f: any, idx: number) => ({
+      id: idx + 1,
+      fetchedAt: f.fetchedAt || f.createdAt || '-',
+      newCount: f.newCount ?? 0,
+      status: f.status || 'ok',
+    }))
+  } catch {
     history.value = []
   } finally {
     historyLoading.value = false
+  }
+}
+
+async function saveRules() {
+  rulesSaving.value = true
+  try {
+    const parsed = JSON.parse(rulesJSON.value)
+    await subscriptionsApi.updateRules(id, parsed)
+    message.success(t('subscription.rulesSaved'))
+  } catch (e: any) {
+    if (e instanceof SyntaxError) {
+      message.error('JSON 格式错误')
+    } else {
+      message.error(e.message)
+    }
+  } finally {
+    rulesSaving.value = false
   }
 }
 

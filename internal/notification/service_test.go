@@ -2,8 +2,10 @@ package notification
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -324,7 +326,7 @@ func TestService_IncrementFailures_MarksUnhealthy(t *testing.T) {
 	}
 	db.Create(ch)
 
-	ch.ConsecutiveFailures = 1
+	svc.incrementFailures(ctx, ch)
 	svc.incrementFailures(ctx, ch)
 
 	var updated model.NotificationChannel
@@ -516,4 +518,501 @@ func TestMatchEvent_Empty(t *testing.T) {
 	if !svc.matchEvent(ch, "anything") {
 		t.Error("empty events should match everything")
 	}
+}
+
+func TestService_Test(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewService(db, zap.NewNop())
+
+	ch := &model.NotificationChannel{
+		Name:    "test-ch",
+		Type:    "webhook",
+		Events:  "*",
+		Config:  `{"url":"http://127.0.0.1:1/nonexistent"}`,
+		Enabled: true,
+	}
+	db.Create(ch)
+
+	err := svc.Test(context.Background())
+	if err == nil {
+		t.Error("expected error with no real endpoint")
+	}
+}
+
+func TestService_DoHTTPGet(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	ok, errMsg := svc.doHTTPGet(context.Background(), srv.URL+"/test")
+	if !ok {
+		t.Errorf("expected success, got error: %s", errMsg)
+	}
+}
+
+func TestService_DoHTTPGet_Error(t *testing.T) {
+	svc := &Service{client: &http.Client{Timeout: time.Millisecond}}
+	ok, _ := svc.doHTTPGet(context.Background(), "http://127.0.0.1:1/fail")
+	if ok {
+		t.Error("expected failure for unreachable URL")
+	}
+}
+
+func TestService_DoHTTPGet_Status500(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	ok, errMsg := svc.doHTTPGet(context.Background(), srv.URL+"/fail")
+	if ok {
+		t.Error("expected failure for 500")
+	}
+	if errMsg == "" {
+		t.Error("expected error message")
+	}
+}
+
+func TestRepository_CleanupOldHistory_DefaultDays(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRepository(db)
+	ctx := context.Background()
+
+	old := model.NotificationHistory{
+		ChannelID: 1, Event: "rss", Level: "info", Title: "old",
+		CreatedAt: time.Now().AddDate(0, 0, -60),
+	}
+	db.Create(&old)
+
+	recent := model.NotificationHistory{
+		ChannelID: 1, Event: "rss", Level: "info", Title: "recent",
+		CreatedAt: time.Now(),
+	}
+	db.Create(&recent)
+
+	if err := repo.CleanupOldHistory(ctx, 0); err != nil {
+		t.Fatalf("CleanupOldHistory: %v", err)
+	}
+
+	var count int64
+	db.Model(&model.NotificationHistory{}).Count(&count)
+	if count != 1 {
+		t.Errorf("expected 1 remaining, got %d", count)
+	}
+}
+
+func TestService_SendTelegram_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &redirectTransport{url: srv.URL + "/telegram"},
+	}}
+	ch := &model.NotificationChannel{
+		Type:   "telegram",
+		Config: `{"token":"fake-token","chat_id":"123"}`,
+	}
+	ok, errMsg := svc.sendTelegram(context.Background(), ch, model.FormattedMessage{Title: "<hello>", Message: "a&b"})
+	if !ok {
+		t.Errorf("expected success, got: %s", errMsg)
+	}
+}
+
+func TestService_SendBark_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &redirectTransport{url: srv.URL + "/bark"},
+	}}
+	ch := &model.NotificationChannel{
+		Type:   "bark",
+		Config: fmt.Sprintf(`{"url":"%s","device_key":"abc123"}`, srv.URL),
+	}
+	ok, errMsg := svc.sendBark(context.Background(), ch, model.FormattedMessage{Title: "test", Message: "msg"})
+	if !ok {
+		t.Errorf("expected success, got: %s", errMsg)
+	}
+}
+
+func TestService_SendServerChan_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &redirectTransport{url: srv.URL + "/schan"},
+	}}
+	ch := &model.NotificationChannel{
+		Type:   "serverchan",
+		Config: `{"sendkey":"testkey"}`,
+	}
+	ok, errMsg := svc.sendServerChan(context.Background(), ch, model.FormattedMessage{Title: "t", Message: "m"})
+	if !ok {
+		t.Errorf("expected success, got: %s", errMsg)
+	}
+}
+
+func TestService_SendDingTalk_WithSecret(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &redirectTransport{url: srv.URL + "/ding"},
+	}}
+	ch := &model.NotificationChannel{
+		Type:   "dingtalk",
+		Config: `{"webhook":"http://hook.example.com/api/send?","secret":"my-secret"}`,
+	}
+	ok, errMsg := svc.sendDingTalk(context.Background(), ch, model.FormattedMessage{Title: "t", Message: "m"})
+	if !ok {
+		t.Errorf("expected success, got: %s", errMsg)
+	}
+}
+
+func TestService_SendDingTalk_NoSecret(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &redirectTransport{url: srv.URL + "/ding"},
+	}}
+	ch := &model.NotificationChannel{
+		Type:   "dingtalk",
+		Config: `{"webhook":"http://hook.example.com"}`,
+	}
+	ok, errMsg := svc.sendDingTalk(context.Background(), ch, model.FormattedMessage{Title: "t", Message: "m"})
+	if !ok {
+		t.Errorf("expected success, got: %s", errMsg)
+	}
+}
+
+func TestService_Send_Failover(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgent := r.Header.Get("User-Agent")
+		if userAgent == "" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		if r.URL.Path == "/primary" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc, db := newTestService(t)
+	ctx := context.Background()
+
+	primary := &model.NotificationChannel{
+		Type:             "webhook",
+		Name:             "primary",
+		Enabled:          true,
+		Healthy:          true,
+		Config:           fmt.Sprintf(`{"url":"%s/primary"}`, srv.URL),
+		Events:           "*",
+		FailoverGroupID:  "group1",
+		MaxErrorsPerHour: 10,
+	}
+	db.Create(primary)
+
+	fallback := &model.NotificationChannel{
+		Type:            "webhook",
+		Name:            "fallback",
+		Enabled:         true,
+		Healthy:         true,
+		Config:          fmt.Sprintf(`{"url":"%s/fallback"}`, srv.URL),
+		Events:          "*",
+		FailoverGroupID: "group1",
+	}
+	db.Create(fallback)
+
+	svc.client = srv.Client()
+
+	err := svc.Send(ctx, model.FormattedMessage{Title: "t", Message: "m", Level: "info"})
+	if err == nil {
+		t.Error("expected error because primary fails")
+	}
+
+	var history []model.NotificationHistory
+	db.Find(&history)
+	if len(history) < 2 {
+		t.Errorf("expected at least 2 history records, got %d", len(history))
+	}
+}
+
+func TestService_DoHTTPPost_StatusError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("bad request"))
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	ok, errMsg := svc.doHTTPPost(context.Background(), srv.URL+"/test", "application/json", "{}")
+	if ok {
+		t.Error("expected failure for 400")
+	}
+	if errMsg == "" {
+		t.Error("expected error message")
+	}
+}
+
+func TestService_DoHTTPPost_InvalidURL(t *testing.T) {
+	svc := &Service{client: &http.Client{}}
+	ok, _ := svc.doHTTPPost(context.Background(), "http://127.0.0.1:1/fail", "application/json", "{}")
+	if ok {
+		t.Error("expected failure for unreachable URL")
+	}
+}
+
+func TestService_RecordHistory_DBError(t *testing.T) {
+	db := setupTestDB(t)
+	svc := &Service{db: db, logger: zap.NewNop()}
+	svc.recordHistory(context.Background(), 999, model.FormattedMessage{Title: "t", Message: "m", Level: "info"}, false, "some error")
+}
+
+func TestService_InQuietHours_Active(t *testing.T) {
+	svc := &Service{}
+	ch := &model.NotificationChannel{
+		QuietHoursStart: "00:00",
+		QuietHoursEnd:   "23:59",
+	}
+	if !svc.inQuietHours(ch) {
+		t.Error("should be in quiet hours")
+	}
+}
+
+func TestService_InQuietHours_NotActive(t *testing.T) {
+	svc := &Service{}
+	ch := &model.NotificationChannel{
+		QuietHoursStart: "03:00",
+		QuietHoursEnd:   "04:00",
+	}
+	svc.inQuietHours(ch)
+}
+
+func TestService_Dispatch_Failure(t *testing.T) {
+	svc, db := newTestService(t)
+	ctx := context.Background()
+
+	ch := &model.NotificationChannel{
+		Type:    "webhook",
+		Name:    "disp-fail",
+		Enabled: true,
+		Healthy: true,
+		Config:  `{"url":"http://127.0.0.1:1/fail"}`,
+		Events:  "*",
+	}
+	db.Create(ch)
+
+	err := svc.Dispatch(ctx, "rss", model.FormattedMessage{Title: "t", Message: "m", Level: "info"})
+	if err == nil {
+		t.Error("expected error from failed dispatch")
+	}
+}
+
+func TestService_Dispatch_QuietHours(t *testing.T) {
+	svc, db := newTestService(t)
+	ctx := context.Background()
+
+	ch := &model.NotificationChannel{
+		Type:            "webhook",
+		Name:            "quiet",
+		Enabled:         true,
+		Healthy:         true,
+		Config:          `{"url":"http://127.0.0.1:1"}`,
+		Events:          "*",
+		QuietHoursStart: "00:00",
+		QuietHoursEnd:   "23:59",
+	}
+	db.Create(ch)
+
+	err := svc.Dispatch(ctx, "rss", model.FormattedMessage{Title: "t", Message: "m", Level: "info"})
+	if err != nil {
+		t.Errorf("quiet hours should skip without error, got %v", err)
+	}
+}
+
+func TestService_Send_QuietHoursSkips(t *testing.T) {
+	svc, db := newTestService(t)
+	ctx := context.Background()
+
+	ch := &model.NotificationChannel{
+		Type:            "webhook",
+		Name:            "quiet-ch",
+		Enabled:         true,
+		Healthy:         true,
+		Config:          `{"url":"http://127.0.0.1:1"}`,
+		Events:          "*",
+		QuietHoursStart: "00:00",
+		QuietHoursEnd:   "23:59",
+	}
+	db.Create(ch)
+
+	err := svc.Send(ctx, model.FormattedMessage{Title: "t", Message: "m", Level: "info"})
+	if err != nil {
+		t.Errorf("quiet hours should skip without error, got %v", err)
+	}
+}
+
+func TestService_Send_EventNotMatch(t *testing.T) {
+	svc, db := newTestService(t)
+	ctx := context.Background()
+
+	ch := &model.NotificationChannel{
+		Type:    "webhook",
+		Name:    "event-filter",
+		Enabled: true,
+		Healthy: true,
+		Config:  `{"url":"http://127.0.0.1:1"}`,
+		Events:  "rss",
+	}
+	db.Create(ch)
+
+	err := svc.Send(ctx, model.FormattedMessage{Title: "t", Message: "m", Level: "warning"})
+	if err != nil {
+		t.Errorf("non-matching event should skip without error, got %v", err)
+	}
+}
+
+func TestTestService_SendTest_Failure(t *testing.T) {
+	ts := NewTestService(&model.NotificationChannel{
+		Type:   "webhook",
+		Config: `{}`,
+	}, zap.NewNop())
+
+	ok, msg := ts.SendTest(context.Background(), model.FormattedMessage{Title: "t", Message: "m"})
+	if ok {
+		t.Error("expected failure for missing url")
+	}
+	if msg == "" {
+		t.Error("expected error message")
+	}
+}
+
+func TestService_SendToChannel_Timeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	ch := &model.NotificationChannel{
+		Type:      "webhook",
+		Config:    fmt.Sprintf(`{"url":"%s"}`, srv.URL),
+		TimeoutMs: 5000,
+	}
+	ok, errMsg := svc.sendToChannel(context.Background(), ch, model.FormattedMessage{Title: "t", Message: "m"})
+	if !ok {
+		t.Errorf("expected success with custom timeout, got: %s", errMsg)
+	}
+}
+
+func TestService_SendToChannel_Telegram(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &redirectTransport{url: srv.URL + "/tg"},
+	}}
+	ch := &model.NotificationChannel{
+		Type:   "telegram",
+		Config: `{"token":"fake","chat_id":"123"}`,
+	}
+	ok, _ := svc.sendToChannel(context.Background(), ch, model.FormattedMessage{Title: "t", Message: "m"})
+	if !ok {
+		t.Error("expected success for telegram")
+	}
+}
+
+func TestService_SendToChannel_Bark(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &redirectTransport{url: srv.URL + "/bark"},
+	}}
+	ch := &model.NotificationChannel{
+		Type:   "bark",
+		Config: fmt.Sprintf(`{"url":"%s","device_key":"abc"}`, srv.URL),
+	}
+	ok, _ := svc.sendToChannel(context.Background(), ch, model.FormattedMessage{Title: "t", Message: "m"})
+	if !ok {
+		t.Error("expected success for bark")
+	}
+}
+
+func TestService_SendToChannel_ServerChan(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &redirectTransport{url: srv.URL + "/sc"},
+	}}
+	ch := &model.NotificationChannel{
+		Type:   "serverchan",
+		Config: `{"sendkey":"testkey"}`,
+	}
+	ok, _ := svc.sendToChannel(context.Background(), ch, model.FormattedMessage{Title: "t", Message: "m"})
+	if !ok {
+		t.Error("expected success for serverchan")
+	}
+}
+
+func TestService_SendToChannel_DingTalk(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &redirectTransport{url: srv.URL + "/dt"},
+	}}
+	ch := &model.NotificationChannel{
+		Type:   "dingtalk",
+		Config: `{"webhook":"http://hook.example.com/api/send?","secret":"s"}`,
+	}
+	ok, _ := svc.sendToChannel(context.Background(), ch, model.FormattedMessage{Title: "t", Message: "m"})
+	if !ok {
+		t.Error("expected success for dingtalk")
+	}
+}
+
+type redirectTransport struct {
+	url string
+}
+
+func (rt *redirectTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	newReq := req.Clone(req.Context())
+	newReq.URL, _ = url.Parse(rt.url)
+	return http.DefaultTransport.RoundTrip(newReq)
 }

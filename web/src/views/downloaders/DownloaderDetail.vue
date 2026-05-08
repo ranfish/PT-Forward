@@ -16,7 +16,7 @@
         <a-descriptions-item :label="t('common.address')">{{ downloader.url }}</a-descriptions-item>
         <a-descriptions-item :label="t('common.status')">{{ downloader.enabled ? t('common.enabled') : t('common.disabled') }}</a-descriptions-item>
         <a-descriptions-item :label="t('common.username')">{{ downloader.username || '-' }}</a-descriptions-item>
-        <a-descriptions-item :label="t('common.createdAt')">{{ downloader.created_at || downloader.createdAt || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.createdAt')">{{ downloader.createdAt || '-' }}</a-descriptions-item>
       </a-descriptions>
 
       <a-tabs v-model:activeKey="activeTab" @change="onTabChange">
@@ -45,7 +45,7 @@
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'total_size'">
-                {{ formatSize(record.total_size) }}
+                {{ formatBytes(record.total_size) }}
               </template>
               <template v-if="column.key === 'progress'">
                 <a-progress :percent="Math.round(record.progress * 100)" size="small" :stroke-width="4" style="width: 80px" />
@@ -88,7 +88,7 @@
         <a-tab-pane key="maindata" :tab="t('downloader.maindata')">
           <a-descriptions bordered :column="2" v-if="maindata">
             <a-descriptions-item :label="t('downloader.torrentCount')">{{ Object.keys(maindata.torrents || {}).length }}</a-descriptions-item>
-            <a-descriptions-item :label="t('downloader.freeSpace')">{{ formatSize(maindata.free_space) }}</a-descriptions-item>
+            <a-descriptions-item :label="t('downloader.freeSpace')">{{ formatBytes(maindata.free_space) }}</a-descriptions-item>
             <a-descriptions-item :label="t('downloader.categoryCount')">{{ Object.keys(maindata.categories || {}).length }}</a-descriptions-item>
             <a-descriptions-item :label="t('downloader.tagCount')">{{ (maindata.tags || []).length }}</a-descriptions-item>
           </a-descriptions>
@@ -171,6 +171,7 @@ import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { downloadersApi } from '@/api/downloaders'
+import { formatSpeed, formatBytes } from '@/utils/format'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -202,7 +203,7 @@ const targetForm = ref({
 const filteredTorrents = computed(() => {
   if (!torrentSearch.value) return torrents.value
   const q = torrentSearch.value.toLowerCase()
-  return torrents.value.filter((t: any) => (t.name || '').toLowerCase().includes(q))
+  return torrents.value.filter((item: any) => (item.name || '').toLowerCase().includes(q))
 })
 
 const torrentColumns = [
@@ -237,24 +238,6 @@ function stateColor(state: string) {
     error: 'red',
   }
   return colors[state] || 'default'
-}
-
-function formatSpeed(bytes: number) {
-  if (!bytes) return '0 B/s'
-  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s']
-  let i = 0
-  let val = bytes
-  while (val >= 1024 && i < units.length - 1) { val /= 1024; i++ }
-  return `${val.toFixed(1)} ${units[i]}`
-}
-
-function formatSize(bytes: number) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let i = 0
-  let val = bytes
-  while (val >= 1024 && i < units.length - 1) { val /= 1024; i++ }
-  return `${val.toFixed(1)} ${units[i]}`
 }
 
 async function fetchDownloader() {
@@ -296,7 +279,7 @@ async function fetchPublishTargets() {
   try {
     const resp = await downloadersApi.listPublishTargets()
     const all = resp.data.data || []
-    publishTargets.value = all.filter((t: any) => t.client_id === id)
+    publishTargets.value = all.filter((item: any) => item.client_id === id)
   } catch (e: any) {
     message.error(e.message)
   } finally {

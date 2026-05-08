@@ -173,7 +173,7 @@ import { useWebSocketStore } from '@/stores/websocket'
 const { t, locale } = useI18n()
 const route = useRoute()
 const authStore = useAuthStore()
-const { isDark, toggle: toggleTheme } = useTheme()
+const { toggle: toggleTheme } = useTheme()
 const wsStore = useWebSocketStore()
 
 function switchLocale(lang: string) {

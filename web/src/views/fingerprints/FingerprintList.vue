@@ -3,18 +3,21 @@
     <div style="margin-bottom: 16px; display: flex; gap: 12px">
       <a-input
         v-model:value="searchForm.infoHash"
-        placeholder="搜索 InfoHash"
+        :placeholder="t('fingerprint.searchInfoHash')"
         style="width: 320px"
         @pressEnter="handleSearch"
       />
       <a-input
         v-model:value="searchForm.piecesHash"
-        placeholder="搜索 PiecesHash"
+        :placeholder="t('fingerprint.searchPiecesHash')"
         style="width: 320px"
         @pressEnter="handleSearch"
       />
       <a-button type="primary" @click="handleSearch">{{ t('common.search') }}</a-button>
       <a-button @click="resetSearch">{{ t('common.reset') }}</a-button>
+      <a-popconfirm title="确定清理指纹缓存？" @confirm="handleDeleteCache">
+        <a-button danger>清理缓存</a-button>
+      </a-popconfirm>
     </div>
 
     <a-table
@@ -111,4 +114,14 @@ async function handleDelete(id: number) {
 }
 
 onMounted(() => pagination.fetch())
+
+async function handleDeleteCache() {
+  try {
+    await fingerprintsApi.deleteCache()
+    message.success(t('common.deleteSuccess'))
+    pagination.fetch()
+  } catch (e: any) {
+    message.error(e.message)
+  }
+}
 </script>

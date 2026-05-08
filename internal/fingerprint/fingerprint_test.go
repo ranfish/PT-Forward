@@ -467,3 +467,120 @@ func TestRepository_CleanupOrphans(t *testing.T) {
 		t.Errorf("expected active_hash_1 to remain, got %s", remaining[0].InfoHash)
 	}
 }
+
+func TestRepository_GetByInfoHashAndSite(t *testing.T) {
+	db := setupFingerprintDB(t)
+	repo := NewRepository(db, zap.NewNop())
+	ctx := context.Background()
+
+	fp := &model.ContentFingerprint{
+		InfoHash: "hash1", SiteName: "site1", TorrentID: "42",
+		FileTree: []byte(`{"file1.txt":100}`),
+	}
+	if err := repo.Save(ctx, fp); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := repo.GetByInfoHashAndSite(ctx, "hash1", "site1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.TorrentID != "42" {
+		t.Errorf("expected 42, got %s", got.TorrentID)
+	}
+	if len(got.FileTreeParsed) != 1 {
+		t.Errorf("expected 1 parsed file, got %d", len(got.FileTreeParsed))
+	}
+
+	_, err = repo.GetByInfoHashAndSite(ctx, "nonexist", "site1")
+	if err == nil {
+		t.Error("expected error for nonexistent")
+	}
+}
+
+func TestRepository_FindCandidatesBySite(t *testing.T) {
+	db := setupFingerprintDB(t)
+	repo := NewRepository(db, zap.NewNop())
+	ctx := context.Background()
+
+	fp1 := &model.ContentFingerprint{InfoHash: "h1", SiteName: "s1", PiecesHash: "p1", TotalSize: 1000}
+	fp2 := &model.ContentFingerprint{InfoHash: "h2", SiteName: "s1", PiecesHash: "p1", TotalSize: 1000}
+	fp3 := &model.ContentFingerprint{InfoHash: "h3", SiteName: "s2", PiecesHash: "p1", TotalSize: 1000}
+	for _, fp := range []*model.ContentFingerprint{fp1, fp2, fp3} {
+		if err := repo.Save(ctx, fp); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	results, err := repo.FindCandidatesBySite(ctx, "s1", "h1", "p1", 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].InfoHash != "h2" {
+		t.Errorf("expected 1 result (h2), got %v", results)
+	}
+
+	results2, err := repo.FindCandidatesBySite(ctx, "s1", "h1", "", 1000, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results2) != 1 {
+		t.Errorf("expected 1 result by size, got %d", len(results2))
+	}
+
+	results3, err := repo.FindCandidatesBySite(ctx, "s1", "h1", "", 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results3 != nil {
+		t.Error("expected nil for no pieces hash and no size")
+	}
+}
+
+func TestRepository_BatchSave(t *testing.T) {
+	db := setupFingerprintDB(t)
+	repo := NewRepository(db, zap.NewNop())
+	ctx := context.Background()
+
+	fps := []*model.ContentFingerprint{
+		{InfoHash: "batch1", SiteName: "s1", PiecesHash: "p1"},
+		{InfoHash: "batch2", SiteName: "s1", PiecesHash: "p2"},
+	}
+	if err := repo.BatchSave(ctx, fps); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := repo.GetByInfoHashAndSite(ctx, "batch1", "s1")
+	if got == nil {
+		t.Error("batch1 should exist")
+	}
+}
+
+func TestRepository_SearchCache(t *testing.T) {
+	db := setupFingerprintDB(t)
+	db.AutoMigrate(&model.SearchCache{})
+	repo := NewRepository(db, zap.NewNop())
+	ctx := context.Background()
+
+	_, err := repo.GetSearchCache(ctx, "s1", "clean_title", 1000)
+	if err == nil {
+		t.Error("expected error for nonexistent cache")
+	}
+
+	candidates := []model.Candidate{{TargetSite: "s2", TargetInfoHash: "h1"}}
+	if err := repo.SaveSearchCache(ctx, "s1", "clean_title", 1000, candidates); err != nil {
+		t.Fatal(err)
+	}
+
+	cache, err := repo.GetSearchCache(ctx, "s1", "clean_title", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cache.SiteName != "s1" {
+		t.Errorf("expected s1, got %s", cache.SiteName)
+	}
+
+	if err := repo.SaveSearchCache(ctx, "s1", "clean_title", 1000, candidates); err != nil {
+		t.Fatal(err)
+	}
+}

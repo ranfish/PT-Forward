@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -28,7 +30,7 @@ func setupIYUUDB(t *testing.T) *gorm.DB {
 func createTestConfig(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	cfg := &model.IYUUConfig{
-		Token:             "test-token-12345678",
+		Token:             "IYUU2436Tfb5654907b6cb659aed15648720eb0fc6ebef8dd",
 		BaseURL:           "https://2025.iyuu.cn",
 		Enabled:           true,
 		RequestTimeoutSec: 60,
@@ -42,11 +44,15 @@ func TestService_Ping_Success(t *testing.T) {
 	createTestConfig(t, db)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("token") != "test-token-12345678" {
+		if r.Header.Get("Token") != "IYUU2436Tfb5654907b6cb659aed15648720eb0fc6ebef8dd" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		if err := json.NewEncoder(w).Encode(map[string]any{"ret": 200, "msg": "ok", "data": []any{}}); err != nil {
+		if r.URL.Path != "/reseed/sites/index" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if err := json.NewEncoder(w).Encode(map[string]any{"code": 0, "msg": "ok", "data": map[string]any{"count": 0, "sites": []any{}}}); err != nil {
 			t.Errorf("encode: %v", err)
 		}
 	}))
@@ -73,7 +79,7 @@ func TestService_Ping_Error(t *testing.T) {
 	createTestConfig(t, db)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		if err := json.NewEncoder(w).Encode(map[string]any{"ret": 400, "msg": "token invalid"}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{"code": 403, "msg": "token invalid"}); err != nil {
 			t.Errorf("encode: %v", err)
 		}
 	}))
@@ -91,10 +97,28 @@ func TestService_QueryReseed_Success(t *testing.T) {
 	db := setupIYUUDB(t)
 	createTestConfig(t, db)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/reseed/index/index" {
+			t.Errorf("expected /reseed/index/index, got %s", r.URL.Path)
+		}
+		if r.Header.Get("Token") == "" {
+			t.Error("expected Token header")
+		}
+		if !strings.Contains(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+			t.Errorf("expected form content type, got %s", r.Header.Get("Content-Type"))
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		if r.Form.Get("hash") == "" || r.Form.Get("sha1") == "" || r.Form.Get("timestamp") == "" || r.Form.Get("version") == "" {
+			t.Errorf("missing required form fields: %v", r.Form)
+		}
 		if err := json.NewEncoder(w).Encode(map[string]any{
-			"ret": 200,
-			"msg": "ok",
+			"code": 0,
+			"msg":  "ok",
 			"data": map[string]any{
 				"abc123": []map[string]any{
 					{"sid": 1, "torrent_id": 42, "info_hash": "def456"},
@@ -145,13 +169,22 @@ func TestService_GetSiteList_Success(t *testing.T) {
 	db := setupIYUUDB(t)
 	createTestConfig(t, db)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/reseed/sites/index" {
+			t.Errorf("expected /reseed/sites/index, got %s", r.URL.Path)
+		}
+		if r.Header.Get("Token") == "" {
+			t.Error("expected Token header")
+		}
 		if err := json.NewEncoder(w).Encode(map[string]any{
-			"ret": 200,
-			"msg": "ok",
-			"data": []map[string]any{
-				{"sid": 1, "nickname": "SiteA", "base_url": "https://sitea.com", "site": "sitea"},
-				{"sid": 2, "nickname": "SiteB", "base_url": "https://siteb.com", "site": "siteb"},
+			"code": 0,
+			"msg":  "ok",
+			"data": map[string]any{
+				"count": 2,
+				"sites": []map[string]any{
+					{"id": 1, "nickname": "SiteA", "base_url": "https://sitea.com", "site": "sitea"},
+					{"id": 2, "nickname": "SiteB", "base_url": "https://siteb.com", "site": "siteb"},
+				},
 			},
 		}); err != nil {
 			t.Errorf("encode: %v", err)
@@ -185,15 +218,32 @@ func TestService_ReportExisting(t *testing.T) {
 	createTestConfig(t, db)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/reseed/sites/reportExisting" {
+			t.Errorf("expected /reseed/sites/reportExisting, got %s", r.URL.Path)
+		}
+		if r.Header.Get("Token") == "" {
+			t.Error("expected Token header")
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		ct := r.Header.Get("Content-Type")
+		if !strings.Contains(ct, "application/json") {
+			t.Errorf("expected JSON content type, got %s", ct)
+		}
 		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
-		sids, ok := req["sid"].([]any)
+		sids, ok := req["sid_list"].([]any)
 		if !ok || len(sids) != 2 {
-			t.Errorf("expected 2 sids, got %v", req["sid"])
+			t.Errorf("expected 2 sids, got %v", req["sid_list"])
 		}
-		if err := json.NewEncoder(w).Encode(map[string]any{"ret": 200, "msg": "ok"}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{
+			"code": 0,
+			"msg":  "ok",
+			"data": map[string]any{"sid_sha1": "abc123def456"},
+		}); err != nil {
 			t.Errorf("encode: %v", err)
 		}
 	}))
@@ -216,12 +266,81 @@ func TestService_ReportExisting_Empty(t *testing.T) {
 	}
 }
 
+func TestService_QueryReseed_AutoEnsureSidSha1(t *testing.T) {
+	db := setupIYUUDB(t)
+	createTestConfig(t, db)
+
+	reportCalled := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/reseed/sites/reportExisting" {
+			reportCalled = true
+			if err := json.NewEncoder(w).Encode(map[string]any{
+				"code": 0,
+				"msg":  "ok",
+				"data": map[string]any{"sid_sha1": "auto_cached_sha1"},
+			}); err != nil {
+				t.Errorf("encode: %v", err)
+			}
+			return
+		}
+		if r.URL.Path == "/reseed/index/index" {
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("parse form: %v", err)
+			}
+			if r.Form.Get("sid_sha1") != "auto_cached_sha1" {
+				t.Errorf("expected sid_sha1='auto_cached_sha1', got '%s'", r.Form.Get("sid_sha1"))
+			}
+			if err := json.NewEncoder(w).Encode(map[string]any{
+				"code": 0,
+				"msg":  "ok",
+				"data": map[string]any{
+					"abc123": []map[string]any{
+						{"sid": 1, "torrent_id": 42, "info_hash": "def456"},
+					},
+				},
+			}); err != nil {
+				t.Errorf("encode: %v", err)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	db.Model(&model.IYUUConfig{}).Where("id = 1").Update("base_url", server.URL)
+	db.Create(&model.IYUUSiteMapping{IYUUSid: 1, SiteDomain: "sitea.com", SiteName: "SiteA", Enabled: true})
+
+	svc := NewService(db, zap.NewNop())
+	results, err := svc.QueryReseed(context.Background(), []string{"abc123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reportCalled {
+		t.Error("expected ReportExisting to be called automatically")
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+}
+
 func TestService_SendNotification(t *testing.T) {
 	db := setupIYUUDB(t)
 	createTestConfig(t, db)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := json.NewEncoder(w).Encode(map[string]any{"ret": 200, "msg": "ok"}); err != nil {
+		if r.Header.Get("Token") == "" {
+			t.Error("expected Token header")
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		if r.Form.Get("text") != "test title" {
+			t.Errorf("expected text 'test title', got %s", r.Form.Get("text"))
+		}
+		if r.Form.Get("desp") != "test body" {
+			t.Errorf("expected desp 'test body', got %s", r.Form.Get("desp"))
+		}
+		if err := json.NewEncoder(w).Encode(map[string]any{"code": 0, "msg": "ok"}); err != nil {
 			t.Errorf("encode: %v", err)
 		}
 	}))
@@ -239,17 +358,19 @@ func TestService_GetSeededSites(t *testing.T) {
 	db := setupIYUUDB(t)
 	createTestConfig(t, db)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ret": 200,
-			"msg": "ok",
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewEncoder(w).Encode(map[string]any{
+			"code": 0,
+			"msg":  "ok",
 			"data": map[string]any{
 				"abc123": []map[string]any{
 					{"sid": 1, "torrent_id": 1, "info_hash": "x"},
 					{"sid": 2, "torrent_id": 2, "info_hash": "y"},
 				},
 			},
-		})
+		}); err != nil {
+			t.Errorf("encode: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -265,5 +386,63 @@ func TestService_GetSeededSites(t *testing.T) {
 	}
 	if len(sites) != 2 {
 		t.Fatalf("expected 2 sites, got %d", len(sites))
+	}
+}
+
+func TestService_doGetWithToken_SetsHeader(t *testing.T) {
+	db := setupIYUUDB(t)
+	createTestConfig(t, db)
+
+	var receivedToken string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedToken = r.Header.Get("Token")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	db.Model(&model.IYUUConfig{}).Where("id = 1").Update("base_url", server.URL)
+
+	svc := NewService(db, zap.NewNop())
+	resp, err := svc.doGetWithToken(context.Background(), server.URL+"/test", "my-token-123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+
+	if receivedToken != "my-token-123" {
+		t.Errorf("expected token 'my-token-123', got '%s'", receivedToken)
+	}
+}
+
+func TestService_doPostFormWithToken_SetsHeaders(t *testing.T) {
+	db := setupIYUUDB(t)
+	createTestConfig(t, db)
+
+	var receivedToken string
+	var receivedCT string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedToken = r.Header.Get("Token")
+		receivedCT = r.Header.Get("Content-Type")
+		if err := json.NewEncoder(w).Encode(map[string]any{"code": 0}); err != nil {
+			t.Errorf("encode: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	db.Model(&model.IYUUConfig{}).Where("id = 1").Update("base_url", server.URL)
+
+	svc := NewService(db, zap.NewNop())
+	form := url.Values{}
+	form.Set("key", "value")
+	var result map[string]any
+	if err := svc.doPostFormWithToken(context.Background(), server.URL+"/test", "my-token-456", form, &result); err != nil {
+		t.Fatal(err)
+	}
+
+	if receivedToken != "my-token-456" {
+		t.Errorf("expected token 'my-token-456', got '%s'", receivedToken)
+	}
+	if !strings.Contains(receivedCT, "application/x-www-form-urlencoded") {
+		t.Errorf("expected form content type, got '%s'", receivedCT)
 	}
 }

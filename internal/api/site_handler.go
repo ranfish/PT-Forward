@@ -1050,7 +1050,7 @@ func (h *SiteHandler) handleDeleteOverride(w http.ResponseWriter, r *http.Reques
 func (h *SiteHandler) handleDomainFreezeByID(w http.ResponseWriter, r *http.Request, idStr string) {
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		Error(w, http.StatusBadRequest, 40000, "invalid site id")
+		Error(w, http.StatusBadRequest, 40001, "invalid site id")
 		return
 	}
 	s, err := h.repo.GetByID(r.Context(), uint(id))
@@ -1071,17 +1071,17 @@ func (h *SiteHandler) handleFreezeStatus(w http.ResponseWriter, r *http.Request)
 			Domain string `json:"domain"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
 		if req.Domain == "" {
-			Error(w, http.StatusBadRequest, 400, "domain is required")
+			Error(w, http.StatusBadRequest, 40001, "domain is required")
 			return
 		}
 		httpclient.GlobalLimiter.ManualUnfreeze(req.Domain)
 		Success(w, map[string]string{"status": "unfrozen", "domain": req.Domain})
 	default:
-		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
 	}
 }
 
@@ -1101,18 +1101,18 @@ func (h *SiteHandler) handleCircuitStatus(w http.ResponseWriter, r *http.Request
 			Domain string `json:"domain"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
 		if req.Domain == "" {
-			Error(w, http.StatusBadRequest, 400, "domain is required")
+			Error(w, http.StatusBadRequest, 40001, "domain is required")
 			return
 		}
 		httpclient.GlobalCircuitBreaker.ResetCircuit(req.Domain)
 		Success(w, map[string]string{"status": "reset", "domain": req.Domain})
 
 	default:
-		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
 	}
 }
 
@@ -1124,12 +1124,12 @@ func (h *SiteHandler) handleDomainFreeze(w http.ResponseWriter, r *http.Request,
 			Reason   string `json:"reason"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
 		dur, err := time.ParseDuration(req.Duration)
 		if err != nil {
-			Error(w, http.StatusBadRequest, 400, "invalid duration format")
+			Error(w, http.StatusBadRequest, 40001, "invalid duration format")
 			return
 		}
 		httpclient.GlobalLimiter.ManualFreeze(domain, dur, req.Reason)
@@ -1144,7 +1144,7 @@ func (h *SiteHandler) handleDomainFreeze(w http.ResponseWriter, r *http.Request,
 		Success(w, status)
 
 	default:
-		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
 	}
 }
 
@@ -1153,7 +1153,7 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		var exclusions []model.PublishExclusion
 		if err := h.db.WithContext(r.Context()).Find(&exclusions).Error; err != nil {
-			Error(w, http.StatusInternalServerError, 500, "failed to list exclusions")
+			Error(w, http.StatusInternalServerError, 50000, "failed to list exclusions")
 			return
 		}
 		Success(w, exclusions)
@@ -1164,11 +1164,11 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 			SourceSite string `json:"source_site"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
 		if req.TargetSite == "" || req.SourceSite == "" {
-			Error(w, http.StatusBadRequest, 400, "target_site and source_site are required")
+			Error(w, http.StatusBadRequest, 40001, "target_site and source_site are required")
 			return
 		}
 		exclusion := model.PublishExclusion{
@@ -1177,10 +1177,10 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := h.db.WithContext(r.Context()).Create(&exclusion).Error; err != nil {
 			if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "UNIQUE") {
-				Error(w, http.StatusConflict, 409, "exclusion already exists")
+				Error(w, http.StatusConflict, 40900, "exclusion already exists")
 				return
 			}
-			Error(w, http.StatusInternalServerError, 500, "failed to create exclusion")
+			Error(w, http.StatusInternalServerError, 50000, "failed to create exclusion")
 			return
 		}
 		Success(w, exclusion)
@@ -1191,19 +1191,19 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 			SourceSite string `json:"source_site"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
 		result := h.db.WithContext(r.Context()).
 			Where("target_site = ? AND source_site = ?", req.TargetSite, req.SourceSite).
 			Delete(&model.PublishExclusion{})
 		if result.RowsAffected == 0 {
-			Error(w, http.StatusNotFound, 404, "exclusion not found")
+			Error(w, http.StatusNotFound, 40400, "exclusion not found")
 			return
 		}
 		Success(w, map[string]string{"status": "deleted"})
 
 	default:
-		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
 	}
 }

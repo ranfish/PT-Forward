@@ -90,10 +90,7 @@ const cacheColumns = [
   { title: '更新时间', key: 'updated_at', width: 180 },
 ]
 
-function formatTime(t: string) {
-  if (!t) return '-'
-  return new Date(t).toLocaleString()
-}
+import { formatTime } from '@/utils/format'
 
 async function handleQuery() {
   if (!queryInput.value.trim()) {

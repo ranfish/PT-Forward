@@ -94,6 +94,12 @@ func (a *Unit3DAdapter) ensureSession(ctx context.Context, config *model.SiteCon
 	return nil
 }
 
+func (a *Unit3DAdapter) resetSession(domain string) {
+	a.sessionMu.Lock()
+	defer a.sessionMu.Unlock()
+	delete(a.sessionReady, domain)
+}
+
 func parseCookieString(raw string) map[string]string {
 	m := make(map[string]string)
 	if raw == "" {
@@ -137,6 +143,7 @@ func (a *Unit3DAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusForbidden {
+		a.resetSession(config.Domain)
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 cookie 过期"}
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -498,7 +505,13 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
+		a.resetSession(config.Domain)
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 CSRF token 过期"}
+	}
+
+	if resp.StatusCode == 419 {
+		a.resetSession(config.Domain)
+		return nil, &model.AppError{Code: 14003, Message: "419 CSRF token 过期，需要重建 session"}
 	}
 
 	if idMatch := regexp.MustCompile(`/torrents/(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {

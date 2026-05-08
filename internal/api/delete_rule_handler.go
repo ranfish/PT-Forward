@@ -2,12 +2,12 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/seeding"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -128,7 +128,7 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := h.db.Create(&rule).Error; err != nil {
-		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("创建规则失败: %v", err))
+		Error(w, http.StatusInternalServerError, 50000, "创建规则失败")
 		return
 	}
 	Success(w, rule)
@@ -198,16 +198,43 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, _ *http.Reques
 	}
 
 	var active []model.SeedingTorrentRecord
-	h.db.Where("status = ?", "seeding").Limit(20).Find(&active)
+	h.db.Where("status = ?", "seeding").Limit(100).Find(&active)
 
 	matched := make([]map[string]interface{}, 0)
 	for _, rec := range active {
-		matched = append(matched, map[string]interface{}{
-			"clientID":  rec.ClientID,
-			"infoHash":  rec.InfoHash,
-			"siteName":  rec.SiteName,
-			"torrentID": rec.TorrentID,
-		})
+		hit := false
+
+		if rule.Type == "expr" && rule.Expr != "" {
+			rc := &seeding.RuleContext{
+				Record: &rec,
+				Now:    time.Now(),
+			}
+			ok, err := seeding.EvalExprForTest(rule.Expr, rc)
+			if err == nil && ok {
+				hit = true
+			}
+		}
+
+		if !hit && rule.Conditions != "" {
+			rc := &seeding.RuleContext{
+				Record: &rec,
+				Now:    time.Now(),
+			}
+			conditions := seeding.ParseConditions(rule.Conditions)
+			if seeding.MatchContext(rc, conditions) {
+				hit = true
+			}
+		}
+
+		if hit {
+			matched = append(matched, map[string]interface{}{
+				"clientID":  rec.ClientID,
+				"infoHash":  rec.InfoHash,
+				"siteName":  rec.SiteName,
+				"torrentID": rec.TorrentID,
+				"title":     rec.TorrentID,
+			})
+		}
 	}
 
 	Success(w, map[string]interface{}{

@@ -136,6 +136,7 @@ const (
 	SelectionMostSpace  ClientSelectionMode = "most_space"
 	SelectionLeastLoad  ClientSelectionMode = "least_load"
 	SelectionRoundRobin ClientSelectionMode = "round_robin"
+	SelectionBestFit    ClientSelectionMode = "best_fit"
 )
 
 // §33.1.58 — PublishGroupStatus 枚举（Sprint 89）

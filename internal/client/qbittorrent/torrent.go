@@ -1,6 +1,7 @@
 package qbittorrent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -83,6 +84,7 @@ func (c *QBClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
 		Torrents    map[string]qbTorrent `json:"torrents"`
 		ServerState struct {
 			FreeSpaceOnDisk int64 `json:"free_space_on_disk"`
+			UpInfoSpeed     int64 `json:"up_info_speed"`
 		} `json:"server_state"`
 		Rid        int               `json:"rid"`
 		Categories map[string]string `json:"categories"`
@@ -108,6 +110,7 @@ func (c *QBClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
 		FreeSpace:   raw.ServerState.FreeSpaceOnDisk,
 		CategoryMap: raw.Categories,
 		Tags:        tags,
+		ServerState: model.ServerState{UploadSpeed: raw.ServerState.UpInfoSpeed},
 	}, nil
 }
 
@@ -163,7 +166,12 @@ func (c *QBClient) AddFromFile(ctx context.Context, data []byte, opts model.AddT
 		return nil, c.wrapErr(11007, "build multipart body", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v2/torrents/add", body)
+	bodyBytes, err := io.ReadAll(body)
+	if err != nil {
+		return nil, c.wrapErr(11007, "read multipart body", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v2/torrents/add", bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, c.wrapErr(11007, "build add request", err)
 	}
@@ -175,6 +183,22 @@ func (c *QBClient) AddFromFile(ctx context.Context, data []byte, opts model.AddT
 		return nil, c.wrapErr(11002, "add torrent request", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusForbidden {
+		c.logger.Debug("session expired during add, re-login", zap.String("client", c.cfg.Name))
+		if loginErr := c.login(ctx); loginErr != nil {
+			return nil, c.wrapErr(11002, "re-login for add torrent", loginErr)
+		}
+		req2, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v2/torrents/add", bytes.NewReader(bodyBytes))
+		req2.Header.Set("Content-Type", contentType)
+		req2.Header.Set("Referer", c.baseURL)
+		resp2, err := c.client.Do(req2)
+		if err != nil {
+			return nil, c.wrapErr(11002, "add torrent retry request", err)
+		}
+		defer func() { _ = resp2.Body.Close() }()
+		resp = resp2
+	}
 
 	if resp.StatusCode == http.StatusUnsupportedMediaType {
 		return nil, c.newErr(11007, "invalid torrent file")

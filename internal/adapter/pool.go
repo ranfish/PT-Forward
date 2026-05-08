@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -79,7 +80,8 @@ func (p *Pool) Rebuild(ctx context.Context, domain string) error {
 	defer p.mu.Unlock()
 
 	for k, a := range p.adapters {
-		if k == domain || (len(k) > len(domain) && k[:len(domain)] == domain) {
+		parts := strings.SplitN(k, ":", 2)
+		if parts[0] == domain {
 			delete(p.adapters, k)
 			_ = a
 		}
@@ -94,7 +96,8 @@ func (p *Pool) Remove(domain string) {
 	defer p.mu.Unlock()
 
 	for k := range p.adapters {
-		if k == domain || (len(k) > len(domain) && k[:len(domain)] == domain) {
+		parts := strings.SplitN(k, ":", 2)
+		if parts[0] == domain {
 			delete(p.adapters, k)
 		}
 	}

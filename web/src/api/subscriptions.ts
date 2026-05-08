@@ -25,4 +25,10 @@ export const subscriptionsApi = {
   trigger(id: number) {
     return client.post(`/rss/subscriptions/${id}/trigger`)
   },
+  dryrun(id: number) {
+    return client.post(`/rss/subscriptions/${id}/dryrun`)
+  },
+  updateRules(id: number, data: any) {
+    return client.put(`/rss/subscriptions/${id}/rules`, data)
+  },
 }

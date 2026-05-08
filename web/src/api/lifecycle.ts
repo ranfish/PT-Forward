@@ -10,4 +10,7 @@ export const lifecycleApi = {
   getBackpressure() {
     return client.get('/lifecycle/backpressure')
   },
+  updateBackpressure(data: any) {
+    return client.put('/lifecycle/backpressure', data)
+  },
 }

@@ -15,9 +15,6 @@ export const schedulerApi = {
   list() {
     return client.get<{ data: { items: SchedulerTask[]; total: number } }>('/scheduler/tasks')
   },
-  get(name: string) {
-    return client.get<{ data: SchedulerTask }>(`/scheduler/tasks/${encodeURIComponent(name)}`)
-  },
   pause(name: string) {
     return client.post(`/scheduler/tasks/${encodeURIComponent(name)}/pause`)
   },

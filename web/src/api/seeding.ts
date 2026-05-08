@@ -37,14 +37,27 @@ export const seedingApi = {
   pauseRecord(id: number) {
     return client.post(`/seeding/records/${id}/pause`)
   },
+  scoringDryrun(data: any) {
+    return client.post('/seeding/scoring-dryrun', data)
+  },
+  getScoringConfig(subscriptionId?: number) {
+    const params: any = {}
+    if (subscriptionId) params.subscriptionId = subscriptionId
+    return client.get('/seeding/scoring-config', { params })
+  },
+  updateScoringConfig(data: any, subscriptionId?: number) {
+    const params: any = {}
+    if (subscriptionId) params.subscriptionId = subscriptionId
+    return client.put('/seeding/scoring-config', data, { params })
+  },
+  listScoringLogs(params?: any) {
+    return client.get('/seeding/scoring-logs', { params })
+  },
 }
 
 export const deleteRulesApi = {
   list() {
     return client.get('/seeding/delete-rules')
-  },
-  get(id: number) {
-    return client.get(`/seeding/delete-rules/${id}`)
   },
   create(data: any) {
     return client.post('/seeding/delete-rules', data)

@@ -409,6 +409,28 @@ func (m *AuthManager) UpdateProfile(ctx context.Context, displayName string) err
 	return m.repo.Update(ctx, user)
 }
 
+func (m *AuthManager) SetupAdmin(ctx context.Context, username, password string) error {
+	if m.IsInitialized(ctx) {
+		return &model.AppError{Code: 40900, Message: "管理员账号已存在"}
+	}
+	if username == "" || password == "" {
+		return &model.AppError{Code: 40001, Message: "用户名和密码不能为空"}
+	}
+	if err := validatePasswordStrength(password); err != nil {
+		return &model.AppError{Code: 40001, Message: err.Error()}
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return authError(ErrAuthPassword, "hash password", err)
+	}
+	user := &model.User{
+		Username:     username,
+		DisplayName:  username,
+		PasswordHash: hash,
+	}
+	return m.repo.Create(ctx, user)
+}
+
 func (m *AuthManager) signToken(claims jwt.MapClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(m.signingKey)

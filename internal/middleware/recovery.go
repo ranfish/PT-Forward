@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -13,10 +14,6 @@ import (
 
 func timeNowUnix() int64 {
 	return time.Now().Unix()
-}
-
-func sleepDuration(ms int64) {
-	time.Sleep(time.Duration(ms) * time.Millisecond)
 }
 
 func Recovery(logger *zap.Logger) func(http.Handler) http.Handler {
@@ -55,6 +52,7 @@ type visitor struct {
 }
 
 type RateLimiter struct {
+	mu       sync.RWMutex
 	visitors map[string]*visitor
 	limit    int
 	window   int64
@@ -70,6 +68,8 @@ func NewRateLimiter(limit int, windowSeconds int64) *RateLimiter {
 
 func (rl *RateLimiter) Allow(ip string) bool {
 	now := timeNowUnix()
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
 	v, exists := rl.visitors[ip]
 	if !exists || now-v.lastSeen >= rl.window {
 		rl.visitors[ip] = &visitor{count: 1, lastSeen: now}
@@ -82,6 +82,8 @@ func (rl *RateLimiter) Allow(ip string) bool {
 
 func (rl *RateLimiter) Cleanup() {
 	now := timeNowUnix()
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
 	for ip, v := range rl.visitors {
 		if now-v.lastSeen > rl.window*2 {
 			delete(rl.visitors, ip)
@@ -91,20 +93,19 @@ func (rl *RateLimiter) Cleanup() {
 
 func RateLimit(limit int, windowSeconds int64) func(http.Handler) http.Handler {
 	limiter := NewRateLimiter(limit, windowSeconds)
-	stop := make(chan struct{})
+	done := make(chan struct{})
 	go func() {
+		ticker := time.NewTicker(time.Duration(windowSeconds) * time.Second)
+		defer ticker.Stop()
 		for {
 			select {
-			case <-stop:
+			case <-done:
 				return
-			default:
-				sleepDuration(int64(windowSeconds) * 1000)
+			case <-ticker.C:
 				limiter.Cleanup()
 			}
 		}
 	}()
-
-	_ = stop
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

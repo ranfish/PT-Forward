@@ -10,4 +10,7 @@ export const fingerprintsApi = {
   delete(id: number) {
     return client.delete(`/fingerprints/${id}`)
   },
+  deleteCache() {
+    return client.delete('/fingerprints/cache')
+  },
 }

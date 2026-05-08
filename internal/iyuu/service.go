@@ -3,10 +3,15 @@ package iyuu
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -15,16 +20,24 @@ import (
 )
 
 type Service struct {
-	db     *gorm.DB
-	logger *zap.Logger
-	client *http.Client
+	db         *gorm.DB
+	logger     *zap.Logger
+	client     *http.Client
+	sidSha1    string
+	sidSha1Mux sync.RWMutex
+	sidSha1Exp time.Time
 }
 
 func NewService(db *gorm.DB, logger *zap.Logger) *Service {
 	return &Service{
 		db:     db,
 		logger: logger,
-		client: &http.Client{Timeout: 60 * time.Second},
+		client: &http.Client{
+			Timeout: 60 * time.Second,
+			Transport: &http.Transport{
+				Proxy: nil,
+			},
+		},
 	}
 }
 
@@ -45,23 +58,28 @@ func (s *Service) Ping(ctx context.Context) error {
 		return err
 	}
 
-	url := cfg.BaseURL + "/App.Api/sites?token=" + cfg.Token
-	resp, err := s.doGet(ctx, url)
+	u := cfg.BaseURL + "/reseed/sites/index"
+	resp, err := s.doGetWithToken(ctx, u, cfg.Token)
 	if err != nil {
 		return iyuuError(ErrIYUUHTTP, "ping failed", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		return iyuuError(ErrIYUUHTTP, fmt.Sprintf("IYUU returned HTTP %d", resp.StatusCode), nil)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return iyuuError(ErrIYUUAPI, "read response body", err)
 	}
 
-	var result iyuuResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if resp.StatusCode != http.StatusOK {
+		return iyuuError(ErrIYUUHTTP, fmt.Sprintf("IYUU returned HTTP %d: %s", resp.StatusCode, string(body)), nil)
+	}
+
+	var result iyuuRestResponse
+	if err := json.Unmarshal(body, &result); err != nil {
 		return iyuuError(ErrIYUUAPI, "decode response", err)
 	}
 
-	if result.Ret != 200 {
+	if result.Code != 0 {
 		return iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU error: %s", result.Msg), nil)
 	}
 
@@ -78,23 +96,51 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 		return nil, err
 	}
 
-	payload := map[string]any{
-		"token":   cfg.Token,
-		"hash":    infoHashes,
-		"version": cfg.Version,
+	hashJSON, err := json.Marshal(infoHashes)
+	if err != nil {
+		return nil, iyuuError(ErrIYUUAPI, "marshal info_hashes", err)
 	}
 
-	var resp iyuuReseedResponse
-	if err := s.doPost(ctx, cfg.BaseURL+"/App.Api/reseed.Query", payload, &resp); err != nil {
+	sha1Hash := fmt.Sprintf("%x", sha1.Sum(hashJSON))
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+
+	form := url.Values{}
+	form.Set("hash", string(hashJSON))
+	form.Set("sha1", sha1Hash)
+	form.Set("timestamp", ts)
+	form.Set("version", cfg.Version)
+	if sidSha1 := s.getSidSha1(); sidSha1 == "" {
+		if err := s.ensureSidSha1(ctx); err != nil {
+			s.logger.Warn("failed to ensure sid_sha1, querying without it", zap.Error(err))
+		}
+	}
+	if sidSha1 := s.getSidSha1(); sidSha1 != "" {
+		form.Set("sid_sha1", sidSha1)
+	}
+
+	u := cfg.BaseURL + "/reseed/index/index"
+	var resp iyuuRestReseedResponse
+	if err := s.doPostFormWithToken(ctx, u, cfg.Token, form, &resp); err != nil {
 		return nil, iyuuError(ErrIYUUHTTP, "query reseed", err)
 	}
 
-	if resp.Ret != 200 {
+	if resp.Code == 404 {
+		return []*model.IYUUReseedResult{}, nil
+	}
+
+	if resp.Code != 0 {
 		return nil, iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU query error: %s", resp.Msg), nil)
 	}
 
-	results := make([]*model.IYUUReseedResult, 0, len(resp.Data))
-	for hash, targets := range resp.Data {
+	var dataMap map[string][]iyuuReseedTarget
+	if len(resp.Data) > 0 && resp.Data[0] == '{' {
+		if err := json.Unmarshal(resp.Data, &dataMap); err != nil {
+			return nil, iyuuError(ErrIYUUAPI, "decode reseed data", err)
+		}
+	}
+
+	results := make([]*model.IYUUReseedResult, 0, len(dataMap))
+	for hash, targets := range dataMap {
 		result := &model.IYUUReseedResult{
 			SourceInfoHash: hash,
 		}
@@ -138,33 +184,45 @@ func (s *Service) GetSiteList(ctx context.Context) ([]model.IYUUSite, error) {
 		return nil, err
 	}
 
-	url := cfg.BaseURL + "/App.Api/sites?token=" + cfg.Token
-	resp, err := s.doGet(ctx, url)
+	u := cfg.BaseURL + "/reseed/sites/index"
+	resp, err := s.doGetWithToken(ctx, u, cfg.Token)
 	if err != nil {
 		return nil, iyuuError(ErrIYUUHTTP, "get site list", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	var result iyuuSitesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, iyuuError(ErrIYUUAPI, "read sites response body", err)
+	}
+
+	var result iyuuRestSitesResponse
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, iyuuError(ErrIYUUAPI, "decode sites response", err)
 	}
 
-	if result.Ret != 200 {
+	if result.Code != 0 {
 		return nil, iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU sites error: %s", result.Msg), nil)
 	}
 
-	sites := make([]model.IYUUSite, 0, len(result.Data))
-	for _, site := range result.Data {
+	var sitesData iyuuSitesData
+	if len(result.Data) > 0 && result.Data[0] == '{' {
+		if err := json.Unmarshal(result.Data, &sitesData); err != nil {
+			return nil, iyuuError(ErrIYUUAPI, "decode sites data", err)
+		}
+	}
+
+	sites := make([]model.IYUUSite, 0, len(sitesData.Sites))
+	for _, site := range sitesData.Sites {
 		sites = append(sites, model.IYUUSite{
-			Sid:      site.Sid,
+			Sid:      site.ID,
 			Nickname: site.Nickname,
 			BaseURL:  site.BaseURL,
 			Site:     site.Site,
 		})
 	}
 
-	if err := s.syncSiteMappings(ctx, result.Data); err != nil {
+	if err := s.syncSiteMappings(ctx, sitesData.Sites); err != nil {
 		s.logger.Warn("failed to sync site mappings", zap.Error(err))
 	}
 
@@ -182,65 +240,122 @@ func (s *Service) ReportExisting(ctx context.Context, sidList []int) error {
 	}
 
 	payload := map[string]any{
-		"token": cfg.Token,
-		"sid":   sidList,
+		"sid_list": sidList,
 	}
 
-	var resp iyuuResponse
-	if err := s.doPost(ctx, cfg.BaseURL+"/App.Api/reseed.ReportExisting", payload, &resp); err != nil {
+	u := cfg.BaseURL + "/reseed/sites/reportExisting"
+	var resp iyuuReportResponse
+	if err := s.doPostJSONWithToken(ctx, u, cfg.Token, payload, &resp); err != nil {
 		return iyuuError(ErrIYUUHTTP, "report existing", err)
 	}
 
-	if resp.Ret != 200 {
+	if resp.Code != 0 {
 		return iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU report error: %s", resp.Msg), nil)
+	}
+
+	if resp.Data.SidSha1 != "" {
+		s.sidSha1Mux.Lock()
+		s.sidSha1 = resp.Data.SidSha1
+		s.sidSha1Exp = time.Now().Add(7 * 24 * time.Hour)
+		s.sidSha1Mux.Unlock()
 	}
 
 	return nil
 }
 
-func (s *Service) SendNotification(_ context.Context, text, desp string) error {
-	cfg, err := s.getConfig(context.Background())
+func (s *Service) getSidSha1() string {
+	s.sidSha1Mux.RLock()
+	defer s.sidSha1Mux.RUnlock()
+	if s.sidSha1 != "" && time.Now().Before(s.sidSha1Exp) {
+		return s.sidSha1
+	}
+	return ""
+}
+
+func (s *Service) ensureSidSha1(ctx context.Context) error {
+	var mappings []model.IYUUSiteMapping
+	if err := s.db.WithContext(ctx).Where("enabled = ?", true).Find(&mappings).Error; err != nil {
+		return err
+	}
+	if len(mappings) == 0 {
+		return nil
+	}
+	sidList := make([]int, 0, len(mappings))
+	for _, m := range mappings {
+		sidList = append(sidList, m.IYUUSid)
+	}
+	return s.ReportExisting(ctx, sidList)
+}
+
+func (s *Service) SendNotification(ctx context.Context, text, desp string) error {
+	cfg, err := s.getConfig(ctx)
 	if err != nil {
 		return err
 	}
 
-	payload := map[string]any{
-		"token": cfg.Token,
-		"text":  text,
-		"desp":  desp,
-	}
+	form := url.Values{}
+	form.Set("text", text)
+	form.Set("desp", desp)
 
-	var resp iyuuResponse
-	if err := s.doPost(context.Background(), cfg.BaseURL+"/+api/send", payload, &resp); err != nil {
+	u := cfg.BaseURL + "/+api/send"
+	var resp iyuuRestResponse
+	if err := s.doPostFormWithToken(ctx, u, cfg.Token, form, &resp); err != nil {
 		return iyuuError(ErrIYUUHTTP, "send notification", err)
 	}
 
-	if resp.Ret != 200 {
+	if resp.Code != 0 {
 		return iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU notification error: %s", resp.Msg), nil)
 	}
 
 	return nil
 }
 
-func (s *Service) doGet(ctx context.Context, url string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func (s *Service) doGetWithToken(ctx context.Context, rawURL, token string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Token", token)
 	return s.client.Do(req)
 }
 
-func (s *Service) doPost(ctx context.Context, url string, payload any, result any) error {
+func (s *Service) doPostFormWithToken(ctx context.Context, rawURL, token string, form url.Values, result any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Token", token)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return iyuuError(ErrIYUUHTTP, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)), nil)
+	}
+
+	return json.Unmarshal(respBody, result)
+}
+
+func (s *Service) doPostJSONWithToken(ctx context.Context, rawURL, token string, payload any, result any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Token", token)
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -262,7 +377,10 @@ func (s *Service) doPost(ctx context.Context, url string, payload any, result an
 
 func (s *Service) getSiteMappings(ctx context.Context) map[int]string {
 	var mappings []model.IYUUSiteMapping
-	s.db.WithContext(ctx).Find(&mappings)
+	if err := s.db.WithContext(ctx).Find(&mappings).Error; err != nil {
+		s.logger.Warn("getSiteMappings failed", zap.Error(err))
+		return make(map[int]string)
+	}
 
 	result := make(map[int]string, len(mappings))
 	for _, m := range mappings {
@@ -275,17 +393,17 @@ func (s *Service) syncSiteMappings(ctx context.Context, sites []iyuuSiteRaw) err
 	for _, site := range sites {
 		var mapping model.IYUUSiteMapping
 		err := s.db.WithContext(ctx).
-			Where("iyuu_sid = ?", site.Sid).
+			Where("iyuu_sid = ?", site.ID).
 			First(&mapping).Error
 		if err == gorm.ErrRecordNotFound {
 			mapping = model.IYUUSiteMapping{
-				IYUUSid:    site.Sid,
+				IYUUSid:    site.ID,
 				SiteDomain: site.BaseURL,
 				SiteName:   site.Nickname,
 			}
 			if err := s.db.WithContext(ctx).Create(&mapping).Error; err != nil {
 				s.logger.Warn("create site mapping failed",
-					zap.Int("sid", site.Sid),
+					zap.Int("sid", site.ID),
 					zap.Error(err),
 				)
 			}
@@ -294,16 +412,37 @@ func (s *Service) syncSiteMappings(ctx context.Context, sites []iyuuSiteRaw) err
 	return nil
 }
 
-type iyuuResponse struct {
-	Ret  int    `json:"ret"`
+type iyuuRestResponse struct {
+	Code int    `json:"code"`
 	Msg  string `json:"msg"`
 	Data any    `json:"data"`
 }
 
-type iyuuReseedResponse struct {
-	Ret  int                           `json:"ret"`
-	Msg  string                        `json:"msg"`
-	Data map[string][]iyuuReseedTarget `json:"data"`
+type iyuuReportResponse struct {
+	Code int            `json:"code"`
+	Msg  string         `json:"msg"`
+	Data iyuuReportData `json:"data"`
+}
+
+type iyuuReportData struct {
+	SidSha1 string `json:"sid_sha1"`
+}
+
+type iyuuRestReseedResponse struct {
+	Code int             `json:"code"`
+	Msg  string          `json:"msg"`
+	Data json.RawMessage `json:"data"`
+}
+
+type iyuuRestSitesResponse struct {
+	Code int             `json:"code"`
+	Msg  string          `json:"msg"`
+	Data json.RawMessage `json:"data"`
+}
+
+type iyuuSitesData struct {
+	Count int           `json:"count"`
+	Sites []iyuuSiteRaw `json:"sites"`
 }
 
 type iyuuReseedTarget struct {
@@ -312,14 +451,8 @@ type iyuuReseedTarget struct {
 	InfoHash  string `json:"info_hash"`
 }
 
-type iyuuSitesResponse struct {
-	Ret  int           `json:"ret"`
-	Msg  string        `json:"msg"`
-	Data []iyuuSiteRaw `json:"data"`
-}
-
 type iyuuSiteRaw struct {
-	Sid      int    `json:"sid"`
+	ID       int    `json:"id"`
 	Nickname string `json:"nickname"`
 	BaseURL  string `json:"base_url"`
 	Site     string `json:"site"`

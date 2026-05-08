@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -256,4 +258,127 @@ func TestEngine_RejectPriority(t *testing.T) {
 	if !result.Reject {
 		t.Error("reject (priority 5) should fire before accept (priority 10)")
 	}
+}
+
+func TestMatchConditionExport_NotRegExp(t *testing.T) {
+	cond := model.RuleCondition{Key: "title", CompareType: model.CompareNotRegExp, Value: `[xX]\.?265`}
+	ctx := &EvalContext{Title: "Movie x264 4K"}
+	assert.True(t, MatchConditionExport(cond, ctx), "x264 should NOT match x265 regex")
+
+	ctx2 := &EvalContext{Title: "Movie x265 4K"}
+	assert.False(t, MatchConditionExport(cond, ctx2), "x265 should match x265 regex")
+}
+
+func TestMatchConditionExport_NotRegExpInvalid(t *testing.T) {
+	cond := model.RuleCondition{Key: "title", CompareType: model.CompareNotRegExp, Value: `[invalid`}
+	ctx := &EvalContext{Title: "anything"}
+	assert.False(t, MatchConditionExport(cond, ctx), "invalid regex should return false")
+}
+
+func TestMatchConditionExport_NotIncludeIn(t *testing.T) {
+	cond := model.RuleCondition{Key: "category", CompareType: model.CompareNotIncludeIn, Value: "movie,tv,music"}
+	ctx := &EvalContext{Category: "anime"}
+	assert.True(t, MatchConditionExport(cond, ctx), "anime NOT in list should return true")
+
+	ctx2 := &EvalContext{Category: "movie"}
+	assert.False(t, MatchConditionExport(cond, ctx2), "movie IS in list should return false")
+
+	ctx3 := &EvalContext{Category: "tv"}
+	assert.False(t, MatchConditionExport(cond, ctx3), "tv IS in list should return false")
+}
+
+func TestMatchConditionExport_UnknownCompareType(t *testing.T) {
+	cond := model.RuleCondition{Key: "title", CompareType: "unknown_type", Value: "test"}
+	ctx := &EvalContext{Title: "test"}
+	assert.False(t, MatchConditionExport(cond, ctx), "unknown compare type should return false")
+}
+
+func TestEngine_MatchAcceptAndReject(t *testing.T) {
+	repo := NewRepository(setupTestDB(t))
+	require.NoError(t, repo.Create(context.Background(), &model.FilterRule{
+		Name:     "aar",
+		RuleType: "accept_and_reject",
+		Priority: 10,
+		Conditions: []model.RuleCondition{
+			{Key: "title", CompareType: model.CompareContain, Value: "HD"},
+		},
+		Enabled: true,
+	}))
+
+	engine := NewEngine(repo, nil)
+	result, err := engine.Match(context.Background(), &EvalContext{Title: "HD-Movie"})
+	require.NoError(t, err)
+	assert.True(t, result.Matched, "should match accept_and_reject rule")
+	assert.Equal(t, "accept_and_reject", result.RuleType)
+	assert.False(t, result.Reject, "accept_and_reject should not set Reject flag")
+}
+
+func TestEngine_MatchAcceptWithSavePathCategoryTags(t *testing.T) {
+	repo := NewRepository(setupTestDB(t))
+	require.NoError(t, repo.Create(context.Background(), &model.FilterRule{
+		Name:     "accept-fields",
+		RuleType: "accept",
+		Priority: 10,
+		SavePath: "/downloads/hd",
+		Category: "movies",
+		Tags:     "hd,4k",
+		Conditions: []model.RuleCondition{
+			{Key: "title", CompareType: model.CompareContain, Value: "HD"},
+		},
+		Enabled: true,
+	}))
+
+	engine := NewEngine(repo, nil)
+	result, err := engine.Match(context.Background(), &EvalContext{Title: "HD-Movie"})
+	require.NoError(t, err)
+	require.True(t, result.Matched)
+	assert.Equal(t, "/downloads/hd", result.SavePath)
+	assert.Equal(t, "movies", result.Category)
+	assert.Equal(t, "hd,4k", result.Tags)
+}
+
+func TestGetField_Uploader(t *testing.T) {
+	ctx := &EvalContext{Uploader: "alice"}
+	assert.Equal(t, "alice", getField(ctx, "uploader"))
+}
+
+func TestGetField_SiteName(t *testing.T) {
+	ctx := &EvalContext{SiteName: "MySite"}
+	assert.Equal(t, "MySite", getField(ctx, "sitename"))
+	assert.Equal(t, "MySite", getField(ctx, "site"))
+}
+
+func TestGetField_Free(t *testing.T) {
+	ctx := &EvalContext{Free: true}
+	assert.Equal(t, "true", getField(ctx, "free"))
+}
+
+func TestGetField_Tags(t *testing.T) {
+	ctx := &EvalContext{Tags: []string{"hd", "4k"}}
+	assert.Equal(t, "hd,4k", getField(ctx, "tags"))
+}
+
+func TestGetField_Unknown(t *testing.T) {
+	ctx := &EvalContext{Title: "test"}
+	assert.Equal(t, "", getField(ctx, "unknown_key"))
+}
+
+func TestCompareNumbers_NonNumericFallback(t *testing.T) {
+	assert.Equal(t, 1, compareNumbers("zzz", "aaa"), "string compare zzz > aaa")
+	assert.Equal(t, -1, compareNumbers("aaa", "zzz"), "string compare aaa < zzz")
+	assert.Equal(t, 0, compareNumbers("abc", "abc"), "string compare abc == abc")
+}
+
+func TestEngine_MatchRepoError(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.Close()
+
+	repo := NewRepository(db)
+	engine := NewEngine(repo, nil)
+	result, err := engine.Match(context.Background(), &EvalContext{Title: "test"})
+	assert.Error(t, err)
+	assert.Nil(t, result)
 }

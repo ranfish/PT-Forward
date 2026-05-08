@@ -25,4 +25,22 @@ export const publishApi = {
   resumeGroup(id: number) {
     return client.post(`/publish/groups/${id}/lifecycle/resume`)
   },
+  lifecycleDeleteGroup(id: number) {
+    return client.post(`/publish/groups/${id}/lifecycle/delete`)
+  },
+  createTask(data: any) {
+    return client.post('/publish/tasks', data)
+  },
+  listTasks(params?: any) {
+    return client.get('/publish/tasks', { params })
+  },
+  getTask(id: number) {
+    return client.get(`/publish/tasks/${id}`)
+  },
+  deleteTask(id: number) {
+    return client.delete(`/publish/tasks/${id}`)
+  },
+  listResults(params?: any) {
+    return client.get('/publish/results', { params })
+  },
 }

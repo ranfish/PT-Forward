@@ -844,6 +844,8 @@ func TestNewTRClient_RPCPath(t *testing.T) {
 		{"http://localhost:9091", "http://localhost:9091/transmission/rpc"},
 		{"http://localhost:9091/", "http://localhost:9091/transmission/rpc"},
 		{"http://localhost:9091/rpc", "http://localhost:9091/rpc"},
+		{"http://localhost:9091/transmission/web", "http://localhost:9091/transmission/web/rpc"},
+		{"http://localhost:9091/transmission/web/rpc", "http://localhost:9091/transmission/web/rpc"},
 	}
 
 	for _, tt := range tests {

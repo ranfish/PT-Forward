@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -38,8 +39,11 @@ type rpcResponse struct {
 
 func NewTRClient(cfg *model.ClientConfig, sharedPaths []model.SharedPathMapping, logger *zap.Logger) (*TRClient, error) {
 	baseURL := strings.TrimRight(cfg.URL, "/")
-	if !strings.HasSuffix(baseURL, "/rpc") {
+	if strings.HasSuffix(baseURL, "/rpc") {
+	} else if u, err := url.Parse(baseURL); err == nil && (u.Path == "" || u.Path == "/") {
 		baseURL += "/transmission/rpc"
+	} else {
+		baseURL += "/rpc"
 	}
 	return &TRClient{
 		cfg:         cfg,

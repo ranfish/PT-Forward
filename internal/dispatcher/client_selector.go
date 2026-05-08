@@ -45,9 +45,11 @@ func (s *ClientSelector) Select(ctx context.Context, sub *model.RSSSubscription)
 	case model.SelectionMostSpace:
 		return s.selectMostSpace(ctx, candidates)
 	case model.SelectionLeastLoad:
-		return s.selectLeastLoad(ctx, candidates)
+		return s.selectLeastUpload(ctx, candidates)
 	case model.SelectionRoundRobin:
 		return s.selectRoundRobin(sub.Name, candidates), nil
+	case model.SelectionBestFit:
+		return s.selectBestFit(ctx, candidates)
 	default:
 		return candidates[0], nil
 	}
@@ -91,23 +93,84 @@ func (s *ClientSelector) selectMostSpace(ctx context.Context, candidates []strin
 	return bestClient, nil
 }
 
-func (s *ClientSelector) selectLeastLoad(ctx context.Context, candidates []string) (string, error) {
+func (s *ClientSelector) selectLeastUpload(ctx context.Context, candidates []string) (string, error) {
 	var bestClient string
-	var bestCount = -1
+	var bestSpeed int64 = -1
 
 	for _, c := range candidates {
 		dl, err := s.clientProvider.Get(c)
 		if err != nil {
 			continue
 		}
-		torrents, err := dl.GetSeedingTorrents(ctx)
+		md, err := dl.GetMainData(ctx)
 		if err != nil {
 			continue
 		}
-		count := len(torrents)
-		if bestCount < 0 || count < bestCount {
-			bestCount = count
+		speed := md.ServerState.UploadSpeed
+		if bestSpeed < 0 || speed < bestSpeed {
+			bestSpeed = speed
 			bestClient = c
+		}
+	}
+
+	if bestClient == "" {
+		return candidates[0], nil
+	}
+	return bestClient, nil
+}
+
+func (s *ClientSelector) selectBestFit(ctx context.Context, candidates []string) (string, error) {
+	type candidateScore struct {
+		name        string
+		uploadSpeed int64
+		freeSpace   int64
+	}
+
+	scores := make([]candidateScore, 0, len(candidates))
+	var maxUpload int64
+	var maxSpace int64
+
+	for _, c := range candidates {
+		dl, err := s.clientProvider.Get(c)
+		if err != nil {
+			continue
+		}
+		md, err := dl.GetMainData(ctx)
+		if err != nil {
+			continue
+		}
+		uploadSpeed := md.ServerState.UploadSpeed
+		scores = append(scores, candidateScore{name: c, uploadSpeed: uploadSpeed, freeSpace: md.FreeSpace})
+		if uploadSpeed > maxUpload {
+			maxUpload = uploadSpeed
+		}
+		if md.FreeSpace > maxSpace {
+			maxSpace = md.FreeSpace
+		}
+	}
+
+	if len(scores) == 0 {
+		return candidates[0], nil
+	}
+
+	var bestClient string
+	var bestScore float64 = -1
+	for _, sc := range scores {
+		var uploadNorm, spaceNorm float64
+		if maxUpload > 0 {
+			uploadNorm = 1.0 - float64(sc.uploadSpeed)/float64(maxUpload)
+		} else {
+			uploadNorm = 1.0
+		}
+		if maxSpace > 0 {
+			spaceNorm = float64(sc.freeSpace) / float64(maxSpace)
+		} else {
+			spaceNorm = 1.0
+		}
+		score := 0.6*uploadNorm + 0.4*spaceNorm
+		if score > bestScore {
+			bestScore = score
+			bestClient = sc.name
 		}
 	}
 
@@ -120,6 +183,10 @@ func (s *ClientSelector) selectLeastLoad(ctx context.Context, candidates []strin
 func (s *ClientSelector) selectRoundRobin(subName string, candidates []string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if len(s.roundRobinIdx) > 10000 {
+		s.roundRobinIdx = make(map[string]int, len(s.roundRobinIdx)/2)
+	}
 
 	key := subName
 	idx := s.roundRobinIdx[key]

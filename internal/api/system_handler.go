@@ -121,10 +121,19 @@ func (h *SystemHandler) handleInfo(w http.ResponseWriter, _ *http.Request) {
 
 	uptime := time.Since(startTime)
 
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
 	Success(w, map[string]interface{}{
 		"version":          h.version,
 		"uptime":           uptime.String(),
 		"goVersion":        runtime.Version(),
+		"os":               runtime.GOOS,
+		"arch":             runtime.GOARCH,
+		"cpuCount":         runtime.NumCPU(),
+		"goroutines":       runtime.NumGoroutine(),
+		"memAlloc":         memStats.Alloc,
+		"heapAlloc":        memStats.HeapAlloc,
 		"connectedClients": connectedClients,
 		"rssSubscriptions": rssCount,
 		"seedingActive":    seedingActive,

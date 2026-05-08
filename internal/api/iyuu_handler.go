@@ -22,6 +22,7 @@ type IYUUHandler struct {
 
 type IYUUQueryService interface {
 	QueryReseed(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error)
+	GetSiteList(ctx context.Context) ([]model.IYUUSite, error)
 }
 
 func NewIYUUHandler(db *gorm.DB, logger *zap.Logger, iyuuSvc IYUUQueryService) *IYUUHandler {
@@ -170,10 +171,23 @@ func (h *IYUUHandler) handleListSites(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (h *IYUUHandler) handleSyncSites(w http.ResponseWriter, _ *http.Request) {
-	h.logger.Info("iyuu site sync triggered")
+func (h *IYUUHandler) handleSyncSites(w http.ResponseWriter, r *http.Request) {
+	if h.iyuuSvc == nil {
+		Error(w, http.StatusServiceUnavailable, 50301, "IYUU 服务未配置")
+		return
+	}
+
+	sites, err := h.iyuuSvc.GetSiteList(r.Context())
+	if err != nil {
+		h.logger.Warn("iyuu site sync failed", zap.Error(err))
+		Error(w, http.StatusBadGateway, 50001, "站点同步失败: "+err.Error())
+		return
+	}
+
+	h.logger.Info("iyuu site sync completed", zap.Int("count", len(sites)))
 	Success(w, map[string]interface{}{
-		"message": "站点同步已触发（后台执行中）",
+		"message": "站点同步完成",
+		"count":   len(sites),
 	})
 }
 
@@ -197,7 +211,7 @@ func (h *IYUUHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	results, err := h.iyuuSvc.QueryReseed(r.Context(), req.InfoHashes)
 	if err != nil {
-		h.logger.Warn("IYUU query failed", zap.Error(err))
+		h.logger.Warn("IYUU query failed", zap.String("error", err.Error()), zap.String("cause", fmt.Sprintf("%v", err)))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("IYUU 查询失败: %v", err))
 		return
 	}
@@ -221,11 +235,12 @@ func (h *IYUUHandler) handleTest(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", "https://api.iyuu.cn/App.Api/sites?token="+cfg.Token, nil)
+	req, err := http.NewRequest("GET", cfg.BaseURL+"/reseed/sites/index", nil)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "构造请求失败")
 		return
 	}
+	req.Header.Set("Token", cfg.Token)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -246,7 +261,7 @@ func (h *IYUUHandler) handleTest(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	if code, ok := result["ret"].(float64); ok && code == 200 {
+	if code, ok := result["code"].(float64); ok && code == 0 {
 		Success(w, map[string]interface{}{
 			"ok":      true,
 			"message": "连接测试成功",

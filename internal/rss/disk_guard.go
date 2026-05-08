@@ -52,7 +52,7 @@ func (g *DiskGuard) check(ctx context.Context) {
 
 	var subs []model.RSSSubscription
 	if err := g.db.WithContext(ctx).
-		Where("enabled = ? AND disk_guard_enabled = ?", true, true).
+		Where("enabled = ? AND disk_guard_enabled = ? AND deleted_at = ?", true, true, time.Time{}).
 		Find(&subs).Error; err != nil {
 		g.logger.Warn("disk guard: query subscriptions failed", zap.Error(err))
 		return

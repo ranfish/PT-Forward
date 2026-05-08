@@ -1,7 +1,9 @@
 package audit
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -82,5 +84,58 @@ func TestLogger_LogEnqueue(t *testing.T) {
 	}
 	if entry.Result != "success" {
 		t.Errorf("expected result=success, got %s", entry.Result)
+	}
+}
+
+func TestLogger_StartAndFlushOnCancel(t *testing.T) {
+	db := setupAuditDB(t)
+	l := NewLogger(db, zap.NewNop())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	l.Start(ctx)
+
+	l.Log("admin", "site", "create", "site", "1", "detail", "success")
+	l.Log("admin", "site", "delete", "site", "2", "", "failure")
+
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	time.Sleep(300 * time.Millisecond)
+
+	var count int64
+	db.Model(&model.OperationAuditLog{}).Count(&count)
+	if count != 2 {
+		t.Errorf("expected 2 logs after cancel, got %d", count)
+	}
+}
+
+func TestLogger_FlushLoopBatchSize(t *testing.T) {
+	db := setupAuditDB(t)
+	l := NewLogger(db, zap.NewNop())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l.Start(ctx)
+
+	for i := 0; i < 55; i++ {
+		l.Log("admin", "site", "action", "type", string(rune(i)), "", "ok")
+	}
+
+	time.Sleep(300 * time.Millisecond)
+
+	var count int64
+	db.Model(&model.OperationAuditLog{}).Count(&count)
+	if count < 50 {
+		t.Errorf("expected at least 50 flushed, got %d", count)
+	}
+}
+
+func TestLogger_NewLogger(t *testing.T) {
+	db := setupAuditDB(t)
+	l := NewLogger(db, zap.NewNop())
+	if l == nil {
+		t.Fatal("expected non-nil logger")
+	}
+	if cap(l.ch) != 1000 {
+		t.Errorf("expected channel capacity 1000, got %d", cap(l.ch))
 	}
 }

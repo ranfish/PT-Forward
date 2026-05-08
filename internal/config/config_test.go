@@ -1,7 +1,11 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
+
+	"go.uber.org/zap"
 )
 
 func TestValidate_OK(t *testing.T) {
@@ -95,5 +99,82 @@ func TestDefaultConfig_Values(t *testing.T) {
 	}
 	if cfg.Server.Mode != "release" {
 		t.Errorf("expected mode release, got %s", cfg.Server.Mode)
+	}
+}
+
+func TestLoad_Defaults(t *testing.T) {
+	cfg, err := Load("", zap.NewNop())
+	if err != nil {
+		t.Fatalf("empty path should use defaults: %v", err)
+	}
+	if cfg.Server.Port != 8765 {
+		t.Errorf("expected default port 8765, got %d", cfg.Server.Port)
+	}
+}
+
+func TestLoad_MissingFile(t *testing.T) {
+	cfg, err := Load("/nonexistent/path/config.yaml", zap.NewNop())
+	if err != nil {
+		t.Fatalf("missing file should use defaults: %v", err)
+	}
+	if cfg.Server.Port != 8765 {
+		t.Errorf("expected default port, got %d", cfg.Server.Port)
+	}
+}
+
+func TestLoad_ValidYAML(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := []byte("server:\n  port: 9999\n  mode: debug\n")
+	if err := os.WriteFile(cfgPath, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(cfgPath, zap.NewNop())
+	if err != nil {
+		t.Fatalf("valid yaml should load: %v", err)
+	}
+	if cfg.Server.Port != 9999 {
+		t.Errorf("expected port 9999, got %d", cfg.Server.Port)
+	}
+	if cfg.Server.Mode != "debug" {
+		t.Errorf("expected mode debug, got %s", cfg.Server.Mode)
+	}
+}
+
+func TestLoad_InvalidYAML(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(cfgPath, []byte("{{invalid yaml"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(cfgPath, zap.NewNop())
+	if err == nil {
+		t.Fatal("expected error for invalid yaml")
+	}
+}
+
+func TestLoad_InvalidConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := []byte("server:\n  port: 0\n")
+	if err := os.WriteFile(cfgPath, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(cfgPath, zap.NewNop())
+	if err == nil {
+		t.Fatal("expected error for invalid config values")
+	}
+}
+
+func TestConfigError(t *testing.T) {
+	err := configError(42000, "test message", nil)
+	if err.Code != 42000 {
+		t.Errorf("expected code 42000, got %d", err.Code)
+	}
+	if err.Message != "test message" {
+		t.Errorf("expected 'test message', got %s", err.Message)
 	}
 }

@@ -135,7 +135,16 @@ func (c *QBClient) detectVersion(ctx context.Context) {
 }
 
 func (c *QBClient) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +161,7 @@ func (c *QBClient) doRequest(ctx context.Context, method, path string, body io.R
 		if loginErr := c.login(ctx); loginErr != nil {
 			return nil, loginErr
 		}
-		req2, _ := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+		req2, _ := http.NewRequestWithContext(ctx, method, c.baseURL+path, bytes.NewReader(bodyBytes))
 		req2.Header.Set("Referer", c.baseURL)
 		return c.client.Do(req2)
 	}
@@ -166,11 +175,30 @@ func (c *QBClient) get(ctx context.Context, path string) (*http.Response, error)
 
 func (c *QBClient) postForm(ctx context.Context, path string, data url.Values) (*http.Response, error) {
 	encoded := data.Encode()
-	resp, err := c.doRequest(ctx, http.MethodPost, path, strings.NewReader(encoded))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, strings.NewReader(encoded))
 	if err != nil {
 		return nil, err
 	}
-	resp.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", c.baseURL)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode == http.StatusForbidden {
+		_ = resp.Body.Close()
+		c.logger.Debug("postForm session expired, re-login", zap.String("client", c.cfg.Name))
+		if loginErr := c.login(ctx); loginErr != nil {
+			return nil, loginErr
+		}
+		req2, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, strings.NewReader(encoded))
+		req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req2.Header.Set("Referer", c.baseURL)
+		return c.client.Do(req2)
+	}
+
 	return resp, nil
 }
 

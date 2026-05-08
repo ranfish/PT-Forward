@@ -88,7 +88,8 @@ func (h *PTGenHandler) handleListCache(w http.ResponseWriter, r *http.Request) {
 
 	q := h.db.Model(&model.PTGenCache{})
 	if keyword := r.URL.Query().Get("keyword"); keyword != "" {
-		q = q.Where("query_key LIKE ? OR chinese_title LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(keyword)
+		q = q.Where("query_key LIKE ? OR chinese_title LIKE ?", "%"+escaped+"%", "%"+escaped+"%")
 	}
 
 	var total int64

@@ -149,3 +149,48 @@ func TestRepository_ListAll(t *testing.T) {
 		t.Fatalf("expected 2, got %d", len(result))
 	}
 }
+
+func TestRepository_RestoreAll(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRepository(db)
+	ctx := context.Background()
+
+	if err := repo.Set(ctx, "old_key", "old_value"); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreData := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+	if err := repo.RestoreAll(ctx, restoreData); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := repo.ListAll(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 after restore, got %d", len(got))
+	}
+	if got["key1"] != "value1" {
+		t.Errorf("expected value1, got %s", got["key1"])
+	}
+	if _, ok := got["old_key"]; ok {
+		t.Error("old_key should be deleted")
+	}
+}
+
+func TestAutoMigrate(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := AutoMigrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasTable("system_settings") {
+		t.Error("expected system_settings table")
+	}
+}

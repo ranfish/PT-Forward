@@ -103,19 +103,62 @@ func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 		detail.Title = strings.TrimSpace(m[1])
 	}
 
-	if m := regexp.MustCompile(`(?i)info_hash.*?<td[^>]*>([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
-		detail.InfoHash = strings.ToLower(m[1])
+	rowRe := regexp.MustCompile(`(?s)<tr[^>]*>.*?</tr>`)
+	for _, row := range rowRe.FindAllString(html, -1) {
+		rowText := cleanRowText(row)
+
+		if (strings.Contains(rowText, "类别") || strings.Contains(rowText, "Category")) && !strings.Contains(rowText, "基本信息") {
+			extractCategoryFromImg(row, detail)
+		}
+
+		if strings.Contains(rowText, "基本信息") || strings.Contains(rowText, "基本") {
+			extractBasicInfoFields(row, detail)
+		}
+
+		if strings.Contains(rowText, "副标题") && !strings.Contains(rowText, "基本信息") {
+			extractSubtitleFromRow(row, detail)
+		}
+
+		if (strings.Contains(rowText, "种子文件") || strings.Contains(rowText, "种子信息")) && detail.InfoHash == "" {
+			if h := extractInfoHashFromRow(row); h != "" {
+				detail.InfoHash = h
+			}
+		}
 	}
 
-	if m := regexp.MustCompile(`(?i)(?:大小|Size|File\s*Size)[^<]*(?:<[^>]*>)*\s*([^<]*(?:\d[\d.,]*\s*(?:TB|GB|MB|KB|B))[^<]*)`).FindStringSubmatch(html); len(m) > 1 {
-		detail.Size = parseSizeStr(m[1])
+	if detail.Size == 0 || detail.Category == "" {
+		ddBlockRe := regexp.MustCompile(`(?s)基本信息</dt>\s*<dd>(.*)</dd>`)
+		if m := ddBlockRe.FindStringSubmatch(html); len(m) > 1 {
+			extractBasicInfoFields(m[1], detail)
+		}
+		fallbackDivRe := regexp.MustCompile(`(?s)基本信息</div>(.*?)种子文件`)
+		if m := fallbackDivRe.FindStringSubmatch(html); len(m) > 1 {
+			extractBasicInfoFields(m[1], detail)
+		}
 	}
 
-	if m := regexp.MustCompile(`(?i)(?:分类|Category|Type)[^<]*<[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
-		detail.Category = strings.TrimSpace(m[1])
+	if detail.InfoHash == "" {
+		for _, re := range hashRowPatterns {
+			if m := re.FindStringSubmatch(html); len(m) > 1 {
+				detail.InfoHash = strings.ToLower(m[1])
+				break
+			}
+		}
+	}
+
+	if detail.InfoHash == "" {
+		if m := regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
+			detail.InfoHash = strings.ToLower(m[1])
+		}
+	}
+
+	if m := regexp.MustCompile(`(?s)<div[^>]*id=['"]kdescr['"][^>]*>([\s\S]*?)</div>`).FindStringSubmatch(html); len(m) > 1 {
+		detail.Description = strings.TrimSpace(m[1])
 	}
 
 	detail.Tags = extractTags(html)
+
+	detail.Category = NormalizeCategory(detail.Category)
 
 	return detail, nil
 }
@@ -480,11 +523,15 @@ func buildGenericDownloadURL(config *model.SiteConfig, torrentID string) string 
 	return base + "/download.php?id=" + torrentID
 }
 
+func stripTags(s string) string {
+	return regexp.MustCompile(`<[^>]+>`).ReplaceAllString(s, "")
+}
+
 func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
 	var results []*model.SeedingSearchResult
 
-	rowRe := regexp.MustCompile(`<tr[^>]*>(.*?)</tr>`)
-	detailLinkRe := regexp.MustCompile(`href="[^"]*(?:details?|torrent)[^"]*id=(\d+)[^"]*"[^>]*>([^<]+)`)
+	rowRe := regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
+	detailLinkRe := regexp.MustCompile(`(?s)href="[^"]*(?:details?|torrent)[^"]*id=(\d+)[^"]*"[^>]*>(.*?)</a>`)
 	sizeRe := regexp.MustCompile(`(?i)([\d.]+)\s*(TB|GB|MB|KB)`)
 	seedersRe := regexp.MustCompile(`>(\d+)</a>\s*</td>\s*$`)
 	leechersRe := regexp.MustCompile(`(\d+)\s*</td>\s*$`)
@@ -497,7 +544,7 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 		}
 
 		torrentID := linkMatch[1]
-		title := strings.TrimSpace(linkMatch[2])
+		title := stripTags(strings.TrimSpace(linkMatch[2]))
 
 		if len(results) > 0 && results[len(results)-1].TorrentID == torrentID {
 			continue

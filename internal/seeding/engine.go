@@ -104,13 +104,16 @@ func (e *Engine) AddSeedingRecord(ctx context.Context, record *model.SeedingTorr
 		e.mu.Unlock()
 		return &model.AppError{Code: 40900, Message: fmt.Sprintf("seeding record already exists: %s", key)}
 	}
-	e.recordMap[key] = record
 	e.mu.Unlock()
 
 	record.Status = model.SeedingStatusSeeding
 	if err := e.db.WithContext(ctx).Create(record).Error; err != nil {
 		return err
 	}
+
+	e.mu.Lock()
+	e.recordMap[key] = record
+	e.mu.Unlock()
 
 	if e.freeEndMonitor != nil {
 		e.freeEndMonitor.Schedule(record)
@@ -537,7 +540,7 @@ func (e *Engine) CollectTrafficStats(ctx context.Context) error {
 
 		var totalUpload, totalDownload int64
 		for _, t := range md.Torrents {
-			totalUpload += t.Uploaded
+			totalUpload += t.UploadSpeed
 			totalDownload += t.DownloadSpeed
 		}
 

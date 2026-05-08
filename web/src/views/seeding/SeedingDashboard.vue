@@ -24,7 +24,7 @@
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic :title="t('seeding.uptime')" :value="formatDuration(status.uptimeSeconds || 0)" :value-style="{ color: '#722ed1' }">
+          <a-statistic :title="t('seeding.uptime')" :value="formatDurationSec(status.uptimeSeconds || 0)" :value-style="{ color: '#722ed1' }">
             <template #prefix><TrophyOutlined /></template>
           </a-statistic>
         </a-card>
@@ -113,8 +113,15 @@
       width="560px"
     >
       <a-form :model="configForm" layout="vertical">
-        <a-form-item :label="t('seeding.downloaderId')" :rules="[{ required: true, message: t('seeding.pleaseInputDownloaderId') }]">
-          <a-input v-model:value="configForm.clientId" :placeholder="t('seeding.downloaderId')" :disabled="!!editingConfig" />
+        <a-form-item :label="t('seeding.downloaderId')">
+          <a-select
+            v-model:value="configForm.clientId"
+            :placeholder="t('seeding.pleaseInputDownloaderId')"
+            :disabled="!!editingConfig"
+            :options="downloaderOptions"
+            show-search
+            :filter-option="(input: string, option: any) => option.label.toLowerCase().includes(input.toLowerCase())"
+          />
         </a-form-item>
         <a-form-item :label="t('common.enable')">
           <a-switch v-model:checked="configForm.enabled" />
@@ -157,6 +164,8 @@ import {
   PlusOutlined,
 } from '@ant-design/icons-vue'
 import { seedingApi } from '@/api/seeding'
+import { downloadersApi } from '@/api/downloaders'
+import { formatDurationSec } from '@/utils/format'
 
 const { t } = useI18n()
 const loading = ref(false)
@@ -164,6 +173,7 @@ const configsLoading = ref(false)
 const status = ref<any>({})
 const torrents = ref<any[]>([])
 const configs = ref<any[]>([])
+const downloaderOptions = ref<{label: string, value: string}[]>([])
 
 const configModalVisible = ref(false)
 const configSubmitting = ref(false)
@@ -202,14 +212,6 @@ const configColumns = [
   { title: '启用', key: 'enabled', width: 80 },
   { title: '操作', key: 'actions', width: 140 },
 ]
-
-function formatDuration(seconds: number) {
-  if (!seconds) return '0s'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
 
 async function fetchData() {
   loading.value = true
@@ -332,8 +334,20 @@ async function handlePauseRecord(recordId: number) {
   }
 }
 
+async function fetchDownloaders() {
+  try {
+    const resp = await downloadersApi.list(1, 100)
+    const items = resp.data.data?.items || resp.data.data || []
+    downloaderOptions.value = items.map((d: any) => ({
+      label: d.name || d.id,
+      value: d.name || d.id,
+    }))
+  } catch (_e: any) {}
+}
+
 onMounted(() => {
   fetchData()
   fetchConfigs()
+  fetchDownloaders()
 })
 </script>

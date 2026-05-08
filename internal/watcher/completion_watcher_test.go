@@ -2,11 +2,17 @@ package watcher
 
 import (
 	"context"
+	"errors"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 
+	"github.com/ranfish/pt-forward/internal/client"
+	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/publish"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -283,5 +289,262 @@ func TestWatcher_MultipleWatches(t *testing.T) {
 func TestFmtCandidate(t *testing.T) {
 	if got := fmtCandidate(42); got != "candidate-42" {
 		t.Errorf("expected candidate-42, got %s", got)
+	}
+}
+
+func injectMockClient(t *testing.T, mgr *client.Manager, name string, dl model.DownloaderClient) {
+	t.Helper()
+	v := reflect.ValueOf(mgr).Elem()
+	f := v.FieldByName("clients")
+	clients := *(*map[string]model.DownloaderClient)(unsafe.Pointer(f.UnsafeAddr()))
+	clients[name] = dl
+}
+
+func TestWatcher_OnWatchCompleted_HappyPath(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	pipeline := publish.NewPipeline(db, zap.NewNop())
+	w := NewCompletionWatcher(db, nil, pipeline, zap.NewNop())
+
+	candidate := model.PublishCandidate{
+		SourceSite:      "site1",
+		SourceTorrentID: "t1",
+		TorrentName:     "Clean Torrent",
+		PublishStatus:   model.CandidatePending,
+	}
+	db.Create(&candidate)
+
+	w.onWatchCompleted(context.Background(), candidate.ID, &model.TorrentInfo{
+		SavePath: "/data/downloads",
+	})
+
+	var updated model.PublishCandidate
+	db.First(&updated, candidate.ID)
+	if !updated.DownloadCompleted {
+		t.Error("expected download_completed")
+	}
+	if updated.LocalSavePath != "/data/downloads" {
+		t.Errorf("expected /data/downloads, got %s", updated.LocalSavePath)
+	}
+	if updated.CompletedAt == nil {
+		t.Error("expected completed_at to be set")
+	}
+}
+
+func TestWatcher_OnWatchCompleted_PipelineNil(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	w := NewCompletionWatcher(db, nil, nil, zap.NewNop())
+
+	candidate := model.PublishCandidate{
+		SourceSite:      "site1",
+		SourceTorrentID: "t1",
+		PublishStatus:   model.CandidatePending,
+	}
+	db.Create(&candidate)
+
+	w.onWatchCompleted(context.Background(), candidate.ID, &model.TorrentInfo{
+		SavePath: "/data/test",
+	})
+
+	var updated model.PublishCandidate
+	db.First(&updated, candidate.ID)
+	if !updated.DownloadCompleted {
+		t.Error("expected download_completed")
+	}
+	if updated.PublishStatus != model.CandidateCompleted {
+		t.Errorf("expected completed, got %s", updated.PublishStatus)
+	}
+	if updated.LocalSavePath != "/data/test" {
+		t.Errorf("expected /data/test, got %s", updated.LocalSavePath)
+	}
+}
+
+func TestWatcher_OnWatchCompleted_DBUpdateFailure(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	w := NewCompletionWatcher(db, nil, nil, zap.NewNop())
+
+	candidate := model.PublishCandidate{
+		SourceSite:      "site1",
+		SourceTorrentID: "t1",
+		PublishStatus:   model.CandidatePending,
+	}
+	db.Create(&candidate)
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB.Close()
+
+	w.onWatchCompleted(context.Background(), candidate.ID, &model.TorrentInfo{
+		SavePath: "/data/test",
+	})
+}
+
+func TestWatcher_OnWatchCompleted_PipelineFailure(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	pipeline := publish.NewPipeline(db, zap.NewNop())
+	w := NewCompletionWatcher(db, nil, pipeline, zap.NewNop())
+
+	candidate := model.PublishCandidate{
+		SourceSite:      "site1",
+		SourceTorrentID: "t1",
+		TorrentName:     "Test 禁转 Torrent",
+		PublishStatus:   model.CandidatePending,
+	}
+	db.Create(&candidate)
+
+	w.onWatchCompleted(context.Background(), candidate.ID, &model.TorrentInfo{
+		SavePath: "/data/test",
+	})
+
+	var updated model.PublishCandidate
+	db.First(&updated, candidate.ID)
+	if updated.PublishStatus != model.CandidateSkipped {
+		t.Errorf("expected skipped, got %s", updated.PublishStatus)
+	}
+}
+
+func TestWatcher_PollOnce_MalformedKey(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	mgr := client.NewManager(db, zap.NewNop())
+	w := NewCompletionWatcher(db, mgr, nil, zap.NewNop())
+
+	w.watchStore.Store("malformed_key", uint(999))
+
+	w.pollOnce(context.Background())
+
+	if _, ok := w.watchStore.Load("malformed_key"); ok {
+		t.Error("malformed key should be deleted")
+	}
+}
+
+func TestWatcher_PollOnce_GetClientFailure(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	mgr := client.NewManager(db, zap.NewNop())
+	w := NewCompletionWatcher(db, mgr, nil, zap.NewNop())
+
+	candidate := model.PublishCandidate{
+		SourceSite:      "site1",
+		SourceTorrentID: "t1",
+		PublishStatus:   model.CandidatePending,
+	}
+	db.Create(&candidate)
+
+	w.watchStore.Store("missing_client|hash1", candidate.ID)
+
+	w.pollOnce(context.Background())
+
+	if _, ok := w.watchStore.Load("missing_client|hash1"); !ok {
+		t.Error("watch should not be removed on Get failure")
+	}
+}
+
+func TestWatcher_PollOnce_GetTorrentByHashError(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	mgr := client.NewManager(db, zap.NewNop())
+	w := NewCompletionWatcher(db, mgr, nil, zap.NewNop())
+
+	mockDL := &mocks.DownloaderClient{
+		GetTorrentByHashFn: func(ctx context.Context, hash string) (*model.TorrentInfo, error) {
+			return nil, errors.New("connection refused")
+		},
+	}
+	injectMockClient(t, mgr, "client1", mockDL)
+
+	candidate := model.PublishCandidate{
+		SourceSite:      "site1",
+		SourceTorrentID: "t1",
+		PublishStatus:   model.CandidatePending,
+	}
+	db.Create(&candidate)
+
+	w.watchStore.Store("client1|hash1", candidate.ID)
+
+	w.pollOnce(context.Background())
+
+	if _, ok := w.watchStore.Load("client1|hash1"); !ok {
+		t.Error("watch should not be removed on GetTorrentByHash error")
+	}
+
+	var updated model.PublishCandidate
+	db.First(&updated, candidate.ID)
+	if updated.PublishStatus != model.CandidatePending {
+		t.Errorf("expected pending, got %s", updated.PublishStatus)
+	}
+}
+
+func TestWatcher_PollOnce_TorrentNotFound(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	mgr := client.NewManager(db, zap.NewNop())
+	w := NewCompletionWatcher(db, mgr, nil, zap.NewNop())
+
+	mockDL := &mocks.DownloaderClient{}
+	injectMockClient(t, mgr, "client1", mockDL)
+
+	candidate := model.PublishCandidate{
+		SourceSite:      "site1",
+		SourceTorrentID: "t1",
+		PublishStatus:   model.CandidatePending,
+	}
+	db.Create(&candidate)
+
+	w.watchStore.Store("client1|hash1", candidate.ID)
+
+	w.pollOnce(context.Background())
+
+	if _, ok := w.watchStore.Load("client1|hash1"); ok {
+		t.Error("watch should be removed for orphan")
+	}
+
+	var updated model.PublishCandidate
+	db.First(&updated, candidate.ID)
+	if updated.PublishStatus != model.CandidateOrphan {
+		t.Errorf("expected orphan, got %s", updated.PublishStatus)
+	}
+	if updated.SkipReason != "种子在下载器中不存在" {
+		t.Errorf("expected orphan skip reason, got %s", updated.SkipReason)
+	}
+}
+
+func TestWatcher_PollOnce_DetectsCompletion(t *testing.T) {
+	db := setupWatcherTestDB(t)
+	mgr := client.NewManager(db, zap.NewNop())
+	pipeline := publish.NewPipeline(db, zap.NewNop())
+	w := NewCompletionWatcher(db, mgr, pipeline, zap.NewNop())
+
+	mockDL := &mocks.DownloaderClient{
+		GetTorrentByHashFn: func(ctx context.Context, hash string) (*model.TorrentInfo, error) {
+			return &model.TorrentInfo{
+				Hash:       "hash1",
+				IsFinished: true,
+				SavePath:   "/data/complete",
+			}, nil
+		},
+	}
+	injectMockClient(t, mgr, "client1", mockDL)
+
+	candidate := model.PublishCandidate{
+		SourceSite:      "site1",
+		SourceTorrentID: "t1",
+		TorrentName:     "Clean Torrent",
+		PublishStatus:   model.CandidatePending,
+	}
+	db.Create(&candidate)
+
+	w.watchStore.Store("client1|hash1", candidate.ID)
+
+	w.pollOnce(context.Background())
+
+	if _, ok := w.watchStore.Load("client1|hash1"); ok {
+		t.Error("watch should be removed after completion")
+	}
+
+	var updated model.PublishCandidate
+	db.First(&updated, candidate.ID)
+	if !updated.DownloadCompleted {
+		t.Error("expected download_completed")
+	}
+	if updated.LocalSavePath != "/data/complete" {
+		t.Errorf("expected /data/complete, got %s", updated.LocalSavePath)
 	}
 }

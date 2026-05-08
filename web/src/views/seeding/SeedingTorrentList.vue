@@ -8,6 +8,16 @@
         @search="pagination.fetch(1)"
       />
       <a-select
+        v-model:value="filters.clientId"
+        :placeholder="t('seeding.filterClient')"
+        allow-clear
+        style="width: 200px"
+        :options="downloaderOptions"
+        show-search
+        :filter-option="(input: string, option: any) => option.label.toLowerCase().includes(input.toLowerCase())"
+        @change="pagination.fetch(1)"
+      />
+      <a-select
         v-model:value="filters.site"
         :placeholder="t('seeding.filterSite')"
         allow-clear
@@ -37,7 +47,7 @@
         pageSize: pagination.pageSize.value,
         total: pagination.total.value,
         showSizeChanger: true,
-        showTotal: (total: number) => t('common.totalCount', { total }),
+        showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
       @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
@@ -75,15 +85,18 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { seedingApi } from '@/api/seeding'
+import { downloadersApi } from '@/api/downloaders'
 import { usePagination } from '@/composables/usePagination'
 
 const { t } = useI18n()
+const downloaderOptions = ref<{label: string, value: string}[]>([])
 const filters = reactive({
   search: '',
+  clientId: undefined as string | undefined,
   site: undefined as string | undefined,
   status: undefined as string | undefined,
 })
@@ -125,5 +138,19 @@ async function handlePause(recordId: number) {
   }
 }
 
-onMounted(() => pagination.fetch())
+async function fetchDownloaders() {
+  try {
+    const resp = await downloadersApi.list(1, 100)
+    const items = resp.data.data?.items || resp.data.data || []
+    downloaderOptions.value = items.map((d: any) => ({
+      label: d.name || d.id,
+      value: d.name || d.id,
+    }))
+  } catch (_e: any) {}
+}
+
+onMounted(() => {
+  fetchDownloaders()
+  pagination.fetch()
+})
 </script>

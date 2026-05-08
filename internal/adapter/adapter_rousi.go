@@ -29,6 +29,63 @@ func NewRousiAdapter(doer *HTTPDoer, logger *zap.Logger) *RousiAdapter {
 
 func (a *RousiAdapter) Framework() string { return "rousi" }
 
+func (a *RousiAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	u := resolveBaseURL(config) + "/api/v1/torrents?perPage=20&page=1"
+	if keyword != "" {
+		u += "&search=" + keyword
+	}
+	if opts != nil && opts.Category != "" {
+		u += "&category=" + opts.Category
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, searchError("构造搜索请求失败", err)
+	}
+	a.setAuthHeaders(req, config.Passkey)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, searchError("搜索请求失败", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Code int `json:"code"`
+		Data struct {
+			Torrents []struct {
+				ID       int    `json:"id"`
+				UUID     string `json:"uuid"`
+				Title    string `json:"title"`
+				Size     int64  `json:"size"`
+				Seeders  int    `json:"seeders"`
+				Leechers int    `json:"leechers"`
+				Category string `json:"category"`
+			} `json:"torrents"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, parseError("解析搜索结果失败", err)
+	}
+
+	var results []*model.SeedingSearchResult
+	for _, t := range result.Data.Torrents {
+		tid := t.UUID
+		if tid == "" {
+			tid = fmt.Sprintf("%d", t.ID)
+		}
+		results = append(results, &model.SeedingSearchResult{
+			TorrentID: tid,
+			Title:     t.Title,
+			Size:      t.Size,
+			Seeders:   t.Seeders,
+			Leechers:  t.Leechers,
+		})
+	}
+	return results, nil
+}
+
 func (a *RousiAdapter) setAuthHeaders(req *http.Request, passkey string) {
 	req.Header.Set("Authorization", "Bearer "+passkey)
 	req.Header.Set("Accept", "application/json")
@@ -43,7 +100,7 @@ func (a *RousiAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 	if err != nil {
 		return nil, networkError("构造请求失败", err)
 	}
-	setCommonHeaders(req, config.Cookie)
+	a.setAuthHeaders(req, config.Passkey)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
@@ -142,30 +199,28 @@ func (a *RousiAdapter) DetectDiscount(ctx context.Context, config *model.SiteCon
 		return &model.DiscountResult{Level: model.DiscountNone}, nil
 	}
 
-	switch promo.Type {
-	case 1:
-		return &model.DiscountResult{Level: model.DiscountFree}, nil
-	case 2:
-		return &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}, nil
-	case 3:
-		return &model.DiscountResult{Level: model.DiscountFree, Multiplier: 2.0}, nil
-	case 4:
-		return &model.DiscountResult{Level: model.DiscountPercent50}, nil
-	case 5:
-		return &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}, nil
-	case 6:
-		return &model.DiscountResult{Level: model.Discount2x50}, nil
-	case 7:
-		return &model.DiscountResult{Level: model.DiscountPercent30}, nil
-	default:
-		if promo.DownMultiplier == 0 && promo.UpMultiplier >= 2 {
-			return &model.DiscountResult{Level: model.Discount2xFree, Multiplier: promo.UpMultiplier}, nil
-		}
-		if promo.DownMultiplier == 0 {
-			return &model.DiscountResult{Level: model.DiscountFree}, nil
-		}
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+	down := promo.DownMultiplier
+	up := promo.UpMultiplier
+
+	if down == 0 && up >= 2 {
+		return &model.DiscountResult{Level: model.Discount2xFree, Multiplier: up}, nil
 	}
+	if down == 0 {
+		return &model.DiscountResult{Level: model.DiscountFree}, nil
+	}
+	if down == 0.5 && up >= 2 {
+		return &model.DiscountResult{Level: model.Discount2x50}, nil
+	}
+	if down == 0.5 {
+		return &model.DiscountResult{Level: model.DiscountPercent50}, nil
+	}
+	if down == 0.3 {
+		return &model.DiscountResult{Level: model.DiscountPercent30}, nil
+	}
+	if up >= 2 {
+		return &model.DiscountResult{Level: model.Discount2xUp, Multiplier: up}, nil
+	}
+	return &model.DiscountResult{Level: model.DiscountNone}, nil
 }
 
 func (a *RousiAdapter) DetectHR(_ context.Context, _ *model.SiteConfig, _ string) (*model.HRResult, error) {

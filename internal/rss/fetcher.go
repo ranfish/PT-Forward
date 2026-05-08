@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -247,15 +248,21 @@ func parseSize(s string) int64 {
 }
 
 var regexCache = map[string]*regexp.Regexp{}
+var regexCacheMu sync.RWMutex
 
 func compileRegex(pattern string) (*regexp.Regexp, error) {
+	regexCacheMu.RLock()
 	if re, ok := regexCache[pattern]; ok {
+		regexCacheMu.RUnlock()
 		return re, nil
 	}
+	regexCacheMu.RUnlock()
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, err
 	}
+	regexCacheMu.Lock()
 	regexCache[pattern] = re
+	regexCacheMu.Unlock()
 	return re, nil
 }

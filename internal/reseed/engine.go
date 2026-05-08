@@ -166,7 +166,9 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 		} else if result.Failed > 0 && result.Matched == 0 {
 			status = model.ReseedTaskFailed
 		}
-		e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
+		deferCtx, deferCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer deferCancel()
+		e.db.WithContext(deferCtx).Model(task).Updates(map[string]interface{}{
 			"status":     status,
 			"updated_at": time.Now(),
 		})

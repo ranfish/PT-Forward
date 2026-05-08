@@ -386,28 +386,38 @@ func (h *PublishHandler) handleGetGroup(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *PublishHandler) handleDeleteGroup(w http.ResponseWriter, r *http.Request, id uint) {
-	if err := h.db.Delete(&model.PublishGroup{}, id).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("publish_group_id = ?", id).Delete(&model.PublishGroupMember{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.PublishGroup{}, id).Error
+	}); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除发布组失败")
 		return
 	}
-	h.db.Where("publish_group_id = ?", id).Delete(&model.PublishGroupMember{})
 	Success(w, nil)
 }
 
 func (h *PublishHandler) handleLifecyclePause(w http.ResponseWriter, r *http.Request, id uint) {
 	now := time.Now()
-	h.db.Model(&model.PublishGroupMember{}).
+	if err := h.db.WithContext(r.Context()).Model(&model.PublishGroupMember{}).
 		Where("publish_group_id = ? AND paused = ?", id, false).
-		Updates(map[string]interface{}{"paused": true, "status_at": now})
+		Updates(map[string]interface{}{"paused": true, "status_at": now}).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "暂停失败")
+		return
+	}
 	h.logger.Info("publish group paused", zap.Uint("id", id))
 	Success(w, map[string]interface{}{"message": "已暂停"})
 }
 
 func (h *PublishHandler) handleLifecycleResume(w http.ResponseWriter, r *http.Request, id uint) {
 	now := time.Now()
-	h.db.Model(&model.PublishGroupMember{}).
+	if err := h.db.WithContext(r.Context()).Model(&model.PublishGroupMember{}).
 		Where("publish_group_id = ? AND paused = ?", id, true).
-		Updates(map[string]interface{}{"paused": false, "status_at": now})
+		Updates(map[string]interface{}{"paused": false, "status_at": now}).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "恢复失败")
+		return
+	}
 	h.logger.Info("publish group resumed", zap.Uint("id", id))
 	Success(w, map[string]interface{}{"message": "已恢复"})
 }

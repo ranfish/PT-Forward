@@ -174,7 +174,7 @@ func NewWSHandler(hub *Hub, authManager *auth.AuthManager, corsOrigins []string)
 		upgrader.CheckOrigin = func(r *http.Request) bool {
 			origin := r.Header.Get("Origin")
 			if origin == "" {
-				return true
+				return len(corsOrigins) == 0 || corsOrigins[0] == "*"
 			}
 			return allowed[origin]
 		}

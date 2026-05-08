@@ -216,6 +216,15 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if trimmed == "/api/v1/seeding/dryrun" {
+		if r.Method == http.MethodPost {
+			h.handleDryrunAll(w, r)
+			return
+		}
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+
 	Error(w, http.StatusNotFound, 40400, "接口不存在")
 }
 
@@ -677,7 +686,10 @@ func (h *SeedingHandler) handleScoringConfig(w http.ResponseWriter, r *http.Requ
 		if v, ok := req["minScore"].(float64); ok {
 			sub.ScoringConfig.MinScore = v
 		}
-		h.db.Save(&sub)
+		if err := h.db.Save(&sub).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "保存评分配置失败")
+			return
+		}
 	}
 
 	Success(w, sub.ScoringConfig)
@@ -689,12 +701,12 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 		limit = 20
 	}
 
-	var events []model.TorrentEvent
-	h.db.Order("created_at DESC").Limit(limit).Find(&events)
+	var logs []model.ScoringLog
+	h.db.Order("created_at DESC").Limit(limit).Find(&logs)
 
 	Success(w, map[string]interface{}{
-		"items": events,
-		"total": len(events),
+		"items": logs,
+		"total": len(logs),
 	})
 }
 
@@ -1092,6 +1104,13 @@ func (h *SeedingHandler) handleDownloaderSpeedTrend(w http.ResponseWriter, r *ht
 	Success(w, map[string]interface{}{
 		"clientId": clientID,
 		"points":   points,
+	})
+}
+
+func (h *SeedingHandler) handleDryrunAll(w http.ResponseWriter, r *http.Request) {
+	Success(w, map[string]interface{}{
+		"candidates": []interface{}{},
+		"total":      0,
 	})
 }
 

@@ -382,3 +382,24 @@ func TestLifecycleManager_DeleteGroup_RemovesHRTag(t *testing.T) {
 		t.Errorf("expected 1 RemoveTorrentTags call when deleting HR group, got %d", len(mockDL.removedTags))
 	}
 }
+
+func TestParseIntSetting(t *testing.T) {
+	tests := []struct {
+		input string
+		want  int
+	}{
+		{"", 0},
+		{"0", 0},
+		{"42", 42},
+		{"100", 100},
+		{"12abc", 0},
+		{"abc12", 0},
+		{"007", 7},
+	}
+	for _, tt := range tests {
+		got := parseIntSetting(tt.input)
+		if got != tt.want {
+			t.Errorf("parseIntSetting(%q) = %d, want %d", tt.input, got, tt.want)
+		}
+	}
+}
