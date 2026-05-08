@@ -1,20 +1,17 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [
-    vue(),
-    VueI18nPlugin({
-      include: resolve(__dirname, './src/locales/**'),
-    }),
-  ],
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
+      'vue-i18n': 'vue-i18n/dist/vue-i18n.mjs',
     },
   },
+  plugins: [
+    vue(),
+  ],
   css: {
     preprocessorOptions: {
       less: {
@@ -29,11 +26,15 @@ export default defineConfig({
           if (id.includes('node_modules/@ant-design/icons-vue')) return 'vendor-icons'
           if (id.includes('node_modules/ant-design-vue')) return 'vendor-antd'
           if (id.includes('node_modules/echarts')) return 'vendor-echarts'
-          if (id.includes('node_modules')) return 'vendor-core'
+          if (id.includes('node_modules/vue')) return 'vendor-vue'
+          if (id.includes('node_modules/axios')) return 'vendor-libs'
+          if (id.includes('node_modules/vue-router')) return 'vendor-libs'
+          if (id.includes('node_modules/vue-i18n')) return 'vendor-libs'
+          if (id.includes('node_modules')) return 'vendor-libs'
         },
       },
     },
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 1500,
   },
   server: {
     port: 5173,

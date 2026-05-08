@@ -2,26 +2,29 @@
   <div>
     <a-page-header :title="`发布组 #${groupId}`" @back="$router.push('/publish')">
       <template #tags>
-        <a-tag :color="group.status === 'active' ? 'green' : group.status === 'completed' ? 'default' : 'orange'">
+        <a-tag :color="group.status === 'active' || group.status === 'monitoring' ? 'green' : group.status === 'deleted' ? 'default' : group.status === 'publishing' ? 'blue' : group.status === 'publish_failed' ? 'red' : 'orange'">
           {{ group.status }}
         </a-tag>
       </template>
       <template #extra>
         <a-space>
-          <a-button @click="pauseGroup" :disabled="group.status !== 'active'">{{ t('common.pause') }}</a-button>
-          <a-button type="primary" @click="resumeGroup" :disabled="group.status !== 'paused'">{{ t('common.resume') }}</a-button>
+          <a-button @click="pauseGroup" :disabled="group.status !== 'active' && group.status !== 'publishing' && group.status !== 'monitoring'">{{ t('common.pause') }}</a-button>
+          <a-button type="primary" @click="resumeGroup" :disabled="group.status !== 'partially_paused' && group.status !== 'all_paused'">{{ t('common.resume') }}</a-button>
+          <a-popconfirm :title="t('common.deleteConfirm')" @confirm="lifecycleDeleteGroup">
+            <a-button danger :disabled="group.status === 'deleting'">{{ t('common.delete') }}</a-button>
+          </a-popconfirm>
         </a-space>
       </template>
     </a-page-header>
 
     <a-spin :spinning="loading">
       <a-descriptions bordered :column="2" style="margin-bottom: 24px">
-        <a-descriptions-item :label="t('publish.sourceSite')">{{ group.source_site }}</a-descriptions-item>
-        <a-descriptions-item :label="t('publish.sourceHash')">{{ group.source_hash }}</a-descriptions-item>
-        <a-descriptions-item :label="t('publish.candidateId')">{{ group.candidate_id }}</a-descriptions-item>
+        <a-descriptions-item :label="t('publish.sourceSite')">{{ group.sourceSite }}</a-descriptions-item>
+        <a-descriptions-item :label="t('publish.sourceHash')">{{ group.sourceHash }}</a-descriptions-item>
+        <a-descriptions-item :label="t('publish.candidateId')">{{ group.candidateId || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('common.status')">{{ group.status }}</a-descriptions-item>
-        <a-descriptions-item :label="t('common.createdAt')">{{ group.created_at || '-' }}</a-descriptions-item>
-        <a-descriptions-item :label="t('common.updatedAt')">{{ group.updated_at || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.createdAt')">{{ group.createdAt || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.updatedAt')">{{ group.updatedAt || '-' }}</a-descriptions-item>
       </a-descriptions>
 
       <a-card :title="t('publish.memberList')">
@@ -109,6 +112,16 @@ async function resumeGroup() {
   try {
     await publishApi.resumeGroup(groupId)
     message.success(t('common.resumed'))
+    fetchGroup()
+  } catch (e: any) {
+    message.error(e.message)
+  }
+}
+
+async function lifecycleDeleteGroup() {
+  try {
+    await publishApi.lifecycleDeleteGroup(groupId)
+    message.success(t('common.deleted'))
     fetchGroup()
   } catch (e: any) {
     message.error(e.message)

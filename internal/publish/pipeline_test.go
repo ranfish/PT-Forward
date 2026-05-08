@@ -8,6 +8,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/notification"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -2011,4 +2012,145 @@ func TestPipeline_ProcessPendingGroups_SkipsCompletedMembers(t *testing.T) {
 	if updatedGroup.Status != model.GroupMonitoring {
 		t.Errorf("all-uploaded group should transition to monitoring, got %s", updatedGroup.Status)
 	}
+}
+
+func TestPipeline_SetCompletionWatcher(t *testing.T) {
+	db := setupPipelineTestDB(t)
+	p := NewPipeline(db, zap.NewNop())
+	p.SetCompletionWatcher(nil)
+}
+
+func TestPipeline_SetNotifyService(t *testing.T) {
+	db := setupPipelineTestDB(t)
+	p := NewPipeline(db, zap.NewNop())
+	p.SetNotifyService(nil)
+}
+
+func TestPipeline_Update(t *testing.T) {
+	db := setupPipelineTestDB(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	task := &model.PublishTask{Type: model.PublishTaskTypeManual, SourceSiteID: 1}
+	if err := p.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	task.Status = model.PublishTaskCompleted
+	if err := p.Update(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := p.GetTask(ctx, task.ID)
+	if got.Status != model.PublishTaskCompleted {
+		t.Errorf("expected completed, got %s", got.Status)
+	}
+}
+
+func setupPipelineDBWithNotify(t *testing.T) (*Pipeline, *gorm.DB) {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(
+		&model.PublishGroup{},
+		&model.PublishGroupMember{},
+		&model.PublishGroupStatusHistory{},
+		&model.NotificationChannel{},
+		&model.NotificationHistory{},
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	p := NewPipeline(db, zap.NewNop())
+	ns := notification.NewService(db, zap.NewNop())
+	p.SetNotifyService(ns)
+	return p, db
+}
+
+func TestPipeline_NotifyPublishResult_Success(t *testing.T) {
+	p, db := setupPipelineDBWithNotify(t)
+	ctx := context.Background()
+
+	db.Create(&model.PublishGroup{ID: 1, SourceTorrentID: "src-t-1"})
+	db.Create(&model.PublishGroupMember{
+		PublishGroupID: 1,
+		SiteName:       "target_site",
+		Status:         model.MemberStatusUploaded,
+		TorrentID:      "new-001",
+		HRProtected:    true,
+		HRMinSeedHours: 48,
+	})
+
+	var member model.PublishGroupMember
+	db.Where("publish_group_id = ?", 1).First(&member)
+
+	p.notifyPublishResult(ctx, &member)
+
+	var history []model.NotificationHistory
+	db.Find(&history)
+	if len(history) != 0 {
+		t.Logf("notification history entries: %d (expected 0 due to no channels)", len(history))
+	}
+}
+
+func TestPipeline_NotifyPublishResult_Error(t *testing.T) {
+	p, db := setupPipelineDBWithNotify(t)
+	ctx := context.Background()
+
+	db.Create(&model.PublishGroup{ID: 1, SourceTorrentID: "src-t-2"})
+	db.Create(&model.PublishGroupMember{
+		PublishGroupID: 1,
+		SiteName:       "fail_site",
+		Status:         model.MemberStatusError,
+		LastError:      "upload rejected",
+	})
+
+	var member model.PublishGroupMember
+	db.Where("publish_group_id = ?", 1).First(&member)
+
+	p.notifyPublishResult(ctx, &member)
+}
+
+func TestPipeline_NotifyPublishResult_NilService(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+	ctx := context.Background()
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: 999,
+		SiteName:       "site",
+		Status:         model.MemberStatusUploaded,
+	}
+	p.notifyPublishResult(ctx, member)
+}
+
+func TestPipeline_NotifyPublishResult_DefaultStatus(t *testing.T) {
+	p, db := setupPipelineDBWithNotify(t)
+	ctx := context.Background()
+
+	db.Create(&model.PublishGroup{ID: 1, SourceTorrentID: "src-t-3"})
+	db.Create(&model.PublishGroupMember{
+		PublishGroupID: 1,
+		SiteName:       "site",
+		Status:         model.MemberStatusNew,
+	})
+
+	var member model.PublishGroupMember
+	db.Where("publish_group_id = ?", 1).First(&member)
+
+	p.notifyPublishResult(ctx, &member)
+}
+
+func TestPipeline_NotifyPublishResult_NoGroup(t *testing.T) {
+	p, _ := setupPipelineDBWithNotify(t)
+	ctx := context.Background()
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: 999,
+		SiteName:       "site",
+		Status:         model.MemberStatusUploaded,
+	}
+
+	p.notifyPublishResult(ctx, member)
 }

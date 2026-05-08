@@ -1,0 +1,170 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head>
+<style data-tippy-stylesheet="">.tippy-box[data-animation=fade][data-state=hidden]{opacity:0}[data-tippy-root]{max-width:calc(100vw - 10px)}.tippy-box{position:relative;background-color:#333;color:#fff;border-radius:4px;font-size:14px;line-height:1.4;outline:0;transition-property:transform,visibility,opacity}.tippy-box[data-placement^=top]>.tippy-arrow{bottom:0}.tippy-box[data-placement^=top]>.tippy-arrow:before{bottom:-7px;left:0;border-width:8px 8px 0;border-top-color:initial;transform-origin:center top}.tippy-box[data-placement^=bottom]>.tippy-arrow{top:0}.tippy-box[data-placement^=bottom]>.tippy-arrow:before{top:-7px;left:0;border-width:0 8px 8px;border-bottom-color:initial;transform-origin:center bottom}.tippy-box[data-placement^=left]>.tippy-arrow{right:0}.tippy-box[data-placement^=left]>.tippy-arrow:before{border-width:8px 0 8px 8px;border-left-color:initial;right:-7px;transform-origin:center left}.tippy-box[data-placement^=right]>.tippy-arrow{left:0}.tippy-box[data-placement^=right]>.tippy-arrow:before{left:-7px;border-width:8px 8px 8px 0;border-right-color:initial;transform-origin:center right}.tippy-box[data-inertia][data-state=visible]{transition-timing-function:cubic-bezier(.54,1.5,.38,1.11)}.tippy-arrow{width:16px;height:16px;color:#333}.tippy-arrow:before{content:"";position:absolute;border-color:transparent;border-style:solid}.tippy-content{position:relative;padding:5px 9px;z-index:1}</style><link rel="stylesheet" href="public/css/font-awesome-4.7.0/css/font-awesome.min.css">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <meta name="keywords" content="haidan">
+        <meta name="description" content="haidan">
+        <meta name="generator" content="NexusPHP">
+    
+    <title>HAIDAN :: 用户详情 - ranfish 海胆之家 - Powered by NexusPHP    </title>
+    <link rel="shortcut icon" href="public/pic/favicon.ico" type="image/x-icon">
+    <link rel="search" type="application/opensearchdescription+xml" title="HAIDAN Torrents" href="opensearch.php">
+    <link rel="stylesheet" href="public/css/largefont.css?202107312100" type="text/css">
+    <link rel="stylesheet" href="public/css/sprites.css?202107312100" type="text/css">
+    <link rel="stylesheet" href="public/css/theme/Default/theme.css?202107312100" type="text/css">
+        <link rel="stylesheet" href="public/css/forum_pic/chs/forumsprites.css?202107312100" type="text/css">
+    <link rel="stylesheet" href="public/css/theme/DarkPassion/theme.css?202107312100" type="text/css">
+        <link rel="stylesheet" href="public/css/theme/DarkPassion/DomTT.css?202107312100" type="text/css">
+    <link rel="stylesheet" href="public/css/curtain_imageresizer.css?202107312100" type="text/css">
+        <link rel="stylesheet" href="public/pic/category/chd/scenetorrents/catsprites.css?202107312100" type="text/css">
+        <link rel="alternate" type="application/rss+xml" title="Latest Torrents" href="torrentrss.php">
+
+
+
+    <script src="https://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+    <!-- clipboard -->
+    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.6/dist/clipboard.min.js"></script>
+    <!-- Tippy -->
+    <script type="text/javascript" src="public/js/popper.min.js"></script>
+    <script type="text/javascript" src="public/js/tippy-bundle.umd.min.js"></script>
+        <script type="text/javascript" src="public/js/curtain_imageresizer.js?202107312100"></script><style type="text/css">body {overflow-y:scroll;}</style>
+    <script type="text/javascript" src="public/js/ajaxbasic.js?202107312100"></script>
+    <script type="text/javascript" src="public/js/common.js?202107312100">
+    </script>
+    <script type="text/javascript" src="public/js/domLib.js?202107312100">
+    </script>
+    <script type="text/javascript" src="public/js/domTT.js?202107312100">
+    </script>
+    <script type="text/javascript" src="public/js/sortable.min.js?202107312100">
+    </script>
+    <script type="text/javascript" src="public/js/domTT_drag.js?202107312100"></script>
+    <script type="text/javascript" src="public/js/fadomatic.js?202107312100"></script>
+
+</head><body>
+    <div class="head" id="head">
+                    <div class="option">
+
+        </div>
+    <div class="top-panel special-border">
+                            <a class="logo_img" href="index.php"><img src="public/pic/logo.png" alt="HAIDAN" title="HAIDAN - 海胆PT,PT">
+                </a>
+                <div class="userinfo medium border-box">
+    <div class="userinfo-half">
+        <div class="user_sub_item" href="userdetails.php?id=43773">
+            <span class="nowrap username-center"><a href="userdetails.php?id=43773" class="NexusMaster_Name"><b>ranfish</b></a></span></div>
+        <a class="user_sub_item" href="logout.php" title="退出">
+            <i class="fa fa-sign-out" aria-hidden="true"></i>&nbsp;退出        </a>
+        <a class="user_sub_item" href="usercp.php" title="控制面板">
+            <i class="fa fa-cog" aria-hidden="true"></i>&nbsp;控制面板        </a>
+        <a class="user_sub_item" href="invite.php?id=43773" title="邀请 ">
+            <i class="fa fa-user-plus " aria-hidden="true"></i>&nbsp;邀请         </a>
+        <a class="user_sub_item" href="torrents.php?inclbookmarked=1&amp;allsec=1&amp;incldead=0" title="收藏">
+            <i class="fa fa-star" aria-hidden="true"></i>&nbsp;收藏        </a>
+        <a class="user_sub_item" href="friends.php" title="好友">
+            <i class="fa fa-users" aria-hidden="true"></i>&nbsp;好友        </a>
+        <a class="user_sub_item" href="getrss.php" title="RSS订阅">
+            <i class="fa fa-rss" aria-hidden="true"></i>&nbsp;RSS订阅        </a>
+        <div class="user_sub_item">
+             <input type="submit" id="modalBtn" class="dt_button" value="每日打卡">            <div id="simpleModal" class="modal">
+                <div class="modal-content">
+                    <div>
+                        <div class="modal-header">
+                            <span class="closeBtn">×</span>
+                            <h2 style="text-align:center">
+                                每日打卡                            </h2>
+                        </div>
+                        <div class="modal-body">
+                            <p>恭喜您,获得了10魔力值奖励!                            </p><p>明天再来可获取15魔力值奖励!                            </p><p><a style="font-weight:bold;color:darkred" href="mybonus.php#magic_rules">打卡规则详情</a>
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+                                    <div id="signinFailModal" class="modal">
+                <div class="modal-content">
+                    <div>
+                        <div class="modal-header">
+                            <span class="closeBtn">×</span>
+                            <h2 style="text-align:center">
+                                每日打卡                            </h2>
+                        </div>
+                        <div class="modal-body">
+                            <p>小海胆开小差了，刷新后再来试试吧!                        </p></div>
+                        <div class="modal-footer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <div class="userinfo-half">
+        <div class="user_item">
+        <a href="classpoint.php">
+        <i class="fa fa-trophy" aria-hidden="true"></i>
+        <font class="color_bonus">等级积分: </font>
+        </a>
+        <span> 32,998 </span>
+        </div>
+        <div class="user_item">
+            <font class="color_bonus">魔力值:             </font>
+            <span id="magic_num">6,277,573.7(0/h)</span>
+            <span id="magic_num_new" style="display:none">6,277,583.7(0/h)</span>
+        </div>
+
+        <div class="user_item">
+            <font class="color_ratio">分享率:             </font> 217.885        </div>
+        <div class="user_item">
+            <font class="color_uploaded">上传量:             </font> 43.873 TB        </div>
+        <div class="user_item">
+            <font class="color_downloaded"> 下载量:             </font> 206.19 GB        </div>
+        <div class="user_item">
+            <font class="color_active">当前活动:             </font> <img class="arrowup" alt="Torrents seeding" title="当前做种" src="public/pic/trans.gif">0 <img class="arrowdown" alt="Torrents leeching" title="当前下载" src="public/pic/trans.gif">
+            0
+        </div>
+        <div class="user_item">
+            <a href="messages.php">&nbsp;<i class="fa fa-envelope" style="color:" aria-hidden="true" alt="inbox" title="收件箱&nbsp;(无新短讯)"></i></a> 0  <a href="messages.php?action=viewmailbox&amp;box=-1"><i class="fa fa-envelope-o" aria-hidden="true" alt="sentbox" title="发件箱"></i></a> 0
+        </div>
+        
+    </div>
+<script>
+                daily_attendance(
+                    '已经打卡'
+                );
+            </script>
+
+</div>    </div>
+
+</div>
+    <div class="mainroute">
+        <div class="navbar special-border"><ul class="menu navmenu"><li class="nav"><a data-hover="&nbsp;首&nbsp;&nbsp;页&nbsp;" href="index.php">&nbsp;首&nbsp;&nbsp;页&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;论&nbsp;&nbsp;坛&nbsp;" href="forums.php">&nbsp;论&nbsp;&nbsp;坛&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;主题推荐区&nbsp;" href="collections.php">&nbsp;主题推荐区&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;影视区&nbsp;" href="videos.php">&nbsp;影视区&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;种&nbsp;&nbsp;子&nbsp;" href="torrents.php">&nbsp;种&nbsp;&nbsp;子&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;魔力商店&nbsp;" href="mybonus.php">&nbsp;魔力商店&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;种子悬赏&nbsp;" href="torrentrequest.php">&nbsp;种子悬赏&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;H&amp;R&nbsp;" href="uploadrequest.php">&nbsp;H&amp;R&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;字&nbsp;&nbsp;幕&nbsp;" href="subtitles.php">&nbsp;字&nbsp;&nbsp;幕&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;排&nbsp;&nbsp;行&nbsp;" href="topten.php">&nbsp;排&nbsp;&nbsp;行&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;规&nbsp;&nbsp;则&nbsp;" href="rules.php">&nbsp;规&nbsp;&nbsp;则&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;常见问题&nbsp;" href="faq.php">&nbsp;常见问题&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;管理组&nbsp;" href="staff.php">&nbsp;管理组&nbsp;</a></li><li class="nav"><a data-hover="&nbsp;日&nbsp;志&nbsp;" href="log.php">&nbsp;日&nbsp;志&nbsp;</a></li></ul></div>        <div class="mainpanel special-border">
+        <a href="#footer" class="float-item right-float-item-1"><img src="public/pic/down-arrow.png "></a>
+        <a href="#head" class="float-item right-float-item-2"><img src="public/pic/top-arrow.png "></a>
+        <a href="upload.php" class="float-item left-float-item-2"><img width="100%" src="public/pic/upload.png "></a>
+        <a href="imgdonate.php" class="float-item left-float-item-1"><img width="100%" src="public/pic/donate.png "></a>
+                    <div align="center" style="margin-bottom: 10px" id="ad_belownav"><a href="adredir.php?id=2&amp;url=https%3A%2F%2Fitem.taobao.com%2Fitem.htm%3Fid%3D942731898846%26amp%3Bspm%3Da213gs.v2success.0.0.4a5848319xMx9r%26amp%3BskuId%3D6011200635934" target="_blank"><img border="0" src="https://s2.loli.net/2025/06/24/bnlTsquDWk6NECY.jpg" width="728" alt="ad"></a></div><h1 style="margin:0px"><span class="nowrap username-center"><b>ranfish</b></span><img src="public/pic/flag/china.gif" alt="中国" style="margin-left: 8pt"></h1><table class="nav" width="100%" border="0" cellspacing="0" cellpadding="0"><tbody><tr><td class="embedded"><h2>清除冗余种子，点击<a class="altlink" href="takeflush.php?id=43773">这里</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="5">
+    <tbody><tr><td width="1%" class="rowhead nowrap" valign="top" align="right">邀请</td><td width="99%" class="rowfollow" valign="top" align="left">没有邀请资格</td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">加入日期</td><td width="99%" class="rowfollow" valign="top" align="left">2022-05-01 18:07:03 (<span title="2022-05-01 18:07:03">4年0月前</span>)</td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">最近动向</td><td width="99%" class="rowfollow" valign="top" align="left">2026-05-06 23:15:10 (<span title="2026-05-06 23:15:10">&lt; 1分前</span>)</td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">当前IP</td><td width="99%" class="rowfollow" valign="top" align="left">58.153.175.240<span title="">[未知]</span></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">传输</td><td width="99%" class="rowfollow" valign="top" align="left"><table border="0" cellspacing="0" cellpadding="0"><tbody><tr><td class="embedded"><strong>分享率</strong>:  <font color="">217.884</font></td><td class="embedded">&nbsp;&nbsp;<img src="public/pic/smilies/163.gif" alt=""></td></tr><tr><td class="embedded"><strong>上传量</strong>:  43.873 TB</td><td class="embedded">&nbsp;&nbsp;<strong>下载量</strong>:  206.19 GB</td></tr></tbody></table></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">BT时间</td><td width="99%" class="rowfollow" valign="top" align="left"><table border="0" cellspacing="0" cellpadding="0"><tbody><tr><td class="embedded"><strong>做种/下载时间比率</strong>:  <font color="">122,463.636</font></td><td class="embedded">&nbsp;&nbsp;<img src="public/pic/smilies/163.gif" alt=""></td></tr><tr><td class="embedded"><strong>做种时间</strong>:  1230262天01:00:13</td><td class="embedded">&nbsp;&nbsp;<strong>下载时间</strong>:  10天01:06:09</td></tr></tbody></table></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">性别</td><td width="99%" class="rowfollow" valign="top" align="left"><img class="male" src="public/pic/trans.gif" alt="Male" title="男生" style="margin-left: 4pt"></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">等级</td><td width="99%" class="rowfollow" valign="top" align="left"><img alt="(贵族)Nexus Master" title="(贵族)Nexus Master" src="public/pic/nexus.gif"> </td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">等级积分</td><td width="99%" class="rowfollow" valign="top" align="left">32,998<a href="classpoint.php?userid=43773">&nbsp;[详情]</a></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">升级卡数量</td><td width="99%" class="rowfollow" valign="top" align="left">0</td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">种子评论</td><td width="99%" class="rowfollow" valign="top" align="left"><a href="userhistory.php?action=viewcomments&amp;id=43773" title="查看评论">2</a></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">论坛帖子</td><td width="99%" class="rowfollow" valign="top" align="left">0</td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">魔力值</td><td width="99%" class="rowfollow" valign="top" align="left">6277573.7</td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">发布种子</td><td width="99%" class="rowfollow" valign="top" align="left"><a href="javascript: getusertorrentlistajax('43773', 'uploaded', 'ka'); klappe_news('a')"><img class="plus" src="public/pic/trans.gif" id="pica" alt="Show/Hide" title="显示/隐藏">   <u>[显示/隐藏]</u></a><div id="ka" style="display: none;"></div></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">当前做种</td><td width="99%" class="rowfollow" valign="top" align="left"><a href="javascript: getusertorrentlistajax('43773', 'seeding', 'ka1'); klappe_news('a1')"><img class="plus" src="public/pic/trans.gif" id="pica1" alt="Show/Hide" title="显示/隐藏">   <u>[显示/隐藏]</u></a><div id="ka1" style="display: none;"></div></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">当前下载</td><td width="99%" class="rowfollow" valign="top" align="left"><a href="javascript: getusertorrentlistajax('43773', 'leeching', 'ka2'); klappe_news('a2')"><img class="plus" src="public/pic/trans.gif" id="pica2" alt="Show/Hide" title="显示/隐藏">   <u>[显示/隐藏]</u></a><div id="ka2" style="display: none;"></div></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">完成种子</td><td width="99%" class="rowfollow" valign="top" align="left"><a href="javascript: getusertorrentlistajax('43773', 'completed', 'ka3'); klappe_news('a3')"><img class="plus" src="public/pic/trans.gif" id="pica3" alt="Show/Hide" title="显示/隐藏">   <u>[显示/隐藏]</u></a><div id="ka3" style="display: none;"></div></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">未完成种子</td><td width="99%" class="rowfollow" valign="top" align="left"><a href="javascript: getusertorrentlistajax('43773', 'incomplete', 'ka4'); klappe_news('a4')"><img class="plus" src="public/pic/trans.gif" id="pica4" alt="Show/Hide" title="显示/隐藏">   <u>[显示/隐藏]</u></a><div id="ka4" style="display: none;"></div></td></tr>
+<tr><td width="1%" class="rowhead nowrap" valign="top" align="right">H&amp;R</td><td width="99%" class="rowfollow" valign="top" align="left"><a href="uploadrequest.php?userid=43773">0</a></td></tr>
+</tbody></table>
+</td></tr></tbody></table>
+</div><div id="footer"><div style="margin-top: 10px; margin-bottom: 30px;" align="center"> (c)  <a href="https://www.haidan.cc" target="_self">HAIDAN</a> 2020-2026 Powered by <a href="aboutnexus.php">NexusPHP</a><br><br>[page created in <b> 0.005516 </b> sec with <b>18</b> db queries, <b>15</b> reads and <b>6</b> writes of memcached and <b>1.48 MB</b> ram]</div>
+<div style="display: none;" id="lightbox" class="lightbox" onclick="Return()"></div><div style="display: none;" id="curtain" class="curtain" onclick="Return()"></div></div></div></body></html>

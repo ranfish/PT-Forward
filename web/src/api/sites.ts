@@ -19,6 +19,12 @@ export const sitesApi = {
   testConnection(id: number) {
     return client.post(`/sites/${id}/test`)
   },
+  detect(id: number) {
+    return client.post(`/sites/${id}/detect`)
+  },
+  getStats(id: number) {
+    return client.get(`/sites/${id}/stats`)
+  },
   updateCredentials(id: number, data: any) {
     return client.put(`/sites/${id}/credentials`, data)
   },

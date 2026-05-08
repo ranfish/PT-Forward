@@ -16,16 +16,16 @@
         <a-card :title="t('system.database')" size="small">
           <a-descriptions :column="1" size="small">
             <a-descriptions-item :label="t('common.status')">
-              <a-tag :color="health.db_status === 'ok' ? 'green' : 'red'">{{ health.db_status || '-' }}</a-tag>
+              <a-tag :color="health.database?.ok ? 'green' : 'red'">{{ health.database?.ok ? 'ok' : 'error' }}</a-tag>
             </a-descriptions-item>
-            <a-descriptions-item :label="t('system.info')">{{ health.db_message || '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('system.info')">{{ health.database?.message || '-' }}</a-descriptions-item>
           </a-descriptions>
         </a-card>
       </a-col>
       <a-col :span="8">
         <a-card :title="t('nav.downloaders')" size="small">
           <a-descriptions :column="1" size="small">
-            <a-descriptions-item :label="t('system.connectedClients')">{{ health.connected_clients ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('system.connectedClients')">{{ health.downloaders?.connected ?? '-' }}</a-descriptions-item>
           </a-descriptions>
         </a-card>
       </a-col>
@@ -33,12 +33,12 @@
 
     <a-card :title="t('system.runtimeInfo')" size="small" style="margin-bottom: 16px">
       <a-descriptions :column="2" size="small" v-if="info">
-        <a-descriptions-item :label="t('system.goVersion')">{{ info.go_version || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('system.goVersion')">{{ info.goVersion || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('system.os')">{{ info.os || '-' }}/{{ info.arch || '-' }}</a-descriptions-item>
-        <a-descriptions-item :label="t('system.cpuCount')">{{ info.cpu_count || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('system.cpuCount')">{{ info.cpuCount || '-' }}</a-descriptions-item>
         <a-descriptions-item label="Goroutines">{{ info.goroutines || '-' }}</a-descriptions-item>
-        <a-descriptions-item :label="t('system.memoryUsage')">{{ formatBytes(info.mem_alloc) }}</a-descriptions-item>
-        <a-descriptions-item :label="t('system.heapMemory')">{{ formatBytes(info.heap_alloc) }}</a-descriptions-item>
+        <a-descriptions-item :label="t('system.memoryUsage')">{{ formatBytes(info.memAlloc) }}</a-descriptions-item>
+        <a-descriptions-item :label="t('system.heapMemory')">{{ formatBytes(info.heapAlloc) }}</a-descriptions-item>
       </a-descriptions>
     </a-card>
 
@@ -53,19 +53,11 @@ import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { systemApi } from '@/api/system'
+import { formatBytes } from '@/utils/format'
 
 const { t } = useI18n()
-
 const health = ref<any>({})
 const info = ref<any>(null)
-
-function formatBytes(bytes?: number) {
-  if (!bytes) return '-'
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB'
-  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB'
-}
 
 async function fetchHealth() {
   try {

@@ -367,3 +367,158 @@ func TestUnit3D_GetTorrentInfoHash_API(t *testing.T) {
 		t.Errorf("hash: %s", hash)
 	}
 }
+
+func TestUnit3D_GetTorrentDetail_WebFull(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><title>Full Movie :: UNIT3D Site</title>
+		info_hash: FFEEddCCbbAA99887766554433221100FFEEddCC
+		<td>Size<td>4.5 GB</td></td>
+		</html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewUnit3DAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "laravel_session=test"}
+
+	detail, err := a.GetTorrentDetail(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Title != "Full Movie" {
+		t.Errorf("title: %s", detail.Title)
+	}
+	if detail.InfoHash != "ffeeddccbbaa99887766554433221100ffeeddcc" {
+		t.Errorf("info_hash: %s", detail.InfoHash)
+	}
+	if detail.Size == 0 {
+		t.Error("expected non-zero size")
+	}
+}
+
+func TestUnit3D_DetectHR_WithHR(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html>This torrent is subject to hit and run rules</html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewUnit3DAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "laravel_session=test"}
+
+	result, err := a.DetectHR(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.HasHR {
+		t.Error("expected HasHR=true")
+	}
+}
+
+func TestUnit3D_DetectHR_MustSeed(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html>You must seed this torrent for the required period</html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewUnit3DAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "laravel_session=test"}
+	config.HR.DefaultSeedTimeH = 120
+
+	result, err := a.DetectHR(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.HasHR {
+		t.Error("expected HasHR=true")
+	}
+	if result.SeedTimeH != 120 {
+		t.Errorf("expected SeedTimeH=120, got %d", result.SeedTimeH)
+	}
+}
+
+func TestUnit3D_DetectHR_NoHR(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html>Normal torrent without any special rules</html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewUnit3DAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "laravel_session=test"}
+
+	result, err := a.DetectHR(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.HasHR {
+		t.Error("expected HasHR=false")
+	}
+}
+
+func TestUnit3D_GetPreciseSLData_WebFull(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html>Seeders<td>30</td>Leechers<td>12</td></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewUnit3DAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "laravel_session=test"}
+
+	sl, err := a.GetPreciseSLData(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sl.Seeders != 30 {
+		t.Errorf("seeders: %d", sl.Seeders)
+	}
+	if sl.Leechers != 12 {
+		t.Errorf("leechers: %d", sl.Leechers)
+	}
+}
+
+func TestUnit3D_VerifyExists_Found(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>
+		<tr><td><a href="details.php?id=42">Found Torrent</a></td></tr>
+		</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewUnit3DAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "laravel_session=test"}
+	config.Paths.Browse = "/torrents"
+
+	found, err := a.VerifyExists(context.Background(), config, "42")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Error("expected found=true")
+	}
+}
+
+func TestUnit3D_VerifyExists_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>
+		<tr><td><a href="details.php?id=99">Other Torrent</a></td></tr>
+		</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewUnit3DAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "laravel_session=test"}
+	config.Paths.Browse = "/torrents"
+
+	found, err := a.VerifyExists(context.Background(), config, "42")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found {
+		t.Error("expected found=false")
+	}
+}

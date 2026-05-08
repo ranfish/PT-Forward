@@ -157,7 +157,12 @@ type AppError struct {
 	Cause     error  `json:"-"`
 }
 
-func (e *AppError) Error() string { return e.Message }
+func (e *AppError) Error() string {
+	if e.Cause != nil {
+		return e.Message + ": " + e.Cause.Error()
+	}
+	return e.Message
+}
 func (e *AppError) Unwrap() error { return e.Cause }
 
 // §33.1.86 — RateLimitConfig: 搜索速率控制配置

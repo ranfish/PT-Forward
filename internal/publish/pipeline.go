@@ -63,7 +63,9 @@ func (p *Pipeline) ListTasks(ctx context.Context, offset, limit int) ([]model.Pu
 	var tasks []model.PublishTask
 	var total int64
 
-	p.db.WithContext(ctx).Model(&model.PublishTask{}).Count(&total)
+	if err := p.db.WithContext(ctx).Model(&model.PublishTask{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := p.db.WithContext(ctx).Order("created_at DESC").
 		Offset(offset).Limit(limit).
 		Find(&tasks).Error
@@ -125,16 +127,14 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 
 	sourceConfig, err := p.siteProvider.GetSiteConfig(ctx, candidate.SourceSite)
 	if err != nil {
-		p.logger.Warn("获取源站配置失败", zap.String("site", candidate.SourceSite), zap.Error(err))
-		candidate.PublishStatus = model.CandidatePublishing
-		return &candidate, nil
+		_ = p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("获取源站配置失败: %v", err))
+		return nil, &model.AppError{Code: 50001, Message: "获取源站配置失败", Cause: err}
 	}
 
 	sourceAdapter, err := p.siteProvider.GetAdapter(ctx, candidate.SourceSite)
 	if err != nil {
-		p.logger.Warn("获取源站适配器失败", zap.String("site", candidate.SourceSite), zap.Error(err))
-		candidate.PublishStatus = model.CandidatePublishing
-		return &candidate, nil
+		_ = p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("获取源站适配器失败: %v", err))
+		return nil, &model.AppError{Code: 50001, Message: "获取源站适配器失败", Cause: err}
 	}
 
 	torrentData, err := sourceAdapter.DownloadTorrent(ctx, sourceConfig, candidate.SourceTorrentID)
@@ -392,13 +392,23 @@ func (p *Pipeline) ListPendingCandidates(ctx context.Context, limit int) ([]mode
 }
 
 func (p *Pipeline) UpdateCandidateStatus(ctx context.Context, id uint, status model.PublishCandidateStatus, result string) error {
-	return p.db.WithContext(ctx).Model(&model.PublishCandidate{}).
-		Where("id = ?", id).
+	now := time.Now()
+	r := p.db.WithContext(ctx).Model(&model.PublishCandidate{}).
+		Where("id = ? AND publish_status != ?", id, status).
 		Updates(map[string]interface{}{
 			"publish_status": status,
 			"publish_result": result,
-			"updated_at":     time.Now(),
-		}).Error
+			"updated_at":     now,
+		})
+	if r.Error != nil {
+		return r.Error
+	}
+	if r.RowsAffected == 0 {
+		p.logger.Debug("candidate status already updated, CAS skip",
+			zap.Uint("id", id),
+			zap.String("status", string(status)))
+	}
+	return nil
 }
 
 func (p *Pipeline) MarkDownloadCompleted(ctx context.Context, id uint, savePath, filePath string) error {
@@ -620,6 +630,17 @@ func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) 
 			continue
 		}
 
+		var clientID string
+		if ev.SourceID != "" {
+			var sub struct {
+				ClientID string `gorm:"column:client_id"`
+			}
+			if err := p.db.WithContext(ctx).Table("rss_subscriptions").Select("client_id").
+				Where("id = ?", ev.SourceID).First(&sub).Error; err == nil {
+				clientID = sub.ClientID
+			}
+		}
+
 		candidate := &model.PublishCandidate{
 			SourceSite:      ev.SiteName,
 			SourceTorrentID: ev.TorrentID,
@@ -630,6 +651,7 @@ func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) 
 			HasHR:           ev.HasHR,
 			PublishStatus:   model.CandidatePending,
 			Role:            model.RoleDownload,
+			ClientID:        clientID,
 		}
 
 		if err := p.CreateCandidate(ctx, candidate); err != nil {
@@ -871,7 +893,9 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 			return p.failMember(ctx, member, StepDownload, fmt.Sprintf("下载源种子失败: %v", dlErr))
 		}
 		torrentData = td
-		p.advanceStep(ctx, member, StepDownload)
+		if err := p.advanceStep(ctx, member, StepDownload); err != nil {
+			return p.failMember(ctx, member, StepDownload, fmt.Sprintf("advanceStep failed: %v", err))
+		}
 	}
 
 	var sourceDetail *model.TorrentDetail
@@ -881,10 +905,20 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 			p.logger.Warn("获取源种子详情失败", zap.Error(detErr))
 		}
 		sourceDetail = detail
-		p.advanceStep(ctx, member, StepDetail)
+		if err := p.advanceStep(ctx, member, StepDetail); err != nil {
+			p.logger.Warn("advanceStep detail failed", zap.Error(err))
+		}
 	}
 
 	if member.LastCompletedStep < StepUpload {
+		if torrentData == nil {
+			td, dlErr := sourceAdapter.DownloadTorrent(ctx, sourceConfig, group.SourceTorrentID)
+			if dlErr != nil {
+				return p.failMember(ctx, member, StepUpload, fmt.Sprintf("resume 重新下载源种子失败: %v", dlErr))
+			}
+			torrentData = td
+		}
+
 		targetConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, member.SiteName)
 		if cfgErr != nil {
 			return p.failMember(ctx, member, StepUpload, fmt.Sprintf("获取目标站配置失败: %v", cfgErr))
@@ -911,13 +945,17 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 								zap.String("title", dr.Title),
 								zap.Int64("size", dr.Size),
 							)
-							p.advanceStep(ctx, member, StepDedup)
+							if err := p.advanceStep(ctx, member, StepDedup); err != nil {
+								p.logger.Warn("advanceStep dedup failed", zap.Error(err))
+							}
 							return nil
 						}
 					}
 				}
 			}
-			p.advanceStep(ctx, member, StepDedup)
+			if err := p.advanceStep(ctx, member, StepDedup); err != nil {
+				p.logger.Warn("advanceStep dedup failed", zap.Error(err))
+			}
 		}
 
 		descriptionText := ""
@@ -966,7 +1004,9 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 				}
 			}
 
-			p.advanceStep(ctx, member, StepRender)
+			if err := p.advanceStep(ctx, member, StepRender); err != nil {
+				p.logger.Warn("advanceStep render failed", zap.Error(err))
+			}
 		}
 
 		pubReq := &model.PublishRequest{
@@ -1031,7 +1071,9 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 			"status":     model.MemberStatusUploaded,
 			"status_at":  &now,
 		})
-		p.advanceStep(ctx, member, StepUpload)
+		if err := p.advanceStep(ctx, member, StepUpload); err != nil {
+			p.logger.Warn("advanceStep upload failed", zap.Error(err))
+		}
 	}
 
 	if member.LastCompletedStep < StepHRDetect {
@@ -1045,21 +1087,21 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 
 func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMember) {
 	if member.TorrentID == "" {
-		p.advanceStep(ctx, member, StepHRDetect)
+		_ = p.advanceStep(ctx, member, StepHRDetect)
 		return
 	}
 
 	targetConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, member.SiteName)
 	if cfgErr != nil {
 		p.logger.Warn("HR 检测: 获取目标站配置失败", zap.Error(cfgErr))
-		p.advanceStep(ctx, member, StepHRDetect)
+		_ = p.advanceStep(ctx, member, StepHRDetect)
 		return
 	}
 
 	targetAdapter, adpErr := p.siteProvider.GetAdapter(ctx, member.SiteName)
 	if adpErr != nil {
 		p.logger.Warn("HR 检测: 获取目标站适配器失败", zap.Error(adpErr))
-		p.advanceStep(ctx, member, StepHRDetect)
+		_ = p.advanceStep(ctx, member, StepHRDetect)
 		return
 	}
 
@@ -1070,7 +1112,7 @@ func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMembe
 			zap.String("torrentID", member.TorrentID),
 			zap.Error(hrErr),
 		)
-		p.advanceStep(ctx, member, StepHRDetect)
+		_ = p.advanceStep(ctx, member, StepHRDetect)
 		return
 	}
 
@@ -1109,7 +1151,7 @@ func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMembe
 			zap.Int("seedTimeH", seedTimeH),
 		)
 	}
-	p.advanceStep(ctx, member, StepHRDetect)
+	_ = p.advanceStep(ctx, member, StepHRDetect)
 }
 
 func (p *Pipeline) notifyPublishResult(ctx context.Context, member *model.PublishGroupMember) {
@@ -1155,22 +1197,27 @@ func (p *Pipeline) notifyPublishResult(ctx context.Context, member *model.Publis
 	}
 }
 
-func (p *Pipeline) advanceStep(ctx context.Context, member *model.PublishGroupMember, step int) {
-	p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
+func (p *Pipeline) advanceStep(ctx context.Context, member *model.PublishGroupMember, step int) error {
+	if err := p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
 		"last_completed_step": step,
 		"updated_at":          time.Now(),
-	})
+	}).Error; err != nil {
+		return err
+	}
 	member.LastCompletedStep = step
+	return nil
 }
 
 func (p *Pipeline) failMember(ctx context.Context, member *model.PublishGroupMember, step int, reason string) error {
 	now := time.Now()
-	p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
+	if err := p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
 		"status":     model.MemberStatusError,
 		"last_error": reason,
 		"error_at":   &now,
 		"status_at":  &now,
-	})
+	}).Error; err != nil {
+		p.logger.Warn("failMember DB update failed", zap.Uint("memberID", member.ID), zap.Error(err))
+	}
 	return publishError(ErrPublishGeneric, fmt.Sprintf("step %d: %s", step, reason), nil)
 }
 

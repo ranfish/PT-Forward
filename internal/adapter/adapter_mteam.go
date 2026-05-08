@@ -11,12 +11,43 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
 
 const mteamUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+type flexInt int64
+
+func (f *flexInt) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 {
+		*f = 0
+		return nil
+	}
+	if data[0] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			*f = 0
+			return nil
+		}
+		*f = flexInt(n)
+		return nil
+	}
+	var n int64
+	if err := json.Unmarshal(data, &n); err != nil {
+		*f = 0
+		return nil
+	}
+	*f = flexInt(n)
+	return nil
+}
 
 type MTeamAdapter struct {
 	*GenericAdapter
@@ -33,6 +64,69 @@ func NewMTeamAdapter(doer *HTTPDoer, logger *zap.Logger) *MTeamAdapter {
 }
 
 func (a *MTeamAdapter) Framework() string { return "mteam" }
+
+func (a *MTeamAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	if config.APIKey != "" {
+		return a.searchViaAPI(ctx, config, keyword)
+	}
+	return a.GenericAdapter.SearchTorrents(ctx, config, keyword, opts)
+}
+
+func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfig, keyword string) ([]*model.SeedingSearchResult, error) {
+	u := resolveBaseURL(config) + "/api/torrent/search"
+	payload, _ := json.Marshal(map[string]interface{}{
+		"keyword":    keyword,
+		"mode":       "normal",
+		"pageNumber": 1,
+		"pageSize":   20,
+	})
+
+	req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(payload))
+	if err != nil {
+		return nil, searchError("构造搜索请求失败", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	a.setAPIHeaders(req, config.APIKey)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, searchError("搜索请求失败", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Code json.Number `json:"code"`
+		Data struct {
+			Data []struct {
+				ID     string  `json:"id"`
+				Name   string  `json:"name"`
+				Size   flexInt `json:"size"`
+				Status struct {
+					Seeders  flexInt `json:"seeders"`
+					Leechers flexInt `json:"leechers"`
+					Discount string  `json:"discount"`
+				} `json:"status"`
+			} `json:"data"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, parseError("解析搜索结果失败", err)
+	}
+
+	var results []*model.SeedingSearchResult
+	for _, item := range result.Data.Data {
+		results = append(results, &model.SeedingSearchResult{
+			TorrentID: item.ID,
+			Title:     item.Name,
+			Size:      int64(item.Size),
+			Seeders:   int(item.Status.Seeders),
+			Leechers:  int(item.Status.Leechers),
+		})
+	}
+	return results, nil
+}
 
 func (a *MTeamAdapter) setAPIHeaders(req *http.Request, apiKey string) {
 	req.Header.Set("User-Agent", mteamUserAgent)
@@ -146,20 +240,30 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	body, _ := io.ReadAll(resp.Body)
 
 	var result struct {
+		Code json.Number `json:"code"`
 		Data struct {
-			Name     string `json:"name"`
-			Size     int64  `json:"size"`
-			InfoHash string `json:"infoHash"`
-			Category string `json:"category"`
-			Seeders  int    `json:"seeders"`
-			Leechers int    `json:"leechers"`
-			Status   struct {
-				Discount string `json:"discount"`
-				HR       bool   `json:"hr"`
+			Name        string   `json:"name"`
+			SmallDescr  string   `json:"smallDescr"`
+			Description string   `json:"description"`
+			Size        flexInt  `json:"size"`
+			InfoHash    string   `json:"infoHash"`
+			Category    string   `json:"category"`
+			Source      string   `json:"source"`
+			Standard    string   `json:"standard"`
+			VideoCodec  string   `json:"videoCodec"`
+			AudioCodec  string   `json:"audioCodec"`
+			Team        string   `json:"team"`
+			Imdb        string   `json:"imdb"`
+			Douban      string   `json:"douban"`
+			MediaInfo   string   `json:"mediaInfo"`
+			Tags        []string `json:"tags"`
+			Status      struct {
+				Discount        string  `json:"discount"`
+				DiscountEndTime string  `json:"discountEndTime"`
+				Seeders         flexInt `json:"seeders"`
+				Leechers        flexInt `json:"leechers"`
+				HR              bool    `json:"hr"`
 			} `json:"status"`
-			MediaInfo string   `json:"mediaInfo"`
-			Imdb      string   `json:"imdb"`
-			Tags      []string `json:"tags"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -168,13 +272,18 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 
 	d := result.Data
 	return &model.TorrentDetail{
-		Title:     d.Name,
-		Size:      d.Size,
-		InfoHash:  strings.ToLower(d.InfoHash),
-		Category:  d.Category,
-		MediaInfo: d.MediaInfo,
-		IMDbID:    d.Imdb,
-		Tags:      d.Tags,
+		Title:        d.Name,
+		Description:  d.Description,
+		Size:         int64(d.Size),
+		InfoHash:     strings.ToLower(d.InfoHash),
+		Category:     d.Category,
+		Source:       d.Source,
+		Resolution:   d.Standard,
+		Codec:        d.VideoCodec,
+		ReleaseGroup: d.Team,
+		MediaInfo:    d.MediaInfo,
+		IMDbID:       d.Imdb,
+		Tags:         d.Tags,
 	}, nil
 }
 
@@ -239,7 +348,8 @@ func (a *MTeamAdapter) discountViaAPI(ctx context.Context, config *model.SiteCon
 	var rawResult struct {
 		Data struct {
 			Status struct {
-				Discount string `json:"discount"`
+				Discount        string `json:"discount"`
+				DiscountEndTime string `json:"discountEndTime"`
 			} `json:"status"`
 		} `json:"data"`
 	}
@@ -247,20 +357,31 @@ func (a *MTeamAdapter) discountViaAPI(ctx context.Context, config *model.SiteCon
 		return &model.DiscountResult{Level: model.DiscountNone}, nil
 	}
 
-	switch strings.ToLower(rawResult.Data.Status.Discount) {
-	case "free":
-		return &model.DiscountResult{Level: model.DiscountFree}, nil
-	case "free2up", "2xfree":
-		return &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}, nil
-	case "2up", "2xup":
-		return &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}, nil
-	case "50%", "halfdown":
-		return &model.DiscountResult{Level: model.DiscountPercent50}, nil
-	case "30%":
-		return &model.DiscountResult{Level: model.DiscountPercent30}, nil
+	var dr *model.DiscountResult
+	switch strings.ToUpper(rawResult.Data.Status.Discount) {
+	case "FREE":
+		dr = &model.DiscountResult{Level: model.DiscountFree}
+	case "_2X_FREE", "FREE_2XUP", "TWOFREE":
+		dr = &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}
+	case "_2X", "2XUP":
+		dr = &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}
+	case "PERCENT_50", "_2X_PERCENT_50":
+		dr = &model.DiscountResult{Level: model.DiscountPercent50}
+	case "PERCENT_70", "_2X_PERCENT_70":
+		dr = &model.DiscountResult{Level: model.DiscountPercent70}
+	case "PERCENT_30":
+		dr = &model.DiscountResult{Level: model.DiscountPercent30}
+	case "NORMAL":
+		dr = &model.DiscountResult{Level: model.DiscountNone}
 	default:
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		dr = &model.DiscountResult{Level: model.DiscountNone}
 	}
+	if dr.Level != model.DiscountNone && rawResult.Data.Status.DiscountEndTime != "" {
+		if t, err := time.Parse(time.RFC3339, rawResult.Data.Status.DiscountEndTime); err == nil {
+			dr.FreeEndAt = &t
+		}
+	}
+	return dr, nil
 }
 
 func (a *MTeamAdapter) discountViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
@@ -383,15 +504,17 @@ func (a *MTeamAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, t
 	body, _ := io.ReadAll(resp.Body)
 	var result struct {
 		Data struct {
-			Seeders  int `json:"seeders"`
-			Leechers int `json:"leechers"`
+			Status struct {
+				Seeders  flexInt `json:"seeders"`
+				Leechers flexInt `json:"leechers"`
+			} `json:"status"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, parseError("解析响应失败", err)
 	}
 
-	return &model.SLData{Seeders: result.Data.Seeders, Leechers: result.Data.Leechers}, nil
+	return &model.SLData{Seeders: int(result.Data.Status.Seeders), Leechers: int(result.Data.Status.Leechers)}, nil
 }
 
 func (a *MTeamAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {

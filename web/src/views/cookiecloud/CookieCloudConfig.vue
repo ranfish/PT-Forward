@@ -55,7 +55,7 @@
             />
           </template>
           <template v-if="column.key === 'sync_duration'">
-            {{ formatDuration(record.sync_duration) }}
+            {{ formatDurationNs(record.sync_duration) }}
           </template>
           <template v-if="column.key === 'created_at'">
             {{ formatTime(record.created_at) }}
@@ -106,17 +106,7 @@ const historyColumns = [
   { title: '错误信息', dataIndex: 'error_message', ellipsis: true },
 ]
 
-function formatTime(t: string) {
-  if (!t) return '-'
-  return new Date(t).toLocaleString()
-}
-
-function formatDuration(ns: number) {
-  if (!ns) return '-'
-  const ms = ns / 1000000
-  if (ms < 1000) return `${ms.toFixed(0)}ms`
-  return `${(ms / 1000).toFixed(1)}s`
-}
+import { formatTime, formatDurationNs } from '@/utils/format'
 
 async function fetchConfig() {
   loading.value = true

@@ -3,24 +3,34 @@
     <a-row :gutter="16" style="margin-bottom: 24px">
       <a-col :span="6">
         <a-card>
-          <a-statistic :title="t('lifecycle.queueDepth')" :value="backpressure.queue_depth || 0" />
+          <a-statistic :title="t('lifecycle.queueDepth')" :value="backpressure.queueDepth || 0" />
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic :title="t('lifecycle.activePublishes')" :value="backpressure.active_publishes || 0" />
+          <a-statistic :title="t('lifecycle.activePublishes')" :value="backpressure.activePublishes || 0" />
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic :title="t('lifecycle.maxConcurrent')" :value="backpressure.max_concurrent_publishes || 0" />
+          <a-statistic :title="t('lifecycle.maxConcurrent')">
+            <template #formatter>
+              <a-input-number
+                v-model:value="backpressureMax"
+                :min="1"
+                size="small"
+                style="width: 100%"
+                @change="updateBackpressure"
+              />
+            </template>
+          </a-statistic>
         </a-card>
       </a-col>
       <a-col :span="6">
         <a-card>
           <a-statistic :title="t('lifecycle.throttled')">
             <template #formatter>
-              <a-tag :color="backpressure.is_throttled ? 'red' : 'green'">{{ backpressure.is_throttled ? t('common.yes') : t('common.no') }}</a-tag>
+              <a-tag :color="backpressure.isThrottled ? 'red' : 'green'">{{ backpressure.isThrottled ? t('common.yes') : t('common.no') }}</a-tag>
             </template>
           </a-statistic>
         </a-card>
@@ -65,6 +75,7 @@ const { t } = useI18n()
 const loading = ref(false)
 const saving = ref(false)
 const backpressure = ref<any>({})
+const backpressureMax = ref(0)
 
 const config = reactive({
   pauseSeeders: true,
@@ -95,6 +106,15 @@ async function fetchBackpressure() {
   try {
     const resp = await lifecycleApi.getBackpressure()
     backpressure.value = resp.data.data || {}
+    backpressureMax.value = backpressure.value.maxConcurrentPublishes || 0
+  } catch (e: any) {
+    message.error(e.message)
+  }
+}
+
+async function updateBackpressure() {
+  try {
+    await lifecycleApi.updateBackpressure({ max_concurrent: backpressureMax.value })
   } catch (e: any) {
     message.error(e.message)
   }

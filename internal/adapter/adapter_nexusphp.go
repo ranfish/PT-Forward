@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,15 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
+
+var basicInfoKeyList = []string{"大小", "类型", "媒介", "编码", "分辨率", "音频编码", "制作组", "地区", "质量", "来源", "发布时间", "发布者", "季", "处理"}
+
+var hashRowPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)种子Hash[：:](?:<[^>]*>|&nbsp;|\s)*([a-fA-F0-9]{40})`),
+	regexp.MustCompile(`(?i)种子散列值[：:](?:<[^>]*>|&nbsp;|\s)*([a-fA-F0-9]{40})`),
+	regexp.MustCompile(`(?i)Hash码(?:<[^>]*>)?[：:]?(?:<[^>]*>|&nbsp;|\s)*([a-fA-F0-9]{40})`),
+	regexp.MustCompile(`data-hash="([a-fA-F0-9]{40})"`),
+}
 
 type NexusPHPAdapter struct {
 	doer   *HTTPDoer
@@ -91,21 +101,184 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 		detail.Title = strings.TrimSpace(m[1])
 	}
 
-	if m := regexp.MustCompile(`(?i)info_hash.*?<td[^>]*>([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
-		detail.InfoHash = strings.ToLower(m[1])
+	rowRe := regexp.MustCompile(`(?s)<tr[^>]*>.*?</tr>`)
+	for _, row := range rowRe.FindAllString(html, -1) {
+		rowText := cleanRowText(row)
+
+		if (strings.Contains(rowText, "类别") || strings.Contains(rowText, "Category")) && !strings.Contains(rowText, "基本信息") {
+			extractCategoryFromImg(row, detail)
+		}
+
+		if strings.Contains(rowText, "基本信息") || strings.Contains(rowText, "基本") {
+			extractBasicInfoFields(row, detail)
+		}
+
+		if strings.Contains(rowText, "副标题") && !strings.Contains(rowText, "基本信息") {
+			extractSubtitleFromRow(row, detail)
+		}
+
+		if (strings.Contains(rowText, "种子文件") || strings.Contains(rowText, "种子信息")) && detail.InfoHash == "" {
+			if h := extractInfoHashFromRow(row); h != "" {
+				detail.InfoHash = h
+			}
+		}
 	}
 
-	if m := regexp.MustCompile(`(?i)(?:大小|Size)[^<]*<[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
-		detail.Size = parseSizeStr(m[1])
+	if detail.Size == 0 || detail.Category == "" {
+		ddBlockRe := regexp.MustCompile(`(?s)基本信息</dt>\s*<dd>(.*)</dd>`)
+		if m := ddBlockRe.FindStringSubmatch(html); len(m) > 1 {
+			extractBasicInfoFields(m[1], detail)
+		}
+		fallbackDivRe := regexp.MustCompile(`(?s)基本信息</div>(.*?)种子文件`)
+		if m := fallbackDivRe.FindStringSubmatch(html); len(m) > 1 {
+			extractBasicInfoFields(m[1], detail)
+		}
 	}
 
-	if m := regexp.MustCompile(`(?i)(?:分类|Category)[^<]*<[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
-		detail.Category = strings.TrimSpace(m[1])
+	if detail.Subtitle == "" {
+		ddSubRe := regexp.MustCompile(`(?s)副标题</dt>\s*<dd>(.*?)</dd>`)
+		if m := ddSubRe.FindStringSubmatch(html); len(m) > 1 {
+			text := stripTags(m[1])
+			text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+			text = strings.TrimSpace(text)
+			if text != "" {
+				detail.Subtitle = text
+			}
+		}
+	}
+
+	if detail.InfoHash == "" {
+		for _, re := range hashRowPatterns {
+			if m := re.FindStringSubmatch(html); len(m) > 1 {
+				detail.InfoHash = strings.ToLower(m[1])
+				break
+			}
+		}
+	}
+
+	if detail.InfoHash == "" {
+		if m := regexp.MustCompile(`(?i)Hash码</dt>\s*<dd>\s*([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
+			detail.InfoHash = strings.ToLower(m[1])
+		}
+	}
+
+	if detail.InfoHash == "" {
+		if m := regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
+			detail.InfoHash = strings.ToLower(m[1])
+		}
+	}
+
+	if m := regexp.MustCompile(`(?s)<div[^>]*id=['"]kdescr['"][^>]*>([\s\S]*?)</div>`).FindStringSubmatch(html); len(m) > 1 {
+		detail.Description = strings.TrimSpace(m[1])
 	}
 
 	detail.Tags = extractTags(html)
 
+	detail.Category = NormalizeCategory(detail.Category)
+
 	return detail, nil
+}
+
+func cleanRowText(row string) string {
+	text := stripTags(row)
+	text = strings.ReplaceAll(text, "&nbsp;", " ")
+	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+	return strings.TrimSpace(text)
+}
+
+func extractBasicInfoFields(row string, detail *model.TorrentDetail) {
+	preprocessed := regexp.MustCompile(`</d[t]>\s*<d[d]>`).ReplaceAllString(row, "：")
+	text := cleanRowText(preprocessed)
+
+	type keyMatch struct {
+		key      string
+		valStart int
+		pos      int
+	}
+	var matches []keyMatch
+	for _, key := range basicInfoKeyList {
+		re := regexp.MustCompile(key + `[：:]`)
+		loc := re.FindStringIndex(text)
+		if loc != nil {
+			matches = append(matches, keyMatch{key: key, valStart: loc[1], pos: loc[0]})
+		}
+	}
+	sort.Slice(matches, func(i, j int) bool { return matches[i].pos < matches[j].pos })
+
+	for i, m := range matches {
+		valEnd := len(text)
+		if i+1 < len(matches) {
+			valEnd = matches[i+1].pos
+		}
+		val := strings.TrimSpace(text[m.valStart:valEnd])
+
+		switch m.key {
+		case "大小":
+			if detail.Size == 0 {
+				if sm := regexp.MustCompile(`([\d.]+)\s*(TB|GB|MB|KB|TiB|GiB|MiB|KiB)`).FindStringSubmatch(val); len(sm) > 2 {
+					detail.Size = parseSizeStr(sm[1] + " " + sm[2])
+				}
+			}
+		case "类型":
+			if detail.Category == "" {
+				detail.Category = val
+			}
+		case "编码":
+			detail.Codec = val
+		case "分辨率":
+			detail.Resolution = val
+		case "媒介", "来源", "质量":
+			if detail.Source == "" {
+				detail.Source = val
+			}
+		case "音频编码":
+			detail.AudioCodec = val
+		case "制作组":
+			detail.ReleaseGroup = val
+		case "地区":
+			detail.Region = val
+		case "处理":
+			detail.Processing = val
+		}
+	}
+}
+
+func extractCategoryFromImg(row string, detail *model.TorrentDetail) {
+	imgRe := regexp.MustCompile(`<img[^>]*alt="([^"]+)"`)
+	for _, m := range imgRe.FindAllStringSubmatch(row, -1) {
+		alt := strings.TrimSpace(m[1])
+		if alt == "" || alt == "Show/Hide" || alt == "显示/隐藏" {
+			continue
+		}
+		detail.Category = alt
+		return
+	}
+	if m := regexp.MustCompile(`cat=\d+[^>]*>([^<]+)`).FindStringSubmatch(row); len(m) > 1 {
+		detail.Category = strings.TrimSpace(m[1])
+	}
+}
+
+func extractSubtitleFromRow(row string, detail *model.TorrentDetail) {
+	tdRe := regexp.MustCompile(`(?s)class="rowfollow"[^>]*>(.*?)</td>`)
+	m := tdRe.FindStringSubmatch(row)
+	if len(m) < 2 {
+		return
+	}
+	text := stripTags(m[1])
+	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+	text = strings.TrimSpace(text)
+	if text != "" {
+		detail.Subtitle = text
+	}
+}
+
+func extractInfoHashFromRow(row string) string {
+	for _, re := range hashRowPatterns {
+		if m := re.FindStringSubmatch(row); len(m) > 1 {
+			return strings.ToLower(m[1])
+		}
+	}
+	return ""
 }
 
 func (a *NexusPHPAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
@@ -148,14 +321,42 @@ func (a *NexusPHPAdapter) GetPreciseSLData(ctx context.Context, config *model.Si
 	html := string(body)
 	sl := &model.SLData{}
 
-	seedersRe := regexp.MustCompile(`(?i)(?:做种数|Seeders?)[^<]*<[^>]*>(\d+)`)
-	if m := seedersRe.FindStringSubmatch(html); len(m) > 1 {
-		sl.Seeders, _ = strconv.Atoi(m[1])
+	seedersRe := regexp.MustCompile(`(\d+)个做种者`)
+	leechersRe := regexp.MustCompile(`(\d+)个下载者`)
+
+	rowRe := regexp.MustCompile(`(?s)<tr[^>]*>.*?</tr>`)
+	for _, row := range rowRe.FindAllString(html, -1) {
+		rowText := cleanRowText(row)
+
+		if strings.Contains(rowText, "同伴") {
+			if m := seedersRe.FindStringSubmatch(rowText); len(m) > 1 {
+				sl.Seeders, _ = strconv.Atoi(m[1])
+			}
+			if m := leechersRe.FindStringSubmatch(rowText); len(m) > 1 {
+				sl.Leechers, _ = strconv.Atoi(m[1])
+			}
+			if sl.Seeders > 0 || sl.Leechers > 0 {
+				return sl, nil
+			}
+		}
+
+		if strings.Contains(rowText, "基本信息") {
+			if m := regexp.MustCompile(`id=['"]seeders['"][^>]*>(?:<[^>]*>)*(\d+)`).FindStringSubmatch(row); len(m) > 1 {
+				sl.Seeders, _ = strconv.Atoi(m[1])
+			}
+			if m := regexp.MustCompile(`id=['"]leechers['"][^>]*>(?:<[^>]*>)*(\d+)`).FindStringSubmatch(row); len(m) > 1 {
+				sl.Leechers, _ = strconv.Atoi(m[1])
+			}
+		}
 	}
 
-	leechersRe := regexp.MustCompile(`(?i)(?:下载数|Leechers?)[^<]*<[^>]*>(\d+)`)
-	if m := leechersRe.FindStringSubmatch(html); len(m) > 1 {
-		sl.Leechers, _ = strconv.Atoi(m[1])
+	if sl.Seeders == 0 && sl.Leechers == 0 {
+		if m := seedersRe.FindStringSubmatch(html); len(m) > 1 {
+			sl.Seeders, _ = strconv.Atoi(m[1])
+		}
+		if m := leechersRe.FindStringSubmatch(html); len(m) > 1 {
+			sl.Leechers, _ = strconv.Atoi(m[1])
+		}
 	}
 
 	return sl, nil
@@ -503,29 +704,36 @@ func setCommonHeaders(req *http.Request, cookie string) {
 func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
 	var results []*model.SeedingSearchResult
 
-	rowRe := regexp.MustCompile(`<tr[^>]*class="torrent-row[^"]*"[^>]*>(.*?)</tr>`)
-	if !rowRe.MatchString(html) {
-		rowRe = regexp.MustCompile(`<tr[^>]*>(.*?)</tr>`)
+	detailLinkRe := regexp.MustCompile(`(?s)href="details\.php\?id=(\d+)"[^>]*><b>\s*&nbsp;([^<]+)</b>`)
+	altDetailLinkRe := regexp.MustCompile(`(?s)href="details\.php\?id=(\d+)[^"]*"[^>]*>(.*?)</a>`)
+	sizeRe := regexp.MustCompile(`(?i)class="rowfollow">([\d.]+)\s*<br\s*/?>\s*(TB|GB|MB|KB)`)
+	seedersRe := regexp.MustCompile(`dllist=1#seeders">\s*(\d+)\s*</a>`)
+	leechersRe := regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
+
+	seen := map[string]bool{}
+	detailMatches := detailLinkRe.FindAllStringSubmatchIndex(html, -1)
+	if len(detailMatches) == 0 {
+		detailMatches = altDetailLinkRe.FindAllStringSubmatchIndex(html, -1)
 	}
 
-	detailLinkRe := regexp.MustCompile(`href="(?:details|detail)\.php\?id=(\d+)[^"]*"[^>]*>([^<]+)`)
-	sizeRe := regexp.MustCompile(`(?i)([\d.]+)\s*(TB|GB|MB|KB)`)
-	seedersRe := regexp.MustCompile(`>(\d+)</a>\s*</td>\s*$`)
-	leechersRe := regexp.MustCompile(`(\d+)\s*</td>\s*$`)
-
-	rows := rowRe.FindAllString(html, -1)
-	for _, row := range rows {
-		linkMatch := detailLinkRe.FindStringSubmatch(row)
-		if len(linkMatch) < 3 {
+	for _, loc := range detailMatches {
+		torrentID := html[loc[2]:loc[3]]
+		if seen[torrentID] {
 			continue
 		}
+		seen[torrentID] = true
 
-		torrentID := linkMatch[1]
-		title := strings.TrimSpace(linkMatch[2])
+		title := html[loc[4]:loc[5]]
+		title = strings.TrimSpace(stripTags(strings.ReplaceAll(title, "&nbsp;", " ")))
 
-		if len(results) > 0 && results[len(results)-1].TorrentID == torrentID {
-			continue
+		start := loc[0]
+		end := loc[1]
+		if end+5000 <= len(html) {
+			end += 5000
+		} else {
+			end = len(html)
 		}
+		chunk := html[start:end]
 
 		result := &model.SeedingSearchResult{
 			TorrentID: torrentID,
@@ -533,22 +741,22 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			DetailURL: config.Domain + "/details.php?id=" + torrentID,
 		}
 
-		if m := sizeRe.FindStringSubmatch(row); len(m) > 2 {
+		if m := sizeRe.FindStringSubmatch(chunk); len(m) > 2 {
 			result.Size = parseSizeStr(m[1] + " " + m[2])
 		}
 
-		if m := seedersRe.FindStringSubmatch(row); len(m) > 1 {
+		if m := seedersRe.FindStringSubmatch(chunk); len(m) > 1 {
 			result.Seeders, _ = strconv.Atoi(m[1])
 		}
 
-		if m := leechersRe.FindStringSubmatch(row); len(m) > 1 {
+		if m := leechersRe.FindStringSubmatch(chunk); len(m) > 1 {
 			result.Leechers, _ = strconv.Atoi(m[1])
 		}
 
 		result.PublishAt = time.Now()
 		results = append(results, result)
 
-		if opts := len(results); opts >= 50 {
+		if len(results) >= 50 {
 			break
 		}
 	}
@@ -560,7 +768,7 @@ func parseSizeStr(s string) int64 {
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, ",", "")
 
-	valRe := regexp.MustCompile(`([\d.]+)\s*(TB|GB|MB|KB|B)`)
+	valRe := regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|B)`)
 	m := valRe.FindStringSubmatch(s)
 	if len(m) < 3 {
 		return 0
@@ -572,13 +780,13 @@ func parseSizeStr(s string) int64 {
 	}
 
 	switch strings.ToUpper(m[2]) {
-	case "TB":
+	case "TB", "TIB":
 		return int64(val * 1024 * 1024 * 1024 * 1024)
-	case "GB":
+	case "GB", "GIB":
 		return int64(val * 1024 * 1024 * 1024)
-	case "MB":
+	case "MB", "MIB":
 		return int64(val * 1024 * 1024)
-	case "KB":
+	case "KB", "KIB":
 		return int64(val * 1024)
 	default:
 		return int64(val)
@@ -617,4 +825,64 @@ func isMusicCategory(cat string) bool {
 	}
 	lower := strings.ToLower(cat)
 	return strings.Contains(lower, "music") || strings.Contains(lower, "音频") || strings.Contains(lower, "hq audio")
+}
+
+var categoryNormRules = []struct {
+	pattern string
+	target  string
+}{
+	{`(?i)^Movies`, "电影"},
+	{`电影`, "电影"},
+	{`高清电影`, "电影"},
+	{`(?i)^TV\s*Series`, "电视剧"},
+	{`电视剧`, "电视剧"},
+	{`剧集`, "电视剧"},
+	{`短剧`, "电视剧"},
+	{`(?i)^TV\s*Shows`, "综艺"},
+	{`综艺`, "综艺"},
+	{`(?i)^Anime`, "动漫"},
+	{`(?i)^Animations`, "动漫"},
+	{`动漫`, "动漫"},
+	{`动画`, "动漫"},
+	{`(?i)^Documentar`, "纪录片"},
+	{`纪录片`, "纪录片"},
+	{`(?i)^Music`, "音乐"},
+	{`音乐`, "音乐"},
+	{`(?i)^Lossless`, "音乐"},
+	{`(?i)^Book`, "书籍"},
+	{`(?i)^Program`, "软件"},
+	{`学习`, "教育"},
+	{`文档`, "文档"},
+	{`漫画`, "漫画"},
+	{`(?i)^Nature`, "纪录片"},
+	{`Doc\s`, "纪录片"},
+}
+
+var categoryNormRe = func() []struct {
+	re     *regexp.Regexp
+	target string
+} {
+	var compiled []struct {
+		re     *regexp.Regexp
+		target string
+	}
+	for _, r := range categoryNormRules {
+		compiled = append(compiled, struct {
+			re     *regexp.Regexp
+			target string
+		}{regexp.MustCompile(r.pattern), r.target})
+	}
+	return compiled
+}()
+
+func NormalizeCategory(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	for _, rule := range categoryNormRe {
+		if rule.re.MatchString(raw) {
+			return rule.target
+		}
+	}
+	return raw
 }

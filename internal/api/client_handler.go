@@ -193,19 +193,25 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Role:           req.Role,
 		ReseedTargetID: req.ReseedTargetID,
 	}
-	if err := h.db.Create(&client).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&client).Error; err != nil {
+			return err
+		}
+		for _, pm := range req.PathMappings {
+			mapping := model.ClientPathMapping{
+				SourceClientID: client.ID,
+				ReseedClientID: client.ID,
+				SourcePath:     pm.SourcePath,
+				ReseedPath:     pm.ReseedPath,
+			}
+			if err := tx.Create(&mapping).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "创建下载器失败")
 		return
-	}
-
-	for _, pm := range req.PathMappings {
-		mapping := model.ClientPathMapping{
-			SourceClientID: client.ID,
-			ReseedClientID: client.ID,
-			SourcePath:     pm.SourcePath,
-			ReseedPath:     pm.ReseedPath,
-		}
-		h.db.Create(&mapping)
 	}
 
 	h.logger.Info("downloader created", zap.String("name", client.Name), zap.String("type", client.Type))
@@ -247,6 +253,10 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		client.Name = req.Name
 	}
 	if req.Type != "" {
+		if req.Type != "qbittorrent" && req.Type != "transmission" {
+			Error(w, http.StatusBadRequest, 40001, "type 必须为 qbittorrent 或 transmission")
+			return
+		}
 		client.Type = req.Type
 	}
 	if req.URL != "" {
@@ -259,28 +269,41 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		client.Password = req.Password
 	}
 	if req.Role != "" {
+		validRoles := map[string]bool{"seeding": true, "download": true, "source": true, "reseed": true}
+		if !validRoles[req.Role] {
+			Error(w, http.StatusBadRequest, 40001, "role 必须为 seeding, download, source 或 reseed")
+			return
+		}
 		client.Role = req.Role
 	}
 	client.ReseedTargetID = req.ReseedTargetID
 	client.Enabled = req.Enabled
 	client.IsDefault = req.IsDefault
 
-	if err := h.db.Save(&client).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&client).Error; err != nil {
+			return err
+		}
+		if req.PathMappings != nil {
+			if err := tx.Where("source_client_id = ?", client.ID).Delete(&model.ClientPathMapping{}).Error; err != nil {
+				return err
+			}
+			for _, pm := range req.PathMappings {
+				mapping := model.ClientPathMapping{
+					SourceClientID: client.ID,
+					ReseedClientID: client.ID,
+					SourcePath:     pm.SourcePath,
+					ReseedPath:     pm.ReseedPath,
+				}
+				if err := tx.Create(&mapping).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新下载器失败")
 		return
-	}
-
-	if req.PathMappings != nil {
-		h.db.Where("source_client_id = ?", client.ID).Delete(&model.ClientPathMapping{})
-		for _, pm := range req.PathMappings {
-			mapping := model.ClientPathMapping{
-				SourceClientID: client.ID,
-				ReseedClientID: client.ID,
-				SourcePath:     pm.SourcePath,
-				ReseedPath:     pm.ReseedPath,
-			}
-			h.db.Create(&mapping)
-		}
 	}
 
 	h.logger.Info("downloader updated", zap.String("name", client.Name))
@@ -312,8 +335,15 @@ func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.db.Where("source_client_id = ? OR reseed_client_id = ?", client.ID, client.ID).Delete(&model.ClientPathMapping{})
-	h.db.Delete(&client)
+	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("source_client_id = ? OR reseed_client_id = ?", client.ID, client.ID).Delete(&model.ClientPathMapping{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&client).Error
+	}); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "删除下载器失败")
+		return
+	}
 
 	h.logger.Info("downloader deleted", zap.String("name", client.Name))
 	Success(w, nil)
@@ -670,7 +700,7 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 	case http.MethodGet:
 		var targets []model.ClientPublishTarget
 		if err := h.db.WithContext(r.Context()).Find(&targets).Error; err != nil {
-			Error(w, http.StatusInternalServerError, 500, "failed to list publish targets")
+			Error(w, http.StatusInternalServerError, 50000, "failed to list publish targets")
 			return
 		}
 		Success(w, targets)
@@ -687,11 +717,11 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			Enabled         bool   `json:"enabled"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
 		if req.ClientID == 0 || req.SiteName == "" {
-			Error(w, http.StatusBadRequest, 400, "client_id and site_name are required")
+			Error(w, http.StatusBadRequest, 40001, "client_id and site_name are required")
 			return
 		}
 		target := model.ClientPublishTarget{
@@ -706,10 +736,10 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 		}
 		if err := h.db.WithContext(r.Context()).Create(&target).Error; err != nil {
 			if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "UNIQUE") {
-				Error(w, http.StatusConflict, 409, "publish target already exists")
+				Error(w, http.StatusConflict, 40900, "publish target already exists")
 				return
 			}
-			Error(w, http.StatusInternalServerError, 500, "failed to create publish target")
+			Error(w, http.StatusInternalServerError, 50000, "failed to create publish target")
 			return
 		}
 		Success(w, target)
@@ -725,12 +755,12 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			Enabled         *bool  `json:"enabled"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
 		var target model.ClientPublishTarget
 		if err := h.db.WithContext(r.Context()).First(&target, req.ID).Error; err != nil {
-			Error(w, http.StatusNotFound, 404, "publish target not found")
+			Error(w, http.StatusNotFound, 40400, "publish target not found")
 			return
 		}
 		updates := map[string]interface{}{}
@@ -763,17 +793,17 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			ID uint `json:"id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			Error(w, http.StatusBadRequest, 400, "invalid request body")
+			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
 		result := h.db.WithContext(r.Context()).Delete(&model.ClientPublishTarget{}, req.ID)
 		if result.RowsAffected == 0 {
-			Error(w, http.StatusNotFound, 404, "publish target not found")
+			Error(w, http.StatusNotFound, 40400, "publish target not found")
 			return
 		}
 		Success(w, map[string]string{"status": "deleted"})
 
 	default:
-		Error(w, http.StatusMethodNotAllowed, 405, "method not allowed")
+		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
 	}
 }

@@ -228,8 +228,8 @@ func TestRousiAdapter_DetectDiscount_Free2x(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Level != model.DiscountFree {
-		t.Errorf("expected FREE, got %s", result.Level)
+	if result.Level != model.Discount2xFree {
+		t.Errorf("expected 2XFREE, got %s", result.Level)
 	}
 	if result.Multiplier != 2.0 {
 		t.Errorf("expected multiplier 2.0, got %f", result.Multiplier)
@@ -754,6 +754,141 @@ func TestRousiAdapter_UploadWithImages(t *testing.T) {
 	}
 	if len(images) != 2 {
 		t.Errorf("expected 2 images, got %d", len(images))
+	}
+}
+
+func TestRousiAdapter_SearchTorrents_OK(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/torrents" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer testkey" {
+			t.Errorf("missing Bearer auth header")
+		}
+		if r.URL.Query().Get("search") != "test" {
+			t.Errorf("unexpected search param: %s", r.URL.Query().Get("search"))
+		}
+		resp := map[string]interface{}{
+			"code": 0,
+			"data": map[string]interface{}{
+				"torrents": []map[string]interface{}{
+					{"id": 1, "uuid": "abc-123", "title": "Test Torrent", "size": 1024, "seeders": 5, "leechers": 2, "category": "movie"},
+					{"id": 2, "uuid": "def-456", "title": "Another Torrent", "size": 2048, "seeders": 3, "leechers": 1, "category": "tv"},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		b, _ := json.Marshal(resp)
+		_, _ = w.Write(b)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewRousiAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	results, err := a.SearchTorrents(context.Background(), config, "test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if results[0].TorrentID != "abc-123" {
+		t.Errorf("expected torrent ID abc-123, got %s", results[0].TorrentID)
+	}
+	if results[0].Title != "Test Torrent" {
+		t.Errorf("unexpected title: %s", results[0].Title)
+	}
+	if results[0].Size != 1024 {
+		t.Errorf("unexpected size: %d", results[0].Size)
+	}
+	if results[0].Seeders != 5 {
+		t.Errorf("expected 5 seeders, got %d", results[0].Seeders)
+	}
+	if results[1].TorrentID != "def-456" {
+		t.Errorf("expected torrent ID def-456, got %s", results[1].TorrentID)
+	}
+}
+
+func TestRousiAdapter_VerifyExists_Found(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"code": 0,
+			"data": map[string]interface{}{
+				"torrents": []map[string]interface{}{
+					{"id": 1, "uuid": "target-uuid", "title": "Found", "size": 1024, "seeders": 5, "leechers": 2, "category": "movie"},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		b, _ := json.Marshal(resp)
+		_, _ = w.Write(b)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewRousiAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	found, err := a.VerifyExists(context.Background(), config, "target-uuid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Error("expected found")
+	}
+}
+
+func TestRousiAdapter_VerifyExists_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"code": 0,
+			"data": map[string]interface{}{
+				"torrents": []map[string]interface{}{
+					{"id": 1, "uuid": "other-uuid", "title": "Other", "size": 1024, "seeders": 5, "leechers": 2, "category": "movie"},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		b, _ := json.Marshal(resp)
+		_, _ = w.Write(b)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewRousiAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	found, err := a.VerifyExists(context.Background(), config, "target-uuid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found {
+		t.Error("expected not found")
+	}
+}
+
+func TestRousiAdapter_DetectHR_IgnoresPageContent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body>Hit and Run</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewRousiAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	result, err := a.DetectHR(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.HasHR {
+		t.Error("rousI never reports HR regardless of page content")
+	}
+	if result.SeedTimeH != 0 {
+		t.Errorf("expected SeedTimeH 0, got %d", result.SeedTimeH)
 	}
 }
 

@@ -107,7 +107,9 @@ type Maindata struct {
 	FreeSpace   int64                  `json:"free_space"`
 }
 
-type ServerState struct{}
+type ServerState struct {
+	UploadSpeed int64 `json:"upload_speed"`
+}
 
 // §33.1.68 — SharedPathMapping: 共享路径映射
 type SharedPathMapping struct {

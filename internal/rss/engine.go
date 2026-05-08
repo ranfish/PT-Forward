@@ -206,6 +206,14 @@ func (e *Engine) startSubscription(parentCtx context.Context, sub *model.RSSSubs
 }
 
 func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
+	var site model.Site
+	if err := e.db.WithContext(ctx).Where("name = ? OR domain = ?", sub.SiteName, sub.SiteName).First(&site).Error; err != nil {
+		e.logger.Warn("site not found for subscription",
+			zap.String("subscription", sub.Name),
+			zap.String("site", sub.SiteName))
+		return
+	}
+
 	for _, url := range sub.URLs {
 		feed, err := e.fetcher.Fetch(ctx, url)
 		if err != nil {
@@ -213,14 +221,6 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				zap.String("subscription", sub.Name),
 				zap.String("url", url),
 				zap.Error(err))
-			continue
-		}
-
-		var site model.Site
-		if err := e.db.WithContext(ctx).Where("name = ? OR domain = ?", sub.SiteName, sub.SiteName).First(&site).Error; err != nil {
-			e.logger.Warn("site not found for subscription",
-				zap.String("subscription", sub.Name),
-				zap.String("site", sub.SiteName))
 			continue
 		}
 
@@ -232,6 +232,16 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			isSeen, _ := e.repo.IsSeen(ctx, event.SiteName, event.TorrentID)
 			if isSeen {
 				continue
+			}
+
+			if sub.DiskBudgetEnabled && sub.ClientID != "" && e.siteProvider != nil {
+				if err := e.checkDiskBudget(ctx, sub, event.Size); err != nil {
+					e.logger.Warn("torrent skipped by disk budget",
+						zap.String("torrent", event.TorrentID),
+						zap.Int64("size", event.Size),
+						zap.Error(err))
+					continue
+				}
 			}
 
 			seen := &model.RSSTorrentSeen{
@@ -312,16 +322,6 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				te.HRSeedTimeH = event.HRSeedTimeH
 				if te.HRSeedTimeH == 0 {
 					te.HRSeedTimeH = 72
-				}
-			}
-
-			if sub.DiskBudgetEnabled && sub.ClientID != "" && e.siteProvider != nil {
-				if err := e.checkDiskBudget(ctx, sub, event.Size); err != nil {
-					e.logger.Debug("torrent skipped by disk budget",
-						zap.String("torrent", event.TorrentID),
-						zap.Int64("size", event.Size),
-						zap.Error(err))
-					continue
 				}
 			}
 

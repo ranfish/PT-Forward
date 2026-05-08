@@ -16,7 +16,7 @@
         pageSize: pagination.pageSize.value,
         total: pagination.total.value,
         showSizeChanger: true,
-        showTotal: (total: number) => `共 ${total} 条`,
+        showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
       @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
@@ -30,6 +30,7 @@
         <template v-if="column.key === 'actions'">
           <a-space>
             <a-button type="link" size="small" @click="openModal(record)">{{ t('common.edit') }}</a-button>
+            <a-button type="link" size="small" @click="testRule(record)">{{ t('common.test') }}</a-button>
             <a-popconfirm :title="t('settings.filterRules.deleteConfirm')" @confirm="handleDelete(record.id)">
               <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
@@ -111,7 +112,7 @@ const columns = [
   { title: '保存路径', dataIndex: 'savePath', key: 'savePath', ellipsis: true },
   { title: '分类', dataIndex: 'category', key: 'category', width: 100 },
   { title: '优先级', dataIndex: 'priority', key: 'priority', width: 80 },
-  { title: '操作', key: 'actions', width: 120 },
+  { title: '操作', key: 'actions', width: 180 },
 ]
 
 const pagination = usePagination((page, size) => filterRulesApi.list(page, size))
@@ -138,10 +139,22 @@ function openModal(record?: any) {
 async function handleSubmit() {
   submitting.value = true
   try {
-    if (editingRule.value) {
-      await filterRulesApi.update(editingRule.value.id, form)
+    const payload: any = { ...form }
+    if (typeof payload.conditions === 'string' && payload.conditions.trim()) {
+      try {
+        payload.conditions = JSON.parse(payload.conditions)
+      } catch {
+        message.error(t('common.jsonFormatError'))
+        submitting.value = false
+        return
+      }
     } else {
-      await filterRulesApi.create(form)
+      payload.conditions = []
+    }
+    if (editingRule.value) {
+      await filterRulesApi.update(editingRule.value.id, payload)
+    } else {
+      await filterRulesApi.create(payload)
     }
     message.success(t('common.operationSuccess'))
     modalVisible.value = false
@@ -158,6 +171,20 @@ async function handleDelete(id: number) {
     await filterRulesApi.delete(id)
     message.success(t('common.deleteSuccess'))
     pagination.fetch()
+  } catch (e: any) {
+    message.error(e.message)
+  }
+}
+
+async function testRule(record: any) {
+  try {
+    const resp = await filterRulesApi.test(record.id, { title: '测试种子标题', size: 1073741824 })
+    const result = resp.data?.data
+    if (result?.matched) {
+      message.success(t('settings.filterRules.testMatched', { name: record.name }))
+    } else {
+      message.info(t('settings.filterRules.testNotMatched', { name: record.name }))
+    }
   } catch (e: any) {
     message.error(e.message)
   }

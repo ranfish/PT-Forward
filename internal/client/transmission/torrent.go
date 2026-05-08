@@ -59,10 +59,26 @@ func (c *TRClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
 		torrentMap[t.HashString] = *t.toModel()
 	}
 	freeSpace, _ := c.GetFreeSpace(ctx)
+	uploadSpeed := c.getSessionStats(ctx)
 	return &model.Maindata{
-		Torrents:  torrentMap,
-		FreeSpace: freeSpace,
+		Torrents:    torrentMap,
+		FreeSpace:   freeSpace,
+		ServerState: model.ServerState{UploadSpeed: uploadSpeed},
 	}, nil
+}
+
+func (c *TRClient) getSessionStats(ctx context.Context) int64 {
+	resp, err := c.rpcCall(ctx, "session-stats", nil)
+	if err != nil {
+		return 0
+	}
+	var stats struct {
+		UploadSpeed int64 `json:"uploadSpeed"`
+	}
+	if err := json.Unmarshal(resp.Arguments, &stats); err != nil {
+		return 0
+	}
+	return stats.UploadSpeed
 }
 
 func (c *TRClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.Maindata, int, error) {

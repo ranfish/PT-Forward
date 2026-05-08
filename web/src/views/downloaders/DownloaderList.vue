@@ -22,10 +22,10 @@
       @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
+        <template v-if="column.key === 'enabled'">
           <a-badge
-            :status="record.status === 'online' ? 'success' : record.status === 'offline' ? 'error' : 'warning'"
-            :text="record.status === 'online' ? t('common.online') : record.status === 'offline' ? t('common.offline') : t('common.unknown')"
+            :status="record.enabled ? 'success' : 'default'"
+            :text="record.enabled ? t('common.online') : t('common.offline')"
           />
         </template>
         <template v-if="column.key === 'actions'">
@@ -66,6 +66,17 @@
         <a-form-item :label="t('common.password')" name="password">
           <a-input-password v-model:value="form.password" :placeholder="t('common.password')" />
         </a-form-item>
+        <a-form-item label="角色" name="role" :rules="[{ required: true, message: '请选择角色' }]">
+          <a-select v-model:value="form.role" placeholder="请选择角色">
+            <a-select-option value="download">下载</a-select-option>
+            <a-select-option value="seeding">做种</a-select-option>
+            <a-select-option value="source">源站</a-select-option>
+            <a-select-option value="reseed">辅种</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item :label="t('common.enable')" name="enabled">
+          <a-switch v-model:checked="form.enabled" />
+        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -90,12 +101,15 @@ const form = reactive({
   url: '',
   username: '',
   password: '',
+  role: 'download',
+  enabled: true,
 })
 
 const columns = [
   { title: '名称', dataIndex: 'name', key: 'name' },
   { title: '类型', dataIndex: 'type', key: 'type' },
   { title: '地址', dataIndex: 'url', key: 'url' },
+  { title: '角色', dataIndex: 'role', key: 'role', width: 80 },
   { title: '启用', dataIndex: 'enabled', key: 'enabled', width: 80 },
   { title: '操作', key: 'actions', width: 260 },
 ]
@@ -105,9 +119,9 @@ const pagination = usePagination((page, size) => downloadersApi.list(page, size)
 function openModal(record?: any) {
   editingRecord.value = record || null
   if (record) {
-    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '' })
+    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true })
   } else {
-    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '' })
+    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '', role: 'download', enabled: true })
   }
   modalVisible.value = true
 }

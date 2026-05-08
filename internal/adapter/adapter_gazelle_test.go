@@ -323,3 +323,220 @@ func TestResolveBase(t *testing.T) {
 		}
 	}
 }
+
+func TestGazelle_GetTorrentDetail_APIFull(t *testing.T) {
+	apiResp := map[string]interface{}{
+		"response": map[string]interface{}{
+			"torrent": map[string]interface{}{
+				"filePath": "movie.2024.bluray.mkv",
+				"size":     5368709120,
+				"infoHash": "11223344556677889900AABBCCDDEEFF00112233",
+				"seeders":  50,
+				"leechers": 15,
+			},
+			"group": map[string]interface{}{
+				"name": "Full API Movie",
+				"category": map[string]interface{}{
+					"name": "Movies",
+				},
+			},
+		},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if err := json.NewEncoder(w).Encode(apiResp); err != nil {
+			t.Errorf("encode: %v", err)
+		}
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "test-key"}
+
+	detail, err := a.GetTorrentDetail(context.Background(), config, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Title != "Full API Movie" {
+		t.Errorf("title: %s", detail.Title)
+	}
+	if detail.Size != 5368709120 {
+		t.Errorf("size: %d", detail.Size)
+	}
+	if detail.Category != "Movies" {
+		t.Errorf("category: %s", detail.Category)
+	}
+	if detail.InfoHash != "11223344556677889900aabbccddeeff00112233" {
+		t.Errorf("info_hash: %s", detail.InfoHash)
+	}
+}
+
+func TestGazelle_VerifyExists_Found(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>
+		<tr><td><a href="details.php?id=42">Found Torrent</a></td></tr>
+		</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	config.Paths.Browse = "/torrents.php"
+
+	found, err := a.VerifyExists(context.Background(), config, "42")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Error("expected found=true")
+	}
+}
+
+func TestGazelle_VerifyExists_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>
+		<tr><td><a href="details.php?id=99">Other Torrent</a></td></tr>
+		</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	config.Paths.Browse = "/torrents.php"
+
+	found, err := a.VerifyExists(context.Background(), config, "42")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found {
+		t.Error("expected found=false")
+	}
+}
+
+func TestGazelle_DetectDiscount_Free(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body><span class="freeleech">Free</span></body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectDiscount(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Level != model.DiscountFree {
+		t.Errorf("expected DiscountFree, got %v", result.Level)
+	}
+}
+
+func TestGazelle_DetectDiscount_2xFree(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>freeleech double upload zone</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectDiscount(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Level != model.Discount2xFree {
+		t.Errorf("expected Discount2xFree, got %v", result.Level)
+	}
+}
+
+func TestGazelle_DetectDiscount_2xUp(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>2x upload bonus</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectDiscount(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Level != model.Discount2xUp {
+		t.Errorf("expected Discount2xUp, got %v", result.Level)
+	}
+}
+
+func TestGazelle_DetectDiscount_50Percent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>half download deal</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectDiscount(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Level != model.DiscountPercent50 {
+		t.Errorf("expected DiscountPercent50, got %v", result.Level)
+	}
+}
+
+func TestGazelle_DetectDiscount_None(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>normal torrent page</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectDiscount(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Level != model.DiscountNone {
+		t.Errorf("expected DiscountNone, got %v", result.Level)
+	}
+}
+
+func TestGazelle_DetectHR_Found(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>Hit and Run rules apply</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectHR(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.HasHR {
+		t.Error("expected HasHR=true")
+	}
+}
+
+func TestGazelle_DetectHR_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>regular torrent</body></html>`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+
+	result, err := a.DetectHR(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.HasHR {
+		t.Error("expected HasHR=false")
+	}
+}

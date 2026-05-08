@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -261,7 +262,7 @@ func (h *LifecycleHandler) handleUpdateBackpressure(w http.ResponseWriter, r *ht
 	}
 
 	data, _ := json.Marshal(existing)
-	h.saveSetting(nil, "lifecycle_backpressure", string(data))
+	h.saveSetting(r, "lifecycle_backpressure", string(data))
 
 	Success(w, existing)
 }
@@ -280,13 +281,17 @@ func (h *LifecycleHandler) getSettingFromDB(key string) (string, error) {
 	return s.Value, err
 }
 
-func (h *LifecycleHandler) saveSetting(_ *http.Request, key, value string) {
+func (h *LifecycleHandler) saveSetting(r *http.Request, key, value string) {
+	ctx := context.Background()
+	if r != nil {
+		ctx = r.Context()
+	}
 	var s setting.Setting
-	result := h.db.Where("`key` = ?", key).First(&s)
+	result := h.db.WithContext(ctx).Where("`key` = ?", key).First(&s)
 	if result.Error != nil {
-		h.db.Create(&setting.Setting{Key: key, Value: value})
+		h.db.WithContext(ctx).Create(&setting.Setting{Key: key, Value: value})
 	} else {
-		h.db.Model(&s).Update("value", value)
+		h.db.WithContext(ctx).Model(&s).Update("value", value)
 	}
 }
 

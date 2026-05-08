@@ -109,7 +109,22 @@ func (h *AuthHandler) HandleSetup(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		return
 	}
-	Error(w, http.StatusConflict, 40900, "密码已设置")
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+
+	if err := h.authManager.SetupAdmin(r.Context(), req.Username, req.Password); err != nil {
+		writeAppError(w, err)
+		return
+	}
+
+	Success(w, map[string]interface{}{"initialized": true})
 }
 
 type changePasswordRequest struct {
@@ -152,6 +167,19 @@ type updateProfileRequest struct {
 }
 
 func (h *AuthHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		user, err := h.authManager.GetUserInfo(r.Context())
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		Success(w, map[string]interface{}{
+			"username":    user.Username,
+			"displayName": user.DisplayName,
+		})
+		return
+	}
+
 	if r.Method != http.MethodPut {
 		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		return

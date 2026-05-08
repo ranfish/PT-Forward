@@ -1,0 +1,879 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="NexusPHP" />
+<title>青蛙 :: 种子详情 &quot;X-Men Origins Wolverine 2009 1080p BluRay x265 DD 5.1 2Audio-MNHD-FRDS&quot; - Powered by NexusPHP</title>
+<link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+<link rel="search" type="application/opensearchdescription+xml" title="青蛙 Torrents" href="opensearch.php" />
+<link rel="stylesheet" href="vendor/layui/css/layui.css" type="text/css" />
+<link rel="stylesheet" href="styles/largefont.css" type="text/css" />
+<link rel="stylesheet" href="styles/sprites.css" type="text/css" />
+<link rel="stylesheet" href="pic/forum_pic/chs/forumsprites.css" type="text/css" />
+<link rel="stylesheet" href="styles/Classic/theme.css" type="text/css" />
+<link rel="stylesheet" href="styles/Classic/DomTT.css" type="text/css" />
+<link rel="stylesheet" href="styles/curtain_imageresizer.css" type="text/css" />
+<link rel="stylesheet" href="styles/nexus.css" type="text/css" />
+<style>
+    .main{
+        width: 1200px;
+    }
+    </style>
+<link rel="stylesheet" href="pic/category/qw/scenetorrents/catsprites.css" type="text/css" />
+<style>
+			#qingwa-menu {
+				border-radius: 50%;
+				height: 60px;
+				width: 60px;
+				opacity: .9;
+				transition: all .3s;
+				position: fixed;
+				left: 20px;
+				bottom: 100px;
+				z-index: 999999;
+				transform: scale(1);
+				background-color: #0c8035;
+				background-image: url(./pic/menu/menu.svg);
+				background-position: center;
+				background-repeat: no-repeat;
+				background-size: cover;
+			}
+
+			#qingwa-menu:hover {
+				opacity: 1;
+				transform: scale(1.1);
+			}
+
+			.qingwa-list {
+				position: fixed;
+				left: 20px;
+				bottom: 105px;
+				height: 50px;
+				width: 50px;
+				opacity: 0;
+				text-decoration: none;
+				transition: all .3s;
+				z-index:999998;
+				pointer-events:none;
+			}
+
+			.qingwa-list>img {
+				border-radius: 50%;
+				background-color: #000;
+				width: 50px;
+				height: 50px;
+				position: fixed;
+				bottom: 105px;
+				transition: all .3s;
+			}
+
+			.qingwa-list_title {
+				text-shadow: 0 0 4px #222;
+				font-size: 20px;
+				color: #FFF;
+				transition: all .3s;
+				user-select: none;
+				writing-mode: vertical-rl;
+				position: fixed;
+				line-height: 50px;
+				bottom: 170px;
+				transform: all .3s;
+				opacity: 0;
+			}
+		</style>
+		<script type="text/javascript">
+			window.onload = () => {
+			let qingwa_menu=document.createElement("div");
+			let qingwa_lists=document.createElement("div");
+			qingwa_menu.setAttribute("id","qingwa-menu");
+			qingwa_menu.setAttribute("onclick","clickMenu(this)");
+			qingwa_lists.setAttribute("id","qingwa-lists");
+			document.body.appendChild(qingwa_menu);
+			document.body.appendChild(qingwa_lists);
+            const menu = document.getElementById("qingwa-lists");
+            const menu_list = [
+                {
+					"title": "个人中心",
+                    "icon": "./pic/menu/user.svg",
+                    "color": "#fdda00",
+                    "href": "./userdetails.php?id=10216",
+                    "target": "_self"
+				},
+				{
+					"title": "控制面板",
+                    "icon": "./pic/menu/settings.svg",
+                    "color": "#798295",
+                    "href": "./usercp.php",
+                    "target": "_self"
+				},
+				{
+                    "title": "爱心捐赠",
+                    "icon": "./pic/menu/donate.svg",
+                    "color": "#FF1122",
+                    "href": "./donate.php",
+                    "target": "_self"
+                },
+                {
+                    "title": "Telegram",
+                    "icon": "./pic/menu/telegram.svg",
+                    "color": "#1296DB",
+                    "href": "https://t.me/+MyNfERbsNt5lNmQ9",
+                    "target": "_blank"
+                }
+
+            ];
+            menu_list.forEach(e => {
+                let a = document.createElement("a");
+                a.innerHTML = `<div class='qingwa-list_title'>${e.title}</div><img style="background-color:${e.color};" src="${e.icon}" />`;
+                a.setAttribute("class", "qingwa-list");
+                a.setAttribute("href", e.href);
+                a.setAttribute("target", e.target);
+                a.addEventListener("mouseover", () => {
+                    a.getElementsByTagName("img")[0].style.transform = "scale(1.1)";
+                    a.getElementsByClassName("qingwa-list_title")[0].style.opacity = 1;
+                });
+                a.addEventListener("mouseout", () => {
+                    a.getElementsByTagName("img")[0].style.transform = "scale(1)";
+                    a.getElementsByClassName("qingwa-list_title")[0].style.opacity = 0;
+                });
+                menu.appendChild(a);
+            });
+        }
+        let clickMenu = (element) => {
+            Array.from(document.getElementsByClassName("qingwa-list")).forEach((e, i) => {
+                if (e.style.opacity == 0) {
+                    e.style.left = (20 + i * 56).toString() + "px";
+                    e.style.opacity = .9;
+                    element.style.left = (80 + i * 56).toString() + "px";
+					e.style.pointerEvents='auto';
+                } else {
+                    e.style.left = "20px";
+                    e.style.opacity = 0;
+                    element.style.left = "20px";
+					e.style.pointerEvents='none';
+                }
+            });
+        }
+		</script>
+	<link rel="alternate" type="application/rss+xml" title="Latest Torrents" href="torrentrss.php" />
+<link rel="stylesheet" href="vendor/jstree/themes/default/style.min.css" />
+<script type="text/javascript" src="js/curtain_imageresizer.js"></script>
+<script type="text/javascript" src="js/ajaxbasic.js"></script>
+<script type="text/javascript" src="js/domLib.js"></script>
+<script type="text/javascript" src="js/domTT.js"></script>
+<script type="text/javascript" src="js/domTT_drag.js"></script>
+<script type="text/javascript" src="js/fadomatic.js"></script>
+<link rel="stylesheet" href="ddlevelsfiles/new-base.css" type="text/css"><style type="text/css">.btn-post-like {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin: 4px 10px 0 0;
+}</style><style type="text/css">.post-reward-box {
+    padding: 15px 30px;
+}
+.post-reward-box .form-control-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding-bottom: 10px;
+}
+.post-reward-box .form-control-row .label{
+    width: 80px;
+}
+
+.post-reward-body-box {
+    margin-top: 80px;
+}
+.post-reward-body-box .post-reward-header {
+    margin: 15px 0 0;
+}
+.post-reward-body-box .post-reward-header .header-wrap {
+    font-weight: bold;
+    color: #ff5e52;
+    padding: 8px 0;
+    width: 30%;
+    background-color: #FFF4DD;
+}
+.post-reward-body-box td,th{
+   text-align: left;
+   padding: 4px 20px 4px 0;
+   border: 0;
+}
+.post-reward-body-box .post-reward-view-more {
+    padding: 10px 0;
+}
+.post-reward-body-box .post-reward-view-more a{
+    color: #5e9be0;
+}</style><style type="text/css">.sticky-promotion-box {
+    padding: 15px 30px;
+    color: black;
+}
+.sticky-promotion-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding-bottom: 10px;
+}
+.sticky-promotion-box a {
+    color: black !important;
+}</style><script type="text/javascript" src="js/jquery-1.12.4.min.js"></script>
+<script type="text/javascript" src="vendor/jstree/jstree.min.js"></script>
+<script type="text/javascript" src="js/common.js"></script>
+<script type="text/javascript">jQuery.noConflict();</script>
+<!--<script type="text/javascript" src="vendor/layer-v3.5.1/layer/layer.js"></script>-->
+<script type="text/javascript" src="vendor/layui/layui.js"></script>
+    </head>
+<body>
+<table id="qingwa-head" class="head" cellspacing="0" cellpadding="0" align="center" style="width: 1228.66px">
+	<tr>
+		<td class="clear">
+			<!--<div class="logo_img"><img src="" alt="" title=" - " /></div>-->
+			<iframe id="banner" scrolling='no' style='margin-bottom:20px;position:relative;left:50%;top:10px;transform:translateX(-50%);overflow: hidden;width:100%;height:280px;border:0;' src='./banner/'></iframe>
+		</td>
+		<td class="clear nowrap" align="right" valign="middle" style="position:fixed; top:80px; right:20px;" >
+            <!-- <style>
+                #donate{
+                    margin-left: 5px;
+                    margin-top: 20px;
+                    height:60px;
+                    transition:all .3s;
+                    opacity: .9;
+                }
+                #donate:hover{
+                    transform: scale(1.05);
+		            opacity: 1;
+                }
+            </style>
+			<a href="donate.php"><img id='donate' src="" alt="Make a donation" /></a> -->
+		</td>
+	</tr>
+</table>
+
+<table class="mainouter" width="1200" cellspacing="0" cellpadding="5" align="center">
+	<tr><td id="nav_block" class="text" align="center">
+<table class="main" width="0" border="0" cellspacing="0" cellpadding="0"><tr><td class="embedded" ><div id="qingwa-logo" style="display:none"></div><div id="nav"><style>
+    #mainmenu{
+        padding-left: 0px !important;
+    }
+</style><ul id="mainmenu" class="menu"><li><a href="index.php" target="_self" style="">首页</a></li><li><a href="forums.php" target="_self" style="">论坛</a></li><li><a href="/web/posterwall" target="_blank" style="">海报墙</a></li><li><a href="torrents.php?tag_id=3" target="_self" style="" rel="nexus-menu-31">官种</a></li><li><a href="torrents.php" target="_self" style="" rel="nexus-menu-5">综合</a></li><li><a href="#" target="_self" style="" rel="nexus-menu-68">额外加成</a></li><li><a href="torrents.php?tag_ids=[18,21,22,23]&union=1" target="_self" style="" rel="nexus-menu-55">保种区</a></li><li><a href="subscribe.php" target="_blank" style="">合集订阅</a></li><li><a href="upload.php" target="_self" style="" rel="nexus-menu-18">发布</a></li><li><a href="viewrequests.php" target="_self" style="">求种</a></li><li><a href="topten.php" target="_blank" style="" rel="nexus-menu-22">排行榜</a></li><li><a href="//wiki.qingwapt.org" target="_blank" style="" rel="nexus-menu-25">规则</a></li><li><a href="/plugin/lucky-draw" target="_blank" style="" rel="nexus-menu-52">娱乐</a></li><li><a href="#" target="_self" style="" rel="nexus-menu-35">工具</a></li><li><a href="contactstaff.php" target="_self" style="">联系管理（仅要事）</a></li></ul><ul id="nexus-menu-31" class="ddsubmenustyle"><li><a href="torrents.php?tag_id=3" target="_self" style="">全部官种</a></li><li><a href="torrents.php?tag_id=3&team=6&source12=1&source13=1" target="_self" style="">DIY@FROG</a></li><li><a href="torrents.php?tag_id=3&team=7" target="_self" style="">FROGE</a></li><li><a href="torrents.php?tag_id=3&team=7&source=9" target="_self" style="">Remux@FROGE</a></li><li><a href="torrents.php?tag_id=3&team=7&source=10" target="_self" style="">Encode@FROGE</a></li><li><a href="torrents.php?tag_id=3&team=8" target="_self" style="">FROGWeb</a></li><li><a href="torrents.php?tag_ids=[3,17]" target="_self" style="">儿童片</a></li></ul><ul id="nexus-menu-5" class="ddsubmenustyle"><li><a href="torrents.php" target="_self" style="">全部</a></li><li><a href="torrents.php?cat=401" target="_self" style="">电影</a></li><li><a href="torrents.php?cat=402" target="_self" style="">剧集</a></li><li><a href="torrents.php?cat=403" target="_self" style="">综艺</a></li><li><a href="torrents.php?cat=405" target="_self" style="">动漫</a></li><li><a href="torrents.php?cat=404" target="_self" style="">纪录片</a></li><li><a href="torrents.php?cat=406" target="_self" style="">MV</a></li><li><a href="torrents.php?cat=407" target="_self" style="">体育</a></li><li><a href="torrents.php?cat=408" target="_self" style="">音乐</a></li><li><a href="torrents.php?cat=412" target="_self" style="">短剧</a></li><li><a href="torrents.php?cat=409" target="_self" style="">其他</a></li></ul><ul id="nexus-menu-68" class="ddsubmenustyle"><li><a href="torrents.php?tag_id=2" target="_self" style="">VCB</a></li><li><a href="torrents.php?tag_id=17" target="_self" style="">儿童片</a></li><li><a href="torrents.php?tag_id=9" target="_self" style="">驻站</a><ul id="nexus-menu-69" class="ddsubmenustyle"><li><a href="/torrents.php?team=10" target="_self" style="">CatEDU</a></li></ul></li><li><a href="torrents.php?tag_ids=[18,21,22,23]&union=1" target="_self" style="">保种区</a></li></ul><ul id="nexus-menu-55" class="ddsubmenustyle"><li><a href="torrents.php?tag_ids=[18,21,22,23]&union=1" target="_self" style="">保种区</a></li><li><a href="my_seeding_torrent_with_buff.php" target="_blank" style="">个人保种区详情</a></li></ul><ul id="nexus-menu-18" class="ddsubmenustyle"><li><a href="upload.php" target="_self" style="">发布</a></li><li><a href="offers.php" target="_self" style="">候选</a></li><li><a href="subtitles.php" target="_self" style="">字幕</a></li></ul><ul id="nexus-menu-22" class="ddsubmenustyle"><li><a href="topten.php" target="_blank" style="">排行榜</a></li></ul><ul id="nexus-menu-25" class="ddsubmenustyle"><li><a href="//wiki.qingwapt.org" target="_blank" style="">Wiki</a></li><li><a href="//wiki.qingwapt.org/docs/faqs" target="_blank" style="">常见问题</a></li><li><a href="//wiki.qingwapt.org/docs/rules/content-rules/upload-title" target="_blank" style="">发种规则</a></li></ul><ul id="nexus-menu-52" class="ddsubmenustyle"><li><a href="/plugin/lucky-draw" target="_blank" style="">大转盘</a></li><li><a href="/medalfragments.php" target="_blank" style="">徽章合成</a></li></ul><ul id="nexus-menu-35" class="ddsubmenustyle"><li><a href="forums.php?action=viewtopic&topicid=275" target="_blank" style="">青蛙辅种助手 (MoviePilot插件)</a></li><li><a href="forums.php?action=viewtopic&topicid=276" target="_blank" style="">auto_feed快速转种</a></li><li><a href="//wiki.qingwapt.org/docs/guides/technical/tracker-update" target="_blank" style="">批量替换tracker</a></li><li><a href="forums.php?action=viewtopic&forumid=5&topicid=340" target="_blank" style="">审种/发种自查助手</a></li><li><a href="forums.php?action=viewtopic&topicid=21" target="_blank" style="">Reseed-Puppy辅种</a></li><li><a href="//wiki.qingwapt.org/docs/guides/technical/anti-pcdn" target="_blank" style="">反PCDN吸血工具</a></li></ul></div></td></tr></table>
+<!--<style>
+        .snowflake {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            pointer-events: none;
+            z-index: 99999999;
+        }
+
+        .snowflake>.snow {
+            position: absolute;
+            top: -50px;
+            animation: fall ease infinite;
+            animation-duration: 20s;
+            overflow: hidden;
+        }
+
+        .snowflake>.snow>svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        @keyframes fall {
+            25% {
+                transform: scale(0.75) translateX(-50px);
+            }
+
+            50% {
+                transform: scale(0.5) translateX(0px);
+            }
+
+            75% {
+                transform: scale(0.5) translateX(50px);
+            }
+
+            to {
+                top: calc(100% - 50px);
+                opacity: 0;
+                transform: scale(0) translateX(0px);
+            }
+        }
+    </style>
+	<script type='text/javascript'>
+        /*
+        const snowflake = document.createElement('div');
+        snowflake.className = "snowflake";
+        document.body.appendChild(snowflake);
+        for (let i = 0; i < 50; i++) {
+            const snow = document.createElement('div');
+            snow.className = 'snow';
+            const size = (Math.random() * 30 + 5);
+            snow.style.width = size.toString() + 'px';
+            snow.style.height = size.toString() + 'px';
+            snow.style.opacity = Math.random() / 2 + .5;
+            snow.style.left = `calc(${(Math.random() * 100).toString()}% - ${size}px - 50px)`;
+            snow.style.animationDelay = `${(i/2).toString()}s`;
+            snow.innerHTML = `<svg t='1734628239187' class='icon' viewBox='0 0 1024 1024' version='1.1' xmlns='http://www.w3.org/2000/svg' p-id='4806'><path d='M506.67 520h-33.26c-0.99 0-1.79-0.8-1.79-1.79V125.79c0-0.99 0.8-1.79 1.79-1.79h33.26c0.99 0 1.79 0.8 1.79 1.79v392.42c0 0.99-0.8 1.79-1.79 1.79z' fill='#ffffff' p-id='4807'></path><path d='M503.24 293.27l-23.52 23.52c-0.7 0.7-1.83 0.7-2.53 0L375.53 215.12c-0.7-0.7-0.7-1.83 0-2.53l23.52-23.52c0.7-0.7 1.83-0.7 2.53 0l101.66 101.66c0.7 0.71 0.7 1.84 0 2.54z' fill='#ffffff' p-id='4808'></path><path d='M476.84 293.27l23.52 23.52c0.7 0.7 1.83 0.7 2.53 0l101.66-101.66c0.7-0.7 0.7-1.83 0-2.53l-23.52-23.52c-0.7-0.7-1.83-0.7-2.53 0L476.84 290.74c-0.7 0.7-0.7 1.83 0 2.53zM498.35 505.6l-16.63 28.8c-0.49 0.86-1.59 1.15-2.45 0.66L139.43 338.85a1.796 1.796 0 0 1-0.66-2.45l16.63-28.8c0.49-0.86 1.59-1.15 2.45-0.66L497.7 503.15c0.85 0.5 1.15 1.59 0.65 2.45z' fill='#ffffff' p-id='4809'></path><path d='M300.28 395.2l8.61 32.12c0.26 0.96-0.31 1.94-1.27 2.19l-138.87 37.21c-0.96 0.26-1.94-0.31-2.19-1.27l-8.61-32.12c-0.26-0.96 0.31-1.94 1.27-2.19l138.87-37.21c0.96-0.25 1.94 0.32 2.19 1.27z' fill='#ffffff' p-id='4810'></path><path d='M287.08 418.07l32.12-8.61c0.96-0.26 1.52-1.24 1.27-2.19L283.26 268.4a1.795 1.795 0 0 0-2.19-1.27l-32.12 8.61c-0.96 0.26-1.52 1.24-1.27 2.19l37.21 138.87a1.79 1.79 0 0 0 2.19 1.27z' fill='#ffffff' p-id='4811'></path><path d='M481.72 505.6l16.63 28.8c0.49 0.86 0.2 1.95-0.66 2.45L157.85 733.06c-0.86 0.49-1.95 0.2-2.45-0.66l-16.63-28.8c-0.49-0.86-0.2-1.95 0.66-2.45l339.84-196.21c0.87-0.49 1.96-0.2 2.45 0.66z' fill='#ffffff' p-id='4812'></path><path d='M287.08 621.93l32.12 8.61c0.96 0.26 1.52 1.24 1.27 2.19L283.26 771.6c-0.26 0.96-1.24 1.52-2.19 1.27l-32.12-8.61a1.795 1.795 0 0 1-1.27-2.19l37.21-138.87a1.79 1.79 0 0 1 2.19-1.27z' fill='#ffffff' p-id='4813'></path><path d='M300.28 644.8l8.61-32.12c0.26-0.96-0.31-1.94-1.27-2.19l-138.87-37.21c-0.96-0.26-1.94 0.31-2.19 1.27l-8.61 32.12c-0.26 0.96 0.31 1.94 1.27 2.19l138.87 37.21c0.96 0.25 1.94-0.32 2.19-1.27z' fill='#ffffff' p-id='4814'></path><path d='M473.41 520h33.26c0.99 0 1.79 0.8 1.79 1.79v392.42c0 0.99-0.8 1.79-1.79 1.79h-33.26c-0.99 0-1.79-0.8-1.79-1.79V521.79c0-0.99 0.8-1.79 1.79-1.79z' fill='#ffffff' p-id='4815'></path><path d='M476.84 746.73l23.52-23.52c0.7-0.7 1.83-0.7 2.53 0l101.66 101.66c0.7 0.7 0.7 1.83 0 2.53l-23.52 23.52c-0.7 0.7-1.83 0.7-2.53 0L476.84 749.26c-0.7-0.7-0.7-1.83 0-2.53z' fill='#ffffff' p-id='4816'></path><path d='M503.24 746.73l-23.52-23.52c-0.7-0.7-1.83-0.7-2.53 0L375.53 824.88c-0.7 0.7-0.7 1.83 0 2.53l23.52 23.52c0.7 0.7 1.83 0.7 2.53 0l101.66-101.66c0.7-0.71 0.7-1.84 0-2.54z' fill='#ffffff' p-id='4817'></path><path d='M481.72 534.4l16.63-28.8c0.49-0.86 1.59-1.15 2.45-0.66l339.84 196.21c0.86 0.49 1.15 1.59 0.66 2.45l-16.63 28.8c-0.49 0.86-1.59 1.15-2.45 0.66L482.38 536.85c-0.86-0.5-1.15-1.59-0.66-2.45z' fill='#ffffff' p-id='4818'></path><path d='M679.79 644.8l-8.61-32.12c-0.26-0.96 0.31-1.94 1.27-2.19l138.87-37.21c0.96-0.26 1.94 0.31 2.19 1.27l8.61 32.12c0.26 0.96-0.31 1.94-1.27 2.19l-138.87 37.21c-0.95 0.25-1.93-0.32-2.19-1.27z' fill='#ffffff' p-id='4819'></path><path d='M693 621.93l-32.12 8.61c-0.96 0.26-1.52 1.24-1.27 2.19l37.21 138.87c0.26 0.96 1.24 1.52 2.19 1.27l32.12-8.61c0.96-0.26 1.52-1.24 1.27-2.19L695.19 623.2a1.795 1.795 0 0 0-2.19-1.27z' fill='#ffffff' p-id='4820'></path><path d='M498.35 534.4l-16.63-28.8c-0.49-0.86-0.2-1.95 0.66-2.45l339.84-196.21c0.86-0.49 1.95-0.2 2.45 0.66l16.63 28.8c0.49 0.86 0.2 1.95-0.66 2.45L500.8 535.06c-0.86 0.49-1.95 0.2-2.45-0.66z' fill='#ffffff' p-id='4821'></path><path d='M693 418.07l-32.12-8.61a1.795 1.795 0 0 1-1.27-2.19l37.21-138.87c0.26-0.96 1.24-1.52 2.19-1.27l32.12 8.61c0.96 0.26 1.52 1.24 1.27 2.19L695.19 416.8c-0.26 0.96-1.24 1.52-2.19 1.27z' fill='#ffffff' p-id='4822'></path><path d='M679.79 395.2l-8.61 32.12c-0.26 0.96 0.31 1.94 1.27 2.19l138.87 37.21c0.96 0.26 1.94-0.31 2.19-1.27l8.61-32.12c0.26-0.96-0.31-1.94-1.27-2.19l-138.87-37.21c-0.95-0.25-1.93 0.32-2.19 1.27z' fill='#ffffff' p-id='4823'></path></svg>`;
+            snowflake.appendChild(snow);
+
+        }*/
+    </script>--><table style="display:none" id="qingwa_info">
+<tbody>
+	<tr>
+		<td><div id="qingwa-upload">46.817 TB</div></td>
+		<td><div id="qingwa-seed">6347</div></td>
+		<td><div id="qingwa-ratio">1,334.713</div></td>
+		<td><div id="qingwa-username"><span class="nowrap"><a  href="https://www.qingwapt.com/userdetails.php?id=10216" class='SVIP_Name'><b class="rainbow">ranfish (匿名)</b></a><img src="https://wawawa.win/team/515819cee59d2ed6.webp" title="2024儿童节徽章" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/><img src="https://wawawa.win/team/58f446430ab3b301.webp" title="发种新手" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/><img src="https://wawawa.win/team/8d1708dacff7798a.webp" title="发种能手" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/></span></div></td>
+	</tr>
+	<tr>
+		<td><div id="qingwa-download">35.92 GB</div></td>
+		<td><div id="qingwa-leech">0</div></td>
+		<td><div id="qingwa-bonus" onclick="window.location.href='mybonus.php'">27,714,180.8</div></td>
+		<td><div id="qingwa-info-menu"><img />MENU<ul id="qingwa-info-menu-menu">
+			<li id="qingwa-usercp" onclick="window.location.href='usercp.php'">控制面板</li>
+			<li id="qingwa-attendance" onclick="window.location.href='attendance.php'"">签到已得100, 补签卡: 12</a>			<li id="qingwa-bookmarks" onclick="window.location.href='torrents.php?inclbookmarked=1&amp;allsec=1&amp;incldead=0'">收藏</li>
+			<li id="qingwa-medal" onclick="window.location.href='medal.php'">徽章</li>
+
+			<li id="qingwa-invite" onclick="window.location.href='invite.php?id=10216'">邀请 </li>
+
+			            				<li id="qingwa-claim" onclick="window.location.href='claim.php?uid=10216'">认领: [0/5000]			<li id="qingwa-rss" onclick="window.location.href='getrss.php'">RSS</li>
+			<li id="qingwa-logout" onclick="window.location.href='logout.php'">退出</li>
+		</ul></div></td>
+	</tr>
+	<!--
+
+	<div id="qingwa-usercp" onclick="window.location.href='usercp.php'">&nbsp;控制面板&nbsp;</div>
+	
+	<div id="qingwa-bonus" onclick="window.location.href='mybonus.php'"></div>
+-->
+</tbody>
+</table>
+<table id="info_block" cellpadding="4" cellspacing="0" border="0" width="100%"><tr>
+	<td><table width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
+		<td class="bottom" align="left">
+            <span class="medium">
+                欢迎回来, <span class="nowrap"><a  href="https://www.qingwapt.com/userdetails.php?id=10216" class='SVIP_Name'><b class="rainbow">ranfish (匿名)</b></a><img src="https://wawawa.win/team/515819cee59d2ed6.webp" title="2024儿童节徽章" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/><img src="https://wawawa.win/team/58f446430ab3b301.webp" title="发种新手" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/><img src="https://wawawa.win/team/8d1708dacff7798a.webp" title="发种能手" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/></span>                [<a href="logout.php">退出</a>]
+                [<a href="usercp.php">&nbsp;控制面板&nbsp;</a>]
+                                                [<a href="torrents.php?inclbookmarked=1&amp;allsec=1&amp;incldead=0">收藏</a>]
+                <font class = 'color_bonus'>蝌蚪 </font>[<a href="mybonus.php">详情</a>][<a href="bonusshop.php">使用</a>]: 27,714,180.8                 <a href="attendance.php" class="">[签到已得100, 补签卡: 12]</a>                <a href="medal.php">[徽章]</a>
+				<a href="task.php">[任务]</a>
+                <font class = 'color_invite'>邀请 </font>[<a href="invite.php?id=10216">发送</a>]: 22(0)                                <br />
+	            <font class="color_ratio">分享率:</font> 1,334.713                <font class='color_uploaded'>上传量:</font> 46.817 TB                <font class='color_downloaded'> 下载量:</font> 35.92 GB                <font class='color_active'>当前活动</font> [<a href="/clean.php">清除</a>] : <img class="arrowup" alt="Torrents seeding" title="当前做种" src="pic/trans.gif" />6347  <img class="arrowdown" alt="Torrents leeching" title="当前下载" src="pic/trans.gif" />0&nbsp;
+                <!--<font class='color_connectable'>可连接:</font> --><font class='color_slots'>连接数：</font>无限制                                <font class='color_bonus'>认领: </font> [<a href="claim.php?uid=10216">0/5000</a>]            </span>
+        </td>
+                	<td class="bottom" align="right"><span class="medium">
+ <a href="friends.php"><img class="buddylist" alt="Buddylist" title="社交名单" src="pic/trans.gif" /></a> <a href="getrss.php"><img class="rss" alt="RSS" title="获取RSS" src="pic/trans.gif" /></a><br/><a href="messages.php"><img class="inboxnew" src="pic/trans.gif" alt="inbox" title="收件箱&nbsp;(有新短讯)" /></a> 10 (5 新)  <a href="messages.php?action=viewmailbox&amp;box=-1"><img class="sentbox" alt="sentbox" title="发件箱" src="pic/trans.gif" /></a> 0
+	</span></td>
+	</tr></table></td>
+</tr></table>
+
+</td></tr>
+
+<tr><td id="outer" align="center" class="outer" style="padding-top: 20px; padding-bottom: 20px">
+<table border="0" cellspacing="0" cellpadding="10"><tr><td style='border: none; padding: 10px; background: red'>
+<b><a href="messages.php" target='_blank'><font color="white">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;你有5条新短讯！点击查看&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font></a></b></td></tr></table><br /><h1 align="center" id="top">X-Men Origins Wolverine 2009 1080p BluRay x265 DD 5.1 2Audio-MNHD-FRDS<span style="margin-left: 6px" title="通过"><svg t="1655145688503" class="icon" viewBox="0 0 1413 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="16225" width="16" height="16"><path d="M1381.807797 107.47394L1274.675044 0.438669 465.281736 809.880718l-322.665524-322.714266L35.434718 594.152982l430.041982 430.041982 107.084012-107.035271-0.243705-0.292446z" fill="#1afa29" p-id="16226"></path></svg></span></h1>
+<table width="97%" cellspacing="0" cellpadding="5">
+<tr><td class="rowhead" width="13%">下载</td><td class="rowfollow" width="87%" align="left"><a class="index" href="download.php?id=10216">[QingWa].X战警前传金刚狼.X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS.torrent</a>&nbsp;&nbsp;<a id="bookmark0" href="javascript: bookmark(10216,0);"><img class="delbookmark" src="pic/trans.gif" alt="Unbookmarked" title="收藏" /></a>&nbsp;&nbsp;&nbsp;由&nbsp;<i>匿名</i>发布于<span title="2024-06-10 17:27:10">1年11月前</span></td></tr><tr><td class="rowhead nowrap" valign="top" align="right">副标题</td><td class="rowfollow" valign="top" align="left">X战警前传：金刚狼/金刚狼/变种特攻：狼人外传 国英双语 10bit HEVC版本</td></tr><tr><td class="rowhead nowrap" valign="top" align="right">标签</td><td class="rowfollow" valign="top" align="left"><span style="background-color:#b20000d8; border: 1px solid #fff;;color:#fff;border-radius:4px;font-size:12px;margin:0 4px 0 0 ;padding:1px 4px;white-space:nowrap;" title="做种数/完成数≥3且做种数>50的种子">零魔</span><span style="background-color:; background-image: linear-gradient(45deg, #f85756, #f9a65f); border: 1px solid #f9a65f; box-shadow: 0 4px 8px rgba(248, 87, 86, 0.4);;color:#fff;border-radius:4px;font-size:12px;margin:0 4px 0 0;padding:1px 4px;white-space:nowrap;" title="">中字</span><span style="background-color:#00BFFF;color:#fff;border-radius:4px;font-size:12px;margin:0 4px 0 0;padding:1px 4px;white-space:nowrap;" title="">国语</span></td></tr><tr><td class="rowhead nowrap" valign="top" align="right">其他站点</td><td class="rowfollow" valign="top" align="left"><div style='line-height:2em'><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pt.keepfrds.com/details.php?id=4112' target='_blank'><img style='width:1em;height:1em;' src='//pt.keepfrds.com/favicon.ico' />朋友</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pt.soulvoice.club/details.php?id=33121' target='_blank'><img style='width:1em;height:1em;' src='//pt.soulvoice.club/favicon.ico' />聆音</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pterclub.com/details.php?id=37353' target='_blank'><img style='width:1em;height:1em;' src='//pterclub.com/favicon.ico' />猫站</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://kp.m-team.cc/detail/397820' target='_blank'><img style='width:1em;height:1em;' src='//kp.m-team.cc/favicon.ico' />馒头</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://hdfans.org/details.php?id=137' target='_blank'><img style='width:1em;height:1em;' src='//hdfans.org/favicon.ico' />红豆饭</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://hdarea.club/details.php?id=66580' target='_blank'><img style='width:1em;height:1em;' src='//hdarea.club/favicon.ico' />好大</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://hdtime.org/details.php?id=37744' target='_blank'><img style='width:1em;height:1em;' src='//hdtime.org/favicon.ico' />时光</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://www.pttime.org/details.php?id=32382' target='_blank'><img style='width:1em;height:1em;' src='//www.pttime.org/favicon.ico' />时间</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pt.0ff.cc/details.php?id=4848' target='_blank'><img style='width:1em;height:1em;' src='//pt.0ff.cc/favicon.ico' />自由农场</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://1ptba.com/details.php?id=10074' target='_blank'><img style='width:1em;height:1em;' src='//1ptba.com/favicon.ico' />1ptba</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://hdtime.org/details.php?id=45692' target='_blank'><img style='width:1em;height:1em;' src='//hdtime.org/favicon.ico' />时光</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pt.upxin.net/details.php?id=40162' target='_blank'><img style='width:1em;height:1em;' src='//pt.upxin.net/favicon.ico' />好多油</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://www.haidan.video/details.php?group_id={group_id}&torrent_id=38871' target='_blank'><img style='width:1em;height:1em;' src='//www.haidan.video/favicon.ico' />海胆</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pthome.net/details.php?id=150325' target='_blank'><img style='width:1em;height:1em;' src='//pthome.net/favicon.ico' />铂金家</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pt.btschool.club/details.php?id=93104' target='_blank'><img style='width:1em;height:1em;' src='//pt.btschool.club/favicon.ico' />学校</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pt.sjtu.edu.cn/details.php?id=221402' target='_blank'><img style='width:1em;height:1em;' src='//pt.sjtu.edu.cn/favicon.ico' />葡萄</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://hdpt.xyz/details.php?id=23286' target='_blank'><img style='width:1em;height:1em;' src='//hdpt.xyz/favicon.ico' />明教</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://www.joyhd.net/details.php?id=81394' target='_blank'><img style='width:1em;height:1em;' src='//www.joyhd.net/favicon.ico' />开心</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://leaves.red/details.php?id=63686' target='_blank'><img style='width:1em;height:1em;' src='//leaves.red/favicon.ico' />红叶</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://zhuque.in/torrent/info/14809' target='_blank'><img style='width:1em;height:1em;' src='//zhuque.in/favicon.ico' />朱雀</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://dajiao.cyou/details.php?id=4623' target='_blank'><img style='width:1em;height:1em;' src='//dajiao.cyou/favicon.ico' />打胶</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pandapt.net/details.php?id=6717' target='_blank'><img style='width:1em;height:1em;' src='//pandapt.net/favicon.ico' />熊猫</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://ubits.club/details.php?id=39716' target='_blank'><img style='width:1em;height:1em;' src='//ubits.club/favicon.ico' />优堡</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://zmpt.cc/details.php?id=33704' target='_blank'><img style='width:1em;height:1em;' src='//zmpt.cc/favicon.ico' />织梦</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://hhanclub.top/details.php?id=31767' target='_blank'><img style='width:1em;height:1em;' src='//hhanclub.top/favicon.ico' />憨憨</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://www.agsvpt.com/details.php?id=1986' target='_blank'><img style='width:1em;height:1em;' src='//www.agsvpt.com/favicon.ico' />末日</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://www.hdkyl.in/details.php?id=18771' target='_blank'><img style='width:1em;height:1em;' src='//www.hdkyl.in/favicon.ico' />麒麟</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://ptcafe.club/details.php?id=19131' target='_blank'><img style='width:1em;height:1em;' src='//ptcafe.club/favicon.ico' />咖啡</a><a style='margin-right:1em;white-space:nowrap;background-color:#FFF;padding:2px;border-radius:4px;box-shadow:0 0 2px rgba(0,0,0,.5)' href='https://pt.hdclone.org/details.php?id=3526' target='_blank'><img style='width:1em;height:1em;' src='//pt.hdclone.org/favicon.ico' />hdclone</a></div><div style='text-align: right;padding-right: 2em'><b>数据来源：IYUU 更新于2025-01-03 21:15:31</b></div></td></tr><tr><td class="rowhead nowrap" valign="top" align="right">添加至订阅列表</td><td class="rowfollow" valign="top" align="left"><select id='subscribe_id'></select><a href='subscribe.php'>请创建订阅列表</a></td></tr>		<script type="text/javascript">
+			document.getElementById('add_subscribe').addEventListener('click',()=>{
+				fetch('subscribe.php?type=add_torrent&id=' + document.getElementById('subscribe_id').value + "&torrent_id=10216").then(res=>{
+					return res.json();
+				}).then(ret=>{
+					alert(ret.msg);
+				});
+			});
+		</script>
+	<tr><td class="rowhead nowrap" valign="top" align="right">基本信息</td><td class="rowfollow" valign="top" align="left"><b><b>大小：</b></b>6.51 GB&nbsp;&nbsp;&nbsp;<b>类型:</b>&nbsp;电影&nbsp;&nbsp;&nbsp;<b>媒介: </b>Encode&nbsp;&nbsp;&nbsp;<b>视频编码: </b>H.265/HEVC&nbsp;&nbsp;&nbsp;<b>音频编码: </b>DD/AC3&nbsp;&nbsp;&nbsp;<b>分辨率: </b>1080p&nbsp;&nbsp;&nbsp;<b>制作组: </b>Other</td></tr><tr><td class="rowhead nowrap" valign="top" align="right">行为</td><td class="rowfollow" valign="top" align="left"><a title="下载种子" href="download.php?id=10216"><img class="dt_download" src="pic/trans.gif" alt="download" />&nbsp;<b><font class="small">下载种子</font></b></a>&nbsp;|&nbsp;<a id='addtosubscribe' data-id='10216' href='javascript:;'><b><font class="small"><svg width=16 height=16 t="1728583000329" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1458" width="200" height="200"><path d="M520.7 98.2L643 345.9l273.4 39.7-197.8 192.9 46.7 272.3-244.6-128.6-244.5 128.6 46.7-272.3L125 385.6l273.5-39.7z" fill="#F0D155" p-id="1459"></path></svg> 添加至订阅列表</font></b></a>&nbsp;|&nbsp;<a id='ghostPeerChecker' data-id='10216' data-passkey=d05e435a25760d263af6619cd329e6f2 href='javascript:;'><b><font class="small"><svg t="1731094288150" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4284" width="16" height="16"><path d="M704 277.333333c0-106.666667-85.333333-213.333333-192-213.333333s-192 106.666667-192 213.333333c0 64-223.146667 170.666667-277.333333 170.666667 0 0 59.093333 144.64 106.666666 192a147.2 147.2 0 0 0 106.666667 42.666667s3.413333 74.026667 34.346667 113.706666A149.333333 149.333333 0 0 0 405.333333 853.333333s23.68 106.666667 106.666667 106.666667 106.666667-106.666667 106.666667-106.666667a138.24 138.24 0 0 0 103.466666-40.32A164.693333 164.693333 0 0 0 768 682.666667a146.986667 146.986667 0 0 0 106.666667-42.666667c47.36-47.36 106.666667-192 106.666666-192-54.4 0-277.333333-106.666667-277.333333-170.666667z" fill="#90CAF9" p-id="4285"></path><path d="M629.12 756.906667C640 805.546667 661.333333 832 682.666667 837.973333a145.493333 145.493333 0 0 1-64 15.36s5.546667-32.426667 10.453333-96.426666zM723.413333 515.413333C772.266667 666.88 874.666667 640 874.666667 640a146.986667 146.986667 0 0 1-106.666667 42.666667 320 320 0 0 1-44.586667-167.253334zM394.88 756.906667C384 805.546667 362.666667 832 341.333333 837.973333a145.493333 145.493333 0 0 0 64 15.36s-5.546667-32.426667-10.453333-96.426666zM300.586667 515.413333C251.52 666.88 149.333333 640 149.333333 640a147.2 147.2 0 0 0 106.666667 42.666667 317.866667 317.866667 0 0 0 44.586667-167.253334z" fill="#64B5F6" p-id="4286"></path><path d="M533.333333 298.666667l85.333334-64s21.333333 53.973333-21.333334 75.306666c-27.093333 13.44-64-11.306667-64-11.306666zM490.666667 298.666667l-85.333334-64s-21.333333 53.973333 21.333334 75.306666c26.88 13.44 64-11.306667 64-11.306666z" fill="#1A237E" p-id="4287"></path><path d="M540.586667 437.76m-24.746667 0a24.746667 24.746667 0 1 0 49.493333 0 24.746667 24.746667 0 1 0-49.493333 0Z" fill="#FFFFFF" p-id="4288"></path><path d="M568.106667 420.48a18.56 18.56 0 1 0 37.12 0 18.56 18.56 0 1 0-37.12 0Z" fill="#FFFFFF" p-id="4289"></path><path d="M605.653333 394.453333a16.853333 16.64 0 1 0 33.706667 0 16.853333 16.64 0 1 0-33.706667 0Z" fill="#FFFFFF" p-id="4290"></path><path d="M481.92 437.76m-24.746667 0a24.746667 24.746667 0 1 0 49.493334 0 24.746667 24.746667 0 1 0-49.493334 0Z" fill="#FFFFFF" p-id="4291"></path><path d="M417.493333 422.4a18.56 18.56 0 1 0 37.12 0 18.56 18.56 0 1 0-37.12 0Z" fill="#FFFFFF" p-id="4292"></path><path d="M384.64 394.453333a16.853333 16.64 0 1 0 33.706667 0 16.853333 16.64 0 1 0-33.706667 0Z" fill="#FFFFFF" p-id="4293"></path><path d="M362.666667 341.333333a213.333333 213.333333 0 0 0 149.333333 64 213.333333 213.333333 0 0 0 149.333333-64s-60.16 106.666667-149.333333 106.666667-149.333333-106.666667-149.333333-106.666667z" fill="#1A237E" p-id="4294"></path><path d="M578.56 286.506667a21.333333 21.333333 0 0 0 21.333333-21.333334 21.333333 21.333333 0 0 0-4.693333-12.8L561.493333 277.333333a21.333333 21.333333 0 0 0 17.066667 9.173334zM445.44 286.506667a21.333333 21.333333 0 0 1-21.333333-21.333334 21.333333 21.333333 0 0 1 4.693333-12.8L462.506667 277.333333a21.333333 21.333333 0 0 1-17.066667 9.173334z" fill="#FFFFFF" p-id="4295"></path></svg> 检查Peer</font></b></a>&nbsp;|&nbsp;<a title="举报该种子违反了规则" href="report.php?torrent=10216"><img class="dt_report" src="pic/trans.gif" alt="report" />&nbsp;<b><font class="small">举报种子</font></b></a>&nbsp;|&nbsp;<a href="javascript:;"><b><font class="small sticky-promotion" data-torrent_id="10216"><svg t="1654506315555" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="15064" width="16" height="16"><path d="M554.62 810.68h-85.31c-11.782 0-21.344-9.562-21.344-21.376V478.296c0-11.782 9.562-21.328 21.344-21.328h85.31c11.782 0 21.344 9.546 21.344 21.328v311.008c-0.002 11.814-9.564 21.376-21.344 21.376z" fill="#F6BB42" p-id="15065"></path><path d="M639.962 703.996H383.968c-35.282 0-64 28.686-64 63.998v42.686c0 35.25 28.718 64 64 64h255.996c35.28 0 63.996-28.75 63.996-64v-42.686c-0.002-35.312-28.718-63.998-63.998-63.998z" fill="#FFCE54" p-id="15066"></path><path d="M746.616 767.994H277.314c-11.782 0-21.342 9.56-21.342 21.31v213.372c0 11.75 9.562 21.312 21.342 21.312h469.302c11.782 0 21.344-9.562 21.344-21.312V789.304c-0.002-11.75-9.564-21.31-21.344-21.31z" fill="#434A54" p-id="15067"></path><path d="M758.022 448a21.344 21.344 0 0 1-19.75-13.28c-4.438-10.906 0.782-23.36 11.718-27.812 82.436-33.594 135.684-96.732 158.278-187.652 11.594-46.67 11.812-89.326 10.688-112.576h-129.684c-11.782 0-21.312-9.562-21.312-21.342 0-11.782 9.532-21.328 21.312-21.328h149.34c10.656 0 19.656 7.844 21.124 18.376 0.406 2.766 9.188 68.28-9.688 145.684-25.468 104.186-89.062 179.684-183.964 218.354a21.38 21.38 0 0 1-8.062 1.576zM265.97 448c-2.688 0-5.406-0.5-8.046-1.578-94.904-38.67-158.512-114.168-183.964-218.354-18.89-77.404-10.094-142.918-9.704-145.684a21.328 21.328 0 0 1 21.124-18.376h149.34c11.782 0 21.328 9.546 21.328 21.328 0 11.78-9.546 21.342-21.328 21.342H105.036c-1.124 23.234-0.89 65.89 10.704 112.576 22.578 90.92 75.826 154.058 158.278 187.652 10.922 4.454 16.156 16.906 11.718 27.812-3.376 8.268-11.36 13.282-19.766 13.282z" fill="#F6BB42" p-id="15068"></path><path d="M661.304 917.302H362.64c-11.782 0-21.328-9.532-21.328-21.31 0-11.782 9.546-21.312 21.328-21.312h298.666a21.3 21.3 0 0 1 21.312 21.312 21.3 21.3 0 0 1-21.314 21.31zM789.302 0.012h-554.66c-11.782 0-21.328 9.546-21.328 21.328v277.336c0 79.78 31.062 154.778 87.466 211.184 56.406 56.388 131.418 87.452 211.184 87.452 79.78 0 154.778-31.062 211.182-87.452 56.406-56.406 87.468-131.404 87.468-211.184V21.338c0.002-11.78-9.53-21.326-21.312-21.326z" fill="#FFCE54" p-id="15069"></path><path d="M789.302 0.012h-42.688c11.782 0 21.344 9.546 21.344 21.328v277.336c0 79.78-31.062 154.778-87.466 211.184-51.374 51.326-118.124 81.702-189.856 86.702 7.062 0.5 14.172 0.75 21.328 0.75 79.78 0 154.778-31.062 211.182-87.452 56.406-56.406 87.468-131.404 87.468-211.184V21.338c0.002-11.78-9.53-21.326-21.312-21.326z" fill="#FFFFFF" opacity=".2" p-id="15070"></path><path d="M668.18 238.896a21.336 21.336 0 0 0-17.218-14.516l-82.842-12.032-37.016-75.06a21.334 21.334 0 1 0-38.262 0l-37.046 75.06-82.826 12.032a21.348 21.348 0 0 0-17.218 14.516 21.38 21.38 0 0 0 5.406 21.876l59.936 58.42-14.156 82.482c-1.376 8 1.922 16.094 8.484 20.876a21.38 21.38 0 0 0 22.468 1.624l74.078-38.954 74.092 38.954a21.12 21.12 0 0 0 9.906 2.438c4.438 0 8.844-1.376 12.532-4.062a21.314 21.314 0 0 0 8.5-20.876l-14.156-82.482 59.936-58.42a21.384 21.384 0 0 0 5.402-21.876z" fill="#ED5564" p-id="15071"></path></svg>&nbsp;置顶促销</font></b></a></td></tr><tr><td class="rowhead nowrap" valign="top" align="right">认领种子</td><td class="rowfollow" valign="top" align="left"><input type="button" value="认领" id="add-claim" data-torrent_id="10216">&nbsp;已被 <b>10</b> 个用户认领，剩余 <b>0</b> 个名额。&nbsp;<b><a href="claim.php?torrent_id=10216">认领详情</a></b></td></tr><tr><td class="rowhead nowrap" valign="top" align="right">种子链接</td><td class="rowfollow" valign="top" align="left"><a title="可在BT客户端使用，当天有效。" href="https://www.qingwapt.com/download.php?id=10216&passkey=d05e435a25760d263af6619cd329e6f2">右键查看。</a></td></tr><tr><td class="rowhead" valign="top">字幕</td><td class="rowfollow" align="left" valign="top"><table border="0" cellspacing="0"><tr><td class="embedded">该种子暂无字幕</td></tr></table><table border="0" cellspacing="0"><tr><td class="embedded"><form method="post" action="subtitles.php"><input type="hidden" name="torrent_name" value="X-Men Origins Wolverine 2009 1080p BluRay x265 DD 5.1 2Audio-MNHD-FRDS" /><input type="hidden" name="detail_torrent_id" value="10216" /><input type="hidden" name="in_detail" value="in_detail" /><input type="submit" value="上传字幕" /></form></td><td class="embedded"><form method="get" action="https://assrt.net/sub/" target="_blank"><input type="text" name="searchword" id="keyword" style="width: 250px" value="X-Men Origins: Wolverine" /><input type="submit" value="搜索射手网" /></form></td><td class="embedded"><form method="get" action="https://www.opensubtitles.org/en/search2/" target="_blank"><input type="hidden" id="moviename" name="MovieName" /><input type="hidden" name="action" value="search" /><input type="hidden" name="SubLanguageID" value="all" /><input onclick="document.getElementById('moviename').value=document.getElementById('keyword').value;" type="submit" value="搜索Opensubtitles" /></form></td>
+</tr></table></td></tr>
+<tr><td class="rowhead nowrap" valign="top" align="right">MediaInfo</td><td class="rowfollow" valign="top" align="left"><div id='kmediaInfo' style="margin-bottom: 10px;"><pre style="font-size:10pt; font-family: 'Courier New', monospace;white-space: break-spaces"><table style="border: none;width: 100%"><tbody><tr><td style="border: none; padding-right: 5px;padding-bottom: 5px"><table style="border: none;width: 100%"><tbody><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px;"><b >文　件: </b>X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS</td></tr><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px;"><b >格　式: </b>HEVC|High Efficiency Video Coding|Main 10@L4@Main</td></tr><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px;"><b >大　小: </b>6.51 GiB</td></tr><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px;"><b >时　长: </b>1 h 47 min</td></tr><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px;"><b >分辨率: </b>1920 x 818</td></tr><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px;"><b >码　率: </b>7232 kb/s</td></tr><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px;"><b >色　深: </b>10 bits</td></tr><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px;"><b >帧　率: </b>23.976 (24000/1001) FPS</td></tr><tr><td style="border: none; padding-right: 5px;"><div style="display: flex; align-items: initial;" ><div style="flex-shrink: 0;width: 54px;font-weight: bold;"><b >音　频: </b></div><div style=" padding-right: 10px; flex-grow: 1;"><table style="table-layout: fixed; border: none; width: 100%"><tbody><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px; max-width: 100px" ><b>01: </b>English DD 5.1 @640 kb/s</td><td style="border: none; padding-right: 5px;padding-bottom: 7px; max-width: 100px" ><b>02: </b>Chinese DD 5.1 @640 kb/s</td></tr></tbody></table></div></div></td></tr><tr><td style="border: none; padding-right: 5px;"><div style="display: flex; align-items: initial;" ><div style="flex-shrink: 0;width: 54px;font-weight: bold;"><b >字　幕: </b></div><div style=" padding-right: 10px; flex-grow: 1;"><table style="table-layout: fixed; border: none; width: 100%"><tbody><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px; max-width: 100px" ><b>01: </b>English</td><td style="border: none; padding-right: 5px;padding-bottom: 7px; max-width: 100px" ><b>02: </b>Chinese</td></tr><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px; max-width: 100px" ><b>03: </b>Chinese</td><td style="border: none; padding-right: 5px;padding-bottom: 7px; max-width: 100px" ><b>04: </b>Chinese</td></tr><tr><td style="border: none; padding-right: 5px;padding-bottom: 7px; max-width: 100px" ><b>05: </b>Chinese</td><td style="border: none; padding-right: 5px;padding-bottom: 7px; max-width: 100px" ><b>06: </b>Chinese</td></tr></tbody></table></div></div></td></tr></tbody></table></td></tr><tr><td colspan="1" class="nexus-media-info-raw"><div><div class="spoiler-title-box"><div class="spoiler-title" title="点击展开/收缩">显示/隐藏原始 MediaInfo</div></div><div class="spoiler-content collapse"><pre>General
+Unique ID                                : 201064560985665698398938001283945533530 (0x9743A039646C8AD38433221DCF27105A)
+Complete name                            : X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS.mkv
+Format                                   : Matroska
+Format version                           : Version 4
+File size                                : 6.51 GiB
+Duration                                 : 1 h 47 min
+Overall bit rate                         : 8 685 kb/s
+Frame rate                               : 23.976 FPS
+Encoded date                             : 2016-05-20 02:14:20 UTC
+Writing application                      : mkvmerge v9.1.0 ('Little Earthquakes') 32bit
+Writing library                          : libebml v1.3.3 + libmatroska v1.4.4
+
+Video
+ID                                       : 1
+Format                                   : HEVC
+Format/Info                              : High Efficiency Video Coding
+Format profile                           : Main 10@L4@Main
+Codec ID                                 : V_MPEGH/ISO/HEVC
+Duration                                 : 1 h 47 min
+Bit rate                                 : 7 232 kb/s
+Width                                    : 1 920 pixels
+Height                                   : 818 pixels
+Display aspect ratio                     : 2.35:1
+Frame rate mode                          : Constant
+Frame rate                               : 23.976 (24000/1001) FPS
+Color space                              : YUV
+Chroma subsampling                       : 4:2:0
+Bit depth                                : 10 bits
+Bits/(Pixel*Frame)                       : 0.192
+Stream size                              : 5.42 GiB (83%)
+Writing library                          : x265 1.9+96-b09998b1256e:[Windows][GCC 5.3.0][64 bit] 10bit
+Encoding settings                        : wpp / ctu=32 / min-cu-size=8 / max-tu-size=16 / tu-intra-depth=2 / tu-inter-depth=2 / me=2 / subme=5 / merange=21 / no-rect / no-amp / max-merge=3 / temporal-mvp / no-early-skip / rdpenalty=1 / no-tskip / no-tskip-fast / no-strong-intra-smoothing / no-lossless / no-cu-lossless / no-constrained-intra / no-fast-intra / no-open-gop / no-temporal-layers / interlace=0 / keyint=360 / min-keyint=1 / scenecut=40 / rc-lookahead=60 / lookahead-slices=4 / bframes=8 / bframe-bias=0 / b-adapt=2 / ref=5 / limit-refs=3 / limit-modes / weightp / weightb / aq-mode=1 / qg-size=16 / aq-strength=1.00 / cbqpoffs=0 / crqpoffs=0 / rd=4 / psy-rd=0.30 / rdoq-level=1 / psy-rdoq=5.00 / no-rd-refine / signhide / deblock=-1:-1 / no-sao / no-sao-non-deblock / b-pyramid / cutree / no-intra-refresh / rc=crf / crf=19.0 / qcomp=0.70 / qpmin=0 / qpmax=51 / qpstep=4 / ipratio=1.40 / pbratio=1.30
+Default                                  : Yes
+Forced                                   : No
+Color range                              : Limited
+Color primaries                          : BT.709
+
+Audio #1
+ID                                       : 2
+Format                                   : AC-3
+Format/Info                              : Audio Coding 3
+Commercial name                          : Dolby Digital
+Codec ID                                 : A_AC3
+Duration                                 : 1 h 47 min
+Bit rate mode                            : Constant
+Bit rate                                 : 640 kb/s
+Channel(s)                               : 6 channels
+Channel layout                           : L R C LFE Ls Rs
+Sampling rate                            : 48.0 kHz
+Frame rate                               : 31.250 FPS (1536 SPF)
+Compression mode                         : Lossy
+Stream size                              : 491 MiB (7%)
+Language                                 : English
+Service kind                             : Complete Main
+Default                                  : Yes
+Forced                                   : No
+Dialog Normalization                     : -31 dB
+cmixlev                                  : -3.0 dB
+surmixlev                                : -3 dB
+dialnorm_Average                         : -31 dB
+dialnorm_Minimum                         : -31 dB
+dialnorm_Maximum                         : -31 dB
+
+Audio #2
+ID                                       : 3
+Format                                   : AC-3
+Format/Info                              : Audio Coding 3
+Commercial name                          : Dolby Digital
+Codec ID                                 : A_AC3
+Duration                                 : 1 h 47 min
+Bit rate mode                            : Constant
+Bit rate                                 : 640 kb/s
+Channel(s)                               : 6 channels
+Channel layout                           : L R C LFE Ls Rs
+Sampling rate                            : 48.0 kHz
+Frame rate                               : 31.250 FPS (1536 SPF)
+Compression mode                         : Lossy
+Stream size                              : 491 MiB (7%)
+Language                                 : Chinese
+Service kind                             : Complete Main
+Default                                  : No
+Forced                                   : No
+Dialog Normalization                     : -31 dB
+cmixlev                                  : -3.0 dB
+surmixlev                                : -3 dB
+dialnorm_Average                         : -31 dB
+dialnorm_Minimum                         : -31 dB
+dialnorm_Maximum                         : -31 dB
+
+Text #1
+ID                                       : 4
+Format                                   : PGS
+Muxing mode                              : zlib
+Codec ID                                 : S_HDMV/PGS
+Codec ID/Info                            : Picture based subtitle format used on BDs/HD-DVDs
+Language                                 : English
+Default                                  : Yes
+Forced                                   : No
+
+Text #2
+ID                                       : 5
+Format                                   : PGS
+Muxing mode                              : zlib
+Codec ID                                 : S_HDMV/PGS
+Codec ID/Info                            : Picture based subtitle format used on BDs/HD-DVDs
+Language                                 : Chinese
+Default                                  : No
+Forced                                   : No
+
+Text #3
+ID                                       : 6
+Format                                   : PGS
+Muxing mode                              : zlib
+Codec ID                                 : S_HDMV/PGS
+Codec ID/Info                            : Picture based subtitle format used on BDs/HD-DVDs
+Language                                 : Chinese
+Default                                  : No
+Forced                                   : No
+
+Text #4
+ID                                       : 7
+Format                                   : PGS
+Muxing mode                              : zlib
+Codec ID                                 : S_HDMV/PGS
+Codec ID/Info                            : Picture based subtitle format used on BDs/HD-DVDs
+Language                                 : Chinese
+Default                                  : No
+Forced                                   : No
+
+Text #5
+ID                                       : 8
+Format                                   : PGS
+Muxing mode                              : zlib
+Codec ID                                 : S_HDMV/PGS
+Codec ID/Info                            : Picture based subtitle format used on BDs/HD-DVDs
+Language                                 : Chinese
+Default                                  : No
+Forced                                   : No
+
+Text #6
+ID                                       : 9
+Format                                   : PGS
+Muxing mode                              : zlib
+Codec ID                                 : S_HDMV/PGS
+Codec ID/Info                            : Picture based subtitle format used on BDs/HD-DVDs
+Language                                 : Chinese
+Default                                  : No
+Forced                                   : No
+
+Menu
+00:00:00.000                             : en:Chapter 01
+00:03:21.201                             : en:Chapter 02
+00:07:49.010                             : en:Chapter 03
+00:10:28.419                             : en:Chapter 04
+00:14:09.807                             : en:Chapter 05
+00:17:50.110                             : en:Chapter 06
+00:19:31.503                             : en:Chapter 07
+00:25:55.136                             : en:Chapter 08
+00:28:17.987                             : en:Chapter 09
+00:32:28.571                             : en:Chapter 10
+00:37:51.310                             : en:Chapter 11
+00:45:03.367                             : en:Chapter 12
+00:49:43.647                             : en:Chapter 13
+00:56:28.468                             : en:Chapter 14
+00:59:41.828                             : en:Chapter 15
+01:02:17.650                             : en:Chapter 16
+01:06:12.176                             : en:Chapter 17
+01:09:54.523                             : en:Chapter 18
+01:12:54.703                             : en:Chapter 19
+01:16:19.741                             : en:Chapter 20
+01:21:29.467                             : en:Chapter 21
+01:25:57.777                             : en:Chapter 22
+01:28:55.121                             : en:Chapter 23
+01:32:06.812                             : en:Chapter 24
+01:33:37.069                             : en:Chapter 25
+01:37:15.538                             : en:Chapter 26
+01:40:22.141                             : en:Chapter 27
+01:41:26.121                             : en:Chapter 28
+
+</pre></div></div></td></tr></tbody></table></pre></div>
+</td></tr><tr><td class="rowhead nowrap" valign="top" align="right"><a href="javascript: klappe_news('descr')"><span class="nowrap"><img class="minus" src="pic/trans.gif" alt="Show/Hide" id="picdescr" title="显示&nbsp;或&nbsp;隐藏" /> 简介</span></a></td><td class="rowfollow" valign="top" align="left"><div id='kdescr'><fieldset><legend> 引用 </legend><br /><font size="3"><span style="color: Red;"><b>郑重声明：</b><br />
+本站提供的所有作品均是用户自行搜集并且上传，禁止任何涉及商业盈利目的使用，否则产生的一切后果将由您自己承担！<br />
+本站不对任何内容负任何法律责任！该下载内容仅做宽带测试及学习使用，请测试完成及时删除。如喜欢资源请购买正版！<br />
+本站列出的所有文件均没在本站服务器保存，本站仅负责连接，本站对被传播文件的内容一无所知。<br />
+本站的链接均由用户自发提供，管理员无法对用户的提交内容或其他行为负责。</font></span></fieldset><br /><div style='height:2em'></div><fieldset><legend> 引用 </legend><br /><b><span style="color: blue;">FRDS官组作品，感谢原制作者发布。</span></b></fieldset><br /><br />
+<img style="max-width: 700px;" id="" alt="image" src="https://img9.doubanio.com/view/photo/l_ratio_poster/public/p2063167557.jpg" onload="Scale(this,700,0);" onclick="Preview(this);" /><br />
+◎译　　名　金刚狼 / X战警前传：金刚狼 / X战警：金钢狼(台) / 变种特攻：狼人外传(港)<br />
+◎片　　名　X-Men Origins: Wolverine<br />
+◎年　　代　2009<br />
+◎产　　地　美国<br />
+◎类　　别　动作 / 科幻<br />
+◎语　　言　英语<br />
+◎上映日期　2009-05-01(美国) / 2009-05-03(中国大陆)<br />
+◎IMDb评分 &nbsp;6.6/10 from 451903 users<br />
+◎IMDb链接 &nbsp;<a class="faqlink" href="https://www.imdb.com/title/tt0458525" target="_blank">https://www.imdb.com/title/tt0458525</a><br />
+◎豆瓣评分　7.5/10 from 224507 users<br />
+◎豆瓣链接　<a class="faqlink" href="https://movie.douban.com/subject/1792928/" target="_blank">https://movie.douban.com/subject/1792928/</a><br />
+◎片　　长　107 分钟<br />
+◎导　　演　加文·胡德 Gavin Hood<br />
+◎编　　剧　戴维·贝尼奥夫 David Benioff / 斯基普·伍兹 Skip Woods<br />
+◎主　　演　休·杰克曼 Hugh Jackman<br />
+　　　　　 &nbsp;列维·施瑞博尔 Liev Schreiber<br />
+　　　　　 &nbsp;瑞恩·雷诺兹 Ryan Reynolds<br />
+　　　　　 &nbsp;丹尼·赫斯顿 Danny Huston<br />
+　　　　　 &nbsp;泰勒·克奇 Taylor Kitsch<br />
+　　　　　 &nbsp;琳恩·柯林斯 Lynn Collins<br />
+　　　　　 &nbsp;威廉姆·亚当斯 Will i Am<br />
+　　　　　 &nbsp;丹尼尔·海尼 Daniel Henney<br />
+<br />
+◎标　　签　科幻 | 美国 | 动作 | 超级英雄 | 漫画改编 | 2009 | marvel | 漫威<br />
+<br />
+◎简　　介<br />
+<br />
+　　1845年，尚年幼的维克多与詹姆斯兄弟俩在长辈之间一场突如其来争执中唤醒了自身的潜能，詹姆斯情急之下将陌生的生父杀死，自此兄弟两人流落战场，他们凭借不死不衰之身和野兽一般的天赋在各个时代的战争中大开杀戒，直到遇见史崔克少校并加入了他的异能人特殊部队。詹姆斯（休·杰克曼 Hugh Jackman 饰）很快厌倦了对弱势者的杀戮，离开了团队和维克多（列维·施瑞博尔 Liev Schreiber 饰），与女友凯拉隐居在山林中，做了一名伐木工人。六年后，詹姆斯惊闻昔日的超能力队友纷纷被杀害，而杀手正是哥哥维克多，不久连凯拉也遭其毒手，愤怒的詹姆斯与史崔克合作，将自己的身体改造，成为钢筋铁骨的“金刚狼”。金刚狼摆脱军方控制后，发誓要杀死维克多和史崔克为凯拉报仇……<br />
+<br />
+◎获奖情况<br />
+<br />
+　　第19届MTV电影奖(2010)<br />
+　　MTV电影奖 最佳打斗(提名) 瑞恩·雷诺兹 / 休·杰克曼 / 列维·施瑞博尔<br />
+<br />
+　　第11届美国青少年选择奖(2009)<br />
+　　最佳动作冒险电影<br />
+　　最佳动作冒险电影男演员 休·杰克曼<br />
+　　最佳电影反派(提名) 列维·施瑞博尔<br />
+　　Choice Movie Fresh Face Male(提名) 泰勒·克奇<br />
+　　Choice Movie Fresh Face Female(提名) 琳恩·柯林斯<br />
+　　最佳银幕大战(提名) 休·杰克曼 / 列维·施瑞博尔<br />
+　　Choice Movie: Hissy Fit(提名) 休·杰克曼<br />
+　　最佳暑期动作冒险电影(提名)<br />
+<br />
+<img style="max-width: 700px;" id="" alt="image" src="https://img.pterclub.net/images/2020/03/28/X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS.mkv_000755.001.png" onload="Scale(this,700,0);" onclick="Preview(this);" /><br />
+<img style="max-width: 700px;" id="" alt="image" src="https://img.pterclub.net/images/2020/03/28/X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS.mkv_002858.546.png" onload="Scale(this,700,0);" onclick="Preview(this);" /><br />
+<img style="max-width: 700px;" id="" alt="image" src="https://img.pterclub.net/images/2020/03/28/X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS.mkv_004054.957.png" onload="Scale(this,700,0);" onclick="Preview(this);" /><br />
+<img style="max-width: 700px;" id="" alt="image" src="https://img.pterclub.net/images/2020/03/28/X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS.mkv_010547.882.png" onload="Scale(this,700,0);" onclick="Preview(this);" /><br />
+<img style="max-width: 700px;" id="" alt="image" src="https://img.pterclub.net/images/2020/03/28/X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS.mkv_012653.706.png" onload="Scale(this,700,0);" onclick="Preview(this);" /><br />
+<img style="max-width: 700px;" id="" alt="image" src="https://img.pterclub.net/images/2020/03/28/X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS.mkv_013427.553.png" onload="Scale(this,700,0);" onclick="Preview(this);" /><br />
+<img style="max-width: 700px;" id="" alt="image" src="https://img.pterclub.net/images/2020/03/28/X-Men.Origins.Wolverine.2009.BluRay.1080p.x265.10bit.2Audio.MNHD-FRDS.mkv_013856.726.png" onload="Scale(this,700,0);" onclick="Preview(this);" /></div></td></tr><tr><td class="rowhead"><a href="javascript: klappe_ext('imdb')"><span class="nowrap"><img class="minus" src="pic/trans.gif" alt="Show/Hide" id="picimdb" title="显示&nbsp;或&nbsp;隐藏" /> IMDb信息</span></a><div id="posterimdb"><img src="https://m.media-amazon.com/images/M/MV5BZWRhMzdhMzEtZTViNy00YWYyLTgxZmUtMTMwMWM0NTEyMjk3XkEyXkFqcGdeQXVyNTIzOTk5ODM@._V1_QL75_UY281_CR0,0,190,281_.jpg" width="105" onclick="Preview(this);" alt="poster" /></div></td><td class="rowfollow" align="left"><div id='kimdb'><a href="https://www.imdb.com/title/tt0458525">https://www.imdb.com/title/tt0458525</a><br /><strong><font color="navy">------------------------------------------------------------------------------------------------------------------------------------</font><br />
+<font color="darkred" size="3">信息:</font><br />
+<font color="navy">------------------------------------------------------------------------------------------------------------------------------------</font></strong><br />
+<strong><font color="DarkRed"> 片名: </font></strong>X-Men Origins: Wolverine<br />
+<strong><font color="DarkRed"> 别名: </font></strong><br />
+<strong><font color="DarkRed"> 年代: </font></strong>2009<br />
+<strong><font color="DarkRed"> 片长: </font></strong>107<br />
+<strong><font color="DarkRed"> 票数: </font></strong>532910<br />
+<strong><font color="DarkRed"> 评分: </font></strong>6.5<br />
+<strong><font color="DarkRed"> 对白语言: </font></strong>English<br />
+<strong><font color="DarkRed"> 国家/地区: </font></strong>United States, United Kingdom<br />
+<strong><font color="DarkRed"> 类别: </font></strong>Action, Sci-Fi<br />
+<strong><font color="DarkRed"> 标语: </font></strong><br />
+<strong><font color="DarkRed"> 导演: </font></strong><a target="_blank" href="https://www.imdb.com/0004303">Gavin Hood</a><br />
+<strong><font color="DarkRed"> 编剧: </font></strong><a target="_blank" href="https://www.imdb.com/1125275">David Benioff</a>, <a target="_blank" href="https://www.imdb.com/0940790">Skip Woods</a><br />
+<strong><font color="DarkRed"> 制作: </font></strong><a target="_blank" href="https://www.imdb.com/0032696 ">Avi Arad</a>, <a target="_blank" href="https://www.imdb.com/0001149 ">Richard Donner</a>, <a target="_blank" href="https://www.imdb.com/0007067 ">Louis G. Friedman</a>, <a target="_blank" href="https://www.imdb.com/0413168 ">Hugh Jackman</a>, <a target="_blank" href="https://www.imdb.com/0498278 ">Stan Lee</a>, <a target="_blank" href="https://www.imdb.com/0003423 ">Peter MacDonald</a>, <a target="_blank" href="https://www.imdb.com/0657561 ">John Palermo</a>, <a target="_blank" href="https://www.imdb.com/0795682 ">Lauren Shuler Donner</a>, <a target="_blank" href="https://www.imdb.com/0001741 ">Bryan Singer</a>, <a target="_blank" href="https://www.imdb.com/0842765 ">Marsha L. Swinton</a>, <a target="_blank" href="https://www.imdb.com/1408101 ">Whitney Thomas</a>, <a target="_blank" href="https://www.imdb.com/0003515 ">Ralph Winter</a><br />
+<strong><font color="DarkRed"> 音乐: </font></strong><a target="_blank" href="https://www.imdb.com/0004581 ">Harry Gregson-Williams</a><br /><br />
+
+<strong><font color="navy">------------------------------------------------------------------------------------------------------------------------------------</font><br />
+<font color="darkred" size="3"> 剧情概要:</font><br />
+<font color="navy">------------------------------------------------------------------------------------------------------------------------------------</font></strong><br />
+The early years of James Logan, featuring his rivalry with his brother Victor Creed, his service in the special forces team Weapon X, and his experimentation into the metal-lined mutant Wolverine.<br /><br />
+
+<strong><font color="navy">------------------------------------------------------------------------------------------------------------------------------------</font><br />
+<font color="darkred" size="3"> 主演:</font><br />
+<font color="navy">------------------------------------------------------------------------------------------------------------------------------------</font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/0413168">Hugh Jackman</a>  .... <strong><font color="DarkRed">Logan / Wolverine </font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/0000630">Liev Schreiber</a>  .... <strong><font color="DarkRed">Victor Creed </font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/0396812">Danny Huston</a>  .... <strong><font color="DarkRed">Stryker </font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/1443238">Will.i.am</a>  .... <strong><font color="DarkRed">John Wraith </font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/1211488">Lynn Collins</a>  .... <strong><font color="DarkRed">Kayla Silverfox </font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/0243806">Kevin Durand</a>  .... <strong><font color="DarkRed">Fred Dukes </font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/0597480">Dominic Monaghan</a>  .... <strong><font color="DarkRed">Chris Bradley / Bolt </font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/2018237">Taylor Kitsch</a>  .... <strong><font color="DarkRed">Remy LeBeau / Gambit </font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/2024644">Daniel Henney</a>  .... <strong><font color="DarkRed">Agent Zero </font></strong><br />
+<font color="DarkRed">.</font> <a target="_blank" href="https://www.imdb.com/0005351">Ryan Reynolds</a>  .... <strong><font color="DarkRed">Wade Wilson </font></strong><br />
+<br /><br /><b>注意：</b>该信息最后更新于2024-06-10 18:56:17，可能已过期，点击<a href="retriver.php?id=10216&amp;type=2&amp;siteid=1"><b>这里</b></a>更新信息</div></td></tr><tr><td class="rowhead nowrap" valign="top" align="right"><a href="javascript: klappe_news('othercopy')"><span class="nowrap"><img class="minus" src="pic/trans.gif" alt="Show/Hide" id="picothercopy" title="显示&nbsp;或&nbsp;隐藏" /> 其它版本</span></a></td><td class="rowfollow" valign="top" align="left"><b>4个其它版本 </b><br /><div id='kothercopy' style="display: block;"><table border="1" cellspacing="0" cellpadding="5">
+<tr><td class="colhead" style="padding: 0px; text-align:center;">类型</td><td class="colhead" align="left">标题</td><td class="colhead" align="center">质量</td><td class="colhead" align="center"><img class="size" src="pic/trans.gif" alt="size" title="大小" /></td><td class="colhead" align="center"><img class="time" src="pic/trans.gif" alt="time added" title="添加时间" /></td><td class="colhead" align="center"><img class="seeders" src="pic/trans.gif" alt="seeders" title="种子数" /></td><td class="colhead" align="center"><img class="leechers" src="pic/trans.gif" alt="leechers" title="下载数" /></td></tr>
+<tr><td colspan="7" style='text-align: center;font-weight: 600;'>WEB-DL (<span id='source_93R3HBB77628M5PF'></span>)</td></tr><tr><td class="rowfollow nowrap" valign="middle" style='padding: 0px'><a href="torrents.php?allsec=1&amp;cat=401"><img class="c_movies" src="pic/cattrans.gif" alt="电影" title="电影" style="background-image: url(pic/category/qw/scenetorrents/chs/catsprites.png);" /></a></td><td class="rowfollow" align="left" style='text-warp: warp;width:50%;'><a href="https://www.qingwapt.com/details.php?id=153376&amp;hit=1">Chu Fei 2025 2160p WEB-DL H.265 AAC 2.0-HDKWeb</a></td><td class="rowfollow" align="left">H.265/HEVC, AAC, 4K/2160p, Other</td><td class="rowfollow" align="center">2.58 GB</td><td class="rowfollow nowrap" align="center"><span title="2025-11-20 13:25:37">5月17天</span></td><td class="rowfollow" align="center">5</td><td class="rowfollow" align="center">0</td></tr>
+<tr><td colspan="7" style='text-align: center;font-weight: 600;'>Remux (<span id='source_1M44DH119H41RM42'></span>)</td></tr><tr><td class="rowfollow nowrap" valign="middle" style='padding: 0px'><a href="torrents.php?allsec=1&amp;cat=401"><img class="c_movies" src="pic/cattrans.gif" alt="电影" title="电影" style="background-image: url(pic/category/qw/scenetorrents/chs/catsprites.png);" /></a></td><td class="rowfollow" align="left" style='text-warp: warp;width:50%;'><a href="https://www.qingwapt.com/details.php?id=153382&amp;hit=1">X-Men Origins: Wolverine 2009 1080p Remux AVC AAC 2.0-Kylin</a> <span style="display: inline-block; margin: 2px; user-select:none; font-size:10px; color: rgb(255, 255, 255); font-weight: 600; background-color: #CC0000; padding: 0px 6px; border-radius: 3px;" alt="50%" title="50%" >50%</span></td><td class="rowfollow" align="left">H.264/AVC, AAC, 1080p, Other</td><td class="rowfollow" align="center">13.78 GB</td><td class="rowfollow nowrap" align="center"><span title="2026-01-08 11:24:38">3月28天</span></td><td class="rowfollow" align="center">2</td><td class="rowfollow" align="center">0</td></tr>
+<tr><td colspan="7" style='text-align: center;font-weight: 600;'>Encode (<span id='source_C1DHRHD5E4DF92GR'></span>)</td></tr><tr><td class="rowfollow nowrap" valign="middle" style='padding: 0px'><a href="torrents.php?allsec=1&amp;cat=401"><img class="c_movies" src="pic/cattrans.gif" alt="电影" title="电影" style="background-image: url(pic/category/qw/scenetorrents/chs/catsprites.png);" /></a></td><td class="rowfollow" align="left" style='text-warp: warp;width:50%;'><a href="https://www.qingwapt.com/details.php?id=60169&amp;hit=1">X-Men Origins Wolverine 2009 1080p BluRay x264 DTS-HD MA 5.1 2Audio-beAst</a></td><td class="rowfollow" align="left">H.264/AVC, DTS-HD MA, 1080p, Other</td><td class="rowfollow" align="center">13.02 GB</td><td class="rowfollow nowrap" align="center"><span title="2025-03-30 20:51:07">1年1月</span></td><td class="rowfollow" align="center">3</td><td class="rowfollow" align="center">0</td></tr>
+<tr><td colspan="7" style='text-align: center;font-weight: 600;'>MiniBD (<span id='source_PP6A8E8CHEP1MHP1'></span>)</td></tr><tr><td class="rowfollow nowrap" valign="middle" style='padding: 0px'><a href="torrents.php?allsec=1&amp;cat=401"><img class="c_movies" src="pic/cattrans.gif" alt="电影" title="电影" style="background-image: url(pic/category/qw/scenetorrents/chs/catsprites.png);" /></a></td><td class="rowfollow" align="left" style='text-warp: warp;width:50%;'><a href="https://www.qingwapt.com/details.php?id=118387&amp;hit=1">X-Men Origins Wolverine 2009 MiniBD 1080p Blu-ray x264 DTS 5.1 2Audios-CMCT</a></td><td class="rowfollow" align="left">H.264/AVC, DTS, 1080p, Other</td><td class="rowfollow" align="center">13.35 GB</td><td class="rowfollow nowrap" align="center"><span title="2025-09-23 06:28:34">7月15天</span></td><td class="rowfollow" align="center">25</td><td class="rowfollow" align="center">0</td></tr>
+</table>
+</div></td></tr><script type="text/javascript">document.getElementById("source_93R3HBB77628M5PF").innerHTML = "1";document.getElementById("source_1M44DH119H41RM42").innerHTML = "1";document.getElementById("source_C1DHRHD5E4DF92GR").innerHTML = "1";document.getElementById("source_PP6A8E8CHEP1MHP1").innerHTML = "1";</script><tr><td class="rowhead nowrap" valign="top" align="right">种子文件</td><td class="rowfollow" valign="top" align="left"><table><tr><td class="no_border_wide"><b>文件数：</b>3个文件<br /><span id="showfl"><a href="javascript: viewfilelist(10216)" >[查看列表]</a></span><span id="hidefl" style="display: none;"><a href="javascript: hidefilelist()">[隐藏列表]</a></span></td><td class="no_border_wide"><b>Hash码:</b>&nbsp;6729d45c05bd77b508fcf4f98aef981744e538a1</td><td class="no_border_wide"><b>种子结构：</b><a href="torrent_info.php?id=10216">[查看结构]</a></td></tr></table><span id='filelist'></span></td></tr><tr><td class="rowhead nowrap" valign="top" align="right">热度表</td><td class="rowfollow" valign="top" align="left"><table><tr><td class="no_border_wide"><b>查看: </b>11</td><td class="no_border_wide"><b>点击: </b>2150</td><td class="no_border_wide"><b><b>完成:</b> </b><a href="viewsnatches.php?id=10216"><b>39</b>次</a> &lt;--- 点击查看完成详情</td><td class="no_border_wide"><b>最近活动：</b><span title="2026-05-06 22:04:40">34分钟前</span></td></tr></table></td></tr><tr><td class="rowhead nowrap" valign="top" align="right"><span id="seeders"></span><span id="leechers"></span>同伴<br /><span id="showpeer"><a href="javascript: viewpeerlist(10216);" class="sublink">[查看列表]</a></span><span id="hidepeer" style="display: none;"><a href="javascript: hidepeerlist();" class="sublink">[隐藏列表]</a></span></td><td class="rowfollow" valign="top" align="left"><div id="peercount"><b>657个做种者</b> | <b>0个下载者</b></div><div id="peerlist"></div></td></tr><style type="text/css">
+					ul.magic
+					{
+						cursor:pointer;
+						list-style-type:none;
+						padding-left:0px;
+					}
+					ul.magic li
+					{
+						margin:0px;text-align:center;float:left;width:40px;margin-right:15px; height:21px;background:url("styles/huise.png") no-repeat;
+						padding-left:5px;padding-right:5px;
+						line-height:20px;
+					}
+					ul.magic li:hover
+					{
+						background:url("styles/boli.png") no-repeat
+					}
+				</style>
+		<tr><td class="rowhead nowrap" valign="top" align="right">蝌蚪奖励</td><td class="rowfollow" valign="top" align="left"><div style="height:25px"><ul id="listNumber" class="magic"><li onclick="saveMagicValue(10216,50);"><font style="font-size:8pt;padding-right:5px;">+50</font></li><li onclick="saveMagicValue(10216,100);"><font style="font-size:8pt;padding-right:5px;">+100</font></li><li onclick="saveMagicValue(10216,200);"><font style="font-size:8pt;padding-right:5px;">+200</font></li><li onclick="saveMagicValue(10216,500);"><font style="font-size:8pt;padding-right:5px;">+500</font></li><li onclick="saveMagicValue(10216,1000);"><font style="font-size:8pt;padding-right:5px;">+1000</font></li></ul><input class="btn" type="button" id="magic_add" style="display:none" value="你已经赠送蝌蚪" disabled="disabled" />&nbsp;目前发布人已获得<span id="spanSumAll">0</span>个蝌蚪奖励。&nbsp</div><div><span id='current_user_magic' style='display:none'><span class="nowrap"><a  href="https://www.qingwapt.com/userdetails.php?id=10216" class='SVIP_Name'><b class="rainbow">ranfish (匿名)</b></a><img src="https://wawawa.win/team/515819cee59d2ed6.webp" title="2024儿童节徽章" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/><img src="https://wawawa.win/team/58f446430ab3b301.webp" title="发种新手" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/><img src="https://wawawa.win/team/8d1708dacff7798a.webp" title="发种能手" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/></span></span>&nbsp;</div></td></tr><tr><td class="rowhead nowrap" valign="top" align="right">感谢者</td><td class="rowfollow" valign="top" align="left"><span id="thanksadded" style="display: none;"><input class="btn" type="button" value="感谢表示成功！" disabled="disabled" /></span><span id="curuser" style="display: none;"><span class="nowrap"><a  href="https://www.qingwapt.com/userdetails.php?id=10216" class='SVIP_Name'><b class="rainbow">ranfish (匿名)</b></a><img src="https://wawawa.win/team/515819cee59d2ed6.webp" title="2024儿童节徽章" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/><img src="https://wawawa.win/team/58f446430ab3b301.webp" title="发种新手" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/><img src="https://wawawa.win/team/8d1708dacff7798a.webp" title="发种能手" class="nexus-username-medal" style="max-height: 11px;max-width: 11px;margin-left: 2pt"/></span> </span><span id="thanksbutton"><input class="btn" type="button" id="saythanks"  onclick="saythanks(10216);"  value="&nbsp;&nbsp;说谢谢&nbsp;&nbsp;" /></span>&nbsp;&nbsp;<span id="nothanks">暂无感谢者</span><span id="addcuruser"></span></td></tr></table>
+<br /><br /><table style='border:1px solid #000000;'><tr><td class="text" align="center"><b>快速评论</b><br /><br /><form id="compose" name="comment" method="post" action="comment.php?action=add&amp;type=torrent" onsubmit="return postvalid(this);"><input type="hidden" name="pid" value="10216" /><br /><textarea name='body' cols="100" rows="8" style="width: 450px" onkeydown="ctrlenter(event,'compose','qr')"></textarea><div align="center"><a href="javascript: SmileIT('[em4]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/4.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/4.gif" alt="" /></a><a href="javascript: SmileIT('[em5]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/5.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/5.gif" alt="" /></a><a href="javascript: SmileIT('[em39]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/39.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/39.gif" alt="" /></a><a href="javascript: SmileIT('[em25]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/25.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/25.gif" alt="" /></a><a href="javascript: SmileIT('[em11]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/11.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/11.gif" alt="" /></a><a href="javascript: SmileIT('[em8]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/8.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/8.gif" alt="" /></a><a href="javascript: SmileIT('[em10]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/10.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/10.gif" alt="" /></a><a href="javascript: SmileIT('[em15]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/15.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/15.gif" alt="" /></a><a href="javascript: SmileIT('[em27]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/27.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/27.gif" alt="" /></a><a href="javascript: SmileIT('[em57]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/57.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/57.gif" alt="" /></a><a href="javascript: SmileIT('[em42]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/42.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/42.gif" alt="" /></a><a href="javascript: SmileIT('[em122]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/122.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/122.gif" alt="" /></a><a href="javascript: SmileIT('[em52]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/52.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/52.gif" alt="" /></a><a href="javascript: SmileIT('[em28]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/28.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/28.gif" alt="" /></a><a href="javascript: SmileIT('[em29]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/29.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/29.gif" alt="" /></a><a href="javascript: SmileIT('[em30]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/30.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/30.gif" alt="" /></a><a href="javascript: SmileIT('[em176]','comment','body')"  onmouseover="domTT_activate(this, event, 'content', '&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;img src=\&#039;pic/smilies/176.gif\&#039; alt=\&#039;\&#039; /&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;', 'trail', false, 'delay', 0,'lifetime',10000,'styleClass','smilies','maxWidth', 400);"><img style="max-width: 25px;" src="pic/smilies/176.gif" alt="" /></a></div><br /><input type="submit" id="qr" class="btn" value="&nbsp;&nbsp;添加&nbsp;&nbsp;" /></form></td></tr></table><p align="center"><a class="index" href="comment.php?action=add&amp;pid=10216&amp;type=torrent">添加评论</a></p>
+</td></tr></table><div id="footer"><div style="margin-top: 10px; margin-bottom: 30px;" align="center"> (c)  <a href="https://www.qingwapt.com" target="_self">青蛙</a> 2024-2026 Powered by <a href="aboutnexus.php">NexusPHP</a><br /><br />[page created in <b> 10.102 </b> sec with <b>19</b> db queries, <b>25</b> reads and <b>1</b> writes of Redis and <b>5.66 MB</b> ram]</div>
+<div style="display: none;" id="lightbox" class="lightbox"></div><div style="display: none;" id="curtain" class="curtain"></div></div><script type="text/javascript" src="ddlevelsfiles/ddlevelsmenu.js"></script><script type="text/javascript">ddlevelsmenu.setup("nav", "topbar")</script><script type="text/javascript">jQuery('#addtosubscribe').on("click",function(){
+	let torrentId = jQuery(this).attr('data-id')
+    layer.open({
+        type: 2,
+        title: '添加至订阅列表',
+        area: ['60%', '600px'],
+        content: '/web/add-to-subscribe/' + torrentId,
+    })
+})
+jQuery('#ghostPeerChecker').on("click",function(){
+	let torrentId = jQuery(this).attr('data-id')
+	let passkey = jQuery(this).attr('data-passkey')
+    layer.open({
+        type: 2,
+        title: '检查Peer',
+        area: ['60%', '600px'],
+        content: "//peerchecker.qingwapt.org/index.html?torrent_id="+torrentId+"&passkey="+passkey,
+    })
+})</script><script type="text/javascript">jQuery('#add-claim').on('click', function () {
+    if (!window.confirm('确定要认领此种子吗？')) {
+        return
+    }
+    let params = {action: "addClaim", params: {"torrent_id": jQuery(this).attr('data-torrent_id')}}
+    jQuery.post("ajax.php", params, function (response) {
+        console.log(response)
+		if(response.data == 'cannot claim'){
+			alert('分集无法认领。')
+			return;
+		}
+        if (response.ret != 0) {
+            alert(response.msg)
+        } else {
+            window.location.reload()
+        }
+    }, 'json')
+})</script><script type="text/javascript">jQuery('#outer').on("click", ".btn-post-like", function () {
+    let _this = jQuery(this)
+    let action = _this.attr("data-action")
+    layer.confirm("确定要 " + action + " ?", {title: "确认", btn: ['提交', '取消'], btnAlign: "c"}, function () {
+        let params = {"type": _this.attr('data-type'), "post_id": _this.attr("data-post_id")}
+        let loadingIndex1 = layer.load()
+        jQuery.post("plugin/post-like", params, function (response) {
+            layer.close(loadingIndex1)
+            if (response.ret != 0) {
+                layer.alert(response.msg, {title: "Info", btn: ['OK'], btnAlign: "c"})
+                return
+            }
+            window.location.reload()
+        }, 'json')
+    })
+
+})</script><script type="text/javascript">
+jQuery('#outer').on('click', '.btn-post-reward', function () {
+    let _this = jQuery(this)
+    let postId = _this.attr('data-post_id')
+    let params = {'post_id': postId}
+    let loadingIndex1 = layer.load()
+    jQuery.get('plugin/post-reward-modal', params, function (response) {
+        layer.close(loadingIndex1)
+        if (response.ret != 0) {
+            layer.alert(response.msg)
+            return
+        }
+        let btn = ['OK']
+        layer.open({
+            title: '帖子奖励',
+            type: 1,
+            content: response.data.content,
+            btn: btn,
+            yes: function () {
+                let params = jQuery('#post-reward-form').serialize() + '&post_id=' + postId
+                console.log(params)
+                let loadingIndex2 = layer.load()
+                jQuery.post('plugin/post-reward?' + params, function (res) {
+                    console.log(res)
+                    layer.close(loadingIndex2)
+                    if (res.ret != 0) {
+                        layer.alert(res.msg)
+                        return
+                    }
+                    window.location.reload()
+                }, 'json')
+                return false
+            },
+            btnAlign: 'c'
+        })
+    }, 'json')
+}).on('click', '.post-reward-view-more a', function () {
+    let _this = jQuery(this)
+    let postId = _this.attr('data-post_id')
+    layer.open({
+        type: 2,
+        area: ['50%', '600px'],
+        title: '帖子奖励记录',
+        content: 'plugin/post-reward-list?post_id=' + postId
+    })
+
+})
+</script><script type="text/javascript">jQuery('#outer').on("click", ".sticky-promotion", function () {
+    let _this = jQuery(this)
+    let torrentId = _this.attr("data-torrent_id")
+    let params = {"torrent_id": torrentId}
+    let loadingIndex1 = layer.load()
+    jQuery.get("plugin/sticky-promotion-info", params, function (response) {
+        layer.close(loadingIndex1)
+        if (response.ret != 0) {
+            layer.alert(response.msg)
+            return
+        }
+        //let btn = ["计算"]
+        let btn = ["确认促销"]
+        // if (response.data.is_author == 1 || response.data.is_exists == 0) {
+        //     btn.push("计算")
+        // }
+        let url = "plugin/sticky-promotion"
+        if (response.data.is_exists == 1) {
+            url = "plugin/sticky-promotion-append"
+        }
+        layer.open({
+            title: "置顶促销",
+            type: 1,
+            content: response.data.content,
+            btn: btn,
+            yes: function () {
+                let params = jQuery('#sticky-promotion-form').serialize() + "&torrent_id=" + torrentId
+                console.log(params)
+                let loadingIndex2 = layer.load()
+                jQuery.post(url + "?" + params + "&__just_calculate=1", function (res) {
+                    console.log(res)
+                    layer.close(loadingIndex2)
+                    if (res.ret != 0) {
+                        layer.alert(res.msg)
+                        return
+                    }
+                    layer.confirm("这将消耗 " + res.data.cost_bonus + " 蝌蚪，确定吗？<br/>" + res.data.expression, {btnAlign: 'c'}, function () {
+                        let loadingIndex3 = layer.load()
+                        jQuery.post(url + "?" + params, function (response) {
+                            layer.close(loadingIndex3)
+                            if (response.ret != 0) {
+                                layer.alert(response.msg)
+                                return
+                            }
+                            layer.closeAll()
+                            window.location.reload()
+                            /*layer.alert(response.msg, function () {
+
+                            });*/
+                        }, 'json')
+                    })
+                }, 'json')
+                return false
+            },
+            btnAlign: 'c'
+        })
+    }, 'json')
+})
+
+jQuery("body").on('click', '.show-sticky-promotion-history', function () {
+    let _this = jQuery(this)
+    let id = _this.attr("data-torrent_id")
+    layer.open({
+        type: 2,
+        area: ['80%', '800px'],
+        title: "种子置顶促销历史",
+        content: "plugin/sticky-promotion-history?torrent_id=" + id
+    })
+}).on('click', '.show-sticky-promotion-append', function () {
+    let _this = jQuery(this)
+    let id = _this.attr("data-sticky_promotion_id")
+    layer.open({
+        type: 2,
+        area: ['80%', '800px'],
+        title: "置顶促销追加情况",
+        content: "plugin/sticky-promotion-append?sticky_promotion_id=" + id
+    })
+}).on('click', '.show-sticky-promotion-participator', function () {
+    let _this = jQuery(this)
+    let id = _this.attr("data-sticky_promotion_id")
+    layer.open({
+        type: 2,
+        area: ['80%', '800px'],
+        title: "置顶促销参与者",
+        content: "plugin/sticky-promotion-participator?sticky_promotion_id=" + id
+    })
+})</script><script type="application/javascript" src="js/nexus.js"></script>
+<script type="application/javascript" src="vendor/jquery-goup-1.1.3/jquery.goup.min.js"></script>
+<script>
+jQuery(document).ready(function(){
+    jQuery.goup()
+});
+</script><img id="nexus-preview" style="display: none; position: absolute" src="" /></body></html>

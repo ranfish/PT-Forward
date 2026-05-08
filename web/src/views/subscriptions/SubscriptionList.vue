@@ -16,7 +16,7 @@
         pageSize: pagination.pageSize.value,
         total: pagination.total.value,
         showSizeChanger: true,
-        showTotal: (total: number) => t('common.totalCount', { total }),
+        showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
       @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
@@ -49,13 +49,52 @@
           <a-input v-model:value="form.name" placeholder="订阅名称" />
         </a-form-item>
         <a-form-item :label="t('common.site')" name="siteName" :rules="[{ required: true, message: t('common.siteRequired') }]">
-          <a-input v-model:value="form.siteName" placeholder="站点名称" />
+          <a-input v-model:value="form.siteName" :placeholder="t('common.site')" />
         </a-form-item>
         <a-form-item :label="t('subscription.url')" name="urls" :rules="[{ required: true, message: t('subscription.urlRequired') }]">
           <a-textarea v-model:value="form.urls" placeholder="RSS 地址，每行一个" :rows="3" />
         </a-form-item>
         <a-form-item :label="t('subscription.cronExpression')" name="cron">
           <a-input v-model:value="form.cron" placeholder="例如: */15 * * * *" />
+        </a-form-item>
+        <a-form-item label="Client ID" name="clientId">
+          <a-input v-model:value="form.clientId" placeholder="qBittorrent" />
+        </a-form-item>
+        <a-form-item label="Save Path" name="savePath">
+          <a-input v-model:value="form.savePath" placeholder="/downloads/..." />
+        </a-form-item>
+        <a-form-item label="Category" name="category">
+          <a-input v-model:value="form.category" />
+        </a-form-item>
+        <a-form-item label="Add Paused" name="addPaused">
+          <a-switch v-model:checked="form.addPaused" />
+        </a-form-item>
+        <a-form-item label="Auto TMM" name="autoTmm">
+          <a-switch v-model:checked="form.autoTmm" />
+        </a-form-item>
+        <a-form-item label="Tags" name="tags">
+          <a-select v-model:value="form.tags" mode="tags" placeholder="标签" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="Scrape Free" name="scrapeFree">
+          <a-switch v-model:checked="form.scrapeFree" />
+        </a-form-item>
+        <a-form-item label="Scrape HR" name="scrapeHr">
+          <a-switch v-model:checked="form.scrapeHr" />
+        </a-form-item>
+        <a-form-item label="Upload Limit (KB/s)" name="uploadLimitKb">
+          <a-input-number v-model:value="form.uploadLimitKb" :min="0" style="width: 100%" placeholder="0 = 不限" />
+        </a-form-item>
+        <a-form-item label="Download Limit (KB/s)" name="downloadLimitKb">
+          <a-input-number v-model:value="form.downloadLimitKb" :min="0" style="width: 100%" placeholder="0 = 不限" />
+        </a-form-item>
+        <a-form-item label="Publish Enabled" name="publishEnabled">
+          <a-switch v-model:checked="form.publishEnabled" />
+        </a-form-item>
+        <a-form-item label="Push Notify" name="pushNotify">
+          <a-switch v-model:checked="form.pushNotify" />
+        </a-form-item>
+        <a-form-item label="Auto Reseed" name="autoReseed">
+          <a-switch v-model:checked="form.autoReseed" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -81,6 +120,20 @@ const form = reactive({
   siteName: '',
   urls: '',
   cron: '*/15 * * * *',
+  clientId: '',
+  savePath: '',
+  category: '',
+  addPaused: false,
+  autoTmm: false,
+  tags: [] as string[],
+  scrapeFree: false,
+  scrapeHr: false,
+  uploadLimitKb: 0,
+  downloadLimitKb: 0,
+  publishEnabled: false,
+  pushNotify: false,
+  autoReseed: false,
+  enabled: true,
 })
 
 const columns = [
@@ -96,9 +149,32 @@ const pagination = usePagination((page, size) => subscriptionsApi.list(page, siz
 function openModal(record?: any) {
   editingRecord.value = record || null
   if (record) {
-    Object.assign(form, { name: record.name, siteName: record.siteName, urls: (record.urls || []).join('\n'), cron: record.cron || '*/15 * * * *' })
+    Object.assign(form, {
+      name: record.name, siteName: record.siteName,
+      urls: (record.urls || []).join('\n'), cron: record.cron || '*/15 * * * *',
+      clientId: record.client_id || record.clientId || '',
+      savePath: record.save_path || record.savePath || '',
+      category: record.category || '',
+      addPaused: record.add_paused || record.addPaused || false,
+      autoTmm: record.auto_tmm || record.autoTmm || false,
+      tags: record.tags || [],
+      scrapeFree: record.scrape_free || record.scrapeFree || false,
+      scrapeHr: record.scrape_hr || record.scrapeHr || false,
+      uploadLimitKb: record.upload_limit_kb || record.uploadLimitKb || 0,
+      downloadLimitKb: record.download_limit_kb || record.downloadLimitKb || 0,
+      publishEnabled: record.publish_enabled || record.publishEnabled || false,
+      pushNotify: record.push_notify || record.pushNotify || false,
+      autoReseed: record.auto_reseed || record.autoReseed || false,
+      enabled: record.enabled ?? true,
+    })
   } else {
-    Object.assign(form, { name: '', siteName: '', urls: '', cron: '*/15 * * * *' })
+    Object.assign(form, {
+      name: '', siteName: '', urls: '', cron: '*/15 * * * *',
+      clientId: '', savePath: '', category: '', addPaused: false, autoTmm: false,
+      tags: [], scrapeFree: false, scrapeHr: false,
+      uploadLimitKb: 0, downloadLimitKb: 0,
+      publishEnabled: false, pushNotify: false, autoReseed: false, enabled: true,
+    })
   }
   modalVisible.value = true
 }

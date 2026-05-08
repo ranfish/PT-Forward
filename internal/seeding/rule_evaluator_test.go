@@ -628,3 +628,38 @@ func TestExprEngine_NightProtection(t *testing.T) {
 		t.Errorf("day time should not match, got %d", len(matches))
 	}
 }
+
+func TestEvalExprForTest(t *testing.T) {
+	rc := &RuleContext{
+		Record: &model.SeedingTorrentRecord{
+			SiteName: "hdhome.org",
+			IsFree:   true,
+			Status:   model.SeedingStatusSeeding,
+		},
+	}
+
+	result, err := EvalExprForTest(`siteName == "hdhome.org"`, rc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result {
+		t.Error("expected true for matching siteName")
+	}
+
+	result, err = EvalExprForTest(`siteName == "other.site"`, rc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result {
+		t.Error("expected false for non-matching siteName")
+	}
+}
+
+func TestValidateExpr(t *testing.T) {
+	if err := ValidateExpr(`siteName == "test"`); err != nil {
+		t.Fatalf("valid expr should pass: %v", err)
+	}
+	if err := ValidateExpr(`!!! invalid [`); err == nil {
+		t.Fatal("invalid expr should fail")
+	}
+}

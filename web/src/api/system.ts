@@ -13,4 +13,7 @@ export const systemApi = {
   clearLogs() {
     return client.delete('/system/logs')
   },
+  ping() {
+    return client.get('/system/ping')
+  },
 }

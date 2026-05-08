@@ -208,3 +208,94 @@ func TestRegistry_CronExecution(t *testing.T) {
 		t.Error("handler should have been triggered")
 	}
 }
+
+func TestRegistry_Reschedule(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	if err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+
+	err := r.Reschedule("test", "*/10 * * * *")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, _ := r.Get("test")
+	if entry.Schedule != "*/10 * * * *" {
+		t.Errorf("expected */10, got %s", entry.Schedule)
+	}
+}
+
+func TestRegistry_Reschedule_NotFound(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	err := r.Reschedule("missing", "*/5 * * * *")
+	if err == nil {
+		t.Error("expected error for missing task")
+	}
+}
+
+func TestRegistry_Reschedule_InvalidCron(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	if err := r.Register("test", "rss", "*/5 * * * *", func(_ context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	err := r.Reschedule("test", "invalid cron !@#")
+	if err == nil {
+		t.Error("expected error for invalid cron")
+	}
+}
+
+func TestRegistry_Pause_NotFound(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	err := r.Pause("missing")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestRegistry_Resume_NotFound(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	err := r.Resume("missing")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestRegistry_Unregister_NotFound(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	err := r.Unregister("missing")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestRegistry_Get_NotFound(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	_, err := r.Get("missing")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestRegistry_Register_InvalidSchedule(t *testing.T) {
+	r := NewRegistry(zap.NewNop())
+	err := r.Register("bad", "rss", "not-a-cron", func(_ context.Context) error { return nil })
+	if err == nil {
+		t.Error("expected error for invalid schedule")
+	}
+}
+
+func TestNormalizeSchedule_EdgeCases(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"* * * * *", "0 * * * * *"},
+		{"0 0 * * 1", "0 0 0 * * 1"},
+	}
+	for _, tt := range tests {
+		got := normalizeSchedule(tt.input)
+		if got != tt.expect {
+			t.Errorf("normalizeSchedule(%q) = %q, want %q", tt.input, got, tt.expect)
+		}
+	}
+}

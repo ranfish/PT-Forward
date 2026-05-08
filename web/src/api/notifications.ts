@@ -4,9 +4,6 @@ export const notificationsApi = {
   list() {
     return client.get('/notifications/channels')
   },
-  get(id: number) {
-    return client.get(`/notifications/channels/${id}`)
-  },
   create(data: any) {
     return client.post('/notifications/channels', data)
   },

@@ -5,7 +5,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/ranfish/pt-forward/internal/auth"
+	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestRecovery_NoPanic(t *testing.T) {
@@ -275,5 +279,129 @@ func TestExtractIP(t *testing.T) {
 				t.Errorf("expected %s, got %s", tt.expected, ip)
 			}
 		})
+	}
+}
+
+func newTestAuthManager(t *testing.T) *auth.AuthManager {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.User{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	repo := auth.NewGormAuthRepository(db)
+	mgr, err := auth.NewAuthManager(repo, zap.NewNop())
+	if err != nil {
+		t.Fatalf("NewAuthManager: %v", err)
+	}
+	return mgr
+}
+
+func TestJWTAuth_NoToken(t *testing.T) {
+	mgr := newTestAuthManager(t)
+	handler := JWTAuth(mgr)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("should not reach handler")
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestJWTAuth_InvalidFormat(t *testing.T) {
+	mgr := newTestAuthManager(t)
+	handler := JWTAuth(mgr)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("should not reach handler")
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Basic abc123")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestJWTAuth_InvalidToken(t *testing.T) {
+	mgr := newTestAuthManager(t)
+	handler := JWTAuth(mgr)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("should not reach handler")
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer invalid.token.here")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestJWTAuth_ValidToken(t *testing.T) {
+	mgr := newTestAuthManager(t)
+
+	tokenPair, err := mgr.IssueTokenPair()
+	if err != nil {
+		t.Fatalf("IssueTokenPair: %v", err)
+	}
+
+	handler := JWTAuth(mgr)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenPair.AccessToken)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestRequestLogger_Normal(t *testing.T) {
+	logger := zap.NewNop()
+	handler := RequestLogger(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/api/v1/test", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestRequestLogger_StatusRecorder(t *testing.T) {
+	rec := &statusRecorder{ResponseWriter: httptest.NewRecorder(), status: http.StatusOK}
+	rec.WriteHeader(http.StatusNotFound)
+	if rec.status != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.status)
+	}
+}
+
+func TestRateLimiter_Cleanup(t *testing.T) {
+	rl := NewRateLimiter(5, 1)
+	rl.visitors["old-ip"] = &visitor{count: 1, lastSeen: 0}
+	rl.visitors["new-ip"] = &visitor{count: 1, lastSeen: timeNowUnix()}
+
+	rl.Cleanup()
+
+	if _, exists := rl.visitors["old-ip"]; exists {
+		t.Error("old-ip should be cleaned up")
+	}
+	if _, exists := rl.visitors["new-ip"]; !exists {
+		t.Error("new-ip should still exist")
 	}
 }

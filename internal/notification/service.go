@@ -180,10 +180,13 @@ func (s *Service) sendTelegram(ctx context.Context, ch *model.NotificationChanne
 	}
 
 	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", token)
-	text := fmt.Sprintf("<b>%s</b>\n%s", escapeHTML(msg.Title), escapeHTML(msg.Message))
-	body := fmt.Sprintf(`{"chat_id":"%s","text":"%s","parse_mode":"HTML"}`, chatID, text)
-
-	return s.doHTTPPost(ctx, apiURL, "application/json", body)
+	payload := map[string]string{
+		"chat_id":    chatID,
+		"text":       fmt.Sprintf("<b>%s</b>\n%s", escapeHTML(msg.Title), escapeHTML(msg.Message)),
+		"parse_mode": "HTML",
+	}
+	bodyBytes, _ := json.Marshal(payload)
+	return s.doHTTPPost(ctx, apiURL, "application/json", string(bodyBytes))
 }
 
 func (s *Service) sendBark(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
@@ -206,8 +209,9 @@ func (s *Service) sendServerChan(ctx context.Context, ch *model.NotificationChan
 	}
 
 	apiURL := fmt.Sprintf("https://sctapi.ftqq.com/%s.send", sendKey)
-	body := fmt.Sprintf(`{"title":"%s","desp":"%s"}`, msg.Title, msg.Message)
-	return s.doHTTPPost(ctx, apiURL, "application/json", body)
+	payload := map[string]string{"title": msg.Title, "desp": msg.Message}
+	bodyBytes, _ := json.Marshal(payload)
+	return s.doHTTPPost(ctx, apiURL, "application/json", string(bodyBytes))
 }
 
 func (s *Service) sendDingTalk(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
@@ -225,8 +229,10 @@ func (s *Service) sendDingTalk(ctx context.Context, ch *model.NotificationChanne
 		apiURL = fmt.Sprintf("%s&timestamp=%d&sign=%s", webhook, timestamp, url.QueryEscape(sign))
 	}
 
-	body := fmt.Sprintf(`{"msgtype":"text","text":{"content":"%s\n%s"}}`, msg.Title, msg.Message)
-	return s.doHTTPPost(ctx, apiURL, "application/json", body)
+	payload := map[string]string{"content": fmt.Sprintf("%s\n%s", msg.Title, msg.Message)}
+	dingBody := map[string]interface{}{"msgtype": "text", "text": payload}
+	bodyBytes, _ := json.Marshal(dingBody)
+	return s.doHTTPPost(ctx, apiURL, "application/json", string(bodyBytes))
 }
 
 func (s *Service) sendWebhook(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
@@ -307,15 +313,15 @@ func (s *Service) resetFailures(ctx context.Context, ch *model.NotificationChann
 }
 
 func (s *Service) incrementFailures(ctx context.Context, ch *model.NotificationChannel) {
-	newCount := ch.ConsecutiveFailures + 1
-	updates := map[string]interface{}{
-		"consecutive_failures": newCount,
+	s.db.WithContext(ctx).Model(ch).
+		UpdateColumn("consecutive_failures", gorm.Expr("consecutive_failures + 1"))
+	var updated model.NotificationChannel
+	if err := s.db.WithContext(ctx).First(&updated, ch.ID).Error; err == nil {
+		if updated.ConsecutiveFailures >= ch.MaxErrorsPerHour && ch.MaxErrorsPerHour > 0 {
+			s.db.WithContext(ctx).Model(ch).UpdateColumn("healthy", false)
+			s.logger.Warn("notification channel marked unhealthy", zap.String("name", ch.Name), zap.Int("failures", updated.ConsecutiveFailures))
+		}
 	}
-	if newCount >= ch.MaxErrorsPerHour && ch.MaxErrorsPerHour > 0 {
-		updates["healthy"] = false
-		s.logger.Warn("notification channel marked unhealthy", zap.String("name", ch.Name), zap.Int("failures", newCount))
-	}
-	s.db.WithContext(ctx).Model(ch).Updates(updates)
 }
 
 func (s *Service) matchEvent(ch *model.NotificationChannel, event string) bool {

@@ -10,6 +10,18 @@
         <a-form-item :label="t('common.enable')">
           <a-switch v-model:checked="form.enabled" />
         </a-form-item>
+        <a-form-item label="Base URL">
+          <a-input v-model:value="form.baseURL" placeholder="https://2025.iyuu.cn" />
+        </a-form-item>
+        <a-form-item label="VIP">
+          <a-switch v-model:checked="form.isVIP" />
+        </a-form-item>
+        <a-form-item label="Version">
+          <a-input v-model:value="form.version" placeholder="1.0.0" />
+        </a-form-item>
+        <a-form-item label="Request Timeout (s)">
+          <a-input-number v-model:value="form.requestTimeoutSec" :min="5" :max="300" style="width: 100%" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" :loading="saving" @click="handleSave">{{ t('common.save') }}</a-button>
@@ -22,6 +34,9 @@
     <a-divider />
 
     <a-card :title="t('iyuu.siteMapping')" :loading="sitesLoading">
+      <template #extra>
+        <a-button size="small" :loading="syncing" @click="handleSyncSites">{{ t('cookiecloud.syncNow') }}</a-button>
+      </template>
       <a-table
         v-if="sites.length > 0"
         :columns="siteColumns"
@@ -36,7 +51,7 @@
           </template>
         </template>
       </a-table>
-      <a-empty :description="t('iyuu.viewAfterSave')" />
+      <a-empty v-else :description="t('iyuu.viewAfterSave')" />
     </a-card>
   </div>
 </template>
@@ -52,12 +67,17 @@ const { t } = useI18n()
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
+const syncing = ref(false)
 const sitesLoading = ref(false)
 const sites = ref<any[]>([])
 
 const form = reactive({
   token: '',
   enabled: false,
+  baseURL: 'https://2025.iyuu.cn',
+  isVIP: false,
+  version: '1.0.0',
+  requestTimeoutSec: 60,
 })
 
 const siteColumns = [
@@ -74,6 +94,10 @@ async function fetchConfig() {
     const data = resp.data?.data || {}
     form.token = data.token || ''
     form.enabled = data.enabled || false
+    form.baseURL = data.baseUrl ?? 'https://2025.iyuu.cn'
+    form.isVIP = data.isVip ?? false
+    form.version = data.version ?? '1.0.0'
+    form.requestTimeoutSec = data.requestTimeoutMs ? Math.round(data.requestTimeoutMs / 1000) : 60
   } catch {
   } finally {
     loading.value = false
@@ -83,7 +107,14 @@ async function fetchConfig() {
 async function handleSave() {
   saving.value = true
   try {
-    await iyuuApi.saveConfig(form)
+    await iyuuApi.saveConfig({
+      token: form.token,
+      baseUrl: form.baseURL,
+      enabled: form.enabled,
+      isVip: form.isVIP,
+      version: form.version,
+      requestTimeoutSec: form.requestTimeoutSec,
+    })
     message.success(t('common.saveSuccess'))
     fetchSites()
   } catch (e: any) {
@@ -116,7 +147,21 @@ async function fetchSites() {
   }
 }
 
+async function handleSyncSites() {
+  syncing.value = true
+  try {
+    await iyuuApi.syncSites()
+    message.success(t('common.operationSuccess'))
+    fetchSites()
+  } catch (e: any) {
+    message.error(e.message)
+  } finally {
+    syncing.value = false
+  }
+}
+
 onMounted(() => {
   fetchConfig()
+  fetchSites()
 })
 </script>

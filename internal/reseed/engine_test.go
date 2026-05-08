@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -1511,5 +1512,897 @@ func TestEngine_findCandidates_WithTargetSites(t *testing.T) {
 	}
 	if candidates[0].TargetSite != "site_a" {
 		t.Errorf("expected site_a, got %s", candidates[0].TargetSite)
+	}
+}
+
+func TestEngine_ListByClientID(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t1", Enabled: true, ClientIDs: "c1"})
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t2", Enabled: true, ClientIDs: "c1,c2"})
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t3", Enabled: true, ClientIDs: "c2,c3"})
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t4", Enabled: true, ClientIDs: "c3"})
+
+	tasks, err := e.ListByClientID(context.Background(), "c1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("expected 2 tasks for c1, got %d", len(tasks))
+	}
+
+	tasks, err = e.ListByClientID(context.Background(), "c2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("expected 2 tasks for c2, got %d", len(tasks))
+	}
+
+	tasks, err = e.ListByClientID(context.Background(), "c3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("expected 2 tasks for c3, got %d", len(tasks))
+	}
+
+	tasks, err = e.ListByClientID(context.Background(), "c99")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) != 0 {
+		t.Errorf("expected 0 tasks for c99, got %d", len(tasks))
+	}
+}
+
+func TestEngine_ListEnabled(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+
+	e.CreateTask(ctx, &model.ReseedTask{Name: "idle1", Enabled: true, ClientIDs: "c1"})
+	e.CreateTask(ctx, &model.ReseedTask{Name: "running1", Enabled: true, ClientIDs: "c1"})
+	task3 := &model.ReseedTask{Name: "completed1", Enabled: true, ClientIDs: "c1"}
+	e.CreateTask(ctx, task3)
+	e.db.Model(task3).Update("status", model.ReseedTaskCompleted)
+	e.CreateTask(ctx, &model.ReseedTask{Name: "disabled1", Enabled: false, ClientIDs: "c1"})
+
+	tasks, err := e.ListEnabled(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("expected 2 enabled tasks (idle+running), got %d", len(tasks))
+	}
+}
+
+func TestEngine_BatchSaveMatches(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	matches := []*model.ReseedMatch{
+		{ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+			TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "infohash_exact",
+			Confidence: 1.0, Status: model.MatchStatusMatched},
+		{ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t3", SourceInfoHash: "ih3",
+			TargetSite: "s2", TargetTorrentID: "t4", MatchMethod: "size_title",
+			Confidence: 0.85, Status: model.MatchStatusMatched},
+	}
+	if err := e.BatchSaveMatches(context.Background(), matches); err != nil {
+		t.Fatal(err)
+	}
+
+	var count int64
+	db.Model(&model.ReseedMatch{}).Count(&count)
+	if count != 2 {
+		t.Errorf("expected 2 matches, got %d", count)
+	}
+}
+
+func TestEngine_FindPendingRetry(t *testing.T) {
+	db := setupReseedDB(t)
+	db.Exec("ALTER TABLE reseed_matches ADD COLUMN max_retries INTEGER DEFAULT 3")
+	e := NewEngine(db, zap.NewNop())
+
+	past := time.Now().Add(-1 * time.Hour)
+	db.Create(&model.ReseedMatch{
+		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "infohash_exact",
+		Confidence: 1.0, Status: model.MatchStatusFailed, FailReason: "test fail",
+		RetryCount: 0, NextRetryAt: &past,
+	})
+	db.Create(&model.ReseedMatch{
+		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t3", SourceInfoHash: "ih3",
+		TargetSite: "s2", TargetTorrentID: "t4", MatchMethod: "size_title",
+		Confidence: 0.85, Status: model.MatchStatusMatched,
+	})
+	future := time.Now().Add(24 * time.Hour)
+	db.Create(&model.ReseedMatch{
+		ClientID: "c2", SourceSite: "s1", SourceTorrentID: "t5", SourceInfoHash: "ih5",
+		TargetSite: "s3", TargetTorrentID: "t6", MatchMethod: "infohash_exact",
+		Confidence: 1.0, Status: model.MatchStatusFailed, FailReason: "not yet",
+		RetryCount: 0, NextRetryAt: &future,
+	})
+
+	matches, err := e.FindPendingRetry(context.Background(), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 pending retry, got %d", len(matches))
+	}
+	if matches[0].SourceInfoHash != "ih1" {
+		t.Errorf("expected ih1, got %s", matches[0].SourceInfoHash)
+	}
+}
+
+func TestEngine_UpdateMatchStatus(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	db.Create(&model.ReseedMatch{
+		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "infohash_exact",
+		Confidence: 1.0, Status: model.MatchStatusMatched,
+	})
+
+	if err := e.UpdateMatchStatus(context.Background(), 1, string(model.MatchStatusFailed), "inject error"); err != nil {
+		t.Fatal(err)
+	}
+
+	var m model.ReseedMatch
+	db.First(&m, 1)
+	if m.Status != model.MatchStatusFailed {
+		t.Errorf("expected failed, got %s", m.Status)
+	}
+	if m.FailReason != "inject error" {
+		t.Errorf("expected 'inject error', got %s", m.FailReason)
+	}
+}
+
+func TestEngine_CancelTask_Existing(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "cancel-exist", Enabled: true, ClientIDs: "c1"})
+	ctx := context.Background()
+	e.Start(ctx)
+
+	if _, ok := e.tasks[1]; !ok {
+		t.Fatal("expected task 1 to be registered")
+	}
+
+	e.CancelTask(1)
+
+	if _, ok := e.tasks[1]; ok {
+		t.Error("expected task 1 to be removed after cancel")
+	}
+}
+
+func TestEngine_Start_ReplaceExisting(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "replace", Enabled: true, ClientIDs: "c1"})
+	ctx := context.Background()
+	e.Start(ctx)
+
+	e.Start(ctx)
+
+	if len(e.tasks) != 1 {
+		t.Errorf("expected 1 task after double start, got %d", len(e.tasks))
+	}
+}
+
+func TestEngine_RunTask_BlockedTitle(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+	e.SetFingerprintRepo(fingerprint.NewRepository(db, zap.NewNop()))
+
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_blocked", SiteName: "site1",
+		Title: "Some.Title.禁转.2023", TotalSize: 1073741824,
+	})
+
+	task := &model.ReseedTask{Name: "blocked-test", Enabled: true, ClientIDs: "c1"}
+	e.CreateTask(context.Background(), task)
+
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "ih_blocked", SiteName: "site1",
+		TorrentID: "t1", Status: model.SeedingStatusSeeding,
+	})
+
+	result, err := e.RunTask(context.Background(), task)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.Blocked != 1 {
+		t.Errorf("expected 1 blocked, got %d", result.Blocked)
+	}
+}
+
+func TestEngine_RunTask_WithProviders(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return []*model.SeedingSearchResult{{TorrentID: "t_tgt", Size: 1073741824}}, nil
+		},
+		GetTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+			return "ih_match", nil
+		},
+		DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+			return []byte("torrent-data"), nil
+		},
+	}
+	sp := &mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: siteName, BaseURL: "https://" + siteName + ".com", Enabled: true}, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Enabled: true}, nil
+		},
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	dlClient := &mocks.DownloaderClient{
+		AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
+			return &model.AddResult{InfoHash: "new_ih"}, nil
+		},
+	}
+	cp := &mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
+			return dlClient, nil
+		},
+	}
+	e.SetSiteProvider(sp)
+	e.SetClientProvider(cp)
+
+	task := &model.ReseedTask{
+		Name: "full-run", Enabled: true, ClientIDs: "c1",
+		TargetSiteIDs: "target_site", ReseedCategory: "cross-seed",
+		InjectionIntervalS: 0,
+	}
+	e.CreateTask(context.Background(), task)
+
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_full", SiteName: "site1",
+		Title: "Normal Title", TotalSize: 1073741824,
+	})
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "ih_full", SiteName: "site1",
+		TorrentID: "t1", Status: model.SeedingStatusSeeding,
+	})
+
+	result, err := e.RunTask(context.Background(), task)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.Injected != 1 {
+		t.Errorf("expected 1 injected, got %d", result.Injected)
+	}
+}
+
+func TestEngine_RunTask_MaxInjectionsLimit(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return []*model.SeedingSearchResult{{TorrentID: "tgt1", Size: 1073741824}}, nil
+		},
+		GetTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+			return "ih_match", nil
+		},
+	}
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: siteName, BaseURL: "https://" + siteName + ".com", Enabled: true}, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Enabled: true}, nil
+		},
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	})
+
+	task := &model.ReseedTask{
+		Name: "max-inj", Enabled: true, ClientIDs: "c1",
+		TargetSiteIDs: "target_site", MaxInjectionsPerRun: 1,
+	}
+	e.CreateTask(context.Background(), task)
+
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "ih1", SiteName: "site1",
+		TorrentID: "t1", Status: model.SeedingStatusSeeding,
+	})
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "ih2", SiteName: "site1",
+		TorrentID: "t2", Status: model.SeedingStatusSeeding,
+	})
+
+	result, err := e.RunTask(context.Background(), task)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.Matched > 1 {
+		t.Errorf("expected at most 1 matched with limit, got %d", result.Matched)
+	}
+}
+
+func TestEngine_RunTask_NoRecords(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	task := &model.ReseedTask{Name: "no-recs", Enabled: true, ClientIDs: "c1"}
+	e.CreateTask(context.Background(), task)
+
+	result, err := e.RunTask(context.Background(), task)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.TotalSources != 0 {
+		t.Errorf("expected 0 sources, got %d", result.TotalSources)
+	}
+}
+
+func TestEngine_RunTask_DefaultSizeTolerance(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	task := &model.ReseedTask{
+		Name: "default-tol", Enabled: true, ClientIDs: "c1",
+		SizeTolerancePercent: 0,
+	}
+	e.CreateTask(context.Background(), task)
+
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "ih1", SiteName: "site1",
+		TorrentID: "t1", Status: model.SeedingStatusSeeding,
+	})
+
+	result, err := e.RunTask(context.Background(), task)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.TotalSources != 1 {
+		t.Errorf("expected 1 source, got %d", result.TotalSources)
+	}
+}
+
+func TestEngine_findCandidates_GetSiteInfoError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+			return nil, fmt.Errorf("site not found")
+		},
+	})
+
+	task := &model.ReseedTask{Name: "fc-err", Enabled: true}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
+	candidates := e.findCandidates(context.Background(), rec, []string{"bad_site"}, nil, 1.0, task)
+	if len(candidates) != 0 {
+		t.Errorf("expected 0 candidates when GetSiteInfo fails, got %d", len(candidates))
+	}
+}
+
+func TestEngine_findCandidates_ListSitesError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		ListSitesFn: func(ctx context.Context) ([]*model.SiteInfo, error) {
+			return nil, fmt.Errorf("db error")
+		},
+	})
+
+	task := &model.ReseedTask{Name: "fc-lserr", Enabled: true}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
+	candidates := e.findCandidates(context.Background(), rec, nil, nil, 1.0, task)
+	if candidates != nil {
+		t.Error("expected nil when ListSites fails")
+	}
+}
+
+func TestEngine_findCandidates_GetSiteConfigError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		ListSitesFn: func(ctx context.Context) ([]*model.SiteInfo, error) {
+			return []*model.SiteInfo{{Name: "tgt", BaseURL: "https://tgt.com", Enabled: true}}, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return nil, fmt.Errorf("config error")
+		},
+	})
+
+	task := &model.ReseedTask{Name: "fc-cfgerr", Enabled: true}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
+	candidates := e.findCandidates(context.Background(), rec, nil, nil, 1.0, task)
+	if len(candidates) != 0 {
+		t.Errorf("expected 0 candidates when GetSiteConfig fails, got %d", len(candidates))
+	}
+}
+
+func TestEngine_findCandidates_GetAdapterError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		ListSitesFn: func(ctx context.Context) ([]*model.SiteInfo, error) {
+			return []*model.SiteInfo{{Name: "tgt", BaseURL: "https://tgt.com", Enabled: true}}, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Enabled: true}, nil
+		},
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return nil, fmt.Errorf("adapter error")
+		},
+	})
+
+	task := &model.ReseedTask{Name: "fc-adaperr", Enabled: true}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
+	candidates := e.findCandidates(context.Background(), rec, nil, nil, 1.0, task)
+	if len(candidates) != 0 {
+		t.Errorf("expected 0 candidates when GetAdapter fails, got %d", len(candidates))
+	}
+}
+
+func TestEngine_matchLayer1InfoHash_NoTorrentID(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return []*model.SeedingSearchResult{{TorrentID: "", Size: 1000}}, nil
+		},
+	}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	c := e.matchLayer1InfoHash(context.Background(), adapter, &model.SiteConfig{}, rec, "site2")
+	if c != nil {
+		t.Error("expected nil for empty torrent ID in search results")
+	}
+}
+
+func TestEngine_matchLayer1InfoHash_GetHashError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return []*model.SeedingSearchResult{{TorrentID: "t1", Size: 1000}}, nil
+		},
+		GetTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+			return "", fmt.Errorf("hash error")
+		},
+	}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	c := e.matchLayer1InfoHash(context.Background(), adapter, &model.SiteConfig{}, rec, "site2")
+	if c != nil {
+		t.Error("expected nil when GetTorrentInfoHash fails")
+	}
+}
+
+func TestEngine_matchLayer1InfoHash_HashMismatch(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return []*model.SeedingSearchResult{{TorrentID: "t1", Size: 1000}}, nil
+		},
+		GetTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+			return "different_hash", nil
+		},
+	}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	c := e.matchLayer1InfoHash(context.Background(), adapter, &model.SiteConfig{}, rec, "site2")
+	if c != nil {
+		t.Error("expected nil when hashes don't match")
+	}
+}
+
+func TestEngine_matchLayer2SizeTitle_EmptyKeyword(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_empty_title", SiteName: "source_site",
+		Title: "", TotalSize: 1073741824,
+	})
+
+	adapter := &mocks.SiteAdapter{}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih_empty_title", SiteName: "source_site"}
+	c := e.matchLayer2SizeTitle(context.Background(), adapter, &model.SiteConfig{}, rec, "target_site", 1.0)
+	if c != nil {
+		t.Error("expected nil for empty normalized title")
+	}
+}
+
+func TestEngine_matchLayer2SizeTitle_SearchError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_search_err", SiteName: "source_site",
+		Title: "Some Movie", TotalSize: 1073741824,
+	})
+
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return nil, fmt.Errorf("search error")
+		},
+	}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih_search_err", SiteName: "source_site"}
+	c := e.matchLayer2SizeTitle(context.Background(), adapter, &model.SiteConfig{}, rec, "target_site", 1.0)
+	if c != nil {
+		t.Error("expected nil on search error")
+	}
+}
+
+func TestEngine_matchLayer2SizeTitle_BestConfidence(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_best", SiteName: "source_site",
+		Title: "Best Movie", TotalSize: 1073741824,
+	})
+
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return []*model.SeedingSearchResult{
+				{TorrentID: "t1", Size: 1073741825},
+				{TorrentID: "t2", Size: 1073741824},
+			}, nil
+		},
+	}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih_best", SiteName: "source_site"}
+	c := e.matchLayer2SizeTitle(context.Background(), adapter, &model.SiteConfig{}, rec, "target_site", 1.0)
+	if c == nil {
+		t.Fatal("expected candidate, got nil")
+	}
+	if c.Confidence != 0.85 {
+		t.Errorf("expected 0.85 (exact size), got %f", c.Confidence)
+	}
+	if c.TargetTorrentID != "t2" {
+		t.Errorf("expected t2 (exact match), got %s", c.TargetTorrentID)
+	}
+}
+
+func TestEngine_matchLayer2SizeTitle_NoTorrentID(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_notid", SiteName: "source_site",
+		Title: "Some Title", TotalSize: 1073741824,
+	})
+
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return []*model.SeedingSearchResult{{TorrentID: "", Size: 1073741824}}, nil
+		},
+	}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih_notid", SiteName: "source_site"}
+	c := e.matchLayer2SizeTitle(context.Background(), adapter, &model.SiteConfig{}, rec, "target_site", 1.0)
+	if c != nil {
+		t.Error("expected nil when no torrent ID in results")
+	}
+}
+
+func TestEngine_matchLayer3Fingerprint_SizeOnlyMatch(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_size_src", SiteName: "source_site",
+		FilesHash: "fh_match", TotalSize: 1073741824,
+	})
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_size_tgt", SiteName: "target_site",
+		FilesHash: "fh_other", TotalSize: 1073741824,
+		TorrentID: "t_size_target",
+	})
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih_size_src", SiteName: "source_site"}
+	c := e.matchLayer3Fingerprint(context.Background(), rec, "target_site")
+	if c == nil {
+		t.Fatal("expected candidate via size-only match, got nil")
+	}
+	if c.Confidence != 0.7 {
+		t.Errorf("expected 0.7, got %f", c.Confidence)
+	}
+}
+
+func TestEngine_matchLayer3Fingerprint_NoTorrentID(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_notid_src", SiteName: "source_site",
+		PiecesHash: "ph_no_tid", TotalSize: 1073741824,
+	})
+	db.Create(&model.ContentFingerprint{
+		InfoHash: "ih_notid_tgt", SiteName: "target_site",
+		PiecesHash: "ph_no_tid", TotalSize: 1073741824,
+		TorrentID: "",
+	})
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih_notid_src", SiteName: "source_site"}
+	c := e.matchLayer3Fingerprint(context.Background(), rec, "target_site")
+	if c != nil {
+		t.Error("expected nil when no torrent ID on target")
+	}
+}
+
+func TestEngine_injectMatch_DownloadError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &mocks.SiteAdapter{
+		DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+			return nil, fmt.Errorf("download failed")
+		},
+	}
+	sp := &mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: "tgt", BaseURL: "https://tgt.com"}, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Enabled: true}, nil
+		},
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	e.SetSiteProvider(sp)
+	e.SetClientProvider(&mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
+			return &mocks.DownloaderClient{}, nil
+		},
+	})
+
+	match := &model.ReseedMatch{
+		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		TargetSite: "tgt", TargetTorrentID: "t2", MatchMethod: "infohash_exact",
+		Confidence: 1.0, Status: model.MatchStatusMatched,
+	}
+	db.Create(match)
+	task := &model.ReseedTask{Name: "inj-dlerr", Enabled: true}
+	e.CreateTask(context.Background(), task)
+
+	err := e.injectMatch(context.Background(), match, task)
+	if err == nil {
+		t.Error("expected error when download fails")
+	}
+}
+
+func TestEngine_injectMatch_EmptyTorrentData(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &mocks.SiteAdapter{
+		DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+			return []byte{}, nil
+		},
+	}
+	sp := &mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: "tgt", BaseURL: "https://tgt.com"}, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Enabled: true}, nil
+		},
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	e.SetSiteProvider(sp)
+	e.SetClientProvider(&mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
+			return &mocks.DownloaderClient{}, nil
+		},
+	})
+
+	match := &model.ReseedMatch{
+		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		TargetSite: "tgt", TargetTorrentID: "t2", MatchMethod: "infohash_exact",
+		Confidence: 1.0, Status: model.MatchStatusMatched,
+	}
+	db.Create(match)
+	task := &model.ReseedTask{Name: "inj-empty", Enabled: true}
+	e.CreateTask(context.Background(), task)
+
+	err := e.injectMatch(context.Background(), match, task)
+	if err == nil {
+		t.Error("expected error when torrent data is empty")
+	}
+}
+
+func TestEngine_injectMatch_AddFromFileError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &mocks.SiteAdapter{
+		DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+			return []byte("data"), nil
+		},
+	}
+	sp := &mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: "tgt", BaseURL: "https://tgt.com"}, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Enabled: true}, nil
+		},
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	dlClient := &mocks.DownloaderClient{
+		AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
+			return nil, fmt.Errorf("add failed: connection refused")
+		},
+	}
+	e.SetSiteProvider(sp)
+	e.SetClientProvider(&mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
+			return dlClient, nil
+		},
+	})
+
+	match := &model.ReseedMatch{
+		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		TargetSite: "tgt", TargetTorrentID: "t2", MatchMethod: "infohash_exact",
+		Confidence: 1.0, Status: model.MatchStatusMatched,
+	}
+	db.Create(match)
+	task := &model.ReseedTask{Name: "inj-adderr", Enabled: true}
+	e.CreateTask(context.Background(), task)
+
+	err := e.injectMatch(context.Background(), match, task)
+	if err == nil {
+		t.Error("expected error when AddFromFile fails")
+	}
+	var updated model.ReseedMatch
+	db.First(&updated, match.ID)
+	if updated.Status != model.MatchStatusFailed {
+		t.Errorf("expected failed, got %s", updated.Status)
+	}
+}
+
+func TestEngine_injectMatch_GetClientError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &mocks.SiteAdapter{
+		DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+			return []byte("data"), nil
+		},
+	}
+	sp := &mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: "tgt", BaseURL: "https://tgt.com"}, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Enabled: true}, nil
+		},
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	}
+	e.SetSiteProvider(sp)
+	e.SetClientProvider(&mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
+			return nil, fmt.Errorf("client not found")
+		},
+	})
+
+	match := &model.ReseedMatch{
+		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		TargetSite: "tgt", TargetTorrentID: "t2", MatchMethod: "infohash_exact",
+		Confidence: 1.0, Status: model.MatchStatusMatched,
+	}
+	db.Create(match)
+	task := &model.ReseedTask{Name: "inj-clerr", Enabled: true}
+	e.CreateTask(context.Background(), task)
+
+	err := e.injectMatch(context.Background(), match, task)
+	if err == nil {
+		t.Error("expected error when GetClient fails")
+	}
+}
+
+func TestEngine_queryIYUU_TargetSiteFilter(t *testing.T) {
+	db := setupReseedDBWithIYUU(t)
+	e := NewEngine(db, zap.NewNop())
+
+	db.Create(&model.IYUUSiteMapping{
+		IYUUSid: 10, SiteDomain: "https://a.com", SiteName: "site_a",
+	})
+	db.Create(&model.IYUUSiteMapping{
+		IYUUSid: 11, SiteDomain: "https://b.com", SiteName: "site_b",
+	})
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: siteName}, nil
+		},
+	})
+	e.SetIYUUService(&mockIYUUService{
+		queryReseedFn: func(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error) {
+			return []*model.IYUUReseedResult{
+				{
+					SourceInfoHash: "ih1",
+					Targets: []model.IYUUTarget{
+						{Sid: 10, TorrentID: 100, InfoHash: "ih_a"},
+						{Sid: 11, TorrentID: 200, InfoHash: "ih_b"},
+					},
+				},
+			}, nil
+		},
+	})
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "src"}
+	candidates := e.queryIYUU(context.Background(), rec, []string{"site_a"}, nil)
+	if len(candidates) != 1 {
+		t.Fatalf("expected 1 candidate (target filter), got %d", len(candidates))
+	}
+	if candidates[0].TargetSite != "site_a" {
+		t.Errorf("expected site_a, got %s", candidates[0].TargetSite)
+	}
+}
+
+func TestEngine_queryIYUU_WrongSourceHash(t *testing.T) {
+	db := setupReseedDBWithIYUU(t)
+	e := NewEngine(db, zap.NewNop())
+	e.SetIYUUService(&mockIYUUService{
+		queryReseedFn: func(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error) {
+			return []*model.IYUUReseedResult{
+				{
+					SourceInfoHash: "other_hash",
+					Targets: []model.IYUUTarget{
+						{Sid: 1, TorrentID: 100, InfoHash: "ih_tgt"},
+					},
+				},
+			}, nil
+		},
+	})
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "src"}
+	candidates := e.queryIYUU(context.Background(), rec, nil, nil)
+	if len(candidates) != 0 {
+		t.Errorf("expected 0 for mismatched source hash, got %d", len(candidates))
+	}
+}
+
+func TestNormalizeTitle_SpecialCases(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"【字幕组】影片名 1080p", "影片名"},
+		{"Title（备注）Something", "titlesomething"},
+		{"Movie 2160p BluRay Extra", "movie"},
+		{"Movie x264 Extra", "movie"},
+		{"Movie hevc Extra", "movie"},
+		{"Movie web-dl Extra", "movie"},
+		{"Movie remux Extra", "movie"},
+		{"Movie bdrip Extra", "movie"},
+		{"Movie hdrip Extra", "movie"},
+		{"Movie webrip Extra", "movie"},
+		{"Movie h264 Extra", "movie"},
+		{"Movie h265 Extra", "movie"},
+		{"Movie bluray Extra", "movie"},
+		{"AB x264", "ab x264"},
+		{"  \t  ", ""},
+	}
+
+	for _, tt := range tests {
+		got := NormalizeTitle(tt.input)
+		if got != tt.expect {
+			t.Errorf("NormalizeTitle(%q) = %q, want %q", tt.input, got, tt.expect)
+		}
 	}
 }

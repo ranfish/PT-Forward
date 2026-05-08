@@ -22,9 +22,9 @@ log:
 
 security:
   rate_limit_enabled: true
-  rate_limit_global: 100
-  rate_limit_write: 30
-  rate_limit_download: 10
+  rate_limit_global: 600
+  rate_limit_write: 200
+  rate_limit_download: 50
   login_max_retries: 5
   login_lockout_min: 5
 

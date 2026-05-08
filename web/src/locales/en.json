@@ -32,6 +32,7 @@
     "saveConfig": "Save Config",
     "deleteConfirm": "Confirm delete?",
     "total": "{n} total",
+    "totalCount": "{count} total",
     "reset": "Reset",
     "saveSuccess": "Saved successfully",
     "deleteSuccess": "Deleted successfully",
@@ -55,22 +56,44 @@
     "password": "Password",
     "url": "URL",
     "running": "Running",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "addSuccess": "Added successfully",
+    "deleteFailed": "Delete failed",
+    "failed": "Operation failed",
+    "jsonFormatError": "Invalid JSON format",
+    "nameRequired": "Name is required",
+    "off": "Off",
+    "on": "On",
+    "saveFailed": "Save failed",
+    "selectType": "Select type",
+    "siteRequired": "Site is required",
+    "statusToggled": "Status toggled",
+    "statusUpdated": "Status updated"
   },
   "auth": {
     "login": "Login",
+    "loginTitle": "PT Automation Platform",
+    "initialSetup": "First time setup — create admin account",
     "username": "Username",
     "password": "Password",
     "oldPassword": "Old Password",
     "newPassword": "New Password",
     "confirmPassword": "Confirm Password",
+    "usernameRequired": "Username is required",
+    "passwordRequired": "Password is required",
+    "createAdmin": "Create Admin",
+    "setupSuccess": "Admin created, logging in...",
+    "setupFailed": "Failed to create admin",
     "changePassword": "Change Password",
     "logout": "Logout",
     "loginSuccess": "Login successful",
     "wrongCredentials": "Invalid username or password",
     "passwordChanged": "Password changed successfully",
     "passwordMismatch": "Passwords do not match",
-    "passwordMinLength": "Password must be at least 8 characters"
+    "passwordMinLength": "Password must be at least 8 characters",
+    "confirmPasswordRequired": "Confirm password is required",
+    "newPasswordRequired": "New password is required",
+    "oldPasswordRequired": "Old password is required"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -148,7 +171,27 @@
     "mainstreamFrameworks": "Mainstream",
     "specialFrameworks": "Custom/Special",
     "otherFrameworks": "Other",
-    "deleteSiteConfirm": "Delete this site?"
+    "deleteSiteConfirm": "Delete this site?",
+    "detect": "Detect Framework",
+    "detectResult": "Detection Result",
+    "detectFramework": "Detected Framework",
+    "detectConfidence": "Confidence",
+    "detectDetail": "Detail",
+    "siteStats": "Site Stats",
+    "uploadBytes": "Upload",
+    "downloadBytes": "Download",
+    "seedingPoints": "Seeding Points",
+    "seedingSize": "Seeding Size",
+    "seedingCount": "Seeding Count",
+    "userClass": "User Class",
+    "ratio": "Ratio",
+    "bonusPoints": "Bonus Points",
+    "statsSyncedAt": "Stats Synced At",
+    "connectionTestSuccess": "Connection test successful",
+    "deleteAllOverrideConfirm": "Delete all override configs?",
+    "domainRequired": "Domain is required",
+    "overrideConfigHint": "Override config takes precedence over global defaults",
+    "siteUrlRequired": "Site URL is required"
   },
   "downloader": {
     "title": "Downloader Management",
@@ -174,7 +217,8 @@
     "freeSpace": "Free Space",
     "categoryCount": "Categories",
     "tagCount": "Tags",
-    "searchTorrent": "Search torrent name"
+    "searchTorrent": "Search torrent name",
+    "deletePublishTargetConfirm": "Delete this publish target?"
   },
   "subscription": {
     "title": "RSS Subscriptions",
@@ -198,7 +242,13 @@
     "time": "Time",
     "deleteSubscriptionConfirm": "Delete this subscription?",
     "statusToggled": "Status toggled",
-    "fetchTriggered": "Fetch triggered"
+    "fetchTriggered": "Fetch triggered",
+    "dryrunComplete": "Dry run completed, {count} records",
+    "dryrunInDevelopment": "Dry run feature is in development",
+    "rules": "Rules",
+    "rulesJson": "Rules (JSON)",
+    "rulesSaved": "Rules saved",
+    "urlRequired": "RSS URL is required"
   },
   "seeding": {
     "title": "Seeding Management",
@@ -238,6 +288,7 @@
     "seedingCount": "Seeding Count",
     "torrentRanking": "Torrent Ranking",
     "filterSite": "Filter by site",
+    "filterClient": "Filter by downloader",
     "filterStatus": "Filter by status",
     "seedingStatus": "Seeding",
     "pausedFreeEnd": "Paused (Free End)",
@@ -249,7 +300,40 @@
     "normalRule": "Normal",
     "deleteTorrent": "Delete Torrent",
     "pauseTorrent": "Pause Torrent",
-    "limitSpeed": "Limit Speed"
+    "limitSpeed": "Limit Speed",
+    "celExpressionOptional": "CEL expression (optional)",
+    "conditionsJson": "Conditions (JSON)",
+    "diskProtect": "Disk Protection",
+    "minDiskSpaceGB": "Min Disk Space (GB)",
+    "pleaseInputDownloaderId": "Please enter downloader ID",
+    "pleaseInputRuleAlias": "Please enter rule alias",
+    "selectAction": "Select action",
+    "scoring": {
+      "title": "Scoring Management",
+      "config": "Scoring Config",
+      "enabled": "Enable Scoring",
+      "halfLifeHours": "Half-Life (hours)",
+      "minScore": "Min Score Threshold",
+      "maxCandidates": "Max Candidates",
+      "maxActiveSeeding": "Max Active Seeding",
+      "topNConfirm": "Top N Confirm",
+      "include2xUp": "Include 2x Upload",
+      "dryrun": "Scoring Dry Run",
+      "seeders": "Seeders",
+      "leechers": "Leechers",
+      "ageHours": "Torrent Age (hours)",
+      "sizeGB": "Torrent Size (GB)",
+      "discount": "Discount Type",
+      "siteWeight": "Site Weight",
+      "runDryrun": "Run Dry Run",
+      "score": "Base Score",
+      "effectiveScore": "Effective Score",
+      "demandScore": "Demand Score",
+      "recencyFactor": "Recency Factor",
+      "shouldCleanup": "Should Cleanup",
+      "logs": "Scoring Logs"
+    },
+    "matchedResult": "Matched {matched}/{total}"
   },
   "reseed": {
     "title": "Reseed Management",
@@ -276,7 +360,18 @@
     "taskCancelled": "Task cancelled",
     "deleteTaskConfirm": "Delete this task?",
     "deleteNegativeCacheConfirm": "Delete this negative cache?",
-    "deleteNegativeCacheDesc": "Delete negative cache by InfoHash above"
+    "deleteNegativeCacheDesc": "Delete negative cache by InfoHash above",
+    "client": "Client",
+    "clientId": "Client ID",
+    "clientIdPlaceholder": "Enter client ID",
+    "pleaseEnterClientId": "Please enter client ID",
+    "pleaseEnterSourceSite": "Please select source site",
+    "pleaseEnterTargetSite": "Please select target site",
+    "pleaseEnterTaskName": "Please enter task name",
+    "siteOptional": "Site (optional)",
+    "sourceSiteIdsPlaceholder": "Enter source site IDs",
+    "targetSiteIdsPlaceholder": "Enter target site IDs",
+    "taskNamePlaceholder": "Enter task name"
   },
   "publish": {
     "title": "Publish Management",
@@ -298,7 +393,15 @@
     "targetSite": "Target Site",
     "exclusionHint": "Torrents from the source site will not be published to the target site",
     "deleteExclusionConfirm": "Delete this exclusion rule?",
-    "deleteConfirm": "Confirm delete?"
+    "deleteConfirm": "Confirm delete?",
+    "tasks": "Publish Tasks",
+    "results": "Publish Results",
+    "viewResults": "View Results",
+    "fillTargetAndSource": "Please fill in target and source sites",
+    "pleaseEnterSourceSite": "Please select source site",
+    "pleaseEnterTargetSite": "Please select target site",
+    "sourceSitePlaceholder": "Enter source site",
+    "targetSitePlaceholder": "Enter target site"
   },
   "event": {
     "title": "Torrent Events",
@@ -306,6 +409,7 @@
     "cleanupOldEvents": "Cleanup Old Events",
     "cleanupConfirm": "Cleanup events older than 30 days?",
     "cleaned": "Cleaned {n} old events",
+    "cleanupCompleted": "Cleaned {count} events",
     "torrentId": "Torrent ID",
     "sourceId": "Source ID"
   },
@@ -325,11 +429,13 @@
     "unfreeze": "Unfreeze",
     "unfreezeConfirm": "Unfreeze this domain?",
     "unfrozen": "{domain} unfrozen",
+    "domainUnfrozen": "{domain} unfrozen",
     "closed": "Closed",
     "open": "Open",
     "halfOpen": "Half-Open",
     "reset": "Reset",
     "resetConfirm": "Reset this circuit breaker?",
+    "resetCircuitConfirm": "Reset this circuit breaker?",
     "circuitReset": "{domain} circuit breaker reset",
     "failures": "Failures",
     "lastFailure": "Last Failure"
@@ -342,7 +448,8 @@
     "viewAfterSave": "Save config to view site list",
     "sid": "SID",
     "siteName": "Site Name",
-    "siteDomain": "Domain"
+    "siteDomain": "Domain",
+    "tokenRequired": "API Token is required"
   },
   "lifecycle": {
     "title": "Lifecycle Config",
@@ -391,7 +498,8 @@
     "pleaseInput": "Please enter query",
     "queryKey": "Query Key",
     "chineseTitleCache": "Chinese Title",
-    "source": "Source"
+    "source": "Source",
+    "queryRequired": "Query is required"
   },
   "scheduler": {
     "title": "Scheduled Tasks",
@@ -411,7 +519,12 @@
     "pauseFailed": "Pause failed",
     "resumeFailed": "Resume failed",
     "taskListFailed": "Failed to get task list",
-    "cronPlaceholder": "e.g. */5 * * * * (5/6 digit cron)"
+    "cronPlaceholder": "e.g. */5 * * * * (5/6 digit cron)",
+    "fetchTaskListFailed": "Failed to fetch task list",
+    "rescheduleFailed": "Failed to reschedule",
+    "taskTriggered": "Task {name} triggered",
+    "taskPaused": "Task {name} paused",
+    "taskResumed": "Task {name} resumed"
   },
   "tracker": {
     "title": "Tracker Members",
@@ -470,7 +583,11 @@
       "channelConfigPlaceholder": "Channel config in JSON format",
       "deleteConfirm": "Delete this channel?",
       "testSent": "Test notification sent",
-      "statusToggled": "Status toggled"
+      "statusToggled": "Status toggled",
+      "history": "History",
+      "historyTitle": "{name} Notification History",
+      "channelNameRequired": "Channel name is required",
+      "channelTypeRequired": "Channel type is required"
     },
     "filterRules": {
       "title": "Filter Rules",
@@ -486,7 +603,11 @@
       "category": "Category",
       "tags": "Tags",
       "priority": "Priority",
-      "deleteConfirm": "Delete this rule?"
+      "deleteConfirm": "Delete this rule?",
+      "testMatched": "Rule \"{name}\" matched",
+      "testNotMatched": "Rule \"{name}\" did not match",
+      "ruleNameRequired": "Rule name is required",
+      "selectRuleType": "Select rule type"
     }
   },
   "cookiecloud": {
@@ -509,6 +630,8 @@
     "testFailed": "Connection test failed",
     "completed": "Success",
     "failed": "Failed",
-    "running": "Running"
+    "running": "Running",
+    "connectionTestFailed": "Connection test failed",
+    "connectionTestSuccess": "Connection test successful"
   }
 }

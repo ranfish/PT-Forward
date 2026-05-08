@@ -35,6 +35,16 @@ func SPAHandler() http.Handler {
 		}
 
 		if strings.HasPrefix(path, "/assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		if path == "/" || path == "/index.html" {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+			r.URL.Path = "/"
 			fileServer.ServeHTTP(w, r)
 			return
 		}
@@ -42,10 +52,14 @@ func SPAHandler() http.Handler {
 		f, err := sub.Open(strings.TrimPrefix(path, "/"))
 		if err == nil {
 			_ = f.Close()
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			fileServer.ServeHTTP(w, r)
 			return
 		}
 
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
 		r.URL.Path = "/"
 		fileServer.ServeHTTP(w, r)
 	})

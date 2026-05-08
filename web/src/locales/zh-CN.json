@@ -32,6 +32,7 @@
     "saveConfig": "保存配置",
     "deleteConfirm": "确定删除？",
     "total": "共 {n} 条",
+    "totalCount": "共 {count} 条",
     "reset": "重置",
     "saveSuccess": "保存成功",
     "deleteSuccess": "删除成功",
@@ -55,22 +56,44 @@
     "password": "密码",
     "url": "地址",
     "running": "运行中",
-    "unknown": "未知"
+    "unknown": "未知",
+    "addSuccess": "添加成功",
+    "deleteFailed": "删除失败",
+    "failed": "操作失败",
+    "jsonFormatError": "JSON 格式错误",
+    "nameRequired": "请输入名称",
+    "off": "关",
+    "on": "开",
+    "saveFailed": "保存失败",
+    "selectType": "请选择类型",
+    "siteRequired": "请选择站点",
+    "statusToggled": "状态已切换",
+    "statusUpdated": "状态已更新"
   },
   "auth": {
     "login": "登录",
+    "loginTitle": "PT 自动化转发平台",
+    "initialSetup": "首次使用，请创建管理员账号",
     "username": "用户名",
     "password": "密码",
     "oldPassword": "旧密码",
     "newPassword": "新密码",
     "confirmPassword": "确认密码",
+    "usernameRequired": "请输入用户名",
+    "passwordRequired": "请输入密码",
+    "createAdmin": "创建管理员",
+    "setupSuccess": "管理员创建成功，正在登录...",
+    "setupFailed": "创建管理员失败",
     "changePassword": "修改密码",
     "logout": "退出登录",
     "loginSuccess": "登录成功",
     "wrongCredentials": "用户名或密码错误",
     "passwordChanged": "密码修改成功",
     "passwordMismatch": "两次输入的密码不一致",
-    "passwordMinLength": "密码至少 8 个字符"
+    "passwordMinLength": "密码至少 8 个字符",
+    "confirmPasswordRequired": "请输入确认密码",
+    "newPasswordRequired": "请输入新密码",
+    "oldPasswordRequired": "请输入旧密码"
   },
   "nav": {
     "dashboard": "仪表盘",
@@ -148,7 +171,27 @@
     "mainstreamFrameworks": "主流框架",
     "specialFrameworks": "自研/特殊",
     "otherFrameworks": "其他",
-    "deleteSiteConfirm": "确定删除该站点？"
+    "deleteSiteConfirm": "确定删除该站点？",
+    "detect": "检测框架",
+    "detectResult": "检测结果",
+    "detectFramework": "检测到框架",
+    "detectConfidence": "置信度",
+    "detectDetail": "详情",
+    "siteStats": "站点统计",
+    "uploadBytes": "上传量",
+    "downloadBytes": "下载量",
+    "seedingPoints": "做种积分",
+    "seedingSize": "做种体积",
+    "seedingCount": "做种数",
+    "userClass": "用户等级",
+    "ratio": "分享率",
+    "bonusPoints": "魔力值",
+    "statsSyncedAt": "统计同步时间",
+    "connectionTestSuccess": "连接测试成功",
+    "deleteAllOverrideConfirm": "确定删除所有覆盖配置？",
+    "domainRequired": "请输入域名",
+    "overrideConfigHint": "覆盖配置优先于全局默认值",
+    "siteUrlRequired": "请输入站点 URL"
   },
   "downloader": {
     "title": "下载器管理",
@@ -174,7 +217,8 @@
     "freeSpace": "可用空间",
     "categoryCount": "分类数",
     "tagCount": "标签数",
-    "searchTorrent": "搜索种子名称"
+    "searchTorrent": "搜索种子名称",
+    "deletePublishTargetConfirm": "确定删除该发布目标？"
   },
   "subscription": {
     "title": "RSS 订阅",
@@ -198,7 +242,13 @@
     "time": "时间",
     "deleteSubscriptionConfirm": "确定删除该订阅？",
     "statusToggled": "状态已切换",
-    "fetchTriggered": "已触发抓取"
+    "fetchTriggered": "已触发抓取",
+    "dryrunComplete": "试运行完成，共 {count} 条记录",
+    "dryrunInDevelopment": "试运行功能开发中",
+    "rules": "规则",
+    "rulesJson": "规则 (JSON)",
+    "rulesSaved": "规则已保存",
+    "urlRequired": "请输入 RSS 地址"
   },
   "seeding": {
     "title": "刷流管理",
@@ -238,6 +288,7 @@
     "seedingCount": "做种数",
     "torrentRanking": "种子排行",
     "filterSite": "筛选站点",
+    "filterClient": "筛选下载器",
     "filterStatus": "筛选状态",
     "seedingStatus": "做种中",
     "pausedFreeEnd": "免费到期暂停",
@@ -249,7 +300,40 @@
     "normalRule": "普通",
     "deleteTorrent": "删除种子",
     "pauseTorrent": "暂停种子",
-    "limitSpeed": "限速"
+    "limitSpeed": "限速",
+    "celExpressionOptional": "CEL 表达式（可选）",
+    "conditionsJson": "条件 (JSON)",
+    "diskProtect": "磁盘保护",
+    "minDiskSpaceGB": "最小磁盘空间 (GB)",
+    "pleaseInputDownloaderId": "请输入下载器 ID",
+    "pleaseInputRuleAlias": "请输入规则别名",
+    "selectAction": "请选择动作",
+    "scoring": {
+      "title": "评分管理",
+      "config": "评分配置",
+      "enabled": "启用评分",
+      "halfLifeHours": "半衰期（小时）",
+      "minScore": "最低评分阈值",
+      "maxCandidates": "最大候选数",
+      "maxActiveSeeding": "最大活跃做种数",
+      "topNConfirm": "Top N 确认数",
+      "include2xUp": "包含双倍上传",
+      "dryrun": "评分试运行",
+      "seeders": "做种数",
+      "leechers": "下载数",
+      "ageHours": "种子年龄（小时）",
+      "sizeGB": "种子大小（GB）",
+      "discount": "优惠类型",
+      "siteWeight": "站点权重",
+      "runDryrun": "执行试运行",
+      "score": "基础评分",
+      "effectiveScore": "有效评分",
+      "demandScore": "需求评分",
+      "recencyFactor": "时效因子",
+      "shouldCleanup": "建议清理",
+      "logs": "评分日志"
+    },
+    "matchedResult": "匹配 {matched}/{total} 条"
   },
   "reseed": {
     "title": "辅种管理",
@@ -276,7 +360,18 @@
     "taskCancelled": "任务已取消",
     "deleteTaskConfirm": "确定删除该任务？",
     "deleteNegativeCacheConfirm": "确定删除该否定缓存？",
-    "deleteNegativeCacheDesc": "否定缓存通过上方表单按 InfoHash 删除"
+    "deleteNegativeCacheDesc": "否定缓存通过上方表单按 InfoHash 删除",
+    "client": "客户端",
+    "clientId": "客户端 ID",
+    "clientIdPlaceholder": "请输入客户端 ID",
+    "pleaseEnterClientId": "请输入客户端 ID",
+    "pleaseEnterSourceSite": "请选择源站点",
+    "pleaseEnterTargetSite": "请选择目标站点",
+    "pleaseEnterTaskName": "请输入任务名称",
+    "siteOptional": "站点（可选）",
+    "sourceSiteIdsPlaceholder": "请输入源站点 ID",
+    "targetSiteIdsPlaceholder": "请输入目标站点 ID",
+    "taskNamePlaceholder": "请输入任务名称"
   },
   "publish": {
     "title": "发布管理",
@@ -296,10 +391,17 @@
     "exclusionSubtitle": "阻止特定源站→目标站的发布",
     "addExclusionRule": "添加排除规则",
     "targetSite": "目标站点",
-    "sourceSite": "源站点",
     "exclusionHint": "添加后，从源站点抓取的种子将不会发布到目标站点",
     "deleteExclusionConfirm": "确定删除该排除规则？",
-    "deleteConfirm": "确定删除？"
+    "deleteConfirm": "确定删除？",
+    "tasks": "发布任务",
+    "results": "发布结果",
+    "viewResults": "查看结果",
+    "fillTargetAndSource": "请填写目标站点和源站点",
+    "pleaseEnterSourceSite": "请选择源站点",
+    "pleaseEnterTargetSite": "请选择目标站点",
+    "sourceSitePlaceholder": "请输入源站点",
+    "targetSitePlaceholder": "请输入目标站点"
   },
   "event": {
     "title": "种子事件",
@@ -307,6 +409,7 @@
     "cleanupOldEvents": "清理旧事件",
     "cleanupConfirm": "确定清理30天前的事件？",
     "cleaned": "已清理 {n} 条旧事件",
+    "cleanupCompleted": "已清理 {count} 条事件",
     "torrentId": "种子ID",
     "sourceId": "源ID"
   },
@@ -326,11 +429,13 @@
     "unfreeze": "解冻",
     "unfreezeConfirm": "确定解冻该域名？",
     "unfrozen": "{domain} 已解冻",
+    "domainUnfrozen": "{domain} 已解冻",
     "closed": "关闭",
     "open": "断开",
     "halfOpen": "半开",
     "reset": "重置",
     "resetConfirm": "确定重置该熔断器？",
+    "resetCircuitConfirm": "确定重置该熔断器？",
     "circuitReset": "{domain} 熔断器已重置",
     "failures": "失败次数",
     "lastFailure": "最后失败"
@@ -343,7 +448,8 @@
     "viewAfterSave": "保存配置后查看站点列表",
     "sid": "SID",
     "siteName": "站点名",
-    "siteDomain": "域名"
+    "siteDomain": "域名",
+    "tokenRequired": "请输入 API Token"
   },
   "lifecycle": {
     "title": "生命周期配置",
@@ -392,7 +498,8 @@
     "pleaseInput": "请输入查询内容",
     "queryKey": "查询关键词",
     "chineseTitleCache": "中文标题",
-    "source": "来源"
+    "source": "来源",
+    "queryRequired": "请输入查询内容"
   },
   "scheduler": {
     "title": "定时任务",
@@ -412,7 +519,12 @@
     "pauseFailed": "暂停失败",
     "resumeFailed": "恢复失败",
     "taskListFailed": "获取任务列表失败",
-    "cronPlaceholder": "例: */5 * * * *（支持 5/6 位 cron）"
+    "cronPlaceholder": "例: */5 * * * *（支持 5/6 位 cron）",
+    "fetchTaskListFailed": "获取任务列表失败",
+    "rescheduleFailed": "修改调度周期失败",
+    "taskTriggered": "任务 {name} 已触发",
+    "taskPaused": "任务 {name} 已暂停",
+    "taskResumed": "任务 {name} 已恢复"
   },
   "tracker": {
     "title": "Tracker 成员",
@@ -471,7 +583,11 @@
       "channelConfigPlaceholder": "JSON 格式的渠道配置",
       "deleteConfirm": "确定删除该渠道？",
       "testSent": "测试通知已发送",
-      "statusToggled": "状态已切换"
+      "statusToggled": "状态已切换",
+      "history": "历史",
+      "historyTitle": "{name} 通知历史",
+      "channelNameRequired": "请输入渠道名称",
+      "channelTypeRequired": "请选择通知类型"
     },
     "filterRules": {
       "title": "过滤规则",
@@ -487,7 +603,11 @@
       "category": "分类",
       "tags": "标签",
       "priority": "优先级",
-      "deleteConfirm": "确定删除该规则？"
+      "deleteConfirm": "确定删除该规则？",
+      "testMatched": "规则「{name}」匹配成功",
+      "testNotMatched": "规则「{name}」不匹配",
+      "ruleNameRequired": "请输入规则名称",
+      "selectRuleType": "请选择规则类型"
     }
   },
   "cookiecloud": {
@@ -510,6 +630,8 @@
     "testFailed": "连接测试失败",
     "completed": "成功",
     "failed": "失败",
-    "running": "运行中"
+    "running": "运行中",
+    "connectionTestFailed": "连接测试失败",
+    "connectionTestSuccess": "连接测试成功"
   }
 }

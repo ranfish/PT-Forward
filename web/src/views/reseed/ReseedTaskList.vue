@@ -16,7 +16,7 @@
         pageSize: pagination.pageSize.value,
         total: pagination.total.value,
         showSizeChanger: true,
-        showTotal: (total: number) => `共 ${total} 条`,
+        showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
       @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
@@ -57,6 +57,24 @@
         <a-form-item :label="t('reseed.targetSiteIds')" name="targetSiteIds" :rules="[{ required: true, message: t('reseed.pleaseEnterTargetSite') }]">
           <a-input v-model:value="form.targetSiteIds" :placeholder="t('reseed.targetSiteIdsPlaceholder')" />
         </a-form-item>
+        <a-form-item label="Enabled" name="enabled">
+          <a-switch v-model:checked="form.enabled" />
+        </a-form-item>
+        <a-form-item label="Size Tolerance %" name="sizeTolerancePercent">
+          <a-input-number v-model:value="form.sizeTolerancePercent" :min="0" :max="100" :step="0.1" style="width: 100%" placeholder="1.0" />
+        </a-form-item>
+        <a-form-item label="Confidence Threshold" name="confidenceThreshold">
+          <a-input-number v-model:value="form.confidenceThreshold" :min="0" :max="1" :step="0.05" style="width: 100%" placeholder="0.7" />
+        </a-form-item>
+        <a-form-item label="Schedule" name="schedule">
+          <a-input v-model:value="form.schedule" placeholder="0 */6 * * *" />
+        </a-form-item>
+        <a-form-item label="Max Injections Per Run" name="maxInjectionsPerRun">
+          <a-input-number v-model:value="form.maxInjectionsPerRun" :min="1" :max="1000" style="width: 100%" placeholder="100" />
+        </a-form-item>
+        <a-form-item label="Reseed Category" name="reseedCategory">
+          <a-input v-model:value="form.reseedCategory" placeholder="cross-seed" />
+        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -76,9 +94,15 @@ const submitting = ref(false)
 
 const form = reactive({
   name: '',
+  enabled: false,
   clientIds: '',
   sourceSiteIds: '',
   targetSiteIds: '',
+  sizeTolerancePercent: 1.0,
+  confidenceThreshold: 0.7,
+  schedule: '0 */6 * * *',
+  maxInjectionsPerRun: 100,
+  reseedCategory: 'cross-seed',
 })
 
 const columns = [
@@ -98,7 +122,7 @@ function statusColor(status: string) {
 }
 
 function openModal() {
-  Object.assign(form, { name: '', clientIds: '', sourceSiteIds: '', targetSiteIds: '' })
+  Object.assign(form, { name: '', enabled: false, clientIds: '', sourceSiteIds: '', targetSiteIds: '', sizeTolerancePercent: 1.0, confidenceThreshold: 0.7, schedule: '0 */6 * * *', maxInjectionsPerRun: 100, reseedCategory: 'cross-seed' })
   modalVisible.value = true
 }
 
