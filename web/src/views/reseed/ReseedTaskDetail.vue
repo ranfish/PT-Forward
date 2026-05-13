@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a-page-header :title="`辅种任务 #${taskId}`" @back="$router.push('/reseed')">
+    <a-page-header :title="t('reseed.taskDetail', { id: taskId })" @back="$router.push('/reseed')">
       <template #tags>
         <a-tag :color="statusColor(task.status)">{{ task.status }}</a-tag>
       </template>
@@ -16,7 +16,7 @@
         <a-descriptions-item :label="t('common.createdAt')">{{ task.created_at || '-' }}</a-descriptions-item>
       </a-descriptions>
 
-      <a-tabs v-model:activeKey="activeTab">
+      <a-tabs v-model:active-key="activeTab">
         <a-tab-pane key="matches" :tab="t('reseed.matchResults')">
           <a-table
             :columns="matchColumns"
@@ -36,8 +36,8 @@
                 <a-button
                   type="link"
                   size="small"
-                  @click="retryMatch(record.id)"
                   :disabled="record.status !== 'failed'"
+                  @click="retryMatch(record.id)"
                 >
                   {{ t('reseed.retry') }}
                 </a-button>
@@ -71,24 +71,44 @@ const route = useRoute()
 const taskId = Number(route.params.id)
 const { t } = useI18n()
 
+interface ReseedTaskInfo {
+  name: string
+  status: string
+  source_site_ids: string
+  target_site_ids: string
+  client_ids: string
+  created_at: string
+}
+
+interface ReseedMatchItem {
+  id: number
+  source_info_hash: string
+  target_site: string
+  target_info_hash: string
+  match_method: string
+  confidence: number
+  status: string
+  fail_reason: string
+}
+
 const loading = ref(false)
 const matchesLoading = ref(false)
-const task = ref<any>({})
-const matches = ref<any[]>([])
+const task = ref<ReseedTaskInfo>({} as ReseedTaskInfo)
+const matches = ref<ReseedMatchItem[]>([])
 const activeTab = ref('matches')
 
 const negDeleteInfoHash = ref('')
 const negDeleteSite = ref('')
 
 const matchColumns = [
-  { title: '源 InfoHash', dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true },
-  { title: '目标站点', dataIndex: 'target_site', key: 'target_site', width: 120 },
-  { title: '目标 InfoHash', dataIndex: 'target_info_hash', key: 'target_info_hash', ellipsis: true },
-  { title: '匹配方法', dataIndex: 'match_method', key: 'match_method', width: 100 },
-  { title: '置信度', dataIndex: 'confidence', key: 'confidence', width: 80 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '失败原因', dataIndex: 'fail_reason', key: 'fail_reason', ellipsis: true },
-  { title: '操作', key: 'actions', width: 80 },
+  { title: t('reseed.sourceInfoHash'), dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true },
+  { title: t('reseed.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120 },
+  { title: t('reseed.targetInfoHash'), dataIndex: 'target_info_hash', key: 'target_info_hash', ellipsis: true },
+  { title: t('reseed.matchMethod'), dataIndex: 'match_method', key: 'match_method', width: 100 },
+  { title: t('reseed.confidence'), dataIndex: 'confidence', key: 'confidence', width: 80 },
+  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('reseed.failReason'), dataIndex: 'fail_reason', key: 'fail_reason', ellipsis: true },
+  { title: t('common.actions'), key: 'actions', width: 80 },
 ]
 
 function statusColor(status: string) {
@@ -101,8 +121,8 @@ async function fetchTask() {
   try {
     const resp = await reseedApi.getTask(taskId)
     task.value = resp.data.data || {}
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     loading.value = false
   }
@@ -113,8 +133,8 @@ async function fetchMatches() {
   try {
     const resp = await reseedApi.getMatches(taskId)
     matches.value = resp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     matchesLoading.value = false
   }
@@ -125,8 +145,8 @@ async function retryMatch(matchId: number) {
     await reseedApi.retryMatch(taskId, matchId)
     message.success(t('reseed.retryTriggered'))
     fetchMatches()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 
@@ -137,8 +157,8 @@ async function deleteNegativeCache() {
     message.success(t('common.deleted'))
     negDeleteInfoHash.value = ''
     negDeleteSite.value = ''
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 

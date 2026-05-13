@@ -72,9 +72,9 @@ const { t } = useI18n()
 
 const queryInput = ref('')
 const querying = ref(false)
-const queryResult = ref<any>(null)
+const queryResult = ref<Record<string, unknown> | null>(null)
 const cacheLoading = ref(false)
-const caches = ref<any[]>([])
+const caches = ref<Record<string, unknown>[]>([])
 
 const cachePagination = reactive({
   current: 1,
@@ -84,10 +84,10 @@ const cachePagination = reactive({
 })
 
 const cacheColumns = [
-  { title: '查询关键词', dataIndex: 'query_key', ellipsis: true },
-  { title: '中文标题', dataIndex: 'chinese_title', ellipsis: true },
-  { title: '来源', dataIndex: 'source', width: 120 },
-  { title: '更新时间', key: 'updated_at', width: 180 },
+  { title: t('ptgen.queryKey'), dataIndex: 'query_key', ellipsis: true },
+  { title: t('ptgen.chineseTitleCache'), dataIndex: 'chinese_title', ellipsis: true },
+  { title: t('ptgen.source'), dataIndex: 'source', width: 120 },
+  { title: t('common.updatedAt'), key: 'updated_at', width: 180 },
 ]
 
 import { formatTime } from '@/utils/format'
@@ -102,8 +102,9 @@ async function handleQuery() {
   try {
     const resp = await ptgenApi.query({ query: queryInput.value.trim() })
     queryResult.value = resp.data?.data || null
-  } catch (e: any) {
-    message.error(e?.response?.data?.message || t('ptgen.queryFailed'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    message.error(err?.response?.data?.message || t('ptgen.queryFailed'))
   } finally {
     querying.value = false
   }
@@ -130,12 +131,13 @@ async function handleCleanCache() {
     const resp = await ptgenApi.cleanCache()
     message.success(t('ptgen.cacheCleaned', { count: resp.data?.data?.deleted || 0 }))
     fetchCache()
-  } catch (e: any) {
-    message.error(e?.response?.data?.message || t('ptgen.cleanFailed'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    message.error(err?.response?.data?.message || t('ptgen.cleanFailed'))
   }
 }
 
-function handleCacheTableChange(pagination: any) {
+function handleCacheTableChange(pagination: { current: number; pageSize: number }) {
   cachePagination.current = pagination.current
   cachePagination.pageSize = pagination.pageSize
   fetchCache()

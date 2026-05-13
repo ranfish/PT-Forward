@@ -24,7 +24,7 @@ type CookieCloudConfig struct {
 	ID           uint       `json:"id" gorm:"primaryKey;autoIncrement"`
 	ServerURL    string     `json:"server_url" gorm:"size:512;not null"`
 	UUID         string     `json:"uuid" gorm:"size:128;not null"`
-	Password     string     `json:"password" gorm:"size:128;not null"`
+	Password     string     `json:"password" gorm:"size:128;not null" encrypted:"true"`
 	CryptoType   string     `json:"crypto_type" gorm:"size:30;default:'legacy'"`
 	SyncEnabled  bool       `json:"sync_enabled" gorm:"default:false"`
 	SyncInterval int        `json:"sync_interval" gorm:"default:60"`

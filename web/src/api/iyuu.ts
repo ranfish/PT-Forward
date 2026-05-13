@@ -4,7 +4,7 @@ export const iyuuApi = {
   getConfig() {
     return client.get('/iyuu/config')
   },
-  saveConfig(data: any) {
+  saveConfig(data: Record<string, unknown>) {
     return client.put('/iyuu/config', data)
   },
   listSites() {

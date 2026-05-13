@@ -5,18 +5,18 @@
         v-model:value="searchForm.infoHash"
         :placeholder="t('fingerprint.searchInfoHash')"
         style="width: 320px"
-        @pressEnter="handleSearch"
+        @press-enter="handleSearch"
       />
       <a-input
         v-model:value="searchForm.piecesHash"
         :placeholder="t('fingerprint.searchPiecesHash')"
         style="width: 320px"
-        @pressEnter="handleSearch"
+        @press-enter="handleSearch"
       />
       <a-button type="primary" @click="handleSearch">{{ t('common.search') }}</a-button>
       <a-button @click="resetSearch">{{ t('common.reset') }}</a-button>
-      <a-popconfirm title="确定清理指纹缓存？" @confirm="handleDeleteCache">
-        <a-button danger>清理缓存</a-button>
+      <a-popconfirm :title="t('fingerprint.cleanupCacheConfirm')" @confirm="handleDeleteCache">
+        <a-button danger>{{ t('fingerprint.cleanupCache') }}</a-button>
       </a-popconfirm>
     </div>
 
@@ -29,10 +29,10 @@
         pageSize: pagination.pageSize.value,
         total: pagination.total.value,
         showSizeChanger: true,
-        showTotal: (total: number) => `共 ${total} 条`,
+        showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
-      @change="(pag: any) => { if (!searchMode) pagination.onPageChange(pag.current, pag.pageSize) }"
+      @change="(pag: { current: number; pageSize: number }) => { if (!searchMode) pagination.onPageChange(pag.current, pag.pageSize) }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'actions'">
@@ -56,7 +56,7 @@ const { t } = useI18n()
 
 const searchMode = ref(false)
 const searchLoading = ref(false)
-const searchResults = ref<any[]>([])
+const searchResults = ref<Record<string, unknown>[]>([])
 
 const searchForm = reactive({ infoHash: '', piecesHash: '' })
 
@@ -64,10 +64,10 @@ const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
   { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
   { title: 'PiecesHash', dataIndex: 'pieces_hash', key: 'pieces_hash', ellipsis: true },
-  { title: '站点', dataIndex: 'site_name', key: 'site_name', width: 120 },
-  { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
-  { title: '操作', key: 'actions', width: 80 },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
+  { title: t('common.title'), dataIndex: 'title', key: 'title', ellipsis: true },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.actions'), key: 'actions', width: 80 },
 ]
 
 const pagination = usePagination((page, size) => fingerprintsApi.list(page, size))
@@ -80,13 +80,13 @@ async function handleSearch() {
   searchMode.value = true
   searchLoading.value = true
   try {
-    const params: any = {}
+    const params: Record<string, unknown> = {}
     if (searchForm.infoHash) params.infoHash = searchForm.infoHash
     if (searchForm.piecesHash) params.piecesHash = searchForm.piecesHash
     const resp = await fingerprintsApi.search(params)
     searchResults.value = resp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     searchLoading.value = false
   }
@@ -108,8 +108,8 @@ async function handleDelete(id: number) {
     } else {
       pagination.fetch()
     }
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -120,8 +120,8 @@ async function handleDeleteCache() {
     await fingerprintsApi.deleteCache()
     message.success(t('common.deleteSuccess'))
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 </script>

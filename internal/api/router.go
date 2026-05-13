@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/ranfish/pt-forward/internal/auth"
@@ -94,6 +95,10 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 func (rt *Router) Register(mux *http.ServeMux, corsOrigins []string, rateLimitEnabled bool, rateLimitGlobal int) {
 	rt.RegisterWithEndpointLimits(mux, corsOrigins, rateLimitEnabled, rateLimitGlobal, 0, 0)
 }
+
+func (rt *Router) Start(_ context.Context) {}
+
+func (rt *Router) Stop() {}
 
 func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []string, rateLimitEnabled bool, rateLimitGlobal, rateLimitWrite, rateLimitDownload int) {
 	rt.corsMW = middleware.CORS(corsOrigins)

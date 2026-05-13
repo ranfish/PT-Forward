@@ -5,10 +5,10 @@
         :columns="memberColumns"
         :data-source="members"
         :loading="loading"
-        :pagination="{ pageSize: 20, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }"
+        :pagination="{ pageSize: 20, showSizeChanger: true, showTotal: (total: number) => t('common.totalCount', { count: total }) }"
         row-key="id"
         size="small"
-        @change="(pag: any) => { page = pag.current; fetchMembers() }"
+        @change="(pag: { current: number }) => { page = pag.current; fetchMembers() }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
@@ -47,31 +47,31 @@ const { t } = useI18n()
 
 const loading = ref(false)
 const historyLoading = ref(false)
-const members = ref<any[]>([])
-const histories = ref<any[]>([])
+const members = ref<Record<string, unknown>[]>([])
+const histories = ref<Record<string, unknown>[]>([])
 const page = ref(1)
 
 const memberColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
   { title: 'InfoHash', key: 'info_hash', width: 180 },
-  { title: '站点', dataIndex: 'site_name', key: 'site_name', width: 120 },
-  { title: '大小', dataIndex: 'size', key: 'size', width: 100 },
-  { title: '角色', dataIndex: 'role', key: 'role', width: 80 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '暂停', key: 'paused', width: 80 },
-  { title: '做种数', dataIndex: 'seeders', key: 'seeders', width: 80 },
-  { title: '下载数', dataIndex: 'leechers', key: 'leechers', width: 80 },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
+  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
+  { title: t('tracker.role'), dataIndex: 'role', key: 'role', width: 80 },
+  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('tracker.pausedStatus'), key: 'paused', width: 80 },
+  { title: t('tracker.seeders'), dataIndex: 'seeders', key: 'seeders', width: 80 },
+  { title: t('tracker.leechers'), dataIndex: 'leechers', key: 'leechers', width: 80 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
 ]
 
 const historyColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '组 ID', dataIndex: 'publish_group_id', key: 'publish_group_id', width: 80 },
-  { title: '成员 Hash', dataIndex: 'member_hash', key: 'member_hash', ellipsis: true },
-  { title: '旧状态', dataIndex: 'old_status', key: 'old_status', width: 100 },
-  { title: '新状态', dataIndex: 'new_status', key: 'new_status', width: 100 },
-  { title: '原因', dataIndex: 'reason', key: 'reason', ellipsis: true },
-  { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('tracker.groupId'), dataIndex: 'publish_group_id', key: 'publish_group_id', width: 80 },
+  { title: t('tracker.memberHash'), dataIndex: 'member_hash', key: 'member_hash', ellipsis: true },
+  { title: t('tracker.oldStatus'), dataIndex: 'old_status', key: 'old_status', width: 100 },
+  { title: t('tracker.newStatus'), dataIndex: 'new_status', key: 'new_status', width: 100 },
+  { title: t('tracker.reason'), dataIndex: 'reason', key: 'reason', ellipsis: true },
+  { title: t('tracker.colTime'), dataIndex: 'created_at', key: 'created_at', width: 180 },
 ]
 
 function memberStatusColor(status: string) {
@@ -85,8 +85,8 @@ async function fetchMembers() {
     const resp = await trackerApi.listMembers()
     const body = resp.data.data
     members.value = body?.items || body || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     loading.value = false
   }
@@ -98,8 +98,8 @@ async function fetchHistory() {
     const resp = await trackerApi.getHistory()
     const body = resp.data.data
     histories.value = body?.items || body || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     historyLoading.value = false
   }
@@ -111,9 +111,9 @@ async function viewMember(hash: string) {
     const resp = await trackerApi.getHistory()
     const body = resp.data.data
     histories.value = body?.items || body || []
-    message.info(`查看 InfoHash: ${hash.substring(0, 16)}...`)
-  } catch (e: any) {
-    message.error(e.message)
+    message.info(t('tracker.viewInfoHash', { hash: hash.substring(0, 16) }))
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 

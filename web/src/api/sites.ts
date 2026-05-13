@@ -7,10 +7,10 @@ export const sitesApi = {
   get(id: number) {
     return client.get(`/sites/${id}`)
   },
-  create(data: any) {
+  create(data: Record<string, unknown>) {
     return client.post('/sites', data)
   },
-  update(id: number, data: any) {
+  update(id: number, data: Record<string, unknown>) {
     return client.put(`/sites/${id}`, data)
   },
   delete(id: number) {
@@ -25,16 +25,25 @@ export const sitesApi = {
   getStats(id: number) {
     return client.get(`/sites/${id}/stats`)
   },
-  updateCredentials(id: number, data: any) {
+  updateCredentials(id: number, data: Record<string, unknown>) {
     return client.put(`/sites/${id}/credentials`, data)
   },
   getOverrides(id: number) {
     return client.get(`/sites/${id}/overrides`)
   },
-  updateOverrides(id: number, data: any) {
+  updateOverrides(id: number, data: Record<string, unknown>) {
     return client.put(`/sites/${id}/overrides`, data)
   },
   deleteOverrides(id: number) {
     return client.delete(`/sites/${id}/overrides`)
+  },
+  getFreezeStatus(id: number) {
+    return client.get(`/sites/${id}/freeze`)
+  },
+  freezeSite(id: number) {
+    return client.post(`/sites/${id}/freeze`)
+  },
+  unfreezeSite(id: number) {
+    return client.delete(`/sites/${id}/freeze`)
   },
 }

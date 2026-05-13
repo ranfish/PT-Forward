@@ -19,7 +19,7 @@
         showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
-      @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
+      @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'enabled'">
@@ -41,98 +41,98 @@
     <a-modal
       v-model:open="modalVisible"
       :title="editingRecord ? t('subscription.editSubscription') : t('subscription.addSubscription')"
-      @ok="handleSubmit"
       :confirm-loading="submitting"
       width="640px"
+      @ok="handleSubmit"
     >
       <a-form :model="form" layout="vertical">
         <a-form-item :label="t('common.name')" name="name" :rules="[{ required: true, message: t('common.nameRequired') }]">
-          <a-input v-model:value="form.name" placeholder="订阅名称" />
+          <a-input v-model:value="form.name" :placeholder="t('subscription.subscriptionNamePlaceholder')" />
         </a-form-item>
-        <a-form-item label="所属站点" name="siteName" :rules="[{ required: true, message: '请选择站点' }]">
-          <a-select v-model:value="form.siteName" placeholder="选择站点" show-search :filter-option="filterSite" :loading="sitesLoading">
+        <a-form-item :label="t('subscription.belongToSite')" name="siteName" :rules="[{ required: true, message: t('common.siteRequired') }]">
+          <a-select v-model:value="form.siteName" :placeholder="t('subscription.selectSite')" show-search :filter-option="filterSite" :loading="sitesLoading">
             <a-select-option v-for="s in sites" :key="s.name" :value="s.name">{{ s.name }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="RSS 地址" name="urls" :rules="[{ required: true, message: '请输入 RSS 地址' }]">
-          <a-textarea v-model:value="form.urls" placeholder="每行一个 RSS 地址" :rows="3" />
+        <a-form-item :label="t('subscription.rssAddress')" name="urls" :rules="[{ required: true, message: t('subscription.urlRequired') }]">
+          <a-textarea v-model:value="form.urls" :placeholder="t('subscription.rssUrlPerLine')" :rows="3" />
         </a-form-item>
-        <a-form-item label="定时表达式" name="cron">
-          <a-input v-model:value="form.cron" placeholder="例如: */15 * * * *（每15分钟）" />
+        <a-form-item :label="t('subscription.cronExpression')" name="cron">
+          <a-input v-model:value="form.cron" :placeholder="t('subscription.cronExampleLong')" />
         </a-form-item>
 
-        <a-divider>下载器设置</a-divider>
-        <a-form-item label="下载器" name="clientId">
-          <a-select v-model:value="form.clientId" placeholder="选择下载器" :loading="downloadersLoading" allow-clear>
+        <a-divider>{{ t('subscription.downloaderSettings') }}</a-divider>
+        <a-form-item :label="t('downloader.title')" name="clientId">
+          <a-select v-model:value="form.clientId" :placeholder="t('subscription.selectDownloader')" :loading="downloadersLoading" allow-clear>
             <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">
               {{ d.name }}（{{ d.type }}）
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="保存路径（留空使用下载器默认值）" name="savePath">
+        <a-form-item :label="t('subscription.savePathHint')" name="savePath">
           <a-input v-model:value="form.savePath" placeholder="/downloads/..." />
         </a-form-item>
-        <a-form-item label="分类" name="category">
-          <a-input v-model:value="form.category" placeholder="下载器中的分类" />
+        <a-form-item :label="t('subscription.categoryLabel')" name="category">
+          <a-input v-model:value="form.category" :placeholder="t('subscription.categoryPlaceholder')" />
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="暂停添加" name="addPaused">
+            <a-form-item :label="t('subscription.addPaused')" name="addPaused">
               <a-switch v-model:checked="form.addPaused" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="自动种子管理" name="autoTmm">
+            <a-form-item :label="t('subscription.autoTmm')" name="autoTmm">
               <a-switch v-model:checked="form.autoTmm" />
             </a-form-item>
           </a-col>
         </a-row>
-        <a-form-item label="标签" name="tags">
-          <a-select v-model:value="form.tags" mode="tags" placeholder="输入标签后回车" style="width: 100%" />
+        <a-form-item :label="t('subscription.tagsLabel')" name="tags">
+          <a-select v-model:value="form.tags" mode="tags" :placeholder="t('subscription.tagsPlaceholder')" style="width: 100%" />
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="上传限速 (KB/s)" name="uploadLimitKb">
-              <a-input-number v-model:value="form.uploadLimitKb" :min="0" style="width: 100%" placeholder="0 = 不限" />
+            <a-form-item :label="t('subscription.uploadLimit')" name="uploadLimitKb">
+              <a-input-number v-model:value="form.uploadLimitKb" :min="0" style="width: 100%" :placeholder="t('subscription.noLimit')" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="下载限速 (KB/s)" name="downloadLimitKb">
-              <a-input-number v-model:value="form.downloadLimitKb" :min="0" style="width: 100%" placeholder="0 = 不限" />
+            <a-form-item :label="t('subscription.downloadLimit')" name="downloadLimitKb">
+              <a-input-number v-model:value="form.downloadLimitKb" :min="0" style="width: 100%" :placeholder="t('subscription.noLimit')" />
             </a-form-item>
           </a-col>
         </a-row>
 
-        <a-divider>抓取选项</a-divider>
+        <a-divider>{{ t('subscription.scrapeOptions') }}</a-divider>
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="只接受免费种子" name="scrapeFree">
+            <a-form-item :label="t('subscription.freeOnly')" name="scrapeFree">
               <a-switch v-model:checked="form.scrapeFree" />
-              <div style="color:#999;font-size:12px;margin-top:4px">开启后仅推送免费/折扣种子到下载器</div>
+              <div style="color:#999;font-size:12px;margin-top:4px">{{ t('subscription.freeOnlyHint') }}</div>
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="检测 HR 信息" name="scrapeHr">
+            <a-form-item :label="t('subscription.scrapeHrLabel')" name="scrapeHr">
               <a-switch v-model:checked="form.scrapeHr" />
-              <div style="color:#999;font-size:12px;margin-top:4px">检测站点 HR（保种时间要求）</div>
+              <div style="color:#999;font-size:12px;margin-top:4px">{{ t('subscription.scrapeHrHint') }}</div>
             </a-form-item>
           </a-col>
         </a-row>
 
-        <a-divider>自动化</a-divider>
+        <a-divider>{{ t('subscription.automation') }}</a-divider>
         <a-row :gutter="16">
           <a-col :span="8">
-            <a-form-item label="启用自动发布" name="publishEnabled">
+            <a-form-item :label="t('subscription.enableAutoPublish')" name="publishEnabled">
               <a-switch v-model:checked="form.publishEnabled" />
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="推送通知" name="pushNotify">
+            <a-form-item :label="t('subscription.pushNotifyLabel')" name="pushNotify">
               <a-switch v-model:checked="form.pushNotify" />
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="自动辅种" name="autoReseed">
+            <a-form-item :label="t('subscription.autoReseedLabel')" name="autoReseed">
               <a-switch v-model:checked="form.autoReseed" />
             </a-form-item>
           </a-col>
@@ -152,15 +152,37 @@ import { sitesApi } from '@/api/sites'
 import { downloadersApi } from '@/api/downloaders'
 import { usePagination } from '@/composables/usePagination'
 
+interface SubscriptionItem {
+  id: number
+  name: string
+  siteName: string
+  urls: string[]
+  cron: string
+  enabled: boolean
+  clientId: string
+  savePath: string
+  category: string
+  addPaused: boolean
+  autoTmm: boolean
+  tags: string[]
+  scrapeFree: boolean
+  scrapeHr: boolean
+  uploadLimitKb: number
+  downloadLimitKb: number
+  publishEnabled: boolean
+  pushNotify: boolean
+  autoReseed: boolean
+}
+
 const { t } = useI18n()
 
 const modalVisible = ref(false)
 const submitting = ref(false)
-const editingRecord = ref<any>(null)
+const editingRecord = ref<SubscriptionItem | null>(null)
 
-const sites = ref<any[]>([])
+const sites = ref<{ name: string }[]>([])
 const sitesLoading = ref(false)
-const downloaders = ref<any[]>([])
+const downloaders = ref<{ name: string; type: string }[]>([])
 const downloadersLoading = ref(false)
 
 const form = reactive({
@@ -185,16 +207,16 @@ const form = reactive({
 })
 
 const columns = [
-  { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '站点', dataIndex: 'siteName', key: 'siteName' },
-  { title: '定时表达式', dataIndex: 'cron', key: 'cron', width: 140 },
-  { title: '启用', key: 'enabled', width: 80, align: 'center' as const },
-  { title: '操作', key: 'actions', width: 220 },
+  { title: t('common.name'), dataIndex: 'name', key: 'name' },
+  { title: t('common.site'), dataIndex: 'siteName', key: 'siteName' },
+  { title: t('subscription.cronExpression'), dataIndex: 'cron', key: 'cron', width: 140 },
+  { title: t('common.enable'), key: 'enabled', width: 80, align: 'center' as const },
+  { title: t('common.actions'), key: 'actions', width: 220 },
 ]
 
 const pagination = usePagination((page, size) => subscriptionsApi.list(page, size))
 
-function filterSite(input: string, option: any) {
+function filterSite(input: string, option: { key?: string }) {
   return option.key?.toLowerCase().includes(input.toLowerCase())
 }
 
@@ -222,7 +244,7 @@ async function fetchDownloaders() {
   }
 }
 
-function openModal(record?: any) {
+function openModal(record?: SubscriptionItem) {
   editingRecord.value = record || null
   if (record) {
     Object.assign(form, {
@@ -266,8 +288,8 @@ async function handleSubmit() {
     message.success(t('common.operationSuccess'))
     modalVisible.value = false
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     submitting.value = false
   }
@@ -278,12 +300,12 @@ async function handleDelete(id: number) {
     await subscriptionsApi.delete(id)
     message.success(t('common.deleteSuccess'))
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 
-async function toggleSubscription(record: any) {
+async function toggleSubscription(record: SubscriptionItem) {
   try {
     if (record.enabled) {
       await subscriptionsApi.pause(record.id)
@@ -292,8 +314,8 @@ async function toggleSubscription(record: any) {
     }
     message.success(t('subscription.statusToggled'))
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 
@@ -301,8 +323,8 @@ async function triggerFetch(id: number) {
   try {
     await subscriptionsApi.trigger(id)
     message.success(t('subscription.fetchTriggered'))
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 

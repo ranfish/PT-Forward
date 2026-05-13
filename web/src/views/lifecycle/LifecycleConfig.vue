@@ -50,13 +50,13 @@
             <a-input-number v-model:value="config.deleteSeedHours" :min="0" style="width: 200px" />
           </a-form-item>
           <a-form-item :label="t('lifecycle.checkInterval')">
-            <a-input v-model:value="config.checkInterval" placeholder="如 5m" style="width: 200px" />
+            <a-input v-model:value="config.checkInterval" :placeholder="t('lifecycle.checkIntervalPlaceholder')" style="width: 200px" />
           </a-form-item>
           <a-form-item :label="t('lifecycle.maxConcurrentChecks')">
             <a-input-number v-model:value="config.maxConcurrentChecks" :min="1" style="width: 200px" />
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" @click="saveConfig" :loading="saving">{{ t('common.saveConfig') }}</a-button>
+            <a-button type="primary" :loading="saving" @click="saveConfig">{{ t('common.saveConfig') }}</a-button>
           </a-form-item>
         </a-form>
       </a-spin>
@@ -74,7 +74,7 @@ const { t } = useI18n()
 
 const loading = ref(false)
 const saving = ref(false)
-const backpressure = ref<any>({})
+const backpressure = ref<Record<string, unknown>>({})
 const backpressureMax = ref(0)
 
 const config = reactive({
@@ -95,8 +95,8 @@ async function fetchConfig() {
     config.deleteSeedHours = data.deleteSeedHours ?? 720
     config.checkInterval = data.checkInterval ?? '5m'
     config.maxConcurrentChecks = data.maxConcurrentChecks ?? 10
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     loading.value = false
   }
@@ -106,17 +106,17 @@ async function fetchBackpressure() {
   try {
     const resp = await lifecycleApi.getBackpressure()
     backpressure.value = resp.data.data || {}
-    backpressureMax.value = backpressure.value.maxConcurrentPublishes || 0
-  } catch (e: any) {
-    message.error(e.message)
+    backpressureMax.value = backpressure.value.maxConcurrentPublishes as number || 0
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
 async function updateBackpressure() {
   try {
     await lifecycleApi.updateBackpressure({ max_concurrent: backpressureMax.value })
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -125,8 +125,8 @@ async function saveConfig() {
   try {
     await lifecycleApi.updateConfig(config)
     message.success(t('common.configSaved'))
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     saving.value = false
   }

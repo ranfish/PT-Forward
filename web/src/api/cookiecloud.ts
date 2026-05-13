@@ -4,7 +4,7 @@ export const cookiecloudApi = {
   getConfig() {
     return client.get('/cookiecloud/config')
   },
-  saveConfig(data: any) {
+  saveConfig(data: Record<string, unknown>) {
     return client.put('/cookiecloud/config', data)
   },
   sync() {

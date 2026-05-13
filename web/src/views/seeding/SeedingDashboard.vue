@@ -35,7 +35,7 @@
       <div style="margin-bottom: 12px; display: flex; justify-content: flex-end">
         <a-button type="primary" @click="openConfigModal()">
           <template #icon><PlusOutlined /></template>
-          新建刷流配置
+          {{ t('seeding.addConfig') }}
         </a-button>
       </div>
       <a-table
@@ -108,9 +108,9 @@
     <a-modal
       v-model:open="configModalVisible"
       :title="editingConfig ? t('seeding.editConfig') : t('seeding.addConfig')"
-      @ok="handleConfigSubmit"
       :confirm-loading="configSubmitting"
       width="560px"
+      @ok="handleConfigSubmit"
     >
       <a-form :model="configForm" layout="vertical">
         <a-form-item :label="t('seeding.downloaderId')">
@@ -120,7 +120,7 @@
             :disabled="!!editingConfig"
             :options="downloaderOptions"
             show-search
-            :filter-option="(input: string, option: any) => option.label.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="(input: string, option: { label: string }) => option.label.toLowerCase().includes(input.toLowerCase())"
           />
         </a-form-item>
         <a-form-item :label="t('common.enable')">
@@ -135,7 +135,7 @@
         <a-form-item :label="t('seeding.diskProtect')">
           <a-switch v-model:checked="configForm.diskProtectEnabled" />
         </a-form-item>
-        <a-form-item :label="t('seeding.minDiskSpaceGB')" v-if="configForm.diskProtectEnabled">
+        <a-form-item v-if="configForm.diskProtectEnabled" :label="t('seeding.minDiskSpaceGB')">
           <a-input-number v-model:value="configForm.minDiskSpaceGB" :min="1" style="width: 100%" />
         </a-form-item>
         <a-form-item :label="t('seeding.maxActiveUploads')">
@@ -166,18 +166,28 @@ import {
 import { seedingApi } from '@/api/seeding'
 import { downloadersApi } from '@/api/downloaders'
 import { formatDurationSec } from '@/utils/format'
+import type { SeedingClientConfig, SeedingTorrentRecord } from '@/api/types'
+
+interface SeedingStatusData {
+  overview?: {
+    activeTorrents?: number
+    pausedTorrents?: number
+    totalTorrents?: number
+  }
+  uptimeSeconds?: number
+}
 
 const { t } = useI18n()
 const loading = ref(false)
 const configsLoading = ref(false)
-const status = ref<any>({})
-const torrents = ref<any[]>([])
-const configs = ref<any[]>([])
+const status = ref<SeedingStatusData>({})
+const torrents = ref<SeedingTorrentRecord[]>([])
+const configs = ref<SeedingClientConfig[]>([])
 const downloaderOptions = ref<{label: string, value: string}[]>([])
 
 const configModalVisible = ref(false)
 const configSubmitting = ref(false)
-const editingConfig = ref<any>(null)
+const editingConfig = ref<SeedingClientConfig | null>(null)
 const configForm = reactive({
   clientId: '',
   enabled: true,
@@ -192,25 +202,25 @@ const configForm = reactive({
 
 const columns = [
   { title: 'Torrent ID', dataIndex: 'torrent_id', key: 'torrent_id', ellipsis: true },
-  { title: '站点', dataIndex: 'site_name', key: 'site_name', width: 120 },
-  { title: '客户端', dataIndex: 'client_id', key: 'client_id', width: 100 },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
+  { title: t('seeding.client'), dataIndex: 'client_id', key: 'client_id', width: 100 },
   { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '免费', dataIndex: 'is_free', key: 'is_free', width: 60 },
+  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('seeding.isFree'), dataIndex: 'is_free', key: 'is_free', width: 60 },
   { title: 'HR', dataIndex: 'has_hr', key: 'has_hr', width: 60 },
-  { title: '来源', dataIndex: 'source', key: 'source', width: 80 },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
-  { title: '操作', key: 'actions', width: 100 },
+  { title: t('seeding.source'), dataIndex: 'source', key: 'source', width: 80 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.actions'), key: 'actions', width: 100 },
 ]
 
 const configColumns = [
-  { title: '下载器 ID', dataIndex: 'client_id', key: 'client_id', width: 120 },
-  { title: '删种 Cron', dataIndex: 'auto_delete_cron', key: 'auto_delete_cron', width: 140 },
-  { title: '主数据 Cron', dataIndex: 'maindata_cron', key: 'maindata_cron', width: 140 },
-  { title: '磁盘保护', key: 'disk_protect_enabled', width: 90 },
-  { title: '最小空间', dataIndex: 'min_disk_space_gb', key: 'min_disk_space_gb', width: 100 },
-  { title: '启用', key: 'enabled', width: 80 },
-  { title: '操作', key: 'actions', width: 140 },
+  { title: t('seeding.downloaderId'), dataIndex: 'client_id', key: 'client_id', width: 120 },
+  { title: t('seeding.autoDeleteCron'), dataIndex: 'auto_delete_cron', key: 'auto_delete_cron', width: 140 },
+  { title: t('seeding.mainDataCron'), dataIndex: 'maindata_cron', key: 'maindata_cron', width: 140 },
+  { title: t('seeding.diskProtect'), key: 'disk_protect_enabled', width: 90 },
+  { title: t('seeding.minDiskSpaceGB'), dataIndex: 'min_disk_space_gb', key: 'min_disk_space_gb', width: 100 },
+  { title: t('common.enable'), key: 'enabled', width: 80 },
+  { title: t('common.actions'), key: 'actions', width: 140 },
 ]
 
 async function fetchData() {
@@ -222,8 +232,8 @@ async function fetchData() {
     ])
     status.value = statusResp.data.data || {}
     torrents.value = torrentsResp.data.data?.items || torrentsResp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     loading.value = false
   }
@@ -235,14 +245,14 @@ async function fetchConfigs() {
     const resp = await seedingApi.getConfig()
     const data = resp.data.data
     configs.value = Array.isArray(data) ? data : data?.items || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     configsLoading.value = false
   }
 }
 
-function openConfigModal(record?: any) {
+function openConfigModal(record?: SeedingClientConfig) {
   editingConfig.value = record || null
   if (record) {
     Object.assign(configForm, {
@@ -287,8 +297,8 @@ async function handleConfigSubmit() {
     message.success(t('common.operationSuccess'))
     configModalVisible.value = false
     fetchConfigs()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     configSubmitting.value = false
   }
@@ -299,18 +309,18 @@ async function handleDeleteConfig(configId: number) {
     await seedingApi.deleteConfig(configId)
     message.success(t('common.deleted'))
     fetchConfigs()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
-async function toggleConfig(record: any, checked: boolean) {
+async function toggleConfig(record: SeedingClientConfig, checked: boolean) {
   try {
     await seedingApi.updateConfig(record.id, { enabled: checked })
     message.success(t('common.statusUpdated'))
     fetchConfigs()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -319,8 +329,8 @@ async function handleResumeRecord(recordId: number) {
     await seedingApi.resumeRecord(recordId)
     message.success(t('common.resumed'))
     fetchData()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -329,8 +339,8 @@ async function handlePauseRecord(recordId: number) {
     await seedingApi.pauseRecord(recordId)
     message.success(t('common.paused'))
     fetchData()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -338,11 +348,11 @@ async function fetchDownloaders() {
   try {
     const resp = await downloadersApi.list(1, 100)
     const items = resp.data.data?.items || resp.data.data || []
-    downloaderOptions.value = items.map((d: any) => ({
+    downloaderOptions.value = items.map((d: Record<string, unknown>) => ({
       label: d.name || d.id,
       value: d.name || d.id,
     }))
-  } catch (_e: any) {}
+  } catch (_e: unknown) {}
 }
 
 onMounted(() => {

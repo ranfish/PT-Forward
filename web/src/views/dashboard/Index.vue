@@ -71,7 +71,7 @@
     </a-row>
 
     <a-card :title="t('dashboard.trends7d')" style="margin-bottom: 24px">
-      <div ref="chartRef" style="height: 320px; width: 100%"></div>
+      <div ref="chartRef" style="height: 320px; width: 100%" />
     </a-card>
 
     <a-card :title="t('dashboard.recentActivity')">
@@ -101,10 +101,43 @@ import {
 import { dashboardApi } from '@/api/dashboard'
 import { useWebSocketStore } from '@/stores/websocket'
 
+interface TrendItem {
+  date: string
+  events: number
+  rss: number
+  publish: number
+  reseed: number
+}
+
+interface ActivityItem {
+  id: number
+  title: string
+  site_name: string
+  info_hash: string
+  size: string
+  status: string
+  created_at: string
+}
+
+interface DashboardOverview {
+  sites?: { online?: number; total?: number }
+  downloaders?: { online?: number; total?: number }
+  torrents?: { seeding?: number; downloading?: number }
+  publish?: { pendingCount?: number; todayCount?: number; totalCount?: number }
+  reseed?: { todayCount?: number; totalCount?: number }
+  system?: { goroutines?: number }
+}
+
+interface WSMessage {
+  type?: string
+  payload?: Record<string, unknown>
+  timestamp?: string
+}
+
 const { t } = useI18n()
 const loading = ref(false)
-const overview = ref<any>({})
-const activities = ref<any[]>([])
+const overview = ref<DashboardOverview>({})
+const activities = ref<ActivityItem[]>([])
 const chartRef = ref<HTMLElement>()
 let chartInstance: echarts.ECharts | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
@@ -112,12 +145,12 @@ const wsStore = useWebSocketStore()
 
 const activityColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '种子标题', dataIndex: 'title', key: 'title', ellipsis: true },
-  { title: '站点', dataIndex: 'site_name', key: 'site_name', width: 120 },
+  { title: t('dashboard.torrentTitle'), dataIndex: 'title', key: 'title', ellipsis: true },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
   { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
-  { title: '大小', dataIndex: 'size', key: 'size', width: 100 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
+  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
 ]
 
 function formatSize(bytes: number): string {
@@ -127,45 +160,45 @@ function formatSize(bytes: number): string {
   return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i]
 }
 
-function initChart(trends: any[]) {
+function initChart(trends: TrendItem[]) {
   if (!chartRef.value) return
   if (chartInstance) {
     chartInstance.dispose()
   }
   chartInstance = echarts.init(chartRef.value)
-  const dates = trends.map((t: any) => t.date)
+  const dates = trends.map((t: TrendItem) => t.date)
   chartInstance.setOption({
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
     },
-    legend: { data: ['事件', 'RSS', '发布', '辅种'], bottom: 0 },
+    legend: { data: [t('dashboard.chartEvents'), 'RSS', t('dashboard.chartPublish'), t('dashboard.chartReseed')], bottom: 0 },
     grid: { left: 50, right: 30, top: 20, bottom: 40 },
     xAxis: { type: 'category', data: dates, boundaryGap: true },
     yAxis: { type: 'value', minInterval: 1 },
     series: [
       {
-        name: '事件', type: 'bar', stack: 'total',
-        data: trends.map((t: any) => t.events),
+        name: t('dashboard.chartEvents'), type: 'bar', stack: 'total',
+        data: trends.map((t: TrendItem) => t.events),
         itemStyle: { color: '#1890ff' },
         emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(24,144,255,0.5)' } },
       },
       {
         name: 'RSS', type: 'bar', stack: 'total',
-        data: trends.map((t: any) => t.rss),
+        data: trends.map((t: TrendItem) => t.rss),
         itemStyle: { color: '#52c41a' },
         emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(82,196,26,0.5)' } },
       },
       {
-        name: '发布', type: 'line', smooth: true,
-        data: trends.map((t: any) => t.publish),
+        name: t('dashboard.chartPublish'), type: 'line', smooth: true,
+        data: trends.map((t: TrendItem) => t.publish),
         itemStyle: { color: '#722ed1' },
         lineStyle: { width: 2 },
         areaStyle: { opacity: 0.1 },
       },
       {
-        name: '辅种', type: 'line', smooth: true,
-        data: trends.map((t: any) => t.reseed),
+        name: t('dashboard.chartReseed'), type: 'line', smooth: true,
+        data: trends.map((t: TrendItem) => t.reseed),
         itemStyle: { color: '#faad14' },
         lineStyle: { width: 2 },
         areaStyle: { opacity: 0.1 },
@@ -181,17 +214,17 @@ function handleResize() {
   }, 200)
 }
 
-function handleWSMessage(msg: any) {
+function handleWSMessage(msg: WSMessage) {
   if (!msg || !msg.type) return
   if (msg.type === 'torrent.added') {
     const p = msg.payload || {}
     activities.value.unshift({
-      id: p.eventId || Date.now(),
-      title: p.title || '',
-      site_name: p.siteName || '',
+      id: (p.eventId as number) || Date.now(),
+      title: (p.title as string) || '',
+      site_name: (p.siteName as string) || '',
       info_hash: '',
-      size: typeof p.size === 'number' ? formatSize(p.size) : p.size || '',
-      status: p.discount || '',
+      size: typeof p.size === 'number' ? formatSize(p.size) : (p.size as string) || '',
+      status: (p.discount as string) || '',
       created_at: msg.timestamp || new Date().toISOString(),
     })
     if (activities.value.length > 20) {
@@ -216,8 +249,8 @@ async function fetchData() {
     const trends = trendsResp.data.data?.trends || []
     await nextTick()
     initChart(trends)
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     loading.value = false
   }

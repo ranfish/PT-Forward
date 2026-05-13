@@ -32,7 +32,7 @@
     </a-row>
 
     <a-card :title="t('system.runtimeInfo')" size="small" style="margin-bottom: 16px">
-      <a-descriptions :column="2" size="small" v-if="info">
+      <a-descriptions v-if="info" :column="2" size="small">
         <a-descriptions-item :label="t('system.goVersion')">{{ info.goVersion || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('system.os')">{{ info.os || '-' }}/{{ info.arch || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('system.cpuCount')">{{ info.cpuCount || '-' }}</a-descriptions-item>
@@ -55,9 +55,27 @@ import { useI18n } from 'vue-i18n'
 import { systemApi } from '@/api/system'
 import { formatBytes } from '@/utils/format'
 
+interface HealthStatus {
+  status?: string
+  version?: string
+  uptime?: string
+  database?: { ok?: boolean; message?: string }
+  downloaders?: { connected?: number }
+}
+
+interface RuntimeInfo {
+  goVersion?: string
+  os?: string
+  arch?: string
+  cpuCount?: number
+  goroutines?: number
+  memAlloc?: number
+  heapAlloc?: number
+}
+
 const { t } = useI18n()
-const health = ref<any>({})
-const info = ref<any>(null)
+const health = ref<HealthStatus>({})
+const info = ref<RuntimeInfo | null>(null)
 
 async function fetchHealth() {
   try {

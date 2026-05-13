@@ -19,7 +19,7 @@
         showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
-      @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
+      @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -28,8 +28,8 @@
         <template v-if="column.key === 'actions'">
           <a-space>
             <a-button type="link" size="small" @click="$router.push(`/reseed/tasks/${record.id}`)">{{ t('common.detail') }}</a-button>
-            <a-button type="link" size="small" @click="triggerTask(record.id)" :disabled="record.status === 'running'">{{ t('common.trigger') }}</a-button>
-            <a-button type="link" size="small" @click="cancelTask(record.id)" :disabled="record.status !== 'running'">{{ t('common.cancel') }}</a-button>
+            <a-button type="link" size="small" :disabled="record.status === 'running'" @click="triggerTask(record.id)">{{ t('common.trigger') }}</a-button>
+            <a-button type="link" size="small" :disabled="record.status !== 'running'" @click="cancelTask(record.id)">{{ t('common.cancel') }}</a-button>
             <a-popconfirm :title="t('reseed.deleteTaskConfirm')" @confirm="handleDelete(record.id)">
               <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
@@ -41,8 +41,8 @@
     <a-modal
       v-model:open="modalVisible"
       :title="t('reseed.createReseedTask')"
-      @ok="handleSubmit"
       :confirm-loading="submitting"
+      @ok="handleSubmit"
     >
       <a-form :model="form" layout="vertical">
         <a-form-item :label="t('reseed.taskName')" name="name" :rules="[{ required: true, message: t('reseed.pleaseEnterTaskName') }]">
@@ -107,11 +107,11 @@ const form = reactive({
 
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '客户端', dataIndex: 'client_ids', key: 'client_ids', ellipsis: true },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
-  { title: '操作', key: 'actions', width: 240 },
+  { title: t('common.name'), dataIndex: 'name', key: 'name' },
+  { title: t('reseed.client'), dataIndex: 'client_ids', key: 'client_ids', ellipsis: true },
+  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.actions'), key: 'actions', width: 240 },
 ]
 
 const pagination = usePagination((page, size) => reseedApi.listTasks(page, size))
@@ -133,8 +133,8 @@ async function handleSubmit() {
     message.success(t('reseed.taskCreated'))
     modalVisible.value = false
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     submitting.value = false
   }
@@ -145,8 +145,8 @@ async function triggerTask(id: number) {
     await reseedApi.triggerTask(id)
     message.success(t('reseed.taskTriggered'))
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -155,8 +155,8 @@ async function cancelTask(id: number) {
     await reseedApi.cancelTask(id)
     message.success(t('reseed.taskCancelled'))
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -165,8 +165,8 @@ async function handleDelete(id: number) {
     await reseedApi.deleteTask(id)
     message.success(t('common.deleted'))
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 

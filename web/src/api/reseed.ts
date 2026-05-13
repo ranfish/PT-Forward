@@ -7,7 +7,7 @@ export const reseedApi = {
   getTask(id: number) {
     return client.get(`/reseed/tasks/${id}`)
   },
-  createTask(data: any) {
+  createTask(data: Record<string, unknown>) {
     return client.post('/reseed/tasks', data)
   },
   deleteTask(id: number) {
@@ -26,7 +26,7 @@ export const reseedApi = {
     return client.post(`/reseed/tasks/${taskId}/matches/${matchId}/retry`)
   },
   deleteNegativeCache(taskId: number, infoHash: string, site?: string) {
-    const params: any = { infoHash }
+    const params: Record<string, string> = { infoHash }
     if (site) params.site = site
     return client.delete(`/reseed/tasks/${taskId}/negative-cache`, { params })
   },

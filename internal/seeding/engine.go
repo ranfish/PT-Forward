@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/dispatcher"
+	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -21,6 +22,7 @@ type Engine struct {
 	clientProvider model.DownloaderProvider
 	siteProvider   model.SiteInfoProvider
 	freeEndMonitor *FreeEndMonitor
+	wsBroadcaster  event.WSBroadcaster
 	mu             sync.RWMutex
 	recordMap      map[string]*model.SeedingTorrentRecord
 	emaStates      map[string]*emaState
@@ -56,6 +58,10 @@ func (e *Engine) SetSiteProvider(sp model.SiteInfoProvider) {
 	e.siteProvider = sp
 }
 
+func (e *Engine) SetWSBroadcaster(b event.WSBroadcaster) {
+	e.wsBroadcaster = b
+}
+
 func recordKey(clientID, infoHash string) string {
 	return clientID + ":" + infoHash
 }
@@ -88,7 +94,7 @@ func (e *Engine) Stop(_ context.Context) error {
 	if e.freeEndMonitor != nil {
 		e.freeEndMonitor.StopAll()
 	}
-	e.logger.Info("seeding engine stopped")
+	e.logger.Info("seeding engine stopped", zap.Int("active_records", len(e.recordMap)))
 	return nil
 }
 
@@ -279,12 +285,25 @@ type EvaluateResult struct {
 	Errors    int
 }
 
-func (e *Engine) Evaluate(ctx context.Context, clientID string, cfg *model.SeedingClientConfig) (*EvaluateResult, error) {
+type evaluateContext struct {
+	clientID     string
+	client       model.DownloaderClient
+	records      []model.SeedingTorrentRecord
+	torrents     []*model.TorrentInfo
+	torrentMap   map[string]*model.TorrentInfo
+	maindata     *model.Maindata
+	freeSpace    int64
+	weights      CleanupWeights
+	minScore     float64
+	minAge       float64
+	cfg          *model.SeedingClientConfig
+	cascadeRules []model.DeleteRule
+}
+
+func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cfg *model.SeedingClientConfig) (*evaluateContext, error) {
 	if e.clientProvider == nil {
 		return nil, &model.AppError{Code: 50001, Message: "client provider not configured"}
 	}
-
-	result := &EvaluateResult{}
 
 	dlClient, err := e.clientProvider.Get(clientID)
 	if err != nil {
@@ -294,10 +313,6 @@ func (e *Engine) Evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 	records, err := e.ListByClient(ctx, clientID)
 	if err != nil {
 		return nil, &model.AppError{Code: 50001, Message: "查询做种记录失败", Cause: err}
-	}
-
-	if len(records) == 0 {
-		return result, nil
 	}
 
 	weights := DefaultCleanupWeights()
@@ -333,134 +348,195 @@ func (e *Engine) Evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 			Find(&cascadeRules)
 	}
 
+	return &evaluateContext{
+		clientID:     clientID,
+		client:       dlClient,
+		records:      records,
+		torrents:     torrents,
+		torrentMap:   torrentMap,
+		maindata:     maindata,
+		freeSpace:    freeSpace,
+		weights:      weights,
+		minScore:     minScore,
+		minAge:       minAgeHours,
+		cfg:          cfg,
+		cascadeRules: cascadeRules,
+	}, nil
+}
+
+func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRecord, ec *evaluateContext, cycleID string) (candidate *CleanupCandidate, evaluated bool, shouldCleanup bool) {
+	if rec.Status != model.SeedingStatusSeeding {
+		return nil, false, false
+	}
+
+	evaluated = true
+
+	ti, ok := ec.torrentMap[rec.InfoHash]
+	if !ok || ti == nil {
+		return nil, true, false
+	}
+
+	ageHours := time.Since(rec.CreatedAt).Hours()
+	seedTimeHours := float64(ti.SeedTime) / 3600.0
+
+	hrStrategy := "protect"
+	if e.siteProvider != nil && rec.SiteName != "" {
+		if siteCfg, err := e.siteProvider.GetSiteConfig(ctx, rec.SiteName); err == nil && siteCfg != nil {
+			if siteCfg.HRStrategy == "skip" || siteCfg.HRStrategy == "ignore" {
+				hrStrategy = siteCfg.HRStrategy
+			}
+		}
+	}
+
+	candidate = &CleanupCandidate{
+		ID:            rec.ID,
+		InfoHash:      rec.InfoHash,
+		SeedTimeHours: seedTimeHours,
+		AgeHours:      ageHours,
+		IsFree:        rec.IsFree,
+		HasHR:         rec.HasHR,
+		HRSeedTimeH:   rec.HRSeedTimeH,
+		HRStrategy:    hrStrategy,
+		Discount:      rec.Discount,
+		FreeEndAt:     rec.FreeEndAt,
+		UploadSpeed:   ti.UploadSpeed,
+	}
+
+	score := CalculateCleanupScore(*candidate, ec.weights)
+	candidate.Score = score
+
+	if score < 5.0 {
+		e.db.WithContext(ctx).Create(&model.ScoringLog{
+			CycleID:  cycleID,
+			ClientID: ec.clientID,
+			InfoHash: rec.InfoHash,
+			SiteName: rec.SiteName,
+			Score:    score,
+		})
+	}
+
+	shouldCleanup = ShouldCleanup(*candidate, ec.minScore, ec.minAge)
+	return candidate, true, shouldCleanup
+}
+
+func (e *Engine) handleDiskProtect(ctx context.Context, rec *model.SeedingTorrentRecord, ec *evaluateContext, result *EvaluateResult) bool {
+	cfg := ec.cfg
+	if cfg == nil || !cfg.DiskProtectEnabled {
+		return false
+	}
+	if ec.freeSpace < 0 || cfg.MinDiskSpaceGB <= 0 {
+		return false
+	}
+
+	minBytes := int64(cfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
+	if ec.freeSpace >= minBytes {
+		return false
+	}
+
+	e.logger.Warn("磁盘空间不足，触发磁盘保护",
+		zap.Int64("freeSpace", ec.freeSpace),
+		zap.Float64("minGB", cfg.MinDiskSpaceGB),
+	)
+	if err := ec.client.PauseTorrent(ctx, rec.InfoHash); err != nil {
+		result.Errors++
+		return true
+	}
+	if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusPausedRule, "disk_protect"); err != nil {
+		e.logger.Error("更新磁盘保护状态失败", zap.Uint("id", rec.ID), zap.Error(err))
+	}
+	result.Paused++
+	return true
+}
+
+func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, result *EvaluateResult) {
+	isDeleteFiles := true
+
+	if HasSameFileTorrent(ti, ec.torrents) {
+		isDeleteFiles = false
+		e.logger.Debug("辅种文件保护：共享文件，仅删种子不删文件",
+			zap.String("infoHash", rec.InfoHash),
+			zap.String("name", ti.Name),
+		)
+	}
+
+	cascaded := false
+	for _, rule := range ec.cascadeRules {
+		relatedHashes := FindRelatedByTagOrPath(ti, ec.torrents, rule.CascadeMaxDepth)
+		if len(relatedHashes) > 0 {
+			allHashes := append([]string{rec.InfoHash}, relatedHashes...)
+			if err := ec.client.BatchDeleteTorrents(ctx, allHashes, isDeleteFiles); err != nil {
+				e.logger.Warn("级联删种失败",
+					zap.Strings("hashes", allHashes),
+					zap.Error(err),
+				)
+				result.Errors++
+			} else {
+				e.logger.Info("级联删种成功",
+					zap.String("source", rec.InfoHash),
+					zap.Int("related", len(relatedHashes)),
+				)
+			}
+			if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); err != nil {
+				e.logger.Error("更新级联删种状态失败", zap.Uint("id", rec.ID), zap.Error(err))
+			}
+			result.Deleted++
+			cascaded = true
+			break
+		}
+	}
+
+	if !cascaded {
+		if err := ec.client.DeleteTorrent(ctx, rec.InfoHash, isDeleteFiles); err != nil {
+			e.logger.Warn("删种失败",
+				zap.String("infoHash", rec.InfoHash),
+				zap.Bool("deleteFiles", isDeleteFiles),
+				zap.Error(err),
+			)
+			result.Errors++
+			return
+		}
+
+		if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); err != nil {
+			e.logger.Error("更新删种状态失败", zap.Uint("id", rec.ID), zap.Error(err))
+		}
+		result.Deleted++
+	}
+}
+
+func (e *Engine) Evaluate(ctx context.Context, clientID string, cfg *model.SeedingClientConfig) (*EvaluateResult, error) {
+	ec, err := e.prepareEvaluateContext(ctx, clientID, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ec.records) == 0 {
+		return &EvaluateResult{}, nil
+	}
+
+	result := &EvaluateResult{}
 	cycleID := time.Now().Format("20060102-150405")
 
-	for i := range records {
-		rec := &records[i]
-		if rec.Status != model.SeedingStatusSeeding {
+	for i := range ec.records {
+		rec := &ec.records[i]
+
+		candidate, evaluated, shouldCleanup := e.evaluateRecord(ctx, rec, ec, cycleID)
+		if !evaluated {
 			continue
 		}
 
 		result.Evaluated++
 
-		ti, ok := torrentMap[rec.InfoHash]
-		if !ok || ti == nil {
+		if candidate == nil {
 			continue
 		}
 
-		ageHours := time.Since(rec.CreatedAt).Hours()
-		seedTimeHours := float64(ti.SeedTime) / 3600.0
-
-		hrStrategy := "protect"
-		if e.siteProvider != nil && rec.SiteName != "" {
-			if siteCfg, err := e.siteProvider.GetSiteConfig(ctx, rec.SiteName); err == nil && siteCfg != nil {
-				if siteCfg.HRStrategy == "skip" || siteCfg.HRStrategy == "ignore" {
-					hrStrategy = siteCfg.HRStrategy
-				}
-			}
-		}
-
-		candidate := CleanupCandidate{
-			ID:            rec.ID,
-			InfoHash:      rec.InfoHash,
-			SeedTimeHours: seedTimeHours,
-			AgeHours:      ageHours,
-			IsFree:        rec.IsFree,
-			HasHR:         rec.HasHR,
-			HRSeedTimeH:   rec.HRSeedTimeH,
-			HRStrategy:    hrStrategy,
-			Discount:      rec.Discount,
-			FreeEndAt:     rec.FreeEndAt,
-		}
-		candidate.UploadSpeed = ti.UploadSpeed
-
-		score := CalculateCleanupScore(candidate, weights)
-		candidate.Score = score
-
-		if score < 5.0 {
-			e.db.WithContext(ctx).Create(&model.ScoringLog{
-				CycleID:  cycleID,
-				ClientID: clientID,
-				InfoHash: rec.InfoHash,
-				SiteName: rec.SiteName,
-				Score:    score,
-			})
-		}
-
-		if !ShouldCleanup(candidate, minScore, minAgeHours) {
-			diskProtect := cfg != nil && cfg.DiskProtectEnabled
-			if diskProtect && freeSpace >= 0 && cfg.MinDiskSpaceGB > 0 {
-				minBytes := int64(cfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
-				if freeSpace < minBytes {
-					e.logger.Warn("磁盘空间不足，触发磁盘保护",
-						zap.Int64("freeSpace", freeSpace),
-						zap.Float64("minGB", cfg.MinDiskSpaceGB),
-					)
-					if err := dlClient.PauseTorrent(ctx, rec.InfoHash); err != nil {
-						result.Errors++
-						continue
-					}
-					if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusPausedRule, "disk_protect"); err != nil {
-						e.logger.Error("更新磁盘保护状态失败", zap.Uint("id", rec.ID), zap.Error(err))
-					}
-					result.Paused++
-				}
-			}
+		if !shouldCleanup {
+			e.handleDiskProtect(ctx, rec, ec, result)
 			continue
 		}
 
-		isDeleteFiles := true
-
-		if HasSameFileTorrent(ti, torrents) {
-			isDeleteFiles = false
-			e.logger.Debug("辅种文件保护：共享文件，仅删种子不删文件",
-				zap.String("infoHash", rec.InfoHash),
-				zap.String("name", ti.Name),
-			)
-		}
-
-		cascaded := false
-		for _, rule := range cascadeRules {
-			relatedHashes := FindRelatedByTagOrPath(ti, torrents, rule.CascadeMaxDepth)
-			if len(relatedHashes) > 0 {
-				allHashes := append([]string{rec.InfoHash}, relatedHashes...)
-				if err := dlClient.BatchDeleteTorrents(ctx, allHashes, isDeleteFiles); err != nil {
-					e.logger.Warn("级联删种失败",
-						zap.Strings("hashes", allHashes),
-						zap.Error(err),
-					)
-					result.Errors++
-				} else {
-					e.logger.Info("级联删种成功",
-						zap.String("source", rec.InfoHash),
-						zap.Int("related", len(relatedHashes)),
-					)
-				}
-				if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); err != nil {
-					e.logger.Error("更新级联删种状态失败", zap.Uint("id", rec.ID), zap.Error(err))
-				}
-				result.Deleted++
-				cascaded = true
-				break
-			}
-		}
-
-		if !cascaded {
-			if err := dlClient.DeleteTorrent(ctx, rec.InfoHash, isDeleteFiles); err != nil {
-				e.logger.Warn("删种失败",
-					zap.String("infoHash", rec.InfoHash),
-					zap.Bool("deleteFiles", isDeleteFiles),
-					zap.Error(err),
-				)
-				result.Errors++
-				continue
-			}
-
-			if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); err != nil {
-				e.logger.Error("更新删种状态失败", zap.Uint("id", rec.ID), zap.Error(err))
-			}
-			result.Deleted++
-		}
+		ti := ec.torrentMap[rec.InfoHash]
+		e.executeCleanup(ctx, rec, ti, ec, result)
 	}
 
 	return result, nil
@@ -591,7 +667,12 @@ func (e *Engine) collectSiteTrafficDaily(ctx context.Context, clientID string, m
 				SeedingCount: count,
 				TorrentCount: count,
 			}
-			_ = e.db.WithContext(ctx).Create(entry).Error
+			if createErr := e.db.WithContext(ctx).Create(entry).Error; createErr != nil {
+				e.logger.Warn("create site traffic daily failed",
+					zap.String("site", siteName),
+					zap.Error(createErr),
+				)
+			}
 			siteTraffic[siteName] = entry
 		} else {
 			e.db.WithContext(ctx).Model(&existing).Updates(map[string]interface{}{

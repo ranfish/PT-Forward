@@ -1,7 +1,7 @@
 import client from './client'
 
 export const publishApi = {
-  listCandidates(params?: any) {
+  listCandidates(params?: Record<string, unknown>) {
     return client.get('/publish/candidates', { params })
   },
   deleteCandidate(id: number) {
@@ -28,10 +28,10 @@ export const publishApi = {
   lifecycleDeleteGroup(id: number) {
     return client.post(`/publish/groups/${id}/lifecycle/delete`)
   },
-  createTask(data: any) {
+  createTask(data: Record<string, unknown>) {
     return client.post('/publish/tasks', data)
   },
-  listTasks(params?: any) {
+  listTasks(params?: Record<string, unknown>) {
     return client.get('/publish/tasks', { params })
   },
   getTask(id: number) {
@@ -40,7 +40,10 @@ export const publishApi = {
   deleteTask(id: number) {
     return client.delete(`/publish/tasks/${id}`)
   },
-  listResults(params?: any) {
+  cancelTask(id: number) {
+    return client.post(`/publish/tasks/${id}/cancel`)
+  },
+  listResults(params?: Record<string, unknown>) {
     return client.get('/publish/results', { params })
   },
 }

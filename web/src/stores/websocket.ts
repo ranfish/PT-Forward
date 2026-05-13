@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 
 export const useWebSocketStore = defineStore('websocket', () => {
   const connected = ref(false)
-  const messages = ref<any[]>([])
+  const messages = ref<Record<string, unknown>[]>([])
   const lastMessage = computed(() => messages.value[messages.value.length - 1] || null)
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null

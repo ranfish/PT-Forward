@@ -161,7 +161,7 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	h.logger.Info("cookiecloud config updated")
+	h.logger.Info("cookiecloud config updated", zap.String("component", "cookiecloud"))
 	Success(w, map[string]interface{}{"message": "配置已更新"})
 }
 

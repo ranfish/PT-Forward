@@ -167,3 +167,21 @@ func (m *Manager) loadPaths(clientID uint) []model.SharedPathMapping {
 	}
 	return result
 }
+
+func (m *Manager) PingAll(ctx context.Context) {
+	m.mu.RLock()
+	clients := make(map[string]model.DownloaderClient, len(m.clients))
+	for k, v := range m.clients {
+		clients[k] = v
+	}
+	m.mu.RUnlock()
+
+	for id, c := range clients {
+		if ctx.Err() != nil {
+			return
+		}
+		if _, err := c.GetMainData(ctx); err != nil {
+			m.logger.Warn("client ping failed", zap.String("clientID", id), zap.Error(err))
+		}
+	}
+}

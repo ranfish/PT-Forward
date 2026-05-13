@@ -253,6 +253,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	var req struct {
 		ClientID            string  `json:"clientId"`
 		Enabled             bool    `json:"enabled"`
+		DeleteRuleIDs       string  `json:"deleteRuleIds"`
 		AutoDeleteCron      string  `json:"autoDeleteCron"`
 		MainDataCron        string  `json:"mainDataCron"`
 		DiskProtectEnabled  bool    `json:"diskProtectEnabled"`
@@ -280,6 +281,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	config := model.SeedingClientConfig{
 		ClientID:            req.ClientID,
 		Enabled:             req.Enabled,
+		DeleteRuleIDs:       req.DeleteRuleIDs,
 		AutoDeleteCron:      req.AutoDeleteCron,
 		MainDataCron:        req.MainDataCron,
 		DiskProtectEnabled:  req.DiskProtectEnabled,
@@ -321,6 +323,9 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 	updates := make(map[string]interface{})
 	if v, ok := req["enabled"]; ok {
 		updates["enabled"] = v
+	}
+	if v, ok := req["deleteRuleIds"]; ok {
+		updates["delete_rule_ids"] = v
 	}
 	if v, ok := req["autoDeleteCron"]; ok {
 		updates["auto_delete_cron"] = v

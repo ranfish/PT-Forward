@@ -15,14 +15,14 @@ type Site struct {
 	AuthType  string `json:"auth_type" gorm:"size:20;not null;default:'cookie'"`
 	Enabled   bool   `json:"enabled" gorm:"default:true"`
 
-	Passkey     string `json:"passkey,omitempty" gorm:"size:200"`
-	Cookie      string `json:"cookie,omitempty" gorm:"type:text"`
-	APIKey      string `json:"api_key,omitempty" gorm:"size:200"`
-	BearerToken string `json:"bearer_token,omitempty" gorm:"size:200"`
-	AuthKey     string `json:"auth_key,omitempty" gorm:"size:200"`
-	AuthHash    string `json:"auth_hash,omitempty" gorm:"size:200"`
+	Passkey     string `json:"passkey,omitempty" gorm:"size:200" encrypted:"true"`
+	Cookie      string `json:"cookie,omitempty" gorm:"type:text" encrypted:"true"`
+	APIKey      string `json:"api_key,omitempty" gorm:"size:200" encrypted:"true"`
+	BearerToken string `json:"bearer_token,omitempty" gorm:"size:200" encrypted:"true"`
+	AuthKey     string `json:"auth_key,omitempty" gorm:"size:200" encrypted:"true"`
+	AuthHash    string `json:"auth_hash,omitempty" gorm:"size:200" encrypted:"true"`
 	UserID      int    `json:"user_id,omitempty" gorm:"default:0"`
-	RSSKey      string `json:"rss_key,omitempty" gorm:"size:200"`
+	RSSKey      string `json:"rss_key,omitempty" gorm:"size:200" encrypted:"true"`
 
 	HashStrategy     string `json:"hash_strategy" gorm:"size:20;not null;default:'xml_tag'"`
 	SizeStrategy     string `json:"size_strategy" gorm:"size:20;not null;default:'xml_tag'"`
@@ -83,7 +83,7 @@ type SiteConfigOverride struct {
 
 	SiteName   string `json:"site_name" gorm:"size:100;not null;uniqueIndex:idx_site_field"`
 	FieldPath  string `json:"field_path" gorm:"size:255;not null;uniqueIndex:idx_site_field"`
-	FieldValue string `json:"field_value" gorm:"type:text;not null"`
+	FieldValue string `json:"field_value" gorm:"type:text;not null" encrypted:"true"`
 	Source     string `json:"source" gorm:"size:20;not null;default:'web_ui'"`
 }
 

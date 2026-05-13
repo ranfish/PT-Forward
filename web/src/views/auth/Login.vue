@@ -6,7 +6,7 @@
         <p>{{ isSetupMode ? t('auth.initialSetup') : t('auth.loginTitle') }}</p>
       </div>
 
-      <a-form :model="form" @finish="handleSubmit" layout="vertical">
+      <a-form :model="form" layout="vertical" @finish="handleSubmit">
         <a-form-item
           name="username"
           :rules="[{ required: true, message: t('auth.usernameRequired') }]"
@@ -109,8 +109,8 @@ async function handleSetup() {
     await authStore.login(form.username, form.password)
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
-  } catch (e: any) {
-    message.error(e.message || t('auth.setupFailed'))
+  } catch (e: unknown) {
+    message.error((e as Error).message || t('auth.setupFailed'))
   } finally {
     loading.value = false
   }
@@ -123,8 +123,8 @@ async function handleLogin() {
     message.success(t('auth.loginSuccess'))
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
-  } catch (e: any) {
-    message.error(e.message || t('auth.wrongCredentials'))
+  } catch (e: unknown) {
+    message.error((e as Error).message || t('auth.wrongCredentials'))
   } finally {
     loading.value = false
   }

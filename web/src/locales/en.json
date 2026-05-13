@@ -68,7 +68,10 @@
     "selectType": "Select type",
     "siteRequired": "Site is required",
     "statusToggled": "Status toggled",
-    "statusUpdated": "Status updated"
+    "statusUpdated": "Status updated",
+    "time": "Time",
+    "title": "Title",
+    "chinese": "Chinese"
   },
   "auth": {
     "login": "Login",
@@ -93,7 +96,10 @@
     "passwordMinLength": "Password must be at least 8 characters",
     "confirmPasswordRequired": "Confirm password is required",
     "newPasswordRequired": "New password is required",
-    "oldPasswordRequired": "Old password is required"
+    "oldPasswordRequired": "Old password is required",
+    "oldPasswordPlaceholder": "Enter old password",
+    "newPasswordPlaceholder": "Enter new password",
+    "confirmPasswordPlaceholder": "Re-enter new password"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -122,7 +128,10 @@
     "systemHealth": "System Monitor",
     "publishExclusions": "Exclusion Rules",
     "torrentEvents": "Torrent Events",
-    "freezeStatus": "Domain Freeze"
+    "freezeStatus": "Domain Freeze",
+    "resourceManagement": "Resource Management",
+    "coreFeatures": "Core Features",
+    "system": "System"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -135,7 +144,10 @@
     "downloadingTorrents": "Downloading",
     "recentActivity": "Recent Activity",
     "trends7d": "7-Day Trends",
-    "torrentTitle": "Torrent Title"
+    "torrentTitle": "Torrent Title",
+    "chartEvents": "Events",
+    "chartPublish": "Publish",
+    "chartReseed": "Reseed"
   },
   "site": {
     "title": "Site Management",
@@ -191,7 +203,51 @@
     "deleteAllOverrideConfirm": "Delete all override configs?",
     "domainRequired": "Domain is required",
     "overrideConfigHint": "Override config takes precedence over global defaults",
-    "siteUrlRequired": "Site URL is required"
+    "siteUrlRequired": "Site URL is required",
+    "mirrorDomain": "Mirror Domain",
+    "mirrorDomainPlaceholder": "e.g. mirror.pterclub.net (leave empty for original)",
+    "selectAuthType": "Select Auth Type",
+    "placeholderConfigured": "•••••••• (configured, leave empty to retain)",
+    "placeholderCookie": "Site Cookie",
+    "placeholderPasskey": "Site Passkey",
+    "placeholderApiKey": "Site API Key (M-Team uses x-api-key)",
+    "roleAndPublish": "Role & Publish",
+    "asSource": "As Source",
+    "asTarget": "As Target",
+    "participateAutoPublishLabel": "Participate in Auto Publish",
+    "cookieCloudSyncLabel": "CookieCloud Sync",
+    "cookieCloudDomainLabel": "CookieCloud Domain",
+    "cookieCloudDomainPlaceholder": "Domain in CookieCloud",
+    "rssSavePathOverride": "RSS / Save Path Override",
+    "overrideRssUrl": "Override RSS URL",
+    "overrideRssUrlPlaceholder": "Custom RSS URL (leave empty for default)",
+    "overrideSavePath": "Override Save Path",
+    "overrideSavePathPlaceholder": "Custom save path (leave empty for default)",
+    "network": "Network",
+    "proxyAddress": "Proxy Address",
+    "proxyPlaceholder": "e.g. socks5://127.0.0.1:1080",
+    "skipSslVerify": "Skip SSL Verify",
+    "parseStrategy": "Parse Strategy",
+    "hashStrategy": "Hash Strategy",
+    "sizeStrategy": "Size Strategy",
+    "idStrategy": "ID Strategy",
+    "defaultGuid": "Default: guid",
+    "defaultEnclosure": "Default: enclosure",
+    "defaultQueryParam": "Default: query_param",
+    "xmlTag": "XML Tag",
+    "fakeFromId": "Generate from ID",
+    "descRegex": "Desc Regex",
+    "queryParam": "Query Param",
+    "linkRegex": "Link Regex",
+    "siteSettings": "Site Settings",
+    "saveSettings": "Save Settings",
+    "role": "Role",
+    "sourceSiteRole": "Source",
+    "targetSiteRole": "Target",
+    "customRssUrl": "Custom RSS URL",
+    "customSavePath": "Custom Save Path",
+    "cookieCloudDomainShortPlaceholder": "CookieCloud Domain",
+    "enabledLabel": "Enabled"
   },
   "downloader": {
     "title": "Downloader Management",
@@ -218,7 +274,22 @@
     "categoryCount": "Categories",
     "tagCount": "Tags",
     "searchTorrent": "Search torrent name",
-    "deletePublishTargetConfirm": "Delete this publish target?"
+    "deletePublishTargetConfirm": "Delete this publish target?",
+    "targetSitePlaceholder": "e.g. hdsky.me",
+    "categoryMappingPlaceholder": "e.g. Movie→Film,TV→Series",
+    "sourceMappingPlaceholder": "e.g. HDSky→HDSky",
+    "codecMappingPlaceholder": "e.g. x264→H.264,x265→H.265",
+    "progress": "Progress",
+    "uploadSpeed": "Upload Speed",
+    "downloadSpeed": "Download Speed",
+    "notify": "Notify",
+    "addressPlaceholder": "e.g. http://192.168.1.1:8080",
+    "role": "Role",
+    "selectRole": "Please select role",
+    "roleDownload": "Download",
+    "roleSeeding": "Seeding",
+    "roleSource": "Source",
+    "roleReseed": "Reseed"
   },
   "subscription": {
     "title": "RSS Subscriptions",
@@ -248,7 +319,55 @@
     "rules": "Rules",
     "rulesJson": "Rules (JSON)",
     "rulesSaved": "Rules saved",
-    "urlRequired": "RSS URL is required"
+    "urlRequired": "RSS URL is required",
+    "downloaderSettings": "Downloader Settings",
+    "selectDownloader": "Select Downloader",
+    "savePathHint": "Save Path (leave empty for downloader default)",
+    "categoryPlaceholder": "Category in downloader",
+    "addPaused": "Add Paused",
+    "autoTmm": "Auto Torrent Management",
+    "tagsPlaceholder": "Enter tag and press Enter",
+    "uploadLimit": "Upload Limit (KB/s)",
+    "downloadLimit": "Download Limit (KB/s)",
+    "noLimit": "0 = No limit",
+    "scrapeOptions": "Scrape Options",
+    "freeOnly": "Free Torrents Only",
+    "freeOnlyHint": "Only push free/discounted torrents to downloader",
+    "scrapeHrLabel": "Detect HR Info",
+    "scrapeHrHint": "Detect site HR (seeding time requirements)",
+    "automation": "Automation",
+    "enableAutoPublish": "Enable Auto Publish",
+    "pushNotifyLabel": "Push Notification",
+    "autoReseedLabel": "Auto Reseed",
+    "rssUrlPerLine": "One RSS URL per line",
+    "rssUrlPerLineShort": "One RSS URL per line",
+    "cronExample": "e.g. */5 * * * *",
+    "cronExampleLong": "e.g. */15 * * * * (every 15 min)",
+    "belongToSite": "Site",
+    "subscriptionNamePlaceholder": "Subscription Name",
+    "rulesHint": "Configure subscription-level custom conditions here (e.g. filter by title, size). Global exclusion rules are managed in Settings → Global Exclusion Rules and apply to all subscriptions.",
+    "selectField": "Select Field",
+    "volumeSize": "Volume Size",
+    "uploader": "Uploader",
+    "isFree": "Is Free",
+    "compareMethod": "Compare Method",
+    "equals": "Equals",
+    "greaterThan": "Greater Than",
+    "lessThan": "Less Than",
+    "contains": "Contains",
+    "notContains": "Does Not Contain",
+    "regexpMatch": "Regexp Match",
+    "unitBytes": "Unit: Bytes",
+    "yesFree": "Yes (Free)",
+    "noNotFree": "No (Not Free)",
+    "inputValue": "Input Value",
+    "bytesHint": "1 GB = 1073741824, 100 MB = 104857600",
+    "addCondition": "Add Condition",
+    "saveRulesBtn": "Save Rules",
+    "deleteShort": "Del",
+    "selectSite": "Select Site",
+    "categoryLabel": "Category",
+    "tagsLabel": "Tags"
   },
   "seeding": {
     "title": "Seeding Management",
@@ -308,6 +427,9 @@
     "pleaseInputDownloaderId": "Please enter downloader ID",
     "pleaseInputRuleAlias": "Please enter rule alias",
     "selectAction": "Select action",
+    "client": "Client",
+    "isFree": "Free",
+    "source": "Source",
     "scoring": {
       "title": "Scoring Management",
       "config": "Scoring Config",
@@ -331,9 +453,16 @@
       "demandScore": "Demand Score",
       "recencyFactor": "Recency Factor",
       "shouldCleanup": "Should Cleanup",
-      "logs": "Scoring Logs"
+      "logs": "Scoring Logs",
+      "linkedSubscription": "Linked Subscription",
+      "selectSubscription": "Select subscription"
     },
-    "matchedResult": "Matched {matched}/{total}"
+    "matchedResult": "Matched {matched}/{total}",
+    "free": "Free",
+    "alias": "Alias",
+    "client": "Client",
+    "condition": "Condition",
+    "source": "Source"
   },
   "reseed": {
     "title": "Reseed Management",
@@ -371,7 +500,8 @@
     "siteOptional": "Site (optional)",
     "sourceSiteIdsPlaceholder": "Enter source site IDs",
     "targetSiteIdsPlaceholder": "Enter target site IDs",
-    "taskNamePlaceholder": "Enter task name"
+    "taskNamePlaceholder": "Enter task name",
+    "taskDetail": "Reseed Task #{id}"
   },
   "publish": {
     "title": "Publish Management",
@@ -401,7 +531,13 @@
     "pleaseEnterSourceSite": "Please select source site",
     "pleaseEnterTargetSite": "Please select target site",
     "sourceSitePlaceholder": "Enter source site",
-    "targetSitePlaceholder": "Enter target site"
+    "targetSitePlaceholder": "Enter target site",
+    "columnRole": "Role",
+    "sourceSiteId": "Source Site ID",
+    "manualCheck": "Manual Check",
+    "publishUrl": "Publish URL",
+    "errorMessage": "Error Message",
+    "completedAt": "Completed At"
   },
   "event": {
     "title": "Torrent Events",
@@ -417,7 +553,9 @@
     "title": "Fingerprints",
     "searchInfoHash": "Search InfoHash",
     "searchPiecesHash": "Search PiecesHash",
-    "deleteConfirm": "Delete this fingerprint?"
+    "deleteConfirm": "Delete this fingerprint?",
+    "cleanupCacheConfirm": "Confirm cleanup fingerprint cache?",
+    "cleanupCache": "Cleanup Cache"
   },
   "httpclient": {
     "title": "Domain Freeze Status",
@@ -438,7 +576,9 @@
     "resetCircuitConfirm": "Reset this circuit breaker?",
     "circuitReset": "{domain} circuit breaker reset",
     "failures": "Failures",
-    "lastFailure": "Last Failure"
+    "lastFailure": "Last Failure",
+    "reason": "Reason",
+    "remainingTime": "Remaining"
   },
   "iyuu": {
     "title": "IYUU Reseed",
@@ -461,7 +601,8 @@
     "deleteSeeders": "Delete Seeders",
     "seedRetentionHours": "Seed Retention (hours)",
     "checkInterval": "Check Interval",
-    "maxConcurrentChecks": "Max Concurrent Checks"
+    "maxConcurrentChecks": "Max Concurrent Checks",
+    "checkIntervalPlaceholder": "e.g. 5m"
   },
   "log": {
     "title": "System Logs",
@@ -539,7 +680,10 @@
     "groupId": "Group ID",
     "memberHash": "Member Hash",
     "oldStatus": "Old Status",
-    "newStatus": "New Status"
+    "newStatus": "New Status",
+    "reason": "Reason",
+    "colTime": "Time",
+    "viewInfoHash": "View InfoHash: {hash}..."
   },
   "system": {
     "title": "System Monitor",
@@ -573,6 +717,11 @@
     "exportBackup": "Export Backup",
     "importBackup": "Import Backup",
     "backupRestored": "Backup restored",
+    "httpProxyPlaceholder": "e.g. http://127.0.0.1:7890",
+    "socksProxyPlaceholder": "e.g. socks5://127.0.0.1:7891",
+    "cookiecloudUrlPlaceholder": "CookieCloud server URL",
+    "cookiecloudUuidPlaceholder": "User UUID",
+    "cookiecloudPasswordPlaceholder": "Encryption password",
     "notifications": {
       "title": "Notification Settings",
       "addChannel": "Add Channel",
@@ -587,7 +736,26 @@
       "history": "History",
       "historyTitle": "{name} Notification History",
       "channelNameRequired": "Channel name is required",
-      "channelTypeRequired": "Channel type is required"
+      "channelTypeRequired": "Channel type is required",
+      "channelNamePlaceholder": "Channel name",
+      "selectTypePlaceholder": "Select notification type",
+      "dingtalk": "DingTalk",
+      "serverchan": "ServerChan",
+      "subscribeEvents": "Subscribe Events",
+      "allEventsPlaceholder": "Leave empty for all events",
+      "maxErrorsPerHour": "Max Errors/Hour",
+      "timeoutMs": "Timeout (ms)",
+      "quietHoursStart": "Quiet Hours Start",
+      "quietHoursStartPlaceholder": "e.g. 23:00",
+      "quietHoursEnd": "Quiet Hours End",
+      "quietHoursEndPlaceholder": "e.g. 08:00",
+      "messageTemplate": "Message Template",
+      "messageTemplatePlaceholder": "Custom message template",
+      "colTime": "Time",
+      "colEvent": "Event",
+      "colTitle": "Title",
+      "colSuccess": "Success",
+      "colError": "Error"
     },
     "filterRules": {
       "title": "Filter Rules",
@@ -607,7 +775,23 @@
       "testMatched": "Rule \"{name}\" matched",
       "testNotMatched": "Rule \"{name}\" did not match",
       "ruleNameRequired": "Rule name is required",
-      "selectRuleType": "Select rule type"
+      "selectRuleType": "Select rule type",
+      "globalExclusionHint": "Global exclusion rules apply to all subscriptions. Torrents matching these rules will be skipped and not pushed to downloaders.",
+      "addExclusionRule": "Add Exclusion Rule",
+      "editExclusionRule": "Edit Exclusion Rule",
+      "matchConditionHint": "Match Conditions (exclude torrent if all conditions are met)",
+      "exclusionCondition": "Exclusion Condition",
+      "moreConditions": "+{n} more",
+      "none": "None",
+      "confirmDeleteThisRule": "Delete this rule?",
+      "ruleNamePlaceholder": "e.g. Exclude no-repost resources",
+      "atLeastOneCondition": "At least one condition is required",
+      "inputNumeric": "Enter number",
+      "selectOption": "Select",
+      "unitBytesDetail": "Unit: Bytes (1 GB = 1073741824, 100 MB = 104857600)",
+      "includeIn": "In (comma-separated)",
+      "notIncludeIn": "Not In (comma-separated)",
+      "notRegexp": "Not Regexp Match"
     }
   },
   "cookiecloud": {
@@ -632,6 +816,7 @@
     "failed": "Failed",
     "running": "Running",
     "connectionTestFailed": "Connection test failed",
-    "connectionTestSuccess": "Connection test successful"
+    "connectionTestSuccess": "Connection test successful",
+    "passwordPlaceholder": "CookieCloud password"
   }
 }

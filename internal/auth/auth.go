@@ -186,6 +186,10 @@ func (m *AuthManager) ConfigureLoginLockout(enabled bool, maxRetries, lockoutMin
 	}
 }
 
+func (m *AuthManager) Stop() {
+	m.persistRefreshTokens()
+}
+
 func (m *AuthManager) loadRefreshTokens(ctx context.Context) {
 	if m.settingRepo == nil {
 		return

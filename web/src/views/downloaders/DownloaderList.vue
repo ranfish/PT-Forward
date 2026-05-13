@@ -19,7 +19,7 @@
         showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
-      @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
+      @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'enabled'">
@@ -44,8 +44,8 @@
     <a-modal
       v-model:open="modalVisible"
       :title="editingRecord ? t('downloader.editDownloader') : t('downloader.addDownloader')"
-      @ok="handleSubmit"
       :confirm-loading="submitting"
+      @ok="handleSubmit"
     >
       <a-form :model="form" layout="vertical">
         <a-form-item :label="t('common.name')" name="name" :rules="[{ required: true, message: t('common.name') }]">
@@ -58,7 +58,7 @@
           </a-select>
         </a-form-item>
         <a-form-item :label="t('common.address')" name="url" :rules="[{ required: true, message: t('common.address') }]">
-          <a-input v-model:value="form.url" placeholder="例如: http://192.168.1.1:8080" />
+          <a-input v-model:value="form.url" :placeholder="t('downloader.addressPlaceholder')" />
         </a-form-item>
         <a-form-item :label="t('common.username')" name="username">
           <a-input v-model:value="form.username" :placeholder="t('common.username')" />
@@ -66,12 +66,12 @@
         <a-form-item :label="t('common.password')" name="password">
           <a-input-password v-model:value="form.password" :placeholder="t('common.password')" />
         </a-form-item>
-        <a-form-item label="角色" name="role" :rules="[{ required: true, message: '请选择角色' }]">
-          <a-select v-model:value="form.role" placeholder="请选择角色">
-            <a-select-option value="download">下载</a-select-option>
-            <a-select-option value="seeding">做种</a-select-option>
-            <a-select-option value="source">源站</a-select-option>
-            <a-select-option value="reseed">辅种</a-select-option>
+        <a-form-item :label="t('downloader.role')" name="role" :rules="[{ required: true, message: t('downloader.selectRole') }]">
+          <a-select v-model:value="form.role" :placeholder="t('downloader.selectRole')">
+            <a-select-option value="download">{{ t('downloader.roleDownload') }}</a-select-option>
+            <a-select-option value="seeding">{{ t('downloader.roleSeeding') }}</a-select-option>
+            <a-select-option value="source">{{ t('downloader.roleSource') }}</a-select-option>
+            <a-select-option value="reseed">{{ t('downloader.roleReseed') }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item :label="t('common.enable')" name="enabled">
@@ -89,11 +89,12 @@ import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { downloadersApi } from '@/api/downloaders'
 import { usePagination } from '@/composables/usePagination'
+import type { ClientConfig } from '@/api/types'
 
 const { t } = useI18n()
 const modalVisible = ref(false)
 const submitting = ref(false)
-const editingRecord = ref<any>(null)
+const editingRecord = ref<ClientConfig | null>(null)
 
 const form = reactive({
   name: '',
@@ -106,17 +107,17 @@ const form = reactive({
 })
 
 const columns = [
-  { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '类型', dataIndex: 'type', key: 'type' },
-  { title: '地址', dataIndex: 'url', key: 'url' },
-  { title: '角色', dataIndex: 'role', key: 'role', width: 80 },
-  { title: '启用', dataIndex: 'enabled', key: 'enabled', width: 80 },
-  { title: '操作', key: 'actions', width: 260 },
+  { title: t('common.name'), dataIndex: 'name', key: 'name' },
+  { title: t('common.type'), dataIndex: 'type', key: 'type' },
+  { title: t('common.address'), dataIndex: 'url', key: 'url' },
+  { title: t('downloader.role'), dataIndex: 'role', key: 'role', width: 80 },
+  { title: t('common.enable'), dataIndex: 'enabled', key: 'enabled', width: 80 },
+  { title: t('common.actions'), key: 'actions', width: 260 },
 ]
 
 const pagination = usePagination((page, size) => downloadersApi.list(page, size))
 
-function openModal(record?: any) {
+function openModal(record?: ClientConfig) {
   editingRecord.value = record || null
   if (record) {
     Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true })
@@ -137,8 +138,8 @@ async function handleSubmit() {
     message.success(t('common.operationSuccess'))
     modalVisible.value = false
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     submitting.value = false
   }
@@ -149,8 +150,8 @@ async function handleDelete(id: number) {
     await downloadersApi.delete(id)
     message.success(t('common.deleteSuccess'))
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -158,8 +159,8 @@ async function testConnection(id: number) {
   try {
     await downloadersApi.testConnection(id)
     message.success(t('common.testSuccess'))
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 

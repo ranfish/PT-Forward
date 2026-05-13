@@ -9,7 +9,7 @@
       </template>
     </a-page-header>
 
-    <a-tabs v-model:activeKey="activeTab" @change="onTabChange">
+    <a-tabs v-model:active-key="activeTab" @change="onTabChange">
       <a-tab-pane key="freeze" :tab="t('httpclient.freezeStatus')">
         <a-table
           :columns="freezeColumns"
@@ -72,26 +72,40 @@ import { httpclientApi } from '@/api/httpclient'
 
 const { t } = useI18n()
 
+interface FreezeStatusItem {
+  domain: string
+  frozen: boolean
+  reason: string
+  remaining: string
+}
+
+interface CircuitStatusItem {
+  domain: string
+  state: string
+  failures: number
+  last_failure: string
+}
+
 const activeTab = ref('freeze')
 const freezeLoading = ref(false)
 const circuitLoading = ref(false)
-const freezeStatuses = ref<any[]>([])
-const circuitStatuses = ref<any[]>([])
+const freezeStatuses = ref<FreezeStatusItem[]>([])
+const circuitStatuses = ref<CircuitStatusItem[]>([])
 
 const freezeColumns = [
-  { title: '域名', dataIndex: 'domain', key: 'domain', ellipsis: true },
-  { title: '状态', key: 'frozen', width: 100 },
-  { title: '原因', key: 'reason', ellipsis: true },
-  { title: '剩余时间', dataIndex: 'remaining', key: 'remaining', width: 120 },
-  { title: '操作', key: 'actions', width: 80 },
+  { title: t('site.domain'), dataIndex: 'domain', key: 'domain', ellipsis: true },
+  { title: t('common.status'), key: 'frozen', width: 100 },
+  { title: t('httpclient.reason'), key: 'reason', ellipsis: true },
+  { title: t('httpclient.remainingTime'), dataIndex: 'remaining', key: 'remaining', width: 120 },
+  { title: t('common.actions'), key: 'actions', width: 80 },
 ]
 
 const circuitColumns = [
-  { title: '域名', dataIndex: 'domain', key: 'domain', ellipsis: true },
-  { title: '状态', key: 'state', width: 100 },
-  { title: '失败次数', dataIndex: 'failures', key: 'failures', width: 100 },
-  { title: '最后失败', dataIndex: 'last_failure', key: 'last_failure', width: 180 },
-  { title: '操作', key: 'actions', width: 80 },
+  { title: t('site.domain'), dataIndex: 'domain', key: 'domain', ellipsis: true },
+  { title: t('common.status'), key: 'state', width: 100 },
+  { title: t('httpclient.failures'), dataIndex: 'failures', key: 'failures', width: 100 },
+  { title: t('httpclient.lastFailure'), dataIndex: 'last_failure', key: 'last_failure', width: 180 },
+  { title: t('common.actions'), key: 'actions', width: 80 },
 ]
 
 async function fetchFreezeStatuses() {
@@ -99,8 +113,8 @@ async function fetchFreezeStatuses() {
   try {
     const resp = await httpclientApi.getFreezeStatuses()
     freezeStatuses.value = resp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     freezeLoading.value = false
   }
@@ -111,8 +125,8 @@ async function fetchCircuitStatuses() {
   try {
     const resp = await httpclientApi.getCircuitStatuses()
     circuitStatuses.value = resp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     circuitLoading.value = false
   }
@@ -133,8 +147,8 @@ async function handleUnfreeze(domain: string) {
     await httpclientApi.unfreezeDomain(domain)
     message.success(t('httpclient.domainUnfrozen', { domain }))
     fetchFreezeStatuses()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 
@@ -143,8 +157,8 @@ async function handleResetCircuit(domain: string) {
     await httpclientApi.resetCircuit(domain)
     message.success(t('httpclient.circuitReset', { domain }))
     fetchCircuitStatuses()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 

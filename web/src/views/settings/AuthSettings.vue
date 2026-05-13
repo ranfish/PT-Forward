@@ -1,13 +1,13 @@
 <template>
   <div>
     <a-card :title="t('auth.changePassword')" style="max-width: 500px">
-      <a-form :model="form" @finish="handleSubmit" layout="vertical">
+      <a-form :model="form" layout="vertical" @finish="handleSubmit">
         <a-form-item
           :label="t('auth.oldPassword')"
           name="oldPassword"
           :rules="[{ required: true, message: t('auth.oldPasswordRequired') }]"
         >
-          <a-input-password v-model:value="form.oldPassword" placeholder="请输入旧密码" />
+          <a-input-password v-model:value="form.oldPassword" :placeholder="t('auth.oldPasswordPlaceholder')" />
         </a-form-item>
         <a-form-item
           :label="t('auth.newPassword')"
@@ -17,7 +17,7 @@
             { min: 8, message: t('auth.passwordMinLength') },
           ]"
         >
-          <a-input-password v-model:value="form.newPassword" placeholder="请输入新密码" />
+          <a-input-password v-model:value="form.newPassword" :placeholder="t('auth.newPasswordPlaceholder')" />
         </a-form-item>
         <a-form-item
           :label="t('auth.confirmPassword')"
@@ -27,7 +27,7 @@
             { validator: validateConfirmPassword },
           ]"
         >
-          <a-input-password v-model:value="form.confirmPassword" placeholder="请再次输入新密码" />
+          <a-input-password v-model:value="form.confirmPassword" :placeholder="t('auth.confirmPasswordPlaceholder')" />
         </a-form-item>
         <a-form-item>
           <a-button type="primary" html-type="submit" :loading="submitting">
@@ -68,8 +68,8 @@ async function handleSubmit() {
     await authApi.changePassword(form.oldPassword, form.newPassword)
     message.success(t('auth.passwordChanged'))
     Object.assign(form, { oldPassword: '', newPassword: '', confirmPassword: '' })
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     submitting.value = false
   }
