@@ -1,6 +1,9 @@
 package model
 
 import (
+	"encoding/json"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -327,5 +330,240 @@ func TestPublishCandidate_Fields(t *testing.T) {
 	}
 	if !c.HasHR {
 		t.Error("HasHR should be true")
+	}
+}
+
+func TestCompareType_Values(t *testing.T) {
+	valid := []CompareType{
+		CompareEquals, CompareBigger, CompareSmaller,
+		CompareContain, CompareIncludeIn,
+		CompareNotContain, CompareNotIncludeIn,
+		CompareRegExp, CompareNotRegExp,
+	}
+	for _, ct := range valid {
+		if string(ct) == "" {
+			t.Errorf("CompareType %v has empty string value", ct)
+		}
+	}
+}
+
+func TestFrameworkLabels_Completeness(t *testing.T) {
+	frameworks := []Framework{
+		FrameworkNexusPHP, FrameworkUnit3D, FrameworkGazelle,
+		FrameworkMTeam, FrameworkTNode, FrameworkLuminance,
+		FrameworkRousi, FrameworkGeneric,
+	}
+	for _, f := range frameworks {
+		if _, ok := FrameworkLabels[f]; !ok {
+			t.Errorf("Framework %q missing from FrameworkLabels", f)
+		}
+	}
+	if len(FrameworkLabels) != len(frameworks) {
+		t.Errorf("FrameworkLabels has %d entries, expected %d", len(FrameworkLabels), len(frameworks))
+	}
+}
+
+func TestAuthTypeLabels_Completeness(t *testing.T) {
+	types := []AuthType{AuthTypeCookie, AuthTypeAPIKey, AuthTypePasskey}
+	for _, at := range types {
+		if _, ok := AuthTypeLabels[at]; !ok {
+			t.Errorf("AuthType %q missing from AuthTypeLabels", at)
+		}
+	}
+}
+
+func TestSite_JSONOmitEmptyCredentials(t *testing.T) {
+	s := Site{
+		ID:        1,
+		Domain:    "test.com",
+		Name:      "Test",
+		Framework: "nexusphp",
+		AuthType:  "cookie",
+	}
+	data, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"passkey", "cookie", "api_key", "bearer_token", "auth_key", "auth_hash", "rss_key"} {
+		if _, ok := m[field]; ok {
+			t.Errorf("empty credential field %q should be omitted in JSON", field)
+		}
+	}
+}
+
+func TestSite_JSONIncludesCredentialsWhenSet(t *testing.T) {
+	s := Site{
+		Domain:    "test.com",
+		Passkey:   "secret123",
+		Cookie:    "session=abc",
+		APIKey:    "key456",
+	}
+	data, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := string(data)
+	for _, val := range []string{`"secret123"`, `"session=abc"`, `"key456"`} {
+		if !strings.Contains(raw, val) {
+			t.Errorf("set credential value %q should appear in JSON", val)
+		}
+	}
+}
+
+func TestClient_PasswordEncrypted(t *testing.T) {
+	field, ok := reflect.TypeOf(ClientConfig{}).FieldByName("Password")
+	if !ok {
+		t.Fatal("ClientConfig.Password field not found")
+	}
+	if field.Tag.Get("encrypted") != "true" {
+		t.Error("ClientConfig.Password should have encrypted:true tag")
+	}
+}
+
+func TestPublishCandidateStatus_Values(t *testing.T) {
+	statuses := []PublishCandidateStatus{
+		CandidatePending, CandidateDownloading, CandidateCompleted,
+		CandidatePublishing, CandidateDone, CandidateFailed,
+		CandidateSkipped, CandidateOrphan,
+	}
+	seen := map[PublishCandidateStatus]bool{}
+	for _, s := range statuses {
+		if seen[s] {
+			t.Errorf("duplicate PublishCandidateStatus: %q", s)
+		}
+		seen[s] = true
+	}
+}
+
+func TestMemberStatus_Values(t *testing.T) {
+	statuses := []MemberStatus{
+		MemberStatusNew, MemberStatusUploaded, MemberStatusUploading,
+		MemberStatusInjected, MemberStatusSeedingConfirmed,
+		MemberStatusDownloading, MemberStatusPaused,
+		MemberStatusError, MemberStatusBanned, MemberStatusDeleted,
+	}
+	seen := map[MemberStatus]bool{}
+	for _, s := range statuses {
+		if seen[s] {
+			t.Errorf("duplicate MemberStatus: %q", s)
+		}
+		seen[s] = true
+	}
+}
+
+func TestReseedMatchStatus_Values(t *testing.T) {
+	statuses := []ReseedMatchStatus{
+		MatchStatusMatched, MatchStatusInjecting,
+		MatchStatusInjected, MatchStatusFailed, MatchStatusSkipped,
+	}
+	seen := map[ReseedMatchStatus]bool{}
+	for _, s := range statuses {
+		if seen[s] {
+			t.Errorf("duplicate ReseedMatchStatus: %q", s)
+		}
+		seen[s] = true
+	}
+}
+
+func TestSideLoadStatus_Values(t *testing.T) {
+	statuses := []SideLoadStatus{
+		SideLoadNotRequired, SideLoadPending, SideLoading,
+		SideLoadCompleted, SideLoadFailed,
+	}
+	seen := map[SideLoadStatus]bool{}
+	for _, s := range statuses {
+		if seen[s] {
+			t.Errorf("duplicate SideLoadStatus: %q", s)
+		}
+		seen[s] = true
+	}
+}
+
+func TestHashStrategy_Values(t *testing.T) {
+	strategies := []HashStrategy{
+		HashGuid, HashBencode, HashFakeFromID,
+		HashXMLTag, HashURLParam, HashGuidSuffix, HashNone,
+	}
+	for _, s := range strategies {
+		if string(s) == "" {
+			t.Errorf("HashStrategy has empty string value")
+		}
+	}
+}
+
+func TestClientSelectionMode_Values(t *testing.T) {
+	modes := []ClientSelectionMode{
+		SelectionFixed, SelectionMostSpace,
+		SelectionLeastLoad, SelectionRoundRobin, SelectionBestFit,
+	}
+	for _, m := range modes {
+		if string(m) == "" {
+			t.Errorf("ClientSelectionMode has empty string value")
+		}
+	}
+}
+
+func TestFilterRule_TableName(t *testing.T) {
+	r := FilterRule{}
+	if r.TableName() != "filter_rules" {
+		t.Errorf("expected filter_rules, got %q", r.TableName())
+	}
+}
+
+func TestRuleCondition_JSONRoundtrip(t *testing.T) {
+	cond := RuleCondition{
+		Key:         "size",
+		CompareType: CompareBigger,
+		Value:       "1073741824",
+	}
+	data, err := json.Marshal(cond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded RuleCondition
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Key != cond.Key || decoded.CompareType != cond.CompareType || decoded.Value != cond.Value {
+		t.Errorf("roundtrip mismatch: got %+v, want %+v", decoded, cond)
+	}
+}
+
+func TestDecisionType_Values(t *testing.T) {
+	decisions := []DecisionType{
+		DecisionMatch, DecisionMatchSizeOnly, DecisionMatchPartial,
+		DecisionReleaseGroupMismatch, DecisionResolutionMismatch,
+		DecisionSourceMismatch, DecisionProperRepackMismatch,
+		DecisionFuzzySizeMismatch, DecisionSizeMismatch,
+		DecisionFileTreeMismatch, DecisionPartialSizeMismatch,
+		DecisionSameInfoHash, DecisionAlreadyExists,
+		DecisionDownloadFailed, DecisionNoDownloadLink,
+		DecisionBlockedRelease,
+	}
+	seen := map[DecisionType]bool{}
+	for _, d := range decisions {
+		if seen[d] {
+			t.Errorf("duplicate DecisionType: %q", d)
+		}
+		seen[d] = true
+	}
+}
+
+func TestPublishGroupStatus_Values(t *testing.T) {
+	statuses := []PublishGroupStatus{
+		GroupActive, GroupPublishing, GroupMonitoring,
+		GroupPartiallyPaused, GroupAllPaused,
+		GroupDeleting, GroupDeleted, GroupPublishFailed,
+	}
+	seen := map[PublishGroupStatus]bool{}
+	for _, s := range statuses {
+		if seen[s] {
+			t.Errorf("duplicate PublishGroupStatus: %q", s)
+		}
+		seen[s] = true
 	}
 }
