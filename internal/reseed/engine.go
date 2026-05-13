@@ -15,6 +15,23 @@ import (
 	"gorm.io/gorm"
 )
 
+type preloadedSites struct {
+	infos    []*model.SiteInfo
+	configs  map[string]*model.SiteConfig
+	adapters map[string]model.SiteAdapter
+}
+
+type fpCache struct {
+	byKey map[string]*model.ContentFingerprint
+}
+
+func (c *fpCache) get(infoHash, siteName string) *model.ContentFingerprint {
+	if c == nil {
+		return nil
+	}
+	return c.byKey[infoHash+"|"+siteName]
+}
+
 type Engine struct {
 	db             *gorm.DB
 	logger         *zap.Logger
@@ -48,6 +65,190 @@ func (e *Engine) SetClientProvider(cp model.DownloaderProvider) {
 
 func (e *Engine) SetIYUUService(svc model.IYUUService) {
 	e.iyuuService = svc
+}
+
+func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []string) *preloadedSites {
+	if e.siteProvider == nil {
+		return nil
+	}
+
+	exclSet := make(map[string]bool, len(excludedSites))
+	for _, s := range excludedSites {
+		exclSet[s] = true
+	}
+
+	var allSites []*model.SiteInfo
+	if len(targetSites) > 0 {
+		for _, siteName := range targetSites {
+			info, err := e.siteProvider.GetSiteInfo(ctx, siteName)
+			if err != nil {
+				e.logger.Warn("获取目标站点信息失败", zap.String("site", siteName), zap.Error(err))
+				continue
+			}
+			allSites = append(allSites, info)
+		}
+	} else {
+		sites, err := e.siteProvider.ListSites(ctx)
+		if err != nil {
+			e.logger.Warn("列出站点失败", zap.Error(err))
+			return nil
+		}
+		allSites = sites
+	}
+
+	var eligible []*model.SiteInfo
+	configs := make(map[string]*model.SiteConfig)
+	adapters := make(map[string]model.SiteAdapter)
+
+	for _, info := range allSites {
+		if exclSet[info.Name] || !info.Enabled {
+			continue
+		}
+
+		config, err := e.siteProvider.GetSiteConfig(ctx, info.BaseURL)
+		if err != nil {
+			e.logger.Warn("获取站点配置失败", zap.String("site", info.Name), zap.Error(err))
+			continue
+		}
+
+		adapter, err := e.siteProvider.GetAdapter(ctx, info.BaseURL)
+		if err != nil {
+			e.logger.Warn("获取适配器失败", zap.String("site", info.Name), zap.Error(err))
+			continue
+		}
+
+		eligible = append(eligible, info)
+		configs[info.Name] = config
+		adapters[info.Name] = adapter
+	}
+
+	return &preloadedSites{
+		infos:    eligible,
+		configs:  configs,
+		adapters: adapters,
+	}
+}
+
+func (e *Engine) preloadFingerprints(ctx context.Context, records []model.SeedingTorrentRecord) *fpCache {
+	if len(records) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var infoHashes []string
+	for _, rec := range records {
+		if !seen[rec.InfoHash] {
+			seen[rec.InfoHash] = true
+			infoHashes = append(infoHashes, rec.InfoHash)
+		}
+	}
+
+	var fps []*model.ContentFingerprint
+	if e.fpRepo != nil {
+		batch, err := e.fpRepo.BatchGetByInfoHashes(ctx, infoHashes)
+		if err != nil {
+			e.logger.Warn("批量预加载指纹失败", zap.Error(err))
+			return &fpCache{byKey: make(map[string]*model.ContentFingerprint)}
+		}
+		fps = batch
+	} else {
+		var batch []model.ContentFingerprint
+		if err := e.db.WithContext(ctx).Where("info_hash IN ?", infoHashes).Find(&batch).Error; err != nil {
+			e.logger.Warn("批量预加载指纹失败(DB)", zap.Error(err))
+			return &fpCache{byKey: make(map[string]*model.ContentFingerprint)}
+		}
+		fps = make([]*model.ContentFingerprint, len(batch))
+		for i := range batch {
+			fps[i] = &batch[i]
+		}
+	}
+
+	byKey := make(map[string]*model.ContentFingerprint, len(fps))
+	for _, fp := range fps {
+		byKey[fp.InfoHash+"|"+fp.SiteName] = fp
+	}
+	return &fpCache{byKey: byKey}
+}
+
+func (e *Engine) preloadExistingMatches(ctx context.Context, records []model.SeedingTorrentRecord) map[string][]model.ReseedMatch {
+	if len(records) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var infoHashes []string
+	for _, rec := range records {
+		if !seen[rec.InfoHash] {
+			seen[rec.InfoHash] = true
+			infoHashes = append(infoHashes, rec.InfoHash)
+		}
+	}
+
+	var matches []model.ReseedMatch
+	if err := e.db.WithContext(ctx).
+		Where("source_info_hash IN ?", infoHashes).
+		Find(&matches).Error; err != nil {
+		e.logger.Warn("批量预加载已有匹配失败", zap.Error(err))
+		return make(map[string][]model.ReseedMatch)
+	}
+
+	result := make(map[string][]model.ReseedMatch, len(matches))
+	for _, m := range matches {
+		result[m.SourceInfoHash] = append(result[m.SourceInfoHash], m)
+	}
+	return result
+}
+
+func (e *Engine) preloadIYUUResults(ctx context.Context, records []model.SeedingTorrentRecord) map[string][]*model.IYUUReseedResult {
+	if e.iyuuService == nil || len(records) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var infoHashes []string
+	for _, rec := range records {
+		if !seen[rec.InfoHash] {
+			seen[rec.InfoHash] = true
+			infoHashes = append(infoHashes, rec.InfoHash)
+		}
+	}
+
+	results, err := e.iyuuService.QueryReseed(ctx, infoHashes)
+	if err != nil {
+		e.logger.Warn("IYUU 批量查询失败", zap.Error(err))
+		return make(map[string][]*model.IYUUReseedResult)
+	}
+
+	byHash := make(map[string][]*model.IYUUReseedResult)
+	for _, r := range results {
+		byHash[r.SourceInfoHash] = append(byHash[r.SourceInfoHash], r)
+	}
+	return byHash
+}
+
+func (e *Engine) preloadIYUUSiteMappings(ctx context.Context) map[int]string {
+	var mappings []model.IYUUSiteMapping
+	if err := e.db.WithContext(ctx).Find(&mappings).Error; err != nil {
+		return make(map[int]string)
+	}
+	result := make(map[int]string, len(mappings))
+	for _, m := range mappings {
+		siteName := m.SiteName
+		if siteName != "" && e.siteProvider != nil {
+			if info, err := e.siteProvider.GetSiteInfo(ctx, siteName); err == nil && info != nil {
+				siteName = info.Name
+			}
+		}
+		if siteName == "" && m.SiteDomain != "" && e.siteProvider != nil {
+			if info, err := e.siteProvider.GetSiteInfoByURL(ctx, m.SiteDomain); err == nil && info != nil {
+				siteName = info.Name
+			}
+		}
+		if siteName != "" {
+			result[m.IYUUSid] = siteName
+		}
+	}
+	return result
 }
 
 func (e *Engine) Start(ctx context.Context) error {
@@ -213,6 +414,17 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 		sizeTolerance = 1.0
 	}
 
+	ps := e.preloadSites(ctx, targetSites, excludedSites)
+	fpCache := e.preloadFingerprints(ctx, seedingRecords)
+	existingMatchesMap := e.preloadExistingMatches(ctx, seedingRecords)
+
+	var iyuuResults map[string][]*model.IYUUReseedResult
+	var iyuuSidMap map[int]string
+	if task.EngineMode == "e2_auto" && e.iyuuService != nil && hasMatchMethod(task.MatchMethods, "iyuu") {
+		iyuuResults = e.preloadIYUUResults(ctx, seedingRecords)
+		iyuuSidMap = e.preloadIYUUSiteMappings(ctx)
+	}
+
 	for _, rec := range seedingRecords {
 		if ctx.Err() == context.Canceled {
 			break
@@ -233,10 +445,8 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 		}
 
 		var recTitle string
-		if e.fpRepo != nil {
-			if fp, fpErr := e.fpRepo.GetByInfoHashAndSite(ctx, rec.InfoHash, rec.SiteName); fpErr == nil && fp != nil {
-				recTitle = fp.Title
-			}
+		if fp := fpCache.get(rec.InfoHash, rec.SiteName); fp != nil {
+			recTitle = fp.Title
 		}
 
 		if !checkPublishEligibility(recTitle) {
@@ -244,21 +454,15 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 			continue
 		}
 
-		existingMatches, err := e.FindMatchesByInfoHash(ctx, rec.InfoHash)
-		if err != nil {
-			e.logger.Warn("查询已有匹配失败", zap.String("infoHash", rec.InfoHash), zap.Error(err))
-			result.Failed++
-			continue
-		}
-		if len(existingMatches) > 0 {
+		if existingMatches := existingMatchesMap[rec.InfoHash]; len(existingMatches) > 0 {
 			result.DuplicateExists += len(existingMatches)
 			continue
 		}
 
-		candidates := e.findCandidates(ctx, rec, targetSites, excludedSites, sizeTolerance, task)
+		candidates := e.findCandidates(ctx, rec, ps, fpCache, sizeTolerance, task)
 
-		if task.EngineMode == "e2_auto" && e.iyuuService != nil && hasMatchMethod(task.MatchMethods, "iyuu") {
-			iyuuCandidates := e.queryIYUU(ctx, rec, targetSites, excludedSites)
+		if iyuuResults != nil {
+			iyuuCandidates := e.filterIYUUResults(rec, iyuuResults, iyuuSidMap, targetSites, excludedSites)
 			if len(iyuuCandidates) > 0 {
 				candidates = append(candidates, iyuuCandidates...)
 			}
@@ -313,8 +517,8 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 				continue
 			}
 
-			if e.clientProvider != nil && e.siteProvider != nil {
-				if err := e.injectMatch(ctx, match, task); err != nil {
+			if e.clientProvider != nil {
+				if err := e.injectMatch(ctx, match, task, ps); err != nil {
 					e.logger.Warn("注入辅种失败",
 						zap.Uint("matchID", match.ID),
 						zap.String("targetSite", c.TargetSite),
@@ -346,62 +550,27 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 	return result, nil
 }
 
-func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRecord, targetSites, excludedSites []string, sizeTolerance float64, task *model.ReseedTask) []model.Candidate {
-	if e.siteProvider == nil {
+func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRecord, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask) []model.Candidate {
+	if ps == nil {
 		return nil
-	}
-
-	var allSites []*model.SiteInfo
-	if len(targetSites) > 0 {
-		for _, siteName := range targetSites {
-			info, err := e.siteProvider.GetSiteInfo(ctx, siteName)
-			if err != nil {
-				e.logger.Warn("获取目标站点信息失败", zap.String("site", siteName), zap.Error(err))
-				continue
-			}
-			allSites = append(allSites, info)
-		}
-	} else {
-		sites, err := e.siteProvider.ListSites(ctx)
-		if err != nil {
-			e.logger.Warn("列出站点失败", zap.Error(err))
-			return nil
-		}
-		for _, s := range sites {
-			if s.Name == rec.SiteName {
-				continue
-			}
-			allSites = append(allSites, s)
-		}
-	}
-
-	exclSet := make(map[string]bool, len(excludedSites))
-	for _, s := range excludedSites {
-		exclSet[s] = true
 	}
 
 	var candidates []model.Candidate
 
-	for _, siteInfo := range allSites {
+	for _, siteInfo := range ps.infos {
 		if ctx.Err() == context.Canceled {
 			break
-		}
-		if exclSet[siteInfo.Name] || !siteInfo.Enabled {
-			continue
 		}
 		if siteInfo.Name == rec.SiteName {
 			continue
 		}
 
-		siteConfig, err := e.siteProvider.GetSiteConfig(ctx, siteInfo.BaseURL)
-		if err != nil {
-			e.logger.Warn("获取站点配置失败", zap.String("site", siteInfo.Name), zap.Error(err))
+		siteConfig := ps.configs[siteInfo.Name]
+		if siteConfig == nil {
 			continue
 		}
-
-		adapter, err := e.siteProvider.GetAdapter(ctx, siteInfo.BaseURL)
-		if err != nil {
-			e.logger.Warn("获取适配器失败", zap.String("site", siteInfo.Name), zap.Error(err))
+		adapter := ps.adapters[siteInfo.Name]
+		if adapter == nil {
 			continue
 		}
 
@@ -411,13 +580,13 @@ func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRec
 			continue
 		}
 
-		c = e.matchLayer2SizeTitle(ctx, adapter, siteConfig, rec, siteInfo.Name, sizeTolerance)
+		c = e.matchLayer2SizeTitle(ctx, adapter, siteConfig, rec, siteInfo.Name, sizeTolerance, fc)
 		if c != nil {
 			candidates = append(candidates, *c)
 			continue
 		}
 
-		c = e.matchLayer3Fingerprint(ctx, rec, siteInfo.Name)
+		c = e.matchLayer3Fingerprint(ctx, rec, siteInfo.Name, fc)
 		if c != nil {
 			candidates = append(candidates, *c)
 		}
@@ -459,22 +628,10 @@ func (e *Engine) matchLayer1InfoHash(ctx context.Context, adapter model.SiteAdap
 	return nil
 }
 
-func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, rec model.SeedingTorrentRecord, siteName string, sizeTolerance float64) *model.Candidate {
-	var fp *model.ContentFingerprint
-	if e.fpRepo != nil {
-		var err error
-		fp, err = e.fpRepo.GetByInfoHashAndSite(ctx, rec.InfoHash, rec.SiteName)
-		if err != nil {
-			e.logger.Debug("Layer2 指纹查询失败", zap.String("site", rec.SiteName), zap.String("info_hash", rec.InfoHash), zap.Error(err))
-			return nil
-		}
-	} else {
-		var fpModel model.ContentFingerprint
-		if err := e.db.WithContext(ctx).Where("info_hash = ? AND site_name = ?", rec.InfoHash, rec.SiteName).First(&fpModel).Error; err != nil {
-			e.logger.Debug("Layer2 DB查询失败", zap.String("site", rec.SiteName), zap.String("info_hash", rec.InfoHash), zap.Error(err))
-			return nil
-		}
-		fp = &fpModel
+func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, rec model.SeedingTorrentRecord, siteName string, sizeTolerance float64, fc *fpCache) *model.Candidate {
+	fp := fc.get(rec.InfoHash, rec.SiteName)
+	if fp == nil {
+		return nil
 	}
 
 	keyword := NormalizeTitle(fp.Title)
@@ -521,24 +678,10 @@ func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAda
 	return best
 }
 
-func (e *Engine) matchLayer3Fingerprint(ctx context.Context, rec model.SeedingTorrentRecord, siteName string) *model.Candidate {
-	var sourceFP *model.ContentFingerprint
-	if e.fpRepo != nil {
-		var err error
-		sourceFP, err = e.fpRepo.GetByInfoHashAndSite(ctx, rec.InfoHash, rec.SiteName)
-		if err != nil {
-			e.logger.Debug("Layer3 源指纹查询失败", zap.String("site", rec.SiteName), zap.String("info_hash", rec.InfoHash), zap.Error(err))
-			return nil
-		}
-	} else {
-		var fp model.ContentFingerprint
-		if err := e.db.WithContext(ctx).
-			Where("info_hash = ? AND site_name = ?", rec.InfoHash, rec.SiteName).
-			First(&fp).Error; err != nil {
-			e.logger.Debug("Layer3 源指纹DB查询失败", zap.String("site", rec.SiteName), zap.String("info_hash", rec.InfoHash), zap.Error(err))
-			return nil
-		}
-		sourceFP = &fp
+func (e *Engine) matchLayer3Fingerprint(ctx context.Context, rec model.SeedingTorrentRecord, siteName string, fc *fpCache) *model.Candidate {
+	sourceFP := fc.get(rec.InfoHash, rec.SiteName)
+	if sourceFP == nil {
+		return nil
 	}
 
 	if sourceFP.PiecesHash == "" && sourceFP.FilesHash == "" {
@@ -868,9 +1011,9 @@ func checkPublishEligibility(title string) bool {
 	return true
 }
 
-func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task *model.ReseedTask) error {
-	if e.siteProvider == nil || e.clientProvider == nil {
-		return reseedError(ErrReseedConfig, "site provider or client provider not configured", nil)
+func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task *model.ReseedTask, ps *preloadedSites) error {
+	if ps == nil {
+		return reseedError(ErrReseedConfig, "preloaded sites not available", nil)
 	}
 
 	e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
@@ -878,19 +1021,14 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		"updated_at": time.Now(),
 	})
 
-	targetSiteInfo, err := e.siteProvider.GetSiteInfo(ctx, match.TargetSite)
-	if err != nil {
-		return e.failMatch(ctx, match, fmt.Sprintf("获取目标站信息失败: %v", err))
+	targetConfig := ps.configs[match.TargetSite]
+	if targetConfig == nil {
+		return e.failMatch(ctx, match, fmt.Sprintf("目标站配置未预加载: %s", match.TargetSite))
 	}
 
-	targetConfig, err := e.siteProvider.GetSiteConfig(ctx, targetSiteInfo.BaseURL)
-	if err != nil {
-		return e.failMatch(ctx, match, fmt.Sprintf("获取目标站配置失败: %v", err))
-	}
-
-	targetAdapter, err := e.siteProvider.GetAdapter(ctx, targetSiteInfo.BaseURL)
-	if err != nil {
-		return e.failMatch(ctx, match, fmt.Sprintf("获取目标站适配器失败: %v", err))
+	targetAdapter := ps.adapters[match.TargetSite]
+	if targetAdapter == nil {
+		return e.failMatch(ctx, match, fmt.Sprintf("目标站适配器未预加载: %s", match.TargetSite))
 	}
 
 	torrentData, err := targetAdapter.DownloadTorrent(ctx, targetConfig, match.TargetTorrentID)
@@ -964,10 +1102,9 @@ func hasMatchMethod(methodsStr, method string) bool {
 	return false
 }
 
-func (e *Engine) queryIYUU(ctx context.Context, rec model.SeedingTorrentRecord, targetSites, excludedSites []string) []model.Candidate {
-	results, err := e.iyuuService.QueryReseed(ctx, []string{rec.InfoHash})
-	if err != nil {
-		e.logger.Warn("IYUU 查询失败", zap.String("infoHash", rec.InfoHash), zap.Error(err))
+func (e *Engine) filterIYUUResults(rec model.SeedingTorrentRecord, iyuuResults map[string][]*model.IYUUReseedResult, sidMap map[int]string, targetSites, excludedSites []string) []model.Candidate {
+	results := iyuuResults[rec.InfoHash]
+	if len(results) == 0 {
 		return nil
 	}
 
@@ -983,11 +1120,8 @@ func (e *Engine) queryIYUU(ctx context.Context, rec model.SeedingTorrentRecord, 
 
 	var candidates []model.Candidate
 	for _, result := range results {
-		if result.SourceInfoHash != rec.InfoHash {
-			continue
-		}
 		for _, target := range result.Targets {
-			siteName := e.iyuuSidToSite(ctx, target.Sid)
+			siteName := sidMap[target.Sid]
 			if siteName == "" {
 				continue
 			}

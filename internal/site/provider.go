@@ -217,6 +217,114 @@ func (p *Provider) ListSites(ctx context.Context) ([]*model.SiteInfo, error) {
 	return result, nil
 }
 
+type SiteResources struct {
+	Configs map[string]*model.SiteConfig
+	Adapters map[string]model.SiteAdapter
+}
+
+func (p *Provider) BatchLoadSiteResources(ctx context.Context, domains []string) (*SiteResources, error) {
+	var sites []model.Site
+	if err := p.db.WithContext(ctx).Where("base_url IN ?", domains).Find(&sites).Error; err != nil {
+		return nil, &model.AppError{Code: 12001, Message: "批量查询站点失败"}
+	}
+
+	siteNames := make([]string, len(sites))
+	for i, s := range sites {
+		siteNames[i] = s.Name
+	}
+
+	var allOverrides []model.SiteConfigOverride
+	if len(siteNames) > 0 {
+		if err := p.db.WithContext(ctx).Where("site_name IN ?", siteNames).Find(&allOverrides).Error; err != nil {
+			allOverrides = nil
+		}
+	}
+
+	overridesBySite := make(map[string][]model.SiteConfigOverride)
+	for _, o := range allOverrides {
+		overridesBySite[o.SiteName] = append(overridesBySite[o.SiteName], o)
+	}
+
+	configs := make(map[string]*model.SiteConfig, len(sites))
+	adapters := make(map[string]model.SiteAdapter, len(sites))
+
+	for i := range sites {
+		s := &sites[i]
+		config := siteToConfig(s)
+		if ov, ok := overridesBySite[s.Name]; ok {
+			p.applyOverridesFromList(config, ov)
+		}
+		configs[s.BaseURL] = config
+
+		p.mu.RLock()
+		if a, ok := p.adapters[s.BaseURL]; ok {
+			p.mu.RUnlock()
+			adapters[s.BaseURL] = a
+		} else {
+			p.mu.RUnlock()
+			a := p.factory.Create(s.Framework, adapter.NewHTTPDoerWithSite(s.ProxyURL, s.SkipSSLVerify))
+			p.mu.Lock()
+			p.adapters[s.BaseURL] = a
+			p.mu.Unlock()
+			adapters[s.BaseURL] = a
+		}
+	}
+
+	return &SiteResources{Configs: configs, Adapters: adapters}, nil
+}
+
+func (p *Provider) applyOverridesFromList(config *model.SiteConfig, overrides []model.SiteConfigOverride) {
+	for _, o := range overrides {
+		switch o.FieldPath {
+		case "cookie":
+			config.Cookie = o.FieldValue
+		case "passkey":
+			config.Passkey = o.FieldValue
+		case "api_key":
+			config.APIKey = o.FieldValue
+		case "auth_key":
+			config.AuthKey = o.FieldValue
+		case "auth_hash":
+			config.AuthHash = o.FieldValue
+		case "rss_key":
+			config.RSSKey = o.FieldValue
+		case "bearer_token":
+			config.BearerToken = o.FieldValue
+		case "user_id":
+			var uid int
+			if _, err := fmt.Sscanf(o.FieldValue, "%d", &uid); err == nil {
+				config.UserID = uid
+			}
+		case "download_url_template":
+			config.RSS.URLTemplate = o.FieldValue
+		case "hash_strategy":
+			config.RSS.HashStrategy = model.HashStrategy(o.FieldValue)
+		case "size_strategy":
+			config.RSS.SizeStrategy = model.SizeStrategy(o.FieldValue)
+		case "id_strategy":
+			config.RSS.IDStrategy = model.IDStrategy(o.FieldValue)
+		case "id_pattern":
+			config.RSS.IDPattern = o.FieldValue
+		case "paths.upload":
+			config.Paths.Upload = o.FieldValue
+		case "paths.takeupload":
+			config.Paths.TakeUpload = o.FieldValue
+		case "paths.browse":
+			config.Paths.Browse = o.FieldValue
+		case "paths.detail":
+			config.Paths.Detail = o.FieldValue
+		default:
+			if strings.HasPrefix(o.FieldPath, "publish.form_fields.") {
+				key := strings.TrimPrefix(o.FieldPath, "publish.form_fields.")
+				if config.Publish.FormFields == nil {
+					config.Publish.FormFields = make(map[string]string)
+				}
+				config.Publish.FormFields[key] = o.FieldValue
+			}
+		}
+	}
+}
+
 func (p *Provider) GetSiteInfoByURL(ctx context.Context, baseURL string) (*model.SiteInfo, error) {
 	var site model.Site
 	if err := p.db.WithContext(ctx).Where("base_url = ?", baseURL).First(&site).Error; err != nil {

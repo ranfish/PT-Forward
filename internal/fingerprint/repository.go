@@ -129,6 +129,22 @@ func (r *Repository) GetByInfoHashAndSite(ctx context.Context, infoHash, siteNam
 	return &fp, nil
 }
 
+func (r *Repository) BatchGetByInfoHashes(ctx context.Context, infoHashes []string) ([]*model.ContentFingerprint, error) {
+	if len(infoHashes) == 0 {
+		return nil, nil
+	}
+	var fps []model.ContentFingerprint
+	if err := r.db.WithContext(ctx).Where("info_hash IN ?", infoHashes).Find(&fps).Error; err != nil {
+		return nil, err
+	}
+	result := make([]*model.ContentFingerprint, len(fps))
+	for i := range fps {
+		r.populateParsed(&fps[i])
+		result[i] = &fps[i]
+	}
+	return result, nil
+}
+
 func (r *Repository) FindCandidatesBySite(ctx context.Context, siteName string, excludeInfoHash string, piecesHash string, totalSize int64, limit int) ([]model.ContentFingerprint, error) {
 	if limit <= 0 {
 		limit = 10
