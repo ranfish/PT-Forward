@@ -336,13 +336,14 @@ func (h *FilterHandler) handleTest(w http.ResponseWriter, r *http.Request, idStr
 	}
 
 	var req struct {
-		Title    string `json:"title"`
-		Size     int64  `json:"size"`
-		Uploader string `json:"uploader"`
-		SiteName string `json:"siteName"`
-		Category string `json:"category"`
-		Free     bool   `json:"free"`
-		Tags     string `json:"tags"`
+		Title         string `json:"title"`
+		Size          int64  `json:"size"`
+		Uploader      string `json:"uploader"`
+		SiteName      string `json:"siteName"`
+		Category      string `json:"category"`
+		Free          bool   `json:"free"`
+		Tags          string `json:"tags"`
+		DiscountLevel string `json:"discountLevel"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -350,12 +351,13 @@ func (h *FilterHandler) handleTest(w http.ResponseWriter, r *http.Request, idStr
 	}
 
 	evalCtx := &filter.EvalContext{
-		Title:    req.Title,
-		Size:     req.Size,
-		Uploader: req.Uploader,
-		SiteName: req.SiteName,
-		Category: req.Category,
-		Free:     req.Free,
+		Title:         req.Title,
+		Size:          req.Size,
+		Uploader:      req.Uploader,
+		SiteName:      req.SiteName,
+		Category:      req.Category,
+		Free:          req.Free,
+		DiscountLevel: req.DiscountLevel,
 	}
 	if req.Tags != "" {
 		evalCtx.Tags = strings.Split(req.Tags, ",")

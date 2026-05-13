@@ -49,20 +49,21 @@ type FileInfo struct {
 
 // §33.1.39 — RSSTorrentEvent: RSS 引擎简化视图
 type RSSTorrentEvent struct {
-	SourceRSS   string         `json:"source_rss"`
-	SiteName    string         `json:"site_name"`
-	TorrentID   string         `json:"torrent_id"`
-	Title       string         `json:"title"`
-	DownloadURL string         `json:"download_url"`
-	Size        int64          `json:"size"`
-	InfoHash    string         `json:"info_hash"`
-	IsFree      bool           `json:"is_free"`
-	FreeEndAt   *time.Time     `json:"free_end_at"`
-	HasHR       bool           `json:"has_hr"`
-	HRSeedTimeH int            `json:"hr_seed_time_h"`
-	MatchedRule *string        `json:"matched_rule"`
-	TorrentData []byte         `json:"-"`
-	Metadata    map[string]any `json:"metadata"`
+	SourceRSS     string         `json:"source_rss"`
+	SiteName      string         `json:"site_name"`
+	TorrentID     string         `json:"torrent_id"`
+	Title         string         `json:"title"`
+	DownloadURL   string         `json:"download_url"`
+	Size          int64          `json:"size"`
+	InfoHash      string         `json:"info_hash"`
+	IsFree        bool           `json:"is_free"`
+	DiscountLevel DiscountLevel  `json:"discount_level"`
+	FreeEndAt     *time.Time     `json:"free_end_at"`
+	HasHR         bool           `json:"has_hr"`
+	HRSeedTimeH   int            `json:"hr_seed_time_h"`
+	MatchedRule   *string        `json:"matched_rule"`
+	TorrentData   []byte         `json:"-"`
+	Metadata      map[string]any `json:"metadata"`
 }
 
 // §33.1.3 — RSSSubscription: 订阅配置（Sprint 89, 7 处合并）

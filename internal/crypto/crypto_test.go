@@ -123,19 +123,33 @@ func TestDecrypt_InvalidCiphertext(t *testing.T) {
 	}
 }
 
-func TestDeriveKey(t *testing.T) {
+func TestPBKDF2KeyDerivation(t *testing.T) {
 	tests := []struct {
 		input string
-		want  int
 	}{
-		{"exactly-32-bytes-key-here!!!!!!!!", 32},
-		{"short", 32},
-		{"this-is-a-very-long-key-that-is-more-than-32-characters", 32},
+		{"exactly-32-bytes-key-here!!!!!!!!"},
+		{"at-least-16-chars"},
+		{"this-is-a-very-long-key-that-is-more-than-32-characters"},
 	}
 	for _, tt := range tests {
-		key := deriveKey(tt.input)
-		if len(key) != tt.want {
-			t.Errorf("deriveKey(%q) length = %d, want %d", tt.input, len(key), tt.want)
+		enc, err := NewCredentialEncryptor(tt.input)
+		if err != nil {
+			t.Errorf("NewCredentialEncryptor(%q) error: %v", tt.input, err)
+			continue
 		}
+		if enc == nil {
+			t.Errorf("NewCredentialEncryptor(%q) returned nil", tt.input)
+		}
+	}
+}
+
+func TestNewCredentialEncryptor_ShortKey(t *testing.T) {
+	_, err := NewCredentialEncryptor("this-is-long-enough")
+	if err != nil {
+		t.Errorf("NewCredentialEncryptor should accept 16+ char keys, got error: %v", err)
+	}
+	_, err = NewCredentialEncryptor("too-short")
+	if err == nil {
+		t.Error("NewCredentialEncryptor should reject keys < 16 chars")
 	}
 }

@@ -68,7 +68,7 @@ func (h *PTGenHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.provider.Query(r.Context(), req.Query)
 	if err != nil {
-		Error(w, http.StatusBadGateway, 50001, "PTGen 查询失败: "+err.Error())
+		Error(w, http.StatusBadGateway, 50001, "PTGen 查询失败，请稍后重试")
 		return
 	}
 

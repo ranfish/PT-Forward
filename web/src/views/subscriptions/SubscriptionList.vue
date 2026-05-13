@@ -137,6 +137,19 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-form-item v-if="form.publishEnabled" :label="t('subscription.publishTargets')">
+          <a-select v-model:value="form.publishTargets" mode="multiple" :placeholder="t('subscription.publishTargetsPlaceholder')" :loading="sitesLoading">
+            <a-select-option v-for="s in sites" :key="s.name" :value="s.name">{{ s.name }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item v-if="form.pushNotify" :label="t('subscription.notifyChannel')">
+          <a-input v-model:value="form.notifyId" :placeholder="t('subscription.notifyChannelPlaceholder')" />
+        </a-form-item>
+        <a-form-item v-if="form.autoReseed" :label="t('subscription.reseedClientIds')">
+          <a-select v-model:value="form.reseedClientIds" mode="multiple" :placeholder="t('subscription.reseedClientIdsPlaceholder')" :loading="downloadersLoading">
+            <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">{{ d.name }}</a-select-option>
+          </a-select>
+        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -153,6 +166,7 @@ import { downloadersApi } from '@/api/downloaders'
 import { usePagination } from '@/composables/usePagination'
 
 interface SubscriptionItem {
+  [key: string]: unknown
   id: number
   name: string
   siteName: string
@@ -203,6 +217,9 @@ const form = reactive({
   publishEnabled: false,
   pushNotify: false,
   autoReseed: false,
+  notifyId: '',
+  publishTargets: [] as string[],
+  reseedClientIds: [] as string[],
   enabled: true,
 })
 
@@ -263,6 +280,9 @@ function openModal(record?: SubscriptionItem) {
       publishEnabled: record.publishEnabled || false,
       pushNotify: record.pushNotify || false,
       autoReseed: record.autoReseed || false,
+      notifyId: (record as Record<string, unknown>).notifyId || '',
+      publishTargets: (record as Record<string, unknown>).publishTargets || [],
+      reseedClientIds: (record as Record<string, unknown>).reseedClientIds || [],
       enabled: record.enabled ?? true,
     })
   } else {
@@ -271,7 +291,8 @@ function openModal(record?: SubscriptionItem) {
       clientId: '', savePath: '', category: '', addPaused: false, autoTmm: false,
       tags: [], scrapeFree: false, scrapeHr: false,
       uploadLimitKb: 0, downloadLimitKb: 0,
-      publishEnabled: false, pushNotify: false, autoReseed: false, enabled: true,
+      publishEnabled: false, pushNotify: false, autoReseed: false,
+      notifyId: '', publishTargets: [], reseedClientIds: [], enabled: true,
     })
   }
   modalVisible.value = true

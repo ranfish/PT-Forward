@@ -70,6 +70,9 @@
       </a-tab-pane>
 
       <a-tab-pane key="tasks" :tab="t('publish.tasks')">
+        <div style="margin-bottom: 16px; display: flex; justify-content: flex-end">
+          <a-button type="primary" @click="showCreateTaskModal = true">{{ t('common.create') }}</a-button>
+        </div>
         <a-table
           :columns="taskColumns"
           :data-source="tasks"
@@ -118,14 +121,39 @@
         </a-table>
       </a-tab-pane>
     </a-tabs>
+
+    <a-modal v-model:open="showCreateTaskModal" :title="t('publish.tasks')" :confirm-loading="createTaskSubmitting" width="520px" @ok="createTask">
+      <a-form layout="vertical">
+        <a-form-item :label="t('publish.sourceSiteId')">
+          <a-select v-model:value="taskForm.sourceSiteId" show-search :placeholder="t('publish.selectSourceSite')" option-filter-prop="label" :filter-option="filterSiteOption">
+            <a-select-option v-for="s in taskSites" :key="s.id" :value="s.id" :label="s.name">{{ s.name }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item :label="t('publish.targetSites')">
+          <a-select v-model:value="taskForm.targetSites" mode="multiple" show-search :placeholder="t('publish.selectTargetSites')" option-filter-prop="label" :filter-option="filterSiteOption">
+            <a-select-option v-for="s in taskSites" :key="s.id" :value="s.name" :label="s.name">{{ s.name }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item :label="t('common.type')">
+          <a-select v-model:value="taskForm.type" allow-clear :placeholder="t('publish.selectType')">
+            <a-select-option value="single">Single</a-select-option>
+            <a-select-option value="batch">Batch</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item :label="t('publish.manualCheck')">
+          <a-switch v-model:checked="taskForm.manualCheck" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
+import { sitesApi } from '@/api/sites'
 import type { PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from '@/api/types'
 
 const { t } = useI18n()
@@ -270,7 +298,7 @@ async function deleteTask(id: number) {
   }
 }
 
-async function viewTaskResults(taskId: number) {
+async function viewTaskResults(_taskId: number) {
   resultsLoading.value = true
   activeTab.value = 'results'
   try {
@@ -298,10 +326,60 @@ async function fetchResults() {
   }
 }
 
+const showCreateTaskModal = ref(false)
+const createTaskSubmitting = ref(false)
+const taskSites = ref<{ id: number; name: string }[]>([])
+const taskForm = reactive({
+  sourceSiteId: undefined as number | undefined,
+  targetSites: [] as string[],
+  type: undefined as string | undefined,
+  manualCheck: false,
+})
+
+function filterSiteOption(input: string, option: { label?: string }) {
+  return (option.label || '').toLowerCase().includes(input.toLowerCase())
+}
+
+async function fetchTaskSites() {
+  try {
+    const resp = await sitesApi.list(1, 200)
+    const body = resp.data.data
+    taskSites.value = (body?.items || body || []) as { id: number; name: string }[]
+  } catch { /* ignore */ }
+}
+
+async function createTask() {
+  if (!taskForm.sourceSiteId || taskForm.targetSites.length === 0) {
+    message.warning(t('publish.sourceAndTargetRequired'))
+    return
+  }
+  createTaskSubmitting.value = true
+  try {
+    await publishApi.createTask({
+      sourceSiteId: taskForm.sourceSiteId,
+      targetSites: taskForm.targetSites,
+      type: taskForm.type || undefined,
+      manualCheck: taskForm.manualCheck,
+    })
+    message.success(t('common.success'))
+    showCreateTaskModal.value = false
+    taskForm.sourceSiteId = undefined
+    taskForm.targetSites = []
+    taskForm.type = undefined
+    taskForm.manualCheck = false
+    fetchTasks()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    createTaskSubmitting.value = false
+  }
+}
+
 onMounted(() => {
   fetchCandidates()
   fetchGroups()
   fetchTasks()
   fetchResults()
+  fetchTaskSites()
 })
 </script>

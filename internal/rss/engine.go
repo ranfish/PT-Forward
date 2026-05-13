@@ -3,11 +3,13 @@ package rss
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/filter"
+	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -155,7 +157,7 @@ func (e *Engine) Trigger(ctx context.Context, subID uint) error {
 		return &model.AppError{Code: 13003, Message: "订阅已禁用"}
 	}
 
-	fetchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	fetchCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	go func() {
 		defer cancel()
 		e.fetchOnce(fetchCtx, sub)
@@ -237,11 +239,14 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 
 		events := e.fetcher.ParseItems(feed, sub, &site)
 
+		metrics.RSSTorrentsFetched.WithLabelValues(sub.SiteName).Add(float64(len(events)))
+
 		var torrentEvents []model.TorrentEvent
 		newCount := 0
 		for _, event := range events {
 			isSeen, _ := e.repo.IsSeen(ctx, event.SiteName, event.TorrentID)
 			if isSeen {
+				metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "already_seen").Inc()
 				continue
 			}
 
@@ -251,6 +256,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 						zap.String("torrent", event.TorrentID),
 						zap.Int64("size", event.Size),
 						zap.Error(err))
+					metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "disk_budget").Inc()
 					continue
 				}
 			}
@@ -261,6 +267,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				e.logger.Debug("torrent skipped: not free",
 					zap.String("torrent", event.TorrentID),
 					zap.Bool("free", event.IsFree))
+				metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "not_free").Inc()
 				continue
 			}
 
@@ -268,15 +275,26 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				e.logger.Debug("torrent skipped by HR skip strategy",
 					zap.String("torrent", event.TorrentID),
 					zap.String("site", sub.SiteName))
+				metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "hr_skip").Inc()
 				continue
+			}
+
+			discountStr := string(event.DiscountLevel)
+			if discountStr == "" {
+				if event.IsFree {
+					discountStr = string(model.DiscountFree)
+				} else {
+					discountStr = string(model.DiscountNone)
+				}
 			}
 
 			if len(sub.Conditions) > 0 {
 				evalCtx := &filter.EvalContext{
-					Title:    event.Title,
-					Size:     event.Size,
-					SiteName: event.SiteName,
-					Free:     event.IsFree,
+					Title:         event.Title,
+					Size:          event.Size,
+					SiteName:      event.SiteName,
+					Free:          event.IsFree,
+					DiscountLevel: discountStr,
 				}
 				allMatch := true
 				for _, cond := range sub.Conditions {
@@ -288,16 +306,55 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				if !allMatch {
 					e.logger.Debug("torrent skipped by subscription conditions",
 						zap.String("torrent", event.TorrentID))
+					metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "subscription_condition").Inc()
 					continue
+				}
+			}
+
+			if e.filterEng != nil && (len(sub.AcceptRuleIDs) > 0 || len(sub.RejectRuleIDs) > 0) {
+				evalCtx := &filter.EvalContext{
+					Title:         event.Title,
+					Size:          event.Size,
+					SiteName:      event.SiteName,
+					Free:          event.IsFree,
+					DiscountLevel: discountStr,
+				}
+				if len(sub.RejectRuleIDs) > 0 {
+					rejectResult, err := e.filterEng.MatchByIDs(ctx, sub.RejectRuleIDs, evalCtx)
+					if err != nil {
+						e.logger.Warn("reject rule match failed",
+							zap.String("torrent", event.TorrentID),
+							zap.Error(err))
+					} else if rejectResult.Matched {
+						e.logger.Debug("torrent rejected by subscription reject rules",
+							zap.String("torrent", event.TorrentID),
+							zap.String("rule", rejectResult.RuleName))
+						metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "subscription_reject_rule").Inc()
+						continue
+					}
+				}
+				if len(sub.AcceptRuleIDs) > 0 {
+					acceptResult, err := e.filterEng.MatchByIDs(ctx, sub.AcceptRuleIDs, evalCtx)
+					if err != nil {
+						e.logger.Warn("accept rule match failed",
+							zap.String("torrent", event.TorrentID),
+							zap.Error(err))
+					} else if !acceptResult.Matched {
+						e.logger.Debug("torrent skipped: no accept rule matched",
+							zap.String("torrent", event.TorrentID))
+						metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "no_accept_rule").Inc()
+						continue
+					}
 				}
 			}
 
 			if e.filterEng != nil {
 				matchResult, err := e.filterEng.Match(ctx, &filter.EvalContext{
-					Title:    event.Title,
-					Size:     event.Size,
-					SiteName: event.SiteName,
-					Free:     event.IsFree,
+					Title:         event.Title,
+					Size:          event.Size,
+					SiteName:      event.SiteName,
+					Free:          event.IsFree,
+					DiscountLevel: discountStr,
 				})
 				if err != nil {
 					e.logger.Warn("filter match failed",
@@ -309,7 +366,20 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 					e.logger.Debug("torrent rejected by global exclusion rule",
 						zap.String("torrent", event.TorrentID),
 						zap.String("rule", matchResult.RuleName))
+					metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "global_rule_reject").Inc()
 					continue
+				}
+			}
+
+			if sub.UseCustomRegex && sub.RegexStr != "" {
+				re, err := regexp.Compile(sub.RegexStr)
+				if err != nil {
+					e.logger.Warn("invalid custom regex",
+						zap.String("subscription", sub.Name),
+						zap.String("regex", sub.RegexStr),
+						zap.Error(err))
+				} else {
+					event.Title = re.ReplaceAllString(event.Title, sub.ReplaceStr)
 				}
 			}
 
@@ -344,7 +414,9 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				MatchedRuleName: derefStr(event.MatchedRule),
 				Metadata:        event.Metadata,
 			}
-			if event.IsFree {
+			if event.DiscountLevel != "" {
+				te.Discount = event.DiscountLevel
+			} else if event.IsFree {
 				te.Discount = model.DiscountFree
 			}
 			if event.FreeEndAt != nil {
@@ -464,6 +536,7 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 
 	if discResult, err := adapter.DetectDiscount(ctx, config, event.TorrentID); err == nil && discResult != nil {
 		if discResult.Level != model.DiscountNone {
+			event.DiscountLevel = discResult.Level
 			event.IsFree = discResult.Level == model.DiscountFree ||
 				discResult.Level == model.Discount2xFree ||
 				discResult.Level == model.Discount2x50

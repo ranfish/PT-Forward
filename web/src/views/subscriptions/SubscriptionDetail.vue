@@ -144,6 +144,7 @@
                   <a-select-option value="uploader">{{ t('subscription.uploader') }}</a-select-option>
                   <a-select-option value="site">{{ t('common.site') }}</a-select-option>
                   <a-select-option value="free">{{ t('subscription.isFree') }}</a-select-option>
+                  <a-select-option value="discount_level">{{ t('subscription.discountLevel') }}</a-select-option>
                 </a-select>
               </a-col>
               <a-col :span="6">

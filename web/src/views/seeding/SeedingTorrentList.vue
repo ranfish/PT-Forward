@@ -146,7 +146,7 @@ async function fetchDownloaders() {
       label: String(d.name || d.id),
       value: String(d.name || d.id),
     }))
-  } catch (_e: unknown) {}
+  } catch {}
 }
 
 onMounted(() => {

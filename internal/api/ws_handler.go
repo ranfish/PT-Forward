@@ -146,7 +146,7 @@ var defaultUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		return false
 	},
 }
 
@@ -166,7 +166,11 @@ type WSHandler struct {
 
 func NewWSHandler(hub *Hub, authManager *auth.AuthManager, corsOrigins []string) *WSHandler {
 	upgrader := defaultUpgrader
-	if len(corsOrigins) > 0 && corsOrigins[0] != "*" {
+	if len(corsOrigins) > 0 && corsOrigins[0] == "*" {
+		upgrader.CheckOrigin = func(r *http.Request) bool {
+			return true
+		}
+	} else if len(corsOrigins) > 0 {
 		allowed := make(map[string]bool, len(corsOrigins))
 		for _, o := range corsOrigins {
 			allowed[o] = true
@@ -174,9 +178,14 @@ func NewWSHandler(hub *Hub, authManager *auth.AuthManager, corsOrigins []string)
 		upgrader.CheckOrigin = func(r *http.Request) bool {
 			origin := r.Header.Get("Origin")
 			if origin == "" {
-				return len(corsOrigins) == 0 || corsOrigins[0] == "*"
+				return true
 			}
 			return allowed[origin]
+		}
+	} else {
+		upgrader.CheckOrigin = func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			return origin == ""
 		}
 	}
 	return &WSHandler{hub: hub, authManager: authManager, corsOrigins: corsOrigins, upgrader: upgrader}

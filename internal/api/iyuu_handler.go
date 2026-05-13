@@ -15,9 +15,10 @@ import (
 )
 
 type IYUUHandler struct {
-	db      *gorm.DB
-	logger  *zap.Logger
-	iyuuSvc IYUUQueryService
+	db         *gorm.DB
+	logger     *zap.Logger
+	iyuuSvc    IYUUQueryService
+	httpClient *http.Client
 }
 
 type IYUUQueryService interface {
@@ -26,7 +27,18 @@ type IYUUQueryService interface {
 }
 
 func NewIYUUHandler(db *gorm.DB, logger *zap.Logger, iyuuSvc IYUUQueryService) *IYUUHandler {
-	return &IYUUHandler{db: db, logger: logger, iyuuSvc: iyuuSvc}
+	return &IYUUHandler{
+		db:      db,
+		logger:  logger,
+		iyuuSvc: iyuuSvc,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 2,
+				IdleConnTimeout:     30 * time.Second,
+			},
+		},
+	}
 }
 
 func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +192,7 @@ func (h *IYUUHandler) handleSyncSites(w http.ResponseWriter, r *http.Request) {
 	sites, err := h.iyuuSvc.GetSiteList(r.Context())
 	if err != nil {
 		h.logger.Warn("iyuu site sync failed", zap.Error(err))
-		Error(w, http.StatusBadGateway, 50001, "站点同步失败: "+err.Error())
+		Error(w, http.StatusBadGateway, 50001, "站点同步失败，请稍后重试")
 		return
 	}
 
@@ -234,7 +246,6 @@ func (h *IYUUHandler) handleTest(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", cfg.BaseURL+"/reseed/sites/index", nil)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "构造请求失败")
@@ -242,9 +253,9 @@ func (h *IYUUHandler) handleTest(w http.ResponseWriter, _ *http.Request) {
 	}
 	req.Header.Set("Token", cfg.Token)
 
-	resp, err := client.Do(req)
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		Error(w, http.StatusBadGateway, 50001, "连接 IYUU 服务失败: "+err.Error())
+		Error(w, http.StatusBadGateway, 50001, "IYUU 服务连接失败，请检查网络")
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()

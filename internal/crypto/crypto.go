@@ -4,14 +4,21 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 const ciphertextPrefix = "enc:"
+
+const pbkdf2Iterations = 100000
+
+var pbkdf2Salt = []byte("pt-forward-credential-encryption")
 
 type CredentialEncryptor struct {
 	aead cipher.AEAD
@@ -21,7 +28,7 @@ func NewCredentialEncryptor(key string) (*CredentialEncryptor, error) {
 	if len(key) < 16 {
 		return nil, fmt.Errorf("encryption key must be at least 16 characters, got %d", len(key))
 	}
-	aesKey := deriveKey(key)
+	aesKey := pbkdf2.Key([]byte(key), pbkdf2Salt, pbkdf2Iterations, 32, sha256.New)
 	block, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return nil, fmt.Errorf("create AES cipher: %w", err)
@@ -31,20 +38,6 @@ func NewCredentialEncryptor(key string) (*CredentialEncryptor, error) {
 		return nil, fmt.Errorf("create GCM: %w", err)
 	}
 	return &CredentialEncryptor{aead: aead}, nil
-}
-
-func deriveKey(key string) []byte {
-	if len(key) >= 32 {
-		return []byte(key[:32])
-	}
-	if len(key) >= 24 {
-		padded := make([]byte, 32)
-		copy(padded, key)
-		return padded
-	}
-	padded := make([]byte, 32)
-	copy(padded, key)
-	return padded
 }
 
 func (e *CredentialEncryptor) Encrypt(plaintext string) (string, error) {

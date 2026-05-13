@@ -247,7 +247,10 @@ func parseSize(s string) int64 {
 	return n
 }
 
+const regexCacheMaxSize = 256
+
 var regexCache = map[string]*regexp.Regexp{}
+var regexCacheOrder []string
 var regexCacheMu sync.RWMutex
 
 func compileRegex(pattern string) (*regexp.Regexp, error) {
@@ -262,7 +265,15 @@ func compileRegex(pattern string) (*regexp.Regexp, error) {
 		return nil, err
 	}
 	regexCacheMu.Lock()
-	regexCache[pattern] = re
+	if _, exists := regexCache[pattern]; !exists {
+		if len(regexCache) >= regexCacheMaxSize {
+			evict := regexCacheOrder[0]
+			delete(regexCache, evict)
+			regexCacheOrder = regexCacheOrder[1:]
+		}
+		regexCache[pattern] = re
+		regexCacheOrder = append(regexCacheOrder, pattern)
+	}
 	regexCacheMu.Unlock()
 	return re, nil
 }

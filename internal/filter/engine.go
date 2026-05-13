@@ -31,13 +31,14 @@ type MatchResult struct {
 }
 
 type EvalContext struct {
-	Title    string
-	Size     int64
-	Category string
-	Tags     []string
-	Uploader string
-	SiteName string
-	Free     bool
+	Title         string
+	Size          int64
+	Category      string
+	Tags          []string
+	Uploader      string
+	SiteName      string
+	Free          bool
+	DiscountLevel string
 }
 
 func (e *Engine) Match(ctx context.Context, evalCtx *EvalContext) (*MatchResult, error) {
@@ -53,15 +54,40 @@ func (e *Engine) Match(ctx context.Context, evalCtx *EvalContext) (*MatchResult,
 	for i := range rules {
 		rule := &rules[i]
 		if matchRule(rule, evalCtx) {
+			isReject := rule.RuleType != "accept"
 			return &MatchResult{
 				Matched:  true,
 				RuleName: rule.Name,
-				RuleType: "reject",
-				Reject:   true,
+				RuleType: rule.RuleType,
+				SavePath: rule.SavePath,
+				Category: rule.Category,
+				Tags:     rule.Tags,
+				Reject:   isReject,
 			}, nil
 		}
 	}
 
+	return &MatchResult{Matched: false}, nil
+}
+
+func (e *Engine) MatchByIDs(ctx context.Context, ruleIDs []uint, evalCtx *EvalContext) (*MatchResult, error) {
+	for _, id := range ruleIDs {
+		rule, err := e.repo.GetByID(ctx, id)
+		if err != nil || rule == nil {
+			continue
+		}
+		if matchRule(rule, evalCtx) {
+			return &MatchResult{
+				Matched:  true,
+				RuleName: rule.Name,
+				RuleType: rule.RuleType,
+				SavePath: rule.SavePath,
+				Category: rule.Category,
+				Tags:     rule.Tags,
+				Reject:   rule.RuleType == "reject",
+			}, nil
+		}
+	}
 	return &MatchResult{Matched: false}, nil
 }
 
@@ -145,6 +171,8 @@ func getField(ctx *EvalContext, key string) string {
 		return strconv.FormatBool(ctx.Free)
 	case "tags":
 		return strings.Join(ctx.Tags, ",")
+	case "discount_level":
+		return ctx.DiscountLevel
 	default:
 		return ""
 	}

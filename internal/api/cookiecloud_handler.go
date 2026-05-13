@@ -169,7 +169,8 @@ func (h *CookieCloudHandler) handleSync(w http.ResponseWriter, r *http.Request) 
 	svc := cookiecloud.NewSyncService(h.db, h.logger)
 	history, err := svc.SyncAll(r.Context())
 	if err != nil {
-		Error(w, http.StatusInternalServerError, 50001, "同步失败: "+err.Error())
+		h.logger.Error("cookiecloud sync failed", zap.Error(err))
+		Error(w, http.StatusInternalServerError, 50001, "CookieCloud 同步失败，请检查配置")
 		return
 	}
 	Success(w, history)
@@ -213,7 +214,8 @@ func (h *CookieCloudHandler) handleTest(w http.ResponseWriter, r *http.Request) 
 
 	_, err := cookiecloud.FetchAndDecrypt(cfg.ServerURL, cfg.UUID, cfg.Password)
 	if err != nil {
-		Error(w, http.StatusBadGateway, 50001, "连接测试失败: "+err.Error())
+		h.logger.Error("cookiecloud test connection failed", zap.Error(err))
+		Error(w, http.StatusBadGateway, 50001, "CookieCloud 连接失败，请检查服务器地址和密码")
 		return
 	}
 
