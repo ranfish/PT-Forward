@@ -68,7 +68,10 @@
     "selectType": "请选择类型",
     "siteRequired": "请选择站点",
     "statusToggled": "状态已切换",
-    "statusUpdated": "状态已更新"
+    "statusUpdated": "状态已更新",
+    "time": "时间",
+    "title": "标题",
+    "chinese": "中文"
   },
   "auth": {
     "login": "登录",
@@ -93,7 +96,10 @@
     "passwordMinLength": "密码至少 8 个字符",
     "confirmPasswordRequired": "请输入确认密码",
     "newPasswordRequired": "请输入新密码",
-    "oldPasswordRequired": "请输入旧密码"
+    "oldPasswordRequired": "请输入旧密码",
+    "oldPasswordPlaceholder": "请输入旧密码",
+    "newPasswordPlaceholder": "请输入新密码",
+    "confirmPasswordPlaceholder": "请再次输入新密码"
   },
   "nav": {
     "dashboard": "仪表盘",
@@ -122,7 +128,10 @@
     "systemHealth": "系统监控",
     "publishExclusions": "排除规则",
     "torrentEvents": "种子事件",
-    "freezeStatus": "域名冻结"
+    "freezeStatus": "域名冻结",
+    "resourceManagement": "资源管理",
+    "coreFeatures": "核心功能",
+    "system": "系统"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -135,7 +144,10 @@
     "downloadingTorrents": "下载中种子",
     "recentActivity": "最近活动",
     "trends7d": "近 7 天趋势",
-    "torrentTitle": "种子标题"
+    "torrentTitle": "种子标题",
+    "chartEvents": "事件",
+    "chartPublish": "发布",
+    "chartReseed": "辅种"
   },
   "site": {
     "title": "站点管理",
@@ -191,7 +203,51 @@
     "deleteAllOverrideConfirm": "确定删除所有覆盖配置？",
     "domainRequired": "请输入域名",
     "overrideConfigHint": "覆盖配置优先于全局默认值",
-    "siteUrlRequired": "请输入站点 URL"
+    "siteUrlRequired": "请输入站点 URL",
+    "mirrorDomain": "镜像域名",
+    "mirrorDomainPlaceholder": "例如: mirror.pterclub.net（留空使用原始域名）",
+    "selectAuthType": "选择认证方式",
+    "placeholderConfigured": "••••••••（已配置，留空保持不变）",
+    "placeholderCookie": "站点 Cookie",
+    "placeholderPasskey": "站点 Passkey",
+    "placeholderApiKey": "站点 API Key（馒头使用 x-api-key）",
+    "roleAndPublish": "角色与发布",
+    "asSource": "作为源站",
+    "asTarget": "作为目标站",
+    "participateAutoPublishLabel": "参与自动发布",
+    "cookieCloudSyncLabel": "CookieCloud 同步",
+    "cookieCloudDomainLabel": "CookieCloud 域名",
+    "cookieCloudDomainPlaceholder": "CookieCloud 中对应的域名",
+    "rssSavePathOverride": "RSS / 保存路径覆盖",
+    "overrideRssUrl": "覆盖 RSS 地址",
+    "overrideRssUrlPlaceholder": "自定义 RSS URL（留空使用默认）",
+    "overrideSavePath": "覆盖保存路径",
+    "overrideSavePathPlaceholder": "自定义保存路径（留空使用默认）",
+    "network": "网络",
+    "proxyAddress": "代理地址",
+    "proxyPlaceholder": "例如: socks5://127.0.0.1:1080",
+    "skipSslVerify": "跳过 SSL 验证",
+    "parseStrategy": "解析策略",
+    "hashStrategy": "Hash 策略",
+    "sizeStrategy": "Size 策略",
+    "idStrategy": "ID 策略",
+    "defaultGuid": "默认: guid",
+    "defaultEnclosure": "默认: enclosure",
+    "defaultQueryParam": "默认: query_param",
+    "xmlTag": "XML 标签",
+    "fakeFromId": "根据 ID 生成",
+    "descRegex": "描述正则",
+    "queryParam": "查询参数",
+    "linkRegex": "链接正则",
+    "siteSettings": "站点设置",
+    "saveSettings": "保存设置",
+    "role": "角色",
+    "sourceSiteRole": "源站",
+    "targetSiteRole": "目标站",
+    "customRssUrl": "自定义 RSS URL",
+    "customSavePath": "自定义保存路径",
+    "cookieCloudDomainShortPlaceholder": "CookieCloud 域名",
+    "enabledLabel": "启用"
   },
   "downloader": {
     "title": "下载器管理",
@@ -218,7 +274,22 @@
     "categoryCount": "分类数",
     "tagCount": "标签数",
     "searchTorrent": "搜索种子名称",
-    "deletePublishTargetConfirm": "确定删除该发布目标？"
+    "deletePublishTargetConfirm": "确定删除该发布目标？",
+    "targetSitePlaceholder": "如 hdsky.me",
+    "categoryMappingPlaceholder": "如 Movie→电影,TV→剧集",
+    "sourceMappingPlaceholder": "如 HDSky→天空",
+    "codecMappingPlaceholder": "如 x264→H.264,x265→H.265",
+    "progress": "进度",
+    "uploadSpeed": "上传速度",
+    "downloadSpeed": "下载速度",
+    "notify": "通知",
+    "addressPlaceholder": "例如: http://192.168.1.1:8080",
+    "role": "角色",
+    "selectRole": "请选择角色",
+    "roleDownload": "下载",
+    "roleSeeding": "做种",
+    "roleSource": "源站",
+    "roleReseed": "辅种"
   },
   "subscription": {
     "title": "RSS 订阅",
@@ -248,7 +319,55 @@
     "rules": "规则",
     "rulesJson": "规则 (JSON)",
     "rulesSaved": "规则已保存",
-    "urlRequired": "请输入 RSS 地址"
+    "urlRequired": "请输入 RSS 地址",
+    "downloaderSettings": "下载器设置",
+    "selectDownloader": "选择下载器",
+    "savePathHint": "保存路径（留空使用下载器默认值）",
+    "categoryPlaceholder": "下载器中的分类",
+    "addPaused": "暂停添加",
+    "autoTmm": "自动种子管理",
+    "tagsPlaceholder": "输入标签后回车",
+    "uploadLimit": "上传限速 (KB/s)",
+    "downloadLimit": "下载限速 (KB/s)",
+    "noLimit": "0 = 不限",
+    "scrapeOptions": "抓取选项",
+    "freeOnly": "只接受免费种子",
+    "freeOnlyHint": "开启后仅推送免费/折扣种子到下载器",
+    "scrapeHrLabel": "检测 HR 信息",
+    "scrapeHrHint": "检测站点 HR（保种时间要求）",
+    "automation": "自动化",
+    "enableAutoPublish": "启用自动发布",
+    "pushNotifyLabel": "推送通知",
+    "autoReseedLabel": "自动辅种",
+    "rssUrlPerLine": "每行一个 RSS 地址",
+    "rssUrlPerLineShort": "每行一个 RSS URL",
+    "cronExample": "如 */5 * * * *",
+    "cronExampleLong": "例如: */15 * * * *（每15分钟）",
+    "belongToSite": "所属站点",
+    "subscriptionNamePlaceholder": "订阅名称",
+    "rulesHint": "此处配置订阅级别的自定义条件（如按标题、体积筛选）。「全局排除规则」在「设置 → 全局排除规则」中管理，对所有订阅生效。",
+    "selectField": "选择字段",
+    "volumeSize": "体积大小",
+    "uploader": "发布者",
+    "isFree": "是否免费",
+    "compareMethod": "比较方式",
+    "equals": "等于",
+    "greaterThan": "大于",
+    "lessThan": "小于",
+    "contains": "包含",
+    "notContains": "不包含",
+    "regexpMatch": "正则匹配",
+    "unitBytes": "单位：字节",
+    "yesFree": "是（免费）",
+    "noNotFree": "否（非免费）",
+    "inputValue": "输入值",
+    "bytesHint": "1 GB = 1073741824，100 MB = 104857600",
+    "addCondition": "添加条件",
+    "saveRulesBtn": "保存规则",
+    "deleteShort": "删",
+    "selectSite": "选择站点",
+    "categoryLabel": "分类",
+    "tagsLabel": "标签"
   },
   "seeding": {
     "title": "刷流管理",
@@ -308,6 +427,9 @@
     "pleaseInputDownloaderId": "请输入下载器 ID",
     "pleaseInputRuleAlias": "请输入规则别名",
     "selectAction": "请选择动作",
+    "client": "客户端",
+    "isFree": "免费",
+    "source": "来源",
     "scoring": {
       "title": "评分管理",
       "config": "评分配置",
@@ -331,9 +453,16 @@
       "demandScore": "需求评分",
       "recencyFactor": "时效因子",
       "shouldCleanup": "建议清理",
-      "logs": "评分日志"
+      "logs": "评分日志",
+      "linkedSubscription": "关联订阅",
+      "selectSubscription": "请选择订阅"
     },
-    "matchedResult": "匹配 {matched}/{total} 条"
+    "matchedResult": "匹配 {matched}/{total} 条",
+    "free": "免费",
+    "alias": "别名",
+    "client": "客户端",
+    "condition": "条件",
+    "source": "来源"
   },
   "reseed": {
     "title": "辅种管理",
@@ -371,7 +500,8 @@
     "siteOptional": "站点（可选）",
     "sourceSiteIdsPlaceholder": "请输入源站点 ID",
     "targetSiteIdsPlaceholder": "请输入目标站点 ID",
-    "taskNamePlaceholder": "请输入任务名称"
+    "taskNamePlaceholder": "请输入任务名称",
+    "taskDetail": "辅种任务 #{id}"
   },
   "publish": {
     "title": "发布管理",
@@ -401,7 +531,13 @@
     "pleaseEnterSourceSite": "请选择源站点",
     "pleaseEnterTargetSite": "请选择目标站点",
     "sourceSitePlaceholder": "请输入源站点",
-    "targetSitePlaceholder": "请输入目标站点"
+    "targetSitePlaceholder": "请输入目标站点",
+    "columnRole": "角色",
+    "sourceSiteId": "源站点ID",
+    "manualCheck": "手动审核",
+    "publishUrl": "发布链接",
+    "errorMessage": "错误信息",
+    "completedAt": "完成时间"
   },
   "event": {
     "title": "种子事件",
@@ -417,7 +553,9 @@
     "title": "指纹管理",
     "searchInfoHash": "搜索 InfoHash",
     "searchPiecesHash": "搜索 PiecesHash",
-    "deleteConfirm": "确定删除该指纹？"
+    "deleteConfirm": "确定删除该指纹？",
+    "cleanupCacheConfirm": "确定清理指纹缓存？",
+    "cleanupCache": "清理缓存"
   },
   "httpclient": {
     "title": "域名冻结状态",
@@ -438,7 +576,9 @@
     "resetCircuitConfirm": "确定重置该熔断器？",
     "circuitReset": "{domain} 熔断器已重置",
     "failures": "失败次数",
-    "lastFailure": "最后失败"
+    "lastFailure": "最后失败",
+    "reason": "原因",
+    "remainingTime": "剩余时间"
   },
   "iyuu": {
     "title": "IYUU 辅种",
@@ -461,7 +601,8 @@
     "deleteSeeders": "删除做种者",
     "seedRetentionHours": "做种保留时间（小时）",
     "checkInterval": "检查间隔",
-    "maxConcurrentChecks": "最大并发检查数"
+    "maxConcurrentChecks": "最大并发检查数",
+    "checkIntervalPlaceholder": "如 5m"
   },
   "log": {
     "title": "系统日志",
@@ -539,7 +680,10 @@
     "groupId": "组 ID",
     "memberHash": "成员 Hash",
     "oldStatus": "旧状态",
-    "newStatus": "新状态"
+    "newStatus": "新状态",
+    "reason": "原因",
+    "colTime": "时间",
+    "viewInfoHash": "查看 InfoHash: {hash}..."
   },
   "system": {
     "title": "系统监控",
@@ -573,6 +717,11 @@
     "exportBackup": "导出备份",
     "importBackup": "导入备份",
     "backupRestored": "备份已恢复",
+    "httpProxyPlaceholder": "例如: http://127.0.0.1:7890",
+    "socksProxyPlaceholder": "例如: socks5://127.0.0.1:7891",
+    "cookiecloudUrlPlaceholder": "CookieCloud 服务器地址",
+    "cookiecloudUuidPlaceholder": "用户 UUID",
+    "cookiecloudPasswordPlaceholder": "加密密码",
     "notifications": {
       "title": "通知设置",
       "addChannel": "添加通知渠道",
@@ -587,7 +736,26 @@
       "history": "历史",
       "historyTitle": "{name} 通知历史",
       "channelNameRequired": "请输入渠道名称",
-      "channelTypeRequired": "请选择通知类型"
+      "channelTypeRequired": "请选择通知类型",
+      "channelNamePlaceholder": "渠道名称",
+      "selectTypePlaceholder": "选择通知类型",
+      "dingtalk": "钉钉",
+      "serverchan": "Server酱",
+      "subscribeEvents": "订阅事件",
+      "allEventsPlaceholder": "留空表示全部事件",
+      "maxErrorsPerHour": "最大错误数/小时",
+      "timeoutMs": "超时(ms)",
+      "quietHoursStart": "静默开始时间",
+      "quietHoursStartPlaceholder": "如 23:00",
+      "quietHoursEnd": "静默结束时间",
+      "quietHoursEndPlaceholder": "如 08:00",
+      "messageTemplate": "消息模板",
+      "messageTemplatePlaceholder": "自定义消息模板",
+      "colTime": "时间",
+      "colEvent": "事件",
+      "colTitle": "标题",
+      "colSuccess": "成功",
+      "colError": "错误"
     },
     "filterRules": {
       "title": "过滤规则",
@@ -607,7 +775,23 @@
       "testMatched": "规则「{name}」匹配成功",
       "testNotMatched": "规则「{name}」不匹配",
       "ruleNameRequired": "请输入规则名称",
-      "selectRuleType": "请选择规则类型"
+      "selectRuleType": "请选择规则类型",
+      "globalExclusionHint": "全局排除规则对所有订阅生效。匹配到这些规则的种子将被直接跳过，不会推送到下载器。",
+      "addExclusionRule": "添加排除规则",
+      "editExclusionRule": "编辑排除规则",
+      "matchConditionHint": "匹配条件（全部满足则排除该种子）",
+      "exclusionCondition": "排除条件",
+      "moreConditions": "+{n} 条",
+      "none": "无",
+      "confirmDeleteThisRule": "确定删除此规则？",
+      "ruleNamePlaceholder": "如：排除禁转资源",
+      "atLeastOneCondition": "至少需要一个条件",
+      "inputNumeric": "输入数值",
+      "selectOption": "选择",
+      "unitBytesDetail": "单位：字节（1 GB = 1073741824，100 MB = 104857600）",
+      "includeIn": "属于（逗号分隔）",
+      "notIncludeIn": "不属于（逗号分隔）",
+      "notRegexp": "正则不匹配"
     }
   },
   "cookiecloud": {
@@ -632,6 +816,7 @@
     "failed": "失败",
     "running": "运行中",
     "connectionTestFailed": "连接测试失败",
-    "connectionTestSuccess": "连接测试成功"
+    "connectionTestSuccess": "连接测试成功",
+    "passwordPlaceholder": "CookieCloud 密码"
   }
 }

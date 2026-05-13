@@ -35,8 +35,8 @@
     <a-modal
       v-model:open="modalVisible"
       :title="t('publish.addExclusionRule')"
-      @ok="handleSubmit"
       :confirm-loading="submitting"
+      @ok="handleSubmit"
     >
       <a-form :model="form" layout="vertical">
         <a-form-item :label="t('publish.targetSite')" name="target_site" :rules="[{ required: true, message: t('publish.pleaseEnterTargetSite') }]">
@@ -62,7 +62,7 @@ import { exclusionsApi } from '@/api/exclusions'
 
 const { t } = useI18n()
 const loading = ref(false)
-const exclusions = ref<any[]>([])
+const exclusions = ref<Record<string, unknown>[]>([])
 const modalVisible = ref(false)
 const submitting = ref(false)
 
@@ -72,10 +72,10 @@ const form = reactive({
 })
 
 const columns = [
-  { title: '目标站点', key: 'target_site', width: 200 },
-  { title: '源站点', key: 'source_site', width: 200 },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 200 },
-  { title: '操作', key: 'actions', width: 100 },
+  { title: t('publish.targetSite'), key: 'target_site', width: 200 },
+  { title: t('publish.sourceSite'), key: 'source_site', width: 200 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 200 },
+  { title: t('common.actions'), key: 'actions', width: 100 },
 ]
 
 async function fetchExclusions() {
@@ -83,8 +83,8 @@ async function fetchExclusions() {
   try {
     const resp = await exclusionsApi.list()
     exclusions.value = resp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     loading.value = false
   }
@@ -107,20 +107,20 @@ async function handleSubmit() {
     message.success(t('common.addSuccess'))
     modalVisible.value = false
     fetchExclusions()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     submitting.value = false
   }
 }
 
-async function handleDelete(record: any) {
+async function handleDelete(record: Record<string, unknown>) {
   try {
-    await exclusionsApi.remove({ target_site: record.target_site, source_site: record.source_site })
+    await exclusionsApi.remove({ target_site: record.target_site as string, source_site: record.source_site as string })
     message.success(t('common.deleted'))
     fetchExclusions()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 

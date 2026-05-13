@@ -9,7 +9,7 @@ type ClientConfig struct {
 	Type           string     `json:"type" gorm:"size:50;not null"`
 	URL            string     `json:"url" gorm:"size:500;not null"`
 	Username       string     `json:"username" gorm:"size:100"`
-	Password       string     `json:"password" gorm:"size:100"`
+	Password       string     `json:"password" gorm:"size:100" encrypted:"true"`
 	Config         string     `json:"config" gorm:"type:text"`
 	Enabled        bool       `json:"enabled" gorm:"default:true"`
 	IsDefault      bool       `json:"is_default" gorm:"default:false"`

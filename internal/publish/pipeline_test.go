@@ -143,6 +143,13 @@ func TestPipeline_CheckEligibility(t *testing.T) {
 		{"exclusive", "Show 独占 S01", false},
 		{"拒绝转载", "Film 谢绝转载 2024", false},
 		{"CatEDU", "Course CatEDU Lecture", false},
+		{"严禁转载", "Doc 严禁转载", false},
+		{"禁止转载", "Anime 禁止转载 EP01", false},
+		{"9KG", "9KG Some Movie", false},
+		{"色情", "色情内容 Film", false},
+		{"成人内容", "成人内容 Film 2024", false},
+		{"XXX", "XXX Movie", false},
+		{"Porn", "Porn Video", false},
 	}
 
 	for _, tt := range tests {
@@ -172,6 +179,56 @@ func TestPipeline_CheckEligibility_HR(t *testing.T) {
 	}
 	if !strings.Contains(reason, "H&R") {
 		t.Errorf("reason should mention H&R, got: %s", reason)
+	}
+}
+
+func TestContainsAnyKeyword(t *testing.T) {
+	tests := []struct {
+		text     string
+		keywords []string
+		found    bool
+	}{
+		{"Movie 禁转 2024", []string{"禁转"}, true},
+		{"Normal Movie", []string{"禁转"}, false},
+		{"9KG Film", []string{"9KG"}, true},
+		{"9kg film", []string{"9KG"}, true},
+		{"nothing here", []string{"禁转", "独占"}, false},
+		{"", []string{"禁转"}, false},
+	}
+	for _, tt := range tests {
+		_, found := containsAnyKeyword(tt.text, tt.keywords)
+		if found != tt.found {
+			t.Errorf("containsAnyKeyword(%q, %v) = %v, want %v", tt.text, tt.keywords, found, tt.found)
+		}
+	}
+}
+
+func TestCheckForbiddenContent(t *testing.T) {
+	p := NewPipeline(setupPipelineTestDB(t), zap.NewNop())
+
+	tests := []struct {
+		name  string
+		texts []string
+		ok    bool
+	}{
+		{"normal", []string{"Movie.2024", "", ""}, true},
+		{"forbidden in title", []string{"Movie 禁转", "", ""}, false},
+		{"forbidden in subtitle", []string{"Movie", "独占资源", ""}, false},
+		{"forbidden in description", []string{"Movie", "", "谢绝转载"}, false},
+		{"9KG in title", []string{"9KG Movie", "", ""}, false},
+		{"adult keyword", []string{"色情内容", "", ""}, false},
+		{"CatEDU in title", []string{"CatEDU Math 101", "", ""}, false},
+		{"empty all", []string{"", "", ""}, true},
+		{"case insensitive adult", []string{"xxx video", "", ""}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ok, reason := p.checkForbiddenContent(tt.texts)
+			if ok != tt.ok {
+				t.Errorf("checkForbiddenContent(%v) = %v (reason: %s), want %v", tt.texts, ok, reason, tt.ok)
+			}
+		})
 	}
 }
 

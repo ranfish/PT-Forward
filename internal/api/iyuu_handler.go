@@ -157,7 +157,7 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	h.logger.Info("iyuu config updated")
+	h.logger.Info("iyuu config updated", zap.String("component", "iyuu"))
 	Success(w, map[string]interface{}{"message": "配置已更新"})
 }
 

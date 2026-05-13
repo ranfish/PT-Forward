@@ -23,7 +23,7 @@
         showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
-      @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
+      @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'enabled'">
@@ -57,90 +57,90 @@
     <a-modal
       v-model:open="modalVisible"
       :title="t('site.editSite')"
-      @ok="handleSubmit"
       :confirm-loading="submitting"
       width="640px"
+      @ok="handleSubmit"
     >
       <a-form :model="form" layout="vertical">
-        <a-form-item label="镜像域名" name="mirrorDomain">
-          <a-input v-model:value="form.mirrorDomain" placeholder="例如: mirror.pterclub.net（留空使用原始域名）" />
+        <a-form-item :label="t('site.mirrorDomain')" name="mirrorDomain">
+          <a-input v-model:value="form.mirrorDomain" :placeholder="t('site.mirrorDomainPlaceholder')" />
         </a-form-item>
         <a-form-item :label="t('site.authType')" name="authType">
-          <a-select v-model:value="form.authType" placeholder="选择认证方式">
+          <a-select v-model:value="form.authType" :placeholder="t('site.selectAuthType')">
             <a-select-option value="cookie">Cookie</a-select-option>
             <a-select-option value="apikey">API Key</a-select-option>
             <a-select-option value="passkey">Passkey</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item v-if="showCookieField" label="Cookie" name="cookie">
-          <a-textarea v-model:value="form.cookie" :rows="3" :placeholder="editingSite?.hasCookie ? '••••••••（已配置，留空保持不变）' : '站点 Cookie'" />
+          <a-textarea v-model:value="form.cookie" :rows="3" :placeholder="editingSite?.hasCookie ? t('site.placeholderConfigured') : t('site.placeholderCookie')" />
         </a-form-item>
         <a-form-item v-if="showPasskeyField" label="Passkey" name="passkey">
-          <a-input-password v-model:value="form.passkey" :placeholder="editingSite?.hasPasskey ? '••••••••（已配置，留空保持不变）' : '站点 Passkey'" />
+          <a-input-password v-model:value="form.passkey" :placeholder="editingSite?.hasPasskey ? t('site.placeholderConfigured') : t('site.placeholderPasskey')" />
         </a-form-item>
         <a-form-item v-if="showApiKeyField" label="API Key" name="apiKey">
-          <a-input-password v-model:value="form.apiKey" :placeholder="editingSite?.hasApiKey ? '••••••••（已配置，留空保持不变）' : '站点 API Key（馒头使用 x-api-key）'" />
+          <a-input-password v-model:value="form.apiKey" :placeholder="editingSite?.hasApiKey ? t('site.placeholderConfigured') : t('site.placeholderApiKey')" />
         </a-form-item>
 
-        <a-divider>角色与发布</a-divider>
-        <a-form-item label="启用" name="enabled">
+        <a-divider>{{ t('site.roleAndPublish') }}</a-divider>
+        <a-form-item :label="t('site.enabledLabel')" name="enabled">
           <a-switch v-model:checked="form.enabled" />
         </a-form-item>
-        <a-form-item label="作为源站" name="isSource">
+        <a-form-item :label="t('site.asSource')" name="isSource">
           <a-switch v-model:checked="form.isSource" />
         </a-form-item>
-        <a-form-item label="作为目标站" name="isTarget">
+        <a-form-item :label="t('site.asTarget')" name="isTarget">
           <a-switch v-model:checked="form.isTarget" />
         </a-form-item>
-        <a-form-item label="参与自动发布" name="participateAutoPublish">
+        <a-form-item :label="t('site.participateAutoPublishLabel')" name="participateAutoPublish">
           <a-switch v-model:checked="form.participateAutoPublish" />
         </a-form-item>
 
-        <a-divider v-if="isCookieAuth">CookieCloud 同步</a-divider>
+        <a-divider v-if="isCookieAuth">{{ t('site.cookieCloudSyncLabel') }}</a-divider>
         <template v-if="isCookieAuth">
-          <a-form-item label="CookieCloud 同步" name="cookieCloudSync">
+          <a-form-item :label="t('site.cookieCloudSyncLabel')" name="cookieCloudSync">
             <a-switch v-model:checked="form.cookieCloudSync" />
           </a-form-item>
-          <a-form-item label="CookieCloud 域名" name="cookieCloudDomain">
-            <a-input v-model:value="form.cookieCloudDomain" placeholder="CookieCloud 中对应的域名" />
+          <a-form-item :label="t('site.cookieCloudDomainLabel')" name="cookieCloudDomain">
+            <a-input v-model:value="form.cookieCloudDomain" :placeholder="t('site.cookieCloudDomainPlaceholder')" />
           </a-form-item>
         </template>
 
-        <a-divider>RSS / 保存路径覆盖</a-divider>
-        <a-form-item label="覆盖 RSS 地址" name="overrideRssUrl">
-          <a-input v-model:value="form.overrideRssUrl" placeholder="自定义 RSS URL（留空使用默认）" />
+        <a-divider>{{ t('site.rssSavePathOverride') }}</a-divider>
+        <a-form-item :label="t('site.overrideRssUrl')" name="overrideRssUrl">
+          <a-input v-model:value="form.overrideRssUrl" :placeholder="t('site.overrideRssUrlPlaceholder')" />
         </a-form-item>
-        <a-form-item label="覆盖保存路径" name="overrideSavePath">
-          <a-input v-model:value="form.overrideSavePath" placeholder="自定义保存路径（留空使用默认）" />
+        <a-form-item :label="t('site.overrideSavePath')" name="overrideSavePath">
+          <a-input v-model:value="form.overrideSavePath" :placeholder="t('site.overrideSavePathPlaceholder')" />
         </a-form-item>
 
-        <a-divider>网络</a-divider>
-        <a-form-item label="代理地址" name="proxyUrl">
-          <a-input v-model:value="form.proxyUrl" placeholder="例如: socks5://127.0.0.1:1080" />
+        <a-divider>{{ t('site.network') }}</a-divider>
+        <a-form-item :label="t('site.proxyAddress')" name="proxyUrl">
+          <a-input v-model:value="form.proxyUrl" :placeholder="t('site.proxyPlaceholder')" />
         </a-form-item>
-        <a-form-item label="跳过 SSL 验证" name="skipSslVerify">
+        <a-form-item :label="t('site.skipSslVerify')" name="skipSslVerify">
           <a-switch v-model:checked="form.skipSslVerify" />
         </a-form-item>
 
-        <a-divider>解析策略</a-divider>
-        <a-form-item label="Hash 策略" name="hashStrategy">
-          <a-select v-model:value="form.hashStrategy" placeholder="默认: guid" allow-clear>
+        <a-divider>{{ t('site.parseStrategy') }}</a-divider>
+        <a-form-item :label="t('site.hashStrategy')" name="hashStrategy">
+          <a-select v-model:value="form.hashStrategy" :placeholder="t('site.defaultGuid')" allow-clear>
             <a-select-option value="guid">GUID</a-select-option>
-            <a-select-option value="xml_tag">XML 标签</a-select-option>
-            <a-select-option value="fake_from_id">根据 ID 生成</a-select-option>
+            <a-select-option value="xml_tag">{{ t('site.xmlTag') }}</a-select-option>
+            <a-select-option value="fake_from_id">{{ t('site.fakeFromId') }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="Size 策略" name="sizeStrategy">
-          <a-select v-model:value="form.sizeStrategy" placeholder="默认: enclosure" allow-clear>
+        <a-form-item :label="t('site.sizeStrategy')" name="sizeStrategy">
+          <a-select v-model:value="form.sizeStrategy" :placeholder="t('site.defaultEnclosure')" allow-clear>
             <a-select-option value="enclosure">Enclosure</a-select-option>
-            <a-select-option value="xml_tag">XML 标签</a-select-option>
-            <a-select-option value="desc_regex">描述正则</a-select-option>
+            <a-select-option value="xml_tag">{{ t('site.xmlTag') }}</a-select-option>
+            <a-select-option value="desc_regex">{{ t('site.descRegex') }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="ID 策略" name="idStrategy">
-          <a-select v-model:value="form.idStrategy" placeholder="默认: query_param" allow-clear>
-            <a-select-option value="query_param">查询参数</a-select-option>
-            <a-select-option value="link_regex">链接正则</a-select-option>
+        <a-form-item :label="t('site.idStrategy')" name="idStrategy">
+          <a-select v-model:value="form.idStrategy" :placeholder="t('site.defaultQueryParam')" allow-clear>
+            <a-select-option value="query_param">{{ t('site.queryParam') }}</a-select-option>
+            <a-select-option value="link_regex">{{ t('site.linkRegex') }}</a-select-option>
           </a-select>
         </a-form-item>
       </a-form>
@@ -157,10 +157,34 @@ import { usePagination } from '@/composables/usePagination'
 
 const { t } = useI18n()
 
+interface SiteListItem {
+  [key: string]: string | number | boolean
+  id: number
+  name: string
+  enabled: boolean
+  participateAutoPublish: boolean
+  isSource: boolean
+  isTarget: boolean
+  hasCookie: boolean
+  hasPasskey: boolean
+  hasApiKey: boolean
+  mirrorDomain: string
+  authType: string
+  cookieCloudSync: boolean
+  cookieCloudDomain: string
+  overrideRssUrl: string
+  overrideSavePath: string
+  proxyUrl: string
+  skipSslVerify: boolean
+  hashStrategy: string
+  sizeStrategy: string
+  idStrategy: string
+}
+
 const searchText = ref('')
 const modalVisible = ref(false)
 const submitting = ref(false)
-const editingSite = ref<any>(null)
+const editingSite = ref<SiteListItem | null>(null)
 
 const form = reactive({
   mirrorDomain: '',
@@ -188,32 +212,32 @@ const showPasskeyField = computed(() => form.authType === 'passkey')
 const showApiKeyField = computed(() => form.authType === 'apikey')
 const isCookieAuth = computed(() => form.authType === 'cookie')
 
-function hasAnyCredential(record: any): boolean {
+function hasAnyCredential(record: SiteListItem): boolean {
   return record.hasCookie || record.hasApiKey || record.hasPasskey
 }
 
 const columns = [
-  { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '启用', key: 'enabled', width: 80, align: 'center' as const },
-  { title: '参与自动发布', key: 'participateAutoPublish', width: 130, align: 'center' as const },
-  { title: '作为源站', key: 'isSource', width: 100, align: 'center' as const },
-  { title: '作为目标站', key: 'isTarget', width: 110, align: 'center' as const },
-  { title: '凭据状态', key: 'hasCookie', width: 100 },
-  { title: '操作', key: 'actions', width: 180 },
+  { title: t('common.name'), dataIndex: 'name', key: 'name' },
+  { title: t('site.enabledLabel'), key: 'enabled', width: 80, align: 'center' as const },
+  { title: t('site.participateAutoPublishLabel'), key: 'participateAutoPublish', width: 130, align: 'center' as const },
+  { title: t('site.asSource'), key: 'isSource', width: 100, align: 'center' as const },
+  { title: t('site.asTarget'), key: 'isTarget', width: 110, align: 'center' as const },
+  { title: t('site.credentialStatus'), key: 'hasCookie', width: 100 },
+  { title: t('common.actions'), key: 'actions', width: 180 },
 ]
 
 const pagination = usePagination((page, size) => sitesApi.list(page, size, searchText.value))
 
-async function toggleField(record: any, field: string, value: boolean) {
+async function toggleField(record: SiteListItem, field: string, value: boolean) {
   try {
     await sitesApi.update(record.id, { [field]: value })
     record[field] = value
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 
-function openModal(record: any) {
+function openModal(record: SiteListItem) {
   editingSite.value = record
   Object.assign(form, {
     mirrorDomain: record.mirrorDomain || '',
@@ -239,14 +263,15 @@ function openModal(record: any) {
 }
 
 async function handleSubmit() {
+  if (!editingSite.value) return
   submitting.value = true
   try {
     await sitesApi.update(editingSite.value.id, form)
     message.success(t('common.operationSuccess'))
     modalVisible.value = false
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     submitting.value = false
   }
@@ -261,8 +286,8 @@ async function testConnection(id: number) {
     } else {
       message.warning(data?.message || t('common.operationFailed'))
     }
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 

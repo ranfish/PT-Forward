@@ -11,7 +11,7 @@
           <a-input v-model:value="form.uuid" placeholder="CookieCloud UUID" />
         </a-form-item>
         <a-form-item :label="t('common.password')">
-          <a-input-password v-model:value="form.password" placeholder="CookieCloud 密码" />
+          <a-input-password v-model:value="form.password" :placeholder="t('cookiecloud.passwordPlaceholder')" />
         </a-form-item>
         <a-form-item :label="t('cookiecloud.cryptoType')">
           <a-select v-model:value="form.cryptoType" style="width: 200px">
@@ -79,7 +79,7 @@ const saving = ref(false)
 const testing = ref(false)
 const syncing = ref(false)
 const historyLoading = ref(false)
-const histories = ref<any[]>([])
+const histories = ref<Record<string, unknown>[]>([])
 
 const form = reactive({
   serverUrl: '',
@@ -98,12 +98,12 @@ const historyPagination = reactive({
 })
 
 const historyColumns = [
-  { title: '时间', key: 'created_at', width: 180 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '同步站点', dataIndex: 'synced_sites', width: 100 },
-  { title: '跳过站点', dataIndex: 'skipped_sites', width: 100 },
-  { title: '耗时', key: 'sync_duration', width: 120 },
-  { title: '错误信息', dataIndex: 'error_message', ellipsis: true },
+  { title: t('common.time'), key: 'created_at', width: 180 },
+  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('cookiecloud.syncedSites'), dataIndex: 'synced_sites', width: 100 },
+  { title: t('cookiecloud.skippedSites'), dataIndex: 'skipped_sites', width: 100 },
+  { title: t('cookiecloud.duration'), key: 'sync_duration', width: 120 },
+  { title: t('cookiecloud.errorMessage'), dataIndex: 'error_message', ellipsis: true },
 ]
 
 import { formatTime, formatDurationNs } from '@/utils/format'
@@ -130,8 +130,9 @@ async function handleSave() {
   try {
     await cookiecloudApi.saveConfig(form)
     message.success(t('common.saveSuccess'))
-  } catch (e: any) {
-    message.error(e?.response?.data?.message || t('common.saveFailed'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    message.error(err?.response?.data?.message || t('common.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -142,8 +143,9 @@ async function handleTest() {
   try {
     await cookiecloudApi.test()
     message.success(t('cookiecloud.connectionTestSuccess'))
-  } catch (e: any) {
-    message.error(e?.response?.data?.message || t('cookiecloud.connectionTestFailed'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    message.error(err?.response?.data?.message || t('cookiecloud.connectionTestFailed'))
   } finally {
     testing.value = false
   }
@@ -156,8 +158,9 @@ async function handleSync() {
     const data = resp.data?.data || {}
     message.success(t('cookiecloud.syncCompleted', { count: data.synced_sites || 0 }))
     fetchHistory()
-  } catch (e: any) {
-    message.error(e?.response?.data?.message || t('cookiecloud.syncFailed'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    message.error(err?.response?.data?.message || t('cookiecloud.syncFailed'))
   } finally {
     syncing.value = false
   }
@@ -179,7 +182,7 @@ async function fetchHistory() {
   }
 }
 
-function handleHistoryTableChange(pagination: any) {
+function handleHistoryTableChange(pagination: { current: number; pageSize: number }) {
   historyPagination.current = pagination.current
   historyPagination.pageSize = pagination.pageSize
   fetchHistory()

@@ -59,30 +59,30 @@
     <a-modal
       v-model:open="modalVisible"
       :title="editingChannel ? t('settings.notifications.editChannel') : t('settings.notifications.addChannel')"
-      @ok="handleSubmit"
       :confirm-loading="submitting"
+      @ok="handleSubmit"
     >
       <a-form :model="form" layout="vertical">
         <a-form-item :label="t('settings.notifications.channelName')" name="name" :rules="[{ required: true, message: t('settings.notifications.channelNameRequired') }]">
-          <a-input v-model:value="form.name" placeholder="渠道名称" />
+          <a-input v-model:value="form.name" :placeholder="t('settings.notifications.channelNamePlaceholder')" />
         </a-form-item>
         <a-form-item :label="t('settings.notifications.channelType')" name="type" :rules="[{ required: true, message: t('settings.notifications.channelTypeRequired') }]">
-          <a-select v-model:value="form.type" placeholder="选择通知类型">
+          <a-select v-model:value="form.type" :placeholder="t('settings.notifications.selectTypePlaceholder')">
             <a-select-option value="telegram">Telegram</a-select-option>
             <a-select-option value="bark">Bark</a-select-option>
             <a-select-option value="webhook">Webhook</a-select-option>
-            <a-select-option value="serverchan">Server酱</a-select-option>
-            <a-select-option value="dingtalk">钉钉</a-select-option>
+            <a-select-option value="serverchan">{{ t('settings.notifications.serverchan') }}</a-select-option>
+            <a-select-option value="dingtalk">{{ t('settings.notifications.dingtalk') }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item :label="t('settings.notifications.channelConfig')" name="config">
-          <a-textarea v-model:value="form.config" :rows="4" placeholder="JSON 格式的渠道配置" />
+          <a-textarea v-model:value="form.config" :rows="4" :placeholder="t('settings.notifications.channelConfigPlaceholder')" />
         </a-form-item>
         <a-form-item :label="t('common.enabled')" name="enabled">
           <a-switch v-model:checked="form.enabled" />
         </a-form-item>
-        <a-form-item label="订阅事件" name="events">
-          <a-select v-model:value="form.events" mode="multiple" placeholder="留空表示全部事件">
+        <a-form-item :label="t('settings.notifications.subscribeEvents')" name="events">
+          <a-select v-model:value="form.events" mode="multiple" :placeholder="t('settings.notifications.allEventsPlaceholder')">
             <a-select-option value="all">all</a-select-option>
             <a-select-option value="rss">rss</a-select-option>
             <a-select-option value="rss_new">rss_new</a-select-option>
@@ -92,20 +92,20 @@
             <a-select-option value="error">error</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="最大错误数/小时" name="maxErrorsPerHour">
+        <a-form-item :label="t('settings.notifications.maxErrorsPerHour')" name="maxErrorsPerHour">
           <a-input-number v-model:value="form.maxErrorsPerHour" :min="0" :max="10000" style="width: 100%" />
         </a-form-item>
-        <a-form-item label="超时(ms)" name="timeoutMs">
+        <a-form-item :label="t('settings.notifications.timeoutMs')" name="timeoutMs">
           <a-input-number v-model:value="form.timeoutMs" :min="1000" :max="60000" :step="1000" style="width: 100%" />
         </a-form-item>
-        <a-form-item label="静默开始时间" name="quietHoursStart">
-          <a-input v-model:value="form.quietHoursStart" placeholder="如 23:00" />
+        <a-form-item :label="t('settings.notifications.quietHoursStart')" name="quietHoursStart">
+          <a-input v-model:value="form.quietHoursStart" :placeholder="t('settings.notifications.quietHoursStartPlaceholder')" />
         </a-form-item>
-        <a-form-item label="静默结束时间" name="quietHoursEnd">
-          <a-input v-model:value="form.quietHoursEnd" placeholder="如 08:00" />
+        <a-form-item :label="t('settings.notifications.quietHoursEnd')" name="quietHoursEnd">
+          <a-input v-model:value="form.quietHoursEnd" :placeholder="t('settings.notifications.quietHoursEndPlaceholder')" />
         </a-form-item>
-        <a-form-item label="消息模板" name="messageTemplate">
-          <a-textarea v-model:value="form.messageTemplate" :rows="2" placeholder="自定义消息模板" />
+        <a-form-item :label="t('settings.notifications.messageTemplate')" name="messageTemplate">
+          <a-textarea v-model:value="form.messageTemplate" :rows="2" :placeholder="t('settings.notifications.messageTemplatePlaceholder')" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -124,12 +124,12 @@ const { t } = useI18n()
 const loading = ref(false)
 const modalVisible = ref(false)
 const submitting = ref(false)
-const editingChannel = ref<any>(null)
-const channels = ref<any[]>([])
+const editingChannel = ref<Record<string, unknown> | null>(null)
+const channels = ref<Record<string, unknown>[]>([])
 const historyVisible = ref(false)
 const historyLoading = ref(false)
-const historyChannel = ref<any>(null)
-const historyRecords = ref<any[]>([])
+const historyChannel = ref<Record<string, unknown> | null>(null)
+const historyRecords = ref<Record<string, unknown>[]>([])
 
 const form = reactive({
   name: '',
@@ -145,19 +145,19 @@ const form = reactive({
 })
 
 const columns = [
-  { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '类型', key: 'type', width: 120 },
-  { title: '启用', key: 'enabled', width: 80 },
-  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
-  { title: '操作', key: 'actions', width: 260 },
+  { title: t('common.name'), dataIndex: 'name', key: 'name' },
+  { title: t('common.type'), key: 'type', width: 120 },
+  { title: t('common.enabled'), key: 'enabled', width: 80 },
+  { title: t('common.createdAt'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+  { title: t('common.actions'), key: 'actions', width: 260 },
 ]
 
 const historyColumns = [
-  { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
-  { title: '事件', dataIndex: 'event', key: 'event', width: 150 },
-  { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
-  { title: '成功', key: 'success', width: 80 },
-  { title: '错误', dataIndex: 'error_msg', key: 'error_msg', ellipsis: true },
+  { title: t('settings.notifications.colTime'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('settings.notifications.colEvent'), dataIndex: 'event', key: 'event', width: 150 },
+  { title: t('settings.notifications.colTitle'), dataIndex: 'title', key: 'title', ellipsis: true },
+  { title: t('settings.notifications.colSuccess'), key: 'success', width: 80 },
+  { title: t('settings.notifications.colError'), dataIndex: 'error_msg', key: 'error_msg', ellipsis: true },
 ]
 
 async function fetchChannels() {
@@ -165,14 +165,14 @@ async function fetchChannels() {
   try {
     const resp = await notificationsApi.list()
     channels.value = resp.data.data?.items || resp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     loading.value = false
   }
 }
 
-function openModal(record?: any) {
+function openModal(record?: Record<string, unknown>) {
   editingChannel.value = record || null
   if (record) {
     Object.assign(form, {
@@ -180,7 +180,7 @@ function openModal(record?: any) {
       type: record.type,
       config: typeof record.config === 'string' ? record.config : JSON.stringify(record.config || {}, null, 2),
       enabled: record.enabled !== false,
-      events: record.events ? record.events.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+      events: typeof record.events === 'string' ? record.events.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
       maxErrorsPerHour: record.maxErrorsPerHour ?? 100,
       timeoutMs: record.timeoutMs ?? 10000,
       quietHoursStart: record.quietHoursStart || '',
@@ -221,15 +221,15 @@ async function handleSubmit() {
       events: form.events.length > 0 ? form.events.join(',') : '',
     }
     if (editingChannel.value) {
-      await notificationsApi.update(editingChannel.value.id, payload)
+      await notificationsApi.update(editingChannel.value.id as number, payload)
     } else {
       await notificationsApi.create(payload)
     }
     message.success(t('common.operationSuccess'))
     modalVisible.value = false
     fetchChannels()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     submitting.value = false
   }
@@ -240,8 +240,8 @@ async function handleDelete(id: number) {
     await notificationsApi.delete(id)
     message.success(t('common.deleteSuccess'))
     fetchChannels()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -249,28 +249,28 @@ async function testChannel(id: number) {
   try {
     await notificationsApi.test(id)
     message.success(t('settings.notifications.testSent'))
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
-async function toggleChannel(record: any) {
+async function toggleChannel(record: Record<string, unknown>) {
   try {
-    await notificationsApi.update(record.id, { ...record, enabled: !record.enabled })
+    await notificationsApi.update(record.id as number, { ...record, enabled: !record.enabled })
     message.success(t('settings.notifications.statusToggled'))
     fetchChannels()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
-async function showHistory(record: any) {
+async function showHistory(record: Record<string, unknown>) {
   historyChannel.value = record
   historyVisible.value = true
   historyLoading.value = true
   try {
-    const resp = await notificationsApi.listHistory(record.id)
-    historyRecords.value = (resp.data.data?.items || resp.data.data || []).map((h: any) => ({
+    const resp = await notificationsApi.listHistory(record.id as number)
+    historyRecords.value = (resp.data.data?.items || resp.data.data || []).map((h: Record<string, unknown>) => ({
       ...h,
       success: h.success,
     }))

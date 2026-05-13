@@ -21,36 +21,5 @@ log:
   format: "json"
 
 security:
-  rate_limit_enabled: false
-  rate_limit_global: 600
-  rate_limit_write: 200
-  rate_limit_download: 50
-  login_max_retries: 5
-  login_lockout_min: 5
-  login_lockout_enabled: false
-
-cookiecloud:
-  enabled: false
-  sync_interval: 60
-
-notification:
-  enabled: true
-  max_retries: 3
-  retry_interval_s: 30
-  batch_size: 10
-
-iyuu:
-  enabled: false
-  api_base: "https://iyuu.cn"
-
-data_cleanup:
-  torrent_event_retain_days: 7
-  publish_result_retain_days: 30
-  seen_record_retain_days: 30
-  notification_retain_days: 30
-  publish_task_retain_days: 30
-  torrent_file_retain_days: 7
-  reseed_match_retain_days: 90
-  ptgen_cache_retain_days: 90
-  seeding_archive_retain_days: 30
-  audit_log_retain_days: 90
+  encryption_key: ""
+  trusted_proxies: []

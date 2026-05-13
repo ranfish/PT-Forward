@@ -11,6 +11,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/ptgen"
+	"github.com/ranfish/pt-forward/internal/screenshot"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -23,6 +24,9 @@ type Pipeline struct {
 	ptgen             *ptgen.Provider
 	completionWatcher model.CompletionWatcher
 	notifyService     *notification.Service
+	screenshotConfig  *screenshot.Config
+	artifactCache     *ArtifactCache
+	torrentCache      *TorrentCache
 }
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
@@ -43,6 +47,18 @@ func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
 
 func (p *Pipeline) SetNotifyService(ns *notification.Service) {
 	p.notifyService = ns
+}
+
+func (p *Pipeline) SetScreenshotConfig(cfg screenshot.Config) {
+	p.screenshotConfig = &cfg
+}
+
+func (p *Pipeline) SetArtifactCache(ac *ArtifactCache) {
+	p.artifactCache = ac
+}
+
+func (p *Pipeline) SetTorrentCache(tc *TorrentCache) {
+	p.torrentCache = tc
 }
 
 func (p *Pipeline) CreateTask(ctx context.Context, task *model.PublishTask) error {
@@ -103,6 +119,54 @@ func (p *Pipeline) DeleteCandidate(ctx context.Context, id uint) error {
 }
 
 func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.PublishCandidate, error) {
+	candidate, err := p.validateAndLoadCandidate(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if p.siteProvider == nil {
+		candidate.PublishStatus = model.CandidatePublishing
+		return candidate, nil
+	}
+
+	sourceDetail, sourceConfig, sourceAdapter, err := p.fetchSourceInfo(ctx, candidate)
+	if err != nil {
+		return nil, err
+	}
+
+	torrentData, err := sourceAdapter.DownloadTorrent(ctx, sourceConfig, candidate.SourceTorrentID)
+	if err != nil {
+		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("下载源种子失败: %v", err)); err != nil {
+			p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
+		}
+		return nil, &model.AppError{Code: 50001, Message: "下载源种子失败", Cause: err}
+	}
+
+	targetSites := parseTargetSites(candidate.TargetSites)
+	if len(targetSites) == 0 {
+		candidate.PublishStatus = model.CandidatePublishing
+		return candidate, nil
+	}
+
+	var lastErr error
+	publishedCount := 0
+	for _, target := range targetSites {
+		if ctx.Err() != nil {
+			break
+		}
+		published, err := p.publishToTarget(ctx, candidate, target, sourceDetail, torrentData)
+		if err != nil {
+			lastErr = err
+		}
+		if published {
+			publishedCount++
+		}
+	}
+
+	candidate.PublishStatus = p.finalizePublishStatus(ctx, id, publishedCount, lastErr)
+	return candidate, nil
+}
+
+func (p *Pipeline) validateAndLoadCandidate(ctx context.Context, id uint) (*model.PublishCandidate, error) {
 	var candidate model.PublishCandidate
 	if err := p.db.WithContext(ctx).First(&candidate, id).Error; err != nil {
 		return nil, err
@@ -120,29 +184,20 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 		return nil, &model.AppError{Code: 40001, Message: "更新候选状态失败", Cause: err}
 	}
 
-	if p.siteProvider == nil {
-		candidate.PublishStatus = model.CandidatePublishing
-		return &candidate, nil
-	}
+	return &candidate, nil
+}
 
+func (p *Pipeline) fetchSourceInfo(ctx context.Context, candidate *model.PublishCandidate) (*model.TorrentDetail, *model.SiteConfig, model.SiteAdapter, error) {
 	sourceConfig, err := p.siteProvider.GetSiteConfig(ctx, candidate.SourceSite)
 	if err != nil {
-		_ = p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("获取源站配置失败: %v", err))
-		return nil, &model.AppError{Code: 50001, Message: "获取源站配置失败", Cause: err}
+		_ = p.UpdateCandidateStatus(ctx, candidate.ID, model.CandidateFailed, fmt.Sprintf("获取源站配置失败: %v", err))
+		return nil, nil, nil, &model.AppError{Code: 50001, Message: "获取源站配置失败", Cause: err}
 	}
 
 	sourceAdapter, err := p.siteProvider.GetAdapter(ctx, candidate.SourceSite)
 	if err != nil {
-		_ = p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("获取源站适配器失败: %v", err))
-		return nil, &model.AppError{Code: 50001, Message: "获取源站适配器失败", Cause: err}
-	}
-
-	torrentData, err := sourceAdapter.DownloadTorrent(ctx, sourceConfig, candidate.SourceTorrentID)
-	if err != nil {
-		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("下载源种子失败: %v", err)); err != nil {
-			p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
-		}
-		return nil, &model.AppError{Code: 50001, Message: "下载源种子失败", Cause: err}
+		_ = p.UpdateCandidateStatus(ctx, candidate.ID, model.CandidateFailed, fmt.Sprintf("获取源站适配器失败: %v", err))
+		return nil, nil, nil, &model.AppError{Code: 50001, Message: "获取源站适配器失败", Cause: err}
 	}
 
 	sourceDetail, err := sourceAdapter.GetTorrentDetail(ctx, sourceConfig, candidate.SourceTorrentID)
@@ -150,212 +205,224 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 		p.logger.Warn("获取源种子详情失败", zap.Error(err))
 	}
 
-	targetSites := parseTargetSites(candidate.TargetSites)
-	if len(targetSites) == 0 {
-		candidate.PublishStatus = model.CandidatePublishing
-		return &candidate, nil
+	if sourceDetail != nil {
+		extraTexts := []string{}
+		if sourceDetail.Subtitle != "" {
+			extraTexts = append(extraTexts, sourceDetail.Subtitle)
+		}
+		if sourceDetail.Description != "" {
+			extraTexts = append(extraTexts, sourceDetail.Description)
+		}
+		if len(extraTexts) > 0 {
+			if eligible, reason := p.checkForbiddenContent(extraTexts); !eligible {
+				_ = p.UpdateCandidateStatus(ctx, candidate.ID, model.CandidateSkipped, reason)
+				return nil, nil, nil, &model.AppError{Code: 40001, Message: fmt.Sprintf("发布合规检查未通过: %s", reason)}
+			}
+		}
 	}
 
-	var lastErr error
-	publishedCount := 0
+	return sourceDetail, sourceConfig, sourceAdapter, nil
+}
 
-	for _, targetSite := range targetSites {
-		if ctx.Err() != nil {
-			break
-		}
+func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (bool, error) {
+	eligible, reason := p.CheckPublishEligibility(ctx, candidate, targetSite)
+	if !eligible {
+		p.logger.Info("目标站发布排除", zap.String("target", targetSite), zap.String("reason", reason))
+		return false, nil
+	}
 
-		if eligible, reason := p.CheckPublishEligibility(ctx, &candidate, targetSite); !eligible {
-			p.logger.Info("目标站发布排除", zap.String("target", targetSite), zap.String("reason", reason))
-			continue
-		}
+	targetConfig, err := p.siteProvider.GetSiteConfig(ctx, targetSite)
+	if err != nil {
+		p.logger.Warn("获取目标站配置失败", zap.String("site", targetSite), zap.Error(err))
+		return false, nil
+	}
 
-		targetConfig, err := p.siteProvider.GetSiteConfig(ctx, targetSite)
-		if err != nil {
-			p.logger.Warn("获取目标站配置失败", zap.String("site", targetSite), zap.Error(err))
-			continue
-		}
+	targetAdapter, err := p.siteProvider.GetAdapter(ctx, targetSite)
+	if err != nil {
+		p.logger.Warn("获取目标站适配器失败", zap.String("site", targetSite), zap.Error(err))
+		return false, nil
+	}
 
-		targetAdapter, err := p.siteProvider.GetAdapter(ctx, targetSite)
-		if err != nil {
-			p.logger.Warn("获取目标站适配器失败", zap.String("site", targetSite), zap.Error(err))
-			continue
-		}
-
-		title := candidate.TorrentName
-		descriptionText := ""
-		if sourceDetail != nil {
-			descriptionText = sourceDetail.Description
-		}
-
-		dedupSkip := false
-		if p.siteProvider != nil && title != "" {
-			dedupResults, dedupErr := targetAdapter.SearchTorrents(ctx, targetConfig, title, nil)
-			if dedupErr == nil {
-				for _, dr := range dedupResults {
-					if dr.Size == candidate.Size && dr.Size > 0 {
-						p.logger.Info("目标站已存在相同资源，跳过发布",
-							zap.String("target", targetSite),
-							zap.String("title", dr.Title),
-							zap.Int64("size", dr.Size),
-						)
-						if err := p.CreateResult(ctx, &model.PublishResultRecord{
-							CandidateID:  id,
-							SourceSite:   candidate.SourceSite,
-							TargetSite:   targetSite,
-							TorrentID:    dr.TorrentID,
-							Status:       model.PublishResultSkipped,
-							ErrorMessage: fmt.Sprintf("去重匹配: %s (size=%d)", dr.Title, dr.Size),
-						}); err != nil {
-							p.logger.Warn("记录发布结果失败", zap.Error(err))
-						}
-						dedupSkip = true
-						break
+	title := candidate.TorrentName
+	if p.siteProvider != nil && title != "" {
+		dedupResults, dedupErr := targetAdapter.SearchTorrents(ctx, targetConfig, title, nil)
+		if dedupErr == nil {
+			for _, dr := range dedupResults {
+				if dr.Size == candidate.Size && dr.Size > 0 {
+					p.logger.Info("目标站已存在相同资源，跳过发布",
+						zap.String("target", targetSite),
+						zap.String("title", dr.Title),
+						zap.Int64("size", dr.Size),
+					)
+					if err := p.CreateResult(ctx, &model.PublishResultRecord{
+						CandidateID:  candidate.ID,
+						SourceSite:   candidate.SourceSite,
+						TargetSite:   targetSite,
+						TorrentID:    dr.TorrentID,
+						Status:       model.PublishResultSkipped,
+						ErrorMessage: fmt.Sprintf("去重匹配: %s (size=%d)", dr.Title, dr.Size),
+					}); err != nil {
+						p.logger.Warn("记录发布结果失败", zap.Error(err))
 					}
+					return false, nil
 				}
 			}
 		}
-		if dedupSkip {
-			continue
-		}
+	}
 
-		descData := &model.DescriptionData{
-			SourceSite:    candidate.SourceSite,
-			MediaInfoText: "",
-			Screenshots:   nil,
-		}
-		if sourceDetail != nil {
-			descData.MediaInfoText = sourceDetail.MediaInfo
-			descData.Screenshots = sourceDetail.Screenshots
-		}
+	pubReq, err := p.buildPublishRequest(ctx, candidate, targetSite, sourceDetail, torrentData)
+	if err != nil {
+		return false, err
+	}
 
-		ptgenResult, ptgenErr := p.queryPTGen(ctx, title)
-		if ptgenErr == nil && ptgenResult != nil {
-			descData.PosterURL = ptgenResult.PosterURL
-			if ptgenResult.RawBBCode != "" {
-				descData.PTGenBody = ptgenResult.RawBBCode
-			}
-		}
-
-		if descriptionText == "" && descData.PTGenBody != "" {
-			descriptionText = descData.PTGenBody
-		}
-
-		var descConfig model.SiteDescConfig
-		siteInfo, siteInfoErr := p.siteProvider.GetSiteInfo(ctx, targetSite)
-		if siteInfoErr == nil && siteInfo != nil {
-			siteConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, siteInfo.BaseURL)
-			if cfgErr == nil && siteConfig != nil {
-				descConfig = siteConfig.Publish.Description
-			}
-		}
-
-		if descConfig.Format != "" || descConfig.TemplateOverride != "" {
-			renderer := description.NewRenderer(descConfig.Format)
-			if rendered, err := renderer.Render(descData, descConfig); err == nil && rendered != "" {
-				descriptionText = rendered
-			}
-		}
-
-		pubReq := &model.PublishRequest{
-			TorrentData:     torrentData,
-			Title:           title,
-			Description:     descriptionText,
-			SourceSite:      candidate.SourceSite,
-			SourceInfoHash:  candidate.InfoHash,
-			SourceTorrentID: candidate.SourceTorrentID,
-			TargetSite:      targetSite,
-			FormFields:      make(map[string]string),
-		}
-
-		if ptgenResult != nil {
-			if ptgenResult.IMDBURL != "" {
-				pubReq.IMDbLink = ptgenResult.IMDBURL
-			}
-			if ptgenResult.DoubanURL != "" {
-				pubReq.DoubanLink = ptgenResult.DoubanURL
-			}
-			if ptgenResult.TMDbURL != "" {
-				if tmdbID := extractTMDBID(ptgenResult.TMDbURL); tmdbID != "" {
-					if pubReq.ExtraFields == nil {
-						pubReq.ExtraFields = make(map[string]string)
-					}
-					pubReq.ExtraFields["tmdb_id"] = tmdbID
-				}
-			}
-		}
-
-		if sourceDetail != nil {
-			if sourceDetail.Category != "" {
-				pubReq.FormFields["category"] = sourceDetail.Category
-			}
-			if sourceDetail.Source != "" {
-				pubReq.FormFields["source"] = sourceDetail.Source
-			}
-			if sourceDetail.Resolution != "" {
-				pubReq.FormFields["resolution"] = sourceDetail.Resolution
-			}
-			if sourceDetail.Codec != "" {
-				pubReq.FormFields["codec"] = sourceDetail.Codec
-			}
-			if sourceDetail.AudioCodec != "" {
-				pubReq.FormFields["audioCodec"] = sourceDetail.AudioCodec
-			}
-			if sourceDetail.Processing != "" {
-				pubReq.FormFields["processing"] = sourceDetail.Processing
-			}
-			if sourceDetail.ReleaseGroup != "" {
-				pubReq.FormFields["team"] = sourceDetail.ReleaseGroup
-			}
-			if sourceDetail.Region != "" {
-				pubReq.FormFields["region"] = sourceDetail.Region
-			}
-			if sourceDetail.IMDbID != "" {
-				pubReq.FormFields["imdb"] = sourceDetail.IMDbID
-			}
-			pubReq.MediaInfo = sourceDetail.MediaInfo
-			pubReq.Screenshots = sourceDetail.Screenshots
-		}
-
-		if pubReq.DoubanLink != "" && pubReq.FormFields["douban"] == "" {
-			pubReq.FormFields["douban"] = pubReq.DoubanLink
-		}
-
-		p.mapFieldValues(ctx, targetSite, pubReq.FormFields)
-
-		resp, err := targetAdapter.UploadTorrent(ctx, targetConfig, pubReq)
-		if err != nil {
-			p.logger.Warn("上传到目标站失败",
-				zap.String("target", targetSite),
-				zap.Error(err),
-			)
-			lastErr = err
-
-			if err := p.CreateResult(ctx, &model.PublishResultRecord{
-				CandidateID:  id,
-				SourceSite:   candidate.SourceSite,
-				TargetSite:   targetSite,
-				TorrentID:    candidate.SourceTorrentID,
-				Status:       model.PublishResultFailed,
-				ErrorMessage: err.Error(),
-			}); err != nil {
-				p.logger.Warn("记录发布结果失败", zap.Error(err))
-			}
-			continue
-		}
-
-		publishedCount++
+	resp, err := targetAdapter.UploadTorrent(ctx, targetConfig, pubReq)
+	if err != nil {
+		p.logger.Warn("上传到目标站失败",
+			zap.String("target", targetSite),
+			zap.Error(err),
+		)
 		if err := p.CreateResult(ctx, &model.PublishResultRecord{
-			CandidateID: id,
-			SourceSite:  candidate.SourceSite,
-			TargetSite:  targetSite,
-			TorrentID:   resp.TorrentID,
-			Status:      model.PublishResultCompleted,
-			PublishURL:  resp.DetailURL,
+			CandidateID:  candidate.ID,
+			SourceSite:   candidate.SourceSite,
+			TargetSite:   targetSite,
+			TorrentID:    candidate.SourceTorrentID,
+			Status:       model.PublishResultFailed,
+			ErrorMessage: err.Error(),
 		}); err != nil {
 			p.logger.Warn("记录发布结果失败", zap.Error(err))
 		}
+		return false, err
 	}
 
+	if err := p.CreateResult(ctx, &model.PublishResultRecord{
+		CandidateID: candidate.ID,
+		SourceSite:  candidate.SourceSite,
+		TargetSite:  targetSite,
+		TorrentID:   resp.TorrentID,
+		Status:      model.PublishResultCompleted,
+		PublishURL:  resp.DetailURL,
+	}); err != nil {
+		p.logger.Warn("记录发布结果失败", zap.Error(err))
+	}
+
+	return true, nil
+}
+
+func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (*model.PublishRequest, error) {
+	title := candidate.TorrentName
+	descriptionText := ""
+	if sourceDetail != nil {
+		descriptionText = sourceDetail.Description
+	}
+
+	descData := &model.DescriptionData{
+		SourceSite:    candidate.SourceSite,
+		MediaInfoText: "",
+		Screenshots:   nil,
+	}
+	if sourceDetail != nil {
+		descData.MediaInfoText = sourceDetail.MediaInfo
+		descData.Screenshots = sourceDetail.Screenshots
+	}
+
+	ptgenResult, ptgenErr := p.queryPTGen(ctx, title)
+	if ptgenErr == nil && ptgenResult != nil {
+		descData.PosterURL = ptgenResult.PosterURL
+		if ptgenResult.RawBBCode != "" {
+			descData.PTGenBody = ptgenResult.RawBBCode
+		}
+	}
+
+	if descriptionText == "" && descData.PTGenBody != "" {
+		descriptionText = descData.PTGenBody
+	}
+
+	var descConfig model.SiteDescConfig
+	siteInfo, siteInfoErr := p.siteProvider.GetSiteInfo(ctx, targetSite)
+	if siteInfoErr == nil && siteInfo != nil {
+		siteConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, siteInfo.BaseURL)
+		if cfgErr == nil && siteConfig != nil {
+			descConfig = siteConfig.Publish.Description
+		}
+	}
+
+	if descConfig.Format != "" || descConfig.TemplateOverride != "" {
+		renderer := description.NewRenderer(descConfig.Format)
+		if rendered, err := renderer.Render(descData, descConfig); err == nil && rendered != "" {
+			descriptionText = rendered
+		}
+	}
+
+	pubReq := &model.PublishRequest{
+		TorrentData:     torrentData,
+		Title:           title,
+		Description:     descriptionText,
+		SourceSite:      candidate.SourceSite,
+		SourceInfoHash:  candidate.InfoHash,
+		SourceTorrentID: candidate.SourceTorrentID,
+		TargetSite:      targetSite,
+		FormFields:      make(map[string]string),
+	}
+
+	if ptgenResult != nil {
+		if ptgenResult.IMDBURL != "" {
+			pubReq.IMDbLink = ptgenResult.IMDBURL
+		}
+		if ptgenResult.DoubanURL != "" {
+			pubReq.DoubanLink = ptgenResult.DoubanURL
+		}
+		if ptgenResult.TMDbURL != "" {
+			if tmdbID := extractTMDBID(ptgenResult.TMDbURL); tmdbID != "" {
+				if pubReq.ExtraFields == nil {
+					pubReq.ExtraFields = make(map[string]string)
+				}
+				pubReq.ExtraFields["tmdb_id"] = tmdbID
+			}
+		}
+	}
+
+	if sourceDetail != nil {
+		if sourceDetail.Category != "" {
+			pubReq.FormFields["category"] = sourceDetail.Category
+		}
+		if sourceDetail.Source != "" {
+			pubReq.FormFields["source"] = sourceDetail.Source
+		}
+		if sourceDetail.Resolution != "" {
+			pubReq.FormFields["resolution"] = sourceDetail.Resolution
+		}
+		if sourceDetail.Codec != "" {
+			pubReq.FormFields["codec"] = sourceDetail.Codec
+		}
+		if sourceDetail.AudioCodec != "" {
+			pubReq.FormFields["audioCodec"] = sourceDetail.AudioCodec
+		}
+		if sourceDetail.Processing != "" {
+			pubReq.FormFields["processing"] = sourceDetail.Processing
+		}
+		if sourceDetail.ReleaseGroup != "" {
+			pubReq.FormFields["team"] = sourceDetail.ReleaseGroup
+		}
+		if sourceDetail.Region != "" {
+			pubReq.FormFields["region"] = sourceDetail.Region
+		}
+		if sourceDetail.IMDbID != "" {
+			pubReq.FormFields["imdb"] = sourceDetail.IMDbID
+		}
+		pubReq.MediaInfo = sourceDetail.MediaInfo
+		pubReq.Screenshots = sourceDetail.Screenshots
+	}
+
+	if pubReq.DoubanLink != "" && pubReq.FormFields["douban"] == "" {
+		pubReq.FormFields["douban"] = pubReq.DoubanLink
+	}
+
+	p.mapFieldValues(ctx, targetSite, pubReq.FormFields)
+
+	return pubReq, nil
+}
+
+func (p *Pipeline) finalizePublishStatus(ctx context.Context, id uint, publishedCount int, lastErr error) model.PublishCandidateStatus {
 	if publishedCount > 0 {
 		now := time.Now()
 		if err := p.db.WithContext(ctx).Model(&model.PublishCandidate{}).
@@ -368,15 +435,15 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 			}).Error; err != nil {
 			p.logger.Error("更新发布完成状态失败", zap.Uint("id", id), zap.Error(err))
 		}
-		candidate.PublishStatus = model.CandidateDone
-	} else if lastErr != nil {
+		return model.CandidateDone
+	}
+	if lastErr != nil {
 		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, lastErr.Error()); err != nil {
 			p.logger.Error("更新发布失败状态失败", zap.Uint("id", id), zap.Error(err))
 		}
-		candidate.PublishStatus = model.CandidateFailed
+		return model.CandidateFailed
 	}
-
-	return &candidate, nil
+	return model.CandidatePublishing
 }
 
 func (p *Pipeline) ListPendingCandidates(ctx context.Context, limit int) ([]model.PublishCandidate, error) {
@@ -442,21 +509,45 @@ func (p *Pipeline) ListResults(ctx context.Context, candidateID uint, limit int)
 	return results, err
 }
 
-func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model.PublishCandidate, targetSite string) (bool, string) {
-	title := candidate.TorrentName
+var (
+	forbiddenTransferKeywords = []string{"禁转", "独占", "谢绝转载", "限时禁转", "严禁转载", "禁止转载", "谢绝搬运"}
+	forbiddenTransferGroups   = []string{"CatEDU"}
+	adultContentKeywords      = []string{"9KG", "9kg", "色情", "成人内容", "成人影片", "AV", "18+", "NSFW", "Adult", "XXX", "Porn", "Erotic", "Hentai"}
+)
 
-	blockedKeywords := []string{"禁转", "独占", "谢绝转载", "限时禁转", "严禁转载"}
-	for _, kw := range blockedKeywords {
-		if strings.Contains(title, kw) {
-			return false, fmt.Sprintf("标题包含禁止转载关键词: %s", kw)
+func containsAnyKeyword(text string, keywords []string) (string, bool) {
+	lower := strings.ToLower(text)
+	for _, kw := range keywords {
+		if strings.Contains(text, kw) || strings.Contains(lower, strings.ToLower(kw)) {
+			return kw, true
 		}
 	}
+	return "", false
+}
 
-	blockedGroups := []string{"CatEDU"}
-	for _, group := range blockedGroups {
-		if strings.Contains(title, group) {
-			return false, fmt.Sprintf("禁止转载小组资源: %s", group)
+func (p *Pipeline) checkForbiddenContent(texts []string) (bool, string) {
+	for _, text := range texts {
+		if text == "" {
+			continue
 		}
+		if kw, found := containsAnyKeyword(text, adultContentKeywords); found {
+			return false, fmt.Sprintf("内容包含成人/色情关键词: %s (§30.5 规则 1)", kw)
+		}
+		if kw, found := containsAnyKeyword(text, forbiddenTransferKeywords); found {
+			return false, fmt.Sprintf("标题/副标题包含禁止转载关键词: %s (§30.5 规则 2)", kw)
+		}
+		for _, grp := range forbiddenTransferGroups {
+			if strings.Contains(text, grp) {
+				return false, fmt.Sprintf("禁止转载小组资源: %s (§30.5 规则 3)", grp)
+			}
+		}
+	}
+	return true, ""
+}
+
+func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model.PublishCandidate, targetSite string) (bool, string) {
+	if eligible, reason := p.checkForbiddenContent([]string{candidate.TorrentName}); !eligible {
+		return false, reason
 	}
 
 	if candidate.HasHR {
@@ -547,7 +638,12 @@ func (p *Pipeline) ProcessPending(ctx context.Context) error {
 					zap.String("torrent_id", c.SourceTorrentID),
 					zap.Error(err),
 				)
-				_ = p.UpdateCandidateStatus(ctx, c.ID, model.CandidateFailed, err.Error())
+				if statusErr := p.UpdateCandidateStatus(ctx, c.ID, model.CandidateFailed, err.Error()); statusErr != nil {
+					p.logger.Warn("update candidate status failed after download error",
+						zap.Uint("id", c.ID),
+						zap.Error(statusErr),
+					)
+				}
 			}
 		}
 	}
@@ -866,12 +962,13 @@ func (p *Pipeline) addStatusHistory(ctx context.Context, groupID uint, memberHas
 }
 
 const (
-	StepDownload = 1
-	StepDetail   = 2
-	StepDedup    = 3
-	StepRender   = 4
-	StepUpload   = 5
-	_            = 6
+	StepEligibility = 0
+	StepDownload    = 1
+	StepDetail      = 2
+	StepDedup       = 3
+	StepRender      = 4
+	StepUpload      = 5
+	_               = 6
 	StepHRDetect = 7
 )
 
@@ -897,6 +994,47 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 	sourceAdapter, err := p.siteProvider.GetAdapter(ctx, group.SourceSite)
 	if err != nil {
 		return publishError(ErrPublishConfig, "get source adapter", err)
+	}
+
+	if member.LastCompletedStep < StepEligibility {
+		title := group.SourceTorrentID
+		var candidate model.PublishCandidate
+		if err := p.db.WithContext(ctx).Where("id = ?", group.CandidateID).First(&candidate).Error; err == nil {
+			if candidate.TorrentName != "" {
+				title = candidate.TorrentName
+			}
+		}
+
+		texts := []string{title}
+		detail, detErr := sourceAdapter.GetTorrentDetail(ctx, sourceConfig, group.SourceTorrentID)
+		if detErr == nil && detail != nil {
+			if detail.Title != "" {
+				texts[0] = detail.Title
+			}
+			if detail.Subtitle != "" {
+				texts = append(texts, detail.Subtitle)
+			}
+			if detail.Description != "" {
+				texts = append(texts, detail.Description)
+			}
+		}
+
+		if eligible, reason := p.checkForbiddenContent(texts); !eligible {
+			return p.failMember(ctx, member, StepEligibility, fmt.Sprintf("发布合规检查未通过: %s", reason))
+		}
+
+		tempCandidate := model.PublishCandidate{
+			TorrentName: texts[0],
+			SourceSite:  group.SourceSite,
+			HasHR:       member.HRProtected,
+		}
+		if eligible, reason := p.CheckPublishEligibility(ctx, &tempCandidate, member.SiteName); !eligible {
+			return p.failMember(ctx, member, StepEligibility, fmt.Sprintf("发布资格检查未通过: %s", reason))
+		}
+
+		if err := p.advanceStep(ctx, member, StepEligibility); err != nil {
+			return p.failMember(ctx, member, StepEligibility, fmt.Sprintf("advanceStep failed: %v", err))
+		}
 	}
 
 	var torrentData []byte

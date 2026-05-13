@@ -8,7 +8,7 @@ type NotificationChannel struct {
 	Type             string    `json:"type" gorm:"size:32;not null"`
 	Name             string    `json:"name" gorm:"size:100;not null"`
 	Enabled          bool      `json:"enabled" gorm:"default:true"`
-	Config           string    `json:"config" gorm:"type:text"`
+	Config           string    `json:"config" gorm:"type:text" encrypted:"true"`
 	Events           string    `json:"events" gorm:"type:text"`
 	MaxErrorsPerHour int       `json:"max_errors_per_hour" gorm:"default:100"`
 	Overrides        string    `json:"overrides" gorm:"type:text"`

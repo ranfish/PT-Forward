@@ -7,10 +7,10 @@ export const subscriptionsApi = {
   get(id: number) {
     return client.get(`/rss/subscriptions/${id}`)
   },
-  create(data: any) {
+  create(data: Record<string, unknown>) {
     return client.post('/rss/subscriptions', data)
   },
-  update(id: number, data: any) {
+  update(id: number, data: Record<string, unknown>) {
     return client.put(`/rss/subscriptions/${id}`, data)
   },
   delete(id: number) {
@@ -28,7 +28,7 @@ export const subscriptionsApi = {
   dryrun(id: number) {
     return client.post(`/rss/subscriptions/${id}/dryrun`)
   },
-  updateRules(id: number, data: any) {
+  updateRules(id: number, data: Record<string, unknown>) {
     return client.put(`/rss/subscriptions/${id}/rules`, data)
   },
 }

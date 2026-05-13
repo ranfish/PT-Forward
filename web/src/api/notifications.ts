@@ -4,10 +4,10 @@ export const notificationsApi = {
   list() {
     return client.get('/notifications/channels')
   },
-  create(data: any) {
+  create(data: Record<string, unknown>) {
     return client.post('/notifications/channels', data)
   },
-  update(id: number, data: any) {
+  update(id: number, data: Record<string, unknown>) {
     return client.put(`/notifications/channels/${id}`, data)
   },
   delete(id: number) {

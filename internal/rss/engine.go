@@ -14,14 +14,16 @@ import (
 )
 
 type Engine struct {
-	fetcher      *Fetcher
-	repo         *Repository
-	db           *gorm.DB
-	logger       *zap.Logger
-	filterEng    *filter.Engine
-	dispatcher   *event.Dispatcher
-	siteProvider model.SiteInfoProvider
-	diskBudget   *DiskBudgetManager
+	fetcher        *Fetcher
+	repo           *Repository
+	db             *gorm.DB
+	logger         *zap.Logger
+	filterEng      *filter.Engine
+	dispatcher     *event.Dispatcher
+	siteProvider   model.SiteInfoProvider
+	diskBudget     *DiskBudgetManager
+	seedingCounter model.SeedingCollector
+	wsBroadcaster  event.WSBroadcaster
 
 	mu    sync.RWMutex
 	tasks map[uint]context.CancelFunc
@@ -109,6 +111,14 @@ func (e *Engine) SetDispatcher(d *event.Dispatcher) {
 	e.dispatcher = d
 }
 
+func (e *Engine) SetSeedingCounter(sc model.SeedingCollector) {
+	e.seedingCounter = sc
+}
+
+func (e *Engine) SetWSBroadcaster(b event.WSBroadcaster) {
+	e.wsBroadcaster = b
+}
+
 func (e *Engine) Start(ctx context.Context) error {
 	subs, err := e.repo.ListActive(ctx)
 	if err != nil {
@@ -127,11 +137,12 @@ func (e *Engine) Stop() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	stopped := len(e.tasks)
 	for id, cancel := range e.tasks {
 		cancel()
 		delete(e.tasks, id)
 	}
-	e.logger.Info("rss engine stopped")
+	e.logger.Info("rss engine stopped", zap.Int("stopped_subscriptions", stopped))
 }
 
 func (e *Engine) Trigger(ctx context.Context, subID uint) error {
@@ -461,4 +472,19 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 			}
 		}
 	}
+}
+
+func (e *Engine) RecheckWaiting(ctx context.Context) error {
+	subs, err := e.repo.ListActive(ctx)
+	if err != nil {
+		return err
+	}
+
+	for i := range subs {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		e.fetchOnce(ctx, &subs[i])
+	}
+	return nil
 }

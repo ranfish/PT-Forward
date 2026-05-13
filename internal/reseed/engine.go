@@ -68,11 +68,12 @@ func (e *Engine) Stop() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	stopped := len(e.tasks)
 	for id, cancel := range e.tasks {
 		cancel()
 		delete(e.tasks, id)
 	}
-	e.logger.Info("reseed engine stopped")
+	e.logger.Info("reseed engine stopped", zap.Int("stopped_tasks", stopped))
 }
 
 func (e *Engine) startTask(parentCtx context.Context, task *model.ReseedTask) {

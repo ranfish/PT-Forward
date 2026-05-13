@@ -14,7 +14,7 @@
         style="width: 200px"
         :options="downloaderOptions"
         show-search
-        :filter-option="(input: string, option: any) => option.label.toLowerCase().includes(input.toLowerCase())"
+        :filter-option="(input: string, option: { label: string }) => option.label.toLowerCase().includes(input.toLowerCase())"
         @change="pagination.fetch(1)"
       />
       <a-select
@@ -50,7 +50,7 @@
         showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
-      @change="(pag: any) => pagination.onPageChange(pag.current, pag.pageSize)"
+      @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -103,15 +103,15 @@ const filters = reactive({
 
 const columns = [
   { title: 'Torrent ID', dataIndex: 'torrent_id', key: 'torrent_id', ellipsis: true },
-  { title: '站点', dataIndex: 'site_name', key: 'site_name', width: 120 },
-  { title: '客户端', dataIndex: 'client_id', key: 'client_id', width: 100 },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
+  { title: t('seeding.client'), dataIndex: 'client_id', key: 'client_id', width: 100 },
   { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
-  { title: '状态', key: 'status', width: 120 },
-  { title: '免费', dataIndex: 'is_free', key: 'is_free', width: 60 },
+  { title: t('common.status'), key: 'status', width: 120 },
+  { title: t('seeding.free'), dataIndex: 'is_free', key: 'is_free', width: 60 },
   { title: 'HR', dataIndex: 'has_hr', key: 'has_hr', width: 60 },
-  { title: '来源', dataIndex: 'source', key: 'source', width: 80 },
-  { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 180 },
-  { title: '操作', key: 'actions', width: 100 },
+  { title: t('seeding.source'), dataIndex: 'source', key: 'source', width: 80 },
+  { title: t('common.updatedAt'), dataIndex: 'updated_at', key: 'updated_at', width: 180 },
+  { title: t('common.actions'), key: 'actions', width: 100 },
 ]
 
 const pagination = usePagination((page, size) =>
@@ -123,8 +123,8 @@ async function handleResume(recordId: number) {
     await seedingApi.resumeRecord(recordId)
     message.success(t('common.resumed'))
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -133,8 +133,8 @@ async function handlePause(recordId: number) {
     await seedingApi.pauseRecord(recordId)
     message.success(t('common.paused'))
     pagination.fetch()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -142,11 +142,11 @@ async function fetchDownloaders() {
   try {
     const resp = await downloadersApi.list(1, 100)
     const items = resp.data.data?.items || resp.data.data || []
-    downloaderOptions.value = items.map((d: any) => ({
-      label: d.name || d.id,
-      value: d.name || d.id,
+    downloaderOptions.value = items.map((d: Record<string, unknown>) => ({
+      label: String(d.name || d.id),
+      value: String(d.name || d.id),
     }))
-  } catch (_e: any) {}
+  } catch (_e: unknown) {}
 }
 
 onMounted(() => {

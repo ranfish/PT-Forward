@@ -8,12 +8,12 @@
     >
       <div class="logo">PT-Forward</div>
       <a-menu
-        v-model:selectedKeys="selectedKeys"
-        v-model:openKeys="openKeys"
+        v-model:selected-keys="selectedKeys"
+        v-model:open-keys="openKeys"
         theme="dark"
         mode="inline"
       >
-        <a-menu-item-group :title="'资源管理'">
+        <a-menu-item-group :title="t('nav.resourceManagement')">
           <a-menu-item key="/" @click="$router.push('/')">
             <template #icon><DashboardOutlined /></template>
             <span>{{ t('nav.dashboard') }}</span>
@@ -32,7 +32,7 @@
           </a-menu-item>
         </a-menu-item-group>
 
-        <a-menu-item-group :title="'核心功能'">
+        <a-menu-item-group :title="t('nav.coreFeatures')">
           <a-sub-menu key="seeding-sub">
             <template #icon><ThunderboltOutlined /></template>
             <template #title>{{ t('nav.seeding') }}</template>
@@ -77,7 +77,7 @@
           </a-menu-item>
         </a-menu-item-group>
 
-        <a-menu-item-group :title="'系统'">
+        <a-menu-item-group :title="t('nav.system')">
           <a-menu-item key="/system" @click="$router.push('/system')">
             <template #icon><DashboardOutlined /></template>
             <span>{{ t('nav.systemHealth') }}</span>
@@ -119,7 +119,7 @@
             style="width: 100px"
             @change="switchLocale"
           >
-            <a-select-option value="zh-CN">中文</a-select-option>
+            <a-select-option value="zh-CN">{{ t('common.chinese') }}</a-select-option>
             <a-select-option value="en">English</a-select-option>
           </a-select>
           <a-button type="text" @click="toggleTheme">

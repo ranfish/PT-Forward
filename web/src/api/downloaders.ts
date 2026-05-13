@@ -7,10 +7,10 @@ export const downloadersApi = {
   get(id: number) {
     return client.get(`/downloaders/${id}`)
   },
-  create(data: any) {
+  create(data: Record<string, unknown>) {
     return client.post('/downloaders', data)
   },
-  update(id: number, data: any) {
+  update(id: number, data: Record<string, unknown>) {
     return client.put(`/downloaders/${id}`, data)
   },
   delete(id: number) {
@@ -19,7 +19,7 @@ export const downloadersApi = {
   testConnection(id: number) {
     return client.post(`/downloaders/${id}/test`)
   },
-  getTorrents(id: number, params?: any) {
+  getTorrents(id: number, params?: Record<string, unknown>) {
     return client.get(`/downloaders/${id}/torrents`, { params })
   },
   getMaindata(id: number) {
@@ -37,10 +37,10 @@ export const downloadersApi = {
   listPublishTargets() {
     return client.get('/downloaders/publish-targets')
   },
-  createPublishTarget(data: any) {
+  createPublishTarget(data: Record<string, unknown>) {
     return client.post('/downloaders/publish-targets', data)
   },
-  updatePublishTarget(data: any) {
+  updatePublishTarget(data: Record<string, unknown>) {
     return client.put('/downloaders/publish-targets', data)
   },
   deletePublishTarget(id: number) {

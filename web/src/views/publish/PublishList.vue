@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a-tabs v-model:activeKey="activeTab">
+    <a-tabs v-model:active-key="activeTab">
       <a-tab-pane key="candidates" :tab="t('publish.candidates')">
         <div style="margin-bottom: 16px; display: flex; justify-content: space-between">
           <a-space>
@@ -17,10 +17,10 @@
           :columns="candidateColumns"
           :data-source="candidates"
           :loading="candidatesLoading"
-          :pagination="{ current: candidatePage, pageSize: 20, total: candidateTotal, showSizeChanger: true, showTotal: (total: number) => `共 ${total} 条` }"
+          :pagination="{ current: candidatePage, pageSize: 20, total: candidateTotal, showSizeChanger: true, showTotal: (total: number) => t('common.totalCount', { count: total }) }"
           row-key="id"
           size="small"
-          @change="(pag: any) => { candidatePage = pag.current; fetchCandidates() }"
+          @change="(pag: { current: number }) => { candidatePage = pag.current; fetchCandidates() }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'publish_status'">
@@ -30,7 +30,7 @@
             </template>
             <template v-if="column.key === 'actions'">
               <a-space>
-                <a-button type="link" size="small" @click="manualPublish(record.id)" :disabled="record.publish_status === 'completed'">
+                <a-button type="link" size="small" :disabled="record.publish_status === 'completed'" @click="manualPublish(record.id)">
                   {{ t('publish.publishAction') }}
                 </a-button>
                 <a-popconfirm :title="t('publish.deleteConfirm')" @confirm="deleteCandidate(record.id)">
@@ -74,10 +74,10 @@
           :columns="taskColumns"
           :data-source="tasks"
           :loading="tasksLoading"
-          :pagination="{ current: taskPage, pageSize: 20, total: taskTotal, showSizeChanger: true, showTotal: (total: number) => `共 ${total} 条` }"
+          :pagination="{ current: taskPage, pageSize: 20, total: taskTotal, showSizeChanger: true, showTotal: (total: number) => t('common.totalCount', { count: total }) }"
           row-key="id"
           size="small"
-          @change="(pag: any) => { taskPage = pag.current; fetchTasks() }"
+          @change="(pag: { current: number }) => { taskPage = pag.current; fetchTasks() }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
@@ -100,7 +100,7 @@
           :columns="resultColumns"
           :data-source="results"
           :loading="resultsLoading"
-          :pagination="{ pageSize: 20, showSizeChanger: true, showTotal: (total: number) => `共 ${total} 条` }"
+          :pagination="{ pageSize: 20, showSizeChanger: true, showTotal: (total: number) => t('common.totalCount', { count: total }) }"
           row-key="id"
           size="small"
         >
@@ -126,62 +126,63 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
+import type { PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from '@/api/types'
 
 const { t } = useI18n()
 const activeTab = ref('candidates')
 const candidateSearch = ref('')
 const candidatesLoading = ref(false)
-const candidates = ref<any[]>([])
+const candidates = ref<PublishCandidate[]>([])
 const candidatePage = ref(1)
 const candidateTotal = ref(0)
 
 const groupsLoading = ref(false)
-const groups = ref<any[]>([])
+const groups = ref<PublishGroup[]>([])
 
 const tasksLoading = ref(false)
-const tasks = ref<any[]>([])
+const tasks = ref<PublishTask[]>([])
 const taskPage = ref(1)
 const taskTotal = ref(0)
 
 const resultsLoading = ref(false)
-const results = ref<any[]>([])
+const results = ref<PublishResultRecord[]>([])
 
 const candidateColumns = [
-  { title: '种子名称', dataIndex: 'torrent_name', key: 'torrent_name', ellipsis: true },
-  { title: '源站点', dataIndex: 'source_site', key: 'source_site', width: 120 },
-  { title: '大小', dataIndex: 'size', key: 'size', width: 100 },
-  { title: '发布状态', key: 'publish_status', width: 100 },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
-  { title: '操作', key: 'actions', width: 120 },
+  { title: t('publish.torrentName'), dataIndex: 'torrent_name', key: 'torrent_name', ellipsis: true },
+  { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 120 },
+  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
+  { title: t('publish.publishStatus'), key: 'publish_status', width: 100 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.actions'), key: 'actions', width: 120 },
 ]
 
 const groupColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '源站点', dataIndex: 'source_site', key: 'source_site', width: 120 },
-  { title: '源 Hash', dataIndex: 'source_hash', key: 'source_hash', ellipsis: true },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
-  { title: '操作', key: 'actions', width: 120 },
+  { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 120 },
+  { title: t('publish.sourceHash'), dataIndex: 'source_hash', key: 'source_hash', ellipsis: true },
+  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.actions'), key: 'actions', width: 120 },
 ]
 
 const taskColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '类型', dataIndex: 'type', key: 'type', width: 100 },
-  { title: '源站点ID', dataIndex: 'source_site_id', key: 'source_site_id', width: 100 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '手动审核', dataIndex: 'manual_check', key: 'manual_check', width: 100, customRender: ({ text }: any) => text ? t('common.yes') : t('common.no') },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
-  { title: '操作', key: 'actions', width: 150 },
+  { title: t('common.type'), dataIndex: 'type', key: 'type', width: 100 },
+  { title: t('publish.sourceSiteId'), dataIndex: 'source_site_id', key: 'source_site_id', width: 100 },
+  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('publish.manualCheck'), dataIndex: 'manual_check', key: 'manual_check', width: 100, customRender: ({ text }: { text: boolean }) => text ? t('common.yes') : t('common.no') },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.actions'), key: 'actions', width: 150 },
 ]
 
 const resultColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '源站点', dataIndex: 'source_site', key: 'source_site', width: 120 },
-  { title: '目标站点', dataIndex: 'target_site', key: 'target_site', width: 120 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '发布链接', key: 'publish_url', ellipsis: true },
-  { title: '错误信息', dataIndex: 'error_message', key: 'error_message', ellipsis: true },
-  { title: '完成时间', dataIndex: 'completed_at', key: 'completed_at', width: 180 },
+  { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 120 },
+  { title: t('publish.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120 },
+  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('publish.publishUrl'), key: 'publish_url', ellipsis: true },
+  { title: t('publish.errorMessage'), dataIndex: 'error_message', key: 'error_message', ellipsis: true },
+  { title: t('publish.completedAt'), dataIndex: 'completed_at', key: 'completed_at', width: 180 },
 ]
 
 function taskStatusColor(status: string) {
@@ -196,8 +197,8 @@ async function fetchCandidates() {
     const body = resp.data.data
     candidates.value = body?.items || body || []
     candidateTotal.value = body?.total || 0
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     candidatesLoading.value = false
   }
@@ -208,8 +209,8 @@ async function fetchGroups() {
   try {
     const resp = await publishApi.listGroups()
     groups.value = resp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     groupsLoading.value = false
   }
@@ -220,8 +221,8 @@ async function manualPublish(id: number) {
     await publishApi.manualPublish(id)
     message.success(t('publish.publishTriggered'))
     fetchCandidates()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -230,8 +231,8 @@ async function deleteCandidate(id: number) {
     await publishApi.deleteCandidate(id)
     message.success(t('common.deleted'))
     fetchCandidates()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -240,8 +241,8 @@ async function deleteGroup(id: number) {
     await publishApi.deleteGroup(id)
     message.success(t('common.deleted'))
     fetchGroups()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -252,8 +253,8 @@ async function fetchTasks() {
     const body = resp.data.data
     tasks.value = body?.items || []
     taskTotal.value = body?.total || 0
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     tasksLoading.value = false
   }
@@ -264,8 +265,8 @@ async function deleteTask(id: number) {
     await publishApi.deleteTask(id)
     message.success(t('common.deleted'))
     fetchTasks()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 
@@ -277,8 +278,8 @@ async function viewTaskResults(taskId: number) {
     const body = resp.data.data
     const allResults = body?.items || []
     results.value = allResults
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     resultsLoading.value = false
   }
@@ -290,8 +291,8 @@ async function fetchResults() {
     const resp = await publishApi.listResults({ limit: 100 })
     const body = resp.data.data
     results.value = body?.items || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     resultsLoading.value = false
   }

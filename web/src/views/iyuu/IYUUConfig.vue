@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a-page-header title="IYUU 辅种" :sub-title="t('iyuu.subtitle')" />
+    <a-page-header :title="t('iyuu.title')" :sub-title="t('iyuu.subtitle')" />
 
     <a-spin :spinning="loading">
       <a-form :model="form" layout="vertical" style="max-width: 600px">
@@ -69,7 +69,7 @@ const saving = ref(false)
 const testing = ref(false)
 const syncing = ref(false)
 const sitesLoading = ref(false)
-const sites = ref<any[]>([])
+const sites = ref<Record<string, unknown>[]>([])
 
 const form = reactive({
   token: '',
@@ -82,9 +82,9 @@ const form = reactive({
 
 const siteColumns = [
   { title: 'SID', dataIndex: 'IYUUSid', key: 'IYUUSid', width: 80 },
-  { title: '站点名', dataIndex: 'SiteName', key: 'SiteName' },
-  { title: '域名', dataIndex: 'SiteDomain', key: 'SiteDomain' },
-  { title: '状态', key: 'Enabled', width: 80 },
+  { title: t('iyuu.siteName'), dataIndex: 'SiteName', key: 'SiteName' },
+  { title: t('iyuu.siteDomain'), dataIndex: 'SiteDomain', key: 'SiteDomain' },
+  { title: t('common.status'), key: 'Enabled', width: 80 },
 ]
 
 async function fetchConfig() {
@@ -117,8 +117,8 @@ async function handleSave() {
     })
     message.success(t('common.saveSuccess'))
     fetchSites()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     saving.value = false
   }
@@ -129,8 +129,8 @@ async function handleTest() {
   try {
     await iyuuApi.test()
     message.success(t('cookiecloud.connectionTestSuccess'))
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     testing.value = false
   }
@@ -153,8 +153,8 @@ async function handleSyncSites() {
     await iyuuApi.syncSites()
     message.success(t('common.operationSuccess'))
     fetchSites()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   } finally {
     syncing.value = false
   }

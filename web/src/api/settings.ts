@@ -10,7 +10,7 @@ export const settingsApi = {
   backup() {
     return client.get('/settings/backup')
   },
-  restore(data: any) {
+  restore(data: Record<string, unknown>) {
     return client.post('/settings/restore', data)
   },
 }

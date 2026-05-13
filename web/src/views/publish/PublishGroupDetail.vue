@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a-page-header :title="`发布组 #${groupId}`" @back="$router.push('/publish')">
+    <a-page-header :title="t('publish.publishGroup', { id: groupId })" @back="$router.push('/publish')">
       <template #tags>
         <a-tag :color="group.status === 'active' || group.status === 'monitoring' ? 'green' : group.status === 'deleted' ? 'default' : group.status === 'publishing' ? 'blue' : group.status === 'publish_failed' ? 'red' : 'orange'">
           {{ group.status }}
@@ -8,8 +8,8 @@
       </template>
       <template #extra>
         <a-space>
-          <a-button @click="pauseGroup" :disabled="group.status !== 'active' && group.status !== 'publishing' && group.status !== 'monitoring'">{{ t('common.pause') }}</a-button>
-          <a-button type="primary" @click="resumeGroup" :disabled="group.status !== 'partially_paused' && group.status !== 'all_paused'">{{ t('common.resume') }}</a-button>
+          <a-button :disabled="group.status !== 'active' && group.status !== 'publishing' && group.status !== 'monitoring'" @click="pauseGroup">{{ t('common.pause') }}</a-button>
+          <a-button type="primary" :disabled="group.status !== 'partially_paused' && group.status !== 'all_paused'" @click="resumeGroup">{{ t('common.resume') }}</a-button>
           <a-popconfirm :title="t('common.deleteConfirm')" @confirm="lifecycleDeleteGroup">
             <a-button danger :disabled="group.status === 'deleting'">{{ t('common.delete') }}</a-button>
           </a-popconfirm>
@@ -60,18 +60,37 @@ const route = useRoute()
 const groupId = Number(route.params.id)
 const { t } = useI18n()
 
+interface GroupDetail {
+  status: string
+  sourceSite: string
+  sourceHash: string
+  candidateId: number
+  createdAt: string
+  updatedAt: string
+}
+
+interface GroupMember {
+  id: number
+  site_name: string
+  info_hash: string
+  size: number
+  role: string
+  status: string
+  created_at: string
+}
+
 const loading = ref(false)
 const membersLoading = ref(false)
-const group = ref<any>({})
-const members = ref<any[]>([])
+const group = ref<GroupDetail>({} as GroupDetail)
+const members = ref<GroupMember[]>([])
 
 const memberColumns = [
-  { title: '站点', dataIndex: 'site_name', key: 'site_name', width: 120 },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
   { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
-  { title: '大小', dataIndex: 'size', key: 'size', width: 100 },
-  { title: '角色', dataIndex: 'role', key: 'role', width: 80 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
+  { title: t('publish.columnRole'), dataIndex: 'role', key: 'role', width: 80 },
+  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
 ]
 
 async function fetchGroup() {
@@ -79,8 +98,8 @@ async function fetchGroup() {
   try {
     const resp = await publishApi.getGroup(groupId)
     group.value = resp.data.data || {}
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     loading.value = false
   }
@@ -91,8 +110,8 @@ async function fetchMembers() {
   try {
     const resp = await publishApi.listCandidates({ groupId })
     members.value = resp.data.data?.items || resp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     membersLoading.value = false
   }
@@ -103,8 +122,8 @@ async function pauseGroup() {
     await publishApi.pauseGroup(groupId)
     message.success(t('common.paused'))
     fetchGroup()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 
@@ -113,8 +132,8 @@ async function resumeGroup() {
     await publishApi.resumeGroup(groupId)
     message.success(t('common.resumed'))
     fetchGroup()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 
@@ -123,8 +142,8 @@ async function lifecycleDeleteGroup() {
     await publishApi.lifecycleDeleteGroup(groupId)
     message.success(t('common.deleted'))
     fetchGroup()
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 

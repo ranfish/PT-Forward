@@ -27,6 +27,7 @@ type TorrentDispatcher struct {
 	clientSelector *ClientSelector
 	logger         *zap.Logger
 	handlers       map[Role]model.EventHandler
+	circuitBreaker *CircuitBreaker
 	mu             sync.RWMutex
 }
 
@@ -46,6 +47,10 @@ func NewTorrentDispatcher(db *gorm.DB, clientMgr *client.Manager, logger *zap.Lo
 
 func (d *TorrentDispatcher) SetClientSelector(selector *ClientSelector) {
 	d.clientSelector = selector
+}
+
+func (d *TorrentDispatcher) SetCircuitBreaker(cb *CircuitBreaker) {
+	d.circuitBreaker = cb
 }
 
 func (d *TorrentDispatcher) RegisterHandler(role Role, handler model.EventHandler) {

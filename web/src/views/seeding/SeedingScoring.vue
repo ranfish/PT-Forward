@@ -5,10 +5,10 @@
     <a-row :gutter="16">
       <a-col :span="12">
         <a-card :title="t('seeding.scoring.config')" style="margin-bottom: 16px">
-          <a-form-item label="关联订阅" style="margin-bottom: 16px">
+          <a-form-item :label="t('seeding.scoring.linkedSubscription')" style="margin-bottom: 16px">
             <a-select
               v-model:value="selectedSubId"
-              :placeholder="'请选择订阅'"
+              :placeholder="t('seeding.scoring.selectSubscription')"
               allow-clear
               style="width: 100%"
               @change="fetchScoringConfig"
@@ -40,7 +40,7 @@
                 <a-switch v-model:checked="scoringConfig.include2xUp" />
               </a-form-item>
               <a-form-item>
-                <a-button type="primary" @click="saveScoringConfig" :loading="saving">{{ t('common.saveConfig') }}</a-button>
+                <a-button type="primary" :loading="saving" @click="saveScoringConfig">{{ t('common.saveConfig') }}</a-button>
               </a-form-item>
             </a-form>
           </a-spin>
@@ -96,7 +96,7 @@
               </a-col>
             </a-row>
             <a-form-item>
-              <a-button type="primary" @click="runDryrun" :loading="dryrunLoading">{{ t('seeding.scoring.runDryrun') }}</a-button>
+              <a-button type="primary" :loading="dryrunLoading" @click="runDryrun">{{ t('seeding.scoring.runDryrun') }}</a-button>
             </a-form-item>
           </a-form>
           <a-descriptions v-if="dryrunResult" bordered :column="2" size="small">
@@ -134,15 +134,31 @@ import { useI18n } from 'vue-i18n'
 import { seedingApi } from '@/api/seeding'
 import { subscriptionsApi } from '@/api/subscriptions'
 
+interface DryrunResult {
+  score?: number
+  effectiveScore?: number
+  demandScore?: number
+  recencyFactor?: number
+  shouldCleanup?: boolean
+}
+
+interface ScoringLogItem {
+  id: number
+  title: string
+  site_name: string
+  size: string
+  created_at: string
+}
+
 const { t } = useI18n()
 
 const configLoading = ref(false)
 const saving = ref(false)
 const dryrunLoading = ref(false)
 const logsLoading = ref(false)
-const dryrunResult = ref<any>(null)
-const scoringLogs = ref<any[]>([])
-const subscriptions = ref<any[]>([])
+const dryrunResult = ref<DryrunResult | null>(null)
+const scoringLogs = ref<ScoringLogItem[]>([])
+const subscriptions = ref<{ id: number; name: string }[]>([])
 const selectedSubId = ref<number | undefined>(undefined)
 const scoringConfig = reactive({
   enabled: false,
@@ -166,10 +182,10 @@ const dryrunForm = reactive({
 
 const logColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
-  { title: '站点', dataIndex: 'site_name', key: 'site_name', width: 100 },
-  { title: '大小', dataIndex: 'size', key: 'size', width: 100 },
-  { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 170 },
+  { title: t('common.title'), dataIndex: 'title', key: 'title', ellipsis: true },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 100 },
+  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
+  { title: t('common.time'), dataIndex: 'created_at', key: 'created_at', width: 170 },
 ]
 
 async function fetchScoringConfig() {
@@ -187,8 +203,8 @@ async function fetchScoringConfig() {
       include2xUp: data.include2xUp ?? data.include_2xup ?? false,
     })
     dryrunForm.halfLifeHours = scoringConfig.halfLifeHours
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     configLoading.value = false
   }
@@ -199,8 +215,8 @@ async function saveScoringConfig() {
   try {
     await seedingApi.updateScoringConfig(scoringConfig, selectedSubId.value)
     message.success(t('common.configSaved'))
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     saving.value = false
   }
@@ -219,8 +235,8 @@ async function runDryrun() {
       siteWeight: dryrunForm.siteWeight,
     })
     dryrunResult.value = resp.data.data
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   } finally {
     dryrunLoading.value = false
   }
@@ -231,7 +247,7 @@ async function fetchScoringLogs() {
   try {
     const resp = await seedingApi.listScoringLogs({ limit: 30 })
     scoringLogs.value = resp.data.data?.items || resp.data.data || []
-  } catch (e: any) {
+  } catch (e: unknown) {
     scoringLogs.value = []
   } finally {
     logsLoading.value = false
@@ -242,8 +258,8 @@ async function fetchSubscriptions() {
   try {
     const resp = await subscriptionsApi.list(1, 200)
     subscriptions.value = resp.data.data?.items || resp.data.data || []
-  } catch (e: any) {
-    console.warn('fetchSubscriptions failed:', e.message)
+  } catch (e: unknown) {
+    console.warn('fetchSubscriptions failed:', e instanceof Error ? e.message : String(e))
   }
 }
 

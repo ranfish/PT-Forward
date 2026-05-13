@@ -34,7 +34,7 @@
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button size="small" @click="triggerTask(record)" :disabled="record.paused">{{ t('common.trigger') }}</a-button>
+            <a-button size="small" :disabled="record.paused" @click="triggerTask(record)">{{ t('common.trigger') }}</a-button>
             <a-button v-if="record.paused" size="small" type="primary" @click="resumeTask(record)">{{ t('common.resume') }}</a-button>
             <a-button v-else size="small" @click="pauseTask(record)">{{ t('common.pause') }}</a-button>
             <a-button size="small" @click="openReschedule(record)">{{ t('scheduler.reschedule') }}</a-button>
@@ -46,8 +46,8 @@
     <a-modal
       v-model:open="rescheduleVisible"
       :title="t('scheduler.editSchedule')"
-      @ok="doReschedule"
       :confirm-loading="rescheduleLoading"
+      @ok="doReschedule"
     >
       <a-form :label-col="{ span: 6 }">
         <a-form-item :label="t('scheduler.taskName')">
@@ -57,7 +57,7 @@
           <a-input :value="rescheduleTarget?.schedule" disabled />
         </a-form-item>
         <a-form-item :label="t('scheduler.newPeriod')">
-          <a-input v-model:value="newSchedule" placeholder="例: */5 * * * *（支持 5/6 位 cron）" />
+          <a-input v-model:value="newSchedule" :placeholder="t('scheduler.cronPlaceholder')" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -81,14 +81,14 @@ const rescheduleTarget = ref<SchedulerTask | null>(null)
 const newSchedule = ref('')
 
 const columns = [
-  { title: '任务名称', dataIndex: 'name', key: 'name', width: 220 },
-  { title: '类型', dataIndex: 'type', key: 'type', width: 100 },
-  { title: '调度周期', key: 'schedule', width: 160 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '上次运行', key: 'last_run_at', width: 180 },
-  { title: '成功/失败', key: 'stats', width: 100 },
-  { title: '最近错误', dataIndex: 'last_error', key: 'last_error', ellipsis: true },
-  { title: '操作', key: 'actions', width: 240, fixed: 'right' },
+  { title: t('scheduler.taskName'), dataIndex: 'name', key: 'name', width: 220 },
+  { title: t('common.type'), dataIndex: 'type', key: 'type', width: 100 },
+  { title: t('scheduler.schedulePeriod'), key: 'schedule', width: 160 },
+  { title: t('common.status'), key: 'status', width: 90 },
+  { title: t('scheduler.lastRun'), key: 'last_run_at', width: 180 },
+  { title: t('scheduler.successFail'), key: 'stats', width: 100 },
+  { title: t('scheduler.lastError'), dataIndex: 'last_error', key: 'last_error', ellipsis: true },
+  { title: t('common.actions'), key: 'actions', width: 240, fixed: 'right' },
 ]
 
 async function fetchTasks() {

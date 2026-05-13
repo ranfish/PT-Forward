@@ -23,7 +23,7 @@ type IYUUSite struct {
 // IYUUConfig — IYUU 服务配置（DB 存储）
 type IYUUConfig struct {
 	ID                uint   `gorm:"primarykey"`
-	Token             string `gorm:"size:64;not null"`
+	Token             string `gorm:"size:64;not null" encrypted:"true"`
 	BaseURL           string `gorm:"size:128;default:'https://2025.iyuu.cn'"`
 	IsVIP             bool   `gorm:"default:false"`
 	Enabled           bool   `gorm:"default:false"`

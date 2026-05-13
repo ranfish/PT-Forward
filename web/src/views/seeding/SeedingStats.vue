@@ -67,24 +67,31 @@ import {
 } from '@ant-design/icons-vue'
 import { seedingApi } from '@/api/seeding'
 
+interface StatsOverviewData {
+  totalUploadBytes?: number
+  totalDownloadBytes?: number
+  todayAdded?: number
+  globalRatio?: number
+}
+
 const { t } = useI18n()
 const siteLoading = ref(false)
 const torrentLoading = ref(false)
-const overview = ref<any>({})
-const siteStats = ref<any[]>([])
-const torrentStats = ref<any[]>([])
+const overview = ref<StatsOverviewData>({})
+const siteStats = ref<Record<string, unknown>[]>([])
+const torrentStats = ref<Record<string, unknown>[]>([])
 
 const siteColumns = [
-  { title: '站点', dataIndex: 'siteName', key: 'siteName' },
-  { title: '做种数', dataIndex: 'count', key: 'count', width: 80 },
+  { title: t('common.site'), dataIndex: 'siteName', key: 'siteName' },
+  { title: t('seeding.seedingCount'), dataIndex: 'count', key: 'count', width: 80 },
 ]
 
 const torrentColumns = [
   { title: 'Torrent ID', dataIndex: 'torrent_id', key: 'torrent_id', ellipsis: true },
-  { title: '站点', dataIndex: 'site_name', key: 'site_name', width: 120 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '免费', dataIndex: 'is_free', key: 'is_free', width: 60 },
-  { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
+  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100 },
+  { title: t('seeding.free'), dataIndex: 'is_free', key: 'is_free', width: 60 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
 ]
 
 function formatSize(bytes: number) {
@@ -106,8 +113,8 @@ async function fetchAll() {
     overview.value = overviewResp.data.data || {}
     siteStats.value = siteResp.data.data?.items || siteResp.data.data || []
     torrentStats.value = torrentResp.data.data?.items || torrentResp.data.data || []
-  } catch (e: any) {
-    message.error(e.message)
+  } catch (e: unknown) {
+    message.error((e as Error).message)
   }
 }
 

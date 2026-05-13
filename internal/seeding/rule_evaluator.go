@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -432,10 +433,33 @@ func includeIn(val, list string) bool {
 	return false
 }
 
+var regexCache struct {
+	sync.RWMutex
+	m map[string]*regexp.Regexp
+}
+
 func matchRegExp(s, pattern string) bool {
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return false
+	regexCache.RLock()
+	if regexCache.m == nil {
+		regexCache.RUnlock()
+		regexCache.Lock()
+		if regexCache.m == nil {
+			regexCache.m = make(map[string]*regexp.Regexp)
+		}
+		regexCache.Unlock()
+		regexCache.RLock()
+	}
+	re, ok := regexCache.m[pattern]
+	regexCache.RUnlock()
+	if !ok {
+		var err error
+		re, err = regexp.Compile(pattern)
+		if err != nil {
+			return false
+		}
+		regexCache.Lock()
+		regexCache.m[pattern] = re
+		regexCache.Unlock()
 	}
 	return re.MatchString(s)
 }
