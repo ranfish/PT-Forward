@@ -28,6 +28,16 @@
       </a-col>
       <a-col :span="6">
         <a-card>
+          <a-statistic :title="t('lifecycle.pauseOnPressure')">
+            <template #formatter>
+              <a-switch v-model:checked="pauseOnPressure" @change="updateBackpressure" />
+            </template>
+          </a-statistic>
+          <div style="color:#999;font-size:12px;margin-top:4px">{{ t('lifecycle.pauseOnPressureHint') }}</div>
+        </a-card>
+      </a-col>
+      <a-col :span="6">
+        <a-card>
           <a-statistic :title="t('lifecycle.throttled')">
             <template #formatter>
               <a-tag :color="backpressure.isThrottled ? 'red' : 'green'">{{ backpressure.isThrottled ? t('common.yes') : t('common.no') }}</a-tag>
@@ -76,6 +86,7 @@ const loading = ref(false)
 const saving = ref(false)
 const backpressure = ref<Record<string, unknown>>({})
 const backpressureMax = ref(0)
+const pauseOnPressure = ref(false)
 
 const config = reactive({
   pauseSeeders: true,
@@ -107,6 +118,7 @@ async function fetchBackpressure() {
     const resp = await lifecycleApi.getBackpressure()
     backpressure.value = resp.data.data || {}
     backpressureMax.value = backpressure.value.maxConcurrentPublishes as number || 0
+  pauseOnPressure.value = backpressure.value.pauseOnPressure as boolean || false
   } catch (e: unknown) {
     message.error((e as Error).message)
   }

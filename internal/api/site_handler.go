@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
+	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/site"
 	"go.uber.org/zap"
@@ -16,9 +18,19 @@ import (
 )
 
 type SiteHandler struct {
-	repo   *site.Repository
-	db     *gorm.DB
-	logger *zap.Logger
+	repo     *site.Repository
+	db       *gorm.DB
+	logger   *zap.Logger
+	provider SiteProvider
+}
+
+type SiteProvider interface {
+	GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error)
+	GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error)
+}
+
+func (h *SiteHandler) SetProvider(p SiteProvider) {
+	h.provider = p
 }
 
 func NewSiteHandler(repo *site.Repository, logger *zap.Logger, db *gorm.DB) *SiteHandler {
@@ -346,6 +358,10 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		h.handleTest(w, r, idStr)
 	case "detect":
 		h.handleDetect(w, r, idStr)
+	case "search":
+		h.handleSearch(w, r, idStr)
+	case "discount":
+		h.handleDetectDiscount(w, r, idStr)
 	case "credentials":
 		if r.Method == http.MethodPut {
 			h.handleUpdateCredentials(w, r, idStr)
@@ -1368,4 +1384,154 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 	default:
 		Error(w, http.StatusMethodNotAllowed, 40001, "method not allowed")
 	}
+}
+
+type searchRequest struct {
+	Query      string `json:"query"`
+	Category   string `json:"category,omitempty"`
+	FreeOnly   bool   `json:"freeOnly,omitempty"`
+	SortBy     string `json:"sortBy,omitempty"`
+	MaxResults int    `json:"maxResults,omitempty"`
+}
+
+func (h *SiteHandler) handleSearch(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+	if h.provider == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "站点服务未就绪")
+		return
+	}
+
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40002, "无效的站点ID")
+		return
+	}
+
+	var site model.Site
+	if err := h.db.WithContext(r.Context()).First(&site, id).Error; err != nil {
+		Error(w, http.StatusNotFound, 40400, "站点不存在")
+		return
+	}
+
+	var req searchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40003, "请求参数错误")
+		return
+	}
+	if req.Query == "" {
+		Error(w, http.StatusBadRequest, 40004, "搜索关键词不能为空")
+		return
+	}
+
+	adapter, err := h.provider.GetAdapter(r.Context(), site.Domain)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50002, "获取站点适配器失败")
+		return
+	}
+
+	config, err := h.provider.GetSiteConfig(r.Context(), site.Domain)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50003, "获取站点配置失败")
+		return
+	}
+
+	opts := &model.SearchOptions{
+		Category:   req.Category,
+		FreeOnly:   req.FreeOnly,
+		SortBy:     req.SortBy,
+		MaxResults: req.MaxResults,
+	}
+	if opts.MaxResults <= 0 {
+		opts.MaxResults = 50
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	results, err := adapter.SearchTorrents(ctx, config, req.Query, opts)
+	if err != nil {
+		h.logger.Warn("search torrents failed",
+			zap.String("site", site.Domain),
+			zap.String("query", req.Query),
+			zap.Error(err))
+		metrics.SiteRequestErrors.WithLabelValues(site.Domain, "search").Inc()
+		Error(w, http.StatusInternalServerError, 50004, "搜索失败: "+err.Error())
+		return
+	}
+
+	if results == nil {
+		results = []*model.SeedingSearchResult{}
+	}
+
+	metrics.SiteRequestsTotal.WithLabelValues(site.Domain, "search").Inc()
+	Success(w, results)
+}
+
+type discountRequest struct {
+	TorrentID string `json:"torrentId"`
+}
+
+func (h *SiteHandler) handleDetectDiscount(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+	if h.provider == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "站点服务未就绪")
+		return
+	}
+
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40002, "无效的站点ID")
+		return
+	}
+
+	var site model.Site
+	if err := h.db.WithContext(r.Context()).First(&site, id).Error; err != nil {
+		Error(w, http.StatusNotFound, 40400, "站点不存在")
+		return
+	}
+
+	var req discountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40003, "请求参数错误")
+		return
+	}
+	if req.TorrentID == "" {
+		Error(w, http.StatusBadRequest, 40005, "种子ID不能为空")
+		return
+	}
+
+	adapter, err := h.provider.GetAdapter(r.Context(), site.Domain)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50002, "获取站点适配器失败")
+		return
+	}
+
+	config, err := h.provider.GetSiteConfig(r.Context(), site.Domain)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50003, "获取站点配置失败")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	result, err := adapter.DetectDiscount(ctx, config, req.TorrentID)
+	if err != nil {
+		h.logger.Warn("detect discount failed",
+			zap.String("site", site.Domain),
+			zap.String("torrentId", req.TorrentID),
+			zap.Error(err))
+		metrics.SiteRequestErrors.WithLabelValues(site.Domain, "discount").Inc()
+		Error(w, http.StatusInternalServerError, 50005, "检测折扣失败: "+err.Error())
+		return
+	}
+
+	metrics.SiteRequestsTotal.WithLabelValues(site.Domain, "discount").Inc()
+	Success(w, result)
 }

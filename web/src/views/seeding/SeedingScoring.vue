@@ -247,7 +247,7 @@ async function fetchScoringLogs() {
   try {
     const resp = await seedingApi.listScoringLogs({ limit: 30 })
     scoringLogs.value = resp.data.data?.items || resp.data.data || []
-  } catch (e: unknown) {
+  } catch {
     scoringLogs.value = []
   } finally {
     logsLoading.value = false

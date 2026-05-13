@@ -176,10 +176,9 @@ func TestEngine_MatchAccept(t *testing.T) {
 	if !result.Matched {
 		t.Error("should match")
 	}
-	if !result.Reject {
-		t.Error("global rules now always reject on match")
-	}
-}
+	if result.Reject {
+		t.Error("accept rule should not be treated as reject")
+	}}
 
 func TestEngine_MatchReject(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
@@ -309,7 +308,7 @@ func TestEngine_MatchAcceptAndReject(t *testing.T) {
 	result, err := engine.Match(context.Background(), &EvalContext{Title: "HD-Movie"})
 	require.NoError(t, err)
 	assert.True(t, result.Matched, "should match rule")
-	assert.True(t, result.Reject, "global rules always reject on match")
+	assert.True(t, result.Reject, "accept_and_reject rule should still reject")
 }
 
 func TestEngine_MatchAcceptWithSavePathCategoryTags(t *testing.T) {
@@ -331,8 +330,11 @@ func TestEngine_MatchAcceptWithSavePathCategoryTags(t *testing.T) {
 	result, err := engine.Match(context.Background(), &EvalContext{Title: "HD-Movie"})
 	require.NoError(t, err)
 	require.True(t, result.Matched)
-	assert.True(t, result.Reject, "global rules always reject on match")
+	assert.False(t, result.Reject, "accept rule should not reject")
 	assert.Equal(t, "accept-fields", result.RuleName)
+	assert.Equal(t, "/downloads/hd", result.SavePath)
+	assert.Equal(t, "movies", result.Category)
+	assert.Equal(t, "hd,4k", result.Tags)
 }
 
 func TestGetField_Uploader(t *testing.T) {
@@ -361,6 +363,21 @@ func TestGetField_Unknown(t *testing.T) {
 	assert.Equal(t, "", getField(ctx, "unknown_key"))
 }
 
+func TestGetField_DiscountLevel(t *testing.T) {
+	ctx := &EvalContext{DiscountLevel: "FREE"}
+	assert.Equal(t, "FREE", getField(ctx, "discount_level"))
+
+	empty := &EvalContext{}
+	assert.Equal(t, "", getField(empty, "discount_level"))
+}
+
+func TestMatchCondition_DiscountLevel(t *testing.T) {
+	cond := model.RuleCondition{Key: "discount_level", CompareType: model.CompareEquals, Value: "FREE"}
+	assert.True(t, MatchConditionExport(cond, &EvalContext{DiscountLevel: "FREE"}))
+	assert.False(t, MatchConditionExport(cond, &EvalContext{DiscountLevel: "NONE"}))
+	assert.False(t, MatchConditionExport(cond, &EvalContext{DiscountLevel: ""}))
+}
+
 func TestCompareNumbers_NonNumericFallback(t *testing.T) {
 	assert.Equal(t, 1, compareNumbers("zzz", "aaa"), "string compare zzz > aaa")
 	assert.Equal(t, -1, compareNumbers("aaa", "zzz"), "string compare aaa < zzz")
@@ -379,4 +396,133 @@ func TestEngine_MatchRepoError(t *testing.T) {
 	result, err := engine.Match(context.Background(), &EvalContext{Title: "test"})
 	assert.Error(t, err)
 	assert.Nil(t, result)
+}
+
+func TestEngine_MatchByIDs_RejectMatch(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRepository(db)
+	engine := NewEngine(repo, nil)
+
+	rule := &model.FilterRule{
+		Name:      "reject-big",
+		RuleType:  "reject",
+		Enabled:   true,
+		Conditions: []model.RuleCondition{
+			{Key: "title", CompareType: model.CompareContain, Value: "spam"},
+		},
+	}
+	require.NoError(t, repo.Create(context.Background(), rule))
+
+	result, err := engine.MatchByIDs(context.Background(), []uint{rule.ID}, &EvalContext{Title: "this is spam torrent"})
+	require.NoError(t, err)
+	assert.True(t, result.Matched)
+	assert.True(t, result.Reject)
+	assert.Equal(t, "reject-big", result.RuleName)
+}
+
+func TestEngine_MatchByIDs_NoMatch(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRepository(db)
+	engine := NewEngine(repo, nil)
+
+	rule := &model.FilterRule{
+		Name:      "reject-big",
+		RuleType:  "reject",
+		Enabled:   true,
+		Conditions: []model.RuleCondition{
+			{Key: "title", CompareType: model.CompareContain, Value: "spam"},
+		},
+	}
+	require.NoError(t, repo.Create(context.Background(), rule))
+
+	result, err := engine.MatchByIDs(context.Background(), []uint{rule.ID}, &EvalContext{Title: "clean torrent"})
+	require.NoError(t, err)
+	assert.False(t, result.Matched)
+}
+
+func TestEngine_MatchByIDs_AcceptRule(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRepository(db)
+	engine := NewEngine(repo, nil)
+
+	rule := &model.FilterRule{
+		Name:      "accept-free",
+		RuleType:  "accept",
+		Enabled:   true,
+		SavePath:  "/data/free",
+		Conditions: []model.RuleCondition{
+			{Key: "discount_level", CompareType: model.CompareEquals, Value: "FREE"},
+		},
+	}
+	require.NoError(t, repo.Create(context.Background(), rule))
+
+	result, err := engine.MatchByIDs(context.Background(), []uint{rule.ID}, &EvalContext{DiscountLevel: "FREE"})
+	require.NoError(t, err)
+	assert.True(t, result.Matched)
+	assert.False(t, result.Reject)
+	assert.Equal(t, "/data/free", result.SavePath)
+}
+
+func TestEngine_MatchByIDs_EmptyIDs(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRepository(db)
+	engine := NewEngine(repo, nil)
+
+	result, err := engine.MatchByIDs(context.Background(), []uint{}, &EvalContext{Title: "test"})
+	require.NoError(t, err)
+	assert.False(t, result.Matched)
+}
+
+func TestEngine_MatchByIDs_NonexistentID(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRepository(db)
+	engine := NewEngine(repo, nil)
+
+	result, err := engine.MatchByIDs(context.Background(), []uint{9999}, &EvalContext{Title: "test"})
+	require.NoError(t, err)
+	assert.False(t, result.Matched)
+}
+
+func TestEngine_Match_AcceptRuleNotRejected(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRepository(db)
+	engine := NewEngine(repo, nil)
+
+	rule := &model.FilterRule{
+		Name:      "accept-free",
+		RuleType:  "accept",
+		Enabled:   true,
+		Conditions: []model.RuleCondition{
+			{Key: "title", CompareType: model.CompareContain, Value: "Ubuntu"},
+		},
+	}
+	require.NoError(t, repo.Create(context.Background(), rule))
+
+	result, err := engine.Match(context.Background(), &EvalContext{Title: "Ubuntu 24.04"})
+	require.NoError(t, err)
+	assert.True(t, result.Matched)
+	assert.False(t, result.Reject, "accept rule should not be treated as reject")
+	assert.Equal(t, "accept", result.RuleType)
+}
+
+func TestEngine_Match_RejectRuleRejected(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRepository(db)
+	engine := NewEngine(repo, nil)
+
+	rule := &model.FilterRule{
+		Name:      "reject-spam",
+		RuleType:  "reject",
+		Enabled:   true,
+		Conditions: []model.RuleCondition{
+			{Key: "title", CompareType: model.CompareContain, Value: "spam"},
+		},
+	}
+	require.NoError(t, repo.Create(context.Background(), rule))
+
+	result, err := engine.Match(context.Background(), &EvalContext{Title: "spam content"})
+	require.NoError(t, err)
+	assert.True(t, result.Matched)
+	assert.True(t, result.Reject)
+	assert.Equal(t, "reject", result.RuleType)
 }

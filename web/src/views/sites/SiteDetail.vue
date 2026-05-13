@@ -72,10 +72,28 @@
       </a-card>
 
       <a-card :title="t('site.siteSettings')" style="margin-bottom: 24px">
-        <a-form :model="settingsForm" layout="vertical" style="max-width: 500px">
+        <a-form :model="settingsForm" layout="vertical" style="max-width: 600px">
+          <a-divider>{{ t('site.basicInfo') }}</a-divider>
+          <a-form-item :label="t('common.name')">
+            <a-input v-model:value="settingsForm.name" />
+          </a-form-item>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item :label="t('site.baseUrl')">
+                <a-input v-model:value="settingsForm.baseUrl" :placeholder="t('site.baseUrlPlaceholder')" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item :label="t('site.alternativeDomains')">
+                <a-input v-model:value="settingsForm.alternativeDomains" :placeholder="t('site.alternativeDomainsPlaceholder')" />
+              </a-form-item>
+            </a-col>
+          </a-row>
           <a-form-item :label="t('site.mirrorDomain')">
             <a-input v-model:value="settingsForm.mirrorDomain" :placeholder="t('site.mirrorDomainPlaceholder')" />
           </a-form-item>
+
+          <a-divider>{{ t('site.roleAndPublish') }}</a-divider>
           <a-row :gutter="16">
             <a-col :span="12">
               <a-form-item :label="t('site.enabledLabel')">
@@ -112,18 +130,24 @@
               </a-form-item>
             </a-col>
           </a-row>
+
+          <a-divider>{{ t('site.rssSavePathOverride') }}</a-divider>
           <a-form-item :label="t('site.overrideRssUrl')">
             <a-input v-model:value="settingsForm.overrideRssUrl" :placeholder="t('site.customRssUrl')" />
           </a-form-item>
           <a-form-item :label="t('site.overrideSavePath')">
             <a-input v-model:value="settingsForm.overrideSavePath" :placeholder="t('site.customSavePath')" />
           </a-form-item>
+
+          <a-divider>{{ t('site.network') }}</a-divider>
           <a-form-item :label="t('site.proxyAddress')">
             <a-input v-model:value="settingsForm.proxyUrl" :placeholder="t('site.proxyPlaceholder')" />
           </a-form-item>
           <a-form-item :label="t('site.skipSslVerify')">
             <a-switch v-model:checked="settingsForm.skipSslVerify" />
           </a-form-item>
+
+          <a-divider>{{ t('site.parseStrategy') }}</a-divider>
           <a-row :gutter="16">
             <a-col :span="8">
               <a-form-item :label="t('site.hashStrategy')">
@@ -152,6 +176,69 @@
               </a-form-item>
             </a-col>
           </a-row>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item :label="t('site.idPattern')">
+                <a-input v-model:value="settingsForm.idPattern" :placeholder="t('site.idPatternPlaceholder')" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item :label="t('site.sizeBaseUnit')">
+                <a-input-number v-model:value="settingsForm.sizeBaseUnit" :placeholder="t('site.sizeBaseUnitPlaceholder')" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item :label="t('site.hashXmlTagName')">
+                <a-input v-model:value="settingsForm.hashXmlTagName" :placeholder="t('site.hashXmlTagNamePlaceholder')" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item :label="t('site.sizeXmlTagName')">
+                <a-input v-model:value="settingsForm.sizeXmlTagName" :placeholder="t('site.sizeXmlTagNamePlaceholder')" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item :label="t('site.hashUrlParamName')">
+                <a-input v-model:value="settingsForm.hashUrlParamName" :placeholder="t('site.hashUrlParamNamePlaceholder')" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item :label="t('site.sizeDescRegex')">
+                <a-input v-model:value="settingsForm.sizeDescRegex" :placeholder="t('site.sizeDescRegexPlaceholder')" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item :label="t('site.sizeTitleRegex')">
+            <a-input v-model:value="settingsForm.sizeTitleRegex" :placeholder="t('site.sizeTitleRegexPlaceholder')" />
+          </a-form-item>
+
+          <a-divider>{{ t('site.downloadSettings') }}</a-divider>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item :label="t('site.downloadMode')">
+                <a-select v-model:value="settingsForm.downloadMode" allow-clear :placeholder="t('site.downloadModeDefault')">
+                  <a-select-option value="direct">Direct</a-select-option>
+                  <a-select-option value="page">Page</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item :label="t('site.requiresSideLoading')">
+                <a-switch v-model:checked="settingsForm.requiresSideLoading" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item :label="t('site.downloadUrlTemplate')">
+            <a-input v-model:value="settingsForm.downloadUrlTemplate" :placeholder="t('site.downloadUrlTemplatePlaceholder')" />
+          </a-form-item>
+          <a-form-item :label="t('site.downloadPagePattern')">
+            <a-input v-model:value="settingsForm.downloadPagePattern" :placeholder="t('site.downloadPagePatternPlaceholder')" />
+          </a-form-item>
+
           <a-form-item>
             <a-button type="primary" @click="updateSettings">{{ t('site.saveSettings') }}</a-button>
           </a-form-item>
@@ -169,6 +256,35 @@
           <a-form-item v-if="needsPasskey" label="Passkey">
             <a-input v-model:value="credForm.passkey" :placeholder="t('site.inputPasskey')" />
           </a-form-item>
+
+          <a-divider>{{ t('site.advancedCredentials') }}</a-divider>
+          <a-form-item :label="t('site.bearerToken')">
+            <a-input-password v-model:value="credForm.bearerToken" :placeholder="t('site.bearerTokenPlaceholder')" />
+          </a-form-item>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item :label="t('site.authKey')">
+                <a-input-password v-model:value="credForm.authKey" :placeholder="t('site.authKeyPlaceholder')" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item :label="t('site.authHash')">
+                <a-input-password v-model:value="credForm.authHash" :placeholder="t('site.authHashPlaceholder')" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item :label="t('site.userId')">
+                <a-input-number v-model:value="credForm.userId" :placeholder="t('site.userIdPlaceholder')" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item :label="t('site.rssKey')">
+                <a-input-password v-model:value="credForm.rssKey" :placeholder="t('site.rssKeyPlaceholder')" />
+              </a-form-item>
+            </a-col>
+          </a-row>
           <a-form-item>
             <a-button type="primary" @click="updateCredentials">{{ t('site.saveCredentials') }}</a-button>
           </a-form-item>
@@ -207,6 +323,56 @@
         <a-alert :message="t('site.overrideConfigHint')" type="info" show-icon style="margin-bottom: 16px" />
         <a-textarea v-model:value="overrideJSON" :rows="12" placeholder="{&quot;upload_rule&quot;: &quot;...&quot;, &quot;download_prefix&quot;: &quot;...&quot;}" />
       </a-modal>
+
+      <a-card :title="t('site.searchTorrents')" style="margin-bottom: 24px">
+        <a-form layout="inline" style="margin-bottom: 16px">
+          <a-form-item>
+            <a-input v-model:value="searchQuery" :placeholder="t('site.searchPlaceholder')" style="width: 300px" @press-enter="doSearch" />
+          </a-form-item>
+          <a-form-item>
+            <a-checkbox v-model:checked="searchFreeOnly">{{ t('site.freeOnly') }}</a-checkbox>
+          </a-form-item>
+          <a-form-item>
+            <a-button type="primary" :loading="searchLoading" @click="doSearch">{{ t('site.search') }}</a-button>
+          </a-form-item>
+        </a-form>
+        <a-table
+          v-if="searchResults.length > 0"
+          :data-source="searchResults"
+          :loading="searchLoading"
+          :pagination="{ pageSize: 10 }"
+          row-key="torrent_id"
+          size="small"
+        >
+          <a-table-column :title="t('site.torrentTitle')" data-index="title" ellipsis />
+          <a-table-column :title="t('site.torrentSize')" data-index="size" :width="100">
+            <template #default="{ text }">{{ formatFileSize(text) }}</template>
+          </a-table-column>
+          <a-table-column :title="t('site.seeders')" data-index="seeders" :width="80" />
+          <a-table-column :title="t('site.leechers')" data-index="leechers" :width="80" />
+          <a-table-column :title="t('site.discount')" data-index="discount" :width="100">
+            <template #default="{ text }">
+              <a-tag v-if="text && text !== 'NONE'" :color="discountColor(text)">{{ text }}</a-tag>
+              <span v-else>-</span>
+            </template>
+          </a-table-column>
+          <a-table-column :title="t('common.actions')" :width="120">
+            <template #default="{ record }">
+              <a-button type="link" size="small" :loading="discountLoadingMap[record.torrent_id]" @click="checkDiscount(record.torrent_id)">{{ t('site.checkDiscount') }}</a-button>
+            </template>
+          </a-table-column>
+        </a-table>
+        <a-empty v-else-if="!searchLoading" :description="t('site.noSearchResults')" />
+        <a-modal v-model:open="showDiscountResult" :title="t('site.discountResult')" :footer="null" width="400px">
+          <a-descriptions bordered :column="1" size="small">
+            <a-descriptions-item :label="t('site.discountLevel')">
+              <a-tag :color="discountColor(discountInfo.level)">{{ discountInfo.level || '-' }}</a-tag>
+            </a-descriptions-item>
+            <a-descriptions-item :label="t('site.multiplier')">{{ discountInfo.multiplier ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('site.freeEndAt')">{{ discountInfo.free_end_at || '-' }}</a-descriptions-item>
+          </a-descriptions>
+        </a-modal>
+      </a-card>
     </a-spin>
   </div>
 </template>
@@ -244,9 +410,12 @@ const siteId = Number(route.params.id)
 const loading = ref(false)
 const site = ref<Record<string, unknown>>({})
 
-const credForm = reactive({ cookie: '', passkey: '', apiKey: '' })
+const credForm = reactive({ cookie: '', passkey: '', apiKey: '', bearerToken: '', authKey: '', authHash: '', userId: undefined as number | undefined, rssKey: '' })
 
 const settingsForm = reactive({
+  name: '',
+  baseUrl: '',
+  alternativeDomains: '',
   enabled: true,
   isSource: false,
   isTarget: false,
@@ -261,6 +430,17 @@ const settingsForm = reactive({
   hashStrategy: '',
   sizeStrategy: '',
   idStrategy: '',
+  idPattern: '',
+  hashXmlTagName: '',
+  sizeXmlTagName: '',
+  hashUrlParamName: '',
+  sizeDescRegex: '',
+  sizeTitleRegex: '',
+  sizeBaseUnit: 0,
+  downloadMode: '',
+  downloadUrlTemplate: '',
+  downloadPagePattern: '',
+  requiresSideLoading: false,
 })
 
 const authTypeLabels: Record<string, string> = {
@@ -305,6 +485,9 @@ async function fetchSite() {
     const resp = await sitesApi.get(siteId)
     site.value = resp.data.data || {}
     Object.assign(settingsForm, {
+      name: site.value.name || '',
+      baseUrl: site.value.baseUrl || '',
+      alternativeDomains: site.value.alternativeDomains || '',
       enabled: site.value.enabled !== undefined ? site.value.enabled : true,
       isSource: site.value.isSource || false,
       isTarget: site.value.isTarget || false,
@@ -319,6 +502,17 @@ async function fetchSite() {
       hashStrategy: site.value.hashStrategy || '',
       sizeStrategy: site.value.sizeStrategy || '',
       idStrategy: site.value.idStrategy || '',
+      idPattern: site.value.idPattern || '',
+      hashXmlTagName: site.value.hashXmlTagName || '',
+      sizeXmlTagName: site.value.sizeXmlTagName || '',
+      hashUrlParamName: site.value.hashUrlParamName || '',
+      sizeDescRegex: site.value.sizeDescRegex || '',
+      sizeTitleRegex: site.value.sizeTitleRegex || '',
+      sizeBaseUnit: site.value.sizeBaseUnit || 0,
+      downloadMode: site.value.downloadMode || '',
+      downloadUrlTemplate: site.value.downloadUrlTemplate || '',
+      downloadPagePattern: site.value.downloadPagePattern || '',
+      requiresSideLoading: site.value.requiresSideLoading || false,
     })
   } catch (e: unknown) {
     message.error((e as Error).message)
@@ -329,15 +523,25 @@ async function fetchSite() {
 
 async function updateCredentials() {
   try {
-    const payload: Record<string, string> = {}
+    const payload: Record<string, unknown> = {}
     if (credForm.cookie) payload.cookie = credForm.cookie
     if (credForm.passkey) payload.passkey = credForm.passkey
     if (credForm.apiKey) payload.apiKey = credForm.apiKey
+    if (credForm.bearerToken) payload.bearerToken = credForm.bearerToken
+    if (credForm.authKey) payload.authKey = credForm.authKey
+    if (credForm.authHash) payload.authHash = credForm.authHash
+    if (credForm.userId) payload.userId = credForm.userId
+    if (credForm.rssKey) payload.rssKey = credForm.rssKey
     await sitesApi.updateCredentials(siteId, payload)
     message.success(t('site.credentialsUpdated'))
     credForm.cookie = ''
     credForm.passkey = ''
     credForm.apiKey = ''
+    credForm.bearerToken = ''
+    credForm.authKey = ''
+    credForm.authHash = ''
+    credForm.userId = undefined
+    credForm.rssKey = ''
     fetchSite()
   } catch (e: unknown) {
     message.error((e as Error).message)
@@ -447,6 +651,65 @@ async function fetchStats() {
     stats.value = {}
   } finally {
     statsLoading.value = false
+  }
+}
+
+const searchQuery = ref('')
+const searchFreeOnly = ref(false)
+const searchLoading = ref(false)
+const searchResults = ref<Record<string, unknown>[]>([])
+const discountLoadingMap = reactive<Record<string, boolean>>({})
+const showDiscountResult = ref(false)
+const discountInfo = reactive({ level: '', free_end_at: null as string | null, multiplier: 0 })
+
+function formatFileSize(bytes: unknown): string {
+  const n = Number(bytes) || 0
+  return formatBytes(n)
+}
+
+function discountColor(level: string): string {
+  const colors: Record<string, string> = {
+    FREE: 'green', '2XFREE': 'lime', '2XUP': 'blue',
+    PERCENT_50: 'orange', PERCENT_70: 'gold', PERCENT_25: 'volcano',
+  }
+  return colors[level] || 'default'
+}
+
+async function doSearch() {
+  if (!searchQuery.value.trim()) {
+    message.warning(t('site.searchKeywordRequired'))
+    return
+  }
+  searchLoading.value = true
+  try {
+    const resp = await sitesApi.searchTorrents(siteId, {
+      query: searchQuery.value.trim(),
+      freeOnly: searchFreeOnly.value,
+    })
+    searchResults.value = resp.data.data || []
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+    searchResults.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+async function checkDiscount(torrentId: string) {
+  discountLoadingMap[torrentId] = true
+  try {
+    const resp = await sitesApi.detectDiscount(siteId, { torrentId })
+    const data = resp.data.data || {}
+    Object.assign(discountInfo, {
+      level: data.level || '-',
+      free_end_at: data.free_end_at || null,
+      multiplier: data.multiplier ?? 0,
+    })
+    showDiscountResult.value = true
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    discountLoadingMap[torrentId] = false
   }
 }
 

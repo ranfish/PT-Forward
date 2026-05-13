@@ -352,7 +352,8 @@ async function fetchDownloaders() {
       label: d.name || d.id,
       value: d.name || d.id,
     }))
-  } catch (_e: unknown) {}
+  } catch {
+  }
 }
 
 onMounted(() => {

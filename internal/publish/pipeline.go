@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/description"
+	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/ptgen"
@@ -275,12 +276,15 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 		return false, err
 	}
 
+	start := time.Now()
 	resp, err := targetAdapter.UploadTorrent(ctx, targetConfig, pubReq)
+	metrics.PublishDuration.WithLabelValues(targetSite).Observe(time.Since(start).Seconds())
 	if err != nil {
 		p.logger.Warn("上传到目标站失败",
 			zap.String("target", targetSite),
 			zap.Error(err),
 		)
+		metrics.PublishTasksTotal.WithLabelValues(targetSite, "failed").Inc()
 		if err := p.CreateResult(ctx, &model.PublishResultRecord{
 			CandidateID:  candidate.ID,
 			SourceSite:   candidate.SourceSite,
@@ -304,6 +308,8 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 	}); err != nil {
 		p.logger.Warn("记录发布结果失败", zap.Error(err))
 	}
+
+	metrics.PublishTasksTotal.WithLabelValues(targetSite, "completed").Inc()
 
 	return true, nil
 }
@@ -1211,10 +1217,15 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 
 		p.mapFieldValues(ctx, member.SiteName, pubReq.FormFields)
 
+		uploadStart := time.Now()
 		resp, uploadErr := targetAdapter.UploadTorrent(ctx, targetConfig, pubReq)
+		metrics.PublishDuration.WithLabelValues(member.SiteName).Observe(time.Since(uploadStart).Seconds())
 		if uploadErr != nil {
+			metrics.PublishTasksTotal.WithLabelValues(member.SiteName, "failed").Inc()
 			return p.failMember(ctx, member, StepUpload, fmt.Sprintf("上传失败: %v", uploadErr))
 		}
+
+		metrics.PublishTasksTotal.WithLabelValues(member.SiteName, "completed").Inc()
 
 		now := time.Now()
 		p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{

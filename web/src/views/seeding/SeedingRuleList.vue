@@ -62,6 +62,21 @@
         <a-form-item :label="t('seeding.priority')" name="priority">
           <a-input-number v-model:value="form.priority" :min="0" style="width: 100%" />
         </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item :label="t('common.enable')">
+              <a-switch v-model:checked="form.enabled" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item :label="t('seeding.deleteNum')">
+              <a-input-number v-model:value="form.delete_num" :min="1" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item :label="t('seeding.removeData')">
+          <a-switch v-model:checked="form.remove_data" />
+        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -89,6 +104,9 @@ const form = reactive({
   expr: '',
   action: 'delete',
   priority: 0,
+  enabled: true,
+  delete_num: 1,
+  remove_data: true,
 })
 
 const columns = [
@@ -123,9 +141,12 @@ function openModal(record?: DeleteRule) {
       expr: record.expr || '',
       action: record.action || 'delete',
       priority: record.priority || 0,
+      enabled: record.enabled ?? true,
+      delete_num: record.delete_num || 1,
+      remove_data: record.remove_data ?? true,
     })
   } else {
-    Object.assign(form, { alias: '', type: 'normal', conditions: '', expr: '', action: 'delete', priority: 0 })
+    Object.assign(form, { alias: '', type: 'normal', conditions: '', expr: '', action: 'delete', priority: 0, enabled: true, delete_num: 1, remove_data: true })
   }
   modalVisible.value = true
 }

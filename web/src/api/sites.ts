@@ -46,4 +46,10 @@ export const sitesApi = {
   unfreezeSite(id: number) {
     return client.delete(`/sites/${id}/freeze`)
   },
+  searchTorrents(id: number, data: { query: string; category?: string; freeOnly?: boolean; sortBy?: string; maxResults?: number }) {
+    return client.post(`/sites/${id}/search`, data)
+  },
+  detectDiscount(id: number, data: { torrentId: string }) {
+    return client.post(`/sites/${id}/discount`, data)
+  },
 }

@@ -497,3 +497,21 @@ export interface BackpressureConfig {
   max_concurrent: number
   [key: string]: unknown
 }
+
+export interface SearchTorrentResult {
+  torrent_id: string
+  title: string
+  size: number
+  seeders: number
+  leechers: number
+  discount: string
+  publish_at: string
+  detail_url: string
+  download_url: string
+}
+
+export interface DiscountResult {
+  level: string
+  free_end_at: string | null
+  multiplier: number
+}

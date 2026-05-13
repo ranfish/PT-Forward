@@ -1057,3 +1057,183 @@ func TestUintToString(t *testing.T) {
 	require.Equal(t, "42", uintToString(42))
 	require.Equal(t, "100", uintToString(100))
 }
+
+func TestDiscountLevel_FallbackLogic(t *testing.T) {
+	evt := &model.RSSTorrentEvent{TorrentID: "1", SiteName: "test"}
+
+	discountStr := string(evt.DiscountLevel)
+	require.Equal(t, "", discountStr)
+
+	evt.IsFree = true
+	discountStr = string(evt.DiscountLevel)
+	if discountStr == "" {
+		if evt.IsFree {
+			discountStr = string(model.DiscountFree)
+		} else {
+			discountStr = string(model.DiscountNone)
+		}
+	}
+	require.Equal(t, string(model.DiscountFree), discountStr)
+
+	evt.IsFree = false
+	evt.DiscountLevel = model.Discount2xFree
+	discountStr = string(evt.DiscountLevel)
+	require.Equal(t, string(model.Discount2xFree), discountStr)
+}
+
+func TestDiscountLevel_DetectHRAndDiscount_SetsLevel(t *testing.T) {
+	eng, _ := newEngineWithDB(t)
+	freeEndAt := time.Now().Add(24 * time.Hour)
+	adapter := &mocks.SiteAdapter{
+		DetectHRFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
+			return &model.HRResult{HasHR: false}, nil
+		},
+		DetectDiscountFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
+			return &model.DiscountResult{
+				Level:     model.Discount2xUp,
+				FreeEndAt: &freeEndAt,
+			}, nil
+		},
+	}
+	eng.SetSiteProvider(&mocks.SiteInfoProvider{
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{}, nil
+		},
+	})
+
+	evt := &model.RSSTorrentEvent{TorrentID: "42", SiteName: "site"}
+	eng.detectHRAndDiscount(context.Background(), evt, "site")
+
+	require.Equal(t, model.Discount2xUp, evt.DiscountLevel)
+}
+
+func TestEngine_FetchOnce_RegexReplacement(t *testing.T) {
+	eng, db := newEngineWithDB(t)
+	makeSite(db, t, "regexsite", "regexsite.com")
+
+	srv := serveRssWithItems(t, rssItem(
+		"[GroupX] Some Title [1080p]",
+		"https://regexsite.com/download.php?id=701",
+		"701",
+		"cc333dd444ee555ff666aa777bb88cc99dd00",
+		"3000000000",
+	))
+
+	sub := makeSub(db, t, "regex-sub", "regexsite", []string{srv.URL})
+	sub.UseCustomRegex = true
+	sub.RegexStr = `^\[.*?\]\s*`
+	sub.ReplaceStr = ""
+	require.NoError(t, db.Save(sub).Error)
+
+	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
+
+	var dispatched []model.TorrentEvent
+	d := event.NewDispatcher(zap.NewNop())
+	d.Register("rss_new", &mocks.EventHandler{
+		Fn: func(ctx context.Context, events []model.TorrentEvent) error {
+			dispatched = append(dispatched, events...)
+			return nil
+		},
+	})
+	eng.SetDispatcher(d)
+
+	eng.fetchOnce(context.Background(), sub)
+
+	require.Len(t, dispatched, 1)
+	require.Equal(t, "Some Title [1080p]", dispatched[0].Title)
+}
+
+func TestEngine_FetchOnce_RegexReplacement_InvalidRegex(t *testing.T) {
+	eng, db := newEngineWithDB(t)
+	makeSite(db, t, "regexsite2", "regexsite2.com")
+
+	srv := serveRssWithItems(t, rssItem(
+		"[GroupX] Title",
+		"https://regexsite2.com/download.php?id=702",
+		"702",
+		"dd444ee555ff666aa777bb88cc99dd00ee11",
+		"2000000000",
+	))
+
+	sub := makeSub(db, t, "regex-sub2", "regexsite2", []string{srv.URL})
+	sub.UseCustomRegex = true
+	sub.RegexStr = "[invalid"
+	sub.ReplaceStr = ""
+	require.NoError(t, db.Save(sub).Error)
+
+	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
+
+	var dispatched []model.TorrentEvent
+	d := event.NewDispatcher(zap.NewNop())
+	d.Register("rss_new", &mocks.EventHandler{
+		Fn: func(ctx context.Context, events []model.TorrentEvent) error {
+			dispatched = append(dispatched, events...)
+			return nil
+		},
+	})
+	eng.SetDispatcher(d)
+
+	eng.fetchOnce(context.Background(), sub)
+
+	require.Len(t, dispatched, 1)
+	require.Equal(t, "[GroupX] Title", dispatched[0].Title)
+}
+
+func TestEngine_FetchOnce_AcceptRejectRules(t *testing.T) {
+	eng, db := newEngineWithDB(t)
+	makeSite(db, t, "rulesite", "rulesite.com")
+
+	acceptRule := &model.FilterRule{
+		Name:      "accept-free",
+		RuleType:  "accept",
+		Enabled:   true,
+		Conditions: []model.RuleCondition{
+			{Key: "title", CompareType: model.CompareContain, Value: "Ubuntu"},
+		},
+	}
+	require.NoError(t, db.Create(acceptRule).Error)
+
+	rejectRule := &model.FilterRule{
+		Name:      "reject-spam",
+		RuleType:  "reject",
+		Enabled:   true,
+		Conditions: []model.RuleCondition{
+			{Key: "title", CompareType: model.CompareContain, Value: "spam"},
+		},
+	}
+	require.NoError(t, db.Create(rejectRule).Error)
+
+	srv := serveRssWithItems(t,
+		rssItem("Ubuntu 24.04 LTS", "https://rulesite.com/dl?id=801", "801", "ee555ff666aa777bb88cc99dd00ee11ff22", "1000000000")+
+			rssItem("Spam Content", "https://rulesite.com/dl?id=802", "802", "ff666aa777bb88cc99dd00ee11ff22aa33", "2000000000")+
+			rssItem("Other Content", "https://rulesite.com/dl?id=803", "803", "aa777bb88cc99dd00ee11ff22aa33bb44", "3000000000"),
+	)
+
+	sub := makeSub(db, t, "rule-sub", "rulesite", []string{srv.URL})
+	sub.AcceptRuleIDs = []uint{acceptRule.ID}
+	sub.RejectRuleIDs = []uint{rejectRule.ID}
+	require.NoError(t, db.Save(sub).Error)
+
+	filterEng := filter.NewEngine(filter.NewRepository(db), zap.NewNop())
+	eng.filterEng = filterEng
+	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
+
+	var dispatched []model.TorrentEvent
+	d := event.NewDispatcher(zap.NewNop())
+	d.Register("rss_new", &mocks.EventHandler{
+		Fn: func(ctx context.Context, events []model.TorrentEvent) error {
+			dispatched = append(dispatched, events...)
+			return nil
+		},
+	})
+	eng.SetDispatcher(d)
+
+	eng.fetchOnce(context.Background(), sub)
+
+	require.Len(t, dispatched, 1)
+	require.Equal(t, "Ubuntu 24.04 LTS", dispatched[0].Title)
+	require.Equal(t, "801", dispatched[0].TorrentID)
+}

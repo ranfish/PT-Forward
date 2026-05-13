@@ -67,6 +67,39 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-row :gutter="16">
+          <a-col :span="8">
+            <a-form-item :label="t('settings.filterRules.ruleType')">
+              <a-select v-model:value="form.ruleType">
+                <a-select-option value="accept">{{ t('settings.filterRules.accept') }}</a-select-option>
+                <a-select-option value="reject">{{ t('settings.filterRules.reject') }}</a-select-option>
+                <a-select-option value="accept_and_reject">{{ t('settings.filterRules.acceptAndReject') }}</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item :label="t('settings.filterRules.priority')">
+              <a-input-number v-model:value="form.priority" :min="0" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item :label="t('settings.filterRules.tags')">
+              <a-input v-model:value="form.tags" :placeholder="t('settings.filterRules.tagsPlaceholder')" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item :label="t('settings.filterRules.savePath')">
+              <a-input v-model:value="form.savePath" :placeholder="t('settings.filterRules.savePathPlaceholder')" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item :label="t('settings.filterRules.category')">
+              <a-input v-model:value="form.category" :placeholder="t('settings.filterRules.categoryPlaceholder')" />
+            </a-form-item>
+          </a-col>
+        </a-row>
 
         <a-divider>{{ t('settings.filterRules.matchConditionHint') }}</a-divider>
 
@@ -81,6 +114,7 @@
                 <a-select-option value="category">{{ t('subscription.categoryLabel') }}</a-select-option>
                 <a-select-option value="free">{{ t('subscription.isFree') }}</a-select-option>
                 <a-select-option value="tags">{{ t('subscription.tagsLabel') }}</a-select-option>
+                <a-select-option value="discount_level">{{ t('subscription.discountLevel') }}</a-select-option>
               </a-select>
             </a-col>
             <a-col :span="6">
@@ -145,6 +179,7 @@ interface ConditionData {
 }
 
 interface FilterRuleItem {
+  [key: string]: unknown
   id: number
   name: string
   enabled: boolean
@@ -164,6 +199,11 @@ interface ConditionForm {
 
 const form = reactive({
   name: '',
+  ruleType: 'reject',
+  priority: 0,
+  savePath: '',
+  category: '',
+  tags: '',
   conditionList: [] as ConditionForm[],
   enabled: true,
 })
@@ -244,11 +284,17 @@ function openModal(record?: FilterRuleItem) {
     if (!form.conditionList.length) form.conditionList.push({ key: 'title', compareType: 'contain', value: '', numValue: 0 })
     Object.assign(form, {
       name: record.name || '',
+      ruleType: record.ruleType || record.rule_type || 'reject',
+      priority: record.priority || 0,
+      savePath: record.savePath || record.save_path || '',
+      category: record.category || '',
+      tags: record.tags || '',
       enabled: record.enabled ?? true,
     })
   } else {
     Object.assign(form, {
-      name: '', conditionList: [{ key: 'title', compareType: 'contain', value: '', numValue: 0 }], enabled: true,
+      name: '', ruleType: 'reject', priority: 0, savePath: '', category: '', tags: '',
+      conditionList: [{ key: 'title', compareType: 'contain', value: '', numValue: 0 }], enabled: true,
     })
   }
   modalVisible.value = true
@@ -267,7 +313,11 @@ async function handleSubmit() {
   try {
     const payload = {
       name: form.name,
-      ruleType: 'reject',
+      ruleType: form.ruleType,
+      priority: form.priority,
+      savePath: form.savePath || undefined,
+      category: form.category || undefined,
+      tags: form.tags || undefined,
       conditions: formToConditions(),
       enabled: form.enabled,
     }

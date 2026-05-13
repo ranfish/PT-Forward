@@ -77,6 +77,34 @@
         <a-form-item :label="t('common.enable')" name="enabled">
           <a-switch v-model:checked="form.enabled" />
         </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item :label="t('downloader.isDefault')">
+              <a-switch v-model:checked="form.isDefault" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item :label="t('downloader.reseedTargetId')">
+              <a-input v-model:value="form.reseedTargetId" :placeholder="t('downloader.reseedTargetIdPlaceholder')" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+
+        <a-divider>{{ t('downloader.pathMappings') }}</a-divider>
+        <div v-for="(pm, idx) in form.pathMappings" :key="idx" style="margin-bottom: 8px">
+          <a-row :gutter="8" align="middle">
+            <a-col :span="10">
+              <a-input v-model:value="pm.sourcePath" :placeholder="t('downloader.sourcePathPlaceholder')" />
+            </a-col>
+            <a-col :span="10">
+              <a-input v-model:value="pm.reseedPath" :placeholder="t('downloader.reseedPathPlaceholder')" />
+            </a-col>
+            <a-col :span="4">
+              <a-button type="text" danger @click="form.pathMappings.splice(idx, 1)">-</a-button>
+            </a-col>
+          </a-row>
+        </div>
+        <a-button type="dashed" block @click="form.pathMappings.push({ sourcePath: '', reseedPath: '' })">+ {{ t('downloader.addPathMapping') }}</a-button>
       </a-form>
     </a-modal>
   </div>
@@ -104,6 +132,9 @@ const form = reactive({
   password: '',
   role: 'download',
   enabled: true,
+  isDefault: false,
+  reseedTargetId: '',
+  pathMappings: [] as { sourcePath: string; reseedPath: string }[],
 })
 
 const columns = [
@@ -120,9 +151,9 @@ const pagination = usePagination((page, size) => downloadersApi.list(page, size)
 function openModal(record?: ClientConfig) {
   editingRecord.value = record || null
   if (record) {
-    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true })
+    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true, isDefault: record.isDefault || false, reseedTargetId: record.reseedTargetId || '', pathMappings: (record.pathMappings || []).map((p: { sourcePath: string; reseedPath: string }) => ({ sourcePath: p.sourcePath || '', reseedPath: p.reseedPath || '' })) })
   } else {
-    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '', role: 'download', enabled: true })
+    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '', role: 'download', enabled: true, isDefault: false, reseedTargetId: '', pathMappings: [] })
   }
   modalVisible.value = true
 }
