@@ -223,7 +223,7 @@ func (h *IYUUHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	results, err := h.iyuuSvc.QueryReseed(r.Context(), req.InfoHashes)
 	if err != nil {
-		h.logger.Warn("IYUU query failed", zap.String("error", err.Error()), zap.String("cause", fmt.Sprintf("%v", err)))
+		h.logger.Warn("IYUU query failed", zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("IYUU 查询失败: %v", err))
 		return
 	}

@@ -80,7 +80,9 @@ func (h *DashboardHandler) handleOverview(w http.ResponseWriter, _ *http.Request
 	h.db.Model(&model.Site{}).Where("enabled = ?", true).Count(&siteOnline)
 
 	var clientConfigs []model.ClientConfig
-	h.db.Where("deleted_at = ? AND enabled = ?", time.Time{}, true).Find(&clientConfigs)
+	if err := h.db.Where("deleted_at = ? AND enabled = ?", time.Time{}, true).Find(&clientConfigs).Error; err != nil {
+		h.logger.Warn("dashboard: query client configs failed", zap.Error(err))
+	}
 
 	onlineCount := len(clientConfigs)
 	if h.clientChecker != nil {
@@ -149,7 +151,10 @@ func (h *DashboardHandler) handleActivities(w http.ResponseWriter, r *http.Reque
 	}
 
 	var seen []model.RSSTorrentSeen
-	h.db.Order("created_at DESC").Limit(int(limit)).Find(&seen)
+	if err := h.db.Order("created_at DESC").Limit(int(limit)).Find(&seen).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询最近种子失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": seen,
@@ -215,7 +220,10 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 			q = q.Where("site_name = ?", site)
 		}
 		q.Count(&total)
-		q.Order("created_at DESC").Limit(100).Find(&events)
+		if err := q.Order("created_at DESC").Limit(100).Find(&events).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "查询种子事件失败")
+			return
+		}
 
 		Success(w, map[string]interface{}{
 			"items": events,
@@ -230,6 +238,10 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 	if remaining == "cleanup" && r.Method == http.MethodPost {
 		before := time.Now().AddDate(0, 0, -30)
 		result := h.db.Where("created_at < ?", before).Delete(&model.TorrentEvent{})
+		if result.Error != nil {
+			Error(w, http.StatusInternalServerError, 50000, "清理事件失败")
+			return
+		}
 		Success(w, map[string]interface{}{
 			"deleted": result.RowsAffected,
 		})

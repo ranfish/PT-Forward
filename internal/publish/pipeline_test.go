@@ -1692,6 +1692,9 @@ func TestPipeline_SetSiteProvider(t *testing.T) {
 	db := setupPipelineTestDBWithGroups(t)
 	p := NewPipeline(db, zap.NewNop())
 	p.SetSiteProvider(nil)
+	if p.siteProvider != nil {
+		t.Error("expected siteProvider to be nil")
+	}
 }
 
 func setupPipelineTestDBWithMappings(t *testing.T) *gorm.DB {
@@ -2075,12 +2078,18 @@ func TestPipeline_SetCompletionWatcher(t *testing.T) {
 	db := setupPipelineTestDB(t)
 	p := NewPipeline(db, zap.NewNop())
 	p.SetCompletionWatcher(nil)
+	if p.completionWatcher != nil {
+		t.Error("expected completionWatcher to be nil")
+	}
 }
 
 func TestPipeline_SetNotifyService(t *testing.T) {
 	db := setupPipelineTestDB(t)
 	p := NewPipeline(db, zap.NewNop())
 	p.SetNotifyService(nil)
+	if p.notifyService != nil {
+		t.Error("expected notifyService to be nil")
+	}
 }
 
 func TestPipeline_Update(t *testing.T) {
@@ -2147,7 +2156,7 @@ func TestPipeline_NotifyPublishResult_Success(t *testing.T) {
 	var history []model.NotificationHistory
 	db.Find(&history)
 	if len(history) != 0 {
-		t.Logf("notification history entries: %d (expected 0 due to no channels)", len(history))
+		t.Errorf("expected 0 notification history entries (no channels configured), got %d", len(history))
 	}
 }
 
@@ -2167,6 +2176,12 @@ func TestPipeline_NotifyPublishResult_Error(t *testing.T) {
 	db.Where("publish_group_id = ?", 1).First(&member)
 
 	p.notifyPublishResult(ctx, &member)
+
+	var history []model.NotificationHistory
+	db.Find(&history)
+	if len(history) != 0 {
+		t.Errorf("expected 0 notification history entries (no channels configured), got %d", len(history))
+	}
 }
 
 func TestPipeline_NotifyPublishResult_NilService(t *testing.T) {
@@ -2180,6 +2195,10 @@ func TestPipeline_NotifyPublishResult_NilService(t *testing.T) {
 		Status:         model.MemberStatusUploaded,
 	}
 	p.notifyPublishResult(ctx, member)
+
+	if p.notifyService != nil {
+		t.Error("expected notifyService to remain nil")
+	}
 }
 
 func TestPipeline_NotifyPublishResult_DefaultStatus(t *testing.T) {
@@ -2197,6 +2216,12 @@ func TestPipeline_NotifyPublishResult_DefaultStatus(t *testing.T) {
 	db.Where("publish_group_id = ?", 1).First(&member)
 
 	p.notifyPublishResult(ctx, &member)
+
+	var history []model.NotificationHistory
+	db.Find(&history)
+	if len(history) != 0 {
+		t.Errorf("expected 0 notifications for default status, got %d", len(history))
+	}
 }
 
 func TestPipeline_NotifyPublishResult_NoGroup(t *testing.T) {

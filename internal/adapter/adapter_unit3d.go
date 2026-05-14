@@ -68,7 +68,7 @@ func (a *Unit3DAdapter) ensureSession(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return networkError("访问首页建立 session 失败", err)
 	}
-	func() { _ = resp.Body.Close() }()
+	_ = resp.Body.Close()
 
 	newCookies := resp.Cookies()
 	if len(newCookies) == 0 {

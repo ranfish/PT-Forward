@@ -16,6 +16,10 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	scoringCutoffHours = 72 * time.Hour
+)
+
 type Engine struct {
 	db             *gorm.DB
 	logger         *zap.Logger
@@ -267,7 +271,7 @@ func (e *Engine) CleanupStale(ctx context.Context) (int64, error) {
 		return result.RowsAffected, &model.AppError{Code: 50001, Message: "pause free-expired records failed", Cause: freeExpired.Error}
 	}
 
-	scoringCutoff := time.Now().Add(-72 * time.Hour)
+	scoringCutoff := time.Now().Add(-scoringCutoffHours)
 	e.db.WithContext(ctx).Where("created_at < ?", scoringCutoff).Delete(&model.ScoringLog{})
 
 	e.logger.Info("seeding cleanup completed",

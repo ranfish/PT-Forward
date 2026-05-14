@@ -15,6 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const defaultFetchInterval = 5 * time.Minute
+
 type Engine struct {
 	fetcher        *Fetcher
 	repo           *Repository
@@ -93,10 +95,9 @@ func (e *Engine) checkDiskBudget(ctx context.Context, sub *model.RSSSubscription
 		return err
 	}
 
-	go func() {
-		time.Sleep(30 * time.Second)
+	time.AfterFunc(30*time.Second, func() {
 		e.diskBudget.Release(ticket)
-	}()
+	})
 
 	return nil
 }
@@ -191,7 +192,7 @@ func (e *Engine) startSubscription(parentCtx context.Context, sub *model.RSSSubs
 
 	interval := parseCronInterval(sub.Cron)
 	if interval < time.Minute {
-		interval = 5 * time.Minute
+		interval = defaultFetchInterval
 	}
 
 	go func() {
@@ -465,7 +466,7 @@ func derefStr(s *string) string {
 
 func parseCronInterval(cron string) time.Duration {
 	if cron == "" {
-		return 5 * time.Minute
+		return defaultFetchInterval
 	}
 
 	if parts := splitCron(cron); len(parts) == 5 {
@@ -481,7 +482,7 @@ func parseCronInterval(cron string) time.Duration {
 		}
 	}
 
-	return 5 * time.Minute
+	return defaultFetchInterval
 }
 
 func splitCron(cron string) []string {

@@ -43,7 +43,17 @@ func TestSyncManager_StartAndStop(t *testing.T) {
 
 	sm.Start(ctx)
 	time.Sleep(50 * time.Millisecond)
-	sm.Stop()
+
+	done := make(chan struct{})
+	go func() {
+		sm.Stop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Stop() hung for more than 2s")
+	}
 }
 
 func TestSyncManager_StopWithoutStart(t *testing.T) {
@@ -51,7 +61,16 @@ func TestSyncManager_StopWithoutStart(t *testing.T) {
 	rc := setting.NewRuntimeConfig(repo, zap.NewNop())
 	sm := NewSyncManager(rc, zap.NewNop())
 
-	sm.Stop()
+	done := make(chan struct{})
+	go func() {
+		sm.Stop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Stop() without Start() hung for more than 2s")
+	}
 }
 
 func TestSyncManager_ContextCancel(t *testing.T) {
@@ -66,5 +85,14 @@ func TestSyncManager_ContextCancel(t *testing.T) {
 	cancel()
 	time.Sleep(100 * time.Millisecond)
 
-	sm.Stop()
+	done := make(chan struct{})
+	go func() {
+		sm.Stop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Stop() after cancel hung for more than 2s")
+	}
 }

@@ -354,7 +354,10 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 		Error(w, http.StatusInternalServerError, 50000, "更新刷流配置失败")
 		return
 	}
-	h.db.First(&config, id)
+	if err := h.db.First(&config, id).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
+		return
+	}
 	Success(w, config)
 }
 
@@ -705,6 +708,9 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 	if limit < 1 {
 		limit = 20
 	}
+	if limit > 200 {
+		limit = 200
+	}
 
 	var logs []model.ScoringLog
 	h.db.Order("created_at DESC").Limit(limit).Find(&logs)
@@ -756,9 +762,15 @@ func (h *SeedingHandler) handleUpdateRule(w http.ResponseWriter, r *http.Request
 	updates["updated_at"] = time.Now()
 
 	if len(updates) > 1 {
-		h.db.Model(&rule).Updates(updates)
+		if err := h.db.Model(&rule).Updates(updates).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "更新规则失败")
+			return
+		}
 	}
-	h.db.First(&rule, id)
+	if err := h.db.First(&rule, id).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询规则失败")
+		return
+	}
 	Success(w, rule)
 }
 
@@ -988,6 +1000,9 @@ func (h *SeedingHandler) handleStatsBySite(w http.ResponseWriter, r *http.Reques
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit < 1 {
 		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
 	}
 
 	type siteStat struct {

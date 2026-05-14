@@ -39,7 +39,10 @@ func (d *CredentialDetector) CheckNow(ctx context.Context) {
 
 func (d *CredentialDetector) check(ctx context.Context) {
 	var sites []model.Site
-	d.db.WithContext(ctx).Where("enabled = ?", true).Find(&sites)
+	if err := d.db.WithContext(ctx).Where("enabled = ?", true).Find(&sites).Error; err != nil {
+		d.logger.Error("credential detector: query sites failed", zap.Error(err))
+		return
+	}
 
 	now := time.Now()
 

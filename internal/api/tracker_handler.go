@@ -289,9 +289,13 @@ func (h *LifecycleHandler) saveSetting(r *http.Request, key, value string) {
 	var s setting.Setting
 	result := h.db.WithContext(ctx).Where("`key` = ?", key).First(&s)
 	if result.Error != nil {
-		h.db.WithContext(ctx).Create(&setting.Setting{Key: key, Value: value})
+		if err := h.db.WithContext(ctx).Create(&setting.Setting{Key: key, Value: value}).Error; err != nil {
+			h.logger.Error("saveSetting: create failed", zap.String("key", key), zap.Error(err))
+		}
 	} else {
-		h.db.WithContext(ctx).Model(&s).Update("value", value)
+		if err := h.db.WithContext(ctx).Model(&s).Update("value", value).Error; err != nil {
+			h.logger.Error("saveSetting: update failed", zap.String("key", key), zap.Error(err))
+		}
 	}
 }
 

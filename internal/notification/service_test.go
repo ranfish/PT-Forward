@@ -788,6 +788,21 @@ func TestService_RecordHistory_DBError(t *testing.T) {
 	db := setupTestDB(t)
 	svc := &Service{db: db, logger: zap.NewNop()}
 	svc.recordHistory(context.Background(), 999, model.FormattedMessage{Title: "t", Message: "m", Level: "info"}, false, "some error")
+
+	var history []model.NotificationHistory
+	db.Find(&history)
+	if len(history) != 1 {
+		t.Fatalf("expected 1 history record, got %d", len(history))
+	}
+	if history[0].Success {
+		t.Error("expected success=false for failed notification")
+	}
+	if history[0].ChannelID != 999 {
+		t.Errorf("expected channel_id=999, got %d", history[0].ChannelID)
+	}
+	if history[0].ErrorMsg != "some error" {
+		t.Errorf("expected error_msg='some error', got %q", history[0].ErrorMsg)
+	}
 }
 
 func TestService_InQuietHours_Active(t *testing.T) {
@@ -807,7 +822,9 @@ func TestService_InQuietHours_NotActive(t *testing.T) {
 		QuietHoursStart: "03:00",
 		QuietHoursEnd:   "04:00",
 	}
-	svc.inQuietHours(ch)
+	if svc.inQuietHours(ch) {
+		t.Error("should not be in quiet hours when start > end of same-day range")
+	}
 }
 
 func TestService_Dispatch_Failure(t *testing.T) {

@@ -389,7 +389,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 		q = q.Where("client_id IN ?", clientIDs)
 	}
 	if err := q.Find(&seedingRecords).Error; err != nil {
-		return nil, &model.AppError{Code: 50001, Message: "查询做种记录失败", Cause: err}
+		return nil, reseedError(ErrReseedDB, "查询做种记录失败", err)
 	}
 	result.TotalSources = len(seedingRecords)
 
@@ -898,7 +898,7 @@ func (e *Engine) RetryMatch(ctx context.Context, id uint) (*model.ReseedMatch, e
 	}
 
 	if m.Status != model.MatchStatusFailed {
-		return nil, &model.AppError{Code: 40001, Message: fmt.Sprintf("只能重试失败的匹配记录，当前状态: %s", m.Status)}
+		return nil, reseedError(ErrReseedGeneric, fmt.Sprintf("只能重试失败的匹配记录，当前状态: %s", m.Status), nil)
 	}
 
 	now := time.Now()
