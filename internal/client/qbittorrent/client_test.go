@@ -10,7 +10,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -19,15 +18,11 @@ import (
 	"go.uber.org/zap"
 )
 
-const testInfoHash = "96cea953af2b6b67e049651051836f890e2444f2"
+const testInfoHash = "444a2b759acbe925ee7ecbf4ebee7ae6fd2a00d4"
 
 func loadTestTorrent(t *testing.T) []byte {
 	t.Helper()
-	data, err := os.ReadFile("/tmp/test.torrent")
-	if err != nil {
-		t.Fatalf("read test torrent: %v", err)
-	}
-	return data
+	return []byte("d4:infod6:lengthi0e4:name4:test12:piece lengthi16384e6:pieces0:eee")
 }
 
 func newTestQBClient(t *testing.T, handler http.Handler) *QBClient {
@@ -142,12 +137,7 @@ func (m *qbMock) handler() http.Handler {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		data, err := os.ReadFile("/tmp/test.torrent")
-		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		_, _ = w.Write(data)
+		_, _ = w.Write([]byte("d4:infod6:lengthi0e4:name4:test12:piece lengthi16384e6:pieces0:eee"))
 	})
 
 	mux.HandleFunc("/api/v2/sync/maindata", func(w http.ResponseWriter, _ *http.Request) {

@@ -134,7 +134,7 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 func (t *retryTransport) backoffDelay(attempt int) time.Duration {
 	delay := t.config.BaseDelay * time.Duration(1<<(attempt-1))
 
-	jitter := time.Duration(rand.Int64N(int64(t.config.BaseDelay)))
+	jitter := time.Duration(rand.Int64N(int64(t.config.BaseDelay))) //nolint:gosec // retry jitter does not need crypto/rand
 	delay += jitter
 
 	if delay > t.config.MaxDelay {

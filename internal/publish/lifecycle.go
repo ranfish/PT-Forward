@@ -252,7 +252,13 @@ func (m *LifecycleManager) deleteGroup(ctx context.Context, group *model.Publish
 
 func (m *LifecycleManager) transitionGroupStatus(ctx context.Context, group *model.PublishGroup, result *LifecycleCheckResult) {
 	var members []model.PublishGroupMember
-	m.db.WithContext(ctx).Where("publish_group_id = ?", group.ID).Find(&members)
+	if err := m.db.WithContext(ctx).Where("publish_group_id = ?", group.ID).Find(&members).Error; err != nil {
+		m.logger.Error("lifecycle: query group members failed",
+			zap.Uint("groupID", group.ID),
+			zap.Error(err),
+		)
+		return
+	}
 
 	allPaused := true
 	anyPublishing := false

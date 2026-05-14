@@ -126,14 +126,15 @@ func (c *TRClient) AddFromFile(ctx context.Context, data []byte, opts model.AddT
 
 	var hash, name string
 	var isDup bool
-	if addResult.TorrentDuplicate != nil {
+	switch {
+	case addResult.TorrentDuplicate != nil:
 		hash = addResult.TorrentDuplicate.HashString
 		name = addResult.TorrentDuplicate.Name
 		isDup = true
-	} else if addResult.TorrentAdded != nil {
+	case addResult.TorrentAdded != nil:
 		hash = addResult.TorrentAdded.HashString
 		name = addResult.TorrentAdded.Name
-	} else {
+	default:
 		return nil, c.newErr(11007, "torrent-add returned no hash")
 	}
 
@@ -178,7 +179,7 @@ func (c *TRClient) ExportTorrent(ctx context.Context, hash string) ([]byte, erro
 	if torrentPath == "" {
 		return nil, c.newErr(11005, "torrent file path is empty")
 	}
-	data, err := os.ReadFile(torrentPath)
+	data, err := os.ReadFile(torrentPath) //nolint:gosec // torrentPath from client config, controlled by admin
 	if err != nil {
 		return nil, c.wrapErr(11002, "read torrent file", err)
 	}

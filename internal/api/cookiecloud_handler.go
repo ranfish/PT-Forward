@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,11 +28,12 @@ func (h *CookieCloudHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case trimmed == "/api/v1/cookiecloud/config" || trimmed == "/api/v1/cookiecloud/config/":
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleGetConfig(w, r)
-		} else if r.Method == http.MethodPut {
+		case http.MethodPut:
 			h.handleUpdateConfig(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
@@ -110,7 +112,8 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 
 	var cfg model.CookieCloudConfig
 	result := h.db.First(&cfg)
-	if result.Error != nil && result.Error == gorm.ErrRecordNotFound {
+	switch {
+	case result.Error != nil && errors.Is(result.Error, gorm.ErrRecordNotFound):
 		cfg = model.CookieCloudConfig{
 			ServerURL:  req.ServerURL,
 			UUID:       req.UUID,
@@ -133,10 +136,10 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 			Error(w, http.StatusInternalServerError, 50000, "创建配置失败")
 			return
 		}
-	} else if result.Error != nil {
+	case result.Error != nil:
 		Error(w, http.StatusInternalServerError, 50000, "获取配置失败")
 		return
-	} else {
+	default:
 		if req.ServerURL != "" {
 			cfg.ServerURL = req.ServerURL
 		}
@@ -191,7 +194,10 @@ func (h *CookieCloudHandler) handleListHistory(w http.ResponseWriter, r *http.Re
 	h.db.Model(&model.CookieCloudSyncHistory{}).Count(&total)
 
 	var histories []model.CookieCloudSyncHistory
-	h.db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&histories)
+	if err := h.db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&histories).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询同步历史失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": histories,

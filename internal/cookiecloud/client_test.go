@@ -252,7 +252,9 @@ func encryptCryptoJSAES(password string, plaintext []byte) string {
 	key, iv := bytesToKey(salt, []byte(password), md5.New(), aes256KeyLen, blockLen)
 	block, _ := aes.NewCipher(key)
 	padLen := blockLen - len(plaintext)%blockLen
-	padded := append(plaintext, bytes.Repeat([]byte{byte(padLen)}, padLen)...)
+	padded := make([]byte, len(plaintext)+padLen)
+	copy(padded, plaintext)
+	copy(padded[len(plaintext):], bytes.Repeat([]byte{byte(padLen)}, padLen))
 	ct := make([]byte, len(padded))
 	cipher.NewCBCEncrypter(block, iv).CryptBlocks(ct, padded)
 	raw := append([]byte("Salted__"), salt...)

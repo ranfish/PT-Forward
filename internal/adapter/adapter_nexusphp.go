@@ -374,7 +374,7 @@ func (a *NexusPHPAdapter) detectDiscountAPI(ctx context.Context, config *model.S
 	if !strings.HasPrefix(u, "http") {
 		u = "https://" + u
 	}
-	u = u + strings.Replace(config.Discount.APIURL, "{id}", torrentID, 1)
+	u += strings.Replace(config.Discount.APIURL, "{id}", torrentID, 1)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {

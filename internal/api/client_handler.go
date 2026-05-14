@@ -109,7 +109,10 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	items := make([]downloaderResponse, 0, len(clients))
 	for i := range clients {
 		var mappings []model.ClientPathMapping
-		h.db.Where("source_client_id = ? OR reseed_client_id = ?", clients[i].ID, clients[i].ID).Find(&mappings)
+		if err := h.db.Where("source_client_id = ? OR reseed_client_id = ?", clients[i].ID, clients[i].ID).Find(&mappings).Error; err != nil {
+			h.logger.Error("query path mappings failed", zap.Uint("clientID", clients[i].ID), zap.Error(err))
+			continue
+		}
 		items = append(items, h.toResponse(&clients[i], mappings))
 	}
 
@@ -144,7 +147,10 @@ func (h *ClientHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var mappings []model.ClientPathMapping
-	h.db.Where("source_client_id = ? OR reseed_client_id = ?", client.ID, client.ID).Find(&mappings)
+	if err := h.db.Where("source_client_id = ? OR reseed_client_id = ?", client.ID, client.ID).Find(&mappings).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询路径映射失败")
+		return
+	}
 
 	Success(w, h.toResponse(&client, mappings))
 }
@@ -217,7 +223,9 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("downloader created", zap.String("name", client.Name), zap.String("type", client.Type))
 
 	var mappings []model.ClientPathMapping
-	h.db.Where("source_client_id = ?", client.ID).Find(&mappings)
+	if err := h.db.Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
+		h.logger.Error("query path mappings failed", zap.Uint("clientID", client.ID), zap.Error(err))
+	}
 	Success(w, h.toResponse(&client, mappings))
 }
 
@@ -309,7 +317,9 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("downloader updated", zap.String("name", client.Name))
 
 	var mappings []model.ClientPathMapping
-	h.db.Where("source_client_id = ?", client.ID).Find(&mappings)
+	if err := h.db.Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
+		h.logger.Error("query path mappings failed", zap.Uint("clientID", client.ID), zap.Error(err))
+	}
 	Success(w, h.toResponse(&client, mappings))
 }
 
@@ -478,7 +488,9 @@ func (h *ClientHandler) buildClient(ctx context.Context, id uint) (model.Downloa
 	}
 
 	var mappings []model.ClientPathMapping
-	h.db.Where("source_client_id = ?", cfg.ID).Find(&mappings)
+	if err := h.db.Where("source_client_id = ?", cfg.ID).Find(&mappings).Error; err != nil {
+		return nil, &model.AppError{Code: 11002, Message: "查询路径映射失败"}
+	}
 
 	sharedPaths := make([]model.SharedPathMapping, 0, len(mappings))
 	for _, m := range mappings {
@@ -548,11 +560,12 @@ func (h *ClientHandler) HandleRouteByPath(w http.ResponseWriter, r *http.Request
 
 	remaining := strings.TrimPrefix(trimmed, "/api/v1/downloaders/")
 	if remaining == "" || remaining == "/" {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.HandleList(w, r)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			h.HandleCreate(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return

@@ -15,7 +15,7 @@ type TorrentCache struct {
 }
 
 func NewTorrentCache(dir string, logger *zap.Logger) *TorrentCache {
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		logger.Warn("torrent cache dir create failed", zap.String("dir", dir), zap.Error(err))
 	}
 	return &TorrentCache{dir: dir, logger: logger}
@@ -25,7 +25,7 @@ func (tc *TorrentCache) Get(key string) ([]byte, bool) {
 	tc.mu.RLock()
 	defer tc.mu.RUnlock()
 	p := tc.path(key)
-	data, err := os.ReadFile(p)
+	data, err := os.ReadFile(p) //nolint:gosec // p derived from info_hash key, not user input
 	if err != nil {
 		return nil, false
 	}
@@ -35,7 +35,7 @@ func (tc *TorrentCache) Get(key string) ([]byte, bool) {
 func (tc *TorrentCache) Set(key string, data []byte) error {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
-	return os.WriteFile(tc.path(key), data, 0644)
+	return os.WriteFile(tc.path(key), data, 0600)
 }
 
 func (tc *TorrentCache) Delete(key string) error {

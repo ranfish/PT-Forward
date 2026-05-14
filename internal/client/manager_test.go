@@ -155,3 +155,120 @@ func TestManager_GetByDBID_NotFound(t *testing.T) {
 		t.Error("expected error for nonexistent ID")
 	}
 }
+
+func TestManager_GetByDBID_ClientNotLoaded(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	cfg := &model.ClientConfig{
+		Name:    "unloaded-qb",
+		Type:    "qbittorrent",
+		URL:     "http://127.0.0.1:9999",
+		Role:    "download",
+		Enabled: true,
+	}
+	db.Create(cfg)
+
+	_, _, err := m.GetByDBID(context.Background(), cfg.ID)
+	if err == nil {
+		t.Error("expected error when client not loaded in manager")
+	}
+}
+
+func TestManager_LoadClients_SkipsDisabled(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	cfg := &model.ClientConfig{
+		Name: "disabled-qb", Type: "qbittorrent", URL: "http://127.0.0.1:9999",
+		Role: "download", Enabled: false,
+	}
+	db.Select("Name", "Type", "URL", "Role", "Enabled").Create(cfg)
+
+	if err := m.LoadClients(context.Background()); err != nil {
+		t.Fatalf("LoadClients: %v", err)
+	}
+	if m.ConnectedCount() != 0 {
+		t.Errorf("expected 0 clients (disabled), got %d", m.ConnectedCount())
+	}
+}
+
+func TestManager_LoadClients_RemovesStale(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	db.Create(&model.ClientConfig{
+		Name: "stale-qb", Type: "qbittorrent", URL: "http://127.0.0.1:9999",
+		Role: "download", Enabled: true,
+	})
+	if err := m.LoadClients(context.Background()); err != nil {
+		t.Fatalf("LoadClients: %v", err)
+	}
+	if m.ConnectedCount() != 1 {
+		t.Fatalf("expected 1, got %d", m.ConnectedCount())
+	}
+
+	db.Exec("DELETE FROM clients WHERE name = 'stale-qb'")
+	if err := m.LoadClients(context.Background()); err != nil {
+		t.Fatalf("LoadClients 2: %v", err)
+	}
+	if m.ConnectedCount() != 0 {
+		t.Errorf("expected 0 after deletion, got %d", m.ConnectedCount())
+	}
+}
+
+func TestManager_PingAll(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	db.Create(&model.ClientConfig{
+		Name: "ping-qb", Type: "qbittorrent", URL: "http://127.0.0.1:9999",
+		Role: "download", Enabled: true,
+	})
+	if err := m.LoadClients(context.Background()); err != nil {
+		t.Fatalf("LoadClients: %v", err)
+	}
+
+	m.PingAll(context.Background())
+}
+
+func TestManager_PingAll_Cancelled(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	db.Create(&model.ClientConfig{
+		Name: "cancel-qb", Type: "qbittorrent", URL: "http://127.0.0.1:9999",
+		Role: "download", Enabled: true,
+	})
+	if err := m.LoadClients(context.Background()); err != nil {
+		t.Fatalf("LoadClients: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	m.PingAll(ctx)
+}
+
+func TestManager_CreateClient_UnsupportedType(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	_, err := m.createClient(&model.ClientConfig{Type: "deluge"}, nil)
+	if err == nil {
+		t.Error("expected error for unsupported type")
+	}
+}
+
+func TestManager_CreateClient_Transmission(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	cfg := &model.ClientConfig{
+		Type: "transmission", URL: "http://127.0.0.1:9998",
+		Name: "test-tr", Role: "download", Enabled: true,
+	}
+	_, err := m.createClient(cfg, nil)
+	if err != nil {
+		t.Fatalf("createClient transmission: %v", err)
+	}
+}

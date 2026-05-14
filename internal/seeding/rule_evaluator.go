@@ -113,22 +113,16 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 			return fmt.Sprintf("%t", ti.IsFinished), true
 		}
 
-		if ti.TotalSize > 0 {
-			switch key {
-			case "downloadUploadRatio":
-				if ti.UploadSpeed > 0 {
-					return fmt.Sprintf("%.4f", float64(ti.DownloadSpeed)/float64(ti.UploadSpeed)), true
-				}
-				return "0", true
+		if ti.TotalSize > 0 && key == "downloadUploadRatio" {
+			if ti.UploadSpeed > 0 {
+				return fmt.Sprintf("%.4f", float64(ti.DownloadSpeed)/float64(ti.UploadSpeed)), true
 			}
+			return "0", true
 		}
 
-		if !ti.AddedAt.IsZero() {
-			switch key {
-			case "addedTime":
-				elapsed := rc.Now.Sub(ti.AddedAt).Seconds()
-				return fmt.Sprintf("%.0f", elapsed), true
-			}
+		if !ti.AddedAt.IsZero() && key == "addedTime" {
+			elapsed := rc.Now.Sub(ti.AddedAt).Seconds()
+			return fmt.Sprintf("%.0f", elapsed), true
 		}
 	}
 
@@ -312,10 +306,8 @@ func (re *RuleEvaluator) matchRule(ctx context.Context, rule model.DeleteRule, r
 			if ok {
 				matched = append(matched, rec)
 			}
-		} else {
-			if MatchContext(rc, conditions) {
-				matched = append(matched, rec)
-			}
+		} else if MatchContext(rc, conditions) {
+			matched = append(matched, rec)
 		}
 	}
 

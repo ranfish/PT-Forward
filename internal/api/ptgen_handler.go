@@ -40,11 +40,12 @@ func (h *PTGenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case trimmed == "/api/v1/ptgen/cache" || trimmed == "/api/v1/ptgen/cache/":
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleListCache(w, r)
-		} else if r.Method == http.MethodDelete {
+		case http.MethodDelete:
 			h.handleCleanCache(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
@@ -96,7 +97,10 @@ func (h *PTGenHandler) handleListCache(w http.ResponseWriter, r *http.Request) {
 	q.Count(&total)
 
 	var caches []model.PTGenCache
-	q.Order("updated_at DESC").Offset(offset).Limit(pageSize).Find(&caches)
+	if err := q.Order("updated_at DESC").Offset(offset).Limit(pageSize).Find(&caches).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询缓存失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": caches,

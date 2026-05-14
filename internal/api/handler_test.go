@@ -45,50 +45,11 @@ func setupTestEnv(t *testing.T) *testEnv {
 		t.Fatalf("open db: %v", err)
 	}
 
-	models := []interface{}{
-		&model.User{},
-		&model.ClientConfig{},
-		&model.ClientPathMapping{},
-		&model.ClientPublishTarget{},
-		&model.Site{},
-		&model.RSSSubscription{},
-		&model.RSSTorrentSeen{},
-		&model.FilterRule{},
-		&model.NotificationChannel{},
-		&model.NotificationHistory{},
-		&model.SeedingClientConfig{},
-		&model.SeedingTorrentRecord{},
-		&model.DeleteRule{},
-		&model.ReseedTask{},
-		&model.PublishTask{},
-		&model.PublishCandidate{},
-		&model.PublishResultRecord{},
-		&model.TorrentEvent{},
-		&model.IYUUConfig{},
-		&model.IYUUSiteMapping{},
-		&model.ReseedMatch{},
-		&model.ReseedNegativeCache{},
-		&model.ContentFingerprint{},
-		&model.SearchCache{},
-		&model.PublishGroup{},
-		&model.PublishGroupMember{},
-		&model.PublishGroupStatusHistory{},
-		&model.DownloaderSpeedSnapshot{},
-		&model.SiteTrafficDaily{},
-		&model.TorrentTraffic{},
-		&model.SeedingClientState{},
-		&model.FreezeEventRecord{},
-		&model.SiteConfigOverride{},
-		&model.CookieCloudConfig{},
-		&model.CookieCloudSyncHistory{},
-		&model.PTGenCache{},
-		&model.PublishExclusion{},
-		setting.Setting{},
+	if err := model.AutoMigrate(db); err != nil {
+		t.Fatalf("model migrate: %v", err)
 	}
-	for _, m := range models {
-		if err := db.AutoMigrate(m); err != nil {
-			t.Fatalf("migrate %T: %v", m, err)
-		}
+	if err := setting.AutoMigrate(db); err != nil {
+		t.Fatalf("setting migrate: %v", err)
 	}
 
 	logger := zap.NewNop()
@@ -5454,26 +5415,11 @@ func setupTestEnvWithClientMgr(t *testing.T) *testEnv {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	models := []interface{}{
-		&model.User{}, &model.ClientConfig{}, &model.ClientPathMapping{},
-		&model.ClientPublishTarget{}, &model.Site{}, &model.RSSSubscription{},
-		&model.RSSTorrentSeen{}, &model.FilterRule{}, &model.NotificationChannel{},
-		&model.NotificationHistory{}, &model.SeedingClientConfig{},
-		&model.SeedingTorrentRecord{}, &model.DeleteRule{}, &model.ReseedTask{},
-		&model.PublishTask{}, &model.PublishCandidate{}, &model.PublishResultRecord{},
-		&model.TorrentEvent{}, &model.IYUUConfig{}, &model.IYUUSiteMapping{},
-		&model.ReseedMatch{}, &model.ReseedNegativeCache{}, &model.ContentFingerprint{},
-		&model.SearchCache{}, &model.PublishGroup{}, &model.PublishGroupMember{},
-		&model.PublishGroupStatusHistory{}, &model.DownloaderSpeedSnapshot{},
-		&model.SiteTrafficDaily{}, &model.TorrentTraffic{}, &model.SeedingClientState{},
-		&model.FreezeEventRecord{}, &model.SiteConfigOverride{}, &model.CookieCloudConfig{},
-		&model.CookieCloudSyncHistory{}, &model.PTGenCache{}, &model.PublishExclusion{},
-		setting.Setting{},
+	if err := model.AutoMigrate(db); err != nil {
+		t.Fatalf("model migrate: %v", err)
 	}
-	for _, m := range models {
-		if err := db.AutoMigrate(m); err != nil {
-			t.Fatalf("migrate %T: %v", m, err)
-		}
+	if err := setting.AutoMigrate(db); err != nil {
+		t.Fatalf("setting migrate: %v", err)
 	}
 	logger := zap.NewNop()
 	authRepo := auth.NewGormAuthRepository(db)

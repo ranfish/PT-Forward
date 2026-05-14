@@ -377,7 +377,7 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 
 	ti, ok := ec.torrentMap[rec.InfoHash]
 	if !ok || ti == nil {
-		return nil, true, false
+		return nil, evaluated, false
 	}
 
 	ageHours := time.Since(rec.CreatedAt).Hours()
@@ -420,7 +420,7 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 	}
 
 	shouldCleanup = ShouldCleanup(*candidate, ec.minScore, ec.minAge)
-	return candidate, true, shouldCleanup
+	return candidate, evaluated, shouldCleanup
 }
 
 func (e *Engine) handleDiskProtect(ctx context.Context, rec *model.SeedingTorrentRecord, ec *evaluateContext, result *EvaluateResult) bool {

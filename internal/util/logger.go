@@ -46,7 +46,7 @@ func InitLogger(cfg LogConfig) (*zap.Logger, error) {
 	cores = append(cores, NewSanitizerCore(consoleCore))
 
 	if cfg.Directory != "" {
-		if err := os.MkdirAll(cfg.Directory, 0755); err == nil {
+		if err := os.MkdirAll(cfg.Directory, 0750); err == nil {
 			if f, err := os.OpenFile(cfg.Directory+"/pt-forward.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600); err == nil {
 				fileCore := zapcore.NewCore(
 					zapcore.NewJSONEncoder(encoderConfig),

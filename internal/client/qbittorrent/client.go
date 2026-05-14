@@ -3,7 +3,7 @@ package qbittorrent
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // SHA1 required by BitTorrent protocol for info_hash
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -244,7 +244,7 @@ func computeInfoHash(torrentData []byte) (string, error) {
 	if err != nil {
 		return "", qbError(ErrQBParse, "parse info dict", err)
 	}
-	h := sha1.Sum(torrentData[infoStart:end])
+	h := sha1.Sum(torrentData[infoStart:end]) //nolint:gosec // SHA1 required by BitTorrent protocol
 	return hex.EncodeToString(h[:]), nil
 }
 

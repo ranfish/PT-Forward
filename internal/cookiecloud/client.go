@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // MD5 required by CookieCloud EVP_BytesToKey key derivation
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -40,7 +40,7 @@ type SyncResult struct {
 }
 
 func md5String(inputs ...string) string {
-	h := md5.New()
+	h := md5.New() //nolint:gosec // MD5 required by CookieCloud protocol
 	for _, s := range inputs {
 		_, _ = io.WriteString(h, s)
 	}
@@ -73,7 +73,7 @@ func pkcs7Strip(data []byte, blockSize int) ([]byte, error) {
 	if padLen > blockSize || padLen == 0 {
 		return nil, ccError(ErrCCCrypto, "pkcs7: invalid padding", nil)
 	}
-	ref := bytes.Repeat([]byte{byte(padLen)}, padLen)
+	ref := bytes.Repeat([]byte{byte(padLen)}, padLen) //nolint:gosec // padLen validated: 1..blockSize
 	if !bytes.HasSuffix(data, ref) {
 		return nil, ccError(ErrCCCrypto, "pkcs7: invalid padding", nil)
 	}
@@ -90,7 +90,7 @@ func decryptCryptoJSAES(password, ciphertext string) ([]byte, error) {
 	}
 	salt := rawEncrypted[8:16]
 	encrypted := rawEncrypted[16:]
-	key, iv := bytesToKey(salt, []byte(password), md5.New(), aes256KeyLen, blockLen)
+	key, iv := bytesToKey(salt, []byte(password), md5.New(), aes256KeyLen, blockLen) //nolint:gosec // MD5 required by CookieCloud protocol
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, ccError(ErrCCCrypto, "aes cipher", err)

@@ -30,11 +30,12 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case trimmed == "/api/v1/seeding/configs" || trimmed == "/api/v1/seeding/configs/":
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleListConfigs(w, r)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			h.handleCreateConfig(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
@@ -186,11 +187,12 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if strings.Contains(trimmed, "/seeding/scoring-config/") {
 		remaining := extractLastSegment(trimmed, "/api/v1/seeding/scoring-config/")
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleScoringConfigByID(w, r, remaining)
-		} else if r.Method == http.MethodPut {
+		case http.MethodPut:
 			h.handleScoringConfigByID(w, r, remaining)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
@@ -394,7 +396,10 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 	var records []model.SeedingTorrentRecord
 	var total int64
 	q.Count(&total)
-	q.Order("updated_at DESC").Find(&records)
+	if err := q.Order("updated_at DESC").Find(&records).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询种子记录失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": records,
@@ -563,7 +568,10 @@ func (h *SeedingHandler) handleRulesRoot(w http.ResponseWriter, r *http.Request)
 
 func (h *SeedingHandler) handleListRules(w http.ResponseWriter, _ *http.Request) {
 	var rules []model.DeleteRule
-	h.db.Order("priority ASC").Find(&rules)
+	if err := h.db.Order("priority ASC").Find(&rules).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询规则列表失败")
+		return
+	}
 	Success(w, map[string]interface{}{
 		"items": rules,
 		"total": len(rules),
@@ -644,7 +652,10 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 	q.Count(&total)
 
 	var records []model.SeedingTorrentRecord
-	q.Order("updated_at DESC").Offset(offset).Limit(pageSize).Find(&records)
+	if err := q.Order("updated_at DESC").Offset(offset).Limit(pageSize).Find(&records).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询种子列表失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": records,
@@ -655,7 +666,10 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 
 func (h *SeedingHandler) handleListClients(w http.ResponseWriter, _ *http.Request) {
 	var configs []model.SeedingClientConfig
-	h.db.Find(&configs)
+	if err := h.db.Find(&configs).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询做种客户端配置失败")
+		return
+	}
 	Success(w, map[string]interface{}{
 		"items": configs,
 		"total": len(configs),
@@ -713,7 +727,10 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 	}
 
 	var logs []model.ScoringLog
-	h.db.Order("created_at DESC").Limit(limit).Find(&logs)
+	if err := h.db.Order("created_at DESC").Limit(limit).Find(&logs).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询评分日志失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": logs,
@@ -1011,13 +1028,16 @@ func (h *SeedingHandler) handleStatsBySite(w http.ResponseWriter, r *http.Reques
 	}
 
 	var stats []siteStat
-	h.db.Model(&model.SeedingTorrentRecord{}).
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).
 		Select("site_name, count(*) as count").
 		Where("status = ?", "seeding").
 		Group("site_name").
 		Order("count DESC").
 		Limit(limit).
-		Find(&stats)
+		Find(&stats).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询站点统计失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": stats,
@@ -1076,7 +1096,10 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 	q.Count(&total)
 
 	var records []model.SeedingTorrentRecord
-	q.Order("created_at ASC").Offset(offset).Limit(pageSize).Find(&records)
+	if err := q.Order("created_at ASC").Offset(offset).Limit(pageSize).Find(&records).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询种子统计失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": records,

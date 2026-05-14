@@ -24,13 +24,13 @@ func (h *ReseedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	trimmed := strings.TrimRight(path, "/")
 
-	switch {
-	case trimmed == "/api/v1/reseed/tasks" || trimmed == "/api/v1/reseed/tasks/":
-		if r.Method == http.MethodGet {
+	if trimmed == "/api/v1/reseed/tasks" || trimmed == "/api/v1/reseed/tasks/" {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleList(w, r)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			h.handleCreate(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return

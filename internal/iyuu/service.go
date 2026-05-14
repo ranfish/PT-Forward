@@ -3,7 +3,7 @@ package iyuu
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // SHA1 used for IYUU token hashing
 	"encoding/json"
 	"fmt"
 	"io"
@@ -101,7 +101,7 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 		return nil, iyuuError(ErrIYUUAPI, "marshal info_hashes", err)
 	}
 
-	sha1Hash := fmt.Sprintf("%x", sha1.Sum(hashJSON))
+	sha1Hash := fmt.Sprintf("%x", sha1.Sum(hashJSON)) //nolint:gosec // SHA1 required by IYUU API protocol
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
 
 	form := url.Values{}
