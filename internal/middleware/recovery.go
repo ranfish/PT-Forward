@@ -70,6 +70,15 @@ func (rl *RateLimiter) Allow(ip string) bool {
 	now := timeNowUnix()
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
+
+	if len(rl.visitors) > rl.limit*2 {
+		for k, v := range rl.visitors {
+			if now-v.lastSeen > rl.window*2 {
+				delete(rl.visitors, k)
+			}
+		}
+	}
+
 	v, exists := rl.visitors[ip]
 	if !exists || now-v.lastSeen >= rl.window {
 		rl.visitors[ip] = &visitor{count: 1, lastSeen: now}
@@ -93,19 +102,6 @@ func (rl *RateLimiter) Cleanup() {
 
 func RateLimit(limit int, windowSeconds int64) func(http.Handler) http.Handler {
 	limiter := NewRateLimiter(limit, windowSeconds)
-	done := make(chan struct{})
-	go func() {
-		ticker := time.NewTicker(time.Duration(windowSeconds) * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				limiter.Cleanup()
-			}
-		}
-	}()
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

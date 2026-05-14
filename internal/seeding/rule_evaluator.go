@@ -265,7 +265,7 @@ func (re *RuleEvaluator) fillScoringContext(ctx context.Context, rc *RuleContext
 		rc.ScoringTotalInCycle = int(cycleCount)
 	}
 
-	cutoff := time.Now().Add(-72 * time.Hour)
+	cutoff := time.Now().Add(-scoringCutoffHours)
 	var lowCount int64
 	re.db.WithContext(ctx).Model(&model.ScoringLog{}).
 		Where("client_id = ? AND info_hash = ? AND score < ? AND created_at > ?",

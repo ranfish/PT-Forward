@@ -389,8 +389,9 @@ func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 	query := h.db.Model(&model.Site{})
 	if search != "" {
-		like := "%" + search + "%"
-		query = query.Where("name LIKE ? OR domain LIKE ?", like, like)
+		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(search)
+		like := "%" + escaped + "%"
+		query = query.Where("name LIKE ? OR domain LIKE ? ESCAPE '\\'", like, like)
 	}
 
 	var total int64
@@ -442,12 +443,20 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, _ := h.repo.ExistsByDomain(r.Context(), req.Domain, 0)
+	exists, err := h.repo.ExistsByDomain(r.Context(), req.Domain, 0)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "检查站点域名失败")
+		return
+	}
 	if exists {
 		Error(w, http.StatusConflict, 40900, "站点域名已存在")
 		return
 	}
-	exists, _ = h.repo.ExistsByName(r.Context(), req.Name, 0)
+	exists, err = h.repo.ExistsByName(r.Context(), req.Name, 0)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "检查站点名称失败")
+		return
+	}
 	if exists {
 		Error(w, http.StatusConflict, 40900, "站点名称已存在")
 		return
@@ -1220,6 +1229,10 @@ func (h *SiteHandler) handleDeleteOverride(w http.ResponseWriter, r *http.Reques
 		q = q.Where("field_path = ?", fieldPath)
 	}
 	result := q.Delete(&model.SiteConfigOverride{})
+	if result.Error != nil {
+		Error(w, http.StatusInternalServerError, 50000, "删除覆盖配置失败")
+		return
+	}
 	Success(w, map[string]interface{}{
 		"deleted": result.RowsAffected,
 	})
@@ -1375,6 +1388,10 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 		result := h.db.WithContext(r.Context()).
 			Where("target_site = ? AND source_site = ?", req.TargetSite, req.SourceSite).
 			Delete(&model.PublishExclusion{})
+		if result.Error != nil {
+			Error(w, http.StatusInternalServerError, 50000, "删除排除规则失败")
+			return
+		}
 		if result.RowsAffected == 0 {
 			Error(w, http.StatusNotFound, 40400, "exclusion not found")
 			return

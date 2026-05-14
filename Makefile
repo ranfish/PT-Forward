@@ -27,15 +27,10 @@ vet:
 lint:
 	golangci-lint run ./...
 
-clean:
-	rm -f $(BINARY)
-	rm -rf data/ logs/
-
-reset-password: build-api
-	./$(BINARY) -reset-password
-
-docker:
-	docker build -t pt-forward:$(VERSION) .
+check-gorm:
+	@echo "Checking GORM error handling..."
+	@! grep -rn '\.Find(' --include='*.go' internal/api/ internal/publish/ internal/rss/ internal/seeding/ internal/reseed/ | grep -v '_test.go' | grep -v '\.Error' | grep -v 'func ' | grep -v '//' || (echo "ERROR: Found .Find() calls without .Error check (see docs/33-编码规范.md §4.3)" && false)
+	@echo "GORM check passed"
 
 golangci-lint: lint
 

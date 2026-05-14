@@ -123,27 +123,6 @@ type ChannelNotifier interface {
 	Test(ctx context.Context) error
 }
 
-// Deprecated: SitePublisher is reserved for v2. Use SiteAdapter methods directly.
-type SitePublisher interface {
-	Publish(ctx context.Context, req *PublishRequest) (*PublishResponse, error)
-	GetUploadForm(ctx context.Context, config *SiteConfig) (*UploadForm, error)
-	SearchTorrent(ctx context.Context, keyword string, config *SiteConfig) ([]PublishDedupResult, error)
-	GetEditForm(ctx context.Context, torrentID string, config *SiteConfig) (*EditForm, error)
-	SubmitEdit(ctx context.Context, torrentID string, newDesc string, config *SiteConfig) error
-}
-
-// Deprecated: Publisher is reserved for v2. Use SiteAdapter.UploadTorrent directly.
-type Publisher interface {
-	Publish(ctx context.Context, req *PublishRequest) (*PublishResponse, error)
-}
-
-// Deprecated: SourceFetcher is reserved for v2. Use SiteAdapter methods directly.
-type SourceFetcher interface {
-	FetchDetail(ctx context.Context, site *SiteConfig, torrentID string, cookie string) (*RawTorrent, error)
-	DownloadTorrent(ctx context.Context, site *SiteConfig, torrentID string, cookie string, passkey string) ([]byte, error)
-	VerifyExists(ctx context.Context, site *SiteConfig, torrentID string, cookie string) (bool, error)
-}
-
 type FingerprintRepository interface {
 	GetByInfoHash(ctx context.Context, infoHash string) (*ContentFingerprint, error)
 	Save(ctx context.Context, fp *ContentFingerprint) error

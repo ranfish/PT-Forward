@@ -191,6 +191,7 @@ func MigratePlaintext(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger)
 				)
 				continue
 			}
+			defer rows.Close()
 			migrated := int64(0)
 			for rows.Next() {
 				var id int64
@@ -209,7 +210,6 @@ func MigratePlaintext(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger)
 				}
 				migrated++
 			}
-			rows.Close()
 			logger.Info("migration completed",
 				zap.String("table", model.TableName),
 				zap.String("column", col),

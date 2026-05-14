@@ -37,7 +37,7 @@ type NotificationHistory struct {
 	Level     string    `json:"level" gorm:"size:16;not null"`
 	Title     string    `json:"title" gorm:"size:256"`
 	Body      string    `json:"body" gorm:"type:text"`
-	Success   bool      `json:"success" gorm:"default:true"`
+	Success   bool      `json:"success"`
 	ErrorMsg  string    `json:"error_msg" gorm:"type:text"`
 	CreatedAt time.Time `json:"created_at"`
 }

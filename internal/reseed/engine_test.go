@@ -281,8 +281,8 @@ func TestEngine_RetryMatch_NonFailedRejected(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected AppError, got %T", err)
 	}
-	if appErr.Code != 40001 {
-		t.Errorf("expected code 40001, got %d", appErr.Code)
+	if appErr.Code != ErrReseedGeneric {
+		t.Errorf("expected code %d, got %d", ErrReseedGeneric, appErr.Code)
 	}
 }
 
@@ -453,6 +453,9 @@ func TestNormalizeTitle(t *testing.T) {
 func TestEngine_SetSiteProvider(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
+	if e.siteProvider != nil {
+		t.Fatal("expected nil siteProvider before Set")
+	}
 	e.SetSiteProvider(nil)
 }
 
@@ -592,6 +595,12 @@ func TestEngine_RunTask_Canceled(t *testing.T) {
 func TestEngine_CancelTask_Noop(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
+	e.mu.Lock()
+	cancelCount := len(e.tasks)
+	e.mu.Unlock()
+	if cancelCount != 0 {
+		t.Errorf("expected 0 tasks, got %d", cancelCount)
+	}
 	e.CancelTask(999)
 }
 
@@ -815,18 +824,27 @@ func TestHasMatchMethod(t *testing.T) {
 func TestEngine_SetClientProvider(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
+	if e.clientProvider != nil {
+		t.Fatal("expected nil clientProvider before Set")
+	}
 	e.SetClientProvider(nil)
 }
 
 func TestEngine_SetFingerprintRepo(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
+	if e.fpRepo != nil {
+		t.Fatal("expected nil fpRepo before Set")
+	}
 	e.SetFingerprintRepo(nil)
 }
 
 func TestEngine_SetIYUUService(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
+	if e.iyuuService != nil {
+		t.Fatal("expected nil iyuuService before Set")
+	}
 	e.SetIYUUService(nil)
 }
 

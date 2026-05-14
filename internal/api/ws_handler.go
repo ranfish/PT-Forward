@@ -194,13 +194,13 @@ func NewWSHandler(hub *Hub, authManager *auth.AuthManager, corsOrigins []string)
 func (s *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tokenStr := r.URL.Query().Get("token")
 	if tokenStr == "" {
-		http.Error(w, "missing token", http.StatusUnauthorized)
+		Error(w, http.StatusUnauthorized, 40100, "missing token")
 		return
 	}
 
 	claims, err := s.authManager.ValidateAccessToken(tokenStr)
 	if err != nil {
-		http.Error(w, "invalid token", http.StatusUnauthorized)
+		Error(w, http.StatusUnauthorized, 40101, "invalid token")
 		return
 	}
 

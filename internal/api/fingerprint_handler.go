@@ -138,6 +138,10 @@ func (h *FingerprintHandler) handleDelete(w http.ResponseWriter, r *http.Request
 
 func (h *FingerprintHandler) handleDeleteCache(w http.ResponseWriter, r *http.Request) {
 	result := h.db.Where("1 = 1").Delete(&model.SearchCache{})
+	if result.Error != nil {
+		Error(w, http.StatusInternalServerError, 50000, "清理缓存失败")
+		return
+	}
 	Success(w, map[string]interface{}{
 		"deleted": result.RowsAffected,
 	})

@@ -356,7 +356,10 @@ func (h *PublishHandler) handleListGroups(w http.ResponseWriter, r *http.Request
 	q.Count(&total)
 
 	var groups []model.PublishGroup
-	q.Order("created_at DESC").Limit(100).Find(&groups)
+	if err := q.Order("created_at DESC").Limit(100).Find(&groups).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询发布组失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": groups,
@@ -372,7 +375,10 @@ func (h *PublishHandler) handleGetGroup(w http.ResponseWriter, r *http.Request, 
 	}
 
 	var members []model.PublishGroupMember
-	h.db.Where("publish_group_id = ?", id).Find(&members)
+	if err := h.db.Where("publish_group_id = ?", id).Find(&members).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询发布成员失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"id":         group.ID,

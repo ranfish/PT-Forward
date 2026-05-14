@@ -783,9 +783,15 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			updates["enabled"] = *req.Enabled
 		}
 		if len(updates) > 0 {
-			h.db.WithContext(r.Context()).Model(&target).Updates(updates)
+			if err := h.db.WithContext(r.Context()).Model(&target).Updates(updates).Error; err != nil {
+				Error(w, http.StatusInternalServerError, 50000, "更新下载器设置失败")
+				return
+			}
 		}
-		h.db.WithContext(r.Context()).First(&target, req.ID)
+		if err := h.db.WithContext(r.Context()).First(&target, req.ID).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "查询下载器设置失败")
+			return
+		}
 		Success(w, target)
 
 	case http.MethodDelete:

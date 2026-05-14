@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -100,7 +99,7 @@ func (h *SchedulerHandler) handleTrigger(w http.ResponseWriter, r *http.Request,
 		Error(w, http.StatusBadRequest, 40001, "任务名称不能为空")
 		return
 	}
-	if err := h.registry.Trigger(context.Background(), name); err != nil {
+	if err := h.registry.Trigger(r.Context(), name); err != nil {
 		Error(w, http.StatusBadRequest, 40002, err.Error())
 		return
 	}

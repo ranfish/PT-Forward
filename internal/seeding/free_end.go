@@ -10,6 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const freeEndBuffer = 5 * time.Minute
+
 type FreeEndMonitor struct {
 	mu     sync.Mutex
 	timers map[string]*time.Timer
@@ -45,7 +47,7 @@ func (m *FreeEndMonitor) Schedule(record *model.SeedingTorrentRecord) {
 		return
 	}
 
-	delay += 5 * time.Minute
+	delay += freeEndBuffer
 
 	m.mu.Lock()
 	if old, ok := m.timers[key]; ok {
@@ -102,8 +104,11 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 	delete(m.timers, key)
 	m.mu.Unlock()
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	var current model.SeedingTorrentRecord
-	if err := m.db.WithContext(context.Background()).Where("client_id = ? AND info_hash = ?", record.ClientID, record.InfoHash).First(&current).Error; err != nil {
+	if err := m.db.WithContext(ctx).Where("client_id = ? AND info_hash = ?", record.ClientID, record.InfoHash).First(&current).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return
 		}
@@ -116,9 +121,6 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 		current.Status == model.SeedingStatusPausedFreeEnd {
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	if m.engine != nil {
 		if err := m.engine.PauseForFreeEnd(ctx, record.ClientID, record.InfoHash); err != nil {
@@ -149,7 +151,7 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 
 func (m *FreeEndMonitor) RecoverOnStartup(ctx context.Context) {
 	var records []model.SeedingTorrentRecord
-	cutoff := time.Now().Add(-5 * time.Minute)
+	cutoff := time.Now().Add(-freeEndBuffer)
 	if err := m.db.WithContext(ctx).
 		Where("is_free = ? AND free_end_at IS NOT NULL AND free_end_at < ? AND status NOT IN ?",
 			true, cutoff, []string{string(model.SeedingStatusDeleted), string(model.SeedingStatusArchived), string(model.SeedingStatusPausedFreeEnd)}).
