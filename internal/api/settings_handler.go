@@ -41,8 +41,7 @@ func (h *SettingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch {
-	case trimmed == "/api/v1/settings" || trimmed == "/api/v1/settings/":
+	if trimmed == "/api/v1/settings" || trimmed == "/api/v1/settings/" {
 		if r.Method == http.MethodGet {
 			h.handleList(w, r)
 		} else {

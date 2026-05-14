@@ -26,11 +26,12 @@ func (h *DeleteRuleHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	trimmed := strings.TrimRight(path, "/")
 
 	if trimmed == "/api/v1/seeding/delete-rules" || trimmed == "/api/v1/seeding/delete-rules/" {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleList(w, r)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			h.handleCreate(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
@@ -198,7 +199,10 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, _ *http.Reques
 	}
 
 	var active []model.SeedingTorrentRecord
-	h.db.Where("status = ?", "seeding").Limit(100).Find(&active)
+	if err := h.db.Where("status = ?", "seeding").Limit(100).Find(&active).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询活跃种子失败")
+		return
+	}
 
 	matched := make([]map[string]interface{}, 0)
 	for _, rec := range active {

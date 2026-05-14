@@ -85,7 +85,10 @@ func (h *FingerprintHandler) handleList(w http.ResponseWriter, r *http.Request) 
 	q.Count(&total)
 
 	var fingerprints []model.ContentFingerprint
-	q.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&fingerprints)
+	if err := q.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&fingerprints).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询指纹失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": fingerprints,
@@ -120,7 +123,10 @@ func (h *FingerprintHandler) handleSearch(w http.ResponseWriter, r *http.Request
 	}
 
 	var fingerprints []model.ContentFingerprint
-	q.Find(&fingerprints)
+	if err := q.Find(&fingerprints).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "搜索指纹失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": fingerprints,

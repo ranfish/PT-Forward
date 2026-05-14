@@ -166,11 +166,12 @@ type WSHandler struct {
 
 func NewWSHandler(hub *Hub, authManager *auth.AuthManager, corsOrigins []string) *WSHandler {
 	upgrader := defaultUpgrader
-	if len(corsOrigins) > 0 && corsOrigins[0] == "*" {
+	switch {
+	case len(corsOrigins) > 0 && corsOrigins[0] == "*":
 		upgrader.CheckOrigin = func(r *http.Request) bool {
 			return true
 		}
-	} else if len(corsOrigins) > 0 {
+	case len(corsOrigins) > 0:
 		allowed := make(map[string]bool, len(corsOrigins))
 		for _, o := range corsOrigins {
 			allowed[o] = true
@@ -182,7 +183,7 @@ func NewWSHandler(hub *Hub, authManager *auth.AuthManager, corsOrigins []string)
 			}
 			return allowed[origin]
 		}
-	} else {
+	default:
 		upgrader.CheckOrigin = func(r *http.Request) bool {
 			origin := r.Header.Get("Origin")
 			return origin == ""

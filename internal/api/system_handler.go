@@ -38,11 +38,12 @@ func (h *SystemHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(trimmed, "/system/info"):
 		h.handleInfo(w, r)
 	case strings.HasSuffix(trimmed, "/system/logs"):
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleListLogs(w, r)
-		} else if r.Method == http.MethodDelete {
+		case http.MethodDelete:
 			h.handleClearLogs(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 	default:

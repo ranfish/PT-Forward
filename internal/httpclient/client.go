@@ -54,7 +54,7 @@ func NewSiteHTTPClient(cfg SiteHTTPConfig) *http.Client {
 		IdleConnTimeout:     cfg.IdleConnTimeout,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: cfg.SkipSSLVerify,
+			InsecureSkipVerify: cfg.SkipSSLVerify, //nolint:gosec // configurable by user for self-signed certs
 		},
 		ForceAttemptHTTP2: true,
 	}

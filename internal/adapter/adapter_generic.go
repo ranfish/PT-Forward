@@ -890,7 +890,7 @@ func (a *GenericAdapter) uploadStarSpaceMusic(ctx context.Context, config *model
 }
 
 func (a *GenericAdapter) doStarSpaceUpload(httpReq *http.Request, config *model.SiteConfig) (*model.PublishResponse, error) {
-	resp, err := a.doer.Client.Do(httpReq)
+	resp, err := a.doer.Client.Do(httpReq) //nolint:gosec // URL from admin-configured site base URL
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
@@ -1007,8 +1007,7 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 		_ = writer.WriteField(k, v)
 	}
 	for k, v := range req.ExtraFields {
-		switch k {
-		case "picture":
+		if k == "picture" {
 			continue
 		}
 		_ = writer.WriteField(k, v)

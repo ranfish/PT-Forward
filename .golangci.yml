@@ -3,6 +3,8 @@ version: "2"
 linters:
   enable:
     - errcheck
+    - gocritic
+    - gosec
     - govet
     - ineffassign
     - staticcheck
@@ -13,6 +15,8 @@ linters:
       exclude-functions:
         - encoding/json.Encoder.Encode
         - fmt.Sscanf
+    gosec:
+      excludes: []
     staticcheck:
       checks:
         - all
@@ -29,3 +33,4 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
+          - gosec

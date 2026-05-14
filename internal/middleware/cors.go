@@ -5,7 +5,7 @@ import (
 )
 
 func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
-	allowAll := len(allowedOrigins) == 1 && allowedOrigins[0] == "*"
+	allowAll := len(allowedOrigins) == 1 && allowedOrigins[0] == "*" //nolint:gosec // G602 false positive: bounds checked by len()==1
 	originSet := make(map[string]bool, len(allowedOrigins))
 	for _, o := range allowedOrigins {
 		originSet[o] = true

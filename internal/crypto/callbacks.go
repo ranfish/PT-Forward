@@ -9,13 +9,13 @@ import (
 )
 
 func RegisterCallbacks(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) {
-	db.Callback().Create().Before("gorm:create").Register("crypto:encrypt", func(d *gorm.DB) {
+	_ = db.Callback().Create().Before("gorm:create").Register("crypto:encrypt", func(d *gorm.DB) {
 		encryptFields(d, enc, logger)
 	})
-	db.Callback().Update().Before("gorm:update").Register("crypto:encrypt", func(d *gorm.DB) {
+	_ = db.Callback().Update().Before("gorm:update").Register("crypto:encrypt", func(d *gorm.DB) {
 		encryptFields(d, enc, logger)
 	})
-	db.Callback().Query().After("gorm:query").Register("crypto:decrypt", func(d *gorm.DB) {
+	_ = db.Callback().Query().After("gorm:query").Register("crypto:decrypt", func(d *gorm.DB) {
 		decryptResults(d, enc, logger)
 	})
 }
@@ -25,7 +25,7 @@ func encryptFields(d *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) {
 		return
 	}
 	val := reflect.ValueOf(d.Statement.Model)
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 	if val.Kind() != reflect.Struct {
@@ -77,7 +77,7 @@ func decryptResults(d *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) {
 
 func decryptValue(val reflect.Value, enc *CredentialEncryptor, logger *zap.Logger) {
 	switch val.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if val.IsNil() {
 			return
 		}
@@ -92,7 +92,7 @@ func decryptValue(val reflect.Value, enc *CredentialEncryptor, logger *zap.Logge
 		}
 		for i := 0; i < val.NumField(); i++ {
 			fv := val.Field(i)
-			if fv.Kind() == reflect.Ptr && !fv.IsNil() {
+			if fv.Kind() == reflect.Pointer && !fv.IsNil() {
 				decryptValue(fv.Elem(), enc, logger)
 				continue
 			}
@@ -191,21 +191,29 @@ func MigratePlaintext(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger)
 				)
 				continue
 			}
-			defer rows.Close()
-			migrated := int64(0)
+			type row struct {
+				ID    int64
+				Value string
+			}
+			var pending []row
 			for rows.Next() {
 				var id int64
 				var plain string
 				if err := rows.Scan(&id, &plain); err != nil {
 					continue
 				}
-				encValue, err := enc.Encrypt(plain)
+				pending = append(pending, row{ID: id, Value: plain})
+			}
+			_ = rows.Close()
+			migrated := int64(0)
+			for _, r := range pending {
+				encValue, err := enc.Encrypt(r.Value)
 				if err != nil {
 					logger.Warn("encrypt failed during migration", zap.Error(err))
 					continue
 				}
-				if err := db.Table(model.TableName).Where("id = ?", id).Update(col, encValue).Error; err != nil {
-					logger.Warn("migration update failed", zap.Int64("id", id), zap.Error(err))
+				if err := db.Table(model.TableName).Where("id = ?", r.ID).Update(col, encValue).Error; err != nil {
+					logger.Warn("migration update failed", zap.Int64("id", r.ID), zap.Error(err))
 					continue
 				}
 				migrated++

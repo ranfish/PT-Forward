@@ -243,7 +243,7 @@ func (m *AuthManager) Login(ctx context.Context, username, password, clientIP st
 	}
 
 	if username != "admin" {
-		bcrypt.CompareHashAndPassword([]byte("$2a$12$dummyhashfortimingpadding000000000000000000000000000000000"), []byte(password))
+		_ = bcrypt.CompareHashAndPassword([]byte("$2a$12$dummyhashfortimingpadding000000000000000000000000000000000"), []byte(password))
 		m.loginLimiter.RecordFailure(clientIP)
 		return nil, &model.AppError{Code: 40100, Message: "用户名或密码错误"}
 	}

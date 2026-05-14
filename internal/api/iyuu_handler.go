@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -47,21 +48,23 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case trimmed == "/api/v1/iyuu/config" || trimmed == "/api/v1/iyuu/config/":
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleGetConfig(w, r)
-		} else if r.Method == http.MethodPut {
+		case http.MethodPut:
 			h.handleUpdateConfig(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
 
 	case trimmed == "/api/v1/iyuu/sites" || trimmed == "/api/v1/iyuu/sites/":
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleListSites(w, r)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			h.handleSyncSites(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
@@ -88,7 +91,10 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 	var configs []model.IYUUConfig
-	h.db.Find(&configs)
+	if err := h.db.Find(&configs).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "获取配置失败")
+		return
+	}
 
 	if len(configs) == 0 {
 		Success(w, map[string]interface{}{
@@ -126,7 +132,8 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 
 	var cfg model.IYUUConfig
 	result := h.db.First(&cfg)
-	if result.Error != nil && result.Error == gorm.ErrRecordNotFound {
+	switch {
+	case result.Error != nil && errors.Is(result.Error, gorm.ErrRecordNotFound):
 		cfg = model.IYUUConfig{
 			Token:   req.Token,
 			BaseURL: req.BaseURL,
@@ -144,10 +151,10 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 			Error(w, http.StatusInternalServerError, 50000, "创建配置失败")
 			return
 		}
-	} else if result.Error != nil {
+	case result.Error != nil:
 		Error(w, http.StatusInternalServerError, 50000, "获取配置失败")
 		return
-	} else {
+	default:
 		if req.Token != "" {
 			cfg.Token = req.Token
 		}
@@ -175,7 +182,10 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 
 func (h *IYUUHandler) handleListSites(w http.ResponseWriter, _ *http.Request) {
 	var mappings []model.IYUUSiteMapping
-	h.db.Order("site_name ASC").Find(&mappings)
+	if err := h.db.Order("site_name ASC").Find(&mappings).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "获取站点映射失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": mappings,

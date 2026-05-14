@@ -15,7 +15,7 @@ type ArtifactCache struct {
 }
 
 func NewArtifactCache(dir string, logger *zap.Logger) *ArtifactCache {
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		logger.Warn("artifact cache dir create failed", zap.String("dir", dir), zap.Error(err))
 	}
 	return &ArtifactCache{dir: dir, logger: logger}
@@ -25,7 +25,7 @@ func (ac *ArtifactCache) Get(key string) ([]byte, bool) {
 	ac.mu.RLock()
 	defer ac.mu.RUnlock()
 	p := ac.path(key)
-	data, err := os.ReadFile(p)
+	data, err := os.ReadFile(p) //nolint:gosec // p derived from hash key, not user input
 	if err != nil {
 		return nil, false
 	}
@@ -35,7 +35,7 @@ func (ac *ArtifactCache) Get(key string) ([]byte, bool) {
 func (ac *ArtifactCache) Set(key string, data []byte) error {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
-	return os.WriteFile(ac.path(key), data, 0644)
+	return os.WriteFile(ac.path(key), data, 0600)
 }
 
 func (ac *ArtifactCache) Delete(key string) error {

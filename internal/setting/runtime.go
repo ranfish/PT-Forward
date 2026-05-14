@@ -129,12 +129,12 @@ func (rc *RuntimeConfig) get(ctx context.Context, key string) string {
 	all, err := rc.repo.ListAll(ctx)
 	if err != nil {
 		rc.logger.Warn("runtime config reload failed", zap.Error(err))
-		v, _ := rc.cache[key]
+		v := rc.cache[key]
 		return v
 	}
 	rc.cache = all
 	rc.expiry = time.Now().Add(rc.ttl)
-	v, _ := rc.cache[key]
+	v := rc.cache[key]
 	return v
 }
 

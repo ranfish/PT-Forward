@@ -2,7 +2,7 @@ package fingerprint
 
 import (
 	"bytes"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // SHA1 required by BitTorrent info_hash fingerprinting
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -78,7 +78,7 @@ func computeInfoHash(infoDict map[string]any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	h := sha1.Sum(encoded)
+	h := sha1.Sum(encoded) //nolint:gosec // SHA1 required by BitTorrent protocol
 	return hex.EncodeToString(h[:]), nil
 }
 
@@ -87,7 +87,7 @@ func computePiecesHash(infoDict map[string]any) string {
 	if !ok {
 		return ""
 	}
-	h := sha1.Sum([]byte(pieces))
+	h := sha1.Sum([]byte(pieces)) //nolint:gosec // SHA1 required by BitTorrent protocol
 	return hex.EncodeToString(h[:])
 }
 

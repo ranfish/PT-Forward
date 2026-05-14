@@ -322,11 +322,12 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 
 	remaining := strings.TrimPrefix(trimmed, "/api/v1/sites/")
 	if remaining == "" || remaining == "/" {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleList(w, r)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			h.handleCreate(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
@@ -860,12 +861,12 @@ func (h *SiteHandler) testSiteConnection(s *model.Site) (bool, string) {
 }
 
 func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, string) {
-	req, err := http.NewRequest("GET", s.BaseURL, nil)
+	req, err := http.NewRequest("GET", s.BaseURL, nil) //nolint:gosec // admin test endpoint, URL from site config
 	if err != nil {
 		return false, "构造请求失败: " + err.Error()
 	}
 	req.Header.Set("Cookie", s.Cookie)
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // admin test endpoint
 	if err != nil {
 		return false, "连接失败: " + err.Error()
 	}
@@ -910,7 +911,7 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	if s.Framework == "mteam" {
 		testURL = strings.TrimRight(s.BaseURL, "/") + "/api/member/profile"
 	}
-	req, err := http.NewRequest("POST", testURL, nil)
+	req, err := http.NewRequest("POST", testURL, nil) //nolint:gosec // admin test endpoint, URL from site config
 	if err != nil {
 		return false, "构造请求失败: " + err.Error()
 	}
@@ -927,7 +928,7 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 			return http.ErrUseLastResponse
 		},
 	}
-	resp, err := noRedirectClient.Do(req)
+	resp, err := noRedirectClient.Do(req) //nolint:gosec // admin test endpoint
 	if err != nil {
 		return false, "连接失败: " + err.Error()
 	}
@@ -960,17 +961,18 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 }
 
 func (h *SiteHandler) testPasskeyAuth(client *http.Client, s *model.Site) (bool, string) {
-	req, err := http.NewRequest("GET", strings.TrimRight(s.BaseURL, "/")+"/api/v1/torrents", nil)
+	req, err := http.NewRequest("GET", strings.TrimRight(s.BaseURL, "/")+"/api/v1/torrents", nil) //nolint:gosec // admin test endpoint
 	if err != nil {
 		return false, "构造请求失败: " + err.Error()
 	}
 	req.Header.Set("Authorization", "Bearer "+s.Passkey)
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // admin test endpoint
 	if err != nil {
 		return false, "连接失败: " + err.Error()
 	}
 	defer func() { _ = resp.Body.Close() }()
+
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return false, "Passkey 无效"
 	}
@@ -995,7 +997,7 @@ func (h *SiteHandler) testPasskeyAuth(client *http.Client, s *model.Site) (bool,
 
 func (h *SiteHandler) detectFramework(s *model.Site) *model.DetectResult {
 	client := buildSiteHTTPClient(s, 15*time.Second)
-	req, err := http.NewRequest("GET", s.BaseURL, nil)
+	req, err := http.NewRequest("GET", s.BaseURL, nil) //nolint:gosec // admin detect endpoint, URL from site config
 	if err != nil {
 		return &model.DetectResult{
 			Framework:       s.Framework,
@@ -1006,7 +1008,7 @@ func (h *SiteHandler) detectFramework(s *model.Site) *model.DetectResult {
 	if s.Cookie != "" {
 		req.Header.Set("Cookie", s.Cookie)
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // admin detect endpoint
 	if err != nil {
 		return &model.DetectResult{
 			Framework:       s.Framework,
@@ -1024,39 +1026,40 @@ func (h *SiteHandler) detectFramework(s *model.Site) *model.DetectResult {
 	confidence := 0.3
 	detail := ""
 
-	if strings.Contains(bodyStr, "NexusPHP") || strings.Contains(bodyStr, "nexusphp") {
+	switch {
+	case strings.Contains(bodyStr, "NexusPHP") || strings.Contains(bodyStr, "nexusphp"):
 		framework = "nexusphp"
 		confidence = 0.9
 		detail = "检测到 NexusPHP 标识"
-	} else if strings.Contains(bodyStr, "UNIT3D") || strings.Contains(bodyStr, "unit3d") {
+	case strings.Contains(bodyStr, "UNIT3D") || strings.Contains(bodyStr, "unit3d"):
 		framework = "unit3d"
 		confidence = 0.9
 		detail = "检测到 Unit3D 标识"
-	} else if strings.Contains(bodyStr, "Gazelle") || strings.Contains(bodyStr, "gazelle") {
+	case strings.Contains(bodyStr, "Gazelle") || strings.Contains(bodyStr, "gazelle"):
 		framework = "gazelle"
 		confidence = 0.9
 		detail = "检测到 Gazelle 标识"
-	} else if strings.Contains(bodyStr, "M-Team") || strings.Contains(bodyStr, "mteam") {
+	case strings.Contains(bodyStr, "M-Team") || strings.Contains(bodyStr, "mteam"):
 		framework = "mteam"
 		confidence = 0.9
 		detail = "检测到 M-Team 标识"
-	} else if strings.Contains(bodyStr, "TNode") || strings.Contains(bodyStr, "tnode") || strings.Contains(bodyStr, "朱雀") {
+	case strings.Contains(bodyStr, "TNode") || strings.Contains(bodyStr, "tnode") || strings.Contains(bodyStr, "朱雀"):
 		framework = "tnode"
 		confidence = 0.9
 		detail = "检测到 TNode 标识"
-	} else if strings.Contains(bodyStr, "Luminance") || strings.Contains(bodyStr, "luminance") {
+	case strings.Contains(bodyStr, "Luminance") || strings.Contains(bodyStr, "luminance"):
 		framework = "luminance"
 		confidence = 0.9
 		detail = "检测到 Luminance 标识"
-	} else if strings.Contains(bodyStr, "Rousi") || strings.Contains(bodyStr, "rousi") {
+	case strings.Contains(bodyStr, "Rousi") || strings.Contains(bodyStr, "rousi"):
 		framework = "rousi"
 		confidence = 0.9
 		detail = "检测到 Rousi 标识"
-	} else if strings.Contains(bodyStr, "Nexus") {
+	case strings.Contains(bodyStr, "Nexus"):
 		framework = "nexusphp"
 		confidence = 0.7
 		detail = "检测到 Nexus 字样（可能是 NexusPHP）"
-	} else {
+	default:
 		detail = "未能识别框架，使用 generic"
 	}
 
@@ -1174,7 +1177,10 @@ func (h *SiteHandler) handleOverrides(w http.ResponseWriter, r *http.Request, id
 
 func (h *SiteHandler) handleListOverrides(w http.ResponseWriter, _ *http.Request, siteName string) {
 	var overrides []model.SiteConfigOverride
-	h.repo.DB().Where("site_name = ?", siteName).Find(&overrides)
+	if err := h.repo.DB().Where("site_name = ?", siteName).Find(&overrides).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "获取站点配置覆盖失败")
+		return
+	}
 	Success(w, map[string]interface{}{
 		"items": overrides,
 		"total": len(overrides),

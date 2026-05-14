@@ -438,3 +438,73 @@ func TestSiteToConfig_AuthConfig_Default(t *testing.T) {
 		t.Errorf("empty DownloadMode should remain empty, got %q", config.Auth.DownloadMode)
 	}
 }
+
+func TestProvider_BatchLoadSiteResources(t *testing.T) {
+	db := setupProviderDB(t)
+	if err := db.AutoMigrate(&model.SiteConfigOverride{}); err != nil {
+		t.Fatalf("migrate overrides: %v", err)
+	}
+	createTestSite(t, db)
+	db.Create(&model.Site{
+		Name: "site2", Domain: "site2.com", BaseURL: "https://site2.com",
+		Framework: "tnode", Enabled: true,
+	})
+	db.Create(&model.SiteConfigOverride{SiteName: "test-site", FieldPath: "passkey", FieldValue: "ov-pass"})
+	db.Create(&model.SiteConfigOverride{SiteName: "test-site", FieldPath: "user_id", FieldValue: "42"})
+
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	res, err := p.BatchLoadSiteResources(context.Background(), []string{"https://test.example.com", "https://site2.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Configs) != 2 {
+		t.Fatalf("expected 2 configs, got %d", len(res.Configs))
+	}
+	cfg1 := res.Configs["https://test.example.com"]
+	if cfg1 == nil {
+		t.Fatal("test.example.com config is nil")
+	}
+	if cfg1.Passkey != "ov-pass" {
+		t.Errorf("override not applied: got passkey %q", cfg1.Passkey)
+	}
+	if cfg1.UserID != 42 {
+		t.Errorf("override user_id not applied: got %d", cfg1.UserID)
+	}
+	if len(res.Adapters) != 2 {
+		t.Errorf("expected 2 adapters, got %d", len(res.Adapters))
+	}
+}
+
+func TestProvider_BatchLoadSiteResources_EmptyDomains(t *testing.T) {
+	db := setupProviderDB(t)
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+
+	res, err := p.BatchLoadSiteResources(context.Background(), []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Configs) != 0 {
+		t.Errorf("expected 0 configs, got %d", len(res.Configs))
+	}
+}
+
+func TestProvider_BatchLoadSiteResources_PublishFormFieldOverride(t *testing.T) {
+	db := setupProviderDB(t)
+	if err := db.AutoMigrate(&model.SiteConfigOverride{}); err != nil {
+		t.Fatalf("migrate overrides: %v", err)
+	}
+	createTestSite(t, db)
+	db.Create(&model.SiteConfigOverride{
+		SiteName: "test-site", FieldPath: "publish.form_fields.subtype", FieldValue: "anime",
+	})
+
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	res, err := p.BatchLoadSiteResources(context.Background(), []string{"https://test.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := res.Configs["https://test.example.com"]
+	if cfg.Publish.FormFields["subtype"] != "anime" {
+		t.Errorf("publish form field override not applied: got %v", cfg.Publish.FormFields)
+	}
+}

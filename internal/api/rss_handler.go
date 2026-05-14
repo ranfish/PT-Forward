@@ -193,11 +193,12 @@ func (h *RSSHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) {
 
 	remaining := strings.TrimPrefix(trimmed, "/api/v1/rss/subscriptions/")
 	if remaining == "" || remaining == "/" {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleList(w, r)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			h.handleCreate(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return

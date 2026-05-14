@@ -332,3 +332,84 @@ func TestMigratePlaintext_SkipsAlreadyEncrypted(t *testing.T) {
 		t.Error("already encrypted value was modified")
 	}
 }
+
+func TestMigratePlaintext_MigratesPlaintext(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+
+	db.Exec("CREATE TABLE IF NOT EXISTS sites (id INTEGER PRIMARY KEY, name TEXT, passkey TEXT, cookie TEXT, api_key TEXT, bearer_token TEXT, auth_key TEXT, auth_hash TEXT, rss_key TEXT)")
+	db.Exec("CREATE TABLE IF NOT EXISTS clients (id INTEGER PRIMARY KEY, name TEXT, password TEXT)")
+	db.Exec("CREATE TABLE IF NOT EXISTS cookie_cloud_configs (id INTEGER PRIMARY KEY, password TEXT)")
+	db.Exec("CREATE TABLE IF NOT EXISTS iyuu_configs (id INTEGER PRIMARY KEY, token TEXT)")
+	db.Exec("CREATE TABLE IF NOT EXISTS notification_channels (id INTEGER PRIMARY KEY, config TEXT)")
+	db.Exec("CREATE TABLE IF NOT EXISTS site_config_overrides (id INTEGER PRIMARY KEY, field_value TEXT)")
+	defer func() {
+		db.Exec("DROP TABLE IF EXISTS sites")
+		db.Exec("DROP TABLE IF EXISTS clients")
+		db.Exec("DROP TABLE IF EXISTS cookie_cloud_configs")
+		db.Exec("DROP TABLE IF EXISTS iyuu_configs")
+		db.Exec("DROP TABLE IF EXISTS notification_channels")
+		db.Exec("DROP TABLE IF EXISTS site_config_overrides")
+	}()
+
+	enc, encErr := NewCredentialEncryptor("test-encryption-key-32bytes!!!")
+	if encErr != nil {
+		t.Fatalf("create encryptor: %v", encErr)
+	}
+
+	db.Exec("INSERT INTO sites (name, passkey, cookie) VALUES ('plain-site', 'plaintext-pass', 'plaintext-cookie')")
+	db.Exec("INSERT INTO sites (name, passkey, cookie) VALUES ('mixed-site', 'another-pass', '')")
+	db.Exec("INSERT INTO clients (name, password) VALUES ('test-client', 'client-secret')")
+
+	err = MigratePlaintext(db, enc, zap.NewNop())
+	if err != nil {
+		t.Fatalf("MigratePlaintext returned error: %v", err)
+	}
+
+	type siteRow struct {
+		Passkey string
+		Cookie  string
+	}
+	var s1 siteRow
+	db.Table("sites").Where("name = ?", "plain-site").Select("passkey, cookie").Scan(&s1)
+	if !enc.IsEncrypted(s1.Passkey) {
+		t.Error("plain-site passkey should be encrypted after migration")
+	}
+	if !enc.IsEncrypted(s1.Cookie) {
+		t.Error("plain-site cookie should be encrypted after migration")
+	}
+	decrypted, _ := enc.Decrypt(s1.Passkey)
+	if decrypted != "plaintext-pass" {
+		t.Errorf("decrypted passkey mismatch: got %q", decrypted)
+	}
+
+	var s2 siteRow
+	db.Table("sites").Where("name = ?", "mixed-site").Select("passkey, cookie").Scan(&s2)
+	if !enc.IsEncrypted(s2.Passkey) {
+		t.Error("mixed-site passkey should be encrypted")
+	}
+
+	type clientRow struct {
+		Password string
+	}
+	var c1 clientRow
+	db.Table("clients").Where("name = ?", "test-client").Select("password").Scan(&c1)
+	if !enc.IsEncrypted(c1.Password) {
+		t.Error("client password should be encrypted after migration")
+	}
+	decryptedClient, _ := enc.Decrypt(c1.Password)
+	if decryptedClient != "client-secret" {
+		t.Errorf("decrypted client password mismatch: got %q", decryptedClient)
+	}
+}
+
+func TestMigratePlaintext_SkipsNonexistentTable(t *testing.T) {
+	db, enc := setupTestDB(t)
+
+	err := MigratePlaintext(db, enc, zap.NewNop())
+	if err != nil {
+		t.Fatalf("MigratePlaintext on test DB should not fail: %v", err)
+	}
+}

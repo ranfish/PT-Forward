@@ -181,8 +181,7 @@ func (e *Engine) RemoveSubscription(subID uint) {
 }
 
 func (e *Engine) startSubscription(parentCtx context.Context, sub *model.RSSSubscription) {
-	ctx, cancel := context.WithCancel(parentCtx)
-
+	ctx, cancel := context.WithCancel(parentCtx) //nolint:gosec // cancel stored in e.tasks for later invocation
 	e.mu.Lock()
 	if old, ok := e.tasks[sub.ID]; ok {
 		old()

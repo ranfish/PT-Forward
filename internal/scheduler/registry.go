@@ -65,12 +65,14 @@ func (r *Registry) Register(name, taskType, schedule string, handler TaskFunc) e
 		if entry.Paused {
 			return
 		}
-		r.runTask(context.Background(), entry) //nolint:errcheck
+		r.runTask(context.Background(), entry) //nolint:gosec,errcheck // runTask handles errors internally
 	})
+
 	if err != nil {
 		delete(r.tasks, name)
-		return schedulerError(ErrSchedulerSchedule, fmt.Sprintf("invalid cron schedule %q", schedule), err)
+		return schedulerError(ErrSchedulerSchedule, fmt.Sprintf("invalid cron schedule %q", scheduleStr), err)
 	}
+
 	r.ids[name] = id
 
 	return nil
@@ -155,8 +157,9 @@ func (r *Registry) Reschedule(name, schedule string) error {
 		if entry.Paused {
 			return
 		}
-		r.runTask(context.Background(), entry) //nolint:errcheck
+		r.runTask(context.Background(), entry) //nolint:gosec,errcheck // runTask handles errors internally
 	})
+
 	if err != nil {
 		return schedulerError(ErrSchedulerSchedule, fmt.Sprintf("failed to reschedule %q", name), err)
 	}

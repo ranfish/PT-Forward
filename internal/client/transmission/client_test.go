@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -17,11 +16,7 @@ import (
 
 func loadTestTorrentTR(t *testing.T) []byte {
 	t.Helper()
-	data, err := os.ReadFile("/tmp/test.torrent")
-	if err != nil {
-		t.Fatalf("read test torrent: %v", err)
-	}
-	return data
+	return []byte("d4:infod6:lengthi0e4:name4:test12:piece lengthi16384e6:pieces0:eee")
 }
 
 type trMock struct {

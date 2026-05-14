@@ -29,11 +29,12 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case trimmed == "/api/v1/publish/tasks" || trimmed == "/api/v1/publish/tasks/":
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleListTasks(w, r)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			h.handleCreateTask(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return

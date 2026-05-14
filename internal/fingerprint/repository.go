@@ -150,11 +150,12 @@ func (r *Repository) FindCandidatesBySite(ctx context.Context, siteName string, 
 		limit = 10
 	}
 	q := r.db.WithContext(ctx).Where("site_name = ? AND info_hash != ?", siteName, excludeInfoHash)
-	if piecesHash != "" {
+	switch {
+	case piecesHash != "":
 		q = q.Where("pieces_hash = ?", piecesHash)
-	} else if totalSize > 0 {
+	case totalSize > 0:
 		q = q.Where("total_size = ?", totalSize)
-	} else {
+	default:
 		return nil, nil
 	}
 	var fps []model.ContentFingerprint

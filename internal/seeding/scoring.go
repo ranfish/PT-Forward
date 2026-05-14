@@ -58,14 +58,15 @@ func CalculateScore(input ScoreInput) ScoreResult {
 		input.SiteWeight = 1.0
 	}
 
-	demandScore := 0.0
-	if input.Leechers == 0 && input.Seeders == 0 {
+	var demandScore float64
+	switch {
+	case input.Leechers == 0 && input.Seeders == 0:
 		demandScore = 0
-	} else if input.Seeders == 0 && input.Leechers > 0 {
+	case input.Seeders == 0 && input.Leechers > 0:
 		demandScore = 99999
-	} else if input.Leechers == 0 {
+	case input.Leechers == 0:
 		demandScore = 0
-	} else {
+	default:
 		demandScore = float64(input.Leechers) / float64(input.Seeders)
 	}
 

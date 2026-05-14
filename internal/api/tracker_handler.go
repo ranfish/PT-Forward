@@ -67,7 +67,10 @@ func (h *TrackerHandler) handleListMembers(w http.ResponseWriter, r *http.Reques
 	q.Count(&total)
 
 	var members []model.PublishGroupMember
-	q.Order("created_at DESC").Limit(100).Find(&members)
+	if err := q.Order("created_at DESC").Limit(100).Find(&members).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询成员列表失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": members,
@@ -77,7 +80,10 @@ func (h *TrackerHandler) handleListMembers(w http.ResponseWriter, r *http.Reques
 
 func (h *TrackerHandler) handleGetMember(w http.ResponseWriter, r *http.Request, hash string) {
 	var members []model.PublishGroupMember
-	h.db.Where("info_hash = ?", hash).Find(&members)
+	if err := h.db.Where("info_hash = ?", hash).Find(&members).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询成员失败")
+		return
+	}
 	if len(members) == 0 {
 		Error(w, http.StatusNotFound, 40400, "成员不存在")
 		return
@@ -86,7 +92,9 @@ func (h *TrackerHandler) handleGetMember(w http.ResponseWriter, r *http.Request,
 	var histories []model.PublishGroupStatusHistory
 	for _, m := range members {
 		var h2 []model.PublishGroupStatusHistory
-		h.db.Where("member_hash = ?", m.InfoHash).Order("created_at DESC").Limit(20).Find(&h2)
+		if err := h.db.Where("member_hash = ?", m.InfoHash).Order("created_at DESC").Limit(20).Find(&h2).Error; err != nil {
+			continue
+		}
 		histories = append(histories, h2...)
 	}
 
@@ -106,7 +114,10 @@ func (h *TrackerHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 	q.Count(&total)
 
 	var histories []model.PublishGroupStatusHistory
-	q.Order("created_at DESC").Limit(100).Find(&histories)
+	if err := q.Order("created_at DESC").Limit(100).Find(&histories).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询历史记录失败")
+		return
+	}
 
 	Success(w, map[string]interface{}{
 		"items": histories,
@@ -129,21 +140,23 @@ func (h *LifecycleHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case strings.HasSuffix(trimmed, "/lifecycle/config"):
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleGetConfig(w, r)
-		} else if r.Method == http.MethodPut {
+		case http.MethodPut:
 			h.handleUpdateConfig(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
 
 	case strings.HasSuffix(trimmed, "/lifecycle/backpressure"):
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleBackpressure(w, r)
-		} else if r.Method == http.MethodPut {
+		case http.MethodPut:
 			h.handleUpdateBackpressure(w, r)
-		} else {
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return

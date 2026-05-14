@@ -44,11 +44,12 @@ func RequestLogger(logger *zap.Logger) func(http.Handler) http.Handler {
 				zap.String("remote", r.RemoteAddr),
 			}
 
-			if rec.status >= 500 {
+			switch {
+			case rec.status >= 500:
 				logger.Error("request", fields...)
-			} else if rec.status >= 400 {
+			case rec.status >= 400:
 				logger.Warn("request", fields...)
-			} else {
+			default:
 				logger.Info("request", fields...)
 			}
 		})

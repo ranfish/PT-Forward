@@ -283,7 +283,7 @@ func (e *Engine) startTask(parentCtx context.Context, task *model.ReseedTask) {
 	if old, ok := e.tasks[task.ID]; ok {
 		old()
 	}
-	ctx, cancel := context.WithCancel(parentCtx)
+	ctx, cancel := context.WithCancel(parentCtx) //nolint:gosec // cancel stored in e.tasks for later invocation
 	e.tasks[task.ID] = cancel
 	e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
 		"status":     model.ReseedTaskIdle,
@@ -343,7 +343,7 @@ func MatchDecision(input MatchInput, sizeTolerance float64) model.DecisionType {
 func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.ReseedExecutionResult, error) {
 	e.mu.Lock()
 	if _, exists := e.tasks[task.ID]; !exists {
-		ctx2, cancel := context.WithCancel(ctx)
+		ctx2, cancel := context.WithCancel(ctx) //nolint:gosec // cancel stored in e.tasks for later invocation
 		e.tasks[task.ID] = cancel
 		ctx = ctx2
 	}
@@ -535,7 +535,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 			if task.InjectionIntervalS > 0 {
 				jitter := 0
 				if task.InjectionJitterS > 0 {
-					jitter = rand.IntN(task.InjectionJitterS)
+					jitter = rand.IntN(task.InjectionJitterS) //nolint:gosec // jitter does not need crypto/rand
 				}
 				interval := time.Duration(task.InjectionIntervalS+jitter) * time.Second
 				select {
