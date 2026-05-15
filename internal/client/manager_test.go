@@ -183,7 +183,8 @@ func TestManager_LoadClients_SkipsDisabled(t *testing.T) {
 		Name: "disabled-qb", Type: "qbittorrent", URL: "http://127.0.0.1:9999",
 		Role: "download", Enabled: false,
 	}
-	db.Select("Name", "Type", "URL", "Role", "Enabled").Create(cfg)
+	db.Exec("INSERT INTO clients (name, type, url, role, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
+		cfg.Name, cfg.Type, cfg.URL, cfg.Role, false)
 
 	if err := m.LoadClients(context.Background()); err != nil {
 		t.Fatalf("LoadClients: %v", err)

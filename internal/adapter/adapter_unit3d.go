@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -150,7 +151,7 @@ func (a *Unit3DAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
 }
 
 func (a *Unit3DAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -180,7 +181,10 @@ func (a *Unit3DAdapter) detailViaAPI(ctx context.Context, config *model.SiteConf
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 
 	var result struct {
 		Data struct {
@@ -225,7 +229,10 @@ func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConf
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	detail := &model.TorrentDetail{}
@@ -247,24 +254,27 @@ func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConf
 
 func (a *Unit3DAdapter) DetectDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
 	if err := a.ensureSession(ctx, config); err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, err
 	}
 	baseURL := resolveBase(config)
 	u := baseURL + "/torrents/" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("请求种子页面失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	if strings.Contains(html, "freeleech") || strings.Contains(html, "free") {
@@ -285,24 +295,27 @@ func (a *Unit3DAdapter) DetectDiscount(ctx context.Context, config *model.SiteCo
 
 func (a *Unit3DAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
 	if err := a.ensureSession(ctx, config); err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, err
 	}
 	baseURL := resolveBase(config)
 	u := baseURL + "/torrents/" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("请求种子页面失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	hasHR := strings.Contains(html, "hit and run") ||
@@ -343,7 +356,10 @@ func (a *Unit3DAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, 
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result struct {
 		Data struct {
 			Seeders  int `json:"seeders"`
@@ -370,7 +386,10 @@ func (a *Unit3DAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, 
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 	sl := &model.SLData{}
 
@@ -406,6 +425,7 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("torrent", "upload.torrent")
 	if err != nil {
@@ -416,26 +436,26 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	}
 
 	if req.Title != "" {
-		_ = writer.WriteField("name", req.Title)
+		fw.writeField("name", req.Title)
 	}
 	if req.Subtitle != "" {
-		_ = writer.WriteField("subhead", req.Subtitle)
+		fw.writeField("subhead", req.Subtitle)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("description", req.Description)
+		fw.writeField("description", req.Description)
 	}
 	if req.MediaInfo != "" {
-		_ = writer.WriteField("mediainfo", req.MediaInfo)
+		fw.writeField("mediainfo", req.MediaInfo)
 	}
 	if req.BDInfo != "" {
-		_ = writer.WriteField("bdinfo", req.BDInfo)
+		fw.writeField("bdinfo", req.BDInfo)
 	}
 	if req.Anonymous {
-		_ = writer.WriteField("anonymous", "on")
+		fw.writeField("anonymous", "on")
 	}
 
 	if csrfToken != "" {
-		_ = writer.WriteField("_token", csrfToken)
+		fw.writeField("_token", csrfToken)
 	}
 
 	fieldMapping := map[string]string{
@@ -449,24 +469,24 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	}
 	for srcType, targetName := range fieldMapping {
 		if v, ok := req.FormFields[srcType]; ok {
-			_ = writer.WriteField(targetName, v)
+			fw.writeField(targetName, v)
 		}
 	}
 
 	if imdbID := extractIMDbID(req.IMDbLink); imdbID != "" {
-		_ = writer.WriteField("imdb_id", imdbID)
+		fw.writeField("imdb_id", imdbID)
 	}
 	if tmdbID, ok := req.ExtraFields["tmdb_id"]; ok {
-		_ = writer.WriteField("tmdb_id", tmdbID)
+		fw.writeField("tmdb_id", tmdbID)
 	}
 	if malID, ok := req.ExtraFields["mal_id"]; ok {
-		_ = writer.WriteField("mal_id", malID)
+		fw.writeField("mal_id", malID)
 	}
 	if tvdbID, ok := req.ExtraFields["tvdb_id"]; ok {
-		_ = writer.WriteField("tvdb_id", tvdbID)
+		fw.writeField("tvdb_id", tvdbID)
 	}
 	if bgmID, ok := req.ExtraFields["bgm_id"]; ok {
-		_ = writer.WriteField("bgm_id", bgmID)
+		fw.writeField("bgm_id", bgmID)
 	}
 
 	for k, v := range req.FormFields {
@@ -474,14 +494,18 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 		case "cat", "source_sel", "standard_sel", "category", "source", "resolution", "codec":
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 	for k, v := range req.ExtraFields {
 		switch k {
 		case "tmdb_id", "mal_id", "tvdb_id", "bgm_id":
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
+	}
+
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
 	}
 
 	if err := writer.Close(); err != nil {
@@ -501,7 +525,10 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
@@ -551,7 +578,10 @@ func (a *Unit3DAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteCo
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return "", err
+	}
 	html := string(body)
 
 	re := regexp.MustCompile(`<meta\s+name="csrf-token"\s+content="([^"]+)"`)

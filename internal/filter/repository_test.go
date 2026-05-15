@@ -419,7 +419,7 @@ func TestRepository_Delete_SetsDeletedAt(t *testing.T) {
 	require.NoError(t, repo.Delete(ctx, rule.ID))
 
 	var raw model.FilterRule
-	err := repo.db.WithContext(ctx).First(&raw, rule.ID).Error
+	err := repo.db.Unscoped().WithContext(ctx).First(&raw, rule.ID).Error
 	require.NoError(t, err)
 	assert.NotEqual(t, time.Time{}, raw.DeletedAt)
 }

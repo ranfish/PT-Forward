@@ -59,7 +59,7 @@ func (a *TNodeAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 		return nil, &model.AppError{Code: 15001, Message: "返回了 HTML 页面而非种子文件"}
 	}
 
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
 }
 
 func (a *TNodeAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -120,17 +120,20 @@ func (a *TNodeAdapter) DetectDiscount(ctx context.Context, config *model.SiteCon
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("请求优惠信息失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	if strings.Contains(html, "pro_free2up") || strings.Contains(html, "2x免费") {
@@ -157,17 +160,20 @@ func (a *TNodeAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("请求HR信息失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	hasHR := strings.Contains(html, "hit and run") ||
@@ -198,7 +204,10 @@ func (a *TNodeAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteC
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 	sl := &model.SLData{}
 
@@ -242,6 +251,7 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("torrent", "upload.torrent")
 	if err != nil {
@@ -252,32 +262,32 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	}
 
 	if req.Title != "" {
-		_ = writer.WriteField("title", req.Title)
+		fw.writeField("title", req.Title)
 	}
 	if req.Subtitle != "" {
-		_ = writer.WriteField("subtitle", req.Subtitle)
+		fw.writeField("subtitle", req.Subtitle)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("note", req.Description)
+		fw.writeField("note", req.Description)
 	}
 	if req.MediaInfo != "" {
-		_ = writer.WriteField("mediainfo", req.MediaInfo)
+		fw.writeField("mediainfo", req.MediaInfo)
 	}
 	if len(req.Screenshots) > 0 {
-		_ = writer.WriteField("screenshot", strings.Join(req.Screenshots, "\n"))
+		fw.writeField("screenshot", strings.Join(req.Screenshots, "\n"))
 	}
 	if req.Anonymous {
-		_ = writer.WriteField("anonymous", "true")
+		fw.writeField("anonymous", "true")
 	}
-	_ = writer.WriteField("confirm", "true")
-	_ = writer.WriteField("zwex", "0")
+	fw.writeField("confirm", "true")
+	fw.writeField("zwex", "0")
 
 	if req.IMDbLink != "" {
 		if tmdbID, ok := req.ExtraFields["tmdbid"]; ok {
-			_ = writer.WriteField("tmdbid", tmdbID)
+			fw.writeField("tmdbid", tmdbID)
 		}
 		if tmdbType, ok := req.ExtraFields["tmdbtype"]; ok {
-			_ = writer.WriteField("tmdbtype", tmdbType)
+			fw.writeField("tmdbtype", tmdbType)
 		}
 	}
 
@@ -297,12 +307,12 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 			continue
 		}
 		if v, ok := req.FormFields[srcType]; ok {
-			_ = writer.WriteField(targetName, v)
+			fw.writeField(targetName, v)
 		}
 	}
 
 	if tags, ok := req.FormFields["tags"]; ok {
-		_ = writer.WriteField("tags", tags)
+		fw.writeField("tags", tags)
 	}
 
 	for k, v := range req.FormFields {
@@ -311,7 +321,11 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 			"category", "medium", "codec", "resolution":
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
+	}
+
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
 	}
 
 	if err := writer.Close(); err != nil {
@@ -336,7 +350,10 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 
 	var result struct {
 		Status int `json:"status"`
@@ -391,7 +408,10 @@ func (a *TNodeAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteCon
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return "", err
+	}
 	html := string(body)
 
 	re := regexp.MustCompile(`<meta\s+name="x-csrf-token"\s+content="([^"]+)"`)

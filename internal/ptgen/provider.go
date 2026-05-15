@@ -45,7 +45,9 @@ func (p *Provider) Query(ctx context.Context, query string) (*model.PTGenResult,
 			Cached:       true,
 		}
 		if cached.JSONData != "" {
-			_ = json.Unmarshal([]byte(cached.JSONData), result)
+			if jsonErr := json.Unmarshal([]byte(cached.JSONData), result); jsonErr != nil {
+				return nil, fmt.Errorf("parse cached ptgen data: %w", jsonErr)
+			}
 			result.Cached = true
 		}
 		return result, nil

@@ -587,6 +587,8 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 	return e.db.WithContext(ctx).Create(record).Error
 }
 
+// Flush returns scored seeding candidates for auto-delete decisions.
+// TODO(v2): implement actual flush logic. Currently a no-op satisfying SeedingCollector.
 func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.SeedingCandidate, error) {
 	return []*model.SeedingCandidate{}, nil
 }

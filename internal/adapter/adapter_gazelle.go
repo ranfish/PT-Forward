@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -56,7 +57,7 @@ func (a *GazelleAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
 }
 
 func (a *GazelleAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -83,7 +84,10 @@ func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteCon
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 
 	var result struct {
 		Response struct {
@@ -132,7 +136,10 @@ func (a *GazelleAdapter) detailViaWeb(ctx context.Context, config *model.SiteCon
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	detail := &model.TorrentDetail{}
@@ -156,17 +163,20 @@ func (a *GazelleAdapter) DetectDiscount(ctx context.Context, config *model.SiteC
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("请求优惠信息失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	if strings.Contains(html, "freeleech") || strings.Contains(html, "free") {
@@ -191,17 +201,20 @@ func (a *GazelleAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("请求HR信息失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	hasHR := strings.Contains(html, "hit and run") ||
@@ -238,7 +251,10 @@ func (a *GazelleAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig,
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result struct {
 		Response struct {
 			Torrent struct {
@@ -267,7 +283,10 @@ func (a *GazelleAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig,
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 	sl := &model.SLData{}
 
@@ -294,6 +313,7 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("file_input", "upload.torrent")
 	if err != nil {
@@ -304,13 +324,13 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	}
 
 	if req.Title != "" {
-		_ = writer.WriteField("title", req.Title)
+		fw.writeField("title", req.Title)
 	}
 	if req.Subtitle != "" {
-		_ = writer.WriteField("subtitle", req.Subtitle)
+		fw.writeField("subtitle", req.Subtitle)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("release_desc", req.Description)
+		fw.writeField("release_desc", req.Description)
 	}
 
 	gazelleFields := map[string]string{
@@ -325,50 +345,50 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	}
 	for srcType, targetName := range gazelleFields {
 		if v, ok := req.FormFields[srcType]; ok {
-			_ = writer.WriteField(targetName, v)
+			fw.writeField(targetName, v)
 		}
 	}
 
 	if year, ok := req.ExtraFields["year"]; ok {
-		_ = writer.WriteField("year", year)
+		fw.writeField("year", year)
 	}
 	if recordLabel, ok := req.ExtraFields["record_label"]; ok {
-		_ = writer.WriteField("record_label", recordLabel)
+		fw.writeField("record_label", recordLabel)
 	}
 	if catalogueNumber, ok := req.ExtraFields["catalogue_number"]; ok {
-		_ = writer.WriteField("catalogue_number", catalogueNumber)
+		fw.writeField("catalogue_number", catalogueNumber)
 	}
 	if image, ok := req.ExtraFields["image"]; ok {
-		_ = writer.WriteField("image", image)
+		fw.writeField("image", image)
 	}
 	if tags, ok := req.ExtraFields["tags"]; ok {
-		_ = writer.WriteField("tags", tags)
+		fw.writeField("tags", tags)
 	}
 	if albumDesc, ok := req.ExtraFields["album_desc"]; ok {
-		_ = writer.WriteField("album_desc", albumDesc)
+		fw.writeField("album_desc", albumDesc)
 	}
 
 	if remaster, ok := req.ExtraFields["remaster"]; ok && remaster == "true" {
-		_ = writer.WriteField("remaster", "true")
+		fw.writeField("remaster", "true")
 		if ry, ok := req.ExtraFields["remaster_year"]; ok {
-			_ = writer.WriteField("remaster_year", ry)
+			fw.writeField("remaster_year", ry)
 		}
 		if rt, ok := req.ExtraFields["remaster_title"]; ok {
-			_ = writer.WriteField("remaster_title", rt)
+			fw.writeField("remaster_title", rt)
 		}
 		if rrl, ok := req.ExtraFields["remaster_record_label"]; ok {
-			_ = writer.WriteField("remaster_record_label", rrl)
+			fw.writeField("remaster_record_label", rrl)
 		}
 		if rcn, ok := req.ExtraFields["remaster_catalogue_number"]; ok {
-			_ = writer.WriteField("remaster_catalogue_number", rcn)
+			fw.writeField("remaster_catalogue_number", rcn)
 		}
 	}
 
 	if v, ok := req.ExtraFields["vanity_house"]; ok && v == "true" {
-		_ = writer.WriteField("vanity_house", "on")
+		fw.writeField("vanity_house", "on")
 	}
 	if v, ok := req.ExtraFields["scene"]; ok && v == "true" {
-		_ = writer.WriteField("scene", "on")
+		fw.writeField("scene", "on")
 	}
 
 	for k, v := range req.FormFields {
@@ -376,7 +396,7 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 		case "cat", "medium_sel", "codec_sel", "audiocodec_sel":
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 	for k, v := range req.ExtraFields {
 		switch k {
@@ -386,7 +406,11 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 			"vanity_house", "scene":
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
+	}
+
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
 	}
 
 	if err := writer.Close(); err != nil {
@@ -406,7 +430,10 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {

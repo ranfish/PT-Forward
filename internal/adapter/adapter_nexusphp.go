@@ -3,6 +3,7 @@ package adapter
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -67,7 +68,7 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 		return nil, &model.AppError{Code: 15001, Message: "返回了 HTML 页面而非种子文件，下载链接可能有误"}
 	}
 
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
 }
 
 func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -384,11 +385,14 @@ func (a *NexusPHPAdapter) detectDiscountAPI(ctx context.Context, config *model.S
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("请求优惠API失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	for _, sel := range config.Discount.Selectors {
@@ -416,17 +420,20 @@ func (a *NexusPHPAdapter) detectDiscountPage(ctx context.Context, config *model.
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("构造优惠检测请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("请求优惠详情页失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	result := DetectDiscountFromHTML(html, &config.DiscountDetection)
@@ -446,17 +453,20 @@ func (a *NexusPHPAdapter) DetectHR(ctx context.Context, config *model.SiteConfig
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("构造HR检测请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("请求HR详情页失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	hasHR := strings.Contains(html, "hit and run") ||
@@ -497,6 +507,7 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
@@ -507,19 +518,19 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	}
 
 	if req.Title != "" {
-		_ = writer.WriteField("name", req.Title)
+		fw.writeField("name", req.Title)
 	}
 	if req.Subtitle != "" {
-		_ = writer.WriteField("small_descr", req.Subtitle)
+		fw.writeField("small_descr", req.Subtitle)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("descr", req.Description)
+		fw.writeField("descr", req.Description)
 	}
 	if req.IMDbLink != "" {
-		_ = writer.WriteField("url", req.IMDbLink)
+		fw.writeField("url", req.IMDbLink)
 	}
 	if req.Anonymous {
-		_ = writer.WriteField("uplver", "1")
+		fw.writeField("uplver", "1")
 	}
 
 	npFieldMap := map[string]string{
@@ -549,19 +560,23 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	for k, v := range req.FormFields {
 		if isMusic {
 			if mapped, ok := npMusicFieldMap[k]; ok {
-				_ = writer.WriteField(mapped, v)
+				fw.writeField(mapped, v)
 			} else if mapped, ok := npFieldMap[k]; ok && k == "category" {
-				_ = writer.WriteField(mapped, v)
+				fw.writeField(mapped, v)
 			} else {
-				_ = writer.WriteField(k, v)
+				fw.writeField(k, v)
 			}
 		} else {
 			if mapped, ok := npFieldMap[k]; ok {
-				_ = writer.WriteField(mapped, v)
+				fw.writeField(mapped, v)
 			} else {
-				_ = writer.WriteField(k, v)
+				fw.writeField(k, v)
 			}
 		}
+	}
+
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
 	}
 
 	if err := writer.Close(); err != nil {

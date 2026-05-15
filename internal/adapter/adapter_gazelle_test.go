@@ -148,23 +148,17 @@ func TestGazelle_GetTorrentDetail_Web(t *testing.T) {
 
 func TestGazelle_DetectDiscount(t *testing.T) {
 	a := NewGazelleAdapter(NewHTTPDoer(), zap.NewNop())
-	result, err := a.DetectDiscount(context.Background(), &model.SiteConfig{}, "1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Level != model.DiscountNone {
-		t.Errorf("expected NONE, got %s", result.Level)
+	_, err := a.DetectDiscount(context.Background(), &model.SiteConfig{}, "1")
+	if err == nil {
+		t.Fatal("expected error when no BaseURL configured")
 	}
 }
 
 func TestGazelle_DetectHR(t *testing.T) {
 	a := NewGazelleAdapter(NewHTTPDoer(), zap.NewNop())
-	result, err := a.DetectHR(context.Background(), &model.SiteConfig{}, "1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.HasHR {
-		t.Error("expected no HR")
+	_, err := a.DetectHR(context.Background(), &model.SiteConfig{}, "1")
+	if err == nil {
+		t.Fatal("expected error when no BaseURL configured")
 	}
 }
 

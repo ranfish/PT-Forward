@@ -435,12 +435,9 @@ func TestRousiAdapter_DetectDiscount_Error(t *testing.T) {
 	a := NewRousiAdapter(doer, zap.NewNop())
 
 	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
-	result, err := a.DetectDiscount(context.Background(), config, "1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Level != model.DiscountNone {
-		t.Errorf("expected NONE on error, got %s", result.Level)
+	_, err := a.DetectDiscount(context.Background(), config, "1")
+	if err == nil {
+		t.Fatal("expected error on HTTP 500 response")
 	}
 }
 

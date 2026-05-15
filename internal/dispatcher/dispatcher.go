@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -158,7 +157,7 @@ func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.T
 func (d *TorrentDispatcher) getSubscription(ctx context.Context, id uint) (*model.RSSSubscription, error) {
 	var sub model.RSSSubscription
 	err := d.db.WithContext(ctx).
-		Where("id = ? AND deleted_at = ? AND enabled = ?", id, time.Time{}, true).
+		Where("id = ? AND enabled = ?", id, true).
 		First(&sub).Error
 	if err != nil {
 		return nil, err
@@ -168,7 +167,7 @@ func (d *TorrentDispatcher) getSubscription(ctx context.Context, id uint) (*mode
 
 func (d *TorrentDispatcher) getClientConfig(ctx context.Context, clientID string) (*model.ClientConfig, error) {
 	var cfg model.ClientConfig
-	q := d.db.WithContext(ctx).Where("deleted_at = ? AND enabled = ?", time.Time{}, true)
+	q := d.db.WithContext(ctx).Where("enabled = ?", true)
 
 	idNum, idErr := strconv.ParseUint(clientID, 10, 64)
 	if idErr == nil {

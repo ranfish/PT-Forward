@@ -232,7 +232,7 @@ func TestExtractInfoHash_Guid(t *testing.T) {
 	item := RSSItem{GUID: "ABC123DEF456ABC123DEF456ABC123DEF456AB12"}
 	site := &model.Site{HashStrategy: "guid"}
 
-	h := extractInfoHash(item, site)
+	h := extractInfoHash(item, site, "")
 	if h != "abc123def456abc123def456abc123def456ab12" {
 		t.Errorf("expected lowercase hash, got %s", h)
 	}
@@ -242,7 +242,7 @@ func TestExtractInfoHash_XMLTag(t *testing.T) {
 	item := RSSItem{CustomHash: "DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"}
 	site := &model.Site{HashStrategy: "xml_tag"}
 
-	h := extractInfoHash(item, site)
+	h := extractInfoHash(item, site, "")
 	if h != "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef" {
 		t.Errorf("expected lowercase hash, got %s", h)
 	}

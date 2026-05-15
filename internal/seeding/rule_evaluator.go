@@ -226,46 +226,119 @@ func (re *RuleEvaluator) EvaluateRulesSimple(ctx context.Context, clientID strin
 	return re.EvaluateRules(ctx, clientID, nil, -1)
 }
 
-func (re *RuleEvaluator) fillScoringContext(ctx context.Context, rc *RuleContext) {
-	if re.db == nil {
-		return
+type scoringCache struct {
+	latestScore map[string]float64
+	rankInCycle map[string]int
+	totalInCycle map[string]int
+	lowScoreCount map[string]int
+}
+
+func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID string, records []model.SeedingTorrentRecord) *scoringCache {
+	cache := &scoringCache{
+		latestScore:   make(map[string]float64, len(records)),
+		rankInCycle:   make(map[string]int, len(records)),
+		totalInCycle:  make(map[string]int, len(records)),
+		lowScoreCount: make(map[string]int, len(records)),
+	}
+	if re.db == nil || len(records) == 0 {
+		return cache
 	}
 
-	var latest model.ScoringLog
-	err := re.db.WithContext(ctx).Where("client_id = ? AND info_hash = ?",
-		rc.Record.ClientID, rc.Record.InfoHash).
-		Order("created_at DESC").
-		First(&latest).Error
-	if err == nil {
-		rc.ScoringScore = latest.Score
+	hashes := make([]string, 0, len(records))
+	for _, r := range records {
+		hashes = append(hashes, r.InfoHash)
 	}
 
-	var cycleLog model.ScoringLog
-	err = re.db.WithContext(ctx).Where("client_id = ? AND info_hash = ?",
-		rc.Record.ClientID, rc.Record.InfoHash).
-		Order("created_at DESC").
-		First(&cycleLog).Error
-	if err == nil {
-		var cycleCount int64
-		re.db.WithContext(ctx).Model(&model.ScoringLog{}).
-			Where("cycle_id = ?", cycleLog.CycleID).
-			Count(&cycleCount)
+	type latestRow struct {
+		InfoHash string
+		Score    float64
+		CycleID  string
+	}
+	var latestRows []latestRow
+	re.db.WithContext(ctx).Model(&model.ScoringLog{}).
+		Select("info_hash, score, cycle_id").
+		Where("client_id = ? AND info_hash IN ? AND id IN (?)",
+			clientID, hashes,
+			re.db.WithContext(ctx).Model(&model.ScoringLog{}).
+				Select("MAX(id)").Where("client_id = ? AND info_hash IN ?", clientID, hashes).
+				Group("info_hash"),
+		).
+		Find(&latestRows)
 
-		var rank int64
+	cycleIDs := make(map[string]struct{})
+	for _, row := range latestRows {
+		cache.latestScore[row.InfoHash] = row.Score
+		if row.CycleID != "" {
+			cycleIDs[row.CycleID] = struct{}{}
+		}
+	}
+
+	if len(cycleIDs) > 0 {
+		cidList := make([]string, 0, len(cycleIDs))
+		for cid := range cycleIDs {
+			cidList = append(cidList, cid)
+		}
+
+		type cycleTotal struct {
+			CycleID string
+			Count   int64
+		}
+		var totals []cycleTotal
 		re.db.WithContext(ctx).Model(&model.ScoringLog{}).
-			Where("cycle_id = ? AND score <= ?", cycleLog.CycleID, cycleLog.Score).
-			Count(&rank)
-		rc.ScoringRank = int(rank)
-		rc.ScoringTotalInCycle = int(cycleCount)
+			Select("cycle_id, COUNT(*) as count").
+			Where("cycle_id IN ?", cidList).
+			Group("cycle_id").
+			Find(&totals)
+		cycleCountMap := make(map[string]int, len(totals))
+		for _, t := range totals {
+			cycleCountMap[t.CycleID] = int(t.Count)
+		}
+
+		for _, row := range latestRows {
+			if row.CycleID != "" {
+				cache.totalInCycle[row.InfoHash] = cycleCountMap[row.CycleID]
+			}
+		}
+
+		for _, row := range latestRows {
+			if row.CycleID == "" {
+				continue
+			}
+			var rank int64
+			re.db.WithContext(ctx).Model(&model.ScoringLog{}).
+				Where("cycle_id = ? AND score <= ?", row.CycleID, row.Score).
+				Count(&rank)
+			cache.rankInCycle[row.InfoHash] = int(rank)
+		}
 	}
 
 	cutoff := time.Now().Add(-scoringCutoffHours)
-	var lowCount int64
+	type lowRow struct {
+		InfoHash string
+		Count    int64
+	}
+	var lowRows []lowRow
 	re.db.WithContext(ctx).Model(&model.ScoringLog{}).
-		Where("client_id = ? AND info_hash = ? AND score < ? AND created_at > ?",
-			rc.Record.ClientID, rc.Record.InfoHash, 5.0, cutoff).
-		Count(&lowCount)
-	rc.LowScoreCount = int(lowCount)
+		Select("info_hash, COUNT(*) as count").
+		Where("client_id = ? AND info_hash IN ? AND score < ? AND created_at > ?",
+			clientID, hashes, 5.0, cutoff).
+		Group("info_hash").
+		Find(&lowRows)
+	for _, row := range lowRows {
+		cache.lowScoreCount[row.InfoHash] = int(row.Count)
+	}
+
+	return cache
+}
+
+func (re *RuleEvaluator) fillScoringContext(_ context.Context, rc *RuleContext, cache *scoringCache) {
+	if cache == nil {
+		return
+	}
+	rc.ScoringScore = cache.latestScore[rc.Record.InfoHash]
+	rc.ScoringRank = cache.rankInCycle[rc.Record.InfoHash]
+	rc.ScoringTotalInCycle = cache.totalInCycle[rc.Record.InfoHash]
+	rc.LowScoreCount = cache.lowScoreCount[rc.Record.InfoHash]
 }
 
 func (re *RuleEvaluator) matchRule(ctx context.Context, rule model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64) []model.SeedingTorrentRecord {
@@ -277,6 +350,12 @@ func (re *RuleEvaluator) matchRule(ctx context.Context, rule model.DeleteRule, r
 	conditions := ParseConditions(rule.Conditions)
 
 	activeUploads, activeDownloads := countActiveStates(torrentMap)
+
+	var clientID string
+	if len(records) > 0 {
+		clientID = records[0].ClientID
+	}
+	cache := re.preloadScoringCache(ctx, clientID, records)
 
 	var matched []model.SeedingTorrentRecord
 	for _, rec := range records {
@@ -295,7 +374,7 @@ func (re *RuleEvaluator) matchRule(ctx context.Context, rule model.DeleteRule, r
 			GlobalDownloadSpeed: globalDownSpeed,
 		}
 
-		re.fillScoringContext(ctx, rc)
+		re.fillScoringContext(ctx, rc, cache)
 
 		if useExpr {
 			ok, err := evalExpr(rule.Expr, rc)

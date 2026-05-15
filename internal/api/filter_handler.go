@@ -142,11 +142,10 @@ func (h *FilterHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 	var total int64
 	h.db.Model(&model.FilterRule{}).
-		Where("deleted_at = ?", time.Time{}).
 		Count(&total)
 
 	var rules []model.FilterRule
-	h.db.Where("deleted_at = ?", time.Time{}).
+	h.db.
 		Order("priority ASC, id ASC").
 		Offset(offset(page, size)).Limit(size).
 		Find(&rules)

@@ -274,7 +274,10 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	var count int64
-	h.db.Model(&model.SeedingClientConfig{}).Where("client_id = ?", req.ClientID).Count(&count)
+	if err := h.db.Model(&model.SeedingClientConfig{}).Where("client_id = ?", req.ClientID).Count(&count).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
+		return
+	}
 	if count > 0 {
 		Error(w, http.StatusConflict, 40900, "该下载器已有刷流配置")
 		return
@@ -395,7 +398,10 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 
 	var records []model.SeedingTorrentRecord
 	var total int64
-	q.Count(&total)
+	if err := q.Count(&total).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询种子记录总数失败")
+		return
+	}
 	if err := q.Order("updated_at DESC").Find(&records).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询种子记录失败")
 		return
@@ -427,10 +433,14 @@ func parseUintParam(path, prefix string) (uint, error) {
 
 func (h *SeedingHandler) handleStats(w http.ResponseWriter, _ *http.Request) {
 	var totalActive int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&totalActive)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&totalActive).Error; err != nil {
+		h.logger.Warn("seeding stats: query active count failed", zap.Error(err))
+	}
 
 	var totalPaused int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&totalPaused)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&totalPaused).Error; err != nil {
+		h.logger.Warn("seeding stats: query paused count failed", zap.Error(err))
+	}
 
 	activeCount := 0
 	if h.engine != nil {
@@ -535,10 +545,14 @@ func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Reque
 	}
 
 	var totalActive int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&totalActive)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&totalActive).Error; err != nil {
+		h.logger.Warn("seeding engine status: query active count failed", zap.Error(err))
+	}
 
 	var totalPaused int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&totalPaused)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&totalPaused).Error; err != nil {
+		h.logger.Warn("seeding engine status: query paused count failed", zap.Error(err))
+	}
 
 	Success(w, map[string]interface{}{
 		"running":       true,
@@ -649,7 +663,10 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 	offset := (page - 1) * pageSize
 
 	var total int64
-	q.Count(&total)
+	if err := q.Count(&total).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询种子列表总数失败")
+		return
+	}
 
 	var records []model.SeedingTorrentRecord
 	if err := q.Order("updated_at DESC").Offset(offset).Limit(pageSize).Find(&records).Error; err != nil {
@@ -884,7 +901,9 @@ func (h *SeedingHandler) handleTestRule(w http.ResponseWriter, r *http.Request, 
 
 func (h *SeedingHandler) handleTriggerClient(w http.ResponseWriter, _ *http.Request, clientID string) {
 	var count int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("client_id = ? AND status = ?", clientID, "seeding").Count(&count)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("client_id = ? AND status = ?", clientID, "seeding").Count(&count).Error; err != nil {
+		h.logger.Warn("seeding trigger: query active count failed", zap.Error(err))
+	}
 	h.logger.Info("seeding client triggered", zap.String("clientId", clientID), zap.Int64("activeCount", count))
 	Success(w, map[string]interface{}{
 		"processedCount": count,
@@ -914,7 +933,10 @@ func (h *SeedingHandler) handleScoringConfigByID(w http.ResponseWriter, r *http.
 		if v, ok := req["minScore"].(float64); ok {
 			sub.ScoringConfig.MinScore = v
 		}
-		h.db.Save(&sub)
+		if err := h.db.Save(&sub).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "保存评分配置失败")
+			return
+		}
 	}
 
 	Success(w, sub.ScoringConfig)
@@ -964,28 +986,40 @@ func (h *SeedingHandler) handleStatsSubroute(w http.ResponseWriter, r *http.Requ
 
 func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Request) {
 	var totalActive int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&totalActive)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&totalActive).Error; err != nil {
+		h.logger.Warn("stats overview: query active count failed", zap.Error(err))
+	}
 
 	var totalPaused int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&totalPaused)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&totalPaused).Error; err != nil {
+		h.logger.Warn("stats overview: query paused count failed", zap.Error(err))
+	}
 
 	var total int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Count(&total)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Count(&total).Error; err != nil {
+		h.logger.Warn("stats overview: query total count failed", zap.Error(err))
+	}
 
 	today := time.Now().Truncate(24 * time.Hour)
 	var todayAdded int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("created_at >= ?", today).Count(&todayAdded)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("created_at >= ?", today).Count(&todayAdded).Error; err != nil {
+		h.logger.Warn("stats overview: query today added count failed", zap.Error(err))
+	}
 
 	var todayDeleted int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ? AND updated_at >= ?", "deleted", today).Count(&todayDeleted)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ? AND updated_at >= ?", "deleted", today).Count(&todayDeleted).Error; err != nil {
+		h.logger.Warn("stats overview: query today deleted count failed", zap.Error(err))
+	}
 
 	var trafficResult []struct {
 		TotalUpload   int64
 		TotalDownload int64
 	}
-	h.db.Model(&model.SiteTrafficDaily{}).
+	if err := h.db.Model(&model.SiteTrafficDaily{}).
 		Select("COALESCE(SUM(upload_delta), 0) as total_upload, COALESCE(SUM(download_delta), 0) as total_download").
-		Scan(&trafficResult)
+		Scan(&trafficResult).Error; err != nil {
+		h.logger.Warn("stats overview: query traffic failed", zap.Error(err))
+	}
 
 	totalUpload := int64(0)
 	totalDownload := int64(0)
@@ -1062,9 +1096,11 @@ func (h *SeedingHandler) handleSiteTrend(w http.ResponseWriter, r *http.Request,
 		dayEnd := dayStart.AddDate(0, 0, 1)
 
 		var count int64
-		h.db.Model(&model.SeedingTorrentRecord{}).
+		if err := h.db.Model(&model.SeedingTorrentRecord{}).
 			Where("site_name = ? AND created_at >= ? AND created_at < ?", site, dayStart, dayEnd).
-			Count(&count)
+			Count(&count).Error; err != nil {
+			h.logger.Warn("site trend: query count failed", zap.Error(err))
+		}
 
 		points = append(points, map[string]interface{}{
 			"date":  dayStart.Format("2006-01-02"),
@@ -1093,7 +1129,10 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 		Where("status = ?", "seeding")
 
 	var total int64
-	q.Count(&total)
+	if err := q.Count(&total).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询种子统计总数失败")
+		return
+	}
 
 	var records []model.SeedingTorrentRecord
 	if err := q.Order("created_at ASC").Offset(offset).Limit(pageSize).Find(&records).Error; err != nil {

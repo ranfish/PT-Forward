@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -9,15 +10,21 @@ import (
 )
 
 func RegisterCallbacks(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) {
-	_ = db.Callback().Create().Before("gorm:create").Register("crypto:encrypt", func(d *gorm.DB) {
+	if err := db.Callback().Create().Before("gorm:create").Register("crypto:encrypt", func(d *gorm.DB) {
 		encryptFields(d, enc, logger)
-	})
-	_ = db.Callback().Update().Before("gorm:update").Register("crypto:encrypt", func(d *gorm.DB) {
+	}); err != nil {
+		panic(fmt.Sprintf("register crypto:create callback: %v", err))
+	}
+	if err := db.Callback().Update().Before("gorm:update").Register("crypto:encrypt", func(d *gorm.DB) {
 		encryptFields(d, enc, logger)
-	})
-	_ = db.Callback().Query().After("gorm:query").Register("crypto:decrypt", func(d *gorm.DB) {
+	}); err != nil {
+		panic(fmt.Sprintf("register crypto:update callback: %v", err))
+	}
+	if err := db.Callback().Query().After("gorm:query").Register("crypto:decrypt", func(d *gorm.DB) {
 		decryptResults(d, enc, logger)
-	})
+	}); err != nil {
+		panic(fmt.Sprintf("register crypto:query callback: %v", err))
+	}
 }
 
 func encryptFields(d *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) {

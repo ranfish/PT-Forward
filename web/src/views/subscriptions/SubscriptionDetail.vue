@@ -104,6 +104,182 @@
               </a-col>
             </a-row>
 
+            <a-collapse :bordered="false" style="margin-bottom: 24px">
+              <a-collapse-panel key="advanced" header="高级选项">
+                <a-divider>速率与过滤</a-divider>
+                <a-row :gutter="16">
+                  <a-col :span="12">
+                    <a-form-item label="跳过同大小">
+                      <a-switch v-model:checked="configForm.skipSameSize" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="12">
+                    <a-form-item label="严格同大小">
+                      <a-switch v-model:checked="configForm.skipSameSizeStrict" />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+                <a-row v-if="configForm.skipSameSize" :gutter="16">
+                  <a-col :span="12">
+                    <a-form-item label="同大小窗口(分钟)">
+                      <a-input-number v-model:value="configForm.skipSameSizeWindowMin" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="12">
+                    <a-form-item label="每小时最大添加数">
+                      <a-input-number v-model:value="configForm.addCountPerHour" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+
+                <a-divider>自定义正则</a-divider>
+                <a-form-item label="使用自定义正则">
+                  <a-switch v-model:checked="configForm.useCustomRegex" />
+                </a-form-item>
+                <template v-if="configForm.useCustomRegex">
+                  <a-form-item label="正则表达式">
+                    <a-input v-model:value="configForm.regexStr" placeholder="(.*)" />
+                  </a-form-item>
+                  <a-form-item label="替换字符串">
+                    <a-input v-model:value="configForm.replaceStr" placeholder="$1" />
+                  </a-form-item>
+                </template>
+
+                <a-divider>免费等待策略</a-divider>
+                <a-form-item label="启用免费等待">
+                  <a-switch v-model:checked="configForm.freeWaitEnabled" />
+                </a-form-item>
+                <a-row v-if="configForm.freeWaitEnabled" :gutter="16">
+                  <a-col :span="8">
+                    <a-form-item label="最大等待(秒)">
+                      <a-input-number v-model:value="configForm.freeWaitMaxWaitSec" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="重检间隔(秒)">
+                      <a-input-number v-model:value="configForm.freeWaitRecheckSec" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="最小剩余(秒)">
+                      <a-input-number v-model:value="configForm.freeWaitMinRemain" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+
+                <a-divider>复检配置</a-divider>
+                <a-form-item label="启用复检">
+                  <a-switch v-model:checked="configForm.recheckEnabled" />
+                </a-form-item>
+                <a-row v-if="configForm.recheckEnabled" :gutter="16">
+                  <a-col :span="8">
+                    <a-form-item label="复检间隔(小时)">
+                      <a-input-number v-model:value="configForm.recheckIntervalH" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="最大复检次数">
+                      <a-input-number v-model:value="configForm.recheckMaxCount" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="最大复检年龄(小时)">
+                      <a-input-number v-model:value="configForm.recheckMaxAgeH" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+
+                <a-divider>可行性评估</a-divider>
+                <a-form-item label="启用可行性评估">
+                  <a-switch v-model:checked="configForm.feasibilityEnabled" />
+                </a-form-item>
+                <a-row v-if="configForm.feasibilityEnabled" :gutter="16">
+                  <a-col :span="8">
+                    <a-form-item label="速度限制">
+                      <a-input-number v-model:value="configForm.feasibilitySpeedLimit" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="大小限制">
+                      <a-input-number v-model:value="configForm.feasibilitySizeLimit" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="安全系数">
+                      <a-input-number v-model:value="configForm.feasibilitySafety" :min="0" :max="1" :step="0.1" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+
+                <a-divider>磁盘预算</a-divider>
+                <a-form-item label="启用磁盘预算">
+                  <a-switch v-model:checked="configForm.diskBudgetEnabled" />
+                </a-form-item>
+                <a-row v-if="configForm.diskBudgetEnabled" :gutter="16">
+                  <a-col :span="12">
+                    <a-form-item label="最低磁盘GB">
+                      <a-input-number v-model:value="configForm.diskBudgetMinGB" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+
+                <a-divider>客户端选择</a-divider>
+                <a-row :gutter="16">
+                  <a-col :span="12">
+                    <a-form-item label="选择模式">
+                      <a-select v-model:value="configForm.clientSelection">
+                        <a-select-option value="fixed">fixed</a-select-option>
+                        <a-select-option value="round_robin">round_robin</a-select-option>
+                        <a-select-option value="least_connections">least_connections</a-select-option>
+                      </a-select>
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="12">
+                    <a-form-item label="候选客户端列表">
+                      <a-select v-model:value="configForm.candidateClients" mode="multiple" :placeholder="'选择候选客户端'" :loading="downloadersLoading" style="width: 100%">
+                        <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">
+                          {{ d.name }}（{{ d.type }}）
+                        </a-select-option>
+                      </a-select>
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+
+                <a-divider>磁盘守卫</a-divider>
+                <a-row :gutter="16">
+                  <a-col :span="12">
+                    <a-form-item label="启用磁盘守卫">
+                      <a-switch v-model:checked="configForm.diskGuardEnabled" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="12">
+                    <a-form-item label="磁盘阈值(字节)">
+                      <a-input-number v-model:value="configForm.diskGuardThreshold" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+
+                <a-divider>生命周期管理</a-divider>
+                <a-row :gutter="16">
+                  <a-col :span="8">
+                    <a-form-item label="暂停阈值 seeders">
+                      <a-input-number v-model:value="configForm.lifecyclePauseSeeders" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="删除阈值 seeders">
+                      <a-input-number v-model:value="configForm.lifecycleDeleteSeeders" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                  <a-col :span="8">
+                    <a-form-item label="删除阈值小时">
+                      <a-input-number v-model:value="configForm.lifecycleDeleteSeedHours" :min="0" style="width: 100%" />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+              </a-collapse-panel>
+            </a-collapse>
+
             <a-form-item>
               <a-button type="primary" :loading="configSaving" @click="saveConfig">{{ t('common.saveConfig') }}</a-button>
             </a-form-item>
@@ -243,6 +419,34 @@ const configForm = reactive({
   publishEnabled: false,
   pushNotify: false,
   autoReseed: false,
+  skipSameSize: false,
+  skipSameSizeWindowMin: 30,
+  skipSameSizeStrict: false,
+  addCountPerHour: 0,
+  useCustomRegex: false,
+  regexStr: '',
+  replaceStr: '',
+  freeWaitEnabled: false,
+  freeWaitMaxWaitSec: 7200,
+  freeWaitRecheckSec: 600,
+  freeWaitMinRemain: 30,
+  recheckEnabled: false,
+  recheckIntervalH: 6,
+  recheckMaxCount: 5,
+  recheckMaxAgeH: 72,
+  feasibilityEnabled: false,
+  feasibilitySpeedLimit: 0,
+  feasibilitySizeLimit: 0,
+  feasibilitySafety: 0.8,
+  diskBudgetEnabled: false,
+  diskBudgetMinGB: 10,
+  candidateClients: [] as string[],
+  clientSelection: 'fixed',
+  diskGuardEnabled: true,
+  diskGuardThreshold: 1073741824,
+  lifecyclePauseSeeders: 0,
+  lifecycleDeleteSeeders: 0,
+  lifecycleDeleteSeedHours: 0,
 })
 const ruleConditions = ref<RuleCond[]>([{ key: 'title', compareType: 'contain', value: '', numValue: 0 }])
 const rulesSaving = ref(false)
@@ -294,6 +498,34 @@ async function fetchSubscription() {
       publishEnabled: subscription.value.publishEnabled || false,
       pushNotify: subscription.value.pushNotify || false,
       autoReseed: subscription.value.autoReseed || false,
+      skipSameSize: subscription.value.skipSameSize || false,
+      skipSameSizeWindowMin: subscription.value.skipSameSizeWindowMin || 30,
+      skipSameSizeStrict: subscription.value.skipSameSizeStrict || false,
+      addCountPerHour: subscription.value.addCountPerHour || 0,
+      useCustomRegex: subscription.value.useCustomRegex || false,
+      regexStr: subscription.value.regexStr || '',
+      replaceStr: subscription.value.replaceStr || '',
+      freeWaitEnabled: subscription.value.freeWaitEnabled || false,
+      freeWaitMaxWaitSec: subscription.value.freeWaitMaxWaitSec || 7200,
+      freeWaitRecheckSec: subscription.value.freeWaitRecheckSec || 600,
+      freeWaitMinRemain: subscription.value.freeWaitMinRemain || 30,
+      recheckEnabled: subscription.value.recheckEnabled || false,
+      recheckIntervalH: subscription.value.recheckIntervalH || 6,
+      recheckMaxCount: subscription.value.recheckMaxCount || 5,
+      recheckMaxAgeH: subscription.value.recheckMaxAgeH || 72,
+      feasibilityEnabled: subscription.value.feasibilityEnabled || false,
+      feasibilitySpeedLimit: subscription.value.feasibilitySpeedLimit || 0,
+      feasibilitySizeLimit: subscription.value.feasibilitySizeLimit || 0,
+      feasibilitySafety: subscription.value.feasibilitySafety ?? 0.8,
+      diskBudgetEnabled: subscription.value.diskBudgetEnabled || false,
+      diskBudgetMinGB: subscription.value.diskBudgetMinGB || 10,
+      candidateClients: subscription.value.candidateClients || [],
+      clientSelection: subscription.value.clientSelection || 'fixed',
+      diskGuardEnabled: subscription.value.diskGuardEnabled ?? true,
+      diskGuardThreshold: subscription.value.diskGuardThreshold || 1073741824,
+      lifecyclePauseSeeders: subscription.value.lifecyclePauseSeeders || 0,
+      lifecycleDeleteSeeders: subscription.value.lifecycleDeleteSeeders || 0,
+      lifecycleDeleteSeedHours: subscription.value.lifecycleDeleteSeedHours || 0,
     })
     const conds = subscription.value.conditions || []
     if (Array.isArray(conds) && conds.length) {
@@ -331,6 +563,34 @@ async function saveConfig() {
       publishEnabled: configForm.publishEnabled,
       pushNotify: configForm.pushNotify,
       autoReseed: configForm.autoReseed,
+      skipSameSize: configForm.skipSameSize,
+      skipSameSizeWindowMin: configForm.skipSameSizeWindowMin,
+      skipSameSizeStrict: configForm.skipSameSizeStrict,
+      addCountPerHour: configForm.addCountPerHour,
+      useCustomRegex: configForm.useCustomRegex,
+      regexStr: configForm.regexStr,
+      replaceStr: configForm.replaceStr,
+      freeWaitEnabled: configForm.freeWaitEnabled,
+      freeWaitMaxWaitSec: configForm.freeWaitMaxWaitSec,
+      freeWaitRecheckSec: configForm.freeWaitRecheckSec,
+      freeWaitMinRemain: configForm.freeWaitMinRemain,
+      recheckEnabled: configForm.recheckEnabled,
+      recheckIntervalH: configForm.recheckIntervalH,
+      recheckMaxCount: configForm.recheckMaxCount,
+      recheckMaxAgeH: configForm.recheckMaxAgeH,
+      feasibilityEnabled: configForm.feasibilityEnabled,
+      feasibilitySpeedLimit: configForm.feasibilitySpeedLimit,
+      feasibilitySizeLimit: configForm.feasibilitySizeLimit,
+      feasibilitySafety: configForm.feasibilitySafety,
+      diskBudgetEnabled: configForm.diskBudgetEnabled,
+      diskBudgetMinGB: configForm.diskBudgetMinGB,
+      candidateClients: configForm.candidateClients,
+      clientSelection: configForm.clientSelection,
+      diskGuardEnabled: configForm.diskGuardEnabled,
+      diskGuardThreshold: configForm.diskGuardThreshold,
+      lifecyclePauseSeeders: configForm.lifecyclePauseSeeders,
+      lifecycleDeleteSeeders: configForm.lifecycleDeleteSeeders,
+      lifecycleDeleteSeedHours: configForm.lifecycleDeleteSeedHours,
     }
     await subscriptionsApi.update(id, payload)
     message.success(t('common.configSaved'))

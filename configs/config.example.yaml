@@ -21,5 +21,5 @@ log:
   format: "json"
 
 security:
-  encryption_key: e1cd1dc1423bb4f4ba4b79bf99a87e1d97ea3eba6459de33bccc4d37673499dc
+  encryption_key: ""
   trusted_proxies: []

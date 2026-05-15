@@ -66,7 +66,7 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 		return nil, &model.AppError{Code: 15001, Message: "返回了 HTML 页面而非种子文件，下载链接可能有误"}
 	}
 
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
 }
 
 func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -234,17 +234,20 @@ func (a *GenericAdapter) detectDiscountGenericAPI(ctx context.Context, config *m
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("请求优惠API失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	for _, sel := range config.Discount.Selectors {
@@ -275,17 +278,20 @@ func (a *GenericAdapter) detectDiscountGenericPage(ctx context.Context, config *
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("请求优惠信息失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	result := DetectDiscountFromHTML(html, &config.DiscountDetection)
@@ -308,17 +314,20 @@ func (a *GenericAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("请求HR信息失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	hasHR := strings.Contains(html, "hit and run") ||
@@ -362,6 +371,7 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
@@ -372,15 +382,18 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	}
 
 	if req.Title != "" {
-		_ = writer.WriteField("name", req.Title)
+		fw.writeField("name", req.Title)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("descr", req.Description)
+		fw.writeField("descr", req.Description)
 	}
 	for k, v := range req.FormFields {
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
+	}
 	if err := writer.Close(); err != nil {
 		return nil, networkError("关闭 multipart writer 失败", err)
 	}
@@ -398,7 +411,10 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
@@ -592,6 +608,7 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
@@ -602,48 +619,51 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 	}
 
 	if req.Title != "" {
-		_ = writer.WriteField("name", req.Title)
+		fw.writeField("name", req.Title)
 	}
 	if req.Subtitle != "" {
-		_ = writer.WriteField("subtitle", req.Subtitle)
+		fw.writeField("subtitle", req.Subtitle)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("descr", req.Description)
+		fw.writeField("descr", req.Description)
 	}
 	if req.IMDbLink != "" {
-		_ = writer.WriteField("imdb_c", req.IMDbLink)
+		fw.writeField("imdb_c", req.IMDbLink)
 	}
 	if req.DoubanLink != "" {
 		m := regexp.MustCompile(`(\d+)`).FindString(req.DoubanLink)
 		if m != "" {
-			_ = writer.WriteField("douban_id", m)
+			fw.writeField("douban_id", m)
 		}
 	}
 	if req.Anonymous {
-		_ = writer.WriteField("anonymity", "yes")
+		fw.writeField("anonymity", "yes")
 	}
 
 	if v, ok := req.FormFields["cat"]; ok {
-		_ = writer.WriteField("type", v)
+		fw.writeField("type", v)
 	}
 	if v, ok := req.FormFields["tags"]; ok {
 		if strings.Contains(v, "禁转") {
-			_ = writer.WriteField("nodistr", "yes")
+			fw.writeField("nodistr", "yes")
 		}
 	}
 
-	_ = writer.WriteField("MAX_FILE_SIZE", "4000000")
-	_ = writer.WriteField("team", "")
-	_ = writer.WriteField("hr", "no")
+	fw.writeField("MAX_FILE_SIZE", "4000000")
+	fw.writeField("team", "")
+	fw.writeField("hr", "no")
 
 	for k, v := range req.FormFields {
 		switch k {
 		case "cat", "tags":
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
+	}
 	if err := writer.Close(); err != nil {
 		return nil, networkError("关闭 multipart writer 失败", err)
 	}
@@ -661,7 +681,10 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
@@ -720,6 +743,7 @@ func (a *GenericAdapter) uploadStarSpaceVideo(ctx context.Context, config *model
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
@@ -729,25 +753,25 @@ func (a *GenericAdapter) uploadStarSpaceVideo(ctx context.Context, config *model
 		return nil, networkError("写入种子数据失败", err)
 	}
 
-	_ = writer.WriteField("tid", "0")
+	fw.writeField("tid", "0")
 
 	if req.Title != "" {
-		_ = writer.WriteField("name", req.Title)
+		fw.writeField("name", req.Title)
 	}
 	if req.Subtitle != "" {
-		_ = writer.WriteField("small_desc", req.Subtitle)
+		fw.writeField("small_desc", req.Subtitle)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("descr", req.Description)
+		fw.writeField("descr", req.Description)
 	}
 	if req.DoubanLink != "" {
-		_ = writer.WriteField("douban_url", req.DoubanLink)
+		fw.writeField("douban_url", req.DoubanLink)
 	}
 	if req.IMDbLink != "" {
-		_ = writer.WriteField("imdb_url", req.IMDbLink)
+		fw.writeField("imdb_url", req.IMDbLink)
 	}
 	if len(req.Screenshots) > 0 {
-		_ = writer.WriteField("screen", strings.Join(req.Screenshots, "\n"))
+		fw.writeField("screen", strings.Join(req.Screenshots, "\n"))
 	}
 
 	fireflyFieldMap := map[string]string{
@@ -760,12 +784,12 @@ func (a *GenericAdapter) uploadStarSpaceVideo(ctx context.Context, config *model
 	}
 	for srcType, targetName := range fireflyFieldMap {
 		if v, ok := req.FormFields[srcType]; ok {
-			_ = writer.WriteField(targetName, v)
+			fw.writeField(targetName, v)
 		}
 	}
 
 	if hdr, ok := req.ExtraFields["tr_hdr"]; ok {
-		_ = writer.WriteField("tr_hdr", hdr)
+		fw.writeField("tr_hdr", hdr)
 	}
 
 	if tags, ok := req.FormFields["tags"]; ok {
@@ -777,7 +801,7 @@ func (a *GenericAdapter) uploadStarSpaceVideo(ctx context.Context, config *model
 		}
 		for tagLabel, tagName := range tagMap {
 			if strings.Contains(tags, tagLabel) {
-				_ = writer.WriteField(tagName, "on")
+				fw.writeField(tagName, "on")
 			}
 		}
 	}
@@ -787,9 +811,12 @@ func (a *GenericAdapter) uploadStarSpaceVideo(ctx context.Context, config *model
 		case "cat", "medium_sel", "codec_sel", "audiocodec_sel", "standard_sel", "team_sel", "tags":
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
+	}
 	if err := writer.Close(); err != nil {
 		return nil, networkError("关闭 multipart writer 失败", err)
 	}
@@ -810,6 +837,7 @@ func (a *GenericAdapter) uploadStarSpaceMusic(ctx context.Context, config *model
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
@@ -819,51 +847,51 @@ func (a *GenericAdapter) uploadStarSpaceMusic(ctx context.Context, config *model
 		return nil, networkError("写入种子数据失败", err)
 	}
 
-	_ = writer.WriteField("tid", "0")
+	fw.writeField("tid", "0")
 
 	if v, ok := req.ExtraFields["artist"]; ok {
-		_ = writer.WriteField("artist", v)
+		fw.writeField("artist", v)
 	}
 	if req.Title != "" {
-		_ = writer.WriteField("title", req.Title)
+		fw.writeField("title", req.Title)
 	}
 	if v, ok := req.ExtraFields["year"]; ok {
-		_ = writer.WriteField("year", v)
+		fw.writeField("year", v)
 	}
 	if v, ok := req.ExtraFields["image"]; ok {
-		_ = writer.WriteField("image", v)
+		fw.writeField("image", v)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("release_desc", req.Description)
+		fw.writeField("release_desc", req.Description)
 	}
 
 	if v, ok := req.FormFields["cat"]; ok {
-		_ = writer.WriteField("release_type", v)
+		fw.writeField("release_type", v)
 	}
 	if v := resolveField(req.FormFields, "category", "cat"); v != "" {
-		_ = writer.WriteField("release_type", v)
+		fw.writeField("release_type", v)
 	}
 	if v := resolveField(req.FormFields, "codec_sel", "codec"); v != "" {
-		_ = writer.WriteField("format", v)
+		fw.writeField("format", v)
 	}
 	if v := resolveField(req.FormFields, "audiocodec_sel", "audioCodec"); v != "" {
-		_ = writer.WriteField("bitrate", v)
+		fw.writeField("bitrate", v)
 	}
 	if v := resolveField(req.FormFields, "medium_sel", "medium"); v != "" {
-		_ = writer.WriteField("media", v)
+		fw.writeField("media", v)
 	}
 
 	if v, ok := req.ExtraFields["remaster_year"]; ok {
-		_ = writer.WriteField("remaster_year", v)
+		fw.writeField("remaster_year", v)
 	}
 	if v, ok := req.ExtraFields["remaster_title"]; ok {
-		_ = writer.WriteField("remaster_title", v)
+		fw.writeField("remaster_title", v)
 	}
 	if v, ok := req.ExtraFields["remaster_record_label"]; ok {
-		_ = writer.WriteField("remaster_record_label", v)
+		fw.writeField("remaster_record_label", v)
 	}
 	if v, ok := req.ExtraFields["remaster_catalogue_number"]; ok {
-		_ = writer.WriteField("remaster_catalogue_number", v)
+		fw.writeField("remaster_catalogue_number", v)
 	}
 
 	for k, v := range req.ExtraFields {
@@ -872,9 +900,12 @@ func (a *GenericAdapter) uploadStarSpaceMusic(ctx context.Context, config *model
 			"remaster_record_label", "remaster_catalogue_number":
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
+	}
 	if err := writer.Close(); err != nil {
 		return nil, networkError("关闭 multipart writer 失败", err)
 	}
@@ -896,7 +927,10 @@ func (a *GenericAdapter) doStarSpaceUpload(httpReq *http.Request, config *model.
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {
@@ -938,6 +972,7 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("files", "upload.torrent")
 	if err != nil {
@@ -948,16 +983,16 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 	}
 
 	if req.Title != "" {
-		_ = writer.WriteField("showName", req.Title)
+		fw.writeField("showName", req.Title)
 	}
 	if req.Subtitle != "" {
-		_ = writer.WriteField("shortDesc", req.Subtitle)
+		fw.writeField("shortDesc", req.Subtitle)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("descr", req.Description)
+		fw.writeField("descr", req.Description)
 	}
 	if req.Anonymous {
-		_ = writer.WriteField("uploadUserAnonymous", "是")
+		fw.writeField("uploadUserAnonymous", "是")
 	}
 
 	yemaFieldMap := map[string]string{
@@ -971,7 +1006,7 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 	}
 	for srcType, targetName := range yemaFieldMap {
 		if v, ok := req.FormFields[srcType]; ok {
-			_ = writer.WriteField(targetName, v)
+			fw.writeField(targetName, v)
 		}
 	}
 
@@ -980,22 +1015,22 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 		for _, tag := range tagList {
 			tag = strings.TrimSpace(tag)
 			if tag != "" {
-				_ = writer.WriteField("tagList", tag)
+				fw.writeField("tagList", tag)
 			}
 		}
 	}
 
 	if imdbID := extractIMDbIDGeneric(req.IMDbLink); imdbID != "" {
-		_ = writer.WriteField("imdb", imdbID)
+		fw.writeField("imdb", imdbID)
 	}
 	if req.DoubanLink != "" {
 		m := regexp.MustCompile(`(\d+)`).FindString(req.DoubanLink)
 		if m != "" {
-			_ = writer.WriteField("douban", m)
+			fw.writeField("douban", m)
 		}
 	}
 	if v, ok := req.ExtraFields["picture"]; ok {
-		_ = writer.WriteField("picture", v)
+		fw.writeField("picture", v)
 	}
 
 	for k, v := range req.FormFields {
@@ -1004,15 +1039,18 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 			"processing_sel", "team_sel", "tags":
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 	for k, v := range req.ExtraFields {
 		if k == "picture" {
 			continue
 		}
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
+	}
 	if err := writer.Close(); err != nil {
 		return nil, networkError("关闭 multipart writer 失败", err)
 	}
@@ -1030,7 +1068,10 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 
 	var result struct {
 		Success  bool        `json:"success"`

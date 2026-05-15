@@ -159,7 +159,7 @@ func (m *LifecycleManager) getEffectiveConfig(ctx context.Context, subscriptionI
 
 	var sub model.RSSSubscription
 	if err := m.db.WithContext(ctx).
-		Where("id = ? AND deleted_at = ?", subscriptionID, time.Time{}).
+		Where("id = ?", subscriptionID).
 		First(&sub).Error; err != nil {
 		return
 	}

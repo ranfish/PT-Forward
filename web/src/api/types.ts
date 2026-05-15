@@ -233,6 +233,7 @@ export interface Site {
   ratio: number
   bonusPoints: number
   statsSyncedAt?: string | null
+  hrStrategy: string
 }
 
 export interface SiteConfigOverride {
@@ -302,8 +303,37 @@ export interface RSSSubscription {
   autoReseed: boolean
   reseedClientIds?: string[]
   skipSameSize: boolean
+  skipSameSizeWindowMin: number
+  skipSameSizeStrict: boolean
   addCountPerHour: number
   conditions?: RuleCondition[]
+  useCustomRegex: boolean
+  regexStr: string
+  replaceStr: string
+  freeWaitEnabled: boolean
+  freeWaitMaxWaitSec: number
+  freeWaitRecheckSec: number
+  freeWaitMinRemain: number
+  recheckEnabled: boolean
+  recheckIntervalH: number
+  recheckMaxCount: number
+  recheckMaxAgeH: number
+  feasibilityEnabled: boolean
+  feasibilitySpeedLimit: number
+  feasibilitySizeLimit: number
+  feasibilitySafety: number
+  diskBudgetEnabled: boolean
+  diskBudgetMinGB: number
+  candidateClients?: string[]
+  clientSelection: string
+  diskGuardEnabled: boolean
+  diskGuardThreshold: number
+  lifecyclePauseSeeders: number
+  lifecycleDeleteSeeders: number
+  lifecycleDeleteSeedHours: number
+  paused: boolean
+  pauseReason: string
+  pausedAt?: string | null
 }
 
 export interface NotificationChannel {
@@ -321,6 +351,11 @@ export interface NotificationChannel {
   quietHoursEnd?: string
   messageTemplate?: string
   hasConfig: boolean
+  overrides?: string
+  failoverGroupId?: string
+  minPriority: number
+  digestTemplate?: string
+  digestIntervalMin: number
 }
 
 export interface NotificationHistory {

@@ -6,6 +6,7 @@ export function usePagination<T = Record<string, unknown>>(
   defaultSize = 20,
 ) {
   const loading = ref(false)
+  const error = ref<string | null>(null)
   const data = ref<T[]>([])
   const total = ref(0)
   const currentPage = ref(1)
@@ -14,11 +15,14 @@ export function usePagination<T = Record<string, unknown>>(
   async function fetch(page?: number) {
     if (page !== undefined) currentPage.value = page
     loading.value = true
+    error.value = null
     try {
       const resp = await fetchFn(currentPage.value, pageSize.value)
       const body = resp.data
       data.value = body.data?.items || []
       total.value = body.data?.total || 0
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '请求失败'
     } finally {
       loading.value = false
     }
@@ -30,5 +34,5 @@ export function usePagination<T = Record<string, unknown>>(
     fetch()
   }
 
-  return { loading, data, total, currentPage, pageSize, fetch, onPageChange }
+  return { loading, error, data, total, currentPage, pageSize, fetch, onPageChange }
 }

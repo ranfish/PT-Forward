@@ -28,6 +28,8 @@ type Engine struct {
 	diskBudget     *DiskBudgetManager
 	seedingCounter model.SeedingCollector
 	wsBroadcaster  event.WSBroadcaster
+	sideLoadMgr    *SideLoadManager
+	configBus      *ConfigEventBus
 
 	mu    sync.RWMutex
 	tasks map[uint]context.CancelFunc
@@ -120,6 +122,109 @@ func (e *Engine) SetSeedingCounter(sc model.SeedingCollector) {
 
 func (e *Engine) SetWSBroadcaster(b event.WSBroadcaster) {
 	e.wsBroadcaster = b
+}
+
+func (e *Engine) SetSideLoadManager(mgr *SideLoadManager) {
+	e.sideLoadMgr = mgr
+}
+
+func (e *Engine) SetConfigEventBus(bus *ConfigEventBus) {
+	e.configBus = bus
+}
+
+func (e *Engine) CleanupOldData(ctx context.Context) (int64, error) {
+	return e.repo.CleanupOldSeen(ctx, 30)
+}
+
+type DryRunResult struct {
+	Total    int                      `json:"total"`
+	Matched  int                      `json:"matched"`
+	Rejected int                      `json:"rejected"`
+	Skipped  int                      `json:"skipped"`
+	Items    []DryRunItem             `json:"items"`
+}
+
+type DryRunItem struct {
+	Title       string `json:"title"`
+	TorrentID   string `json:"torrent_id"`
+	InfoHash    string `json:"info_hash"`
+	Size        int64  `json:"size"`
+	Status      string `json:"status"`
+	Reason      string `json:"reason,omitempty"`
+	MatchedRule string `json:"matched_rule,omitempty"`
+}
+
+func (e *Engine) DryRun(ctx context.Context, sub *model.RSSSubscription) (*DryRunResult, error) {
+	var site model.Site
+	if err := e.db.WithContext(ctx).Where("name = ? OR domain = ?", sub.SiteName, sub.SiteName).First(&site).Error; err != nil {
+		return nil, fmt.Errorf("site not found: %w", err)
+	}
+
+	result := &DryRunResult{}
+
+	for _, url := range sub.URLs {
+		feed, err := e.fetcher.Fetch(ctx, url)
+		if err != nil {
+			return nil, fmt.Errorf("fetch RSS: %w", err)
+		}
+
+		events := e.fetcher.ParseItems(feed, sub, &site)
+		result.Total += len(events)
+
+		for _, ev := range events {
+			item := DryRunItem{
+				Title:     ev.Title,
+				TorrentID: ev.TorrentID,
+				InfoHash:  ev.InfoHash,
+				Size:      ev.Size,
+			}
+
+			seen, err := e.repo.IsSeen(ctx, ev.SiteName, ev.TorrentID)
+			if err != nil {
+				e.logger.Warn("dryrun seen check failed", zap.Error(err))
+			}
+			if seen {
+				item.Status = "skipped"
+				item.Reason = "already_seen"
+				result.Skipped++
+				result.Items = append(result.Items, item)
+				continue
+			}
+
+			if ev.MatchedRule != nil && *ev.MatchedRule != "" {
+				item.Status = "matched"
+				item.MatchedRule = *ev.MatchedRule
+				result.Matched++
+			} else {
+				item.Status = "rejected"
+				item.Reason = "no_rule_matched"
+				result.Rejected++
+			}
+
+			result.Items = append(result.Items, item)
+		}
+	}
+
+	return result, nil
+}
+
+func (e *Engine) needsSideLoading(ctx context.Context, siteName, infoHash string) bool {
+	if e.siteProvider == nil {
+		return false
+	}
+	info, err := e.siteProvider.GetSiteInfo(ctx, siteName)
+	if err != nil || info == nil {
+		return false
+	}
+	strategy := info.HashStrategy
+	if strategy != string(model.HashBencode) && strategy != string(model.HashFakeFromID) {
+		return false
+	}
+	return infoHash == "" || len(infoHash) != 40 || isFakeHash(infoHash)
+}
+
+func isFakeHash(h string) bool {
+	return len(h) > 0 && len(h) != 40 || (len(h) == 40 && h[:8] == "fakehash")
 }
 
 func (e *Engine) Start(ctx context.Context) error {
@@ -244,7 +349,15 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 		var torrentEvents []model.TorrentEvent
 		newCount := 0
 		for _, event := range events {
-			isSeen, _ := e.repo.IsSeen(ctx, event.SiteName, event.TorrentID)
+			isSeen, seenErr := e.repo.IsSeen(ctx, event.SiteName, event.TorrentID)
+			if seenErr != nil {
+				e.logger.Warn("check seen status failed, skipping torrent",
+					zap.String("site", event.SiteName),
+					zap.String("torrent", event.TorrentID),
+					zap.Error(seenErr),
+				)
+				continue
+			}
 			if isSeen {
 				metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "already_seen").Inc()
 				continue
@@ -429,6 +542,21 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				}
 			}
 
+			if e.needsSideLoading(ctx, event.SiteName, te.InfoHash) {
+				te.RequiresSideLoading = true
+				te.SideLoadStatus = model.SideLoadPending
+				if e.sideLoadMgr != nil {
+					if err := e.sideLoadMgr.Enqueue(&te, event.SiteName); err != nil {
+						e.logger.Warn("side load enqueue failed, dispatching directly",
+							zap.String("site", event.SiteName),
+							zap.String("torrent_id", event.TorrentID),
+							zap.Error(err))
+						torrentEvents = append(torrentEvents, te)
+					}
+					continue
+				}
+			}
+
 			torrentEvents = append(torrentEvents, te)
 
 			e.logger.Debug("new torrent from RSS",
@@ -560,4 +688,10 @@ func (e *Engine) RecheckWaiting(ctx context.Context) error {
 		e.fetchOnce(ctx, &subs[i])
 	}
 	return nil
+}
+
+func (e *Engine) ExpireDiskBudget() {
+	if e.diskBudget != nil {
+		e.diskBudget.Expire()
+	}
 }

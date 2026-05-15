@@ -82,7 +82,10 @@ func (h *FingerprintHandler) handleList(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var total int64
-	q.Count(&total)
+	if err := q.Count(&total).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询指纹总数失败")
+		return
+	}
 
 	var fingerprints []model.ContentFingerprint
 	if err := q.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&fingerprints).Error; err != nil {

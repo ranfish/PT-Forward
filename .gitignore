@@ -15,6 +15,7 @@ logs/
 
 # Config overrides
 configs/config.local.yaml
+configs/config.yaml
 
 # Environment
 .env

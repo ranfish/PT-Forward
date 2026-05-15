@@ -77,6 +77,65 @@
         <a-form-item :label="t('seeding.removeData')">
           <a-switch v-model:checked="form.remove_data" />
         </a-form-item>
+        <a-collapse :bordered="false" style="margin-top: 8px; background: transparent">
+          <a-collapse-panel key="advanced" header="高级选项">
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="适应时间(秒)">
+                  <a-input-number v-model:value="form.fit_time" :min="0" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="仅删种子(保留数据)">
+                  <a-switch v-model:checked="form.only_delete_torrent" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="限速字节数">
+                  <a-input-number v-model:value="form.limit_speed_bytes" :min="0" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="先 Reannounce">
+                  <a-switch v-model:checked="form.reannounce_before" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="Reannounce 等待(ms)">
+                  <a-input-number v-model:value="form.reannounce_wait_ms" :min="0" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="重试次数">
+                  <a-input-number v-model:value="form.reannounce_retries" :min="0" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="重试间隔(ms)">
+                  <a-input-number v-model:value="form.reannounce_interval_ms" :min="0" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="级联删除">
+                  <a-switch v-model:checked="form.cascade_delete" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row v-if="form.cascade_delete" :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="级联最大深度">
+                  <a-input-number v-model:value="form.cascade_max_depth" :min="1" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-collapse-panel>
+        </a-collapse>
       </a-form>
     </a-modal>
   </div>
@@ -107,6 +166,15 @@ const form = reactive({
   enabled: true,
   delete_num: 1,
   remove_data: true,
+  fit_time: 0,
+  only_delete_torrent: false,
+  limit_speed_bytes: 0,
+  reannounce_before: true,
+  reannounce_wait_ms: 2000,
+  reannounce_retries: 2,
+  reannounce_interval_ms: 3000,
+  cascade_delete: false,
+  cascade_max_depth: 1,
 })
 
 const columns = [
@@ -144,9 +212,18 @@ function openModal(record?: DeleteRule) {
       enabled: record.enabled ?? true,
       delete_num: record.delete_num || 1,
       remove_data: record.remove_data ?? true,
+      fit_time: record.fit_time ?? 0,
+      only_delete_torrent: record.only_delete_torrent || false,
+      limit_speed_bytes: record.limit_speed_bytes ?? 0,
+      reannounce_before: record.reannounce_before ?? true,
+      reannounce_wait_ms: record.reannounce_wait_ms ?? 2000,
+      reannounce_retries: record.reannounce_retries ?? 2,
+      reannounce_interval_ms: record.reannounce_interval_ms ?? 3000,
+      cascade_delete: record.cascade_delete || false,
+      cascade_max_depth: record.cascade_max_depth ?? 1,
     })
   } else {
-    Object.assign(form, { alias: '', type: 'normal', conditions: '', expr: '', action: 'delete', priority: 0, enabled: true, delete_num: 1, remove_data: true })
+    Object.assign(form, { alias: '', type: 'normal', conditions: '', expr: '', action: 'delete', priority: 0, enabled: true, delete_num: 1, remove_data: true, fit_time: 0, only_delete_torrent: false, limit_speed_bytes: 0, reannounce_before: true, reannounce_wait_ms: 2000, reannounce_retries: 2, reannounce_interval_ms: 3000, cascade_delete: false, cascade_max_depth: 1 })
   }
   modalVisible.value = true
 }

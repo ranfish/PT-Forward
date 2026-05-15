@@ -19,7 +19,10 @@ type WSMessage struct {
 }
 
 func NewWSMessage(eventType string, payload interface{}) *WSMessage {
-	data, _ := json.Marshal(payload)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		data = []byte("null")
+	}
 	return &WSMessage{
 		Type:      eventType,
 		Payload:   data,
@@ -251,7 +254,9 @@ func (c *Client) readPump() {
 			Type     string   `json:"type"`
 			Channels []string `json:"channels"`
 		}
-		_ = json.Unmarshal(raw, &msg)
+		if err := json.Unmarshal(raw, &msg); err != nil {
+			continue
+		}
 
 		switch msg.Type {
 		case "client.ping":

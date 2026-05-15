@@ -187,21 +187,62 @@ func (w *CompletionWatcher) pollOnce(ctx context.Context) {
 }
 
 func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID uint, torrent *model.TorrentInfo) {
+	var candidate model.PublishCandidate
+	if err := w.db.WithContext(ctx).First(&candidate, candidateID).Error; err != nil {
+		w.logger.Error("failed to load candidate for completion", zap.Uint("candidate_id", candidateID), zap.Error(err))
+		return
+	}
+
+	if candidate.Role == model.RoleSource && candidate.ClientID != "" {
+		sourceClient, err := w.clientMgr.Get(candidate.ClientID)
+		if err != nil {
+			w.logger.Error("failed to get source client for transfer", zap.Error(err))
+		} else if sourceClient.GetReseedTargetID() != "" {
+			reseedClientName, reseedHash, err := w.transferToReseed(ctx, &candidate, sourceClient, torrent)
+			if err != nil {
+				w.logger.Error("transfer to reseed failed, continuing with source client",
+					zap.Uint("candidate_id", candidateID),
+					zap.Error(err),
+				)
+			} else {
+				w.logger.Info("transfer to reseed completed",
+					zap.Uint("candidate_id", candidateID),
+					zap.String("reseed_client", reseedClientName),
+					zap.String("reseed_hash", reseedHash),
+				)
+				candidate.ClientID = reseedClientName
+				candidate.InfoHash = reseedHash
+				candidate.SourceClientID = sourceClient.GetName()
+			}
+		}
+	}
+
 	w.logger.Info("download completed, triggering publish",
 		zap.Uint("candidate_id", candidateID),
 		zap.String("save_path", torrent.SavePath),
 	)
 
 	now := time.Now()
+	updates := map[string]interface{}{
+		"download_completed": true,
+		"completed_at":       &now,
+		"local_save_path":    torrent.SavePath,
+		"publish_status":     model.CandidateCompleted,
+		"updated_at":         now,
+	}
+	if candidate.ClientID != "" {
+		updates["client_id"] = candidate.ClientID
+	}
+	if candidate.InfoHash != "" {
+		updates["info_hash"] = candidate.InfoHash
+	}
+	if candidate.SourceClientID != "" {
+		updates["source_client_id"] = candidate.SourceClientID
+	}
+
 	if err := w.db.WithContext(ctx).Model(&model.PublishCandidate{}).
 		Where("id = ?", candidateID).
-		Updates(map[string]interface{}{
-			"download_completed": true,
-			"completed_at":       &now,
-			"local_save_path":    torrent.SavePath,
-			"publish_status":     model.CandidateCompleted,
-			"updated_at":         now,
-		}).Error; err != nil {
+		Updates(updates).Error; err != nil {
 		w.logger.Error("failed to update candidate completion status",
 			zap.Uint("candidate_id", candidateID),
 			zap.Error(err),
@@ -222,6 +263,41 @@ func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID ui
 			zap.Error(err),
 		)
 	}
+}
+
+func (w *CompletionWatcher) transferToReseed(ctx context.Context, candidate *model.PublishCandidate, sourceClient model.DownloaderClient, torrent *model.TorrentInfo) (string, string, error) {
+	reseedClient, err := w.clientMgr.Get(sourceClient.GetReseedTargetID())
+	if err != nil {
+		return "", "", fmt.Errorf("get reseed client %s: %w", sourceClient.GetReseedTargetID(), err)
+	}
+
+	torrentData, err := sourceClient.ExportTorrent(ctx, candidate.InfoHash)
+	if err != nil {
+		return "", "", fmt.Errorf("export torrent from source: %w", err)
+	}
+
+	reseedPath := client.MapPath(torrent.SavePath, sourceClient.GetSharedPaths())
+
+	opts := model.AddTorrentOptions{
+		SavePath: reseedPath,
+		Category: "reseed",
+		Paused:   false,
+	}
+
+	addResult, err := reseedClient.AddFromFile(ctx, torrentData, opts)
+	if err != nil {
+		return "", "", fmt.Errorf("add torrent to reseed client: %w", err)
+	}
+
+	if err := sourceClient.DeleteTorrent(ctx, candidate.InfoHash, false); err != nil {
+		w.logger.Warn("failed to remove torrent from source after transfer (reseed already added)",
+			zap.String("source_client", sourceClient.GetName()),
+			zap.String("hash", candidate.InfoHash),
+			zap.Error(err),
+		)
+	}
+
+	return reseedClient.GetName(), addResult.InfoHash, nil
 }
 
 func (w *CompletionWatcher) markCandidateOrphan(ctx context.Context, candidateID uint) {

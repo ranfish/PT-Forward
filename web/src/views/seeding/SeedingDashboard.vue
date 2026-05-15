@@ -147,6 +147,100 @@
         <a-form-item :label="t('seeding.superSeedingDefault')">
           <a-switch v-model:checked="configForm.superSeedingDefault" />
         </a-form-item>
+        <a-collapse :bordered="false" style="margin-top: 8px; background: transparent">
+          <a-collapse-panel key="advanced" header="高级选项">
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="拒绝规则 ID 列表">
+                  <a-input v-model:value="configForm.rejectRuleIds" placeholder="1,2,3" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="管理范围">
+                  <a-select v-model:value="configForm.scope">
+                    <a-select-option value="managed">managed</a-select-option>
+                    <a-select-option value="all">all</a-select-option>
+                    <a-select-option value="custom">custom</a-select-option>
+                  </a-select>
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="FitTime 检查间隔(ms)">
+                  <a-input-number v-model:value="configForm.fitTimeCheckMs" :min="0" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="紧急缓冲比例">
+                  <a-input-number v-model:value="configForm.emergencyBuffer" :min="0" :max="1" :step="0.05" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="预过滤">
+                  <a-switch v-model:checked="configForm.preFilterEnabled" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="最低磁盘百分比">
+                  <a-input-number v-model:value="configForm.minDiskSpacePercent" :min="0" :max="100" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="空间告警">
+                  <a-switch v-model:checked="configForm.spaceAlarmEnabled" />
+                </a-form-item>
+              </a-col>
+              <a-col v-if="configForm.spaceAlarmEnabled" :span="12">
+                <a-form-item label="告警阈值(GB)">
+                  <a-input-number v-model:value="configForm.spaceAlarmGb" :min="1" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="增强批次大小">
+                  <a-input-number v-model:value="configForm.enhancementBatchSize" :min="1" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="增强缓存 TTL(秒)">
+                  <a-input-number v-model:value="configForm.enhancementCacheTtl" :min="0" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="EMA 平滑系数">
+                  <a-input-number v-model:value="configForm.emaAlpha" :min="0" :max="1" :step="0.05" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="活跃时间窗口">
+                  <a-input v-model:value="configForm.activeTimeWindows" placeholder="08:00-22:00" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item label="归档粒度">
+                  <a-select v-model:value="configForm.archiveGranularity">
+                    <a-select-option value="daily">daily</a-select-option>
+                    <a-select-option value="hourly">hourly</a-select-option>
+                    <a-select-option value="weekly">weekly</a-select-option>
+                  </a-select>
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-form-item label="清理评分权重(JSON)">
+              <a-textarea v-model:value="configForm.cleanupScoreWeights" :rows="2" placeholder="JSON: seed_time, ratio, ..." />
+            </a-form-item>
+          </a-collapse-panel>
+        </a-collapse>
       </a-form>
     </a-modal>
   </div>
@@ -198,6 +292,20 @@ const configForm = reactive({
   maxActiveUploads: 0,
   maxActiveDownloads: 0,
   superSeedingDefault: false,
+  rejectRuleIds: '',
+  fitTimeCheckMs: 2000,
+  emergencyBuffer: 0.2,
+  spaceAlarmEnabled: false,
+  spaceAlarmGb: 10,
+  minDiskSpacePercent: 0,
+  scope: 'managed',
+  preFilterEnabled: true,
+  enhancementBatchSize: 20,
+  enhancementCacheTtl: 600,
+  activeTimeWindows: '',
+  emaAlpha: 0.1,
+  cleanupScoreWeights: '',
+  archiveGranularity: 'daily',
 })
 
 const columns = [
@@ -265,6 +373,20 @@ function openConfigModal(record?: SeedingClientConfig) {
       maxActiveUploads: record.max_active_uploads || 0,
       maxActiveDownloads: record.max_active_downloads || 0,
       superSeedingDefault: record.super_seeding_default || false,
+      rejectRuleIds: record.reject_rule_ids || '',
+      fitTimeCheckMs: record.fit_time_check_ms ?? 2000,
+      emergencyBuffer: record.emergency_buffer ?? 0.2,
+      spaceAlarmEnabled: record.space_alarm_enabled || false,
+      spaceAlarmGb: record.space_alarm_gb ?? 10,
+      minDiskSpacePercent: record.min_disk_space_percent ?? 0,
+      scope: record.scope || 'managed',
+      preFilterEnabled: record.pre_filter_enabled ?? true,
+      enhancementBatchSize: record.enhancement_batch_size ?? 20,
+      enhancementCacheTtl: record.enhancement_cache_ttl ?? 600,
+      activeTimeWindows: record.active_time_windows || '',
+      emaAlpha: record.ema_alpha ?? 0.1,
+      cleanupScoreWeights: record.cleanup_score_weights || '',
+      archiveGranularity: record.archive_granularity || 'daily',
     })
   } else {
     Object.assign(configForm, {
@@ -277,6 +399,20 @@ function openConfigModal(record?: SeedingClientConfig) {
       maxActiveUploads: 0,
       maxActiveDownloads: 0,
       superSeedingDefault: false,
+      rejectRuleIds: '',
+      fitTimeCheckMs: 2000,
+      emergencyBuffer: 0.2,
+      spaceAlarmEnabled: false,
+      spaceAlarmGb: 10,
+      minDiskSpacePercent: 0,
+      scope: 'managed',
+      preFilterEnabled: true,
+      enhancementBatchSize: 20,
+      enhancementCacheTtl: 600,
+      activeTimeWindows: '',
+      emaAlpha: 0.1,
+      cleanupScoreWeights: '',
+      archiveGranularity: 'daily',
     })
   }
   configModalVisible.value = true

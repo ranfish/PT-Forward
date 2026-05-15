@@ -22,6 +22,12 @@ export const downloadersApi = {
   getTorrents(id: number, params?: Record<string, unknown>) {
     return client.get(`/downloaders/${id}/torrents`, { params })
   },
+  getTorrent(id: number, infoHash: string) {
+    return client.get(`/downloaders/${id}/torrents/${infoHash}`)
+  },
+  getFreeSpace(id: number) {
+    return client.get(`/downloaders/${id}/free-space`)
+  },
   getMaindata(id: number) {
     return client.get(`/downloaders/${id}/maindata`)
   },

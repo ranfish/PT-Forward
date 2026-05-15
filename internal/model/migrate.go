@@ -1,6 +1,9 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"github.com/ranfish/pt-forward/internal/setting"
+	"gorm.io/gorm"
+)
 
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
@@ -46,5 +49,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&IYUUSiteMapping{},
 		&OperationAuditLog{},
 		&SchemaMigration{},
+		&setting.Setting{},
 	)
 }

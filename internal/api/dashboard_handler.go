@@ -46,41 +46,63 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *DashboardHandler) handleOverview(w http.ResponseWriter, _ *http.Request) {
 	var rssCount int64
-	h.db.Model(&model.RSSSubscription{}).Where("enabled = ? AND deleted_at = ?", true, time.Time{}).Count(&rssCount)
+	if err := h.db.Model(&model.RSSSubscription{}).Where("enabled = ?", true).Count(&rssCount).Error; err != nil {
+		h.logger.Warn("dashboard: query rss count failed", zap.Error(err))
+	}
 
 	var seedingActive int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&seedingActive)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&seedingActive).Error; err != nil {
+		h.logger.Warn("dashboard: query seeding active count failed", zap.Error(err))
+	}
 
 	var seedingPaused int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&seedingPaused)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&seedingPaused).Error; err != nil {
+		h.logger.Warn("dashboard: query seeding paused count failed", zap.Error(err))
+	}
 
 	var reseedActive int64
-	h.db.Model(&model.ReseedTask{}).Where("enabled = ?", true).Count(&reseedActive)
+	if err := h.db.Model(&model.ReseedTask{}).Where("enabled = ?", true).Count(&reseedActive).Error; err != nil {
+		h.logger.Warn("dashboard: query reseed active count failed", zap.Error(err))
+	}
 
 	var publishPending int64
-	h.db.Model(&model.PublishCandidate{}).Where("publish_status = ?", "pending").Count(&publishPending)
+	if err := h.db.Model(&model.PublishCandidate{}).Where("publish_status = ?", "pending").Count(&publishPending).Error; err != nil {
+		h.logger.Warn("dashboard: query publish pending count failed", zap.Error(err))
+	}
 
 	var publishToday int64
 	today := time.Now().Truncate(24 * time.Hour)
-	h.db.Model(&model.PublishCandidate{}).Where("publish_status = ? AND updated_at >= ?", "done", today).Count(&publishToday)
+	if err := h.db.Model(&model.PublishCandidate{}).Where("publish_status = ? AND updated_at >= ?", "done", today).Count(&publishToday).Error; err != nil {
+		h.logger.Warn("dashboard: query publish today count failed", zap.Error(err))
+	}
 
 	var publishTotal int64
-	h.db.Model(&model.PublishCandidate{}).Where("publish_status = ?", "done").Count(&publishTotal)
+	if err := h.db.Model(&model.PublishCandidate{}).Where("publish_status = ?", "done").Count(&publishTotal).Error; err != nil {
+		h.logger.Warn("dashboard: query publish total count failed", zap.Error(err))
+	}
 
 	var reseedToday int64
-	h.db.Model(&model.ReseedMatch{}).Where("status = ? AND injected_at >= ?", "injected", today).Count(&reseedToday)
+	if err := h.db.Model(&model.ReseedMatch{}).Where("status = ? AND injected_at >= ?", "injected", today).Count(&reseedToday).Error; err != nil {
+		h.logger.Warn("dashboard: query reseed today count failed", zap.Error(err))
+	}
 
 	var reseedTotal int64
-	h.db.Model(&model.ReseedMatch{}).Where("status = ?", "injected").Count(&reseedTotal)
+	if err := h.db.Model(&model.ReseedMatch{}).Where("status = ?", "injected").Count(&reseedTotal).Error; err != nil {
+		h.logger.Warn("dashboard: query reseed total count failed", zap.Error(err))
+	}
 
 	var siteTotal int64
-	h.db.Model(&model.Site{}).Count(&siteTotal)
+	if err := h.db.Model(&model.Site{}).Count(&siteTotal).Error; err != nil {
+		h.logger.Warn("dashboard: query site total count failed", zap.Error(err))
+	}
 
 	var siteOnline int64
-	h.db.Model(&model.Site{}).Where("enabled = ?", true).Count(&siteOnline)
+	if err := h.db.Model(&model.Site{}).Where("enabled = ?", true).Count(&siteOnline).Error; err != nil {
+		h.logger.Warn("dashboard: query site online count failed", zap.Error(err))
+	}
 
 	var clientConfigs []model.ClientConfig
-	if err := h.db.Where("deleted_at = ? AND enabled = ?", time.Time{}, true).Find(&clientConfigs).Error; err != nil {
+	if err := h.db.Where("enabled = ?", true).Find(&clientConfigs).Error; err != nil {
 		h.logger.Warn("dashboard: query client configs failed", zap.Error(err))
 	}
 
@@ -95,12 +117,16 @@ func (h *DashboardHandler) handleOverview(w http.ResponseWriter, _ *http.Request
 	runtime.ReadMemStats(&memStats)
 
 	var downloadingCount int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "downloading").Count(&downloadingCount)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "downloading").Count(&downloadingCount).Error; err != nil {
+		h.logger.Warn("dashboard: query downloading count failed", zap.Error(err))
+	}
 
 	var totalSizeResult []struct {
 		Total int64
 	}
-	h.db.Model(&model.SeedingTorrentRecord{}).Select("COALESCE(SUM(size), 0) as total").Scan(&totalSizeResult)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Select("COALESCE(SUM(size), 0) as total").Scan(&totalSizeResult).Error; err != nil {
+		h.logger.Warn("dashboard: query total size failed", zap.Error(err))
+	}
 	totalSize := int64(0)
 	if len(totalSizeResult) > 0 {
 		totalSize = totalSizeResult[0].Total
@@ -179,16 +205,24 @@ func (h *DashboardHandler) handleTrends(w http.ResponseWriter, r *http.Request) 
 		dayEnd := dayStart.AddDate(0, 0, 1)
 
 		var events int64
-		h.db.Model(&model.TorrentEvent{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&events)
+		if err := h.db.Model(&model.TorrentEvent{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&events).Error; err != nil {
+			h.logger.Warn("dashboard: query events count failed", zap.Error(err))
+		}
 
 		var seen int64
-		h.db.Model(&model.RSSTorrentSeen{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&seen)
+		if err := h.db.Model(&model.RSSTorrentSeen{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&seen).Error; err != nil {
+			h.logger.Warn("dashboard: query seen count failed", zap.Error(err))
+		}
 
 		var publishDone int64
-		h.db.Model(&model.PublishCandidate{}).Where("updated_at >= ? AND updated_at < ? AND publish_status = ?", dayStart, dayEnd, "done").Count(&publishDone)
+		if err := h.db.Model(&model.PublishCandidate{}).Where("updated_at >= ? AND updated_at < ? AND publish_status = ?", dayStart, dayEnd, "done").Count(&publishDone).Error; err != nil {
+			h.logger.Warn("dashboard: query publish done count failed", zap.Error(err))
+		}
 
 		var reseedDone int64
-		h.db.Model(&model.ReseedMatch{}).Where("injected_at >= ? AND injected_at < ?", dayStart, dayEnd).Count(&reseedDone)
+		if err := h.db.Model(&model.ReseedMatch{}).Where("injected_at >= ? AND injected_at < ?", dayStart, dayEnd).Count(&reseedDone).Error; err != nil {
+			h.logger.Warn("dashboard: query reseed done count failed", zap.Error(err))
+		}
 
 		points = append(points, map[string]interface{}{
 			"date":    dayStart.Format("2006-01-02"),
@@ -220,6 +254,10 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 			q = q.Where("site_name = ?", site)
 		}
 		q.Count(&total)
+		if err := q.Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "查询种子事件总数失败")
+			return
+		}
 		if err := q.Order("created_at DESC").Limit(100).Find(&events).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "查询种子事件失败")
 			return

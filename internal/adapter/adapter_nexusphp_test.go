@@ -1345,12 +1345,9 @@ func TestNexusPHP_DetectDiscount_API_NetworkError(t *testing.T) {
 	config.Discount.APIURL = "/api/discount?id={id}"
 	config.Discount.Selectors = []string{"free"}
 
-	result, err := a.DetectDiscount(context.Background(), config, "1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Level != model.DiscountNone {
-		t.Errorf("expected NONE on network error, got %s", result.Level)
+	_, err := a.DetectDiscount(context.Background(), config, "1")
+	if err == nil {
+		t.Fatal("expected error on network error")
 	}
 }
 
