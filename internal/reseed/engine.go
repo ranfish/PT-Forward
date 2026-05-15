@@ -1047,6 +1047,13 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		Paused:   false,
 	}
 
+	if match.SourceInfoHash != "" {
+		sourceTorrent, serr := dlClient.GetTorrentByHash(ctx, match.SourceInfoHash)
+		if serr == nil && sourceTorrent != nil && sourceTorrent.SavePath != "" {
+			opts.SavePath = sourceTorrent.SavePath
+		}
+	}
+
 	if len(torrentData) == 0 {
 		return e.failMatch(ctx, match, "种子数据为空")
 	}

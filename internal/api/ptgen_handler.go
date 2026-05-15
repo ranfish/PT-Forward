@@ -94,7 +94,10 @@ func (h *PTGenHandler) handleListCache(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var total int64
-	q.Count(&total)
+	if err := q.Count(&total).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询缓存总数失败")
+		return
+	}
 
 	var caches []model.PTGenCache
 	if err := q.Order("updated_at DESC").Offset(offset).Limit(pageSize).Find(&caches).Error; err != nil {

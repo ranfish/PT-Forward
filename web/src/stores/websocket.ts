@@ -8,6 +8,24 @@ export const useWebSocketStore = defineStore('websocket', () => {
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let reconnectAttempts = 0
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+  const activeChannels = ref<string[]>([])
+
+  function startHeartbeat() {
+    stopHeartbeat()
+    heartbeatTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }))
+      }
+    }, 30000)
+  }
+
+  function stopHeartbeat() {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer)
+      heartbeatTimer = null
+    }
+  }
 
   function connect() {
     const token = localStorage.getItem('pt-forward-access-token')
@@ -25,6 +43,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
     ws.onopen = () => {
       connected.value = true
       reconnectAttempts = 0
+      startHeartbeat()
+      if (activeChannels.value.length > 0) {
+        ws!.send(JSON.stringify({ type: 'subscribe', channels: activeChannels.value }))
+      }
     }
 
     ws.onmessage = (event) => {
@@ -34,12 +56,15 @@ export const useWebSocketStore = defineStore('websocket', () => {
         if (messages.value.length > 200) {
           messages.value = messages.value.slice(-100)
         }
-      } catch {}
+      } catch {
+        console.warn('[ws] failed to parse message')
+      }
     }
 
     ws.onclose = () => {
       connected.value = false
       ws = null
+      stopHeartbeat()
       scheduleReconnect()
     }
 
@@ -59,18 +84,22 @@ export const useWebSocketStore = defineStore('websocket', () => {
     if (reconnectTimer) clearTimeout(reconnectTimer)
     reconnectTimer = null
     reconnectAttempts = 0
+    stopHeartbeat()
     ws?.close()
     ws = null
     connected.value = false
+    messages.value = []
   }
 
   function subscribe(channels: string[]) {
+    activeChannels.value = [...new Set([...activeChannels.value, ...channels])]
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'subscribe', channels }))
     }
   }
 
   function unsubscribe(channels: string[]) {
+    activeChannels.value = activeChannels.value.filter((c) => !channels.includes(c))
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'unsubscribe', channels }))
     }

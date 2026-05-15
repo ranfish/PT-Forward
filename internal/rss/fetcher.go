@@ -73,7 +73,7 @@ func (f *Fetcher) ParseItems(feed *RSSFeed, sub *model.RSSSubscription, site *mo
 
 		event.TorrentID = extractTorrentID(item, site)
 		event.DownloadURL = extractDownloadURL(item, site)
-		event.InfoHash = extractInfoHash(item, site)
+		event.InfoHash = extractInfoHash(item, site, event.TorrentID)
 		event.Size = extractSize(item, site)
 
 		if event.TorrentID == "" && event.DownloadURL == "" {
@@ -160,7 +160,7 @@ func extractDownloadURL(item RSSItem, site *model.Site) string {
 	return item.Link
 }
 
-func extractInfoHash(item RSSItem, site *model.Site) string {
+func extractInfoHash(item RSSItem, site *model.Site, torrentID string) string {
 	strategy := site.HashStrategy
 	if strategy == "" {
 		strategy = "guid"
@@ -174,6 +174,11 @@ func extractInfoHash(item RSSItem, site *model.Site) string {
 		}
 		return strings.ToLower(item.GUID)
 	case "xml_tag":
+		return strings.ToLower(item.CustomHash)
+	case "fake_from_id":
+		if torrentID != "" {
+			return "fakehash" + torrentID + "fakehash"
+		}
 		return strings.ToLower(item.CustomHash)
 	default:
 		return strings.ToLower(item.CustomHash)

@@ -1,4 +1,4 @@
-.PHONY: build run test vet lint clean reset-password docker frontend golangci-lint tidy fmt
+.PHONY: build run test vet lint clean reset-password docker docker-multiarch frontend golangci-lint tidy fmt
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BINARY  := pt-forward
@@ -40,3 +40,9 @@ tidy:
 fmt:
 	gofmt -w .
 	goimports -w .
+
+docker:
+	docker build --build-arg VERSION=$(VERSION) -t pt-forward:$(VERSION) -t pt-forward:latest .
+
+docker-multiarch:
+	docker buildx build --platform linux/amd64,linux/arm64 --build-arg VERSION=$(VERSION) -t pt-forward:$(VERSION) -t pt-forward:latest .

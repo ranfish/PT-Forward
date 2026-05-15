@@ -239,6 +239,15 @@
             <a-input v-model:value="settingsForm.downloadPagePattern" :placeholder="t('site.downloadPagePatternPlaceholder')" />
           </a-form-item>
 
+          <a-divider>{{ t('site.hrStrategy') }}</a-divider>
+          <a-form-item :label="t('site.hrStrategy')">
+            <a-select v-model:value="settingsForm.hrStrategy" allow-clear :placeholder="t('site.hrStrategyPlaceholder')">
+              <a-select-option value="protect">{{ t('site.hrProtect') }}</a-select-option>
+              <a-select-option value="ignore">{{ t('site.hrIgnore') }}</a-select-option>
+              <a-select-option value="strict">{{ t('site.hrStrict') }}</a-select-option>
+            </a-select>
+          </a-form-item>
+
           <a-form-item>
             <a-button type="primary" @click="updateSettings">{{ t('site.saveSettings') }}</a-button>
           </a-form-item>
@@ -441,6 +450,7 @@ const settingsForm = reactive({
   downloadUrlTemplate: '',
   downloadPagePattern: '',
   requiresSideLoading: false,
+  hrStrategy: '',
 })
 
 const authTypeLabels: Record<string, string> = {
@@ -513,6 +523,7 @@ async function fetchSite() {
       downloadUrlTemplate: site.value.downloadUrlTemplate || '',
       downloadPagePattern: site.value.downloadPagePattern || '',
       requiresSideLoading: site.value.requiresSideLoading || false,
+      hrStrategy: site.value.hrStrategy || '',
     })
   } catch (e: unknown) {
     message.error((e as Error).message)
@@ -565,6 +576,7 @@ async function updateSettings() {
       hashStrategy: settingsForm.hashStrategy,
       sizeStrategy: settingsForm.sizeStrategy,
       idStrategy: settingsForm.idStrategy,
+      hrStrategy: settingsForm.hrStrategy,
     })
     message.success(t('common.configSaved'))
     fetchSite()

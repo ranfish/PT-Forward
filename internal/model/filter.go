@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // §8.8.4 — FilterRule: 过滤规则
 type FilterRule struct {
@@ -15,7 +19,7 @@ type FilterRule struct {
 	Enabled    bool            `json:"enabled" gorm:"default:true"`
 	CreatedAt  time.Time       `json:"created_at"`
 	UpdatedAt  time.Time       `json:"updated_at"`
-	DeletedAt  time.Time       `json:"deleted_at" gorm:"index"`
+	DeletedAt  gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 func (FilterRule) TableName() string { return "filter_rules" }

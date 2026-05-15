@@ -31,7 +31,7 @@ func NewManager(db *gorm.DB, logger *zap.Logger) *Manager {
 func (m *Manager) LoadClients(ctx context.Context) error {
 	var configs []model.ClientConfig
 	if err := m.db.WithContext(ctx).
-		Where("deleted_at = ? AND enabled = ?", time.Time{}, true).
+		Where("enabled = ?", true).
 		Find(&configs).Error; err != nil {
 		return clientError(ErrClientConfigParse, "load client configs", err)
 	}
@@ -108,7 +108,7 @@ func (m *Manager) ListClients() []string {
 func (m *Manager) GetByDBID(ctx context.Context, id uint) (model.DownloaderClient, *model.ClientConfig, error) {
 	var cfg model.ClientConfig
 	if err := m.db.WithContext(ctx).
-		Where("id = ? AND deleted_at = ? AND enabled = ?", id, time.Time{}, true).
+		Where("id = ? AND enabled = ?", id, true).
 		First(&cfg).Error; err != nil {
 		return nil, nil, clientError(ErrClientConnection, "client config not found", err)
 	}
@@ -184,4 +184,12 @@ func (m *Manager) PingAll(ctx context.Context) {
 			m.logger.Warn("client ping failed", zap.String("clientID", id), zap.Error(err))
 		}
 	}
+}
+
+func (m *Manager) GetTorrentInfo(ctx context.Context, clientID uint, infoHash string) (*model.TorrentInfo, error) {
+	dl, _, err := m.GetByDBID(ctx, clientID)
+	if err != nil {
+		return nil, err
+	}
+	return dl.GetTorrentByHash(ctx, infoHash)
 }

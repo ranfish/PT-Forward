@@ -122,10 +122,6 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if t.config.OnRetry != nil {
 			t.config.OnRetry(attempt+1, resp, err)
 		}
-
-		if attempt == t.config.MaxRetries {
-			return resp, err
-		}
 	}
 
 	return resp, err

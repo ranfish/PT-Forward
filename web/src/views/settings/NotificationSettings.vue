@@ -107,6 +107,25 @@
         <a-form-item :label="t('settings.notifications.messageTemplate')" name="messageTemplate">
           <a-textarea v-model:value="form.messageTemplate" :rows="2" :placeholder="t('settings.notifications.messageTemplatePlaceholder')" />
         </a-form-item>
+        <a-collapse :bordered="false" style="margin-top: 8px; background: transparent">
+          <a-collapse-panel key="advanced" header="高级选项">
+            <a-form-item label="覆盖配置 (JSON)" name="overrides">
+              <a-textarea v-model:value="form.overrides" :rows="3" />
+            </a-form-item>
+            <a-form-item label="故障转移组 ID" name="failoverGroupId">
+              <a-input v-model:value="form.failoverGroupId" placeholder="failover-group-id" />
+            </a-form-item>
+            <a-form-item label="最小优先级 (1-5)" name="minPriority">
+              <a-input-number v-model:value="form.minPriority" :min="1" :max="5" style="width: 100%" />
+            </a-form-item>
+            <a-form-item label="摘要模板" name="digestTemplate">
+              <a-textarea v-model:value="form.digestTemplate" :rows="2" />
+            </a-form-item>
+            <a-form-item label="摘要间隔(分钟)" name="digestIntervalMin">
+              <a-input-number v-model:value="form.digestIntervalMin" :min="1" :max="1440" style="width: 100%" />
+            </a-form-item>
+          </a-collapse-panel>
+        </a-collapse>
       </a-form>
     </a-modal>
   </div>
@@ -142,6 +161,11 @@ const form = reactive({
   quietHoursStart: '',
   quietHoursEnd: '',
   messageTemplate: '',
+  overrides: '',
+  failoverGroupId: '',
+  minPriority: 3,
+  digestTemplate: '',
+  digestIntervalMin: 60,
 })
 
 const columns = [
@@ -186,6 +210,11 @@ function openModal(record?: Record<string, unknown>) {
       quietHoursStart: record.quietHoursStart || '',
       quietHoursEnd: record.quietHoursEnd || '',
       messageTemplate: record.messageTemplate || '',
+      overrides: typeof record.overrides === 'string' ? record.overrides : (record.overrides ? JSON.stringify(record.overrides, null, 2) : ''),
+      failoverGroupId: record.failoverGroupId || '',
+      minPriority: record.minPriority ?? 3,
+      digestTemplate: record.digestTemplate || '',
+      digestIntervalMin: record.digestIntervalMin ?? 60,
     })
   } else {
     Object.assign(form, {
@@ -199,6 +228,11 @@ function openModal(record?: Record<string, unknown>) {
       quietHoursStart: '',
       quietHoursEnd: '',
       messageTemplate: '',
+      overrides: '',
+      failoverGroupId: '',
+      minPriority: 3,
+      digestTemplate: '',
+      digestIntervalMin: 60,
     })
   }
   modalVisible.value = true

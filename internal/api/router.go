@@ -54,14 +54,16 @@ type Router struct {
 	publicRateLimitMW  func(http.Handler) http.Handler
 }
 
-func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, logger *zap.Logger) *Router {
+func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, logger *zap.Logger) *Router {
 	siteRepo := site.NewRepository(db)
 	rssRepo := rss.NewRepository(db)
 	filterRepo := filter.NewRepository(db)
 	filterEng := filter.NewEngine(filterRepo, logger)
 	notifyRepo := notification.NewRepository(db)
 	settingsRepo := setting.NewRepository(db)
-	hub := NewHub()
+	if hub == nil {
+		hub = NewHub()
+	}
 	var dashChecker clientOnlineChecker
 	if clientMgr != nil {
 		dashChecker = clientMgr
@@ -247,12 +249,13 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/dashboard/trends/", dashboardHandler)
 
 	systemHandler := rt.chain(rt.rateLimitMW, rt.systemHandler.ServeHTTP)
+	publicSystemHandler := rt.public(rt.systemHandler.ServeHTTP)
 	mux.Handle("/api/v1/system/info", systemHandler)
 	mux.Handle("/api/v1/system/info/", systemHandler)
 	mux.Handle("/api/v1/system/logs", systemHandler)
 	mux.Handle("/api/v1/system/logs/", systemHandler)
-	mux.Handle("/api/v1/system/health", systemHandler)
-	mux.Handle("/api/v1/system/health/", systemHandler)
+	mux.Handle("/api/v1/system/health", publicSystemHandler)
+	mux.Handle("/api/v1/system/health/", publicSystemHandler)
 
 	torrentEventHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/torrent-events", torrentEventHandler)

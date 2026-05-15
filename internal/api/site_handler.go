@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -875,9 +876,8 @@ func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, 
 		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
 
-	body := make([]byte, 128*1024)
-	n, _ := resp.Body.Read(body)
-	bodyStr := string(body[:n])
+	bodyData, _ := io.ReadAll(io.LimitReader(resp.Body, 128*1024))
+	bodyStr := string(bodyData)
 	lower := strings.ToLower(bodyStr)
 
 	loginIndicators := []string{
@@ -934,9 +934,8 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body := make([]byte, 64*1024)
-	n, _ := resp.Body.Read(body)
-	bodyStr := string(body[:n])
+	bodyData, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	bodyStr := string(bodyData)
 
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return false, "API Key 无效或已过期"
@@ -980,9 +979,8 @@ func (h *SiteHandler) testPasskeyAuth(client *http.Client, s *model.Site) (bool,
 		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
 
-	body := make([]byte, 64*1024)
-	n, _ := resp.Body.Read(body)
-	bodyStr := string(body[:n])
+	bodyData, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	bodyStr := string(bodyData)
 	lower := strings.ToLower(bodyStr)
 
 	if strings.Contains(lower, `"code":401`) || strings.Contains(lower, `"code":403`) {
@@ -1018,9 +1016,8 @@ func (h *SiteHandler) detectFramework(s *model.Site) *model.DetectResult {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body := make([]byte, 64*1024)
-	n, _ := resp.Body.Read(body)
-	bodyStr := string(body[:n])
+	bodyData, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	bodyStr := string(bodyData)
 
 	framework := "generic"
 	confidence := 0.3

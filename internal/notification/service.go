@@ -172,7 +172,7 @@ func (s *Service) channelTimeout(ch *model.NotificationChannel) time.Duration {
 }
 
 func (s *Service) sendTelegram(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
-	cfg := parseConfig(ch.Config)
+	cfg := parseConfig(ch.Config, s.logger)
 	token := cfg["token"]
 	chatID := cfg["chat_id"]
 	if token == "" || chatID == "" {
@@ -190,7 +190,7 @@ func (s *Service) sendTelegram(ctx context.Context, ch *model.NotificationChanne
 }
 
 func (s *Service) sendBark(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
-	cfg := parseConfig(ch.Config)
+	cfg := parseConfig(ch.Config, s.logger)
 	serverURL := cfg["url"]
 	deviceKey := cfg["device_key"]
 	if serverURL == "" || deviceKey == "" {
@@ -202,7 +202,7 @@ func (s *Service) sendBark(ctx context.Context, ch *model.NotificationChannel, m
 }
 
 func (s *Service) sendServerChan(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
-	cfg := parseConfig(ch.Config)
+	cfg := parseConfig(ch.Config, s.logger)
 	sendKey := cfg["sendkey"]
 	if sendKey == "" {
 		return false, "缺少 sendkey"
@@ -215,7 +215,7 @@ func (s *Service) sendServerChan(ctx context.Context, ch *model.NotificationChan
 }
 
 func (s *Service) sendDingTalk(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
-	cfg := parseConfig(ch.Config)
+	cfg := parseConfig(ch.Config, s.logger)
 	webhook := cfg["webhook"]
 	secret := cfg["secret"]
 	if webhook == "" {
@@ -236,7 +236,7 @@ func (s *Service) sendDingTalk(ctx context.Context, ch *model.NotificationChanne
 }
 
 func (s *Service) sendWebhook(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
-	cfg := parseConfig(ch.Config)
+	cfg := parseConfig(ch.Config, s.logger)
 	webhookURL := cfg["url"]
 	if webhookURL == "" {
 		return false, "缺少 url"
@@ -306,20 +306,27 @@ func (s *Service) recordHistory(ctx context.Context, channelID uint, msg model.F
 }
 
 func (s *Service) resetFailures(ctx context.Context, ch *model.NotificationChannel) {
-	s.db.WithContext(ctx).Model(ch).Updates(map[string]interface{}{
+	if err := s.db.WithContext(ctx).Model(ch).Updates(map[string]interface{}{
 		"consecutive_failures": 0,
 		"healthy":              true,
-	})
+	}).Error; err != nil {
+		s.logger.Warn("reset notification failures failed", zap.Uint("channelID", ch.ID), zap.Error(err))
+	}
 }
 
 func (s *Service) incrementFailures(ctx context.Context, ch *model.NotificationChannel) {
-	s.db.WithContext(ctx).Model(ch).
-		UpdateColumn("consecutive_failures", gorm.Expr("consecutive_failures + 1"))
+	if err := s.db.WithContext(ctx).Model(ch).
+		UpdateColumn("consecutive_failures", gorm.Expr("consecutive_failures + 1")).Error; err != nil {
+		s.logger.Warn("increment notification failures failed", zap.Uint("channelID", ch.ID), zap.Error(err))
+	}
 	var updated model.NotificationChannel
 	if err := s.db.WithContext(ctx).First(&updated, ch.ID).Error; err == nil {
 		if updated.ConsecutiveFailures >= ch.MaxErrorsPerHour && ch.MaxErrorsPerHour > 0 {
-			s.db.WithContext(ctx).Model(ch).UpdateColumn("healthy", false)
-			s.logger.Warn("notification channel marked unhealthy", zap.String("name", ch.Name), zap.Int("failures", updated.ConsecutiveFailures))
+			if err := s.db.WithContext(ctx).Model(ch).UpdateColumn("healthy", false).Error; err != nil {
+				s.logger.Warn("mark channel unhealthy failed", zap.String("name", ch.Name), zap.Error(err))
+			} else {
+				s.logger.Warn("notification channel marked unhealthy", zap.String("name", ch.Name), zap.Int("failures", updated.ConsecutiveFailures))
+			}
 		}
 	}
 }
@@ -342,15 +349,23 @@ func (s *Service) inQuietHours(ch *model.NotificationChannel) bool {
 		return false
 	}
 	now := time.Now().Format("15:04")
-	return now >= ch.QuietHoursStart && now <= ch.QuietHoursEnd
+	if ch.QuietHoursStart <= ch.QuietHoursEnd {
+		return now >= ch.QuietHoursStart && now <= ch.QuietHoursEnd
+	}
+	return now >= ch.QuietHoursStart || now <= ch.QuietHoursEnd
 }
 
-func parseConfig(configStr string) map[string]string {
+func parseConfig(configStr string, logger *zap.Logger) map[string]string {
 	cfg := make(map[string]string)
 	if configStr == "" {
 		return cfg
 	}
-	_ = json.Unmarshal([]byte(configStr), &cfg)
+	if err := json.Unmarshal([]byte(configStr), &cfg); err != nil && logger != nil {
+		logger.Warn("notification config parse failed, using empty config",
+			zap.String("raw", configStr),
+			zap.Error(err),
+		)
+	}
 	return cfg
 }
 

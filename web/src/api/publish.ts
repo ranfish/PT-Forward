@@ -4,6 +4,9 @@ export const publishApi = {
   listCandidates(params?: Record<string, unknown>) {
     return client.get('/publish/candidates', { params })
   },
+  getCandidate(id: number) {
+    return client.get(`/publish/candidates/${id}`)
+  },
   deleteCandidate(id: number) {
     return client.delete(`/publish/candidates/${id}`)
   },

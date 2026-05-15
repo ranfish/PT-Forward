@@ -264,7 +264,9 @@ func (h *LifecycleHandler) handleUpdateBackpressure(w http.ResponseWriter, r *ht
 
 	existing := map[string]interface{}{}
 	if val, err := h.getSettingFromDB("lifecycle_backpressure"); err == nil && val != "" {
-		_ = json.Unmarshal([]byte(val), &existing)
+		if jsonErr := json.Unmarshal([]byte(val), &existing); jsonErr != nil {
+			h.logger.Warn("parse existing backpressure config failed", zap.Error(jsonErr))
+		}
 	}
 
 	if req.MaxConcurrent != nil {
@@ -274,7 +276,11 @@ func (h *LifecycleHandler) handleUpdateBackpressure(w http.ResponseWriter, r *ht
 		existing["pause_on_pressure"] = *req.PauseOnPressure
 	}
 
-	data, _ := json.Marshal(existing)
+	data, err := json.Marshal(existing)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 400, "failed to marshal backpressure config")
+		return
+	}
 	h.saveSetting(r, "lifecycle_backpressure", string(data))
 
 	Success(w, existing)

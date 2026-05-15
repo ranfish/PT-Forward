@@ -19,7 +19,6 @@ func NewRepository(db *gorm.DB) *Repository {
 func (r *Repository) List(ctx context.Context) ([]model.RSSSubscription, error) {
 	var subs []model.RSSSubscription
 	err := r.db.WithContext(ctx).
-		Where("deleted_at = ?", time.Time{}).
 		Order("name ASC").
 		Find(&subs).Error
 	return subs, err
@@ -28,14 +27,14 @@ func (r *Repository) List(ctx context.Context) ([]model.RSSSubscription, error) 
 func (r *Repository) ListActive(ctx context.Context) ([]model.RSSSubscription, error) {
 	var subs []model.RSSSubscription
 	err := r.db.WithContext(ctx).
-		Where("deleted_at = ? AND enabled = ? AND paused = ?", time.Time{}, true, false).
+		Where("enabled = ? AND paused = ?", true, false).
 		Find(&subs).Error
 	return subs, err
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uint) (*model.RSSSubscription, error) {
 	var sub model.RSSSubscription
-	err := r.db.WithContext(ctx).Where("deleted_at = ?", time.Time{}).First(&sub, id).Error
+	err := r.db.WithContext(ctx).First(&sub, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -51,16 +50,13 @@ func (r *Repository) Update(ctx context.Context, sub *model.RSSSubscription) err
 }
 
 func (r *Repository) Delete(ctx context.Context, id uint) error {
-	now := time.Now()
-	return r.db.WithContext(ctx).Model(&model.RSSSubscription{}).
-		Where("id = ? AND deleted_at = ?", id, time.Time{}).
-		Update("deleted_at", now).Error
+	return r.db.WithContext(ctx).Delete(&model.RSSSubscription{}, id).Error
 }
 
 func (r *Repository) ExistsByName(ctx context.Context, name string, excludeID uint) (bool, error) {
 	var count int64
 	q := r.db.WithContext(ctx).Model(&model.RSSSubscription{}).
-		Where("name = ? AND deleted_at = ?", name, time.Time{})
+		Where("name = ?", name)
 	if excludeID > 0 {
 		q = q.Where("id != ?", excludeID)
 	}
@@ -88,4 +84,17 @@ func (r *Repository) ListSeenBySite(ctx context.Context, siteName string, since 
 	}
 	err := q.Find(&seen).Error
 	return seen, err
+}
+
+func (r *Repository) CleanupOldSeen(ctx context.Context, retentionDays int) (int64, error) {
+	if retentionDays <= 0 {
+		retentionDays = 30
+	}
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	result := r.db.WithContext(ctx).
+		Where("status IN ? AND updated_at < ?",
+			[]string{"pushed", "expired", "skipped_rule"},
+			cutoff,
+		).Delete(&model.RSSTorrentSeen{})
+	return result.RowsAffected, result.Error
 }

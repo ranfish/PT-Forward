@@ -50,7 +50,10 @@ func (a *RousiAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result struct {
 		Code int `json:"code"`
 		Data struct {
@@ -112,7 +115,7 @@ func (a *RousiAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
 }
 
 func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -136,7 +139,10 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result struct {
 		Code int `json:"code"`
 		Data struct {
@@ -169,17 +175,20 @@ func (a *RousiAdapter) DetectDiscount(ctx context.Context, config *model.SiteCon
 	u := resolveBaseURL(config) + "/api/v1/torrents/" + torrentID
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("构造请求失败", err)
 	}
 	a.setAuthHeaders(req, config.Passkey)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("请求优惠信息失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result struct {
 		Data struct {
 			Promotion *struct {
@@ -191,7 +200,7 @@ func (a *RousiAdapter) DetectDiscount(ctx context.Context, config *model.SiteCon
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, parseError("解析优惠信息失败", err)
 	}
 
 	promo := result.Data.Promotion
@@ -241,7 +250,10 @@ func (a *RousiAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteC
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result struct {
 		Data struct {
 			Seeders  int `json:"seeders"`
@@ -331,7 +343,10 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`

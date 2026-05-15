@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // §33.1.1 — TorrentEvent: RSS → 系统核心事件载体（Sprint 91）
 type TorrentEvent struct {
@@ -71,7 +75,7 @@ type RSSSubscription struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	DeletedAt time.Time `json:"deleted_at" gorm:"index"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 	Name      string    `json:"name" gorm:"size:100;not null"`
 	Enabled   bool      `json:"enabled" gorm:"default:true"`
 

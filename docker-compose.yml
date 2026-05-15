@@ -1,18 +1,21 @@
-version: "3.8"
 services:
   pt-forward:
     image: pt-forward:latest
-    build: .
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
     container_name: pt-forward
     restart: unless-stopped
     ports:
-      - "8765:8765"
+      - "${PTF_SERVER_PORT:-8765}:8765"
     volumes:
-      - ./configs:/config
+      - ./configs:/config:ro
       - ./data:/data
     environment:
-      - TZ=Asia/Shanghai
-      - PTF_LOG_LEVEL=info
+      - TZ=${TZ:-Asia/Shanghai}
+      - PTF_LOG_LEVEL=${PTF_LOG_LEVEL:-info}
+      - PTF_SECURITY_ENCRYPTION_KEY=${PTF_SECURITY_ENCRYPTION_KEY:-}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8765/healthz"]
       interval: 30s

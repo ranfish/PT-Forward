@@ -10,6 +10,9 @@ export const reseedApi = {
   createTask(data: Record<string, unknown>) {
     return client.post('/reseed/tasks', data)
   },
+  updateTask(id: number, data: Record<string, unknown>) {
+    return client.put(`/reseed/tasks/${id}`, data)
+  },
   deleteTask(id: number) {
     return client.delete(`/reseed/tasks/${id}`)
   },

@@ -225,12 +225,9 @@ func TestUnit3D_DetectDiscount_None(t *testing.T) {
 
 func TestUnit3D_DetectHR(t *testing.T) {
 	a := NewUnit3DAdapter(NewHTTPDoer(), zap.NewNop())
-	result, err := a.DetectHR(context.Background(), &model.SiteConfig{}, "1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.HasHR {
-		t.Error("expected no HR")
+	_, err := a.DetectHR(context.Background(), &model.SiteConfig{}, "1")
+	if err == nil {
+		t.Fatal("expected error when no BaseURL configured")
 	}
 }
 

@@ -94,7 +94,10 @@ func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 
 	var result struct {
 		Code json.Number `json:"code"`
@@ -160,7 +163,10 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 		return nil, httpError(fmtES("genDlToken HTTP %d", resp.StatusCode), nil)
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
+	if err != nil {
+		return nil, networkError("读取 genDlToken 响应失败", err)
+	}
 	var tokenResp struct {
 		Data string `json:"data"`
 	}
@@ -187,7 +193,7 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 		return nil, httpError(fmtES("下载种子 HTTP %d", dlResp.StatusCode), nil)
 	}
 
-	return io.ReadAll(dlResp.Body)
+	return io.ReadAll(io.LimitReader(dlResp.Body, 50*1024*1024))
 }
 
 func (a *MTeamAdapter) downloadViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
@@ -212,7 +218,7 @@ func (a *MTeamAdapter) downloadViaWeb(ctx context.Context, config *model.SiteCon
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
 }
 
 func (a *MTeamAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -237,7 +243,10 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 
 	var result struct {
 		Code json.Number `json:"code"`
@@ -301,7 +310,10 @@ func (a *MTeamAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfi
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	detail := &model.TorrentDetail{}
@@ -333,18 +345,21 @@ func (a *MTeamAdapter) discountViaAPI(ctx context.Context, config *model.SiteCon
 	u := resolveBaseURL(config) + "/api/torrent/detail"
 	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader("id="+torrentID))
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("构造优惠检测请求失败", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	a.setAPIHeaders(req, config.APIKey)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("优惠检测请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var rawResult struct {
 		Data struct {
 			Status struct {
@@ -354,7 +369,7 @@ func (a *MTeamAdapter) discountViaAPI(ctx context.Context, config *model.SiteCon
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &rawResult); err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, parseError("解析优惠检测结果失败", err)
 	}
 
 	var dr *model.DiscountResult
@@ -388,17 +403,20 @@ func (a *MTeamAdapter) discountViaWeb(ctx context.Context, config *model.SiteCon
 	u := resolveBaseURL(config) + "/details.php?id=" + torrentID
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("构造优惠检测请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.DiscountResult{Level: model.DiscountNone}, nil
+		return nil, networkError("优惠检测请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	if strings.Contains(html, "pro_free2up") {
@@ -422,18 +440,21 @@ func (a *MTeamAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 		u := resolveBaseURL(config) + "/api/torrent/detail"
 		req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader("id="+torrentID))
 		if err != nil {
-			return &model.HRResult{HasHR: false}, nil
+			return nil, networkError("构造 HR 检测请求失败", err)
 		}
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		a.setAPIHeaders(req, config.APIKey)
 
 		resp, err := a.doer.Client.Do(req)
 		if err != nil {
-			return &model.HRResult{HasHR: false}, nil
+			return nil, networkError("HR 检测请求失败", err)
 		}
 		defer func() { _ = resp.Body.Close() }()
 
-		body, _ := io.ReadAll(resp.Body)
+		body, err := readBody(resp)
+		if err != nil {
+			return nil, err
+		}
 		var rawResult struct {
 			Data struct {
 				Status struct {
@@ -442,7 +463,7 @@ func (a *MTeamAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(body, &rawResult); err != nil {
-			return &model.HRResult{HasHR: false}, nil
+			return nil, parseError("解析 HR 检测结果失败", err)
 		}
 
 		if rawResult.Data.Status.HR {
@@ -454,17 +475,20 @@ func (a *MTeamAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 	u := resolveBaseURL(config) + "/details.php?id=" + torrentID
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("构造 HR 检测请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return &model.HRResult{HasHR: false}, nil
+		return nil, networkError("HR 检测请求失败", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := strings.ToLower(string(body))
 
 	hasHR := strings.Contains(html, "hit and run") ||
@@ -501,7 +525,10 @@ func (a *MTeamAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, t
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result struct {
 		Data struct {
 			Status struct {
@@ -531,7 +558,10 @@ func (a *MTeamAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, t
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 	sl := &model.SLData{}
 
@@ -562,6 +592,7 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
@@ -572,56 +603,59 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 
 	if req.Title != "" {
-		_ = writer.WriteField("name", req.Title)
+		fw.writeField("name", req.Title)
 	}
 	if req.Subtitle != "" {
-		_ = writer.WriteField("smallDescr", req.Subtitle)
+		fw.writeField("smallDescr", req.Subtitle)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("descr", req.Description)
+		fw.writeField("descr", req.Description)
 	}
 	if req.Anonymous {
-		_ = writer.WriteField("anonymous", "true")
+		fw.writeField("anonymous", "true")
 	}
 	if req.IMDbLink != "" {
-		_ = writer.WriteField("imdb", req.IMDbLink)
+		fw.writeField("imdb", req.IMDbLink)
 	}
 	if req.DoubanLink != "" {
-		_ = writer.WriteField("douban", req.DoubanLink)
+		fw.writeField("douban", req.DoubanLink)
 	}
 	if req.MediaInfo != "" {
-		_ = writer.WriteField("mediainfo", req.MediaInfo)
+		fw.writeField("mediainfo", req.MediaInfo)
 	}
 
 	if v, ok := req.FormFields["category"]; ok {
-		_ = writer.WriteField("category", v)
+		fw.writeField("category", v)
 	}
 	if v, ok := req.FormFields["source"]; ok {
-		_ = writer.WriteField("source", v)
+		fw.writeField("source", v)
 	}
 	if v, ok := req.FormFields["medium"]; ok {
-		_ = writer.WriteField("medium", v)
+		fw.writeField("medium", v)
 	}
 	if v, ok := req.FormFields["standard"]; ok {
-		_ = writer.WriteField("standard", v)
+		fw.writeField("standard", v)
 	}
 	if v, ok := req.FormFields["videoCodec"]; ok {
-		_ = writer.WriteField("videoCodec", v)
+		fw.writeField("videoCodec", v)
 	}
 	if v, ok := req.FormFields["audioCodec"]; ok {
-		_ = writer.WriteField("audioCodec", v)
+		fw.writeField("audioCodec", v)
 	}
 	if v, ok := req.FormFields["team"]; ok {
-		_ = writer.WriteField("team", v)
+		fw.writeField("team", v)
 	}
 	if v, ok := req.FormFields["processing"]; ok {
-		_ = writer.WriteField("processing", v)
+		fw.writeField("processing", v)
 	}
 
 	for k, v := range req.ExtraFields {
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
+	}
 	if err := writer.Close(); err != nil {
 		return nil, networkError("关闭 multipart writer 失败", err)
 	}
@@ -639,7 +673,10 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 
 	if resp.StatusCode == http.StatusForbidden {
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: API Key 无效或权限不足"}
@@ -694,6 +731,7 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
+	fw := newFieldWriter(writer)
 
 	fileWriter, err := writer.CreateFormFile("file", "upload.torrent")
 	if err != nil {
@@ -704,30 +742,33 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 	}
 
 	if req.Title != "" {
-		_ = writer.WriteField("name", req.Title)
+		fw.writeField("name", req.Title)
 	}
 	if req.Subtitle != "" {
-		_ = writer.WriteField("small_descr", req.Subtitle)
+		fw.writeField("small_descr", req.Subtitle)
 	}
 	if req.Description != "" {
-		_ = writer.WriteField("descr", req.Description)
+		fw.writeField("descr", req.Description)
 	}
 	if req.IMDbLink != "" {
-		_ = writer.WriteField("url", req.IMDbLink)
+		fw.writeField("url", req.IMDbLink)
 	}
 	if req.Anonymous {
-		_ = writer.WriteField("uplver", "1")
+		fw.writeField("uplver", "1")
 	}
 	if req.DoubanLink != "" {
-		_ = writer.WriteField("douban", req.DoubanLink)
+		fw.writeField("douban", req.DoubanLink)
 	}
 	if req.MediaInfo != "" {
-		_ = writer.WriteField("mediainfo", req.MediaInfo)
+		fw.writeField("mediainfo", req.MediaInfo)
 	}
 	for k, v := range req.FormFields {
-		_ = writer.WriteField(k, v)
+		fw.writeField(k, v)
 	}
 
+	if err := fw.hasError(); err != nil {
+		return nil, fmt.Errorf("write form field: %w", err)
+	}
 	if err := writer.Close(); err != nil {
 		return nil, networkError("关闭 multipart writer 失败", err)
 	}
@@ -745,7 +786,10 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	html := string(body)
 
 	if resp.StatusCode == http.StatusForbidden {

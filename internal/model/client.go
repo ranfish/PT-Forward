@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // §33.1.41 — ClientConfig: 下载器配置（Sprint 78 DB-2）
 type ClientConfig struct {
@@ -18,7 +22,7 @@ type ClientConfig struct {
 	LastPingAt     *time.Time `json:"last_ping_at"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
-	DeletedAt      time.Time  `json:"deleted_at" gorm:"index"`
+	DeletedAt      gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 func (ClientConfig) TableName() string { return "clients" }

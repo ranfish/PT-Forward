@@ -35,6 +35,7 @@ type testEnv struct {
 	mux          *http.ServeMux
 	token        string
 	taskRegistry *scheduler.Registry
+	stopCh       chan struct{}
 }
 
 func setupTestEnv(t *testing.T) *testEnv {
@@ -66,7 +67,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	seedingEngine := seeding.NewEngine(db, logger)
 	taskRegistry := scheduler.NewRegistry(logger)
 
-	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, nil, taskRegistry, &mockIYUUQueryService{}, "test", logger)
+	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, nil, taskRegistry, &mockIYUUQueryService{}, "test", nil, logger)
 	mux := http.NewServeMux()
 	router.Register(mux, []string{"*"}, true, 120)
 
@@ -75,7 +76,9 @@ func setupTestEnv(t *testing.T) *testEnv {
 		authManager: authManager,
 		router:      router,
 		mux:         mux,
+		stopCh:      make(chan struct{}),
 	}
+	go router.Hub().Run(env.stopCh)
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("TestP@ss1"), 10)
 	db.Create(&model.User{
@@ -5434,7 +5437,7 @@ func setupTestEnvWithClientMgr(t *testing.T) *testEnv {
 	seedingEngine := seeding.NewEngine(db, logger)
 	taskRegistry := scheduler.NewRegistry(logger)
 	clientMgr := client.NewManager(db, logger)
-	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, clientMgr, taskRegistry, &mockIYUUQueryService{}, "test", logger)
+	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, clientMgr, taskRegistry, &mockIYUUQueryService{}, "test", nil, logger)
 	mux := http.NewServeMux()
 	router.Register(mux, []string{"*"}, true, 120)
 	env := &testEnv{
@@ -5443,7 +5446,9 @@ func setupTestEnvWithClientMgr(t *testing.T) *testEnv {
 		router:       router,
 		mux:          mux,
 		taskRegistry: taskRegistry,
+		stopCh:       make(chan struct{}),
 	}
+	go router.Hub().Run(env.stopCh)
 	hash, _ := bcrypt.GenerateFromPassword([]byte("TestP@ss1"), 10)
 	db.Create(&model.User{
 		Username:     "admin",

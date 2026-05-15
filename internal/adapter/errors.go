@@ -2,6 +2,8 @@ package adapter
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 
 	"github.com/ranfish/pt-forward/internal/model"
 )
@@ -66,4 +68,12 @@ func searchError(msg string, err error) *model.AppError {
 
 func fmtES(format string, args ...interface{}) string {
 	return fmt.Sprintf(format, args...)
+}
+
+func readBody(resp *http.Response) ([]byte, error) {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, networkError("读取响应失败", err)
+	}
+	return body, nil
 }

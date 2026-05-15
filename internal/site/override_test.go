@@ -585,7 +585,7 @@ func TestSeedExclusions_CreatesExclusions(t *testing.T) {
 	require.NoError(t, SeedExclusions(db))
 	var count int64
 	db.Model(&model.PublishExclusion{}).Count(&count)
-	assert.Equal(t, int64(len(defaultExclusions)), count)
+	assert.Equal(t, int64(len(loadSeedData().Exclusions)), count)
 }
 
 func TestSeedExclusions_SpecificExclusion(t *testing.T) {
@@ -604,7 +604,7 @@ func TestSeedExclusions_Idempotent(t *testing.T) {
 	require.NoError(t, SeedExclusions(db))
 	var count int64
 	db.Model(&model.PublishExclusion{}).Count(&count)
-	assert.Equal(t, int64(len(defaultExclusions)), count)
+	assert.Equal(t, int64(len(loadSeedData().Exclusions)), count)
 }
 
 func TestSeedFormFieldOverrides_CreatesOverrides(t *testing.T) {
@@ -636,5 +636,5 @@ func TestSeedFormFieldOverrides_Idempotent(t *testing.T) {
 	require.NoError(t, SeedFormFieldOverrides(db))
 	var count int64
 	db.Model(&model.SiteConfigOverride{}).Count(&count)
-	assert.Equal(t, int64(len(defaultFormFieldOverrides)), count)
+	assert.Equal(t, int64(len(loadSeedData().Overrides)), count)
 }

@@ -266,11 +266,10 @@ func (h *RSSHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 	var total int64
 	h.db.Model(&model.RSSSubscription{}).
-		Where("deleted_at = ?", time.Time{}).
 		Count(&total)
 
 	var subs []model.RSSSubscription
-	h.db.Where("deleted_at = ?", time.Time{}).
+	h.db.
 		Order("name ASC").
 		Offset(offset(page, size)).Limit(size).
 		Find(&subs)

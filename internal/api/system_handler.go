@@ -115,10 +115,14 @@ func (h *SystemHandler) handleInfo(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	var rssCount int64
-	h.db.Model(&model.RSSSubscription{}).Where("enabled = ? AND deleted_at = ?", true, time.Time{}).Count(&rssCount)
+	if err := h.db.Model(&model.RSSSubscription{}).Where("enabled = ?", true).Count(&rssCount).Error; err != nil {
+		h.logger.Warn("query rss subscription count failed", zap.Error(err))
+	}
 
 	var seedingActive int64
-	h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&seedingActive)
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&seedingActive).Error; err != nil {
+		h.logger.Warn("query seeding active count failed", zap.Error(err))
+	}
 
 	uptime := time.Since(startTime)
 
@@ -206,10 +210,15 @@ func (h *SystemHandler) handleClearLogs(w http.ResponseWriter, _ *http.Request) 
 	}
 
 	matches, _ := filepath.Glob(filepath.Join(logDir, "*.log"))
+	deleted := 0
 	for _, f := range matches {
-		_ = os.Truncate(f, 0)
+		if err := os.Truncate(f, 0); err != nil {
+			h.logger.Warn("truncate log failed", zap.String("file", f), zap.Error(err))
+		} else {
+			deleted++
+		}
 	}
-	Success(w, map[string]interface{}{"deleted": len(matches)})
+	Success(w, map[string]interface{}{"deleted": deleted})
 }
 
 var startTime = time.Now()

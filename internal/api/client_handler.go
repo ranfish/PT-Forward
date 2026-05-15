@@ -99,10 +99,10 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	page, size := parsePagination(r)
 
 	var total int64
-	h.db.Model(&model.ClientConfig{}).Where("deleted_at = ?", time.Time{}).Count(&total)
+	h.db.Model(&model.ClientConfig{}).Count(&total)
 
 	var clients []model.ClientConfig
-	h.db.Where("deleted_at = ?", time.Time{}).
+	h.db.
 		Offset(offset(page, size)).Limit(size).
 		Find(&clients)
 
@@ -183,7 +183,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var existing model.ClientConfig
-	if h.db.Where("name = ? AND deleted_at = ?", req.Name, time.Time{}).First(&existing).Error == nil {
+	if h.db.Where("name = ?", req.Name).First(&existing).Error == nil {
 		Error(w, http.StatusConflict, 40900, "下载器名称已存在")
 		return
 	}

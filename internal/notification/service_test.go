@@ -447,14 +447,14 @@ func TestCalcDingTalkSign(t *testing.T) {
 }
 
 func TestParseConfig_Empty(t *testing.T) {
-	cfg := parseConfig("")
+	cfg := parseConfig("", nil)
 	if len(cfg) != 0 {
 		t.Errorf("expected empty map, got %v", cfg)
 	}
 }
 
 func TestParseConfig_ValidJSON(t *testing.T) {
-	cfg := parseConfig(`{"token":"abc","chat_id":"123"}`)
+	cfg := parseConfig(`{"token":"abc","chat_id":"123"}`, nil)
 	if cfg["token"] != "abc" {
 		t.Errorf("expected token=abc, got %s", cfg["token"])
 	}
@@ -464,7 +464,7 @@ func TestParseConfig_ValidJSON(t *testing.T) {
 }
 
 func TestParseConfig_InvalidJSON(t *testing.T) {
-	cfg := parseConfig("not json")
+	cfg := parseConfig("not json", nil)
 	if len(cfg) != 0 {
 		t.Errorf("expected empty map for invalid JSON, got %v", cfg)
 	}

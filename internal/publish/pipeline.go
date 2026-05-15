@@ -191,13 +191,17 @@ func (p *Pipeline) validateAndLoadCandidate(ctx context.Context, id uint) (*mode
 func (p *Pipeline) fetchSourceInfo(ctx context.Context, candidate *model.PublishCandidate) (*model.TorrentDetail, *model.SiteConfig, model.SiteAdapter, error) {
 	sourceConfig, err := p.siteProvider.GetSiteConfig(ctx, candidate.SourceSite)
 	if err != nil {
-		_ = p.UpdateCandidateStatus(ctx, candidate.ID, model.CandidateFailed, fmt.Sprintf("获取源站配置失败: %v", err))
+		if statusErr := p.UpdateCandidateStatus(ctx, candidate.ID, model.CandidateFailed, fmt.Sprintf("获取源站配置失败: %v", err)); statusErr != nil {
+			p.logger.Warn("update candidate status failed", zap.Uint("id", candidate.ID), zap.Error(statusErr))
+		}
 		return nil, nil, nil, &model.AppError{Code: 50001, Message: "获取源站配置失败", Cause: err}
 	}
 
 	sourceAdapter, err := p.siteProvider.GetAdapter(ctx, candidate.SourceSite)
 	if err != nil {
-		_ = p.UpdateCandidateStatus(ctx, candidate.ID, model.CandidateFailed, fmt.Sprintf("获取源站适配器失败: %v", err))
+		if statusErr := p.UpdateCandidateStatus(ctx, candidate.ID, model.CandidateFailed, fmt.Sprintf("获取源站适配器失败: %v", err)); statusErr != nil {
+			p.logger.Warn("update candidate status failed", zap.Uint("id", candidate.ID), zap.Error(statusErr))
+		}
 		return nil, nil, nil, &model.AppError{Code: 50001, Message: "获取源站适配器失败", Cause: err}
 	}
 
@@ -216,7 +220,9 @@ func (p *Pipeline) fetchSourceInfo(ctx context.Context, candidate *model.Publish
 		}
 		if len(extraTexts) > 0 {
 			if eligible, reason := p.checkForbiddenContent(extraTexts); !eligible {
-				_ = p.UpdateCandidateStatus(ctx, candidate.ID, model.CandidateSkipped, reason)
+				if statusErr := p.UpdateCandidateStatus(ctx, candidate.ID, model.CandidateSkipped, reason); statusErr != nil {
+					p.logger.Warn("update candidate status failed", zap.Uint("id", candidate.ID), zap.Error(statusErr))
+				}
 				return nil, nil, nil, &model.AppError{Code: 40001, Message: fmt.Sprintf("发布合规检查未通过: %s", reason)}
 			}
 		}
@@ -314,28 +320,38 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 	return true, nil
 }
 
-func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (*model.PublishRequest, error) {
-	title := candidate.TorrentName
+type descResult struct {
+	Text      string
+	IMDbLink  string
+	DoubanLink string
+	TMDBID    string
+}
+
+func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite, title string, sourceDetail *model.TorrentDetail) descResult {
 	descriptionText := ""
 	if sourceDetail != nil {
 		descriptionText = sourceDetail.Description
 	}
 
 	descData := &model.DescriptionData{
-		SourceSite:    candidate.SourceSite,
-		MediaInfoText: "",
-		Screenshots:   nil,
+		SourceSite: sourceSite,
 	}
 	if sourceDetail != nil {
 		descData.MediaInfoText = sourceDetail.MediaInfo
 		descData.Screenshots = sourceDetail.Screenshots
 	}
 
+	var result descResult
 	ptgenResult, ptgenErr := p.queryPTGen(ctx, title)
 	if ptgenErr == nil && ptgenResult != nil {
 		descData.PosterURL = ptgenResult.PosterURL
 		if ptgenResult.RawBBCode != "" {
 			descData.PTGenBody = ptgenResult.RawBBCode
+		}
+		result.IMDbLink = ptgenResult.IMDBURL
+		result.DoubanLink = ptgenResult.DoubanURL
+		if ptgenResult.TMDbURL != "" {
+			result.TMDBID = extractTMDBID(ptgenResult.TMDbURL)
 		}
 	}
 
@@ -359,62 +375,66 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 		}
 	}
 
+	result.Text = descriptionText
+	return result
+}
+
+func populateFormFields(fields map[string]string, detail *model.TorrentDetail) {
+	if detail == nil {
+		return
+	}
+	if detail.Category != "" {
+		fields["category"] = detail.Category
+	}
+	if detail.Source != "" {
+		fields["source"] = detail.Source
+	}
+	if detail.Resolution != "" {
+		fields["resolution"] = detail.Resolution
+	}
+	if detail.Codec != "" {
+		fields["codec"] = detail.Codec
+	}
+	if detail.AudioCodec != "" {
+		fields["audioCodec"] = detail.AudioCodec
+	}
+	if detail.Processing != "" {
+		fields["processing"] = detail.Processing
+	}
+	if detail.ReleaseGroup != "" {
+		fields["team"] = detail.ReleaseGroup
+	}
+	if detail.Region != "" {
+		fields["region"] = detail.Region
+	}
+	if detail.IMDbID != "" {
+		fields["imdb"] = detail.IMDbID
+	}
+}
+
+func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (*model.PublishRequest, error) {
+	title := candidate.TorrentName
+	desc := p.renderDescription(ctx, candidate.SourceSite, targetSite, title, sourceDetail)
+
 	pubReq := &model.PublishRequest{
 		TorrentData:     torrentData,
 		Title:           title,
-		Description:     descriptionText,
+		Description:     desc.Text,
 		SourceSite:      candidate.SourceSite,
 		SourceInfoHash:  candidate.InfoHash,
 		SourceTorrentID: candidate.SourceTorrentID,
 		TargetSite:      targetSite,
 		FormFields:      make(map[string]string),
+		IMDbLink:        desc.IMDbLink,
+		DoubanLink:      desc.DoubanLink,
 	}
 
-	if ptgenResult != nil {
-		if ptgenResult.IMDBURL != "" {
-			pubReq.IMDbLink = ptgenResult.IMDBURL
-		}
-		if ptgenResult.DoubanURL != "" {
-			pubReq.DoubanLink = ptgenResult.DoubanURL
-		}
-		if ptgenResult.TMDbURL != "" {
-			if tmdbID := extractTMDBID(ptgenResult.TMDbURL); tmdbID != "" {
-				if pubReq.ExtraFields == nil {
-					pubReq.ExtraFields = make(map[string]string)
-				}
-				pubReq.ExtraFields["tmdb_id"] = tmdbID
-			}
-		}
+	if desc.TMDBID != "" {
+		pubReq.ExtraFields = map[string]string{"tmdb_id": desc.TMDBID}
 	}
 
 	if sourceDetail != nil {
-		if sourceDetail.Category != "" {
-			pubReq.FormFields["category"] = sourceDetail.Category
-		}
-		if sourceDetail.Source != "" {
-			pubReq.FormFields["source"] = sourceDetail.Source
-		}
-		if sourceDetail.Resolution != "" {
-			pubReq.FormFields["resolution"] = sourceDetail.Resolution
-		}
-		if sourceDetail.Codec != "" {
-			pubReq.FormFields["codec"] = sourceDetail.Codec
-		}
-		if sourceDetail.AudioCodec != "" {
-			pubReq.FormFields["audioCodec"] = sourceDetail.AudioCodec
-		}
-		if sourceDetail.Processing != "" {
-			pubReq.FormFields["processing"] = sourceDetail.Processing
-		}
-		if sourceDetail.ReleaseGroup != "" {
-			pubReq.FormFields["team"] = sourceDetail.ReleaseGroup
-		}
-		if sourceDetail.Region != "" {
-			pubReq.FormFields["region"] = sourceDetail.Region
-		}
-		if sourceDetail.IMDbID != "" {
-			pubReq.FormFields["imdb"] = sourceDetail.IMDbID
-		}
+		populateFormFields(pubReq.FormFields, sourceDetail)
 		pubReq.MediaInfo = sourceDetail.MediaInfo
 		pubReq.Screenshots = sourceDetail.Screenshots
 	}
@@ -1116,51 +1136,13 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 		}
 
 		descriptionText := ""
-		if sourceDetail != nil {
-			descriptionText = sourceDetail.Description
-		}
-
 		var imdbLink, doubanLink string
 
 		if member.LastCompletedStep < StepRender {
-			descData := &model.DescriptionData{
-				SourceSite: group.SourceSite,
-			}
-			if sourceDetail != nil {
-				descData.MediaInfoText = sourceDetail.MediaInfo
-				descData.Screenshots = sourceDetail.Screenshots
-			}
-
-			ptgenResult, ptgenErr := p.queryPTGen(ctx, title)
-			if ptgenErr == nil && ptgenResult != nil {
-				descData.PosterURL = ptgenResult.PosterURL
-				if ptgenResult.RawBBCode != "" {
-					descData.PTGenBody = ptgenResult.RawBBCode
-				}
-				imdbLink = ptgenResult.IMDBURL
-				doubanLink = ptgenResult.DoubanURL
-			}
-
-			if descriptionText == "" && descData.PTGenBody != "" {
-				descriptionText = descData.PTGenBody
-			}
-
-			var descConfig model.SiteDescConfig
-			siteInfo, siteInfoErr := p.siteProvider.GetSiteInfo(ctx, member.SiteName)
-			if siteInfoErr == nil && siteInfo != nil {
-				siteConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, siteInfo.BaseURL)
-				if cfgErr == nil && siteConfig != nil {
-					descConfig = siteConfig.Publish.Description
-				}
-			}
-
-			if descConfig.Format != "" || descConfig.TemplateOverride != "" {
-				renderer := description.NewRenderer(descConfig.Format)
-				if rendered, err := renderer.Render(descData, descConfig); err == nil && rendered != "" {
-					descriptionText = rendered
-				}
-			}
-
+			desc := p.renderDescription(ctx, group.SourceSite, member.SiteName, title, sourceDetail)
+			descriptionText = desc.Text
+			imdbLink = desc.IMDbLink
+			doubanLink = desc.DoubanLink
 			if err := p.advanceStep(ctx, member, StepRender); err != nil {
 				p.logger.Warn("advanceStep render failed", zap.Error(err))
 			}
@@ -1180,35 +1162,9 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 		}
 
 		if sourceDetail != nil {
+			populateFormFields(pubReq.FormFields, sourceDetail)
 			pubReq.MediaInfo = sourceDetail.MediaInfo
 			pubReq.Screenshots = sourceDetail.Screenshots
-			if sourceDetail.Category != "" {
-				pubReq.FormFields["category"] = sourceDetail.Category
-			}
-			if sourceDetail.Source != "" {
-				pubReq.FormFields["source"] = sourceDetail.Source
-			}
-			if sourceDetail.Resolution != "" {
-				pubReq.FormFields["resolution"] = sourceDetail.Resolution
-			}
-			if sourceDetail.Codec != "" {
-				pubReq.FormFields["codec"] = sourceDetail.Codec
-			}
-			if sourceDetail.AudioCodec != "" {
-				pubReq.FormFields["audioCodec"] = sourceDetail.AudioCodec
-			}
-			if sourceDetail.Processing != "" {
-				pubReq.FormFields["processing"] = sourceDetail.Processing
-			}
-			if sourceDetail.ReleaseGroup != "" {
-				pubReq.FormFields["team"] = sourceDetail.ReleaseGroup
-			}
-			if sourceDetail.Region != "" {
-				pubReq.FormFields["region"] = sourceDetail.Region
-			}
-			if sourceDetail.IMDbID != "" {
-				pubReq.FormFields["imdb"] = sourceDetail.IMDbID
-			}
 		}
 
 		if pubReq.DoubanLink != "" && pubReq.FormFields["douban"] == "" {
@@ -1248,22 +1204,28 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 }
 
 func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMember) {
+	advanceHR := func() {
+		if err := p.advanceStep(ctx, member, StepHRDetect); err != nil {
+			p.logger.Warn("advanceStep HR failed", zap.Uint("memberID", member.ID), zap.Error(err))
+		}
+	}
+
 	if member.TorrentID == "" {
-		_ = p.advanceStep(ctx, member, StepHRDetect)
+		advanceHR()
 		return
 	}
 
 	targetConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, member.SiteName)
 	if cfgErr != nil {
 		p.logger.Warn("HR 检测: 获取目标站配置失败", zap.Error(cfgErr))
-		_ = p.advanceStep(ctx, member, StepHRDetect)
+		advanceHR()
 		return
 	}
 
 	targetAdapter, adpErr := p.siteProvider.GetAdapter(ctx, member.SiteName)
 	if adpErr != nil {
 		p.logger.Warn("HR 检测: 获取目标站适配器失败", zap.Error(adpErr))
-		_ = p.advanceStep(ctx, member, StepHRDetect)
+		advanceHR()
 		return
 	}
 
@@ -1274,7 +1236,7 @@ func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMembe
 			zap.String("torrentID", member.TorrentID),
 			zap.Error(hrErr),
 		)
-		_ = p.advanceStep(ctx, member, StepHRDetect)
+		advanceHR()
 		return
 	}
 
@@ -1313,7 +1275,7 @@ func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMembe
 			zap.Int("seedTimeH", seedTimeH),
 		)
 	}
-	_ = p.advanceStep(ctx, member, StepHRDetect)
+	advanceHR()
 }
 
 func (p *Pipeline) notifyPublishResult(ctx context.Context, member *model.PublishGroupMember) {
@@ -1447,7 +1409,7 @@ func (p *Pipeline) processDownloadCandidate(ctx context.Context, c *model.Publis
 	}
 	subQuery := p.db.WithContext(ctx).Table("rss_subscriptions").
 		Select("save_path, category, add_paused, auto_tmm").
-		Where("id = ? AND deleted_at = ?", c.SubscriptionID, time.Time{})
+		Where("id = ?", c.SubscriptionID)
 	if err := subQuery.First(&sub).Error; err != nil {
 		return fmt.Errorf("get subscription settings: %w", err)
 	}
@@ -1488,7 +1450,9 @@ func (p *Pipeline) processDownloadCandidate(ctx context.Context, c *model.Publis
 		return fmt.Errorf("add torrent to downloader: %w", err)
 	}
 
-	_ = p.UpdateCandidateStatus(ctx, c.ID, model.CandidateDownloading, "")
+	if err := p.UpdateCandidateStatus(ctx, c.ID, model.CandidateDownloading, ""); err != nil {
+		p.logger.Warn("update candidate to downloading failed", zap.Uint("id", c.ID), zap.Error(err))
+	}
 
 	p.logger.Info("torrent added to downloader",
 		zap.String("client", c.ClientID),
@@ -1504,7 +1468,13 @@ func (p *Pipeline) processDownloadCandidate(ctx context.Context, c *model.Publis
 	)
 
 	if p.completionWatcher != nil && result != nil && result.InfoHash != "" {
-		_ = p.completionWatcher.Watch(ctx, c.ClientID, result.InfoHash, c.ID)
+		if err := p.completionWatcher.Watch(ctx, c.ClientID, result.InfoHash, c.ID); err != nil {
+			p.logger.Warn("completion watcher register failed",
+				zap.String("clientID", c.ClientID),
+				zap.String("infoHash", result.InfoHash),
+				zap.Error(err),
+			)
+		}
 	}
 
 	return nil
