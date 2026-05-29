@@ -1,30 +1,24 @@
 import client from './client'
-
-export interface SchedulerTask {
-  name: string
-  type: string
-  schedule: string
-  last_run_at: string | null
-  last_error: string
-  success_count: number
-  error_count: number
-  paused: boolean
-}
+import type { SchedulerTask } from './types'
+import type { ApiResponse } from './types'
 
 export const schedulerApi = {
   list() {
-    return client.get<{ data: { items: SchedulerTask[]; total: number } }>('/scheduler/tasks')
+    return client.get<ApiResponse<{ items: SchedulerTask[]; total: number }>>('/scheduler/tasks')
+  },
+  get(name: string) {
+    return client.get<ApiResponse<SchedulerTask>>(`/scheduler/tasks/${encodeURIComponent(name)}`)
   },
   pause(name: string) {
-    return client.post(`/scheduler/tasks/${encodeURIComponent(name)}/pause`)
+    return client.post<ApiResponse<void>>(`/scheduler/tasks/${encodeURIComponent(name)}/pause`)
   },
   resume(name: string) {
-    return client.post(`/scheduler/tasks/${encodeURIComponent(name)}/resume`)
+    return client.post<ApiResponse<void>>(`/scheduler/tasks/${encodeURIComponent(name)}/resume`)
   },
   trigger(name: string) {
-    return client.post(`/scheduler/tasks/${encodeURIComponent(name)}/trigger`)
+    return client.post<ApiResponse<void>>(`/scheduler/tasks/${encodeURIComponent(name)}/trigger`)
   },
   reschedule(name: string, schedule: string) {
-    return client.put(`/scheduler/tasks/${encodeURIComponent(name)}/schedule`, { schedule })
+    return client.put<ApiResponse<void>>(`/scheduler/tasks/${encodeURIComponent(name)}/schedule`, { schedule })
   },
 }

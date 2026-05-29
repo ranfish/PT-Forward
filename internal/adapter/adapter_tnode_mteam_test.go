@@ -1036,7 +1036,7 @@ func TestMTeam_DetectHR_API_NoHR(t *testing.T) {
 
 func TestMTeam_DetectHR_Web_HR(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>Hit and Run Policy</body></html>`))
+		_, _ = w.Write([]byte(`<html><body><img class="hitandrun" src="x.gif" /></body></html>`))
 	}))
 	defer srv.Close()
 
@@ -1053,19 +1053,99 @@ func TestMTeam_DetectHR_Web_HR(t *testing.T) {
 }
 
 func TestMTeam_DetectHR_Web_NoHR(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>normal torrent details</body></html>`))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `<html><body>no hr here</body></html>`)
 	}))
 	defer srv.Close()
 
-	doer := &HTTPDoer{Client: srv.Client()}
-	a := NewMTeamAdapter(doer, zap.NewNop())
+	a := NewMTeamAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	config := &model.SiteConfig{}
+	config.Domain = srv.URL
+	config.Cookie = "test=1"
 
-	result, err := a.DetectHR(context.Background(), &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}, "1")
+	result, err := a.DetectHR(context.Background(), config, "42")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if result.HasHR {
 		t.Error("expected HasHR=false")
+	}
+}
+
+func TestMTeam_DetectHRAndDiscount_API_Combined(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"data":{"status":{"discount":"FREE","discountEndTime":"2026-12-31T23:59:59Z","hr":true}}}`)
+	}))
+	defer srv.Close()
+
+	a := NewMTeamAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	config := &model.SiteConfig{}
+	config.Domain = srv.URL
+	config.APIKey = "test-key"
+	config.HR = model.SiteHRConfig{DefaultSeedTimeH: 48}
+
+	hrResult, discResult, err := a.DetectHRAndDiscount(context.Background(), config, "123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hrResult == nil || !hrResult.HasHR {
+		t.Error("expected HasHR=true")
+	}
+	if hrResult.SeedTimeH != 48 {
+		t.Errorf("expected SeedTimeH=48, got %d", hrResult.SeedTimeH)
+	}
+	if discResult == nil || discResult.Level != model.DiscountFree {
+		t.Errorf("expected DiscountFree, got %v", discResult)
+	}
+	if discResult.FreeEndAt == nil {
+		t.Error("expected FreeEndAt to be set")
+	}
+}
+
+func TestMTeam_DetectHRAndDiscount_API_Normal(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"data":{"status":{"discount":"NORMAL","hr":false}}}`)
+	}))
+	defer srv.Close()
+
+	a := NewMTeamAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	config := &model.SiteConfig{}
+	config.Domain = srv.URL
+	config.APIKey = "test-key"
+
+	hrResult, discResult, err := a.DetectHRAndDiscount(context.Background(), config, "456")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hrResult == nil || hrResult.HasHR {
+		t.Error("expected HasHR=false")
+	}
+	if discResult == nil || discResult.Level != model.DiscountNone {
+		t.Errorf("expected DiscountNone, got %v", discResult)
+	}
+}
+
+func TestMTeam_DetectHRAndDiscount_WebFallback(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `<html><body>no hr no discount</body></html>`)
+	}))
+	defer srv.Close()
+
+	a := NewMTeamAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	config := &model.SiteConfig{}
+	config.Domain = srv.URL
+	config.Cookie = "test=1"
+
+	hrResult, discResult, err := a.DetectHRAndDiscount(context.Background(), config, "123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hrResult == nil || hrResult.HasHR {
+		t.Error("expected HasHR=false")
+	}
+	if discResult == nil || discResult.Level != model.DiscountNone {
+		t.Errorf("expected DiscountNone, got %v", discResult)
 	}
 }

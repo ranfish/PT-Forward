@@ -9,22 +9,23 @@ import (
 	"gorm.io/gorm"
 )
 
-func RegisterCallbacks(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) {
+func RegisterCallbacks(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) error {
 	if err := db.Callback().Create().Before("gorm:create").Register("crypto:encrypt", func(d *gorm.DB) {
 		encryptFields(d, enc, logger)
 	}); err != nil {
-		panic(fmt.Sprintf("register crypto:create callback: %v", err))
+		return fmt.Errorf("register crypto:create callback: %w", err)
 	}
 	if err := db.Callback().Update().Before("gorm:update").Register("crypto:encrypt", func(d *gorm.DB) {
 		encryptFields(d, enc, logger)
 	}); err != nil {
-		panic(fmt.Sprintf("register crypto:update callback: %v", err))
+		return fmt.Errorf("register crypto:update callback: %w", err)
 	}
 	if err := db.Callback().Query().After("gorm:query").Register("crypto:decrypt", func(d *gorm.DB) {
 		decryptResults(d, enc, logger)
 	}); err != nil {
-		panic(fmt.Sprintf("register crypto:query callback: %v", err))
+		return fmt.Errorf("register crypto:query callback: %w", err)
 	}
+	return nil
 }
 
 func encryptFields(d *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger) {
@@ -123,7 +124,9 @@ func decryptValue(val reflect.Value, enc *CredentialEncryptor, logger *zap.Logge
 			}
 			plain, err := enc.Decrypt(encValue)
 			if err != nil {
-				logger.Error("decrypt field failed", zap.String("field", ft.Name), zap.Error(err))
+				logger.Error("decrypt field failed, clearing credential",
+					zap.String("field", ft.Name), zap.Error(err))
+				fv.SetString("")
 				continue
 			}
 			fv.SetString(plain)
@@ -165,7 +168,8 @@ func MigratePlaintext(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger)
 		for _, col := range model.Columns {
 			var count int64
 			err := db.Table(model.TableName).
-				Where(col+" != '' AND "+col+" NOT LIKE ?", ciphertextPrefix+"%").
+				Where(col+" != '' AND "+col+" NOT LIKE ? AND "+col+" NOT LIKE ?",
+					ciphertextPrefix+"%", ciphertextV2Prefix+"%").
 				Count(&count).Error
 			if err != nil {
 				if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "doesn't exist") {
@@ -188,7 +192,8 @@ func MigratePlaintext(db *gorm.DB, enc *CredentialEncryptor, logger *zap.Logger)
 			)
 			rows, err := db.Table(model.TableName).
 				Select("id, "+col).
-				Where(col+" != '' AND "+col+" NOT LIKE ?", ciphertextPrefix+"%").
+				Where(col+" != '' AND "+col+" NOT LIKE ? AND "+col+" NOT LIKE ?",
+					ciphertextPrefix+"%", ciphertextV2Prefix+"%").
 				Rows()
 			if err != nil {
 				logger.Warn("migration query failed",

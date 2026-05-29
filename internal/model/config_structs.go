@@ -34,3 +34,8 @@ type SecurityConfig struct {
 	EncryptionKey  string   `yaml:"encryption_key"       mapstructure:"encryption_key"`
 	TrustedProxies []string `yaml:"trusted_proxies"      mapstructure:"trusted_proxies"`
 }
+
+type MemoryConfig struct {
+	MaxTotalMB  int     `yaml:"max_total_mb"  mapstructure:"max_total_mb"`
+	WarnPercent float64 `yaml:"warn_percent"  mapstructure:"warn_percent"`
+}

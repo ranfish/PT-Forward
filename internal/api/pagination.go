@@ -20,6 +20,9 @@ func parsePagination(r *http.Request) (page, size int) {
 			page = v
 		}
 	}
+	if page > 10000 {
+		page = 10000
+	}
 	if s := r.URL.Query().Get("size"); s != "" {
 		if v, err := strconv.Atoi(s); err == nil && v > 0 && v <= 200 {
 			size = v

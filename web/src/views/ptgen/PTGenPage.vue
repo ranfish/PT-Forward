@@ -117,9 +117,9 @@ async function fetchCache() {
       page: cachePagination.current,
       size: cachePagination.pageSize,
     })
-    const data = resp.data?.data || {}
-    caches.value = data.items || []
-    cachePagination.total = data.total || 0
+    const data = resp.data?.data || []
+    caches.value = data
+    cachePagination.total = data.length
   } catch {
   } finally {
     cacheLoading.value = false

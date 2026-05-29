@@ -12,6 +12,7 @@ type Config struct {
 	Database model.DatabaseConfig `yaml:"database" mapstructure:"database"`
 	Log      model.LogConfig      `yaml:"log" mapstructure:"log"`
 	Security model.SecurityConfig `yaml:"security" mapstructure:"security"`
+	Memory   model.MemoryConfig   `yaml:"memory" mapstructure:"memory"`
 }
 
 func (c *Config) Validate() error {

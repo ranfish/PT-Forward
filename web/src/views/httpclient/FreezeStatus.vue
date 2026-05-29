@@ -112,7 +112,7 @@ async function fetchFreezeStatuses() {
   freezeLoading.value = true
   try {
     const resp = await httpclientApi.getFreezeStatuses()
-    freezeStatuses.value = resp.data.data || []
+    freezeStatuses.value = (resp.data.data || []) as unknown as FreezeStatusItem[]
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   } finally {
@@ -124,7 +124,7 @@ async function fetchCircuitStatuses() {
   circuitLoading.value = true
   try {
     const resp = await httpclientApi.getCircuitStatuses()
-    circuitStatuses.value = resp.data.data || []
+    circuitStatuses.value = (resp.data.data || []) as CircuitStatusItem[]
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   } finally {

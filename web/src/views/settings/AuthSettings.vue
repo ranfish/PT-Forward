@@ -1,5 +1,21 @@
 <template>
   <div>
+    <a-card :title="t('auth.profile')" style="max-width: 500px; margin-bottom: 16px">
+      <a-form :model="profileForm" layout="vertical" @finish="handleProfileSubmit">
+        <a-form-item :label="t('auth.username')">
+          <a-input :value="profile.username" disabled />
+        </a-form-item>
+        <a-form-item :label="t('auth.displayName')" name="displayName">
+          <a-input v-model:value="profileForm.displayName" :placeholder="t('auth.displayNamePlaceholder')" />
+        </a-form-item>
+        <a-form-item>
+          <a-button type="primary" html-type="submit" :loading="profileSubmitting">
+            {{ t('common.save') }}
+          </a-button>
+        </a-form-item>
+      </a-form>
+    </a-card>
+
     <a-card :title="t('auth.changePassword')" style="max-width: 500px">
       <a-form :model="form" layout="vertical" @finish="handleSubmit">
         <a-form-item
@@ -40,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import type { Rule } from 'ant-design-vue/es/form'
@@ -49,6 +65,10 @@ import { authApi } from '@/api/auth'
 const { t } = useI18n()
 
 const submitting = ref(false)
+const profileSubmitting = ref(false)
+
+const profile = reactive({ username: '', displayName: '' })
+const profileForm = reactive({ displayName: '' })
 
 const form = reactive({
   oldPassword: '',
@@ -59,6 +79,29 @@ const form = reactive({
 const validateConfirmPassword = async (_rule: Rule, value: string) => {
   if (value && value !== form.newPassword) {
     throw new Error(t('auth.passwordMismatch'))
+  }
+}
+
+async function fetchProfile() {
+  try {
+    const resp = await authApi.getProfile()
+    const data = resp.data?.data || resp.data
+    profile.username = data?.username || ''
+    profile.displayName = data?.displayName || ''
+    profileForm.displayName = data?.displayName || ''
+  } catch { /* ignore */ }
+}
+
+async function handleProfileSubmit() {
+  profileSubmitting.value = true
+  try {
+    await authApi.updateProfile({ displayName: profileForm.displayName })
+    profile.displayName = profileForm.displayName
+    message.success(t('common.saveSuccess'))
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    profileSubmitting.value = false
   }
 }
 
@@ -74,4 +117,6 @@ async function handleSubmit() {
     submitting.value = false
   }
 }
+
+onMounted(fetchProfile)
 </script>

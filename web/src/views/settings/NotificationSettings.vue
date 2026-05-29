@@ -83,13 +83,13 @@
         </a-form-item>
         <a-form-item :label="t('settings.notifications.subscribeEvents')" name="events">
           <a-select v-model:value="form.events" mode="multiple" :placeholder="t('settings.notifications.allEventsPlaceholder')">
-            <a-select-option value="all">all</a-select-option>
-            <a-select-option value="rss">rss</a-select-option>
-            <a-select-option value="rss_new">rss_new</a-select-option>
-            <a-select-option value="publish">publish</a-select-option>
-            <a-select-option value="info">info</a-select-option>
-            <a-select-option value="warning">warning</a-select-option>
-            <a-select-option value="error">error</a-select-option>
+            <a-select-option value="all">{{ t('settings.notifications.eventAll') }}</a-select-option>
+            <a-select-option value="rss">{{ t('settings.notifications.eventRss') }}</a-select-option>
+            <a-select-option value="rss_new">{{ t('settings.notifications.eventRssNew') }}</a-select-option>
+            <a-select-option value="publish">{{ t('settings.notifications.eventPublish') }}</a-select-option>
+            <a-select-option value="info">{{ t('settings.notifications.eventInfo') }}</a-select-option>
+            <a-select-option value="warning">{{ t('settings.notifications.eventWarning') }}</a-select-option>
+            <a-select-option value="error">{{ t('settings.notifications.eventError') }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item :label="t('settings.notifications.maxErrorsPerHour')" name="maxErrorsPerHour">
@@ -108,20 +108,20 @@
           <a-textarea v-model:value="form.messageTemplate" :rows="2" :placeholder="t('settings.notifications.messageTemplatePlaceholder')" />
         </a-form-item>
         <a-collapse :bordered="false" style="margin-top: 8px; background: transparent">
-          <a-collapse-panel key="advanced" header="高级选项">
-            <a-form-item label="覆盖配置 (JSON)" name="overrides">
+          <a-collapse-panel key="advanced" :header="t('common.advancedOptions')">
+            <a-form-item :label="t('settings.notifications.overrides')" name="overrides">
               <a-textarea v-model:value="form.overrides" :rows="3" />
             </a-form-item>
-            <a-form-item label="故障转移组 ID" name="failoverGroupId">
+            <a-form-item :label="t('settings.notifications.failoverGroupId')" name="failoverGroupId">
               <a-input v-model:value="form.failoverGroupId" placeholder="failover-group-id" />
             </a-form-item>
-            <a-form-item label="最小优先级 (1-5)" name="minPriority">
+            <a-form-item :label="t('settings.notifications.minPriority')" name="minPriority">
               <a-input-number v-model:value="form.minPriority" :min="1" :max="5" style="width: 100%" />
             </a-form-item>
-            <a-form-item label="摘要模板" name="digestTemplate">
+            <a-form-item :label="t('settings.notifications.digestTemplate')" name="digestTemplate">
               <a-textarea v-model:value="form.digestTemplate" :rows="2" />
             </a-form-item>
-            <a-form-item label="摘要间隔(分钟)" name="digestIntervalMin">
+            <a-form-item :label="t('settings.notifications.digestIntervalMin')" name="digestIntervalMin">
               <a-input-number v-model:value="form.digestIntervalMin" :min="1" :max="1440" style="width: 100%" />
             </a-form-item>
           </a-collapse-panel>
@@ -137,18 +137,20 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { notificationsApi } from '@/api/notifications'
+import type { NotificationChannel, NotificationHistory } from '@/api/types'
+import { formatTime } from '@/utils/format'
 
 const { t } = useI18n()
 
 const loading = ref(false)
 const modalVisible = ref(false)
 const submitting = ref(false)
-const editingChannel = ref<Record<string, unknown> | null>(null)
-const channels = ref<Record<string, unknown>[]>([])
+const editingChannel = ref<NotificationChannel | null>(null)
+const channels = ref<NotificationChannel[]>([])
 const historyVisible = ref(false)
 const historyLoading = ref(false)
-const historyChannel = ref<Record<string, unknown> | null>(null)
-const historyRecords = ref<Record<string, unknown>[]>([])
+const historyChannel = ref<NotificationChannel | null>(null)
+const historyRecords = ref<NotificationHistory[]>([])
 
 const form = reactive({
   name: '',
@@ -172,23 +174,24 @@ const columns = [
   { title: t('common.name'), dataIndex: 'name', key: 'name' },
   { title: t('common.type'), key: 'type', width: 120 },
   { title: t('common.enabled'), key: 'enabled', width: 80 },
-  { title: t('common.createdAt'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+  { title: t('common.createdAt'), dataIndex: 'createdAt', key: 'createdAt', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('common.actions'), key: 'actions', width: 260 },
 ]
 
 const historyColumns = [
-  { title: t('settings.notifications.colTime'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('settings.notifications.colTime'), dataIndex: 'createdAt', key: 'createdAt', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('settings.notifications.colEvent'), dataIndex: 'event', key: 'event', width: 150 },
   { title: t('settings.notifications.colTitle'), dataIndex: 'title', key: 'title', ellipsis: true },
   { title: t('settings.notifications.colSuccess'), key: 'success', width: 80 },
-  { title: t('settings.notifications.colError'), dataIndex: 'error_msg', key: 'error_msg', ellipsis: true },
+  { title: t('settings.notifications.colError'), dataIndex: 'errorMsg', key: 'errorMsg', ellipsis: true },
 ]
 
 async function fetchChannels() {
   loading.value = true
   try {
     const resp = await notificationsApi.list()
-    channels.value = resp.data.data?.items || resp.data.data || []
+    const data = resp.data.data
+    channels.value = data?.items ?? []
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {
@@ -196,7 +199,7 @@ async function fetchChannels() {
   }
 }
 
-function openModal(record?: Record<string, unknown>) {
+function openModal(record?: NotificationChannel) {
   editingChannel.value = record || null
   if (record) {
     Object.assign(form, {
@@ -255,7 +258,7 @@ async function handleSubmit() {
       events: form.events.length > 0 ? form.events.join(',') : '',
     }
     if (editingChannel.value) {
-      await notificationsApi.update(editingChannel.value.id as number, payload)
+      await notificationsApi.update(editingChannel.value.id, payload)
     } else {
       await notificationsApi.create(payload)
     }
@@ -288,9 +291,9 @@ async function testChannel(id: number) {
   }
 }
 
-async function toggleChannel(record: Record<string, unknown>) {
+async function toggleChannel(record: NotificationChannel) {
   try {
-    await notificationsApi.update(record.id as number, { ...record, enabled: !record.enabled })
+    await notificationsApi.update(record.id, { ...record, enabled: !record.enabled })
     message.success(t('settings.notifications.statusToggled'))
     fetchChannels()
   } catch (e: unknown) {
@@ -298,16 +301,14 @@ async function toggleChannel(record: Record<string, unknown>) {
   }
 }
 
-async function showHistory(record: Record<string, unknown>) {
+async function showHistory(record: NotificationChannel) {
   historyChannel.value = record
   historyVisible.value = true
   historyLoading.value = true
   try {
-    const resp = await notificationsApi.listHistory(record.id as number)
-    historyRecords.value = (resp.data.data?.items || resp.data.data || []).map((h: Record<string, unknown>) => ({
-      ...h,
-      success: h.success,
-    }))
+    const resp = await notificationsApi.listHistory(record.id)
+    const data = resp.data.data
+    historyRecords.value = data?.items || (Array.isArray(data) ? data : [])
   } catch {
     historyRecords.value = []
   } finally {

@@ -59,6 +59,7 @@ import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { exclusionsApi } from '@/api/exclusions'
+import { formatTime } from '@/utils/format'
 
 const { t } = useI18n()
 const loading = ref(false)
@@ -74,7 +75,7 @@ const form = reactive({
 const columns = [
   { title: t('publish.targetSite'), key: 'target_site', width: 200 },
   { title: t('publish.sourceSite'), key: 'source_site', width: 200 },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 200 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 200, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('common.actions'), key: 'actions', width: 100 },
 ]
 

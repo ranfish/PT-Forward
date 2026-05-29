@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/cookiecloud"
+	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -110,6 +111,13 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	if req.ServerURL != "" {
+		if err := middleware.ValidatePublicURL(req.ServerURL); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "serverUrl 不合法: "+err.Error())
+			return
+		}
+	}
+
 	var cfg model.CookieCloudConfig
 	result := h.db.First(&cfg)
 	switch {
@@ -184,6 +192,8 @@ func (h *CookieCloudHandler) handleListHistory(w http.ResponseWriter, r *http.Re
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("size"))
 	if page < 1 {
 		page = 1
+	} else if page > 10000 {
+		page = 10000
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20

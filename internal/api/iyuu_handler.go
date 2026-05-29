@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
+	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -123,7 +124,8 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		BaseURL           string `json:"baseUrl"`
 		Enabled           *bool  `json:"enabled"`
 		IsVIP             *bool  `json:"isVip"`
-		RequestTimeoutSec *int   `json:"requestTimeoutSec"`
+		RequestTimeoutMs *int   `json:"requestTimeoutMs"`
+		Version           string `json:"version,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -134,9 +136,16 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 	result := h.db.First(&cfg)
 	switch {
 	case result.Error != nil && errors.Is(result.Error, gorm.ErrRecordNotFound):
+		if req.BaseURL != "" {
+			if err := middleware.ValidatePublicURL(req.BaseURL); err != nil {
+				Error(w, http.StatusBadRequest, 40001, "baseUrl 不合法: "+err.Error())
+				return
+			}
+		}
 		cfg = model.IYUUConfig{
 			Token:   req.Token,
 			BaseURL: req.BaseURL,
+			Version: req.Version,
 		}
 		if req.Enabled != nil {
 			cfg.Enabled = *req.Enabled
@@ -144,8 +153,11 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		if req.IsVIP != nil {
 			cfg.IsVIP = *req.IsVIP
 		}
-		if req.RequestTimeoutSec != nil {
-			cfg.RequestTimeoutSec = *req.RequestTimeoutSec
+		if req.RequestTimeoutMs != nil {
+			cfg.RequestTimeoutSec = *req.RequestTimeoutMs / 1000
+			if cfg.RequestTimeoutSec < 1 {
+				cfg.RequestTimeoutSec = 1
+			}
 		}
 		if err := h.db.Create(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "创建配置失败")
@@ -158,17 +170,27 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		if req.Token != "" {
 			cfg.Token = req.Token
 		}
-		if req.BaseURL != "" {
-			cfg.BaseURL = req.BaseURL
+	if req.BaseURL != "" {
+		if err := middleware.ValidatePublicURL(req.BaseURL); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "baseUrl 不合法: "+err.Error())
+			return
 		}
+		cfg.BaseURL = req.BaseURL
+	}
 		if req.Enabled != nil {
 			cfg.Enabled = *req.Enabled
 		}
 		if req.IsVIP != nil {
 			cfg.IsVIP = *req.IsVIP
 		}
-		if req.RequestTimeoutSec != nil {
-			cfg.RequestTimeoutSec = *req.RequestTimeoutSec
+		if req.RequestTimeoutMs != nil {
+			cfg.RequestTimeoutSec = *req.RequestTimeoutMs / 1000
+			if cfg.RequestTimeoutSec < 1 {
+				cfg.RequestTimeoutSec = 1
+			}
+		}
+		if req.Version != "" {
+			cfg.Version = req.Version
 		}
 		if err := h.db.Save(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "保存配置失败")
@@ -268,9 +290,8 @@ func (h *IYUUHandler) handleTest(w http.ResponseWriter, _ *http.Request) {
 		Error(w, http.StatusBadGateway, 50001, "IYUU 服务连接失败，请检查网络")
 		return
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
 	if resp.StatusCode != http.StatusOK {
 		Error(w, http.StatusBadGateway, 50001, "IYUU 返回 HTTP "+resp.Status)
 		return

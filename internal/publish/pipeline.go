@@ -3,9 +3,10 @@ package publish
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strings"
-	"time"
+		"regexp"
+		"strings"
+		"sync"
+		"time"
 
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/metrics"
@@ -17,17 +18,22 @@ import (
 	"gorm.io/gorm"
 )
 
+var reTMDBID = regexp.MustCompile(`(?:themoviedb\.org|tmdb\.org)/(?:movie|tv)/(\d+)`)
+
 type Pipeline struct {
-	db                *gorm.DB
-	logger            *zap.Logger
-	siteProvider      model.SiteInfoProvider
-	clientProvider    model.DownloaderProvider
-	ptgen             *ptgen.Provider
-	completionWatcher model.CompletionWatcher
-	notifyService     *notification.Service
-	screenshotConfig  *screenshot.Config
-	artifactCache     *ArtifactCache
-	torrentCache      *TorrentCache
+	db                  *gorm.DB
+	logger              *zap.Logger
+	siteProvider        model.SiteInfoProvider
+	clientProvider      model.DownloaderProvider
+	ptgen               *ptgen.Provider
+	completionWatcher   model.CompletionWatcher
+	notifyService       *notification.Service
+	screenshotConfig    *screenshot.Config
+	artifactCache       *ArtifactCache
+	torrentCache        *TorrentCache
+	backpressureCtrl    *BackpressureController
+	artifactGenerator   *PublishArtifactGenerator
+	memberMu            sync.Map
 }
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
@@ -52,6 +58,11 @@ func (p *Pipeline) SetNotifyService(ns *notification.Service) {
 
 func (p *Pipeline) SetScreenshotConfig(cfg screenshot.Config) {
 	p.screenshotConfig = &cfg
+	p.artifactGenerator = NewPublishArtifactGenerator(&cfg, p.logger)
+}
+
+func (p *Pipeline) SetBackpressureController(ctrl *BackpressureController) {
+	p.backpressureCtrl = ctrl
 }
 
 func (p *Pipeline) SetArtifactCache(ac *ArtifactCache) {
@@ -232,6 +243,21 @@ func (p *Pipeline) fetchSourceInfo(ctx context.Context, candidate *model.Publish
 }
 
 func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (bool, error) {
+	var publishSucceeded bool
+	if p.backpressureCtrl != nil {
+		if err := p.backpressureCtrl.AcquireSlot(ctx, targetSite); err != nil {
+			p.logger.Warn("backpressure: publish blocked",
+				zap.String("target", targetSite),
+				zap.Error(err))
+			return false, err
+		}
+		defer func() {
+			if p.backpressureCtrl != nil {
+				p.backpressureCtrl.ReleaseSlot(targetSite, publishSucceeded)
+			}
+		}()
+	}
+
 	eligible, reason := p.CheckPublishEligibility(ctx, candidate, targetSite)
 	if !eligible {
 		p.logger.Info("目标站发布排除", zap.String("target", targetSite), zap.String("reason", reason))
@@ -317,6 +343,7 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 
 	metrics.PublishTasksTotal.WithLabelValues(targetSite, "completed").Inc()
 
+	publishSucceeded = true
 	return true, nil
 }
 
@@ -362,7 +389,7 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 	var descConfig model.SiteDescConfig
 	siteInfo, siteInfoErr := p.siteProvider.GetSiteInfo(ctx, targetSite)
 	if siteInfoErr == nil && siteInfo != nil {
-		siteConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, siteInfo.BaseURL)
+		siteConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, targetSite)
 		if cfgErr == nil && siteConfig != nil {
 			descConfig = siteConfig.Publish.Description
 		}
@@ -758,6 +785,30 @@ func parseTargetSites(s string) []string {
 }
 
 func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) error {
+	sourceIDs := make([]string, 0)
+	for i := range events {
+		if events[i].SourceID != "" {
+			sourceIDs = append(sourceIDs, events[i].SourceID)
+		}
+	}
+
+	clientIDMap := make(map[string]string, len(sourceIDs))
+	if len(sourceIDs) > 0 {
+		var results []struct {
+			ID       uint   `gorm:"column:id"`
+			ClientID string `gorm:"column:client_id"`
+		}
+		if err := p.db.WithContext(ctx).Table("rss_subscriptions").
+			Select("id, client_id").
+			Where("id IN ?", sourceIDs).
+			Find(&results).Error; err != nil {
+			p.logger.Warn("query subscription client IDs for notification", zap.Error(err))
+		}
+		for _, r := range results {
+			clientIDMap[fmt.Sprintf("%d", r.ID)] = r.ClientID
+		}
+	}
+
 	for i := range events {
 		ev := &events[i]
 		if ev.MatchedRuleName == "" {
@@ -766,12 +817,18 @@ func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) 
 
 		var clientID string
 		if ev.SourceID != "" {
-			var sub struct {
-				ClientID string `gorm:"column:client_id"`
-			}
-			if err := p.db.WithContext(ctx).Table("rss_subscriptions").Select("client_id").
-				Where("id = ?", ev.SourceID).First(&sub).Error; err == nil {
-				clientID = sub.ClientID
+			clientID = clientIDMap[ev.SourceID]
+		}
+
+		role := model.RoleDownload
+		if ev.Metadata != nil {
+			if r, ok := ev.Metadata["client_role"].(string); ok {
+				switch model.PublishCandidateRole(r) {
+				case model.RoleSource:
+					role = model.RoleSource
+				default:
+					role = model.RoleDownload
+				}
 			}
 		}
 
@@ -785,7 +842,7 @@ func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) 
 			Discount:        ev.Discount,
 			HasHR:           ev.HasHR,
 			PublishStatus:   model.CandidatePending,
-			Role:            model.RoleDownload,
+			Role:            role,
 			ClientID:        clientID,
 		}
 
@@ -825,8 +882,7 @@ func (p *Pipeline) queryPTGen(ctx context.Context, title string) (*model.PTGenRe
 }
 
 func extractTMDBID(tmdbURL string) string {
-	re := regexp.MustCompile(`(?:themoviedb\.org|tmdb\.org)/(?:movie|tv)/(\d+)`)
-	m := re.FindStringSubmatch(tmdbURL)
+	m := reTMDBID.FindStringSubmatch(tmdbURL)
 	if len(m) > 1 {
 		return m[1]
 	}
@@ -859,7 +915,9 @@ func (p *Pipeline) GetGroup(ctx context.Context, id uint) (*model.PublishGroup, 
 func (p *Pipeline) ListGroups(ctx context.Context, offset, limit int) ([]model.PublishGroup, int64, error) {
 	var groups []model.PublishGroup
 	var total int64
-	p.db.WithContext(ctx).Model(&model.PublishGroup{}).Count(&total)
+	if err := p.db.WithContext(ctx).Model(&model.PublishGroup{}).Count(&total).Error; err != nil {
+		p.logger.Warn("count publish groups failed", zap.Error(err))
+	}
 	err := p.db.WithContext(ctx).Order("created_at DESC").Offset(offset).Limit(limit).Find(&groups).Error
 	return groups, total, err
 }
@@ -999,6 +1057,14 @@ const (
 )
 
 func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.PublishGroupMember) error {
+	key := fmt.Sprintf("member:%d", member.ID)
+	if _, loaded := p.memberMu.LoadOrStore(key, struct{}{}); loaded {
+		p.logger.Debug("member already being processed, skip",
+			zap.Uint("memberID", member.ID))
+		return nil
+	}
+	defer p.memberMu.Delete(key)
+
 	if member.PublishGroupID == 0 {
 		return publishError(ErrPublishConfig, "member has no group", nil)
 	}
@@ -1184,11 +1250,13 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 		metrics.PublishTasksTotal.WithLabelValues(member.SiteName, "completed").Inc()
 
 		now := time.Now()
-		p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
+		if err := p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
 			"torrent_id": resp.TorrentID,
 			"status":     model.MemberStatusUploaded,
 			"status_at":  &now,
-		})
+		}).Error; err != nil {
+			p.logger.Error("update member after upload failed", zap.Uint("memberID", member.ID), zap.Error(err))
+		}
 		if err := p.advanceStep(ctx, member, StepUpload); err != nil {
 			p.logger.Warn("advanceStep upload failed", zap.Error(err))
 		}
@@ -1246,13 +1314,15 @@ func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMembe
 		if seedTimeH <= 0 {
 			seedTimeH = 72
 		}
-		p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
+		if err := p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
 			"hr_protected":      true,
 			"hr_min_seed_hours": seedTimeH,
 			"hr_min_ratio":      hrResult.MinRatio,
 			"hr_seed_start":     &hrSeedStart,
 			"hr_site":           member.SiteName,
-		})
+		}).Error; err != nil {
+			p.logger.Error("update member hr protection failed", zap.Uint("memberID", member.ID), zap.Error(err))
+		}
 		member.HRProtected = true
 		member.HRSeedStart = &hrSeedStart
 		member.HRMinSeedHours = seedTimeH
@@ -1260,7 +1330,15 @@ func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMembe
 		hrTag := fmt.Sprintf("PROTECTED_HR_%s", member.SiteName)
 		if p.clientProvider != nil && member.ClientID != "" && member.InfoHash != "" {
 			if dl, dlErr := p.clientProvider.Get(member.ClientID); dlErr == nil {
-				if tagErr := dl.SetTorrentTags(ctx, member.InfoHash, []string{hrTag}); tagErr != nil {
+				mergedTags := []string{hrTag}
+				if current, gErr := dl.GetTorrentByHash(ctx, member.InfoHash); gErr == nil && current != nil {
+					for _, t := range current.Tags {
+						if t != hrTag {
+							mergedTags = append(mergedTags, t)
+						}
+					}
+				}
+				if tagErr := dl.SetTorrentTags(ctx, member.InfoHash, mergedTags); tagErr != nil {
 					p.logger.Warn("设置 HR 保护标签失败",
 						zap.String("clientID", member.ClientID),
 						zap.String("infoHash", member.InfoHash),

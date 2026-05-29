@@ -15,6 +15,39 @@ import (
 	"gorm.io/gorm"
 )
 
+var (
+	regexSubCache   = make(map[string]*regexp.Regexp)
+	regexSubCacheMu sync.RWMutex
+	regexSubKeys    []string
+)
+
+const regexSubCacheMax = 256
+
+func getOrCompileRegex(pattern string) (*regexp.Regexp, error) {
+	regexSubCacheMu.RLock()
+	re, ok := regexSubCache[pattern]
+	regexSubCacheMu.RUnlock()
+	if ok {
+		return re, nil
+	}
+	regexSubCacheMu.Lock()
+	defer regexSubCacheMu.Unlock()
+	if re, ok := regexSubCache[pattern]; ok {
+		return re, nil
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	if len(regexSubCache) >= regexSubCacheMax && len(regexSubKeys) > 0 {
+		delete(regexSubCache, regexSubKeys[0])
+		regexSubKeys = regexSubKeys[1:]
+	}
+	regexSubCache[pattern] = re
+	regexSubKeys = append(regexSubKeys, pattern)
+	return re, nil
+}
+
 const defaultFetchInterval = 5 * time.Minute
 
 type Engine struct {
@@ -30,9 +63,14 @@ type Engine struct {
 	wsBroadcaster  event.WSBroadcaster
 	sideLoadMgr    *SideLoadManager
 	configBus      *ConfigEventBus
+	pushLimiter    *PushLimiter
 
 	mu    sync.RWMutex
 	tasks map[uint]context.CancelFunc
+	wg    sync.WaitGroup
+
+	fetchMu    map[uint]*sync.Mutex
+	fetchMuIdx sync.Mutex
 }
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
@@ -43,7 +81,19 @@ func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 		logger:     logger,
 		diskBudget: NewDiskBudgetManager(logger),
 		tasks:      make(map[uint]context.CancelFunc),
+		fetchMu:    make(map[uint]*sync.Mutex),
 	}
+}
+
+func (e *Engine) getFetchMutex(subID uint) *sync.Mutex {
+	e.fetchMuIdx.Lock()
+	defer e.fetchMuIdx.Unlock()
+	if m, ok := e.fetchMu[subID]; ok {
+		return m
+	}
+	m := &sync.Mutex{}
+	e.fetchMu[subID] = m
+	return m
 }
 
 func (e *Engine) siteHRStrategy(ctx context.Context, siteName string) string {
@@ -58,6 +108,40 @@ func (e *Engine) siteHRStrategy(ctx context.Context, siteName string) string {
 		return config.HRStrategy
 	}
 	return "protect"
+}
+
+func (e *Engine) checkDiskGuard(ctx context.Context, sub *model.RSSSubscription) error {
+	if !sub.DiskGuardEnabled || sub.ClientID == "" || e.siteProvider == nil {
+		return nil
+	}
+
+	threshold := int64(sub.DiskGuardThreshold)
+	if threshold <= 0 {
+		return nil
+	}
+
+	cp, ok := e.siteProvider.(interface {
+		GetDownloaderClient(ctx context.Context, clientID string) (model.DownloaderClient, error)
+	})
+	if !ok {
+		return nil
+	}
+
+	dlClient, err := cp.GetDownloaderClient(ctx, sub.ClientID)
+	if err != nil {
+		return rssError(ErrRSSDisk, "磁盘守卫：获取下载器失败", err)
+	}
+
+	md, err := dlClient.GetMainData(ctx)
+	if err != nil {
+		return rssError(ErrRSSDisk, "磁盘守卫：获取下载器空间信息失败", err)
+	}
+
+	if md.FreeSpace < threshold {
+		return rssError(ErrRSSDisk, fmt.Sprintf("磁盘守卫拦截: 剩余 %d 字节 < 阈值 %d 字节 (%.2f GB)", md.FreeSpace, threshold, float64(threshold)/1073741824), nil)
+	}
+
+	return nil
 }
 
 func (e *Engine) checkDiskBudget(ctx context.Context, sub *model.RSSSubscription, size int64) error {
@@ -75,12 +159,12 @@ func (e *Engine) checkDiskBudget(ctx context.Context, sub *model.RSSSubscription
 
 	dlClient, err := cp.GetDownloaderClient(ctx, sub.ClientID)
 	if err != nil {
-		return nil
+		return rssError(ErrRSSDisk, "磁盘预算检查：获取下载器失败", err)
 	}
 
 	md, err := dlClient.GetMainData(ctx)
 	if err != nil {
-		return nil
+		return rssError(ErrRSSDisk, "磁盘预算检查：获取下载器空间信息失败", err)
 	}
 
 	freeSpace := md.FreeSpace
@@ -130,6 +214,10 @@ func (e *Engine) SetSideLoadManager(mgr *SideLoadManager) {
 
 func (e *Engine) SetConfigEventBus(bus *ConfigEventBus) {
 	e.configBus = bus
+}
+
+func (e *Engine) SetPushLimiter(limiter *PushLimiter) {
+	e.pushLimiter = limiter
 }
 
 func (e *Engine) CleanupOldData(ctx context.Context) (int64, error) {
@@ -224,7 +312,13 @@ func (e *Engine) needsSideLoading(ctx context.Context, siteName, infoHash string
 }
 
 func isFakeHash(h string) bool {
-	return len(h) > 0 && len(h) != 40 || (len(h) == 40 && h[:8] == "fakehash")
+	if len(h) == 0 {
+		return false
+	}
+	if len(h) != 40 {
+		return true
+	}
+	return h[:8] == "fakehash"
 }
 
 func (e *Engine) Start(ctx context.Context) error {
@@ -243,13 +337,15 @@ func (e *Engine) Start(ctx context.Context) error {
 
 func (e *Engine) Stop() {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	stopped := len(e.tasks)
 	for id, cancel := range e.tasks {
 		cancel()
 		delete(e.tasks, id)
 	}
+	e.mu.Unlock()
+
+	e.wg.Wait()
 	e.logger.Info("rss engine stopped", zap.Int("stopped_subscriptions", stopped))
 }
 
@@ -263,10 +359,22 @@ func (e *Engine) Trigger(ctx context.Context, subID uint) error {
 		return &model.AppError{Code: 13003, Message: "订阅已禁用"}
 	}
 
-	fetchCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	fetchCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	e.wg.Add(1)
 	go func() {
+		defer e.wg.Done()
 		defer cancel()
+		e.logger.Debug("rss trigger: fetchOnce starting",
+			zap.String("subscription", sub.Name),
+			zap.Uint("id", sub.ID),
+			zap.String("siteName", sub.SiteName),
+			zap.Int("urlCount", len(sub.URLs)),
+		)
 		e.fetchOnce(fetchCtx, sub)
+		e.logger.Debug("rss trigger: fetchOnce completed",
+			zap.String("subscription", sub.Name),
+			zap.Uint("id", sub.ID),
+		)
 	}()
 	return nil
 }
@@ -299,7 +407,9 @@ func (e *Engine) startSubscription(parentCtx context.Context, sub *model.RSSSubs
 		interval = defaultFetchInterval
 	}
 
+	e.wg.Add(1)
 	go func() {
+		defer e.wg.Done()
 		e.fetchOnce(ctx, sub)
 
 		ticker := time.NewTicker(interval)
@@ -324,6 +434,22 @@ func (e *Engine) startSubscription(parentCtx context.Context, sub *model.RSSSubs
 }
 
 func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
+	fetchMu := e.getFetchMutex(sub.ID)
+	if !fetchMu.TryLock() {
+		e.logger.Debug("subscription fetch already in progress, skipping",
+			zap.String("subscription", sub.Name),
+			zap.Uint("id", sub.ID))
+		return
+	}
+	defer fetchMu.Unlock()
+
+	if e.pushLimiter != nil && !e.pushLimiter.Allow(fmt.Sprintf("%d", sub.ID)) {
+		e.logger.Debug("subscription push rate limited",
+			zap.String("subscription", sub.Name),
+			zap.Uint("id", sub.ID))
+		return
+	}
+
 	var site model.Site
 	if err := e.db.WithContext(ctx).Where("name = ? OR domain = ?", sub.SiteName, sub.SiteName).First(&site).Error; err != nil {
 		e.logger.Warn("site not found for subscription",
@@ -339,10 +465,14 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				zap.String("subscription", sub.Name),
 				zap.String("url", url),
 				zap.Error(err))
+			e.saveFetchLog(ctx, sub.ID, 0, 0, 0, "error", err.Error())
 			continue
 		}
 
 		events := e.fetcher.ParseItems(feed, sub, &site)
+		e.logger.Info("rss parse result",
+			zap.String("subscription", sub.Name),
+			zap.Int("events", len(events)))
 
 		metrics.RSSTorrentsFetched.WithLabelValues(sub.SiteName).Add(float64(len(events)))
 
@@ -359,8 +489,22 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				continue
 			}
 			if isSeen {
+				e.logger.Debug("torrent already seen, skipping",
+					zap.String("site", event.SiteName),
+					zap.String("torrent", event.TorrentID))
 				metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "already_seen").Inc()
 				continue
+			}
+
+			if sub.DiskGuardEnabled && sub.ClientID != "" && e.siteProvider != nil {
+				if err := e.checkDiskGuard(ctx, sub); err != nil {
+					e.logger.Warn("torrent skipped by disk guard",
+						zap.String("torrent", event.TorrentID),
+						zap.Int64("size", event.Size),
+						zap.Error(err))
+					metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "disk_guard").Inc()
+					continue
+				}
 			}
 
 			if sub.DiskBudgetEnabled && sub.ClientID != "" && e.siteProvider != nil {
@@ -374,7 +518,14 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				}
 			}
 
+			t0 := time.Now()
 			e.detectHRAndDiscount(ctx, event, site.Domain)
+			if dur := time.Since(t0); dur > 2*time.Second {
+				e.logger.Warn("detectHRAndDiscount slow",
+					zap.String("subscription", sub.Name),
+					zap.String("torrent", event.TorrentID),
+					zap.Duration("duration", dur))
+			}
 
 			if sub.ScrapeFree && !event.IsFree {
 				e.logger.Debug("torrent skipped: not free",
@@ -402,13 +553,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			}
 
 			if len(sub.Conditions) > 0 {
-				evalCtx := &filter.EvalContext{
-					Title:         event.Title,
-					Size:          event.Size,
-					SiteName:      event.SiteName,
-					Free:          event.IsFree,
-					DiscountLevel: discountStr,
-				}
+				evalCtx := newEvalCtx(event, discountStr)
 				allMatch := true
 				for _, cond := range sub.Conditions {
 					if !filter.MatchConditionExport(cond, evalCtx) {
@@ -425,20 +570,16 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			}
 
 			if e.filterEng != nil && (len(sub.AcceptRuleIDs) > 0 || len(sub.RejectRuleIDs) > 0) {
-				evalCtx := &filter.EvalContext{
-					Title:         event.Title,
-					Size:          event.Size,
-					SiteName:      event.SiteName,
-					Free:          event.IsFree,
-					DiscountLevel: discountStr,
-				}
-				if len(sub.RejectRuleIDs) > 0 {
-					rejectResult, err := e.filterEng.MatchByIDs(ctx, sub.RejectRuleIDs, evalCtx)
-					if err != nil {
-						e.logger.Warn("reject rule match failed",
-							zap.String("torrent", event.TorrentID),
-							zap.Error(err))
-					} else if rejectResult.Matched {
+				evalCtx := newEvalCtx(event, discountStr)
+			if len(sub.RejectRuleIDs) > 0 {
+				rejectResult, err := e.filterEng.MatchByIDs(ctx, sub.RejectRuleIDs, evalCtx)
+				if err != nil {
+					e.logger.Warn("reject rule match failed, skipping torrent (fail-closed)",
+						zap.String("torrent", event.TorrentID),
+						zap.Error(err))
+					metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "reject_rule_error").Inc()
+					continue
+				} else if rejectResult.Matched {
 						e.logger.Debug("torrent rejected by subscription reject rules",
 							zap.String("torrent", event.TorrentID),
 							zap.String("rule", rejectResult.RuleName))
@@ -448,31 +589,39 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				}
 				if len(sub.AcceptRuleIDs) > 0 {
 					acceptResult, err := e.filterEng.MatchByIDs(ctx, sub.AcceptRuleIDs, evalCtx)
-					if err != nil {
-						e.logger.Warn("accept rule match failed",
+					switch {
+					case err != nil:
+						e.logger.Warn("accept rule match failed, skipping torrent (fail-closed)",
 							zap.String("torrent", event.TorrentID),
 							zap.Error(err))
-					} else if !acceptResult.Matched {
+						metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "accept_rule_error").Inc()
+						continue
+					case !acceptResult.Matched:
 						e.logger.Debug("torrent skipped: no accept rule matched",
 							zap.String("torrent", event.TorrentID))
 						metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "no_accept_rule").Inc()
 						continue
+					default:
+						if acceptResult.SavePath != "" && sub.SavePath == "" {
+							event.Metadata["filter_save_path"] = acceptResult.SavePath
+						}
+						if acceptResult.Category != "" && sub.Category == "" {
+							event.Metadata["filter_category"] = acceptResult.Category
+						}
+						if acceptResult.Tags != "" && len(sub.Tags) == 0 {
+							event.Metadata["filter_tags"] = acceptResult.Tags
+						}
 					}
 				}
 			}
 
 			if e.filterEng != nil {
-				matchResult, err := e.filterEng.Match(ctx, &filter.EvalContext{
-					Title:         event.Title,
-					Size:          event.Size,
-					SiteName:      event.SiteName,
-					Free:          event.IsFree,
-					DiscountLevel: discountStr,
-				})
+				matchResult, err := e.filterEng.Match(ctx, newEvalCtx(event, discountStr))
 				if err != nil {
-					e.logger.Warn("filter match failed",
+					e.logger.Warn("global filter match failed, skipping torrent (fail-closed)",
 						zap.String("torrent", event.TorrentID),
 						zap.Error(err))
+					metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "global_filter_error").Inc()
 					continue
 				}
 				if matchResult.Matched && matchResult.Reject {
@@ -485,7 +634,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			}
 
 			if sub.UseCustomRegex && sub.RegexStr != "" {
-				re, err := regexp.Compile(sub.RegexStr)
+				re, err := getOrCompileRegex(sub.RegexStr)
 				if err != nil {
 					e.logger.Warn("invalid custom regex",
 						zap.String("subscription", sub.Name),
@@ -574,13 +723,50 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			}
 		}
 
+		if e.seedingCounter != nil && sub.Enabled && sub.ClientID != "" {
+			for i := range torrentEvents {
+				if err := e.seedingCounter.Add(ctx, sub.ClientID, &torrentEvents[i]); err != nil {
+					e.logger.Debug("seeding counter add failed",
+						zap.String("torrent_id", torrentEvents[i].TorrentID),
+						zap.Error(err))
+				} else {
+					e.repo.MarkStatus(ctx, torrentEvents[i].SiteName, torrentEvents[i].TorrentID, "pushed")
+				}
+			}
+			subIDStr := uintToString(sub.ID)
+			if _, flushErr := e.seedingCounter.Flush(ctx, subIDStr); flushErr != nil {
+				e.logger.Warn("seeding counter flush failed",
+					zap.String("subscription", sub.Name),
+					zap.Error(flushErr))
+			}
+		}
+
 		if newCount > 0 {
 			e.logger.Info("rss fetch completed",
 				zap.String("subscription", sub.Name),
 				zap.Int("total", len(events)),
 				zap.Int("new", newCount),
 				zap.Int("dispatched", len(torrentEvents)))
+		} else {
+			e.logger.Debug("rss fetch completed: no new torrents",
+				zap.String("subscription", sub.Name),
+				zap.Int("total", len(events)))
 		}
+		e.saveFetchLog(ctx, sub.ID, len(events), newCount, len(torrentEvents), "ok", "")
+	}
+}
+
+func (e *Engine) saveFetchLog(ctx context.Context, subID uint, total, newCount, dispatched int, status, errMsg string) {
+	log := &model.RSSFetchLog{
+		SubscriptionID: fmt.Sprintf("%d", subID),
+		Total:          total,
+		NewCount:       newCount,
+		Dispatched:     dispatched,
+		Status:         status,
+		ErrorMsg:       errMsg,
+	}
+	if err := e.db.WithContext(ctx).Create(log).Error; err != nil {
+		e.logger.Debug("save fetch log failed", zap.Error(err))
 	}
 }
 
@@ -589,6 +775,19 @@ func derefStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func newEvalCtx(event *model.RSSTorrentEvent, discountStr string) *filter.EvalContext {
+	return &filter.EvalContext{
+		Title:         event.Title,
+		Size:          event.Size,
+		SiteName:      event.SiteName,
+		Free:          event.IsFree,
+		DiscountLevel: discountStr,
+		Uploader:      event.Uploader,
+		Category:      event.Category,
+		Tags:          event.Tags,
+	}
 }
 
 func parseCronInterval(cron string) time.Duration {
@@ -635,34 +834,68 @@ func uintToString(n uint) string {
 	return fmt.Sprintf("%d", n)
 }
 
+const perTorrentDetectTimeout = 15 * time.Second
+
 func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorrentEvent, siteName string) {
 	if e.siteProvider == nil || event.TorrentID == "" {
 		return
 	}
 
-	adapter, err := e.siteProvider.GetAdapter(ctx, siteName)
+	detectCtx, detectCancel := context.WithTimeout(ctx, perTorrentDetectTimeout)
+	defer detectCancel()
+
+	adapter, err := e.siteProvider.GetAdapter(detectCtx, siteName)
 	if err != nil {
-		e.logger.Debug("获取适配器失败，跳过HR/折扣检测", zap.String("site", siteName), zap.Error(err))
+		e.logger.Warn("获取适配器失败，跳过HR/折扣检测", zap.String("site", siteName), zap.Error(err))
 		return
 	}
 
-	config, err := e.siteProvider.GetSiteConfig(ctx, siteName)
+	config, err := e.siteProvider.GetSiteConfig(detectCtx, siteName)
 	if err != nil {
-		e.logger.Debug("获取站点配置失败，跳过HR/折扣检测", zap.String("site", siteName), zap.Error(err))
+		e.logger.Warn("获取站点配置失败，跳过HR/折扣检测", zap.String("site", siteName), zap.Error(err))
 		return
 	}
 
-	if hrResult, err := adapter.DetectHR(ctx, config, event.TorrentID); err == nil && hrResult != nil {
+	if combined, ok := adapter.(model.CombinedHRDiscountDetector); ok {
+		hrResult, discResult, err := combined.DetectHRAndDiscount(detectCtx, config, event.TorrentID)
+		if err != nil {
+			e.logger.Debug("combined detect failed", zap.String("site", siteName), zap.String("torrent", event.TorrentID), zap.Error(err))
+			return
+		}
+		if hrResult != nil {
+			event.HasHR = hrResult.HasHR
+			if event.HasHR {
+				event.HRSeedTimeH = hrResult.SeedTimeH
+				if event.HRSeedTimeH == 0 {
+					event.HRSeedTimeH = 72
+				}
+			}
+		}
+		if discResult != nil && discResult.Level != model.DiscountNone {
+			event.DiscountLevel = discResult.Level
+			event.IsFree = discResult.Level == model.DiscountFree ||
+				discResult.Level == model.Discount2xFree ||
+				discResult.Level == model.Discount2x50
+			if discResult.FreeEndAt != nil {
+				event.FreeEndAt = discResult.FreeEndAt
+			}
+		}
+		return
+	}
+
+	if hrResult, err := adapter.DetectHR(detectCtx, config, event.TorrentID); err == nil && hrResult != nil {
 		event.HasHR = hrResult.HasHR
-		if hrResult.HasHR {
+		if event.HasHR {
 			event.HRSeedTimeH = hrResult.SeedTimeH
 			if event.HRSeedTimeH == 0 {
 				event.HRSeedTimeH = 72
 			}
 		}
+	} else if err != nil {
+		e.logger.Debug("detect HR failed", zap.String("site", siteName), zap.String("torrent", event.TorrentID), zap.Error(err))
 	}
 
-	if discResult, err := adapter.DetectDiscount(ctx, config, event.TorrentID); err == nil && discResult != nil {
+	if discResult, err := adapter.DetectDiscount(detectCtx, config, event.TorrentID); err == nil && discResult != nil {
 		if discResult.Level != model.DiscountNone {
 			event.DiscountLevel = discResult.Level
 			event.IsFree = discResult.Level == model.DiscountFree ||

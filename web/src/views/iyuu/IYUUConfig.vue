@@ -5,21 +5,21 @@
     <a-spin :spinning="loading">
       <a-form :model="form" layout="vertical" style="max-width: 600px">
         <a-form-item :label="t('iyuu.apiToken')" :rules="[{ required: true, message: t('iyuu.tokenRequired') }]">
-          <a-input v-model:value="form.token" placeholder="IYUU API Token" />
+          <a-input v-model:value="form.token" :placeholder="t('iyuu.tokenPlaceholder')" />
         </a-form-item>
         <a-form-item :label="t('common.enable')">
           <a-switch v-model:checked="form.enabled" />
         </a-form-item>
-        <a-form-item label="Base URL">
+        <a-form-item :label="t('iyuu.baseUrl')">
           <a-input v-model:value="form.baseURL" placeholder="https://2025.iyuu.cn" />
         </a-form-item>
-        <a-form-item label="VIP">
+        <a-form-item :label="t('iyuu.vip')">
           <a-switch v-model:checked="form.isVIP" />
         </a-form-item>
-        <a-form-item label="Version">
+        <a-form-item :label="t('iyuu.version')">
           <a-input v-model:value="form.version" placeholder="1.0.0" />
         </a-form-item>
-        <a-form-item label="Request Timeout (s)">
+        <a-form-item :label="t('iyuu.requestTimeout')">
           <a-input-number v-model:value="form.requestTimeoutSec" :min="5" :max="300" style="width: 100%" />
         </a-form-item>
         <a-form-item>
@@ -53,6 +53,35 @@
       </a-table>
       <a-empty v-else :description="t('iyuu.viewAfterSave')" />
     </a-card>
+
+    <a-divider />
+
+    <a-card :title="t('iyuu.manualQuery')" style="margin-top: 16px">
+      <a-form layout="vertical">
+        <a-form-item :label="t('iyuu.infoHashes')">
+          <a-textarea v-model:value="queryHashes" :rows="3" :placeholder="t('iyuu.infoHashesPlaceholder')" />
+        </a-form-item>
+        <a-form-item>
+          <a-button type="primary" :loading="querying" @click="handleQuery">{{ t('iyuu.query') }}</a-button>
+        </a-form-item>
+      </a-form>
+      <a-table
+        v-if="queryResults.length > 0"
+        :columns="queryColumns"
+        :data-source="queryResults"
+        :pagination="false"
+        row-key="sid"
+        size="small"
+        style="margin-top: 12px"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'torrents'">
+            <span>{{ record.torrents?.length || 0 }}</span>
+          </template>
+        </template>
+      </a-table>
+      <a-empty v-else-if="queryExecuted" :description="t('common.noData')" style="margin-top: 12px" />
+    </a-card>
   </div>
 </template>
 
@@ -81,11 +110,42 @@ const form = reactive({
 })
 
 const siteColumns = [
-  { title: 'SID', dataIndex: 'IYUUSid', key: 'IYUUSid', width: 80 },
+  { title: t('iyuu.sid'), dataIndex: 'IYUUSid', key: 'IYUUSid', width: 80 },
   { title: t('iyuu.siteName'), dataIndex: 'SiteName', key: 'SiteName' },
   { title: t('iyuu.siteDomain'), dataIndex: 'SiteDomain', key: 'SiteDomain' },
   { title: t('common.status'), key: 'Enabled', width: 80 },
 ]
+
+const queryHashes = ref('')
+const querying = ref(false)
+const queryResults = ref<Record<string, unknown>[]>([])
+const queryExecuted = ref(false)
+
+const queryColumns = [
+  { title: t('iyuu.sid'), dataIndex: 'sid', key: 'sid', width: 80 },
+  { title: t('iyuu.siteName'), dataIndex: 'site_name', key: 'site_name' },
+  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100 },
+  { title: t('common.title'), key: 'torrents', width: 100 },
+]
+
+async function handleQuery() {
+  const hashes = queryHashes.value.split(/[\n,;\s]+/).map(h => h.trim()).filter(Boolean)
+  if (!hashes.length) {
+    message.warning(t('iyuu.infoHashesRequired'))
+    return
+  }
+  querying.value = true
+  queryExecuted.value = false
+  try {
+    const resp = await iyuuApi.query({ infoHashes: hashes })
+    queryResults.value = resp.data?.data || []
+    queryExecuted.value = true
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    querying.value = false
+  }
+}
 
 async function fetchConfig() {
   loading.value = true
@@ -113,7 +173,7 @@ async function handleSave() {
       enabled: form.enabled,
       isVip: form.isVIP,
       version: form.version,
-      requestTimeoutSec: form.requestTimeoutSec,
+      requestTimeoutMs: form.requestTimeoutSec * 1000,
     })
     message.success(t('common.saveSuccess'))
     fetchSites()
@@ -140,7 +200,7 @@ async function fetchSites() {
   sitesLoading.value = true
   try {
     const resp = await iyuuApi.listSites()
-    sites.value = resp.data?.data?.items || resp.data?.data || []
+    sites.value = resp.data?.data || []
   } catch {
   } finally {
     sitesLoading.value = false

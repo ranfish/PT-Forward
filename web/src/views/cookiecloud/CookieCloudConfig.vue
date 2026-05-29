@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a-page-header title="CookieCloud" :sub-title="t('cookiecloud.subtitle')" />
+    <a-page-header :title="t('cookiecloud.title')" :sub-title="t('cookiecloud.subtitle')" />
 
     <a-spin :spinning="loading">
       <a-form :model="form" layout="vertical" style="max-width: 600px">
@@ -8,14 +8,14 @@
           <a-input v-model:value="form.serverUrl" placeholder="https://cookiecloud.example.com" />
         </a-form-item>
         <a-form-item :label="t('cookiecloud.uuid')">
-          <a-input v-model:value="form.uuid" placeholder="CookieCloud UUID" />
+          <a-input v-model:value="form.uuid" :placeholder="t('cookiecloud.uuidPlaceholder')" />
         </a-form-item>
         <a-form-item :label="t('common.password')">
           <a-input-password v-model:value="form.password" :placeholder="t('cookiecloud.passwordPlaceholder')" />
         </a-form-item>
         <a-form-item :label="t('cookiecloud.cryptoType')">
           <a-select v-model:value="form.cryptoType" style="width: 200px">
-            <a-select-option value="legacy">Legacy</a-select-option>
+            <a-select-option value="legacy">{{ t('cookiecloud.cryptoLegacy') }}</a-select-option>
             <a-select-option value="aes-256-gcm">AES-256-GCM</a-select-option>
           </a-select>
         </a-form-item>
@@ -155,8 +155,8 @@ async function handleSync() {
   syncing.value = true
   try {
     const resp = await cookiecloudApi.sync()
-    const data = resp.data?.data || {}
-    message.success(t('cookiecloud.syncCompleted', { count: data.synced_sites || 0 }))
+    const data = resp.data?.data || { synced: 0 }
+    message.success(t('cookiecloud.syncCompleted', { count: data.synced || 0 }))
     fetchHistory()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
@@ -173,8 +173,8 @@ async function fetchHistory() {
       page: historyPagination.current,
       size: historyPagination.pageSize,
     })
-    const data = resp.data?.data || {}
-    histories.value = data.items || []
+    const data = resp.data?.data || { items: [], total: 0 }
+    histories.value = (data.items || []) as Record<string, unknown>[]
     historyPagination.total = data.total || 0
   } catch {
   } finally {

@@ -22,16 +22,18 @@ type TaskEntry struct {
 	SuccessCount int64      `json:"success_count"`
 	ErrorCount   int64      `json:"error_count"`
 	Paused       bool       `json:"paused"`
+	Running      bool       `json:"running"`
 }
 
 type Registry struct {
-	mu     sync.RWMutex
-	tasks  map[string]*TaskEntry
-	logger *zap.Logger
-	cron   *cron.Cron
-	ids    map[string]cron.EntryID
-	ctx    context.Context
-	cancel context.CancelFunc
+	mu      sync.RWMutex
+	statsMu sync.Mutex
+	tasks   map[string]*TaskEntry
+	logger  *zap.Logger
+	cron    *cron.Cron
+	ids     map[string]cron.EntryID
+	ctx     context.Context
+	cancel  context.CancelFunc
 }
 
 func NewRegistry(logger *zap.Logger) *Registry {
@@ -62,7 +64,10 @@ func (r *Registry) Register(name, taskType, schedule string, handler TaskFunc) e
 
 	scheduleStr := normalizeSchedule(schedule)
 	id, err := r.cron.AddFunc(scheduleStr, func() {
-		if entry.Paused {
+		r.mu.RLock()
+		paused := entry.Paused
+		r.mu.RUnlock()
+		if paused {
 			return
 		}
 		r.runTask(context.Background(), entry) //nolint:gosec,errcheck // runTask handles errors internally
@@ -154,7 +159,10 @@ func (r *Registry) Reschedule(name, schedule string) error {
 	}
 
 	newID, err := r.cron.AddFunc(scheduleStr, func() {
-		if entry.Paused {
+		r.mu.RLock()
+		paused := entry.Paused
+		r.mu.RUnlock()
+		if paused {
 			return
 		}
 		r.runTask(context.Background(), entry) //nolint:gosec,errcheck // runTask handles errors internally
@@ -215,9 +223,8 @@ func (r *Registry) Start(ctx context.Context) error {
 
 func (r *Registry) Stop() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.logger.Info("task registry stopping: draining in-flight tasks")
+	r.mu.Unlock()
 
 	stopCtx := r.cron.Stop()
 
@@ -226,25 +233,53 @@ func (r *Registry) Stop() error {
 
 	select {
 	case <-stopCtx.Done():
+		r.mu.Lock()
 		r.logger.Info("all in-flight tasks drained")
+		r.mu.Unlock()
 	case <-drainTimer.C:
+		r.mu.Lock()
 		r.logger.Warn("drain timeout exceeded, forcing stop")
+		r.mu.Unlock()
 	}
 
 	if r.cancel != nil {
 		r.cancel()
 	}
 
+	r.mu.Lock()
 	r.logger.Info("task registry stopped")
+	r.mu.Unlock()
 	return nil
 }
 
 func (r *Registry) runTask(ctx context.Context, entry *TaskEntry) error {
-	now := time.Now()
-	err := entry.Handler(ctx)
+	r.statsMu.Lock()
+	if entry.Running {
+		r.statsMu.Unlock()
+		r.logger.Warn("task already running, skipping", zap.String("task", entry.Name))
+		return nil
+	}
+	entry.Running = true
+	r.statsMu.Unlock()
 
-	r.mu.Lock()
+	now := time.Now()
+	var err error
+	func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				r.logger.Error("task panicked",
+					zap.String("task", entry.Name),
+					zap.Any("recover", rec),
+				)
+				err = fmt.Errorf("panic: %v", rec)
+			}
+		}()
+		err = entry.Handler(ctx)
+	}()
+
+	r.statsMu.Lock()
 	entry.LastRunAt = &now
+	entry.Running = false
 	if err != nil {
 		entry.LastError = err.Error()
 		entry.ErrorCount++
@@ -252,7 +287,7 @@ func (r *Registry) runTask(ctx context.Context, entry *TaskEntry) error {
 		entry.LastError = ""
 		entry.SuccessCount++
 	}
-	r.mu.Unlock()
+	r.statsMu.Unlock()
 
 	return err
 }

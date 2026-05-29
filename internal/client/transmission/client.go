@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -82,7 +83,7 @@ func (c *TRClient) rpcCall(ctx context.Context, method string, args interface{})
 
 	if resp.StatusCode == http.StatusConflict {
 		sid := resp.Header.Get("X-Transmission-Session-Id")
-		_ = resp.Body.Close()
+		httpclient.DrainBody(resp)
 		if sid != "" {
 			c.mu.Lock()
 			c.sessionID = sid
@@ -93,20 +94,23 @@ func (c *TRClient) rpcCall(ctx context.Context, method string, args interface{})
 			return nil, err
 		}
 	}
-	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
+		httpclient.DrainBody(resp)
 		return nil, c.newErr(11003, "unauthorized: wrong username or password")
 	}
 	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		httpclient.DrainBody(resp)
 		return nil, c.newErr(11002, fmt.Sprintf("rpc returned %d: %s", resp.StatusCode, string(b)))
 	}
 
 	var rpcResp rpcResponse
 	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
+		httpclient.DrainBody(resp)
 		return nil, c.wrapErr(11002, "decode rpc response", err)
 	}
+	httpclient.DrainBody(resp)
 	if rpcResp.Result != "success" {
 		return nil, c.newErr(11002, fmt.Sprintf("rpc error: %s", rpcResp.Result))
 	}

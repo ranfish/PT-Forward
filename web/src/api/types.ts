@@ -19,6 +19,40 @@ export interface ListParams {
   search?: string
   sort_by?: string
   sort_dir?: string
+  limit?: number
+  [key: string]: string | number | undefined
+}
+
+export interface SeedingConfigRequest {
+  clientId?: string
+  enabled?: boolean
+  deleteRuleIds?: string
+  rejectRuleIds?: string
+  autoDeleteCron?: string
+  mainDataCron?: string
+  fitTimeCheckMs?: number
+  diskProtectEnabled?: boolean
+  minDiskSpaceGB?: number
+  emergencyBuffer?: number
+  spaceAlarmEnabled?: boolean
+  spaceAlarmGb?: number
+  minDiskSpacePercent?: number
+  maxActiveUploads?: number
+  maxActiveDownloads?: number
+  superSeedingDefault?: boolean
+  scope?: string
+  preFilterEnabled?: boolean
+  enhancementBatchSize?: number
+  enhancementCacheTtl?: number
+  activeTimeWindows?: string
+  emaAlpha?: number
+  cleanupScoreWeights?: string
+  archiveGranularity?: string
+  reannounceBefore?: boolean
+  reannounceRetries?: number
+  reannounceIntervalMs?: number
+  reannounceWaitMs?: number
+  minSeedHoursBeforeDelete?: number
 }
 
 export interface SeedingClientConfig {
@@ -49,6 +83,11 @@ export interface SeedingClientConfig {
   ema_alpha: number
   cleanup_score_weights: string
   archive_granularity: string
+  reannounce_before: boolean
+  reannounce_retries: number
+  reannounce_interval_ms: number
+  reannounce_wait_ms: number
+  min_seed_hours_before_delete: number
 }
 
 export interface SeedingTorrentRecord {
@@ -68,6 +107,9 @@ export interface SeedingTorrentRecord {
   status: string
   last_action_by: string
   source: string
+  first_matched_at: string | null
+  title: string
+  detail_url: string
 }
 
 export interface DeleteRule {
@@ -78,6 +120,7 @@ export interface DeleteRule {
   priority: number
   enabled: boolean
   type: string
+  logic: string
   conditions: string
   expr: string
   fit_time: number
@@ -136,6 +179,10 @@ export interface ClientConfig {
   enabled: boolean
   isDefault: boolean
   pathMappings: PathMapping[]
+  downloadSpeed: number
+  uploadSpeed: number
+  freeSpace: number
+  totalDiskSpace: number
   createdAt: string
   updatedAt: string
 }
@@ -215,7 +262,6 @@ export interface Site {
   cookieCloudSync: boolean
   cookieCloudDomain?: string
   alternativeDomains?: string
-  mirrorDomain?: string
   lastSyncAt?: string | null
   isSource: boolean
   isTarget: boolean
@@ -224,10 +270,11 @@ export interface Site {
   overrideSavePath?: string
   proxyUrl?: string
   skipSslVerify: boolean
-  uploadBytes: number
-  downloadBytes: number
+  maxConcurrent: number
+  uploadBytes: string
+  downloadBytes: string
   seedingPoints: number
-  seedingSize: number
+  seedingSize: string
   seedingCount: number
   userClass: string
   ratio: number
@@ -344,6 +391,7 @@ export interface NotificationChannel {
   healthy: boolean
   createdAt: string
   updatedAt: string
+  config?: string
   events?: string
   maxErrorsPerHour: number
   timeoutMs: number
@@ -356,18 +404,19 @@ export interface NotificationChannel {
   minPriority: number
   digestTemplate?: string
   digestIntervalMin: number
+  consecutiveFailures?: number
 }
 
 export interface NotificationHistory {
   id: number
-  channel_id: number
+  channelId: number
   event: string
   level: string
   title: string
   body: string
   success: boolean
-  error_msg: string
-  created_at: string
+  errorMsg: string
+  createdAt: string
 }
 
 export interface PublishCandidate {
@@ -521,17 +570,88 @@ export interface IYUUConfig {
 }
 
 export interface LifecycleConfig {
-  pause_seeders: number
-  delete_seeders: number
-  delete_seed_hours: number
-  [key: string]: unknown
+  pauseSeeders: boolean
+  deleteSeeders: boolean
+  deleteSeedHours: number
+  checkInterval: string
+  maxConcurrentChecks: number
 }
 
-export interface BackpressureConfig {
-  enabled: boolean
-  max_concurrent: number
-  [key: string]: unknown
+export interface BackpressureResponse {
+  queueDepth: number
+  maxQueueDepth: number
+  activePublishes: number
+  maxConcurrentPublishes: number
+  bandwidthLimitKB: number
+  isThrottled: boolean
+  pauseOnPressure: boolean
 }
+
+export interface BackpressureUpdateRequest {
+  max_concurrent?: number
+  pause_on_pressure?: boolean
+}
+
+export interface SeedingStatsOverview {
+  totalTorrents: number
+  activeTorrents: number
+  pausedTorrents: number
+  realSeeding: number
+  realDownloading: number
+  totalUploadBytes: number
+  totalDownloadBytes: number
+  globalRatio: number
+  todayDeleted: number
+  todayAdded: number
+}
+
+export interface SeedingSiteStat {
+  siteName: string
+  count: number
+}
+
+export interface SeedingSiteTrendPoint {
+  date: string
+  count: number
+}
+
+export interface SeedingSpeedTrendPoint {
+  timestamp: string
+  uploadSpeed: number
+  downloadSpeed: number
+}
+
+export interface ScoringDryrunRequest {
+  seeders: number
+  leechers: number
+  ageHours: number
+  size: number
+  discount: string
+  halfLifeHours: number
+  siteWeight: number
+}
+
+export interface SettingsRestoreRequest {
+  settings: Record<string, string>
+}
+
+export interface ManualForwardSubmitRequest {
+  client_id?: number
+  info_hash?: string
+  name?: string
+  save_path?: string
+  source_site?: string
+  source_site_id?: number
+  source_torrent_id?: string
+  title?: string
+  description?: string
+  media_info?: string
+  screenshots?: string | string[]
+  target_sites?: string[]
+}
+
+export type CreateWithoutId<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt' | 'created_at' | 'updated_at'>
+export type UpdatePartial<T> = Partial<CreateWithoutId<T>>
 
 export interface SearchTorrentResult {
   torrent_id: string
@@ -549,4 +669,15 @@ export interface DiscountResult {
   level: string
   free_end_at: string | null
   multiplier: number
+}
+
+export interface SchedulerTask {
+  name: string
+  type: string
+  schedule: string
+  last_run_at: string | null
+  last_error: string
+  success_count: number
+  error_count: number
+  paused: boolean
 }

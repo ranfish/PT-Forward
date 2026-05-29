@@ -1,21 +1,25 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 
+	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/scheduler"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type SchedulerHandler struct {
 	registry *scheduler.Registry
+	db       *gorm.DB
 	logger   *zap.Logger
 }
 
-func NewSchedulerHandler(registry *scheduler.Registry, logger *zap.Logger) *SchedulerHandler {
-	return &SchedulerHandler{registry: registry, logger: logger}
+func NewSchedulerHandler(registry *scheduler.Registry, db *gorm.DB, logger *zap.Logger) *SchedulerHandler {
+	return &SchedulerHandler{registry: registry, db: db, logger: logger}
 }
 
 func (h *SchedulerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +134,35 @@ func (h *SchedulerHandler) handleReschedule(w http.ResponseWriter, r *http.Reque
 		Error(w, code, 40003, err.Error())
 		return
 	}
+	if h.db != nil {
+		if err := h.db.WithContext(r.Context()).Save(&model.SchedulerTaskOverride{
+			Name:     name,
+			Schedule: req.Schedule,
+		}).Error; err != nil {
+			h.logger.Warn("failed to persist schedule override", zap.String("name", name), zap.Error(err))
+		}
+	}
 	Success(w, map[string]interface{}{"rescheduled": true, "name": name, "schedule": req.Schedule})
+}
+
+func ApplySchedulerOverrides(ctx context.Context, db *gorm.DB, registry *scheduler.Registry, logger *zap.Logger) {
+	var overrides []model.SchedulerTaskOverride
+	if err := db.WithContext(ctx).Find(&overrides).Error; err != nil {
+		logger.Warn("failed to load scheduler overrides", zap.Error(err))
+		return
+	}
+	for _, o := range overrides {
+		if err := registry.Reschedule(o.Name, o.Schedule); err != nil {
+			logger.Warn("failed to apply schedule override",
+				zap.String("name", o.Name),
+				zap.String("schedule", o.Schedule),
+				zap.Error(err))
+			continue
+		}
+		logger.Info("applied schedule override",
+			zap.String("name", o.Name),
+			zap.String("schedule", o.Schedule))
+	}
 }
 
 func (h *SchedulerHandler) extractTaskName(trimmed, prefix string) string {

@@ -284,15 +284,15 @@ func TestNexusPHP_DetectDiscount_None(t *testing.T) {
 
 func TestNexusPHP_DetectHR(t *testing.T) {
 	tests := []struct {
-		name      string
-		html      string
-		selectors []string
-		hasHR     bool
+		name  string
+		html  string
+		hasHR bool
 	}{
-		{"no selectors", "<html>normal</html>", nil, false},
-		{"hit and run", "<html>Hit and Run policy</html>", []string{"hr"}, true},
-		{"考核", "<html>考核期内</html>", []string{"hr"}, true},
-		{"no HR", "<html>normal torrent</html>", []string{"hr"}, false},
+		{"no HR icon", "<html>normal</html>", false},
+		{"class hitandrun", `<html><img class="hitandrun" src="pic/trans.gif" alt="H&R" /></html>`, true},
+		{"keyword in rules no match", "<html>Hit and Run policy</html>", false},
+		{"考核 in rules no match", "<html>考核期内</html>", false},
+		{"no HR", "<html>normal torrent</html>", false},
 	}
 
 	for _, tt := range tests {
@@ -305,7 +305,6 @@ func TestNexusPHP_DetectHR(t *testing.T) {
 			doer := &HTTPDoer{Client: srv.Client()}
 			a := NewNexusPHPAdapter(doer, zap.NewNop())
 			config := &model.SiteConfig{Domain: srv.URL}
-			config.HR.Selectors = tt.selectors
 
 			result, err := a.DetectHR(context.Background(), config, "1")
 			if err != nil {
@@ -1217,8 +1216,8 @@ func TestNexusPHP_VerifyExists_SearchError(t *testing.T) {
 	config := &model.SiteConfig{Domain: srv.URL}
 
 	found, err := a.VerifyExists(context.Background(), config, "42")
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error on search failure")
 	}
 	if found {
 		t.Error("expected false on search error")
@@ -1381,7 +1380,6 @@ func TestNexusPHP_DetectHR_HitAndRunClass(t *testing.T) {
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewNexusPHPAdapter(doer, zap.NewNop())
 	config := &model.SiteConfig{Domain: srv.URL}
-	config.HR.Selectors = []string{"hr"}
 	config.HR.DefaultSeedTimeH = 120
 
 	result, err := a.DetectHR(context.Background(), config, "1")

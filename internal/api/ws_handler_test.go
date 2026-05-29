@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -38,17 +37,18 @@ func TestHub_ClientReceive(t *testing.T) {
 	server := httptest.NewServer(wsHandler)
 	defer server.Close()
 
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "?token=" + pair.AccessToken
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
 	defer func() { _ = conn.Close() }()
 
-	time.Sleep(50 * time.Millisecond)
-
-	if hub.ClientCount() != 1 {
-		t.Errorf("expected 1 client, got %d", hub.ClientCount())
+	if err := conn.WriteJSON(map[string]interface{}{
+		"type":  "auth",
+		"token": pair.AccessToken,
+	}); err != nil {
+		t.Fatalf("write auth: %v", err)
 	}
 
 	_, msg, err := conn.ReadMessage()
@@ -62,6 +62,12 @@ func TestHub_ClientReceive(t *testing.T) {
 	}
 	if wsMsg.Type != "server.connected" {
 		t.Errorf("expected server.connected, got %s", wsMsg.Type)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	if hub.ClientCount() != 1 {
+		t.Errorf("expected 1 client, got %d", hub.ClientCount())
 	}
 
 	hub.Broadcast(NewWSMessage("task.created", map[string]string{"taskId": "test-1"}))
@@ -93,17 +99,24 @@ func TestHub_Subscribe(t *testing.T) {
 	server := httptest.NewServer(wsHandler)
 	defer server.Close()
 
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "?token=" + pair.AccessToken
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
 	defer func() { _ = conn.Close() }()
 
+	if err := conn.WriteJSON(map[string]interface{}{
+		"type":  "auth",
+		"token": pair.AccessToken,
+	}); err != nil {
+		t.Fatalf("write auth: %v", err)
+	}
+
 	time.Sleep(50 * time.Millisecond)
 
 	if err := conn.WriteJSON(map[string]interface{}{
-		"type":     "client.subscribe",
+		"type":     "subscribe",
 		"channels": []string{"dashboard"},
 	}); err != nil {
 		t.Fatalf("write json: %v", err)
@@ -111,7 +124,7 @@ func TestHub_Subscribe(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	if err := conn.WriteJSON(map[string]interface{}{
-		"type": "client.ping",
+		"type": "ping",
 	}); err != nil {
 		t.Fatalf("write ping: %v", err)
 	}
@@ -129,13 +142,13 @@ func TestHub_Subscribe(t *testing.T) {
 		if err := json.Unmarshal(msg, &wsMsg); err != nil {
 			t.Fatalf("unmarshal: %v", err)
 		}
-		if wsMsg.Type == "server.pong" {
+		if wsMsg.Type == "pong" {
 			foundPong = true
 			break
 		}
 	}
 	if !foundPong {
-		t.Error("expected server.pong response")
+		t.Error("expected pong response")
 	}
 }
 
@@ -147,13 +160,31 @@ func TestHub_UnauthorizedConnection(t *testing.T) {
 	server := httptest.NewServer(wsHandler)
 	defer server.Close()
 
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "?token=invalid"
-	_, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
-	if err == nil {
-		t.Error("expected error for invalid token")
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
 	}
-	if resp != nil && resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("expected 401, got %d", resp.StatusCode)
+	defer func() { _ = conn.Close() }()
+
+	if err := conn.WriteJSON(map[string]interface{}{
+		"type":  "auth",
+		"token": "invalid",
+	}); err != nil {
+		t.Fatalf("write auth: %v", err)
+	}
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, msg, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	var wsMsg WSMessage
+	if err := json.Unmarshal(msg, &wsMsg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if wsMsg.Type != "error" {
+		t.Errorf("expected error response, got %s", wsMsg.Type)
 	}
 }
 

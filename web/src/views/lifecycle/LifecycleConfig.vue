@@ -79,16 +79,25 @@ import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { lifecycleApi } from '@/api/lifecycle'
+import type { BackpressureResponse, LifecycleConfig } from '@/api/types'
 
 const { t } = useI18n()
 
 const loading = ref(false)
 const saving = ref(false)
-const backpressure = ref<Record<string, unknown>>({})
+const backpressure = ref<BackpressureResponse>({
+  queueDepth: 0,
+  maxQueueDepth: 256,
+  activePublishes: 0,
+  maxConcurrentPublishes: 5,
+  bandwidthLimitKB: 0,
+  isThrottled: false,
+  pauseOnPressure: true,
+})
 const backpressureMax = ref(0)
 const pauseOnPressure = ref(false)
 
-const config = reactive({
+const config = reactive<LifecycleConfig>({
   pauseSeeders: true,
   deleteSeeders: false,
   deleteSeedHours: 720,
@@ -100,7 +109,7 @@ async function fetchConfig() {
   loading.value = true
   try {
     const resp = await lifecycleApi.getConfig()
-    const data = resp.data.data || {}
+    const data = resp.data.data as LifecycleConfig
     config.pauseSeeders = data.pauseSeeders ?? true
     config.deleteSeeders = data.deleteSeeders ?? false
     config.deleteSeedHours = data.deleteSeedHours ?? 720
@@ -116,9 +125,10 @@ async function fetchConfig() {
 async function fetchBackpressure() {
   try {
     const resp = await lifecycleApi.getBackpressure()
-    backpressure.value = resp.data.data || {}
-    backpressureMax.value = backpressure.value.maxConcurrentPublishes as number || 0
-  pauseOnPressure.value = backpressure.value.pauseOnPressure as boolean || false
+    const data = resp.data.data as BackpressureResponse
+    backpressure.value = data
+    backpressureMax.value = data.maxConcurrentPublishes || 0
+    pauseOnPressure.value = data.pauseOnPressure || false
   } catch (e: unknown) {
     message.error((e as Error).message)
   }

@@ -21,6 +21,7 @@ type SiteAdapter struct {
 	GetTorrentInfoHashFn          func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error)
 	SupportsSearchByPiecesHashVal bool
 	VerifyExistsFn                func(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error)
+	FetchUserStatsFn              func(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error)
 }
 
 func (m *SiteAdapter) Framework() string {
@@ -107,6 +108,13 @@ func (m *SiteAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig
 		return m.VerifyExistsFn(ctx, config, torrentID)
 	}
 	return false, nil
+}
+
+func (m *SiteAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	if m.FetchUserStatsFn != nil {
+		return m.FetchUserStatsFn(ctx, config)
+	}
+	return nil, nil
 }
 
 type SiteInfoProvider struct {

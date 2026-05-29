@@ -74,12 +74,13 @@ func RealIP(r *http.Request) string {
 }
 
 func firstIP(xff string) string {
+	xff = trimSpace(xff)
 	for i := 0; i < len(xff); i++ {
 		if xff[i] == ',' {
 			return trimSpace(xff[:i])
 		}
 	}
-	return trimSpace(xff)
+	return xff
 }
 
 func trimSpace(s string) string {

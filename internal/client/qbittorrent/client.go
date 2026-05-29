@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -31,6 +32,9 @@ type QBClient struct {
 	apiVersion  string
 	isV5        bool
 	sharedPaths []model.SharedPathMapping
+
+	ipBanned bool
+	banUntil time.Time
 
 	mu sync.RWMutex
 }
@@ -65,6 +69,15 @@ func (c *QBClient) GetReseedTargetID() string                 { return c.cfg.Res
 func (c *QBClient) GetID() uint                               { return c.cfg.ID }
 func (c *QBClient) GetSharedPaths() []model.SharedPathMapping { return c.sharedPaths }
 
+func (c *QBClient) IsIPBanned() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if !c.ipBanned {
+		return false
+	}
+	return time.Now().Before(c.banUntil)
+}
+
 func (c *QBClient) Version() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -87,12 +100,26 @@ func (c *QBClient) login(ctx context.Context) error {
 	if err != nil {
 		return c.wrapErr(11002, "login request", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return c.newErr(11003, fmt.Sprintf("login returned %d", resp.StatusCode))
+
+	body, _ := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
+
+	if resp.StatusCode == http.StatusForbidden && strings.Contains(string(body), "封禁") {
+		c.mu.Lock()
+		c.ipBanned = true
+		c.banUntil = time.Now().Add(5 * time.Minute)
+		c.mu.Unlock()
+		c.logger.Error("qBittorrent IP banned, skipping re-login for 5 minutes",
+			zap.String("client", c.cfg.Name),
+			zap.String("body", strings.TrimSpace(string(body))),
+		)
+		return c.newErr(11003, "IP banned by qBittorrent: "+strings.TrimSpace(string(body)))
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return c.newErr(11003, fmt.Sprintf("login returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body))))
+	}
+
 	if strings.TrimSpace(string(body)) != "Ok." {
 		return c.newErr(11003, "login failed: "+strings.TrimSpace(string(body)))
 	}
@@ -101,6 +128,7 @@ func (c *QBClient) login(ctx context.Context) error {
 		if cookie.Name == "SID" {
 			c.mu.Lock()
 			c.sid = cookie.Value
+			c.ipBanned = false
 			c.mu.Unlock()
 			break
 		}
@@ -138,7 +166,7 @@ func (c *QBClient) doRequest(ctx context.Context, method, path string, body io.R
 	var bodyBytes []byte
 	if body != nil {
 		var err error
-		bodyBytes, err = io.ReadAll(body)
+		bodyBytes, err = io.ReadAll(io.LimitReader(body, 100<<20))
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +184,17 @@ func (c *QBClient) doRequest(ctx context.Context, method, path string, body io.R
 	}
 
 	if resp.StatusCode == http.StatusForbidden {
-		_ = resp.Body.Close()
+		httpclient.DrainBody(resp)
+
+		c.mu.RLock()
+		banned := c.ipBanned && time.Now().Before(c.banUntil)
+		c.mu.RUnlock()
+
+		if banned {
+			c.logger.Debug("skipping re-login, IP still banned", zap.String("client", c.cfg.Name))
+			return nil, c.newErr(11003, "qBittorrent IP banned, re-login skipped")
+		}
+
 		c.logger.Debug("session expired, re-login", zap.String("client", c.cfg.Name))
 		if loginErr := c.login(ctx); loginErr != nil {
 			return nil, loginErr
@@ -188,7 +226,17 @@ func (c *QBClient) postForm(ctx context.Context, path string, data url.Values) (
 	}
 
 	if resp.StatusCode == http.StatusForbidden {
-		_ = resp.Body.Close()
+		httpclient.DrainBody(resp)
+
+		c.mu.RLock()
+		banned := c.ipBanned && time.Now().Before(c.banUntil)
+		c.mu.RUnlock()
+
+		if banned {
+			c.logger.Debug("skipping re-login, IP still banned", zap.String("client", c.cfg.Name))
+			return nil, c.newErr(11003, "qBittorrent IP banned, re-login skipped")
+		}
+
 		c.logger.Debug("postForm session expired, re-login", zap.String("client", c.cfg.Name))
 		if loginErr := c.login(ctx); loginErr != nil {
 			return nil, loginErr
@@ -207,20 +255,26 @@ func (c *QBClient) getString(ctx context.Context, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer func() { _ = resp.Body.Close() }()
-	b, _ := io.ReadAll(resp.Body)
+	b, _ := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
 	return strings.TrimSpace(string(b)), nil
 }
 
 func (c *QBClient) pauseEndpoint() string {
-	if c.isV5 {
+	c.mu.RLock()
+	v5 := c.isV5
+	c.mu.RUnlock()
+	if v5 {
 		return "/api/v2/torrents/stop"
 	}
 	return "/api/v2/torrents/pause"
 }
 
 func (c *QBClient) resumeEndpoint() string {
-	if c.isV5 {
+	c.mu.RLock()
+	v5 := c.isV5
+	c.mu.RUnlock()
+	if v5 {
 		return "/api/v2/torrents/start"
 	}
 	return "/api/v2/torrents/resume"

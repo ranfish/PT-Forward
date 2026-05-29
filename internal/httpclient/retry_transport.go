@@ -172,7 +172,7 @@ func readAndCacheBody(req *http.Request) (*cachedBody, error) {
 		return nil, nil
 	}
 
-	data, err := io.ReadAll(req.Body)
+	data, err := io.ReadAll(io.LimitReader(req.Body, 100<<20))
 	if closeErr := req.Body.Close(); closeErr != nil && err == nil {
 		err = closeErr
 	}

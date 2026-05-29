@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -32,7 +33,7 @@ func (a *RousiAdapter) Framework() string { return "rousi" }
 func (a *RousiAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 	u := resolveBaseURL(config) + "/api/v1/torrents?perPage=20&page=1"
 	if keyword != "" {
-		u += "&search=" + keyword
+		u += "&search=" + url.QueryEscape(keyword)
 	}
 	if opts != nil && opts.Category != "" {
 		u += "&category=" + opts.Category
@@ -48,7 +49,7 @@ func (a *RousiAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, searchError("搜索请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -109,7 +110,7 @@ func (a *RousiAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 	if err != nil {
 		return nil, downloadError("下载失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
@@ -130,7 +131,7 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return nil, networkError("请求详情失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil
@@ -183,7 +184,7 @@ func (a *RousiAdapter) DetectDiscount(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, networkError("请求优惠信息失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -236,6 +237,19 @@ func (a *RousiAdapter) DetectHR(_ context.Context, _ *model.SiteConfig, _ string
 	return &model.HRResult{HasHR: false}, nil
 }
 
+func (a *RousiAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
+	result := make(map[string]*model.SLData, len(torrentIDs))
+	for _, id := range torrentIDs {
+		sl, err := a.GetPreciseSLData(ctx, config, id)
+		if err != nil {
+			a.logger.Warn("获取SL数据失败", zap.String("torrentID", id), zap.Error(err))
+			continue
+		}
+		result[id] = sl
+	}
+	return result, nil
+}
+
 func (a *RousiAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
 	u := resolveBaseURL(config) + "/api/v1/torrents/" + torrentID
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -248,7 +262,7 @@ func (a *RousiAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return &model.SLData{}, nil
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -341,7 +355,7 @@ func (a *RousiAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	respBody, err := readBody(resp)
 	if err != nil {
@@ -394,7 +408,7 @@ func resolveField(fields map[string]string, keys ...string) string {
 func (a *RousiAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
 	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
 	if err != nil {
-		return false, nil
+		return false, fmt.Errorf("search for verify exists %q: %w", torrentID, err)
 	}
 	for _, r := range results {
 		if r.TorrentID == torrentID {
@@ -402,4 +416,69 @@ func (a *RousiAdapter) VerifyExists(ctx context.Context, config *model.SiteConfi
 		}
 	}
 	return false, nil
+}
+
+func (a *RousiAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	baseURL := resolveBaseURL(config)
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v1/profile?include_fields[user]=seeding_leeching_data", nil)
+	if err != nil {
+		return nil, fmt.Errorf("构造请求失败: %w", err)
+	}
+	a.setAuthHeaders(req, config.Passkey)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("请求失败: %w", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		respBody := string(body)
+		if len(respBody) > 200 {
+			respBody = respBody[:200]
+		}
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, respBody)
+	}
+
+	var result struct {
+		Code int `json:"code"`
+		Data struct {
+			ID       int    `json:"id"`
+			Username string `json:"username"`
+			Level    int    `json:"level"`
+			LevelText string `json:"level_text"`
+			Uploaded   int64   `json:"uploaded"`
+			Downloaded int64   `json:"downloaded"`
+			Ratio      float64 `json:"ratio"`
+			Karma      float64 `json:"karma"`
+			SeedingLeechingData struct {
+				SeedingCount int   `json:"seeding_count"`
+				SeedingSize  int64 `json:"seeding_size"`
+			} `json:"seeding_leeching_data"`
+		} `json:"data"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("解析响应失败: %w", err)
+	}
+	if result.Code != 0 {
+		return nil, fmt.Errorf("API 错误: code=%d msg=%s", result.Code, result.Message)
+	}
+
+	stats := &model.UserStatsResult{
+		Username:      result.Data.Username,
+		UserClass:     result.Data.LevelText,
+		UploadBytes:   result.Data.Uploaded,
+		DownloadBytes: result.Data.Downloaded,
+		Ratio:         result.Data.Ratio,
+		BonusPoints:   result.Data.Karma,
+		SeedingCount:  result.Data.SeedingLeechingData.SeedingCount,
+		SeedingSize:   result.Data.SeedingLeechingData.SeedingSize,
+	}
+
+	return stats, nil
 }

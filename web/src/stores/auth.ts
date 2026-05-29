@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { authApi } from '@/api/auth'
 import router from '@/router'
+import { useWebSocketStore } from './websocket'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem('pt-forward-access-token') || '')
@@ -17,6 +18,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
+    const wsStore = useWebSocketStore()
+    wsStore.disconnect()
     accessToken.value = ''
     isLoggedIn.value = false
     localStorage.removeItem('pt-forward-access-token')

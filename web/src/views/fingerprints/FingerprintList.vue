@@ -51,6 +51,7 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { fingerprintsApi } from '@/api/fingerprints'
 import { usePagination } from '@/composables/usePagination'
+import { formatTime } from '@/utils/format'
 
 const { t } = useI18n()
 
@@ -63,10 +64,10 @@ const searchForm = reactive({ infoHash: '', piecesHash: '' })
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
   { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
-  { title: 'PiecesHash', dataIndex: 'pieces_hash', key: 'pieces_hash', ellipsis: true },
+  { title: t('fingerprints.piecesHash'), dataIndex: 'pieces_hash', key: 'pieces_hash', ellipsis: true },
   { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
   { title: t('common.title'), dataIndex: 'title', key: 'title', ellipsis: true },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('common.actions'), key: 'actions', width: 80 },
 ]
 
@@ -84,7 +85,7 @@ async function handleSearch() {
     if (searchForm.infoHash) params.infoHash = searchForm.infoHash
     if (searchForm.piecesHash) params.piecesHash = searchForm.piecesHash
     const resp = await fingerprintsApi.search(params)
-    searchResults.value = resp.data.data || []
+    searchResults.value = (resp.data.data?.items ?? []) as Record<string, unknown>[]
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {

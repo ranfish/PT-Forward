@@ -1,19 +1,20 @@
 import client from './client'
+import type { ApiResponse, ApiResponsePaginated } from './types'
 
 export const fingerprintsApi = {
   list(page = 1, size = 20) {
-    return client.get('/fingerprints', { params: { page, size } })
+    return client.get<ApiResponsePaginated<unknown>>('/fingerprints', { params: { page, size } })
   },
   get(id: number) {
-    return client.get(`/fingerprints/${id}`)
+    return client.get<ApiResponse<unknown>>(`/fingerprints/${id}`)
   },
   search(params: { infoHash?: string; piecesHash?: string }) {
-    return client.get('/fingerprints/search', { params })
+    return client.get<ApiResponse<{ items: unknown[]; total: number }>>('/fingerprints/search', { params })
   },
   delete(id: number) {
-    return client.delete(`/fingerprints/${id}`)
+    return client.delete<ApiResponse<void>>(`/fingerprints/${id}`)
   },
   deleteCache() {
-    return client.delete('/fingerprints/cache')
+    return client.delete<ApiResponse<{ deleted: number }>>('/fingerprints/cache')
   },
 }

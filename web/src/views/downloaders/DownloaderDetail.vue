@@ -16,7 +16,7 @@
         <a-descriptions-item :label="t('common.address')">{{ downloader.url }}</a-descriptions-item>
         <a-descriptions-item :label="t('common.status')">{{ downloader.enabled ? t('common.enabled') : t('common.disabled') }}</a-descriptions-item>
         <a-descriptions-item :label="t('common.username')">{{ downloader.username || '-' }}</a-descriptions-item>
-        <a-descriptions-item :label="t('common.createdAt')">{{ downloader.createdAt || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.createdAt')">{{ formatTime(downloader.createdAt) }}</a-descriptions-item>
       </a-descriptions>
 
       <a-tabs v-model:active-key="activeTab" @change="onTabChange">
@@ -48,7 +48,7 @@
                 {{ formatBytes(record.total_size) }}
               </template>
               <template v-if="column.key === 'progress'">
-                <a-progress :percent="Math.round(record.progress * 100)" size="small" :stroke-width="4" style="width: 80px" />
+                <a-progress :percent="Math.round((record.progress ?? 0) * 100)" size="small" :stroke-width="4" style="width: 80px" />
               </template>
               <template v-if="column.key === 'upload_speed'">
                 {{ formatSpeed(record.upload_speed) }}
@@ -89,6 +89,7 @@
           <a-descriptions v-if="maindata" bordered :column="2">
             <a-descriptions-item :label="t('downloader.torrentCount')">{{ Object.keys(maindata.torrents || {}).length }}</a-descriptions-item>
             <a-descriptions-item :label="t('downloader.freeSpace')">{{ formatBytes(maindata.free_space) }}</a-descriptions-item>
+            <a-descriptions-item :label="t('downloader.totalDiskSpace')">{{ formatBytes(maindata.total_disk_space) }}</a-descriptions-item>
             <a-descriptions-item :label="t('downloader.categoryCount')">{{ Object.keys(maindata.categories || {}).length }}</a-descriptions-item>
             <a-descriptions-item :label="t('downloader.tagCount')">{{ (maindata.tags || []).length }}</a-descriptions-item>
           </a-descriptions>
@@ -171,12 +172,13 @@ import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { downloadersApi } from '@/api/downloaders'
-import { formatSpeed, formatBytes } from '@/utils/format'
-import type { TorrentInfo, ClientPublishTarget } from '@/api/types'
+import { formatSpeed, formatBytes, formatTime } from '@/utils/format'
+import type { TorrentInfo, ClientPublishTarget, ClientConfig } from '@/api/types'
 
 interface MaindataResponse {
   torrents?: Record<string, unknown>
   free_space?: number
+  total_disk_space?: number
   categories?: Record<string, unknown>
   tags?: string[]
 }
@@ -188,7 +190,7 @@ const id = Number(route.params.id)
 const loading = ref(false)
 const torrentsLoading = ref(false)
 const targetsLoading = ref(false)
-const downloader = ref<Record<string, unknown>>({})
+const downloader = ref<Partial<ClientConfig>>({})
 const torrents = ref<TorrentInfo[]>([])
 const maindata = ref<MaindataResponse | null>(null)
 const publishTargets = ref<ClientPublishTarget[]>([])
@@ -265,7 +267,7 @@ async function fetchTorrents() {
   try {
     const resp = await downloadersApi.getTorrents(id)
     const body = resp.data.data
-    torrents.value = body?.items || body || []
+    torrents.value = body?.items ?? []
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {

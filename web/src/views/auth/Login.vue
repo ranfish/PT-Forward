@@ -97,6 +97,13 @@ async function handleSubmit() {
   }
 }
 
+function safeRedirect(path: string) {
+  if (!path.startsWith('/') || path.startsWith('//')) {
+    return '/'
+  }
+  return path
+}
+
 async function handleSetup() {
   if (form.password !== form.confirmPassword) {
     message.error(t('auth.passwordMismatch'))
@@ -107,7 +114,7 @@ async function handleSetup() {
     await authApi.setup({ username: form.username, password: form.password })
     message.success(t('auth.setupSuccess'))
     await authStore.login(form.username, form.password)
-    const redirect = (route.query.redirect as string) || '/'
+    const redirect = safeRedirect((route.query.redirect as string) || '/')
     router.push(redirect)
   } catch (e: unknown) {
     message.error((e as Error).message || t('auth.setupFailed'))
@@ -121,7 +128,7 @@ async function handleLogin() {
   try {
     await authStore.login(form.username, form.password)
     message.success(t('auth.loginSuccess'))
-    const redirect = (route.query.redirect as string) || '/'
+    const redirect = safeRedirect((route.query.redirect as string) || '/')
     router.push(redirect)
   } catch (e: unknown) {
     message.error((e as Error).message || t('auth.wrongCredentials'))

@@ -34,6 +34,14 @@
         size="small"
       />
     </a-card>
+
+    <a-modal v-model:open="memberDetailVisible" :title="t('tracker.memberDetail')" width="600px" :footer="null">
+      <a-spin :spinning="memberDetailLoading">
+        <a-descriptions v-if="memberDetail" bordered :column="1" size="small">
+          <a-descriptions-item v-for="(val, key) in memberDetail" :key="key" :label="String(key)">{{ val ?? '-' }}</a-descriptions-item>
+        </a-descriptions>
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
@@ -42,6 +50,7 @@ import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { trackerApi } from '@/api/tracker'
+import { formatTime } from '@/utils/format'
 
 const { t } = useI18n()
 
@@ -50,6 +59,9 @@ const historyLoading = ref(false)
 const members = ref<Record<string, unknown>[]>([])
 const histories = ref<Record<string, unknown>[]>([])
 const page = ref(1)
+const memberDetailVisible = ref(false)
+const memberDetailLoading = ref(false)
+const memberDetail = ref<Record<string, unknown> | null>(null)
 
 const memberColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
@@ -61,7 +73,7 @@ const memberColumns = [
   { title: t('tracker.pausedStatus'), key: 'paused', width: 80 },
   { title: t('tracker.seeders'), dataIndex: 'seeders', key: 'seeders', width: 80 },
   { title: t('tracker.leechers'), dataIndex: 'leechers', key: 'leechers', width: 80 },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 
 const historyColumns = [
@@ -71,7 +83,7 @@ const historyColumns = [
   { title: t('tracker.oldStatus'), dataIndex: 'old_status', key: 'old_status', width: 100 },
   { title: t('tracker.newStatus'), dataIndex: 'new_status', key: 'new_status', width: 100 },
   { title: t('tracker.reason'), dataIndex: 'reason', key: 'reason', ellipsis: true },
-  { title: t('tracker.colTime'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('tracker.colTime'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 
 function memberStatusColor(status: string) {
@@ -84,7 +96,7 @@ async function fetchMembers() {
   try {
     const resp = await trackerApi.listMembers()
     const body = resp.data.data
-    members.value = body?.items || body || []
+    members.value = (body?.items ?? []) as Record<string, unknown>[]
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {
@@ -97,7 +109,7 @@ async function fetchHistory() {
   try {
     const resp = await trackerApi.getHistory()
     const body = resp.data.data
-    histories.value = body?.items || body || []
+    histories.value = (body?.items ?? []) as Record<string, unknown>[]
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {
@@ -107,13 +119,16 @@ async function fetchHistory() {
 
 async function viewMember(hash: string) {
   if (!hash) return
+  memberDetailVisible.value = true
+  memberDetailLoading.value = true
+  memberDetail.value = null
   try {
-    const resp = await trackerApi.getHistory()
-    const body = resp.data.data
-    histories.value = body?.items || body || []
-    message.info(t('tracker.viewInfoHash', { hash: hash.substring(0, 16) }))
+    const resp = await trackerApi.getMember(hash)
+    memberDetail.value = (resp.data.data || null) as Record<string, unknown> | null
   } catch (e: unknown) {
     message.error((e as Error).message)
+  } finally {
+    memberDetailLoading.value = false
   }
 }
 

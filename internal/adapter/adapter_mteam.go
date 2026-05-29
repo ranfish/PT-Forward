@@ -13,8 +13,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
+)
+
+var (
+	reMTeamTitle      = regexp.MustCompile(`<title>([^<]+)</title>`)
+	reMTeamInfoHash   = regexp.MustCompile(`(?i)info_hash.*?<td[^>]*>([a-fA-F0-9]{40})`)
+	reMTeamSize       = regexp.MustCompile(`(?i)(?:大小|Size)[^<]*<[^>]*>([^<]+)`)
+	reMTeamCategory   = regexp.MustCompile(`(?i)(?:分类|Category)[^<]*<[^>]*>([^<]+)`)
+	reMTeamSeeders    = regexp.MustCompile(`(?i)(?:做种|Seeders?)[^<]*<[^>]*>(\d+)`)
+	reMTeamLeechers   = regexp.MustCompile(`(?i)(?:下载|Leechers?)[^<]*<[^>]*>(\d+)`)
+	reMTeamDetailID   = regexp.MustCompile(`(?:details|detail)\.php\?id=(\d+)`)
+	reMTeamErrorClass = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 )
 
 const mteamUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -92,7 +104,7 @@ func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfi
 	if err != nil {
 		return nil, searchError("搜索请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -157,7 +169,7 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, networkError("genDlToken 请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("genDlToken HTTP %d", resp.StatusCode), nil)
@@ -187,7 +199,7 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, downloadError("下载种子失败", err)
 	}
-	defer func() { _ = dlResp.Body.Close() }()
+	defer func() { drainBody(dlResp) }()
 
 	if dlResp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("下载种子 HTTP %d", dlResp.StatusCode), nil)
@@ -212,7 +224,7 @@ func (a *MTeamAdapter) downloadViaWeb(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, downloadError("下载失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
@@ -241,7 +253,7 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -308,7 +320,7 @@ func (a *MTeamAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfi
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -317,16 +329,16 @@ func (a *MTeamAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfi
 	html := string(body)
 
 	detail := &model.TorrentDetail{}
-	if m := regexp.MustCompile(`<title>([^<]+)</title>`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reMTeamTitle.FindStringSubmatch(html); len(m) > 1 {
 		detail.Title = strings.TrimSpace(m[1])
 	}
-	if m := regexp.MustCompile(`(?i)info_hash.*?<td[^>]*>([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reMTeamInfoHash.FindStringSubmatch(html); len(m) > 1 {
 		detail.InfoHash = strings.ToLower(m[1])
 	}
-	if m := regexp.MustCompile(`(?i)(?:大小|Size)[^<]*<[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reMTeamSize.FindStringSubmatch(html); len(m) > 1 {
 		detail.Size = parseSizeStr(m[1])
 	}
-	if m := regexp.MustCompile(`(?i)(?:分类|Category)[^<]*<[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reMTeamCategory.FindStringSubmatch(html); len(m) > 1 {
 		detail.Category = strings.TrimSpace(m[1])
 	}
 	detail.Tags = extractTags(html)
@@ -354,7 +366,7 @@ func (a *MTeamAdapter) discountViaAPI(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, networkError("优惠检测请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -380,7 +392,9 @@ func (a *MTeamAdapter) discountViaAPI(ctx context.Context, config *model.SiteCon
 		dr = &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}
 	case "_2X", "2XUP":
 		dr = &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}
-	case "PERCENT_50", "_2X_PERCENT_50":
+	case "_2X_PERCENT_50":
+		dr = &model.DiscountResult{Level: model.Discount2x50, Multiplier: 2.0}
+	case "PERCENT_50":
 		dr = &model.DiscountResult{Level: model.DiscountPercent50}
 	case "PERCENT_70", "_2X_PERCENT_70":
 		dr = &model.DiscountResult{Level: model.DiscountPercent70}
@@ -411,7 +425,7 @@ func (a *MTeamAdapter) discountViaWeb(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, networkError("优惠检测请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -435,6 +449,94 @@ func (a *MTeamAdapter) discountViaWeb(ctx context.Context, config *model.SiteCon
 	return &model.DiscountResult{Level: model.DiscountNone}, nil
 }
 
+func (a *MTeamAdapter) DetectHRAndDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, *model.DiscountResult, error) {
+	if config.APIKey != "" {
+		return a.detectHRAndDiscountViaAPI(ctx, config, torrentID)
+	}
+	hr, err := a.DetectHR(ctx, config, torrentID)
+	if err != nil {
+		return nil, nil, err
+	}
+	disc, err := a.DetectDiscount(ctx, config, torrentID)
+	if err != nil {
+		return hr, nil, err
+	}
+	return hr, disc, nil
+}
+
+func (a *MTeamAdapter) detectHRAndDiscountViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, *model.DiscountResult, error) {
+	u := resolveBaseURL(config) + "/api/torrent/detail"
+	a.logger.Debug("mteam combined detect: sending request",
+		zap.String("url", u),
+		zap.String("torrent", torrentID),
+		zap.Bool("hasAPIKey", config.APIKey != ""))
+	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader("id="+torrentID))
+	if err != nil {
+		return nil, nil, networkError("构造合并检测请求失败", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	a.setAPIHeaders(req, config.APIKey)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, nil, networkError("合并检测请求失败", err)
+	}
+	defer func() { drainBody(resp) }()
+	a.logger.Debug("mteam combined detect: got response",
+		zap.String("torrent", torrentID),
+		zap.Int("status", resp.StatusCode))
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, nil, err
+	}
+	var rawResult struct {
+		Data struct {
+			Status struct {
+				Discount        string `json:"discount"`
+				DiscountEndTime string `json:"discountEndTime"`
+				HR              bool   `json:"hr"`
+			} `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &rawResult); err != nil {
+		return nil, nil, parseError("解析合并检测结果失败", err)
+	}
+
+	hrResult := &model.HRResult{HasHR: rawResult.Data.Status.HR}
+	if hrResult.HasHR {
+		hrResult.SeedTimeH = config.HR.SeedTimeH()
+	}
+
+	var dr *model.DiscountResult
+	switch strings.ToUpper(rawResult.Data.Status.Discount) {
+	case "FREE":
+		dr = &model.DiscountResult{Level: model.DiscountFree}
+	case "_2X_FREE", "FREE_2XUP", "TWOFREE":
+		dr = &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}
+	case "_2X", "2XUP":
+		dr = &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}
+	case "_2X_PERCENT_50":
+		dr = &model.DiscountResult{Level: model.Discount2x50, Multiplier: 2.0}
+	case "PERCENT_50":
+		dr = &model.DiscountResult{Level: model.DiscountPercent50}
+	case "PERCENT_70", "_2X_PERCENT_70":
+		dr = &model.DiscountResult{Level: model.DiscountPercent70}
+	case "PERCENT_30":
+		dr = &model.DiscountResult{Level: model.DiscountPercent30}
+	case "NORMAL":
+		dr = &model.DiscountResult{Level: model.DiscountNone}
+	default:
+		dr = &model.DiscountResult{Level: model.DiscountNone}
+	}
+	if dr.Level != model.DiscountNone && rawResult.Data.Status.DiscountEndTime != "" {
+		if t, err := time.Parse(time.RFC3339, rawResult.Data.Status.DiscountEndTime); err == nil {
+			dr.FreeEndAt = &t
+		}
+	}
+	return hrResult, dr, nil
+}
+
 func (a *MTeamAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
 	if config.APIKey != "" {
 		u := resolveBaseURL(config) + "/api/torrent/detail"
@@ -449,7 +551,7 @@ func (a *MTeamAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 		if err != nil {
 			return nil, networkError("HR 检测请求失败", err)
 		}
-		defer func() { _ = resp.Body.Close() }()
+		defer func() { drainBody(resp) }()
 
 		body, err := readBody(resp)
 		if err != nil {
@@ -483,7 +585,7 @@ func (a *MTeamAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 	if err != nil {
 		return nil, networkError("HR 检测请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -491,14 +593,24 @@ func (a *MTeamAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 	}
 	html := strings.ToLower(string(body))
 
-	hasHR := strings.Contains(html, "hit and run") ||
-		strings.Contains(html, "hit&run") ||
-		strings.Contains(html, "h&r") ||
-		strings.Contains(html, "考核")
+	hasHR := detectHRFromHTML(html)
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
 		result.SeedTimeH = config.HR.SeedTimeH()
+	}
+	return result, nil
+}
+
+func (a *MTeamAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
+	result := make(map[string]*model.SLData, len(torrentIDs))
+	for _, id := range torrentIDs {
+		sl, err := a.GetPreciseSLData(ctx, config, id)
+		if err != nil {
+			a.logger.Warn("获取SL数据失败", zap.String("torrentID", id), zap.Error(err))
+			continue
+		}
+		result[id] = sl
 	}
 	return result, nil
 }
@@ -523,7 +635,7 @@ func (a *MTeamAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, t
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -556,7 +668,7 @@ func (a *MTeamAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, t
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -565,10 +677,10 @@ func (a *MTeamAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, t
 	html := string(body)
 	sl := &model.SLData{}
 
-	if m := regexp.MustCompile(`(?i)(?:做种|Seeders?)[^<]*<[^>]*>(\d+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reMTeamSeeders.FindStringSubmatch(html); len(m) > 1 {
 		sl.Seeders, _ = strconv.Atoi(m[1])
 	}
-	if m := regexp.MustCompile(`(?i)(?:下载|Leechers?)[^<]*<[^>]*>(\d+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reMTeamLeechers.FindStringSubmatch(html); len(m) > 1 {
 		sl.Leechers, _ = strconv.Atoi(m[1])
 	}
 
@@ -671,7 +783,7 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -704,7 +816,7 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 
 	html := string(body)
-	if idMatch := regexp.MustCompile(`(?:details|detail)\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
+	if idMatch := reMTeamDetailID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
 		return &model.PublishResponse{
 			Success:    true,
@@ -784,7 +896,7 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -796,7 +908,7 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 cookie 过期"}
 	}
 
-	if idMatch := regexp.MustCompile(`(?:details|detail)\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
+	if idMatch := reMTeamDetailID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
 		return &model.PublishResponse{
 			Success:    true,
@@ -811,7 +923,7 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 	}
 
 	errMsg := "上传失败"
-	if m := regexp.MustCompile(`class="error"[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reMTeamErrorClass.FindStringSubmatch(html); len(m) > 1 {
 		errMsg = strings.TrimSpace(m[1])
 	}
 
@@ -840,7 +952,7 @@ func resolveBaseURL(config *model.SiteConfig) string {
 func (a *MTeamAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
 	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
 	if err != nil {
-		return false, nil
+		return false, fmt.Errorf("search for verify exists %q: %w", torrentID, err)
 	}
 	for _, r := range results {
 		if r.TorrentID == torrentID {
@@ -848,4 +960,108 @@ func (a *MTeamAdapter) VerifyExists(ctx context.Context, config *model.SiteConfi
 		}
 	}
 	return false, nil
+}
+
+func (a *MTeamAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	if config.APIKey == "" {
+		return a.fetchUserStatsHTML(ctx, config)
+	}
+	return a.fetchUserStatsAPI(ctx, config)
+}
+
+func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	u := resolveBaseURL(config) + "/api/member/profile"
+	req, err := http.NewRequestWithContext(ctx, "POST", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	a.setAPIHeaders(req, config.APIKey)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Message string `json:"message"`
+		Data    struct {
+			ID           flexInt `json:"id"`
+			Username     string  `json:"username"`
+			MemberCount  struct {
+				Uploaded   string `json:"uploaded"`
+				Downloaded string `json:"downloaded"`
+				Seeding    string `json:"seeding"`
+				Bonus      string `json:"bonus"`
+				ShareRate  string `json:"shareRate"`
+			} `json:"memberCount"`
+			MemberStatus struct {
+				LastLogin string `json:"lastLogin"`
+			} `json:"memberStatus"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("解析用户信息失败: %w", err)
+	}
+
+	stats := &model.UserStatsResult{
+		Username: result.Data.Username,
+	}
+	stats.UploadBytes = parseSizeString(result.Data.MemberCount.Uploaded)
+	stats.DownloadBytes = parseSizeString(result.Data.MemberCount.Downloaded)
+	stats.SeedingCount, _ = strconv.Atoi(result.Data.MemberCount.Seeding)
+	stats.BonusPoints, _ = strconv.ParseFloat(result.Data.MemberCount.Bonus, 64)
+	stats.Ratio, _ = strconv.ParseFloat(result.Data.MemberCount.ShareRate, 64)
+	if stats.Ratio == 0 && stats.DownloadBytes > 0 {
+		stats.Ratio = float64(stats.UploadBytes) / float64(stats.DownloadBytes)
+	}
+	return stats, nil
+}
+
+func (a *MTeamAdapter) fetchUserStatsHTML(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	pageURL := config.Domain + "/index.php"
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer httpclient.DrainBody(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	htmlBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	html := string(htmlBytes)
+
+	result := &model.UserStatsResult{}
+	if m := reNexusUsername.FindStringSubmatch(html); len(m) > 2 {
+		result.Username = strings.TrimSpace(m[2])
+	} else if m := reNexusUsernameAlt.FindStringSubmatch(html); len(m) > 2 {
+		result.Username = strings.TrimSpace(m[2])
+	}
+	if m := reNexusFontUploaded.FindStringSubmatch(html); len(m) > 1 {
+		result.UploadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reNexusLabelUpload.FindStringSubmatch(html); len(m) > 1 {
+		result.UploadBytes = parseSizeString(cleanText(m[1]))
+	}
+	if m := reNexusFontDownloaded.FindStringSubmatch(html); len(m) > 1 {
+		result.DownloadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reNexusLabelDownload.FindStringSubmatch(html); len(m) > 1 {
+		result.DownloadBytes = parseSizeString(cleanText(m[1]))
+	}
+	return result, nil
 }

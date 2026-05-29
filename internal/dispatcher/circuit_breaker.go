@@ -30,10 +30,20 @@ func NewCircuitBreaker(logger *zap.Logger, notifyService *notification.Service) 
 }
 
 func (cb *CircuitBreaker) Allow(key string) bool {
-	cb.mu.RLock()
-	defer cb.mu.RUnlock()
-	if until, ok := cb.openUntil[key]; ok {
-		return time.Now().After(until)
+	cb.mu.Lock()
+	now := time.Now()
+	if len(cb.openUntil) > 50 {
+		for k, until := range cb.openUntil {
+			if now.After(until) {
+				delete(cb.openUntil, k)
+				delete(cb.failureCounts, k)
+			}
+		}
+	}
+	until, ok := cb.openUntil[key]
+	cb.mu.Unlock()
+	if ok {
+		return now.After(until)
 	}
 	return true
 }

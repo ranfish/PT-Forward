@@ -25,6 +25,23 @@
     </a-modal>
 
     <a-spin :spinning="loading">
+      <div style="margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
+        <a-button v-if="siteFrozen" type="primary" danger size="small" :loading="freezeLoading" @click="handleUnfreeze">{{ t('site.unfreeze') }}</a-button>
+        <a-button v-else size="small" :loading="freezeLoading" @click="showFreezeModal = true">{{ t('site.freeze') }}</a-button>
+        <a-tag v-if="siteFrozen" color="red">{{ t('site.frozen') }}</a-tag>
+      </div>
+
+      <a-modal v-model:open="showFreezeModal" :title="t('site.freezeTitle')" @ok="handleFreeze">
+        <a-form layout="vertical">
+          <a-form-item :label="t('site.freezeDuration')">
+            <a-input v-model:value="freezeForm.duration" placeholder="1h / 30m / 2d" />
+          </a-form-item>
+          <a-form-item :label="t('site.freezeReason')">
+            <a-textarea v-model:value="freezeForm.reason" :rows="2" />
+          </a-form-item>
+        </a-form>
+      </a-modal>
+
       <a-descriptions bordered :column="2" style="margin-bottom: 24px">
         <a-descriptions-item :label="t('common.name')">{{ site.name }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.framework')">
@@ -33,10 +50,9 @@
           </a-tag>
         </a-descriptions-item>
         <a-descriptions-item :label="t('site.authType')">{{ authLabel }}</a-descriptions-item>
-        <a-descriptions-item v-if="site.mirrorDomain" :label="t('site.mirrorDomain')">{{ site.mirrorDomain }}</a-descriptions-item>
-        <a-descriptions-item v-if="needsCookie" label="Cookie">{{ site.hasCookie ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
-        <a-descriptions-item v-if="needsApiKey" label="API Key">{{ site.hasApiKey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
-        <a-descriptions-item v-if="needsPasskey" label="Passkey">{{ site.hasPasskey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
+        <a-descriptions-item v-if="needsCookie" :label="t('sites.cookie')">{{ site.hasCookie ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
+        <a-descriptions-item v-if="needsApiKey" :label="t('sites.apiKey')">{{ site.hasApiKey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
+        <a-descriptions-item v-if="needsPasskey" :label="t('sites.passkey')">{{ site.hasPasskey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.enabledLabel')"><a-badge :status="site.enabled ? 'success' : 'default'" :text="site.enabled ? t('common.yes') : t('common.no')" /></a-descriptions-item>
         <a-descriptions-item :label="t('site.role')">{{ [site.isSource ? t('site.sourceSiteRole') : '', site.isTarget ? t('site.targetSiteRole') : ''].filter(Boolean).join(', ') || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.participateAutoPublishLabel')">{{ site.participateAutoPublish ? t('common.yes') : t('common.no') }}</a-descriptions-item>
@@ -49,16 +65,20 @@
         <a-descriptions-item :label="t('site.overrideSavePath')">{{ site.overrideSavePath || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.proxyAddress')">{{ site.proxyUrl || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.skipSslVerify')">{{ site.skipSslVerify ? t('common.yes') : t('common.no') }}</a-descriptions-item>
-        <a-descriptions-item :label="t('site.lastSync')">{{ site.lastSyncAt || '-' }}</a-descriptions-item>
-        <a-descriptions-item :label="t('common.createdAt')">{{ site.createdAt || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('site.maxConcurrent')">{{ site.maxConcurrent || 2 }}</a-descriptions-item>
+        <a-descriptions-item :label="t('site.lastSync')">{{ formatTime(site.lastSyncAt) }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.createdAt')">{{ formatTime(site.createdAt) }}</a-descriptions-item>
       </a-descriptions>
 
       <a-card :title="t('site.siteStats')" style="margin-bottom: 24px">
+        <template #extra>
+          <a-button size="small" :loading="statsSyncing" @click="syncStats">{{ t('site.syncStats') }}</a-button>
+        </template>
         <a-spin :spinning="statsLoading">
           <a-row :gutter="16">
             <a-col :span="4"><a-statistic :title="t('site.uploadBytes')" :value="formatBytes(stats.uploadBytes)" /></a-col>
             <a-col :span="4"><a-statistic :title="t('site.downloadBytes')" :value="formatBytes(stats.downloadBytes)" /></a-col>
-            <a-col :span="4"><a-statistic :title="t('site.ratio')" :value="stats.ratio?.toFixed(2) || '-'" /></a-col>
+            <a-col :span="4"><a-statistic :title="t('site.ratio')" :value="Number(stats.uploadBytes ?? 0) > 0 && Number(stats.downloadBytes ?? 0) === 0 ? '∞' : (Number.isFinite(stats.ratio) ? stats.ratio!.toFixed(2) : '-')" /></a-col>
             <a-col :span="4"><a-statistic :title="t('site.seedingCount')" :value="stats.seedingCount ?? '-'" /></a-col>
             <a-col :span="4"><a-statistic :title="t('site.seedingPoints')" :value="stats.seedingPoints ?? '-'" /></a-col>
             <a-col :span="4"><a-statistic :title="t('site.bonusPoints')" :value="stats.bonusPoints ?? '-'" /></a-col>
@@ -66,7 +86,7 @@
           <a-row :gutter="16" style="margin-top: 12px">
             <a-col :span="4"><a-statistic :title="t('site.seedingSize')" :value="formatBytes(stats.seedingSize)" /></a-col>
             <a-col :span="4"><a-statistic :title="t('site.userClass')" :value="stats.userClass || '-'" /></a-col>
-            <a-col :span="8"><a-statistic :title="t('site.statsSyncedAt')" :value="stats.statsSyncedAt || '-'" /></a-col>
+            <a-col :span="8"><a-statistic :title="t('site.statsSyncedAt')" :value="formatTime(stats.statsSyncedAt)" /></a-col>
           </a-row>
         </a-spin>
       </a-card>
@@ -89,9 +109,6 @@
               </a-form-item>
             </a-col>
           </a-row>
-          <a-form-item :label="t('site.mirrorDomain')">
-            <a-input v-model:value="settingsForm.mirrorDomain" :placeholder="t('site.mirrorDomainPlaceholder')" />
-          </a-form-item>
 
           <a-divider>{{ t('site.roleAndPublish') }}</a-divider>
           <a-row :gutter="16">
@@ -146,6 +163,10 @@
           <a-form-item :label="t('site.skipSslVerify')">
             <a-switch v-model:checked="settingsForm.skipSslVerify" />
           </a-form-item>
+          <a-form-item :label="t('site.maxConcurrent')">
+            <a-input-number v-model:value="settingsForm.maxConcurrent" :min="1" :max="100" style="width: 100%" />
+            <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('site.maxConcurrentHint') }}</div>
+          </a-form-item>
 
           <a-divider>{{ t('site.parseStrategy') }}</a-divider>
           <a-row :gutter="16">
@@ -161,7 +182,7 @@
             <a-col :span="8">
               <a-form-item :label="t('site.sizeStrategy')">
                 <a-select v-model:value="settingsForm.sizeStrategy" allow-clear>
-                  <a-select-option value="enclosure">Enclosure</a-select-option>
+                  <a-select-option value="enclosure">{{ t('site.sizeStrategyEnclosure') }}</a-select-option>
                   <a-select-option value="xml_tag">{{ t('site.xmlTag') }}</a-select-option>
                   <a-select-option value="desc_regex">{{ t('site.descRegex') }}</a-select-option>
                 </a-select>
@@ -221,8 +242,8 @@
             <a-col :span="12">
               <a-form-item :label="t('site.downloadMode')">
                 <a-select v-model:value="settingsForm.downloadMode" allow-clear :placeholder="t('site.downloadModeDefault')">
-                  <a-select-option value="direct">Direct</a-select-option>
-                  <a-select-option value="page">Page</a-select-option>
+                  <a-select-option value="direct">{{ t('site.downloadModeDirect') }}</a-select-option>
+                  <a-select-option value="page">{{ t('site.downloadModePage') }}</a-select-option>
                 </a-select>
               </a-form-item>
             </a-col>
@@ -244,7 +265,7 @@
             <a-select v-model:value="settingsForm.hrStrategy" allow-clear :placeholder="t('site.hrStrategyPlaceholder')">
               <a-select-option value="protect">{{ t('site.hrProtect') }}</a-select-option>
               <a-select-option value="ignore">{{ t('site.hrIgnore') }}</a-select-option>
-              <a-select-option value="strict">{{ t('site.hrStrict') }}</a-select-option>
+              <a-select-option value="skip">{{ t('site.hrStrict') }}</a-select-option>
             </a-select>
           </a-form-item>
 
@@ -256,13 +277,13 @@
 
       <a-card :title="t('site.credentialManagement')" style="margin-bottom: 24px">
         <a-form :model="credForm" layout="vertical" style="max-width: 500px">
-          <a-form-item v-if="needsCookie" label="Cookie">
+          <a-form-item v-if="needsCookie" :label="t('sites.cookie')">
             <a-textarea v-model:value="credForm.cookie" :rows="4" :placeholder="t('site.inputCookie')" />
           </a-form-item>
-          <a-form-item v-if="needsApiKey" label="API Key">
+          <a-form-item v-if="needsApiKey" :label="t('sites.apiKey')">
             <a-input-password v-model:value="credForm.apiKey" :placeholder="t('site.inputApiKey')" />
           </a-form-item>
-          <a-form-item v-if="needsPasskey" label="Passkey">
+          <a-form-item v-if="needsPasskey" :label="t('sites.passkey')">
             <a-input v-model:value="credForm.passkey" :placeholder="t('site.inputPasskey')" />
           </a-form-item>
 
@@ -392,6 +413,7 @@ import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
+import type { Site, SiteCredentials, SearchTorrentResult, SiteConfigOverride } from '@/api/types'
 
 interface DetectResultData {
   framework?: string
@@ -417,8 +439,7 @@ const route = useRoute()
 const siteId = Number(route.params.id)
 
 const loading = ref(false)
-const site = ref<Record<string, unknown>>({})
-
+const site = ref<Partial<Site>>({})
 const credForm = reactive({ cookie: '', passkey: '', apiKey: '', bearerToken: '', authKey: '', authHash: '', userId: undefined as number | undefined, rssKey: '' })
 
 const settingsForm = reactive({
@@ -429,13 +450,13 @@ const settingsForm = reactive({
   isSource: false,
   isTarget: false,
   participateAutoPublish: true,
-  mirrorDomain: '',
   cookieCloudSync: false,
   cookieCloudDomain: '',
   overrideRssUrl: '',
   overrideSavePath: '',
   proxyUrl: '',
   skipSslVerify: false,
+  maxConcurrent: 2,
   hashStrategy: '',
   sizeStrategy: '',
   idStrategy: '',
@@ -466,7 +487,7 @@ const authLabel = computed(() => authTypeLabels[site.value.authType as string] |
 
 const overrideLoading = ref(false)
 const overrideSaving = ref(false)
-const overrideData = ref<Record<string, unknown>>({})
+const overrideData = ref<Partial<SiteConfigOverride>>({})
 const overrideJSON = ref('{}')
 const showOverrideEditor = ref(false)
 
@@ -476,9 +497,10 @@ const detecting = ref(false)
 const showDetectResult = ref(false)
 const detectResult = ref<DetectResultData>({})
 const statsLoading = ref(false)
+const statsSyncing = ref(false)
 const stats = ref<SiteStatsData>({})
 
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatTime } from '@/utils/format'
 const frameworkColors: Record<string, string> = {
   nexusphp: 'blue', unit3d: 'green', gazelle: 'purple',
   mteam: 'orange', rousi: 'pink', tnode: 'cyan', luminance: 'magenta', generic: 'default',
@@ -489,6 +511,47 @@ const frameworkLabels: Record<string, string> = {
   mteam: 'M-Team', rousi: 'Rousi', tnode: 'TNode', luminance: 'Luminance', generic: 'Generic',
 }
 
+const siteFrozen = ref(false)
+const freezeLoading = ref(false)
+const showFreezeModal = ref(false)
+const freezeForm = reactive({ duration: '1h', reason: '' })
+
+async function checkFreezeStatus() {
+  try {
+    const resp = await sitesApi.getFreezeStatus(siteId)
+    siteFrozen.value = resp.data.data?.frozen ?? false
+  } catch {
+    siteFrozen.value = false
+  }
+}
+
+async function handleFreeze() {
+  freezeLoading.value = true
+  try {
+    await sitesApi.freezeSite(siteId, freezeForm)
+    message.success(t('site.freezeSuccess'))
+    siteFrozen.value = true
+    showFreezeModal.value = false
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    freezeLoading.value = false
+  }
+}
+
+async function handleUnfreeze() {
+  freezeLoading.value = true
+  try {
+    await sitesApi.unfreezeSite(siteId)
+    message.success(t('site.unfreezeSuccess'))
+    siteFrozen.value = false
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    freezeLoading.value = false
+  }
+}
+
 async function fetchSite() {
   loading.value = true
   try {
@@ -497,18 +560,18 @@ async function fetchSite() {
     Object.assign(settingsForm, {
       name: site.value.name || '',
       baseUrl: site.value.baseUrl || '',
-      alternativeDomains: site.value.alternativeDomains || '',
+      alternativeDomains: altDomainsToText(site.value.alternativeDomains),
       enabled: site.value.enabled !== undefined ? site.value.enabled : true,
       isSource: site.value.isSource || false,
       isTarget: site.value.isTarget || false,
       participateAutoPublish: site.value.participateAutoPublish !== undefined ? site.value.participateAutoPublish : true,
-      mirrorDomain: site.value.mirrorDomain || '',
       cookieCloudSync: site.value.cookieCloudSync || false,
       cookieCloudDomain: site.value.cookieCloudDomain || '',
       overrideRssUrl: site.value.overrideRssUrl || '',
       overrideSavePath: site.value.overrideSavePath || '',
       proxyUrl: site.value.proxyUrl || '',
       skipSslVerify: site.value.skipSslVerify || false,
+      maxConcurrent: site.value.maxConcurrent || 2,
       hashStrategy: site.value.hashStrategy || '',
       sizeStrategy: site.value.sizeStrategy || '',
       idStrategy: site.value.idStrategy || '',
@@ -534,8 +597,7 @@ async function fetchSite() {
 
 async function updateCredentials() {
   try {
-    const payload: Record<string, unknown> = {}
-    if (credForm.cookie) payload.cookie = credForm.cookie
+    const payload: SiteCredentials = {}
     if (credForm.passkey) payload.passkey = credForm.passkey
     if (credForm.apiKey) payload.apiKey = credForm.apiKey
     if (credForm.bearerToken) payload.bearerToken = credForm.bearerToken
@@ -543,6 +605,7 @@ async function updateCredentials() {
     if (credForm.authHash) payload.authHash = credForm.authHash
     if (credForm.userId) payload.userId = credForm.userId
     if (credForm.rssKey) payload.rssKey = credForm.rssKey
+    if (credForm.cookie) payload.cookie = credForm.cookie
     await sitesApi.updateCredentials(siteId, payload)
     message.success(t('site.credentialsUpdated'))
     credForm.cookie = ''
@@ -566,17 +629,31 @@ async function updateSettings() {
       isSource: settingsForm.isSource,
       isTarget: settingsForm.isTarget,
       participateAutoPublish: settingsForm.participateAutoPublish,
-      mirrorDomain: settingsForm.mirrorDomain,
       cookieCloudSync: settingsForm.cookieCloudSync,
       cookieCloudDomain: settingsForm.cookieCloudDomain,
       overrideRssUrl: settingsForm.overrideRssUrl,
       overrideSavePath: settingsForm.overrideSavePath,
       proxyUrl: settingsForm.proxyUrl,
       skipSslVerify: settingsForm.skipSslVerify,
+      maxConcurrent: settingsForm.maxConcurrent,
       hashStrategy: settingsForm.hashStrategy,
       sizeStrategy: settingsForm.sizeStrategy,
       idStrategy: settingsForm.idStrategy,
       hrStrategy: settingsForm.hrStrategy,
+      name: settingsForm.name,
+      baseUrl: settingsForm.baseUrl,
+      alternativeDomains: altDomainsToJson(settingsForm.alternativeDomains),
+      idPattern: settingsForm.idPattern,
+      hashXmlTagName: settingsForm.hashXmlTagName,
+      sizeXmlTagName: settingsForm.sizeXmlTagName,
+      hashUrlParamName: settingsForm.hashUrlParamName,
+      sizeDescRegex: settingsForm.sizeDescRegex,
+      sizeTitleRegex: settingsForm.sizeTitleRegex,
+      sizeBaseUnit: settingsForm.sizeBaseUnit,
+      downloadMode: settingsForm.downloadMode,
+      downloadUrlTemplate: settingsForm.downloadUrlTemplate,
+      downloadPagePattern: settingsForm.downloadPagePattern,
+      requiresSideLoading: settingsForm.requiresSideLoading,
     })
     message.success(t('common.configSaved'))
     fetchSite()
@@ -589,12 +666,13 @@ async function fetchOverrides() {
   overrideLoading.value = true
   try {
     const resp = await sitesApi.getOverrides(siteId)
-    const data = resp.data?.data || {}
-    if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const items = resp.data?.data?.items
+    if (Array.isArray(items)) {
       const filtered: Record<string, unknown> = {}
-      for (const [k, v] of Object.entries(data)) {
-        if (k !== 'id' && k !== 'site_id' && k !== 'created_at' && k !== 'updated_at') {
-          filtered[k] = v
+      for (const item of items) {
+        const entry = item as unknown as Record<string, unknown>
+        if (entry.fieldPath && entry.fieldPath !== 'id' && entry.fieldPath !== 'site_id' && entry.fieldPath !== 'created_at' && entry.fieldPath !== 'updated_at') {
+          filtered[entry.fieldPath as string] = entry.fieldValue
         }
       }
       overrideData.value = filtered
@@ -666,13 +744,43 @@ async function fetchStats() {
   }
 }
 
+async function syncStats() {
+  statsSyncing.value = true
+  try {
+    await sitesApi.syncSiteStats(siteId)
+    message.success(t('site.statsSynced'))
+    fetchStats()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    statsSyncing.value = false
+  }
+}
+
 const searchQuery = ref('')
 const searchFreeOnly = ref(false)
 const searchLoading = ref(false)
-const searchResults = ref<Record<string, unknown>[]>([])
+const searchResults = ref<SearchTorrentResult[]>([])
 const discountLoadingMap = reactive<Record<string, boolean>>({})
 const showDiscountResult = ref(false)
 const discountInfo = reactive({ level: '', free_end_at: null as string | null, multiplier: 0 })
+
+function altDomainsToText(val: string | undefined): string {
+  if (!val) return ''
+  try {
+    const arr: string[] = JSON.parse(val)
+    if (Array.isArray(arr)) return arr.join(', ')
+  } catch { /* not JSON, return as-is */ }
+  return val
+}
+
+function altDomainsToJson(val: string): string {
+  const trimmed = val.trim()
+  if (!trimmed) return ''
+  const items = trimmed.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean)
+  if (items.length === 0) return ''
+  return JSON.stringify(items)
+}
 
 function formatFileSize(bytes: unknown): string {
   const n = Number(bytes) || 0
@@ -729,5 +837,6 @@ onMounted(() => {
   fetchSite()
   fetchOverrides()
   fetchStats()
+  checkFreezeStatus()
 })
 </script>

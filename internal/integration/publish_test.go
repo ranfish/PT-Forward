@@ -251,6 +251,7 @@ func TestE2E_FullChain_RSSToPublishViaReseed(t *testing.T) {
 		Title: "Big.Buck.Bunny.2024.2160p.BluRay.x264-GROUP",
 		Size:  20000000000, InfoHash: "aaaa1111bbbb2222",
 		SourceID: fmt.Sprintf("%d", sub.ID),
+		Discount: model.DiscountFree,
 	}}
 
 	require.NoError(t, td.OnTorrents(ctx, rssEvents))

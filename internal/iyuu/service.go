@@ -6,7 +6,6 @@ import (
 	"crypto/sha1" //nolint:gosec // SHA1 used for IYUU token hashing
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -63,9 +63,9 @@ func (s *Service) Ping(ctx context.Context) error {
 	if err != nil {
 		return iyuuError(ErrIYUUHTTP, "ping failed", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	body, err := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
 
-	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return iyuuError(ErrIYUUAPI, "read response body", err)
 	}
@@ -189,9 +189,8 @@ func (s *Service) GetSiteList(ctx context.Context) ([]model.IYUUSite, error) {
 	if err != nil {
 		return nil, iyuuError(ErrIYUUHTTP, "get site list", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
+	body, err := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
 	if err != nil {
 		return nil, iyuuError(ErrIYUUAPI, "read sites response body", err)
 	}
@@ -331,9 +330,8 @@ func (s *Service) doPostFormWithToken(ctx context.Context, rawURL, token string,
 	if err != nil {
 		return err
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
 	if err != nil {
 		return err
 	}
@@ -361,9 +359,8 @@ func (s *Service) doPostJSONWithToken(ctx context.Context, rawURL, token string,
 	if err != nil {
 		return err
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
 	if err != nil {
 		return err
 	}
@@ -390,23 +387,36 @@ func (s *Service) getSiteMappings(ctx context.Context) map[int]string {
 }
 
 func (s *Service) syncSiteMappings(ctx context.Context, sites []iyuuSiteRaw) error {
+	if len(sites) == 0 {
+		return nil
+	}
+
+	sids := make([]int, 0, len(sites))
 	for _, site := range sites {
-		var mapping model.IYUUSiteMapping
-		err := s.db.WithContext(ctx).
-			Where("iyuu_sid = ?", site.ID).
-			First(&mapping).Error
-		if err == gorm.ErrRecordNotFound {
-			mapping = model.IYUUSiteMapping{
-				IYUUSid:    site.ID,
-				SiteDomain: site.BaseURL,
-				SiteName:   site.Nickname,
-			}
-			if err := s.db.WithContext(ctx).Create(&mapping).Error; err != nil {
-				s.logger.Warn("create site mapping failed",
-					zap.Int("sid", site.ID),
-					zap.Error(err),
-				)
-			}
+		sids = append(sids, site.ID)
+	}
+
+	var existing []model.IYUUSiteMapping
+	s.db.WithContext(ctx).Where("iyuu_sid IN ?", sids).Find(&existing)
+	existingSet := make(map[int]bool, len(existing))
+	for _, m := range existing {
+		existingSet[m.IYUUSid] = true
+	}
+
+	for _, site := range sites {
+		if existingSet[site.ID] {
+			continue
+		}
+		mapping := model.IYUUSiteMapping{
+			IYUUSid:    site.ID,
+			SiteDomain: site.BaseURL,
+			SiteName:   site.Nickname,
+		}
+		if err := s.db.WithContext(ctx).Create(&mapping).Error; err != nil {
+			s.logger.Warn("create site mapping failed",
+				zap.Int("sid", site.ID),
+				zap.Error(err),
+			)
 		}
 	}
 	return nil

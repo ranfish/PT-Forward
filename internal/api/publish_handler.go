@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -167,6 +169,8 @@ func (h *PublishHandler) handleListTasks(w http.ResponseWriter, r *http.Request)
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
 	if page < 1 {
 		page = 1
+	} else if page > 10000 {
+		page = 10000
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
@@ -188,7 +192,11 @@ func (h *PublishHandler) handleListTasks(w http.ResponseWriter, r *http.Request)
 func (h *PublishHandler) handleGetTask(w http.ResponseWriter, r *http.Request, id uint) {
 	task, err := h.pipeline.GetTask(r.Context(), id)
 	if err != nil {
-		Error(w, http.StatusNotFound, 40400, "发布任务不存在")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(w, http.StatusNotFound, 40400, "发布任务不存在")
+		} else {
+			Error(w, http.StatusInternalServerError, 50000, "查询发布任务失败")
+		}
 		return
 	}
 	Success(w, task)
@@ -276,6 +284,9 @@ func (h *PublishHandler) handleListCandidates(w http.ResponseWriter, r *http.Req
 	if limit < 1 {
 		limit = 20
 	}
+	if limit > 200 {
+		limit = 200
+	}
 
 	candidates, err := h.pipeline.ListPendingCandidates(r.Context(), limit)
 	if err != nil {
@@ -291,7 +302,11 @@ func (h *PublishHandler) handleListCandidates(w http.ResponseWriter, r *http.Req
 func (h *PublishHandler) handleGetCandidate(w http.ResponseWriter, r *http.Request, id uint) {
 	candidate, err := h.pipeline.GetCandidate(r.Context(), id)
 	if err != nil {
-		Error(w, http.StatusNotFound, 40400, "发布候选不存在")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(w, http.StatusNotFound, 40400, "发布候选不存在")
+		} else {
+			Error(w, http.StatusInternalServerError, 50000, "查询发布候选失败")
+		}
 		return
 	}
 	Success(w, candidate)
@@ -303,10 +318,17 @@ func (h *PublishHandler) handleListResults(w http.ResponseWriter, r *http.Reques
 	if limit < 1 {
 		limit = 20
 	}
+	if limit > 200 {
+		limit = 200
+	}
 
 	var candidateID uint
 	if candidateIDStr != "" {
-		n, _ := strconv.ParseUint(candidateIDStr, 10, 64)
+		n, err := strconv.ParseUint(candidateIDStr, 10, 64)
+		if err != nil {
+			Error(w, http.StatusBadRequest, 40001, "无效的 candidateId")
+			return
+		}
 		candidateID = uint(n)
 	}
 
@@ -323,7 +345,11 @@ func (h *PublishHandler) handleListResults(w http.ResponseWriter, r *http.Reques
 
 func (h *PublishHandler) handleDeleteCandidate(w http.ResponseWriter, r *http.Request, id uint) {
 	if err := h.pipeline.DeleteCandidate(r.Context(), id); err != nil {
-		Error(w, http.StatusNotFound, 40400, "发布候选不存在")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(w, http.StatusNotFound, 40400, "发布候选不存在")
+		} else {
+			Error(w, http.StatusInternalServerError, 50000, "删除发布候选失败")
+		}
 		return
 	}
 	h.logger.Info("publish candidate deleted", zap.Uint("id", id))
@@ -334,7 +360,9 @@ func (h *PublishHandler) handleDeleteCandidate(w http.ResponseWriter, r *http.Re
 }
 
 func (h *PublishHandler) handleManualPublish(w http.ResponseWriter, r *http.Request, id uint) {
-	candidate, err := h.pipeline.PublishCandidate(r.Context(), id)
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+	candidate, err := h.pipeline.PublishCandidate(ctx, id)
 	if err != nil {
 		if strings.Contains(err.Error(), "合规检查") {
 			Error(w, http.StatusBadRequest, 40001, err.Error())
@@ -357,7 +385,7 @@ func (h *PublishHandler) handleListGroups(w http.ResponseWriter, r *http.Request
 	q.Count(&total)
 
 	var groups []model.PublishGroup
-	if err := q.Order("created_at DESC").Limit(100).Find(&groups).Error; err != nil {
+	if err := q.Session(&gorm.Session{}).Order("created_at DESC").Limit(100).Find(&groups).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询发布组失败")
 		return
 	}
@@ -382,13 +410,14 @@ func (h *PublishHandler) handleGetGroup(w http.ResponseWriter, r *http.Request, 
 	}
 
 	Success(w, map[string]interface{}{
-		"id":         group.ID,
-		"status":     group.Status,
-		"sourceHash": group.SourceHash,
-		"sourceSite": group.SourceSite,
-		"createdAt":  group.CreatedAt,
-		"updatedAt":  group.UpdatedAt,
-		"members":    members,
+		"id":           group.ID,
+		"candidateId":  group.CandidateID,
+		"status":       group.Status,
+		"sourceHash":   group.SourceHash,
+		"sourceSite":   group.SourceSite,
+		"createdAt":    group.CreatedAt,
+		"updatedAt":    group.UpdatedAt,
+		"members":      members,
 	})
 }
 
@@ -430,8 +459,11 @@ func (h *PublishHandler) handleLifecycleResume(w http.ResponseWriter, r *http.Re
 }
 
 func (h *PublishHandler) handleLifecycleDelete(w http.ResponseWriter, r *http.Request, id uint) {
-	h.db.Model(&model.PublishGroup{}).Where("id = ?", id).
-		Updates(map[string]interface{}{"status": "deleting", "updated_at": time.Now()})
+	if err := h.db.Model(&model.PublishGroup{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"status": "deleting", "updated_at": time.Now()}).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "触发删除失败")
+		return
+	}
 	h.logger.Info("publish group deleting", zap.Uint("id", id))
 	Success(w, map[string]interface{}{"message": "删除已触发"})
 }

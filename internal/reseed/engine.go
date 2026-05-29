@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -105,13 +106,13 @@ func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []
 			continue
 		}
 
-		config, err := e.siteProvider.GetSiteConfig(ctx, info.BaseURL)
+		config, err := e.siteProvider.GetSiteConfig(ctx, info.Name)
 		if err != nil {
 			e.logger.Warn("获取站点配置失败", zap.String("site", info.Name), zap.Error(err))
 			continue
 		}
 
-		adapter, err := e.siteProvider.GetAdapter(ctx, info.BaseURL)
+		adapter, err := e.siteProvider.GetAdapter(ctx, info.Name)
 		if err != nil {
 			e.logger.Warn("获取适配器失败", zap.String("site", info.Name), zap.Error(err))
 			continue
@@ -186,7 +187,11 @@ func (e *Engine) preloadExistingMatches(ctx context.Context, records []model.See
 
 	var matches []model.ReseedMatch
 	if err := e.db.WithContext(ctx).
-		Where("source_info_hash IN ?", infoHashes).
+		Where("source_info_hash IN ? AND status IN ?", infoHashes, []model.ReseedMatchStatus{
+			model.MatchStatusMatched,
+			model.MatchStatusInjecting,
+			model.MatchStatusInjected,
+		}).
 		Find(&matches).Error; err != nil {
 		e.logger.Warn("批量预加载已有匹配失败", zap.Error(err))
 		return make(map[string][]model.ReseedMatch)
@@ -285,10 +290,14 @@ func (e *Engine) startTask(parentCtx context.Context, task *model.ReseedTask) {
 	}
 	ctx, cancel := context.WithCancel(parentCtx) //nolint:gosec // cancel stored in e.tasks for later invocation
 	e.tasks[task.ID] = cancel
-	e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
+	if err := e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
 		"status":     model.ReseedTaskIdle,
 		"updated_at": time.Now(),
-	})
+	}).Error; err != nil {
+		e.logger.Warn("update reseed task to idle failed",
+			zap.Uint("taskID", task.ID),
+			zap.Error(err))
+	}
 }
 
 func (e *Engine) CancelTask(taskID uint) {
@@ -340,7 +349,7 @@ func MatchDecision(input MatchInput, sizeTolerance float64) model.DecisionType {
 	return model.DecisionSizeMismatch
 }
 
-func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.ReseedExecutionResult, error) {
+func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *model.ReseedExecutionResult, retErr error) {
 	e.mu.Lock()
 	if _, exists := e.tasks[task.ID]; !exists {
 		ctx2, cancel := context.WithCancel(ctx) //nolint:gosec // cancel stored in e.tasks for later invocation
@@ -350,30 +359,49 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 	e.mu.Unlock()
 
 	start := time.Now()
-	e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
+	if err := e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
 		"status":     model.ReseedTaskRunning,
 		"updated_at": start,
-	})
+	}).Error; err != nil {
+		e.logger.Warn("update reseed task to running failed",
+			zap.Uint("taskID", task.ID),
+			zap.Error(err))
+	}
 
-	result := &model.ReseedExecutionResult{
+	result = &model.ReseedExecutionResult{
 		TaskID:      fmt.Sprintf("%d", task.ID),
 		CompletedAt: time.Now(),
 	}
 
 	defer func() {
+		if r := recover(); r != nil {
+			e.logger.Error("reseed RunTask panic recovered",
+				zap.Uint("taskID", task.ID),
+				zap.Any("panic", r),
+			)
+			retErr = fmt.Errorf("reseed task panic: %v", r)
+		}
+
+		if result == nil {
+			return
+		}
 		result.Duration = time.Since(start).Seconds()
 		status := model.ReseedTaskCompleted
 		if ctx.Err() == context.Canceled {
 			status = model.ReseedTaskCancelled
-		} else if result.Failed > 0 && result.Matched == 0 {
+		} else if retErr != nil || (result.Failed > 0 && result.Matched == 0) {
 			status = model.ReseedTaskFailed
 		}
 		deferCtx, deferCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer deferCancel()
-		e.db.WithContext(deferCtx).Model(task).Updates(map[string]interface{}{
+		if err := e.db.WithContext(deferCtx).Model(task).Updates(map[string]interface{}{
 			"status":     status,
 			"updated_at": time.Now(),
-		})
+		}).Error; err != nil {
+			e.logger.Warn("update reseed task final status failed",
+				zap.Uint("taskID", task.ID),
+				zap.Error(err))
+		}
 	}()
 
 	clientIDs := ParseClientIDs(task.ClientIDs)
@@ -389,7 +417,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 		q = q.Where("client_id IN ?", clientIDs)
 	}
 	if err := q.Find(&seedingRecords).Error; err != nil {
-		return nil, reseedError(ErrReseedDB, "查询做种记录失败", err)
+		return result, reseedError(ErrReseedDB, "查询做种记录失败", err)
 	}
 	result.TotalSources = len(seedingRecords)
 
@@ -538,9 +566,11 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (*model.Re
 					jitter = rand.IntN(task.InjectionJitterS) //nolint:gosec // jitter does not need crypto/rand
 				}
 				interval := time.Duration(task.InjectionIntervalS+jitter) * time.Second
+				timer := time.NewTimer(interval)
 				select {
-				case <-time.After(interval):
+				case <-timer.C:
 				case <-ctx.Done():
+					timer.Stop()
 					return result, nil
 				}
 			}
@@ -798,7 +828,7 @@ func NormalizeTitle(title string) string {
 
 func (e *Engine) CreateTask(ctx context.Context, task *model.ReseedTask) error {
 	task.Status = model.ReseedTaskIdle
-	return e.db.WithContext(ctx).Create(task).Error
+	return dbimpl.ForceCreate(e.db.WithContext(ctx), task)
 }
 
 func (e *Engine) GetTask(ctx context.Context, id uint) (*model.ReseedTask, error) {
@@ -902,14 +932,20 @@ func (e *Engine) RetryMatch(ctx context.Context, id uint) (*model.ReseedMatch, e
 	}
 
 	now := time.Now()
-	m.Status = model.MatchStatusMatched
-	m.RetryCount++
-	m.FailReason = ""
-	m.NextRetryAt = &now
+	newRetry := m.RetryCount + 1
 
-	if err := e.db.WithContext(ctx).Save(&m).Error; err != nil {
+	if err := e.db.WithContext(ctx).Model(&m).Updates(map[string]interface{}{
+		"status":        model.MatchStatusMatched,
+		"retry_count":   newRetry,
+		"fail_reason":   "",
+		"next_retry_at": &now,
+	}).Error; err != nil {
 		return nil, err
 	}
+	m.Status = model.MatchStatusMatched
+	m.RetryCount = newRetry
+	m.FailReason = ""
+	m.NextRetryAt = &now
 	return &m, nil
 }
 
@@ -1016,10 +1052,14 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		return reseedError(ErrReseedConfig, "preloaded sites not available", nil)
 	}
 
-	e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
+	if err := e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
 		"status":     model.MatchStatusInjecting,
 		"updated_at": time.Now(),
-	})
+	}).Error; err != nil {
+		e.logger.Warn("update reseed match to injecting failed",
+			zap.Uint("matchID", match.ID),
+			zap.Error(err))
+	}
 
 	targetConfig := ps.configs[match.TargetSite]
 	if targetConfig == nil {
@@ -1087,13 +1127,15 @@ func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason
 		decisionType = model.DecisionBlockedRelease
 	}
 
-	e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
+	if err := e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
 		"status":        model.MatchStatusFailed,
 		"decision_type": string(decisionType),
 		"fail_reason":   reason,
 		"retry_count":   match.RetryCount,
 		"updated_at":    time.Now(),
-	})
+	}).Error; err != nil {
+		e.logger.Error("failMatch update db error", zap.Uint("matchID", match.ID), zap.Error(err))
+	}
 	return reseedError(ErrReseedGeneric, reason, nil)
 }
 

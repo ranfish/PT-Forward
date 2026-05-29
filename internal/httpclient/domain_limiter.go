@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const defaultMaxConcurrent = 2
+
 type DomainRateLimiter struct {
 	mu         sync.Mutex
 	domains    map[string]*domainState
@@ -21,11 +23,14 @@ type domainState struct {
 	consecutiveFreezes int
 	frozenBy           string
 	freezeReason       string
+	concurrentCh       chan struct{}
+	maxConcurrent      int
 }
 
 type DomainLimitConfig struct {
-	MaxReqs    int
-	WindowSecs int
+	MaxReqs       int
+	WindowSecs    int
+	MaxConcurrent int
 }
 
 func NewDomainRateLimiter(defaultRPS float64) *DomainRateLimiter {
@@ -44,9 +49,12 @@ func (l *DomainRateLimiter) getOrCreate(domain string) *domainState {
 			maxReqs = int(l.defaultRPS * 60)
 			windowSecs = 60
 		}
+		mc := defaultMaxConcurrent
 		state = &domainState{
-			maxReqs:    maxReqs,
-			windowSecs: windowSecs,
+			maxReqs:       maxReqs,
+			windowSecs:    windowSecs,
+			maxConcurrent: mc,
+			concurrentCh:  make(chan struct{}, mc),
 		}
 		l.domains[domain] = state
 	}
@@ -65,6 +73,10 @@ func (l *DomainRateLimiter) SetDomainConfig(domain string, cfg DomainLimitConfig
 	if cfg.WindowSecs > 0 {
 		state.windowSecs = cfg.WindowSecs
 	}
+	if cfg.MaxConcurrent > 0 {
+		state.maxConcurrent = cfg.MaxConcurrent
+		state.concurrentCh = make(chan struct{}, cfg.MaxConcurrent)
+	}
 	state.mu.Unlock()
 }
 
@@ -73,46 +85,68 @@ func (l *DomainRateLimiter) Acquire(ctx context.Context, domain string) error {
 	state := l.getOrCreate(domain)
 	l.mu.Unlock()
 
+	select {
+	case state.concurrentCh <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
 	state.mu.Lock()
-
-	now := time.Now()
-
-	if now.Before(state.frozenUntil) {
-		waitDur := time.Until(state.frozenUntil)
-		state.mu.Unlock()
-		select {
-		case <-time.After(waitDur):
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-		state.mu.Lock()
-	}
-
-	cutoff := time.Now().Add(-time.Duration(state.windowSecs) * time.Second)
-	valid := state.timestamps[:0]
-	for _, ts := range state.timestamps {
-		if ts.After(cutoff) {
-			valid = append(valid, ts)
-		}
-	}
-	state.timestamps = valid
-
-	if len(state.timestamps) >= state.maxReqs {
-		waitDur := state.timestamps[0].Sub(cutoff)
-		if waitDur > 0 {
+	for {
+		if time.Now().Before(state.frozenUntil) {
+			waitDur := time.Until(state.frozenUntil)
 			state.mu.Unlock()
 			select {
 			case <-time.After(waitDur):
 			case <-ctx.Done():
+				<-state.concurrentCh
 				return ctx.Err()
 			}
 			state.mu.Lock()
+			continue
 		}
+
+		cutoff := time.Now().Add(-time.Duration(state.windowSecs) * time.Second)
+		valid := state.timestamps[:0]
+		for _, ts := range state.timestamps {
+			if ts.After(cutoff) {
+				valid = append(valid, ts)
+			}
+		}
+		state.timestamps = valid
+
+		if len(state.timestamps) >= state.maxReqs {
+			waitDur := state.timestamps[0].Sub(cutoff)
+			if waitDur > 0 {
+				state.mu.Unlock()
+				select {
+				case <-time.After(waitDur):
+				case <-ctx.Done():
+					<-state.concurrentCh
+					return ctx.Err()
+				}
+				state.mu.Lock()
+				continue
+			}
+		}
+
+		break
 	}
 
 	state.timestamps = append(state.timestamps, time.Now())
 	state.mu.Unlock()
 	return nil
+}
+
+func (l *DomainRateLimiter) Release(domain string) {
+	l.mu.Lock()
+	state := l.getOrCreate(domain)
+	l.mu.Unlock()
+
+	select {
+	case <-state.concurrentCh:
+	default:
+	}
 }
 
 func (l *DomainRateLimiter) Freeze(domain string, duration time.Duration) {

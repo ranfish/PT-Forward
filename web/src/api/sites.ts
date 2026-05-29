@@ -1,55 +1,68 @@
 import client from './client'
+import type { ApiResponse, ApiResponsePaginated, Site, SiteCredentials, SiteConfigOverride, UpdatePartial, SearchTorrentResult, DiscountResult } from './types'
 
 export const sitesApi = {
-  list(page = 1, size = 20, search = '') {
-    return client.get('/sites', { params: { page, size, search } })
+  list(page = 1, size = 20, search = '', extraParams?: Record<string, string>) {
+    return client.get<ApiResponsePaginated<Site>>('/sites', { params: { page, size, search, ...extraParams } })
   },
   get(id: number) {
-    return client.get(`/sites/${id}`)
+    return client.get<ApiResponse<Site>>(`/sites/${id}`)
   },
-  create(data: Record<string, unknown>) {
-    return client.post('/sites', data)
+  create(data: UpdatePartial<Site>) {
+    return client.post<ApiResponse<Site>>('/sites', data)
   },
-  update(id: number, data: Record<string, unknown>) {
-    return client.put(`/sites/${id}`, data)
+  update(id: number, data: UpdatePartial<Site>) {
+    return client.put<ApiResponse<Site>>(`/sites/${id}`, data)
   },
   delete(id: number) {
-    return client.delete(`/sites/${id}`)
+    return client.delete<ApiResponse<void>>(`/sites/${id}`)
   },
   testConnection(id: number) {
-    return client.post(`/sites/${id}/test`)
+    return client.post<ApiResponse<{ success: boolean; message?: string }>>(`/sites/${id}/test`)
   },
   detect(id: number) {
-    return client.post(`/sites/${id}/detect`)
+    return client.post<ApiResponse<{ framework: string; detail?: string }>>(`/sites/${id}/detect`)
   },
   getStats(id: number) {
-    return client.get(`/sites/${id}/stats`)
+    return client.get<ApiResponse<Record<string, unknown>>>(`/sites/${id}/stats`)
   },
-  updateCredentials(id: number, data: Record<string, unknown>) {
-    return client.put(`/sites/${id}/credentials`, data)
+  updateCredentials(id: number, data: SiteCredentials) {
+    return client.put<ApiResponse<void>>(`/sites/${id}/credentials`, data)
   },
   getOverrides(id: number) {
-    return client.get(`/sites/${id}/overrides`)
+    return client.get<ApiResponse<{ items: SiteConfigOverride[]; total: number }>>(`/sites/${id}/overrides`)
   },
-  updateOverrides(id: number, data: Record<string, unknown>) {
-    return client.put(`/sites/${id}/overrides`, data)
+  updateOverrides(id: number, data: UpdatePartial<SiteConfigOverride>) {
+    return client.put<ApiResponse<SiteConfigOverride>>(`/sites/${id}/overrides`, data)
   },
   deleteOverrides(id: number) {
-    return client.delete(`/sites/${id}/overrides`)
+    return client.delete<ApiResponse<void>>(`/sites/${id}/overrides`)
   },
-  getFreezeStatus(id: number) {
-    return client.get(`/sites/${id}/freeze`)
+  syncAllStats() {
+    return client.post<ApiResponse<{ synced: number; failed: number; failedSites: string[] }>>('/sites/stats-sync', {}, { timeout: 300000 })
   },
-  freezeSite(id: number) {
-    return client.post(`/sites/${id}/freeze`)
+  getSyncAllStatus() {
+    return client.get<ApiResponse<{ running: boolean; synced: number; failed: number; failedSites: string[] }>>('/sites/stats-sync', { params: { t: Date.now() } })
   },
-  unfreezeSite(id: number) {
-    return client.delete(`/sites/${id}/freeze`)
+  syncSiteStats(id: number) {
+    return client.post<ApiResponse<Record<string, unknown>>>(`/sites/${id}/stats`)
+  },
+  batchUpdate(ids: number[], fields: UpdatePartial<Site>) {
+    return client.post<ApiResponse<{ updated: number }>>('/sites/batch-update', { ids, fields })
   },
   searchTorrents(id: number, data: { query: string; category?: string; freeOnly?: boolean; sortBy?: string; maxResults?: number }) {
-    return client.post(`/sites/${id}/search`, data)
+    return client.post<ApiResponse<SearchTorrentResult[]>>(`/sites/${id}/search`, data)
   },
   detectDiscount(id: number, data: { torrentId: string }) {
-    return client.post(`/sites/${id}/discount`, data)
+    return client.post<ApiResponse<DiscountResult>>(`/sites/${id}/discount`, data)
+  },
+  freezeSite(id: number, data?: { duration?: string; reason?: string }) {
+    return client.post<ApiResponse<void>>(`/sites/${id}/freeze`, data || {})
+  },
+  unfreezeSite(id: number) {
+    return client.delete<ApiResponse<void>>(`/sites/${id}/freeze`)
+  },
+  getFreezeStatus(id: number) {
+    return client.get<ApiResponse<{ frozen: boolean; frozenAt?: string; reason?: string }>>(`/sites/${id}/freeze`)
   },
 }

@@ -20,9 +20,13 @@ type SeedingTorrentRecord struct {
 	FreeLevel   string        `json:"free_level" gorm:"size:20"`
 	Discount    DiscountLevel `json:"discount" gorm:"size:20;default:'NONE'"`
 
-	Status       SeedingTorrentStatus `json:"status" gorm:"size:20;not null;default:'seeding';index"`
-	LastActionBy string               `json:"last_action_by" gorm:"size:100"`
-	Source       string               `json:"source" gorm:"size:20;default:'rss'"`
+	Status        SeedingTorrentStatus `json:"status" gorm:"size:20;not null;default:'seeding';index"`
+	LastActionBy  string               `json:"last_action_by" gorm:"size:100"`
+	Source        string               `json:"source" gorm:"size:20;default:'rss'"`
+	SubscriptionID string     `json:"subscription_id" gorm:"size:50;index"`
+	FlushedAt      *time.Time `json:"flushed_at" gorm:"index"`
+
+	FirstMatchedAt *time.Time `json:"first_matched_at" gorm:"index"`
 }
 
 func (SeedingTorrentRecord) TableName() string { return "seeding_torrent_records" }
@@ -66,6 +70,13 @@ type SeedingClientConfig struct {
 	CleanupScoreWeights string `json:"cleanup_score_weights" gorm:"type:text"`
 
 	ArchiveGranularity string `json:"archive_granularity" gorm:"size:20;default:'daily'"`
+
+	ReannounceBefore     bool `json:"reannounce_before" gorm:"default:true"`
+	ReannounceRetries    int  `json:"reannounce_retries" gorm:"default:2"`
+	ReannounceIntervalMs int  `json:"reannounce_interval_ms" gorm:"default:3000"`
+	ReannounceWaitMs     int  `json:"reannounce_wait_ms" gorm:"default:2000"`
+
+	MinSeedHoursBeforeDelete float64 `json:"min_seed_hours_before_delete" gorm:"default:1"`
 }
 
 func (SeedingClientConfig) TableName() string { return "seeding_client_configs" }
@@ -125,6 +136,7 @@ type DeleteRule struct {
 	Enabled  bool   `json:"enabled" gorm:"default:true"`
 
 	Type       string `json:"type" gorm:"size:20;not null;default:'normal'"`
+	Logic      string `json:"logic" gorm:"size:10;not null;default:'and'"`
 	Conditions string `json:"conditions" gorm:"type:text"`
 	Expr       string `json:"expr" gorm:"type:text"`
 
@@ -203,7 +215,7 @@ func (FreezeEventRecord) TableName() string { return "freeze_events" }
 
 // §18.6 — SeedingScoringConfig: 刷流评分配置（embedded in RSSSubscription）
 type SeedingScoringConfig struct {
-	Enabled bool `json:"enabled" gorm:"default:false"`
+	Enabled bool `json:"enabled" gorm:"column:scoring_enabled;default:false"`
 
 	HalfLifeHours   float64 `json:"half_life_hours" gorm:"default:2"`
 	SiteWeightsJSON string  `json:"site_weights_json" gorm:"type:text;default:'{}'"`
@@ -245,10 +257,18 @@ type ScoringLog struct {
 	ClientID  string    `json:"client_id" gorm:"size:50;index;not null"`
 	InfoHash  string    `json:"info_hash" gorm:"size:40;index;not null"`
 	SiteName  string    `json:"site_name" gorm:"size:100"`
+	TorrentID string    `json:"torrent_id" gorm:"size:50"`
 	Score     float64   `json:"score"`
 	Demand    float64   `json:"demand"`
 	UploadVal float64   `json:"upload_val"`
 	Recency   float64   `json:"recency"`
+	Seeders   int       `json:"seeders"`
+	Leechers  int       `json:"leechers"`
+	AgeHours  float64   `json:"age_hours"`
+	Discount  string    `json:"discount" gorm:"size:20"`
+	IsFree    bool      `json:"is_free"`
+	HasHR     bool      `json:"has_hr"`
+	UploadSpeed int64   `json:"upload_speed"`
 	CreatedAt time.Time `json:"created_at" gorm:"index"`
 }
 

@@ -60,6 +60,13 @@ var builtinWAFPatterns = []wafPattern{
 		FreezeDur: 5 * time.Minute,
 	},
 	{
+		Name: "http_403",
+		MatchFunc: func(resp *http.Response) bool {
+			return resp.StatusCode == 403
+		},
+		FreezeDur: 30 * time.Second,
+	},
+	{
 		Name: "login_redirect",
 		MatchFunc: func(resp *http.Response) bool {
 			if resp.StatusCode != 200 {

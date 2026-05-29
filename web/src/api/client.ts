@@ -1,5 +1,6 @@
 import axios from 'axios'
 import router from '@/router'
+import i18n from '@/composables/useI18n'
 
 const client = axios.create({
   baseURL: '/api/v1',
@@ -31,7 +32,7 @@ client.interceptors.response.use(
   (resp) => {
     const body = resp.data
     if (body && body.code !== undefined && body.code !== 0) {
-      return Promise.reject(new Error(body.message || '请求失败'))
+      return Promise.reject(new Error(body.message || i18n.global.t('common.requestFailed')))
     }
     return resp
   },
@@ -81,7 +82,7 @@ client.interceptors.response.use(
       }
     }
 
-    const msg = error.response?.data?.message || error.message || '网络错误'
+    const msg = error.response?.data?.message || error.message || i18n.global.t('common.networkError')
     return Promise.reject(new Error(msg))
   },
 )

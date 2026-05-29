@@ -68,6 +68,9 @@ type RSSTorrentEvent struct {
 	MatchedRule   *string        `json:"matched_rule"`
 	TorrentData   []byte         `json:"-"`
 	Metadata      map[string]any `json:"metadata"`
+	Category      string         `json:"category"`
+	Tags          []string       `json:"tags"`
+	Uploader      string         `json:"uploader"`
 }
 
 // §33.1.3 — RSSSubscription: 订阅配置（Sprint 89, 7 处合并）
@@ -221,6 +224,19 @@ type RSSTorrentSeen struct {
 }
 
 func (RSSTorrentSeen) TableName() string { return "rss_torrent_seen" }
+
+type RSSFetchLog struct {
+	ID             uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	SubscriptionID string    `json:"subscription_id" gorm:"size:100;not null;index:idx_fetch_log_sub"`
+	Total          int       `json:"total" gorm:"default:0"`
+	NewCount       int       `json:"new_count" gorm:"default:0"`
+	Dispatched     int       `json:"dispatched" gorm:"default:0"`
+	Status         string    `json:"status" gorm:"size:20;not null;default:'ok'"`
+	ErrorMsg       string    `json:"error_msg" gorm:"size:500"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (RSSFetchLog) TableName() string { return "rss_fetch_logs" }
 
 // §33.1.45 — RSSSubscriptionRule: 订阅-规则关联
 type RSSSubscriptionRule struct {

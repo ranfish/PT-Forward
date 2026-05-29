@@ -8,13 +8,29 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
+)
+
+var (
+	reUnit3DTitle      = regexp.MustCompile(`<title>([^<]+)</title>`)
+	reUnit3DInfoHash   = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
+	reUnit3DSize       = regexp.MustCompile(`(?i)(?:size|大小)[^<]*<[^>]*>([^<]+)`)
+	reUnit3DSeeders    = regexp.MustCompile(`(?i)(?:seeders?|做种)[^<]*<[^>]*>(\d+)`)
+	reUnit3DLeechers   = regexp.MustCompile(`(?i)(?:leechers?|下载)[^<]*<[^>]*>(\d+)`)
+	reUnit3DTorrentID  = regexp.MustCompile(`/torrents/(\d+)`)
+	reUnit3DErrorClass = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
+	reUnit3DErrorLI    = regexp.MustCompile(`<li[^>]*>([^<]*(?:error|fail|失败|错误|duplicate|already)[^<]*)</li>`)
+	reUnit3DCSRFMeta   = regexp.MustCompile(`<meta\s+name="csrf-token"\s+content="([^"]+)"`)
+	reUnit3DCSRFInput  = regexp.MustCompile(`<input[^>]+name="_token"[^>]+value="([^"]+)"`)
+	reUnit3DIMDbID     = regexp.MustCompile(`tt\d+`)
 )
 
 type Unit3DAdapter struct {
@@ -69,7 +85,7 @@ func (a *Unit3DAdapter) ensureSession(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return networkError("访问首页建立 session 失败", err)
 	}
-	_ = resp.Body.Close()
+	drainBody(resp)
 
 	newCookies := resp.Cookies()
 	if len(newCookies) == 0 {
@@ -141,7 +157,7 @@ func (a *Unit3DAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return nil, downloadError("下载失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode == http.StatusForbidden {
 		a.resetSession(config.Domain)
@@ -166,11 +182,11 @@ func (a *Unit3DAdapter) GetTorrentDetail(ctx context.Context, config *model.Site
 
 func (a *Unit3DAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
 	baseURL := resolveBase(config)
-	u := baseURL + "/api/torrents/" + torrentID
+	u := baseURL + "/torrents/" + url.PathEscape(torrentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, err
+		return nil, networkError("构造请求失败", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+config.APIKey)
 	setCommonHeaders(req, config.Cookie)
@@ -179,7 +195,7 @@ func (a *Unit3DAdapter) detailViaAPI(ctx context.Context, config *model.SiteConf
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -215,7 +231,7 @@ func (a *Unit3DAdapter) detailViaAPI(ctx context.Context, config *model.SiteConf
 
 func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
 	baseURL := resolveBase(config)
-	u := baseURL + "/torrents/" + torrentID
+	u := baseURL + "/torrents/" + url.PathEscape(torrentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
@@ -227,7 +243,7 @@ func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConf
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -236,16 +252,16 @@ func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConf
 	html := string(body)
 
 	detail := &model.TorrentDetail{}
-	if m := regexp.MustCompile(`<title>([^<]+)</title>`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DTitle.FindStringSubmatch(html); len(m) > 1 {
 		parts := strings.SplitN(m[1], " :: ", 2)
 		detail.Title = strings.TrimSpace(parts[0])
 	}
 
-	if m := regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DInfoHash.FindStringSubmatch(html); len(m) > 1 {
 		detail.InfoHash = strings.ToLower(m[1])
 	}
 
-	if m := regexp.MustCompile(`(?i)(?:size|大小)[^<]*<[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DSize.FindStringSubmatch(html); len(m) > 1 {
 		detail.Size = parseSizeStr(m[1])
 	}
 
@@ -269,7 +285,7 @@ func (a *Unit3DAdapter) DetectDiscount(ctx context.Context, config *model.SiteCo
 	if err != nil {
 		return nil, networkError("请求种子页面失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -310,7 +326,7 @@ func (a *Unit3DAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, 
 	if err != nil {
 		return nil, networkError("请求种子页面失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -318,15 +334,76 @@ func (a *Unit3DAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, 
 	}
 	html := strings.ToLower(string(body))
 
-	hasHR := strings.Contains(html, "hit and run") ||
-		strings.Contains(html, "hit&run") ||
-		strings.Contains(html, "h&r") ||
+	hasHR := detectHRFromHTML(html) ||
 		strings.Contains(html, "hr_rule") ||
 		strings.Contains(html, "must seed")
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
 		result.SeedTimeH = config.HR.SeedTimeH()
+	}
+	return result, nil
+}
+
+func (a *Unit3DAdapter) DetectHRAndDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, *model.DiscountResult, error) {
+	if err := a.ensureSession(ctx, config); err != nil {
+		return nil, nil, err
+	}
+	baseURL := resolveBase(config)
+	u := baseURL + "/torrents/" + torrentID
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, networkError("构造请求失败", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, nil, networkError("请求种子页面失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, nil, err
+	}
+	html := strings.ToLower(string(body))
+
+	hrResult := &model.HRResult{HasHR: detectHRFromHTML(html) ||
+		strings.Contains(html, "hr_rule") ||
+		strings.Contains(html, "must seed")}
+	if hrResult.HasHR {
+		hrResult.SeedTimeH = config.HR.SeedTimeH()
+	}
+
+	var discResult *model.DiscountResult
+	if strings.Contains(html, "freeleech") || strings.Contains(html, "free") {
+		if strings.Contains(html, "double upload") || strings.Contains(html, "2x") {
+			discResult = &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}
+		} else {
+			discResult = &model.DiscountResult{Level: model.DiscountFree}
+		}
+	} else if strings.Contains(html, "double upload") || strings.Contains(html, "2x upload") {
+		discResult = &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}
+	} else if strings.Contains(html, "50% free") || strings.Contains(html, "half download") {
+		discResult = &model.DiscountResult{Level: model.DiscountPercent50}
+	} else {
+		discResult = &model.DiscountResult{Level: model.DiscountNone}
+	}
+
+	return hrResult, discResult, nil
+}
+
+func (a *Unit3DAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
+	result := make(map[string]*model.SLData, len(torrentIDs))
+	for _, id := range torrentIDs {
+		sl, err := a.GetPreciseSLData(ctx, config, id)
+		if err != nil {
+			a.logger.Warn("获取SL数据失败", zap.String("torrentID", id), zap.Error(err))
+			continue
+		}
+		result[id] = sl
 	}
 	return result, nil
 }
@@ -354,7 +431,7 @@ func (a *Unit3DAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, 
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -384,7 +461,7 @@ func (a *Unit3DAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, 
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -393,10 +470,10 @@ func (a *Unit3DAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, 
 	html := string(body)
 	sl := &model.SLData{}
 
-	if m := regexp.MustCompile(`(?i)(?:seeders?|做种)[^<]*<[^>]*>(\d+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DSeeders.FindStringSubmatch(html); len(m) > 1 {
 		sl.Seeders, _ = strconv.Atoi(m[1])
 	}
-	if m := regexp.MustCompile(`(?i)(?:leechers?|下载)[^<]*<[^>]*>(\d+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DLeechers.FindStringSubmatch(html); len(m) > 1 {
 		sl.Leechers, _ = strconv.Atoi(m[1])
 	}
 
@@ -523,7 +600,7 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -541,7 +618,7 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 		return nil, &model.AppError{Code: 14003, Message: "419 CSRF token 过期，需要重建 session"}
 	}
 
-	if idMatch := regexp.MustCompile(`/torrents/(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
+	if idMatch := reUnit3DTorrentID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
 		return &model.PublishResponse{
 			Success:    true,
@@ -556,9 +633,9 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	}
 
 	errMsg := "上传失败"
-	if m := regexp.MustCompile(`class="error"[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DErrorClass.FindStringSubmatch(html); len(m) > 1 {
 		errMsg = strings.TrimSpace(m[1])
-	} else if m := regexp.MustCompile(`<li[^>]*>([^<]*(?:error|fail|失败|错误|duplicate|already)[^<]*)</li>`).FindStringSubmatch(html); len(m) > 1 {
+	} else if m := reUnit3DErrorLI.FindStringSubmatch(html); len(m) > 1 {
 		errMsg = strings.TrimSpace(m[1])
 	}
 
@@ -576,7 +653,7 @@ func (a *Unit3DAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteCo
 	if err != nil {
 		return "", networkError("请求页面失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -584,13 +661,11 @@ func (a *Unit3DAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteCo
 	}
 	html := string(body)
 
-	re := regexp.MustCompile(`<meta\s+name="csrf-token"\s+content="([^"]+)"`)
-	if m := re.FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DCSRFMeta.FindStringSubmatch(html); len(m) > 1 {
 		return m[1], nil
 	}
 
-	re2 := regexp.MustCompile(`<input[^>]+name="_token"[^>]+value="([^"]+)"`)
-	if m := re2.FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DCSRFInput.FindStringSubmatch(html); len(m) > 1 {
 		return m[1], nil
 	}
 
@@ -601,7 +676,7 @@ func extractIMDbID(link string) string {
 	if link == "" {
 		return ""
 	}
-	m := regexp.MustCompile(`tt\d+`).FindString(link)
+	m := reUnit3DIMDbID.FindString(link)
 	return m
 }
 
@@ -627,7 +702,7 @@ func resolveBase(config *model.SiteConfig) string {
 func (a *Unit3DAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
 	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
 	if err != nil {
-		return false, nil
+		return false, fmt.Errorf("search for verify exists %q: %w", torrentID, err)
 	}
 	for _, r := range results {
 		if r.TorrentID == torrentID {
@@ -635,4 +710,115 @@ func (a *Unit3DAdapter) VerifyExists(ctx context.Context, config *model.SiteConf
 		}
 	}
 	return false, nil
+}
+
+func (a *Unit3DAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	if config.APIKey != "" || config.BearerToken != "" {
+		return a.fetchUserStatsAPI(ctx, config)
+	}
+	return a.fetchUserStatsHTML(ctx, config)
+}
+
+func (a *Unit3DAdapter) fetchUserStatsAPI(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	u := resolveBase(config) + "/api/user"
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	if config.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+config.APIKey)
+	} else if config.BearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+config.BearerToken)
+	}
+	if config.Cookie != "" {
+		req.Header.Set("Cookie", config.Cookie)
+	}
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer httpclient.DrainBody(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw struct {
+		ID          flexInt `json:"id"`
+		Username    string  `json:"username"`
+		Uploaded    flexInt `json:"uploaded"`
+		Downloaded  flexInt `json:"downloaded"`
+		Ratio       float64 `json:"ratio"`
+		Seedbonus   float64 `json:"seedbonus"`
+		Seeding     int     `json:"seeding"`
+		Group       struct {
+			Name string `json:"name"`
+		} `json:"group"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("解析用户信息失败: %w", err)
+	}
+
+	return &model.UserStatsResult{
+		Username:     raw.Username,
+		UserClass:    raw.Group.Name,
+		UploadBytes:  int64(raw.Uploaded),
+		DownloadBytes: int64(raw.Downloaded),
+		Ratio:        raw.Ratio,
+		BonusPoints:  raw.Seedbonus,
+		SeedingCount: raw.Seeding,
+	}, nil
+}
+
+func (a *Unit3DAdapter) fetchUserStatsHTML(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	pageURL := config.Domain + "/"
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer httpclient.DrainBody(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	htmlBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	html := string(htmlBytes)
+
+	result := &model.UserStatsResult{}
+	if m := reNexusUsername.FindStringSubmatch(html); len(m) > 2 {
+		result.Username = strings.TrimSpace(m[2])
+	} else if m := reNexusUsernameAlt.FindStringSubmatch(html); len(m) > 2 {
+		result.Username = strings.TrimSpace(m[2])
+	}
+	if m := reNexusFontUploaded.FindStringSubmatch(html); len(m) > 1 {
+		result.UploadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reNexusLabelUpload.FindStringSubmatch(html); len(m) > 1 {
+		result.UploadBytes = parseSizeString(cleanText(m[1]))
+	}
+	if m := reNexusFontDownloaded.FindStringSubmatch(html); len(m) > 1 {
+		result.DownloadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reNexusLabelDownload.FindStringSubmatch(html); len(m) > 1 {
+		result.DownloadBytes = parseSizeString(cleanText(m[1]))
+	}
+	if result.DownloadBytes > 0 && result.UploadBytes > 0 {
+		result.Ratio = float64(result.UploadBytes) / float64(result.DownloadBytes)
+	}
+	return result, nil
 }

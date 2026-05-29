@@ -119,19 +119,19 @@ func TestDetectDiscountFromHTML_KeywordFreeLower(t *testing.T) {
 func TestDetectDiscountFromHTML_Keyword2xFreeChinese_MatchesFreeFirst(t *testing.T) {
 	html := `<html><body><span>2x免费</span></body></html>`
 	result := DetectDiscountFromHTML(html, nil)
-	assert.Equal(t, model.DiscountFree, result.Level)
+	assert.Equal(t, model.Discount2xFree, result.Level)
 }
 
-func TestDetectDiscountFromHTML_Keyword2xFreeSpace_MatchesFreeFirst(t *testing.T) {
+func TestDetectDiscountFromHTML_Keyword2xFreeSpace_Matches2xFreeFirst(t *testing.T) {
 	html := `<html><body><span>2x Free</span></body></html>`
 	result := DetectDiscountFromHTML(html, nil)
-	assert.Equal(t, model.DiscountFree, result.Level)
+	assert.Equal(t, model.Discount2xFree, result.Level)
 }
 
-func TestDetectDiscountFromHTML_Keyword2xFreeNoSpace_MatchesFreeFirst(t *testing.T) {
+func TestDetectDiscountFromHTML_Keyword2xFreeNoSpace_Matches2xFreeFirst(t *testing.T) {
 	html := `<html><body><span>2xFree</span></body></html>`
 	result := DetectDiscountFromHTML(html, nil)
-	assert.Equal(t, model.DiscountFree, result.Level)
+	assert.Equal(t, model.Discount2xFree, result.Level)
 }
 
 func TestDetectDiscountFromHTML_KeywordDoubleUpload(t *testing.T) {
@@ -146,10 +146,10 @@ func TestDetectDiscountFromHTML_Keyword2xUpload(t *testing.T) {
 	assert.Equal(t, model.Discount2xUp, result.Level)
 }
 
-func TestDetectDiscountFromHTML_Keyword50pFree_MatchesFreeFirst(t *testing.T) {
+func TestDetectDiscountFromHTML_Keyword50pFree(t *testing.T) {
 	html := `<html><body><span>50% Free</span></body></html>`
 	result := DetectDiscountFromHTML(html, nil)
-	assert.Equal(t, model.DiscountFree, result.Level)
+	assert.Equal(t, model.DiscountPercent50, result.Level)
 }
 
 func TestDetectDiscountFromHTML_KeywordHalfDownload(t *testing.T) {

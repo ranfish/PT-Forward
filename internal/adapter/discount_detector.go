@@ -24,9 +24,6 @@ var defaultKeywordRules = []struct {
 	Keyword string
 	Level   model.DiscountLevel
 }{
-	{"免费", model.DiscountFree},
-	{"free", model.DiscountFree},
-	{"freeleech", model.DiscountFree},
 	{"2x免费", model.Discount2xFree},
 	{"2x free", model.Discount2xFree},
 	{"2xfree", model.Discount2xFree},
@@ -34,6 +31,9 @@ var defaultKeywordRules = []struct {
 	{"2x upload", model.Discount2xUp},
 	{"50% free", model.DiscountPercent50},
 	{"half download", model.DiscountPercent50},
+	{"freeleech", model.DiscountFree},
+	{"免费", model.DiscountFree},
+	{"free", model.DiscountFree},
 }
 
 func DetectDiscountFromHTML(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {

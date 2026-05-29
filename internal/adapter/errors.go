@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 )
 
@@ -70,10 +71,16 @@ func fmtES(format string, args ...interface{}) string {
 	return fmt.Sprintf(format, args...)
 }
 
+const maxResponseBodySize = 10 * 1024 * 1024
+
 func readBody(resp *http.Response) ([]byte, error) {
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
 	if err != nil {
 		return nil, networkError("读取响应失败", err)
 	}
 	return body, nil
+}
+
+func drainBody(resp *http.Response) {
+	httpclient.DrainBody(resp)
 }

@@ -1,6 +1,9 @@
 <template>
   <div>
-    <div style="margin-bottom: 16px; display: flex; justify-content: flex-end">
+    <div style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px">
+      <a-button :disabled="selectedRowKeys.length === 0" :loading="batchTriggering" @click="batchTrigger">
+        {{ t('subscription.batchTrigger', { count: selectedRowKeys.length }) }}
+      </a-button>
       <a-button type="primary" @click="openModal()">
         <template #icon><PlusOutlined /></template>
         {{ t('subscription.addSubscription') }}
@@ -11,6 +14,7 @@
       :columns="columns"
       :data-source="pagination.data.value"
       :loading="pagination.loading.value"
+      :row-selection="{ selectedRowKeys, onChange: onSelectionChange }"
       :pagination="{
         current: pagination.currentPage.value,
         pageSize: pagination.pageSize.value,
@@ -23,7 +27,7 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'enabled'">
-          <a-switch :checked="record.enabled" @change="toggleSubscription(record)" />
+          <a-switch :checked="!record.paused" @change="toggleSubscription(record)" />
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
@@ -190,6 +194,34 @@ interface SubscriptionItem {
 
 const { t } = useI18n()
 
+const selectedRowKeys = ref<number[]>([])
+const batchTriggering = ref(false)
+
+function onSelectionChange(keys: number[]) {
+  selectedRowKeys.value = keys
+}
+
+async function batchTrigger() {
+  batchTriggering.value = true
+  let ok = 0
+  let fail = 0
+  for (const id of selectedRowKeys.value) {
+    try {
+      await subscriptionsApi.trigger(id)
+      ok++
+    } catch {
+      fail++
+    }
+  }
+  batchTriggering.value = false
+  selectedRowKeys.value = []
+  if (fail === 0) {
+    message.success(t('subscription.batchTriggerSuccess', { count: ok }))
+  } else {
+    message.warning(t('subscription.batchTriggerResult', { ok, fail }))
+  }
+}
+
 const modalVisible = ref(false)
 const submitting = ref(false)
 const editingRecord = ref<SubscriptionItem | null>(null)
@@ -280,9 +312,9 @@ function openModal(record?: SubscriptionItem) {
       publishEnabled: record.publishEnabled || false,
       pushNotify: record.pushNotify || false,
       autoReseed: record.autoReseed || false,
-      notifyId: (record as Record<string, unknown>).notifyId || '',
-      publishTargets: (record as Record<string, unknown>).publishTargets || [],
-      reseedClientIds: (record as Record<string, unknown>).reseedClientIds || [],
+      notifyId: record.notifyId || '',
+      publishTargets: record.publishTargets || [],
+      reseedClientIds: record.reseedClientIds || [],
       enabled: record.enabled ?? true,
     })
   } else {
@@ -328,10 +360,10 @@ async function handleDelete(id: number) {
 
 async function toggleSubscription(record: SubscriptionItem) {
   try {
-    if (record.enabled) {
-      await subscriptionsApi.pause(record.id)
-    } else {
+    if (record.paused) {
       await subscriptionsApi.resume(record.id)
+    } else {
+      await subscriptionsApi.pause(record.id)
     }
     message.success(t('subscription.statusToggled'))
     pagination.fetch()

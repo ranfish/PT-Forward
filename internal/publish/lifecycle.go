@@ -112,14 +112,18 @@ func (m *LifecycleManager) checkGroup(ctx context.Context, group *model.PublishG
 		}
 		hasTarget = true
 
-		if mem.HRProtected && !mem.HRReleased {
+			if mem.HRProtected && !mem.HRReleased {
 			if mem.HRSeedStart != nil {
 				elapsed := time.Since(*mem.HRSeedStart).Hours()
 				if elapsed < float64(mem.HRMinSeedHours) {
 					allAboveDelete = false
 					continue
 				}
-				m.db.WithContext(ctx).Model(mem).Update("hr_released", true)
+				if err := m.db.WithContext(ctx).Model(mem).Update("hr_released", true).Error; err != nil {
+					m.logger.Warn("update hr_released failed",
+						zap.Uint("memberID", mem.ID),
+						zap.Error(err))
+				}
 				m.removeHRTag(ctx, mem)
 			}
 		}
@@ -190,11 +194,15 @@ func (m *LifecycleManager) pauseMember(ctx context.Context, mem *model.PublishGr
 	}
 
 	now := time.Now()
-	m.db.WithContext(ctx).Model(mem).Updates(map[string]interface{}{
+	if err := m.db.WithContext(ctx).Model(mem).Updates(map[string]interface{}{
 		"paused":    true,
 		"status":    model.MemberStatusPaused,
 		"status_at": &now,
-	})
+	}).Error; err != nil {
+		m.logger.Warn("update member to paused failed",
+			zap.Uint("memberID", mem.ID),
+			zap.Error(err))
+	}
 	result.PausedMembers++
 	m.logger.Debug("lifecycle: member paused",
 		zap.Uint("groupID", mem.PublishGroupID),
@@ -228,17 +236,25 @@ func (m *LifecycleManager) deleteGroup(ctx context.Context, group *model.Publish
 	}
 
 	now := time.Now()
-	m.db.WithContext(ctx).Model(&model.PublishGroupMember{}).
+	if err := m.db.WithContext(ctx).Model(&model.PublishGroupMember{}).
 		Where("publish_group_id = ? AND status != ?", group.ID, model.MemberStatusDeleted).
 		Updates(map[string]interface{}{
 			"status":    model.MemberStatusDeleted,
 			"status_at": &now,
-		})
+		}).Error; err != nil {
+		m.logger.Warn("update group members to deleted failed",
+			zap.Uint("groupID", group.ID),
+			zap.Error(err))
+	}
 
-	m.db.WithContext(ctx).Model(group).Updates(map[string]interface{}{
+	if err := m.db.WithContext(ctx).Model(group).Updates(map[string]interface{}{
 		"status":     model.GroupDeleted,
 		"updated_at": now,
-	})
+	}).Error; err != nil {
+		m.logger.Warn("update group status to deleted failed",
+			zap.Uint("groupID", group.ID),
+			zap.Error(err))
+	}
 
 	result.DeletedGroups++
 	if deleteErrors > 0 {
@@ -293,10 +309,14 @@ func (m *LifecycleManager) transitionGroupStatus(ctx context.Context, group *mod
 	}
 
 	if newStatus != group.Status {
-		m.db.WithContext(ctx).Model(group).Updates(map[string]interface{}{
+		if err := m.db.WithContext(ctx).Model(group).Updates(map[string]interface{}{
 			"status":     newStatus,
 			"updated_at": time.Now(),
-		})
+		}).Error; err != nil {
+			m.logger.Warn("update group status failed",
+				zap.Uint("groupID", group.ID),
+				zap.Error(err))
+		}
 	}
 }
 

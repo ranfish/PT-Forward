@@ -155,7 +155,7 @@ func TestWatcher_PollDetectsCompletion(t *testing.T) {
 
 	w.watchStore.Range(func(key, _ any) bool {
 		watchKey := key.(string)
-		w.watchStore.Store(watchKey, candidate.ID)
+		w.watchStore.Store(watchKey, watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
 		return true
 	})
 
@@ -237,6 +237,7 @@ func TestWatcher_StartStop(t *testing.T) {
 	}
 
 	time.Sleep(150 * time.Millisecond)
+	w.Stop()
 	cancel()
 	time.Sleep(50 * time.Millisecond)
 }
@@ -251,7 +252,7 @@ func TestWatcher_ConcurrentWatch(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			key := "client|" + "hash"
-			w.watchStore.Store(key, uint(i))
+			w.watchStore.Store(key, watchEntry{candidateID: uint(i), submittedAt: time.Now()})
 		}(i)
 	}
 	wg.Wait()
@@ -409,7 +410,7 @@ func TestWatcher_PollOnce_MalformedKey(t *testing.T) {
 	mgr := client.NewManager(db, zap.NewNop())
 	w := NewCompletionWatcher(db, mgr, nil, zap.NewNop())
 
-	w.watchStore.Store("malformed_key", uint(999))
+	w.watchStore.Store("malformed_key", watchEntry{candidateID: 999, submittedAt: time.Now()})
 
 	w.pollOnce(context.Background())
 
@@ -430,7 +431,7 @@ func TestWatcher_PollOnce_GetClientFailure(t *testing.T) {
 	}
 	db.Create(&candidate)
 
-	w.watchStore.Store("missing_client|hash1", candidate.ID)
+	w.watchStore.Store("missing_client|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
 
 	w.pollOnce(context.Background())
 
@@ -458,7 +459,7 @@ func TestWatcher_PollOnce_GetTorrentByHashError(t *testing.T) {
 	}
 	db.Create(&candidate)
 
-	w.watchStore.Store("client1|hash1", candidate.ID)
+	w.watchStore.Store("client1|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
 
 	w.pollOnce(context.Background())
 
@@ -488,7 +489,7 @@ func TestWatcher_PollOnce_TorrentNotFound(t *testing.T) {
 	}
 	db.Create(&candidate)
 
-	w.watchStore.Store("client1|hash1", candidate.ID)
+	w.watchStore.Store("client1|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
 
 	w.pollOnce(context.Background())
 
@@ -531,7 +532,7 @@ func TestWatcher_PollOnce_DetectsCompletion(t *testing.T) {
 	}
 	db.Create(&candidate)
 
-	w.watchStore.Store("client1|hash1", candidate.ID)
+	w.watchStore.Store("client1|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
 
 	w.pollOnce(context.Background())
 

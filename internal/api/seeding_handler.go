@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/seeding"
 	"go.uber.org/zap"
@@ -62,10 +64,6 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	case trimmed == "/api/v1/seeding/status" || trimmed == "/api/v1/seeding/status/":
 		h.handleEngineStatus(w, r)
-		return
-
-	case trimmed == "/api/v1/seeding/rules" || trimmed == "/api/v1/seeding/rules/":
-		h.handleRulesRoot(w, r)
 		return
 
 	case trimmed == "/api/v1/seeding/torrents" || trimmed == "/api/v1/seeding/torrents/":
@@ -127,31 +125,6 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.handleUpdateConfig(w, r, uint(id))
 		case http.MethodDelete:
 			h.handleDeleteConfig(w, r, uint(id))
-		default:
-			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
-		}
-		return
-	}
-
-	if strings.Contains(trimmed, "/seeding/rules/") {
-		remaining := extractLastSegment(trimmed, "/api/v1/seeding/rules/")
-		parts := strings.SplitN(remaining, "/", 2)
-		id, err := strconv.ParseUint(parts[0], 10, 64)
-		if err != nil {
-			Error(w, http.StatusBadRequest, 40001, "无效的规则 ID")
-			return
-		}
-		if len(parts) == 2 && parts[1] == "test" && r.Method == http.MethodPost {
-			h.handleTestRule(w, r, uint(id))
-			return
-		}
-		switch r.Method {
-		case http.MethodGet:
-			h.handleGetRule(w, r, uint(id))
-		case http.MethodPut:
-			h.handleUpdateRule(w, r, uint(id))
-		case http.MethodDelete:
-			h.handleDeleteRule(w, r, uint(id))
 		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
@@ -263,6 +236,25 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		MaxActiveUploads    int     `json:"maxActiveUploads"`
 		MaxActiveDownloads  int     `json:"maxActiveDownloads"`
 		SuperSeedingDefault bool    `json:"superSeedingDefault"`
+		FitTimeCheckMs      int     `json:"fitTimeCheckMs"`
+		EmergencyBuffer     float64 `json:"emergencyBuffer"`
+		SpaceAlarmEnabled   bool    `json:"spaceAlarmEnabled"`
+		SpaceAlarmGB        float64 `json:"spaceAlarmGb"`
+		MinDiskSpacePercent float64 `json:"minDiskSpacePercent"`
+		Scope               string  `json:"scope"`
+		PreFilterEnabled    bool    `json:"preFilterEnabled"`
+		EnhancementBatchSize int    `json:"enhancementBatchSize"`
+		EnhancementCacheTTL int     `json:"enhancementCacheTtl"`
+		ActiveTimeWindows   string  `json:"activeTimeWindows"`
+		EmaAlpha            float64 `json:"emaAlpha"`
+		CleanupScoreWeights string  `json:"cleanupScoreWeights"`
+		ArchiveGranularity  string  `json:"archiveGranularity"`
+		RejectRuleIDs       string  `json:"rejectRuleIds"`
+		ReannounceBefore    bool    `json:"reannounceBefore"`
+		ReannounceRetries   int     `json:"reannounceRetries"`
+		ReannounceIntervalMs int   `json:"reannounceIntervalMs"`
+		ReannounceWaitMs    int     `json:"reannounceWaitMs"`
+		MinSeedHoursBeforeDelete float64 `json:"minSeedHoursBeforeDelete"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -294,6 +286,25 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		MaxActiveUploads:    req.MaxActiveUploads,
 		MaxActiveDownloads:  req.MaxActiveDownloads,
 		SuperSeedingDefault: req.SuperSeedingDefault,
+		FitTimeCheckMs:      req.FitTimeCheckMs,
+		EmergencyBuffer:     req.EmergencyBuffer,
+		SpaceAlarmEnabled:   req.SpaceAlarmEnabled,
+		SpaceAlarmGB:        req.SpaceAlarmGB,
+		MinDiskSpacePercent: req.MinDiskSpacePercent,
+		Scope:               req.Scope,
+		PreFilterEnabled:    req.PreFilterEnabled,
+		EnhancementBatchSize: req.EnhancementBatchSize,
+		EnhancementCacheTTL: req.EnhancementCacheTTL,
+		ActiveTimeWindows:   req.ActiveTimeWindows,
+		EmaAlpha:            req.EmaAlpha,
+		CleanupScoreWeights: req.CleanupScoreWeights,
+		ArchiveGranularity:  req.ArchiveGranularity,
+		RejectRuleIDs:       req.RejectRuleIDs,
+		ReannounceBefore:    req.ReannounceBefore,
+		ReannounceRetries:   req.ReannounceRetries,
+		ReannounceIntervalMs: req.ReannounceIntervalMs,
+		ReannounceWaitMs:    req.ReannounceWaitMs,
+		MinSeedHoursBeforeDelete: req.MinSeedHoursBeforeDelete,
 	}
 	if config.AutoDeleteCron == "" {
 		config.AutoDeleteCron = "*/30 * * * *"
@@ -305,7 +316,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		config.MinDiskSpaceGB = 50
 	}
 
-	if err := h.db.Create(&config).Error; err != nil {
+	if err := dbimpl.ForceCreate(h.db, &config); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "创建刷流配置失败")
 		return
 	}
@@ -336,7 +347,7 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 		updates["auto_delete_cron"] = v
 	}
 	if v, ok := req["mainDataCron"]; ok {
-		updates["maindata_cron"] = v
+		updates["main_data_cron"] = v
 	}
 	if v, ok := req["diskProtectEnabled"]; ok {
 		updates["disk_protect_enabled"] = v
@@ -352,6 +363,63 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 	}
 	if v, ok := req["superSeedingDefault"]; ok {
 		updates["super_seeding_default"] = v
+	}
+	if v, ok := req["fitTimeCheckMs"]; ok {
+		updates["fit_time_check_ms"] = v
+	}
+	if v, ok := req["emergencyBuffer"]; ok {
+		updates["emergency_buffer"] = v
+	}
+	if v, ok := req["spaceAlarmEnabled"]; ok {
+		updates["space_alarm_enabled"] = v
+	}
+	if v, ok := req["spaceAlarmGb"]; ok {
+		updates["space_alarm_gb"] = v
+	}
+	if v, ok := req["minDiskSpacePercent"]; ok {
+		updates["min_disk_space_percent"] = v
+	}
+	if v, ok := req["scope"]; ok {
+		updates["scope"] = v
+	}
+	if v, ok := req["preFilterEnabled"]; ok {
+		updates["pre_filter_enabled"] = v
+	}
+	if v, ok := req["enhancementBatchSize"]; ok {
+		updates["enhancement_batch_size"] = v
+	}
+	if v, ok := req["enhancementCacheTtl"]; ok {
+		updates["enhancement_cache_ttl"] = v
+	}
+	if v, ok := req["activeTimeWindows"]; ok {
+		updates["active_time_windows"] = v
+	}
+	if v, ok := req["emaAlpha"]; ok {
+		updates["ema_alpha"] = v
+	}
+	if v, ok := req["cleanupScoreWeights"]; ok {
+		updates["cleanup_score_weights"] = v
+	}
+	if v, ok := req["archiveGranularity"]; ok {
+		updates["archive_granularity"] = v
+	}
+	if v, ok := req["rejectRuleIds"]; ok {
+		updates["reject_rule_ids"] = v
+	}
+	if v, ok := req["reannounceBefore"]; ok {
+		updates["reannounce_before"] = v
+	}
+	if v, ok := req["reannounceRetries"]; ok {
+		updates["reannounce_retries"] = v
+	}
+	if v, ok := req["reannounceIntervalMs"]; ok {
+		updates["reannounce_interval_ms"] = v
+	}
+	if v, ok := req["reannounceWaitMs"]; ok {
+		updates["reannounce_wait_ms"] = v
+	}
+	if v, ok := req["minSeedHoursBeforeDelete"]; ok {
+		updates["min_seed_hours_before_delete"] = v
 	}
 	updates["updated_at"] = time.Now()
 
@@ -375,7 +443,19 @@ func (h *SeedingHandler) handleDeleteConfig(w http.ResponseWriter, _ *http.Reque
 }
 
 func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Request) {
-	clientID := r.URL.Query().Get("clientId")
+	query := r.URL.Query()
+	clientID := query.Get("client_id")
+	siteName := query.Get("site")
+	status := query.Get("status")
+	search := query.Get("search")
+	page, _ := strconv.Atoi(query.Get("page"))
+	size, _ := strconv.Atoi(query.Get("size"))
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 50
+	}
 
 	if h.engine != nil && clientID != "" {
 		records, err := h.engine.ListByClient(r.Context(), clientID)
@@ -383,9 +463,51 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 			Error(w, http.StatusInternalServerError, 50000, "查询刷流记录失败")
 			return
 		}
+
+		filtered := records
+		if siteName != "" {
+			var tmp []model.SeedingTorrentRecord
+			for _, r := range filtered {
+				if r.SiteName == siteName {
+					tmp = append(tmp, r)
+				}
+			}
+			filtered = tmp
+		}
+		if status != "" {
+			var tmp []model.SeedingTorrentRecord
+			for _, r := range filtered {
+				if string(r.Status) == status {
+					tmp = append(tmp, r)
+				}
+			}
+			filtered = tmp
+		}
+		if search != "" {
+			var tmp []model.SeedingTorrentRecord
+			for _, r := range filtered {
+				if strings.Contains(r.InfoHash, search) || strings.Contains(r.TorrentID, search) || strings.Contains(r.SiteName, search) {
+					tmp = append(tmp, r)
+				}
+			}
+			filtered = tmp
+		}
+
+		total := len(filtered)
+		start := (page - 1) * size
+		if start > total {
+			start = total
+		}
+		end := start + size
+		if end > total {
+			end = total
+		}
+
 		Success(w, map[string]interface{}{
-			"items": records,
-			"total": len(records),
+			"items": filtered[start:end],
+			"total": total,
+			"page":  page,
+			"size":  size,
 		})
 		return
 	}
@@ -395,14 +517,25 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 	if clientID != "" {
 		q = q.Where("client_id = ?", clientID)
 	}
+	if siteName != "" {
+		q = q.Where("site_name = ?", siteName)
+	}
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	if search != "" {
+		q = q.Where("info_hash LIKE ? OR torrent_id LIKE ? OR site_name LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+	}
 
-	var records []model.SeedingTorrentRecord
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询种子记录总数失败")
 		return
 	}
-	if err := q.Order("updated_at DESC").Find(&records).Error; err != nil {
+
+	var records []model.SeedingTorrentRecord
+	offset := (page - 1) * size
+	if err := q.Session(&gorm.Session{}).Order("updated_at DESC").Offset(offset).Limit(size).Find(&records).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询种子记录失败")
 		return
 	}
@@ -410,6 +543,8 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 	Success(w, map[string]interface{}{
 		"items": records,
 		"total": total,
+		"page":  page,
+		"size":  size,
 	})
 }
 
@@ -432,25 +567,21 @@ func parseUintParam(path, prefix string) (uint, error) {
 }
 
 func (h *SeedingHandler) handleStats(w http.ResponseWriter, _ *http.Request) {
-	var totalActive int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&totalActive).Error; err != nil {
-		h.logger.Warn("seeding stats: query active count failed", zap.Error(err))
-	}
-
-	var totalPaused int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&totalPaused).Error; err != nil {
-		h.logger.Warn("seeding stats: query paused count failed", zap.Error(err))
-	}
-
 	activeCount := 0
+	var managedCounts *seeding.ManagedCounts
 	if h.engine != nil {
-		activeCount = h.engine.TotalActiveCount()
+		managedCounts = h.engine.GetManagedCounts()
+		activeCount = managedCounts.Active
+	}
+
+	dbPausedCount := 0
+	if managedCounts != nil {
+		dbPausedCount = managedCounts.Paused
 	}
 
 	Success(w, map[string]interface{}{
 		"activeRecords": activeCount,
-		"dbActiveCount": totalActive,
-		"dbPausedCount": totalPaused,
+		"dbPausedCount": dbPausedCount,
 	})
 }
 
@@ -509,11 +640,14 @@ func (h *SeedingHandler) handleResumeRecord(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if h.engine != nil {
-		if err := h.engine.UpdateStatus(r.Context(), uint(id), model.SeedingStatusSeeding, "manual_resume"); err != nil {
-			Error(w, http.StatusInternalServerError, 50000, "恢复记录失败")
-			return
-		}
+	if h.engine == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "刷流引擎未初始化")
+		return
+	}
+
+	if err := h.engine.UpdateStatus(r.Context(), uint(id), model.SeedingStatusSeeding, "manual_resume"); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "恢复记录失败")
+		return
 	}
 
 	h.logger.Info("seeding record resumed", zap.String("id", idStr))
@@ -527,11 +661,14 @@ func (h *SeedingHandler) handlePauseRecord(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if h.engine != nil {
-		if err := h.engine.UpdateStatus(r.Context(), uint(id), model.SeedingStatusPausedFreeEnd, "manual_pause"); err != nil {
-			Error(w, http.StatusInternalServerError, 50000, "暂停记录失败")
-			return
-		}
+	if h.engine == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "刷流引擎未初始化")
+		return
+	}
+
+	if err := h.engine.UpdateStatus(r.Context(), uint(id), model.SeedingStatusPausedFreeEnd, "manual_pause"); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "暂停记录失败")
+		return
 	}
 
 	h.logger.Info("seeding record paused", zap.String("id", idStr))
@@ -540,18 +677,17 @@ func (h *SeedingHandler) handlePauseRecord(w http.ResponseWriter, r *http.Reques
 
 func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Request) {
 	activeCount := 0
+	pausedCount := 0
+	realSeeding := 0
+	realDownloading := 0
 	if h.engine != nil {
-		activeCount = h.engine.TotalActiveCount()
-	}
-
-	var totalActive int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&totalActive).Error; err != nil {
-		h.logger.Warn("seeding engine status: query active count failed", zap.Error(err))
-	}
-
-	var totalPaused int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&totalPaused).Error; err != nil {
-		h.logger.Warn("seeding engine status: query paused count failed", zap.Error(err))
+		mc := h.engine.GetManagedCounts()
+		activeCount = mc.Active
+		pausedCount = mc.Paused
+		for _, rc := range h.engine.GetRealTorrentCounts() {
+			realSeeding += rc.Seeding
+			realDownloading += rc.Downloading
+		}
 	}
 
 	Success(w, map[string]interface{}{
@@ -562,86 +698,11 @@ func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Reque
 			"total":  activeCount,
 		},
 		"overview": map[string]interface{}{
-			"totalTorrents":  totalActive + totalPaused,
-			"activeTorrents": totalActive,
-			"pausedTorrents": totalPaused,
+			"totalTorrents":  realSeeding + realDownloading,
+			"activeTorrents": realSeeding,
+			"pausedTorrents": pausedCount,
 		},
 	})
-}
-
-func (h *SeedingHandler) handleRulesRoot(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		h.handleListRules(w, r)
-	case http.MethodPost:
-		h.handleCreateRule(w, r)
-	default:
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
-	}
-}
-
-func (h *SeedingHandler) handleListRules(w http.ResponseWriter, _ *http.Request) {
-	var rules []model.DeleteRule
-	if err := h.db.Order("priority ASC").Find(&rules).Error; err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询规则列表失败")
-		return
-	}
-	Success(w, map[string]interface{}{
-		"items": rules,
-		"total": len(rules),
-	})
-}
-
-func (h *SeedingHandler) handleCreateRule(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Alias           string `json:"alias"`
-		Priority        int    `json:"priority"`
-		Enabled         bool   `json:"enabled"`
-		Type            string `json:"type"`
-		Conditions      string `json:"conditions"`
-		Expr            string `json:"expr"`
-		Action          string `json:"action"`
-		CascadeDelete   bool   `json:"cascade_delete"`
-		CascadeMaxDepth int    `json:"cascade_max_depth"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
-		return
-	}
-	if req.Alias == "" {
-		Error(w, http.StatusBadRequest, 40001, "alias 为必填项")
-		return
-	}
-	if req.Type == "" {
-		req.Type = "normal"
-	}
-	if req.Action == "" {
-		req.Action = "delete"
-	}
-
-	if req.Type == "expr" && req.Expr != "" {
-		if err := seeding.ValidateExpr(req.Expr); err != nil {
-			Error(w, http.StatusBadRequest, 14003, "表达式语法错误: "+err.Error())
-			return
-		}
-	}
-
-	rule := model.DeleteRule{
-		Alias:           req.Alias,
-		Priority:        req.Priority,
-		Enabled:         req.Enabled,
-		Type:            req.Type,
-		Conditions:      req.Conditions,
-		Expr:            req.Expr,
-		Action:          req.Action,
-		CascadeDelete:   req.CascadeDelete,
-		CascadeMaxDepth: req.CascadeMaxDepth,
-	}
-	if err := h.db.Create(&rule).Error; err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "创建规则失败")
-		return
-	}
-	Success(w, rule)
 }
 
 func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Request) {
@@ -656,6 +717,8 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("size"))
 	if page < 1 {
 		page = 1
+	} else if page > 10000 {
+		page = 10000
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
@@ -669,13 +732,55 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 	}
 
 	var records []model.SeedingTorrentRecord
-	if err := q.Order("updated_at DESC").Offset(offset).Limit(pageSize).Find(&records).Error; err != nil {
+	if err := q.Session(&gorm.Session{}).Order("updated_at DESC").Offset(offset).Limit(pageSize).Find(&records).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询种子列表失败")
 		return
 	}
 
+	type seenTitle struct {
+		SiteName  string
+		TorrentID string
+		Title     string
+	}
+	var titles []seenTitle
+	h.db.Model(&model.RSSTorrentSeen{}).
+		Select("site_name, torrent_id, title").
+		Find(&titles)
+	titleMap := make(map[string]string, len(titles))
+	for _, t := range titles {
+		titleMap[t.SiteName+":"+t.TorrentID] = t.Title
+	}
+
+	type siteInfo struct {
+		BaseURL   string
+		Framework string
+	}
+	var sites []model.Site
+	h.db.Select("name, base_url, framework").Find(&sites)
+	siteMap := make(map[string]siteInfo, len(sites))
+	for _, s := range sites {
+		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
+	}
+
+	type torrentItem struct {
+		model.SeedingTorrentRecord
+		Title     string `json:"title"`
+		DetailURL string `json:"detail_url"`
+	}
+
+	items := make([]torrentItem, len(records))
+	for i := range records {
+		items[i] = torrentItem{SeedingTorrentRecord: records[i]}
+		if title, ok := titleMap[records[i].SiteName+":"+records[i].TorrentID]; ok {
+			items[i].Title = title
+		}
+		if si, ok := siteMap[records[i].SiteName]; ok && si.BaseURL != "" && records[i].TorrentID != "" {
+			items[i].DetailURL = buildDetailURL(si.BaseURL, si.Framework, records[i].TorrentID)
+		}
+	}
+
 	Success(w, map[string]interface{}{
-		"items": records,
+		"items": items,
 		"total": total,
 		"page":  page,
 	})
@@ -716,18 +821,52 @@ func (h *SeedingHandler) handleScoringConfig(w http.ResponseWriter, r *http.Requ
 			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 			return
 		}
+		updates := make(map[string]interface{})
 		if v, ok := req["enabled"].(bool); ok {
 			sub.ScoringConfig.Enabled = v
+			updates["enabled"] = v
 		}
 		if v, ok := req["halfLifeHours"].(float64); ok {
 			sub.ScoringConfig.HalfLifeHours = v
+			updates["half_life_hours"] = v
 		}
 		if v, ok := req["minScore"].(float64); ok {
 			sub.ScoringConfig.MinScore = v
+			updates["min_score"] = v
 		}
-		if err := h.db.Save(&sub).Error; err != nil {
-			Error(w, http.StatusInternalServerError, 50000, "保存评分配置失败")
-			return
+		if v, ok := req["maxCandidates"].(float64); ok && v >= 0 && v <= 10000 {
+			sub.ScoringConfig.MaxCandidates = int(v)
+			updates["max_candidates"] = int(v)
+		}
+		if v, ok := req["maxActiveSeeding"].(float64); ok && v >= 0 && v <= 10000 {
+			sub.ScoringConfig.MaxActiveSeeding = int(v)
+			updates["max_active_seeding"] = int(v)
+		}
+		if v, ok := req["topNConfirm"].(float64); ok && v >= 0 && v <= 100 {
+			sub.ScoringConfig.TopNConfirm = int(v)
+			updates["top_n_confirm"] = int(v)
+		}
+		if v, ok := req["include2xUp"].(bool); ok {
+			sub.ScoringConfig.Include2xUp = v
+			updates["include2x_up"] = v
+		}
+		if v, ok := req["siteWeightsJSON"].(string); ok {
+			sub.ScoringConfig.SiteWeightsJSON = v
+			updates["site_weights_json"] = v
+		}
+		if v, ok := req["batchLimit"].(float64); ok && v >= 0 && v <= 10000 {
+			sub.ScoringConfig.BatchLimit = int(v)
+			updates["batch_limit"] = int(v)
+		}
+		if v, ok := req["pushIntervalMs"].(float64); ok && v >= 0 && v <= 3600000 {
+			sub.ScoringConfig.PushIntervalMs = int(v)
+			updates["push_interval_ms"] = int(v)
+		}
+		if len(updates) > 0 {
+			if err := h.db.Model(&sub).Updates(updates).Error; err != nil {
+				Error(w, http.StatusInternalServerError, 50000, "保存评分配置失败")
+				return
+			}
 		}
 	}
 
@@ -755,159 +894,55 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func (h *SeedingHandler) handleGetRule(w http.ResponseWriter, _ *http.Request, id uint) {
-	var rule model.DeleteRule
-	if err := h.db.First(&rule, id).Error; err != nil {
-		Error(w, http.StatusNotFound, 40400, "规则不存在")
-		return
-	}
-	Success(w, rule)
-}
+func (h *SeedingHandler) handleTriggerClient(w http.ResponseWriter, r *http.Request, clientID string) {
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+	var cfg model.SeedingClientConfig
+	cfgErr := h.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", clientID, true).First(&cfg).Error
 
-func (h *SeedingHandler) handleUpdateRule(w http.ResponseWriter, r *http.Request, id uint) {
-	var rule model.DeleteRule
-	if err := h.db.First(&rule, id).Error; err != nil {
-		Error(w, http.StatusNotFound, 40400, "规则不存在")
-		return
-	}
-
-	var req map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
-		return
-	}
-
-	updates := make(map[string]interface{})
-	for _, field := range []string{"alias", "priority", "enabled", "type", "conditions", "action", "expr", "cascade_delete", "cascade_max_depth"} {
-		if v, ok := req[field]; ok {
-			updates[field] = v
+	if cfgErr != nil {
+		count := 0
+		if h.engine != nil {
+			count = h.engine.GetActiveCount(clientID)
 		}
-	}
-
-	if exprVal, ok := req["expr"].(string); ok && exprVal != "" {
-		if typeVal, _ := req["type"].(string); typeVal == "expr" || rule.Type == "expr" {
-			if err := seeding.ValidateExpr(exprVal); err != nil {
-				Error(w, http.StatusBadRequest, 14003, "表达式语法错误: "+err.Error())
-				return
-			}
-		}
-	}
-
-	updates["updated_at"] = time.Now()
-
-	if len(updates) > 1 {
-		if err := h.db.Model(&rule).Updates(updates).Error; err != nil {
-			Error(w, http.StatusInternalServerError, 50000, "更新规则失败")
-			return
-		}
-	}
-	if err := h.db.First(&rule, id).Error; err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询规则失败")
-		return
-	}
-	Success(w, rule)
-}
-
-func (h *SeedingHandler) handleDeleteRule(w http.ResponseWriter, _ *http.Request, id uint) {
-	if err := h.db.Delete(&model.DeleteRule{}, id).Error; err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "删除规则失败")
-		return
-	}
-	Success(w, nil)
-}
-
-func (h *SeedingHandler) handleTestRule(w http.ResponseWriter, r *http.Request, id uint) {
-	var rule model.DeleteRule
-	if err := h.db.First(&rule, id).Error; err != nil {
-		Error(w, http.StatusNotFound, 40400, "规则不存在")
+		h.logger.Warn("seeding trigger: no enabled config, returning count only", zap.String("clientId", clientID))
+		Success(w, map[string]interface{}{
+			"processedCount": count,
+			"clientId":       clientID,
+			"evaluated":      false,
+			"reason":         "no enabled config",
+		})
 		return
 	}
 
-	var req struct {
-		TorrentName string `json:"torrentName"`
-		Size        int64  `json:"size"`
-		Seeders     int    `json:"seeders"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+	if h.engine == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "刷流引擎未初始化")
 		return
 	}
 
-	matched := false
-	reason := "未匹配"
-
-	if rule.Type == "expr" && rule.Expr != "" {
-		if err := seeding.ValidateExpr(rule.Expr); err != nil {
-			reason = "表达式语法错误: " + err.Error()
-		} else {
-			rc := &seeding.RuleContext{
-				Record: &model.SeedingTorrentRecord{
-					SiteName: "test",
-					Status:   model.SeedingStatusSeeding,
-					Discount: model.DiscountNone,
-					HasHR:    false,
-					IsFree:   false,
-				},
-				Torrent: &model.TorrentInfo{
-					Name:        req.TorrentName,
-					TotalSize:   req.Size,
-					NumComplete: req.Seeders,
-				},
-				FreeSpace: -1,
-				Now:       time.Now(),
-			}
-			ok, err := seeding.EvalExprForTest(rule.Expr, rc)
-			if err != nil {
-				reason = "表达式求值错误: " + err.Error()
-			} else if ok {
-				matched = true
-				reason = "表达式匹配: " + rule.Expr
-			}
-		}
+	result, err := h.engine.Evaluate(ctx, clientID, &cfg)
+	if err != nil {
+		h.logger.Error("seeding evaluate failed", zap.String("clientId", clientID), zap.Error(err))
+		Error(w, http.StatusInternalServerError, 50000, "评估执行失败: "+err.Error())
+		return
 	}
 
-	if !matched && rule.Conditions != "" {
-		rc := &seeding.RuleContext{
-			Record: &model.SeedingTorrentRecord{
-				SiteName:  "test",
-				Status:    model.SeedingStatusSeeding,
-				Discount:  model.DiscountNone,
-				IsFree:    false,
-				HasHR:     false,
-				ClientID:  "test",
-				TorrentID: "test",
-			},
-			Torrent: &model.TorrentInfo{
-				Name:        req.TorrentName,
-				TotalSize:   req.Size,
-				NumComplete: req.Seeders,
-			},
-			FreeSpace: -1,
-			Now:       time.Now(),
-		}
-		conditions := seeding.ParseConditions(rule.Conditions)
-		if seeding.MatchContext(rc, conditions) {
-			matched = true
-			reason = fmt.Sprintf("条件匹配: %d 个条件", len(conditions))
-		}
-	}
-
+	h.logger.Info("seeding client evaluated",
+		zap.String("clientId", clientID),
+		zap.Int("evaluated", result.Evaluated),
+		zap.Int("paused", result.Paused),
+		zap.Int("deleted", result.Deleted),
+		zap.Int("limited", result.Limited),
+		zap.Int("errors", result.Errors),
+	)
 	Success(w, map[string]interface{}{
-		"matched": matched,
-		"reason":  reason,
-		"ruleId":  id,
-	})
-}
-
-func (h *SeedingHandler) handleTriggerClient(w http.ResponseWriter, _ *http.Request, clientID string) {
-	var count int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("client_id = ? AND status = ?", clientID, "seeding").Count(&count).Error; err != nil {
-		h.logger.Warn("seeding trigger: query active count failed", zap.Error(err))
-	}
-	h.logger.Info("seeding client triggered", zap.String("clientId", clientID), zap.Int64("activeCount", count))
-	Success(w, map[string]interface{}{
-		"processedCount": count,
 		"clientId":       clientID,
+		"evaluated":      true,
+		"processedCount": result.Evaluated,
+		"pausedCount":    result.Paused,
+		"deletedCount":   result.Deleted,
+		"limitedCount":   result.Limited,
+		"errorCount":     result.Errors,
 	})
 }
 
@@ -924,18 +959,52 @@ func (h *SeedingHandler) handleScoringConfigByID(w http.ResponseWriter, r *http.
 			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 			return
 		}
+		updates := make(map[string]interface{})
 		if v, ok := req["enabled"].(bool); ok {
 			sub.ScoringConfig.Enabled = v
+			updates["enabled"] = v
 		}
 		if v, ok := req["halfLifeHours"].(float64); ok {
 			sub.ScoringConfig.HalfLifeHours = v
+			updates["half_life_hours"] = v
 		}
 		if v, ok := req["minScore"].(float64); ok {
 			sub.ScoringConfig.MinScore = v
+			updates["min_score"] = v
 		}
-		if err := h.db.Save(&sub).Error; err != nil {
-			Error(w, http.StatusInternalServerError, 50000, "保存评分配置失败")
-			return
+		if v, ok := req["maxCandidates"].(float64); ok && v >= 0 && v <= 10000 {
+			sub.ScoringConfig.MaxCandidates = int(v)
+			updates["max_candidates"] = int(v)
+		}
+		if v, ok := req["maxActiveSeeding"].(float64); ok && v >= 0 && v <= 10000 {
+			sub.ScoringConfig.MaxActiveSeeding = int(v)
+			updates["max_active_seeding"] = int(v)
+		}
+		if v, ok := req["topNConfirm"].(float64); ok && v >= 0 && v <= 100 {
+			sub.ScoringConfig.TopNConfirm = int(v)
+			updates["top_n_confirm"] = int(v)
+		}
+		if v, ok := req["include2xUp"].(bool); ok {
+			sub.ScoringConfig.Include2xUp = v
+			updates["include2x_up"] = v
+		}
+		if v, ok := req["siteWeightsJSON"].(string); ok {
+			sub.ScoringConfig.SiteWeightsJSON = v
+			updates["site_weights_json"] = v
+		}
+		if v, ok := req["batchLimit"].(float64); ok && v >= 0 && v <= 10000 {
+			sub.ScoringConfig.BatchLimit = int(v)
+			updates["batch_limit"] = int(v)
+		}
+		if v, ok := req["pushIntervalMs"].(float64); ok && v >= 0 && v <= 3600000 {
+			sub.ScoringConfig.PushIntervalMs = int(v)
+			updates["push_interval_ms"] = int(v)
+		}
+		if len(updates) > 0 {
+			if err := h.db.Model(&sub).Updates(updates).Error; err != nil {
+				Error(w, http.StatusInternalServerError, 50000, "保存评分配置失败")
+				return
+			}
 		}
 	}
 
@@ -985,14 +1054,18 @@ func (h *SeedingHandler) handleStatsSubroute(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Request) {
-	var totalActive int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&totalActive).Error; err != nil {
-		h.logger.Warn("stats overview: query active count failed", zap.Error(err))
-	}
-
-	var totalPaused int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&totalPaused).Error; err != nil {
-		h.logger.Warn("stats overview: query paused count failed", zap.Error(err))
+	activeTorrents := 0
+	pausedTorrents := 0
+	realSeeding := 0
+	realDownloading := 0
+	if h.engine != nil {
+		mc := h.engine.GetManagedCounts()
+		activeTorrents = mc.Active
+		pausedTorrents = mc.Paused
+		for _, rc := range h.engine.GetRealTorrentCounts() {
+			realSeeding += rc.Seeding
+			realDownloading += rc.Downloading
+		}
 	}
 
 	var total int64
@@ -1036,14 +1109,16 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Requ
 	}
 
 	Success(w, map[string]interface{}{
-		"totalTorrents":      total,
-		"activeTorrents":     totalActive,
-		"pausedTorrents":     totalPaused,
-		"totalUploadBytes":   totalUpload,
-		"totalDownloadBytes": totalDownload,
-		"globalRatio":        globalRatio,
-		"todayDeleted":       todayDeleted,
-		"todayAdded":         todayAdded,
+		"totalTorrents":        total,
+		"activeTorrents":       activeTorrents,
+		"pausedTorrents":       pausedTorrents,
+		"realSeeding":          realSeeding,
+		"realDownloading":      realDownloading,
+		"totalUploadBytes":     totalUpload,
+		"totalDownloadBytes":   totalDownload,
+		"globalRatio":          globalRatio,
+		"todayDeleted":         todayDeleted,
+		"todayAdded":           todayAdded,
 	})
 }
 
@@ -1119,6 +1194,8 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("size"))
 	if page < 1 {
 		page = 1
+	} else if page > 10000 {
+		page = 10000
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
@@ -1156,29 +1233,42 @@ func (h *SeedingHandler) handleDownloaderSpeedTrend(w http.ResponseWriter, r *ht
 	}
 
 	now := time.Now()
-	points := make([]map[string]interface{}, 0)
-
 	step := hours / 24
 	if step < 1 {
 		step = 1
 	}
 
+	rangeStart := now.Add(time.Duration(-hours) * time.Hour).Truncate(time.Hour)
+	rangeEnd := now.Truncate(time.Hour).Add(time.Hour)
+
+	var snapshots []model.DownloaderSpeedSnapshot
+	if err := h.db.Where("client_id = ? AND recorded_at >= ? AND recorded_at < ?", clientID, rangeStart, rangeEnd).
+		Order("recorded_at ASC").Find(&snapshots).Error; err != nil {
+		h.logger.Warn("query speed snapshots failed",
+			zap.String("clientID", clientID),
+			zap.Error(err))
+	}
+
+	bucketMap := make(map[string]model.DownloaderSpeedSnapshot)
+	for _, s := range snapshots {
+		key := s.RecordedAt.Truncate(time.Duration(step) * time.Hour).Format(time.RFC3339)
+		bucketMap[key] = s
+	}
+
+	points := make([]map[string]interface{}, 0)
 	for i := hours; i >= 0; i -= step {
 		t := now.Add(time.Duration(-i) * time.Hour)
-		tStart := t.Truncate(time.Hour)
-
-		var snapshot model.DownloaderSpeedSnapshot
-		err := h.db.Where("client_id = ? AND recorded_at >= ? AND recorded_at < ?", clientID, tStart, tStart.Add(time.Hour)).
-			Order("recorded_at DESC").First(&snapshot).Error
+		tKey := t.Truncate(time.Duration(step) * time.Hour).Format(time.RFC3339)
+		tDisplay := t.Truncate(time.Hour).Format(time.RFC3339)
 
 		point := map[string]interface{}{
-			"timestamp":     tStart.Format(time.RFC3339),
+			"timestamp":     tDisplay,
 			"uploadSpeed":   0,
 			"downloadSpeed": 0,
 		}
-		if err == nil {
-			point["uploadSpeed"] = snapshot.UploadSpeed
-			point["downloadSpeed"] = snapshot.DownloadSpeed
+		if s, ok := bucketMap[tKey]; ok {
+			point["uploadSpeed"] = s.UploadSpeed
+			point["downloadSpeed"] = s.DownloadSpeed
 		}
 		points = append(points, point)
 	}
@@ -1190,16 +1280,59 @@ func (h *SeedingHandler) handleDownloaderSpeedTrend(w http.ResponseWriter, r *ht
 }
 
 func (h *SeedingHandler) handleDryrunAll(w http.ResponseWriter, r *http.Request) {
+	if h.engine == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "刷流引擎未初始化")
+		return
+	}
+	ctx := r.Context()
+	configs, err := h.engine.ListConfigs(ctx)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
+		return
+	}
+
+	totalEvaluated := 0
+	for _, cfg := range configs {
+		count, evalErr := h.engine.DryRunEvaluate(ctx, cfg.ClientID, cfg)
+		if evalErr != nil {
+			h.logger.Warn("dryrun evaluate failed", zap.String("clientId", cfg.ClientID), zap.Error(evalErr))
+			continue
+		}
+		totalEvaluated += count
+	}
+
 	Success(w, map[string]interface{}{
-		"candidates": []interface{}{},
-		"total":      0,
+		"candidates":  []interface{}{},
+		"total":       totalEvaluated,
+		"configCount": len(configs),
 	})
 }
 
 func (h *SeedingHandler) handleDryrunBySub(w http.ResponseWriter, r *http.Request, subID string) {
+	if h.engine == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "刷流引擎未初始化")
+		return
+	}
+	ctx := r.Context()
+	var configs []*model.SeedingClientConfig
+	if err := h.db.WithContext(ctx).Where("enabled = ?", true).Find(&configs).Error; err != nil {
+		h.logger.Warn("query seeding configs for dryrun",
+			zap.String("subID", subID),
+			zap.Error(err))
+	}
+
+	totalEvaluated := 0
+	for _, cfg := range configs {
+		count, err := h.engine.DryRunEvaluate(ctx, cfg.ClientID, cfg)
+		if err != nil {
+			continue
+		}
+		totalEvaluated += count
+	}
+
 	Success(w, map[string]interface{}{
 		"subscriptionId": subID,
 		"candidates":     []interface{}{},
-		"total":          0,
+		"total":          totalEvaluated,
 	})
 }

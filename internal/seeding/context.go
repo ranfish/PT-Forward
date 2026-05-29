@@ -1,6 +1,7 @@
 package seeding
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -127,7 +128,11 @@ var (
 
 func getOrCompileProgram(exprStr string) (*vm.Program, error) {
 	if cached, ok := programCache.Load(exprStr); ok {
-		return cached.(*vm.Program), nil
+		prog, ok2 := cached.(*vm.Program)
+		if !ok2 {
+			return nil, fmt.Errorf("invalid cached program type")
+		}
+		return prog, nil
 	}
 
 	env := &exprEnv{}

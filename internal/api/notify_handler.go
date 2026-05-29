@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
 	"go.uber.org/zap"
@@ -28,29 +29,39 @@ var validNotifyTypes = map[string]bool{
 }
 
 type createNotifyRequest struct {
-	Type             string `json:"type"`
-	Name             string `json:"name"`
-	Enabled          bool   `json:"enabled"`
-	Config           string `json:"config"`
-	Events           string `json:"events,omitempty"`
-	MaxErrorsPerHour int    `json:"maxErrorsPerHour,omitempty"`
-	TimeoutMs        int    `json:"timeoutMs,omitempty"`
-	QuietHoursStart  string `json:"quietHoursStart,omitempty"`
-	QuietHoursEnd    string `json:"quietHoursEnd,omitempty"`
-	MessageTemplate  string `json:"messageTemplate,omitempty"`
+	Type              string `json:"type"`
+	Name              string `json:"name"`
+	Enabled           bool   `json:"enabled"`
+	Config            string `json:"config"`
+	Events            string `json:"events,omitempty"`
+	MaxErrorsPerHour  int    `json:"maxErrorsPerHour,omitempty"`
+	TimeoutMs         int    `json:"timeoutMs,omitempty"`
+	QuietHoursStart   string `json:"quietHoursStart,omitempty"`
+	QuietHoursEnd     string `json:"quietHoursEnd,omitempty"`
+	MessageTemplate   string `json:"messageTemplate,omitempty"`
+	Overrides         string `json:"overrides,omitempty"`
+	FailoverGroupID   string `json:"failoverGroupId,omitempty"`
+	MinPriority       int    `json:"minPriority,omitempty"`
+	DigestTemplate    string `json:"digestTemplate,omitempty"`
+	DigestIntervalMin int    `json:"digestIntervalMin,omitempty"`
 }
 
 type updateNotifyRequest struct {
-	Type             *string `json:"type,omitempty"`
-	Name             *string `json:"name,omitempty"`
-	Enabled          *bool   `json:"enabled,omitempty"`
-	Config           *string `json:"config,omitempty"`
-	Events           *string `json:"events,omitempty"`
-	MaxErrorsPerHour *int    `json:"maxErrorsPerHour,omitempty"`
-	TimeoutMs        *int    `json:"timeoutMs,omitempty"`
-	QuietHoursStart  *string `json:"quietHoursStart,omitempty"`
-	QuietHoursEnd    *string `json:"quietHoursEnd,omitempty"`
-	MessageTemplate  *string `json:"messageTemplate,omitempty"`
+	Type              *string `json:"type,omitempty"`
+	Name              *string `json:"name,omitempty"`
+	Enabled           *bool   `json:"enabled,omitempty"`
+	Config            *string `json:"config,omitempty"`
+	Events            *string `json:"events,omitempty"`
+	MaxErrorsPerHour  *int    `json:"maxErrorsPerHour,omitempty"`
+	TimeoutMs         *int    `json:"timeoutMs,omitempty"`
+	QuietHoursStart   *string `json:"quietHoursStart,omitempty"`
+	QuietHoursEnd     *string `json:"quietHoursEnd,omitempty"`
+	MessageTemplate   *string `json:"messageTemplate,omitempty"`
+	Overrides         *string `json:"overrides,omitempty"`
+	FailoverGroupID   *string `json:"failoverGroupId,omitempty"`
+	MinPriority       *int    `json:"minPriority,omitempty"`
+	DigestTemplate    *string `json:"digestTemplate,omitempty"`
+	DigestIntervalMin *int    `json:"digestIntervalMin,omitempty"`
 }
 
 type notifyResponse struct {
@@ -66,8 +77,40 @@ type notifyResponse struct {
 	TimeoutMs        int       `json:"timeoutMs"`
 	QuietHoursStart  string    `json:"quietHoursStart,omitempty"`
 	QuietHoursEnd    string    `json:"quietHoursEnd,omitempty"`
-	MessageTemplate  string    `json:"messageTemplate,omitempty"`
-	HasConfig        bool      `json:"hasConfig"`
+	MessageTemplate   string    `json:"messageTemplate,omitempty"`
+	Overrides         string    `json:"overrides,omitempty"`
+	FailoverGroupID   string    `json:"failoverGroupId,omitempty"`
+	MinPriority       int       `json:"minPriority"`
+	DigestTemplate    string    `json:"digestTemplate,omitempty"`
+	DigestIntervalMin  int       `json:"digestIntervalMin"`
+	ConsecutiveFailures int      `json:"consecutiveFailures"`
+	HasConfig          bool      `json:"hasConfig"`
+}
+
+type notifyHistoryResponse struct {
+	ID        uint      `json:"id"`
+	ChannelID uint      `json:"channelId"`
+	Event     string    `json:"event"`
+	Level     string    `json:"level"`
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
+	Success   bool      `json:"success"`
+	ErrorMsg  string    `json:"errorMsg"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+func (h *NotifyHandler) toHistoryResponse(hist *model.NotificationHistory) notifyHistoryResponse {
+	return notifyHistoryResponse{
+		ID:        hist.ID,
+		ChannelID: hist.ChannelID,
+		Event:     hist.Event,
+		Level:     hist.Level,
+		Title:     hist.Title,
+		Body:      hist.Body,
+		Success:   hist.Success,
+		ErrorMsg:  hist.ErrorMsg,
+		CreatedAt: hist.CreatedAt,
+	}
 }
 
 func (h *NotifyHandler) toResponse(ch *model.NotificationChannel) notifyResponse {
@@ -84,8 +127,14 @@ func (h *NotifyHandler) toResponse(ch *model.NotificationChannel) notifyResponse
 		TimeoutMs:        ch.TimeoutMs,
 		QuietHoursStart:  ch.QuietHoursStart,
 		QuietHoursEnd:    ch.QuietHoursEnd,
-		MessageTemplate:  ch.MessageTemplate,
-		HasConfig:        ch.Config != "",
+		MessageTemplate:   ch.MessageTemplate,
+		Overrides:         ch.Overrides,
+		FailoverGroupID:   ch.FailoverGroupID,
+		MinPriority:       ch.MinPriority,
+		DigestTemplate:    ch.DigestTemplate,
+		DigestIntervalMin:  ch.DigestIntervalMin,
+		ConsecutiveFailures: ch.ConsecutiveFailures,
+		HasConfig:          ch.Config != "",
 	}
 }
 
@@ -183,6 +232,11 @@ func (h *NotifyHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := validateNotifyURLs(req.Type, req.Config); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "config URL 不合法: "+err.Error())
+		return
+	}
+
 	exists, _ := h.repo.ExistsByName(r.Context(), req.Name, 0)
 	if exists {
 		Error(w, http.StatusConflict, 40900, "通道名称已存在")
@@ -209,6 +263,11 @@ func (h *NotifyHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		QuietHoursStart:  req.QuietHoursStart,
 		QuietHoursEnd:    req.QuietHoursEnd,
 		MessageTemplate:  req.MessageTemplate,
+		Overrides:         req.Overrides,
+		FailoverGroupID:  req.FailoverGroupID,
+		MinPriority:       req.MinPriority,
+		DigestTemplate:    req.DigestTemplate,
+		DigestIntervalMin: req.DigestIntervalMin,
 		Healthy:          true,
 	}
 
@@ -275,6 +334,14 @@ func (h *NotifyHandler) handleUpdate(w http.ResponseWriter, r *http.Request, idS
 		ch.Enabled = *req.Enabled
 	}
 	if req.Config != nil {
+		notifyType := ch.Type
+		if req.Type != nil {
+			notifyType = *req.Type
+		}
+		if err := validateNotifyURLs(notifyType, *req.Config); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "config URL 不合法: "+err.Error())
+			return
+		}
 		ch.Config = *req.Config
 	}
 	if req.Events != nil {
@@ -294,6 +361,21 @@ func (h *NotifyHandler) handleUpdate(w http.ResponseWriter, r *http.Request, idS
 	}
 	if req.MessageTemplate != nil {
 		ch.MessageTemplate = *req.MessageTemplate
+	}
+	if req.Overrides != nil {
+		ch.Overrides = *req.Overrides
+	}
+	if req.FailoverGroupID != nil {
+		ch.FailoverGroupID = *req.FailoverGroupID
+	}
+	if req.MinPriority != nil {
+		ch.MinPriority = *req.MinPriority
+	}
+	if req.DigestTemplate != nil {
+		ch.DigestTemplate = *req.DigestTemplate
+	}
+	if req.DigestIntervalMin != nil {
+		ch.DigestIntervalMin = *req.DigestIntervalMin
 	}
 
 	if err := h.repo.Update(r.Context(), ch); err != nil {
@@ -348,6 +430,10 @@ func (h *NotifyHandler) handleTest(w http.ResponseWriter, r *http.Request, idStr
 
 	testService := notification.NewTestService(ch, h.logger)
 	ok, message := testService.SendTest(r.Context(), msg)
+	if !ok {
+		Error(w, http.StatusBadGateway, 15003, message)
+		return
+	}
 	Success(w, map[string]interface{}{
 		"ok":      ok,
 		"message": message,
@@ -367,9 +453,14 @@ func (h *NotifyHandler) handleHistory(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
+	items := make([]notifyHistoryResponse, 0, len(history))
+	for i := range history {
+		items = append(items, h.toHistoryResponse(&history[i]))
+	}
+
 	Success(w, map[string]interface{}{
-		"items": history,
-		"total": len(history),
+		"items": items,
+		"total": len(items),
 	})
 }
 
@@ -377,4 +468,37 @@ func parseNotifyUint(s string) (uint, error) {
 	var n uint
 	_, err := fmt.Sscanf(s, "%d", &n)
 	return n, err
+}
+
+func validateNotifyURLs(notifyType, configJSON string) error {
+	if configJSON == "" {
+		return nil
+	}
+	var cfg map[string]string
+	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+		return nil
+	}
+
+	urlFields := urlFieldsForType(notifyType)
+	for _, field := range urlFields {
+		if v, ok := cfg[field]; ok && v != "" {
+			if err := middleware.ValidatePublicURL(v); err != nil {
+				return fmt.Errorf("%s: %w", field, err)
+			}
+		}
+	}
+	return nil
+}
+
+func urlFieldsForType(t string) []string {
+	switch t {
+	case "bark":
+		return []string{"url"}
+	case "webhook":
+		return []string{"url"}
+	case "dingtalk":
+		return []string{"webhook"}
+	default:
+		return nil
+	}
 }

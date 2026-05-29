@@ -81,6 +81,8 @@ func (h *PTGenHandler) handleListCache(w http.ResponseWriter, r *http.Request) {
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("size"))
 	if page < 1 {
 		page = 1
+	} else if page > 10000 {
+		page = 10000
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20

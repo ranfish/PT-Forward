@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -13,6 +14,7 @@ type Logger struct {
 	db     *gorm.DB
 	logger *zap.Logger
 	ch     chan *model.OperationAuditLog
+	wg     sync.WaitGroup
 }
 
 func NewLogger(db *gorm.DB, logger *zap.Logger) *Logger {
@@ -24,7 +26,12 @@ func NewLogger(db *gorm.DB, logger *zap.Logger) *Logger {
 }
 
 func (l *Logger) Start(ctx context.Context) {
+	l.wg.Add(1)
 	go l.flushLoop(ctx)
+}
+
+func (l *Logger) Stop() {
+	l.wg.Wait()
 }
 
 func (l *Logger) Log(actor, module, action, targetType, targetID, detail, result string) {
@@ -49,6 +56,7 @@ func (l *Logger) Log(actor, module, action, targetType, targetID, detail, result
 }
 
 func (l *Logger) flushLoop(ctx context.Context) {
+	defer l.wg.Done()
 	batch := make([]*model.OperationAuditLog, 0, 50)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -56,18 +64,25 @@ func (l *Logger) flushLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			l.flush(batch)
-			return
+			for {
+				select {
+				case entry := <-l.ch:
+					batch = append(batch, entry)
+				default:
+					l.flush(batch)
+					return
+				}
+			}
 		case entry := <-l.ch:
 			batch = append(batch, entry)
 			if len(batch) >= 50 {
 				l.flush(batch)
-				batch = batch[:0]
+				batch = make([]*model.OperationAuditLog, 0, 50)
 			}
 		case <-ticker.C:
 			if len(batch) > 0 {
 				l.flush(batch)
-				batch = batch[:0]
+				batch = make([]*model.OperationAuditLog, 0, 50)
 			}
 		}
 	}

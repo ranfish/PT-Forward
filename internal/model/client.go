@@ -104,15 +104,17 @@ type AddResult struct {
 
 // §33.1.25 — Maindata: 下载器全局状态
 type Maindata struct {
-	Torrents    map[string]TorrentInfo `json:"torrents"`
-	ServerState ServerState            `json:"server_state"`
-	CategoryMap map[string]string      `json:"categories"`
-	Tags        []string               `json:"tags"`
-	FreeSpace   int64                  `json:"free_space"`
+	Torrents       map[string]TorrentInfo `json:"torrents"`
+	ServerState    ServerState            `json:"server_state"`
+	CategoryMap    map[string]string      `json:"categories"`
+	Tags           []string               `json:"tags"`
+	FreeSpace      int64                  `json:"free_space,string"`
+	TotalDiskSpace int64                  `json:"total_disk_space,string"`
 }
 
 type ServerState struct {
-	UploadSpeed int64 `json:"upload_speed"`
+	DownloadSpeed int64 `json:"download_speed"`
+	UploadSpeed   int64 `json:"upload_speed"`
 }
 
 // §33.1.68 — SharedPathMapping: 共享路径映射

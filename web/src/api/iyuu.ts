@@ -1,22 +1,23 @@
 import client from './client'
+import type { ApiResponse, IYUUConfig } from './types'
 
 export const iyuuApi = {
   getConfig() {
-    return client.get('/iyuu/config')
+    return client.get<ApiResponse<IYUUConfig>>('/iyuu/config')
   },
-  saveConfig(data: Record<string, unknown>) {
-    return client.put('/iyuu/config', data)
+  saveConfig(data: Partial<Omit<IYUUConfig, 'id'>>) {
+    return client.put<ApiResponse<IYUUConfig>>('/iyuu/config', data)
   },
   listSites() {
-    return client.get('/iyuu/sites')
+    return client.get<ApiResponse<Array<{ name: string; url: string }>>>('/iyuu/sites')
   },
   syncSites() {
-    return client.post('/iyuu/sites')
+    return client.post<ApiResponse<{ synced: number }>>('/iyuu/sites')
   },
   query(data: { infoHashes: string[] }) {
-    return client.post('/iyuu/query', data)
+    return client.post<ApiResponse<Array<{ infoHash: string; sites: string[] }>>>('/iyuu/query', data)
   },
   test() {
-    return client.post('/iyuu/test')
+    return client.post<ApiResponse<{ success: boolean }>>('/iyuu/test')
   },
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/model"
 	"gorm.io/gorm"
 )
@@ -32,7 +33,7 @@ func (r *Repository) GetByID(ctx context.Context, id uint) (*model.NotificationC
 }
 
 func (r *Repository) Create(ctx context.Context, ch *model.NotificationChannel) error {
-	return r.db.WithContext(ctx).Create(ch).Error
+	return dbimpl.ForceCreate(r.db.WithContext(ctx), ch)
 }
 
 func (r *Repository) Update(ctx context.Context, ch *model.NotificationChannel) error {

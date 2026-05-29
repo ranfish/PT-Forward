@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
@@ -110,7 +112,11 @@ func (h *ReseedHandler) handleList(w http.ResponseWriter, r *http.Request) {
 func (h *ReseedHandler) handleGet(w http.ResponseWriter, r *http.Request, id uint) {
 	task, err := h.engine.GetTask(r.Context(), id)
 	if err != nil {
-		Error(w, http.StatusNotFound, 40400, "辅种任务不存在")
+		if strings.Contains(err.Error(), "not found") {
+			Error(w, http.StatusNotFound, 40400, "辅种任务不存在")
+		} else {
+			Error(w, http.StatusInternalServerError, 50000, "查询辅种任务失败")
+		}
 		return
 	}
 	Success(w, task)
@@ -128,6 +134,20 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Schedule             string  `json:"schedule"`
 		MaxInjectionsPerRun  int     `json:"maxInjectionsPerRun"`
 		ReseedCategory       string  `json:"reseedCategory"`
+		TargetSiteExcludes      string  `json:"targetSiteExcludes"`
+		ReleaseGroupExcludes    string  `json:"releaseGroupExcludes"`
+		CategoryExcludes        string  `json:"categoryExcludes"`
+		TitleKeywordExcludes    string  `json:"titleKeywordExcludes"`
+		MatchMethods            string  `json:"matchMethods"`
+		FallbackEnabled         bool    `json:"fallbackEnabled"`
+		MaxFallbacks            int     `json:"maxFallbacks"`
+		EngineMode              string  `json:"engineMode"`
+		InjectionIntervalS      int     `json:"injectionIntervalS"`
+		InjectionJitterS        int     `json:"injectionJitterS"`
+		InjectionConcurrency    int     `json:"injectionConcurrency"`
+		ScanConcurrency         int     `json:"scanConcurrency"`
+		MaxRetries              int     `json:"maxRetries"`
+		RetryIntervalH          int     `json:"retryIntervalH"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -149,6 +169,20 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Schedule:             req.Schedule,
 		MaxInjectionsPerRun:  req.MaxInjectionsPerRun,
 		ReseedCategory:       req.ReseedCategory,
+		TargetSiteExcludes:      req.TargetSiteExcludes,
+		ReleaseGroupExcludes:    req.ReleaseGroupExcludes,
+		CategoryExcludes:        req.CategoryExcludes,
+		TitleKeywordExcludes:    req.TitleKeywordExcludes,
+		MatchMethods:            req.MatchMethods,
+		FallbackEnabled:         req.FallbackEnabled,
+		MaxFallbacks:            req.MaxFallbacks,
+		EngineMode:              req.EngineMode,
+		InjectionIntervalS:      req.InjectionIntervalS,
+		InjectionJitterS:        req.InjectionJitterS,
+		InjectionConcurrency:    req.InjectionConcurrency,
+		ScanConcurrency:         req.ScanConcurrency,
+		MaxRetries:              req.MaxRetries,
+		RetryIntervalH:          req.RetryIntervalH,
 	}
 	if task.Schedule == "" {
 		task.Schedule = "0 */6 * * *"
@@ -216,6 +250,48 @@ func (h *ReseedHandler) handleUpdate(w http.ResponseWriter, r *http.Request, id 
 	if v, ok := req["reseedCategory"].(string); ok {
 		task.ReseedCategory = v
 	}
+	if v, ok := req["targetSiteExcludes"].(string); ok {
+		task.TargetSiteExcludes = v
+	}
+	if v, ok := req["releaseGroupExcludes"].(string); ok {
+		task.ReleaseGroupExcludes = v
+	}
+	if v, ok := req["categoryExcludes"].(string); ok {
+		task.CategoryExcludes = v
+	}
+	if v, ok := req["titleKeywordExcludes"].(string); ok {
+		task.TitleKeywordExcludes = v
+	}
+	if v, ok := req["matchMethods"].(string); ok {
+		task.MatchMethods = v
+	}
+	if v, ok := req["fallbackEnabled"].(bool); ok {
+		task.FallbackEnabled = v
+	}
+	if v, ok := req["maxFallbacks"].(float64); ok {
+		task.MaxFallbacks = int(v)
+	}
+	if v, ok := req["engineMode"].(string); ok {
+		task.EngineMode = v
+	}
+	if v, ok := req["injectionIntervalS"].(float64); ok {
+		task.InjectionIntervalS = int(v)
+	}
+	if v, ok := req["injectionJitterS"].(float64); ok {
+		task.InjectionJitterS = int(v)
+	}
+	if v, ok := req["injectionConcurrency"].(float64); ok {
+		task.InjectionConcurrency = int(v)
+	}
+	if v, ok := req["scanConcurrency"].(float64); ok {
+		task.ScanConcurrency = int(v)
+	}
+	if v, ok := req["maxRetries"].(float64); ok {
+		task.MaxRetries = int(v)
+	}
+	if v, ok := req["retryIntervalH"].(float64); ok {
+		task.RetryIntervalH = int(v)
+	}
 
 	if err := h.engine.UpdateTask(r.Context(), task); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新辅种任务失败")
@@ -241,11 +317,18 @@ func (h *ReseedHandler) handleTrigger(w http.ResponseWriter, r *http.Request, id
 
 	task, err := h.engine.GetTask(r.Context(), id)
 	if err != nil {
-		Error(w, http.StatusNotFound, 40400, "辅种任务不存在")
+		if strings.Contains(err.Error(), "not found") {
+			Error(w, http.StatusNotFound, 40400, "辅种任务不存在")
+		} else {
+			Error(w, http.StatusInternalServerError, 50000, "查询辅种任务失败")
+		}
 		return
 	}
 
-	result, err := h.engine.RunTask(r.Context(), task)
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+
+	result, err := h.engine.RunTask(ctx, task)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "执行辅种任务失败")
 		return
@@ -263,7 +346,11 @@ func (h *ReseedHandler) handleCancel(w http.ResponseWriter, r *http.Request, id 
 
 	_, err := h.engine.GetTask(r.Context(), id)
 	if err != nil {
-		Error(w, http.StatusNotFound, 40400, "辅种任务不存在")
+		if strings.Contains(err.Error(), "not found") {
+			Error(w, http.StatusNotFound, 40400, "辅种任务不存在")
+		} else {
+			Error(w, http.StatusInternalServerError, 50000, "查询辅种任务失败")
+		}
 		return
 	}
 
@@ -327,8 +414,10 @@ func (h *ReseedHandler) handleRetryMatch(w http.ResponseWriter, r *http.Request,
 	if err != nil {
 		if strings.Contains(err.Error(), "只能重试") {
 			Error(w, http.StatusBadRequest, 40001, err.Error())
-		} else {
+		} else if strings.Contains(err.Error(), "not found") {
 			Error(w, http.StatusNotFound, 40400, "匹配记录不存在")
+		} else {
+			Error(w, http.StatusInternalServerError, 50000, "重试匹配失败")
 		}
 		return
 	}

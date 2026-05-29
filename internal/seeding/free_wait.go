@@ -19,14 +19,18 @@ type FreeWaitMonitor struct {
 }
 
 type freeWaitEntry struct {
-	SiteName    string
-	TorrentID   string
-	InfoHash    string
-	Title       string
-	Size        int64
-	AddedAt     time.Time
-	CheckBefore *time.Time
-	CheckCount  int
+	SiteName       string
+	TorrentID      string
+	InfoHash       string
+	Title          string
+	Size           int64
+	ClientID       string
+	SubscriptionID string
+	HasHR          bool
+	HRSeedTimeH    int
+	AddedAt        time.Time
+	CheckBefore    *time.Time
+	CheckCount     int
 }
 
 func NewFreeWaitMonitor(db *gorm.DB, logger *zap.Logger) *FreeWaitMonitor {
@@ -41,7 +45,36 @@ func (m *FreeWaitMonitor) SetEngine(e *Engine) {
 	m.engine = e
 }
 
-func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size int64, checkBefore *time.Time) {
+func (m *FreeWaitMonitor) RecoverOnStartup(ctx context.Context) {
+	var entries []model.FreeWaitEntry
+	if err := m.db.WithContext(ctx).Find(&entries).Error; err != nil {
+		m.logger.Warn("free wait: recover from DB failed", zap.Error(err))
+		return
+	}
+	for i := range entries {
+		dbEntry := &entries[i]
+		key := dbEntry.SiteName + "|" + dbEntry.TorrentID
+		m.pending[key] = &freeWaitEntry{
+			SiteName:       dbEntry.SiteName,
+			TorrentID:      dbEntry.TorrentID,
+			InfoHash:       dbEntry.InfoHash,
+			Title:          dbEntry.Title,
+			Size:           dbEntry.Size,
+			ClientID:       dbEntry.ClientID,
+			SubscriptionID: dbEntry.SubscriptionID,
+			HasHR:          dbEntry.HasHR,
+			HRSeedTimeH:    dbEntry.HRSeedTimeH,
+			AddedAt:        dbEntry.CreatedAt,
+			CheckBefore:    dbEntry.CheckBefore,
+			CheckCount:     dbEntry.CheckCount,
+		}
+	}
+	if len(entries) > 0 {
+		m.logger.Info("free wait: recovered entries from DB", zap.Int("count", len(entries)))
+	}
+}
+
+func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size int64, checkBefore *time.Time, clientID, subscriptionID string, hasHR bool, hrSeedTimeH int) {
 	if torrentID == "" {
 		return
 	}
@@ -53,16 +86,37 @@ func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size 
 		m.mu.Unlock()
 		return
 	}
-	m.pending[key] = &freeWaitEntry{
-		SiteName:    siteName,
-		TorrentID:   torrentID,
-		InfoHash:    infoHash,
-		Title:       title,
-		Size:        size,
-		AddedAt:     time.Now(),
-		CheckBefore: checkBefore,
+	entry := &freeWaitEntry{
+		SiteName:       siteName,
+		TorrentID:      torrentID,
+		InfoHash:       infoHash,
+		Title:          title,
+		Size:           size,
+		ClientID:       clientID,
+		SubscriptionID: subscriptionID,
+		HasHR:          hasHR,
+		HRSeedTimeH:    hrSeedTimeH,
+		AddedAt:        time.Now(),
+		CheckBefore:    checkBefore,
 	}
+	m.pending[key] = entry
 	m.mu.Unlock()
+
+	dbEntry := &model.FreeWaitEntry{
+		SiteName:       siteName,
+		TorrentID:      torrentID,
+		InfoHash:       infoHash,
+		Title:          title,
+		Size:           size,
+		ClientID:       clientID,
+		SubscriptionID: subscriptionID,
+		HasHR:          hasHR,
+		HRSeedTimeH:    hrSeedTimeH,
+		CheckBefore:    checkBefore,
+	}
+	if err := m.db.Create(dbEntry).Error; err != nil {
+		m.logger.Warn("free wait: persist to DB failed", zap.String("key", key), zap.Error(err))
+	}
 
 	if m.logger != nil {
 		m.logger.Debug("free wait: added",
@@ -78,6 +132,8 @@ func (m *FreeWaitMonitor) Remove(siteName, torrentID string) {
 	m.mu.Lock()
 	delete(m.pending, key)
 	m.mu.Unlock()
+
+	m.db.Where("site_name = ? AND torrent_id = ?", siteName, torrentID).Delete(&model.FreeWaitEntry{})
 }
 
 type DiscountChecker interface {
@@ -146,6 +202,9 @@ func (m *FreeWaitMonitor) CheckOnce(ctx context.Context, checker DiscountChecker
 			m.mu.Lock()
 			if entry, ok := m.pending[e.SiteName+"|"+e.TorrentID]; ok {
 				entry.CheckCount++
+				m.db.Model(&model.FreeWaitEntry{}).
+					Where("site_name = ? AND torrent_id = ?", e.SiteName, e.TorrentID).
+					Update("check_count", entry.CheckCount)
 			}
 			m.mu.Unlock()
 		}
@@ -164,4 +223,6 @@ func (m *FreeWaitMonitor) ClearAll() {
 	m.mu.Lock()
 	m.pending = make(map[string]*freeWaitEntry)
 	m.mu.Unlock()
+
+	m.db.Where("1 = 1").Delete(&model.FreeWaitEntry{})
 }

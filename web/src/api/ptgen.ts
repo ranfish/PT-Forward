@@ -1,13 +1,14 @@
 import client from './client'
+import type { ApiResponse } from './types'
 
 export const ptgenApi = {
   query(data: { query: string }) {
-    return client.post('/ptgen/query', data)
+    return client.post<ApiResponse<Record<string, unknown>>>('/ptgen/query', data)
   },
   listCache(params?: { page?: number; size?: number; keyword?: string }) {
-    return client.get('/ptgen/cache', { params })
+    return client.get<ApiResponse<Record<string, unknown>[]>>('/ptgen/cache', { params })
   },
   cleanCache(retainDays?: number) {
-    return client.delete('/ptgen/cache', { params: { retainDays } })
+    return client.delete<ApiResponse<{ deleted: number }>>('/ptgen/cache', { params: { retainDays } })
   },
 }

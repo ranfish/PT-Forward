@@ -779,8 +779,8 @@ func TestGenericAdapter_VerifyExists_SearchError(t *testing.T) {
 	config.Paths.Browse = "/browse.php"
 
 	found, err := a.VerifyExists(context.Background(), config, "42")
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error on search failure")
 	}
 	if found {
 		t.Error("expected found=false on server error")
@@ -1094,7 +1094,7 @@ func TestGenericAdapter_GetPreciseSLData_EmptyHTML(t *testing.T) {
 	}
 }
 
-func TestGenericAdapter_DetectHR_NoSelectors(t *testing.T) {
+func TestGenericAdapter_DetectHR_NoConfig(t *testing.T) {
 	a := NewGenericAdapter("generic", NewHTTPDoer(), zap.NewNop())
 
 	result, err := a.DetectHR(context.Background(), &model.SiteConfig{}, "1")
@@ -1102,7 +1102,7 @@ func TestGenericAdapter_DetectHR_NoSelectors(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result.HasHR {
-		t.Error("expected HasHR=false with no selectors")
+		t.Error("expected HasHR=false with no config")
 	}
 }
 
@@ -1127,10 +1127,11 @@ func TestGenericAdapter_DetectHR_MultiplePatterns(t *testing.T) {
 		html   string
 		wantHR bool
 	}{
-		{"hit and run", `<html>hit and run policy</html>`, true},
-		{"hit&run", `<html>hit&run enabled</html>`, true},
-		{"h&r", `<html>this is h&r torrent</html>`, true},
-		{"考核", `<html>考核期</html>`, true},
+		{"class hitandrun", `<html><img class="hitandrun" src="x.gif" /></html>`, true},
+		{"class hitandrun single quote", `<html><img class='hitandrun' src="x.gif" /></html>`, true},
+		{"hit and run keyword no match", `<html>hit and run policy</html>`, false},
+		{"hit&run keyword no match", `<html>hit&run enabled</html>`, false},
+		{"考核 keyword no match", `<html>考核期</html>`, false},
 		{"no hr", `<html>normal torrent</html>`, false},
 	}
 
@@ -1144,9 +1145,8 @@ func TestGenericAdapter_DetectHR_MultiplePatterns(t *testing.T) {
 			doer := &HTTPDoer{Client: srv.Client()}
 			a := NewGenericAdapter("generic", doer, zap.NewNop())
 
-			config := &model.SiteConfig{Domain: srv.URL}
-			config.Paths.Detail = "/details?id={id}"
-			config.HR.Selectors = []string{"hitandrun"}
+	config := &model.SiteConfig{Domain: srv.URL}
+	config.Paths.Detail = "/details?id={id}"
 
 			result, err := a.DetectHR(context.Background(), config, "1")
 			if err != nil {
@@ -1170,7 +1170,6 @@ func TestGenericAdapter_DetectHR_CustomSeedTime(t *testing.T) {
 
 	config := &model.SiteConfig{Domain: srv.URL}
 	config.Paths.Detail = "/details?id={id}"
-	config.HR.Selectors = []string{"hitandrun"}
 	config.HR.DefaultSeedTimeH = 120
 
 	result, err := a.DetectHR(context.Background(), config, "1")

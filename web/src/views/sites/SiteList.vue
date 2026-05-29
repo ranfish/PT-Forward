@@ -1,29 +1,56 @@
 <template>
   <div>
     <div style="margin-bottom: 16px; display: flex; justify-content: space-between">
-      <a-space>
-        <a-input-search
+      <a-space wrap>
+        <a-input
           v-model:value="searchText"
           :placeholder="t('common.search')"
-          style="width: 240px"
-          @search="pagination.fetch(1)"
+          style="width: 200px"
+          allow-clear
         />
+        <a-select v-model:value="filters.enabled" :placeholder="t('site.filterEnabled')" style="width: 110px" allow-clear>
+          <a-select-option value="true">{{ t('site.filterEnabledOnly') }}</a-select-option>
+          <a-select-option value="false">{{ t('site.filterDisabledOnly') }}</a-select-option>
+        </a-select>
+        <a-select v-model:value="filters.isSource" :placeholder="t('site.filterSource')" style="width: 110px" allow-clear>
+          <a-select-option value="true">{{ t('site.filterYes') }}</a-select-option>
+          <a-select-option value="false">{{ t('site.filterNo') }}</a-select-option>
+        </a-select>
+        <a-select v-model:value="filters.isTarget" :placeholder="t('site.filterTarget')" style="width: 110px" allow-clear>
+          <a-select-option value="true">{{ t('site.filterYes') }}</a-select-option>
+          <a-select-option value="false">{{ t('site.filterNo') }}</a-select-option>
+        </a-select>
+        <a-button :loading="syncing" @click="syncAllStats">{{ t('site.syncAllStats') }}</a-button>
+        <template v-if="selectedRowKeys.length > 0">
+          <a-divider type="vertical" />
+          <a-tag color="blue" closable @close="selectedRowKeys = []">{{ t('site.selectedCount', { count: selectedRowKeys.length }) }}</a-tag>
+          <a-button size="small" @click="batchUpdate('enabled', true)">{{ t('site.batchEnable') }}</a-button>
+          <a-button size="small" @click="batchUpdate('enabled', false)">{{ t('site.batchDisable') }}</a-button>
+          <a-button size="small" @click="batchUpdate('is_source', true)">{{ t('site.batchSetSource') }}</a-button>
+          <a-button size="small" @click="batchUpdate('is_source', false)">{{ t('site.batchUnsetSource') }}</a-button>
+          <a-button size="small" @click="batchUpdate('is_target', true)">{{ t('site.batchSetTarget') }}</a-button>
+          <a-button size="small" @click="batchUpdate('is_target', false)">{{ t('site.batchUnsetTarget') }}</a-button>
+          <a-button size="small" @click="batchUpdate('participate_auto_publish', true)">{{ t('site.batchSetPublish') }}</a-button>
+          <a-button size="small" @click="batchUpdate('participate_auto_publish', false)">{{ t('site.batchUnsetPublish') }}</a-button>
+        </template>
       </a-space>
+      <a-button type="primary" @click="openCreateModal">{{ t('common.create') }}</a-button>
     </div>
 
     <a-table
       :columns="columns"
-      :data-source="pagination.data.value"
-      :loading="pagination.loading.value"
+      :data-source="filteredData"
+      :loading="loading"
+      :row-selection="{ selectedRowKeys, onChange: onSelectionChange }"
       :pagination="{
-        current: pagination.currentPage.value,
-        pageSize: pagination.pageSize.value,
-        total: pagination.total.value,
+        current: currentPage,
+        pageSize: pageSize,
+        total: filteredData.length,
         showSizeChanger: true,
         showTotal: (total: number) => t('common.totalCount', { count: total }),
       }"
       row-key="id"
-      @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
+      @change="(pag: { current: number; pageSize: number }) => { currentPage = pag.current; pageSize = pag.pageSize }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'enabled'">
@@ -44,11 +71,38 @@
             :text="hasAnyCredential(record) ? t('common.configured') : t('common.notConfigured')"
           />
         </template>
+        <template v-if="column.key === 'username'">
+          <span>{{ record.username || '-' }}</span>
+        </template>
+        <template v-if="column.key === 'userClass'">
+          <span>{{ record.userClass || '-' }}</span>
+        </template>
+        <template v-if="column.key === 'uploadBytes'">
+          <span>{{ formatBytes(Number(record.uploadBytes)) }}</span>
+        </template>
+        <template v-if="column.key === 'downloadBytes'">
+          <span>{{ formatBytes(Number(record.downloadBytes)) }}</span>
+        </template>
+        <template v-if="column.key === 'ratio'">
+          <span>{{ Number(record.uploadBytes) > 0 && Number(record.downloadBytes) === 0 ? '∞' : (record.ratio ? record.ratio.toFixed(2) : '-') }}</span>
+        </template>
+        <template v-if="column.key === 'seedingCount'">
+          <span>{{ record.seedingCount || '-' }}</span>
+        </template>
+        <template v-if="column.key === 'bonusPoints'">
+          <span>{{ record.bonusPoints ? Number(record.bonusPoints).toLocaleString('en', { maximumFractionDigits: 0 }) : '-' }}</span>
+        </template>
+        <template v-if="column.key === 'syncTime'">
+          <span>{{ formatTime(record.statsSyncedAt) }}</span>
+        </template>
         <template v-if="column.key === 'actions'">
           <a-space>
             <a-button type="link" size="small" @click="$router.push(`/sites/${record.id}`)">{{ t('common.detail') }}</a-button>
             <a-button type="link" size="small" @click="openModal(record)">{{ t('common.edit') }}</a-button>
             <a-button type="link" size="small" @click="testConnection(record.id)">{{ t('common.test') }}</a-button>
+            <a-popconfirm :title="t('common.deleteConfirm')" @confirm="deleteSite(record.id)">
+              <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
+            </a-popconfirm>
           </a-space>
         </template>
       </template>
@@ -56,29 +110,49 @@
 
     <a-modal
       v-model:open="modalVisible"
-      :title="t('site.editSite')"
+      :title="isCreateMode ? t('site.addSite') : t('site.editSite')"
       :confirm-loading="submitting"
       width="640px"
       @ok="handleSubmit"
     >
       <a-form :model="form" layout="vertical">
-        <a-form-item :label="t('site.mirrorDomain')" name="mirrorDomain">
-          <a-input v-model:value="form.mirrorDomain" :placeholder="t('site.mirrorDomainPlaceholder')" />
-        </a-form-item>
+        <template v-if="isCreateMode">
+          <a-form-item :label="t('site.siteName')" name="name" :rules="[{ required: true, message: t('site.nameRequired') }]">
+            <a-input v-model:value="form.name" :placeholder="t('site.siteName')" />
+          </a-form-item>
+          <a-form-item :label="t('site.domain')" name="domain">
+            <a-input v-model:value="form.domain" :placeholder="t('site.domainPlaceholder')" />
+          </a-form-item>
+          <a-form-item :label="t('site.baseUrl')" name="baseUrl">
+            <a-input v-model:value="form.baseUrl" :placeholder="t('site.baseUrlPlaceholder')" />
+          </a-form-item>
+          <a-form-item :label="t('site.framework')" name="framework">
+            <a-select v-model:value="form.framework" :placeholder="t('site.framework')" allow-clear>
+              <a-select-option value="nexusphp">NexusPHP</a-select-option>
+              <a-select-option value="unit3d">UNIT3D</a-select-option>
+              <a-select-option value="gazelle">Gazelle</a-select-option>
+              <a-select-option value="mteam">M-Team</a-select-option>
+              <a-select-option value="tnode">TNode</a-select-option>
+              <a-select-option value="luminance">Luminance</a-select-option>
+              <a-select-option value="rousi">ROUSI</a-select-option>
+              <a-select-option value="generic">{{ t('site.frameworkGeneric') }}</a-select-option>
+            </a-select>
+          </a-form-item>
+        </template>
         <a-form-item :label="t('site.authType')" name="authType">
           <a-select v-model:value="form.authType" :placeholder="t('site.selectAuthType')">
             <a-select-option value="cookie">Cookie</a-select-option>
-            <a-select-option value="apikey">API Key</a-select-option>
+            <a-select-option value="apikey">{{ t('site.authTypeApiKey') }}</a-select-option>
             <a-select-option value="passkey">Passkey</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item v-if="showCookieField" label="Cookie" name="cookie">
+        <a-form-item v-if="showCookieField" :label="t('sites.cookie')" name="cookie">
           <a-textarea v-model:value="form.cookie" :rows="3" :placeholder="editingSite?.hasCookie ? t('site.placeholderConfigured') : t('site.placeholderCookie')" />
         </a-form-item>
-        <a-form-item v-if="showPasskeyField" label="Passkey" name="passkey">
+        <a-form-item v-if="showPasskeyField" :label="t('sites.passkey')" name="passkey">
           <a-input-password v-model:value="form.passkey" :placeholder="editingSite?.hasPasskey ? t('site.placeholderConfigured') : t('site.placeholderPasskey')" />
         </a-form-item>
-        <a-form-item v-if="showApiKeyField" label="API Key" name="apiKey">
+        <a-form-item v-if="showApiKeyField" :label="t('sites.apiKey')" name="apiKey">
           <a-input-password v-model:value="form.apiKey" :placeholder="editingSite?.hasApiKey ? t('site.placeholderConfigured') : t('site.placeholderApiKey')" />
         </a-form-item>
 
@@ -132,7 +206,7 @@
         </a-form-item>
         <a-form-item :label="t('site.sizeStrategy')" name="sizeStrategy">
           <a-select v-model:value="form.sizeStrategy" :placeholder="t('site.defaultEnclosure')" allow-clear>
-            <a-select-option value="enclosure">Enclosure</a-select-option>
+            <a-select-option value="enclosure">{{ t('site.sizeStrategyEnclosure') }}</a-select-option>
             <a-select-option value="xml_tag">{{ t('site.xmlTag') }}</a-select-option>
             <a-select-option value="desc_regex">{{ t('site.descRegex') }}</a-select-option>
           </a-select>
@@ -153,7 +227,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
-import { usePagination } from '@/composables/usePagination'
+import { formatBytes, formatTime } from '@/utils/format'
 
 const { t } = useI18n()
 
@@ -168,7 +242,6 @@ interface SiteListItem {
   hasCookie: boolean
   hasPasskey: boolean
   hasApiKey: boolean
-  mirrorDomain: string
   authType: string
   cookieCloudSync: boolean
   cookieCloudDomain: string
@@ -179,15 +252,61 @@ interface SiteListItem {
   hashStrategy: string
   sizeStrategy: string
   idStrategy: string
+  username: string
+  userClass: string
+  uploadBytes: string | number
+  downloadBytes: string | number
+  ratio: number
+  bonusPoints: number
+  seedingCount: number
+  statsSyncedAt: string
+  framework: string
+  domain: string
 }
 
+const allSites = ref<SiteListItem[]>([])
+const loading = ref(false)
 const searchText = ref('')
 const modalVisible = ref(false)
 const submitting = ref(false)
+const syncing = ref(false)
 const editingSite = ref<SiteListItem | null>(null)
+const isCreateMode = ref(false)
+const selectedRowKeys = ref<number[]>([])
+const currentPage = ref(1)
+const pageSize = ref(20)
+
+const filters = reactive({
+  enabled: undefined as string | undefined,
+  isSource: undefined as string | undefined,
+  isTarget: undefined as string | undefined,
+})
+
+const filteredData = computed(() => {
+  let data = allSites.value
+  const q = searchText.value.trim().toLowerCase()
+  if (q) {
+    data = data.filter(s => {
+      const name = (s.name || '').toLowerCase()
+      const domain = (s.domain || '').toLowerCase()
+      const username = (s.username || '').toLowerCase()
+      return name.includes(q) || domain.includes(q) || username.includes(q)
+    })
+  }
+  if (filters.enabled === 'true') data = data.filter(s => s.enabled)
+  else if (filters.enabled === 'false') data = data.filter(s => !s.enabled)
+  if (filters.isSource === 'true') data = data.filter(s => s.isSource)
+  else if (filters.isSource === 'false') data = data.filter(s => !s.isSource)
+  if (filters.isTarget === 'true') data = data.filter(s => s.isTarget)
+  else if (filters.isTarget === 'false') data = data.filter(s => !s.isTarget)
+  return data
+})
 
 const form = reactive({
-  mirrorDomain: '',
+  name: '',
+  domain: '',
+  baseUrl: '',
+  framework: '',
   authType: 'cookie',
   cookie: '',
   passkey: '',
@@ -217,16 +336,51 @@ function hasAnyCredential(record: SiteListItem): boolean {
 }
 
 const columns = [
-  { title: t('common.name'), dataIndex: 'name', key: 'name' },
-  { title: t('site.enabledLabel'), key: 'enabled', width: 80, align: 'center' as const },
-  { title: t('site.participateAutoPublishLabel'), key: 'participateAutoPublish', width: 130, align: 'center' as const },
-  { title: t('site.asSource'), key: 'isSource', width: 100, align: 'center' as const },
-  { title: t('site.asTarget'), key: 'isTarget', width: 110, align: 'center' as const },
-  { title: t('site.credentialStatus'), key: 'hasCookie', width: 100 },
-  { title: t('common.actions'), key: 'actions', width: 180 },
+  { title: t('common.name'), dataIndex: 'name', key: 'name', width: 100 },
+  { title: t('site.enabledLabel'), key: 'enabled', width: 70, align: 'center' as const },
+  { title: t('site.participateAutoPublishLabel'), key: 'participateAutoPublish', width: 120, align: 'center' as const },
+  { title: t('site.asSource'), key: 'isSource', width: 80, align: 'center' as const },
+  { title: t('site.asTarget'), key: 'isTarget', width: 80, align: 'center' as const },
+  { title: t('site.credentialStatus'), key: 'hasCookie', width: 90 },
+  { title: t('site.username'), key: 'username', width: 90 },
+  { title: t('site.userClass'), key: 'userClass', width: 90 },
+  { title: t('site.uploadBytes'), key: 'uploadBytes', width: 100 },
+  { title: t('site.downloadBytes'), key: 'downloadBytes', width: 100 },
+  { title: t('site.ratio'), key: 'ratio', width: 70 },
+  { title: t('site.seedingCount'), key: 'seedingCount', width: 80 },
+  { title: t('site.bonusPoints'), key: 'bonusPoints', width: 100 },
+  { title: t('site.syncTime'), key: 'syncTime', width: 120 },
+  { title: t('common.actions'), key: 'actions', width: 240 },
 ]
 
-const pagination = usePagination((page, size) => sitesApi.list(page, size, searchText.value))
+async function fetchAll() {
+  loading.value = true
+  try {
+    const resp = await sitesApi.list(1, 200)
+    allSites.value = (resp.data?.data?.items || []) as unknown as SiteListItem[]
+  } catch {
+    allSites.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+function onSelectionChange(keys: number[]) {
+  selectedRowKeys.value = keys
+}
+
+async function batchUpdate(field: string, value: boolean) {
+  if (selectedRowKeys.value.length === 0) return
+  try {
+    const resp = await sitesApi.batchUpdate(selectedRowKeys.value, { [field]: value })
+    const updated = resp.data?.data?.updated ?? 0
+    message.success(t('site.batchUpdateSuccess', { count: updated }))
+    selectedRowKeys.value = []
+    await fetchAll()
+  } catch (e: unknown) {
+    message.error(t('site.batchUpdateFailed', { error: e instanceof Error ? e.message : String(e) }))
+  }
+}
 
 async function toggleField(record: SiteListItem, field: string, value: boolean) {
   try {
@@ -238,9 +392,13 @@ async function toggleField(record: SiteListItem, field: string, value: boolean) 
 }
 
 function openModal(record: SiteListItem) {
+  isCreateMode.value = false
   editingSite.value = record
   Object.assign(form, {
-    mirrorDomain: record.mirrorDomain || '',
+    name: record.name || '',
+    domain: record.domain || '',
+    baseUrl: (record as Record<string, string | number | boolean>).baseUrl as string || '',
+    framework: record.framework || '',
     authType: record.authType || 'cookie',
     cookie: '',
     passkey: '',
@@ -262,14 +420,52 @@ function openModal(record: SiteListItem) {
   modalVisible.value = true
 }
 
+function openCreateModal() {
+  isCreateMode.value = true
+  editingSite.value = null
+  Object.assign(form, {
+    name: '',
+    domain: '',
+    baseUrl: '',
+    framework: '',
+    authType: 'cookie',
+    cookie: '',
+    passkey: '',
+    apiKey: '',
+    isSource: false,
+    isTarget: false,
+    participateAutoPublish: true,
+    enabled: true,
+    cookieCloudSync: false,
+    cookieCloudDomain: '',
+    overrideRssUrl: '',
+    overrideSavePath: '',
+    proxyUrl: '',
+    skipSslVerify: false,
+    hashStrategy: '',
+    sizeStrategy: '',
+    idStrategy: '',
+  })
+  modalVisible.value = true
+}
+
 async function handleSubmit() {
-  if (!editingSite.value) return
   submitting.value = true
   try {
-    await sitesApi.update(editingSite.value.id, form)
+    if (isCreateMode.value) {
+      await sitesApi.create(form)
+    } else if (editingSite.value) {
+      const payload: Record<string, unknown> = {}
+      const skipIfEmpty = ['name', 'domain', 'baseUrl', 'framework']
+      for (const [key, value] of Object.entries(form)) {
+        if (skipIfEmpty.includes(key) && !value) continue
+        payload[key] = value
+      }
+      await sitesApi.update(editingSite.value.id, payload)
+    }
     message.success(t('common.operationSuccess'))
     modalVisible.value = false
-    pagination.fetch()
+    await fetchAll()
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   } finally {
@@ -277,11 +473,21 @@ async function handleSubmit() {
   }
 }
 
+async function deleteSite(id: number) {
+  try {
+    await sitesApi.delete(id)
+    message.success(t('common.deleted'))
+    await fetchAll()
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  }
+}
+
 async function testConnection(id: number) {
   try {
     const resp = await sitesApi.testConnection(id)
     const data = resp.data?.data
-    if (data?.ok) {
+    if (data?.success) {
       message.success(data.message || t('site.connectionTestSuccess'))
     } else {
       message.warning(data?.message || t('common.operationFailed'))
@@ -291,5 +497,26 @@ async function testConnection(id: number) {
   }
 }
 
-onMounted(() => pagination.fetch())
+async function syncAllStats() {
+  syncing.value = true
+  try {
+    const resp = await sitesApi.syncAllStats()
+    const data = resp.data?.data as Record<string, unknown>
+    const synced = (data?.synced as number) ?? 0
+    const failed = (data?.failed as number) ?? 0
+    const failedSites = (data?.failedSites as string[]) ?? []
+    if (failed > 0) {
+      message.warning(`${t('site.syncAllStatsSuccess', { synced, failed })} ${failedSites.join(', ')}`)
+    } else {
+      message.success(t('site.syncAllStatsSuccess', { synced, failed }))
+    }
+    await fetchAll()
+  } catch (e: unknown) {
+    message.error(t('site.syncAllStatsFailed', { error: e instanceof Error ? e.message : String(e) }))
+  } finally {
+    syncing.value = false
+  }
+}
+
+onMounted(() => fetchAll())
 </script>

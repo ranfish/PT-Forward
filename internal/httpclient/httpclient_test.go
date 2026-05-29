@@ -12,12 +12,13 @@ import (
 
 func TestDomainRateLimiter_BasicAcquire(t *testing.T) {
 	limiter := NewDomainRateLimiter(0)
-	limiter.SetDomainConfig("example.com", DomainLimitConfig{MaxReqs: 3, WindowSecs: 1})
+	limiter.SetDomainConfig("example.com", DomainLimitConfig{MaxReqs: 3, WindowSecs: 1, MaxConcurrent: 5})
 
 	for i := 0; i < 3; i++ {
 		if err := limiter.Acquire(context.Background(), "example.com"); err != nil {
 			t.Fatalf("acquire %d failed: %v", i, err)
 		}
+		limiter.Release("example.com")
 	}
 }
 
@@ -218,7 +219,7 @@ func TestTransport_Integration(t *testing.T) {
 
 func TestTransport_ConcurrentRequests(t *testing.T) {
 	limiter := NewDomainRateLimiter(0)
-	limiter.SetDomainConfig("concurrent.local", DomainLimitConfig{MaxReqs: 50, WindowSecs: 1})
+	limiter.SetDomainConfig("concurrent.local", DomainLimitConfig{MaxReqs: 50, WindowSecs: 1, MaxConcurrent: 20})
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
@@ -257,10 +258,68 @@ func TestTransport_ConcurrentRequests(t *testing.T) {
 	}
 }
 
+func TestDomainRateLimiter_ConcurrencyLimit(t *testing.T) {
+	limiter := NewDomainRateLimiter(0)
+	limiter.SetDomainConfig("limited.com", DomainLimitConfig{MaxReqs: 100, WindowSecs: 60, MaxConcurrent: 2})
+
+	if err := limiter.Acquire(context.Background(), "limited.com"); err != nil {
+		t.Fatalf("first acquire failed: %v", err)
+	}
+	if err := limiter.Acquire(context.Background(), "limited.com"); err != nil {
+		t.Fatalf("second acquire failed: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	err := limiter.Acquire(ctx, "limited.com")
+	if err == nil {
+		t.Error("expected timeout error for third acquire with MaxConcurrent=2")
+		limiter.Release("limited.com")
+	}
+
+	limiter.Release("limited.com")
+	limiter.Release("limited.com")
+
+	if err := limiter.Acquire(context.Background(), "limited.com"); err != nil {
+		t.Fatalf("acquire after release failed: %v", err)
+	}
+	limiter.Release("limited.com")
+}
+
+func TestDomainRateLimiter_ThunderingHerdFix(t *testing.T) {
+	limiter := NewDomainRateLimiter(0)
+	limiter.SetDomainConfig("herd.com", DomainLimitConfig{MaxReqs: 1, WindowSecs: 1, MaxConcurrent: 5})
+
+	if err := limiter.Acquire(context.Background(), "herd.com"); err != nil {
+		t.Fatalf("first acquire failed: %v", err)
+	}
+
+	limiter.Freeze("herd.com", 50*time.Millisecond)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- limiter.Acquire(context.Background(), "herd.com")
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("acquire after freeze failed: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("acquire hung - thundering herd not fixed")
+	}
+
+	limiter.Release("herd.com")
+	limiter.Release("herd.com")
+}
+
 func TestGetDomainStatuses(t *testing.T) {
 	limiter := NewDomainRateLimiter(0)
 	limiter.Freeze("a.com", 1*time.Hour)
 	limiter.Acquire(context.Background(), "b.com")
+	limiter.Release("b.com")
 
 	statuses := limiter.GetDomainStatuses()
 	if !statuses["a.com"].Frozen {

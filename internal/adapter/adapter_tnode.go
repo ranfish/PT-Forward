@@ -8,12 +8,25 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
+)
+
+var (
+	reTNodeTitle     = regexp.MustCompile(`<title>([^<]+)</title>`)
+	reTNodeInfoHash  = regexp.MustCompile(`(?i)info_hash.*?<td[^>]*>([a-fA-F0-9]{40})`)
+	reTNodeSize      = regexp.MustCompile(`(?i)(?:大小|Size|体积)[^<]*<[^>]*>([^<]+)`)
+	reTNodeCategory  = regexp.MustCompile(`(?i)(?:分类|Category|类型)[^<]*<[^>]*>([^<]+)`)
+	reTNodeDesc      = regexp.MustCompile(`(?s)(?:简介|Description|描述)</h\d?>.*?<div[^>]*>(.*?)</div>`)
+	reTNodeSeeders   = regexp.MustCompile(`(?i)(?:做种|Seeders?|保种)[^<]*<[^>]*>(\d+)`)
+	reTNodeLeechers  = regexp.MustCompile(`(?i)(?:下载|Leechers?)[^<]*<[^>]*>(\d+)`)
+	reTNodeCSRFMeta  = regexp.MustCompile(`<meta\s+name="x-csrf-token"\s+content="([^"]+)"`)
+	reTNodeCSRFAlt   = regexp.MustCompile(`(?i)csrf[_-]?token["\s:=]+["']?([a-zA-Z0-9_-]+)`)
 )
 
 type TNodeAdapter struct {
@@ -45,7 +58,7 @@ func (a *TNodeAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 	if err != nil {
 		return nil, downloadError("下载失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode == http.StatusForbidden {
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
@@ -75,39 +88,39 @@ func (a *TNodeAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return nil, networkError("请求详情页失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
 	if err != nil {
-		return nil, networkError("读取响应失败", err)
+		return nil, err
 	}
 
 	html := string(body)
 	detail := &model.TorrentDetail{}
 
-	if m := regexp.MustCompile(`<title>([^<]+)</title>`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reTNodeTitle.FindStringSubmatch(html); len(m) > 1 {
 		detail.Title = strings.TrimSpace(m[1])
 	}
 
-	if m := regexp.MustCompile(`(?i)info_hash.*?<td[^>]*>([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reTNodeInfoHash.FindStringSubmatch(html); len(m) > 1 {
 		detail.InfoHash = strings.ToLower(m[1])
 	}
 
-	if m := regexp.MustCompile(`(?i)(?:大小|Size|体积)[^<]*<[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reTNodeSize.FindStringSubmatch(html); len(m) > 1 {
 		detail.Size = parseSizeStr(m[1])
 	}
 
-	if m := regexp.MustCompile(`(?i)(?:分类|Category|类型)[^<]*<[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reTNodeCategory.FindStringSubmatch(html); len(m) > 1 {
 		detail.Category = strings.TrimSpace(m[1])
 	}
 
 	detail.Tags = extractTags(html)
 
-	descRe := regexp.MustCompile(`(?s)(?:简介|Description|描述)</h\d?>.*?<div[^>]*>(.*?)</div>`)
+	descRe := reTNodeDesc
 	if m := descRe.FindStringSubmatch(html); len(m) > 1 {
 		detail.Description = strings.TrimSpace(m[1])
 	}
@@ -128,7 +141,7 @@ func (a *TNodeAdapter) DetectDiscount(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, networkError("请求优惠信息失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -168,7 +181,7 @@ func (a *TNodeAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 	if err != nil {
 		return nil, networkError("请求HR信息失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -176,15 +189,68 @@ func (a *TNodeAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, t
 	}
 	html := strings.ToLower(string(body))
 
-	hasHR := strings.Contains(html, "hit and run") ||
-		strings.Contains(html, "hit&run") ||
-		strings.Contains(html, "h&r") ||
-		strings.Contains(html, "考核") ||
-		strings.Contains(html, "hitandrun")
+	hasHR := detectHRFromHTML(html)
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
 		result.SeedTimeH = config.HR.SeedTimeH()
+	}
+	return result, nil
+}
+
+func (a *TNodeAdapter) DetectHRAndDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, *model.DiscountResult, error) {
+	u := buildDomainURL(config, "/details.php", torrentID, "")
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, networkError("构造请求失败", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, nil, networkError("请求种子页面失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, nil, err
+	}
+	html := strings.ToLower(string(body))
+
+	hrResult := &model.HRResult{HasHR: detectHRFromHTML(html)}
+	if hrResult.HasHR {
+		hrResult.SeedTimeH = config.HR.SeedTimeH()
+	}
+
+	var discResult *model.DiscountResult
+	if strings.Contains(html, "pro_free2up") || strings.Contains(html, "2x免费") {
+		discResult = &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}
+	} else if strings.Contains(html, "pro_2up") || strings.Contains(html, "2x上传") {
+		discResult = &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}
+	} else if strings.Contains(html, "pro_free") || strings.Contains(html, "免费") {
+		discResult = &model.DiscountResult{Level: model.DiscountFree}
+	} else if strings.Contains(html, "pro_50p") || strings.Contains(html, "50%") {
+		discResult = &model.DiscountResult{Level: model.DiscountPercent50}
+	} else if strings.Contains(html, "pro_30p") || strings.Contains(html, "30%") {
+		discResult = &model.DiscountResult{Level: model.DiscountPercent30}
+	} else {
+		discResult = &model.DiscountResult{Level: model.DiscountNone}
+	}
+
+	return hrResult, discResult, nil
+}
+
+func (a *TNodeAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
+	result := make(map[string]*model.SLData, len(torrentIDs))
+	for _, id := range torrentIDs {
+		sl, err := a.GetPreciseSLData(ctx, config, id)
+		if err != nil {
+			a.logger.Warn("获取SL数据失败", zap.String("torrentID", id), zap.Error(err))
+			continue
+		}
+		result[id] = sl
 	}
 	return result, nil
 }
@@ -202,7 +268,7 @@ func (a *TNodeAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -211,10 +277,10 @@ func (a *TNodeAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteC
 	html := string(body)
 	sl := &model.SLData{}
 
-	if m := regexp.MustCompile(`(?i)(?:做种|Seeders?|保种)[^<]*<[^>]*>(\d+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reTNodeSeeders.FindStringSubmatch(html); len(m) > 1 {
 		sl.Seeders, _ = strconv.Atoi(m[1])
 	}
-	if m := regexp.MustCompile(`(?i)(?:下载|Leechers?)[^<]*<[^>]*>(\d+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reTNodeLeechers.FindStringSubmatch(html); len(m) > 1 {
 		sl.Leechers, _ = strconv.Atoi(m[1])
 	}
 
@@ -348,7 +414,7 @@ func (a *TNodeAdapter) UploadTorrent(ctx context.Context, config *model.SiteConf
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -406,7 +472,7 @@ func (a *TNodeAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return "", networkError("请求页面失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -414,13 +480,11 @@ func (a *TNodeAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteCon
 	}
 	html := string(body)
 
-	re := regexp.MustCompile(`<meta\s+name="x-csrf-token"\s+content="([^"]+)"`)
-	if m := re.FindStringSubmatch(html); len(m) > 1 {
+	if m := reTNodeCSRFMeta.FindStringSubmatch(html); len(m) > 1 {
 		return m[1], nil
 	}
 
-	re2 := regexp.MustCompile(`(?i)csrf[_-]?token["\s:=]+["']?([a-zA-Z0-9_-]+)`)
-	if m := re2.FindStringSubmatch(html); len(m) > 1 {
+	if m := reTNodeCSRFAlt.FindStringSubmatch(html); len(m) > 1 {
 		return m[1], nil
 	}
 
@@ -432,17 +496,124 @@ func buildDomainURL(config *model.SiteConfig, path, torrentID, passkey string) s
 	if !strings.HasPrefix(u, "http") {
 		u = "https://" + u
 	}
-	u += path + "?id=" + torrentID
+	u += path + "?id=" + url.QueryEscape(torrentID)
 	if passkey != "" {
-		u += "&passkey=" + passkey
+		u += "&passkey=" + url.QueryEscape(passkey)
 	}
 	return u
+}
+
+func (a *TNodeAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	baseURL := resolveBaseURL(config)
+
+	detailURL := baseURL + "/api/consumer/fetchSelfDetail"
+	req, err := http.NewRequestWithContext(ctx, "GET", detailURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("构造请求失败: %w", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("请求用户详情失败: %w", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 200 {
+			snippet = snippet[:200]
+		}
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet)
+	}
+
+	var detailResp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			ID                   int    `json:"id"`
+			Name                 string `json:"name"`
+			Level                int    `json:"level"`
+			Bonus                int64  `json:"bonus"`
+			UploadSize           int64  `json:"uploadSize"`
+			DownloadSize         int64  `json:"downloadSize"`
+			PromotionUploadSize  int64  `json:"promotionUploadSize"`
+			PromotionDownloadSize int64 `json:"promotionDownloadSize"`
+			SeedCost             int64  `json:"seedCost"`
+			OwnerValidTorrentNum int    `json:"ownerValidTorrentNum"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &detailResp); err != nil {
+		return nil, fmt.Errorf("解析用户详情失败: %w", err)
+	}
+	if !detailResp.Success {
+		return nil, fmt.Errorf("API 返回失败: success=false")
+	}
+
+	stats := &model.UserStatsResult{
+		Username:      detailResp.Data.Name,
+		UploadBytes:   detailResp.Data.UploadSize,
+		DownloadBytes: detailResp.Data.DownloadSize,
+		BonusPoints:   float64(detailResp.Data.Bonus),
+	}
+	if detailResp.Data.DownloadSize > 0 {
+		stats.Ratio = float64(detailResp.Data.UploadSize) / float64(detailResp.Data.DownloadSize)
+	}
+
+	levelNames := map[int]string{
+		0: "乱民", 1: "小卒", 2: "教谕", 3: "登仕郎", 4: "修职郎",
+		5: "文林郎", 6: "忠武校尉", 7: "承信将军", 8: "武毅将军",
+		9: "武节将军", 10: "显威将军", 11: "宣武将军",
+	}
+	if name, ok := levelNames[detailResp.Data.Level]; ok {
+		stats.UserClass = name
+	}
+
+	seedBody, seedErr := a.fetchTNodeSeedInfo(ctx, config, baseURL)
+	if seedErr == nil {
+		var seedResp struct {
+			Success bool `json:"success"`
+			Data    struct {
+				Num      int   `json:"num"`
+				FileSize int64 `json:"fileSize"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(seedBody, &seedResp) == nil && seedResp.Success {
+			stats.SeedingCount = seedResp.Data.Num
+			stats.SeedingSize = seedResp.Data.FileSize
+		}
+	}
+
+	return stats, nil
+}
+
+func (a *TNodeAdapter) fetchTNodeSeedInfo(ctx context.Context, config *model.SiteConfig, baseURL string) ([]byte, error) {
+	seedURL := baseURL + "/api/userTorrent/fetchSeedTorrentInfo"
+	req, err := http.NewRequestWithContext(ctx, "POST", seedURL, strings.NewReader("{}"))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { drainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return readBody(resp)
 }
 
 func (a *TNodeAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
 	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
 	if err != nil {
-		return false, nil
+		return false, fmt.Errorf("search for verify exists %q: %w", torrentID, err)
 	}
 	for _, r := range results {
 		if r.TorrentID == torrentID {

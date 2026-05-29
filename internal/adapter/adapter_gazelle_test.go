@@ -501,7 +501,7 @@ func TestGazelle_DetectDiscount_None(t *testing.T) {
 
 func TestGazelle_DetectHR_Found(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>Hit and Run rules apply</body></html>`))
+		_, _ = w.Write([]byte(`<html><body><span class="hitandrun">H&R</span></body></html>`))
 	}))
 	defer srv.Close()
 

@@ -1,12 +1,15 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/rss"
 	"go.uber.org/zap"
@@ -40,9 +43,7 @@ type createRSSRequest struct {
 	UploadLimitKB   int64 `json:"uploadLimitKb,omitempty"`
 	DownloadLimitKB int64 `json:"downloadLimitKb,omitempty"`
 
-	Tags     []string `json:"tags,omitempty"`
-	IsSource bool     `json:"isSource"`
-	IsTarget bool     `json:"isTarget"`
+	Tags []string `json:"tags,omitempty"`
 
 	ScrapeFree bool `json:"scrapeFree"`
 	ScrapeHR   bool `json:"scrapeHr"`
@@ -55,6 +56,45 @@ type createRSSRequest struct {
 
 	AutoReseed      bool     `json:"autoReseed"`
 	ReseedClientIDs []string `json:"reseedClientIds,omitempty"`
+
+	SkipSameSize          bool   `json:"skipSameSize"`
+	SkipSameSizeWindowMin int    `json:"skipSameSizeWindowMin"`
+	SkipSameSizeStrict    bool   `json:"skipSameSizeStrict"`
+	AddCountPerHour       int    `json:"addCountPerHour"`
+
+	UseCustomRegex bool   `json:"useCustomRegex"`
+	RegexStr       string `json:"regexStr,omitempty"`
+	ReplaceStr     string `json:"replaceStr,omitempty"`
+
+	FreeWaitEnabled    bool `json:"freeWaitEnabled"`
+	FreeWaitMaxWaitSec int  `json:"freeWaitMaxWaitSec"`
+	FreeWaitRecheckSec int  `json:"freeWaitRecheckSec"`
+	FreeWaitMinRemain  int  `json:"freeWaitMinRemain"`
+
+	RecheckEnabled   bool `json:"recheckEnabled"`
+	RecheckIntervalH int  `json:"recheckIntervalH"`
+	RecheckMaxCount  int  `json:"recheckMaxCount"`
+	RecheckMaxAgeH   int  `json:"recheckMaxAgeH"`
+
+	FeasibilityEnabled    bool    `json:"feasibilityEnabled"`
+	FeasibilitySpeedLimit float64 `json:"feasibilitySpeedLimit"`
+	FeasibilitySizeLimit  float64 `json:"feasibilitySizeLimit"`
+	FeasibilitySafety     float64 `json:"feasibilitySafety"`
+
+	DiskBudgetEnabled bool    `json:"diskBudgetEnabled"`
+	DiskBudgetMinGB   float64 `json:"diskBudgetMinGB"`
+
+	CandidateClients []string            `json:"candidateClients,omitempty"`
+	ClientSelection  model.ClientSelectionMode `json:"clientSelection,omitempty"`
+
+	DiskGuardEnabled   bool    `json:"diskGuardEnabled"`
+	DiskGuardThreshold float64 `json:"diskGuardThreshold"`
+
+	LifecyclePauseSeeders    int `json:"lifecyclePauseSeeders"`
+	LifecycleDeleteSeeders   int `json:"lifecycleDeleteSeeders"`
+	LifecycleDeleteSeedHours int `json:"lifecycleDeleteSeedHours"`
+
+	Conditions []model.RuleCondition `json:"conditions,omitempty"`
 }
 
 type updateRSSRequest struct {
@@ -86,6 +126,43 @@ type updateRSSRequest struct {
 
 	AutoReseed      *bool     `json:"autoReseed,omitempty"`
 	ReseedClientIDs *[]string `json:"reseedClientIds,omitempty"`
+
+	SkipSameSize          *bool   `json:"skipSameSize,omitempty"`
+	SkipSameSizeWindowMin *int    `json:"skipSameSizeWindowMin,omitempty"`
+	SkipSameSizeStrict    *bool   `json:"skipSameSizeStrict,omitempty"`
+	AddCountPerHour       *int    `json:"addCountPerHour,omitempty"`
+
+	UseCustomRegex *bool   `json:"useCustomRegex,omitempty"`
+	RegexStr       *string `json:"regexStr,omitempty"`
+	ReplaceStr     *string `json:"replaceStr,omitempty"`
+
+	FreeWaitEnabled    *bool `json:"freeWaitEnabled,omitempty"`
+	FreeWaitMaxWaitSec *int  `json:"freeWaitMaxWaitSec,omitempty"`
+	FreeWaitRecheckSec *int  `json:"freeWaitRecheckSec,omitempty"`
+	FreeWaitMinRemain  *int  `json:"freeWaitMinRemain,omitempty"`
+
+	RecheckEnabled   *bool `json:"recheckEnabled,omitempty"`
+	RecheckIntervalH *int  `json:"recheckIntervalH,omitempty"`
+	RecheckMaxCount  *int  `json:"recheckMaxCount,omitempty"`
+	RecheckMaxAgeH   *int  `json:"recheckMaxAgeH,omitempty"`
+
+	FeasibilityEnabled    *bool    `json:"feasibilityEnabled,omitempty"`
+	FeasibilitySpeedLimit *float64 `json:"feasibilitySpeedLimit,omitempty"`
+	FeasibilitySizeLimit  *float64 `json:"feasibilitySizeLimit,omitempty"`
+	FeasibilitySafety     *float64 `json:"feasibilitySafety,omitempty"`
+
+	DiskBudgetEnabled *bool    `json:"diskBudgetEnabled,omitempty"`
+	DiskBudgetMinGB   *float64 `json:"diskBudgetMinGB,omitempty"`
+
+	CandidateClients *[]string            `json:"candidateClients,omitempty"`
+	ClientSelection  *model.ClientSelectionMode `json:"clientSelection,omitempty"`
+
+	DiskGuardEnabled   *bool    `json:"diskGuardEnabled,omitempty"`
+	DiskGuardThreshold *float64 `json:"diskGuardThreshold,omitempty"`
+
+	LifecyclePauseSeeders    *int `json:"lifecyclePauseSeeders,omitempty"`
+	LifecycleDeleteSeeders   *int `json:"lifecycleDeleteSeeders,omitempty"`
+	LifecycleDeleteSeedHours *int `json:"lifecycleDeleteSeedHours,omitempty"`
 }
 
 type rssResponse struct {
@@ -125,7 +202,53 @@ type rssResponse struct {
 	SkipSameSize    bool `json:"skipSameSize"`
 	AddCountPerHour int  `json:"addCountPerHour"`
 
+	UseCustomRegex bool   `json:"useCustomRegex"`
+	RegexStr       string `json:"regexStr"`
+	ReplaceStr     string `json:"replaceStr"`
+
+	FreeWaitEnabled    bool `json:"freeWaitEnabled"`
+	FreeWaitMaxWaitSec int  `json:"freeWaitMaxWaitSec"`
+	FreeWaitRecheckSec int  `json:"freeWaitRecheckSec"`
+	FreeWaitMinRemain  int  `json:"freeWaitMinRemain"`
+
+	RecheckEnabled   bool `json:"recheckEnabled"`
+	RecheckIntervalH int  `json:"recheckIntervalH"`
+	RecheckMaxCount  int  `json:"recheckMaxCount"`
+	RecheckMaxAgeH   int  `json:"recheckMaxAgeH"`
+
+	FeasibilityEnabled    bool    `json:"feasibilityEnabled"`
+	FeasibilitySpeedLimit float64 `json:"feasibilitySpeedLimit"`
+	FeasibilitySizeLimit  float64 `json:"feasibilitySizeLimit"`
+	FeasibilitySafety     float64 `json:"feasibilitySafety"`
+
+	SkipSameSizeWindowMin int  `json:"skipSameSizeWindowMin"`
+	SkipSameSizeStrict    bool `json:"skipSameSizeStrict"`
+
+	DiskBudgetEnabled bool    `json:"diskBudgetEnabled"`
+	DiskBudgetMinGB   float64 `json:"diskBudgetMinGB"`
+
+	CandidateClients []string                    `json:"candidateClients"`
+	ClientSelection  model.ClientSelectionMode   `json:"clientSelection"`
+
+	DiskGuardEnabled   bool       `json:"diskGuardEnabled"`
+	DiskGuardThreshold float64    `json:"diskGuardThreshold"`
+	Paused             bool       `json:"paused"`
+	PauseReason        string     `json:"pauseReason"`
+	PausedAt           *time.Time `json:"pausedAt"`
+
+	LifecyclePauseSeeders    int `json:"lifecyclePauseSeeders"`
+	LifecycleDeleteSeeders   int `json:"lifecycleDeleteSeeders"`
+	LifecycleDeleteSeedHours int `json:"lifecycleDeleteSeedHours"`
+
 	Conditions []model.RuleCondition `json:"conditions,omitempty"`
+
+	RecentFetches []fetchHistoryEntry `json:"recentFetches,omitempty"`
+}
+
+type fetchHistoryEntry struct {
+	FetchedAt time.Time `json:"fetchedAt"`
+	NewCount  int       `json:"newCount"`
+	Status    string    `json:"status"`
 }
 
 func (h *RSSHandler) toResponse(s *model.RSSSubscription) rssResponse {
@@ -165,6 +288,44 @@ func (h *RSSHandler) toResponse(s *model.RSSSubscription) rssResponse {
 
 		SkipSameSize:    s.SkipSameSize,
 		AddCountPerHour: s.AddCountPerHour,
+
+		UseCustomRegex: s.UseCustomRegex,
+		RegexStr:       s.RegexStr,
+		ReplaceStr:     s.ReplaceStr,
+
+		FreeWaitEnabled:    s.FreeWaitEnabled,
+		FreeWaitMaxWaitSec: s.FreeWaitMaxWaitSec,
+		FreeWaitRecheckSec: s.FreeWaitRecheckSec,
+		FreeWaitMinRemain:  s.FreeWaitMinRemain,
+
+		RecheckEnabled:   s.RecheckEnabled,
+		RecheckIntervalH: s.RecheckIntervalH,
+		RecheckMaxCount:  s.RecheckMaxCount,
+		RecheckMaxAgeH:   s.RecheckMaxAgeH,
+
+		FeasibilityEnabled:    s.FeasibilityEnabled,
+		FeasibilitySpeedLimit: s.FeasibilitySpeedLimit,
+		FeasibilitySizeLimit:  s.FeasibilitySizeLimit,
+		FeasibilitySafety:     s.FeasibilitySafety,
+
+		SkipSameSizeWindowMin: s.SkipSameSizeWindowMin,
+		SkipSameSizeStrict:    s.SkipSameSizeStrict,
+
+		DiskBudgetEnabled: s.DiskBudgetEnabled,
+		DiskBudgetMinGB:   s.DiskBudgetMinGB,
+
+		CandidateClients: s.CandidateClients,
+		ClientSelection:  s.ClientSelection,
+
+		DiskGuardEnabled:   s.DiskGuardEnabled,
+		DiskGuardThreshold: s.DiskGuardThreshold,
+		Paused:             s.Paused,
+		PauseReason:        s.PauseReason,
+		PausedAt:           s.PausedAt,
+
+		LifecyclePauseSeeders:    s.LifecyclePauseSeeders,
+		LifecycleDeleteSeeders:   s.LifecycleDeleteSeeders,
+		LifecycleDeleteSeedHours: s.LifecycleDeleteSeedHours,
 
 		Conditions: s.Conditions,
 	}
@@ -299,6 +460,13 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for i, u := range req.URLs {
+		if err := middleware.ValidatePublicURL(u); err != nil {
+			Error(w, http.StatusBadRequest, 40001, fmt.Sprintf("urls[%d] 不合法: %s", i, err.Error()))
+			return
+		}
+	}
+
 	exists, _ := h.repo.ExistsByName(r.Context(), req.Name, 0)
 	if exists {
 		Error(w, http.StatusConflict, 40900, "订阅名称已存在")
@@ -345,6 +513,45 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 		AutoReseed:      req.AutoReseed,
 		ReseedClientIDs: req.ReseedClientIDs,
+
+		SkipSameSize:          req.SkipSameSize,
+		SkipSameSizeWindowMin: req.SkipSameSizeWindowMin,
+		SkipSameSizeStrict:    req.SkipSameSizeStrict,
+		AddCountPerHour:       req.AddCountPerHour,
+
+		UseCustomRegex: req.UseCustomRegex,
+		RegexStr:       req.RegexStr,
+		ReplaceStr:     req.ReplaceStr,
+
+		FreeWaitEnabled:    req.FreeWaitEnabled,
+		FreeWaitMaxWaitSec: req.FreeWaitMaxWaitSec,
+		FreeWaitRecheckSec: req.FreeWaitRecheckSec,
+		FreeWaitMinRemain:  req.FreeWaitMinRemain,
+
+		RecheckEnabled:   req.RecheckEnabled,
+		RecheckIntervalH: req.RecheckIntervalH,
+		RecheckMaxCount:  req.RecheckMaxCount,
+		RecheckMaxAgeH:   req.RecheckMaxAgeH,
+
+		FeasibilityEnabled:    req.FeasibilityEnabled,
+		FeasibilitySpeedLimit: req.FeasibilitySpeedLimit,
+		FeasibilitySizeLimit:  req.FeasibilitySizeLimit,
+		FeasibilitySafety:     req.FeasibilitySafety,
+
+		DiskBudgetEnabled: req.DiskBudgetEnabled,
+		DiskBudgetMinGB:   req.DiskBudgetMinGB,
+
+		CandidateClients: req.CandidateClients,
+		ClientSelection:  req.ClientSelection,
+
+		DiskGuardEnabled:   req.DiskGuardEnabled,
+		DiskGuardThreshold: req.DiskGuardThreshold,
+
+		LifecyclePauseSeeders:    req.LifecyclePauseSeeders,
+		LifecycleDeleteSeeders:   req.LifecycleDeleteSeeders,
+		LifecycleDeleteSeedHours: req.LifecycleDeleteSeedHours,
+
+		Conditions: req.Conditions,
 	}
 
 	if err := h.repo.Create(r.Context(), &sub); err != nil {
@@ -369,7 +576,26 @@ func (h *RSSHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	Success(w, h.toResponse(sub))
+	resp := h.toResponse(sub)
+
+	var logs []model.RSSFetchLog
+	h.db.WithContext(r.Context()).
+		Where("subscription_id = ?", fmt.Sprintf("%d", id)).
+		Order("created_at DESC").
+		Limit(50).
+		Find(&logs)
+	if len(logs) > 0 {
+		resp.RecentFetches = make([]fetchHistoryEntry, len(logs))
+		for i, l := range logs {
+			resp.RecentFetches[i] = fetchHistoryEntry{
+				FetchedAt: l.CreatedAt,
+				NewCount:  l.NewCount,
+				Status:    l.Status,
+			}
+		}
+	}
+
+	Success(w, resp)
 }
 
 func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
@@ -403,6 +629,12 @@ func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		sub.Enabled = *req.Enabled
 	}
 	if req.URLs != nil {
+		for i, u := range *req.URLs {
+			if err := middleware.ValidatePublicURL(u); err != nil {
+				Error(w, http.StatusBadRequest, 40001, fmt.Sprintf("urls[%d] 不合法: %s", i, err.Error()))
+				return
+			}
+		}
 		sub.URLs = *req.URLs
 	}
 	if req.SiteName != nil {
@@ -459,6 +691,90 @@ func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.ReseedClientIDs != nil {
 		sub.ReseedClientIDs = *req.ReseedClientIDs
 	}
+	if req.SkipSameSize != nil {
+		sub.SkipSameSize = *req.SkipSameSize
+	}
+	if req.SkipSameSizeWindowMin != nil {
+		sub.SkipSameSizeWindowMin = *req.SkipSameSizeWindowMin
+	}
+	if req.SkipSameSizeStrict != nil {
+		sub.SkipSameSizeStrict = *req.SkipSameSizeStrict
+	}
+	if req.AddCountPerHour != nil {
+		sub.AddCountPerHour = *req.AddCountPerHour
+	}
+	if req.UseCustomRegex != nil {
+		sub.UseCustomRegex = *req.UseCustomRegex
+	}
+	if req.RegexStr != nil {
+		sub.RegexStr = *req.RegexStr
+	}
+	if req.ReplaceStr != nil {
+		sub.ReplaceStr = *req.ReplaceStr
+	}
+	if req.FreeWaitEnabled != nil {
+		sub.FreeWaitEnabled = *req.FreeWaitEnabled
+	}
+	if req.FreeWaitMaxWaitSec != nil {
+		sub.FreeWaitMaxWaitSec = *req.FreeWaitMaxWaitSec
+	}
+	if req.FreeWaitRecheckSec != nil {
+		sub.FreeWaitRecheckSec = *req.FreeWaitRecheckSec
+	}
+	if req.FreeWaitMinRemain != nil {
+		sub.FreeWaitMinRemain = *req.FreeWaitMinRemain
+	}
+	if req.RecheckEnabled != nil {
+		sub.RecheckEnabled = *req.RecheckEnabled
+	}
+	if req.RecheckIntervalH != nil {
+		sub.RecheckIntervalH = *req.RecheckIntervalH
+	}
+	if req.RecheckMaxCount != nil {
+		sub.RecheckMaxCount = *req.RecheckMaxCount
+	}
+	if req.RecheckMaxAgeH != nil {
+		sub.RecheckMaxAgeH = *req.RecheckMaxAgeH
+	}
+	if req.FeasibilityEnabled != nil {
+		sub.FeasibilityEnabled = *req.FeasibilityEnabled
+	}
+	if req.FeasibilitySpeedLimit != nil {
+		sub.FeasibilitySpeedLimit = *req.FeasibilitySpeedLimit
+	}
+	if req.FeasibilitySizeLimit != nil {
+		sub.FeasibilitySizeLimit = *req.FeasibilitySizeLimit
+	}
+	if req.FeasibilitySafety != nil {
+		sub.FeasibilitySafety = *req.FeasibilitySafety
+	}
+	if req.DiskBudgetEnabled != nil {
+		sub.DiskBudgetEnabled = *req.DiskBudgetEnabled
+	}
+	if req.DiskBudgetMinGB != nil {
+		sub.DiskBudgetMinGB = *req.DiskBudgetMinGB
+	}
+	if req.CandidateClients != nil {
+		sub.CandidateClients = *req.CandidateClients
+	}
+	if req.ClientSelection != nil {
+		sub.ClientSelection = *req.ClientSelection
+	}
+	if req.DiskGuardEnabled != nil {
+		sub.DiskGuardEnabled = *req.DiskGuardEnabled
+	}
+	if req.DiskGuardThreshold != nil {
+		sub.DiskGuardThreshold = *req.DiskGuardThreshold
+	}
+	if req.LifecyclePauseSeeders != nil {
+		sub.LifecyclePauseSeeders = *req.LifecyclePauseSeeders
+	}
+	if req.LifecycleDeleteSeeders != nil {
+		sub.LifecycleDeleteSeeders = *req.LifecycleDeleteSeeders
+	}
+	if req.LifecycleDeleteSeedHours != nil {
+		sub.LifecycleDeleteSeedHours = *req.LifecycleDeleteSeedHours
+	}
 
 	if err := h.repo.Update(r.Context(), sub); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新订阅失败")
@@ -509,14 +825,19 @@ func (h *RSSHandler) handleTrigger(w http.ResponseWriter, r *http.Request, idStr
 		return
 	}
 
-	if e := h.engine.Trigger(r.Context(), uint(id)); e != nil {
-		writeAppError(w, e)
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+
+	if err := h.engine.Trigger(ctx, uint(id)); err != nil {
+		h.logger.Warn("rss trigger failed", zap.Error(err))
+		Error(w, http.StatusInternalServerError, 50000, "RSS 触发执行失败")
 		return
 	}
 
+	h.logger.Info("rss subscription triggered", zap.String("id", idStr))
 	Success(w, map[string]interface{}{
 		"triggered": true,
-		"message":   "RSS 抓取已触发（后台执行中）",
+		"message":   "RSS 抓取已完成",
 	})
 }
 
@@ -581,16 +902,34 @@ func (h *RSSHandler) handleDryrun(w http.ResponseWriter, r *http.Request, idStr 
 		return
 	}
 
-	seen, err := h.repo.ListSeenBySite(r.Context(), sub.SiteName, time.Time{})
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	result, err := h.engine.DryRun(ctx, sub)
 	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询种子记录失败")
+		h.logger.Warn("dryrun failed, falling back to seen list", zap.Uint("subId", uint(id)), zap.Error(err))
+		seen, seenErr := h.repo.ListSeenBySite(r.Context(), sub.SiteName, time.Time{})
+		if seenErr != nil {
+			Error(w, http.StatusInternalServerError, 50000, "查询种子记录失败")
+			return
+		}
+		Success(w, map[string]interface{}{
+			"subscription":   h.toResponse(sub),
+			"recentTorrents": seen,
+			"total":          len(seen),
+			"live":           false,
+		})
 		return
 	}
 
 	Success(w, map[string]interface{}{
-		"subscription":   h.toResponse(sub),
-		"recentTorrents": seen,
-		"total":          len(seen),
+		"subscription": h.toResponse(sub),
+		"total":        result.Total,
+		"matched":      result.Matched,
+		"skipped":      result.Skipped,
+		"rejected":     result.Rejected,
+		"items":        result.Items,
+		"live":         true,
 	})
 }
 

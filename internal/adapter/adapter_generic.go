@@ -8,13 +8,38 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
+)
+
+var (
+	reGenericTitle             = regexp.MustCompile(`<title>([^<]+)</title>`)
+	reGenericRow               = regexp.MustCompile(`(?s)<tr[^>]*>.*?</tr>`)
+	reGenericDDBlock           = regexp.MustCompile(`(?s)基本信息</dt>\s*<dd>(.*)</dd>`)
+	reGenericFallbackDiv       = regexp.MustCompile(`(?s)基本信息</div>(.*?)种子文件`)
+	reGenericInfoHash          = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
+	reGenericKdescr            = regexp.MustCompile(`(?s)<div[^>]*id=['"]kdescr['"][^>]*>([\s\S]*?)</div>`)
+	reGenericSeeders           = regexp.MustCompile(`(?i)(?:做种数|Seeders?|S[^<]*<[^>]*>)(\d+)`)
+	reGenericLeechers          = regexp.MustCompile(`(?i)(?:下载数|Leechers?|L[^<]*<[^>]*>)(\d+)`)
+	reGenericDetailID          = regexp.MustCompile(`(?:details|detail|torrent)\.php\?id=(\d+)`)
+	reGenericErrorClass        = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
+	reGenericStripTags         = regexp.MustCompile(`<[^>]+>`)
+	reGenericBrowseRow         = regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
+	reGenericBrowseDetailLink  = regexp.MustCompile(`(?s)href="[^"]*(?:details?|torrent)[^"]*id=(\d+)[^"]*"[^>]*>(.*?)</a>`)
+	reGenericBrowseSize        = regexp.MustCompile(`(?i)([\d.]+)\s*(TB|GB|MB|KB)`)
+	reGenericBrowseSeeders     = regexp.MustCompile(`>(\d+)</a>\s*</td>\s*$`)
+	reGenericBrowseLeechers    = regexp.MustCompile(`(\d+)\s*</td>\s*$`)
+	reGenericDigits            = regexp.MustCompile(`(\d+)`)
+	reGenericTTGID             = regexp.MustCompile(`/t/(\d+)`)
+	reGenericStarSpaceDetailID = regexp.MustCompile(`(?:details|torrent)\.php\?id=(\d+)`)
+	reGenericIMDbID            = regexp.MustCompile(`tt\d+`)
 )
 
 type GenericAdapter struct {
@@ -52,7 +77,7 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 	if err != nil {
 		return nil, downloadError("下载失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode == http.StatusForbidden {
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
@@ -85,26 +110,25 @@ func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 	if err != nil {
 		return nil, networkError("请求详情页失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
 	if err != nil {
-		return nil, networkError("读取响应失败", err)
+		return nil, err
 	}
 
 	html := string(body)
 	detail := &model.TorrentDetail{}
 
-	if m := regexp.MustCompile(`<title>([^<]+)</title>`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGenericTitle.FindStringSubmatch(html); len(m) > 1 {
 		detail.Title = strings.TrimSpace(m[1])
 	}
 
-	rowRe := regexp.MustCompile(`(?s)<tr[^>]*>.*?</tr>`)
-	for _, row := range rowRe.FindAllString(html, -1) {
+	for _, row := range reGenericRow.FindAllString(html, -1) {
 		rowText := cleanRowText(row)
 
 		if (strings.Contains(rowText, "类别") || strings.Contains(rowText, "Category")) && !strings.Contains(rowText, "基本信息") {
@@ -127,12 +151,10 @@ func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 	}
 
 	if detail.Size == 0 || detail.Category == "" {
-		ddBlockRe := regexp.MustCompile(`(?s)基本信息</dt>\s*<dd>(.*)</dd>`)
-		if m := ddBlockRe.FindStringSubmatch(html); len(m) > 1 {
+		if m := reGenericDDBlock.FindStringSubmatch(html); len(m) > 1 {
 			extractBasicInfoFields(m[1], detail)
 		}
-		fallbackDivRe := regexp.MustCompile(`(?s)基本信息</div>(.*?)种子文件`)
-		if m := fallbackDivRe.FindStringSubmatch(html); len(m) > 1 {
+		if m := reGenericFallbackDiv.FindStringSubmatch(html); len(m) > 1 {
 			extractBasicInfoFields(m[1], detail)
 		}
 	}
@@ -147,12 +169,12 @@ func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 	}
 
 	if detail.InfoHash == "" {
-		if m := regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
+		if m := reGenericInfoHash.FindStringSubmatch(html); len(m) > 1 {
 			detail.InfoHash = strings.ToLower(m[1])
 		}
 	}
 
-	if m := regexp.MustCompile(`(?s)<div[^>]*id=['"]kdescr['"][^>]*>([\s\S]*?)</div>`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGenericKdescr.FindStringSubmatch(html); len(m) > 1 {
 		detail.Description = strings.TrimSpace(m[1])
 	}
 
@@ -192,26 +214,26 @@ func (a *GenericAdapter) GetPreciseSLData(ctx context.Context, config *model.Sit
 	if err != nil {
 		return nil, networkError("请求详情页失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
 	if err != nil {
-		return nil, networkError("读取响应失败", err)
+		return nil, err
 	}
 
 	html := string(body)
 	sl := &model.SLData{}
 
-	seedersRe := regexp.MustCompile(`(?i)(?:做种数|Seeders?|S[^<]*<[^>]*>)(\d+)`)
+	seedersRe := reGenericSeeders
 	if m := seedersRe.FindStringSubmatch(html); len(m) > 1 {
 		sl.Seeders, _ = strconv.Atoi(m[1])
 	}
 
-	leechersRe := regexp.MustCompile(`(?i)(?:下载数|Leechers?|L[^<]*<[^>]*>)(\d+)`)
+	leechersRe := reGenericLeechers
 	if m := leechersRe.FindStringSubmatch(html); len(m) > 1 {
 		sl.Leechers, _ = strconv.Atoi(m[1])
 	}
@@ -242,15 +264,18 @@ func (a *GenericAdapter) detectDiscountGenericAPI(ctx context.Context, config *m
 	if err != nil {
 		return nil, networkError("请求优惠API失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
 		return nil, err
 	}
-	html := string(body)
+	html := strings.ToLower(string(body))
 
 	for _, sel := range config.Discount.Selectors {
+		if !strings.Contains(html, strings.ToLower(sel)) {
+			continue
+		}
 		lower := strings.ToLower(sel)
 		switch {
 		case strings.Contains(lower, "2xfree"):
@@ -266,7 +291,22 @@ func (a *GenericAdapter) detectDiscountGenericAPI(ctx context.Context, config *m
 		}
 	}
 
-	_ = html
+	if strings.Contains(html, "pro_free2up") || strings.Contains(html, "2xfree") {
+		return &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}, nil
+	}
+	if strings.Contains(html, "pro_2up") || strings.Contains(html, "2xup") {
+		return &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}, nil
+	}
+	if strings.Contains(html, "pro_free") || strings.Contains(html, "免费") || strings.Contains(html, "free") {
+		return &model.DiscountResult{Level: model.DiscountFree}, nil
+	}
+	if strings.Contains(html, "pro_50p") || strings.Contains(html, "50%") {
+		return &model.DiscountResult{Level: model.DiscountPercent50}, nil
+	}
+	if strings.Contains(html, "pro_30p") || strings.Contains(html, "30%") {
+		return &model.DiscountResult{Level: model.DiscountPercent30}, nil
+	}
+
 	return &model.DiscountResult{Level: model.DiscountNone}, nil
 }
 
@@ -286,7 +326,7 @@ func (a *GenericAdapter) detectDiscountGenericPage(ctx context.Context, config *
 	if err != nil {
 		return nil, networkError("请求优惠信息失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -303,10 +343,6 @@ func (a *GenericAdapter) detectDiscountGenericPage(ctx context.Context, config *
 }
 
 func (a *GenericAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
-	if len(config.HR.Selectors) == 0 {
-		return &model.HRResult{HasHR: false}, nil
-	}
-
 	u := buildGenericURL(config, config.Paths.Detail, torrentID)
 	if u == "" {
 		return &model.HRResult{HasHR: false}, nil
@@ -322,7 +358,7 @@ func (a *GenericAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 	if err != nil {
 		return nil, networkError("请求HR信息失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -330,11 +366,7 @@ func (a *GenericAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 	}
 	html := strings.ToLower(string(body))
 
-	hasHR := strings.Contains(html, "hit and run") ||
-		strings.Contains(html, "hit&run") ||
-		strings.Contains(html, "h&r") ||
-		strings.Contains(html, "考核") ||
-		strings.Contains(html, "hitandrun")
+	hasHR := detectHRFromHTML(html)
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
@@ -342,6 +374,52 @@ func (a *GenericAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 	}
 
 	return result, nil
+}
+
+func (a *GenericAdapter) DetectHRAndDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, *model.DiscountResult, error) {
+	if config.Discount.HasAPI && config.Discount.APIURL != "" {
+		hr, err := a.DetectHR(ctx, config, torrentID)
+		if err != nil {
+			return nil, nil, err
+		}
+		disc, err := a.DetectDiscount(ctx, config, torrentID)
+		if err != nil {
+			return hr, nil, err
+		}
+		return hr, disc, nil
+	}
+
+	u := buildGenericURL(config, config.Paths.Detail, torrentID)
+	if u == "" {
+		return &model.HRResult{HasHR: false}, &model.DiscountResult{Level: model.DiscountNone}, nil
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, networkError("构造请求失败", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, nil, networkError("请求详情页失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, nil, err
+	}
+	html := strings.ToLower(string(body))
+
+	hrResult := &model.HRResult{HasHR: detectHRFromHTML(html)}
+	if hrResult.HasHR {
+		hrResult.SeedTimeH = config.HR.SeedTimeH()
+	}
+
+	discResult := DetectDiscountFromHTML(html, &config.DiscountDetection)
+
+	return hrResult, discResult, nil
 }
 
 func (a *GenericAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
@@ -409,7 +487,7 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -421,7 +499,7 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足"}
 	}
 
-	if idMatch := regexp.MustCompile(`(?:details|detail|torrent)\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
+	if idMatch := reGenericDetailID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
 		return &model.PublishResponse{
 			Success:    true,
@@ -436,7 +514,7 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	}
 
 	errMsg := "上传失败: 未知响应"
-	if m := regexp.MustCompile(`class="error"[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGenericErrorClass.FindStringSubmatch(html); len(m) > 1 {
 		errMsg = strings.TrimSpace(m[1])
 	}
 
@@ -450,9 +528,9 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 	}
 
 	if strings.Contains(u, "?") {
-		u += "&search=" + keyword
+		u += "&search=" + url.QueryEscape(keyword)
 	} else {
-		u += "?search=" + keyword
+		u += "?search=" + url.QueryEscape(keyword)
 	}
 	if opts != nil && opts.Category != "" {
 		u += "&cat=" + opts.Category
@@ -468,15 +546,15 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return nil, searchError("搜索请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readBody(resp)
 	if err != nil {
-		return nil, networkError("读取响应失败", err)
+		return nil, err
 	}
 
 	return parseGenericBrowse(string(body), config), nil
@@ -498,7 +576,7 @@ func (a *GenericAdapter) SupportsSearchByPiecesHash() bool { return false }
 func (a *GenericAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
 	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
 	if err != nil {
-		return false, nil
+		return false, fmt.Errorf("search for verify exists %q: %w", torrentID, err)
 	}
 	for _, r := range results {
 		if r.TorrentID == torrentID {
@@ -514,10 +592,10 @@ func buildGenericURL(config *model.SiteConfig, pathTpl, torrentID string) string
 	}
 	u := pathTpl
 	if torrentID != "" {
-		u = strings.ReplaceAll(u, "{id}", torrentID)
+		u = strings.ReplaceAll(u, "{id}", url.PathEscape(torrentID))
 	}
-	u = strings.ReplaceAll(u, "{passkey}", config.Passkey)
-	u = strings.ReplaceAll(u, "{authkey}", config.AuthKey)
+	u = strings.ReplaceAll(u, "{passkey}", url.QueryEscape(config.Passkey))
+	u = strings.ReplaceAll(u, "{authkey}", url.QueryEscape(config.AuthKey))
 	if !strings.HasPrefix(u, "http") {
 		base := config.Domain
 		if !strings.HasPrefix(base, "http") {
@@ -534,23 +612,23 @@ func buildGenericDownloadURL(config *model.SiteConfig, torrentID string) string 
 		base = "https://" + base
 	}
 	if config.Passkey != "" {
-		return base + "/download.php?id=" + torrentID + "&passkey=" + config.Passkey
+		return base + "/download.php?id=" + url.QueryEscape(torrentID) + "&passkey=" + url.QueryEscape(config.Passkey)
 	}
-	return base + "/download.php?id=" + torrentID
+	return base + "/download.php?id=" + url.QueryEscape(torrentID)
 }
 
 func stripTags(s string) string {
-	return regexp.MustCompile(`<[^>]+>`).ReplaceAllString(s, "")
+	return reGenericStripTags.ReplaceAllString(s, "")
 }
 
 func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
 	var results []*model.SeedingSearchResult
 
-	rowRe := regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
-	detailLinkRe := regexp.MustCompile(`(?s)href="[^"]*(?:details?|torrent)[^"]*id=(\d+)[^"]*"[^>]*>(.*?)</a>`)
-	sizeRe := regexp.MustCompile(`(?i)([\d.]+)\s*(TB|GB|MB|KB)`)
-	seedersRe := regexp.MustCompile(`>(\d+)</a>\s*</td>\s*$`)
-	leechersRe := regexp.MustCompile(`(\d+)\s*</td>\s*$`)
+	rowRe := reGenericBrowseRow
+	detailLinkRe := reGenericBrowseDetailLink
+	sizeRe := reGenericBrowseSize
+	seedersRe := reGenericBrowseSeeders
+	leechersRe := reGenericBrowseLeechers
 
 	rows := rowRe.FindAllString(html, -1)
 	for _, row := range rows {
@@ -631,7 +709,7 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 		fw.writeField("imdb_c", req.IMDbLink)
 	}
 	if req.DoubanLink != "" {
-		m := regexp.MustCompile(`(\d+)`).FindString(req.DoubanLink)
+		m := reGenericDigits.FindString(req.DoubanLink)
 		if m != "" {
 			fw.writeField("douban_id", m)
 		}
@@ -679,7 +757,7 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -691,7 +769,7 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足"}
 	}
 
-	if idMatch := regexp.MustCompile(`/t/(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
+	if idMatch := reGenericTTGID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
 		return &model.PublishResponse{
 			Success:    true,
@@ -706,7 +784,7 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 	}
 
 	errMsg := "上传失败"
-	if m := regexp.MustCompile(`class="error"[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGenericErrorClass.FindStringSubmatch(html); len(m) > 1 {
 		errMsg = strings.TrimSpace(m[1])
 	}
 
@@ -925,7 +1003,7 @@ func (a *GenericAdapter) doStarSpaceUpload(httpReq *http.Request, config *model.
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -937,7 +1015,7 @@ func (a *GenericAdapter) doStarSpaceUpload(httpReq *http.Request, config *model.
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden"}
 	}
 
-	if idMatch := regexp.MustCompile(`(?:details|torrent)\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
+	if idMatch := reGenericStarSpaceDetailID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
 		return &model.PublishResponse{
 			Success:    true,
@@ -952,7 +1030,7 @@ func (a *GenericAdapter) doStarSpaceUpload(httpReq *http.Request, config *model.
 	}
 
 	errMsg := "上传失败"
-	if m := regexp.MustCompile(`class="error"[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGenericErrorClass.FindStringSubmatch(html); len(m) > 1 {
 		errMsg = strings.TrimSpace(m[1])
 	}
 
@@ -1024,7 +1102,7 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 		fw.writeField("imdb", imdbID)
 	}
 	if req.DoubanLink != "" {
-		m := regexp.MustCompile(`(\d+)`).FindString(req.DoubanLink)
+		m := reGenericDigits.FindString(req.DoubanLink)
 		if m != "" {
 			fw.writeField("douban", m)
 		}
@@ -1066,7 +1144,7 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -1118,6 +1196,63 @@ func extractIMDbIDGeneric(link string) string {
 	if link == "" {
 		return ""
 	}
-	m := regexp.MustCompile(`tt\d+`).FindString(link)
+	m := reGenericIMDbID.FindString(link)
 	return m
+}
+
+func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	pageURL := 	config.Domain + "/index.php"
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer httpclient.DrainBody(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	htmlBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	html := string(htmlBytes)
+
+	if strings.Contains(html, "login.php") && !strings.Contains(html, "userdetails") {
+		return nil, fmt.Errorf("cookie 无效或已过期")
+	}
+
+	result := &model.UserStatsResult{}
+	if m := reNexusUsername.FindStringSubmatch(html); len(m) > 2 {
+		result.Username = strings.TrimSpace(m[2])
+	} else if m := reNexusUsernameSpan.FindStringSubmatch(html); len(m) > 2 {
+		result.Username = strings.TrimSpace(m[2])
+	} else if m := reNexusUsernameAlt.FindStringSubmatch(html); len(m) > 2 {
+		result.Username = strings.TrimSpace(m[2])
+	}
+	if m := reNexusFontUploaded.FindStringSubmatch(html); len(m) > 1 {
+		result.UploadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reNexusLabelUpload.FindStringSubmatch(html); len(m) > 1 {
+		result.UploadBytes = parseSizeString(cleanText(m[1]))
+	}
+	if m := reNexusFontDownloaded.FindStringSubmatch(html); len(m) > 1 {
+		result.DownloadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reNexusLabelDownload.FindStringSubmatch(html); len(m) > 1 {
+		result.DownloadBytes = parseSizeString(cleanText(m[1]))
+	}
+	if m := reNexusFontRatio.FindStringSubmatch(html); len(m) > 1 {
+		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
+	} else if m := reNexusLabelRatio.FindStringSubmatch(html); len(m) > 1 {
+		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
+	}
+	if result.Ratio == 0 && result.DownloadBytes > 0 && result.UploadBytes > 0 {
+		result.Ratio = float64(result.UploadBytes) / float64(result.DownloadBytes)
+	}
+	return result, nil
 }

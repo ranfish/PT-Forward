@@ -115,8 +115,8 @@ func TestCORS_Wildcard(t *testing.T) {
 	if w.Header().Get("Access-Control-Allow-Origin") != "https://example.com" {
 		t.Errorf("expected origin echoed, got %s", w.Header().Get("Access-Control-Allow-Origin"))
 	}
-	if w.Header().Get("Access-Control-Allow-Credentials") != "true" {
-		t.Error("expected Allow-Credentials true")
+	if w.Header().Get("Access-Control-Allow-Credentials") != "" {
+		t.Error("wildcard origin should not set Allow-Credentials")
 	}
 }
 
@@ -252,6 +252,8 @@ func TestRequestLogger_SkipsHealthz(t *testing.T) {
 }
 
 func TestExtractIP(t *testing.T) {
+	_ = SetTrustedProxies([]string{"1.2.3.4/32"})
+
 	tests := []struct {
 		name       string
 		remoteAddr string
@@ -259,7 +261,7 @@ func TestExtractIP(t *testing.T) {
 		xri        string
 		expected   string
 	}{
-		{"direct", "1.2.3.4:1234", "", "", "1.2.3.4"},
+		{"direct", "10.0.0.1:1234", "", "", "10.0.0.1"},
 		{"xff", "1.2.3.4:1234", "5.6.7.8, 9.10.11.12", "", "5.6.7.8"},
 		{"xri", "1.2.3.4:1234", "", "5.6.7.8", "5.6.7.8"},
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ranfish/pt-forward/internal/adapter"
 	"github.com/ranfish/pt-forward/internal/auth"
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/filter"
@@ -32,7 +33,8 @@ type Router struct {
 	seedingHandler     *SeedingHandler
 	deleteRuleHandler  *DeleteRuleHandler
 	reseedHandler      *ReseedHandler
-	publishHandler     *PublishHandler
+	publishHandler      *PublishHandler
+	manualForwardHandler *ManualForwardHandler
 	dashboardHandler   *DashboardHandler
 	systemHandler      *SystemHandler
 	iyuuHandler        *IYUUHandler
@@ -68,27 +70,41 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 	if clientMgr != nil {
 		dashChecker = clientMgr
 	}
+	adapterFactory := adapter.NewFactory(logger)
+	siteHandler := NewSiteHandler(siteRepo, logger, db)
+	siteHandler.SetStatsSync(site.NewStatsSyncService(db, adapterFactory, logger))
+	var clientMgrIface ClientManager
+	if clientMgr != nil {
+		clientMgrIface = clientMgr
+	}
+	dashHandler := NewDashboardHandler(db, logger, appVersion, dashChecker)
+	sysHandler := NewSystemHandler(appVersion, db, clientMgr, logger)
+	if seedingEngine != nil {
+		dashHandler.SetSeedingEngine(seedingEngine)
+		sysHandler.SetSeedingEngine(seedingEngine)
+	}
 	return &Router{
 		authHandler:        NewAuthHandler(authManager),
-		clientHandler:      NewClientHandler(db, logger, clientMgr),
-		siteHandler:        NewSiteHandler(siteRepo, logger, db),
+		clientHandler:      NewClientHandler(db, logger, clientMgrIface),
+		siteHandler:        siteHandler,
 		rssHandler:         NewRSSHandler(rssRepo, rssEngine, db, logger),
 		filterHandler:      NewFilterHandler(filterRepo, filterEng, db, logger),
 		notifyHandler:      NewNotifyHandler(notifyRepo, notifyService, logger),
 		settingsHandler:    NewSettingsHandler(settingsRepo, logger),
 		seedingHandler:     NewSeedingHandler(db, logger, seedingEngine),
-		deleteRuleHandler:  NewDeleteRuleHandler(db, logger),
+		deleteRuleHandler:  NewDeleteRuleHandler(db, logger, clientMgrIface),
 		reseedHandler:      NewReseedHandler(reseedEngine, logger),
-		publishHandler:     NewPublishHandler(publishPipeline, logger, db),
-		dashboardHandler:   NewDashboardHandler(db, logger, appVersion, dashChecker),
-		systemHandler:      NewSystemHandler(appVersion, db, clientMgr, logger),
+		publishHandler:       NewPublishHandler(publishPipeline, logger, db),
+		manualForwardHandler: NewManualForwardHandler(db, logger),
+		dashboardHandler:   dashHandler,
+		systemHandler:      sysHandler,
 		iyuuHandler:        NewIYUUHandler(db, logger, iyuuSvc),
 		fingerprintHandler: NewFingerprintHandler(db, logger),
 		trackerHandler:     NewTrackerHandler(db, logger),
 		lifecycleHandler:   NewLifecycleHandler(db, logger),
 		cookiecloudHandler: NewCookieCloudHandler(db, logger),
 		ptgenHandler:       NewPTGenHandler(db, logger),
-		schedulerHandler:   NewSchedulerHandler(taskRegistry, logger),
+		schedulerHandler:   NewSchedulerHandler(taskRegistry, db, logger),
 		wsHandler:          NewWSHandler(hub, authManager, nil),
 		hub:                hub,
 		authManager:        authManager,
@@ -109,6 +125,10 @@ func (rt *Router) SetSiteProvider(p interface {
 	GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error)
 }) {
 	rt.siteHandler.SetProvider(p)
+}
+
+func (rt *Router) SetConfigEventBus(bus *rss.ConfigEventBus) {
+	rt.settingsHandler.SetConfigEventBus(bus)
 }
 
 func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []string, rateLimitEnabled bool, rateLimitGlobal, rateLimitWrite, rateLimitDownload int) {
@@ -209,8 +229,6 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/seeding/scoring-dryrun/", seedingHandler)
 	mux.Handle("/api/v1/seeding/status", seedingHandler)
 	mux.Handle("/api/v1/seeding/status/", seedingHandler)
-	mux.Handle("/api/v1/seeding/rules", seedingHandler)
-	mux.Handle("/api/v1/seeding/rules/", seedingHandler)
 	mux.Handle("/api/v1/seeding/torrents", seedingHandler)
 	mux.Handle("/api/v1/seeding/torrents/", seedingHandler)
 	mux.Handle("/api/v1/seeding/clients", seedingHandler)
@@ -225,6 +243,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	deleteRuleHandler := rt.chain(rt.rateLimitMW, rt.deleteRuleHandler.ServeHTTP)
 	mux.Handle("/api/v1/seeding/delete-rules", deleteRuleHandler)
 	mux.Handle("/api/v1/seeding/delete-rules/", deleteRuleHandler)
+	mux.Handle("/api/v1/seeding/rules", deleteRuleHandler)
+	mux.Handle("/api/v1/seeding/rules/", deleteRuleHandler)
 
 	reseedHandler := rt.chain(rt.rateLimitMW, rt.reseedHandler.ServeHTTP)
 	mux.Handle("/api/v1/reseed/tasks", reseedHandler)
@@ -239,6 +259,18 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/publish/results/", publishHandler)
 	mux.Handle("/api/v1/publish/groups", publishHandler)
 	mux.Handle("/api/v1/publish/groups/", publishHandler)
+
+	mfHandler := rt.chain(writeLimitMW, rt.manualForwardHandler.ServeHTTP)
+	mux.Handle("/api/v1/manual-forward/seeded-torrents", mfHandler)
+	mux.Handle("/api/v1/manual-forward/seeded-torrents/", mfHandler)
+	mux.Handle("/api/v1/manual-forward/analyze", mfHandler)
+	mux.Handle("/api/v1/manual-forward/analyze/", mfHandler)
+	mux.Handle("/api/v1/manual-forward/eligible-targets", mfHandler)
+	mux.Handle("/api/v1/manual-forward/eligible-targets/", mfHandler)
+	mux.Handle("/api/v1/manual-forward/submit", mfHandler)
+	mux.Handle("/api/v1/manual-forward/submit/", mfHandler)
+	mux.Handle("/api/v1/manual-forward/batch-submit", mfHandler)
+	mux.Handle("/api/v1/manual-forward/batch-submit/", mfHandler)
 
 	dashboardHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/dashboard/overview", dashboardHandler)

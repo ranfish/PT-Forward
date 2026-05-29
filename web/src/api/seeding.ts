@@ -1,131 +1,123 @@
 import client from './client'
+import type {
+  ApiResponse,
+  ApiResponsePaginated,
+  SeedingClientConfig,
+  SeedingTorrentRecord,
+  SeedingScoringConfig,
+  SeedingStatsOverview,
+  SeedingSiteStat,
+  SeedingSiteTrendPoint,
+  SeedingSpeedTrendPoint,
+  ScoringLog,
+  DeleteRule,
+  ScoringDryrunRequest,
+  ListParams,
+  SeedingConfigRequest,
+  CreateWithoutId,
+  UpdatePartial,
+} from './types'
 
 export const seedingApi = {
   getStatus() {
-    return client.get('/seeding/status')
+    return client.get<ApiResponse<{ running: boolean; lastRunAt: string | null }>>('/seeding/status')
   },
   getConfig() {
-    return client.get('/seeding/configs')
+    return client.get<ApiResponse<{ items: SeedingClientConfig[]; total: number }>>('/seeding/configs')
   },
-  updateConfig(id: number, data: Record<string, unknown>) {
-    return client.put(`/seeding/configs/${id}`, data)
+  updateConfig(id: number, data: SeedingConfigRequest) {
+    return client.put<ApiResponse<SeedingClientConfig>>(`/seeding/configs/${id}`, data)
   },
-  createConfig(data: Record<string, unknown>) {
-    return client.post('/seeding/configs', data)
+  createConfig(data: SeedingConfigRequest) {
+    return client.post<ApiResponse<SeedingClientConfig>>('/seeding/configs', data)
   },
   deleteConfig(id: number) {
-    return client.delete(`/seeding/configs/${id}`)
+    return client.delete<ApiResponse<void>>(`/seeding/configs/${id}`)
   },
-  listRecords(page = 1, size = 20) {
-    return client.get('/seeding/records', { params: { page, size } })
+  listRecords(page = 1, size = 20, filters?: { search?: string; clientId?: string; site?: string; status?: string }) {
+    const params: Record<string, string | number> = { page, size }
+    if (filters) {
+      if (filters.search) params.search = filters.search
+      if (filters.clientId) params.client_id = filters.clientId
+      if (filters.site) params.site = filters.site
+      if (filters.status) params.status = filters.status
+    }
+    return client.get<ApiResponsePaginated<SeedingTorrentRecord>>('/seeding/records', { params })
   },
   getStatsOverview() {
-    return client.get('/seeding/stats/overview')
+    return client.get<ApiResponse<SeedingStatsOverview>>('/seeding/stats/overview')
   },
   getStatsBySite() {
-    return client.get('/seeding/stats/by-site')
+    return client.get<ApiResponse<{ items: SeedingSiteStat[]; total: number }>>('/seeding/stats/by-site')
   },
   getStatsTorrents(page = 1, size = 20) {
-    return client.get('/seeding/stats/torrents', { params: { page, size } })
+    return client.get<ApiResponsePaginated<unknown>>('/seeding/stats/torrents', { params: { page, size } })
   },
   getTorrents(page = 1, size = 20) {
-    return client.get('/seeding/torrents', { params: { page, size } })
+    return client.get<ApiResponsePaginated<unknown>>('/seeding/torrents', { params: { page, size } })
   },
   resumeRecord(id: number) {
-    return client.post(`/seeding/records/${id}/resume`)
+    return client.post<ApiResponse<void>>(`/seeding/records/${id}/resume`)
   },
   pauseRecord(id: number) {
-    return client.post(`/seeding/records/${id}/pause`)
+    return client.post<ApiResponse<void>>(`/seeding/records/${id}/pause`)
   },
-  scoringDryrun(data: Record<string, unknown>) {
-    return client.post('/seeding/scoring-dryrun', data)
+  scoringDryrun(data: ScoringDryrunRequest) {
+    return client.post<ApiResponse<{ score: number; demand: number }>>('/seeding/scoring-dryrun', data)
   },
   getScoringConfig(subscriptionId?: number) {
     const params: Record<string, number> = {}
     if (subscriptionId) params.subscriptionId = subscriptionId
-    return client.get('/seeding/scoring-config', { params })
+    return client.get<ApiResponse<SeedingScoringConfig>>('/seeding/scoring-config', { params })
   },
-  updateScoringConfig(data: Record<string, unknown>, subscriptionId?: number) {
+  updateScoringConfig(data: UpdatePartial<SeedingScoringConfig>, subscriptionId?: number) {
     const params: Record<string, number> = {}
     if (subscriptionId) params.subscriptionId = subscriptionId
-    return client.put('/seeding/scoring-config', data, { params })
+    return client.put<ApiResponse<SeedingScoringConfig>>('/seeding/scoring-config', data, { params })
   },
-  listScoringLogs(params?: Record<string, unknown>) {
-    return client.get('/seeding/scoring-logs', { params })
-  },
-}
-
-export const seedingRulesApi = {
-  list() {
-    return client.get('/seeding/rules')
-  },
-  create(data: Record<string, unknown>) {
-    return client.post('/seeding/rules', data)
-  },
-  get(id: number) {
-    return client.get(`/seeding/rules/${id}`)
-  },
-  update(id: number, data: Record<string, unknown>) {
-    return client.put(`/seeding/rules/${id}`, data)
-  },
-  delete(id: number) {
-    return client.delete(`/seeding/rules/${id}`)
-  },
-  test(id: number, data?: Record<string, unknown>) {
-    return client.post(`/seeding/rules/${id}/test`, data || {})
+  listScoringLogs(params?: ListParams) {
+    return client.get<ApiResponsePaginated<ScoringLog>>('/seeding/scoring-logs', { params })
   },
 }
 
 export const seedingClientsApi = {
-  list() {
-    return client.get('/seeding/clients')
-  },
   trigger(clientId: string) {
-    return client.post(`/seeding/clients/${clientId}/trigger`)
+    return client.post<ApiResponse<void>>(`/seeding/clients/${clientId}/trigger`)
   },
 }
 
 export const seedingDryrunApi = {
   runAll() {
-    return client.post('/seeding/dryrun')
+    return client.post<ApiResponse<void>>('/seeding/dryrun')
   },
   runBySubscription(subId: string) {
-    return client.post(`/seeding/dryrun/${subId}`)
+    return client.post<ApiResponse<void>>(`/seeding/dryrun/${subId}`)
   },
 }
 
 export const seedingStatsApi = {
-  overview() {
-    return client.get('/seeding/stats/overview')
+  siteTrend(site: string, range = '7d') {
+    return client.get<ApiResponse<{ site: string; trends: SeedingSiteTrendPoint[] }>>(`/seeding/stats/by-site/${encodeURIComponent(site)}/trend`, { params: { range } })
   },
-  bySite() {
-    return client.get('/seeding/stats/by-site')
-  },
-  torrents(page = 1, size = 20) {
-    return client.get('/seeding/stats/torrents', { params: { page, size } })
-  },
-  siteTrend(site: string) {
-    return client.get(`/seeding/stats/by-site/${encodeURIComponent(site)}/trend`)
-  },
-  downloaderSpeedTrend(id: number) {
-    return client.get(`/seeding/stats/downloader/${id}/speed-trend`)
+  downloaderSpeedTrend(id: string, range = '24h') {
+    return client.get<ApiResponse<{ clientId: string; points: SeedingSpeedTrendPoint[] }>>(`/seeding/stats/downloader/${id}/speed-trend`, { params: { range } })
   },
 }
 
 export const deleteRulesApi = {
   list() {
-    return client.get('/seeding/delete-rules')
+    return client.get<ApiResponse<{ items: DeleteRule[]; total: number }>>('/seeding/delete-rules')
   },
-  create(data: Record<string, unknown>) {
-    return client.post('/seeding/delete-rules', data)
+  create(data: CreateWithoutId<DeleteRule>) {
+    return client.post<ApiResponse<DeleteRule>>('/seeding/delete-rules', data)
   },
-  update(id: number, data: Record<string, unknown>) {
-    return client.put(`/seeding/delete-rules/${id}`, data)
+  update(id: number, data: UpdatePartial<DeleteRule>) {
+    return client.put<ApiResponse<DeleteRule>>(`/seeding/delete-rules/${id}`, data)
   },
   delete(id: number) {
-    return client.delete(`/seeding/delete-rules/${id}`)
+    return client.delete<ApiResponse<void>>(`/seeding/delete-rules/${id}`)
   },
   test(id: number) {
-    return client.post(`/seeding/delete-rules/${id}/test`)
+    return client.post<ApiResponse<{ matched: boolean; torrentsAffected: number }>>(`/seeding/delete-rules/${id}/test`)
   },
 }

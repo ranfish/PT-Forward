@@ -1905,6 +1905,94 @@ func TestPipeline_ProcessMemberWithResume_HRDetected(t *testing.T) {
 	}
 }
 
+func TestPipeline_HRDetected_PreservesExistingTags(t *testing.T) {
+	db := setupPipelineTestDBWithGroups(t)
+	p := NewPipeline(db, zap.NewNop())
+
+	var setTagsCalls [][]string
+	mockDL := &mocks.DownloaderClient{
+		GetTorrentByHashFn: func(_ context.Context, hash string) (*model.TorrentInfo, error) {
+			if hash == "abc123" {
+				return &model.TorrentInfo{Hash: "abc123", Tags: []string{"pt-forward", "test"}}, nil
+			}
+			return nil, nil
+		},
+		SetTorrentTagsFn: func(_ context.Context, _ string, tags []string) error {
+			setTagsCalls = append(setTagsCalls, tags)
+			return nil
+		},
+	}
+	p.SetClientProvider(&mocks.DownloaderProvider{Client: mockDL})
+
+	adapter := &mockPublishAdapter{
+		SiteAdapter: &mocks.SiteAdapter{
+			UploadTorrentFn: func(_ context.Context, _ *model.SiteConfig, _ *model.PublishRequest) (*model.PublishResponse, error) {
+				return &model.PublishResponse{TorrentID: "hr-001", InfoHash: "newhash123"}, nil
+			},
+			DetectHRFn: func(_ context.Context, _ *model.SiteConfig, _ string) (*model.HRResult, error) {
+				return &model.HRResult{HasHR: true, SeedTimeH: 72, MinRatio: 1.0}, nil
+			},
+		},
+	}
+	sp := &mockPublishSiteProvider{
+		SiteInfoProvider: &mocks.SiteInfoProvider{
+			GetSiteConfigFn: func(_ context.Context, domain string) (*model.SiteConfig, error) {
+				return &model.SiteConfig{Domain: domain, Enabled: true}, nil
+			},
+			GetAdapterFn: func(_ context.Context, _ string) (model.SiteAdapter, error) {
+				return adapter, nil
+			},
+		},
+	}
+	p.SetSiteProvider(sp)
+	ctx := context.Background()
+
+	group, err := p.CreateGroup(ctx, 0, "source_hash", "source_site", "src-t-1")
+	if err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+
+	member := &model.PublishGroupMember{
+		PublishGroupID: group.ID,
+		SiteName:       "hr_target",
+		ClientID:       "test-client",
+		InfoHash:       "abc123",
+		Status:         model.MemberStatusNew,
+	}
+	if err := p.AddGroupMember(ctx, group.ID, member); err != nil {
+		t.Fatalf("AddGroupMember: %v", err)
+	}
+
+	var dbMember model.PublishGroupMember
+	db.Where("id = ?", member.ID).First(&dbMember)
+
+	if err := p.ProcessMemberWithResume(ctx, &dbMember); err != nil {
+		t.Fatalf("ProcessMemberWithResume: %v", err)
+	}
+
+	if len(setTagsCalls) != 1 {
+		t.Fatalf("expected 1 SetTorrentTags call, got %d", len(setTagsCalls))
+	}
+	tags := setTagsCalls[0]
+	hrTag := "PROTECTED_HR_hr_target"
+	hasHR := false
+	hasOrig := false
+	for _, tag := range tags {
+		if tag == hrTag {
+			hasHR = true
+		}
+		if tag == "pt-forward" {
+			hasOrig = true
+		}
+	}
+	if !hasHR {
+		t.Errorf("expected HR tag %s in %v", hrTag, tags)
+	}
+	if !hasOrig {
+		t.Errorf("expected original tag 'pt-forward' preserved in %v", tags)
+	}
+}
+
 func TestPipeline_ProcessMemberWithResume_NoHR(t *testing.T) {
 	db := setupPipelineTestDBWithGroups(t)
 	p := NewPipeline(db, zap.NewNop())

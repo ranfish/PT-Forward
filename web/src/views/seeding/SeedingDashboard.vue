@@ -66,43 +66,56 @@
     </a-card>
 
     <a-card :title="t('seeding.activeTorrents')">
-      <a-table
-        :columns="columns"
-        :data-source="torrents"
-        :loading="loading"
-        :pagination="{ pageSize: 20, showSizeChanger: true }"
-        row-key="id"
-        size="small"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <a-badge
-              :status="record.status === 'seeding' ? 'success' : 'warning'"
-              :text="record.status"
-            />
+      <div ref="torrentTableRef">
+        <a-table
+          :columns="columns"
+          :data-source="torrents"
+          :loading="loading"
+          :pagination="{ pageSize: 20, showSizeChanger: true }"
+          :scroll="{ x: 'max-content' }"
+          row-key="id"
+          size="small"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'title'">
+              <a v-if="record.detail_url" :href="record.detail_url" target="_blank" style="color: #1890ff">{{ record.title || record.torrent_id }}</a>
+              <span v-else>{{ record.title || record.torrent_id }}</span>
+            </template>
+            <template v-if="column.key === 'status'">
+              <a-badge
+                :status="record.status === 'seeding' ? 'success' : 'warning'"
+                :text="record.status"
+              />
+            </template>
+            <template v-if="column.key === 'is_free'">
+              <a-tag :color="record.is_free ? 'green' : 'default'">{{ record.is_free ? t('common.yes') : t('common.no') }}</a-tag>
+            </template>
+            <template v-if="column.key === 'has_hr'">
+              <a-tag :color="record.has_hr ? 'red' : 'default'">{{ record.has_hr ? t('common.yes') : t('common.no') }}</a-tag>
+            </template>
+            <template v-if="column.key === 'actions'">
+              <a-space>
+                <a-button
+                  v-if="record.status !== 'seeding'"
+                  type="link"
+                  size="small"
+                  @click="handleResumeRecord(record.id)"
+                >
+                  {{ t('common.resume') }}
+                </a-button>
+                <a-button
+                  v-if="record.status === 'seeding'"
+                  type="link"
+                  size="small"
+                  @click="handlePauseRecord(record.id)"
+                >
+                  {{ t('common.pause') }}
+                </a-button>
+              </a-space>
+            </template>
           </template>
-          <template v-if="column.key === 'actions'">
-            <a-space>
-              <a-button
-                v-if="record.status !== 'seeding'"
-                type="link"
-                size="small"
-                @click="handleResumeRecord(record.id)"
-              >
-                {{ t('common.resume') }}
-              </a-button>
-              <a-button
-                v-if="record.status === 'seeding'"
-                type="link"
-                size="small"
-                @click="handlePauseRecord(record.id)"
-              >
-                {{ t('common.pause') }}
-              </a-button>
-            </a-space>
-          </template>
-        </template>
-      </a-table>
+        </a-table>
+      </div>
     </a-card>
 
     <a-modal
@@ -247,7 +260,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -272,6 +285,7 @@ interface SeedingStatusData {
 }
 
 const { t } = useI18n()
+const torrentTableRef = ref<HTMLElement>()
 const loading = ref(false)
 const configsLoading = ref(false)
 const status = ref<SeedingStatusData>({})
@@ -310,12 +324,13 @@ const configForm = reactive({
 
 const columns = [
   { title: 'Torrent ID', dataIndex: 'torrent_id', key: 'torrent_id', ellipsis: true },
+  { title: t('seeding.torrentTitle'), dataIndex: 'title', key: 'title', ellipsis: true },
   { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
   { title: t('seeding.client'), dataIndex: 'client_id', key: 'client_id', width: 100 },
   { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
   { title: t('common.status'), key: 'status', width: 100 },
-  { title: t('seeding.isFree'), dataIndex: 'is_free', key: 'is_free', width: 60 },
-  { title: 'HR', dataIndex: 'has_hr', key: 'has_hr', width: 60 },
+  { title: t('seeding.isFree'), key: 'is_free', width: 60 },
+  { title: 'HR', key: 'has_hr', width: 60 },
   { title: t('seeding.source'), dataIndex: 'source', key: 'source', width: 80 },
   { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
   { title: t('common.actions'), key: 'actions', width: 100 },
@@ -492,9 +507,73 @@ async function fetchDownloaders() {
   }
 }
 
+const resizeCleanupFns: (() => void)[] = []
+
+function initResizable() {
+  if (!torrentTableRef.value) return
+  const table = torrentTableRef.value.querySelector('.ant-table') as HTMLElement
+  if (!table) return
+  const thead = table.querySelector('thead') as HTMLElement
+  if (!thead) return
+  const ths = thead.querySelectorAll('th')
+
+  ths.forEach((th) => {
+    const thEl = th as HTMLElement
+    thEl.style.position = 'relative'
+
+    const handle = document.createElement('div')
+    handle.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize;z-index:10;background:transparent'
+    handle.addEventListener('mouseenter', () => { handle.style.background = '#1890ff40' })
+    handle.addEventListener('mouseleave', () => { handle.style.background = 'transparent' })
+    thEl.appendChild(handle)
+
+    let startX = 0
+    let startWidth = 0
+
+    const onMouseMove = (e: MouseEvent) => {
+      const diff = e.clientX - startX
+      const newWidth = Math.max(60, startWidth + diff)
+      thEl.style.width = `${newWidth}px`
+      thEl.style.minWidth = `${newWidth}px`
+      thEl.style.maxWidth = `${newWidth}px`
+    }
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    const onMouseDown = (e: MouseEvent) => {
+      e.preventDefault()
+      startX = e.clientX
+      startWidth = thEl.offsetWidth
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    handle.addEventListener('mousedown', onMouseDown)
+    resizeCleanupFns.push(() => {
+      handle.removeEventListener('mousedown', onMouseDown)
+      handle.removeEventListener('mouseenter', () => { handle.style.background = '#1890ff40' })
+      handle.removeEventListener('mouseleave', () => { handle.style.background = 'transparent' })
+      handle.remove()
+    })
+  })
+}
+
 onMounted(() => {
   fetchData()
   fetchConfigs()
   fetchDownloaders()
+  nextTick(() => initResizable())
+})
+
+onBeforeUnmount(() => {
+  resizeCleanupFns.forEach((fn) => fn())
+  resizeCleanupFns.length = 0
 })
 </script>

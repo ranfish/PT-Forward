@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -106,9 +106,8 @@ func (p *Provider) queryEndpoint(ctx context.Context, endpoint, query string) (*
 	if err != nil {
 		return nil, ptgenError(ErrPTGenRemote, fmt.Sprintf("request %s", endpoint), err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
 	if err != nil {
 		return nil, ptgenError(ErrPTGenResponse, "read response", err)
 	}
