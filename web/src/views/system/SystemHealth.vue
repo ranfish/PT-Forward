@@ -98,7 +98,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { systemApi } from '@/api/system'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatTime } from '@/utils/format'
 
 interface HealthStatus {
   status?: string
@@ -145,10 +145,10 @@ function logLevelColor(level: unknown) {
 
 function formatLogTime(ts: unknown) {
   if (!ts) return '-'
-  if (typeof ts === 'string') return ts
+  if (typeof ts === 'string') return formatTime(ts)
   if (typeof ts === 'number') {
-    if (ts > 1e12) return new Date(ts).toLocaleString()
-    return new Date(ts * 1000).toLocaleString()
+    if (ts > 1e12) return formatTime(new Date(ts).toISOString())
+    return formatTime(new Date(ts * 1000).toISOString())
   }
   return String(ts)
 }

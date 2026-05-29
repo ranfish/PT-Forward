@@ -55,6 +55,7 @@ type SeedingClientConfig struct {
 
 	MaxActiveUploads    int  `json:"max_active_uploads" gorm:"default:0"`
 	MaxActiveDownloads  int  `json:"max_active_downloads" gorm:"default:0"`
+	MaxActiveSeeding    int  `json:"max_active_seeding" gorm:"default:100"`
 	SuperSeedingDefault bool `json:"super_seeding_default" gorm:"default:false"`
 
 	Scope string `json:"scope" gorm:"size:16;not null;default:'managed'"`

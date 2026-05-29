@@ -18,7 +18,7 @@
             <a-tag :color="record.paused ? 'orange' : 'green'">{{ record.paused ? t('tracker.pausedStatus') : t('tracker.active') }}</a-tag>
           </template>
           <template v-if="column.key === 'info_hash'">
-            <a-button type="link" size="small" @click="viewMember(record.info_hash)">{{ record.info_hash?.substring(0, 16) }}...</a-button>
+            <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.info_hash)">{{ record.info_hash }}</span>
           </template>
         </template>
       </a-table>
@@ -50,9 +50,14 @@ import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { trackerApi } from '@/api/tracker'
-import { formatTime } from '@/utils/format'
+import { formatTime, copyToClipboard } from '@/utils/format'
 
 const { t } = useI18n()
+
+function copyHash(text: string) {
+  copyToClipboard(text)
+  message.success(t('common.copied'))
+}
 
 const loading = ref(false)
 const historyLoading = ref(false)

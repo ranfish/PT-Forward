@@ -54,6 +54,9 @@
       @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'info_hash'">
+          <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.info_hash)">{{ record.info_hash }}</span>
+        </template>
         <template v-if="column.key === 'status'">
           <a-badge
             :status="record.status === 'seeding' ? 'success' : record.status === 'downloading' ? 'processing' : 'warning'"
@@ -93,10 +96,16 @@ import { seedingApi } from '@/api/seeding'
 import { downloadersApi } from '@/api/downloaders'
 import { usePagination } from '@/composables/usePagination'
 import { useEnumLabels } from '@/utils/enumLabels'
-import { formatTime } from '@/utils/format'
+import { formatTime, copyToClipboard } from '@/utils/format'
 
 const { t } = useI18n()
 const { translateSeedingStatus } = useEnumLabels()
+
+function copyHash(text: string) {
+  copyToClipboard(text)
+  message.success(t('common.copied'))
+}
+
 const downloaderOptions = ref<{label: string, value: string}[]>([])
 const filters = reactive({
   search: '',

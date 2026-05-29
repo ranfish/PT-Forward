@@ -96,7 +96,7 @@
             <span v-else>{{ record.title }}</span>
           </template>
           <template v-if="column.key === 'info_hash'">
-            <span v-if="/^[0-9a-f]{40}$/i.test(record.info_hash)">{{ record.info_hash }}</span>
+            <span v-if="/^[0-9a-f]{40}$/i.test(record.info_hash)" style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.info_hash)">{{ record.info_hash }}</span>
             <span v-else style="color: #999">-</span>
           </template>
           <template v-if="column.key === 'size'">
@@ -121,7 +121,39 @@ import {
 } from '@ant-design/icons-vue'
 import { dashboardApi, type TrendPoint } from '@/api/dashboard'
 import { useWebSocketStore } from '@/stores/websocket'
-import { formatTime } from '@/utils/format'
+import { formatTime, copyToClipboard } from '@/utils/format'
+
+const torrentStatusLabels: Record<string, string> = {
+  pushed: '已入库',
+  seen: '已发现',
+  skipped: '已跳过',
+  filtered: '已过滤',
+  error: '出错',
+  pending: '待处理',
+}
+
+const discountLabels: Record<string, string> = {
+  NONE: '-',
+  FREE: '免费',
+  '2XFREE': '2x免费',
+  '2XUP': '2x上传',
+  '2X50': '2x上传 50%下载',
+  PERCENT_25: '75折',
+  PERCENT_30: '7折',
+  PERCENT_50: '5折',
+  PERCENT_70: '3折',
+  PERCENT_75: '25折',
+  CUSTOM: '自定义',
+}
+
+function discountLabel(s: string): string {
+  return torrentStatusLabels[s] || discountLabels[s] || s
+}
+
+function copyHash(text: string) {
+  copyToClipboard(text)
+  message.success(t('common.copied'))
+}
 
 interface ActivityItem {
   id: number
@@ -168,7 +200,7 @@ const activityColumns = [
   { title: '种子ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 100 },
   { title: 'InfoHash', key: 'info_hash', width: 280 },
   { title: t('common.size'), key: 'size', width: 100 },
-  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100 },
+  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100, customRender: ({ text }: { text: string }) => discountLabel(text) },
   { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 

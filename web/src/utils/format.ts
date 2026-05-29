@@ -3,7 +3,7 @@ export function formatBytes(bytes?: number | string): string {
   const n = typeof bytes === 'string' ? Number(bytes) : bytes
   if (!Number.isFinite(n) || n < 0) return '-'
   if (n === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
   let i = 0
   let val = n
   while (val >= 1024 && i < units.length - 1) {
@@ -38,6 +38,17 @@ export function formatDurationNs(ns?: number): string {
   const ms = ns / 1000000
   if (ms < 1000) return `${ms.toFixed(0)}ms`
   return `${(ms / 1000).toFixed(1)}s`
+}
+
+export function copyToClipboard(text: string) {
+  const el = document.createElement('textarea')
+  el.value = text
+  el.style.position = 'fixed'
+  el.style.left = '-9999px'
+  document.body.appendChild(el)
+  el.select()
+  document.execCommand('copy')
+  document.body.removeChild(el)
 }
 
 export function formatDurationSec(seconds?: number): string {

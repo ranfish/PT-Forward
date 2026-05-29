@@ -27,6 +27,8 @@ var (
 	reGazelleGroupID    = regexp.MustCompile(`torrents\.php\?id=(\d+)`)
 	reGazelleErrorClass = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reGazelleErrorP     = regexp.MustCompile(`<p[^>]*>([^<]*(?:error|fail|already|duplicate|exist)[^<]*)</p>`)
+	reGazelleUserBonus   = regexp.MustCompile(`(?i)积分:\s*([\d,]+)`)
+	reGazelleSeedingNum  = regexp.MustCompile(`(?i)当前做种[^<]*<[^>]*>(\d+)`)
 )
 
 type GazelleAdapter struct {
@@ -569,10 +571,21 @@ func (a *GazelleAdapter) VerifyExists(ctx context.Context, config *model.SiteCon
 }
 
 func (a *GazelleAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	var stats *model.UserStatsResult
+	var err error
 	if config.APIKey != "" {
-		return a.fetchUserStatsAPI(ctx, config)
+		stats, err = a.fetchUserStatsAPI(ctx, config)
+	} else {
+		stats, err = a.fetchUserStatsCookie(ctx, config)
 	}
-	return a.fetchUserStatsCookie(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	if stats.BonusPoints == 0 {
+		a.fetchFromUserPHP(ctx, config, stats)
+	}
+	a.fetchSeedingFromCommunityStats(ctx, config, stats)
+	return stats, nil
 }
 
 func (a *GazelleAdapter) fetchUserStatsAPI(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
@@ -682,12 +695,131 @@ func toInt64(v interface{}) int64 {
 			return int64(f)
 		}
 	case string:
-		if i, err := strconv.ParseInt(val, 10, 64); err == nil {
+		cleaned := strings.ReplaceAll(val, ",", "")
+		if i, err := strconv.ParseInt(cleaned, 10, 64); err == nil {
 			return i
 		}
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
+		if f, err := strconv.ParseFloat(cleaned, 64); err == nil {
 			return int64(f)
 		}
 	}
 	return 0
+}
+
+func (a *GazelleAdapter) fetchFromUserPHP(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
+	baseURL := resolveBase(config)
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/user.php", nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { drainBody(resp) }()
+
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return
+	}
+
+	html := string(body)
+	if stats.BonusPoints == 0 {
+		if m := reGazelleUserBonus.FindStringSubmatch(html); len(m) > 1 {
+			bonusStr := strings.ReplaceAll(m[1], ",", "")
+			if v, err := strconv.ParseFloat(bonusStr, 64); err == nil {
+				stats.BonusPoints = v
+			}
+		}
+	}
+	if stats.SeedingCount == 0 {
+		if m := reGazelleSeedingNum.FindStringSubmatch(html); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil {
+				stats.SeedingCount = n
+			}
+		}
+	}
+}
+
+func (a *GazelleAdapter) fetchSeedingFromCommunityStats(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
+	userID := a.getUserID(ctx, config)
+	if userID == 0 {
+		return
+	}
+	baseURL := resolveBase(config)
+	u := fmt.Sprintf("%s/ajax.php?action=community_stats&userid=%d", baseURL, userID)
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return
+	}
+	if config.APIKey != "" {
+		req.Header.Set("Authorization", config.APIKey)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return
+	}
+
+	var result struct {
+		Status   string `json:"status"`
+		Response struct {
+			Seeding interface{} `json:"seeding"`
+		} `json:"response"`
+	}
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil {
+		return
+	}
+	if result.Status != "success" {
+		return
+	}
+	if n := toInt64(result.Response.Seeding); n > 0 {
+		stats.SeedingCount = int(n)
+	}
+}
+
+func (a *GazelleAdapter) getUserID(ctx context.Context, config *model.SiteConfig) int64 {
+	baseURL := resolveBase(config)
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/ajax.php?action=index", nil)
+	if err != nil {
+		return 0
+	}
+	if config.APIKey != "" {
+		req.Header.Set("Authorization", config.APIKey)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return 0
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return 0
+	}
+
+	var result struct {
+		Response struct {
+			ID int64 `json:"id"`
+		} `json:"response"`
+	}
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil {
+		return 0
+	}
+	return result.Response.ID
 }

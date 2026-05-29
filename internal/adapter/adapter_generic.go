@@ -40,6 +40,20 @@ var (
 	reGenericTTGID             = regexp.MustCompile(`/t/(\d+)`)
 	reGenericStarSpaceDetailID = regexp.MustCompile(`(?:details|torrent)\.php\?id=(\d+)`)
 	reGenericIMDbID            = regexp.MustCompile(`tt\d+`)
+
+	reGenericWelcomeUsername   = regexp.MustCompile(`(?i)欢迎[：:]\s*<a[^>]*><span[^>]*>([^<]+)</span>`)
+	reGenericLabelUpload       = regexp.MustCompile(`(?i)上传[：:]\s*([\d.]+)\s*(TB|GB|MB|KB|T|G|M|K)`)
+	reGenericLabelDownload     = regexp.MustCompile(`(?i)下载[：:]\s*([\d.]+)\s*(TB|GB|MB|KB|T|G|M|K)`)
+	reGenericBonus             = regexp.MustCompile(`(?i)魔力[：:]\s*([\d,.]+)`)
+	reGenericSeedingCount      = regexp.MustCompile(`(?i)alt=['"]做种数['"][^>]*>\s*(\d+)`)
+	reGenericUserClass         = regexp.MustCompile(`(?i)class='uc(\d+)'`)
+
+	starSpaceUserClassMap = map[string]string{
+		"0": "未激活", "1": "User", "2": "Power User", "3": "Elite User",
+		"4": "Crazy User", "5": "Insane User", "6": "Veteran User",
+		"7": "Extreme User", "8": "Ultimate User", "9": "Master User",
+		"10": "Star User", "11": "God User",
+	}
 )
 
 type GenericAdapter struct {
@@ -1224,7 +1238,10 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 	}
 	html := string(htmlBytes)
 
-	if strings.Contains(html, "login.php") && !strings.Contains(html, "userdetails") {
+	if strings.Contains(html, "login.php") && !strings.Contains(html, "userdetails") && !strings.Contains(html, "userdetail.") {
+		return nil, fmt.Errorf("cookie 无效或已过期")
+	}
+	if strings.Contains(html, "login_act.php") && !strings.Contains(html, "user_info") {
 		return nil, fmt.Errorf("cookie 无效或已过期")
 	}
 
@@ -1235,21 +1252,43 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 		result.Username = strings.TrimSpace(m[2])
 	} else if m := reNexusUsernameAlt.FindStringSubmatch(html); len(m) > 2 {
 		result.Username = strings.TrimSpace(m[2])
+	} else if m := reGenericWelcomeUsername.FindStringSubmatch(html); len(m) > 1 {
+		result.Username = strings.TrimSpace(m[1])
 	}
 	if m := reNexusFontUploaded.FindStringSubmatch(html); len(m) > 1 {
 		result.UploadBytes = parseSizeString(cleanText(m[1]))
 	} else if m := reNexusLabelUpload.FindStringSubmatch(html); len(m) > 1 {
 		result.UploadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reGenericLabelUpload.FindStringSubmatch(html); len(m) > 2 {
+		result.UploadBytes = parseSizeString(m[1] + m[2] + "B")
 	}
 	if m := reNexusFontDownloaded.FindStringSubmatch(html); len(m) > 1 {
 		result.DownloadBytes = parseSizeString(cleanText(m[1]))
 	} else if m := reNexusLabelDownload.FindStringSubmatch(html); len(m) > 1 {
 		result.DownloadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reGenericLabelDownload.FindStringSubmatch(html); len(m) > 2 {
+		result.DownloadBytes = parseSizeString(m[1] + m[2] + "B")
 	}
 	if m := reNexusFontRatio.FindStringSubmatch(html); len(m) > 1 {
 		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
 	} else if m := reNexusLabelRatio.FindStringSubmatch(html); len(m) > 1 {
 		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
+	}
+	if m := reGenericBonus.FindStringSubmatch(html); len(m) > 1 {
+		bonusStr := strings.ReplaceAll(m[1], ",", "")
+		if v, err := strconv.ParseFloat(bonusStr, 64); err == nil {
+			result.BonusPoints = v
+		}
+	}
+	if m := reGenericSeedingCount.FindStringSubmatch(html); len(m) > 1 {
+		result.SeedingCount, _ = strconv.Atoi(strings.TrimSpace(m[1]))
+	}
+	if m := reGenericUserClass.FindStringSubmatch(html); len(m) > 1 {
+		if name, ok := starSpaceUserClassMap[m[1]]; ok {
+			result.UserClass = name
+		} else {
+			result.UserClass = "UC" + m[1]
+		}
 	}
 	if result.Ratio == 0 && result.DownloadBytes > 0 && result.UploadBytes > 0 {
 		result.Ratio = float64(result.UploadBytes) / float64(result.DownloadBytes)
