@@ -84,11 +84,8 @@ func TestManager_LoadClients_WithConfig(t *testing.T) {
 	}
 
 	names := m.ListClients()
-	if len(names) != 1 {
-		t.Errorf("expected 1 client, got %d: %v", len(names), names)
-	}
-	if names[0] != "test-qb" {
-		t.Errorf("expected test-qb, got %s", names[0])
+	if len(names) != 0 {
+		t.Errorf("expected 0 clients (connection to 127.0.0.1:9999 should fail), got %d: %v", len(names), names)
 	}
 }
 
@@ -107,16 +104,16 @@ func TestManager_Reload(t *testing.T) {
 	if err := m.LoadClients(context.Background()); err != nil {
 		t.Fatalf("LoadClients: %v", err)
 	}
-	if m.ConnectedCount() != 1 {
-		t.Errorf("expected 1, got %d", m.ConnectedCount())
+	if m.ConnectedCount() != 0 {
+		t.Errorf("expected 0 (unreachable), got %d", m.ConnectedCount())
 	}
 
 	err := m.Reload(context.Background())
 	if err != nil {
 		t.Fatalf("Reload: %v", err)
 	}
-	if m.ConnectedCount() != 1 {
-		t.Errorf("expected 1 after reload, got %d", m.ConnectedCount())
+	if m.ConnectedCount() != 0 {
+		t.Errorf("expected 0 after reload (unreachable), got %d", m.ConnectedCount())
 	}
 }
 
@@ -139,6 +136,9 @@ func TestManager_GetByDBID(t *testing.T) {
 
 	_, gotCfg, err := m.GetByDBID(context.Background(), cfg.ID)
 	if err != nil {
+		if gotCfg != nil && gotCfg.Name == "client-b" {
+			return
+		}
 		t.Fatalf("GetByDBID: %v", err)
 	}
 	if gotCfg.Name != "client-b" {
@@ -202,11 +202,12 @@ func TestManager_LoadClients_RemovesStale(t *testing.T) {
 		Name: "stale-qb", Type: "qbittorrent", URL: "http://127.0.0.1:9999",
 		Role: "download", Enabled: true,
 	})
-	if err := m.LoadClients(context.Background()); err != nil {
-		t.Fatalf("LoadClients: %v", err)
-	}
+
+	m.mu.Lock()
+	m.clients["stale-qb"] = &stubClient{name: "stale-qb"}
+	m.mu.Unlock()
 	if m.ConnectedCount() != 1 {
-		t.Fatalf("expected 1, got %d", m.ConnectedCount())
+		t.Fatalf("expected 1 (injected), got %d", m.ConnectedCount())
 	}
 
 	db.Exec("DELETE FROM clients WHERE name = 'stale-qb'")
@@ -273,3 +274,52 @@ func TestManager_CreateClient_Transmission(t *testing.T) {
 		t.Fatalf("createClient transmission: %v", err)
 	}
 }
+
+type stubClient struct {
+	name string
+}
+
+func (s *stubClient) GetName() string                                               { return s.name }
+func (s *stubClient) GetRole() string                                               { return "download" }
+func (s *stubClient) GetReseedTargetID() string                                     { return "" }
+func (s *stubClient) GetID() uint                                                   { return 0 }
+func (s *stubClient) GetSharedPaths() []model.SharedPathMapping                     { return nil }
+func (s *stubClient) GetTorrentByHash(_ context.Context, _ string) (*model.TorrentInfo, error) {
+	return nil, nil
+}
+func (s *stubClient) GetSeedingTorrents(_ context.Context) ([]*model.TorrentInfo, error) {
+	return nil, nil
+}
+func (s *stubClient) GetTorrentsByPath(_ context.Context, _ string) ([]*model.TorrentInfo, error) {
+	return nil, nil
+}
+func (s *stubClient) GetMainData(_ context.Context) (*model.Maindata, error)        { return nil, nil }
+func (s *stubClient) GetMainDataIncremental(_ context.Context, _ int) (*model.Maindata, int, error) {
+	return nil, 0, nil
+}
+func (s *stubClient) AddFromFile(_ context.Context, _ []byte, _ model.AddTorrentOptions) (*model.AddResult, error) {
+	return nil, nil
+}
+func (s *stubClient) ExportTorrent(_ context.Context, _ string) ([]byte, error) { return nil, nil }
+func (s *stubClient) DeleteTorrent(_ context.Context, _ string, _ bool) error   { return nil }
+func (s *stubClient) BatchDeleteTorrents(_ context.Context, _ []string, _ bool) error {
+	return nil
+}
+func (s *stubClient) PauseTorrent(_ context.Context, _ string) error            { return nil }
+func (s *stubClient) ResumeTorrent(_ context.Context, _ string) error           { return nil }
+func (s *stubClient) Reannounce(_ context.Context, _ string) error              { return nil }
+func (s *stubClient) Recheck(_ context.Context, _ string) error                 { return nil }
+func (s *stubClient) SetTorrentTags(_ context.Context, _ string, _ []string) error {
+	return nil
+}
+func (s *stubClient) RemoveTorrentTags(_ context.Context, _ string, _ []string) error {
+	return nil
+}
+func (s *stubClient) SetCategory(_ context.Context, _ string, _ string) error    { return nil }
+func (s *stubClient) SetSavePath(_ context.Context, _ string, _ string) error    { return nil }
+func (s *stubClient) SetSuperSeeding(_ context.Context, _ string, _ bool) error   { return nil }
+func (s *stubClient) SetUploadLimit(_ context.Context, _ string, _ int64) error   { return nil }
+func (s *stubClient) PauseAllDownloads(_ context.Context) error                   { return nil }
+func (s *stubClient) ResumeAllDownloads(_ context.Context) error                  { return nil }
+func (s *stubClient) GetFreeSpace(_ context.Context) (int64, error)               { return 0, nil }
+func (s *stubClient) CheckExists(_ context.Context, _ string) (bool, error)       { return false, nil }

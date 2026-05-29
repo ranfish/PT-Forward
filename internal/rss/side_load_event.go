@@ -24,17 +24,35 @@ func NewSideLoadEventEmitter() *SideLoadEventEmitter {
 	return &SideLoadEventEmitter{}
 }
 
+type subHandle struct {
+	ch chan SideLoadEvent
+}
+
 func (e *SideLoadEventEmitter) Subscribe() chan SideLoadEvent {
 	ch := make(chan SideLoadEvent, 100)
-	e.subscribers.Store(new(int), ch)
+	handle := &subHandle{ch: ch}
+	e.subscribers.Store(handle, true)
 	return ch
 }
 
+func (e *SideLoadEventEmitter) Unsubscribe(ch chan SideLoadEvent) {
+	e.subscribers.Range(func(key, _ interface{}) bool {
+		if h, ok := key.(*subHandle); ok && h.ch == ch {
+			e.subscribers.Delete(key)
+			return false
+		}
+		return true
+	})
+}
+
 func (e *SideLoadEventEmitter) Emit(event SideLoadEvent, logger *zap.Logger) {
-	e.subscribers.Range(func(_, value interface{}) bool {
-		ch := value.(chan SideLoadEvent)
+	e.subscribers.Range(func(key, _ interface{}) bool {
+		h, ok := key.(*subHandle)
+		if !ok {
+			return true
+		}
 		select {
-		case ch <- event:
+		case h.ch <- event:
 		default:
 			if logger != nil {
 				logger.Warn("side load event dropped: subscriber channel full",

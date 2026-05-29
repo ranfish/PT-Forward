@@ -7,12 +7,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -53,6 +53,7 @@ func (s *Service) Send(ctx context.Context, msg model.FormattedMessage) error {
 			continue
 		}
 		if s.inQuietHours(ch) {
+			s.recordHistory(ctx, ch.ID, msg, false, "suppressed: quiet hours")
 			continue
 		}
 		if ch.Healthy {
@@ -117,6 +118,7 @@ func (s *Service) Dispatch(ctx context.Context, event string, msg model.Formatte
 			continue
 		}
 		if s.inQuietHours(ch) {
+			s.recordHistory(ctx, ch.ID, msg, false, "suppressed: quiet hours")
 			continue
 		}
 
@@ -262,10 +264,10 @@ func (s *Service) doHTTPPost(ctx context.Context, apiURL, contentType, body stri
 	if err != nil {
 		return false, err.Error()
 	}
-	defer func() { _ = resp.Body.Close() }()
+	respBody, _ := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
 
 	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(resp.Body)
 		return false, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody))
 	}
 	return true, ""
@@ -282,7 +284,7 @@ func (s *Service) doHTTPGet(ctx context.Context, apiURL string) (bool, string) {
 	if err != nil {
 		return false, err.Error()
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	if resp.StatusCode >= 400 {
 		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
@@ -362,7 +364,7 @@ func parseConfig(configStr string, logger *zap.Logger) map[string]string {
 	}
 	if err := json.Unmarshal([]byte(configStr), &cfg); err != nil && logger != nil {
 		logger.Warn("notification config parse failed, using empty config",
-			zap.String("raw", configStr),
+			zap.Int("raw_len", len(configStr)),
 			zap.Error(err),
 		)
 	}
@@ -381,4 +383,9 @@ func calcDingTalkSign(timestamp int64, secret string) string {
 	h := hmac.New(sha256.New, []byte(secret))
 	h.Write([]byte(stringToSign))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
+func (s *Service) CleanupHistory(ctx context.Context, retainDays int) error {
+	repo := NewRepository(s.db)
+	return repo.CleanupOldHistory(ctx, retainDays)
 }

@@ -10,6 +10,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   let reconnectAttempts = 0
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
   const activeChannels = ref<string[]>([])
+  let stopped = false
 
   function startHeartbeat() {
     stopHeartbeat()
@@ -28,6 +29,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   function connect() {
+    if (stopped) return
+
     const token = localStorage.getItem('pt-forward-access-token')
     if (!token) return
 
@@ -36,22 +39,30 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const url = `${protocol}//${location.host}/api/v1/ws?token=${token}`
+    const url = `${protocol}//${location.host}/api/v1/ws`
 
     ws = new WebSocket(url)
 
     ws.onopen = () => {
-      connected.value = true
-      reconnectAttempts = 0
-      startHeartbeat()
-      if (activeChannels.value.length > 0) {
-        ws!.send(JSON.stringify({ type: 'subscribe', channels: activeChannels.value }))
-      }
+      ws!.send(JSON.stringify({ type: 'auth', token }))
     }
 
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data)
+        if (msg.type === 'server.connected') {
+          connected.value = true
+          reconnectAttempts = 0
+          startHeartbeat()
+          if (activeChannels.value.length > 0) {
+            ws!.send(JSON.stringify({ type: 'subscribe', channels: activeChannels.value }))
+          }
+          return
+        }
+        if (msg.type === 'error' && !connected.value) {
+          ws?.close()
+          return
+        }
         messages.value = [...messages.value, msg]
         if (messages.value.length > 200) {
           messages.value = messages.value.slice(-100)
@@ -65,7 +76,9 @@ export const useWebSocketStore = defineStore('websocket', () => {
       connected.value = false
       ws = null
       stopHeartbeat()
-      scheduleReconnect()
+      if (!stopped) {
+        scheduleReconnect()
+      }
     }
 
     ws.onerror = () => {
@@ -81,6 +94,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   function disconnect() {
+    stopped = true
     if (reconnectTimer) clearTimeout(reconnectTimer)
     reconnectTimer = null
     reconnectAttempts = 0

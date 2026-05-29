@@ -97,6 +97,7 @@ func TestPipelineIntegration_FilterAccept_SeedingAndPublish(t *testing.T) {
 			Size:      3900000000,
 			InfoHash:  "789ghi012jkl",
 			SourceID:  "1",
+			Discount:  model.DiscountFree,
 		},
 		{
 			SiteName:        "testsite",

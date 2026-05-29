@@ -10,17 +10,55 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
+
+func parseTagsJSON(raw json.RawMessage) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var arr []string
+	if err := json.Unmarshal(raw, &arr); err == nil {
+		return arr
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil && s != "" {
+		return strings.Split(s, ", ")
+	}
+	return nil
+}
+
+func parseCategoriesJSON(raw json.RawMessage) map[string]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var simple map[string]string
+	if err := json.Unmarshal(raw, &simple); err == nil {
+		return simple
+	}
+	var nested map[string]struct {
+		SavePath string `json:"savePath"`
+	}
+	if err := json.Unmarshal(raw, &nested); err == nil {
+		result := make(map[string]string, len(nested))
+		for k, v := range nested {
+			result[k] = v.SavePath
+		}
+		return result
+	}
+	return nil
+}
 
 func (c *QBClient) GetTorrentByHash(ctx context.Context, hash string) (*model.TorrentInfo, error) {
 	resp, err := c.get(ctx, "/api/v2/torrents/info?hashes="+url.QueryEscape(hash))
 	if err != nil {
 		return nil, c.wrapErr(11002, "get torrent by hash", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	var torrents []qbTorrent
 	if err := json.NewDecoder(resp.Body).Decode(&torrents); err != nil {
@@ -38,7 +76,7 @@ func (c *QBClient) GetSeedingTorrents(ctx context.Context) ([]*model.TorrentInfo
 	if err != nil {
 		return nil, c.wrapErr(11002, "get seeding torrents", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	var torrents []qbTorrent
 	if err := json.NewDecoder(resp.Body).Decode(&torrents); err != nil {
@@ -57,7 +95,7 @@ func (c *QBClient) GetTorrentsByPath(ctx context.Context, savePath string) ([]*m
 	if err != nil {
 		return nil, c.wrapErr(11002, "get torrents by path", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	var torrents []qbTorrent
 	if err := json.NewDecoder(resp.Body).Decode(&torrents); err != nil {
@@ -78,39 +116,45 @@ func (c *QBClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
 	if err != nil {
 		return nil, c.wrapErr(11002, "get maindata", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	var raw struct {
 		Torrents    map[string]qbTorrent `json:"torrents"`
 		ServerState struct {
 			FreeSpaceOnDisk int64 `json:"free_space_on_disk"`
+			DlInfoSpeed     int64 `json:"dl_info_speed"`
 			UpInfoSpeed     int64 `json:"up_info_speed"`
 		} `json:"server_state"`
-		Rid        int               `json:"rid"`
-		Categories map[string]string `json:"categories"`
-		Tags       string            `json:"tags"`
-		FullUpdate bool              `json:"full_update"`
+		Rid        int                `json:"rid"`
+		Categories json.RawMessage    `json:"categories"`
+		Tags       json.RawMessage    `json:"tags"`
+		FullUpdate bool               `json:"full_update"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, c.wrapErr(11002, "decode maindata", err)
 	}
 
 	torrents := make(map[string]model.TorrentInfo, len(raw.Torrents))
+	var totalSize int64
 	for hash, t := range raw.Torrents {
-		torrents[hash] = *t.toModel()
+		mt := *t.toModel()
+		torrents[hash] = mt
+		totalSize += mt.TotalSize
 	}
 
-	var tags []string
-	if raw.Tags != "" {
-		tags = strings.Split(raw.Tags, ", ")
-	}
+	tags := parseTagsJSON(raw.Tags)
+	categories := parseCategoriesJSON(raw.Categories)
 
 	return &model.Maindata{
-		Torrents:    torrents,
-		FreeSpace:   raw.ServerState.FreeSpaceOnDisk,
-		CategoryMap: raw.Categories,
-		Tags:        tags,
-		ServerState: model.ServerState{UploadSpeed: raw.ServerState.UpInfoSpeed},
+		Torrents:       torrents,
+		FreeSpace:      raw.ServerState.FreeSpaceOnDisk,
+		TotalDiskSpace: raw.ServerState.FreeSpaceOnDisk + totalSize,
+		CategoryMap:    categories,
+		Tags:           tags,
+		ServerState: model.ServerState{
+			DownloadSpeed: raw.ServerState.DlInfoSpeed,
+			UploadSpeed:   raw.ServerState.UpInfoSpeed,
+		},
 	}, nil
 }
 
@@ -120,7 +164,7 @@ func (c *QBClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.
 	if err != nil {
 		return nil, 0, c.wrapErr(11002, "get maindata incremental", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	var raw struct {
 		Torrents        map[string]qbTorrent `json:"torrents"`
@@ -128,10 +172,10 @@ func (c *QBClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.
 		ServerState     struct {
 			FreeSpaceOnDisk int64 `json:"free_space_on_disk"`
 		} `json:"server_state"`
-		Rid        int               `json:"rid"`
-		Categories map[string]string `json:"categories"`
-		Tags       string            `json:"tags"`
-		FullUpdate bool              `json:"full_update"`
+		Rid        int                `json:"rid"`
+		Categories json.RawMessage    `json:"categories"`
+		Tags       json.RawMessage    `json:"tags"`
+		FullUpdate bool               `json:"full_update"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, 0, c.wrapErr(11002, "decode maindata incremental", err)
@@ -142,15 +186,13 @@ func (c *QBClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.
 		torrents[hash] = *t.toModel()
 	}
 
-	var tags []string
-	if raw.Tags != "" {
-		tags = strings.Split(raw.Tags, ", ")
-	}
+	tags := parseTagsJSON(raw.Tags)
+	categories := parseCategoriesJSON(raw.Categories)
 
 	return &model.Maindata{
 		Torrents:    torrents,
 		FreeSpace:   raw.ServerState.FreeSpaceOnDisk,
-		CategoryMap: raw.Categories,
+		CategoryMap: categories,
 		Tags:        tags,
 	}, raw.Rid, nil
 }
@@ -166,7 +208,7 @@ func (c *QBClient) AddFromFile(ctx context.Context, data []byte, opts model.AddT
 		return nil, c.wrapErr(11007, "build multipart body", err)
 	}
 
-	bodyBytes, err := io.ReadAll(body)
+	bodyBytes, err := io.ReadAll(io.LimitReader(body, 100<<20))
 	if err != nil {
 		return nil, c.wrapErr(11007, "read multipart body", err)
 	}
@@ -182,9 +224,17 @@ func (c *QBClient) AddFromFile(ctx context.Context, data []byte, opts model.AddT
 	if err != nil {
 		return nil, c.wrapErr(11002, "add torrent request", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	if resp.StatusCode == http.StatusForbidden {
+		c.mu.RLock()
+		banned := c.ipBanned && time.Now().Before(c.banUntil)
+		c.mu.RUnlock()
+
+		if banned {
+			return nil, c.newErr(11003, "qBittorrent IP banned, add torrent skipped")
+		}
+
 		c.logger.Debug("session expired during add, re-login", zap.String("client", c.cfg.Name))
 		if loginErr := c.login(ctx); loginErr != nil {
 			return nil, c.wrapErr(11002, "re-login for add torrent", loginErr)
@@ -196,7 +246,7 @@ func (c *QBClient) AddFromFile(ctx context.Context, data []byte, opts model.AddT
 		if err != nil {
 			return nil, c.wrapErr(11002, "add torrent retry request", err)
 		}
-		defer func() { _ = resp2.Body.Close() }()
+		defer func() { httpclient.DrainBody(resp2) }()
 		resp = resp2
 	}
 
@@ -204,7 +254,7 @@ func (c *QBClient) AddFromFile(ctx context.Context, data []byte, opts model.AddT
 		return nil, c.newErr(11007, "invalid torrent file")
 	}
 	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		return nil, c.newErr(11007, fmt.Sprintf("add torrent returned %d: %s", resp.StatusCode, string(b)))
 	}
 
@@ -236,9 +286,9 @@ func (c *QBClient) queryHashAfterAdd(ctx context.Context, data []byte) (string, 
 	if err != nil {
 		return "", c.wrapErr(11007, "query recent torrent", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
 	if resp.StatusCode != http.StatusOK {
 		return "", c.newErr(11007, fmt.Sprintf("query recent torrent returned %d", resp.StatusCode))
 	}
@@ -258,13 +308,13 @@ func (c *QBClient) ExportTorrent(ctx context.Context, hash string) ([]byte, erro
 	if err != nil {
 		return nil, c.wrapErr(11002, "export torrent", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.newErr(11005, fmt.Sprintf("export torrent returned %d", resp.StatusCode))
 	}
 
-	b, err := io.ReadAll(resp.Body)
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20))
 	if err != nil {
 		return nil, c.wrapErr(11002, "read export response", err)
 	}
@@ -280,7 +330,7 @@ func (c *QBClient) DeleteTorrent(ctx context.Context, hash string, deleteFiles b
 	if err != nil {
 		return c.wrapErr(11002, "delete torrent", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -293,7 +343,7 @@ func (c *QBClient) BatchDeleteTorrents(ctx context.Context, hashes []string, del
 	if err != nil {
 		return c.wrapErr(11002, "batch delete torrents", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -303,7 +353,7 @@ func (c *QBClient) PauseTorrent(ctx context.Context, hash string) error {
 	if err != nil {
 		return c.wrapErr(11002, "pause torrent", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -313,7 +363,7 @@ func (c *QBClient) ResumeTorrent(ctx context.Context, hash string) error {
 	if err != nil {
 		return c.wrapErr(11002, "resume torrent", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -323,7 +373,7 @@ func (c *QBClient) Reannounce(ctx context.Context, hash string) error {
 	if err != nil {
 		return c.wrapErr(11002, "reannounce", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -333,7 +383,7 @@ func (c *QBClient) Recheck(ctx context.Context, hash string) error {
 	if err != nil {
 		return c.wrapErr(11002, "recheck", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -351,7 +401,7 @@ func (c *QBClient) SetTorrentTags(ctx context.Context, hash string, tags []strin
 		if err != nil {
 			return c.wrapErr(11002, "remove old tags", err)
 		}
-		_ = resp.Body.Close()
+		httpclient.DrainBody(resp)
 	}
 	if len(tags) > 0 {
 		addData := url.Values{
@@ -362,7 +412,7 @@ func (c *QBClient) SetTorrentTags(ctx context.Context, hash string, tags []strin
 		if err != nil {
 			return c.wrapErr(11002, "add tags", err)
 		}
-		_ = resp.Body.Close()
+		httpclient.DrainBody(resp)
 	}
 	return nil
 }
@@ -376,7 +426,7 @@ func (c *QBClient) RemoveTorrentTags(ctx context.Context, hash string, tags []st
 	if err != nil {
 		return c.wrapErr(11002, "remove tags", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -389,7 +439,7 @@ func (c *QBClient) SetCategory(ctx context.Context, hash string, category string
 	if err != nil {
 		return c.wrapErr(11002, "set category", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -402,7 +452,7 @@ func (c *QBClient) SetSavePath(ctx context.Context, hash string, savePath string
 	if err != nil {
 		return c.wrapErr(11002, "set save path", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -415,7 +465,7 @@ func (c *QBClient) SetSuperSeeding(ctx context.Context, hash string, enable bool
 	if err != nil {
 		return c.wrapErr(11002, "set super seeding", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -428,7 +478,7 @@ func (c *QBClient) SetUploadLimit(ctx context.Context, infoHash string, limitByt
 	if err != nil {
 		return c.wrapErr(11002, "set upload limit", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -438,7 +488,7 @@ func (c *QBClient) PauseAllDownloads(ctx context.Context) error {
 	if err != nil {
 		return c.wrapErr(11002, "pause all", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 
@@ -448,7 +498,7 @@ func (c *QBClient) ResumeAllDownloads(ctx context.Context) error {
 	if err != nil {
 		return c.wrapErr(11002, "resume all", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	return nil
 }
 

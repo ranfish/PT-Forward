@@ -14,6 +14,11 @@ import (
 	"gorm.io/gorm"
 )
 
+type watchEntry struct {
+	candidateID uint
+	submittedAt time.Time
+}
+
 type CompletionWatcher struct {
 	db        *gorm.DB
 	clientMgr *client.Manager
@@ -22,6 +27,7 @@ type CompletionWatcher struct {
 
 	watchStore   sync.Map
 	pollInterval time.Duration
+	watchTTL     time.Duration
 }
 
 func NewCompletionWatcher(db *gorm.DB, clientMgr *client.Manager, pipeline *publish.Pipeline, logger *zap.Logger) *CompletionWatcher {
@@ -31,6 +37,7 @@ func NewCompletionWatcher(db *gorm.DB, clientMgr *client.Manager, pipeline *publ
 		pipeline:     pipeline,
 		logger:       logger,
 		pollInterval: 30 * time.Second,
+		watchTTL:     48 * time.Hour,
 	}
 }
 
@@ -56,7 +63,7 @@ func (w *CompletionWatcher) Watch(_ context.Context, clientName, infoHash string
 		return &model.AppError{Code: 40001, Message: "client_name and info_hash are required"}
 	}
 	key := clientName + "|" + infoHash
-	w.watchStore.Store(key, candidateID)
+	w.watchStore.Store(key, watchEntry{candidateID: candidateID, submittedAt: time.Now()})
 	w.logger.Debug("watch registered",
 		zap.String("client", clientName),
 		zap.String("info_hash", infoHash),
@@ -139,7 +146,22 @@ func (w *CompletionWatcher) pollOnce(ctx context.Context) {
 		}
 
 		keyStr := key.(string)
-		candidateID := value.(uint)
+		entry, ok := value.(watchEntry)
+		if !ok {
+			w.watchStore.Delete(key)
+			return true
+		}
+		candidateID := entry.candidateID
+
+		if time.Since(entry.submittedAt) > w.watchTTL {
+			w.logger.Warn("watch TTL expired, marking orphan",
+				zap.Uint("candidate_id", candidateID),
+				zap.Duration("ttl", w.watchTTL),
+			)
+			w.watchStore.Delete(key)
+			w.markCandidateOrphan(ctx, candidateID)
+			return true
+		}
 
 		parts := strings.SplitN(keyStr, "|", 2)
 		if len(parts) != 2 {
@@ -330,7 +352,7 @@ func (w *CompletionWatcher) recoverPendingWatches(ctx context.Context) {
 	for _, c := range candidates {
 		if c.ClientID != "" && c.InfoHash != "" {
 			key := c.ClientID + "|" + c.InfoHash
-			w.watchStore.Store(key, c.ID)
+			w.watchStore.Store(key, watchEntry{candidateID: c.ID, submittedAt: time.Now()})
 			recovered++
 		}
 	}

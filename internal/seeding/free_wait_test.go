@@ -18,6 +18,9 @@ func setupFreeWaitDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
+	if err := db.AutoMigrate(&model.FreeWaitEntry{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db
 }
 
@@ -41,10 +44,10 @@ func TestFreeWaitMonitor_Add(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil)
+	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil, "client1", "1", false, 0)
 	assert.Equal(t, 1, m.PendingCount())
 
-	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil)
+	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil, "client1", "1", false, 0)
 	assert.Equal(t, 1, m.PendingCount())
 }
 
@@ -52,7 +55,7 @@ func TestFreeWaitMonitor_Remove(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test", 1024, nil)
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0)
 	assert.Equal(t, 1, m.PendingCount())
 
 	m.Remove("site-a", "123")
@@ -63,8 +66,8 @@ func TestFreeWaitMonitor_CheckOnce_BecameFree(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil)
-	m.Add("site-a", "456", "hash2", "Not Free", 2048, nil)
+	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil, "client1", "1", false, 0)
+	m.Add("site-a", "456", "hash2", "Not Free", 2048, nil, "client1", "1", false, 0)
 
 	checker := &mockDiscountChecker{
 		discounts: map[string]model.DiscountLevel{
@@ -89,7 +92,7 @@ func TestFreeWaitMonitor_CheckOnce_Expired(t *testing.T) {
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
 	before := time.Now().Add(-1 * time.Hour)
-	m.Add("site-a", "123", "hash1", "Test", 1024, &before)
+	m.Add("site-a", "123", "hash1", "Test", 1024, &before, "client1", "1", false, 0)
 
 	checker := &mockDiscountChecker{}
 	processed := m.CheckOnce(context.Background(), checker, nil)
@@ -101,7 +104,7 @@ func TestFreeWaitMonitor_CheckOnce_NoneFree(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test", 1024, nil)
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0)
 
 	checker := &mockDiscountChecker{
 		discounts: map[string]model.DiscountLevel{},
@@ -116,8 +119,8 @@ func TestFreeWaitMonitor_ClearAll(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test", 1024, nil)
-	m.Add("site-b", "456", "hash2", "Test2", 2048, nil)
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0)
+	m.Add("site-b", "456", "hash2", "Test2", 2048, nil, "client1", "1", false, 0)
 
 	m.ClearAll()
 	assert.Equal(t, 0, m.PendingCount())
@@ -127,6 +130,36 @@ func TestFreeWaitMonitor_AddEmptyTorrentID(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "", "hash1", "Test", 1024, nil)
+	m.Add("site-a", "", "hash1", "Test", 1024, nil, "client1", "1", false, 0)
 	assert.Equal(t, 0, m.PendingCount())
+}
+
+func TestFreeWaitMonitor_RecoverOnStartup(t *testing.T) {
+	db := setupFreeWaitDB(t)
+	m := NewFreeWaitMonitor(db, zap.NewNop())
+
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0)
+	m.Add("site-b", "456", "hash2", "Test2", 2048, nil, "client1", "2", true, 72)
+	assert.Equal(t, 2, m.PendingCount())
+
+	m2 := NewFreeWaitMonitor(db, zap.NewNop())
+	assert.Equal(t, 0, m2.PendingCount())
+
+	m2.RecoverOnStartup(context.Background())
+	assert.Equal(t, 2, m2.PendingCount())
+}
+
+func TestFreeWaitMonitor_RemoveDeletesFromDB(t *testing.T) {
+	db := setupFreeWaitDB(t)
+	m := NewFreeWaitMonitor(db, zap.NewNop())
+
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0)
+	assert.Equal(t, 1, m.PendingCount())
+
+	m.Remove("site-a", "123")
+	assert.Equal(t, 0, m.PendingCount())
+
+	m2 := NewFreeWaitMonitor(db, zap.NewNop())
+	m2.RecoverOnStartup(context.Background())
+	assert.Equal(t, 0, m2.PendingCount())
 }

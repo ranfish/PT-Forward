@@ -49,6 +49,8 @@ func (p *Provider) applyOverridesToInfo(ctx context.Context, siteName string, in
 	if err := p.db.WithContext(ctx).
 		Where("site_name = ?", siteName).
 		Find(&overrides).Error; err != nil {
+		p.logger.Warn("query site config overrides failed, using defaults",
+			zap.String("site", siteName), zap.Error(err))
 		return
 	}
 
@@ -88,8 +90,8 @@ func (p *Provider) applyOverridesToInfo(ctx context.Context, siteName string, in
 }
 
 func (p *Provider) GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error) {
-	site, err := p.repo.GetByDomain(ctx, domain)
-	if err != nil {
+	site := p.repo.GetByDomain(ctx, domain)
+	if site == nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
 	config := siteToConfig(site)
@@ -102,6 +104,8 @@ func (p *Provider) applyOverrides(ctx context.Context, siteName string, config *
 	if err := p.db.WithContext(ctx).
 		Where("site_name = ?", siteName).
 		Find(&overrides).Error; err != nil {
+		p.logger.Warn("query site config overrides failed, using defaults",
+			zap.String("site", siteName), zap.Error(err))
 		return
 	}
 
@@ -157,8 +161,8 @@ func (p *Provider) applyOverrides(ctx context.Context, siteName string, config *
 }
 
 func (p *Provider) GetSiteDefault(ctx context.Context, domain string) (*model.SiteDefault, error) {
-	site, err := p.repo.GetByDomain(ctx, domain)
-	if err != nil {
+	site := p.repo.GetByDomain(ctx, domain)
+	if site == nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
 
@@ -190,8 +194,8 @@ func (p *Provider) GetAdapter(ctx context.Context, domain string) (model.SiteAda
 	}
 	p.mu.RUnlock()
 
-	site, err := p.repo.GetByDomain(ctx, domain)
-	if err != nil {
+	site := p.repo.GetByDomain(ctx, domain)
+	if site == nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
 
@@ -236,6 +240,7 @@ func (p *Provider) BatchLoadSiteResources(ctx context.Context, domains []string)
 	var allOverrides []model.SiteConfigOverride
 	if len(siteNames) > 0 {
 		if err := p.db.WithContext(ctx).Where("site_name IN ?", siteNames).Find(&allOverrides).Error; err != nil {
+			p.logger.Warn("batch load site overrides failed", zap.Error(err))
 			allOverrides = nil
 		}
 	}
@@ -334,8 +339,8 @@ func (p *Provider) GetSiteInfoByURL(ctx context.Context, baseURL string) (*model
 }
 
 func (p *Provider) DetectFramework(ctx context.Context, domain string) (*model.DetectResult, error) {
-	site, err := p.repo.GetByDomain(ctx, domain)
-	if err != nil {
+	site := p.repo.GetByDomain(ctx, domain)
+	if site == nil {
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
 

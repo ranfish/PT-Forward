@@ -46,7 +46,9 @@ func setupTestDB(t *testing.T) (*gorm.DB, *CredentialEncryptor) {
 	if err != nil {
 		t.Fatalf("create encryptor: %v", err)
 	}
-	RegisterCallbacks(db, enc, zap.NewNop())
+	if err := RegisterCallbacks(db, enc, zap.NewNop()); err != nil {
+		t.Fatalf("register callbacks: %v", err)
+	}
 	return db, enc
 }
 

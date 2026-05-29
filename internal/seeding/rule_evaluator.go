@@ -46,6 +46,8 @@ type RuleContext struct {
 	ScoringRank         int
 	ScoringTotalInCycle int
 	LowScoreCount       int
+
+	logger *zap.Logger
 }
 
 func (rc *RuleContext) fieldValue(key string) (string, bool) {
@@ -98,7 +100,16 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 		case "ratio":
 			return fmt.Sprintf("%.4f", ti.Ratio), true
 		case "seedingTime", "seed_time":
-			return fmt.Sprintf("%d", ti.SeedTime), true
+			if ti.SeedTime > 0 {
+				return fmt.Sprintf("%d", ti.SeedTime), true
+			}
+			if !ti.AddedAt.IsZero() {
+				elapsed := int64(rc.Now.Sub(ti.AddedAt).Seconds())
+				if elapsed > 0 {
+					return fmt.Sprintf("%d", elapsed), true
+				}
+			}
+			return "0", true
 		case "category":
 			return ti.Category, true
 		case "tags":
@@ -151,9 +162,15 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 	case "hour":
 		return fmt.Sprintf("%d", rc.Now.Hour()), true
 	case "activeUploads":
-		return fmt.Sprintf("%d", rc.ActiveUploads), true
+		if rc.Torrent != nil && rc.Torrent.UploadSpeed > 0 {
+			return "1", true
+		}
+		return "0", true
 	case "activeDownloads":
-		return fmt.Sprintf("%d", rc.ActiveDownloads), true
+		if rc.Torrent != nil && rc.Torrent.DownloadSpeed > 0 {
+			return "1", true
+		}
+		return "0", true
 	case "globalUploadSpeed":
 		return fmt.Sprintf("%.0f", rc.GlobalUploadSpeed), true
 	case "globalDownloadSpeed":
@@ -203,9 +220,10 @@ func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, tor
 	}
 
 	now := time.Now()
+	cache := re.preloadScoringCache(ctx, clientID, records)
 	var matches []RuleMatch
 	for _, rule := range rules {
-		matched := re.matchRule(ctx, rule, records, torrentMap, freeSpace, now, globalUpSpeed, globalDownSpeed)
+		matched := re.matchRuleWithCache(ctx, rule, records, torrentMap, freeSpace, now, globalUpSpeed, globalDownSpeed, cache)
 		if len(matched) > 0 {
 			matches = append(matches, RuleMatch{
 				Rule:     rule,
@@ -224,6 +242,46 @@ func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, tor
 
 func (re *RuleEvaluator) EvaluateRulesSimple(ctx context.Context, clientID string) ([]RuleMatch, error) {
 	return re.EvaluateRules(ctx, clientID, nil, -1)
+}
+
+func (re *RuleEvaluator) MatchRules(ctx context.Context, rules []model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64) []RuleMatch {
+	if len(rules) == 0 || len(records) == 0 {
+		return nil
+	}
+
+	var clientID string
+	if len(records) > 0 {
+		clientID = records[0].ClientID
+	}
+
+	var globalUpSpeed, globalDownSpeed float64
+	var state model.SeedingClientState
+	if re.db != nil {
+		if err := re.db.WithContext(ctx).Where("client_id = ?", clientID).First(&state).Error; err == nil {
+			globalUpSpeed = state.AvgUploadSpeed
+			globalDownSpeed = state.AvgDownloadSpeed
+		}
+	}
+
+	now := time.Now()
+	cache := re.preloadScoringCache(ctx, clientID, records)
+	var matches []RuleMatch
+	for _, rule := range rules {
+		matched := re.matchRuleWithCache(ctx, rule, records, torrentMap, freeSpace, now, globalUpSpeed, globalDownSpeed, cache)
+		if len(matched) > 0 {
+			matches = append(matches, RuleMatch{
+				Rule:     rule,
+				Records:  matched,
+				Priority: rule.Priority,
+			})
+		}
+	}
+
+	sort.Slice(matches, func(i, j int) bool {
+		return matches[i].Priority > matches[j].Priority
+	})
+
+	return matches
 }
 
 type scoringCache struct {
@@ -255,7 +313,7 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID strin
 		CycleID  string
 	}
 	var latestRows []latestRow
-	re.db.WithContext(ctx).Model(&model.ScoringLog{}).
+	if dbErr := re.db.WithContext(ctx).Model(&model.ScoringLog{}).
 		Select("info_hash, score, cycle_id").
 		Where("client_id = ? AND info_hash IN ? AND id IN (?)",
 			clientID, hashes,
@@ -263,7 +321,9 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID strin
 				Select("MAX(id)").Where("client_id = ? AND info_hash IN ?", clientID, hashes).
 				Group("info_hash"),
 		).
-		Find(&latestRows)
+		Find(&latestRows).Error; dbErr != nil {
+		re.logger.Warn("preload scoring cache: query latest scores failed", zap.Error(dbErr))
+	}
 
 	cycleIDs := make(map[string]struct{})
 	for _, row := range latestRows {
@@ -284,11 +344,13 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID strin
 			Count   int64
 		}
 		var totals []cycleTotal
-		re.db.WithContext(ctx).Model(&model.ScoringLog{}).
+		if dbErr := re.db.WithContext(ctx).Model(&model.ScoringLog{}).
 			Select("cycle_id, COUNT(*) as count").
 			Where("cycle_id IN ?", cidList).
 			Group("cycle_id").
-			Find(&totals)
+			Find(&totals).Error; dbErr != nil {
+			re.logger.Warn("preload scoring cache: query cycle totals failed", zap.Error(dbErr))
+		}
 		cycleCountMap := make(map[string]int, len(totals))
 		for _, t := range totals {
 			cycleCountMap[t.CycleID] = int(t.Count)
@@ -305,9 +367,11 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID strin
 				continue
 			}
 			var rank int64
-			re.db.WithContext(ctx).Model(&model.ScoringLog{}).
+			if dbErr := re.db.WithContext(ctx).Model(&model.ScoringLog{}).
 				Where("cycle_id = ? AND score <= ?", row.CycleID, row.Score).
-				Count(&rank)
+				Count(&rank).Error; dbErr != nil {
+				re.logger.Warn("preload scoring cache: query rank failed", zap.Error(dbErr))
+			}
 			cache.rankInCycle[row.InfoHash] = int(rank)
 		}
 	}
@@ -318,12 +382,14 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID strin
 		Count    int64
 	}
 	var lowRows []lowRow
-	re.db.WithContext(ctx).Model(&model.ScoringLog{}).
+	if dbErr := re.db.WithContext(ctx).Model(&model.ScoringLog{}).
 		Select("info_hash, COUNT(*) as count").
 		Where("client_id = ? AND info_hash IN ? AND score < ? AND created_at > ?",
 			clientID, hashes, 5.0, cutoff).
 		Group("info_hash").
-		Find(&lowRows)
+		Find(&lowRows).Error; dbErr != nil {
+		re.logger.Warn("preload scoring cache: query low score counts failed", zap.Error(dbErr))
+	}
 	for _, row := range lowRows {
 		cache.lowScoreCount[row.InfoHash] = int(row.Count)
 	}
@@ -341,7 +407,7 @@ func (re *RuleEvaluator) fillScoringContext(_ context.Context, rc *RuleContext, 
 	rc.LowScoreCount = cache.lowScoreCount[rc.Record.InfoHash]
 }
 
-func (re *RuleEvaluator) matchRule(ctx context.Context, rule model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64) []model.SeedingTorrentRecord {
+func (re *RuleEvaluator) matchRuleWithCache(ctx context.Context, rule model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64, cache *scoringCache) []model.SeedingTorrentRecord {
 	if rule.Conditions == "" && rule.Expr == "" {
 		return nil
 	}
@@ -350,12 +416,6 @@ func (re *RuleEvaluator) matchRule(ctx context.Context, rule model.DeleteRule, r
 	conditions := ParseConditions(rule.Conditions)
 
 	activeUploads, activeDownloads := countActiveStates(torrentMap)
-
-	var clientID string
-	if len(records) > 0 {
-		clientID = records[0].ClientID
-	}
-	cache := re.preloadScoringCache(ctx, clientID, records)
 
 	var matched []model.SeedingTorrentRecord
 	for _, rec := range records {
@@ -372,6 +432,7 @@ func (re *RuleEvaluator) matchRule(ctx context.Context, rule model.DeleteRule, r
 			ActiveDownloads:     activeDownloads,
 			GlobalUploadSpeed:   globalUpSpeed,
 			GlobalDownloadSpeed: globalDownSpeed,
+			logger:              re.logger,
 		}
 
 		re.fillScoringContext(ctx, rc, cache)
@@ -385,7 +446,7 @@ func (re *RuleEvaluator) matchRule(ctx context.Context, rule model.DeleteRule, r
 			if ok {
 				matched = append(matched, rec)
 			}
-		} else if MatchContext(rc, conditions) {
+		} else if MatchContextWithLogic(rc, conditions, rule.Logic) {
 			matched = append(matched, rec)
 		}
 	}
@@ -430,48 +491,89 @@ func ParseConditions(conditionsJSON string) []ruleCondition {
 }
 
 func MatchContext(rc *RuleContext, conditions []ruleCondition) bool {
+	return MatchContextWithLogic(rc, conditions, "and")
+}
+
+func MatchContextWithLogic(rc *RuleContext, conditions []ruleCondition, logic string) bool {
+	if len(conditions) == 0 {
+		return false
+	}
+	if logic == "or" {
+		for _, cond := range conditions {
+			if evalCondition(rc, cond) {
+				return true
+			}
+		}
+		return false
+	}
 	for _, cond := range conditions {
 		if !evalCondition(rc, cond) {
 			return false
 		}
 	}
-	return len(conditions) > 0
+	return true
 }
 
 func evalCondition(rc *RuleContext, cond ruleCondition) bool {
 	fv, known := rc.fieldValue(cond.Field)
 	if !known {
-		return true
+		switch cond.Operator {
+		case "equals", "==", "not_equals", "!=",
+			"contains", "not_contains",
+			"includeIn", "notIncludeIn",
+			"regExp", "notRegExp":
+			return true
+		case "bigger", ">", "smaller", "<",
+			"bigger_eq", ">=", "smaller_eq", "<=":
+			return false
+		default:
+			return true
+		}
 	}
 
+	result := false
 	switch cond.Operator {
 	case "equals", "==":
-		return fv == cond.Value
+		result = fv == cond.Value
 	case "not_equals", "!=":
-		return fv != cond.Value
+		result = fv != cond.Value
 	case "contains":
-		return strings.Contains(fv, cond.Value)
+		result = strings.Contains(fv, cond.Value)
 	case "not_contains":
-		return !strings.Contains(fv, cond.Value)
+		result = !strings.Contains(fv, cond.Value)
 	case "bigger", ">":
-		return compareNumeric(fv, cond.Value) > 0
+		result = compareNumeric(fv, cond.Value) > 0
 	case "smaller", "<":
-		return compareNumeric(fv, cond.Value) < 0
+		result = compareNumeric(fv, cond.Value) < 0
 	case "bigger_eq", ">=":
-		return compareNumeric(fv, cond.Value) >= 0
+		result = compareNumeric(fv, cond.Value) >= 0
 	case "smaller_eq", "<=":
-		return compareNumeric(fv, cond.Value) <= 0
+		result = compareNumeric(fv, cond.Value) <= 0
 	case "includeIn":
-		return includeIn(fv, cond.Value)
+		result = includeIn(fv, cond.Value)
 	case "notIncludeIn":
-		return !includeIn(fv, cond.Value)
+		result = !includeIn(fv, cond.Value)
 	case "regExp":
-		return matchRegExp(fv, cond.Value)
+		result = matchRegExp(fv, cond.Value)
 	case "notRegExp":
-		return !matchRegExp(fv, cond.Value)
+		result = !matchRegExp(fv, cond.Value)
 	default:
-		return true
+		result = true
 	}
+
+	if rc.logger != nil {
+		rc.logger.Debug("rule eval condition",
+			zap.String("field", cond.Field),
+			zap.String("operator", cond.Operator),
+			zap.String("condValue", cond.Value),
+			zap.String("fieldValue", fv),
+			zap.Bool("known", known),
+			zap.Bool("result", result),
+			zap.String("torrentID", rc.Record.TorrentID),
+		)
+	}
+
+	return result
 }
 
 func compareNumeric(fieldVal, condVal string) int {

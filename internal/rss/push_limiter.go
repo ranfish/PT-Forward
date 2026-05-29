@@ -31,11 +31,20 @@ func (l *PushLimiter) Allow(subscriptionID string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	now := time.Now()
+	if len(l.counters) > 100 {
+		for k, c := range l.counters {
+			if now.After(c.resetAt) {
+				delete(l.counters, k)
+			}
+		}
+	}
+
 	c, ok := l.counters[subscriptionID]
-	if !ok || time.Now().After(c.resetAt) {
+	if !ok || now.After(c.resetAt) {
 		l.counters[subscriptionID] = &pushCounter{
 			count:   1,
-			resetAt: time.Now().Add(time.Hour),
+			resetAt: now.Add(time.Hour),
 		}
 		return true
 	}

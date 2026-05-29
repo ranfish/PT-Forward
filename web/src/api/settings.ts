@@ -1,24 +1,22 @@
 import client from './client'
+import type { ApiResponse, SettingsRestoreRequest } from './types'
 
 export const settingsApi = {
   get(prefix?: string) {
     const params: Record<string, string> = {}
     if (prefix) params.prefix = prefix
-    return client.get('/settings', { params })
-  },
-  getByKey(key: string) {
-    return client.get(`/settings/${key}`)
+    return client.get<ApiResponse<Record<string, string>>>('/settings', { params })
   },
   update(key: string, data: { value: string }) {
-    return client.put(`/settings/${key}`, data)
+    return client.put<ApiResponse<void>>(`/settings/${key}`, data)
   },
   remove(key: string) {
-    return client.delete(`/settings/${key}`)
+    return client.delete<ApiResponse<void>>(`/settings/${key}`)
   },
   backup() {
-    return client.get('/settings/backup')
+    return client.get<ApiResponse<Record<string, string>>>('/settings/backup')
   },
-  restore(data: Record<string, unknown>) {
-    return client.post('/settings/restore', data)
+  restore(data: SettingsRestoreRequest) {
+    return client.post<ApiResponse<void>>('/settings/restore', data)
   },
 }

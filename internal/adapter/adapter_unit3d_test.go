@@ -395,7 +395,7 @@ func TestUnit3D_GetTorrentDetail_WebFull(t *testing.T) {
 
 func TestUnit3D_DetectHR_WithHR(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html>This torrent is subject to hit and run rules</html>`))
+		_, _ = w.Write([]byte(`<html><span class="hitandrun">H&R</span></html>`))
 	}))
 	defer srv.Close()
 

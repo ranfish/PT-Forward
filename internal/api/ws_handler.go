@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -76,8 +78,8 @@ func NewHub() *Hub {
 	return &Hub{
 		clients:    make(map[*Client]bool),
 		broadcast:  make(chan *WSMessage, 256),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		register:   make(chan *Client, 64),
+		unregister: make(chan *Client, 64),
 	}
 }
 
@@ -122,7 +124,15 @@ func (h *Hub) Run(stop <-chan struct{}) {
 			}
 			h.mu.RUnlock()
 			for _, c := range stale {
-				h.unregister <- c
+				select {
+				case h.unregister <- c:
+				default:
+					h.mu.Lock()
+					delete(h.clients, c)
+					close(c.send)
+					h.mu.Unlock()
+					slog.Warn("ws: unregister channel full, directly evicted stale client")
+				}
 			}
 		}
 	}
@@ -132,6 +142,7 @@ func (h *Hub) Broadcast(message *WSMessage) {
 	select {
 	case h.broadcast <- message:
 	default:
+		slog.Warn("ws: broadcast channel full, message dropped", "type", message.Type, "id", message.ID)
 	}
 }
 
@@ -157,7 +168,8 @@ const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 512
+	maxMessageSize = 4096
+	authWait       = 10 * time.Second
 )
 
 type WSHandler struct {
@@ -189,29 +201,54 @@ func NewWSHandler(hub *Hub, authManager *auth.AuthManager, corsOrigins []string)
 	default:
 		upgrader.CheckOrigin = func(r *http.Request) bool {
 			origin := r.Header.Get("Origin")
-			return origin == ""
+			if origin == "" {
+				return true
+			}
+			host := r.Host
+			if host == "" {
+				host = r.URL.Host
+			}
+			u, err := url.Parse(origin)
+			if err != nil {
+				return false
+			}
+			return u.Host == host
 		}
 	}
 	return &WSHandler{hub: hub, authManager: authManager, corsOrigins: corsOrigins, upgrader: upgrader}
 }
 
 func (s *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	tokenStr := r.URL.Query().Get("token")
-	if tokenStr == "" {
-		Error(w, http.StatusUnauthorized, 40100, "missing token")
-		return
-	}
-
-	claims, err := s.authManager.ValidateAccessToken(tokenStr)
-	if err != nil {
-		Error(w, http.StatusUnauthorized, 40101, "invalid token")
-		return
-	}
-
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
+
+	_ = conn.SetReadDeadline(time.Now().Add(authWait))
+	_, rawMsg, err := conn.ReadMessage()
+	if err != nil {
+		_ = conn.Close()
+		return
+	}
+
+	var authMsg struct {
+		Type  string `json:"type"`
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(rawMsg, &authMsg); err != nil || authMsg.Type != "auth" || authMsg.Token == "" {
+		_ = conn.WriteJSON(NewWSMessage("error", map[string]string{"reason": "auth required"}))
+		_ = conn.Close()
+		return
+	}
+
+	claims, err := s.authManager.ValidateAccessToken(authMsg.Token)
+	if err != nil {
+		_ = conn.WriteJSON(NewWSMessage("error", map[string]string{"reason": "invalid token"}))
+		_ = conn.Close()
+		return
+	}
+
+	_ = conn.SetReadDeadline(time.Time{})
 
 	client := &Client{
 		hub:      s.hub,
@@ -220,19 +257,29 @@ func (s *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		userID:   claims.Sub,
 		channels: make(map[string]bool),
 	}
-	s.hub.register <- client
+	select {
+	case s.hub.register <- client:
+	default:
+		slog.Warn("ws: register channel full, closing new connection")
+		_ = conn.Close()
+		return
+	}
+
+	go client.writePump()
+	go client.readPump()
 
 	client.send <- NewWSMessage("server.connected", map[string]string{
 		"serverTime": time.Now().UTC().Format(time.RFC3339),
 	})
-
-	go client.writePump()
-	go client.readPump()
 }
 
 func (c *Client) readPump() {
 	defer func() {
-		c.hub.unregister <- c
+		select {
+		case c.hub.unregister <- c:
+		default:
+			slog.Warn("ws: unregister channel full on readPump exit")
+		}
 		_ = c.conn.Close()
 	}()
 
@@ -259,20 +306,31 @@ func (c *Client) readPump() {
 		}
 
 		switch msg.Type {
-		case "client.ping":
-			c.send <- NewWSMessage("server.pong", nil)
-		case "client.subscribe":
+		case "ping":
+			select {
+			case c.send <- NewWSMessage("pong", nil):
+			default:
+			}
+		case "subscribe":
 			c.mu.Lock()
 			for _, ch := range msg.Channels {
 				c.channels[ch] = true
 			}
 			c.mu.Unlock()
-		case "client.unsubscribe":
+			select {
+			case c.send <- NewWSMessage("subscribed", map[string]interface{}{"channels": msg.Channels}):
+			default:
+			}
+		case "unsubscribe":
 			c.mu.Lock()
 			for _, ch := range msg.Channels {
 				delete(c.channels, ch)
 			}
 			c.mu.Unlock()
+			select {
+			case c.send <- NewWSMessage("unsubscribed", map[string]interface{}{"channels": msg.Channels}):
+			default:
+			}
 		}
 	}
 }

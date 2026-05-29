@@ -53,6 +53,7 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { torrentEventsApi } from '@/api/torrent-events'
+import { formatTime } from '@/utils/format'
 
 const { t } = useI18n()
 
@@ -68,7 +69,7 @@ const columns = [
   { title: t('common.title'), key: 'title', ellipsis: true },
   { title: t('common.size'), key: 'size', width: 100 },
   { title: t('event.sourceId'), key: 'source_id', width: 140 },
-  { title: t('common.time'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.time'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 
 function formatSize(bytes: number) {
@@ -87,7 +88,7 @@ async function fetchEvents() {
     if (siteFilter.value) params.site = siteFilter.value
     const resp = await torrentEventsApi.list(params)
     const body = resp.data.data
-    events.value = body?.items || body || []
+    events.value = (body?.items || []) as Record<string, unknown>[]
 
     if (!siteNames.value.length) {
       const names = new Set<string>()

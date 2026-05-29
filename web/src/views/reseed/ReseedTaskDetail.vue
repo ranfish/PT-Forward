@@ -1,61 +1,63 @@
 <template>
   <div>
     <a-page-header :title="t('reseed.taskDetail', { id: taskId })" @back="$router.push('/reseed')">
-      <template #tags>
-        <a-tag :color="statusColor(task.status)">{{ task.status }}</a-tag>
+      <template v-if="task" #tags>
+        <a-tag :color="statusColor(task.status)">{{ translateReseedStatus(task.status) }}</a-tag>
       </template>
     </a-page-header>
 
     <a-spin :spinning="loading">
-      <a-descriptions bordered :column="2" style="margin-bottom: 24px">
-        <a-descriptions-item :label="t('common.name')">{{ task.name }}</a-descriptions-item>
-        <a-descriptions-item :label="t('common.status')">{{ task.status }}</a-descriptions-item>
-        <a-descriptions-item :label="t('reseed.sourceSite')">{{ task.source_site_ids }}</a-descriptions-item>
-        <a-descriptions-item :label="t('reseed.targetSite')">{{ task.target_site_ids }}</a-descriptions-item>
-        <a-descriptions-item :label="t('reseed.client')">{{ task.client_ids }}</a-descriptions-item>
-        <a-descriptions-item :label="t('common.createdAt')">{{ task.created_at || '-' }}</a-descriptions-item>
-      </a-descriptions>
+      <template v-if="task">
+        <a-descriptions bordered :column="2" style="margin-bottom: 24px">
+          <a-descriptions-item :label="t('common.name')">{{ task.name }}</a-descriptions-item>
+          <a-descriptions-item :label="t('common.status')">{{ translateReseedStatus(task.status) }}</a-descriptions-item>
+          <a-descriptions-item :label="t('reseed.sourceSite')">{{ task.source_site_ids }}</a-descriptions-item>
+          <a-descriptions-item :label="t('reseed.targetSite')">{{ task.target_site_ids }}</a-descriptions-item>
+          <a-descriptions-item :label="t('reseed.client')">{{ task.client_ids }}</a-descriptions-item>
+          <a-descriptions-item :label="t('common.createdAt')">{{ formatTime(task.created_at) }}</a-descriptions-item>
+        </a-descriptions>
 
-      <a-tabs v-model:active-key="activeTab">
-        <a-tab-pane key="matches" :tab="t('reseed.matchResults')">
-          <a-table
-            :columns="matchColumns"
-            :data-source="matches"
-            :loading="matchesLoading"
-            :pagination="{ pageSize: 20 }"
-            row-key="id"
-            size="small"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'status'">
-                <a-tag :color="record.status === 'injected' ? 'green' : record.status === 'failed' ? 'red' : 'blue'">
-                  {{ record.status }}
-                </a-tag>
+        <a-tabs v-model:active-key="activeTab">
+          <a-tab-pane key="matches" :tab="t('reseed.matchResults')">
+            <a-table
+              :columns="matchColumns"
+              :data-source="matches"
+              :loading="matchesLoading"
+              :pagination="{ pageSize: 20 }"
+              row-key="id"
+              size="small"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <a-tag :color="record.status === 'injected' ? 'green' : record.status === 'failed' ? 'red' : 'blue'">
+                    {{ translateReseedStatus(record.status) }}
+                  </a-tag>
+                </template>
+                <template v-if="column.key === 'actions'">
+                  <a-button
+                    type="link"
+                    size="small"
+                    :disabled="record.status !== 'failed'"
+                    @click="retryMatch(record.id)"
+                  >
+                    {{ t('reseed.retry') }}
+                  </a-button>
+                </template>
               </template>
-              <template v-if="column.key === 'actions'">
-                <a-button
-                  type="link"
-                  size="small"
-                  :disabled="record.status !== 'failed'"
-                  @click="retryMatch(record.id)"
-                >
-                  {{ t('reseed.retry') }}
-                </a-button>
-              </template>
-            </template>
-          </a-table>
-        </a-tab-pane>
-        <a-tab-pane key="negative" :tab="t('reseed.negativeCache')">
-          <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center">
-            <a-input v-model:value="negDeleteInfoHash" placeholder="InfoHash" style="width: 320px" />
-            <a-input v-model:value="negDeleteSite" :placeholder="t('reseed.siteOptional')" style="width: 200px" />
-            <a-popconfirm :title="t('reseed.deleteNegativeCacheConfirm')" @confirm="deleteNegativeCache">
-              <a-button type="primary" danger :disabled="!negDeleteInfoHash">{{ t('common.delete') }}</a-button>
-            </a-popconfirm>
-          </div>
-          <a-empty :description="t('reseed.deleteNegativeCacheDesc')" />
-        </a-tab-pane>
-      </a-tabs>
+            </a-table>
+          </a-tab-pane>
+          <a-tab-pane key="negative" :tab="t('reseed.negativeCache')">
+            <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center">
+              <a-input v-model:value="negDeleteInfoHash" placeholder="InfoHash" style="width: 320px" />
+              <a-input v-model:value="negDeleteSite" :placeholder="t('reseed.siteOptional')" style="width: 200px" />
+              <a-popconfirm :title="t('reseed.deleteNegativeCacheConfirm')" @confirm="deleteNegativeCache">
+                <a-button type="primary" danger :disabled="!negDeleteInfoHash">{{ t('common.delete') }}</a-button>
+              </a-popconfirm>
+            </div>
+            <a-empty :description="t('reseed.deleteNegativeCacheDesc')" />
+          </a-tab-pane>
+        </a-tabs>
+      </template>
     </a-spin>
   </div>
 </template>
@@ -66,10 +68,13 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { reseedApi } from '@/api/reseed'
+import { formatTime } from '@/utils/format'
+import { useEnumLabels } from '@/utils/enumLabels'
 
 const route = useRoute()
 const taskId = Number(route.params.id)
 const { t } = useI18n()
+const { translateReseedStatus } = useEnumLabels()
 
 interface ReseedTaskInfo {
   name: string
@@ -93,7 +98,7 @@ interface ReseedMatchItem {
 
 const loading = ref(false)
 const matchesLoading = ref(false)
-const task = ref<ReseedTaskInfo>({} as ReseedTaskInfo)
+const task = ref<ReseedTaskInfo | null>(null)
 const matches = ref<ReseedMatchItem[]>([])
 const activeTab = ref('matches')
 
@@ -120,7 +125,7 @@ async function fetchTask() {
   loading.value = true
   try {
     const resp = await reseedApi.getTask(taskId)
-    task.value = resp.data.data || {}
+    task.value = resp.data.data || null
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   } finally {
@@ -132,7 +137,7 @@ async function fetchMatches() {
   matchesLoading.value = true
   try {
     const resp = await reseedApi.getMatches(taskId)
-    matches.value = resp.data.data || []
+    matches.value = resp.data.data?.items ?? []
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   } finally {

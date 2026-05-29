@@ -43,10 +43,6 @@ func (m *Manager) LoadClients(ctx context.Context) error {
 	for _, cfg := range configs {
 		activeIDs[cfg.Name] = true
 
-		if _, exists := m.clients[cfg.Name]; exists {
-			continue
-		}
-
 		paths := m.loadPaths(cfg.ID)
 		client, err := m.createClient(&cfg, paths)
 		if err != nil {
@@ -60,12 +56,12 @@ func (m *Manager) LoadClients(ctx context.Context) error {
 
 		connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		if connected, err := m.connectClient(connectCtx, client); !connected {
-			m.logger.Warn("failed to connect client",
+			m.logger.Warn("failed to connect client, skipping",
 				zap.String("name", cfg.Name),
 				zap.Error(err),
 			)
 			cancel()
-			m.clients[cfg.Name] = client
+			delete(m.clients, cfg.Name)
 			continue
 		}
 		cancel()
@@ -156,7 +152,10 @@ func (m *Manager) createClient(cfg *model.ClientConfig, paths []model.SharedPath
 
 func (m *Manager) loadPaths(clientID uint) []model.SharedPathMapping {
 	var mappings []model.ClientPathMapping
-	m.db.Where("source_client_id = ?", clientID).Find(&mappings)
+	if err := m.db.Where("source_client_id = ?", clientID).Find(&mappings).Error; err != nil {
+		m.logger.Warn("failed to load path mappings", zap.Uint("clientID", clientID), zap.Error(err))
+		return nil
+	}
 
 	result := make([]model.SharedPathMapping, 0, len(mappings))
 	for _, mp := range mappings {
@@ -166,6 +165,10 @@ func (m *Manager) loadPaths(clientID uint) []model.SharedPathMapping {
 		})
 	}
 	return result
+}
+
+type ipBannedChecker interface {
+	IsIPBanned() bool
 }
 
 func (m *Manager) PingAll(ctx context.Context) {
@@ -180,6 +183,26 @@ func (m *Manager) PingAll(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+
+		if checker, ok := c.(ipBannedChecker); ok && checker.IsIPBanned() {
+			m.logger.Warn("client IP banned, attempting reconnect",
+				zap.String("clientID", id),
+			)
+			if connector, ok := c.(connecter); ok {
+				if err := connector.Connect(ctx); err != nil {
+					m.logger.Warn("client reconnect failed, IP still banned",
+						zap.String("clientID", id),
+						zap.Error(err),
+					)
+					continue
+				}
+				m.logger.Info("client reconnect succeeded after IP ban",
+					zap.String("clientID", id),
+				)
+			}
+			continue
+		}
+
 		if _, err := c.GetMainData(ctx); err != nil {
 			m.logger.Warn("client ping failed", zap.String("clientID", id), zap.Error(err))
 		}

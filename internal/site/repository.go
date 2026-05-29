@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/model"
 	"gorm.io/gorm"
 )
@@ -34,13 +35,12 @@ func (r *Repository) GetByID(ctx context.Context, id uint) (*model.Site, error) 
 	return &site, nil
 }
 
-func (r *Repository) GetByDomain(ctx context.Context, domain string) (*model.Site, error) {
+func (r *Repository) GetByDomain(ctx context.Context, ident string) *model.Site {
 	var site model.Site
-	err := r.db.WithContext(ctx).Where("domain = ?", domain).First(&site).Error
-	if err != nil {
-		return nil, err
+	if err := r.db.WithContext(ctx).Where("domain = ? OR name = ?", ident, ident).First(&site).Error; err != nil {
+		return nil
 	}
-	return &site, nil
+	return &site
 }
 
 func (r *Repository) GetByName(ctx context.Context, name string) (*model.Site, error) {
@@ -53,7 +53,7 @@ func (r *Repository) GetByName(ctx context.Context, name string) (*model.Site, e
 }
 
 func (r *Repository) Create(ctx context.Context, site *model.Site) error {
-	return r.db.WithContext(ctx).Create(site).Error
+	return dbimpl.ForceCreate(r.db.WithContext(ctx), site)
 }
 
 func (r *Repository) Update(ctx context.Context, site *model.Site) error {

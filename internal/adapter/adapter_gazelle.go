@@ -8,12 +8,25 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
+)
+
+var (
+	reGazelleTitle      = regexp.MustCompile(`<title>([^<]+)</title>`)
+	reGazelleInfoHash   = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
+	reGazelleSize       = regexp.MustCompile(`(?i)(?:size|大小)[^<]*<[^>]*>([^<]+)`)
+	reGazelleSeeders    = regexp.MustCompile(`(?i)(?:seeders?|做种)[^<]*<[^>]*>(\d+)`)
+	reGazelleLeechers   = regexp.MustCompile(`(?i)(?:leechers?|下载)[^<]*<[^>]*>(\d+)`)
+	reGazelleTorrentID  = regexp.MustCompile(`torrents\.php\?torrentid=(\d+)`)
+	reGazelleGroupID    = regexp.MustCompile(`torrents\.php\?id=(\d+)`)
+	reGazelleErrorClass = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
+	reGazelleErrorP     = regexp.MustCompile(`<p[^>]*>([^<]*(?:error|fail|already|duplicate|exist)[^<]*)</p>`)
 )
 
 type GazelleAdapter struct {
@@ -34,11 +47,11 @@ func (a *GazelleAdapter) Framework() string { return "gazelle" }
 
 func (a *GazelleAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
 	baseURL := resolveBase(config)
-	u := baseURL + "/torrents.php?action=download&id=" + torrentID
+	u := baseURL + "/torrents.php?action=download&id=" + url.QueryEscape(torrentID)
 	if config.Passkey != "" {
-		u += "&passkey=" + config.Passkey
+		u += "&passkey=" + url.QueryEscape(config.Passkey)
 	} else if config.AuthKey != "" {
-		u += "&authkey=" + config.AuthKey
+		u += "&authkey=" + url.QueryEscape(config.AuthKey)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -51,7 +64,7 @@ func (a *GazelleAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 	if err != nil {
 		return nil, downloadError("下载失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
@@ -82,7 +95,7 @@ func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -134,7 +147,7 @@ func (a *GazelleAdapter) detailViaWeb(ctx context.Context, config *model.SiteCon
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -143,14 +156,14 @@ func (a *GazelleAdapter) detailViaWeb(ctx context.Context, config *model.SiteCon
 	html := string(body)
 
 	detail := &model.TorrentDetail{}
-	if m := regexp.MustCompile(`<title>([^<]+)</title>`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGazelleTitle.FindStringSubmatch(html); len(m) > 1 {
 		parts := strings.SplitN(m[1], " :: ", 2)
 		detail.Title = strings.TrimSpace(parts[0])
 	}
-	if m := regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGazelleInfoHash.FindStringSubmatch(html); len(m) > 1 {
 		detail.InfoHash = strings.ToLower(m[1])
 	}
-	if m := regexp.MustCompile(`(?i)(?:size|大小)[^<]*<[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGazelleSize.FindStringSubmatch(html); len(m) > 1 {
 		detail.Size = parseSizeStr(m[1])
 	}
 
@@ -171,7 +184,7 @@ func (a *GazelleAdapter) DetectDiscount(ctx context.Context, config *model.SiteC
 	if err != nil {
 		return nil, networkError("请求优惠信息失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -209,7 +222,7 @@ func (a *GazelleAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 	if err != nil {
 		return nil, networkError("请求HR信息失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -217,14 +230,71 @@ func (a *GazelleAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 	}
 	html := strings.ToLower(string(body))
 
-	hasHR := strings.Contains(html, "hit and run") ||
-		strings.Contains(html, "hit&run") ||
-		strings.Contains(html, "h&r") ||
+	hasHR := detectHRFromHTML(html) ||
 		strings.Contains(html, "must seed")
 
 	result := &model.HRResult{HasHR: hasHR}
 	if hasHR {
 		result.SeedTimeH = config.HR.SeedTimeH()
+	}
+	return result, nil
+}
+
+func (a *GazelleAdapter) DetectHRAndDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, *model.DiscountResult, error) {
+	baseURL := resolveBase(config)
+	u := baseURL + "/torrents.php?torrentid=" + torrentID
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, networkError("构造请求失败", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, nil, networkError("请求种子页面失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, nil, err
+	}
+	html := strings.ToLower(string(body))
+
+	hrResult := &model.HRResult{HasHR: detectHRFromHTML(html) ||
+		strings.Contains(html, "must seed")}
+	if hrResult.HasHR {
+		hrResult.SeedTimeH = config.HR.SeedTimeH()
+	}
+
+	var discResult *model.DiscountResult
+	if strings.Contains(html, "freeleech") || strings.Contains(html, "free") {
+		if strings.Contains(html, "double upload") || strings.Contains(html, "2x") {
+			discResult = &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}
+		} else {
+			discResult = &model.DiscountResult{Level: model.DiscountFree}
+		}
+	} else if strings.Contains(html, "double upload") || strings.Contains(html, "2x upload") {
+		discResult = &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}
+	} else if strings.Contains(html, "50%") || strings.Contains(html, "half download") {
+		discResult = &model.DiscountResult{Level: model.DiscountPercent50}
+	} else {
+		discResult = &model.DiscountResult{Level: model.DiscountNone}
+	}
+
+	return hrResult, discResult, nil
+}
+
+func (a *GazelleAdapter) GetBatchSLData(ctx context.Context, config *model.SiteConfig, torrentIDs []string) (map[string]*model.SLData, error) {
+	result := make(map[string]*model.SLData, len(torrentIDs))
+	for _, id := range torrentIDs {
+		sl, err := a.GetPreciseSLData(ctx, config, id)
+		if err != nil {
+			a.logger.Warn("获取SL数据失败", zap.String("torrentID", id), zap.Error(err))
+			continue
+		}
+		result[id] = sl
 	}
 	return result, nil
 }
@@ -249,7 +319,7 @@ func (a *GazelleAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig,
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -281,7 +351,7 @@ func (a *GazelleAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig,
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -290,10 +360,10 @@ func (a *GazelleAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig,
 	html := string(body)
 	sl := &model.SLData{}
 
-	if m := regexp.MustCompile(`(?i)(?:seeders?|做种)[^<]*<[^>]*>(\d+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGazelleSeeders.FindStringSubmatch(html); len(m) > 1 {
 		sl.Seeders, _ = strconv.Atoi(m[1])
 	}
-	if m := regexp.MustCompile(`(?i)(?:leechers?|下载)[^<]*<[^>]*>(\d+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGazelleLeechers.FindStringSubmatch(html); len(m) > 1 {
 		sl.Leechers, _ = strconv.Atoi(m[1])
 	}
 
@@ -428,7 +498,7 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { drainBody(resp) }()
 
 	body, err := readBody(resp)
 	if err != nil {
@@ -440,7 +510,7 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足"}
 	}
 
-	if idMatch := regexp.MustCompile(`torrents\.php\?torrentid=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
+	if idMatch := reGazelleTorrentID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
 		return &model.PublishResponse{
 			Success:    true,
@@ -450,7 +520,7 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 		}, nil
 	}
 
-	if idMatch := regexp.MustCompile(`torrents\.php\?id=(\d+)`).FindStringSubmatch(html); len(idMatch) > 1 {
+	if idMatch := reGazelleGroupID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
 		return &model.PublishResponse{
 			Success:    true,
@@ -465,9 +535,9 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	}
 
 	errMsg := "上传失败"
-	if m := regexp.MustCompile(`class="error"[^>]*>([^<]+)`).FindStringSubmatch(html); len(m) > 1 {
+	if m := reGazelleErrorClass.FindStringSubmatch(html); len(m) > 1 {
 		errMsg = strings.TrimSpace(m[1])
-	} else if m := regexp.MustCompile(`<p[^>]*>([^<]*(?:error|fail|already|duplicate|exist)[^<]*)</p>`).FindStringSubmatch(html); len(m) > 1 {
+	} else if m := reGazelleErrorP.FindStringSubmatch(html); len(m) > 1 {
 		errMsg = strings.TrimSpace(m[1])
 	}
 
@@ -488,7 +558,7 @@ func (a *GazelleAdapter) GetTorrentInfoHash(ctx context.Context, config *model.S
 func (a *GazelleAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
 	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
 	if err != nil {
-		return false, nil
+		return false, fmt.Errorf("search for verify exists %q: %w", torrentID, err)
 	}
 	for _, r := range results {
 		if r.TorrentID == torrentID {
@@ -496,4 +566,128 @@ func (a *GazelleAdapter) VerifyExists(ctx context.Context, config *model.SiteCon
 		}
 	}
 	return false, nil
+}
+
+func (a *GazelleAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	if config.APIKey != "" {
+		return a.fetchUserStatsAPI(ctx, config)
+	}
+	return a.fetchUserStatsCookie(ctx, config)
+}
+
+func (a *GazelleAdapter) fetchUserStatsAPI(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	baseURL := resolveBase(config)
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/ajax.php?action=index", nil)
+	if err != nil {
+		return nil, fmt.Errorf("构造请求失败: %w", err)
+	}
+	req.Header.Set("Authorization", config.APIKey)
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("请求失败: %w", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	return parseGazelleStatsAPI(body)
+}
+
+func (a *GazelleAdapter) fetchUserStatsCookie(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	baseURL := resolveBase(config)
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/ajax.php?action=index", nil)
+	if err != nil {
+		return nil, fmt.Errorf("构造请求失败: %w", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("请求失败: %w", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	return parseGazelleStatsAPI(body)
+}
+
+func parseGazelleStatsAPI(body []byte) (*model.UserStatsResult, error) {
+	var result struct {
+		Status   string `json:"status"`
+		Response struct {
+			Username  string `json:"username"`
+			ID        int64  `json:"id"`
+			Userstats struct {
+				Uploaded   interface{} `json:"uploaded"`
+				Downloaded interface{} `json:"downloaded"`
+				Ratio      float64     `json:"ratio"`
+				Class      string      `json:"class"`
+				BonusPoints interface{} `json:"bonusPoints"`
+				SeedingCount int        `json:"seedingCount"`
+				SeedingSize interface{} `json:"seedingSize"`
+			} `json:"userstats"`
+		} `json:"response"`
+	}
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil {
+		return nil, fmt.Errorf("解析响应失败: %w", err)
+	}
+	if result.Status != "success" {
+		return nil, fmt.Errorf("API 返回状态: %s", result.Status)
+	}
+
+	stats := &model.UserStatsResult{
+		Username:  result.Response.Username,
+		UserClass: result.Response.Userstats.Class,
+		Ratio:     result.Response.Userstats.Ratio,
+	}
+
+	stats.UploadBytes = toInt64(result.Response.Userstats.Uploaded)
+	stats.DownloadBytes = toInt64(result.Response.Userstats.Downloaded)
+
+	if bp := toInt64(result.Response.Userstats.BonusPoints); bp > 0 {
+		stats.BonusPoints = float64(bp)
+	}
+	if sc := result.Response.Userstats.SeedingCount; sc > 0 {
+		stats.SeedingCount = sc
+	}
+	if ss := toInt64(result.Response.Userstats.SeedingSize); ss > 0 {
+		stats.SeedingSize = ss
+	}
+
+	return stats, nil
+}
+
+func toInt64(v interface{}) int64 {
+	switch val := v.(type) {
+	case float64:
+		return int64(val)
+	case int64:
+		return val
+	case json.Number:
+		if i, err := val.Int64(); err == nil {
+			return i
+		}
+		if f, err := val.Float64(); err == nil {
+			return int64(f)
+		}
+	case string:
+		if i, err := strconv.ParseInt(val, 10, 64); err == nil {
+			return i
+		}
+		if f, err := strconv.ParseFloat(val, 64); err == nil {
+			return int64(f)
+		}
+	}
+	return 0
 }

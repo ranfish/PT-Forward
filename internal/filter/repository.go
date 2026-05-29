@@ -3,6 +3,7 @@ package filter
 import (
 	"context"
 
+	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/model"
 	"gorm.io/gorm"
 )
@@ -33,7 +34,7 @@ func (r *Repository) GetByID(ctx context.Context, id uint) (*model.FilterRule, e
 }
 
 func (r *Repository) Create(ctx context.Context, rule *model.FilterRule) error {
-	return r.db.WithContext(ctx).Create(rule).Error
+	return dbimpl.ForceCreate(r.db.WithContext(ctx), rule)
 }
 
 func (r *Repository) Update(ctx context.Context, rule *model.FilterRule) error {

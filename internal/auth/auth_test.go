@@ -576,9 +576,9 @@ func TestValidatePasswordStrength(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validatePasswordStrength(tt.pwd)
+			err := ValidatePasswordStrength(tt.pwd)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validatePasswordStrength(%q) = %v, wantErr %v", tt.pwd, err, tt.wantErr)
+				t.Errorf("ValidatePasswordStrength(%q) = %v, wantErr %v", tt.pwd, err, tt.wantErr)
 			}
 		})
 	}

@@ -10,6 +10,8 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/client/qbittorrent"
 	"github.com/ranfish/pt-forward/internal/client/transmission"
+	dbimpl "github.com/ranfish/pt-forward/internal/db"
+	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -25,6 +27,7 @@ type ClientManager interface {
 	Get(clientID string) (model.DownloaderClient, error)
 	Reload(ctx context.Context) error
 	ConnectedCount() int
+	ListClients() []string
 }
 
 func NewClientHandler(db *gorm.DB, logger *zap.Logger, clientMgr ClientManager) *ClientHandler {
@@ -60,6 +63,10 @@ type downloaderResponse struct {
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
 	PathMappings   []pathMappingRequest `json:"pathMappings"`
+	DownloadSpeed   int64                `json:"downloadSpeed"`
+	UploadSpeed     int64                `json:"uploadSpeed"`
+	FreeSpace       int64                `json:"freeSpace"`
+	TotalDiskSpace  int64                `json:"totalDiskSpace"`
 	CreatedAt      time.Time            `json:"createdAt"`
 	UpdatedAt      time.Time            `json:"updatedAt"`
 }
@@ -113,7 +120,18 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 			h.logger.Error("query path mappings failed", zap.Uint("clientID", clients[i].ID), zap.Error(err))
 			continue
 		}
-		items = append(items, h.toResponse(&clients[i], mappings))
+		resp := h.toResponse(&clients[i], mappings)
+		if clients[i].Enabled && h.clientMgr != nil {
+			if dlClient, err := h.clientMgr.Get(clients[i].Name); err == nil {
+				if md, mdErr := dlClient.GetMainData(r.Context()); mdErr == nil && md != nil {
+					resp.DownloadSpeed = md.ServerState.DownloadSpeed
+					resp.UploadSpeed = md.ServerState.UploadSpeed
+					resp.FreeSpace = md.FreeSpace
+					resp.TotalDiskSpace = md.TotalDiskSpace
+				}
+			}
+		}
+		items = append(items, resp)
 	}
 
 	Success(w, PaginatedResult{
@@ -171,6 +189,10 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, 40001, "name, type, url, role 为必填项")
 		return
 	}
+	if err := middleware.ValidateSafeURL(req.URL); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "url 不合法: "+err.Error())
+		return
+	}
 	if req.Type != "qbittorrent" && req.Type != "transmission" {
 		Error(w, http.StatusBadRequest, 40001, "type 必须为 qbittorrent 或 transmission")
 		return
@@ -200,7 +222,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		ReseedTargetID: req.ReseedTargetID,
 	}
 	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&client).Error; err != nil {
+		if err := dbimpl.ForceCreateTx(tx, &client); err != nil {
 			return err
 		}
 		for _, pm := range req.PathMappings {
@@ -268,6 +290,10 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		client.Type = req.Type
 	}
 	if req.URL != "" {
+		if err := middleware.ValidateSafeURL(req.URL); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "url 不合法: "+err.Error())
+			return
+		}
 		client.URL = req.URL
 	}
 	if req.Username != "" {
@@ -289,7 +315,17 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	client.IsDefault = req.IsDefault
 
 	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(&client).Error; err != nil {
+		if err := tx.Model(&client).Updates(map[string]interface{}{
+			"name":             client.Name,
+			"type":             client.Type,
+			"url":              client.URL,
+			"username":         client.Username,
+			"password":         client.Password,
+			"role":             client.Role,
+			"reseed_target_id": client.ReseedTargetID,
+			"enabled":          client.Enabled,
+			"is_default":       client.IsDefault,
+		}).Error; err != nil {
 			return err
 		}
 		if req.PathMappings != nil {
@@ -381,6 +417,10 @@ func (h *ClientHandler) HandleTest(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	ok, message, version := h.testConnection(ctx, &client)
+	if !ok {
+		Error(w, http.StatusBadGateway, 11003, message)
+		return
+	}
 	Success(w, map[string]interface{}{
 		"ok":      ok,
 		"message": message,
@@ -442,8 +482,14 @@ func (h *ClientHandler) HandleFreeSpace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	totalDiskSpace := int64(0)
+	if md, mdErr := dlClient.GetMainData(r.Context()); mdErr == nil && md != nil {
+		totalDiskSpace = md.TotalDiskSpace
+	}
+
 	Success(w, map[string]interface{}{
-		"freeSpace": freeSpace,
+		"freeSpace":      freeSpace,
+		"totalDiskSpace": totalDiskSpace,
 	})
 }
 
@@ -747,7 +793,7 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			NotifyOnPublish: req.NotifyOnPublish,
 			Enabled:         req.Enabled,
 		}
-		if err := h.db.WithContext(r.Context()).Create(&target).Error; err != nil {
+		if err := dbimpl.ForceCreate(h.db.WithContext(r.Context()), &target); err != nil {
 			if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "UNIQUE") {
 				Error(w, http.StatusConflict, 40900, "publish target already exists")
 				return

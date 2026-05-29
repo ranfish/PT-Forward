@@ -45,9 +45,13 @@ func (f *Fetcher) Fetch(ctx context.Context, url string) (*RSSFeed, error) {
 	if err != nil {
 		return nil, rssError(ErrRSSNetwork, "请求失败", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
-	data, err := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, rssError(ErrRSSNetwork, fmt.Sprintf("RSS 返回非成功状态码: %d", resp.StatusCode), nil)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 	if err != nil {
 		return nil, rssError(ErrRSSNetwork, "读取响应失败", err)
 	}

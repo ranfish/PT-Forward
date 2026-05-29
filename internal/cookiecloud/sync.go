@@ -27,7 +27,10 @@ func (s *SyncService) SyncAll(ctx context.Context) (*model.CookieCloudSyncHistor
 		UpdateTime: time.Now(),
 		CreatedAt:  time.Now(),
 	}
-	s.db.Create(history)
+	if err := s.db.Create(history).Error; err != nil {
+		s.logger.Error("create sync history failed", zap.Error(err))
+		return nil, ccError(ErrCCSync, "create history", err)
+	}
 
 	start := time.Now()
 
@@ -37,14 +40,18 @@ func (s *SyncService) SyncAll(ctx context.Context) (*model.CookieCloudSyncHistor
 		Find(&sites).Error; err != nil {
 		history.Status = "failed"
 		history.ErrorMessage = err.Error()
-		s.db.Save(history)
+		if saveErr := s.db.Save(history).Error; saveErr != nil {
+			s.logger.Error("save sync history failed", zap.Error(saveErr))
+		}
 		return history, ccError(ErrCCSync, "query sites", err)
 	}
 
 	if len(sites) == 0 {
 		history.Status = "completed"
 		history.SyncedSites = 0
-		s.db.Save(history)
+		if saveErr := s.db.Save(history).Error; saveErr != nil {
+			s.logger.Error("save sync history failed", zap.Error(saveErr))
+		}
 		return history, nil
 	}
 
@@ -52,7 +59,9 @@ func (s *SyncService) SyncAll(ctx context.Context) (*model.CookieCloudSyncHistor
 	if err != nil {
 		history.Status = "failed"
 		history.ErrorMessage = err.Error()
-		s.db.Save(history)
+		if saveErr := s.db.Save(history).Error; saveErr != nil {
+			s.logger.Error("save sync history failed", zap.Error(saveErr))
+		}
 		return history, err
 	}
 
@@ -60,7 +69,9 @@ func (s *SyncService) SyncAll(ctx context.Context) (*model.CookieCloudSyncHistor
 	if err != nil {
 		history.Status = "failed"
 		history.ErrorMessage = fmt.Sprintf("fetch/decrypt failed: %v", err)
-		s.db.Save(history)
+		if saveErr := s.db.Save(history).Error; saveErr != nil {
+			s.logger.Error("save sync history failed", zap.Error(saveErr))
+		}
 		return history, err
 	}
 
@@ -122,7 +133,9 @@ func (s *SyncService) SyncAll(ctx context.Context) (*model.CookieCloudSyncHistor
 		history.ErrorMessage = string(errJSON)
 	}
 
-	s.db.Save(history)
+	if saveErr := s.db.Save(history).Error; saveErr != nil {
+		s.logger.Error("save sync history failed", zap.Error(saveErr))
+	}
 
 	s.updateConfigSyncTime(ctx)
 

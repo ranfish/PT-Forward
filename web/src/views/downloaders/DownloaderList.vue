@@ -22,11 +22,29 @@
       @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'type'">
+          {{ translateDownloaderType(record.type) }}
+        </template>
+        <template v-if="column.key === 'role'">
+          {{ translateRole(record.role) }}
+        </template>
         <template v-if="column.key === 'enabled'">
           <a-badge
             :status="record.enabled ? 'success' : 'default'"
             :text="record.enabled ? t('common.online') : t('common.offline')"
           />
+        </template>
+        <template v-if="column.key === 'downloadSpeed'">
+          <span><ArrowDownOutlined /> {{ formatSpeed(record.downloadSpeed) }}</span>
+        </template>
+        <template v-if="column.key === 'uploadSpeed'">
+          <span><ArrowUpOutlined /> {{ formatSpeed(record.uploadSpeed) }}</span>
+        </template>
+        <template v-if="column.key === 'freeSpace'">
+          <span><DatabaseOutlined /> {{ formatBytes(record.freeSpace) }}</span>
+        </template>
+        <template v-if="column.key === 'totalDiskSpace'">
+          <span>{{ formatBytes(record.totalDiskSpace) }}</span>
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
@@ -114,12 +132,15 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ArrowDownOutlined, ArrowUpOutlined, DatabaseOutlined } from '@ant-design/icons-vue'
 import { downloadersApi } from '@/api/downloaders'
 import { usePagination } from '@/composables/usePagination'
+import { formatBytes, formatSpeed } from '@/utils/format'
+import { useEnumLabels } from '@/utils/enumLabels'
 import type { ClientConfig } from '@/api/types'
 
 const { t } = useI18n()
+const { translateRole, translateDownloaderType } = useEnumLabels()
 const modalVisible = ref(false)
 const submitting = ref(false)
 const editingRecord = ref<ClientConfig | null>(null)
@@ -141,7 +162,11 @@ const columns = [
   { title: t('common.name'), dataIndex: 'name', key: 'name' },
   { title: t('common.type'), dataIndex: 'type', key: 'type' },
   { title: t('common.address'), dataIndex: 'url', key: 'url' },
-  { title: t('downloader.role'), dataIndex: 'role', key: 'role', width: 80 },
+  { title: t('downloader.downloadSpeed'), key: 'downloadSpeed', width: 120 },
+  { title: t('downloader.uploadSpeed'), key: 'uploadSpeed', width: 120 },
+  { title: t('downloader.freeSpace'), key: 'freeSpace', width: 120 },
+  { title: t('downloader.totalDiskSpace'), key: 'totalDiskSpace', width: 120 },
+  { title: t('downloader.role'), dataIndex: 'role', key: 'role', width: 110 },
   { title: t('common.enable'), dataIndex: 'enabled', key: 'enabled', width: 80 },
   { title: t('common.actions'), key: 'actions', width: 260 },
 ]

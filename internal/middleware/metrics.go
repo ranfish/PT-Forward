@@ -37,6 +37,11 @@ func (r *metricsRecorder) Unwrap() http.ResponseWriter {
 func Metrics() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if _, ok := w.(http.Hijacker); ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			path := normalizePath(r.URL.Path)
 			start := time.Now()
 			rec := &metricsRecorder{ResponseWriter: w, status: http.StatusOK}

@@ -31,6 +31,7 @@
         style="width: 150px"
         @change="pagination.fetch(1)"
       >
+        <a-select-option value="pending">{{ t('seeding.pendingStatus') }}</a-select-option>
         <a-select-option value="seeding">{{ t('seeding.seedingStatus') }}</a-select-option>
         <a-select-option value="paused_free_end">{{ t('seeding.pausedFreeEnd') }}</a-select-option>
         <a-select-option value="paused_rule">{{ t('seeding.pausedRule') }}</a-select-option>
@@ -56,7 +57,7 @@
         <template v-if="column.key === 'status'">
           <a-badge
             :status="record.status === 'seeding' ? 'success' : record.status === 'downloading' ? 'processing' : 'warning'"
-            :text="record.status"
+            :text="translateSeedingStatus(record.status)"
           />
         </template>
         <template v-if="column.key === 'actions'">
@@ -85,14 +86,17 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { seedingApi } from '@/api/seeding'
 import { downloadersApi } from '@/api/downloaders'
 import { usePagination } from '@/composables/usePagination'
+import { useEnumLabels } from '@/utils/enumLabels'
+import { formatTime } from '@/utils/format'
 
 const { t } = useI18n()
+const { translateSeedingStatus } = useEnumLabels()
 const downloaderOptions = ref<{label: string, value: string}[]>([])
 const filters = reactive({
   search: '',
@@ -110,13 +114,17 @@ const columns = [
   { title: t('seeding.free'), dataIndex: 'is_free', key: 'is_free', width: 60 },
   { title: 'HR', dataIndex: 'has_hr', key: 'has_hr', width: 60 },
   { title: t('seeding.source'), dataIndex: 'source', key: 'source', width: 80 },
-  { title: t('common.updatedAt'), dataIndex: 'updated_at', key: 'updated_at', width: 180 },
+  { title: t('common.updatedAt'), dataIndex: 'updated_at', key: 'updated_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('common.actions'), key: 'actions', width: 100 },
 ]
 
 const pagination = usePagination((page, size) =>
-  seedingApi.listRecords(page, size),
+  seedingApi.listRecords(page, size, { ...filters }),
 )
+
+watch(filters, () => {
+  pagination.fetch(1)
+}, { deep: true })
 
 async function handleResume(recordId: number) {
   try {
@@ -142,7 +150,7 @@ async function fetchDownloaders() {
   try {
     const resp = await downloadersApi.list(1, 100)
     const items = resp.data.data?.items || resp.data.data || []
-    downloaderOptions.value = items.map((d: Record<string, unknown>) => ({
+    downloaderOptions.value = items.map((d: { name?: string; id?: number }) => ({
       label: String(d.name || d.id),
       value: String(d.name || d.id),
     }))

@@ -967,6 +967,95 @@ func TestEngine_CheckDiskBudget_GetClientError(t *testing.T) {
 
 	sub := &model.RSSSubscription{ClientID: "client1"}
 	err := eng.checkDiskBudget(context.Background(), sub, 1000)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "获取下载器失败")
+}
+
+func TestEngine_CheckDiskGuard_Disabled(t *testing.T) {
+	eng, _ := newEngineWithDB(t)
+	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: false, DiskGuardThreshold: 1073741824}
+	err := eng.checkDiskGuard(context.Background(), sub)
+	require.NoError(t, err)
+}
+
+func TestEngine_CheckDiskGuard_SufficientSpace(t *testing.T) {
+	eng, _ := newEngineWithDB(t)
+	provider := &mockProviderWithDownloader{
+		SiteInfoProvider: &mocks.SiteInfoProvider{},
+		GetDownloaderClientFn: func(ctx context.Context, clientID string) (model.DownloaderClient, error) {
+			return &mocks.DownloaderClient{
+				GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
+					return &model.Maindata{FreeSpace: 50 * 1024 * 1024 * 1024}, nil
+				},
+			}, nil
+		},
+	}
+	eng.SetSiteProvider(provider)
+
+	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
+	err := eng.checkDiskGuard(context.Background(), sub)
+	require.NoError(t, err)
+}
+
+func TestEngine_CheckDiskGuard_InsufficientSpace(t *testing.T) {
+	eng, _ := newEngineWithDB(t)
+	provider := &mockProviderWithDownloader{
+		SiteInfoProvider: &mocks.SiteInfoProvider{},
+		GetDownloaderClientFn: func(ctx context.Context, clientID string) (model.DownloaderClient, error) {
+			return &mocks.DownloaderClient{
+				GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
+					return &model.Maindata{FreeSpace: 500 * 1024 * 1024}, nil
+				},
+			}, nil
+		},
+	}
+	eng.SetSiteProvider(provider)
+
+	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
+	err := eng.checkDiskGuard(context.Background(), sub)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "磁盘守卫拦截")
+}
+
+func TestEngine_CheckDiskGuard_GetClientError(t *testing.T) {
+	eng, _ := newEngineWithDB(t)
+	provider := &mockProviderWithDownloader{
+		SiteInfoProvider: &mocks.SiteInfoProvider{},
+		GetDownloaderClientFn: func(ctx context.Context, clientID string) (model.DownloaderClient, error) {
+			return nil, fmt.Errorf("client not found")
+		},
+	}
+	eng.SetSiteProvider(provider)
+
+	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
+	err := eng.checkDiskGuard(context.Background(), sub)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "磁盘守卫：获取下载器失败")
+}
+
+func TestEngine_CheckDiskGuard_NilProvider(t *testing.T) {
+	eng, _ := newEngineWithDB(t)
+	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
+	err := eng.checkDiskGuard(context.Background(), sub)
+	require.NoError(t, err)
+}
+
+func TestEngine_CheckDiskGuard_ZeroThreshold(t *testing.T) {
+	eng, _ := newEngineWithDB(t)
+	provider := &mockProviderWithDownloader{
+		SiteInfoProvider: &mocks.SiteInfoProvider{},
+		GetDownloaderClientFn: func(ctx context.Context, clientID string) (model.DownloaderClient, error) {
+			return &mocks.DownloaderClient{
+				GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
+					return &model.Maindata{FreeSpace: 0}, nil
+				},
+			}, nil
+		},
+	}
+	eng.SetSiteProvider(provider)
+
+	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 0}
+	err := eng.checkDiskGuard(context.Background(), sub)
 	require.NoError(t, err)
 }
 

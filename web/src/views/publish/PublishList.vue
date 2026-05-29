@@ -25,7 +25,7 @@
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'publish_status'">
               <a-tag :color="record.publish_status === 'pending' ? 'blue' : record.publish_status === 'completed' ? 'green' : record.publish_status === 'failed' ? 'red' : 'default'">
-                {{ record.publish_status }}
+                {{ translatePublishStatus(record.publish_status) }}
               </a-tag>
             </template>
             <template v-if="column.key === 'actions'">
@@ -54,7 +54,7 @@
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
               <a-tag :color="record.status === 'active' ? 'green' : record.status === 'completed' ? 'default' : 'orange'">
-                {{ record.status }}
+                {{ translatePublishStatus(record.status) }}
               </a-tag>
             </template>
             <template v-if="column.key === 'actions'">
@@ -84,11 +84,12 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
-              <a-tag :color="taskStatusColor(record.status)">{{ record.status }}</a-tag>
+              <a-tag :color="taskStatusColor(record.status)">{{ translatePublishStatus(record.status) }}</a-tag>
             </template>
             <template v-if="column.key === 'actions'">
               <a-space>
-                <a-button type="link" size="small" @click="viewTaskResults(record.id)">{{ t('publish.viewResults') }}</a-button>
+                <a-button type="link" size="small" @click="viewTaskResults()">{{ t('publish.viewResults') }}</a-button>
+                <a-button v-if="record.status === 'pending' || record.status === 'running'" type="link" size="small" @click="cancelTask(record.id)">{{ t('common.cancel') }}</a-button>
                 <a-popconfirm :title="t('publish.deleteConfirm')" @confirm="deleteTask(record.id)">
                   <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
                 </a-popconfirm>
@@ -110,7 +111,7 @@
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
               <a-tag :color="record.status === 'published' ? 'green' : record.status === 'skipped' ? 'orange' : record.status === 'failed' ? 'red' : 'blue'">
-                {{ record.status }}
+                {{ translatePublishStatus(record.status) }}
               </a-tag>
             </template>
             <template v-if="column.key === 'publish_url'">
@@ -136,8 +137,8 @@
         </a-form-item>
         <a-form-item :label="t('common.type')">
           <a-select v-model:value="taskForm.type" allow-clear :placeholder="t('publish.selectType')">
-            <a-select-option value="single">Single</a-select-option>
-            <a-select-option value="batch">Batch</a-select-option>
+            <a-select-option value="single">{{ t('publish.typeSingle') }}</a-select-option>
+            <a-select-option value="batch">{{ t('publish.typeBatch') }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item :label="t('publish.manualCheck')">
@@ -154,9 +155,12 @@ import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
 import { sitesApi } from '@/api/sites'
+import { useEnumLabels } from '@/utils/enumLabels'
 import type { PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from '@/api/types'
+import { formatTime } from '@/utils/format'
 
 const { t } = useI18n()
+const { translatePublishStatus } = useEnumLabels()
 const activeTab = ref('candidates')
 const candidateSearch = ref('')
 const candidatesLoading = ref(false)
@@ -180,7 +184,7 @@ const candidateColumns = [
   { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 120 },
   { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
   { title: t('publish.publishStatus'), key: 'publish_status', width: 100 },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('common.actions'), key: 'actions', width: 120 },
 ]
 
@@ -189,7 +193,7 @@ const groupColumns = [
   { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 120 },
   { title: t('publish.sourceHash'), dataIndex: 'source_hash', key: 'source_hash', ellipsis: true },
   { title: t('common.status'), key: 'status', width: 100 },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('common.actions'), key: 'actions', width: 120 },
 ]
 
@@ -199,7 +203,7 @@ const taskColumns = [
   { title: t('publish.sourceSiteId'), dataIndex: 'source_site_id', key: 'source_site_id', width: 100 },
   { title: t('common.status'), key: 'status', width: 100 },
   { title: t('publish.manualCheck'), dataIndex: 'manual_check', key: 'manual_check', width: 100, customRender: ({ text }: { text: boolean }) => text ? t('common.yes') : t('common.no') },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('common.actions'), key: 'actions', width: 150 },
 ]
 
@@ -236,7 +240,7 @@ async function fetchGroups() {
   groupsLoading.value = true
   try {
     const resp = await publishApi.listGroups()
-    groups.value = resp.data.data || []
+    groups.value = resp.data.data?.items ?? []
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {
@@ -298,7 +302,17 @@ async function deleteTask(id: number) {
   }
 }
 
-async function viewTaskResults(_taskId: number) {
+async function cancelTask(id: number) {
+  try {
+    await publishApi.cancelTask(id)
+    message.success(t('common.operationSuccess'))
+    fetchTasks()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  }
+}
+
+async function viewTaskResults() {
   resultsLoading.value = true
   activeTab.value = 'results'
   try {
@@ -356,10 +370,10 @@ async function createTask() {
   createTaskSubmitting.value = true
   try {
     await publishApi.createTask({
-      sourceSiteId: taskForm.sourceSiteId,
-      targetSites: taskForm.targetSites,
+      source_site_id: taskForm.sourceSiteId,
+      target_sites: taskForm.targetSites,
       type: taskForm.type || undefined,
-      manualCheck: taskForm.manualCheck,
+      manual_check: taskForm.manualCheck,
     })
     message.success(t('common.success'))
     showCreateTaskModal.value = false

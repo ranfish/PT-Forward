@@ -1,22 +1,23 @@
 import client from './client'
+import type { ApiResponse } from './types'
 
 export const authApi = {
   status() {
-    return client.get('/auth/status')
+    return client.get<ApiResponse<{ initialized: boolean }>>('/auth/status')
   },
   setup(data: { username: string; password: string }) {
-    return client.post('/auth/setup', data)
+    return client.post<ApiResponse<{ accessToken: string; refreshToken: string }>>('/auth/setup', data)
   },
   login(data: { username: string; password: string }) {
-    return client.post('/auth/login', data)
+    return client.post<ApiResponse<{ accessToken: string; refreshToken: string }>>('/auth/login', data)
   },
   changePassword(oldPassword: string, newPassword: string) {
-    return client.put('/auth/password', { oldPassword, newPassword })
+    return client.put<ApiResponse<void>>('/auth/password', { oldPassword, newPassword })
   },
   getProfile() {
-    return client.get('/auth/profile')
+    return client.get<ApiResponse<{ username: string; displayName: string }>>('/auth/profile')
   },
-  updateProfile(data: { username?: string; password?: string }) {
-    return client.put('/auth/profile', data)
+  updateProfile(data: { displayName: string }) {
+    return client.put<ApiResponse<void>>('/auth/profile', data)
   },
 }

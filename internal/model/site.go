@@ -48,7 +48,6 @@ type Site struct {
 	CookieCloudSync    bool       `json:"cookie_cloud_sync" gorm:"default:false"`
 	CookieCloudDomain  string     `json:"cookie_cloud_domain,omitempty" gorm:"size:200"`
 	AlternativeDomains string     `json:"alternative_domains,omitempty" gorm:"type:text"`
-	MirrorDomain       string     `json:"mirror_domain,omitempty" gorm:"size:200"`
 	LastSyncAt         *time.Time `json:"last_sync_at"`
 
 	IsSource               bool `json:"is_source" gorm:"default:false"`
@@ -61,6 +60,7 @@ type Site struct {
 
 	ProxyURL      string `json:"proxy_url,omitempty" gorm:"size:500"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify" gorm:"default:false"`
+	MaxConcurrent int    `json:"max_concurrent" gorm:"default:2"`
 
 	UploadBytes   int64      `json:"upload_bytes" gorm:"default:0"`
 	DownloadBytes int64      `json:"download_bytes" gorm:"default:0"`
@@ -68,6 +68,7 @@ type Site struct {
 	SeedingSize   int64      `json:"seeding_size" gorm:"default:0"`
 	SeedingCount  int        `json:"seeding_count" gorm:"default:0"`
 	UserClass     string     `json:"user_class" gorm:"size:64"`
+	Username      string     `json:"username" gorm:"size:64"`
 	Ratio         float64    `json:"ratio" gorm:"default:0"`
 	BonusPoints   float64    `json:"bonus_points" gorm:"default:0"`
 	StatsSyncedAt *time.Time `json:"stats_synced_at"`

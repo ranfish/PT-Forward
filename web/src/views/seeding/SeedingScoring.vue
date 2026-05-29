@@ -17,32 +17,43 @@
             </a-select>
           </a-form-item>
           <a-spin :spinning="configLoading">
-            <a-form :model="scoringConfig" layout="vertical">
-              <a-form-item :label="t('seeding.scoring.enabled')">
-                <a-switch v-model:checked="scoringConfig.enabled" />
-              </a-form-item>
-              <a-form-item :label="t('seeding.scoring.halfLifeHours')">
-                <a-input-number v-model:value="scoringConfig.halfLifeHours" :min="0.1" :step="0.5" style="width: 100%" />
-              </a-form-item>
-              <a-form-item :label="t('seeding.scoring.minScore')">
-                <a-input-number v-model:value="scoringConfig.minScore" :min="0" :step="0.1" style="width: 100%" />
-              </a-form-item>
-              <a-form-item :label="t('seeding.scoring.maxCandidates')">
-                <a-input-number v-model:value="scoringConfig.maxCandidates" :min="1" style="width: 100%" />
-              </a-form-item>
-              <a-form-item :label="t('seeding.scoring.maxActiveSeeding')">
-                <a-input-number v-model:value="scoringConfig.maxActiveSeeding" :min="1" style="width: 100%" />
-              </a-form-item>
-              <a-form-item :label="t('seeding.scoring.topNConfirm')">
-                <a-input-number v-model:value="scoringConfig.topNConfirm" :min="1" style="width: 100%" />
-              </a-form-item>
-              <a-form-item :label="t('seeding.scoring.include2xUp')">
-                <a-switch v-model:checked="scoringConfig.include2xUp" />
-              </a-form-item>
-              <a-form-item>
-                <a-button type="primary" :loading="saving" @click="saveScoringConfig">{{ t('common.saveConfig') }}</a-button>
-              </a-form-item>
-            </a-form>
+            <a-alert v-if="!selectedSubId" :message="t('seeding.scoring.selectSubscriptionHint')" type="info" show-icon style="margin-bottom: 16px" />
+            <div :style="{ opacity: selectedSubId ? 1 : 0.4, pointerEvents: selectedSubId ? 'auto' : 'none' }">
+              <a-form :model="scoringConfig" layout="vertical">
+                <a-form-item :label="t('seeding.scoring.enabled')">
+                  <a-switch v-model:checked="scoringConfig.enabled" />
+                </a-form-item>
+                <a-form-item :label="t('seeding.scoring.halfLifeHours')">
+                  <a-input-number v-model:value="scoringConfig.halfLifeHours" :min="0.1" :step="0.5" style="width: 100%" />
+                </a-form-item>
+                <a-form-item :label="t('seeding.scoring.minScore')">
+                  <a-input-number v-model:value="scoringConfig.minScore" :min="0" :step="0.1" style="width: 100%" />
+                </a-form-item>
+                <a-form-item :label="t('seeding.scoring.maxCandidates')">
+                  <a-input-number v-model:value="scoringConfig.maxCandidates" :min="1" style="width: 100%" />
+                </a-form-item>
+                <a-form-item :label="t('seeding.scoring.maxActiveSeeding')">
+                  <a-input-number v-model:value="scoringConfig.maxActiveSeeding" :min="1" style="width: 100%" />
+                </a-form-item>
+                <a-form-item :label="t('seeding.scoring.topNConfirm')">
+                  <a-input-number v-model:value="scoringConfig.topNConfirm" :min="1" style="width: 100%" />
+                </a-form-item>
+                <a-form-item :label="t('seeding.scoring.include2xUp')">
+                  <a-switch v-model:checked="scoringConfig.include2xUp" />
+                </a-form-item>
+                <a-form-item :label="t('seeding.scoring.batchLimit')">
+                  <a-input-number v-model:value="scoringConfig.batchLimit" :min="1" style="width: 100%" />
+                  <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('seeding.scoring.batchLimitHint') }}</div>
+                </a-form-item>
+                <a-form-item :label="t('seeding.scoring.pushIntervalMs')">
+                  <a-input-number v-model:value="scoringConfig.pushIntervalMs" :min="0" :step="100" style="width: 100%" />
+                  <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('seeding.scoring.pushIntervalMsHint') }}</div>
+                </a-form-item>
+                <a-form-item>
+                  <a-button type="primary" :loading="saving" @click="saveScoringConfig">{{ t('common.saveConfig') }}</a-button>
+                </a-form-item>
+              </a-form>
+            </div>
           </a-spin>
         </a-card>
 
@@ -76,16 +87,16 @@
               <a-col :span="12">
                 <a-form-item :label="t('seeding.scoring.discount')">
                   <a-select v-model:value="dryrunForm.discount" style="width: 100%">
-                    <a-select-option value="">None</a-select-option>
-                    <a-select-option value="FREE">Free</a-select-option>
-                    <a-select-option value="2XFREE">2x Free</a-select-option>
-                    <a-select-option value="2XUP">2x Up</a-select-option>
-                    <a-select-option value="PERCENT_50">Half Down</a-select-option>
-                    <a-select-option value="2X50">2x Half Down</a-select-option>
-                    <a-select-option value="PERCENT_25">25% Down</a-select-option>
-                    <a-select-option value="PERCENT_70">70% Down</a-select-option>
-                    <a-select-option value="PERCENT_75">75% Down</a-select-option>
-                    <a-select-option value="CUSTOM">Custom</a-select-option>
+                    <a-select-option value="">{{ t('seeding.scoring.discountNone') }}</a-select-option>
+                    <a-select-option value="FREE">{{ t('seeding.scoring.discountFree') }}</a-select-option>
+                    <a-select-option value="2XFREE">{{ t('seeding.scoring.discount2xFree') }}</a-select-option>
+                    <a-select-option value="2XUP">{{ t('seeding.scoring.discount2xUp') }}</a-select-option>
+                    <a-select-option value="PERCENT_50">{{ t('seeding.scoring.discountHalfDown') }}</a-select-option>
+                    <a-select-option value="2X50">{{ t('seeding.scoring.discount2xHalfDown') }}</a-select-option>
+                    <a-select-option value="PERCENT_25">{{ t('seeding.scoring.discount25Down') }}</a-select-option>
+                    <a-select-option value="PERCENT_70">{{ t('seeding.scoring.discount70Down') }}</a-select-option>
+                    <a-select-option value="PERCENT_75">{{ t('seeding.scoring.discount75Down') }}</a-select-option>
+                    <a-select-option value="CUSTOM">{{ t('seeding.scoring.discountCustom') }}</a-select-option>
                   </a-select>
                 </a-form-item>
               </a-col>
@@ -100,10 +111,10 @@
             </a-form-item>
           </a-form>
           <a-descriptions v-if="dryrunResult" bordered :column="2" size="small">
-            <a-descriptions-item :label="t('seeding.scoring.score')">{{ dryrunResult.score?.toFixed(4) }}</a-descriptions-item>
-            <a-descriptions-item :label="t('seeding.scoring.effectiveScore')">{{ dryrunResult.effectiveScore?.toFixed(4) }}</a-descriptions-item>
-            <a-descriptions-item :label="t('seeding.scoring.demandScore')">{{ dryrunResult.demandScore?.toFixed(4) }}</a-descriptions-item>
-            <a-descriptions-item :label="t('seeding.scoring.recencyFactor')">{{ dryrunResult.recencyFactor?.toFixed(4) }}</a-descriptions-item>
+            <a-descriptions-item :label="t('seeding.scoring.score')">{{ Number.isFinite(dryrunResult.score) ? dryrunResult.score!.toFixed(4) : '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('seeding.scoring.effectiveScore')">{{ Number.isFinite(dryrunResult.effectiveScore) ? dryrunResult.effectiveScore!.toFixed(4) : '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('seeding.scoring.demandScore')">{{ Number.isFinite(dryrunResult.demandScore) ? dryrunResult.demandScore!.toFixed(4) : '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('seeding.scoring.recencyFactor')">{{ Number.isFinite(dryrunResult.recencyFactor) ? dryrunResult.recencyFactor!.toFixed(4) : '-' }}</a-descriptions-item>
             <a-descriptions-item :label="t('seeding.scoring.shouldCleanup')">
               <a-tag :color="dryrunResult.shouldCleanup ? 'red' : 'green'">{{ dryrunResult.shouldCleanup ? t('common.yes') : t('common.no') }}</a-tag>
             </a-descriptions-item>
@@ -133,6 +144,7 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { seedingApi } from '@/api/seeding'
 import { subscriptionsApi } from '@/api/subscriptions'
+import { formatTime } from '@/utils/format'
 
 interface DryrunResult {
   score?: number
@@ -168,6 +180,8 @@ const scoringConfig = reactive({
   maxActiveSeeding: 100,
   topNConfirm: 10,
   include2xUp: false,
+  batchLimit: 5,
+  pushIntervalMs: 0,
 })
 
 const dryrunForm = reactive({
@@ -182,10 +196,10 @@ const dryrunForm = reactive({
 
 const logColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: t('common.title'), dataIndex: 'title', key: 'title', ellipsis: true },
+  { title: t('seeding.infoHash'), dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
   { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 100 },
-  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
-  { title: t('common.time'), dataIndex: 'created_at', key: 'created_at', width: 170 },
+  { title: t('seeding.scoringScore'), dataIndex: 'score', key: 'score', width: 80 },
+  { title: t('common.time'), dataIndex: 'created_at', key: 'created_at', width: 170, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 
 async function fetchScoringConfig() {
@@ -195,12 +209,14 @@ async function fetchScoringConfig() {
     const data = resp.data.data || {}
     Object.assign(scoringConfig, {
       enabled: data.enabled ?? false,
-      halfLifeHours: data.halfLifeHours ?? data.half_life_hours ?? 2,
-      minScore: data.minScore ?? data.min_score ?? 1.0,
-      maxCandidates: data.maxCandidates ?? data.max_candidates ?? 50,
-      maxActiveSeeding: data.maxActiveSeeding ?? data.max_active_seeding ?? 100,
-      topNConfirm: data.topNConfirm ?? data.top_n_confirm ?? 10,
-      include2xUp: data.include2xUp ?? data.include_2xup ?? false,
+      halfLifeHours: data.half_life_hours ?? 2,
+      minScore: data.min_score ?? 1.0,
+      maxCandidates: data.max_candidates ?? 50,
+      maxActiveSeeding: data.max_active_seeding ?? 100,
+      topNConfirm: data.top_n_confirm ?? 10,
+      include2xUp: data.include_2xup ?? false,
+      batchLimit: data.batch_limit ?? 5,
+      pushIntervalMs: data.push_interval_ms ?? 0,
     })
     dryrunForm.halfLifeHours = scoringConfig.halfLifeHours
   } catch (e: unknown) {
@@ -246,7 +262,7 @@ async function fetchScoringLogs() {
   logsLoading.value = true
   try {
     const resp = await seedingApi.listScoringLogs({ limit: 30 })
-    scoringLogs.value = resp.data.data?.items || resp.data.data || []
+    scoringLogs.value = (resp.data.data?.items || []) as unknown as ScoringLogItem[]
   } catch {
     scoringLogs.value = []
   } finally {

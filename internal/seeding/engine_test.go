@@ -13,12 +13,14 @@ import (
 )
 
 type mockDownloaderClient struct {
-	maindata *model.Maindata
-	err      error
-	seeds    []*model.TorrentInfo
-	seedErr  error
-	delErr   error
-	pauseErr error
+	maindata    *model.Maindata
+	err         error
+	seeds       []*model.TorrentInfo
+	seedErr     error
+	delErr      error
+	pauseErr    error
+	torrentByHash map[string]*model.TorrentInfo
+	reannounceCalls int
 }
 
 func (m *mockDownloaderClient) GetMainData(_ context.Context) (*model.Maindata, error) {
@@ -36,7 +38,12 @@ func (m *mockDownloaderClient) AddFromFile(_ context.Context, _ []byte, _ model.
 func (m *mockDownloaderClient) ExportTorrent(_ context.Context, _ string) ([]byte, error) {
 	return nil, nil
 }
-func (m *mockDownloaderClient) GetTorrentByHash(_ context.Context, _ string) (*model.TorrentInfo, error) {
+func (m *mockDownloaderClient) GetTorrentByHash(_ context.Context, hash string) (*model.TorrentInfo, error) {
+	if m.torrentByHash != nil {
+		if ti, ok := m.torrentByHash[hash]; ok {
+			return ti, nil
+		}
+	}
 	return nil, nil
 }
 func (m *mockDownloaderClient) GetSeedingTorrents(_ context.Context) ([]*model.TorrentInfo, error) {
@@ -53,7 +60,10 @@ func (m *mockDownloaderClient) BatchDeleteTorrents(_ context.Context, _ []string
 }
 func (m *mockDownloaderClient) PauseTorrent(_ context.Context, _ string) error  { return m.pauseErr }
 func (m *mockDownloaderClient) ResumeTorrent(_ context.Context, _ string) error { return nil }
-func (m *mockDownloaderClient) Reannounce(_ context.Context, _ string) error    { return nil }
+func (m *mockDownloaderClient) Reannounce(_ context.Context, _ string) error {
+	m.reannounceCalls++
+	return nil
+}
 func (m *mockDownloaderClient) Recheck(_ context.Context, _ string) error       { return nil }
 func (m *mockDownloaderClient) SetTorrentTags(_ context.Context, _ string, _ []string) error {
 	return nil
@@ -272,13 +282,13 @@ func TestEngine_TotalActiveCount(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1", Status: model.SeedingStatusSeeding}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2", Status: model.SeedingStatusSeeding}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3", Status: model.SeedingStatusSeeding}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -435,6 +445,119 @@ func TestEngine_OnTorrents_NoSourceID(t *testing.T) {
 
 	if e.TotalActiveCount() != 0 {
 		t.Error("no records should be created for empty SourceID")
+	}
+}
+
+func setupOnTorrentsTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.SeedingTorrentRecord{}, &model.RSSSubscription{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	return db
+}
+
+func TestEngine_OnTorrents_NonFreeSkipped(t *testing.T) {
+	db := setupOnTorrentsTestDB(t)
+	e := NewEngine(db, zap.NewNop())
+	_ = e.Start(context.Background())
+
+	events := []model.TorrentEvent{
+		{
+			SourceID:  "999",
+			SiteName:  "site1",
+			TorrentID: "42",
+			InfoHash:  "hash_no_sub",
+			Discount:  model.DiscountNone,
+		},
+	}
+
+	if err := e.OnTorrents(context.Background(), events); err != nil {
+		t.Fatal(err)
+	}
+
+	if e.TotalActiveCount() != 0 {
+		t.Errorf("expected 0 records for non-free event without sub, got %d", e.TotalActiveCount())
+	}
+}
+
+func TestEngine_OnTorrents_Include2xUp(t *testing.T) {
+	db := setupOnTorrentsTestDB(t)
+	e := NewEngine(db, zap.NewNop())
+	_ = e.Start(context.Background())
+
+	sub := &model.RSSSubscription{
+		Name: "test-sub", Enabled: true, SiteName: "site1", ClientID: "c1",
+		ScoringConfig: model.SeedingScoringConfig{Enabled: true, Include2xUp: true},
+	}
+	db.Create(sub)
+
+	events := []model.TorrentEvent{
+		{
+			SourceID:  fmt.Sprintf("%d", sub.ID),
+			SiteName:  "site1",
+			TorrentID: "42",
+			InfoHash:  "hash_2xup",
+			Discount:  model.Discount2xUp,
+			Metadata:  map[string]any{"client_name": "c1"},
+		},
+	}
+
+	if err := e.OnTorrents(context.Background(), events); err != nil {
+		t.Fatal(err)
+	}
+
+	var count int64
+	db.Model(&model.SeedingTorrentRecord{}).Where("info_hash = ?", "hash_2xup").Count(&count)
+	if count != 1 {
+		t.Errorf("expected 1 record for 2xUp with Include2xUp=true, got %d", count)
+	}
+
+	rec, ok := e.GetRecord("c1", "hash_2xup")
+	if !ok {
+		t.Fatal("expected record in recordMap")
+	}
+	if rec.Status != model.SeedingStatusPending {
+		t.Errorf("expected status pending, got %s", rec.Status)
+	}
+}
+
+func TestEngine_OnTorrents_FreeWait(t *testing.T) {
+	db := setupOnTorrentsTestDB(t)
+	e := NewEngine(db, zap.NewNop())
+	_ = e.Start(context.Background())
+
+	sub := &model.RSSSubscription{
+		Name: "test-sub", Enabled: true, SiteName: "site1", ClientID: "c1",
+		ScoringConfig:    model.SeedingScoringConfig{Enabled: true},
+		FreeWaitEnabled:  true,
+		FreeWaitMaxWaitSec: 3600,
+	}
+	db.Create(sub)
+
+	events := []model.TorrentEvent{
+		{
+			SourceID:  fmt.Sprintf("%d", sub.ID),
+			SiteName:  "site1",
+			TorrentID: "42",
+			InfoHash:  "hash_none",
+			Discount:  model.DiscountNone,
+			Metadata:  map[string]any{"client_name": "c1"},
+		},
+	}
+
+	if err := e.OnTorrents(context.Background(), events); err != nil {
+		t.Fatal(err)
+	}
+
+	if e.TotalActiveCount() != 0 {
+		t.Errorf("expected 0 records (non-free should not create record), got %d", e.TotalActiveCount())
+	}
+	if e.freeWaitMonitor.PendingCount() != 1 {
+		t.Errorf("expected 1 pending free wait entry, got %d", e.freeWaitMonitor.PendingCount())
 	}
 }
 
@@ -686,7 +809,7 @@ func TestEngine_CollectTrafficStats(t *testing.T) {
 	mc := &mockDownloaderClient{
 		maindata: &model.Maindata{
 			Torrents: map[string]model.TorrentInfo{
-				"h1": {UploadSpeed: 3000, DownloadSpeed: 500},
+				"h1": {UploadSpeed: 3000, DownloadSpeed: 500, Uploaded: 1024000},
 			},
 			FreeSpace: 1024,
 		},
@@ -717,7 +840,10 @@ func TestEngine_CollectTrafficStats(t *testing.T) {
 	var traffic model.SiteTrafficDaily
 	db.Where("site_name = ?", "site1").First(&traffic)
 	if traffic.SeedingCount != 1 {
-		t.Errorf("expected 1, got %d", traffic.SeedingCount)
+		t.Errorf("expected seeding_count 1, got %d", traffic.SeedingCount)
+	}
+	if traffic.UploadDelta != 1024000 {
+		t.Errorf("expected upload_delta 1024000, got %d", traffic.UploadDelta)
 	}
 }
 
@@ -776,14 +902,19 @@ func TestEngine_CollectSiteTrafficDaily_Update(t *testing.T) {
 	})
 
 	md := &model.Maindata{
-		Torrents: map[string]model.TorrentInfo{},
+		Torrents: map[string]model.TorrentInfo{
+			"h1": {Uploaded: 2048000},
+		},
 	}
 	e.collectSiteTrafficDaily(ctx, "c1", md, now)
 
 	var traffic model.SiteTrafficDaily
 	db.Where("site_name = ? AND date = ?", "site1", today).First(&traffic)
 	if traffic.SeedingCount != 1 {
-		t.Errorf("expected 1 (updated), got %d", traffic.SeedingCount)
+		t.Errorf("expected seeding_count 1 (updated), got %d", traffic.SeedingCount)
+	}
+	if traffic.UploadDelta != 2048000 {
+		t.Errorf("expected upload_delta 2048000 (updated), got %d", traffic.UploadDelta)
 	}
 }
 
@@ -995,8 +1126,147 @@ func TestEngine_Evaluate_DiskProtection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Paused != 1 {
-		t.Errorf("expected 1 paused (disk protect), got %d", result.Paused)
+	if result.Paused != 0 {
+		t.Errorf("expected 0 paused (disk protect no longer pauses), got %d", result.Paused)
+	}
+	var rec model.SeedingTorrentRecord
+	db.Where("info_hash = ?", "hash1").First(&rec)
+	if rec.Status != model.SeedingStatusSeeding {
+		t.Errorf("expected seeding (not paused), got %s", rec.Status)
+	}
+}
+
+func TestEngine_Evaluate_DiskProtectRecovery(t *testing.T) {
+	db := setupEngineTestDBAll(t)
+	ctx := context.Background()
+	e := NewEngine(db, zap.NewNop())
+	_ = e.Start(ctx)
+
+	now := time.Now()
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID:     "c1",
+		InfoHash:     "hash1",
+		SiteName:     "s1",
+		TorrentID:    "1",
+		Status:       model.SeedingStatusPausedRule,
+		LastActionBy: "disk_protect",
+		FlushedAt:    &now,
+		CreatedAt:    time.Now().Add(-10 * time.Hour),
+	})
+
+	mc := &mockDownloaderClient{
+		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
+		seeds:    []*model.TorrentInfo{},
+	}
+	e.SetClientProvider(&mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	cfg := &model.SeedingClientConfig{
+		DiskProtectEnabled: true,
+		MinDiskSpaceGB:     10,
+	}
+	_, err := e.Evaluate(ctx, "c1", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var rec model.SeedingTorrentRecord
+	db.Where("info_hash = ?", "hash1").First(&rec)
+	if rec.Status != model.SeedingStatusPending {
+		t.Errorf("expected pending after disk_protect recovery, got %s", rec.Status)
+	}
+	if rec.LastActionBy != "disk_recover" {
+		t.Errorf("expected last_action_by=disk_recover, got %s", rec.LastActionBy)
+	}
+	if rec.FlushedAt != nil {
+		t.Error("expected flushed_at to be nil after recovery")
+	}
+}
+
+func TestEngine_Evaluate_DiskProtectNoRecoveryWhenFull(t *testing.T) {
+	db := setupEngineTestDBAll(t)
+	ctx := context.Background()
+	e := NewEngine(db, zap.NewNop())
+	_ = e.Start(ctx)
+
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID:     "c1",
+		InfoHash:     "hash1",
+		SiteName:     "s1",
+		TorrentID:    "1",
+		Status:       model.SeedingStatusPausedRule,
+		LastActionBy: "disk_protect",
+		CreatedAt:    time.Now().Add(-10 * time.Hour),
+	})
+
+	mc := &mockDownloaderClient{
+		maindata: &model.Maindata{FreeSpace: 100},
+		seeds:    []*model.TorrentInfo{},
+	}
+	e.SetClientProvider(&mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	cfg := &model.SeedingClientConfig{
+		DiskProtectEnabled: true,
+		MinDiskSpaceGB:     10,
+	}
+	_, err := e.Evaluate(ctx, "c1", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var rec model.SeedingTorrentRecord
+	db.Where("info_hash = ?", "hash1").First(&rec)
+	if rec.Status != model.SeedingStatusDeleted {
+		t.Errorf("expected deleted (not in downloader, paused_rule should be cleaned up), got %s", rec.Status)
+	}
+}
+
+func TestEngine_Evaluate_PausedDiskProtect_InQB_TooYoung(t *testing.T) {
+	db := setupEngineTestDBAll(t)
+	ctx := context.Background()
+	e := NewEngine(db, zap.NewNop())
+	_ = e.Start(ctx)
+
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID:     "c1",
+		InfoHash:     "hash1",
+		SiteName:     "s1",
+		TorrentID:    "1",
+		Status:       model.SeedingStatusPausedRule,
+		LastActionBy: "disk_protect",
+		IsFree:       true,
+		CreatedAt:    time.Now().Add(-1 * time.Hour),
+	})
+
+	mc := &mockDownloaderClient{
+		maindata: &model.Maindata{FreeSpace: 100},
+		seeds: []*model.TorrentInfo{
+			{Hash: "hash1", UploadSpeed: 0, SeedTime: 3600},
+		},
+	}
+	e.SetClientProvider(&mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	cfg := &model.SeedingClientConfig{
+		DiskProtectEnabled: true,
+		MinDiskSpaceGB:     10,
+	}
+	_, err := e.Evaluate(ctx, "c1", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var rec model.SeedingTorrentRecord
+	db.Where("info_hash = ?", "hash1").First(&rec)
+	if rec.Status != model.SeedingStatusPausedRule {
+		t.Errorf("expected paused_rule (too young, no delete rule matched), got %s", rec.Status)
 	}
 }
 
@@ -1035,5 +1305,258 @@ func TestEngine_Evaluate_DeleteTorrent(t *testing.T) {
 	}
 	if result.Deleted < 1 {
 		t.Errorf("expected at least 1 deleted, got %d (evaluated=%d)", result.Deleted, result.Evaluated)
+	}
+}
+
+func TestEngine_RefreshMaindataCache(t *testing.T) {
+	db := setupEngineTestDB(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+	defer e.Stop(ctx)
+
+	callCount := 0
+	mc := &mockDownloaderClient{
+		maindata: &model.Maindata{
+			FreeSpace: 50 * 1024 * 1024 * 1024,
+			Torrents: map[string]model.TorrentInfo{
+				"h1": {Hash: "h1", UploadSpeed: 1024, DownloadSpeed: 512},
+			},
+		},
+	}
+	origGetMainData := mc.GetMainData
+	_ = origGetMainData
+	mc.err = nil
+	e.SetClientProvider(&mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	_ = callCount
+	e.refreshMaindataOnce(ctx)
+
+	cached := e.getCachedMaindata("c1")
+	if cached == nil {
+		t.Fatal("expected cached maindata for c1")
+	}
+	if cached.FreeSpace != 50*1024*1024*1024 {
+		t.Errorf("expected free space 50GB, got %d", cached.FreeSpace)
+	}
+	if time.Since(cached.UpdatedAt) > 5*time.Second {
+		t.Errorf("expected recent update time, got %v", cached.UpdatedAt)
+	}
+}
+
+func TestEngine_RefreshMaindata_NoProvider(t *testing.T) {
+	db := setupEngineTestDB(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+	defer e.Stop(ctx)
+
+	e.refreshMaindataOnce(ctx)
+
+	cached := e.getCachedMaindata("c1")
+	if cached != nil {
+		t.Error("expected nil cache when no provider set")
+	}
+}
+
+func TestEngine_RefreshMaindata_ClientError(t *testing.T) {
+	db := setupEngineTestDB(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+	defer e.Stop(ctx)
+
+	mc := &mockDownloaderClient{
+		maindata: nil,
+		err:      fmt.Errorf("connection refused"),
+	}
+	e.SetClientProvider(&mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	e.refreshMaindataOnce(ctx)
+
+	cached := e.getCachedMaindata("c1")
+	if cached != nil {
+		t.Error("expected nil cache when client returns error")
+	}
+}
+
+func TestEngine_EvaluateUsesCachedMaindata(t *testing.T) {
+	db := setupEngineTestDBAll(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+	defer e.Stop(ctx)
+
+	mc := &mockDownloaderClient{
+		maindata: &model.Maindata{
+			FreeSpace: 10 * 1024 * 1024 * 1024,
+		},
+		seeds: []*model.TorrentInfo{},
+	}
+	e.SetClientProvider(&mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	e.refreshMaindataOnce(ctx)
+
+	_, err := e.Evaluate(ctx, "c1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cached := e.getCachedMaindata("c1")
+	if cached == nil {
+		t.Fatal("expected cached maindata to exist after evaluate")
+	}
+}
+
+func TestEngine_Reannounce_AbortsDelete(t *testing.T) {
+	db := setupEngineTestDBAll(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+	defer e.Stop(ctx)
+
+	past := time.Now().Add(-200 * time.Hour)
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "1",
+		Status: model.SeedingStatusSeeding, IsFree: false, HasHR: false, CreatedAt: past,
+	})
+
+	mc := &mockDownloaderClient{
+		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
+		seeds:    []*model.TorrentInfo{
+			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024},
+		},
+		torrentByHash: map[string]*model.TorrentInfo{
+			"h1": {Hash: "h1", NumIncomplete: 5, UploadSpeed: 1024},
+		},
+	}
+	e.SetClientProvider(&mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	e.refreshMaindataOnce(ctx)
+
+	cfg := &model.SeedingClientConfig{
+		ClientID:             "c1",
+		Enabled:              true,
+		ReannounceBefore:     true,
+		ReannounceRetries:    2,
+		ReannounceIntervalMs: 100,
+		ReannounceWaitMs:     100,
+	}
+
+	result, err := e.Evaluate(ctx, "c1", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Deleted == 0 {
+		t.Errorf("expected deletion to proceed even with leechers, got 0 deletions")
+	}
+	if mc.reannounceCalls == 0 {
+		t.Error("expected reannounce to be called")
+	}
+}
+
+func TestEngine_Reannounce_Disabled(t *testing.T) {
+	db := setupEngineTestDBAll(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+	defer e.Stop(ctx)
+
+	past := time.Now().Add(-200 * time.Hour)
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "1",
+		Status: model.SeedingStatusSeeding, IsFree: false, HasHR: false, CreatedAt: past,
+	})
+
+	mc := &mockDownloaderClient{
+		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
+		seeds:    []*model.TorrentInfo{
+			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024},
+		},
+	}
+	e.SetClientProvider(&mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	e.refreshMaindataOnce(ctx)
+
+	cfg := &model.SeedingClientConfig{
+		ClientID:         "c1",
+		Enabled:          true,
+		ReannounceBefore: false,
+	}
+
+	result, err := e.Evaluate(ctx, "c1", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Deleted != 1 {
+		t.Errorf("expected 1 deletion (reannounce disabled), got %d", result.Deleted)
+	}
+	if mc.reannounceCalls > 0 {
+		t.Error("expected no reannounce calls when disabled")
+	}
+}
+
+func TestEngine_Reannounce_AllRetriesFail(t *testing.T) {
+	db := setupEngineTestDBAll(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+	defer e.Stop(ctx)
+
+	past := time.Now().Add(-200 * time.Hour)
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "1",
+		Status: model.SeedingStatusSeeding, IsFree: false, HasHR: false, CreatedAt: past,
+	})
+
+	mc := &mockDownloaderClient{
+		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
+		seeds:    []*model.TorrentInfo{
+			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024},
+		},
+		torrentByHash: map[string]*model.TorrentInfo{
+			"h1": {Hash: "h1", NumIncomplete: 0, UploadSpeed: 0},
+		},
+	}
+	e.SetClientProvider(&mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	e.refreshMaindataOnce(ctx)
+
+	cfg := &model.SeedingClientConfig{
+		ClientID:             "c1",
+		Enabled:              true,
+		ReannounceBefore:     true,
+		ReannounceRetries:    2,
+		ReannounceIntervalMs: 50,
+		ReannounceWaitMs:     50,
+	}
+
+	result, err := e.Evaluate(ctx, "c1", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Deleted != 1 {
+		t.Errorf("expected 1 deletion (reannounce failed), got %d", result.Deleted)
+	}
+	if mc.reannounceCalls != 2 {
+		t.Errorf("expected 2 reannounce calls, got %d", mc.reannounceCalls)
 	}
 }

@@ -1,36 +1,37 @@
 import client from './client'
+import type { ApiResponse, ApiResponsePaginated, ReseedTask, ReseedMatch, UpdatePartial } from './types'
 
 export const reseedApi = {
   listTasks(page = 1, size = 20) {
-    return client.get('/reseed/tasks', { params: { page, size } })
+    return client.get<ApiResponsePaginated<ReseedTask>>('/reseed/tasks', { params: { page, size } })
   },
   getTask(id: number) {
-    return client.get(`/reseed/tasks/${id}`)
+    return client.get<ApiResponse<ReseedTask>>(`/reseed/tasks/${id}`)
   },
-  createTask(data: Record<string, unknown>) {
-    return client.post('/reseed/tasks', data)
+  createTask(data: UpdatePartial<ReseedTask>) {
+    return client.post<ApiResponse<ReseedTask>>('/reseed/tasks', data)
   },
-  updateTask(id: number, data: Record<string, unknown>) {
-    return client.put(`/reseed/tasks/${id}`, data)
+  updateTask(id: number, data: UpdatePartial<ReseedTask>) {
+    return client.put<ApiResponse<ReseedTask>>(`/reseed/tasks/${id}`, data)
   },
   deleteTask(id: number) {
-    return client.delete(`/reseed/tasks/${id}`)
+    return client.delete<ApiResponse<void>>(`/reseed/tasks/${id}`)
   },
   triggerTask(id: number) {
-    return client.post(`/reseed/tasks/${id}/trigger`)
+    return client.post<ApiResponse<void>>(`/reseed/tasks/${id}/trigger`)
   },
   cancelTask(id: number) {
-    return client.post(`/reseed/tasks/${id}/cancel`)
+    return client.post<ApiResponse<void>>(`/reseed/tasks/${id}/cancel`)
   },
   getMatches(taskId: number) {
-    return client.get(`/reseed/tasks/${taskId}/matches`)
+    return client.get<ApiResponse<{ items: ReseedMatch[]; total: number }>>(`/reseed/tasks/${taskId}/matches`)
   },
   retryMatch(taskId: number, matchId: number) {
-    return client.post(`/reseed/tasks/${taskId}/matches/${matchId}/retry`)
+    return client.post<ApiResponse<ReseedMatch>>(`/reseed/tasks/${taskId}/matches/${matchId}/retry`)
   },
   deleteNegativeCache(taskId: number, infoHash: string, site?: string) {
     const params: Record<string, string> = { infoHash }
     if (site) params.site = site
-    return client.delete(`/reseed/tasks/${taskId}/negative-cache`, { params })
+    return client.delete<ApiResponse<void>>(`/reseed/tasks/${taskId}/negative-cache`, { params })
   },
 }

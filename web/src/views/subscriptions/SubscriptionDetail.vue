@@ -10,8 +10,10 @@
         <a-descriptions-item :label="t('subscription.cronExpression')">{{ subscription.cron }}</a-descriptions-item>
         <a-descriptions-item :label="t('common.status')">
           <a-badge :status="subscription.enabled ? 'success' : 'default'" :text="subscription.enabled ? t('common.enabled') : t('common.disabled')" />
+          <a-tag v-if="subscription.paused" color="orange" style="margin-left: 8px">{{ subscription.pauseReason || t('subscription.paused') }}</a-tag>
         </a-descriptions-item>
-        <a-descriptions-item :label="t('common.createdAt')">{{ subscription.createdAt || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.createdAt')">{{ formatTime(subscription.createdAt) }}</a-descriptions-item>
+        <a-descriptions-item :label="t('common.updatedAt')">{{ formatTime(subscription.updatedAt) }}</a-descriptions-item>
       </a-descriptions>
 
       <a-tabs v-model:active-key="activeTab">
@@ -103,140 +105,190 @@
                 </a-form-item>
               </a-col>
             </a-row>
+            <a-row v-if="configForm.pushNotify" :gutter="16">
+              <a-col :span="12">
+                <a-form-item :label="t('subscription.notifyChannel')">
+                  <a-select v-model:value="configForm.notifyId" allow-clear :placeholder="t('subscription.selectNotifyChannel')" :loading="notifyChannelsLoading">
+                    <a-select-option v-for="ch in notifyChannels" :key="String(ch.id)" :value="String(ch.id)">{{ ch.name }}（{{ ch.type }}）</a-select-option>
+                  </a-select>
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row v-if="configForm.publishEnabled" :gutter="16">
+              <a-col :span="12">
+                <a-form-item :label="t('subscription.publishTargets')">
+                  <a-select v-model:value="configForm.publishTargets" mode="multiple" :placeholder="t('subscription.selectPublishTargets')" :loading="sitesLoading" style="width: 100%">
+                    <a-select-option v-for="s in targetSites" :key="s.domain" :value="s.domain">{{ s.name }}（{{ s.domain }}）</a-select-option>
+                  </a-select>
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row v-if="configForm.autoReseed" :gutter="16">
+              <a-col :span="12">
+                <a-form-item :label="t('subscription.reseedClients')">
+                  <a-select v-model:value="configForm.reseedClientIds" mode="multiple" :placeholder="t('subscription.selectReseedClients')" :loading="downloadersLoading" style="width: 100%">
+                    <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">{{ d.name }}（{{ d.type }}）</a-select-option>
+                  </a-select>
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-divider>{{ t('subscription.lifecycleManagement') }}</a-divider>
+            <a-row :gutter="16">
+              <a-col :span="8">
+                <a-form-item :label="t('subscription.lifecyclePauseSeeders')">
+                  <a-input-number v-model:value="configForm.lifecyclePauseSeeders" :min="0" style="width: 100%" />
+                  <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('subscription.lifecyclePauseSeedersHint') }}</div>
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item :label="t('subscription.lifecycleDeleteSeeders')">
+                  <a-input-number v-model:value="configForm.lifecycleDeleteSeeders" :min="0" style="width: 100%" />
+                  <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('subscription.lifecycleDeleteSeedersHint') }}</div>
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item :label="t('subscription.lifecycleDeleteSeedHours')">
+                  <a-input-number v-model:value="configForm.lifecycleDeleteSeedHours" :min="0" style="width: 100%" />
+                  <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('subscription.unitHours') }}</div>
+                </a-form-item>
+              </a-col>
+            </a-row>
 
             <a-collapse :bordered="false" style="margin-bottom: 24px">
-              <a-collapse-panel key="advanced" header="高级选项">
-                <a-divider>速率与过滤</a-divider>
+              <a-collapse-panel key="advanced" :header="t('common.advancedOptions')">
+                <a-divider>{{ t('subscription.rateAndFilter') }}</a-divider>
                 <a-row :gutter="16">
                   <a-col :span="12">
-                    <a-form-item label="跳过同大小">
+                    <a-form-item :label="t('subscription.skipSameSize')">
                       <a-switch v-model:checked="configForm.skipSameSize" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="12">
-                    <a-form-item label="严格同大小">
+                    <a-form-item :label="t('subscription.skipSameSizeStrict')">
                       <a-switch v-model:checked="configForm.skipSameSizeStrict" />
                     </a-form-item>
                   </a-col>
                 </a-row>
                 <a-row v-if="configForm.skipSameSize" :gutter="16">
                   <a-col :span="12">
-                    <a-form-item label="同大小窗口(分钟)">
+                    <a-form-item :label="t('subscription.sameSizeWindowMin')">
                       <a-input-number v-model:value="configForm.skipSameSizeWindowMin" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="12">
-                    <a-form-item label="每小时最大添加数">
+                    <a-form-item :label="t('subscription.maxAddCountPerHour')">
                       <a-input-number v-model:value="configForm.addCountPerHour" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                 </a-row>
 
-                <a-divider>自定义正则</a-divider>
-                <a-form-item label="使用自定义正则">
+                <a-divider>{{ t('subscription.customRegex') }}</a-divider>
+                <a-form-item :label="t('subscription.useCustomRegex')">
                   <a-switch v-model:checked="configForm.useCustomRegex" />
                 </a-form-item>
                 <template v-if="configForm.useCustomRegex">
-                  <a-form-item label="正则表达式">
+                  <a-form-item :label="t('subscription.regexStr')">
                     <a-input v-model:value="configForm.regexStr" placeholder="(.*)" />
                   </a-form-item>
-                  <a-form-item label="替换字符串">
+                  <a-form-item :label="t('subscription.replaceStr')">
                     <a-input v-model:value="configForm.replaceStr" placeholder="$1" />
                   </a-form-item>
                 </template>
 
-                <a-divider>免费等待策略</a-divider>
-                <a-form-item label="启用免费等待">
+                <a-divider>{{ t('subscription.freeWaitStrategy') }}</a-divider>
+                <a-form-item :label="t('subscription.freeWaitEnabled')">
                   <a-switch v-model:checked="configForm.freeWaitEnabled" />
                 </a-form-item>
                 <a-row v-if="configForm.freeWaitEnabled" :gutter="16">
                   <a-col :span="8">
-                    <a-form-item label="最大等待(秒)">
+                    <a-form-item :label="t('subscription.freeWaitMaxSec')">
                       <a-input-number v-model:value="configForm.freeWaitMaxWaitSec" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="8">
-                    <a-form-item label="重检间隔(秒)">
+                    <a-form-item :label="t('subscription.freeWaitRecheckSec')">
                       <a-input-number v-model:value="configForm.freeWaitRecheckSec" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="8">
-                    <a-form-item label="最小剩余(秒)">
+                    <a-form-item :label="t('subscription.freeWaitMinRemain')">
                       <a-input-number v-model:value="configForm.freeWaitMinRemain" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                 </a-row>
 
-                <a-divider>复检配置</a-divider>
-                <a-form-item label="启用复检">
+                <a-divider>{{ t('subscription.recheckConfig') }}</a-divider>
+                <a-form-item :label="t('subscription.recheckEnabled')">
                   <a-switch v-model:checked="configForm.recheckEnabled" />
                 </a-form-item>
                 <a-row v-if="configForm.recheckEnabled" :gutter="16">
                   <a-col :span="8">
-                    <a-form-item label="复检间隔(小时)">
+                    <a-form-item :label="t('subscription.recheckIntervalH')">
                       <a-input-number v-model:value="configForm.recheckIntervalH" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="8">
-                    <a-form-item label="最大复检次数">
+                    <a-form-item :label="t('subscription.recheckMaxCount')">
                       <a-input-number v-model:value="configForm.recheckMaxCount" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="8">
-                    <a-form-item label="最大复检年龄(小时)">
+                    <a-form-item :label="t('subscription.recheckMaxAgeH')">
                       <a-input-number v-model:value="configForm.recheckMaxAgeH" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                 </a-row>
 
-                <a-divider>可行性评估</a-divider>
-                <a-form-item label="启用可行性评估">
+                <a-divider>{{ t('subscription.feasibility') }}</a-divider>
+                <a-form-item :label="t('subscription.feasibilityEnabled')">
                   <a-switch v-model:checked="configForm.feasibilityEnabled" />
                 </a-form-item>
                 <a-row v-if="configForm.feasibilityEnabled" :gutter="16">
                   <a-col :span="8">
-                    <a-form-item label="速度限制">
+                    <a-form-item :label="t('subscription.feasibilitySpeedLimit')">
                       <a-input-number v-model:value="configForm.feasibilitySpeedLimit" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="8">
-                    <a-form-item label="大小限制">
+                    <a-form-item :label="t('subscription.feasibilitySizeLimit')">
                       <a-input-number v-model:value="configForm.feasibilitySizeLimit" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="8">
-                    <a-form-item label="安全系数">
+                    <a-form-item :label="t('subscription.feasibilitySafety')">
                       <a-input-number v-model:value="configForm.feasibilitySafety" :min="0" :max="1" :step="0.1" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                 </a-row>
 
-                <a-divider>磁盘预算</a-divider>
-                <a-form-item label="启用磁盘预算">
+                <a-divider>{{ t('subscription.diskBudget') }}</a-divider>
+                <a-form-item :label="t('subscription.diskBudgetEnabled')">
                   <a-switch v-model:checked="configForm.diskBudgetEnabled" />
                 </a-form-item>
                 <a-row v-if="configForm.diskBudgetEnabled" :gutter="16">
                   <a-col :span="12">
-                    <a-form-item label="最低磁盘GB">
+                    <a-form-item :label="t('subscription.diskBudgetMinGB')">
                       <a-input-number v-model:value="configForm.diskBudgetMinGB" :min="0" style="width: 100%" />
                     </a-form-item>
                   </a-col>
                 </a-row>
 
-                <a-divider>客户端选择</a-divider>
+                <a-divider>{{ t('subscription.clientSelection') }}</a-divider>
                 <a-row :gutter="16">
                   <a-col :span="12">
-                    <a-form-item label="选择模式">
+                    <a-form-item :label="t('subscription.clientSelectMode')">
                       <a-select v-model:value="configForm.clientSelection">
-                        <a-select-option value="fixed">fixed</a-select-option>
-                        <a-select-option value="round_robin">round_robin</a-select-option>
-                        <a-select-option value="least_connections">least_connections</a-select-option>
+                        <a-select-option value="fixed">{{ t('subscription.clientSelectModeFixed') }}</a-select-option>
+                        <a-select-option value="most_space">{{ t('subscription.clientSelectModeMostSpace') }}</a-select-option>
+                        <a-select-option value="least_load">{{ t('subscription.clientSelectModeLeastLoad') }}</a-select-option>
+                        <a-select-option value="round_robin">{{ t('subscription.clientSelectModeRoundRobin') }}</a-select-option>
+                        <a-select-option value="best_fit">{{ t('subscription.clientSelectModeBestFit') }}</a-select-option>
                       </a-select>
                     </a-form-item>
                   </a-col>
                   <a-col :span="12">
-                    <a-form-item label="候选客户端列表">
-                      <a-select v-model:value="configForm.candidateClients" mode="multiple" :placeholder="'选择候选客户端'" :loading="downloadersLoading" style="width: 100%">
+                    <a-form-item :label="t('subscription.candidateClients')">
+                      <a-select v-model:value="configForm.candidateClients" mode="multiple" :placeholder="t('subscription.selectCandidateClients')" :loading="downloadersLoading" style="width: 100%">
                         <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">
                           {{ d.name }}（{{ d.type }}）
                         </a-select-option>
@@ -245,35 +297,17 @@
                   </a-col>
                 </a-row>
 
-                <a-divider>磁盘守卫</a-divider>
+                <a-divider>{{ t('subscription.diskGuard') }}</a-divider>
                 <a-row :gutter="16">
                   <a-col :span="12">
-                    <a-form-item label="启用磁盘守卫">
+                    <a-form-item :label="t('subscription.diskGuardEnabled')">
                       <a-switch v-model:checked="configForm.diskGuardEnabled" />
                     </a-form-item>
                   </a-col>
                   <a-col :span="12">
-                    <a-form-item label="磁盘阈值(字节)">
-                      <a-input-number v-model:value="configForm.diskGuardThreshold" :min="0" style="width: 100%" />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
-
-                <a-divider>生命周期管理</a-divider>
-                <a-row :gutter="16">
-                  <a-col :span="8">
-                    <a-form-item label="暂停阈值 seeders">
-                      <a-input-number v-model:value="configForm.lifecyclePauseSeeders" :min="0" style="width: 100%" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="8">
-                    <a-form-item label="删除阈值 seeders">
-                      <a-input-number v-model:value="configForm.lifecycleDeleteSeeders" :min="0" style="width: 100%" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="8">
-                    <a-form-item label="删除阈值小时">
-                      <a-input-number v-model:value="configForm.lifecycleDeleteSeedHours" :min="0" style="width: 100%" />
+                    <a-form-item :label="t('subscription.diskGuardThreshold')">
+                      <a-input-number v-model:value="configForm.diskGuardThreshold" :min="0" style="width: calc(100% - 40px)" />
+                      <span style="margin-left: 8px; color: #999">GB</span>
                     </a-form-item>
                   </a-col>
                 </a-row>
@@ -334,13 +368,18 @@
                 </a-select>
               </a-col>
               <a-col :span="10">
-                <a-input-number
-                  v-if="cond.key === 'size'"
-                  v-model:value="cond.numValue"
-                  style="width:100%"
-                  :min="0"
-                  :placeholder="t('subscription.unitBytes')"
-                />
+                <div v-if="cond.key === 'size'" style="display: flex; gap: 8px">
+                  <a-input-number
+                    v-model:value="cond.numValue"
+                    style="flex: 1"
+                    :min="0"
+                    :placeholder="t('subscription.volumeSize')"
+                  />
+                  <a-select v-model:value="cond.sizeUnit" style="width: 80px">
+                    <a-select-option value="MB">MB</a-select-option>
+                    <a-select-option value="GB">GB</a-select-option>
+                  </a-select>
+                </div>
                 <a-select v-else-if="cond.key === 'free'" v-model:value="cond.value" style="width:100%">
                   <a-select-option value="true">{{ t('subscription.yesFree') }}</a-select-option>
                   <a-select-option value="false">{{ t('subscription.noNotFree') }}</a-select-option>
@@ -353,11 +392,8 @@
                 </a-button>
               </a-col>
             </a-row>
-            <div v-if="cond.key === 'size'" style="margin-top:4px;color:#999;font-size:12px">
-              {{ t('subscription.bytesHint') }}
-            </div>
           </div>
-          <a-button type="dashed" block style="margin-bottom:16px" @click="ruleConditions.push({key:'title',compareType:'contain',value:'',numValue:0})">
+          <a-button type="dashed" block style="margin-bottom:16px" @click="ruleConditions.push({key:'title',compareType:'contain',value:'',numValue:0,sizeUnit:'GB'})">
             {{ t('subscription.addCondition') }}
           </a-button>
           <a-form layout="vertical" style="max-width: 600px">
@@ -377,13 +413,18 @@ import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { subscriptionsApi } from '@/api/subscriptions'
+import { formatTime } from '@/utils/format'
 import { downloadersApi } from '@/api/downloaders'
+import { notificationsApi } from '@/api/notifications'
+import { sitesApi } from '@/api/sites'
+import type { RSSSubscription, ClientConfig, RuleCondition, NotificationChannel, Site } from '@/api/types'
 
 interface RuleCond {
   key: string
   compareType: string
   value: string
   numValue: number
+  sizeUnit: string
 }
 
 const { t } = useI18n()
@@ -395,12 +436,16 @@ const loading = ref(false)
 const configSaving = ref(false)
 const dryrunLoading = ref(false)
 const historyLoading = ref(false)
-const subscription = ref<Record<string, unknown>>({})
+const subscription = ref<Partial<RSSSubscription>>({})
 const dryrunResults = ref<Record<string, unknown>[]>([])
 const history = ref<Record<string, unknown>[]>([])
 const activeTab = ref('config')
-const downloaders = ref<Record<string, unknown>[]>([])
+const downloaders = ref<Partial<ClientConfig>[]>([])
 const downloadersLoading = ref(false)
+const notifyChannels = ref<NotificationChannel[]>([])
+const notifyChannelsLoading = ref(false)
+const targetSites = ref<Partial<Site>[]>([])
+const sitesLoading = ref(false)
 
 const configForm = reactive({
   name: '',
@@ -419,6 +464,12 @@ const configForm = reactive({
   publishEnabled: false,
   pushNotify: false,
   autoReseed: false,
+  notifyId: '',
+  publishTargets: [] as string[],
+  reseedClientIds: [] as string[],
+  lifecyclePauseSeeders: 0,
+  lifecycleDeleteSeeders: 0,
+  lifecycleDeleteSeedHours: 0,
   skipSameSize: false,
   skipSameSizeWindowMin: 30,
   skipSameSizeStrict: false,
@@ -443,12 +494,9 @@ const configForm = reactive({
   candidateClients: [] as string[],
   clientSelection: 'fixed',
   diskGuardEnabled: true,
-  diskGuardThreshold: 1073741824,
-  lifecyclePauseSeeders: 0,
-  lifecycleDeleteSeeders: 0,
-  lifecycleDeleteSeedHours: 0,
+  diskGuardThreshold: 1,
 })
-const ruleConditions = ref<RuleCond[]>([{ key: 'title', compareType: 'contain', value: '', numValue: 0 }])
+const ruleConditions = ref<RuleCond[]>([{ key: 'title', compareType: 'contain', value: '', numValue: 0, sizeUnit: 'GB' }])
 const rulesSaving = ref(false)
 
 const dryrunColumns = [
@@ -476,6 +524,31 @@ async function fetchDownloaders() {
   }
 }
 
+async function fetchNotifyChannels() {
+  notifyChannelsLoading.value = true
+  try {
+    const resp = await notificationsApi.list()
+    const data = resp.data.data
+    notifyChannels.value = data?.items ?? []
+  } catch {
+    notifyChannels.value = []
+  } finally {
+    notifyChannelsLoading.value = false
+  }
+}
+
+async function fetchTargetSites() {
+  sitesLoading.value = true
+  try {
+    const resp = await sitesApi.list(1, 200)
+    targetSites.value = resp.data?.data?.items || []
+  } catch {
+    targetSites.value = []
+  } finally {
+    sitesLoading.value = false
+  }
+}
+
 async function fetchSubscription() {
   loading.value = true
   try {
@@ -490,7 +563,7 @@ async function fetchSubscription() {
       category: subscription.value.category || '',
       addPaused: subscription.value.addPaused || false,
       autoTmm: subscription.value.autoTmm || false,
-      tags: subscription.value.tags || [],
+      tags: Array.isArray(subscription.value.tags) ? subscription.value.tags : [],
       uploadLimitKb: subscription.value.uploadLimitKb || 0,
       downloadLimitKb: subscription.value.downloadLimitKb || 0,
       scrapeFree: subscription.value.scrapeFree || false,
@@ -498,6 +571,12 @@ async function fetchSubscription() {
       publishEnabled: subscription.value.publishEnabled || false,
       pushNotify: subscription.value.pushNotify || false,
       autoReseed: subscription.value.autoReseed || false,
+      notifyId: subscription.value.notifyId || '',
+      publishTargets: subscription.value.publishTargets || [],
+      reseedClientIds: subscription.value.reseedClientIds || [],
+      lifecyclePauseSeeders: subscription.value.lifecyclePauseSeeders || 0,
+      lifecycleDeleteSeeders: subscription.value.lifecycleDeleteSeeders || 0,
+      lifecycleDeleteSeedHours: subscription.value.lifecycleDeleteSeedHours || 0,
       skipSameSize: subscription.value.skipSameSize || false,
       skipSameSizeWindowMin: subscription.value.skipSameSizeWindowMin || 30,
       skipSameSizeStrict: subscription.value.skipSameSizeStrict || false,
@@ -522,18 +601,16 @@ async function fetchSubscription() {
       candidateClients: subscription.value.candidateClients || [],
       clientSelection: subscription.value.clientSelection || 'fixed',
       diskGuardEnabled: subscription.value.diskGuardEnabled ?? true,
-      diskGuardThreshold: subscription.value.diskGuardThreshold || 1073741824,
-      lifecyclePauseSeeders: subscription.value.lifecyclePauseSeeders || 0,
-      lifecycleDeleteSeeders: subscription.value.lifecycleDeleteSeeders || 0,
-      lifecycleDeleteSeedHours: subscription.value.lifecycleDeleteSeedHours || 0,
+      diskGuardThreshold: subscription.value.diskGuardThreshold != null ? Number(subscription.value.diskGuardThreshold) / 1073741824 : 1,
     })
     const conds = subscription.value.conditions || []
     if (Array.isArray(conds) && conds.length) {
-      ruleConditions.value = conds.map((c: Record<string, unknown>) => ({
+      ruleConditions.value = conds.map((c: RuleCondition) => ({
         key: String(c.key || 'title'),
-        compareType: String(c.compare_type || c.compareType || 'contain'),
+        compareType: String(c.compare_type || 'contain'),
         value: String(c.value || ''),
-        numValue: c.key === 'size' ? Number(c.value || 0) : 0,
+        numValue: c.key === 'size' ? (Number(c.value || 0) >= 1073741824 ? Number(c.value || 0) / 1073741824 : Number(c.value || 0) / 1048576) : 0,
+        sizeUnit: c.key === 'size' ? (Number(c.value || 0) >= 1073741824 || Number(c.value || 0) === 0 ? 'GB' : 'MB') : 'GB',
       }))
     }
   } catch (e: unknown) {
@@ -563,6 +640,12 @@ async function saveConfig() {
       publishEnabled: configForm.publishEnabled,
       pushNotify: configForm.pushNotify,
       autoReseed: configForm.autoReseed,
+      notifyId: configForm.notifyId,
+      publishTargets: configForm.publishTargets,
+      reseedClientIds: configForm.reseedClientIds,
+      lifecyclePauseSeeders: configForm.lifecyclePauseSeeders,
+      lifecycleDeleteSeeders: configForm.lifecycleDeleteSeeders,
+      lifecycleDeleteSeedHours: configForm.lifecycleDeleteSeedHours,
       skipSameSize: configForm.skipSameSize,
       skipSameSizeWindowMin: configForm.skipSameSizeWindowMin,
       skipSameSizeStrict: configForm.skipSameSizeStrict,
@@ -587,10 +670,7 @@ async function saveConfig() {
       candidateClients: configForm.candidateClients,
       clientSelection: configForm.clientSelection,
       diskGuardEnabled: configForm.diskGuardEnabled,
-      diskGuardThreshold: configForm.diskGuardThreshold,
-      lifecyclePauseSeeders: configForm.lifecyclePauseSeeders,
-      lifecycleDeleteSeeders: configForm.lifecycleDeleteSeeders,
-      lifecycleDeleteSeedHours: configForm.lifecycleDeleteSeedHours,
+      diskGuardThreshold: Math.round(configForm.diskGuardThreshold * 1073741824),
     }
     await subscriptionsApi.update(id, payload)
     message.success(t('common.configSaved'))
@@ -607,7 +687,7 @@ async function runDryrun() {
   try {
     const resp = await subscriptionsApi.dryrun(id)
     const data = resp.data.data || {}
-    dryrunResults.value = (data.recentTorrents || []).map((torrent: Record<string, unknown>) => ({
+    dryrunResults.value = ((data.recentTorrents || []) as Record<string, unknown>[]).map((torrent: Record<string, unknown>) => ({
       title: torrent.title || torrent.name || '-',
       size: torrent.size ? (Number(torrent.size) / 1073741824).toFixed(2) + ' GB' : '-',
       matched: torrent.matched ? t('common.yes') : t('common.no'),
@@ -626,7 +706,8 @@ async function fetchHistory() {
   try {
     const resp = await subscriptionsApi.get(id)
     const sub = resp.data.data || {}
-    history.value = (sub.recentFetches || []).map((f: Record<string, unknown>, idx: number) => ({
+    history.value = ((sub as unknown as Record<string, unknown>).recentFetches || []) as Record<string, unknown>[]
+    history.value = (history.value as Record<string, unknown>[]).map((f: Record<string, unknown>, idx: number) => ({
       id: idx + 1,
       fetchedAt: f.fetchedAt || f.createdAt || '-',
       newCount: f.newCount ?? 0,
@@ -642,11 +723,17 @@ async function fetchHistory() {
 async function saveRules() {
   rulesSaving.value = true
   try {
-    const conditions = ruleConditions.value.map(c => ({
-      key: c.key,
-      compare_type: c.compareType,
-      value: c.key === 'size' ? String(c.numValue || 0) : c.value,
-    }))
+    const conditions = ruleConditions.value.map(c => {
+      let sizeVal = c.numValue || 0
+      if (c.key === 'size') {
+        sizeVal = c.sizeUnit === 'GB' ? sizeVal * 1073741824 : sizeVal * 1048576
+      }
+      return {
+        key: c.key,
+        compare_type: c.compareType,
+        value: c.key === 'size' ? String(Math.round(sizeVal)) : c.value,
+      }
+    })
     await subscriptionsApi.updateRules(id, { conditions })
     message.success(t('subscription.rulesSaved'))
   } catch (e: unknown) {
@@ -660,5 +747,7 @@ onMounted(() => {
   fetchSubscription()
   fetchHistory()
   fetchDownloaders()
+  fetchNotifyChannels()
+  fetchTargetSites()
 })
 </script>

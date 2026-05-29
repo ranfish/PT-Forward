@@ -1959,3 +1959,106 @@ func TestQBClient_GetMainDataIncremental_WithTags(t *testing.T) {
 		t.Errorf("expected 2 tags, got %d", len(md.Tags))
 	}
 }
+
+func TestQBClient_IPBanDetection(t *testing.T) {
+	loginAttempts := 0
+	banned := true
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v2/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		loginAttempts++
+		if banned {
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprint(w, "身份认证失败次数过多，您的 IP 地址已被封禁。")
+			return
+		}
+		http.SetCookie(w, &http.Cookie{Name: "SID", Value: "test-sid"})
+		fmt.Fprint(w, "Ok.")
+	})
+	mux.HandleFunc("/api/v2/app/version", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "5.0.0")
+	})
+	mux.HandleFunc("/api/v2/transfer/info", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]interface{}{"connection_status": "connected"})
+	})
+
+	c := newTestQBClient(t, mux)
+
+	err := c.Connect(context.Background())
+	if err == nil {
+		t.Fatal("expected error when IP is banned")
+	}
+	if !strings.Contains(err.Error(), "IP banned") {
+		t.Errorf("expected IP banned error, got: %v", err)
+	}
+	if !c.IsIPBanned() {
+		t.Error("expected IsIPBanned to return true")
+	}
+	if loginAttempts != 1 {
+		t.Errorf("expected 1 login attempt, got %d", loginAttempts)
+	}
+
+	banned = false
+	loginAttempts = 0
+	err = c.Connect(context.Background())
+	if err != nil {
+		t.Errorf("expected success after unban, got: %v", err)
+	}
+	if c.IsIPBanned() {
+		t.Error("expected IsIPBanned to return false after unban")
+	}
+}
+
+func TestQBClient_IPBanSkipsReLogin(t *testing.T) {
+	loginAttempts := 0
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v2/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		loginAttempts++
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, "身份认证失败次数过多，您的 IP 地址已被封禁。")
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, "Forbidden")
+	})
+
+	c := newTestQBClient(t, mux)
+
+	c.login(context.Background())
+	initialAttempts := loginAttempts
+
+	_, err := c.get(context.Background(), "/api/v2/transfer/info")
+	if err == nil {
+		t.Fatal("expected error from get when IP is banned")
+	}
+	t.Logf("first get after ban: %v, login attempts: %d->%d", err, initialAttempts, loginAttempts)
+
+	reloginAttempts := loginAttempts - initialAttempts
+	if reloginAttempts > 1 {
+		t.Errorf("expected at most 1 re-login attempt after ban detected, got %d", reloginAttempts)
+	}
+
+	loginAttempts = 0
+	_, err = c.get(context.Background(), "/api/v2/transfer/info")
+	if err == nil {
+		t.Fatal("expected error from second get when IP is banned")
+	}
+	t.Logf("second get: %v, login attempts: %d", err, loginAttempts)
+	if loginAttempts > 0 {
+		t.Errorf("expected 0 login attempts on second get (ban active), got %d", loginAttempts)
+	}
+}
+
+func TestQBClient_IPBanExpires(t *testing.T) {
+	c := &QBClient{
+		cfg:    &model.ClientConfig{Name: "test"},
+		logger: zap.NewNop(),
+	}
+	c.ipBanned = true
+	c.banUntil = time.Now().Add(-1 * time.Second)
+
+	if c.IsIPBanned() {
+		t.Error("expected ban to be expired")
+	}
+}

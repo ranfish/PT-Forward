@@ -356,6 +356,7 @@ func TestE2E_OnTorrents_NoMatchedRule(t *testing.T) {
 		Title: "Unmatched.Torrent.2024", Size: 5000000000,
 		InfoHash: "unmatched1234",
 		SourceID: fmt.Sprintf("%d", sub.ID),
+		Discount: model.DiscountFree,
 	}}
 
 	require.NoError(t, td.OnTorrents(ctx, events))
@@ -632,6 +633,7 @@ func TestE2E_DuplicateSeedingRecord(t *testing.T) {
 
 	evt := makeTorrentEvent("dup-source-site", "dup-001", "Duplicate.Test", 8000000000, "duphash1111abcd")
 	evt.SourceID = fmt.Sprintf("%d", sub.ID)
+	evt.Discount = model.DiscountFree
 	events := []model.TorrentEvent{evt, evt}
 
 	require.NoError(t, td.OnTorrents(ctx, events))

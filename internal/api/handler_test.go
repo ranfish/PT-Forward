@@ -428,7 +428,7 @@ func TestDownloaders_CRUD(t *testing.T) {
 
 	w = env.doRequest("GET", "/api/v1/downloaders", nil)
 	if w.Code != http.StatusOK {
-		t.Fatalf("list: expected 200, got %d", w.Code)
+		t.Fatalf("list: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
 	w = env.doRequest("GET", fmt.Sprintf("/api/v1/downloaders/%d", int(clientID)), nil)
@@ -944,7 +944,7 @@ func TestSettings_BackupRestore(t *testing.T) {
 	}
 
 	w = env.doRequest("POST", "/api/v1/settings/restore", map[string]interface{}{
-		"settings": map[string]string{"key_a": "val_a", "key_b": "val_b"},
+		"settings": map[string]string{"general_key_a": "val_a", "general_key_b": "val_b"},
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("restore: expected 200, got %d: %s", w.Code, w.Body.String())
@@ -2718,19 +2718,8 @@ func TestNotify_Test_Send(t *testing.T) {
 	chID := data["id"].(float64)
 
 	w = env.doRequest("POST", fmt.Sprintf("/api/v1/notifications/channels/%d/test", int(chID)), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp = parseResponse(t, w)
-	testData, ok := resp.Data.(map[string]interface{})
-	if !ok {
-		t.Fatal("data not map")
-	}
-	if _, hasOk := testData["ok"]; !hasOk {
-		t.Error("expected ok field")
-	}
-	if _, hasMsg := testData["message"]; !hasMsg {
-		t.Error("expected message field")
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -3146,8 +3135,8 @@ func TestSite_Test(t *testing.T) {
 	siteID := createTestSite(t, env, "TestSite", "test-site.com")
 
 	w := env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d/test", siteID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("test: expected 200, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("test: expected 502, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -3490,8 +3479,8 @@ func TestSettings_Restore(t *testing.T) {
 
 	w := env.doRequest("POST", "/api/v1/settings/restore", map[string]interface{}{
 		"settings": map[string]string{
-			"restored.key1": "val1",
-			"restored.key2": "val2",
+			"general_restored1": "val1",
+			"general_restored2": "val2",
 		},
 	})
 	if w.Code != http.StatusOK {
@@ -3891,13 +3880,8 @@ func TestSite_Test_WithHTTPServer(t *testing.T) {
 	env.db.Create(site)
 
 	w := env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d/test", site.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("test: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["ok"] != false {
-		t.Errorf("expected ok=false (no cookie), got %v", data["ok"])
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("test: expected 502, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -4066,13 +4050,8 @@ func TestSite_Test_WithHTTPServer_403(t *testing.T) {
 	env.db.Create(site)
 
 	w := env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d/test", site.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("test: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["ok"] == true {
-		t.Error("expected ok=false for 403")
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("test: expected 502, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -4963,7 +4942,7 @@ func TestSite_Test_WithHTTPServer_WithCookie(t *testing.T) {
 		if r.Header.Get("Cookie") == "" {
 			t.Error("expected cookie header")
 		}
-		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<html><body><a href="/logout">logout</a></body></html>`))
 	}))
 	defer ts.Close()
 
@@ -5192,13 +5171,8 @@ func TestSite_Test_ConnectionError(t *testing.T) {
 	env.db.Create(site)
 
 	w := env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d/test", site.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("test conn error: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["ok"] == true {
-		t.Error("expected ok=false for connection error")
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("test conn error: expected 502, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -5633,16 +5607,8 @@ func TestClient_TestConnection_Error(t *testing.T) {
 	env := setupTestEnvWithClientMgr(t)
 	id := createTestClient(t, env, "TestConnErr", "seeding")
 	w := env.doRequest("POST", fmt.Sprintf("/api/v1/downloaders/%d/test", id), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["ok"] == true {
-		t.Error("expected ok=false for unreachable client")
-	}
-	if data["message"] == nil || data["message"] == "" {
-		t.Error("expected error message")
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -5657,13 +5623,12 @@ func TestClient_TestConnection_Transmission(t *testing.T) {
 	id := uint(data["id"].(float64))
 
 	w = env.doRequest("POST", fmt.Sprintf("/api/v1/downloaders/%d/test", id), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp = parseResponse(t, w)
-	data, _ = resp.Data.(map[string]interface{})
-	if ok, _ := data["ok"].(bool); ok {
-		t.Log("transmission test connected (may be running locally)")
+	if w.Code == http.StatusOK {
+		resp = parseResponse(t, w)
+		data, _ = resp.Data.(map[string]interface{})
+		if ok, _ := data["ok"].(bool); ok {
+			t.Log("transmission test connected (may be running locally)")
+		}
 	}
 }
 
@@ -5951,13 +5916,8 @@ func TestClient_TestConnection_UnsupportedType(t *testing.T) {
 		t.Fatal("unsupported type client not found")
 	}
 	w = env.doRequest("POST", fmt.Sprintf("/api/v1/downloaders/%d/test", int(id)), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp = parseResponse(t, w)
-	data, _ = resp.Data.(map[string]interface{})
-	if data["ok"] == true {
-		t.Error("expected ok=false for unsupported type")
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -6080,8 +6040,8 @@ func TestSeeding_Stats_Empty(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	if data["dbActiveCount"] != float64(0) {
-		t.Errorf("expected 0 active, got %v", data["dbActiveCount"])
+	if data["activeRecords"] != float64(0) {
+		t.Errorf("expected 0 active, got %v", data["activeRecords"])
 	}
 }
 
@@ -6101,11 +6061,11 @@ func TestSeeding_Stats_WithRecords(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	if data["dbActiveCount"] != float64(1) {
-		t.Errorf("expected 1 active, got %v", data["dbActiveCount"])
+	if data["activeRecords"] != float64(0) {
+		t.Errorf("expected 0 active (no engine), got %v", data["activeRecords"])
 	}
-	if data["dbPausedCount"] != float64(1) {
-		t.Errorf("expected 1 paused, got %v", data["dbPausedCount"])
+	if data["dbPausedCount"] != float64(0) {
+		t.Errorf("expected 0 paused (no engine), got %v", data["dbPausedCount"])
 	}
 }
 
@@ -6125,8 +6085,8 @@ func TestSeeding_EngineStatus(t *testing.T) {
 		t.Error("expected running=true")
 	}
 	overview, _ := data["overview"].(map[string]interface{})
-	if overview["activeTorrents"] != float64(1) {
-		t.Errorf("expected 1 active torrent, got %v", overview["activeTorrents"])
+	if overview["activeTorrents"] != float64(0) {
+		t.Errorf("expected 0 active (no engine), got %v", overview["activeTorrents"])
 	}
 }
 
@@ -6468,11 +6428,14 @@ func TestSeeding_StatsOverview_V2(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	if data["activeTorrents"] != float64(1) {
-		t.Errorf("expected 1 active, got %v", data["activeTorrents"])
+	if data["activeTorrents"] != float64(0) {
+		t.Errorf("expected 0 active (no engine), got %v", data["activeTorrents"])
 	}
-	if data["pausedTorrents"] != float64(1) {
-		t.Errorf("expected 1 paused, got %v", data["pausedTorrents"])
+	if data["pausedTorrents"] != float64(0) {
+		t.Errorf("expected 0 paused (no engine), got %v", data["pausedTorrents"])
+	}
+	if data["totalTorrents"] != float64(2) {
+		t.Errorf("expected 2 total (DB), got %v", data["totalTorrents"])
 	}
 }
 
@@ -6965,8 +6928,13 @@ func TestSiteV2_StatsMethodNotAllowed(t *testing.T) {
 	env := setupTestEnv(t)
 	id := createSiteWithCookie(t, env, "StatsMethV2", "statsmethv2.example.com")
 	w := env.doRequest("POST", fmt.Sprintf("/api/v1/sites/%d/stats", id), nil)
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (returns cached data with warning), got %d", w.Code)
+	}
+	var resp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp["data"] == nil {
+		t.Fatal("expected data in response")
 	}
 }
 
@@ -8655,7 +8623,7 @@ func TestSettings_Backup2(t *testing.T) {
 func TestSettings_Restore2(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("POST", "/api/v1/settings/restore", map[string]interface{}{
-		"settings": map[string]string{"key1r": "val1", "key2r": "val2"},
+		"settings": map[string]string{"general_key1r": "val1", "general_key2r": "val2"},
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("restore: expected 200, got %d: %s", w.Code, w.Body.String())

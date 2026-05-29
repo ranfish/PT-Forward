@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { ApiResponse, PaginatedData } from '@/api/types'
+import i18n from '@/composables/useI18n'
 
 export function usePagination<T = Record<string, unknown>>(
   fetchFn: (page: number, size: number) => Promise<{ data: ApiResponse<PaginatedData<T>> }>,
@@ -22,7 +23,7 @@ export function usePagination<T = Record<string, unknown>>(
       data.value = body.data?.items || []
       total.value = body.data?.total || 0
     } catch (e) {
-      error.value = e instanceof Error ? e.message : '请求失败'
+      error.value = e instanceof Error ? e.message : i18n.global.t('common.requestFailed')
     } finally {
       loading.value = false
     }

@@ -91,8 +91,9 @@ func buildRetryChain(base http.RoundTripper, domain string) http.RoundTripper {
 	}
 	return &circuitBreakerTransport{
 		base:     retry,
-		config:   DefaultCircuitBreakerConfig(),
-		logger:   nil,
+		config:   cb.config,
+		logger:   cb.logger,
+		mu:       cb.mu,
 		circuits: cb.circuits,
 	}
 }

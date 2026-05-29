@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -39,7 +40,7 @@ func TestEncryptDecrypt_Roundtrip(t *testing.T) {
 			t.Errorf("encrypt(%q): %v", plain, err)
 			continue
 		}
-		if !strings.HasPrefix(cipher, ciphertextPrefix) {
+		if !strings.HasPrefix(cipher, ciphertextV2Prefix) {
 			t.Errorf("encrypted value missing prefix: %s", cipher[:20])
 			continue
 		}
@@ -151,5 +152,44 @@ func TestNewCredentialEncryptor_ShortKey(t *testing.T) {
 	_, err = NewCredentialEncryptor("too-short")
 	if err == nil {
 		t.Error("NewCredentialEncryptor should reject keys < 16 chars")
+	}
+}
+
+func TestDecrypt_LegacyFormat(t *testing.T) {
+	enc, err := NewCredentialEncryptor("test-encryption-key-32bytes!!!")
+	if err != nil {
+		t.Fatalf("create encryptor: %v", err)
+	}
+	legacyEnc, err := newAEAD("test-encryption-key-32bytes!!!", legacySalt)
+	if err != nil {
+		t.Fatalf("create legacy AEAD: %v", err)
+	}
+	plain := "legacy-secret-value"
+	nonce := make([]byte, legacyEnc.NonceSize())
+	nonce[0] = 0x01
+	nonce[1] = 0x02
+	ct := legacyEnc.Seal(nonce, nonce, []byte(plain), nil)
+	legacyValue := ciphertextPrefix + base64.StdEncoding.EncodeToString(ct)
+
+	dec, err := enc.Decrypt(legacyValue)
+	if err != nil {
+		t.Fatalf("decrypt legacy: %v", err)
+	}
+	if dec != plain {
+		t.Errorf("legacy roundtrip: got %q, want %q", dec, plain)
+	}
+}
+
+func TestIsLegacyEncrypted(t *testing.T) {
+	enc, _ := NewCredentialEncryptor("test-encryption-key-32bytes!!!")
+	newVal, _ := enc.Encrypt("test")
+	if enc.IsLegacyEncrypted(newVal) {
+		t.Error("new format should not be legacy")
+	}
+	if !enc.IsLegacyEncrypted("enc:abc") {
+		t.Error("enc: prefix should be legacy")
+	}
+	if enc.IsLegacyEncrypted("plaintext") {
+		t.Error("plaintext should not be legacy")
 	}
 }

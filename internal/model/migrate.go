@@ -15,6 +15,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&RSSSubscription{},
 		&RSSSubscriptionRule{},
 		&RSSTorrentSeen{},
+		&RSSFetchLog{},
 		&FilterRule{},
 		&DeleteRule{},
 		&TorrentEvent{},
@@ -48,6 +49,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&IYUUConfig{},
 		&IYUUSiteMapping{},
 		&OperationAuditLog{},
+		&SchedulerTaskOverride{},
+		&FreeWaitEntry{},
 		&SchemaMigration{},
 		&setting.Setting{},
 	)

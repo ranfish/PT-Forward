@@ -29,6 +29,11 @@ func RequestLogger(logger *zap.Logger) func(http.Handler) http.Handler {
 				return
 			}
 
+			if _, ok := w.(http.Hijacker); ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			start := time.Now()
 			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 

@@ -65,7 +65,7 @@
       </a-col>
       <a-col :span="6">
         <a-card>
-          <a-statistic title="Goroutines" :value="overview.system?.goroutines || 0" />
+          <a-statistic :title="t('dashboard.goroutines')" :value="overview.system?.goroutines || 0" />
         </a-card>
       </a-col>
     </a-row>
@@ -79,10 +79,31 @@
         :columns="activityColumns"
         :data-source="activities"
         :loading="loading"
-        :pagination="false"
+        :pagination="{
+          current: activityPage,
+          pageSize: activitySize,
+          total: activityTotal,
+          showSizeChanger: true,
+          showTotal: (total: number) => t('common.totalCount', { count: total }),
+        }"
         row-key="id"
         size="small"
-      />
+        @change="(pag: { current: number; pageSize: number }) => { activityPage = pag.current; activitySize = pag.pageSize; fetchActivities() }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'title'">
+            <a v-if="record.detail_url" :href="record.detail_url" target="_blank" style="color: #1890ff">{{ record.title }}</a>
+            <span v-else>{{ record.title }}</span>
+          </template>
+          <template v-if="column.key === 'info_hash'">
+            <span v-if="/^[0-9a-f]{40}$/i.test(record.info_hash)">{{ record.info_hash }}</span>
+            <span v-else style="color: #999">-</span>
+          </template>
+          <template v-if="column.key === 'size'">
+            {{ formatSize(record.size) }}
+          </template>
+        </template>
+      </a-table>
     </a-card>
   </div>
 </template>
@@ -98,23 +119,17 @@ import {
   ThunderboltOutlined,
   SendOutlined,
 } from '@ant-design/icons-vue'
-import { dashboardApi } from '@/api/dashboard'
+import { dashboardApi, type TrendPoint } from '@/api/dashboard'
 import { useWebSocketStore } from '@/stores/websocket'
-
-interface TrendItem {
-  date: string
-  events: number
-  rss: number
-  publish: number
-  reseed: number
-}
+import { formatTime } from '@/utils/format'
 
 interface ActivityItem {
   id: number
   title: string
   site_name: string
   info_hash: string
-  size: string
+  detail_url: string
+  size: number
   status: string
   created_at: string
 }
@@ -138,6 +153,9 @@ const { t } = useI18n()
 const loading = ref(false)
 const overview = ref<DashboardOverview>({})
 const activities = ref<ActivityItem[]>([])
+const activityPage = ref(1)
+const activitySize = ref(20)
+const activityTotal = ref(0)
 const chartRef = ref<HTMLElement>()
 let chartInstance: echarts.ECharts | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
@@ -145,12 +163,13 @@ const wsStore = useWebSocketStore()
 
 const activityColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: t('dashboard.torrentTitle'), dataIndex: 'title', key: 'title', ellipsis: true },
-  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
-  { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
-  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
+  { title: t('dashboard.torrentTitle'), dataIndex: 'title', key: 'title', ellipsis: true, width: 220 },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 80 },
+  { title: '种子ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 100 },
+  { title: 'InfoHash', key: 'info_hash', width: 280 },
+  { title: t('common.size'), key: 'size', width: 100 },
   { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100 },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 
 function formatSize(bytes: number): string {
@@ -160,48 +179,47 @@ function formatSize(bytes: number): string {
   return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i]
 }
 
-function initChart(trends: TrendItem[]) {
+function initChart(points: TrendPoint[]) {
   if (!chartRef.value) return
   if (chartInstance) {
     chartInstance.dispose()
   }
   chartInstance = echarts.init(chartRef.value)
-  const dates = trends.map((t: TrendItem) => t.date)
+  const dates = points.map(p => p.date)
   chartInstance.setOption({
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
     },
-    legend: { data: [t('dashboard.chartEvents'), 'RSS', t('dashboard.chartPublish'), t('dashboard.chartReseed')], bottom: 0 },
+    legend: { data: [t('dashboard.chartEvents'), t('dashboard.chartRSS'), t('dashboard.chartPublish'), t('dashboard.chartReseed')], bottom: 0 },
     grid: { left: 50, right: 30, top: 20, bottom: 40 },
     xAxis: { type: 'category', data: dates, boundaryGap: true },
     yAxis: { type: 'value', minInterval: 1 },
     series: [
       {
-        name: t('dashboard.chartEvents'), type: 'bar', stack: 'total',
-        data: trends.map((t: TrendItem) => t.events),
+        name: t('dashboard.chartEvents'), type: 'line', smooth: true,
+        data: points.map(p => p.events),
         itemStyle: { color: '#1890ff' },
-        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(24,144,255,0.5)' } },
+        lineStyle: { width: 2 },
+        areaStyle: { opacity: 0.1 },
       },
       {
-        name: 'RSS', type: 'bar', stack: 'total',
-        data: trends.map((t: TrendItem) => t.rss),
+        name: t('dashboard.chartRSS'), type: 'line', smooth: true,
+        data: points.map(p => p.rss),
         itemStyle: { color: '#52c41a' },
-        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(82,196,26,0.5)' } },
+        lineStyle: { width: 2 },
       },
       {
         name: t('dashboard.chartPublish'), type: 'line', smooth: true,
-        data: trends.map((t: TrendItem) => t.publish),
+        data: points.map(p => p.publish),
         itemStyle: { color: '#722ed1' },
         lineStyle: { width: 2 },
-        areaStyle: { opacity: 0.1 },
       },
       {
         name: t('dashboard.chartReseed'), type: 'line', smooth: true,
-        data: trends.map((t: TrendItem) => t.reseed),
+        data: points.map(p => p.reseed),
         itemStyle: { color: '#faad14' },
         lineStyle: { width: 2 },
-        areaStyle: { opacity: 0.1 },
       },
     ],
   })
@@ -223,12 +241,13 @@ function handleWSMessage(msg: WSMessage) {
       title: (p.title as string) || '',
       site_name: (p.siteName as string) || '',
       info_hash: '',
-      size: typeof p.size === 'number' ? formatSize(p.size) : (p.size as string) || '',
+      detail_url: '',
+      size: typeof p.size === 'number' ? p.size : 0,
       status: (p.discount as string) || '',
       created_at: msg.timestamp || new Date().toISOString(),
     })
-    if (activities.value.length > 20) {
-      activities.value = activities.value.slice(0, 20)
+    if (activities.value.length > activitySize.value) {
+      activities.value = activities.value.slice(0, activitySize.value)
     }
   }
   if (msg.type === 'system.site.frozen') {
@@ -236,19 +255,29 @@ function handleWSMessage(msg: WSMessage) {
   }
 }
 
+async function fetchActivities() {
+  try {
+    const resp = await dashboardApi.getActivities(activityPage.value, activitySize.value)
+    const body = resp.data.data || { items: [], total: 0 }
+    activities.value = (body.items || []) as ActivityItem[]
+    activityTotal.value = body.total || 0
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  }
+}
+
 async function fetchData() {
   loading.value = true
   try {
-    const [overviewResp, activityResp, trendsResp] = await Promise.all([
+    const [overviewResp, trendsResp] = await Promise.all([
       dashboardApi.getOverview(),
-      dashboardApi.getActivities(1, 20),
       dashboardApi.getTrends(7),
     ])
     overview.value = overviewResp.data.data || {}
-    activities.value = activityResp.data.data?.items || activityResp.data.data || []
-    const trends = trendsResp.data.data?.trends || []
+    const trendData = trendsResp.data.data || { trends: [] }
     await nextTick()
-    initChart(trends)
+    initChart(trendData.trends || [])
+    await fetchActivities()
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   } finally {

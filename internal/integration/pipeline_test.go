@@ -86,6 +86,7 @@ func TestE2E_RSSToSeedingRecord(t *testing.T) {
 		SiteName: "source-site", TorrentID: "torrent-001",
 		Title: "Ubuntu 24.04 LTS", Size: 4700000000,
 		InfoHash: "abc123def456", SourceID: "1",
+		Discount: model.DiscountFree,
 	}}
 
 	require.NoError(t, td.OnTorrents(ctx, events))

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -128,16 +127,5 @@ func RateLimit(limit int, windowSeconds int64) func(http.Handler) http.Handler {
 }
 
 func ExtractIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.SplitN(xff, ",", 2)
-		return strings.TrimSpace(parts[0])
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
-	}
-	idx := strings.LastIndex(r.RemoteAddr, ":")
-	if idx != -1 {
-		return r.RemoteAddr[:idx]
-	}
-	return r.RemoteAddr
+	return RealIP(r)
 }

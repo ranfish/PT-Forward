@@ -116,7 +116,7 @@ func decodeString(data []byte, pos int) (any, int, error) {
 	colon += pos
 
 	var length int
-	if _, err := fmt.Sscanf(string(data[pos:colon]), "%d", &length); err != nil {
+	if _, err := fmt.Sscanf(string(data[pos:colon]), "%d", &length); err != nil || length < 0 {
 		return nil, pos, fpError(ErrFPBencode, "parse string length", err)
 	}
 

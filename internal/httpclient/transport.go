@@ -42,7 +42,20 @@ func (e *FreezeEventEmitter) SetDB(db *gorm.DB) {
 }
 
 func (e *FreezeEventEmitter) Subscribe(ch chan FreezeEvent) {
+	e.mu.Lock()
 	e.subscribers = append(e.subscribers, ch)
+	e.mu.Unlock()
+}
+
+func (e *FreezeEventEmitter) Unsubscribe(ch chan FreezeEvent) {
+	e.mu.Lock()
+	for i, s := range e.subscribers {
+		if s == ch {
+			e.subscribers = append(e.subscribers[:i], e.subscribers[i+1:]...)
+			break
+		}
+	}
+	e.mu.Unlock()
 }
 
 func (e *FreezeEventEmitter) Emit(event FreezeEvent) {
@@ -76,13 +89,15 @@ func (e *FreezeEventEmitter) Emit(event FreezeEvent) {
 	if shouldNotify {
 		e.lastNotified[event.Domain] = time.Now()
 	}
+	snapshot := make([]chan FreezeEvent, len(e.subscribers))
+	copy(snapshot, e.subscribers)
 	e.mu.Unlock()
 
 	if !shouldNotify {
 		return
 	}
 
-	for _, ch := range e.subscribers {
+	for _, ch := range snapshot {
 		select {
 		case ch <- event:
 		default:
@@ -113,6 +128,7 @@ func (t *domainLimiterTransport) RoundTrip(req *http.Request) (*http.Response, e
 	if err := t.limiter.Acquire(req.Context(), domain); err != nil {
 		return nil, httpError(ErrHTRateLimit, "domain rate limit acquire failed", err)
 	}
+	defer t.limiter.Release(domain)
 
 	resp, err := t.base.RoundTrip(req)
 	if err != nil {

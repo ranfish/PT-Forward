@@ -63,6 +63,7 @@ type loginLimiter struct {
 	lockoutMin int
 	attempts   map[string]*loginAttempt
 	mu         sync.RWMutex
+	stopCh     chan struct{}
 }
 
 func (l *loginLimiter) CheckLocked(ip string) error {
@@ -107,6 +108,34 @@ func (l *loginLimiter) RecordSuccess(ip string) {
 	delete(l.attempts, ip)
 }
 
+func (l *loginLimiter) cleanupLoop() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-l.stopCh:
+			return
+		case <-ticker.C:
+			l.mu.Lock()
+			now := time.Now()
+			for ip, a := range l.attempts {
+				if a.count < l.maxRetries || now.After(a.lockedUntil) {
+					delete(l.attempts, ip)
+				}
+			}
+			l.mu.Unlock()
+		}
+	}
+}
+
+func (l *loginLimiter) stop() {
+	select {
+	case <-l.stopCh:
+	default:
+		close(l.stopCh)
+	}
+}
+
 type AuthManager struct {
 	signingKey    []byte
 	refreshTokens map[string]time.Time
@@ -115,6 +144,12 @@ type AuthManager struct {
 	settingRepo   SettingStore
 	logger        *zap.Logger
 	mu            sync.RWMutex
+	setupOnce     sync.Once
+
+	persistCh  chan struct{}
+	persistWg  sync.WaitGroup
+	stopOnce   sync.Once
+	stopCh     chan struct{}
 }
 
 type SettingStore interface {
@@ -163,11 +198,17 @@ func NewAuthManagerWithSettings(repo model.AuthRepository, settingRepo SettingSt
 			maxRetries: 5,
 			lockoutMin: 5,
 			attempts:   make(map[string]*loginAttempt),
+			stopCh:     make(chan struct{}),
 		},
 		repo:        repo,
 		settingRepo: settingRepo,
 		logger:      logger,
+		persistCh:   make(chan struct{}, 1),
+		stopCh:      make(chan struct{}),
 	}
+
+	go mgr.loginLimiter.cleanupLoop()
+	go mgr.persistLoop()
 
 	if settingRepo != nil {
 		mgr.loadRefreshTokens(context.Background())
@@ -177,6 +218,7 @@ func NewAuthManagerWithSettings(repo model.AuthRepository, settingRepo SettingSt
 }
 
 func (m *AuthManager) ConfigureLoginLockout(enabled bool, maxRetries, lockoutMin int) {
+	m.loginLimiter.mu.Lock()
 	m.loginLimiter.enabled = enabled
 	if maxRetries > 0 {
 		m.loginLimiter.maxRetries = maxRetries
@@ -184,10 +226,40 @@ func (m *AuthManager) ConfigureLoginLockout(enabled bool, maxRetries, lockoutMin
 	if lockoutMin > 0 {
 		m.loginLimiter.lockoutMin = lockoutMin
 	}
+	m.loginLimiter.mu.Unlock()
 }
 
 func (m *AuthManager) Stop() {
-	m.persistRefreshTokens()
+	m.stopOnce.Do(func() {
+		close(m.stopCh)
+	})
+	m.loginLimiter.stop()
+	m.persistWg.Wait()
+}
+
+func (m *AuthManager) persistLoop() {
+	for {
+		select {
+		case <-m.stopCh:
+			m.persistRefreshTokens()
+			return
+		case <-m.persistCh:
+			select {
+			case <-m.stopCh:
+				m.persistRefreshTokens()
+				return
+			case <-time.After(500 * time.Millisecond):
+			}
+			m.persistRefreshTokens()
+		}
+	}
+}
+
+func (m *AuthManager) triggerPersist() {
+	select {
+	case m.persistCh <- struct{}{}:
+	default:
+	}
 }
 
 func (m *AuthManager) loadRefreshTokens(ctx context.Context) {
@@ -305,7 +377,7 @@ func (m *AuthManager) IssueTokenPair() (*TokenPair, error) {
 	m.evictOldestIfNeeded()
 	m.mu.Unlock()
 
-	go m.persistRefreshTokens()
+	m.triggerPersist()
 
 	return &TokenPair{
 		AccessToken:  accessToken,
@@ -335,7 +407,7 @@ func (m *AuthManager) RefreshTokens(oldRefreshToken string) (*TokenPair, error) 
 	delete(m.refreshTokens, jti)
 	m.mu.Unlock()
 
-	go m.persistRefreshTokens()
+	m.triggerPersist()
 
 	pair, err := m.IssueTokenPair()
 	if err != nil {
@@ -381,7 +453,7 @@ func (m *AuthManager) VerifyPassword(ctx context.Context, password string) error
 }
 
 func (m *AuthManager) SetPassword(ctx context.Context, password string) error {
-	if err := validatePasswordStrength(password); err != nil {
+	if err := ValidatePasswordStrength(password); err != nil {
 		return &model.AppError{Code: 40001, Message: err.Error()}
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
@@ -400,7 +472,7 @@ func (m *AuthManager) RevokeAllRefreshTokens() {
 	m.refreshTokens = make(map[string]time.Time)
 	m.mu.Unlock()
 
-	go m.persistRefreshTokens()
+	m.triggerPersist()
 }
 
 func (m *AuthManager) IsInitialized(ctx context.Context) bool {
@@ -409,7 +481,7 @@ func (m *AuthManager) IsInitialized(ctx context.Context) bool {
 }
 
 func (m *AuthManager) ResetPassword(ctx context.Context, password string) error {
-	if err := validatePasswordStrength(password); err != nil {
+	if err := ValidatePasswordStrength(password); err != nil {
 		return &model.AppError{Code: 40001, Message: err.Error()}
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
@@ -437,25 +509,36 @@ func (m *AuthManager) UpdateProfile(ctx context.Context, displayName string) err
 }
 
 func (m *AuthManager) SetupAdmin(ctx context.Context, username, password string) error {
-	if m.IsInitialized(ctx) {
-		return &model.AppError{Code: 40900, Message: "管理员账号已存在"}
+	var setupErr error
+	m.setupOnce.Do(func() {
+		if m.IsInitialized(ctx) {
+			setupErr = &model.AppError{Code: 40900, Message: "管理员账号已存在"}
+			return
+		}
+		if username == "" || password == "" {
+			setupErr = &model.AppError{Code: 40001, Message: "用户名和密码不能为空"}
+			return
+		}
+		if err := ValidatePasswordStrength(password); err != nil {
+			setupErr = &model.AppError{Code: 40001, Message: err.Error()}
+			return
+		}
+		hash, err := HashPassword(password)
+		if err != nil {
+			setupErr = authError(ErrAuthPassword, "hash password", err)
+			return
+		}
+		user := &model.User{
+			Username:     username,
+			DisplayName:  username,
+			PasswordHash: hash,
+		}
+		setupErr = m.repo.Create(ctx, user)
+	})
+	if setupErr == nil && m.IsInitialized(ctx) {
+		setupErr = &model.AppError{Code: 40900, Message: "管理员账号已存在"}
 	}
-	if username == "" || password == "" {
-		return &model.AppError{Code: 40001, Message: "用户名和密码不能为空"}
-	}
-	if err := validatePasswordStrength(password); err != nil {
-		return &model.AppError{Code: 40001, Message: err.Error()}
-	}
-	hash, err := HashPassword(password)
-	if err != nil {
-		return authError(ErrAuthPassword, "hash password", err)
-	}
-	user := &model.User{
-		Username:     username,
-		DisplayName:  username,
-		PasswordHash: hash,
-	}
-	return m.repo.Create(ctx, user)
+	return setupErr
 }
 
 func (m *AuthManager) signToken(claims jwt.MapClaims) (string, error) {
@@ -495,7 +578,7 @@ func (m *AuthManager) evictOldestIfNeeded() {
 	delete(m.refreshTokens, oldestJTI)
 }
 
-func validatePasswordStrength(password string) error {
+func ValidatePasswordStrength(password string) error {
 	if len(password) < 8 {
 		return authError(ErrAuthPassword, "密码长度至少 8 位", nil)
 	}
@@ -519,13 +602,21 @@ func validatePasswordStrength(password string) error {
 }
 
 func GenerateRandomPassword(length int) (string, error) {
+	charsLen := len(randomPasswordChars)
 	b := make([]byte, length)
-	randBytes := make([]byte, length)
-	if _, err := rand.Read(randBytes); err != nil {
-		return "", authError(ErrAuthPassword, "random password generation failed", err)
-	}
 	for i := range b {
-		b[i] = randomPasswordChars[int(randBytes[i])%len(randomPasswordChars)]
+		for {
+			var rb [1]byte
+			if _, err := rand.Read(rb[:]); err != nil {
+				return "", authError(ErrAuthPassword, "random password generation failed", err)
+			}
+			v := int(rb[0])
+			remainder := 256 % charsLen
+			if v < (256 - remainder) {
+				b[i] = randomPasswordChars[v%charsLen]
+				break
+			}
+		}
 	}
 	return string(b), nil
 }

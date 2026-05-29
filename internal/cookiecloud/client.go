@@ -12,6 +12,8 @@ import (
 	"hash"
 	"io"
 	"net/http"
+
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"strings"
 	"time"
 )
@@ -112,7 +114,7 @@ func FetchAndDecrypt(serverURL, uuid, password string) (map[string][]CookieData,
 	if err != nil {
 		return nil, ccError(ErrCCHTTP, "http request", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	if resp.StatusCode != 200 {
 		return nil, ccError(ErrCCHTTP, fmt.Sprintf("server returned status %d", resp.StatusCode), nil)

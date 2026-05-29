@@ -725,18 +725,20 @@ func TestWAFDetector_PeekBodyLimit(t *testing.T) {
 
 func TestAcquire_RateLimitWait(t *testing.T) {
 	limiter := NewDomainRateLimiter(0)
-	limiter.SetDomainConfig("wait.local", DomainLimitConfig{MaxReqs: 2, WindowSecs: 2})
+	limiter.SetDomainConfig("wait.local", DomainLimitConfig{MaxReqs: 2, WindowSecs: 2, MaxConcurrent: 5})
 
 	for i := 0; i < 2; i++ {
 		if err := limiter.Acquire(context.Background(), "wait.local"); err != nil {
 			t.Fatalf("acquire %d failed: %v", i, err)
 		}
+		limiter.Release("wait.local")
 	}
 
 	start := time.Now()
 	if err := limiter.Acquire(context.Background(), "wait.local"); err != nil {
 		t.Fatalf("acquire after wait failed: %v", err)
 	}
+	limiter.Release("wait.local")
 	elapsed := time.Since(start)
 	if elapsed < 500*time.Millisecond {
 		t.Errorf("expected rate limit wait, elapsed=%v", elapsed)
@@ -745,8 +747,9 @@ func TestAcquire_RateLimitWait(t *testing.T) {
 
 func TestAcquire_RateLimitContextCancel(t *testing.T) {
 	limiter := NewDomainRateLimiter(0)
-	limiter.SetDomainConfig("cancel.local", DomainLimitConfig{MaxReqs: 1, WindowSecs: 10})
+	limiter.SetDomainConfig("cancel.local", DomainLimitConfig{MaxReqs: 1, WindowSecs: 10, MaxConcurrent: 5})
 	limiter.Acquire(context.Background(), "cancel.local")
+	limiter.Release("cancel.local")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -754,6 +757,7 @@ func TestAcquire_RateLimitContextCancel(t *testing.T) {
 	err := limiter.Acquire(ctx, "cancel.local")
 	if err == nil {
 		t.Error("expected context cancelled error")
+		limiter.Release("cancel.local")
 	}
 }
 

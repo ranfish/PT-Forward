@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/model"
 	"gorm.io/gorm"
 )
@@ -42,7 +43,7 @@ func (r *Repository) GetByID(ctx context.Context, id uint) (*model.RSSSubscripti
 }
 
 func (r *Repository) Create(ctx context.Context, sub *model.RSSSubscription) error {
-	return r.db.WithContext(ctx).Create(sub).Error
+	return dbimpl.ForceCreate(r.db.WithContext(ctx), sub)
 }
 
 func (r *Repository) Update(ctx context.Context, sub *model.RSSSubscription) error {
@@ -97,4 +98,11 @@ func (r *Repository) CleanupOldSeen(ctx context.Context, retentionDays int) (int
 			cutoff,
 		).Delete(&model.RSSTorrentSeen{})
 	return result.RowsAffected, result.Error
+}
+
+func (r *Repository) MarkStatus(ctx context.Context, siteName, torrentID, status string) {
+	r.db.WithContext(ctx).
+		Model(&model.RSSTorrentSeen{}).
+		Where("site_name = ? AND torrent_id = ?", siteName, torrentID).
+		Update("status", status)
 }

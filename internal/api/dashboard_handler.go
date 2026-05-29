@@ -3,10 +3,12 @@ package api
 import (
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/seeding"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -16,14 +18,23 @@ type DashboardHandler struct {
 	logger        *zap.Logger
 	version       string
 	clientChecker clientOnlineChecker
+	seedingEngine torrentCounter
 }
 
 type clientOnlineChecker interface {
 	ConnectedCount() int
 }
 
+type torrentCounter interface {
+	GetRealTorrentCounts() map[string]*seeding.RealTorrentCounts
+}
+
 func NewDashboardHandler(db *gorm.DB, logger *zap.Logger, version string, checker clientOnlineChecker) *DashboardHandler {
 	return &DashboardHandler{db: db, logger: logger, version: version, clientChecker: checker}
+}
+
+func (h *DashboardHandler) SetSeedingEngine(engine torrentCounter) {
+	h.seedingEngine = engine
 }
 
 func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -50,14 +61,17 @@ func (h *DashboardHandler) handleOverview(w http.ResponseWriter, _ *http.Request
 		h.logger.Warn("dashboard: query rss count failed", zap.Error(err))
 	}
 
-	var seedingActive int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&seedingActive).Error; err != nil {
-		h.logger.Warn("dashboard: query seeding active count failed", zap.Error(err))
-	}
-
-	var seedingPaused int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status IN ?", []string{"paused_free_end", "paused_rule"}).Count(&seedingPaused).Error; err != nil {
-		h.logger.Warn("dashboard: query seeding paused count failed", zap.Error(err))
+	var realSeeding, realDownloading, realPaused, realTotal int
+	var realTotalSize int64
+	if h.seedingEngine != nil {
+		counts := h.seedingEngine.GetRealTorrentCounts()
+		for _, c := range counts {
+			realSeeding += c.Seeding
+			realDownloading += c.Downloading
+			realPaused += c.Paused
+			realTotal += c.Total
+			realTotalSize += c.TotalSize
+		}
 	}
 
 	var reseedActive int64
@@ -116,22 +130,6 @@ func (h *DashboardHandler) handleOverview(w http.ResponseWriter, _ *http.Request
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
-	var downloadingCount int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "downloading").Count(&downloadingCount).Error; err != nil {
-		h.logger.Warn("dashboard: query downloading count failed", zap.Error(err))
-	}
-
-	var totalSizeResult []struct {
-		Total int64
-	}
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Select("COALESCE(SUM(size), 0) as total").Scan(&totalSizeResult).Error; err != nil {
-		h.logger.Warn("dashboard: query total size failed", zap.Error(err))
-	}
-	totalSize := int64(0)
-	if len(totalSizeResult) > 0 {
-		totalSize = totalSizeResult[0].Total
-	}
-
 	Success(w, map[string]interface{}{
 		"sites": map[string]interface{}{
 			"total":  siteTotal,
@@ -142,10 +140,11 @@ func (h *DashboardHandler) handleOverview(w http.ResponseWriter, _ *http.Request
 			"online": onlineCount,
 		},
 		"torrents": map[string]interface{}{
-			"seeding":     seedingActive,
-			"paused":      seedingPaused,
-			"downloading": downloadingCount,
-			"totalSize":   totalSize,
+			"seeding":     realSeeding,
+			"paused":      realPaused,
+			"downloading": realDownloading,
+			"total":       realTotal,
+			"totalSize":   realTotalSize,
 		},
 		"publish": map[string]interface{}{
 			"todayCount":   publishToday,
@@ -168,24 +167,90 @@ func (h *DashboardHandler) handleOverview(w http.ResponseWriter, _ *http.Request
 }
 
 func (h *DashboardHandler) handleActivities(w http.ResponseWriter, r *http.Request) {
-	limit := int64(50)
-	if v := r.URL.Query().Get("limit"); v != "" {
-		n, err := parseInt64(v)
-		if err == nil && n > 0 && n <= 200 {
-			limit = n
+	page := int64(1)
+	size := int64(20)
+	if v := r.URL.Query().Get("page"); v != "" {
+		if n, err := parseInt64(v); err == nil && n > 0 {
+			page = n
+		}
+	}
+	if v := r.URL.Query().Get("size"); v != "" {
+		if n, err := parseInt64(v); err == nil && n > 0 && n <= 200 {
+			size = n
 		}
 	}
 
+	var total int64
+	h.db.Model(&model.RSSTorrentSeen{}).Count(&total)
+
 	var seen []model.RSSTorrentSeen
-	if err := h.db.Order("created_at DESC").Limit(int(limit)).Find(&seen).Error; err != nil {
+	offset := int((page - 1) * size)
+	if err := h.db.Order("created_at DESC").Offset(offset).Limit(int(size)).Find(&seen).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询最近种子失败")
 		return
 	}
 
+	type seedingHash struct {
+		SiteName  string
+		TorrentID string
+		InfoHash  string
+	}
+	var seedingHashes []seedingHash
+	h.db.Model(&model.SeedingTorrentRecord{}).
+		Select("site_name, torrent_id, info_hash").
+		Find(&seedingHashes)
+
+	realHashMap := make(map[string]string, len(seedingHashes))
+	for _, sh := range seedingHashes {
+		realHashMap[sh.SiteName+":"+sh.TorrentID] = sh.InfoHash
+	}
+
+	type siteInfo struct {
+		BaseURL   string
+		Framework string
+	}
+	var sites []model.Site
+	h.db.Select("name, base_url, framework").Find(&sites)
+	siteMap := make(map[string]siteInfo, len(sites))
+	for _, s := range sites {
+		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
+	}
+
+	type activityItem struct {
+		model.RSSTorrentSeen
+		DetailURL string `json:"detail_url"`
+	}
+
+	items := make([]activityItem, len(seen))
+	for i := range seen {
+		if len(seen[i].InfoHash) != 40 {
+			if real, ok := realHashMap[seen[i].SiteName+":"+seen[i].TorrentID]; ok && len(real) == 40 {
+				seen[i].InfoHash = real
+			}
+		}
+		items[i] = activityItem{RSSTorrentSeen: seen[i]}
+		if si, ok := siteMap[seen[i].SiteName]; ok && si.BaseURL != "" && seen[i].TorrentID != "" {
+			items[i].DetailURL = buildDetailURL(si.BaseURL, si.Framework, seen[i].TorrentID)
+		}
+	}
+
 	Success(w, map[string]interface{}{
-		"items": seen,
-		"total": len(seen),
+		"items": items,
+		"total": total,
+		"page":  page,
+		"size":  size,
 	})
+}
+
+func buildDetailURL(baseURL, framework, torrentID string) string {
+	switch framework {
+	case "tnode":
+		return baseURL + "/torrent/info/" + torrentID
+	case "unit3d", "rousi":
+		return baseURL + "/torrent/" + torrentID
+	default:
+		return baseURL + "/details.php?id=" + torrentID
+	}
 }
 
 func (h *DashboardHandler) handleTrends(w http.ResponseWriter, r *http.Request) {
@@ -197,39 +262,73 @@ func (h *DashboardHandler) handleTrends(w http.ResponseWriter, r *http.Request) 
 	}
 
 	now := time.Now()
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -(days - 1))
+	dayEnd := dayStart.AddDate(0, 0, days)
+
+	type dayCount struct {
+		Date  string `json:"date"`
+		Count int64  `json:"count"`
+	}
+
+	var eventCounts []dayCount
+	if err := h.db.Model(&model.TorrentEvent{}).
+		Select("DATE(created_at) as date, COUNT(*) as count").
+		Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).
+		Group("DATE(created_at)").Find(&eventCounts).Error; err != nil {
+		h.logger.Warn("query event trend counts failed", zap.Error(err))
+	}
+
+	var seenCounts []dayCount
+	if err := h.db.Model(&model.RSSTorrentSeen{}).
+		Select("DATE(created_at) as date, COUNT(*) as count").
+		Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).
+		Group("DATE(created_at)").Find(&seenCounts).Error; err != nil {
+		h.logger.Warn("query seen trend counts failed", zap.Error(err))
+	}
+
+	var publishCounts []dayCount
+	if err := h.db.Model(&model.PublishCandidate{}).
+		Select("DATE(updated_at) as date, COUNT(*) as count").
+		Where("updated_at >= ? AND updated_at < ? AND publish_status = ?", dayStart, dayEnd, "done").
+		Group("DATE(updated_at)").Find(&publishCounts).Error; err != nil {
+		h.logger.Warn("query publish trend counts failed", zap.Error(err))
+	}
+
+	var reseedCounts []dayCount
+	if err := h.db.Model(&model.ReseedMatch{}).
+		Select("DATE(injected_at) as date, COUNT(*) as count").
+		Where("injected_at >= ? AND injected_at < ?", dayStart, dayEnd).
+		Group("DATE(injected_at)").Find(&reseedCounts).Error; err != nil {
+		h.logger.Warn("query reseed trend counts failed", zap.Error(err))
+	}
+
+	eventMap := make(map[string]int64, len(eventCounts))
+	for _, e := range eventCounts {
+		eventMap[e.Date] = e.Count
+	}
+	seenMap := make(map[string]int64, len(seenCounts))
+	for _, s := range seenCounts {
+		seenMap[s.Date] = s.Count
+	}
+	publishMap := make(map[string]int64, len(publishCounts))
+	for _, p := range publishCounts {
+		publishMap[p.Date] = p.Count
+	}
+	reseedMap := make(map[string]int64, len(reseedCounts))
+	for _, r := range reseedCounts {
+		reseedMap[r.Date] = r.Count
+	}
+
 	points := make([]map[string]interface{}, 0, days)
-
 	for i := days - 1; i >= 0; i-- {
-		day := now.AddDate(0, 0, -i)
-		dayStart := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
-		dayEnd := dayStart.AddDate(0, 0, 1)
-
-		var events int64
-		if err := h.db.Model(&model.TorrentEvent{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&events).Error; err != nil {
-			h.logger.Warn("dashboard: query events count failed", zap.Error(err))
-		}
-
-		var seen int64
-		if err := h.db.Model(&model.RSSTorrentSeen{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&seen).Error; err != nil {
-			h.logger.Warn("dashboard: query seen count failed", zap.Error(err))
-		}
-
-		var publishDone int64
-		if err := h.db.Model(&model.PublishCandidate{}).Where("updated_at >= ? AND updated_at < ? AND publish_status = ?", dayStart, dayEnd, "done").Count(&publishDone).Error; err != nil {
-			h.logger.Warn("dashboard: query publish done count failed", zap.Error(err))
-		}
-
-		var reseedDone int64
-		if err := h.db.Model(&model.ReseedMatch{}).Where("injected_at >= ? AND injected_at < ?", dayStart, dayEnd).Count(&reseedDone).Error; err != nil {
-			h.logger.Warn("dashboard: query reseed done count failed", zap.Error(err))
-		}
-
+		d := now.AddDate(0, 0, -i)
+		ds := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, d.Location()).Format("2006-01-02")
 		points = append(points, map[string]interface{}{
-			"date":    dayStart.Format("2006-01-02"),
-			"events":  events,
-			"rss":     seen,
-			"publish": publishDone,
-			"reseed":  reseedDone,
+			"date":    ds,
+			"events":  eventMap[ds],
+			"rss":     seenMap[ds],
+			"publish": publishMap[ds],
+			"reseed":  reseedMap[ds],
 		})
 	}
 
@@ -240,12 +339,12 @@ func (h *DashboardHandler) handleTrends(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Request, trimmed string) {
-	if r.Method != http.MethodGet {
-		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
-		return
-	}
-
 	if trimmed == "/api/v1/torrent-events" || trimmed == "/api/v1/torrent-events/" {
+		if r.Method != http.MethodGet {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			return
+		}
+
 		var events []model.TorrentEvent
 		var total int64
 
@@ -258,7 +357,7 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 			Error(w, http.StatusInternalServerError, 50000, "查询种子事件总数失败")
 			return
 		}
-		if err := q.Order("created_at DESC").Limit(100).Find(&events).Error; err != nil {
+		if err := q.Session(&gorm.Session{}).Order("created_at DESC").Limit(100).Find(&events).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "查询种子事件失败")
 			return
 		}
@@ -273,7 +372,11 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 	remaining := strings.TrimPrefix(trimmed, "/api/v1/torrent-events/")
 	remaining = strings.TrimRight(remaining, "/")
 
-	if remaining == "cleanup" && r.Method == http.MethodPost {
+	if remaining == "cleanup" {
+		if r.Method != http.MethodPost {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+			return
+		}
 		before := time.Now().AddDate(0, 0, -30)
 		result := h.db.Where("created_at < ?", before).Delete(&model.TorrentEvent{})
 		if result.Error != nil {
@@ -286,6 +389,11 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if r.Method != http.MethodGet {
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+
 	var event model.TorrentEvent
 	if err := h.db.First(&event, remaining).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "事件不存在")
@@ -295,12 +403,5 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 }
 
 func parseInt64(s string) (int64, error) {
-	var n int64
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return 0, nil
-		}
-		n = n*10 + int64(c-'0')
-	}
-	return n, nil
+	return strconv.ParseInt(s, 10, 64)
 }

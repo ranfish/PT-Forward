@@ -69,7 +69,7 @@ type circuitBreakerTransport struct {
 	base     http.RoundTripper
 	config   CircuitBreakerConfig
 	logger   *zap.Logger
-	mu       sync.Mutex
+	mu       *sync.Mutex
 	circuits map[string]*circuitState
 }
 
@@ -93,6 +93,7 @@ func NewCircuitBreakerTransport(base http.RoundTripper, cfg CircuitBreakerConfig
 		base:     base,
 		config:   cfg,
 		logger:   logger,
+		mu:       &sync.Mutex{},
 		circuits: make(map[string]*circuitState),
 	}
 }
@@ -229,7 +230,25 @@ func (t *circuitBreakerTransport) GetAllCircuitStatuses() map[string]CircuitStat
 	for _, d := range domains {
 		result[d] = t.GetCircuitStatus(d)
 	}
+	t.cleanupStale()
 	return result
+}
+
+func (t *circuitBreakerTransport) cleanupStale() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	now := time.Now()
+	for domain, circuit := range t.circuits {
+		circuit.mu.Lock()
+		isStale := circuit.state == CircuitClosed &&
+			circuit.failures == 0 &&
+			circuit.successes == 0 &&
+			now.Sub(circuit.lastFailure) > 30*time.Minute
+		circuit.mu.Unlock()
+		if isStale {
+			delete(t.circuits, domain)
+		}
+	}
 }
 
 func (t *circuitBreakerTransport) ResetCircuit(domain string) {

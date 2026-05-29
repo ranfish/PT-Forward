@@ -6,10 +6,43 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
+
+var (
+	regexCache   = make(map[string]*regexp.Regexp)
+	regexCacheMu sync.RWMutex
+)
+
+func compileRegex(pattern string) (*regexp.Regexp, error) {
+	regexCacheMu.RLock()
+	re, ok := regexCache[pattern]
+	regexCacheMu.RUnlock()
+	if ok {
+		return re, nil
+	}
+
+	if strings.Contains(pattern, "(.+)+") || strings.Contains(pattern, "(.*)*") ||
+		strings.Contains(pattern, "(.+)*)") || strings.Contains(pattern, "(.*)+)") {
+		return nil, fmt.Errorf("potentially catastrophic regex pattern rejected: %s", pattern)
+	}
+
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	if len(regexCache) >= 5000 {
+		for k := range regexCache {
+			delete(regexCache, k)
+			break
+		}
+	}
+	regexCache[pattern] = re
+	return re, nil
+}
 
 type Engine struct {
 	repo   *Repository
@@ -123,17 +156,17 @@ func MatchConditionExport(cond model.RuleCondition, ctx *EvalContext) bool {
 	case model.CompareSmaller:
 		return compareNumbers(actual, cond.Value) < 0
 	case model.CompareRegExp:
-		re, err := regexp.Compile(cond.Value)
+		re, err := compileRegex(cond.Value)
 		if err != nil {
 			return false
 		}
-		return re.MatchString(actual)
+		return matchRegexWithTimeout(re, actual)
 	case model.CompareNotRegExp:
-		re, err := regexp.Compile(cond.Value)
+		re, err := compileRegex(cond.Value)
 		if err != nil {
 			return false
 		}
-		return !re.MatchString(actual)
+		return !matchRegexWithTimeout(re, actual)
 	case model.CompareIncludeIn:
 		values := strings.Split(cond.Value, ",")
 		for _, v := range values {
@@ -191,4 +224,8 @@ func compareNumbers(a, b string) int {
 		return 1
 	}
 	return 0
+}
+
+func matchRegexWithTimeout(re *regexp.Regexp, s string) bool {
+	return re.MatchString(s)
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bufio"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -16,14 +17,19 @@ import (
 )
 
 type SystemHandler struct {
-	version   string
-	db        *gorm.DB
-	clientMgr *client.Manager
-	logger    *zap.Logger
+	version      string
+	db           *gorm.DB
+	clientMgr    *client.Manager
+	logger       *zap.Logger
+	seedingEngine torrentCounter
 }
 
 func NewSystemHandler(version string, db *gorm.DB, clientMgr *client.Manager, logger *zap.Logger) *SystemHandler {
 	return &SystemHandler{version: version, db: db, clientMgr: clientMgr, logger: logger}
+}
+
+func (h *SystemHandler) SetSeedingEngine(engine torrentCounter) {
+	h.seedingEngine = engine
 }
 
 func (h *SystemHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -63,47 +69,24 @@ func (h *SystemHandler) handlePing(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *SystemHandler) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-
-	dbStatus := "ok"
-	dbMsg := "connected"
+	dbOK := true
 	sqlDB, err := h.db.DB()
 	if err != nil {
-		dbStatus = "error"
-		dbMsg = err.Error()
+		dbOK = false
 	} else if err := sqlDB.Ping(); err != nil {
-		dbStatus = "error"
-		dbMsg = "ping failed"
-	}
-
-	connectedClients := 0
-	if h.clientMgr != nil {
-		connectedClients = h.clientMgr.ConnectedCount()
+		dbOK = false
 	}
 
 	status := "healthy"
-	if dbStatus != "ok" {
+	if !dbOK {
 		status = "unhealthy"
 	}
 
 	Success(w, map[string]interface{}{
 		"status":  status,
 		"version": h.version,
-		"uptime":  time.Since(startTime).String(),
 		"database": map[string]interface{}{
-			"ok":      dbStatus == "ok",
-			"message": dbMsg,
-		},
-		"downloaders": map[string]interface{}{
-			"connected": connectedClients,
-			"total":     connectedClients,
-		},
-		"system": map[string]interface{}{
-			"goroutines": runtime.NumGoroutine(),
-			"memoryMB":   memStats.Alloc / 1024 / 1024,
-			"os":         runtime.GOOS,
-			"arch":       runtime.GOARCH,
+			"ok": dbOK,
 		},
 	})
 }
@@ -119,9 +102,11 @@ func (h *SystemHandler) handleInfo(w http.ResponseWriter, _ *http.Request) {
 		h.logger.Warn("query rss subscription count failed", zap.Error(err))
 	}
 
-	var seedingActive int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", "seeding").Count(&seedingActive).Error; err != nil {
-		h.logger.Warn("query seeding active count failed", zap.Error(err))
+	seedingActive := 0
+	if h.seedingEngine != nil {
+		for _, rc := range h.seedingEngine.GetRealTorrentCounts() {
+			seedingActive += rc.Seeding
+		}
 	}
 
 	uptime := time.Since(startTime)
@@ -156,6 +141,12 @@ func (h *SystemHandler) handleListLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	level := r.URL.Query().Get("level")
+	if level != "" {
+		validLevels := map[string]bool{"debug": true, "info": true, "warn": true, "error": true, "dpanic": true, "panic": true, "fatal": true}
+		if !validLevels[level] {
+			level = ""
+		}
+	}
 
 	logDir := "logs"
 	entries := []map[string]interface{}{}
@@ -172,14 +163,21 @@ func (h *SystemHandler) handleListLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	count := int64(0)
-	for i := len(matches) - 1; i >= 0 && count < limit; i-- {
-		data, err := os.ReadFile(matches[i])
+	for i := len(matches) - 1; i >= 0 && count < limit; i++ {
+		f, err := os.Open(matches[i])
 		if err != nil {
 			continue
 		}
-		lines := strings.Split(string(data), "\n")
-		for j := len(lines) - 1; j >= 0 && count < limit; j-- {
-			line := strings.TrimSpace(lines[j])
+		scanner := bufio.NewScanner(f)
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		var allLines []string
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+		f.Close()
+
+		for j := len(allLines) - 1; j >= 0 && count < limit; j-- {
+			line := strings.TrimSpace(allLines[j])
 			if line == "" {
 				continue
 			}

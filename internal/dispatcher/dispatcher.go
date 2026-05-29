@@ -92,6 +92,26 @@ func (d *TorrentDispatcher) OnTorrents(ctx context.Context, events []model.Torre
 func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.TorrentEvent) (map[Role][]model.TorrentEvent, error) {
 	result := make(map[Role][]model.TorrentEvent)
 
+	subIDs := make([]uint, 0, len(events))
+	for i := range events {
+		subID, err := strconv.ParseUint(events[i].SourceID, 10, 64)
+		if err != nil {
+			continue
+		}
+		subIDs = append(subIDs, uint(subID))
+	}
+
+	subMap := make(map[uint]*model.RSSSubscription, len(subIDs))
+	if len(subIDs) > 0 {
+		var subs []model.RSSSubscription
+		if err := d.db.WithContext(ctx).Where("id IN ? AND enabled = ?", subIDs, true).Find(&subs).Error; err != nil {
+			d.logger.Warn("query subscriptions for dispatch", zap.Error(err))
+		}
+		for i := range subs {
+			subMap[subs[i].ID] = &subs[i]
+		}
+	}
+
 	for i := range events {
 		ev := &events[i]
 
@@ -105,13 +125,12 @@ func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.T
 			continue
 		}
 
-		sub, err := d.getSubscription(ctx, uint(subID))
-		if err != nil {
+		sub, ok := subMap[uint(subID)]
+		if !ok {
 			d.logger.Debug("subscription not found, skipping event",
 				zap.Uint("subscription_id", uint(subID)),
 				zap.String("site", ev.SiteName),
 				zap.String("torrent_id", ev.TorrentID),
-				zap.Error(err),
 			)
 			continue
 		}
@@ -152,17 +171,6 @@ func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.T
 	}
 
 	return result, nil
-}
-
-func (d *TorrentDispatcher) getSubscription(ctx context.Context, id uint) (*model.RSSSubscription, error) {
-	var sub model.RSSSubscription
-	err := d.db.WithContext(ctx).
-		Where("id = ? AND enabled = ?", id, true).
-		First(&sub).Error
-	if err != nil {
-		return nil, err
-	}
-	return &sub, nil
 }
 
 func (d *TorrentDispatcher) getClientConfig(ctx context.Context, clientID string) (*model.ClientConfig, error) {

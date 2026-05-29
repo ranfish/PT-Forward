@@ -18,6 +18,23 @@ type SiteAdapter interface {
 	GetTorrentInfoHash(ctx context.Context, config *SiteConfig, torrentID string) (string, error)
 	SupportsSearchByPiecesHash() bool
 	VerifyExists(ctx context.Context, config *SiteConfig, torrentID string) (bool, error)
+	FetchUserStats(ctx context.Context, config *SiteConfig) (*UserStatsResult, error)
+}
+
+type CombinedHRDiscountDetector interface {
+	DetectHRAndDiscount(ctx context.Context, config *SiteConfig, torrentID string) (*HRResult, *DiscountResult, error)
+}
+
+type UserStatsResult struct {
+	Username      string
+	UserClass     string
+	UploadBytes   int64
+	DownloadBytes int64
+	Ratio         float64
+	BonusPoints   float64
+	SeedingPoints float64
+	SeedingSize   int64
+	SeedingCount  int
 }
 
 type EventHandler interface {

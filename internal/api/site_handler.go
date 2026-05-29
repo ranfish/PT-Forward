@@ -12,6 +12,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metrics"
+	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/site"
 	"go.uber.org/zap"
@@ -19,10 +20,11 @@ import (
 )
 
 type SiteHandler struct {
-	repo     *site.Repository
-	db       *gorm.DB
-	logger   *zap.Logger
-	provider SiteProvider
+	repo      *site.Repository
+	db        *gorm.DB
+	logger    *zap.Logger
+	provider  SiteProvider
+	statsSync *site.StatsSyncService
 }
 
 type SiteProvider interface {
@@ -32,6 +34,10 @@ type SiteProvider interface {
 
 func (h *SiteHandler) SetProvider(p SiteProvider) {
 	h.provider = p
+}
+
+func (h *SiteHandler) SetStatsSync(s *site.StatsSyncService) {
+	h.statsSync = s
 }
 
 func NewSiteHandler(repo *site.Repository, logger *zap.Logger, db *gorm.DB) *SiteHandler {
@@ -86,6 +92,17 @@ type createSiteRequest struct {
 
 	ProxyURL      string `json:"proxyUrl,omitempty"`
 	SkipSSLVerify bool   `json:"skipSslVerify"`
+	MaxConcurrent int    `json:"maxConcurrent,omitempty"`
+
+	HRStrategy string `json:"hrStrategy,omitempty"`
+}
+
+func applySiteMaxConcurrent(domain string, maxConcurrent int) {
+	if maxConcurrent > 0 {
+		httpclient.GlobalLimiter.SetDomainConfig(domain, httpclient.DomainLimitConfig{
+			MaxConcurrent: maxConcurrent,
+		})
+	}
 }
 
 type updateSiteRequest struct {
@@ -128,7 +145,6 @@ type updateSiteRequest struct {
 	CookieCloudSync    *bool   `json:"cookieCloudSync,omitempty"`
 	CookieCloudDomain  *string `json:"cookieCloudDomain,omitempty"`
 	AlternativeDomains *string `json:"alternativeDomains,omitempty"`
-	MirrorDomain       *string `json:"mirrorDomain,omitempty"`
 	Enabled            *bool   `json:"enabled,omitempty"`
 
 	OverrideRSSURL   *string `json:"overrideRssUrl,omitempty"`
@@ -136,6 +152,9 @@ type updateSiteRequest struct {
 
 	ProxyURL      *string `json:"proxyUrl,omitempty"`
 	SkipSSLVerify *bool   `json:"skipSslVerify,omitempty"`
+	MaxConcurrent *int    `json:"maxConcurrent,omitempty"`
+
+	HRStrategy *string `json:"hrStrategy,omitempty"`
 }
 
 type updateCredentialsRequest struct {
@@ -185,13 +204,15 @@ type siteResponse struct {
 	LastSyncAt        *time.Time `json:"lastSyncAt,omitempty"`
 
 	AlternativeDomains string `json:"alternativeDomains,omitempty"`
-	MirrorDomain       string `json:"mirrorDomain,omitempty"`
 
 	OverrideRSSURL   string `json:"overrideRssUrl,omitempty"`
 	OverrideSavePath string `json:"overrideSavePath,omitempty"`
 
 	ProxyURL      string `json:"proxyUrl,omitempty"`
 	SkipSSLVerify bool   `json:"skipSslVerify"`
+	MaxConcurrent int    `json:"maxConcurrent"`
+
+	HRStrategy string `json:"hrStrategy,omitempty"`
 
 	HasPasskey     bool `json:"hasPasskey"`
 	HasCookie      bool `json:"hasCookie"`
@@ -203,11 +224,12 @@ type siteResponse struct {
 
 	UserID int `json:"userId,omitempty"`
 
-	UploadBytes   int64      `json:"uploadBytes"`
-	DownloadBytes int64      `json:"downloadBytes"`
+	UploadBytes   int64      `json:"uploadBytes,string"`
+	DownloadBytes int64      `json:"downloadBytes,string"`
 	SeedingPoints float64    `json:"seedingPoints"`
-	SeedingSize   int64      `json:"seedingSize"`
+	SeedingSize   int64      `json:"seedingSize,string"`
 	SeedingCount  int        `json:"seedingCount"`
+	Username      string     `json:"username,omitempty"`
 	UserClass     string     `json:"userClass,omitempty"`
 	Ratio         float64    `json:"ratio"`
 	BonusPoints   float64    `json:"bonusPoints"`
@@ -255,13 +277,15 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		LastSyncAt:        s.LastSyncAt,
 
 		AlternativeDomains: s.AlternativeDomains,
-		MirrorDomain:       s.MirrorDomain,
 
 		OverrideRSSURL:   s.OverrideRSSURL,
 		OverrideSavePath: s.OverrideSavePath,
 
 		ProxyURL:      s.ProxyURL,
 		SkipSSLVerify: s.SkipSSLVerify,
+		MaxConcurrent: s.MaxConcurrent,
+
+		HRStrategy: s.HRStrategy,
 
 		HasPasskey:     s.Passkey != "",
 		HasCookie:      s.Cookie != "",
@@ -278,6 +302,7 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		SeedingPoints: s.SeedingPoints,
 		SeedingSize:   s.SeedingSize,
 		SeedingCount:  s.SeedingCount,
+		Username:      s.Username,
 		UserClass:     s.UserClass,
 		Ratio:         s.Ratio,
 		BonusPoints:   s.BonusPoints,
@@ -338,6 +363,24 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 	remaining = strings.TrimRight(remaining, "/")
 	parts := strings.SplitN(remaining, "/", 3)
 
+	if remaining == "stats-sync" {
+		if r.Method == http.MethodPost {
+			h.handleSyncAllStats(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
+	if remaining == "batch-update" {
+		if r.Method == http.MethodPost {
+			h.handleBatchUpdate(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
 	if len(parts) == 1 {
 		switch r.Method {
 		case http.MethodGet:
@@ -371,9 +414,12 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 	case "stats":
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.handleGetStats(w, r, idStr)
-		} else {
+		case http.MethodPost:
+			h.handleSyncSiteStats(w, r, idStr)
+		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 	case "overrides":
@@ -387,13 +433,36 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 
 func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	page, size := parsePagination(r)
-	search := r.URL.Query().Get("search")
+	q := r.URL.Query()
+	search := q.Get("search")
+	framework := q.Get("framework")
+	enabled := q.Get("enabled")
+	isSource := q.Get("isSource")
+	isTarget := q.Get("isTarget")
 
 	query := h.db.Model(&model.Site{})
 	if search != "" {
 		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(search)
 		like := "%" + escaped + "%"
 		query = query.Where("name LIKE ? OR domain LIKE ? ESCAPE '\\'", like, like)
+	}
+	if framework != "" {
+		query = query.Where("framework = ?", framework)
+	}
+	if enabled == "true" {
+		query = query.Where("enabled = ?", true)
+	} else if enabled == "false" {
+		query = query.Where("enabled = ?", false)
+	}
+	if isSource == "true" {
+		query = query.Where("is_source = ?", true)
+	} else if isSource == "false" {
+		query = query.Where("is_source = ?", false)
+	}
+	if isTarget == "true" {
+		query = query.Where("is_target = ?", true)
+	} else if isTarget == "false" {
+		query = query.Where("is_target = ?", false)
 	}
 
 	var total int64
@@ -427,6 +496,23 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if req.Name == "" || req.Domain == "" || req.BaseURL == "" {
 		Error(w, http.StatusBadRequest, 40001, "name, domain, baseUrl 为必填项")
 		return
+	}
+
+	if err := middleware.ValidatePublicURL(req.BaseURL); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "baseUrl 不合法: "+err.Error())
+		return
+	}
+	if req.ProxyURL != "" {
+		if err := middleware.ValidateProxyURL(req.ProxyURL); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "proxyUrl 不合法: "+err.Error())
+			return
+		}
+	}
+	if req.OverrideRSSURL != "" {
+		if err := middleware.ValidatePublicURL(req.OverrideRSSURL); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "overrideRssUrl 不合法: "+err.Error())
+			return
+		}
 	}
 
 	if req.Framework == "" {
@@ -511,12 +597,17 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 		ProxyURL:      req.ProxyURL,
 		SkipSSLVerify: req.SkipSSLVerify,
+		MaxConcurrent: req.MaxConcurrent,
+
+		HRStrategy: req.HRStrategy,
 	}
 
 	if err := h.repo.Create(r.Context(), &s); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "创建站点失败")
 		return
 	}
+
+	applySiteMaxConcurrent(s.Domain, s.MaxConcurrent)
 
 	h.logger.Info("site created", zap.String("name", s.Name), zap.String("domain", s.Domain))
 	Success(w, h.toResponse(&s))
@@ -557,7 +648,7 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name != nil {
+	if req.Name != nil && *req.Name != "" {
 		exists, _ := h.repo.ExistsByName(r.Context(), *req.Name, id)
 		if exists {
 			Error(w, http.StatusConflict, 40900, "站点名称已存在")
@@ -565,7 +656,7 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		s.Name = *req.Name
 	}
-	if req.Domain != nil {
+	if req.Domain != nil && *req.Domain != "" {
 		exists, _ := h.repo.ExistsByDomain(r.Context(), *req.Domain, id)
 		if exists {
 			Error(w, http.StatusConflict, 40900, "站点域名已存在")
@@ -573,10 +664,14 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		s.Domain = *req.Domain
 	}
-	if req.BaseURL != nil {
+	if req.BaseURL != nil && *req.BaseURL != "" {
+		if err := middleware.ValidatePublicURL(*req.BaseURL); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "baseUrl 不合法: "+err.Error())
+			return
+		}
 		s.BaseURL = *req.BaseURL
 	}
-	if req.Framework != nil {
+	if req.Framework != nil && *req.Framework != "" {
 		if !validFrameworks[*req.Framework] {
 			Error(w, http.StatusBadRequest, 40001, "不支持的 framework")
 			return
@@ -610,9 +705,6 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.AlternativeDomains != nil {
 		s.AlternativeDomains = *req.AlternativeDomains
-	}
-	if req.MirrorDomain != nil {
-		s.MirrorDomain = *req.MirrorDomain
 	}
 	if req.Passkey != nil && *req.Passkey != "" {
 		s.Passkey = *req.Passkey
@@ -666,22 +758,42 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		s.RequiresSideLoading = *req.RequiresSideLoading
 	}
 	if req.OverrideRSSURL != nil {
+		if *req.OverrideRSSURL != "" {
+			if err := middleware.ValidatePublicURL(*req.OverrideRSSURL); err != nil {
+				Error(w, http.StatusBadRequest, 40001, "overrideRssUrl 不合法: "+err.Error())
+				return
+			}
+		}
 		s.OverrideRSSURL = *req.OverrideRSSURL
 	}
 	if req.OverrideSavePath != nil {
 		s.OverrideSavePath = *req.OverrideSavePath
 	}
 	if req.ProxyURL != nil {
+		if *req.ProxyURL != "" {
+			if err := middleware.ValidateProxyURL(*req.ProxyURL); err != nil {
+				Error(w, http.StatusBadRequest, 40001, "proxyUrl 不合法: "+err.Error())
+				return
+			}
+		}
 		s.ProxyURL = *req.ProxyURL
 	}
 	if req.SkipSSLVerify != nil {
 		s.SkipSSLVerify = *req.SkipSSLVerify
+	}
+	if req.MaxConcurrent != nil {
+		s.MaxConcurrent = *req.MaxConcurrent
+	}
+	if req.HRStrategy != nil {
+		s.HRStrategy = *req.HRStrategy
 	}
 
 	if err := h.repo.Update(r.Context(), s); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新站点失败")
 		return
 	}
+
+	applySiteMaxConcurrent(s.Domain, s.MaxConcurrent)
 
 	h.logger.Info("site updated", zap.String("name", s.Name))
 	Success(w, h.toResponse(s))
@@ -723,6 +835,22 @@ func (h *SiteHandler) handleTest(w http.ResponseWriter, r *http.Request, idStr s
 	}
 
 	ok, message := h.testSiteConnection(s)
+
+	if !ok {
+		Error(w, http.StatusBadGateway, 30001, message)
+		return
+	}
+
+	if h.statsSync != nil {
+		go func() { //nolint:gosec // G118: intentional — must outlive request context
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := h.statsSync.SyncSiteStats(ctx, s.ID); err != nil {
+				h.logger.Debug("test-triggered stats sync failed", zap.String("site", s.Name), zap.Error(err))
+			}
+		}()
+	}
+
 	Success(w, map[string]interface{}{
 		"ok":      ok,
 		"message": message,
@@ -801,7 +929,11 @@ func (h *SiteHandler) handleUpdateCredentials(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	updated, _ := h.repo.GetByID(r.Context(), uint(id))
+	updated, err := h.repo.GetByID(r.Context(), uint(id))
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "重新获取站点失败")
+		return
+	}
 	h.logger.Info("site credentials updated", zap.String("domain", updated.Domain))
 	Success(w, h.toResponse(updated))
 }
@@ -820,6 +952,7 @@ func (h *SiteHandler) handleGetStats(w http.ResponseWriter, r *http.Request, idS
 	}
 
 	Success(w, map[string]interface{}{
+		"username":      s.Username,
 		"uploadBytes":   s.UploadBytes,
 		"downloadBytes": s.DownloadBytes,
 		"seedingPoints": s.SeedingPoints,
@@ -830,6 +963,106 @@ func (h *SiteHandler) handleGetStats(w http.ResponseWriter, r *http.Request, idS
 		"bonusPoints":   s.BonusPoints,
 		"statsSyncedAt": s.StatsSyncedAt,
 	})
+}
+
+func (h *SiteHandler) handleBatchUpdate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs    []uint                 `json:"ids"`
+		Fields map[string]interface{} `json:"fields"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if len(req.IDs) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "ids 不能为空")
+		return
+	}
+	if len(req.Fields) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "fields 不能为空")
+		return
+	}
+
+	updates := make(map[string]interface{})
+	boolFields := map[string]bool{
+		"enabled": true, "is_source": true, "is_target": true,
+		"participate_auto_publish": true, "cookie_cloud_sync": true,
+	}
+	for k, v := range req.Fields {
+		if !boolFields[k] {
+			Error(w, http.StatusBadRequest, 40001, "不允许批量更新字段: "+k)
+			return
+		}
+		bVal, ok := v.(bool)
+		if !ok {
+			Error(w, http.StatusBadRequest, 40001, "字段 "+k+" 必须为布尔值")
+			return
+		}
+		updates[k] = bVal
+	}
+	if len(updates) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "没有有效的更新字段")
+		return
+	}
+
+	result := h.db.WithContext(r.Context()).Model(&model.Site{}).Where("id IN ?", req.IDs).Updates(updates)
+	if result.Error != nil {
+		Error(w, http.StatusInternalServerError, 50000, "批量更新失败: "+result.Error.Error())
+		return
+	}
+
+	Success(w, map[string]interface{}{
+		"updated": result.RowsAffected,
+	})
+}
+
+func (h *SiteHandler) handleSyncAllStats(w http.ResponseWriter, r *http.Request) {
+	if h.statsSync == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "Stats 同步服务未初始化")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	synced, failedSites := h.statsSync.SyncAllSites(ctx)
+	Success(w, map[string]interface{}{
+		"synced":      synced,
+		"failed":      len(failedSites),
+		"failedSites": failedSites,
+	})
+}
+
+func (h *SiteHandler) handleSyncSiteStats(w http.ResponseWriter, r *http.Request, idStr string) {
+	if h.statsSync == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "Stats 同步服务未初始化")
+		return
+	}
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的站点 ID")
+		return
+	}
+
+	if err := h.statsSync.SyncSiteStats(r.Context(), uint(id)); err != nil {
+		updated, _ := h.repo.GetByID(r.Context(), uint(id))
+		if updated != nil {
+			resp := h.toResponse(updated)
+			Success(w, map[string]interface{}{
+				"site":         resp,
+				"syncWarning":  err.Error(),
+			})
+			return
+		}
+		Error(w, http.StatusBadGateway, 50000, "同步站点统计失败: "+err.Error())
+		return
+	}
+
+	updated, err := h.repo.GetByID(r.Context(), uint(id))
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "重新获取站点失败")
+		return
+	}
+	Success(w, h.toResponse(updated))
 }
 
 func (h *SiteHandler) testSiteConnection(s *model.Site) (bool, string) {
@@ -871,7 +1104,7 @@ func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, 
 	if err != nil {
 		return false, "连接失败: " + err.Error()
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 	if resp.StatusCode >= 400 {
 		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
@@ -903,6 +1136,15 @@ func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, 
 		}
 	}
 
+	finalURL := resp.Request.URL.String()
+	if strings.Contains(finalURL, "login") && !strings.Contains(finalURL, "userdetails") {
+		return false, "Cookie 无效或已过期（页面重定向到登录页）"
+	}
+
+	if !strings.Contains(bodyStr, "userdetails") && !strings.Contains(bodyStr, "logout") {
+		return false, "Cookie 无效或已过期（页面缺少登录态标识）"
+	}
+
 	return true, "连接成功"
 }
 
@@ -918,8 +1160,6 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	req.Header.Set("x-api-key", s.APIKey)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-	req.Header.Set("Accept", "application/json")
 
 	noRedirectClient := &http.Client{
 		Timeout:   client.Timeout,
@@ -932,7 +1172,7 @@ func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, 
 	if err != nil {
 		return false, "连接失败: " + err.Error()
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	bodyData, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	bodyStr := string(bodyData)
@@ -970,7 +1210,7 @@ func (h *SiteHandler) testPasskeyAuth(client *http.Client, s *model.Site) (bool,
 	if err != nil {
 		return false, "连接失败: " + err.Error()
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return false, "Passkey 无效"
@@ -1014,7 +1254,7 @@ func (h *SiteHandler) detectFramework(s *model.Site) *model.DetectResult {
 			DetectionDetail: "无法访问站点: " + err.Error(),
 		}
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { httpclient.DrainBody(resp) }()
 
 	bodyData, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	bodyStr := string(bodyData)
@@ -1478,7 +1718,7 @@ func (h *SiteHandler) handleSearch(w http.ResponseWriter, r *http.Request, idStr
 			zap.String("query", req.Query),
 			zap.Error(err))
 		metrics.SiteRequestErrors.WithLabelValues(site.Domain, "search").Inc()
-		Error(w, http.StatusInternalServerError, 50004, "搜索失败: "+err.Error())
+		Error(w, http.StatusInternalServerError, 50004, "搜索失败")
 		return
 	}
 
@@ -1548,7 +1788,7 @@ func (h *SiteHandler) handleDetectDiscount(w http.ResponseWriter, r *http.Reques
 			zap.String("torrentId", req.TorrentID),
 			zap.Error(err))
 		metrics.SiteRequestErrors.WithLabelValues(site.Domain, "discount").Inc()
-		Error(w, http.StatusInternalServerError, 50005, "检测折扣失败: "+err.Error())
+		Error(w, http.StatusInternalServerError, 50005, "检测折扣失败")
 		return
 	}
 

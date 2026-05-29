@@ -2,11 +2,13 @@ package setting
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 const (
@@ -67,6 +69,10 @@ func SeedDefaults(ctx context.Context, repo *Repository, seeds map[string]string
 	for key, value := range seeds {
 		_, err := repo.Get(ctx, key)
 		if err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				logger.Warn("seed setting check failed", zap.String("key", key), zap.Error(err))
+				continue
+			}
 			if err := repo.Set(ctx, key, value); err != nil {
 				logger.Warn("seed setting failed", zap.String("key", key), zap.Error(err))
 			}
