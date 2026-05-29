@@ -38,6 +38,9 @@
             size="small"
           >
             <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'info_hash'">
+                <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.info_hash)">{{ record.info_hash }}</span>
+              </template>
               <template v-if="column.key === 'status'">
                 <a-tag :color="record.status === 'completed' ? 'green' : record.status === 'failed' ? 'red' : 'blue'">
                   {{ translatePublishStatus(record.status) }}
@@ -57,7 +60,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
-import { formatTime } from '@/utils/format'
+import { formatTime, copyToClipboard } from '@/utils/format'
 import { useEnumLabels } from '@/utils/enumLabels'
 import type { PublishGroup } from '@/api/types'
 
@@ -65,6 +68,11 @@ const route = useRoute()
 const groupId = Number(route.params.id)
 const { t } = useI18n()
 const { translatePublishStatus } = useEnumLabels()
+
+function copyHash(text: string) {
+  copyToClipboard(text)
+  message.success(t('common.copied'))
+}
 
 interface GroupMember {
   id: number

@@ -31,6 +31,13 @@ var (
 	reUnit3DCSRFMeta   = regexp.MustCompile(`<meta\s+name="csrf-token"\s+content="([^"]+)"`)
 	reUnit3DCSRFInput  = regexp.MustCompile(`<input[^>]+name="_token"[^>]+value="([^"]+)"`)
 	reUnit3DIMDbID     = regexp.MustCompile(`tt\d+`)
+	reUnit3DUploaded   = regexp.MustCompile(`(?s)ratio-bar__uploaded[^>]*>.*?<i[^>]*></i>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
+	reUnit3DDownloaded = regexp.MustCompile(`(?s)ratio-bar__downloaded[^>]*>.*?<i[^>]*></i>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
+	reUnit3DRatio      = regexp.MustCompile(`(?s)top-nav__stats-ratio[^>]*>.*?<i[^>]*></i>\s*([\d.,]+)`)
+	reUnit3DSeeding    = regexp.MustCompile(`(?s)ratio-bar__seeding[^>]*>.*?<i[^>]*></i>\s*(\d+)`)
+	reUnit3DBonus      = regexp.MustCompile(`(?s)ratio-bar__points[^>]*>.*?<i[^>]*></i>\s*([\d,.]+)`)
+	reUnit3DUsername   = regexp.MustCompile(`(?s)ratio-bar__uploaded[^>]*>\s*<a[^>]*href="[^"]*/users/([^/"]+)`)
+	reUnit3DUserClass = regexp.MustCompile(`(?s)组别:\s*<span[^>]*>.*?</i>\s*(\w[\w\s]*?)</span>`)
 )
 
 type Unit3DAdapter struct {
@@ -802,23 +809,47 @@ func (a *Unit3DAdapter) fetchUserStatsHTML(ctx context.Context, config *model.Si
 	html := string(htmlBytes)
 
 	result := &model.UserStatsResult{}
-	if m := reNexusUsername.FindStringSubmatch(html); len(m) > 2 {
-		result.Username = strings.TrimSpace(m[2])
-	} else if m := reNexusUsernameAlt.FindStringSubmatch(html); len(m) > 2 {
-		result.Username = strings.TrimSpace(m[2])
+	if m := reUnit3DUsername.FindStringSubmatch(html); len(m) > 1 {
+		result.Username = strings.TrimSpace(m[1])
 	}
-	if m := reNexusFontUploaded.FindStringSubmatch(html); len(m) > 1 {
-		result.UploadBytes = parseSizeString(cleanText(m[1]))
-	} else if m := reNexusLabelUpload.FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DUploaded.FindStringSubmatch(html); len(m) > 1 {
 		result.UploadBytes = parseSizeString(cleanText(m[1]))
 	}
-	if m := reNexusFontDownloaded.FindStringSubmatch(html); len(m) > 1 {
-		result.DownloadBytes = parseSizeString(cleanText(m[1]))
-	} else if m := reNexusLabelDownload.FindStringSubmatch(html); len(m) > 1 {
+	if m := reUnit3DDownloaded.FindStringSubmatch(html); len(m) > 1 {
 		result.DownloadBytes = parseSizeString(cleanText(m[1]))
 	}
-	if result.DownloadBytes > 0 && result.UploadBytes > 0 {
+	if m := reUnit3DRatio.FindStringSubmatch(html); len(m) > 1 {
+		result.Ratio, _ = strconv.ParseFloat(strings.TrimSpace(m[1]), 64)
+	}
+	if m := reUnit3DBonus.FindStringSubmatch(html); len(m) > 1 {
+		bonusStr := strings.ReplaceAll(strings.TrimSpace(m[1]), ",", "")
+		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
+	}
+	if m := reUnit3DSeeding.FindStringSubmatch(html); len(m) > 1 {
+		result.SeedingCount, _ = strconv.Atoi(strings.TrimSpace(m[1]))
+	}
+	if result.Ratio == 0 && result.DownloadBytes > 0 && result.UploadBytes > 0 {
 		result.Ratio = float64(result.UploadBytes) / float64(result.DownloadBytes)
 	}
+
+	if result.Username != "" && result.UserClass == "" {
+		profileURL := config.Domain + "/users/" + result.Username
+		pReq, pErr := http.NewRequestWithContext(ctx, "GET", profileURL, nil)
+		if pErr == nil {
+			setCommonHeaders(pReq, config.Cookie)
+			pResp, pErr := a.doer.Client.Do(pReq)
+			if pErr == nil {
+				defer httpclient.DrainBody(pResp)
+				if pResp.StatusCode == http.StatusOK {
+					if pBody, rErr := io.ReadAll(pResp.Body); rErr == nil {
+						if m := reUnit3DUserClass.FindStringSubmatch(string(pBody)); len(m) > 1 {
+							result.UserClass = strings.TrimSpace(m[1])
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return result, nil
 }

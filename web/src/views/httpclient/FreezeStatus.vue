@@ -69,6 +69,7 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { httpclientApi } from '@/api/httpclient'
+import { formatTime } from '@/utils/format'
 
 const { t } = useI18n()
 
@@ -104,7 +105,7 @@ const circuitColumns = [
   { title: t('site.domain'), dataIndex: 'domain', key: 'domain', ellipsis: true },
   { title: t('common.status'), key: 'state', width: 100 },
   { title: t('httpclient.failures'), dataIndex: 'failures', key: 'failures', width: 100 },
-  { title: t('httpclient.lastFailure'), dataIndex: 'last_failure', key: 'last_failure', width: 180 },
+  { title: t('httpclient.lastFailure'), dataIndex: 'last_failure', key: 'last_failure', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('common.actions'), key: 'actions', width: 80 },
 ]
 

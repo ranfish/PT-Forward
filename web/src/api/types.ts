@@ -74,6 +74,7 @@ export interface SeedingClientConfig {
   min_disk_space_percent: number
   max_active_uploads: number
   max_active_downloads: number
+  max_active_seeding: number
   super_seeding_default: boolean
   scope: string
   pre_filter_enabled: boolean
@@ -375,6 +376,7 @@ export interface RSSSubscription {
   clientSelection: string
   diskGuardEnabled: boolean
   diskGuardThreshold: number
+  minScore: number
   lifecyclePauseSeeders: number
   lifecycleDeleteSeeders: number
   lifecycleDeleteSeedHours: number

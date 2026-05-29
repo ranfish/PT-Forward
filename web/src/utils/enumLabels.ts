@@ -18,6 +18,9 @@ const seedingStatusMap: Record<string, string> = {
   paused_free_end: 'seeding.pausedFreeEnd',
   paused_rule: 'seeding.pausedRule',
   downloading: 'seeding.downloadingStatus',
+  deleted: 'seeding.deletedStatus',
+  paused: 'seeding.pausedStatus',
+  stopped: 'seeding.stoppedStatus',
 }
 
 const publishStatusMap: Record<string, string> = {

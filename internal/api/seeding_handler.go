@@ -361,6 +361,9 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 	if v, ok := req["maxActiveDownloads"]; ok {
 		updates["max_active_downloads"] = v
 	}
+	if v, ok := req["maxActiveSeeding"]; ok {
+		updates["max_active_seeding"] = v
+	}
 	if v, ok := req["superSeedingDefault"]; ok {
 		updates["super_seeding_default"] = v
 	}

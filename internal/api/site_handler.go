@@ -1137,11 +1137,11 @@ func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, 
 	}
 
 	finalURL := resp.Request.URL.String()
-	if strings.Contains(finalURL, "login") && !strings.Contains(finalURL, "userdetails") {
+	if strings.Contains(finalURL, "login") && !strings.Contains(finalURL, "userdetails") && !strings.Contains(finalURL, "userdetail.") {
 		return false, "Cookie 无效或已过期（页面重定向到登录页）"
 	}
 
-	if !strings.Contains(bodyStr, "userdetails") && !strings.Contains(bodyStr, "logout") {
+	if !strings.Contains(bodyStr, "userdetails") && !strings.Contains(bodyStr, "userdetail.") && !strings.Contains(bodyStr, "logout") {
 		return false, "Cookie 无效或已过期（页面缺少登录态标识）"
 	}
 

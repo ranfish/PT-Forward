@@ -35,6 +35,9 @@
       @change="(pag: { current: number; pageSize: number }) => { if (!searchMode) pagination.onPageChange(pag.current, pag.pageSize) }"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'info_hash'">
+          <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.info_hash)">{{ record.info_hash }}</span>
+        </template>
         <template v-if="column.key === 'actions'">
           <a-popconfirm :title="t('fingerprint.deleteConfirm')" @confirm="handleDelete(record.id)">
             <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
@@ -51,9 +54,14 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { fingerprintsApi } from '@/api/fingerprints'
 import { usePagination } from '@/composables/usePagination'
-import { formatTime } from '@/utils/format'
+import { formatTime, copyToClipboard } from '@/utils/format'
 
 const { t } = useI18n()
+
+function copyHash(text: string) {
+  copyToClipboard(text)
+  message.success(t('common.copied'))
+}
 
 const searchMode = ref(false)
 const searchLoading = ref(false)

@@ -11,6 +11,8 @@ var reSizeValue = regexp.MustCompile(`([\d.]+)\s*(TB|GB|MB|KB|TiB|GiB|MiB|KiB|B)
 
 func parseSizeString(s string) int64 {
 	s = strings.TrimSpace(s)
+	s = html.UnescapeString(s)
+	s = strings.ReplaceAll(s, "\u00a0", " ")
 	if s == "" {
 		return 0
 	}

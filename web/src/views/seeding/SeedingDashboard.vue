@@ -66,56 +66,56 @@
     </a-card>
 
     <a-card :title="t('seeding.activeTorrents')">
-      <div ref="torrentTableRef">
-        <a-table
-          :columns="columns"
-          :data-source="torrents"
-          :loading="loading"
-          :pagination="{ pageSize: 20, showSizeChanger: true }"
-          :scroll="{ x: 'max-content' }"
-          row-key="id"
-          size="small"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'title'">
-              <a v-if="record.detail_url" :href="record.detail_url" target="_blank" style="color: #1890ff">{{ record.title || record.torrent_id }}</a>
-              <span v-else>{{ record.title || record.torrent_id }}</span>
-            </template>
-            <template v-if="column.key === 'status'">
+      <a-table
+        :columns="columns"
+        :data-source="torrents"
+        :loading="loading"
+        :pagination="{ pageSize: 20, showSizeChanger: true }"
+        row-key="id"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'title'">
+            <a v-if="record.detail_url" :href="record.detail_url" target="_blank" style="color: #1890ff">{{ record.title || record.torrent_id }}</a>
+            <span v-else>{{ record.title || record.torrent_id }}</span>
+          </template>
+          <template v-if="column.key === 'info_hash'">
+            <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.info_hash)">{{ record.info_hash }}</span>
+          </template>
+          <template v-if="column.key === 'status'">
               <a-badge
                 :status="record.status === 'seeding' ? 'success' : 'warning'"
-                :text="record.status"
+                :text="translateSeedingStatus(record.status)"
               />
             </template>
-            <template v-if="column.key === 'is_free'">
-              <a-tag :color="record.is_free ? 'green' : 'default'">{{ record.is_free ? t('common.yes') : t('common.no') }}</a-tag>
-            </template>
-            <template v-if="column.key === 'has_hr'">
-              <a-tag :color="record.has_hr ? 'red' : 'default'">{{ record.has_hr ? t('common.yes') : t('common.no') }}</a-tag>
-            </template>
-            <template v-if="column.key === 'actions'">
-              <a-space>
-                <a-button
-                  v-if="record.status !== 'seeding'"
-                  type="link"
-                  size="small"
-                  @click="handleResumeRecord(record.id)"
-                >
-                  {{ t('common.resume') }}
-                </a-button>
-                <a-button
-                  v-if="record.status === 'seeding'"
-                  type="link"
-                  size="small"
-                  @click="handlePauseRecord(record.id)"
-                >
-                  {{ t('common.pause') }}
-                </a-button>
-              </a-space>
-            </template>
+          <template v-if="column.key === 'is_free'">
+            <a-tag :color="record.is_free ? 'green' : 'default'">{{ record.is_free ? t('common.yes') : t('common.no') }}</a-tag>
           </template>
-        </a-table>
-      </div>
+          <template v-if="column.key === 'has_hr'">
+            <a-tag :color="record.has_hr ? 'red' : 'default'">{{ record.has_hr ? t('common.yes') : t('common.no') }}</a-tag>
+          </template>
+          <template v-if="column.key === 'actions'">
+            <a-space>
+              <a-button
+                v-if="record.status !== 'seeding'"
+                type="link"
+                size="small"
+                @click="handleResumeRecord(record.id)"
+              >
+                {{ t('common.resume') }}
+              </a-button>
+              <a-button
+                v-if="record.status === 'seeding'"
+                type="link"
+                size="small"
+                @click="handlePauseRecord(record.id)"
+              >
+                {{ t('common.pause') }}
+              </a-button>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
     </a-card>
 
     <a-modal
@@ -156,6 +156,9 @@
         </a-form-item>
         <a-form-item :label="t('seeding.maxActiveDownloads')">
           <a-input-number v-model:value="configForm.maxActiveDownloads" :min="0" style="width: 100%" />
+        </a-form-item>
+        <a-form-item :label="t('seeding.maxActiveSeeding')">
+          <a-input-number v-model:value="configForm.maxActiveSeeding" :min="0" style="width: 100%" />
         </a-form-item>
         <a-form-item :label="t('seeding.superSeedingDefault')">
           <a-switch v-model:checked="configForm.superSeedingDefault" />
@@ -260,7 +263,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick, onBeforeUnmount } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -272,8 +275,9 @@ import {
 } from '@ant-design/icons-vue'
 import { seedingApi } from '@/api/seeding'
 import { downloadersApi } from '@/api/downloaders'
-import { formatDurationSec } from '@/utils/format'
-import type { SeedingClientConfig, SeedingTorrentRecord } from '@/api/types'
+import { formatDurationSec, formatTime, copyToClipboard } from '@/utils/format'
+import { useEnumLabels } from '@/utils/enumLabels'
+import type { ClientConfig, SeedingClientConfig, SeedingTorrentRecord } from '@/api/types'
 
 interface SeedingStatusData {
   overview?: {
@@ -282,10 +286,13 @@ interface SeedingStatusData {
     totalTorrents?: number
   }
   uptimeSeconds?: number
+  running?: boolean
+  lastRunAt?: string | null
+  [key: string]: unknown
 }
 
 const { t } = useI18n()
-const torrentTableRef = ref<HTMLElement>()
+const { translateSeedingStatus } = useEnumLabels()
 const loading = ref(false)
 const configsLoading = ref(false)
 const status = ref<SeedingStatusData>({})
@@ -305,6 +312,7 @@ const configForm = reactive({
   minDiskSpaceGB: 50,
   maxActiveUploads: 0,
   maxActiveDownloads: 0,
+  maxActiveSeeding: 100,
   superSeedingDefault: false,
   rejectRuleIds: '',
   fitTimeCheckMs: 2000,
@@ -323,17 +331,17 @@ const configForm = reactive({
 })
 
 const columns = [
-  { title: 'Torrent ID', dataIndex: 'torrent_id', key: 'torrent_id', ellipsis: true },
-  { title: t('seeding.torrentTitle'), dataIndex: 'title', key: 'title', ellipsis: true },
-  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
-  { title: t('seeding.client'), dataIndex: 'client_id', key: 'client_id', width: 100 },
-  { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
-  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('seeding.fieldTorrentName'), dataIndex: 'title', key: 'title', ellipsis: true, width: 260 },
+  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 60 },
+  { title: t('seeding.fieldTorrentID'), dataIndex: 'torrent_id', key: 'torrent_id', ellipsis: true, width: 60 },
+  { title: t('seeding.client'), dataIndex: 'client_id', key: 'client_id', width: 50 },
+  { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true, width: 200 },
+  { title: t('common.status'), key: 'status', width: 80 },
   { title: t('seeding.isFree'), key: 'is_free', width: 60 },
-  { title: 'HR', key: 'has_hr', width: 60 },
-  { title: t('seeding.source'), dataIndex: 'source', key: 'source', width: 80 },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180 },
-  { title: t('common.actions'), key: 'actions', width: 100 },
+  { title: 'HR', key: 'has_hr', width: 50 },
+  { title: t('seeding.source'), dataIndex: 'source', key: 'source', width: 70 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 150, customRender: ({ text }: { text: string }) => formatTime(text) },
+  { title: t('common.actions'), key: 'actions', width: 80 },
 ]
 
 const configColumns = [
@@ -353,8 +361,8 @@ async function fetchData() {
       seedingApi.getStatus(),
       seedingApi.getTorrents(1, 20),
     ])
-    status.value = statusResp.data.data || {}
-    torrents.value = torrentsResp.data.data?.items || torrentsResp.data.data || []
+    status.value = statusResp.data.data as SeedingStatusData || {}
+    torrents.value = (torrentsResp.data.data?.items || torrentsResp.data.data || []) as SeedingTorrentRecord[]
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {
@@ -387,6 +395,7 @@ function openConfigModal(record?: SeedingClientConfig) {
       minDiskSpaceGB: record.min_disk_space_gb || 50,
       maxActiveUploads: record.max_active_uploads || 0,
       maxActiveDownloads: record.max_active_downloads || 0,
+      maxActiveSeeding: record.max_active_seeding || 100,
       superSeedingDefault: record.super_seeding_default || false,
       rejectRuleIds: record.reject_rule_ids || '',
       fitTimeCheckMs: record.fit_time_check_ms ?? 2000,
@@ -413,6 +422,7 @@ function openConfigModal(record?: SeedingClientConfig) {
       minDiskSpaceGB: 50,
       maxActiveUploads: 0,
       maxActiveDownloads: 0,
+      maxActiveSeeding: 100,
       superSeedingDefault: false,
       rejectRuleIds: '',
       fitTimeCheckMs: 2000,
@@ -499,81 +509,22 @@ async function fetchDownloaders() {
   try {
     const resp = await downloadersApi.list(1, 100)
     const items = resp.data.data?.items || resp.data.data || []
-    downloaderOptions.value = items.map((d: Record<string, unknown>) => ({
-      label: d.name || d.id,
-      value: d.name || d.id,
+    downloaderOptions.value = items.map((d: ClientConfig) => ({
+      label: d.name || String(d.id),
+      value: d.name || String(d.id),
     }))
   } catch {
   }
 }
 
-const resizeCleanupFns: (() => void)[] = []
-
-function initResizable() {
-  if (!torrentTableRef.value) return
-  const table = torrentTableRef.value.querySelector('.ant-table') as HTMLElement
-  if (!table) return
-  const thead = table.querySelector('thead') as HTMLElement
-  if (!thead) return
-  const ths = thead.querySelectorAll('th')
-
-  ths.forEach((th) => {
-    const thEl = th as HTMLElement
-    thEl.style.position = 'relative'
-
-    const handle = document.createElement('div')
-    handle.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize;z-index:10;background:transparent'
-    handle.addEventListener('mouseenter', () => { handle.style.background = '#1890ff40' })
-    handle.addEventListener('mouseleave', () => { handle.style.background = 'transparent' })
-    thEl.appendChild(handle)
-
-    let startX = 0
-    let startWidth = 0
-
-    const onMouseMove = (e: MouseEvent) => {
-      const diff = e.clientX - startX
-      const newWidth = Math.max(60, startWidth + diff)
-      thEl.style.width = `${newWidth}px`
-      thEl.style.minWidth = `${newWidth}px`
-      thEl.style.maxWidth = `${newWidth}px`
-    }
-
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-
-    const onMouseDown = (e: MouseEvent) => {
-      e.preventDefault()
-      startX = e.clientX
-      startWidth = thEl.offsetWidth
-      document.addEventListener('mousemove', onMouseMove)
-      document.addEventListener('mouseup', onMouseUp)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    }
-
-    handle.addEventListener('mousedown', onMouseDown)
-    resizeCleanupFns.push(() => {
-      handle.removeEventListener('mousedown', onMouseDown)
-      handle.removeEventListener('mouseenter', () => { handle.style.background = '#1890ff40' })
-      handle.removeEventListener('mouseleave', () => { handle.style.background = 'transparent' })
-      handle.remove()
-    })
-  })
+function copyHash(text: string) {
+  copyToClipboard(text)
+  message.success(t('common.copied'))
 }
 
 onMounted(() => {
   fetchData()
   fetchConfigs()
   fetchDownloaders()
-  nextTick(() => initResizable())
-})
-
-onBeforeUnmount(() => {
-  resizeCleanupFns.forEach((fn) => fn())
-  resizeCleanupFns.length = 0
 })
 </script>

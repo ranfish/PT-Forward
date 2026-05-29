@@ -297,6 +297,11 @@
                   </a-col>
                 </a-row>
 
+                <a-divider>{{ t('subscription.scoringConfig') }}</a-divider>
+                <a-form-item :label="t('subscription.minScore')">
+                  <a-input-number v-model:value="configForm.minScore" :min="0" :max="10" :step="0.1" style="width: 200px" />
+                </a-form-item>
+
                 <a-divider>{{ t('subscription.diskGuard') }}</a-divider>
                 <a-row :gutter="16">
                   <a-col :span="12">
@@ -495,6 +500,7 @@ const configForm = reactive({
   clientSelection: 'fixed',
   diskGuardEnabled: true,
   diskGuardThreshold: 1,
+  minScore: 1.0,
 })
 const ruleConditions = ref<RuleCond[]>([{ key: 'title', compareType: 'contain', value: '', numValue: 0, sizeUnit: 'GB' }])
 const rulesSaving = ref(false)
@@ -602,6 +608,7 @@ async function fetchSubscription() {
       clientSelection: subscription.value.clientSelection || 'fixed',
       diskGuardEnabled: subscription.value.diskGuardEnabled ?? true,
       diskGuardThreshold: subscription.value.diskGuardThreshold != null ? Number(subscription.value.diskGuardThreshold) / 1073741824 : 1,
+      minScore: subscription.value.minScore ?? 1.0,
     })
     const conds = subscription.value.conditions || []
     if (Array.isArray(conds) && conds.length) {
@@ -671,6 +678,7 @@ async function saveConfig() {
       clientSelection: configForm.clientSelection,
       diskGuardEnabled: configForm.diskGuardEnabled,
       diskGuardThreshold: Math.round(configForm.diskGuardThreshold * 1073741824),
+      minScore: configForm.minScore,
     }
     await subscriptionsApi.update(id, payload)
     message.success(t('common.configSaved'))
@@ -682,16 +690,37 @@ async function saveConfig() {
   }
 }
 
+const reasonLabels: Record<string, string> = {
+  already_seen: '已存在',
+  no_rule_matched: '无匹配规则',
+  matched: '已匹配',
+  rejected: '未匹配',
+  skipped: '已跳过',
+  seen: '已存在',
+  pushed: '已入库',
+  pending: '待处理',
+}
+
+function dryrunReason(torrent: Record<string, unknown>): string {
+  const reason = (torrent.reason as string) || ''
+  const rule = (torrent.matched_rule as string) || ''
+  const status = (torrent.status as string) || ''
+  if (reason) return reasonLabels[reason] || reason
+  if (rule) return `匹配规则: ${rule}`
+  return reasonLabels[status] || status || '-'
+}
+
 async function runDryrun() {
   dryrunLoading.value = true
   try {
     const resp = await subscriptionsApi.dryrun(id)
     const data = resp.data.data || {}
-    dryrunResults.value = ((data.recentTorrents || []) as Record<string, unknown>[]).map((torrent: Record<string, unknown>) => ({
+    const torrents = (data.items || data.recentTorrents || []) as Record<string, unknown>[]
+    dryrunResults.value = torrents.map((torrent: Record<string, unknown>) => ({
       title: torrent.title || torrent.name || '-',
       size: torrent.size ? (Number(torrent.size) / 1073741824).toFixed(2) + ' GB' : '-',
-      matched: torrent.matched ? t('common.yes') : t('common.no'),
-      reason: torrent.reason || '-',
+      matched: torrent.status === 'matched' ? t('common.yes') : t('common.no'),
+      reason: dryrunReason(torrent),
     }))
     message.success(t('subscription.dryrunComplete', { count: data.total || 0 }))
   } catch (e: unknown) {

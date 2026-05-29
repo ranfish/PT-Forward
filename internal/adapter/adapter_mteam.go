@@ -993,10 +993,10 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 		Data    struct {
 			ID           flexInt `json:"id"`
 			Username     string  `json:"username"`
+			Role         flexInt `json:"role"`
 			MemberCount  struct {
 				Uploaded   string `json:"uploaded"`
 				Downloaded string `json:"downloaded"`
-				Seeding    string `json:"seeding"`
 				Bonus      string `json:"bonus"`
 				ShareRate  string `json:"shareRate"`
 			} `json:"memberCount"`
@@ -1012,15 +1012,99 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	stats := &model.UserStatsResult{
 		Username: result.Data.Username,
 	}
+	if className := a.resolveRoleName(ctx, config, int(result.Data.Role)); className != "" {
+		stats.UserClass = className
+	}
 	stats.UploadBytes = parseSizeString(result.Data.MemberCount.Uploaded)
 	stats.DownloadBytes = parseSizeString(result.Data.MemberCount.Downloaded)
-	stats.SeedingCount, _ = strconv.Atoi(result.Data.MemberCount.Seeding)
 	stats.BonusPoints, _ = strconv.ParseFloat(result.Data.MemberCount.Bonus, 64)
 	stats.Ratio, _ = strconv.ParseFloat(result.Data.MemberCount.ShareRate, 64)
 	if stats.Ratio == 0 && stats.DownloadBytes > 0 {
 		stats.Ratio = float64(stats.UploadBytes) / float64(stats.DownloadBytes)
 	}
+
+	peerURL := resolveBaseURL(config) + "/api/tracker/myPeerStatistics"
+	peerReq, err := http.NewRequestWithContext(ctx, "POST", peerURL, nil)
+	if err != nil {
+		a.logger.Warn("构造 myPeerStatistics 请求失败", zap.Error(err))
+		return stats, nil
+	}
+	a.setAPIHeaders(peerReq, config.APIKey)
+
+	peerResp, err := a.doer.Client.Do(peerReq)
+	if err != nil {
+		a.logger.Warn("myPeerStatistics 请求失败", zap.Error(err))
+		return stats, nil
+	}
+	defer func() { drainBody(peerResp) }()
+
+	peerBody, err := readBody(peerResp)
+	if err != nil {
+		a.logger.Warn("读取 myPeerStatistics 响应失败", zap.Error(err))
+		return stats, nil
+	}
+
+	var peerResult struct {
+		Data struct {
+			SeederCount  flexInt `json:"seederCount"`
+			SeederSize   flexInt `json:"seederSize"`
+			LeecherCount flexInt `json:"leecherCount"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(peerBody, &peerResult); err != nil {
+		a.logger.Warn("解析 myPeerStatistics 响应失败", zap.Error(err))
+		return stats, nil
+	}
+
+	stats.SeedingCount = int(peerResult.Data.SeederCount)
+	stats.SeedingSize = int64(peerResult.Data.SeederSize)
 	return stats, nil
+}
+
+var mteamRoleMap = map[int]string{
+	1: "小卒", 2: "捕頭", 3: "知縣", 4: "通判", 5: "知州",
+	6: "府丞", 7: "府尹", 8: "總督", 9: "大臣", 10: "VIP",
+	11: "職人", 12: "巡查", 13: "總版", 14: "總管",
+	15: "維護開發員", 16: "站長", 17: "候選管理", 18: "波菜管理", 19: "小組長",
+}
+
+func (a *MTeamAdapter) resolveRoleName(ctx context.Context, config *model.SiteConfig, role int) string {
+	if role <= 0 {
+		return ""
+	}
+	if name, ok := mteamRoleMap[role]; ok {
+		return name
+	}
+	roleURL := resolveBaseURL(config) + "/api/member/sysRoleList"
+	roleReq, err := http.NewRequestWithContext(ctx, "POST", roleURL, nil)
+	if err != nil {
+		return ""
+	}
+	a.setAPIHeaders(roleReq, config.APIKey)
+	roleResp, err := a.doer.Client.Do(roleReq)
+	if err != nil {
+		return ""
+	}
+	defer func() { drainBody(roleResp) }()
+	roleBody, err := readBody(roleResp)
+	if err != nil {
+		return ""
+	}
+	var roleResult struct {
+		Data []struct {
+			ID      flexInt `json:"id"`
+			NameChs string  `json:"nameChs"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(roleBody, &roleResult); err != nil {
+		return ""
+	}
+	for _, r := range roleResult.Data {
+		if int(r.ID) == role {
+			return r.NameChs
+		}
+	}
+	return ""
 }
 
 func (a *MTeamAdapter) fetchUserStatsHTML(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {

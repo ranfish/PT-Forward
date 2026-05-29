@@ -972,47 +972,52 @@ func NormalizeCategory(raw string) string {
 }
 
 var (
-	reNexusUsername        = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails\.php\?id=(\d+)"[^>]*><b[^>]*>([^<]+)`)
-	reNexusUsernameAlt     = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails\.php\?id=(\d+)"[^>]*>([^<]+)</a>`)
-	reNexusUsernameSpan    = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails\.php\?id=(\d+)"[^>]*><[^>]*><span[^>]*>([^<]+)</span>`)
-	reNexusUserID          = regexp.MustCompile(`userdetails\.php\?id=(\d+)`)
+	reNexusUsername        = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails?\.php\?id=(\d+)"[^>]*><b[^>]*>([^<]+)`)
+	reNexusUsernameAlt     = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails?\.php\?id=(\d+)"[^>]*>([^<]+)</a>`)
+	reNexusUsernameSpan    = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails?\.php\?id=(\d+)"[^>]*><[^>]*><span[^>]*>([^<]+)</span>`)
+	reNexusUserID          = regexp.MustCompile(`userdetails?\.php\?id=(\d+)`)
 	reNexusUserNameClass   = regexp.MustCompile(`(?i)class='([^']+_Name)'`)
-	reNexusUsernameByName  = regexp.MustCompile(`(?i)<a[^>]*class='[^']*_Name'[^>]*href="[^"]*userdetails\.php\?id=(\d+)"[^>]*><b[^>]*>([^<]+)`)
-	reNexusUsernameByName2 = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails\.php\?id=(\d+)"[^>]*class='[^']*_Name'[^>]*><b[^>]*>([^<]+)`)
+	reNexusUserClassSpan   = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails?\.php\?id=\d+"[^>]*>[^<]*</a></span>\s*<span>\s*[\[(]([^)\]]+)[\])]\s*</span>`)
+	reNexusUserClassStrong = regexp.MustCompile(`(?i)</strong>\[([^\]]+)\]`)
+	reNexusBonusBeforeLabel = regexp.MustCompile(`(?i)(\d[\d,.]+)\s*<[^>]*>\s*(?:魅力值?|魔力|火花|UCoin|Bonus|憨豆|元宝|蝌蚪)\s*</[^>]+>`)
+	reNexusUsernameByName  = regexp.MustCompile(`(?i)<a[^>]*class='[^']*_Name'[^>]*href="[^"]*userdetails?\.php\?id=(\d+)"[^>]*><b[^>]*>([^<]+)`)
+	reNexusUsernameByName2 = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails?\.php\?id=(\d+)"[^>]*class='[^']*_Name'[^>]*><b[^>]*>([^<]+)`)
 	reNexusUsernameUUID    = regexp.MustCompile(`(?i)<a\s[^>]*class='[^']*_Name'[^>]*><b[^>]*>([^<]+)`)
-	reNexusUsernameDeep    = regexp.MustCompile(`(?is)<a[^>]*href=["'][^"']*userdetails\.php\?id=(\d+)["'][^>]*>(.*?)</a>`)
+	reNexusUsernameDeep    = regexp.MustCompile(`(?is)<a[^>]*href=["'][^"']*userdetails?\.php\?id=(\d+)["'][^>]*>(.*?)</a>`)
 	reNexusInfoBlock       = regexp.MustCompile(`(?s)id="info_block"(.*?)</table>`)
-	reNexusWelcomeBack     = regexp.MustCompile(`(?is)(?:欢迎[回来]|Welcome\s+back|你好).{0,200}?<a[^>]*href="[^"]*userdetails\.php\?id=(\d+)"[^>]*>(.*?)</a>`)
-	reNexusUsernameSimple  = regexp.MustCompile(`(?is)<a[^>]*href="userdetails"[^>]*>.*?<strong>([^<]+)</strong>`)
+	reNexusWelcomeBack     = regexp.MustCompile(`(?is)(?:欢迎[回来]|Welcome\s+back|你好).{0,200}?<a[^>]*href="[^"]*userdetails?\.php\?id=(\d+)"[^>]*>(.*?)</a>`)
+	reNexusUsernameSimple  = regexp.MustCompile(`(?is)<a[^>]*href="userdetails?"[^>]*>.*?<strong>([^<]+)</strong>`)
 	reNexusFontUploaded    = regexp.MustCompile(`(?i)class\s*=\s*['"]?color_uploaded['"]?>[^<]*</(?:font|span)>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B)?)`)
 	reNexusFontDownloaded  = regexp.MustCompile(`(?i)class\s*=\s*['"]?color_downloaded['"]?>[^<]*</(?:font|span)>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B)?)`)
 	reNexusFontRatio       = regexp.MustCompile(`(?i)class\s*=\s*['"]?color_ratio['"]?>[^<]*</(?:font|span)>\s*([\d.,]+)`)
 	reNexusFontBonus       = regexp.MustCompile(`(?i)class\s*=\s*['"]?color_bonus['"]?>[^<]*</(?:font|span)>\s*(?:<[^>]*>)?\s*(?:\[[^\]]*\]\s*)?:?\s*([\d,]+\.\d+|[\d,]+\d)`)
-	reNexusFontBonusInline = regexp.MustCompile(`(?i)class\s*=\s*['"]?color_bonus['"]?>(?:魔力|时魔|啤酒|茉莉|Bonus)[^:<]*:\s*([\d,]+\.\d+)\s*</(?:font|span)>`)
+	reNexusFontBonusInline = regexp.MustCompile(`(?i)class\s*=\s*['"]?color_bonus['"]?>(?:魔力|时魔|啤酒|茉莉|火花|魅力值?|UCoin|Bonus|憨豆|元宝|蝌蚪)[^:<]*:\s*([\d,]+\.\d+)\s*</(?:font|span)>`)
 	reNexusArrowUp         = regexp.MustCompile(`(?i)class="arrowup"[^>]*(?:/>|>)([^<]*)`)
+	reNexusArrowUpImg      = regexp.MustCompile(`(?i)(?:arrowup|做种中)[^>]*>(?:\s|&nbsp;)*(?:<(?:font|span)[^>]*>)*\s*(\d+)\s*(?:</(?:font|span)>)?`)
 	reNexusJsonSeeding     = regexp.MustCompile(`(?i)&quot;(?:活跃|做种数|做种|seeding|active)[：:]?&quot;,&quot;value&quot;:&quot;[↑↑\s]*(\d+)`)
 	reNexusSeedLabel       = regexp.MustCompile(`(?i)(?:做种数|seeding)\s*[：:]\s*(\d+)`)
 	reMaterialPlayArrow    = regexp.MustCompile(`(?i)play_arrow</i>\s*<span[^>]*>(\d+)\s*</span>`)
 	reAltSeedingCount      = regexp.MustCompile(`(?i)alt=["']做种数["'][^>]*>(?:\s|&nbsp;)*(\d+)`)
 	reFontTitleSeeding     = regexp.MustCompile(`(?i)title=["']当前做种["'][^>]*>(?:<[^>]*>)?\s*⬆(?:</[^>]*>)?\s*(\d+)`)
-	reNexusLabelUpload     = regexp.MustCompile(`(?i)(?:上传量|Uploaded|上傳量)\s*(?:<[^>]*>)*\s*[:：]?\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B)?)`)
-	reNexusLabelUploadRelaxed = regexp.MustCompile(`(?i)(?:上传量|Uploaded|上傳量)\s*(?:：|:)?\s*(?:</?(?:font|span|a|b|i|div|img)[^>]*>)*(?:\s|&nbsp;)*(?:<[^>]*>)*\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B))`)
-	reNexusLabelDownload   = regexp.MustCompile(`(?i)(?:下载量|Downloaded|下載量)\s*(?:<[^>]*>)*\s*[:：]?\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B)?)`)
-	reNexusLabelDownloadRelaxed = regexp.MustCompile(`(?i)(?:下载量|Downloaded|下載量)\s*(?:：|:)?\s*(?:</?(?:font|span|a|b|i|div|img)[^>]*>)*(?:\s|&nbsp;)*(?:<[^>]*>)*\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B))`)
+	reNexusLabelUpload     = regexp.MustCompile(`(?i)(?:上传量|Uploaded|上傳量)\s*(?:<[^>]*>)*\s*[:：]?\s*([\d.,]+(?:\s|&nbsp;)*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B)?)`)
+	reNexusLabelUploadRelaxed = regexp.MustCompile(`(?i)(?:上传量|Uploaded|上傳量)\s*(?:：|:)?\s*(?:</?(?:font|span|a|b|i|div|img)[^>]*>)*(?:\s|&nbsp;)*(?:<[^>]*>)*\s*([\d.,]+(?:\s|&nbsp;)*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B))`)
+	reNexusLabelDownload   = regexp.MustCompile(`(?i)(?:下载量|Downloaded|下載量)\s*(?:<[^>]*>)*\s*[:：]?\s*([\d.,]+(?:\s|&nbsp;)*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B)?)`)
+	reNexusLabelDownloadRelaxed = regexp.MustCompile(`(?i)(?:下载量|Downloaded|下載量)\s*(?:：|:)?\s*(?:</?(?:font|span|a|b|i|div|img)[^>]*>)*(?:\s|&nbsp;)*(?:<[^>]*>)*\s*([\d.,]+(?:\s|&nbsp;)*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B))`)
 	reNexusLabelRatio      = regexp.MustCompile(`(?i)(?:分享率|Share\s*Ratio|Ratio)\s*(?:<[^>]*>)+\s*([\d.,]+)`)
-	reNexusLabelBonus      = regexp.MustCompile(`(?i)(?:魔力|茉莉|Bonus)\s*(?:<[^>]*>)+\s*(?:.*?:\s*)?([\d,.]+)`)
+	reNexusLabelBonus      = regexp.MustCompile(`(?i)(?:魔力|茉莉|火花|魅力值?|UCoin|Bonus|憨豆|元宝|蝌蚪)\s*(?:<[^>]*>)+\s*(?:.*?:\s*)?([\d,.]+)`)
 	reNexusDataStats       = regexp.MustCompile(`(?i)&quot;label&quot;:&quot;上传量：&quot;,&quot;value&quot;:&quot;([\d.,]+\s*(?:TB|GB|MB|KB|B))&quot;`)
 	reNexusIconTitleUpload = regexp.MustCompile(`(?i)title=["']上传量[：:]["'][^>]*>[^<]*</[a-z]>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B))`)
 	reNexusIconTitleDown   = regexp.MustCompile(`(?i)title=["']下载量[：:]["'][^>]*>[^<]*</[a-z]>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB|B))`)
 	reNexusIconTitleRatio  = regexp.MustCompile(`(?i)title=["']分享率[：:]["'][^>]*>[^<]*</[a-z]>\s*([\d.,]+)`)
-	reNexusDataBonus       = regexp.MustCompile(`(?i)&quot;label&quot;:&quot;(?:魔力|爆米花|茉莉|Bonus)[^&]*&quot;,&quot;value&quot;:&quot;([\d,.]+)&quot;`)
+	reNexusDataBonus       = regexp.MustCompile(`(?i)&quot;label&quot;:&quot;(?:魔力|爆米花|茉莉|火花|魅力值?|UCoin|Bonus|憨豆|元宝|蝌蚪)[^&]*&quot;,&quot;value&quot;:&quot;([\d,.]+)&quot;`)
 	reNexusApiUser         = regexp.MustCompile(`"username"`)
 	reDetailTransfer       = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:传输|傳送|Transfer)[^<]*</td>\s*<td[^>]*>(.*?)</td>`)
 	reDetailUpload         = regexp.MustCompile(`(?i)(?:上[传傳]量|Uploaded)\s*[:：]?\s*([\d.,]+\s*(?:TB|GB|MB|KB|B))`)
 	reDetailDownload       = regexp.MustCompile(`(?i)(?:下[载載]量|Downloaded)\s*[:：]?\s*([\d.,]+\s*(?:TB|GB|MB|KB|B))`)
 	reDetailClass          = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:等级|等級|Class)\s*</td>\s*<td[^>]*>(.*?)</td>`)
 	reDetailClassImg       = regexp.MustCompile(`<img[^>]*title=["']([^"']+)["']`)
-	reDetailBonus          = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:魔力|Bonus|Karma|积分|茉莉)[^<]*</td>\s*<td[^>]*>(.*?)</td>`)
+	reDetailBonus          = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:魔力|Bonus|Karma|积分|茉莉|火花|魅力值?|UCoin|憨豆|元宝|蝌蚪)[^<]*</td>\s*<td[^>]*>(.*?)</td>`)
+	reUcoinValue           = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>UCoin.*?<td[^>]*>.*?title="([\d,.]+)"`)
 	reDetailSeedingPoints  = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>做种积分[^<]*</td>\s*<td[^>]*>(.*?)</td>`)
 	reDetailSeedingPointsB = regexp.MustCompile(`(?i)做种积分[^<]*</b>[\s:]*([\d,]+\.?\d*)`)
 	reDetailSeeding        = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:做种活动|当前做种|做种体积|做种数)\s*</td>\s*<td[^>]*>(.*?)</td>`)
@@ -1025,7 +1030,18 @@ var (
 	reNexusJsonUpload       = regexp.MustCompile(`(?i)&quot;上[传傳]量[：:]&quot;,&quot;value&quot;:&quot;(\d[\d.,]+\s*(?:TB|GB|MB|KB))&quot;`)
 	reNexusJsonDownload     = regexp.MustCompile(`(?i)&quot;下[载載]量[：:]&quot;,&quot;value&quot;:&quot;(\d[\d.,]+\s*(?:TB|GB|MB|KB))&quot;`)
 	reNexusJsonRatio        = regexp.MustCompile(`(?i)&quot;分享率[：:]&quot;,&quot;value&quot;:&quot;([\d.]+)&quot;`)
-	reNexusJsonBonus        = regexp.MustCompile(`(?i)&quot;(?:魔力|积分|茉莉|Bonus)[：:]&quot;,&quot;value&quot;:&quot;([\d,.]+)&quot;`)
+	reNexusJsonBonus        = regexp.MustCompile(`(?i)&quot;(?:魔力|积分|茉莉|火花|魅力值?|UCoin|Bonus|憨豆|元宝|蝌蚪)[：:]&quot;,&quot;value&quot;:&quot;([\d,.]+)&quot;`)
+	reAltUpload            = regexp.MustCompile(`(?i)alt=["']上传["'][^>]*>(?:\s|&nbsp;)*([\d.,]+)\s*(TB|GB|MB|KB)`)
+	reAltDownload          = regexp.MustCompile(`(?i)alt=["']下载["'][^>]*>(?:\s|&nbsp;)*([\d.,]+)\s*(TB|GB|MB|KB)`)
+	reAltRatio             = regexp.MustCompile(`(?i)\[分享率\]\s*[:：]\s*(?:&nbsp;|\s)*([\d.,]+)`)
+	reAltBonus             = regexp.MustCompile(`(?is)alt=["']憨豆["'][^>]*>.*?<div[^>]*>([\d,.]+)\s*</div>`)
+	reFontLabelUpload      = regexp.MustCompile(`(?i)(?:上传|上传量)\s*[:：]\s*</(?:font|span)>\s*([\d.,]+)\s*(TB|GB|MB|KB)`)
+	reFontLabelDownload    = regexp.MustCompile(`(?i)(?:下载|下载量)\s*[:：]\s*</(?:font|span)>\s*([\d.,]+)\s*(TB|GB|MB|KB)`)
+	reFontLabelRatio       = regexp.MustCompile(`(?i)分享率\s*[:：]\s*</(?:font|span)>\s*≥?\s*([\d.,]+)`)
+	reFontLabelBonus       = regexp.MustCompile(`(?is)魔力值[^<]*</(?:font|span)>.*?]:\s*([\d,.]+)`)
+	reFontArrowSeeding     = regexp.MustCompile(`(?i)当前做种[^>]*>[^⬆]*⬆</(?:font|span)>\s*(\d+)`)
+	reLinkBonus            = regexp.MustCompile(`(?i)魔力值\s*\(([\d,.]+)\)`)
+	reYuanbaoBonus         = regexp.MustCompile(`(?s)元宝.*?mybonus\.php[^>]*>([\d,.]+)`)
 )
 
 func (a *NexusPHPAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
@@ -1133,7 +1149,7 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 
 	html := string(body)
 
-	if strings.Contains(html, "login.php") && !strings.Contains(html, "userdetails") {
+	if strings.Contains(html, "login.php") && !strings.Contains(html, "userdetails") && !strings.Contains(html, "userdetail.") {
 		return nil, fmt.Errorf("cookie 无效或已过期")
 	}
 
@@ -1218,6 +1234,16 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 			result.UserClass = vc
 		}
 	}
+	if result.UserClass == "" {
+		if m := reNexusUserClassSpan.FindStringSubmatch(html); len(m) > 1 {
+			result.UserClass = strings.TrimSpace(m[1])
+		}
+	}
+	if result.UserClass == "" {
+		if m := reNexusUserClassStrong.FindStringSubmatch(html); len(m) > 1 {
+			result.UserClass = strings.TrimSpace(m[1])
+		}
+	}
 
 	if m := reNexusFontUploaded.FindStringSubmatch(searchHTML); len(m) > 1 {
 		result.UploadBytes = parseSizeString(cleanText(m[1]))
@@ -1233,6 +1259,10 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 		result.UploadBytes = parseSizeString(cleanText(m[1]))
 	} else if m := reNexusJsonUpload.FindStringSubmatch(html); len(m) > 1 {
 		result.UploadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reAltUpload.FindStringSubmatch(html); len(m) > 1 {
+		result.UploadBytes = parseSizeString(m[1] + " " + m[2])
+	} else if m := reFontLabelUpload.FindStringSubmatch(html); len(m) > 1 {
+		result.UploadBytes = parseSizeString(m[1] + " " + m[2])
 	}
 
 	if m := reNexusFontDownloaded.FindStringSubmatch(searchHTML); len(m) > 1 {
@@ -1247,6 +1277,10 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 		result.DownloadBytes = parseSizeString(cleanText(m[1]))
 	} else if m := reNexusJsonDownload.FindStringSubmatch(html); len(m) > 1 {
 		result.DownloadBytes = parseSizeString(cleanText(m[1]))
+	} else if m := reAltDownload.FindStringSubmatch(html); len(m) > 1 {
+		result.DownloadBytes = parseSizeString(m[1] + " " + m[2])
+	} else if m := reFontLabelDownload.FindStringSubmatch(html); len(m) > 1 {
+		result.DownloadBytes = parseSizeString(m[1] + " " + m[2])
 	}
 
 	if m := reNexusFontRatio.FindStringSubmatch(searchHTML); len(m) > 1 {
@@ -1257,6 +1291,10 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
 	} else if m := reNexusJsonRatio.FindStringSubmatch(html); len(m) > 1 {
 		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
+	} else if m := reAltRatio.FindStringSubmatch(html); len(m) > 1 {
+		result.Ratio, _ = strconv.ParseFloat(m[1], 64)
+	} else if m := reFontLabelRatio.FindStringSubmatch(html); len(m) > 1 {
+		result.Ratio, _ = strconv.ParseFloat(m[1], 64)
 	}
 	if result.Ratio == 0 && result.DownloadBytes > 0 && result.UploadBytes > 0 {
 		result.Ratio = float64(result.UploadBytes) / float64(result.DownloadBytes)
@@ -1268,6 +1306,12 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 	} else if m := reNexusFontBonusInline.FindStringSubmatch(searchHTML); len(m) > 1 {
 		bonusStr := strings.ReplaceAll(cleanText(m[1]), ",", "")
 		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
+	} else if m := reAltBonus.FindStringSubmatch(html); len(m) > 1 {
+		bonusStr := strings.ReplaceAll(m[1], ",", "")
+		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
+	} else if m := reNexusBonusBeforeLabel.FindStringSubmatch(html); len(m) > 1 {
+		bonusStr := strings.ReplaceAll(m[1], ",", "")
+		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
 	} else if m := reNexusLabelBonus.FindStringSubmatch(searchHTML); len(m) > 1 {
 		bonusStr := strings.ReplaceAll(cleanText(m[1]), ",", "")
 		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
@@ -1276,6 +1320,15 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
 	} else if m := reNexusJsonBonus.FindStringSubmatch(html); len(m) > 1 {
 		bonusStr := strings.ReplaceAll(cleanText(m[1]), ",", "")
+		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
+	} else if m := reFontLabelBonus.FindStringSubmatch(html); len(m) > 1 {
+		bonusStr := strings.ReplaceAll(m[1], ",", "")
+		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
+	} else if m := reLinkBonus.FindStringSubmatch(html); len(m) > 1 {
+		bonusStr := strings.ReplaceAll(m[1], ",", "")
+		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
+	} else if m := reYuanbaoBonus.FindStringSubmatch(html); len(m) > 1 {
+		bonusStr := strings.ReplaceAll(m[1], ",", "")
 		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
 	}
 
@@ -1306,6 +1359,16 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 	}
 	if result.SeedingCount == 0 {
 		if m := reFontTitleSeeding.FindStringSubmatch(html); len(m) > 1 {
+			result.SeedingCount, _ = strconv.Atoi(m[1])
+		}
+	}
+	if result.SeedingCount == 0 {
+		if m := reNexusArrowUpImg.FindStringSubmatch(html); len(m) > 1 {
+			result.SeedingCount, _ = strconv.Atoi(m[1])
+		}
+	}
+	if result.SeedingCount == 0 {
+		if m := reFontArrowSeeding.FindStringSubmatch(html); len(m) > 1 {
 			result.SeedingCount, _ = strconv.Atoi(m[1])
 		}
 	}
@@ -1402,6 +1465,15 @@ func (a *NexusPHPAdapter) enrichFromUserDetails(ctx context.Context, config *mod
 			if v, err := strconv.ParseFloat(part, 64); err == nil && v > result.BonusPoints {
 				result.BonusPoints = v
 				break
+			}
+		}
+	}
+
+	if result.BonusPoints == 0 {
+		if m := reUcoinValue.FindStringSubmatch(html); len(m) > 1 {
+			bonusStr := strings.ReplaceAll(m[1], ",", "")
+			if v, err := strconv.ParseFloat(bonusStr, 64); err == nil {
+				result.BonusPoints = v
 			}
 		}
 	}

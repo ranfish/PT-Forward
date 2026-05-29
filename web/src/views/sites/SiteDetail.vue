@@ -399,7 +399,7 @@
               <a-tag :color="discountColor(discountInfo.level)">{{ discountInfo.level || '-' }}</a-tag>
             </a-descriptions-item>
             <a-descriptions-item :label="t('site.multiplier')">{{ discountInfo.multiplier ?? '-' }}</a-descriptions-item>
-            <a-descriptions-item :label="t('site.freeEndAt')">{{ discountInfo.free_end_at || '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('site.freeEndAt')">{{ formatTime(discountInfo.free_end_at) }}</a-descriptions-item>
           </a-descriptions>
         </a-modal>
       </a-card>

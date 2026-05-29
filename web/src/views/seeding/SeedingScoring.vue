@@ -139,12 +139,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, h } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { seedingApi } from '@/api/seeding'
 import { subscriptionsApi } from '@/api/subscriptions'
-import { formatTime } from '@/utils/format'
+import { formatTime, copyToClipboard } from '@/utils/format'
 
 interface DryrunResult {
   score?: number
@@ -163,6 +163,11 @@ interface ScoringLogItem {
 }
 
 const { t } = useI18n()
+
+function copyHash(text: string) {
+  copyToClipboard(text)
+  message.success(t('common.copied'))
+}
 
 const configLoading = ref(false)
 const saving = ref(false)
@@ -196,7 +201,7 @@ const dryrunForm = reactive({
 
 const logColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: t('seeding.infoHash'), dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
+  { title: t('seeding.infoHash'), dataIndex: 'info_hash', key: 'info_hash', ellipsis: true, customRender: ({ text }: { text: string }) => h('span', { style: 'cursor:pointer;font-family:monospace;font-size:12px', onClick: () => copyHash(text) }, text) },
   { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 100 },
   { title: t('seeding.scoringScore'), dataIndex: 'score', key: 'score', width: 80 },
   { title: t('common.time'), dataIndex: 'created_at', key: 'created_at', width: 170, customRender: ({ text }: { text: string }) => formatTime(text) },

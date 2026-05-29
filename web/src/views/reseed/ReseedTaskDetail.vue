@@ -28,6 +28,12 @@
               size="small"
             >
               <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'source_info_hash'">
+                  <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.source_info_hash)">{{ record.source_info_hash }}</span>
+                </template>
+                <template v-if="column.key === 'target_info_hash'">
+                  <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.target_info_hash)">{{ record.target_info_hash }}</span>
+                </template>
                 <template v-if="column.key === 'status'">
                   <a-tag :color="record.status === 'injected' ? 'green' : record.status === 'failed' ? 'red' : 'blue'">
                     {{ translateReseedStatus(record.status) }}
@@ -68,13 +74,18 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { reseedApi } from '@/api/reseed'
-import { formatTime } from '@/utils/format'
+import { formatTime, copyToClipboard } from '@/utils/format'
 import { useEnumLabels } from '@/utils/enumLabels'
 
 const route = useRoute()
 const taskId = Number(route.params.id)
 const { t } = useI18n()
 const { translateReseedStatus } = useEnumLabels()
+
+function copyHash(text: string) {
+  copyToClipboard(text)
+  message.success(t('common.copied'))
+}
 
 interface ReseedTaskInfo {
   name: string

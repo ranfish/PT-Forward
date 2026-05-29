@@ -38,6 +38,7 @@
             <template #title>{{ t('nav.seeding') }}</template>
             <a-menu-item key="/seeding" @click="$router.push('/seeding')">{{ t('nav.seedingDashboard') }}</a-menu-item>
             <a-menu-item key="/seeding/rules" @click="$router.push('/seeding/rules')">{{ t('nav.seedingRules') }}</a-menu-item>
+            <a-menu-item key="/seeding/scoring" @click="$router.push('/seeding/scoring')">{{ t('nav.seedingScoring') }}</a-menu-item>
             <a-menu-item key="/seeding/torrents" @click="$router.push('/seeding/torrents')">{{ t('nav.seedingTorrents') }}</a-menu-item>
             <a-menu-item key="/seeding/stats" @click="$router.push('/seeding/stats')">{{ t('nav.seedingStats') }}</a-menu-item>
           </a-sub-menu>

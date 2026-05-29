@@ -19,7 +19,8 @@ type flushContext struct {
 	clientID       string
 	client         model.DownloaderClient
 	records        []model.SeedingTorrentRecord
-	freeSpace int64
+	freeSpace      int64
+	clientCfg      *model.SeedingClientConfig
 }
 
 func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (*flushContext, error) {
@@ -102,6 +103,7 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 		client:         dlClient,
 		records:        records,
 		freeSpace:      freeSpace,
+		clientCfg:      &cfg,
 	}, nil
 }
 
@@ -309,6 +311,9 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 
 	activeCount := e.GetActiveCount(fc.clientID)
 	maxActive := fc.scoringCfg.MaxActiveSeeding
+	if fc.clientCfg != nil && fc.clientCfg.MaxActiveSeeding > 0 {
+		maxActive = fc.clientCfg.MaxActiveSeeding
+	}
 	if maxActive <= 0 {
 		maxActive = 100
 	}

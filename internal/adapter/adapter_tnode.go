@@ -506,12 +506,17 @@ func buildDomainURL(config *model.SiteConfig, path, torrentID, passkey string) s
 func (a *TNodeAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
 	baseURL := resolveBaseURL(config)
 
-	detailURL := baseURL + "/api/consumer/fetchSelfDetail"
+	csrfToken, csrfErr := a.fetchCSRFToken(ctx, config, baseURL+"/index")
+
+	detailURL := baseURL + "/api/user/getMainInfo"
 	req, err := http.NewRequestWithContext(ctx, "GET", detailURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("构造请求失败: %w", err)
 	}
 	setCommonHeaders(req, config.Cookie)
+	if csrfErr == nil && csrfToken != "" {
+		req.Header.Set("x-csrf-token", csrfToken)
+	}
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
@@ -532,65 +537,46 @@ func (a *TNodeAdapter) FetchUserStats(ctx context.Context, config *model.SiteCon
 	}
 
 	var detailResp struct {
-		Success bool `json:"success"`
-		Data    struct {
-			ID                   int    `json:"id"`
-			Name                 string `json:"name"`
-			Level                int    `json:"level"`
-			Bonus                int64  `json:"bonus"`
-			UploadSize           int64  `json:"uploadSize"`
-			DownloadSize         int64  `json:"downloadSize"`
-			PromotionUploadSize  int64  `json:"promotionUploadSize"`
-			PromotionDownloadSize int64 `json:"promotionDownloadSize"`
-			SeedCost             int64  `json:"seedCost"`
-			OwnerValidTorrentNum int    `json:"ownerValidTorrentNum"`
+		Status int `json:"status"`
+		Data   struct {
+			ID       int    `json:"id"`
+			Username string `json:"username"`
+			Class    struct {
+				Level int    `json:"level"`
+				Name  string `json:"name"`
+			} `json:"class"`
+			Bonus     float64 `json:"bonus"`
+			Upload    int64   `json:"upload"`
+			Download  int64   `json:"download"`
+			Seeding   int     `json:"seeding"`
+			SeedTime  float64 `json:"seedTime"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &detailResp); err != nil {
 		return nil, fmt.Errorf("解析用户详情失败: %w", err)
 	}
-	if !detailResp.Success {
-		return nil, fmt.Errorf("API 返回失败: success=false")
+	if detailResp.Status != 200 {
+		return nil, fmt.Errorf("API 返回状态: %d", detailResp.Status)
 	}
 
 	stats := &model.UserStatsResult{
-		Username:      detailResp.Data.Name,
-		UploadBytes:   detailResp.Data.UploadSize,
-		DownloadBytes: detailResp.Data.DownloadSize,
-		BonusPoints:   float64(detailResp.Data.Bonus),
+		Username:      detailResp.Data.Username,
+		UploadBytes:   detailResp.Data.Upload,
+		DownloadBytes: detailResp.Data.Download,
+		BonusPoints:   detailResp.Data.Bonus,
+		SeedingCount:  detailResp.Data.Seeding,
 	}
-	if detailResp.Data.DownloadSize > 0 {
-		stats.Ratio = float64(detailResp.Data.UploadSize) / float64(detailResp.Data.DownloadSize)
+	if detailResp.Data.Download > 0 {
+		stats.Ratio = float64(detailResp.Data.Upload) / float64(detailResp.Data.Download)
 	}
-
-	levelNames := map[int]string{
-		0: "乱民", 1: "小卒", 2: "教谕", 3: "登仕郎", 4: "修职郎",
-		5: "文林郎", 6: "忠武校尉", 7: "承信将军", 8: "武毅将军",
-		9: "武节将军", 10: "显威将军", 11: "宣武将军",
-	}
-	if name, ok := levelNames[detailResp.Data.Level]; ok {
-		stats.UserClass = name
-	}
-
-	seedBody, seedErr := a.fetchTNodeSeedInfo(ctx, config, baseURL)
-	if seedErr == nil {
-		var seedResp struct {
-			Success bool `json:"success"`
-			Data    struct {
-				Num      int   `json:"num"`
-				FileSize int64 `json:"fileSize"`
-			} `json:"data"`
-		}
-		if json.Unmarshal(seedBody, &seedResp) == nil && seedResp.Success {
-			stats.SeedingCount = seedResp.Data.Num
-			stats.SeedingSize = seedResp.Data.FileSize
-		}
+	if detailResp.Data.Class.Name != "" {
+		stats.UserClass = detailResp.Data.Class.Name
 	}
 
 	return stats, nil
 }
 
-func (a *TNodeAdapter) fetchTNodeSeedInfo(ctx context.Context, config *model.SiteConfig, baseURL string) ([]byte, error) {
+func (a *TNodeAdapter) fetchTNodeSeedInfo(ctx context.Context, config *model.SiteConfig, baseURL string, csrfToken string) ([]byte, error) {
 	seedURL := baseURL + "/api/userTorrent/fetchSeedTorrentInfo"
 	req, err := http.NewRequestWithContext(ctx, "POST", seedURL, strings.NewReader("{}"))
 	if err != nil {
@@ -598,6 +584,9 @@ func (a *TNodeAdapter) fetchTNodeSeedInfo(ctx context.Context, config *model.Sit
 	}
 	req.Header.Set("Content-Type", "application/json")
 	setCommonHeaders(req, config.Cookie)
+	if csrfToken != "" {
+		req.Header.Set("x-csrf-token", csrfToken)
+	}
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {

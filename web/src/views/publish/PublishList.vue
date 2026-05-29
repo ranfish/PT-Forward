@@ -214,7 +214,7 @@ const resultColumns = [
   { title: t('common.status'), key: 'status', width: 100 },
   { title: t('publish.publishUrl'), key: 'publish_url', ellipsis: true },
   { title: t('publish.errorMessage'), dataIndex: 'error_message', key: 'error_message', ellipsis: true },
-  { title: t('publish.completedAt'), dataIndex: 'completed_at', key: 'completed_at', width: 180 },
+  { title: t('publish.completedAt'), dataIndex: 'completed_at', key: 'completed_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 
 function taskStatusColor(status: string) {
