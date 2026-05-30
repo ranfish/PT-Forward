@@ -35,6 +35,7 @@ type RuleContext struct {
 	Record    *model.SeedingTorrentRecord
 	Torrent   *model.TorrentInfo
 	FreeSpace int64
+	TotalSpace int64
 	Now       time.Time
 
 	ActiveUploads       int
@@ -159,6 +160,18 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 		return "0", true
 	case "freeSpace":
 		return fmt.Sprintf("%d", rc.FreeSpace), true
+	case "totalSpace":
+		return fmt.Sprintf("%d", rc.TotalSpace), true
+	case "diskUsedPercent":
+		if rc.TotalSpace > 0 {
+			used := rc.TotalSpace - rc.FreeSpace
+			if used < 0 {
+				used = 0
+			}
+			pct := float64(used) / float64(rc.TotalSpace) * 100
+			return fmt.Sprintf("%.2f", pct), true
+		}
+		return "0", true
 	case "hour":
 		return fmt.Sprintf("%d", rc.Now.Hour()), true
 	case "activeUploads":
@@ -188,7 +201,7 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 	return "", false
 }
 
-func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo, freeSpace int64) ([]RuleMatch, error) {
+func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo, freeSpace int64, totalSpace int64) ([]RuleMatch, error) {
 	var rules []model.DeleteRule
 	if err := re.db.WithContext(ctx).
 		Where("enabled = ?", true).
@@ -223,7 +236,7 @@ func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, tor
 	cache := re.preloadScoringCache(ctx, clientID, records)
 	var matches []RuleMatch
 	for _, rule := range rules {
-		matched := re.matchRuleWithCache(ctx, rule, records, torrentMap, freeSpace, now, globalUpSpeed, globalDownSpeed, cache)
+		matched := re.matchRuleWithCache(ctx, rule, records, torrentMap, freeSpace, totalSpace, now, globalUpSpeed, globalDownSpeed, cache)
 		if len(matched) > 0 {
 			matches = append(matches, RuleMatch{
 				Rule:     rule,
@@ -241,10 +254,10 @@ func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, tor
 }
 
 func (re *RuleEvaluator) EvaluateRulesSimple(ctx context.Context, clientID string) ([]RuleMatch, error) {
-	return re.EvaluateRules(ctx, clientID, nil, -1)
+	return re.EvaluateRules(ctx, clientID, nil, -1, 0)
 }
 
-func (re *RuleEvaluator) MatchRules(ctx context.Context, rules []model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64) []RuleMatch {
+func (re *RuleEvaluator) MatchRules(ctx context.Context, rules []model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, totalSpace int64) []RuleMatch {
 	if len(rules) == 0 || len(records) == 0 {
 		return nil
 	}
@@ -267,7 +280,7 @@ func (re *RuleEvaluator) MatchRules(ctx context.Context, rules []model.DeleteRul
 	cache := re.preloadScoringCache(ctx, clientID, records)
 	var matches []RuleMatch
 	for _, rule := range rules {
-		matched := re.matchRuleWithCache(ctx, rule, records, torrentMap, freeSpace, now, globalUpSpeed, globalDownSpeed, cache)
+		matched := re.matchRuleWithCache(ctx, rule, records, torrentMap, freeSpace, totalSpace, now, globalUpSpeed, globalDownSpeed, cache)
 		if len(matched) > 0 {
 			matches = append(matches, RuleMatch{
 				Rule:     rule,
@@ -407,7 +420,7 @@ func (re *RuleEvaluator) fillScoringContext(_ context.Context, rc *RuleContext, 
 	rc.LowScoreCount = cache.lowScoreCount[rc.Record.InfoHash]
 }
 
-func (re *RuleEvaluator) matchRuleWithCache(ctx context.Context, rule model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64, cache *scoringCache) []model.SeedingTorrentRecord {
+func (re *RuleEvaluator) matchRuleWithCache(ctx context.Context, rule model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, totalSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64, cache *scoringCache) []model.SeedingTorrentRecord {
 	if rule.Conditions == "" && rule.Expr == "" {
 		return nil
 	}
@@ -427,6 +440,7 @@ func (re *RuleEvaluator) matchRuleWithCache(ctx context.Context, rule model.Dele
 			Record:              &rec,
 			Torrent:             ti,
 			FreeSpace:           freeSpace,
+			TotalSpace:          totalSpace,
 			Now:                 now,
 			ActiveUploads:       activeUploads,
 			ActiveDownloads:     activeDownloads,

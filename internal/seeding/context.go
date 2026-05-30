@@ -41,6 +41,8 @@ type exprEnv struct {
 	FreeRemainSec float64 `expr:"freeRemainSec"`
 	HRRemainSec   int64   `expr:"hrRemainSec"`
 	FreeSpace     int64   `expr:"freeSpace"`
+	TotalSpace    int64   `expr:"totalSpace"`
+	DiskUsedPct   float64 `expr:"diskUsedPct"`
 	Hour          int     `expr:"hour"`
 
 	ActiveUploads       int     `expr:"activeUploads"`
@@ -67,6 +69,13 @@ func buildExprEnv(rc *RuleContext) *exprEnv {
 		Source:       rc.Record.Source,
 		LastActionBy: rc.Record.LastActionBy,
 		FreeSpace:    rc.FreeSpace,
+		TotalSpace:   rc.TotalSpace,
+		DiskUsedPct: func() float64 {
+			if rc.TotalSpace > 0 {
+				return float64(rc.TotalSpace-rc.FreeSpace) / float64(rc.TotalSpace) * 100.0
+			}
+			return 0
+		}(),
 		Hour:         rc.Now.Hour(),
 
 		ActiveUploads:       rc.ActiveUploads,

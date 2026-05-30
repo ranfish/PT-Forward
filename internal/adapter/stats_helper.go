@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var reSizeValue = regexp.MustCompile(`([\d.]+)\s*(TB|GB|MB|KB|TiB|GiB|MiB|KiB|B)`)
+var reSizeValue = regexp.MustCompile(`([\d.]+)\s*(PB|TB|GB|MB|KB|PiB|TiB|GiB|MiB|KiB|B)`)
 
 func parseSizeString(s string) int64 {
 	s = strings.TrimSpace(s)
@@ -32,6 +32,8 @@ func parseSizeString(s string) int64 {
 func sizeToBytes(val string, unit string) int64 {
 	var multiplier float64
 	switch strings.ToUpper(unit) {
+	case "PB", "PIB":
+		multiplier = 1 << 50
 	case "TB", "TIB":
 		multiplier = 1 << 40
 	case "GB", "GIB":
