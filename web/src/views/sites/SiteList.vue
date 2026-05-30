@@ -89,6 +89,9 @@
         <template v-if="column.key === 'seedingCount'">
           <span>{{ record.seedingCount || '-' }}</span>
         </template>
+        <template v-if="column.key === 'seedingSize'">
+          <span>{{ record.seedingSize ? formatBytes(Number(record.seedingSize)) : '-' }}</span>
+        </template>
         <template v-if="column.key === 'bonusPoints'">
           <span>{{ record.bonusPoints ? Number(record.bonusPoints).toLocaleString('en', { maximumFractionDigits: 0 }) : '-' }}</span>
         </template>
@@ -348,6 +351,7 @@ const columns = [
   { title: t('site.downloadBytes'), key: 'downloadBytes', width: 100 },
   { title: t('site.ratio'), key: 'ratio', width: 70 },
   { title: t('site.seedingCount'), key: 'seedingCount', width: 80 },
+  { title: t('site.seedingSize'), key: 'seedingSize', width: 100 },
   { title: t('site.bonusPoints'), key: 'bonusPoints', width: 100 },
   { title: t('site.syncTime'), key: 'syncTime', width: 120 },
   { title: t('common.actions'), key: 'actions', width: 240 },

@@ -1021,9 +1021,6 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 
 	ageHours := time.Since(rec.CreatedAt).Hours()
 	seedTimeHours := float64(ti.SeedTime) / 3600.0
-	if seedTimeHours == 0 && !ti.AddedAt.IsZero() {
-		seedTimeHours = time.Since(ti.AddedAt).Hours()
-	}
 
 	hrStrategy := "protect"
 	if e.siteProvider != nil && rec.SiteName != "" {

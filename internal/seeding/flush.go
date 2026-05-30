@@ -423,6 +423,20 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 			break
 		}
 
+		if fc.clientCfg != nil && fc.clientCfg.DiskProtectEnabled && fc.clientCfg.MinDiskSpaceGB > 0 {
+			if md, mdErr := fc.client.GetMainData(ctx); mdErr == nil && md != nil {
+				minBytes := int64(fc.clientCfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
+				if md.FreeSpace < minBytes {
+					e.logger.Warn("flush: disk protect triggered during batch, stopping",
+						zap.String("client_id", fc.clientID),
+						zap.Int64("freeSpace", md.FreeSpace),
+						zap.Float64("minGB", fc.clientCfg.MinDiskSpaceGB),
+						zap.Int("pushed", len(results)))
+					break
+				}
+			}
+		}
+
 		candidate, pushed := e.pushOne(ctx, fc, c)
 		results = append(results, candidate)
 		if pushed {
