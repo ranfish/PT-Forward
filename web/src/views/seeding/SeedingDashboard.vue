@@ -172,6 +172,19 @@
                 </a-form-item>
               </a-col>
               <a-col :span="12">
+                <a-form-item label="删种规则">
+                  <a-select
+                    v-model:value="configForm.deleteRuleIds"
+                    mode="multiple"
+                    :options="deleteRuleOptions"
+                    placeholder="选择绑定的删种规则"
+                    allow-clear
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
                 <a-form-item label="管理范围">
                   <a-select v-model:value="configForm.scope">
                     <a-select-option value="managed">managed</a-select-option>
@@ -273,11 +286,11 @@ import {
   TrophyOutlined,
   PlusOutlined,
 } from '@ant-design/icons-vue'
-import { seedingApi } from '@/api/seeding'
+import { seedingApi, deleteRulesApi } from '@/api/seeding'
 import { downloadersApi } from '@/api/downloaders'
 import { formatDurationSec, formatTime, copyToClipboard } from '@/utils/format'
 import { useEnumLabels } from '@/utils/enumLabels'
-import type { ClientConfig, SeedingClientConfig, SeedingTorrentRecord } from '@/api/types'
+import type { ClientConfig, SeedingClientConfig, SeedingTorrentRecord, DeleteRule } from '@/api/types'
 
 interface SeedingStatusData {
   overview?: {
@@ -299,6 +312,7 @@ const status = ref<SeedingStatusData>({})
 const torrents = ref<SeedingTorrentRecord[]>([])
 const configs = ref<SeedingClientConfig[]>([])
 const downloaderOptions = ref<{label: string, value: string}[]>([])
+const deleteRuleOptions = ref<{label: string, value: number}[]>([])
 
 const configModalVisible = ref(false)
 const configSubmitting = ref(false)
@@ -315,6 +329,7 @@ const configForm = reactive({
   maxActiveSeeding: 100,
   superSeedingDefault: false,
   rejectRuleIds: '',
+  deleteRuleIds: [] as number[],
   fitTimeCheckMs: 2000,
   emergencyBuffer: 0.2,
   spaceAlarmEnabled: false,
@@ -350,6 +365,7 @@ const configColumns = [
   { title: t('seeding.mainDataCron'), dataIndex: 'maindata_cron', key: 'maindata_cron', width: 140 },
   { title: t('seeding.diskProtect'), key: 'disk_protect_enabled', width: 90 },
   { title: t('seeding.minDiskSpaceGB'), dataIndex: 'min_disk_space_gb', key: 'min_disk_space_gb', width: 100 },
+  { title: '删种规则', dataIndex: 'delete_rule_ids', key: 'delete_rule_ids', width: 120 },
   { title: t('common.enable'), key: 'enabled', width: 80 },
   { title: t('common.actions'), key: 'actions', width: 140 },
 ]
@@ -398,6 +414,7 @@ function openConfigModal(record?: SeedingClientConfig) {
       maxActiveSeeding: record.max_active_seeding || 100,
       superSeedingDefault: record.super_seeding_default || false,
       rejectRuleIds: record.reject_rule_ids || '',
+      deleteRuleIds: record.delete_rule_ids ? record.delete_rule_ids.split(',').map(Number).filter(n => !isNaN(n)) : [],
       fitTimeCheckMs: record.fit_time_check_ms ?? 2000,
       emergencyBuffer: record.emergency_buffer ?? 0.2,
       spaceAlarmEnabled: record.space_alarm_enabled || false,
@@ -425,6 +442,7 @@ function openConfigModal(record?: SeedingClientConfig) {
       maxActiveSeeding: 100,
       superSeedingDefault: false,
       rejectRuleIds: '',
+      deleteRuleIds: [] as number[],
       fitTimeCheckMs: 2000,
       emergencyBuffer: 0.2,
       spaceAlarmEnabled: false,
@@ -450,10 +468,14 @@ async function handleConfigSubmit() {
   }
   configSubmitting.value = true
   try {
+    const payload = {
+      ...configForm,
+      deleteRuleIds: configForm.deleteRuleIds.length > 0 ? configForm.deleteRuleIds.join(',') : '',
+    }
     if (editingConfig.value) {
-      await seedingApi.updateConfig(editingConfig.value.id, configForm)
+      await seedingApi.updateConfig(editingConfig.value.id, payload)
     } else {
-      await seedingApi.createConfig(configForm)
+      await seedingApi.createConfig(payload)
     }
     message.success(t('common.operationSuccess'))
     configModalVisible.value = false
@@ -517,6 +539,18 @@ async function fetchDownloaders() {
   }
 }
 
+async function fetchDeleteRules() {
+  try {
+    const resp = await deleteRulesApi.list()
+    const items = resp.data.data?.items || []
+    deleteRuleOptions.value = items.map((r: DeleteRule) => ({
+      label: `#${r.id} ${r.alias || r.type} (优先级:${r.priority})`,
+      value: r.id,
+    }))
+  } catch {
+  }
+}
+
 function copyHash(text: string) {
   copyToClipboard(text)
   message.success(t('common.copied'))
@@ -526,5 +560,6 @@ onMounted(() => {
   fetchData()
   fetchConfigs()
   fetchDownloaders()
+  fetchDeleteRules()
 })
 </script>

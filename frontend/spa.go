@@ -35,7 +35,7 @@ func SPAHandler() http.Handler {
 		}
 
 		if strings.HasPrefix(path, "/assets/") {
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			w.Header().Set("Cache-Control", "public, max-age=86400")
 			fileServer.ServeHTTP(w, r)
 			return
 		}

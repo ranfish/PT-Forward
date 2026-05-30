@@ -12,6 +12,7 @@
       :data-source="rules"
       :loading="loading"
       :pagination="false"
+      :scroll="{ x: 1100 }"
       row-key="id"
     >
       <template #bodyCell="{ column, record }">
@@ -30,9 +31,9 @@
             <span style="color: #666; font-size: 12px">{{ truncate(record.expr, 40) }}</span>
           </template>
           <template v-else>
-            <template v-for="(c, i) in parseConditions(record.conditions)" :key="i">
-              <a-tag style="margin-bottom: 2px">{{ fieldLabel(c.field) }} {{ opSymbol(c.operator) }} {{ c.value }}{{ fieldMeta[c.field]?.unit === 'hours' ? 'h' : '' }}</a-tag>
-              <span v-if="i < parseConditions(record.conditions).length - 1" style="color: #999; font-size: 11px; margin: 0 2px">{{ record.logic === 'or' ? t('seeding.logicOrShort') : t('seeding.logicAndShort') }}</span>
+            <template v-for="(c, i) in parseConditionsForDisplay(record.conditions)" :key="i">
+              <a-tag style="margin-bottom: 2px">{{ fieldLabel(c.field) }} {{ opSymbol(c.operator) }} {{ formatCondValue(c.field, c.value) }}</a-tag>
+              <span v-if="i < parseConditionsForDisplay(record.conditions).length - 1" style="color: #999; font-size: 11px; margin: 0 2px">{{ record.logic === 'or' ? t('seeding.logicOrShort') : t('seeding.logicAndShort') }}</span>
             </template>
             <span v-if="!record.conditions" style="color: #999">-</span>
           </template>
@@ -81,7 +82,7 @@
             <a-button size="small" type="dashed" @click="showRawJson = !showRawJson">{{ showRawJson ? t('seeding.hideRawJson') : t('seeding.showRawJson') }}</a-button>
           </div>
           <div v-for="(cond, idx) in conditions" :key="idx" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
-            <a-select v-model:value="cond.field" show-search option-filter-prop="label" style="width: 180px" :placeholder="t('seeding.selectField')">
+            <a-select v-model:value="cond.field" show-search option-filter-prop="label" style="width: 180px" :placeholder="t('seeding.selectField')" @change="(v: string) => { cond.value = ''; const u = fieldUnit(v); condUnits[idx] = u === 'size' ? 1 : u === 'speed' ? 0 : 0 }">
               <a-select-option v-for="f in availableFields" :key="f.value" :value="f.value" :label="f.label">
                 {{ f.label }} <span style="color: #999; font-size: 11px">({{ f.value }})</span>
               </a-select-option>
@@ -100,6 +101,18 @@
             <template v-else-if="fieldType(cond.field) === 'enum:discount'">
               <a-select v-model:value="cond.value" style="flex: 1" :placeholder="t('seeding.conditionValue')">
                 <a-select-option v-for="v in discountOptions" :key="v.value" :value="v.value">{{ v.label }}</a-select-option>
+              </a-select>
+            </template>
+            <template v-else-if="fieldUnit(cond.field) === 'size'">
+              <a-input-number v-model:value="cond.value" style="flex: 1; min-width: 100px" :placeholder="t('seeding.conditionValue')" :min="0" />
+              <a-select v-model:value="condUnits[idx]" style="width: 70px">
+                <a-select-option v-for="(u, ui) in sizeUnits" :key="ui" :value="ui">{{ u.value }}</a-select-option>
+              </a-select>
+            </template>
+            <template v-else-if="fieldUnit(cond.field) === 'speed'">
+              <a-input-number v-model:value="cond.value" style="flex: 1; min-width: 100px" :placeholder="t('seeding.conditionValue')" :min="0" />
+              <a-select v-model:value="condUnits[idx]" style="width: 75px">
+                <a-select-option v-for="(u, ui) in speedUnits" :key="ui" :value="ui">{{ u.value }}</a-select-option>
               </a-select>
             </template>
             <template v-else>
@@ -264,6 +277,7 @@ const form = reactive({
 
 interface ConditionItem { field: string; operator: string; value: string }
 const conditions = ref<ConditionItem[]>([])
+const condUnits = ref<number[]>([])
 
 const statusOptions = [
   { value: 'seeding', label: t('seeding.seedingStatus') },
@@ -296,13 +310,13 @@ const fieldMeta: Record<string, { type: string; hint: string; unit?: string }> =
   last_action_by: { type: 'text', hint: '' },
   name: { type: 'text', hint: '' },
   seed_time: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
-  size: { type: 'number', hint: t('seeding.unitBytes') },
-  totalSize: { type: 'number', hint: t('seeding.unitBytes') },
+  size: { type: 'number', hint: '', unit: 'size' },
+  totalSize: { type: 'number', hint: '', unit: 'size' },
   progress: { type: 'number', hint: '0~1' },
   state: { type: 'text', hint: '' },
-  uploaded: { type: 'number', hint: t('seeding.unitBytes') },
-  uploadSpeed: { type: 'number', hint: 'B/s' },
-  downloadSpeed: { type: 'number', hint: 'B/s' },
+  uploaded: { type: 'number', hint: '', unit: 'size' },
+  uploadSpeed: { type: 'number', hint: '', unit: 'speed' },
+  downloadSpeed: { type: 'number', hint: '', unit: 'speed' },
   ratio: { type: 'number', hint: '' },
   downloadUploadRatio: { type: 'number', hint: '' },
   category: { type: 'text', hint: '' },
@@ -314,17 +328,17 @@ const fieldMeta: Record<string, { type: string; hint: string; unit?: string }> =
   addedTime: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
   freeRemainSec: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
   hrRemainSec: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
-  freeSpace: { type: 'number', hint: t('seeding.unitBytes') },
-  totalSpace: { type: 'number', hint: t('seeding.unitBytes') },
-  diskUsedPercent: { type: 'number', hint: '%' },
+  freeSpace: { type: 'number', hint: '', unit: 'size' },
+  totalSpace: { type: 'number', hint: '', unit: 'size' },
+  diskUsedPercent: { type: 'number', hint: '%', unit: 'percent' },
   scoringScore: { type: 'number', hint: '' },
   scoringRank: { type: 'number', hint: '' },
   lowScoreCount: { type: 'number', hint: '' },
   hour: { type: 'number', hint: '0~23' },
   activeUploads: { type: 'number', hint: '' },
   activeDownloads: { type: 'number', hint: '' },
-  globalUploadSpeed: { type: 'number', hint: 'B/s' },
-  globalDownloadSpeed: { type: 'number', hint: 'B/s' },
+  globalUploadSpeed: { type: 'number', hint: '', unit: 'speed' },
+  globalDownloadSpeed: { type: 'number', hint: '', unit: 'speed' },
 }
 
 function fieldType(field: string): string {
@@ -332,7 +346,83 @@ function fieldType(field: string): string {
 }
 
 function fieldHint(field: string): string {
+  const u = fieldUnit(field)
+  if (u === 'size') return ''
+  if (u === 'speed') return ''
+  if (u === 'percent') return '%'
+  if (u === 'hours') return t('seeding.unitHours')
   return fieldMeta[field]?.hint || t('seeding.conditionValue')
+}
+
+function fieldUnit(field: string): string {
+  return fieldMeta[field]?.unit || ''
+}
+
+const sizeUnits = [
+  { value: 'MB', factor: 1024 * 1024 },
+  { value: 'GB', factor: 1024 * 1024 * 1024 },
+  { value: 'TB', factor: 1024 * 1024 * 1024 * 1024 },
+]
+const speedUnits = [
+  { value: 'KB/s', factor: 1024 },
+  { value: 'MB/s', factor: 1024 * 1024 },
+]
+
+function displayValueForField(field: string, storeVal: string, unitIdx: number): string {
+  const u = fieldUnit(field)
+  if (!u || storeVal === '' || storeVal === undefined) return storeVal
+  const n = parseFloat(storeVal)
+  if (isNaN(n)) return storeVal
+  if (u === 'size') {
+    const units = sizeUnits
+    const idx = unitIdx >= 0 && unitIdx < units.length ? unitIdx : 1
+    return String(n / units[idx].factor)
+  }
+  if (u === 'speed') {
+    const units = speedUnits
+    const idx = unitIdx >= 0 && unitIdx < units.length ? unitIdx : 0
+    return String(n / units[idx].factor)
+  }
+  return storeVal
+}
+
+function storeValueFromDisplay(field: string, displayVal: string, unitIdx: number): string {
+  const u = fieldUnit(field)
+  if (!u || displayVal === '') return displayVal
+  const n = parseFloat(displayVal)
+  if (isNaN(n)) return displayVal
+  if (u === 'size') {
+    const units = sizeUnits
+    const idx = unitIdx >= 0 && unitIdx < units.length ? unitIdx : 1
+    return String(Math.round(n * units[idx].factor))
+  }
+  if (u === 'speed') {
+    const units = speedUnits
+    const idx = unitIdx >= 0 && unitIdx < units.length ? unitIdx : 0
+    return String(Math.round(n * units[idx].factor))
+  }
+  return displayVal
+}
+
+function inferUnitIndex(field: string, storeVal: string): number {
+  const u = fieldUnit(field)
+  if (!u) return 0
+  const n = parseFloat(storeVal)
+  if (isNaN(n) || n === 0) {
+    if (u === 'size') return 1
+    if (u === 'speed') return 0
+    return 0
+  }
+  if (u === 'size') {
+    if (n >= 1024 * 1024 * 1024 * 1024) return 2
+    if (n >= 1024 * 1024 * 1024) return 1
+    return 0
+  }
+  if (u === 'speed') {
+    if (n >= 1024 * 1024) return 1
+    return 0
+  }
+  return 0
 }
 
 function applicableOperators(field: string): { value: string; label: string }[] {
@@ -376,6 +466,35 @@ function fieldLabel(field: string): string {
 function opSymbol(op: string): string {
   const map: Record<string, string> = { '==': '=', '!=': '≠', '>=': '≥', '<=': '≤', '>': '>', '<': '<', 'contains': '∋', 'not_contains': '∌', 'includeIn': 'in', 'notIncludeIn': '∉', 'regExp': '~', 'notRegExp': '!~' }
   return map[op] || op
+}
+
+function formatCondValue(field: string, storeVal: string): string {
+  if (!storeVal) return storeVal
+  const u = fieldUnit(field)
+  if (u === 'hours') {
+    const h = Number(storeVal) / 3600
+    return String(Math.round(h * 100) / 100) + 'h'
+  }
+  if (u === 'size') {
+    const idx = inferUnitIndex(field, storeVal)
+    const val = Number(storeVal) / sizeUnits[idx].factor
+    return (Math.round(val * 100) / 100) + ' ' + sizeUnits[idx].value
+  }
+  if (u === 'speed') {
+    const idx = inferUnitIndex(field, storeVal)
+    const val = Number(storeVal) / speedUnits[idx].factor
+    return (Math.round(val * 100) / 100) + ' ' + speedUnits[idx].value
+  }
+  return storeVal
+}
+
+function parseConditionsForDisplay(json: string): ConditionItem[] {
+  if (!json) return []
+  try {
+    return JSON.parse(json)
+  } catch {
+    return []
+  }
 }
 
 const availableFields = [
@@ -425,17 +544,23 @@ const availableFields = [
 
 function addCondition() {
   conditions.value.push({ field: '', operator: '==', value: '' })
+  condUnits.value.push(0)
 }
 
 function removeCondition(idx: number) {
   conditions.value.splice(idx, 1)
+  condUnits.value.splice(idx, 1)
 }
 
 function conditionsToJSON(): string {
   if (conditions.value.length === 0) return ''
-  return JSON.stringify(conditions.value.map(c => {
+  return JSON.stringify(conditions.value.map((c, i) => {
     if (fieldMeta[c.field]?.unit === 'hours' && c.value) {
       return { ...c, value: String(Math.round(Number(c.value) * 3600)) }
+    }
+    if ((fieldMeta[c.field]?.unit === 'size' || fieldMeta[c.field]?.unit === 'speed') && c.value) {
+      const storeVal = storeValueFromDisplay(c.field, c.value, condUnits.value[i] ?? 0)
+      return { ...c, value: storeVal }
     }
     return c
   }))
@@ -445,13 +570,22 @@ function parseConditions(json: string): ConditionItem[] {
   if (!json) return []
   try {
     const parsed = JSON.parse(json)
-    return parsed.map((c: ConditionItem) => {
+    const units: number[] = []
+    const items = parsed.map((c: ConditionItem) => {
       if (fieldMeta[c.field]?.unit === 'hours' && c.value) {
         const hours = Number(c.value) / 3600
         return { ...c, value: String(Math.round(hours * 100) / 100) }
       }
+      if ((fieldMeta[c.field]?.unit === 'size' || fieldMeta[c.field]?.unit === 'speed') && c.value) {
+        units.push(inferUnitIndex(c.field, c.value))
+        const display = displayValueForField(c.field, c.value, units[units.length - 1])
+        return { ...c, value: display }
+      }
+      units.push(0)
       return c
     })
+    condUnits.value = units
+    return items
   } catch {
     return []
   }
@@ -463,13 +597,13 @@ function truncate(s: string, n: number): string {
 }
 
 const columns = [
-  { title: t('seeding.alias'), dataIndex: 'alias', key: 'alias', width: 120 },
-  { title: t('seeding.condition'), key: 'conditions' },
-  { title: t('seeding.action'), dataIndex: 'action', key: 'action', width: 90 },
-  { title: t('seeding.deleteNum'), key: 'delete_num', width: 80 },
-  { title: t('seeding.priority'), dataIndex: 'priority', key: 'priority', width: 70 },
-  { title: t('common.enabledStatus'), key: 'enabled', width: 70 },
-  { title: t('common.actions'), key: 'actions', width: 180 },
+  { title: t('seeding.alias'), dataIndex: 'alias', key: 'alias', width: 200 },
+  { title: t('seeding.condition'), key: 'conditions', width: 300, ellipsis: true },
+  { title: t('seeding.action'), dataIndex: 'action', key: 'action', width: 100 },
+  { title: t('seeding.priority'), dataIndex: 'priority', key: 'priority', width: 90 },
+  { title: t('seeding.deleteNum'), key: 'delete_num', width: 120 },
+  { title: t('common.enabledStatus'), key: 'enabled', width: 60 },
+  { title: t('common.actions'), key: 'actions', width: 160, fixed: 'right' as const },
 ]
 
 async function fetchRules() {

@@ -101,16 +101,7 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 		case "ratio":
 			return fmt.Sprintf("%.4f", ti.Ratio), true
 		case "seedingTime", "seed_time":
-			if ti.SeedTime > 0 {
-				return fmt.Sprintf("%d", ti.SeedTime), true
-			}
-			if !ti.AddedAt.IsZero() {
-				elapsed := int64(rc.Now.Sub(ti.AddedAt).Seconds())
-				if elapsed > 0 {
-					return fmt.Sprintf("%d", elapsed), true
-				}
-			}
-			return "0", true
+			return fmt.Sprintf("%d", ti.SeedTime), true
 		case "category":
 			return ti.Category, true
 		case "tags":
