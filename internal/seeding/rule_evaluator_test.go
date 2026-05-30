@@ -429,7 +429,7 @@ func TestExprEngine_RatioAndTime(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1)
+	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,7 +462,7 @@ func TestExprEngine_FreeSpaceCheck(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, 10*1024*1024*1024)
+	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, 10*1024*1024*1024, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +492,7 @@ func TestExprEngine_SiteAndFreeAndHR(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1)
+	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -520,7 +520,7 @@ func TestExprEngine_NoMatch(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1)
+	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,7 +562,7 @@ func TestExprEngine_StateInList(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1)
+	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -590,7 +590,7 @@ func TestExprEngine_NightProtection(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1)
+	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

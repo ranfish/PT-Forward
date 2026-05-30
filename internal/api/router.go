@@ -151,7 +151,7 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 		}
 		publicRateLimitMW = middleware.RateLimit(publicRL, 60)
 	} else {
-		publicRateLimitMW = middleware.RateLimit(30, 60)
+		publicRateLimitMW = func(next http.Handler) http.Handler { return next }
 	}
 	rt.publicRateLimitMW = publicRateLimitMW
 

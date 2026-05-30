@@ -25,8 +25,11 @@ const (
 
 func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
 	hashSet := make(map[string]bool, len(torrentMap))
-	for hash := range torrentMap {
-		hashSet[strings.ToLower(hash)] = true
+	lowerMap := make(map[string]*model.TorrentInfo, len(torrentMap))
+	for hash, ti := range torrentMap {
+		lh := strings.ToLower(hash)
+		hashSet[lh] = true
+		lowerMap[lh] = ti
 	}
 
 	e.mu.Lock()
@@ -95,11 +98,23 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 
 	if len(existingRecords) > 0 {
 		var recoverHashes []string
+		deadStates := map[string]bool{
+			"stalledDL":    true,
+			"missingFiles": true,
+			"error":        true,
+			"unknown":      true,
+		}
 		for _, rec := range existingRecords {
 			lowerHash := strings.ToLower(rec.InfoHash)
-			if hashSet[lowerHash] {
-				recoverHashes = append(recoverHashes, rec.InfoHash)
+			if !hashSet[lowerHash] {
+				continue
 			}
+			if ti := lowerMap[lowerHash]; ti != nil {
+				if deadStates[ti.State] && ti.Progress == 0 {
+					continue
+				}
+			}
+			recoverHashes = append(recoverHashes, rec.InfoHash)
 		}
 		if len(recoverHashes) > 0 {
 			e.logger.Info("recovering orphan torrents: deleted records still present in downloader",
@@ -149,9 +164,10 @@ type Engine struct {
 }
 
 type maindataEntry struct {
-	Maindata  *model.Maindata
-	FreeSpace int64
-	UpdatedAt time.Time
+	Maindata      *model.Maindata
+	FreeSpace     int64
+	TotalDiskSpace int64
+	UpdatedAt     time.Time
 }
 
 type emaState struct {
@@ -336,9 +352,10 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 		}
 
 		entry := &maindataEntry{
-			Maindata:  md,
-			FreeSpace: md.FreeSpace,
-			UpdatedAt: time.Now(),
+			Maindata:       md,
+			FreeSpace:      md.FreeSpace,
+			TotalDiskSpace: md.TotalDiskSpace,
+			UpdatedAt:      time.Now(),
 		}
 
 		e.maindataMu.Lock()
@@ -837,8 +854,8 @@ func (e *Engine) CleanupStale(ctx context.Context) (int64, error) {
 
 type EvaluateResult struct {
 	Evaluated int
-	Paused    int
 	Deleted   int
+	Paused    int
 	Limited   int
 	Errors    int
 }
@@ -851,6 +868,7 @@ type evaluateContext struct {
 	torrentMap   map[string]*model.TorrentInfo
 	maindata     *model.Maindata
 	freeSpace    int64
+	totalSpace   int64
 	weights      CleanupWeights
 	minScore     float64
 	minAge       float64
@@ -894,14 +912,17 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 
 	var maindata *model.Maindata
 	freeSpace := int64(-1)
+	totalSpace := int64(0)
 	if cached := e.getCachedMaindata(clientID); cached != nil {
 		maindata = cached.Maindata
 		freeSpace = cached.FreeSpace
+		totalSpace = cached.TotalDiskSpace
 	} else {
 		md, mdErr := dlClient.GetMainData(ctx)
 		if mdErr == nil && md != nil {
 			maindata = md
 			freeSpace = md.FreeSpace
+			totalSpace = md.TotalDiskSpace
 		}
 		e.updateEMA(ctx, clientID, md, torrentMap)
 	}
@@ -931,6 +952,7 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 		torrentMap:   torrentMap,
 		maindata:     maindata,
 		freeSpace:    freeSpace,
+		totalSpace:   totalSpace,
 		weights:      weights,
 		minScore:     minScore,
 		minAge:       minAgeHours,
@@ -1065,6 +1087,31 @@ func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) 
 
 	for i := range paused {
 		rec := &paused[i]
+
+		if rec.IsFree && rec.FreeEndAt != nil && rec.FreeEndAt.Before(time.Now()) {
+			stillFree := e.recheckDiscountForRecover(ctx, rec)
+			if !stillFree {
+				e.logger.Info("disk_protect 恢复: 免费期已过且不再免费，删除记录",
+					zap.String("info_hash", rec.InfoHash),
+					zap.String("site", rec.SiteName),
+					zap.Time("free_end_at", *rec.FreeEndAt))
+				if err := e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
+					"status":         model.SeedingStatusDeleted,
+					"last_action_by": "free_expired_while_paused",
+				}).Error; err != nil {
+					e.logger.Warn("disk_protect 恢复: 删除过期记录失败",
+						zap.Uint("id", rec.ID), zap.Error(err))
+				}
+				e.mu.Lock()
+				delete(e.recordMap, recordKey(clientID, rec.InfoHash))
+				e.mu.Unlock()
+				continue
+			}
+			e.logger.Info("disk_protect 恢复: 免费期已过但实时检测仍免费，继续恢复",
+				zap.String("info_hash", rec.InfoHash),
+				zap.String("site", rec.SiteName))
+		}
+
 		rec.FlushedAt = nil
 		if err := e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
 			"status":         model.SeedingStatusPending,
@@ -1087,6 +1134,27 @@ func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) 
 			zap.String("info_hash", rec.InfoHash),
 			zap.String("client_id", clientID))
 	}
+}
+
+func (e *Engine) recheckDiscountForRecover(ctx context.Context, rec *model.SeedingTorrentRecord) bool {
+	if e.siteProvider == nil || rec.SiteName == "" {
+		return false
+	}
+	adapter, err := e.siteProvider.GetAdapter(ctx, rec.SiteName)
+	if err != nil {
+		return false
+	}
+	siteCfg, err := e.siteProvider.GetSiteConfig(ctx, rec.SiteName)
+	if err != nil || siteCfg == nil {
+		return false
+	}
+	recheckCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	result, err := adapter.DetectDiscount(recheckCtx, siteCfg, rec.TorrentID)
+	if err != nil {
+		return false
+	}
+	return result != nil && result.Level.IsFree()
 }
 
 func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, result *EvaluateResult) {
@@ -1328,7 +1396,7 @@ func (e *Engine) evaluateRulesPhase(ctx context.Context, ec *evaluateContext, dr
 	}
 
 	evaluator := NewRuleEvaluator(e.db, e.logger)
-	matches := evaluator.MatchRules(ctx, ec.deleteRules, seedingRecords, ec.torrentMap, ec.freeSpace)
+	matches := evaluator.MatchRules(ctx, ec.deleteRules, seedingRecords, ec.torrentMap, ec.freeSpace, ec.totalSpace)
 
 	for _, match := range matches {
 		rule := match.Rule
