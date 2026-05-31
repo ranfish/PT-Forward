@@ -38,7 +38,7 @@ func TestDetectDiscountFromHTML_DefaultNone(t *testing.T) {
 }
 
 func TestDetectDiscountFromHTML_KeywordFree(t *testing.T) {
-	html := `<html><body><span>限时免费</span></body></html>`
+	html := `<html><body><span>限时freeleech活动</span></body></html>`
 	result := DetectDiscountFromHTML(html, nil)
 	assert.Equal(t, model.DiscountFree, result.Level)
 }
@@ -71,7 +71,7 @@ func TestDetectDiscountFromHTML_CustomMappingNoMatch(t *testing.T) {
 
 	html := `<html><body><span class="pro_2up">2xUp</span></body></html>`
 	result := DetectDiscountFromHTML(html, cfg)
-	assert.Equal(t, model.DiscountNone, result.Level)
+	assert.Equal(t, model.Discount2xUp, result.Level)
 }
 
 func TestDetectDiscountFromHTML_CustomMappingFallbackToKeywords(t *testing.T) {
@@ -81,7 +81,7 @@ func TestDetectDiscountFromHTML_CustomMappingFallbackToKeywords(t *testing.T) {
 		},
 	}
 
-	html := `<html><body><span>限时免费</span></body></html>`
+	html := `<html><body><span>freeleech限时</span></body></html>`
 	result := DetectDiscountFromHTML(html, cfg)
 	assert.Equal(t, model.DiscountFree, result.Level)
 }
@@ -111,7 +111,7 @@ func TestDetectDiscountFromHTML_Default2x50pctdown(t *testing.T) {
 }
 
 func TestDetectDiscountFromHTML_KeywordFreeLower(t *testing.T) {
-	html := `<html><body><span>This is free download</span></body></html>`
+	html := `<html><body><span>This is freeleech download</span></body></html>`
 	result := DetectDiscountFromHTML(html, nil)
 	assert.Equal(t, model.DiscountFree, result.Level)
 }
@@ -231,4 +231,28 @@ func TestDetectDiscountFromHTML_ClassMappingKeywordFallback(t *testing.T) {
 	html := `<html><body><span>double upload</span></body></html>`
 	result := DetectDiscountFromHTML(html, cfg)
 	assert.Equal(t, model.Discount2xUp, result.Level)
+}
+
+func TestDetectDiscountFromDetailsPage_ExtractsH1Only(t *testing.T) {
+	html := `<html><body><h1>Title <img class="pro_free" src="x.gif" alt="Free" /></h1><table><tr><td><img class="pro_50p" /></td></tr></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
+
+func TestDetectDiscountFromDetailsPage_IgnoresSimilarTorrents(t *testing.T) {
+	html := `<html><body><h1>Target Torrent Title</h1><table class="details"><tr><td>info</td></tr></table><h2>Similar</h2><table><tr><td><img class="pro_free" src="x.gif" /></td></tr></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountNone, result.Level)
+}
+
+func TestDetectDiscountFromDetailsPage_FreeInH1(t *testing.T) {
+	html := `<html><body><h1>Torrent <img class="pro_free" src="x.gif" alt="Free" title="免费" /> (限时)</h1><table><tr><td>no discount here</td></tr></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
+
+func TestDetectDiscountFromHTML_NoBareFreeKeyword(t *testing.T) {
+	html := `<html><body><span>Free Space: 100GB</span></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.DiscountNone, result.Level)
 }

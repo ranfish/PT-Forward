@@ -1326,6 +1326,10 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 		}
 	}
 
+	if !dryRun {
+		e.refreshDiscountStatus(ctx, ec.records)
+	}
+
 	handledHashes := e.evaluateRulesPhase(ctx, ec, dryRun, result)
 
 	for i := range ec.records {
@@ -1979,6 +1983,92 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 			e.logger.Warn("update seeding client state failed",
 				zap.String("client_id", clientID),
 				zap.Error(err))
+		}
+	}
+}
+
+func (e *Engine) refreshDiscountStatus(ctx context.Context, records []model.SeedingTorrentRecord) {
+	if e.siteProvider == nil {
+		return
+	}
+
+	var targets []model.SeedingTorrentRecord
+	for i := range records {
+		r := &records[i]
+		if r.IsFree && r.FreeEndAt == nil && r.SiteName != "" && r.TorrentID != "" &&
+			(r.Status == model.SeedingStatusSeeding || r.Status == model.SeedingStatusPending) {
+			targets = append(targets, *r)
+		}
+	}
+	if len(targets) == 0 {
+		return
+	}
+
+	siteGroups := make(map[string][]*model.SeedingTorrentRecord)
+	for i := range targets {
+		t := &targets[i]
+		siteGroups[t.SiteName] = append(siteGroups[t.SiteName], t)
+	}
+
+	for siteName, recs := range siteGroups {
+		adapter, adpErr := e.siteProvider.GetAdapter(ctx, siteName)
+		if adpErr != nil {
+			continue
+		}
+		siteCfg, cfgErr := e.siteProvider.GetSiteConfig(ctx, siteName)
+		if cfgErr != nil || siteCfg == nil {
+			continue
+		}
+
+		for _, rec := range recs {
+			if ctx.Err() != nil {
+				return
+			}
+			recheckCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			discResult, discErr := adapter.DetectDiscount(recheckCtx, siteCfg, rec.TorrentID)
+			cancel()
+			if discErr != nil {
+				e.logger.Debug("refresh discount: check failed",
+					zap.String("site", siteName),
+					zap.String("torrent_id", rec.TorrentID),
+					zap.Error(discErr))
+				continue
+			}
+
+			nowFree := discResult != nil && discResult.Level.IsFree()
+			if nowFree {
+				continue
+			}
+
+			newDiscount := model.DiscountNone
+			if discResult != nil {
+				newDiscount = discResult.Level
+			}
+
+			e.logger.Info("refresh discount: 种子已不再免费",
+				zap.String("site", siteName),
+				zap.String("torrent_id", rec.TorrentID),
+				zap.String("info_hash", rec.InfoHash),
+				zap.String("new_discount", string(newDiscount)))
+
+			if dbErr := e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
+				"is_free":    false,
+				"discount":   newDiscount,
+				"updated_at": time.Now(),
+			}).Error; dbErr != nil {
+				e.logger.Warn("refresh discount: DB update failed",
+					zap.String("torrent_id", rec.TorrentID),
+					zap.Error(dbErr))
+				continue
+			}
+
+			e.mu.Lock()
+			key := recordKey(rec.ClientID, rec.InfoHash)
+			if r, ok := e.recordMap[key]; ok {
+				r.IsFree = false
+				r.Discount = newDiscount
+			}
+			e.mu.Unlock()
 		}
 	}
 }

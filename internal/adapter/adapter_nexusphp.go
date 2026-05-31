@@ -471,7 +471,7 @@ func (a *NexusPHPAdapter) detectDiscountPage(ctx context.Context, config *model.
 	}
 	html := strings.ToLower(string(body))
 
-	result := DetectDiscountFromHTML(html, &config.DiscountDetection)
+	result := DetectDiscountFromDetailsPage(html, &config.DiscountDetection)
 	if result.Level != model.DiscountNone {
 		return result, nil
 	}
@@ -547,7 +547,7 @@ func (a *NexusPHPAdapter) DetectHRAndDiscount(ctx context.Context, config *model
 		hrResult.SeedTimeH = config.HR.SeedTimeH()
 	}
 
-	discResult := DetectDiscountFromHTML(html, &config.DiscountDetection)
+	discResult := DetectDiscountFromDetailsPage(html, &config.DiscountDetection)
 
 	return hrResult, discResult, nil
 }
