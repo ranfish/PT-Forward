@@ -90,6 +90,25 @@ func (c *QBClient) GetSeedingTorrents(ctx context.Context) ([]*model.TorrentInfo
 	return result, nil
 }
 
+func (c *QBClient) GetAllTorrents(ctx context.Context) ([]*model.TorrentInfo, error) {
+	resp, err := c.get(ctx, "/api/v2/torrents/info")
+	if err != nil {
+		return nil, c.wrapErr(11002, "get all torrents", err)
+	}
+	defer func() { httpclient.DrainBody(resp) }()
+
+	var torrents []qbTorrent
+	if err := json.NewDecoder(resp.Body).Decode(&torrents); err != nil {
+		return nil, c.wrapErr(11002, "decode all torrents", err)
+	}
+
+	result := make([]*model.TorrentInfo, 0, len(torrents))
+	for i := range torrents {
+		result = append(result, torrents[i].toModel())
+	}
+	return result, nil
+}
+
 func (c *QBClient) GetTorrentsByPath(ctx context.Context, savePath string) ([]*model.TorrentInfo, error) {
 	resp, err := c.get(ctx, "/api/v2/torrents/info")
 	if err != nil {

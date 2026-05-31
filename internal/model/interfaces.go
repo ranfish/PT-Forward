@@ -76,6 +76,7 @@ type DownloaderClient interface {
 
 	GetTorrentByHash(ctx context.Context, hash string) (*TorrentInfo, error)
 	GetSeedingTorrents(ctx context.Context) ([]*TorrentInfo, error)
+	GetAllTorrents(ctx context.Context) ([]*TorrentInfo, error)
 	GetTorrentsByPath(ctx context.Context, savePath string) ([]*TorrentInfo, error)
 	GetMainData(ctx context.Context) (*Maindata, error)
 	GetMainDataIncremental(ctx context.Context, rid int) (*Maindata, int, error)

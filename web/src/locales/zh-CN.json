@@ -544,7 +544,8 @@
     "ruleAlias": "规则别名",
     "expression": "表达式",
     "action": "动作",
-    "priority": "优先级",
+    "priority": "优先级（数值越大越先执行）",
+    "priorityShort": "优先级",
     "deleteRuleConfirm": "确定删除该规则？",
     "configs": "刷流配置",
     "addConfig": "新建刷流配置",
@@ -1190,7 +1191,8 @@
     "cleanupReseedMatchDays": "辅种匹配保留天数",
     "cleanupPtgenCacheDays": "PTGen 缓存保留天数",
     "cleanupSeedingArchiveDays": "做种归档保留天数",
-    "cleanupAuditLogDays": "审计日志保留天数"
+     "cleanupAuditLogDays": "审计日志保留天数",
+     "cleanupTorrentTrafficDays": "流量快照保留天数"
   },
   "cookiecloud": {
     "subtitle": "浏览器 Cookie 自动同步",

@@ -13,6 +13,7 @@ type qbTorrent struct {
 	TotalSize     int64   `json:"total_size"`
 	Progress      float64 `json:"progress"`
 	Uploaded      int64   `json:"uploaded"`
+	Downloaded    int64   `json:"downloaded"`
 	UploadSpeed   int64   `json:"upspeed"`
 	DownloadSpeed int64   `json:"dlspeed"`
 	Ratio         float64 `json:"ratio"`
@@ -62,6 +63,7 @@ func (t qbTorrent) toModel() *model.TorrentInfo {
 		Category:      t.Category,
 		Progress:      t.Progress,
 		Uploaded:      t.Uploaded,
+		Downloaded:    t.Downloaded,
 		UploadSpeed:   t.UploadSpeed,
 		DownloadSpeed: t.DownloadSpeed,
 		SeedTime:      t.SeedingTime,

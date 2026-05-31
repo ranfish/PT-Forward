@@ -75,6 +75,7 @@ type TorrentInfo struct {
 	Category      string    `json:"category"`
 	Progress      float64   `json:"progress"`
 	Uploaded      int64     `json:"uploaded"`
+	Downloaded    int64     `json:"downloaded"`
 	UploadSpeed   int64     `json:"upload_speed"`
 	DownloadSpeed int64     `json:"download_speed"`
 	SeedTime      int64     `json:"seed_time"`

@@ -115,6 +115,10 @@
                 <a-select-option v-for="(u, ui) in speedUnits" :key="ui" :value="ui">{{ u.value }}</a-select-option>
               </a-select>
             </template>
+            <template v-else-if="fieldUnit(cond.field) === 'progress'">
+              <a-input-number v-model:value="cond.value" style="flex: 1; min-width: 100px" :placeholder="'1~100'" :min="0" :max="100" />
+              <span style="line-height: 32px; margin-left: 4px; color: #999">%</span>
+            </template>
             <template v-else>
               <a-input v-model:value="cond.value" style="flex: 1" :placeholder="fieldHint(cond.field)" />
             </template>
@@ -312,7 +316,7 @@ const fieldMeta: Record<string, { type: string; hint: string; unit?: string }> =
   seed_time: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
   size: { type: 'number', hint: '', unit: 'size' },
   totalSize: { type: 'number', hint: '', unit: 'size' },
-  progress: { type: 'number', hint: '0~1' },
+  progress: { type: 'number', hint: '1~100', unit: 'progress' },
   state: { type: 'text', hint: '' },
   uploaded: { type: 'number', hint: '', unit: 'size' },
   uploadSpeed: { type: 'number', hint: '', unit: 'speed' },
@@ -350,6 +354,7 @@ function fieldHint(field: string): string {
   if (u === 'size') return ''
   if (u === 'speed') return ''
   if (u === 'percent') return '%'
+  if (u === 'progress') return '%'
   if (u === 'hours') return t('seeding.unitHours')
   return fieldMeta[field]?.hint || t('seeding.conditionValue')
 }
@@ -383,6 +388,9 @@ function displayValueForField(field: string, storeVal: string, unitIdx: number):
     const idx = unitIdx >= 0 && unitIdx < units.length ? unitIdx : 0
     return String(n / units[idx].factor)
   }
+  if (u === 'progress') {
+    return String(Math.round(n * 10000) / 100)
+  }
   return storeVal
 }
 
@@ -400,6 +408,10 @@ function storeValueFromDisplay(field: string, displayVal: string, unitIdx: numbe
     const units = speedUnits
     const idx = unitIdx >= 0 && unitIdx < units.length ? unitIdx : 0
     return String(Math.round(n * units[idx].factor))
+  }
+  if (u === 'progress') {
+    const clamped = Math.min(100, Math.max(0, n))
+    return String(Math.round(clamped) / 100)
   }
   return displayVal
 }
@@ -485,6 +497,10 @@ function formatCondValue(field: string, storeVal: string): string {
     const val = Number(storeVal) / speedUnits[idx].factor
     return (Math.round(val * 100) / 100) + ' ' + speedUnits[idx].value
   }
+  if (u === 'progress') {
+    const pct = Math.round(Number(storeVal) * 100)
+    return pct + '%'
+  }
   return storeVal
 }
 
@@ -562,6 +578,10 @@ function conditionsToJSON(): string {
       const storeVal = storeValueFromDisplay(c.field, c.value, condUnits.value[i] ?? 0)
       return { ...c, value: storeVal }
     }
+    if (fieldMeta[c.field]?.unit === 'progress' && c.value) {
+      const storeVal = storeValueFromDisplay(c.field, c.value, 0)
+      return { ...c, value: storeVal }
+    }
     return c
   }))
 }
@@ -579,6 +599,11 @@ function parseConditions(json: string): ConditionItem[] {
       if ((fieldMeta[c.field]?.unit === 'size' || fieldMeta[c.field]?.unit === 'speed') && c.value) {
         units.push(inferUnitIndex(c.field, c.value))
         const display = displayValueForField(c.field, c.value, units[units.length - 1])
+        return { ...c, value: display }
+      }
+      if (fieldMeta[c.field]?.unit === 'progress' && c.value) {
+        units.push(0)
+        const display = displayValueForField(c.field, c.value, 0)
         return { ...c, value: display }
       }
       units.push(0)
@@ -600,7 +625,7 @@ const columns = [
   { title: t('seeding.alias'), dataIndex: 'alias', key: 'alias', width: 200 },
   { title: t('seeding.condition'), key: 'conditions', width: 300, ellipsis: true },
   { title: t('seeding.action'), dataIndex: 'action', key: 'action', width: 100 },
-  { title: t('seeding.priority'), dataIndex: 'priority', key: 'priority', width: 90 },
+  { title: t('seeding.priorityShort'), dataIndex: 'priority', key: 'priority', width: 90 },
   { title: t('seeding.deleteNum'), key: 'delete_num', width: 120 },
   { title: t('common.enabledStatus'), key: 'enabled', width: 60 },
   { title: t('common.actions'), key: 'actions', width: 160, fixed: 'right' as const },

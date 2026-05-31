@@ -166,6 +166,7 @@ func sampleTRTorrent() trTorrent {
 		TotalSize:      2147483648,
 		PercentDone:    1.0,
 		UploadedEver:   1073741824,
+		DownloadedEver: 536870912,
 		RateUpload:     0,
 		RateDownload:   0,
 		UploadRatio:    2.5,

@@ -26,7 +26,9 @@ type SeedingTorrentRecord struct {
 	SubscriptionID string     `json:"subscription_id" gorm:"size:50;index"`
 	FlushedAt      *time.Time `json:"flushed_at" gorm:"index"`
 
-	FirstMatchedAt *time.Time `json:"first_matched_at" gorm:"index"`
+	FirstMatchedAt    *time.Time `json:"first_matched_at" gorm:"index"`
+	FinalUploaded     int64      `json:"final_uploaded" gorm:"default:0"`
+	FinalDownloaded   int64      `json:"final_downloaded" gorm:"default:0"`
 }
 
 func (SeedingTorrentRecord) TableName() string { return "seeding_torrent_records" }

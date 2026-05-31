@@ -290,6 +290,9 @@ func (s *stubClient) GetTorrentByHash(_ context.Context, _ string) (*model.Torre
 func (s *stubClient) GetSeedingTorrents(_ context.Context) ([]*model.TorrentInfo, error) {
 	return nil, nil
 }
+func (s *stubClient) GetAllTorrents(_ context.Context) ([]*model.TorrentInfo, error) {
+	return nil, nil
+}
 func (s *stubClient) GetTorrentsByPath(_ context.Context, _ string) ([]*model.TorrentInfo, error) {
 	return nil, nil
 }

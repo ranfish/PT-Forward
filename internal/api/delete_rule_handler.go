@@ -318,7 +318,7 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 			if err != nil {
 				continue
 			}
-			ts, err := dl.GetSeedingTorrents(ctx)
+			ts, err := dl.GetAllTorrents(ctx)
 			if err != nil {
 				continue
 			}

@@ -15,6 +15,7 @@ type DownloaderClient struct {
 
 	GetTorrentByHashFn       func(ctx context.Context, hash string) (*model.TorrentInfo, error)
 	GetSeedingTorrentsFn     func(ctx context.Context) ([]*model.TorrentInfo, error)
+	GetAllTorrentsFn         func(ctx context.Context) ([]*model.TorrentInfo, error)
 	GetTorrentsByPathFn      func(ctx context.Context, savePath string) ([]*model.TorrentInfo, error)
 	GetMainDataFn            func(ctx context.Context) (*model.Maindata, error)
 	GetMainDataIncrementalFn func(ctx context.Context, rid int) (*model.Maindata, int, error)
@@ -54,6 +55,13 @@ func (m *DownloaderClient) GetTorrentByHash(ctx context.Context, hash string) (*
 func (m *DownloaderClient) GetSeedingTorrents(ctx context.Context) ([]*model.TorrentInfo, error) {
 	if m.GetSeedingTorrentsFn != nil {
 		return m.GetSeedingTorrentsFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *DownloaderClient) GetAllTorrents(ctx context.Context) ([]*model.TorrentInfo, error) {
+	if m.GetAllTorrentsFn != nil {
+		return m.GetAllTorrentsFn(ctx)
 	}
 	return nil, nil
 }
