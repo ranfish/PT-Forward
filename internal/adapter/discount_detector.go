@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -32,25 +33,39 @@ var defaultKeywordRules = []struct {
 	{"50% free", model.DiscountPercent50},
 	{"half download", model.DiscountPercent50},
 	{"freeleech", model.DiscountFree},
-	{"免费", model.DiscountFree},
-	{"free", model.DiscountFree},
 }
+
+var h1Re = regexp.MustCompile(`(?is)<h1[^>]*>(.*?)</h1>`)
 
 func DetectDiscountFromHTML(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {
 	if cfg != nil && cfg.DiscountClassMapping != nil {
-		return detectFromClassMapping(html, cfg.DiscountClassMapping)
+		return detectFromClassMapping(html, cfg)
 	}
 	return detectFromDefaultRules(html)
 }
 
-func detectFromClassMapping(html string, mapping map[string]string) *model.DiscountResult {
+func DetectDiscountFromDetailsPage(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {
+	targetHTML := html
+	if m := h1Re.FindStringSubmatch(html); len(m) > 1 {
+		targetHTML = m[1]
+	}
+	return DetectDiscountFromHTML(targetHTML, cfg)
+}
+
+func detectFromClassMapping(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {
 	lower := strings.ToLower(html)
-	for cssClass, levelStr := range mapping {
+	for cssClass, levelStr := range cfg.DiscountClassMapping {
 		if strings.Contains(lower, strings.ToLower(cssClass)) {
 			level := model.DiscountLevel(strings.ToUpper(levelStr))
 			if level.IsValid() {
 				return &model.DiscountResult{Level: level}
 			}
+		}
+	}
+
+	for _, rule := range defaultNexusPHPRules {
+		if strings.Contains(lower, rule.CSSClass) {
+			return &model.DiscountResult{Level: rule.Level}
 		}
 	}
 
