@@ -602,6 +602,8 @@ export interface SeedingStatsOverview {
   realDownloading: number
   totalUploadBytes: number
   totalDownloadBytes: number
+  todayUploadBytes: number
+  todayDownloadBytes: number
   globalRatio: number
   todayDeleted: number
   todayAdded: number

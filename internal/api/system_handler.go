@@ -2,11 +2,14 @@ package api
 
 import (
 	"bufio"
+	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -52,6 +55,8 @@ func (h *SystemHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
+	case strings.HasSuffix(trimmed, "/system/audit-logs"):
+		h.handleListAuditLogs(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -156,25 +161,44 @@ func (h *SystemHandler) handleListLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	matches, _ := filepath.Glob(filepath.Join(logDir, "*.log"))
+	matches, _ := filepath.Glob(filepath.Join(logDir, "pt-forward-*.log"))
+	matches2, _ := filepath.Glob(filepath.Join(logDir, "pt-forward-*.log.gz"))
+	matches = append(matches, matches2...)
 	if len(matches) == 0 {
 		Success(w, map[string]interface{}{"items": entries, "total": 0})
 		return
 	}
+	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
 
 	count := int64(0)
-	for i := len(matches) - 1; i >= 0 && count < limit; i++ {
-		f, err := os.Open(matches[i])
-		if err != nil {
-			continue
+	for i := 0; i < len(matches) && count < limit; i++ {
+		path := matches[i]
+		var scanner *bufio.Scanner
+		if strings.HasSuffix(path, ".gz") {
+			gf, err := os.Open(path)
+			if err != nil {
+				continue
+			}
+			gz, err := gzip.NewReader(gf)
+			if err != nil {
+				gf.Close()
+				continue
+			}
+			defer gz.Close()
+			scanner = bufio.NewScanner(gz)
+		} else {
+			f, err := os.Open(path)
+			if err != nil {
+				continue
+			}
+			defer f.Close()
+			scanner = bufio.NewScanner(f)
 		}
-		scanner := bufio.NewScanner(f)
 		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		var allLines []string
 		for scanner.Scan() {
 			allLines = append(allLines, scanner.Text())
 		}
-		f.Close()
 
 		for j := len(allLines) - 1; j >= 0 && count < limit; j-- {
 			line := strings.TrimSpace(allLines[j])
@@ -200,14 +224,16 @@ func (h *SystemHandler) handleListLogs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *SystemHandler) handleClearLogs(w http.ResponseWriter, _ *http.Request) {
+func (h *SystemHandler) handleClearLogs(w http.ResponseWriter, r *http.Request) {
 	logDir := "logs"
 	if _, err := os.Stat(logDir); os.IsNotExist(err) {
 		Success(w, map[string]interface{}{"deleted": 0})
 		return
 	}
 
-	matches, _ := filepath.Glob(filepath.Join(logDir, "*.log"))
+	matches, _ := filepath.Glob(filepath.Join(logDir, "pt-forward-*.log"))
+	matches2, _ := filepath.Glob(filepath.Join(logDir, "pt-forward-*.log.gz"))
+	matches = append(matches, matches2...)
 	deleted := 0
 	for _, f := range matches {
 		if err := os.Truncate(f, 0); err != nil {
@@ -216,7 +242,50 @@ func (h *SystemHandler) handleClearLogs(w http.ResponseWriter, _ *http.Request) 
 			deleted++
 		}
 	}
+	auditLog(r, "system", "clear", "log", "", fmt.Sprintf("cleared=%d", deleted), "success")
 	Success(w, map[string]interface{}{"deleted": deleted})
+}
+
+func (h *SystemHandler) handleListAuditLogs(w http.ResponseWriter, r *http.Request) {
+	page, size := parsePagination(r)
+
+	query := h.db.WithContext(r.Context()).Model(&model.OperationAuditLog{})
+
+	if module := r.URL.Query().Get("module"); module != "" {
+		query = query.Where("module = ?", module)
+	}
+	if action := r.URL.Query().Get("action"); action != "" {
+		query = query.Where("action = ?", action)
+	}
+	if actor := r.URL.Query().Get("actor"); actor != "" {
+		query = query.Where("actor = ?", actor)
+	}
+	if startDate := r.URL.Query().Get("start_date"); startDate != "" {
+		if t, err := time.Parse("2006-01-02", startDate); err == nil {
+			query = query.Where("created_at >= ?", t)
+		}
+	}
+	if endDate := r.URL.Query().Get("end_date"); endDate != "" {
+		if t, err := time.Parse("2006-01-02", endDate); err == nil {
+			query = query.Where("created_at < ?", t.AddDate(0, 0, 1))
+		}
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var logs []model.OperationAuditLog
+	if err := query.Order("created_at DESC").Offset((page - 1) * size).Limit(size).Find(&logs).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询审计日志失败")
+		return
+	}
+
+	Success(w, map[string]interface{}{
+		"items": logs,
+		"total": total,
+		"page":  page,
+		"size":  size,
+	})
 }
 
 var startTime = time.Now()

@@ -145,6 +145,7 @@ func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key 
 	}
 
 	h.logger.Info("setting updated", zap.String("key", key))
+	auditLog(r, "settings", "update", "setting", key, "", "success")
 	if h.configBus != nil {
 		h.configBus.Publish(rss.ConfigChangedEvent{
 			ChangedKeys: []string{key},
@@ -169,6 +170,7 @@ func (h *SettingsHandler) handleDelete(w http.ResponseWriter, r *http.Request, k
 	}
 
 	h.logger.Info("setting deleted", zap.String("key", key))
+	auditLog(r, "settings", "delete", "setting", key, "", "success")
 	if h.configBus != nil {
 		h.configBus.Publish(rss.ConfigChangedEvent{
 			ChangedKeys: []string{key},

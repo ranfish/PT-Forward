@@ -114,6 +114,7 @@
     "publish": "发布管理",
     "fingerprints": "指纹管理",
     "logs": "系统日志",
+    "audit": "审计日志",
     "settings": "系统设置",
     "notifications": "通知设置",
     "authSettings": "认证设置",
@@ -209,6 +210,12 @@
     "syncingAllStats": "正在同步所有站点…",
     "syncAllStatsSuccess": "同步完成：成功 {synced} 个，失败 {failed} 个",
     "syncAllStatsFailed": "同步失败：{error}",
+    "syncStats": "同步",
+    "syncSingleSuccess": "站点同步成功",
+    "syncSingleFailed": "同步失败：{error}",
+    "batchSync": "同步选中",
+    "batchSyncSuccess": "批量同步完成：成功 {synced} 个，失败 {failed} 个",
+    "batchSyncFailed": "批量同步失败：{error}",
     "batchUpdateSuccess": "已更新 {count} 个站点",
     "batchUpdateFailed": "批量更新失败：{error}",
     "batchEnable": "启用",
@@ -553,6 +560,8 @@
     "deleteConfigConfirm": "确定删除该配置？",
     "totalUpload": "总上传量",
     "totalDownload": "总下载量",
+    "todayUpload": "当日上传量",
+    "todayDownload": "当日下载量",
     "todayAdded": "今日新增",
     "globalRatio": "全局分享率",
     "siteStats": "站点统计",
@@ -600,7 +609,7 @@
     "fieldClientID": "客户端ID",
     "fieldSeedTime": "做种时长",
     "fieldSize": "种子大小(字节)",
-    "fieldProgress": "进度",
+    "fieldProgress": "下载进度(progress)",
     "fieldUploaded": "已上传(字节)",
     "fieldUploadSpeed": "上传速度(B/s)",
     "fieldDownloadSpeed": "下载速度(B/s)",
@@ -1215,5 +1224,18 @@
   },
   "fingerprints": {
     "piecesHash": "PiecesHash"
+  },
+  "audit": {
+    "title": "审计日志",
+    "actor": "操作人",
+    "module": "模块",
+    "action": "操作",
+    "targetType": "目标类型",
+    "targetId": "目标ID",
+    "detail": "详情",
+    "filterModule": "按模块筛选",
+    "filterAction": "按操作筛选",
+    "startDate": "开始日期",
+    "endDate": "结束日期"
   }
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -461,11 +462,19 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 	for _, url := range sub.URLs {
 		feed, err := e.fetcher.Fetch(ctx, url)
 		if err != nil {
-			e.logger.Warn("rss fetch failed",
-				zap.String("subscription", sub.Name),
-				zap.String("url", url),
-				zap.Error(err))
-			e.saveFetchLog(ctx, sub.ID, 0, 0, 0, "error", err.Error())
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "非 XML 内容") || strings.Contains(errMsg, "请求间隔") {
+				e.logger.Debug("rss fetch rate-limited, skipping",
+					zap.String("subscription", sub.Name),
+					zap.String("url", url),
+					zap.Error(err))
+			} else {
+				e.logger.Warn("rss fetch failed",
+					zap.String("subscription", sub.Name),
+					zap.String("url", url),
+					zap.Error(err))
+			}
+			e.saveFetchLog(ctx, sub.ID, 0, 0, 0, "error", errMsg)
 			continue
 		}
 

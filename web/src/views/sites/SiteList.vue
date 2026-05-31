@@ -24,6 +24,7 @@
         <template v-if="selectedRowKeys.length > 0">
           <a-divider type="vertical" />
           <a-tag color="blue" closable @close="selectedRowKeys = []">{{ t('site.selectedCount', { count: selectedRowKeys.length }) }}</a-tag>
+          <a-button size="small" :loading="batchSyncing" @click="batchSyncSelected">{{ t('site.batchSync') }}</a-button>
           <a-button size="small" @click="batchUpdate('enabled', true)">{{ t('site.batchEnable') }}</a-button>
           <a-button size="small" @click="batchUpdate('enabled', false)">{{ t('site.batchDisable') }}</a-button>
           <a-button size="small" @click="batchUpdate('is_source', true)">{{ t('site.batchSetSource') }}</a-button>
@@ -102,6 +103,7 @@
           <a-space>
             <a-button type="link" size="small" @click="$router.push(`/sites/${record.id}`)">{{ t('common.detail') }}</a-button>
             <a-button type="link" size="small" @click="openModal(record)">{{ t('common.edit') }}</a-button>
+            <a-button type="link" size="small" :loading="syncingSingleId === record.id" @click="syncSingleStats(record.id)">{{ t('site.syncStats') }}</a-button>
             <a-button type="link" size="small" @click="testConnection(record.id)">{{ t('common.test') }}</a-button>
             <a-popconfirm :title="t('common.deleteConfirm')" @confirm="deleteSite(record.id)">
               <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
@@ -273,6 +275,8 @@ const searchText = ref('')
 const modalVisible = ref(false)
 const submitting = ref(false)
 const syncing = ref(false)
+const batchSyncing = ref(false)
+const syncingSingleId = ref<number | null>(null)
 const editingSite = ref<SiteListItem | null>(null)
 const isCreateMode = ref(false)
 const selectedRowKeys = ref<number[]>([])
@@ -519,6 +523,42 @@ async function syncAllStats() {
     message.error(t('site.syncAllStatsFailed', { error: e instanceof Error ? e.message : String(e) }))
   } finally {
     syncing.value = false
+  }
+}
+
+async function batchSyncSelected() {
+  if (selectedRowKeys.value.length === 0) return
+  batchSyncing.value = true
+  try {
+    const resp = await sitesApi.batchSyncStats(selectedRowKeys.value)
+    const data = resp.data?.data
+    const synced = data?.synced ?? 0
+    const failed = data?.failed ?? 0
+    const failedSites = data?.failedSites ?? []
+    if (failed > 0) {
+      message.warning(`${t('site.batchSyncSuccess', { synced, failed })} ${failedSites.join(', ')}`)
+    } else {
+      message.success(t('site.batchSyncSuccess', { synced, failed }))
+    }
+    selectedRowKeys.value = []
+    await fetchAll()
+  } catch (e: unknown) {
+    message.error(t('site.batchSyncFailed', { error: e instanceof Error ? e.message : String(e) }))
+  } finally {
+    batchSyncing.value = false
+  }
+}
+
+async function syncSingleStats(id: number) {
+  syncingSingleId.value = id
+  try {
+    await sitesApi.syncSiteStats(id)
+    message.success(t('site.syncSingleSuccess'))
+    await fetchAll()
+  } catch (e: unknown) {
+    message.error(t('site.syncSingleFailed', { error: e instanceof Error ? e.message : String(e) }))
+  } finally {
+    syncingSingleId.value = null
   }
 }
 

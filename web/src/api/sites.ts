@@ -50,6 +50,9 @@ export const sitesApi = {
   batchUpdate(ids: number[], fields: UpdatePartial<Site>) {
     return client.post<ApiResponse<{ updated: number }>>('/sites/batch-update', { ids, fields })
   },
+  batchSyncStats(ids: number[]) {
+    return client.post<ApiResponse<{ synced: number; failed: number; failedSites: string[] }>>('/sites/batch-sync', { ids }, { timeout: 300000 })
+  },
   searchTorrents(id: number, data: { query: string; category?: string; freeOnly?: boolean; sortBy?: string; maxResults?: number }) {
     return client.post<ApiResponse<SearchTorrentResult[]>>(`/sites/${id}/search`, data)
   },

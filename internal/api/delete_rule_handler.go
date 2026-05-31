@@ -185,6 +185,7 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		Error(w, http.StatusInternalServerError, 50000, "创建规则失败")
 		return
 	}
+	auditLog(r, "delete_rule", "create", "rule", fmt.Sprintf("%d", rule.ID), rule.Alias, "success")
 	Success(w, rule)
 }
 
@@ -278,14 +279,16 @@ func (h *DeleteRuleHandler) handleUpdate(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	h.db.First(&rule, id)
+	auditLog(r, "delete_rule", "update", "rule", fmt.Sprintf("%d", id), rule.Alias, "success")
 	Success(w, rule)
 }
 
-func (h *DeleteRuleHandler) handleDelete(w http.ResponseWriter, _ *http.Request, id uint) {
+func (h *DeleteRuleHandler) handleDelete(w http.ResponseWriter, r *http.Request, id uint) {
 	if err := h.db.Delete(&model.DeleteRule{}, id).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除规则失败")
 		return
 	}
+	auditLog(r, "delete_rule", "delete", "rule", fmt.Sprintf("%d", id), "", "success")
 	Success(w, nil)
 }
 

@@ -46,6 +46,7 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	auditLog(r, "auth", "login", "user", req.Username, "", "success")
 	Success(w, pair)
 }
 

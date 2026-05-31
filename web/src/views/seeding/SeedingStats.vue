@@ -1,28 +1,42 @@
 <template>
   <div>
     <a-row :gutter="16" style="margin-bottom: 24px">
-      <a-col :span="6">
+      <a-col :span="4">
         <a-card>
           <a-statistic :title="t('seeding.totalUpload')" :value="formatSize(overview.totalUploadBytes || 0)" :value-style="{ color: '#52c41a' }">
             <template #prefix><CloudUploadOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
-      <a-col :span="6">
+      <a-col :span="4">
+        <a-card>
+          <a-statistic :title="t('seeding.todayUpload')" :value="formatSize(overview.todayUploadBytes || 0)" :value-style="{ color: '#73d13d' }">
+            <template #prefix><CloudUploadOutlined /></template>
+          </a-statistic>
+        </a-card>
+      </a-col>
+      <a-col :span="4">
         <a-card>
           <a-statistic :title="t('seeding.totalDownload')" :value="formatSize(overview.totalDownloadBytes || 0)" :value-style="{ color: '#1890ff' }">
             <template #prefix><CloudDownloadOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
-      <a-col :span="6">
+      <a-col :span="4">
+        <a-card>
+          <a-statistic :title="t('seeding.todayDownload')" :value="formatSize(overview.todayDownloadBytes || 0)" :value-style="{ color: '#40a9ff' }">
+            <template #prefix><CloudDownloadOutlined /></template>
+          </a-statistic>
+        </a-card>
+      </a-col>
+      <a-col :span="4">
         <a-card>
           <a-statistic :title="t('seeding.todayAdded')" :value="overview.todayAdded || 0" :value-style="{ color: '#faad14' }">
             <template #prefix><ClockCircleOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
-      <a-col :span="6">
+      <a-col :span="4">
         <a-card>
           <a-statistic :title="t('seeding.globalRatio')" :value="overview.globalRatio === -1 ? '∞' : (overview.globalRatio || 0)" :precision="overview.globalRatio === -1 ? undefined : 2" :value-style="{ color: '#722ed1' }">
             <template #prefix><PieChartOutlined /></template>
@@ -124,6 +138,8 @@ const overview = ref<SeedingStatsOverview>({
   realDownloading: 0,
   totalUploadBytes: 0,
   totalDownloadBytes: 0,
+  todayUploadBytes: 0,
+  todayDownloadBytes: 0,
   globalRatio: 0,
   todayDeleted: 0,
   todayAdded: 0,

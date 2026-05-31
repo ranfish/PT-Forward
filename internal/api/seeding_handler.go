@@ -320,6 +320,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		Error(w, http.StatusInternalServerError, 50000, "创建刷流配置失败")
 		return
 	}
+	auditLog(r, "seeding", "create", "config", fmt.Sprintf("%d", config.ID), config.ClientID, "success")
 	Success(w, config)
 }
 
@@ -434,14 +435,16 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
 		return
 	}
+	auditLog(r, "seeding", "update", "config", fmt.Sprintf("%d", id), config.ClientID, "success")
 	Success(w, config)
 }
 
-func (h *SeedingHandler) handleDeleteConfig(w http.ResponseWriter, _ *http.Request, id uint) {
+func (h *SeedingHandler) handleDeleteConfig(w http.ResponseWriter, r *http.Request, id uint) {
 	if err := h.db.Delete(&model.SeedingClientConfig{}, id).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除刷流配置失败")
 		return
 	}
+	auditLog(r, "seeding", "delete", "config", fmt.Sprintf("%d", id), "", "success")
 	Success(w, nil)
 }
 
@@ -938,6 +941,7 @@ func (h *SeedingHandler) handleTriggerClient(w http.ResponseWriter, r *http.Requ
 		zap.Int("limited", result.Limited),
 		zap.Int("errors", result.Errors),
 	)
+	auditLog(r, "seeding", "trigger", "client", clientID, fmt.Sprintf("evaluated=%d,paused=%d,deleted=%d", result.Evaluated, result.Paused, result.Deleted), "success")
 	Success(w, map[string]interface{}{
 		"clientId":       clientID,
 		"evaluated":      true,
@@ -1104,6 +1108,21 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Requ
 		totalDownload = trafficResult[0].TotalDownload
 	}
 
+	todayUpload := int64(0)
+	todayDownload := int64(0)
+	type todayTrafficRow struct {
+		TodayUpload   int64
+		TodayDownload int64
+	}
+	var todayResult []todayTrafficRow
+	if err := h.db.Model(&model.SiteTrafficDaily{}).
+		Select("COALESCE(SUM(upload_delta), 0) as today_upload, COALESCE(SUM(download_delta), 0) as today_download").
+		Where("date = ?", time.Now().Format("2006-01-02")).
+		Scan(&todayResult).Error; err == nil && len(todayResult) > 0 {
+		todayUpload = todayResult[0].TodayUpload
+		todayDownload = todayResult[0].TodayDownload
+	}
+
 	var globalRatio float64
 	if totalDownload > 0 {
 		globalRatio = float64(totalUpload) / float64(totalDownload)
@@ -1119,6 +1138,8 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Requ
 		"realDownloading":      realDownloading,
 		"totalUploadBytes":     totalUpload,
 		"totalDownloadBytes":   totalDownload,
+		"todayUploadBytes":     todayUpload,
+		"todayDownloadBytes":   todayDownload,
 		"globalRatio":          globalRatio,
 		"todayDeleted":         todayDeleted,
 		"todayAdded":           todayAdded,

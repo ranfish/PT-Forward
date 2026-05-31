@@ -381,6 +381,15 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if remaining == "batch-sync" {
+		if r.Method == http.MethodPost {
+			h.handleBatchSyncSiteStats(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
 	if len(parts) == 1 {
 		switch r.Method {
 		case http.MethodGet:
@@ -610,6 +619,7 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	applySiteMaxConcurrent(s.Domain, s.MaxConcurrent)
 
 	h.logger.Info("site created", zap.String("name", s.Name), zap.String("domain", s.Domain))
+	auditLog(r, "site", "create", "site", fmt.Sprintf("%d", s.ID), s.Name, "success")
 	Success(w, h.toResponse(&s))
 }
 
@@ -796,6 +806,7 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	applySiteMaxConcurrent(s.Domain, s.MaxConcurrent)
 
 	h.logger.Info("site updated", zap.String("name", s.Name))
+	auditLog(r, "site", "update", "site", fmt.Sprintf("%d", id), s.Name, "success")
 	Success(w, h.toResponse(s))
 }
 
@@ -818,6 +829,7 @@ func (h *SiteHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("site deleted", zap.String("name", s.Name))
+	auditLog(r, "site", "delete", "site", fmt.Sprintf("%d", id), s.Name, "success")
 	Success(w, nil)
 }
 
@@ -935,6 +947,7 @@ func (h *SiteHandler) handleUpdateCredentials(w http.ResponseWriter, r *http.Req
 		return
 	}
 	h.logger.Info("site credentials updated", zap.String("domain", updated.Domain))
+	auditLog(r, "site", "update_credentials", "site", idStr, updated.Domain, "success")
 	Success(w, h.toResponse(updated))
 }
 
@@ -1011,6 +1024,7 @@ func (h *SiteHandler) handleBatchUpdate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	auditLog(r, "site", "batch_update", "site", "", fmt.Sprintf("ids=%v, affected=%d", req.IDs, result.RowsAffected), "success")
 	Success(w, map[string]interface{}{
 		"updated": result.RowsAffected,
 	})
@@ -1025,6 +1039,42 @@ func (h *SiteHandler) handleSyncAllStats(w http.ResponseWriter, r *http.Request)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	synced, failedSites := h.statsSync.SyncAllSites(ctx)
+	Success(w, map[string]interface{}{
+		"synced":      synced,
+		"failed":      len(failedSites),
+		"failedSites": failedSites,
+	})
+}
+
+func (h *SiteHandler) handleBatchSyncSiteStats(w http.ResponseWriter, r *http.Request) {
+	if h.statsSync == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "Stats 同步服务未初始化")
+		return
+	}
+	var req struct {
+		IDs []uint `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if len(req.IDs) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "ids 不能为空")
+		return
+	}
+
+	timeout := time.Duration(len(req.IDs)*30) * time.Second
+	if timeout < 2*time.Minute {
+		timeout = 2 * time.Minute
+	}
+	if timeout > 5*time.Minute {
+		timeout = 5 * time.Minute
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	synced, failedSites := h.statsSync.SyncSelectedSites(ctx, req.IDs)
+	auditLog(r, "site", "batch_sync", "site", "", fmt.Sprintf("ids=%v, synced=%d, failed=%d", req.IDs, synced, len(failedSites)), "success")
 	Success(w, map[string]interface{}{
 		"synced":      synced,
 		"failed":      len(failedSites),

@@ -173,6 +173,7 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 	}
 
 	h.logger.Info("cookiecloud config updated", zap.String("component", "cookiecloud"))
+	auditLog(r, "cookiecloud", "update_config", "config", "", "", "success")
 	Success(w, map[string]interface{}{"message": "配置已更新"})
 }
 
@@ -184,6 +185,7 @@ func (h *CookieCloudHandler) handleSync(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusInternalServerError, 50001, "CookieCloud 同步失败，请检查配置")
 		return
 	}
+	auditLog(r, "cookiecloud", "sync", "config", "", "", "success")
 	Success(w, history)
 }
 

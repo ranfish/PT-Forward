@@ -560,6 +560,7 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("rss subscription created", zap.String("name", sub.Name), zap.String("site", sub.SiteName))
+	auditLog(r, "rss", "create", "subscription", fmt.Sprintf("%d", sub.ID), sub.Name, "success")
 	Success(w, h.toResponse(&sub))
 }
 
@@ -782,6 +783,7 @@ func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("rss subscription updated", zap.String("name", sub.Name))
+	auditLog(r, "rss", "update", "subscription", fmt.Sprintf("%d", id), sub.Name, "success")
 	Success(w, h.toResponse(sub))
 }
 
@@ -804,6 +806,7 @@ func (h *RSSHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("rss subscription deleted", zap.Uint("id", id))
+	auditLog(r, "rss", "delete", "subscription", fmt.Sprintf("%d", id), "", "success")
 	Success(w, nil)
 }
 
@@ -835,6 +838,7 @@ func (h *RSSHandler) handleTrigger(w http.ResponseWriter, r *http.Request, idStr
 	}
 
 	h.logger.Info("rss subscription triggered", zap.String("id", idStr))
+	auditLog(r, "rss", "trigger", "subscription", idStr, sub.Name, "success")
 	Success(w, map[string]interface{}{
 		"triggered": true,
 		"message":   "RSS 抓取已完成",

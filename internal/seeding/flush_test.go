@@ -14,12 +14,14 @@ import (
 )
 
 type flushMockClient struct {
-	maindata    *model.Maindata
-	maindataErr error
-	seeds       []*model.TorrentInfo
-	addResult   *model.AddResult
-	addErr      error
-	existsMap   map[string]bool
+	maindata     *model.Maindata
+	maindataErr  error
+	seeds        []*model.TorrentInfo
+	addResult    *model.AddResult
+	addResultFn  func() *model.AddResult
+	addErr       error
+	existsMap    map[string]bool
+	addCallCount int
 }
 
 func (m *flushMockClient) GetName() string                           { return "c1" }
@@ -43,6 +45,10 @@ func (m *flushMockClient) GetTorrentsByPath(_ context.Context, _ string) ([]*mod
 	return nil, nil
 }
 func (m *flushMockClient) AddFromFile(_ context.Context, _ []byte, _ model.AddTorrentOptions) (*model.AddResult, error) {
+	m.addCallCount++
+	if m.addResultFn != nil {
+		return m.addResultFn(), m.addErr
+	}
 	return m.addResult, m.addErr
 }
 func (m *flushMockClient) ExportTorrent(_ context.Context, _ string) ([]byte, error) { return nil, nil }
@@ -100,6 +106,9 @@ func newMockSiteProvider() *mocks.SiteInfoProvider {
 			return &mocks.SiteAdapter{
 				DownloadTorrentFn: func(_ context.Context, _ *model.SiteConfig, _ string) ([]byte, error) {
 					return []byte("mock-torrent-data"), nil
+				},
+				DetectDiscountFn: func(_ context.Context, _ *model.SiteConfig, _ string) (*model.DiscountResult, error) {
+					return &model.DiscountResult{Level: model.DiscountFree}, nil
 				},
 			}, nil
 		},
@@ -677,9 +686,13 @@ func TestFlush_ScoreWithBatchSLData(t *testing.T) {
 		e.mu.Unlock()
 	}
 
+	var addSeq int
 	mc := &flushMockClient{
-		maindata:  &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
-		addResult: &model.AddResult{InfoHash: "h_new"},
+		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
+		addResultFn: func() *model.AddResult {
+			addSeq++
+			return &model.AddResult{InfoHash: fmt.Sprintf("h_new_%d", addSeq)}
+		},
 	}
 	e.SetClientProvider(&flushMockProvider{
 		clients: map[string]model.DownloaderClient{"c1": mc},
@@ -719,6 +732,9 @@ func TestFlush_ScoreWithBatchSLData(t *testing.T) {
 						return sl, nil
 					}
 					return nil, nil
+				},
+				DetectDiscountFn: func(_ context.Context, _ *model.SiteConfig, _ string) (*model.DiscountResult, error) {
+					return &model.DiscountResult{Level: model.DiscountFree}, nil
 				},
 			}, nil
 		},
@@ -786,9 +802,13 @@ func TestFlush_ConfirmTopN_Rescores(t *testing.T) {
 		e.mu.Unlock()
 	}
 
+	var addSeq int
 	mc := &flushMockClient{
-		maindata:  &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
-		addResult: &model.AddResult{InfoHash: "h_new"},
+		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
+		addResultFn: func() *model.AddResult {
+			addSeq++
+			return &model.AddResult{InfoHash: fmt.Sprintf("h_new_%d", addSeq)}
+		},
 	}
 	e.SetClientProvider(&flushMockProvider{
 		clients: map[string]model.DownloaderClient{"c1": mc},
@@ -833,6 +853,9 @@ func TestFlush_ConfirmTopN_Rescores(t *testing.T) {
 						return sl, nil
 					}
 					return &model.SLData{Seeders: 0, Leechers: 0}, nil
+				},
+				DetectDiscountFn: func(_ context.Context, _ *model.SiteConfig, _ string) (*model.DiscountResult, error) {
+					return &model.DiscountResult{Level: model.DiscountFree}, nil
 				},
 			}, nil
 		},
