@@ -3,6 +3,9 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/ranfish/pt-forward/internal/audit"
+	"github.com/ranfish/pt-forward/internal/auth"
 )
 
 type Response struct {
@@ -39,4 +42,15 @@ func ErrorWithDetail(w http.ResponseWriter, httpStatus int, code int, message st
 		Message: message,
 		Detail:  detail,
 	})
+}
+
+func actorFromRequest(r *http.Request) string {
+	if uid, ok := r.Context().Value(auth.CtxKeyUserID).(string); ok && uid != "" {
+		return uid
+	}
+	return "system"
+}
+
+func auditLog(r *http.Request, module, action, targetType, targetID, detail, result string) {
+	audit.Log(actorFromRequest(r), module, action, targetType, targetID, detail, result)
 }

@@ -99,6 +99,10 @@
             <template #icon><FileTextOutlined /></template>
             <span>{{ t('nav.logs') }}</span>
           </a-menu-item>
+          <a-menu-item key="/audit" @click="$router.push('/audit')">
+            <template #icon><AuditOutlined /></template>
+            <span>{{ t('nav.audit') }}</span>
+          </a-menu-item>
           <a-sub-menu key="settings-sub">
             <template #icon><SettingOutlined /></template>
             <template #title>{{ t('nav.settings') }}</template>
@@ -155,6 +159,7 @@ import {
   SendOutlined,
   SafetyOutlined,
   FileTextOutlined,
+  AuditOutlined,
   SettingOutlined,
   BulbOutlined,
   LogoutOutlined,

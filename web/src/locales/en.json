@@ -114,6 +114,7 @@
     "publish": "Publish",
     "fingerprints": "Fingerprints",
     "logs": "System Logs",
+    "audit": "Audit Logs",
     "settings": "Settings",
     "notifications": "Notifications",
     "authSettings": "Auth Settings",
@@ -209,6 +210,12 @@
     "syncingAllStats": "Syncing all sites…",
     "syncAllStatsSuccess": "Sync completed: {synced} succeeded, {failed} failed",
     "syncAllStatsFailed": "Sync failed: {error}",
+    "syncStats": "Sync",
+    "syncSingleSuccess": "Site synced successfully",
+    "syncSingleFailed": "Sync failed: {error}",
+    "batchSync": "Sync Selected",
+    "batchSyncSuccess": "Batch sync completed: {synced} succeeded, {failed} failed",
+    "batchSyncFailed": "Batch sync failed: {error}",
     "batchUpdateSuccess": "Updated {count} sites",
     "batchUpdateFailed": "Batch update failed: {error}",
     "batchEnable": "Enable",
@@ -553,6 +560,8 @@
     "deleteConfigConfirm": "Delete this config?",
     "totalUpload": "Total Upload",
     "totalDownload": "Total Download",
+    "todayUpload": "Today Upload",
+    "todayDownload": "Today Download",
     "todayAdded": "Added Today",
     "globalRatio": "Global Ratio",
     "siteStats": "Site Stats",
@@ -600,7 +609,7 @@
     "fieldClientID": "Client ID",
     "fieldSeedTime": "Seed Time",
     "fieldSize": "Size (bytes)",
-    "fieldProgress": "Progress",
+    "fieldProgress": "Download Progress(progress)",
     "fieldUploaded": "Uploaded (bytes)",
     "fieldUploadSpeed": "Upload Speed (B/s)",
     "fieldDownloadSpeed": "Download Speed (B/s)",
@@ -1215,5 +1224,18 @@
   },
   "fingerprints": {
     "piecesHash": "PiecesHash"
+  },
+  "audit": {
+    "title": "Audit Logs",
+    "actor": "Actor",
+    "module": "Module",
+    "action": "Action",
+    "targetType": "Target Type",
+    "targetId": "Target ID",
+    "detail": "Detail",
+    "filterModule": "Filter by module",
+    "filterAction": "Filter by action",
+    "startDate": "Start Date",
+    "endDate": "End Date"
   }
 }

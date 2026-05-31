@@ -42,6 +42,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'system', name: 'SystemHealth', component: () => import('@/views/system/SystemHealth.vue') },
       { path: 'httpclient', name: 'FreezeStatus', component: () => import('@/views/httpclient/FreezeStatus.vue') },
       { path: 'logs', name: 'Logs', component: () => import('@/views/system/SystemHealth.vue') },
+      { path: 'audit', name: 'AuditLogs', component: () => import('@/views/system/AuditLogList.vue') },
       { path: 'settings', name: 'Settings', component: () => import('@/views/settings/Index.vue') },
       { path: 'settings/notifications', name: 'NotificationSettings', component: () => import('@/views/settings/NotificationSettings.vue') },
       { path: 'settings/auth', name: 'AuthSettings', component: () => import('@/views/settings/AuthSettings.vue') },

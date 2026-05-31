@@ -47,6 +47,7 @@ var (
 	reGenericBonus             = regexp.MustCompile(`(?i)魔力[：:]\s*([\d,.]+)`)
 	reGenericSeedingCount      = regexp.MustCompile(`(?i)alt=['"]做种数['"][^>]*>\s*(\d+)`)
 	reGenericUserClass         = regexp.MustCompile(`(?i)class='uc(\d+)'`)
+	reBonusHourTotalSize      = regexp.MustCompile(`合计体积</td>\s*<td>\s*</td>\s*<td[^>]*>\s*([\d.,]+\s*(?:T|G|M|TB|GB|MB))`)
 
 	starSpaceUserClassMap = map[string]string{
 		"0": "未激活", "1": "User", "2": "Power User", "3": "Elite User",
@@ -352,8 +353,46 @@ func (a *GenericAdapter) detectDiscountGenericPage(ctx context.Context, config *
 	if result.Level != model.DiscountNone {
 		return result, nil
 	}
-
 	return &model.DiscountResult{Level: model.DiscountNone}, nil
+}
+
+func (a *GenericAdapter) fetchSeedingSizeFromBonusHour(ctx context.Context, config *model.SiteConfig, result *model.UserStatsResult) {
+	pageURL := config.Domain + "/p_bonus/bonus_hour.php"
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer httpclient.DrainBody(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	html := string(body)
+	if m := reBonusHourTotalSize.FindStringSubmatch(html); len(m) > 1 {
+		sizeStr := strings.TrimSpace(m[1])
+		if strings.HasSuffix(sizeStr, " T") {
+			sizeStr = sizeStr[:len(sizeStr)-2] + " TB"
+		} else if strings.HasSuffix(sizeStr, " G") {
+			sizeStr = sizeStr[:len(sizeStr)-2] + " GB"
+		} else if strings.HasSuffix(sizeStr, " M") {
+			sizeStr = sizeStr[:len(sizeStr)-2] + " MB"
+		}
+		if sz := parseSizeString(sizeStr); sz > 0 {
+			result.SeedingSize = sz
+		}
+	}
 }
 
 func (a *GenericAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
@@ -1292,6 +1331,9 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 	}
 	if result.Ratio == 0 && result.DownloadBytes > 0 && result.UploadBytes > 0 {
 		result.Ratio = float64(result.UploadBytes) / float64(result.DownloadBytes)
+	}
+	if result.SeedingSize == 0 {
+		a.fetchSeedingSizeFromBonusHour(ctx, config, result)
 	}
 	return result, nil
 }

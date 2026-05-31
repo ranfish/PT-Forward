@@ -585,6 +585,9 @@ func (a *GazelleAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 		a.fetchFromUserPHP(ctx, config, stats)
 	}
 	a.fetchSeedingFromCommunityStats(ctx, config, stats)
+	if stats.SeedingSize == 0 {
+		a.fetchSeedingSizeFromBPRates(ctx, config, stats)
+	}
 	return stats, nil
 }
 
@@ -822,4 +825,33 @@ func (a *GazelleAdapter) getUserID(ctx context.Context, config *model.SiteConfig
 		return 0
 	}
 	return result.Response.ID
+}
+
+var reGazelleBPRatesSize = regexp.MustCompile(`(?is)<thead>.*?大小.*?</thead>.*?<tbody>\s*<tr>\s*<td>\d+</td>\s*<td>([\d.,]+\s*(?:TB|GB|MB|TiB|GiB|MiB))</td>`)
+
+func (a *GazelleAdapter) fetchSeedingSizeFromBPRates(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
+	baseURL := resolveBase(config)
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/bonus.php?action=bprates", nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return
+	}
+
+	html := string(body)
+	if m := reGazelleBPRatesSize.FindStringSubmatch(html); len(m) > 1 {
+		if sz := parseSizeString(m[1]); sz > 0 {
+			stats.SeedingSize = sz
+		}
+	}
 }

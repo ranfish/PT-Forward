@@ -38,6 +38,8 @@ var (
 	reUnit3DBonus      = regexp.MustCompile(`(?s)ratio-bar__points[^>]*>.*?<i[^>]*></i>\s*([\d,.]+)`)
 	reUnit3DUsername   = regexp.MustCompile(`(?s)ratio-bar__uploaded[^>]*>\s*<a[^>]*href="[^"]*/users/([^/"]+)`)
 	reUnit3DUserClass = regexp.MustCompile(`(?s)组别:\s*<span[^>]*>.*?</i>\s*(\w[\w\s]*?)</span>`)
+	reUnit3DSeedingSize = regexp.MustCompile(`(?is)<td>\s*做种体积\s*</td>\s*<td>\s*<span[^>]*>([\d.,]+\s*(?:PiB|TiB|GiB|MiB|KiB|TB|GB|MB|KB))</span>`)
+	reUnit3DProfileBonus = regexp.MustCompile(`(?is)<td>\s*魔力\s*</td>\s*<td>.*?<strong>魔力:</strong>\s*<span[^>]*>([\d,.]+)</span>`)
 )
 
 type Unit3DAdapter struct {
@@ -832,7 +834,7 @@ func (a *Unit3DAdapter) fetchUserStatsHTML(ctx context.Context, config *model.Si
 		result.Ratio = float64(result.UploadBytes) / float64(result.DownloadBytes)
 	}
 
-	if result.Username != "" && result.UserClass == "" {
+	if result.Username != "" {
 		profileURL := config.Domain + "/users/" + result.Username
 		pReq, pErr := http.NewRequestWithContext(ctx, "GET", profileURL, nil)
 		if pErr == nil {
@@ -842,8 +844,26 @@ func (a *Unit3DAdapter) fetchUserStatsHTML(ctx context.Context, config *model.Si
 				defer httpclient.DrainBody(pResp)
 				if pResp.StatusCode == http.StatusOK {
 					if pBody, rErr := io.ReadAll(pResp.Body); rErr == nil {
-						if m := reUnit3DUserClass.FindStringSubmatch(string(pBody)); len(m) > 1 {
-							result.UserClass = strings.TrimSpace(m[1])
+						profileHTML := string(pBody)
+						if result.UserClass == "" {
+							if m := reUnit3DUserClass.FindStringSubmatch(profileHTML); len(m) > 1 {
+								result.UserClass = strings.TrimSpace(m[1])
+							}
+						}
+						if result.SeedingSize == 0 {
+							if m := reUnit3DSeedingSize.FindStringSubmatch(profileHTML); len(m) > 1 {
+								if sz := parseSizeString(strings.TrimSpace(m[1])); sz > 0 {
+									result.SeedingSize = sz
+								}
+							}
+						}
+						if result.BonusPoints == 0 {
+							if m := reUnit3DProfileBonus.FindStringSubmatch(profileHTML); len(m) > 1 {
+								bonusStr := strings.ReplaceAll(strings.TrimSpace(m[1]), ",", "")
+								if v, err := strconv.ParseFloat(bonusStr, 64); err == nil && v > result.BonusPoints {
+									result.BonusPoints = v
+								}
+							}
 						}
 					}
 				}

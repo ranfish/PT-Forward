@@ -1,5 +1,17 @@
 import client from './client'
-import type { ApiResponse } from './types'
+import type { ApiResponse, PaginatedData } from './types'
+
+export interface AuditLog {
+  id: number
+  created_at: string
+  actor: string
+  module: string
+  action: string
+  target_type: string
+  target_id: string
+  detail: string
+  result: string
+}
 
 export const systemApi = {
   health() {
@@ -13,5 +25,8 @@ export const systemApi = {
   },
   clearLogs() {
     return client.delete<ApiResponse<void>>('/system/logs')
+  },
+  listAuditLogs(params?: Record<string, unknown>) {
+    return client.get<ApiResponse<PaginatedData<AuditLog>>>('/system/audit-logs', { params })
   },
 }

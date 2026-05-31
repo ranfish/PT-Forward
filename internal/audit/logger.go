@@ -17,6 +17,18 @@ type Logger struct {
 	wg     sync.WaitGroup
 }
 
+var defaultLogger *Logger
+
+func SetDefault(l *Logger) {
+	defaultLogger = l
+}
+
+func Log(actor, module, action, targetType, targetID, detail, result string) {
+	if defaultLogger != nil {
+		defaultLogger.Log(actor, module, action, targetType, targetID, detail, result)
+	}
+}
+
 func NewLogger(db *gorm.DB, logger *zap.Logger) *Logger {
 	return &Logger{
 		db:     db,

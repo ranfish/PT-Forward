@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -244,6 +245,8 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("downloader created", zap.String("name", client.Name), zap.String("type", client.Type))
 
+	auditLog(r, "client", "create", "client", fmt.Sprintf("%d", client.ID), client.Name, "success")
+
 	var mappings []model.ClientPathMapping
 	if err := h.db.Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
 		h.logger.Error("query path mappings failed", zap.Uint("clientID", client.ID), zap.Error(err))
@@ -352,6 +355,8 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("downloader updated", zap.String("name", client.Name))
 
+	auditLog(r, "client", "update", "client", fmt.Sprintf("%d", id), client.Name, "success")
+
 	var mappings []model.ClientPathMapping
 	if err := h.db.Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
 		h.logger.Error("query path mappings failed", zap.Uint("clientID", client.ID), zap.Error(err))
@@ -392,6 +397,7 @@ func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("downloader deleted", zap.String("name", client.Name))
+	auditLog(r, "client", "delete", "client", fmt.Sprintf("%d", id), client.Name, "success")
 	Success(w, nil)
 }
 

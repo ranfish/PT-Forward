@@ -573,6 +573,10 @@ func (a *TNodeAdapter) FetchUserStats(ctx context.Context, config *model.SiteCon
 		stats.UserClass = detailResp.Data.Class.Name
 	}
 
+	if stats.SeedingSize == 0 {
+		a.enrichSeedingSizeFromInfoAPI(ctx, config, baseURL, csrfToken, stats)
+	}
+
 	return stats, nil
 }
 
@@ -610,4 +614,40 @@ func (a *TNodeAdapter) VerifyExists(ctx context.Context, config *model.SiteConfi
 		}
 	}
 	return false, nil
+}
+
+func (a *TNodeAdapter) enrichSeedingSizeFromInfoAPI(ctx context.Context, config *model.SiteConfig, baseURL string, csrfToken string, stats *model.UserStatsResult) {
+	infoURL := baseURL + "/api/user/getInfo"
+	req, err := http.NewRequestWithContext(ctx, "GET", infoURL, nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+	if csrfToken != "" {
+		req.Header.Set("x-csrf-token", csrfToken)
+	}
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return
+	}
+
+	var infoResp struct {
+		Status int `json:"status"`
+		Data   struct {
+			SeedSize int64 `json:"seedSize"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &infoResp); err != nil {
+		return
+	}
+	if infoResp.Status == 200 && infoResp.Data.SeedSize > 0 {
+		stats.SeedingSize = infoResp.Data.SeedSize
+	}
 }

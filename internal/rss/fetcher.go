@@ -51,6 +51,16 @@ func (f *Fetcher) Fetch(ctx context.Context, url string) (*RSSFeed, error) {
 		return nil, rssError(ErrRSSNetwork, fmt.Sprintf("RSS 返回非成功状态码: %d", resp.StatusCode), nil)
 	}
 
+	ct := strings.ToLower(resp.Header.Get("Content-Type"))
+	if !strings.Contains(ct, "xml") && !strings.Contains(ct, "rss") && !strings.Contains(ct, "octet-stream") {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		preview := strings.TrimSpace(string(data))
+		if len(preview) > 200 {
+			preview = preview[:200]
+		}
+		return nil, rssError(ErrRSSParse, fmt.Sprintf("RSS 返回非 XML 内容 (Content-Type: %s): %s", ct, preview), nil)
+	}
+
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 	if err != nil {
 		return nil, rssError(ErrRSSNetwork, "读取响应失败", err)

@@ -79,6 +79,54 @@ func (s *StatsSyncService) SyncSiteStats(ctx context.Context, siteID uint) error
 	return s.syncSingleSite(ctx, &site)
 }
 
+func (s *StatsSyncService) SyncSelectedSites(ctx context.Context, ids []uint) (synced int, failedSites []string) {
+	var sites []model.Site
+	if err := s.db.WithContext(ctx).Where("id IN ?", ids).Find(&sites).Error; err != nil {
+		s.logger.Warn("query selected sites for sync", zap.Error(err))
+		return 0, nil
+	}
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 5)
+
+	for i := range sites {
+		site := &sites[i]
+		creds := siteCreds(site)
+		if !hasCreds(creds, site.AuthType) {
+			mu.Lock()
+			failedSites = append(failedSites, site.Name)
+			mu.Unlock()
+			continue
+		}
+
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			siteCtx, cancel := context.WithTimeout(ctx, 25*time.Second)
+			defer cancel()
+
+			if err := s.syncSingleSite(siteCtx, site); err != nil {
+				s.logger.Warn("site stats sync failed",
+					zap.String("site", site.Name),
+					zap.Error(err))
+				mu.Lock()
+				failedSites = append(failedSites, site.Name)
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				synced++
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	return
+}
+
 func (s *StatsSyncService) SyncAllSites(ctx context.Context) (synced int, failedSites []string) {
 	var sites []model.Site
 	if err := s.db.WithContext(ctx).Where("enabled = ?", true).Find(&sites).Error; err != nil {

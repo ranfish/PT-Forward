@@ -983,6 +983,7 @@ var (
 	reNexusUsernameByName  = regexp.MustCompile(`(?i)<a[^>]*class='[^']*_Name'[^>]*href="[^"]*userdetails?\.php\?id=(\d+)"[^>]*><b[^>]*>([^<]+)`)
 	reNexusUsernameByName2 = regexp.MustCompile(`(?i)<a[^>]*href="[^"]*userdetails?\.php\?id=(\d+)"[^>]*class='[^']*_Name'[^>]*><b[^>]*>([^<]+)`)
 	reNexusUsernameUUID    = regexp.MustCompile(`(?i)<a\s[^>]*class='[^']*_Name'[^>]*><b[^>]*>([^<]+)`)
+	reNexusUserUUID        = regexp.MustCompile(`userdetails\.php\?uuid=([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})`)
 	reNexusUsernameDeep    = regexp.MustCompile(`(?is)<a[^>]*href=["'][^"']*userdetails?\.php\?id=(\d+)["'][^>]*>(.*?)</a>`)
 	reNexusInfoBlock       = regexp.MustCompile(`(?s)id="info_block"(.*?)</table>`)
 	reNexusWelcomeBack     = regexp.MustCompile(`(?is)(?:欢迎[回来]|Welcome\s+back|你好).{0,200}?<a[^>]*href="[^"]*userdetails?\.php\?id=(\d+)"[^>]*>(.*?)</a>`)
@@ -994,6 +995,7 @@ var (
 	reNexusFontBonusInline = regexp.MustCompile(`(?i)class\s*=\s*['"]?color_bonus['"]?>(?:魔力|时魔|啤酒|茉莉|火花|魅力值?|UCoin|Bonus|憨豆|元宝|蝌蚪)[^:<]*:\s*([\d,]+\.\d+)\s*</(?:font|span)>`)
 	reNexusArrowUp         = regexp.MustCompile(`(?i)class="arrowup"[^>]*(?:/>|>)([^<]*)`)
 	reNexusArrowUpImg      = regexp.MustCompile(`(?i)(?:arrowup|做种中)[^>]*>(?:\s|&nbsp;)*(?:<(?:font|span)[^>]*>)*\s*(\d+)\s*(?:</(?:font|span)>)?`)
+	reSpriteArrowSeeding   = regexp.MustCompile(`(?is)sprite_arrowup[^>]*>(?:</figure>)?\s*(\d+)\s*</a>\s*(?:&nbsp;)*\s*<span[^>]*class="peering-size"[^>]*>\(([\d.,]+(?:&nbsp;|\s)*(?:PiB|TiB|GiB|MiB|KiB|TB|GB|MB|KB|B))\)`)
 	reNexusJsonSeeding     = regexp.MustCompile(`(?i)&quot;(?:活跃|做种数|做种|seeding|active)[：:]?&quot;,&quot;value&quot;:&quot;[↑↑\s]*(\d+)`)
 	reNexusSeedLabel       = regexp.MustCompile(`(?i)(?:做种数|seeding)\s*[：:]\s*(\d+)`)
 	reMaterialPlayArrow    = regexp.MustCompile(`(?i)play_arrow</i>\s*<span[^>]*>(\d+)\s*</span>`)
@@ -1022,9 +1024,16 @@ var (
 	reDetailSeedingPointsB = regexp.MustCompile(`(?i)做种积分[^<]*</b>[\s:]*([\d,]+\.?\d*)`)
 	reDetailSeeding        = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:做种活动|当前做种|做种体积|做种数)\s*</td>\s*<td[^>]*>(.*?)</td>`)
 	reDetailSeedingSimple  = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>做种\s*</td>\s*<td[^>]*>(.*?)</td>`)
+	reDetailSeedingSize    = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>做种大小\s*</td>\s*<td[^>]*>(.*?)</td>`)
+	reDetailArrowUpSize    = regexp.MustCompile(`(?is)class=["']?arrowup["']?[^>]*>\s*([\d,.]+\s*(?:TB|GB|MB|TiB|GiB|MiB|PB|PiB))`)
 	reDetailUsername       = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:用户名|用戶名|Username)\s*</td>\s*<td[^>]*>(.*?)</td>`)
 	reDetailH1            = regexp.MustCompile(`(?is)<h1[^>]*>(.*?)</h1>`)
 	reDetailRowheadUpload   = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:上[传傳]量|Uploaded)\s*</td>\s*<td[^>]*>(.*?)</td>`)
+	reUserIDLoose          = regexp.MustCompile(`userdetails?(?:\.php)?\?id=(\d+)`)
+	reIDField             = regexp.MustCompile(`(?i)<b>ID</b>\s*(?:&nbsp;|\s)*(\d+)`)
+	reAJAXSummary         = regexp.MustCompile(`(?i)(?:<[^>]*>)?(\d+)(?:<[^>]*>)?\s*条记录.*?大小[：:]?\s*([\d.,]+\s*(?:PiB|TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
+	reBonusSeedingSize   = regexp.MustCompile(`(?i)当前做种体积[^<]*<[^>]*>([\d.,]+\s*(?:PiB|TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
+	reDetailSeedingVol   = regexp.MustCompile(`([\d.,]+\s*(?:PiB|TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
 	reDetailRowheadDownload = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:下[载載]量|Downloaded)\s*</td>\s*<td[^>]*>(.*?)</td>`)
 	reDetailRowheadRatio    = regexp.MustCompile(`(?is)class=["']?rowhead["']?[^>]*>(?:分享率|Ratio)\s*</td>\s*<td[^>]*>(.*?)</td>`)
 	reNexusJsonUpload       = regexp.MustCompile(`(?i)&quot;上[传傳]量[：:]&quot;,&quot;value&quot;:&quot;(\d[\d.,]+\s*(?:PB|TB|GB|MB|KB))&quot;`)
@@ -1039,6 +1048,7 @@ var (
 	reFontLabelDownload    = regexp.MustCompile(`(?i)(?:下载|下载量)\s*[:：]\s*</(?:font|span)>\s*([\d.,]+)\s*(PiB|TB|GB|MB|KB)`)
 	reFontLabelRatio       = regexp.MustCompile(`(?i)分享率\s*[:：]\s*</(?:font|span)>\s*≥?\s*([\d.,]+)`)
 	reFontLabelBonus       = regexp.MustCompile(`(?is)魔力值[^<]*</(?:font|span)>.*?]:\s*([\d,.]+)`)
+	reFontLabelBonusSpan   = regexp.MustCompile(`(?is)魔力值[^<]*</(?:font|span)>.*?]:\s*(?:<[^>]*>)*\s*([\d,.]+)`)
 	reFontArrowSeeding     = regexp.MustCompile(`(?i)当前做种[^>]*>[^⬆]*⬆</(?:font|span)>\s*(\d+)`)
 	reLinkBonus            = regexp.MustCompile(`(?i)魔力值\s*\(([\d,.]+)\)`)
 	reYuanbaoBonus         = regexp.MustCompile(`(?s)元宝.*?mybonus\.php[^>]*>([\d,.]+)`)
@@ -1330,6 +1340,9 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 	} else if m := reFontLabelBonus.FindStringSubmatch(html); len(m) > 1 {
 		bonusStr := strings.ReplaceAll(m[1], ",", "")
 		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
+	} else if m := reFontLabelBonusSpan.FindStringSubmatch(html); len(m) > 1 {
+		bonusStr := strings.ReplaceAll(m[1], ",", "")
+		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
 	} else if m := reLinkBonus.FindStringSubmatch(html); len(m) > 1 {
 		bonusStr := strings.ReplaceAll(m[1], ",", "")
 		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
@@ -1338,7 +1351,14 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 		result.BonusPoints, _ = strconv.ParseFloat(bonusStr, 64)
 	}
 
-	if m := reNexusArrowUp.FindStringSubmatch(searchHTML); len(m) > 1 {
+	if m := reSpriteArrowSeeding.FindStringSubmatch(html); len(m) > 1 {
+		if n, err := strconv.Atoi(strings.TrimSpace(m[1])); err == nil && n > 0 {
+			result.SeedingCount = n
+		}
+		if sz := parseSizeString(strings.ReplaceAll(m[2], "&nbsp;", " ")); sz > 0 {
+			result.SeedingSize = sz
+		}
+	} else if m := reNexusArrowUp.FindStringSubmatch(searchHTML); len(m) > 1 {
 		arrowText := strings.TrimSpace(m[1])
 		if n, err := strconv.Atoi(arrowText); err == nil && n > 0 {
 			result.SeedingCount = n
@@ -1390,6 +1410,14 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 			uid = m[1]
 		}
 	}
+	if uid == "" {
+		if m := reNexusUserUUID.FindStringSubmatch(html); len(m) > 1 {
+			uid = "uuid:" + m[1]
+		}
+	}
+	if uid == "" {
+		uid = a.resolveUIDFromSelfProfile(ctx, config)
+	}
 	if uid != "" {
 		a.enrichFromUserDetails(ctx, config, uid, result)
 	}
@@ -1398,7 +1426,12 @@ func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.
 }
 
 func (a *NexusPHPAdapter) enrichFromUserDetails(ctx context.Context, config *model.SiteConfig, uid string, result *model.UserStatsResult) {
-	pageURL := config.Domain + "/userdetails.php?id=" + uid
+	var pageURL string
+	if strings.HasPrefix(uid, "uuid:") {
+		pageURL = config.Domain + "/userdetails.php?uuid=" + strings.TrimPrefix(uid, "uuid:")
+	} else {
+		pageURL = config.Domain + "/userdetails.php?id=" + uid
+	}
 	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
 	if err != nil {
 		return
@@ -1508,14 +1541,22 @@ func (a *NexusPHPAdapter) enrichFromUserDetails(ctx context.Context, config *mod
 		}
 	}
 
-	if result.SeedingCount == 0 {
+	if result.SeedingCount == 0 || result.SeedingSize == 0 {
 		if m := reDetailSeeding.FindStringSubmatch(html); len(m) > 1 {
-			seedStr := cleanText(m[1])
+			tdHTML := m[1]
+			seedStr := cleanText(tdHTML)
 			parts := strings.Split(seedStr, " ")
 			for _, p := range parts {
-				if n, err := strconv.Atoi(strings.TrimSpace(p)); err == nil && n > 0 {
+				if n, err := strconv.Atoi(strings.TrimSpace(p)); err == nil && n > 0 && result.SeedingCount == 0 {
 					result.SeedingCount = n
 					break
+				}
+			}
+			if result.SeedingSize == 0 {
+				if sv := reDetailSeedingVol.FindStringSubmatch(tdHTML); len(sv) > 1 {
+					if sz := parseSizeString(sv[1]); sz > 0 {
+						result.SeedingSize = sz
+					}
 				}
 			}
 		}
@@ -1579,19 +1620,47 @@ func (a *NexusPHPAdapter) enrichFromUserDetails(ctx context.Context, config *mod
 		result.Ratio = float64(result.UploadBytes) / float64(result.DownloadBytes)
 	}
 
+	if result.SeedingSize == 0 {
+		if m := reDetailSeedingSize.FindStringSubmatch(html); len(m) > 1 {
+			if sz := parseSizeString(cleanText(m[1])); sz > 0 {
+				result.SeedingSize = sz
+			}
+		}
+	}
+	if result.SeedingSize == 0 {
+		if m := reDetailArrowUpSize.FindStringSubmatch(html); len(m) > 1 {
+			if sz := parseSizeString(m[1]); sz > 0 {
+				result.SeedingSize = sz
+			}
+		}
+	}
+
  	if result.SeedingCount == 0 || result.SeedingSize == 0 {
  		a.fetchSeedingFromAJAX(ctx, config, uid, result)
  	}
+	if result.SeedingSize == 0 {
+		a.fetchSeedingSizeFromBonus(ctx, config, result)
+	}
 }
 
 func (a *NexusPHPAdapter) fetchSeedingFromAJAX(ctx context.Context, config *model.SiteConfig, uid string, result *model.UserStatsResult) {
-	ajaxURL := config.Domain + "/getusertorrentlistajax.php?userid=" + uid + "&type=seeding"
+	var ajaxURL string
+	if strings.HasPrefix(uid, "uuid:") {
+		uuid := strings.TrimPrefix(uid, "uuid:")
+		ajaxURL = config.Domain + "/getusertorrentlistajax.php?useruuid=" + uuid + "&type=seeding"
+	} else {
+		ajaxURL = config.Domain + "/getusertorrentlistajax.php?userid=" + uid + "&type=seeding"
+	}
 	req, err := http.NewRequestWithContext(ctx, "GET", ajaxURL, nil)
 	if err != nil {
 		return
 	}
 	setCommonHeaders(req, config.Cookie)
-	req.Header.Set("Referer", config.Domain+"/userdetails.php?id="+uid)
+	if strings.HasPrefix(uid, "uuid:") {
+		req.Header.Set("Referer", config.Domain+"/userdetails.php?uuid="+strings.TrimPrefix(uid, "uuid:"))
+	} else {
+		req.Header.Set("Referer", config.Domain+"/userdetails.php?id="+uid)
+	}
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 
 	resp, err := a.doer.Client.Do(req)
@@ -1610,6 +1679,23 @@ func (a *NexusPHPAdapter) fetchSeedingFromAJAX(ctx context.Context, config *mode
 	}
 
 	html := string(body)
+	if !strings.Contains(html, "<table") && !strings.Contains(html, "条记录") {
+		return
+	}
+
+	ajaxText := strings.ReplaceAll(html, "&nbsp;", " ")
+	ajaxText = strings.ReplaceAll(ajaxText, "&amp;", "&")
+
+	if m := reAJAXSummary.FindStringSubmatch(ajaxText); len(m) > 2 {
+		if summaryCount, _ := strconv.Atoi(m[1]); summaryCount > 0 && result.SeedingCount == 0 {
+			result.SeedingCount = summaryCount
+		}
+		if sz := parseSizeString(m[2]); sz > 0 && result.SeedingSize == 0 {
+			result.SeedingSize = sz
+			return
+		}
+	}
+
 	if !strings.Contains(html, "<table") {
 		return
 	}
@@ -1721,4 +1807,68 @@ func isValidUserClass(class string) string {
 		return ""
 	}
 	return class
+}
+
+func (a *NexusPHPAdapter) resolveUIDFromSelfProfile(ctx context.Context, config *model.SiteConfig) string {
+	pageURL := config.Domain + "/userdetails"
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return ""
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer httpclient.DrainBody(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ""
+	}
+
+	html := string(body)
+	if m := reUserIDLoose.FindStringSubmatch(html); len(m) > 1 {
+		return m[1]
+	}
+	if m := reIDField.FindStringSubmatch(html); len(m) > 1 {
+		return m[1]
+	}
+	return ""
+}
+
+func (a *NexusPHPAdapter) fetchSeedingSizeFromBonus(ctx context.Context, config *model.SiteConfig, result *model.UserStatsResult) {
+	pageURL := config.Domain + "/mybonus.php"
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer httpclient.DrainBody(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	html := string(body)
+	if m := reBonusSeedingSize.FindStringSubmatch(html); len(m) > 1 {
+		if sz := parseSizeString(m[1]); sz > 0 {
+			result.SeedingSize = sz
+		}
+	}
 }
