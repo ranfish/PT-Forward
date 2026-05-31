@@ -41,6 +41,9 @@ func (m *flushMockClient) GetTorrentByHash(_ context.Context, _ string) (*model.
 func (m *flushMockClient) GetSeedingTorrents(_ context.Context) ([]*model.TorrentInfo, error) {
 	return m.seeds, nil
 }
+func (m *flushMockClient) GetAllTorrents(_ context.Context) ([]*model.TorrentInfo, error) {
+	return m.seeds, nil
+}
 func (m *flushMockClient) GetTorrentsByPath(_ context.Context, _ string) ([]*model.TorrentInfo, error) {
 	return nil, nil
 }

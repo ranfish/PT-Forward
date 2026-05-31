@@ -49,6 +49,9 @@ func (m *mockDownloaderClient) GetTorrentByHash(_ context.Context, hash string) 
 func (m *mockDownloaderClient) GetSeedingTorrents(_ context.Context) ([]*model.TorrentInfo, error) {
 	return m.seeds, m.seedErr
 }
+func (m *mockDownloaderClient) GetAllTorrents(_ context.Context) ([]*model.TorrentInfo, error) {
+	return m.seeds, m.seedErr
+}
 func (m *mockDownloaderClient) GetTorrentsByPath(_ context.Context, _ string) ([]*model.TorrentInfo, error) {
 	return nil, nil
 }
@@ -1291,7 +1294,7 @@ func TestEngine_Evaluate_DeleteTorrent(t *testing.T) {
 	mc := &mockDownloaderClient{
 		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
 		seeds: []*model.TorrentInfo{
-			{Hash: "hash1", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024},
+			{Hash: "hash1", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024, Progress: 1.0},
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
@@ -1433,7 +1436,7 @@ func TestEngine_Reannounce_AbortsDelete(t *testing.T) {
 	mc := &mockDownloaderClient{
 		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
 		seeds:    []*model.TorrentInfo{
-			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024},
+			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024, Progress: 1.0},
 		},
 		torrentByHash: map[string]*model.TorrentInfo{
 			"h1": {Hash: "h1", NumIncomplete: 5, UploadSpeed: 1024},
@@ -1483,7 +1486,7 @@ func TestEngine_Reannounce_Disabled(t *testing.T) {
 	mc := &mockDownloaderClient{
 		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
 		seeds:    []*model.TorrentInfo{
-			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024},
+			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024, Progress: 1.0},
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
@@ -1527,7 +1530,7 @@ func TestEngine_Reannounce_AllRetriesFail(t *testing.T) {
 	mc := &mockDownloaderClient{
 		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
 		seeds:    []*model.TorrentInfo{
-			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024},
+			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024, Progress: 1.0},
 		},
 		torrentByHash: map[string]*model.TorrentInfo{
 			"h1": {Hash: "h1", NumIncomplete: 0, UploadSpeed: 0},

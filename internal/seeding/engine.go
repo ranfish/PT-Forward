@@ -622,6 +622,38 @@ func (e *Engine) ListByClient(ctx context.Context, clientID string) ([]model.See
 	return records, err
 }
 
+func (e *Engine) saveFinalTraffic(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo) {
+	if ti == nil || rec == nil {
+		return
+	}
+
+	traffic := &model.TorrentTraffic{
+		ClientID:      rec.ClientID,
+		InfoHash:      rec.InfoHash,
+		SiteName:      rec.SiteName,
+		Uploaded:      ti.Uploaded,
+		Downloaded:    ti.Downloaded,
+		UploadSpeed:   ti.UploadSpeed,
+		DownloadSpeed: ti.DownloadSpeed,
+		Ratio:         ti.Ratio,
+		RecordedAt:    time.Now(),
+	}
+	if err := e.db.WithContext(ctx).Create(traffic).Error; err != nil {
+		e.logger.Warn("save final torrent_traffic failed",
+			zap.String("infoHash", rec.InfoHash),
+			zap.Error(err))
+	}
+
+	if err := e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
+		"final_uploaded":   ti.Uploaded,
+		"final_downloaded": ti.Downloaded,
+	}).Error; err != nil {
+		e.logger.Warn("save final_uploaded to record failed",
+			zap.Uint("id", rec.ID),
+			zap.Error(err))
+	}
+}
+
 func (e *Engine) UpdateStatus(ctx context.Context, id uint, status model.SeedingTorrentStatus, actionBy string) error {
 	if err := e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
 		Where("id = ?", id).
@@ -900,9 +932,9 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 		minScore, minAgeHours, weights = e.applyConfig(cfg, minScore, minAgeHours, weights)
 	}
 
-	torrents, err := dlClient.GetSeedingTorrents(ctx)
+	torrents, err := dlClient.GetAllTorrents(ctx)
 	if err != nil {
-		return nil, &model.AppError{Code: 50001, Message: "获取做种列表失败", Cause: err}
+		return nil, &model.AppError{Code: 50001, Message: "获取种子列表失败", Cause: err}
 	}
 
 	torrentMap := make(map[string]*model.TorrentInfo, len(torrents))
@@ -974,7 +1006,11 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 	if rec.Status == model.SeedingStatusPausedRule && rec.LastActionBy == "disk_protect" {
 		ti, ok := ec.torrentMap[rec.InfoHash]
 		if ok && ti != nil && ti.State != "" && ti.State != "pausedUP" && ti.State != "pausedDL" {
-			if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusSeeding, "resumed_in_downloader"); err != nil {
+			resumedBy := "resumed_in_downloader"
+			if ti.Progress < 1.0 {
+				resumedBy = "resumed_downloading"
+			}
+			if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusSeeding, resumedBy); err != nil {
 				e.logger.Warn("sync paused_rule→seeding failed", zap.Uint("id", rec.ID), zap.Error(err))
 			} else {
 				rec.Status = model.SeedingStatusSeeding
@@ -1016,6 +1052,10 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 		e.logger.Debug("seeding record cleaned: torrent not in downloader",
 			zap.String("info_hash", rec.InfoHash),
 			zap.String("client_id", rec.ClientID))
+		return nil, evaluated, false
+	}
+
+	if ti.Progress < 1.0 {
 		return nil, evaluated, false
 	}
 
@@ -1182,6 +1222,7 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 					e.logger.Error("更新级联删种失败状态出错", zap.Uint("id", rec.ID), zap.Error(usErr))
 				}
 			} else {
+				e.saveFinalTraffic(ctx, rec, ti)
 				e.logger.Info("级联删种成功",
 					zap.String("source", rec.InfoHash),
 					zap.Int("related", len(relatedHashes)),
@@ -1198,6 +1239,7 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 	}
 
 	if !cascaded {
+		e.saveFinalTraffic(ctx, rec, ti)
 		if err := ec.client.DeleteTorrent(ctx, rec.InfoHash, isDeleteFiles); err != nil {
 			e.logger.Warn("删种失败",
 				zap.String("infoHash", rec.InfoHash),
@@ -1506,6 +1548,7 @@ func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorren
 						e.logger.Error("update rule cascade fail status error", zap.Uint("id", rec.ID), zap.Error(usErr))
 					}
 				} else {
+					e.saveFinalTraffic(ctx, rec, ti)
 					e.logger.Info("rule cascade delete success",
 						zap.String("source", rec.InfoHash),
 						zap.Int("related", len(relatedHashes)),
@@ -1523,6 +1566,7 @@ func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorren
 	}
 
 	if !cascaded {
+		e.saveFinalTraffic(ctx, rec, ti)
 		if err := ec.client.DeleteTorrent(ctx, rec.InfoHash, deleteFiles); err != nil {
 			e.logger.Warn("rule delete failed",
 				zap.String("infoHash", rec.InfoHash),
@@ -1789,11 +1833,58 @@ func (e *Engine) CollectTrafficStats(ctx context.Context) error {
 		}
 
 		e.collectSiteTrafficDaily(ctx, clientID, md, now)
+
+		e.collectTorrentTraffic(ctx, clientID, md, now)
 	}
 
 	return nil
 }
 
+func (e *Engine) collectTorrentTraffic(ctx context.Context, clientID string, md *model.Maindata, now time.Time) {
+	var records []model.SeedingTorrentRecord
+	e.db.WithContext(ctx).
+		Where("client_id = ? AND status IN ?", clientID,
+			[]string{string(model.SeedingStatusPending), string(model.SeedingStatusSeeding), "paused_free_end", "paused_rule"}).
+		Find(&records)
+
+	if len(records) == 0 || md == nil {
+		return
+	}
+
+	trafficBatch := make([]*model.TorrentTraffic, 0, len(records))
+	for _, rec := range records {
+		ti, ok := md.Torrents[rec.InfoHash]
+		if !ok {
+			continue
+		}
+		trafficBatch = append(trafficBatch, &model.TorrentTraffic{
+			ClientID:      clientID,
+			InfoHash:      rec.InfoHash,
+			SiteName:      rec.SiteName,
+			Uploaded:      ti.Uploaded,
+			Downloaded:    ti.Downloaded,
+			UploadSpeed:   ti.UploadSpeed,
+			DownloadSpeed: ti.DownloadSpeed,
+			Ratio:         ti.Ratio,
+			RecordedAt:    now,
+		})
+	}
+
+	if len(trafficBatch) > 0 {
+		if err := e.db.WithContext(ctx).Create(&trafficBatch).Error; err != nil {
+			e.logger.Warn("batch write torrent_traffic failed",
+				zap.String("clientID", clientID),
+				zap.Int("count", len(trafficBatch)),
+				zap.Error(err))
+		}
+	}
+}
+
+// collectSiteTrafficDaily writes instantaneous cumulative upload SUM to site_traffic_daily.
+// Note: upload_delta is NOT an incremental value — it's overwritten each cycle with the
+// current SUM of ti.Uploaded for active torrents. The stats API no longer uses this field
+// for "today's upload" display (uses torrent_traffic max-min instead).
+// site_traffic_daily is retained for site-level trend charts only.
 func (e *Engine) collectSiteTrafficDaily(ctx context.Context, clientID string, md *model.Maindata, now time.Time) {
 	today := now.Truncate(24 * time.Hour)
 

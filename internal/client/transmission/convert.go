@@ -13,6 +13,7 @@ type trTorrent struct {
 	TotalSize      int64    `json:"totalSize"`
 	PercentDone    float64  `json:"percentDone"`
 	UploadedEver   int64    `json:"uploadedEver"`
+	DownloadedEver int64    `json:"downloadedEver"`
 	RateUpload     int64    `json:"rateUpload"`
 	RateDownload   int64    `json:"rateDownload"`
 	UploadRatio    float64  `json:"uploadRatio"`
@@ -33,7 +34,7 @@ type trTorrent struct {
 }
 
 var allFields = []string{
-	"hashString", "name", "totalSize", "percentDone", "uploadedEver",
+	"hashString", "name", "totalSize", "percentDone", "uploadedEver", "downloadedEver",
 	"rateUpload", "rateDownload", "uploadRatio", "status", "error",
 	"errorString", "downloadDir", "labels", "addedDate", "secondsSeeding",
 	"isFinished", "trackerStats", "torrentFile", "id",
@@ -81,6 +82,7 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 		Category:      category,
 		Progress:      t.PercentDone,
 		Uploaded:      t.UploadedEver,
+		Downloaded:    t.DownloadedEver,
 		UploadSpeed:   t.RateUpload,
 		DownloadSpeed: t.RateDownload,
 		SeedTime:      t.SecondsSeeding,

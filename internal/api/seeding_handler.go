@@ -1091,36 +1091,51 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Requ
 		h.logger.Warn("stats overview: query today deleted count failed", zap.Error(err))
 	}
 
-	var trafficResult []struct {
+	var deletedUploadResult []struct {
 		TotalUpload   int64
 		TotalDownload int64
 	}
-	if err := h.db.Model(&model.SiteTrafficDaily{}).
-		Select("COALESCE(SUM(upload_delta), 0) as total_upload, COALESCE(SUM(download_delta), 0) as total_download").
-		Scan(&trafficResult).Error; err != nil {
-		h.logger.Warn("stats overview: query traffic failed", zap.Error(err))
+	h.db.Model(&model.SeedingTorrentRecord{}).
+		Select("COALESCE(SUM(final_uploaded), 0) as total_upload, COALESCE(SUM(final_downloaded), 0) as total_download").
+		Where("status = ?", "deleted").
+		Scan(&deletedUploadResult)
+
+	var activeUploadResult []struct {
+		TotalUpload   int64
+		TotalDownload int64
 	}
+	h.db.Raw(`SELECT COALESCE(SUM(uploaded), 0) as total_upload, COALESCE(SUM(downloaded), 0) as total_download FROM torrent_traffic WHERE recorded_at = (SELECT MAX(recorded_at) FROM torrent_traffic)`).
+		Scan(&activeUploadResult)
 
 	totalUpload := int64(0)
 	totalDownload := int64(0)
-	if len(trafficResult) > 0 {
-		totalUpload = trafficResult[0].TotalUpload
-		totalDownload = trafficResult[0].TotalDownload
+	if len(deletedUploadResult) > 0 {
+		totalUpload += deletedUploadResult[0].TotalUpload
+		totalDownload += deletedUploadResult[0].TotalDownload
+	}
+	if len(activeUploadResult) > 0 {
+		totalUpload += activeUploadResult[0].TotalUpload
+		totalDownload += activeUploadResult[0].TotalDownload
 	}
 
 	todayUpload := int64(0)
 	todayDownload := int64(0)
-	type todayTrafficRow struct {
-		TodayUpload   int64
-		TodayDownload int64
+	type deltaRow struct {
+		UploadDelta   int64
+		DownloadDelta int64
 	}
-	var todayResult []todayTrafficRow
-	if err := h.db.Model(&model.SiteTrafficDaily{}).
-		Select("COALESCE(SUM(upload_delta), 0) as today_upload, COALESCE(SUM(download_delta), 0) as today_download").
-		Where("date = ?", time.Now().Format("2006-01-02")).
-		Scan(&todayResult).Error; err == nil && len(todayResult) > 0 {
-		todayUpload = todayResult[0].TodayUpload
-		todayDownload = todayResult[0].TodayDownload
+	var deltaResult []deltaRow
+	h.db.Raw(`SELECT COALESCE(SUM(delta_upload), 0) as upload_delta, COALESCE(SUM(delta_download), 0) as download_delta FROM (
+		SELECT info_hash,
+			MAX(uploaded) - MIN(uploaded) AS delta_upload,
+			MAX(downloaded) - MIN(downloaded) AS delta_download
+		FROM torrent_traffic
+		WHERE recorded_at >= ?
+		GROUP BY info_hash
+	)`, today).Scan(&deltaResult)
+	if len(deltaResult) > 0 {
+		todayUpload = deltaResult[0].UploadDelta
+		todayDownload = deltaResult[0].DownloadDelta
 	}
 
 	var globalRatio float64

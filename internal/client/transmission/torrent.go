@@ -35,6 +35,18 @@ func (c *TRClient) GetSeedingTorrents(ctx context.Context) ([]*model.TorrentInfo
 	return result, nil
 }
 
+func (c *TRClient) GetAllTorrents(ctx context.Context) ([]*model.TorrentInfo, error) {
+	torrents, err := c.getTorrents(ctx, nil, allFields)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*model.TorrentInfo, 0, len(torrents))
+	for i := range torrents {
+		result = append(result, torrents[i].toModel())
+	}
+	return result, nil
+}
+
 func (c *TRClient) GetTorrentsByPath(ctx context.Context, savePath string) ([]*model.TorrentInfo, error) {
 	torrents, err := c.getTorrents(ctx, nil, allFields)
 	if err != nil {

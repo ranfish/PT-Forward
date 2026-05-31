@@ -544,7 +544,8 @@
     "ruleAlias": "Rule Alias",
     "expression": "Expression",
     "action": "Action",
-    "priority": "Priority",
+    "priority": "Priority (higher value = executed first)",
+    "priorityShort": "Priority",
     "deleteRuleConfirm": "Delete this rule?",
     "configs": "Seeding Configs",
     "addConfig": "New Seeding Config",
@@ -1190,7 +1191,8 @@
     "cleanupReseedMatchDays": "Reseed Match Retention (days)",
     "cleanupPtgenCacheDays": "PTGen Cache Retention (days)",
     "cleanupSeedingArchiveDays": "Seeding Archive Retention (days)",
-    "cleanupAuditLogDays": "Audit Log Retention (days)"
+     "cleanupAuditLogDays": "Audit Log Retention (days)",
+     "cleanupTorrentTrafficDays": "Traffic Snapshot Retention (days)"
   },
   "cookiecloud": {
     "subtitle": "Browser Cookie auto-sync",

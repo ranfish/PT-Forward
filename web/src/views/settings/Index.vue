@@ -144,6 +144,11 @@
               <a-input-number v-model:value="form.cleanupAuditLogDays" :min="1" style="width: 100%" />
             </a-form-item>
           </a-col>
+          <a-col :span="8">
+            <a-form-item :label="t('settings.cleanupTorrentTrafficDays')">
+              <a-input-number v-model:value="form.cleanupTorrentTrafficDays" :min="7" style="width: 100%" />
+            </a-form-item>
+          </a-col>
         </a-row>
 
         <a-form-item>
@@ -206,6 +211,7 @@ const form = reactive({
   cleanupPtgenCacheDays: 90,
   cleanupSeedingArchiveDays: 90,
   cleanupAuditLogDays: 90,
+  cleanupTorrentTrafficDays: 30,
 })
 
 async function fetchSettings() {
@@ -248,6 +254,7 @@ async function fetchSettings() {
       cleanupPtgenCacheDays: parseInt(data.data_cleanup_ptgen_cache_days) || 90,
       cleanupSeedingArchiveDays: parseInt(data.data_cleanup_seeding_archive_days) || 90,
       cleanupAuditLogDays: parseInt(data.data_cleanup_audit_log_days) || 90,
+      cleanupTorrentTrafficDays: parseInt(data.torrent_traffic_retention_days) || 30,
     })
   } catch (e: unknown) {
     message.error((e as Error).message)
@@ -285,6 +292,7 @@ async function saveSettings() {
       ['data_cleanup_ptgen_cache_days', String(form.cleanupPtgenCacheDays)],
       ['data_cleanup_seeding_archive_days', String(form.cleanupSeedingArchiveDays)],
       ['data_cleanup_audit_log_days', String(form.cleanupAuditLogDays)],
+      ['torrent_traffic_retention_days', String(form.cleanupTorrentTrafficDays)],
     ]
     for (const [key, value] of entries) {
       await settingsApi.update(key, { value })
