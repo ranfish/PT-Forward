@@ -53,6 +53,14 @@
           <template v-if="column.key === 'disk_protect_enabled'">
             <a-tag :color="record.disk_protect_enabled ? 'green' : 'default'">{{ record.disk_protect_enabled ? t('common.on') : t('common.off') }}</a-tag>
           </template>
+          <template v-if="column.key === 'delete_rule_ids'">
+            <template v-if="record.delete_rule_ids">
+              <div v-for="id in record.delete_rule_ids.split(',').map(Number).filter((n: number) => !isNaN(n))" :key="id" style="line-height: 22px">
+                <a-tag size="small">{{ deleteRuleMap.get(id) || ('#' + id) }}</a-tag>
+              </div>
+            </template>
+            <span v-else style="color: #999">-</span>
+          </template>
           <template v-if="column.key === 'actions'">
             <a-space>
               <a-button type="link" size="small" @click="openConfigModal(record)">{{ t('common.edit') }}</a-button>
@@ -276,7 +284,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -313,6 +321,15 @@ const torrents = ref<SeedingTorrentRecord[]>([])
 const configs = ref<SeedingClientConfig[]>([])
 const downloaderOptions = ref<{label: string, value: string}[]>([])
 const deleteRuleOptions = ref<{label: string, value: number}[]>([])
+
+const deleteRuleMap = computed(() => {
+  const m = new Map<number, string>()
+  for (const r of deleteRuleOptions.value) {
+    const alias = r.label.replace(/^#\d+\s*/, '').replace(/\s*\(.*\)$/, '')
+    m.set(r.value, alias || `#${r.value}`)
+  }
+  return m
+})
 
 const configModalVisible = ref(false)
 const configSubmitting = ref(false)
@@ -361,12 +378,12 @@ const columns = [
 
 const configColumns = [
   { title: t('seeding.downloaderId'), dataIndex: 'client_id', key: 'client_id', width: 120 },
-  { title: t('seeding.autoDeleteCron'), dataIndex: 'auto_delete_cron', key: 'auto_delete_cron', width: 140 },
-  { title: t('seeding.mainDataCron'), dataIndex: 'maindata_cron', key: 'maindata_cron', width: 140 },
-  { title: t('seeding.diskProtect'), key: 'disk_protect_enabled', width: 90 },
-  { title: t('seeding.minDiskSpaceGB'), dataIndex: 'min_disk_space_gb', key: 'min_disk_space_gb', width: 100 },
-  { title: '删种规则', dataIndex: 'delete_rule_ids', key: 'delete_rule_ids', width: 120 },
-  { title: t('common.enable'), key: 'enabled', width: 80 },
+  { title: t('seeding.autoDeleteCronShort'), dataIndex: 'auto_delete_cron', key: 'auto_delete_cron', width: 120 },
+  { title: t('seeding.mainDataCronShort'), dataIndex: 'maindata_cron', key: 'maindata_cron', width: 100 },
+  { title: t('seeding.diskProtectShort'), key: 'disk_protect_enabled', width: 100 },
+  { title: t('seeding.minDiskSpaceGB'), dataIndex: 'min_disk_space_gb', key: 'min_disk_space_gb', width: 120 },
+  { title: t('seeding.deleteRules'), key: 'delete_rule_ids', width: 260 },
+  { title: t('common.enable'), key: 'enabled', width: 70 },
   { title: t('common.actions'), key: 'actions', width: 140 },
 ]
 

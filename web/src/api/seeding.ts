@@ -50,8 +50,10 @@ export const seedingApi = {
   getStatsBySite() {
     return client.get<ApiResponse<{ items: SeedingSiteStat[]; total: number }>>('/seeding/stats/by-site')
   },
-  getStatsTorrents(page = 1, size = 20) {
-    return client.get<ApiResponsePaginated<unknown>>('/seeding/stats/torrents', { params: { page, size } })
+  getStatsTorrents(page = 1, size = 20, sort = 'uploaded', status = '') {
+    const params: Record<string, string | number> = { page, size, sort }
+    if (status) params.status = status
+    return client.get<ApiResponsePaginated<unknown>>('/seeding/stats/torrents', { params })
   },
   getTorrents(page = 1, size = 20) {
     return client.get<ApiResponsePaginated<unknown>>('/seeding/torrents', { params: { page, size } })

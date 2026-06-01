@@ -326,3 +326,6 @@ func (s *stubClient) PauseAllDownloads(_ context.Context) error                 
 func (s *stubClient) ResumeAllDownloads(_ context.Context) error                  { return nil }
 func (s *stubClient) GetFreeSpace(_ context.Context) (int64, error)               { return 0, nil }
 func (s *stubClient) CheckExists(_ context.Context, _ string) (bool, error)       { return false, nil }
+func (s *stubClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
+	return &model.GlobalTransferStats{}, nil
+}

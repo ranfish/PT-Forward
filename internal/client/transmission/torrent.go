@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -68,10 +69,14 @@ func (c *TRClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
 	}
 	torrentMap := make(map[string]model.TorrentInfo, len(torrents))
 	var totalSize int64
+	var inflightBytes int64
 	for _, t := range torrents {
 		mt := *t.toModel()
 		torrentMap[t.HashString] = mt
 		totalSize += mt.TotalSize
+		if t.PercentDone < 1.0 {
+			inflightBytes += int64(float64(t.TotalSize) * (1.0 - t.PercentDone))
+		}
 	}
 	freeSpace, _ := c.GetFreeSpace(ctx)
 	dlSpeed, ulSpeed := c.getSessionStats(ctx)
@@ -79,6 +84,7 @@ func (c *TRClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
 		Torrents:       torrentMap,
 		FreeSpace:      freeSpace,
 		TotalDiskSpace: freeSpace + totalSize,
+		InflightBytes:  inflightBytes,
 		ServerState:    model.ServerState{DownloadSpeed: dlSpeed, UploadSpeed: ulSpeed},
 	}, nil
 }
@@ -344,4 +350,24 @@ func (c *TRClient) CheckExists(ctx context.Context, infoHash string) (bool, erro
 		return false, err
 	}
 	return t != nil, nil
+}
+
+func (c *TRClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTransferStats, error) {
+	resp, err := c.rpcCall(ctx, "session-stats", nil)
+	if err != nil {
+		return nil, fmt.Errorf("session-stats rpc: %w", err)
+	}
+	var stats struct {
+		CumulativeStats struct {
+			UploadedBytes   int64 `json:"uploadedBytes"`
+			DownloadedBytes int64 `json:"downloadedBytes"`
+		} `json:"cumulative-stats"`
+	}
+	if err := json.Unmarshal(resp.Arguments, &stats); err != nil {
+		return nil, fmt.Errorf("decode session-stats: %w", err)
+	}
+	return &model.GlobalTransferStats{
+		AllTimeUpload:   stats.CumulativeStats.UploadedBytes,
+		AllTimeDownload: stats.CumulativeStats.DownloadedBytes,
+	}, nil
 }

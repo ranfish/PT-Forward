@@ -746,24 +746,30 @@ func TestRemoveLabels_CaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestTRStatusToString(t *testing.T) {
+func TestTRStateToString(t *testing.T) {
 	tests := []struct {
 		status   int
+		done     bool
 		expected string
 	}{
-		{0, "stopped"},
-		{1, "checking"},
-		{2, "checking"},
-		{3, "downloading"},
-		{4, "downloading"},
-		{5, "uploading"},
-		{6, "uploading"},
-		{99, "unknown"},
+		{0, false, "pausedDL"},
+		{0, true, "pausedUP"},
+		{1, false, "checkingDL"},
+		{1, true, "checkingUP"},
+		{2, false, "checkingDL"},
+		{2, true, "checkingUP"},
+		{3, false, "downloading"},
+		{4, false, "downloading"},
+		{5, false, "queuedUP"},
+		{5, true, "queuedUP"},
+		{6, false, "uploading"},
+		{6, true, "uploading"},
+		{99, false, "unknown"},
 	}
 
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf("status_%d", tt.status), func(t *testing.T) {
-			got := trStatusToString(tt.status)
+		t.Run(fmt.Sprintf("status_%d_done_%v", tt.status, tt.done), func(t *testing.T) {
+			got := trStateToString(tt.status, tt.done)
 			if got != tt.expected {
 				t.Errorf("expected %s, got %s", tt.expected, got)
 			}
@@ -798,8 +804,8 @@ func TestTRConvert_ErrorState(t *testing.T) {
 	if info.Error != "tracker not responding" {
 		t.Errorf("expected error string, got %q", info.Error)
 	}
-	if info.State != "stopped" {
-		t.Errorf("expected stopped, got %s", info.State)
+	if info.State != "pausedDL" {
+		t.Errorf("expected pausedDL, got %s", info.State)
 	}
 }
 

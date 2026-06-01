@@ -200,6 +200,68 @@ func (e *Engine) SetClientProvider(cp model.DownloaderProvider) {
 	}
 }
 
+func (e *Engine) GetGlobalTransferStats(ctx context.Context) *model.GlobalTransferStats {
+	result := &model.GlobalTransferStats{}
+	if e.clientProvider == nil {
+		return result
+	}
+	configs, err := e.ListConfigs(ctx)
+	if err != nil {
+		e.logger.Debug("list seeding configs failed for global stats", zap.Error(err))
+		return result
+	}
+	for _, cfg := range configs {
+		if !cfg.Enabled {
+			continue
+		}
+		client, err := e.clientProvider.Get(cfg.ClientID)
+		if err != nil {
+			continue
+		}
+		stats, err := client.GetGlobalTransferStats(ctx)
+		if err != nil {
+			e.logger.Debug("get global transfer stats failed",
+				zap.String("client", client.GetName()),
+				zap.Error(err))
+			continue
+		}
+		result.AllTimeUpload += stats.AllTimeUpload
+		result.AllTimeDownload += stats.AllTimeDownload
+	}
+	return result
+}
+
+func (e *Engine) GetTodayTransferDelta(ctx context.Context) *model.GlobalTransferStats {
+	result := &model.GlobalTransferStats{}
+	if e.clientProvider == nil {
+		return result
+	}
+	configs, err := e.ListConfigs(ctx)
+	if err != nil {
+		return result
+	}
+	for _, cfg := range configs {
+		if !cfg.Enabled {
+			continue
+		}
+		client, err := e.clientProvider.Get(cfg.ClientID)
+		if err != nil {
+			continue
+		}
+		currentStats, err := client.GetGlobalTransferStats(ctx)
+		if err != nil {
+			continue
+		}
+		var dbState model.SeedingClientState
+		if err := e.db.WithContext(ctx).Where("client_id = ?", cfg.ClientID).First(&dbState).Error; err != nil {
+			continue
+		}
+		result.AllTimeUpload += currentStats.AllTimeUpload - dbState.DayStartUpload
+		result.AllTimeDownload += currentStats.AllTimeDownload - dbState.DayStartDownload
+	}
+	return result
+}
+
 func (e *Engine) SetSiteProvider(sp model.SiteInfoProvider) {
 	e.siteProvider = sp
 }
@@ -413,6 +475,7 @@ func (e *Engine) freeWaitCheckOnce(ctx context.Context) {
 			HasHR:          entry.HasHR,
 			HRSeedTimeH:    entry.HRSeedTimeH,
 			SubscriptionID: entry.SubscriptionID,
+			TorrentSize:    entry.Size,
 		}
 		if err := e.AddSeedingRecord(ctx, record); err != nil {
 			return err
@@ -506,6 +569,7 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 				HasHR:          entry.HasHR,
 				HRSeedTimeH:    entry.HRSeedTimeH,
 				SubscriptionID: entry.SubscriptionID,
+				TorrentSize:    entry.Size,
 			}
 			if dbErr := e.db.WithContext(ctx).Create(newRecord).Error; dbErr != nil {
 				e.logger.Warn("free wait push: create alt record failed",
@@ -790,6 +854,7 @@ func (e *Engine) OnTorrents(ctx context.Context, events []model.TorrentEvent) er
 			Discount:       ev.Discount,
 			IsFree:         ev.Discount == model.DiscountFree || ev.Discount == model.Discount2xFree,
 			FreeEndAt:      ev.FreeEndAt,
+			TorrentSize:    ev.Size,
 		}
 		if ev.HasHR {
 			record.HasHR = true
@@ -1738,6 +1803,7 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 		SubscriptionID: event.SourceID,
 		IsFree:      event.Discount == model.DiscountFree || event.Discount == model.Discount2xFree,
 		FreeEndAt:   event.FreeEndAt,
+		TorrentSize: event.Size,
 	}
 
 	result := e.db.WithContext(ctx).Clauses(clause.OnConflict{
@@ -1971,16 +2037,18 @@ func (e *Engine) GetRealTorrentCounts() map[string]*RealTorrentCounts {
 			}
 			counts.Total++
 			counts.TotalSize += ti.TotalSize
-			state := strings.ToLower(ti.State)
-			switch {
-			case strings.HasSuffix(state, "up") || state == "uploading":
-				counts.Seeding++
-			case state == "downloading" || state == "stalleddl" || state == "forceddl" ||
-				state == "metadl" || state == "checkingdl" || state == "queueddl":
-				counts.Downloading++
-			case ti.IsPaused || strings.HasSuffix(state, "dl"):
-				counts.Paused++
-			}
+		state := strings.ToLower(ti.State)
+		switch {
+		case state == "uploading" || state == "stalledup" || state == "forcedup" ||
+			state == "queuedup" || state == "checkingup":
+			counts.Seeding++
+		case state == "downloading" || state == "stalleddl" || state == "forceddl" ||
+			state == "metadl" || state == "forcedmetadl" || state == "checkingdl" || state == "queueddl":
+			counts.Downloading++
+		case ti.IsPaused || state == "pausedup" || state == "stoppedup" ||
+			strings.HasSuffix(state, "dl"):
+			counts.Paused++
+		}
 		}
 		result[clientID] = counts
 	}
@@ -2053,6 +2121,16 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 
 	var dbState model.SeedingClientState
 	err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&dbState).Error
+
+	var globalStats *model.GlobalTransferStats
+	if e.clientProvider != nil {
+		if client, cErr := e.clientProvider.Get(clientID); cErr == nil {
+			if gs, gsErr := client.GetGlobalTransferStats(ctx); gsErr == nil {
+				globalStats = gs
+			}
+		}
+	}
+
 	if err != nil {
 		dbState = model.SeedingClientState{
 			ClientID:         clientID,
@@ -2060,17 +2138,33 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 			AvgDownloadSpeed: state.DownloadSpeed,
 			Initialized:      true,
 		}
+		if globalStats != nil {
+			dbState.AllTimeUpload = globalStats.AllTimeUpload
+			dbState.AllTimeDownload = globalStats.AllTimeDownload
+		}
 		if err := e.db.WithContext(ctx).Create(&dbState).Error; err != nil {
 			e.logger.Warn("create seeding client state failed",
 				zap.String("client_id", clientID),
 				zap.Error(err))
 		}
 	} else {
-		if err := e.db.WithContext(ctx).Model(&dbState).Updates(map[string]interface{}{
+		updates := map[string]interface{}{
 			"avg_upload_speed":   state.UploadSpeed,
 			"avg_download_speed": state.DownloadSpeed,
 			"initialized":        true,
-		}).Error; err != nil {
+		}
+		if globalStats != nil {
+			updates["all_time_upload"] = globalStats.AllTimeUpload
+			updates["all_time_download"] = globalStats.AllTimeDownload
+
+			today := time.Now().Format("2006-01-02")
+			if dbState.DayStartDate != today {
+				updates["day_start_upload"] = globalStats.AllTimeUpload
+				updates["day_start_download"] = globalStats.AllTimeDownload
+				updates["day_start_date"] = today
+			}
+		}
+		if err := e.db.WithContext(ctx).Model(&dbState).Updates(updates).Error; err != nil {
 			e.logger.Warn("update seeding client state failed",
 				zap.String("client_id", clientID),
 				zap.Error(err))

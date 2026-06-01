@@ -611,7 +611,14 @@ export interface SeedingStatsOverview {
 
 export interface SeedingSiteStat {
   siteName: string
-  count: number
+  seedingCount: number
+  totalCount: number
+  todayAdded: number
+  todayDeleted: number
+  activeFree: number
+  activeNonFree: number
+  todayUploadBytes: number
+  historyUploadBytes: number
 }
 
 export interface SeedingSiteTrendPoint {

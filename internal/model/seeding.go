@@ -29,6 +29,7 @@ type SeedingTorrentRecord struct {
 	FirstMatchedAt    *time.Time `json:"first_matched_at" gorm:"index"`
 	FinalUploaded     int64      `json:"final_uploaded" gorm:"default:0"`
 	FinalDownloaded   int64      `json:"final_downloaded" gorm:"default:0"`
+	TorrentSize       int64      `json:"torrent_size" gorm:"default:0"`
 }
 
 func (SeedingTorrentRecord) TableName() string { return "seeding_torrent_records" }
@@ -86,15 +87,18 @@ func (SeedingClientConfig) TableName() string { return "seeding_client_configs" 
 
 // §33.1.84 — SeedingClientState: 刷流下载器持久化状态
 type SeedingClientState struct {
-	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ClientID  string    `json:"client_id" gorm:"uniqueIndex;size:50;not null"`
-	UpdatedAt time.Time `json:"updated_at"`
-
-	AvgUploadSpeed   float64 `json:"avg_upload_speed"`
-	AvgDownloadSpeed float64 `json:"avg_download_speed"`
-	Initialized      bool    `json:"initialized"`
-
-	WasLowSpace bool `json:"was_low_space"`
+	ID               uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	ClientID         string    `gorm:"uniqueIndex;not null" json:"client_id"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	AvgUploadSpeed   float64   `json:"avg_upload_speed"`
+	AvgDownloadSpeed float64   `json:"avg_download_speed"`
+	Initialized      bool      `json:"initialized"`
+	WasLowSpace      bool      `json:"was_low_space"`
+	AllTimeUpload    int64     `gorm:"default:0" json:"alltime_upload"`
+	AllTimeDownload  int64     `gorm:"default:0" json:"alltime_download"`
+	DayStartUpload   int64     `gorm:"default:0" json:"day_start_upload"`
+	DayStartDownload int64     `gorm:"default:0" json:"day_start_download"`
+	DayStartDate     string    `gorm:"default:''" json:"day_start_date"`
 }
 
 func (SeedingClientState) TableName() string { return "seeding_client_states" }

@@ -31,6 +31,7 @@ func setupSeedingE2EDB(t *testing.T) *gorm.DB {
 		&model.DeleteRule{},
 		&model.SeedingClientState{},
 		&model.ScoringLog{},
+		&model.FreeWaitEntry{},
 	)
 	require.NoError(t, err, "auto-migrate models")
 	return db
@@ -87,6 +88,11 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 				},
 			}, nil
 		},
+		GetAllTorrentsFn: func(_ context.Context) ([]*model.TorrentInfo, error) {
+			return []*model.TorrentInfo{
+				{Hash: "e2e_hash_001", UploadSpeed: 100, SeedTime: 100, Ratio: 0.5, TotalSize: 1024, Progress: 1.0},
+			}, nil
+		},
 		GetSeedingTorrentsFn: func(_ context.Context) ([]*model.TorrentInfo, error) {
 			return []*model.TorrentInfo{
 				{Hash: "e2e_hash_001", UploadSpeed: 100, SeedTime: 100, Ratio: 0.5, TotalSize: 1024},
@@ -135,6 +141,9 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 				DownloadTorrentFn: func(_ context.Context, _ *model.SiteConfig, _ string) ([]byte, error) {
 					return []byte("d8:announce30:http://tracker.test.com/announcee"), nil
 				},
+				DetectDiscountFn: func(_ context.Context, _ *model.SiteConfig, _ string) (*model.DiscountResult, error) {
+					return &model.DiscountResult{Level: model.DiscountFree}, nil
+				},
 				GetBatchSLDataFn: func(_ context.Context, _ *model.SiteConfig, tids []string) (map[string]*model.SLData, error) {
 					result := make(map[string]*model.SLData)
 					for _, tid := range tids {
@@ -169,13 +178,13 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 		},
 	}
 	require.NoError(t, eng.OnTorrents(ctx, events))
-	assert.Equal(t, 1, eng.TotalActiveCount(), "OnTorrents should create 1 active record")
 
 	var rec model.SeedingTorrentRecord
 	require.NoError(t, db.Where("info_hash = ?", "e2e_hash_001").First(&rec).Error)
 	assert.Equal(t, "1001", rec.TorrentID)
 	assert.True(t, rec.IsFree)
-	t.Logf("Phase 1 PASS: record created id=%d torrent=%s isFree=%v", rec.ID, rec.TorrentID, rec.IsFree)
+	assert.Equal(t, model.SeedingStatusPending, rec.Status)
+	t.Logf("Phase 1 PASS: record created id=%d torrent=%s isFree=%v status=%s", rec.ID, rec.TorrentID, rec.IsFree, rec.Status)
 
 	t.Log("=== Phase 2: Flush ===")
 	candidates, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID))

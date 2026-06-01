@@ -830,7 +830,7 @@ func (h *SeedingHandler) handleScoringConfig(w http.ResponseWriter, r *http.Requ
 		updates := make(map[string]interface{})
 		if v, ok := req["enabled"].(bool); ok {
 			sub.ScoringConfig.Enabled = v
-			updates["enabled"] = v
+			updates["scoring_enabled"] = v
 		}
 		if v, ok := req["halfLifeHours"].(float64); ok {
 			sub.ScoringConfig.HalfLifeHours = v
@@ -1091,57 +1091,26 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Requ
 		h.logger.Warn("stats overview: query today deleted count failed", zap.Error(err))
 	}
 
-	var deletedUploadResult []struct {
-		TotalUpload   int64
-		TotalDownload int64
+	var globalStats *model.GlobalTransferStats
+	if h.engine != nil {
+		globalStats = h.engine.GetGlobalTransferStats(context.Background())
 	}
-	h.db.Model(&model.SeedingTorrentRecord{}).
-		Select("COALESCE(SUM(final_uploaded), 0) as total_upload, COALESCE(SUM(final_downloaded), 0) as total_download").
-		Where("status = ?", "deleted").
-		Scan(&deletedUploadResult)
-
-	var activeUploadResult []struct {
-		TotalUpload   int64
-		TotalDownload int64
-	}
-	h.db.Raw(`SELECT COALESCE(SUM(uploaded), 0) as total_upload, COALESCE(SUM(downloaded), 0) as total_download FROM torrent_traffic WHERE recorded_at = (SELECT MAX(recorded_at) FROM torrent_traffic)`).
-		Scan(&activeUploadResult)
-
-	totalUpload := int64(0)
-	totalDownload := int64(0)
-	if len(deletedUploadResult) > 0 {
-		totalUpload += deletedUploadResult[0].TotalUpload
-		totalDownload += deletedUploadResult[0].TotalDownload
-	}
-	if len(activeUploadResult) > 0 {
-		totalUpload += activeUploadResult[0].TotalUpload
-		totalDownload += activeUploadResult[0].TotalDownload
+	if globalStats == nil {
+		globalStats = &model.GlobalTransferStats{}
 	}
 
 	todayUpload := int64(0)
 	todayDownload := int64(0)
-	type deltaRow struct {
-		UploadDelta   int64
-		DownloadDelta int64
-	}
-	var deltaResult []deltaRow
-	h.db.Raw(`SELECT COALESCE(SUM(delta_upload), 0) as upload_delta, COALESCE(SUM(delta_download), 0) as download_delta FROM (
-		SELECT info_hash,
-			MAX(uploaded) - MIN(uploaded) AS delta_upload,
-			MAX(downloaded) - MIN(downloaded) AS delta_download
-		FROM torrent_traffic
-		WHERE recorded_at >= ?
-		GROUP BY info_hash
-	)`, today).Scan(&deltaResult)
-	if len(deltaResult) > 0 {
-		todayUpload = deltaResult[0].UploadDelta
-		todayDownload = deltaResult[0].DownloadDelta
+	if h.engine != nil {
+		todayStats := h.engine.GetTodayTransferDelta(context.Background())
+		todayUpload = todayStats.AllTimeUpload
+		todayDownload = todayStats.AllTimeDownload
 	}
 
 	var globalRatio float64
-	if totalDownload > 0 {
-		globalRatio = float64(totalUpload) / float64(totalDownload)
-	} else if totalUpload > 0 {
+	if globalStats.AllTimeDownload > 0 {
+		globalRatio = float64(globalStats.AllTimeUpload) / float64(globalStats.AllTimeDownload)
+	} else if globalStats.AllTimeUpload > 0 {
 		globalRatio = -1
 	}
 
@@ -1151,13 +1120,15 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Requ
 		"pausedTorrents":       pausedTorrents,
 		"realSeeding":          realSeeding,
 		"realDownloading":      realDownloading,
-		"totalUploadBytes":     totalUpload,
-		"totalDownloadBytes":   totalDownload,
+		"totalUploadBytes":     globalStats.AllTimeUpload,
+		"totalDownloadBytes":   globalStats.AllTimeDownload,
 		"todayUploadBytes":     todayUpload,
 		"todayDownloadBytes":   todayDownload,
 		"globalRatio":          globalRatio,
 		"todayDeleted":         todayDeleted,
 		"todayAdded":           todayAdded,
+		"statsScope":           "seeding",
+		"statsScopeNote":       "仅统计刷流绑定且启用的下载器全局传输量（含该下载器内所有种子，含非刷流种子）",
 	})
 }
 
@@ -1170,21 +1141,94 @@ func (h *SeedingHandler) handleStatsBySite(w http.ResponseWriter, r *http.Reques
 		limit = 200
 	}
 
+	today := time.Now().Truncate(24 * time.Hour)
+
 	type siteStat struct {
-		SiteName string `json:"siteName"`
-		Count    int64  `json:"count"`
+		SiteName      string `json:"siteName"`
+		SeedingCount  int64  `json:"seedingCount"`
+		TotalCount    int64  `json:"totalCount"`
+		TodayAdded    int64  `json:"todayAdded"`
+		TodayDeleted  int64  `json:"todayDeleted"`
+		ActiveFree    int64  `json:"activeFree"`
+		ActiveNonFree int64  `json:"activeNonFree"`
+		TodayUpload   int64  `json:"todayUploadBytes"`
+		HistoryUpload int64  `json:"historyUploadBytes"`
 	}
 
 	var stats []siteStat
 	if err := h.db.Model(&model.SeedingTorrentRecord{}).
-		Select("site_name, count(*) as count").
-		Where("status = ?", "seeding").
+		Select(`site_name,
+			SUM(CASE WHEN status IN ('seeding','pending','paused_free_end','paused_rule') THEN 1 ELSE 0 END) as seeding_count,
+			COUNT(*) as total_count,
+			SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as today_added,
+			SUM(CASE WHEN status = 'deleted' AND updated_at >= ? THEN 1 ELSE 0 END) as today_deleted,
+			SUM(CASE WHEN is_free = 1 AND status IN ('seeding','pending','paused_free_end','paused_rule') THEN 1 ELSE 0 END) as active_free,
+			SUM(CASE WHEN is_free = 0 AND status IN ('seeding','pending','paused_free_end','paused_rule') THEN 1 ELSE 0 END) as active_non_free,
+			0 as today_upload_bytes,
+			SUM(final_uploaded) as history_upload_bytes`,
+			today, today).
 		Group("site_name").
-		Order("count DESC").
+		Order("seeding_count DESC").
 		Limit(limit).
 		Find(&stats).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询站点统计失败")
 		return
+	}
+
+	siteUploadMap := map[string]int64{}
+	type uploadRow struct {
+		SiteName    string `json:"site_name"`
+		UploadDelta int64  `json:"upload_delta"`
+	}
+	var uploadRows []uploadRow
+	h.db.Raw(`SELECT site_name, SUM(delta_upload) as upload_delta
+		FROM (
+			SELECT site_name, info_hash,
+				MAX(uploaded) - MIN(uploaded) AS delta_upload
+			FROM torrent_traffic
+			WHERE recorded_at >= ?
+			GROUP BY site_name, info_hash
+		) sub
+		GROUP BY site_name`, today).Scan(&uploadRows)
+	for _, row := range uploadRows {
+		siteUploadMap[row.SiteName] = row.UploadDelta
+	}
+
+	for i := range stats {
+		if v, ok := siteUploadMap[stats[i].SiteName]; ok {
+			stats[i].TodayUpload = v
+		}
+	}
+
+	historyUploadMap := map[string]int64{}
+	type historyRow struct {
+		SiteName string `json:"site_name"`
+		Uploaded int64  `json:"uploaded"`
+	}
+	var historyRows []historyRow
+	h.db.Raw(`SELECT site_name, SUM(uploaded) as uploaded
+		FROM (
+			SELECT str.site_name, str.info_hash,
+				CASE WHEN str.final_uploaded > 0 THEN str.final_uploaded
+					WHEN tt.uploaded > 0 THEN tt.uploaded
+					ELSE 0 END as uploaded
+			FROM seeding_torrent_records str
+			LEFT JOIN (
+				SELECT info_hash, MAX(uploaded) as uploaded
+				FROM torrent_traffic
+				GROUP BY info_hash
+			) tt ON tt.info_hash = str.info_hash
+			WHERE str.status IN ('seeding','pending','paused_free_end','paused_rule')
+		) sub
+		GROUP BY site_name`).Scan(&historyRows)
+	for _, row := range historyRows {
+		historyUploadMap[row.SiteName] = row.Uploaded
+	}
+
+	for i := range stats {
+		if v, ok := historyUploadMap[stats[i].SiteName]; ok {
+			stats[i].HistoryUpload += v
+		}
 	}
 
 	Success(w, map[string]interface{}{
@@ -1231,6 +1275,7 @@ func (h *SeedingHandler) handleSiteTrend(w http.ResponseWriter, r *http.Request,
 func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("size"))
+	sortBy := r.URL.Query().Get("sort")
 	if page < 1 {
 		page = 1
 	} else if page > 10000 {
@@ -1241,8 +1286,11 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 	}
 	offset := (page - 1) * pageSize
 
-	q := h.db.Model(&model.SeedingTorrentRecord{}).
-		Where("status = ?", "seeding")
+	status := r.URL.Query().Get("status")
+	q := h.db.Model(&model.SeedingTorrentRecord{})
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -1250,14 +1298,99 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	orderClause := "final_uploaded DESC"
+	switch sortBy {
+	case "size":
+		orderClause = "torrent_size DESC"
+	case "uploaded":
+		orderClause = "final_uploaded DESC"
+	case "time":
+		orderClause = "flushed_at DESC"
+	default:
+		orderClause = "final_uploaded DESC"
+	}
+
 	var records []model.SeedingTorrentRecord
-	if err := q.Order("created_at ASC").Offset(offset).Limit(pageSize).Find(&records).Error; err != nil {
+	if err := q.Order(orderClause).Offset(offset).Limit(pageSize).Find(&records).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询种子统计失败")
 		return
 	}
 
+	type torrentWithTraffic struct {
+		model.SeedingTorrentRecord
+		LatestUpload int64  `json:"latest_upload"`
+		Title        string `json:"title"`
+		DetailURL    string `json:"detail_url"`
+	}
+
+	type siteInfo struct {
+		BaseURL   string
+		Framework string
+	}
+	siteMap := map[string]siteInfo{}
+	var siteList []model.Site
+	h.db.Select("name, base_url, framework").Find(&siteList)
+	for _, s := range siteList {
+		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
+	}
+
+	hashes := make([]string, 0, len(records))
+	for _, rec := range records {
+		hyield := rec.InfoHash
+		if len(hyield) > 0 {
+			hashes = append(hashes, hyield)
+		}
+	}
+
+	latestMap := map[string]int64{}
+	titleKeyMap := map[string]string{}
+	if len(hashes) > 0 {
+		type trafficRow struct {
+			InfoHash string `json:"info_hash"`
+			Uploaded int64  `json:"uploaded"`
+		}
+		var rows []trafficRow
+		h.db.Raw(`SELECT info_hash, MAX(uploaded) as uploaded
+			FROM torrent_traffic
+			WHERE info_hash IN (?) AND recorded_at >= ?
+			GROUP BY info_hash`, hashes, time.Now().Truncate(24*time.Hour)).Scan(&rows)
+		for _, row := range rows {
+			latestMap[row.InfoHash] = row.Uploaded
+		}
+
+		type titleRow struct {
+			SiteName  string `json:"site_name"`
+			TorrentID string `json:"torrent_id"`
+			Title     string `json:"title"`
+		}
+		var titles []titleRow
+		siteTorrents := make([]string, 0, len(records))
+		for _, rec := range records {
+			siteTorrents = append(siteTorrents, rec.SiteName+"|"+rec.TorrentID)
+		}
+		h.db.Raw(`SELECT site_name, torrent_id, title FROM rss_torrent_seen WHERE site_name || '|' || torrent_id IN (?)`, siteTorrents).Scan(&titles)
+		for _, t := range titles {
+			titleKeyMap[t.SiteName+"|"+t.TorrentID] = t.Title
+		}
+	}
+
+	result := make([]torrentWithTraffic, 0, len(records))
+	for _, rec := range records {
+		r := torrentWithTraffic{SeedingTorrentRecord: rec}
+		if v, ok := latestMap[rec.InfoHash]; ok {
+			r.LatestUpload = v
+		}
+		if t, ok := titleKeyMap[rec.SiteName+"|"+rec.TorrentID]; ok {
+			r.Title = t
+		}
+		if si, ok := siteMap[rec.SiteName]; ok && si.BaseURL != "" && rec.TorrentID != "" {
+			r.DetailURL = buildDetailURL(si.BaseURL, si.Framework, rec.TorrentID)
+		}
+		result = append(result, r)
+	}
+
 	Success(w, map[string]interface{}{
-		"items": records,
+		"items": result,
 		"total": total,
 		"page":  page,
 	})

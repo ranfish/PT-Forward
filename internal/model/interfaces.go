@@ -67,6 +67,11 @@ type IYUUService interface {
 	SendNotification(ctx context.Context, text, desp string) error
 }
 
+type GlobalTransferStats struct {
+	AllTimeUpload   int64
+	AllTimeDownload int64
+}
+
 type DownloaderClient interface {
 	GetName() string
 	GetRole() string
@@ -103,6 +108,7 @@ type DownloaderClient interface {
 	GetFreeSpace(ctx context.Context) (int64, error)
 
 	CheckExists(ctx context.Context, infoHash string) (bool, error)
+	GetGlobalTransferStats(ctx context.Context) (*GlobalTransferStats, error)
 }
 
 type DownloaderProvider interface {

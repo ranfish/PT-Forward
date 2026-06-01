@@ -42,8 +42,8 @@ func (t qbTorrent) toModel() *model.TorrentInfo {
 	}
 
 	var errStr string
-	if t.State == "error" {
-		errStr = "error"
+	if t.State == "error" || t.State == "missingFiles" {
+		errStr = t.State
 	}
 
 	return &model.TorrentInfo{
