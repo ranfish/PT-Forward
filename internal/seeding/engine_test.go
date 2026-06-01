@@ -92,6 +92,9 @@ func (m *mockDownloaderClient) GetRole() string                           { retu
 func (m *mockDownloaderClient) GetReseedTargetID() string                 { return "" }
 func (m *mockDownloaderClient) GetID() uint                               { return 0 }
 func (m *mockDownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
+func (m *mockDownloaderClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
+	return &model.GlobalTransferStats{}, nil
+}
 
 type mockDownloaderProvider struct {
 	clients map[string]*mockDownloaderClient

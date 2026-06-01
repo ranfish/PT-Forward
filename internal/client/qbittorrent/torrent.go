@@ -155,10 +155,14 @@ func (c *QBClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
 
 	torrents := make(map[string]model.TorrentInfo, len(raw.Torrents))
 	var totalSize int64
+	var inflightBytes int64
 	for hash, t := range raw.Torrents {
 		mt := *t.toModel()
 		torrents[hash] = mt
 		totalSize += mt.TotalSize
+		if t.Progress < 1.0 {
+			inflightBytes += int64(float64(t.TotalSize) * (1.0 - t.Progress))
+		}
 	}
 
 	tags := parseTagsJSON(raw.Tags)
@@ -168,6 +172,7 @@ func (c *QBClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
 		Torrents:       torrents,
 		FreeSpace:      raw.ServerState.FreeSpaceOnDisk,
 		TotalDiskSpace: raw.ServerState.FreeSpaceOnDisk + totalSize,
+		InflightBytes:  inflightBytes,
 		CategoryMap:    categories,
 		Tags:           tags,
 		ServerState: model.ServerState{
@@ -201,18 +206,24 @@ func (c *QBClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.
 	}
 
 	torrents := make(map[string]model.TorrentInfo, len(raw.Torrents))
+	var inflightBytes int64
 	for hash, t := range raw.Torrents {
-		torrents[hash] = *t.toModel()
+		mt := *t.toModel()
+		torrents[hash] = mt
+		if t.Progress < 1.0 {
+			inflightBytes += int64(float64(t.TotalSize) * (1.0 - t.Progress))
+		}
 	}
 
 	tags := parseTagsJSON(raw.Tags)
 	categories := parseCategoriesJSON(raw.Categories)
 
 	return &model.Maindata{
-		Torrents:    torrents,
-		FreeSpace:   raw.ServerState.FreeSpaceOnDisk,
-		CategoryMap: categories,
-		Tags:        tags,
+		Torrents:      torrents,
+		FreeSpace:     raw.ServerState.FreeSpaceOnDisk,
+		InflightBytes: inflightBytes,
+		CategoryMap:   categories,
+		Tags:          tags,
 	}, raw.Rid, nil
 }
 
@@ -535,4 +546,26 @@ func (c *QBClient) CheckExists(ctx context.Context, infoHash string) (bool, erro
 		return false, err
 	}
 	return t != nil, nil
+}
+
+func (c *QBClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTransferStats, error) {
+	resp, err := c.get(ctx, "/api/v2/transfer/info")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("transfer info returned %d", resp.StatusCode)
+	}
+	var info struct {
+		UpInfoData   int64 `json:"up_info_data"`
+		DlInfoData   int64 `json:"dl_info_data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return nil, fmt.Errorf("decode transfer info: %w", err)
+	}
+	return &model.GlobalTransferStats{
+		AllTimeUpload:   info.UpInfoData,
+		AllTimeDownload: info.DlInfoData,
+	}, nil
 }

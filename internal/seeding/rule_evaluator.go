@@ -166,15 +166,9 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 	case "hour":
 		return fmt.Sprintf("%d", rc.Now.Hour()), true
 	case "activeUploads":
-		if rc.Torrent != nil && rc.Torrent.UploadSpeed > 0 {
-			return "1", true
-		}
-		return "0", true
+		return fmt.Sprintf("%d", rc.ActiveUploads), true
 	case "activeDownloads":
-		if rc.Torrent != nil && rc.Torrent.DownloadSpeed > 0 {
-			return "1", true
-		}
-		return "0", true
+		return fmt.Sprintf("%d", rc.ActiveDownloads), true
 	case "globalUploadSpeed":
 		return fmt.Sprintf("%.0f", rc.GlobalUploadSpeed), true
 	case "globalDownloadSpeed":

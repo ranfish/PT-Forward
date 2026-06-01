@@ -9,7 +9,7 @@
 - **站点数据**：官组命名、规则等站点原始数据必须原样写入，不能杜撰
 - **删除代码后**：必须跑 `go vet ./...`（不只是 `go build`），确保测试文件不引用已删符号
 - **前端验证**：改完前端代码后跑 `vue-tsc -b --noEmit` + `npx eslint src/` 确认零错误
-- **前端构建部署**：前端源码修改后必须重新构建才能生效，完整流程：
+- **前端构建部署**：前端源码修改后必须回归审核并重新构建才能生效，完整流程：
   1. `PATH="/home/incast/.local/bin:$PATH" ./node_modules/.bin/vite build`（在 `web/` 目录，Node 需 ≥20，系统 Node 18 不行，用 `/home/incast/.local/bin/node` v22）
   2. `rm -rf frontend/dist && cp -r web/dist frontend/dist`
   3. `CGO_ENABLED=1 go build -ldflags "-s -w" -o pt-forward ./cmd/pt-forward/`

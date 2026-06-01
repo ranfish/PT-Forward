@@ -213,6 +213,10 @@ func (m *DownloaderClient) CheckExists(ctx context.Context, infoHash string) (bo
 	return false, nil
 }
 
+func (m *DownloaderClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTransferStats, error) {
+	return &model.GlobalTransferStats{}, nil
+}
+
 type DownloaderProvider struct {
 	Client        model.DownloaderClient
 	GetFn         func(clientID string) (model.DownloaderClient, error)

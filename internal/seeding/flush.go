@@ -418,6 +418,7 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 	}
 
 	var results []*model.SeedingCandidate
+	var batchPendingBytes int64
 	for _, c := range qualified {
 		if ctx.Err() != nil {
 			break
@@ -426,13 +427,30 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 		if fc.clientCfg != nil && fc.clientCfg.DiskProtectEnabled && fc.clientCfg.MinDiskSpaceGB > 0 {
 			if md, mdErr := fc.client.GetMainData(ctx); mdErr == nil && md != nil {
 				minBytes := int64(fc.clientCfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
-				if md.FreeSpace < minBytes {
+				inflightBytes := md.InflightBytes + batchPendingBytes
+				effectiveFree := md.FreeSpace - inflightBytes
+				if effectiveFree < minBytes {
 					e.logger.Warn("flush: disk protect triggered during batch, stopping",
 						zap.String("client_id", fc.clientID),
 						zap.Int64("freeSpace", md.FreeSpace),
+						zap.Int64("inflightBytes", inflightBytes),
+						zap.Int64("batchPendingBytes", batchPendingBytes),
+						zap.Int64("effectiveFree", effectiveFree),
 						zap.Float64("minGB", fc.clientCfg.MinDiskSpaceGB),
 						zap.Int("pushed", len(results)))
 					break
+				}
+				torrentSize := c.Record.TorrentSize
+				if torrentSize > 0 && effectiveFree-torrentSize < minBytes {
+					e.logger.Info("flush: disk budget insufficient for torrent, skipping",
+						zap.String("client_id", fc.clientID),
+						zap.Int64("freeSpace", md.FreeSpace),
+						zap.Int64("inflightBytes", inflightBytes),
+						zap.Int64("effectiveFree", effectiveFree),
+						zap.Int64("torrentSize", torrentSize),
+						zap.Float64("minGB", fc.clientCfg.MinDiskSpaceGB),
+						zap.String("torrent_id", c.TorrentID))
+					continue
 				}
 			}
 		}
@@ -440,6 +458,7 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 		candidate, pushed := e.pushOne(ctx, fc, c)
 		results = append(results, candidate)
 		if pushed {
+			batchPendingBytes += c.Record.TorrentSize
 			e.logger.Info("flush: pushed seeding torrent",
 				zap.String("client_id", fc.clientID),
 				zap.String("site", c.SiteName),

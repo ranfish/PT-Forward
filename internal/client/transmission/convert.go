@@ -71,7 +71,7 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 		IsFinished:    t.IsFinished || t.PercentDone >= 1.0,
 		IsPaused:      t.Status == 0,
 		Removed:       false,
-		State:         trStatusToString(t.Status),
+		State:         trStateToString(t.Status, t.PercentDone >= 1.0),
 		Error:         errStr,
 		NumComplete:   numComplete,
 		NumIncomplete: numIncomplete,
@@ -90,15 +90,23 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 	}
 }
 
-func trStatusToString(status int) string {
+func trStateToString(status int, done bool) string {
 	switch status {
 	case 0:
-		return "stopped"
+		if done {
+			return "pausedUP"
+		}
+		return "pausedDL"
 	case 1, 2:
-		return "checking"
+		if done {
+			return "checkingUP"
+		}
+		return "checkingDL"
 	case 3, 4:
 		return "downloading"
-	case 5, 6:
+	case 5:
+		return "queuedUP"
+	case 6:
 		return "uploading"
 	default:
 		return "unknown"

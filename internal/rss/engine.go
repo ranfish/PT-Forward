@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/event"
@@ -51,6 +52,17 @@ func getOrCompileRegex(pattern string) (*regexp.Regexp, error) {
 
 const defaultFetchInterval = 5 * time.Minute
 
+type detectCacheEntry struct {
+	hasHR         bool
+	hrSeedTimeH   int
+	discountLevel model.DiscountLevel
+	isFree        bool
+	freeEndAt     *time.Time
+	cachedAt      time.Time
+}
+
+const detectCacheTTL = 5 * time.Minute
+
 type Engine struct {
 	fetcher        *Fetcher
 	repo           *Repository
@@ -65,6 +77,8 @@ type Engine struct {
 	sideLoadMgr    *SideLoadManager
 	configBus      *ConfigEventBus
 	pushLimiter    *PushLimiter
+
+	detectCache sync.Map
 
 	mu    sync.RWMutex
 	tasks map[uint]context.CancelFunc
@@ -487,7 +501,14 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 
 		var torrentEvents []model.TorrentEvent
 		newCount := 0
-		for _, event := range events {
+
+		type detectItem struct {
+			event *model.RSSTorrentEvent
+			index int
+		}
+		var detectItems []detectItem
+
+		for i, event := range events {
 			isSeen, seenErr := e.repo.IsSeen(ctx, event.SiteName, event.TorrentID)
 			if seenErr != nil {
 				e.logger.Warn("check seen status failed, skipping torrent",
@@ -527,14 +548,44 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				}
 			}
 
-			t0 := time.Now()
-			e.detectHRAndDiscount(ctx, event, site.Domain)
-			if dur := time.Since(t0); dur > 2*time.Second {
-				e.logger.Warn("detectHRAndDiscount slow",
-					zap.String("subscription", sub.Name),
-					zap.String("torrent", event.TorrentID),
-					zap.Duration("duration", dur))
+			detectItems = append(detectItems, detectItem{event: event, index: i})
+		}
+
+		if len(detectItems) > 0 {
+			const maxConcurrentDetect = 2
+			sem := make(chan struct{}, maxConcurrentDetect)
+			var wg sync.WaitGroup
+			var slowCount int64
+
+			for _, item := range detectItems {
+				wg.Add(1)
+				sem <- struct{}{}
+				go func(it detectItem) {
+					defer wg.Done()
+					defer func() { <-sem }()
+					t0 := time.Now()
+					e.detectHRAndDiscount(ctx, it.event, site.Domain)
+					if dur := time.Since(t0); dur > 2*time.Second {
+						atomic.AddInt64(&slowCount, 1)
+						e.logger.Warn("detectHRAndDiscount slow",
+							zap.String("subscription", sub.Name),
+							zap.String("torrent", it.event.TorrentID),
+							zap.Duration("duration", dur))
+					}
+				}(item)
 			}
+			wg.Wait()
+
+			if slowCount > 0 {
+				e.logger.Info("detectHRAndDiscount batch summary",
+					zap.String("subscription", sub.Name),
+					zap.Int("total", len(detectItems)),
+					zap.Int64("slow", slowCount))
+			}
+		}
+
+		for _, item := range detectItems {
+			event := item.event
 
 			if sub.ScrapeFree && !event.IsFree {
 				e.logger.Debug("torrent skipped: not free",
@@ -843,11 +894,25 @@ func uintToString(n uint) string {
 	return fmt.Sprintf("%d", n)
 }
 
-const perTorrentDetectTimeout = 15 * time.Second
+const perTorrentDetectTimeout = 8 * time.Second
 
 func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorrentEvent, siteName string) {
 	if e.siteProvider == nil || event.TorrentID == "" {
 		return
+	}
+
+	cacheKey := siteName + ":" + event.TorrentID
+	if cached, ok := e.detectCache.Load(cacheKey); ok {
+		entry := cached.(*detectCacheEntry)
+		if time.Since(entry.cachedAt) < detectCacheTTL {
+			event.HasHR = entry.hasHR
+			event.HRSeedTimeH = entry.hrSeedTimeH
+			event.DiscountLevel = entry.discountLevel
+			event.IsFree = entry.isFree
+			event.FreeEndAt = entry.freeEndAt
+			return
+		}
+		e.detectCache.Delete(cacheKey)
 	}
 
 	detectCtx, detectCancel := context.WithTimeout(ctx, perTorrentDetectTimeout)
@@ -889,32 +954,71 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 				event.FreeEndAt = discResult.FreeEndAt
 			}
 		}
+		e.detectCache.Store(cacheKey, &detectCacheEntry{
+			hasHR:         event.HasHR,
+			hrSeedTimeH:   event.HRSeedTimeH,
+			discountLevel: event.DiscountLevel,
+			isFree:        event.IsFree,
+			freeEndAt:     event.FreeEndAt,
+			cachedAt:      time.Now(),
+		})
 		return
 	}
 
-	if hrResult, err := adapter.DetectHR(detectCtx, config, event.TorrentID); err == nil && hrResult != nil {
-		event.HasHR = hrResult.HasHR
+	type hrOut struct {
+		result *model.HRResult
+		err    error
+	}
+	type discOut struct {
+		result *model.DiscountResult
+		err    error
+	}
+
+	hrCh := make(chan hrOut, 1)
+	discCh := make(chan discOut, 1)
+
+	go func() {
+		r, err := adapter.DetectHR(detectCtx, config, event.TorrentID)
+		hrCh <- hrOut{result: r, err: err}
+	}()
+
+	go func() {
+		r, err := adapter.DetectDiscount(detectCtx, config, event.TorrentID)
+		discCh <- discOut{result: r, err: err}
+	}()
+
+	hr := <-hrCh
+	if hr.err == nil && hr.result != nil {
+		event.HasHR = hr.result.HasHR
 		if event.HasHR {
-			event.HRSeedTimeH = hrResult.SeedTimeH
+			event.HRSeedTimeH = hr.result.SeedTimeH
 			if event.HRSeedTimeH == 0 {
 				event.HRSeedTimeH = 72
 			}
 		}
-	} else if err != nil {
-		e.logger.Debug("detect HR failed", zap.String("site", siteName), zap.String("torrent", event.TorrentID), zap.Error(err))
+	} else if hr.err != nil {
+		e.logger.Debug("detect HR failed", zap.String("site", siteName), zap.String("torrent", event.TorrentID), zap.Error(hr.err))
 	}
 
-	if discResult, err := adapter.DetectDiscount(detectCtx, config, event.TorrentID); err == nil && discResult != nil {
-		if discResult.Level != model.DiscountNone {
-			event.DiscountLevel = discResult.Level
-			event.IsFree = discResult.Level == model.DiscountFree ||
-				discResult.Level == model.Discount2xFree ||
-				discResult.Level == model.Discount2x50
-			if discResult.FreeEndAt != nil {
-				event.FreeEndAt = discResult.FreeEndAt
-			}
+	disc := <-discCh
+	if disc.err == nil && disc.result != nil && disc.result.Level != model.DiscountNone {
+		event.DiscountLevel = disc.result.Level
+		event.IsFree = disc.result.Level == model.DiscountFree ||
+			disc.result.Level == model.Discount2xFree ||
+			disc.result.Level == model.Discount2x50
+		if disc.result.FreeEndAt != nil {
+			event.FreeEndAt = disc.result.FreeEndAt
 		}
 	}
+
+	e.detectCache.Store(cacheKey, &detectCacheEntry{
+		hasHR:         event.HasHR,
+		hrSeedTimeH:   event.HRSeedTimeH,
+		discountLevel: event.DiscountLevel,
+		isFree:        event.IsFree,
+		freeEndAt:     event.FreeEndAt,
+		cachedAt:      time.Now(),
+	})
 }
 
 func (e *Engine) RecheckWaiting(ctx context.Context) error {

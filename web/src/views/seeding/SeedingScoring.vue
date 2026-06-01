@@ -21,7 +21,7 @@
             <div :style="{ opacity: selectedSubId ? 1 : 0.4, pointerEvents: selectedSubId ? 'auto' : 'none' }">
               <a-form :model="scoringConfig" layout="vertical">
                 <a-form-item :label="t('seeding.scoring.enabled')">
-                  <a-switch v-model:checked="scoringConfig.enabled" />
+                  <a-switch v-model:checked="scoringConfig.enabled" @change="saveScoringConfig" />
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.halfLifeHours')">
                   <a-input-number v-model:value="scoringConfig.halfLifeHours" :min="0.1" :step="0.5" style="width: 100%" />
@@ -39,7 +39,7 @@
                   <a-input-number v-model:value="scoringConfig.topNConfirm" :min="1" style="width: 100%" />
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.include2xUp')">
-                  <a-switch v-model:checked="scoringConfig.include2xUp" />
+                  <a-switch v-model:checked="scoringConfig.include2xUp" @change="saveScoringConfig" />
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.batchLimit')">
                   <a-input-number v-model:value="scoringConfig.batchLimit" :min="1" style="width: 100%" />

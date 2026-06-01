@@ -22,12 +22,12 @@
 
         <a-divider>{{ t('settings.otherSettings') }}</a-divider>
         <a-form-item :label="t('settings.websocketEnabled')">
-          <a-switch v-model:checked="form.websocketEnabled" />
+          <a-switch v-model:checked="form.websocketEnabled" @change="(v: boolean) => saveBoolSetting('websocketEnabled', v)" />
         </a-form-item>
 
         <a-divider>{{ t('settings.loginSecurity') }}</a-divider>
         <a-form-item :label="t('settings.loginLockoutEnabled')">
-          <a-switch v-model:checked="form.loginLockoutEnabled" />
+          <a-switch v-model:checked="form.loginLockoutEnabled" @change="(v: boolean) => saveBoolSetting('login_lockout_enabled', v)" />
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
@@ -44,7 +44,7 @@
 
         <a-divider>{{ t('settings.rateLimit') }}</a-divider>
         <a-form-item :label="t('settings.rateLimitEnabled')">
-          <a-switch v-model:checked="form.rateLimitEnabled" />
+          <a-switch v-model:checked="form.rateLimitEnabled" @change="(v: boolean) => saveBoolSetting('rate_limit_enabled', v)" />
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="8">
@@ -66,7 +66,7 @@
 
         <a-divider>{{ t('settings.screenshotConfig') }}</a-divider>
         <a-form-item :label="t('settings.screenshotEnabled')">
-          <a-switch v-model:checked="form.screenshotEnabled" />
+          <a-switch v-model:checked="form.screenshotEnabled" @change="(v: boolean) => saveBoolSetting('screenshot_enabled', v)" />
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
@@ -176,8 +176,13 @@ import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi } from '@/api/settings'
+import { switchAutoSave } from '@/utils/switch-auto-save'
 
 const { t } = useI18n()
+
+function saveBoolSetting(key: string, value: boolean) {
+  return switchAutoSave(() => settingsApi.update(key, { value: String(value) }), t('common.configSaved'))
+}
 
 const saving = ref(false)
 const backingUp = ref(false)
