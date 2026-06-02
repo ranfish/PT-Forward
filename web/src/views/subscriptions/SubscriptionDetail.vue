@@ -297,11 +297,6 @@
                   </a-col>
                 </a-row>
 
-                <a-divider>{{ t('subscription.scoringConfig') }}</a-divider>
-                <a-form-item :label="t('subscription.minScore')">
-                  <a-input-number v-model:value="configForm.minScore" :min="0" :max="10" :step="0.1" style="width: 200px" />
-                </a-form-item>
-
                 <a-divider>{{ t('subscription.diskGuard') }}</a-divider>
                 <a-row :gutter="16">
                   <a-col :span="12">
@@ -500,7 +495,6 @@ const configForm = reactive({
   clientSelection: 'fixed',
   diskGuardEnabled: true,
   diskGuardThreshold: 1,
-  minScore: 1.0,
 })
 const ruleConditions = ref<RuleCond[]>([{ key: 'title', compareType: 'contain', value: '', numValue: 0, sizeUnit: 'GB' }])
 const rulesSaving = ref(false)
@@ -608,7 +602,6 @@ async function fetchSubscription() {
       clientSelection: subscription.value.clientSelection || 'fixed',
       diskGuardEnabled: subscription.value.diskGuardEnabled ?? true,
       diskGuardThreshold: subscription.value.diskGuardThreshold != null ? Number(subscription.value.diskGuardThreshold) / 1073741824 : 1,
-      minScore: subscription.value.minScore ?? 1.0,
     })
     const conds = subscription.value.conditions || []
     if (Array.isArray(conds) && conds.length) {
@@ -678,7 +671,6 @@ async function saveConfig() {
       clientSelection: configForm.clientSelection,
       diskGuardEnabled: configForm.diskGuardEnabled,
       diskGuardThreshold: Math.round(configForm.diskGuardThreshold * 1073741824),
-      minScore: configForm.minScore,
     }
     await subscriptionsApi.update(id, payload)
     message.success(t('common.configSaved'))
