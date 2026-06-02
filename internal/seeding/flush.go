@@ -734,6 +734,13 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 	rec.FlushedAt = &now
 	rec.Status = model.SeedingStatusSeeding
 
+	if e.reseedTrigger != nil && pushSub.AutoReseed && len(pushSub.ReseedClientIDs) > 0 {
+		recordCopy := *rec
+		clientIDs := make([]string, len(pushSub.ReseedClientIDs))
+		copy(clientIDs, pushSub.ReseedClientIDs)
+		go e.reseedTrigger.OnTorrentSeeding(context.Background(), recordCopy, clientIDs)
+	}
+
 	return candidate, true
 }
 

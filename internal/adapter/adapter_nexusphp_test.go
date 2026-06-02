@@ -2,8 +2,10 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -453,8 +455,219 @@ func TestNexusPHP_GetTorrentInfoHash_OK(t *testing.T) {
 
 func TestNexusPHP_SupportsSearchByPiecesHash(t *testing.T) {
 	a := NewNexusPHPAdapter(NewHTTPDoer(), zap.NewNop())
-	if a.SupportsSearchByPiecesHash() {
-		t.Error("should be false")
+	if !a.SupportsSearchByPiecesHash() {
+		t.Error("should be true (§33.32)")
+	}
+}
+
+func TestNexusPHP_SearchByPiecesHash(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/api/pieces-hash" {
+			t.Errorf("expected /api/pieces-hash, got %s", r.URL.Path)
+		}
+		if r.Header.Get("Accept") != "application/json" {
+			t.Errorf("expected Accept: application/json, got %q", r.Header.Get("Accept"))
+		}
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("expected Content-Type: application/json, got %q", r.Header.Get("Content-Type"))
+		}
+
+		body, _ := io.ReadAll(r.Body)
+		var req struct {
+			Passkey     string   `json:"passkey"`
+			PiecesHash []string `json:"pieces_hash"`
+		}
+		_ = json.Unmarshal(body, &req)
+
+		if req.Passkey != "31ab1c9e2bf5533b4d23e94b2cad5cd9" {
+			t.Errorf("unexpected passkey: %s", req.Passkey)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		response := `{"ret":0,"msg":"torrent.querybypieceshash","data":{"c18baab72660ea8d3696ce514700311fd4cbb061":245967}}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{
+		Domain:  srv.URL,
+		Passkey: "31ab1c9e2bf5533b4d23e94b2cad5cd9",
+	}
+
+	matches, err := a.SearchByPiecesHash(context.Background(), config, []string{"c18baab72660ea8d3696ce514700311fd4cbb061"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+	if matches["c18baab72660ea8d3696ce514700311fd4cbb061"] != 245967 {
+		t.Errorf("expected torrent_id 245967, got %d", matches["c18baab72660ea8d3696ce514700311fd4cbb061"])
+	}
+}
+
+func TestNexusPHP_SearchByPiecesHash_NoCreds(t *testing.T) {
+	a := NewNexusPHPAdapter(NewHTTPDoer(), zap.NewNop())
+	config := &model.SiteConfig{Domain: "https://example.com", Passkey: "", Cookie: ""}
+
+	_, err := a.SearchByPiecesHash(context.Background(), config, []string{"abc"})
+	if err == nil {
+		t.Error("expected error for empty passkey")
+	}
+}
+
+func TestNexusPHP_SearchByPiecesHash_NoMatch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ret":0,"msg":"torrent.querybypieceshash","data":{}}`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{
+		Domain:  srv.URL,
+		Passkey: "31ab1c9e2bf5533b4d23e94b2cad5cd9",
+	}
+
+	matches, err := a.SearchByPiecesHash(context.Background(), config, []string{"nonexistent_hash"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 0 {
+		t.Errorf("expected 0 matches, got %d", len(matches))
+	}
+}
+
+func TestNexusPHP_SearchByPiecesHash_AuthError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ret":-1,"msg":"Unauthenticated.","data":{"guards":["passkey"]}}`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{
+		Domain:  srv.URL,
+		Passkey: "00000000000000000000000000000000",
+	}
+
+	_, err := a.SearchByPiecesHash(context.Background(), config, []string{"abc"})
+	if err == nil {
+		t.Error("expected auth error")
+	}
+}
+
+func TestNexusPHP_SearchByPiecesHash_CookieAuth_KeepfrdsFormat(t *testing.T) {
+	requestCount := 0
+	var lastPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		lastPath = r.URL.Path
+
+		if r.Header.Get("Accept") != "application/json" {
+			t.Errorf("expected Accept: application/json, got %q", r.Header.Get("Accept"))
+		}
+
+		if r.URL.Path == "/api/pieces-hash" {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"errors":["Not Found"]}`))
+			return
+		}
+
+		if r.URL.Path == "/api/torrents/pieces-hash" {
+			if r.Header.Get("Cookie") == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"errors":["Unauthorized"]}`))
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"abc123":99999}}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{
+		Domain: srv.URL,
+		Cookie: "c_secure_uid=test; c_secure_pass=test",
+	}
+
+	matches, err := a.SearchByPiecesHash(context.Background(), config, []string{"abc123"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+	if matches["abc123"] != 99999 {
+		t.Errorf("expected 99999, got %d", matches["abc123"])
+	}
+	if requestCount != 2 {
+		t.Errorf("expected 2 requests (fallback), got %d", requestCount)
+	}
+	if lastPath != "/api/torrents/pieces-hash" {
+		t.Errorf("expected final path /api/torrents/pieces-hash, got %s", lastPath)
+	}
+}
+
+func TestNexusPHP_SearchByPiecesHash_StandardPath_HitsFirstTry(t *testing.T) {
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if r.URL.Path != "/api/pieces-hash" {
+			t.Errorf("expected /api/pieces-hash, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ret":0,"msg":"torrent.querybypieceshash","data":{"hash1":111}}`))
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{
+		Domain:  srv.URL,
+		Passkey: "31ab1c9e2bf5533b4d23e94b2cad5cd9",
+	}
+
+	matches, err := a.SearchByPiecesHash(context.Background(), config, []string{"hash1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requestCount != 1 {
+		t.Errorf("expected 1 request (no fallback), got %d", requestCount)
+	}
+	if matches["hash1"] != 111 {
+		t.Errorf("expected 111, got %d", matches["hash1"])
+	}
+}
+
+func TestNexusPHP_SearchByPiecesHash_AllPathsFail(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{
+		Domain:  srv.URL,
+		Passkey: "31ab1c9e2bf5533b4d23e94b2cad5cd9",
+	}
+
+	_, err := a.SearchByPiecesHash(context.Background(), config, []string{"hash1"})
+	if err == nil {
+		t.Error("expected error when all paths return 404")
 	}
 }
 

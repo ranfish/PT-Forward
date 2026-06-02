@@ -161,9 +161,18 @@ type Engine struct {
 	freeWaitMonitor *FreeWaitMonitor
 	refreshCancel   context.CancelFunc
 	wg              sync.WaitGroup
+	reseedTrigger   ReseedTrigger
 
 	unregisteredCursor  int
 	unregisteredChecking bool
+}
+
+type ReseedTrigger interface {
+	OnTorrentSeeding(ctx context.Context, record model.SeedingTorrentRecord, reseedClientIDs []string)
+}
+
+func (e *Engine) SetReseedTrigger(trigger ReseedTrigger) {
+	e.reseedTrigger = trigger
 }
 
 type maindataEntry struct {

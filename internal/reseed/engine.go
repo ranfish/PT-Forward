@@ -2,8 +2,10 @@ package reseed
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +14,7 @@ import (
 	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -20,6 +23,12 @@ type preloadedSites struct {
 	infos    []*model.SiteInfo
 	configs  map[string]*model.SiteConfig
 	adapters map[string]model.SiteAdapter
+}
+
+// §33.32 — piecesHashSearcher is an optional capability interface.
+// Adapters that support NexusPHP /api/pieces-hash implement this.
+type piecesHashSearcher interface {
+	SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error)
 }
 
 type fpCache struct {
@@ -200,6 +209,43 @@ func (e *Engine) preloadExistingMatches(ctx context.Context, records []model.See
 	result := make(map[string][]model.ReseedMatch, len(matches))
 	for _, m := range matches {
 		result[m.SourceInfoHash] = append(result[m.SourceInfoHash], m)
+	}
+	return result
+}
+
+func (e *Engine) preloadNegativeCache(ctx context.Context, records []model.SeedingTorrentRecord) map[string]map[string]bool {
+	if len(records) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var infoHashes []string
+	for _, rec := range records {
+		if !seen[rec.InfoHash] {
+			seen[rec.InfoHash] = true
+			infoHashes = append(infoHashes, rec.InfoHash)
+		}
+	}
+
+	entries, err := e.GetNegativeCacheByHashes(ctx, infoHashes)
+	if err != nil {
+		e.logger.Warn("预加载负面缓存失败", zap.Error(err))
+		return make(map[string]map[string]bool)
+	}
+
+	result := make(map[string]map[string]bool)
+	for _, entry := range entries {
+		if result[entry.SourceInfoHash] == nil {
+			result[entry.SourceInfoHash] = make(map[string]bool)
+		}
+		if entry.ExcludedTargets != "" {
+			for _, t := range strings.Split(entry.ExcludedTargets, ",") {
+				t = strings.TrimSpace(t)
+				if t != "" {
+					result[entry.SourceInfoHash][t] = true
+				}
+			}
+		}
 	}
 	return result
 }
@@ -445,6 +491,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	ps := e.preloadSites(ctx, targetSites, excludedSites)
 	fpCache := e.preloadFingerprints(ctx, seedingRecords)
 	existingMatchesMap := e.preloadExistingMatches(ctx, seedingRecords)
+	negCache := e.preloadNegativeCache(ctx, seedingRecords)
 
 	var iyuuResults map[string][]*model.IYUUReseedResult
 	var iyuuSidMap map[int]string
@@ -487,7 +534,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			continue
 		}
 
-		candidates := e.findCandidates(ctx, rec, ps, fpCache, sizeTolerance, task)
+		candidates := e.findCandidates(ctx, rec, ps, fpCache, sizeTolerance, task, negCache)
 
 		if iyuuResults != nil {
 			iyuuCandidates := e.filterIYUUResults(rec, iyuuResults, iyuuSidMap, targetSites, excludedSites)
@@ -499,13 +546,26 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			continue
 		}
 
+		concurrency := task.InjectionConcurrency
+		if concurrency <= 0 {
+			concurrency = 1
+		}
+		sem := make(chan struct{}, concurrency)
+		var wg sync.WaitGroup
+		var resultMu sync.Mutex
+
 		for _, c := range candidates {
-			if result.Matched >= task.MaxInjectionsPerRun && task.MaxInjectionsPerRun > 0 {
+			resultMu.Lock()
+			totalCount := result.Injected + result.Failed + result.Matched
+			resultMu.Unlock()
+			if totalCount >= task.MaxInjectionsPerRun && task.MaxInjectionsPerRun > 0 {
 				break
 			}
 
 			if !checkPublishEligibility(recTitle) {
+				resultMu.Lock()
 				result.Blocked++
+				resultMu.Unlock()
 				continue
 			}
 
@@ -541,24 +601,40 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 					zap.String("targetSite", c.TargetSite),
 					zap.Error(err),
 				)
+				resultMu.Lock()
 				result.Failed++
+				resultMu.Unlock()
 				continue
 			}
 
-			if e.clientProvider != nil {
-				if err := e.injectMatch(ctx, match, task, ps); err != nil {
+			if e.clientProvider == nil {
+				resultMu.Lock()
+				result.Matched++
+				resultMu.Unlock()
+				continue
+			}
+
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(m *model.ReseedMatch) {
+				defer wg.Done()
+				defer func() { <-sem }()
+
+				if err := e.injectMatch(ctx, m, task, ps); err != nil {
 					e.logger.Warn("注入辅种失败",
-						zap.Uint("matchID", match.ID),
-						zap.String("targetSite", c.TargetSite),
+						zap.Uint("matchID", m.ID),
+						zap.String("targetSite", m.TargetSite),
 						zap.Error(err),
 					)
+					resultMu.Lock()
 					result.Failed++
-					continue
+					resultMu.Unlock()
+					return
 				}
+				resultMu.Lock()
 				result.Injected++
-			} else {
-				result.Matched++
-			}
+				resultMu.Unlock()
+			}(match)
 
 			if task.InjectionIntervalS > 0 {
 				jitter := 0
@@ -571,16 +647,18 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				case <-timer.C:
 				case <-ctx.Done():
 					timer.Stop()
+					wg.Wait()
 					return result, nil
 				}
 			}
 		}
+		wg.Wait()
 	}
 
 	return result, nil
 }
 
-func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRecord, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask) []model.Candidate {
+func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRecord, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool) []model.Candidate {
 	if ps == nil {
 		return nil
 	}
@@ -595,6 +673,10 @@ func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRec
 			continue
 		}
 
+		if negCache != nil && negCache[rec.InfoHash] != nil && negCache[rec.InfoHash][siteInfo.Name] {
+			continue
+		}
+
 		siteConfig := ps.configs[siteInfo.Name]
 		if siteConfig == nil {
 			continue
@@ -604,7 +686,13 @@ func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRec
 			continue
 		}
 
-		c := e.matchLayer1InfoHash(ctx, adapter, siteConfig, rec, siteInfo.Name)
+		c := e.matchLayer0PiecesHash(ctx, adapter, siteConfig, rec, siteInfo.Name, fc)
+		if c != nil {
+			candidates = append(candidates, *c)
+			continue
+		}
+
+		c = e.matchLayer1InfoHash(ctx, adapter, siteConfig, rec, siteInfo.Name)
 		if c != nil {
 			candidates = append(candidates, *c)
 			continue
@@ -623,6 +711,45 @@ func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRec
 	}
 
 	return candidates
+}
+
+func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, rec model.SeedingTorrentRecord, siteName string, fc *fpCache) *model.Candidate {
+	if !adapter.SupportsSearchByPiecesHash() {
+		return nil
+	}
+	searcher, ok := adapter.(piecesHashSearcher)
+	if !ok {
+		return nil
+	}
+	if config.Passkey == "" && config.Cookie == "" {
+		return nil
+	}
+
+	fp := fc.get(rec.InfoHash, rec.SiteName)
+	if fp == nil || fp.PiecesHash == "" {
+		return nil
+	}
+
+	matches, err := searcher.SearchByPiecesHash(ctx, config, []string{fp.PiecesHash})
+	if err != nil {
+		e.logger.Debug("Layer0 pieces_hash API 失败",
+			zap.String("site", siteName),
+			zap.String("pieces_hash", fp.PiecesHash),
+			zap.Error(err))
+		return nil
+	}
+
+	torrentID, found := matches[fp.PiecesHash]
+	if !found || torrentID == 0 {
+		return nil
+	}
+
+	return &model.Candidate{
+		TargetSite:      siteName,
+		TargetTorrentID: strconv.Itoa(torrentID),
+		Confidence:      1.0,
+		MatchMethod:     "pieces_hash",
+	}
 }
 
 func (e *Engine) matchLayer1InfoHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, rec model.SeedingTorrentRecord, siteName string) *model.Candidate {
@@ -669,6 +796,18 @@ func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAda
 		return nil
 	}
 
+	if e.fpRepo != nil {
+		if cache, err := e.fpRepo.GetSearchCache(ctx, siteName, keyword, fp.TotalSize); err == nil {
+			var cached []model.Candidate
+			if json.Unmarshal([]byte(cache.Results), &cached) == nil && len(cached) > 0 {
+				best := &cached[0]
+				best.TargetSite = siteName
+				return best
+			}
+			return nil
+		}
+	}
+
 	results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
 	if err != nil {
 		e.logger.Debug("Layer2 搜索失败", zap.String("site", siteName), zap.String("keyword", keyword), zap.Error(err))
@@ -702,6 +841,16 @@ func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAda
 					MatchMethod:     "size_title",
 				}
 			}
+		}
+	}
+
+	if e.fpRepo != nil {
+		var toCache []model.Candidate
+		if best != nil {
+			toCache = []model.Candidate{*best}
+		}
+		if err := e.fpRepo.SaveSearchCache(ctx, siteName, keyword, fp.TotalSize, toCache); err != nil {
+			e.logger.Debug("Layer2 保存搜索缓存失败", zap.String("site", siteName), zap.Error(err))
 		}
 	}
 
@@ -882,11 +1031,71 @@ func (e *Engine) BatchSaveMatches(ctx context.Context, matches []*model.ReseedMa
 func (e *Engine) FindPendingRetry(ctx context.Context, limit int) ([]model.ReseedMatch, error) {
 	var matches []model.ReseedMatch
 	err := e.db.WithContext(ctx).
-		Where("status = ? AND retry_count < max_retries AND next_retry_at <= ?", model.MatchStatusFailed, time.Now()).
+		Where("status = ? AND retry_count < ?", model.MatchStatusFailed, 5).
+		Where("next_retry_at IS NULL OR next_retry_at <= ?", time.Now()).
 		Order("next_retry_at ASC").
 		Limit(limit).
 		Find(&matches).Error
 	return matches, err
+}
+
+func (e *Engine) RetryFailedMatches(ctx context.Context) (int, int, error) {
+	matches, err := e.FindPendingRetry(ctx, 50)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(matches) == 0 {
+		return 0, 0, nil
+	}
+
+	siteSet := make(map[string]bool)
+	for _, m := range matches {
+		siteSet[m.TargetSite] = true
+	}
+	var targetSites []string
+	for s := range siteSet {
+		targetSites = append(targetSites, s)
+	}
+
+	ps := e.preloadSites(ctx, targetSites, nil)
+	if ps == nil {
+		return len(matches), 0, reseedError(ErrReseedConfig, "preload sites for retry failed", nil)
+	}
+
+	defaultTask := &model.ReseedTask{ReseedCategory: "cross-seed"}
+
+	retried, succeeded := 0, 0
+	for i := range matches {
+		if ctx.Err() != nil {
+			break
+		}
+		m := &matches[i]
+
+		if e.clientProvider == nil {
+			continue
+		}
+
+		if err := e.injectMatch(ctx, m, defaultTask, ps); err != nil {
+			nextRetry := time.Now().Add(24 * time.Hour)
+			e.db.WithContext(ctx).Model(m).Updates(map[string]interface{}{
+				"next_retry_at": &nextRetry,
+			})
+			retried++
+			continue
+		}
+		succeeded++
+		retried++
+
+		if i < len(matches)-1 {
+			select {
+			case <-time.After(2 * time.Second):
+			case <-ctx.Done():
+				return retried, succeeded, nil
+			}
+		}
+	}
+
+	return retried, succeeded, nil
 }
 
 func (e *Engine) UpdateMatchStatus(ctx context.Context, id uint, status string, failReason string) error {
@@ -958,9 +1167,9 @@ func (e *Engine) DeleteNegativeCache(ctx context.Context, infoHash, site string)
 	return result.RowsAffected, result.Error
 }
 
-func (e *Engine) SetNegativeCache(ctx context.Context, sourceInfoHash, targetSite, reason, method string, layerDepth int, ttl time.Duration) error {
+func (e *Engine) SetNegativeCache(ctx context.Context, sourceSite, sourceInfoHash, targetSite, method string, layerDepth int, ttl time.Duration) error {
 	entry := &model.ReseedNegativeCache{
-		SourceSite:      targetSite,
+		SourceSite:      sourceSite,
 		SourceInfoHash:  sourceInfoHash,
 		ExcludedTargets: targetSite,
 		LastMethod:      method,
@@ -988,6 +1197,103 @@ func (e *Engine) FlushNegativeCache(ctx context.Context) (int64, error) {
 	return result.RowsAffected, result.Error
 }
 
+func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.SeedingTorrentRecord, reseedClientIDs []string) {
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Minute)
+	defer cancel()
+
+	e.logger.Info("auto reseed triggered",
+		zap.String("site", record.SiteName),
+		zap.String("info_hash", record.InfoHash),
+		zap.Strings("reseed_client_ids", reseedClientIDs))
+
+	if e.siteProvider == nil {
+		e.logger.Warn("auto reseed: siteProvider not available")
+		return
+	}
+
+	ps := e.preloadSites(ctx, nil, []string{record.SiteName})
+	if ps == nil || len(ps.infos) == 0 {
+		e.logger.Debug("auto reseed: no target sites available")
+		return
+	}
+
+	records := []model.SeedingTorrentRecord{record}
+	fpc := e.preloadFingerprints(ctx, records)
+	negCache := e.preloadNegativeCache(ctx, records)
+	existingMatchesMap := e.preloadExistingMatches(ctx, records)
+
+	if len(existingMatchesMap[record.InfoHash]) > 0 {
+		e.logger.Debug("auto reseed: already matched", zap.String("info_hash", record.InfoHash))
+		return
+	}
+
+	var recTitle string
+	if fp := fpc.get(record.InfoHash, record.SiteName); fp != nil {
+		recTitle = fp.Title
+	}
+	if !checkPublishEligibility(recTitle) {
+		e.logger.Info("auto reseed: blocked by publish eligibility", zap.String("title", recTitle))
+		return
+	}
+
+	task := &model.ReseedTask{
+		SizeTolerancePercent: 1.0,
+		MaxInjectionsPerRun:  10,
+		ReseedCategory:       "cross-seed",
+	}
+
+	candidates := e.findCandidates(ctx, record, ps, fpc, task.SizeTolerancePercent, task, negCache)
+	if len(candidates) == 0 {
+		e.logger.Debug("auto reseed: no candidates found", zap.String("info_hash", record.InfoHash))
+		return
+	}
+
+	e.logger.Info("auto reseed: candidates found",
+		zap.String("info_hash", record.InfoHash),
+		zap.Int("count", len(candidates)))
+
+	for _, c := range candidates {
+		for _, clientID := range reseedClientIDs {
+			match := &model.ReseedMatch{
+				ClientID:        clientID,
+				SourceSite:      record.SiteName,
+				SourceTorrentID: record.TorrentID,
+				SourceInfoHash:  record.InfoHash,
+				TargetSite:      c.TargetSite,
+				TargetTorrentID: c.TargetTorrentID,
+				TargetInfoHash:  c.TargetInfoHash,
+				MatchMethod:     c.MatchMethod,
+				Confidence:      c.Confidence,
+				DecisionType:    string(model.DecisionMatch),
+				Status:          model.MatchStatusMatched,
+			}
+
+			if err := e.SaveMatch(ctx, match); err != nil {
+				e.logger.Warn("auto reseed: save match failed",
+					zap.String("target_site", c.TargetSite),
+					zap.Error(err))
+				continue
+			}
+
+			if e.clientProvider == nil {
+				continue
+			}
+
+			if err := e.injectMatch(ctx, match, task, ps); err != nil {
+				e.logger.Warn("auto reseed: inject failed",
+					zap.Uint("match_id", match.ID),
+					zap.String("target_site", c.TargetSite),
+					zap.Error(err))
+				continue
+			}
+			e.logger.Info("auto reseed: injected",
+				zap.String("source_hash", record.InfoHash),
+				zap.String("target_site", c.TargetSite),
+				zap.String("client_id", clientID))
+		}
+	}
+}
+
 func (e *Engine) RunEnabledTasks(ctx context.Context) error {
 	var tasks []model.ReseedTask
 	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&tasks).Error; err != nil {
@@ -998,9 +1304,34 @@ func (e *Engine) RunEnabledTasks(ctx context.Context) error {
 		return nil
 	}
 
-	e.logger.Info("running enabled reseed tasks", zap.Int("count", len(tasks)))
+	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	now := time.Now()
 
 	for i := range tasks {
+		scheduleStr := tasks[i].Schedule
+		if scheduleStr == "" {
+			scheduleStr = "0 0 */6 * * *"
+		}
+		if parts := strings.Fields(scheduleStr); len(parts) == 5 {
+			scheduleStr = "0 " + scheduleStr
+		}
+
+		sched, err := parser.Parse(scheduleStr)
+		if err != nil {
+			e.logger.Warn("invalid reseed task schedule, running immediately",
+				zap.Uint("task_id", tasks[i].ID),
+				zap.String("schedule", tasks[i].Schedule),
+				zap.Error(err))
+		} else {
+			var nextRun time.Time
+			if tasks[i].LastRunAt != nil {
+				nextRun = sched.Next(*tasks[i].LastRunAt)
+			}
+			if !nextRun.IsZero() && nextRun.After(now) {
+				continue
+			}
+		}
+
 		if _, err := e.RunTask(ctx, &tasks[i]); err != nil {
 			e.logger.Warn("reseed task failed",
 				zap.Uint("task_id", tasks[i].ID),
@@ -1008,6 +1339,11 @@ func (e *Engine) RunEnabledTasks(ctx context.Context) error {
 				zap.Error(err),
 			)
 		}
+
+		e.db.WithContext(ctx).Model(&tasks[i]).Updates(map[string]interface{}{
+			"last_run_at": now,
+			"updated_at":  now,
+		})
 	}
 
 	return nil
@@ -1136,6 +1472,18 @@ func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason
 	}).Error; err != nil {
 		e.logger.Error("failMatch update db error", zap.Uint("matchID", match.ID), zap.Error(err))
 	}
+
+	ttl := 24 * time.Hour
+	switch decisionType {
+	case model.DecisionAlreadyExists:
+		ttl = 72 * time.Hour
+	case model.DecisionBlockedRelease:
+		ttl = 168 * time.Hour
+	}
+	if err := e.SetNegativeCache(ctx, match.SourceSite, match.SourceInfoHash, match.TargetSite, match.MatchMethod, 1, ttl); err != nil {
+		e.logger.Debug("set negative cache failed", zap.Uint("matchID", match.ID), zap.Error(err))
+	}
+
 	return reseedError(ErrReseedGeneric, reason, nil)
 }
 

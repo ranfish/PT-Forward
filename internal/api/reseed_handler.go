@@ -325,17 +325,30 @@ func (h *ReseedHandler) handleTrigger(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-	defer cancel()
-
-	result, err := h.engine.RunTask(ctx, task)
-	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "执行辅种任务失败")
+	if task.Status == model.ReseedTaskRunning {
+		Error(w, http.StatusConflict, 40900, "任务正在执行中")
 		return
 	}
 
-	h.logger.Info("reseed task triggered", zap.Uint("id", id))
-	Success(w, result)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		result, err := h.engine.RunTask(ctx, task)
+		if err != nil {
+			h.logger.Warn("reseed task async execution failed",
+				zap.Uint("id", id), zap.Error(err))
+			return
+		}
+		h.logger.Info("reseed task async completed",
+			zap.Uint("id", id),
+			zap.Int("matched", result.Matched),
+			zap.Int("injected", result.Injected),
+			zap.Int("failed", result.Failed),
+			zap.Int("blocked", result.Blocked))
+	}()
+
+	h.logger.Info("reseed task triggered async", zap.Uint("id", id))
+	Success(w, map[string]interface{}{"message": "任务已触发", "status": "running"})
 }
 
 func (h *ReseedHandler) handleCancel(w http.ResponseWriter, r *http.Request, id uint) {

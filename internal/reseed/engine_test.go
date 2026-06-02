@@ -628,15 +628,18 @@ func TestEngine_SetNegativeCache(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	err := e.SetNegativeCache(context.Background(), "ih1", "site1", "size mismatch", "pieces_hash", 3, 24*time.Hour)
+	err := e.SetNegativeCache(context.Background(), "sourceSite1", "ih1", "targetSite1", "pieces_hash", 3, 24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var entry model.ReseedNegativeCache
 	db.Where("source_info_hash = ?", "ih1").First(&entry)
-	if entry.SourceSite != "site1" {
-		t.Errorf("expected site1, got %s", entry.SourceSite)
+	if entry.SourceSite != "sourceSite1" {
+		t.Errorf("expected sourceSite1, got %s", entry.SourceSite)
+	}
+	if entry.ExcludedTargets != "targetSite1" {
+		t.Errorf("expected targetSite1, got %s", entry.ExcludedTargets)
 	}
 	if entry.LastMethod != "pieces_hash" {
 		t.Errorf("expected pieces_hash, got %s", entry.LastMethod)
@@ -650,10 +653,10 @@ func TestEngine_GetNegativeCacheByHashes(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	if err := e.SetNegativeCache(context.Background(), "ih1", "site1", "reason1", "method1", 3, 24*time.Hour); err != nil {
+	if err := e.SetNegativeCache(context.Background(), "s1", "ih1", "site1", "method1", 3, 24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.SetNegativeCache(context.Background(), "ih2", "site2", "reason2", "method2", 3, 24*time.Hour); err != nil {
+	if err := e.SetNegativeCache(context.Background(), "s2", "ih2", "site2", "method2", 3, 24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
 
@@ -880,7 +883,7 @@ func TestEngine_findCandidates_NilProvider(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 	task := &model.ReseedTask{Name: "fc-nil", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
-	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task)
+	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil)
 	if candidates != nil {
 		t.Error("expected nil when provider is nil")
 	}
@@ -918,7 +921,7 @@ func TestEngine_findCandidates_WithProvider(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-prov", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task)
+	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil)
 	if len(candidates) != 1 {
 		t.Fatalf("expected 1 candidate, got %d", len(candidates))
 	}
@@ -1517,7 +1520,7 @@ func TestEngine_findCandidates_ExcludedAndDisabled(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-excl", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, []string{"excluded"}), nil, 1.0, task)
+	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, []string{"excluded"}), nil, 1.0, task, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates (excluded+disabled+same site), got %d", len(candidates))
 	}
@@ -1549,7 +1552,7 @@ func TestEngine_findCandidates_WithTargetSites(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-targets", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih_match", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), []string{"site_a"}, nil), nil, 1.0, task)
+	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), []string{"site_a"}, nil), nil, 1.0, task, nil)
 	if len(candidates) != 1 {
 		t.Fatalf("expected 1 candidate, got %d", len(candidates))
 	}
@@ -1929,7 +1932,7 @@ func TestEngine_findCandidates_GetSiteInfoError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-err", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), []string{"bad_site"}, nil), nil, 1.0, task)
+	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), []string{"bad_site"}, nil), nil, 1.0, task, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates when GetSiteInfo fails, got %d", len(candidates))
 	}
@@ -1946,7 +1949,7 @@ func TestEngine_findCandidates_ListSitesError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-lserr", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task)
+	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil)
 	if candidates != nil {
 		t.Error("expected nil when ListSites fails")
 	}
@@ -1966,7 +1969,7 @@ func TestEngine_findCandidates_GetSiteConfigError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-cfgerr", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task)
+	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates when GetSiteConfig fails, got %d", len(candidates))
 	}
@@ -1989,7 +1992,7 @@ func TestEngine_findCandidates_GetAdapterError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-adaperr", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task)
+	candidates := e.findCandidates(context.Background(), rec, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates when GetAdapter fails, got %d", len(candidates))
 	}
@@ -2474,5 +2477,213 @@ func TestNormalizeTitle_SpecialCases(t *testing.T) {
 		if got != tt.expect {
 			t.Errorf("NormalizeTitle(%q) = %q, want %q", tt.input, got, tt.expect)
 		}
+	}
+}
+
+// §33.32 — Test helper: wraps mocks.SiteAdapter + piecesHashSearcher
+type testPiecesHashAdapter struct {
+	*mocks.SiteAdapter
+	searchByPiecesHashFn func(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error)
+}
+
+func (a *testPiecesHashAdapter) SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error) {
+	if a.searchByPiecesHashFn != nil {
+		return a.searchByPiecesHashFn(ctx, config, piecesHashes)
+	}
+	return nil, nil
+}
+
+func TestEngine_matchLayer0PiecesHash_Found(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true},
+		searchByPiecesHashFn: func(_ context.Context, _ *model.SiteConfig, hashes []string) (map[string]int, error) {
+			return map[string]int{"ph_abc": 12345}, nil
+		},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {PiecesHash: "ph_abc", InfoHash: "ih1", SiteName: "site1"},
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	config := &model.SiteConfig{Passkey: "31ab1c9e2bf5533b4d23e94b2cad5cd9"}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "target_site", fc)
+	if c == nil {
+		t.Fatal("expected candidate, got nil")
+	}
+	if c.MatchMethod != "pieces_hash" {
+		t.Errorf("expected pieces_hash, got %s", c.MatchMethod)
+	}
+	if c.TargetTorrentID != "12345" {
+		t.Errorf("expected 12345, got %s", c.TargetTorrentID)
+	}
+	if c.Confidence != 1.0 {
+		t.Errorf("expected confidence 1.0, got %f", c.Confidence)
+	}
+	if c.TargetSite != "target_site" {
+		t.Errorf("expected target_site, got %s", c.TargetSite)
+	}
+}
+
+func TestEngine_matchLayer0PiecesHash_NoFingerprint(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{}}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	config := &model.SiteConfig{Passkey: "pk"}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when no fingerprint")
+	}
+}
+
+func TestEngine_matchLayer0PiecesHash_EmptyPiecesHash(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {PiecesHash: "", InfoHash: "ih1", SiteName: "site1"},
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	config := &model.SiteConfig{Passkey: "pk"}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when empty pieces_hash")
+	}
+}
+
+func TestEngine_matchLayer0PiecesHash_NotSupported(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: false},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {PiecesHash: "ph_abc"},
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	config := &model.SiteConfig{Passkey: "pk"}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when adapter does not support pieces_hash")
+	}
+}
+
+func TestEngine_matchLayer0PiecesHash_NoCreds(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {PiecesHash: "ph_abc"},
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	config := &model.SiteConfig{Passkey: "", Cookie: ""}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when no passkey and no cookie")
+	}
+}
+
+func TestEngine_matchLayer0PiecesHash_CookieOnly(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true},
+		searchByPiecesHashFn: func(_ context.Context, _ *model.SiteConfig, _ []string) (map[string]int, error) {
+			return map[string]int{"ph_abc": 88888}, nil
+		},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {PiecesHash: "ph_abc"},
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	config := &model.SiteConfig{Passkey: "", Cookie: "session=abc123"}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
+	if c == nil {
+		t.Fatal("expected candidate with cookie-only auth")
+	}
+	if c.MatchMethod != "pieces_hash" {
+		t.Errorf("expected pieces_hash, got %s", c.MatchMethod)
+	}
+	if c.TargetTorrentID != "88888" {
+		t.Errorf("expected 88888, got %s", c.TargetTorrentID)
+	}
+}
+
+func TestEngine_matchLayer0PiecesHash_APIError(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true},
+		searchByPiecesHashFn: func(_ context.Context, _ *model.SiteConfig, _ []string) (map[string]int, error) {
+			return nil, fmt.Errorf("connection refused")
+		},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {PiecesHash: "ph_abc"},
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	config := &model.SiteConfig{Passkey: "pk"}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil on API error")
+	}
+}
+
+func TestEngine_matchLayer0PiecesHash_NoMatch(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true},
+		searchByPiecesHashFn: func(_ context.Context, _ *model.SiteConfig, _ []string) (map[string]int, error) {
+			return map[string]int{}, nil
+		},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {PiecesHash: "ph_abc"},
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	config := &model.SiteConfig{Passkey: "pk"}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when no match")
 	}
 }

@@ -750,7 +750,121 @@ func (a *NexusPHPAdapter) GetTorrentInfoHash(ctx context.Context, config *model.
 	return detail.InfoHash, nil
 }
 
-func (a *NexusPHPAdapter) SupportsSearchByPiecesHash() bool { return false }
+func (a *NexusPHPAdapter) SupportsSearchByPiecesHash() bool { return true }
+
+// §33.32 §33.34 — SearchByPiecesHash calls NexusPHP pieces-hash API
+//
+// Authentication modes:
+//   - passkey (standard NP, 52 sites): passkey in body, cookie optional
+//   - cookie-only (keepfrds): cookie required, passkey ignored
+//
+// API paths (auto-fallback):
+//   - /api/pieces-hash (standard, 52 sites)
+//   - /api/torrents/pieces-hash (keepfrds variant)
+//
+// Response formats:
+//   - standard NP: {"ret":0,"msg":"...","data":{"hash":tid}}
+//   - keepfrds:    {"data":{"hash":tid}}  (no ret/msg fields)
+//
+// Max 100 hashes per request (NexusPHP TorrentRepository::getPiecesHashCache limit).
+func (a *NexusPHPAdapter) SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error) {
+	if len(piecesHashes) == 0 {
+		return nil, nil
+	}
+
+	hasPasskey := config.Passkey != "" && len(config.Passkey) == 32
+	hasCookie := config.Cookie != ""
+	if !hasPasskey && !hasCookie {
+		return nil, configError("pieces_hash API 需要 passkey 或 cookie 认证")
+	}
+
+	u := config.Domain
+	if !strings.HasPrefix(u, "http") {
+		u = "https://" + u
+	}
+
+	const maxBatch = 100
+	hashes := piecesHashes
+	if len(hashes) > maxBatch {
+		hashes = hashes[:maxBatch]
+	}
+
+	bodyMap := map[string]any{
+		"pieces_hash": hashes,
+	}
+	if hasPasskey {
+		bodyMap["passkey"] = config.Passkey
+	}
+	bodyBytes, err := json.Marshal(bodyMap)
+	if err != nil {
+		return nil, parseError("构造 pieces_hash 请求失败", err)
+	}
+
+	paths := []string{"/api/pieces-hash", "/api/torrents/pieces-hash"}
+	var lastErr error
+	for _, path := range paths {
+		result, err := a.doPiecesHashRequest(ctx, u+path, bodyBytes, config.Cookie)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		if !isPiecesHash404(err) {
+			return nil, err
+		}
+	}
+	return nil, lastErr
+}
+
+func isPiecesHash404(err error) bool {
+	appErr, ok := err.(*model.AppError)
+	if !ok {
+		return false
+	}
+	return strings.Contains(appErr.Message, "HTTP 404")
+}
+
+func (a *NexusPHPAdapter) doPiecesHashRequest(ctx context.Context, apiURL string, body []byte, cookie string) (map[string]int, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, networkError("构造 pieces_hash 请求失败", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "PT-Forward/1.0")
+	if cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, networkError("pieces_hash API 请求失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpError(fmtES("pieces_hash API HTTP %d", resp.StatusCode), nil)
+	}
+
+	respBody, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResp struct {
+		Ret  int            `json:"ret"`
+		Msg  string         `json:"msg"`
+		Data map[string]int `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return nil, parseError("解析 pieces_hash 响应失败", err)
+	}
+
+	if apiResp.Ret != 0 {
+		return nil, authError(fmtES("pieces_hash API 返回错误: %s", apiResp.Msg), nil)
+	}
+
+	return apiResp.Data, nil
+}
 
 func (a *NexusPHPAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
 	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
