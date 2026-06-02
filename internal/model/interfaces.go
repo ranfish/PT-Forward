@@ -109,6 +109,7 @@ type DownloaderClient interface {
 
 	CheckExists(ctx context.Context, infoHash string) (bool, error)
 	GetGlobalTransferStats(ctx context.Context) (*GlobalTransferStats, error)
+	GetTrackerMessages(ctx context.Context, hash string) (string, error)
 }
 
 type DownloaderProvider interface {

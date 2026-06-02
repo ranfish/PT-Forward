@@ -601,6 +601,7 @@
     "pausedRule": "Paused (Rule)",
     "downloadingStatus": "Downloading",
     "deletedStatus": "Deleted",
+    "unregisteredStatus": "Unregistered",
     "pausedStatus": "Paused",
     "normalRule": "Normal",
     "deleteTorrent": "Delete Torrent",

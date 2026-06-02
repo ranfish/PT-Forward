@@ -139,39 +139,7 @@
         :pagination="{ pageSize: 20, total: torrentTotal, current: torrentPage, onChange: onTorrentPageChange }"
         row-key="id"
         size="small"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'title'">
-            <a v-if="record.detail_url" :href="record.detail_url" target="_blank" style="color: #1890ff">{{ record.title || record.torrent_id }}</a>
-            <span v-else>{{ record.title || record.torrent_id }}</span>
-          </template>
-          <template v-else-if="column.key === 'info_hash'">
-            <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.info_hash)">{{ record.info_hash }}</span>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            {{ translateSeedingStatus(record.status) }}
-          </template>
-          <template v-else-if="column.key === 'is_free'">
-            <a-tag :color="record.is_free ? 'green' : 'default'">{{ record.is_free ? t('common.yes') : t('common.no') }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'discount'">
-            <a-tag v-if="record.discount && record.discount !== 'NONE'" color="blue">{{ record.discount }}</a-tag>
-            <span v-else>-</span>
-          </template>
-          <template v-else-if="column.key === 'has_hr'">
-            <a-tag :color="record.has_hr ? 'red' : 'default'">{{ record.has_hr ? t('common.yes') : t('common.no') }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'latest_upload'">
-            <span style="color: #52c41a; font-weight: 500">{{ formatSize(record.latest_upload || 0) }}</span>
-          </template>
-          <template v-else-if="column.key === 'torrent_size'">
-            {{ formatSize(record.torrent_size || 0) }}
-          </template>
-          <template v-else-if="column.key === 'flushed_at'">
-            {{ record.flushed_at ? formatTime(record.flushed_at) : '-' }}
-          </template>
-        </template>
-      </a-table>
+      />
     </a-card>
   </div>
 </template>
@@ -189,8 +157,8 @@ import {
 } from '@ant-design/icons-vue'
 import { seedingApi, seedingStatsApi } from '@/api/seeding'
 import { useEnumLabels } from '@/utils/enumLabels'
-import type { SeedingStatsOverview, SeedingSiteStat, SeedingTorrentRecord, SeedingClientConfig, SeedingSpeedTrendPoint, SeedingSiteTrendPoint } from '@/api/types'
-import { formatTime, copyToClipboard } from '@/utils/format'
+import { useTorrentColumns } from '@/composables/useTorrentColumns'
+import type { SeedingStatsOverview, SeedingSiteStat, SeedingClientConfig, SeedingSpeedTrendPoint, SeedingSiteTrendPoint } from '@/api/types'
 
 const { t } = useI18n()
 const { translateSeedingStatus } = useEnumLabels()
@@ -244,24 +212,10 @@ const siteColumns = [
   { title: t('seeding.totalCount'), dataIndex: 'totalCount', key: 'totalCount', width: 80 },
 ]
 
-const torrentColumns = [
-  { title: t('seeding.torrentName'), dataIndex: 'title', key: 'title', width: 280, ellipsis: true },
-  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 55 },
-  { title: t('seeding.torrentId'), dataIndex: 'torrent_id', key: 'torrent_id', width: 55, ellipsis: true },
-  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 50 },
-  { title: t('seeding.free'), dataIndex: 'is_free', key: 'is_free', width: 35 },
-  { title: t('seeding.discount'), dataIndex: 'discount', key: 'discount', width: 50 },
-  { title: t('seeding.hr'), dataIndex: 'has_hr', key: 'has_hr', width: 35 },
-  { title: t('seeding.size'), dataIndex: 'torrent_size', key: 'torrent_size', width: 65 },
-  { title: t('seeding.upload'), dataIndex: 'latest_upload', key: 'latest_upload', width: 75 },
-  { title: t('seeding.infoHash'), dataIndex: 'info_hash', key: 'info_hash', width: 180 },
-  { title: t('seeding.flushedAt'), dataIndex: 'flushed_at', key: 'flushed_at', width: 120 },
-]
-
-function copyHash(text: string) {
-  copyToClipboard(text)
-  message.success(t('common.copied'))
-}
+const { columns: torrentColumns } = useTorrentColumns({
+  show: ['title', 'site_name', 'torrent_id', 'status', 'discount', 'is_free', 'has_hr', 'torrent_size', 'latest_upload', 'info_hash', 'flushed_at'],
+  statusRender: (record) => translateSeedingStatus(record.status as string),
+})
 
 function formatSize(bytes: number) {
   if (!bytes) return '0 B'

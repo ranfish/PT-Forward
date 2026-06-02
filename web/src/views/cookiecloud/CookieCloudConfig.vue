@@ -20,7 +20,7 @@
           </a-select>
         </a-form-item>
         <a-form-item :label="t('cookiecloud.autoSync')">
-          <a-switch v-model:checked="form.syncEnabled" />
+          <a-switch v-model:checked="form.syncEnabled" @change="handleSave" />
         </a-form-item>
         <a-form-item :label="t('cookiecloud.syncInterval')">
           <a-input-number v-model:value="form.syncInterval" :min="10" :max="1440" style="width: 200px" />

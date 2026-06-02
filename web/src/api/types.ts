@@ -157,6 +157,9 @@ export interface ScoringLog {
   client_id: string
   info_hash: string
   site_name: string
+  torrent_id: string
+  title: string
+  detail_url: string
   score: number
   demand: number
   upload_val: number

@@ -329,3 +329,6 @@ func (s *stubClient) CheckExists(_ context.Context, _ string) (bool, error)     
 func (s *stubClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
 	return &model.GlobalTransferStats{}, nil
 }
+func (s *stubClient) GetTrackerMessages(_ context.Context, _ string) (string, error) {
+	return "", nil
+}

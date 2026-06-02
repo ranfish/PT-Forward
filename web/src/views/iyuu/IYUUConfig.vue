@@ -8,13 +8,13 @@
           <a-input v-model:value="form.token" :placeholder="t('iyuu.tokenPlaceholder')" />
         </a-form-item>
         <a-form-item :label="t('common.enable')">
-          <a-switch v-model:checked="form.enabled" />
+          <a-switch v-model:checked="form.enabled" @change="handleSave" />
         </a-form-item>
         <a-form-item :label="t('iyuu.baseUrl')">
           <a-input v-model:value="form.baseURL" placeholder="https://2025.iyuu.cn" />
         </a-form-item>
         <a-form-item :label="t('iyuu.vip')">
-          <a-switch v-model:checked="form.isVIP" />
+          <a-switch v-model:checked="form.isVIP" @change="handleSave" />
         </a-form-item>
         <a-form-item :label="t('iyuu.version')">
           <a-input v-model:value="form.version" placeholder="1.0.0" />

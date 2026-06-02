@@ -30,6 +30,10 @@ type SeedingTorrentRecord struct {
 	FinalUploaded     int64      `json:"final_uploaded" gorm:"default:0"`
 	FinalDownloaded   int64      `json:"final_downloaded" gorm:"default:0"`
 	TorrentSize       int64      `json:"torrent_size" gorm:"default:0"`
+
+	Unregistered     bool       `json:"unregistered" gorm:"default:false"`
+	UnregisteredAt   *time.Time `json:"unregistered_at"`
+	UnregisteredMsg  string     `json:"unregistered_msg" gorm:"size:200"`
 }
 
 func (SeedingTorrentRecord) TableName() string { return "seeding_torrent_records" }

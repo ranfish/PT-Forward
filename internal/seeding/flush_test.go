@@ -85,6 +85,9 @@ func (m *flushMockClient) CheckExists(_ context.Context, hash string) (bool, err
 func (m *flushMockClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
 	return &model.GlobalTransferStats{}, nil
 }
+func (m *flushMockClient) GetTrackerMessages(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
 
 type flushMockProvider struct {
 	clients map[string]model.DownloaderClient
