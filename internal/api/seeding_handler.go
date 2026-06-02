@@ -82,6 +82,10 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleScoringLogs(w, r)
 		return
 
+	case trimmed == "/api/v1/seeding/unregistered-keywords" || trimmed == "/api/v1/seeding/unregistered-keywords/":
+		h.handleUnregisteredKeywords(w, r)
+		return
+
 	case strings.HasPrefix(trimmed, "/api/v1/seeding/stats/"):
 		h.handleStatsSubroute(w, r, trimmed)
 		return
@@ -546,8 +550,50 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	type seenTitle struct {
+		SiteName  string
+		TorrentID string
+		Title     string
+	}
+	var titles []seenTitle
+	h.db.Model(&model.RSSTorrentSeen{}).
+		Select("site_name, torrent_id, title").
+		Find(&titles)
+	titleMap := make(map[string]string, len(titles))
+	for _, t := range titles {
+		titleMap[t.SiteName+"|"+t.TorrentID] = t.Title
+	}
+
+	type siteInfo struct {
+		BaseURL   string
+		Framework string
+	}
+	var sites []model.Site
+	h.db.Select("name, base_url, framework").Find(&sites)
+	siteMap := make(map[string]siteInfo, len(sites))
+	for _, s := range sites {
+		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
+	}
+
+	type recordItem struct {
+		model.SeedingTorrentRecord
+		Title     string `json:"title"`
+		DetailURL string `json:"detail_url"`
+	}
+
+	items := make([]recordItem, len(records))
+	for i := range records {
+		items[i] = recordItem{SeedingTorrentRecord: records[i]}
+		if title, ok := titleMap[records[i].SiteName+"|"+records[i].TorrentID]; ok {
+			items[i].Title = title
+		}
+		if si, ok := siteMap[records[i].SiteName]; ok && si.BaseURL != "" && records[i].TorrentID != "" {
+			items[i].DetailURL = buildDetailURL(si.BaseURL, si.Framework, records[i].TorrentID)
+		}
+	}
+
 	Success(w, map[string]interface{}{
-		"items": records,
+		"items": items,
 		"total": total,
 		"page":  page,
 		"size":  size,
@@ -879,6 +925,41 @@ func (h *SeedingHandler) handleScoringConfig(w http.ResponseWriter, r *http.Requ
 	Success(w, sub.ScoringConfig)
 }
 
+func (h *SeedingHandler) handleUnregisteredKeywords(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		var val string
+		h.db.Raw("SELECT value FROM system_settings WHERE key = 'seeding.unregistered_keywords' LIMIT 1").Row().Scan(&val)
+		var keywords []string
+		if val != "" {
+			json.Unmarshal([]byte(val), &keywords)
+		}
+		if len(keywords) == 0 {
+			keywords = []string{
+				"unregistered torrent", "unregistered", "torrent not found",
+				"torrent not exist", "not registered", "unknown torrent",
+				"invalid torrent", "torrent has been deleted",
+			}
+		}
+		Success(w, map[string]interface{}{"keywords": keywords})
+		return
+	}
+	if r.Method == http.MethodPut || r.Method == http.MethodPost {
+		var body struct {
+			Keywords []string `json:"keywords"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			Error(w, http.StatusBadRequest, 40000, "invalid body")
+			return
+		}
+		data, _ := json.Marshal(body.Keywords)
+		h.db.Exec("INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+			"seeding.unregistered_keywords", string(data))
+		Success(w, map[string]interface{}{"keywords": body.Keywords})
+		return
+	}
+	Error(w, http.StatusMethodNotAllowed, 40500, "method not allowed")
+}
+
 func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit < 1 {
@@ -894,9 +975,55 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	type titleRow struct {
+		SiteName  string `json:"site_name"`
+		TorrentID string `json:"torrent_id"`
+		Title     string `json:"title"`
+	}
+	var titles []titleRow
+	if len(logs) > 0 {
+		keys := make([]string, 0, len(logs))
+		for _, l := range logs {
+			keys = append(keys, l.SiteName+"|"+l.TorrentID)
+		}
+		h.db.Raw(`SELECT site_name, torrent_id, title FROM rss_torrent_seen WHERE site_name || '|' || torrent_id IN (?)`, keys).Scan(&titles)
+	}
+	titleMap := make(map[string]string, len(titles))
+	for _, t := range titles {
+		titleMap[t.SiteName+"|"+t.TorrentID] = t.Title
+	}
+
+	type siteInfo struct {
+		BaseURL   string
+		Framework string
+	}
+	var siteList []model.Site
+	h.db.Select("name, base_url, framework").Find(&siteList)
+	siteMap := make(map[string]siteInfo, len(siteList))
+	for _, s := range siteList {
+		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
+	}
+
+	type logItem struct {
+		model.ScoringLog
+		Title     string `json:"title"`
+		DetailURL string `json:"detail_url"`
+	}
+
+	items := make([]logItem, len(logs))
+	for i := range logs {
+		items[i] = logItem{ScoringLog: logs[i]}
+		if t, ok := titleMap[logs[i].SiteName+"|"+logs[i].TorrentID]; ok {
+			items[i].Title = t
+		}
+		if si, ok := siteMap[logs[i].SiteName]; ok && si.BaseURL != "" && logs[i].TorrentID != "" {
+			items[i].DetailURL = buildDetailURL(si.BaseURL, si.Framework, logs[i].TorrentID)
+		}
+	}
+
 	Success(w, map[string]interface{}{
-		"items": logs,
-		"total": len(logs),
+		"items": items,
+		"total": len(items),
 	})
 }
 

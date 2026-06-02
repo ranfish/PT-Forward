@@ -237,6 +237,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/seeding/scoring-config/", seedingHandler)
 	mux.Handle("/api/v1/seeding/scoring-logs", seedingHandler)
 	mux.Handle("/api/v1/seeding/scoring-logs/", seedingHandler)
+	mux.Handle("/api/v1/seeding/unregistered-keywords", seedingHandler)
+	mux.Handle("/api/v1/seeding/unregistered-keywords/", seedingHandler)
 	mux.Handle("/api/v1/seeding/dryrun", seedingHandler)
 	mux.Handle("/api/v1/seeding/dryrun/", seedingHandler)
 

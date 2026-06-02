@@ -558,8 +558,8 @@ func (c *QBClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTra
 		return nil, fmt.Errorf("transfer info returned %d", resp.StatusCode)
 	}
 	var info struct {
-		UpInfoData   int64 `json:"up_info_data"`
-		DlInfoData   int64 `json:"dl_info_data"`
+		UpInfoData int64 `json:"up_info_data"`
+		DlInfoData int64 `json:"dl_info_data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
 		return nil, fmt.Errorf("decode transfer info: %w", err)
@@ -568,4 +568,31 @@ func (c *QBClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTra
 		AllTimeUpload:   info.UpInfoData,
 		AllTimeDownload: info.DlInfoData,
 	}, nil
+}
+
+func (c *QBClient) GetTrackerMessages(ctx context.Context, hash string) (string, error) {
+	resp, err := c.get(ctx, "/api/v2/torrents/trackers?hash="+url.QueryEscape(hash))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("trackers API returned %d", resp.StatusCode)
+	}
+	var trackers []struct {
+		URL  string `json:"url"`
+		Msg  string `json:"msg"`
+		Tier int    `json:"tier"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&trackers); err != nil {
+		return "", fmt.Errorf("decode trackers: %w", err)
+	}
+	for _, t := range trackers {
+		if strings.HasPrefix(t.URL, "**") || strings.HasPrefix(t.URL, "http://") || strings.HasPrefix(t.URL, "https://") {
+			if t.Msg != "" && !strings.EqualFold(t.Msg, "ok") && !strings.Contains(t.Msg, "Success") {
+				return t.Msg, nil
+			}
+		}
+	}
+	return "", nil
 }

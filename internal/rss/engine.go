@@ -710,6 +710,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				TorrentID:      event.TorrentID,
 				SubscriptionID: uintToString(sub.ID),
 				InfoHash:       event.InfoHash,
+				IsFakeHash:     isFakeHash(event.InfoHash) || event.InfoHash == "" || len(event.InfoHash) != 40,
 				Title:          event.Title,
 				Size:           event.Size,
 				Status:         "seen",

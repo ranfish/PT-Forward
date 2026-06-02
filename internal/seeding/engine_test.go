@@ -95,6 +95,9 @@ func (m *mockDownloaderClient) GetSharedPaths() []model.SharedPathMapping { retu
 func (m *mockDownloaderClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
 	return &model.GlobalTransferStats{}, nil
 }
+func (m *mockDownloaderClient) GetTrackerMessages(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
 
 type mockDownloaderProvider struct {
 	clients map[string]*mockDownloaderClient

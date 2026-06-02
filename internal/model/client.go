@@ -66,6 +66,7 @@ type TorrentInfo struct {
 	Removed       bool      `json:"removed"`
 	State         string    `json:"state"`
 	Error         string    `json:"error"`
+	TrackerMsg    string    `json:"tracker_msg"`
 	NumComplete   int       `json:"num_complete"`
 	NumIncomplete int       `json:"num_incomplete"`
 	Ratio         float64   `json:"ratio"`

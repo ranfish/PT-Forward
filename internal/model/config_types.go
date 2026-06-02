@@ -190,6 +190,7 @@ const (
 	SeedingStatusDeleteFailed  SeedingTorrentStatus = "delete_failed"
 	SeedingStatusDeleted       SeedingTorrentStatus = "deleted"
 	SeedingStatusArchived      SeedingTorrentStatus = "archived"
+	SeedingStatusUnregistered  SeedingTorrentStatus = "unregistered"
 )
 
 // §33.1.59d — PublishCandidateRole 枚举（Sprint 94）

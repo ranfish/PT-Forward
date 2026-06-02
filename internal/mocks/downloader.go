@@ -217,6 +217,10 @@ func (m *DownloaderClient) GetGlobalTransferStats(ctx context.Context) (*model.G
 	return &model.GlobalTransferStats{}, nil
 }
 
+func (m *DownloaderClient) GetTrackerMessages(ctx context.Context, hash string) (string, error) {
+	return "", nil
+}
+
 type DownloaderProvider struct {
 	Client        model.DownloaderClient
 	GetFn         func(clientID string) (model.DownloaderClient, error)

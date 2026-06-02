@@ -80,6 +80,12 @@ export const seedingApi = {
   listScoringLogs(params?: ListParams) {
     return client.get<ApiResponsePaginated<ScoringLog>>('/seeding/scoring-logs', { params })
   },
+  getUnregisteredKeywords() {
+    return client.get<ApiResponse<{ keywords: string[] }>>('/seeding/unregistered-keywords')
+  },
+  updateUnregisteredKeywords(keywords: string[]) {
+    return client.put<ApiResponse<{ keywords: string[] }>>('/seeding/unregistered-keywords', { keywords })
+  },
 }
 
 export const seedingClientsApi = {

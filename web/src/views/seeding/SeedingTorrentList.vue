@@ -52,39 +52,7 @@
       }"
       row-key="id"
       @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'info_hash'">
-          <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.info_hash)">{{ record.info_hash }}</span>
-        </template>
-        <template v-if="column.key === 'status'">
-          <a-badge
-            :status="record.status === 'seeding' ? 'success' : record.status === 'downloading' ? 'processing' : 'warning'"
-            :text="translateSeedingStatus(record.status)"
-          />
-        </template>
-        <template v-if="column.key === 'actions'">
-          <a-space>
-            <a-button
-              v-if="record.status !== 'seeding'"
-              type="link"
-              size="small"
-              @click="handleResume(record.id)"
-            >
-              {{ t('common.resume') }}
-            </a-button>
-            <a-button
-              v-if="record.status === 'seeding'"
-              type="link"
-              size="small"
-              @click="handlePause(record.id)"
-            >
-              {{ t('common.pause') }}
-            </a-button>
-          </a-space>
-        </template>
-      </template>
-    </a-table>
+    />
   </div>
 </template>
 
@@ -96,15 +64,49 @@ import { seedingApi } from '@/api/seeding'
 import { downloadersApi } from '@/api/downloaders'
 import { usePagination } from '@/composables/usePagination'
 import { useEnumLabels } from '@/utils/enumLabels'
-import { formatTime, copyToClipboard } from '@/utils/format'
+import { useTorrentColumns } from '@/composables/useTorrentColumns'
+import { h } from 'vue'
+import { Badge, Space, Button } from 'ant-design-vue'
 
 const { t } = useI18n()
 const { translateSeedingStatus } = useEnumLabels()
 
-function copyHash(text: string) {
-  copyToClipboard(text)
-  message.success(t('common.copied'))
+function handleResume(recordId: number) {
+  return async () => {
+    try {
+      await seedingApi.resumeRecord(recordId)
+      message.success(t('common.resumed'))
+      pagination.fetch()
+    } catch (e: unknown) {
+      message.error((e as Error).message)
+    }
+  }
 }
+
+function handlePause(recordId: number) {
+  return async () => {
+    try {
+      await seedingApi.pauseRecord(recordId)
+      message.success(t('common.paused'))
+      pagination.fetch()
+    } catch (e: unknown) {
+      message.error((e as Error).message)
+    }
+  }
+}
+
+const { columns } = useTorrentColumns({
+  show: ['title', 'site_name', 'torrent_id', 'discount', 'is_free', 'has_hr', 'torrent_size', 'info_hash', 'client_id', 'source', 'status', 'flushed_at', 'updated_at', 'actions'],
+  statusRender: (record) => h(Badge, {
+    status: record.status === 'seeding' ? 'success' : record.status === 'downloading' ? 'processing' : 'warning',
+    text: translateSeedingStatus(record.status as string),
+  }),
+  actionsRender: (record) => h(Space, () => [
+    record.status !== 'seeding'
+      ? h(Button, { type: 'link', size: 'small', onClick: handleResume(record.id as number) }, () => t('common.resume'))
+      : h(Button, { type: 'link', size: 'small', onClick: handlePause(record.id as number) }, () => t('common.pause')),
+  ]),
+})
 
 const downloaderOptions = ref<{label: string, value: string}[]>([])
 const filters = reactive({
@@ -114,19 +116,6 @@ const filters = reactive({
   status: undefined as string | undefined,
 })
 
-const columns = [
-  { title: 'Torrent ID', dataIndex: 'torrent_id', key: 'torrent_id', ellipsis: true },
-  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
-  { title: t('seeding.client'), dataIndex: 'client_id', key: 'client_id', width: 100 },
-  { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
-  { title: t('common.status'), key: 'status', width: 120 },
-  { title: t('seeding.free'), dataIndex: 'is_free', key: 'is_free', width: 60 },
-  { title: 'HR', dataIndex: 'has_hr', key: 'has_hr', width: 60 },
-  { title: t('seeding.source'), dataIndex: 'source', key: 'source', width: 80 },
-  { title: t('common.updatedAt'), dataIndex: 'updated_at', key: 'updated_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
-  { title: t('common.actions'), key: 'actions', width: 100 },
-]
-
 const pagination = usePagination((page, size) =>
   seedingApi.listRecords(page, size, { ...filters }),
 )
@@ -134,26 +123,6 @@ const pagination = usePagination((page, size) =>
 watch(filters, () => {
   pagination.fetch(1)
 }, { deep: true })
-
-async function handleResume(recordId: number) {
-  try {
-    await seedingApi.resumeRecord(recordId)
-    message.success(t('common.resumed'))
-    pagination.fetch()
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  }
-}
-
-async function handlePause(recordId: number) {
-  try {
-    await seedingApi.pauseRecord(recordId)
-    message.success(t('common.paused'))
-    pagination.fetch()
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  }
-}
 
 async function fetchDownloaders() {
   try {

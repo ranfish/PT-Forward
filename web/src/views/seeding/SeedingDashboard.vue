@@ -81,49 +81,7 @@
         :pagination="{ pageSize: 20, showSizeChanger: true }"
         row-key="id"
         size="small"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'title'">
-            <a v-if="record.detail_url" :href="record.detail_url" target="_blank" style="color: #1890ff">{{ record.title || record.torrent_id }}</a>
-            <span v-else>{{ record.title || record.torrent_id }}</span>
-          </template>
-          <template v-if="column.key === 'info_hash'">
-            <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.info_hash)">{{ record.info_hash }}</span>
-          </template>
-          <template v-if="column.key === 'status'">
-              <a-badge
-                :status="record.status === 'seeding' ? 'success' : 'warning'"
-                :text="translateSeedingStatus(record.status)"
-              />
-            </template>
-          <template v-if="column.key === 'is_free'">
-            <a-tag :color="record.is_free ? 'green' : 'default'">{{ record.is_free ? t('common.yes') : t('common.no') }}</a-tag>
-          </template>
-          <template v-if="column.key === 'has_hr'">
-            <a-tag :color="record.has_hr ? 'red' : 'default'">{{ record.has_hr ? t('common.yes') : t('common.no') }}</a-tag>
-          </template>
-          <template v-if="column.key === 'actions'">
-            <a-space>
-              <a-button
-                v-if="record.status !== 'seeding'"
-                type="link"
-                size="small"
-                @click="handleResumeRecord(record.id)"
-              >
-                {{ t('common.resume') }}
-              </a-button>
-              <a-button
-                v-if="record.status === 'seeding'"
-                type="link"
-                size="small"
-                @click="handlePauseRecord(record.id)"
-              >
-                {{ t('common.pause') }}
-              </a-button>
-            </a-space>
-          </template>
-        </template>
-      </a-table>
+      />
     </a-card>
 
     <a-modal
@@ -159,14 +117,9 @@
         <a-form-item v-if="configForm.diskProtectEnabled" :label="t('seeding.minDiskSpaceGB')">
           <a-input-number v-model:value="configForm.minDiskSpaceGB" :min="1" style="width: 100%" />
         </a-form-item>
-        <a-form-item :label="t('seeding.maxActiveUploads')">
-          <a-input-number v-model:value="configForm.maxActiveUploads" :min="0" style="width: 100%" />
-        </a-form-item>
-        <a-form-item :label="t('seeding.maxActiveDownloads')">
-          <a-input-number v-model:value="configForm.maxActiveDownloads" :min="0" style="width: 100%" />
-        </a-form-item>
         <a-form-item :label="t('seeding.maxActiveSeeding')">
-          <a-input-number v-model:value="configForm.maxActiveSeeding" :min="0" style="width: 100%" />
+          <a-input-number v-model:value="configForm.maxActiveSeeding" :min="-1" style="width: 100%" />
+          <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('seeding.maxActiveSeedingHint') }}</div>
         </a-form-item>
         <a-form-item :label="t('seeding.superSeedingDefault')">
           <a-switch v-model:checked="configForm.superSeedingDefault" />
@@ -296,8 +249,11 @@ import {
 } from '@ant-design/icons-vue'
 import { seedingApi, deleteRulesApi } from '@/api/seeding'
 import { downloadersApi } from '@/api/downloaders'
-import { formatDurationSec, formatTime, copyToClipboard } from '@/utils/format'
+import { formatDurationSec } from '@/utils/format'
 import { useEnumLabels } from '@/utils/enumLabels'
+import { useTorrentColumns } from '@/composables/useTorrentColumns'
+import { h } from 'vue'
+import { Badge, Space, Button } from 'ant-design-vue'
 import type { ClientConfig, SeedingClientConfig, SeedingTorrentRecord, DeleteRule } from '@/api/types'
 
 interface SeedingStatusData {
@@ -341,8 +297,6 @@ const configForm = reactive({
   mainDataCron: '*/10 * * * *',
   diskProtectEnabled: false,
   minDiskSpaceGB: 50,
-  maxActiveUploads: 0,
-  maxActiveDownloads: 0,
   maxActiveSeeding: 100,
   superSeedingDefault: false,
   rejectRuleIds: '',
@@ -362,19 +316,18 @@ const configForm = reactive({
   archiveGranularity: 'daily',
 })
 
-const columns = [
-  { title: t('seeding.fieldTorrentName'), dataIndex: 'title', key: 'title', ellipsis: true, width: 260 },
-  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 60 },
-  { title: t('seeding.fieldTorrentID'), dataIndex: 'torrent_id', key: 'torrent_id', ellipsis: true, width: 60 },
-  { title: t('seeding.client'), dataIndex: 'client_id', key: 'client_id', width: 50 },
-  { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true, width: 200 },
-  { title: t('common.status'), key: 'status', width: 80 },
-  { title: t('seeding.isFree'), key: 'is_free', width: 60 },
-  { title: 'HR', key: 'has_hr', width: 50 },
-  { title: t('seeding.source'), dataIndex: 'source', key: 'source', width: 70 },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 150, customRender: ({ text }: { text: string }) => formatTime(text) },
-  { title: t('common.actions'), key: 'actions', width: 80 },
-]
+const { columns } = useTorrentColumns({
+  show: ['title', 'site_name', 'torrent_id', 'discount', 'is_free', 'has_hr', 'info_hash', 'client_id', 'source', 'status', 'flushed_at', 'actions'],
+  statusRender: (record) => h(Badge, {
+    status: record.status === 'seeding' ? 'success' : 'warning',
+    text: translateSeedingStatus(record.status as string),
+  }),
+  actionsRender: (record) => h(Space, () => [
+    record.status !== 'seeding'
+      ? h(Button, { type: 'link', size: 'small', onClick: () => handleResumeRecord(record.id as number) }, () => t('common.resume'))
+      : h(Button, { type: 'link', size: 'small', onClick: () => handlePauseRecord(record.id as number) }, () => t('common.pause')),
+  ]),
+})
 
 const configColumns = [
   { title: t('seeding.downloaderId'), dataIndex: 'client_id', key: 'client_id', width: 120 },
@@ -426,8 +379,6 @@ function openConfigModal(record?: SeedingClientConfig) {
       mainDataCron: record.maindata_cron || '*/10 * * * *',
       diskProtectEnabled: record.disk_protect_enabled || false,
       minDiskSpaceGB: record.min_disk_space_gb || 50,
-      maxActiveUploads: record.max_active_uploads || 0,
-      maxActiveDownloads: record.max_active_downloads || 0,
       maxActiveSeeding: record.max_active_seeding || 100,
       superSeedingDefault: record.super_seeding_default || false,
       rejectRuleIds: record.reject_rule_ids || '',
@@ -454,8 +405,6 @@ function openConfigModal(record?: SeedingClientConfig) {
       mainDataCron: '*/10 * * * *',
       diskProtectEnabled: false,
       minDiskSpaceGB: 50,
-      maxActiveUploads: 0,
-      maxActiveDownloads: 0,
       maxActiveSeeding: 100,
       superSeedingDefault: false,
       rejectRuleIds: '',
@@ -566,11 +515,6 @@ async function fetchDeleteRules() {
     }))
   } catch {
   }
-}
-
-function copyHash(text: string) {
-  copyToClipboard(text)
-  message.success(t('common.copied'))
 }
 
 onMounted(() => {

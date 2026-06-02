@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"time"
@@ -70,7 +71,7 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 
 	var records []model.SeedingTorrentRecord
 	if dbErr := e.db.WithContext(ctx).
-		Where("client_id = ? AND status IN ? AND source = ? AND subscription_id = ?", clientID, []model.SeedingTorrentStatus{model.SeedingStatusPending, model.SeedingStatusSeeding}, "rss", subscriptionID).
+		Where("client_id = ? AND status IN ? AND source IN ? AND subscription_id = ?", clientID, []model.SeedingTorrentStatus{model.SeedingStatusPending, model.SeedingStatusSeeding}, []string{"rss", "free_wait"}, subscriptionID).
 		Find(&records).Error; dbErr != nil {
 		e.logger.Warn("flush: load records failed",
 			zap.String("client_id", clientID),
@@ -311,13 +312,19 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 
 	activeCount := e.GetActiveCount(fc.clientID)
 	maxActive := fc.scoringCfg.MaxActiveSeeding
-	if fc.clientCfg != nil && fc.clientCfg.MaxActiveSeeding > 0 {
+	if fc.clientCfg != nil && fc.clientCfg.MaxActiveSeeding != 0 {
 		maxActive = fc.clientCfg.MaxActiveSeeding
 	}
-	if maxActive <= 0 {
+	if maxActive == 0 {
 		maxActive = 100
 	}
-	remaining := maxActive - activeCount
+
+	var remaining int
+	if maxActive < 0 {
+		remaining = math.MaxInt32 - activeCount
+	} else {
+		remaining = maxActive - activeCount
+	}
 	if remaining <= 0 {
 		e.logger.Info("flush: max active seeding reached, checking disk_recover only",
 			zap.String("client_id", fc.clientID),
@@ -651,6 +658,13 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 					zap.String("torrent_id", rec.TorrentID),
 					zap.Error(dbErr))
 			}
+			if dbErr := e.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
+				Where("site_name = ? AND torrent_id = ?", rec.SiteName, rec.TorrentID).
+				Update("info_hash", addResult.InfoHash).Error; dbErr != nil {
+				e.logger.Warn("flush: backfill rss_torrent_seen info_hash failed",
+					zap.String("torrent_id", rec.TorrentID),
+					zap.Error(dbErr))
+			}
 			realKey := recordKey(fc.clientID, addResult.InfoHash)
 			rec.InfoHash = addResult.InfoHash
 			e.mu.Lock()
@@ -688,6 +702,13 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 						zap.Error(delErr))
 				}
 				return candidate, false
+			}
+			if dbErr := e.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
+				Where("site_name = ? AND torrent_id = ?", rec.SiteName, rec.TorrentID).
+				Update("info_hash", addResult.InfoHash).Error; dbErr != nil {
+				e.logger.Warn("flush: backfill rss_torrent_seen info_hash failed",
+					zap.String("torrent_id", rec.TorrentID),
+					zap.Error(dbErr))
 			}
 			e.mu.Lock()
 			e.recordMap[altKey] = newRecord

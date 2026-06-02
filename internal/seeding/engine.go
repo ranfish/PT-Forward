@@ -161,6 +161,9 @@ type Engine struct {
 	freeWaitMonitor *FreeWaitMonitor
 	refreshCancel   context.CancelFunc
 	wg              sync.WaitGroup
+
+	unregisteredCursor  int
+	unregisteredChecking bool
 }
 
 type maindataEntry struct {
@@ -357,9 +360,8 @@ func (e *Engine) Start(ctx context.Context) error {
 
 	refreshCtx, cancel := context.WithCancel(context.Background())
 	e.refreshCancel = cancel
-	e.wg.Add(2)
+	e.wg.Add(1)
 	go func() { defer e.wg.Done(); e.refreshMaindataLoop(refreshCtx) }()
-	go func() { defer e.wg.Done(); e.freeWaitCheckLoop(refreshCtx) }()
 
 	return nil
 }
@@ -431,6 +433,7 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 		}
 		e.updateEMA(ctx, clientID, md, torrentMap)
 		e.syncStaleRecords(ctx, clientID, torrentMap)
+		e.checkUnregisteredTorrents(ctx, clientID, dlClient)
 	}
 }
 
@@ -440,30 +443,16 @@ func (e *Engine) getCachedMaindata(clientID string) *maindataEntry {
 	return e.maindataCache[clientID]
 }
 
-func (e *Engine) freeWaitCheckLoop(ctx context.Context) {
-	ticker := time.NewTicker(10 * time.Minute)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			e.freeWaitCheckOnce(ctx)
-		}
-	}
-}
-
-func (e *Engine) freeWaitCheckOnce(ctx context.Context) {
+func (e *Engine) FreeWaitCheckOnce(ctx context.Context) int {
 	if e.freeWaitMonitor == nil || e.freeWaitMonitor.PendingCount() == 0 {
-		return
+		return 0
 	}
 	if e.siteProvider == nil {
-		return
+		return 0
 	}
 
 	checker := &siteDiscountChecker{provider: e.siteProvider}
-	e.freeWaitMonitor.CheckOnce(ctx, checker, func(ctx context.Context, entry *freeWaitEntry) error {
+	return e.freeWaitMonitor.CheckOnce(ctx, checker, func(ctx context.Context, entry *freeWaitEntry) error {
 		record := &model.SeedingTorrentRecord{
 			ClientID:       entry.ClientID,
 			InfoHash:       entry.InfoHash,
@@ -503,8 +492,22 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 
 	exists, err := dlClient.CheckExists(ctx, entry.InfoHash)
 	if err == nil && exists {
-		e.logger.Debug("free wait push: already exists in client",
+		e.logger.Debug("free wait push: already exists in client, ensuring status=seeding",
 			zap.String("info_hash", entry.InfoHash))
+		now := time.Now()
+		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("client_id = ? AND info_hash = ? AND status = ?", entry.ClientID, entry.InfoHash, model.SeedingStatusPending).
+			Updates(map[string]interface{}{
+				"status":     model.SeedingStatusSeeding,
+				"flushed_at": now,
+			})
+		e.mu.Lock()
+		key := recordKey(entry.ClientID, entry.InfoHash)
+		if r, ok := e.recordMap[key]; ok && r.Status == model.SeedingStatusPending {
+			r.Status = model.SeedingStatusSeeding
+			r.FlushedAt = &now
+		}
+		e.mu.Unlock()
 		return
 	}
 
@@ -548,6 +551,8 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 		return
 	}
 
+	now := time.Now()
+
 	e.logger.Info("free wait push: pushed to downloader",
 		zap.String("client_id", entry.ClientID),
 		zap.String("site", entry.SiteName),
@@ -558,6 +563,17 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 		e.mu.Lock()
 		altKey := recordKey(entry.ClientID, addResult.InfoHash)
 		if _, ok := e.recordMap[altKey]; !ok {
+			oldKey := recordKey(entry.ClientID, entry.InfoHash)
+			delete(e.recordMap, oldKey)
+			e.mu.Unlock()
+
+			e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+				Where("client_id = ? AND info_hash = ?", entry.ClientID, entry.InfoHash).
+				Updates(map[string]interface{}{
+					"status":     model.SeedingStatusDeleted,
+					"updated_at": now,
+				})
+
 			newRecord := &model.SeedingTorrentRecord{
 				ClientID:       entry.ClientID,
 				SiteName:       entry.SiteName,
@@ -565,7 +581,8 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 				InfoHash:       addResult.InfoHash,
 				IsFree:         true,
 				Source:         "free_wait",
-				Status:         model.SeedingStatusPending,
+				Status:         model.SeedingStatusSeeding,
+				FlushedAt:      &now,
 				HasHR:          entry.HasHR,
 				HRSeedTimeH:    entry.HRSeedTimeH,
 				SubscriptionID: entry.SubscriptionID,
@@ -581,8 +598,35 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 						zap.Error(delErr))
 				}
 			} else {
+				e.mu.Lock()
 				e.recordMap[altKey] = newRecord
+				e.mu.Unlock()
+				if dbErr := e.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
+					Where("site_name = ? AND torrent_id = ?", entry.SiteName, entry.TorrentID).
+					Update("info_hash", addResult.InfoHash).Error; dbErr != nil {
+					e.logger.Warn("free wait push: backfill rss_torrent_seen info_hash failed",
+						zap.String("torrent_id", entry.TorrentID),
+						zap.Error(dbErr))
+				}
+				if e.freeEndMonitor != nil && newRecord.FreeEndAt != nil {
+					e.freeEndMonitor.Schedule(newRecord)
+				}
 			}
+		} else {
+			e.mu.Unlock()
+		}
+	} else {
+		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("client_id = ? AND info_hash = ?", entry.ClientID, entry.InfoHash).
+			Updates(map[string]interface{}{
+				"status":     model.SeedingStatusSeeding,
+				"flushed_at": now,
+			})
+		e.mu.Lock()
+		key := recordKey(entry.ClientID, entry.InfoHash)
+		if r, ok := e.recordMap[key]; ok {
+			r.Status = model.SeedingStatusSeeding
+			r.FlushedAt = &now
 		}
 		e.mu.Unlock()
 	}
@@ -873,7 +917,12 @@ func (e *Engine) OnTorrents(ctx context.Context, events []model.TorrentEvent) er
 
 func (e *Engine) CleanupStale(ctx context.Context) (int64, error) {
 	cutoff := time.Now().AddDate(0, 0, -30)
-	staleStatuses := []string{"paused_free_end", "paused_rule", "stopped"}
+	staleStatuses := []string{
+		string(model.SeedingStatusPausedFreeEnd),
+		string(model.SeedingStatusPausedRule),
+		string(model.SeedingStatusDeleted),
+		string(model.SeedingStatusUnregistered),
+	}
 
 	type staleKey struct {
 		ClientID string
@@ -1175,10 +1224,6 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 	return candidate, evaluated, shouldCleanup
 }
 
-func (e *Engine) handleDiskProtect(ctx context.Context, rec *model.SeedingTorrentRecord, ec *evaluateContext, result *EvaluateResult) bool {
-	return false
-}
-
 func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) {
 	var paused []model.SeedingTorrentRecord
 	if err := e.db.WithContext(ctx).
@@ -1458,9 +1503,6 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 		}
 
 		if !shouldCleanup {
-			if !dryRun {
-				e.handleDiskProtect(ctx, rec, ec, result)
-			}
 			continue
 		}
 
@@ -2255,5 +2297,133 @@ func (e *Engine) refreshDiscountStatus(ctx context.Context, records []model.Seed
 			}
 			e.mu.Unlock()
 		}
+	}
+}
+
+var defaultUnregisteredKeywords = []string{
+	"unregistered torrent",
+	"unregistered",
+	"torrent not found",
+	"torrent not exist",
+	"not registered",
+	"unknown torrent",
+	"invalid torrent",
+	"torrent has been deleted",
+}
+
+func (e *Engine) getUnregisteredKeywords() []string {
+	var val string
+	row := e.db.Raw("SELECT value FROM system_settings WHERE key = 'seeding.unregistered_keywords' LIMIT 1").Row()
+	if err := row.Scan(&val); err != nil || val == "" {
+		return defaultUnregisteredKeywords
+	}
+	var keywords []string
+	if json.Unmarshal([]byte(val), &keywords) == nil && len(keywords) > 0 {
+		return keywords
+	}
+	return defaultUnregisteredKeywords
+}
+
+func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string, dlClient model.DownloaderClient) {
+	if e.unregisteredChecking {
+		return
+	}
+	e.unregisteredChecking = true
+	defer func() { e.unregisteredChecking = false }()
+
+	keywords := e.getUnregisteredKeywords()
+
+	e.mu.RLock()
+	var candidates []*model.SeedingTorrentRecord
+	for _, rec := range e.recordMap {
+		if rec.ClientID == clientID && rec.Status == model.SeedingStatusSeeding && !rec.Unregistered {
+			candidates = append(candidates, rec)
+		}
+	}
+	e.mu.RUnlock()
+
+	if len(candidates) == 0 {
+		return
+	}
+
+	batchSize := 20
+	if e.unregisteredCursor >= len(candidates) {
+		e.unregisteredCursor = 0
+	}
+	end := e.unregisteredCursor + batchSize
+	if end > len(candidates) {
+		end = len(candidates)
+	}
+	batch := candidates[e.unregisteredCursor:end]
+	e.unregisteredCursor = end
+
+	for _, rec := range batch {
+		if ctx.Err() != nil {
+			return
+		}
+		msg, err := dlClient.GetTrackerMessages(ctx, rec.InfoHash)
+		if err != nil || msg == "" {
+			continue
+		}
+		msgLowered := strings.ToLower(msg)
+		matched := false
+		for _, kw := range keywords {
+			if strings.Contains(msgLowered, strings.ToLower(kw)) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+
+		e.logger.Info("unregistered torrent detected",
+			zap.String("client_id", clientID),
+			zap.String("site", rec.SiteName),
+			zap.String("torrent_id", rec.TorrentID),
+			zap.String("info_hash", rec.InfoHash),
+			zap.String("tracker_msg", msg))
+
+		if err := dlClient.PauseTorrent(ctx, rec.InfoHash); err != nil {
+			e.logger.Warn("unregistered: pause failed", zap.String("hash", rec.InfoHash), zap.Error(err))
+		}
+
+		now := time.Now()
+		if err := e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
+			"status":           model.SeedingStatusUnregistered,
+			"unregistered":     true,
+			"unregistered_at":  now,
+			"unregistered_msg": msg,
+			"last_action_by":   "unregistered_patrol",
+		}).Error; err != nil {
+			e.logger.Warn("unregistered: update DB failed", zap.Error(err))
+			continue
+		}
+
+		e.mu.Lock()
+		rec.Status = model.SeedingStatusUnregistered
+		rec.Unregistered = true
+		rec.UnregisteredAt = &now
+		rec.UnregisteredMsg = msg
+		e.mu.Unlock()
+
+		if err := dlClient.DeleteTorrent(ctx, rec.InfoHash, true); err != nil {
+			e.logger.Warn("unregistered: delete torrent+files failed", zap.String("hash", rec.InfoHash), zap.Error(err))
+		} else {
+			e.logger.Info("unregistered: deleted torrent and files",
+				zap.String("info_hash", rec.InfoHash),
+				zap.String("site", rec.SiteName),
+				zap.String("torrent_id", rec.TorrentID))
+		}
+
+		key := recordKey(rec.ClientID, rec.InfoHash)
+		e.mu.Lock()
+		delete(e.recordMap, key)
+		e.mu.Unlock()
+
+		e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
+			"status":         model.SeedingStatusDeleted,
+			"last_action_by": "unregistered_patrol",
+		})
 	}
 }

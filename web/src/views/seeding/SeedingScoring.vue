@@ -24,16 +24,15 @@
                   <a-switch v-model:checked="scoringConfig.enabled" @change="saveScoringConfig" />
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.halfLifeHours')">
-                  <a-input-number v-model:value="scoringConfig.halfLifeHours" :min="0.1" :step="0.5" style="width: 100%" />
+                  <a-input-number v-model:value="scoringConfig.halfLifeHours" :min="0.1" :step="0.5" style="width: 100%">
+                    <template #addonAfter>小时</template>
+                  </a-input-number>
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.minScore')">
                   <a-input-number v-model:value="scoringConfig.minScore" :min="0" :step="0.1" style="width: 100%" />
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.maxCandidates')">
                   <a-input-number v-model:value="scoringConfig.maxCandidates" :min="1" style="width: 100%" />
-                </a-form-item>
-                <a-form-item :label="t('seeding.scoring.maxActiveSeeding')">
-                  <a-input-number v-model:value="scoringConfig.maxActiveSeeding" :min="1" style="width: 100%" />
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.topNConfirm')">
                   <a-input-number v-model:value="scoringConfig.topNConfirm" :min="1" style="width: 100%" />
@@ -43,11 +42,14 @@
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.batchLimit')">
                   <a-input-number v-model:value="scoringConfig.batchLimit" :min="1" style="width: 100%" />
-                  <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('seeding.scoring.batchLimitHint') }}</div>
                 </a-form-item>
                 <a-form-item :label="t('seeding.scoring.pushIntervalMs')">
                   <a-input-number v-model:value="scoringConfig.pushIntervalMs" :min="0" :step="100" style="width: 100%" />
                   <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('seeding.scoring.pushIntervalMsHint') }}</div>
+                </a-form-item>
+                <a-form-item :label="t('seeding.scoring.siteWeights')">
+                  <a-input-number v-model:value="siteWeight" :min="0.1" :step="0.1" style="width: 100%" :addon-before="currentSiteName" />
+                  <div style="font-size: 11px; color: #999; margin-top: 4px">{{ t('seeding.scoring.siteWeightsHint') }}</div>
                 </a-form-item>
                 <a-form-item>
                   <a-button type="primary" :loading="saving" @click="saveScoringConfig">{{ t('common.saveConfig') }}</a-button>
@@ -112,7 +114,7 @@
           </a-form>
           <a-descriptions v-if="dryrunResult" bordered :column="2" size="small">
             <a-descriptions-item :label="t('seeding.scoring.score')">{{ Number.isFinite(dryrunResult.score) ? dryrunResult.score!.toFixed(4) : '-' }}</a-descriptions-item>
-            <a-descriptions-item :label="t('seeding.scoring.effectiveScore')">{{ Number.isFinite(dryrunResult.effectiveScore) ? dryrunResult.effectiveScore!.toFixed(4) : '-' }}</a-descriptions-item>
+            <a-descriptions-item :label="t('seeding.scoring.effectiveScore')"><span style="color: #f5222d; font-weight: bold; font-size: 16px">{{ Number.isFinite(dryrunResult.effectiveScore) ? dryrunResult.effectiveScore!.toFixed(4) : '-' }}</span></a-descriptions-item>
             <a-descriptions-item :label="t('seeding.scoring.demandScore')">{{ Number.isFinite(dryrunResult.demandScore) ? dryrunResult.demandScore!.toFixed(4) : '-' }}</a-descriptions-item>
             <a-descriptions-item :label="t('seeding.scoring.recencyFactor')">{{ Number.isFinite(dryrunResult.recencyFactor) ? dryrunResult.recencyFactor!.toFixed(4) : '-' }}</a-descriptions-item>
             <a-descriptions-item :label="t('seeding.scoring.shouldCleanup')">
@@ -135,16 +137,42 @@
         </a-card>
       </a-col>
     </a-row>
+
+    <a-card title="站点删种检测关键词（tracker 返回信息包含以下关键词时，自动删除种子及文件）" style="margin-top: 16px">
+      <div style="margin-bottom: 8px; display: flex; gap: 8px; align-items: center">
+        <a-input
+          v-model:value="newKeyword"
+          placeholder="输入关键词，如 unregistered torrent"
+          style="width: 300px"
+          @press-enter="addKeyword"
+        />
+        <a-button type="primary" size="small" @click="addKeyword">添加</a-button>
+        <a-button size="small" @click="saveKeywords" :loading="keywordsSaving">保存</a-button>
+      </div>
+      <div>
+        <a-tag
+          v-for="(kw, i) in unregisteredKeywords"
+          :key="i"
+          closable
+          style="margin-bottom: 4px"
+          @close="removeKeyword(i)"
+        >
+          {{ kw }}
+        </a-tag>
+      </div>
+    </a-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, h } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { seedingApi } from '@/api/seeding'
 import { subscriptionsApi } from '@/api/subscriptions'
-import { formatTime, copyToClipboard } from '@/utils/format'
+import { useTorrentColumns } from '@/composables/useTorrentColumns'
+import { formatTime } from '@/utils/format'
+import type { ScoringLog } from '@/api/types'
 
 interface DryrunResult {
   score?: number
@@ -154,40 +182,50 @@ interface DryrunResult {
   shouldCleanup?: boolean
 }
 
-interface ScoringLogItem {
-  id: number
-  title: string
-  site_name: string
-  size: string
-  created_at: string
-}
-
 const { t } = useI18n()
 
-function copyHash(text: string) {
-  copyToClipboard(text)
-  message.success(t('common.copied'))
-}
-
+const scoringLogs = ref<ScoringLog[]>([])
 const configLoading = ref(false)
 const saving = ref(false)
 const dryrunLoading = ref(false)
 const logsLoading = ref(false)
 const dryrunResult = ref<DryrunResult | null>(null)
-const scoringLogs = ref<ScoringLogItem[]>([])
-const subscriptions = ref<{ id: number; name: string }[]>([])
+const unregisteredKeywords = ref<string[]>([])
+const newKeyword = ref('')
+const keywordsSaving = ref(false)
+const subscriptions = ref<{ id: number; name: string; site_name?: string }[]>([])
 const selectedSubId = ref<number | undefined>(undefined)
 const scoringConfig = reactive({
   enabled: false,
   halfLifeHours: 2,
   minScore: 1.0,
   maxCandidates: 50,
-  maxActiveSeeding: 100,
   topNConfirm: 10,
   include2xUp: false,
   batchLimit: 5,
   pushIntervalMs: 0,
 })
+
+const siteWeight = ref(1.0)
+const currentSiteName = ref('')
+
+function siteWeightsToJSON(): string {
+  if (!currentSiteName.value) return '{}'
+  return JSON.stringify({ [currentSiteName.value]: siteWeight.value })
+}
+
+function parseSiteWeightsJSON(json: string) {
+  try {
+    const obj = JSON.parse(json || '{}')
+    if (currentSiteName.value && obj[currentSiteName.value] !== undefined) {
+      siteWeight.value = obj[currentSiteName.value] as number
+    } else {
+      siteWeight.value = 1.0
+    }
+  } catch {
+    siteWeight.value = 1.0
+  }
+}
 
 const dryrunForm = reactive({
   seeders: 100,
@@ -199,16 +237,19 @@ const dryrunForm = reactive({
   halfLifeHours: 2,
 })
 
+const { columns: baseLogColumns } = useTorrentColumns({
+  show: ['title', 'site_name', 'torrent_id'],
+})
 const logColumns = [
-  { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: t('seeding.infoHash'), dataIndex: 'info_hash', key: 'info_hash', ellipsis: true, customRender: ({ text }: { text: string }) => h('span', { style: 'cursor:pointer;font-family:monospace;font-size:12px', onClick: () => copyHash(text) }, text) },
-  { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 100 },
-  { title: t('seeding.scoringScore'), dataIndex: 'score', key: 'score', width: 80 },
+  ...baseLogColumns,
+  { title: t('seeding.scoring.score'), dataIndex: 'score', key: 'score', width: 80, customRender: ({ text }: { text: number }) => typeof text === 'number' ? text.toFixed(4) : '-' },
   { title: t('common.time'), dataIndex: 'created_at', key: 'created_at', width: 170, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 
 async function fetchScoringConfig() {
   configLoading.value = true
+  const sub = subscriptions.value.find(s => s.id === selectedSubId.value)
+  currentSiteName.value = sub?.site_name || ''
   try {
     const resp = await seedingApi.getScoringConfig(selectedSubId.value)
     const data = resp.data.data || {}
@@ -217,12 +258,12 @@ async function fetchScoringConfig() {
       halfLifeHours: data.half_life_hours ?? 2,
       minScore: data.min_score ?? 1.0,
       maxCandidates: data.max_candidates ?? 50,
-      maxActiveSeeding: data.max_active_seeding ?? 100,
       topNConfirm: data.top_n_confirm ?? 10,
       include2xUp: data.include_2xup ?? false,
       batchLimit: data.batch_limit ?? 5,
       pushIntervalMs: data.push_interval_ms ?? 0,
     })
+    parseSiteWeightsJSON(data.site_weights_json || '{}')
     dryrunForm.halfLifeHours = scoringConfig.halfLifeHours
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
@@ -234,7 +275,7 @@ async function fetchScoringConfig() {
 async function saveScoringConfig() {
   saving.value = true
   try {
-    await seedingApi.updateScoringConfig(scoringConfig, selectedSubId.value)
+    await seedingApi.updateScoringConfig({ ...scoringConfig, site_weights_json: siteWeightsToJSON() } as any, selectedSubId.value)
     message.success(t('common.configSaved'))
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
@@ -267,7 +308,7 @@ async function fetchScoringLogs() {
   logsLoading.value = true
   try {
     const resp = await seedingApi.listScoringLogs({ limit: 30 })
-    scoringLogs.value = (resp.data.data?.items || []) as unknown as ScoringLogItem[]
+    scoringLogs.value = resp.data.data?.items || []
   } catch {
     scoringLogs.value = []
   } finally {
@@ -284,9 +325,42 @@ async function fetchSubscriptions() {
   }
 }
 
+async function fetchUnregisteredKeywords() {
+  try {
+    const resp = await seedingApi.getUnregisteredKeywords()
+    unregisteredKeywords.value = resp.data.data?.keywords || []
+  } catch {
+  }
+}
+
+function addKeyword() {
+  const kw = newKeyword.value.trim()
+  if (kw && !unregisteredKeywords.value.includes(kw)) {
+    unregisteredKeywords.value.push(kw)
+  }
+  newKeyword.value = ''
+}
+
+function removeKeyword(idx: number) {
+  unregisteredKeywords.value.splice(idx, 1)
+}
+
+async function saveKeywords() {
+  keywordsSaving.value = true
+  try {
+    await seedingApi.updateUnregisteredKeywords(unregisteredKeywords.value)
+    message.success(t('common.saveSuccess'))
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    keywordsSaving.value = false
+  }
+}
+
 onMounted(() => {
   fetchSubscriptions()
   fetchScoringConfig()
   fetchScoringLogs()
+  fetchUnregisteredKeywords()
 })
 </script>

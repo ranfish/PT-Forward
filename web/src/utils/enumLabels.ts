@@ -21,6 +21,7 @@ const seedingStatusMap: Record<string, string> = {
   deleted: 'seeding.deletedStatus',
   paused: 'seeding.pausedStatus',
   stopped: 'seeding.stoppedStatus',
+  unregistered: 'seeding.unregisteredStatus',
 }
 
 const publishStatusMap: Record<string, string> = {
