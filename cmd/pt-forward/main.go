@@ -252,6 +252,7 @@ func main() {
 	seedingEngine.SetClientProvider(clientManager)
 	seedingEngine.SetSiteProvider(siteProvider)
 	seedingEngine.SetWSBroadcaster(wsHub)
+	seedingEngine.SetReseedTrigger(reseedEngine)
 
 	freeWaitMonitor := seeding.NewFreeWaitMonitor(db, log)
 	freeWaitMonitor.SetEngine(seedingEngine)
@@ -706,8 +707,21 @@ func registerSchedulerTasks(
 		return seedingConfirm.CheckOnce(ctx, clientMgr)
 	})
 
-	register("reseed_tasks", "reseed", "0 */30 * * * *", func(ctx context.Context) error {
+	register("reseed_tasks", "reseed", "0 */5 * * * *", func(ctx context.Context) error {
 		return reseedEngine.RunEnabledTasks(ctx)
+	})
+
+	register("reseed_retry", "reseed", "0 0 */1 * * *", func(ctx context.Context) error {
+		retried, succeeded, err := reseedEngine.RetryFailedMatches(ctx)
+		if err != nil {
+			return err
+		}
+		if retried > 0 {
+			log.Info("reseed retry processed",
+				zap.Int("retried", retried),
+				zap.Int("succeeded", succeeded))
+		}
+		return nil
 	})
 
 	register("seeding_cleanup", "seeding", "0 0 */6 * * *", func(ctx context.Context) error {

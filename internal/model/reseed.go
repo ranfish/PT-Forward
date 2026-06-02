@@ -62,6 +62,8 @@ type ReseedTask struct {
 
 	MaxRetries     int `json:"max_retries" gorm:"default:3"`
 	RetryIntervalH int `json:"retry_interval_h" gorm:"default:24"`
+
+	LastRunAt *time.Time `json:"last_run_at"`
 }
 
 func (ReseedTask) TableName() string { return "reseed_tasks" }
