@@ -1,10 +1,10 @@
 # 📘 M-Team (mTorrent) API 完整技术手册
 
-> **版本**: v2.0 Production Ready (Based on Official OpenAPI 3.1.0)
-> **更新日期**: 2026-04-12
-> **API基础URL**: `https://test2.m-team.cc/api` (测试环境) / `https://m-team.cc` (生产环境)
+> **版本**: v2.2 Production Ready (Based on Official OpenAPI 3.1.0)
+> **更新日期**: 2026-06-04
+> **API基础URL**: `https://test2.m-team.cc/api` (测试环境) / `https://api.m-team.cc` (生产环境)
 > **认证方式**: x-api-key Header
-> **数据来源**: 官方 OpenAPI 3.1.0 定义 (363 个端点, 108 个Schema)
+> **数据来源**: 官方 OpenAPI 3.1.0 定义 (372 个端点, 116 个Schema)
 
 ---
 
@@ -32,8 +32,8 @@
 | 属性 | 值 |
 |------|-----|
 | **OpenAPI版本** | 3.1.0 |
-| **API端点总数** | 363 个 |
-| **数据模型数量** | 108 个 |
+| **API端点总数** | 372 个 |
+| **数据模型数量** | 116 个 |
 | **主要HTTP方法** | POST (356个) + GET (13个) |
 | **认证方式** | Bearer Token via x-api-key Header |
 | **响应格式** | 统一JSON: `{code, message, data}` |
@@ -70,8 +70,13 @@ URLs: []string{
 
 **⚠️ 2026年重要变更（来源: Jackett Issue #15433）：**
 - **旧端点**: `${SiteUrl}/api/torrent/search` （已废弃）
-- **新端点**: `https://m-team.cc/api/torrent/search` 或 `https://api.m-team.io/api/torrent/search`
+- **新端点**: `https://api.m-team.cc/api/torrent/search` 或 `https://api.m-team.io/api/torrent/search`
 - **截止日期**: 2026年7月1日旧端点将停止服务
+
+**⚠️ 生产环境 API 域名说明 (2026-06 验证)：**
+- `api.m-team.cc` — PT-Forward 系统使用此域名（Go HTTP Client 正常，curl 可能 302→Google 是代理/CF 行为差异）
+- `api.m-team.io` — Jackett/Prowlarr 等工具使用此域名
+- 两者均可作为 API 域名，功能等价
 
 ---
 
@@ -130,224 +135,92 @@ Origin: https://kp.m-team.cc
 
 | 模块 | 接口数量 | 说明 |
 |------|----------|------|
-| `/admin/agent` | 8 个 | API接口 |
-| `/admin/album` | 2 个 | API接口 |
-| `/admin/banip` | 4 个 | API接口 |
-| `/admin/bet` | 1 个 | API接口 |
-| `/admin/cheaterbox` | 4 个 | API接口 |
-| `/admin/dmm` | 6 个 | API接口 |
-| `/admin/forum` | 9 个 | API接口 |
-| `/admin/fun` | 2 个 | API接口 |
-| `/admin/links` | 4 个 | API接口 |
-| `/admin/logs` | 1 个 | API接口 |
-| `/admin/mall` | 4 个 | API接口 |
-| `/admin/member` | 14 个 | API接口 |
-| `/admin/menu` | 2 个 | API接口 |
-| `/admin/news` | 4 个 | API接口 |
-| `/admin/offer` | 3 个 | API接口 |
-| `/admin/orders` | 1 个 | API接口 |
-| `/admin/poll` | 5 个 | API接口 |
-| `/admin/promotion` | 7 个 | API接口 |
-| `/admin/report` | 4 个 | API接口 |
-| `/admin/roles` | 5 个 | API接口 |
-| `/admin/seedbox` | 4 个 | API接口 |
-| `/admin/seedboxWhite` | 4 个 | API接口 |
-| `/admin/setting` | 2 个 | API接口 |
-| `/admin/staffbox` | 6 个 | API接口 |
-| `/admin/subtitle` | 1 个 | API接口 |
-| `/admin/system` | 2 个 | API接口 |
-| `/admin/torrent` | 34 个 | API接口 |
-| `/album/albumCollect` | 1 个 | API接口 |
-| `/album/albumCreate` | 1 个 | API接口 |
-| `/album/albumDetail` | 1 个 | API接口 |
-| `/album/albumEdit` | 1 个 | API接口 |
-| `/album/albumFavList` | 1 个 | API接口 |
-| `/album/albumSearch` | 1 个 | API接口 |
-| `/album/albumTorrentAuditing` | 1 个 | API接口 |
-| `/album/albumTorrentJoin` | 1 个 | API接口 |
-| `/album/albumTorrentRemove` | 1 个 | API接口 |
-| `/album/albumTorrentSearch` | 1 个 | API接口 |
-| `/album/myAlbumList` | 1 个 | API接口 |
-| `/bet/addBetgameOpt` | 1 个 | API接口 |
-| `/bet/betgameDetailLog` | 1 个 | API接口 |
-| `/bet/betgameOdds` | 1 个 | API接口 |
-| `/bet/bonusTopList` | 1 个 | API接口 |
-| `/bet/createOrUpdate` | 1 个 | API接口 |
-| `/bet/delBetgame` | 1 个 | API接口 |
-| `/bet/delBetgameOpt` | 1 个 | API接口 |
-| `/bet/findBetgameList` | 1 个 | API接口 |
-| `/bet/gamefinish` | 1 个 | API接口 |
-| `/bet/getDetail` | 1 个 | API接口 |
-| `/bet/getDetailBetList` | 1 个 | API接口 |
-| `/bet/myCouponLog` | 1 个 | API接口 |
-| `/bet/nullBetgame` | 1 个 | API接口 |
-| `/bet/state` | 1 个 | API接口 |
-| `/bet/updateBetgameStatus` | 1 个 | API接口 |
-| `/comment/del` | 1 个 | API接口 |
-| `/comment/detail` | 1 个 | API接口 |
-| `/comment/edit` | 1 个 | API接口 |
-| `/comment/fetchList` | 1 个 | API接口 |
-| `/comment/post` | 1 个 | API接口 |
-| `/comment/redirect` | 1 个 | API接口 |
-| `/comment/redirectV2` | 1 个 | API接口 |
-| `/common/captcha` | 1 个 | API接口 |
-| `/credit/logs` | 1 个 | API接口 |
-| `/dmm/collages` | 9 个 | API接口 |
-| `/dmm/dmmInfo` | 1 个 | API接口 |
-| `/dmm/dmmSeearch` | 1 个 | API接口 |
-| `/dmm/showcase` | 10 个 | API接口 |
-| `/error` | 2 个 | API接口 |
-| `/examine/getMyActiveList` | 1 个 | API接口 |
-| `/forum/forums` | 1 个 | API接口 |
-| `/forum/post` | 5 个 | API接口 |
-| `/forum/topic` | 9 个 | API接口 |
-| `/friends/addBlock` | 1 个 | API接口 |
-| `/friends/addFriend` | 1 个 | API接口 |
-| `/friends/getBlocks` | 1 个 | API接口 |
-| `/friends/getFriends` | 1 个 | API接口 |
-| `/friends/removeBlock` | 1 个 | API接口 |
-| `/friends/removeFriend` | 1 个 | API接口 |
-| `/fun/detail` | 1 个 | API接口 |
-| `/fun/edit` | 1 个 | API接口 |
-| `/fun/first` | 1 个 | API接口 |
-| `/fun/post` | 1 个 | API接口 |
-| `/fun/vote` | 1 个 | API接口 |
-| `/invite/getUserInviteHistory` | 1 个 | API接口 |
-| `/invite/getUserInviteInfo` | 1 个 | API接口 |
-| `/invite/getUserInviteSendHistory` | 1 个 | API接口 |
-| `/invite/sendInvite` | 1 个 | API接口 |
-| `/laboratory/funcState` | 1 个 | API接口 |
-| `/laboratory/telegram` | 2 个 | API接口 |
-| `/laboratory/tiggerFunc` | 1 个 | API接口 |
-| `/links/apply` | 1 个 | API接口 |
-| `/links/view` | 1 个 | API接口 |
-| `/mall/exchange` | 1 个 | API接口 |
-| `/mall/getGlobalFreeSingleListV2` | 1 个 | API接口 |
-| `/mall/getGlobalFreeSinglePrice` | 1 个 | API接口 |
-| `/mall/globalFreeSingleAuction` | 1 个 | API接口 |
-| `/mall/list` | 1 个 | API接口 |
-| `/media/douban` | 2 个 | API接口 |
-| `/media/imdb` | 1 个 | API接口 |
-| `/member/base` | 1 个 | API接口 |
-| `/member/bases` | 1 个 | API接口 |
-| `/member/bindOTP` | 1 个 | API接口 |
-| `/member/checkInviteCode` | 1 个 | API接口 |
-| `/member/forgotPwd` | 1 个 | API接口 |
-| `/member/forgotPwdTow` | 1 个 | API接口 |
-| `/member/genOTPUrl` | 1 个 | API接口 |
-| `/member/getCrimeRecords` | 1 个 | API接口 |
-| `/member/getSessionList` | 1 个 | API接口 |
-| `/member/getUserTorrentList` | 1 个 | API接口 |
-| `/member/logout` | 1 个 | API接口 |
-| `/member/profile` | 1 个 | API接口 |
-| `/member/queryUserLoginHistory` | 1 个 | API接口 |
-| `/member/register` | 1 个 | API接口 |
-| `/member/revokeSession` | 1 个 | API接口 |
-| `/member/sendEmailCode` | 1 个 | API接口 |
-| `/member/sendEmailVerifyCode` | 1 个 | API接口 |
-| `/member/sendLoginEmailVerifyCode` | 1 个 | API接口 |
-| `/member/sendPasskey` | 1 个 | API接口 |
-| `/member/sysRoleList` | 1 个 | API接口 |
-| `/member/unbindOTP` | 1 个 | API接口 |
-| `/member/updateLastBrowse` | 1 个 | API接口 |
-| `/member/updateProfile` | 1 个 | API接口 |
-| `/member/updateSecurity` | 1 个 | API接口 |
-| `/member/verifyAccount` | 1 个 | API接口 |
-| `/member/verifyAccountByUser` | 1 个 | API接口 |
-| `/menu/list` | 1 个 | API接口 |
-| `/msg/boxList` | 1 个 | API接口 |
-| `/msg/delBox` | 1 个 | API接口 |
-| `/msg/delete` | 1 个 | API接口 |
-| `/msg/forward` | 1 个 | API接口 |
-| `/msg/markRead` | 1 个 | API接口 |
-| `/msg/move` | 1 个 | API接口 |
-| `/msg/newBox` | 1 个 | API接口 |
-| `/msg/notify` | 1 个 | API接口 |
-| `/msg/read` | 1 个 | API接口 |
-| `/msg/reply` | 1 个 | API接口 |
-| `/msg/search` | 1 个 | API接口 |
-| `/msg/send` | 1 个 | API接口 |
-| `/msg/statistic` | 1 个 | API接口 |
-| `/msg/updateBoxName` | 1 个 | API接口 |
-| `/news/list` | 1 个 | API接口 |
-| `/offer/config` | 1 个 | API接口 |
-| `/offer/vote` | 1 个 | API接口 |
-| `/poll/first` | 1 个 | API接口 |
-| `/poll/vote` | 1 个 | API接口 |
-| `/report/report` | 1 个 | API接口 |
-| `/rss/dlv2` | 1 个 | API接口 |
-| `/rss/fetch` | 1 个 | API接口 |
-| `/rss/genlink` | 1 个 | API接口 |
-| `/seek/addto` | 1 个 | API接口 |
-| `/seek/collection` | 1 个 | API接口 |
-| `/seek/create` | 1 个 | API接口 |
-| `/seek/detail` | 1 个 | API接口 |
-| `/seek/edit` | 1 个 | API接口 |
-| `/seek/favList` | 1 个 | API接口 |
-| `/seek/recovery` | 1 个 | API接口 |
-| `/seek/search` | 1 个 | API接口 |
-| `/seek/submit` | 1 个 | API接口 |
-| `/seek/submitList` | 1 个 | API接口 |
-| `/seek/take` | 1 个 | API接口 |
-| `/staffbox/post` | 1 个 | API接口 |
-| `/subtitle/dl` | 1 个 | API接口 |
-| `/subtitle/dlV2` | 1 个 | API接口 |
-| `/subtitle/genlink` | 1 个 | API接口 |
-| `/subtitle/langs` | 1 个 | API接口 |
-| `/subtitle/list` | 1 个 | API接口 |
-| `/subtitle/search` | 1 个 | API接口 |
-| `/subtitle/upload` | 1 个 | API接口 |
-| `/system/banlogs` | 1 个 | API接口 |
-| `/system/countryList` | 1 个 | API接口 |
-| `/system/getConf` | 1 个 | API接口 |
-| `/system/hello` | 1 个 | API接口 |
-| `/system/ip` | 2 个 | API接口 |
-| `/system/ipASN` | 2 个 | API接口 |
-| `/system/ips` | 2 个 | API接口 |
-| `/system/iscn` | 2 个 | API接口 |
-| `/system/langs` | 1 个 | API接口 |
-| `/system/news` | 1 个 | API接口 |
-| `/system/promotion` | 1 个 | API接口 |
-| `/system/staff` | 1 个 | API接口 |
-| `/system/state` | 1 个 | API接口 |
-| `/system/sysConf` | 1 个 | API接口 |
-| `/system/top` | 1 个 | API接口 |
-| `/system/unix` | 2 个 | API接口 |
-| `/team/apply` | 1 个 | API接口 |
-| `/team/myTeams` | 1 个 | API接口 |
-| `/team/updateMembers` | 1 个 | API接口 |
-| `/torrent/audioCodecList` | 1 个 | API接口 |
-| `/torrent/categoryList` | 1 个 | API接口 |
-| `/torrent/chearCollection` | 1 个 | API接口 |
-| `/torrent/collection` | 1 个 | API接口 |
-| `/torrent/createOredit` | 1 个 | API接口 |
-| `/torrent/detail` | 1 个 | API接口 |
-| `/torrent/files` | 1 个 | API接口 |
-| `/torrent/genDlToken` | 1 个 | API接口 |
-| `/torrent/mediaInfo` | 1 个 | API接口 |
-| `/torrent/mediumList` | 1 个 | API接口 |
-| `/torrent/peers` | 1 个 | API接口 |
-| `/torrent/processingList` | 1 个 | API接口 |
-| `/torrent/queryTorrentTrackerHistory` | 1 个 | API接口 |
-| `/torrent/requestReseed` | 1 个 | API接口 |
-| `/torrent/rewardStatus` | 1 个 | API接口 |
-| `/torrent/sayThank` | 1 个 | API接口 |
-| `/torrent/search` | 1 个 | API接口 |
-| `/torrent/sendReward` | 1 个 | API接口 |
-| `/torrent/sourceList` | 1 个 | API接口 |
-| `/torrent/standardList` | 1 个 | API接口 |
-| `/torrent/teamList` | 1 个 | API接口 |
-| `/torrent/thanksStatus` | 1 个 | API接口 |
-| `/torrent/videoCodecList` | 1 个 | API接口 |
-| `/torrent/viewHits` | 1 个 | API接口 |
-| `/tracker/clientList` | 1 个 | API接口 |
-| `/tracker/flush` | 1 个 | API接口 |
-| `/tracker/myPeerStatistics` | 1 个 | API接口 |
-| `/tracker/myPeerStatus` | 1 个 | API接口 |
-| `/tracker/mybonus` | 1 个 | API接口 |
-| `/tracker/queryHistory` | 1 个 | API接口 |
+| `/admin/*` (全部) | 143 个 | 管理后台接口（禁止第三方调用） |
+| `/album/*` | 11 个 | 专辑/合集管理 |
+| `/bet/*` | 21 个 | 投注系统 |
+| `/comment/*` | 7 个 | 评论系统 |
+| `/common/*` | 1 个 | 公共接口（验证码等） |
+| `/credit/*` | 1 个 | 积分日志 |
+| `/dmm/*` | 22 个 | DMM/日娱内容管理 |
+| `/error` | 2 个 | 错误处理 |
+| `/examine/*` | 1 个 | 审核系统 |
+| `/forum/*` | 15 个 | 论坛 |
+| `/friends/*` | 6 个 | 好友/黑名单 |
+| `/fun/*` | 5 个 | 趣味功能 |
+| `/invite/*` | 4 个 | 邀请系统 |
+| `/laboratory/*` | 4 个 | 实验室（Telegram绑定等） |
+| `/links/*` | 2 个 | 友情链接 |
+| `/mall/*` | 5 个 | 商城 |
+| `/media/*` | 3 个 | 媒体信息查询（豆瓣/IMDb） |
+| `/member/*` | 26 个 | 用户系统 |
+| `/menu/*` | 1 个 | 菜单 |
+| `/msg/*` | 14 个 | 消息系统 |
+| `/news/*` | 1 个 | 公告/新闻 |
+| `/offer/*` | 2 个 | Offer 系统 |
+| `/poll/*` | 2 个 | 投票 |
+| `/report/*` | 1 个 | 举报 |
+| `/rss/*` | 3 个 | RSS |
+| `/seek/*` | 11 个 | 求种 |
+| `/staffbox/*` | 1 个 | 职员信箱 |
+| `/subtitle/*` | 8 个 | 字幕 |
+| `/system/*` | 16 个 | 系统信息 |
+| `/team/*` | 3 个 | 制作组 |
+| `/torrent/*` | 25 个 | 种子管理 |
+| `/tracker/*` | 6 个 | Tracker 统计 |
 
-**总计**: 363 个路径, 369 个HTTP端点
+**总计**: 372 个路径
+| `/system/banlogs` | 1 个 | 封禁日志 |
+| `/system/countryList` | 1 个 | 国家/地区列表 |
+| `/system/getConf` | 1 个 | 获取配置 |
+| `/system/hello` | 1 个 | 连接测试 |
+| `/system/ip` | 2 个 | IP 查询 |
+| `/system/ipASN` | 2 个 | IP ASN 查询 |
+| `/system/ips` | 2 个 | IP 地址列表 |
+| `/system/iscn` | 2 个 | ISCN 查询 |
+| `/system/langs` | 1 个 | 语言列表 |
+| `/system/news` | 1 个 | 站点新闻 |
+| `/system/promotion/rules` | 1 个 | 升级规则 |
+| `/system/staff` | 1 个 | 工作人员 |
+| `/system/state` | 1 个 | 站点状态 |
+| `/system/sysConf` | 1 个 | 系统配置 |
+| `/system/top` | 1 个 | 排行榜 |
+| `/system/unix` | 2 个 | Unix 时间戳 |
+| `/team/apply` | 1 个 | 制作组申请 |
+| `/team/myTeams` | 1 个 | 我的制作组 |
+| `/team/updateMembers` | 1 个 | 更新成员 |
+| `/torrent/audioCodecList` | 1 个 | 音频编码列表 |
+| `/torrent/categoryList` | 1 个 | 分类列表 |
+| `/torrent/chearCollection` | 1 个 | 清理收藏 |
+| `/torrent/collection` | 1 个 | 收藏 |
+| `/torrent/createOredit` | 1 个 | 创建/编辑种子 |
+| `/torrent/detail` | 1 个 | 种子详情 |
+| `/torrent/files` | 1 个 | 文件列表 |
+| `/torrent/genDlToken` | 1 个 | 生成下载令牌 |
+| `/torrent/mediaInfo` | 1 个 | MediaInfo |
+| `/torrent/mediumList` | 1 个 | 媒介列表 |
+| `/torrent/peers` | 1 个 | Peer 列表 |
+| `/torrent/processingList` | 1 个 | 处理状态列表 |
+| `/torrent/queryTorrentTrackerHistory` | 1 个 | Tracker 历史 |
+| `/torrent/requestReseed` | 1 个 | 请求续种 |
+| `/torrent/rewardStatus` | 1 个 | 奖励状态 |
+| `/torrent/sayThank` | 1 个 | 感谢 |
+| `/torrent/search` | 1 个 | 搜索种子 |
+| `/torrent/sendReward` | 1 个 | 发送奖励 |
+| `/torrent/sourceList` | 1 个 | 来源列表 |
+| `/torrent/standardList` | 1 个 | 标准列表 |
+| `/torrent/teamList` | 1 个 | 制作组列表 |
+| `/torrent/thanksStatus` | 1 个 | 感谢状态 |
+| `/torrent/updateMediaInfo` | 1 个 | 更新 MediaInfo |
+| `/torrent/videoCodecList` | 1 个 | 视频编码列表 |
+| `/torrent/viewHits` | 1 个 | 浏览次数 |
+| `/tracker/clientList` | 1 个 | 客户端列表 |
+| `/tracker/flush` | 1 个 | 刷新缓存 |
+| `/tracker/myPeerStatistics` | 1 个 | Peer 统计 |
+| `/tracker/myPeerStatus` | 1 个 | Peer 状态 |
+| `/tracker/mybonus` | 1 个 | 魔力值 |
+| `/tracker/queryHistory` | 1 个 | 查询历史 |
+
+**总计**: 372 个路径
 
 ### 3.2 允许第三方调用的API清单 ✅
 
@@ -357,7 +230,7 @@ Origin: https://kp.m-team.cc
 > 
 > **认证方式**: HTTP请求头中通过 `x-api-key` 传递
 
-#### ✅ 允许调用的Member模块（58个接口）
+#### ✅ 允许调用的Member模块（26个接口）
 
 | 端点 | 方法 | 功能说明 |
 |------|------|----------|
@@ -388,7 +261,7 @@ Origin: https://kp.m-team.cc
 | `/api/member/verifyAccount` | POST |  |
 | `/api/member/verifyAccountByUser` | POST |  |
 
-#### ✅ 允许调用的Message模块（16个接口）
+#### ✅ 允许调用的Message模块（14个接口）
 
 | 端点 | 方法 | 功能说明 |
 |------|------|----------|
@@ -407,7 +280,7 @@ Origin: https://kp.m-team.cc
 | `/api/msg/statistic` | POST |  |
 | `/api/msg/updateBoxName` | POST |  |
 
-#### 🔍 Torrent模块（28个接口 - 需验证权限）
+#### 🔍 Torrent模块（25个接口 - 需验证权限）
 
 | 端点 | 方法 | 功能说明 |
 |------|------|----------|
@@ -433,6 +306,7 @@ Origin: https://kp.m-team.cc
 | `/api/torrent/standardList` | POST |  |
 | `/api/torrent/teamList` | POST |  |
 | `/api/torrent/thanksStatus` | POST |  |
+| `/api/torrent/updateMediaInfo` | POST |  |
 | `/api/torrent/videoCodecList` | POST |  |
 | `/api/torrent/viewHits` | POST |  |
 
@@ -465,7 +339,7 @@ Origin: https://kp.m-team.cc
 
 **功能**: 根据关键词、分类等条件搜索种子
 
-**Schema**: `TorrentSearch` (33个字段, 全部可选)
+**Schema**: `TorrentSearch` (32个字段, 全部可选)
 
 #### 完整参数定义（基于官方OpenAPI 3.1.0）
 
@@ -480,7 +354,7 @@ Origin: https://kp.m-team.cc
 | `dmmCode` | string | ○ |  |  |
 | `dmmField` | ?(→TorrentDmmSearchField) | ○ |  |  |
 | `douban` | string | ○ |  |  |
-| `formSystem` | boolean | ○ |  |  |
+| `favDateLimit` | string | ○ | 收藏日期范围过滤 |  |
 | `hot` | boolean | ○ |  |  |
 | `imdb` | string | ○ |  |  |
 | `keyword` | string | ○ |  |  |
@@ -503,7 +377,6 @@ Origin: https://kp.m-team.cc
 | `uploadDateStart` | string | ○ |  |  |
 | `videoCodecs` | array | ○ |  |  |
 | `visible` | integer | ○ |  |  |
-| `withCache` | boolean | ○ |  |  |
 
 #### 关键枚举值说明
 
@@ -572,13 +445,16 @@ curl -X POST "https://test2.m-team.cc/api/torrent/search" \
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | `id` | integer/string | ✅ 是 | 种子ID |
+| `origin` | string | ✅ 是 | 调用来源标识（如 `FLOW` / `DETAIL`） |
 
 ```bash
 curl -X POST "https://test2.m-team.cc/api/torrent/detail" \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_API_KEY" \
-  -d '{"id": 123456}'
+  -d '{"id": 123456, "origin": "DETAIL"}'
 ```
+
+> **注意**: `origin` 参数在 v2.2 spec 中标记为必填。PT-Forward 适配器当前未传此参数仍可正常工作（服务端容错），但建议加上以保前向兼容。
 
 ### 4.3 生成下载令牌 - `POST /api/torrent/genDlToken` ⚠️
 
@@ -624,6 +500,7 @@ curl -X POST "https://test2.m-team.cc/api/torrent/genDlToken" \
 | `/api/torrent/standardList` | POST | 获取标准列表 |
 | `/api/torrent/processingList` | POST | 获取处理状态列表 |
 | `/api/torrent/teamList` | POST | 获取制作组列表 |
+| `/api/torrent/updateMediaInfo` | POST | 更新 MediaInfo |
 | `/api/torrent/queryTorrentTrackerHistory` | POST | 查询Tracker历史 |
 
 ---
@@ -634,13 +511,24 @@ curl -X POST "https://test2.m-team.cc/api/torrent/genDlToken" \
 
 **功能**: 获取当前登录用户的详细资料和统计数据
 
-**请求参数**: 无需额外参数（或传空对象 `{}`）
+**请求参数**: 支持传 `uid` 指定用户查询；不传则返回当前 API Key 对应用户。
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `uid` | integer | ✅ 是 | 用户ID（v2.2 spec 标记为必填，但服务端容错可省略） |
 
 ```bash
+# 获取自己的资料（省略 uid）
 curl -X POST "https://test2.m-team.cc/api/member/profile" \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_API_KEY" \
   -d '{}'
+
+# 指定 uid 查询
+curl -X POST "https://test2.m-team.cc/api/member/profile" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -d '{"uid": 12345}'
 ```
 
 **响应字段（基于官方Schema）**:
@@ -1055,7 +943,8 @@ class MTeamClient {
 | 接口 | 文档声明 | 实际要求 | 解决方案 |
 |------|----------|----------|----------|
 | `/torrent/genDlToken` | JSON/Form均可 | **必须Form格式** | 使用`application/x-www-form-urlencoded` |
-| `/member/profile` | JSON | JSON或空对象 | 建议传`{}` |
+| `/torrent/detail` | `origin` 必填 | 服务端容错可省略 | 建议传 `origin=DETAIL` 保前向兼容 |
+| `/member/profile` | `uid` 必填 | 服务端容错可省略 | 不传则返回当前用户 |
 | `/torrent/search` | JSON | JSON | 正常使用JSON即可 |
 | `code`字段类型 | string | 可能是number/string | 统一转string后比较 |
 
@@ -1096,7 +985,7 @@ def safe_api_call(client, func_name, *args, **kwargs):
 
 1. **使用Swagger UI在线测试**: https://test2.m-team.cc/api/swagger-ui/index.html
 2. **使用浏览器DevTools**: 登录后查看Network面板中的实际请求
-3. **保存OpenAPI定义**: 已导出到 `/tmp/mteam_openapi.json` (194KB, 363端点)
+3. **保存OpenAPI定义**: 从 `https://test2.m-team.cc/api/v3/api-docs` 获取最新 spec（372端点, 116 Schema）
 4. **对比官方文档与实际行为**: 官方文档可能存在bug，以实际调用结果为准
 
 ---
@@ -1468,12 +1357,11 @@ func (c *MTeamAPIClient) Upload(form map[string]interface{}) (json.RawMessage, e
 
 | 属性 | 值 |
 |------|-----|
-| **文件路径** | `/tmp/mteam_openapi.json` |
-| **文件大小** | 194,355 字节 (190 KB) |
+| **文件路径** | 从 `https://test2.m-team.cc/api/v3/api-docs` 获取 |
 | **OpenAPI版本** | 3.1.0 |
-| **API端点数** | 363 个 |
-| **Schema数量** | 108 个 |
-| **获取时间** | 2026-04-12 |
+| **API端点数** | 372 个 |
+| **Schema数量** | 116 个 |
+| **获取时间** | 2026-06-04 |
 | **获取方式** | curl + x-api-key认证 |
 
 ### C. 版本历史
@@ -1483,6 +1371,7 @@ func (c *MTeamAPIClient) Upload(form map[string]interface{}) (json.RawMessage, e
 | v1.0 | 2026-04-12 | 初始版本（基于代码推断和网络搜索）|
 | v2.0 | 2026-04-12 | **重大更新**: 基于官方OpenAPI 3.1.0定义重写，新增363个端点、108个Schema、完整参数定义 |
 | v2.1 | 2026-04-16 | 新增附录A「API 调用方法（开发参考）」：curl/Playwright/Go 三种调用方式、端点速查表、响应格式规范 |
+| v2.2 | 2026-06-04 | 对比最新 spec 更新：端点 363→372、Schema 108→116；`/torrent/detail` 新增 `origin` 必填参数；`/member/profile` 新增 `uid` 参数；TorrentSearch 移除 `formSystem`/`withCache`、新增 `favDateLimit`；模块统计精简为按前缀汇总；新增 `torrent/updateMediaInfo` 端点 |
 
 ---
 

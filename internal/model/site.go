@@ -294,12 +294,13 @@ type SiteConfig struct {
 	ProxyURL      string `json:"proxy_url,omitempty"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify"`
 
-	DownloadMode         string `json:"download_mode,omitempty"`
-	DownloadURLTemplate  string `json:"download_url_template,omitempty"`
+	DownloadMode        string `json:"download_mode,omitempty"`
+	DownloadURLTemplate string `json:"download_url_template,omitempty"`
 	PasskeyAlias        string `json:"passkey_alias,omitempty"`
 	PasskeyHint         string `json:"passkey_hint,omitempty"`
 
-	SupportsPiecesHashAPI bool `json:"supports_pieces_hash_api"`
+	SupportsPiecesHashAPI bool     `json:"supports_pieces_hash_api"`
+	AlternativeDomains    []string `json:"alternative_domains,omitempty"`
 }
 
 // §33.1.72 — DetectResult: 框架检测结果

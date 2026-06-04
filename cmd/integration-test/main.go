@@ -75,7 +75,7 @@ func main() {
 		doer := adapter.NewHTTPDoerWithSite(config.ProxyURL, config.SkipSSLVerify)
 		a := factory.Create(s.Framework, doer)
 
-		torrentID, err := resolveTorrentID(config, s.Framework)
+		torrentIDs, err := resolveTorrentIDs(config, s.Framework)
 		if err != nil {
 			fmt.Printf("SKIP  %-12s 获取种子ID: %v\n", s.Name, err)
 			skipCount++
@@ -83,12 +83,22 @@ func main() {
 			continue
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		data, dlErr := a.DownloadTorrent(ctx, config, torrentID)
-		cancel()
+		var data []byte
+		var usedID string
+		for _, tid := range torrentIDs {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			d, dlErr := a.DownloadTorrent(ctx, config, tid)
+			cancel()
+			if dlErr == nil {
+				data = d
+				usedID = tid
+				break
+			}
+			fmt.Printf("  TRY  %-12s id=%-40s %v\n", s.Name, tid, dlErr)
+		}
 
-		if dlErr != nil {
-			fmt.Printf("FAIL  %-12s id=%-8s %v\n", s.Name, torrentID, dlErr)
+		if data == nil {
+			fmt.Printf("FAIL  %-12s all %d candidates failed\n", s.Name, len(torrentIDs))
 			failCount++
 			failList = append(failList, s.Name)
 		} else if len(data) < 4 || !isBencode(data) {
@@ -96,11 +106,11 @@ func main() {
 			if len(preview) > 60 {
 				preview = preview[:60]
 			}
-			fmt.Printf("FAIL  %-12s id=%-8s 非种子(%dB): %s\n", s.Name, torrentID, len(data), preview)
+			fmt.Printf("FAIL  %-12s id=%-40s 非种子(%dB): %s\n", s.Name, usedID, len(data), preview)
 			failCount++
 			failList = append(failList, s.Name)
 		} else {
-			fmt.Printf("PASS  %-12s id=%-8s OK (%dB)\n", s.Name, torrentID, len(data))
+			fmt.Printf("PASS  %-12s id=%-40s OK (%dB)\n", s.Name, usedID, len(data))
 			passCount++
 		}
 
@@ -137,16 +147,32 @@ func openDB() *gorm.DB {
 	return db
 }
 
-func resolveTorrentID(config *model.SiteConfig, framework string) (string, error) {
+func resolveTorrentIDs(config *model.SiteConfig, framework string) ([]string, error) {
 	if framework == "yemapt" {
-		return resolveYemaptTorrentID(config)
+		id, err := resolveYemaptTorrentID(config)
+		return []string{id}, err
 	}
 	if framework == "tnode" {
-		return resolveTnodeTorrentID(config)
+		id, err := resolveTnodeTorrentID(config)
+		return []string{id}, err
+	}
+	if framework == "unit3d" {
+		id, err := resolveUnit3DTorrentID(config)
+		return []string{id}, err
+	}
+	if framework == "rousi" {
+		return resolveRousiTorrentIDs(config)
+	}
+	if framework == "mteam" {
+		return resolveMTeamTorrentIDs(config)
+	}
+	if config.Domain == "star-space.net" {
+		id, err := resolveStarSpaceTorrentID(config)
+		return []string{id}, err
 	}
 	browseURL := buildBrowseURL(config, framework)
 	if browseURL == "" {
-		return "", fmt.Errorf("no browse URL for %s", config.Domain)
+		return nil, fmt.Errorf("no browse URL for %s", config.Domain)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -154,7 +180,7 @@ func resolveTorrentID(config *model.SiteConfig, framework string) (string, error
 
 	req, err := http.NewRequestWithContext(ctx, "GET", browseURL, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
@@ -168,7 +194,7 @@ func resolveTorrentID(config *model.SiteConfig, framework string) (string, error
 	})
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -177,14 +203,14 @@ func resolveTorrentID(config *model.SiteConfig, framework string) (string, error
 	html := buf.String()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP %d (%dB)", resp.StatusCode, len(html))
+		return nil, fmt.Errorf("HTTP %d (%dB)", resp.StatusCode, len(html))
 	}
 
-	id := extractID(html, framework, config.Domain)
-	if id == "" {
-		return "", fmt.Errorf("no torrent ID in page (%dB)", len(html))
+	ids := extractIDs(html, framework, config.Domain)
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("no torrent ID in page (%dB)", len(html))
 	}
-	return id, nil
+	return ids, nil
 }
 
 func buildBrowseURL(config *model.SiteConfig, framework string) string {
@@ -217,6 +243,14 @@ func buildBrowseURL(config *model.SiteConfig, framework string) string {
 }
 
 func extractID(html, framework, domain string) string {
+	ids := extractIDs(html, framework, domain)
+	if len(ids) == 0 {
+		return ""
+	}
+	return ids[0]
+}
+
+func extractIDs(html, framework, domain string) []string {
 	var patterns []*regexp.Regexp
 
 	switch {
@@ -235,6 +269,7 @@ func extractID(html, framework, domain string) string {
 		}
 	case framework == "unit3d":
 		patterns = []*regexp.Regexp{
+			regexp.MustCompile(`/torrents/(\d+)`),
 			regexp.MustCompile(`/torrent/(\d+)`),
 		}
 	default:
@@ -245,13 +280,20 @@ func extractID(html, framework, domain string) string {
 		}
 	}
 
+	seen := map[string]bool{}
+	var ids []string
 	for _, re := range patterns {
-		m := re.FindStringSubmatch(html)
-		if len(m) >= 2 {
-			return m[1]
+		for _, m := range re.FindAllStringSubmatch(html, -1) {
+			if len(m) >= 2 && !seen[m[1]] {
+				seen[m[1]] = true
+				ids = append(ids, m[1])
+			}
+		}
+		if len(ids) >= 10 {
+			break
 		}
 	}
-	return ""
+	return ids
 }
 
 func resolveYemaptTorrentID(config *model.SiteConfig) (string, error) {
@@ -344,6 +386,247 @@ func resolveTnodeTorrentID(config *model.SiteConfig) (string, error) {
 		return "52000", nil
 	}
 	return "52000", nil
+}
+
+func resolveUnit3DTorrentID(config *model.SiteConfig) (string, error) {
+	base := config.BaseURL
+	if base == "" {
+		base = "https://" + config.Domain
+	}
+	client := httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+		ProxyURL:      config.ProxyURL,
+		SkipSSLVerify: config.SkipSSLVerify,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	for _, path := range []string{
+		"/api/torrents?perPage=5&page=1",
+		"/api/torrent/filter?perPage=5&page=1",
+	} {
+		req, err := http.NewRequestWithContext(ctx, "GET", base+path, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", "Mozilla/5.0")
+		if config.Cookie != "" {
+			req.Header.Set("Cookie", config.Cookie)
+		}
+		if config.APIKey != "" {
+			req.Header.Set("Authorization", "Bearer "+config.APIKey)
+		} else if config.AuthKey != "" {
+			req.Header.Set("Authorization", "Bearer "+config.AuthKey)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		var buf bytes.Buffer
+		io.Copy(&buf, resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			continue
+		}
+
+		var raw map[string]json.RawMessage
+		if json.Unmarshal(buf.Bytes(), &raw) != nil {
+			continue
+		}
+		dataField, ok := raw["data"]
+		if !ok {
+			continue
+		}
+		var torrentList []struct {
+			ID json.Number `json:"id"`
+		}
+		if json.Unmarshal(dataField, &torrentList) != nil || len(torrentList) == 0 {
+			continue
+		}
+		for _, t := range torrentList {
+			if s := t.ID.String(); s != "" && s != "0" {
+				return s, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("unit3d: no torrent ID found via API")
+}
+
+func resolveRousiTorrentIDs(config *model.SiteConfig) ([]string, error) {
+	if config.Passkey == "" {
+		return nil, fmt.Errorf("rousi: no passkey")
+	}
+	base := config.BaseURL
+	if base == "" {
+		base = "https://" + config.Domain
+	}
+	client := httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+		ProxyURL:      config.ProxyURL,
+		SkipSSLVerify: config.SkipSSLVerify,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	reqURL := base + "/api/v1/torrents?perPage=10&page=1"
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+config.Passkey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Origin", "https://rousi.pro")
+	req.Header.Set("Referer", "https://rousi.pro/")
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	io.Copy(&buf, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("rousi API HTTP %d (%dB)", resp.StatusCode, buf.Len())
+	}
+
+	var result struct {
+		Code int `json:"code"`
+		Data struct {
+			Torrents []struct {
+				ID   int    `json:"id"`
+				UUID string `json:"uuid"`
+			} `json:"torrents"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		return nil, fmt.Errorf("rousi: parse error: %v", err)
+	}
+	var ids []string
+	for _, t := range result.Data.Torrents {
+		tid := t.UUID
+		if tid == "" {
+			tid = fmt.Sprintf("%d", t.ID)
+		}
+		ids = append(ids, tid)
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("rousi: no torrents in API response")
+	}
+	return ids, nil
+}
+
+func resolveMTeamTorrentIDs(config *model.SiteConfig) ([]string, error) {
+	if config.APIKey == "" {
+		return nil, fmt.Errorf("mteam: no api key")
+	}
+	base := config.BaseURL
+	if base == "" {
+		base = "https://" + config.Domain
+	}
+	client := httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+		ProxyURL:      config.ProxyURL,
+		SkipSSLVerify: config.SkipSSLVerify,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	payload, _ := json.Marshal(map[string]interface{}{
+		"pageNumber": 1,
+		"pageSize":   10,
+		"mode":       "normal",
+	})
+	req, err := http.NewRequestWithContext(ctx, "POST", base+"/api/torrent/search", bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", config.APIKey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	io.Copy(&buf, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("mteam search API HTTP %d (%dB)", resp.StatusCode, buf.Len())
+	}
+
+	var result struct {
+		Data struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		return nil, fmt.Errorf("mteam: parse error: %v", err)
+	}
+	var ids []string
+	for _, t := range result.Data.Data {
+		if t.ID != "" {
+			ids = append(ids, t.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("mteam: no torrents in search response")
+	}
+	return ids, nil
+}
+
+func resolveStarSpaceTorrentID(config *model.SiteConfig) (string, error) {
+	base := config.BaseURL
+	if base == "" {
+		base = "https://" + config.Domain
+	}
+	client := httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+		ProxyURL:      config.ProxyURL,
+		SkipSSLVerify: config.SkipSSLVerify,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	for _, path := range []string{
+		"/p_torrent/video_list_g.php",
+		"/browse.php",
+	} {
+		reqURL := base + path
+		req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+		if config.Cookie != "" {
+			req.Header.Set("Cookie", config.Cookie)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		var buf bytes.Buffer
+		io.Copy(&buf, resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			continue
+		}
+		html := buf.String()
+		for _, re := range []*regexp.Regexp{
+			regexp.MustCompile(`download\.php\?tid=(\d+)`),
+			regexp.MustCompile(`download\?id=(\d+)`),
+			regexp.MustCompile(`details\.php\?id=(\d+)`),
+		} {
+			if m := re.FindStringSubmatch(html); len(m) >= 2 {
+				return m[1], nil
+			}
+		}
+	}
+	return "", fmt.Errorf("star-space: no torrent ID found")
 }
 
 func isBencode(data []byte) bool {

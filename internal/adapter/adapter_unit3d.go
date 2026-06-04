@@ -20,25 +20,25 @@ import (
 )
 
 var (
-	reUnit3DTitle      = regexp.MustCompile(`<title>([^<]+)</title>`)
-	reUnit3DInfoHash   = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
-	reUnit3DSize       = regexp.MustCompile(`(?i)(?:size|大小)[^<]*<[^>]*>([^<]+)`)
-	reUnit3DSeeders    = regexp.MustCompile(`(?i)(?:seeders?|做种)[^<]*<[^>]*>(\d+)`)
-	reUnit3DLeechers   = regexp.MustCompile(`(?i)(?:leechers?|下载)[^<]*<[^>]*>(\d+)`)
-	reUnit3DTorrentID  = regexp.MustCompile(`/torrents/(\d+)`)
-	reUnit3DErrorClass = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
-	reUnit3DErrorLI    = regexp.MustCompile(`<li[^>]*>([^<]*(?:error|fail|失败|错误|duplicate|already)[^<]*)</li>`)
-	reUnit3DCSRFMeta   = regexp.MustCompile(`<meta\s+name="csrf-token"\s+content="([^"]+)"`)
-	reUnit3DCSRFInput  = regexp.MustCompile(`<input[^>]+name="_token"[^>]+value="([^"]+)"`)
-	reUnit3DIMDbID     = regexp.MustCompile(`tt\d+`)
-	reUnit3DUploaded   = regexp.MustCompile(`(?s)ratio-bar__uploaded[^>]*>.*?<i[^>]*></i>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
-	reUnit3DDownloaded = regexp.MustCompile(`(?s)ratio-bar__downloaded[^>]*>.*?<i[^>]*></i>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
-	reUnit3DRatio      = regexp.MustCompile(`(?s)top-nav__stats-ratio[^>]*>.*?<i[^>]*></i>\s*([\d.,]+)`)
-	reUnit3DSeeding    = regexp.MustCompile(`(?s)ratio-bar__seeding[^>]*>.*?<i[^>]*></i>\s*(\d+)`)
-	reUnit3DBonus      = regexp.MustCompile(`(?s)ratio-bar__points[^>]*>.*?<i[^>]*></i>\s*([\d,.]+)`)
-	reUnit3DUsername   = regexp.MustCompile(`(?s)ratio-bar__uploaded[^>]*>\s*<a[^>]*href="[^"]*/users/([^/"]+)`)
-	reUnit3DUserClass = regexp.MustCompile(`(?s)组别:\s*<span[^>]*>.*?</i>\s*(\w[\w\s]*?)</span>`)
-	reUnit3DSeedingSize = regexp.MustCompile(`(?is)<td>\s*做种体积\s*</td>\s*<td>\s*<span[^>]*>([\d.,]+\s*(?:PiB|TiB|GiB|MiB|KiB|TB|GB|MB|KB))</span>`)
+	reUnit3DTitle        = regexp.MustCompile(`<title>([^<]+)</title>`)
+	reUnit3DInfoHash     = regexp.MustCompile(`(?i)info_hash.*?([a-fA-F0-9]{40})`)
+	reUnit3DSize         = regexp.MustCompile(`(?i)(?:size|大小)[^<]*<[^>]*>([^<]+)`)
+	reUnit3DSeeders      = regexp.MustCompile(`(?i)(?:seeders?|做种)[^<]*<[^>]*>(\d+)`)
+	reUnit3DLeechers     = regexp.MustCompile(`(?i)(?:leechers?|下载)[^<]*<[^>]*>(\d+)`)
+	reUnit3DTorrentID    = regexp.MustCompile(`/torrents/(\d+)`)
+	reUnit3DErrorClass   = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
+	reUnit3DErrorLI      = regexp.MustCompile(`<li[^>]*>([^<]*(?:error|fail|失败|错误|duplicate|already)[^<]*)</li>`)
+	reUnit3DCSRFMeta     = regexp.MustCompile(`<meta\s+name="csrf-token"\s+content="([^"]+)"`)
+	reUnit3DCSRFInput    = regexp.MustCompile(`<input[^>]+name="_token"[^>]+value="([^"]+)"`)
+	reUnit3DIMDbID       = regexp.MustCompile(`tt\d+`)
+	reUnit3DUploaded     = regexp.MustCompile(`(?s)ratio-bar__uploaded[^>]*>.*?<i[^>]*></i>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
+	reUnit3DDownloaded   = regexp.MustCompile(`(?s)ratio-bar__downloaded[^>]*>.*?<i[^>]*></i>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
+	reUnit3DRatio        = regexp.MustCompile(`(?s)top-nav__stats-ratio[^>]*>.*?<i[^>]*></i>\s*([\d.,]+)`)
+	reUnit3DSeeding      = regexp.MustCompile(`(?s)ratio-bar__seeding[^>]*>.*?<i[^>]*></i>\s*(\d+)`)
+	reUnit3DBonus        = regexp.MustCompile(`(?s)ratio-bar__points[^>]*>.*?<i[^>]*></i>\s*([\d,.]+)`)
+	reUnit3DUsername     = regexp.MustCompile(`(?s)ratio-bar__uploaded[^>]*>\s*<a[^>]*href="[^"]*/users/([^/"]+)`)
+	reUnit3DUserClass    = regexp.MustCompile(`(?s)组别:\s*<span[^>]*>.*?</i>\s*(\w[\w\s]*?)</span>`)
+	reUnit3DSeedingSize  = regexp.MustCompile(`(?is)<td>\s*做种体积\s*</td>\s*<td>\s*<span[^>]*>([\d.,]+\s*(?:PiB|TiB|GiB|MiB|KiB|TB|GB|MB|KB))</span>`)
 	reUnit3DProfileBonus = regexp.MustCompile(`(?is)<td>\s*魔力\s*</td>\s*<td>.*?<strong>魔力:</strong>\s*<span[^>]*>([\d,.]+)</span>`)
 )
 
@@ -151,6 +151,11 @@ func (a *Unit3DAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	}
 	baseURL := resolveBase(config)
 	downloadPath := "/torrents/download/" + torrentID
+	if config.RSSKey != "" {
+		downloadPath = "/torrents/download/" + torrentID + "." + config.RSSKey
+	} else if config.Passkey != "" {
+		downloadPath = "/torrents/download/" + torrentID + "." + config.Passkey
+	}
 	u := baseURL + downloadPath
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -160,6 +165,8 @@ func (a *Unit3DAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	setCommonHeaders(req, config.Cookie)
 	if config.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+config.APIKey)
+	} else if config.AuthKey != "" {
+		req.Header.Set("Authorization", "Bearer "+config.AuthKey)
 	}
 
 	resp, err := a.doer.Client.Do(req)
@@ -722,10 +729,21 @@ func (a *Unit3DAdapter) VerifyExists(ctx context.Context, config *model.SiteConf
 }
 
 func (a *Unit3DAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
+	var stats *model.UserStatsResult
+	var err error
 	if config.APIKey != "" || config.BearerToken != "" {
-		return a.fetchUserStatsAPI(ctx, config)
+		stats, err = a.fetchUserStatsAPI(ctx, config)
+	} else {
+		stats, err = a.fetchUserStatsHTML(ctx, config)
 	}
-	return a.fetchUserStatsHTML(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	if stats.Username != "" && config.Passkey == "" {
+		a.logger.Warn("UNIT3D scraping security keys", zap.String("domain", config.Domain), zap.String("username", stats.Username))
+		a.scrapeUnit3DSecurityKeys(ctx, config, stats)
+	}
+	return stats, nil
 }
 
 func (a *Unit3DAdapter) fetchUserStatsAPI(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
@@ -760,14 +778,14 @@ func (a *Unit3DAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Sit
 	}
 
 	var raw struct {
-		ID          flexInt `json:"id"`
-		Username    string  `json:"username"`
-		Uploaded    flexInt `json:"uploaded"`
-		Downloaded  flexInt `json:"downloaded"`
-		Ratio       float64 `json:"ratio"`
-		Seedbonus   float64 `json:"seedbonus"`
-		Seeding     int     `json:"seeding"`
-		Group       struct {
+		ID         flexInt `json:"id"`
+		Username   string  `json:"username"`
+		Uploaded   flexInt `json:"uploaded"`
+		Downloaded flexInt `json:"downloaded"`
+		Ratio      float64 `json:"ratio"`
+		Seedbonus  float64 `json:"seedbonus"`
+		Seeding    int     `json:"seeding"`
+		Group      struct {
 			Name string `json:"name"`
 		} `json:"group"`
 	}
@@ -776,13 +794,13 @@ func (a *Unit3DAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Sit
 	}
 
 	return &model.UserStatsResult{
-		Username:     raw.Username,
-		UserClass:    raw.Group.Name,
-		UploadBytes:  int64(raw.Uploaded),
+		Username:      raw.Username,
+		UserClass:     raw.Group.Name,
+		UploadBytes:   int64(raw.Uploaded),
 		DownloadBytes: int64(raw.Downloaded),
-		Ratio:        raw.Ratio,
-		BonusPoints:  raw.Seedbonus,
-		SeedingCount: raw.Seeding,
+		Ratio:         raw.Ratio,
+		BonusPoints:   raw.Seedbonus,
+		SeedingCount:  raw.Seeding,
 	}, nil
 }
 
@@ -872,4 +890,59 @@ func (a *Unit3DAdapter) fetchUserStatsHTML(ctx context.Context, config *model.Si
 	}
 
 	return result, nil
+}
+
+var (
+	reUnit3DPID = regexp.MustCompile(`class="[^"]*current_pid[^"]*">([a-f0-9]{32})</p>`)
+	reUnit3DRID = regexp.MustCompile(`class="[^"]*current_rid[^"]*">([a-f0-9]{32})</p>`)
+	reUnit3DAPI = regexp.MustCompile(`class="[^"]*current_api[^"]*">([A-Za-z0-9]{40,})</p>`)
+)
+
+func (a *Unit3DAdapter) scrapeUnit3DSecurityKeys(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
+	baseURL := resolveBase(config)
+	if err := a.ensureSession(ctx, config); err != nil {
+		a.logger.Debug("scrapeUnit3DSecurityKeys: ensureSession failed", zap.Error(err))
+		return
+	}
+	pageURL := baseURL + "/users/" + url.PathEscape(stats.Username) + "/settings/security"
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		a.logger.Debug("scrapeUnit3DSecurityKeys: request failed", zap.String("url", pageURL), zap.Error(err))
+		return
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+	httpclient.DrainBody(resp)
+	if resp.StatusCode != http.StatusOK {
+		a.logger.Warn("scrapeUnit3DSecurityKeys: non-200", zap.String("url", pageURL), zap.Int("status", resp.StatusCode))
+		return
+	}
+
+	html := string(body)
+
+	if m := reUnit3DPID.FindStringSubmatch(html); len(m) > 1 {
+		stats.Passkey = m[1]
+	}
+	if m := reUnit3DRID.FindStringSubmatch(html); len(m) > 1 {
+		stats.RSSKey = m[1]
+	}
+	if m := reUnit3DAPI.FindStringSubmatch(html); len(m) > 1 {
+		stats.AuthKey = m[1]
+	}
+
+	if stats.Passkey != "" || stats.RSSKey != "" || stats.AuthKey != "" {
+		a.logger.Info("scraped UNIT3D security keys",
+			zap.String("domain", config.Domain),
+			zap.Bool("passkey", stats.Passkey != ""),
+			zap.Bool("rsskey", stats.RSSKey != ""),
+			zap.Bool("api_token", stats.AuthKey != ""),
+		)
+	} else {
+		a.logger.Warn("scrapeUnit3DSecurityKeys: no keys found", zap.String("domain", config.Domain), zap.Int("htmlLen", len(html)))
+	}
 }
