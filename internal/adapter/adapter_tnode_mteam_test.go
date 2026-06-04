@@ -23,14 +23,19 @@ func TestTNodeAdapter_Framework(t *testing.T) {
 func TestTNodeAdapter_DownloadTorrent_OK(t *testing.T) {
 	payload := []byte("d4:infod6:lengthi0eee")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/download.php" {
+		switch r.URL.Path {
+		case "/index":
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte(`<html><meta name="x-csrf-token" content="test-csrf-token"/></html>`))
+		case "/api/torrent/download/42":
+			if r.Header.Get("x-csrf-token") != "test-csrf-token" {
+				t.Errorf("missing csrf token header")
+			}
+			w.Header().Set("Content-Type", "application/x-bittorrent")
+			w.Write(payload)
+		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		if r.URL.Query().Get("id") != "42" {
-			t.Errorf("unexpected id: %s", r.URL.Query().Get("id"))
-		}
-		w.Header().Set("Content-Type", "application/x-bittorrent")
-		_, _ = w.Write(payload)
 	}))
 	defer srv.Close()
 

@@ -18,7 +18,7 @@ type ContentFingerprint struct {
 	FileTree        []byte           `json:"file_tree" gorm:"type:blob"`
 	FileTreeParsed  map[string]int64 `json:"-" gorm:"-"`
 	Title           string           `json:"title" gorm:"size:500"`
-	FilesHash       string           `json:"files_hash" gorm:"size:128"`
+	FilesHash       string           `json:"files_hash" gorm:"size:128;index"`
 }
 
 func (ContentFingerprint) TableName() string { return "content_fingerprints" }

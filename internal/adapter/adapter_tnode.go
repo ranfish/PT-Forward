@@ -46,13 +46,19 @@ func NewTNodeAdapter(doer *HTTPDoer, logger *zap.Logger) *TNodeAdapter {
 func (a *TNodeAdapter) Framework() string { return "tnode" }
 
 func (a *TNodeAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-	u := buildDomainURL(config, "/download.php", torrentID, config.Passkey)
+	baseURL := resolveBaseURL(config)
+	csrfToken, _ := a.fetchCSRFToken(ctx, config, baseURL+"/index")
+
+	u := baseURL + "/api/torrent/download/" + url.PathEscape(torrentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
+	if csrfToken != "" {
+		req.Header.Set("x-csrf-token", csrfToken)
+	}
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
@@ -577,6 +583,8 @@ func (a *TNodeAdapter) FetchUserStats(ctx context.Context, config *model.SiteCon
 		a.enrichSeedingSizeFromInfoAPI(ctx, config, baseURL, csrfToken, stats)
 	}
 
+	a.scrapeSecurityKeys(ctx, config, baseURL, csrfToken, stats)
+
 	return stats, nil
 }
 
@@ -650,4 +658,61 @@ func (a *TNodeAdapter) enrichSeedingSizeFromInfoAPI(ctx context.Context, config 
 	if infoResp.Status == 200 && infoResp.Data.SeedSize > 0 {
 		stats.SeedingSize = infoResp.Data.SeedSize
 	}
+}
+
+func (a *TNodeAdapter) scrapeSecurityKeys(ctx context.Context, config *model.SiteConfig, baseURL, csrfToken string, stats *model.UserStatsResult) {
+	if config.Cookie == "" {
+		return
+	}
+
+	securityURL := baseURL + "/api/user/getSecurityInfo"
+	req, err := http.NewRequestWithContext(ctx, "GET", securityURL, nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+	if csrfToken != "" {
+		req.Header.Set("x-csrf-token", csrfToken)
+	}
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		a.logger.Debug("请求安全信息失败", zap.Error(err))
+		return
+	}
+	defer func() { drainBody(resp) }()
+
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return
+	}
+
+	var secResp struct {
+		Status int `json:"status"`
+		Data   struct {
+			TorrentKey string `json:"torrentKey"`
+			RSSKey     string `json:"rssKey"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &secResp); err != nil {
+		return
+	}
+	if secResp.Status != 200 {
+		return
+	}
+
+	if secResp.Data.RSSKey != "" {
+		stats.RSSKey = secResp.Data.RSSKey
+	}
+	if secResp.Data.TorrentKey != "" {
+		stats.AuthKey = secResp.Data.TorrentKey
+	}
+
+	a.logger.Debug("采集到 tnode 安全密钥",
+		zap.Bool("rss_key", stats.RSSKey != ""),
+		zap.Bool("torrent_key", stats.AuthKey != ""))
 }

@@ -8,6 +8,8 @@
         <a-tag v-else-if="needsApiKey" color="red">{{ t('site.apiKeyNotConfigured') }}</a-tag>
         <a-tag v-if="needsPasskey && site.hasPasskey" color="green">{{ t('site.passkeyValid') }}</a-tag>
         <a-tag v-else-if="needsPasskey" color="red">{{ t('site.passkeyNotConfigured') }}</a-tag>
+        <a-tag v-if="site.hasAuthKey" color="green">{{ t('site.authKeyValid') }}</a-tag>
+        <a-tag v-if="site.hasRssKey" color="green">{{ t('site.rssKeyValid') }}</a-tag>
       </template>
       <template #extra>
         <a-button :loading="detecting" @click="runDetect">{{ t('site.detect') }}</a-button>
@@ -53,6 +55,8 @@
         <a-descriptions-item v-if="needsCookie" :label="t('sites.cookie')">{{ site.hasCookie ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
         <a-descriptions-item v-if="needsApiKey" :label="t('sites.apiKey')">{{ site.hasApiKey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
         <a-descriptions-item v-if="needsPasskey" :label="t('sites.passkey')">{{ site.hasPasskey ? t('common.configured') : t('common.notConfigured') }}</a-descriptions-item>
+        <a-descriptions-item v-if="site.hasAuthKey" :label="t('sites.authKey')">{{ t('common.configured') }}</a-descriptions-item>
+        <a-descriptions-item v-if="site.hasRssKey" :label="t('sites.rssKey')">{{ t('common.configured') }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.enabledLabel')"><a-badge :status="site.enabled ? 'success' : 'default'" :text="site.enabled ? t('common.yes') : t('common.no')" /></a-descriptions-item>
         <a-descriptions-item :label="t('site.role')">{{ [site.isSource ? t('site.sourceSiteRole') : '', site.isTarget ? t('site.targetSiteRole') : ''].filter(Boolean).join(', ') || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.participateAutoPublishLabel')">{{ site.participateAutoPublish ? t('common.yes') : t('common.no') }}</a-descriptions-item>
@@ -283,8 +287,20 @@
           <a-form-item v-if="needsApiKey" :label="t('sites.apiKey')">
             <a-input-password v-model:value="credForm.apiKey" :placeholder="t('site.inputApiKey')" />
           </a-form-item>
-          <a-form-item v-if="needsPasskey" :label="t('sites.passkey')">
-            <a-input v-model:value="credForm.passkey" :placeholder="t('site.inputPasskey')" />
+          <a-form-item v-if="showPasskeyField" :label="site.passkeyAlias || t('sites.passkey')">
+            <template v-if="site.passkeyHint" #extra>
+              <span style="color: rgba(0,0,0,0.45); font-size: 12px;">{{ site.passkeyHint }}</span>
+            </template>
+            <a-input-group compact>
+              <a-input
+                v-model:value="credForm.passkey"
+                :placeholder="site.passkeyMasked || (site.passkeyAlias ? `${t('site.inputPasskey')}${site.passkeyAlias}` : t('site.inputPasskey'))"
+                style="width: calc(100% - 40px)"
+              />
+              <a-button :disabled="!site.passkeyMasked" @click="fillPasskeyMasked">
+                <template #icon><SyncOutlined /></template>
+              </a-button>
+            </a-input-group>
           </a-form-item>
 
           <a-divider>{{ t('site.advancedCredentials') }}</a-divider>
@@ -294,7 +310,7 @@
           <a-row :gutter="16">
             <a-col :span="12">
               <a-form-item :label="t('site.authKey')">
-                <a-input-password v-model:value="credForm.authKey" :placeholder="t('site.authKeyPlaceholder')" />
+                <a-input-password v-model:value="credForm.authKey" :placeholder="site.authKeyMasked || t('site.authKeyPlaceholder')" />
               </a-form-item>
             </a-col>
             <a-col :span="12">
@@ -311,7 +327,7 @@
             </a-col>
             <a-col :span="12">
               <a-form-item :label="t('site.rssKey')">
-                <a-input-password v-model:value="credForm.rssKey" :placeholder="t('site.rssKeyPlaceholder')" />
+                <a-input-password v-model:value="credForm.rssKey" :placeholder="site.rssKeyMasked || t('site.rssKeyPlaceholder')" />
               </a-form-item>
             </a-col>
           </a-row>
@@ -411,6 +427,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { SyncOutlined } from '@ant-design/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
 import type { Site, SiteCredentials, SearchTorrentResult, SiteConfigOverride } from '@/api/types'
@@ -483,6 +500,10 @@ const authTypeLabels: Record<string, string> = {
 const needsCookie = computed(() => site.value.authType === 'cookie' || !site.value.authType)
 const needsApiKey = computed(() => site.value.authType === 'apikey')
 const needsPasskey = computed(() => site.value.authType === 'passkey')
+const showPasskeyField = computed(() => {
+  const fw = site.value.framework as string
+  return needsPasskey.value || (fw === 'nexusphp' || fw === 'generic')
+})
 const authLabel = computed(() => authTypeLabels[site.value.authType as string] || 'Cookie')
 
 const overrideLoading = ref(false)
@@ -592,6 +613,12 @@ async function fetchSite() {
     message.error((e as Error).message)
   } finally {
     loading.value = false
+  }
+}
+
+function fillPasskeyMasked() {
+  if (site.value.passkeyMasked) {
+    credForm.passkey = site.value.passkeyMasked
   }
 }
 

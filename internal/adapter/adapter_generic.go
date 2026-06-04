@@ -74,9 +74,14 @@ func (a *GenericAdapter) ParseRSS(_ context.Context, _ string, _ *model.SiteConf
 }
 
 func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-	u := buildGenericURL(config, config.Paths.Detail, torrentID)
-	if u == "" {
-		u = buildGenericDownloadURL(config, torrentID)
+	var u string
+	if config.DownloadURLTemplate != "" {
+		u = buildGenericURL(config, config.DownloadURLTemplate, torrentID)
+	} else {
+		u = buildGenericURL(config, config.Paths.Detail, torrentID)
+		if u == "" {
+			u = buildGenericDownloadURL(config, torrentID)
+		}
 	}
 	if u == "" {
 		return nil, configError(fmtES("no download URL configured for %s", a.framework))
@@ -650,7 +655,10 @@ func buildGenericURL(config *model.SiteConfig, pathTpl, torrentID string) string
 	u = strings.ReplaceAll(u, "{passkey}", url.QueryEscape(config.Passkey))
 	u = strings.ReplaceAll(u, "{authkey}", url.QueryEscape(config.AuthKey))
 	if !strings.HasPrefix(u, "http") {
-		base := config.Domain
+		base := config.BaseURL
+		if base == "" {
+			base = config.Domain
+		}
 		if !strings.HasPrefix(base, "http") {
 			base = "https://" + base
 		}
@@ -660,7 +668,10 @@ func buildGenericURL(config *model.SiteConfig, pathTpl, torrentID string) string
 }
 
 func buildGenericDownloadURL(config *model.SiteConfig, torrentID string) string {
-	base := config.Domain
+	base := config.BaseURL
+	if base == "" {
+		base = config.Domain
+	}
 	if !strings.HasPrefix(base, "http") {
 		base = "https://" + base
 	}

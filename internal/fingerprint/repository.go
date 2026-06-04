@@ -168,6 +168,23 @@ func (r *Repository) FindCandidatesBySite(ctx context.Context, siteName string, 
 	return fps, nil
 }
 
+func (r *Repository) FindByFilesHashAndSite(ctx context.Context, siteName, filesHash string) ([]model.ContentFingerprint, error) {
+	if filesHash == "" {
+		return nil, nil
+	}
+	var fps []model.ContentFingerprint
+	err := r.db.WithContext(ctx).
+		Where("site_name = ? AND files_hash = ?", siteName, filesHash).
+		Find(&fps).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range fps {
+		r.populateParsed(&fps[i])
+	}
+	return fps, nil
+}
+
 func (r *Repository) populateParsed(fp *model.ContentFingerprint) {
 	if len(fp.FileTree) > 0 {
 		var parsed map[string]int64

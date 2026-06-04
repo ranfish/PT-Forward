@@ -239,12 +239,17 @@ export interface Site {
   authType: string
   enabled: boolean
   hasPasskey: boolean
+  passkeyMasked?: string
+  passkeyAlias?: string
+  passkeyHint?: string
   hasCookie: boolean
   hasApiKey: boolean
   hasBearerToken: boolean
   hasAuthKey: boolean
+  authKeyMasked?: string
   hasAuthHash: boolean
   hasRssKey: boolean
+  rssKeyMasked?: string
   userId?: number
   hashStrategy: string
   sizeStrategy: string

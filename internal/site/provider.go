@@ -77,6 +77,8 @@ func (p *Provider) applyOverridesToInfo(ctx context.Context, siteName string, in
 			}
 		case "download_url_template":
 			info.DownloadURLTemplate = o.FieldValue
+		case "passkey_alias":
+		case "passkey_hint":
 		case "hash_strategy":
 			info.HashStrategy = o.FieldValue
 		case "size_strategy":
@@ -132,6 +134,11 @@ func (p *Provider) applyOverrides(ctx context.Context, siteName string, config *
 			}
 		case "download_url_template":
 			config.RSS.URLTemplate = o.FieldValue
+			config.DownloadURLTemplate = o.FieldValue
+		case "passkey_alias":
+			config.PasskeyAlias = o.FieldValue
+		case "passkey_hint":
+			config.PasskeyHint = o.FieldValue
 		case "hash_strategy":
 			config.RSS.HashStrategy = model.HashStrategy(o.FieldValue)
 		case "size_strategy":
@@ -302,6 +309,11 @@ func (p *Provider) applyOverridesFromList(config *model.SiteConfig, overrides []
 			}
 		case "download_url_template":
 			config.RSS.URLTemplate = o.FieldValue
+			config.DownloadURLTemplate = o.FieldValue
+		case "passkey_alias":
+			config.PasskeyAlias = o.FieldValue
+		case "passkey_hint":
+			config.PasskeyHint = o.FieldValue
 		case "hash_strategy":
 			config.RSS.HashStrategy = model.HashStrategy(o.FieldValue)
 		case "size_strategy":
@@ -428,6 +440,7 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 			},
 		},
 		Domain:      s.Domain,
+		BaseURL:     s.BaseURL,
 		Enabled:     s.Enabled,
 		IsSource:    s.IsSource,
 		IsTarget:    s.IsTarget,
@@ -443,6 +456,10 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		ProxyURL:      s.ProxyURL,
 		SkipSSLVerify: s.SkipSSLVerify,
 		HRStrategy:    s.HRStrategy,
+
+		DownloadURLTemplate: s.DownloadURLTemplate,
+		DownloadMode:         s.DownloadMode,
+		SupportsPiecesHashAPI: s.SupportsPiecesHashAPI,
 	}
 }
 
@@ -490,6 +507,13 @@ func defaultPaths(framework string) model.SitePathsConfig {
 			Browse: "/api/v1/torrents",
 			Detail: "/api/v1/torrents/{uuid}",
 			Upload: "/api/v1/torrents",
+			RSS:    "/rss",
+		}
+	case "yemapt":
+		return model.SitePathsConfig{
+			Browse: "/torrent/list",
+			Detail: "/torrent/detail/{id}",
+			Upload: "/api/torrent/upload",
 			RSS:    "/rss",
 		}
 	default:

@@ -2,6 +2,7 @@ package reseed
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -2509,7 +2510,7 @@ func TestEngine_matchLayer0PiecesHash_Found(t *testing.T) {
 	}}
 
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
-	config := &model.SiteConfig{Passkey: "31ab1c9e2bf5533b4d23e94b2cad5cd9"}
+	config := &model.SiteConfig{Passkey: "31ab1c9e2bf5533b4d23e94b2cad5cd9", SupportsPiecesHashAPI: true}
 
 	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "target_site", fc)
 	if c == nil {
@@ -2589,6 +2590,35 @@ func TestEngine_matchLayer0PiecesHash_NotSupported(t *testing.T) {
 	}
 }
 
+func TestEngine_matchLayer0PiecesHash_SiteConfigDisabled(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	called := false
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true},
+		searchByPiecesHashFn: func(_ context.Context, _ *model.SiteConfig, _ []string) (map[string]int, error) {
+			called = true
+			return map[string]int{"ph_abc": 1}, nil
+		},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {PiecesHash: "ph_abc"},
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+	config := &model.SiteConfig{Passkey: "pk", SupportsPiecesHashAPI: false}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when site config disables pieces_hash API")
+	}
+	if called {
+		t.Error("SearchByPiecesHash should not be called when SupportsPiecesHashAPI is false")
+	}
+}
+
 func TestEngine_matchLayer0PiecesHash_NoCreds(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
@@ -2626,7 +2656,7 @@ func TestEngine_matchLayer0PiecesHash_CookieOnly(t *testing.T) {
 	}}
 
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
-	config := &model.SiteConfig{Passkey: "", Cookie: "session=abc123"}
+	config := &model.SiteConfig{Passkey: "", Cookie: "session=abc123", SupportsPiecesHashAPI: true}
 
 	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
 	if c == nil {
@@ -2685,5 +2715,233 @@ func TestEngine_matchLayer0PiecesHash_NoMatch(t *testing.T) {
 	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec, "site2", fc)
 	if c != nil {
 		t.Error("expected nil when no match")
+	}
+}
+
+func TestEngine_matchLayer15FileTree_Found(t *testing.T) {
+	db := setupReseedDB(t)
+	fpRepo := fingerprint.NewRepository(db, zap.NewNop())
+	e := NewEngine(db, zap.NewNop())
+	e.fpRepo = fpRepo
+
+	srcFP := &model.ContentFingerprint{
+		InfoHash:       "ih_src",
+		SiteName:       "site1",
+		TorrentID:      "100",
+		FilesHash:      "fh_abc",
+		FileTreeParsed: map[string]int64{"movie.mkv": 1000000},
+		TotalSize:      1000000,
+		FileCount:      1,
+	}
+	srcFPJSON, _ := json.Marshal(srcFP.FileTreeParsed)
+	srcFP.FileTree = srcFPJSON
+	db.Create(srcFP)
+
+	tgtFP := &model.ContentFingerprint{
+		InfoHash:       "ih_tgt",
+		SiteName:       "site2",
+		TorrentID:      "200",
+		FilesHash:      "fh_abc",
+		FileTreeParsed: map[string]int64{"movie.mkv": 1000000},
+		TotalSize:      1000000,
+		FileCount:      1,
+	}
+	tgtFPJSON, _ := json.Marshal(tgtFP.FileTreeParsed)
+	tgtFP.FileTree = tgtFPJSON
+	db.Create(tgtFP)
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih_src|site1": srcFP,
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih_src", SiteName: "site1"}
+	c := e.matchLayer15FileTree(context.Background(), rec, "site2", fc)
+	if c == nil {
+		t.Fatal("expected candidate, got nil")
+	}
+	if c.MatchMethod != "file_tree" {
+		t.Errorf("expected file_tree, got %s", c.MatchMethod)
+	}
+	if c.TargetTorrentID != "200" {
+		t.Errorf("expected 200, got %s", c.TargetTorrentID)
+	}
+	if c.Confidence != 0.9 {
+		t.Errorf("expected confidence 0.9, got %f", c.Confidence)
+	}
+	if c.TargetInfoHash != "ih_tgt" {
+		t.Errorf("expected ih_tgt, got %s", c.TargetInfoHash)
+	}
+}
+
+func TestEngine_matchLayer15FileTree_NoFingerprint(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{}}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+
+	c := e.matchLayer15FileTree(context.Background(), rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when no fingerprint")
+	}
+}
+
+func TestEngine_matchLayer15FileTree_EmptyFilesHash(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {FilesHash: "", FileTreeParsed: nil},
+	}}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+
+	c := e.matchLayer15FileTree(context.Background(), rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when empty files_hash and no file_tree")
+	}
+}
+
+func TestEngine_matchLayer15FileTree_NoRepo(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {FilesHash: "fh_abc", FileTreeParsed: map[string]int64{"a": 1}},
+	}}
+	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
+
+	c := e.matchLayer15FileTree(context.Background(), rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when no fpRepo")
+	}
+}
+
+func TestEngine_matchLayer15FileTree_FileTreeMismatch(t *testing.T) {
+	db := setupReseedDB(t)
+	fpRepo := fingerprint.NewRepository(db, zap.NewNop())
+	e := NewEngine(db, zap.NewNop())
+	e.fpRepo = fpRepo
+
+	srcFP := &model.ContentFingerprint{
+		InfoHash:       "ih_src",
+		SiteName:       "site1",
+		TorrentID:      "100",
+		FilesHash:      "fh_same",
+		FileTreeParsed: map[string]int64{"movie.mkv": 1000000},
+	}
+	srcFP.FileTree, _ = json.Marshal(srcFP.FileTreeParsed)
+	db.Create(srcFP)
+
+	tgtFP := &model.ContentFingerprint{
+		InfoHash:       "ih_tgt",
+		SiteName:       "site2",
+		TorrentID:      "200",
+		FilesHash:      "fh_same",
+		FileTreeParsed: map[string]int64{"different.mkv": 2000000},
+	}
+	tgtFP.FileTree, _ = json.Marshal(tgtFP.FileTreeParsed)
+	db.Create(tgtFP)
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih_src|site1": srcFP,
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih_src", SiteName: "site1"}
+	c := e.matchLayer15FileTree(context.Background(), rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when file trees don't match")
+	}
+}
+
+func TestEngine_matchLayer15FileTree_NoMatch(t *testing.T) {
+	db := setupReseedDB(t)
+	fpRepo := fingerprint.NewRepository(db, zap.NewNop())
+	e := NewEngine(db, zap.NewNop())
+	e.fpRepo = fpRepo
+
+	srcFP := &model.ContentFingerprint{
+		InfoHash:       "ih_src",
+		SiteName:       "site1",
+		TorrentID:      "100",
+		FilesHash:      "fh_unique",
+		FileTreeParsed: map[string]int64{"a.mkv": 1},
+	}
+	srcFP.FileTree, _ = json.Marshal(srcFP.FileTreeParsed)
+	db.Create(srcFP)
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih_src|site1": srcFP,
+	}}
+
+	rec := model.SeedingTorrentRecord{InfoHash: "ih_src", SiteName: "site1"}
+	c := e.matchLayer15FileTree(context.Background(), rec, "site2", fc)
+	if c != nil {
+		t.Error("expected nil when no match in target site")
+	}
+}
+
+func TestCompareFileTreesStrict(t *testing.T) {
+	tests := []struct {
+		name string
+		src  map[string]int64
+		tgt  map[string]int64
+		want bool
+	}{
+		{
+			name: "identical_single",
+			src:  map[string]int64{"movie.mkv": 1000},
+			tgt:  map[string]int64{"movie.mkv": 1000},
+			want: true,
+		},
+		{
+			name: "identical_multi",
+			src:  map[string]int64{"a.mkv": 100, "b.mkv": 200, "c.srt": 10},
+			tgt:  map[string]int64{"a.mkv": 100, "b.mkv": 200, "c.srt": 10},
+			want: true,
+		},
+		{
+			name: "different_size",
+			src:  map[string]int64{"movie.mkv": 1000},
+			tgt:  map[string]int64{"movie.mkv": 2000},
+			want: false,
+		},
+		{
+			name: "different_name",
+			src:  map[string]int64{"movie.mkv": 1000},
+			tgt:  map[string]int64{"other.mkv": 1000},
+			want: false,
+		},
+		{
+			name: "different_count",
+			src:  map[string]int64{"a.mkv": 100, "b.mkv": 200},
+			tgt:  map[string]int64{"a.mkv": 100},
+			want: false,
+		},
+		{
+			name: "empty_src",
+			src:  map[string]int64{},
+			tgt:  map[string]int64{"a.mkv": 100},
+			want: false,
+		},
+		{
+			name: "nil_src",
+			src:  nil,
+			tgt:  map[string]int64{"a.mkv": 100},
+			want: false,
+		},
+		{
+			name: "extra_file_in_tgt",
+			src:  map[string]int64{"a.mkv": 100},
+			tgt:  map[string]int64{"a.mkv": 100, "extra.mkv": 50},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareFileTreesStrict(tt.src, tt.tgt)
+			if got != tt.want {
+				t.Errorf("compareFileTreesStrict() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

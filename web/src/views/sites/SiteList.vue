@@ -70,6 +70,7 @@
           <a-badge
             :status="hasAnyCredential(record) ? 'success' : 'default'"
             :text="hasAnyCredential(record) ? t('common.configured') : t('common.notConfigured')"
+            style="white-space: nowrap"
           />
         </template>
         <template v-if="column.key === 'username'">
@@ -348,7 +349,7 @@ const columns = [
   { title: t('site.participateAutoPublishLabel'), key: 'participateAutoPublish', width: 120, align: 'center' as const },
   { title: t('site.asSource'), key: 'isSource', width: 80, align: 'center' as const },
   { title: t('site.asTarget'), key: 'isTarget', width: 80, align: 'center' as const },
-  { title: t('site.credentialStatus'), key: 'hasCookie', width: 90 },
+  { title: t('site.credentialStatus'), key: 'hasCookie', width: 130 },
   { title: t('site.username'), key: 'username', width: 90 },
   { title: t('site.userClass'), key: 'userClass', width: 90 },
   { title: t('site.uploadBytes'), key: 'uploadBytes', width: 100 },

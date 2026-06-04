@@ -76,9 +76,25 @@ func (a *NexusPHPAdapter) ParseRSS(_ context.Context, _ string, _ *model.SiteCon
 }
 
 func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-	u := buildURL(config.Domain, "/download.php", torrentID, config.Passkey)
+	var u string
+	if config.DownloadMode == "signed" {
+		signedURL, err := a.resolveSignedDownloadURL(ctx, config, torrentID)
+		if err != nil {
+			return nil, err
+		}
+		u = signedURL
+	} else if config.DownloadURLTemplate != "" {
+		u = buildTemplateURL(config, config.DownloadURLTemplate, torrentID)
+	} else {
+		u = buildURL(config.Domain, "/download.php", torrentID, config.Passkey)
+	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	method := "GET"
+	if config.DownloadMode == "signed" {
+		method = "POST"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, u, nil)
 	if err != nil {
 		return nil, networkError("构造请求失败", err)
 	}
@@ -103,6 +119,46 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 	}
 
 	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
+}
+
+var reSignedDownloadURL = regexp.MustCompile(`download\.php\?id=` + regexp.QuoteMeta("{id}") + `&t=\d+&sign=[a-f0-9]+`)
+
+func (a *NexusPHPAdapter) resolveSignedDownloadURL(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
+	detailURL := buildURL(config.Domain, "/details.php", torrentID, "")
+
+	req, err := http.NewRequestWithContext(ctx, "GET", detailURL, nil)
+	if err != nil {
+		return "", networkError("构造详情页请求失败", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return "", downloadError("获取详情页失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
+	if err != nil {
+		return "", downloadError("读取详情页失败", err)
+	}
+
+	idEscaped := regexp.QuoteMeta(torrentID)
+	pattern := regexp.MustCompile(`download\.php\?id=` + idEscaped + `&t=\d+&sign=[a-f0-9]+`)
+	match := pattern.FindString(string(body))
+	if match == "" {
+		return "", configError("未在详情页找到签名下载链接")
+	}
+
+	if !strings.HasPrefix(match, "http") {
+		base := config.Domain
+		if !strings.HasPrefix(base, "http") {
+			base = "https://" + base
+		}
+		match = base + "/" + strings.TrimLeft(match, "/")
+	}
+
+	return match, nil
 }
 
 func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -879,6 +935,24 @@ func (a *NexusPHPAdapter) VerifyExists(ctx context.Context, config *model.SiteCo
 	return false, nil
 }
 
+func buildTemplateURL(config *model.SiteConfig, tpl, torrentID string) string {
+	u := tpl
+	if torrentID != "" {
+		u = strings.ReplaceAll(u, "{id}", url.PathEscape(torrentID))
+	}
+	u = strings.ReplaceAll(u, "{passkey}", url.QueryEscape(config.Passkey))
+	u = strings.ReplaceAll(u, "{rsskey}", url.QueryEscape(config.RSSKey))
+	u = strings.ReplaceAll(u, "{authkey}", url.QueryEscape(config.AuthKey))
+	if !strings.HasPrefix(u, "http") {
+		base := config.Domain
+		if !strings.HasPrefix(base, "http") {
+			base = "https://" + base
+		}
+		u = base + "/" + strings.TrimLeft(u, "/")
+	}
+	return u
+}
+
 func buildURL(domain, path, torrentID, passkey string) string {
 	u := domain
 	if !strings.HasPrefix(u, "http") {
@@ -1172,6 +1246,10 @@ func (a *NexusPHPAdapter) FetchUserStats(ctx context.Context, config *model.Site
 	stats, err := a.fetchUserStatsAPI(ctx, config)
 	if err == nil && stats != nil {
 		if stats.SeedingCount > 0 && stats.SeedingSize > 0 {
+			a.scrapePasskey(ctx, config, stats)
+			if config.DownloadMode == "cuhash" {
+				a.scrapeCuhash(ctx, config, stats)
+			}
 			return stats, nil
 		}
 		htmlStats, htmlErr := a.fetchUserStatsHTML(ctx, config)
@@ -1190,10 +1268,24 @@ func (a *NexusPHPAdapter) FetchUserStats(ctx context.Context, config *model.Site
 			if (stats.UserClass == "" || strings.HasPrefix(stats.UserClass, "UID:")) && htmlStats.UserClass != "" {
 				stats.UserClass = htmlStats.UserClass
 			}
+			if htmlStats.Passkey != "" {
+				stats.Passkey = htmlStats.Passkey
+			}
+		}
+		a.scrapePasskey(ctx, config, stats)
+		if config.DownloadMode == "cuhash" {
+			a.scrapeCuhash(ctx, config, stats)
 		}
 		return stats, nil
 	}
-	return a.fetchUserStatsHTML(ctx, config)
+	stats, err = a.fetchUserStatsHTML(ctx, config)
+	if err == nil && stats != nil {
+		a.scrapePasskey(ctx, config, stats)
+		if config.DownloadMode == "cuhash" {
+			a.scrapeCuhash(ctx, config, stats)
+		}
+	}
+	return stats, err
 }
 
 func (a *NexusPHPAdapter) fetchUserStatsAPI(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
@@ -1248,6 +1340,66 @@ func (a *NexusPHPAdapter) fetchUserStatsAPI(ctx context.Context, config *model.S
 		result.Ratio = float64(result.UploadBytes) / float64(result.DownloadBytes)
 	}
 	return result, nil
+}
+
+var rePasskeyRow = regexp.MustCompile(`(?s)(?:密钥|密匙|PASSKEY).{0,500}?([a-f0-9]{32})`)
+var reCuhashFromLink = regexp.MustCompile(`cuhash=([a-f0-9]{32})`)
+
+func (a *NexusPHPAdapter) scrapePasskey(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
+	if stats.Passkey != "" {
+		return
+	}
+	if config.Cookie == "" {
+		return
+	}
+	pageURL := config.Domain + "/usercp.php"
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer httpclient.DrainBody(resp)
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	if m := rePasskeyRow.FindStringSubmatch(string(body)); len(m) > 1 {
+		stats.Passkey = m[1]
+	}
+}
+
+func (a *NexusPHPAdapter) scrapeCuhash(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
+	if config.Cookie == "" {
+		return
+	}
+	pageURL := config.Domain + "/index.php"
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer httpclient.DrainBody(resp)
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
+	if err != nil {
+		return
+	}
+	if m := reCuhashFromLink.FindStringSubmatch(string(body)); len(m) > 1 {
+		stats.Passkey = m[1]
+	}
 }
 
 func (a *NexusPHPAdapter) fetchUserStatsHTML(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
