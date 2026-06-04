@@ -2,6 +2,7 @@ package site
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -229,7 +230,7 @@ func (p *Provider) ListSites(ctx context.Context) ([]*model.SiteInfo, error) {
 }
 
 type SiteResources struct {
-	Configs map[string]*model.SiteConfig
+	Configs  map[string]*model.SiteConfig
 	Adapters map[string]model.SiteAdapter
 }
 
@@ -422,7 +423,7 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 	paths := defaultPaths(s.Framework)
 	pub := defaultPublishConfig(s.Framework)
 
-	return &model.SiteConfig{
+	cfg := &model.SiteConfig{
 		SiteDefault: model.SiteDefault{
 			Domain:    s.Domain,
 			Framework: s.Framework,
@@ -457,10 +458,19 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		SkipSSLVerify: s.SkipSSLVerify,
 		HRStrategy:    s.HRStrategy,
 
-		DownloadURLTemplate: s.DownloadURLTemplate,
-		DownloadMode:         s.DownloadMode,
+		DownloadURLTemplate:   s.DownloadURLTemplate,
+		DownloadMode:          s.DownloadMode,
 		SupportsPiecesHashAPI: s.SupportsPiecesHashAPI,
 	}
+
+	if s.AlternativeDomains != "" {
+		var alts []string
+		if json.Unmarshal([]byte(s.AlternativeDomains), &alts) == nil {
+			cfg.AlternativeDomains = alts
+		}
+	}
+
+	return cfg
 }
 
 func defaultPaths(framework string) model.SitePathsConfig {

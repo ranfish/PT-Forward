@@ -27,8 +27,8 @@ var (
 	reGazelleGroupID    = regexp.MustCompile(`torrents\.php\?id=(\d+)`)
 	reGazelleErrorClass = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reGazelleErrorP     = regexp.MustCompile(`<p[^>]*>([^<]*(?:error|fail|already|duplicate|exist)[^<]*)</p>`)
-	reGazelleUserBonus   = regexp.MustCompile(`(?i)积分:\s*([\d,]+)`)
-	reGazelleSeedingNum  = regexp.MustCompile(`(?i)当前做种[^<]*<[^>]*>(\d+)`)
+	reGazelleUserBonus  = regexp.MustCompile(`(?i)积分:\s*([\d,]+)`)
+	reGazelleSeedingNum = regexp.MustCompile(`(?i)当前做种[^<]*<[^>]*>(\d+)`)
 )
 
 type GazelleAdapter struct {
@@ -50,10 +50,13 @@ func (a *GazelleAdapter) Framework() string { return "gazelle" }
 func (a *GazelleAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
 	baseURL := resolveBase(config)
 	u := baseURL + "/torrents.php?action=download&id=" + url.QueryEscape(torrentID)
-	if config.Passkey != "" {
-		u += "&passkey=" + url.QueryEscape(config.Passkey)
-	} else if config.AuthKey != "" {
+	if config.AuthKey != "" {
 		u += "&authkey=" + url.QueryEscape(config.AuthKey)
+	}
+	if config.RSSKey != "" {
+		u += "&torrent_pass=" + url.QueryEscape(config.RSSKey)
+	} else if config.Passkey != "" {
+		u += "&passkey=" + url.QueryEscape(config.Passkey)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -588,6 +591,9 @@ func (a *GazelleAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 	if stats.SeedingSize == 0 {
 		a.fetchSeedingSizeFromBPRates(ctx, config, stats)
 	}
+	if config.AuthKey == "" || config.RSSKey == "" {
+		a.scrapeGazelleAuthKeys(ctx, config, stats)
+	}
 	return stats, nil
 }
 
@@ -645,13 +651,13 @@ func parseGazelleStatsAPI(body []byte) (*model.UserStatsResult, error) {
 			Username  string `json:"username"`
 			ID        int64  `json:"id"`
 			Userstats struct {
-				Uploaded   interface{} `json:"uploaded"`
-				Downloaded interface{} `json:"downloaded"`
-				Ratio      float64     `json:"ratio"`
-				Class      string      `json:"class"`
-				BonusPoints interface{} `json:"bonusPoints"`
-				SeedingCount int        `json:"seedingCount"`
-				SeedingSize interface{} `json:"seedingSize"`
+				Uploaded     interface{} `json:"uploaded"`
+				Downloaded   interface{} `json:"downloaded"`
+				Ratio        float64     `json:"ratio"`
+				Class        string      `json:"class"`
+				BonusPoints  interface{} `json:"bonusPoints"`
+				SeedingCount int         `json:"seedingCount"`
+				SeedingSize  interface{} `json:"seedingSize"`
 			} `json:"userstats"`
 		} `json:"response"`
 	}
@@ -853,5 +859,42 @@ func (a *GazelleAdapter) fetchSeedingSizeFromBPRates(ctx context.Context, config
 		if sz := parseSizeString(m[1]); sz > 0 {
 			stats.SeedingSize = sz
 		}
+	}
+}
+
+func (a *GazelleAdapter) scrapeGazelleAuthKeys(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
+	baseURL := resolveBase(config)
+	pageURL := baseURL + "/torrents.php?page=1"
+
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { drainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return
+	}
+
+	html := string(body)
+
+	reAuthkey := regexp.MustCompile(`authkey=([a-f0-9]{32})`)
+	reTorrentPass := regexp.MustCompile(`torrent_pass=([a-f0-9]{32})`)
+
+	if m := reAuthkey.FindStringSubmatch(html); len(m) >= 2 {
+		stats.AuthKey = m[1]
+	}
+	if m := reTorrentPass.FindStringSubmatch(html); len(m) >= 2 {
+		stats.RSSKey = m[1]
 	}
 }

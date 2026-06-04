@@ -3,6 +3,7 @@ package site
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/url"
@@ -202,7 +203,17 @@ func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site)
 		SkipSSLVerify: site.SkipSSLVerify,
 	}
 
+	var alts []string
+	if site.AlternativeDomains != "" {
+		json.Unmarshal([]byte(site.AlternativeDomains), &alts)
+		config.AlternativeDomains = alts
+	}
+
 	stats, err := a.FetchUserStats(ctx, config)
+	if err != nil && len(alts) > 0 {
+		config.Domain = alts[0]
+		stats, err = a.FetchUserStats(ctx, config)
+	}
 	if err != nil {
 		return err
 	}
