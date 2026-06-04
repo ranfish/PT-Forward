@@ -35,6 +35,9 @@ type UserStatsResult struct {
 	SeedingPoints float64
 	SeedingSize   int64
 	SeedingCount  int
+	Passkey       string
+	RSSKey        string
+	AuthKey       string
 }
 
 type EventHandler interface {

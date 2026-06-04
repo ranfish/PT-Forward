@@ -588,7 +588,10 @@ func (c *QBClient) GetTrackerMessages(ctx context.Context, hash string) (string,
 		return "", fmt.Errorf("decode trackers: %w", err)
 	}
 	for _, t := range trackers {
-		if strings.HasPrefix(t.URL, "**") || strings.HasPrefix(t.URL, "http://") || strings.HasPrefix(t.URL, "https://") {
+		if strings.HasPrefix(t.URL, "**") {
+			continue
+		}
+		if strings.HasPrefix(t.URL, "http://") || strings.HasPrefix(t.URL, "https://") {
 			if t.Msg != "" && !strings.EqualFold(t.Msg, "ok") && !strings.Contains(t.Msg, "Success") {
 				return t.Msg, nil
 			}

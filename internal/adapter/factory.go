@@ -41,6 +41,8 @@ func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 		return NewNexusPHPAdapter(doer, f.logger)
 	case "tnode":
 		return NewTNodeAdapter(doer, f.logger)
+	case "yemapt":
+		return NewYemaptAdapter(doer, f.logger)
 	case "mteam":
 		return NewMTeamAdapter(doer, f.logger)
 	case "unit3d":
@@ -101,6 +103,13 @@ var FrameworkDefaults = map[string]FrameworkDefault{
 		RequiresSideLoading: true,
 	},
 	"tnode": {
+		HashStrategy:        "guid",
+		SizeStrategy:        "enclosure",
+		IDStrategy:          "query_param",
+		IDPattern:           "id",
+		DownloadURLTemplate: "download.php?id={id}&passkey={passkey}",
+	},
+	"yemapt": {
 		HashStrategy:        "guid",
 		SizeStrategy:        "enclosure",
 		IDStrategy:          "query_param",

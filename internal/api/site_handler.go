@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -214,13 +215,18 @@ type siteResponse struct {
 
 	HRStrategy string `json:"hrStrategy,omitempty"`
 
-	HasPasskey     bool `json:"hasPasskey"`
+	HasPasskey     bool   `json:"hasPasskey"`
+	PasskeyMasked  string `json:"passkeyMasked,omitempty"`
+	PasskeyAlias   string `json:"passkeyAlias,omitempty"`
+	PasskeyHint    string `json:"passkeyHint,omitempty"`
 	HasCookie      bool `json:"hasCookie"`
 	HasAPIKey      bool `json:"hasApiKey"`
 	HasBearerToken bool `json:"hasBearerToken"`
-	HasAuthKey     bool `json:"hasAuthKey"`
-	HasAuthHash    bool `json:"hasAuthHash"`
-	HasRSSKey      bool `json:"hasRssKey"`
+	HasAuthKey     bool   `json:"hasAuthKey"`
+	AuthKeyMasked  string `json:"authKeyMasked,omitempty"`
+	HasAuthHash    bool   `json:"hasAuthHash"`
+	HasRSSKey      bool   `json:"hasRssKey"`
+	RSSKeyMasked   string `json:"rssKeyMasked,omitempty"`
 
 	UserID int `json:"userId,omitempty"`
 
@@ -240,8 +246,18 @@ type siteResponse struct {
 	DetectionDetail   string `json:"detectionDetail,omitempty"`
 }
 
+func maskPasskey(pk string) string {
+	if len(pk) <= 8 {
+		if pk == "" {
+			return ""
+		}
+		return "****"
+	}
+	return pk[:4] + "****" + pk[len(pk)-4:]
+}
+
 func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
-	return siteResponse{
+	resp := siteResponse{
 		ID:        s.ID,
 		Name:      s.Name,
 		Domain:    s.Domain,
@@ -288,12 +304,15 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		HRStrategy: s.HRStrategy,
 
 		HasPasskey:     s.Passkey != "",
+		PasskeyMasked:  maskPasskey(s.Passkey),
 		HasCookie:      s.Cookie != "",
 		HasAPIKey:      s.APIKey != "",
 		HasBearerToken: s.BearerToken != "",
 		HasAuthKey:     s.AuthKey != "",
+		AuthKeyMasked:  maskPasskey(s.AuthKey),
 		HasAuthHash:    s.AuthHash != "",
 		HasRSSKey:      s.RSSKey != "",
+		RSSKeyMasked:   maskPasskey(s.RSSKey),
 
 		UserID: s.UserID,
 
@@ -312,6 +331,21 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		FrameworkVerified: s.FrameworkVerified,
 		DetectionDetail:   s.DetectionDetail,
 	}
+
+	var overrides []model.SiteConfigOverride
+	if h.db != nil {
+		h.db.Where("site_name = ? AND field_path IN ?", s.Name, []string{"passkey_alias", "passkey_hint"}).Find(&overrides)
+		for _, o := range overrides {
+			switch o.FieldPath {
+			case "passkey_alias":
+				resp.PasskeyAlias = o.FieldValue
+			case "passkey_hint":
+				resp.PasskeyHint = o.FieldValue
+			}
+		}
+	}
+
+	return resp
 }
 
 var validFrameworks = map[string]bool{
@@ -435,6 +469,8 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		h.handleOverrides(w, r, idStr)
 	case "freeze":
 		h.handleDomainFreezeByID(w, r, idStr)
+	case "download-test":
+		h.handleDownloadTest(w, r, idStr)
 	default:
 		Error(w, http.StatusNotFound, 40400, "路径不存在")
 	}
@@ -1844,4 +1880,181 @@ func (h *SiteHandler) handleDetectDiscount(w http.ResponseWriter, r *http.Reques
 
 	metrics.SiteRequestsTotal.WithLabelValues(site.Domain, "discount").Inc()
 	Success(w, result)
+}
+
+func (h *SiteHandler) handleDownloadTest(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+	if h.provider == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "站点服务未就绪")
+		return
+	}
+
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40002, "无效的站点ID")
+		return
+	}
+
+	var site model.Site
+	if err := h.db.WithContext(r.Context()).First(&site, id).Error; err != nil {
+		Error(w, http.StatusNotFound, 40400, "站点不存在")
+		return
+	}
+
+	config, err := h.provider.GetSiteConfig(r.Context(), site.Domain)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50003, "获取站点配置失败")
+		return
+	}
+
+	creds := map[string]bool{
+		"cookie": config.Cookie != "",
+		"apiKey": config.APIKey != "",
+		"passkey": config.Passkey != "",
+	}
+	if !creds["cookie"] && !creds["apiKey"] && !creds["passkey"] {
+		Error(w, http.StatusBadRequest, 14003, "站点无凭据")
+		return
+	}
+
+	adapter, err := h.provider.GetAdapter(r.Context(), site.Domain)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50002, "获取站点适配器失败")
+		return
+	}
+
+	var req struct {
+		TorrentID string `json:"torrentId"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	torrentID := req.TorrentID
+	if torrentID == "" {
+		var resolveErr error
+		torrentID, resolveErr = h.resolveTorrentIDForTest(r.Context(), adapter, config, site.Framework)
+		if resolveErr != nil {
+			Error(w, http.StatusBadGateway, 50006, "获取测试种子ID失败: "+resolveErr.Error())
+			return
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	data, dlErr := adapter.DownloadTorrent(ctx, config, torrentID)
+	if dlErr != nil {
+		h.logger.Warn("download test failed",
+			zap.String("site", site.Name),
+			zap.String("torrentId", torrentID),
+			zap.Error(dlErr))
+		Error(w, http.StatusBadGateway, 50007, fmt.Sprintf("下载失败(id=%s): %s", torrentID, dlErr.Error()))
+		return
+	}
+
+	isTorrent := len(data) >= 3 && data[0] == 'd' && data[1] >= '0' && data[1] <= '9' && data[2] == ':'
+	if !isTorrent {
+		preview := string(data)
+		if len(preview) > 100 {
+			preview = preview[:100]
+		}
+		Error(w, http.StatusBadGateway, 50008, fmt.Sprintf("返回了非种子文件(%dB): %s", len(data), preview))
+		return
+	}
+
+	Success(w, map[string]interface{}{
+		"ok":         true,
+		"torrentId":  torrentID,
+		"size":       len(data),
+		"siteName":   site.Name,
+		"framework":  site.Framework,
+	})
+}
+
+func (h *SiteHandler) resolveTorrentIDForTest(ctx context.Context, a model.SiteAdapter, config *model.SiteConfig, framework string) (string, error) {
+	results, err := a.SearchTorrents(ctx, config, "", &model.SearchOptions{MaxResults: 1})
+	if err == nil && len(results) > 0 {
+		return results[0].TorrentID, nil
+	}
+
+	client := buildSiteHTTPClient(&model.Site{BaseURL: config.Domain, ProxyURL: config.ProxyURL, SkipSSLVerify: config.SkipSSLVerify}, 10*time.Second)
+	browseURL := buildBrowseURLForTest(config, framework)
+	if browseURL == "" {
+		return "", fmt.Errorf("无法自动获取种子ID，请手动提供 torrentId")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", browseURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	if config.Cookie != "" {
+		req.Header.Set("Cookie", config.Cookie)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { httpclient.DrainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	bodyData, _ := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+	return extractTorrentIDFromHTML(string(bodyData), framework, config.Domain), nil
+}
+
+func buildBrowseURLForTest(config *model.SiteConfig, framework string) string {
+	base := config.BaseURL
+	if base == "" {
+		base = "https://" + config.Domain
+	}
+	if config.Domain == "totheglory.im" {
+		return base + "/browse.php"
+	}
+	switch framework {
+	case "nexusphp":
+		return base + "/torrents.php"
+	case "gazelle":
+		return base + "/torrents.php"
+	case "unit3d":
+		return base + "/torrents"
+	case "rousi":
+		return base + "/torrents.php"
+	case "generic":
+		return base + "/browse.php"
+	}
+	return base + "/torrents.php"
+}
+
+func extractTorrentIDFromHTML(html, framework, domain string) string {
+	patterns := []*regexp.Regexp{}
+	switch {
+	case domain == "totheglory.im":
+		patterns = []*regexp.Regexp{
+			regexp.MustCompile(`/dl/(\d+)/`),
+			regexp.MustCompile(`details\.php\?id=(\d+)`),
+		}
+	case domain == "hdcity.city":
+		patterns = []*regexp.Regexp{regexp.MustCompile(`download\?id=(\d+)`)}
+	case framework == "gazelle":
+		patterns = []*regexp.Regexp{regexp.MustCompile(`torrentid=(\d+)`)}
+	case framework == "unit3d":
+		patterns = []*regexp.Regexp{regexp.MustCompile(`/torrent/(\d+)`)}
+	default:
+		patterns = []*regexp.Regexp{
+			regexp.MustCompile(`download\.php\?id=(\d+)`),
+			regexp.MustCompile(`download\?id=(\d+)`),
+			regexp.MustCompile(`details\.php\?id=(\d+)`),
+		}
+	}
+	for _, re := range patterns {
+		if m := re.FindStringSubmatch(html); len(m) >= 2 {
+			return m[1]
+		}
+	}
+	return ""
 }

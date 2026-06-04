@@ -220,6 +220,15 @@ func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site)
 		"seeding_count":   stats.SeedingCount,
 		"stats_synced_at": now,
 	}
+	if stats.Passkey != "" {
+		updates["passkey"] = stats.Passkey
+	}
+	if stats.RSSKey != "" {
+		updates["rss_key"] = stats.RSSKey
+	}
+	if stats.AuthKey != "" {
+		updates["auth_key"] = stats.AuthKey
+	}
 
 	return s.db.WithContext(ctx).Model(site).Updates(updates).Error
 }

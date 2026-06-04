@@ -41,8 +41,9 @@ type SiteSeedData struct {
 	IsSource           bool           `json:"is_source"`
 	IsTarget           bool           `json:"is_target"`
 	CookieCloudDomain  string         `json:"cookiecloud_domain"`
-	AlternativeDomains string         `json:"alternative_domains"`
-	Form               SiteFormConfig `json:"form"`
+	AlternativeDomains          string         `json:"alternative_domains"`
+	SupportsPiecesHashAPI       *bool          `json:"supports_pieces_hash_api,omitempty"`
+	Form                        SiteFormConfig `json:"form"`
 }
 
 type seedData struct {
@@ -108,6 +109,10 @@ func SeedSites(db *gorm.DB) error {
 			DownloadMode:        defaultDownloadMode(s.DownloadMode),
 			DownloadURLTemplate: defs.DownloadURLTemplate,
 			RequiresSideLoading: defs.RequiresSideLoading,
+		}
+
+		if s.SupportsPiecesHashAPI != nil {
+			site.SupportsPiecesHashAPI = *s.SupportsPiecesHashAPI
 		}
 
 		if err := db.Create(site).Error; err != nil {

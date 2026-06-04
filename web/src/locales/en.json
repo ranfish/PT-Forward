@@ -168,6 +168,8 @@
     "apiKeyNotConfigured": "API Key Not Set",
     "passkeyValid": "Passkey Valid",
     "passkeyNotConfigured": "Passkey Not Set",
+    "authKeyValid": "Auth Key Valid",
+    "rssKeyValid": "RSS Key Valid",
     "credentialManagement": "Credential Management",
     "saveCredentials": "Save Credentials",
     "credentialsUpdated": "Credentials updated",
@@ -1249,7 +1251,9 @@
   "sites": {
     "cookie": "Cookie",
     "passkey": "Passkey",
-    "apiKey": "API Key"
+    "apiKey": "API Key",
+    "authKey": "Auth Key",
+    "rssKey": "RSS Key"
   },
   "fingerprints": {
     "piecesHash": "PiecesHash"

@@ -62,6 +62,8 @@ type Site struct {
 	SkipSSLVerify bool   `json:"skip_ssl_verify" gorm:"default:false"`
 	MaxConcurrent int    `json:"max_concurrent" gorm:"default:2"`
 
+	SupportsPiecesHashAPI bool `json:"supports_pieces_hash_api" gorm:"default:true"`
+
 	UploadBytes   int64      `json:"upload_bytes" gorm:"default:0"`
 	DownloadBytes int64      `json:"download_bytes" gorm:"default:0"`
 	SeedingPoints float64    `json:"seeding_points" gorm:"default:0"`
@@ -136,6 +138,8 @@ type SiteInfo struct {
 	DownloadMode        string `json:"download_mode"`
 	DownloadURLTemplate string `json:"download_url_template"`
 	DownloadPagePattern string `json:"download_page_pattern"`
+	PasskeyAlias        string `json:"passkey_alias,omitempty"`
+	PasskeyHint         string `json:"passkey_hint,omitempty"`
 
 	ProxyURL      string `json:"proxy_url"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify"`
@@ -271,6 +275,7 @@ type SiteScreenshotsConfig struct {
 type SiteConfig struct {
 	SiteDefault
 	Domain          string `json:"domain"`
+	BaseURL         string `json:"base_url,omitempty"`
 	Enabled         bool   `json:"enabled"`
 	IsSource        bool   `json:"is_source"`
 	IsTarget        bool   `json:"is_target"`
@@ -288,6 +293,13 @@ type SiteConfig struct {
 
 	ProxyURL      string `json:"proxy_url,omitempty"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify"`
+
+	DownloadMode         string `json:"download_mode,omitempty"`
+	DownloadURLTemplate  string `json:"download_url_template,omitempty"`
+	PasskeyAlias        string `json:"passkey_alias,omitempty"`
+	PasskeyHint         string `json:"passkey_hint,omitempty"`
+
+	SupportsPiecesHashAPI bool `json:"supports_pieces_hash_api"`
 }
 
 // §33.1.72 — DetectResult: 框架检测结果

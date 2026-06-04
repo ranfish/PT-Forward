@@ -577,6 +577,8 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				decision = model.DecisionMatch
 			case c.MatchMethod == "fingerprint":
 				decision = model.DecisionMatchPartial
+			case c.MatchMethod == "file_tree":
+				decision = model.DecisionMatch
 			case c.MatchMethod == "size_title":
 				decision = model.DecisionMatchSizeOnly
 			}
@@ -698,6 +700,12 @@ func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRec
 			continue
 		}
 
+		c = e.matchLayer15FileTree(ctx, rec, siteInfo.Name, fc)
+		if c != nil {
+			candidates = append(candidates, *c)
+			continue
+		}
+
 		c = e.matchLayer2SizeTitle(ctx, adapter, siteConfig, rec, siteInfo.Name, sizeTolerance, fc)
 		if c != nil {
 			candidates = append(candidates, *c)
@@ -714,6 +722,9 @@ func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRec
 }
 
 func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, rec model.SeedingTorrentRecord, siteName string, fc *fpCache) *model.Candidate {
+	if !config.SupportsPiecesHashAPI {
+		return nil
+	}
 	if !adapter.SupportsSearchByPiecesHash() {
 		return nil
 	}
@@ -855,6 +866,64 @@ func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAda
 	}
 
 	return best
+}
+
+func (e *Engine) matchLayer15FileTree(ctx context.Context, rec model.SeedingTorrentRecord, siteName string, fc *fpCache) *model.Candidate {
+	sourceFP := fc.get(rec.InfoHash, rec.SiteName)
+	if sourceFP == nil {
+		return nil
+	}
+	if sourceFP.FilesHash == "" && len(sourceFP.FileTreeParsed) == 0 {
+		return nil
+	}
+	if e.fpRepo == nil {
+		return nil
+	}
+
+	matches, err := e.fpRepo.FindByFilesHashAndSite(ctx, siteName, sourceFP.FilesHash)
+	if err != nil {
+		e.logger.Debug("Layer1.5 files_hash query failed",
+			zap.String("site", siteName),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	for i := range matches {
+		m := &matches[i]
+		if m.InfoHash == rec.InfoHash {
+			continue
+		}
+		if m.TorrentID == "" {
+			continue
+		}
+		if !compareFileTreesStrict(sourceFP.FileTreeParsed, m.FileTreeParsed) {
+			continue
+		}
+		return &model.Candidate{
+			TargetSite:      siteName,
+			TargetTorrentID: m.TorrentID,
+			TargetInfoHash:  m.InfoHash,
+			Confidence:      0.9,
+			MatchMethod:     "file_tree",
+		}
+	}
+	return nil
+}
+
+func compareFileTreesStrict(src, tgt map[string]int64) bool {
+	if len(src) == 0 || len(tgt) == 0 {
+		return false
+	}
+	if len(src) != len(tgt) {
+		return false
+	}
+	for path, sz := range src {
+		if tgt[path] != sz {
+			return false
+		}
+	}
+	return true
 }
 
 func (e *Engine) matchLayer3Fingerprint(ctx context.Context, rec model.SeedingTorrentRecord, siteName string, fc *fpCache) *model.Candidate {

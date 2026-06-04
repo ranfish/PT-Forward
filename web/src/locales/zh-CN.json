@@ -168,6 +168,8 @@
     "apiKeyNotConfigured": "API Key 未配置",
     "passkeyValid": "Passkey 有效",
     "passkeyNotConfigured": "Passkey 未配置",
+    "authKeyValid": "Auth Key 有效",
+    "rssKeyValid": "RSS Key 有效",
     "credentialManagement": "凭证管理",
     "saveCredentials": "保存凭证",
     "credentialsUpdated": "凭证已更新",
@@ -1252,7 +1254,9 @@
   "sites": {
     "cookie": "Cookie",
     "passkey": "Passkey",
-    "apiKey": "API Key"
+    "apiKey": "API Key",
+    "authKey": "Auth Key",
+    "rssKey": "RSS Key"
   },
   "fingerprints": {
     "piecesHash": "PiecesHash"
