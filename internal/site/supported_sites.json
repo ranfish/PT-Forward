@@ -376,8 +376,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "piggo.me",
     "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
-    "verification_status": "blocked",
-    "special_notes": "二师兄 - CF 468 封锁服务器 IP（仅目标）"
+    "verification_status": "verified",
+    "special_notes": "RSS/下载直连可用；cookie 页面(details/upload)被 WAF+异地登录 2FA 拦截，需关闭 ScrapeFree"
   },
   "playlet.cc": {
     "domain": "playlet.cc",

@@ -277,6 +277,7 @@ export interface Site {
   isSource: boolean
   isTarget: boolean
   participateAutoPublish: boolean
+  assumeFree: boolean
   overrideRssUrl?: string
   overrideSavePath?: string
   proxyUrl?: string

@@ -528,6 +528,109 @@ func TestFlush_Include2xUp(t *testing.T) {
 	}
 }
 
+func TestFlush_AssumeFreeSite(t *testing.T) {
+	db := setupFlushTestDB(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+
+	subID := seedSubscription(t, db, true, false)
+
+	if err := db.Create(&model.Site{
+		Domain: "piggo.me", Name: "二师兄", BaseURL: "https://piggo.me",
+		Framework: "nexusphp", AssumeFree: true,
+	}).Error; err != nil {
+		t.Fatalf("seed site: %v", err)
+	}
+
+	now := time.Now()
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "h1", SiteName: "二师兄", TorrentID: "1",
+		Discount: model.DiscountNone, Status: model.SeedingStatusPending,
+		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
+	})
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "h2", SiteName: "二师兄", TorrentID: "2",
+		Discount: model.DiscountNone, Status: model.SeedingStatusPending,
+		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
+	})
+
+	mc := &flushMockClient{
+		maindata:  &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
+		addResult: &model.AddResult{InfoHash: "h1"},
+	}
+	e.SetClientProvider(&flushMockProvider{
+		clients: map[string]model.DownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+	e.SetSiteProvider(newMockSiteProvider())
+
+	for _, hash := range []string{"h1", "h2"} {
+		e.mu.Lock()
+		e.recordMap[recordKey("c1", hash)] = &model.SeedingTorrentRecord{
+			ClientID: "c1", InfoHash: hash, Status: model.SeedingStatusPending,
+			SubscriptionID: fmt.Sprintf("%d", subID),
+		}
+		e.mu.Unlock()
+	}
+
+	candidates, err := e.Flush(ctx, fmt.Sprintf("%d", subID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidates) != 2 {
+		t.Errorf("expected 2 candidates (assume_free site), got %d", len(candidates))
+	}
+}
+
+func TestFlush_AssumeFreeNotSet(t *testing.T) {
+	db := setupFlushTestDB(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+
+	subID := seedSubscription(t, db, true, false)
+
+	if err := db.Create(&model.Site{
+		Domain: "piggo.me", Name: "二师兄", BaseURL: "https://piggo.me",
+		Framework: "nexusphp", AssumeFree: false,
+	}).Error; err != nil {
+		t.Fatalf("seed site: %v", err)
+	}
+
+	now := time.Now()
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "h1", SiteName: "二师兄", TorrentID: "1",
+		Discount: model.DiscountNone, Status: model.SeedingStatusPending,
+		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
+	})
+
+	mc := &flushMockClient{
+		maindata:  &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
+		addResult: &model.AddResult{InfoHash: "h1"},
+	}
+	e.SetClientProvider(&flushMockProvider{
+		clients: map[string]model.DownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+	e.SetSiteProvider(newMockSiteProvider())
+
+	e.mu.Lock()
+	e.recordMap[recordKey("c1", "h1")] = &model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "h1", Status: model.SeedingStatusPending,
+		SubscriptionID: fmt.Sprintf("%d", subID),
+	}
+	e.mu.Unlock()
+
+	candidates, err := e.Flush(ctx, fmt.Sprintf("%d", subID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidates) != 0 {
+		t.Errorf("expected 0 candidates (assume_free not set), got %d", len(candidates))
+	}
+}
+
 func TestFlush_BatchLimit(t *testing.T) {
 	db := setupFlushTestDB(t)
 	e := NewEngine(db, zap.NewNop())

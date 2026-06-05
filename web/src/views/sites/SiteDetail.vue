@@ -60,6 +60,10 @@
         <a-descriptions-item :label="t('site.enabledLabel')"><a-badge :status="site.enabled ? 'success' : 'default'" :text="site.enabled ? t('common.yes') : t('common.no')" /></a-descriptions-item>
         <a-descriptions-item :label="t('site.role')">{{ [site.isSource ? t('site.sourceSiteRole') : '', site.isTarget ? t('site.targetSiteRole') : ''].filter(Boolean).join(', ') || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.participateAutoPublishLabel')">{{ site.participateAutoPublish ? t('common.yes') : t('common.no') }}</a-descriptions-item>
+        <a-descriptions-item :label="t('site.assumeFreeLabel')">
+          <a-badge v-if="site.assumeFree" status="warning" :text="t('common.yes')" />
+          <span v-else>{{ t('common.no') }}</span>
+        </a-descriptions-item>
         <a-descriptions-item v-if="needsCookie" :label="t('site.cookieCloudSyncLabel')">{{ site.cookieCloudSync ? t('common.yes') : t('common.no') }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.proxyAddress')">{{ site.proxyUrl || '-' }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.skipSslVerify')">{{ site.skipSslVerify ? t('common.yes') : t('common.no') }}</a-descriptions-item>
@@ -129,6 +133,14 @@
             <a-col :span="6">
               <a-form-item :label="t('site.asTarget')">
                 <a-switch v-model:checked="settingsForm.isTarget" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-row :gutter="24">
+            <a-col :span="24">
+              <a-form-item :label="t('site.assumeFreeLabel')">
+                <a-switch v-model:checked="settingsForm.assumeFree" />
+                <span style="font-size: 12px; color: #999; margin-left: 12px;">{{ t('site.assumeFreeHint') }}</span>
               </a-form-item>
             </a-col>
           </a-row>
@@ -292,6 +304,7 @@ const settingsForm = reactive({
   isSource: false,
   isTarget: false,
   participateAutoPublish: true,
+  assumeFree: false,
   cookieCloudSync: false,
   proxyUrl: '',
   skipSslVerify: false,
@@ -431,6 +444,7 @@ async function fetchSite() {
       isSource: site.value.isSource || false,
       isTarget: site.value.isTarget || false,
       participateAutoPublish: site.value.participateAutoPublish !== undefined ? site.value.participateAutoPublish : true,
+      assumeFree: site.value.assumeFree || false,
       cookieCloudSync: site.value.cookieCloudSync || false,
       proxyUrl: site.value.proxyUrl || '',
       skipSslVerify: site.value.skipSslVerify || false,
@@ -478,6 +492,7 @@ async function updateSettings() {
       isSource: settingsForm.isSource,
       isTarget: settingsForm.isTarget,
       participateAutoPublish: settingsForm.participateAutoPublish,
+      assumeFree: settingsForm.assumeFree,
       cookieCloudSync: settingsForm.cookieCloudSync,
       proxyUrl: settingsForm.proxyUrl,
       skipSslVerify: settingsForm.skipSslVerify,
