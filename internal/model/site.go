@@ -54,6 +54,11 @@ type Site struct {
 	IsTarget               bool `json:"is_target" gorm:"default:false"`
 	ParticipateAutoPublish bool `json:"participate_auto_publish" gorm:"default:true"`
 
+	// AssumeFree: 当 DetectDiscount 不可用时（如站点 cookie 被 WAF/异地登录拦截，
+	// 只能用 RSS+passkey 抓种子），将 discount=NONE 的种子也视为 Free。
+	// 仅对已知"无法解析优惠信息"的站点开启，避免误判付费种子。
+	AssumeFree bool `json:"assume_free" gorm:"default:false"`
+
 	OverrideRSSURL   string `json:"override_rss_url,omitempty" gorm:"size:500"`
 	OverrideSavePath string `json:"override_save_path,omitempty" gorm:"size:500"`
 	HRStrategy       string `json:"hr_strategy" gorm:"size:20;not null;default:'protect'"`
@@ -143,6 +148,8 @@ type SiteInfo struct {
 
 	ProxyURL      string `json:"proxy_url"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify"`
+
+	AssumeFree bool `json:"assume_free"`
 }
 
 // §33.1.60 — SiteDefault: go:embed YAML 默认配置
@@ -301,6 +308,8 @@ type SiteConfig struct {
 
 	SupportsPiecesHashAPI bool     `json:"supports_pieces_hash_api"`
 	AlternativeDomains    []string `json:"alternative_domains,omitempty"`
+
+	AssumeFree bool `json:"assume_free"`
 }
 
 // §33.1.72 — DetectResult: 框架检测结果

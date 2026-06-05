@@ -33,6 +33,8 @@
           <a-button size="small" @click="batchUpdate('is_target', false)">{{ t('site.batchUnsetTarget') }}</a-button>
           <a-button size="small" @click="batchUpdate('participate_auto_publish', true)">{{ t('site.batchSetPublish') }}</a-button>
           <a-button size="small" @click="batchUpdate('participate_auto_publish', false)">{{ t('site.batchUnsetPublish') }}</a-button>
+          <a-button size="small" @click="batchUpdate('assume_free', true)">{{ t('site.batchSetAssumeFree') }}</a-button>
+          <a-button size="small" @click="batchUpdate('assume_free', false)">{{ t('site.batchUnsetAssumeFree') }}</a-button>
         </template>
       </a-space>
       <a-button type="primary" @click="openCreateModal">{{ t('common.create') }}</a-button>
@@ -65,6 +67,9 @@
         </template>
         <template v-if="column.key === 'isTarget'">
           <a-switch :checked="record.isTarget" size="small" @change="(v: boolean) => toggleField(record, 'isTarget', v)" />
+        </template>
+        <template v-if="column.key === 'assumeFree'">
+          <a-switch :checked="record.assumeFree" size="small" @change="(v: boolean) => toggleField(record, 'assumeFree', v)" />
         </template>
         <template v-if="column.key === 'hasCookie'">
           <a-badge
@@ -195,6 +200,10 @@
         <a-form-item :label="t('site.participateAutoPublishLabel')" name="participateAutoPublish">
           <a-switch v-model:checked="form.participateAutoPublish" />
         </a-form-item>
+        <a-form-item :label="t('site.assumeFreeLabel')" name="assumeFree">
+          <a-switch v-model:checked="form.assumeFree" />
+          <div style="font-size: 12px; color: #999; margin-top: 4px;">{{ t('site.assumeFreeHint') }}</div>
+        </a-form-item>
 
         <a-divider v-if="isCookieAuth">{{ t('site.cookieCloudSyncLabel') }}</a-divider>
         <template v-if="isCookieAuth">
@@ -233,6 +242,7 @@ interface SiteListItem {
   participateAutoPublish: boolean
   isSource: boolean
   isTarget: boolean
+  assumeFree: boolean
   hasCookie: boolean
   hasPasskey: boolean
   hasApiKey: boolean
@@ -341,6 +351,7 @@ const form = reactive({
   isSource: false,
   isTarget: false,
   participateAutoPublish: true,
+  assumeFree: false,
   enabled: true,
   cookieCloudSync: false,
   proxyUrl: '',
@@ -362,6 +373,7 @@ const columns = [
   { title: t('site.participateAutoPublishLabel'), key: 'participateAutoPublish', width: 120, align: 'center' as const },
   { title: t('site.asSource'), key: 'isSource', width: 80, align: 'center' as const },
   { title: t('site.asTarget'), key: 'isTarget', width: 80, align: 'center' as const },
+  { title: t('site.assumeFreeLabel'), key: 'assumeFree', width: 100, align: 'center' as const },
   { title: t('site.credentialStatus'), key: 'hasCookie', width: 130 },
   { title: t('site.username'), key: 'username', width: 90 },
   { title: t('site.userClass'), key: 'userClass', width: 90 },
@@ -428,6 +440,7 @@ function openModal(record: SiteListItem) {
     isSource: record.isSource || false,
     isTarget: record.isTarget || false,
     participateAutoPublish: record.participateAutoPublish !== undefined ? record.participateAutoPublish : true,
+    assumeFree: record.assumeFree || false,
     enabled: record.enabled !== undefined ? record.enabled : true,
     cookieCloudSync: record.cookieCloudSync || false,
     proxyUrl: record.proxyUrl || '',
@@ -451,6 +464,7 @@ function openCreateModal() {
     isSource: false,
     isTarget: false,
     participateAutoPublish: true,
+    assumeFree: false,
     enabled: true,
     cookieCloudSync: false,
     proxyUrl: '',
@@ -466,7 +480,7 @@ async function handleSubmit() {
     if (isCreateMode.value) {
       // create 模式：只传 domain + 用户填的字段；name/baseUrl/framework 由后端 seed 自动填充
       const payload: Record<string, unknown> = { domain: form.domain }
-      const optionalFields = ['cookie', 'passkey', 'apiKey', 'isSource', 'isTarget', 'participateAutoPublish', 'enabled', 'cookieCloudSync', 'proxyUrl', 'skipSslVerify']
+      const optionalFields = ['cookie', 'passkey', 'apiKey', 'isSource', 'isTarget', 'participateAutoPublish', 'assumeFree', 'enabled', 'cookieCloudSync', 'proxyUrl', 'skipSslVerify']
       for (const key of optionalFields) {
         const value = (form as Record<string, unknown>)[key]
         if (value !== '' && value !== undefined) {

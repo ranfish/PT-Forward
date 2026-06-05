@@ -401,6 +401,7 @@ func siteToInfo(s *model.Site) *model.SiteInfo {
 		DownloadPagePattern: s.DownloadPagePattern,
 		ProxyURL:            s.ProxyURL,
 		SkipSSLVerify:       s.SkipSSLVerify,
+		AssumeFree:          s.AssumeFree,
 	}
 }
 
@@ -451,6 +452,7 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		DownloadURLTemplate:   s.DownloadURLTemplate,
 		DownloadMode:          s.DownloadMode,
 		SupportsPiecesHashAPI: s.SupportsPiecesHashAPI,
+		AssumeFree:            s.AssumeFree,
 	}
 
 	if s.AlternativeDomains != "" {

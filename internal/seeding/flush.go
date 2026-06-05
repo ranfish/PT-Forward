@@ -14,14 +14,15 @@ import (
 )
 
 type flushContext struct {
-	subscriptionID string
-	sub            *model.RSSSubscription
-	scoringCfg     model.SeedingScoringConfig
-	clientID       string
-	client         model.DownloaderClient
-	records        []model.SeedingTorrentRecord
-	freeSpace      int64
-	clientCfg      *model.SeedingClientConfig
+	subscriptionID   string
+	sub              *model.RSSSubscription
+	scoringCfg       model.SeedingScoringConfig
+	clientID         string
+	client           model.DownloaderClient
+	records          []model.SeedingTorrentRecord
+	freeSpace        int64
+	clientCfg        *model.SeedingClientConfig
+	assumeFreeSites  map[string]bool
 }
 
 func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (*flushContext, error) {
@@ -96,15 +97,47 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 		}
 	}
 
+	assumeFreeSites := make(map[string]bool)
+	{
+		names := make(map[string]struct{}, len(records))
+		for i := range records {
+			names[records[i].SiteName] = struct{}{}
+		}
+		if len(names) > 0 {
+			list := make([]string, 0, len(names))
+			for n := range names {
+				list = append(list, n)
+			}
+			type siteRow struct {
+				Name       string `gorm:"column:name"`
+				AssumeFree bool   `gorm:"column:assume_free"`
+			}
+			var rows []siteRow
+			if err := e.db.WithContext(ctx).Table("sites").
+				Select("name, assume_free").
+				Where("name IN ?", list).
+				Find(&rows).Error; err != nil {
+				e.logger.Warn("flush: query assume_free failed",
+					zap.Error(err))
+			}
+			for _, r := range rows {
+				if r.AssumeFree {
+					assumeFreeSites[r.Name] = true
+				}
+			}
+		}
+	}
+
 	return &flushContext{
-		subscriptionID: subscriptionID,
-		sub:            &sub,
-		scoringCfg:     scoringCfg,
-		clientID:       clientID,
-		client:         dlClient,
-		records:        records,
-		freeSpace:      freeSpace,
-		clientCfg:      &cfg,
+		subscriptionID:  subscriptionID,
+		sub:             &sub,
+		scoringCfg:      scoringCfg,
+		clientID:        clientID,
+		client:          dlClient,
+		records:         records,
+		freeSpace:       freeSpace,
+		clientCfg:       &cfg,
+		assumeFreeSites: assumeFreeSites,
 	}, nil
 }
 
@@ -148,8 +181,14 @@ func (e *Engine) collectCandidates(fc *flushContext) []*flushCandidate {
 		isFree := discount.IsFree()
 		is2xUp := discount == model.Discount2xUp || discount == model.Discount2x50
 
-		if !isFree && (!scoringCfg.Include2xUp || !is2xUp) {
+		assumeFree := fc.assumeFreeSites[rec.SiteName]
+
+		if !isFree && !assumeFree && (!scoringCfg.Include2xUp || !is2xUp) {
 			continue
+		}
+
+		if assumeFree && !isFree {
+			isFree = true
 		}
 
 		candidates = append(candidates, &flushCandidate{

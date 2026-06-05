@@ -81,6 +81,7 @@ type createSiteRequest struct {
 	IsSource               bool `json:"isSource"`
 	IsTarget               bool `json:"isTarget"`
 	ParticipateAutoPublish bool `json:"participateAutoPublish"`
+	AssumeFree             bool `json:"assumeFree"`
 
 	CookieCloudSync   bool   `json:"cookieCloudSync"`
 	CookieCloudDomain string `json:"cookieCloudDomain,omitempty"`
@@ -142,6 +143,7 @@ type updateSiteRequest struct {
 	IsSource               *bool `json:"isSource,omitempty"`
 	IsTarget               *bool `json:"isTarget,omitempty"`
 	ParticipateAutoPublish *bool `json:"participateAutoPublish,omitempty"`
+	AssumeFree             *bool `json:"assumeFree,omitempty"`
 
 	CookieCloudSync    *bool   `json:"cookieCloudSync,omitempty"`
 	CookieCloudDomain  *string `json:"cookieCloudDomain,omitempty"`
@@ -183,6 +185,7 @@ type siteResponse struct {
 	IsSource               bool `json:"isSource"`
 	IsTarget               bool `json:"isTarget"`
 	ParticipateAutoPublish bool `json:"participateAutoPublish"`
+	AssumeFree             bool `json:"assumeFree"`
 
 	HashStrategy     string `json:"hashStrategy"`
 	SizeStrategy     string `json:"sizeStrategy"`
@@ -294,6 +297,7 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		IsSource:               s.IsSource,
 		IsTarget:               s.IsTarget,
 		ParticipateAutoPublish: s.ParticipateAutoPublish,
+		AssumeFree:             s.AssumeFree,
 
 		HashStrategy:     s.HashStrategy,
 		SizeStrategy:     s.SizeStrategy,
@@ -674,6 +678,7 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		IsSource:               req.IsSource,
 		IsTarget:               req.IsTarget,
 		ParticipateAutoPublish: req.ParticipateAutoPublish,
+		AssumeFree:             req.AssumeFree,
 
 		CookieCloudSync:   req.CookieCloudSync,
 		CookieCloudDomain: req.CookieCloudDomain,
@@ -785,6 +790,9 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ParticipateAutoPublish != nil {
 		s.ParticipateAutoPublish = *req.ParticipateAutoPublish
+	}
+	if req.AssumeFree != nil {
+		s.AssumeFree = *req.AssumeFree
 	}
 	if req.CookieCloudSync != nil {
 		s.CookieCloudSync = *req.CookieCloudSync
@@ -1079,6 +1087,7 @@ func (h *SiteHandler) handleBatchUpdate(w http.ResponseWriter, r *http.Request) 
 	boolFields := map[string]bool{
 		"enabled": true, "is_source": true, "is_target": true,
 		"participate_auto_publish": true, "cookie_cloud_sync": true,
+		"assume_free": true,
 	}
 	for k, v := range req.Fields {
 		if !boolFields[k] {
