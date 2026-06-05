@@ -115,7 +115,7 @@ func (p *mockDownloaderProvider) ListClients() []string { return p.list }
 
 func setupEngineTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(uniqueSQLiteDSN()), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestEngine_ListByClient(t *testing.T) {
 
 func setupEngineTestDBFull(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(uniqueSQLiteDSN()), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -459,7 +459,7 @@ func TestEngine_OnTorrents_NoSourceID(t *testing.T) {
 
 func setupOnTorrentsTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(uniqueSQLiteDSN()), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -792,7 +792,7 @@ func TestEngine_ApplyConfig(t *testing.T) {
 
 func setupEngineTestDBAll(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(uniqueSQLiteDSN()), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -1399,8 +1399,6 @@ func TestEngine_EvaluateUsesCachedMaindata(t *testing.T) {
 	db := setupEngineTestDBAll(t)
 	e := NewEngine(db, zap.NewNop())
 	ctx := context.Background()
-	_ = e.Start(ctx)
-	defer e.Stop(ctx)
 
 	mc := &mockDownloaderClient{
 		maindata: &model.Maindata{
@@ -1412,6 +1410,11 @@ func TestEngine_EvaluateUsesCachedMaindata(t *testing.T) {
 		clients: map[string]*mockDownloaderClient{"c1": mc},
 		list:    []string{"c1"},
 	})
+
+	if err := e.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer e.Stop(ctx)
 
 	e.refreshMaindataOnce(ctx)
 

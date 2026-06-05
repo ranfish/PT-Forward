@@ -750,10 +750,6 @@ func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Reque
 	Success(w, map[string]interface{}{
 		"running":       true,
 		"uptimeSeconds": time.Since(startTime).Seconds(),
-		"clients": map[string]interface{}{
-			"online": activeCount,
-			"total":  activeCount,
-		},
 		"overview": map[string]interface{}{
 			"totalTorrents":   total,
 			"activeTorrents":  activeCount,
@@ -1421,7 +1417,8 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 	offset := (page - 1) * pageSize
 
 	status := r.URL.Query().Get("status")
-	q := h.db.Model(&model.SeedingTorrentRecord{})
+	q := h.db.Model(&model.SeedingTorrentRecord{}).
+		Where("status IN ?", []string{"seeding", "paused_free_end", "paused_rule"})
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
