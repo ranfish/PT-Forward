@@ -1,0 +1,1012 @@
+{
+  "13city.org": {
+    "domain": "13city.org",
+    "name_cn": "13城",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "13city.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "1ptba.com": {
+    "domain": "1ptba.com",
+    "name_cn": "壹吧",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "1ptba.com",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "52pt.site": {
+    "domain": "52pt.site",
+    "name_cn": "五二",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "52pt.site",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "api.m-team.cc": {
+    "domain": "api.m-team.cc",
+    "name_cn": "馒头",
+    "framework": "mteam",
+    "auth_type": "apikey",
+    "cookiecloud_domain": "m-team.cc",
+    "download_url_template": "",
+    "api_key_label": "存取令牌",
+    "api_key_hint": "请从 控制台-实验室 获取",
+    "verification_status": "verified",
+    "special_notes": "CookieCloud 域名 m-team.cc；禁调 /login /admin/** /apikey/**"
+  },
+  "audiences.me": {
+    "domain": "audiences.me",
+    "name_cn": "人人",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "audiences.me",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "bilibili.download": {
+    "domain": "bilibili.download",
+    "name_cn": "轨道炮",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "bilibili.download",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "仅目标"
+  },
+  "cangbao.ge": {
+    "domain": "cangbao.ge",
+    "name_cn": "藏宝阁",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "cangbao.ge",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "carpt.net": {
+    "domain": "carpt.net",
+    "name_cn": "车站",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "carpt.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "cc.mypt.cc": {
+    "domain": "cc.mypt.cc",
+    "name_cn": "我的PT",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "cc.mypt.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "crabpt.vip": {
+    "domain": "crabpt.vip",
+    "name_cn": "蟹黄堡",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "crabpt.vip",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "cspt.top": {
+    "domain": "cspt.top",
+    "name_cn": "财神",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "cspt.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "cyanbug.net": {
+    "domain": "cyanbug.net",
+    "name_cn": "大青虫",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "cyanbug.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "dicmusic.com": {
+    "domain": "dicmusic.com",
+    "name_cn": "海豚",
+    "framework": "gazelle",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "dicmusic.com",
+    "download_url_template": "torrents.php?action=download\u0026id={id}\u0026authkey={authkey}\u0026torrent_pass={rsskey}",
+    "verification_status": "verified"
+  },
+  "discfan.net": {
+    "domain": "discfan.net",
+    "name_cn": "碟粉",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "discfan.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "dubhe.site": {
+    "domain": "dubhe.site",
+    "name_cn": "天枢",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "dubhe.site",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "duckboobee.org": {
+    "domain": "duckboobee.org",
+    "name_cn": "三月",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "duckboobee.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "et8.org": {
+    "domain": "et8.org",
+    "name_cn": "他吹吹风",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "et8.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "greatposterwall.com": {
+    "domain": "greatposterwall.com",
+    "name_cn": "海豹",
+    "framework": "gazelle",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "greatposterwall.com",
+    "download_url_template": "torrents.php?action=download\u0026id={id}\u0026authkey={authkey}\u0026torrent_pass={rsskey}",
+    "verification_status": "verified"
+  },
+  "hdarea.club": {
+    "domain": "hdarea.club",
+    "name_cn": "好大",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hdarea.club",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "hdbao.cc": {
+    "domain": "hdbao.cc",
+    "name_cn": "海的宝",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hdbao.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "hdcity.city": {
+    "domain": "hdcity.city",
+    "name_cn": "城市",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hdcity.city",
+    "download_url_template": "download?id={id}\u0026cuhash={passkey}",
+    "passkey_label": "cuhash",
+    "passkey_hint": "需要从种子下载地址获取，cuhash=后面的值",
+    "verification_status": "verified"
+  },
+  "hdfans.org": {
+    "domain": "hdfans.org",
+    "name_cn": "红豆饭",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hdfans.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "hdhome.org": {
+    "domain": "hdhome.org",
+    "name_cn": "家园",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hdhome.org",
+    "download_url_template": "download.php?id={id}\u0026rsskey={rsskey}",
+    "rss_key_label": "RSS Key",
+    "rss_key_hint": "RSS Key（当前加密密钥），请到站点 RSS 页面生成获取",
+    "show_passkey": false,
+    "show_rsskey": true,
+    "publish_form_fields": {
+      "douban": ""
+    },
+    "verification_status": "verified"
+  },
+  "hdroute.org": {
+    "domain": "hdroute.org",
+    "name_cn": "在脚下",
+    "framework": "generic",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hdroute.org",
+    "download_url_template": "download.php?id={id}",
+    "verification_status": "verified",
+    "special_notes": "仅源站，http://"
+  },
+  "hdsky.me": {
+    "domain": "hdsky.me",
+    "name_cn": "天空",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hdsky.me",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "publish_form_fields": {
+      "douban": ""
+    },
+    "verification_status": "verified"
+  },
+  "hdtime.org": {
+    "domain": "hdtime.org",
+    "name_cn": "时光",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hdtime.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "hdvideo.top": {
+    "domain": "hdvideo.top",
+    "name_cn": "HDVideo",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hdvideo.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "hhanclub.net": {
+    "domain": "hhanclub.net",
+    "name_cn": "憨憨",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "hhanclub.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "仅源站，全站官种"
+  },
+  "kufei.org": {
+    "domain": "kufei.org",
+    "name_cn": "库非",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "kufei.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "lemonhd.net": {
+    "domain": "lemonhd.net",
+    "name_cn": "柠檬不甜",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "lemonhd.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "longpt.org": {
+    "domain": "longpt.org",
+    "name_cn": "龙PT",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "longpt.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "monikadesign.uk": {
+    "domain": "monikadesign.uk",
+    "name_cn": "莫妮卡",
+    "framework": "unit3d",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "monikadesign.uk",
+    "download_url_template": "torrents/download/{id}.{rsskey}",
+    "verification_status": "verified"
+  },
+  "mua.xloli.cc": {
+    "domain": "mua.xloli.cc",
+    "name_cn": "萝莉",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "mua.xloli.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "nanyangpt.com": {
+    "domain": "nanyangpt.com",
+    "name_cn": "南洋",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "nanyangpt.com",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "njtupt.top": {
+    "domain": "njtupt.top",
+    "name_cn": "浦园",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "njtupt.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "open.cd": {
+    "domain": "open.cd",
+    "name_cn": "皇后",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "open.cd",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "ourbits.club": {
+    "domain": "ourbits.club",
+    "name_cn": "我堡",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "ourbits.club",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "仅源站"
+  },
+  "p.t-baozi.cc": {
+    "domain": "p.t-baozi.cc",
+    "name_cn": "包子",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "p.t-baozi.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pandapt.net": {
+    "domain": "pandapt.net",
+    "name_cn": "熊猫",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pandapt.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "piggo.me": {
+    "domain": "piggo.me",
+    "name_cn": "二师兄",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "piggo.me",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "blocked",
+    "special_notes": "二师兄 - CF 468 封锁服务器 IP（仅目标）"
+  },
+  "playlet.cc": {
+    "domain": "playlet.cc",
+    "name_cn": "短剧PT",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "playlet.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "无上传权限，仅辅种"
+  },
+  "pt.0ff.cc": {
+    "domain": "pt.0ff.cc",
+    "name_cn": "农场",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.0ff.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.aling.de": {
+    "domain": "pt.aling.de",
+    "name_cn": "阿玲",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.aling.de",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.btschool.club": {
+    "domain": "pt.btschool.club",
+    "name_cn": "学校",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.btschool.club",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.cdy.skin": {
+    "domain": "pt.cdy.skin",
+    "name_cn": "传道院",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.cdy.skin",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "blocked",
+    "special_notes": "传道院 - HTTP 403 / 直连超时"
+  },
+  "pt.eastgame.org": {
+    "domain": "pt.eastgame.org",
+    "name_cn": "TLF",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.eastgame.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.gtkpw.xyz": {
+    "domain": "pt.gtkpw.xyz",
+    "name_cn": "GTK",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.gtkpw.xyz",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.hdclone.top": {
+    "domain": "pt.hdclone.top",
+    "name_cn": "克隆",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.hdclone.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.hdupt.com": {
+    "domain": "pt.hdupt.com",
+    "name_cn": "好多油",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.hdupt.com",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.itzmx.com": {
+    "domain": "pt.itzmx.com",
+    "name_cn": "分享站",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.itzmx.com",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.keepfrds.com": {
+    "domain": "pt.keepfrds.com",
+    "name_cn": "朋友",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.keepfrds.com",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "仅源站"
+  },
+  "pt.lajidui.top": {
+    "domain": "pt.lajidui.top",
+    "name_cn": "垃圾堆",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.lajidui.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.luckpt.de": {
+    "domain": "pt.luckpt.de",
+    "name_cn": "幸运",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.luckpt.de",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.muxuege.org": {
+    "domain": "pt.muxuege.org",
+    "name_cn": "慕雪阁",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.muxuege.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.novahd.top": {
+    "domain": "pt.novahd.top",
+    "name_cn": "Nova高清",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.novahd.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.ptskit.org": {
+    "domain": "pt.ptskit.org",
+    "name_cn": "拾刻",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.ptskit.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "仅源站"
+  },
+  "pt.sjtu.edu.cn": {
+    "domain": "pt.sjtu.edu.cn",
+    "name_cn": "葡萄",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.sjtu.edu.cn",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.soulvoice.club": {
+    "domain": "pt.soulvoice.club",
+    "name_cn": "聆音",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.soulvoice.club",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.tey.cc": {
+    "domain": "pt.tey.cc",
+    "name_cn": "太乙",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.tey.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.tu88.men": {
+    "domain": "pt.tu88.men",
+    "name_cn": "图88",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.tu88.men",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.xingyungept.org": {
+    "domain": "pt.xingyungept.org",
+    "name_cn": "星陨阁",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.xingyungept.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pt.ying.us.kg": {
+    "domain": "pt.ying.us.kg",
+    "name_cn": "樱花",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pt.ying.us.kg",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "ptcafe.club": {
+    "domain": "ptcafe.club",
+    "name_cn": "咖啡",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "ptcafe.club",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "ptchdbits.co": {
+    "domain": "ptchdbits.co",
+    "name_cn": "彩虹岛",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "ptchdbits.co",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pterclub.net": {
+    "domain": "pterclub.net",
+    "name_cn": "猫",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pterclub.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "ptfans.cc": {
+    "domain": "ptfans.cc",
+    "name_cn": "PTFans",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "ptfans.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "pthome.net": {
+    "domain": "pthome.net",
+    "name_cn": "铂金家",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "pthome.net",
+    "download_url_template": "download.php?id={id}\u0026rsskey={rsskey}",
+    "rss_key_label": "RSS Key",
+    "rss_key_hint": "RSS Key（当前加密密钥），请到站点 RSS 页面生成获取",
+    "show_passkey": false,
+    "show_rsskey": true,
+    "verification_status": "verified"
+  },
+  "ptlgs.org": {
+    "domain": "ptlgs.org",
+    "name_cn": "劳改所",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "ptlgs.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "ptsbao.club": {
+    "domain": "ptsbao.club",
+    "name_cn": "烧包",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "ptsbao.club",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "ptzone.xyz": {
+    "domain": "ptzone.xyz",
+    "name_cn": "PT地带",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "ptzone.xyz",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "raingfh.top": {
+    "domain": "raingfh.top",
+    "name_cn": "雨",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "raingfh.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "rousi.pro": {
+    "domain": "rousi.pro",
+    "name_cn": "肉丝",
+    "framework": "rousi",
+    "auth_type": "passkey",
+    "cookiecloud_domain": "rousi.pro",
+    "download_url_template": "api/torrent/{id}/download/{passkey}",
+    "verification_status": "verified"
+  },
+  "sbpt.link": {
+    "domain": "sbpt.link",
+    "name_cn": "SBPT",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "sbpt.link",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "sewerpt.com": {
+    "domain": "sewerpt.com",
+    "name_cn": "下水道",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "sewerpt.com",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "springsunday.net": {
+    "domain": "springsunday.net",
+    "name_cn": "不可说",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "springsunday.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "star-space.net": {
+    "domain": "star-space.net",
+    "name_cn": "影",
+    "framework": "generic",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "star-space.net",
+    "download_url_template": "p_torrent/download.php?tid={id}\u0026passkey={passkey}",
+    "paths": {
+      "browse": "p_torrent/video_list_g.php"
+    },
+    "verification_status": "verified"
+  },
+  "sunnypt.top": {
+    "domain": "sunnypt.top",
+    "name_cn": "阳光",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "sunnypt.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "仅源站"
+  },
+  "tjupt.org": {
+    "domain": "tjupt.org",
+    "name_cn": "不可羊",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "tjupt.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "totheglory.im": {
+    "domain": "totheglory.im",
+    "name_cn": "套套哥",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "totheglory.im",
+    "download_url_template": "dl/{id}/{passkey}",
+    "verification_status": "verified"
+  },
+  "u2.dmhy.org": {
+    "domain": "u2.dmhy.org",
+    "name_cn": "幼儿园",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "u2.dmhy.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "仅源站"
+  },
+  "ubits.club": {
+    "domain": "ubits.club",
+    "name_cn": "优堡",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "ubits.club",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "仅源站"
+  },
+  "wintersakura.net": {
+    "domain": "wintersakura.net",
+    "name_cn": "冬樱",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "wintersakura.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.52movie.top": {
+    "domain": "www.52movie.top",
+    "name_cn": "我爱电影",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.52movie.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "无上传权限，仅辅种"
+  },
+  "www.agsvpt.com": {
+    "domain": "www.agsvpt.com",
+    "name_cn": "末日",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.agsvpt.com",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.dragonhd.xyz": {
+    "domain": "www.dragonhd.xyz",
+    "name_cn": "龙之家",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.dragonhd.xyz",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.haidan.cc": {
+    "domain": "www.haidan.cc",
+    "name_cn": "海胆",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.haidan.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.hddolby.com": {
+    "domain": "www.hddolby.com",
+    "name_cn": "不可杜",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.hddolby.com",
+    "download_url_template": "download.php?id={id}\u0026rsskey={rsskey}",
+    "rss_key_label": "RSS Key",
+    "rss_key_hint": "RSS Key（当前加密密钥），请到站点 RSS 页面生成获取",
+    "show_passkey": false,
+    "show_rsskey": true,
+    "verification_status": "verified",
+    "special_notes": "需过 2FA 页"
+  },
+  "www.hdkyl.in": {
+    "domain": "www.hdkyl.in",
+    "name_cn": "麒麟",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.hdkyl.in",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.hitpt.com": {
+    "domain": "www.hitpt.com",
+    "name_cn": "百川",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.hitpt.com",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.htpt.cc": {
+    "domain": "www.htpt.cc",
+    "name_cn": "海棠",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.htpt.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.hxpt.org": {
+    "domain": "www.hxpt.org",
+    "name_cn": "好学",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.hxpt.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.momentpt.top": {
+    "domain": "www.momentpt.top",
+    "name_cn": "瞬间",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.momentpt.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.okpt.net": {
+    "domain": "www.okpt.net",
+    "name_cn": "OKPT",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.okpt.net",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.oshen.win": {
+    "domain": "www.oshen.win",
+    "name_cn": "奥申",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.oshen.win",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "blocked",
+    "special_notes": "奥申 - 空页面"
+  },
+  "www.ptlao.top": {
+    "domain": "www.ptlao.top",
+    "name_cn": "忘年桥",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.ptlao.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.pttime.org": {
+    "domain": "www.pttime.org",
+    "name_cn": "时间",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.pttime.org",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.qingwapt.com": {
+    "domain": "www.qingwapt.com",
+    "name_cn": "青蛙",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "qingwapt.com",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "CookieCloud 域名 qingwapt.com"
+  },
+  "www.tangpt.top": {
+    "domain": "www.tangpt.top",
+    "name_cn": "趟平",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.tangpt.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "www.tokyo-manga.top": {
+    "domain": "www.tokyo-manga.top",
+    "name_cn": "东京",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.tokyo-manga.top",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "无上传权限，仅辅种"
+  },
+  "www.yemapt.org": {
+    "domain": "www.yemapt.org",
+    "name_cn": "野马",
+    "framework": "yemapt",
+    "auth_type": "apikey",
+    "cookiecloud_domain": "yemapt.org",
+    "download_url_template": "",
+    "api_key_label": "API Auth Key",
+    "api_key_hint": "请从 个人面板-安全设定 页面创建，默认有效期 180 天",
+    "show_cookie": true,
+    "verification_status": "verified",
+    "special_notes": "CookieCloud 域名 yemapt.org；上传走 /api/torrent/add JSON API"
+  },
+  "xingtan.one": {
+    "domain": "xingtan.one",
+    "name_cn": "杏坛",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "xingtan.one",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "xingwan.cc": {
+    "domain": "xingwan.cc",
+    "name_cn": "星湾",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "xingwan.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "yhpp.cc": {
+    "domain": "yhpp.cc",
+    "name_cn": "昆仑",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "yhpp.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "zeus.hamsters.space": {
+    "domain": "zeus.hamsters.space",
+    "name_cn": "蝴蝶",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "zeus.hamsters.space",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "zhuque.in": {
+    "domain": "zhuque.in",
+    "name_cn": "朱雀",
+    "framework": "tnode",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "zhuque.in",
+    "download_url_template": "api/torrent/download/{id}",
+    "verification_status": "verified"
+  },
+  "zmpt.cc": {
+    "domain": "zmpt.cc",
+    "name_cn": "织梦",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "zmpt.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  },
+  "zrpt.cc": {
+    "domain": "zrpt.cc",
+    "name_cn": "自然",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "zrpt.cc",
+    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "verification_status": "verified"
+  }
+}

@@ -742,6 +742,11 @@ func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Reque
 		}
 	}
 
+	var total int64
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).Count(&total).Error; err != nil {
+		h.logger.Warn("engine status: query total count failed", zap.Error(err))
+	}
+
 	Success(w, map[string]interface{}{
 		"running":       true,
 		"uptimeSeconds": time.Since(startTime).Seconds(),
@@ -750,9 +755,11 @@ func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Reque
 			"total":  activeCount,
 		},
 		"overview": map[string]interface{}{
-			"totalTorrents":  realSeeding + realDownloading,
-			"activeTorrents": realSeeding,
-			"pausedTorrents": pausedCount,
+			"totalTorrents":   total,
+			"activeTorrents":  activeCount,
+			"pausedTorrents":  pausedCount,
+			"realSeeding":     realSeeding,
+			"realDownloading": realDownloading,
 		},
 	})
 }

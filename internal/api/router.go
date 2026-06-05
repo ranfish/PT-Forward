@@ -44,6 +44,7 @@ type Router struct {
 	cookiecloudHandler   *CookieCloudHandler
 	ptgenHandler         *PTGenHandler
 	schedulerHandler     *SchedulerHandler
+	supportedSitesHandler *SupportedSitesHandler
 	wsHandler            *WSHandler
 	hub                  *Hub
 	authManager          *auth.AuthManager
@@ -105,6 +106,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		cookiecloudHandler:   NewCookieCloudHandler(db, logger),
 		ptgenHandler:         NewPTGenHandler(db, logger),
 		schedulerHandler:     NewSchedulerHandler(taskRegistry, db, logger),
+		supportedSitesHandler: NewSupportedSitesHandler(logger),
 		wsHandler:            NewWSHandler(hub, authManager, nil),
 		hub:                  hub,
 		authManager:          authManager,
@@ -342,6 +344,10 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	schedulerHandler := rt.chain(rt.rateLimitMW, rt.schedulerHandler.ServeHTTP)
 	mux.Handle("/api/v1/scheduler/tasks", schedulerHandler)
 	mux.Handle("/api/v1/scheduler/tasks/", schedulerHandler)
+
+	supportedSitesHandler := rt.chain(rt.rateLimitMW, rt.supportedSitesHandler.ServeHTTP)
+	mux.Handle("/api/v1/supported-sites", supportedSitesHandler)
+	mux.Handle("/api/v1/supported-sites/", supportedSitesHandler)
 }
 
 func (rt *Router) public(fn http.HandlerFunc) http.HandlerFunc {

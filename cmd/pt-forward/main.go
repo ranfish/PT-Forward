@@ -215,6 +215,7 @@ func main() {
 	rssEngine.SetFilterEngine(filterEngine)
 	rssEngine.SetDispatcher(eventDispatcher)
 	rssEngine.SetSiteProvider(siteProvider)
+	rssEngine.SetClientProvider(clientManager)
 	rssEngine.SetSeedingCounter(seedingEngine)
 	rssEngine.SetWSBroadcaster(wsHub)
 

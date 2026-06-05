@@ -354,7 +354,15 @@
     "addSite": "添加站点",
     "siteName": "站点名称",
     "domainPlaceholder": "例如: pterclub.net",
-    "nameRequired": "请输入站点名称"
+    "nameRequired": "请输入站点名称",
+    "selectSupportedSite": "选择支持站点",
+    "selectSupportedSitePlaceholder": "搜索站点名称或域名",
+    "supportedSiteRequired": "请从列表选择一个支持的站点",
+    "cookieCloudDomain": "CookieCloud 域名",
+    "specialNotes": "备注",
+    "blocked": "不可用",
+    "blockedSiteWarning": "该站点当前不可添加",
+    "createModeDomainLocked": "由系统白名单自动填充"
   },
   "downloader": {
     "title": "下载器管理",

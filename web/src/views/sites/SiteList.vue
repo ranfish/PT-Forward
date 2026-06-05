@@ -123,35 +123,55 @@
     >
       <a-form :model="form" layout="vertical">
         <template v-if="isCreateMode">
-          <a-form-item :label="t('site.siteName')" name="name" :rules="[{ required: true, message: t('site.nameRequired') }]">
-            <a-input v-model:value="form.name" :placeholder="t('site.siteName')" />
-          </a-form-item>
-          <a-form-item :label="t('site.domain')" name="domain">
-            <a-input v-model:value="form.domain" :placeholder="t('site.domainPlaceholder')" />
-          </a-form-item>
-          <a-form-item :label="t('site.baseUrl')" name="baseUrl">
-            <a-input v-model:value="form.baseUrl" :placeholder="t('site.baseUrlPlaceholder')" />
-          </a-form-item>
-          <a-form-item :label="t('site.framework')" name="framework">
-            <a-select v-model:value="form.framework" :placeholder="t('site.framework')" allow-clear>
-              <a-select-option value="nexusphp">NexusPHP</a-select-option>
-              <a-select-option value="unit3d">UNIT3D</a-select-option>
-              <a-select-option value="gazelle">Gazelle</a-select-option>
-              <a-select-option value="mteam">M-Team</a-select-option>
-              <a-select-option value="tnode">TNode</a-select-option>
-              <a-select-option value="luminance">Luminance</a-select-option>
-              <a-select-option value="rousi">ROUSI</a-select-option>
-              <a-select-option value="generic">{{ t('site.frameworkGeneric') }}</a-select-option>
+          <a-form-item :label="t('site.selectSupportedSite')" name="domain" :rules="[{ required: true, message: t('site.supportedSiteRequired') }]">
+            <a-select
+              v-model:value="form.domain"
+              show-search
+              :placeholder="t('site.selectSupportedSitePlaceholder')"
+              :filter-option="filterSupportedSite"
+              :loading="loadingSupportedSites"
+              :status="selectedSupportedSite?.verification_status === 'blocked' ? 'warning' : ''"
+              option-label-prop="label"
+              @change="onSupportedSiteChange"
+            >
+              <a-select-option
+                v-for="s in supportedSites"
+                :key="s.domain"
+                :value="s.domain"
+                :label="`${s.name_cn} (${s.domain})`"
+                :disabled="s.verification_status === 'blocked'"
+              >
+                <span>{{ s.name_cn }}</span>
+                <span style="color: #999; margin-left: 8px; font-size: 12px;">{{ s.domain }}</span>
+                <a-tag v-if="s.verification_status === 'blocked'" color="error" style="margin-left: 8px;">{{ t('site.blocked') }}</a-tag>
+              </a-select-option>
             </a-select>
           </a-form-item>
+
+          <template v-if="selectedSupportedSite">
+            <a-alert
+              v-if="selectedSupportedSite.verification_status === 'blocked'"
+              type="error"
+              style="margin-bottom: 12px;"
+              :message="t('site.blockedSiteWarning')"
+              :description="selectedSupportedSite.special_notes"
+              show-icon
+            />
+            <a-descriptions v-else size="small" :column="2" bordered style="margin-bottom: 12px;">
+              <a-descriptions-item :label="t('site.siteName')">{{ selectedSupportedSite.name_cn }}</a-descriptions-item>
+              <a-descriptions-item :label="t('site.framework')">{{ selectedSupportedSite.framework }}</a-descriptions-item>
+              <a-descriptions-item :label="t('site.authType')">{{ selectedSupportedSite.auth_type }}</a-descriptions-item>
+              <a-descriptions-item :label="t('site.cookieCloudDomain')">{{ selectedSupportedSite.cookiecloud_domain }}</a-descriptions-item>
+              <a-descriptions-item v-if="selectedSupportedSite.special_notes" :label="t('site.specialNotes')" :span="2">
+                {{ selectedSupportedSite.special_notes }}
+              </a-descriptions-item>
+            </a-descriptions>
+          </template>
+
+          <a-form-item :label="t('site.authType')" name="authType">
+            <a-input :value="form.authType" disabled />
+          </a-form-item>
         </template>
-        <a-form-item :label="t('site.authType')" name="authType">
-          <a-select v-model:value="form.authType" :placeholder="t('site.selectAuthType')">
-            <a-select-option value="cookie">Cookie</a-select-option>
-            <a-select-option value="apikey">{{ t('site.authTypeApiKey') }}</a-select-option>
-            <a-select-option value="passkey">Passkey</a-select-option>
-          </a-select>
-        </a-form-item>
         <a-form-item v-if="showCookieField" :label="t('sites.cookie')" name="cookie">
           <a-textarea v-model:value="form.cookie" :rows="3" :placeholder="editingSite?.hasCookie ? t('site.placeholderConfigured') : t('site.placeholderCookie')" />
         </a-form-item>
@@ -200,6 +220,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
+import { ensureSupportedSitesCache, type SupportedSite } from '@/api/supported-sites'
 import { formatBytes, formatTime } from '@/utils/format'
 
 const { t } = useI18n()
@@ -244,6 +265,43 @@ const isCreateMode = ref(false)
 const selectedRowKeys = ref<number[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
+
+// 白名单站点列表（go:embed seed 数据，懒加载 + 缓存）
+const supportedSites = ref<SupportedSite[]>([])
+const loadingSupportedSites = ref(false)
+const selectedSupportedSite = computed<SupportedSite | null>(() => {
+  if (!isCreateMode.value || !form.domain) return null
+  return supportedSites.value.find(s => s.domain === form.domain) || null
+})
+
+// a-select 过滤函数：按 domain 或 name_cn 模糊匹配
+function filterSupportedSite(input: string, option: { value: string }) {
+  if (!input) return true
+  const needle = input.toLowerCase()
+  const item = supportedSites.value.find(s => s.domain === option.value)
+  if (!item) return false
+  return item.domain.toLowerCase().includes(needle) || item.name_cn.toLowerCase().includes(needle)
+}
+
+// 选中支持站点后，从 seed 同步 authType 到 form（仅前端展示，后端会强制覆盖）
+function onSupportedSiteChange(domain: string) {
+  const s = supportedSites.value.find(x => x.domain === domain)
+  if (s) {
+    form.authType = s.auth_type || 'cookie'
+  }
+}
+
+async function fetchSupportedSites() {
+  loadingSupportedSites.value = true
+  try {
+    const byDomain = await ensureSupportedSitesCache()
+    supportedSites.value = Array.from(byDomain.values()).filter(s => s.verification_status === 'verified')
+  } catch {
+    supportedSites.value = []
+  } finally {
+    loadingSupportedSites.value = false
+  }
+}
 
 const filters = reactive({
   enabled: undefined as string | undefined,
@@ -398,6 +456,7 @@ function openCreateModal() {
     proxyUrl: '',
     skipSslVerify: false,
   })
+  fetchSupportedSites() // 懒加载白名单
   modalVisible.value = true
 }
 
@@ -405,7 +464,16 @@ async function handleSubmit() {
   submitting.value = true
   try {
     if (isCreateMode.value) {
-      await sitesApi.create(form)
+      // create 模式：只传 domain + 用户填的字段；name/baseUrl/framework 由后端 seed 自动填充
+      const payload: Record<string, unknown> = { domain: form.domain }
+      const optionalFields = ['cookie', 'passkey', 'apiKey', 'isSource', 'isTarget', 'participateAutoPublish', 'enabled', 'cookieCloudSync', 'proxyUrl', 'skipSslVerify']
+      for (const key of optionalFields) {
+        const value = (form as Record<string, unknown>)[key]
+        if (value !== '' && value !== undefined) {
+          payload[key] = value
+        }
+      }
+      await sitesApi.create(payload)
     } else if (editingSite.value) {
       const payload: Record<string, unknown> = {}
       const skipIfEmpty = ['name', 'domain', 'baseUrl', 'framework']

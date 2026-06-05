@@ -254,7 +254,7 @@ import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
-import { getSiteOverride } from '@/data/site-overrides'
+import { ensureSupportedSitesCache, getSiteFieldOverride } from '@/api/supported-sites'
 import type { Site, SiteCredentials } from '@/api/types'
 
 interface DetectResultData {
@@ -306,7 +306,12 @@ const authTypeLabels: Record<string, string> = {
 }
 
 const fw = computed(() => site.value.framework as string)
-const override = computed(() => getSiteOverride(site.value.domain as string))
+// supported_sites 缓存加载状态（触发 override 重新计算）
+const supportedSitesLoaded = ref(false)
+const override = computed(() => {
+  if (!supportedSitesLoaded.value) return undefined
+  return getSiteFieldOverride(site.value.domain as string)
+})
 
 const needsCookie = computed(() => {
   if (override.value?.showCookie !== undefined) return override.value.showCookie
@@ -548,6 +553,10 @@ onMounted(() => {
   fetchSite()
   fetchStats()
   checkFreezeStatus()
+  // 预加载白名单缓存，加载完成后触发 override 重算
+  ensureSupportedSitesCache()
+    .then(() => { supportedSitesLoaded.value = true })
+    .catch(() => {/* 缓存加载失败不阻塞页面，使用框架默认显示 */})
 })
 </script>
 

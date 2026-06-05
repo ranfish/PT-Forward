@@ -354,7 +354,15 @@
     "addSite": "Add Site",
     "siteName": "Site Name",
     "domainPlaceholder": "e.g. pterclub.net",
-    "nameRequired": "Site name is required"
+    "nameRequired": "Site name is required",
+    "selectSupportedSite": "Select Supported Site",
+    "selectSupportedSitePlaceholder": "Search by name or domain",
+    "supportedSiteRequired": "Please select a supported site from the list",
+    "cookieCloudDomain": "CookieCloud Domain",
+    "specialNotes": "Notes",
+    "blocked": "Blocked",
+    "blockedSiteWarning": "This site cannot be added currently",
+    "createModeDomainLocked": "Auto-filled by system whitelist"
   },
   "downloader": {
     "title": "Downloader Management",

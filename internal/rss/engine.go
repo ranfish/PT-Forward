@@ -71,6 +71,7 @@ type Engine struct {
 	filterEng      *filter.Engine
 	dispatcher     *event.Dispatcher
 	siteProvider   model.SiteInfoProvider
+	clientProvider model.DownloaderProvider
 	diskBudget     *DiskBudgetManager
 	seedingCounter model.SeedingCollector
 	wsBroadcaster  event.WSBroadcaster
@@ -126,7 +127,7 @@ func (e *Engine) siteHRStrategy(ctx context.Context, siteName string) string {
 }
 
 func (e *Engine) checkDiskGuard(ctx context.Context, sub *model.RSSSubscription) error {
-	if !sub.DiskGuardEnabled || sub.ClientID == "" || e.siteProvider == nil {
+	if !sub.DiskGuardEnabled || sub.ClientID == "" {
 		return nil
 	}
 
@@ -135,14 +136,11 @@ func (e *Engine) checkDiskGuard(ctx context.Context, sub *model.RSSSubscription)
 		return nil
 	}
 
-	cp, ok := e.siteProvider.(interface {
-		GetDownloaderClient(ctx context.Context, clientID string) (model.DownloaderClient, error)
-	})
-	if !ok {
-		return nil
+	if e.clientProvider == nil {
+		return rssError(ErrRSSDisk, "磁盘守卫：下载器提供者未注入，拒绝放行（fail-closed）", nil)
 	}
 
-	dlClient, err := cp.GetDownloaderClient(ctx, sub.ClientID)
+	dlClient, err := e.clientProvider.Get(sub.ClientID)
 	if err != nil {
 		return rssError(ErrRSSDisk, "磁盘守卫：获取下载器失败", err)
 	}
@@ -160,19 +158,11 @@ func (e *Engine) checkDiskGuard(ctx context.Context, sub *model.RSSSubscription)
 }
 
 func (e *Engine) checkDiskBudget(ctx context.Context, sub *model.RSSSubscription, size int64) error {
-	clientProvider := e.siteProvider
-	if clientProvider == nil {
-		return nil
+	if e.clientProvider == nil {
+		return rssError(ErrRSSDisk, "磁盘预算检查：下载器提供者未注入，拒绝放行（fail-closed）", nil)
 	}
 
-	cp, ok := clientProvider.(interface {
-		GetDownloaderClient(ctx context.Context, clientID string) (model.DownloaderClient, error)
-	})
-	if !ok {
-		return nil
-	}
-
-	dlClient, err := cp.GetDownloaderClient(ctx, sub.ClientID)
+	dlClient, err := e.clientProvider.Get(sub.ClientID)
 	if err != nil {
 		return rssError(ErrRSSDisk, "磁盘预算检查：获取下载器失败", err)
 	}
@@ -205,6 +195,10 @@ func (e *Engine) checkDiskBudget(ctx context.Context, sub *model.RSSSubscription
 
 func (e *Engine) SetSiteProvider(sp model.SiteInfoProvider) {
 	e.siteProvider = sp
+}
+
+func (e *Engine) SetClientProvider(cp model.DownloaderProvider) {
+	e.clientProvider = cp
 }
 
 func (e *Engine) SetFilterEngine(fe *filter.Engine) {
@@ -526,7 +520,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				continue
 			}
 
-			if sub.DiskGuardEnabled && sub.ClientID != "" && e.siteProvider != nil {
+			if sub.DiskGuardEnabled && sub.ClientID != "" && e.clientProvider != nil {
 				if err := e.checkDiskGuard(ctx, sub); err != nil {
 					e.logger.Warn("torrent skipped by disk guard",
 						zap.String("torrent", event.TorrentID),
@@ -537,7 +531,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				}
 			}
 
-			if sub.DiskBudgetEnabled && sub.ClientID != "" && e.siteProvider != nil {
+			if sub.DiskBudgetEnabled && sub.ClientID != "" && e.clientProvider != nil {
 				if err := e.checkDiskBudget(ctx, sub, event.Size); err != nil {
 					e.logger.Warn("torrent skipped by disk budget",
 						zap.String("torrent", event.TorrentID),
