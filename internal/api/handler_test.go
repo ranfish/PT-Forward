@@ -6247,6 +6247,7 @@ func TestSeeding_StatsTorrents_V2(t *testing.T) {
 	env := setupTestEnv(t)
 	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s1", TorrentID: "t1", Status: model.SeedingStatusSeeding})
 	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s1", TorrentID: "t2", Status: model.SeedingStatusPausedFreeEnd})
+	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h3", SiteName: "s1", TorrentID: "t3", Status: model.SeedingStatusDeleted})
 
 	w := env.doRequest("GET", "/api/v1/seeding/stats/torrents", nil)
 	if w.Code != http.StatusOK {
@@ -6254,8 +6255,18 @@ func TestSeeding_StatsTorrents_V2(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
+	if data["total"] != float64(2) {
+		t.Errorf("expected 2 torrents (seeding + paused_free_end, exclude deleted), got %v", data["total"])
+	}
+
+	w = env.doRequest("GET", "/api/v1/seeding/stats/torrents?status=seeding", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp = parseResponse(t, w)
+	data, _ = resp.Data.(map[string]interface{})
 	if data["total"] != float64(1) {
-		t.Errorf("expected 1 torrent (only seeding), got %v", data["total"])
+		t.Errorf("expected 1 torrent (status=seeding filter), got %v", data["total"])
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/dispatcher"
@@ -146,25 +147,26 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 }
 
 type Engine struct {
-	db              *gorm.DB
-	logger          *zap.Logger
-	clientProvider  model.DownloaderProvider
-	siteProvider    model.SiteInfoProvider
-	freeEndMonitor  *FreeEndMonitor
-	wsBroadcaster   event.WSBroadcaster
-	mu              sync.RWMutex
-	recordMap       map[string]*model.SeedingTorrentRecord
-	emaStates       map[string]*emaState
-	maindataMu      sync.RWMutex
-	maindataCache   map[string]*maindataEntry
-	fitTimer        *FitTimer
-	freeWaitMonitor *FreeWaitMonitor
-	refreshCancel   context.CancelFunc
-	wg              sync.WaitGroup
-	reseedTrigger   ReseedTrigger
+	db                *gorm.DB
+	logger            *zap.Logger
+	clientProvider    model.DownloaderProvider
+	clientProviderMu  sync.RWMutex
+	siteProvider      model.SiteInfoProvider
+	freeEndMonitor    *FreeEndMonitor
+	wsBroadcaster     event.WSBroadcaster
+	mu                sync.RWMutex
+	recordMap         map[string]*model.SeedingTorrentRecord
+	emaStates         map[string]*emaState
+	maindataMu        sync.RWMutex
+	maindataCache     map[string]*maindataEntry
+	fitTimer          *FitTimer
+	freeWaitMonitor   *FreeWaitMonitor
+	refreshCancel     context.CancelFunc
+	wg                sync.WaitGroup
+	reseedTrigger     ReseedTrigger
 
-	unregisteredCursor   int
-	unregisteredChecking bool
+	unregisteredCursor   atomic.Int64
+	unregisteredChecking atomic.Bool
 }
 
 type ReseedTrigger interface {
@@ -206,15 +208,23 @@ func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 }
 
 func (e *Engine) SetClientProvider(cp model.DownloaderProvider) {
+	e.clientProviderMu.Lock()
+	defer e.clientProviderMu.Unlock()
 	e.clientProvider = cp
 	if e.freeEndMonitor != nil {
 		e.freeEndMonitor.client = cp
 	}
 }
 
+func (e *Engine) getClientProvider() model.DownloaderProvider {
+	e.clientProviderMu.RLock()
+	defer e.clientProviderMu.RUnlock()
+	return e.clientProvider
+}
+
 func (e *Engine) GetGlobalTransferStats(ctx context.Context) *model.GlobalTransferStats {
 	result := &model.GlobalTransferStats{}
-	if e.clientProvider == nil {
+	if e.getClientProvider() == nil {
 		return result
 	}
 	configs, err := e.ListConfigs(ctx)
@@ -226,7 +236,7 @@ func (e *Engine) GetGlobalTransferStats(ctx context.Context) *model.GlobalTransf
 		if !cfg.Enabled {
 			continue
 		}
-		client, err := e.clientProvider.Get(cfg.ClientID)
+		client, err := e.getClientProvider().Get(cfg.ClientID)
 		if err != nil {
 			continue
 		}
@@ -245,7 +255,7 @@ func (e *Engine) GetGlobalTransferStats(ctx context.Context) *model.GlobalTransf
 
 func (e *Engine) GetTodayTransferDelta(ctx context.Context) *model.GlobalTransferStats {
 	result := &model.GlobalTransferStats{}
-	if e.clientProvider == nil {
+	if e.getClientProvider() == nil {
 		return result
 	}
 	configs, err := e.ListConfigs(ctx)
@@ -256,7 +266,7 @@ func (e *Engine) GetTodayTransferDelta(ctx context.Context) *model.GlobalTransfe
 		if !cfg.Enabled {
 			continue
 		}
-		client, err := e.clientProvider.Get(cfg.ClientID)
+		client, err := e.getClientProvider().Get(cfg.ClientID)
 		if err != nil {
 			continue
 		}
@@ -404,17 +414,17 @@ func (e *Engine) refreshMaindataLoop(ctx context.Context) {
 }
 
 func (e *Engine) refreshMaindataOnce(ctx context.Context) {
-	if e.clientProvider == nil {
+	if e.getClientProvider() == nil {
 		return
 	}
 
-	clients := e.clientProvider.ListClients()
+	clients := e.getClientProvider().ListClients()
 	for _, clientID := range clients {
 		if ctx.Err() != nil {
 			return
 		}
 
-		dlClient, err := e.clientProvider.Get(clientID)
+		dlClient, err := e.getClientProvider().Get(clientID)
 		if err != nil {
 			continue
 		}
@@ -488,10 +498,10 @@ func (e *Engine) FreeWaitCheckOnce(ctx context.Context) int {
 }
 
 func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) {
-	if e.clientProvider == nil {
+	if e.getClientProvider() == nil {
 		return
 	}
-	dlClient, err := e.clientProvider.Get(entry.ClientID)
+	dlClient, err := e.getClientProvider().Get(entry.ClientID)
 	if err != nil {
 		e.logger.Warn("free wait push: client not available",
 			zap.String("client_id", entry.ClientID),
@@ -1033,11 +1043,11 @@ type evaluateContext struct {
 }
 
 func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cfg *model.SeedingClientConfig) (*evaluateContext, error) {
-	if e.clientProvider == nil {
+	if e.getClientProvider() == nil {
 		return nil, &model.AppError{Code: 50001, Message: "client provider not configured"}
 	}
 
-	dlClient, err := e.clientProvider.Get(clientID)
+	dlClient, err := e.getClientProvider().Get(clientID)
 	if err != nil {
 		return nil, &model.AppError{Code: 50001, Message: "获取下载器失败", Cause: err}
 	}
@@ -1900,11 +1910,11 @@ func (e *Engine) Clear(ctx context.Context, clientID string) error {
 }
 
 func (e *Engine) CollectTrafficStats(ctx context.Context) error {
-	if e.clientProvider == nil {
+	if e.getClientProvider() == nil {
 		return nil
 	}
 
-	clients := e.clientProvider.ListClients()
+	clients := e.getClientProvider().ListClients()
 	now := time.Now()
 
 	for _, clientID := range clients {
@@ -1915,7 +1925,7 @@ func (e *Engine) CollectTrafficStats(ctx context.Context) error {
 		}
 
 		if md == nil {
-			dlClient, err := e.clientProvider.Get(clientID)
+			dlClient, err := e.getClientProvider().Get(clientID)
 			if err != nil {
 				e.logger.Debug("获取下载器失败，跳过", zap.String("clientID", clientID), zap.Error(err))
 				continue
@@ -2166,14 +2176,16 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 		state.UploadSpeed = emaAlpha*newUp + (1-emaAlpha)*state.UploadSpeed
 		state.DownloadSpeed = emaAlpha*newDown + (1-emaAlpha)*state.DownloadSpeed
 	}
+	snapshotUp := state.UploadSpeed
+	snapshotDown := state.DownloadSpeed
 	e.mu.Unlock()
 
 	var dbState model.SeedingClientState
 	err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&dbState).Error
 
 	var globalStats *model.GlobalTransferStats
-	if e.clientProvider != nil {
-		if client, cErr := e.clientProvider.Get(clientID); cErr == nil {
+	if e.getClientProvider() != nil {
+		if client, cErr := e.getClientProvider().Get(clientID); cErr == nil {
 			if gs, gsErr := client.GetGlobalTransferStats(ctx); gsErr == nil {
 				globalStats = gs
 			}
@@ -2183,8 +2195,8 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 	if err != nil {
 		dbState = model.SeedingClientState{
 			ClientID:         clientID,
-			AvgUploadSpeed:   state.UploadSpeed,
-			AvgDownloadSpeed: state.DownloadSpeed,
+			AvgUploadSpeed:   snapshotUp,
+			AvgDownloadSpeed: snapshotDown,
 			Initialized:      true,
 		}
 		if globalStats != nil {
@@ -2198,8 +2210,8 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 		}
 	} else {
 		updates := map[string]interface{}{
-			"avg_upload_speed":   state.UploadSpeed,
-			"avg_download_speed": state.DownloadSpeed,
+			"avg_upload_speed":   snapshotUp,
+			"avg_download_speed": snapshotDown,
 			"initialized":        true,
 		}
 		if globalStats != nil {
@@ -2332,11 +2344,10 @@ func (e *Engine) getUnregisteredKeywords() []string {
 }
 
 func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string, dlClient model.DownloaderClient) {
-	if e.unregisteredChecking {
+	if !e.unregisteredChecking.CompareAndSwap(false, true) {
 		return
 	}
-	e.unregisteredChecking = true
-	defer func() { e.unregisteredChecking = false }()
+	defer e.unregisteredChecking.Store(false)
 
 	keywords := e.getUnregisteredKeywords()
 
@@ -2354,15 +2365,16 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 	}
 
 	batchSize := 20
-	if e.unregisteredCursor >= len(candidates) {
-		e.unregisteredCursor = 0
+	cursor := int(e.unregisteredCursor.Load())
+	if cursor >= len(candidates) {
+		cursor = 0
 	}
-	end := e.unregisteredCursor + batchSize
+	end := cursor + batchSize
 	if end > len(candidates) {
 		end = len(candidates)
 	}
-	batch := candidates[e.unregisteredCursor:end]
-	e.unregisteredCursor = end
+	batch := candidates[cursor:end]
+	e.unregisteredCursor.Store(int64(end))
 
 	for _, rec := range batch {
 		if ctx.Err() != nil {

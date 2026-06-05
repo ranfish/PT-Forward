@@ -13,7 +13,7 @@ import (
 
 func setupFreeEndDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(uniqueSQLiteDSN()), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

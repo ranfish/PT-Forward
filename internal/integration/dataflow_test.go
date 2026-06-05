@@ -165,16 +165,18 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 	}
 	require.NoError(t, db.Create(sub).Error)
 	db.Model(sub).Update("min_score", 0.0)
+	subID := fmt.Sprintf("%d", sub.ID)
 
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "seeding-client",
-		TorrentID: "free-001",
-		InfoHash:  "aa111bb222cc333dd444ee555ff666aa777bb88",
-		SiteName:  "f4-site",
-		Status:    model.SeedingStatusSeeding,
-		Source:    "rss",
-		IsFree:    true,
-		Discount:  model.DiscountFree,
+		ClientID:       "seeding-client",
+		TorrentID:      "free-001",
+		InfoHash:       "aa111bb222cc333dd444ee555ff666aa777bb88",
+		SiteName:       "f4-site",
+		SubscriptionID: subID,
+		Status:         model.SeedingStatusSeeding,
+		Source:         "rss",
+		IsFree:         true,
+		Discount:       model.DiscountFree,
 	}
 	require.NoError(t, db.Create(record).Error)
 
@@ -211,6 +213,9 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 			return &mocks.SiteAdapter{
 				DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
 					return torrentData, nil
+				},
+				DetectDiscountFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
+					return &model.DiscountResult{Level: model.DiscountFree}, nil
 				},
 			}, nil
 		},
