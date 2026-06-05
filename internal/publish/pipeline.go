@@ -3,10 +3,10 @@ package publish
 import (
 	"context"
 	"fmt"
-		"regexp"
-		"strings"
-		"sync"
-		"time"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/metrics"
@@ -21,19 +21,19 @@ import (
 var reTMDBID = regexp.MustCompile(`(?:themoviedb\.org|tmdb\.org)/(?:movie|tv)/(\d+)`)
 
 type Pipeline struct {
-	db                  *gorm.DB
-	logger              *zap.Logger
-	siteProvider        model.SiteInfoProvider
-	clientProvider      model.DownloaderProvider
-	ptgen               *ptgen.Provider
-	completionWatcher   model.CompletionWatcher
-	notifyService       *notification.Service
-	screenshotConfig    *screenshot.Config
-	artifactCache       *ArtifactCache
-	torrentCache        *TorrentCache
-	backpressureCtrl    *BackpressureController
-	artifactGenerator   *PublishArtifactGenerator
-	memberMu            sync.Map
+	db                *gorm.DB
+	logger            *zap.Logger
+	siteProvider      model.SiteInfoProvider
+	clientProvider    model.DownloaderProvider
+	ptgen             *ptgen.Provider
+	completionWatcher model.CompletionWatcher
+	notifyService     *notification.Service
+	screenshotConfig  *screenshot.Config
+	artifactCache     *ArtifactCache
+	torrentCache      *TorrentCache
+	backpressureCtrl  *BackpressureController
+	artifactGenerator *PublishArtifactGenerator
+	memberMu          sync.Map
 }
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
@@ -348,10 +348,10 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 }
 
 type descResult struct {
-	Text      string
-	IMDbLink  string
+	Text       string
+	IMDbLink   string
 	DoubanLink string
-	TMDBID    string
+	TMDBID     string
 }
 
 func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite, title string, sourceDetail *model.TorrentDetail) descResult {
@@ -1053,7 +1053,7 @@ const (
 	StepRender      = 4
 	StepUpload      = 5
 	_               = 6
-	StepHRDetect = 7
+	StepHRDetect    = 7
 )
 
 func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.PublishGroupMember) error {

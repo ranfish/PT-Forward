@@ -220,7 +220,9 @@ type siteResponse struct {
 	PasskeyAlias   string `json:"passkeyAlias,omitempty"`
 	PasskeyHint    string `json:"passkeyHint,omitempty"`
 	HasCookie      bool   `json:"hasCookie"`
+	CookieMasked   string `json:"cookieMasked,omitempty"`
 	HasAPIKey      bool   `json:"hasApiKey"`
+	APIKeyMasked   string `json:"apiKeyMasked,omitempty"`
 	HasBearerToken bool   `json:"hasBearerToken"`
 	HasAuthKey     bool   `json:"hasAuthKey"`
 	AuthKeyMasked  string `json:"authKeyMasked,omitempty"`
@@ -254,6 +256,27 @@ func maskPasskey(pk string) string {
 		return "****"
 	}
 	return pk[:4] + "****" + pk[len(pk)-4:]
+}
+
+func maskCookie(c string) string {
+	if c == "" {
+		return ""
+	}
+	var names []string
+	for _, part := range strings.Split(c, ";") {
+		p := strings.TrimSpace(part)
+		if eq := strings.Index(p, "="); eq > 0 {
+			names = append(names, p[:eq])
+		}
+		if len(names) >= 3 {
+			break
+		}
+	}
+	summary := strings.Join(names, ", ")
+	if len(names) >= 3 {
+		summary += ", ..."
+	}
+	return fmt.Sprintf("已配置（%d 字节，含 %s）", len(c), summary)
 }
 
 func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
@@ -306,7 +329,9 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		HasPasskey:     s.Passkey != "",
 		PasskeyMasked:  maskPasskey(s.Passkey),
 		HasCookie:      s.Cookie != "",
+		CookieMasked:   maskCookie(s.Cookie),
 		HasAPIKey:      s.APIKey != "",
+		APIKeyMasked:   maskPasskey(s.APIKey),
 		HasBearerToken: s.BearerToken != "",
 		HasAuthKey:     s.AuthKey != "",
 		AuthKeyMasked:  maskPasskey(s.AuthKey),

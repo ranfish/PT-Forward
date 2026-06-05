@@ -156,10 +156,10 @@
           <a-textarea v-model:value="form.cookie" :rows="3" :placeholder="editingSite?.hasCookie ? t('site.placeholderConfigured') : t('site.placeholderCookie')" />
         </a-form-item>
         <a-form-item v-if="showPasskeyField" :label="t('sites.passkey')" name="passkey">
-          <a-input-password v-model:value="form.passkey" :placeholder="editingSite?.hasPasskey ? t('site.placeholderConfigured') : t('site.placeholderPasskey')" />
+          <a-input v-model:value="form.passkey" :placeholder="editingSite?.hasPasskey ? t('site.placeholderConfigured') : t('site.placeholderPasskey')" />
         </a-form-item>
         <a-form-item v-if="showApiKeyField" :label="t('sites.apiKey')" name="apiKey">
-          <a-input-password v-model:value="form.apiKey" :placeholder="editingSite?.hasApiKey ? t('site.placeholderConfigured') : t('site.placeholderApiKey')" />
+          <a-input v-model:value="form.apiKey" :placeholder="editingSite?.hasApiKey ? t('site.placeholderConfigured') : t('site.placeholderApiKey')" />
         </a-form-item>
 
         <a-divider>{{ t('site.roleAndPublish') }}</a-divider>
@@ -181,18 +181,7 @@
           <a-form-item :label="t('site.cookieCloudSyncLabel')" name="cookieCloudSync">
             <a-switch v-model:checked="form.cookieCloudSync" />
           </a-form-item>
-          <a-form-item :label="t('site.cookieCloudDomainLabel')" name="cookieCloudDomain">
-            <a-input v-model:value="form.cookieCloudDomain" :placeholder="t('site.cookieCloudDomainPlaceholder')" />
-          </a-form-item>
         </template>
-
-        <a-divider>{{ t('site.rssSavePathOverride') }}</a-divider>
-        <a-form-item :label="t('site.overrideRssUrl')" name="overrideRssUrl">
-          <a-input v-model:value="form.overrideRssUrl" :placeholder="t('site.overrideRssUrlPlaceholder')" />
-        </a-form-item>
-        <a-form-item :label="t('site.overrideSavePath')" name="overrideSavePath">
-          <a-input v-model:value="form.overrideSavePath" :placeholder="t('site.overrideSavePathPlaceholder')" />
-        </a-form-item>
 
         <a-divider>{{ t('site.network') }}</a-divider>
         <a-form-item :label="t('site.proxyAddress')" name="proxyUrl">
@@ -200,28 +189,6 @@
         </a-form-item>
         <a-form-item :label="t('site.skipSslVerify')" name="skipSslVerify">
           <a-switch v-model:checked="form.skipSslVerify" />
-        </a-form-item>
-
-        <a-divider>{{ t('site.parseStrategy') }}</a-divider>
-        <a-form-item :label="t('site.hashStrategy')" name="hashStrategy">
-          <a-select v-model:value="form.hashStrategy" :placeholder="t('site.defaultGuid')" allow-clear>
-            <a-select-option value="guid">GUID</a-select-option>
-            <a-select-option value="xml_tag">{{ t('site.xmlTag') }}</a-select-option>
-            <a-select-option value="fake_from_id">{{ t('site.fakeFromId') }}</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item :label="t('site.sizeStrategy')" name="sizeStrategy">
-          <a-select v-model:value="form.sizeStrategy" :placeholder="t('site.defaultEnclosure')" allow-clear>
-            <a-select-option value="enclosure">{{ t('site.sizeStrategyEnclosure') }}</a-select-option>
-            <a-select-option value="xml_tag">{{ t('site.xmlTag') }}</a-select-option>
-            <a-select-option value="desc_regex">{{ t('site.descRegex') }}</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item :label="t('site.idStrategy')" name="idStrategy">
-          <a-select v-model:value="form.idStrategy" :placeholder="t('site.defaultQueryParam')" allow-clear>
-            <a-select-option value="query_param">{{ t('site.queryParam') }}</a-select-option>
-            <a-select-option value="link_regex">{{ t('site.linkRegex') }}</a-select-option>
-          </a-select>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -250,14 +217,8 @@ interface SiteListItem {
   hasApiKey: boolean
   authType: string
   cookieCloudSync: boolean
-  cookieCloudDomain: string
-  overrideRssUrl: string
-  overrideSavePath: string
   proxyUrl: string
   skipSslVerify: boolean
-  hashStrategy: string
-  sizeStrategy: string
-  idStrategy: string
   username: string
   userClass: string
   uploadBytes: string | number
@@ -324,14 +285,8 @@ const form = reactive({
   participateAutoPublish: true,
   enabled: true,
   cookieCloudSync: false,
-  cookieCloudDomain: '',
-  overrideRssUrl: '',
-  overrideSavePath: '',
   proxyUrl: '',
   skipSslVerify: false,
-  hashStrategy: '',
-  sizeStrategy: '',
-  idStrategy: '',
 })
 
 const showCookieField = computed(() => form.authType === 'cookie')
@@ -417,14 +372,8 @@ function openModal(record: SiteListItem) {
     participateAutoPublish: record.participateAutoPublish !== undefined ? record.participateAutoPublish : true,
     enabled: record.enabled !== undefined ? record.enabled : true,
     cookieCloudSync: record.cookieCloudSync || false,
-    cookieCloudDomain: record.cookieCloudDomain || '',
-    overrideRssUrl: record.overrideRssUrl || '',
-    overrideSavePath: record.overrideSavePath || '',
     proxyUrl: record.proxyUrl || '',
     skipSslVerify: record.skipSslVerify || false,
-    hashStrategy: record.hashStrategy || '',
-    sizeStrategy: record.sizeStrategy || '',
-    idStrategy: record.idStrategy || '',
   })
   modalVisible.value = true
 }
@@ -446,14 +395,8 @@ function openCreateModal() {
     participateAutoPublish: true,
     enabled: true,
     cookieCloudSync: false,
-    cookieCloudDomain: '',
-    overrideRssUrl: '',
-    overrideSavePath: '',
     proxyUrl: '',
     skipSslVerify: false,
-    hashStrategy: '',
-    sizeStrategy: '',
-    idStrategy: '',
   })
   modalVisible.value = true
 }

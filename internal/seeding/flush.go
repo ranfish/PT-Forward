@@ -621,11 +621,11 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 	}
 
 	opts := model.AddTorrentOptions{
-		SavePath:  pushSub.SavePath,
-		Category:  pushSub.Category,
-		Tags:      pushSub.Tags,
-		Paused:    pushSub.AddPaused,
-		AutoTMM:   pushSub.AutoTMM,
+		SavePath: pushSub.SavePath,
+		Category: pushSub.Category,
+		Tags:     pushSub.Tags,
+		Paused:   pushSub.AddPaused,
+		AutoTMM:  pushSub.AutoTMM,
 	}
 	if pushSub.UploadLimitKB > 0 {
 		opts.UploadLimit = pushSub.UploadLimitKB * 1024

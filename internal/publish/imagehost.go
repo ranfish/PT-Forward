@@ -36,9 +36,9 @@ func NewImageHostUploader(logger *zap.Logger) *ImageHostUploader {
 }
 
 type UploadResult struct {
-	ShowURL    string `json:"show_url"`
-	DirectURL  string `json:"direct_url"`
-	ThumbURL   string `json:"thumb_url"`
+	ShowURL   string `json:"show_url"`
+	DirectURL string `json:"direct_url"`
+	ThumbURL  string `json:"thumb_url"`
 }
 
 func (u *ImageHostUploader) UploadPixHost(ctx context.Context, imagePath string) (*UploadResult, error) {
@@ -130,9 +130,9 @@ func (u *ImageHostUploader) doPixHostUpload(ctx context.Context, imagePath strin
 	}
 
 	var uploadResp struct {
-		Status    string `json:"status"`
-		ShowURL   string `json:"show_url"`
-		ThumbURL  string `json:"thumb_url"`
+		Status   string `json:"status"`
+		ShowURL  string `json:"show_url"`
+		ThumbURL string `json:"thumb_url"`
 	}
 	if err := json.Unmarshal(body, &uploadResp); err != nil {
 		return nil, fmt.Errorf("parse upload response: %w", err)

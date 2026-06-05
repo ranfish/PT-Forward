@@ -32,11 +32,11 @@ type RuleMatch struct {
 }
 
 type RuleContext struct {
-	Record    *model.SeedingTorrentRecord
-	Torrent   *model.TorrentInfo
-	FreeSpace int64
+	Record     *model.SeedingTorrentRecord
+	Torrent    *model.TorrentInfo
+	FreeSpace  int64
 	TotalSpace int64
-	Now       time.Time
+	Now        time.Time
 
 	ActiveUploads       int
 	ActiveDownloads     int
@@ -283,9 +283,9 @@ func (re *RuleEvaluator) MatchRules(ctx context.Context, rules []model.DeleteRul
 }
 
 type scoringCache struct {
-	latestScore map[string]float64
-	rankInCycle map[string]int
-	totalInCycle map[string]int
+	latestScore   map[string]float64
+	rankInCycle   map[string]int
+	totalInCycle  map[string]int
 	lowScoreCount map[string]int
 }
 

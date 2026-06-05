@@ -240,11 +240,11 @@ func (e *Engine) CleanupOldData(ctx context.Context) (int64, error) {
 }
 
 type DryRunResult struct {
-	Total    int                      `json:"total"`
-	Matched  int                      `json:"matched"`
-	Rejected int                      `json:"rejected"`
-	Skipped  int                      `json:"skipped"`
-	Items    []DryRunItem             `json:"items"`
+	Total    int          `json:"total"`
+	Matched  int          `json:"matched"`
+	Rejected int          `json:"rejected"`
+	Skipped  int          `json:"skipped"`
+	Items    []DryRunItem `json:"items"`
 }
 
 type DryRunItem struct {
@@ -631,15 +631,15 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 
 			if e.filterEng != nil && (len(sub.AcceptRuleIDs) > 0 || len(sub.RejectRuleIDs) > 0) {
 				evalCtx := newEvalCtx(event, discountStr)
-			if len(sub.RejectRuleIDs) > 0 {
-				rejectResult, err := e.filterEng.MatchByIDs(ctx, sub.RejectRuleIDs, evalCtx)
-				if err != nil {
-					e.logger.Warn("reject rule match failed, skipping torrent (fail-closed)",
-						zap.String("torrent", event.TorrentID),
-						zap.Error(err))
-					metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "reject_rule_error").Inc()
-					continue
-				} else if rejectResult.Matched {
+				if len(sub.RejectRuleIDs) > 0 {
+					rejectResult, err := e.filterEng.MatchByIDs(ctx, sub.RejectRuleIDs, evalCtx)
+					if err != nil {
+						e.logger.Warn("reject rule match failed, skipping torrent (fail-closed)",
+							zap.String("torrent", event.TorrentID),
+							zap.Error(err))
+						metrics.RSSTorrentsFiltered.WithLabelValues(sub.SiteName, "reject_rule_error").Inc()
+						continue
+					} else if rejectResult.Matched {
 						e.logger.Debug("torrent rejected by subscription reject rules",
 							zap.String("torrent", event.TorrentID),
 							zap.String("rule", rejectResult.RuleName))

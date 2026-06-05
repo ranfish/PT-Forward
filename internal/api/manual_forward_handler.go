@@ -17,13 +17,13 @@ import (
 )
 
 type ManualForwardHandler struct {
-	db         *gorm.DB
-	logger     *zap.Logger
-	pipeline   PublishPipeline
-	siteMgr    SiteManager
-	clientMgr  MFClientProvider
-	taskStore  sync.Map
-	taskSeq    atomic.Int64
+	db        *gorm.DB
+	logger    *zap.Logger
+	pipeline  PublishPipeline
+	siteMgr   SiteManager
+	clientMgr MFClientProvider
+	taskStore sync.Map
+	taskSeq   atomic.Int64
 }
 
 type PublishPipeline interface {
@@ -46,8 +46,8 @@ func NewManualForwardHandler(db *gorm.DB, logger *zap.Logger) *ManualForwardHand
 	}
 }
 
-func (h *ManualForwardHandler) SetPipeline(p PublishPipeline)       { h.pipeline = p }
-func (h *ManualForwardHandler) SetSiteManager(s SiteManager)        { h.siteMgr = s }
+func (h *ManualForwardHandler) SetPipeline(p PublishPipeline)        { h.pipeline = p }
+func (h *ManualForwardHandler) SetSiteManager(s SiteManager)         { h.siteMgr = s }
 func (h *ManualForwardHandler) SetClientProvider(c MFClientProvider) { h.clientMgr = c }
 
 func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -158,12 +158,12 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 }
 
 type analyzeTask struct {
-	mu        sync.RWMutex             `json:"-"`
-	ID        int64                    `json:"id"`
-	Status    string                   `json:"status"`
-	Error     string                   `json:"error,omitempty"`
-	Result    map[string]interface{}   `json:"result,omitempty"`
-	CreatedAt time.Time                `json:"created_at"`
+	mu        sync.RWMutex           `json:"-"`
+	ID        int64                  `json:"id"`
+	Status    string                 `json:"status"`
+	Error     string                 `json:"error,omitempty"`
+	Result    map[string]interface{} `json:"result,omitempty"`
+	CreatedAt time.Time              `json:"created_at"`
 }
 
 func (t *analyzeTask) setError(err string) {
@@ -302,8 +302,8 @@ func (h *ManualForwardHandler) handlePollAnalyze(w http.ResponseWriter, r *http.
 
 func (h *ManualForwardHandler) handleEligibleTargets(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		SourceSite      string   `json:"source_site"`
-		BlockedTargets  []string `json:"blocked_targets"`
+		SourceSite     string   `json:"source_site"`
+		BlockedTargets []string `json:"blocked_targets"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")

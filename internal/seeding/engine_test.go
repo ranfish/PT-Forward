@@ -13,13 +13,13 @@ import (
 )
 
 type mockDownloaderClient struct {
-	maindata    *model.Maindata
-	err         error
-	seeds       []*model.TorrentInfo
-	seedErr     error
-	delErr      error
-	pauseErr    error
-	torrentByHash map[string]*model.TorrentInfo
+	maindata        *model.Maindata
+	err             error
+	seeds           []*model.TorrentInfo
+	seedErr         error
+	delErr          error
+	pauseErr        error
+	torrentByHash   map[string]*model.TorrentInfo
 	reannounceCalls int
 }
 
@@ -67,7 +67,7 @@ func (m *mockDownloaderClient) Reannounce(_ context.Context, _ string) error {
 	m.reannounceCalls++
 	return nil
 }
-func (m *mockDownloaderClient) Recheck(_ context.Context, _ string) error       { return nil }
+func (m *mockDownloaderClient) Recheck(_ context.Context, _ string) error { return nil }
 func (m *mockDownloaderClient) SetTorrentTags(_ context.Context, _ string, _ []string) error {
 	return nil
 }
@@ -541,8 +541,8 @@ func TestEngine_OnTorrents_FreeWait(t *testing.T) {
 
 	sub := &model.RSSSubscription{
 		Name: "test-sub", Enabled: true, SiteName: "site1", ClientID: "c1",
-		ScoringConfig:    model.SeedingScoringConfig{Enabled: true},
-		FreeWaitEnabled:  true,
+		ScoringConfig:      model.SeedingScoringConfig{Enabled: true},
+		FreeWaitEnabled:    true,
 		FreeWaitMaxWaitSec: 3600,
 	}
 	db.Create(sub)
@@ -1441,7 +1441,7 @@ func TestEngine_Reannounce_AbortsDelete(t *testing.T) {
 
 	mc := &mockDownloaderClient{
 		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
-		seeds:    []*model.TorrentInfo{
+		seeds: []*model.TorrentInfo{
 			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024, Progress: 1.0},
 		},
 		torrentByHash: map[string]*model.TorrentInfo{
@@ -1491,7 +1491,7 @@ func TestEngine_Reannounce_Disabled(t *testing.T) {
 
 	mc := &mockDownloaderClient{
 		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
-		seeds:    []*model.TorrentInfo{
+		seeds: []*model.TorrentInfo{
 			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024, Progress: 1.0},
 		},
 	}
@@ -1535,7 +1535,7 @@ func TestEngine_Reannounce_AllRetriesFail(t *testing.T) {
 
 	mc := &mockDownloaderClient{
 		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
-		seeds:    []*model.TorrentInfo{
+		seeds: []*model.TorrentInfo{
 			{Hash: "h1", Name: "test", UploadSpeed: 0, SeedTime: 720000, Ratio: 5.0, TotalSize: 1024, Progress: 1.0},
 		},
 		torrentByHash: map[string]*model.TorrentInfo{

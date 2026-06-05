@@ -19,7 +19,7 @@ type FilterRule struct {
 	Enabled    bool            `json:"enabled" gorm:"default:true"`
 	CreatedAt  time.Time       `json:"created_at"`
 	UpdatedAt  time.Time       `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	DeletedAt  gorm.DeletedAt  `json:"deleted_at" gorm:"index"`
 }
 
 func (FilterRule) TableName() string { return "filter_rules" }

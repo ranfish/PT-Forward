@@ -1276,9 +1276,9 @@ func TestEngine_FetchOnce_AcceptRejectRules(t *testing.T) {
 	makeSite(db, t, "rulesite", "rulesite.com")
 
 	acceptRule := &model.FilterRule{
-		Name:      "accept-free",
-		RuleType:  "accept",
-		Enabled:   true,
+		Name:     "accept-free",
+		RuleType: "accept",
+		Enabled:  true,
 		Conditions: []model.RuleCondition{
 			{Key: "title", CompareType: model.CompareContain, Value: "Ubuntu"},
 		},
@@ -1286,9 +1286,9 @@ func TestEngine_FetchOnce_AcceptRejectRules(t *testing.T) {
 	require.NoError(t, db.Create(acceptRule).Error)
 
 	rejectRule := &model.FilterRule{
-		Name:      "reject-spam",
-		RuleType:  "reject",
-		Enabled:   true,
+		Name:     "reject-spam",
+		RuleType: "reject",
+		Enabled:  true,
 		Conditions: []model.RuleCondition{
 			{Key: "title", CompareType: model.CompareContain, Value: "spam"},
 		},

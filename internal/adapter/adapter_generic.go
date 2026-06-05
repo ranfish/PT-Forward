@@ -41,13 +41,13 @@ var (
 	reGenericStarSpaceDetailID = regexp.MustCompile(`(?:details|torrent)\.php\?id=(\d+)`)
 	reGenericIMDbID            = regexp.MustCompile(`tt\d+`)
 
-	reGenericWelcomeUsername   = regexp.MustCompile(`(?i)欢迎[：:]\s*<a[^>]*><span[^>]*>([^<]+)</span>`)
-	reGenericLabelUpload       = regexp.MustCompile(`(?i)上传[：:]\s*([\d.]+)\s*(TB|GB|MB|KB|T|G|M|K)`)
-	reGenericLabelDownload     = regexp.MustCompile(`(?i)下载[：:]\s*([\d.]+)\s*(TB|GB|MB|KB|T|G|M|K)`)
-	reGenericBonus             = regexp.MustCompile(`(?i)魔力[：:]\s*([\d,.]+)`)
-	reGenericSeedingCount      = regexp.MustCompile(`(?i)alt=['"]做种数['"][^>]*>\s*(\d+)`)
-	reGenericUserClass         = regexp.MustCompile(`(?i)class='uc(\d+)'`)
-	reBonusHourTotalSize      = regexp.MustCompile(`合计体积</td>\s*<td>\s*</td>\s*<td[^>]*>\s*([\d.,]+\s*(?:T|G|M|TB|GB|MB))`)
+	reGenericWelcomeUsername = regexp.MustCompile(`(?i)欢迎[：:]\s*<a[^>]*><span[^>]*>([^<]+)</span>`)
+	reGenericLabelUpload     = regexp.MustCompile(`(?i)上传[：:]\s*([\d.]+)\s*(TB|GB|MB|KB|T|G|M|K)`)
+	reGenericLabelDownload   = regexp.MustCompile(`(?i)下载[：:]\s*([\d.]+)\s*(TB|GB|MB|KB|T|G|M|K)`)
+	reGenericBonus           = regexp.MustCompile(`(?i)魔力[：:]\s*([\d,.]+)`)
+	reGenericSeedingCount    = regexp.MustCompile(`(?i)alt=['"]做种数['"][^>]*>\s*(\d+)`)
+	reGenericUserClass       = regexp.MustCompile(`(?i)class='uc(\d+)'`)
+	reBonusHourTotalSize     = regexp.MustCompile(`合计体积</td>\s*<td>\s*</td>\s*<td[^>]*>\s*([\d.,]+\s*(?:T|G|M|TB|GB|MB))`)
 
 	starSpaceUserClassMap = map[string]string{
 		"0": "未激活", "1": "User", "2": "Power User", "3": "Elite User",
@@ -1265,7 +1265,7 @@ func extractIMDbIDGeneric(link string) string {
 }
 
 func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
-	pageURL := 	config.Domain + "/index.php"
+	pageURL := config.Domain + "/index.php"
 	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
 	if err != nil {
 		return nil, err

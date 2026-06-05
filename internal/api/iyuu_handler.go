@@ -120,12 +120,12 @@ func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 
 func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Token             string `json:"token"`
-		BaseURL           string `json:"baseUrl"`
-		Enabled           *bool  `json:"enabled"`
-		IsVIP             *bool  `json:"isVip"`
+		Token            string `json:"token"`
+		BaseURL          string `json:"baseUrl"`
+		Enabled          *bool  `json:"enabled"`
+		IsVIP            *bool  `json:"isVip"`
 		RequestTimeoutMs *int   `json:"requestTimeoutMs"`
-		Version           string `json:"version,omitempty"`
+		Version          string `json:"version,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -170,13 +170,13 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		if req.Token != "" {
 			cfg.Token = req.Token
 		}
-	if req.BaseURL != "" {
-		if err := middleware.ValidatePublicURL(req.BaseURL); err != nil {
-			Error(w, http.StatusBadRequest, 40001, "baseUrl 不合法: "+err.Error())
-			return
+		if req.BaseURL != "" {
+			if err := middleware.ValidatePublicURL(req.BaseURL); err != nil {
+				Error(w, http.StatusBadRequest, 40001, "baseUrl 不合法: "+err.Error())
+				return
+			}
+			cfg.BaseURL = req.BaseURL
 		}
-		cfg.BaseURL = req.BaseURL
-	}
 		if req.Enabled != nil {
 			cfg.Enabled = *req.Enabled
 		}

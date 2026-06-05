@@ -20,10 +20,10 @@ import (
 )
 
 type SystemHandler struct {
-	version      string
-	db           *gorm.DB
-	clientMgr    *client.Manager
-	logger       *zap.Logger
+	version       string
+	db            *gorm.DB
+	clientMgr     *client.Manager
+	logger        *zap.Logger
 	seedingEngine torrentCounter
 }
 

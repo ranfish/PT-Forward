@@ -8,20 +8,20 @@ import (
 
 // §33.1.41 — ClientConfig: 下载器配置（Sprint 78 DB-2）
 type ClientConfig struct {
-	ID             uint       `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name           string     `json:"name" gorm:"size:100;not null;uniqueIndex"`
-	Type           string     `json:"type" gorm:"size:50;not null"`
-	URL            string     `json:"url" gorm:"size:500;not null"`
-	Username       string     `json:"username" gorm:"size:100"`
-	Password       string     `json:"password" gorm:"size:100" encrypted:"true"`
-	Config         string     `json:"config" gorm:"type:text"`
-	Enabled        bool       `json:"enabled" gorm:"default:true"`
-	IsDefault      bool       `json:"is_default" gorm:"default:false"`
-	Role           string     `json:"role" gorm:"size:20;default:'seeding'"`
-	ReseedTargetID string     `json:"reseed_target_id,omitempty" gorm:"size:50"`
-	LastPingAt     *time.Time `json:"last_ping_at"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID             uint           `json:"id" gorm:"primaryKey;autoIncrement"`
+	Name           string         `json:"name" gorm:"size:100;not null;uniqueIndex"`
+	Type           string         `json:"type" gorm:"size:50;not null"`
+	URL            string         `json:"url" gorm:"size:500;not null"`
+	Username       string         `json:"username" gorm:"size:100"`
+	Password       string         `json:"password" gorm:"size:100" encrypted:"true"`
+	Config         string         `json:"config" gorm:"type:text"`
+	Enabled        bool           `json:"enabled" gorm:"default:true"`
+	IsDefault      bool           `json:"is_default" gorm:"default:false"`
+	Role           string         `json:"role" gorm:"size:20;default:'seeding'"`
+	ReseedTargetID string         `json:"reseed_target_id,omitempty" gorm:"size:50"`
+	LastPingAt     *time.Time     `json:"last_ping_at"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 	DeletedAt      gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 

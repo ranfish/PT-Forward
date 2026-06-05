@@ -6,8 +6,8 @@ import (
 )
 
 type fitTimerKey struct {
-	RuleID    uint
-	InfoHash  string
+	RuleID   uint
+	InfoHash string
 }
 
 type FitTimer struct {

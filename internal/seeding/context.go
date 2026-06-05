@@ -76,7 +76,7 @@ func buildExprEnv(rc *RuleContext) *exprEnv {
 			}
 			return 0
 		}(),
-		Hour:         rc.Now.Hour(),
+		Hour: rc.Now.Hour(),
 
 		ActiveUploads:       rc.ActiveUploads,
 		ActiveDownloads:     rc.ActiveDownloads,

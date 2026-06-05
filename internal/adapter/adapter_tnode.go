@@ -18,15 +18,15 @@ import (
 )
 
 var (
-	reTNodeTitle     = regexp.MustCompile(`<title>([^<]+)</title>`)
-	reTNodeInfoHash  = regexp.MustCompile(`(?i)info_hash.*?<td[^>]*>([a-fA-F0-9]{40})`)
-	reTNodeSize      = regexp.MustCompile(`(?i)(?:大小|Size|体积)[^<]*<[^>]*>([^<]+)`)
-	reTNodeCategory  = regexp.MustCompile(`(?i)(?:分类|Category|类型)[^<]*<[^>]*>([^<]+)`)
-	reTNodeDesc      = regexp.MustCompile(`(?s)(?:简介|Description|描述)</h\d?>.*?<div[^>]*>(.*?)</div>`)
-	reTNodeSeeders   = regexp.MustCompile(`(?i)(?:做种|Seeders?|保种)[^<]*<[^>]*>(\d+)`)
-	reTNodeLeechers  = regexp.MustCompile(`(?i)(?:下载|Leechers?)[^<]*<[^>]*>(\d+)`)
-	reTNodeCSRFMeta  = regexp.MustCompile(`<meta\s+name="x-csrf-token"\s+content="([^"]+)"`)
-	reTNodeCSRFAlt   = regexp.MustCompile(`(?i)csrf[_-]?token["\s:=]+["']?([a-zA-Z0-9_-]+)`)
+	reTNodeTitle    = regexp.MustCompile(`<title>([^<]+)</title>`)
+	reTNodeInfoHash = regexp.MustCompile(`(?i)info_hash.*?<td[^>]*>([a-fA-F0-9]{40})`)
+	reTNodeSize     = regexp.MustCompile(`(?i)(?:大小|Size|体积)[^<]*<[^>]*>([^<]+)`)
+	reTNodeCategory = regexp.MustCompile(`(?i)(?:分类|Category|类型)[^<]*<[^>]*>([^<]+)`)
+	reTNodeDesc     = regexp.MustCompile(`(?s)(?:简介|Description|描述)</h\d?>.*?<div[^>]*>(.*?)</div>`)
+	reTNodeSeeders  = regexp.MustCompile(`(?i)(?:做种|Seeders?|保种)[^<]*<[^>]*>(\d+)`)
+	reTNodeLeechers = regexp.MustCompile(`(?i)(?:下载|Leechers?)[^<]*<[^>]*>(\d+)`)
+	reTNodeCSRFMeta = regexp.MustCompile(`<meta\s+name="x-csrf-token"\s+content="([^"]+)"`)
+	reTNodeCSRFAlt  = regexp.MustCompile(`(?i)csrf[_-]?token["\s:=]+["']?([a-zA-Z0-9_-]+)`)
 )
 
 type TNodeAdapter struct {
@@ -551,11 +551,11 @@ func (a *TNodeAdapter) FetchUserStats(ctx context.Context, config *model.SiteCon
 				Level int    `json:"level"`
 				Name  string `json:"name"`
 			} `json:"class"`
-			Bonus     float64 `json:"bonus"`
-			Upload    int64   `json:"upload"`
-			Download  int64   `json:"download"`
-			Seeding   int     `json:"seeding"`
-			SeedTime  float64 `json:"seedTime"`
+			Bonus    float64 `json:"bonus"`
+			Upload   int64   `json:"upload"`
+			Download int64   `json:"download"`
+			Seeding  int     `json:"seeding"`
+			SeedTime float64 `json:"seedTime"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &detailResp); err != nil {

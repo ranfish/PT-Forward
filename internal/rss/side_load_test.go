@@ -98,9 +98,9 @@ func TestSideLoadManager_Worker_ProcessSuccess(t *testing.T) {
 	provider := &mocks.SiteInfoProvider{
 		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{
-				Name:     "testsite",
-				Passkey:  "pk123",
-				Cookie:   "cookie123",
+				Name:    "testsite",
+				Passkey: "pk123",
+				Cookie:  "cookie123",
 			}, nil
 		},
 		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
@@ -210,10 +210,10 @@ func createTestTorrent(t *testing.T) []byte {
 	t.Helper()
 	pieces := make([]byte, 20)
 	info := map[string]any{
-		"name":          "test.txt",
-		"length":        int64(1024),
-		"piece length":  int64(16384),
-		"pieces":        string(pieces),
+		"name":         "test.txt",
+		"length":       int64(1024),
+		"piece length": int64(16384),
+		"pieces":       string(pieces),
 	}
 	encoded, err := encodeBencode(map[string]any{
 		"info":     info,

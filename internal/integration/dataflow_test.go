@@ -408,15 +408,15 @@ func TestScenario_F7_Layer1InfoHashMatch(t *testing.T) {
 	require.NoError(t, db.Create(record).Error)
 
 	task := &model.ReseedTask{
-		Name:                "f7-task",
-		ClientIDs:           "reseed-client",
-		TargetSiteIDs:       "f7-target",
-		EngineMode:          "e1_manual",
-		MatchMethods:        "infohash",
+		Name:                 "f7-task",
+		ClientIDs:            "reseed-client",
+		TargetSiteIDs:        "f7-target",
+		EngineMode:           "e1_manual",
+		MatchMethods:         "infohash",
 		SizeTolerancePercent: 1.0,
-		MaxInjectionsPerRun: 10,
-		Enabled:             true,
-		Status:              "idle",
+		MaxInjectionsPerRun:  10,
+		Enabled:              true,
+		Status:               "idle",
 	}
 	require.NoError(t, db.Create(task).Error)
 
@@ -485,7 +485,8 @@ func TestScenario_F7_Layer1InfoHashMatch(t *testing.T) {
 	assert.Equal(t, "tgt-001", matches[0].TargetTorrentID)
 
 	t.Logf("PASS F7: Layer1 InfoHash match matched=%d injected=%d failed=%d",
-		result.Matched, result.Injected, result.Failed)}
+		result.Matched, result.Injected, result.Failed)
+}
 
 func TestScenario_F7_NoMatchFound(t *testing.T) {
 	db := setupDB(t)
@@ -514,15 +515,15 @@ func TestScenario_F7_NoMatchFound(t *testing.T) {
 	require.NoError(t, db.Create(record).Error)
 
 	task := &model.ReseedTask{
-		Name:                "f7-nomatch",
-		ClientIDs:           "reseed-client",
-		TargetSiteIDs:       "f7nomatch-tgt",
-		EngineMode:          "e1_manual",
-		MatchMethods:        "infohash",
+		Name:                 "f7-nomatch",
+		ClientIDs:            "reseed-client",
+		TargetSiteIDs:        "f7nomatch-tgt",
+		EngineMode:           "e1_manual",
+		MatchMethods:         "infohash",
 		SizeTolerancePercent: 1.0,
-		MaxInjectionsPerRun: 10,
-		Enabled:             true,
-		Status:              "idle",
+		MaxInjectionsPerRun:  10,
+		Enabled:              true,
+		Status:               "idle",
 	}
 	require.NoError(t, db.Create(task).Error)
 
@@ -565,7 +566,7 @@ func TestScenario_F12_SideLoadHashResolution(t *testing.T) {
 	mockProvider := &mocks.SiteInfoProvider{
 		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
 			return &model.SiteInfo{
-				Name: siteName,
+				Name:    siteName,
 				Passkey: "test-pk",
 			}, nil
 		},

@@ -75,12 +75,12 @@ type RSSTorrentEvent struct {
 
 // §33.1.3 — RSSSubscription: 订阅配置（Sprint 89, 7 处合并）
 type RSSSubscription struct {
-	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        uint           `json:"id" gorm:"primaryKey;autoIncrement"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
-	Name      string    `json:"name" gorm:"size:100;not null"`
-	Enabled   bool      `json:"enabled" gorm:"default:true"`
+	Name      string         `json:"name" gorm:"size:100;not null"`
+	Enabled   bool           `json:"enabled" gorm:"default:true"`
 
 	URLs     []string `json:"urls" gorm:"type:json;size:2048;serializer:json"`
 	SiteName string   `json:"site_name" gorm:"size:50;not null;index"`

@@ -13,11 +13,11 @@ import (
 )
 
 type PublishArtifactGenerator struct {
-	screenshotEngine *ScreenshotEngine
-	subtitleDetector *SubtitleDetector
+	screenshotEngine  *ScreenshotEngine
+	subtitleDetector  *SubtitleDetector
 	mediaInfoAnalyzer *MediaInfoAnalyzer
-	imageUploader    *ImageHostUploader
-	logger           *zap.Logger
+	imageUploader     *ImageHostUploader
+	logger            *zap.Logger
 }
 
 func NewPublishArtifactGenerator(cfg *screenshot.Config, logger *zap.Logger) *PublishArtifactGenerator {

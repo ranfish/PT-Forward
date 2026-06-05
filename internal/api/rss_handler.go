@@ -57,10 +57,10 @@ type createRSSRequest struct {
 	AutoReseed      bool     `json:"autoReseed"`
 	ReseedClientIDs []string `json:"reseedClientIds,omitempty"`
 
-	SkipSameSize          bool   `json:"skipSameSize"`
-	SkipSameSizeWindowMin int    `json:"skipSameSizeWindowMin"`
-	SkipSameSizeStrict    bool   `json:"skipSameSizeStrict"`
-	AddCountPerHour       int    `json:"addCountPerHour"`
+	SkipSameSize          bool `json:"skipSameSize"`
+	SkipSameSizeWindowMin int  `json:"skipSameSizeWindowMin"`
+	SkipSameSizeStrict    bool `json:"skipSameSizeStrict"`
+	AddCountPerHour       int  `json:"addCountPerHour"`
 
 	UseCustomRegex bool   `json:"useCustomRegex"`
 	RegexStr       string `json:"regexStr,omitempty"`
@@ -84,7 +84,7 @@ type createRSSRequest struct {
 	DiskBudgetEnabled bool    `json:"diskBudgetEnabled"`
 	DiskBudgetMinGB   float64 `json:"diskBudgetMinGB"`
 
-	CandidateClients []string            `json:"candidateClients,omitempty"`
+	CandidateClients []string                  `json:"candidateClients,omitempty"`
 	ClientSelection  model.ClientSelectionMode `json:"clientSelection,omitempty"`
 
 	DiskGuardEnabled   bool    `json:"diskGuardEnabled"`
@@ -127,10 +127,10 @@ type updateRSSRequest struct {
 	AutoReseed      *bool     `json:"autoReseed,omitempty"`
 	ReseedClientIDs *[]string `json:"reseedClientIds,omitempty"`
 
-	SkipSameSize          *bool   `json:"skipSameSize,omitempty"`
-	SkipSameSizeWindowMin *int    `json:"skipSameSizeWindowMin,omitempty"`
-	SkipSameSizeStrict    *bool   `json:"skipSameSizeStrict,omitempty"`
-	AddCountPerHour       *int    `json:"addCountPerHour,omitempty"`
+	SkipSameSize          *bool `json:"skipSameSize,omitempty"`
+	SkipSameSizeWindowMin *int  `json:"skipSameSizeWindowMin,omitempty"`
+	SkipSameSizeStrict    *bool `json:"skipSameSizeStrict,omitempty"`
+	AddCountPerHour       *int  `json:"addCountPerHour,omitempty"`
 
 	UseCustomRegex *bool   `json:"useCustomRegex,omitempty"`
 	RegexStr       *string `json:"regexStr,omitempty"`
@@ -154,7 +154,7 @@ type updateRSSRequest struct {
 	DiskBudgetEnabled *bool    `json:"diskBudgetEnabled,omitempty"`
 	DiskBudgetMinGB   *float64 `json:"diskBudgetMinGB,omitempty"`
 
-	CandidateClients *[]string            `json:"candidateClients,omitempty"`
+	CandidateClients *[]string                  `json:"candidateClients,omitempty"`
 	ClientSelection  *model.ClientSelectionMode `json:"clientSelection,omitempty"`
 
 	DiskGuardEnabled   *bool    `json:"diskGuardEnabled,omitempty"`
@@ -227,8 +227,8 @@ type rssResponse struct {
 	DiskBudgetEnabled bool    `json:"diskBudgetEnabled"`
 	DiskBudgetMinGB   float64 `json:"diskBudgetMinGB"`
 
-	CandidateClients []string                    `json:"candidateClients"`
-	ClientSelection  model.ClientSelectionMode   `json:"clientSelection"`
+	CandidateClients []string                  `json:"candidateClients"`
+	ClientSelection  model.ClientSelectionMode `json:"clientSelection"`
 
 	DiskGuardEnabled   bool       `json:"diskGuardEnabled"`
 	DiskGuardThreshold float64    `json:"diskGuardThreshold"`

@@ -1145,8 +1145,8 @@ func TestGenericAdapter_DetectHR_MultiplePatterns(t *testing.T) {
 			doer := &HTTPDoer{Client: srv.Client()}
 			a := NewGenericAdapter("generic", doer, zap.NewNop())
 
-	config := &model.SiteConfig{Domain: srv.URL}
-	config.Paths.Detail = "/details?id={id}"
+			config := &model.SiteConfig{Domain: srv.URL}
+			config.Paths.Detail = "/details?id={id}"
 
 			result, err := a.DetectHR(context.Background(), config, "1")
 			if err != nil {

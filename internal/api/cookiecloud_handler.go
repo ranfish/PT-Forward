@@ -120,6 +120,7 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 
 	var cfg model.CookieCloudConfig
 	result := h.db.First(&cfg)
+	wasEnabled := result.Error == nil && cfg.SyncEnabled
 	switch {
 	case result.Error != nil && errors.Is(result.Error, gorm.ErrRecordNotFound):
 		cfg = model.CookieCloudConfig{
@@ -170,6 +171,10 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 			Error(w, http.StatusInternalServerError, 50000, "保存配置失败")
 			return
 		}
+	}
+
+	if req.SyncEnabled != nil && *req.SyncEnabled && !wasEnabled {
+		h.db.Model(&model.CookieCloudConfig{}).Where("1 = 1").Update("last_sync_at", nil)
 	}
 
 	h.logger.Info("cookiecloud config updated", zap.String("component", "cookiecloud"))

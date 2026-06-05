@@ -64,10 +64,10 @@ type downloaderResponse struct {
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
 	PathMappings   []pathMappingRequest `json:"pathMappings"`
-	DownloadSpeed   int64                `json:"downloadSpeed"`
-	UploadSpeed     int64                `json:"uploadSpeed"`
-	FreeSpace       int64                `json:"freeSpace"`
-	TotalDiskSpace  int64                `json:"totalDiskSpace"`
+	DownloadSpeed  int64                `json:"downloadSpeed"`
+	UploadSpeed    int64                `json:"uploadSpeed"`
+	FreeSpace      int64                `json:"freeSpace"`
+	TotalDiskSpace int64                `json:"totalDiskSpace"`
 	CreatedAt      time.Time            `json:"createdAt"`
 	UpdatedAt      time.Time            `json:"updatedAt"`
 }

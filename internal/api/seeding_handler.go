@@ -230,34 +230,34 @@ func (h *SeedingHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request,
 
 func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientID            string  `json:"clientId"`
-		Enabled             bool    `json:"enabled"`
-		DeleteRuleIDs       string  `json:"deleteRuleIds"`
-		AutoDeleteCron      string  `json:"autoDeleteCron"`
-		MainDataCron        string  `json:"mainDataCron"`
-		DiskProtectEnabled  bool    `json:"diskProtectEnabled"`
-		MinDiskSpaceGB      float64 `json:"minDiskSpaceGB"`
-		MaxActiveUploads    int     `json:"maxActiveUploads"`
-		MaxActiveDownloads  int     `json:"maxActiveDownloads"`
-		SuperSeedingDefault bool    `json:"superSeedingDefault"`
-		FitTimeCheckMs      int     `json:"fitTimeCheckMs"`
-		EmergencyBuffer     float64 `json:"emergencyBuffer"`
-		SpaceAlarmEnabled   bool    `json:"spaceAlarmEnabled"`
-		SpaceAlarmGB        float64 `json:"spaceAlarmGb"`
-		MinDiskSpacePercent float64 `json:"minDiskSpacePercent"`
-		Scope               string  `json:"scope"`
-		PreFilterEnabled    bool    `json:"preFilterEnabled"`
-		EnhancementBatchSize int    `json:"enhancementBatchSize"`
-		EnhancementCacheTTL int     `json:"enhancementCacheTtl"`
-		ActiveTimeWindows   string  `json:"activeTimeWindows"`
-		EmaAlpha            float64 `json:"emaAlpha"`
-		CleanupScoreWeights string  `json:"cleanupScoreWeights"`
-		ArchiveGranularity  string  `json:"archiveGranularity"`
-		RejectRuleIDs       string  `json:"rejectRuleIds"`
-		ReannounceBefore    bool    `json:"reannounceBefore"`
-		ReannounceRetries   int     `json:"reannounceRetries"`
-		ReannounceIntervalMs int   `json:"reannounceIntervalMs"`
-		ReannounceWaitMs    int     `json:"reannounceWaitMs"`
+		ClientID                 string  `json:"clientId"`
+		Enabled                  bool    `json:"enabled"`
+		DeleteRuleIDs            string  `json:"deleteRuleIds"`
+		AutoDeleteCron           string  `json:"autoDeleteCron"`
+		MainDataCron             string  `json:"mainDataCron"`
+		DiskProtectEnabled       bool    `json:"diskProtectEnabled"`
+		MinDiskSpaceGB           float64 `json:"minDiskSpaceGB"`
+		MaxActiveUploads         int     `json:"maxActiveUploads"`
+		MaxActiveDownloads       int     `json:"maxActiveDownloads"`
+		SuperSeedingDefault      bool    `json:"superSeedingDefault"`
+		FitTimeCheckMs           int     `json:"fitTimeCheckMs"`
+		EmergencyBuffer          float64 `json:"emergencyBuffer"`
+		SpaceAlarmEnabled        bool    `json:"spaceAlarmEnabled"`
+		SpaceAlarmGB             float64 `json:"spaceAlarmGb"`
+		MinDiskSpacePercent      float64 `json:"minDiskSpacePercent"`
+		Scope                    string  `json:"scope"`
+		PreFilterEnabled         bool    `json:"preFilterEnabled"`
+		EnhancementBatchSize     int     `json:"enhancementBatchSize"`
+		EnhancementCacheTTL      int     `json:"enhancementCacheTtl"`
+		ActiveTimeWindows        string  `json:"activeTimeWindows"`
+		EmaAlpha                 float64 `json:"emaAlpha"`
+		CleanupScoreWeights      string  `json:"cleanupScoreWeights"`
+		ArchiveGranularity       string  `json:"archiveGranularity"`
+		RejectRuleIDs            string  `json:"rejectRuleIds"`
+		ReannounceBefore         bool    `json:"reannounceBefore"`
+		ReannounceRetries        int     `json:"reannounceRetries"`
+		ReannounceIntervalMs     int     `json:"reannounceIntervalMs"`
+		ReannounceWaitMs         int     `json:"reannounceWaitMs"`
 		MinSeedHoursBeforeDelete float64 `json:"minSeedHoursBeforeDelete"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -280,34 +280,34 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	config := model.SeedingClientConfig{
-		ClientID:            req.ClientID,
-		Enabled:             req.Enabled,
-		DeleteRuleIDs:       req.DeleteRuleIDs,
-		AutoDeleteCron:      req.AutoDeleteCron,
-		MainDataCron:        req.MainDataCron,
-		DiskProtectEnabled:  req.DiskProtectEnabled,
-		MinDiskSpaceGB:      req.MinDiskSpaceGB,
-		MaxActiveUploads:    req.MaxActiveUploads,
-		MaxActiveDownloads:  req.MaxActiveDownloads,
-		SuperSeedingDefault: req.SuperSeedingDefault,
-		FitTimeCheckMs:      req.FitTimeCheckMs,
-		EmergencyBuffer:     req.EmergencyBuffer,
-		SpaceAlarmEnabled:   req.SpaceAlarmEnabled,
-		SpaceAlarmGB:        req.SpaceAlarmGB,
-		MinDiskSpacePercent: req.MinDiskSpacePercent,
-		Scope:               req.Scope,
-		PreFilterEnabled:    req.PreFilterEnabled,
-		EnhancementBatchSize: req.EnhancementBatchSize,
-		EnhancementCacheTTL: req.EnhancementCacheTTL,
-		ActiveTimeWindows:   req.ActiveTimeWindows,
-		EmaAlpha:            req.EmaAlpha,
-		CleanupScoreWeights: req.CleanupScoreWeights,
-		ArchiveGranularity:  req.ArchiveGranularity,
-		RejectRuleIDs:       req.RejectRuleIDs,
-		ReannounceBefore:    req.ReannounceBefore,
-		ReannounceRetries:   req.ReannounceRetries,
-		ReannounceIntervalMs: req.ReannounceIntervalMs,
-		ReannounceWaitMs:    req.ReannounceWaitMs,
+		ClientID:                 req.ClientID,
+		Enabled:                  req.Enabled,
+		DeleteRuleIDs:            req.DeleteRuleIDs,
+		AutoDeleteCron:           req.AutoDeleteCron,
+		MainDataCron:             req.MainDataCron,
+		DiskProtectEnabled:       req.DiskProtectEnabled,
+		MinDiskSpaceGB:           req.MinDiskSpaceGB,
+		MaxActiveUploads:         req.MaxActiveUploads,
+		MaxActiveDownloads:       req.MaxActiveDownloads,
+		SuperSeedingDefault:      req.SuperSeedingDefault,
+		FitTimeCheckMs:           req.FitTimeCheckMs,
+		EmergencyBuffer:          req.EmergencyBuffer,
+		SpaceAlarmEnabled:        req.SpaceAlarmEnabled,
+		SpaceAlarmGB:             req.SpaceAlarmGB,
+		MinDiskSpacePercent:      req.MinDiskSpacePercent,
+		Scope:                    req.Scope,
+		PreFilterEnabled:         req.PreFilterEnabled,
+		EnhancementBatchSize:     req.EnhancementBatchSize,
+		EnhancementCacheTTL:      req.EnhancementCacheTTL,
+		ActiveTimeWindows:        req.ActiveTimeWindows,
+		EmaAlpha:                 req.EmaAlpha,
+		CleanupScoreWeights:      req.CleanupScoreWeights,
+		ArchiveGranularity:       req.ArchiveGranularity,
+		RejectRuleIDs:            req.RejectRuleIDs,
+		ReannounceBefore:         req.ReannounceBefore,
+		ReannounceRetries:        req.ReannounceRetries,
+		ReannounceIntervalMs:     req.ReannounceIntervalMs,
+		ReannounceWaitMs:         req.ReannounceWaitMs,
 		MinSeedHoursBeforeDelete: req.MinSeedHoursBeforeDelete,
 	}
 	if config.AutoDeleteCron == "" {
@@ -1242,20 +1242,20 @@ func (h *SeedingHandler) handleStatsOverview(w http.ResponseWriter, _ *http.Requ
 	}
 
 	Success(w, map[string]interface{}{
-		"totalTorrents":        total,
-		"activeTorrents":       activeTorrents,
-		"pausedTorrents":       pausedTorrents,
-		"realSeeding":          realSeeding,
-		"realDownloading":      realDownloading,
-		"totalUploadBytes":     globalStats.AllTimeUpload,
-		"totalDownloadBytes":   globalStats.AllTimeDownload,
-		"todayUploadBytes":     todayUpload,
-		"todayDownloadBytes":   todayDownload,
-		"globalRatio":          globalRatio,
-		"todayDeleted":         todayDeleted,
-		"todayAdded":           todayAdded,
-		"statsScope":           "seeding",
-		"statsScopeNote":       "仅统计刷流绑定且启用的下载器全局传输量（含该下载器内所有种子，含非刷流种子）",
+		"totalTorrents":      total,
+		"activeTorrents":     activeTorrents,
+		"pausedTorrents":     pausedTorrents,
+		"realSeeding":        realSeeding,
+		"realDownloading":    realDownloading,
+		"totalUploadBytes":   globalStats.AllTimeUpload,
+		"totalDownloadBytes": globalStats.AllTimeDownload,
+		"todayUploadBytes":   todayUpload,
+		"todayDownloadBytes": todayDownload,
+		"globalRatio":        globalRatio,
+		"todayDeleted":       todayDeleted,
+		"todayAdded":         todayAdded,
+		"statsScope":         "seeding",
+		"statsScopeNote":     "仅统计刷流绑定且启用的下载器全局传输量（含该下载器内所有种子，含非刷流种子）",
 	})
 }
 

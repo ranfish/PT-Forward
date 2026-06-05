@@ -410,14 +410,14 @@ func (h *PublishHandler) handleGetGroup(w http.ResponseWriter, r *http.Request, 
 	}
 
 	Success(w, map[string]interface{}{
-		"id":           group.ID,
-		"candidateId":  group.CandidateID,
-		"status":       group.Status,
-		"sourceHash":   group.SourceHash,
-		"sourceSite":   group.SourceSite,
-		"createdAt":    group.CreatedAt,
-		"updatedAt":    group.UpdatedAt,
-		"members":      members,
+		"id":          group.ID,
+		"candidateId": group.CandidateID,
+		"status":      group.Status,
+		"sourceHash":  group.SourceHash,
+		"sourceSite":  group.SourceSite,
+		"createdAt":   group.CreatedAt,
+		"updatedAt":   group.UpdatedAt,
+		"members":     members,
 	})
 }
 

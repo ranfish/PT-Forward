@@ -10,7 +10,9 @@ import (
 
 func TestMaxBodySize_AllowsNormal(t *testing.T) {
 	handler := MaxBodySize(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req struct{ Q string `json:"query"` }
+		var req struct {
+			Q string `json:"query"`
+		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
