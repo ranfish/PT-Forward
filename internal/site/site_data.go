@@ -90,6 +90,11 @@ func SeedSites(db *gorm.DB) error {
 			defs = adapter.FrameworkDefaults["generic"]
 		}
 
+		downloadTpl := defs.DownloadURLTemplate
+		if supp, ok := GetSupportedSite(s.Domain); ok && supp.DownloadURLTemplate != "" {
+			downloadTpl = supp.DownloadURLTemplate
+		}
+
 		site := &model.Site{
 			Domain:             s.Domain,
 			Name:               s.Name,
@@ -107,7 +112,7 @@ func SeedSites(db *gorm.DB) error {
 			IDStrategy:          defs.IDStrategy,
 			IDPattern:           defs.IDPattern,
 			DownloadMode:        defaultDownloadMode(s.DownloadMode),
-			DownloadURLTemplate: defs.DownloadURLTemplate,
+			DownloadURLTemplate: downloadTpl,
 			RequiresSideLoading: defs.RequiresSideLoading,
 		}
 
@@ -120,6 +125,40 @@ func SeedSites(db *gorm.DB) error {
 		}
 	}
 
+	return nil
+}
+
+// SyncSiteTemplates 把 supported_sites.json 的 download_url_template 同步到 DB sites 表。
+// 仅覆盖 DB 里等于 framework default 的记录（用户没手动改过的）。
+func SyncSiteTemplates(db *gorm.DB) error {
+	for _, supp := range ListSupportedSites() {
+		if supp.DownloadURLTemplate == "" {
+			continue
+		}
+
+		var site model.Site
+		if err := db.Where("domain = ?", supp.Domain).First(&site).Error; err != nil {
+			continue
+		}
+
+		defs, ok := adapter.FrameworkDefaults[site.Framework]
+		if !ok {
+			continue
+		}
+
+		if site.DownloadURLTemplate != defs.DownloadURLTemplate {
+			continue
+		}
+
+		if site.DownloadURLTemplate == supp.DownloadURLTemplate {
+			continue
+		}
+
+		if err := db.Model(&model.Site{}).Where("domain = ?", supp.Domain).
+			Update("download_url_template", supp.DownloadURLTemplate).Error; err != nil {
+			return siteError(ErrSiteSeed, fmt.Sprintf("sync download_url_template %s", supp.Domain), err)
+		}
+	}
 	return nil
 }
 

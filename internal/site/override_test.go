@@ -638,3 +638,32 @@ func TestSeedFormFieldOverrides_Idempotent(t *testing.T) {
 	db.Model(&model.SiteConfigOverride{}).Count(&count)
 	assert.Equal(t, int64(len(loadSeedData().Overrides)), count)
 }
+
+func TestSyncSiteTemplates_UpdatesFrameworkDefault(t *testing.T) {
+	db := setupOverrideDB(t)
+	require.NoError(t, SeedSites(db))
+
+	defs := adapter.FrameworkDefaults["nexusphp"]
+	require.NoError(t, db.Model(&model.Site{}).Where("domain = ?", "pthome.net").
+		Update("download_url_template", defs.DownloadURLTemplate).Error)
+
+	require.NoError(t, SyncSiteTemplates(db))
+
+	var site model.Site
+	require.NoError(t, db.Where("domain = ?", "pthome.net").First(&site).Error)
+	assert.Equal(t, "download.php?id={id}&rsskey={rsskey}", site.DownloadURLTemplate)
+}
+
+func TestSyncSiteTemplates_PreservesUserOverride(t *testing.T) {
+	db := setupOverrideDB(t)
+	require.NoError(t, SeedSites(db))
+
+	require.NoError(t, db.Model(&model.Site{}).Where("domain = ?", "pthome.net").
+		Update("download_url_template", "custom.php?{id}").Error)
+
+	require.NoError(t, SyncSiteTemplates(db))
+
+	var site model.Site
+	require.NoError(t, db.Where("domain = ?", "pthome.net").First(&site).Error)
+	assert.Equal(t, "custom.php?{id}", site.DownloadURLTemplate)
+}

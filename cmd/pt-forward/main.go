@@ -157,6 +157,9 @@ func main() {
 		if err := site.SeedSites(db); err != nil {
 			log.Warn("site seed warning", zap.Error(err))
 		}
+		if err := site.SyncSiteTemplates(db); err != nil {
+			log.Warn("sync site templates warning", zap.Error(err))
+		}
 		if err := site.SeedFieldMappings(db); err != nil {
 			log.Warn("field mapping seed warning", zap.Error(err))
 		}
