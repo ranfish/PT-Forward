@@ -703,11 +703,11 @@ func TestScenario_F10_DispatchByEvent(t *testing.T) {
 }
 
 type mockIYUUService struct {
-	queryReseedFn     func(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error)
-	getSeededSitesFn  func(ctx context.Context, infoHash string) ([]string, error)
-	getSiteListFn     func(ctx context.Context) ([]model.IYUUSite, error)
-	reportExistingFn  func(ctx context.Context, sidList []int) error
-	pingFn            func(ctx context.Context) error
+	queryReseedFn      func(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error)
+	getSeededSitesFn   func(ctx context.Context, infoHash string) ([]string, error)
+	getSiteListFn      func(ctx context.Context) ([]model.IYUUSite, error)
+	reportExistingFn   func(ctx context.Context, sidList []int) error
+	pingFn             func(ctx context.Context) error
 	sendNotificationFn func(ctx context.Context, text, desp string) error
 }
 

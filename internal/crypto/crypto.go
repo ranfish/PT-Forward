@@ -23,8 +23,8 @@ const pbkdf2Iterations = 100000
 var legacySalt = []byte("pt-forward-credential-encryption")
 
 type CredentialEncryptor struct {
-	aead    cipher.AEAD
-	legacy  cipher.AEAD
+	aead      cipher.AEAD
+	legacy    cipher.AEAD
 	hasLegacy bool
 }
 

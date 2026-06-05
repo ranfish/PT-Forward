@@ -243,7 +243,9 @@ export interface Site {
   passkeyAlias?: string
   passkeyHint?: string
   hasCookie: boolean
+  cookieMasked?: string
   hasApiKey: boolean
+  apiKeyMasked?: string
   hasBearerToken: boolean
   hasAuthKey: boolean
   authKeyMasked?: string

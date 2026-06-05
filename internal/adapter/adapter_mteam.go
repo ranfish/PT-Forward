@@ -991,10 +991,10 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	var result struct {
 		Message string `json:"message"`
 		Data    struct {
-			ID           flexInt `json:"id"`
-			Username     string  `json:"username"`
-			Role         flexInt `json:"role"`
-			MemberCount  struct {
+			ID          flexInt `json:"id"`
+			Username    string  `json:"username"`
+			Role        flexInt `json:"role"`
+			MemberCount struct {
 				Uploaded   string `json:"uploaded"`
 				Downloaded string `json:"downloaded"`
 				Bonus      string `json:"bonus"`

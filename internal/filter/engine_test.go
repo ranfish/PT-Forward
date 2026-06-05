@@ -178,7 +178,8 @@ func TestEngine_MatchAccept(t *testing.T) {
 	}
 	if result.Reject {
 		t.Error("accept rule should not be treated as reject")
-	}}
+	}
+}
 
 func TestEngine_MatchReject(t *testing.T) {
 	repo := NewRepository(setupTestDB(t))
@@ -404,9 +405,9 @@ func TestEngine_MatchByIDs_RejectMatch(t *testing.T) {
 	engine := NewEngine(repo, nil)
 
 	rule := &model.FilterRule{
-		Name:      "reject-big",
-		RuleType:  "reject",
-		Enabled:   true,
+		Name:     "reject-big",
+		RuleType: "reject",
+		Enabled:  true,
 		Conditions: []model.RuleCondition{
 			{Key: "title", CompareType: model.CompareContain, Value: "spam"},
 		},
@@ -426,9 +427,9 @@ func TestEngine_MatchByIDs_NoMatch(t *testing.T) {
 	engine := NewEngine(repo, nil)
 
 	rule := &model.FilterRule{
-		Name:      "reject-big",
-		RuleType:  "reject",
-		Enabled:   true,
+		Name:     "reject-big",
+		RuleType: "reject",
+		Enabled:  true,
 		Conditions: []model.RuleCondition{
 			{Key: "title", CompareType: model.CompareContain, Value: "spam"},
 		},
@@ -446,10 +447,10 @@ func TestEngine_MatchByIDs_AcceptRule(t *testing.T) {
 	engine := NewEngine(repo, nil)
 
 	rule := &model.FilterRule{
-		Name:      "accept-free",
-		RuleType:  "accept",
-		Enabled:   true,
-		SavePath:  "/data/free",
+		Name:     "accept-free",
+		RuleType: "accept",
+		Enabled:  true,
+		SavePath: "/data/free",
 		Conditions: []model.RuleCondition{
 			{Key: "discount_level", CompareType: model.CompareEquals, Value: "FREE"},
 		},
@@ -489,9 +490,9 @@ func TestEngine_Match_AcceptRuleNotRejected(t *testing.T) {
 	engine := NewEngine(repo, nil)
 
 	rule := &model.FilterRule{
-		Name:      "accept-free",
-		RuleType:  "accept",
-		Enabled:   true,
+		Name:     "accept-free",
+		RuleType: "accept",
+		Enabled:  true,
 		Conditions: []model.RuleCondition{
 			{Key: "title", CompareType: model.CompareContain, Value: "Ubuntu"},
 		},
@@ -511,9 +512,9 @@ func TestEngine_Match_RejectRuleRejected(t *testing.T) {
 	engine := NewEngine(repo, nil)
 
 	rule := &model.FilterRule{
-		Name:      "reject-spam",
-		RuleType:  "reject",
-		Enabled:   true,
+		Name:     "reject-spam",
+		RuleType: "reject",
+		Enabled:  true,
 		Conditions: []model.RuleCondition{
 			{Key: "title", CompareType: model.CompareContain, Value: "spam"},
 		},

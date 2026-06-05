@@ -23,37 +23,37 @@ import (
 )
 
 type Router struct {
-	authHandler        *AuthHandler
-	clientHandler      *ClientHandler
-	siteHandler        *SiteHandler
-	rssHandler         *RSSHandler
-	filterHandler      *FilterHandler
-	notifyHandler      *NotifyHandler
-	settingsHandler    *SettingsHandler
-	seedingHandler     *SeedingHandler
-	deleteRuleHandler  *DeleteRuleHandler
-	reseedHandler      *ReseedHandler
-	publishHandler      *PublishHandler
+	authHandler          *AuthHandler
+	clientHandler        *ClientHandler
+	siteHandler          *SiteHandler
+	rssHandler           *RSSHandler
+	filterHandler        *FilterHandler
+	notifyHandler        *NotifyHandler
+	settingsHandler      *SettingsHandler
+	seedingHandler       *SeedingHandler
+	deleteRuleHandler    *DeleteRuleHandler
+	reseedHandler        *ReseedHandler
+	publishHandler       *PublishHandler
 	manualForwardHandler *ManualForwardHandler
-	dashboardHandler   *DashboardHandler
-	systemHandler      *SystemHandler
-	iyuuHandler        *IYUUHandler
-	fingerprintHandler *FingerprintHandler
-	trackerHandler     *TrackerHandler
-	lifecycleHandler   *LifecycleHandler
-	cookiecloudHandler *CookieCloudHandler
-	ptgenHandler       *PTGenHandler
-	schedulerHandler   *SchedulerHandler
-	wsHandler          *WSHandler
-	hub                *Hub
-	authManager        *auth.AuthManager
-	logger             *zap.Logger
-	corsMW             func(http.Handler) http.Handler
-	recoveryMW         func(http.Handler) http.Handler
-	secMW              func(http.Handler) http.Handler
-	authMW             func(http.Handler) http.Handler
-	rateLimitMW        func(http.Handler) http.Handler
-	publicRateLimitMW  func(http.Handler) http.Handler
+	dashboardHandler     *DashboardHandler
+	systemHandler        *SystemHandler
+	iyuuHandler          *IYUUHandler
+	fingerprintHandler   *FingerprintHandler
+	trackerHandler       *TrackerHandler
+	lifecycleHandler     *LifecycleHandler
+	cookiecloudHandler   *CookieCloudHandler
+	ptgenHandler         *PTGenHandler
+	schedulerHandler     *SchedulerHandler
+	wsHandler            *WSHandler
+	hub                  *Hub
+	authManager          *auth.AuthManager
+	logger               *zap.Logger
+	corsMW               func(http.Handler) http.Handler
+	recoveryMW           func(http.Handler) http.Handler
+	secMW                func(http.Handler) http.Handler
+	authMW               func(http.Handler) http.Handler
+	rateLimitMW          func(http.Handler) http.Handler
+	publicRateLimitMW    func(http.Handler) http.Handler
 }
 
 func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, logger *zap.Logger) *Router {
@@ -84,31 +84,31 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		sysHandler.SetSeedingEngine(seedingEngine)
 	}
 	return &Router{
-		authHandler:        NewAuthHandler(authManager),
-		clientHandler:      NewClientHandler(db, logger, clientMgrIface),
-		siteHandler:        siteHandler,
-		rssHandler:         NewRSSHandler(rssRepo, rssEngine, db, logger),
-		filterHandler:      NewFilterHandler(filterRepo, filterEng, db, logger),
-		notifyHandler:      NewNotifyHandler(notifyRepo, notifyService, logger),
-		settingsHandler:    NewSettingsHandler(settingsRepo, logger),
-		seedingHandler:     NewSeedingHandler(db, logger, seedingEngine),
-		deleteRuleHandler:  NewDeleteRuleHandler(db, logger, clientMgrIface),
-		reseedHandler:      NewReseedHandler(reseedEngine, logger),
+		authHandler:          NewAuthHandler(authManager),
+		clientHandler:        NewClientHandler(db, logger, clientMgrIface),
+		siteHandler:          siteHandler,
+		rssHandler:           NewRSSHandler(rssRepo, rssEngine, db, logger),
+		filterHandler:        NewFilterHandler(filterRepo, filterEng, db, logger),
+		notifyHandler:        NewNotifyHandler(notifyRepo, notifyService, logger),
+		settingsHandler:      NewSettingsHandler(settingsRepo, logger),
+		seedingHandler:       NewSeedingHandler(db, logger, seedingEngine),
+		deleteRuleHandler:    NewDeleteRuleHandler(db, logger, clientMgrIface),
+		reseedHandler:        NewReseedHandler(reseedEngine, logger),
 		publishHandler:       NewPublishHandler(publishPipeline, logger, db),
 		manualForwardHandler: NewManualForwardHandler(db, logger),
-		dashboardHandler:   dashHandler,
-		systemHandler:      sysHandler,
-		iyuuHandler:        NewIYUUHandler(db, logger, iyuuSvc),
-		fingerprintHandler: NewFingerprintHandler(db, logger),
-		trackerHandler:     NewTrackerHandler(db, logger),
-		lifecycleHandler:   NewLifecycleHandler(db, logger),
-		cookiecloudHandler: NewCookieCloudHandler(db, logger),
-		ptgenHandler:       NewPTGenHandler(db, logger),
-		schedulerHandler:   NewSchedulerHandler(taskRegistry, db, logger),
-		wsHandler:          NewWSHandler(hub, authManager, nil),
-		hub:                hub,
-		authManager:        authManager,
-		logger:             logger,
+		dashboardHandler:     dashHandler,
+		systemHandler:        sysHandler,
+		iyuuHandler:          NewIYUUHandler(db, logger, iyuuSvc),
+		fingerprintHandler:   NewFingerprintHandler(db, logger),
+		trackerHandler:       NewTrackerHandler(db, logger),
+		lifecycleHandler:     NewLifecycleHandler(db, logger),
+		cookiecloudHandler:   NewCookieCloudHandler(db, logger),
+		ptgenHandler:         NewPTGenHandler(db, logger),
+		schedulerHandler:     NewSchedulerHandler(taskRegistry, db, logger),
+		wsHandler:            NewWSHandler(hub, authManager, nil),
+		hub:                  hub,
+		authManager:          authManager,
+		logger:               logger,
 	}
 }
 

@@ -149,13 +149,13 @@ func seedSubscription(t *testing.T, db *gorm.DB, scoringEnabled bool, include2xU
 		SiteName: "site1",
 		ClientID: "c1",
 		ScoringConfig: model.SeedingScoringConfig{
-			Enabled:         scoringEnabled,
-			MaxCandidates:   50,
+			Enabled:          scoringEnabled,
+			MaxCandidates:    50,
 			MaxActiveSeeding: 100,
-			BatchLimit:      10,
-			MinScore:        -1,
-			Include2xUp:     include2xUp,
-			HalfLifeHours:   2.0,
+			BatchLimit:       10,
+			MinScore:         -1,
+			Include2xUp:      include2xUp,
+			HalfLifeHours:    2.0,
 		},
 	}
 	if err := db.Create(sub).Error; err != nil {
@@ -894,10 +894,10 @@ func TestFlush_DiskProtectBlocks(t *testing.T) {
 	subID := seedSubscription(t, db, true, true)
 
 	db.Create(&model.SeedingClientConfig{
-		ClientID:          "c1",
-		Enabled:           true,
+		ClientID:           "c1",
+		Enabled:            true,
 		DiskProtectEnabled: true,
-		MinDiskSpaceGB:    50,
+		MinDiskSpaceGB:     50,
 	})
 
 	db.Create(&model.SeedingTorrentRecord{
@@ -947,10 +947,10 @@ func TestFlush_DiskProtectAllowsWhenSpaceOK(t *testing.T) {
 	subID := seedSubscription(t, db, true, true)
 
 	db.Create(&model.SeedingClientConfig{
-		ClientID:          "c1",
-		Enabled:           true,
+		ClientID:           "c1",
+		Enabled:            true,
 		DiskProtectEnabled: true,
-		MinDiskSpaceGB:    10,
+		MinDiskSpaceGB:     10,
 	})
 
 	db.Create(&model.SeedingTorrentRecord{

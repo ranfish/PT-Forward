@@ -375,8 +375,8 @@ func (c *TRClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTra
 
 func (c *TRClient) GetTrackerMessages(ctx context.Context, hash string) (string, error) {
 	resp, err := c.rpcCall(ctx, "torrent-get", map[string]interface{}{
-		"ids":     []string{hash},
-		"fields":  []string{"trackerStats"},
+		"ids":    []string{hash},
+		"fields": []string{"trackerStats"},
 	})
 	if err != nil {
 		return "", fmt.Errorf("torrent-get rpc: %w", err)

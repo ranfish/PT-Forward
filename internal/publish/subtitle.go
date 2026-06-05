@@ -56,9 +56,9 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 
 	var result struct {
 		Streams []struct {
-			Index      int    `json:"index"`
-			CodecName  string `json:"codec_name"`
-			Tags       struct {
+			Index     int    `json:"index"`
+			CodecName string `json:"codec_name"`
+			Tags      struct {
 				Language string `json:"language"`
 				Title    string `json:"title"`
 			} `json:"tags"`
@@ -113,10 +113,10 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 		candidates = append(candidates, SubtitleCandidate{
 			StreamIndex: stream.Index,
 			Codec:       codec,
-			Language:     lang,
-			Title:        stream.Tags.Title,
-			IsText:       isText,
-			Score:        score,
+			Language:    lang,
+			Title:       stream.Tags.Title,
+			IsText:      isText,
+			Score:       score,
 		})
 	}
 

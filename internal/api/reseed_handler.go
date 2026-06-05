@@ -134,20 +134,20 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Schedule             string  `json:"schedule"`
 		MaxInjectionsPerRun  int     `json:"maxInjectionsPerRun"`
 		ReseedCategory       string  `json:"reseedCategory"`
-		TargetSiteExcludes      string  `json:"targetSiteExcludes"`
-		ReleaseGroupExcludes    string  `json:"releaseGroupExcludes"`
-		CategoryExcludes        string  `json:"categoryExcludes"`
-		TitleKeywordExcludes    string  `json:"titleKeywordExcludes"`
-		MatchMethods            string  `json:"matchMethods"`
-		FallbackEnabled         bool    `json:"fallbackEnabled"`
-		MaxFallbacks            int     `json:"maxFallbacks"`
-		EngineMode              string  `json:"engineMode"`
-		InjectionIntervalS      int     `json:"injectionIntervalS"`
-		InjectionJitterS        int     `json:"injectionJitterS"`
-		InjectionConcurrency    int     `json:"injectionConcurrency"`
-		ScanConcurrency         int     `json:"scanConcurrency"`
-		MaxRetries              int     `json:"maxRetries"`
-		RetryIntervalH          int     `json:"retryIntervalH"`
+		TargetSiteExcludes   string  `json:"targetSiteExcludes"`
+		ReleaseGroupExcludes string  `json:"releaseGroupExcludes"`
+		CategoryExcludes     string  `json:"categoryExcludes"`
+		TitleKeywordExcludes string  `json:"titleKeywordExcludes"`
+		MatchMethods         string  `json:"matchMethods"`
+		FallbackEnabled      bool    `json:"fallbackEnabled"`
+		MaxFallbacks         int     `json:"maxFallbacks"`
+		EngineMode           string  `json:"engineMode"`
+		InjectionIntervalS   int     `json:"injectionIntervalS"`
+		InjectionJitterS     int     `json:"injectionJitterS"`
+		InjectionConcurrency int     `json:"injectionConcurrency"`
+		ScanConcurrency      int     `json:"scanConcurrency"`
+		MaxRetries           int     `json:"maxRetries"`
+		RetryIntervalH       int     `json:"retryIntervalH"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -169,20 +169,20 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Schedule:             req.Schedule,
 		MaxInjectionsPerRun:  req.MaxInjectionsPerRun,
 		ReseedCategory:       req.ReseedCategory,
-		TargetSiteExcludes:      req.TargetSiteExcludes,
-		ReleaseGroupExcludes:    req.ReleaseGroupExcludes,
-		CategoryExcludes:        req.CategoryExcludes,
-		TitleKeywordExcludes:    req.TitleKeywordExcludes,
-		MatchMethods:            req.MatchMethods,
-		FallbackEnabled:         req.FallbackEnabled,
-		MaxFallbacks:            req.MaxFallbacks,
-		EngineMode:              req.EngineMode,
-		InjectionIntervalS:      req.InjectionIntervalS,
-		InjectionJitterS:        req.InjectionJitterS,
-		InjectionConcurrency:    req.InjectionConcurrency,
-		ScanConcurrency:         req.ScanConcurrency,
-		MaxRetries:              req.MaxRetries,
-		RetryIntervalH:          req.RetryIntervalH,
+		TargetSiteExcludes:   req.TargetSiteExcludes,
+		ReleaseGroupExcludes: req.ReleaseGroupExcludes,
+		CategoryExcludes:     req.CategoryExcludes,
+		TitleKeywordExcludes: req.TitleKeywordExcludes,
+		MatchMethods:         req.MatchMethods,
+		FallbackEnabled:      req.FallbackEnabled,
+		MaxFallbacks:         req.MaxFallbacks,
+		EngineMode:           req.EngineMode,
+		InjectionIntervalS:   req.InjectionIntervalS,
+		InjectionJitterS:     req.InjectionJitterS,
+		InjectionConcurrency: req.InjectionConcurrency,
+		ScanConcurrency:      req.ScanConcurrency,
+		MaxRetries:           req.MaxRetries,
+		RetryIntervalH:       req.RetryIntervalH,
 	}
 	if task.Schedule == "" {
 		task.Schedule = "0 */6 * * *"

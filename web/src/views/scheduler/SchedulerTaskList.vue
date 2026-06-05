@@ -109,6 +109,7 @@ const taskNameMap: Record<string, string> = {
   notification_cleanup_history: '通知历史清理',
   site_stats_sync: '站点统计同步',
   seeding_free_wait_check: '刷流免费等待检查',
+  cookiecloud_sync: 'CookieCloud 同步',
 }
 
 function taskLabel(name: string): string {

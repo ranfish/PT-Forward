@@ -65,26 +65,26 @@ type updateNotifyRequest struct {
 }
 
 type notifyResponse struct {
-	ID               uint      `json:"id"`
-	Type             string    `json:"type"`
-	Name             string    `json:"name"`
-	Enabled          bool      `json:"enabled"`
-	Healthy          bool      `json:"healthy"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
-	Events           string    `json:"events,omitempty"`
-	MaxErrorsPerHour int       `json:"maxErrorsPerHour"`
-	TimeoutMs        int       `json:"timeoutMs"`
-	QuietHoursStart  string    `json:"quietHoursStart,omitempty"`
-	QuietHoursEnd    string    `json:"quietHoursEnd,omitempty"`
-	MessageTemplate   string    `json:"messageTemplate,omitempty"`
-	Overrides         string    `json:"overrides,omitempty"`
-	FailoverGroupID   string    `json:"failoverGroupId,omitempty"`
-	MinPriority       int       `json:"minPriority"`
-	DigestTemplate    string    `json:"digestTemplate,omitempty"`
-	DigestIntervalMin  int       `json:"digestIntervalMin"`
-	ConsecutiveFailures int      `json:"consecutiveFailures"`
-	HasConfig          bool      `json:"hasConfig"`
+	ID                  uint      `json:"id"`
+	Type                string    `json:"type"`
+	Name                string    `json:"name"`
+	Enabled             bool      `json:"enabled"`
+	Healthy             bool      `json:"healthy"`
+	CreatedAt           time.Time `json:"createdAt"`
+	UpdatedAt           time.Time `json:"updatedAt"`
+	Events              string    `json:"events,omitempty"`
+	MaxErrorsPerHour    int       `json:"maxErrorsPerHour"`
+	TimeoutMs           int       `json:"timeoutMs"`
+	QuietHoursStart     string    `json:"quietHoursStart,omitempty"`
+	QuietHoursEnd       string    `json:"quietHoursEnd,omitempty"`
+	MessageTemplate     string    `json:"messageTemplate,omitempty"`
+	Overrides           string    `json:"overrides,omitempty"`
+	FailoverGroupID     string    `json:"failoverGroupId,omitempty"`
+	MinPriority         int       `json:"minPriority"`
+	DigestTemplate      string    `json:"digestTemplate,omitempty"`
+	DigestIntervalMin   int       `json:"digestIntervalMin"`
+	ConsecutiveFailures int       `json:"consecutiveFailures"`
+	HasConfig           bool      `json:"hasConfig"`
 }
 
 type notifyHistoryResponse struct {
@@ -115,26 +115,26 @@ func (h *NotifyHandler) toHistoryResponse(hist *model.NotificationHistory) notif
 
 func (h *NotifyHandler) toResponse(ch *model.NotificationChannel) notifyResponse {
 	return notifyResponse{
-		ID:               ch.ID,
-		Type:             ch.Type,
-		Name:             ch.Name,
-		Enabled:          ch.Enabled,
-		Healthy:          ch.Healthy,
-		CreatedAt:        ch.CreatedAt,
-		UpdatedAt:        ch.UpdatedAt,
-		Events:           ch.Events,
-		MaxErrorsPerHour: ch.MaxErrorsPerHour,
-		TimeoutMs:        ch.TimeoutMs,
-		QuietHoursStart:  ch.QuietHoursStart,
-		QuietHoursEnd:    ch.QuietHoursEnd,
-		MessageTemplate:   ch.MessageTemplate,
-		Overrides:         ch.Overrides,
-		FailoverGroupID:   ch.FailoverGroupID,
-		MinPriority:       ch.MinPriority,
-		DigestTemplate:    ch.DigestTemplate,
-		DigestIntervalMin:  ch.DigestIntervalMin,
+		ID:                  ch.ID,
+		Type:                ch.Type,
+		Name:                ch.Name,
+		Enabled:             ch.Enabled,
+		Healthy:             ch.Healthy,
+		CreatedAt:           ch.CreatedAt,
+		UpdatedAt:           ch.UpdatedAt,
+		Events:              ch.Events,
+		MaxErrorsPerHour:    ch.MaxErrorsPerHour,
+		TimeoutMs:           ch.TimeoutMs,
+		QuietHoursStart:     ch.QuietHoursStart,
+		QuietHoursEnd:       ch.QuietHoursEnd,
+		MessageTemplate:     ch.MessageTemplate,
+		Overrides:           ch.Overrides,
+		FailoverGroupID:     ch.FailoverGroupID,
+		MinPriority:         ch.MinPriority,
+		DigestTemplate:      ch.DigestTemplate,
+		DigestIntervalMin:   ch.DigestIntervalMin,
 		ConsecutiveFailures: ch.ConsecutiveFailures,
-		HasConfig:          ch.Config != "",
+		HasConfig:           ch.Config != "",
 	}
 }
 
@@ -253,22 +253,22 @@ func (h *NotifyHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ch := &model.NotificationChannel{
-		Type:             req.Type,
-		Name:             req.Name,
-		Enabled:          req.Enabled,
-		Config:           req.Config,
-		Events:           req.Events,
-		MaxErrorsPerHour: maxErrors,
-		TimeoutMs:        timeout,
-		QuietHoursStart:  req.QuietHoursStart,
-		QuietHoursEnd:    req.QuietHoursEnd,
-		MessageTemplate:  req.MessageTemplate,
+		Type:              req.Type,
+		Name:              req.Name,
+		Enabled:           req.Enabled,
+		Config:            req.Config,
+		Events:            req.Events,
+		MaxErrorsPerHour:  maxErrors,
+		TimeoutMs:         timeout,
+		QuietHoursStart:   req.QuietHoursStart,
+		QuietHoursEnd:     req.QuietHoursEnd,
+		MessageTemplate:   req.MessageTemplate,
 		Overrides:         req.Overrides,
-		FailoverGroupID:  req.FailoverGroupID,
+		FailoverGroupID:   req.FailoverGroupID,
 		MinPriority:       req.MinPriority,
 		DigestTemplate:    req.DigestTemplate,
 		DigestIntervalMin: req.DigestIntervalMin,
-		Healthy:          true,
+		Healthy:           true,
 	}
 
 	if err := h.repo.Create(r.Context(), ch); err != nil {

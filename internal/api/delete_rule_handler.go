@@ -16,9 +16,9 @@ import (
 )
 
 type DeleteRuleHandler struct {
-	db         *gorm.DB
-	logger     *zap.Logger
-	clientMgr  ClientManager
+	db        *gorm.DB
+	logger    *zap.Logger
+	clientMgr ClientManager
 }
 
 func NewDeleteRuleHandler(db *gorm.DB, logger *zap.Logger, clientMgr ClientManager) *DeleteRuleHandler {
@@ -111,25 +111,25 @@ func (h *DeleteRuleHandler) handleGet(w http.ResponseWriter, _ *http.Request, id
 
 func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Alias               string `json:"alias"`
-		Priority            int    `json:"priority"`
-		Enabled             bool   `json:"enabled"`
-		Type                string `json:"type"`
-		Logic               string `json:"logic"`
-		Conditions          string `json:"conditions"`
-		Action              string `json:"action"`
-		DeleteNum           int    `json:"delete_num"`
-		RemoveData          bool   `json:"remove_data"`
-		Expr                string `json:"expr"`
-		FitTime             int    `json:"fit_time"`
-		OnlyDeleteTorrent   bool   `json:"only_delete_torrent"`
-		LimitSpeedBytes     int64  `json:"limit_speed_bytes"`
-		ReannounceBefore    bool   `json:"reannounce_before"`
-		ReannounceWaitMs    int    `json:"reannounce_wait_ms"`
-		ReannounceRetries   int    `json:"reannounce_retries"`
-		ReannounceIntervalMs int   `json:"reannounce_interval_ms"`
-		CascadeDelete       bool   `json:"cascade_delete"`
-		CascadeMaxDepth     int    `json:"cascade_max_depth"`
+		Alias                string `json:"alias"`
+		Priority             int    `json:"priority"`
+		Enabled              bool   `json:"enabled"`
+		Type                 string `json:"type"`
+		Logic                string `json:"logic"`
+		Conditions           string `json:"conditions"`
+		Action               string `json:"action"`
+		DeleteNum            int    `json:"delete_num"`
+		RemoveData           bool   `json:"remove_data"`
+		Expr                 string `json:"expr"`
+		FitTime              int    `json:"fit_time"`
+		OnlyDeleteTorrent    bool   `json:"only_delete_torrent"`
+		LimitSpeedBytes      int64  `json:"limit_speed_bytes"`
+		ReannounceBefore     bool   `json:"reannounce_before"`
+		ReannounceWaitMs     int    `json:"reannounce_wait_ms"`
+		ReannounceRetries    int    `json:"reannounce_retries"`
+		ReannounceIntervalMs int    `json:"reannounce_interval_ms"`
+		CascadeDelete        bool   `json:"cascade_delete"`
+		CascadeMaxDepth      int    `json:"cascade_max_depth"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -148,25 +148,25 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 	}
 
 	rule := model.DeleteRule{
-		Alias:               req.Alias,
-		Priority:            req.Priority,
-		Enabled:             req.Enabled,
-		Type:                req.Type,
-		Logic:               req.Logic,
-		Conditions:          req.Conditions,
-		Action:              req.Action,
-		DeleteNum:           req.DeleteNum,
-		RemoveData:          req.RemoveData,
-		Expr:                req.Expr,
-		FitTime:             req.FitTime,
-		OnlyDeleteTorrent:   req.OnlyDeleteTorrent,
-		LimitSpeedBytes:     req.LimitSpeedBytes,
-		ReannounceBefore:    req.ReannounceBefore,
-		ReannounceWaitMs:    req.ReannounceWaitMs,
-		ReannounceRetries:   req.ReannounceRetries,
+		Alias:                req.Alias,
+		Priority:             req.Priority,
+		Enabled:              req.Enabled,
+		Type:                 req.Type,
+		Logic:                req.Logic,
+		Conditions:           req.Conditions,
+		Action:               req.Action,
+		DeleteNum:            req.DeleteNum,
+		RemoveData:           req.RemoveData,
+		Expr:                 req.Expr,
+		FitTime:              req.FitTime,
+		OnlyDeleteTorrent:    req.OnlyDeleteTorrent,
+		LimitSpeedBytes:      req.LimitSpeedBytes,
+		ReannounceBefore:     req.ReannounceBefore,
+		ReannounceWaitMs:     req.ReannounceWaitMs,
+		ReannounceRetries:    req.ReannounceRetries,
 		ReannounceIntervalMs: req.ReannounceIntervalMs,
-		CascadeDelete:       req.CascadeDelete,
-		CascadeMaxDepth:     req.CascadeMaxDepth,
+		CascadeDelete:        req.CascadeDelete,
+		CascadeMaxDepth:      req.CascadeMaxDepth,
 	}
 	if rule.Type == "" {
 		rule.Type = "normal"
@@ -417,10 +417,10 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 	}
 
 	Success(w, map[string]interface{}{
-		"matched":       matched,
-		"total":         len(matched),
-		"totalScanned":  len(candidates),
-		"rule":          rule,
+		"matched":      matched,
+		"total":        len(matched),
+		"totalScanned": len(candidates),
+		"rule":         rule,
 	})
 }
 

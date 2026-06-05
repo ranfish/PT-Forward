@@ -32,18 +32,18 @@ type SiteFormConfig struct {
 }
 
 type SiteSeedData struct {
-	Domain             string         `json:"domain"`
-	Name               string         `json:"name"`
-	BaseURL            string         `json:"base_url"`
-	Framework          string         `json:"framework"`
-	AuthType           string         `json:"auth_type"`
-	DownloadMode       string         `json:"download_mode"`
-	IsSource           bool           `json:"is_source"`
-	IsTarget           bool           `json:"is_target"`
-	CookieCloudDomain  string         `json:"cookiecloud_domain"`
-	AlternativeDomains          string         `json:"alternative_domains"`
-	SupportsPiecesHashAPI       *bool          `json:"supports_pieces_hash_api,omitempty"`
-	Form                        SiteFormConfig `json:"form"`
+	Domain                string         `json:"domain"`
+	Name                  string         `json:"name"`
+	BaseURL               string         `json:"base_url"`
+	Framework             string         `json:"framework"`
+	AuthType              string         `json:"auth_type"`
+	DownloadMode          string         `json:"download_mode"`
+	IsSource              bool           `json:"is_source"`
+	IsTarget              bool           `json:"is_target"`
+	CookieCloudDomain     string         `json:"cookiecloud_domain"`
+	AlternativeDomains    string         `json:"alternative_domains"`
+	SupportsPiecesHashAPI *bool          `json:"supports_pieces_hash_api,omitempty"`
+	Form                  SiteFormConfig `json:"form"`
 }
 
 type seedData struct {
@@ -140,15 +140,15 @@ func defaultDownloadMode(s string) string {
 func SeedFieldMappings(db *gorm.DB) error {
 	for _, s := range seedSites() {
 		fieldTypes := map[string][]SelectOption{
-			"cat":            s.Form.Category,
-			"medium_sel":     s.Form.MediumSel,
-			"codec_sel":      s.Form.CodecSel,
-			"standard_sel":   s.Form.StandardSel,
-			"audiocodec_sel": s.Form.AudioCodec,
-			"team_sel":       s.Form.TeamSel,
-			"processing_sel": s.Form.ProcessingSel,
-			"source_sel":     s.Form.SourceSel,
-			"tags":           s.Form.Tags,
+			"cat":               s.Form.Category,
+			"medium_sel":        s.Form.MediumSel,
+			"codec_sel":         s.Form.CodecSel,
+			"standard_sel":      s.Form.StandardSel,
+			"audiocodec_sel":    s.Form.AudioCodec,
+			"team_sel":          s.Form.TeamSel,
+			"processing_sel":    s.Form.ProcessingSel,
+			"source_sel":        s.Form.SourceSel,
+			"tags":              s.Form.Tags,
 			"music_format_sel":  s.Form.MusicFormatSel,
 			"music_medium_sel":  s.Form.MusicMediumSel,
 			"music_publish_sel": s.Form.MusicPublishSel,

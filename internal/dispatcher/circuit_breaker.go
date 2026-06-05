@@ -9,13 +9,13 @@ import (
 )
 
 type CircuitBreaker struct {
-	logger         *zap.Logger
-	notifyService  *notification.Service
-	mu             sync.RWMutex
-	failureCounts  map[string]int
-	openUntil      map[string]time.Time
-	threshold      int
-	resetTimeout   time.Duration
+	logger        *zap.Logger
+	notifyService *notification.Service
+	mu            sync.RWMutex
+	failureCounts map[string]int
+	openUntil     map[string]time.Time
+	threshold     int
+	resetTimeout  time.Duration
 }
 
 func NewCircuitBreaker(logger *zap.Logger, notifyService *notification.Service) *CircuitBreaker {

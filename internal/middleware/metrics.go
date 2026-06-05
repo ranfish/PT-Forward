@@ -10,7 +10,7 @@ import (
 
 type metricsRecorder struct {
 	http.ResponseWriter
-	status int
+	status  int
 	written bool
 }
 

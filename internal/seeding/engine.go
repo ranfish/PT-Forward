@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	scoringCutoffHours     = 72 * time.Hour
-	syncGracePeriod        = 15 * time.Minute
-	syncHardTimeout        = 2 * time.Hour
+	scoringCutoffHours = 72 * time.Hour
+	syncGracePeriod    = 15 * time.Minute
+	syncHardTimeout    = 2 * time.Hour
 )
 
 func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
@@ -123,9 +123,9 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 			e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
 				Where("client_id = ? AND info_hash IN ?", clientID, recoverHashes).
 				Updates(map[string]interface{}{
-					"status":        model.SeedingStatusSeeding,
+					"status":         model.SeedingStatusSeeding,
 					"last_action_by": "",
-					"updated_at":    time.Now(),
+					"updated_at":     time.Now(),
 				})
 
 			e.mu.Lock()
@@ -163,7 +163,7 @@ type Engine struct {
 	wg              sync.WaitGroup
 	reseedTrigger   ReseedTrigger
 
-	unregisteredCursor  int
+	unregisteredCursor   int
 	unregisteredChecking bool
 }
 
@@ -176,10 +176,10 @@ func (e *Engine) SetReseedTrigger(trigger ReseedTrigger) {
 }
 
 type maindataEntry struct {
-	Maindata      *model.Maindata
-	FreeSpace     int64
+	Maindata       *model.Maindata
+	FreeSpace      int64
 	TotalDiskSpace int64
-	UpdatedAt     time.Time
+	UpdatedAt      time.Time
 }
 
 type emaState struct {
@@ -1852,9 +1852,9 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 		Source:         "rss",
 		Status:         model.SeedingStatusPending,
 		SubscriptionID: event.SourceID,
-		IsFree:      event.Discount == model.DiscountFree || event.Discount == model.Discount2xFree,
-		FreeEndAt:   event.FreeEndAt,
-		TorrentSize: event.Size,
+		IsFree:         event.Discount == model.DiscountFree || event.Discount == model.Discount2xFree,
+		FreeEndAt:      event.FreeEndAt,
+		TorrentSize:    event.Size,
 	}
 
 	result := e.db.WithContext(ctx).Clauses(clause.OnConflict{
@@ -1884,8 +1884,6 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 	}
 	return nil
 }
-
-
 
 func (e *Engine) Clear(ctx context.Context, clientID string) error {
 	e.mu.Lock()
@@ -2088,18 +2086,18 @@ func (e *Engine) GetRealTorrentCounts() map[string]*RealTorrentCounts {
 			}
 			counts.Total++
 			counts.TotalSize += ti.TotalSize
-		state := strings.ToLower(ti.State)
-		switch {
-		case state == "uploading" || state == "stalledup" || state == "forcedup" ||
-			state == "queuedup" || state == "checkingup":
-			counts.Seeding++
-		case state == "downloading" || state == "stalleddl" || state == "forceddl" ||
-			state == "metadl" || state == "forcedmetadl" || state == "checkingdl" || state == "queueddl":
-			counts.Downloading++
-		case ti.IsPaused || state == "pausedup" || state == "stoppedup" ||
-			strings.HasSuffix(state, "dl"):
-			counts.Paused++
-		}
+			state := strings.ToLower(ti.State)
+			switch {
+			case state == "uploading" || state == "stalledup" || state == "forcedup" ||
+				state == "queuedup" || state == "checkingup":
+				counts.Seeding++
+			case state == "downloading" || state == "stalleddl" || state == "forceddl" ||
+				state == "metadl" || state == "forcedmetadl" || state == "checkingdl" || state == "queueddl":
+				counts.Downloading++
+			case ti.IsPaused || state == "pausedup" || state == "stoppedup" ||
+				strings.HasSuffix(state, "dl"):
+				counts.Paused++
+			}
 		}
 		result[clientID] = counts
 	}

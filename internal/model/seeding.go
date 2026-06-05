@@ -20,20 +20,20 @@ type SeedingTorrentRecord struct {
 	FreeLevel   string        `json:"free_level" gorm:"size:20"`
 	Discount    DiscountLevel `json:"discount" gorm:"size:20;default:'NONE'"`
 
-	Status        SeedingTorrentStatus `json:"status" gorm:"size:20;not null;default:'seeding';index"`
-	LastActionBy  string               `json:"last_action_by" gorm:"size:100"`
-	Source        string               `json:"source" gorm:"size:20;default:'rss'"`
-	SubscriptionID string     `json:"subscription_id" gorm:"size:50;index"`
-	FlushedAt      *time.Time `json:"flushed_at" gorm:"index"`
+	Status         SeedingTorrentStatus `json:"status" gorm:"size:20;not null;default:'seeding';index"`
+	LastActionBy   string               `json:"last_action_by" gorm:"size:100"`
+	Source         string               `json:"source" gorm:"size:20;default:'rss'"`
+	SubscriptionID string               `json:"subscription_id" gorm:"size:50;index"`
+	FlushedAt      *time.Time           `json:"flushed_at" gorm:"index"`
 
-	FirstMatchedAt    *time.Time `json:"first_matched_at" gorm:"index"`
-	FinalUploaded     int64      `json:"final_uploaded" gorm:"default:0"`
-	FinalDownloaded   int64      `json:"final_downloaded" gorm:"default:0"`
-	TorrentSize       int64      `json:"torrent_size" gorm:"default:0"`
+	FirstMatchedAt  *time.Time `json:"first_matched_at" gorm:"index"`
+	FinalUploaded   int64      `json:"final_uploaded" gorm:"default:0"`
+	FinalDownloaded int64      `json:"final_downloaded" gorm:"default:0"`
+	TorrentSize     int64      `json:"torrent_size" gorm:"default:0"`
 
-	Unregistered     bool       `json:"unregistered" gorm:"default:false"`
-	UnregisteredAt   *time.Time `json:"unregistered_at"`
-	UnregisteredMsg  string     `json:"unregistered_msg" gorm:"size:200"`
+	Unregistered    bool       `json:"unregistered" gorm:"default:false"`
+	UnregisteredAt  *time.Time `json:"unregistered_at"`
+	UnregisteredMsg string     `json:"unregistered_msg" gorm:"size:200"`
 }
 
 func (SeedingTorrentRecord) TableName() string { return "seeding_torrent_records" }
@@ -263,24 +263,24 @@ type CleanupScoreWeights struct {
 }
 
 type ScoringLog struct {
-	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	CycleID   string    `json:"cycle_id" gorm:"size:30;index;not null"`
-	ClientID  string    `json:"client_id" gorm:"size:50;index;not null"`
-	InfoHash  string    `json:"info_hash" gorm:"size:40;index;not null"`
-	SiteName  string    `json:"site_name" gorm:"size:100"`
-	TorrentID string    `json:"torrent_id" gorm:"size:50"`
-	Score     float64   `json:"score"`
-	Demand    float64   `json:"demand"`
-	UploadVal float64   `json:"upload_val"`
-	Recency   float64   `json:"recency"`
-	Seeders   int       `json:"seeders"`
-	Leechers  int       `json:"leechers"`
-	AgeHours  float64   `json:"age_hours"`
-	Discount  string    `json:"discount" gorm:"size:20"`
-	IsFree    bool      `json:"is_free"`
-	HasHR     bool      `json:"has_hr"`
-	UploadSpeed int64   `json:"upload_speed"`
-	CreatedAt time.Time `json:"created_at" gorm:"index"`
+	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	CycleID     string    `json:"cycle_id" gorm:"size:30;index;not null"`
+	ClientID    string    `json:"client_id" gorm:"size:50;index;not null"`
+	InfoHash    string    `json:"info_hash" gorm:"size:40;index;not null"`
+	SiteName    string    `json:"site_name" gorm:"size:100"`
+	TorrentID   string    `json:"torrent_id" gorm:"size:50"`
+	Score       float64   `json:"score"`
+	Demand      float64   `json:"demand"`
+	UploadVal   float64   `json:"upload_val"`
+	Recency     float64   `json:"recency"`
+	Seeders     int       `json:"seeders"`
+	Leechers    int       `json:"leechers"`
+	AgeHours    float64   `json:"age_hours"`
+	Discount    string    `json:"discount" gorm:"size:20"`
+	IsFree      bool      `json:"is_free"`
+	HasHR       bool      `json:"has_hr"`
+	UploadSpeed int64     `json:"upload_speed"`
+	CreatedAt   time.Time `json:"created_at" gorm:"index"`
 }
 
 func (ScoringLog) TableName() string { return "scoring_logs" }

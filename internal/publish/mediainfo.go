@@ -19,20 +19,20 @@ type MediaInfoResult struct {
 }
 
 type MediaInfoTrack struct {
-	Format            string `json:"format,omitempty"`
-	CodecID           string `json:"codec_id,omitempty"`
-	Duration          string `json:"duration,omitempty"`
-	BitRate           string `json:"bit_rate,omitempty"`
-	Width             string `json:"width,omitempty"`
-	Height            string `json:"height,omitempty"`
-	FrameRate         string `json:"frame_rate,omitempty"`
+	Format             string `json:"format,omitempty"`
+	CodecID            string `json:"codec_id,omitempty"`
+	Duration           string `json:"duration,omitempty"`
+	BitRate            string `json:"bit_rate,omitempty"`
+	Width              string `json:"width,omitempty"`
+	Height             string `json:"height,omitempty"`
+	FrameRate          string `json:"frame_rate,omitempty"`
 	DisplayAspectRatio string `json:"display_aspect_ratio,omitempty"`
-	Language          string `json:"language,omitempty"`
-	Channels          string `json:"channels,omitempty"`
-	SamplingRate      string `json:"sampling_rate,omitempty"`
-	Title             string `json:"title,omitempty"`
-	FileSize          string `json:"file_size,omitempty"`
-	OverallBitRate    string `json:"overall_bit_rate,omitempty"`
+	Language           string `json:"language,omitempty"`
+	Channels           string `json:"channels,omitempty"`
+	SamplingRate       string `json:"sampling_rate,omitempty"`
+	Title              string `json:"title,omitempty"`
+	FileSize           string `json:"file_size,omitempty"`
+	OverallBitRate     string `json:"overall_bit_rate,omitempty"`
 }
 
 type MediaInfoAnalyzer struct {

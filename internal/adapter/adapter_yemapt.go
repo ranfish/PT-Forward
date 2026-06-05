@@ -168,13 +168,13 @@ func (a *YemaptAdapter) fetchUserStatsOpenAPI(ctx context.Context, config *model
 	var result struct {
 		Success bool `json:"success"`
 		Data    struct {
-			ID                     int    `json:"id"`
-			Name                   string `json:"name"`
-			Level                  int    `json:"level"`
-			Bonus                  int64  `json:"bonus"`
-			PromotionUploadSize    int64  `json:"promotionUploadSize"`
-			PromotionDownloadSize  int64  `json:"promotionDownloadSize"`
-			Status                 string `json:"status"`
+			ID                    int    `json:"id"`
+			Name                  string `json:"name"`
+			Level                 int    `json:"level"`
+			Bonus                 int64  `json:"bonus"`
+			PromotionUploadSize   int64  `json:"promotionUploadSize"`
+			PromotionDownloadSize int64  `json:"promotionDownloadSize"`
+			Status                string `json:"status"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {

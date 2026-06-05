@@ -397,10 +397,10 @@ func TestSite_JSONOmitEmptyCredentials(t *testing.T) {
 
 func TestSite_JSONIncludesCredentialsWhenSet(t *testing.T) {
 	s := Site{
-		Domain:    "test.com",
-		Passkey:   "secret123",
-		Cookie:    "session=abc",
-		APIKey:    "key456",
+		Domain:  "test.com",
+		Passkey: "secret123",
+		Cookie:  "session=abc",
+		APIKey:  "key456",
 	}
 	data, err := json.Marshal(s)
 	if err != nil {

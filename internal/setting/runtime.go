@@ -21,9 +21,9 @@ const (
 	KeyRateLimitWrite    = "rate_limit_write"
 	KeyRateLimitDownload = "rate_limit_download"
 
-	KeyScreenshotEnabled    = "screenshot_enabled"
-	KeyScreenshotMpvPath    = "screenshot_mpv_path"
-	KeyScreenshotCount      = "screenshot_count"
+	KeyScreenshotEnabled     = "screenshot_enabled"
+	KeyScreenshotMpvPath     = "screenshot_mpv_path"
+	KeyScreenshotCount       = "screenshot_count"
 	KeyScreenshotMinInterval = "screenshot_min_interval"
 	KeyScreenshotJPEGQuality = "screenshot_jpeg_quality"
 
@@ -49,9 +49,9 @@ var DefaultSeeds = map[string]string{
 	KeyRateLimitWrite:    "200",
 	KeyRateLimitDownload: "50",
 
-	KeyScreenshotEnabled:    "false",
-	KeyScreenshotMpvPath:    "mpv",
-	KeyScreenshotCount:      "6",
+	KeyScreenshotEnabled:     "false",
+	KeyScreenshotMpvPath:     "mpv",
+	KeyScreenshotCount:       "6",
 	KeyScreenshotMinInterval: "60",
 	KeyScreenshotJPEGQuality: "85",
 

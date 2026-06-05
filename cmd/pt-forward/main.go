@@ -24,9 +24,10 @@ import (
 	"github.com/ranfish/pt-forward/internal/auth"
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/config"
+	"github.com/ranfish/pt-forward/internal/cookiecloud"
+	"github.com/ranfish/pt-forward/internal/crypto"
 	dbpkg "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/dispatcher"
-	"github.com/ranfish/pt-forward/internal/crypto"
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/filter"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
@@ -769,6 +770,34 @@ func registerSchedulerTasks(
 
 	register("rss_recheck_waiting", "rss", "0 */15 * * * *", func(ctx context.Context) error {
 		return rssEngine.RecheckWaiting(ctx)
+	})
+
+	register("cookiecloud_sync", "maintenance", "0 */5 * * * *", func(ctx context.Context) error {
+		var cfg model.CookieCloudConfig
+		if err := db.WithContext(ctx).First(&cfg).Error; err != nil {
+			return nil
+		}
+		if !cfg.SyncEnabled {
+			return nil
+		}
+		interval := cfg.SyncInterval
+		if interval < 5 {
+			interval = 5
+		}
+		if cfg.LastSyncAt != nil && time.Since(*cfg.LastSyncAt) < time.Duration(interval)*time.Minute {
+			return nil
+		}
+		syncSvc := cookiecloud.NewSyncService(db, log)
+		history, err := syncSvc.SyncAll(ctx)
+		if err != nil {
+			log.Warn("cookiecloud scheduled sync failed", zap.Error(err))
+			return nil
+		}
+		log.Info("cookiecloud scheduled sync completed",
+			zap.Int("synced", history.SyncedSites),
+			zap.Int("skipped", history.SkippedSites),
+		)
+		return nil
 	})
 
 	register("rss_cleanup_old_seen", "maintenance", "0 0 3 * * *", func(ctx context.Context) error {

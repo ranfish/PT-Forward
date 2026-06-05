@@ -84,10 +84,10 @@ func setupCookieCloudServer(t *testing.T, encrypted string) *httptest.Server {
 func seedCookieCloudConfig(t *testing.T, db *gorm.DB, serverURL, uuid, password string, enabled bool) {
 	t.Helper()
 	cfg := &model.CookieCloudConfig{
-		ServerURL:   serverURL,
-		UUID:        uuid,
-		Password:    password,
-		SyncEnabled: enabled,
+		ServerURL:    serverURL,
+		UUID:         uuid,
+		Password:     password,
+		SyncEnabled:  enabled,
 		SyncInterval: 60,
 	}
 	require.NoError(t, db.Create(cfg).Error)

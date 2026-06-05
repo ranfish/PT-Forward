@@ -144,10 +144,10 @@ func (c *QBClient) GetMainData(ctx context.Context) (*model.Maindata, error) {
 			DlInfoSpeed     int64 `json:"dl_info_speed"`
 			UpInfoSpeed     int64 `json:"up_info_speed"`
 		} `json:"server_state"`
-		Rid        int                `json:"rid"`
-		Categories json.RawMessage    `json:"categories"`
-		Tags       json.RawMessage    `json:"tags"`
-		FullUpdate bool               `json:"full_update"`
+		Rid        int             `json:"rid"`
+		Categories json.RawMessage `json:"categories"`
+		Tags       json.RawMessage `json:"tags"`
+		FullUpdate bool            `json:"full_update"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, c.wrapErr(11002, "decode maindata", err)
@@ -196,10 +196,10 @@ func (c *QBClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.
 		ServerState     struct {
 			FreeSpaceOnDisk int64 `json:"free_space_on_disk"`
 		} `json:"server_state"`
-		Rid        int                `json:"rid"`
-		Categories json.RawMessage    `json:"categories"`
-		Tags       json.RawMessage    `json:"tags"`
-		FullUpdate bool               `json:"full_update"`
+		Rid        int             `json:"rid"`
+		Categories json.RawMessage `json:"categories"`
+		Tags       json.RawMessage `json:"tags"`
+		FullUpdate bool            `json:"full_update"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, 0, c.wrapErr(11002, "decode maindata incremental", err)

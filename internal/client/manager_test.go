@@ -279,11 +279,11 @@ type stubClient struct {
 	name string
 }
 
-func (s *stubClient) GetName() string                                               { return s.name }
-func (s *stubClient) GetRole() string                                               { return "download" }
-func (s *stubClient) GetReseedTargetID() string                                     { return "" }
-func (s *stubClient) GetID() uint                                                   { return 0 }
-func (s *stubClient) GetSharedPaths() []model.SharedPathMapping                     { return nil }
+func (s *stubClient) GetName() string                           { return s.name }
+func (s *stubClient) GetRole() string                           { return "download" }
+func (s *stubClient) GetReseedTargetID() string                 { return "" }
+func (s *stubClient) GetID() uint                               { return 0 }
+func (s *stubClient) GetSharedPaths() []model.SharedPathMapping { return nil }
 func (s *stubClient) GetTorrentByHash(_ context.Context, _ string) (*model.TorrentInfo, error) {
 	return nil, nil
 }
@@ -296,7 +296,7 @@ func (s *stubClient) GetAllTorrents(_ context.Context) ([]*model.TorrentInfo, er
 func (s *stubClient) GetTorrentsByPath(_ context.Context, _ string) ([]*model.TorrentInfo, error) {
 	return nil, nil
 }
-func (s *stubClient) GetMainData(_ context.Context) (*model.Maindata, error)        { return nil, nil }
+func (s *stubClient) GetMainData(_ context.Context) (*model.Maindata, error) { return nil, nil }
 func (s *stubClient) GetMainDataIncremental(_ context.Context, _ int) (*model.Maindata, int, error) {
 	return nil, 0, nil
 }
@@ -308,24 +308,24 @@ func (s *stubClient) DeleteTorrent(_ context.Context, _ string, _ bool) error   
 func (s *stubClient) BatchDeleteTorrents(_ context.Context, _ []string, _ bool) error {
 	return nil
 }
-func (s *stubClient) PauseTorrent(_ context.Context, _ string) error            { return nil }
-func (s *stubClient) ResumeTorrent(_ context.Context, _ string) error           { return nil }
-func (s *stubClient) Reannounce(_ context.Context, _ string) error              { return nil }
-func (s *stubClient) Recheck(_ context.Context, _ string) error                 { return nil }
+func (s *stubClient) PauseTorrent(_ context.Context, _ string) error  { return nil }
+func (s *stubClient) ResumeTorrent(_ context.Context, _ string) error { return nil }
+func (s *stubClient) Reannounce(_ context.Context, _ string) error    { return nil }
+func (s *stubClient) Recheck(_ context.Context, _ string) error       { return nil }
 func (s *stubClient) SetTorrentTags(_ context.Context, _ string, _ []string) error {
 	return nil
 }
 func (s *stubClient) RemoveTorrentTags(_ context.Context, _ string, _ []string) error {
 	return nil
 }
-func (s *stubClient) SetCategory(_ context.Context, _ string, _ string) error    { return nil }
-func (s *stubClient) SetSavePath(_ context.Context, _ string, _ string) error    { return nil }
-func (s *stubClient) SetSuperSeeding(_ context.Context, _ string, _ bool) error   { return nil }
-func (s *stubClient) SetUploadLimit(_ context.Context, _ string, _ int64) error   { return nil }
-func (s *stubClient) PauseAllDownloads(_ context.Context) error                   { return nil }
-func (s *stubClient) ResumeAllDownloads(_ context.Context) error                  { return nil }
-func (s *stubClient) GetFreeSpace(_ context.Context) (int64, error)               { return 0, nil }
-func (s *stubClient) CheckExists(_ context.Context, _ string) (bool, error)       { return false, nil }
+func (s *stubClient) SetCategory(_ context.Context, _ string, _ string) error   { return nil }
+func (s *stubClient) SetSavePath(_ context.Context, _ string, _ string) error   { return nil }
+func (s *stubClient) SetSuperSeeding(_ context.Context, _ string, _ bool) error { return nil }
+func (s *stubClient) SetUploadLimit(_ context.Context, _ string, _ int64) error { return nil }
+func (s *stubClient) PauseAllDownloads(_ context.Context) error                 { return nil }
+func (s *stubClient) ResumeAllDownloads(_ context.Context) error                { return nil }
+func (s *stubClient) GetFreeSpace(_ context.Context) (int64, error)             { return 0, nil }
+func (s *stubClient) CheckExists(_ context.Context, _ string) (bool, error)     { return false, nil }
 func (s *stubClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
 	return &model.GlobalTransferStats{}, nil
 }

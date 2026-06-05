@@ -11,22 +11,22 @@ import (
 )
 
 type MemoryConfig struct {
-	MaxTotalMB int     `json:"max_total_mb"`
+	MaxTotalMB  int     `json:"max_total_mb"`
 	WarnPercent float64 `json:"warn_percent"`
 }
 
 type EvictFunc func(ctx context.Context, targetBytes uint64) uint64
 
 type MemoryMonitor struct {
-	cfg        MemoryConfig
-	logger     *zap.Logger
-	evictors   []evictorEntry
-	mu         sync.Mutex
-	wg         sync.WaitGroup
-	running    atomic.Bool
-	lastRSS    atomic.Uint64
-	warnLevel  atomic.Bool
-	stopCh     chan struct{}
+	cfg       MemoryConfig
+	logger    *zap.Logger
+	evictors  []evictorEntry
+	mu        sync.Mutex
+	wg        sync.WaitGroup
+	running   atomic.Bool
+	lastRSS   atomic.Uint64
+	warnLevel atomic.Bool
+	stopCh    chan struct{}
 }
 
 type evictorEntry struct {

@@ -447,14 +447,14 @@ func (a *RousiAdapter) FetchUserStats(ctx context.Context, config *model.SiteCon
 	var result struct {
 		Code int `json:"code"`
 		Data struct {
-			ID       int    `json:"id"`
-			Username string `json:"username"`
-			Level    int    `json:"level"`
-			LevelText string `json:"level_text"`
-			Uploaded   int64   `json:"uploaded"`
-			Downloaded int64   `json:"downloaded"`
-			Ratio      float64 `json:"ratio"`
-			Karma      float64 `json:"karma"`
+			ID                  int     `json:"id"`
+			Username            string  `json:"username"`
+			Level               int     `json:"level"`
+			LevelText           string  `json:"level_text"`
+			Uploaded            int64   `json:"uploaded"`
+			Downloaded          int64   `json:"downloaded"`
+			Ratio               float64 `json:"ratio"`
+			Karma               float64 `json:"karma"`
 			SeedingLeechingData struct {
 				SeedingCount int   `json:"seeding_count"`
 				SeedingSize  int64 `json:"seeding_size"`

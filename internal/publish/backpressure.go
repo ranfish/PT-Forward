@@ -16,7 +16,7 @@ import (
 type BackpressureSignal int
 
 const (
-	SignalBandwidth  BackpressureSignal = iota + 1
+	SignalBandwidth BackpressureSignal = iota + 1
 	SignalQueueDepth
 	SignalSiteFailure
 	SignalDiskIO
@@ -191,15 +191,15 @@ type SiteFailureStatus struct {
 }
 
 type BackpressureStatus struct {
-	QueueDepth             int                           `json:"queue_depth"`
-	MaxQueueDepth          int                           `json:"max_queue_depth"`
-	ActivePublishes        int                           `json:"active_publishes"`
-	MaxConcurrentPublishes int                           `json:"max_concurrent_publishes"`
-	ActiveDiskIO           int                           `json:"active_disk_io"`
-	MaxDiskIO              int                           `json:"max_disk_io"`
-	IsThrottled            bool                          `json:"is_throttled"`
-	PauseOnPressure        bool                          `json:"pause_on_pressure"`
-	PausedSites            map[string]SiteFailureStatus  `json:"paused_sites,omitempty"`
+	QueueDepth             int                          `json:"queue_depth"`
+	MaxQueueDepth          int                          `json:"max_queue_depth"`
+	ActivePublishes        int                          `json:"active_publishes"`
+	MaxConcurrentPublishes int                          `json:"max_concurrent_publishes"`
+	ActiveDiskIO           int                          `json:"active_disk_io"`
+	MaxDiskIO              int                          `json:"max_disk_io"`
+	IsThrottled            bool                         `json:"is_throttled"`
+	PauseOnPressure        bool                         `json:"pause_on_pressure"`
+	PausedSites            map[string]SiteFailureStatus `json:"paused_sites,omitempty"`
 }
 
 func (c *BackpressureController) isSitePaused(site string) bool {

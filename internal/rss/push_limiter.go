@@ -6,8 +6,8 @@ import (
 )
 
 type PushLimiter struct {
-	mu       sync.Mutex
-	counters map[string]*pushCounter
+	mu         sync.Mutex
+	counters   map[string]*pushCounter
 	maxPerHour int
 }
 

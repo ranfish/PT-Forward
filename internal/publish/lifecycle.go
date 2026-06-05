@@ -112,7 +112,7 @@ func (m *LifecycleManager) checkGroup(ctx context.Context, group *model.PublishG
 		}
 		hasTarget = true
 
-			if mem.HRProtected && !mem.HRReleased {
+		if mem.HRProtected && !mem.HRReleased {
 			if mem.HRSeedStart != nil {
 				elapsed := time.Since(*mem.HRSeedStart).Hours()
 				if elapsed < float64(mem.HRMinSeedHours) {

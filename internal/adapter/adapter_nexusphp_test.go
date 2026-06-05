@@ -477,7 +477,7 @@ func TestNexusPHP_SearchByPiecesHash(t *testing.T) {
 
 		body, _ := io.ReadAll(r.Body)
 		var req struct {
-			Passkey     string   `json:"passkey"`
+			Passkey    string   `json:"passkey"`
 			PiecesHash []string `json:"pieces_hash"`
 		}
 		_ = json.Unmarshal(body, &req)

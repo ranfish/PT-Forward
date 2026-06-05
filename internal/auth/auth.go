@@ -146,10 +146,10 @@ type AuthManager struct {
 	mu            sync.RWMutex
 	setupOnce     sync.Once
 
-	persistCh  chan struct{}
-	persistWg  sync.WaitGroup
-	stopOnce   sync.Once
-	stopCh     chan struct{}
+	persistCh chan struct{}
+	persistWg sync.WaitGroup
+	stopOnce  sync.Once
+	stopCh    chan struct{}
 }
 
 type SettingStore interface {

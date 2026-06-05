@@ -19,15 +19,15 @@ type ComponentHealth struct {
 }
 
 type HealthResponse struct {
-	Status     string                    `json:"status"`
-	Version    string                    `json:"version"`
-	Uptime     string                    `json:"uptime"`
+	Status     string                     `json:"status"`
+	Version    string                     `json:"version"`
+	Uptime     string                     `json:"uptime"`
 	Components map[string]ComponentHealth `json:"components,omitempty"`
 }
 
 type HealthChecker struct {
-	version    string
-	dbPinger   DBPinger
+	version  string
+	dbPinger DBPinger
 }
 
 func NewHealthChecker(version string) *HealthChecker {
