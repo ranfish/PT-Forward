@@ -357,17 +357,11 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		DetectionDetail:   s.DetectionDetail,
 	}
 
-	var overrides []model.SiteConfigOverride
-	if h.db != nil {
-		h.db.Where("site_name = ? AND field_path IN ?", s.Name, []string{"passkey_alias", "passkey_hint"}).Find(&overrides)
-		for _, o := range overrides {
-			switch o.FieldPath {
-			case "passkey_alias":
-				resp.PasskeyAlias = o.FieldValue
-			case "passkey_hint":
-				resp.PasskeyHint = o.FieldValue
-			}
-		}
+	// passkey_label / passkey_hint 从 supported_sites seed 读取（替代 site_config_overrides 表）
+	// 这是 §30.6 严格白名单设计：seed 是唯一真相源，UI 与 adapter 字段映射一致
+	if seed, ok := site.GetSupportedSite(s.Domain); ok {
+		resp.PasskeyAlias = seed.PasskeyLabel
+		resp.PasskeyHint = seed.PasskeyHint
 	}
 
 	return resp
@@ -563,9 +557,47 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" || req.Domain == "" || req.BaseURL == "" {
-		Error(w, http.StatusBadRequest, 40001, "name, domain, baseUrl 为必填项")
+	if req.Domain == "" {
+		Error(w, http.StatusBadRequest, 40001, "domain 为必填项")
 		return
+	}
+
+	// === 强白名单校验：domain 必须在 supported_sites.json 中 ===
+	// 用户从前端下拉选择站点，前端只传 domain，后端从 seed 自动填充其他系统字段
+	seed, ok := site.GetSupportedSite(req.Domain)
+	if !ok {
+		ErrorWithDetail(w, http.StatusBadRequest, 40002, "站点不在系统支持列表中",
+			"请从前端下拉列表选择已支持的站点（共 "+strconv.Itoa(len(site.ListSupportedSites()))+" 个）")
+		return
+	}
+	if seed.VerificationStatus == "blocked" {
+		ErrorWithDetail(w, http.StatusBadRequest, 40003, "站点暂不可添加",
+			seed.SpecialNotes)
+		return
+	}
+
+	// 强制覆盖系统字段（seed 为唯一真相源，防止前端绕过）
+	req.Framework = seed.Framework
+	req.AuthType = seed.AuthType
+	if seed.CookiecloudDomain != "" {
+		req.CookieCloudDomain = seed.CookiecloudDomain
+	}
+	if seed.DownloadURLTemplate != "" {
+		req.DownloadURLTemplate = seed.DownloadURLTemplate
+	}
+
+	// 自动填充 name（如未提供）
+	if req.Name == "" {
+		req.Name = seed.NameCN
+	}
+	if req.Name == "" {
+		Error(w, http.StatusBadRequest, 40001, "name 为必填项")
+		return
+	}
+
+	// 自动填充 baseURL（如未提供）
+	if req.BaseURL == "" {
+		req.BaseURL = "https://" + req.Domain
 	}
 
 	if err := middleware.ValidatePublicURL(req.BaseURL); err != nil {
@@ -585,21 +617,7 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if req.Framework == "" {
-		req.Framework = "generic"
-	}
-	if !validFrameworks[req.Framework] {
-		Error(w, http.StatusBadRequest, 40001, "framework 必须为 nexusphp/unit3d/gazelle/mteam/tnode/luminance/rousi/generic")
-		return
-	}
-
-	if req.AuthType == "" {
-		req.AuthType = "cookie"
-	}
-	if !model.ValidAuthType(req.AuthType) {
-		Error(w, http.StatusBadRequest, 40001, "authType 必须为 cookie/apikey/passkey")
-		return
-	}
+	// framework/authType 已由 seed 强制覆盖，跳过用户输入校验
 
 	exists, err := h.repo.ExistsByDomain(r.Context(), req.Domain, 0)
 	if err != nil {

@@ -325,11 +325,9 @@ func TestSettings_MethodNotAllowed(t *testing.T) {
 func TestSites_CRUD(t *testing.T) {
 	env := setupTestEnv(t)
 
+	// 使用 supported_sites.json 里的真实 domain（步骤 3 强白名单校验）
 	createBody := map[string]interface{}{
-		"name":      "TestSite",
-		"domain":    "test.com",
-		"baseUrl":   "https://test.com",
-		"framework": "nexusphp",
+		"domain": "longpt.org",
 	}
 	w := env.doRequest("POST", "/api/v1/sites", createBody)
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
@@ -479,13 +477,8 @@ func TestNotifications_CRUD(t *testing.T) {
 func TestRSS_CRUD(t *testing.T) {
 	env := setupTestEnv(t)
 
-	siteBody := map[string]interface{}{
-		"name":      "RSSSite",
-		"domain":    "rss-site.com",
-		"baseUrl":   "https://rss-site.com",
-		"framework": "nexusphp",
-	}
-	env.doRequest("POST", "/api/v1/sites", siteBody)
+	// db 直接创建（步骤 3 强白名单校验）
+	env.db.Create(&model.Site{Name: "RSSSite", Domain: "rss-site.com", BaseURL: "https://rss-site.com", Framework: "nexusphp", AuthType: "cookie", Enabled: true})
 
 	createBody := map[string]interface{}{
 		"name":      "TestRSS",
@@ -1712,21 +1705,14 @@ func TestErrorWithDetail(t *testing.T) {
 func TestSiteOverrides_CRUD(t *testing.T) {
 	env := setupTestEnv(t)
 
-	createBody := map[string]interface{}{
-		"name":      "OverrideTestSite",
-		"domain":    "override-test.com",
-		"baseUrl":   "https://override-test.com",
-		"framework": "nexusphp",
+	// db 直接创建（步骤 3 强白名单校验）
+	site := &model.Site{Name: "OverrideTestSite", Domain: "override-test.com", BaseURL: "https://override-test.com", Framework: "nexusphp", AuthType: "cookie", Enabled: true}
+	if err := env.db.Create(site).Error; err != nil {
+		t.Fatalf("create site: %v", err)
 	}
-	w := env.doRequest("POST", "/api/v1/sites", createBody)
-	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
-		t.Fatalf("create site: expected 200/201, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	siteID := data["id"].(float64)
+	siteID := float64(site.ID)
 
-	w = env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d/overrides", int(siteID)), nil)
+	w := env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d/overrides", int(siteID)), nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("list overrides: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -2344,19 +2330,19 @@ func (m *mockIYUUQueryService) GetSiteList(_ context.Context) ([]model.IYUUSite,
 
 func createTestSite(t *testing.T, env *testEnv, name, domain string) uint {
 	t.Helper()
-	body := map[string]interface{}{
-		"name":      name,
-		"domain":    domain,
-		"baseUrl":   "https://" + domain,
-		"framework": "nexusphp",
+	// 直接 db.Create 而非走 API：避免步骤 3 加的白名单强校验影响测试 setup
+	s := &model.Site{
+		Name:      name,
+		Domain:    domain,
+		BaseURL:   "https://" + domain,
+		Framework: "nexusphp",
+		AuthType:  "cookie",
+		Enabled:   true,
 	}
-	w := env.doRequest("POST", "/api/v1/sites", body)
-	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
-		t.Fatalf("create site: expected 200/201, got %d: %s", w.Code, w.Body.String())
+	if err := env.db.Create(s).Error; err != nil {
+		t.Fatalf("create site: %v", err)
 	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	return uint(data["id"].(float64))
+	return s.ID
 }
 
 func TestSite_UpdateCredentials_HappyPath(t *testing.T) {
@@ -3356,10 +3342,8 @@ func TestFilter_TestRule(t *testing.T) {
 func TestRSS_Trigger(t *testing.T) {
 	env := setupTestEnv(t)
 
-	env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "RSSTrigSite", "domain": "rss-trig.com",
-		"baseUrl": "https://rss-trig.com", "framework": "nexusphp",
-	})
+	// db 直接创建（步骤 3 强白名单校验，POST API 不接受 fake domain）
+	env.db.Create(&model.Site{Name: "RSSTrigSite", Domain: "rss-trig.com", BaseURL: "https://rss-trig.com", Framework: "nexusphp", AuthType: "cookie", Enabled: true})
 
 	w := env.doRequest("POST", "/api/v1/rss/subscriptions", map[string]interface{}{
 		"name":     "trig-sub",
@@ -3389,10 +3373,8 @@ func TestRSS_Trigger(t *testing.T) {
 func TestRSS_Trigger_Disabled(t *testing.T) {
 	env := setupTestEnv(t)
 
-	env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "RSSDisSite", "domain": "rss-dis.com",
-		"baseUrl": "https://rss-dis.com", "framework": "nexusphp",
-	})
+	// db 直接创建（步骤 3 强白名单校验）
+	env.db.Create(&model.Site{Name: "RSSDisSite", Domain: "rss-dis.com", BaseURL: "https://rss-dis.com", Framework: "nexusphp", AuthType: "cookie", Enabled: true})
 
 	w := env.doRequest("POST", "/api/v1/rss/subscriptions", map[string]interface{}{
 		"name":     "dis-sub",
@@ -4545,10 +4527,11 @@ func TestSite_Create_Validation(t *testing.T) {
 
 func TestSite_Create_DuplicateDomain(t *testing.T) {
 	env := setupTestEnv(t)
-	createTestSite(t, env, "DupSite", "dupsite.com")
+	// 直接 db 写入白名单内的 domain 制造重复（步骤 3 强白名单校验）
+	createTestSite(t, env, "龙PT", "longpt.org")
 
 	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "DupSite2", "domain": "dupsite.com", "baseUrl": "https://dupsite.com",
+		"domain": "longpt.org",
 	})
 	if w.Code != http.StatusConflict {
 		t.Fatalf("dup domain: expected 409, got %d: %s", w.Code, w.Body.String())
@@ -4689,10 +4672,13 @@ func TestSite_Get_NotFound(t *testing.T) {
 
 func TestSite_Create_DuplicateName(t *testing.T) {
 	env := setupTestEnv(t)
-	createTestSite(t, env, "DupNameSite", "dupname.com")
+	// 先 db 写入制造 name 重复（用白名单内 domain）
+	createTestSite(t, env, "龙PT", "longpt.org")
 
+	// POST 用另一个白名单 domain 但显式传相同 name → 应返回 409（name 重复）
 	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "DupNameSite", "domain": "dupname2.com", "baseUrl": "https://dupname2.com",
+		"domain": "kufei.org",
+		"name":   "龙PT",
 	})
 	if w.Code != http.StatusConflict {
 		t.Fatalf("dup name: expected 409, got %d: %s", w.Code, w.Body.String())
@@ -5044,10 +5030,8 @@ func TestSite_Detect_NexusKeyword(t *testing.T) {
 func TestSeeding_ScoringConfigByID(t *testing.T) {
 	env := setupTestEnv(t)
 
-	env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "ScorConfSite", "domain": "scorconf.com",
-		"baseUrl": "https://scorconf.com", "framework": "nexusphp",
-	})
+	// db 直接创建（步骤 3 强白名单校验）
+	env.db.Create(&model.Site{Name: "ScorConfSite", Domain: "scorconf.com", BaseURL: "https://scorconf.com", Framework: "nexusphp", AuthType: "cookie", Enabled: true})
 	w := env.doRequest("POST", "/api/v1/rss/subscriptions", map[string]interface{}{
 		"name": "scorconf-sub", "siteName": "ScorConfSite",
 		"urls": []string{"https://scorconf.com/rss"}, "enabled": true,
@@ -5229,10 +5213,8 @@ func TestSettings_Restore_BadJSON(t *testing.T) {
 func TestSeeding_ScoringConfig_Put(t *testing.T) {
 	env := setupTestEnv(t)
 
-	env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "ScorPutSite", "domain": "scorput.com",
-		"baseUrl": "https://scorput.com", "framework": "nexusphp",
-	})
+	// db 直接创建（步骤 3 强白名单校验）
+	env.db.Create(&model.Site{Name: "ScorPutSite", Domain: "scorput.com", BaseURL: "https://scorput.com", Framework: "nexusphp", AuthType: "cookie", Enabled: true})
 	w := env.doRequest("POST", "/api/v1/rss/subscriptions", map[string]interface{}{
 		"name": "scorput-sub", "siteName": "ScorPutSite",
 		"urls": []string{"https://scorput.com/rss"}, "enabled": true,
@@ -5290,10 +5272,8 @@ func TestSeeding_ScoringConfig_CRUD2(t *testing.T) {
 		t.Fatalf("list: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "ScorConf2Site", "domain": "scorconf2.com",
-		"baseUrl": "https://scorconf2.com", "framework": "nexusphp",
-	})
+	// db 直接创建（步骤 3 强白名单校验）
+	env.db.Create(&model.Site{Name: "ScorConf2Site", Domain: "scorconf2.com", BaseURL: "https://scorconf2.com", Framework: "nexusphp", AuthType: "cookie", Enabled: true})
 	w = env.doRequest("POST", "/api/v1/rss/subscriptions", map[string]interface{}{
 		"name": "scorconf2-sub", "siteName": "ScorConf2Site",
 		"urls": []string{"https://scorconf2.com/rss"}, "enabled": true,
@@ -6630,17 +6610,15 @@ func TestSeeding_Rules_MethodNotAllowed(t *testing.T) {
 
 func createSiteWithCookie(t *testing.T, env *testEnv, name, domain string) uint {
 	t.Helper()
-	body := map[string]interface{}{
-		"name": name, "domain": domain, "baseUrl": "https://" + domain,
-		"framework": "nexusphp", "authType": "cookie", "cookie": "session=abc123", "enabled": true,
+	// 直接 db.Create（步骤 3 强白名单校验，POST API 不接受 fake domain）
+	s := &model.Site{
+		Name: name, Domain: domain, BaseURL: "https://" + domain,
+		Framework: "nexusphp", AuthType: "cookie", Cookie: "session=abc123", Enabled: true,
 	}
-	w := env.doRequest("POST", "/api/v1/sites", body)
-	if w.Code != http.StatusOK {
-		t.Fatalf("createSiteWithCookie: expected 200, got %d: %s", w.Code, w.Body.String())
+	if err := env.db.Create(s).Error; err != nil {
+		t.Fatalf("createSiteWithCookie: %v", err)
 	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	return uint(data["id"].(float64))
+	return s.ID
 }
 
 func TestSite_NewSiteHandler(t *testing.T) {
@@ -6693,8 +6671,9 @@ func TestSiteV2_CreateInvalidBody(t *testing.T) {
 
 func TestSiteV2_CreateDefaultsFramework(t *testing.T) {
 	env := setupTestEnv(t)
+	// 步骤 3：framework/authType 由 seed 强制覆盖；选 hdroute.org (generic) 验证
 	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "NoFW", "domain": "nofw-v2.example.com", "baseUrl": "https://nofw-v2.example.com",
+		"domain": "hdroute.org",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -7186,9 +7165,10 @@ func TestBuildSiteHTTPClient(t *testing.T) {
 
 func TestSiteV2_ToResponseHasCredentials(t *testing.T) {
 	env := setupTestEnv(t)
+	// 用白名单内 domain（步骤 3）；framework/authType 由 seed 强制覆盖（gazelle→cookie）
 	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "CredV2", "domain": "credv2.example.com", "baseUrl": "https://credv2.example.com",
-		"framework": "gazelle", "authType": "passkey", "passkey": "pk",
+		"domain": "dicmusic.com",
+		"passkey": "pk",
 		"apiKey": "ak", "authKey": "authk", "authHash": "authh",
 		"rssKey": "rssk", "bearerToken": "bt", "enabled": true,
 	})
@@ -7231,13 +7211,32 @@ func TestSiteV2_UpdateMultipleFields(t *testing.T) {
 
 func TestSiteV2_CreateAllFrameworks(t *testing.T) {
 	env := setupTestEnv(t)
-	for i, fw := range []string{"nexusphp", "unit3d", "gazelle", "mteam", "tnode", "luminance", "rousi", "generic"} {
+	// 步骤 3 强白名单校验：每个 framework 选 supported_sites.json 内的一个真实 domain
+	frameworkDomains := []struct {
+		fw     string
+		domain string
+	}{
+		{"nexusphp", "13city.org"},
+		{"unit3d", "monikadesign.uk"},
+		{"gazelle", "dicmusic.com"},
+		{"mteam", "api.m-team.cc"},
+		{"tnode", "zhuque.in"},
+		{"rousi", "rousi.pro"},
+		{"yemapt", "www.yemapt.org"},
+		{"generic", "hdroute.org"},
+	}
+	for i, tc := range frameworkDomains {
 		w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-			"name": fmt.Sprintf("FW_%s", fw), "domain": fmt.Sprintf("fw-%s-v2.example.com", fw),
-			"baseUrl": fmt.Sprintf("https://fw-%s-v2.example.com", fw), "framework": fw,
+			"domain": tc.domain,
 		})
 		if w.Code != http.StatusOK {
-			t.Fatalf("framework %s (#%d): expected 200, got %d", fw, i, w.Code)
+			t.Fatalf("framework %s (#%d, domain %s): expected 200, got %d: %s", tc.fw, i, tc.domain, w.Code, w.Body.String())
+		}
+		// 验证 framework 被 seed 强制覆盖（即使没传 framework 字段）
+		resp := parseResponse(t, w)
+		data, _ := resp.Data.(map[string]interface{})
+		if data["framework"] != tc.fw {
+			t.Errorf("framework %s: expected seed framework %s, got %v", tc.fw, tc.fw, data["framework"])
 		}
 	}
 }
@@ -7330,18 +7329,19 @@ func TestSiteV2_UpdateDuplicateDomain(t *testing.T) {
 
 func TestSiteV2_CreateWithAllOptionalFields(t *testing.T) {
 	env := setupTestEnv(t)
+	// 用白名单内 domain（步骤 3）；framework/authType/downloadUrlTemplate/cookieCloudDomain 由 seed 强制覆盖，其他可选字段透传
 	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"name": "FullV2", "domain": "fullv2.example.com", "baseUrl": "https://fullv2.example.com",
-		"framework": "nexusphp", "authType": "cookie", "cookie": "sid=full", "passkey": "pk",
+		"domain": "longpt.org",
+		"cookie": "sid=full", "passkey": "pk",
 		"hashStrategy": "guid", "sizeStrategy": "enclosure", "idStrategy": "query_param",
 		"hashXmlTagName": "infoHash", "sizeXmlTagName": "contentLength", "hashUrlParamName": "hash",
 		"sizeDescRegex": `(\d+)\s*GB`, "sizeTitleRegex": `(\d+)\s*MB`, "sizeBaseUnit": 1024,
-		"downloadMode": "template", "downloadUrlTemplate": "https://fullv2.example.com/dl?id={id}",
+		"downloadMode": "template",
 		"downloadPagePattern": "/details.php", "requiresSideLoading": true,
 		"isSource": true, "isTarget": true, "participateAutoPublish": true,
-		"cookieCloudSync": true, "cookieCloudDomain": ".fullv2.example.com",
-		"enabled": true, "alternativeDomains": "alt.fullv2.example.com",
-		"overrideRssUrl": "https://rss.fullv2.example.com", "overrideSavePath": "/data/full",
+		"cookieCloudSync": true,
+		"enabled": true, "alternativeDomains": "alt.longpt.org",
+		"overrideRssUrl": "https://rss.longpt.org", "overrideSavePath": "/data/full",
 		"proxyUrl": "socks5://proxy:1080", "skipSslVerify": true,
 	})
 	if w.Code != http.StatusOK {
@@ -7352,7 +7352,7 @@ func TestSiteV2_CreateWithAllOptionalFields(t *testing.T) {
 	if data["requiresSideLoading"] != true {
 		t.Error("expected requiresSideLoading=true")
 	}
-	if data["alternativeDomains"] != "alt.fullv2.example.com" {
+	if data["alternativeDomains"] != "alt.longpt.org" {
 		t.Errorf("expected alt, got %v", data["alternativeDomains"])
 	}
 }
