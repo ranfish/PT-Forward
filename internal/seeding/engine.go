@@ -1867,6 +1867,13 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 		TorrentSize:    event.Size,
 	}
 
+	if !record.IsFree && record.Discount != model.DiscountAssumeFree && e.siteProvider != nil && record.SiteName != "" {
+		if siteInfo, infoErr := e.siteProvider.GetSiteInfo(ctx, record.SiteName); infoErr == nil && siteInfo != nil && siteInfo.AssumeFree {
+			record.IsFree = true
+			record.Discount = model.DiscountAssumeFree
+		}
+	}
+
 	result := e.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "client_id"}, {Name: "info_hash"}},
 		DoNothing: true,

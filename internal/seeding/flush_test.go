@@ -581,6 +581,19 @@ func TestFlush_AssumeFreeSite(t *testing.T) {
 	if len(candidates) != 2 {
 		t.Errorf("expected 2 candidates (assume_free site), got %d", len(candidates))
 	}
+
+	for _, hash := range []string{"h1", "h2"} {
+		var dbRec model.SeedingTorrentRecord
+		if err := db.Where("info_hash = ?", hash).First(&dbRec).Error; err != nil {
+			t.Fatalf("load record %s: %v", hash, err)
+		}
+		if !dbRec.IsFree {
+			t.Errorf("record %s should have is_free=true (assume_free backfill)", hash)
+		}
+		if dbRec.Discount != model.DiscountAssumeFree {
+			t.Errorf("record %s should have discount=ASSUME_FREE, got %s", hash, dbRec.Discount)
+		}
+	}
 }
 
 func TestFlush_AssumeFreeNotSet(t *testing.T) {
@@ -628,6 +641,78 @@ func TestFlush_AssumeFreeNotSet(t *testing.T) {
 	}
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates (assume_free not set), got %d", len(candidates))
+	}
+}
+
+func TestFlush_AssumeFreeSkipsDetectDiscount(t *testing.T) {
+	db := setupFlushTestDB(t)
+	e := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	_ = e.Start(ctx)
+
+	subID := seedSubscription(t, db, true, false)
+
+	if err := db.Create(&model.Site{
+		Domain: "piggo.me", Name: "二师兄", BaseURL: "https://piggo.me",
+		Framework: "nexusphp", AssumeFree: true,
+	}).Error; err != nil {
+		t.Fatalf("seed site: %v", err)
+	}
+
+	now := time.Now()
+	db.Create(&model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "h1", SiteName: "二师兄", TorrentID: "1",
+		Discount: model.DiscountNone, Status: model.SeedingStatusPending,
+		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
+	})
+
+	mc := &flushMockClient{
+		maindata:  &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
+		addResult: &model.AddResult{InfoHash: "h1"},
+	}
+	e.SetClientProvider(&flushMockProvider{
+		clients: map[string]model.DownloaderClient{"c1": mc},
+		list:    []string{"c1"},
+	})
+
+	detectDiscountCalled := 0
+	mockProvider := &mocks.SiteInfoProvider{
+		GetSiteInfoFn: func(_ context.Context, siteName string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: siteName, AssumeFree: siteName == "二师兄"}, nil
+		},
+		GetSiteConfigFn: func(_ context.Context, _ string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{}, nil
+		},
+		GetAdapterFn: func(_ context.Context, _ string) (model.SiteAdapter, error) {
+			return &mocks.SiteAdapter{
+				DownloadTorrentFn: func(_ context.Context, _ *model.SiteConfig, _ string) ([]byte, error) {
+					return []byte("mock-torrent-data"), nil
+				},
+				DetectDiscountFn: func(_ context.Context, _ *model.SiteConfig, _ string) (*model.DiscountResult, error) {
+					detectDiscountCalled++
+					return &model.DiscountResult{Level: model.DiscountFree}, nil
+				},
+			}, nil
+		},
+	}
+	e.SetSiteProvider(mockProvider)
+
+	e.mu.Lock()
+	e.recordMap[recordKey("c1", "h1")] = &model.SeedingTorrentRecord{
+		ClientID: "c1", InfoHash: "h1", Status: model.SeedingStatusPending,
+		SubscriptionID: fmt.Sprintf("%d", subID),
+	}
+	e.mu.Unlock()
+
+	candidates, err := e.Flush(ctx, fmt.Sprintf("%d", subID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidates) != 1 {
+		t.Fatalf("expected 1 candidate, got %d", len(candidates))
+	}
+	if detectDiscountCalled > 0 {
+		t.Errorf("DetectDiscount should NOT be called for ASSUME_FREE record, called %d times", detectDiscountCalled)
 	}
 }
 

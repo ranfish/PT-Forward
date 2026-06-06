@@ -182,13 +182,25 @@ func (e *Engine) collectCandidates(fc *flushContext) []*flushCandidate {
 		is2xUp := discount == model.Discount2xUp || discount == model.Discount2x50
 
 		assumeFree := fc.assumeFreeSites[rec.SiteName]
-
-		if !isFree && !assumeFree && (!scoringCfg.Include2xUp || !is2xUp) {
-			continue
+		if assumeFree && !isFree {
+			rec.IsFree = true
+			rec.Discount = model.DiscountAssumeFree
+			isFree = true
+			if err := e.db.WithContext(context.Background()).Model(&model.SeedingTorrentRecord{}).
+				Where("id = ?", rec.ID).
+				Updates(map[string]interface{}{
+					"discount": model.DiscountAssumeFree,
+					"is_free":  true,
+				}).Error; err != nil {
+				e.logger.Warn("flush: backfill assume_free failed",
+					zap.Uint("id", rec.ID),
+					zap.String("site", rec.SiteName),
+					zap.Error(err))
+			}
 		}
 
-		if assumeFree && !isFree {
-			isFree = true
+		if !isFree && (!scoringCfg.Include2xUp || !is2xUp) {
+			continue
 		}
 
 		candidates = append(candidates, &flushCandidate{
@@ -550,7 +562,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 		return candidate, false
 	}
 
-	if rec.IsFree && rec.FreeEndAt == nil && e.siteProvider != nil && rec.SiteName != "" {
+	if rec.IsFree && rec.FreeEndAt == nil && rec.Discount != model.DiscountAssumeFree && e.siteProvider != nil && rec.SiteName != "" {
 		if adapter, adpErr := e.siteProvider.GetAdapter(ctx, rec.SiteName); adpErr == nil {
 			if siteCfg, cfgErr := e.siteProvider.GetSiteConfig(ctx, rec.SiteName); cfgErr == nil && siteCfg != nil {
 				recheckCtx, recheckCancel := context.WithTimeout(ctx, 10*time.Second)
