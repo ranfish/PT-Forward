@@ -5,17 +5,18 @@ package model
 type DiscountLevel string
 
 const (
-	DiscountNone      DiscountLevel = "NONE"
-	DiscountFree      DiscountLevel = "FREE"
-	Discount2xUp      DiscountLevel = "2XUP"
-	Discount2xFree    DiscountLevel = "2XFREE"
-	DiscountPercent25 DiscountLevel = "PERCENT_25"
-	DiscountPercent30 DiscountLevel = "PERCENT_30"
-	DiscountPercent50 DiscountLevel = "PERCENT_50"
-	Discount2x50      DiscountLevel = "2X50"
-	DiscountPercent70 DiscountLevel = "PERCENT_70"
-	DiscountPercent75 DiscountLevel = "PERCENT_75"
-	DiscountCustom    DiscountLevel = "CUSTOM"
+	DiscountNone        DiscountLevel = "NONE"
+	DiscountFree        DiscountLevel = "FREE"
+	Discount2xUp        DiscountLevel = "2XUP"
+	Discount2xFree      DiscountLevel = "2XFREE"
+	DiscountPercent25   DiscountLevel = "PERCENT_25"
+	DiscountPercent30   DiscountLevel = "PERCENT_30"
+	DiscountPercent50   DiscountLevel = "PERCENT_50"
+	Discount2x50        DiscountLevel = "2X50"
+	DiscountPercent70   DiscountLevel = "PERCENT_70"
+	DiscountPercent75   DiscountLevel = "PERCENT_75"
+	DiscountCustom      DiscountLevel = "CUSTOM"
+	DiscountAssumeFree  DiscountLevel = "ASSUME_FREE"
 )
 
 func (d DiscountLevel) DownloadRatio() float64 {
@@ -51,6 +52,9 @@ func (d DiscountLevel) UploadRatio() float64 {
 }
 
 func (d DiscountLevel) IsFree() bool {
+	if d == DiscountAssumeFree {
+		return true
+	}
 	return d.DownloadRatio() == 0.0
 }
 
@@ -87,7 +91,8 @@ func (d DiscountLevel) IsValid() bool {
 	switch d {
 	case DiscountNone, DiscountFree, Discount2xUp, Discount2xFree,
 		DiscountPercent25, DiscountPercent30, DiscountPercent50,
-		Discount2x50, DiscountPercent70, DiscountPercent75, DiscountCustom:
+		Discount2x50, DiscountPercent70, DiscountPercent75, DiscountCustom,
+		DiscountAssumeFree:
 		return true
 	default:
 		return false
