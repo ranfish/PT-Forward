@@ -83,6 +83,40 @@ func TestFetch_InvalidXML(t *testing.T) {
 	}
 }
 
+func TestFetchWithProxy_DefaultsToFallbackClient(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(sampleRSS))
+	}))
+	defer srv.Close()
+
+	f := NewFetcher(newTestLogger())
+	feed, err := f.FetchWithProxy(t.Context(), srv.URL, "", false)
+	if err != nil {
+		t.Fatalf("FetchWithProxy with no proxy: %v", err)
+	}
+	if len(feed.Channel.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(feed.Channel.Items))
+	}
+}
+
+func TestFetchWithProxy_CacheReusesClient(t *testing.T) {
+	f := NewFetcher(newTestLogger())
+	c1 := f.clientFor("http://example.proxy:9999", false)
+	c2 := f.clientFor("http://example.proxy:9999", false)
+	if c1 != c2 {
+		t.Fatal("clientFor should return cached client for same key")
+	}
+	c3 := f.clientFor("", true)
+	if c3 == c1 {
+		t.Fatal("clientFor should return different client for different config")
+	}
+	c4 := f.clientFor("", false)
+	if c4 != f.client {
+		t.Fatal("clientFor with empty proxy and skipSSL=false should return default client")
+	}
+}
+
 func TestParseItems_QueryParamID(t *testing.T) {
 	var feed RSSFeed
 	if err := xml.Unmarshal([]byte(sampleRSS), &feed); err != nil {
