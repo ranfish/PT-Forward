@@ -45,6 +45,9 @@ func setupTestEnv(t *testing.T) *testEnv {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
+	if sqlDB, err := db.DB(); err == nil {
+		sqlDB.SetMaxOpenConns(1)
+	}
 
 	if err := model.AutoMigrate(db); err != nil {
 		t.Fatalf("model migrate: %v", err)
