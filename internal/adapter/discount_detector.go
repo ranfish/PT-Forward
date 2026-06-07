@@ -3,6 +3,7 @@ package adapter
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 )
@@ -64,6 +65,16 @@ var imageRules = []struct {
 
 var h1Re = regexp.MustCompile(`(?is)<h1[^>]*>(.*?)</h1>`)
 
+// freeEndAtRe matches NexusPHP discount expiry markers like:
+//
+//	剩余时间：<span title="2026-05-08 13:50:58">1天15时</span>
+//	剩余时间：<b><span title="2026-05-08 13:50:58">1天15时</span></b>
+//	优惠剩余时间：<b><span title="2026-05-07 17:10:15">17时47分</span></b>
+//
+// Captures the ISO-ish timestamp in the title attribute. Lives near (often
+// inside) the h1 element on most NP-based sites.
+var freeEndAtRe = regexp.MustCompile(`(?is)(?:剩余时间|优惠剩余时间)[^<]*(?:<b>)?\s*<span[^>]*title=["']([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2}:[0-9]{2})["']`)
+
 func DetectDiscountFromHTML(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {
 	if cfg != nil && cfg.DiscountClassMapping != nil {
 		return detectFromClassMapping(html, cfg)
@@ -77,12 +88,33 @@ func DetectDiscountFromDetailsPage(html string, cfg *model.SiteDiscountDetection
 		targetHTML = m[1]
 	}
 	result := DetectDiscountFromHTML(targetHTML, cfg)
-	if result.Level != model.DiscountNone {
-		return result
+	if result.Level == model.DiscountNone {
+		// Fallback: scan full HTML for image-based markers (e.g. TTG /pic/ico_free.gif)
+		// which live outside the h1 element.
+		result = detectFromImageRules(html)
 	}
-	// Fallback: scan full HTML for image-based markers (e.g. TTG /pic/ico_free.gif)
-	// which live outside the h1 element.
-	return detectFromImageRules(html)
+	if result.Level != model.DiscountNone {
+		// Parse discount expiry only when a discount was detected, otherwise
+		// we'd pick up unrelated <span title="..."> attributes.
+		if t, ok := parseFreeEndAt(targetHTML); ok {
+			result.FreeEndAt = &t
+		}
+	}
+	return result
+}
+
+// parseFreeEndAt extracts the discount end timestamp from "剩余时间：<span title=...>"
+// markers. Returns ok=false if not found or unparseable.
+func parseFreeEndAt(scope string) (time.Time, bool) {
+	m := freeEndAtRe.FindStringSubmatch(scope)
+	if len(m) < 2 {
+		return time.Time{}, false
+	}
+	t, err := time.ParseInLocation("2006-01-02 15:04:05", m[1], time.Local)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
 }
 
 func detectFromImageRules(html string) *model.DiscountResult {
