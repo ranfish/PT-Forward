@@ -364,6 +364,20 @@ func TestDetectDiscountFromDetailsPage_TTGImage2xFree(t *testing.T) {
 	assert.Equal(t, model.Discount2xFree, result.Level)
 }
 
+func TestDetectDiscountFromDetailsPage_TTGImageHalfDiscount(t *testing.T) {
+	html := `<html><body><h1>Some Title</h1>
+	<table><tr><td><img src="/pic/ico_half.gif" /></td></tr></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountPercent50, result.Level)
+}
+
+func TestDetectDiscountFromDetailsPage_TTGImage30Discount(t *testing.T) {
+	html := `<html><body><h1>Some Title</h1>
+	<table><tr><td><img src="/pic/ico_30.gif" /></td></tr></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountPercent30, result.Level)
+}
+
 func TestDetectDiscountFromHTML_ImageFree(t *testing.T) {
 	html := `<html><body><img src="/pic/ico_free.gif" alt="free"></body></html>`
 	result := DetectDiscountFromHTML(html, nil)
