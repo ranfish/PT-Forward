@@ -383,3 +383,40 @@ func TestDetectDiscountFromHTML_ImageFree(t *testing.T) {
 	result := DetectDiscountFromHTML(html, nil)
 	assert.Equal(t, model.DiscountFree, result.Level)
 }
+
+func TestDetectDiscountFromDetailsPage_FreeEndAtInH1(t *testing.T) {
+	html := `<html><body><h1>Title&nbsp;<b>[<font class='twoupfree' >2X免费</font>]</b> <font color='#00CC66'>剩余时间：<span title="2026-07-07 18:50:48">29天23时</span></font></h1></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.Discount2xFree, result.Level)
+	if assert.NotNil(t, result.FreeEndAt) {
+		assert.Equal(t, "2026-07-07 18:50:48", result.FreeEndAt.Format("2006-01-02 15:04:05"))
+	}
+}
+
+func TestDetectDiscountFromDetailsPage_FreeEndAtBolded(t *testing.T) {
+	// ourbits / pterclub style: 剩余时间：<b><span title="...">...</span></b>
+	html := `<html><body><h1>Title&nbsp;<b>[<font class='free'>免费</font>]</b>&nbsp;剩余时间：<b><span title="2026-05-08 13:50:58">1天15时</span></b></h1></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+	if assert.NotNil(t, result.FreeEndAt) {
+		assert.Equal(t, "2026-05-08 13:50:58", result.FreeEndAt.Format("2006-01-02 15:04:05"))
+	}
+}
+
+func TestDetectDiscountFromDetailsPage_FreeEndAtDiscountPrefix(t *testing.T) {
+	// hdsky style: 优惠剩余时间：...
+	html := `<html><body><h1>Title&nbsp;<b>[<font class="free">免费</font>]</b>[优惠剩余时间：<b><span title="2026-05-07 17:10:15">17时47分</span></b>]</h1></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+	if assert.NotNil(t, result.FreeEndAt) {
+		assert.Equal(t, "2026-05-07 17:10:15", result.FreeEndAt.Format("2006-01-02 15:04:05"))
+	}
+}
+
+func TestDetectDiscountFromDetailsPage_NoDiscountNoFreeEndAt(t *testing.T) {
+	// Must NOT pick up unrelated <span title="..."> when there's no discount marker
+	html := `<html><body><h1>Title <span title="2025-01-01 00:00:00">some text</span></h1></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountNone, result.Level)
+	assert.Nil(t, result.FreeEndAt)
+}
