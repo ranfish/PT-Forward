@@ -70,10 +70,11 @@ var h1Re = regexp.MustCompile(`(?is)<h1[^>]*>(.*?)</h1>`)
 //	剩余时间：<span title="2026-05-08 13:50:58">1天15时</span>
 //	剩余时间：<b><span title="2026-05-08 13:50:58">1天15时</span></b>
 //	优惠剩余时间：<b><span title="2026-05-07 17:10:15">17时47分</span></b>
+//	(限时<span title="2026-06-08 14:16:41">6时40分</span>)        (彩虹岛 ptchdbits.co)
 //
 // Captures the ISO-ish timestamp in the title attribute. Lives near (often
 // inside) the h1 element on most NP-based sites.
-var freeEndAtRe = regexp.MustCompile(`(?is)(?:剩余时间|优惠剩余时间)[^<]*(?:<b>)?\s*<span[^>]*title=["']([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2}:[0-9]{2})["']`)
+var freeEndAtRe = regexp.MustCompile(`(?is)(?:剩余时间|优惠剩余时间|限时)[^<]{0,20}(?:<b>)?\s*<span[^>]*title=["']([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2}:[0-9]{2})["']`)
 
 func DetectDiscountFromHTML(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {
 	if cfg != nil && cfg.DiscountClassMapping != nil {

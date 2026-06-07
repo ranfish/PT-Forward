@@ -413,6 +413,16 @@ func TestDetectDiscountFromDetailsPage_FreeEndAtDiscountPrefix(t *testing.T) {
 	}
 }
 
+func TestDetectDiscountFromDetailsPage_FreeEndAtParen(t *testing.T) {
+	// ptchdbits.co / springsunday.net style: (限时<span title="...">...</span>)
+	html := `<html><body><h1>Title&nbsp;<img class="pro_free" src="pic/trans.gif" alt="Free" title="免费" /> (限时<span title="2026-06-08 14:16:41">6时40分</span>)</h1></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+	if assert.NotNil(t, result.FreeEndAt) {
+		assert.Equal(t, "2026-06-08 14:16:41", result.FreeEndAt.Format("2006-01-02 15:04:05"))
+	}
+}
+
 func TestDetectDiscountFromDetailsPage_NoDiscountNoFreeEndAt(t *testing.T) {
 	// Must NOT pick up unrelated <span title="..."> when there's no discount marker
 	html := `<html><body><h1>Title <span title="2025-01-01 00:00:00">some text</span></h1></body></html>`
