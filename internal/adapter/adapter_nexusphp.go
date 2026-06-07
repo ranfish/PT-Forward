@@ -588,6 +588,10 @@ func (a *NexusPHPAdapter) DetectHRAndDiscount(ctx context.Context, config *model
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
+		a.logger.Warn("detectHRAndDiscount request failed",
+			zap.String("url", u),
+			zap.String("torrent", torrentID),
+			zap.Error(err))
 		return nil, nil, networkError("请求详情页失败", err)
 	}
 	defer func() { drainBody(resp) }()

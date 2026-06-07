@@ -48,6 +48,20 @@ var defaultKeywordRules = []struct {
 	{"freeleech", model.DiscountFree},
 }
 
+// imageRules covers sites that mark discount status via icon images instead of
+// CSS classes (e.g. TTG uses <img src="/pic/ico_free.gif">). These patterns
+// are matched against the full HTML since the icon is typically outside h1.
+var imageRules = []struct {
+	Pattern string
+	Level   model.DiscountLevel
+}{
+	{"ico_free.gif", model.DiscountFree},
+	{"ico_2xfree.gif", model.Discount2xFree},
+	{"ico_2x.gif", model.Discount2xUp},
+	{"ico_50p.gif", model.DiscountPercent50},
+	{"ico_30p.gif", model.DiscountPercent30},
+}
+
 var h1Re = regexp.MustCompile(`(?is)<h1[^>]*>(.*?)</h1>`)
 
 func DetectDiscountFromHTML(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {
@@ -62,7 +76,23 @@ func DetectDiscountFromDetailsPage(html string, cfg *model.SiteDiscountDetection
 	if m := h1Re.FindStringSubmatch(html); len(m) > 1 {
 		targetHTML = m[1]
 	}
-	return DetectDiscountFromHTML(targetHTML, cfg)
+	result := DetectDiscountFromHTML(targetHTML, cfg)
+	if result.Level != model.DiscountNone {
+		return result
+	}
+	// Fallback: scan full HTML for image-based markers (e.g. TTG /pic/ico_free.gif)
+	// which live outside the h1 element.
+	return detectFromImageRules(html)
+}
+
+func detectFromImageRules(html string) *model.DiscountResult {
+	lower := strings.ToLower(html)
+	for _, rule := range imageRules {
+		if strings.Contains(lower, rule.Pattern) {
+			return &model.DiscountResult{Level: rule.Level}
+		}
+	}
+	return &model.DiscountResult{Level: model.DiscountNone}
 }
 
 func detectFromClassMapping(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {
