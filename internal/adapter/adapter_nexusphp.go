@@ -124,7 +124,7 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 var reSignedDownloadURL = regexp.MustCompile(`download\.php\?id=` + regexp.QuoteMeta("{id}") + `&t=\d+&sign=[a-f0-9]+`)
 
 func (a *NexusPHPAdapter) resolveSignedDownloadURL(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
-	detailURL := buildURL(config.Domain, "/details.php", torrentID, "")
+	detailURL := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", detailURL, nil)
 	if err != nil {
@@ -162,7 +162,7 @@ func (a *NexusPHPAdapter) resolveSignedDownloadURL(ctx context.Context, config *
 }
 
 func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	u := buildURL(config.Domain, "/details.php", torrentID, "")
+	u := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
@@ -385,7 +385,7 @@ func (a *NexusPHPAdapter) GetBatchSLData(ctx context.Context, config *model.Site
 }
 
 func (a *NexusPHPAdapter) GetPreciseSLData(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	u := buildURL(config.Domain, "/details.php", torrentID, "")
+	u := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
@@ -507,7 +507,7 @@ func (a *NexusPHPAdapter) detectDiscountAPI(ctx context.Context, config *model.S
 }
 
 func (a *NexusPHPAdapter) detectDiscountPage(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
-	u := buildURL(config.Domain, "/details.php", torrentID, "")
+	u := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
@@ -536,7 +536,7 @@ func (a *NexusPHPAdapter) detectDiscountPage(ctx context.Context, config *model.
 }
 
 func (a *NexusPHPAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
-	u := buildURL(config.Domain, "/details.php", torrentID, "")
+	u := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
@@ -579,7 +579,7 @@ func (a *NexusPHPAdapter) DetectHRAndDiscount(ctx context.Context, config *model
 		return hr, disc, nil
 	}
 
-	u := buildURL(config.Domain, "/details.php", torrentID, "")
+	u := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, nil, networkError("构造请求失败", err)
@@ -963,6 +963,23 @@ func buildURL(domain, path, torrentID, passkey string) string {
 		u += "&passkey=" + url.QueryEscape(passkey)
 	}
 	return u
+}
+
+// buildDetailsURL constructs the details page URL. If detailsURLTemplate is
+// provided (e.g. "/t-{id}"), it takes precedence over the default /details.php?id={id}.
+func buildDetailsURL(domain, torrentID, detailsURLTemplate string) string {
+	if detailsURLTemplate != "" {
+		u := strings.ReplaceAll(detailsURLTemplate, "{id}", url.QueryEscape(torrentID))
+		if !strings.HasPrefix(u, "http") {
+			base := domain
+			if !strings.HasPrefix(base, "http") {
+				base = "https://" + base
+			}
+			u = base + u
+		}
+		return u
+	}
+	return buildURL(domain, "/details.php", torrentID, "")
 }
 
 func setCommonHeaders(req *http.Request, cookie string) {

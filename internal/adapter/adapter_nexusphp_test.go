@@ -746,6 +746,54 @@ func TestBuildURL(t *testing.T) {
 	}
 }
 
+func TestBuildDetailsURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		domain   string
+		id       string
+		tpl      string
+		want     string
+	}{
+		{
+			name:   "empty template falls back to /details.php",
+			domain: "example.com",
+			id:     "42",
+			tpl:    "",
+			want:   "https://example.com/details.php?id=42",
+		},
+		{
+			name:   "rewrite template /t-{id}",
+			domain: "hdcity.city",
+			id:     "66586",
+			tpl:    "/t-{id}",
+			want:   "https://hdcity.city/t-66586",
+		},
+		{
+			name:   "absolute URL template",
+			domain: "hdcity.city",
+			id:     "100",
+			tpl:    "https://other.example.com/details/{id}",
+			want:   "https://other.example.com/details/100",
+		},
+		{
+			name:   "template with domain already absolute",
+			domain: "https://hdcity.city",
+			id:     "5",
+			tpl:    "/t-{id}",
+			want:   "https://hdcity.city/t-5",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildDetailsURL(tt.domain, tt.id, tt.tpl)
+			if got != tt.want {
+				t.Errorf("buildDetailsURL() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIsMusicCategory(t *testing.T) {
 	tests := []struct {
 		cat  string

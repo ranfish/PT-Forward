@@ -74,6 +74,7 @@ type createSiteRequest struct {
 
 	DownloadMode        string `json:"downloadMode,omitempty"`
 	DownloadURLTemplate string `json:"downloadUrlTemplate,omitempty"`
+	DetailsURLTemplate  string `json:"detailsUrlTemplate,omitempty"`
 	DownloadPagePattern string `json:"downloadPagePattern,omitempty"`
 
 	RequiresSideLoading bool `json:"requiresSideLoading"`
@@ -136,6 +137,7 @@ type updateSiteRequest struct {
 
 	DownloadMode        *string `json:"downloadMode,omitempty"`
 	DownloadURLTemplate *string `json:"downloadUrlTemplate,omitempty"`
+	DetailsURLTemplate  *string `json:"detailsUrlTemplate,omitempty"`
 	DownloadPagePattern *string `json:"downloadPagePattern,omitempty"`
 
 	RequiresSideLoading *bool `json:"requiresSideLoading,omitempty"`
@@ -200,6 +202,7 @@ type siteResponse struct {
 
 	DownloadMode        string `json:"downloadMode"`
 	DownloadURLTemplate string `json:"downloadUrlTemplate,omitempty"`
+	DetailsURLTemplate  string `json:"detailsUrlTemplate,omitempty"`
 	DownloadPagePattern string `json:"downloadPagePattern,omitempty"`
 	RequiresSideLoading bool   `json:"requiresSideLoading"`
 
@@ -312,6 +315,7 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 
 		DownloadMode:        s.DownloadMode,
 		DownloadURLTemplate: s.DownloadURLTemplate,
+		DetailsURLTemplate:  s.DetailsURLTemplate,
 		DownloadPagePattern: s.DownloadPagePattern,
 		RequiresSideLoading: s.RequiresSideLoading,
 
@@ -672,6 +676,7 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 		DownloadMode:        defaultStr(req.DownloadMode, "template"),
 		DownloadURLTemplate: req.DownloadURLTemplate,
+		DetailsURLTemplate:  req.DetailsURLTemplate,
 		DownloadPagePattern: req.DownloadPagePattern,
 		RequiresSideLoading: req.RequiresSideLoading,
 
@@ -847,6 +852,9 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.DownloadURLTemplate != nil {
 		s.DownloadURLTemplate = *req.DownloadURLTemplate
+	}
+	if req.DetailsURLTemplate != nil {
+		s.DetailsURLTemplate = *req.DetailsURLTemplate
 	}
 	if req.DownloadPagePattern != nil {
 		s.DownloadPagePattern = *req.DownloadPagePattern

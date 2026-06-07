@@ -398,6 +398,7 @@ func siteToInfo(s *model.Site) *model.SiteInfo {
 		SizeBaseUnit:        s.SizeBaseUnit,
 		DownloadMode:        s.DownloadMode,
 		DownloadURLTemplate: s.DownloadURLTemplate,
+		DetailsURLTemplate:  s.DetailsURLTemplate,
 		DownloadPagePattern: s.DownloadPagePattern,
 		ProxyURL:            s.ProxyURL,
 		SkipSSLVerify:       s.SkipSSLVerify,
@@ -450,6 +451,7 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		HRStrategy:    s.HRStrategy,
 
 		DownloadURLTemplate:   s.DownloadURLTemplate,
+		DetailsURLTemplate:    s.DetailsURLTemplate,
 		DownloadMode:          s.DownloadMode,
 		SupportsPiecesHashAPI: s.SupportsPiecesHashAPI,
 		AssumeFree:            s.AssumeFree,
