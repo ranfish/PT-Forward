@@ -559,6 +559,10 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.engine != nil && sub.Enabled && !sub.Paused {
+		h.engine.AddSubscription(context.Background(), &sub)
+	}
+
 	h.logger.Info("rss subscription created", zap.String("name", sub.Name), zap.String("site", sub.SiteName))
 	auditLog(r, "rss", "create", "subscription", fmt.Sprintf("%d", sub.ID), sub.Name, "success")
 	Success(w, h.toResponse(&sub))
@@ -782,6 +786,13 @@ func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.engine != nil {
+		h.engine.RemoveSubscription(sub.ID)
+		if sub.Enabled && !sub.Paused {
+			h.engine.AddSubscription(context.Background(), sub)
+		}
+	}
+
 	h.logger.Info("rss subscription updated", zap.String("name", sub.Name))
 	auditLog(r, "rss", "update", "subscription", fmt.Sprintf("%d", id), sub.Name, "success")
 	Success(w, h.toResponse(sub))
@@ -803,6 +814,10 @@ func (h *RSSHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if err := h.repo.Delete(r.Context(), id); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除订阅失败")
 		return
+	}
+
+	if h.engine != nil {
+		h.engine.RemoveSubscription(id)
 	}
 
 	h.logger.Info("rss subscription deleted", zap.Uint("id", id))
@@ -871,6 +886,13 @@ func (h *RSSHandler) handleSetPause(w http.ResponseWriter, r *http.Request, idSt
 	if err := h.repo.Update(r.Context(), sub); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新订阅状态失败")
 		return
+	}
+
+	if h.engine != nil {
+		h.engine.RemoveSubscription(sub.ID)
+		if !paused && sub.Enabled {
+			h.engine.AddSubscription(context.Background(), sub)
+		}
 	}
 
 	action := "已恢复"
