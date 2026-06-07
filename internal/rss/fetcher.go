@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -16,8 +17,9 @@ import (
 )
 
 type Fetcher struct {
-	client *http.Client
-	logger *zap.Logger
+	client      *http.Client
+	clientCache sync.Map
+	logger      *zap.Logger
 }
 
 func NewFetcher(logger *zap.Logger) *Fetcher {
@@ -35,13 +37,37 @@ func NewFetcherWithClient(client *http.Client, logger *zap.Logger) *Fetcher {
 }
 
 func (f *Fetcher) Fetch(ctx context.Context, url string) (*RSSFeed, error) {
+	return f.fetchWithClient(ctx, url, f.client)
+}
+
+func (f *Fetcher) FetchWithProxy(ctx context.Context, url, proxyURL string, skipSSLVerify bool) (*RSSFeed, error) {
+	return f.fetchWithClient(ctx, url, f.clientFor(proxyURL, skipSSLVerify))
+}
+
+func (f *Fetcher) clientFor(proxyURL string, skipSSLVerify bool) *http.Client {
+	if proxyURL == "" && !skipSSLVerify {
+		return f.client
+	}
+	key := proxyURL + "|" + strconv.FormatBool(skipSSLVerify)
+	if cached, ok := f.clientCache.Load(key); ok {
+		return cached.(*http.Client)
+	}
+	c := httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+		ProxyURL:      proxyURL,
+		SkipSSLVerify: skipSSLVerify,
+	})
+	actual, _ := f.clientCache.LoadOrStore(key, c)
+	return actual.(*http.Client)
+}
+
+func (f *Fetcher) fetchWithClient(ctx context.Context, url string, client *http.Client) (*RSSFeed, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, rssError(ErrRSSNetwork, "构造请求失败", err)
 	}
 	req.Header.Set("User-Agent", "PT-Forward/1.0")
 
-	resp, err := f.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, rssError(ErrRSSNetwork, "请求失败", err)
 	}
