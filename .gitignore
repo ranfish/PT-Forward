@@ -50,3 +50,7 @@ examples/
 /tmp/
 media/
 temp/
+# Temp decrypt tool (keep local, never commit)
+cmd/_tmp_decrypt/
+cmd/_tmp_test/
+cmd/_tmp_decrypt2/
