@@ -40,6 +40,8 @@ type Site struct {
 	DownloadMode        string `json:"download_mode" gorm:"size:20;default:'template'"`
 	DownloadURLTemplate string `json:"download_url_template" gorm:"size:512"`
 	DownloadPagePattern string `json:"download_page_pattern" gorm:"size:512"`
+	// DetailsURLTemplate: 详情页 URL 模板（如 /t-{id}），空则使用框架默认 /details.php?id={id}
+	DetailsURLTemplate string `json:"details_url_template" gorm:"size:512"`
 
 	FrameworkDetected bool   `json:"framework_detected" gorm:"default:false"`
 	FrameworkVerified bool   `json:"framework_verified" gorm:"default:false"`
@@ -142,6 +144,7 @@ type SiteInfo struct {
 
 	DownloadMode        string `json:"download_mode"`
 	DownloadURLTemplate string `json:"download_url_template"`
+	DetailsURLTemplate  string `json:"details_url_template,omitempty"`
 	DownloadPagePattern string `json:"download_page_pattern"`
 	PasskeyAlias        string `json:"passkey_alias,omitempty"`
 	PasskeyHint         string `json:"passkey_hint,omitempty"`
@@ -303,6 +306,7 @@ type SiteConfig struct {
 
 	DownloadMode        string `json:"download_mode,omitempty"`
 	DownloadURLTemplate string `json:"download_url_template,omitempty"`
+	DetailsURLTemplate  string `json:"details_url_template,omitempty"`
 	PasskeyAlias        string `json:"passkey_alias,omitempty"`
 	PasskeyHint         string `json:"passkey_hint,omitempty"`
 
