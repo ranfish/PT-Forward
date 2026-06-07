@@ -21,6 +21,19 @@ var defaultNexusPHPRules = []CSSDiscountRule{
 	{CSSClass: "pro_2x50pctdown", Level: model.Discount2x50},
 }
 
+// nativeNexusPHPRules covers NexusPHP standard template CSS classes that don't
+// have the pro_ prefix. Matched against quote-normalized HTML (double quotes
+// converted to single quotes) so the quoted class name won't false-match
+// unrelated substrings like "Nofree".
+var nativeNexusPHPRules = []CSSDiscountRule{
+	{CSSClass: "'twoupfree'", Level: model.Discount2xFree},
+	{CSSClass: "'twouphalfdown'", Level: model.Discount2x50},
+	{CSSClass: "'thirtypercent'", Level: model.DiscountPercent30},
+	{CSSClass: "'halfdown'", Level: model.DiscountPercent50},
+	{CSSClass: "'promotion-tag-free'", Level: model.DiscountFree},
+	{CSSClass: "'free'", Level: model.DiscountFree},
+}
+
 var defaultKeywordRules = []struct {
 	Keyword string
 	Level   model.DiscountLevel
@@ -54,12 +67,19 @@ func DetectDiscountFromDetailsPage(html string, cfg *model.SiteDiscountDetection
 
 func detectFromClassMapping(html string, cfg *model.SiteDiscountDetectionConfig) *model.DiscountResult {
 	lower := strings.ToLower(html)
+	normalized := strings.ReplaceAll(lower, `"`, `'`)
 	for cssClass, levelStr := range cfg.DiscountClassMapping {
 		if strings.Contains(lower, strings.ToLower(cssClass)) {
 			level := model.DiscountLevel(strings.ToUpper(levelStr))
 			if level.IsValid() {
 				return &model.DiscountResult{Level: level}
 			}
+		}
+	}
+
+	for _, rule := range nativeNexusPHPRules {
+		if strings.Contains(normalized, rule.CSSClass) {
+			return &model.DiscountResult{Level: rule.Level}
 		}
 	}
 
@@ -80,6 +100,13 @@ func detectFromClassMapping(html string, cfg *model.SiteDiscountDetectionConfig)
 
 func detectFromDefaultRules(html string) *model.DiscountResult {
 	lower := strings.ToLower(html)
+	normalized := strings.ReplaceAll(lower, `"`, `'`)
+
+	for _, rule := range nativeNexusPHPRules {
+		if strings.Contains(normalized, rule.CSSClass) {
+			return &model.DiscountResult{Level: rule.Level}
+		}
+	}
 
 	for _, rule := range defaultNexusPHPRules {
 		if strings.Contains(lower, rule.CSSClass) {

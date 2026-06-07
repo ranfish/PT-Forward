@@ -256,3 +256,86 @@ func TestDetectDiscountFromHTML_NoBareFreeKeyword(t *testing.T) {
 	result := DetectDiscountFromHTML(html, nil)
 	assert.Equal(t, model.DiscountNone, result.Level)
 }
+
+func TestDetectDiscountFromHTML_NativeFree(t *testing.T) {
+	html := `<html><body><h1>Title <img class='free' src='x.gif' alt='Free' /></h1></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
+
+func TestDetectDiscountFromHTML_NativeFreeDoubleQuote(t *testing.T) {
+	html := `<html><body><h1>Title <img class="free" src="x.gif" alt="Free" /></h1></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
+
+func TestDetectDiscountFromHTML_NativeTwoupFree(t *testing.T) {
+	html := `<html><body><h1>Title <img class='twoupfree' src='x.gif' alt='2X Free' /></h1></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.Discount2xFree, result.Level)
+}
+
+func TestDetectDiscountFromHTML_NativeTwoupHalfdown(t *testing.T) {
+	html := `<html><body><h1>Title <img class='twouphalfdown' src='x.gif' alt='2X 50%' /></h1></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.Discount2x50, result.Level)
+}
+
+func TestDetectDiscountFromHTML_NativeHalfdown(t *testing.T) {
+	html := `<html><body><h1>Title <img class='halfdown' src='x.gif' alt='50%' /></h1></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.DiscountPercent50, result.Level)
+}
+
+func TestDetectDiscountFromHTML_NativeThirtyPercent(t *testing.T) {
+	html := `<html><body><h1>Title <img class='thirtypercent' src='x.gif' alt='30%' /></h1></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.DiscountPercent30, result.Level)
+}
+
+func TestDetectDiscountFromHTML_NativePromotionTagFree(t *testing.T) {
+	html := `<html><body><span class='promotion-tag-free'>Free</span></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
+
+func TestDetectDiscountFromHTML_NativeNoFreeNoFalsePositive(t *testing.T) {
+	html := `<html><body><h1>Title <img class='Nofree' src='x.gif' alt='Not Free' /></h1></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.DiscountNone, result.Level)
+}
+
+func TestDetectDiscountFromHTML_NativeTwoupFreeBeatsFree(t *testing.T) {
+	html := `<html><body><h1>Title <img class='twoupfree' src='x.gif' /></h1><span class='free'>other</span></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.Discount2xFree, result.Level)
+}
+
+func TestDetectDiscountFromDetailsPage_NativeFreeInH1(t *testing.T) {
+	html := `<html><body><h1>Torrent Title <img class='free' src='x.gif' alt='Free' /></h1><table></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
+
+func TestDetectDiscountFromDetailsPage_NativeFreeNoH1FallsBackToFullText(t *testing.T) {
+	html := `<html><body><div class='title'>Torrent Title</div><table><tr><td><img class='free' src='x.gif' alt='Free' /></td></tr></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
+
+func TestDetectDiscountFromHTML_ProFreeStillMatchesAfterNative(t *testing.T) {
+	html := `<html><body><span class='pro_free'>Free</span></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
+
+func TestDetectDiscountFromHTML_CustomMappingStillUsesNativeAsFallback(t *testing.T) {
+	cfg := &model.SiteDiscountDetectionConfig{
+		DiscountClassMapping: map[string]string{
+			"custom_class": "FREE",
+		},
+	}
+	html := `<html><body><img class='twoupfree' src='x.gif' /></body></html>`
+	result := DetectDiscountFromHTML(html, cfg)
+	assert.Equal(t, model.Discount2xFree, result.Level)
+}
