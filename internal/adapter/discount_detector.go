@@ -58,8 +58,8 @@ var imageRules = []struct {
 	{"ico_free.gif", model.DiscountFree},
 	{"ico_2xfree.gif", model.Discount2xFree},
 	{"ico_2x.gif", model.Discount2xUp},
-	{"ico_50p.gif", model.DiscountPercent50},
-	{"ico_30p.gif", model.DiscountPercent30},
+	{"ico_half.gif", model.DiscountPercent50},
+	{"ico_30.gif", model.DiscountPercent30},
 }
 
 var h1Re = regexp.MustCompile(`(?is)<h1[^>]*>(.*?)</h1>`)
