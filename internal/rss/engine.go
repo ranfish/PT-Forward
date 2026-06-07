@@ -707,6 +707,12 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				IsFakeHash:     isFakeHash(event.InfoHash) || event.InfoHash == "" || len(event.InfoHash) != 40,
 				Title:          event.Title,
 				Size:           event.Size,
+				IsFree:         event.IsFree,
+				FreeLevel:      string(event.DiscountLevel),
+				Discount:       model.DiscountLevel(discountStr),
+				HasHR:          event.HasHR,
+				HRSeedTimeH:    event.HRSeedTimeH,
+				FreeEndAt:      event.FreeEndAt,
 				Status:         "seen",
 			}
 			if err := e.repo.MarkSeen(ctx, seen); err != nil {
