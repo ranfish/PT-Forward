@@ -176,8 +176,17 @@ func main() {
 	if err := db.Find(&allSites).Error; err == nil {
 		for _, s := range allSites {
 			if s.MaxConcurrent > 0 {
-				httpclient.GlobalLimiter.SetDomainConfig(s.Domain, httpclient.DomainLimitConfig{
+				// Scale MaxReqs with MaxConcurrent (default 30 reqs/60s for
+				// maxConcurrent=2). See applySiteMaxConcurrent for rationale.
+				const defaultMaxConcurrent = 2
+				const defaultMaxReqs = 30
+				// DomainRateLimiter keys by "https://<domain>" (see transport.extractDomain),
+				// so prepend the scheme here to match.
+				rateKey := "https://" + s.Domain
+				httpclient.GlobalLimiter.SetDomainConfig(rateKey, httpclient.DomainLimitConfig{
 					MaxConcurrent: s.MaxConcurrent,
+					MaxReqs:       defaultMaxReqs * s.MaxConcurrent / defaultMaxConcurrent,
+					WindowSecs:    60,
 				})
 			}
 		}

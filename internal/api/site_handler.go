@@ -102,8 +102,22 @@ type createSiteRequest struct {
 
 func applySiteMaxConcurrent(domain string, maxConcurrent int) {
 	if maxConcurrent > 0 {
-		httpclient.GlobalLimiter.SetDomainConfig(domain, httpclient.DomainLimitConfig{
+		// Default limiter is 30 reqs/60s for maxConcurrent=2 (15 reqs per concurrent
+		// slot per minute). Scale MaxReqs proportionally so high-concurrency sites
+		// (e.g. TTG with max_concurrent=20 for batch RSS detect) don't get queued
+		// behind the default rate window.
+		// DomainRateLimiter keys by "https://<domain>" (see transport.extractDomain).
+		const (
+			defaultMaxConcurrent = 2
+			defaultMaxReqs       = 30
+			windowSecs           = 60
+		)
+		maxReqs := defaultMaxReqs * maxConcurrent / defaultMaxConcurrent
+		rateKey := "https://" + domain
+		httpclient.GlobalLimiter.SetDomainConfig(rateKey, httpclient.DomainLimitConfig{
 			MaxConcurrent: maxConcurrent,
+			MaxReqs:       maxReqs,
+			WindowSecs:    windowSecs,
 		})
 	}
 }

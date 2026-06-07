@@ -339,3 +339,33 @@ func TestDetectDiscountFromHTML_CustomMappingStillUsesNativeAsFallback(t *testin
 	result := DetectDiscountFromHTML(html, cfg)
 	assert.Equal(t, model.Discount2xFree, result.Level)
 }
+
+func TestDetectDiscountFromDetailsPage_TTGImageFreeOutsideH1(t *testing.T) {
+	html := `<html><body><h1>Goosebumps S01 2023 2160p</h1>
+	<table><tr><td><img class="topic" border=0 src="/pic/ico_free.gif" referrerpolicy='no-referrer'/>
+	<font color="red">本种子限时不计流量（Freeleech）下载！</font></td></tr></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
+
+func TestDetectDiscountFromDetailsPage_TTGImageFreeNoSimilarFalsePositive(t *testing.T) {
+	// Similar torrents table has pro_free but should NOT trigger because h1 is empty
+	// and pro_free CSS rules don't apply to fallback. Image rule should not match either.
+	html := `<html><body><h1>Target Title</h1>
+	<h2>Similar</h2><table><tr><td><img class="pro_free" src="x.gif" /></td></tr></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.DiscountNone, result.Level)
+}
+
+func TestDetectDiscountFromDetailsPage_TTGImage2xFree(t *testing.T) {
+	html := `<html><body><h1>Some Title</h1>
+	<table><tr><td><img src="/pic/ico_2xfree.gif" /></td></tr></table></body></html>`
+	result := DetectDiscountFromDetailsPage(html, nil)
+	assert.Equal(t, model.Discount2xFree, result.Level)
+}
+
+func TestDetectDiscountFromHTML_ImageFree(t *testing.T) {
+	html := `<html><body><img src="/pic/ico_free.gif" alt="free"></body></html>`
+	result := DetectDiscountFromHTML(html, nil)
+	assert.Equal(t, model.DiscountFree, result.Level)
+}
