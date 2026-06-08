@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/adapter"
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/filter"
 	"github.com/ranfish/pt-forward/internal/metrics"
@@ -467,29 +468,65 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 		return
 	}
 
-	for _, url := range sub.URLs {
-		feed, err := e.fetcher.FetchWithProxy(ctx, url, site.ProxyURL, site.SkipSSLVerify)
-		if err != nil {
-			errMsg := err.Error()
-			if strings.Contains(errMsg, "非 XML 内容") || strings.Contains(errMsg, "请求间隔") {
-				e.logger.Debug("rss fetch rate-limited, skipping",
-					zap.String("subscription", sub.Name),
-					zap.String("url", url),
-					zap.Error(err))
-			} else {
-				e.logger.Warn("rss fetch failed",
-					zap.String("subscription", sub.Name),
-					zap.String("url", url),
-					zap.Error(err))
+	// Resolve mteam API adapter once (if applicable) so RSS-vs-API branch can
+	// reuse the same handle. Empty mtAdapter means "fall back to RSS".
+	var mtAdapter *adapter.MTeamAdapter
+	var mtConfig *model.SiteConfig
+	if site.Framework == "mteam" && e.siteProvider != nil {
+		if config, err := e.siteProvider.GetSiteConfig(ctx, site.Domain); err == nil && config.APIKey != "" {
+			if ad, err := e.siteProvider.GetAdapter(ctx, site.Domain); err == nil {
+				if mt, ok := ad.(*adapter.MTeamAdapter); ok {
+					mtAdapter = mt
+					mtConfig = config
+				}
 			}
-			e.saveFetchLog(ctx, sub.ID, 0, 0, 0, "error", errMsg)
-			continue
+		}
+	}
+
+	for _, url := range sub.URLs {
+		var events []*model.RSSTorrentEvent
+		var apiMode bool
+
+		if mtAdapter != nil {
+			apiEvents, apiErr := mtAdapter.FetchItemsByAPI(ctx, mtConfig, url, sub.SiteName)
+			if apiErr != nil {
+				e.logger.Warn("mteam API fetch failed, falling back to RSS",
+					zap.String("subscription", sub.Name),
+					zap.String("url", url),
+					zap.Error(apiErr))
+				// Don't save error log here yet; RSS fallback still has a chance.
+			} else {
+				events = apiEvents
+				apiMode = true
+				e.logger.Info("mteam API fetch result",
+					zap.String("subscription", sub.Name),
+					zap.Int("events", len(events)))
+			}
 		}
 
-		events := e.fetcher.ParseItems(feed, sub, &site)
-		e.logger.Info("rss parse result",
-			zap.String("subscription", sub.Name),
-			zap.Int("events", len(events)))
+		if events == nil {
+			feed, err := e.fetcher.FetchWithProxy(ctx, url, site.ProxyURL, site.SkipSSLVerify)
+			if err != nil {
+				errMsg := err.Error()
+				if strings.Contains(errMsg, "非 XML 内容") || strings.Contains(errMsg, "请求间隔") {
+					e.logger.Debug("rss fetch rate-limited, skipping",
+						zap.String("subscription", sub.Name),
+						zap.String("url", url),
+						zap.Error(err))
+				} else {
+					e.logger.Warn("rss fetch failed",
+						zap.String("subscription", sub.Name),
+						zap.String("url", url),
+						zap.Error(err))
+				}
+				e.saveFetchLog(ctx, sub.ID, 0, 0, 0, "error", errMsg)
+				continue
+			}
+			events = e.fetcher.ParseItems(feed, sub, &site)
+			e.logger.Info("rss parse result",
+				zap.String("subscription", sub.Name),
+				zap.Int("events", len(events)))
+		}
 
 		metrics.RSSTorrentsFetched.WithLabelValues(sub.SiteName).Add(float64(len(events)))
 
@@ -545,7 +582,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			detectItems = append(detectItems, detectItem{event: event, index: i})
 		}
 
-		if len(detectItems) > 0 {
+		if len(detectItems) > 0 && !apiMode {
 			const maxConcurrentDetect = 2
 			sem := make(chan struct{}, maxConcurrentDetect)
 			var wg sync.WaitGroup
@@ -576,6 +613,10 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 					zap.Int("total", len(detectItems)),
 					zap.Int64("slow", slowCount))
 			}
+		} else if len(detectItems) > 0 && apiMode {
+			e.logger.Debug("skipping detect for API-mode events",
+				zap.String("subscription", sub.Name),
+				zap.Int("count", len(detectItems)))
 		}
 
 		for _, item := range detectItems {
