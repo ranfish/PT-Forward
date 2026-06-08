@@ -21,10 +21,17 @@ func setupFreeEndDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func TestFreeEndMonitor_Schedule(t *testing.T) {
+func TestFreeEndMonitor_Schedule_PausedWhenDownloading(t *testing.T) {
 	db := setupFreeEndDB(t)
 	engine := NewEngine(db, zap.NewNop())
-	mon := engine.freeEndMonitor
+	dlClient := &mockDownloaderClient{
+		torrentByHash: map[string]*model.TorrentInfo{
+			"abc123": {Hash: "abc123", Progress: 0.3},
+		},
+	}
+	engine.freeEndMonitor.client = &mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"test-client": dlClient},
+	}
 
 	freeEnd := time.Now().Add(-10 * time.Second)
 	record := &model.SeedingTorrentRecord{
@@ -38,13 +45,50 @@ func TestFreeEndMonitor_Schedule(t *testing.T) {
 	}
 	db.Create(record)
 
-	mon.Schedule(record)
-	time.Sleep(100 * time.Millisecond)
+	engine.freeEndMonitor.Schedule(record)
+	time.Sleep(200 * time.Millisecond)
 
 	var updated model.SeedingTorrentRecord
 	db.First(&updated, record.ID)
 	if updated.Status != model.SeedingStatusPausedFreeEnd {
-		t.Errorf("expected status paused_free_end, got %s", updated.Status)
+		t.Errorf("downloading torrent should be paused, got %s", updated.Status)
+	}
+}
+
+func TestFreeEndMonitor_Schedule_KeepsSeedingWhenComplete(t *testing.T) {
+	db := setupFreeEndDB(t)
+	engine := NewEngine(db, zap.NewNop())
+	dlClient := &mockDownloaderClient{
+		torrentByHash: map[string]*model.TorrentInfo{
+			"abc123": {Hash: "abc123", Progress: 1.0},
+		},
+	}
+	engine.freeEndMonitor.client = &mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"test-client": dlClient},
+	}
+
+	freeEnd := time.Now().Add(-10 * time.Second)
+	record := &model.SeedingTorrentRecord{
+		ClientID:  "test-client",
+		InfoHash:  "abc123",
+		SiteName:  "test-site",
+		TorrentID: "12345",
+		IsFree:    true,
+		FreeEndAt: &freeEnd,
+		Status:    model.SeedingStatusSeeding,
+	}
+	db.Create(record)
+
+	engine.freeEndMonitor.Schedule(record)
+	time.Sleep(200 * time.Millisecond)
+
+	var updated model.SeedingTorrentRecord
+	db.First(&updated, record.ID)
+	if updated.Status != model.SeedingStatusSeeding {
+		t.Errorf("completed torrent should keep seeding, got %s", updated.Status)
+	}
+	if updated.IsFree {
+		t.Errorf("is_free should be cleared after free expired")
 	}
 }
 
@@ -135,8 +179,13 @@ func TestFreeEndMonitor_StopAll(t *testing.T) {
 	}
 }
 
-func TestFreeEndMonitor_RecoverOnStartup(t *testing.T) {
+func TestFreeEndMonitor_RecoverOnStartup_Downloading(t *testing.T) {
 	db := setupFreeEndDB(t)
+	dlClient := &mockDownloaderClient{
+		torrentByHash: map[string]*model.TorrentInfo{
+			"expired": {Hash: "expired", Progress: 0.5},
+		},
+	}
 
 	past := time.Now().Add(-1 * time.Hour)
 	future := time.Now().Add(1 * time.Hour)
@@ -160,6 +209,9 @@ func TestFreeEndMonitor_RecoverOnStartup(t *testing.T) {
 	db.Create(upcoming)
 
 	engine := NewEngine(db, zap.NewNop())
+	engine.freeEndMonitor.client = &mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"client1": dlClient},
+	}
 	mon := engine.freeEndMonitor
 
 	mon.RecoverOnStartup(context.Background())
@@ -167,11 +219,48 @@ func TestFreeEndMonitor_RecoverOnStartup(t *testing.T) {
 	var updated model.SeedingTorrentRecord
 	db.First(&updated, expired.ID)
 	if updated.Status != model.SeedingStatusPausedFreeEnd {
-		t.Errorf("expired record should be paused, got %s", updated.Status)
+		t.Errorf("expired downloading record should be paused, got %s", updated.Status)
 	}
 
 	if mon.ActiveTimerCount() != 1 {
 		t.Errorf("upcoming record should have 1 timer, got %d", mon.ActiveTimerCount())
+	}
+}
+
+func TestFreeEndMonitor_RecoverOnStartup_Completed(t *testing.T) {
+	db := setupFreeEndDB(t)
+	dlClient := &mockDownloaderClient{
+		torrentByHash: map[string]*model.TorrentInfo{
+			"expired": {Hash: "expired", Progress: 1.0},
+		},
+	}
+
+	past := time.Now().Add(-1 * time.Hour)
+
+	expired := &model.SeedingTorrentRecord{
+		ClientID:  "client1",
+		InfoHash:  "expired",
+		IsFree:    true,
+		FreeEndAt: &past,
+		Status:    model.SeedingStatusSeeding,
+	}
+	db.Create(expired)
+
+	engine := NewEngine(db, zap.NewNop())
+	engine.freeEndMonitor.client = &mockDownloaderProvider{
+		clients: map[string]*mockDownloaderClient{"client1": dlClient},
+	}
+	mon := engine.freeEndMonitor
+
+	mon.RecoverOnStartup(context.Background())
+
+	var updated model.SeedingTorrentRecord
+	db.First(&updated, expired.ID)
+	if updated.Status != model.SeedingStatusSeeding {
+		t.Errorf("expired completed record should keep seeding, got %s", updated.Status)
+	}
+	if updated.IsFree {
+		t.Errorf("is_free should be cleared")
 	}
 }
 
@@ -197,5 +286,31 @@ func TestFreeEndMonitor_AlreadyPaused(t *testing.T) {
 	db.First(&updated, record.ID)
 	if updated.Status != model.SeedingStatusPausedFreeEnd {
 		t.Errorf("already paused record should remain paused, got %s", updated.Status)
+	}
+}
+
+func TestFreeEndMonitor_NoDownloader_PausedAsDefault(t *testing.T) {
+	db := setupFreeEndDB(t)
+	engine := NewEngine(db, zap.NewNop())
+	engine.freeEndMonitor.client = nil
+
+	freeEnd := time.Now().Add(-10 * time.Second)
+	record := &model.SeedingTorrentRecord{
+		ClientID:  "test-client",
+		InfoHash:  "abc123",
+		SiteName:  "test-site",
+		TorrentID: "12345",
+		IsFree:    true,
+		FreeEndAt: &freeEnd,
+		Status:    model.SeedingStatusSeeding,
+	}
+	db.Create(record)
+
+	engine.freeEndMonitor.handleFreeEnded(record)
+
+	var updated model.SeedingTorrentRecord
+	db.First(&updated, record.ID)
+	if updated.Status != model.SeedingStatusPausedFreeEnd {
+		t.Errorf("no downloader = safe default = paused, got %s", updated.Status)
 	}
 }

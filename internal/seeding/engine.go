@@ -820,6 +820,15 @@ func (e *Engine) PauseForFreeEnd(ctx context.Context, clientID, infoHash string)
 		}).Error
 }
 
+func (e *Engine) MarkFreeExpired(ctx context.Context, clientID, infoHash string) error {
+	return e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+		Where("client_id = ? AND info_hash = ?", clientID, infoHash).
+		Updates(map[string]interface{}{
+			"is_free":        false,
+			"last_action_by": "free_end_keeper",
+		}).Error
+}
+
 type ManagedCounts struct {
 	Active int `json:"active"`
 	Paused int `json:"paused"`
@@ -971,17 +980,17 @@ func (e *Engine) CleanupStale(ctx context.Context) (int64, error) {
 	freeExpired := e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
 		Where("status = ? AND is_free = ? AND free_end_at IS NOT NULL AND free_end_at < ?", "seeding", true, time.Now()).
 		Updates(map[string]interface{}{
-			"status":     "paused_free_end",
+			"is_free":    false,
 			"updated_at": time.Now(),
 		})
 	if freeExpired.Error != nil {
-		return result.RowsAffected, &model.AppError{Code: 50001, Message: "pause free-expired records failed", Cause: freeExpired.Error}
+		return result.RowsAffected, &model.AppError{Code: 50001, Message: "mark free-expired records failed", Cause: freeExpired.Error}
 	}
 
 	e.mu.Lock()
 	for _, r := range e.recordMap {
 		if r.Status == model.SeedingStatusSeeding && r.IsFree && r.FreeEndAt != nil && r.FreeEndAt.Before(time.Now()) {
-			r.Status = model.SeedingStatusPausedFreeEnd
+			r.IsFree = false
 		}
 	}
 	activeClients := make(map[string]bool, len(e.recordMap))

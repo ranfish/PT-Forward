@@ -122,31 +122,68 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 		return
 	}
 
-	if m.engine != nil {
-		if err := m.engine.PauseForFreeEnd(ctx, record.ClientID, record.InfoHash); err != nil {
-			m.logger.Error("free end monitor: pause failed",
-				zap.String("client", record.ClientID),
-				zap.String("info_hash", record.InfoHash),
-				zap.Error(err),
-			)
-			return
-		}
-	}
-
+	isDownloading := false
 	if m.client != nil {
 		dlClient, err := m.client.Get(record.ClientID)
 		if err == nil {
-			if err := dlClient.PauseTorrent(ctx, record.InfoHash); err != nil {
-				m.logger.Warn("free end monitor: downloader pause failed", zap.Error(err))
+			ti, err := dlClient.GetTorrentByHash(ctx, record.InfoHash)
+			if err != nil {
+				m.logger.Warn("free end monitor: get torrent state failed, assuming downloading to be safe",
+					zap.String("info_hash", record.InfoHash),
+					zap.Error(err))
+				isDownloading = true
+			} else if ti != nil && ti.Progress < 1.0 {
+				isDownloading = true
 			}
 		}
+	} else {
+		isDownloading = true
 	}
 
-	m.logger.Info("free end monitor: 种子免费到期，已暂停",
-		zap.String("client", record.ClientID),
-		zap.String("info_hash", record.InfoHash),
-		zap.String("site", record.SiteName),
-	)
+	if isDownloading {
+		if m.engine != nil {
+			if err := m.engine.PauseForFreeEnd(ctx, record.ClientID, record.InfoHash); err != nil {
+				m.logger.Error("free end monitor: pause failed",
+					zap.String("client", record.ClientID),
+					zap.String("info_hash", record.InfoHash),
+					zap.Error(err),
+				)
+				return
+			}
+		}
+
+		if m.client != nil {
+			dlClient, err := m.client.Get(record.ClientID)
+			if err == nil {
+				if err := dlClient.PauseTorrent(ctx, record.InfoHash); err != nil {
+					m.logger.Warn("free end monitor: downloader pause failed", zap.Error(err))
+				}
+			}
+		}
+
+		m.logger.Info("free end monitor: 种子下载中免费到期，已暂停",
+			zap.String("client", record.ClientID),
+			zap.String("info_hash", record.InfoHash),
+			zap.String("site", record.SiteName),
+		)
+	} else {
+		if m.engine != nil {
+			if err := m.engine.MarkFreeExpired(ctx, record.ClientID, record.InfoHash); err != nil {
+				m.logger.Error("free end monitor: mark free expired failed",
+					zap.String("client", record.ClientID),
+					zap.String("info_hash", record.InfoHash),
+					zap.Error(err),
+				)
+				return
+			}
+		}
+
+		m.logger.Info("free end monitor: 种子已做完，免费到期，继续保种",
+			zap.String("client", record.ClientID),
+			zap.String("info_hash", record.InfoHash),
+			zap.String("site", record.SiteName),
+		)
+	}
 }
 
 func (m *FreeEndMonitor) RecoverOnStartup(ctx context.Context) {
