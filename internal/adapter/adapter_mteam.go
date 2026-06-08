@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -411,6 +412,204 @@ func (a *MTeamAdapter) discountViaAPI(ctx context.Context, config *model.SiteCon
 		}
 	}
 	return dr, nil
+}
+
+// FetchItemsByAPI queries the /api/torrent/search endpoint directly to bypass
+// the page-size + sign-bound RSS feed. Used when site.framework == "mteam" and
+// APIKey is configured. Categories/teams/pageSize/discounts are parsed from
+// the original RSS URL's query string (so users keep using the same URL field).
+//
+// URL query params:
+//
+//	categories=401,419,...     -> API filter
+//	teams=9,44                 -> API filter
+//	pageSize=50                -> API request size (default 50, max 100)
+//	discounts=FREE,_2X_FREE    -> client-side filter (default: FREE,_2X_FREE,FREE_2XUP,TWOFREE)
+//
+// Returns []*RSSTorrentEvent already populated with discount info (no need to
+// run DetectDiscount again).
+func (a *MTeamAdapter) FetchItemsByAPI(ctx context.Context, config *model.SiteConfig, feedURL, siteName string) ([]*model.RSSTorrentEvent, error) {
+	if config.APIKey == "" {
+		return nil, parseError("FetchItemsByAPI: API key 未配置", nil)
+	}
+
+	categories, teams, pageSize, wantDiscounts := parseMTeamFeedParams(feedURL)
+	payload := map[string]interface{}{
+		"mode":       "normal",
+		"pageNumber": 1,
+		"pageSize":   pageSize,
+	}
+	if len(categories) > 0 {
+		payload["categories"] = categories
+	}
+	if len(teams) > 0 {
+		payload["teams"] = teams
+	}
+	body, _ := json.Marshal(payload)
+
+	u := resolveBaseURL(config) + "/api/torrent/search"
+	req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(body))
+	if err != nil {
+		return nil, networkError("构造 API 搜索请求失败", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	a.setAPIHeaders(req, config.APIKey)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, networkError("API 搜索请求失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	respBody, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Code json.Number `json:"code"`
+		Data struct {
+			Data []mTeamSearchItem `json:"data"`
+		} `json:"data"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, parseError("解析 API 搜索结果失败", err)
+	}
+	if result.Code.String() != "0" {
+		return nil, parseError(fmt.Sprintf("API 搜索失败: %s", result.Message), nil)
+	}
+
+	events := make([]*model.RSSTorrentEvent, 0, len(result.Data.Data))
+	for _, item := range result.Data.Data {
+		dr := mTeamDiscountToResult(item.Status.Discount, item.Status.DiscountEndTime)
+		if dr.Level == model.DiscountNone {
+			continue
+		}
+		if !wantDiscounts[strings.ToUpper(item.Status.Discount)] {
+			continue
+		}
+		ev := &model.RSSTorrentEvent{
+			SourceRSS:     feedURL,
+			SiteName:      siteName,
+			TorrentID:     item.ID,
+			Title:         item.Name,
+			Size:          int64(item.Size),
+			InfoHash:      "",
+			DownloadURL:   resolveBaseURL(config) + "/download.php?id=" + item.ID,
+			IsFree:        dr.Level == model.DiscountFree || dr.Level == model.Discount2xFree || dr.Level == model.Discount2x50,
+			DiscountLevel: dr.Level,
+			FreeEndAt:     dr.FreeEndAt,
+			Metadata:      map[string]any{},
+		}
+		events = append(events, ev)
+	}
+	return events, nil
+}
+
+// mTeamSearchItem mirrors the search API item shape (subset we care about).
+type mTeamSearchItem struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Size   flexInt `json:"size"`
+	Status struct {
+		Discount        string `json:"discount"`
+		DiscountEndTime string `json:"discountEndTime"`
+	} `json:"status"`
+}
+
+// parseMTeamFeedParams extracts categories/teams/pageSize/discounts from the
+// RSS URL's query string. Returns parallel slices + a discount lookup set.
+func parseMTeamFeedParams(feedURL string) (categories, teams []int, pageSize int, discounts map[string]bool) {
+	discounts = defaultMTeamDiscounts()
+	pageSize = 50
+	if feedURL == "" {
+		return
+	}
+	parsed, err := url.Parse(feedURL)
+	if err != nil {
+		return
+	}
+	q := parsed.Query()
+	if v := q.Get("categories"); v != "" {
+		categories = parseIntList(v)
+	}
+	if v := q.Get("teams"); v != "" {
+		teams = parseIntList(v)
+	}
+	if v := q.Get("pageSize"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 100 {
+			pageSize = n
+		}
+	}
+	if v := q.Get("discounts"); v != "" {
+		custom := make(map[string]bool)
+		for _, d := range strings.Split(v, ",") {
+			d = strings.TrimSpace(strings.ToUpper(d))
+			if d != "" {
+				custom[d] = true
+			}
+		}
+		if len(custom) > 0 {
+			discounts = custom
+		}
+	}
+	return
+}
+
+func defaultMTeamDiscounts() map[string]bool {
+	return map[string]bool{
+		"FREE":        true,
+		"_2X_FREE":    true,
+		"FREE_2XUP":   true,
+		"TWOFREE":     true,
+		"_2X":         true,
+		"2XUP":        true,
+		"_2X_PERCENT_50": true,
+	}
+}
+
+func parseIntList(s string) []int {
+	var out []int
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if n, err := strconv.Atoi(p); err == nil {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// mTeamDiscountToResult converts API discount strings to DiscountResult.
+// Mirrors discountViaAPI's switch but operates on a raw string.
+func mTeamDiscountToResult(discount, endTime string) *model.DiscountResult {
+	var dr *model.DiscountResult
+	switch strings.ToUpper(discount) {
+	case "FREE":
+		dr = &model.DiscountResult{Level: model.DiscountFree}
+	case "_2X_FREE", "FREE_2XUP", "TWOFREE":
+		dr = &model.DiscountResult{Level: model.Discount2xFree, Multiplier: 2.0}
+	case "_2X", "2XUP":
+		dr = &model.DiscountResult{Level: model.Discount2xUp, Multiplier: 2.0}
+	case "_2X_PERCENT_50":
+		dr = &model.DiscountResult{Level: model.Discount2x50, Multiplier: 2.0}
+	case "PERCENT_50":
+		dr = &model.DiscountResult{Level: model.DiscountPercent50}
+	case "PERCENT_70", "_2X_PERCENT_70":
+		dr = &model.DiscountResult{Level: model.DiscountPercent70}
+	case "PERCENT_30":
+		dr = &model.DiscountResult{Level: model.DiscountPercent30}
+	case "NORMAL", "":
+		dr = &model.DiscountResult{Level: model.DiscountNone}
+	default:
+		dr = &model.DiscountResult{Level: model.DiscountNone}
+	}
+	if dr.Level != model.DiscountNone && endTime != "" {
+		if t, err := time.Parse(time.RFC3339, endTime); err == nil {
+			dr.FreeEndAt = &t
+		}
+	}
+	return dr
 }
 
 func (a *MTeamAdapter) discountViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
