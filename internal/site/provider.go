@@ -455,6 +455,7 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		DownloadMode:          s.DownloadMode,
 		SupportsPiecesHashAPI: s.SupportsPiecesHashAPI,
 		AssumeFree:            s.AssumeFree,
+		APIDomain:             s.APIDomain,
 	}
 
 	if s.AlternativeDomains != "" {

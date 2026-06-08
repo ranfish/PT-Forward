@@ -839,6 +839,9 @@ func (a *NexusPHPAdapter) SearchByPiecesHash(ctx context.Context, config *model.
 	}
 
 	u := config.Domain
+	if config.APIDomain != "" {
+		u = config.APIDomain
+	}
 	if !strings.HasPrefix(u, "http") {
 		u = "https://" + u
 	}
@@ -890,7 +893,7 @@ func (a *NexusPHPAdapter) doPiecesHashRequest(ctx context.Context, apiURL string
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "PT-Forward/1.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	if cookie != "" {
 		req.Header.Set("Cookie", cookie)
 	}

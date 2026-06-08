@@ -70,6 +70,7 @@ type Site struct {
 	MaxConcurrent int    `json:"max_concurrent" gorm:"default:2"`
 
 	SupportsPiecesHashAPI bool `json:"supports_pieces_hash_api" gorm:"default:true"`
+	APIDomain             string `json:"api_domain,omitempty" gorm:"size:255;default:''"`
 
 	UploadBytes   int64      `json:"upload_bytes" gorm:"default:0"`
 	DownloadBytes int64      `json:"download_bytes" gorm:"default:0"`
@@ -312,6 +313,7 @@ type SiteConfig struct {
 
 	SupportsPiecesHashAPI bool     `json:"supports_pieces_hash_api"`
 	AlternativeDomains    []string `json:"alternative_domains,omitempty"`
+	APIDomain             string   `json:"api_domain,omitempty"`
 
 	AssumeFree bool `json:"assume_free"`
 }

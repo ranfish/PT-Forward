@@ -671,6 +671,39 @@ func TestNexusPHP_SearchByPiecesHash_AllPathsFail(t *testing.T) {
 	}
 }
 
+func TestNexusPHP_SearchByPiecesHash_APIDomainOverride(t *testing.T) {
+	mainSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("should not hit main domain")
+		w.WriteHeader(500)
+	}))
+	defer mainSrv.Close()
+
+	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/pieces-hash" {
+			t.Errorf("expected /api/pieces-hash, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ret":0,"data":{"abc":99}}`))
+	}))
+	defer apiSrv.Close()
+
+	doer := &HTTPDoer{Client: apiSrv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{
+		Domain:   mainSrv.URL,
+		APIDomain: apiSrv.URL,
+		Passkey:  "31ab1c9e2bf5533b4d23e94b2cad5cd9",
+	}
+
+	matches, err := a.SearchByPiecesHash(context.Background(), config, []string{"abc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if matches["abc"] != 99 {
+		t.Errorf("expected 99, got %d", matches["abc"])
+	}
+}
+
 func TestNexusPHP_GetBatchSLData(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`<html>Seeders: 10, Leechers: 5</html>`))
