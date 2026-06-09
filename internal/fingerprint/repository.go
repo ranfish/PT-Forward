@@ -76,9 +76,15 @@ func (r *Repository) ComputeAndSave(ctx context.Context, siteName, torrentID str
 	}
 
 	var existing model.ContentFingerprint
-	err = r.db.WithContext(ctx).
-		Where("site_name = ? AND torrent_id = ?", siteName, torrentID).
-		First(&existing).Error
+	if torrentID != "" {
+		err = r.db.WithContext(ctx).
+			Where("site_name = ? AND torrent_id = ?", siteName, torrentID).
+			First(&existing).Error
+	} else {
+		err = r.db.WithContext(ctx).
+			Where("info_hash = ?", meta.InfoHash).
+			First(&existing).Error
+	}
 	if err == nil {
 		fp.ID = existing.ID
 		fp.CreatedAt = existing.CreatedAt

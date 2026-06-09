@@ -25,10 +25,34 @@ type preloadedSites struct {
 	adapters map[string]model.SiteAdapter
 }
 
+type piecesHashCache struct {
+	bySite map[string]map[string]int
+}
+
+func (c *piecesHashCache) get(siteName, piecesHash string) (int, bool) {
+	if c == nil {
+		return 0, false
+	}
+	m, ok := c.bySite[siteName]
+	if !ok {
+		return 0, false
+	}
+	tid, ok := m[piecesHash]
+	return tid, ok
+}
+
 // §33.32 — piecesHashSearcher is an optional capability interface.
 // Adapters that support NexusPHP /api/pieces-hash implement this.
 type piecesHashSearcher interface {
 	SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error)
+}
+
+type sourceTorrent struct {
+	InfoHash string
+	SiteName string
+	ClientID string
+	Name     string
+	SavePath string
 }
 
 type fpCache struct {
@@ -43,14 +67,15 @@ func (c *fpCache) get(infoHash, siteName string) *model.ContentFingerprint {
 }
 
 type Engine struct {
-	db             *gorm.DB
-	logger         *zap.Logger
-	siteProvider   model.SiteInfoProvider
-	clientProvider model.DownloaderProvider
-	iyuuService    model.IYUUService
-	fpRepo         *fingerprint.Repository
-	mu             sync.RWMutex
-	tasks          map[uint]context.CancelFunc
+	db              *gorm.DB
+	logger          *zap.Logger
+	siteProvider    model.SiteInfoProvider
+	clientProvider  model.DownloaderProvider
+	iyuuService     model.IYUUService
+	fpRepo          *fingerprint.Repository
+	trackerResolver *TrackerSiteResolver
+	mu              sync.RWMutex
+	tasks           map[uint]context.CancelFunc
 }
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
@@ -75,6 +100,10 @@ func (e *Engine) SetClientProvider(cp model.DownloaderProvider) {
 
 func (e *Engine) SetIYUUService(svc model.IYUUService) {
 	e.iyuuService = svc
+}
+
+func (e *Engine) SetTrackerResolver(resolver *TrackerSiteResolver) {
+	e.trackerResolver = resolver
 }
 
 func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []string) *preloadedSites {
@@ -139,33 +168,53 @@ func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []
 	}
 }
 
-func (e *Engine) preloadFingerprints(ctx context.Context, records []model.SeedingTorrentRecord) *fpCache {
-	if len(records) == 0 {
+const preloadBatchSize = 500
+
+func chunkStrings(slice []string, size int) [][]string {
+	var chunks [][]string
+	for i := 0; i < len(slice); i += size {
+		end := i + size
+		if end > len(slice) {
+			end = len(slice)
+		}
+		chunks = append(chunks, slice[i:end])
+	}
+	return chunks
+}
+
+func (e *Engine) preloadFingerprints(ctx context.Context, infoHashes []string) *fpCache {
+	if len(infoHashes) == 0 {
 		return nil
 	}
 
 	seen := make(map[string]bool)
-	var infoHashes []string
-	for _, rec := range records {
-		if !seen[rec.InfoHash] {
-			seen[rec.InfoHash] = true
-			infoHashes = append(infoHashes, rec.InfoHash)
+	var deduped []string
+	for _, ih := range infoHashes {
+		if !seen[ih] {
+			seen[ih] = true
+			deduped = append(deduped, ih)
 		}
 	}
 
 	var fps []*model.ContentFingerprint
 	if e.fpRepo != nil {
-		batch, err := e.fpRepo.BatchGetByInfoHashes(ctx, infoHashes)
-		if err != nil {
-			e.logger.Warn("批量预加载指纹失败", zap.Error(err))
-			return &fpCache{byKey: make(map[string]*model.ContentFingerprint)}
+		for _, chunk := range chunkStrings(deduped, preloadBatchSize) {
+			batch, err := e.fpRepo.BatchGetByInfoHashes(ctx, chunk)
+			if err != nil {
+				e.logger.Warn("批量预加载指纹失败", zap.Error(err))
+				return &fpCache{byKey: make(map[string]*model.ContentFingerprint)}
+			}
+			fps = append(fps, batch...)
 		}
-		fps = batch
 	} else {
 		var batch []model.ContentFingerprint
-		if err := e.db.WithContext(ctx).Where("info_hash IN ?", infoHashes).Find(&batch).Error; err != nil {
-			e.logger.Warn("批量预加载指纹失败(DB)", zap.Error(err))
-			return &fpCache{byKey: make(map[string]*model.ContentFingerprint)}
+		for _, chunk := range chunkStrings(deduped, preloadBatchSize) {
+			var partial []model.ContentFingerprint
+			if err := e.db.WithContext(ctx).Where("info_hash IN ?", chunk).Find(&partial).Error; err != nil {
+				e.logger.Warn("批量预加载指纹失败(DB)", zap.Error(err))
+				return &fpCache{byKey: make(map[string]*model.ContentFingerprint)}
+			}
+			batch = append(batch, partial...)
 		}
 		fps = make([]*model.ContentFingerprint, len(batch))
 		for i := range batch {
@@ -180,30 +229,25 @@ func (e *Engine) preloadFingerprints(ctx context.Context, records []model.Seedin
 	return &fpCache{byKey: byKey}
 }
 
-func (e *Engine) preloadExistingMatches(ctx context.Context, records []model.SeedingTorrentRecord) map[string][]model.ReseedMatch {
-	if len(records) == 0 {
+func (e *Engine) preloadExistingMatches(ctx context.Context, infoHashes []string) map[string][]model.ReseedMatch {
+	if len(infoHashes) == 0 {
 		return nil
 	}
 
-	seen := make(map[string]bool)
-	var infoHashes []string
-	for _, rec := range records {
-		if !seen[rec.InfoHash] {
-			seen[rec.InfoHash] = true
-			infoHashes = append(infoHashes, rec.InfoHash)
-		}
-	}
-
 	var matches []model.ReseedMatch
-	if err := e.db.WithContext(ctx).
-		Where("source_info_hash IN ? AND status IN ?", infoHashes, []model.ReseedMatchStatus{
-			model.MatchStatusMatched,
-			model.MatchStatusInjecting,
-			model.MatchStatusInjected,
-		}).
-		Find(&matches).Error; err != nil {
-		e.logger.Warn("批量预加载已有匹配失败", zap.Error(err))
-		return make(map[string][]model.ReseedMatch)
+	for _, chunk := range chunkStrings(infoHashes, preloadBatchSize) {
+		var partial []model.ReseedMatch
+		if err := e.db.WithContext(ctx).
+			Where("source_info_hash IN ? AND status IN ?", chunk, []model.ReseedMatchStatus{
+				model.MatchStatusMatched,
+				model.MatchStatusInjecting,
+				model.MatchStatusInjected,
+			}).
+			Find(&partial).Error; err != nil {
+			e.logger.Warn("批量预加载已有匹配失败", zap.Error(err))
+			return make(map[string][]model.ReseedMatch)
+		}
+		matches = append(matches, partial...)
 	}
 
 	result := make(map[string][]model.ReseedMatch, len(matches))
@@ -213,18 +257,9 @@ func (e *Engine) preloadExistingMatches(ctx context.Context, records []model.See
 	return result
 }
 
-func (e *Engine) preloadNegativeCache(ctx context.Context, records []model.SeedingTorrentRecord) map[string]map[string]bool {
-	if len(records) == 0 {
+func (e *Engine) preloadNegativeCache(ctx context.Context, infoHashes []string) map[string]map[string]bool {
+	if len(infoHashes) == 0 {
 		return nil
-	}
-
-	seen := make(map[string]bool)
-	var infoHashes []string
-	for _, rec := range records {
-		if !seen[rec.InfoHash] {
-			seen[rec.InfoHash] = true
-			infoHashes = append(infoHashes, rec.InfoHash)
-		}
 	}
 
 	entries, err := e.GetNegativeCacheByHashes(ctx, infoHashes)
@@ -250,21 +285,205 @@ func (e *Engine) preloadNegativeCache(ctx context.Context, records []model.Seedi
 	return result
 }
 
-func (e *Engine) preloadIYUUResults(ctx context.Context, records []model.SeedingTorrentRecord) map[string][]*model.IYUUReseedResult {
-	if e.iyuuService == nil || len(records) == 0 {
+func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTorrent, ps *preloadedSites, fc *fpCache, negCache map[string]map[string]bool) *piecesHashCache {
+	if ps == nil || fc == nil || len(sources) == 0 {
 		return nil
 	}
 
-	seen := make(map[string]bool)
-	var infoHashes []string
-	for _, rec := range records {
-		if !seen[rec.InfoHash] {
-			seen[rec.InfoHash] = true
-			infoHashes = append(infoHashes, rec.InfoHash)
+	eligibleSites := make(map[string]struct {
+		config  *model.SiteConfig
+		adapter model.SiteAdapter
+	})
+
+	for _, siteInfo := range ps.infos {
+		siteConfig := ps.configs[siteInfo.Name]
+		if siteConfig == nil || !siteConfig.SupportsPiecesHashAPI {
+			continue
+		}
+		if siteConfig.Passkey == "" && siteConfig.Cookie == "" {
+			continue
+		}
+		adapter := ps.adapters[siteInfo.Name]
+		if adapter == nil || !adapter.SupportsSearchByPiecesHash() {
+			continue
+		}
+		if _, ok := adapter.(piecesHashSearcher); !ok {
+			continue
+		}
+		eligibleSites[siteInfo.Name] = struct {
+			config  *model.SiteConfig
+			adapter model.SiteAdapter
+		}{config: siteConfig, adapter: adapter}
+	}
+
+	if len(eligibleSites) == 0 {
+		return nil
+	}
+
+	sitePiecesHashes := make(map[string]map[string]string)
+	for _, src := range sources {
+		fp := fc.get(src.InfoHash, src.SiteName)
+		if fp == nil || fp.PiecesHash == "" {
+			continue
+		}
+		for siteName := range eligibleSites {
+			if siteName == src.SiteName {
+				continue
+			}
+			if negCache != nil && negCache[src.InfoHash] != nil && negCache[src.InfoHash][siteName] {
+				continue
+			}
+			if sitePiecesHashes[siteName] == nil {
+				sitePiecesHashes[siteName] = make(map[string]string)
+			}
+			sitePiecesHashes[siteName][fp.PiecesHash] = src.InfoHash
 		}
 	}
 
-	results, err := e.iyuuService.QueryReseed(ctx, infoHashes)
+	if len(sitePiecesHashes) == 0 {
+		return nil
+	}
+
+	cache := &piecesHashCache{bySite: make(map[string]map[string]int)}
+
+	for siteName, phMap := range sitePiecesHashes {
+		es := eligibleSites[siteName]
+		searcher := es.adapter.(piecesHashSearcher)
+
+		allHashes := make([]string, 0, len(phMap))
+		for ph := range phMap {
+			allHashes = append(allHashes, ph)
+		}
+
+		const batchSize = 100
+		siteResults := make(map[string]int)
+
+		for i := 0; i < len(allHashes); i += batchSize {
+			end := i + batchSize
+			if end > len(allHashes) {
+				end = len(allHashes)
+			}
+			batch := allHashes[i:end]
+
+			matches, err := searcher.SearchByPiecesHash(ctx, es.config, batch)
+			if err != nil {
+				e.logger.Warn("批量 pieces_hash 查询失败",
+					zap.String("site", siteName),
+					zap.Int("batch", i/batchSize+1),
+					zap.Int("totalBatches", (len(allHashes)+batchSize-1)/batchSize),
+					zap.Error(err))
+				continue
+			}
+
+			for ph, tid := range matches {
+				siteResults[ph] = tid
+			}
+		}
+
+		if len(siteResults) > 0 {
+			cache.bySite[siteName] = siteResults
+		}
+
+		e.logger.Info("pieces_hash 批量查询完成",
+			zap.String("site", siteName),
+			zap.Int("queried", len(allHashes)),
+			zap.Int("matched", len(siteResults)))
+	}
+
+	return cache
+}
+
+func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourceTorrent, infoHashes []string) {
+	if e.fpRepo == nil || e.clientProvider == nil || len(infoHashes) == 0 {
+		return
+	}
+
+	existing := e.preloadFingerprints(ctx, infoHashes)
+
+	type missingEntry struct {
+		src        sourceTorrent
+		clientName string
+	}
+
+	clientCache := make(map[string]model.DownloaderClient)
+	var missing []missingEntry
+
+	for _, src := range sources {
+		if existing.get(src.InfoHash, src.SiteName) != nil {
+			continue
+		}
+		dlClient, ok := clientCache[src.ClientID]
+		if !ok {
+			var err error
+			dlClient, err = e.clientProvider.Get(src.ClientID)
+			if err != nil {
+				continue
+			}
+			clientCache[src.ClientID] = dlClient
+		}
+		missing = append(missing, missingEntry{src: src, clientName: src.ClientID})
+	}
+
+	if len(missing) == 0 {
+		return
+	}
+
+	e.logger.Info("开始计算缺失指纹",
+		zap.Int("missing", len(missing)),
+		zap.Int("total", len(sources)))
+
+	computed := 0
+	for _, m := range missing {
+		if ctx.Err() != nil {
+			break
+		}
+		dlClient := clientCache[m.clientName]
+		torrentData, err := dlClient.ExportTorrent(ctx, m.src.InfoHash)
+		if err != nil {
+			if computed == 0 {
+				e.logger.Warn("导出种子文件失败（首个错误）",
+					zap.String("hash", m.src.InfoHash),
+					zap.String("client", m.clientName),
+					zap.Error(err))
+			}
+			continue
+		}
+		if len(torrentData) == 0 {
+			continue
+		}
+
+		_, err = e.fpRepo.ComputeAndSave(ctx, m.src.SiteName, "", torrentData, m.src.Name)
+		if err != nil {
+			if computed == 0 {
+				e.logger.Warn("计算指纹失败（首个错误）",
+					zap.String("hash", m.src.InfoHash),
+					zap.Error(err))
+			}
+			continue
+		}
+		computed++
+	}
+
+	if computed > 0 {
+		e.logger.Info("指纹计算完成", zap.Int("computed", computed), zap.Int("missing", len(missing)))
+	}
+}
+
+func (e *Engine) preloadIYUUResults(ctx context.Context, infoHashes []string) map[string][]*model.IYUUReseedResult {
+	if e.iyuuService == nil || len(infoHashes) == 0 {
+		return nil
+	}
+
+	var deduped []string
+	seen := make(map[string]bool)
+	for _, ih := range infoHashes {
+		if !seen[ih] {
+			seen[ih] = true
+			deduped = append(deduped, ih)
+		}
+	}
+
+	results, err := e.iyuuService.QueryReseed(ctx, deduped)
 	if err != nil {
 		e.logger.Warn("IYUU 批量查询失败", zap.Error(err))
 		return make(map[string][]*model.IYUUReseedResult)
@@ -450,33 +669,60 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		}
 	}()
 
-	clientIDs := ParseClientIDs(task.ClientIDs)
-	if len(clientIDs) == 0 {
+	clientNames := e.resolveClientIDsToNames(ctx, task.ClientIDs)
+	if len(clientNames) == 0 {
 		return result, nil
 	}
 
-	var seedingRecords []model.SeedingTorrentRecord
-	q := e.db.WithContext(ctx).Where("status = ?", "seeding")
-	if len(clientIDs) == 1 {
-		q = q.Where("client_id = ?", clientIDs[0])
-	} else {
-		q = q.Where("client_id IN ?", clientIDs)
+	if e.clientProvider == nil {
+		return result, nil
 	}
-	if err := q.Find(&seedingRecords).Error; err != nil {
-		return result, reseedError(ErrReseedDB, "查询做种记录失败", err)
-	}
-	result.TotalSources = len(seedingRecords)
 
-	if len(seedingRecords) == 0 {
+	var sourceTorrents []sourceTorrent
+	for _, clientName := range clientNames {
+		dlClient, err := e.clientProvider.Get(clientName)
+		if err != nil {
+			e.logger.Warn("获取下载器失败", zap.String("client", clientName), zap.Error(err))
+			continue
+		}
+		torrents, err := dlClient.GetSeedingTorrents(ctx)
+		if err != nil {
+			e.logger.Warn("获取做种种子失败", zap.String("client", clientName), zap.Error(err))
+			continue
+		}
+		for _, t := range torrents {
+			siteName := ""
+			if e.trackerResolver != nil {
+				siteName = e.trackerResolver.Resolve(t.TrackerURL)
+			}
+			if siteName == "" {
+				continue
+			}
+			sourceTorrents = append(sourceTorrents, sourceTorrent{
+				InfoHash: t.Hash,
+				SiteName: siteName,
+				ClientID: clientName,
+				Name:     t.Name,
+				SavePath: t.SavePath,
+			})
+		}
+	}
+	result.TotalSources = len(sourceTorrents)
+
+	e.logger.Debug("辅种源种子解析完成",
+		zap.Int("totalSeeding", result.TotalSources),
+		zap.String("taskID", fmt.Sprintf("%d", task.ID)))
+
+	if len(sourceTorrents) == 0 {
 		return result, nil
 	}
 
 	var sourceSites []string
 	if task.SourceSiteIDs != "" {
-		sourceSites = ParseClientIDs(task.SourceSiteIDs)
+		sourceSites = e.resolveSiteIDsToNames(ctx, task.SourceSiteIDs)
 	}
 
-	targetSites := ParseClientIDs(task.TargetSiteIDs)
+	targetSites := e.resolveSiteIDsToNames(ctx, task.TargetSiteIDs)
 
 	var excludedSites []string
 	if task.TargetSiteExcludes != "" {
@@ -488,27 +734,59 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		sizeTolerance = 1.0
 	}
 
+	var infoHashes []string
+	for _, src := range sourceTorrents {
+		infoHashes = append(infoHashes, src.InfoHash)
+	}
+
+	e.computeMissingFingerprints(ctx, sourceTorrents, infoHashes)
+
+	e.logger.Info("preload 开始",
+		zap.Int("sources", len(sourceTorrents)),
+		zap.Strings("targetSites", targetSites))
+
 	ps := e.preloadSites(ctx, targetSites, excludedSites)
-	fpCache := e.preloadFingerprints(ctx, seedingRecords)
-	existingMatchesMap := e.preloadExistingMatches(ctx, seedingRecords)
-	negCache := e.preloadNegativeCache(ctx, seedingRecords)
+	fpCache := e.preloadFingerprints(ctx, infoHashes)
+	existingMatchesMap := e.preloadExistingMatches(ctx, infoHashes)
+	negCache := e.preloadNegativeCache(ctx, infoHashes)
+
+	var phCache *piecesHashCache
+	if hasMatchMethod(task.MatchMethods, "pieces_hash") {
+		phCache = e.preloadPiecesHashCache(ctx, sourceTorrents, ps, fpCache, negCache)
+	}
+
+	e.logger.Info("preload 完成",
+		zap.Int("fpCache", len(fpCache.byKey)),
+		zap.Int("existingMatches", len(existingMatchesMap)),
+		zap.Int("piecesHashSites", len(phCache.bySite)))
 
 	var iyuuResults map[string][]*model.IYUUReseedResult
 	var iyuuSidMap map[int]string
-	if task.EngineMode == "e2_auto" && e.iyuuService != nil && hasMatchMethod(task.MatchMethods, "iyuu") {
-		iyuuResults = e.preloadIYUUResults(ctx, seedingRecords)
+	if task.EngineMode == model.ReseedModeIYUUCloud && e.iyuuService != nil && hasMatchMethod(task.MatchMethods, "iyuu") {
+		iyuuResults = e.preloadIYUUResults(ctx, infoHashes)
 		iyuuSidMap = e.preloadIYUUSiteMappings(ctx)
 	}
 
-	for _, rec := range seedingRecords {
-		if ctx.Err() == context.Canceled {
+	matchCount := 0
+	for _, src := range sourceTorrents {
+		if ctx.Err() != nil {
+			e.logger.Warn("辅种主循环 context 取消", zap.Error(ctx.Err()))
 			break
+		}
+
+		matchCount++
+		if matchCount <= 5 || matchCount%500 == 0 {
+			e.logger.Info("辅种进度",
+				zap.Int("processed", matchCount),
+				zap.Int("total", len(sourceTorrents)),
+				zap.Int("matched", result.Matched),
+				zap.Int("skipped", result.Skipped))
 		}
 
 		if len(sourceSites) > 0 {
 			found := false
 			for _, s := range sourceSites {
-				if rec.SiteName == s {
+				if src.SiteName == s {
 					found = true
 					break
 				}
@@ -520,7 +798,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		}
 
 		var recTitle string
-		if fp := fpCache.get(rec.InfoHash, rec.SiteName); fp != nil {
+		if fp := fpCache.get(src.InfoHash, src.SiteName); fp != nil {
 			recTitle = fp.Title
 		}
 
@@ -529,15 +807,23 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			continue
 		}
 
-		if existingMatches := existingMatchesMap[rec.InfoHash]; len(existingMatches) > 0 {
+		if existingMatches := existingMatchesMap[src.InfoHash]; len(existingMatches) > 0 {
 			result.DuplicateExists += len(existingMatches)
 			continue
 		}
 
-		candidates := e.findCandidates(ctx, rec, ps, fpCache, sizeTolerance, task, negCache)
+		candidates := e.findCandidates(ctx, src, ps, fpCache, sizeTolerance, task, negCache, phCache)
+
+		if matchCount <= 10 {
+			e.logger.Info("findCandidates 结果",
+				zap.Int("idx", matchCount),
+				zap.String("src_site", src.SiteName),
+				zap.String("hash", src.InfoHash[:16]),
+				zap.Int("candidates", len(candidates)))
+		}
 
 		if iyuuResults != nil {
-			iyuuCandidates := e.filterIYUUResults(rec, iyuuResults, iyuuSidMap, targetSites, excludedSites)
+			iyuuCandidates := e.filterIYUUResults(src, iyuuResults, iyuuSidMap, targetSites, excludedSites)
 			if len(iyuuCandidates) > 0 {
 				candidates = append(candidates, iyuuCandidates...)
 			}
@@ -571,7 +857,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 
 			decision := model.DecisionMatch
 			switch {
-			case c.TargetInfoHash == rec.InfoHash && c.TargetInfoHash != "":
+			case c.TargetInfoHash == src.InfoHash && c.TargetInfoHash != "":
 				decision = model.DecisionSameInfoHash
 			case c.MatchMethod == "iyuu":
 				decision = model.DecisionMatch
@@ -584,10 +870,10 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			}
 
 			match := &model.ReseedMatch{
-				ClientID:        rec.ClientID,
-				SourceSite:      rec.SiteName,
-				SourceTorrentID: rec.TorrentID,
-				SourceInfoHash:  rec.InfoHash,
+				ClientID:        src.ClientID,
+				SourceSite:      src.SiteName,
+				SourceTorrentID: "",
+				SourceInfoHash:  src.InfoHash,
 				TargetSite:      c.TargetSite,
 				TargetTorrentID: c.TargetTorrentID,
 				TargetInfoHash:  c.TargetInfoHash,
@@ -599,7 +885,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 
 			if err := e.SaveMatch(ctx, match); err != nil {
 				e.logger.Warn("保存匹配结果失败",
-					zap.String("sourceHash", rec.InfoHash),
+					zap.String("sourceHash", src.InfoHash),
 					zap.String("targetSite", c.TargetSite),
 					zap.Error(err),
 				)
@@ -621,6 +907,11 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			go func(m *model.ReseedMatch) {
 				defer wg.Done()
 				defer func() { <-sem }()
+
+				e.logger.Info("injectMatch 开始",
+					zap.Uint("matchID", m.ID),
+					zap.String("targetSite", m.TargetSite),
+					zap.String("targetTorrentID", m.TargetTorrentID))
 
 				if err := e.injectMatch(ctx, m, task, ps); err != nil {
 					e.logger.Warn("注入辅种失败",
@@ -660,7 +951,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	return result, nil
 }
 
-func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRecord, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool) []model.Candidate {
+func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool, phCache *piecesHashCache) []model.Candidate {
 	if ps == nil {
 		return nil
 	}
@@ -671,11 +962,11 @@ func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRec
 		if ctx.Err() == context.Canceled {
 			break
 		}
-		if siteInfo.Name == rec.SiteName {
+		if siteInfo.Name == src.SiteName {
 			continue
 		}
 
-		if negCache != nil && negCache[rec.InfoHash] != nil && negCache[rec.InfoHash][siteInfo.Name] {
+		if negCache != nil && negCache[src.InfoHash] != nil && negCache[src.InfoHash][siteInfo.Name] {
 			continue
 		}
 
@@ -688,40 +979,64 @@ func (e *Engine) findCandidates(ctx context.Context, rec model.SeedingTorrentRec
 			continue
 		}
 
-		c := e.matchLayer0PiecesHash(ctx, adapter, siteConfig, rec, siteInfo.Name, fc)
-		if c != nil {
-			candidates = append(candidates, *c)
-			continue
+		var c *model.Candidate
+
+		if hasMatchMethod(task.MatchMethods, "pieces_hash") {
+			c = e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, phCache)
+			if c != nil {
+				candidates = append(candidates, *c)
+				continue
+			}
 		}
 
-		c = e.matchLayer1InfoHash(ctx, adapter, siteConfig, rec, siteInfo.Name)
-		if c != nil {
-			candidates = append(candidates, *c)
-			continue
+		if hasMatchMethod(task.MatchMethods, "file_tree") {
+			c = e.matchLayer15FileTree(ctx, src.InfoHash, src.SiteName, siteInfo.Name, fc)
+			if c != nil {
+				candidates = append(candidates, *c)
+				continue
+			}
 		}
 
-		c = e.matchLayer15FileTree(ctx, rec, siteInfo.Name, fc)
-		if c != nil {
-			candidates = append(candidates, *c)
-			continue
+		if hasMatchMethod(task.MatchMethods, "size_title") {
+			c = e.matchLayer2SizeTitle(ctx, adapter, siteConfig, src.InfoHash, src.SiteName, siteInfo.Name, sizeTolerance, fc)
+			if c != nil {
+				candidates = append(candidates, *c)
+				continue
+			}
 		}
 
-		c = e.matchLayer2SizeTitle(ctx, adapter, siteConfig, rec, siteInfo.Name, sizeTolerance, fc)
-		if c != nil {
-			candidates = append(candidates, *c)
-			continue
-		}
-
-		c = e.matchLayer3Fingerprint(ctx, rec, siteInfo.Name, fc)
-		if c != nil {
-			candidates = append(candidates, *c)
+		if hasMatchMethod(task.MatchMethods, "fingerprint") {
+			c = e.matchLayer3Fingerprint(ctx, src.InfoHash, src.SiteName, siteInfo.Name, fc)
+			if c != nil {
+				candidates = append(candidates, *c)
+			}
 		}
 	}
 
 	return candidates
 }
 
-func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, rec model.SeedingTorrentRecord, siteName string, fc *fpCache) *model.Candidate {
+func (e *Engine) matchLayer0FromCache(sourceInfoHash, sourceSiteName, siteName string, fc *fpCache, phCache *piecesHashCache) *model.Candidate {
+	if phCache == nil {
+		return nil
+	}
+	fp := fc.get(sourceInfoHash, sourceSiteName)
+	if fp == nil || fp.PiecesHash == "" {
+		return nil
+	}
+	torrentID, found := phCache.get(siteName, fp.PiecesHash)
+	if !found || torrentID == 0 {
+		return nil
+	}
+	return &model.Candidate{
+		TargetSite:      siteName,
+		TargetTorrentID: strconv.Itoa(torrentID),
+		Confidence:      1.0,
+		MatchMethod:     "pieces_hash",
+	}
+}
+
+func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
 	if !config.SupportsPiecesHashAPI {
 		return nil
 	}
@@ -736,7 +1051,7 @@ func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAd
 		return nil
 	}
 
-	fp := fc.get(rec.InfoHash, rec.SiteName)
+	fp := fc.get(sourceInfoHash, sourceSiteName)
 	if fp == nil || fp.PiecesHash == "" {
 		return nil
 	}
@@ -763,41 +1078,8 @@ func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAd
 	}
 }
 
-func (e *Engine) matchLayer1InfoHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, rec model.SeedingTorrentRecord, siteName string) *model.Candidate {
-	if rec.InfoHash == "" {
-		return nil
-	}
-
-	results, err := adapter.SearchTorrents(ctx, config, rec.InfoHash, nil)
-	if err != nil {
-		e.logger.Debug("Layer1 搜索失败", zap.String("site", siteName), zap.Error(err))
-		return nil
-	}
-
-	for _, r := range results {
-		if r.TorrentID == "" {
-			continue
-		}
-		targetHash, err := adapter.GetTorrentInfoHash(ctx, config, r.TorrentID)
-		if err != nil {
-			continue
-		}
-		if targetHash == rec.InfoHash {
-			return &model.Candidate{
-				TargetSite:      siteName,
-				TargetTorrentID: r.TorrentID,
-				TargetInfoHash:  targetHash,
-				Confidence:      1.0,
-				MatchMethod:     "infohash_exact",
-			}
-		}
-	}
-
-	return nil
-}
-
-func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, rec model.SeedingTorrentRecord, siteName string, sizeTolerance float64, fc *fpCache) *model.Candidate {
-	fp := fc.get(rec.InfoHash, rec.SiteName)
+func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, sizeTolerance float64, fc *fpCache) *model.Candidate {
+	fp := fc.get(sourceInfoHash, sourceSiteName)
 	if fp == nil {
 		return nil
 	}
@@ -868,8 +1150,8 @@ func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAda
 	return best
 }
 
-func (e *Engine) matchLayer15FileTree(ctx context.Context, rec model.SeedingTorrentRecord, siteName string, fc *fpCache) *model.Candidate {
-	sourceFP := fc.get(rec.InfoHash, rec.SiteName)
+func (e *Engine) matchLayer15FileTree(ctx context.Context, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
+	sourceFP := fc.get(sourceInfoHash, sourceSiteName)
 	if sourceFP == nil {
 		return nil
 	}
@@ -891,7 +1173,7 @@ func (e *Engine) matchLayer15FileTree(ctx context.Context, rec model.SeedingTorr
 
 	for i := range matches {
 		m := &matches[i]
-		if m.InfoHash == rec.InfoHash {
+		if m.InfoHash == sourceInfoHash {
 			continue
 		}
 		if m.TorrentID == "" {
@@ -926,8 +1208,8 @@ func compareFileTreesStrict(src, tgt map[string]int64) bool {
 	return true
 }
 
-func (e *Engine) matchLayer3Fingerprint(ctx context.Context, rec model.SeedingTorrentRecord, siteName string, fc *fpCache) *model.Candidate {
-	sourceFP := fc.get(rec.InfoHash, rec.SiteName)
+func (e *Engine) matchLayer3Fingerprint(ctx context.Context, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
+	sourceFP := fc.get(sourceInfoHash, sourceSiteName)
 	if sourceFP == nil {
 		return nil
 	}
@@ -938,14 +1220,14 @@ func (e *Engine) matchLayer3Fingerprint(ctx context.Context, rec model.SeedingTo
 
 	var targetFPs []model.ContentFingerprint
 	if e.fpRepo != nil {
-		candidates, err := e.fpRepo.FindCandidatesBySite(ctx, siteName, rec.InfoHash, sourceFP.PiecesHash, sourceFP.TotalSize, 10)
+		candidates, err := e.fpRepo.FindCandidatesBySite(ctx, siteName, sourceInfoHash, sourceFP.PiecesHash, sourceFP.TotalSize, 10)
 		if err != nil {
 			e.logger.Debug("Layer3 候选查询失败", zap.String("site", siteName), zap.Error(err))
 			return nil
 		}
 		targetFPs = candidates
 	} else {
-		q := e.db.WithContext(ctx).Where("site_name = ? AND info_hash != ?", siteName, rec.InfoHash)
+		q := e.db.WithContext(ctx).Where("site_name = ? AND info_hash != ?", siteName, sourceInfoHash)
 		if sourceFP.PiecesHash != "" {
 			q = q.Where("pieces_hash = ?", sourceFP.PiecesHash)
 		} else {
@@ -1253,10 +1535,16 @@ func (e *Engine) GetNegativeCacheByHashes(ctx context.Context, hashes []string) 
 		return nil, nil
 	}
 	var entries []model.ReseedNegativeCache
-	err := e.db.WithContext(ctx).
-		Where("source_info_hash IN ? AND expires_at > ?", hashes, time.Now()).
-		Find(&entries).Error
-	return entries, err
+	for _, chunk := range chunkStrings(hashes, preloadBatchSize) {
+		var partial []model.ReseedNegativeCache
+		if err := e.db.WithContext(ctx).
+			Where("source_info_hash IN ? AND expires_at > ?", chunk, time.Now()).
+			Find(&partial).Error; err != nil {
+			return entries, err
+		}
+		entries = append(entries, partial...)
+	}
+	return entries, nil
 }
 
 func (e *Engine) FlushNegativeCache(ctx context.Context) (int64, error) {
@@ -1286,10 +1574,10 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 		return
 	}
 
-	records := []model.SeedingTorrentRecord{record}
-	fpc := e.preloadFingerprints(ctx, records)
-	negCache := e.preloadNegativeCache(ctx, records)
-	existingMatchesMap := e.preloadExistingMatches(ctx, records)
+	infoHashes := []string{record.InfoHash}
+	fpc := e.preloadFingerprints(ctx, infoHashes)
+	negCache := e.preloadNegativeCache(ctx, infoHashes)
+	existingMatchesMap := e.preloadExistingMatches(ctx, infoHashes)
 
 	if len(existingMatchesMap[record.InfoHash]) > 0 {
 		e.logger.Debug("auto reseed: already matched", zap.String("info_hash", record.InfoHash))
@@ -1311,7 +1599,12 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 		ReseedCategory:       "cross-seed",
 	}
 
-	candidates := e.findCandidates(ctx, record, ps, fpc, task.SizeTolerancePercent, task, negCache)
+	src := sourceTorrent{
+		InfoHash: record.InfoHash,
+		SiteName: record.SiteName,
+		ClientID: record.ClientID,
+	}
+	candidates := e.findCandidates(ctx, src, ps, fpc, task.SizeTolerancePercent, task, negCache, nil)
 	if len(candidates) == 0 {
 		e.logger.Debug("auto reseed: no candidates found", zap.String("info_hash", record.InfoHash))
 		return
@@ -1418,6 +1711,50 @@ func (e *Engine) RunEnabledTasks(ctx context.Context) error {
 	return nil
 }
 
+func (e *Engine) resolveClientIDsToNames(ctx context.Context, ids string) []string {
+	parts := ParseClientIDs(ids)
+	if len(parts) == 0 {
+		return nil
+	}
+	var clients []model.ClientConfig
+	if err := e.db.WithContext(ctx).Select("id, name").Where("id IN ?", partsToUint(parts)).Find(&clients).Error; err != nil {
+		e.logger.Warn("resolve client IDs to names failed", zap.Error(err))
+		return parts
+	}
+	names := make([]string, 0, len(clients))
+	for _, c := range clients {
+		names = append(names, c.Name)
+	}
+	return names
+}
+
+func (e *Engine) resolveSiteIDsToNames(ctx context.Context, ids string) []string {
+	parts := ParseClientIDs(ids)
+	if len(parts) == 0 {
+		return nil
+	}
+	var sites []model.Site
+	if err := e.db.WithContext(ctx).Select("id, name").Where("id IN ?", partsToUint(parts)).Find(&sites).Error; err != nil {
+		e.logger.Warn("resolve site IDs to names failed", zap.Error(err))
+		return parts
+	}
+	names := make([]string, 0, len(sites))
+	for _, s := range sites {
+		names = append(names, s.Name)
+	}
+	return names
+}
+
+func partsToUint(parts []string) []uint {
+	result := make([]uint, 0, len(parts))
+	for _, p := range parts {
+		if v, err := strconv.ParseUint(p, 10, 32); err == nil {
+			result = append(result, uint(v))
+		}
+	}
+	return result
+}
+
 func ParseClientIDs(ids string) []string {
 	if ids == "" {
 		return nil
@@ -1489,7 +1826,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	opts := model.AddTorrentOptions{
 		Category: task.ReseedCategory,
 		Tags:     []string{"reseed", "pt-forward"},
-		Paused:   false,
+		Paused:   true,
 	}
 
 	if match.SourceInfoHash != "" {
@@ -1511,13 +1848,55 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		return e.failMatch(ctx, match, fmt.Sprintf("注入种子到下载器失败: %v", err))
 	}
 
+	infoHash := addResult.InfoHash
+	if infoHash == "" {
+		return e.failMatch(ctx, match, "注入后未获取到 InfoHash")
+	}
+
+	if err := dlClient.Recheck(ctx, infoHash); err != nil {
+		return e.failMatch(ctx, match, fmt.Sprintf("触发校验失败: %v", err))
+	}
+
+	recheckErr := e.waitForRecheck(ctx, dlClient, infoHash, 120*time.Second)
+	if recheckErr != nil {
+		_ = dlClient.PauseTorrent(ctx, infoHash)
+		return e.failMatch(ctx, match, recheckErr.Error())
+	}
+
+	if err := dlClient.ResumeTorrent(ctx, infoHash); err != nil {
+		e.logger.Warn("辅种恢复做种失败", zap.String("hash", infoHash), zap.Error(err))
+	}
+
 	now := time.Now()
 	return e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
 		"status":           model.MatchStatusInjected,
-		"target_info_hash": addResult.InfoHash,
+		"target_info_hash": infoHash,
 		"injected_at":      &now,
 		"updated_at":       now,
 	}).Error
+}
+
+func (e *Engine) waitForRecheck(ctx context.Context, dlClient model.DownloaderClient, infoHash string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	interval := 3 * time.Second
+	for time.Now().Before(deadline) {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		time.Sleep(interval)
+		ti, err := dlClient.GetTorrentByHash(ctx, infoHash)
+		if err != nil || ti == nil {
+			continue
+		}
+		if ti.State == "checking" || ti.State == "queuedDL" || ti.State == "metaDL" {
+			continue
+		}
+		if ti.Progress >= 1.0 {
+			return nil
+		}
+		return fmt.Errorf("校验完成，进度 %.1f%%，状态 %s，文件不完整，已暂停", ti.Progress*100, ti.State)
+	}
+	return fmt.Errorf("校验超时（%v），已暂停", timeout)
 }
 
 func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason string) error {
@@ -1568,8 +1947,8 @@ func hasMatchMethod(methodsStr, method string) bool {
 	return false
 }
 
-func (e *Engine) filterIYUUResults(rec model.SeedingTorrentRecord, iyuuResults map[string][]*model.IYUUReseedResult, sidMap map[int]string, targetSites, excludedSites []string) []model.Candidate {
-	results := iyuuResults[rec.InfoHash]
+func (e *Engine) filterIYUUResults(src sourceTorrent, iyuuResults map[string][]*model.IYUUReseedResult, sidMap map[int]string, targetSites, excludedSites []string) []model.Candidate {
+	results := iyuuResults[src.InfoHash]
 	if len(results) == 0 {
 		return nil
 	}
@@ -1591,7 +1970,7 @@ func (e *Engine) filterIYUUResults(rec model.SeedingTorrentRecord, iyuuResults m
 			if siteName == "" {
 				continue
 			}
-			if exclSet[siteName] || siteName == rec.SiteName {
+			if exclSet[siteName] || siteName == src.SiteName {
 				continue
 			}
 			if len(targetSet) > 0 && !targetSet[siteName] {

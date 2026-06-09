@@ -11,8 +11,8 @@
         <a-descriptions bordered :column="2" style="margin-bottom: 24px">
           <a-descriptions-item :label="t('common.name')">{{ task.name }}</a-descriptions-item>
           <a-descriptions-item :label="t('common.status')">{{ translateReseedStatus(task.status) }}</a-descriptions-item>
-          <a-descriptions-item :label="t('reseed.sourceSite')">{{ task.source_site_ids }}</a-descriptions-item>
-          <a-descriptions-item :label="t('reseed.targetSite')">{{ task.target_site_ids }}</a-descriptions-item>
+          <a-descriptions-item :label="t('reseed.sourceSite')">{{ resolveSiteIDs(task.source_site_ids) }}</a-descriptions-item>
+          <a-descriptions-item :label="t('reseed.targetSite')">{{ resolveSiteIDs(task.target_site_ids) }}</a-descriptions-item>
           <a-descriptions-item :label="t('reseed.client')">{{ task.client_ids }}</a-descriptions-item>
           <a-descriptions-item :label="t('common.createdAt')">{{ formatTime(task.created_at) }}</a-descriptions-item>
         </a-descriptions>
@@ -74,6 +74,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { reseedApi } from '@/api/reseed'
+import { sitesApi } from '@/api/sites'
 import { formatTime, copyToClipboard } from '@/utils/format'
 import { useEnumLabels } from '@/utils/enumLabels'
 
@@ -81,6 +82,25 @@ const route = useRoute()
 const taskId = Number(route.params.id)
 const { t } = useI18n()
 const { translateReseedStatus } = useEnumLabels()
+
+const siteMap = ref<Record<string, string>>({})
+
+async function fetchSiteMap() {
+  try {
+    const resp = await sitesApi.list(1, 200)
+    const items = resp.data?.data?.items || resp.data?.data || []
+    const m: Record<string, string> = {}
+    for (const s of items) {
+      m[String(s.id)] = s.name
+    }
+    siteMap.value = m
+  } catch { /* ignore */ }
+}
+
+function resolveSiteIDs(ids: string): string {
+  if (!ids) return '-'
+  return ids.split(',').map(id => siteMap.value[id.trim()] || id).join(', ')
+}
 
 function copyHash(text: string) {
   copyToClipboard(text)
@@ -179,6 +199,7 @@ async function deleteNegativeCache() {
 }
 
 onMounted(() => {
+  fetchSiteMap()
   fetchTask()
   fetchMatches()
 })

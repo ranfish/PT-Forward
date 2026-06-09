@@ -248,6 +248,16 @@ func main() {
 	reseedEngine.SetClientProvider(clientManager)
 	reseedEngine.SetIYUUService(iyuuService)
 
+	trackerResolver := reseed.NewTrackerSiteResolver()
+	var siteRecords []*model.Site
+	if err := db.Find(&siteRecords).Error; err != nil {
+		log.Warn("加载站点列表用于 tracker 解析失败", zap.Error(err))
+	} else {
+		trackerResolver.BuildIndex(siteRecords)
+		log.Info("tracker→站点映射索引已构建", zap.Int("sites", len(siteRecords)))
+	}
+	reseedEngine.SetTrackerResolver(trackerResolver)
+
 	publishPipeline.SetSiteProvider(siteProvider)
 	publishPipeline.SetClientProvider(clientManager)
 	publishPipeline.SetCompletionWatcher(completionWatcher)

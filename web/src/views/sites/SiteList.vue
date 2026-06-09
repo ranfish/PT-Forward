@@ -20,6 +20,8 @@
           <a-select-option value="true">{{ t('site.filterYes') }}</a-select-option>
           <a-select-option value="false">{{ t('site.filterNo') }}</a-select-option>
         </a-select>
+        <a-divider type="vertical" />
+        <a-button @click="resetFilters">{{ t('common.resetFilters') }}</a-button>
         <a-button :loading="syncing" @click="syncAllStats">{{ t('site.syncAllStats') }}</a-button>
         <template v-if="selectedRowKeys.length > 0">
           <a-divider type="vertical" />
@@ -318,6 +320,13 @@ const filters = reactive({
   isSource: undefined as string | undefined,
   isTarget: undefined as string | undefined,
 })
+
+function resetFilters() {
+  searchText.value = ''
+  filters.enabled = undefined
+  filters.isSource = undefined
+  filters.isTarget = undefined
+}
 
 const filteredData = computed(() => {
   let data = allSites.value

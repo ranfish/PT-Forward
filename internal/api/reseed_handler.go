@@ -199,6 +199,16 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if task.ReseedCategory == "" {
 		task.ReseedCategory = "cross-seed"
 	}
+	if task.EngineMode == "" {
+		task.EngineMode = model.ReseedModeSeedFeature
+	}
+	if !model.ValidReseedMode(task.EngineMode) {
+		Error(w, http.StatusBadRequest, 40001, "engineMode 必须为 seed_feature 或 iyuu_cloud")
+		return
+	}
+	if task.MatchMethods == "" {
+		task.MatchMethods = model.ReseedModeDefaults[task.EngineMode]
+	}
 
 	if err := h.engine.CreateTask(r.Context(), task); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "创建辅种任务失败")
@@ -272,7 +282,14 @@ func (h *ReseedHandler) handleUpdate(w http.ResponseWriter, r *http.Request, id 
 		task.MaxFallbacks = int(v)
 	}
 	if v, ok := req["engineMode"].(string); ok {
+		if v != "" && !model.ValidReseedMode(v) {
+			Error(w, http.StatusBadRequest, 40001, "engineMode 必须为 seed_feature 或 iyuu_cloud")
+			return
+		}
 		task.EngineMode = v
+		if task.EngineMode != "" && task.MatchMethods == "" {
+			task.MatchMethods = model.ReseedModeDefaults[task.EngineMode]
+		}
 	}
 	if v, ok := req["injectionIntervalS"].(float64); ok {
 		task.InjectionIntervalS = int(v)

@@ -23,6 +23,21 @@ type ContentFingerprint struct {
 
 func (ContentFingerprint) TableName() string { return "content_fingerprints" }
 
+const (
+	ReseedModeSeedFeature = "seed_feature"
+	ReseedModeIYUUCloud   = "iyuu_cloud"
+)
+
+var ReseedModeDefaults = map[string]string{
+	ReseedModeSeedFeature: "pieces_hash,file_tree,size_title,fingerprint",
+	ReseedModeIYUUCloud:   "iyuu",
+}
+
+func ValidReseedMode(mode string) bool {
+	_, ok := ReseedModeDefaults[mode]
+	return ok
+}
+
 // §33.1.63 — ReseedTask: 辅种任务
 type ReseedTask struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
@@ -45,7 +60,7 @@ type ReseedTask struct {
 	FallbackEnabled     bool    `json:"fallback_enabled" gorm:"default:true"`
 	MaxFallbacks        int     `json:"max_fallbacks" gorm:"default:3"`
 
-	EngineMode string `json:"engine_mode" gorm:"size:20;default:'e1_manual'"`
+	EngineMode string `json:"engine_mode" gorm:"size:20;default:'seed_feature'"`
 
 	SizeTolerancePercent float64 `json:"size_tolerance_percent" gorm:"default:1.0"`
 
