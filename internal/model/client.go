@@ -81,6 +81,7 @@ type TorrentInfo struct {
 	DownloadSpeed int64     `json:"download_speed"`
 	SeedTime      int64     `json:"seed_time"`
 	AddedAt       time.Time `json:"added_at"`
+	TrackerURL    string    `json:"tracker_url"`
 }
 
 // §33.1.35 — AddTorrentOptions: 种子添加选项

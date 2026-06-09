@@ -69,8 +69,9 @@ type Site struct {
 	SkipSSLVerify bool   `json:"skip_ssl_verify" gorm:"default:false"`
 	MaxConcurrent int    `json:"max_concurrent" gorm:"default:2"`
 
-	SupportsPiecesHashAPI bool `json:"supports_pieces_hash_api" gorm:"default:true"`
+	SupportsPiecesHashAPI bool   `json:"supports_pieces_hash_api" gorm:"default:true"`
 	APIDomain             string `json:"api_domain,omitempty" gorm:"size:255;default:''"`
+	TrackerDomains        string `json:"tracker_domains,omitempty" gorm:"type:text"`
 
 	UploadBytes   int64      `json:"upload_bytes" gorm:"default:0"`
 	DownloadBytes int64      `json:"download_bytes" gorm:"default:0"`

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
@@ -384,9 +385,9 @@ func TestScenario_F5_PublishE2E(t *testing.T) {
 		candidate.ID, atomic.LoadInt32(&uploadCalled) > 0, len(results))
 }
 
-// ── F7: 辅种引擎 Layer1 InfoHash 匹配 ────────────────────────────
+// ── F7: 辅种引擎 SizeTitle 匹配 + 注入 ────────────────────────────
 
-func TestScenario_F7_Layer1InfoHashMatch(t *testing.T) {
+func TestScenario_F7_SizeTitleMatchAndInject(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 
@@ -402,6 +403,9 @@ func TestScenario_F7_Layer1InfoHashMatch(t *testing.T) {
 	}
 	require.NoError(t, db.Create(targetSite).Error)
 
+	reseedClient := makeClient("reseed-client", "reseed")
+	require.NoError(t, db.Create(reseedClient).Error)
+
 	record := &model.SeedingTorrentRecord{
 		ClientID:  "reseed-client",
 		TorrentID: "src-001",
@@ -414,10 +418,10 @@ func TestScenario_F7_Layer1InfoHashMatch(t *testing.T) {
 
 	task := &model.ReseedTask{
 		Name:                 "f7-task",
-		ClientIDs:            "reseed-client",
-		TargetSiteIDs:        "f7-target",
+		ClientIDs:            fmt.Sprintf("%d", reseedClient.ID),
+		TargetSiteIDs:        fmt.Sprintf("%d", targetSite.ID),
 		EngineMode:           "e1_manual",
-		MatchMethods:         "infohash",
+		MatchMethods:         "size_title",
 		SizeTolerancePercent: 1.0,
 		MaxInjectionsPerRun:  10,
 		Enabled:              true,
@@ -465,15 +469,32 @@ func TestScenario_F7_Layer1InfoHashMatch(t *testing.T) {
 					return &model.AddResult{InfoHash: "aa111bb222cc333dd444ee555ff666aa777bb88"}, nil
 				},
 				GetTorrentByHashFn: func(ctx context.Context, hash string) (*model.TorrentInfo, error) {
-					return nil, nil
+					return &model.TorrentInfo{Hash: hash, Progress: 1.0, State: "seeding"}, nil
+				},
+				GetSeedingTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
+					return []*model.TorrentInfo{
+						{Hash: "aa111bb222cc333dd444ee555ff666aa777bb88", TrackerURL: "https://tracker.f7source.com/announce"},
+					}, nil
 				},
 			}, nil
 		},
 	}
 
 	eng := reseed.NewEngine(db, nopLogger())
+	fpRepo := fingerprint.NewRepository(db, nopLogger())
+	require.NoError(t, fpRepo.Save(ctx, &model.ContentFingerprint{
+		InfoHash:  "aa111bb222cc333dd444ee555ff666aa777bb88",
+		SiteName:  "f7-source",
+		Title:     "Ubuntu 24.04",
+		TotalSize: 4700000000,
+	}))
+	eng.SetFingerprintRepo(fpRepo)
 	eng.SetSiteProvider(mockSiteProvider)
 	eng.SetClientProvider(mockDLProvider)
+
+	resolver := reseed.NewTrackerSiteResolver()
+	resolver.BuildIndex([]*model.Site{{Domain: "f7source.com", Name: "f7-source"}})
+	eng.SetTrackerResolver(resolver)
 
 	result, err := eng.RunTask(ctx, task)
 	require.NoError(t, err)
@@ -489,7 +510,7 @@ func TestScenario_F7_Layer1InfoHashMatch(t *testing.T) {
 	require.Len(t, matches, 1)
 	assert.Equal(t, "tgt-001", matches[0].TargetTorrentID)
 
-	t.Logf("PASS F7: Layer1 InfoHash match matched=%d injected=%d failed=%d",
+	t.Logf("PASS F7: SizeTitle match matched=%d injected=%d failed=%d",
 		result.Matched, result.Injected, result.Failed)
 }
 
@@ -509,8 +530,11 @@ func TestScenario_F7_NoMatchFound(t *testing.T) {
 	}
 	require.NoError(t, db.Create(targetSite).Error)
 
+	nomatchClient := makeClient("reseed-client-nm", "reseed")
+	require.NoError(t, db.Create(nomatchClient).Error)
+
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "reseed-client",
+		ClientID:  "reseed-client-nm",
 		TorrentID: "src-nm-001",
 		InfoHash:  "cc111bb222cc333dd444ee555ff666aa777bb00",
 		SiteName:  "f7nomatch-src",
@@ -521,10 +545,10 @@ func TestScenario_F7_NoMatchFound(t *testing.T) {
 
 	task := &model.ReseedTask{
 		Name:                 "f7-nomatch",
-		ClientIDs:            "reseed-client",
-		TargetSiteIDs:        "f7nomatch-tgt",
+		ClientIDs:            fmt.Sprintf("%d", nomatchClient.ID),
+		TargetSiteIDs:        fmt.Sprintf("%d", targetSite.ID),
 		EngineMode:           "e1_manual",
-		MatchMethods:         "infohash",
+		MatchMethods:         "pieces_hash",
 		SizeTolerancePercent: 1.0,
 		MaxInjectionsPerRun:  10,
 		Enabled:              true,
@@ -548,8 +572,25 @@ func TestScenario_F7_NoMatchFound(t *testing.T) {
 		},
 	}
 
+	mockDLProvider := &mocks.DownloaderProvider{
+		GetFn: func(clientID string) (model.DownloaderClient, error) {
+			return &mocks.DownloaderClient{
+				GetSeedingTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
+					return []*model.TorrentInfo{
+						{Hash: "cc111bb222cc333dd444ee555ff666aa777bb00", TrackerURL: "https://tracker.f7nomatch-src.com/announce"},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
 	eng := reseed.NewEngine(db, nopLogger())
 	eng.SetSiteProvider(mockSiteProvider)
+	eng.SetClientProvider(mockDLProvider)
+
+	resolver := reseed.NewTrackerSiteResolver()
+	resolver.BuildIndex([]*model.Site{{Domain: "f7nomatch-src.com", Name: "f7nomatch-src"}})
+	eng.SetTrackerResolver(resolver)
 
 	result, err := eng.RunTask(ctx, task)
 	require.NoError(t, err)

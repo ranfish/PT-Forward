@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -200,14 +201,28 @@ func (c *TRClient) ExportTorrent(ctx context.Context, hash string) ([]byte, erro
 		return nil, c.newErr(11005, "torrent not found for export")
 	}
 	torrentPath := torrents[0].TorrentFile
-	if torrentPath == "" {
-		return nil, c.newErr(11005, "torrent file path is empty")
+	if torrentPath != "" {
+		data, err := os.ReadFile(torrentPath) //nolint:gosec // torrentPath from client config, controlled by admin
+		if err == nil {
+			return data, nil
+		}
 	}
-	data, err := os.ReadFile(torrentPath) //nolint:gosec // torrentPath from client config, controlled by admin
-	if err != nil {
-		return nil, c.wrapErr(11002, "read torrent file", err)
+
+	var cfg struct {
+		TorrentDir string `json:"torrent_dir"`
 	}
-	return data, nil
+	if c.cfg.Config != "" {
+		_ = json.Unmarshal([]byte(c.cfg.Config), &cfg)
+	}
+	if cfg.TorrentDir != "" {
+		localPath := filepath.Join(cfg.TorrentDir, hash+".torrent")
+		data, err := os.ReadFile(localPath) //nolint:gosec // controlled by admin config
+		if err == nil {
+			return data, nil
+		}
+	}
+
+	return nil, c.newErr(11005, "torrent file not accessible (remote path unavailable, no torrent_dir configured)")
 }
 
 func (c *TRClient) DeleteTorrent(ctx context.Context, hash string, deleteFiles bool) error {

@@ -2370,7 +2370,7 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 	e.mu.RLock()
 	var candidates []*model.SeedingTorrentRecord
 	for _, rec := range e.recordMap {
-		if rec.ClientID == clientID && rec.Status == model.SeedingStatusSeeding && !rec.Unregistered {
+		if rec.ClientID == clientID && !rec.Unregistered && (rec.Status == model.SeedingStatusSeeding || rec.Status == model.SeedingStatusPausedFreeEnd || rec.Status == model.SeedingStatusPausedRule) {
 			candidates = append(candidates, rec)
 		}
 	}

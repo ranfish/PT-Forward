@@ -26,8 +26,9 @@ type trTorrent struct {
 	SecondsSeeding int64    `json:"secondsSeeding"`
 	IsFinished     bool     `json:"isFinished"`
 	TrackerStats   []struct {
-		SeederCount  int `json:"seederCount"`
-		LeecherCount int `json:"leecherCount"`
+		SeederCount  int    `json:"seederCount"`
+		LeecherCount int    `json:"leecherCount"`
+		Announce     string `json:"announce"`
 	} `json:"trackerStats"`
 	TorrentFile string `json:"torrentFile"`
 	ID          int    `json:"id"`
@@ -60,9 +61,11 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 	}
 
 	var numComplete, numIncomplete int
+	var trackerURL string
 	if len(t.TrackerStats) > 0 {
 		numComplete = t.TrackerStats[0].SeederCount
 		numIncomplete = t.TrackerStats[0].LeecherCount
+		trackerURL = t.TrackerStats[0].Announce
 	}
 
 	return &model.TorrentInfo{
@@ -87,6 +90,7 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 		DownloadSpeed: t.RateDownload,
 		SeedTime:      t.SecondsSeeding,
 		AddedAt:       time.Unix(t.AddedDate, 0),
+		TrackerURL:    trackerURL,
 	}
 }
 

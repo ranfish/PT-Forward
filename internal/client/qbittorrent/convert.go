@@ -25,6 +25,7 @@ type qbTorrent struct {
 	NumIncomplete int     `json:"num_incomplete"`
 	SeedingTime   int64   `json:"seeding_time"`
 	AddedOn       int64   `json:"added_on"`
+	Tracker       string  `json:"tracker"`
 }
 
 func (t qbTorrent) toModel() *model.TorrentInfo {
@@ -68,5 +69,6 @@ func (t qbTorrent) toModel() *model.TorrentInfo {
 		DownloadSpeed: t.DownloadSpeed,
 		SeedTime:      t.SeedingTime,
 		AddedAt:       time.Unix(t.AddedOn, 0),
+		TrackerURL:    t.Tracker,
 	}
 }
