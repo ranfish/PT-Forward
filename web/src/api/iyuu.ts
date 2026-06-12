@@ -20,4 +20,7 @@ export const iyuuApi = {
   test() {
     return client.post<ApiResponse<{ success: boolean }>>('/iyuu/test')
   },
+  status() {
+    return client.get<ApiResponse<{ available: boolean; domains: string[] }>>('/iyuu/status')
+  },
 }
