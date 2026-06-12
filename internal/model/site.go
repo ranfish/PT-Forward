@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // §33.1.4 — Site: 站点模型（C1 消解，ID uint PK）
 type Site struct {
@@ -54,6 +57,7 @@ type Site struct {
 
 	IsSource               bool `json:"is_source" gorm:"default:false"`
 	IsTarget               bool `json:"is_target" gorm:"default:false"`
+	TargetTypes            string `json:"target_types,omitempty" gorm:"size:200"`
 	ParticipateAutoPublish bool `json:"participate_auto_publish" gorm:"default:true"`
 
 	// AssumeFree: 当 DetectDiscount 不可用时（如站点 cookie 被 WAF/异地登录拦截，
@@ -73,6 +77,11 @@ type Site struct {
 	APIDomain             string `json:"api_domain,omitempty" gorm:"size:255;default:''"`
 	TrackerDomains        string `json:"tracker_domains,omitempty" gorm:"type:text"`
 
+	ReseedLimitCount    int `json:"reseed_limit_count" gorm:"default:0"`
+	ReseedLimitInterval int `json:"reseed_limit_interval" gorm:"default:0"`
+	IYUULimitCount      int `json:"iyuu_limit_count" gorm:"default:0"`
+	IYUULimitInterval   int `json:"iyuu_limit_interval" gorm:"default:0"`
+
 	UploadBytes   int64      `json:"upload_bytes" gorm:"default:0"`
 	DownloadBytes int64      `json:"download_bytes" gorm:"default:0"`
 	SeedingPoints float64    `json:"seeding_points" gorm:"default:0"`
@@ -86,6 +95,13 @@ type Site struct {
 }
 
 func (Site) TableName() string { return "sites" }
+
+func (s *Site) HasTargetType(tt string) bool {
+	if s.TargetTypes == "" {
+		return s.IsTarget
+	}
+	return strings.Contains(s.TargetTypes, `"`+tt+`"`)
+}
 
 // §33.1.59 — SiteConfigOverride: 站点配置字段级用户覆盖（Sprint 89 决策 #232）
 type SiteConfigOverride struct {

@@ -652,7 +652,7 @@ func TestReseedTasks_CRUD(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/reseed/tasks", map[string]interface{}{
 		"name":          "Test Reseed",
 		"enabled":       false,
-		"clientIds":     "c1,c2",
+		"clientIds":     "1,2",
 		"sourceSiteIds": "1,2",
 		"targetSiteIds": "3,4",
 	})
@@ -3042,7 +3042,7 @@ func TestReseed_Trigger(t *testing.T) {
 	env := setupTestEnv(t)
 
 	w := env.doRequest("POST", "/api/v1/reseed/tasks", map[string]interface{}{
-		"name": "TriggerTask", "enabled": false,
+		"name": "TriggerTask", "enabled": false, "clientIds": "1",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
@@ -3061,7 +3061,7 @@ func TestReseed_Cancel(t *testing.T) {
 	env := setupTestEnv(t)
 
 	w := env.doRequest("POST", "/api/v1/reseed/tasks", map[string]interface{}{
-		"name": "CancelTask", "enabled": false,
+		"name": "CancelTask", "enabled": false, "clientIds": "1",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
@@ -4180,7 +4180,7 @@ func TestReseed_Update(t *testing.T) {
 	env := setupTestEnv(t)
 
 	w := env.doRequest("POST", "/api/v1/reseed/tasks", map[string]interface{}{
-		"name": "UpdateReseed", "enabled": false,
+		"name": "UpdateReseed", "enabled": false, "clientIds": "1",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
@@ -4192,7 +4192,7 @@ func TestReseed_Update(t *testing.T) {
 	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/reseed/tasks/%d", taskID), map[string]interface{}{
 		"name":                 "UpdatedReseed",
 		"enabled":              true,
-		"clientIds":            "c3",
+		"clientIds":            "3",
 		"sourceSiteIds":        "5",
 		"targetSiteIds":        "6",
 		"sizeTolerancePercent": 2.0,
@@ -4210,7 +4210,7 @@ func TestReseed_Trigger_RunError(t *testing.T) {
 	env := setupTestEnv(t)
 
 	w := env.doRequest("POST", "/api/v1/reseed/tasks", map[string]interface{}{
-		"name": "TriggerErrTask", "enabled": true, "sourceSiteIds": "1", "targetSiteIds": "2",
+		"name": "TriggerErrTask", "enabled": true, "clientIds": "1", "sourceSiteIds": "1", "targetSiteIds": "2",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
@@ -8211,6 +8211,7 @@ func TestReseed_CRUD2(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/reseed/tasks", map[string]interface{}{
 		"name":    "reseed-crud2",
 		"enabled": true,
+		"clientIds": "1",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
@@ -8266,6 +8267,7 @@ func TestReseed_Cancel2(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/reseed/tasks", map[string]interface{}{
 		"name":    "cancel-task-2",
 		"enabled": true,
+		"clientIds": "1",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())

@@ -445,7 +445,7 @@ func TestScenario_F7_SizeTitleMatchAndInject(t *testing.T) {
 					return []*model.SeedingSearchResult{
 						{
 							TorrentID: "tgt-001",
-							Title:     "Ubuntu 24.04",
+							Title:     "Ubuntu.24.04.LTS.2024.1080p.BluRay.x264-GROUPF7",
 							Size:      4700000000,
 						},
 					}, nil
@@ -471,9 +471,9 @@ func TestScenario_F7_SizeTitleMatchAndInject(t *testing.T) {
 				GetTorrentByHashFn: func(ctx context.Context, hash string) (*model.TorrentInfo, error) {
 					return &model.TorrentInfo{Hash: hash, Progress: 1.0, State: "seeding"}, nil
 				},
-				GetSeedingTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
+				GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
 					return []*model.TorrentInfo{
-						{Hash: "aa111bb222cc333dd444ee555ff666aa777bb88", TrackerURL: "https://tracker.f7source.com/announce"},
+						{Hash: "aa111bb222cc333dd444ee555ff666aa777bb88", TrackerURL: "https://tracker.f7source.com/announce", Progress: 1.0},
 					}, nil
 				},
 			}, nil
@@ -485,7 +485,7 @@ func TestScenario_F7_SizeTitleMatchAndInject(t *testing.T) {
 	require.NoError(t, fpRepo.Save(ctx, &model.ContentFingerprint{
 		InfoHash:  "aa111bb222cc333dd444ee555ff666aa777bb88",
 		SiteName:  "f7-source",
-		Title:     "Ubuntu 24.04",
+		Title:     "Ubuntu.24.04.LTS.2024.1080p.BluRay.x264-GROUPF7",
 		TotalSize: 4700000000,
 	}))
 	eng.SetFingerprintRepo(fpRepo)
@@ -575,9 +575,9 @@ func TestScenario_F7_NoMatchFound(t *testing.T) {
 	mockDLProvider := &mocks.DownloaderProvider{
 		GetFn: func(clientID string) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
-				GetSeedingTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
+				GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
 					return []*model.TorrentInfo{
-						{Hash: "cc111bb222cc333dd444ee555ff666aa777bb00", TrackerURL: "https://tracker.f7nomatch-src.com/announce"},
+						{Hash: "cc111bb222cc333dd444ee555ff666aa777bb00", TrackerURL: "https://tracker.f7nomatch-src.com/announce", Progress: 1.0},
 					}, nil
 				},
 			}, nil

@@ -116,7 +116,14 @@ func (a *RousiAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
+	if err != nil {
+		return nil, downloadError("读取种子数据失败", err)
+	}
+	if len(data) == 0 {
+		return nil, &model.AppError{Code: 15001, Message: "种子数据为空"}
+	}
+	return data, nil
 }
 
 func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {

@@ -35,8 +35,8 @@ func TestCircuitState_String(t *testing.T) {
 
 func TestDefaultCircuitBreakerConfig_Values(t *testing.T) {
 	cfg := DefaultCircuitBreakerConfig()
-	if cfg.FailureThreshold != 5 {
-		t.Errorf("FailureThreshold = %d, want 5", cfg.FailureThreshold)
+	if cfg.FailureThreshold != 15 {
+		t.Errorf("FailureThreshold = %d, want 15", cfg.FailureThreshold)
 	}
 	if cfg.RecoveryTimeout != 60*time.Second {
 		t.Errorf("RecoveryTimeout = %v, want 60s", cfg.RecoveryTimeout)
@@ -705,8 +705,8 @@ func TestWAFDetector_RateLimitText_English(t *testing.T) {
 		Body:       newStringBody(body),
 	}
 	dur := detector.Detect(resp)
-	if dur != 60*time.Second {
-		t.Errorf("expected 60s for rate limit text, got %v", dur)
+	if dur != 25*time.Second {
+		t.Errorf("expected 25s for rate limit text, got %v", dur)
 	}
 }
 

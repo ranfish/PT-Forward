@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
@@ -134,6 +133,7 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Schedule             string  `json:"schedule"`
 		MaxInjectionsPerRun  int     `json:"maxInjectionsPerRun"`
 		ReseedCategory       string  `json:"reseedCategory"`
+		ReseedTags           string  `json:"reseedTags"`
 		TargetSiteExcludes   string  `json:"targetSiteExcludes"`
 		ReleaseGroupExcludes string  `json:"releaseGroupExcludes"`
 		CategoryExcludes     string  `json:"categoryExcludes"`
@@ -169,6 +169,7 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Schedule:             req.Schedule,
 		MaxInjectionsPerRun:  req.MaxInjectionsPerRun,
 		ReseedCategory:       req.ReseedCategory,
+		ReseedTags:           req.ReseedTags,
 		TargetSiteExcludes:   req.TargetSiteExcludes,
 		ReleaseGroupExcludes: req.ReleaseGroupExcludes,
 		CategoryExcludes:     req.CategoryExcludes,
@@ -199,6 +200,9 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if task.ReseedCategory == "" {
 		task.ReseedCategory = "cross-seed"
 	}
+	if task.ReseedTags == "" {
+		task.ReseedTags = "reseed,pt-forward"
+	}
 	if task.EngineMode == "" {
 		task.EngineMode = model.ReseedModeSeedFeature
 	}
@@ -210,10 +214,16 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		task.MatchMethods = model.ReseedModeDefaults[task.EngineMode]
 	}
 
+	if err := h.engine.ValidateClientRoles(r.Context(), req.ClientIDs); err != nil {
+		Error(w, http.StatusBadRequest, 40001, err.Error())
+		return
+	}
+
 	if err := h.engine.CreateTask(r.Context(), task); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "创建辅种任务失败")
 		return
 	}
+	h.engine.SyncTaskSchedule(r.Context(), task)
 	Success(w, task)
 }
 
@@ -259,6 +269,9 @@ func (h *ReseedHandler) handleUpdate(w http.ResponseWriter, r *http.Request, id 
 	}
 	if v, ok := req["reseedCategory"].(string); ok {
 		task.ReseedCategory = v
+	}
+	if v, ok := req["reseedTags"].(string); ok {
+		task.ReseedTags = v
 	}
 	if v, ok := req["targetSiteExcludes"].(string); ok {
 		task.TargetSiteExcludes = v
@@ -310,14 +323,21 @@ func (h *ReseedHandler) handleUpdate(w http.ResponseWriter, r *http.Request, id 
 		task.RetryIntervalH = int(v)
 	}
 
+	if err := h.engine.ValidateClientRoles(r.Context(), task.ClientIDs); err != nil {
+		Error(w, http.StatusBadRequest, 40001, err.Error())
+		return
+	}
+
 	if err := h.engine.UpdateTask(r.Context(), task); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新辅种任务失败")
 		return
 	}
+	h.engine.SyncTaskSchedule(r.Context(), task)
 	Success(w, task)
 }
 
 func (h *ReseedHandler) handleDelete(w http.ResponseWriter, r *http.Request, id uint) {
+	h.engine.RemoveTaskSchedule(id)
 	if err := h.engine.DeleteTask(r.Context(), id); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除辅种任务失败")
 		return
@@ -348,7 +368,7 @@ func (h *ReseedHandler) handleTrigger(w http.ResponseWriter, r *http.Request, id
 	}
 
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		result, err := h.engine.RunTask(ctx, task)
 		if err != nil {

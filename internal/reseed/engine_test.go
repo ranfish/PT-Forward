@@ -28,6 +28,8 @@ func setupReseedDB(t *testing.T) *gorm.DB {
 		&model.ContentFingerprint{},
 		&model.SeedingTorrentRecord{},
 		&model.SearchCache{},
+		&model.ClientConfig{},
+		&model.Site{},
 	); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -41,7 +43,7 @@ func setupEngineWithMockClient(t *testing.T, db *gorm.DB, torrents []*model.Torr
 		GetFn: func(clientID string) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				Name: clientID,
-				GetSeedingTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
+				GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
 					return torrents, nil
 				},
 			}, nil
@@ -137,9 +139,9 @@ func TestEngine_RunTaskWithRecords(t *testing.T) {
 		GetFn: func(clientID string) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				Name: "c1",
-				GetSeedingTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
+				GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
 					return []*model.TorrentInfo{
-						{Hash: "ih1", TrackerURL: "https://tracker.site1.com/announce"},
+						{Hash: "ih1", TrackerURL: "https://tracker.site1.com/announce", Progress: 1.0},
 					}, nil
 				},
 			}, nil
@@ -158,25 +160,6 @@ func TestEngine_RunTaskWithRecords(t *testing.T) {
 	}
 	if result.TotalSources != 1 {
 		t.Errorf("expected 1 source, got %d", result.TotalSources)
-	}
-}
-
-func TestEngine_RunEnabledTasks(t *testing.T) {
-	db := setupReseedDB(t)
-	e := NewEngine(db, zap.NewNop())
-
-	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "enabled1", Enabled: true, ClientIDs: "c1"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "disabled", Enabled: false, ClientIDs: "c1"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "enabled2", Enabled: true, ClientIDs: "c2"}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := e.RunEnabledTasks(context.Background()); err != nil {
-		t.Fatalf("run enabled: %v", err)
 	}
 }
 
@@ -438,8 +421,8 @@ func TestEngine_RunTask_EmptyClientIDs(t *testing.T) {
 func TestEngine_RunTask_SourceSiteFilter(t *testing.T) {
 	db := setupReseedDB(t)
 	torrents := []*model.TorrentInfo{
-		{Hash: "ih1", TrackerURL: "https://tracker.site1.com/announce"},
-		{Hash: "ih2", TrackerURL: "https://tracker.site2.com/announce"},
+		{Hash: "ih1", TrackerURL: "https://tracker.site1.com/announce", Progress: 1.0},
+		{Hash: "ih2", TrackerURL: "https://tracker.site2.com/announce", Progress: 1.0},
 	}
 	e := setupEngineWithMockClient(t, db, torrents, map[string]string{
 		"site1.com": "site1",
@@ -512,23 +495,6 @@ func TestEngine_StartStop(t *testing.T) {
 	}
 
 	e.Stop()
-}
-
-func TestEngine_RunEnabledTasks2(t *testing.T) {
-	db := setupReseedDB(t)
-	e := NewEngine(db, zap.NewNop())
-
-	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "task1", Enabled: true, ClientIDs: "c1"}); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "task2", Enabled: true, ClientIDs: ""}); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-
-	err := e.RunEnabledTasks(context.Background())
-	if err != nil {
-		t.Fatalf("RunEnabledTasks: %v", err)
-	}
 }
 
 func TestEngine_SaveAndFindMatch(t *testing.T) {
@@ -608,7 +574,7 @@ func TestEngine_MatchDecision_Layered(t *testing.T) {
 func TestEngine_RunTask_Canceled(t *testing.T) {
 	db := setupReseedDB(t)
 	torrents := []*model.TorrentInfo{
-		{Hash: "ih1", TrackerURL: "https://tracker.site1.com/announce"},
+		{Hash: "ih1", TrackerURL: "https://tracker.site1.com/announce", Progress: 1.0},
 	}
 	e := setupEngineWithMockClient(t, db, torrents, map[string]string{
 		"site1.com": "site1",
@@ -891,18 +857,52 @@ func TestEngine_SetIYUUService(t *testing.T) {
 func TestEngine_RunTask_DuplicateExists(t *testing.T) {
 	db := setupReseedDB(t)
 	torrents := []*model.TorrentInfo{
-		{Hash: "ih_dup", TrackerURL: "https://tracker.site1.com/announce"},
+		{Hash: "ih_dup", TrackerURL: "https://tracker.site1.com/announce", Progress: 1.0},
 	}
 	e := setupEngineWithMockClient(t, db, torrents, map[string]string{
 		"site1.com": "site1",
 	})
-	task := &model.ReseedTask{Name: "dup-task", Enabled: true, ClientIDs: "c1"}
+
+	fpRepo := fingerprint.NewRepository(db, zap.NewNop())
+	if err := fpRepo.Save(context.Background(), &model.ContentFingerprint{
+		InfoHash: "ih_dup", SiteName: "site1",
+		Title: "Test.Torrent.2023.1080p.BluRay.x264-GROUPD", TotalSize: 1073741824,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	e.SetFingerprintRepo(fpRepo)
+
+	adapter := &mocks.SiteAdapter{
+		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+			return []*model.SeedingSearchResult{
+				{TorrentID: "t2", Title: "Test.Torrent.2023.1080p.BluRay.x264-GROUPD", Size: 1073741824},
+			}, nil
+		},
+	}
+	e.SetSiteProvider(&mocks.SiteInfoProvider{
+		ListSitesFn: func(ctx context.Context) ([]*model.SiteInfo, error) {
+			return []*model.SiteInfo{
+				{Name: "site2", BaseURL: "https://site2.example.com", Enabled: true},
+			}, nil
+		},
+		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
+			return &model.SiteInfo{Name: "site2", BaseURL: "https://site2.example.com", Enabled: true}, nil
+		},
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Enabled: true}, nil
+		},
+		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
+			return adapter, nil
+		},
+	})
+
+	task := &model.ReseedTask{Name: "dup-task", Enabled: true, ClientIDs: "c1", TargetSiteIDs: "site2", MatchMethods: "size_title"}
 	if err := e.CreateTask(context.Background(), task); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
 	db.Create(&model.ReseedMatch{
-		ClientID: "c1", SourceSite: "site1", SourceTorrentID: "t1", SourceInfoHash: "ih_dup",
+		ClientID: "c1", SourceSite: "site1", SourceTorrentID: "ih_dup", SourceInfoHash: "ih_dup",
 		TargetSite: "site2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	})
@@ -921,7 +921,7 @@ func TestEngine_findCandidates_NilProvider(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 	task := &model.ReseedTask{Name: "fc-nil", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil)
 	if candidates != nil {
 		t.Error("expected nil when provider is nil")
 	}
@@ -934,7 +934,7 @@ func TestEngine_findCandidates_WithProvider(t *testing.T) {
 	adapter := &mocks.SiteAdapter{
 		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return []*model.SeedingSearchResult{
-				{TorrentID: "target_t1", Title: "Ubuntu 24.04", Size: 1073741824},
+				{TorrentID: "target_t1", Title: "Ubuntu.24.04.2024.1080p.BluRay.x264-GROUPX", Size: 1073741824},
 			}, nil
 		},
 	}
@@ -942,7 +942,7 @@ func TestEngine_findCandidates_WithProvider(t *testing.T) {
 	fpRepo := fingerprint.NewRepository(db, zap.NewNop())
 	if err := fpRepo.Save(context.Background(), &model.ContentFingerprint{
 		InfoHash: "ih1", SiteName: "source_site",
-		Title: "Ubuntu 24.04", TotalSize: 1073741824,
+		Title: "Ubuntu.24.04.2024.1080p.BluRay.x264-GROUPX", TotalSize: 1073741824,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -964,33 +964,33 @@ func TestEngine_findCandidates_WithProvider(t *testing.T) {
 	e.SetSiteProvider(sp)
 
 	task := &model.ReseedTask{Name: "fc-prov", Enabled: true, MatchMethods: "size_title"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: "ih1", SiteName: "source_site"}, e.preloadSites(context.Background(), nil, nil), e.preloadFingerprints(context.Background(), []string{"ih1"}), 1.0, task, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: "ih1", SiteName: "source_site"}, e.preloadSites(context.Background(), nil, nil), e.preloadFingerprints(context.Background(), []string{"ih1"}), 1.0, task, nil, nil, nil, nil)
 	if len(candidates) != 1 {
 		t.Fatalf("expected 1 candidate, got %d", len(candidates))
 	}
-	if candidates[0].MatchMethod != "size_title" {
-		t.Errorf("expected size_title, got %s", candidates[0].MatchMethod)
+	if candidates[0].MatchMethod != "search_verify" {
+		t.Errorf("expected search_verify, got %s", candidates[0].MatchMethod)
 	}
 	if candidates[0].TargetSite != "target_site" {
 		t.Errorf("expected target_site, got %s", candidates[0].TargetSite)
 	}
 }
 
-func TestEngine_matchLayer2SizeTitle_WithDB(t *testing.T) {
+func TestEngine_matchLayer2SearchVerify_WithDB(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
 	db.Create(&model.ContentFingerprint{
 		InfoHash:  "ih_source",
 		SiteName:  "source_site",
-		Title:     "Some Movie 2023",
+		Title:     "Some.Movie.2023.1080p.BluRay.x264-GROUP1",
 		TotalSize: 1073741824,
 	})
 
 	adapter := &mocks.SiteAdapter{
 		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return []*model.SeedingSearchResult{
-				{TorrentID: "t_target", Size: 1073741824},
+				{TorrentID: "t_target", Title: "Some.Movie.2023.1080p.BluRay.x264-GROUP1", Size: 1073741824},
 			}, nil
 		},
 	}
@@ -1001,11 +1001,11 @@ func TestEngine_matchLayer2SizeTitle_WithDB(t *testing.T) {
 	if c == nil {
 		t.Fatal("expected candidate, got nil")
 	}
-	if c.MatchMethod != "size_title" {
-		t.Errorf("expected size_title, got %s", c.MatchMethod)
+	if c.MatchMethod != "search_verify" {
+		t.Errorf("expected search_verify, got %s", c.MatchMethod)
 	}
-	if c.Confidence != 0.85 {
-		t.Errorf("expected confidence 0.85, got %f", c.Confidence)
+	if c.Confidence != 0.95 {
+		t.Errorf("expected confidence 0.95, got %f", c.Confidence)
 	}
 }
 
@@ -1014,7 +1014,7 @@ func TestEngine_matchLayer2SizeTitle_NoFingerprint(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 	adapter := &mocks.SiteAdapter{}
 	rec := model.SeedingTorrentRecord{InfoHash: "nonexist", SiteName: "site1"}
-	c := e.matchLayer2SizeTitle(context.Background(), adapter, &model.SiteConfig{}, rec.InfoHash, rec.SiteName, "site2", 1.0, nil)
+	c := e.matchLayer2SearchVerify(context.Background(), adapter, &model.SiteConfig{}, rec.InfoHash, rec.SiteName, "site2", nil, nil)
 	if c != nil {
 		t.Error("expected nil when no fingerprint found")
 	}
@@ -1027,14 +1027,14 @@ func TestEngine_matchLayer2SizeTitle_SizeMismatch(t *testing.T) {
 	db.Create(&model.ContentFingerprint{
 		InfoHash:  "ih_src2",
 		SiteName:  "source_site",
-		Title:     "Another Movie",
+		Title:     "Another.Movie.2023.1080p.BluRay.x264-GROUP2",
 		TotalSize: 1073741824,
 	})
 
 	adapter := &mocks.SiteAdapter{
 		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return []*model.SeedingSearchResult{
-				{TorrentID: "t1", Size: 2147483648},
+				{TorrentID: "t1", Title: "Another.Movie.2023.1080p.BluRay.x264-GROUP2", Size: 2147483648},
 			}, nil
 		},
 	}
@@ -1110,8 +1110,9 @@ func TestEngine_matchLayer3Fingerprint_EmptyPiecesHash(t *testing.T) {
 
 func makePreloadedSites(targetSite string, config *model.SiteConfig, adapter model.SiteAdapter) *preloadedSites {
 	return &preloadedSites{
-		configs:  map[string]*model.SiteConfig{targetSite: config},
-		adapters: map[string]model.SiteAdapter{targetSite: adapter},
+		configs:    map[string]*model.SiteConfig{targetSite: config},
+		adapters:   map[string]model.SiteAdapter{targetSite: adapter},
+		siteLimits: map[string]*model.Site{},
 	}
 }
 
@@ -1142,8 +1143,9 @@ func TestEngine_injectMatch_FailSiteInfo(t *testing.T) {
 	}
 
 	err := e.injectMatch(context.Background(), match, task, &preloadedSites{
-		configs:  map[string]*model.SiteConfig{},
-		adapters: map[string]model.SiteAdapter{},
+		configs:    map[string]*model.SiteConfig{},
+		adapters:   map[string]model.SiteAdapter{},
+		siteLimits: map[string]*model.Site{},
 	})
 	if err == nil {
 		t.Error("expected error when config not preloaded")
@@ -1259,6 +1261,9 @@ func TestEngine_injectMatch_AlreadyExists(t *testing.T) {
 		AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
 			return nil, fmt.Errorf("torrent already exists in client")
 		},
+		GetTorrentByHashFn: func(ctx context.Context, hash string) (*model.TorrentInfo, error) {
+			return &model.TorrentInfo{Hash: hash, SavePath: "/data"}, nil
+		},
 	}
 	cp := &mocks.DownloaderProvider{
 		GetFn: func(clientID string) (model.DownloaderClient, error) {
@@ -1281,13 +1286,13 @@ func TestEngine_injectMatch_AlreadyExists(t *testing.T) {
 
 	ps := makePreloadedSites("target_site", &model.SiteConfig{Enabled: true}, adapter)
 	err := e.injectMatch(context.Background(), match, task, ps)
-	if err == nil {
-		t.Error("expected error for already exists")
+	if err != nil {
+		t.Fatalf("unexpected error for already exists: %v", err)
 	}
 	var updated model.ReseedMatch
 	db.First(&updated, match.ID)
-	if updated.Status != model.MatchStatusFailed {
-		t.Errorf("expected failed, got %s", updated.Status)
+	if updated.Status != model.MatchStatusInjected {
+		t.Errorf("expected injected, got %s", updated.Status)
 	}
 	if updated.DecisionType != string(model.DecisionAlreadyExists) {
 		t.Errorf("expected %s, got %s", model.DecisionAlreadyExists, updated.DecisionType)
@@ -1521,7 +1526,7 @@ func TestEngine_findCandidates_ExcludedAndDisabled(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-excl", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, []string{"excluded"}), nil, 1.0, task, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, []string{"excluded"}), nil, 1.0, task, nil, nil, nil, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates (excluded+disabled+same site), got %d", len(candidates))
 	}
@@ -1533,7 +1538,7 @@ func TestEngine_findCandidates_WithTargetSites(t *testing.T) {
 
 	adapter := &mocks.SiteAdapter{
 		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-			return []*model.SeedingSearchResult{{TorrentID: "t1", Title: "Test Torrent", Size: 1000}}, nil
+			return []*model.SeedingSearchResult{{TorrentID: "t1", Title: "Test.Torrent.2024.1080p.BluRay.x264-GROUPZ", Size: 1073741824}}, nil
 		},
 	}
 	e.SetSiteProvider(&mocks.SiteInfoProvider{
@@ -1551,14 +1556,14 @@ func TestEngine_findCandidates_WithTargetSites(t *testing.T) {
 	fpRepo := fingerprint.NewRepository(db, zap.NewNop())
 	if err := fpRepo.Save(context.Background(), &model.ContentFingerprint{
 		InfoHash: "ih_match", SiteName: "source_site",
-		Title: "Test Torrent", TotalSize: 1000,
+		Title: "Test.Torrent.2024.1080p.BluRay.x264-GROUPZ", TotalSize: 1073741824,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	e.SetFingerprintRepo(fpRepo)
 
 	task := &model.ReseedTask{Name: "fc-targets", Enabled: true, MatchMethods: "size_title"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: "ih_match", SiteName: "source_site"}, e.preloadSites(context.Background(), []string{"site_a"}, nil), e.preloadFingerprints(context.Background(), []string{"ih_match"}), 1.0, task, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: "ih_match", SiteName: "source_site"}, e.preloadSites(context.Background(), []string{"site_a"}, nil), e.preloadFingerprints(context.Background(), []string{"ih_match"}), 1.0, task, nil, nil, nil, nil)
 	if len(candidates) != 1 {
 		t.Fatalf("expected 1 candidate, got %d", len(candidates))
 	}
@@ -1653,43 +1658,6 @@ func TestEngine_BatchSaveMatches(t *testing.T) {
 	}
 }
 
-func TestEngine_FindPendingRetry(t *testing.T) {
-	db := setupReseedDB(t)
-	db.Exec("ALTER TABLE reseed_matches ADD COLUMN max_retries INTEGER DEFAULT 3")
-	e := NewEngine(db, zap.NewNop())
-
-	past := time.Now().Add(-1 * time.Hour)
-	db.Create(&model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
-		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
-		Confidence: 1.0, Status: model.MatchStatusFailed, FailReason: "test fail",
-		RetryCount: 0, NextRetryAt: &past,
-	})
-	db.Create(&model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t3", SourceInfoHash: "ih3",
-		TargetSite: "s2", TargetTorrentID: "t4", MatchMethod: "size_title",
-		Confidence: 0.85, Status: model.MatchStatusMatched,
-	})
-	future := time.Now().Add(24 * time.Hour)
-	db.Create(&model.ReseedMatch{
-		ClientID: "c2", SourceSite: "s1", SourceTorrentID: "t5", SourceInfoHash: "ih5",
-		TargetSite: "s3", TargetTorrentID: "t6", MatchMethod: "pieces_hash",
-		Confidence: 1.0, Status: model.MatchStatusFailed, FailReason: "not yet",
-		RetryCount: 0, NextRetryAt: &future,
-	})
-
-	matches, err := e.FindPendingRetry(context.Background(), 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(matches) != 1 {
-		t.Fatalf("expected 1 pending retry, got %d", len(matches))
-	}
-	if matches[0].SourceInfoHash != "ih1" {
-		t.Errorf("expected ih1, got %s", matches[0].SourceInfoHash)
-	}
-}
-
 func TestEngine_UpdateMatchStatus(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
@@ -1751,7 +1719,7 @@ func TestEngine_Start_ReplaceExisting(t *testing.T) {
 func TestEngine_RunTask_BlockedTitle(t *testing.T) {
 	db := setupReseedDB(t)
 	torrents := []*model.TorrentInfo{
-		{Hash: "ih_blocked", TrackerURL: "https://tracker.site1.com/announce"},
+		{Hash: "ih_blocked", TrackerURL: "https://tracker.site1.com/announce", Progress: 1.0},
 	}
 	e := setupEngineWithMockClient(t, db, torrents, map[string]string{
 		"site1.com": "site1",
@@ -1781,7 +1749,7 @@ func TestEngine_RunTask_WithProviders(t *testing.T) {
 
 	adapter := &mocks.SiteAdapter{
 		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-			return []*model.SeedingSearchResult{{TorrentID: "t_tgt", Size: 1073741824}}, nil
+			return []*model.SeedingSearchResult{{TorrentID: "t_tgt", Title: "Normal.Title.2024.1080p.BluRay.x264-GROUPF", Size: 1073741824}}, nil
 		},
 		GetTorrentInfoHashFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 			return "ih_match", nil
@@ -1817,9 +1785,9 @@ func TestEngine_RunTask_WithProviders(t *testing.T) {
 		DeleteTorrentFn: func(ctx context.Context, hash string, deleteFiles bool) error {
 			return nil
 		},
-		GetSeedingTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
+		GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
 			return []*model.TorrentInfo{
-				{Hash: "ih_full", TrackerURL: "https://tracker.site1.com/announce"},
+				{Hash: "ih_full", TrackerURL: "https://tracker.site1.com/announce", Progress: 1.0},
 			}, nil
 		},
 	}
@@ -1844,7 +1812,7 @@ func TestEngine_RunTask_WithProviders(t *testing.T) {
 
 	db.Create(&model.ContentFingerprint{
 		InfoHash: "ih_full", SiteName: "site1",
-		Title: "Normal Title", TotalSize: 1073741824,
+		Title: "Normal.Title.2024.1080p.BluRay.x264-GROUPF", TotalSize: 1073741824,
 	})
 
 	result, err := e.RunTask(context.Background(), task)
@@ -1934,9 +1902,9 @@ func TestEngine_RunTask_DefaultSizeTolerance(t *testing.T) {
 		GetFn: func(clientID string) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				Name: "c1",
-				GetSeedingTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
+				GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
 					return []*model.TorrentInfo{
-						{Hash: "ih1", TrackerURL: "https://tracker.site1.com/announce"},
+						{Hash: "ih1", TrackerURL: "https://tracker.site1.com/announce", Progress: 1.0},
 					}, nil
 				},
 			}, nil
@@ -1969,7 +1937,7 @@ func TestEngine_findCandidates_GetSiteInfoError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-err", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), []string{"bad_site"}, nil), nil, 1.0, task, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), []string{"bad_site"}, nil), nil, 1.0, task, nil, nil, nil, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates when GetSiteInfo fails, got %d", len(candidates))
 	}
@@ -1986,7 +1954,7 @@ func TestEngine_findCandidates_ListSitesError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-lserr", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil)
 	if candidates != nil {
 		t.Error("expected nil when ListSites fails")
 	}
@@ -2006,7 +1974,7 @@ func TestEngine_findCandidates_GetSiteConfigError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-cfgerr", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates when GetSiteConfig fails, got %d", len(candidates))
 	}
@@ -2029,7 +1997,7 @@ func TestEngine_findCandidates_GetAdapterError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-adaperr", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates when GetAdapter fails, got %d", len(candidates))
 	}
@@ -2052,14 +2020,13 @@ func TestEngine_matchLayer2SizeTitle_EmptyKeyword(t *testing.T) {
 		t.Error("expected nil for empty normalized title")
 	}
 }
-
 func TestEngine_matchLayer2SizeTitle_SearchError(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
 	db.Create(&model.ContentFingerprint{
 		InfoHash: "ih_search_err", SiteName: "source_site",
-		Title: "Some Movie", TotalSize: 1073741824,
+		Title: "Some.Movie.2023.1080p.BluRay.x264-GROUP3", TotalSize: 1073741824,
 	})
 
 	adapter := &mocks.SiteAdapter{
@@ -2075,34 +2042,27 @@ func TestEngine_matchLayer2SizeTitle_SearchError(t *testing.T) {
 	}
 }
 
-func TestEngine_matchLayer2SizeTitle_BestConfidence(t *testing.T) {
+func TestEngine_matchLayer2SizeTitle_GroupMismatch(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
 	db.Create(&model.ContentFingerprint{
 		InfoHash: "ih_best", SiteName: "source_site",
-		Title: "Best Movie", TotalSize: 1073741824,
+		Title: "Best.Movie.2023.1080p.BluRay.x264-GROUPA", TotalSize: 1073741824,
 	})
 
 	adapter := &mocks.SiteAdapter{
 		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 			return []*model.SeedingSearchResult{
-				{TorrentID: "t1", Size: 1073741825},
-				{TorrentID: "t2", Size: 1073741824},
+				{TorrentID: "t1", Title: "Best.Movie.2023.1080p.BluRay.x264-GROUPB", Size: 1073741824},
 			}, nil
 		},
 	}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih_best", SiteName: "source_site"}
 	fc := e.preloadFingerprints(context.Background(), []string{rec.InfoHash})
 	c := e.matchLayer2SizeTitle(context.Background(), adapter, &model.SiteConfig{}, rec.InfoHash, rec.SiteName, "target_site", 1.0, fc)
-	if c == nil {
-		t.Fatal("expected candidate, got nil")
-	}
-	if c.Confidence != 0.85 {
-		t.Errorf("expected 0.85 (exact size), got %f", c.Confidence)
-	}
-	if c.TargetTorrentID != "t2" {
-		t.Errorf("expected t2 (exact match), got %s", c.TargetTorrentID)
+	if c != nil {
+		t.Error("expected nil when group name mismatch")
 	}
 }
 
@@ -2112,12 +2072,12 @@ func TestEngine_matchLayer2SizeTitle_NoTorrentID(t *testing.T) {
 
 	db.Create(&model.ContentFingerprint{
 		InfoHash: "ih_notid", SiteName: "source_site",
-		Title: "Some Title", TotalSize: 1073741824,
+		Title: "Some.Title.2023.1080p.BluRay.x264-GROUP4", TotalSize: 1073741824,
 	})
 
 	adapter := &mocks.SiteAdapter{
 		SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-			return []*model.SeedingSearchResult{{TorrentID: "", Size: 1073741824}}, nil
+			return []*model.SeedingSearchResult{{TorrentID: "", Title: "Some.Title.2023.1080p.BluRay.x264-GROUP4", Size: 1073741824}}, nil
 		},
 	}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih_notid", SiteName: "source_site"}

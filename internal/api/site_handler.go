@@ -173,7 +173,12 @@ type updateSiteRequest struct {
 	SkipSSLVerify *bool   `json:"skipSslVerify,omitempty"`
 	MaxConcurrent *int    `json:"maxConcurrent,omitempty"`
 
-	HRStrategy *string `json:"hrStrategy,omitempty"`
+	HRStrategy          *string `json:"hrStrategy,omitempty"`
+	TargetTypes         *string `json:"targetTypes,omitempty"`
+	ReseedLimitCount    *int    `json:"reseedLimitCount,omitempty"`
+	ReseedLimitInterval *int    `json:"reseedLimitInterval,omitempty"`
+	IYUULimitCount      *int    `json:"iyuuLimitCount,omitempty"`
+	IYUULimitInterval   *int    `json:"iyuuLimitInterval,omitempty"`
 }
 
 type updateCredentialsRequest struct {
@@ -229,11 +234,16 @@ type siteResponse struct {
 	OverrideRSSURL   string `json:"overrideRssUrl,omitempty"`
 	OverrideSavePath string `json:"overrideSavePath,omitempty"`
 
-	ProxyURL      string `json:"proxyUrl,omitempty"`
-	SkipSSLVerify bool   `json:"skipSslVerify"`
-	MaxConcurrent int    `json:"maxConcurrent"`
+	ProxyURL             string `json:"proxyUrl,omitempty"`
+	SkipSSLVerify        bool   `json:"skipSslVerify"`
+	MaxConcurrent        int    `json:"maxConcurrent"`
 
-	HRStrategy string `json:"hrStrategy,omitempty"`
+	HRStrategy           string `json:"hrStrategy,omitempty"`
+	TargetTypes          string `json:"targetTypes,omitempty"`
+	ReseedLimitCount     int    `json:"reseedLimitCount"`
+	ReseedLimitInterval  int    `json:"reseedLimitInterval"`
+	IYUULimitCount       int    `json:"iyuuLimitCount"`
+	IYUULimitInterval    int    `json:"iyuuLimitInterval"`
 
 	HasPasskey     bool   `json:"hasPasskey"`
 	PasskeyMasked  string `json:"passkeyMasked,omitempty"`
@@ -346,7 +356,12 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		SkipSSLVerify: s.SkipSSLVerify,
 		MaxConcurrent: s.MaxConcurrent,
 
-		HRStrategy: s.HRStrategy,
+		HRStrategy:           s.HRStrategy,
+		TargetTypes:          s.TargetTypes,
+		ReseedLimitCount:     s.ReseedLimitCount,
+		ReseedLimitInterval:  s.ReseedLimitInterval,
+		IYUULimitCount:       s.IYUULimitCount,
+		IYUULimitInterval:    s.IYUULimitInterval,
 
 		HasPasskey:     s.Passkey != "",
 		PasskeyMasked:  maskPasskey(s.Passkey),
@@ -905,6 +920,21 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.HRStrategy != nil {
 		s.HRStrategy = *req.HRStrategy
+	}
+	if req.TargetTypes != nil {
+		s.TargetTypes = *req.TargetTypes
+	}
+	if req.ReseedLimitCount != nil {
+		s.ReseedLimitCount = *req.ReseedLimitCount
+	}
+	if req.ReseedLimitInterval != nil {
+		s.ReseedLimitInterval = *req.ReseedLimitInterval
+	}
+	if req.IYUULimitCount != nil {
+		s.IYUULimitCount = *req.IYUULimitCount
+	}
+	if req.IYUULimitInterval != nil {
+		s.IYUULimitInterval = *req.IYUULimitInterval
 	}
 
 	if err := h.repo.Update(r.Context(), s); err != nil {

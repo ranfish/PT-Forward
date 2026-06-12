@@ -70,6 +70,7 @@ type ReseedTask struct {
 	InjectionConcurrency int    `json:"injection_concurrency" gorm:"default:3"`
 	ScanConcurrency      int    `json:"scan_concurrency" gorm:"default:5"`
 	ReseedCategory       string `json:"reseed_category" gorm:"size:100;default:'cross-seed'"`
+	ReseedTags           string `json:"reseed_tags" gorm:"size:200;default:'reseed,pt-forward'"`
 
 	Schedule string           `json:"schedule" gorm:"size:100;default:'0 */6 * * *'"`
 	Status   ReseedTaskStatus `json:"status" gorm:"size:20;default:'idle'"`

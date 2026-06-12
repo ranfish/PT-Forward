@@ -206,7 +206,14 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 		return nil, httpError(fmtES("下载种子 HTTP %d", dlResp.StatusCode), nil)
 	}
 
-	return io.ReadAll(io.LimitReader(dlResp.Body, 50*1024*1024))
+	data, err := io.ReadAll(io.LimitReader(dlResp.Body, 50*1024*1024))
+	if err != nil {
+		return nil, downloadError("读取种子数据失败", err)
+	}
+	if len(data) == 0 {
+		return nil, &model.AppError{Code: 15001, Message: "种子数据为空"}
+	}
+	return data, nil
 }
 
 func (a *MTeamAdapter) downloadViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
@@ -231,7 +238,14 @@ func (a *MTeamAdapter) downloadViaWeb(ctx context.Context, config *model.SiteCon
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
-	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
+	if err != nil {
+		return nil, downloadError("读取种子数据失败", err)
+	}
+	if len(data) == 0 {
+		return nil, &model.AppError{Code: 15001, Message: "种子数据为空"}
+	}
+	return data, nil
 }
 
 func (a *MTeamAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {

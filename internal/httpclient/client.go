@@ -22,6 +22,20 @@ func Init(logger *zap.Logger) {
 	GlobalCircuitBreaker = NewCircuitBreakerTransport(nil, DefaultCircuitBreakerConfig(), logger)
 }
 
+func IsDomainCircuitOpen(domain string) bool {
+	if GlobalCircuitBreaker == nil {
+		return false
+	}
+	return GlobalCircuitBreaker.GetCircuitStatus(domain).State == CircuitOpen
+}
+
+func TripDomainCircuit(domain string) {
+	if GlobalCircuitBreaker == nil {
+		return
+	}
+	GlobalCircuitBreaker.TripCircuit(domain)
+}
+
 type SiteHTTPConfig struct {
 	Domain              string
 	Timeout             time.Duration

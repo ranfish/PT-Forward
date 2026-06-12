@@ -10,6 +10,7 @@ type IYUUTarget struct {
 	Sid       int    `json:"sid"`
 	TorrentID int    `json:"torrent_id"`
 	InfoHash  string `json:"info_hash"`
+	Group     int    `json:"group"`
 }
 
 // §33.1.16 — IYUUSite: IYUU 站点信息

@@ -40,7 +40,7 @@ type CircuitBreakerConfig struct {
 
 func DefaultCircuitBreakerConfig() CircuitBreakerConfig {
 	return CircuitBreakerConfig{
-		FailureThreshold: 5,
+		FailureThreshold: 15,
 		RecoveryTimeout:  60 * time.Second,
 		HalfOpenMaxReqs:  3,
 		SuccessThreshold: 3,
@@ -260,6 +260,13 @@ func (t *circuitBreakerTransport) ResetCircuit(domain string) {
 	circuit.halfOpenAttempts = 0
 	circuit.openedAt = time.Time{}
 	circuit.mu.Unlock()
+}
+
+func (t *circuitBreakerTransport) TripCircuit(domain string) {
+	circuit := t.getOrCreate(domain)
+	circuit.mu.Lock()
+	defer circuit.mu.Unlock()
+	t.tripCircuit(circuit, domain)
 }
 
 func (t *circuitBreakerTransport) CloseIdleConnections() {

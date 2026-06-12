@@ -50,7 +50,7 @@ type SeedingClientConfig struct {
 	RejectRuleIDs string `json:"reject_rule_ids" gorm:"type:text"`
 
 	AutoDeleteCron string `json:"auto_delete_cron" gorm:"size:100;default:'*/30 * * * *'"`
-	MainDataCron   string `json:"maindata_cron" gorm:"size:100;default:'*/10 * * * * *'"`
+	MainDataCron   string `json:"maindata_cron" gorm:"size:100;default:'*/10 * * * *'"`
 	FitTimeCheckMs int    `json:"fit_time_check_ms" gorm:"default:2000"`
 
 	DiskProtectEnabled  bool    `json:"disk_protect_enabled" gorm:"default:true"`
