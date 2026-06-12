@@ -293,6 +293,11 @@ export interface Site {
   bonusPoints: number
   statsSyncedAt?: string | null
   hrStrategy: string
+  targetTypes?: string
+  reseedLimitCount: number
+  reseedLimitInterval: number
+  iyuuLimitCount: number
+  iyuuLimitInterval: number
 }
 
 export interface SiteConfigOverride {
@@ -532,6 +537,7 @@ export interface ReseedTask {
   injection_concurrency: number
   scan_concurrency: number
   reseed_category: string
+  reseed_tags: string
   schedule: string
   status: string
   version: number

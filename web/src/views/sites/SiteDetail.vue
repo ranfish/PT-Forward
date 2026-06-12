@@ -58,7 +58,7 @@
         <a-descriptions-item v-if="showAuthKey && site.hasAuthKey" :label="t('sites.authKey')">{{ t('common.configured') }}</a-descriptions-item>
         <a-descriptions-item v-if="showRssKey && site.hasRssKey" :label="rssKeyLabel">{{ t('common.configured') }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.enabledLabel')"><a-badge :status="site.enabled ? 'success' : 'default'" :text="site.enabled ? t('common.yes') : t('common.no')" /></a-descriptions-item>
-        <a-descriptions-item :label="t('site.role')">{{ [site.isSource ? t('site.sourceSiteRole') : '', site.isTarget ? t('site.targetSiteRole') : ''].filter(Boolean).join(', ') || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('site.role')">{{ formatRoles(site.isSource, site.isTarget, site.targetTypes) }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.participateAutoPublishLabel')">{{ site.participateAutoPublish ? t('common.yes') : t('common.no') }}</a-descriptions-item>
         <a-descriptions-item :label="t('site.assumeFreeLabel')">
           <a-badge v-if="site.assumeFree" status="warning" :text="t('common.yes')" />
@@ -130,9 +130,15 @@
                 <a-switch v-model:checked="settingsForm.isSource" />
               </a-form-item>
             </a-col>
-            <a-col :span="6">
-              <a-form-item :label="t('site.asTarget')">
-                <a-switch v-model:checked="settingsForm.isTarget" />
+          </a-row>
+          <a-row :gutter="24">
+            <a-col :span="12">
+              <a-form-item :label="t('site.targetTypes')">
+                <a-select v-model:value="settingsForm.targetTypes" mode="multiple" :placeholder="t('site.targetTypesPlaceholder')" style="width: 100%">
+                  <a-select-option value="publish">{{ t('site.targetTypePublish') }}</a-select-option>
+                  <a-select-option value="seed_feature">{{ t('site.targetTypeSeedFeature') }}</a-select-option>
+                  <a-select-option value="iyuu">{{ t('site.targetTypeIyuu') }}</a-select-option>
+                </a-select>
               </a-form-item>
             </a-col>
           </a-row>
@@ -182,6 +188,38 @@
               <a-select-option value="skip">{{ t('site.hrStrict') }}</a-select-option>
             </a-select>
           </a-form-item>
+
+          <div v-if="settingsForm.targetTypes.includes('seed_feature')" class="section-title">{{ t('site.seedFeatureRateLimit') }}</div>
+          <a-row v-if="settingsForm.targetTypes.includes('seed_feature')" :gutter="24">
+            <a-col :span="8">
+              <a-form-item :label="t('site.reseedLimitCount')">
+                <a-input-number v-model:value="settingsForm.reseedLimitCount" :min="0" :max="10000" style="width: 100%" />
+                <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('site.reseedLimitCountHint') }}</div>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item :label="t('site.reseedLimitInterval')">
+                <a-input-number v-model:value="settingsForm.reseedLimitInterval" :min="0" :max="3600" style="width: 100%" />
+                <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('site.reseedLimitIntervalHint') }}</div>
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <div v-if="settingsForm.targetTypes.includes('iyuu')" class="section-title">{{ t('site.iyuuRateLimit') }}</div>
+          <a-row v-if="settingsForm.targetTypes.includes('iyuu')" :gutter="24">
+            <a-col :span="8">
+              <a-form-item :label="t('site.iyuuLimitCount')">
+                <a-input-number v-model:value="settingsForm.iyuuLimitCount" :min="0" :max="10000" style="width: 100%" />
+                <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('site.reseedLimitCountHint') }}</div>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item :label="t('site.iyuuLimitInterval')">
+                <a-input-number v-model:value="settingsForm.iyuuLimitInterval" :min="0" :max="3600" style="width: 100%" />
+                <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('site.reseedLimitIntervalHint') }}</div>
+              </a-form-item>
+            </a-col>
+          </a-row>
 
           <a-form-item>
             <a-button type="primary" @click="updateSettings">{{ t('site.saveSettings') }}</a-button>
@@ -310,6 +348,11 @@ const settingsForm = reactive({
   skipSslVerify: false,
   maxConcurrent: 2,
   hrStrategy: '',
+  targetTypes: [] as string[],
+  reseedLimitCount: 0,
+  reseedLimitInterval: 0,
+  iyuuLimitCount: 0,
+  iyuuLimitInterval: 0,
 })
 
 const authTypeLabels: Record<string, string> = {
@@ -450,6 +493,11 @@ async function fetchSite() {
       skipSslVerify: site.value.skipSslVerify || false,
       maxConcurrent: site.value.maxConcurrent || 2,
       hrStrategy: site.value.hrStrategy || '',
+      targetTypes: parseTargetTypes(site.value.targetTypes, site.value.isTarget),
+      reseedLimitCount: site.value.reseedLimitCount || 0,
+      reseedLimitInterval: site.value.reseedLimitInterval || 0,
+      iyuuLimitCount: site.value.iyuuLimitCount || 0,
+      iyuuLimitInterval: site.value.iyuuLimitInterval || 0,
     })
   } catch (e: unknown) {
     message.error((e as Error).message)
@@ -501,6 +549,11 @@ async function updateSettings() {
       name: settingsForm.name,
       baseUrl: settingsForm.baseUrl,
       alternativeDomains: altDomainsToJson(settingsForm.alternativeDomains),
+      targetTypes: targetTypesToJson(settingsForm.targetTypes),
+      reseedLimitCount: settingsForm.reseedLimitCount,
+      reseedLimitInterval: settingsForm.reseedLimitInterval,
+      iyuuLimitCount: settingsForm.iyuuLimitCount,
+      iyuuLimitInterval: settingsForm.iyuuLimitInterval,
     })
     message.success(t('common.configSaved'))
     fetchSite()
@@ -562,6 +615,44 @@ function altDomainsToJson(val: string): string {
   const items = trimmed.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean)
   if (items.length === 0) return ''
   return JSON.stringify(items)
+}
+
+function parseTargetTypes(val: string | undefined, isTarget: boolean | undefined): string[] {
+  if (val) {
+    try {
+      const arr = JSON.parse(val)
+      if (Array.isArray(arr)) return arr
+    } catch { /* ignore */ }
+  }
+  if (isTarget) return ['publish', 'seed_feature', 'iyuu']
+  return []
+}
+
+function targetTypesToJson(types: string[]): string {
+  if (types.length === 0) return ''
+  return JSON.stringify(types)
+}
+
+const targetTypeLabels: Record<string, string> = {
+  publish: t('site.targetTypePublish'),
+  seed_feature: t('site.targetTypeSeedFeature'),
+  iyuu: t('site.targetTypeIyuu'),
+}
+
+function formatRoles(isSource?: boolean, isTarget?: boolean, targetTypes?: string): string {
+  const roles: string[] = []
+  if (isSource) roles.push(t('site.sourceSiteRole'))
+  if (targetTypes) {
+    try {
+      const arr: string[] = JSON.parse(targetTypes)
+      for (const tt of arr) {
+        if (targetTypeLabels[tt]) roles.push(targetTypeLabels[tt])
+      }
+    } catch { /* ignore */ }
+  } else if (isTarget) {
+    roles.push(t('site.targetSiteRole'))
+  }
+  return roles.filter(Boolean).join(', ') || '-'
 }
 
 onMounted(() => {

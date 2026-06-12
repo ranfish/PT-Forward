@@ -3,6 +3,7 @@ package iyuu
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -120,8 +121,10 @@ func TestService_QueryReseed_Success(t *testing.T) {
 			"code": 0,
 			"msg":  "ok",
 			"data": map[string]any{
-				"abc123": []map[string]any{
-					{"sid": 1, "torrent_id": 42, "info_hash": "def456"},
+				"abc123": map[string]any{
+					"torrent": []map[string]any{
+						{"sid": 1, "torrent_id": 42, "info_hash": "def456", "group": 0},
+					},
 				},
 			},
 		}); err != nil {
@@ -148,6 +151,9 @@ func TestService_QueryReseed_Success(t *testing.T) {
 	}
 	if results[0].Targets[0].Sid != 1 {
 		t.Errorf("expected sid 1, got %d", results[0].Targets[0].Sid)
+	}
+	if results[0].Targets[0].Group != 0 {
+		t.Errorf("expected group 0, got %d", results[0].Targets[0].Group)
 	}
 }
 
@@ -294,8 +300,10 @@ func TestService_QueryReseed_AutoEnsureSidSha1(t *testing.T) {
 				"code": 0,
 				"msg":  "ok",
 				"data": map[string]any{
-					"abc123": []map[string]any{
-						{"sid": 1, "torrent_id": 42, "info_hash": "def456"},
+					"abc123": map[string]any{
+						"torrent": []map[string]any{
+							{"sid": 1, "torrent_id": 42, "info_hash": "def456"},
+						},
 					},
 				},
 			}); err != nil {
@@ -320,6 +328,117 @@ func TestService_QueryReseed_AutoEnsureSidSha1(t *testing.T) {
 	}
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+}
+
+func TestService_QueryReseed_LegacyFormat(t *testing.T) {
+	db := setupIYUUDB(t)
+	createTestConfig(t, db)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/reseed/sites/reportExisting" {
+			if err := json.NewEncoder(w).Encode(map[string]any{
+				"code": 0, "msg": "ok",
+				"data": map[string]any{"sid_sha1": "sha1"},
+			}); err != nil {
+				t.Errorf("encode: %v", err)
+			}
+			return
+		}
+		if r.URL.Path == "/reseed/index/index" {
+			if err := json.NewEncoder(w).Encode(map[string]any{
+				"code": 0,
+				"msg":  "ok",
+				"data": map[string]any{
+					"abc123": []map[string]any{
+						{"sid": 1, "torrent_id": 42, "info_hash": "def456"},
+					},
+				},
+			}); err != nil {
+				t.Errorf("encode: %v", err)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	db.Model(&model.IYUUConfig{}).Where("id = 1").Update("base_url", server.URL)
+	db.Create(&model.IYUUSiteMapping{IYUUSid: 1, SiteDomain: "sitea.com", SiteName: "SiteA", Enabled: true})
+
+	svc := NewService(db, zap.NewNop())
+	results, err := svc.QueryReseed(context.Background(), []string{"abc123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Targets[0].Sid != 1 {
+		t.Errorf("expected sid 1, got %d", results[0].Targets[0].Sid)
+	}
+}
+
+func TestService_QueryReseed_BatchSplit(t *testing.T) {
+	db := setupIYUUDB(t)
+	createTestConfig(t, db)
+
+	var batchSizes []int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/reseed/sites/reportExisting" {
+			if err := json.NewEncoder(w).Encode(map[string]any{
+				"code": 0, "msg": "ok",
+				"data": map[string]any{"sid_sha1": "sha1"},
+			}); err != nil {
+				t.Errorf("encode: %v", err)
+			}
+			return
+		}
+		if r.URL.Path == "/reseed/index/index" {
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("parse form: %v", err)
+			}
+			var hashes []string
+			if err := json.Unmarshal([]byte(r.Form.Get("hash")), &hashes); err != nil {
+				t.Fatalf("unmarshal hash: %v", err)
+			}
+			batchSizes = append(batchSizes, len(hashes))
+			if err := json.NewEncoder(w).Encode(map[string]any{
+				"code": 0, "msg": "ok", "data": map[string]any{},
+			}); err != nil {
+				t.Errorf("encode: %v", err)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	db.Model(&model.IYUUConfig{}).Where("id = 1").Update("base_url", server.URL)
+	db.Create(&model.IYUUSiteMapping{IYUUSid: 1, SiteDomain: "sitea.com", SiteName: "SiteA", Enabled: true})
+
+	svc := NewService(db, zap.NewNop())
+
+	hashes := make([]string, 350)
+	for i := range hashes {
+		hashes[i] = fmt.Sprintf("hash_%040d", i)
+	}
+
+	results, err := svc.QueryReseed(context.Background(), hashes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results from empty data, got %d", len(results))
+	}
+	if len(batchSizes) != 2 {
+		t.Fatalf("expected 2 batches, got %d", len(batchSizes))
+	}
+	if batchSizes[0] != 200 {
+		t.Errorf("expected first batch of 200, got %d", batchSizes[0])
+	}
+	if batchSizes[1] != 150 {
+		t.Errorf("expected second batch of 150, got %d", batchSizes[1])
 	}
 }
 
@@ -363,9 +482,11 @@ func TestService_GetSeededSites(t *testing.T) {
 			"code": 0,
 			"msg":  "ok",
 			"data": map[string]any{
-				"abc123": []map[string]any{
-					{"sid": 1, "torrent_id": 1, "info_hash": "x"},
-					{"sid": 2, "torrent_id": 2, "info_hash": "y"},
+				"abc123": map[string]any{
+					"torrent": []map[string]any{
+						{"sid": 1, "torrent_id": 1, "info_hash": "x"},
+						{"sid": 2, "torrent_id": 2, "info_hash": "y"},
+					},
 				},
 			},
 		}); err != nil {

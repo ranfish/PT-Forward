@@ -2,31 +2,136 @@ package reseed
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand/v2"
+	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/robfig/cron/v3"
+	"github.com/ranfish/pt-forward/internal/scheduler"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type preloadedSites struct {
-	infos    []*model.SiteInfo
-	configs  map[string]*model.SiteConfig
-	adapters map[string]model.SiteAdapter
+	infos       []*model.SiteInfo
+	configs     map[string]*model.SiteConfig
+	adapters    map[string]model.SiteAdapter
+	siteLimits  map[string]*model.Site
+}
+
+type siteLimitEntry struct {
+	date  string
+	count int
+}
+
+type siteLimiter struct {
+	mu      sync.Mutex
+	counts  map[string]*siteLimitEntry
+}
+
+func newSiteLimiter() *siteLimiter {
+	return &siteLimiter{counts: make(map[string]*siteLimitEntry)}
+}
+
+func (l *siteLimiter) checkAndIncr(siteName string, maxCount int) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if maxCount <= 0 {
+		return true
+	}
+	today := time.Now().Format("2006-01-02")
+	entry := l.counts[siteName]
+	if entry == nil || entry.date != today {
+		entry = &siteLimitEntry{date: today, count: 0}
+		l.counts[siteName] = entry
+	}
+	if entry.count >= maxCount {
+		return false
+	}
+	entry.count++
+	return true
+}
+
+func (l *siteLimiter) getCount(siteName string) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	today := time.Now().Format("2006-01-02")
+	entry := l.counts[siteName]
+	if entry == nil || entry.date != today {
+		return 0
+	}
+	return entry.count
+}
+
+type l2Stats struct {
+	mu             sync.Mutex
+	searched       map[string]int
+	noKeyword      int
+	noGroup        int
+	searchFailed   int
+	searchEmpty    int
+	groupMismatch  int
+	sizeMismatch   int
+	matched        int
+	siteResults    map[string]string
+}
+
+func newL2Stats() *l2Stats {
+	return &l2Stats{
+		searched:    make(map[string]int),
+		siteResults: make(map[string]string),
+	}
+}
+
+func (s *l2Stats) record(site string, result string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.searched[site]++
+	if _, ok := s.siteResults[site]; !ok {
+		s.siteResults[site] = result
+	}
+}
+
+func (s *l2Stats) log(e *Engine) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e.logger.Info("L2搜索验证统计",
+		zap.Int("searched", len(s.searched)),
+		zap.Int("noKeyword", s.noKeyword),
+		zap.Int("noGroup", s.noGroup),
+		zap.Int("searchFailed", s.searchFailed),
+		zap.Int("searchEmpty", s.searchEmpty),
+		zap.Int("groupMismatch", s.groupMismatch),
+		zap.Int("sizeMismatch", s.sizeMismatch),
+		zap.Int("matched", s.matched))
+	sites := make([]string, 0, len(s.siteResults))
+	for site := range s.siteResults {
+		sites = append(sites, site)
+	}
+	sort.Strings(sites)
+	for _, site := range sites {
+		e.logger.Info("L2站点统计",
+			zap.String("site", site),
+			zap.Int("searchCount", s.searched[site]),
+			zap.String("sampleResult", s.siteResults[site]))
+	}
 }
 
 type piecesHashCache struct {
-	bySite map[string]map[string]int
+	bySite       map[string]map[string]int
+	queriedSites map[string]bool
 }
 
 func (c *piecesHashCache) get(siteName, piecesHash string) (int, bool) {
@@ -39,6 +144,13 @@ func (c *piecesHashCache) get(siteName, piecesHash string) (int, bool) {
 	}
 	tid, ok := m[piecesHash]
 	return tid, ok
+}
+
+func (c *piecesHashCache) wasQueried(siteName string) bool {
+	if c == nil {
+		return false
+	}
+	return c.queriedSites[siteName]
 }
 
 // §33.32 — piecesHashSearcher is an optional capability interface.
@@ -74,15 +186,18 @@ type Engine struct {
 	iyuuService     model.IYUUService
 	fpRepo          *fingerprint.Repository
 	trackerResolver *TrackerSiteResolver
+	scheduler       *scheduler.Registry
+	limiter         *siteLimiter
 	mu              sync.RWMutex
 	tasks           map[uint]context.CancelFunc
 }
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 	return &Engine{
-		db:     db,
-		logger: logger,
-		tasks:  make(map[uint]context.CancelFunc),
+		db:      db,
+		logger:  logger,
+		limiter: newSiteLimiter(),
+		tasks:   make(map[uint]context.CancelFunc),
 	}
 }
 
@@ -104,6 +219,73 @@ func (e *Engine) SetIYUUService(svc model.IYUUService) {
 
 func (e *Engine) SetTrackerResolver(resolver *TrackerSiteResolver) {
 	e.trackerResolver = resolver
+}
+
+func (e *Engine) SetScheduler(registry *scheduler.Registry) {
+	e.scheduler = registry
+}
+
+func reseedSchedulerName(taskID uint) string {
+	return fmt.Sprintf("reseed_task_%d", taskID)
+}
+
+func (e *Engine) SyncTaskSchedule(ctx context.Context, task *model.ReseedTask) {
+	if e.scheduler == nil {
+		return
+	}
+	name := reseedSchedulerName(task.ID)
+	if !task.Enabled {
+		_ = e.scheduler.Unregister(name)
+		return
+	}
+	handler := func(ctx context.Context) error {
+		_, err := e.RunTask(ctx, task)
+		if err != nil {
+			e.logger.Warn("reseed task failed",
+				zap.Uint("task_id", task.ID),
+				zap.String("name", task.Name),
+				zap.Error(err))
+		}
+		e.db.WithContext(ctx).Model(task).Updates(map[string]interface{}{
+			"last_run_at": time.Now(),
+			"updated_at":  time.Now(),
+		})
+		return nil
+	}
+	if err := e.scheduler.Unregister(name); err == nil {
+	}
+	schedule := task.Schedule
+	if schedule == "" {
+		schedule = "0 */6 * * *"
+	}
+	if err := e.scheduler.Register(name, "reseed", schedule, handler); err != nil {
+		e.logger.Warn("failed to register reseed task schedule",
+			zap.Uint("task_id", task.ID),
+			zap.String("schedule", schedule),
+			zap.Error(err))
+	}
+}
+
+func (e *Engine) RemoveTaskSchedule(taskID uint) {
+	if e.scheduler == nil {
+		return
+	}
+	_ = e.scheduler.Unregister(reseedSchedulerName(taskID))
+}
+
+func (e *Engine) RegisterAllTaskSchedules(ctx context.Context) {
+	if e.scheduler == nil {
+		return
+	}
+	var tasks []model.ReseedTask
+	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&tasks).Error; err != nil {
+		e.logger.Warn("failed to load reseed tasks for scheduler", zap.Error(err))
+		return
+	}
+	for i := range tasks {
+		e.SyncTaskSchedule(ctx, &tasks[i])
+	}
+	e.logger.Info("reseed task schedules registered", zap.Int("count", len(tasks)))
 }
 
 func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []string) *preloadedSites {
@@ -138,6 +320,23 @@ func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []
 	var eligible []*model.SiteInfo
 	configs := make(map[string]*model.SiteConfig)
 	adapters := make(map[string]model.SiteAdapter)
+	siteLimits := make(map[string]*model.Site)
+
+	var siteNames []string
+	for _, info := range allSites {
+		if exclSet[info.Name] || !info.Enabled {
+			continue
+		}
+		siteNames = append(siteNames, info.Name)
+	}
+
+	if len(siteNames) > 0 {
+		var sites []model.Site
+		e.db.WithContext(ctx).Where("name IN ?", siteNames).Find(&sites)
+		for i := range sites {
+			siteLimits[sites[i].Name] = &sites[i]
+		}
+	}
 
 	for _, info := range allSites {
 		if exclSet[info.Name] || !info.Enabled {
@@ -162,9 +361,10 @@ func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []
 	}
 
 	return &preloadedSites{
-		infos:    eligible,
-		configs:  configs,
-		adapters: adapters,
+		infos:      eligible,
+		configs:    configs,
+		adapters:   adapters,
+		siteLimits: siteLimits,
 	}
 }
 
@@ -229,32 +429,43 @@ func (e *Engine) preloadFingerprints(ctx context.Context, infoHashes []string) *
 	return &fpCache{byKey: byKey}
 }
 
-func (e *Engine) preloadExistingMatches(ctx context.Context, infoHashes []string) map[string][]model.ReseedMatch {
+func (e *Engine) preloadExistingMatches(ctx context.Context, infoHashes []string, clientHashes map[string]bool) (map[string][]model.ReseedMatch, int) {
 	if len(infoHashes) == 0 {
-		return nil
+		return nil, 0
 	}
 
 	var matches []model.ReseedMatch
 	for _, chunk := range chunkStrings(infoHashes, preloadBatchSize) {
 		var partial []model.ReseedMatch
 		if err := e.db.WithContext(ctx).
-			Where("source_info_hash IN ? AND status IN ?", chunk, []model.ReseedMatchStatus{
-				model.MatchStatusMatched,
-				model.MatchStatusInjecting,
-				model.MatchStatusInjected,
-			}).
+			Where("source_info_hash IN ?", chunk).
 			Find(&partial).Error; err != nil {
 			e.logger.Warn("批量预加载已有匹配失败", zap.Error(err))
-			return make(map[string][]model.ReseedMatch)
+			return make(map[string][]model.ReseedMatch), 0
 		}
 		matches = append(matches, partial...)
 	}
 
+	deletedCount := 0
 	result := make(map[string][]model.ReseedMatch, len(matches))
 	for _, m := range matches {
+		switch m.Status {
+		case model.MatchStatusFailed:
+			continue
+		case model.MatchStatusInjected:
+			if m.TargetInfoHash != "" {
+				if clientHashes != nil && !clientHashes[m.TargetInfoHash] {
+					deletedCount++
+					continue
+				}
+			} else if clientHashes != nil {
+				deletedCount++
+				continue
+			}
+		}
 		result[m.SourceInfoHash] = append(result[m.SourceInfoHash], m)
 	}
-	return result
+	return result, deletedCount
 }
 
 func (e *Engine) preloadNegativeCache(ctx context.Context, infoHashes []string) map[string]map[string]bool {
@@ -285,7 +496,87 @@ func (e *Engine) preloadNegativeCache(ctx context.Context, infoHashes []string) 
 	return result
 }
 
-func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTorrent, ps *preloadedSites, fc *fpCache, negCache map[string]map[string]bool) *piecesHashCache {
+func (e *Engine) preflightCheck(ctx context.Context, ps *preloadedSites, concurrency int) {
+	if ps == nil || concurrency <= 0 {
+		return
+	}
+
+	type siteCheck struct {
+		name    string
+		baseURL string
+		domain  string
+		client  *http.Client
+	}
+
+	var checks []siteCheck
+	for _, siteInfo := range ps.infos {
+		config := ps.configs[siteInfo.Name]
+		if config == nil || config.BaseURL == "" || config.Domain == "" {
+			continue
+		}
+		if httpclient.IsDomainCircuitOpen(config.Domain) {
+			continue
+		}
+		checks = append(checks, siteCheck{
+			name:    siteInfo.Name,
+			baseURL: config.BaseURL,
+			domain:  config.Domain,
+			client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+				Domain:        config.Domain,
+				Timeout:       5 * time.Second,
+				ProxyURL:      config.ProxyURL,
+				SkipSSLVerify: config.SkipSSLVerify,
+			}),
+		})
+	}
+
+	if len(checks) == 0 {
+		return
+	}
+
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+	failed := 0
+
+	for _, c := range checks {
+		wg.Add(1)
+		go func(sc siteCheck) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
+
+			checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
+			req, err := http.NewRequestWithContext(checkCtx, http.MethodHead, sc.baseURL, nil)
+			if err != nil {
+				return
+			}
+			resp, err := sc.client.Do(req)
+			if err != nil {
+				httpclient.TripDomainCircuit(sc.domain)
+				e.logger.Warn("站点连接性检测失败，已熔断",
+					zap.String("site", sc.name),
+					zap.String("domain", sc.domain),
+					zap.Error(err))
+				failed++
+				return
+			}
+			resp.Body.Close()
+		}(c)
+	}
+	wg.Wait()
+
+	e.logger.Info("站点连接性检测完成",
+		zap.Int("total", len(checks)),
+		zap.Int("failed", failed))
+}
+
+func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTorrent, ps *preloadedSites, fc *fpCache, negCache map[string]map[string]bool, scanConcurrency int) *piecesHashCache {
 	if ps == nil || fc == nil || len(sources) == 0 {
 		return nil
 	}
@@ -301,6 +592,9 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 			continue
 		}
 		if siteConfig.Passkey == "" && siteConfig.Cookie == "" {
+			continue
+		}
+		if httpclient.IsDomainCircuitOpen(siteConfig.Domain) {
 			continue
 		}
 		adapter := ps.adapters[siteInfo.Name]
@@ -344,50 +638,119 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 		return nil
 	}
 
-	cache := &piecesHashCache{bySite: make(map[string]map[string]int)}
+	cache := &piecesHashCache{
+		bySite:       make(map[string]map[string]int),
+		queriedSites: make(map[string]bool),
+	}
 
+	type queryJob struct {
+		siteName string
+		config   *model.SiteConfig
+		searcher piecesHashSearcher
+		hashes   []string
+	}
+
+	var jobs []queryJob
 	for siteName, phMap := range sitePiecesHashes {
 		es := eligibleSites[siteName]
 		searcher := es.adapter.(piecesHashSearcher)
-
 		allHashes := make([]string, 0, len(phMap))
 		for ph := range phMap {
 			allHashes = append(allHashes, ph)
 		}
+		jobs = append(jobs, queryJob{
+			siteName: siteName,
+			config:   es.config,
+			searcher: searcher,
+			hashes:   allHashes,
+		})
+	}
 
-		const batchSize = 100
-		siteResults := make(map[string]int)
+	if scanConcurrency <= 0 {
+		scanConcurrency = 10
+	}
 
-		for i := 0; i < len(allHashes); i += batchSize {
-			end := i + batchSize
-			if end > len(allHashes) {
-				end = len(allHashes)
+	type queryResult struct {
+		siteName string
+		results  map[string]int
+		batchOK  int
+		queried  int
+	}
+
+	results := make([]queryResult, len(jobs))
+	sem := make(chan struct{}, scanConcurrency)
+	var wg sync.WaitGroup
+
+	for i, job := range jobs {
+		wg.Add(1)
+		go func(idx int, j queryJob) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
 			}
-			batch := allHashes[i:end]
+			defer func() {
+				if r := recover(); r != nil {
+					e.logger.Error("pieces_hash 查询 panic recovered",
+						zap.String("site", j.siteName),
+						zap.Any("panic", r))
+				}
+			}()
 
-			matches, err := searcher.SearchByPiecesHash(ctx, es.config, batch)
-			if err != nil {
-				e.logger.Warn("批量 pieces_hash 查询失败",
-					zap.String("site", siteName),
-					zap.Int("batch", i/batchSize+1),
-					zap.Int("totalBatches", (len(allHashes)+batchSize-1)/batchSize),
-					zap.Error(err))
-				continue
+			const batchSize = 100
+			siteResults := make(map[string]int)
+			batchOK := 0
+
+			for k := 0; k < len(j.hashes); k += batchSize {
+				end := k + batchSize
+				if end > len(j.hashes) {
+					end = len(j.hashes)
+				}
+				batch := j.hashes[k:end]
+
+				matches, err := j.searcher.SearchByPiecesHash(ctx, j.config, batch)
+				if err != nil {
+					e.logger.Warn("批量 pieces_hash 查询失败",
+						zap.String("site", j.siteName),
+						zap.Int("batch", k/batchSize+1),
+						zap.Int("totalBatches", (len(j.hashes)+batchSize-1)/batchSize),
+						zap.Error(err))
+					continue
+				}
+				batchOK++
+
+				for ph, tid := range matches {
+					siteResults[ph] = tid
+				}
 			}
 
-			for ph, tid := range matches {
-				siteResults[ph] = tid
+			results[idx] = queryResult{
+				siteName: j.siteName,
+				results:  siteResults,
+				batchOK:  batchOK,
+				queried:  len(j.hashes),
 			}
+		}(i, job)
+	}
+	wg.Wait()
+
+	for _, r := range results {
+		if r.siteName == "" {
+			continue
 		}
-
-		if len(siteResults) > 0 {
-			cache.bySite[siteName] = siteResults
+		if r.batchOK > 0 {
+			cache.queriedSites[r.siteName] = true
+		}
+		if len(r.results) > 0 {
+			cache.bySite[r.siteName] = r.results
 		}
 
 		e.logger.Info("pieces_hash 批量查询完成",
-			zap.String("site", siteName),
-			zap.Int("queried", len(allHashes)),
-			zap.Int("matched", len(siteResults)))
+			zap.String("site", r.siteName),
+			zap.Int("queried", r.queried),
+			zap.Int("matched", len(r.results)))
 	}
 
 	return cache
@@ -654,7 +1017,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		status := model.ReseedTaskCompleted
 		if ctx.Err() == context.Canceled {
 			status = model.ReseedTaskCancelled
-		} else if retErr != nil || (result.Failed > 0 && result.Matched == 0) {
+		} else if retErr != nil || (result.Failed > 0 && result.Injected == 0 && result.Matched == 0) {
 			status = model.ReseedTaskFailed
 		}
 		deferCtx, deferCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -678,19 +1041,30 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		return result, nil
 	}
 
+	e.retryFailedForTask(ctx, task, clientNames)
+
 	var sourceTorrents []sourceTorrent
+	clientHashes := make(map[string]bool)
+	seenSourceNames := make(map[string]bool)
 	for _, clientName := range clientNames {
 		dlClient, err := e.clientProvider.Get(clientName)
 		if err != nil {
 			e.logger.Warn("获取下载器失败", zap.String("client", clientName), zap.Error(err))
 			continue
 		}
-		torrents, err := dlClient.GetSeedingTorrents(ctx)
+		allTorrents, err := dlClient.GetAllTorrents(ctx)
 		if err != nil {
-			e.logger.Warn("获取做种种子失败", zap.String("client", clientName), zap.Error(err))
+			e.logger.Warn("获取所有种子失败", zap.String("client", clientName), zap.Error(err))
 			continue
 		}
-		for _, t := range torrents {
+		for _, t := range allTorrents {
+			clientHashes[t.Hash] = true
+			if t.Progress < 1.0 {
+				continue
+			}
+			if t.Name != "" && seenSourceNames[t.Name] {
+				continue
+			}
 			siteName := ""
 			if e.trackerResolver != nil {
 				siteName = e.trackerResolver.Resolve(t.TrackerURL)
@@ -698,6 +1072,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			if siteName == "" {
 				continue
 			}
+			seenSourceNames[t.Name] = true
 			sourceTorrents = append(sourceTorrents, sourceTorrent{
 				InfoHash: t.Hash,
 				SiteName: siteName,
@@ -747,18 +1122,36 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 
 	ps := e.preloadSites(ctx, targetSites, excludedSites)
 	fpCache := e.preloadFingerprints(ctx, infoHashes)
-	existingMatchesMap := e.preloadExistingMatches(ctx, infoHashes)
+	existingMatchesMap, deletedCount := e.preloadExistingMatches(ctx, infoHashes, clientHashes)
 	negCache := e.preloadNegativeCache(ctx, infoHashes)
 
 	var phCache *piecesHashCache
 	if hasMatchMethod(task.MatchMethods, "pieces_hash") {
-		phCache = e.preloadPiecesHashCache(ctx, sourceTorrents, ps, fpCache, negCache)
+		scanConc := task.ScanConcurrency
+		if scanConc <= 0 {
+			scanConc = 10
+		}
+		e.preflightCheck(ctx, ps, scanConc)
+		phCache = e.preloadPiecesHashCache(ctx, sourceTorrents, ps, fpCache, negCache, scanConc)
 	}
 
+	phSites := 0
+	if phCache != nil {
+		phSites = len(phCache.bySite)
+	}
 	e.logger.Info("preload 完成",
 		zap.Int("fpCache", len(fpCache.byKey)),
 		zap.Int("existingMatches", len(existingMatchesMap)),
-		zap.Int("piecesHashSites", len(phCache.bySite)))
+		zap.Int("deletedInClient", deletedCount),
+		zap.Int("piecesHashSites", phSites))
+
+	confirmedTargets := make(map[string]bool)
+	for _, matches := range existingMatchesMap {
+		for _, m := range matches {
+			key := m.TargetSite + ":" + m.TargetTorrentID
+			confirmedTargets[key] = true
+		}
+	}
 
 	var iyuuResults map[string][]*model.IYUUReseedResult
 	var iyuuSidMap map[int]string
@@ -767,7 +1160,11 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		iyuuSidMap = e.preloadIYUUSiteMappings(ctx)
 	}
 
+	l2s := newL2Stats()
+
 	matchCount := 0
+	seenPiecesHashes := make(map[string]bool)
+	injectedTargets := make(map[string]bool)
 	for _, src := range sourceTorrents {
 		if ctx.Err() != nil {
 			e.logger.Warn("辅种主循环 context 取消", zap.Error(ctx.Err()))
@@ -807,18 +1204,21 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			continue
 		}
 
-		if existingMatches := existingMatchesMap[src.InfoHash]; len(existingMatches) > 0 {
-			result.DuplicateExists += len(existingMatches)
-			continue
+		if fp := fpCache.get(src.InfoHash, src.SiteName); fp != nil && fp.PiecesHash != "" {
+			if seenPiecesHashes[fp.PiecesHash] {
+				result.Skipped++
+				continue
+			}
+			seenPiecesHashes[fp.PiecesHash] = true
 		}
 
-		candidates := e.findCandidates(ctx, src, ps, fpCache, sizeTolerance, task, negCache, phCache)
+		candidates := e.findCandidates(ctx, src, ps, fpCache, sizeTolerance, task, negCache, phCache, l2s, confirmedTargets)
 
 		if matchCount <= 10 {
 			e.logger.Info("findCandidates 结果",
 				zap.Int("idx", matchCount),
 				zap.String("src_site", src.SiteName),
-				zap.String("hash", src.InfoHash[:16]),
+				zap.String("hash", truncHash(src.InfoHash)),
 				zap.Int("candidates", len(candidates)))
 		}
 
@@ -841,6 +1241,18 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		var resultMu sync.Mutex
 
 		for _, c := range candidates {
+			targetKey := c.TargetSite + ":" + c.TargetTorrentID
+			if confirmedTargets[targetKey] {
+				resultMu.Lock()
+				result.DuplicateExists++
+				resultMu.Unlock()
+				continue
+			}
+			if injectedTargets[c.TargetTorrentID] {
+				continue
+			}
+			injectedTargets[c.TargetTorrentID] = true
+
 			resultMu.Lock()
 			totalCount := result.Injected + result.Failed + result.Matched
 			resultMu.Unlock()
@@ -853,6 +1265,25 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				result.Blocked++
 				resultMu.Unlock()
 				continue
+			}
+
+			if sl, ok := ps.siteLimits[c.TargetSite]; ok {
+				var limitCount int
+				if c.MatchMethod == "iyuu" {
+					limitCount = sl.IYUULimitCount
+					if limitCount <= 0 {
+						limitCount = sl.ReseedLimitCount
+					}
+				} else {
+					limitCount = sl.ReseedLimitCount
+				}
+				if limitCount > 0 && !e.limiter.checkAndIncr(c.TargetSite, limitCount) {
+					e.logger.Debug("站点辅种达到每日上限，跳过",
+						zap.String("targetSite", c.TargetSite),
+						zap.Int("limit", limitCount),
+					)
+					continue
+				}
 			}
 
 			decision := model.DecisionMatch
@@ -872,7 +1303,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			match := &model.ReseedMatch{
 				ClientID:        src.ClientID,
 				SourceSite:      src.SiteName,
-				SourceTorrentID: "",
+				SourceTorrentID: src.InfoHash,
 				SourceInfoHash:  src.InfoHash,
 				TargetSite:      c.TargetSite,
 				TargetTorrentID: c.TargetTorrentID,
@@ -929,12 +1360,28 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				resultMu.Unlock()
 			}(match)
 
-			if task.InjectionIntervalS > 0 {
+			siteInterval := 0
+			if sl, ok := ps.siteLimits[c.TargetSite]; ok {
+				if c.MatchMethod == "iyuu" {
+					if sl.IYUULimitInterval > 0 {
+						siteInterval = sl.IYUULimitInterval
+					} else if sl.ReseedLimitInterval > 0 {
+						siteInterval = sl.ReseedLimitInterval
+					}
+				} else if sl.ReseedLimitInterval > 0 {
+					siteInterval = sl.ReseedLimitInterval
+				}
+			}
+			effectiveInterval := task.InjectionIntervalS
+			if siteInterval > effectiveInterval {
+				effectiveInterval = siteInterval
+			}
+			if effectiveInterval > 0 {
 				jitter := 0
 				if task.InjectionJitterS > 0 {
 					jitter = rand.IntN(task.InjectionJitterS) //nolint:gosec // jitter does not need crypto/rand
 				}
-				interval := time.Duration(task.InjectionIntervalS+jitter) * time.Second
+				interval := time.Duration(effectiveInterval+jitter) * time.Second
 				timer := time.NewTimer(interval)
 				select {
 				case <-timer.C:
@@ -948,68 +1395,122 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		wg.Wait()
 	}
 
+	l2s.log(e)
 	return result, nil
 }
 
-func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool, phCache *piecesHashCache) []model.Candidate {
+func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool, phCache *piecesHashCache, l2s *l2Stats, confirmedTargets map[string]bool) []model.Candidate {
 	if ps == nil {
 		return nil
 	}
 
-	var candidates []model.Candidate
-
-	for _, siteInfo := range ps.infos {
-		if ctx.Err() == context.Canceled {
-			break
-		}
+	matchSingleSite := func(siteInfo *model.SiteInfo) *model.Candidate {
 		if siteInfo.Name == src.SiteName {
-			continue
+			return nil
 		}
-
 		if negCache != nil && negCache[src.InfoHash] != nil && negCache[src.InfoHash][siteInfo.Name] {
-			continue
+			return nil
 		}
-
 		siteConfig := ps.configs[siteInfo.Name]
 		if siteConfig == nil {
-			continue
+			return nil
 		}
 		adapter := ps.adapters[siteInfo.Name]
 		if adapter == nil {
-			continue
+			return nil
+		}
+		if httpclient.IsDomainCircuitOpen(siteConfig.Domain) {
+			return nil
 		}
 
-		var c *model.Candidate
-
 		if hasMatchMethod(task.MatchMethods, "pieces_hash") {
-			c = e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, phCache)
+			c := e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, phCache)
 			if c != nil {
-				candidates = append(candidates, *c)
-				continue
+				targetKey := siteInfo.Name + ":" + c.TargetTorrentID
+				if confirmedTargets != nil && confirmedTargets[targetKey] {
+					return nil
+				}
+				if !e.verifyL0Size(ctx, adapter, siteConfig, fc.get(src.InfoHash, src.SiteName), c.TargetTorrentID, siteInfo.Name) {
+					c = nil
+				} else {
+					return c
+				}
 			}
 		}
 
 		if hasMatchMethod(task.MatchMethods, "file_tree") {
-			c = e.matchLayer15FileTree(ctx, src.InfoHash, src.SiteName, siteInfo.Name, fc)
+			c := e.matchLayer15FileTree(ctx, src.InfoHash, src.SiteName, siteInfo.Name, fc)
 			if c != nil {
-				candidates = append(candidates, *c)
-				continue
+				return c
 			}
 		}
 
 		if hasMatchMethod(task.MatchMethods, "size_title") {
-			c = e.matchLayer2SizeTitle(ctx, adapter, siteConfig, src.InfoHash, src.SiteName, siteInfo.Name, sizeTolerance, fc)
-			if c != nil {
-				candidates = append(candidates, *c)
-				continue
+			if phCache != nil && phCache.wasQueried(siteInfo.Name) {
+				// pieces_hash batch query already ran for this site and found no match.
+				// pieces_hash is a precise content index; L2 title search would only
+				// find different-content torrents (false positives). Skip L2, try L3.
+			} else {
+				c := e.matchLayer2SearchVerify(ctx, adapter, siteConfig, src.InfoHash, src.SiteName, siteInfo.Name, fc, l2s)
+				if c != nil {
+					return c
+				}
 			}
 		}
 
 		if hasMatchMethod(task.MatchMethods, "fingerprint") {
-			c = e.matchLayer3Fingerprint(ctx, src.InfoHash, src.SiteName, siteInfo.Name, fc)
+			c := e.matchLayer3Fingerprint(ctx, src.InfoHash, src.SiteName, siteInfo.Name, fc)
 			if c != nil {
-				candidates = append(candidates, *c)
+				return c
 			}
+		}
+
+		return nil
+	}
+
+	concurrency := task.ScanConcurrency
+	if concurrency <= 0 {
+		concurrency = 5
+	}
+
+	results := make([]*model.Candidate, len(ps.infos))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, concurrency)
+
+	for i, si := range ps.infos {
+		if ctx.Err() != nil {
+			break
+		}
+		wg.Add(1)
+		go func(idx int, siteInfo *model.SiteInfo) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
+			defer func() {
+				if r := recover(); r != nil {
+					e.logger.Error("matchSingleSite panic recovered",
+						zap.String("site", siteInfo.Name),
+						zap.Any("panic", r))
+				}
+			}()
+			results[idx] = matchSingleSite(siteInfo)
+		}(i, si)
+	}
+	wg.Wait()
+
+	var candidates []model.Candidate
+	seenTargets := make(map[string]bool)
+	for _, c := range results {
+		if c == nil {
+			continue
+		}
+		if !seenTargets[c.TargetTorrentID] {
+			seenTargets[c.TargetTorrentID] = true
+			candidates = append(candidates, *c)
 		}
 	}
 
@@ -1034,6 +1535,44 @@ func (e *Engine) matchLayer0FromCache(sourceInfoHash, sourceSiteName, siteName s
 		Confidence:      1.0,
 		MatchMethod:     "pieces_hash",
 	}
+}
+
+func (e *Engine) verifyL0Size(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, fp *model.ContentFingerprint, targetTorrentID string, siteName string) bool {
+	if fp == nil || fp.TotalSize == 0 {
+		return true
+	}
+	results, err := adapter.SearchTorrents(ctx, config, targetTorrentID, nil)
+	if err != nil {
+		e.logger.Debug("L0 size验证搜索失败，放行",
+			zap.String("site", siteName),
+			zap.String("torrentID", targetTorrentID),
+			zap.Error(err))
+		return true
+	}
+	var targetSize int64
+	found := false
+	for _, r := range results {
+		if r.TorrentID == targetTorrentID {
+			targetSize = r.Size
+			found = true
+			break
+		}
+	}
+	if !found {
+		e.logger.Debug("L0 size验证未找到目标种子，放行",
+			zap.String("site", siteName),
+			zap.String("torrentID", targetTorrentID))
+		return true
+	}
+	if !CompareSizeDisplay(fp.TotalSize, targetSize) {
+		e.logger.Warn("L0 pieces_hash命中但size不匹配，降级",
+			zap.String("site", siteName),
+			zap.String("torrentID", targetTorrentID),
+			zap.Int64("sourceSize", fp.TotalSize),
+			zap.Int64("targetSize", targetSize))
+		return false
+	}
+	return true
 }
 
 func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
@@ -1079,75 +1618,110 @@ func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAd
 }
 
 func (e *Engine) matchLayer2SizeTitle(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, sizeTolerance float64, fc *fpCache) *model.Candidate {
+	return e.matchLayer2SearchVerify(ctx, adapter, config, sourceInfoHash, sourceSiteName, siteName, fc, nil)
+}
+
+func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache, l2s *l2Stats) *model.Candidate {
 	fp := fc.get(sourceInfoHash, sourceSiteName)
-	if fp == nil {
+	if fp == nil || fp.Title == "" {
 		return nil
 	}
 
-	keyword := NormalizeTitle(fp.Title)
+	keyword := ExtractSearchKeyword(fp.Title)
 	if keyword == "" {
+		if l2s != nil {
+			l2s.mu.Lock()
+			l2s.noKeyword++
+			l2s.mu.Unlock()
+		}
 		return nil
 	}
 
-	if e.fpRepo != nil {
-		if cache, err := e.fpRepo.GetSearchCache(ctx, siteName, keyword, fp.TotalSize); err == nil {
-			var cached []model.Candidate
-			if json.Unmarshal([]byte(cache.Results), &cached) == nil && len(cached) > 0 {
-				best := &cached[0]
-				best.TargetSite = siteName
-				return best
-			}
-			return nil
+	groupName := ExtractGroupName(fp.Title)
+	if groupName == "" {
+		if l2s != nil {
+			l2s.mu.Lock()
+			l2s.noGroup++
+			l2s.mu.Unlock()
 		}
+		return nil
 	}
 
 	results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
 	if err != nil {
-		e.logger.Debug("Layer2 搜索失败", zap.String("site", siteName), zap.String("keyword", keyword), zap.Error(err))
+		if l2s != nil {
+			l2s.record(siteName, "搜索失败")
+			l2s.mu.Lock()
+			l2s.searchFailed++
+			l2s.mu.Unlock()
+		}
 		return nil
 	}
 
-	var best *model.Candidate
+	if len(results) == 0 {
+		if l2s != nil {
+			l2s.record(siteName, "搜索无结果")
+			l2s.mu.Lock()
+			l2s.searchEmpty++
+			l2s.mu.Unlock()
+		}
+		return nil
+	}
+
+	var filteredByGroup, filteredBySize, filteredByEmptyID int
 	for _, r := range results {
 		if r.TorrentID == "" {
+			filteredByEmptyID++
 			continue
 		}
-
-		input := MatchInput{
-			SourceSize: fp.TotalSize,
-			TargetSize: r.Size,
+		if !strings.Contains(r.Title, groupName) {
+			filteredByGroup++
+			continue
 		}
-		decision := MatchDecision(input, sizeTolerance)
-
-		if decision == model.DecisionMatch || decision == model.DecisionMatchSizeOnly || decision == model.DecisionSameInfoHash {
-			confidence := 0.7
-			if decision == model.DecisionMatch {
-				confidence = 0.85
-			} else if decision == model.DecisionSameInfoHash {
-				confidence = 1.0
-			}
-			if best == nil || confidence > best.Confidence {
-				best = &model.Candidate{
-					TargetSite:      siteName,
-					TargetTorrentID: r.TorrentID,
-					Confidence:      confidence,
-					MatchMethod:     "size_title",
-				}
-			}
+		if !CompareSizeDisplay(fp.TotalSize, r.Size) {
+			filteredBySize++
+			continue
 		}
-	}
-
-	if e.fpRepo != nil {
-		var toCache []model.Candidate
-		if best != nil {
-			toCache = []model.Candidate{*best}
+		if l2s != nil {
+			l2s.record(siteName, "命中")
+			l2s.mu.Lock()
+			l2s.matched++
+			l2s.mu.Unlock()
 		}
-		if err := e.fpRepo.SaveSearchCache(ctx, siteName, keyword, fp.TotalSize, toCache); err != nil {
-			e.logger.Debug("Layer2 保存搜索缓存失败", zap.String("site", siteName), zap.Error(err))
+		e.logger.Info("L2命中",
+			zap.String("site", siteName),
+			zap.String("keyword", keyword),
+			zap.String("groupName", groupName),
+			zap.String("targetTorrentID", r.TorrentID),
+			zap.String("targetTitle", r.Title),
+			zap.Int64("targetSize", r.Size),
+			zap.Int64("sourceSize", fp.TotalSize))
+		return &model.Candidate{
+			TargetSite:      siteName,
+			TargetTorrentID: r.TorrentID,
+			Confidence:      0.95,
+			MatchMethod:     "search_verify",
 		}
 	}
 
-	return best
+	e.logger.Info("L2搜索未匹配",
+		zap.String("site", siteName),
+		zap.String("keyword", keyword),
+		zap.String("groupName", groupName),
+		zap.Int("results", len(results)),
+		zap.Int("noTorrentID", filteredByEmptyID),
+		zap.Int("groupMismatch", filteredByGroup),
+		zap.Int("sizeMismatch", filteredBySize))
+	if l2s != nil {
+		reason := fmt.Sprintf("未匹配(group=%d,size=%d)", filteredByGroup, filteredBySize)
+		l2s.record(siteName, reason)
+		l2s.mu.Lock()
+		l2s.groupMismatch += filteredByGroup
+		l2s.sizeMismatch += filteredBySize
+		l2s.mu.Unlock()
+	}
+
+	return nil
 }
 
 func (e *Engine) matchLayer15FileTree(ctx context.Context, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
@@ -1326,6 +1900,128 @@ func NormalizeTitle(title string) string {
 	return title
 }
 
+var resolutionKeywords = []string{"2160p", "1080p", "720p", "480p"}
+
+func ExtractSearchKeyword(title string) string {
+	if title == "" {
+		return ""
+	}
+	rest := stripChinesePrefix(title)
+	if rest == "" {
+		return ""
+	}
+	return truncateToResolution(rest)
+}
+
+func stripChinesePrefix(title string) string {
+	i := 0
+	inBracket := false
+	for i < len(title) {
+		r, size := utf8.DecodeRuneInString(title[i:])
+		if r == '[' || r == '【' {
+			inBracket = true
+			i += size
+			continue
+		}
+		if inBracket && (r == ']' || r == '】') {
+			inBracket = false
+			i += size
+			if i < len(title) {
+				r2, _ := utf8.DecodeRuneInString(title[i:])
+				if r2 == '.' || r2 == ' ' || r2 == ']' || r2 == '】' {
+					i++
+				}
+			}
+			continue
+		}
+		if inBracket {
+			i += size
+			continue
+		}
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return title[i:]
+		}
+		if r == '.' || r == ' ' || r == '+' || r == '-' || r == '_' {
+			prev := i
+			i += size
+			found := false
+			for i < len(title) {
+				r2, size2 := utf8.DecodeRuneInString(title[i:])
+				if (r2 >= 'a' && r2 <= 'z') || (r2 >= 'A' && r2 <= 'Z') || (r2 >= '0' && r2 <= '9') {
+					found = true
+					break
+				}
+				if r2 == '.' || r2 == ' ' || r2 == '+' || r2 == '-' || r2 == '_' {
+					i += size2
+					continue
+				}
+				break
+			}
+			if !found {
+				return ""
+			}
+			return title[prev:]
+		}
+		i += size
+	}
+	return ""
+}
+
+func truncateToResolution(s string) string {
+	lower := strings.ToLower(s)
+	bestIdx := -1
+	bestEnd := 0
+	for _, kw := range resolutionKeywords {
+		idx := strings.Index(lower, kw)
+		if idx >= 0 && (bestIdx < 0 || idx < bestIdx) {
+			bestIdx = idx
+			bestEnd = idx + len(kw)
+		}
+	}
+	if bestIdx < 0 {
+		return ""
+	}
+	return s[:bestEnd]
+}
+
+func ExtractGroupName(title string) string {
+	if title == "" {
+		return ""
+	}
+	// Remove file extension
+	clean := title
+	for _, ext := range []string{".mkv", ".mp4", ".avi", ".ts", ".wmv", ".flv"} {
+		if strings.HasSuffix(strings.ToLower(clean), ext) {
+			clean = clean[:len(clean)-len(ext)]
+			break
+		}
+	}
+	// Find last '-'
+	lastDash := strings.LastIndex(clean, "-")
+	if lastDash < 0 || lastDash >= len(clean)-1 {
+		return ""
+	}
+	group := clean[lastDash+1:]
+	group = strings.TrimSpace(group)
+	if group == "" {
+		return ""
+	}
+	return group
+}
+
+func CompareSizeDisplay(sourceBytes, resultBytes int64) bool {
+	const gb = 1073741824.0
+	const mb = 1048576.0
+	if sourceBytes >= int64(gb) || resultBytes >= int64(gb) {
+		sGB := math.Round(float64(sourceBytes)/gb*100) / 100
+		rGB := math.Round(float64(resultBytes)/gb*100) / 100
+		return sGB == rGB
+	}
+	sMB := math.Round(float64(sourceBytes)/mb*100) / 100
+	rMB := math.Round(float64(resultBytes)/mb*100) / 100
+	return sMB == rMB
+}
+
 func (e *Engine) CreateTask(ctx context.Context, task *model.ReseedTask) error {
 	task.Status = model.ReseedTaskIdle
 	return dbimpl.ForceCreate(e.db.WithContext(ctx), task)
@@ -1376,27 +2072,41 @@ func (e *Engine) ListEnabled(ctx context.Context) ([]model.ReseedTask, error) {
 }
 
 func (e *Engine) BatchSaveMatches(ctx context.Context, matches []*model.ReseedMatch) error {
-	return e.db.WithContext(ctx).Create(matches).Error
+	return e.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "client_id"},
+			{Name: "source_site"},
+			{Name: "source_torrent_id"},
+			{Name: "target_site"},
+			{Name: "target_torrent_id"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"updated_at", "target_info_hash", "match_method", "confidence",
+			"decision_type", "status", "fail_reason",
+		}),
+	}).Create(matches).Error
 }
 
-func (e *Engine) FindPendingRetry(ctx context.Context, limit int) ([]model.ReseedMatch, error) {
+func (e *Engine) retryFailedForTask(ctx context.Context, task *model.ReseedTask, clientNames []string) {
+	maxRetries := task.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+	retryInterval := time.Duration(task.RetryIntervalH) * time.Hour
+	if retryInterval <= 0 {
+		retryInterval = 24 * time.Hour
+	}
+
 	var matches []model.ReseedMatch
 	err := e.db.WithContext(ctx).
-		Where("status = ? AND retry_count < ?", model.MatchStatusFailed, 5).
+		Where("status = ? AND retry_count < ?", model.MatchStatusFailed, maxRetries).
+		Where("client_id IN ?", clientNames).
 		Where("next_retry_at IS NULL OR next_retry_at <= ?", time.Now()).
 		Order("next_retry_at ASC").
-		Limit(limit).
+		Limit(50).
 		Find(&matches).Error
-	return matches, err
-}
-
-func (e *Engine) RetryFailedMatches(ctx context.Context) (int, int, error) {
-	matches, err := e.FindPendingRetry(ctx, 50)
-	if err != nil {
-		return 0, 0, err
-	}
-	if len(matches) == 0 {
-		return 0, 0, nil
+	if err != nil || len(matches) == 0 {
+		return
 	}
 
 	siteSet := make(map[string]bool)
@@ -1410,10 +2120,8 @@ func (e *Engine) RetryFailedMatches(ctx context.Context) (int, int, error) {
 
 	ps := e.preloadSites(ctx, targetSites, nil)
 	if ps == nil {
-		return len(matches), 0, reseedError(ErrReseedConfig, "preload sites for retry failed", nil)
+		return
 	}
-
-	defaultTask := &model.ReseedTask{ReseedCategory: "cross-seed"}
 
 	retried, succeeded := 0, 0
 	for i := range matches {
@@ -1421,13 +2129,8 @@ func (e *Engine) RetryFailedMatches(ctx context.Context) (int, int, error) {
 			break
 		}
 		m := &matches[i]
-
-		if e.clientProvider == nil {
-			continue
-		}
-
-		if err := e.injectMatch(ctx, m, defaultTask, ps); err != nil {
-			nextRetry := time.Now().Add(24 * time.Hour)
+		if err := e.injectMatch(ctx, m, task, ps); err != nil {
+			nextRetry := time.Now().Add(retryInterval)
 			e.db.WithContext(ctx).Model(m).Updates(map[string]interface{}{
 				"next_retry_at": &nextRetry,
 			})
@@ -1441,12 +2144,17 @@ func (e *Engine) RetryFailedMatches(ctx context.Context) (int, int, error) {
 			select {
 			case <-time.After(2 * time.Second):
 			case <-ctx.Done():
-				return retried, succeeded, nil
+				break
 			}
 		}
 	}
 
-	return retried, succeeded, nil
+	if retried > 0 {
+		e.logger.Info("辅种重试完成",
+			zap.Uint("task_id", task.ID),
+			zap.Int("retried", retried),
+			zap.Int("succeeded", succeeded))
+	}
 }
 
 func (e *Engine) UpdateMatchStatus(ctx context.Context, id uint, status string, failReason string) error {
@@ -1461,7 +2169,19 @@ func (e *Engine) UpdateMatchStatus(ctx context.Context, id uint, status string, 
 }
 
 func (e *Engine) SaveMatch(ctx context.Context, match *model.ReseedMatch) error {
-	return e.db.WithContext(ctx).Create(match).Error
+	return e.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "client_id"},
+			{Name: "source_site"},
+			{Name: "source_torrent_id"},
+			{Name: "target_site"},
+			{Name: "target_torrent_id"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"updated_at", "target_info_hash", "match_method", "confidence",
+			"decision_type", "status", "fail_reason",
+		}),
+	}).Create(match).Error
 }
 
 func (e *Engine) FindMatchesByInfoHash(ctx context.Context, infoHash string) ([]model.ReseedMatch, error) {
@@ -1527,7 +2247,12 @@ func (e *Engine) SetNegativeCache(ctx context.Context, sourceSite, sourceInfoHas
 		LayerDepth:      layerDepth,
 		ExpiresAt:       time.Now().Add(ttl),
 	}
-	return e.db.WithContext(ctx).Create(entry).Error
+	return e.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "source_info_hash"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"excluded_targets", "last_method", "layer_depth", "expires_at",
+		}),
+	}).Create(entry).Error
 }
 
 func (e *Engine) GetNegativeCacheByHashes(ctx context.Context, hashes []string) ([]model.ReseedNegativeCache, error) {
@@ -1577,11 +2302,14 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 	infoHashes := []string{record.InfoHash}
 	fpc := e.preloadFingerprints(ctx, infoHashes)
 	negCache := e.preloadNegativeCache(ctx, infoHashes)
-	existingMatchesMap := e.preloadExistingMatches(ctx, infoHashes)
+	existingMatchesMap, _ := e.preloadExistingMatches(ctx, infoHashes, nil)
 
-	if len(existingMatchesMap[record.InfoHash]) > 0 {
-		e.logger.Debug("auto reseed: already matched", zap.String("info_hash", record.InfoHash))
-		return
+	confirmedTargets := make(map[string]bool)
+	for _, matches := range existingMatchesMap {
+		for _, m := range matches {
+			key := m.TargetSite + ":" + m.TargetTorrentID
+			confirmedTargets[key] = true
+		}
 	}
 
 	var recTitle string
@@ -1604,7 +2332,7 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 		SiteName: record.SiteName,
 		ClientID: record.ClientID,
 	}
-	candidates := e.findCandidates(ctx, src, ps, fpc, task.SizeTolerancePercent, task, negCache, nil)
+	candidates := e.findCandidates(ctx, src, ps, fpc, task.SizeTolerancePercent, task, negCache, nil, nil, nil)
 	if len(candidates) == 0 {
 		e.logger.Debug("auto reseed: no candidates found", zap.String("info_hash", record.InfoHash))
 		return
@@ -1615,6 +2343,10 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 		zap.Int("count", len(candidates)))
 
 	for _, c := range candidates {
+		targetKey := c.TargetSite + ":" + c.TargetTorrentID
+		if confirmedTargets[targetKey] {
+			continue
+		}
 		for _, clientID := range reseedClientIDs {
 			match := &model.ReseedMatch{
 				ClientID:        clientID,
@@ -1656,58 +2388,28 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 	}
 }
 
-func (e *Engine) RunEnabledTasks(ctx context.Context) error {
-	var tasks []model.ReseedTask
-	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&tasks).Error; err != nil {
-		return reseedError(ErrReseedDB, "query enabled reseed tasks", err)
+func allowedReseedRole(role string) bool {
+	return role == "download" || role == "master_reseed" || role == "reseed"
+}
+
+func (e *Engine) ValidateClientRoles(ctx context.Context, clientIDs string) error {
+	parts := ParseClientIDs(clientIDs)
+	if len(parts) == 0 {
+		return fmt.Errorf("client_ids 为空")
 	}
-
-	if len(tasks) == 0 {
-		return nil
+	uintIDs := partsToUint(parts)
+	if len(uintIDs) == 0 {
+		return fmt.Errorf("client_ids 格式无效")
 	}
-
-	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-	now := time.Now()
-
-	for i := range tasks {
-		scheduleStr := tasks[i].Schedule
-		if scheduleStr == "" {
-			scheduleStr = "0 0 */6 * * *"
-		}
-		if parts := strings.Fields(scheduleStr); len(parts) == 5 {
-			scheduleStr = "0 " + scheduleStr
-		}
-
-		sched, err := parser.Parse(scheduleStr)
-		if err != nil {
-			e.logger.Warn("invalid reseed task schedule, running immediately",
-				zap.Uint("task_id", tasks[i].ID),
-				zap.String("schedule", tasks[i].Schedule),
-				zap.Error(err))
-		} else {
-			var nextRun time.Time
-			if tasks[i].LastRunAt != nil {
-				nextRun = sched.Next(*tasks[i].LastRunAt)
-			}
-			if !nextRun.IsZero() && nextRun.After(now) {
-				continue
-			}
-		}
-
-		if _, err := e.RunTask(ctx, &tasks[i]); err != nil {
-			e.logger.Warn("reseed task failed",
-				zap.Uint("task_id", tasks[i].ID),
-				zap.String("name", tasks[i].Name),
-				zap.Error(err),
-			)
-		}
-
-		e.db.WithContext(ctx).Model(&tasks[i]).Updates(map[string]interface{}{
-			"last_run_at": now,
-			"updated_at":  now,
-		})
+	var clients []model.ClientConfig
+	if err := e.db.WithContext(ctx).Select("id, name, role").Where("id IN ?", uintIDs).Find(&clients).Error; err != nil {
+		return fmt.Errorf("查询下载器失败: %w", err)
 	}
-
+	for _, c := range clients {
+		if !allowedReseedRole(c.Role) {
+			return fmt.Errorf("下载器 %s（ID=%d）角色为 %s，辅种任务仅允许 download 或 master_reseed 角色的下载器", c.Name, c.ID, c.Role)
+		}
+	}
 	return nil
 }
 
@@ -1716,9 +2418,16 @@ func (e *Engine) resolveClientIDsToNames(ctx context.Context, ids string) []stri
 	if len(parts) == 0 {
 		return nil
 	}
+	uintIDs := partsToUint(parts)
+	if len(uintIDs) == 0 {
+		return parts
+	}
 	var clients []model.ClientConfig
-	if err := e.db.WithContext(ctx).Select("id, name").Where("id IN ?", partsToUint(parts)).Find(&clients).Error; err != nil {
+	if err := e.db.WithContext(ctx).Select("id, name").Where("id IN ?", uintIDs).Find(&clients).Error; err != nil {
 		e.logger.Warn("resolve client IDs to names failed", zap.Error(err))
+		return parts
+	}
+	if len(clients) == 0 {
 		return parts
 	}
 	names := make([]string, 0, len(clients))
@@ -1733,9 +2442,16 @@ func (e *Engine) resolveSiteIDsToNames(ctx context.Context, ids string) []string
 	if len(parts) == 0 {
 		return nil
 	}
+	uintIDs := partsToUint(parts)
+	if len(uintIDs) == 0 {
+		return parts
+	}
 	var sites []model.Site
-	if err := e.db.WithContext(ctx).Select("id, name").Where("id IN ?", partsToUint(parts)).Find(&sites).Error; err != nil {
+	if err := e.db.WithContext(ctx).Select("id, name").Where("id IN ?", uintIDs).Find(&sites).Error; err != nil {
 		e.logger.Warn("resolve site IDs to names failed", zap.Error(err))
+		return parts
+	}
+	if len(sites) == 0 {
 		return parts
 	}
 	names := make([]string, 0, len(sites))
@@ -1743,6 +2459,13 @@ func (e *Engine) resolveSiteIDsToNames(ctx context.Context, ids string) []string
 		names = append(names, s.Name)
 	}
 	return names
+}
+
+func truncHash(h string) string {
+	if len(h) > 16 {
+		return h[:16]
+	}
+	return h
 }
 
 func partsToUint(parts []string) []uint {
@@ -1768,6 +2491,14 @@ func ParseClientIDs(ids string) []string {
 		}
 	}
 	return result
+}
+
+func parseTags(tagsStr string, defaults ...string) []string {
+	tags := ParseClientIDs(tagsStr)
+	if len(tags) == 0 {
+		return defaults
+	}
+	return tags
 }
 
 func checkPublishEligibility(title string) bool {
@@ -1808,6 +2539,10 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		return e.failMatch(ctx, match, fmt.Sprintf("目标站配置未预加载: %s", match.TargetSite))
 	}
 
+	if httpclient.IsDomainCircuitOpen(targetConfig.Domain) {
+		return e.failMatch(ctx, match, fmt.Sprintf("目标站熔断中: %s", match.TargetSite))
+	}
+
 	targetAdapter := ps.adapters[match.TargetSite]
 	if targetAdapter == nil {
 		return e.failMatch(ctx, match, fmt.Sprintf("目标站适配器未预加载: %s", match.TargetSite))
@@ -1825,7 +2560,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 
 	opts := model.AddTorrentOptions{
 		Category: task.ReseedCategory,
-		Tags:     []string{"reseed", "pt-forward"},
+		Tags:     parseTags(task.ReseedTags, "reseed", "pt-forward"),
 		Paused:   true,
 	}
 
@@ -1843,18 +2578,23 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "already") || strings.Contains(err.Error(), "exist") {
-			return e.failMatch(ctx, match, "种子已存在于下载器中")
+			e.logger.Info("辅种种子添加返回已存在（error 路径），验证下载器中是否真的存在",
+				zap.Uint("matchID", match.ID))
+			return e.verifyDuplicateAndFinish(ctx, dlClient, match, "")
 		}
 		return e.failMatch(ctx, match, fmt.Sprintf("注入种子到下载器失败: %v", err))
+	}
+
+	if addResult.IsDuplicate {
+		e.logger.Info("辅种种子添加返回已存在（duplicate），验证下载器中是否真的存在",
+			zap.Uint("matchID", match.ID),
+			zap.String("hash", addResult.InfoHash))
+		return e.verifyDuplicateAndFinish(ctx, dlClient, match, addResult.InfoHash)
 	}
 
 	infoHash := addResult.InfoHash
 	if infoHash == "" {
 		return e.failMatch(ctx, match, "注入后未获取到 InfoHash")
-	}
-
-	if err := dlClient.Recheck(ctx, infoHash); err != nil {
-		return e.failMatch(ctx, match, fmt.Sprintf("触发校验失败: %v", err))
 	}
 
 	recheckErr := e.waitForRecheck(ctx, dlClient, infoHash, 120*time.Second)
@@ -1876,9 +2616,49 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	}).Error
 }
 
+func (e *Engine) verifyDuplicateAndFinish(ctx context.Context, dlClient model.DownloaderClient, match *model.ReseedMatch, infoHash string) error {
+	checkHash := infoHash
+	if checkHash == "" {
+		checkHash = match.TargetInfoHash
+	}
+	if checkHash == "" {
+		checkHash = match.SourceInfoHash
+	}
+
+	if checkHash != "" {
+		torrent, err := dlClient.GetTorrentByHash(ctx, checkHash)
+		if err != nil {
+			e.logger.Warn("验证重复种子时查询下载器失败，放行",
+				zap.Uint("matchID", match.ID),
+				zap.String("hash", checkHash),
+				zap.Error(err))
+		} else if torrent == nil {
+			e.logger.Info("辅种种子被标记为重复但下载器中不存在，跳过",
+				zap.Uint("matchID", match.ID),
+				zap.String("hash", checkHash))
+			return e.failMatch(ctx, match, "种子被下载器标记为重复但实际不存在于活动列表")
+		}
+	}
+
+	now := time.Now()
+	updates := map[string]interface{}{
+		"status":        model.MatchStatusInjected,
+		"injected_at":   &now,
+		"decision_type": string(model.DecisionAlreadyExists),
+		"updated_at":    now,
+	}
+	if infoHash != "" {
+		updates["target_info_hash"] = infoHash
+	}
+	return e.db.WithContext(ctx).Model(match).Updates(updates).Error
+}
+
 func (e *Engine) waitForRecheck(ctx context.Context, dlClient model.DownloaderClient, infoHash string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	interval := 3 * time.Second
+	gracePeriod := 15 * time.Second
+	startTime := time.Now()
+
 	for time.Now().Before(deadline) {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -1888,15 +2668,18 @@ func (e *Engine) waitForRecheck(ctx context.Context, dlClient model.DownloaderCl
 		if err != nil || ti == nil {
 			continue
 		}
-		if ti.State == "checking" || ti.State == "queuedDL" || ti.State == "metaDL" {
+		if strings.HasPrefix(ti.State, "checking") {
 			continue
 		}
 		if ti.Progress >= 1.0 {
 			return nil
 		}
-		return fmt.Errorf("校验完成，进度 %.1f%%，状态 %s，文件不完整，已暂停", ti.Progress*100, ti.State)
+		if time.Since(startTime) < gracePeriod {
+			continue
+		}
+		return fmt.Errorf("数据未通过校验，进度 %.1f%%，状态 %s，请手动检查", ti.Progress*100, ti.State)
 	}
-	return fmt.Errorf("校验超时（%v），已暂停", timeout)
+	return fmt.Errorf("校验超时（%v），请手动检查", timeout)
 }
 
 func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason string) error {
@@ -1905,8 +2688,6 @@ func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason
 
 	decisionType := model.DecisionDownloadFailed
 	switch {
-	case strings.Contains(reason, "已存在"):
-		decisionType = model.DecisionAlreadyExists
 	case strings.Contains(reason, "禁转") || strings.Contains(reason, "独占"):
 		decisionType = model.DecisionBlockedRelease
 	}
@@ -1921,15 +2702,13 @@ func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason
 		e.logger.Error("failMatch update db error", zap.Uint("matchID", match.ID), zap.Error(err))
 	}
 
-	ttl := 24 * time.Hour
-	switch decisionType {
-	case model.DecisionAlreadyExists:
-		ttl = 72 * time.Hour
-	case model.DecisionBlockedRelease:
-		ttl = 168 * time.Hour
-	}
-	if err := e.SetNegativeCache(ctx, match.SourceSite, match.SourceInfoHash, match.TargetSite, match.MatchMethod, 1, ttl); err != nil {
-		e.logger.Debug("set negative cache failed", zap.Uint("matchID", match.ID), zap.Error(err))
+	// 不设负面缓存：瞬态失败（限流/超时/站点故障）允许快速重试。
+	// 种子不存在的情况由 pieces_hash API 自然处理——下次查询不会返回已删除的种子。
+	// 仅对禁转/独占设置长 TTL 负面缓存。
+	if decisionType == model.DecisionBlockedRelease {
+		if err := e.SetNegativeCache(ctx, match.SourceSite, match.SourceInfoHash, match.TargetSite, match.MatchMethod, 1, 168*time.Hour); err != nil {
+			e.logger.Debug("set negative cache failed", zap.Uint("matchID", match.ID), zap.Error(err))
+		}
 	}
 
 	return reseedError(ErrReseedGeneric, reason, nil)

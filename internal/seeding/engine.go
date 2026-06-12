@@ -22,6 +22,7 @@ const (
 	scoringCutoffHours = 72 * time.Hour
 	syncGracePeriod    = 15 * time.Minute
 	syncHardTimeout    = 2 * time.Hour
+	sqliteVarLimit     = 500
 )
 
 func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
@@ -73,12 +74,18 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 		e.logger.Info("synced stale seeding records",
 			zap.String("client_id", clientID),
 			zap.Int("stale_count", len(staleHashes)))
-		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-			Where("client_id = ? AND info_hash IN ?", clientID, staleHashes).
-			Updates(map[string]interface{}{
-				"status":     model.SeedingStatusDeleted,
-				"updated_at": time.Now(),
-			})
+		for i := 0; i < len(staleHashes); i += sqliteVarLimit {
+			end := i + sqliteVarLimit
+			if end > len(staleHashes) {
+				end = len(staleHashes)
+			}
+			e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+				Where("client_id = ? AND info_hash IN ?", clientID, staleHashes[i:end]).
+				Updates(map[string]interface{}{
+					"status":     model.SeedingStatusDeleted,
+					"updated_at": time.Now(),
+				})
+		}
 	}
 
 	var orphanHashes []string
@@ -90,11 +97,19 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 	}
 
 	var existingRecords []model.SeedingTorrentRecord
-	if dbErr := e.db.WithContext(ctx).
-		Where("client_id = ? AND LOWER(info_hash) IN ? AND status = ?", clientID, orphanHashes, model.SeedingStatusDeleted).
-		Find(&existingRecords).Error; dbErr != nil {
-		e.logger.Warn("syncStale: query orphan records failed", zap.String("client_id", clientID), zap.Error(dbErr))
-		return
+	for i := 0; i < len(orphanHashes); i += sqliteVarLimit {
+		end := i + sqliteVarLimit
+		if end > len(orphanHashes) {
+			end = len(orphanHashes)
+		}
+		var partial []model.SeedingTorrentRecord
+		if dbErr := e.db.WithContext(ctx).
+			Where("client_id = ? AND LOWER(info_hash) IN ? AND status = ?", clientID, orphanHashes[i:end], model.SeedingStatusDeleted).
+			Find(&partial).Error; dbErr != nil {
+			e.logger.Warn("syncStale: query orphan records failed", zap.String("client_id", clientID), zap.Error(dbErr))
+			return
+		}
+		existingRecords = append(existingRecords, partial...)
 	}
 
 	if len(existingRecords) > 0 {
@@ -121,13 +136,19 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 			e.logger.Info("recovering orphan torrents: deleted records still present in downloader",
 				zap.String("client_id", clientID),
 				zap.Int("count", len(recoverHashes)))
-			e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-				Where("client_id = ? AND info_hash IN ?", clientID, recoverHashes).
-				Updates(map[string]interface{}{
-					"status":         model.SeedingStatusSeeding,
-					"last_action_by": "",
-					"updated_at":     time.Now(),
-				})
+			for i := 0; i < len(recoverHashes); i += sqliteVarLimit {
+				end := i + sqliteVarLimit
+				if end > len(recoverHashes) {
+					end = len(recoverHashes)
+				}
+				e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+					Where("client_id = ? AND info_hash IN ?", clientID, recoverHashes[i:end]).
+					Updates(map[string]interface{}{
+						"status":         model.SeedingStatusSeeding,
+						"last_action_by": "",
+						"updated_at":     time.Now(),
+					})
+			}
 
 			e.mu.Lock()
 			for _, hash := range recoverHashes {

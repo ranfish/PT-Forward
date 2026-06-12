@@ -111,7 +111,14 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 		return nil, &model.AppError{Code: 15001, Message: "返回了 HTML 页面而非种子文件，下载链接可能有误"}
 	}
 
-	return io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
+	if err != nil {
+		return nil, downloadError("读取种子数据失败", err)
+	}
+	if len(data) == 0 {
+		return nil, &model.AppError{Code: 15001, Message: "种子数据为空"}
+	}
+	return data, nil
 }
 
 func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {

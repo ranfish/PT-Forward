@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -87,7 +88,13 @@ func (s *Service) Ping(ctx context.Context) error {
 }
 
 func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*model.IYUUReseedResult, error) {
-	if len(infoHashes) == 0 {
+	var cleaned []string
+	for _, h := range infoHashes {
+		if h != "" {
+			cleaned = append(cleaned, h)
+		}
+	}
+	if len(cleaned) == 0 {
 		return nil, nil
 	}
 
@@ -96,62 +103,144 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 		return nil, err
 	}
 
-	hashJSON, err := json.Marshal(infoHashes)
-	if err != nil {
-		return nil, iyuuError(ErrIYUUAPI, "marshal info_hashes", err)
-	}
-
-	sha1Hash := fmt.Sprintf("%x", sha1.Sum(hashJSON)) //nolint:gosec // SHA1 required by IYUU API protocol
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
-
-	form := url.Values{}
-	form.Set("hash", string(hashJSON))
-	form.Set("sha1", sha1Hash)
-	form.Set("timestamp", ts)
-	form.Set("version", cfg.Version)
 	if sidSha1 := s.getSidSha1(); sidSha1 == "" {
 		if err := s.ensureSidSha1(ctx); err != nil {
 			s.logger.Warn("failed to ensure sid_sha1, querying without it", zap.Error(err))
 		}
 	}
-	if sidSha1 := s.getSidSha1(); sidSha1 != "" {
-		form.Set("sid_sha1", sidSha1)
-	}
+	sidSha1 := s.getSidSha1()
 
-	u := cfg.BaseURL + "/reseed/index/index"
-	var resp iyuuRestReseedResponse
-	if err := s.doPostFormWithToken(ctx, u, cfg.Token, form, &resp); err != nil {
-		return nil, iyuuError(ErrIYUUHTTP, "query reseed", err)
-	}
+	infoHashes = cleaned
 
-	if resp.Code == 404 {
-		return []*model.IYUUReseedResult{}, nil
-	}
+	const batchSize = 200
+	var allResults []*model.IYUUReseedResult
 
-	if resp.Code != 0 {
-		return nil, iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU query error: %s", resp.Msg), nil)
-	}
-
-	var dataMap map[string][]iyuuReseedTarget
-	if len(resp.Data) > 0 && resp.Data[0] == '{' {
-		if err := json.Unmarshal(resp.Data, &dataMap); err != nil {
-			return nil, iyuuError(ErrIYUUAPI, "decode reseed data", err)
+	for i := 0; i < len(infoHashes); i += batchSize {
+		end := i + batchSize
+		if end > len(infoHashes) {
+			end = len(infoHashes)
 		}
+		batch := make([]string, end-i)
+		copy(batch, infoHashes[i:end])
+		sort.Strings(batch)
+
+		hashJSON, err := json.Marshal(batch)
+		if err != nil {
+			return nil, iyuuError(ErrIYUUAPI, "marshal info_hashes batch", err)
+		}
+
+		sha1Hash := fmt.Sprintf("%x", sha1.Sum(hashJSON)) //nolint:gosec // SHA1 required by IYUU API protocol
+		ts := strconv.FormatInt(time.Now().Unix(), 10)
+
+		form := url.Values{}
+		form.Set("hash", string(hashJSON))
+		form.Set("sha1", sha1Hash)
+		form.Set("timestamp", ts)
+		form.Set("version", cfg.Version)
+		if sidSha1 != "" {
+			form.Set("sid_sha1", sidSha1)
+		}
+
+		u := cfg.BaseURL + "/reseed/index/index"
+		var resp iyuuRestReseedResponse
+		if err := s.doPostFormWithToken(ctx, u, cfg.Token, form, &resp); err != nil {
+			s.logger.Warn("IYUU batch query failed",
+				zap.Int("batch", i/batchSize+1),
+				zap.Int("from", i),
+				zap.Int("to", end),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		if resp.Code == 404 {
+			s.logger.Info("IYUU batch returned 404 (no matches)",
+				zap.Int("batch", i/batchSize+1),
+				zap.Int("batchSize", len(batch)),
+			)
+			continue
+		}
+
+		if resp.Code != 0 {
+			s.logger.Warn("IYUU batch query error",
+				zap.Int("batch", i/batchSize+1),
+				zap.String("msg", resp.Msg),
+				zap.Int("code", resp.Code),
+			)
+			continue
+		}
+
+		batchResults, err := s.parseReseedData(resp.Data)
+		if err != nil {
+			s.logger.Warn("IYUU batch decode failed",
+				zap.Int("batch", i/batchSize+1),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		s.logger.Info("IYUU batch result",
+			zap.Int("batch", i/batchSize+1),
+			zap.Int("batchSize", len(batch)),
+			zap.Int("results", len(batchResults)),
+		)
+
+		allResults = append(allResults, batchResults...)
+	}
+
+	return allResults, nil
+}
+
+func (s *Service) parseReseedData(data json.RawMessage) ([]*model.IYUUReseedResult, error) {
+	if len(data) == 0 || data[0] != '{' {
+		return nil, nil
+	}
+
+	var dataMap map[string]json.RawMessage
+	if err := json.Unmarshal(data, &dataMap); err != nil {
+		return nil, iyuuError(ErrIYUUAPI, "decode reseed data outer", err)
 	}
 
 	results := make([]*model.IYUUReseedResult, 0, len(dataMap))
-	for hash, targets := range dataMap {
+	for hash, raw := range dataMap {
 		result := &model.IYUUReseedResult{
 			SourceInfoHash: hash,
 		}
-		for _, t := range targets {
-			result.Targets = append(result.Targets, model.IYUUTarget{
-				Sid:       t.Sid,
-				TorrentID: t.TorrentID,
-				InfoHash:  t.InfoHash,
-			})
+
+		var targets []iyuuReseedTarget
+		if err := json.Unmarshal(raw, &targets); err == nil && len(targets) > 0 {
+			for _, t := range targets {
+				tid, _ := t.TorrentID.Int64()
+				result.Targets = append(result.Targets, model.IYUUTarget{
+					Sid:       t.Sid,
+					TorrentID: int(tid),
+					InfoHash:  t.InfoHash,
+					Group:     t.Group,
+				})
+			}
+		} else {
+			var wrapper iyuuReseedDataWrapper
+			if err := json.Unmarshal(raw, &wrapper); err != nil {
+				s.logger.Info("skip unparseable reseed entry",
+					zap.String("hash", hash),
+					zap.Error(err),
+				)
+				continue
+			}
+			for _, t := range wrapper.Torrent {
+				tid, _ := t.TorrentID.Int64()
+				result.Targets = append(result.Targets, model.IYUUTarget{
+					Sid:       t.Sid,
+					TorrentID: int(tid),
+					InfoHash:  t.InfoHash,
+					Group:     t.Group,
+				})
+			}
 		}
-		results = append(results, result)
+
+		if len(result.Targets) > 0 {
+			results = append(results, result)
+		}
 	}
 
 	return results, nil
@@ -456,9 +545,14 @@ type iyuuSitesData struct {
 }
 
 type iyuuReseedTarget struct {
-	Sid       int    `json:"sid"`
-	TorrentID int    `json:"torrent_id"`
-	InfoHash  string `json:"info_hash"`
+	Sid       int            `json:"sid"`
+	TorrentID json.Number    `json:"torrent_id"`
+	InfoHash  string         `json:"info_hash"`
+	Group     int            `json:"group"`
+}
+
+type iyuuReseedDataWrapper struct {
+	Torrent []iyuuReseedTarget `json:"torrent"`
 }
 
 type iyuuSiteRaw struct {

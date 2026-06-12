@@ -119,8 +119,8 @@ func TestWAFDetector_RateLimitText(t *testing.T) {
 	}
 	resp.Body = newStringBody(body)
 	dur := detector.Detect(resp)
-	if dur != 60*time.Second {
-		t.Errorf("expected 60s freeze for rate limit text, got %v", dur)
+	if dur != 25*time.Second {
+		t.Errorf("expected 25s freeze for rate limit text, got %v", dur)
 	}
 }
 
@@ -145,8 +145,8 @@ func TestWAFDetector_EmptyResponse(t *testing.T) {
 		Body:       newStringBody("   "),
 	}
 	dur := detector.Detect(resp)
-	if dur != 60*time.Second {
-		t.Errorf("expected 60s for empty response, got %v", dur)
+	if dur != 25*time.Second {
+		t.Errorf("expected 25s for empty response, got %v", dur)
 	}
 }
 

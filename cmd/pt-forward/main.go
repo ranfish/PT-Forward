@@ -290,6 +290,7 @@ func main() {
 	eventDispatcher.Register("rss_new", torrentDispatcher)
 
 	taskRegistry := scheduler.NewRegistry(log)
+	reseedEngine.SetScheduler(taskRegistry)
 
 	router := api.NewRouter(
 		authManager,
@@ -351,7 +352,7 @@ func main() {
 
 	syncManager := scheduler.NewSyncManager(setting.NewRuntimeConfig(settingsRepo, log), log)
 	statsSyncSvc := site.NewStatsSyncService(db, adapterFactory, log)
-	registerSchedulerTasks(taskRegistry, syncManager, siteProvider, clientManager, rssEngine, seedingEngine, reseedEngine, publishPipeline, lifecycleManager, seedingConfirmation, freeWaitMonitor, statsSyncSvc, notifyService, settingsRepo, db, log)
+	registerSchedulerTasks(taskRegistry, syncManager, siteProvider, clientManager, rssEngine, seedingEngine, publishPipeline, lifecycleManager, seedingConfirmation, freeWaitMonitor, statsSyncSvc, notifyService, settingsRepo, db, log)
 	api.ApplySchedulerOverrides(ctx, db, taskRegistry, log)
 
 	if err := clientManager.LoadClients(ctx); err != nil {
@@ -377,6 +378,7 @@ func main() {
 	if err := taskRegistry.Start(ctx); err != nil {
 		log.Error("failed to start task registry", zap.Error(err))
 	}
+	reseedEngine.RegisterAllTaskSchedules(ctx)
 	syncManager.Start(ctx)
 	sideLoadMgr.Start(ctx)
 
@@ -689,7 +691,6 @@ func registerSchedulerTasks(
 	clientMgr *client.Manager,
 	rssEngine *rss.Engine,
 	seedingEngine *seeding.Engine,
-	reseedEngine *reseed.Engine,
 	publishPipeline *publish.Pipeline,
 	lifecycleMgr *publish.LifecycleManager,
 	seedingConfirm *publish.SeedingConfirmation,
@@ -709,46 +710,29 @@ func registerSchedulerTasks(
 		}
 	}
 
-	register("client_ping", "maintenance", "0 */5 * * * *", func(ctx context.Context) error {
+	register("client_ping", "maintenance", "*/5 * * * *", func(ctx context.Context) error {
 		clientMgr.PingAll(ctx)
 		return nil
 	})
 
-	register("publish_pending", "publish", "0 */30 * * * *", func(ctx context.Context) error {
+	register("publish_pending", "publish", "*/30 * * * *", func(ctx context.Context) error {
 		return publishPipeline.ProcessPending(ctx)
 	})
 
-	register("publish_groups", "publish", "0 */60 * * * *", func(ctx context.Context) error {
+	register("publish_groups", "publish", "*/60 * * * *", func(ctx context.Context) error {
 		return publishPipeline.ProcessPendingGroups(ctx)
 	})
 
-	register("publish_lifecycle", "publish", "0 */30 * * * *", func(ctx context.Context) error {
+	register("publish_lifecycle", "publish", "*/30 * * * *", func(ctx context.Context) error {
 		_, err := lifecycleMgr.CheckOnce(ctx)
 		return err
 	})
 
-	register("publish_seeding_confirm", "publish", "0 */15 * * * *", func(ctx context.Context) error {
+	register("publish_seeding_confirm", "publish", "*/15 * * * *", func(ctx context.Context) error {
 		return seedingConfirm.CheckOnce(ctx, clientMgr)
 	})
 
-	register("reseed_tasks", "reseed", "0 */5 * * * *", func(ctx context.Context) error {
-		return reseedEngine.RunEnabledTasks(ctx)
-	})
-
-	register("reseed_retry", "reseed", "0 0 */1 * * *", func(ctx context.Context) error {
-		retried, succeeded, err := reseedEngine.RetryFailedMatches(ctx)
-		if err != nil {
-			return err
-		}
-		if retried > 0 {
-			log.Info("reseed retry processed",
-				zap.Int("retried", retried),
-				zap.Int("succeeded", succeeded))
-		}
-		return nil
-	})
-
-	register("seeding_cleanup", "seeding", "0 0 */6 * * *", func(ctx context.Context) error {
+	register("seeding_cleanup", "seeding", "0 */6 * * *", func(ctx context.Context) error {
 		cleaned, err := seedingEngine.CleanupStale(ctx)
 		if err != nil {
 			return err
@@ -759,7 +743,7 @@ func registerSchedulerTasks(
 		return nil
 	})
 
-	register("seeding_auto_delete", "seeding", "0 */30 * * * *", func(ctx context.Context) error {
+	register("seeding_auto_delete", "seeding", "*/30 * * * *", func(ctx context.Context) error {
 		configs, err := seedingEngine.ListConfigs(ctx)
 		if err != nil {
 			return err
@@ -782,20 +766,20 @@ func registerSchedulerTasks(
 		return nil
 	})
 
-	register("seeding_traffic_stats", "seeding", "0 */10 * * * *", func(ctx context.Context) error {
+	register("seeding_traffic_stats", "seeding", "*/10 * * * *", func(ctx context.Context) error {
 		return seedingEngine.CollectTrafficStats(ctx)
 	})
 
-	register("rss_disk_budget_expire", "rss", "0 */5 * * * *", func(_ context.Context) error {
+	register("rss_disk_budget_expire", "rss", "*/5 * * * *", func(_ context.Context) error {
 		rssEngine.ExpireDiskBudget()
 		return nil
 	})
 
-	register("rss_recheck_waiting", "rss", "0 */15 * * * *", func(ctx context.Context) error {
+	register("rss_recheck_waiting", "rss", "*/15 * * * *", func(ctx context.Context) error {
 		return rssEngine.RecheckWaiting(ctx)
 	})
 
-	register("cookiecloud_sync", "maintenance", "0 */5 * * * *", func(ctx context.Context) error {
+	register("cookiecloud_sync", "maintenance", "*/5 * * * *", func(ctx context.Context) error {
 		var cfg model.CookieCloudConfig
 		if err := db.WithContext(ctx).First(&cfg).Error; err != nil {
 			return nil
@@ -823,7 +807,7 @@ func registerSchedulerTasks(
 		return nil
 	})
 
-	register("rss_cleanup_old_seen", "maintenance", "0 0 3 * * *", func(ctx context.Context) error {
+	register("rss_cleanup_old_seen", "maintenance", "0 3 * * *", func(ctx context.Context) error {
 		cleaned, err := rssEngine.CleanupOldData(ctx)
 		if err != nil {
 			return err
@@ -834,7 +818,7 @@ func registerSchedulerTasks(
 		return nil
 	})
 
-	register("traffic_data_cleanup", "maintenance", "0 0 3 * * *", func(ctx context.Context) error {
+	register("traffic_data_cleanup", "maintenance", "0 3 * * *", func(ctx context.Context) error {
 		retentionDays := 30
 		if v, err := settingsRepo.Get(ctx, setting.KeyTorrentTrafficRetentionDays); err == nil && v != "" {
 			if d, pErr := strconv.Atoi(v); pErr == nil && d >= 7 {
@@ -853,12 +837,12 @@ func registerSchedulerTasks(
 		return nil
 	})
 
-	register("notification_cleanup_history", "maintenance", "0 0 4 * * *", func(ctx context.Context) error {
+	register("notification_cleanup_history", "maintenance", "0 4 * * *", func(ctx context.Context) error {
 		return notifyService.CleanupHistory(ctx, 30)
 	})
 
 	if statsSync != nil {
-		register("site_stats_sync", "maintenance", "0 0 */6 * * *", func(ctx context.Context) error {
+		register("site_stats_sync", "maintenance", "0 */6 * * *", func(ctx context.Context) error {
 			synced, failedSites := statsSync.SyncAllSites(ctx)
 			if synced > 0 || len(failedSites) > 0 {
 				log.Info("site stats sync completed", zap.Int("synced", synced), zap.Int("failed", len(failedSites)), zap.Strings("failedSites", failedSites))
@@ -868,7 +852,7 @@ func registerSchedulerTasks(
 	}
 
 	if freeWaitMonitor != nil && siteProvider != nil {
-		register("seeding_free_wait_check", "seeding", "0 */15 * * * *", func(ctx context.Context) error {
+		register("seeding_free_wait_check", "seeding", "*/15 * * * *", func(ctx context.Context) error {
 			processed := seedingEngine.FreeWaitCheckOnce(ctx)
 			if processed > 0 {
 				log.Info("free wait check completed", zap.Int("processed", processed))

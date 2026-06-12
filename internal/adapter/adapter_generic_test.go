@@ -441,11 +441,11 @@ func TestGenericAdapter_DownloadTorrent_EmptyBody(t *testing.T) {
 	config.Paths.Detail = "/dl?id={id}"
 
 	data, err := a.DownloadTorrent(context.Background(), config, "1")
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error for empty body")
 	}
-	if len(data) != 0 {
-		t.Errorf("expected empty body, got %d bytes", len(data))
+	if data != nil {
+		t.Errorf("expected nil data, got %d bytes", len(data))
 	}
 }
 

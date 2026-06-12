@@ -117,7 +117,7 @@
           </a-col>
           <a-col :span="12">
             <a-form-item :label="t('reseed.maxInjectionsPerRun')" name="maxInjectionsPerRun">
-              <a-input-number v-model:value="form.maxInjectionsPerRun" :min="1" :max="1000" style="width: 100%" placeholder="100" />
+              <a-input-number v-model:value="form.maxInjectionsPerRun" :min="0" :max="10000" style="width: 100%" placeholder="0" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -137,6 +137,11 @@
           <a-col :span="12">
             <a-form-item :label="t('reseed.reseedCategory')" name="reseedCategory">
               <a-input v-model:value="form.reseedCategory" placeholder="cross-seed" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="辅种标签" name="reseedTags">
+              <a-input v-model:value="form.reseedTags" placeholder="reseed,pt-forward" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -264,7 +269,7 @@ async function fetchDownloaders() {
   try {
     const resp = await downloadersApi.list(1, 200)
     const items: ClientConfig[] = resp.data?.data?.items || resp.data?.data || []
-    downloaders.value = items.filter(d => d.role === 'download' || d.role === 'reseed')
+    downloaders.value = items.filter(d => d.role === 'download' || d.role === 'master_reseed' || d.role === 'reseed')
   } catch {
     downloaders.value = []
   } finally {
@@ -306,8 +311,9 @@ const defaultForm = {
   sizeTolerancePercent: 1.0,
   confidenceThreshold: 0.7,
   schedule: '0 */6 * * *',
-  maxInjectionsPerRun: 100,
+  maxInjectionsPerRun: 0,
   reseedCategory: 'cross-seed',
+  reseedTags: 'reseed,pt-forward',
   targetSiteExcludes: '',
   releaseGroupExcludes: '',
   categoryExcludes: '',
@@ -316,9 +322,9 @@ const defaultForm = {
   fallbackEnabled: true,
   maxFallbacks: 3,
   engineMode: 'seed_feature',
-  injectionIntervalS: 15,
+  injectionIntervalS: 1,
   injectionJitterS: 5,
-  injectionConcurrency: 3,
+  injectionConcurrency: 10,
   scanConcurrency: 5,
   maxRetries: 3,
   retryIntervalH: 24,
@@ -354,8 +360,9 @@ function openModal(record?: ReseedTask) {
       sizeTolerancePercent: record.size_tolerance_percent ?? 1.0,
       confidenceThreshold: record.confidence_threshold ?? 0.7,
       schedule: record.schedule || '0 */6 * * *',
-      maxInjectionsPerRun: record.max_injections_per_run ?? 100,
+      maxInjectionsPerRun: record.max_injections_per_run ?? 0,
       reseedCategory: record.reseed_category || 'cross-seed',
+      reseedTags: record.reseed_tags || 'reseed,pt-forward',
       targetSiteExcludes: record.target_site_excludes || '',
       releaseGroupExcludes: record.release_group_excludes || '',
       categoryExcludes: record.category_excludes || '',
@@ -364,9 +371,9 @@ function openModal(record?: ReseedTask) {
       fallbackEnabled: record.fallback_enabled ?? true,
       maxFallbacks: record.max_fallbacks ?? 3,
       engineMode: record.engine_mode || 'seed_feature',
-      injectionIntervalS: record.injection_interval_s ?? 15,
+      injectionIntervalS: record.injection_interval_s ?? 1,
       injectionJitterS: record.injection_jitter_s ?? 5,
-      injectionConcurrency: record.injection_concurrency ?? 3,
+      injectionConcurrency: record.injection_concurrency ?? 10,
       scanConcurrency: record.scan_concurrency ?? 5,
       maxRetries: record.max_retries ?? 3,
       retryIntervalH: record.retry_interval_h ?? 24,

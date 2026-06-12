@@ -172,7 +172,6 @@ type ReseedTaskRepository interface {
 type ReseedMatchRepository interface {
 	BatchSaveMatches(ctx context.Context, matches []*ReseedMatch) error
 	FindMatchesByInfoHash(ctx context.Context, infoHash string) ([]ReseedMatch, error)
-	FindPendingRetry(ctx context.Context, limit int) ([]ReseedMatch, error)
 	UpdateMatchStatus(ctx context.Context, id uint, status string, failReason string) error
 }
 

@@ -89,7 +89,7 @@ var builtinWAFPatterns = []wafPattern{
 			body := peekBody(resp, 512)
 			return len(strings.TrimSpace(body)) == 0
 		},
-		FreezeDur: 60 * time.Second,
+		FreezeDur: 25 * time.Second,
 	},
 	{
 		Name: "rate_limit_text",
@@ -104,7 +104,7 @@ var builtinWAFPatterns = []wafPattern{
 				strings.Contains(lower, "请求过于频繁") ||
 				strings.Contains(lower, "访问频率过高")
 		},
-		FreezeDur: 60 * time.Second,
+		FreezeDur: 25 * time.Second,
 	},
 }
 
