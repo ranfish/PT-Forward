@@ -113,6 +113,11 @@
           </a-sub-menu>
         </a-menu-item-group>
       </a-menu>
+      <div class="sidebar-version">
+        <span>FE {{ frontendVersion }}</span>
+        <span style="margin: 0 2px">/</span>
+        <span>BE {{ backendVersion }}</span>
+      </div>
     </a-layout-sider>
 
     <a-layout>
@@ -175,12 +180,16 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import { useWebSocketStore } from '@/stores/websocket'
+import { systemApi } from '@/api/system'
 
 const { t, locale } = useI18n()
 const route = useRoute()
 const authStore = useAuthStore()
 const { toggle: toggleTheme } = useTheme()
 const wsStore = useWebSocketStore()
+
+const frontendVersion = __APP_VERSION__
+const backendVersion = ref('-')
 
 function switchLocale(lang: string) {
   locale.value = lang
@@ -216,6 +225,9 @@ watch(
 
 onMounted(() => {
   wsStore.connect()
+  systemApi.health().then((resp) => {
+    backendVersion.value = resp.data?.data?.version || '-'
+  }).catch(() => {})
 })
 </script>
 
@@ -229,6 +241,15 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 1px;
+}
+
+.sidebar-version {
+  padding: 8px 16px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  font-family: monospace;
+  margin-top: auto;
 }
 
 .header {
