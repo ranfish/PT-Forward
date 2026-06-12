@@ -15,7 +15,7 @@ export interface AuditLog {
 
 export const systemApi = {
   health() {
-    return client.get<ApiResponse<{ status: string }>>('/system/health')
+    return client.get<ApiResponse<{ status: string; version: string; uptime: string }>>('/system/health')
   },
   info() {
     return client.get<ApiResponse<{ version: string; buildTime: string; goVersion: string }>>('/system/info')
