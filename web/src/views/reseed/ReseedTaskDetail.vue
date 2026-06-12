@@ -13,7 +13,7 @@
           <a-descriptions-item :label="t('common.status')">{{ translateReseedStatus(task.status) }}</a-descriptions-item>
           <a-descriptions-item :label="t('reseed.sourceSite')">{{ resolveSiteIDs(task.source_site_ids) }}</a-descriptions-item>
           <a-descriptions-item :label="t('reseed.targetSite')">{{ resolveSiteIDs(task.target_site_ids) }}</a-descriptions-item>
-          <a-descriptions-item :label="t('reseed.client')">{{ task.client_ids }}</a-descriptions-item>
+          <a-descriptions-item :label="t('reseed.client')">{{ resolveDownloaderIDs(task.client_ids) }}</a-descriptions-item>
           <a-descriptions-item :label="t('common.createdAt')">{{ formatTime(task.created_at) }}</a-descriptions-item>
         </a-descriptions>
 
@@ -75,6 +75,7 @@ import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { reseedApi } from '@/api/reseed'
 import { sitesApi } from '@/api/sites'
+import { downloadersApi } from '@/api/downloaders'
 import { formatTime, copyToClipboard } from '@/utils/format'
 import { useEnumLabels } from '@/utils/enumLabels'
 
@@ -84,6 +85,7 @@ const { t } = useI18n()
 const { translateReseedStatus } = useEnumLabels()
 
 const siteMap = ref<Record<string, string>>({})
+const downloaderMap = ref<Record<string, string>>({})
 
 async function fetchSiteMap() {
   try {
@@ -97,9 +99,26 @@ async function fetchSiteMap() {
   } catch { /* ignore */ }
 }
 
+async function fetchDownloaderMap() {
+  try {
+    const resp = await downloadersApi.list(1, 200)
+    const items = resp.data?.data?.items || resp.data?.data || []
+    const m: Record<string, string> = {}
+    for (const d of items) {
+      m[String(d.id)] = d.name
+    }
+    downloaderMap.value = m
+  } catch { /* ignore */ }
+}
+
 function resolveSiteIDs(ids: string): string {
   if (!ids) return '-'
   return ids.split(',').map(id => siteMap.value[id.trim()] || id).join(', ')
+}
+
+function resolveDownloaderIDs(ids: string): string {
+  if (!ids) return '-'
+  return ids.split(',').map(id => downloaderMap.value[id.trim()] || id).join(', ')
 }
 
 function copyHash(text: string) {
@@ -200,6 +219,7 @@ async function deleteNegativeCache() {
 
 onMounted(() => {
   fetchSiteMap()
+  fetchDownloaderMap()
   fetchTask()
   fetchMatches()
 })

@@ -11,6 +11,7 @@
       :columns="columns"
       :data-source="pagination.data.value"
       :loading="pagination.loading.value"
+      :scroll="{ x: 800 }"
       :pagination="{
         current: pagination.currentPage.value,
         pageSize: pagination.pageSize.value,
@@ -22,6 +23,9 @@
       @change="(pag: { current: number; pageSize: number }) => pagination.onPageChange(pag.current, pag.pageSize)"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'client_ids'">
+          {{ resolveDownloaderIDs(record.client_ids) }}
+        </template>
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ translateReseedStatus(record.status) }}</a-tag>
         </template>
@@ -294,6 +298,11 @@ function filterOption(input: string, option: any) {
   return String(label).toLowerCase().includes(input.toLowerCase())
 }
 
+function resolveDownloaderIDs(ids: string): string {
+  if (!ids) return '-'
+  return ids.split(',').map(id => downloaderMap.value[id.trim()] || id).join(', ')
+}
+
 function selectAllSource() {
   form.sourceSiteIds = sourceSites.value.map(s => String(s.id))
 }
@@ -332,13 +341,21 @@ const defaultForm = {
 
 const form = reactive({ ...defaultForm })
 
+const downloaderMap = computed(() => {
+  const m: Record<string, string> = {}
+  for (const d of downloaders.value) {
+    m[String(d.id)] = d.name
+  }
+  return m
+})
+
 const columns = [
-  { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: t('common.name'), dataIndex: 'name', key: 'name' },
-  { title: t('reseed.client'), dataIndex: 'client_ids', key: 'client_ids', ellipsis: true },
-  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100 },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
-  { title: t('common.actions'), key: 'actions', width: 240 },
+  { title: 'ID', dataIndex: 'id', key: 'id', width: 50 },
+  { title: t('common.name'), dataIndex: 'name', key: 'name', width: 150, ellipsis: true },
+  { title: t('reseed.client'), dataIndex: 'client_ids', key: 'client_ids', width: 120 },
+  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 80 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 160, customRender: ({ text }: { text: string }) => formatTime(text) },
+  { title: t('common.actions'), key: 'actions', width: 220 },
 ]
 
 const pagination = usePagination((page, size) => reseedApi.listTasks(page, size))
