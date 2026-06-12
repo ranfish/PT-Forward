@@ -555,7 +555,7 @@ async function updateSettings() {
       name: settingsForm.name,
       baseUrl: settingsForm.baseUrl,
       alternativeDomains: altDomainsToJson(settingsForm.alternativeDomains),
-      targetTypes: targetTypesToJson(settingsForm.targetTypes),
+      targetTypes: targetTypesToJson(settingsForm.targetTypes.filter(t => t !== 'iyuu' || iyuuSupported.value)),
       reseedLimitCount: settingsForm.reseedLimitCount,
       reseedLimitInterval: settingsForm.reseedLimitInterval,
       iyuuLimitCount: settingsForm.iyuuLimitCount,
@@ -630,7 +630,7 @@ function parseTargetTypes(val: string | undefined, isTarget: boolean | undefined
       if (Array.isArray(arr)) return arr
     } catch { /* ignore */ }
   }
-  if (isTarget) return ['publish', 'seed_feature', 'iyuu']
+  if (isTarget) return ['publish', 'seed_feature']
   return []
 }
 
