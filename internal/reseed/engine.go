@@ -523,7 +523,7 @@ func (e *Engine) preflightCheck(ctx context.Context, ps *preloadedSites, concurr
 			domain:  config.Domain,
 			client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
 				Domain:        config.Domain,
-				Timeout:       5 * time.Second,
+				Timeout:       10 * time.Second,
 				ProxyURL:      config.ProxyURL,
 				SkipSSLVerify: config.SkipSSLVerify,
 			}),
@@ -549,24 +549,44 @@ func (e *Engine) preflightCheck(ctx context.Context, ps *preloadedSites, concurr
 				return
 			}
 
-			checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			defer cancel()
-
-			req, err := http.NewRequestWithContext(checkCtx, http.MethodHead, sc.baseURL, nil)
-			if err != nil {
-				return
+			doCheck := func() (int, error) {
+				checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+				defer cancel()
+				req, err := http.NewRequestWithContext(checkCtx, http.MethodHead, sc.baseURL, nil)
+				if err != nil {
+					return 0, err
+				}
+				resp, err := sc.client.Do(req)
+				if err != nil {
+					return 0, err
+				}
+				defer resp.Body.Close()
+				return resp.StatusCode, nil
 			}
-			resp, err := sc.client.Do(req)
+
+			status, err := doCheck()
+			if err != nil {
+				time.Sleep(500 * time.Millisecond)
+				status, err = doCheck()
+			}
 			if err != nil {
 				httpclient.TripDomainCircuit(sc.domain)
-				e.logger.Warn("站点连接性检测失败，已熔断",
+				e.logger.Warn("站点连接性检测失败(重试后)，已熔断",
 					zap.String("site", sc.name),
 					zap.String("domain", sc.domain),
 					zap.Error(err))
 				failed++
 				return
 			}
-			resp.Body.Close()
+			if status >= 200 && status < 500 {
+				return
+			}
+			httpclient.TripDomainCircuit(sc.domain)
+			e.logger.Warn("站点连接性检测失败(5xx)，已熔断",
+				zap.String("site", sc.name),
+				zap.String("domain", sc.domain),
+				zap.Int("status", status))
+			failed++
 		}(c)
 	}
 	wg.Wait()
