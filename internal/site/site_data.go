@@ -77,6 +77,15 @@ func seedSites() []SiteSeedData {
 	return loadSeedData().Sites
 }
 
+func GetSiteSeedData(domain string) (*SiteSeedData, bool) {
+	for i := range loadSeedData().Sites {
+		if loadSeedData().Sites[i].Domain == domain {
+			return &loadSeedData().Sites[i], true
+		}
+	}
+	return nil, false
+}
+
 func SeedSites(db *gorm.DB) error {
 	for _, s := range seedSites() {
 		var existing model.Site

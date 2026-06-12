@@ -654,6 +654,11 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var supportsPiecesHashAPI bool
+	if seedData, ok := site.GetSiteSeedData(req.Domain); ok && seedData.SupportsPiecesHashAPI != nil {
+		supportsPiecesHashAPI = *seedData.SupportsPiecesHashAPI
+	}
+
 	// framework/authType 已由 seed 强制覆盖，跳过用户输入校验
 
 	exists, err := h.repo.ExistsByDomain(r.Context(), req.Domain, 0)
@@ -727,6 +732,8 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		MaxConcurrent: req.MaxConcurrent,
 
 		HRStrategy: req.HRStrategy,
+
+		SupportsPiecesHashAPI: supportsPiecesHashAPI,
 	}
 
 	if err := h.repo.Create(r.Context(), &s); err != nil {

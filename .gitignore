@@ -3,6 +3,7 @@
 
 # Data
 data/
+!internal/site/data/
 *.db
 *.db-journal
 *.db-wal
