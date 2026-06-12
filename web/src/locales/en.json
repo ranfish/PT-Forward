@@ -31,6 +31,8 @@
     "totalCount": "{count} total",
     "copied": "Copied to clipboard",
     "reset": "Reset",
+    "frontend": "FE",
+    "backend": "BE",
     "resetFilters": "Reset Filters",
     "selectAll": "Select All",
     "deselectAll": "Deselect",
