@@ -114,9 +114,9 @@
         </a-menu-item-group>
       </a-menu>
       <div class="sidebar-version">
-        <span>FE {{ frontendVersion }}</span>
+        <span>{{ t('common.frontend') }} {{ frontendVersion }}</span>
         <span style="margin: 0 2px">/</span>
-        <span>BE {{ backendVersion }}</span>
+        <span>{{ t('common.backend') }} {{ backendVersion }}</span>
       </div>
     </a-layout-sider>
 
