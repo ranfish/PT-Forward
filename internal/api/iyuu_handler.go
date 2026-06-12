@@ -48,6 +48,14 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	trimmed := strings.TrimRight(path, "/")
 
 	switch {
+	case trimmed == "/api/v1/iyuu/status" || trimmed == "/api/v1/iyuu/status/":
+		if r.Method == http.MethodGet {
+			h.handleStatus(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+
 	case trimmed == "/api/v1/iyuu/config" || trimmed == "/api/v1/iyuu/config/":
 		switch r.Method {
 		case http.MethodGet:
@@ -115,6 +123,43 @@ func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 		"isVip":            cfg.IsVIP,
 		"version":          cfg.Version,
 		"requestTimeoutMs": cfg.RequestTimeoutSec * 1000,
+	})
+}
+
+func (h *IYUUHandler) handleStatus(w http.ResponseWriter, _ *http.Request) {
+	var cfg model.IYUUConfig
+	if err := h.db.First(&cfg).Error; err != nil {
+		Success(w, map[string]interface{}{
+			"available": false,
+			"domains":   []string{},
+		})
+		return
+	}
+
+	available := cfg.Enabled && cfg.Token != ""
+	if !available {
+		Success(w, map[string]interface{}{
+			"available": false,
+			"domains":   []string{},
+		})
+		return
+	}
+
+	var mappings []model.IYUUSiteMapping
+	h.db.Find(&mappings)
+	domains := make([]string, 0, len(mappings))
+	for _, m := range mappings {
+		d := strings.TrimPrefix(m.SiteDomain, "https://")
+		d = strings.TrimPrefix(d, "http://")
+		d = strings.TrimSuffix(d, "/")
+		if d != "" {
+			domains = append(domains, d)
+		}
+	}
+
+	Success(w, map[string]interface{}{
+		"available": true,
+		"domains":   domains,
 	})
 }
 
@@ -199,6 +244,19 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 	}
 
 	h.logger.Info("iyuu config updated", zap.String("component", "iyuu"))
+
+	if cfg.Enabled && cfg.Token != "" {
+		go func() {
+			syncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if _, err := h.iyuuSvc.GetSiteList(syncCtx); err != nil {
+				h.logger.Warn("auto-sync IYUU sites after config save failed", zap.Error(err))
+			} else {
+				h.logger.Info("auto-synced IYUU sites after config save")
+			}
+		}()
+	}
+
 	Success(w, map[string]interface{}{"message": "配置已更新"})
 }
 

@@ -308,6 +308,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/iyuu/query/", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/test", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/test/", iyuuHandler)
+	mux.Handle("/api/v1/iyuu/status", iyuuHandler)
+	mux.Handle("/api/v1/iyuu/status/", iyuuHandler)
 
 	fingerprintHandler := rt.chain(rt.rateLimitMW, rt.fingerprintHandler.ServeHTTP)
 	mux.Handle("/api/v1/fingerprints", fingerprintHandler)
