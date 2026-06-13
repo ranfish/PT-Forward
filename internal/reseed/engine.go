@@ -1066,6 +1066,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	var sourceTorrents []sourceTorrent
 	clientHashes := make(map[string]bool)
 	seenSourceNames := make(map[string]bool)
+	nameSites := make(map[string]map[string]bool)
 	for _, clientName := range clientNames {
 		dlClient, err := e.clientProvider.Get(clientName)
 		if err != nil {
@@ -1082,9 +1083,6 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			if t.Progress < 1.0 {
 				continue
 			}
-			if t.Name != "" && seenSourceNames[t.Name] {
-				continue
-			}
 			siteName := ""
 			if e.trackerResolver != nil {
 				siteName = e.trackerResolver.Resolve(t.TrackerURL)
@@ -1092,7 +1090,16 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			if siteName == "" {
 				continue
 			}
-			seenSourceNames[t.Name] = true
+			if t.Name != "" {
+				if nameSites[t.Name] == nil {
+					nameSites[t.Name] = make(map[string]bool)
+				}
+				nameSites[t.Name][siteName] = true
+				if seenSourceNames[t.Name] {
+					continue
+				}
+				seenSourceNames[t.Name] = true
+			}
 			sourceTorrents = append(sourceTorrents, sourceTorrent{
 				InfoHash: t.Hash,
 				SiteName: siteName,
@@ -1104,8 +1111,15 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	}
 	result.TotalSources = len(sourceTorrents)
 
+	multiSiteCount := 0
+	for _, sites := range nameSites {
+		if len(sites) > 1 {
+			multiSiteCount++
+		}
+	}
 	e.logger.Debug("辅种源种子解析完成",
 		zap.Int("totalSeeding", result.TotalSources),
+		zap.Int("multiSiteNames", multiSiteCount),
 		zap.String("taskID", fmt.Sprintf("%d", task.ID)))
 
 	if len(sourceTorrents) == 0 {
@@ -1232,7 +1246,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			seenPiecesHashes[fp.PiecesHash] = true
 		}
 
-		candidates := e.findCandidates(ctx, src, ps, fpCache, sizeTolerance, task, negCache, phCache, l2s, confirmedTargets)
+		candidates := e.findCandidates(ctx, src, ps, fpCache, sizeTolerance, task, negCache, phCache, l2s, confirmedTargets, nameSites)
 
 		if matchCount <= 10 {
 			e.logger.Info("findCandidates 结果",
@@ -1419,7 +1433,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	return result, nil
 }
 
-func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool, phCache *piecesHashCache, l2s *l2Stats, confirmedTargets map[string]bool) []model.Candidate {
+func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool, phCache *piecesHashCache, l2s *l2Stats, confirmedTargets map[string]bool, nameSites map[string]map[string]bool) []model.Candidate {
 	if ps == nil {
 		return nil
 	}
@@ -1427,6 +1441,11 @@ func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *prel
 	matchSingleSite := func(siteInfo *model.SiteInfo) *model.Candidate {
 		if siteInfo.Name == src.SiteName {
 			return nil
+		}
+		if nameSites != nil {
+			if sites := nameSites[src.Name]; sites != nil && sites[siteInfo.Name] {
+				return nil
+			}
 		}
 		if negCache != nil && negCache[src.InfoHash] != nil && negCache[src.InfoHash][siteInfo.Name] {
 			return nil
@@ -2359,7 +2378,7 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 		SiteName: record.SiteName,
 		ClientID: record.ClientID,
 	}
-	candidates := e.findCandidates(ctx, src, ps, fpc, task.SizeTolerancePercent, task, negCache, nil, nil, nil)
+	candidates := e.findCandidates(ctx, src, ps, fpc, task.SizeTolerancePercent, task, negCache, nil, nil, nil, nil)
 	if len(candidates) == 0 {
 		e.logger.Debug("auto reseed: no candidates found", zap.String("info_hash", record.InfoHash))
 		return

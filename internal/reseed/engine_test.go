@@ -921,7 +921,7 @@ func TestEngine_findCandidates_NilProvider(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 	task := &model.ReseedTask{Name: "fc-nil", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "site1"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil, nil)
 	if candidates != nil {
 		t.Error("expected nil when provider is nil")
 	}
@@ -964,7 +964,7 @@ func TestEngine_findCandidates_WithProvider(t *testing.T) {
 	e.SetSiteProvider(sp)
 
 	task := &model.ReseedTask{Name: "fc-prov", Enabled: true, MatchMethods: "size_title"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: "ih1", SiteName: "source_site"}, e.preloadSites(context.Background(), nil, nil), e.preloadFingerprints(context.Background(), []string{"ih1"}), 1.0, task, nil, nil, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: "ih1", SiteName: "source_site"}, e.preloadSites(context.Background(), nil, nil), e.preloadFingerprints(context.Background(), []string{"ih1"}), 1.0, task, nil, nil, nil, nil, nil)
 	if len(candidates) != 1 {
 		t.Fatalf("expected 1 candidate, got %d", len(candidates))
 	}
@@ -1526,7 +1526,7 @@ func TestEngine_findCandidates_ExcludedAndDisabled(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-excl", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, []string{"excluded"}), nil, 1.0, task, nil, nil, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, []string{"excluded"}), nil, 1.0, task, nil, nil, nil, nil, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates (excluded+disabled+same site), got %d", len(candidates))
 	}
@@ -1563,7 +1563,7 @@ func TestEngine_findCandidates_WithTargetSites(t *testing.T) {
 	e.SetFingerprintRepo(fpRepo)
 
 	task := &model.ReseedTask{Name: "fc-targets", Enabled: true, MatchMethods: "size_title"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: "ih_match", SiteName: "source_site"}, e.preloadSites(context.Background(), []string{"site_a"}, nil), e.preloadFingerprints(context.Background(), []string{"ih_match"}), 1.0, task, nil, nil, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: "ih_match", SiteName: "source_site"}, e.preloadSites(context.Background(), []string{"site_a"}, nil), e.preloadFingerprints(context.Background(), []string{"ih_match"}), 1.0, task, nil, nil, nil, nil, nil)
 	if len(candidates) != 1 {
 		t.Fatalf("expected 1 candidate, got %d", len(candidates))
 	}
@@ -1937,7 +1937,7 @@ func TestEngine_findCandidates_GetSiteInfoError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-err", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), []string{"bad_site"}, nil), nil, 1.0, task, nil, nil, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), []string{"bad_site"}, nil), nil, 1.0, task, nil, nil, nil, nil, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates when GetSiteInfo fails, got %d", len(candidates))
 	}
@@ -1954,7 +1954,7 @@ func TestEngine_findCandidates_ListSitesError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-lserr", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil, nil)
 	if candidates != nil {
 		t.Error("expected nil when ListSites fails")
 	}
@@ -1974,7 +1974,7 @@ func TestEngine_findCandidates_GetSiteConfigError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-cfgerr", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates when GetSiteConfig fails, got %d", len(candidates))
 	}
@@ -1997,7 +1997,7 @@ func TestEngine_findCandidates_GetAdapterError(t *testing.T) {
 
 	task := &model.ReseedTask{Name: "fc-adaperr", Enabled: true}
 	rec := model.SeedingTorrentRecord{InfoHash: "ih1", SiteName: "source_site"}
-	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil)
+	candidates := e.findCandidates(context.Background(), sourceTorrent{InfoHash: rec.InfoHash, SiteName: rec.SiteName}, e.preloadSites(context.Background(), nil, nil), nil, 1.0, task, nil, nil, nil, nil, nil)
 	if len(candidates) != 0 {
 		t.Errorf("expected 0 candidates when GetAdapter fails, got %d", len(candidates))
 	}
