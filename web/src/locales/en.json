@@ -685,8 +685,6 @@
     "fieldIsPaused": "Paused",
     "fieldDownloaded": "Downloaded (bytes)",
     "fieldError": "Error",
-    "fieldTrackerMsg": "Tracker Message",
-    "trackerMsgHint": "May not be available on some clients",
     "fieldTrackerURL": "Tracker URL",
     "fieldAddedTime": "Added Time",
     "fieldFreeRemain": "Free Remain",
