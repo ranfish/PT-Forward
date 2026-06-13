@@ -20,7 +20,7 @@
           <a-switch :checked="record.enabled" @change="toggleRule(record)" />
         </template>
         <template v-else-if="column.key === 'action'">
-          {{ translateAction(record.action) }}
+          {{ translateActionRecord(record) }}
         </template>
         <template v-else-if="column.key === 'type'">
           {{ translateType(record.type) }}
@@ -130,11 +130,16 @@
           <a-textarea v-model:value="form.expr" :rows="3" :placeholder="t('seeding.celExpressionOptional')" />
         </a-form-item>
         <a-form-item :label="t('seeding.action')" name="action">
-          <a-select v-model:value="form.action" :placeholder="t('seeding.selectAction')">
-            <a-select-option value="delete">{{ t('seeding.deleteTorrent') }}</a-select-option>
+          <a-select v-model:value="actionMode" :placeholder="t('seeding.selectAction')">
+            <a-select-option value="delete">{{ t('seeding.deleteWithFiles') }}</a-select-option>
+            <a-select-option value="delete_only">{{ t('seeding.deleteTorrentOnly') }}</a-select-option>
             <a-select-option value="pause">{{ t('seeding.pauseTorrent') }}</a-select-option>
             <a-select-option value="limit_speed">{{ t('seeding.limitSpeed') }}</a-select-option>
           </a-select>
+        </a-form-item>
+        <a-form-item v-if="actionMode === 'limit_speed'" :label="t('seeding.speedLimitLabel')">
+          <a-input-number v-model:value="form.limit_speed_mb" :min="0" style="width: calc(100% - 50px)" />
+          <span style="margin-left: 8px; color: #999">MB/s</span>
         </a-form-item>
         <a-form-item :label="t('seeding.priority')" name="priority">
           <a-input-number v-model:value="form.priority" :min="0" style="width: 100%" />
@@ -152,9 +157,6 @@
             </a-form-item>
           </a-col>
         </a-row>
-        <a-form-item :label="t('seeding.removeData')">
-          <a-switch v-model:checked="form.remove_data" />
-        </a-form-item>
         <a-collapse :bordered="false" style="margin-top: 8px; background: transparent">
           <a-collapse-panel key="advanced" :header="t('seeding.advancedOptions')">
             <a-row :gutter="16">
@@ -162,19 +164,6 @@
                 <a-form-item :label="t('seeding.fitTime')">
                   <a-input-number v-model:value="form.fit_time" :min="0" style="width: 100%" />
                   <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('seeding.fitTimeHint') }}</div>
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item :label="t('seeding.onlyDeleteTorrent')">
-                  <a-switch v-model:checked="form.only_delete_torrent" />
-                </a-form-item>
-              </a-col>
-            </a-row>
-            <a-row :gutter="16">
-              <a-col :span="12">
-                <a-form-item :label="t('seeding.limitSpeedBytes')">
-                  <a-input-number v-model:value="form.limit_speed_mb" :min="0" style="width: calc(100% - 50px)" />
-                  <span style="margin-left: 8px; color: #999">MB/s</span>
                 </a-form-item>
               </a-col>
               <a-col :span="12">
@@ -239,8 +228,13 @@ const actionLabels: Record<string, string> = {
   limit_speed: t('seeding.limitSpeed'),
 }
 
-function translateAction(action: string): string {
-  return actionLabels[action] || action
+function translateActionRecord(record: DeleteRule): string {
+  if (record.action === 'delete') {
+    return record.only_delete_torrent || !record.remove_data
+      ? t('seeding.deleteTorrentOnly')
+      : t('seeding.deleteWithFiles')
+  }
+  return actionLabels[record.action] || record.action
 }
 
 const typeLabels: Record<string, string> = {
@@ -278,6 +272,8 @@ const form = reactive({
   cascade_delete: false,
   cascade_max_depth: 1,
 })
+
+const actionMode = ref<'delete' | 'delete_only' | 'pause' | 'limit_speed'>('delete')
 
 interface ConditionItem { field: string; operator: string; value: string }
 const conditions = ref<ConditionItem[]>([])
@@ -648,6 +644,12 @@ function openModal(record?: DeleteRule) {
   editingRule.value = record || null
   showRawJson.value = false
   if (record) {
+    let mode: 'delete' | 'delete_only' | 'pause' | 'limit_speed' = 'delete'
+    if (record.action === 'pause') mode = 'pause'
+    else if (record.action === 'limit_speed') mode = 'limit_speed'
+    else if (record.action === 'delete' && (record.only_delete_torrent || !record.remove_data)) mode = 'delete_only'
+    actionMode.value = mode
+
     Object.assign(form, {
       alias: record.alias || '',
       type: record.type || 'normal',
@@ -671,6 +673,7 @@ function openModal(record?: DeleteRule) {
     })
     conditions.value = parseConditions(record.conditions || '')
   } else {
+    actionMode.value = 'delete'
     Object.assign(form, { alias: '', type: 'normal', logic: 'and', conditions: '', expr: '', action: 'delete', priority: 0, enabled: true, delete_num: 1, remove_data: true, fit_time: 0, only_delete_torrent: false, limit_speed_mb: 0, reannounce_before: true, reannounce_wait_ms: 2000, reannounce_retries: 2, reannounce_interval_ms: 3000, cascade_delete: false, cascade_max_depth: 1 })
     conditions.value = []
   }
@@ -685,6 +688,24 @@ async function handleSubmit() {
     }
     const payload = { ...form, limit_speed_bytes: Math.round((form.limit_speed_mb || 0) * 1048576) }
     delete (payload as Record<string, unknown>).limit_speed_mb
+    switch (actionMode.value) {
+      case 'delete':
+        payload.action = 'delete'
+        payload.remove_data = true
+        payload.only_delete_torrent = false
+        break
+      case 'delete_only':
+        payload.action = 'delete'
+        payload.remove_data = false
+        payload.only_delete_torrent = true
+        break
+      case 'pause':
+        payload.action = 'pause'
+        break
+      case 'limit_speed':
+        payload.action = 'limit_speed'
+        break
+    }
     if (editingRule.value) {
       await deleteRulesApi.update(editingRule.value.id, payload)
     } else {
