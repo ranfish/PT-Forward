@@ -96,9 +96,9 @@ func TestSideLoadManager_Worker_ProcessSuccess(t *testing.T) {
 	}
 
 	provider := &mocks.SiteInfoProvider{
-		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
-			return &model.SiteInfo{
-				Name:    "testsite",
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{
+				Domain:  "testsite",
 				Passkey: "pk123",
 				Cookie:  "cookie123",
 			}, nil
@@ -157,8 +157,8 @@ func TestSideLoadManager_Worker_CacheHit(t *testing.T) {
 	}
 
 	provider := &mocks.SiteInfoProvider{
-		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
-			return &model.SiteInfo{Name: "testsite"}, nil
+		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
+			return &model.SiteConfig{Domain: "testsite"}, nil
 		},
 		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
 			return adapter, nil
