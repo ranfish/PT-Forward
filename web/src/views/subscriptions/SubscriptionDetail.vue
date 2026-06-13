@@ -685,6 +685,14 @@ async function saveConfig() {
 const reasonLabels: Record<string, string> = {
   already_seen: '已存在',
   no_rule_matched: '无匹配规则',
+  condition_not_matched: '条件不满足',
+  rejected_by_rule: '被拒绝规则过滤',
+  no_accept_rule_matched: '无匹配接受规则',
+  no_filter_rules: '已匹配',
+  global_rule_rejected: '被全局规则拒绝',
+  reject_rule_error: '拒绝规则匹配异常',
+  accept_rule_error: '接受规则匹配异常',
+  global_filter_error: '全局过滤异常',
   matched: '已匹配',
   rejected: '未匹配',
   skipped: '已跳过',
@@ -697,7 +705,11 @@ function dryrunReason(torrent: Record<string, unknown>): string {
   const reason = (torrent.reason as string) || ''
   const rule = (torrent.matched_rule as string) || ''
   const status = (torrent.status as string) || ''
-  if (reason) return reasonLabels[reason] || reason
+  if (reason) {
+    if (reason.startsWith('rejected_by_rule:')) return `被拒绝规则过滤: ${reason.slice('rejected_by_rule:'.length)}`
+    if (reason.startsWith('global_rule_rejected:')) return `被全局规则拒绝: ${reason.slice('global_rule_rejected:'.length)}`
+    return reasonLabels[reason] || reason
+  }
   if (rule) return `匹配规则: ${rule}`
   return reasonLabels[status] || status || '-'
 }
