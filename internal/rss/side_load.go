@@ -202,22 +202,10 @@ func (m *SideLoadManager) processTask(ctx context.Context, task *SideLoadTask) {
 		return
 	}
 
-	siteInfo, err := m.siteProvider.GetSiteInfo(ctx, task.SiteName)
-	if err != nil || siteInfo == nil {
-		m.markFailed(task, fmt.Errorf("get site info: %w", err))
+	siteCfg, err := m.siteProvider.GetSiteConfig(ctx, task.SiteName)
+	if err != nil || siteCfg == nil {
+		m.markFailed(task, fmt.Errorf("get site config: %w", err))
 		return
-	}
-
-	siteCfg := &model.SiteConfig{
-		Domain:      siteInfo.Name,
-		Passkey:     siteInfo.Passkey,
-		Cookie:      siteInfo.Cookie,
-		APIKey:      siteInfo.APIKey,
-		AuthKey:     siteInfo.AuthKey,
-		AuthHash:    siteInfo.AuthHash,
-		UserID:      siteInfo.UserID,
-		RSSKey:      siteInfo.RSSKey,
-		BearerToken: siteInfo.BearerToken,
 	}
 
 	torrentData, err := adapter.DownloadTorrent(ctx, siteCfg, task.TorrentEvent.TorrentID)
