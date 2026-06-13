@@ -271,7 +271,7 @@ const targetSites = computed(() => sites.value.filter(s => s.isTarget))
 async function fetchDownloaders() {
   downloadersLoading.value = true
   try {
-    const resp = await downloadersApi.list(1, 200)
+    const resp = await downloadersApi.listLight(1, 200)
     const items: ClientConfig[] = resp.data?.data?.items || resp.data?.data || []
     downloaders.value = items.filter(d => d.role === 'download' || d.role === 'master_reseed' || d.role === 'reseed')
   } catch {

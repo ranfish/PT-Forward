@@ -101,7 +101,7 @@ async function fetchSiteMap() {
 
 async function fetchDownloaderMap() {
   try {
-    const resp = await downloadersApi.list(1, 200)
+    const resp = await downloadersApi.listLight(1, 200)
     const items = resp.data?.data?.items || resp.data?.data || []
     const m: Record<string, string> = {}
     for (const d of items) {
