@@ -830,6 +830,7 @@ func (e *Engine) PauseForFreeEnd(ctx context.Context, clientID, infoHash string)
 	e.mu.Lock()
 	if r, ok := e.recordMap[key]; ok {
 		r.Status = model.SeedingStatusPausedFreeEnd
+		r.IsFree = false
 	}
 	e.mu.Unlock()
 
@@ -837,6 +838,7 @@ func (e *Engine) PauseForFreeEnd(ctx context.Context, clientID, infoHash string)
 		Where("client_id = ? AND info_hash = ?", clientID, infoHash).
 		Updates(map[string]interface{}{
 			"status":         model.SeedingStatusPausedFreeEnd,
+			"is_free":        false,
 			"last_action_by": "free_end_pauser",
 		}).Error
 }
@@ -1158,11 +1160,7 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 }
 
 func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRecord, ec *evaluateContext, cycleID string) (candidate *CleanupCandidate, evaluated bool, shouldCleanup bool) {
-	if rec.Status != model.SeedingStatusSeeding && rec.Status != model.SeedingStatusDeleteFailed && rec.Status != model.SeedingStatusPausedRule {
-		return nil, false, false
-	}
-
-	if rec.Status == model.SeedingStatusPausedRule && rec.LastActionBy != "disk_protect" {
+	if rec.Status != model.SeedingStatusSeeding && rec.Status != model.SeedingStatusDeleteFailed && rec.Status != model.SeedingStatusPausedRule && rec.Status != model.SeedingStatusPausedFreeEnd {
 		return nil, false, false
 	}
 
@@ -1218,7 +1216,7 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 		return nil, evaluated, false
 	}
 
-	if ti.Progress < 1.0 {
+	if rec.Status == model.SeedingStatusSeeding && ti.Progress < 1.0 {
 		return nil, evaluated, false
 	}
 
@@ -1540,6 +1538,39 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 			continue
 		}
 
+		if rec.Status == model.SeedingStatusPending {
+			pendingMaxAge := 24 * time.Hour
+			if rec.CreatedAt.Add(pendingMaxAge).Before(time.Now()) {
+				if dryRun {
+					result.Deleted++
+					continue
+				}
+				e.logger.Info("pending 超时清理",
+					zap.Uint("id", rec.ID),
+					zap.String("info_hash", rec.InfoHash),
+					zap.String("client_id", rec.ClientID),
+					zap.Time("created_at", rec.CreatedAt),
+				)
+				ti := ec.torrentMap[rec.InfoHash]
+				if ti != nil {
+					if err := ec.client.DeleteTorrent(ctx, rec.InfoHash, true); err != nil {
+						e.logger.Warn("pending 超时清理：删除下载器种子失败", zap.Error(err))
+					}
+				}
+				if err := e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
+					"status":         model.SeedingStatusDeleted,
+					"last_action_by": "pending_timeout",
+				}).Error; err != nil {
+					e.logger.Warn("pending 超时清理：更新状态失败", zap.Uint("id", rec.ID), zap.Error(err))
+				}
+				e.mu.Lock()
+				delete(e.recordMap, recordKey(rec.ClientID, rec.InfoHash))
+				e.mu.Unlock()
+				result.Deleted++
+			}
+			continue
+		}
+
 		candidate, evaluated, shouldCleanup := e.evaluateRecord(ctx, rec, ec, cycleID)
 		if !evaluated {
 			continue
@@ -1587,6 +1618,10 @@ func (e *Engine) evaluateRulesPhase(ctx context.Context, ec *evaluateContext, dr
 			}
 			seedingRecords = append(seedingRecords, rec)
 		} else if rec.Status == model.SeedingStatusPausedRule && rec.LastActionBy == "disk_protect" {
+			seedingRecords = append(seedingRecords, rec)
+		} else if rec.Status == model.SeedingStatusPausedFreeEnd {
+			seedingRecords = append(seedingRecords, rec)
+		} else if rec.Status == model.SeedingStatusPausedRule {
 			seedingRecords = append(seedingRecords, rec)
 		}
 	}
