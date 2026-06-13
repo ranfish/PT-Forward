@@ -289,16 +289,99 @@ func (e *Engine) DryRun(ctx context.Context, sub *model.RSSSubscription) (*DryRu
 				continue
 			}
 
-			if ev.MatchedRule != nil && *ev.MatchedRule != "" {
-				item.Status = "matched"
-				item.MatchedRule = *ev.MatchedRule
-				result.Matched++
-			} else {
-				item.Status = "rejected"
-				item.Reason = "no_rule_matched"
-				result.Rejected++
+			discountStr := string(ev.DiscountLevel)
+			if discountStr == "" {
+				if ev.IsFree {
+					discountStr = string(model.DiscountFree)
+				} else {
+					discountStr = string(model.DiscountNone)
+				}
 			}
 
+			if len(sub.Conditions) > 0 {
+				evalCtx := newEvalCtx(ev, discountStr)
+				allMatch := true
+				for _, cond := range sub.Conditions {
+					if !filter.MatchConditionExport(cond, evalCtx) {
+						allMatch = false
+						break
+					}
+				}
+				if !allMatch {
+					item.Status = "rejected"
+					item.Reason = "condition_not_matched"
+					result.Rejected++
+					result.Items = append(result.Items, item)
+					continue
+				}
+			}
+
+			if e.filterEng != nil && (len(sub.AcceptRuleIDs) > 0 || len(sub.RejectRuleIDs) > 0) {
+				evalCtx := newEvalCtx(ev, discountStr)
+
+				if len(sub.RejectRuleIDs) > 0 {
+					rejectResult, err := e.filterEng.MatchByIDs(ctx, sub.RejectRuleIDs, evalCtx)
+					if err != nil {
+						item.Status = "rejected"
+						item.Reason = "reject_rule_error"
+						result.Rejected++
+						result.Items = append(result.Items, item)
+						continue
+					} else if rejectResult.Matched {
+						item.Status = "rejected"
+						item.Reason = "rejected_by_rule:" + rejectResult.RuleName
+						result.Rejected++
+						result.Items = append(result.Items, item)
+						continue
+					}
+				}
+
+				if len(sub.AcceptRuleIDs) > 0 {
+					acceptResult, err := e.filterEng.MatchByIDs(ctx, sub.AcceptRuleIDs, evalCtx)
+					if err != nil {
+						item.Status = "rejected"
+						item.Reason = "accept_rule_error"
+						result.Rejected++
+						result.Items = append(result.Items, item)
+						continue
+					} else if !acceptResult.Matched {
+						item.Status = "rejected"
+						item.Reason = "no_accept_rule_matched"
+						result.Rejected++
+						result.Items = append(result.Items, item)
+						continue
+					}
+				}
+			}
+
+			if e.filterEng != nil {
+				matchResult, err := e.filterEng.Match(ctx, newEvalCtx(ev, discountStr))
+				if err != nil {
+					item.Status = "rejected"
+					item.Reason = "global_filter_error"
+					result.Rejected++
+					result.Items = append(result.Items, item)
+					continue
+				}
+				if matchResult.Matched && matchResult.Reject {
+					item.Status = "rejected"
+					item.Reason = "global_rule_rejected:" + matchResult.RuleName
+					result.Rejected++
+					result.Items = append(result.Items, item)
+					continue
+				}
+				if matchResult.Matched && !matchResult.Reject {
+					item.Status = "matched"
+					item.MatchedRule = matchResult.RuleName
+					result.Matched++
+					result.Items = append(result.Items, item)
+					continue
+				}
+			}
+
+			item.Status = "matched"
+			item.Reason = "no_filter_rules"
+			result.Matched++
 			result.Items = append(result.Items, item)
 		}
 	}
