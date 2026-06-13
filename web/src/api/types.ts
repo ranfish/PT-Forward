@@ -182,6 +182,7 @@ export interface ClientConfig {
   reseedTargetId?: string
   enabled: boolean
   isDefault: boolean
+  torrentDir?: string
   pathMappings: PathMapping[]
   downloadSpeed: number
   uploadSpeed: number
