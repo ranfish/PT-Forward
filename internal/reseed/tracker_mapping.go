@@ -97,6 +97,16 @@ func (r *TrackerSiteResolver) Resolve(trackerURL string) string {
 		}
 	}
 
+	for h := host; strings.Contains(h, "."); h = h[strings.Index(h, ".")+1:] {
+		rest := h[strings.Index(h, ".")+1:]
+		if !strings.Contains(rest, ".") {
+			break
+		}
+		if name, ok := r.domainToSite[rest]; ok {
+			return name
+		}
+	}
+
 	return ""
 }
 
