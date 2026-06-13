@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/client/qbittorrent"
@@ -105,6 +106,7 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page, size := parsePagination(r)
+	light := r.URL.Query().Get("light") == "true"
 
 	var total int64
 	h.db.Model(&model.ClientConfig{}).Count(&total)
@@ -122,17 +124,34 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		resp := h.toResponse(&clients[i], mappings)
-		if clients[i].Enabled && h.clientMgr != nil {
-			if dlClient, err := h.clientMgr.Get(clients[i].Name); err == nil {
-				if md, mdErr := dlClient.GetMainData(r.Context()); mdErr == nil && md != nil {
-					resp.DownloadSpeed = md.ServerState.DownloadSpeed
-					resp.UploadSpeed = md.ServerState.UploadSpeed
-					resp.FreeSpace = md.FreeSpace
-					resp.TotalDiskSpace = md.TotalDiskSpace
-				}
-			}
-		}
 		items = append(items, resp)
+	}
+
+	if !light {
+		var wg sync.WaitGroup
+		for i := range items {
+			if !clients[i].Enabled || h.clientMgr == nil {
+				continue
+			}
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				name := clients[idx].Name
+				dlClient, err := h.clientMgr.Get(name)
+				if err != nil {
+					return
+				}
+				md, mdErr := dlClient.GetMainData(r.Context())
+				if mdErr != nil || md == nil {
+					return
+				}
+				items[idx].DownloadSpeed = md.ServerState.DownloadSpeed
+				items[idx].UploadSpeed = md.ServerState.UploadSpeed
+				items[idx].FreeSpace = md.FreeSpace
+				items[idx].TotalDiskSpace = md.TotalDiskSpace
+			}(i)
+		}
+		wg.Wait()
 	}
 
 	Success(w, PaginatedResult{
