@@ -108,6 +108,10 @@
           </a-col>
         </a-row>
 
+        <a-form-item label="种子文件路径" name="torrentDir">
+          <a-input v-model:value="form.torrentDir" placeholder="如 /data/torrents（远程下载器的 .torrent 文件本地映射路径，L0 pieces_hash 匹配需要）" />
+        </a-form-item>
+
         <a-divider>{{ t('downloader.pathMappings') }}</a-divider>
         <div v-for="(pm, idx) in form.pathMappings" :key="idx" style="margin-bottom: 8px">
           <a-row :gutter="8" align="middle">
@@ -155,6 +159,7 @@ const form = reactive({
   enabled: true,
   isDefault: false,
   reseedTargetId: '',
+  torrentDir: '',
   pathMappings: [] as { sourcePath: string; reseedPath: string }[],
 })
 
@@ -176,9 +181,9 @@ const pagination = usePagination((page, size) => downloadersApi.list(page, size)
 function openModal(record?: ClientConfig) {
   editingRecord.value = record || null
   if (record) {
-    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true, isDefault: record.isDefault || false, reseedTargetId: record.reseedTargetId || '', pathMappings: (record.pathMappings || []).map((p: { sourcePath: string; reseedPath: string }) => ({ sourcePath: p.sourcePath || '', reseedPath: p.reseedPath || '' })) })
+    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true, isDefault: record.isDefault || false, reseedTargetId: record.reseedTargetId || '', torrentDir: record.torrentDir || '', pathMappings: (record.pathMappings || []).map((p: { sourcePath: string; reseedPath: string }) => ({ sourcePath: p.sourcePath || '', reseedPath: p.reseedPath || '' })) })
   } else {
-    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '', role: 'download', enabled: true, isDefault: false, reseedTargetId: '', pathMappings: [] })
+    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '', role: 'download', enabled: true, isDefault: false, reseedTargetId: '', torrentDir: '', pathMappings: [] })
   }
   modalVisible.value = true
 }

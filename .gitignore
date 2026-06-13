@@ -52,6 +52,18 @@ examples/
 media/
 temp/
 tr/
+
+# Downloader torrent caches (remote .torrent copies)
+PT0/
+PT1/
+PT2/
+PT3/
+PT4/
+PT5/
+PT6/
+PT7/
+PT8/
+*.torrent
 # Temp decrypt tool (keep local, never commit)
 cmd/_tmp_decrypt/
 cmd/_tmp_test/

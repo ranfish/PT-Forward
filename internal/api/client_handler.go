@@ -46,6 +46,7 @@ type createDownloaderRequest struct {
 	ReseedTargetID string               `json:"reseedTargetId"`
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
+	TorrentDir     string               `json:"torrentDir"`
 	PathMappings   []pathMappingRequest `json:"pathMappings"`
 }
 
@@ -64,6 +65,7 @@ type downloaderResponse struct {
 	ReseedTargetID string               `json:"reseedTargetId,omitempty"`
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
+	TorrentDir     string               `json:"torrentDir,omitempty"`
 	PathMappings   []pathMappingRequest `json:"pathMappings"`
 	DownloadSpeed  int64                `json:"downloadSpeed"`
 	UploadSpeed    int64                `json:"uploadSpeed"`
@@ -86,6 +88,14 @@ func (h *ClientHandler) toResponse(c *model.ClientConfig, mappings []model.Clien
 		IsDefault:      c.IsDefault,
 		CreatedAt:      c.CreatedAt,
 		UpdatedAt:      c.UpdatedAt,
+	}
+	if c.Config != "" {
+		var cfg struct {
+			TorrentDir string `json:"torrent_dir"`
+		}
+		if json.Unmarshal([]byte(c.Config), &cfg) == nil {
+			resp.TorrentDir = cfg.TorrentDir
+		}
 	}
 	for _, m := range mappings {
 		resp.PathMappings = append(resp.PathMappings, pathMappingRequest{
@@ -241,6 +251,10 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Role:           req.Role,
 		ReseedTargetID: req.ReseedTargetID,
 	}
+	if req.TorrentDir != "" {
+		cfgBytes, _ := json.Marshal(map[string]string{"torrent_dir": req.TorrentDir})
+		client.Config = string(cfgBytes)
+	}
 	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
 		if err := dbimpl.ForceCreateTx(tx, &client); err != nil {
 			return err
@@ -336,6 +350,14 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	client.Enabled = req.Enabled
 	client.IsDefault = req.IsDefault
 
+	var configJSON string
+	if req.TorrentDir != "" {
+		cfgBytes, _ := json.Marshal(map[string]string{"torrent_dir": req.TorrentDir})
+		configJSON = string(cfgBytes)
+	} else {
+		configJSON = ""
+	}
+
 	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&client).Updates(map[string]interface{}{
 			"name":             client.Name,
@@ -347,6 +369,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 			"reseed_target_id": client.ReseedTargetID,
 			"enabled":          client.Enabled,
 			"is_default":       client.IsDefault,
+			"config":           configJSON,
 		}).Error; err != nil {
 			return err
 		}
