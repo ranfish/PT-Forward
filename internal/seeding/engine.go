@@ -1612,6 +1612,10 @@ func (e *Engine) evaluateRulesPhase(ctx context.Context, ec *evaluateContext, dr
 
 	var seedingRecords []model.SeedingTorrentRecord
 	for _, rec := range ec.records {
+		ti := ec.torrentMap[rec.InfoHash]
+		if ti == nil {
+			continue
+		}
 		if rec.Status == model.SeedingStatusSeeding {
 			if rec.FlushedAt != nil && now.Sub(*rec.FlushedAt) < minSeedDur {
 				continue

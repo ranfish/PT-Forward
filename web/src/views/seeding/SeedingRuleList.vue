@@ -331,7 +331,7 @@ const fieldMeta: Record<string, { type: string; hint: string; unit?: string }> =
   is_paused: { type: 'bool', hint: '' },
   downloaded: { type: 'number', hint: '', unit: 'size' },
   error: { type: 'text', hint: '' },
-  tracker_msg: { type: 'text', hint: '' },
+  tracker_msg: { type: 'text', hint: t('seeding.trackerMsgHint') },
   tracker_url: { type: 'text', hint: '' },
   addedTime: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
   freeRemainSec: { type: 'number', hint: t('seeding.unitHours'), unit: 'hours' },
