@@ -126,8 +126,6 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 			return fmt.Sprintf("%d", ti.Downloaded), true
 		case "error":
 			return ti.Error, true
-		case "tracker_msg":
-			return ti.TrackerMsg, true
 		case "tracker_url":
 			return ti.TrackerURL, true
 		}
