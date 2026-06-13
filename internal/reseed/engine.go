@@ -1930,7 +1930,14 @@ func ExtractSearchKeyword(title string) string {
 	if rest == "" {
 		return ""
 	}
-	return truncateToResolution(rest)
+	raw := truncateToResolution(rest)
+	raw = strings.TrimLeft(raw, ".")
+	if raw == "" {
+		return ""
+	}
+	raw = strings.ReplaceAll(raw, ".", " ")
+	raw = strings.Join(strings.Fields(raw), " ")
+	return raw
 }
 
 func stripChinesePrefix(title string) string {
