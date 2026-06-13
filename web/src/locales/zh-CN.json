@@ -688,6 +688,7 @@
     "fieldDownloaded": "已下载(字节)",
     "fieldError": "错误信息",
     "fieldTrackerMsg": "Tracker消息",
+    "trackerMsgHint": "部分客户端可能不返回此字段",
     "fieldTrackerURL": "Tracker地址",
     "fieldAddedTime": "添加时长",
     "fieldFreeRemain": "免费剩余",
