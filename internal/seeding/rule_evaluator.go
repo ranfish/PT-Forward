@@ -78,6 +78,12 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 		return rec.Source, true
 	case "last_action_by":
 		return rec.LastActionBy, true
+	case "unregistered":
+		return fmt.Sprintf("%t", rec.Unregistered), true
+	case "unregistered_msg":
+		return rec.UnregisteredMsg, true
+	case "subscription_id":
+		return rec.SubscriptionID, true
 	}
 
 	if ti != nil {
@@ -114,6 +120,16 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 			return fmt.Sprintf("%d", ti.NumIncomplete), true
 		case "is_finished":
 			return fmt.Sprintf("%t", ti.IsFinished), true
+		case "is_paused":
+			return fmt.Sprintf("%t", ti.IsPaused), true
+		case "downloaded":
+			return fmt.Sprintf("%d", ti.Downloaded), true
+		case "error":
+			return ti.Error, true
+		case "tracker_msg":
+			return ti.TrackerMsg, true
+		case "tracker_url":
+			return ti.TrackerURL, true
 		}
 
 		if ti.TotalSize > 0 && key == "downloadUploadRatio" {
