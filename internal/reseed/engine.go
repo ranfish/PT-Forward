@@ -1939,7 +1939,7 @@ func NormalizeTitle(title string) string {
 	return title
 }
 
-var resolutionKeywords = []string{"2160p", "1080p", "720p", "480p", "4k", "1080i"}
+var resolutionKeywords = []string{"2160p", "1080p", "1080i", "720p", "576p", "576i", "480p", "480i", "1440p", "4320p", "4k"}
 
 func ExtractSearchKeyword(title string) string {
 	if title == "" {
