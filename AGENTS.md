@@ -1,5 +1,13 @@
 # PT-Forward 项目 Agent 指令
 
+## 环境信息
+
+- **Go**：`/home/incast/.local/go/bin/go`（v1.25，系统 PATH 中无 go，必须用全路径）
+- **Node**：`/home/incast/.local/bin/node`（v22，系统 Node 18 不兼容，必须用此路径）
+- **CGO**：后端编译必须 `CGO_ENABLED=1`
+- **DB**：`data/pt-forward.db`（SQLite）
+- **服务**：`systemctl --user restart pt-forward`（用户级 systemd 服务，端口 8765）
+
 ## 通用规则
 
 - **语言**：与用户沟通用中文
@@ -7,14 +15,35 @@
 - **敏感信息**：禁止在本机或云端保存 cookie、passkey、apikey、token 等敏感信息
 - **适配器文档**：放在 `docs/32-站点适配器设计/` 目录下
 - **站点数据**：官组命名、规则等站点原始数据必须原样写入，不能杜撰
-- **删除代码后**：必须跑 `go vet ./...`（不只是 `go build`），确保测试文件不引用已删符号
-- **后端验证**：改完后端代码需要回归审核、并重新编译部署。
-- **前端验证**：改完前端代码后跑 `vue-tsc -b --noEmit` + `npx eslint src/` 确认零错误
-- **前端构建部署**：前端源码修改后必须回归审核并重新构建才能生效，完整流程：
-  1. `PATH="/home/incast/.local/bin:$PATH" ./node_modules/.bin/vite build`（在 `web/` 目录，Node 需 ≥20，系统 Node 18 不行，用 `/home/incast/.local/bin/node` v22）
-  2. `rm -rf frontend/dist && cp -r web/dist frontend/dist`
-  3. `CGO_ENABLED=1 go build -ldflags "-s -w" -o pt-forward ./cmd/pt-forward/`
-  4. 重启进程
+- **Git 提交**：禁止提交 `data/`、`PT0/`～`PT8/`、`*.torrent`、`logs/`、`*.db`（详见 `.gitignore`）
+- **删除代码后**：必须跑 `go vet ./internal/... ./cmd/pt-forward/...`（**不要**用 `go vet ./...`，`cmd/verify-pieces-hash` 有已知冲突会报错），确保测试文件不引用已删符号
+- **编译部署前**：必须灵魂三问、回归审核，然后再进行编译和部署
+
+## 灵魂三问（每次代码改动后必须逐条审核）
+
+1. **nil 安全**：所有指针返回值是否检查了 nil？map 查找是否有 ok 判断？type assertion 是否用了 comma-ok 模式？
+2. **边界安全**：空输入/空 DB/context 取消/并发锁竞争等边界情况是否处理？`context.WithTimeout` 后是否都调了 `cancel()`？锁是否有嵌套导致死锁风险？
+3. **回归通过**：`go vet` + `go test` + `vue-tsc` + `eslint` 是否全部通过？
+
+## 后端验证与部署
+
+改完后端代码，回归审核通过后执行完整编译部署流程：
+
+1. `go vet ./internal/... ./cmd/pt-forward/...`（**不要**用 `./...`）
+2. `go test ./internal/... -count=1 -timeout 180s`
+3. `CGO_ENABLED=1 /home/incast/.local/go/bin/go build -ldflags "-s -w" -o pt-forward ./cmd/pt-forward/`
+4. `systemctl --user restart pt-forward && sleep 2 && systemctl --user is-active pt-forward`
+
+## 前端验证与部署
+
+改完前端代码后跑 `vue-tsc -b --noEmit` + `npx eslint src/` 确认零错误。
+
+前端是 Go embed（`frontend/spa.go` 用 `//go:embed all:dist`），修改前端后必须重新构建并重新编译 Go 二进制才能生效，完整流程：
+
+1. `cd web/ && rm -rf node_modules/.vite && PATH="/home/incast/.local/bin:$PATH" ./node_modules/.bin/vite build`
+2. `rm -rf frontend/dist && cp -r web/dist frontend/dist`
+3. `CGO_ENABLED=1 /home/incast/.local/go/bin/go build -ldflags "-s -w" -o pt-forward ./cmd/pt-forward/`
+4. `systemctl --user restart pt-forward && sleep 2 && systemctl --user is-active pt-forward`
 
 ## 数据采集策略
 
@@ -44,6 +73,7 @@
 2. **禁止发布源站带 禁转/独占/谢绝转载/限时禁转 标签或标题/副标题中带上述字样的种子**
 3. **CatEDU 小组资源默认禁转**
 
-## 版本管理 ##
-**前端构建部署**：构建部署前必须提交并推送代码 ，并在 PR 描述中注明版本号和变更内容。
-**后端编译部署**：编译部署前必须提交并推送代码，并在 PR 描述中注明版本号和变更内容。
+## 版本管理
+
+- **编译部署前**：必须先提交并推送代码，然后在 commit message 中注明版本号和变更内容
+- **禁止先部署后提交**：代码必须在 git 历史中先于部署生效
