@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -1666,20 +1667,27 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		return nil
 	}
 
-	keyword := ExtractSearchKeyword(fp.Title)
-	groupName := ExtractGroupName(fp.Title)
+	isMusic := detectContentType(fp.FileTreeParsed) == "music"
 
-	if (keyword == "" || keywordStartsWithYear(keyword)) && len(fp.FileTreeParsed) > 0 {
-		fileKeyword, fileGroup := extractFromFileTree(fp.FileTreeParsed)
-		if fileKeyword != "" && !keywordStartsWithYear(fileKeyword) {
-			e.logger.Debug("从视频文件名提取关键词",
-				zap.String("title", fp.Title),
-				zap.String("originalKeyword", keyword),
-				zap.String("fileKeyword", fileKeyword),
-				zap.String("fileGroup", fileGroup))
-			keyword = fileKeyword
-			if fileGroup != "" {
-				groupName = fileGroup
+	var keyword, groupName string
+	if isMusic {
+		keyword = ExtractMusicKeyword(fp.Title)
+	} else {
+		keyword = ExtractSearchKeyword(fp.Title)
+		groupName = ExtractGroupName(fp.Title)
+
+		if (keyword == "" || keywordStartsWithYear(keyword)) && len(fp.FileTreeParsed) > 0 {
+			fileKeyword, fileGroup := extractFromFileTree(fp.FileTreeParsed)
+			if fileKeyword != "" && !keywordStartsWithYear(fileKeyword) {
+				e.logger.Debug("从视频文件名提取关键词",
+					zap.String("title", fp.Title),
+					zap.String("originalKeyword", keyword),
+					zap.String("fileKeyword", fileKeyword),
+					zap.String("fileGroup", fileGroup))
+				keyword = fileKeyword
+				if fileGroup != "" {
+					groupName = fileGroup
+				}
 			}
 		}
 	}
@@ -1693,13 +1701,20 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		return nil
 	}
 
-	if groupName == "" {
+	if !isMusic && groupName == "" {
 		if l2s != nil {
 			l2s.mu.Lock()
 			l2s.noGroup++
 			l2s.mu.Unlock()
 		}
 		return nil
+	}
+
+	if isMusic {
+		e.logger.Debug("音乐种子L2搜索",
+			zap.String("site", siteName),
+			zap.String("title", fp.Title),
+			zap.String("keyword", keyword))
 	}
 
 	results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
@@ -1729,7 +1744,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 			filteredByEmptyID++
 			continue
 		}
-		if !strings.Contains(r.Title, groupName) {
+		if !isMusic && !strings.Contains(r.Title, groupName) {
 			filteredByGroup++
 			continue
 		}
@@ -1747,6 +1762,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 			zap.String("site", siteName),
 			zap.String("keyword", keyword),
 			zap.String("groupName", groupName),
+			zap.Bool("music", isMusic),
 			zap.String("targetTorrentID", r.TorrentID),
 			zap.String("targetTitle", r.Title),
 			zap.Int64("targetSize", r.Size),
@@ -1763,6 +1779,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		zap.String("site", siteName),
 		zap.String("keyword", keyword),
 		zap.String("groupName", groupName),
+		zap.Bool("music", isMusic),
 		zap.Int("results", len(results)),
 		zap.Int("noTorrentID", filteredByEmptyID),
 		zap.Int("groupMismatch", filteredByGroup),
@@ -2111,6 +2128,319 @@ func keywordStartsWithYear(keyword string) bool {
 		return false
 	}
 	return year >= 1920 && year <= 2030
+}
+
+var audioExtensions = []string{".flac", ".wav", ".ape", ".tta", ".wv", ".mp3", ".m4a", ".ogg", ".opus", ".aac", ".dsf", ".dff"}
+
+func detectContentType(fileTree map[string]int64) string {
+	if len(fileTree) == 0 {
+		return "video"
+	}
+	hasAudio := false
+	hasVideo := false
+	for path := range fileTree {
+		lower := strings.ToLower(path)
+		for _, ext := range audioExtensions {
+			if strings.HasSuffix(lower, ext) {
+				hasAudio = true
+			}
+		}
+		for _, ext := range videoExtensions {
+			if strings.HasSuffix(lower, ext) {
+				hasVideo = true
+			}
+		}
+	}
+	if hasAudio && !hasVideo {
+		return "music"
+	}
+	return "video"
+}
+
+func ExtractMusicKeyword(title string) string {
+	if title == "" {
+		return ""
+	}
+	s := musicStripCurlyBraces(title)
+	s = musicProcessSquareBrackets(s)
+
+	if result, ok := musicSceneNaming(s); ok {
+		return musicNormalize(result)
+	}
+
+	s = musicStripDatePrefix(s)
+	s = musicStripYearParens(s)
+	s = musicStripTrailingFormat(s)
+	return musicNormalize(s)
+}
+
+func musicStripCurlyBraces(s string) string {
+	for {
+		start := strings.Index(s, "{")
+		if start < 0 {
+			break
+		}
+		end := strings.Index(s[start:], "}")
+		if end < 0 {
+			break
+		}
+		s = s[:start] + " " + s[start+end+1:]
+	}
+	return s
+}
+
+var musicBracketNoisePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)(FLAC|APE|WAV|MP3|DSD|DSF|CUE|SACD|ISO)`),
+	regexp.MustCompile(`(?i)(bit|kHz|KHz)`),
+	regexp.MustCompile(`^\d+-\d+$`),
+	regexp.MustCompile(`(?i)^(EAC|XLD|OpenCD)$`),
+	regexp.MustCompile(`(?i)(Genie|KKBOX|Bugs|Tidal|MQA|Spotify)`),
+	regexp.MustCompile(`^\d{4}(\.\d{2}(\.\d{2})?)?$|^\d{6}$|^\d{8}$`),
+	regexp.MustCompile(`(?i)(版|初回|限定|復刻|Remaster|Edition)`),
+	regexp.MustCompile(`(?i)^(Album|Single|EP|Live|Mini)`),
+	regexp.MustCompile(`C\d{2}|例大祭|Comiket|ボーマス|M3-`),
+	regexp.MustCompile(`^[A-Z]{2,5}[-_]?\d{2,6}`),
+	regexp.MustCompile(`(?i)^(US|EU|JP|KR|HK|TW|CN|DE|SE|FI|FR|NL|IT|AU|UK)$`),
+}
+
+func musicIsBracketNoise(content string) bool {
+	if len([]rune(content)) > 20 {
+		return false
+	}
+	for _, p := range musicBracketNoisePatterns {
+		if p.MatchString(content) {
+			return true
+		}
+	}
+	return false
+}
+
+func musicProcessSquareBrackets(s string) string {
+	for _, pair := range [][2]string{{"[", "]"}, {"【", "】"}} {
+		open, closeCh := pair[0], pair[1]
+		for {
+			start := strings.Index(s, open)
+			if start < 0 {
+				break
+			}
+			end := strings.Index(s[start:], closeCh)
+			if end < 0 {
+				break
+			}
+			content := s[start+len(open) : start+end]
+			rest := s[start+end+len(closeCh):]
+			if musicIsBracketNoise(content) {
+				s = s[:start] + " " + rest
+			} else {
+				s = s[:start] + " " + content + " " + rest
+			}
+		}
+	}
+	return s
+}
+
+var musicSceneAnchors = map[string]bool{
+	"CD": true, "CDR": true, "CDEP": true, "CDM": true,
+	"WEB": true, "WEBFLAC": true, "2CD": true, "3CD": true,
+	"DVD": true, "VINYL": true, "12INCH_VINYL": true, "7_INCH_VINYL": true,
+	"16BIT": true, "24BIT": true,
+	"FLAC": true, "FLACME": true,
+	"REMASTERED": true, "REPACK": true, "GOLD": true,
+	"BOOTLEG": true, "PROMO": true, "SPLIT": true,
+	"SINGLE": true, "EP": true,
+}
+
+var musicCountryCodes = map[string]bool{
+	"DE": true, "SE": true, "FI": true, "CN": true,
+	"US": true, "JP": true, "KR": true, "UK": true,
+	"FR": true, "NL": true, "IT": true, "AU": true,
+}
+
+var musicYearRe = regexp.MustCompile(`^(19|20)\d{2}$`)
+var musicDeluxeRe = regexp.MustCompile(`(?i)^(Deluxe|Limited)`)
+
+func musicIsMetadataAnchor(seg string) bool {
+	upper := strings.ToUpper(seg)
+	if musicSceneAnchors[upper] || musicCountryCodes[upper] {
+		return true
+	}
+	if strings.HasPrefix(seg, "(") {
+		return true
+	}
+	if musicYearRe.MatchString(seg) || musicDeluxeRe.MatchString(seg) {
+		return true
+	}
+	return false
+}
+
+func musicSceneNaming(s string) (string, bool) {
+	s = strings.TrimSpace(s)
+	if strings.Contains(s, " ") || hasCJKChar(s) || !strings.Contains(s, "-") {
+		return s, false
+	}
+	segs := strings.Split(s, "-")
+	var filtered []string
+	for _, seg := range segs {
+		if seg != "" && seg != "_" {
+			filtered = append(filtered, seg)
+		}
+	}
+	anchorIdx := -1
+	for i, seg := range filtered {
+		if musicIsMetadataAnchor(seg) {
+			anchorIdx = i
+			break
+		}
+	}
+	if anchorIdx <= 0 {
+		return s, false
+	}
+	keep := filtered[:anchorIdx]
+	if len(keep) < 1 {
+		return s, false
+	}
+	return strings.Join(keep, "-"), true
+}
+
+var musicDatePrefixPatterns = []struct {
+	re   *regexp.Regexp
+	repl string
+}{
+	{regexp.MustCompile(`^\d{4}\s*[-–—]\s+`), ""},
+	{regexp.MustCompile(`^\d{4}\.\d{2}\.\d{2}\s*[-–—]?\s*`), ""},
+	{regexp.MustCompile(`^\d{4}\.\d{2}\s+`), ""},
+	{regexp.MustCompile(`^\d{4}\.\s+`), ""},
+	{regexp.MustCompile(`^\d{4}-([A-Z])`), "$1"},
+}
+
+func musicStripDatePrefix(s string) string {
+	for _, p := range musicDatePrefixPatterns {
+		s = p.re.ReplaceAllString(s, p.repl)
+	}
+	return s
+}
+
+var musicFYearRe = regexp.MustCompile(`(19|20)\d{2}`)
+var musicFFormatRe = regexp.MustCompile(`(?i)^(FLAC|WAV|APE|MP3|DSD|M4A|OGG)$`)
+var musicFTypeRe = regexp.MustCompile(`(?i)^(album|EP|Single)$`)
+
+func musicShouldStripParen(content string) bool {
+	return musicFYearRe.MatchString(content) ||
+		musicFFormatRe.MatchString(content) ||
+		musicFTypeRe.MatchString(content)
+}
+
+func musicStripYearParens(s string) string {
+	for _, pair := range [][2]string{{"(", ")"}, {"（", "）"}} {
+		open, closeCh := pair[0], pair[1]
+		var buf strings.Builder
+		i := 0
+		for i < len(s) {
+			idx := strings.Index(s[i:], open)
+			if idx < 0 {
+				buf.WriteString(s[i:])
+				break
+			}
+			closeIdx := strings.Index(s[i+idx+len(open):], closeCh)
+			if closeIdx < 0 {
+				buf.WriteString(s[i:])
+				break
+			}
+			content := strings.TrimSpace(s[i+idx+len(open) : i+idx+len(open)+closeIdx])
+			parenEnd := i + idx + len(open) + closeIdx + len(closeCh)
+			buf.WriteString(s[i : i+idx])
+			if musicShouldStripParen(content) {
+				buf.WriteByte(' ')
+			} else {
+				buf.WriteString(s[i+idx : parenEnd])
+			}
+			i = parenEnd
+		}
+		s = buf.String()
+	}
+	return s
+}
+
+var musicTrailingFormatPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`\s+(?:-\s+)?(?:FLAC|Flac|flac)(?:\s*分轨)?$`),
+	regexp.MustCompile(`\s+分轨$`),
+}
+
+func musicStripTrailingFormat(s string) string {
+	for {
+		changed := false
+		for _, p := range musicTrailingFormatPatterns {
+			newS := p.ReplaceAllString(s, "")
+			if newS != s {
+				s = newS
+				changed = true
+			}
+		}
+		s = strings.TrimRight(s, " -")
+		if !changed {
+			break
+		}
+	}
+	return s
+}
+
+var musicInvisibleRunes = map[rune]bool{
+	'\u200E': true, '\u200B': true, '\u200C': true, '\u200D': true, '\uFEFF': true,
+}
+
+var musicSymbolsToSpace = map[rune]bool{
+	'(': true, ')': true, '[': true, ']': true, '{': true, '}': true,
+	'（': true, '）': true, '【': true, '】': true,
+	'《': true, '》': true, '「': true, '」': true,
+	'『': true, '』': true, '〈': true, '〉': true,
+	':': true, '：': true, ';': true, '；': true,
+	'-': true, '–': true, '—': true, '‐': true, '－': true,
+	'~': true, '～': true, '〜': true,
+	'.': true, '．': true, '。': true,
+	',': true, '，': true, '、': true,
+	'!': true, '！': true, '?': true, '？': true,
+	'+': true, '#': true, '@': true, '$': true, '%': true,
+	'/': true, '／': true, '=': true, '＝': true,
+	'^': true, '`': true, '\\': true, '<': true, '>': true,
+	'|': true, '｜': true, '&': true, '＆': true,
+	'…': true, '_': true, '・': true, '·': true, '•': true,
+	'*': true, '＊': true,
+	'\'': true, '\u2018': true, '\u2019': true,
+	'"': true, '\u201C': true, '\u201D': true,
+	'†': true, '′': true, '″': true, '→': true,
+	'∶': true, '‧': true, '⁄': true,
+}
+
+var musicMultiSpaceRe = regexp.MustCompile(`\s+`)
+
+func musicNormalize(s string) string {
+	var buf strings.Builder
+	for _, r := range s {
+		if musicInvisibleRunes[r] {
+			continue
+		}
+		if r >= '\uFF01' && r <= '\uFF5E' {
+			r = r - '\uFEE0'
+		} else if r == '\u3000' {
+			r = ' '
+		}
+		if musicSymbolsToSpace[r] {
+			buf.WriteRune(' ')
+		} else {
+			buf.WriteRune(r)
+		}
+	}
+	result := musicMultiSpaceRe.ReplaceAllString(buf.String(), " ")
+	return strings.TrimSpace(result)
+}
+
+func hasCJKChar(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) {
+			return true
+		}
+	}
+	return false
 }
 
 func CompareSizeDisplay(sourceBytes, resultBytes int64) bool {
