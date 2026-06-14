@@ -30,6 +30,7 @@ type ClientManager interface {
 	Reload(ctx context.Context) error
 	ConnectedCount() int
 	ListClients() []string
+	IsConnected(name string) bool
 }
 
 func NewClientHandler(db *gorm.DB, logger *zap.Logger, clientMgr ClientManager) *ClientHandler {
@@ -71,6 +72,7 @@ type downloaderResponse struct {
 	UploadSpeed    int64                `json:"uploadSpeed"`
 	FreeSpace      int64                `json:"freeSpace"`
 	TotalDiskSpace int64                `json:"totalDiskSpace"`
+	Connected      bool                 `json:"connected"`
 	CreatedAt      time.Time            `json:"createdAt"`
 	UpdatedAt      time.Time            `json:"updatedAt"`
 }
@@ -143,6 +145,10 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 			if !clients[i].Enabled || h.clientMgr == nil {
 				continue
 			}
+			items[i].Connected = h.clientMgr.IsConnected(clients[i].Name)
+			if !items[i].Connected {
+				continue
+			}
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
@@ -162,6 +168,12 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 			}(i)
 		}
 		wg.Wait()
+	} else {
+		for i := range items {
+			if clients[i].Enabled && h.clientMgr != nil {
+				items[i].Connected = h.clientMgr.IsConnected(clients[i].Name)
+			}
+		}
 	}
 
 	Success(w, PaginatedResult{
@@ -279,6 +291,10 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("downloader created", zap.String("name", client.Name), zap.String("type", client.Type))
 
 	auditLog(r, "client", "create", "client", fmt.Sprintf("%d", client.ID), client.Name, "success")
+
+	if h.clientMgr != nil {
+		_ = h.clientMgr.Reload(r.Context())
+	}
 
 	var mappings []model.ClientPathMapping
 	if err := h.db.Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
@@ -399,6 +415,10 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	auditLog(r, "client", "update", "client", fmt.Sprintf("%d", id), client.Name, "success")
 
+	if h.clientMgr != nil {
+		_ = h.clientMgr.Reload(r.Context())
+	}
+
 	var mappings []model.ClientPathMapping
 	if err := h.db.Where("source_client_id = ?", client.ID).Find(&mappings).Error; err != nil {
 		h.logger.Error("query path mappings failed", zap.Uint("clientID", client.ID), zap.Error(err))
@@ -440,6 +460,11 @@ func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("downloader deleted", zap.String("name", client.Name))
 	auditLog(r, "client", "delete", "client", fmt.Sprintf("%d", id), client.Name, "success")
+
+	if h.clientMgr != nil {
+		_ = h.clientMgr.Reload(r.Context())
+	}
+
 	Success(w, nil)
 }
 

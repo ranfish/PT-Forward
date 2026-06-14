@@ -711,7 +711,7 @@ func registerSchedulerTasks(
 	}
 
 	register("client_ping", "maintenance", "*/5 * * * *", func(ctx context.Context) error {
-		clientMgr.PingAll(ctx)
+		clientMgr.HealthCheck(ctx)
 		return nil
 	})
 
