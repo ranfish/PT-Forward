@@ -11,6 +11,7 @@ import (
 )
 
 type TorrentMeta struct {
+	Name        string
 	InfoHash    string
 	PiecesHash  string
 	TotalSize   int64
@@ -50,6 +51,7 @@ func ComputeFromTorrent(data []byte) (*TorrentMeta, error) {
 		return nil, fpError(ErrFPCompute, "info hash", err)
 	}
 
+	name := getStr(infoDict, "name")
 	piecesHash := computePiecesHash(infoDict)
 	fileTree := extractFileTree(infoDict)
 	totalSize := computeTotalSize(fileTree)
@@ -63,6 +65,7 @@ func ComputeFromTorrent(data []byte) (*TorrentMeta, error) {
 	filesHash := computeFilesHash(fileTree)
 
 	return &TorrentMeta{
+		Name:        name,
 		InfoHash:    infoHash,
 		PiecesHash:  piecesHash,
 		TotalSize:   totalSize,
