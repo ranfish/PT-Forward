@@ -219,7 +219,24 @@ func TestManager_LoadClients_RemovesStale(t *testing.T) {
 	}
 }
 
-func TestManager_PingAll(t *testing.T) {
+func TestManager_IsConnected(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	if m.IsConnected("nope") {
+		t.Error("expected false for nonexistent client")
+	}
+
+	m.mu.Lock()
+	m.clients["injected"] = &stubClient{name: "injected"}
+	m.mu.Unlock()
+
+	if !m.IsConnected("injected") {
+		t.Error("expected true for injected client")
+	}
+}
+
+func TestManager_HealthCheck(t *testing.T) {
 	db := setupManagerDB(t)
 	m := NewManager(db, zap.NewNop())
 
@@ -231,10 +248,10 @@ func TestManager_PingAll(t *testing.T) {
 		t.Fatalf("LoadClients: %v", err)
 	}
 
-	m.PingAll(context.Background())
+	m.HealthCheck(context.Background())
 }
 
-func TestManager_PingAll_Cancelled(t *testing.T) {
+func TestManager_HealthCheck_Cancelled(t *testing.T) {
 	db := setupManagerDB(t)
 	m := NewManager(db, zap.NewNop())
 
@@ -248,7 +265,50 @@ func TestManager_PingAll_Cancelled(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	m.PingAll(ctx)
+	m.HealthCheck(ctx)
+}
+
+func TestManager_HealthCheck_ReconnectsDisconnectedClient(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	cfg := &model.ClientConfig{
+		Name: "disc-qb", Type: "qbittorrent", URL: "http://127.0.0.1:9999",
+		Role: "download", Enabled: true,
+	}
+	db.Create(cfg)
+
+	if err := m.LoadClients(context.Background()); err != nil {
+		t.Fatalf("LoadClients: %v", err)
+	}
+	if m.IsConnected("disc-qb") {
+		t.Fatal("expected client to be disconnected (unreachable)")
+	}
+
+	m.HealthCheck(context.Background())
+
+	if m.IsConnected("disc-qb") {
+		t.Error("expected client to still be disconnected (still unreachable)")
+	}
+}
+
+func TestManager_HealthCheck_RemovesDisabledClient(t *testing.T) {
+	db := setupManagerDB(t)
+	m := NewManager(db, zap.NewNop())
+
+	m.mu.Lock()
+	m.clients["should-remove"] = &stubClient{name: "should-remove"}
+	m.mu.Unlock()
+
+	if !m.IsConnected("should-remove") {
+		t.Fatal("expected client to be connected before health check")
+	}
+
+	m.HealthCheck(context.Background())
+
+	if m.IsConnected("should-remove") {
+		t.Error("expected client to be removed (not in DB)")
+	}
 }
 
 func TestManager_CreateClient_UnsupportedType(t *testing.T) {

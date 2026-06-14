@@ -30,8 +30,8 @@
         </template>
         <template v-if="column.key === 'enabled'">
           <a-badge
-            :status="record.enabled ? 'success' : 'default'"
-            :text="record.enabled ? t('common.online') : t('common.offline')"
+            :status="!record.enabled ? 'default' : (record.connected ? 'success' : 'error')"
+            :text="!record.enabled ? t('common.disabled') : (record.connected ? t('common.online') : t('common.disconnected'))"
           />
         </template>
         <template v-if="column.key === 'downloadSpeed'">

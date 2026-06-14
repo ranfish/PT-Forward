@@ -188,6 +188,7 @@ export interface ClientConfig {
   uploadSpeed: number
   freeSpace: number
   totalDiskSpace: number
+  connected: boolean
   createdAt: string
   updatedAt: string
 }
