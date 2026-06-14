@@ -1667,6 +1667,23 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 	}
 
 	keyword := ExtractSearchKeyword(fp.Title)
+	groupName := ExtractGroupName(fp.Title)
+
+	if (keyword == "" || keywordStartsWithYear(keyword)) && len(fp.FileTreeParsed) > 0 {
+		fileKeyword, fileGroup := extractFromFileTree(fp.FileTreeParsed)
+		if fileKeyword != "" && !keywordStartsWithYear(fileKeyword) {
+			e.logger.Debug("从视频文件名提取关键词",
+				zap.String("title", fp.Title),
+				zap.String("originalKeyword", keyword),
+				zap.String("fileKeyword", fileKeyword),
+				zap.String("fileGroup", fileGroup))
+			keyword = fileKeyword
+			if fileGroup != "" {
+				groupName = fileGroup
+			}
+		}
+	}
+
 	if keyword == "" {
 		if l2s != nil {
 			l2s.mu.Lock()
@@ -1676,7 +1693,6 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		return nil
 	}
 
-	groupName := ExtractGroupName(fp.Title)
 	if groupName == "" {
 		if l2s != nil {
 			l2s.mu.Lock()
@@ -2053,6 +2069,48 @@ func ExtractGroupName(title string) string {
 		return ""
 	}
 	return group
+}
+
+var videoExtensions = []string{".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".flv", ".mov"}
+
+func findMainVideoFile(fileTree map[string]int64) string {
+	var bestPath string
+	var bestSize int64
+	for path, size := range fileTree {
+		lower := strings.ToLower(path)
+		for _, ext := range videoExtensions {
+			if strings.HasSuffix(lower, ext) && size > bestSize {
+				bestPath = path
+				bestSize = size
+				break
+			}
+		}
+	}
+	return bestPath
+}
+
+func extractFromFileTree(fileTree map[string]int64) (keyword, groupName string) {
+	videoFile := findMainVideoFile(fileTree)
+	if videoFile == "" {
+		return "", ""
+	}
+	if idx := strings.LastIndex(videoFile, "/"); idx >= 0 {
+		videoFile = videoFile[idx+1:]
+	}
+	keyword = ExtractSearchKeyword(videoFile)
+	groupName = ExtractGroupName(videoFile)
+	return
+}
+
+func keywordStartsWithYear(keyword string) bool {
+	if len(keyword) < 4 {
+		return false
+	}
+	year, err := strconv.Atoi(keyword[:4])
+	if err != nil {
+		return false
+	}
+	return year >= 1920 && year <= 2030
 }
 
 func CompareSizeDisplay(sourceBytes, resultBytes int64) bool {

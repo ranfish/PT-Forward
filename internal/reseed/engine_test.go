@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -2886,6 +2887,129 @@ func TestCompareFileTreesStrict(t *testing.T) {
 			got := compareFileTreesStrict(tt.src, tt.tgt)
 			if got != tt.want {
 				t.Errorf("compareFileTreesStrict() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFindMainVideoFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileTree map[string]int64
+		want     string
+	}{
+		{
+			name:     "single mkv",
+			fileTree: map[string]int64{"movie.mkv": 1000000},
+			want:     "movie.mkv",
+		},
+		{
+			name: "largest video wins",
+			fileTree: map[string]int64{
+				"small.mkv":    500000,
+				"big.mkv":      5000000,
+				"cover.jpg":    100000,
+				"info.txt":     1000,
+			},
+			want: "big.mkv",
+		},
+		{
+			name: "no video files",
+			fileTree: map[string]int64{
+				"cover.jpg": 100000,
+				"info.txt":  1000,
+			},
+			want: "",
+		},
+		{
+			name:     "empty tree",
+			fileTree: map[string]int64{},
+			want:     "",
+		},
+		{
+			name: "subdirectory path",
+			fileTree: map[string]int64{
+				"Subs/sub1.srt":                 50000,
+				"Movie.2020.mkv":                5000000,
+				"Movie.2020_s.jpg":              100000,
+			},
+			want: "Movie.2020.mkv",
+		},
+		{
+			name: "mp4 and mkv, mkv larger",
+			fileTree: map[string]int64{
+				"a.mp4": 3000000,
+				"b.mkv": 4000000,
+			},
+			want: "b.mkv",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := findMainVideoFile(tt.fileTree)
+			if got != tt.want {
+				t.Errorf("findMainVideoFile() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExtractFromFileTree(t *testing.T) {
+	fileTree := map[string]int64{
+		"[斯巴达克斯].Spartacus.1960.4K.Restored.Edition.BluRay.1080p.x264.DTS.2Audios-CMCT.mkv": 23628070195,
+		"[斯巴达克斯].Spartacus.1960.4K.Restored.Edition.BluRay.1080p.x264.DTS.2Audios-CMCT_s.jpg": 800000,
+		"斯巴达克斯 1960 蓝光封面.jpg": 500000,
+		"斯巴达克斯 1960 内容简介.txt":  1000,
+	}
+
+	keyword, groupName := extractFromFileTree(fileTree)
+
+	if keyword == "" {
+		t.Fatal("expected non-empty keyword")
+	}
+	if !strings.Contains(keyword, "Spartacus") {
+		t.Errorf("keyword should contain 'Spartacus', got %q", keyword)
+	}
+	if groupName != "CMCT" {
+		t.Errorf("groupName should be CMCT, got %q", groupName)
+	}
+}
+
+func TestExtractFromFileTree_NoVideo(t *testing.T) {
+	fileTree := map[string]int64{
+		"cover.jpg": 100000,
+		"info.txt":  1000,
+	}
+	keyword, groupName := extractFromFileTree(fileTree)
+	if keyword != "" {
+		t.Errorf("expected empty keyword, got %q", keyword)
+	}
+	if groupName != "" {
+		t.Errorf("expected empty groupName, got %q", groupName)
+	}
+}
+
+func TestKeywordStartsWithYear(t *testing.T) {
+	tests := []struct {
+		keyword string
+		want    bool
+	}{
+		{"2023 1080p", true},
+		{"1960 4K", true},
+		{"1934 FRA 1080p", true},
+		{"2013 Extended Cut 1080p", true},
+		{"The Matrix 1999 1080p", false},
+		{"Spartacus 1960 4K", false},
+		{"1080p", false},
+		{"4K", false},
+		{"", false},
+		{"ab", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.keyword, func(t *testing.T) {
+			got := keywordStartsWithYear(tt.keyword)
+			if got != tt.want {
+				t.Errorf("keywordStartsWithYear(%q) = %v, want %v", tt.keyword, got, tt.want)
 			}
 		})
 	}
