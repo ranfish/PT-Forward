@@ -54,6 +54,7 @@ temp/
 tr/
 
 # Downloader torrent caches (remote .torrent copies)
+tr/
 PT0/
 PT1/
 PT2/
