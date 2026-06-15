@@ -78,6 +78,26 @@ func TestNexusPHP_DownloadTorrent_Forbidden(t *testing.T) {
 	}
 }
 
+func TestNexusPHP_DownloadTorrent_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewNexusPHPAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL}
+
+	_, err := a.DownloadTorrent(context.Background(), config, "1")
+	if err == nil {
+		t.Fatal("expected error for 404")
+	}
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrAdapterNotFound {
+		t.Errorf("expected ErrAdapterNotFound, got %v", err)
+	}
+}
+
 func TestNexusPHP_DownloadTorrent_HTML(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")

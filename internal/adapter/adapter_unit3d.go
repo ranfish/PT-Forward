@@ -179,6 +179,9 @@ func (a *Unit3DAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 		a.resetSession(config.Domain)
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 cookie 过期"}
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, notFoundError("种子不存在或已被删除")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}

@@ -53,6 +53,9 @@ func (a *YemaptAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	if resp.StatusCode == http.StatusForbidden {
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 认证失败"}
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, notFoundError("种子不存在或已被删除")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}

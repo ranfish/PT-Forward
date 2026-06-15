@@ -172,6 +172,9 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 	}
 	defer func() { drainBody(resp) }()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, notFoundError("种子不存在或已被删除")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("genDlToken HTTP %d", resp.StatusCode), nil)
 	}
@@ -202,6 +205,9 @@ func (a *MTeamAdapter) downloadViaAPI(ctx context.Context, config *model.SiteCon
 	}
 	defer func() { drainBody(dlResp) }()
 
+	if dlResp.StatusCode == http.StatusNotFound {
+		return nil, notFoundError("种子不存在或已被删除")
+	}
 	if dlResp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("下载种子 HTTP %d", dlResp.StatusCode), nil)
 	}
@@ -234,6 +240,9 @@ func (a *MTeamAdapter) downloadViaWeb(ctx context.Context, config *model.SiteCon
 	}
 	defer func() { drainBody(resp) }()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, notFoundError("种子不存在或已被删除")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
