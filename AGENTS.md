@@ -73,6 +73,35 @@
 2. **禁止发布源站带 禁转/独占/谢绝转载/限时禁转 标签或标题/副标题中带上述字样的种子**
 3. **CatEDU 小组资源默认禁转**
 
+## PT-IDX 项目（云端指纹服务）
+
+- **项目路径**：`/home/incast/PT-IDX`
+- **Go module**：`github.com/ranfish/pt-idx`
+- **DB**：PostgreSQL，本地实例，数据库名 `pt_idx`
+- **服务**：`systemctl --user restart pt-idx`（用户级 systemd 服务，端口 8766）
+- **CGO**：不需要（纯 Go + pgx 驱动）
+
+### PT-IDX 验证与部署
+
+1. `go vet ./...`
+2. `go test ./... -count=1 -timeout 180s`
+3. `/home/incast/.local/go/bin/go build -ldflags "-s -w" -o pt-idx ./cmd/pt-idx/`
+4. `systemctl --user restart pt-idx && sleep 2 && systemctl --user is-active pt-idx`
+
+### PT-IDX 代码复用规则
+
+- `bencode.go` + `compute.go` 从 PT-Forward **手动复制**，禁止 import PT-Forward 包
+- pieces_hash 计算逻辑必须与 PT-Forward **逐字节一致**
+- PT-Forward 侧 bencode/compute 如有修改，PT-IDX 侧必须同步
+
+### PT-IDX 数据采集规则
+
+- 批量采集器/RSS 订阅器下载 .torrent 后立即计算 pieces_hash，**丢弃 .torrent 数据**
+- 禁止在磁盘上持久化 .torrent 文件
+- 站点凭证（cookie/passkey）必须 AES-GCM 加密存 PostgreSQL
+- 禁止在日志中出现任何凭证
+- 配置文件含敏感信息，必须加入 `.gitignore`
+
 ## 版本管理
 
 - **编译部署前**：必须先提交并推送代码，然后在 commit message 中注明版本号和变更内容
