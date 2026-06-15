@@ -239,6 +239,10 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, 40001, "type 必须为 qbittorrent 或 transmission")
 		return
 	}
+	if req.TorrentDir == "" {
+		Error(w, http.StatusBadRequest, 40001, "种子文件目录为必填项")
+		return
+	}
 
 	validRoles := map[string]bool{"seeding": true, "download": true, "source": true, "reseed": true}
 	if !validRoles[req.Role] {
@@ -341,6 +345,21 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		client.Type = req.Type
 	}
+	effectiveType := client.Type
+	_ = effectiveType
+	torrentDir := req.TorrentDir
+	if torrentDir == "" && client.Config != "" {
+		var cfg struct {
+			TorrentDir string `json:"torrent_dir"`
+		}
+		if json.Unmarshal([]byte(client.Config), &cfg) == nil {
+			torrentDir = cfg.TorrentDir
+		}
+	}
+	if torrentDir == "" {
+		Error(w, http.StatusBadRequest, 40001, "种子文件目录为必填项")
+		return
+	}
 	if req.URL != "" {
 		if err := middleware.ValidateSafeURL(req.URL); err != nil {
 			Error(w, http.StatusBadRequest, 40001, "url 不合法: "+err.Error())
@@ -370,6 +389,8 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.TorrentDir != "" {
 		cfgBytes, _ := json.Marshal(map[string]string{"torrent_dir": req.TorrentDir})
 		configJSON = string(cfgBytes)
+	} else if client.Config != "" {
+		configJSON = client.Config
 	} else {
 		configJSON = ""
 	}
