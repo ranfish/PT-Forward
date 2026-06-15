@@ -203,6 +203,13 @@ func (s *Service) doRequest(ctx context.Context, method, path string, body []byt
 	return nil, lastErr
 }
 
+func (s *Service) IsBreakerOpen() bool {
+	s.breaker.mu.Lock()
+	defer s.breaker.mu.Unlock()
+	return s.breaker.failureCount >= s.breaker.maxFailures &&
+		time.Since(s.breaker.lastFailureTime) <= s.breaker.recoveryTime
+}
+
 func (s *Service) Close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

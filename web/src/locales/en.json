@@ -126,6 +126,7 @@
     "authSettings": "Auth Settings",
     "filterRules": "Global Exclusion Rules",
     "iyuu": "IYUU Reseed",
+    "cloudFp": "Cloud Fingerprint",
     "cookiecloud": "CookieCloud",
     "ptgen": "PTGen Movie Info",
     "seedingDashboard": "Overview",
@@ -1038,6 +1039,17 @@
     "version": "Version",
     "requestTimeout": "Request Timeout (s)",
     "sid": "SID"
+  },
+  "cloudFp": {
+    "title": "Cloud Fingerprint Service",
+    "subtitle": "PT-IDX cloud fingerprint matching configuration",
+    "baseUrl": "Service URL",
+    "apiToken": "API Token",
+    "requestTimeout": "Request Timeout (s)",
+    "statusTitle": "Service Status",
+    "breaker": "Circuit Breaker",
+    "breakerOpen": "Tripped",
+    "breakerClosed": "Healthy"
   },
   "lifecycle": {
     "title": "Lifecycle Config",

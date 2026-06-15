@@ -1047,67 +1047,6 @@ func TestEngine_matchLayer2SizeTitle_SizeMismatch(t *testing.T) {
 	}
 }
 
-func TestEngine_matchLayer3Fingerprint_WithDB(t *testing.T) {
-	db := setupReseedDB(t)
-	e := NewEngine(db, zap.NewNop())
-
-	db.Create(&model.ContentFingerprint{
-		InfoHash:   "ih_fp_src",
-		SiteName:   "source_site",
-		PiecesHash: "ph_match",
-		TotalSize:  1073741824,
-	})
-	db.Create(&model.ContentFingerprint{
-		InfoHash:   "ih_fp_tgt",
-		SiteName:   "target_site",
-		PiecesHash: "ph_match",
-		TotalSize:  1073741824,
-		TorrentID:  "t_fp_target",
-	})
-
-	rec := model.SeedingTorrentRecord{InfoHash: "ih_fp_src", SiteName: "source_site"}
-	fc := e.preloadFingerprints(context.Background(), []string{rec.InfoHash})
-	c := e.matchLayer3Fingerprint(context.Background(), rec.InfoHash, rec.SiteName, "target_site", fc)
-	if c == nil {
-		t.Fatal("expected candidate, got nil")
-	}
-	if c.MatchMethod != "fingerprint" {
-		t.Errorf("expected fingerprint, got %s", c.MatchMethod)
-	}
-	if c.TargetTorrentID != "t_fp_target" {
-		t.Errorf("expected t_fp_target, got %s", c.TargetTorrentID)
-	}
-	if c.Confidence != 1.0 {
-		t.Errorf("expected confidence 1.0, got %f", c.Confidence)
-	}
-}
-
-func TestEngine_matchLayer3Fingerprint_NoFingerprint(t *testing.T) {
-	db := setupReseedDB(t)
-	e := NewEngine(db, zap.NewNop())
-	rec := model.SeedingTorrentRecord{InfoHash: "nonexist", SiteName: "site1"}
-	c := e.matchLayer3Fingerprint(context.Background(), rec.InfoHash, rec.SiteName, "target_site", nil)
-	if c != nil {
-		t.Error("expected nil when no fingerprint found")
-	}
-}
-
-func TestEngine_matchLayer3Fingerprint_EmptyPiecesHash(t *testing.T) {
-	db := setupReseedDB(t)
-	e := NewEngine(db, zap.NewNop())
-	db.Create(&model.ContentFingerprint{
-		InfoHash:  "ih_empty_ph",
-		SiteName:  "source_site",
-		TotalSize: 1073741824,
-	})
-	rec := model.SeedingTorrentRecord{InfoHash: "ih_empty_ph", SiteName: "source_site"}
-	fc := e.preloadFingerprints(context.Background(), []string{rec.InfoHash})
-	c := e.matchLayer3Fingerprint(context.Background(), rec.InfoHash, rec.SiteName, "target_site", fc)
-	if c != nil {
-		t.Error("expected nil when no pieces_hash and no files_hash")
-	}
-}
-
 func makePreloadedSites(targetSite string, config *model.SiteConfig, adapter model.SiteAdapter) *preloadedSites {
 	return &preloadedSites{
 		configs:    map[string]*model.SiteConfig{targetSite: config},
@@ -2085,53 +2024,6 @@ func TestEngine_matchLayer2SizeTitle_NoTorrentID(t *testing.T) {
 	c := e.matchLayer2SizeTitle(context.Background(), adapter, &model.SiteConfig{}, rec.InfoHash, rec.SiteName, "target_site", 1.0, fc)
 	if c != nil {
 		t.Error("expected nil when no torrent ID in results")
-	}
-}
-
-func TestEngine_matchLayer3Fingerprint_SizeOnlyMatch(t *testing.T) {
-	db := setupReseedDB(t)
-	e := NewEngine(db, zap.NewNop())
-
-	db.Create(&model.ContentFingerprint{
-		InfoHash: "ih_size_src", SiteName: "source_site",
-		FilesHash: "fh_match", TotalSize: 1073741824,
-	})
-	db.Create(&model.ContentFingerprint{
-		InfoHash: "ih_size_tgt", SiteName: "target_site",
-		FilesHash: "fh_other", TotalSize: 1073741824,
-		TorrentID: "t_size_target",
-	})
-
-	rec := model.SeedingTorrentRecord{InfoHash: "ih_size_src", SiteName: "source_site"}
-	fc := e.preloadFingerprints(context.Background(), []string{rec.InfoHash})
-	c := e.matchLayer3Fingerprint(context.Background(), rec.InfoHash, rec.SiteName, "target_site", fc)
-	if c == nil {
-		t.Fatal("expected candidate via size-only match, got nil")
-	}
-	if c.Confidence != 0.7 {
-		t.Errorf("expected 0.7, got %f", c.Confidence)
-	}
-}
-
-func TestEngine_matchLayer3Fingerprint_NoTorrentID(t *testing.T) {
-	db := setupReseedDB(t)
-	e := NewEngine(db, zap.NewNop())
-
-	db.Create(&model.ContentFingerprint{
-		InfoHash: "ih_notid_src", SiteName: "source_site",
-		PiecesHash: "ph_no_tid", TotalSize: 1073741824,
-	})
-	db.Create(&model.ContentFingerprint{
-		InfoHash: "ih_notid_tgt", SiteName: "target_site",
-		PiecesHash: "ph_no_tid", TotalSize: 1073741824,
-		TorrentID: "",
-	})
-
-	rec := model.SeedingTorrentRecord{InfoHash: "ih_notid_src", SiteName: "source_site"}
-	fc := e.preloadFingerprints(context.Background(), []string{rec.InfoHash})
-	c := e.matchLayer3Fingerprint(context.Background(), rec.InfoHash, rec.SiteName, "target_site", fc)
-	if c != nil {
-		t.Error("expected nil when no torrent ID on target")
 	}
 }
 

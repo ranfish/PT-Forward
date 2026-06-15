@@ -124,6 +124,12 @@ func (rt *Router) Start(_ context.Context) {}
 
 func (rt *Router) Stop() {}
 
+func (rt *Router) SetCloudFPBreakerFn(fn func() bool) {
+	if rt.cloudFPHandler != nil {
+		rt.cloudFPHandler.SetBreakerFn(fn)
+	}
+}
+
 func (rt *Router) SetSiteProvider(p interface {
 	GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error)
 	GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error)

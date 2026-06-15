@@ -313,6 +313,7 @@ func main() {
 	)
 	router.SetSiteProvider(siteProvider)
 	router.SetConfigEventBus(configEventBus)
+	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
 	mux := http.NewServeMux()
 	router.RegisterWithEndpointLimits(mux, cfg.Server.CORSOrigins, true, 120, 60, 60)

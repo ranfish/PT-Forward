@@ -126,6 +126,7 @@
     "authSettings": "认证设置",
     "filterRules": "全局排除规则",
     "iyuu": "IYUU 辅种",
+    "cloudFp": "云指纹",
     "cookiecloud": "CookieCloud",
     "ptgen": "PTGen 影片信息",
     "seedingDashboard": "总览",
@@ -1041,6 +1042,17 @@
     "version": "版本",
     "requestTimeout": "请求超时(秒)",
     "sid": "SID"
+  },
+  "cloudFp": {
+    "title": "云指纹服务",
+    "subtitle": "PT-IDX 云端指纹匹配配置",
+    "baseUrl": "服务地址",
+    "apiToken": "API Token",
+    "requestTimeout": "请求超时(秒)",
+    "statusTitle": "服务状态",
+    "breaker": "熔断器",
+    "breakerOpen": "已熔断",
+    "breakerClosed": "正常"
   },
   "lifecycle": {
     "title": "生命周期配置",

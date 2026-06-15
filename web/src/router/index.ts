@@ -34,6 +34,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'fingerprints', name: 'Fingerprints', component: () => import('@/views/fingerprints/FingerprintList.vue') },
       { path: 'events', name: 'TorrentEvents', component: () => import('@/views/events/TorrentEventList.vue') },
       { path: 'iyuu', name: 'IYUU', component: () => import('@/views/iyuu/IYUUConfig.vue') },
+      { path: 'cloud-fp', name: 'CloudFP', component: () => import('@/views/cloudfp/CloudFPConfig.vue') },
       { path: 'cookiecloud', name: 'CookieCloud', component: () => import('@/views/cookiecloud/CookieCloudConfig.vue') },
       { path: 'ptgen', name: 'PTGen', component: () => import('@/views/ptgen/PTGenPage.vue') },
       { path: 'tracker', name: 'Tracker', component: () => import('@/views/tracker/TrackerList.vue') },
