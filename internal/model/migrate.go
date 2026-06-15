@@ -48,6 +48,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&ScoringLog{},
 		&IYUUConfig{},
 		&IYUUSiteMapping{},
+		&CloudFPConfig{},
 		&OperationAuditLog{},
 		&SchedulerTaskOverride{},
 		&FreeWaitEntry{},

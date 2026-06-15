@@ -23,6 +23,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/auth"
 	"github.com/ranfish/pt-forward/internal/client"
+	"github.com/ranfish/pt-forward/internal/cloudfp"
 	"github.com/ranfish/pt-forward/internal/config"
 	"github.com/ranfish/pt-forward/internal/cookiecloud"
 	"github.com/ranfish/pt-forward/internal/crypto"
@@ -214,6 +215,8 @@ func main() {
 
 	iyuuService := iyuu.NewService(db, log)
 
+	cloudFPService := cloudfp.NewService(db, log)
+
 	fpRepo := fingerprint.NewRepository(db, log)
 
 	completionWatcher := watcher.NewCompletionWatcher(db, clientManager, publishPipeline, log)
@@ -247,6 +250,7 @@ func main() {
 	reseedEngine.SetFingerprintRepo(fpRepo)
 	reseedEngine.SetClientProvider(clientManager)
 	reseedEngine.SetIYUUService(iyuuService)
+	reseedEngine.SetCloudFPService(cloudFPService)
 
 	trackerResolver := reseed.NewTrackerSiteResolver()
 	var siteRecords []*model.Site
