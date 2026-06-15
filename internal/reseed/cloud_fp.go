@@ -2,12 +2,96 @@ package reseed
 
 import (
 	"context"
+	"encoding/json"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
+
+type domainResolver struct {
+	domainToName map[string]string
+	nameToDomain map[string]string
+}
+
+func buildDomainResolver(ps *preloadedSites) *domainResolver {
+	if ps == nil {
+		return &domainResolver{
+			domainToName: make(map[string]string),
+			nameToDomain: make(map[string]string),
+		}
+	}
+	dr := &domainResolver{
+		domainToName: make(map[string]string),
+		nameToDomain: make(map[string]string),
+	}
+	for name, site := range ps.siteLimits {
+		if site == nil {
+			continue
+		}
+		primary := normalizeDomain(site.Domain)
+		if primary == "" {
+			primary = normalizeDomain(site.BaseURL)
+		}
+		if primary != "" {
+			dr.domainToName[primary] = name
+			dr.nameToDomain[name] = primary
+		}
+		if site.BaseURL != "" {
+			if d := normalizeDomain(site.BaseURL); d != "" && d != primary {
+				dr.domainToName[d] = name
+			}
+		}
+		if site.AlternativeDomains != "" {
+			var alts []string
+			if err := json.Unmarshal([]byte(site.AlternativeDomains), &alts); err == nil {
+				for _, alt := range alts {
+					if d := normalizeDomain(alt); d != "" {
+						dr.domainToName[d] = name
+					}
+				}
+			}
+		}
+	}
+	return dr
+}
+
+func normalizeDomain(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
+		u, err := url.Parse(raw)
+		if err == nil && u.Host != "" {
+			return strings.ToLower(u.Host)
+		}
+	}
+	return strings.ToLower(raw)
+}
+
+func (dr *domainResolver) toName(domain string) string {
+	if dr == nil {
+		return domain
+	}
+	if name, ok := dr.domainToName[strings.ToLower(domain)]; ok {
+		return name
+	}
+	return domain
+}
+
+func (dr *domainResolver) toDomain(name string) string {
+	if dr == nil {
+		return name
+	}
+	if domain, ok := dr.nameToDomain[name]; ok {
+		return domain
+	}
+	return name
+}
 
 type cloudFPCache struct {
 	data    map[string][]model.CloudFPMatch
@@ -42,7 +126,7 @@ func (c *cloudFPCache) markDeleted(site, torrentID string) {
 	c.deleted.Store(site+":"+torrentID, true)
 }
 
-func (e *Engine) preloadCloudFingerprints(ctx context.Context, fc *fpCache) *cloudFPCache {
+func (e *Engine) preloadCloudFingerprints(ctx context.Context, fc *fpCache, dr *domainResolver) *cloudFPCache {
 	if e.cloudFPService == nil || !e.cloudFPService.IsEnabled() {
 		return nil
 	}
@@ -66,8 +150,19 @@ func (e *Engine) preloadCloudFingerprints(ctx context.Context, fc *fpCache) *clo
 		return nil
 	}
 
-	e.logger.Info("L1 云端指纹预加载完成", zap.Int("hashes", len(allHashes)), zap.Int("matched", len(matches)))
-	return &cloudFPCache{data: matches}
+	translated := make(map[string][]model.CloudFPMatch, len(matches))
+	for hash, list := range matches {
+		for _, m := range list {
+			m.SiteName = dr.toName(m.SiteName)
+			translated[hash] = append(translated[hash], m)
+		}
+	}
+
+	e.logger.Info("L1 云端指纹预加载完成",
+		zap.Int("hashes", len(allHashes)),
+		zap.Int("matched", len(translated)),
+	)
+	return &cloudFPCache{data: translated}
 }
 
 func (e *Engine) matchLayer1FromCloudCache(sourceInfoHash, sourceSiteName, siteName string, fc *fpCache, cache *cloudFPCache) *model.Candidate {
