@@ -252,7 +252,7 @@ const submitting = ref(false)
 const editingTask = ref<ReseedTask | null>(null)
 
 const reseedModeMatchMethods: Record<string, string> = {
-  seed_feature: 'pieces_hash,file_tree,size_title,fingerprint',
+  seed_feature: 'pieces_hash,size_title,fingerprint',
   iyuu_cloud: 'iyuu',
 }
 
