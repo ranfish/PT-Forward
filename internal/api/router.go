@@ -38,6 +38,7 @@ type Router struct {
 	dashboardHandler     *DashboardHandler
 	systemHandler        *SystemHandler
 	iyuuHandler          *IYUUHandler
+	cloudFPHandler       *CloudFPHandler
 	fingerprintHandler   *FingerprintHandler
 	trackerHandler       *TrackerHandler
 	lifecycleHandler     *LifecycleHandler
@@ -100,6 +101,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		dashboardHandler:     dashHandler,
 		systemHandler:        sysHandler,
 		iyuuHandler:          NewIYUUHandler(db, logger, iyuuSvc),
+		cloudFPHandler:       NewCloudFPHandler(db, logger),
 		fingerprintHandler:   NewFingerprintHandler(db, logger),
 		trackerHandler:       NewTrackerHandler(db, logger),
 		lifecycleHandler:     NewLifecycleHandler(db, logger),
@@ -310,6 +312,14 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/iyuu/test/", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/status", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/status/", iyuuHandler)
+
+	cloudFPHandler := rt.chain(rt.rateLimitMW, rt.cloudFPHandler.ServeHTTP)
+	mux.Handle("/api/v1/cloud-fp/config", cloudFPHandler)
+	mux.Handle("/api/v1/cloud-fp/config/", cloudFPHandler)
+	mux.Handle("/api/v1/cloud-fp/test", cloudFPHandler)
+	mux.Handle("/api/v1/cloud-fp/test/", cloudFPHandler)
+	mux.Handle("/api/v1/cloud-fp/status", cloudFPHandler)
+	mux.Handle("/api/v1/cloud-fp/status/", cloudFPHandler)
 
 	fingerprintHandler := rt.chain(rt.rateLimitMW, rt.fingerprintHandler.ServeHTTP)
 	mux.Handle("/api/v1/fingerprints", fingerprintHandler)

@@ -2,6 +2,7 @@ package reseed
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -24,6 +25,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+const errAdapterNotFoundCode = 31006
 
 type preloadedSites struct {
 	infos       []*model.SiteInfo
@@ -180,17 +183,21 @@ func (c *fpCache) get(infoHash, siteName string) *model.ContentFingerprint {
 }
 
 type Engine struct {
-	db              *gorm.DB
-	logger          *zap.Logger
-	siteProvider    model.SiteInfoProvider
-	clientProvider  model.DownloaderProvider
-	iyuuService     model.IYUUService
-	fpRepo          *fingerprint.Repository
-	trackerResolver *TrackerSiteResolver
-	scheduler       *scheduler.Registry
-	limiter         *siteLimiter
-	mu              sync.RWMutex
-	tasks           map[uint]context.CancelFunc
+	db                   *gorm.DB
+	logger               *zap.Logger
+	siteProvider         model.SiteInfoProvider
+	clientProvider       model.DownloaderProvider
+	iyuuService          model.IYUUService
+	fpRepo               *fingerprint.Repository
+	trackerResolver      *TrackerSiteResolver
+	scheduler            *scheduler.Registry
+	limiter              *siteLimiter
+	mu                   sync.RWMutex
+	tasks                map[uint]context.CancelFunc
+	cloudFPService       model.CloudFPService
+	deleteReporter       *deleteReporter
+	contributeReporter   *contributeReporter
+	currentCloudFPCache  *cloudFPCache
 }
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
@@ -224,6 +231,14 @@ func (e *Engine) SetTrackerResolver(resolver *TrackerSiteResolver) {
 
 func (e *Engine) SetScheduler(registry *scheduler.Registry) {
 	e.scheduler = registry
+}
+
+func (e *Engine) SetCloudFPService(svc model.CloudFPService) {
+	e.cloudFPService = svc
+	if svc != nil {
+		e.deleteReporter = newDeleteReporter(svc, e.logger)
+		e.contributeReporter = newContributeReporter(svc, e.logger)
+	}
 }
 
 func reseedSchedulerName(taskID uint) string {
@@ -921,13 +936,21 @@ func (e *Engine) Start(ctx context.Context) error {
 
 func (e *Engine) Stop() {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	stopped := len(e.tasks)
 	for id, cancel := range e.tasks {
 		cancel()
 		delete(e.tasks, id)
 	}
+	e.mu.Unlock()
+
+	if e.deleteReporter != nil {
+		e.deleteReporter.Close()
+	}
+	if e.contributeReporter != nil {
+		e.contributeReporter.Close()
+	}
+
 	e.logger.Info("reseed engine stopped", zap.Int("stopped_tasks", stopped))
 }
 
@@ -1170,6 +1193,26 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		phCache = e.preloadPiecesHashCache(ctx, sourceTorrents, ps, fpCache, negCache, scanConc)
 	}
 
+	cfCache := e.preloadCloudFingerprints(ctx, fpCache)
+	e.currentCloudFPCache = cfCache
+	defer func() { e.currentCloudFPCache = nil }()
+
+	if phCache != nil && e.contributeReporter != nil && e.cloudFPService != nil && e.cloudFPService.IsEnabled() {
+		var contributeRecords []model.CloudFPContribute
+		for siteName, hashMap := range phCache.bySite {
+			for ph, tid := range hashMap {
+				contributeRecords = append(contributeRecords, model.CloudFPContribute{
+					PiecesHash: ph,
+					SiteName:   siteName,
+					TorrentID:  strconv.Itoa(tid),
+				})
+			}
+		}
+		if len(contributeRecords) > 0 {
+			e.contributeReporter.Upload(contributeRecords)
+		}
+	}
+
 	phSites := 0
 	if phCache != nil {
 		phSites = len(phCache.bySite)
@@ -1247,7 +1290,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			seenPiecesHashes[fp.PiecesHash] = true
 		}
 
-		candidates := e.findCandidates(ctx, src, ps, fpCache, sizeTolerance, task, negCache, phCache, l2s, confirmedTargets, nameSites)
+		candidates := e.findCandidates(ctx, src, ps, fpCache, sizeTolerance, task, negCache, phCache, cfCache, l2s, confirmedTargets, nameSites)
 
 		if matchCount <= 10 {
 			e.logger.Info("findCandidates 结果",
@@ -1327,7 +1370,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				decision = model.DecisionSameInfoHash
 			case c.MatchMethod == "iyuu":
 				decision = model.DecisionMatch
-			case c.MatchMethod == "fingerprint":
+			case c.MatchMethod == "fingerprint" || c.MatchMethod == "cloud_fingerprint":
 				decision = model.DecisionMatchPartial
 			case c.MatchMethod == "size_title":
 				decision = model.DecisionMatchSizeOnly
@@ -1432,7 +1475,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	return result, nil
 }
 
-func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool, phCache *piecesHashCache, l2s *l2Stats, confirmedTargets map[string]bool, nameSites map[string]map[string]bool) []model.Candidate {
+func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool, phCache *piecesHashCache, cfCache *cloudFPCache, l2s *l2Stats, confirmedTargets map[string]bool, nameSites map[string]map[string]bool) []model.Candidate {
 	if ps == nil {
 		return nil
 	}
@@ -1476,23 +1519,22 @@ func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *prel
 			}
 		}
 
+		if hasMatchMethod(task.MatchMethods, "fingerprint") {
+			c := e.matchLayer1FromCloudCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, cfCache)
+			if c != nil {
+				return c
+			}
+		}
+
 		if hasMatchMethod(task.MatchMethods, "size_title") {
 			if phCache != nil && phCache.wasQueried(siteInfo.Name) {
 				// pieces_hash batch query already ran for this site and found no match.
-				// pieces_hash is a precise content index; L2 title search would only
-				// find different-content torrents (false positives). Skip L2, try L3.
+				// Skip L2.
 			} else {
 				c := e.matchLayer2SearchVerify(ctx, adapter, siteConfig, src.InfoHash, src.SiteName, siteInfo.Name, fc, l2s)
 				if c != nil {
 					return c
 				}
-			}
-		}
-
-		if hasMatchMethod(task.MatchMethods, "fingerprint") {
-			c := e.matchLayer3Fingerprint(ctx, src.InfoHash, src.SiteName, siteInfo.Name, fc)
-			if c != nil {
-				return c
 			}
 		}
 
@@ -2699,7 +2741,7 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 		SiteName: record.SiteName,
 		ClientID: record.ClientID,
 	}
-	candidates := e.findCandidates(ctx, src, ps, fpc, task.SizeTolerancePercent, task, negCache, nil, nil, nil, nil)
+	candidates := e.findCandidates(ctx, src, ps, fpc, task.SizeTolerancePercent, task, negCache, nil, nil, nil, nil, nil)
 	if len(candidates) == 0 {
 		e.logger.Debug("auto reseed: no candidates found", zap.String("info_hash", record.InfoHash))
 		return
@@ -2917,6 +2959,15 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 
 	torrentData, err := targetAdapter.DownloadTorrent(ctx, targetConfig, match.TargetTorrentID)
 	if err != nil {
+		var appErr *model.AppError
+		if errors.As(err, &appErr) && appErr.Code == errAdapterNotFoundCode {
+			if e.currentCloudFPCache != nil {
+				e.currentCloudFPCache.markDeleted(match.TargetSite, match.TargetTorrentID)
+			}
+			if e.deleteReporter != nil {
+				e.deleteReporter.Report(match.TargetSite, match.TargetTorrentID)
+			}
+		}
 		return e.failMatch(ctx, match, fmt.Sprintf("下载目标种子失败: %v", err))
 	}
 

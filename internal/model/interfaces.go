@@ -190,3 +190,11 @@ type PublishTaskRepository interface {
 	Update(ctx context.Context, task *PublishTask) error
 	UpdateTaskStatus(ctx context.Context, id uint, status PublishTaskStatus) error
 }
+
+type CloudFPService interface {
+	IsEnabled() bool
+	BatchLookup(ctx context.Context, piecesHashes []string, targetSites []string) (map[string][]CloudFPMatch, error)
+	ReportDeleted(ctx context.Context, reports []CloudFPDeleteReport) error
+	UploadRecords(ctx context.Context, records []CloudFPContribute) error
+	TestConnection(ctx context.Context) error
+}
