@@ -45,6 +45,26 @@ func TestGazelle_DownloadTorrent_OK(t *testing.T) {
 	}
 }
 
+func TestGazelle_DownloadTorrent_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewGazelleAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, Passkey: "pk1"}
+
+	_, err := a.DownloadTorrent(context.Background(), config, "42")
+	if err == nil {
+		t.Fatal("expected error for 404")
+	}
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrAdapterNotFound {
+		t.Errorf("expected ErrAdapterNotFound, got %v", err)
+	}
+}
+
 func TestGazelle_DownloadTorrent_AuthKey(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("authkey") != "ak1" {

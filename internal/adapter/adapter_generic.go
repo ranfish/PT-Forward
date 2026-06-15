@@ -102,6 +102,9 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 	if resp.StatusCode == http.StatusForbidden {
 		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, notFoundError("种子不存在或已被删除")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}

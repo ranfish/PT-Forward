@@ -62,6 +62,26 @@ func TestUnit3D_DownloadTorrent_Forbidden(t *testing.T) {
 	}
 }
 
+func TestUnit3D_DownloadTorrent_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewUnit3DAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL}
+
+	_, err := a.DownloadTorrent(context.Background(), config, "1")
+	if err == nil {
+		t.Fatal("expected error for 404")
+	}
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrAdapterNotFound {
+		t.Errorf("expected ErrAdapterNotFound, got %v", err)
+	}
+}
+
 func TestUnit3D_DownloadTorrent_CustomPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {

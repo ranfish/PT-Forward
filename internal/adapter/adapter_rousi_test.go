@@ -56,9 +56,29 @@ func TestRousiAdapter_DownloadTorrent_Error(t *testing.T) {
 	a := NewRousiAdapter(doer, zap.NewNop())
 
 	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
-	_, err := a.DownloadTorrent(context.Background(), config, "1")
+	_, err := a.DownloadTorrent(context.Background(), config, "42")
 	if err == nil {
 		t.Fatal("expected error for 500")
+	}
+}
+
+func TestRousiAdapter_DownloadTorrent_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewRousiAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Passkey: "testkey"}
+	_, err := a.DownloadTorrent(context.Background(), config, "42")
+	if err == nil {
+		t.Fatal("expected error for 404")
+	}
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrAdapterNotFound {
+		t.Errorf("expected ErrAdapterNotFound, got %v", err)
 	}
 }
 

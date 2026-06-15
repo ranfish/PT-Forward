@@ -112,6 +112,9 @@ func (a *RousiAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 	}
 	defer func() { drainBody(resp) }()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, notFoundError("种子不存在或已被删除")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}

@@ -426,6 +426,10 @@ func TestGenericAdapter_DownloadTorrent_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for 404")
 	}
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrAdapterNotFound {
+		t.Errorf("expected ErrAdapterNotFound, got %v", err)
+	}
 }
 
 func TestGenericAdapter_DownloadTorrent_EmptyBody(t *testing.T) {

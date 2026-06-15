@@ -68,6 +68,46 @@ func TestTNodeAdapter_DownloadTorrent_Forbidden(t *testing.T) {
 	}
 }
 
+func TestTNodeAdapter_DownloadTorrent_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewTNodeAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	_, err := a.DownloadTorrent(context.Background(), config, "1")
+	if err == nil {
+		t.Fatal("expected error for 404")
+	}
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrAdapterNotFound {
+		t.Errorf("expected ErrAdapterNotFound, got %v", err)
+	}
+}
+
+func TestMTeamAdapter_DownloadTorrent_WebNotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+
+	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
+	_, err := a.DownloadTorrent(context.Background(), config, "1")
+	if err == nil {
+		t.Fatal("expected error for 404")
+	}
+	var appErr *model.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrAdapterNotFound {
+		t.Errorf("expected ErrAdapterNotFound, got %v", err)
+	}
+}
+
 func TestTNodeAdapter_GetTorrentDetail(t *testing.T) {
 	html := `<!DOCTYPE html><html><head><title>Test Torrent Title</title></head><body>
 	<tr><td>info_hash</td><td>ABCDEF0123456789ABCDEF0123456789ABCDEF00</td></tr>
