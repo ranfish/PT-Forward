@@ -5360,6 +5360,7 @@ func createTestClient(t *testing.T, env *testEnv, name, role string) uint {
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": name, "type": "qbittorrent", "url": "http://localhost:8080",
 		"username": "admin", "password": "pass", "role": role, "enabled": true,
+		"torrentDir": "/tmp/torrents",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create client %s: expected 200, got %d: %s", name, w.Code, w.Body.String())
@@ -5477,7 +5478,7 @@ func TestClient_Create_DuplicateName(t *testing.T) {
 	env := setupTestEnv(t)
 	body := map[string]interface{}{
 		"name": "DupClient", "type": "qbittorrent", "url": "http://localhost:8080",
-		"role": "seeding", "enabled": true,
+		"role": "seeding", "enabled": true, "torrentDir": "/tmp/torrents",
 	}
 	w := env.doRequest("POST", "/api/v1/downloaders", body)
 	if w.Code != http.StatusOK {
@@ -5493,7 +5494,7 @@ func TestClient_Create_WithTransmission(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": "trclient", "type": "transmission", "url": "http://localhost:9091",
-		"role": "download", "enabled": true,
+		"role": "download", "enabled": true, "torrentDir": "/tmp/torrents",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -5509,7 +5510,7 @@ func TestClient_Create_WithPathMappings(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": "PathMapClient", "type": "qbittorrent", "url": "http://localhost:8080",
-		"role": "seeding", "enabled": true,
+		"role": "seeding", "enabled": true, "torrentDir": "/tmp/torrents",
 		"pathMappings": []map[string]string{
 			{"sourcePath": "/data/movies", "reseedPath": "/mnt/movies"},
 		},
@@ -5560,6 +5561,7 @@ func TestClient_List_Pagination(t *testing.T) {
 		env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 			"name": fmt.Sprintf("PageClient%d", i), "type": "qbittorrent",
 			"url": fmt.Sprintf("http://localhost:%d", 8080+i), "role": "seeding", "enabled": true,
+			"torrentDir": "/tmp/torrents",
 		})
 	}
 	w := env.doRequest("GET", "/api/v1/downloaders?page=1&size=2", nil)
@@ -5599,7 +5601,7 @@ func TestClient_TestConnection_Transmission(t *testing.T) {
 	env := setupTestEnvWithClientMgr(t)
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": "TRTestConn", "type": "transmission", "url": "http://localhost:9091",
-		"role": "download", "enabled": true,
+		"role": "download", "enabled": true, "torrentDir": "/tmp/torrents",
 	})
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
@@ -5742,7 +5744,7 @@ func TestClient_ServeHTTP_CreateViaRoute(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("POST", "/api/v1/downloaders/", map[string]interface{}{
 		"name": "RouteCreate", "type": "qbittorrent", "url": "http://localhost:8080",
-		"role": "seeding", "enabled": true,
+		"role": "seeding", "enabled": true, "torrentDir": "/tmp/torrents",
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create via route: expected 200, got %d: %s", w.Code, w.Body.String())
@@ -9040,6 +9042,7 @@ func TestClient_Create_DuplicateName2(t *testing.T) {
 	body := map[string]interface{}{
 		"name": "dup-client", "type": "qbittorrent", "url": "http://a.com",
 		"username": "u", "password": "p", "role": "seeding", "enabled": true,
+		"torrentDir": "/tmp/torrents",
 	}
 	w := env.doRequest("POST", "/api/v1/downloaders", body)
 	if w.Code != http.StatusOK {
@@ -9103,7 +9106,7 @@ func TestClient_Update_InvalidJSON(t *testing.T) {
 	env := setupTestEnv(t)
 	body := map[string]interface{}{
 		"name": "upclient", "type": "qbittorrent", "url": "http://a.com",
-		"role": "seeding", "enabled": true,
+		"role": "seeding", "enabled": true, "torrentDir": "/tmp/torrents",
 	}
 	w := env.doRequest("POST", "/api/v1/downloaders", body)
 	if w.Code != http.StatusOK {

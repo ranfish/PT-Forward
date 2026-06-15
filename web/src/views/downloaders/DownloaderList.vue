@@ -108,8 +108,8 @@
           </a-col>
         </a-row>
 
-        <a-form-item label="种子文件路径" name="torrentDir">
-          <a-input v-model:value="form.torrentDir" placeholder="如 /data/torrents（远程下载器的 .torrent 文件本地映射路径，L0 pieces_hash 匹配需要）" />
+        <a-form-item label="种子文件路径" name="torrentDir" :rules="[{ required: true, message: '种子文件目录为必填项' }]">
+          <a-input v-model:value="form.torrentDir" placeholder="如 /data/torrents（下载器的 .torrent 文件本地映射路径，指纹计算和辅种匹配必需）" />
         </a-form-item>
 
         <a-divider>{{ t('downloader.pathMappings') }}</a-divider>
