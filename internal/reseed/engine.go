@@ -198,6 +198,7 @@ type Engine struct {
 	deleteReporter       *deleteReporter
 	contributeReporter   *contributeReporter
 	currentCloudFPCache  *cloudFPCache
+	currentDomainResolver *domainResolver
 }
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
@@ -1193,17 +1194,22 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		phCache = e.preloadPiecesHashCache(ctx, sourceTorrents, ps, fpCache, negCache, scanConc)
 	}
 
-	cfCache := e.preloadCloudFingerprints(ctx, fpCache)
+	dr := buildDomainResolver(ps)
+	e.currentDomainResolver = dr
+	defer func() { e.currentDomainResolver = nil }()
+
+	cfCache := e.preloadCloudFingerprints(ctx, fpCache, dr)
 	e.currentCloudFPCache = cfCache
 	defer func() { e.currentCloudFPCache = nil }()
 
 	if phCache != nil && e.contributeReporter != nil && e.cloudFPService != nil && e.cloudFPService.IsEnabled() {
 		var contributeRecords []model.CloudFPContribute
 		for siteName, hashMap := range phCache.bySite {
+			domain := dr.toDomain(siteName)
 			for ph, tid := range hashMap {
 				contributeRecords = append(contributeRecords, model.CloudFPContribute{
 					PiecesHash: ph,
-					SiteName:   siteName,
+					SiteName:   domain,
 					TorrentID:  strconv.Itoa(tid),
 				})
 			}
@@ -2909,7 +2915,11 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 				e.currentCloudFPCache.markDeleted(match.TargetSite, match.TargetTorrentID)
 			}
 			if e.deleteReporter != nil {
-				e.deleteReporter.Report(match.TargetSite, match.TargetTorrentID)
+				reportSite := match.TargetSite
+				if e.currentDomainResolver != nil {
+					reportSite = e.currentDomainResolver.toDomain(match.TargetSite)
+				}
+				e.deleteReporter.Report(reportSite, match.TargetTorrentID)
 			}
 		}
 		return e.failMatch(ctx, match, fmt.Sprintf("下载目标种子失败: %v", err))
