@@ -13,12 +13,17 @@ import (
 )
 
 type CloudFPHandler struct {
-	db     *gorm.DB
-	logger *zap.Logger
+	db      *gorm.DB
+	logger  *zap.Logger
+	breaker func() bool
 }
 
 func NewCloudFPHandler(db *gorm.DB, logger *zap.Logger) *CloudFPHandler {
 	return &CloudFPHandler{db: db, logger: logger}
+}
+
+func (h *CloudFPHandler) SetBreakerFn(fn func() bool) {
+	h.breaker = fn
 }
 
 func (h *CloudFPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -118,11 +123,16 @@ func (h *CloudFPHandler) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		Success(w, map[string]interface{}{"configured": false, "enabled": false})
 		return
 	}
+	breakerOpen := false
+	if h.breaker != nil {
+		breakerOpen = h.breaker()
+	}
 	Success(w, map[string]interface{}{
 		"configured":          true,
 		"enabled":             cfg.Enabled,
 		"base_url":            cfg.BaseURL,
 		"request_timeout_sec": cfg.RequestTimeoutSec,
+		"breaker_open":        breakerOpen,
 	})
 }
 

@@ -56,6 +56,10 @@
             <template #icon><ApiOutlined /></template>
             <span>{{ t('nav.iyuu') }}</span>
           </a-menu-item>
+          <a-menu-item key="/cloud-fp" @click="$router.push('/cloud-fp')">
+            <template #icon><CloudOutlined /></template>
+            <span>{{ t('nav.cloudFp') }}</span>
+          </a-menu-item>
           <a-menu-item key="/cookiecloud" @click="$router.push('/cookiecloud')">
             <template #icon><CloudSyncOutlined /></template>
             <span>{{ t('nav.cookiecloud') }}</span>
@@ -170,6 +174,7 @@ import {
   LogoutOutlined,
   ApiOutlined,
   CloudSyncOutlined,
+  CloudOutlined,
   VideoCameraOutlined,
   ClusterOutlined,
   HeartOutlined,

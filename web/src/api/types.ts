@@ -590,6 +590,14 @@ export interface IYUUConfig {
   requestTimeoutMs: number
 }
 
+export interface CloudFPConfig {
+  id: number
+  base_url: string
+  api_token: string
+  enabled: boolean
+  request_timeout_sec: number
+}
+
 export interface LifecycleConfig {
   pauseSeeders: boolean
   deleteSeeders: boolean

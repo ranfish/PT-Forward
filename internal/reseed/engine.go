@@ -1829,62 +1829,6 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 	return nil
 }
 
-func (e *Engine) matchLayer3Fingerprint(ctx context.Context, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
-	sourceFP := fc.get(sourceInfoHash, sourceSiteName)
-	if sourceFP == nil {
-		return nil
-	}
-
-	if sourceFP.PiecesHash == "" && sourceFP.FilesHash == "" {
-		return nil
-	}
-
-	var targetFPs []model.ContentFingerprint
-	if e.fpRepo != nil {
-		candidates, err := e.fpRepo.FindCandidatesBySite(ctx, siteName, sourceInfoHash, sourceFP.PiecesHash, sourceFP.TotalSize, 10)
-		if err != nil {
-			e.logger.Debug("Layer3 候选查询失败", zap.String("site", siteName), zap.Error(err))
-			return nil
-		}
-		targetFPs = candidates
-	} else {
-		q := e.db.WithContext(ctx).Where("site_name = ? AND info_hash != ?", siteName, sourceInfoHash)
-		if sourceFP.PiecesHash != "" {
-			q = q.Where("pieces_hash = ?", sourceFP.PiecesHash)
-		} else {
-			q = q.Where("total_size = ?", sourceFP.TotalSize)
-		}
-		if err := q.Limit(10).Find(&targetFPs).Error; err != nil {
-			return nil
-		}
-	}
-
-	for _, tfp := range targetFPs {
-		confidence := 0.6
-		if sourceFP.PiecesHash != "" && tfp.PiecesHash == sourceFP.PiecesHash {
-			confidence = 0.95
-		}
-		if sourceFP.TotalSize > 0 && tfp.TotalSize == sourceFP.TotalSize {
-			confidence += 0.1
-			if confidence > 1.0 {
-				confidence = 1.0
-			}
-		}
-
-		if tfp.TorrentID != "" {
-			return &model.Candidate{
-				TargetSite:      siteName,
-				TargetTorrentID: tfp.TorrentID,
-				TargetInfoHash:  tfp.InfoHash,
-				Confidence:      confidence,
-				MatchMethod:     "fingerprint",
-			}
-		}
-	}
-
-	return nil
-}
-
 func NormalizeTitle(title string) string {
 	title = strings.TrimSpace(title)
 	if title == "" {
