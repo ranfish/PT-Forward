@@ -15,7 +15,7 @@ export const iyuuApi = {
     return client.post<ApiResponse<{ synced: number }>>('/iyuu/sites')
   },
   query(data: { infoHashes: string[] }) {
-    return client.post<ApiResponse<Array<{ infoHash: string; sites: string[] }>>>('/iyuu/query', data)
+    return client.post<ApiResponse<{ results: Array<{ source_info_hash: string; targets: Array<{ sid: number; torrent_id: number; info_hash: string; group: number }> }>; total: number }>>('/iyuu/query', data)
   },
   test() {
     return client.post<ApiResponse<{ success: boolean }>>('/iyuu/test')
