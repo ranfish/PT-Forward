@@ -9,7 +9,7 @@ export const iyuuApi = {
     return client.put<ApiResponse<IYUUConfig>>('/iyuu/config', data)
   },
   listSites() {
-    return client.get<ApiResponse<Array<{ name: string; url: string }>>>('/iyuu/sites')
+    return client.get<ApiResponse<{ items: Array<{ IYUUSid: number; SiteName: string; SiteDomain: string; Enabled: boolean }>; total: number }>>('/iyuu/sites')
   },
   syncSites() {
     return client.post<ApiResponse<{ synced: number }>>('/iyuu/sites')

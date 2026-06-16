@@ -173,12 +173,13 @@ func (h *IYUUHandler) handleStatus(w http.ResponseWriter, _ *http.Request) {
 
 func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Token            string `json:"token"`
-		BaseURL          string `json:"baseUrl"`
-		Enabled          *bool  `json:"enabled"`
-		IsVIP            *bool  `json:"isVip"`
-		RequestTimeoutMs *int   `json:"requestTimeoutMs"`
-		Version          string `json:"version,omitempty"`
+		Token             string `json:"token"`
+		BaseURL           string `json:"baseUrl"`
+		Enabled           *bool  `json:"enabled"`
+		IsVIP             *bool  `json:"isVip"`
+		RequestTimeoutMs  *int   `json:"requestTimeoutMs"`
+		SyncIntervalHours *int   `json:"syncIntervalHours"`
+		Version           string `json:"version,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -212,6 +213,9 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 				cfg.RequestTimeoutSec = 1
 			}
 		}
+		if req.SyncIntervalHours != nil && *req.SyncIntervalHours > 0 {
+			cfg.SyncIntervalHours = *req.SyncIntervalHours
+		}
 		if err := h.db.Create(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "创建配置失败")
 			return
@@ -244,6 +248,9 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		}
 		if req.Version != "" {
 			cfg.Version = req.Version
+		}
+		if req.SyncIntervalHours != nil && *req.SyncIntervalHours > 0 {
+			cfg.SyncIntervalHours = *req.SyncIntervalHours
 		}
 		if err := h.db.Save(&cfg).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "保存配置失败")
