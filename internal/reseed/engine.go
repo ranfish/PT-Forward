@@ -1427,6 +1427,12 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 					zap.String("targetTorrentID", m.TargetTorrentID))
 
 				if err := e.injectMatch(ctx, m, task, ps); err != nil {
+					if errors.Is(err, errAlreadyExists) {
+						resultMu.Lock()
+						result.Skipped++
+						resultMu.Unlock()
+						return
+					}
 					e.logger.Warn("注入辅种失败",
 						zap.Uint("matchID", m.ID),
 						zap.String("targetSite", m.TargetSite),
@@ -2885,6 +2891,8 @@ func checkPublishEligibility(title string) bool {
 	return true
 }
 
+var errAlreadyExists = errors.New("torrent already exists in downloader")
+
 func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task *model.ReseedTask, ps *preloadedSites) error {
 	if ps == nil {
 		return reseedError(ErrReseedConfig, "preloaded sites not available", nil)
@@ -3020,7 +3028,7 @@ func (e *Engine) verifyDuplicateAndFinish(ctx context.Context, dlClient model.Do
 
 	now := time.Now()
 	updates := map[string]interface{}{
-		"status":        model.MatchStatusInjected,
+		"status":        model.MatchStatusSkipped,
 		"injected_at":   &now,
 		"decision_type": string(model.DecisionAlreadyExists),
 		"updated_at":    now,
@@ -3028,7 +3036,10 @@ func (e *Engine) verifyDuplicateAndFinish(ctx context.Context, dlClient model.Do
 	if infoHash != "" {
 		updates["target_info_hash"] = infoHash
 	}
-	return e.db.WithContext(ctx).Model(match).Updates(updates).Error
+	if err := e.db.WithContext(ctx).Model(match).Updates(updates).Error; err != nil {
+		return err
+	}
+	return errAlreadyExists
 }
 
 func (e *Engine) waitForRecheck(ctx context.Context, dlClient model.DownloaderClient, infoHash string, timeout time.Duration) error {
