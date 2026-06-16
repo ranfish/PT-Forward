@@ -903,7 +903,11 @@
     "maxInjectionsPerRun": "Max Injections Per Run",
     "reseedCategory": "Reseed Category",
     "scheduleAndLimits": "Schedule & Limits",
-    "excludeRules": "Exclusion Rules"
+    "excludeRules": "Exclusion Rules",
+    "matchLayers": "Match Layers",
+    "matchLayerL0": "Pieces Hash (L0) — Site API real-time exact match (always on)",
+    "matchLayerL1": "Cloud Fingerprint (L1) — PT-IDX cloud match",
+    "matchLayerL2": "Name/Size (L2) — Fuzzy match, may have false positives"
   },
   "publish": {
     "candidates": "Candidates",

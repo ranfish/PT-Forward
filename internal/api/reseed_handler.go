@@ -213,6 +213,9 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if task.MatchMethods == "" {
 		task.MatchMethods = model.ReseedModeDefaults[task.EngineMode]
 	}
+	if task.EngineMode == model.ReseedModeSeedFeature && !strings.Contains(task.MatchMethods, "pieces_hash") {
+		task.MatchMethods = "pieces_hash," + task.MatchMethods
+	}
 
 	if err := h.engine.ValidateClientRoles(r.Context(), req.ClientIDs); err != nil {
 		Error(w, http.StatusBadRequest, 40001, err.Error())
@@ -303,6 +306,9 @@ func (h *ReseedHandler) handleUpdate(w http.ResponseWriter, r *http.Request, id 
 		if task.EngineMode != "" && task.MatchMethods == "" {
 			task.MatchMethods = model.ReseedModeDefaults[task.EngineMode]
 		}
+	}
+	if task.EngineMode == model.ReseedModeSeedFeature && task.MatchMethods != "" && !strings.Contains(task.MatchMethods, "pieces_hash") {
+		task.MatchMethods = "pieces_hash," + task.MatchMethods
 	}
 	if v, ok := req["injectionIntervalS"].(float64); ok {
 		task.InjectionIntervalS = int(v)

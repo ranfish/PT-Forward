@@ -1526,9 +1526,13 @@ func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *prel
 		}
 
 		if hasMatchMethod(task.MatchMethods, "fingerprint") {
-			c := e.matchLayer1FromCloudCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, cfCache)
-			if c != nil {
-				return c
+			if phCache != nil && phCache.wasQueried(siteInfo.Name) {
+				// L0 pieces_hash API 已成功查询该站，权威否定，跳过 L1
+			} else {
+				c := e.matchLayer1FromCloudCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, cfCache)
+				if c != nil {
+					return c
+				}
 			}
 		}
 
