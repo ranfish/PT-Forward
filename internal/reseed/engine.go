@@ -1477,7 +1477,9 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		wg.Wait()
 	}
 
-	l2s.log(e)
+	if task.EngineMode == model.ReseedModeSeedFeature {
+		l2s.log(e)
+	}
 	return result, nil
 }
 
