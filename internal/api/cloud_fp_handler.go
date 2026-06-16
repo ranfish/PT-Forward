@@ -98,19 +98,28 @@ func (h *CloudFPHandler) handleTest(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, 40001, "服务未启用或未配置 URL")
 		return
 	}
+	if cfg.APIToken == "" {
+		Error(w, http.StatusBadRequest, 40001, "API Token 未配置")
+		return
+	}
 	client := &http.Client{Timeout: time.Duration(cfg.RequestTimeoutSec) * time.Second}
-	req, err := http.NewRequestWithContext(r.Context(), "GET", cfg.BaseURL+"/api/v1/health", nil)
+	req, err := http.NewRequestWithContext(r.Context(), "GET", cfg.BaseURL+"/api/v1/fingerprints/contribute", nil)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50001, "构造请求失败")
 		return
 	}
+	req.Header.Set("Authorization", "Bearer "+cfg.APIToken)
 	resp, err := client.Do(req)
 	if err != nil {
 		Error(w, http.StatusBadGateway, 50201, fmt.Sprintf("连接失败: %v", err))
 		return
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode == http.StatusUnauthorized {
+		Error(w, http.StatusBadGateway, 50201, "API Token 无效")
+		return
+	}
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusMethodNotAllowed {
 		Error(w, http.StatusBadGateway, 50201, fmt.Sprintf("HTTP %d", resp.StatusCode))
 		return
 	}
@@ -137,6 +146,9 @@ func (h *CloudFPHandler) handleStatus(w http.ResponseWriter, _ *http.Request) {
 }
 
 func maskCloudFPToken(token string) string {
+	if token == "" {
+		return ""
+	}
 	if len(token) <= 4 {
 		return "***"
 	}
