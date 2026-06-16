@@ -76,13 +76,7 @@
         row-key="sid"
         size="small"
         style="margin-top: 12px"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'torrents'">
-            <span>{{ record.torrents?.length || 0 }}</span>
-          </template>
-        </template>
-      </a-table>
+      />
       <a-empty v-else-if="queryExecuted" :description="t('common.noData')" style="margin-top: 12px" />
     </a-card>
   </div>
@@ -126,10 +120,9 @@ const queryResults = ref<Record<string, unknown>[]>([])
 const queryExecuted = ref(false)
 
 const queryColumns = [
-  { title: t('iyuu.sid'), dataIndex: 'sid', key: 'sid', width: 80 },
-  { title: t('iyuu.siteName'), dataIndex: 'site_name', key: 'site_name' },
-  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100 },
-  { title: t('common.title'), key: 'torrents', width: 100 },
+  { title: 'SID', dataIndex: 'sid', key: 'sid', width: 80 },
+  { title: 'Torrent ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 120 },
+  { title: 'Info Hash', dataIndex: 'info_hash', key: 'info_hash' },
 ]
 
 async function handleQuery() {
@@ -142,7 +135,15 @@ async function handleQuery() {
   queryExecuted.value = false
   try {
     const resp = await iyuuApi.query({ infoHashes: hashes })
-    queryResults.value = resp.data?.data || []
+    const rawResults = resp.data?.data?.results || []
+    const rows: Record<string, unknown>[] = []
+    for (const r of rawResults) {
+      const targets = (r as Record<string, unknown>)?.targets as Array<Record<string, unknown>> || []
+      for (const tgt of targets) {
+        rows.push({ sid: tgt.sid, torrent_id: tgt.torrent_id, info_hash: tgt.info_hash })
+      }
+    }
+    queryResults.value = rows
     queryExecuted.value = true
   } catch (e: unknown) {
     message.error((e as Error).message)
