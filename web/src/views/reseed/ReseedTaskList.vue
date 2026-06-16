@@ -112,6 +112,16 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <template v-if="form.engineMode === 'seed_feature'">
+          <a-divider>{{ t('reseed.matchLayers') }}</a-divider>
+          <a-form-item>
+            <a-checkbox-group v-model:value="matchLayers">
+              <a-checkbox value="pieces_hash" disabled>{{ t('reseed.matchLayerL0') }}</a-checkbox>
+              <a-checkbox value="fingerprint">{{ t('reseed.matchLayerL1') }}</a-checkbox>
+              <a-checkbox value="size_title">{{ t('reseed.matchLayerL2') }}</a-checkbox>
+            </a-checkbox-group>
+          </a-form-item>
+        </template>
         <a-divider>{{ t('reseed.scheduleAndLimits') }}</a-divider>
         <a-row :gutter="16">
           <a-col :span="12">
@@ -252,13 +262,29 @@ const submitting = ref(false)
 const editingTask = ref<ReseedTask | null>(null)
 
 const reseedModeMatchMethods: Record<string, string> = {
-  seed_feature: 'pieces_hash,size_title,fingerprint',
+  seed_feature: 'pieces_hash,fingerprint',
   iyuu_cloud: 'iyuu',
 }
 
 function onEngineModeChange(mode: string) {
   form.matchMethods = reseedModeMatchMethods[mode] || ''
 }
+
+const matchLayers = computed({
+  get: () => {
+    if (!form.matchMethods) {
+      return ['pieces_hash', 'fingerprint', 'size_title']
+    }
+    return form.matchMethods.split(',').map((s: string) => s.trim()).filter(Boolean)
+  },
+  set: (val: string[]) => {
+    const layers = [...val]
+    if (!layers.includes('pieces_hash')) {
+      layers.push('pieces_hash')
+    }
+    form.matchMethods = layers.join(',')
+  },
+})
 
 const downloaders = ref<ClientConfig[]>([])
 const downloadersLoading = ref(false)

@@ -906,7 +906,11 @@
     "maxInjectionsPerRun": "每轮最大注入数",
     "reseedCategory": "辅种分类",
     "scheduleAndLimits": "调度与限制",
-    "excludeRules": "排除规则"
+    "excludeRules": "排除规则",
+    "matchLayers": "匹配层级",
+    "matchLayerL0": "种子指纹（L0）— 站点 API 实时精确匹配（始终开启）",
+    "matchLayerL1": "云端指纹（L1）— PT-IDX 云端匹配",
+    "matchLayerL2": "名称/体积（L2）— 模糊匹配，有误报风险"
   },
   "publish": {
     "candidates": "候选列表",

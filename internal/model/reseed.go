@@ -29,7 +29,7 @@ const (
 )
 
 var ReseedModeDefaults = map[string]string{
-	ReseedModeSeedFeature: "pieces_hash,size_title,fingerprint",
+	ReseedModeSeedFeature: "pieces_hash,fingerprint",
 	ReseedModeIYUUCloud:   "iyuu",
 }
 
