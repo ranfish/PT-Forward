@@ -318,6 +318,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/iyuu/test/", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/status", iyuuHandler)
 	mux.Handle("/api/v1/iyuu/status/", iyuuHandler)
+	mux.Handle("/api/v1/iyuu/supported-targets", iyuuHandler)
+	mux.Handle("/api/v1/iyuu/supported-targets/", iyuuHandler)
 
 	cloudFPHandler := rt.chain(rt.rateLimitMW, rt.cloudFPHandler.ServeHTTP)
 	mux.Handle("/api/v1/cloud-fp/config", cloudFPHandler)
