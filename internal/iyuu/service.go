@@ -349,9 +349,14 @@ func (s *Service) ReportExisting(ctx context.Context, sidList []int) error {
 		return iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU report error: %s", resp.Msg), nil)
 	}
 
-	if resp.Data.SidSha1 != "" {
+	var data iyuuReportData
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return iyuuError(ErrIYUUAPI, fmt.Sprintf("parse report data: %v", err), nil)
+	}
+
+	if data.SidSha1 != "" {
 		s.sidSha1Mux.Lock()
-		s.sidSha1 = resp.Data.SidSha1
+		s.sidSha1 = data.SidSha1
 		s.sidSha1Exp = time.Now().Add(7 * 24 * time.Hour)
 		s.sidSha1Mux.Unlock()
 	}
@@ -526,9 +531,9 @@ type iyuuRestResponse struct {
 }
 
 type iyuuReportResponse struct {
-	Code int            `json:"code"`
-	Msg  string         `json:"msg"`
-	Data iyuuReportData `json:"data"`
+	Code int             `json:"code"`
+	Msg  string          `json:"msg"`
+	Data json.RawMessage `json:"data"`
 }
 
 type iyuuReportData struct {
