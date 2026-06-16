@@ -23,4 +23,7 @@ export const iyuuApi = {
   status() {
     return client.get<ApiResponse<{ available: boolean; domains: string[] }>>('/iyuu/status')
   },
+  supportedTargets() {
+    return client.get<ApiResponse<{ sites: Array<{ site_id: number; name: string; domain: string; iyuu_sid: number }>; total: number }>>('/iyuu/supported-targets')
+  },
 }

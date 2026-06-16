@@ -214,6 +214,7 @@ func main() {
 	seedingEngine := seeding.NewEngine(db, log)
 
 	iyuuService := iyuu.NewService(db, log)
+	go iyuuService.StartSyncLoop(ctx, 24*time.Hour)
 
 	cloudFPService := cloudfp.NewService(db, log)
 

@@ -93,6 +93,14 @@ func (h *IYUUHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 		return
+
+	case trimmed == "/api/v1/iyuu/supported-targets" || trimmed == "/api/v1/iyuu/supported-targets/":
+		if r.Method == http.MethodGet {
+			h.handleSupportedTargets(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
 	}
 
 	Error(w, http.StatusNotFound, 40400, "接口不存在")
@@ -380,4 +388,86 @@ func maskToken(token string) string {
 		return "****"
 	}
 	return token[:4] + "****" + token[len(token)-4:]
+}
+
+type iyuuSupportedTarget struct {
+	SiteID  uint   `json:"site_id"`
+	Name    string `json:"name"`
+	Domain  string `json:"domain"`
+	IYUUSid int    `json:"iyuu_sid"`
+}
+
+func (h *IYUUHandler) handleSupportedTargets(w http.ResponseWriter, _ *http.Request) {
+	var mappings []model.IYUUSiteMapping
+	if err := h.db.Where("enabled = ?", true).Find(&mappings).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询 IYUU 站点映射失败")
+		return
+	}
+
+	var sites []model.Site
+	if err := h.db.Where("enabled = ? AND is_target = ?", true, true).Find(&sites).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询站点列表失败")
+		return
+	}
+
+	byName := make(map[string]*model.Site, len(sites))
+	byDomain := make(map[string]*model.Site, len(sites))
+	for i := range sites {
+		s := &sites[i]
+		byName[s.Name] = s
+		for _, d := range buildSiteDomains(s) {
+			if _, exists := byDomain[d]; !exists {
+				byDomain[d] = s
+			}
+		}
+	}
+
+	var result []iyuuSupportedTarget
+	seen := make(map[uint]bool)
+	for _, m := range mappings {
+		var matched *model.Site
+		if s, ok := byName[m.SiteName]; ok {
+			matched = s
+		} else if d := normalizeIYUUDomain(m.SiteDomain); d != "" {
+			if s, ok := byDomain[d]; ok {
+				matched = s
+			}
+		}
+		if matched != nil && !seen[matched.ID] {
+			seen[matched.ID] = true
+			result = append(result, iyuuSupportedTarget{
+				SiteID:  matched.ID,
+				Name:    matched.Name,
+				Domain:  matched.Domain,
+				IYUUSid: m.IYUUSid,
+			})
+		}
+	}
+
+	Success(w, map[string]interface{}{
+		"sites": result,
+		"total": len(result),
+	})
+}
+
+func buildSiteDomains(s *model.Site) []string {
+	domains := []string{normalizeIYUUDomain(s.Domain), normalizeIYUUDomain(s.BaseURL)}
+	if s.AlternativeDomains != "" {
+		var alts []string
+		if err := json.Unmarshal([]byte(s.AlternativeDomains), &alts); err == nil {
+			for _, a := range alts {
+				domains = append(domains, normalizeIYUUDomain(a))
+			}
+		}
+	}
+	return domains
+}
+
+func normalizeIYUUDomain(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	s = strings.TrimPrefix(s, "https://")
+	s = strings.TrimPrefix(s, "http://")
+	s = strings.TrimPrefix(s, "www.")
+	s = strings.TrimSuffix(s, "/")
+	return s
 }
