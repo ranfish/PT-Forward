@@ -22,6 +22,9 @@
         <a-form-item :label="t('iyuu.requestTimeout')">
           <a-input-number v-model:value="form.requestTimeoutSec" :min="5" :max="300" style="width: 100%" />
         </a-form-item>
+        <a-form-item :label="t('iyuu.syncIntervalHours')">
+          <a-input-number v-model:value="form.syncIntervalHours" :min="1" :max="168" style="width: 100%" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" :loading="saving" @click="handleSave">{{ t('common.save') }}</a-button>
@@ -35,7 +38,7 @@
 
     <a-card :title="t('iyuu.siteMapping')" :loading="sitesLoading">
       <template #extra>
-        <a-button size="small" :loading="syncing" @click="handleSyncSites">{{ t('cookiecloud.syncNow') }}</a-button>
+        <a-button size="small" :loading="syncing" @click="handleSyncSites">{{ t('iyuu.syncSites') }}</a-button>
       </template>
       <a-table
         v-if="sites.length > 0"
@@ -107,6 +110,7 @@ const form = reactive({
   isVIP: false,
   version: '1.0.0',
   requestTimeoutSec: 60,
+  syncIntervalHours: 24,
 })
 
 const siteColumns = [
@@ -158,6 +162,7 @@ async function fetchConfig() {
     form.isVIP = data.isVip ?? false
     form.version = data.version ?? '1.0.0'
     form.requestTimeoutSec = data.requestTimeoutMs ? Math.round(data.requestTimeoutMs / 1000) : 60
+    form.syncIntervalHours = data.syncIntervalHours ?? 24
   } catch {
   } finally {
     loading.value = false
@@ -174,6 +179,7 @@ async function handleSave() {
       isVip: form.isVIP,
       version: form.version,
       requestTimeoutMs: form.requestTimeoutSec * 1000,
+      syncIntervalHours: form.syncIntervalHours,
     })
     message.success(t('common.saveSuccess'))
     fetchSites()
@@ -200,7 +206,8 @@ async function fetchSites() {
   sitesLoading.value = true
   try {
     const resp = await iyuuApi.listSites()
-    sites.value = resp.data?.data || []
+    const data = resp.data?.data
+    sites.value = data?.items || data || []
   } catch {
   } finally {
     sitesLoading.value = false

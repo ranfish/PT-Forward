@@ -1042,6 +1042,8 @@
     "vip": "VIP",
     "version": "Version",
     "requestTimeout": "Request Timeout (s)",
+    "syncIntervalHours": "Site Sync Interval (hours)",
+    "syncSites": "Sync Sites",
     "sid": "SID"
   },
   "cloudFp": {

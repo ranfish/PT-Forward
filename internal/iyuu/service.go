@@ -570,18 +570,20 @@ type iyuuSiteRaw struct {
 	Site     string `json:"site"`
 }
 
-func (s *Service) StartSyncLoop(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		interval = 24 * time.Hour
+func (s *Service) StartSyncLoop(ctx context.Context, defaultInterval time.Duration) {
+	if defaultInterval <= 0 {
+		defaultInterval = 24 * time.Hour
 	}
 
 	s.doSync(ctx)
 
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
 	for {
+		interval := defaultInterval
+		if cfg, err := s.getConfig(ctx); err == nil && cfg.SyncIntervalHours > 0 {
+			interval = time.Duration(cfg.SyncIntervalHours) * time.Hour
+		}
 		select {
-		case <-ticker.C:
+		case <-time.After(interval):
 			s.doSync(ctx)
 		case <-ctx.Done():
 			return

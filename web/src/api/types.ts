@@ -588,6 +588,7 @@ export interface IYUUConfig {
   enabled: boolean
   version: string
   requestTimeoutMs: number
+  syncIntervalHours: number
 }
 
 export interface CloudFPConfig {

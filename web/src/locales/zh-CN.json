@@ -1045,6 +1045,8 @@
     "vip": "VIP",
     "version": "版本",
     "requestTimeout": "请求超时(秒)",
+    "syncIntervalHours": "站点同步间隔(小时)",
+    "syncSites": "IYUU 同步站点",
     "sid": "SID"
   },
   "cloudFp": {
