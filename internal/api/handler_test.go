@@ -411,13 +411,14 @@ func TestDownloaders_CRUD(t *testing.T) {
 	env := setupTestEnv(t)
 
 	createBody := map[string]interface{}{
-		"name":     "Test QB",
-		"type":     "qbittorrent",
-		"url":      "http://localhost:8080",
-		"username": "admin",
-		"password": "pass",
-		"role":     "seeding",
-		"enabled":  true,
+		"name":       "Test QB",
+		"type":       "qbittorrent",
+		"url":        "http://localhost:8080",
+		"username":   "admin",
+		"password":   "pass",
+		"role":       "seeding",
+		"enabled":    true,
+		"torrentDir": "/tmp/torrents",
 	}
 	w := env.doRequest("POST", "/api/v1/downloaders", createBody)
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
@@ -2788,6 +2789,7 @@ func TestDownloader_Update_HappyPath(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": "UpdHappyDL", "type": "qbittorrent", "url": "http://localhost:8080",
 		"username": "admin", "password": "pass", "role": "seeding", "enabled": true,
+		"torrentDir": "/tmp/torrents",
 	})
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create: expected 200/201, got %d: %s", w.Code, w.Body.String())
@@ -2824,6 +2826,7 @@ func TestDownloader_Update_WithPathMappings(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": "PathMapDL", "type": "qbittorrent", "url": "http://localhost:8080",
 		"username": "admin", "password": "pass", "role": "seeding", "enabled": true,
+		"torrentDir": "/tmp/torrents",
 		"pathMappings": []map[string]string{
 			{"sourcePath": "/data/movies", "reseedPath": "/mnt/movies"},
 		},
@@ -2872,6 +2875,7 @@ func TestDownloader_Update_InvalidJSON(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": "BadJSONDL", "type": "qbittorrent", "url": "http://localhost:8080",
 		"username": "admin", "password": "pass", "role": "seeding", "enabled": true,
+		"torrentDir": "/tmp/torrents",
 	})
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create: expected 200/201, got %d: %s", w.Code, w.Body.String())
@@ -2913,6 +2917,7 @@ func TestPublishTargets_CreateAndGet(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": "PTCrtDL", "type": "qbittorrent", "url": "http://localhost:8080",
 		"username": "admin", "password": "pass", "role": "seeding", "enabled": true,
+		"torrentDir": "/tmp/torrents",
 	})
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create dl: expected 200/201, got %d: %s", w.Code, w.Body.String())
@@ -2961,6 +2966,7 @@ func TestPublishTargets_Update(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": "PTUpdDL", "type": "qbittorrent", "url": "http://localhost:8080",
 		"username": "admin", "password": "pass", "role": "seeding", "enabled": true,
+		"torrentDir": "/tmp/torrents",
 	})
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create dl: expected 200/201, got %d: %s", w.Code, w.Body.String())
@@ -3005,6 +3011,7 @@ func TestPublishTargets_Delete(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/downloaders", map[string]interface{}{
 		"name": "PTDelDL", "type": "qbittorrent", "url": "http://localhost:8080",
 		"username": "admin", "password": "pass", "role": "seeding", "enabled": true,
+		"torrentDir": "/tmp/torrents",
 	})
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create dl: expected 200/201, got %d: %s", w.Code, w.Body.String())
