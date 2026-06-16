@@ -65,8 +65,15 @@
         </a-row>
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item :label="t('reseed.clientId')" name="clientIds" :rules="[{ required: true, message: t('reseed.pleaseEnterClientId') }]">
-              <a-select v-model:value="form.clientIds" :placeholder="t('reseed.clientIdPlaceholder')" :loading="downloadersLoading" show-search :filter-option="filterOption" allow-clear>
+            <a-form-item name="clientIds" :rules="form.engineMode === 'iyuu_cloud' ? [{ required: true, message: t('reseed.pleaseEnterClientId'), type: 'array' as const, min: 1 }] : [{ required: true, message: t('reseed.pleaseEnterClientId') }]">
+              <template #label>
+                {{ t('reseed.clientId') }}
+                <template v-if="form.engineMode === 'iyuu_cloud'">
+                  <a-button type="link" size="small" @click="selectAllClients">{{ t('common.selectAll') }}</a-button>
+                  <a-button type="link" size="small" @click="clientIdsModel = []">{{ t('common.deselectAll') }}</a-button>
+                </template>
+              </template>
+              <a-select v-model:value="clientIdsModel" :mode="form.engineMode === 'iyuu_cloud' ? 'multiple' : undefined" :placeholder="t('reseed.clientIdPlaceholder')" :loading="downloadersLoading" show-search :filter-option="filterOption" allow-clear>
                 <a-select-option v-for="d in downloaders" :key="d.id" :value="String(d.id)" :label="`${d.name}（${d.type}）`">
                   {{ d.name }}（{{ d.type }}）
                 </a-select-option>
@@ -304,6 +311,28 @@ const matchLayers = computed({
   },
 })
 
+const clientIdsModel = computed({
+  get(): string | string[] {
+    if (form.engineMode === 'iyuu_cloud') {
+      if (Array.isArray(form.clientIds)) return form.clientIds
+      return form.clientIds ? [form.clientIds] : []
+    }
+    if (Array.isArray(form.clientIds)) return form.clientIds[0] || ''
+    return form.clientIds
+  },
+  set(val: string | string[]) {
+    if (form.engineMode === 'iyuu_cloud') {
+      form.clientIds = Array.isArray(val) ? val : []
+    } else {
+      form.clientIds = val as string
+    }
+  },
+})
+
+function selectAllClients() {
+  clientIdsModel.value = downloaders.value.map(d => String(d.id))
+}
+
 const downloaders = ref<ClientConfig[]>([])
 const downloadersLoading = ref(false)
 const sites = ref<Site[]>([])
@@ -366,7 +395,7 @@ function selectAllTarget() {
 const defaultForm = {
   name: '',
   enabled: false,
-  clientIds: '',
+  clientIds: '' as string | string[],
   sourceSiteIds: [] as string[],
   targetSiteIds: [] as string[],
   sizeTolerancePercent: 1.0,
@@ -461,6 +490,7 @@ async function handleSubmit() {
   try {
     const payload = {
       ...form,
+      clientIds: Array.isArray(form.clientIds) ? form.clientIds.join(',') : form.clientIds,
       sourceSiteIds: (form.sourceSiteIds as string[]).join(','),
       targetSiteIds: (form.targetSiteIds as string[]).join(','),
     }
