@@ -224,7 +224,7 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		Error(w, http.StatusInternalServerError, 50000, "获取配置失败")
 		return
 	default:
-		if req.Token != "" {
+		if req.Token != "" && !strings.Contains(req.Token, "****") {
 			cfg.Token = req.Token
 		}
 		if req.BaseURL != "" {
