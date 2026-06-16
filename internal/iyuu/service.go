@@ -115,7 +115,10 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 	infoHashes = cleaned
 
 	const batchSize = 200
+	const batchDelay = 2 * time.Second
+	const maxConsecutiveErrors = 5
 	var allResults []*model.IYUUReseedResult
+	consecutiveErrors := 0
 
 	for i := 0; i < len(infoHashes); i += batchSize {
 		end := i + batchSize
@@ -145,49 +148,79 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 
 		u := cfg.BaseURL + "/reseed/index/index"
 		var resp iyuuRestReseedResponse
+		shouldBreak := false
+		shouldDelay := true
+
 		if err := s.doPostFormWithToken(ctx, u, cfg.Token, form, &resp); err != nil {
-			s.logger.Warn("IYUU batch query failed",
+			s.logger.Warn("IYUU 批次查询网络失败",
 				zap.Int("batch", i/batchSize+1),
-				zap.Int("from", i),
-				zap.Int("to", end),
+				zap.Int("totalBatches", (len(infoHashes)+batchSize-1)/batchSize),
 				zap.Error(err),
 			)
-			continue
-		}
-
-		if resp.Code == 404 {
+			consecutiveErrors++
+			if consecutiveErrors >= maxConsecutiveErrors {
+				s.logger.Warn("IYUU 连续网络错误，中止查询",
+					zap.Int("consecutiveErrors", consecutiveErrors),
+				)
+				shouldBreak = true
+			}
+		} else if resp.Code == 429 {
+			s.logger.Warn("IYUU 限速（429），中止查询",
+				zap.Int("batch", i/batchSize+1),
+				zap.String("msg", resp.Msg),
+			)
+			shouldBreak = true
+			shouldDelay = false
+		} else if resp.Code == 404 {
+			consecutiveErrors = 0
 			s.logger.Info("IYUU batch returned 404 (no matches)",
 				zap.Int("batch", i/batchSize+1),
 				zap.Int("batchSize", len(batch)),
 			)
-			continue
-		}
-
-		if resp.Code != 0 {
-			s.logger.Warn("IYUU batch query error",
+		} else if resp.Code != 0 {
+			consecutiveErrors++
+			s.logger.Warn("IYUU 服务器错误",
 				zap.Int("batch", i/batchSize+1),
 				zap.String("msg", resp.Msg),
 				zap.Int("code", resp.Code),
+				zap.Int("consecutiveErrors", consecutiveErrors),
 			)
-			continue
+			if consecutiveErrors >= maxConsecutiveErrors {
+				s.logger.Warn("IYUU 连续服务器错误，中止查询",
+					zap.Int("consecutiveErrors", consecutiveErrors),
+				)
+				shouldBreak = true
+			}
+		} else {
+			consecutiveErrors = 0
+
+			batchResults, parseErr := s.parseReseedData(resp.Data)
+			if parseErr != nil {
+				s.logger.Warn("IYUU batch decode failed",
+					zap.Int("batch", i/batchSize+1),
+					zap.Error(parseErr),
+				)
+			} else {
+				s.logger.Info("IYUU batch result",
+					zap.Int("batch", i/batchSize+1),
+					zap.Int("batchSize", len(batch)),
+					zap.Int("results", len(batchResults)),
+				)
+				allResults = append(allResults, batchResults...)
+			}
 		}
 
-		batchResults, err := s.parseReseedData(resp.Data)
-		if err != nil {
-			s.logger.Warn("IYUU batch decode failed",
-				zap.Int("batch", i/batchSize+1),
-				zap.Error(err),
-			)
-			continue
+		if shouldBreak {
+			break
 		}
 
-		s.logger.Info("IYUU batch result",
-			zap.Int("batch", i/batchSize+1),
-			zap.Int("batchSize", len(batch)),
-			zap.Int("results", len(batchResults)),
-		)
-
-		allResults = append(allResults, batchResults...)
+		if shouldDelay && i+batchSize < len(infoHashes) {
+			select {
+			case <-time.After(batchDelay):
+			case <-ctx.Done():
+				return allResults, ctx.Err()
+			}
+		}
 	}
 
 	return allResults, nil
