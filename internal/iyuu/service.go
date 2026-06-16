@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
@@ -21,12 +22,13 @@ import (
 )
 
 type Service struct {
-	db         *gorm.DB
-	logger     *zap.Logger
-	client     *http.Client
-	sidSha1    string
-	sidSha1Mux sync.RWMutex
-	sidSha1Exp time.Time
+	db          *gorm.DB
+	logger      *zap.Logger
+	client      *http.Client
+	sidSha1     string
+	sidSha1Mux  sync.RWMutex
+	sidSha1Exp  time.Time
+	syncRunning atomic.Bool
 }
 
 func NewService(db *gorm.DB, logger *zap.Logger) *Service {
@@ -268,6 +270,12 @@ func (s *Service) GetSeededSites(ctx context.Context, infoHash string) ([]string
 }
 
 func (s *Service) GetSiteList(ctx context.Context) ([]model.IYUUSite, error) {
+	if !s.syncRunning.CompareAndSwap(false, true) {
+		s.logger.Info("IYUU 站点同步已在进行中，跳过")
+		return nil, iyuuError(ErrIYUUAPI, "sync already in progress", nil)
+	}
+	defer s.syncRunning.Store(false)
+
 	cfg, err := s.getConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -560,4 +568,39 @@ type iyuuSiteRaw struct {
 	Nickname string `json:"nickname"`
 	BaseURL  string `json:"base_url"`
 	Site     string `json:"site"`
+}
+
+func (s *Service) StartSyncLoop(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = 24 * time.Hour
+	}
+
+	s.doSync(ctx)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.doSync(ctx)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (s *Service) doSync(ctx context.Context) {
+	cfg, err := s.getConfig(ctx)
+	if err != nil {
+		return
+	}
+	if !cfg.Enabled {
+		return
+	}
+	_, err = s.GetSiteList(ctx)
+	if err != nil {
+		s.logger.Warn("IYUU 定时同步失败", zap.Error(err))
+	} else {
+		s.logger.Info("IYUU 定时同步完成")
+	}
 }

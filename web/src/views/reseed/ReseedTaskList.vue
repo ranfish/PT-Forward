@@ -83,8 +83,8 @@
           </a-col>
         </a-row>
         <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item name="sourceSiteIds" :rules="[{ required: true, message: t('reseed.pleaseEnterSourceSite') }]">
+          <a-col v-if="form.engineMode !== 'iyuu_cloud'" :span="12">
+            <a-form-item name="sourceSiteIds" :rules="form.engineMode === 'iyuu_cloud' ? [] : [{ required: true, message: t('reseed.pleaseEnterSourceSite') }]">
               <template #label>
                 {{ t('reseed.sourceSiteIds') }}
                 <a-button type="link" size="small" @click="selectAllSource">{{ t('common.selectAll') }}</a-button>
@@ -97,15 +97,15 @@
               </a-select>
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :span="form.engineMode === 'iyuu_cloud' ? 24 : 12">
             <a-form-item name="targetSiteIds" :rules="[{ required: true, message: t('reseed.pleaseEnterTargetSite') }]">
               <template #label>
                 {{ t('reseed.targetSiteIds') }}
                 <a-button type="link" size="small" @click="selectAllTarget">{{ t('common.selectAll') }}</a-button>
                 <a-button type="link" size="small" @click="form.targetSiteIds = []">{{ t('common.deselectAll') }}</a-button>
               </template>
-              <a-select v-model:value="form.targetSiteIds" mode="multiple" :placeholder="t('reseed.targetSiteIdsPlaceholder')" :loading="sitesLoading" show-search :filter-option="filterOption" allow-clear>
-                <a-select-option v-for="s in targetSites" :key="s.id" :value="String(s.id)" :label="`${s.name}（${s.domain}）`">
+              <a-select v-model:value="form.targetSiteIds" mode="multiple" :placeholder="t('reseed.targetSiteIdsPlaceholder')" :loading="sitesLoading || iyuuSupportedLoading" show-search :filter-option="filterOption" allow-clear>
+                <a-select-option v-for="s in filteredTargetSites" :key="s.id" :value="String(s.id)" :label="`${s.name}（${s.domain}）`">
                   {{ s.name }}（{{ s.domain }}）
                 </a-select-option>
               </a-select>
@@ -249,6 +249,7 @@ import { PlusOutlined, EditOutlined } from '@ant-design/icons-vue'
 import { reseedApi } from '@/api/reseed'
 import { downloadersApi } from '@/api/downloaders'
 import { sitesApi } from '@/api/sites'
+import { iyuuApi } from '@/api/iyuu'
 import { usePagination } from '@/composables/usePagination'
 import { useEnumLabels } from '@/utils/enumLabels'
 
@@ -268,6 +269,23 @@ const reseedModeMatchMethods: Record<string, string> = {
 
 function onEngineModeChange(mode: string) {
   form.matchMethods = reseedModeMatchMethods[mode] || ''
+  if (mode === 'iyuu_cloud') {
+    form.sourceSiteIds = []
+    fetchIYUUSupportedTargets()
+  }
+}
+
+async function fetchIYUUSupportedTargets() {
+  iyuuSupportedLoading.value = true
+  try {
+    const resp = await iyuuApi.supportedTargets()
+    const items = resp.data?.data?.sites || []
+    iyuuSupportedIds.value = new Set(items.map((s: { site_id: number }) => String(s.site_id)))
+  } catch {
+    iyuuSupportedIds.value = new Set()
+  } finally {
+    iyuuSupportedLoading.value = false
+  }
 }
 
 const matchLayers = computed({
@@ -293,6 +311,14 @@ const sitesLoading = ref(false)
 
 const sourceSites = computed(() => sites.value.filter(s => s.isSource))
 const targetSites = computed(() => sites.value.filter(s => s.isTarget))
+
+const iyuuSupportedIds = ref<Set<string>>(new Set())
+const iyuuSupportedLoading = ref(false)
+
+const filteredTargetSites = computed(() => {
+  if (form.engineMode !== 'iyuu_cloud') return targetSites.value
+  return targetSites.value.filter(s => iyuuSupportedIds.value.has(String(s.id)))
+})
 
 async function fetchDownloaders() {
   downloadersLoading.value = true
@@ -421,6 +447,9 @@ function openModal(record?: ReseedTask) {
       maxRetries: record.max_retries ?? 3,
       retryIntervalH: record.retry_interval_h ?? 24,
     })
+    if (record.engine_mode === 'iyuu_cloud') {
+      fetchIYUUSupportedTargets()
+    }
   } else {
     Object.assign(form, { ...defaultForm, sourceSiteIds: [], targetSiteIds: [] })
   }
