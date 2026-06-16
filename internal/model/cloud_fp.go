@@ -3,7 +3,7 @@ package model
 type CloudFPConfig struct {
 	ID                uint   `gorm:"primarykey" json:"id"`
 	BaseURL           string `gorm:"size:128;not null" json:"base_url"`
-	APIToken          string `gorm:"size:128;not null" encrypted:"true" json:"-"`
+	APIToken          string `gorm:"size:128;not null" encrypted:"true" json:"api_token"`
 	Enabled           bool   `gorm:"default:false" json:"enabled"`
 	RequestTimeoutSec int    `gorm:"default:10" json:"request_timeout_sec"`
 }
