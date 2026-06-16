@@ -2,6 +2,7 @@ package reseed
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -1225,13 +1226,16 @@ func TestEngine_injectMatch_AlreadyExists(t *testing.T) {
 
 	ps := makePreloadedSites("target_site", &model.SiteConfig{Enabled: true}, adapter)
 	err := e.injectMatch(context.Background(), match, task, ps)
-	if err != nil {
-		t.Fatalf("unexpected error for already exists: %v", err)
+	if err == nil {
+		t.Fatal("expected errAlreadyExists, got nil")
+	}
+	if !errors.Is(err, errAlreadyExists) {
+		t.Fatalf("expected errAlreadyExists, got %v", err)
 	}
 	var updated model.ReseedMatch
 	db.First(&updated, match.ID)
-	if updated.Status != model.MatchStatusInjected {
-		t.Errorf("expected injected, got %s", updated.Status)
+	if updated.Status != model.MatchStatusSkipped {
+		t.Errorf("expected skipped, got %s", updated.Status)
 	}
 	if updated.DecisionType != string(model.DecisionAlreadyExists) {
 		t.Errorf("expected %s, got %s", model.DecisionAlreadyExists, updated.DecisionType)
