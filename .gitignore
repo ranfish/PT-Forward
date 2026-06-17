@@ -64,6 +64,7 @@ PT5/
 PT6/
 PT7/
 PT8/
+fnOS/
 *.torrent
 # Temp decrypt tool (keep local, never commit)
 cmd/_tmp_decrypt/
