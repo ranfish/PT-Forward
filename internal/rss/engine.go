@@ -570,7 +570,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 		var events []*model.RSSTorrentEvent
 		var apiMode bool
 
-		if mtAdapter != nil {
+		if mtAdapter != nil && !strings.Contains(url, "rss.m-team.cc") {
 			apiEvents, apiErr := mtAdapter.FetchItemsByAPI(ctx, mtConfig, url, sub.SiteName)
 			if apiErr != nil {
 				e.logger.Warn("mteam API fetch failed, falling back to RSS",
