@@ -922,6 +922,15 @@ func (e *Engine) preloadIYUUSiteMappings(ctx context.Context) map[int]string {
 }
 
 func (e *Engine) Start(ctx context.Context) error {
+	// Reset stale "running" tasks from previous process crash/restart
+	if result := e.db.WithContext(ctx).Model(&model.ReseedTask{}).
+		Where("status = ?", "running").
+		Update("status", "idle"); result.Error != nil {
+		e.logger.Warn("failed to reset stale running tasks", zap.Error(result.Error))
+	} else if result.RowsAffected > 0 {
+		e.logger.Info("reset stale running tasks", zap.Int64("count", result.RowsAffected))
+	}
+
 	var tasks []model.ReseedTask
 	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&tasks).Error; err != nil {
 		return reseedError(ErrReseedDB, "load reseed tasks", err)
