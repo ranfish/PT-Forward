@@ -5,7 +5,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "13city.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "1ptba.com": {
@@ -14,7 +14,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "1ptba.com",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "52pt.site": {
@@ -23,7 +23,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "52pt.site",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "api.m-team.cc": {
@@ -44,7 +44,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "audiences.me",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "bilibili.download": {
@@ -53,7 +53,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "bilibili.download",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "仅目标"
   },
@@ -63,7 +63,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "cangbao.ge",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "carpt.net": {
@@ -72,7 +72,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "carpt.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "cc.mypt.cc": {
@@ -81,7 +81,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "cc.mypt.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "crabpt.vip": {
@@ -90,7 +90,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "crabpt.vip",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "cspt.top": {
@@ -99,7 +99,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "cspt.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "cyanbug.net": {
@@ -108,7 +108,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "cyanbug.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "dicmusic.com": {
@@ -117,7 +117,7 @@
     "framework": "gazelle",
     "auth_type": "cookie",
     "cookiecloud_domain": "dicmusic.com",
-    "download_url_template": "torrents.php?action=download\u0026id={id}\u0026authkey={authkey}\u0026torrent_pass={rsskey}",
+    "download_url_template": "torrents.php?action=download&id={id}&authkey={authkey}&torrent_pass={rsskey}",
     "verification_status": "verified"
   },
   "discfan.net": {
@@ -126,7 +126,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "discfan.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "dubhe.site": {
@@ -135,7 +135,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "dubhe.site",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "duckboobee.org": {
@@ -144,7 +144,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "duckboobee.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "et8.org": {
@@ -153,7 +153,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "et8.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "greatposterwall.com": {
@@ -162,7 +162,7 @@
     "framework": "gazelle",
     "auth_type": "cookie",
     "cookiecloud_domain": "greatposterwall.com",
-    "download_url_template": "torrents.php?action=download\u0026id={id}\u0026authkey={authkey}\u0026torrent_pass={rsskey}",
+    "download_url_template": "torrents.php?action=download&id={id}&authkey={authkey}&torrent_pass={rsskey}",
     "verification_status": "verified"
   },
   "hdarea.club": {
@@ -171,7 +171,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "hdarea.club",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "hdbao.cc": {
@@ -180,7 +180,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "hdbao.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "hdcity.city": {
@@ -189,7 +189,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "hdcity.city",
-    "download_url_template": "download?id={id}\u0026cuhash={passkey}",
+    "download_url_template": "download?id={id}&cuhash={passkey}",
     "passkey_label": "cuhash",
     "passkey_hint": "需要从种子下载地址获取，cuhash=后面的值",
     "verification_status": "verified"
@@ -200,7 +200,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "hdfans.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "hdhome.org": {
@@ -209,7 +209,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "hdhome.org",
-    "download_url_template": "download.php?id={id}\u0026rsskey={rsskey}",
+    "download_url_template": "download.php?id={id}&rsskey={rsskey}",
     "rss_key_label": "RSS Key",
     "rss_key_hint": "RSS Key（当前加密密钥），请到站点 RSS 页面生成获取",
     "show_passkey": false,
@@ -235,7 +235,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "hdsky.me",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "publish_form_fields": {
       "douban": ""
     },
@@ -247,7 +247,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "hdtime.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "hdvideo.top": {
@@ -256,7 +256,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "hdvideo.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "hhanclub.net": {
@@ -265,7 +265,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "hhanclub.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "仅源站，全站官种"
   },
@@ -275,7 +275,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "kufei.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "lemonhd.net": {
@@ -284,7 +284,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "lemonhd.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "longpt.org": {
@@ -293,7 +293,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "longpt.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "monikadesign.uk": {
@@ -311,7 +311,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "mua.xloli.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "nanyangpt.com": {
@@ -320,7 +320,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "nanyangpt.com",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "njtupt.top": {
@@ -329,7 +329,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "njtupt.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "open.cd": {
@@ -338,7 +338,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "open.cd",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "ourbits.club": {
@@ -347,7 +347,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "ourbits.club",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "仅源站"
   },
@@ -357,7 +357,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "p.t-baozi.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pandapt.net": {
@@ -366,7 +366,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pandapt.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "piggo.me": {
@@ -375,7 +375,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "piggo.me",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "RSS/下载直连可用；cookie 页面(details/upload)被 WAF+异地登录 2FA 拦截，需关闭 ScrapeFree"
   },
@@ -385,7 +385,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "playlet.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "无上传权限，仅辅种"
   },
@@ -395,7 +395,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.0ff.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.aling.de": {
@@ -404,7 +404,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.aling.de",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.btschool.club": {
@@ -413,7 +413,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.btschool.club",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.cdy.skin": {
@@ -422,7 +422,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.cdy.skin",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "blocked",
     "special_notes": "传道院 - HTTP 403 / 直连超时"
   },
@@ -432,7 +432,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.eastgame.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.gtkpw.xyz": {
@@ -441,7 +441,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.gtkpw.xyz",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.hdclone.top": {
@@ -450,7 +450,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.hdclone.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.hdupt.com": {
@@ -459,7 +459,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.hdupt.com",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.itzmx.com": {
@@ -468,7 +468,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.itzmx.com",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.keepfrds.com": {
@@ -477,7 +477,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.keepfrds.com",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "仅源站"
   },
@@ -487,7 +487,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.lajidui.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.luckpt.de": {
@@ -496,7 +496,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.luckpt.de",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.muxuege.org": {
@@ -505,7 +505,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.muxuege.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.novahd.top": {
@@ -514,7 +514,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.novahd.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.ptskit.org": {
@@ -523,7 +523,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.ptskit.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "仅源站"
   },
@@ -533,7 +533,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.sjtu.edu.cn",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.soulvoice.club": {
@@ -542,7 +542,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.soulvoice.club",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.tey.cc": {
@@ -551,7 +551,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.tey.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.tu88.men": {
@@ -560,7 +560,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.tu88.men",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.xingyungept.org": {
@@ -569,7 +569,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.xingyungept.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pt.ying.us.kg": {
@@ -578,7 +578,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pt.ying.us.kg",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "ptcafe.club": {
@@ -587,7 +587,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "ptcafe.club",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "ptchdbits.co": {
@@ -596,7 +596,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "ptchdbits.co",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pterclub.net": {
@@ -605,7 +605,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pterclub.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "ptfans.cc": {
@@ -614,7 +614,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "ptfans.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "pthome.net": {
@@ -623,7 +623,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "pthome.net",
-    "download_url_template": "download.php?id={id}\u0026rsskey={rsskey}",
+    "download_url_template": "download.php?id={id}&rsskey={rsskey}",
     "rss_key_label": "RSS Key",
     "rss_key_hint": "RSS Key（当前加密密钥），请到站点 RSS 页面生成获取",
     "show_passkey": false,
@@ -636,7 +636,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "ptlgs.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "ptsbao.club": {
@@ -645,7 +645,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "ptsbao.club",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "ptzone.xyz": {
@@ -654,7 +654,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "ptzone.xyz",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "raingfh.top": {
@@ -663,7 +663,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "raingfh.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "rousi.pro": {
@@ -681,7 +681,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "sbpt.link",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "sewerpt.com": {
@@ -690,7 +690,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "sewerpt.com",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "springsunday.net": {
@@ -699,7 +699,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "springsunday.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "star-space.net": {
@@ -708,7 +708,7 @@
     "framework": "generic",
     "auth_type": "cookie",
     "cookiecloud_domain": "star-space.net",
-    "download_url_template": "p_torrent/download.php?tid={id}\u0026passkey={passkey}",
+    "download_url_template": "p_torrent/download.php?tid={id}&passkey={passkey}",
     "paths": {
       "browse": "p_torrent/video_list_g.php"
     },
@@ -720,7 +720,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "sunnypt.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "仅源站"
   },
@@ -730,7 +730,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "tjupt.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "totheglory.im": {
@@ -748,7 +748,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "u2.dmhy.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "仅源站"
   },
@@ -758,7 +758,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "ubits.club",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "仅源站"
   },
@@ -768,7 +768,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "wintersakura.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.52movie.top": {
@@ -777,7 +777,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.52movie.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "无上传权限，仅辅种"
   },
@@ -787,7 +787,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.agsvpt.com",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.dragonhd.xyz": {
@@ -796,7 +796,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.dragonhd.xyz",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.haidan.cc": {
@@ -805,7 +805,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.haidan.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.hddolby.com": {
@@ -814,7 +814,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.hddolby.com",
-    "download_url_template": "download.php?id={id}\u0026rsskey={rsskey}",
+    "download_url_template": "download.php?id={id}&rsskey={rsskey}",
     "rss_key_label": "RSS Key",
     "rss_key_hint": "RSS Key（当前加密密钥），请到站点 RSS 页面生成获取",
     "show_passkey": false,
@@ -828,7 +828,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.hdkyl.in",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.hitpt.com": {
@@ -837,7 +837,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.hitpt.com",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.htpt.cc": {
@@ -846,7 +846,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.htpt.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.hxpt.org": {
@@ -855,7 +855,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.hxpt.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.momentpt.top": {
@@ -864,7 +864,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.momentpt.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.okpt.net": {
@@ -873,7 +873,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.okpt.net",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.oshen.win": {
@@ -882,7 +882,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.oshen.win",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "blocked",
     "special_notes": "奥申 - 空页面"
   },
@@ -892,7 +892,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.ptlao.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.pttime.org": {
@@ -901,7 +901,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.pttime.org",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.qingwapt.com": {
@@ -910,7 +910,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "qingwapt.com",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "CookieCloud 域名 qingwapt.com"
   },
@@ -920,7 +920,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.tangpt.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "www.tokyo-manga.top": {
@@ -929,7 +929,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "www.tokyo-manga.top",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified",
     "special_notes": "无上传权限，仅辅种"
   },
@@ -952,7 +952,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "xingtan.one",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "xingwan.cc": {
@@ -961,7 +961,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "xingwan.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "yhpp.cc": {
@@ -970,7 +970,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "yhpp.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "zeus.hamsters.space": {
@@ -979,7 +979,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "zeus.hamsters.space",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "zhuque.in": {
@@ -997,7 +997,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "zmpt.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
   "zrpt.cc": {
@@ -1006,7 +1006,7 @@
     "framework": "nexusphp",
     "auth_type": "cookie",
     "cookiecloud_domain": "zrpt.cc",
-    "download_url_template": "download.php?id={id}\u0026passkey={passkey}",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   }
 }
