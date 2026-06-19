@@ -4986,16 +4986,16 @@
       "supports_pieces_hash_api": false
     },
     {
-      "domain": "haidan.cc",
+      "domain": "www.haidan.cc",
       "name": "海胆",
-      "base_url": "https://haidan.cc",
+      "base_url": "https://www.haidan.cc",
       "framework": "nexusphp",
       "auth_type": "",
       "download_mode": "",
       "is_source": true,
       "is_target": true,
-      "cookiecloud_domain": "",
-      "alternative_domains": "www.haidan.cc",
+      "cookiecloud_domain": "www.haidan.cc",
+      "alternative_domains": "haidan.cc",
       "form": {
         "category": [
           {
