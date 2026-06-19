@@ -82,6 +82,8 @@ func (s *Service) getToken() string {
 	return s.config.APIToken
 }
 
+const cloudFPLookupBatchSize = 400
+
 func (s *Service) BatchLookup(ctx context.Context, piecesHashes []string, targetSites []string) (map[string][]model.CloudFPMatch, error) {
 	if !s.isEnabled() {
 		return nil, nil
@@ -90,6 +92,32 @@ func (s *Service) BatchLookup(ctx context.Context, piecesHashes []string, target
 		return nil, fmt.Errorf("circuit breaker open")
 	}
 
+	// 分批查询（PT-IDX API 限制每次最多 500 个）
+	if len(piecesHashes) <= cloudFPLookupBatchSize {
+		return s.singleLookup(ctx, piecesHashes, targetSites)
+	}
+
+	allMatches := make(map[string][]model.CloudFPMatch)
+	for i := 0; i < len(piecesHashes); i += cloudFPLookupBatchSize {
+		end := i + cloudFPLookupBatchSize
+		if end > len(piecesHashes) {
+			end = len(piecesHashes)
+		}
+		batch := piecesHashes[i:end]
+		matches, err := s.singleLookup(ctx, batch, targetSites)
+		if err != nil {
+			s.breaker.recordFailure()
+			return nil, err
+		}
+		for k, v := range matches {
+			allMatches[k] = append(allMatches[k], v...)
+		}
+	}
+	s.breaker.recordSuccess()
+	return allMatches, nil
+}
+
+func (s *Service) singleLookup(ctx context.Context, piecesHashes []string, targetSites []string) (map[string][]model.CloudFPMatch, error) {
 	body, _ := json.Marshal(map[string]interface{}{
 		"pieces_hashes": piecesHashes,
 		"target_sites":  targetSites,
@@ -97,10 +125,8 @@ func (s *Service) BatchLookup(ctx context.Context, piecesHashes []string, target
 
 	respBody, err := s.doRequest(ctx, "POST", "/api/v1/fingerprints/lookup", body)
 	if err != nil {
-		s.breaker.recordFailure()
 		return nil, err
 	}
-	s.breaker.recordSuccess()
 
 	var resp struct {
 		Matches map[string][]model.CloudFPMatch `json:"matches"`
