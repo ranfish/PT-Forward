@@ -30566,6 +30566,36 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false
+    },
+    {
+      "domain": "www.musopia.vip",
+      "name": "音乐乌托邦",
+      "base_url": "https://www.musopia.vip",
+      "framework": "nexusphp",
+      "auth_type": "cookie",
+      "download_mode": "",
+      "is_source": true,
+      "is_target": true,
+      "cookiecloud_domain": "www.musopia.vip",
+      "alternative_domains": "",
+      "supports_pieces_hash_api": true,
+      "verification_status": "verified",
+      "special_notes": ""
+    },
+    {
+      "domain": "dstudio.me",
+      "name": "深度",
+      "base_url": "https://dstudio.me",
+      "framework": "nexusphp",
+      "auth_type": "cookie",
+      "download_mode": "",
+      "is_source": true,
+      "is_target": false,
+      "cookiecloud_domain": "dstudio.me",
+      "alternative_domains": "",
+      "supports_pieces_hash_api": true,
+      "verification_status": "verified",
+      "special_notes": "全站官种，只能做源站"
     }
   ],
   "exclusions": [
