@@ -1008,5 +1008,25 @@
     "cookiecloud_domain": "zrpt.cc",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
+  },
+  "www.musopia.vip": {
+    "domain": "www.musopia.vip",
+    "name_cn": "音乐乌托邦",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.musopia.vip",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": ""
+  },
+  "dstudio.me": {
+    "domain": "dstudio.me",
+    "name_cn": "深度",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "dstudio.me",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "全站官种，只能做源站"
   }
 }
