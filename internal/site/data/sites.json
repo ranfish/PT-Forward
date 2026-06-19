@@ -2816,7 +2816,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "audiences.me",
@@ -7740,7 +7740,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "nanyangpt.com",
@@ -9002,7 +9002,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "pt.0ff.cc",
@@ -10150,7 +10150,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "bilibili.download",
@@ -11783,7 +11783,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": true
     },
     {
       "domain": "pt.novahd.top",
@@ -22459,7 +22459,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "monikadesign.uk",
@@ -22715,7 +22715,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "dicmusic.com",
@@ -22919,7 +22919,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "zhuque.in",
@@ -23088,7 +23088,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "rousi.pro",
@@ -23211,7 +23211,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "totheglory.im",
@@ -23614,7 +23614,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "star-space.net",
@@ -23933,7 +23933,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "52pt.site",
@@ -27223,7 +27223,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "sunnypt.top",
@@ -28419,7 +28419,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "www.tokyo-manga.top",
@@ -28851,7 +28851,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "greatposterwall.com",
@@ -29137,7 +29137,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "api.m-team.cc",
@@ -29565,7 +29565,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "cc.mypt.cc",
@@ -29901,7 +29901,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "hdbao.cc",
@@ -30167,7 +30167,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "raingfh.top",
@@ -30509,7 +30509,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "playlet.cc",
@@ -30537,7 +30537,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     },
     {
       "domain": "www.52movie.top",
@@ -30565,7 +30565,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": false
     }
   ],
   "exclusions": [
