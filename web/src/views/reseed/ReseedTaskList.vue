@@ -345,8 +345,16 @@ const iyuuSupportedIds = ref<Set<string>>(new Set())
 const iyuuSupportedLoading = ref(false)
 
 const filteredTargetSites = computed(() => {
-  if (form.engineMode !== 'iyuu_cloud') return targetSites.value
-  return targetSites.value.filter(s => iyuuSupportedIds.value.has(String(s.id)))
+  if (form.engineMode === 'iyuu_cloud') {
+    return targetSites.value.filter(s => iyuuSupportedIds.value.has(String(s.id)))
+  }
+  // seed_feature 模式：仅 L0 勾选时，只显示支持 pieces_hash API 的站点
+  const hasL1 = matchLayers.value.includes('fingerprint')
+  const hasL2 = matchLayers.value.includes('size_title')
+  if (!hasL1 && !hasL2) {
+    return targetSites.value.filter(s => s.supportsPiecesHashApi)
+  }
+  return targetSites.value
 })
 
 async function fetchDownloaders() {
@@ -389,7 +397,7 @@ function selectAllSource() {
 }
 
 function selectAllTarget() {
-  form.targetSiteIds = targetSites.value.map(s => String(s.id))
+  form.targetSiteIds = filteredTargetSites.value.map(s => String(s.id))
 }
 
 const defaultForm = {

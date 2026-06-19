@@ -300,6 +300,7 @@ export interface Site {
   reseedLimitInterval: number
   iyuuLimitCount: number
   iyuuLimitInterval: number
+  supportsPiecesHashApi: boolean
 }
 
 export interface SiteConfigOverride {

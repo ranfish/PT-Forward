@@ -262,6 +262,8 @@ type siteResponse struct {
 
 	UserID int `json:"userId,omitempty"`
 
+	SupportsPiecesHashAPI bool `json:"supportsPiecesHashApi"`
+
 	UploadBytes   int64      `json:"uploadBytes,string"`
 	DownloadBytes int64      `json:"downloadBytes,string"`
 	SeedingPoints float64    `json:"seedingPoints"`
@@ -377,6 +379,8 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		RSSKeyMasked:   maskPasskey(s.RSSKey),
 
 		UserID: s.UserID,
+
+		SupportsPiecesHashAPI: s.SupportsPiecesHashAPI,
 
 		UploadBytes:   s.UploadBytes,
 		DownloadBytes: s.DownloadBytes,
