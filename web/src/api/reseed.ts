@@ -23,8 +23,11 @@ export const reseedApi = {
   cancelTask(id: number) {
     return client.post<ApiResponse<void>>(`/reseed/tasks/${id}/cancel`)
   },
-  getMatches(taskId: number) {
-    return client.get<ApiResponse<{ items: ReseedMatch[]; total: number }>>(`/reseed/tasks/${taskId}/matches`)
+  getMatches(taskId: number, page?: number, pageSize?: number) {
+    const params: Record<string, number> = {}
+    if (page) params.page = page
+    if (pageSize) params.pageSize = pageSize
+    return client.get<ApiResponse<{ items: ReseedMatch[]; total: number; page: number; pageSize: number }>>(`/reseed/tasks/${taskId}/matches`, { params })
   },
   retryMatch(taskId: number, matchId: number) {
     return client.post<ApiResponse<ReseedMatch>>(`/reseed/tasks/${taskId}/matches/${matchId}/retry`)

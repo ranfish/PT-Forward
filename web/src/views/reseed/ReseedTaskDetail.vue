@@ -23,7 +23,14 @@
               :columns="matchColumns"
               :data-source="matches"
               :loading="matchesLoading"
-              :pagination="{ pageSize: 20 }"
+              :pagination="{
+                current: matchesPage,
+                pageSize: matchesPageSize,
+                total: matchesTotal,
+                showSizeChanger: true,
+                showTotal: (t: number) => `${t} 条`,
+              }"
+              @change="handleMatchesChange"
               row-key="id"
               size="small"
             >
@@ -150,6 +157,9 @@ const loading = ref(false)
 const matchesLoading = ref(false)
 const task = ref<ReseedTaskInfo | null>(null)
 const matches = ref<ReseedMatchItem[]>([])
+const matchesTotal = ref(0)
+const matchesPage = ref(1)
+const matchesPageSize = ref(20)
 const activeTab = ref('matches')
 
 const negDeleteInfoHash = ref('')
@@ -186,13 +196,20 @@ async function fetchTask() {
 async function fetchMatches() {
   matchesLoading.value = true
   try {
-    const resp = await reseedApi.getMatches(taskId)
+    const resp = await reseedApi.getMatches(taskId, matchesPage.value, matchesPageSize.value)
     matches.value = resp.data.data?.items ?? []
+    matchesTotal.value = resp.data.data?.total ?? 0
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   } finally {
     matchesLoading.value = false
   }
+}
+
+function handleMatchesChange(pag: { current?: number; pageSize?: number }) {
+  if (pag.current) matchesPage.value = pag.current
+  if (pag.pageSize) matchesPageSize.value = pag.pageSize
+  fetchMatches()
 }
 
 async function retryMatch(matchId: number) {
