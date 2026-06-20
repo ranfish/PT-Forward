@@ -56,6 +56,9 @@ const reseedStatusMap: Record<string, string> = {
   injected: 'reseed.statusInjected',
   new: 'reseed.statusNew',
   active: 'reseed.statusActive',
+  matched: 'reseed.statusMatched',
+  skipped: 'reseed.statusSkipped',
+  cancelled: 'reseed.statusCancelled',
 }
 
 export function useEnumLabels() {
