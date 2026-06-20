@@ -422,20 +422,38 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	}
 
 	infoHash := r.URL.Query().Get("infoHash")
-	if infoHash == "" {
-		Success(w, map[string]interface{}{"items": []model.ReseedMatch{}, "total": 0})
-		return
+	status := r.URL.Query().Get("status")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
 	}
 
-	matches, err := h.engine.FindMatchesByInfoHash(r.Context(), infoHash)
-	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询匹配记录失败")
-		return
+	query := h.engine.DB().Model(&model.ReseedMatch{}).Where("source_info_hash IN (?)",
+		h.engine.DB().Model(&model.ReseedMatch{}).Select("DISTINCT source_info_hash"),
+	)
+
+	_ = taskIDStr // task_id 不在 matches 表中，忽略
+	_ = infoHash  // 保留兼容性
+
+	if status != "" {
+		query = query.Where("status = ?", status)
 	}
+
+	var total int64
+	query.Count(&total)
+
+	var matches []model.ReseedMatch
+	query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&matches)
 
 	Success(w, map[string]interface{}{
-		"items": matches,
-		"total": len(matches),
+		"items":    matches,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
 	})
 }
 
