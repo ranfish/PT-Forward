@@ -218,6 +218,10 @@ func (e *Engine) SetFingerprintRepo(repo *fingerprint.Repository) {
 	e.fpRepo = repo
 }
 
+func (e *Engine) DB() *gorm.DB {
+	return e.db
+}
+
 func (e *Engine) SetClientProvider(cp model.DownloaderProvider) {
 	e.clientProvider = cp
 }
