@@ -59,7 +59,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var version = "0.0.1"
+var version = "dev"
 
 func main() {
 	configPath := flag.String("config", "", "path to config file")
