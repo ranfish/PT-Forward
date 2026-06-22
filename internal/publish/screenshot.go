@@ -17,7 +17,6 @@ import (
 
 type ScreenshotEngine struct {
 	mpvPath     string
-	ffmpegPath  string
 	ffprobePath string
 	count       int
 	minInterval float64
@@ -40,7 +39,6 @@ func NewScreenshotEngine(mpvPath string, count int, minInterval int, quality int
 	}
 	return &ScreenshotEngine{
 		mpvPath:     mpvPath,
-		ffmpegPath:  "ffmpeg",
 		ffprobePath: "ffprobe",
 		count:       count,
 		minInterval: float64(minInterval),
@@ -51,12 +49,8 @@ func NewScreenshotEngine(mpvPath string, count int, minInterval int, quality int
 
 func (e *ScreenshotEngine) Available() bool {
 	_, mpvErr := exec.LookPath(e.mpvPath)
-	_, ffErr := exec.LookPath(e.ffmpegPath)
-	if mpvErr != nil && ffErr != nil {
-		return false
-	}
 	_, probeErr := exec.LookPath(e.ffprobePath)
-	return probeErr == nil
+	return mpvErr == nil && probeErr == nil
 }
 
 type videoInfo struct {
@@ -66,7 +60,7 @@ type videoInfo struct {
 
 func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtitleStreamID int) ([]string, error) {
 	if !e.Available() {
-		return nil, fmt.Errorf("screenshot tools not available (need ffprobe + mpv or ffmpeg)")
+		return nil, fmt.Errorf("screenshot tools not available (need ffprobe + mpv)")
 	}
 
 	if _, err := os.Stat(videoPath); os.IsNotExist(err) {
@@ -85,25 +79,14 @@ func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtit
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	useFFmpeg := info.isHDR && subtitleStreamID <= 0 && e.ffmpegAvailable()
-
 	var paths []string
 	for i, ts := range points {
 		outPath := filepath.Join(tmpDir, fmt.Sprintf("shot_%03d.jpg", i))
-		var capErr error
-		if useFFmpeg {
-			capErr = e.captureFrameFFmpeg(ctx, videoPath, ts, outPath)
-		} else {
-			capErr = e.captureFrameMPV(ctx, videoPath, ts, subtitleStreamID, outPath)
-		}
+		capErr := e.captureFrameMPV(ctx, videoPath, ts, subtitleStreamID, info.isHDR, outPath)
 		if capErr != nil {
-			engine := "mpv"
-			if useFFmpeg {
-				engine = "ffmpeg"
-			}
 			e.logger.Warn("screenshot capture failed",
-				zap.String("engine", engine),
 				zap.Float64("timestamp", ts),
+				zap.Bool("hdr", info.isHDR),
 				zap.Error(capErr))
 			continue
 		}
@@ -114,11 +97,6 @@ func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtit
 		return nil, fmt.Errorf("all screenshot captures failed")
 	}
 	return paths, nil
-}
-
-func (e *ScreenshotEngine) ffmpegAvailable() bool {
-	_, err := exec.LookPath(e.ffmpegPath)
-	return err == nil
 }
 
 func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*videoInfo, error) {
@@ -214,29 +192,7 @@ func (e *ScreenshotEngine) generateTimePoints(duration float64) []float64 {
 	return points
 }
 
-func (e *ScreenshotEngine) captureFrameFFmpeg(ctx context.Context, videoPath string, timestamp float64, outPath string) error {
-	args := []string{
-		"-ss", strconv.FormatFloat(timestamp, 'f', 3, 64),
-		"-i", videoPath,
-		"-frames:v", "1",
-		"-vf", "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p",
-		"-q:v", strconv.Itoa(2 + (100-e.quality)/10),
-		"-y", outPath,
-	}
-
-	cmd := exec.CommandContext(ctx, e.ffmpegPath, args...) //nolint:gosec // intentional subprocess
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("ffmpeg exited: %w, output: %s", err, string(output))
-	}
-
-	if _, statErr := os.Stat(outPath); statErr != nil {
-		return fmt.Errorf("ffmpeg output file not found: %s", outPath)
-	}
-	return nil
-}
-
-func (e *ScreenshotEngine) captureFrameMPV(ctx context.Context, videoPath string, timestamp float64, subtitleStreamID int, outPath string) error {
+func (e *ScreenshotEngine) captureFrameMPV(ctx context.Context, videoPath string, timestamp float64, subtitleStreamID int, isHDR bool, outPath string) error {
 	outDir := filepath.Dir(outPath)
 	args := []string{
 		"--vo=image",
@@ -249,6 +205,11 @@ func (e *ScreenshotEngine) captureFrameMPV(ctx context.Context, videoPath string
 		"--vo-image-format=jpg",
 		"--vo-image-jpeg-quality=" + strconv.Itoa(e.quality),
 		"--vo-image-outdir=" + outDir,
+	}
+
+	// HDR: add mobius tone-mapping via lavfi filter (requires zimg for color conversion)
+	if isHDR {
+		args = append(args, "--vf=lavfi=[tonemap=mobius]")
 	}
 
 	if subtitleStreamID > 0 {
