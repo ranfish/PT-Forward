@@ -31,7 +31,7 @@
 
 1. `go vet ./internal/... ./cmd/pt-forward/...`（**不要**用 `./...`）
 2. `go test ./internal/... -count=1 -timeout 180s`
-3. `CGO_ENABLED=1 /home/incast/.local/go/bin/go build -ldflags "-s -w" -o pt-forward ./cmd/pt-forward/`
+3. `CGO_ENABLED=1 /home/incast/.local/go/bin/go build -ldflags "-s -w -X main.version=$(git describe --tags --always --dirty)" -o pt-forward ./cmd/pt-forward/`
 4. `systemctl --user restart pt-forward && sleep 2 && systemctl --user is-active pt-forward`
 
 ## 前端验证与部署
@@ -42,7 +42,7 @@
 
 1. `cd web/ && rm -rf node_modules/.vite && PATH="/home/incast/.local/bin:$PATH" ./node_modules/.bin/vite build`
 2. `rm -rf frontend/dist && cp -r web/dist frontend/dist`
-3. `CGO_ENABLED=1 /home/incast/.local/go/bin/go build -ldflags "-s -w" -o pt-forward ./cmd/pt-forward/`
+3. `CGO_ENABLED=1 /home/incast/.local/go/bin/go build -ldflags "-s -w -X main.version=$(git describe --tags --always --dirty)" -o pt-forward ./cmd/pt-forward/`
 4. `systemctl --user restart pt-forward && sleep 2 && systemctl --user is-active pt-forward`
 
 ## 数据采集策略
