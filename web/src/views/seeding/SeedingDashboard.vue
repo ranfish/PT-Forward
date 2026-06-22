@@ -126,6 +126,10 @@
         </a-form-item>
         <a-collapse :bordered="false" style="margin-top: 8px; background: transparent">
           <a-collapse-panel key="advanced" header="高级选项">
+            <a-form-item label="删种规则全局生效" :label-col="{ span: 4 }">
+              <a-switch v-model:checked="deleteRulesGlobal" @change="onDeleteRulesGlobalChange" />
+              <span style="margin-left: 8px; color: #999; font-size: 12px;">开启后所有启用的删种规则自动对所有刷流下载器生效，无需逐个配置</span>
+            </a-form-item>
             <a-row :gutter="16">
               <a-col :span="12">
                 <a-form-item label="拒绝规则 ID 列表">
@@ -134,13 +138,18 @@
               </a-col>
               <a-col :span="12">
                 <a-form-item label="删种规则">
-                  <a-select
-                    v-model:value="configForm.deleteRuleIds"
-                    mode="multiple"
-                    :options="deleteRuleOptions"
-                    placeholder="选择绑定的删种规则"
-                    allow-clear
-                  />
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <a-select
+                      v-if="!deleteRulesGlobal"
+                      v-model:value="configForm.deleteRuleIds"
+                      mode="multiple"
+                      :options="deleteRuleOptions"
+                      placeholder="选择绑定的删种规则"
+                      allow-clear
+                      style="flex: 1"
+                    />
+                    <span v-else style="color: #52c41a; font-size: 12px;">全局模式：所有启用的删种规则自动生效</span>
+                  </div>
                 </a-form-item>
               </a-col>
             </a-row>
@@ -248,6 +257,8 @@ import {
   PlusOutlined,
 } from '@ant-design/icons-vue'
 import { seedingApi, deleteRulesApi } from '@/api/seeding'
+import { settingsApi } from '@/api/settings'
+import { message as antMessage } from 'ant-design-vue'
 import { downloadersApi } from '@/api/downloaders'
 import { formatDurationSec } from '@/utils/format'
 import { useEnumLabels } from '@/utils/enumLabels'
@@ -277,6 +288,7 @@ const torrents = ref<SeedingTorrentRecord[]>([])
 const configs = ref<SeedingClientConfig[]>([])
 const downloaderOptions = ref<{label: string, value: string}[]>([])
 const deleteRuleOptions = ref<{label: string, value: number}[]>([])
+const deleteRulesGlobal = ref(false)
 
 const deleteRuleMap = computed(() => {
   const m = new Map<number, string>()
@@ -517,10 +529,29 @@ async function fetchDeleteRules() {
   }
 }
 
+async function fetchDeleteRulesGlobal() {
+  try {
+    const resp = await settingsApi.get('seeding_delete_rules_global')
+    deleteRulesGlobal.value = (resp.data as unknown as Record<string, string>)['seeding_delete_rules_global'] === 'true'
+  } catch {
+  }
+}
+
+async function onDeleteRulesGlobalChange(checked: boolean) {
+  try {
+    await settingsApi.update('seeding_delete_rules_global', { value: checked ? 'true' : 'false' })
+    antMessage.success(checked ? '全局模式已开启' : '全局模式已关闭')
+  } catch {
+    antMessage.error('设置更新失败')
+    deleteRulesGlobal.value = !checked
+  }
+}
+
 onMounted(() => {
   fetchData()
   fetchConfigs()
   fetchDownloaders()
   fetchDeleteRules()
+  fetchDeleteRulesGlobal()
 })
 </script>

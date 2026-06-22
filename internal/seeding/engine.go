@@ -1126,7 +1126,24 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 
 	var cascadeRules []model.DeleteRule
 	var deleteRules []model.DeleteRule
-	if cfg != nil && cfg.DeleteRuleIDs != "" {
+
+	// Check global switch: when enabled, all DeleteRules apply to all seeding clients
+	var globalDeleteRules string
+	e.db.Raw("SELECT value FROM system_settings WHERE key = 'seeding_delete_rules_global' LIMIT 1").Scan(&globalDeleteRules)
+
+	if globalDeleteRules == "true" {
+		if dbErr := e.db.WithContext(ctx).
+			Where("enabled = ? AND cascade_delete = ?", true, true).
+			Find(&cascadeRules).Error; dbErr != nil {
+			e.logger.Warn("load cascade delete rules (global) failed", zap.String("client_id", clientID), zap.Error(dbErr))
+		}
+		if dbErr := e.db.WithContext(ctx).
+			Where("enabled = ?", true).
+			Order("priority DESC").
+			Find(&deleteRules).Error; dbErr != nil {
+			e.logger.Warn("load delete rules (global) failed", zap.String("client_id", clientID), zap.Error(dbErr))
+		}
+	} else if cfg != nil && cfg.DeleteRuleIDs != "" {
 		ruleIDs := splitRuleIDs(cfg.DeleteRuleIDs)
 		if dbErr := e.db.WithContext(ctx).
 			Where("id IN (?) AND enabled = ? AND cascade_delete = ?", ruleIDs, true, true).

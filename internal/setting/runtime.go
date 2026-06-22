@@ -37,6 +37,8 @@ const (
 	KeyDataCleanupSeedingArchiveDays = "data_cleanup_seeding_archive_days"
 	KeyDataCleanupAuditLogDays       = "data_cleanup_audit_log_days"
 	KeyTorrentTrafficRetentionDays   = "torrent_traffic_retention_days"
+
+	KeySeedingDeleteRulesGlobal = "seeding_delete_rules_global"
 )
 
 var DefaultSeeds = map[string]string{
@@ -65,6 +67,8 @@ var DefaultSeeds = map[string]string{
 	KeyDataCleanupSeedingArchiveDays: "90",
 	KeyDataCleanupAuditLogDays:       "90",
 	KeyTorrentTrafficRetentionDays:   "30",
+
+	KeySeedingDeleteRulesGlobal: "false",
 }
 
 func SeedDefaults(ctx context.Context, repo *Repository, seeds map[string]string, logger *zap.Logger) {
