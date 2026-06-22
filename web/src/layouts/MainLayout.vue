@@ -118,9 +118,7 @@
         </a-menu-item-group>
       </a-menu>
       <div class="sidebar-version">
-        <span>{{ t('common.frontend') }} {{ frontendVersion }}</span>
-        <span style="margin: 0 2px">/</span>
-        <span>{{ t('common.backend') }} {{ backendVersion }}</span>
+        <span>{{ backendVersion }}</span>
       </div>
     </a-layout-sider>
 
@@ -193,7 +191,6 @@ const authStore = useAuthStore()
 const { toggle: toggleTheme } = useTheme()
 const wsStore = useWebSocketStore()
 
-const frontendVersion = __APP_VERSION__
 const backendVersion = ref('-')
 
 function switchLocale(lang: string) {
