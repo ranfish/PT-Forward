@@ -17,25 +17,28 @@ COPY --from=frontend /build/web/dist frontend/dist
 ARG VERSION=dev
 RUN CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=${VERSION}" -o /pt-forward ./cmd/pt-forward
 
-FROM debian:bookworm-slim
-RUN apt-get update && \
+FROM debian:trixie-slim
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null; \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates tzdata wget \
-        libass9 liblcms2-2 zlib1g libfribidi0 libharfbuzz0b \
-        libfontconfig1 libfreetype6 libpng16-16 libstdc++6 \
-        libunibreak5 libglib2.0-0 libzimg2 && \
-    rm -rf /var/lib/apt/lists/* && \
-    groupadd -r pt-forward && useradd -r -g pt-forward pt-forward
-ARG TARGETARCH
+        ffmpeg \
+        fonts-noto-cjk \
+        libass9 libfontconfig1 libharfbuzz0b libfribidi0 \
+        libplacebo349 libzimg2 libjpeg62-turbo \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r pt-forward && useradd -r -g pt-forward pt-forward
+
 COPY --from=builder /pt-forward /usr/local/bin/pt-forward
-COPY bin/${TARGETARCH}/mpv /usr/local/bin/mpv
-COPY bin/${TARGETARCH}/ffprobe /usr/local/bin/ffprobe
-COPY bin/${TARGETARCH}/ffmpeg /usr/local/bin/ffmpeg
-RUN chmod 755 /usr/local/bin/mpv /usr/local/bin/ffprobe /usr/local/bin/ffmpeg
+COPY bin/amd64/mpv-new /usr/local/bin/mpv
+RUN chmod 755 /usr/local/bin/pt-forward /usr/local/bin/mpv
+
+WORKDIR /
 USER pt-forward
 EXPOSE 8765
 VOLUME /data
 VOLUME /config
+VOLUME /logs
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -qO- http://localhost:8765/healthz || exit 1
 ENTRYPOINT ["/pt-forward"]
 CMD ["--config", "/config/config.yaml"]

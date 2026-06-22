@@ -165,34 +165,13 @@ func TestProbeVideo_DetectsHDR(t *testing.T) {
 	}
 }
 
-func TestEngineSelection_UsesFFmpegForHDRNoSubs(t *testing.T) {
+func TestEngineSelection_AlwaysMPV(t *testing.T) {
 	engine := NewScreenshotEngine("mpv", 5, 30, 85, nil)
-	engine.ffmpegPath = "nonexistent_ffmpeg"
 	engine.ffprobePath = "nonexistent_ffprobe"
 
-	info := &videoInfo{duration: 7200, isHDR: true}
-	useFFmpeg := info.isHDR && engine.ffmpegAvailable()
-	if useFFmpeg {
-		t.Error("ffmpeg not available, should fallback to mpv")
-	}
-}
-
-func TestEngineSelection_UsesMPVForHDRWithSubs(t *testing.T) {
-	engine := NewScreenshotEngine("mpv", 5, 30, 85, nil)
-	engine.ffmpegPath = "nonexistent_ffmpeg"
-
-	info := &videoInfo{duration: 7200, isHDR: true}
-	subtitleStreamID := 1
-	useFFmpeg := info.isHDR && subtitleStreamID <= 0 && engine.ffmpegAvailable()
-	if useFFmpeg {
-		t.Error("should use mpv when subtitles requested")
-	}
-}
-
-func TestEngineSelection_UsesMPVForSDR(t *testing.T) {
-	info := &videoInfo{duration: 7200, isHDR: false}
-	if info.isHDR {
-		t.Error("SDR video should not be flagged as HDR")
+	// All videos use mpv regardless of HDR or subtitles
+	if engine.mpvPath != "mpv" {
+		t.Error("mpvPath should default to mpv")
 	}
 }
 
