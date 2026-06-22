@@ -1,0 +1,17 @@
+FROM debian:trixie-slim
+
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    meson ninja-build gcc pkg-config python3 \
+    libass-dev libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
+    libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev \
+    libavfilter-dev libplacebo-dev \
+    libjpeg-dev zlib1g-dev \
+    libzimg-dev \
+    ffmpeg \
+    fonts-noto-cjk && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
