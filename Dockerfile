@@ -33,7 +33,6 @@ COPY bin/amd64/mpv-new /usr/local/bin/mpv
 RUN chmod 755 /usr/local/bin/pt-forward /usr/local/bin/mpv
 
 WORKDIR /
-USER pt-forward
 EXPOSE 8765
 VOLUME /data
 VOLUME /config
