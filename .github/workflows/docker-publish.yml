@@ -37,14 +37,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Debug Docker Hub login
-        if: always()
-        run: |
-          OUTCOME="${{ steps.dockerhub_login.outcome }}"
-          USER_SET="${{ secrets.DOCKERHUB_USERNAME != '' }}"
-          TOKEN_SET="${{ secrets.DOCKERHUB_TOKEN != '' }}"
-          echo "::notice::outcome=$OUTCOME username_set=$USER_SET token_set=$TOKEN_SET"
-
       - name: Build and push to GHCR
         uses: docker/build-push-action@v6
         with:
