@@ -64,6 +64,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Create frontend dist placeholder
+        run: mkdir -p frontend/dist && echo '<html></html>' > frontend/dist/index.html
+
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
