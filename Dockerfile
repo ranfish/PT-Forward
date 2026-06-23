@@ -18,8 +18,7 @@ ARG VERSION=dev
 RUN CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=${VERSION}" -o /pt-forward ./cmd/pt-forward
 
 FROM debian:trixie-slim
-RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null; \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates tzdata wget \
         ffmpeg \
