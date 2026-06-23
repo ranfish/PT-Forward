@@ -157,9 +157,9 @@
               <a-col :span="12">
                 <a-form-item label="管理范围">
                   <a-select v-model:value="configForm.scope">
-                    <a-select-option value="managed">managed</a-select-option>
-                    <a-select-option value="all">all</a-select-option>
-                    <a-select-option value="custom">custom</a-select-option>
+                    <a-select-option value="managed">仅刷流种子</a-select-option>
+                    <a-select-option value="all">全部种子</a-select-option>
+                    <a-select-option value="custom">自定义</a-select-option>
                   </a-select>
                 </a-form-item>
               </a-col>
