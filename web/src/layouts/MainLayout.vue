@@ -119,8 +119,46 @@
       </a-menu>
       <div class="sidebar-version">
         <span>{{ backendVersion }}</span>
+        <a-button type="link" size="small" style="padding: 0 0 0 4px; font-size: 12px;" :loading="updateChecking" @click="checkUpdate">
+          检查更新
+        </a-button>
       </div>
     </a-layout-sider>
+
+    <a-modal v-model:open="updateModalVisible" title="系统更新" :footer="null" width="500px">
+      <div v-if="updateChecking" style="text-align: center; padding: 20px;">
+        <a-spin tip="正在检查更新..." />
+      </div>
+      <div v-else-if="updateInfo">
+        <a-descriptions :column="1" size="small" bordered>
+          <a-descriptions-item label="当前版本">{{ updateInfo.current_version }}</a-descriptions-item>
+          <a-descriptions-item label="最新版本">
+            <span :style="{ color: updateInfo.has_update ? '#fa541c' : '#52c41a' }">
+              {{ updateInfo.latest_version || '-' }}
+            </span>
+          </a-descriptions-item>
+        </a-descriptions>
+        <div v-if="updateInfo.error" style="color: #ff4d4f; margin-top: 12px;">{{ updateInfo.error }}</div>
+        <div v-if="updateInfo.has_update" style="margin-top: 16px;">
+          <a-alert v-if="updateInfo.release_notes" type="info" show-icon style="margin-bottom: 12px;">
+            <template #message>更新内容</template>
+            <pre style="white-space: pre-wrap; font-size: 12px; max-height: 200px; overflow: auto;">{{ updateInfo.release_notes }}</pre>
+          </a-alert>
+          <a-popconfirm title="确认更新？系统将自动重启。" ok-text="确认" cancel-text="取消" @confirm="performUpdate">
+            <a-button type="primary" :loading="updating" style="width: 100%">
+              {{ updating ? '正在下载并更新...' : '立即更新' }}
+            </a-button>
+          </a-popconfirm>
+          <div style="text-align: center; margin-top: 8px; color: #999; font-size: 12px;">
+            更新过程约 1-2 分钟，完成后系统自动重启
+          </div>
+        </div>
+        <div v-else style="text-align: center; padding: 20px; color: #52c41a;">
+          <a-check-circle-outlined style="font-size: 24px;" />
+          <div style="margin-top: 8px;">已是最新版本</div>
+        </div>
+      </div>
+    </a-modal>
 
     <a-layout>
       <a-layout-header class="header">
@@ -156,6 +194,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { message as antMessage } from 'ant-design-vue'
 import {
   DashboardOutlined,
   GlobalOutlined,
@@ -184,6 +223,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import { useWebSocketStore } from '@/stores/websocket'
 import { systemApi } from '@/api/system'
+import type { UpdateInfo } from '@/api/system'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -192,6 +232,10 @@ const { toggle: toggleTheme } = useTheme()
 const wsStore = useWebSocketStore()
 
 const backendVersion = ref('-')
+const updateChecking = ref(false)
+const updateModalVisible = ref(false)
+const updateInfo = ref<UpdateInfo | null>(null)
+const updating = ref(false)
 
 function switchLocale(lang: string) {
   locale.value = lang
@@ -231,6 +275,41 @@ onMounted(() => {
     backendVersion.value = resp.data?.data?.version || '-'
   }).catch(() => {})
 })
+
+async function checkUpdate() {
+  updateChecking.value = true
+  updateModalVisible.value = true
+  updateInfo.value = null
+  try {
+    const resp = await systemApi.checkUpdate()
+    updateInfo.value = resp.data as unknown as UpdateInfo
+  } catch {
+    updateInfo.value = {
+      has_update: false,
+      current_version: backendVersion.value,
+      latest_version: '',
+      release_notes: '',
+      download_url: '',
+      error: '检查更新失败，请检查网络连接',
+    }
+  } finally {
+    updateChecking.value = false
+  }
+}
+
+async function performUpdate() {
+  updating.value = true
+  try {
+    await systemApi.performUpdate()
+    antMessage.loading('正在下载并更新，系统将在几秒后重启...', 0)
+    setTimeout(() => {
+      window.location.reload()
+    }, 30000)
+  } catch {
+    antMessage.error('更新失败')
+    updating.value = false
+  }
+}
 </script>
 
 <style scoped>
