@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"path/filepath"
 	"strconv"
 	"syscall"
@@ -99,7 +100,7 @@ func main() {
 		os.Exit(1) //nolint:gocritic
 	}
 
-	if err := initEncryption(cfg, db, log); err != nil {
+	if err := initEncryption(cfg, *configPath, db, log); err != nil {
 		log.Error("failed to init encryption", zap.Error(err))
 		os.Exit(1) //nolint:gocritic
 	}
@@ -638,7 +639,7 @@ func initDB(cfg *config.Config, log *zap.Logger) (*gorm.DB, error) {
 	return db, nil
 }
 
-func initEncryption(cfg *config.Config, db *gorm.DB, log *zap.Logger) error {
+func initEncryption(cfg *config.Config, configPath string, db *gorm.DB, log *zap.Logger) error {
 	key := cfg.Security.EncryptionKey
 	if key == "" {
 		settingsRepo := setting.NewRepository(db)
@@ -649,7 +650,33 @@ func initEncryption(cfg *config.Config, db *gorm.DB, log *zap.Logger) error {
 		}
 	}
 	if key == "" {
-		return fmt.Errorf("encryption_key is required: set security.encryption_key in config or system_settings table")
+		// Auto-generate on first run
+		generated, err := crypto.GenerateRandomKey()
+		if err != nil {
+			return fmt.Errorf("generate encryption key: %w", err)
+		}
+		key = generated
+
+		// Write to config.yaml (preferred: key separated from DB)
+		if configPath != "" {
+			if err := writeEncryptionKeyToConfig(configPath, key); err != nil {
+				log.Warn("failed to write encryption_key to config, falling back to DB", zap.Error(err))
+				// Fallback: store in DB
+				settingsRepo := setting.NewRepository(db)
+				if err := settingsRepo.Set(context.Background(), "encryption_key", key); err != nil {
+					return fmt.Errorf("save generated encryption key: %w", err)
+				}
+			} else {
+				log.Info("encryption_key auto-generated and written to config file", zap.String("path", configPath))
+			}
+		} else {
+			// No config path, store in DB
+			settingsRepo := setting.NewRepository(db)
+			if err := settingsRepo.Set(context.Background(), "encryption_key", key); err != nil {
+				return fmt.Errorf("save generated encryption key: %w", err)
+			}
+			log.Info("encryption_key auto-generated and stored in database")
+		}
 	}
 	enc, err := crypto.NewCredentialEncryptor(key)
 	if err != nil {
@@ -663,6 +690,24 @@ func initEncryption(cfg *config.Config, db *gorm.DB, log *zap.Logger) error {
 	}
 	log.Info("credential encryption initialized")
 	return nil
+}
+
+func writeEncryptionKeyToConfig(configPath, key string) error {
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Create new config file
+			return os.WriteFile(configPath, []byte("security:\n  encryption_key: "+key+"\n"), 0640)
+		}
+		return err
+	}
+
+	// Append security section to existing config
+	trimmed := strings.TrimSpace(string(content))
+	if trimmed == "" {
+		return os.WriteFile(configPath, []byte("security:\n  encryption_key: "+key+"\n"), 0640)
+	}
+	return os.WriteFile(configPath, []byte(trimmed+"\n\nsecurity:\n  encryption_key: "+key+"\n"), 0640)
 }
 
 func resetAdminPassword(db *gorm.DB, newPassword string, log *zap.Logger) error {

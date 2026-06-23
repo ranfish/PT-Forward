@@ -18,6 +18,15 @@ const ciphertextPrefix = "enc:"
 
 const ciphertextV2Prefix = "enc2:"
 
+// GenerateRandomKey generates a random 32-byte hex-encoded encryption key.
+func GenerateRandomKey() (string, error) {
+	b := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return "", fmt.Errorf("read random bytes: %w", err)
+	}
+	return fmt.Sprintf("%x", b), nil
+}
+
 const pbkdf2Iterations = 100000
 
 var legacySalt = []byte("pt-forward-credential-encryption")
