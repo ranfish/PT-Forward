@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -36,6 +37,13 @@ func EnsureAdminUser(ctx context.Context, repo model.AuthRepository, logger *zap
 		return authError(ErrAuthInit, "create admin user", err)
 	}
 
-	logger.Info("admin user created with random password", zap.String("hint", "use -reset-password flag to set a known password"))
+	fmt.Printf("======================================================\n")
+	fmt.Printf("  Admin user created\n")
+	fmt.Printf("  Username: admin\n")
+	fmt.Printf("  Password: %s\n", password)
+	fmt.Printf("  Please login and change password immediately.\n")
+	fmt.Printf("======================================================\n")
+
+	logger.Info("admin user created", zap.String("hint", "check stdout for credentials"))
 	return nil
 }
