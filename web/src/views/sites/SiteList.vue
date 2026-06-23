@@ -8,9 +8,9 @@
           style="width: 200px"
           allow-clear
         />
-        <a-select v-model:value="filters.enabled" :placeholder="t('site.filterEnabled')" style="width: 110px" allow-clear>
-          <a-select-option value="true">{{ t('site.filterEnabledOnly') }}</a-select-option>
-          <a-select-option value="false">{{ t('site.filterDisabledOnly') }}</a-select-option>
+        <a-select v-model:value="filters.enabled" placeholder="状态" style="width: 120px" allow-clear>
+          <a-select-option value="true">我的站点</a-select-option>
+          <a-select-option value="false">未启用</a-select-option>
         </a-select>
         <a-select v-model:value="filters.isSource" :placeholder="t('site.filterSource')" style="width: 110px" allow-clear>
           <a-select-option value="true">{{ t('site.filterYes') }}</a-select-option>
@@ -57,6 +57,12 @@
       row-key="id"
       @change="(pag: { current: number; pageSize: number }) => { currentPage = pag.current; pageSize = pag.pageSize }"
     >
+      <template #emptyText>
+        <div style="padding: 40px; text-align: center;">
+          <p style="color: #999; margin-bottom: 12px;">{{ filteredData.length === 0 && filters.enabled === 'true' ? '还没有启用的站点，清除"我的站点"筛选可浏览全部站点并启用' : '暂无数据' }}</p>
+          <a-button v-if="filteredData.length === 0 && filters.enabled === 'true'" type="link" @click="filters.enabled = undefined">浏览全部站点</a-button>
+        </div>
+      </template>
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'enabled'">
           <a-switch :checked="record.enabled" size="small" @change="(v: boolean) => toggleField(record, 'enabled', v)" />
@@ -316,7 +322,7 @@ async function fetchSupportedSites() {
 }
 
 const filters = reactive({
-  enabled: undefined as string | undefined,
+  enabled: 'true' as string | undefined,
   isSource: undefined as string | undefined,
   isTarget: undefined as string | undefined,
 })

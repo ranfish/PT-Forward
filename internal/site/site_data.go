@@ -110,7 +110,7 @@ func SeedSites(db *gorm.DB) error {
 			BaseURL:            s.BaseURL,
 			Framework:          s.Framework,
 			AuthType:           defaultAuthType(s.AuthType),
-			Enabled:            true,
+			Enabled:            false,
 			IsSource:           s.IsSource,
 			IsTarget:           s.IsTarget,
 			CookieCloudDomain:  s.CookieCloudDomain,
