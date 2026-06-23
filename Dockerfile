@@ -39,5 +39,5 @@ VOLUME /data
 VOLUME /config
 VOLUME /logs
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -qO- http://localhost:8765/healthz || exit 1
-ENTRYPOINT ["/pt-forward"]
+ENTRYPOINT ["/usr/local/bin/pt-forward"]
 CMD ["--config", "/config/config.yaml"]
