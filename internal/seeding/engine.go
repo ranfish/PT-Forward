@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	neturl "net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -474,6 +475,145 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 		e.updateEMA(ctx, clientID, md, torrentMap)
 		e.syncStaleRecords(ctx, clientID, torrentMap)
 		e.checkUnregisteredTorrents(ctx, clientID, dlClient)
+		e.syncUnmanagedTorrents(ctx, clientID, torrentMap)
+	}
+}
+
+// syncUnmanagedTorrents: when client config scope=all, auto-register torrents
+// that exist in the downloader but not in seeding_torrent_records.
+func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
+	cfg, err := e.ListConfigs(ctx)
+	if err != nil {
+		return
+	}
+	var clientCfg *model.SeedingClientConfig
+	for _, c := range cfg {
+		if c.ClientID == clientID && c.Enabled {
+			clientCfg = c
+			break
+		}
+	}
+	if clientCfg == nil || clientCfg.Scope != "all" {
+		return
+	}
+
+	// Build site domain map from DB for tracker matching
+	var sites []model.Site
+	if err := e.db.WithContext(ctx).Find(&sites).Error; err != nil {
+		return
+	}
+	domainToName := make(map[string]string)
+	for i := range sites {
+		s := &sites[i]
+		if s.Name == "" {
+			continue
+		}
+		// From BaseURL
+		if s.BaseURL != "" {
+			u := s.BaseURL
+			u = strings.TrimPrefix(u, "https://")
+			u = strings.TrimPrefix(u, "http://")
+			parts := strings.SplitN(u, "/", 2)
+			if parts[0] != "" {
+				domainToName[parts[0]] = s.Name
+			}
+		}
+		// From AlternativeDomains
+		if s.AlternativeDomains != "" {
+			for _, d := range strings.Split(s.AlternativeDomains, ",") {
+				d = strings.TrimSpace(d)
+				if d != "" {
+					domainToName[d] = s.Name
+				}
+			}
+		}
+		// From TrackerDomains
+		if s.TrackerDomains != "" {
+			for _, d := range strings.Split(s.TrackerDomains, ",") {
+				d = strings.TrimSpace(d)
+				if d != "" {
+					domainToName[d] = s.Name
+				}
+			}
+		}
+	}
+
+	var newRecords []*model.SeedingTorrentRecord
+	for hash, ti := range torrentMap {
+		if ti.State == "error" || ti.Removed {
+			continue
+		}
+		key := recordKey(clientID, hash)
+		e.mu.RLock()
+		_, exists := e.recordMap[key]
+		e.mu.RUnlock()
+		if exists {
+			continue
+		}
+
+		// Extract site name from tracker URL
+		siteName := "unknown"
+		if ti.TrackerURL != "" {
+			trackerHost := ti.TrackerURL
+			if u, err := neturl.Parse(ti.TrackerURL); err == nil && u.Host != "" {
+				trackerHost = u.Host
+			}
+			// Try exact match first, then suffix match
+			if name, ok := domainToName[trackerHost]; ok {
+				siteName = name
+			} else {
+				for domain, name := range domainToName {
+					if strings.HasSuffix(trackerHost, domain) {
+						siteName = name
+						break
+					}
+				}
+			}
+		}
+
+		// Check DB to avoid duplicates (race condition safety)
+		var count int64
+		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("client_id = ? AND info_hash = ?", clientID, hash).
+			Count(&count)
+		if count > 0 {
+			continue
+		}
+
+		newRecords = append(newRecords, &model.SeedingTorrentRecord{
+			ClientID:    clientID,
+			InfoHash:    hash,
+			SiteName:    siteName,
+			TorrentID:   "",
+			Status:      model.SeedingStatusSeeding,
+			Source:      "imported",
+			TorrentSize: ti.TotalSize,
+		})
+	}
+
+	if len(newRecords) == 0 {
+		return
+	}
+
+	// Batch insert
+	inserted := 0
+	for _, rec := range newRecords {
+		if err := e.db.WithContext(ctx).Create(rec).Error; err != nil {
+			continue // Skip duplicates (unique constraint)
+		}
+		key := recordKey(rec.ClientID, rec.InfoHash)
+		e.mu.Lock()
+		e.recordMap[key] = rec
+		e.mu.Unlock()
+		inserted++
+	}
+
+	if inserted > 0 {
+		e.logger.Info("scope=all: imported unmanaged torrents",
+			zap.String("client_id", clientID),
+			zap.Int("imported", inserted),
+			zap.Int("total_in_downloader", len(torrentMap)),
+		)
 	}
 }
 
