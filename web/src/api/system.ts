@@ -13,6 +13,15 @@ export interface AuditLog {
   result: string
 }
 
+export interface UpdateInfo {
+  has_update: boolean
+  current_version: string
+  latest_version: string
+  release_notes: string
+  download_url: string
+  error?: string
+}
+
 export const systemApi = {
   health() {
     return client.get<ApiResponse<{ status: string; version: string; uptime: string }>>('/system/health')
@@ -28,5 +37,11 @@ export const systemApi = {
   },
   listAuditLogs(params?: Record<string, unknown>) {
     return client.get<ApiResponse<PaginatedData<AuditLog>>>('/system/audit-logs', { params })
+  },
+  checkUpdate() {
+    return client.get<ApiResponse<UpdateInfo>>('/system/check-update')
+  },
+  performUpdate() {
+    return client.post<ApiResponse<{ status: string; latest_version: string; current_version: string }>>('/system/update')
   },
 }

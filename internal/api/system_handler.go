@@ -57,6 +57,14 @@ func (h *SystemHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	case strings.HasSuffix(trimmed, "/system/audit-logs"):
 		h.handleListAuditLogs(w, r)
+	case strings.HasSuffix(trimmed, "/system/check-update"):
+		h.handleCheckUpdate(w, r)
+	case strings.HasSuffix(trimmed, "/system/update"):
+		if r.Method == http.MethodPost {
+			h.handleUpdate(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
