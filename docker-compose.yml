@@ -5,7 +5,14 @@ services:
     ports:
       - "8765:8765"
     volumes:
-      - ./data:/data
-      - ./config:/config
-      - ./logs:/logs
+      - ./data:/data        # SQLite 数据库（持久化）
+      - ./config:/config    # 配置文件（持久化）
+      - ./logs:/logs        # 系统日志（持久化）
+    environment:
+      - TZ=Asia/Shanghai    # 时区
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8765/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
