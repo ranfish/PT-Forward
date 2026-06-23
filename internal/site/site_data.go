@@ -132,6 +132,11 @@ func SeedSites(db *gorm.DB) error {
 		if err := db.Create(site).Error; err != nil {
 			return siteError(ErrSiteSeed, fmt.Sprintf("create site %s", s.Domain), err)
 		}
+		// GORM skips zero-value bool (false) on Create, using column default (true).
+		// Force update to set enabled=false for seeded sites.
+		if err := db.Model(site).Update("enabled", false).Error; err != nil {
+			return siteError(ErrSiteSeed, fmt.Sprintf("disable seeded site %s", s.Domain), err)
+		}
 	}
 
 	return nil

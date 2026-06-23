@@ -473,7 +473,7 @@ func TestSeedSites_FirstSeedPopulates(t *testing.T) {
 	require.NoError(t, db.Where("domain = ?", "longpt.org").First(&site).Error)
 	assert.Equal(t, "龙PT", site.Name)
 	assert.Equal(t, "nexusphp", site.Framework)
-	assert.True(t, site.Enabled)
+	assert.False(t, site.Enabled)
 	assert.True(t, site.IsSource)
 	assert.True(t, site.IsTarget)
 }
