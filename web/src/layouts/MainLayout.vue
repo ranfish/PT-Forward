@@ -282,7 +282,7 @@ async function checkUpdate() {
   updateInfo.value = null
   try {
     const resp = await systemApi.checkUpdate()
-    updateInfo.value = resp.data as unknown as UpdateInfo
+    updateInfo.value = resp.data.data as unknown as UpdateInfo
   } catch {
     updateInfo.value = {
       has_update: false,
