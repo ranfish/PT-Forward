@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,10 +14,32 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
 )
 
 const githubAPI = "https://api.github.com/repos/ranfish/PT-Forward/releases/latest"
+
+func (h *SystemHandler) getProxyFromSettings() string {
+	repo := setting.NewRepository(h.db)
+	val, err := repo.Get(context.Background(), "httpProxy")
+	if err != nil || val == "" {
+		return ""
+	}
+	return val
+}
+
+func (h *SystemHandler) newHTTPClientWithProxy(timeout time.Duration) *http.Client {
+	proxyStr := h.getProxyFromSettings()
+	tr := &http.Transport{}
+	if proxyStr != "" {
+		if u, err := url.Parse(proxyStr); err == nil {
+			tr.Proxy = http.ProxyURL(u)
+			h.logger.Info("OTA: using proxy", zap.String("proxy", proxyStr))
+		}
+	}
+	return &http.Client{Timeout: timeout, Transport: tr}
+}
 
 type githubRelease struct {
 	TagName string `json:"tag_name"`
@@ -36,7 +59,7 @@ func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request
 	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := h.newHTTPClientWithProxy(15 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		h.logger.Warn("check update: github api failed", zap.Error(err))
@@ -107,7 +130,7 @@ func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := h.newHTTPClientWithProxy(10 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		Error(w, http.StatusServiceUnavailable, 50001, "无法连接 GitHub API")
@@ -174,7 +197,7 @@ func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
 	defer dlCancel()
 
 	req, _ := http.NewRequestWithContext(dlCtx, "GET", downloadURL, nil)
-	client := &http.Client{Timeout: 5 * time.Minute}
+	client := h.newHTTPClientWithProxy(5 * time.Minute)
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("download: %w", err)
