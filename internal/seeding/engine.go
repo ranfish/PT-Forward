@@ -1554,7 +1554,7 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 
 	if !cascaded {
 		e.saveFinalTraffic(ctx, rec, ti)
-		if err := ec.client.DeleteTorrent(ctx, rec.InfoHash, isDeleteFiles); err != nil {
+		if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, isDeleteFiles); err != nil {
 			e.logger.Warn("删种失败",
 				zap.String("infoHash", rec.InfoHash),
 				zap.Bool("deleteFiles", isDeleteFiles),
@@ -1594,6 +1594,38 @@ func (e *Engine) markRelatedDeleted(ctx context.Context, relatedHashes []string,
 		}
 	}
 	e.mu.Unlock()
+}
+
+// deleteTorrentWithCompanions: deletes a torrent and its cross-seeded companions.
+// Companions (same save_path + same name + same size, different info_hash) are
+// deleted WITHOUT data first, then the main torrent is deleted WITH data.
+// This prevents orphaned torrents referencing deleted data files.
+func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateContext, infoHash string, deleteData bool) error {
+	ti := ec.torrentMap[infoHash]
+	var companionHashes []string
+	if ti != nil {
+		companionHashes = FindRelatedByTagOrPath(ti, ec.torrents, 1)
+	}
+
+	// Delete companions WITHOUT data first
+	for _, compHash := range companionHashes {
+		if err := ec.client.DeleteTorrent(ctx, compHash, false); err != nil {
+			e.logger.Warn("companion delete failed (continuing)",
+				zap.String("companion_hash", compHash),
+				zap.String("main_hash", infoHash),
+				zap.Error(err))
+		} else {
+			e.logger.Info("companion deleted (cascade)",
+				zap.String("companion_hash", compHash),
+				zap.String("main_hash", infoHash))
+		}
+	}
+	if len(companionHashes) > 0 {
+		e.markRelatedDeleted(ctx, companionHashes, ec.clientID, "companion_cascade")
+	}
+
+	// Delete main torrent
+	return ec.client.DeleteTorrent(ctx, infoHash, deleteData)
 }
 
 func (e *Engine) reannounceBeforeDelete(ctx context.Context, client model.DownloaderClient, infoHash string, cfg *model.SeedingClientConfig) bool {
@@ -1709,11 +1741,21 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 					zap.Time("created_at", rec.CreatedAt),
 				)
 				ti := ec.torrentMap[rec.InfoHash]
-				if ti != nil {
-					if err := ec.client.DeleteTorrent(ctx, rec.InfoHash, true); err != nil {
-						e.logger.Warn("pending 超时清理：删除下载器种子失败", zap.Error(err))
-					}
+			if ti != nil {
+				if err := ec.client.DeleteTorrent(ctx, rec.InfoHash, true); err != nil {
+					e.logger.Warn("pending 超时清理：删除下载器种子失败", zap.Error(err))
 				}
+				// Cascade delete companions for pending timeout
+				if ec.torrentMap[rec.InfoHash] != nil {
+					companions := FindRelatedByTagOrPath(ec.torrentMap[rec.InfoHash], ec.torrents, 1)
+					for _, compHash := range companions {
+						if err := ec.client.DeleteTorrent(ctx, compHash, false); err != nil {
+							e.logger.Warn("pending cleanup: companion delete failed", zap.String("hash", compHash), zap.Error(err))
+						}
+					}
+					e.markRelatedDeleted(ctx, companions, ec.clientID, "pending_companion_cascade")
+				}
+			}
 				if err := e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
 					"status":         model.SeedingStatusDeleted,
 					"last_action_by": "pending_timeout",
@@ -1919,7 +1961,7 @@ func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorren
 
 	if !cascaded {
 		e.saveFinalTraffic(ctx, rec, ti)
-		if err := ec.client.DeleteTorrent(ctx, rec.InfoHash, deleteFiles); err != nil {
+		if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, deleteFiles); err != nil {
 			e.logger.Warn("rule delete failed",
 				zap.String("infoHash", rec.InfoHash),
 				zap.Bool("deleteFiles", deleteFiles),
