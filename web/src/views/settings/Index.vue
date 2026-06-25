@@ -224,7 +224,9 @@ async function fetchSettings() {
     const resp = await settingsApi.get()
     const raw = resp.data.data
     const data: Record<string, string> = {}
-    if (Array.isArray(raw)) {
+    if (raw && typeof raw === 'object' && raw.items && typeof raw.items === 'object') {
+      Object.assign(data, raw.items)
+    } else if (Array.isArray(raw)) {
       for (const item of raw) {
         data[item.key] = item.value
       }
