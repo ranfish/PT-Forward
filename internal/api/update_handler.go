@@ -59,8 +59,14 @@ func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request
 	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	client := h.newHTTPClientWithProxy(15 * time.Second)
-	resp, err := client.Do(req)
+	// GitHub API: try direct first (api.github.com is usually accessible),
+	// fall back to proxy if direct fails.
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		h.logger.Warn("check update: direct failed, trying proxy", zap.Error(err))
+		proxyClient := h.newHTTPClientWithProxy(15 * time.Second)
+		resp, err = proxyClient.Do(req)
+	}
 	if err != nil {
 		h.logger.Warn("check update: github api failed", zap.Error(err))
 		Success(w, map[string]interface{}{
@@ -130,8 +136,12 @@ func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	client := h.newHTTPClientWithProxy(10 * time.Second)
-	resp, err := client.Do(req)
+	// GitHub API: try direct first, proxy fallback
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		proxyClient := h.newHTTPClientWithProxy(10 * time.Second)
+		resp, err = proxyClient.Do(req)
+	}
 	if err != nil {
 		Error(w, http.StatusServiceUnavailable, 50001, "无法连接 GitHub API")
 		return
