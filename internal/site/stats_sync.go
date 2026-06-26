@@ -181,8 +181,15 @@ func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site)
 		ForceAttemptHTTP2:   true,
 		MaxIdleConnsPerHost: 5,
 	}
-	if site.ProxyURL != "" {
-		if pu, err := url.Parse(site.ProxyURL); err == nil {
+	// Resolve proxy: site proxy_url > global proxy (if use_global_proxy) > direct
+	effectiveProxy := site.ProxyURL
+	if effectiveProxy == "" && site.UseGlobalProxy {
+		var globalProxy string
+		s.db.Raw("SELECT value FROM system_settings WHERE key = 'httpProxy' LIMIT 1").Scan(&globalProxy)
+		effectiveProxy = globalProxy
+	}
+	if effectiveProxy != "" {
+		if pu, err := url.Parse(effectiveProxy); err == nil {
 			transport.Proxy = http.ProxyURL(pu)
 		}
 	}
@@ -199,7 +206,7 @@ func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site)
 		AuthKey:       site.AuthKey,
 		AuthHash:      site.AuthHash,
 		UserID:        site.UserID,
-		ProxyURL:      site.ProxyURL,
+		ProxyURL:      effectiveProxy,
 		SkipSSLVerify: site.SkipSSLVerify,
 	}
 
