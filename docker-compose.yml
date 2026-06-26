@@ -1,3 +1,11 @@
+# PT-Forward Docker Compose
+# 使用方法：
+#   1. 将此文件保存为 docker-compose.yml
+#   2. 直接运行 docker compose up -d（data/config/logs 目录自动创建）
+# 更新方式：
+#   方式 1（OTA 热更新）：前端侧栏 → 检查更新 → 立即更新（推荐，无需拉取镜像）
+#   方式 2（镜像更新）：docker compose pull && docker compose up -d
+
 services:
   pt-forward:
     image: ghcr.io/ranfish/pt-forward:latest
@@ -5,9 +13,9 @@ services:
     ports:
       - "8765:8765"
     volumes:
-      - ./data:/data        # SQLite 数据库（持久化）
-      - ./config:/config    # 配置文件（持久化）
-      - ./logs:/logs        # 系统日志（持久化）
+      - ./data:/data        # SQLite 数据库（持久化，自动创建）
+      - ./config:/config    # 配置文件（持久化，自动创建）
+      - ./logs:/logs        # 系统日志（持久化，自动创建）
     environment:
       - TZ=Asia/Shanghai    # 时区
     restart: unless-stopped
