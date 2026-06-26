@@ -79,6 +79,9 @@
         <template v-if="column.key === 'assumeFree'">
           <a-switch :checked="record.assumeFree" size="small" @change="(v: boolean) => toggleField(record, 'assumeFree', v)" />
         </template>
+        <template v-if="column.key === 'useGlobalProxy'">
+          <a-switch :checked="record.useGlobalProxy" size="small" @change="(v: boolean) => toggleField(record, 'useGlobalProxy', v)" />
+        </template>
         <template v-if="column.key === 'hasCookie'">
           <a-badge
             :status="hasAnyCredential(record) ? 'success' : 'default'"
@@ -224,6 +227,10 @@
         <a-form-item :label="t('site.proxyAddress')" name="proxyUrl">
           <a-input v-model:value="form.proxyUrl" :placeholder="t('site.proxyPlaceholder')" />
         </a-form-item>
+        <a-form-item label="使用全局代理">
+          <a-switch v-model:checked="form.useGlobalProxy" />
+          <span style="margin-left: 8px; color: #999; font-size: 12px;">勾选后使用 /settings 中配置的全局代理</span>
+        </a-form-item>
         <a-form-item :label="t('site.skipSslVerify')" name="skipSslVerify">
           <a-switch v-model:checked="form.skipSslVerify" />
         </a-form-item>
@@ -251,6 +258,7 @@ interface SiteListItem {
   isSource: boolean
   isTarget: boolean
   assumeFree: boolean
+  useGlobalProxy: boolean
   hasCookie: boolean
   hasPasskey: boolean
   hasApiKey: boolean
@@ -370,6 +378,7 @@ const form = reactive({
   enabled: true,
   cookieCloudSync: false,
   proxyUrl: '',
+  useGlobalProxy: false,
   skipSslVerify: false,
 })
 
@@ -389,6 +398,7 @@ const columns = [
   { title: t('site.asSource'), key: 'isSource', width: 80, align: 'center' as const },
   { title: t('site.asTarget'), key: 'isTarget', width: 80, align: 'center' as const },
   { title: t('site.assumeFreeLabel'), key: 'assumeFree', width: 100, align: 'center' as const },
+  { title: '代理', key: 'useGlobalProxy', width: 60, align: 'center' as const },
   { title: t('site.credentialStatus'), key: 'hasCookie', width: 130 },
   { title: t('site.username'), key: 'username', width: 90 },
   { title: t('site.userClass'), key: 'userClass', width: 90 },
@@ -459,6 +469,7 @@ function openModal(record: SiteListItem) {
     enabled: record.enabled !== undefined ? record.enabled : true,
     cookieCloudSync: record.cookieCloudSync || false,
     proxyUrl: record.proxyUrl || '',
+    useGlobalProxy: record.useGlobalProxy || false,
     skipSslVerify: record.skipSslVerify || false,
   })
   modalVisible.value = true
@@ -482,7 +493,8 @@ function openCreateModal() {
     assumeFree: false,
     enabled: true,
     cookieCloudSync: false,
-    proxyUrl: '',
+  proxyUrl: '',
+  useGlobalProxy: false,
     skipSslVerify: false,
   })
   fetchSupportedSites() // 懒加载白名单
@@ -495,7 +507,7 @@ async function handleSubmit() {
     if (isCreateMode.value) {
       // create 模式：只传 domain + 用户填的字段；name/baseUrl/framework 由后端 seed 自动填充
       const payload: Record<string, unknown> = { domain: form.domain }
-      const optionalFields = ['cookie', 'passkey', 'apiKey', 'isSource', 'isTarget', 'participateAutoPublish', 'assumeFree', 'enabled', 'cookieCloudSync', 'proxyUrl', 'skipSslVerify']
+      const optionalFields = ['cookie', 'passkey', 'apiKey', 'isSource', 'isTarget', 'participateAutoPublish', 'assumeFree', 'enabled', 'cookieCloudSync', 'proxyUrl', 'skipSslVerify', 'useGlobalProxy']
       for (const key of optionalFields) {
         const value = (form as Record<string, unknown>)[key]
         if (value !== '' && value !== undefined) {

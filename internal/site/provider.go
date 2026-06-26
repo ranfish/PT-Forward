@@ -201,7 +201,7 @@ func (p *Provider) GetAdapter(ctx context.Context, domain string) (model.SiteAda
 		return nil, &model.AppError{Code: 12001, Message: "站点不存在: " + domain}
 	}
 
-	a := p.factory.Create(site.Framework, adapter.NewHTTPDoerWithSite(site.ProxyURL, site.SkipSSLVerify))
+	a := p.factory.Create(site.Framework, adapter.NewHTTPDoerWithSite(p.resolveProxy(ctx, site), site.SkipSSLVerify))
 
 	p.mu.Lock()
 	p.adapters[domain] = a
@@ -269,7 +269,7 @@ func (p *Provider) BatchLoadSiteResources(ctx context.Context, domains []string)
 			adapters[s.BaseURL] = a
 		} else {
 			p.mu.RUnlock()
-			a := p.factory.Create(s.Framework, adapter.NewHTTPDoerWithSite(s.ProxyURL, s.SkipSSLVerify))
+			a := p.factory.Create(s.Framework, adapter.NewHTTPDoerWithSite(p.resolveProxy(ctx, s), s.SkipSSLVerify))
 			p.mu.Lock()
 			p.adapters[s.BaseURL] = a
 			p.mu.Unlock()
@@ -590,4 +590,20 @@ func defaultPublishConfig(framework string) model.SitePublishFullConfig {
 	default:
 		return model.SitePublishFullConfig{}
 	}
+}
+
+// resolveProxy resolves the proxy URL for a site:
+// 1. Site's own proxy_url (highest priority)
+// 2. Global proxy from /settings (if use_global_proxy=true)
+// 3. Empty (direct connection)
+func (p *Provider) resolveProxy(ctx context.Context, site *model.Site) string {
+	if site.ProxyURL != "" {
+		return site.ProxyURL
+	}
+	if site.UseGlobalProxy {
+		var val string
+		p.db.WithContext(ctx).Raw("SELECT value FROM system_settings WHERE key = 'httpProxy' LIMIT 1").Scan(&val)
+		return val
+	}
+	return ""
 }

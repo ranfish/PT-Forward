@@ -69,9 +69,10 @@ type Site struct {
 	OverrideSavePath string `json:"override_save_path,omitempty" gorm:"size:500"`
 	HRStrategy       string `json:"hr_strategy" gorm:"size:20;not null;default:'protect'"`
 
-	ProxyURL      string `json:"proxy_url,omitempty" gorm:"size:500"`
-	SkipSSLVerify bool   `json:"skip_ssl_verify" gorm:"default:false"`
-	MaxConcurrent int    `json:"max_concurrent" gorm:"default:2"`
+	ProxyURL        string `json:"proxy_url,omitempty" gorm:"size:500"`
+	UseGlobalProxy  bool   `json:"use_global_proxy" gorm:"default:false"`
+	SkipSSLVerify   bool   `json:"skip_ssl_verify" gorm:"default:false"`
+	MaxConcurrent   int    `json:"max_concurrent" gorm:"default:2"`
 
 	SupportsPiecesHashAPI bool   `json:"supports_pieces_hash_api" gorm:"default:true"`
 	APIDomain             string `json:"api_domain,omitempty" gorm:"size:255;default:''"`
