@@ -1509,15 +1509,9 @@ func (e *Engine) recheckDiscountForRecover(ctx context.Context, rec *model.Seedi
 }
 
 func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, result *EvaluateResult) {
+	// deleteTorrentWithCompanions handles file protection: companions deleted without data first,
+	// then main torrent deleted with data. No need for HasSameFileTorrent guard here.
 	isDeleteFiles := true
-
-	if HasSameFileTorrent(ti, ec.torrents) {
-		isDeleteFiles = false
-		e.logger.Debug("辅种文件保护：共享文件，仅删种子不删文件",
-			zap.String("infoHash", rec.InfoHash),
-			zap.String("name", ti.Name),
-		)
-	}
 
 	e.reannounceBeforeDelete(ctx, ec.client, rec.InfoHash, ec.cfg)
 
@@ -1919,9 +1913,8 @@ func (e *Engine) executeRuleAction(ctx context.Context, rec *model.SeedingTorren
 func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, rule *model.DeleteRule, result *EvaluateResult) {
 	deleteFiles := rule.RemoveData && !rule.OnlyDeleteTorrent
 
-	if ti != nil && HasSameFileTorrent(ti, ec.torrents) {
-		deleteFiles = false
-	}
+	// deleteTorrentWithCompanions handles file protection: companions deleted without data first,
+	// then main torrent deleted with data. No need for HasSameFileTorrent guard.
 
 	if rule.ReannounceBefore && ti != nil {
 		e.reannounceRuleBeforeDelete(ctx, ec.client, rec.InfoHash, rule)
