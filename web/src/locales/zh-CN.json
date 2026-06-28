@@ -369,6 +369,7 @@
     "iyuuRateLimit": "IYUU 辅种限速",
     "iyuuLimitCount": "IYUU 每日上限",
     "iyuuLimitInterval": "IYUU 每次间隔(秒)",
+    "seedFeatureRateLimit": "种子特征辅种限速",
     "targetTypes": "目标类型",
     "targetTypesPlaceholder": "选择该站点作为哪些功能的目标",
     "targetTypePublish": "发布目标",
