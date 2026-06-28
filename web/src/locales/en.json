@@ -369,6 +369,7 @@
     "iyuuRateLimit": "IYUU Rate Limit",
     "iyuuLimitCount": "IYUU Daily Limit",
     "iyuuLimitInterval": "IYUU Interval (seconds)",
+    "seedFeatureRateLimit": "Seed Feature Rate Limit",
     "targetTypes": "Target Types",
     "targetTypesPlaceholder": "Select target roles for this site",
     "targetTypePublish": "Publish Target",
