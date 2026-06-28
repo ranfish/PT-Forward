@@ -93,9 +93,10 @@ type createSiteRequest struct {
 	OverrideRSSURL   string `json:"overrideRssUrl,omitempty"`
 	OverrideSavePath string `json:"overrideSavePath,omitempty"`
 
-	ProxyURL      string `json:"proxyUrl,omitempty"`
-	SkipSSLVerify bool   `json:"skipSslVerify"`
-	MaxConcurrent int    `json:"maxConcurrent,omitempty"`
+	ProxyURL        string `json:"proxyUrl,omitempty"`
+	UseGlobalProxy  bool   `json:"useGlobalProxy"`
+	SkipSSLVerify   bool   `json:"skipSslVerify"`
+	MaxConcurrent   int    `json:"maxConcurrent,omitempty"`
 
 	HRStrategy string `json:"hrStrategy,omitempty"`
 }
@@ -169,8 +170,9 @@ type updateSiteRequest struct {
 	OverrideRSSURL   *string `json:"overrideRssUrl,omitempty"`
 	OverrideSavePath *string `json:"overrideSavePath,omitempty"`
 
-	ProxyURL      *string `json:"proxyUrl,omitempty"`
-	SkipSSLVerify *bool   `json:"skipSslVerify,omitempty"`
+	ProxyURL       *string `json:"proxyUrl,omitempty"`
+	UseGlobalProxy *bool   `json:"useGlobalProxy,omitempty"`
+	SkipSSLVerify  *bool   `json:"skipSslVerify,omitempty"`
 	MaxConcurrent *int    `json:"maxConcurrent,omitempty"`
 
 	HRStrategy          *string `json:"hrStrategy,omitempty"`
@@ -235,6 +237,7 @@ type siteResponse struct {
 	OverrideSavePath string `json:"overrideSavePath,omitempty"`
 
 	ProxyURL             string `json:"proxyUrl,omitempty"`
+	UseGlobalProxy       bool   `json:"useGlobalProxy"`
 	SkipSSLVerify        bool   `json:"skipSslVerify"`
 	MaxConcurrent        int    `json:"maxConcurrent"`
 
@@ -354,9 +357,10 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		OverrideRSSURL:   s.OverrideRSSURL,
 		OverrideSavePath: s.OverrideSavePath,
 
-		ProxyURL:      s.ProxyURL,
-		SkipSSLVerify: s.SkipSSLVerify,
-		MaxConcurrent: s.MaxConcurrent,
+		ProxyURL:        s.ProxyURL,
+		UseGlobalProxy:  s.UseGlobalProxy,
+		SkipSSLVerify:   s.SkipSSLVerify,
+		MaxConcurrent:   s.MaxConcurrent,
 
 		HRStrategy:           s.HRStrategy,
 		TargetTypes:          s.TargetTypes,
@@ -922,6 +926,9 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		s.ProxyURL = *req.ProxyURL
+	}
+	if req.UseGlobalProxy != nil {
+		s.UseGlobalProxy = *req.UseGlobalProxy
 	}
 	if req.SkipSSLVerify != nil {
 		s.SkipSSLVerify = *req.SkipSSLVerify
