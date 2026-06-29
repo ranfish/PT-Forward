@@ -103,7 +103,19 @@
           </a-col>
           <a-col :span="12">
             <a-form-item :label="t('downloader.reseedTargetId')">
-              <a-input v-model:value="form.reseedTargetId" :placeholder="t('downloader.reseedTargetIdPlaceholder')" />
+              <a-select
+                v-model:value="form.reseedTargetId"
+                :placeholder="t('downloader.reseedTargetIdPlaceholder')"
+                allow-clear
+              >
+                <a-select-option
+                  v-for="c in (pagination.data.value as ClientConfig[]).filter(d => d.role === 'reseed' && d.name !== form.name)"
+                  :key="c.id"
+                  :value="c.name"
+                >
+                  {{ c.name }}
+                </a-select-option>
+              </a-select>
             </a-form-item>
           </a-col>
         </a-row>
