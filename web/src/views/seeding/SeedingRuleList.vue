@@ -131,8 +131,7 @@
         </a-form-item>
         <a-form-item :label="t('seeding.action')" name="action">
           <a-select v-model:value="actionMode" :placeholder="t('seeding.selectAction')">
-            <a-select-option value="delete">{{ t('seeding.deleteWithFiles') }}</a-select-option>
-            <a-select-option value="delete_only">{{ t('seeding.deleteTorrentOnly') }}</a-select-option>
+            <a-select-option value="delete">{{ t('seeding.deleteTorrent') }}</a-select-option>
             <a-select-option value="pause">{{ t('seeding.pauseTorrent') }}</a-select-option>
             <a-select-option value="limit_speed">{{ t('seeding.limitSpeed') }}</a-select-option>
           </a-select>
@@ -190,7 +189,7 @@
                   <a-input-number v-model:value="form.reannounce_interval_ms" :min="0" style="width: 100%" />
                 </a-form-item>
               </a-col>
-              <a-col :span="24">
+              <a-col :span="24" v-if="actionMode === 'delete'">
                 <a-form-item :label="t('seeding.deleteCompanions')">
                   <a-radio-group v-model:value="form.delete_companions">
                     <a-radio :value="true">{{ t('seeding.deleteCompanionsOn') }}</a-radio>
@@ -227,9 +226,9 @@ const actionLabels: Record<string, string> = {
 
 function translateActionRecord(record: DeleteRule): string {
   if (record.action === 'delete') {
-    return record.only_delete_torrent || !record.remove_data
-      ? t('seeding.deleteTorrentOnly')
-      : t('seeding.deleteWithFiles')
+    return record.delete_companions
+      ? t('seeding.deleteWithFiles')
+      : t('seeding.deleteCompanionsOff')
   }
   return actionLabels[record.action] || record.action
 }
@@ -258,9 +257,7 @@ const form = reactive({
   priority: 0,
   enabled: true,
   delete_num: 1,
-  remove_data: true,
   fit_time: 0,
-  only_delete_torrent: false,
   limit_speed_mb: 0,
   reannounce_before: true,
   reannounce_wait_ms: 2000,
@@ -269,7 +266,7 @@ const form = reactive({
   delete_companions: true,
 })
 
-const actionMode = ref<'delete' | 'delete_only' | 'pause' | 'limit_speed'>('delete')
+const actionMode = ref<'delete' | 'pause' | 'limit_speed'>('delete')
 
 interface ConditionItem { field: string; operator: string; value: string }
 const conditions = ref<ConditionItem[]>([])
@@ -654,10 +651,9 @@ function openModal(record?: DeleteRule) {
   editingRule.value = record || null
   showRawJson.value = false
   if (record) {
-    let mode: 'delete' | 'delete_only' | 'pause' | 'limit_speed' = 'delete'
+    let mode: 'delete' | 'pause' | 'limit_speed' = 'delete'
     if (record.action === 'pause') mode = 'pause'
     else if (record.action === 'limit_speed') mode = 'limit_speed'
-    else if (record.action === 'delete' && (record.only_delete_torrent || !record.remove_data)) mode = 'delete_only'
     actionMode.value = mode
 
     Object.assign(form, {
@@ -670,9 +666,7 @@ function openModal(record?: DeleteRule) {
       priority: record.priority || 0,
       enabled: record.enabled ?? true,
       delete_num: record.delete_num ?? 1,
-      remove_data: record.remove_data ?? true,
       fit_time: record.fit_time ?? 0,
-      only_delete_torrent: record.only_delete_torrent || false,
       limit_speed_mb: Math.round((record.limit_speed_bytes ?? 0) / 1048576 * 100) / 100,
       reannounce_before: record.reannounce_before ?? true,
       reannounce_wait_ms: record.reannounce_wait_ms ?? 2000,
@@ -683,7 +677,7 @@ function openModal(record?: DeleteRule) {
     conditions.value = parseConditions(record.conditions || '')
   } else {
     actionMode.value = 'delete'
-    Object.assign(form, { alias: '', type: 'normal', logic: 'and', conditions: '', expr: '', action: 'delete', priority: 0, enabled: true, delete_num: 1, remove_data: true, fit_time: 0, only_delete_torrent: false, limit_speed_mb: 0, reannounce_before: true, reannounce_wait_ms: 2000, reannounce_retries: 2, reannounce_interval_ms: 3000, delete_companions: true })
+    Object.assign(form, { alias: '', type: 'normal', logic: 'and', conditions: '', expr: '', action: 'delete', priority: 0, enabled: true, delete_num: 1, fit_time: 0, limit_speed_mb: 0, reannounce_before: true, reannounce_wait_ms: 2000, reannounce_retries: 2, reannounce_interval_ms: 3000, delete_companions: true })
     conditions.value = []
   }
   modalVisible.value = true
@@ -700,13 +694,6 @@ async function handleSubmit() {
     switch (actionMode.value) {
       case 'delete':
         payload.action = 'delete'
-        payload.remove_data = true
-        payload.only_delete_torrent = false
-        break
-      case 'delete_only':
-        payload.action = 'delete'
-        payload.remove_data = false
-        payload.only_delete_torrent = true
         break
       case 'pause':
         payload.action = 'pause'

@@ -127,8 +127,6 @@ export interface DeleteRule {
   fit_time: number
   action: string
   delete_num: number
-  remove_data: boolean
-  only_delete_torrent: boolean
   limit_speed_bytes: number
   reannounce_before: boolean
   reannounce_wait_ms: number

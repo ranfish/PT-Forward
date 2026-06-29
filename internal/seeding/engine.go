@@ -1905,17 +1905,16 @@ func (e *Engine) executeRuleAction(ctx context.Context, rec *model.SeedingTorren
 }
 
 func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, rule *model.DeleteRule, result *EvaluateResult) {
-	deleteFiles := rule.RemoveData && !rule.OnlyDeleteTorrent
 
 	if rule.ReannounceBefore && ti != nil {
 		e.reannounceRuleBeforeDelete(ctx, ec.client, rec.InfoHash, rule)
 	}
 
 	e.saveFinalTraffic(ctx, rec, ti)
-	if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, deleteFiles, rule.DeleteCompanions); err != nil {
+	if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, true, rule.DeleteCompanions); err != nil {
 		e.logger.Warn("rule delete failed",
 			zap.String("infoHash", rec.InfoHash),
-			zap.Bool("deleteFiles", deleteFiles),
+			zap.Bool("deleteCompanions", rule.DeleteCompanions),
 			zap.Error(err))
 		result.Errors++
 		if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "rule:"+rule.Alias); usErr != nil {
