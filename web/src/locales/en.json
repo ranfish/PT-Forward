@@ -73,7 +73,8 @@
     "chinese": "Chinese",
     "advancedOptions": "Advanced Options",
     "requestFailed": "Request failed",
-    "networkError": "Network error"
+    "networkError": "Network error",
+    "saveSuccess": "Saved successfully"
   },
   "auth": {
     "login": "Login",
@@ -206,7 +207,7 @@
     "bonusPoints": "Bonus Points",
     "syncTime": "Sync Time",
     "statsSyncedAt": "Stats Synced At",
-    "syncStats": "Sync Stats",
+    "syncStats": "Sync",
     "statsSynced": "Stats synced successfully",
     "freeze": "Freeze",
     "unfreeze": "Unfreeze",
@@ -220,7 +221,6 @@
     "syncingAllStats": "Syncing all sites…",
     "syncAllStatsSuccess": "Sync completed: {synced} succeeded, {failed} failed",
     "syncAllStatsFailed": "Sync failed: {error}",
-    "syncStats": "Sync",
     "syncSingleSuccess": "Site synced successfully",
     "syncSingleFailed": "Sync failed: {error}",
     "batchSync": "Sync Selected",
@@ -511,7 +511,7 @@
     "tagsLabel": "Tags",
     "publishTargets": "Publish Target Sites",
     "publishTargetsPlaceholder": "Select target sites for auto-publish",
-    "notifyChannel": "Notify Channel ID",
+    "notifyChannel": "Notify Channel",
     "notifyChannelPlaceholder": "Channel ID for push notifications",
     "reseedClientIds": "Reseed Downloaders",
     "reseedClientIdsPlaceholder": "Select downloaders for reseeding",
@@ -564,12 +564,13 @@
     "lifecycleDeleteSeeders": "Delete Threshold (Seeders)",
     "lifecycleDeleteSeedersHint": "Delete when seeders below this value, 0 = no limit",
     "lifecycleDeleteSeedHours": "Delete Min Seed Hours",
-    "notifyChannel": "Notify Channel",
     "selectNotifyChannel": "Select push notification channel",
-    "publishTargets": "Publish Target Sites",
     "selectPublishTargets": "Select target sites for auto-publish",
     "reseedClients": "Reseed Clients",
-    "selectReseedClients": "Select clients for reseeding"
+    "selectReseedClients": "Select clients for reseeding",
+    "paused": "Paused",
+    "unitHours": "hours",
+    "maxActiveSeedingHint": "Max concurrent seeding tasks for this subscription"
   },
   "seeding": {
     "activeTorrents": "Active Torrents",
@@ -600,18 +601,16 @@
     "deleteConfigConfirm": "Delete this config?",
     "totalUpload": "Total Upload",
     "totalDownload": "Total Download",
-    "todayUpload": "Today Upload",
+    "todayUpload": "Upload Today",
     "todayDownload": "Today Download",
-    "todayAdded": "Added Today",
+    "todayAdded": "Pushed Today",
     "globalRatio": "Global Ratio",
     "statsScopeNote": "Scope: Seeding-bound enabled downloaders only (includes all torrents in that downloader, not just seeding-managed)",
     "siteStats": "Site Stats",
     "seedingCount": "Seeding Now",
-    "todayAdded": "Pushed Today",
     "todayDeleted": "Deleted Today",
     "activeFree": "Free",
     "activeNonFree": "Paid",
-    "todayUpload": "Upload Today",
     "historyUpload": "History Upload",
     "todayUploadDist": "Today Upload Distribution",
     "historyUploadDist": "History Upload Distribution",
@@ -764,7 +763,9 @@
       "logs": "Scoring Logs",
       "linkedSubscription": "Linked Subscription",
       "selectSubscription": "Select subscription",
-      "selectSubscriptionHint": "Please select an RSS subscription above before configuring scoring parameters."
+      "selectSubscriptionHint": "Please select an RSS subscription above before configuring scoring parameters.",
+      "siteWeights": "Site Weights",
+      "siteWeightsHint": "Weight multiplier per site (0-10)"
     },
     "matchedResult": "Matched {matched}/{total}",
     "free": "Free",
@@ -799,9 +800,9 @@
     "fitTime": "Fit Time (seconds)",
     "onlyDeleteTorrent": "Delete Torrent Only (Keep Data)",
     "limitSpeedBytes": "Speed Limit (bytes)",
-    "reannounceBefore": "Reannounce First",
-    "reannounceWaitMs": "Reannounce Wait (ms)",
-    "reannounceRetries": "Retries",
+    "reannounceBefore": "Reannounce Before Delete",
+    "reannounceWaitMs": "Wait Time (ms)",
+    "reannounceRetries": "Retry Count",
     "reannounceIntervalMs": "Retry Interval (ms)",
     "cascadeDelete": "Cascade Delete",
     "cascadeMaxDepth": "Cascade Max Depth",
@@ -829,13 +830,8 @@
     "granularityWeekly": "Weekly",
     "cleanupScoreWeights": "Cleanup Score Weights (JSON)",
     "reannounce": "Reannounce Settings",
-    "reannounceBefore": "Reannounce Before Delete",
-    "reannounceRetries": "Retry Count",
-    "reannounceIntervalMs": "Retry Interval (ms)",
-    "reannounceWaitMs": "Wait Time (ms)",
     "torrentId": "Torrent ID",
-    "infoHash": "InfoHash",
-    "hr": "HR"
+    "maxActiveSeedingHint": "Max concurrent seeding tasks"
   },
   "reseed": {
     "addTask": "Create Task",
@@ -1289,8 +1285,8 @@
     "cleanupReseedMatchDays": "Reseed Match Retention (days)",
     "cleanupPtgenCacheDays": "PTGen Cache Retention (days)",
     "cleanupSeedingArchiveDays": "Seeding Archive Retention (days)",
-     "cleanupAuditLogDays": "Audit Log Retention (days)",
-     "cleanupTorrentTrafficDays": "Traffic Snapshot Retention (days)"
+    "cleanupAuditLogDays": "Audit Log Retention (days)",
+    "cleanupTorrentTrafficDays": "Traffic Snapshot Retention (days)"
   },
   "cookiecloud": {
     "subtitle": "Browser Cookie auto-sync",
