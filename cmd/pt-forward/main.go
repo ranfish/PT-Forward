@@ -318,7 +318,26 @@ func main() {
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
 	mux := http.NewServeMux()
-	router.RegisterWithEndpointLimits(mux, cfg.Server.CORSOrigins, true, 120, 60, 60)
+	rateLimitEnabled := setting.NewRuntimeConfig(settingsRepo, log).GetBool(ctx, setting.KeyRateLimitEnabled)
+	rateLimitGlobal := setting.NewRuntimeConfig(settingsRepo, log).GetInt(ctx, setting.KeyRateLimitGlobal)
+	rateLimitWrite := setting.NewRuntimeConfig(settingsRepo, log).GetInt(ctx, setting.KeyRateLimitWrite)
+	rateLimitDownload := setting.NewRuntimeConfig(settingsRepo, log).GetInt(ctx, setting.KeyRateLimitDownload)
+	if rateLimitGlobal <= 0 {
+		rateLimitGlobal = 600
+	}
+	if rateLimitWrite <= 0 {
+		rateLimitWrite = 200
+	}
+	if rateLimitDownload <= 0 {
+		rateLimitDownload = 50
+	}
+	log.Info("rate limit config",
+		zap.Bool("enabled", rateLimitEnabled),
+		zap.Int("global", rateLimitGlobal),
+		zap.Int("write", rateLimitWrite),
+		zap.Int("download", rateLimitDownload),
+	)
+	router.RegisterWithEndpointLimits(mux, cfg.Server.CORSOrigins, rateLimitEnabled, rateLimitGlobal, rateLimitWrite, rateLimitDownload)
 
 	healthChecker := health.NewHealthChecker(version)
 	if sqlDB, err := db.DB(); err == nil {

@@ -407,3 +407,28 @@ func TestRateLimiter_Cleanup(t *testing.T) {
 		t.Error("new-ip should still exist")
 	}
 }
+
+func TestRateLimiter_RejectedDoesNotUpdateLastSeen(t *testing.T) {
+	rl := NewRateLimiter(3, 60)
+	ip := "1.2.3.4"
+
+	for i := 0; i < 3; i++ {
+		if !rl.Allow(ip) {
+			t.Fatalf("request %d should be allowed", i+1)
+		}
+	}
+
+	lastSeenBefore := rl.visitors[ip].lastSeen
+
+	for i := 0; i < 10; i++ {
+		rl.Allow(ip)
+	}
+
+	if rl.visitors[ip].lastSeen != lastSeenBefore {
+		t.Errorf("lastSeen should not change after rejected requests: got %d, want %d",
+			rl.visitors[ip].lastSeen, lastSeenBefore)
+	}
+	if rl.visitors[ip].count != 3 {
+		t.Errorf("count should remain 3 after rejected requests: got %d", rl.visitors[ip].count)
+	}
+}

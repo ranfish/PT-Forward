@@ -83,9 +83,12 @@ func (rl *RateLimiter) Allow(ip string) bool {
 		rl.visitors[ip] = &visitor{count: 1, lastSeen: now}
 		return true
 	}
+	if v.count >= rl.limit {
+		return false
+	}
 	v.count++
 	v.lastSeen = now
-	return v.count <= rl.limit
+	return true
 }
 
 func (rl *RateLimiter) Cleanup() {
