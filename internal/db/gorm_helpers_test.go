@@ -72,11 +72,11 @@ func TestForceCreate_FloatZero(t *testing.T) {
 	assert.Equal(t, 0.0, result.EmergencyBuffer, "EmergencyBuffer should be 0")
 }
 
-func TestForceCreate_DeleteRuleRemoveData(t *testing.T) {
+func TestForceCreate_DeleteRuleDeleteCompanions(t *testing.T) {
 	db := setupTestDB(t)
 
 	rule := &model.DeleteRule{
-		Alias: "safe-rule", Enabled: false, RemoveData: false,
+		Alias: "safe-rule", Enabled: false, DeleteCompanions: false,
 		ReannounceBefore: false, Type: "normal", Action: "delete",
 	}
 	require.NoError(t, ForceCreate(db, rule))
@@ -84,7 +84,7 @@ func TestForceCreate_DeleteRuleRemoveData(t *testing.T) {
 	var result model.DeleteRule
 	require.NoError(t, db.First(&result, rule.ID).Error)
 	assert.False(t, result.Enabled, "Enabled should be false")
-	assert.False(t, result.RemoveData, "RemoveData should be false — DATA LOSS PREVENTION")
+	assert.False(t, result.DeleteCompanions, "DeleteCompanions should be false — DATA LOSS PREVENTION")
 	assert.False(t, result.ReannounceBefore, "ReannounceBefore should be false")
 }
 

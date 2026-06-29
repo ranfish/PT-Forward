@@ -119,10 +119,8 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		Conditions           string `json:"conditions"`
 		Action               string `json:"action"`
 		DeleteNum            int    `json:"delete_num"`
-		RemoveData           bool   `json:"remove_data"`
 		Expr                 string `json:"expr"`
 		FitTime              int    `json:"fit_time"`
-		OnlyDeleteTorrent    bool   `json:"only_delete_torrent"`
 		LimitSpeedBytes      int64  `json:"limit_speed_bytes"`
 		ReannounceBefore     bool   `json:"reannounce_before"`
 		ReannounceWaitMs     int    `json:"reannounce_wait_ms"`
@@ -155,10 +153,8 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		Conditions:           req.Conditions,
 		Action:               req.Action,
 		DeleteNum:            req.DeleteNum,
-		RemoveData:           req.RemoveData,
 		Expr:                 req.Expr,
 		FitTime:              req.FitTime,
-		OnlyDeleteTorrent:    req.OnlyDeleteTorrent,
 		LimitSpeedBytes:      req.LimitSpeedBytes,
 		ReannounceBefore:     req.ReannounceBefore,
 		ReannounceWaitMs:     req.ReannounceWaitMs,
@@ -225,17 +221,11 @@ func (h *DeleteRuleHandler) handleUpdate(w http.ResponseWriter, r *http.Request,
 	if v, ok := req["delete_num"].(float64); ok {
 		updates["delete_num"] = int(v)
 	}
-	if v, ok := req["remove_data"].(bool); ok {
-		updates["remove_data"] = v
-	}
 	if v, ok := req["expr"].(string); ok {
 		updates["expr"] = v
 	}
 	if v, ok := req["fit_time"].(float64); ok {
 		updates["fit_time"] = int(v)
-	}
-	if v, ok := req["only_delete_torrent"].(bool); ok {
-		updates["only_delete_torrent"] = v
 	}
 	if v, ok := req["limit_speed_bytes"].(float64); ok {
 		updates["limit_speed_bytes"] = int64(v)

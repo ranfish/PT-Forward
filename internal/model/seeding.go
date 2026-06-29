@@ -153,11 +153,9 @@ type DeleteRule struct {
 
 	FitTime int `json:"fit_time" gorm:"default:0"`
 
-	Action            string `json:"action" gorm:"size:20;not null;default:'delete'"`
-	DeleteNum         int    `json:"delete_num" gorm:"default:1"`
-	RemoveData        bool   `json:"remove_data" gorm:"default:true"`
-	OnlyDeleteTorrent bool   `json:"only_delete_torrent" gorm:"default:false"`
-	LimitSpeedBytes   int64  `json:"limit_speed_bytes" gorm:"default:0"`
+	Action          string `json:"action" gorm:"size:20;not null;default:'delete'"`
+	DeleteNum       int    `json:"delete_num" gorm:"default:1"`
+	LimitSpeedBytes int64  `json:"limit_speed_bytes" gorm:"default:0"`
 
 	ReannounceBefore     bool `json:"reannounce_before" gorm:"default:true"`
 	ReannounceWaitMs     int  `json:"reannounce_wait_ms" gorm:"default:2000"`
