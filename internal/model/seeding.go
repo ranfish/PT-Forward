@@ -164,8 +164,9 @@ type DeleteRule struct {
 	ReannounceRetries    int  `json:"reannounce_retries" gorm:"default:2"`
 	ReannounceIntervalMs int  `json:"reannounce_interval_ms" gorm:"default:3000"`
 
-	CascadeDelete   bool `json:"cascade_delete" gorm:"default:false"`
-	CascadeMaxDepth int  `json:"cascade_max_depth" gorm:"default:1"`
+	CascadeDelete    bool `json:"cascade_delete" gorm:"default:false"`
+	CascadeMaxDepth  int  `json:"cascade_max_depth" gorm:"default:1"`
+	DeleteCompanions bool `json:"delete_companions" gorm:"default:true"`
 }
 
 func (DeleteRule) TableName() string { return "delete_rules" }

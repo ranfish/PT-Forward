@@ -136,6 +136,7 @@ export interface DeleteRule {
   reannounce_interval_ms: number
   cascade_delete: boolean
   cascade_max_depth: number
+  delete_companions: boolean
 }
 
 export interface SeedingScoringConfig {

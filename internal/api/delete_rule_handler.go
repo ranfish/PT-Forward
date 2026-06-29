@@ -130,6 +130,7 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		ReannounceIntervalMs int    `json:"reannounce_interval_ms"`
 		CascadeDelete        bool   `json:"cascade_delete"`
 		CascadeMaxDepth      int    `json:"cascade_max_depth"`
+		DeleteCompanions     bool   `json:"delete_companions"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -167,6 +168,7 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		ReannounceIntervalMs: req.ReannounceIntervalMs,
 		CascadeDelete:        req.CascadeDelete,
 		CascadeMaxDepth:      req.CascadeMaxDepth,
+		DeleteCompanions:     req.DeleteCompanions,
 	}
 	if rule.Type == "" {
 		rule.Type = "normal"
@@ -259,6 +261,9 @@ func (h *DeleteRuleHandler) handleUpdate(w http.ResponseWriter, r *http.Request,
 	}
 	if v, ok := req["cascade_max_depth"].(float64); ok {
 		updates["cascade_max_depth"] = int(v)
+	}
+	if v, ok := req["delete_companions"].(bool); ok {
+		updates["delete_companions"] = v
 	}
 	if exprVal, ok := req["expr"].(string); ok && exprVal != "" {
 		effectiveType, _ := req["type"].(string)
