@@ -134,8 +134,6 @@ export interface DeleteRule {
   reannounce_wait_ms: number
   reannounce_retries: number
   reannounce_interval_ms: number
-  cascade_delete: boolean
-  cascade_max_depth: number
   delete_companions: boolean
 }
 

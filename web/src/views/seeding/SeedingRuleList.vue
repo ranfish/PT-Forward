@@ -190,22 +190,13 @@
                   <a-input-number v-model:value="form.reannounce_interval_ms" :min="0" style="width: 100%" />
                 </a-form-item>
               </a-col>
-              <a-col :span="12">
+              <a-col :span="24">
                 <a-form-item :label="t('seeding.deleteCompanions')">
-                  <a-switch v-model:checked="form.delete_companions" />
+                  <a-radio-group v-model:value="form.delete_companions">
+                    <a-radio :value="true">{{ t('seeding.deleteCompanionsOn') }}</a-radio>
+                    <a-radio :value="false">{{ t('seeding.deleteCompanionsOff') }}</a-radio>
+                  </a-radio-group>
                   <div v-if="!form.delete_companions" style="font-size: 12px; color: #999; margin-top: 4px;">{{ t('seeding.deleteCompanionsHint') }}</div>
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item :label="t('seeding.cascadeDelete')">
-                  <a-switch v-model:checked="form.cascade_delete" :disabled="!form.delete_companions" />
-                </a-form-item>
-              </a-col>
-            </a-row>
-            <a-row v-if="form.cascade_delete && form.delete_companions" :gutter="16">
-              <a-col :span="12">
-                <a-form-item :label="t('seeding.cascadeMaxDepth')">
-                  <a-input-number v-model:value="form.cascade_max_depth" :min="1" style="width: 100%" />
                 </a-form-item>
               </a-col>
             </a-row>
@@ -275,9 +266,7 @@ const form = reactive({
   reannounce_wait_ms: 2000,
   reannounce_retries: 2,
   reannounce_interval_ms: 3000,
-  cascade_delete: false,
   delete_companions: true,
-  cascade_max_depth: 1,
 })
 
 const actionMode = ref<'delete' | 'delete_only' | 'pause' | 'limit_speed'>('delete')
@@ -689,14 +678,12 @@ function openModal(record?: DeleteRule) {
       reannounce_wait_ms: record.reannounce_wait_ms ?? 2000,
       reannounce_retries: record.reannounce_retries ?? 2,
       reannounce_interval_ms: record.reannounce_interval_ms ?? 3000,
-      cascade_delete: record.cascade_delete || false,
       delete_companions: record.delete_companions !== undefined ? record.delete_companions : true,
-      cascade_max_depth: record.cascade_max_depth ?? 1,
     })
     conditions.value = parseConditions(record.conditions || '')
   } else {
     actionMode.value = 'delete'
-    Object.assign(form, { alias: '', type: 'normal', logic: 'and', conditions: '', expr: '', action: 'delete', priority: 0, enabled: true, delete_num: 1, remove_data: true, fit_time: 0, only_delete_torrent: false, limit_speed_mb: 0, reannounce_before: true, reannounce_wait_ms: 2000, reannounce_retries: 2, reannounce_interval_ms: 3000, cascade_delete: false, cascade_max_depth: 1, delete_companions: true })
+    Object.assign(form, { alias: '', type: 'normal', logic: 'and', conditions: '', expr: '', action: 'delete', priority: 0, enabled: true, delete_num: 1, remove_data: true, fit_time: 0, only_delete_torrent: false, limit_speed_mb: 0, reannounce_before: true, reannounce_wait_ms: 2000, reannounce_retries: 2, reannounce_interval_ms: 3000, delete_companions: true })
     conditions.value = []
   }
   modalVisible.value = true

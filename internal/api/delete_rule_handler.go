@@ -128,8 +128,6 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		ReannounceWaitMs     int    `json:"reannounce_wait_ms"`
 		ReannounceRetries    int    `json:"reannounce_retries"`
 		ReannounceIntervalMs int    `json:"reannounce_interval_ms"`
-		CascadeDelete        bool   `json:"cascade_delete"`
-		CascadeMaxDepth      int    `json:"cascade_max_depth"`
 		DeleteCompanions     bool   `json:"delete_companions"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -166,8 +164,6 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		ReannounceWaitMs:     req.ReannounceWaitMs,
 		ReannounceRetries:    req.ReannounceRetries,
 		ReannounceIntervalMs: req.ReannounceIntervalMs,
-		CascadeDelete:        req.CascadeDelete,
-		CascadeMaxDepth:      req.CascadeMaxDepth,
 		DeleteCompanions:     req.DeleteCompanions,
 	}
 	if rule.Type == "" {
@@ -255,12 +251,6 @@ func (h *DeleteRuleHandler) handleUpdate(w http.ResponseWriter, r *http.Request,
 	}
 	if v, ok := req["reannounce_interval_ms"].(float64); ok {
 		updates["reannounce_interval_ms"] = int(v)
-	}
-	if v, ok := req["cascade_delete"].(bool); ok {
-		updates["cascade_delete"] = v
-	}
-	if v, ok := req["cascade_max_depth"].(float64); ok {
-		updates["cascade_max_depth"] = int(v)
 	}
 	if v, ok := req["delete_companions"].(bool); ok {
 		updates["delete_companions"] = v
