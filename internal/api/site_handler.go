@@ -814,13 +814,7 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		s.BaseURL = *req.BaseURL
 	}
-	if req.Framework != nil && *req.Framework != "" {
-		if !validFrameworks[*req.Framework] {
-			Error(w, http.StatusBadRequest, 40001, "不支持的 framework")
-			return
-		}
-		s.Framework = *req.Framework
-	}
+	// framework 不可由用户修改：内置站点的 framework 由 supported_sites.json 唯一确定
 	if req.AuthType != nil {
 		if !model.ValidAuthType(*req.AuthType) {
 			Error(w, http.StatusBadRequest, 40001, "不支持的 authType")

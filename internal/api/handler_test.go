@@ -4548,15 +4548,21 @@ func TestSite_Create_DuplicateDomain(t *testing.T) {
 	}
 }
 
-func TestSite_Update_InvalidFramework(t *testing.T) {
+func TestSite_Update_FrameworkIgnored(t *testing.T) {
 	env := setupTestEnv(t)
-	siteID := createTestSite(t, env, "BadFWSite", "badfw.com")
+	siteID := createTestSite(t, env, "FWSite", "fw.com")
 
+	// framework 不可由用户修改，传入无效值也不报错，只是忽略
 	w := env.doRequest("PUT", fmt.Sprintf("/api/v1/sites/%d", siteID), map[string]interface{}{
 		"framework": "invalid_framework",
 	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("invalid framework: expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("framework should be ignored, expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, _ := resp.Data.(map[string]interface{})
+	if data["framework"] != "nexusphp" {
+		t.Errorf("framework should be immutable, expected nexusphp, got %v", data["framework"])
 	}
 }
 
@@ -7214,7 +7220,7 @@ func TestSiteV2_UpdateMultipleFields(t *testing.T) {
 	env := setupTestEnv(t)
 	id := createSiteWithCookie(t, env, "MultiUpV2", "multiupv2.example.com")
 	w := env.doRequest("PUT", fmt.Sprintf("/api/v1/sites/%d", id), map[string]interface{}{
-		"framework": "unit3d", "isSource": true, "isTarget": true, "participateAutoPublish": false,
+		"isSource": true, "isTarget": true, "participateAutoPublish": false,
 		"cookieCloudSync": true, "cookieCloudDomain": "sync.example.com",
 		"alternativeDomains": "alt.example.com", "hashStrategy": "fake_from_id",
 		"sizeStrategy": "desc_regex", "idStrategy": "link_regex", "idPattern": `/torrent/(\d+)`,
@@ -7227,8 +7233,9 @@ func TestSiteV2_UpdateMultipleFields(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	if data["framework"] != "unit3d" {
-		t.Errorf("expected unit3d, got %v", data["framework"])
+	// framework 不可由用户修改，应保持原值
+	if data["framework"] != "nexusphp" {
+		t.Errorf("framework should be immutable, expected nexusphp, got %v", data["framework"])
 	}
 }
 
@@ -7393,12 +7400,18 @@ func TestSiteV2_CredentialsInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestSiteV2_UpdateInvalidFramework(t *testing.T) {
+func TestSiteV2_FrameworkImmutable(t *testing.T) {
 	env := setupTestEnv(t)
-	id := createSiteWithCookie(t, env, "UpdInvFWV2", "updinvfwv2.example.com")
-	w := env.doRequest("PUT", fmt.Sprintf("/api/v1/sites/%d", id), map[string]interface{}{"framework": "nope"})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+	id := createSiteWithCookie(t, env, "UpdFWV2", "updfwv2.example.com")
+	// framework 不可由用户修改，即使传入有效值也应被忽略
+	w := env.doRequest("PUT", fmt.Sprintf("/api/v1/sites/%d", id), map[string]interface{}{"framework": "unit3d"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := parseResponse(t, w)
+	data, _ := resp.Data.(map[string]interface{})
+	if data["framework"] != "nexusphp" {
+		t.Errorf("framework should be immutable, expected nexusphp, got %v", data["framework"])
 	}
 }
 
