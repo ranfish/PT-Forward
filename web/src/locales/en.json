@@ -833,7 +833,7 @@
     "torrentId": "Torrent ID",
     "maxActiveSeedingHint": "Max concurrent seeding tasks",
     "deleteCompanions": "Delete Companions",
-    "deleteCompanionsHint": "When off, only delete the triggered torrent. Keep data if companions exist; delete data if none.",
+    "deleteCompanionsHint": "Only delete the triggered site torrent. Keep data if other sites are still seeding; delete data if no companions exist.",
     "deleteCompanionsOn": "Delete companions + data",
     "deleteCompanionsOff": "Only this site"
   },

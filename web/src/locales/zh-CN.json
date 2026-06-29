@@ -833,7 +833,7 @@
     "reannounce": "重新汇报设置",
     "torrentId": "种子ID",
     "deleteCompanions": "删除辅种",
-    "deleteCompanionsHint": "关闭后仅删本站种子，有辅种时保留数据，无辅种时删数据",
+    "deleteCompanionsHint": "仅删除命中规则的站点种子。其它站点仍有辅种时保留数据文件；无辅种时一并删除数据文件。",
     "deleteCompanionsOn": "删除辅种 + 数据",
     "deleteCompanionsOff": "仅删本站种子"
   },
