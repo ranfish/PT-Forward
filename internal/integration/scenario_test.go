@@ -175,7 +175,7 @@ func TestScenario_F6_TransferToReseed(t *testing.T) {
 
 	sourceMockDL := &mocks.DownloaderClient{
 		ID: sourceClientID, Name: "source-client", Role: "source",
-		ReseedTargetID: "reseed-client",
+		TransferTargetID: "reseed-client",
 		GetTorrentByHashFn: func(ctx context.Context, hash string) (*model.TorrentInfo, error) {
 			return &model.TorrentInfo{
 				Hash:       hash,

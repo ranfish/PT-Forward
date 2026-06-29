@@ -176,7 +176,7 @@ export interface ClientConfig {
   url: string
   username: string
   role: string
-  reseedTargetId?: string
+  transferTargetId?: string
   enabled: boolean
   isDefault: boolean
   torrentDir?: string

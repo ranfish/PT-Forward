@@ -219,7 +219,7 @@ func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID ui
 		sourceClient, err := w.clientMgr.Get(candidate.ClientID)
 		if err != nil {
 			w.logger.Error("failed to get source client for transfer", zap.Error(err))
-		} else if sourceClient.GetReseedTargetID() != "" {
+		} else if sourceClient.GetTransferTargetID() != "" {
 			reseedClientName, reseedHash, err := w.transferToReseed(ctx, &candidate, sourceClient, torrent)
 			if err != nil {
 				w.logger.Error("transfer to reseed failed, continuing with source client",
@@ -288,9 +288,9 @@ func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID ui
 }
 
 func (w *CompletionWatcher) transferToReseed(ctx context.Context, candidate *model.PublishCandidate, sourceClient model.DownloaderClient, torrent *model.TorrentInfo) (string, string, error) {
-	reseedClient, err := w.clientMgr.Get(sourceClient.GetReseedTargetID())
+	reseedClient, err := w.clientMgr.Get(sourceClient.GetTransferTargetID())
 	if err != nil {
-		return "", "", fmt.Errorf("get reseed client %s: %w", sourceClient.GetReseedTargetID(), err)
+		return "", "", fmt.Errorf("get reseed client %s: %w", sourceClient.GetTransferTargetID(), err)
 	}
 
 	torrentData, err := sourceClient.ExportTorrent(ctx, candidate.InfoHash)

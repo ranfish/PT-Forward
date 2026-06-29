@@ -102,10 +102,10 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item :label="t('downloader.reseedTargetId')">
+            <a-form-item :label="t('downloader.transferTargetId')">
               <a-select
-                v-model:value="form.reseedTargetId"
-                :placeholder="t('downloader.reseedTargetIdPlaceholder')"
+                v-model:value="form.transferTargetId"
+                :placeholder="t('downloader.transferTargetIdPlaceholder')"
                 allow-clear
               >
                 <a-select-option
@@ -170,7 +170,7 @@ const form = reactive({
   role: 'download',
   enabled: true,
   isDefault: false,
-  reseedTargetId: '',
+  transferTargetId: '',
   torrentDir: '',
   pathMappings: [] as { sourcePath: string; reseedPath: string }[],
 })
@@ -193,9 +193,9 @@ const pagination = usePagination((page, size) => downloadersApi.list(page, size)
 function openModal(record?: ClientConfig) {
   editingRecord.value = record || null
   if (record) {
-    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true, isDefault: record.isDefault || false, reseedTargetId: record.reseedTargetId || '', torrentDir: record.torrentDir || '', pathMappings: (record.pathMappings || []).map((p: { sourcePath: string; reseedPath: string }) => ({ sourcePath: p.sourcePath || '', reseedPath: p.reseedPath || '' })) })
+    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true, isDefault: record.isDefault || false, transferTargetId: record.transferTargetId || '', torrentDir: record.torrentDir || '', pathMappings: (record.pathMappings || []).map((p: { sourcePath: string; reseedPath: string }) => ({ sourcePath: p.sourcePath || '', reseedPath: p.reseedPath || '' })) })
   } else {
-    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '', role: 'download', enabled: true, isDefault: false, reseedTargetId: '', torrentDir: '', pathMappings: [] })
+    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '', role: 'download', enabled: true, isDefault: false, transferTargetId: '', torrentDir: '', pathMappings: [] })
   }
   modalVisible.value = true
 }

@@ -65,7 +65,7 @@ func (c *QBClient) Connect(ctx context.Context) error {
 
 func (c *QBClient) GetName() string                           { return c.cfg.Name }
 func (c *QBClient) GetRole() string                           { return c.cfg.Role }
-func (c *QBClient) GetReseedTargetID() string                 { return c.cfg.ReseedTargetID }
+func (c *QBClient) GetTransferTargetID() string                 { return c.cfg.TransferTargetID }
 func (c *QBClient) GetID() uint                               { return c.cfg.ID }
 func (c *QBClient) GetSharedPaths() []model.SharedPathMapping { return c.sharedPaths }
 

@@ -89,7 +89,7 @@ func (m *mockDownloaderClient) GetMainDataIncremental(_ context.Context, _ int) 
 }
 func (m *mockDownloaderClient) GetName() string                           { return "mock" }
 func (m *mockDownloaderClient) GetRole() string                           { return "" }
-func (m *mockDownloaderClient) GetReseedTargetID() string                 { return "" }
+func (m *mockDownloaderClient) GetTransferTargetID() string                 { return "" }
 func (m *mockDownloaderClient) GetID() uint                               { return 0 }
 func (m *mockDownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
 func (m *mockDownloaderClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
