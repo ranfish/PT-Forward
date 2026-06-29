@@ -66,7 +66,7 @@ func (c *TRClient) Connect(ctx context.Context) error {
 
 func (c *TRClient) GetName() string                           { return c.cfg.Name }
 func (c *TRClient) GetRole() string                           { return c.cfg.Role }
-func (c *TRClient) GetReseedTargetID() string                 { return c.cfg.ReseedTargetID }
+func (c *TRClient) GetTransferTargetID() string                 { return c.cfg.TransferTargetID }
 func (c *TRClient) GetID() uint                               { return c.cfg.ID }
 func (c *TRClient) GetSharedPaths() []model.SharedPathMapping { return c.sharedPaths }
 

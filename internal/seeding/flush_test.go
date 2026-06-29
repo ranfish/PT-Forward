@@ -26,7 +26,7 @@ type flushMockClient struct {
 
 func (m *flushMockClient) GetName() string                           { return "c1" }
 func (m *flushMockClient) GetRole() string                           { return "seeding" }
-func (m *flushMockClient) GetReseedTargetID() string                 { return "" }
+func (m *flushMockClient) GetTransferTargetID() string                 { return "" }
 func (m *flushMockClient) GetID() uint                               { return 1 }
 func (m *flushMockClient) GetSharedPaths() []model.SharedPathMapping { return nil }
 func (m *flushMockClient) GetMainData(_ context.Context) (*model.Maindata, error) {

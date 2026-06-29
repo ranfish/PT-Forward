@@ -9,7 +9,7 @@ import (
 type DownloaderClient struct {
 	Name           string
 	Role           string
-	ReseedTargetID string
+	TransferTargetID string
 	ID             uint
 	FreeSpaceVal   int64
 
@@ -41,7 +41,7 @@ type DownloaderClient struct {
 
 func (m *DownloaderClient) GetName() string                           { return m.Name }
 func (m *DownloaderClient) GetRole() string                           { return m.Role }
-func (m *DownloaderClient) GetReseedTargetID() string                 { return m.ReseedTargetID }
+func (m *DownloaderClient) GetTransferTargetID() string                 { return m.TransferTargetID }
 func (m *DownloaderClient) GetID() uint                               { return m.ID }
 func (m *DownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
 

@@ -78,7 +78,7 @@ type GlobalTransferStats struct {
 type DownloaderClient interface {
 	GetName() string
 	GetRole() string
-	GetReseedTargetID() string
+	GetTransferTargetID() string
 	GetID() uint
 	GetSharedPaths() []SharedPathMapping
 

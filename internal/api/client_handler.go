@@ -44,7 +44,7 @@ type createDownloaderRequest struct {
 	Username       string               `json:"username"`
 	Password       string               `json:"password"`
 	Role           string               `json:"role"`
-	ReseedTargetID string               `json:"reseedTargetId"`
+	TransferTargetID string               `json:"transferTargetId"`
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
 	TorrentDir     string               `json:"torrentDir"`
@@ -63,7 +63,7 @@ type downloaderResponse struct {
 	URL            string               `json:"url"`
 	Username       string               `json:"username"`
 	Role           string               `json:"role"`
-	ReseedTargetID string               `json:"reseedTargetId,omitempty"`
+	TransferTargetID string               `json:"transferTargetId,omitempty"`
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
 	TorrentDir     string               `json:"torrentDir,omitempty"`
@@ -85,7 +85,7 @@ func (h *ClientHandler) toResponse(c *model.ClientConfig, mappings []model.Clien
 		URL:            c.URL,
 		Username:       c.Username,
 		Role:           c.Role,
-		ReseedTargetID: c.ReseedTargetID,
+		TransferTargetID: c.TransferTargetID,
 		Enabled:        c.Enabled,
 		IsDefault:      c.IsDefault,
 		CreatedAt:      c.CreatedAt,
@@ -265,7 +265,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Enabled:        req.Enabled,
 		IsDefault:      req.IsDefault,
 		Role:           req.Role,
-		ReseedTargetID: req.ReseedTargetID,
+		TransferTargetID: req.TransferTargetID,
 	}
 	if req.TorrentDir != "" {
 		cfgBytes, _ := json.Marshal(map[string]string{"torrent_dir": req.TorrentDir})
@@ -381,7 +381,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		client.Role = req.Role
 	}
-	client.ReseedTargetID = req.ReseedTargetID
+	client.TransferTargetID = req.TransferTargetID
 	client.Enabled = req.Enabled
 	client.IsDefault = req.IsDefault
 
@@ -403,7 +403,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 			"username":         client.Username,
 			"password":         client.Password,
 			"role":             client.Role,
-			"reseed_target_id": client.ReseedTargetID,
+			"reseed_target_id": client.TransferTargetID,
 			"enabled":          client.Enabled,
 			"is_default":       client.IsDefault,
 			"config":           configJSON,

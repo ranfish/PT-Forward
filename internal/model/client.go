@@ -18,7 +18,7 @@ type ClientConfig struct {
 	Enabled        bool           `json:"enabled" gorm:"default:true"`
 	IsDefault      bool           `json:"is_default" gorm:"default:false"`
 	Role           string         `json:"role" gorm:"size:20;default:'seeding'"`
-	ReseedTargetID string         `json:"reseed_target_id,omitempty" gorm:"size:50"`
+	TransferTargetID string       `json:"transfer_target_id,omitempty" gorm:"column:reseed_target_id;size:50"`
 	LastPingAt     *time.Time     `json:"last_ping_at"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
