@@ -57,6 +57,13 @@ var (
 	reHDRouteSeedSize  = regexp.MustCompile(`(?i)class="peering-size">\(([\d.]+)&nbsp;(TB|GB|MB|KB|B)\)`)
 	reHDRouteUserClass = regexp.MustCompile(`(?i)</a></span>\s*<span>\(([A-Za-z0-9]+)\)</span>`)
 
+	// totheglory.im patterns (<font color=xxx> tag structure, colon inside font tag)
+	reTTGRatio     = regexp.MustCompile(`(?i)分享率\s*:?\s*</font>\s*<font[^>]*>([\d.]+)</font>`)
+	reTTGUpload    = regexp.MustCompile(`(?i)上传量\s*:?\s*</font>\s*<font[^>]*>\s*(?:<a[^>]*>)?\s*([\d.]+)\s*(TB|GB|MB|KB|B)`)
+	reTTGDownload  = regexp.MustCompile(`(?i)下载量\s*:?\s*</font>\s*<font[^>]*>\s*(?:<a[^>]*>)?\s*([\d.]+)\s*(TB|GB|MB|KB|B)`)
+	reTTGSeeding   = regexp.MustCompile(`(?i)alt=['"]做种中['"][^>]*>(?:\s|&nbsp;)*(?:<[^>]*>)*\s*(\d+)`)
+	reTTGBonus     = regexp.MustCompile(`(?i)积分\s*:?\s*<a[^>]*>([\d.]+)</a>`)
+
 	starSpaceUserClassMap = map[string]string{
 		"0": "未激活", "1": "User", "2": "Power User", "3": "Elite User",
 		"4": "Crazy User", "5": "Insane User", "6": "Veteran User",
@@ -1331,6 +1338,8 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 		result.UploadBytes = parseSizeString(m[1] + m[2] + "B")
 	} else if m := reHDRouteUpload.FindStringSubmatch(html); len(m) > 2 {
 		result.UploadBytes = parseSizeString(m[1] + m[2])
+	} else if m := reTTGUpload.FindStringSubmatch(html); len(m) > 2 {
+		result.UploadBytes = parseSizeString(m[1] + m[2])
 	}
 	if m := reNexusFontDownloaded.FindStringSubmatch(html); len(m) > 1 {
 		result.DownloadBytes = parseSizeString(cleanText(m[1]))
@@ -1340,6 +1349,8 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 		result.DownloadBytes = parseSizeString(m[1] + m[2] + "B")
 	} else if m := reHDRouteDownload.FindStringSubmatch(html); len(m) > 2 {
 		result.DownloadBytes = parseSizeString(m[1] + m[2])
+	} else if m := reTTGDownload.FindStringSubmatch(html); len(m) > 2 {
+		result.DownloadBytes = parseSizeString(m[1] + m[2])
 	}
 	if m := reNexusFontRatio.FindStringSubmatch(html); len(m) > 1 {
 		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
@@ -1347,16 +1358,24 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
 	} else if m := reHDRouteRatio.FindStringSubmatch(html); len(m) > 1 {
 		result.Ratio, _ = strconv.ParseFloat(m[1], 64)
+	} else if m := reTTGRatio.FindStringSubmatch(html); len(m) > 1 {
+		result.Ratio, _ = strconv.ParseFloat(m[1], 64)
 	}
 	if m := reGenericBonus.FindStringSubmatch(html); len(m) > 1 {
 		bonusStr := strings.ReplaceAll(m[1], ",", "")
 		if v, err := strconv.ParseFloat(bonusStr, 64); err == nil {
 			result.BonusPoints = v
 		}
+	} else if m := reTTGBonus.FindStringSubmatch(html); len(m) > 1 {
+		if v, err := strconv.ParseFloat(m[1], 64); err == nil {
+			result.BonusPoints = v
+		}
 	}
 	if m := reGenericSeedingCount.FindStringSubmatch(html); len(m) > 1 {
 		result.SeedingCount, _ = strconv.Atoi(strings.TrimSpace(m[1]))
 	} else if m := reHDRouteSeeding.FindStringSubmatch(html); len(m) > 1 {
+		result.SeedingCount, _ = strconv.Atoi(strings.TrimSpace(m[1]))
+	} else if m := reTTGSeeding.FindStringSubmatch(html); len(m) > 1 {
 		result.SeedingCount, _ = strconv.Atoi(strings.TrimSpace(m[1]))
 	}
 	if m := reGenericUserClass.FindStringSubmatch(html); len(m) > 1 {
