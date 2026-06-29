@@ -46,7 +46,7 @@ var DefaultSeeds = map[string]string{
 	KeyLoginMaxRetries:     "5",
 	KeyLoginLockoutMin:     "5",
 
-	KeyRateLimitEnabled:  "false",
+	KeyRateLimitEnabled:  "true",
 	KeyRateLimitGlobal:   "600",
 	KeyRateLimitWrite:    "200",
 	KeyRateLimitDownload: "50",
