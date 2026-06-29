@@ -49,6 +49,14 @@ var (
 	reGenericUserClass       = regexp.MustCompile(`(?i)class='uc(\d+)'`)
 	reBonusHourTotalSize     = regexp.MustCompile(`合计体积</td>\s*<td>\s*</td>\s*<td[^>]*>\s*([\d.,]+\s*(?:T|G|M|TB|GB|MB))`)
 
+	// hdroute.org patterns (class="header-user-data" structure)
+	reHDRouteRatio     = regexp.MustCompile(`(?i)分享率[：:]?\s*<span class="header-user-data">([\d.]+)</span>`)
+	reHDRouteUpload    = regexp.MustCompile(`(?i)上传量[：:]?\s*<span class="header-user-data">([\d.]+)&nbsp;(TB|GB|MB|KB|B)</span>`)
+	reHDRouteDownload  = regexp.MustCompile(`(?i)下载量[：:]?\s*<span class="header-user-data">([\d.]+)&nbsp;(TB|GB|MB|KB|B)</span>`)
+	reHDRouteSeeding   = regexp.MustCompile(`(?i)title="seeding"></figure>\s*(\d+)`)
+	reHDRouteSeedSize  = regexp.MustCompile(`(?i)class="peering-size">\(([\d.]+)&nbsp;(TB|GB|MB|KB|B)\)`)
+	reHDRouteUserClass = regexp.MustCompile(`(?i)</a></span>\s*<span>\(([A-Za-z0-9]+)\)</span>`)
+
 	starSpaceUserClassMap = map[string]string{
 		"0": "未激活", "1": "User", "2": "Power User", "3": "Elite User",
 		"4": "Crazy User", "5": "Insane User", "6": "Veteran User",
@@ -1321,6 +1329,8 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 		result.UploadBytes = parseSizeString(cleanText(m[1]))
 	} else if m := reGenericLabelUpload.FindStringSubmatch(html); len(m) > 2 {
 		result.UploadBytes = parseSizeString(m[1] + m[2] + "B")
+	} else if m := reHDRouteUpload.FindStringSubmatch(html); len(m) > 2 {
+		result.UploadBytes = parseSizeString(m[1] + m[2])
 	}
 	if m := reNexusFontDownloaded.FindStringSubmatch(html); len(m) > 1 {
 		result.DownloadBytes = parseSizeString(cleanText(m[1]))
@@ -1328,11 +1338,15 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 		result.DownloadBytes = parseSizeString(cleanText(m[1]))
 	} else if m := reGenericLabelDownload.FindStringSubmatch(html); len(m) > 2 {
 		result.DownloadBytes = parseSizeString(m[1] + m[2] + "B")
+	} else if m := reHDRouteDownload.FindStringSubmatch(html); len(m) > 2 {
+		result.DownloadBytes = parseSizeString(m[1] + m[2])
 	}
 	if m := reNexusFontRatio.FindStringSubmatch(html); len(m) > 1 {
 		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
 	} else if m := reNexusLabelRatio.FindStringSubmatch(html); len(m) > 1 {
 		result.Ratio, _ = strconv.ParseFloat(cleanText(m[1]), 64)
+	} else if m := reHDRouteRatio.FindStringSubmatch(html); len(m) > 1 {
+		result.Ratio, _ = strconv.ParseFloat(m[1], 64)
 	}
 	if m := reGenericBonus.FindStringSubmatch(html); len(m) > 1 {
 		bonusStr := strings.ReplaceAll(m[1], ",", "")
@@ -1342,12 +1356,22 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 	}
 	if m := reGenericSeedingCount.FindStringSubmatch(html); len(m) > 1 {
 		result.SeedingCount, _ = strconv.Atoi(strings.TrimSpace(m[1]))
+	} else if m := reHDRouteSeeding.FindStringSubmatch(html); len(m) > 1 {
+		result.SeedingCount, _ = strconv.Atoi(strings.TrimSpace(m[1]))
 	}
 	if m := reGenericUserClass.FindStringSubmatch(html); len(m) > 1 {
 		if name, ok := starSpaceUserClassMap[m[1]]; ok {
 			result.UserClass = name
 		} else {
 			result.UserClass = "UC" + m[1]
+		}
+	} else if m := reHDRouteUserClass.FindStringSubmatch(html); len(m) > 1 {
+		result.UserClass = m[1]
+	}
+	// hdroute: extract seeding size from peering-size (first match = seeding)
+	if result.SeedingSize == 0 {
+		if m := reHDRouteSeedSize.FindStringSubmatch(html); len(m) > 2 {
+			result.SeedingSize = parseSizeString(m[1] + m[2])
 		}
 	}
 	if result.Ratio == 0 && result.DownloadBytes > 0 && result.UploadBytes > 0 {
