@@ -73,7 +73,8 @@
     "chinese": "中文",
     "advancedOptions": "高级选项",
     "requestFailed": "请求失败",
-    "networkError": "网络错误"
+    "networkError": "网络错误",
+    "saveSuccess": "保存成功"
   },
   "auth": {
     "login": "登录",
@@ -206,7 +207,7 @@
     "bonusPoints": "魔力值",
     "syncTime": "同步时间",
     "statsSyncedAt": "统计同步时间",
-    "syncStats": "同步统计",
+    "syncStats": "同步",
     "statsSynced": "统计同步成功",
     "freeze": "冻结",
     "unfreeze": "解冻",
@@ -220,7 +221,6 @@
     "syncingAllStats": "正在同步所有站点…",
     "syncAllStatsSuccess": "同步完成：成功 {synced} 个，失败 {failed} 个",
     "syncAllStatsFailed": "同步失败：{error}",
-    "syncStats": "同步",
     "syncSingleSuccess": "站点同步成功",
     "syncSingleFailed": "同步失败：{error}",
     "batchSync": "同步选中",
@@ -511,7 +511,7 @@
     "tagsLabel": "标签",
     "publishTargets": "发布目标站点",
     "publishTargetsPlaceholder": "选择自动发布的目标站点",
-    "notifyChannel": "通知渠道 ID",
+    "notifyChannel": "通知渠道",
     "notifyChannelPlaceholder": "推送通知使用的渠道 ID",
     "reseedClientIds": "辅种下载器",
     "reseedClientIdsPlaceholder": "选择辅种使用的下载器",
@@ -565,12 +565,12 @@
     "lifecycleDeleteSeeders": "删除阈值（做种人数）",
     "lifecycleDeleteSeedersHint": "做种人数低于此值时删除，0为不限制",
     "lifecycleDeleteSeedHours": "删除最小做种时长（小时）",
-    "notifyChannel": "通知渠道",
     "selectNotifyChannel": "选择推送通知渠道",
-    "publishTargets": "发布目标站点",
     "selectPublishTargets": "选择自动发布的目标站点",
     "reseedClients": "辅种客户端",
-    "selectReseedClients": "选择辅种使用的客户端"
+    "selectReseedClients": "选择辅种使用的客户端",
+    "paused": "已暂停",
+    "unitHours": "小时"
   },
   "seeding": {
     "activeTorrents": "活跃种子",
@@ -602,18 +602,16 @@
     "deleteConfigConfirm": "确定删除该配置？",
     "totalUpload": "总上传量",
     "totalDownload": "总下载量",
-    "todayUpload": "当日上传量",
+    "todayUpload": "今日上传",
     "todayDownload": "今日下载量",
-    "todayAdded": "今日新增",
+    "todayAdded": "今日推送",
     "globalRatio": "全局分享率",
     "statsScopeNote": "统计口径：仅统计刷流绑定且启用的下载器全局传输量（含该下载器内所有种子，含非刷流种子）",
     "siteStats": "站点统计",
     "seedingCount": "当前做种数",
-    "todayAdded": "今日推送",
     "todayDeleted": "今日删除",
     "activeFree": "免费种",
     "activeNonFree": "收费种",
-    "todayUpload": "今日上传",
     "historyUpload": "历史上传",
     "todayUploadDist": "今日上传分布",
     "historyUploadDist": "历史上传分布",
@@ -767,7 +765,8 @@
       "logs": "评分日志",
       "linkedSubscription": "关联订阅",
       "selectSubscription": "请选择订阅",
-      "selectSubscriptionHint": "请先在上方选择一个 RSS 订阅，才能配置该订阅的评分参数。"
+      "selectSubscriptionHint": "请先在上方选择一个 RSS 订阅，才能配置该订阅的评分参数。",
+      "maxActiveSeeding": "最大同时辅种数"
     },
     "matchedResult": "匹配 {matched}/{total} 条",
     "free": "免费",
@@ -802,8 +801,8 @@
     "fitTime": "适应时间(秒)",
     "onlyDeleteTorrent": "仅删种子(保留数据)",
     "limitSpeedBytes": "限速字节数",
-    "reannounceBefore": "先重新汇报",
-    "reannounceWaitMs": "重新汇报等待(ms)",
+    "reannounceBefore": "删种前重新汇报",
+    "reannounceWaitMs": "等待时间(ms)",
     "reannounceRetries": "重试次数",
     "reannounceIntervalMs": "重试间隔(ms)",
     "cascadeDelete": "级联删除",
@@ -832,13 +831,7 @@
     "granularityWeekly": "按周",
     "cleanupScoreWeights": "清理评分权重(JSON)",
     "reannounce": "重新汇报设置",
-    "reannounceBefore": "删种前重新汇报",
-    "reannounceRetries": "重试次数",
-    "reannounceIntervalMs": "重试间隔(ms)",
-    "reannounceWaitMs": "等待时间(ms)",
-    "torrentId": "种子ID",
-    "infoHash": "InfoHash",
-    "hr": "HR"
+    "torrentId": "种子ID"
   },
   "reseed": {
     "addTask": "创建任务",
@@ -1292,8 +1285,8 @@
     "cleanupReseedMatchDays": "辅种匹配保留天数",
     "cleanupPtgenCacheDays": "PTGen 缓存保留天数",
     "cleanupSeedingArchiveDays": "做种归档保留天数",
-     "cleanupAuditLogDays": "审计日志保留天数",
-     "cleanupTorrentTrafficDays": "流量快照保留天数"
+    "cleanupAuditLogDays": "审计日志保留天数",
+    "cleanupTorrentTrafficDays": "流量快照保留天数"
   },
   "cookiecloud": {
     "subtitle": "浏览器 Cookie 自动同步",
