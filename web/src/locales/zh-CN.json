@@ -831,7 +831,9 @@
     "granularityWeekly": "按周",
     "cleanupScoreWeights": "清理评分权重(JSON)",
     "reannounce": "重新汇报设置",
-    "torrentId": "种子ID"
+    "torrentId": "种子ID",
+    "deleteCompanions": "删除辅种",
+    "deleteCompanionsHint": "关闭后仅删本站种子，有辅种时保留数据，无辅种时删数据"
   },
   "reseed": {
     "addTask": "创建任务",

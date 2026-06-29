@@ -1205,13 +1205,12 @@ type evaluateContext struct {
 	torrentMap   map[string]*model.TorrentInfo
 	maindata     *model.Maindata
 	freeSpace    int64
-	totalSpace   int64
-	weights      CleanupWeights
-	minScore     float64
-	minAge       float64
-	cfg          *model.SeedingClientConfig
-	cascadeRules []model.DeleteRule
-	deleteRules  []model.DeleteRule
+	totalSpace  int64
+	weights     CleanupWeights
+	minScore    float64
+	minAge      float64
+	cfg         *model.SeedingClientConfig
+	deleteRules []model.DeleteRule
 }
 
 func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cfg *model.SeedingClientConfig) (*evaluateContext, error) {
@@ -1264,7 +1263,6 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 		e.updateEMA(ctx, clientID, md, torrentMap)
 	}
 
-	var cascadeRules []model.DeleteRule
 	var deleteRules []model.DeleteRule
 
 	// Check global switch: when enabled, all DeleteRules apply to all seeding clients
@@ -1273,11 +1271,6 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 
 	if globalDeleteRules == "true" {
 		if dbErr := e.db.WithContext(ctx).
-			Where("enabled = ? AND cascade_delete = ?", true, true).
-			Find(&cascadeRules).Error; dbErr != nil {
-			e.logger.Warn("load cascade delete rules (global) failed", zap.String("client_id", clientID), zap.Error(dbErr))
-		}
-		if dbErr := e.db.WithContext(ctx).
 			Where("enabled = ?", true).
 			Order("priority DESC").
 			Find(&deleteRules).Error; dbErr != nil {
@@ -1285,11 +1278,6 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 		}
 	} else if cfg != nil && cfg.DeleteRuleIDs != "" {
 		ruleIDs := splitRuleIDs(cfg.DeleteRuleIDs)
-		if dbErr := e.db.WithContext(ctx).
-			Where("id IN (?) AND enabled = ? AND cascade_delete = ?", ruleIDs, true, true).
-			Find(&cascadeRules).Error; dbErr != nil {
-			e.logger.Warn("load cascade delete rules failed", zap.String("client_id", clientID), zap.Error(dbErr))
-		}
 		if dbErr := e.db.WithContext(ctx).
 			Where("id IN (?) AND enabled = ?", ruleIDs, true).
 			Order("priority DESC").
@@ -1311,7 +1299,6 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 		minScore:     minScore,
 		minAge:       minAgeHours,
 		cfg:          cfg,
-		cascadeRules: cascadeRules,
 		deleteRules:  deleteRules,
 	}, nil
 }
@@ -1509,63 +1496,28 @@ func (e *Engine) recheckDiscountForRecover(ctx context.Context, rec *model.Seedi
 }
 
 func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, result *EvaluateResult) {
-	// deleteTorrentWithCompanions handles file protection: companions deleted without data first,
-	// then main torrent deleted with data. No need for HasSameFileTorrent guard here.
 	isDeleteFiles := true
 
 	e.reannounceBeforeDelete(ctx, ec.client, rec.InfoHash, ec.cfg)
 
-	cascaded := false
-	for _, rule := range ec.cascadeRules {
-		relatedHashes := FindRelatedByTagOrPath(ti, ec.torrents, rule.CascadeMaxDepth)
-		if len(relatedHashes) > 0 {
-			allHashes := append([]string{rec.InfoHash}, relatedHashes...)
-			if err := ec.client.BatchDeleteTorrents(ctx, allHashes, isDeleteFiles); err != nil {
-				e.logger.Warn("级联删种失败",
-					zap.Strings("hashes", allHashes),
-					zap.Error(err),
-				)
-				result.Errors++
-				if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "auto_cleanup"); usErr != nil {
-					e.logger.Error("更新级联删种失败状态出错", zap.Uint("id", rec.ID), zap.Error(usErr))
-				}
-			} else {
-				e.saveFinalTraffic(ctx, rec, ti)
-				e.logger.Info("级联删种成功",
-					zap.String("source", rec.InfoHash),
-					zap.Int("related", len(relatedHashes)),
-				)
-				if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); usErr != nil {
-					e.logger.Error("更新级联删种状态出错", zap.Uint("id", rec.ID), zap.Error(usErr))
-				}
-				e.markRelatedDeleted(ctx, relatedHashes, ec.clientID, "cascade_cleanup")
-				result.Deleted++
-			}
-			cascaded = true
-			break
+	e.saveFinalTraffic(ctx, rec, ti)
+	if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, isDeleteFiles, true); err != nil {
+		e.logger.Warn("删种失败",
+			zap.String("infoHash", rec.InfoHash),
+			zap.Bool("deleteFiles", isDeleteFiles),
+			zap.Error(err),
+		)
+		result.Errors++
+		if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "auto_cleanup"); usErr != nil {
+			e.logger.Error("更新删种失败状态出错", zap.Uint("id", rec.ID), zap.Error(usErr))
 		}
+		return
 	}
 
-	if !cascaded {
-		e.saveFinalTraffic(ctx, rec, ti)
-		if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, isDeleteFiles); err != nil {
-			e.logger.Warn("删种失败",
-				zap.String("infoHash", rec.InfoHash),
-				zap.Bool("deleteFiles", isDeleteFiles),
-				zap.Error(err),
-			)
-			result.Errors++
-			if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "auto_cleanup"); usErr != nil {
-				e.logger.Error("更新删种失败状态出错", zap.Uint("id", rec.ID), zap.Error(usErr))
-			}
-			return
-		}
-
-		if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); err != nil {
-			e.logger.Error("更新删种状态失败", zap.Uint("id", rec.ID), zap.Error(err))
-		}
-		result.Deleted++
+	if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); err != nil {
+		e.logger.Error("更新删种状态失败", zap.Uint("id", rec.ID), zap.Error(err))
 	}
+	result.Deleted++
 }
 
 func (e *Engine) markRelatedDeleted(ctx context.Context, relatedHashes []string, clientID, actionBy string) {
@@ -1591,14 +1543,34 @@ func (e *Engine) markRelatedDeleted(ctx context.Context, relatedHashes []string,
 }
 
 // deleteTorrentWithCompanions: deletes a torrent and its cross-seeded companions.
-// Companions (same save_path + same name + same size, different info_hash) are
-// deleted WITHOUT data first, then the main torrent is deleted WITH data.
-// This prevents orphaned torrents referencing deleted data files.
-func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateContext, infoHash string, deleteData bool) error {
+// When deleteCompanions=true: companions are deleted WITHOUT data first, then the
+// main torrent is deleted WITH data.
+// When deleteCompanions=false: companions are left untouched. If any companions
+// exist, the main torrent is deleted WITHOUT data (to protect shared files);
+// if no companions exist, the main torrent is deleted WITH data.
+func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateContext, infoHash string, deleteData bool, deleteCompanions bool) error {
 	ti := ec.torrentMap[infoHash]
 	var companionHashes []string
 	if ti != nil {
 		companionHashes = FindRelatedByTagOrPath(ti, ec.torrents, 1)
+	}
+
+	if !deleteCompanions {
+		if len(companionHashes) > 0 {
+			e.logger.Info("skipping companions, keeping data",
+				zap.String("main_hash", infoHash),
+				zap.Int("companions", len(companionHashes)))
+			err := ec.client.DeleteTorrent(ctx, infoHash, false)
+			if err == nil {
+				e.removeFromSnapshot(ec, []string{infoHash})
+			}
+			return err
+		}
+		err := ec.client.DeleteTorrent(ctx, infoHash, deleteData)
+		if err == nil {
+			e.removeFromSnapshot(ec, []string{infoHash})
+		}
+		return err
 	}
 
 	// Delete companions WITHOUT data first
@@ -1616,10 +1588,32 @@ func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateCo
 	}
 	if len(companionHashes) > 0 {
 		e.markRelatedDeleted(ctx, companionHashes, ec.clientID, "companion_cascade")
+		e.removeFromSnapshot(ec, companionHashes)
 	}
 
 	// Delete main torrent
-	return ec.client.DeleteTorrent(ctx, infoHash, deleteData)
+	err := ec.client.DeleteTorrent(ctx, infoHash, deleteData)
+	if err == nil {
+		e.removeFromSnapshot(ec, []string{infoHash})
+	}
+	return err
+}
+
+func (e *Engine) removeFromSnapshot(ec *evaluateContext, hashes []string) {
+	hashSet := make(map[string]bool, len(hashes))
+	for _, h := range hashes {
+		hashSet[h] = true
+	}
+	filtered := ec.torrents[:0]
+	for _, t := range ec.torrents {
+		if !hashSet[t.Hash] {
+			filtered = append(filtered, t)
+		}
+	}
+	ec.torrents = filtered
+	for h := range hashSet {
+		delete(ec.torrentMap, h)
+	}
 }
 
 func (e *Engine) reannounceBeforeDelete(ctx context.Context, client model.DownloaderClient, infoHash string, cfg *model.SeedingClientConfig) bool {
@@ -1913,48 +1907,44 @@ func (e *Engine) executeRuleAction(ctx context.Context, rec *model.SeedingTorren
 func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, rule *model.DeleteRule, result *EvaluateResult) {
 	deleteFiles := rule.RemoveData && !rule.OnlyDeleteTorrent
 
-	// deleteTorrentWithCompanions handles file protection: companions deleted without data first,
-	// then main torrent deleted with data. No need for HasSameFileTorrent guard.
-
 	if rule.ReannounceBefore && ti != nil {
 		e.reannounceRuleBeforeDelete(ctx, ec.client, rec.InfoHash, rule)
 	}
 
+	// Per-rule cascade: only the triggering rule's CascadeDelete applies
 	cascaded := false
-	for _, cr := range ec.cascadeRules {
-		if cr.CascadeDelete && ti != nil {
-			relatedHashes := FindRelatedByTagOrPath(ti, ec.torrents, cr.CascadeMaxDepth)
-			if len(relatedHashes) > 0 {
-				allHashes := append([]string{rec.InfoHash}, relatedHashes...)
-				if err := ec.client.BatchDeleteTorrents(ctx, allHashes, deleteFiles); err != nil {
-					e.logger.Warn("rule cascade delete failed",
-						zap.Strings("hashes", allHashes),
-						zap.Error(err))
-					result.Errors++
-					if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "rule:"+rule.Alias); usErr != nil {
-						e.logger.Error("update rule cascade fail status error", zap.Uint("id", rec.ID), zap.Error(usErr))
-					}
-				} else {
-					e.saveFinalTraffic(ctx, rec, ti)
-					e.logger.Info("rule cascade delete success",
-						zap.String("source", rec.InfoHash),
-						zap.Int("related", len(relatedHashes)),
-						zap.Uint("ruleID", rule.ID))
-					if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "rule:"+rule.Alias); usErr != nil {
-						e.logger.Error("update rule cascade status error", zap.Uint("id", rec.ID), zap.Error(usErr))
-					}
-					e.markRelatedDeleted(ctx, relatedHashes, ec.clientID, "rule:"+rule.Alias)
-					result.Deleted++
+	if rule.CascadeDelete && rule.DeleteCompanions && ti != nil {
+		relatedHashes := FindRelatedByTagOrPath(ti, ec.torrents, rule.CascadeMaxDepth)
+		if len(relatedHashes) > 0 {
+			allHashes := append([]string{rec.InfoHash}, relatedHashes...)
+			if err := ec.client.BatchDeleteTorrents(ctx, allHashes, deleteFiles); err != nil {
+				e.logger.Warn("rule cascade delete failed",
+					zap.Strings("hashes", allHashes),
+					zap.Error(err))
+				result.Errors++
+				if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "rule:"+rule.Alias); usErr != nil {
+					e.logger.Error("update rule cascade fail status error", zap.Uint("id", rec.ID), zap.Error(usErr))
 				}
-				cascaded = true
-				break
+			} else {
+				e.saveFinalTraffic(ctx, rec, ti)
+				e.logger.Info("rule cascade delete success",
+					zap.String("source", rec.InfoHash),
+					zap.Int("related", len(relatedHashes)),
+					zap.Uint("ruleID", rule.ID))
+				if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "rule:"+rule.Alias); usErr != nil {
+					e.logger.Error("update rule cascade status error", zap.Uint("id", rec.ID), zap.Error(usErr))
+				}
+				e.markRelatedDeleted(ctx, relatedHashes, ec.clientID, "rule:"+rule.Alias)
+				e.removeFromSnapshot(ec, allHashes)
+				result.Deleted++
 			}
+			cascaded = true
 		}
 	}
 
 	if !cascaded {
 		e.saveFinalTraffic(ctx, rec, ti)
-		if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, deleteFiles); err != nil {
+		if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, deleteFiles, rule.DeleteCompanions); err != nil {
 			e.logger.Warn("rule delete failed",
 				zap.String("infoHash", rec.InfoHash),
 				zap.Bool("deleteFiles", deleteFiles),
