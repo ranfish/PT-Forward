@@ -12,19 +12,9 @@
         <a-tag v-if="showRssKey && site.hasRssKey" color="green">{{ t('site.rssKeyValid') }}</a-tag>
       </template>
       <template #extra>
-        <a-button :loading="detecting" @click="runDetect">{{ t('site.detect') }}</a-button>
+        <a-tag color="blue">{{ frameworkLabels[site.framework as string] || site.framework }}</a-tag>
       </template>
     </a-page-header>
-
-    <a-modal v-model:open="showDetectResult" :title="t('site.detectResult')" :footer="null" width="520px">
-      <a-descriptions bordered :column="1" size="small">
-        <a-descriptions-item :label="t('site.detectFramework')">
-          <a-tag color="blue">{{ detectResult.framework }}</a-tag>
-        </a-descriptions-item>
-        <a-descriptions-item :label="t('site.detectConfidence')">{{ ((detectResult.confidence ?? 0) * 100).toFixed(0) }}%</a-descriptions-item>
-        <a-descriptions-item v-if="detectResult.detectionDetail" :label="t('site.detectDetail')">{{ detectResult.detectionDetail }}</a-descriptions-item>
-      </a-descriptions>
-    </a-modal>
 
     <a-spin :spinning="loading">
       <div style="margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
@@ -308,12 +298,6 @@ import { iyuuApi } from '@/api/iyuu'
 import { ensureSupportedSitesCache, getSiteFieldOverride } from '@/api/supported-sites'
 import type { Site, SiteCredentials } from '@/api/types'
 
-interface DetectResultData {
-  framework?: string
-  confidence?: number
-  detectionDetail?: string
-}
-
 interface SiteStatsData {
   uploadBytes?: number
   downloadBytes?: number
@@ -421,9 +405,6 @@ const showRssKey = computed(() => {
 })
 const showAdvancedCredentials = computed(() => showBearerToken.value || showAuthKey.value || showAuthHash.value || showUserId.value || showRssKey.value)
 
-const detecting = ref(false)
-const showDetectResult = ref(false)
-const detectResult = ref<DetectResultData>({})
 const statsLoading = ref(false)
 const statsSyncing = ref(false)
 const stats = ref<SiteStatsData>({})
@@ -565,19 +546,6 @@ async function updateSettings() {
     fetchSite()
   } catch (e: unknown) {
     message.error((e as Error).message)
-  }
-}
-
-async function runDetect() {
-  detecting.value = true
-  try {
-    const resp = await sitesApi.detect(siteId)
-    detectResult.value = resp.data.data || {}
-    showDetectResult.value = true
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  } finally {
-    detecting.value = false
   }
 }
 

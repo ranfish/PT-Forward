@@ -188,6 +188,16 @@
             <a-input :value="form.authType" disabled />
           </a-form-item>
         </template>
+
+        <template v-if="!isCreateMode && editingSite">
+          <a-form-item :label="t('site.framework')">
+            <a-input :value="editingSite.framework" disabled />
+          </a-form-item>
+          <a-form-item :label="t('site.authType')">
+            <a-input :value="editingSite.authType" disabled />
+          </a-form-item>
+        </template>
+
         <a-form-item v-if="showCookieField" :label="t('sites.cookie')" name="cookie">
           <a-textarea v-model:value="form.cookie" :rows="3" :placeholder="editingSite?.hasCookie ? t('site.placeholderConfigured') : t('site.placeholderCookie')" />
         </a-form-item>
@@ -517,9 +527,9 @@ async function handleSubmit() {
       await sitesApi.create(payload)
     } else if (editingSite.value) {
       const payload: Record<string, unknown> = {}
-      const skipIfEmpty = ['name', 'domain', 'baseUrl', 'framework']
+      const skipFields = ['name', 'domain', 'baseUrl', 'framework']
       for (const [key, value] of Object.entries(form)) {
-        if (skipIfEmpty.includes(key) && !value) continue
+        if (skipFields.includes(key)) continue
         payload[key] = value
       }
       await sitesApi.update(editingSite.value.id, payload)
