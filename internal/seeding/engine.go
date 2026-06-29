@@ -1911,56 +1911,23 @@ func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorren
 		e.reannounceRuleBeforeDelete(ctx, ec.client, rec.InfoHash, rule)
 	}
 
-	// Per-rule cascade: only the triggering rule's CascadeDelete applies
-	cascaded := false
-	if rule.CascadeDelete && rule.DeleteCompanions && ti != nil {
-		relatedHashes := FindRelatedByTagOrPath(ti, ec.torrents, rule.CascadeMaxDepth)
-		if len(relatedHashes) > 0 {
-			allHashes := append([]string{rec.InfoHash}, relatedHashes...)
-			if err := ec.client.BatchDeleteTorrents(ctx, allHashes, deleteFiles); err != nil {
-				e.logger.Warn("rule cascade delete failed",
-					zap.Strings("hashes", allHashes),
-					zap.Error(err))
-				result.Errors++
-				if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "rule:"+rule.Alias); usErr != nil {
-					e.logger.Error("update rule cascade fail status error", zap.Uint("id", rec.ID), zap.Error(usErr))
-				}
-			} else {
-				e.saveFinalTraffic(ctx, rec, ti)
-				e.logger.Info("rule cascade delete success",
-					zap.String("source", rec.InfoHash),
-					zap.Int("related", len(relatedHashes)),
-					zap.Uint("ruleID", rule.ID))
-				if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "rule:"+rule.Alias); usErr != nil {
-					e.logger.Error("update rule cascade status error", zap.Uint("id", rec.ID), zap.Error(usErr))
-				}
-				e.markRelatedDeleted(ctx, relatedHashes, ec.clientID, "rule:"+rule.Alias)
-				e.removeFromSnapshot(ec, allHashes)
-				result.Deleted++
-			}
-			cascaded = true
+	e.saveFinalTraffic(ctx, rec, ti)
+	if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, deleteFiles, rule.DeleteCompanions); err != nil {
+		e.logger.Warn("rule delete failed",
+			zap.String("infoHash", rec.InfoHash),
+			zap.Bool("deleteFiles", deleteFiles),
+			zap.Error(err))
+		result.Errors++
+		if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "rule:"+rule.Alias); usErr != nil {
+			e.logger.Error("update rule delete fail status error", zap.Uint("id", rec.ID), zap.Error(usErr))
 		}
+		e.fitTimer.Remove(rec.InfoHash)
+		return
 	}
-
-	if !cascaded {
-		e.saveFinalTraffic(ctx, rec, ti)
-		if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, deleteFiles, rule.DeleteCompanions); err != nil {
-			e.logger.Warn("rule delete failed",
-				zap.String("infoHash", rec.InfoHash),
-				zap.Bool("deleteFiles", deleteFiles),
-				zap.Error(err))
-			result.Errors++
-			if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "rule:"+rule.Alias); usErr != nil {
-				e.logger.Error("update rule delete fail status error", zap.Uint("id", rec.ID), zap.Error(usErr))
-			}
-			e.fitTimer.Remove(rec.InfoHash)
-			return
-		}
-		if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "rule:"+rule.Alias); err != nil {
-			e.logger.Error("update rule delete status failed", zap.Uint("id", rec.ID), zap.Error(err))
-		}
-		result.Deleted++
+	if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "rule:"+rule.Alias); err != nil {
+		e.logger.Error("update rule delete status failed", zap.Uint("id", rec.ID), zap.Error(err))
 	}
+	result.Deleted++
 
 	e.fitTimer.Remove(rec.InfoHash)
 }
