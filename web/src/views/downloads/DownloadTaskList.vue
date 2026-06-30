@@ -19,6 +19,21 @@
       </template>
     </a-page-header>
 
+    <div v-if="spaceStats.length > 0" style="margin-bottom: 16px">
+      <a-row :gutter="12">
+        <a-col v-for="s in spaceStats" :key="s.client_id" :span="Math.max(6, Math.floor(24 / spaceStats.length))">
+          <a-card size="small" :title="s.client_id">
+            <a-statistic title="实际可用" :value="formatBytes(s.effective_free)" :value-style="{ color: s.effective_free < 50 * 1024 * 1024 * 1024 ? '#ff4d4f' : '#52c41a', fontSize: '16px' }" />
+            <div style="font-size: 12px; color: #999; margin-top: 8px">
+              <div>剩余 {{ formatBytes(s.free_space) }}</div>
+              <div>待下载 {{ formatBytes(s.pending_bytes) }}</div>
+              <div>{{ s.torrent_count }} 种子 / {{ s.downloading_count }} 下载中</div>
+            </div>
+          </a-card>
+        </a-col>
+      </a-row>
+    </div>
+
     <a-card :title="t('downloads.configTitle')" style="margin-bottom: 16px">
       <div style="margin-bottom: 12px; display: flex; justify-content: flex-end">
         <a-button type="primary" size="small" @click="openConfigModal()">{{ t('downloads.addConfig') }}</a-button>
@@ -236,7 +251,7 @@ import { ref, reactive, computed, onMounted, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
-import { downloadsApi, type DownloadTask, type DownloadClientConfig } from '@/api/downloads'
+import { downloadsApi, type DownloadTask, type DownloadClientConfig, type SpaceStat } from '@/api/downloads'
 import { downloadersApi } from '@/api/downloaders'
 import { seedingApi, deleteRulesApi } from '@/api/seeding'
 import { formatBytes, formatTime } from '@/utils/format'
@@ -253,6 +268,7 @@ const filterStatus = ref<string>('')
 const selectedRowKeys = ref<number[]>([])
 const deleteMode = ref(true)
 const allClients = ref<string[]>([])
+const spaceStats = ref<SpaceStat[]>([])
 const configs = ref<DownloadClientConfig[]>([])
 const configsLoading = ref(false)
 const allRules = ref<{ id: number; alias: string }[]>([])
@@ -553,15 +569,24 @@ async function handleDeleteConfig(id: number) {
 }
 
 async function fetchConfigs() {
-  configsLoading.value = true
-  try {
-    const resp = await downloadsApi.listConfigs()
-    configs.value = resp.data.data || []
-  } catch {
-    // ignore
-  } finally {
-    configsLoading.value = false
-  }
+	configsLoading.value = true
+	try {
+		const resp = await downloadsApi.listConfigs()
+		configs.value = resp.data.data || []
+	} catch {
+		// ignore
+	} finally {
+		configsLoading.value = false
+	}
+}
+
+async function fetchSpaceStats() {
+	try {
+		const resp = await downloadsApi.spaceStats()
+		spaceStats.value = resp.data.data || []
+	} catch {
+		// ignore
+	}
 }
 
 onMounted(async () => {
@@ -578,7 +603,11 @@ onMounted(async () => {
     // ignore
   }
   fetchConfigs()
+  fetchSpaceStats()
   fetchData()
-  setInterval(fetchData, 30000)
+  setInterval(() => {
+    fetchData()
+    fetchSpaceStats()
+  }, 30000)
 })
 </script>
