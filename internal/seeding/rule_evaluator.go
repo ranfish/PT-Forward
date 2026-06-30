@@ -12,17 +12,19 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/rule"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 type RuleEvaluator struct {
-	db     *gorm.DB
-	logger *zap.Logger
+	db         *gorm.DB
+	logger     *zap.Logger
+	ruleModule *rule.Module
 }
 
 func NewRuleEvaluator(db *gorm.DB, logger *zap.Logger) *RuleEvaluator {
-	return &RuleEvaluator{db: db, logger: logger}
+	return &RuleEvaluator{db: db, logger: logger, ruleModule: rule.NewModule(db)}
 }
 
 type RuleMatch struct {
@@ -419,13 +421,10 @@ func (re *RuleEvaluator) fillScoringContext(_ context.Context, rc *RuleContext, 
 	rc.LowScoreCount = cache.lowScoreCount[rc.Record.InfoHash]
 }
 
-func (re *RuleEvaluator) matchRuleWithCache(ctx context.Context, rule model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, totalSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64, cache *scoringCache) []model.SeedingTorrentRecord {
-	if rule.Conditions == "" && rule.Expr == "" {
+func (re *RuleEvaluator) matchRuleWithCache(ctx context.Context, r model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, totalSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64, cache *scoringCache) []model.SeedingTorrentRecord {
+	if r.Conditions == "" && r.Expr == "" {
 		return nil
 	}
-
-	useExpr := rule.Type == "expr" && rule.Expr != ""
-	conditions := ParseConditions(rule.Conditions)
 
 	activeUploads, activeDownloads := countActiveStates(torrentMap)
 
@@ -435,37 +434,24 @@ func (re *RuleEvaluator) matchRuleWithCache(ctx context.Context, rule model.Dele
 		if torrentMap != nil {
 			ti = torrentMap[rec.InfoHash]
 		}
-		rc := &RuleContext{
-			Record:              &rec,
-			Torrent:             ti,
-			FreeSpace:           freeSpace,
-			TotalSpace:          totalSpace,
-			Now:                 now,
-			ActiveUploads:       activeUploads,
-			ActiveDownloads:     activeDownloads,
-			GlobalUploadSpeed:   globalUpSpeed,
-			GlobalDownloadSpeed: globalDownSpeed,
-			logger:              re.logger,
+
+		var score float64
+		var rankInt, lowCountInt int
+		if cache != nil {
+			score = cache.latestScore[rec.InfoHash]
+			rankInt = cache.rankInCycle[rec.InfoHash]
+			lowCountInt = cache.lowScoreCount[rec.InfoHash]
 		}
 
-		re.fillScoringContext(ctx, rc, cache)
+		rc := toRuleContext(&rec, ti, freeSpace, totalSpace, now, activeUploads, activeDownloads, globalUpSpeed, globalDownSpeed, score, rankInt, lowCountInt)
 
-		if useExpr {
-			ok, err := evalExpr(rule.Expr, rc)
-			if err != nil {
-				re.logger.Debug("expr eval failed", zap.String("expr", rule.Expr), zap.Error(err))
-				continue
-			}
-			if ok {
-				matched = append(matched, rec)
-			}
-		} else if MatchContextWithLogic(rc, conditions, rule.Logic) {
+		if rule.MatchRule(rc, &r) {
 			matched = append(matched, rec)
 		}
 	}
 
-	if rule.DeleteNum > 0 && len(matched) > rule.DeleteNum {
-		matched = matched[:rule.DeleteNum]
+	if r.DeleteNum > 0 && len(matched) > r.DeleteNum {
+		matched = matched[:r.DeleteNum]
 	}
 
 	return matched

@@ -60,6 +60,10 @@ type Context struct {
 	ActiveDownloads     int
 	GlobalUploadSpeed   float64
 	GlobalDownloadSpeed float64
+
+	ScoringScore  float64
+	ScoringRank   int
+	LowScoreCount int
 }
 
 func (c *Context) fieldValue(key string) (string, bool) {
@@ -179,6 +183,12 @@ func (c *Context) fieldValue(key string) (string, bool) {
 		return fmt.Sprintf("%.0f", c.GlobalUploadSpeed), true
 	case "globalDownloadSpeed":
 		return fmt.Sprintf("%.0f", c.GlobalDownloadSpeed), true
+	case "scoringScore":
+		return fmt.Sprintf("%.2f", c.ScoringScore), true
+	case "scoringRank":
+		return fmt.Sprintf("%d", c.ScoringRank), true
+	case "lowScoreCount":
+		return fmt.Sprintf("%d", c.LowScoreCount), true
 	}
 	return "", false
 }
@@ -360,6 +370,9 @@ type ExprEnv struct {
 	ActiveDownloads     int     `expr:"activeDownloads"`
 	GlobalUploadSpeed   float64 `expr:"globalUploadSpeed"`
 	GlobalDownloadSpeed float64 `expr:"globalDownloadSpeed"`
+	ScoringScore  float64 `expr:"scoringScore"`
+	ScoringRank   int     `expr:"scoringRank"`
+	LowScoreCount int     `expr:"lowScoreCount"`
 }
 
 func buildExprEnv(c *Context) *ExprEnv {
@@ -394,6 +407,9 @@ func buildExprEnv(c *Context) *ExprEnv {
 		ActiveDownloads:     c.ActiveDownloads,
 		GlobalUploadSpeed:   c.GlobalUploadSpeed,
 		GlobalDownloadSpeed: c.GlobalDownloadSpeed,
+		ScoringScore:        c.ScoringScore,
+		ScoringRank:         c.ScoringRank,
+		LowScoreCount:       c.LowScoreCount,
 	}
 	if c.TotalSpace > 0 {
 		env.DiskUsedPct = float64(c.TotalSpace-c.FreeSpace) / float64(c.TotalSpace) * 100.0
