@@ -19,6 +19,12 @@
       </template>
     </a-page-header>
 
+    <div style="margin-bottom: 16px">
+      <a-space>
+        <a-button type="primary" @click="showAddModal = true" :icon="h(PlusOutlined)">{{ t('downloads.addDownload') }}</a-button>
+      </a-space>
+    </div>
+
     <div v-if="selectedRowKeys.length > 0" style="margin-bottom: 16px">
       <a-space>
         <span>{{ selectedRowKeys.length }} {{ t('downloads.selected') }}</span>
@@ -88,16 +94,65 @@
         <template v-else-if="column.key === 'created_at'">
           {{ formatTime(record.created_at) }}
         </template>
+        <template v-else-if="column.key === 'action'">
+          <a-space size="small">
+            <a-button v-if="record.transfer_status === 'transfer_failed' || record.transfer_status === 'transfer_partial'"
+              type="link" size="small" @click="handleRetryTransfer(record)">{{ t('downloads.retryTransfer') }}</a-button>
+            <a-popconfirm
+              :title="t('downloads.deleteConfirm')"
+              @confirm="handleDelete(record)"
+              :ok-text="t('common.confirm')"
+              :cancel-text="t('common.cancel')"
+            >
+              <template #description>
+                <a-radio-group v-model:value="deleteMode" style="margin-top: 8px" v-if="record.status !== 'deleted'">
+                  <a-radio :value="true">{{ t('downloads.deleteWithCompanions') }}</a-radio>
+                  <a-radio :value="false">{{ t('downloads.deleteSiteOnly') }}</a-radio>
+                </a-radio-group>
+              </template>
+              <a-button type="text" danger size="small" :disabled="record.status === 'deleted'">
+                {{ t('common.delete') }}
+              </a-button>
+            </a-popconfirm>
+          </a-space>
+        </template>
       </template>
     </a-table>
+
+    <a-modal v-model:open="showAddModal" :title="t('downloads.addDownload')" :confirm-loading="adding" @ok="handleAdd" width="520px">
+      <a-form layout="vertical">
+        <a-form-item label="目标下载器" required>
+          <a-select v-model:value="addForm.client_id" :placeholder="t('downloads.selectClient')">
+            <a-select-option v-for="c in clientOptions" :key="c" :value="c">{{ c }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-tabs v-model:active-key="addMode">
+          <a-tab-pane key="file" tab="上传 .torrent 文件">
+            <a-upload :before-upload="handleFileSelect" :max-count="1" accept=".torrent">
+              <a-button :icon="h(UploadOutlined)">{{ t('downloads.selectFile') }}</a-button>
+            </a-upload>
+            <span v-if="addForm.file" style="margin-left: 8px; color: #52c41a">{{ addForm.file.name }}</span>
+          </a-tab-pane>
+          <a-tab-pane key="url" tab="下载链接">
+            <a-input v-model:value="addForm.url" placeholder="https://example.com/download.php?id=123&passkey=xxx" />
+          </a-tab-pane>
+        </a-tabs>
+        <a-form-item label="分类（可选）" style="margin-top: 16px">
+          <a-input v-model:value="addForm.category" placeholder="如 PT3" />
+        </a-form-item>
+        <a-form-item label="添加后暂停">
+          <a-switch v-model:checked="addForm.paused" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, reactive, computed, onMounted, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
-import { ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons-vue'
+import { ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { downloadsApi, type DownloadTask } from '@/api/downloads'
 import { formatBytes, formatTime } from '@/utils/format'
 
@@ -111,6 +166,18 @@ const total = ref(0)
 const filterClient = ref<string>('')
 const filterStatus = ref<string>('')
 const selectedRowKeys = ref<number[]>([])
+const deleteMode = ref(true)
+
+const showAddModal = ref(false)
+const adding = ref(false)
+const addMode = ref<'file' | 'url'>('file')
+const addForm = reactive({
+  client_id: '',
+  url: '',
+  category: '',
+  paused: false,
+  file: null as File | null,
+})
 
 const hasSelected = computed(() => selectedRowKeys.value.length > 0)
 
@@ -130,6 +197,7 @@ const columns = computed(() => [
   { title: t('downloads.transfer'), key: 'transfer_status', width: 90 },
   { title: t('downloads.size'), key: 'total_size', width: 90 },
   { title: t('downloads.created'), key: 'created_at', width: 140 },
+  { title: t('common.action'), key: 'action', width: 120 },
 ])
 
 function statusColor(status: string): string {
@@ -233,6 +301,73 @@ async function handleBulkDelete() {
     fetchData()
   } catch {
     message.error(t('common.operationFailed'))
+  }
+}
+
+async function handleDelete(record: DownloadTask) {
+  try {
+    await downloadsApi.delete(record.id, deleteMode.value)
+    message.success(t('common.deleted'))
+    fetchData()
+  } catch {
+    message.error(t('common.operationFailed'))
+  }
+}
+
+async function handleRetryTransfer(record: DownloadTask) {
+  try {
+    await downloadsApi.retryTransfer(record.id)
+    message.success(t('downloads.transferRetrySent'))
+    fetchData()
+  } catch {
+    message.error(t('common.operationFailed'))
+  }
+}
+
+const handleFileSelect = (file: File) => {
+  addForm.file = file
+  return false
+}
+
+async function handleAdd() {
+  if (!addForm.client_id) {
+    message.warning(t('downloads.selectClient'))
+    return
+  }
+  if (addMode.value === 'file' && !addForm.file) {
+    message.warning(t('downloads.selectFile'))
+    return
+  }
+  if (addMode.value === 'url' && !addForm.url) {
+    message.warning(t('downloads.inputUrl'))
+    return
+  }
+
+  adding.value = true
+  try {
+    if (addMode.value === 'file' && addForm.file) {
+      const formData = new FormData()
+      formData.append('torrent', addForm.file)
+      formData.append('client_id', addForm.client_id)
+      if (addForm.category) formData.append('category', addForm.category)
+      if (addForm.paused) formData.append('paused', 'true')
+      const { default: client } = await import('@/api/client')
+      await client.post('/downloads', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+    } else {
+      await downloadsApi.addByUrl(addForm.client_id, addForm.url, addForm.category, addForm.paused)
+    }
+    message.success(t('common.operationSuccess'))
+    showAddModal.value = false
+    addForm.client_id = ''
+    addForm.url = ''
+    addForm.category = ''
+    addForm.paused = false
+    addForm.file = null
+    fetchData()
+  } catch {
+    message.error(t('common.operationFailed'))
+  } finally {
+    adding.value = false
   }
 }
 

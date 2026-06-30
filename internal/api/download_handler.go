@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/download"
@@ -36,6 +39,8 @@ func (h *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			h.handleList(w, r)
+		case http.MethodPost:
+			h.handleAdd(w, r)
 		default:
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
@@ -78,6 +83,12 @@ func (h *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			h.handleDelete(w, r, uint(id))
 		default:
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+	case rest == "/retry-transfer" || rest == "/retry-transfer/":
+		if r.Method == http.MethodPost {
+			h.handleRetryTransfer(w, r, uint(id))
+		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
 	default:
@@ -260,6 +271,125 @@ func (h *DownloadHandler) doRecheck(ctx context.Context, task *model.DownloadTas
 		return err
 	}
 	return c.Recheck(ctx, task.InfoHash)
+}
+
+type addTaskRequest struct {
+	ClientID string `json:"client_id"`
+	URL      string `json:"url"`
+	Category string `json:"category"`
+	Paused   bool   `json:"paused"`
+}
+
+func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
+	var torrentData []byte
+	var clientID, category string
+	var paused bool
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "解析表单失败")
+			return
+		}
+		file, _, err := r.FormFile("torrent")
+		if err != nil {
+			Error(w, http.StatusBadRequest, 40001, "请上传 .torrent 文件")
+			return
+		}
+		defer file.Close()
+		torrentData, err = io.ReadAll(file)
+		if err != nil {
+			Error(w, http.StatusBadRequest, 40001, "读取文件失败")
+			return
+		}
+		clientID = r.FormValue("client_id")
+		category = r.FormValue("category")
+		paused = r.FormValue("paused") == "true"
+	} else {
+		var req addTaskRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+			return
+		}
+		clientID = req.ClientID
+		category = req.Category
+		paused = req.Paused
+		if req.URL != "" {
+			httpClient := &http.Client{Timeout: 30 * time.Second}
+			resp, err := httpClient.Get(req.URL)
+			if err != nil {
+				Error(w, http.StatusBadRequest, 40001, "下载 .torrent 失败: "+err.Error())
+				return
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != 200 {
+				Error(w, http.StatusBadRequest, 40001, fmt.Sprintf("下载 .torrent 失败: HTTP %d", resp.StatusCode))
+				return
+			}
+			torrentData, err = io.ReadAll(resp.Body)
+			if err != nil {
+				Error(w, http.StatusBadRequest, 40001, "读取 .torrent 数据失败")
+				return
+			}
+		}
+	}
+
+	if clientID == "" {
+		Error(w, http.StatusBadRequest, 40001, "client_id 为必填项")
+		return
+	}
+	if len(torrentData) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "请提供 .torrent 文件或下载链接")
+		return
+	}
+
+	c, err := h.clientMgr.Get(clientID)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "下载器不可用: "+err.Error())
+		return
+	}
+
+	opts := model.AddTorrentOptions{
+		Category: category,
+		Paused:   paused,
+	}
+	result, err := c.AddFromFile(r.Context(), torrentData, opts)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "添加种子失败: "+err.Error())
+		return
+	}
+
+	task := &model.DownloadTask{
+		Source:      model.DownloadSourceManual,
+		ClientID:    clientID,
+		InfoHash:    result.InfoHash,
+		TorrentName: result.Name,
+		Category:    category,
+		Status:      model.DownloadStatusDownloading,
+	}
+	if paused {
+		task.Status = model.DownloadStatusPaused
+	}
+	if err := h.repo.Create(r.Context(), task); err != nil {
+		h.logger.Warn("failed to create download task", zap.Error(err))
+	}
+
+	Success(w, task)
+}
+
+func (h *DownloadHandler) handleRetryTransfer(w http.ResponseWriter, r *http.Request, id uint) {
+	task, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		Error(w, http.StatusNotFound, 40400, "任务不存在")
+		return
+	}
+	if task.TransferStatus != model.TransferStatusFailed && task.TransferStatus != model.TransferStatusPartial {
+		Error(w, http.StatusBadRequest, 40001, "仅转移失败或部分转移的任务可重试")
+		return
+	}
+
+	h.repo.UpdateTransfer(r.Context(), id, model.TransferStatusPending, "", "")
+	Success(w, map[string]interface{}{"id": id, "transfer_status": model.TransferStatusPending})
 }
 
 var _ = fmt.Sprintf

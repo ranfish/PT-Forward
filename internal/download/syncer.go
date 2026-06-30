@@ -42,6 +42,7 @@ func (s *Syncer) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			s.sync(ctx)
+			s.processTransfers(ctx)
 		}
 	}
 }
@@ -193,4 +194,94 @@ func (s *Syncer) importTask(ctx context.Context, clientID string, ti *model.Torr
 		zap.Uint("id", task.ID),
 		zap.String("client", clientID),
 		zap.String("name", ti.Name))
+}
+
+func (s *Syncer) processTransfers(ctx context.Context) {
+	var tasks []model.DownloadTask
+	s.db.WithContext(ctx).
+		Where("status = ? AND (transfer_status = ? OR transfer_status = ? OR transfer_status = ?)",
+			model.DownloadStatusCompleted,
+			model.TransferStatusPending,
+			model.TransferStatusFailed,
+			model.TransferStatusPartial).
+		Find(&tasks)
+
+	for _, task := range tasks {
+		s.processTransfer(ctx, &task)
+	}
+}
+
+func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) {
+	sourceClient, err := s.clientMgr.Get(task.ClientID)
+	if err != nil {
+		s.logger.Warn("transfer: source client unavailable",
+			zap.Uint("id", task.ID), zap.String("client", task.ClientID), zap.Error(err))
+		return
+	}
+
+	targetID := sourceClient.GetTransferTargetID()
+	if targetID == "" {
+		return
+	}
+
+	targetClient, err := s.clientMgr.Get(targetID)
+	if err != nil {
+		s.logger.Warn("transfer: target client unavailable",
+			zap.Uint("id", task.ID), zap.String("target", targetID), zap.Error(err))
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetID, "")
+		return
+	}
+
+	if task.TransferStatus != model.TransferStatusPartial {
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetID, "")
+
+		torrentData, err := sourceClient.ExportTorrent(ctx, task.InfoHash)
+		if err != nil {
+			s.logger.Error("transfer: export torrent failed",
+				zap.Uint("id", task.ID), zap.Error(err))
+			s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetID, "")
+			return
+		}
+
+		sourceTorrent, _ := sourceClient.GetTorrentByHash(ctx, task.InfoHash)
+		var savePath string
+		if sourceTorrent != nil {
+			savePath = client.MapPath(sourceTorrent.SavePath, sourceClient.GetSharedPaths())
+		}
+
+		opts := model.AddTorrentOptions{
+			SavePath: savePath,
+			Paused:   false,
+		}
+		result, err := targetClient.AddFromFile(ctx, torrentData, opts)
+		if err != nil {
+			s.logger.Error("transfer: add to target failed",
+				zap.Uint("id", task.ID), zap.String("target", targetID), zap.Error(err))
+			s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetID, "")
+			return
+		}
+
+		s.logger.Info("transfer: added to target",
+			zap.Uint("id", task.ID),
+			zap.String("target", targetID),
+			zap.String("new_hash", result.InfoHash))
+
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetID, result.InfoHash)
+		task.TransferHash = result.InfoHash
+	}
+
+	if err := sourceClient.DeleteTorrent(ctx, task.InfoHash, false); err != nil {
+		s.logger.Warn("transfer: delete from source failed (partial)",
+			zap.Uint("id", task.ID), zap.Error(err))
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusPartial, targetID, task.TransferHash)
+		return
+	}
+
+	s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, targetID, task.TransferHash)
+	s.repo.UpdateClientAndHash(ctx, task.ID, targetID, task.TransferHash)
+
+	s.logger.Info("transfer: completed",
+		zap.Uint("id", task.ID),
+		zap.String("source", task.ClientID),
+		zap.String("target", targetID))
 }
