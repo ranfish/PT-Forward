@@ -141,7 +141,8 @@
     "resourceManagement": "资源管理",
     "coreFeatures": "核心功能",
     "system": "系统",
-    "downloads": "下载管理"
+    "downloads": "下载管理",
+    "deleteRules": "删种规则"
   },
   "dashboard": {
     "sitesOnline": "站点 (在线/总数)",
@@ -1379,6 +1380,9 @@
     "selectFile": "选择 .torrent 文件",
     "inputUrl": "请输入下载链接",
     "retryTransfer": "重试转移",
-    "transferRetrySent": "重试请求已发送"
+    "transferRetrySent": "重试请求已发送",
+    "configTitle": "下载配置",
+    "addConfig": "添加配置",
+    "selectRules": "选择删种规则"
   }
 }

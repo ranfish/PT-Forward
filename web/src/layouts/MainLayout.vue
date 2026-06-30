@@ -37,11 +37,14 @@
             <template #icon><ThunderboltOutlined /></template>
             <template #title>{{ t('nav.seeding') }}</template>
             <a-menu-item key="/seeding" @click="$router.push('/seeding')">{{ t('nav.seedingDashboard') }}</a-menu-item>
-            <a-menu-item key="/seeding/rules" @click="$router.push('/seeding/rules')">{{ t('nav.seedingRules') }}</a-menu-item>
             <a-menu-item key="/seeding/scoring" @click="$router.push('/seeding/scoring')">{{ t('nav.seedingScoring') }}</a-menu-item>
             <a-menu-item key="/seeding/torrents" @click="$router.push('/seeding/torrents')">{{ t('nav.seedingTorrents') }}</a-menu-item>
             <a-menu-item key="/seeding/stats" @click="$router.push('/seeding/stats')">{{ t('nav.seedingStats') }}</a-menu-item>
           </a-sub-menu>
+          <a-menu-item key="/rules" @click="$router.push('/rules')">
+            <template #icon><ProfileOutlined /></template>
+            <span>{{ t('nav.deleteRules') }}</span>
+          </a-menu-item>
           <a-menu-item key="/downloads" @click="$router.push('/downloads')">
             <template #icon><DownloadOutlined /></template>
             <span>{{ t('nav.downloads') }}</span>
@@ -208,6 +211,7 @@ import {
   CopyOutlined,
   SendOutlined,
   DownloadOutlined,
+  ProfileOutlined,
   SafetyOutlined,
   FileTextOutlined,
   AuditOutlined,
