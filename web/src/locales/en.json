@@ -141,7 +141,8 @@
     "resourceManagement": "Resource Management",
     "coreFeatures": "Core Features",
     "system": "System",
-    "downloads": "Downloads"
+    "downloads": "Downloads",
+    "deleteRules": "Delete Rules"
   },
   "dashboard": {
     "sitesOnline": "Sites (Online/Total)",
@@ -1379,6 +1380,9 @@
     "selectFile": "Select .torrent file",
     "inputUrl": "Enter download URL",
     "retryTransfer": "Retry Transfer",
-    "transferRetrySent": "Retry request sent"
+    "transferRetrySent": "Retry request sent",
+    "configTitle": "Download Config",
+    "addConfig": "Add Config",
+    "selectRules": "Select delete rules"
   }
 }

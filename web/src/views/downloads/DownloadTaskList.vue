@@ -19,6 +19,35 @@
       </template>
     </a-page-header>
 
+    <a-card :title="t('downloads.configTitle')" style="margin-bottom: 16px">
+      <div style="margin-bottom: 12px; display: flex; justify-content: flex-end">
+        <a-button type="primary" size="small" @click="openConfigModal()">{{ t('downloads.addConfig') }}</a-button>
+      </div>
+      <a-table :data-source="configs" :columns="configColumns" :loading="configsLoading" :pagination="false" row-key="id" size="small">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'enabled'">
+            <a-switch :checked="record.enabled" @change="(v: boolean) => toggleConfig(record, v)" />
+          </template>
+          <template v-if="column.key === 'delete_rule_ids'">
+            <template v-if="record.delete_rule_ids">
+              <a-tag v-for="id in record.delete_rule_ids.split(',').filter(Boolean)" :key="id" size="small">
+                {{ ruleMap.get(Number(id)) || '#' + id }}
+              </a-tag>
+            </template>
+            <span v-else style="color: #999">-</span>
+          </template>
+          <template v-if="column.key === 'actions'">
+            <a-space size="small">
+              <a-button type="link" size="small" @click="openConfigModal(record)">{{ t('common.edit') }}</a-button>
+              <a-popconfirm @confirm="handleDeleteConfig(record.id)">
+                <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
+              </a-popconfirm>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
+    </a-card>
+
     <div style="margin-bottom: 16px">
       <a-space>
         <a-button type="primary" @click="showAddModal = true" :icon="h(PlusOutlined)">{{ t('downloads.addDownload') }}</a-button>
@@ -145,6 +174,60 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal v-model:open="configModalVisible" :title="t('downloads.configTitle')" :confirm-loading="configSubmitting" @ok="handleConfigSubmit" width="600px">
+      <a-form layout="vertical">
+        <a-form-item label="下载器" required>
+          <a-select v-model:value="configForm.client_id" :disabled="!!editingConfig" :placeholder="t('downloads.selectClient')">
+            <a-select-option v-for="c in clientOptions" :key="c" :value="c">{{ c }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="删种规则">
+          <a-select v-model:value="configForm.deleteRuleIds" mode="multiple" :placeholder="t('downloads.selectRules')">
+            <a-select-option v-for="r in allRules" :key="r.id" :value="r.id">{{ r.alias }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="启用">
+              <a-switch v-model:checked="configForm.enabled" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="管理范围">
+              <a-select v-model:value="configForm.scope">
+                <a-select-option value="managed">仅 PT-Forward 推送</a-select-option>
+                <a-select-option value="all">全部种子</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="数据同步周期">
+              <a-input v-model:value="configForm.main_data_cron" placeholder="*/20 * * * *" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="删种评估周期">
+              <a-input v-model:value="configForm.auto_delete_cron" placeholder="*/30 * * * *" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="磁盘保护">
+              <a-switch v-model:checked="configForm.disk_protect_enabled" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="最小剩余空间 GB">
+              <a-input-number v-model:value="configForm.min_disk_space_gb" :min="0" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -153,8 +236,9 @@ import { ref, reactive, computed, onMounted, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
-import { downloadsApi, type DownloadTask } from '@/api/downloads'
+import { downloadsApi, type DownloadTask, type DownloadClientConfig } from '@/api/downloads'
 import { downloadersApi } from '@/api/downloaders'
+import { seedingApi, deleteRulesApi } from '@/api/seeding'
 import { formatBytes, formatTime } from '@/utils/format'
 
 const { t } = useI18n()
@@ -169,6 +253,31 @@ const filterStatus = ref<string>('')
 const selectedRowKeys = ref<number[]>([])
 const deleteMode = ref(true)
 const allClients = ref<string[]>([])
+const configs = ref<DownloadClientConfig[]>([])
+const configsLoading = ref(false)
+const allRules = ref<{ id: number; alias: string }[]>([])
+const ruleMap = computed(() => new Map(allRules.value.map(r => [r.id, r.alias])))
+const configModalVisible = ref(false)
+const configSubmitting = ref(false)
+const editingConfig = ref<DownloadClientConfig | null>(null)
+const configForm = reactive({
+  client_id: '',
+  enabled: true,
+  deleteRuleIds: [] as number[],
+  auto_delete_cron: '*/30 * * * *',
+  main_data_cron: '*/20 * * * *',
+  disk_protect_enabled: true,
+  min_disk_space_gb: 50,
+  scope: 'managed',
+})
+
+const configColumns = computed(() => [
+  { title: '下载器', dataIndex: 'client_id', key: 'client_id', width: 120 },
+  { title: '启用', key: 'enabled', width: 70 },
+  { title: '删种规则', key: 'delete_rule_ids' },
+  { title: '范围', dataIndex: 'scope', key: 'scope', width: 120 },
+  { title: '操作', key: 'actions', width: 120 },
+])
 
 const showAddModal = ref(false)
 const adding = ref(false)
@@ -369,6 +478,92 @@ async function handleAdd() {
   }
 }
 
+function openConfigModal(record?: DownloadClientConfig) {
+  editingConfig.value = record || null
+  if (record) {
+    Object.assign(configForm, {
+      client_id: record.client_id,
+      enabled: record.enabled,
+      deleteRuleIds: record.delete_rule_ids ? record.delete_rule_ids.split(',').filter(Boolean).map(Number) : [],
+      auto_delete_cron: record.auto_delete_cron || '*/30 * * * *',
+      main_data_cron: record.main_data_cron || '*/20 * * * *',
+      disk_protect_enabled: record.disk_protect_enabled,
+      min_disk_space_gb: record.min_disk_space_gb || 50,
+      scope: record.scope || 'managed',
+    })
+  } else {
+    Object.assign(configForm, {
+      client_id: '', enabled: true, deleteRuleIds: [],
+      auto_delete_cron: '*/30 * * * *', main_data_cron: '*/20 * * * *',
+      disk_protect_enabled: true, min_disk_space_gb: 50, scope: 'managed',
+    })
+  }
+  configModalVisible.value = true
+}
+
+async function handleConfigSubmit() {
+  if (!configForm.client_id) {
+    message.warning(t('downloads.selectClient'))
+    return
+  }
+  configSubmitting.value = true
+  try {
+    const payload = {
+      client_id: configForm.client_id,
+      enabled: configForm.enabled,
+      delete_rule_ids: configForm.deleteRuleIds.join(','),
+      auto_delete_cron: configForm.auto_delete_cron,
+      main_data_cron: configForm.main_data_cron,
+      disk_protect_enabled: configForm.disk_protect_enabled,
+      min_disk_space_gb: configForm.min_disk_space_gb,
+      scope: configForm.scope,
+    }
+    if (editingConfig.value) {
+      await downloadsApi.updateConfig(editingConfig.value.id, payload)
+    } else {
+      await downloadsApi.createConfig(payload)
+    }
+    message.success(t('common.operationSuccess'))
+    configModalVisible.value = false
+    fetchConfigs()
+  } catch {
+    message.error(t('common.operationFailed'))
+  } finally {
+    configSubmitting.value = false
+  }
+}
+
+async function toggleConfig(record: DownloadClientConfig, checked: boolean) {
+  try {
+    await downloadsApi.updateConfig(record.id, { enabled: checked })
+    record.enabled = checked
+  } catch {
+    message.error(t('common.operationFailed'))
+  }
+}
+
+async function handleDeleteConfig(id: number) {
+  try {
+    await downloadsApi.deleteConfig(id)
+    message.success(t('common.deleted'))
+    fetchConfigs()
+  } catch {
+    message.error(t('common.operationFailed'))
+  }
+}
+
+async function fetchConfigs() {
+  configsLoading.value = true
+  try {
+    const resp = await downloadsApi.listConfigs()
+    configs.value = resp.data.data || []
+  } catch {
+    // ignore
+  } finally {
+    configsLoading.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     const resp = await downloadersApi.list(1, 200)
@@ -376,6 +571,13 @@ onMounted(async () => {
   } catch {
     // ignore
   }
+  try {
+    const resp = await deleteRulesApi.list()
+    allRules.value = (resp.data.data?.items || []).map((r: { id: number; alias: string }) => ({ id: r.id, alias: r.alias }))
+  } catch {
+    // ignore
+  }
+  fetchConfigs()
   fetchData()
   setInterval(fetchData, 30000)
 })

@@ -1,6 +1,28 @@
 import client from './client'
 import type { ApiResponse } from './types'
 
+export interface DownloadClientConfig {
+  id: number
+  client_id: string
+  enabled: boolean
+  delete_rule_ids: string
+  auto_delete_cron: string
+  main_data_cron: string
+  disk_protect_enabled: boolean
+  min_disk_space_gb: number
+  space_alarm_enabled: boolean
+  space_alarm_gb: number
+  min_disk_space_percent: number
+  max_active_uploads: number
+  max_active_downloads: number
+  super_seeding_default: boolean
+  scope: string
+  reannounce_before: boolean
+  reannounce_retries: number
+  reannounce_interval_ms: number
+  reannounce_wait_ms: number
+}
+
 export interface DownloadTask {
   id: number
   created_at: string
@@ -76,5 +98,21 @@ export const downloadsApi = {
 
   retryTransfer(id: number) {
     return client.post<ApiResponse<unknown>>(`/downloads/${id}/retry-transfer`)
+  },
+
+  listConfigs() {
+    return client.get<ApiResponse<DownloadClientConfig[]>>('/downloads/configs')
+  },
+
+  createConfig(data: Partial<DownloadClientConfig>) {
+    return client.post<ApiResponse<DownloadClientConfig>>('/downloads/configs', data)
+  },
+
+  updateConfig(id: number, data: Partial<DownloadClientConfig>) {
+    return client.put<ApiResponse<DownloadClientConfig>>(`/downloads/configs/${id}`, data)
+  },
+
+  deleteConfig(id: number) {
+    return client.delete<ApiResponse<unknown>>(`/downloads/configs/${id}`)
   },
 }
