@@ -199,11 +199,9 @@ func (s *Syncer) importTask(ctx context.Context, clientID string, ti *model.Torr
 func (s *Syncer) processTransfers(ctx context.Context) {
 	var tasks []model.DownloadTask
 	s.db.WithContext(ctx).
-		Where("status = ? AND (transfer_status = ? OR transfer_status = ? OR transfer_status = ?)",
+		Where("status = ? AND transfer_status != ?",
 			model.DownloadStatusCompleted,
-			model.TransferStatusPending,
-			model.TransferStatusFailed,
-			model.TransferStatusPartial).
+			model.TransferStatusTransferred).
 		Find(&tasks)
 
 	for _, task := range tasks {
@@ -221,6 +219,7 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 
 	targetID := sourceClient.GetTransferTargetID()
 	if targetID == "" {
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, "", "")
 		return
 	}
 
