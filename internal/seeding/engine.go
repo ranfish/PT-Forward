@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/companion"
 	"github.com/ranfish/pt-forward/internal/dispatcher"
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -1543,38 +1544,12 @@ func (e *Engine) markRelatedDeleted(ctx context.Context, relatedHashes []string,
 }
 
 // deleteTorrentWithCompanions: deletes a torrent and its cross-seeded companions.
-// When deleteCompanions=true: companions are deleted WITHOUT data first, then the
-// main torrent is deleted WITH data.
-// When deleteCompanions=false: companions are left untouched. If any companions
-// exist, the main torrent is deleted WITHOUT data (to protect shared files);
-// if no companions exist, the main torrent is deleted WITH data.
+// Uses companion.PlanDelete for shared planning logic.
 func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateContext, infoHash string, deleteData bool, deleteCompanions bool) error {
 	ti := ec.torrentMap[infoHash]
-	var companionHashes []string
-	if ti != nil {
-		companionHashes = FindRelatedByTagOrPath(ti, ec.torrents, 1)
-	}
+	plan := companion.PlanDelete(ti, ec.torrents, deleteCompanions, deleteData)
 
-	if !deleteCompanions {
-		if len(companionHashes) > 0 {
-			e.logger.Info("skipping companions, keeping data",
-				zap.String("main_hash", infoHash),
-				zap.Int("companions", len(companionHashes)))
-			err := ec.client.DeleteTorrent(ctx, infoHash, false)
-			if err == nil {
-				e.removeFromSnapshot(ec, []string{infoHash})
-			}
-			return err
-		}
-		err := ec.client.DeleteTorrent(ctx, infoHash, deleteData)
-		if err == nil {
-			e.removeFromSnapshot(ec, []string{infoHash})
-		}
-		return err
-	}
-
-	// Delete companions WITHOUT data first
-	for _, compHash := range companionHashes {
+	for _, compHash := range plan.CompanionHashes {
 		if err := ec.client.DeleteTorrent(ctx, compHash, false); err != nil {
 			e.logger.Warn("companion delete failed (continuing)",
 				zap.String("companion_hash", compHash),
@@ -1586,34 +1561,20 @@ func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateCo
 				zap.String("main_hash", infoHash))
 		}
 	}
-	if len(companionHashes) > 0 {
-		e.markRelatedDeleted(ctx, companionHashes, ec.clientID, "companion_cascade")
-		e.removeFromSnapshot(ec, companionHashes)
+	if len(plan.CompanionHashes) > 0 {
+		e.markRelatedDeleted(ctx, plan.CompanionHashes, ec.clientID, "companion_cascade")
 	}
 
-	// Delete main torrent
-	err := ec.client.DeleteTorrent(ctx, infoHash, deleteData)
+	err := ec.client.DeleteTorrent(ctx, plan.MainHash, plan.DeleteData)
 	if err == nil {
-		e.removeFromSnapshot(ec, []string{infoHash})
+		allDeleted := append(plan.CompanionHashes, plan.MainHash)
+		companion.RemoveFromSnapshot(&ec.torrents, ec.torrentMap, allDeleted)
 	}
 	return err
 }
 
 func (e *Engine) removeFromSnapshot(ec *evaluateContext, hashes []string) {
-	hashSet := make(map[string]bool, len(hashes))
-	for _, h := range hashes {
-		hashSet[h] = true
-	}
-	filtered := ec.torrents[:0]
-	for _, t := range ec.torrents {
-		if !hashSet[t.Hash] {
-			filtered = append(filtered, t)
-		}
-	}
-	ec.torrents = filtered
-	for h := range hashSet {
-		delete(ec.torrentMap, h)
-	}
+	companion.RemoveFromSnapshot(&ec.torrents, ec.torrentMap, hashes)
 }
 
 func (e *Engine) reannounceBeforeDelete(ctx context.Context, client model.DownloaderClient, infoHash string, cfg *model.SeedingClientConfig) bool {

@@ -78,3 +78,49 @@ func HasAnyTag(tags []string, targets []string) bool {
 	}
 	return false
 }
+
+type DeletePlan struct {
+	MainHash        string
+	CompanionHashes []string
+	DeleteData      bool
+}
+
+func PlanDelete(ti *model.TorrentInfo, allTorrents []*model.TorrentInfo, deleteCompanions bool, deleteData bool) *DeletePlan {
+	if ti == nil {
+		return &DeletePlan{DeleteData: deleteData}
+	}
+	companions := FindRelatedByTagOrPath(ti, allTorrents, 1)
+
+	if !deleteCompanions && len(companions) > 0 {
+		return &DeletePlan{
+			MainHash:   ti.Hash,
+			DeleteData: false,
+		}
+	}
+
+	return &DeletePlan{
+		MainHash:        ti.Hash,
+		CompanionHashes: companions,
+		DeleteData:      deleteData,
+	}
+}
+
+func RemoveFromSnapshot(torrents *[]*model.TorrentInfo, torrentMap map[string]*model.TorrentInfo, hashes []string) {
+	if len(hashes) == 0 {
+		return
+	}
+	hashSet := make(map[string]bool, len(hashes))
+	for _, h := range hashes {
+		hashSet[h] = true
+	}
+	filtered := (*torrents)[:0]
+	for _, t := range *torrents {
+		if !hashSet[t.Hash] {
+			filtered = append(filtered, t)
+		}
+	}
+	*torrents = filtered
+	for h := range hashSet {
+		delete(torrentMap, h)
+	}
+}
