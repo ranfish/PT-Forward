@@ -61,6 +61,15 @@ func (h *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if path == "/api/v1/downloads/space-stats" || path == "/api/v1/downloads/space-stats/" {
+		if r.Method == http.MethodGet {
+			h.handleSpaceStats(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
 	idStr := ""
 	for _, seg := range splitPath(path) {
 		if _, err := strconv.ParseUint(seg, 10, 32); err == nil {
@@ -398,6 +407,75 @@ func (h *DownloadHandler) handleRetryTransfer(w http.ResponseWriter, r *http.Req
 }
 
 var _ = fmt.Sprintf
+
+type spaceStat struct {
+	ClientID        string `json:"client_id"`
+	FreeSpace       int64  `json:"free_space"`
+	TotalSpace      int64  `json:"total_space"`
+	PendingBytes    int64  `json:"pending_bytes"`
+	EffectiveFree   int64  `json:"effective_free"`
+	TorrentCount    int    `json:"torrent_count"`
+	DownloadingCount int   `json:"downloading_count"`
+}
+
+func (h *DownloadHandler) handleSpaceStats(w http.ResponseWriter, r *http.Request) {
+	clientNames := h.clientMgr.ListClients()
+	var stats []spaceStat
+
+	for _, name := range clientNames {
+		c, err := h.clientMgr.Get(name)
+		if err != nil {
+			continue
+		}
+		if c.GetRole() == "seeding" {
+			continue
+		}
+
+		freeSpace, err := c.GetFreeSpace(r.Context())
+		if err != nil {
+			continue
+		}
+
+		torrents, err := c.GetAllTorrents(r.Context())
+		if err != nil {
+			continue
+		}
+
+		var pending int64
+		dlCount := 0
+		for _, t := range torrents {
+			if !t.IsFinished {
+				remaining := t.TotalSize - int64(float64(t.TotalSize)*t.Progress)
+				if remaining > 0 {
+					pending += remaining
+				}
+				dlCount++
+			}
+		}
+
+		effective := freeSpace - pending
+		if effective < 0 {
+			effective = 0
+		}
+
+		totalSpace := int64(0)
+		if md, err := c.GetMainData(r.Context()); err == nil {
+			totalSpace = md.TotalDiskSpace
+		}
+
+		stats = append(stats, spaceStat{
+			ClientID:         name,
+			FreeSpace:        freeSpace,
+			TotalSpace:       totalSpace,
+			PendingBytes:     pending,
+			EffectiveFree:    effective,
+			TorrentCount:     len(torrents),
+			DownloadingCount: dlCount,
+		})
+	}
+
+	Success(w, stats)
+}
 
 func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, rest string) {
 	rest = strings.TrimPrefix(rest, "/")

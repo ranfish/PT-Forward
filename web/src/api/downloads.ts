@@ -115,4 +115,18 @@ export const downloadsApi = {
   deleteConfig(id: number) {
     return client.delete<ApiResponse<unknown>>(`/downloads/configs/${id}`)
   },
+
+  spaceStats() {
+    return client.get<ApiResponse<SpaceStat[]>>('/downloads/space-stats')
+  },
+}
+
+export interface SpaceStat {
+  client_id: string
+  free_space: number
+  total_space: number
+  pending_bytes: number
+  effective_free: number
+  torrent_count: number
+  downloading_count: number
 }
