@@ -46,6 +46,7 @@ type Router struct {
 	ptgenHandler         *PTGenHandler
 	schedulerHandler     *SchedulerHandler
 	supportedSitesHandler *SupportedSitesHandler
+	downloadHandler       *DownloadHandler
 	wsHandler            *WSHandler
 	hub                  *Hub
 	authManager          *auth.AuthManager
@@ -109,6 +110,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		ptgenHandler:         NewPTGenHandler(db, logger),
 		schedulerHandler:     NewSchedulerHandler(taskRegistry, db, logger),
 		supportedSitesHandler: NewSupportedSitesHandler(logger),
+		downloadHandler:       NewDownloadHandler(db, logger),
 		wsHandler:            NewWSHandler(hub, authManager, nil),
 		hub:                  hub,
 		authManager:          authManager,
@@ -372,6 +374,10 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	supportedSitesHandler := rt.chain(rt.rateLimitMW, rt.supportedSitesHandler.ServeHTTP)
 	mux.Handle("/api/v1/supported-sites", supportedSitesHandler)
 	mux.Handle("/api/v1/supported-sites/", supportedSitesHandler)
+
+	downloadHandler := rt.chain(rt.rateLimitMW, rt.downloadHandler.ServeHTTP)
+	mux.Handle("/api/v1/downloads", downloadHandler)
+	mux.Handle("/api/v1/downloads/", downloadHandler)
 }
 
 func (rt *Router) public(fn http.HandlerFunc) http.HandlerFunc {

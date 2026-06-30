@@ -140,7 +140,8 @@
     "freezeStatus": "域名冻结",
     "resourceManagement": "资源管理",
     "coreFeatures": "核心功能",
-    "system": "系统"
+    "system": "系统",
+    "downloads": "下载管理"
   },
   "dashboard": {
     "sitesOnline": "站点 (在线/总数)",
@@ -1339,5 +1340,31 @@
     "filterAction": "按操作筛选",
     "startDate": "开始日期",
     "endDate": "结束日期"
+  },
+  "downloads": {
+    "title": "下载管理",
+    "subtitle": "管理普通下载和主辅分离下载任务",
+    "torrentName": "种子名称",
+    "client": "下载器",
+    "site": "站点",
+    "transfer": "转移",
+    "size": "大小",
+    "created": "创建时间",
+    "filterClient": "筛选下载器",
+    "filterStatus": "筛选状态",
+    "statusDownloading": "下载中",
+    "statusCompleted": "已完成",
+    "statusPaused": "已暂停",
+    "statusError": "错误",
+    "statusDeleted": "已删除",
+    "statusPending": "等待中",
+    "transferPending": "待转移",
+    "transferTransferring": "转移中",
+    "transferTransferred": "已转移",
+    "transferFailed": "转移失败",
+    "transferPartial": "部分转移",
+    "deleteConfirm": "确认删除此任务？",
+    "deleteWithCompanions": "删除辅种+数据",
+    "deleteSiteOnly": "仅删本站种子"
   }
 }

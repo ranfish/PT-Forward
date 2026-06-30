@@ -140,7 +140,8 @@
     "freezeStatus": "Domain Freeze",
     "resourceManagement": "Resource Management",
     "coreFeatures": "Core Features",
-    "system": "System"
+    "system": "System",
+    "downloads": "Downloads"
   },
   "dashboard": {
     "sitesOnline": "Sites (Online/Total)",
@@ -1339,5 +1340,31 @@
     "filterAction": "Filter by action",
     "startDate": "Start Date",
     "endDate": "End Date"
+  },
+  "downloads": {
+    "title": "Download Management",
+    "subtitle": "Manage regular and transfer downloads",
+    "torrentName": "Torrent Name",
+    "client": "Downloader",
+    "site": "Site",
+    "transfer": "Transfer",
+    "size": "Size",
+    "created": "Created",
+    "filterClient": "Filter by Downloader",
+    "filterStatus": "Filter by Status",
+    "statusDownloading": "Downloading",
+    "statusCompleted": "Completed",
+    "statusPaused": "Paused",
+    "statusError": "Error",
+    "statusDeleted": "Deleted",
+    "statusPending": "Pending",
+    "transferPending": "Pending",
+    "transferTransferring": "Transferring",
+    "transferTransferred": "Transferred",
+    "transferFailed": "Failed",
+    "transferPartial": "Partial",
+    "deleteConfirm": "Delete this task?",
+    "deleteWithCompanions": "Delete companions + data",
+    "deleteSiteOnly": "This site only"
   }
 }
