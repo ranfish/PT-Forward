@@ -154,6 +154,7 @@ import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { downloadsApi, type DownloadTask } from '@/api/downloads'
+import { downloadersApi } from '@/api/downloaders'
 import { formatBytes, formatTime } from '@/utils/format'
 
 const { t } = useI18n()
@@ -167,6 +168,7 @@ const filterClient = ref<string>('')
 const filterStatus = ref<string>('')
 const selectedRowKeys = ref<number[]>([])
 const deleteMode = ref(true)
+const allClients = ref<string[]>([])
 
 const showAddModal = ref(false)
 const adding = ref(false)
@@ -181,11 +183,7 @@ const addForm = reactive({
 
 const hasSelected = computed(() => selectedRowKeys.value.length > 0)
 
-const clientOptions = computed(() => {
-  const set = new Set<string>()
-  tasks.value.forEach(t => { if (t.client_id) set.add(t.client_id) })
-  return Array.from(set).sort()
-})
+const clientOptions = computed(() => allClients.value)
 
 const columns = computed(() => [
   { title: t('downloads.torrentName'), dataIndex: 'torrent_name', key: 'torrent_name', ellipsis: true },
@@ -371,7 +369,13 @@ async function handleAdd() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    const resp = await downloadersApi.list(1, 200)
+    allClients.value = (resp.data.data?.items || []).map((c: { name: string }) => c.name).sort()
+  } catch {
+    // ignore
+  }
   fetchData()
   setInterval(fetchData, 30000)
 })
