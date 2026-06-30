@@ -19,11 +19,25 @@
       </template>
     </a-page-header>
 
+    <div v-if="selectedRowKeys.length > 0" style="margin-bottom: 16px">
+      <a-space>
+        <span>{{ selectedRowKeys.length }} {{ t('downloads.selected') }}</span>
+        <a-button size="small" @click="handleBulk('pause')" :disabled="!hasSelected">{{ t('downloads.pause') }}</a-button>
+        <a-button size="small" @click="handleBulk('resume')">{{ t('downloads.resume') }}</a-button>
+        <a-button size="small" @click="handleBulk('recheck')">{{ t('downloads.recheck') }}</a-button>
+        <a-popconfirm :title="t('downloads.bulkDeleteConfirm')" @confirm="handleBulkDelete">
+          <a-button size="small" danger>{{ t('common.delete') }}</a-button>
+        </a-popconfirm>
+        <a-button size="small" type="text" @click="selectedRowKeys = []">{{ t('common.cancel') }}</a-button>
+      </a-space>
+    </div>
+
     <a-table
       :data-source="tasks"
       :columns="columns"
       :loading="loading"
       row-key="id"
+      :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
       :pagination="{
         current: page,
         pageSize: size,
@@ -32,18 +46,35 @@
         showTotal: (total: number) => `${total} ${t('common.items')}`,
       }"
       @change="onPageChange"
+      size="small"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'torrent_name'">
-          <span :title="record.torrent_name" style="display: inline-block; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <span :title="record.torrent_name" style="display: inline-block; max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;">
             {{ record.torrent_name }}
           </span>
         </template>
         <template v-else-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
-          <span v-if="record.progress > 0 && record.progress < 100 && record.status === 'downloading'" style="margin-left: 4px; font-size: 12px; color: #999">
-            {{ record.progress.toFixed(1) }}%
+        </template>
+        <template v-else-if="column.key === 'progress'">
+          <div v-if="record.status === 'downloading' || record.status === 'paused'" style="min-width: 100px">
+            <a-progress :percent="Math.round(record.progress)" size="small" :stroke-color="record.status === 'paused' ? '#faad14' : '#1890ff'" />
+          </div>
+          <span v-else style="color: #ccc">-</span>
+        </template>
+        <template v-else-if="column.key === 'speed'">
+          <div v-if="record.status === 'downloading'" style="font-size: 12px; line-height: 1.4">
+            <div><ArrowUpOutlined /> {{ formatSpeed(record.upload_speed) }}</div>
+            <div><ArrowDownOutlined /> {{ formatSpeed(record.download_speed) }}</div>
+          </div>
+          <span v-else-if="record.status === 'completed'" style="font-size: 12px">
+            <ArrowUpOutlined /> {{ formatSpeed(record.upload_speed) }}
           </span>
+          <span v-else style="color: #ccc">-</span>
+        </template>
+        <template v-else-if="column.key === 'ratio'">
+          <span :style="{ color: record.ratio >= 1 ? '#52c41a' : '#faad14' }">{{ record.ratio > 0 ? record.ratio.toFixed(2) : '-' }}</span>
         </template>
         <template v-else-if="column.key === 'transfer_status'">
           <a-tag v-if="record.transfer_status" :color="transferColor(record.transfer_status)">
@@ -57,25 +88,6 @@
         <template v-else-if="column.key === 'created_at'">
           {{ formatTime(record.created_at) }}
         </template>
-        <template v-else-if="column.key === 'action'">
-          <a-popconfirm
-            :title="t('downloads.deleteConfirm')"
-            @confirm="handleDelete(record)"
-            :ok-text="t('common.confirm')"
-            :cancel-text="t('common.cancel')"
-          >
-            <template #icon></template>
-            <template #description>
-              <a-radio-group v-model:value="deleteMode" style="margin-top: 8px" v-if="record.status !== 'deleted'">
-                <a-radio :value="true">{{ t('downloads.deleteWithCompanions') }}</a-radio>
-                <a-radio :value="false">{{ t('downloads.deleteSiteOnly') }}</a-radio>
-              </a-radio-group>
-            </template>
-            <a-button type="text" danger size="small" :disabled="record.status === 'deleted'">
-              {{ t('common.delete') }}
-            </a-button>
-          </a-popconfirm>
-        </template>
       </template>
     </a-table>
   </div>
@@ -85,7 +97,7 @@
 import { ref, computed, onMounted, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
-import { ReloadOutlined } from '@ant-design/icons-vue'
+import { ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons-vue'
 import { downloadsApi, type DownloadTask } from '@/api/downloads'
 import { formatBytes, formatTime } from '@/utils/format'
 
@@ -98,7 +110,9 @@ const size = ref(20)
 const total = ref(0)
 const filterClient = ref<string>('')
 const filterStatus = ref<string>('')
-const deleteMode = ref(true)
+const selectedRowKeys = ref<number[]>([])
+
+const hasSelected = computed(() => selectedRowKeys.value.length > 0)
 
 const clientOptions = computed(() => {
   const set = new Set<string>()
@@ -108,13 +122,14 @@ const clientOptions = computed(() => {
 
 const columns = computed(() => [
   { title: t('downloads.torrentName'), dataIndex: 'torrent_name', key: 'torrent_name', ellipsis: true },
-  { title: t('downloads.client'), dataIndex: 'client_id', key: 'client_id', width: 120 },
-  { title: t('downloads.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
-  { title: t('common.status'), key: 'status', width: 140 },
-  { title: t('downloads.transfer'), key: 'transfer_status', width: 120 },
-  { title: t('downloads.size'), key: 'total_size', width: 100 },
-  { title: t('downloads.created'), key: 'created_at', width: 150 },
-  { title: t('common.action'), key: 'action', width: 80 },
+  { title: t('downloads.client'), dataIndex: 'client_id', key: 'client_id', width: 100 },
+  { title: t('common.status'), key: 'status', width: 90 },
+  { title: t('downloads.progress'), key: 'progress', width: 120 },
+  { title: t('downloads.speed'), key: 'speed', width: 100 },
+  { title: t('downloads.ratio'), key: 'ratio', width: 70 },
+  { title: t('downloads.transfer'), key: 'transfer_status', width: 90 },
+  { title: t('downloads.size'), key: 'total_size', width: 90 },
+  { title: t('downloads.created'), key: 'created_at', width: 140 },
 ])
 
 function statusColor(status: string): string {
@@ -163,6 +178,11 @@ function transferLabel(status: string): string {
   return map[status] || status
 }
 
+function formatSpeed(bytesPerSec: number): string {
+  if (!bytesPerSec || bytesPerSec <= 0) return '0 B/s'
+  return formatBytes(bytesPerSec) + '/s'
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -188,10 +208,28 @@ function onPageChange(pag: { current: number; pageSize: number }) {
   fetchData()
 }
 
-async function handleDelete(record: DownloadTask) {
+function onSelectChange(keys: number[]) {
+  selectedRowKeys.value = keys
+}
+
+async function handleBulk(action: string) {
   try {
-    await downloadsApi.delete(record.id, deleteMode.value)
-    message.success(t('common.deleted'))
+    const resp = await downloadsApi.bulkAction(selectedRowKeys.value, action)
+    const d = resp.data.data
+    message.success(`${d.succeeded} ${t('common.success')}, ${d.failed} ${t('common.failed')}`)
+    selectedRowKeys.value = []
+    fetchData()
+  } catch {
+    message.error(t('common.operationFailed'))
+  }
+}
+
+async function handleBulkDelete() {
+  try {
+    const resp = await downloadsApi.bulkAction(selectedRowKeys.value, 'delete', true)
+    const d = resp.data.data
+    message.success(`${d.succeeded} ${t('common.success')}, ${d.failed} ${t('common.failed')}`)
+    selectedRowKeys.value = []
     fetchData()
   } catch {
     message.error(t('common.operationFailed'))
@@ -200,7 +238,6 @@ async function handleDelete(record: DownloadTask) {
 
 onMounted(() => {
   fetchData()
-  // Auto refresh every 30s
   setInterval(fetchData, 30000)
 })
 </script>

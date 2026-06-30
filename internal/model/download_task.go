@@ -42,6 +42,12 @@ type DownloadTask struct {
 
 	Status       string  `json:"status" gorm:"size:20;not null;default:'pending';index"`
 	Progress     float64 `json:"progress"`
+	UploadSpeed  int64   `json:"upload_speed"`
+	DownloadSpeed int64  `json:"download_speed"`
+	Ratio        float64 `json:"ratio"`
+	Uploaded     int64   `json:"uploaded"`
+	NumSeeds     int     `json:"num_seeds"`
+	NumPeers     int     `json:"num_peers"`
 	ErrorMessage string  `json:"error_message" gorm:"type:text"`
 
 	TransferStatus   string     `json:"transfer_status" gorm:"size:20"`

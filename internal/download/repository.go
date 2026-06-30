@@ -84,11 +84,18 @@ func (r *Repository) UpdateStatus(ctx context.Context, id uint, status string, p
 	return r.db.WithContext(ctx).Model(&model.DownloadTask{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
-			"status":        status,
-			"progress":      progress,
-			"error_message": errMsg,
-			"updated_at":    time.Now(),
+			"status":         status,
+			"progress":       progress,
+			"error_message":  errMsg,
+			"updated_at":     time.Now(),
 		}).Error
+}
+
+func (r *Repository) UpdateProgress(ctx context.Context, id uint, updates map[string]interface{}) error {
+	updates["updated_at"] = time.Now()
+	return r.db.WithContext(ctx).Model(&model.DownloadTask{}).
+		Where("id = ?", id).
+		Updates(updates).Error
 }
 
 func (r *Repository) UpdateTransfer(ctx context.Context, id uint, transferStatus, transferClientID, transferHash string) error {
