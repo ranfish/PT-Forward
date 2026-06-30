@@ -132,11 +132,21 @@ func (s *Syncer) updateTaskProgress(ctx context.Context, clientID string, ti *mo
 		return
 	}
 
-	if task.Status == status && task.Progress == progress {
+	if task.Status == status && task.Progress == progress && task.UploadSpeed == ti.UploadSpeed {
 		return
 	}
 
-	s.repo.UpdateStatus(ctx, task.ID, status, progress, ti.Error)
+	s.repo.UpdateProgress(ctx, task.ID, map[string]interface{}{
+		"status":          status,
+		"progress":        progress,
+		"error_message":   ti.Error,
+		"upload_speed":    ti.UploadSpeed,
+		"download_speed":  ti.DownloadSpeed,
+		"ratio":           ti.Ratio,
+		"uploaded":        ti.Uploaded,
+		"num_seeds":       ti.NumComplete,
+		"num_peers":       ti.NumIncomplete,
+	})
 
 	if status == model.DownloadStatusCompleted && task.Status != model.DownloadStatusCompleted {
 		s.logger.Info("download completed",

@@ -15,6 +15,12 @@ export interface DownloadTask {
   site_name: string
   status: string
   progress: number
+  upload_speed: number
+  download_speed: number
+  ratio: number
+  uploaded: number
+  num_seeds: number
+  num_peers: number
   error_message: string
   transfer_status: string
   transfer_client_id: string
@@ -49,5 +55,13 @@ export const downloadsApi = {
 
   delete(id: number, deleteCompanions: boolean) {
     return client.delete<ApiResponse<unknown>>(`/downloads/${id}`, { data: { delete_companions: deleteCompanions } })
+  },
+
+  bulkAction(ids: number[], action: string, deleteCompanions?: boolean) {
+    return client.post<ApiResponse<{ succeeded: number; failed: number }>>(`/downloads/bulk-action`, {
+      ids,
+      action,
+      delete_companions: deleteCompanions,
+    })
   },
 }

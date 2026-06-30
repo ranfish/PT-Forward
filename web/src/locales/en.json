@@ -1365,6 +1365,14 @@
     "transferPartial": "Partial",
     "deleteConfirm": "Delete this task?",
     "deleteWithCompanions": "Delete companions + data",
-    "deleteSiteOnly": "This site only"
+    "deleteSiteOnly": "This site only",
+    "selected": "selected",
+    "pause": "Pause",
+    "resume": "Resume",
+    "recheck": "Recheck",
+    "progress": "Progress",
+    "speed": "Speed",
+    "ratio": "Ratio",
+    "bulkDeleteConfirm": "Delete selected tasks?"
   }
 }

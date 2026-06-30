@@ -1365,6 +1365,14 @@
     "transferPartial": "部分转移",
     "deleteConfirm": "确认删除此任务？",
     "deleteWithCompanions": "删除辅种+数据",
-    "deleteSiteOnly": "仅删本站种子"
+    "deleteSiteOnly": "仅删本站种子",
+    "selected": "已选",
+    "pause": "暂停",
+    "resume": "恢复",
+    "recheck": "重校验",
+    "progress": "进度",
+    "speed": "速度",
+    "ratio": "分享率",
+    "bulkDeleteConfirm": "确认删除选中的任务？"
   }
 }

@@ -110,7 +110,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		ptgenHandler:         NewPTGenHandler(db, logger),
 		schedulerHandler:     NewSchedulerHandler(taskRegistry, db, logger),
 		supportedSitesHandler: NewSupportedSitesHandler(logger),
-		downloadHandler:       NewDownloadHandler(db, logger),
+		downloadHandler:       NewDownloadHandler(db, clientMgr, logger),
 		wsHandler:            NewWSHandler(hub, authManager, nil),
 		hub:                  hub,
 		authManager:          authManager,
