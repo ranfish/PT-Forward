@@ -25,6 +25,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'seeding/torrents', name: 'SeedingTorrents', component: () => import('@/views/seeding/SeedingTorrentList.vue') },
       { path: 'seeding/stats', name: 'SeedingStats', component: () => import('@/views/seeding/SeedingStats.vue') },
       { path: 'seeding/scoring', name: 'SeedingScoring', component: () => import('@/views/seeding/SeedingScoring.vue') },
+      { path: 'downloads', name: 'Downloads', component: () => import('@/views/downloads/DownloadTaskList.vue') },
       { path: 'reseed', name: 'ReseedTasks', component: () => import('@/views/reseed/ReseedTaskList.vue') },
       { path: 'reseed/tasks/:id', name: 'ReseedTaskDetail', component: () => import('@/views/reseed/ReseedTaskDetail.vue') },
       { path: 'publish', name: 'PublishList', component: () => import('@/views/publish/PublishList.vue') },

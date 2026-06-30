@@ -52,6 +52,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&OperationAuditLog{},
 		&SchedulerTaskOverride{},
 		&FreeWaitEntry{},
+		&DownloadTask{},
 		&SchemaMigration{},
 		&setting.Setting{},
 	)

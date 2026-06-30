@@ -42,6 +42,10 @@
             <a-menu-item key="/seeding/torrents" @click="$router.push('/seeding/torrents')">{{ t('nav.seedingTorrents') }}</a-menu-item>
             <a-menu-item key="/seeding/stats" @click="$router.push('/seeding/stats')">{{ t('nav.seedingStats') }}</a-menu-item>
           </a-sub-menu>
+          <a-menu-item key="/downloads" @click="$router.push('/downloads')">
+            <template #icon><DownloadOutlined /></template>
+            <span>{{ t('nav.downloads') }}</span>
+          </a-menu-item>
           <a-menu-item key="/reseed" @click="$router.push('/reseed')">
             <template #icon><CopyOutlined /></template>
             <span>{{ t('nav.reseed') }}</span>
@@ -203,6 +207,7 @@ import {
   ThunderboltOutlined,
   CopyOutlined,
   SendOutlined,
+  DownloadOutlined,
   SafetyOutlined,
   FileTextOutlined,
   AuditOutlined,

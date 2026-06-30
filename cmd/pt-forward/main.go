@@ -30,6 +30,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/crypto"
 	dbpkg "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/dispatcher"
+	"github.com/ranfish/pt-forward/internal/download"
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/filter"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
@@ -400,6 +401,9 @@ func main() {
 	if err := completionWatcher.Start(ctx); err != nil {
 		log.Warn("completion watcher start warning", zap.Error(err))
 	}
+
+	downloadSyncer := download.NewSyncer(db, clientManager, log)
+	go downloadSyncer.Run(ctx)
 
 	if err := taskRegistry.Start(ctx); err != nil {
 		log.Error("failed to start task registry", zap.Error(err))
