@@ -64,4 +64,17 @@ export const downloadsApi = {
       delete_companions: deleteCompanions,
     })
   },
+
+  addByUrl(clientId: string, url: string, category?: string, paused?: boolean) {
+    return client.post<ApiResponse<DownloadTask>>('/downloads', {
+      client_id: clientId,
+      url,
+      category: category || '',
+      paused: paused || false,
+    })
+  },
+
+  retryTransfer(id: number) {
+    return client.post<ApiResponse<unknown>>(`/downloads/${id}/retry-transfer`)
+  },
 }

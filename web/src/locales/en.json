@@ -1373,6 +1373,12 @@
     "progress": "Progress",
     "speed": "Speed",
     "ratio": "Ratio",
-    "bulkDeleteConfirm": "Delete selected tasks?"
+    "bulkDeleteConfirm": "Delete selected tasks?",
+    "addDownload": "Add Download",
+    "selectClient": "Select target downloader",
+    "selectFile": "Select .torrent file",
+    "inputUrl": "Enter download URL",
+    "retryTransfer": "Retry Transfer",
+    "transferRetrySent": "Retry request sent"
   }
 }

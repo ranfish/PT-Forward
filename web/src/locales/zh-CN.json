@@ -1373,6 +1373,12 @@
     "progress": "进度",
     "speed": "速度",
     "ratio": "分享率",
-    "bulkDeleteConfirm": "确认删除选中的任务？"
+    "bulkDeleteConfirm": "确认删除选中的任务？",
+    "addDownload": "添加下载",
+    "selectClient": "选择目标下载器",
+    "selectFile": "选择 .torrent 文件",
+    "inputUrl": "请输入下载链接",
+    "retryTransfer": "重试转移",
+    "transferRetrySent": "重试请求已发送"
   }
 }
