@@ -2,10 +2,13 @@ package download
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/client"
+	"github.com/ranfish/pt-forward/internal/companion"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/rule"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -14,6 +17,8 @@ type Syncer struct {
 	db          *gorm.DB
 	repo        *Repository
 	clientMgr   *client.Manager
+	ruleModule  *rule.Module
+	fitTimer    *rule.FitTimer
 	logger      *zap.Logger
 	intervalSec int
 }
@@ -23,6 +28,8 @@ func NewSyncer(db *gorm.DB, clientMgr *client.Manager, logger *zap.Logger) *Sync
 		db:          db,
 		repo:        NewRepository(db),
 		clientMgr:   clientMgr,
+		ruleModule:  rule.NewModule(db),
+		fitTimer:    rule.NewFitTimer(),
 		logger:      logger,
 		intervalSec: 20,
 	}
@@ -32,6 +39,7 @@ func (s *Syncer) Run(ctx context.Context) {
 	ticker := time.NewTicker(time.Duration(s.intervalSec) * time.Second)
 	defer ticker.Stop()
 
+	s.restoreFitTimer(ctx)
 	s.logger.Info("download syncer started", zap.Int("interval_sec", s.intervalSec))
 	s.sync(ctx)
 
@@ -42,8 +50,22 @@ func (s *Syncer) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			s.sync(ctx)
+			s.evaluateRules(ctx)
 			s.processTransfers(ctx)
 		}
+	}
+}
+
+func (s *Syncer) restoreFitTimer(ctx context.Context) {
+	var tasks []model.DownloadTask
+	s.db.WithContext(ctx).
+		Where("first_matched_at IS NOT NULL AND status != ?", model.DownloadStatusDeleted).
+		Find(&tasks)
+	for _, t := range tasks {
+		s.fitTimer.MarkMatched(0, t.InfoHash, *t.FirstMatchedAt)
+	}
+	if len(tasks) > 0 {
+		s.logger.Info("fit timer restored", zap.Int("entries", len(tasks)))
 	}
 }
 
@@ -284,3 +306,175 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 		zap.String("source", task.ClientID),
 		zap.String("target", targetID))
 }
+
+func (s *Syncer) evaluateRules(ctx context.Context) {
+	clientNames := s.clientMgr.ListClients()
+	now := time.Now()
+
+	for _, name := range clientNames {
+		c, err := s.clientMgr.Get(name)
+		if err != nil {
+			continue
+		}
+		role := c.GetRole()
+		if role == "seeding" {
+			continue
+		}
+
+		var cfg model.DownloadClientConfig
+		if err := s.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", name, true).First(&cfg).Error; err != nil {
+			continue
+		}
+
+		ruleIDs := splitRuleIDs(cfg.DeleteRuleIDs)
+		if len(ruleIDs) == 0 {
+			continue
+		}
+
+		rules, err := s.ruleModule.ListRulesByIDs(ctx, ruleIDs)
+		if err != nil || len(rules) == 0 {
+			continue
+		}
+
+		torrents, err := c.GetAllTorrents(ctx)
+		if err != nil {
+			continue
+		}
+
+		var rulePtrs []*model.DeleteRule
+		for i := range rules {
+			rulePtrs = append(rulePtrs, &rules[i])
+		}
+
+		var contexts []*rule.Context
+		for _, ti := range torrents {
+			contexts = append(contexts, rule.ContextFromTorrentInfo(ti, "", name, now))
+		}
+
+		activeHashes := make(map[string]bool)
+		matchedSet := make(map[string]*model.DeleteRule)
+		for _, c := range contexts {
+			for _, r := range rulePtrs {
+				if rule.MatchRule(c, r) {
+					activeHashes[c.InfoHash] = true
+					matchedSet[c.InfoHash] = r
+					break
+				}
+			}
+		}
+
+		for _, r := range rulePtrs {
+			s.fitTimer.ClearUnmatched(r.ID, activeHashes)
+		}
+
+		torrentMap := make(map[string]*model.TorrentInfo, len(torrents))
+		for _, ti := range torrents {
+			torrentMap[ti.Hash] = ti
+		}
+
+		for hash, r := range matchedSet {
+			ti := torrentMap[hash]
+			if ti == nil {
+				continue
+			}
+
+			if r.FitTime > 0 {
+				if !s.fitTimer.IsFit(r.ID, hash, r.FitTime, now) {
+					s.fitTimer.MarkMatched(r.ID, hash, now)
+					now2 := now
+					s.db.WithContext(ctx).Model(&model.DownloadTask{}).
+						Where("client_id = ? AND info_hash = ?", name, hash).
+						Update("first_matched_at", &now2)
+					continue
+				}
+			}
+
+			s.logger.Info("rule matched, deleting",
+				zap.String("client", name),
+				zap.String("hash", hash),
+				zap.String("rule", r.Alias),
+				zap.Uint("rule_id", r.ID))
+
+			plan := companion.PlanDelete(ti, torrents, r.DeleteCompanions, true)
+
+			for _, compHash := range plan.CompanionHashes {
+				if err := c.DeleteTorrent(ctx, compHash, false); err != nil {
+					s.logger.Warn("rule delete companion failed",
+						zap.String("hash", compHash), zap.Error(err))
+				}
+			}
+
+			if err := c.DeleteTorrent(ctx, plan.MainHash, plan.DeleteData); err != nil {
+				s.logger.Warn("rule delete main failed",
+					zap.String("hash", plan.MainHash), zap.Error(err))
+			} else {
+				action := model.DeleteActionWithCompanions
+				if !r.DeleteCompanions {
+					action = model.DeleteActionSiteOnly
+				}
+				s.db.WithContext(ctx).Model(&model.DownloadTask{}).
+					Where("client_id = ? AND info_hash = ?", name, hash).
+					Updates(map[string]interface{}{
+						"status":        model.DownloadStatusDeleted,
+						"deleted_at":    &now,
+						"delete_action": action,
+						"first_matched_at": nil,
+					})
+				s.fitTimer.Remove(hash)
+			}
+		}
+
+		for hash := range activeHashes {
+			if _, matched := matchedSet[hash]; !matched {
+				s.db.WithContext(ctx).Model(&model.DownloadTask{}).
+					Where("client_id = ? AND info_hash = ?", name, hash).
+					Update("first_matched_at", nil)
+			}
+		}
+	}
+}
+
+func splitRuleIDs(s string) []uint {
+	if s == "" {
+		return nil
+	}
+	var result []uint
+	for _, part := range splitCSV(s) {
+		if id, err := parseUint(part); err == nil && id > 0 {
+			result = append(result, id)
+		}
+	}
+	return result
+}
+
+func splitCSV(s string) []string {
+	var result []string
+	current := ""
+	for _, c := range s {
+		if c == ',' {
+			if current != "" {
+				result = append(result, current)
+				current = ""
+			}
+		} else {
+			current += string(c)
+		}
+	}
+	if current != "" {
+		result = append(result, current)
+	}
+	return result
+}
+
+func parseUint(s string) (uint, error) {
+	var n uint
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, errInvalidNumber
+		}
+		n = n*10 + uint(c-'0')
+	}
+	return n, nil
+}
+
+var errInvalidNumber = fmt.Errorf("invalid number")

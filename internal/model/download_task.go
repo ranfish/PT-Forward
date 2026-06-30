@@ -55,6 +55,8 @@ type DownloadTask struct {
 	TransferHash     string     `json:"transfer_hash" gorm:"size:40"`
 	TransferredAt    *time.Time `json:"transferred_at"`
 
+	FirstMatchedAt   *time.Time `json:"first_matched_at"`
+
 	DeletedAt    *time.Time `json:"deleted_at"`
 	DeleteAction string     `json:"delete_action" gorm:"size:20"`
 

@@ -56,6 +56,11 @@ func (h *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.HasPrefix(path, "/api/v1/downloads/configs") {
+		h.handleConfigs(w, r, strings.TrimPrefix(path, "/api/v1/downloads/configs"))
+		return
+	}
+
 	idStr := ""
 	for _, seg := range splitPath(path) {
 		if _, err := strconv.ParseUint(seg, 10, 32); err == nil {
@@ -393,3 +398,73 @@ func (h *DownloadHandler) handleRetryTransfer(w http.ResponseWriter, r *http.Req
 }
 
 var _ = fmt.Sprintf
+
+func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, rest string) {
+	rest = strings.TrimPrefix(rest, "/")
+	switch {
+	case rest == "" && r.Method == http.MethodGet:
+		var configs []model.DownloadClientConfig
+		h.db.WithContext(r.Context()).Order("client_id ASC").Find(&configs)
+		Success(w, configs)
+	case rest == "" && r.Method == http.MethodPost:
+		var req model.DownloadClientConfig
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+			return
+		}
+		if req.ClientID == "" {
+			Error(w, http.StatusBadRequest, 40001, "client_id 为必填项")
+			return
+		}
+		if req.AutoDeleteCron == "" {
+			req.AutoDeleteCron = "*/30 * * * *"
+		}
+		if req.MainDataCron == "" {
+			req.MainDataCron = "*/20 * * * *"
+		}
+		if req.Scope == "" {
+			req.Scope = "managed"
+		}
+		if err := h.db.WithContext(r.Context()).Create(&req).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "创建配置失败")
+			return
+		}
+		Success(w, req)
+	default:
+		idStr := rest
+		if idx := strings.Index(idStr, "/"); idx >= 0 {
+			idStr = idStr[:idx]
+		}
+		id, err := strconv.ParseUint(idStr, 10, 32)
+		if err != nil {
+			Error(w, http.StatusBadRequest, 40001, "无效的 ID")
+			return
+		}
+		switch r.Method {
+		case http.MethodPut:
+			var req map[string]interface{}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+				return
+			}
+			delete(req, "id")
+			delete(req, "created_at")
+			req["updated_at"] = time.Now()
+			if err := h.db.WithContext(r.Context()).Model(&model.DownloadClientConfig{}).Where("id = ?", id).Updates(req).Error; err != nil {
+				Error(w, http.StatusInternalServerError, 50000, "更新配置失败")
+				return
+			}
+			var updated model.DownloadClientConfig
+			h.db.WithContext(r.Context()).First(&updated, id)
+			Success(w, updated)
+		case http.MethodDelete:
+			if err := h.db.WithContext(r.Context()).Delete(&model.DownloadClientConfig{}, id).Error; err != nil {
+				Error(w, http.StatusInternalServerError, 50000, "删除配置失败")
+				return
+			}
+			Success(w, map[string]interface{}{"id": id})
+		default:
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+	}
+}
