@@ -39,7 +39,13 @@
           <a-button size="small" @click="batchUpdate('assume_free', false)">{{ t('site.batchUnsetAssumeFree') }}</a-button>
         </template>
       </a-space>
-      <a-button type="primary" @click="openCreateModal">{{ t('common.create') }}</a-button>
+      <a-space>
+        <a-button :loading="exporting" @click="handleExport">导出配置</a-button>
+        <a-upload :show-upload-list="false" :before-upload="handleImportFile" accept=".json">
+          <a-button :loading="importing">导入配置</a-button>
+        </a-upload>
+        <a-button type="primary" @click="openCreateModal">{{ t('common.create') }}</a-button>
+      </a-space>
     </div>
 
     <a-table
@@ -251,7 +257,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
+import type { UploadProps } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
 import { ensureSupportedSitesCache, type SupportedSite } from '@/api/supported-sites'
@@ -296,6 +303,8 @@ const submitting = ref(false)
 const syncing = ref(false)
 const batchSyncing = ref(false)
 const syncingSingleId = ref<number | null>(null)
+const exporting = ref(false)
+const importing = ref(false)
 const editingSite = ref<SiteListItem | null>(null)
 const isCreateMode = ref(false)
 const selectedRowKeys = ref<number[]>([])
@@ -622,6 +631,60 @@ async function syncSingleStats(id: number) {
     message.error(t('site.syncSingleFailed', { error: e instanceof Error ? e.message : String(e) }))
   } finally {
     syncingSingleId.value = null
+  }
+}
+
+async function handleExport() {
+  exporting.value = true
+  try {
+    const { data } = await sitesApi.exportConfig()
+    const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `pt-forward-sites-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    message.success('已导出站点配置（含明文凭证，请妥善保管）')
+  } catch (e: unknown) {
+    message.error('导出失败：' + (e instanceof Error ? e.message : String(e)))
+  } finally {
+    exporting.value = false
+  }
+}
+
+const handleImportFile: UploadProps['beforeUpload'] = (file) => {
+  Modal.confirm({
+    title: '确认导入站点配置',
+    content: '导入会用导出文件的凭证（除 Cookie）和用户配置覆盖本机已存在的同名站点，本机的 Cookie 和开发者预设字段不受影响。仅本机已存在的站点会被更新，不存在的会被跳过。是否继续？',
+    okText: '确认导入',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: () => doImport(file),
+  })
+  return false
+}
+
+async function doImport(file: File) {
+  importing.value = true
+  try {
+    const text = await file.text()
+    const parsed = JSON.parse(text) as { sites?: unknown[] }
+    if (!parsed.sites || !Array.isArray(parsed.sites)) {
+      message.error('文件格式错误：缺少 sites 数组')
+      return
+    }
+    const { data } = await sitesApi.importConfig({ sites: parsed.sites })
+    const r = data.data
+    const parts = [`更新 ${r.updated} 个`]
+    if (r.skipped.length > 0) parts.push(`跳过 ${r.skipped.length} 个（${r.skipped.join(', ')}）`)
+    if (r.errors.length > 0) parts.push(`失败 ${r.errors.length} 个`)
+    message.success(`导入完成：${parts.join('，')}`)
+    await fetchAll()
+  } catch (e: unknown) {
+    message.error('导入失败：' + (e instanceof Error ? e.message : String(e)))
+  } finally {
+    importing.value = false
   }
 }
 

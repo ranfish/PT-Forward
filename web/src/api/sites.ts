@@ -68,4 +68,10 @@ export const sitesApi = {
   getFreezeStatus(id: number) {
     return client.get<ApiResponse<{ frozen: boolean; frozenAt?: string; reason?: string }>>(`/sites/${id}/freeze`)
   },
+  exportConfig() {
+    return client.get<ApiResponse<{ version: number; exported_at: string; warning: string; sites: unknown[] }>>('/sites/export')
+  },
+  importConfig(data: { sites: unknown[] }) {
+    return client.post<ApiResponse<{ total: number; updated: number; skipped: string[]; errors: string[] }>>('/sites/import', data)
+  },
 }
