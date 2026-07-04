@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a-page-header :title="site.name || site.domain" @back="$router.push('/sites')">
+    <a-page-header :title="site.name || maskDomain(site.domain)" @back="$router.push('/sites')">
       <template #tags>
         <a-tag v-if="needsCookie && site.hasCookie" color="green">{{ t('site.cookieValid') }}</a-tag>
         <a-tag v-else-if="needsCookie" color="red">{{ t('site.cookieNotConfigured') }}</a-tag>
@@ -315,12 +315,14 @@ const { t } = useI18n()
 function maskDomain(url: string | undefined): string {
   if (!url) return ''
   const m = url.match(/^(https?:\/\/)([^/]+)(.*)$/)
-  if (!m) return '***'
-  const parts = m[2].split('.')
-  if (parts.length >= 2) {
-    return `${m[1]}***.${parts[parts.length - 1]}${m[3]}`
+  if (m) {
+    const parts = m[2].split('.')
+    if (parts.length >= 2) return `${m[1]}***.${parts[parts.length - 1]}${m[3]}`
+    return `${m[1]}***${m[3]}`
   }
-  return `${m[1]}***${m[3]}`
+  const parts = url.split('.')
+  if (parts.length >= 2) return `***.${parts[parts.length - 1]}`
+  return '***'
 }
 
 const route = useRoute()
