@@ -101,6 +101,11 @@ func main() {
 		os.Exit(1) //nolint:gocritic
 	}
 
+	if err := dbpkg.RunMigrations(db, log); err != nil {
+		log.Error("failed to run data migrations", zap.Error(err))
+		os.Exit(1) //nolint:gocritic
+	}
+
 	if err := initEncryption(cfg, *configPath, db, log); err != nil {
 		log.Error("failed to init encryption", zap.Error(err))
 		os.Exit(1) //nolint:gocritic
@@ -151,13 +156,6 @@ func main() {
 	}
 
 	setting.SeedDefaults(ctx, settingsRepo, setting.DefaultSeeds, log)
-
-	if migrated, _ := settingsRepo.Get(ctx, "migration_ema_alpha_default_v1"); migrated != "done" {
-		if err := db.Model(&model.SeedingClientConfig{}).Where("ema_alpha = ?", 0.1).Update("ema_alpha", 0.3).Error; err != nil {
-			log.Warn("migrate ema_alpha 0.1->0.3 failed", zap.Error(err))
-		}
-		_ = settingsRepo.Set(ctx, "migration_ema_alpha_default_v1", "done")
-	}
 
 	auditLogger := audit.NewLogger(db, log)
 	auditLogger.Start(ctx)
@@ -721,6 +719,10 @@ func initEncryption(cfg *config.Config, configPath string, db *gorm.DB, log *zap
 			}
 			log.Info("encryption_key auto-generated and stored in database")
 		}
+	}
+	syncRepo := setting.NewRepository(db)
+	if stored, _ := syncRepo.Get(context.Background(), "encryption_key"); stored != key {
+		_ = syncRepo.Set(context.Background(), "encryption_key", key)
 	}
 	enc, err := crypto.NewCredentialEncryptor(key)
 	if err != nil {

@@ -16,6 +16,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/ranfish/pt-forward/internal/audit"
 	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/httpclient"
@@ -3006,6 +3007,8 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	}
 
 	now := time.Now()
+	audit.Log("system", "reseed", "inject", "torrent", match.SourceInfoHash,
+		fmt.Sprintf("辅种注入 client=%s %s→%s", match.ClientID, match.SourceSite, match.TargetSite), "success")
 	return e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
 		"status":           model.MatchStatusInjected,
 		"target_info_hash": infoHash,

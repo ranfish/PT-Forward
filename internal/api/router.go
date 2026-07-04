@@ -306,6 +306,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/system/check-update/", systemHandler)
 	mux.Handle("/api/v1/system/update", systemHandler)
 	mux.Handle("/api/v1/system/update/", systemHandler)
+	mux.Handle("/api/v1/system/encryption-key", systemHandler)
+	mux.Handle("/api/v1/system/encryption-key/", systemHandler)
 	mux.Handle("/api/v1/system/health", publicSystemHandler)
 	mux.Handle("/api/v1/system/health/", publicSystemHandler)
 
