@@ -226,6 +226,7 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 	eng.SetClientProvider(mockDLProvider)
 	eng.SetSiteProvider(mockSiteProvider)
 	require.NoError(t, eng.Start(ctx))
+	defer eng.Stop(ctx)
 
 	var dbRecords []model.SeedingTorrentRecord
 	db.Where("client_id = ? AND status = ? AND source = ?", "seeding-client", model.SeedingStatusSeeding, "rss").Find(&dbRecords)
