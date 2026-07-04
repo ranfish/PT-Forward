@@ -64,33 +64,44 @@ func (s *Service) Send(ctx context.Context, msg model.FormattedMessage) error {
 		}
 	}
 
-	var lastErr error
+	type mainResult struct {
+		ch      *model.NotificationChannel
+		success bool
+		errMsg  string
+	}
+	resultCh := make(chan mainResult, len(healthyChannels))
 	for _, ch := range healthyChannels {
-		success, errMsg := s.sendToChannel(ctx, ch, msg)
+		go func(ch *model.NotificationChannel) {
+			success, errMsg := s.sendToChannel(ctx, ch, msg)
+			resultCh <- mainResult{ch: ch, success: success, errMsg: errMsg}
+		}(ch)
+	}
 
-		s.recordHistory(ctx, ch.ID, msg, success, errMsg)
+	var lastErr error
+	for i := 0; i < len(healthyChannels); i++ {
+		res := <-resultCh
+		s.recordHistory(ctx, res.ch.ID, msg, res.success, res.errMsg)
+		if res.success {
+			s.resetFailures(ctx, res.ch)
+			continue
+		}
+		lastErr = notifyError(ErrNotifyChannel, fmt.Sprintf("%s: %s", res.ch.Name, res.errMsg), nil)
+		s.incrementFailures(ctx, res.ch)
 
-		if success {
-			s.resetFailures(ctx, ch)
-		} else {
-			lastErr = notifyError(ErrNotifyChannel, fmt.Sprintf("%s: %s", ch.Name, errMsg), nil)
-			s.incrementFailures(ctx, ch)
-
-			if ch.FailoverGroupID != "" {
-				if fallbacks, ok := failoverGroups[ch.FailoverGroupID]; ok {
-					for _, fb := range fallbacks {
-						if fb.ID == ch.ID || !fb.Healthy {
-							continue
-						}
-						fbOk, fbErr := s.sendToChannel(ctx, fb, msg)
-						s.recordHistory(ctx, fb.ID, msg, fbOk, fbErr)
-						if fbOk {
-							s.logger.Info("故障转移到备用通道",
-								zap.String("from", ch.Name),
-								zap.String("to", fb.Name),
-							)
-							break
-						}
+		if res.ch.FailoverGroupID != "" {
+			if fallbacks, ok := failoverGroups[res.ch.FailoverGroupID]; ok {
+				for _, fb := range fallbacks {
+					if fb.ID == res.ch.ID || !fb.Healthy {
+						continue
+					}
+					fbOk, fbErr := s.sendToChannel(ctx, fb, msg)
+					s.recordHistory(ctx, fb.ID, msg, fbOk, fbErr)
+					if fbOk {
+						s.logger.Info("故障转移到备用通道",
+							zap.String("from", res.ch.Name),
+							zap.String("to", fb.Name),
+						)
+						break
 					}
 				}
 			}
@@ -253,43 +264,69 @@ func (s *Service) sendWebhook(ctx context.Context, ch *model.NotificationChannel
 }
 
 func (s *Service) doHTTPPost(ctx context.Context, apiURL, contentType, body string) (bool, string) {
-	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(body))
-	if err != nil {
-		return false, err.Error()
-	}
-	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("User-Agent", "PT-Forward/1.0")
+	var lastErr string
+	for attempt := 0; attempt < 2; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(body))
+		if err != nil {
+			return false, err.Error()
+		}
+		req.Header.Set("Content-Type", contentType)
+		req.Header.Set("User-Agent", "PT-Forward/1.0")
 
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return false, err.Error()
-	}
-	respBody, _ := httpclient.ReadBody(resp)
-	httpclient.DrainBody(resp)
+		resp, err := s.client.Do(req)
+		if err != nil {
+			lastErr = err.Error()
+			if attempt == 0 {
+				select {
+				case <-time.After(200 * time.Millisecond):
+				case <-ctx.Done():
+					return false, lastErr
+				}
+				continue
+			}
+			return false, lastErr
+		}
+		respBody, _ := httpclient.ReadBody(resp)
+		httpclient.DrainBody(resp)
 
-	if resp.StatusCode >= 400 {
-		return false, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody))
+		if resp.StatusCode >= 400 {
+			return false, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody))
+		}
+		return true, ""
 	}
-	return true, ""
+	return false, lastErr
 }
 
 func (s *Service) doHTTPGet(ctx context.Context, apiURL string) (bool, string) {
-	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
-	if err != nil {
-		return false, err.Error()
-	}
-	req.Header.Set("User-Agent", "PT-Forward/1.0")
+	var lastErr string
+	for attempt := 0; attempt < 2; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+		if err != nil {
+			return false, err.Error()
+		}
+		req.Header.Set("User-Agent", "PT-Forward/1.0")
 
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return false, err.Error()
+		resp, err := s.client.Do(req)
+		if err != nil {
+			lastErr = err.Error()
+			if attempt == 0 {
+				select {
+				case <-time.After(200 * time.Millisecond):
+				case <-ctx.Done():
+					return false, lastErr
+				}
+				continue
+			}
+			return false, lastErr
+		}
+		if resp.StatusCode >= 400 {
+			httpclient.DrainBody(resp)
+			return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
+		}
+		httpclient.DrainBody(resp)
+		return true, ""
 	}
-	defer func() { httpclient.DrainBody(resp) }()
-
-	if resp.StatusCode >= 400 {
-		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
-	}
-	return true, ""
+	return false, lastErr
 }
 
 func (s *Service) recordHistory(ctx context.Context, channelID uint, msg model.FormattedMessage, success bool, errMsg string) {
