@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -87,12 +89,19 @@ func SeedDefaults(ctx context.Context, repo *Repository, seeds map[string]string
 }
 
 type RuntimeConfig struct {
-	repo   *Repository
-	logger *zap.Logger
-	mu     sync.RWMutex
-	cache  map[string]string
-	expiry time.Time
-	ttl    time.Duration
+	repo          *Repository
+	logger        *zap.Logger
+	mu            sync.RWMutex
+	cache         map[string]string
+	expiry        time.Time
+	ttl           time.Duration
+	loadedVersion int64
+}
+
+var globalConfigVersion atomic.Int64
+
+func InvalidateAll() {
+	globalConfigVersion.Add(1)
 }
 
 func NewRuntimeConfig(repo *Repository, logger *zap.Logger) *RuntimeConfig {
@@ -112,13 +121,14 @@ func (rc *RuntimeConfig) Reload(ctx context.Context) error {
 	rc.mu.Lock()
 	rc.cache = all
 	rc.expiry = time.Now().Add(rc.ttl)
+	rc.loadedVersion = globalConfigVersion.Load()
 	rc.mu.Unlock()
 	return nil
 }
 
 func (rc *RuntimeConfig) get(ctx context.Context, key string) string {
 	rc.mu.RLock()
-	if time.Now().Before(rc.expiry) {
+	if time.Now().Before(rc.expiry) && rc.loadedVersion == globalConfigVersion.Load() {
 		v, ok := rc.cache[key]
 		rc.mu.RUnlock()
 		if ok {
@@ -130,7 +140,7 @@ func (rc *RuntimeConfig) get(ctx context.Context, key string) string {
 
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
-	if time.Now().Before(rc.expiry) {
+	if time.Now().Before(rc.expiry) && rc.loadedVersion == globalConfigVersion.Load() {
 		v, ok := rc.cache[key]
 		if ok {
 			return v
@@ -146,6 +156,7 @@ func (rc *RuntimeConfig) get(ctx context.Context, key string) string {
 	}
 	rc.cache = all
 	rc.expiry = time.Now().Add(rc.ttl)
+	rc.loadedVersion = globalConfigVersion.Load()
 	v := rc.cache[key]
 	return v
 }
@@ -164,6 +175,6 @@ func (rc *RuntimeConfig) GetInt(ctx context.Context, key string) int {
 }
 
 func (rc *RuntimeConfig) GetBool(ctx context.Context, key string) bool {
-	v := rc.get(ctx, key)
-	return v == "true" || v == "1"
+	v := strings.ToLower(rc.get(ctx, key))
+	return v == "true" || v == "1" || v == "yes" || v == "on"
 }

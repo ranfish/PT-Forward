@@ -152,6 +152,13 @@ func main() {
 
 	setting.SeedDefaults(ctx, settingsRepo, setting.DefaultSeeds, log)
 
+	if migrated, _ := settingsRepo.Get(ctx, "migration_ema_alpha_default_v1"); migrated != "done" {
+		if err := db.Model(&model.SeedingClientConfig{}).Where("ema_alpha = ?", 0.1).Update("ema_alpha", 0.3).Error; err != nil {
+			log.Warn("migrate ema_alpha 0.1->0.3 failed", zap.Error(err))
+		}
+		_ = settingsRepo.Set(ctx, "migration_ema_alpha_default_v1", "done")
+	}
+
 	auditLogger := audit.NewLogger(db, log)
 	auditLogger.Start(ctx)
 	audit.SetDefault(auditLogger)
@@ -240,9 +247,22 @@ func main() {
 	sideLoadEmitter := rss.NewSideLoadEventEmitter()
 	sideLoadMgr := rss.NewSideLoadManager(siteProvider, sideLoadEmitter, log)
 	rssEngine.SetSideLoadManager(sideLoadMgr)
-	rssEngine.SetConfigEventBus(rss.NewConfigEventBus())
 	configEventBus := rss.NewConfigEventBus()
 	rssEngine.SetConfigEventBus(configEventBus)
+	go func() {
+		ch := configEventBus.Subscribe()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case _, ok := <-ch:
+				if !ok {
+					return
+				}
+				setting.InvalidateAll()
+			}
+		}
+	}()
 	rssEngine.SetPushLimiter(rss.NewPushLimiter(0))
 	sideLoadEventCh := sideLoadEmitter.Subscribe()
 	rss.StartSideLoadRepeater(ctx, sideLoadEventCh, func(ctx context.Context, events []model.TorrentEvent) error {
@@ -319,10 +339,11 @@ func main() {
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
 	mux := http.NewServeMux()
-	rateLimitEnabled := setting.NewRuntimeConfig(settingsRepo, log).GetBool(ctx, setting.KeyRateLimitEnabled)
-	rateLimitGlobal := setting.NewRuntimeConfig(settingsRepo, log).GetInt(ctx, setting.KeyRateLimitGlobal)
-	rateLimitWrite := setting.NewRuntimeConfig(settingsRepo, log).GetInt(ctx, setting.KeyRateLimitWrite)
-	rateLimitDownload := setting.NewRuntimeConfig(settingsRepo, log).GetInt(ctx, setting.KeyRateLimitDownload)
+	runtimeCfg := setting.NewRuntimeConfig(settingsRepo, log)
+	rateLimitEnabled := runtimeCfg.GetBool(ctx, setting.KeyRateLimitEnabled)
+	rateLimitGlobal := runtimeCfg.GetInt(ctx, setting.KeyRateLimitGlobal)
+	rateLimitWrite := runtimeCfg.GetInt(ctx, setting.KeyRateLimitWrite)
+	rateLimitDownload := runtimeCfg.GetInt(ctx, setting.KeyRateLimitDownload)
 	if rateLimitGlobal <= 0 {
 		rateLimitGlobal = 600
 	}
@@ -380,6 +401,7 @@ func main() {
 	syncManager := scheduler.NewSyncManager(setting.NewRuntimeConfig(settingsRepo, log), log)
 	statsSyncSvc := site.NewStatsSyncService(db, adapterFactory, log)
 	registerSchedulerTasks(taskRegistry, syncManager, siteProvider, clientManager, rssEngine, seedingEngine, publishPipeline, lifecycleManager, seedingConfirmation, freeWaitMonitor, statsSyncSvc, notifyService, settingsRepo, db, log)
+	reseedEngine.RegisterAllTaskSchedules(ctx)
 	api.ApplySchedulerOverrides(ctx, db, taskRegistry, log)
 
 	if err := clientManager.LoadClients(ctx); err != nil {
@@ -408,7 +430,6 @@ func main() {
 	if err := taskRegistry.Start(ctx); err != nil {
 		log.Error("failed to start task registry", zap.Error(err))
 	}
-	reseedEngine.RegisterAllTaskSchedules(ctx)
 	syncManager.Start(ctx)
 	sideLoadMgr.Start(ctx)
 

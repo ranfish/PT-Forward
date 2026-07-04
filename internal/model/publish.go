@@ -92,6 +92,7 @@ type PublishGroupMember struct {
 	ReportedAt *time.Time `json:"reported_at"`
 
 	LastCompletedStep int `json:"last_completed_step" gorm:"default:0"`
+	RetryCount        int `json:"retry_count" gorm:"default:0"`
 }
 
 func (PublishGroupMember) TableName() string { return "publish_group_members" }

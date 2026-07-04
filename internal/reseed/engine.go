@@ -103,9 +103,7 @@ func (s *l2Stats) record(site string, result string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.searched[site]++
-	if _, ok := s.siteResults[site]; !ok {
-		s.siteResults[site] = result
-	}
+	s.siteResults[site] = result
 }
 
 func (s *l2Stats) log(e *Engine) {
@@ -2508,6 +2506,7 @@ func (e *Engine) retryFailedForTask(ctx context.Context, task *model.ReseedTask,
 	}
 
 	retried, succeeded := 0, 0
+loop:
 	for i := range matches {
 		if ctx.Err() != nil {
 			break
@@ -2528,7 +2527,7 @@ func (e *Engine) retryFailedForTask(ctx context.Context, task *model.ReseedTask,
 			select {
 			case <-time.After(2 * time.Second):
 			case <-ctx.Done():
-				break
+				break loop
 			}
 		}
 	}

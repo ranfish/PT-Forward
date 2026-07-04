@@ -97,25 +97,25 @@ func TestRuntimeConfig_GetBool(t *testing.T) {
 
 	repo.Set(ctx, "bool_true", "true")
 	repo.Set(ctx, "bool_one", "1")
+	repo.Set(ctx, "bool_yes", "yes")
+	repo.Set(ctx, "bool_on", "on")
+	repo.Set(ctx, "bool_true_upper", "True")
 	repo.Set(ctx, "bool_false", "false")
 	repo.Set(ctx, "bool_zero", "0")
-	repo.Set(ctx, "bool_random", "yes")
+	repo.Set(ctx, "bool_random", "random")
 	rc.Reload(ctx)
 
-	if !rc.GetBool(ctx, "bool_true") {
-		t.Error("true should be true")
+	trueKeys := []string{"bool_true", "bool_one", "bool_yes", "bool_on", "bool_true_upper"}
+	for _, k := range trueKeys {
+		if !rc.GetBool(ctx, k) {
+			t.Errorf("%s should be true", k)
+		}
 	}
-	if !rc.GetBool(ctx, "bool_one") {
-		t.Error("1 should be true")
-	}
-	if rc.GetBool(ctx, "bool_false") {
-		t.Error("false should be false")
-	}
-	if rc.GetBool(ctx, "bool_zero") {
-		t.Error("0 should be false")
-	}
-	if rc.GetBool(ctx, "bool_random") {
-		t.Error("yes should be false")
+	falseKeys := []string{"bool_false", "bool_zero", "bool_random"}
+	for _, k := range falseKeys {
+		if rc.GetBool(ctx, k) {
+			t.Errorf("%s should be false", k)
+		}
 	}
 }
 

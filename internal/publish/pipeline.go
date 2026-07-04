@@ -496,7 +496,10 @@ func (p *Pipeline) finalizePublishStatus(ctx context.Context, id uint, published
 		}
 		return model.CandidateFailed
 	}
-	return model.CandidatePublishing
+	if err := p.UpdateCandidateStatus(ctx, id, model.CandidateSkipped, "所有目标站点均被去重或合规检查跳过"); err != nil {
+		p.logger.Error("更新发布跳过状态失败", zap.Uint("id", id), zap.Error(err))
+	}
+	return model.CandidateSkipped
 }
 
 func (p *Pipeline) ListPendingCandidates(ctx context.Context, limit int) ([]model.PublishCandidate, error) {
@@ -729,13 +732,15 @@ func (p *Pipeline) ProcessPendingGroups(ctx context.Context) error {
 
 		var members []model.PublishGroupMember
 		if err := p.db.WithContext(ctx).
-			Where("publish_group_id = ? AND status IN ?",
+			Where("publish_group_id = ? AND (status IN ? OR (status = ? AND retry_count < ?))",
 				group.ID,
 				[]model.MemberStatus{
 					model.MemberStatusNew,
 					model.MemberStatusUploading,
 					model.MemberStatusInjected,
 				},
+				model.MemberStatusError,
+				3,
 			).Find(&members).Error; err != nil {
 			p.logger.Warn("query pending members failed",
 				zap.Uint("groupID", group.ID),
@@ -1413,13 +1418,15 @@ func (p *Pipeline) advanceStep(ctx context.Context, member *model.PublishGroupMe
 func (p *Pipeline) failMember(ctx context.Context, member *model.PublishGroupMember, step int, reason string) error {
 	now := time.Now()
 	if err := p.db.WithContext(ctx).Model(member).Updates(map[string]interface{}{
-		"status":     model.MemberStatusError,
-		"last_error": reason,
-		"error_at":   &now,
-		"status_at":  &now,
+		"status":      model.MemberStatusError,
+		"last_error":  reason,
+		"error_at":    &now,
+		"status_at":   &now,
+		"retry_count": member.RetryCount + 1,
 	}).Error; err != nil {
 		p.logger.Warn("failMember DB update failed", zap.Uint("memberID", member.ID), zap.Error(err))
 	}
+	member.RetryCount++
 	return publishError(ErrPublishGeneric, fmt.Sprintf("step %d: %s", step, reason), nil)
 }
 

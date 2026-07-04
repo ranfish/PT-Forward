@@ -70,7 +70,11 @@ func (r *Registry) Register(name, taskType, schedule string, handler TaskFunc) e
 		if paused {
 			return
 		}
-		r.runTask(context.Background(), entry) //nolint:gosec,errcheck // runTask handles errors internally
+		ctx := r.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		r.runTask(ctx, entry) //nolint:gosec,errcheck // runTask handles errors internally
 	})
 
 	if err != nil {
@@ -165,7 +169,11 @@ func (r *Registry) Reschedule(name, schedule string) error {
 		if paused {
 			return
 		}
-		r.runTask(context.Background(), entry) //nolint:gosec,errcheck // runTask handles errors internally
+		ctx := r.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		r.runTask(ctx, entry) //nolint:gosec,errcheck // runTask handles errors internally
 	})
 
 	if err != nil {

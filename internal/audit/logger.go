@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -17,15 +18,15 @@ type Logger struct {
 	wg     sync.WaitGroup
 }
 
-var defaultLogger *Logger
+var defaultLogger atomic.Pointer[Logger]
 
 func SetDefault(l *Logger) {
-	defaultLogger = l
+	defaultLogger.Store(l)
 }
 
 func Log(actor, module, action, targetType, targetID, detail, result string) {
-	if defaultLogger != nil {
-		defaultLogger.Log(actor, module, action, targetType, targetID, detail, result)
+	if l := defaultLogger.Load(); l != nil {
+		l.Log(actor, module, action, targetType, targetID, detail, result)
 	}
 }
 
