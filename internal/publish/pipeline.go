@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -317,6 +318,8 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 			zap.Error(err),
 		)
 		metrics.PublishTasksTotal.WithLabelValues(targetSite, "failed").Inc()
+		audit.Log("system", "publish", "upload", "torrent", candidate.SourceTorrentID,
+			fmt.Sprintf("发布失败 %s → %s: %s", candidate.SourceSite, targetSite, err.Error()), "failed")
 		if err := p.CreateResult(ctx, &model.PublishResultRecord{
 			CandidateID:  candidate.ID,
 			SourceSite:   candidate.SourceSite,
@@ -329,6 +332,8 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 		}
 		return false, err
 	}
+	audit.Log("system", "publish", "upload", "torrent", candidate.SourceTorrentID,
+		fmt.Sprintf("发布 %s → %s", candidate.SourceSite, targetSite), "success")
 
 	if err := p.CreateResult(ctx, &model.PublishResultRecord{
 		CandidateID: candidate.ID,

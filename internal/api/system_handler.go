@@ -15,6 +15,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -65,6 +66,8 @@ func (h *SystemHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
+	case strings.HasSuffix(trimmed, "/system/encryption-key"):
+		h.handleEncryptionKey(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -72,6 +75,32 @@ func (h *SystemHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *SystemHandler) HandlePing(w http.ResponseWriter, r *http.Request) {
 	h.handlePing(w, r)
+}
+
+func (h *SystemHandler) handleEncryptionKey(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		var s setting.Setting
+		h.db.Where("`key` = ?", "encryption_key").First(&s)
+		Success(w, map[string]interface{}{"key": s.Value})
+	case http.MethodPost:
+		var req struct {
+			Key string `json:"key"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Key == "" {
+			Error(w, http.StatusBadRequest, 40001, "key 不能为空")
+			return
+		}
+		s := setting.Setting{Key: "encryption_key", Value: req.Key}
+		if err := h.db.Save(&s).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50001, "保存失败")
+			return
+		}
+		h.logger.Warn("encryption key updated via API", zap.String("actor", actorFromRequest(r)))
+		Success(w, map[string]interface{}{"message": "密钥已更新,请重启服务生效;注意:旧密钥加密的数据无法用新密钥解密"})
+	default:
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+	}
 }
 
 func (h *SystemHandler) handlePing(w http.ResponseWriter, _ *http.Request) {

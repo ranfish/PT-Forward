@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/companion"
 	"github.com/ranfish/pt-forward/internal/dispatcher"
 	"github.com/ranfish/pt-forward/internal/event"
@@ -1524,6 +1525,8 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 	if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); err != nil {
 		e.logger.Error("更新删种状态失败", zap.Uint("id", rec.ID), zap.Error(err))
 	}
+	audit.Log("system", "seeding", "delete", "torrent", rec.InfoHash,
+		fmt.Sprintf("自动删种 client=%s site=%s reason=%s", rec.ClientID, rec.SiteName, rec.LastActionBy), "success")
 	result.Deleted++
 }
 
