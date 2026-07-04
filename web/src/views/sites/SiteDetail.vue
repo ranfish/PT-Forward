@@ -93,7 +93,7 @@
             </a-col>
             <a-col :span="8">
               <a-form-item :label="t('site.baseUrl')">
-                <a-input v-model:value="settingsForm.baseUrl" :placeholder="t('site.baseUrlPlaceholder')" />
+                <a-input :value="maskDomain(settingsForm.baseUrl)" disabled />
               </a-form-item>
             </a-col>
             <a-col :span="8">
@@ -311,6 +311,17 @@ interface SiteStatsData {
 }
 
 const { t } = useI18n()
+
+function maskDomain(url: string | undefined): string {
+  if (!url) return ''
+  const m = url.match(/^(https?:\/\/)([^/]+)(.*)$/)
+  if (!m) return '***'
+  const parts = m[2].split('.')
+  if (parts.length >= 2) {
+    return `${m[1]}***.${parts[parts.length - 1]}${m[3]}`
+  }
+  return `${m[1]}***${m[3]}`
+}
 
 const route = useRoute()
 const siteId = Number(route.params.id)
