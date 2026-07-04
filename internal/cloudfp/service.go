@@ -94,7 +94,13 @@ func (s *Service) BatchLookup(ctx context.Context, piecesHashes []string, target
 
 	// 分批查询（PT-IDX API 限制每次最多 500 个）
 	if len(piecesHashes) <= cloudFPLookupBatchSize {
-		return s.singleLookup(ctx, piecesHashes, targetSites)
+		matches, err := s.singleLookup(ctx, piecesHashes, targetSites)
+		if err != nil {
+			s.breaker.recordFailure()
+			return nil, err
+		}
+		s.breaker.recordSuccess()
+		return matches, nil
 	}
 
 	allMatches := make(map[string][]model.CloudFPMatch)

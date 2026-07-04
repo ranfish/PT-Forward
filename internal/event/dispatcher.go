@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -50,13 +51,24 @@ func (d *Dispatcher) Dispatch(ctx context.Context, eventType string, events []mo
 
 	var lastErr error
 	for _, handler := range handlers {
-		if err := handler.OnTorrents(ctx, events); err != nil {
-			d.logger.Warn("event handler failed",
-				zap.String("event_type", eventType),
-				zap.Error(err),
-			)
-			lastErr = eventError(ErrEventHandler, "handler failed", err)
-		}
+		func(h model.EventHandler) {
+			defer func() {
+				if r := recover(); r != nil {
+					d.logger.Error("event handler panicked",
+						zap.String("event_type", eventType),
+						zap.Any("panic", r),
+					)
+					lastErr = eventError(ErrEventHandler, "handler panicked", fmt.Errorf("%v", r))
+				}
+			}()
+			if err := h.OnTorrents(ctx, events); err != nil {
+				d.logger.Warn("event handler failed",
+					zap.String("event_type", eventType),
+					zap.Error(err),
+				)
+				lastErr = eventError(ErrEventHandler, "handler failed", err)
+			}
+		}(handler)
 	}
 
 	if wsB != nil {

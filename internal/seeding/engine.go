@@ -454,6 +454,12 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 
 		md, mdErr := dlClient.GetMainData(ctx)
 		if mdErr != nil || md == nil {
+			if mdErr != nil {
+				e.logger.Warn("refresh maindata failed",
+					zap.String("client", clientID),
+					zap.Error(mdErr),
+				)
+			}
 			continue
 		}
 
@@ -2344,6 +2350,12 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 		totalDown += ti.DownloadSpeed
 	}
 
+	alpha := emaAlpha
+	var clientCfg model.SeedingClientConfig
+	if err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&clientCfg).Error; err == nil && clientCfg.EmaAlpha > 0 {
+		alpha = clientCfg.EmaAlpha
+	}
+
 	e.mu.Lock()
 	state, ok := e.emaStates[clientID]
 	if !ok {
@@ -2358,8 +2370,8 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 		state.UploadSpeed = newUp
 		state.DownloadSpeed = newDown
 	} else {
-		state.UploadSpeed = emaAlpha*newUp + (1-emaAlpha)*state.UploadSpeed
-		state.DownloadSpeed = emaAlpha*newDown + (1-emaAlpha)*state.DownloadSpeed
+		state.UploadSpeed = alpha*newUp + (1-alpha)*state.UploadSpeed
+		state.DownloadSpeed = alpha*newDown + (1-alpha)*state.DownloadSpeed
 	}
 	snapshotUp := state.UploadSpeed
 	snapshotDown := state.DownloadSpeed

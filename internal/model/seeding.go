@@ -73,7 +73,7 @@ type SeedingClientConfig struct {
 
 	ActiveTimeWindows string `json:"active_time_windows" gorm:"size:256"`
 
-	EmaAlpha float64 `json:"ema_alpha" gorm:"default:0.1"`
+	EmaAlpha float64 `json:"ema_alpha" gorm:"default:0.3"`
 
 	CleanupScoreWeights string `json:"cleanup_score_weights" gorm:"type:text"`
 

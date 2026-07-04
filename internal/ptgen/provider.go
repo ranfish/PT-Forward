@@ -181,10 +181,12 @@ func (p *Provider) queryEndpoint(ctx context.Context, endpoint, query string) (*
 	return result, nil
 }
 
+const ptgenCacheMaxDays = 7
+
 func (p *Provider) getCache(ctx context.Context, query string) (*model.PTGenCache, error) {
 	var cache model.PTGenCache
 	err := p.db.WithContext(ctx).
-		Where("query_key = ?", query).
+		Where("query_key = ? AND updated_at > ?", query, time.Now().AddDate(0, 0, -ptgenCacheMaxDays)).
 		First(&cache).Error
 	if err != nil {
 		return nil, err
