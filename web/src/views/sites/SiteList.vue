@@ -44,7 +44,6 @@
         <a-upload :show-upload-list="false" :before-upload="handleImportFile" accept=".json">
           <a-button :loading="importing">导入配置</a-button>
         </a-upload>
-        <a-button type="primary" @click="openCreateModal">{{ t('common.create') }}</a-button>
       </a-space>
     </div>
 
