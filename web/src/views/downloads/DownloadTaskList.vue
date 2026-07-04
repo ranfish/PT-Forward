@@ -291,7 +291,7 @@ const configColumns = computed(() => [
   { title: '下载器', dataIndex: 'client_id', key: 'client_id', width: 120 },
   { title: '启用', key: 'enabled', width: 70 },
   { title: '删种规则', key: 'delete_rule_ids' },
-  { title: '范围', dataIndex: 'scope', key: 'scope', width: 120 },
+  { title: '范围', dataIndex: 'scope', key: 'scope', width: 120, customRender: ({ text }: { text: string }) => (text === 'all' ? '全部种子' : '仅 PT-Forward 推送') },
   { title: '操作', key: 'actions', width: 120 },
 ])
 
