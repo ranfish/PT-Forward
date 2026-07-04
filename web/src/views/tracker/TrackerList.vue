@@ -12,7 +12,7 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
-            <a-tag :color="memberStatusColor(record.status)">{{ record.status }}</a-tag>
+            <a-tag :color="memberStatusColor(record.status)">{{ translateMemberStatus(record.status) }}</a-tag>
           </template>
           <template v-if="column.key === 'paused'">
             <a-tag :color="record.paused ? 'orange' : 'green'">{{ record.paused ? t('tracker.pausedStatus') : t('tracker.active') }}</a-tag>
@@ -51,8 +51,10 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { trackerApi } from '@/api/tracker'
 import { formatTime, copyToClipboard } from '@/utils/format'
+import { useEnumLabels } from '@/utils/enumLabels'
 
 const { t } = useI18n()
+const { translatePublishRole, translateMemberStatus } = useEnumLabels()
 
 function copyHash(text: string) {
   copyToClipboard(text)
@@ -73,7 +75,7 @@ const memberColumns = [
   { title: 'InfoHash', key: 'info_hash', width: 180 },
   { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
   { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
-  { title: t('tracker.role'), dataIndex: 'role', key: 'role', width: 80 },
+  { title: t('tracker.role'), dataIndex: 'role', key: 'role', width: 80, customRender: ({ text }: { text: string }) => translatePublishRole(text) },
   { title: t('common.status'), key: 'status', width: 100 },
   { title: t('tracker.pausedStatus'), key: 'paused', width: 80 },
   { title: t('tracker.seeders'), dataIndex: 'seeders', key: 'seeders', width: 80 },
@@ -85,8 +87,8 @@ const historyColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
   { title: t('tracker.groupId'), dataIndex: 'publish_group_id', key: 'publish_group_id', width: 80 },
   { title: t('tracker.memberHash'), dataIndex: 'member_hash', key: 'member_hash', ellipsis: true },
-  { title: t('tracker.oldStatus'), dataIndex: 'old_status', key: 'old_status', width: 100 },
-  { title: t('tracker.newStatus'), dataIndex: 'new_status', key: 'new_status', width: 100 },
+  { title: t('tracker.oldStatus'), dataIndex: 'old_status', key: 'old_status', width: 100, customRender: ({ text }: { text: string }) => translateMemberStatus(text) },
+  { title: t('tracker.newStatus'), dataIndex: 'new_status', key: 'new_status', width: 100, customRender: ({ text }: { text: string }) => translateMemberStatus(text) },
   { title: t('tracker.reason'), dataIndex: 'reason', key: 'reason', ellipsis: true },
   { title: t('tracker.colTime'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]

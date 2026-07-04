@@ -89,7 +89,7 @@ import { useEnumLabels } from '@/utils/enumLabels'
 const route = useRoute()
 const taskId = Number(route.params.id)
 const { t } = useI18n()
-const { translateReseedStatus } = useEnumLabels()
+const { translateReseedStatus, translateMatchMethod } = useEnumLabels()
 
 const siteMap = ref<Record<string, string>>({})
 const downloaderMap = ref<Record<string, string>>({})
@@ -169,7 +169,7 @@ const matchColumns = [
   { title: t('reseed.sourceInfoHash'), dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true },
   { title: t('reseed.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120 },
   { title: t('reseed.targetInfoHash'), dataIndex: 'target_info_hash', key: 'target_info_hash', ellipsis: true },
-  { title: t('reseed.matchMethod'), dataIndex: 'match_method', key: 'match_method', width: 100 },
+  { title: t('reseed.matchMethod'), dataIndex: 'match_method', key: 'match_method', width: 100, customRender: ({ text }: { text: string }) => translateMatchMethod(text) },
   { title: t('reseed.confidence'), dataIndex: 'confidence', key: 'confidence', width: 80 },
   { title: t('common.status'), key: 'status', width: 100 },
   { title: t('reseed.failReason'), dataIndex: 'fail_reason', key: 'fail_reason', ellipsis: true },

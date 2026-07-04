@@ -30,10 +30,10 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'module'">
-          <a-tag color="blue">{{ record.module }}</a-tag>
+          <a-tag color="blue">{{ translateAuditModule(record.module) }}</a-tag>
         </template>
         <template v-if="column.key === 'action'">
-          <a-tag :color="actionColor(record.action)">{{ record.action }}</a-tag>
+          <a-tag :color="actionColor(record.action)">{{ translateAuditAction(record.action) }}</a-tag>
         </template>
         <template v-if="column.key === 'detail'">
           <a-tooltip :title="record.detail">
@@ -55,8 +55,10 @@ import { useI18n } from 'vue-i18n'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { systemApi } from '@/api/system'
 import { formatTime } from '@/utils/format'
+import { useEnumLabels } from '@/utils/enumLabels'
 
 const { t } = useI18n()
+const { translateAuditModule, translateAuditAction } = useEnumLabels()
 
 const loading = ref(false)
 const logs = ref<Record<string, unknown>[]>([])

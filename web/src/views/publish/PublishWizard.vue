@@ -137,8 +137,10 @@ import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { manualForwardApi } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
+import { useEnumLabels } from '@/utils/enumLabels'
 
 const { t } = useI18n()
+const { translateQbState } = useEnumLabels()
 
 const currentStep = ref(0)
 
@@ -175,7 +177,7 @@ const torrentColumns = [
   { title: t('common.name'), dataIndex: 'name', key: 'name', ellipsis: true },
   { title: t('common.size'), key: 'size', width: 100 },
   { title: t('seeding.client'), dataIndex: 'client_id', key: 'client_id', width: 80 },
-  { title: t('publish.state'), dataIndex: 'state', key: 'state', width: 100 },
+  { title: t('publish.state'), dataIndex: 'state', key: 'state', width: 100, customRender: ({ text }: { text: string }) => translateQbState(text) },
 ]
 
 const targetColumns = [
