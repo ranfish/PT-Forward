@@ -98,8 +98,8 @@
                 <a-button type="link" size="small" @click="form.sourceSiteIds = []">{{ t('common.deselectAll') }}</a-button>
               </template>
               <a-select v-model:value="form.sourceSiteIds" mode="multiple" :placeholder="t('reseed.sourceSiteIdsPlaceholder')" :loading="sitesLoading" show-search :filter-option="filterOption" allow-clear>
-                <a-select-option v-for="s in sourceSites" :key="s.id" :value="String(s.id)" :label="`${s.name}（${s.domain}）`">
-                  {{ s.name }}（{{ s.domain }}）
+                <a-select-option v-for="s in sourceSites" :key="s.id" :value="String(s.id)" :label="s.name">
+                  {{ s.name }}
                 </a-select-option>
               </a-select>
             </a-form-item>
@@ -112,8 +112,8 @@
                 <a-button type="link" size="small" @click="form.targetSiteIds = []">{{ t('common.deselectAll') }}</a-button>
               </template>
               <a-select v-model:value="form.targetSiteIds" mode="multiple" :placeholder="t('reseed.targetSiteIdsPlaceholder')" :loading="sitesLoading || iyuuSupportedLoading" show-search :filter-option="filterOption" allow-clear>
-                <a-select-option v-for="s in filteredTargetSites" :key="s.id" :value="String(s.id)" :label="`${s.name}（${s.domain}）`">
-                  {{ s.name }}（{{ s.domain }}）
+                <a-select-option v-for="s in filteredTargetSites" :key="s.id" :value="String(s.id)" :label="s.name">
+                  {{ s.name }}
                 </a-select-option>
               </a-select>
             </a-form-item>

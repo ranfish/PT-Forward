@@ -118,7 +118,7 @@
               <a-col :span="12">
                 <a-form-item :label="t('subscription.publishTargets')">
                   <a-select v-model:value="configForm.publishTargets" mode="multiple" :placeholder="t('subscription.selectPublishTargets')" :loading="sitesLoading" style="width: 100%">
-                    <a-select-option v-for="s in targetSites" :key="s.domain" :value="s.domain">{{ s.name }}（{{ s.domain }}）</a-select-option>
+                    <a-select-option v-for="s in targetSites" :key="s.domain" :value="s.domain">{{ s.name }}</a-select-option>
                   </a-select>
                 </a-form-item>
               </a-col>

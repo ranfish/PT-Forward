@@ -180,7 +180,7 @@ const torrentColumns = [
 
 const targetColumns = [
   { title: t('common.name'), dataIndex: 'name', key: 'name' },
-  { title: t('site.domain'), dataIndex: 'domain', key: 'domain' },
+  { title: t('common.site'), dataIndex: 'name', key: 'name' },
   { title: t('common.status'), key: 'blocked', width: 80 },
 ]
 
