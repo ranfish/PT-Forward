@@ -1,5 +1,6 @@
 # Binaries
 /pt-forward
+/.pt-forward.new
 
 # Data
 data/
