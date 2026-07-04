@@ -160,7 +160,7 @@ import type { PublishCandidate, PublishGroup, PublishTask, PublishResultRecord }
 import { formatTime } from '@/utils/format'
 
 const { t } = useI18n()
-const { translatePublishStatus } = useEnumLabels()
+const { translatePublishStatus, translatePublishType } = useEnumLabels()
 const activeTab = ref('candidates')
 const candidateSearch = ref('')
 const candidatesLoading = ref(false)
@@ -199,7 +199,7 @@ const groupColumns = [
 
 const taskColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: t('common.type'), dataIndex: 'type', key: 'type', width: 100 },
+  { title: t('common.type'), dataIndex: 'type', key: 'type', width: 100, customRender: ({ text }: { text: string }) => translatePublishType(text) },
   { title: t('publish.sourceSiteId'), dataIndex: 'source_site_id', key: 'source_site_id', width: 100 },
   { title: t('common.status'), key: 'status', width: 100 },
   { title: t('publish.manualCheck'), dataIndex: 'manual_check', key: 'manual_check', width: 100, customRender: ({ text }: { text: boolean }) => text ? t('common.yes') : t('common.no') },

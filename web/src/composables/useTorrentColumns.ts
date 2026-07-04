@@ -3,6 +3,7 @@ import { h, type VNode } from 'vue'
 import { Tag } from 'ant-design-vue'
 import { formatTime, copyToClipboard, formatBytes } from '@/utils/format'
 import { message } from 'ant-design-vue'
+import { useEnumLabels } from '@/utils/enumLabels'
 
 export type TorrentColumnKey =
   | 'title'
@@ -31,6 +32,7 @@ export interface TorrentColumnOptions {
 
 export function useTorrentColumns(options: TorrentColumnOptions = {}) {
   const { t } = useI18n()
+  const { translateSeedingSource } = useEnumLabels()
 
   function copyHash(text: string) {
     copyToClipboard(text)
@@ -137,6 +139,7 @@ export function useTorrentColumns(options: TorrentColumnOptions = {}) {
       dataIndex: 'source',
       key: 'source',
       width: 60,
+      customRender: ({ text }: { text: string }) => translateSeedingSource(text),
     },
     status: {
       title: t('common.status'),

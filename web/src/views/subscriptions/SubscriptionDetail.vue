@@ -417,6 +417,7 @@ import { formatTime } from '@/utils/format'
 import { downloadersApi } from '@/api/downloaders'
 import { notificationsApi } from '@/api/notifications'
 import { sitesApi } from '@/api/sites'
+import { useEnumLabels } from '@/utils/enumLabels'
 import type { RSSSubscription, ClientConfig, RuleCondition, NotificationChannel, Site } from '@/api/types'
 
 interface RuleCond {
@@ -428,6 +429,7 @@ interface RuleCond {
 }
 
 const { t } = useI18n()
+const { translateFetchStatus } = useEnumLabels()
 
 const route = useRoute()
 const id = Number(route.params.id)
@@ -509,7 +511,7 @@ const dryrunColumns = [
 const historyColumns = [
   { title: t('subscription.time'), dataIndex: 'fetchedAt', key: 'fetchedAt', width: 180 },
   { title: t('subscription.newTorrents'), dataIndex: 'newCount', key: 'newCount', width: 100 },
-  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100 },
+  { title: t('common.status'), dataIndex: 'status', key: 'status', width: 100, customRender: ({ text }: { text: string }) => translateFetchStatus(text) },
 ]
 
 async function fetchDownloaders() {

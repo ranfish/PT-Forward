@@ -67,7 +67,7 @@ import type { PublishGroup } from '@/api/types'
 const route = useRoute()
 const groupId = Number(route.params.id)
 const { t } = useI18n()
-const { translatePublishStatus } = useEnumLabels()
+const { translatePublishStatus, translatePublishRole } = useEnumLabels()
 
 function copyHash(text: string) {
   copyToClipboard(text)
@@ -93,7 +93,7 @@ const memberColumns = [
   { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
   { title: 'InfoHash', dataIndex: 'info_hash', key: 'info_hash', ellipsis: true },
   { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
-  { title: t('publish.columnRole'), dataIndex: 'role', key: 'role', width: 80 },
+  { title: t('publish.columnRole'), dataIndex: 'role', key: 'role', width: 80, customRender: ({ text }: { text: string }) => translatePublishRole(text) },
   { title: t('common.status'), key: 'status', width: 100 },
   { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
