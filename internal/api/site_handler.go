@@ -488,6 +488,24 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if remaining == "export" {
+		if r.Method == http.MethodGet {
+			h.handleExport(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
+	if remaining == "import" {
+		if r.Method == http.MethodPost {
+			h.handleImport(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
 	if len(parts) == 1 {
 		switch r.Method {
 		case http.MethodGet:
@@ -538,6 +556,157 @@ func (h *SiteHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) 
 	default:
 		Error(w, http.StatusNotFound, 40400, "路径不存在")
 	}
+}
+
+type siteExportImport struct {
+	Domain string `json:"domain"`
+	Name   string `json:"name"`
+
+	Passkey     string `json:"passkey"`
+	APIKey      string `json:"api_key"`
+	BearerToken string `json:"bearer_token"`
+	AuthKey     string `json:"auth_key"`
+	AuthHash    string `json:"auth_hash"`
+	UserID      int    `json:"user_id"`
+	RSSKey      string `json:"rss_key"`
+
+	BaseURL  string `json:"base_url"`
+	AuthType string `json:"auth_type"`
+	Enabled  bool   `json:"enabled"`
+
+	CookieCloudSync   bool   `json:"cookie_cloud_sync"`
+	CookieCloudDomain string `json:"cookie_cloud_domain"`
+
+	IsSource               bool   `json:"is_source"`
+	IsTarget               bool   `json:"is_target"`
+	TargetTypes            string `json:"target_types"`
+	ParticipateAutoPublish bool   `json:"participate_auto_publish"`
+
+	HRStrategy       string `json:"hr_strategy"`
+	OverrideRSSURL   string `json:"override_rss_url"`
+	OverrideSavePath string `json:"override_save_path"`
+
+	AssumeFree bool `json:"assume_free"`
+
+	ProxyURL       string `json:"proxy_url"`
+	UseGlobalProxy bool   `json:"use_global_proxy"`
+	SkipSSLVerify  bool   `json:"skip_ssl_verify"`
+	MaxConcurrent  int    `json:"max_concurrent"`
+
+	ReseedLimitCount    int `json:"reseed_limit_count"`
+	ReseedLimitInterval int `json:"reseed_limit_interval"`
+	IYUULimitCount      int `json:"iyuu_limit_count"`
+	IYUULimitInterval   int `json:"iyuu_limit_interval"`
+
+	AlternativeDomains    string `json:"alternative_domains"`
+	TrackerDomains        string `json:"tracker_domains"`
+	SupportsPiecesHashAPI bool   `json:"supports_pieces_hash_api"`
+	APIDomain             string `json:"api_domain"`
+}
+
+var siteImportFields = []string{
+	"passkey", "api_key", "bearer_token", "auth_key", "auth_hash", "user_id", "rss_key",
+	"base_url", "auth_type", "enabled",
+	"cookie_cloud_sync", "cookie_cloud_domain",
+	"is_source", "is_target", "target_types", "participate_auto_publish",
+	"hr_strategy", "override_rss_url", "override_save_path",
+	"assume_free",
+	"proxy_url", "use_global_proxy", "skip_ssl_verify", "max_concurrent",
+	"reseed_limit_count", "reseed_limit_interval", "iyuu_limit_count", "iyuu_limit_interval",
+	"alternative_domains", "tracker_domains", "supports_pieces_hash_api", "api_domain",
+}
+
+type siteImportResult struct {
+	Total   int      `json:"total"`
+	Updated int      `json:"updated"`
+	Skipped []string `json:"skipped"`
+	Errors  []string `json:"errors"`
+}
+
+func (h *SiteHandler) handleExport(w http.ResponseWriter, r *http.Request) {
+	var sites []model.Site
+	if err := h.db.WithContext(r.Context()).Where("enabled = ?", true).Find(&sites).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询站点失败")
+		return
+	}
+	out := make([]siteExportImport, 0, len(sites))
+	for i := range sites {
+		s := &sites[i]
+		out = append(out, siteExportImport{
+			Domain: s.Domain, Name: s.Name,
+			Passkey:                s.Passkey,
+			APIKey:                 s.APIKey,
+			BearerToken:            s.BearerToken,
+			AuthKey:                s.AuthKey,
+			AuthHash:               s.AuthHash,
+			UserID:                 s.UserID,
+			RSSKey:                 s.RSSKey,
+			BaseURL:                s.BaseURL,
+			AuthType:               s.AuthType,
+			Enabled:                s.Enabled,
+			CookieCloudSync:        s.CookieCloudSync,
+			CookieCloudDomain:      s.CookieCloudDomain,
+			IsSource:               s.IsSource,
+			IsTarget:               s.IsTarget,
+			TargetTypes:            s.TargetTypes,
+			ParticipateAutoPublish: s.ParticipateAutoPublish,
+			HRStrategy:             s.HRStrategy,
+			OverrideRSSURL:         s.OverrideRSSURL,
+			OverrideSavePath:       s.OverrideSavePath,
+			AssumeFree:             s.AssumeFree,
+			ProxyURL:               s.ProxyURL,
+			UseGlobalProxy:         s.UseGlobalProxy,
+			SkipSSLVerify:          s.SkipSSLVerify,
+			MaxConcurrent:          s.MaxConcurrent,
+			ReseedLimitCount:       s.ReseedLimitCount,
+			ReseedLimitInterval:    s.ReseedLimitInterval,
+			IYUULimitCount:         s.IYUULimitCount,
+			IYUULimitInterval:      s.IYUULimitInterval,
+			AlternativeDomains:     s.AlternativeDomains,
+			TrackerDomains:         s.TrackerDomains,
+			SupportsPiecesHashAPI:  s.SupportsPiecesHashAPI,
+			APIDomain:              s.APIDomain,
+		})
+	}
+	w.Header().Set("Content-Disposition", `attachment; filename="pt-forward-sites-export.json"`)
+	Success(w, map[string]interface{}{
+		"version":     1,
+		"exported_at": time.Now().Format(time.RFC3339),
+		"warning":     "本文件含明文凭证（passkey/apikey 等），请妥善保管，勿传云盘/入 git",
+		"sites":       out,
+	})
+}
+
+func (h *SiteHandler) handleImport(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Sites []siteExportImport `json:"sites"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	result := siteImportResult{Skipped: []string{}, Errors: []string{}}
+	for i := range req.Sites {
+		in := &req.Sites[i]
+		result.Total++
+		if in.Domain == "" {
+			result.Errors = append(result.Errors, "缺少 domain")
+			continue
+		}
+		var existing model.Site
+		if err := h.db.WithContext(r.Context()).Where("domain = ?", in.Domain).First(&existing).Error; err != nil {
+			result.Skipped = append(result.Skipped, in.Domain)
+			continue
+		}
+		if err := h.db.WithContext(r.Context()).Model(&existing).Select(siteImportFields).Updates(in).Error; err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", in.Domain, err))
+			continue
+		}
+		result.Updated++
+	}
+	auditLog(r, "site", "import", "sites", "", fmt.Sprintf("total=%d updated=%d skipped=%d", result.Total, result.Updated, len(result.Skipped)), "success")
+	h.logger.Info("sites imported", zap.Int("total", result.Total), zap.Int("updated", result.Updated), zap.Int("skipped", len(result.Skipped)))
+	Success(w, result)
 }
 
 func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
