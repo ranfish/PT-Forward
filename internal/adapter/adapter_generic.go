@@ -63,6 +63,8 @@ var (
 	reTTGDownload  = regexp.MustCompile(`(?i)下载量\s*:?\s*</font>\s*<font[^>]*>\s*(?:<a[^>]*>)?\s*([\d.]+)\s*(TB|GB|MB|KB|B)`)
 	reTTGSeeding   = regexp.MustCompile(`(?i)alt=['"]做种中['"][^>]*>(?:\s|&nbsp;)*(?:<[^>]*>)*\s*(\d+)`)
 	reTTGBonus     = regexp.MustCompile(`(?i)积分\s*:?\s*<a[^>]*>([\d.]+)</a>`)
+	reTTGUserID    = regexp.MustCompile(`(?i)/userdetails\.php\?id=(\d+)`)
+	reTTGUserClass = regexp.MustCompile(`(?i)等级\s*</td>\s*<td[^>]*>([^<]+)</td>`)
 
 	starSpaceUserClassMap = map[string]string{
 		"0": "未激活", "1": "User", "2": "Power User", "3": "Elite User",
@@ -1387,6 +1389,11 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 	} else if m := reHDRouteUserClass.FindStringSubmatch(html); len(m) > 1 {
 		result.UserClass = m[1]
 	}
+	if result.UserClass == "" && strings.Contains(config.Domain, "totheglory") {
+		if idm := reTTGUserID.FindStringSubmatch(html); len(idm) > 1 {
+			result.UserClass = a.fetchTTGUserClass(ctx, config, idm[1])
+		}
+	}
 	// hdroute: extract seeding size from peering-size (first match = seeding)
 	if result.SeedingSize == 0 {
 		if m := reHDRouteSeedSize.FindStringSubmatch(html); len(m) > 2 {
@@ -1399,5 +1406,31 @@ func (a *GenericAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 	if result.SeedingSize == 0 {
 		a.fetchSeedingSizeFromBonusHour(ctx, config, result)
 	}
+
 	return result, nil
+}
+
+func (a *GenericAdapter) fetchTTGUserClass(ctx context.Context, config *model.SiteConfig, userID string) string {
+	detailURL := config.Domain + "/userdetails.php?id=" + userID
+	req, err := http.NewRequestWithContext(ctx, "GET", detailURL, nil)
+	if err != nil {
+		return ""
+	}
+	setCommonHeaders(req, config.Cookie)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer httpclient.DrainBody(resp)
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ""
+	}
+	if m := reTTGUserClass.FindStringSubmatch(string(body)); len(m) > 1 {
+		return strings.TrimSpace(m[1])
+	}
+	return ""
 }
