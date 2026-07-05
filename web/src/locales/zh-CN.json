@@ -74,7 +74,10 @@
     "advancedOptions": "高级选项",
     "requestFailed": "请求失败",
     "networkError": "网络错误",
-    "saveSuccess": "保存成功"
+    "saveSuccess": "保存成功",
+    "action": "操作",
+    "confirm": "确认",
+    "items": "条"
   },
   "auth": {
     "login": "登录",
@@ -436,7 +439,9 @@
     "reseedPathPlaceholder": "辅种路径",
     "addPathMapping": "添加路径映射",
     "typeQbittorrent": "qBittorrent",
-    "typeTransmission": "Transmission"
+    "typeTransmission": "Transmission",
+    "transferTargetId": "辅种目标",
+    "transferTargetIdPlaceholder": "选择辅种目标下载器"
   },
   "subscription": {
     "title": "标题",
