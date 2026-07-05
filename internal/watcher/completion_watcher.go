@@ -302,7 +302,8 @@ func (w *CompletionWatcher) transferToReseed(ctx context.Context, candidate *mod
 
 	opts := model.AddTorrentOptions{
 		SavePath: reseedPath,
-		Category: "reseed",
+		Category: torrent.Category,
+		Tags:     torrent.Tags,
 		Paused:   false,
 	}
 
