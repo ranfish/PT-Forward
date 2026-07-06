@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -75,6 +76,14 @@ func (h *ReseedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleCancel(w, r, taskID)
 	case "matches":
 		if len(parts) == 3 && parts[2] != "" {
+			if parts[2] == "batch-retry" {
+				h.handleBatchRetryMatches(w, r, taskID)
+				return
+			}
+			if parts[2] == "batch-delete" {
+				h.handleBatchDeleteMatches(w, r, taskID)
+				return
+			}
 			subParts := strings.SplitN(parts[2], "/", 2)
 			if len(subParts) == 2 && subParts[1] == "retry" {
 				matchID, retryErr := parseMatchID(subParts[0])
@@ -420,7 +429,9 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	infoHash := r.URL.Query().Get("infoHash")
+	clientID := r.URL.Query().Get("clientId")
+	site := r.URL.Query().Get("site")
+	torrentID := r.URL.Query().Get("torrentId")
 	status := r.URL.Query().Get("status")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
@@ -431,13 +442,19 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 		pageSize = 20
 	}
 
-	query := h.engine.DB().Model(&model.ReseedMatch{}).Where("source_info_hash IN (?)",
-		h.engine.DB().Model(&model.ReseedMatch{}).Select("DISTINCT source_info_hash"),
-	)
+	_ = taskIDStr // matches 表无 task_id，全局筛选
 
-	_ = taskIDStr // task_id 不在 matches 表中，忽略
-	_ = infoHash  // 保留兼容性
+	query := h.engine.DB().Model(&model.ReseedMatch{})
 
+	if clientID != "" {
+		query = query.Where("client_id = ?", clientID)
+	}
+	if site != "" {
+		query = query.Where("target_site = ? OR source_site = ?", site, site)
+	}
+	if torrentID != "" {
+		query = query.Where("source_torrent_id LIKE ? OR target_torrent_id LIKE ?", "%"+torrentID+"%", "%"+torrentID+"%")
+	}
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -542,6 +559,88 @@ func (h *ReseedHandler) handleRetryMatch(w http.ResponseWriter, r *http.Request,
 
 	h.logger.Info("reseed match retry triggered", zap.Uint("id", id))
 	Success(w, match)
+}
+
+func (h *ReseedHandler) handleBatchRetryMatches(w http.ResponseWriter, r *http.Request, taskID uint) {
+	if r.Method != http.MethodPost {
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+	var req struct {
+		MatchIDs []uint `json:"match_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if len(req.MatchIDs) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "match_ids 不能为空")
+		return
+	}
+	if len(req.MatchIDs) > 100 {
+		Error(w, http.StatusBadRequest, 40001, "单次最多重试 100 条")
+		return
+	}
+
+	_ = taskID
+
+	var succeeded, failed uint
+	var failMsgs []string
+	for _, id := range req.MatchIDs {
+		if _, err := h.engine.RetryMatch(r.Context(), id); err != nil {
+			failed++
+			failMsgs = append(failMsgs, fmt.Sprintf("id=%d: %v", id, err))
+		} else {
+			succeeded++
+		}
+	}
+
+	h.logger.Info("reseed matches batch retry",
+		zap.Uint("task_id", taskID),
+		zap.Int("count", len(req.MatchIDs)),
+		zap.Uint("succeeded", succeeded),
+		zap.Uint("failed", failed))
+
+	Success(w, map[string]interface{}{
+		"succeeded": succeeded,
+		"failed":    failed,
+		"messages":  failMsgs,
+	})
+}
+
+func (h *ReseedHandler) handleBatchDeleteMatches(w http.ResponseWriter, r *http.Request, taskID uint) {
+	if r.Method != http.MethodPost {
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+	var req struct {
+		MatchIDs []uint `json:"match_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if len(req.MatchIDs) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "match_ids 不能为空")
+		return
+	}
+
+	_ = taskID
+
+	result := h.engine.DB().Where("id IN ?", req.MatchIDs).Delete(&model.ReseedMatch{})
+	if result.Error != nil {
+		Error(w, http.StatusInternalServerError, 50000, "删除失败")
+		return
+	}
+
+	h.logger.Info("reseed matches batch delete",
+		zap.Uint("task_id", taskID),
+		zap.Int("count", len(req.MatchIDs)),
+		zap.Int64("deleted", result.RowsAffected))
+
+	Success(w, map[string]interface{}{
+		"deleted": result.RowsAffected,
+	})
 }
 
 func (h *ReseedHandler) handleNegativeCache(w http.ResponseWriter, r *http.Request) {

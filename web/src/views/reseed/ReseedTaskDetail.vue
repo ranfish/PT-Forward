@@ -19,6 +19,25 @@
 
         <a-tabs v-model:active-key="activeTab">
           <a-tab-pane key="matches" :tab="t('reseed.matchResults')">
+            <div style="margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+              <a-input v-model:value="filter.clientId" placeholder="客户端" style="width: 150px" allow-clear @press-enter="onFilterSearch" />
+              <a-input v-model:value="filter.site" placeholder="站点" style="width: 150px" allow-clear @press-enter="onFilterSearch" />
+              <a-input v-model:value="filter.torrentId" placeholder="种子ID" style="width: 130px" allow-clear @press-enter="onFilterSearch" />
+              <a-select v-model:value="filter.status" placeholder="状态" style="width: 120px" allow-clear>
+                <a-select-option value="matched">待注入</a-select-option>
+                <a-select-option value="injected">已注入</a-select-option>
+                <a-select-option value="failed">失败</a-select-option>
+              </a-select>
+              <a-button type="primary" @click="onFilterSearch">查询</a-button>
+              <a-button @click="onFilterReset">重置</a-button>
+            </div>
+            <div v-if="selectedMatchKeys.length" style="margin-bottom: 12px; display: flex; gap: 12px; align-items: center; padding: 8px 12px; background: #e6f4ff; border-radius: 4px">
+              <span>已选 {{ selectedMatchKeys.length }} 项</span>
+              <a-button size="small" @click="batchRetryFailed">重试失败</a-button>
+              <a-popconfirm :title="`确认删除选中的 ${selectedMatchKeys.length} 条记录？`" @confirm="batchDelete">
+                <a-button size="small" danger>{{ t('common.delete') }}</a-button>
+              </a-popconfirm>
+            </div>
             <a-table
               :columns="matchColumns"
               :data-source="matches"
@@ -30,6 +49,7 @@
                 showSizeChanger: true,
                 showTotal: (t: number) => `${t} 条`,
               }"
+              :row-selection="{ selectedRowKeys: selectedMatchKeys, onChange: onSelectChange }"
               row-key="id"
               size="small"
               @change="handleMatchesChange"
@@ -115,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
@@ -201,6 +221,9 @@ const matchesPage = ref(1)
 const matchesPageSize = ref(20)
 const activeTab = ref('matches')
 
+const filter = reactive({ clientId: '', site: '', torrentId: '', status: '' })
+const selectedMatchKeys = ref<number[]>([])
+
 const negDeleteInfoHash = ref('')
 const negDeleteSite = ref('')
 
@@ -223,6 +246,7 @@ const iyuuColumns = [
 
 const matchColumns = [
   { title: t('reseed.sourceInfoHash'), dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true },
+  { title: '客户端', dataIndex: 'client_id', key: 'client_id', width: 100 },
   { title: t('reseed.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120 },
   { title: t('reseed.targetInfoHash'), dataIndex: 'target_info_hash', key: 'target_info_hash', ellipsis: true },
   { title: t('reseed.matchMethod'), dataIndex: 'match_method', key: 'match_method', width: 100, customRender: ({ text }: { text: string }) => translateMatchMethod(text) },
@@ -252,7 +276,14 @@ async function fetchTask() {
 async function fetchMatches() {
   matchesLoading.value = true
   try {
-    const resp = await reseedApi.getMatches(taskId, matchesPage.value, matchesPageSize.value)
+    const resp = await reseedApi.getMatches(taskId, {
+      page: matchesPage.value,
+      pageSize: matchesPageSize.value,
+      clientId: filter.clientId || undefined,
+      site: filter.site || undefined,
+      torrentId: filter.torrentId || undefined,
+      status: filter.status || undefined,
+    })
     matches.value = resp.data.data?.items ?? []
     matchesTotal.value = resp.data.data?.total ?? 0
   } catch (e: unknown) {
@@ -266,6 +297,58 @@ function handleMatchesChange(pag: { current?: number; pageSize?: number }) {
   if (pag.current) matchesPage.value = pag.current
   if (pag.pageSize) matchesPageSize.value = pag.pageSize
   fetchMatches()
+}
+
+function onFilterSearch() {
+  matchesPage.value = 1
+  selectedMatchKeys.value = []
+  fetchMatches()
+}
+
+function onFilterReset() {
+  filter.clientId = ''
+  filter.site = ''
+  filter.torrentId = ''
+  filter.status = ''
+  matchesPage.value = 1
+  selectedMatchKeys.value = []
+  fetchMatches()
+}
+
+function onSelectChange(keys: number[]) {
+  selectedMatchKeys.value = keys
+}
+
+async function batchRetryFailed() {
+  const failedIds = matches.value
+    .filter(m => selectedMatchKeys.value.includes(m.id) && m.status === 'failed')
+    .map(m => m.id)
+  if (!failedIds.length) {
+    message.warning('选中的记录中没有失败项')
+    return
+  }
+  try {
+    const resp = await reseedApi.batchRetryMatches(taskId, failedIds)
+    const d = resp.data.data
+    message.success(`重试完成：成功 ${d?.succeeded ?? 0}，失败 ${d?.failed ?? 0}`)
+    selectedMatchKeys.value = []
+    fetchMatches()
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  }
+}
+
+async function batchDelete() {
+  if (!selectedMatchKeys.value.length) return
+  try {
+    const resp = await reseedApi.batchDeleteMatches(taskId, selectedMatchKeys.value)
+    const deleted = resp.data.data?.deleted ?? 0
+    message.success(`已删除 ${deleted} 条`)
+    selectedMatchKeys.value = []
+    fetchMatches()
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  }
 }
 
 async function retryMatch(matchId: number) {
