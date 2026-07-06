@@ -64,7 +64,7 @@ type ReseedTask struct {
 
 	SizeTolerancePercent float64 `json:"size_tolerance_percent" gorm:"default:1.0"`
 
-	MaxInjectionsPerRun  int    `json:"max_injections_per_run" gorm:"default:100"`
+	MaxInjectionsPerRun  int    `json:"max_injections_per_run"`
 	InjectionIntervalS   int    `json:"injection_interval_s" gorm:"default:15"`
 	InjectionJitterS     int    `json:"injection_jitter_s" gorm:"default:5"`
 	InjectionConcurrency int    `json:"injection_concurrency" gorm:"default:3"`
