@@ -9,6 +9,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/companion"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/rule"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -19,6 +20,7 @@ type Syncer struct {
 	clientMgr   *client.Manager
 	ruleModule  *rule.Module
 	fitTimer    *rule.FitTimer
+	runtimeCfg  *setting.RuntimeConfig
 	logger      *zap.Logger
 	schedules   map[string]*clientSchedule
 }
@@ -29,13 +31,14 @@ type clientSchedule struct {
 	lastTransfer time.Time
 }
 
-func NewSyncer(db *gorm.DB, clientMgr *client.Manager, logger *zap.Logger) *Syncer {
+func NewSyncer(db *gorm.DB, clientMgr *client.Manager, runtimeCfg *setting.RuntimeConfig, logger *zap.Logger) *Syncer {
 	return &Syncer{
 		db:         db,
 		repo:       NewRepository(db),
 		clientMgr:  clientMgr,
 		ruleModule: rule.NewModule(db),
 		fitTimer:   rule.NewFitTimer(),
+		runtimeCfg: runtimeCfg,
 		logger:     logger,
 		schedules:  make(map[string]*clientSchedule),
 	}
@@ -278,24 +281,27 @@ func (s *Syncer) updateTaskProgress(ctx context.Context, clientID string, ti *mo
 		return
 	}
 
-	s.repo.UpdateProgress(ctx, task.ID, map[string]interface{}{
-		"status":          status,
-		"progress":        progress,
-		"error_message":   ti.Error,
-		"upload_speed":    ti.UploadSpeed,
-		"download_speed":  ti.DownloadSpeed,
-		"ratio":           ti.Ratio,
-		"uploaded":        ti.Uploaded,
-		"num_seeds":       ti.NumComplete,
-		"num_peers":       ti.NumIncomplete,
-	})
+	updates := map[string]interface{}{
+		"status":         status,
+		"progress":       progress,
+		"error_message":  ti.Error,
+		"upload_speed":   ti.UploadSpeed,
+		"download_speed": ti.DownloadSpeed,
+		"ratio":          ti.Ratio,
+		"uploaded":       ti.Uploaded,
+		"num_seeds":      ti.NumComplete,
+		"num_peers":      ti.NumIncomplete,
+	}
 
 	if status == model.DownloadStatusCompleted && task.Status != model.DownloadStatusCompleted {
+		updates["completed_at"] = time.Now()
 		s.logger.Info("download completed",
 			zap.Uint("id", task.ID),
 			zap.String("client", clientID),
 			zap.String("name", ti.Name))
 	}
+
+	s.repo.UpdateProgress(ctx, task.ID, updates)
 }
 
 func (s *Syncer) importTask(ctx context.Context, clientID string, ti *model.TorrentInfo) {
@@ -339,12 +345,18 @@ func (s *Syncer) importTask(ctx context.Context, clientID string, ti *model.Torr
 
 func (s *Syncer) processClientTransfers(ctx context.Context, clientName string) {
 	var tasks []model.DownloadTask
-	s.db.WithContext(ctx).
+	query := s.db.WithContext(ctx).
 		Where("status = ? AND transfer_status != ? AND client_id = ?",
 			model.DownloadStatusCompleted,
 			model.TransferStatusTransferred,
-			clientName).
-		Find(&tasks)
+			clientName)
+
+	if cooldown := s.runtimeCfg.GetInt(ctx, setting.KeyTransferCooldownSeconds); cooldown > 0 {
+		cutoff := time.Now().Add(-time.Duration(cooldown) * time.Second)
+		query = query.Where("(completed_at IS NULL OR completed_at < ?)", cutoff)
+	}
+
+	query.Find(&tasks)
 
 	for _, task := range tasks {
 		s.processTransfer(ctx, &task)
@@ -402,10 +414,17 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 			return
 		}
 
-		s.logger.Info("transfer: added to target",
-			zap.Uint("id", task.ID),
-			zap.String("target", targetID),
-			zap.String("new_hash", result.InfoHash))
+		if result.IsDuplicate {
+			s.logger.Info("transfer: target already has torrent (skip add)",
+				zap.Uint("id", task.ID),
+				zap.String("target", targetID),
+				zap.String("hash", result.InfoHash))
+		} else {
+			s.logger.Info("transfer: added to target",
+				zap.Uint("id", task.ID),
+				zap.String("target", targetID),
+				zap.String("new_hash", result.InfoHash))
+		}
 
 		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetID, result.InfoHash)
 		task.TransferHash = result.InfoHash
