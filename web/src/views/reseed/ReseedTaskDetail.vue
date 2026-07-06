@@ -30,9 +30,9 @@
                 showSizeChanger: true,
                 showTotal: (t: number) => `${t} 条`,
               }"
-              @change="handleMatchesChange"
               row-key="id"
               size="small"
+              @change="handleMatchesChange"
             >
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'source_info_hash'">
@@ -69,6 +69,45 @@
             </div>
             <a-empty :description="t('reseed.deleteNegativeCacheDesc')" />
           </a-tab-pane>
+          <a-tab-pane key="iyuu" tab="IYUU日志">
+            <div v-if="iyuuStats" style="margin-bottom: 16px; display: flex; gap: 24px; flex-wrap: wrap; padding: 12px; background: #fafafa; border-radius: 4px">
+              <span>调用次数: <strong>{{ iyuuStats.TotalCalls }}</strong></span>
+              <span style="color: #3f8600">成功: <strong>{{ iyuuStats.SuccessCalls }}</strong></span>
+              <span style="color: #cf1322">失败: <strong>{{ iyuuStats.ErrorCalls }}</strong></span>
+              <span>请求hash: <strong>{{ iyuuStats.TotalRequests }}</strong></span>
+              <span>匹配hash: <strong>{{ iyuuStats.TotalMatched }}</strong></span>
+              <span>返回目标: <strong>{{ iyuuStats.TotalTargets }}</strong></span>
+            </div>
+            <a-table
+              :columns="iyuuColumns"
+              :data-source="iyuuLogs"
+              :loading="iyuuLoading"
+              :pagination="{
+                current: iyuuPage,
+                pageSize: iyuuPageSize,
+                total: iyuuTotal,
+                showSizeChanger: true,
+                showTotal: (t: number) => `${t} 条`,
+              }"
+              row-key="id"
+              size="small"
+              @change="handleIYUUChange"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <a-tag :color="record.status === 'success' ? 'green' : 'red'">{{ record.status === 'success' ? '成功' : '失败' }}</a-tag>
+                </template>
+                <template v-if="column.key === 'created_at'">
+                  {{ formatTime(record.created_at) }}
+                </template>
+                <template v-if="column.key === 'message'">
+                  <a-tooltip :title="record.message">
+                    <span style="display: inline-block; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ record.message || '-' }}</span>
+                  </a-tooltip>
+                </template>
+              </template>
+            </a-table>
+          </a-tab-pane>
         </a-tabs>
       </template>
     </a-spin>
@@ -80,7 +119,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { reseedApi } from '@/api/reseed'
+import { reseedApi, type ReseedIYUULog, type IYUULogStats } from '@/api/reseed'
 import { sitesApi } from '@/api/sites'
 import { downloadersApi } from '@/api/downloaders'
 import { formatTime, copyToClipboard } from '@/utils/format'
@@ -165,6 +204,23 @@ const activeTab = ref('matches')
 const negDeleteInfoHash = ref('')
 const negDeleteSite = ref('')
 
+const iyuuLoading = ref(false)
+const iyuuLogs = ref<ReseedIYUULog[]>([])
+const iyuuTotal = ref(0)
+const iyuuPage = ref(1)
+const iyuuPageSize = ref(20)
+const iyuuStats = ref<IYUULogStats | null>(null)
+
+const iyuuColumns = [
+  { title: '时间', key: 'created_at', width: 180 },
+  { title: '状态', key: 'status', width: 80 },
+  { title: '请求hash', dataIndex: 'request_hashes', key: 'request_hashes', width: 90 },
+  { title: '匹配hash', dataIndex: 'matched_hashes', key: 'matched_hashes', width: 90 },
+  { title: '返回目标', dataIndex: 'response_targets', key: 'response_targets', width: 90 },
+  { title: '耗时(ms)', dataIndex: 'duration_ms', key: 'duration_ms', width: 90 },
+  { title: '消息', key: 'message', ellipsis: true },
+]
+
 const matchColumns = [
   { title: t('reseed.sourceInfoHash'), dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true },
   { title: t('reseed.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120 },
@@ -234,10 +290,31 @@ async function deleteNegativeCache() {
   }
 }
 
+async function fetchIYUULogs() {
+  iyuuLoading.value = true
+  try {
+    const resp = await reseedApi.getIYUULogs(taskId, iyuuPage.value, iyuuPageSize.value)
+    iyuuLogs.value = resp.data.data?.items ?? []
+    iyuuTotal.value = resp.data.data?.total ?? 0
+    iyuuStats.value = resp.data.data?.stats ?? null
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  } finally {
+    iyuuLoading.value = false
+  }
+}
+
+function handleIYUUChange(pag: { current?: number; pageSize?: number }) {
+  if (pag.current) iyuuPage.value = pag.current
+  if (pag.pageSize) iyuuPageSize.value = pag.pageSize
+  fetchIYUULogs()
+}
+
 onMounted(() => {
   fetchSiteMap()
   fetchDownloaderMap()
   fetchTask()
   fetchMatches()
+  fetchIYUULogs()
 })
 </script>

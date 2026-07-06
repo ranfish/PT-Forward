@@ -1,6 +1,27 @@
 import client from './client'
 import type { ApiResponse, ApiResponsePaginated, ReseedTask, ReseedMatch, UpdatePartial } from './types'
 
+export interface ReseedIYUULog {
+  id: number
+  created_at: string
+  task_id: number
+  request_hashes: number
+  response_targets: number
+  matched_hashes: number
+  status: string
+  message: string
+  duration_ms: number
+}
+
+export interface IYUULogStats {
+  TotalCalls: number
+  SuccessCalls: number
+  ErrorCalls: number
+  TotalRequests: number
+  TotalMatched: number
+  TotalTargets: number
+}
+
 export const reseedApi = {
   listTasks(page = 1, size = 20) {
     return client.get<ApiResponsePaginated<ReseedTask>>('/reseed/tasks', { params: { page, size } })
@@ -36,5 +57,11 @@ export const reseedApi = {
     const params: Record<string, string> = { infoHash }
     if (site) params.site = site
     return client.delete<ApiResponse<void>>(`/reseed/tasks/${taskId}/negative-cache`, { params })
+  },
+  getIYUULogs(taskId: number, page?: number, pageSize?: number) {
+    const params: Record<string, number> = {}
+    if (page) params.page = page
+    if (pageSize) params.pageSize = pageSize
+    return client.get<ApiResponse<{ items: ReseedIYUULog[]; total: number; page: number; pageSize: number; stats: IYUULogStats }>>(`/reseed/tasks/${taskId}/iyuu-logs`, { params })
   },
 }

@@ -91,6 +91,8 @@ func (h *ReseedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	case "negative-cache":
 		h.handleNegativeCache(w, r)
+	case "iyuu-logs":
+		h.handleListIYUULogs(w, r, taskID)
 	default:
 		Error(w, http.StatusNotFound, 40400, "路径不存在")
 	}
@@ -451,6 +453,51 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 		"total":    total,
 		"page":     page,
 		"pageSize": pageSize,
+	})
+}
+
+func (h *ReseedHandler) handleListIYUULogs(w http.ResponseWriter, r *http.Request, taskID uint) {
+	if r.Method != http.MethodGet {
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
+
+	query := h.engine.DB().Model(&model.ReseedIYUULog{}).Where("task_id = ?", taskID)
+
+	var total int64
+	query.Count(&total)
+
+	var logs []model.ReseedIYUULog
+	query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs)
+
+	type iyuuLogStats struct {
+		TotalCalls    int64
+		SuccessCalls  int64
+		ErrorCalls    int64
+		TotalRequests int64
+		TotalMatched  int64
+		TotalTargets  int64
+	}
+	var stats iyuuLogStats
+	h.engine.DB().Model(&model.ReseedIYUULog{}).Where("task_id = ?", taskID).
+		Select("COUNT(*) as total_calls, COALESCE(SUM(CASE WHEN status='success' THEN 1 ELSE 0 END),0) as success_calls, COALESCE(SUM(CASE WHEN status='error' THEN 1 ELSE 0 END),0) as error_calls, COALESCE(SUM(request_hashes),0) as total_requests, COALESCE(SUM(matched_hashes),0) as total_matched, COALESCE(SUM(response_targets),0) as total_targets").
+		Scan(&stats)
+
+	Success(w, map[string]interface{}{
+		"items":    logs,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+		"stats":    stats,
 	})
 }
 
