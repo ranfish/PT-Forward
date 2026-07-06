@@ -29,10 +29,15 @@
           {{ translateRole(record.role) }}
         </template>
         <template v-if="column.key === 'enabled'">
-          <a-badge
-            :status="!record.enabled ? 'default' : (record.connected ? 'success' : 'error')"
-            :text="!record.enabled ? t('common.disabled') : (record.connected ? t('common.online') : t('common.disconnected'))"
-          />
+          <a-space :size="8" align="center">
+            <a-switch :checked="record.enabled" size="small" @change="(val: boolean) => toggleEnabled(record, val)" />
+            <a-badge
+              v-if="record.enabled"
+              :status="record.connected ? 'success' : 'error'"
+              :text="record.connected ? t('common.online') : t('common.disconnected')"
+            />
+            <span v-else style="color: #999">{{ t('common.disabled') }}</span>
+          </a-space>
         </template>
         <template v-if="column.key === 'downloadSpeed'">
           <span><ArrowDownOutlined /> {{ formatSpeed(record.downloadSpeed) }}</span>
@@ -191,7 +196,7 @@ const columns = [
   { title: t('downloader.freeSpace'), key: 'freeSpace', width: 120 },
   { title: t('downloader.totalDiskSpace'), key: 'totalDiskSpace', width: 120 },
   { title: t('downloader.role'), dataIndex: 'role', key: 'role', width: 110 },
-  { title: t('common.enable'), dataIndex: 'enabled', key: 'enabled', width: 80 },
+  { title: t('common.enable'), dataIndex: 'enabled', key: 'enabled', width: 160 },
   { title: t('common.actions'), key: 'actions', width: 260 },
 ]
 
@@ -241,6 +246,17 @@ async function testConnection(id: number) {
     message.success(t('common.testSuccess'))
   } catch (e: unknown) {
     message.error((e as Error).message)
+  }
+}
+
+async function toggleEnabled(record: ClientConfig, val: boolean) {
+  try {
+    await downloadersApi.update(record.id, { ...record, enabled: val })
+    record.enabled = val
+    message.success(t('common.operationSuccess'))
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+    pagination.fetch()
   }
 }
 

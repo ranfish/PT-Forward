@@ -137,8 +137,8 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item :label="t('reseed.maxInjectionsPerRun')" name="maxInjectionsPerRun">
-              <a-input-number v-model:value="form.maxInjectionsPerRun" :min="0" :max="10000" style="width: 100%" placeholder="0" />
+            <a-form-item :label="t('reseed.maxInjectionsPerRun')" name="maxInjectionsPerRun" help="0 为不限制，最大 100">
+              <a-input-number v-model:value="form.maxInjectionsPerRun" :min="0" :max="100" style="width: 100%" />
             </a-form-item>
           </a-col>
         </a-row>

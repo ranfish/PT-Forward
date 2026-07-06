@@ -194,9 +194,6 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if task.ConfidenceThreshold == 0 {
 		task.ConfidenceThreshold = 0.7
 	}
-	if task.MaxInjectionsPerRun == 0 {
-		task.MaxInjectionsPerRun = 100
-	}
 	if task.ReseedCategory == "" {
 		task.ReseedCategory = "cross-seed"
 	}
