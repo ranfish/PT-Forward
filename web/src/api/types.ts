@@ -565,6 +565,8 @@ export interface ReseedMatch {
   fail_reason: string
   retry_count: number
   next_retry_at: string | null
+  directory?: string
+  source_detail_url?: string
 }
 
 export interface CookieCloudConfig {

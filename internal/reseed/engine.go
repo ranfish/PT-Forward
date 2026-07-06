@@ -3038,6 +3038,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		"target_info_hash": infoHash,
 		"injected_at":      &now,
 		"updated_at":       now,
+		"directory":        opts.SavePath,
 	}).Error
 }
 

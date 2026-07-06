@@ -44,7 +44,7 @@ export const reseedApi = {
   cancelTask(id: number) {
     return client.post<ApiResponse<void>>(`/reseed/tasks/${id}/cancel`)
   },
-  getMatches(taskId: number, opts?: { page?: number; pageSize?: number; clientId?: string; site?: string; torrentId?: string; status?: string }) {
+  getMatches(taskId: number, opts?: { page?: number; pageSize?: number; clientId?: string; site?: string; torrentId?: string; status?: string; orderField?: string; order?: string }) {
     const params: Record<string, string | number> = {}
     if (opts?.page) params.page = opts.page
     if (opts?.pageSize) params.pageSize = opts.pageSize
@@ -52,7 +52,12 @@ export const reseedApi = {
     if (opts?.site) params.site = opts.site
     if (opts?.torrentId) params.torrentId = opts.torrentId
     if (opts?.status) params.status = opts.status
+    if (opts?.orderField) params.orderField = opts.orderField
+    if (opts?.order) params.order = opts.order
     return client.get<ApiResponse<{ items: ReseedMatch[]; total: number; page: number; pageSize: number }>>(`/reseed/tasks/${taskId}/matches`, { params })
+  },
+  clearAllMatches(taskId: number) {
+    return client.post<ApiResponse<{ deleted: number }>>(`/reseed/tasks/${taskId}/matches/clear`)
   },
   batchRetryMatches(taskId: number, matchIds: number[]) {
     return client.post<ApiResponse<{ succeeded: number; failed: number; messages: string[] }>>(`/reseed/tasks/${taskId}/matches/batch-retry`, { match_ids: matchIds })

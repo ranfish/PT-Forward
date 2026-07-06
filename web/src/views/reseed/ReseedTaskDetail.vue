@@ -30,6 +30,9 @@
               </a-select>
               <a-button type="primary" @click="onFilterSearch">查询</a-button>
               <a-button @click="onFilterReset">重置</a-button>
+              <a-popconfirm title="确认清除所有辅种记录？此操作不可恢复" @confirm="clearAllMatches">
+                <a-button danger>清除辅种记录</a-button>
+              </a-popconfirm>
             </div>
             <div v-if="selectedMatchKeys.length" style="margin-bottom: 12px; display: flex; gap: 12px; align-items: center; padding: 8px 12px; background: #e6f4ff; border-radius: 4px">
               <span>已选 {{ selectedMatchKeys.length }} 项</span>
@@ -60,6 +63,16 @@
                 </template>
                 <template v-if="column.key === 'target_info_hash'">
                   <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.target_info_hash)">{{ record.target_info_hash }}</span>
+                </template>
+                <template v-if="column.key === 'source_torrent_id'">
+                  <a v-if="record.source_detail_url" :href="record.source_detail_url" target="_blank" rel="noopener" style="font-family:monospace;font-size:12px">{{ record.source_torrent_id }}</a>
+                  <span v-else style="font-family:monospace;font-size:12px">{{ record.source_torrent_id }}</span>
+                </template>
+                <template v-if="column.key === 'directory'">
+                  <span style="font-size:12px">{{ record.directory || '-' }}</span>
+                </template>
+                <template v-if="column.key === 'created_at'">
+                  {{ formatTime(record.created_at) }}
                 </template>
                 <template v-if="column.key === 'status'">
                   <a-tag :color="record.status === 'injected' ? 'green' : record.status === 'failed' ? 'red' : 'blue'">
@@ -204,12 +217,17 @@ interface ReseedTaskInfo {
 interface ReseedMatchItem {
   id: number
   source_info_hash: string
+  source_torrent_id: string
+  source_detail_url?: string
   target_site: string
   target_info_hash: string
   match_method: string
   confidence: number
   status: string
   fail_reason: string
+  directory?: string
+  created_at: string
+  client_id: string
 }
 
 const loading = ref(false)
@@ -222,6 +240,7 @@ const matchesPageSize = ref(20)
 const activeTab = ref('matches')
 
 const filter = reactive({ clientId: '', site: '', torrentId: '', status: '' })
+const matchesOrder = reactive({ field: '', order: '' })
 const selectedMatchKeys = ref<number[]>([])
 
 const negDeleteInfoHash = ref('')
@@ -245,13 +264,16 @@ const iyuuColumns = [
 ]
 
 const matchColumns = [
-  { title: t('reseed.sourceInfoHash'), dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true },
-  { title: '客户端', dataIndex: 'client_id', key: 'client_id', width: 100 },
-  { title: t('reseed.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120 },
+  { title: t('reseed.sourceInfoHash'), dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true, sorter: true },
+  { title: '客户端', dataIndex: 'client_id', key: 'client_id', width: 100, sorter: true },
+  { title: t('reseed.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120, sorter: true },
+  { title: '种子ID', dataIndex: 'source_torrent_id', key: 'source_torrent_id', width: 110, sorter: true },
+  { title: '资源文件夹', dataIndex: 'directory', key: 'directory', ellipsis: true, sorter: true },
   { title: t('reseed.targetInfoHash'), dataIndex: 'target_info_hash', key: 'target_info_hash', ellipsis: true },
   { title: t('reseed.matchMethod'), dataIndex: 'match_method', key: 'match_method', width: 100, customRender: ({ text }: { text: string }) => translateMatchMethod(text) },
-  { title: t('reseed.confidence'), dataIndex: 'confidence', key: 'confidence', width: 80 },
-  { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('reseed.confidence'), dataIndex: 'confidence', key: 'confidence', width: 80, sorter: true },
+  { title: t('common.status'), key: 'status', width: 100, sorter: true },
+  { title: '匹配时间', dataIndex: 'created_at', key: 'created_at', width: 160, sorter: true },
   { title: t('reseed.failReason'), dataIndex: 'fail_reason', key: 'fail_reason', ellipsis: true },
   { title: t('common.actions'), key: 'actions', width: 80 },
 ]
@@ -283,6 +305,8 @@ async function fetchMatches() {
       site: filter.site || undefined,
       torrentId: filter.torrentId || undefined,
       status: filter.status || undefined,
+      orderField: matchesOrder.field || undefined,
+      order: matchesOrder.order || undefined,
     })
     matches.value = resp.data.data?.items ?? []
     matchesTotal.value = resp.data.data?.total ?? 0
@@ -293,10 +317,30 @@ async function fetchMatches() {
   }
 }
 
-function handleMatchesChange(pag: { current?: number; pageSize?: number }) {
+function handleMatchesChange(pag: { current?: number; pageSize?: number }, _filters: unknown, sorter: { field?: string; order?: 'ascend' | 'descend' }) {
   if (pag.current) matchesPage.value = pag.current
   if (pag.pageSize) matchesPageSize.value = pag.pageSize
+  if (sorter?.field && sorter.order) {
+    matchesOrder.field = sorter.field
+    matchesOrder.order = sorter.order === 'ascend' ? 'asc' : 'desc'
+  } else {
+    matchesOrder.field = ''
+    matchesOrder.order = ''
+  }
   fetchMatches()
+}
+
+async function clearAllMatches() {
+  try {
+    const resp = await reseedApi.clearAllMatches(taskId)
+    const deleted = resp.data.data?.deleted ?? 0
+    message.success(`已清除 ${deleted} 条记录`)
+    selectedMatchKeys.value = []
+    matchesPage.value = 1
+    fetchMatches()
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  }
 }
 
 function onFilterSearch() {
@@ -310,6 +354,8 @@ function onFilterReset() {
   filter.site = ''
   filter.torrentId = ''
   filter.status = ''
+  matchesOrder.field = ''
+  matchesOrder.order = ''
   matchesPage.value = 1
   selectedMatchKeys.value = []
   fetchMatches()
