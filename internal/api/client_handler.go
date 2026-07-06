@@ -239,8 +239,8 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, 40001, "type 必须为 qbittorrent 或 transmission")
 		return
 	}
-	if req.TorrentDir == "" {
-		Error(w, http.StatusBadRequest, 40001, "种子文件目录为必填项")
+	if req.TransferTargetID != "" && req.Type != "qbittorrent" {
+		Error(w, http.StatusBadRequest, 40001, "配置转移目标的下载器必须是 qbittorrent 类型（transmission 的种子导出依赖本地文件，跨机不可达）")
 		return
 	}
 
@@ -345,21 +345,6 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		client.Type = req.Type
 	}
-	effectiveType := client.Type
-	_ = effectiveType
-	torrentDir := req.TorrentDir
-	if torrentDir == "" && client.Config != "" {
-		var cfg struct {
-			TorrentDir string `json:"torrent_dir"`
-		}
-		if json.Unmarshal([]byte(client.Config), &cfg) == nil {
-			torrentDir = cfg.TorrentDir
-		}
-	}
-	if torrentDir == "" {
-		Error(w, http.StatusBadRequest, 40001, "种子文件目录为必填项")
-		return
-	}
 	if req.URL != "" {
 		if err := middleware.ValidateSafeURL(req.URL); err != nil {
 			Error(w, http.StatusBadRequest, 40001, "url 不合法: "+err.Error())
@@ -384,6 +369,11 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	client.TransferTargetID = req.TransferTargetID
 	client.Enabled = req.Enabled
 	client.IsDefault = req.IsDefault
+
+	if client.TransferTargetID != "" && client.Type != "qbittorrent" {
+		Error(w, http.StatusBadRequest, 40001, "配置转移目标的下载器必须是 qbittorrent 类型（transmission 的种子导出依赖本地文件，跨机不可达）")
+		return
+	}
 
 	var configJSON string
 	if req.TorrentDir != "" {
