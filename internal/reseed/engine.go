@@ -872,7 +872,7 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 	}
 }
 
-func (e *Engine) preloadIYUUResults(ctx context.Context, infoHashes []string) map[string][]*model.IYUUReseedResult {
+func (e *Engine) preloadIYUUResults(ctx context.Context, taskID uint, infoHashes []string) map[string][]*model.IYUUReseedResult {
 	if e.iyuuService == nil || len(infoHashes) == 0 {
 		return nil
 	}
@@ -886,16 +886,40 @@ func (e *Engine) preloadIYUUResults(ctx context.Context, infoHashes []string) ma
 		}
 	}
 
+	start := time.Now()
 	results, err := e.iyuuService.QueryReseed(ctx, deduped)
-	if err != nil {
-		e.logger.Warn("IYUU 批量查询失败", zap.Error(err))
-		return make(map[string][]*model.IYUUReseedResult)
-	}
+	durationMs := int(time.Since(start) / time.Millisecond)
 
 	byHash := make(map[string][]*model.IYUUReseedResult)
-	for _, r := range results {
-		byHash[r.SourceInfoHash] = append(byHash[r.SourceInfoHash], r)
+	logStatus := "success"
+	logMsg := ""
+	responseTargets := 0
+	if err != nil {
+		logStatus = "error"
+		logMsg = err.Error()
+		e.logger.Warn("IYUU 批量查询失败", zap.Error(err))
+	} else {
+		for _, r := range results {
+			byHash[r.SourceInfoHash] = append(byHash[r.SourceInfoHash], r)
+			responseTargets += len(r.Targets)
+		}
 	}
+
+	if taskID > 0 {
+		log := &model.ReseedIYUULog{
+			TaskID:          taskID,
+			RequestHashes:   len(deduped),
+			ResponseTargets: responseTargets,
+			MatchedHashes:   len(byHash),
+			Status:          logStatus,
+			Message:         logMsg,
+			DurationMs:      durationMs,
+		}
+		if createErr := e.db.WithContext(ctx).Create(log).Error; createErr != nil {
+			e.logger.Warn("failed to save IYUU API log", zap.Error(createErr))
+		}
+	}
+
 	return byHash
 }
 
@@ -1252,7 +1276,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	var iyuuResults map[string][]*model.IYUUReseedResult
 	var iyuuSidMap map[int]string
 	if task.EngineMode == model.ReseedModeIYUUCloud && e.iyuuService != nil && hasMatchMethod(task.MatchMethods, "iyuu") {
-		iyuuResults = e.preloadIYUUResults(ctx, infoHashes)
+		iyuuResults = e.preloadIYUUResults(ctx, task.ID, infoHashes)
 		iyuuSidMap = e.preloadIYUUSiteMappings(ctx)
 	}
 

@@ -204,3 +204,18 @@ type Candidate struct {
 	Confidence      float64 `json:"confidence"`
 	MatchMethod     string  `json:"match_method"`
 }
+
+// ReseedIYUULog: IYUU 云端辅种 API 调用日志
+type ReseedIYUULog struct {
+	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	CreatedAt       time.Time `json:"created_at"`
+	TaskID          uint      `json:"task_id" gorm:"index;not null"`
+	RequestHashes   int       `json:"request_hashes"`
+	ResponseTargets int       `json:"response_targets"`
+	MatchedHashes   int       `json:"matched_hashes"`
+	Status          string    `json:"status" gorm:"size:20;not null;default:'success';index"`
+	Message         string    `json:"message" gorm:"type:text"`
+	DurationMs      int       `json:"duration_ms"`
+}
+
+func (ReseedIYUULog) TableName() string { return "reseed_iyuu_logs" }
