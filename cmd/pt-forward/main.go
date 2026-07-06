@@ -422,7 +422,7 @@ func main() {
 		log.Warn("completion watcher start warning", zap.Error(err))
 	}
 
-	downloadSyncer := download.NewSyncer(db, clientManager, log)
+	downloadSyncer := download.NewSyncer(db, clientManager, runtimeCfg, log)
 	go downloadSyncer.Run(ctx)
 
 	if err := taskRegistry.Start(ctx); err != nil {

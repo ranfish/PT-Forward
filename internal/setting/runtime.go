@@ -41,6 +41,8 @@ const (
 	KeyTorrentTrafficRetentionDays   = "torrent_traffic_retention_days"
 
 	KeySeedingDeleteRulesGlobal = "seeding_delete_rules_global"
+
+	KeyTransferCooldownSeconds = "transfer_cooldown_seconds"
 )
 
 var DefaultSeeds = map[string]string{
@@ -71,6 +73,8 @@ var DefaultSeeds = map[string]string{
 	KeyTorrentTrafficRetentionDays:   "30",
 
 	KeySeedingDeleteRulesGlobal: "false",
+
+	KeyTransferCooldownSeconds: "30",
 }
 
 func SeedDefaults(ctx context.Context, repo *Repository, seeds map[string]string, logger *zap.Logger) {

@@ -51,4 +51,9 @@ func init() {
 	RegisterMigration(1, "ema_alpha_default_0.1_to_0.3", func(gormDB *gorm.DB) error {
 		return gormDB.Model(&model.SeedingClientConfig{}).Where("ema_alpha = ?", 0.1).Update("ema_alpha", 0.3).Error
 	})
+	RegisterMigration(2, "backfill_download_tasks_completed_at", func(gormDB *gorm.DB) error {
+		return gormDB.Model(&model.DownloadTask{}).
+			Where("status = ? AND completed_at IS NULL", model.DownloadStatusCompleted).
+			Update("completed_at", gorm.Expr("updated_at")).Error
+	})
 }
