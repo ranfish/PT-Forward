@@ -105,7 +105,8 @@
             <a-form-item :label="t('downloader.transferTargetId')">
               <a-select
                 v-model:value="form.transferTargetId"
-                :placeholder="t('downloader.transferTargetIdPlaceholder')"
+                :placeholder="form.type !== 'qbittorrent' ? '仅 qBittorrent 支持主辅分离转移' : t('downloader.transferTargetIdPlaceholder')"
+                :disabled="form.type !== 'qbittorrent'"
                 allow-clear
               >
                 <a-select-option
@@ -120,8 +121,8 @@
           </a-col>
         </a-row>
 
-        <a-form-item label="种子文件路径" name="torrentDir" :rules="[{ required: true, message: '种子文件目录为必填项' }]">
-          <a-input v-model:value="form.torrentDir" placeholder="如 /data/torrents（下载器的 .torrent 文件本地映射路径，指纹计算和辅种匹配必需）" />
+        <a-form-item label="种子文件路径" name="torrentDir">
+          <a-input v-model:value="form.torrentDir" placeholder="选填。仅当下载器是 transmission 且与 PT-Forward 同机时填写（导出种子做主辅分离转移用）；qbittorrent 不需要" />
         </a-form-item>
 
         <a-divider>{{ t('downloader.pathMappings') }}</a-divider>
@@ -145,7 +146,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, ArrowDownOutlined, ArrowUpOutlined, DatabaseOutlined } from '@ant-design/icons-vue'
@@ -173,6 +174,12 @@ const form = reactive({
   transferTargetId: '',
   torrentDir: '',
   pathMappings: [] as { sourcePath: string; reseedPath: string }[],
+})
+
+watch(() => form.type, (val) => {
+  if (val !== 'qbittorrent' && form.transferTargetId) {
+    form.transferTargetId = ''
+  }
 })
 
 const columns = [
