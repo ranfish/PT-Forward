@@ -84,6 +84,10 @@ func (h *ReseedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				h.handleBatchDeleteMatches(w, r, taskID)
 				return
 			}
+			if parts[2] == "clear" {
+				h.handleClearMatches(w, r, taskID)
+				return
+			}
 			subParts := strings.SplitN(parts[2], "/", 2)
 			if len(subParts) == 2 && subParts[1] == "retry" {
 				matchID, retryErr := parseMatchID(subParts[0])
@@ -433,6 +437,8 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	site := r.URL.Query().Get("site")
 	torrentID := r.URL.Query().Get("torrentId")
 	status := r.URL.Query().Get("status")
+	orderField := r.URL.Query().Get("orderField")
+	order := r.URL.Query().Get("order")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
@@ -442,7 +448,7 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 		pageSize = 20
 	}
 
-	_ = taskIDStr // matches 表无 task_id，全局筛选
+	_ = taskIDStr
 
 	query := h.engine.DB().Model(&model.ReseedMatch{})
 
@@ -462,11 +468,49 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	var total int64
 	query.Count(&total)
 
+	allowedOrders := map[string]bool{
+		"created_at": true, "status": true, "target_site": true, "source_site": true,
+		"client_id": true, "confidence": true, "source_torrent_id": true,
+		"target_torrent_id": true, "directory": true,
+	}
+	orderClause := "created_at DESC"
+	if allowedOrders[orderField] {
+		dir := "DESC"
+		if strings.ToLower(order) == "asc" {
+			dir = "ASC"
+		}
+		orderClause = orderField + " " + dir
+	}
+
 	var matches []model.ReseedMatch
-	query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&matches)
+	query.Order(orderClause).Offset((page - 1) * pageSize).Limit(pageSize).Find(&matches)
+
+	type siteBrief struct {
+		BaseURL   string
+		Framework string
+	}
+	siteInfos := make(map[string]siteBrief)
+	var sites []model.Site
+	h.engine.DB().Select("name, base_url, framework").Find(&sites)
+	for _, s := range sites {
+		siteInfos[s.Name] = siteBrief{BaseURL: s.BaseURL, Framework: s.Framework}
+	}
+
+	type matchWithURL struct {
+		model.ReseedMatch
+		SourceDetailURL string `json:"source_detail_url"`
+	}
+	items := make([]matchWithURL, 0, len(matches))
+	for _, m := range matches {
+		item := matchWithURL{ReseedMatch: m}
+		if si, ok := siteInfos[m.SourceSite]; ok && m.SourceTorrentID != "" {
+			item.SourceDetailURL = buildDetailURL(si.BaseURL, si.Framework, m.SourceTorrentID)
+		}
+		items = append(items, item)
+	}
 
 	Success(w, map[string]interface{}{
-		"items":    matches,
+		"items":    items,
 		"total":    total,
 		"page":     page,
 		"pageSize": pageSize,
@@ -638,6 +682,22 @@ func (h *ReseedHandler) handleBatchDeleteMatches(w http.ResponseWriter, r *http.
 		zap.Int("count", len(req.MatchIDs)),
 		zap.Int64("deleted", result.RowsAffected))
 
+	Success(w, map[string]interface{}{
+		"deleted": result.RowsAffected,
+	})
+}
+
+func (h *ReseedHandler) handleClearMatches(w http.ResponseWriter, r *http.Request, taskID uint) {
+	if r.Method != http.MethodPost {
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+	result := h.engine.DB().Where("1 = 1").Delete(&model.ReseedMatch{})
+	if result.Error != nil {
+		Error(w, http.StatusInternalServerError, 50000, "清除失败")
+		return
+	}
+	h.logger.Info("reseed matches cleared", zap.Uint("task_id", taskID), zap.Int64("deleted", result.RowsAffected))
 	Success(w, map[string]interface{}{
 		"deleted": result.RowsAffected,
 	})

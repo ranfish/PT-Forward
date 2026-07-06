@@ -109,6 +109,7 @@ type ReseedMatch struct {
 	FailReason  string            `json:"fail_reason" gorm:"size:512"`
 	RetryCount  int               `json:"retry_count" gorm:"default:0"`
 	NextRetryAt *time.Time        `json:"next_retry_at"`
+	Directory   string            `json:"directory" gorm:"type:text"`
 
 	CachedTorrentData []byte `json:"-" gorm:"-"`
 }
