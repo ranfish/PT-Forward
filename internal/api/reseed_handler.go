@@ -450,7 +450,7 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 		pageSize = 20
 	}
 
-	query := h.engine.DB().Model(&model.ReseedMatch{}).Where("task_id = ?", taskID)
+	query := h.engine.DB().Model(&model.ReseedMatch{}).Where("task_id = ? OR task_id = 0", taskID)
 
 	if clientID != "" {
 		query = query.Where("client_id = ?", clientID)
