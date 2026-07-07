@@ -56,4 +56,11 @@ func init() {
 			Where("status = ? AND completed_at IS NULL", model.DownloadStatusCompleted).
 			Update("completed_at", gorm.Expr("updated_at")).Error
 	})
+	RegisterMigration(3, "backfill_reseed_matches_source_torrent_id", func(gormDB *gorm.DB) error {
+		return gormDB.Exec(`UPDATE reseed_matches SET source_torrent_id = (
+			SELECT torrent_id FROM seeding_torrent_records
+			WHERE seeding_torrent_records.info_hash = reseed_matches.source_info_hash
+			LIMIT 1
+		) WHERE LENGTH(source_torrent_id) >= 40`).Error
+	})
 }
