@@ -103,7 +103,7 @@ func (h *ReseedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.handleListMatches(w, r, taskID)
 		}
 	case "negative-cache":
-		h.handleNegativeCache(w, r)
+		h.handleNegativeCache(w, r, taskID)
 	case "feature-logs":
 		h.handleListFeatureLogs(w, r, taskID)
 	case "iyuu-logs":
@@ -739,7 +739,29 @@ func (h *ReseedHandler) handleClearMatches(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func (h *ReseedHandler) handleNegativeCache(w http.ResponseWriter, r *http.Request) {
+func (h *ReseedHandler) handleNegativeCache(w http.ResponseWriter, r *http.Request, taskID uint) {
+	if r.Method == http.MethodGet {
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if page < 1 {
+			page = 1
+		}
+		pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+		if pageSize < 1 || pageSize > 200 {
+			pageSize = 20
+		}
+		query := h.engine.DB().Model(&model.ReseedNegativeCache{})
+		var total int64
+		query.Count(&total)
+		var items []model.ReseedNegativeCache
+		query.Order("expires_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&items)
+		Success(w, map[string]interface{}{
+			"items":    items,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		})
+		return
+	}
 	if r.Method == http.MethodDelete {
 		infoHash := r.URL.Query().Get("infoHash")
 		site := r.URL.Query().Get("site")
