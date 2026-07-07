@@ -120,7 +120,24 @@
                 <a-button type="primary" danger :disabled="!negDeleteInfoHash">{{ t('common.delete') }}</a-button>
               </a-popconfirm>
             </div>
-            <a-empty :description="t('reseed.deleteNegativeCacheDesc')" />
+            <a-table
+              :columns="negColumns"
+              :data-source="negCache"
+              :loading="negLoading"
+              :pagination="{ current: negPage, pageSize: negPageSize, total: negTotal, showSizeChanger: true, showTotal: (t: number) => `${t} 条` }"
+              row-key="id"
+              size="small"
+              @change="handleNegChange"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'source_info_hash'">
+                  <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.source_info_hash)">{{ record.source_info_hash }}</span>
+                </template>
+                <template v-if="column.key === 'expires_at'">
+                  {{ formatTime(record.expires_at) }}
+                </template>
+              </template>
+            </a-table>
           </a-tab-pane>
           <a-tab-pane v-if="task?.engine_mode !== 'seed_feature'" key="iyuu" tab="IYUU日志">
             <div v-if="iyuuStats" style="margin-bottom: 16px; display: flex; gap: 24px; flex-wrap: wrap; padding: 12px; background: #fafafa; border-radius: 4px">
@@ -172,7 +189,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { reseedApi, type ReseedIYUULog, type IYUULogStats, type ReseedFeatureLog, type FeatureLogStats } from '@/api/reseed'
+import { reseedApi, type ReseedIYUULog, type IYUULogStats, type ReseedFeatureLog, type FeatureLogStats, type ReseedNegativeCacheItem } from '@/api/reseed'
 import { sitesApi } from '@/api/sites'
 import { downloadersApi } from '@/api/downloaders'
 import { formatTime, copyToClipboard } from '@/utils/format'
@@ -264,6 +281,18 @@ const filter = reactive({ clientId: '', site: '', torrentId: '', status: '' })
 const matchesOrder = reactive({ field: '', order: '' })
 const selectedMatchKeys = ref<number[]>([])
 
+const negLoading = ref(false)
+const negCache = ref<ReseedNegativeCacheItem[]>([])
+const negTotal = ref(0)
+const negPage = ref(1)
+const negPageSize = ref(20)
+const negColumns = [
+  { title: '源InfoHash', dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true },
+  { title: '源站点', dataIndex: 'source_site', key: 'source_site', width: 100 },
+  { title: '排除目标', dataIndex: 'excluded_targets', key: 'excluded_targets', ellipsis: true },
+  { title: '方法', dataIndex: 'last_method', key: 'last_method', width: 100 },
+  { title: '过期时间', dataIndex: 'expires_at', key: 'expires_at', width: 160 },
+]
 const negDeleteInfoHash = ref('')
 const negDeleteSite = ref('')
 
@@ -441,6 +470,25 @@ async function retryMatch(matchId: number) {
   }
 }
 
+async function fetchNegativeCache() {
+  negLoading.value = true
+  try {
+    const resp = await reseedApi.getNegativeCache(taskId, negPage.value, negPageSize.value)
+    negCache.value = resp.data.data?.items ?? []
+    negTotal.value = resp.data.data?.total ?? 0
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  } finally {
+    negLoading.value = false
+  }
+}
+
+function handleNegChange(pag: { current?: number; pageSize?: number }) {
+  if (pag.current) negPage.value = pag.current
+  if (pag.pageSize) negPageSize.value = pag.pageSize
+  fetchNegativeCache()
+}
+
 async function deleteNegativeCache() {
   if (!negDeleteInfoHash.value) return
   try {
@@ -448,6 +496,7 @@ async function deleteNegativeCache() {
     message.success(t('common.deleted'))
     negDeleteInfoHash.value = ''
     negDeleteSite.value = ''
+    fetchNegativeCache()
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   }
@@ -500,5 +549,6 @@ onMounted(() => {
   fetchMatches()
   fetchIYUULogs()
   fetchFeatureLogs()
+  fetchNegativeCache()
 })
 </script>

@@ -39,6 +39,18 @@ export interface FeatureLogStats {
   TotalMatched: number
 }
 
+export interface ReseedNegativeCacheItem {
+  id: number
+  source_site: string
+  source_torrent_id: string
+  source_info_hash: string
+  excluded_targets: string
+  last_method: string
+  layer_depth: number
+  expires_at: string
+  created_at: string
+}
+
 export const reseedApi = {
   listTasks(page = 1, size = 20) {
     return client.get<ApiResponsePaginated<ReseedTask>>('/reseed/tasks', { params: { page, size } })
@@ -90,6 +102,12 @@ export const reseedApi = {
   },
   retryMatch(taskId: number, matchId: number) {
     return client.post<ApiResponse<ReseedMatch>>(`/reseed/tasks/${taskId}/matches/${matchId}/retry`)
+  },
+  getNegativeCache(taskId: number, page?: number, pageSize?: number) {
+    const params: Record<string, number> = {}
+    if (page) params.page = page
+    if (pageSize) params.pageSize = pageSize
+    return client.get<ApiResponse<{ items: ReseedNegativeCacheItem[]; total: number; page: number; pageSize: number }>>(`/reseed/tasks/${taskId}/negative-cache`, { params })
   },
   deleteNegativeCache(taskId: number, infoHash: string, site?: string) {
     const params: Record<string, string> = { infoHash }
