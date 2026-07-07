@@ -100,7 +100,7 @@ func (h *ReseedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				h.handleGetMatch(w, r, idStr, parts[2])
 			}
 		} else {
-			h.handleListMatches(w, r, idStr)
+			h.handleListMatches(w, r, taskID)
 		}
 	case "negative-cache":
 		h.handleNegativeCache(w, r)
@@ -427,7 +427,7 @@ func (h *ReseedHandler) handleCancel(w http.ResponseWriter, r *http.Request, id 
 	Success(w, map[string]interface{}{"message": "任务已取消"})
 }
 
-func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request, taskIDStr string) {
+func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request, taskID uint) {
 	if r.Method != http.MethodGet {
 		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		return
@@ -448,9 +448,7 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 		pageSize = 20
 	}
 
-	_ = taskIDStr
-
-	query := h.engine.DB().Model(&model.ReseedMatch{})
+	query := h.engine.DB().Model(&model.ReseedMatch{}).Where("task_id = ?", taskID)
 
 	if clientID != "" {
 		query = query.Where("client_id = ?", clientID)
@@ -692,7 +690,7 @@ func (h *ReseedHandler) handleClearMatches(w http.ResponseWriter, r *http.Reques
 		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		return
 	}
-	result := h.engine.DB().Where("1 = 1").Delete(&model.ReseedMatch{})
+	result := h.engine.DB().Where("task_id = ?", taskID).Delete(&model.ReseedMatch{})
 	if result.Error != nil {
 		Error(w, http.StatusInternalServerError, 50000, "清除失败")
 		return

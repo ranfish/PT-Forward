@@ -110,6 +110,7 @@ type ReseedMatch struct {
 	RetryCount  int               `json:"retry_count" gorm:"default:0"`
 	NextRetryAt *time.Time        `json:"next_retry_at"`
 	Directory   string            `json:"directory" gorm:"type:text"`
+	TaskID      uint              `json:"task_id" gorm:"index;default:0"`
 
 	CachedTorrentData []byte `json:"-" gorm:"-"`
 }
@@ -210,7 +211,7 @@ type Candidate struct {
 type ReseedIYUULog struct {
 	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	CreatedAt       time.Time `json:"created_at"`
-	TaskID          uint      `json:"task_id" gorm:"index;not null"`
+	TaskID      uint              `json:"task_id" gorm:"index;default:0"`
 	RequestHashes   int       `json:"request_hashes"`
 	ResponseTargets int       `json:"response_targets"`
 	MatchedHashes   int       `json:"matched_hashes"`
