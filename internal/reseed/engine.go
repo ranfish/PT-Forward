@@ -1431,6 +1431,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			}
 
 			match := &model.ReseedMatch{
+				TaskID:          task.ID,
 				ClientID:        src.ClientID,
 				SourceSite:      src.SiteName,
 				SourceTorrentID: src.TorrentID,
