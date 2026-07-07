@@ -163,11 +163,12 @@ type piecesHashSearcher interface {
 }
 
 type sourceTorrent struct {
-	InfoHash string
-	SiteName string
-	ClientID string
-	Name     string
-	SavePath string
+	InfoHash  string
+	TorrentID string
+	SiteName  string
+	ClientID  string
+	Name      string
+	SavePath  string
 }
 
 type fpCache struct {
@@ -1124,6 +1125,16 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 
 	e.retryFailedForTask(ctx, task, clientNames)
 
+	// 预加载 seeding_torrent_records 的 InfoHash→TorrentID 映射（关联源站数字种子ID）
+	var seedRecords []model.SeedingTorrentRecord
+	e.db.WithContext(ctx).Select("info_hash, torrent_id").Find(&seedRecords)
+	seedTorrentIDs := make(map[string]string, len(seedRecords))
+	for _, r := range seedRecords {
+		if r.InfoHash != "" && r.TorrentID != "" {
+			seedTorrentIDs[r.InfoHash] = r.TorrentID
+		}
+	}
+
 	var sourceTorrents []sourceTorrent
 	clientHashes := make(map[string]bool)
 	seenSourceNames := make(map[string]bool)
@@ -1162,11 +1173,12 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				seenSourceNames[t.Name] = true
 			}
 			sourceTorrents = append(sourceTorrents, sourceTorrent{
-				InfoHash: t.Hash,
-				SiteName: siteName,
-				ClientID: clientName,
-				Name:     t.Name,
-				SavePath: t.SavePath,
+				InfoHash:  t.Hash,
+				TorrentID: seedTorrentIDs[t.Hash],
+				SiteName:  siteName,
+				ClientID:  clientName,
+				Name:      t.Name,
+				SavePath:  t.SavePath,
 			})
 		}
 	}
@@ -1421,7 +1433,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			match := &model.ReseedMatch{
 				ClientID:        src.ClientID,
 				SourceSite:      src.SiteName,
-				SourceTorrentID: src.InfoHash,
+				SourceTorrentID: src.TorrentID,
 				SourceInfoHash:  src.InfoHash,
 				TargetSite:      c.TargetSite,
 				TargetTorrentID: c.TargetTorrentID,
