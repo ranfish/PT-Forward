@@ -104,6 +104,8 @@ func (h *ReseedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	case "negative-cache":
 		h.handleNegativeCache(w, r)
+	case "feature-logs":
+		h.handleListFeatureLogs(w, r, taskID)
 	case "iyuu-logs":
 		h.handleListIYUULogs(w, r, taskID)
 	default:
@@ -512,6 +514,42 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 		"total":    total,
 		"page":     page,
 		"pageSize": pageSize,
+	})
+}
+
+func (h *ReseedHandler) handleListFeatureLogs(w http.ResponseWriter, r *http.Request, taskID uint) {
+	if r.Method != http.MethodGet {
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
+	query := h.engine.DB().Model(&model.ReseedFeatureLog{}).Where("task_id = ?", taskID)
+	var total int64
+	query.Count(&total)
+	var logs []model.ReseedFeatureLog
+	query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs)
+	type featureStats struct {
+		TotalCalls   int64
+		TotalQueried int64
+		TotalMatched int64
+	}
+	var stats featureStats
+	h.engine.DB().Model(&model.ReseedFeatureLog{}).Where("task_id = ?", taskID).
+		Select("COUNT(*) as total_calls, COALESCE(SUM(queried),0) as total_queried, COALESCE(SUM(matched),0) as total_matched").
+		Scan(&stats)
+	Success(w, map[string]interface{}{
+		"items":    logs,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+		"stats":    stats,
 	})
 }
 

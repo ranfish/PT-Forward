@@ -92,6 +92,26 @@
               </template>
             </a-table>
           </a-tab-pane>
+          <a-tab-pane v-if="task?.engine_mode === 'seed_feature'" key="feature" tab="特征辅种日志">
+            <div v-if="featureStats" style="margin-bottom: 16px; display: flex; gap: 24px; flex-wrap: wrap; padding: 12px; background: #fafafa; border-radius: 4px">
+              <span>查询次数: <strong>{{ featureStats.TotalCalls }}</strong></span>
+              <span>查询种子: <strong>{{ featureStats.TotalQueried }}</strong></span>
+              <span>匹配种子: <strong>{{ featureStats.TotalMatched }}</strong></span>
+            </div>
+            <a-table
+              :columns="featureColumns"
+              :data-source="featureLogs"
+              :loading="featureLoading"
+              :pagination="{ current: featurePage, pageSize: featurePageSize, total: featureTotal, showSizeChanger: true, showTotal: (t: number) => `${t} 条` }"
+              row-key="id"
+              size="small"
+              @change="handleFeatureChange"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'created_at'">{{ formatTime(record.created_at) }}</template>
+              </template>
+            </a-table>
+          </a-tab-pane>
           <a-tab-pane key="negative" :tab="t('reseed.negativeCache')">
             <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center">
               <a-input v-model:value="negDeleteInfoHash" placeholder="InfoHash" style="width: 320px" />
@@ -102,7 +122,7 @@
             </div>
             <a-empty :description="t('reseed.deleteNegativeCacheDesc')" />
           </a-tab-pane>
-          <a-tab-pane key="iyuu" tab="IYUU日志">
+          <a-tab-pane v-if="task?.engine_mode !== 'seed_feature'" key="iyuu" tab="IYUU日志">
             <div v-if="iyuuStats" style="margin-bottom: 16px; display: flex; gap: 24px; flex-wrap: wrap; padding: 12px; background: #fafafa; border-radius: 4px">
               <span>调用次数: <strong>{{ iyuuStats.TotalCalls }}</strong></span>
               <span style="color: #3f8600">成功: <strong>{{ iyuuStats.SuccessCalls }}</strong></span>
@@ -152,7 +172,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { reseedApi, type ReseedIYUULog, type IYUULogStats } from '@/api/reseed'
+import { reseedApi, type ReseedIYUULog, type IYUULogStats, type ReseedFeatureLog, type FeatureLogStats } from '@/api/reseed'
 import { sitesApi } from '@/api/sites'
 import { downloadersApi } from '@/api/downloaders'
 import { formatTime, copyToClipboard } from '@/utils/format'
@@ -212,6 +232,7 @@ interface ReseedTaskInfo {
   target_site_ids: string
   client_ids: string
   created_at: string
+  engine_mode: string
 }
 
 interface ReseedMatchItem {
@@ -252,6 +273,19 @@ const iyuuTotal = ref(0)
 const iyuuPage = ref(1)
 const iyuuPageSize = ref(20)
 const iyuuStats = ref<IYUULogStats | null>(null)
+const featureLoading = ref(false)
+const featureLogs = ref<ReseedFeatureLog[]>([])
+const featureTotal = ref(0)
+const featurePage = ref(1)
+const featurePageSize = ref(20)
+const featureStats = ref<FeatureLogStats | null>(null)
+const featureColumns = [
+  { title: '时间', key: 'created_at', width: 180 },
+  { title: '站点', dataIndex: 'site', key: 'site', width: 120 },
+  { title: '查询数', dataIndex: 'queried', key: 'queried', width: 90 },
+  { title: '匹配数', dataIndex: 'matched', key: 'matched', width: 90 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 80 },
+]
 
 const iyuuColumns = [
   { title: '时间', key: 'created_at', width: 180 },
@@ -439,11 +473,32 @@ function handleIYUUChange(pag: { current?: number; pageSize?: number }) {
   fetchIYUULogs()
 }
 
+async function fetchFeatureLogs() {
+  featureLoading.value = true
+  try {
+    const resp = await reseedApi.getFeatureLogs(taskId, featurePage.value, featurePageSize.value)
+    featureLogs.value = resp.data.data?.items ?? []
+    featureTotal.value = resp.data.data?.total ?? 0
+    featureStats.value = resp.data.data?.stats ?? null
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  } finally {
+    featureLoading.value = false
+  }
+}
+
+function handleFeatureChange(pag: { current?: number; pageSize?: number }) {
+  if (pag.current) featurePage.value = pag.current
+  if (pag.pageSize) featurePageSize.value = pag.pageSize
+  fetchFeatureLogs()
+}
+
 onMounted(() => {
   fetchSiteMap()
   fetchDownloaderMap()
   fetchTask()
   fetchMatches()
   fetchIYUULogs()
+  fetchFeatureLogs()
 })
 </script>
