@@ -211,6 +211,9 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 		}
 
 		if shouldBreak {
+			if len(allResults) == 0 {
+				return nil, iyuuError(ErrIYUUAPI, fmt.Sprintf("IYUU 查询中止（连续错误或限速），无有效结果", ), nil)
+			}
 			break
 		}
 
