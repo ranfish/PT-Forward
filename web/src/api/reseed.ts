@@ -22,6 +22,23 @@ export interface IYUULogStats {
   TotalTargets: number
 }
 
+
+export interface ReseedFeatureLog {
+  id: number
+  created_at: string
+  task_id: number
+  site: string
+  queried: number
+  matched: number
+  status: string
+}
+
+export interface FeatureLogStats {
+  TotalCalls: number
+  TotalQueried: number
+  TotalMatched: number
+}
+
 export const reseedApi = {
   listTasks(page = 1, size = 20) {
     return client.get<ApiResponsePaginated<ReseedTask>>('/reseed/tasks', { params: { page, size } })
@@ -55,6 +72,12 @@ export const reseedApi = {
     if (opts?.orderField) params.orderField = opts.orderField
     if (opts?.order) params.order = opts.order
     return client.get<ApiResponse<{ items: ReseedMatch[]; total: number; page: number; pageSize: number }>>(`/reseed/tasks/${taskId}/matches`, { params })
+  },
+  getFeatureLogs(taskId: number, page?: number, pageSize?: number) {
+    const params: Record<string, number> = {}
+    if (page) params.page = page
+    if (pageSize) params.pageSize = pageSize
+    return client.get<ApiResponse<{ items: ReseedFeatureLog[]; total: number; page: number; pageSize: number; stats: FeatureLogStats }>>(`/reseed/tasks/${taskId}/feature-logs`, { params })
   },
   clearAllMatches(taskId: number) {
     return client.post<ApiResponse<{ deleted: number }>>(`/reseed/tasks/${taskId}/matches/clear`)

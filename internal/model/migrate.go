@@ -43,6 +43,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&ReseedMatch{},
 		&ReseedNegativeCache{},
 		&ReseedIYUULog{},
+		&ReseedFeatureLog{},
 		&CookieCloudSyncHistory{},
 		&CookieCloudConfig{},
 		&FreezeEventRecord{},

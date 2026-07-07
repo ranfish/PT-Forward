@@ -617,7 +617,7 @@ func (e *Engine) preflightCheck(ctx context.Context, ps *preloadedSites, concurr
 		zap.Int("failed", failed))
 }
 
-func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTorrent, ps *preloadedSites, fc *fpCache, negCache map[string]map[string]bool, scanConcurrency int) *piecesHashCache {
+func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTorrent, ps *preloadedSites, fc *fpCache, negCache map[string]map[string]bool, scanConcurrency int, taskID uint) *piecesHashCache {
 	if ps == nil || fc == nil || len(sources) == 0 {
 		return nil
 	}
@@ -792,6 +792,16 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 			zap.String("site", r.siteName),
 			zap.Int("queried", r.queried),
 			zap.Int("matched", len(r.results)))
+
+		if taskID > 0 {
+			e.db.WithContext(ctx).Create(&model.ReseedFeatureLog{
+				TaskID:  taskID,
+				Site:    r.siteName,
+				Queried: r.queried,
+				Matched: len(r.results),
+				Status:  "success",
+			})
+		}
 	}
 
 	return cache
@@ -1239,7 +1249,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			scanConc = 10
 		}
 		e.preflightCheck(ctx, ps, scanConc)
-		phCache = e.preloadPiecesHashCache(ctx, sourceTorrents, ps, fpCache, negCache, scanConc)
+		phCache = e.preloadPiecesHashCache(ctx, sourceTorrents, ps, fpCache, negCache, scanConc, task.ID)
 	}
 
 	dr := buildDomainResolver(ps)

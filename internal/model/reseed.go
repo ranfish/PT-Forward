@@ -221,3 +221,16 @@ type ReseedIYUULog struct {
 }
 
 func (ReseedIYUULog) TableName() string { return "reseed_iyuu_logs" }
+
+// ReseedFeatureLog: 特征辅种 pieces_hash 查询日志
+type ReseedFeatureLog struct {
+	ID         uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	CreatedAt  time.Time `json:"created_at"`
+	TaskID     uint      `json:"task_id" gorm:"index;not null"`
+	Site       string    `json:"site" gorm:"size:50"`
+	Queried    int       `json:"queried"`
+	Matched    int       `json:"matched"`
+	Status     string    `json:"status" gorm:"size:20;not null;default:'success'"`
+}
+
+func (ReseedFeatureLog) TableName() string { return "reseed_feature_logs" }
