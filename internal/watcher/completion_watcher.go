@@ -300,9 +300,14 @@ func (w *CompletionWatcher) transferToReseed(ctx context.Context, candidate *mod
 
 	reseedPath := client.MapPath(torrent.SavePath, sourceClient.GetSharedPaths())
 
+	reseedCategory := torrent.Category
+	if reseedCategory == "" {
+		reseedCategory = "reseed"
+	}
+
 	opts := model.AddTorrentOptions{
 		SavePath: reseedPath,
-		Category: torrent.Category,
+		Category: reseedCategory,
 		Tags:     torrent.Tags,
 		Paused:   false,
 	}
