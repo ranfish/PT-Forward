@@ -728,7 +728,7 @@ func (h *ReseedHandler) handleClearMatches(w http.ResponseWriter, r *http.Reques
 		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		return
 	}
-	result := h.engine.DB().Where("task_id = ?", taskID).Delete(&model.ReseedMatch{})
+	result := h.engine.DB().Where("task_id = ? OR task_id = 0", taskID).Delete(&model.ReseedMatch{})
 	if result.Error != nil {
 		Error(w, http.StatusInternalServerError, 50000, "清除失败")
 		return
