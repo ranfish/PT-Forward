@@ -141,17 +141,36 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 		return candidate, nil
 	}
 
-	sourceDetail, sourceConfig, sourceAdapter, err := p.fetchSourceInfo(ctx, candidate)
-	if err != nil {
-		return nil, err
-	}
+	var sourceDetail *model.TorrentDetail
+	var torrentData []byte
 
-	torrentData, err := sourceAdapter.DownloadTorrent(ctx, sourceConfig, candidate.SourceTorrentID)
-	if err != nil {
-		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("下载源种子失败: %v", err)); err != nil {
+	if candidate.SourceTorrentID != "" && p.siteProvider != nil {
+		var sourceConfig *model.SiteConfig
+		var sourceAdapter model.SiteAdapter
+		sourceDetail, sourceConfig, sourceAdapter, err = p.fetchSourceInfo(ctx, candidate)
+		if err != nil {
+			return nil, err
+		}
+		torrentData, err = sourceAdapter.DownloadTorrent(ctx, sourceConfig, candidate.SourceTorrentID)
+		if err != nil {
+			if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("下载源种子失败: %v", err)); err != nil {
+				p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
+			}
+			return nil, &model.AppError{Code: 50001, Message: "下载源种子失败", Cause: err}
+		}
+	} else if candidate.DownloadCompleted && candidate.ClientID != "" && p.clientProvider != nil {
+		torrentData, sourceDetail, err = p.fetchFromDownloader(ctx, candidate)
+		if err != nil {
+			if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("从下载器导出种子失败: %v", err)); err != nil {
+				p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
+			}
+			return nil, &model.AppError{Code: 50001, Message: "从下载器导出种子失败", Cause: err}
+		}
+	} else {
+		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, "无法获取种子文件（无源站ID且无法从下载器导出）"); err != nil {
 			p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
 		}
-		return nil, &model.AppError{Code: 50001, Message: "下载源种子失败", Cause: err}
+		return nil, &model.AppError{Code: 50001, Message: "无法获取种子文件"}
 	}
 
 	targetSites := parseTargetSites(candidate.TargetSites)
@@ -198,6 +217,29 @@ func (p *Pipeline) validateAndLoadCandidate(ctx context.Context, id uint) (*mode
 	}
 
 	return &candidate, nil
+}
+
+func (p *Pipeline) fetchFromDownloader(ctx context.Context, candidate *model.PublishCandidate) ([]byte, *model.TorrentDetail, error) {
+	dlClient, err := p.clientProvider.Get(candidate.ClientID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("获取下载器失败: %w", err)
+	}
+
+	torrentData, err := dlClient.ExportTorrent(ctx, candidate.InfoHash)
+	if err != nil {
+		return nil, nil, fmt.Errorf("导出种子失败: %w", err)
+	}
+
+	detail := &model.TorrentDetail{
+		Title: candidate.TorrentName,
+	}
+	if torrent, tErr := dlClient.GetTorrentByHash(ctx, candidate.InfoHash); tErr == nil && torrent != nil {
+		detail.Size = torrent.TotalSize
+		if detail.Title == "" {
+			detail.Title = torrent.Name
+		}
+	}
+	return torrentData, detail, nil
 }
 
 func (p *Pipeline) fetchSourceInfo(ctx context.Context, candidate *model.PublishCandidate) (*model.TorrentDetail, *model.SiteConfig, model.SiteAdapter, error) {
@@ -655,6 +697,16 @@ func (p *Pipeline) ProcessPending(ctx context.Context) error {
 		}
 
 		if c.DownloadCompleted {
+			if c.Role == "manual" {
+				go func(cid uint) {
+					mctx, mcancel := context.WithTimeout(context.Background(), 5*time.Minute)
+					defer mcancel()
+					if _, merr := p.PublishCandidate(mctx, cid); merr != nil {
+						p.logger.Warn("manual candidate publish failed", zap.Uint("id", cid), zap.Error(merr))
+					}
+				}(c.ID)
+				continue
+			}
 			if err := p.UpdateCandidateStatus(ctx, c.ID, model.CandidateDone, ""); err != nil {
 				p.logger.Warn("update candidate status failed",
 					zap.Uint("id", c.ID),
