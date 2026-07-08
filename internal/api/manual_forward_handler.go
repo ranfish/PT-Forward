@@ -27,11 +27,11 @@ type ManualForwardHandler struct {
 }
 
 type PublishPipeline interface {
-	PublishCandidateFromManual(ctx context.Context, candidate *model.PublishCandidate) error
+	PublishCandidate(ctx context.Context, id uint) (*model.PublishCandidate, error)
 }
 
 type SiteManager interface {
-	ListSites(ctx context.Context) ([]model.Site, error)
+	ListSites(ctx context.Context) ([]*model.SiteInfo, error)
 	GetSiteConfig(ctx context.Context, siteURL string) (*model.SiteConfig, error)
 }
 
