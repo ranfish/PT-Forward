@@ -32,6 +32,7 @@ type PublishCandidate struct {
 	SkipReason        string                 `json:"skip_reason" gorm:"size:200"`
 	UserOverrides     string                 `json:"user_overrides" gorm:"type:text"`
 	Role              PublishCandidateRole   `json:"role" gorm:"size:20;default:'download'"`
+	RetryCount        int                    `json:"retry_count" gorm:"default:0"`
 }
 
 func (PublishCandidate) TableName() string { return "publish_candidates" }

@@ -551,6 +551,20 @@ func (p *Pipeline) finalizePublishStatus(ctx context.Context, id uint, published
 		return model.CandidateDone
 	}
 	if lastErr != nil {
+		// 候选级重试：RetryCount < 3 → 改回 pending，等下次 ProcessPending 重试
+		var fc model.PublishCandidate
+		if err := p.db.WithContext(ctx).First(&fc, id).Error; err == nil && fc.RetryCount < 3 {
+			now := time.Now()
+			p.db.WithContext(ctx).Model(&model.PublishCandidate{}).Where("id = ?", id).Updates(map[string]interface{}{
+				"publish_status": model.CandidatePending,
+				"retry_count":    fc.RetryCount + 1,
+				"publish_result": lastErr.Error(),
+				"updated_at":     now,
+			})
+			p.logger.Info("candidate scheduled for retry",
+				zap.Uint("id", id), zap.Int("retry", fc.RetryCount+1))
+			return model.CandidatePending
+		}
 		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, lastErr.Error()); err != nil {
 			p.logger.Error("更新发布失败状态失败", zap.Uint("id", id), zap.Error(err))
 		}
@@ -710,7 +724,7 @@ func (p *Pipeline) ProcessPending(ctx context.Context) error {
 		}
 
 		if c.DownloadCompleted {
-			if c.Role == "manual" {
+			if c.Role == "manual" || c.RetryCount > 0 {
 				go func(cid uint) {
 					mctx, mcancel := context.WithTimeout(context.Background(), 5*time.Minute)
 					defer mcancel()

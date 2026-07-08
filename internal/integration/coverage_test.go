@@ -165,7 +165,7 @@ func TestE2E_PublishCandidate_UploadFailed(t *testing.T) {
 
 	result, err := pipeline.PublishCandidate(ctx, candidate.ID)
 	require.NoError(t, err)
-	assert.Equal(t, model.CandidateFailed, result.PublishStatus)
+	assert.Equal(t, model.CandidatePending, result.PublishStatus)  // 首次失败→重试 scheduled
 
 	var results []model.PublishResultRecord
 	require.NoError(t, db.Find(&results).Error)
