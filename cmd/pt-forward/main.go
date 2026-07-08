@@ -294,6 +294,10 @@ func main() {
 	publishPipeline.SetArtifactCache(publish.NewArtifactCache(filepath.Join(cacheDir, "artifacts"), log))
 	publishPipeline.SetTorrentCache(publish.NewTorrentCache(filepath.Join(cacheDir, "torrents"), log))
 
+	bpCtrl := publish.NewBackpressureController(db, publish.DefaultBackpressureConfig(), log)
+	publishPipeline.SetBackpressureController(bpCtrl)
+	go bpCtrl.StartCleanup(ctx)
+
 	lifecycleManager := publish.NewLifecycleManager(db, log)
 	lifecycleManager.SetClientProvider(clientManager)
 
