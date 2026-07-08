@@ -31,7 +31,6 @@ type Pipeline struct {
 	notifyService     *notification.Service
 	screenshotConfig  *screenshot.Config
 	artifactCache     *ArtifactCache
-	torrentCache      *TorrentCache
 	backpressureCtrl  *BackpressureController
 	artifactGenerator *PublishArtifactGenerator
 	memberMu          sync.Map
@@ -68,10 +67,6 @@ func (p *Pipeline) SetBackpressureController(ctrl *BackpressureController) {
 
 func (p *Pipeline) SetArtifactCache(ac *ArtifactCache) {
 	p.artifactCache = ac
-}
-
-func (p *Pipeline) SetTorrentCache(tc *TorrentCache) {
-	p.torrentCache = tc
 }
 
 func (p *Pipeline) CreateTask(ctx context.Context, task *model.PublishTask) error {

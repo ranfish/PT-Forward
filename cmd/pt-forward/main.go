@@ -292,7 +292,6 @@ func main() {
 	_ = os.MkdirAll(filepath.Join(cacheDir, "artifacts"), 0o750)
 	_ = os.MkdirAll(filepath.Join(cacheDir, "torrents"), 0o750)
 	publishPipeline.SetArtifactCache(publish.NewArtifactCache(filepath.Join(cacheDir, "artifacts"), log))
-	publishPipeline.SetTorrentCache(publish.NewTorrentCache(filepath.Join(cacheDir, "torrents"), log))
 
 	bpCtrl := publish.NewBackpressureController(db, publish.DefaultBackpressureConfig(), log)
 	publishPipeline.SetBackpressureController(bpCtrl)
