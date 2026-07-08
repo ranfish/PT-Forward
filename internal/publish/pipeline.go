@@ -30,7 +30,6 @@ type Pipeline struct {
 	completionWatcher model.CompletionWatcher
 	notifyService     *notification.Service
 	screenshotConfig  *screenshot.Config
-	artifactCache     *ArtifactCache
 	backpressureCtrl  *BackpressureController
 	artifactGenerator *PublishArtifactGenerator
 	memberMu          sync.Map
@@ -63,10 +62,6 @@ func (p *Pipeline) SetScreenshotConfig(cfg screenshot.Config) {
 
 func (p *Pipeline) SetBackpressureController(ctrl *BackpressureController) {
 	p.backpressureCtrl = ctrl
-}
-
-func (p *Pipeline) SetArtifactCache(ac *ArtifactCache) {
-	p.artifactCache = ac
 }
 
 func (p *Pipeline) CreateTask(ctx context.Context, task *model.PublishTask) error {

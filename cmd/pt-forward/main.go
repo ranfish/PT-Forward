@@ -291,7 +291,6 @@ func main() {
 	cacheDir := filepath.Join(filepath.Dir(cfg.Database.SQLitePath), "cache")
 	_ = os.MkdirAll(filepath.Join(cacheDir, "artifacts"), 0o750)
 	_ = os.MkdirAll(filepath.Join(cacheDir, "torrents"), 0o750)
-	publishPipeline.SetArtifactCache(publish.NewArtifactCache(filepath.Join(cacheDir, "artifacts"), log))
 
 	bpCtrl := publish.NewBackpressureController(db, publish.DefaultBackpressureConfig(), log)
 	publishPipeline.SetBackpressureController(bpCtrl)
