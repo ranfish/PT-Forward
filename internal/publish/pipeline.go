@@ -233,12 +233,25 @@ func (p *Pipeline) fetchFromDownloader(ctx context.Context, candidate *model.Pub
 	detail := &model.TorrentDetail{
 		Title: candidate.TorrentName,
 	}
+	var savePath string
 	if torrent, tErr := dlClient.GetTorrentByHash(ctx, candidate.InfoHash); tErr == nil && torrent != nil {
 		detail.Size = torrent.TotalSize
 		if detail.Title == "" {
 			detail.Title = torrent.Name
 		}
+		savePath = torrent.SavePath
 	}
+
+	// 本地产物生成（截图 + MediaInfo）
+	if p.artifactGenerator != nil && savePath != "" {
+		if artifact, aErr := p.artifactGenerator.Generate(ctx, savePath, "", nil); aErr == nil && artifact != nil {
+			detail.MediaInfo = artifact.MediaInfoText
+			detail.Screenshots = artifact.ScreenshotURLs
+		} else if aErr != nil {
+			p.logger.Warn("artifact generation failed", zap.Error(aErr))
+		}
+	}
+
 	return torrentData, detail, nil
 }
 
