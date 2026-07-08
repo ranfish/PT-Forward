@@ -2443,8 +2443,9 @@ func TestSite_Exclusions_GetEmpty(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected array, got %T", resp.Data)
 	}
-	if len(items) != 0 {
-		t.Errorf("expected 0 exclusions, got %d", len(items))
+	// 硬编码互斥规则会追加到列表，所以 >= 4
+	if len(items) < 4 {
+		t.Errorf("expected at least 4 exclusions (hardcoded), got %d", len(items))
 	}
 }
 
@@ -2476,8 +2477,9 @@ func TestSite_Exclusions_CreateAndGet(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected array, got %T", resp.Data)
 	}
-	if len(items) != 1 {
-		t.Errorf("expected 1 exclusion, got %d", len(items))
+	// 硬编码 4 条 + 用户创建 1 条 = 5
+	if len(items) != 5 {
+		t.Errorf("expected 5 exclusions (4 hardcoded + 1 user), got %d", len(items))
 	}
 }
 

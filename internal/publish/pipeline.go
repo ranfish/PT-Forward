@@ -712,6 +712,12 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 		return false, "源站种子存在 H&R (Hit and Run) 标记，跳过发布"
 	}
 
+	// 硬编码互斥站点对（不可修改）
+	if IsHardcodedExclusion(candidate.SourceSite, targetSite) {
+		return false, fmt.Sprintf("源站 %s → 目标站 %s 为互斥站点（硬编码规则）", candidate.SourceSite, targetSite)
+	}
+
+	// 用户自定义排除规则
 	if targetSite != "" && candidate.SourceSite != "" {
 		var exclusion model.PublishExclusion
 		err := p.db.WithContext(ctx).
@@ -723,6 +729,25 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 	}
 
 	return true, ""
+}
+
+// hardcodedExclusionPairs 硬编码互斥站点对（双向），禁止用户修改
+var HardcodedExclusionPairs = map[string]map[string]bool{
+	"不可说": {"优堡": true},
+	"优堡":   {"不可说": true},
+	"家园":   {"铂金家": true},
+	"铂金家": {"家园": true},
+}
+
+func PublishHardcodedExclusionPairs() map[string]map[string]bool {
+	return HardcodedExclusionPairs
+}
+
+func IsHardcodedExclusion(sourceSite, targetSite string) bool {
+	if targets, ok := HardcodedExclusionPairs[sourceSite]; ok {
+		return targets[targetSite]
+	}
+	return false
 }
 
 func (p *Pipeline) ProcessPending(ctx context.Context) error {
