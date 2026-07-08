@@ -15,6 +15,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/site"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -1973,6 +1974,14 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusInternalServerError, 50000, "failed to list exclusions")
 			return
 		}
+		for src, targets := range publish.PublishHardcodedExclusionPairs() {
+			for tgt := range targets {
+				exclusions = append(exclusions, model.PublishExclusion{
+					SourceSite: src,
+					TargetSite: tgt,
+				})
+			}
+		}
 		Success(w, exclusions)
 
 	case http.MethodPost:
@@ -2009,6 +2018,10 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			Error(w, http.StatusBadRequest, 40001, "invalid request body")
+			return
+		}
+		if publish.IsHardcodedExclusion(req.SourceSite, req.TargetSite) {
+			Error(w, http.StatusForbidden, 40300, "硬编码互斥规则不可删除")
 			return
 		}
 		result := h.db.WithContext(r.Context()).
