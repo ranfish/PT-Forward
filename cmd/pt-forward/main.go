@@ -42,6 +42,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/publish"
+	"github.com/ranfish/pt-forward/internal/screenshot"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/rss"
 	"github.com/ranfish/pt-forward/internal/scheduler"
@@ -339,6 +340,24 @@ func main() {
 
 	mux := http.NewServeMux()
 	runtimeCfg := setting.NewRuntimeConfig(settingsRepo, log)
+
+	if runtimeCfg.GetBool(ctx, setting.KeyScreenshotEnabled) {
+		ssCfg := screenshot.Config{
+			MpvPath:     runtimeCfg.GetString(ctx, setting.KeyScreenshotMpvPath),
+			Count:       runtimeCfg.GetInt(ctx, setting.KeyScreenshotCount),
+			MinInterval: runtimeCfg.GetInt(ctx, setting.KeyScreenshotMinInterval),
+			JPEGQuality: runtimeCfg.GetInt(ctx, setting.KeyScreenshotJPEGQuality),
+		}
+		if ssCfg.MpvPath == "" {
+			ssCfg.MpvPath = "mpv"
+		}
+		if ssCfg.Count == 0 {
+			ssCfg.Count = 6
+		}
+		publishPipeline.SetScreenshotConfig(ssCfg)
+		log.Info("screenshot engine enabled for publish", zap.String("mpv_path", ssCfg.MpvPath), zap.Int("count", ssCfg.Count))
+	}
+
 	rateLimitEnabled := runtimeCfg.GetBool(ctx, setting.KeyRateLimitEnabled)
 	rateLimitGlobal := runtimeCfg.GetInt(ctx, setting.KeyRateLimitGlobal)
 	rateLimitWrite := runtimeCfg.GetInt(ctx, setting.KeyRateLimitWrite)
