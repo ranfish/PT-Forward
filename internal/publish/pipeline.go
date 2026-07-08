@@ -219,6 +219,43 @@ func (p *Pipeline) validateAndLoadCandidate(ctx context.Context, id uint) (*mode
 	return &candidate, nil
 }
 
+func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (map[string]interface{}, error) {
+	result := map[string]interface{}{
+		"description": "",
+		"poster_url":  "",
+		"media_info":  "",
+		"screenshots": []string{},
+	}
+
+	// PTGen 查询（标题→简介/海报）
+	if p.ptgen != nil {
+		if ptgenResult, err := p.ptgen.Query(ctx, name); err == nil && ptgenResult != nil {
+			if ptgenResult.RawBBCode != "" {
+				result["description"] = ptgenResult.RawBBCode
+			}
+			if ptgenResult.PosterURL != "" {
+				result["poster_url"] = ptgenResult.PosterURL
+			}
+		}
+	}
+
+	// 本地产物（截图 + MediaInfo）
+	if p.artifactGenerator != nil && savePath != "" {
+		if artifact, err := p.artifactGenerator.Generate(ctx, savePath, "", nil); err == nil && artifact != nil {
+			if artifact.MediaInfoText != "" {
+				result["media_info"] = artifact.MediaInfoText
+			}
+			if len(artifact.ScreenshotURLs) > 0 {
+				result["screenshots"] = artifact.ScreenshotURLs
+			}
+		} else if err != nil {
+			p.logger.Warn("analyze: artifact generation failed", zap.Error(err))
+		}
+	}
+
+	return result, nil
+}
+
 func (p *Pipeline) fetchFromDownloader(ctx context.Context, candidate *model.PublishCandidate) ([]byte, *model.TorrentDetail, error) {
 	dlClient, err := p.clientProvider.Get(candidate.ClientID)
 	if err != nil {

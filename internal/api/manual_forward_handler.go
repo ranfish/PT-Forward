@@ -28,6 +28,7 @@ type ManualForwardHandler struct {
 
 type PublishPipeline interface {
 	PublishCandidate(ctx context.Context, id uint) (*model.PublishCandidate, error)
+	AnalyzeTorrent(ctx context.Context, name, savePath string) (map[string]interface{}, error)
 }
 
 type SiteManager interface {
@@ -273,10 +274,31 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	result["forbid_reason"] = forbidReason
 
 	result["title"] = name
-	result["description"] = ""
-	result["media_info"] = ""
-	result["screenshots"] = []string{}
-	result["poster_url"] = ""
+
+	// 调 pipeline 分析（PTGen 简介/海报 + 本地截图/MediaInfo）
+	if h.pipeline != nil {
+		analyzeCtx, analyzeCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer analyzeCancel()
+		if analyzeResult, analyzeErr := h.pipeline.AnalyzeTorrent(analyzeCtx, name, savePath); analyzeErr == nil && analyzeResult != nil {
+			if v, ok := analyzeResult["description"]; ok {
+				result["description"] = v
+			}
+			if v, ok := analyzeResult["media_info"]; ok {
+				result["media_info"] = v
+			}
+			if v, ok := analyzeResult["screenshots"]; ok {
+				result["screenshots"] = v
+			}
+			if v, ok := analyzeResult["poster_url"]; ok {
+				result["poster_url"] = v
+			}
+		}
+	} else {
+		result["description"] = ""
+		result["media_info"] = ""
+		result["screenshots"] = []string{}
+		result["poster_url"] = ""
+	}
 
 	task.setResult(result)
 }
