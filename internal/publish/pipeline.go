@@ -559,6 +559,7 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 
 	if sourceDetail != nil {
 		populateFormFields(pubReq.FormFields, sourceDetail)
+		pubReq.Subtitle = sourceDetail.Subtitle
 		pubReq.MediaInfo = sourceDetail.MediaInfo
 		pubReq.Screenshots = sourceDetail.Screenshots
 	}
