@@ -132,6 +132,14 @@ func (rt *Router) SetCloudFPBreakerFn(fn func() bool) {
 	}
 }
 
+
+// SetupManualForward 注入手动转发向导所需的依赖
+func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager) {
+	rt.manualForwardHandler.SetPipeline(pipeline)
+	rt.manualForwardHandler.SetSiteManager(siteProvider)
+	rt.manualForwardHandler.SetClientProvider(clientMgr)
+}
+
 func (rt *Router) SetSiteProvider(p interface {
 	GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error)
 	GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error)

@@ -333,6 +333,7 @@ func main() {
 		log,
 	)
 	router.SetSiteProvider(siteProvider)
+	router.SetupManualForward(publishPipeline, siteProvider, clientManager)
 	router.SetConfigEventBus(configEventBus)
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
