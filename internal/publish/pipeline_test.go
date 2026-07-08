@@ -1210,8 +1210,9 @@ func TestPipeline_PublishCandidate_E2E_UploadFail(t *testing.T) {
 	}
 
 	result, _ := p.PublishCandidate(ctx, candidate.ID)
-	if result.PublishStatus != model.CandidateFailed {
-		t.Errorf("expected failed, got %s", result.PublishStatus)
+	// 首次失败 → Pending（RetryCount < 3，等待重试）
+	if result.PublishStatus != model.CandidatePending {
+		t.Errorf("expected pending (retry scheduled), got %s", result.PublishStatus)
 	}
 
 	results, _ := p.ListResults(ctx, candidate.ID, 10)
