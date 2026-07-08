@@ -370,10 +370,10 @@ async function createTask() {
   createTaskSubmitting.value = true
   try {
     await publishApi.createTask({
-      source_site_id: taskForm.sourceSiteId,
-      target_sites: taskForm.targetSites,
+      sourceSiteId: taskForm.sourceSiteId,
+      targetSites: taskForm.targetSites,
       type: taskForm.type || undefined,
-      manual_check: taskForm.manualCheck,
+      manualCheck: taskForm.manualCheck,
     })
     message.success(t('common.success'))
     showCreateTaskModal.value = false
