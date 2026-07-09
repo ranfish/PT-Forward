@@ -62,7 +62,7 @@ func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		}
 	case strings.HasSuffix(path, "/manual-forward/analyze") && r.Method == http.MethodPost:
 		h.handleStartAnalyze(w, r)
-	case strings.HasSuffix(path, "/manual-forward/analyze/"):
+	case strings.Contains(path, "/manual-forward/analyze/") && r.Method == http.MethodGet:
 		h.handlePollAnalyze(w, r)
 	case strings.HasSuffix(path, "/manual-forward/eligible-targets"):
 		if r.Method == http.MethodPost {
