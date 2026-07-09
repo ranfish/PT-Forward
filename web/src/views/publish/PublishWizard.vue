@@ -239,7 +239,8 @@ async function startAnalyze() {
       name: selectedTorrent.value.name,
       save_path: selectedTorrent.value.save_path,
     })
-    const taskId = startResp.data?.data?.taskId
+    const respData = startResp.data?.data as Record<string, unknown> | undefined
+    const taskId = Number(respData?.task_id ?? respData?.taskId)
     if (!taskId) { analyzeError.value = 'No task_id returned'; analyzing.value = false; return }
 
     const poll = async () => {
