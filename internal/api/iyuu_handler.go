@@ -206,6 +206,12 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		}
 		if req.IsVIP != nil {
 			cfg.IsVIP = *req.IsVIP
+			// VIP 开关变化时自动切换域名
+			if *req.IsVIP {
+				cfg.BaseURL = "https://vip.iyuu.cn"
+			} else {
+				cfg.BaseURL = "https://2025.iyuu.cn"
+			}
 		}
 		if req.RequestTimeoutMs != nil {
 			cfg.RequestTimeoutSec = *req.RequestTimeoutMs / 1000
@@ -239,6 +245,12 @@ func (h *IYUUHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request)
 		}
 		if req.IsVIP != nil {
 			cfg.IsVIP = *req.IsVIP
+			// VIP 开关变化时自动切换域名
+			if *req.IsVIP {
+				cfg.BaseURL = "https://vip.iyuu.cn"
+			} else {
+				cfg.BaseURL = "https://2025.iyuu.cn"
+			}
 		}
 		if req.RequestTimeoutMs != nil {
 			cfg.RequestTimeoutSec = *req.RequestTimeoutMs / 1000

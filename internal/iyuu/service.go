@@ -44,6 +44,21 @@ func NewService(db *gorm.DB, logger *zap.Logger) *Service {
 	}
 }
 
+
+func effectiveBaseURL(cfg *model.IYUUConfig) string {
+	if cfg.IsVIP && cfg.BaseURL != "" {
+		// VIP 已开启：如果用户手动填了 BaseURL 就用手填的，否则用 VIP 域名
+		if cfg.BaseURL == "https://2025.iyuu.cn" {
+			return "https://vip.iyuu.cn"
+		}
+		return cfg.BaseURL
+	}
+	if cfg.BaseURL == "" {
+		return "https://2025.iyuu.cn"
+	}
+	return cfg.BaseURL
+}
+
 func (s *Service) getConfig(ctx context.Context) (*model.IYUUConfig, error) {
 	var cfg model.IYUUConfig
 	if err := s.db.WithContext(ctx).First(&cfg).Error; err != nil {
@@ -61,7 +76,7 @@ func (s *Service) Ping(ctx context.Context) error {
 		return err
 	}
 
-	u := cfg.BaseURL + "/reseed/sites/index"
+	u := effectiveBaseURL(cfg) + "/reseed/sites/index"
 	resp, err := s.doGetWithToken(ctx, u, cfg.Token)
 	if err != nil {
 		return iyuuError(ErrIYUUHTTP, "ping failed", err)
@@ -115,7 +130,7 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 	infoHashes = cleaned
 
 	const batchSize = 200
-	const batchDelay = 2 * time.Second
+	const batchDelay = 5 * time.Second
 	const maxConsecutiveErrors = 5
 	var allResults []*model.IYUUReseedResult
 	consecutiveErrors := 0
@@ -146,7 +161,7 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 			form.Set("sid_sha1", sidSha1)
 		}
 
-		u := cfg.BaseURL + "/reseed/index/index"
+		u := effectiveBaseURL(cfg) + "/reseed/index/index"
 		var resp iyuuRestReseedResponse
 		shouldBreak := false
 		shouldDelay := true
@@ -177,6 +192,13 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 				zap.Int("batch", i/batchSize+1),
 				zap.Int("batchSize", len(batch)),
 			)
+		} else if resp.Code == 400 {
+			// 限速（访问频率过快）：跳过该批，不累计错误，继续下一批
+			s.logger.Warn("IYUU 限速，跳过该批",
+				zap.Int("batch", i/batchSize+1),
+				zap.String("msg", resp.Msg),
+			)
+			shouldDelay = true
 		} else if resp.Code != 0 {
 			consecutiveErrors++
 			s.logger.Warn("IYUU 服务器错误",
@@ -317,7 +339,7 @@ func (s *Service) GetSiteList(ctx context.Context) ([]model.IYUUSite, error) {
 		return nil, err
 	}
 
-	u := cfg.BaseURL + "/reseed/sites/index"
+	u := effectiveBaseURL(cfg) + "/reseed/sites/index"
 	resp, err := s.doGetWithToken(ctx, u, cfg.Token)
 	if err != nil {
 		return nil, iyuuError(ErrIYUUHTTP, "get site list", err)
@@ -375,7 +397,7 @@ func (s *Service) ReportExisting(ctx context.Context, sidList []int) error {
 		"sid_list": sidList,
 	}
 
-	u := cfg.BaseURL + "/reseed/sites/reportExisting"
+	u := effectiveBaseURL(cfg) + "/reseed/sites/reportExisting"
 	var resp iyuuReportResponse
 	if err := s.doPostJSONWithToken(ctx, u, cfg.Token, payload, &resp); err != nil {
 		return iyuuError(ErrIYUUHTTP, "report existing", err)
@@ -434,7 +456,7 @@ func (s *Service) SendNotification(ctx context.Context, text, desp string) error
 	form.Set("text", text)
 	form.Set("desp", desp)
 
-	u := cfg.BaseURL + "/+api/send"
+	u := effectiveBaseURL(cfg) + "/+api/send"
 	var resp iyuuRestResponse
 	if err := s.doPostFormWithToken(ctx, u, cfg.Token, form, &resp); err != nil {
 		return iyuuError(ErrIYUUHTTP, "send notification", err)

@@ -14,7 +14,7 @@
           <a-input v-model:value="form.baseURL" placeholder="https://2025.iyuu.cn" />
         </a-form-item>
         <a-form-item :label="t('iyuu.vip')">
-          <a-switch v-model:checked="form.isVIP" @change="handleSave" />
+          <a-switch v-model:checked="form.isVIP" @change="handleVIPChange" />
         </a-form-item>
         <a-form-item :label="t('iyuu.version')">
           <a-input v-model:value="form.version" placeholder="1.0.0" />
@@ -168,6 +168,10 @@ async function fetchConfig() {
   } finally {
     loading.value = false
   }
+}
+
+function handleVIPChange() {
+  form.baseURL = form.isVIP ? 'https://vip.iyuu.cn' : 'https://2025.iyuu.cn'
 }
 
 async function handleSave() {
