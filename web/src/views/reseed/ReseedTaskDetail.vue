@@ -25,7 +25,9 @@
               <a-input v-model:value="filter.torrentId" placeholder="种子ID" style="width: 130px" allow-clear @press-enter="onFilterSearch" />
               <a-select v-model:value="filter.status" placeholder="状态" style="width: 120px" allow-clear>
                 <a-select-option value="matched">待注入</a-select-option>
+                <a-select-option value="injecting">注入中</a-select-option>
                 <a-select-option value="injected">已注入</a-select-option>
+                <a-select-option value="skipped">已跳过</a-select-option>
                 <a-select-option value="failed">失败</a-select-option>
               </a-select>
               <a-button type="primary" @click="onFilterSearch">查询</a-button>
