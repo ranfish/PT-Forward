@@ -1,5 +1,11 @@
 <template>
   <div>
+    <div style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px">
+      <a-button type="primary" @click="$router.push('/publish/manual')">
+        <template #icon><PlusOutlined /></template>
+        {{ t('publish.manualForward') }}
+      </a-button>
+    </div>
     <a-tabs v-model:active-key="activeTab">
       <a-tab-pane key="candidates" :tab="t('publish.candidates')">
         <div style="margin-bottom: 16px; display: flex; justify-content: space-between">
