@@ -280,22 +280,28 @@ func (h *PublishHandler) handleCancelTask(w http.ResponseWriter, r *http.Request
 }
 
 func (h *PublishHandler) handleListCandidates(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 {
-		limit = 20
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
 	}
-	if limit > 200 {
-		limit = 200
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+	if pageSize == 0 {
+		pageSize, _ = strconv.Atoi(r.URL.Query().Get("size"))
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
 	}
 
-	candidates, err := h.pipeline.ListPendingCandidates(r.Context(), limit)
+	candidates, total, err := h.pipeline.ListAllCandidates(r.Context(), page, pageSize)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询发布候选失败")
 		return
 	}
 	Success(w, map[string]interface{}{
-		"items": candidates,
-		"total": len(candidates),
+		"items":    candidates,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
 	})
 }
 
