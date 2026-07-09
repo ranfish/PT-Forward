@@ -19,10 +19,18 @@
 - **站点数据**：官组命名、规则等站点原始数据必须原样写入，不能杜撰
 - **Git 提交**：禁止提交 `data/`、`PT0/`～`PT8/`、`*.torrent`、`logs/`、`*.db`（详见 `.gitignore`）
 - **删除代码后**：必须跑 `go vet ./internal/... ./cmd/pt-forward/...`（**不要**用 `go vet ./...`，`cmd/verify-pieces-hash` 有已知冲突会报错），确保测试文件不引用已删符号
-- **编译部署前**：必须灵魂三问、回归审核，然后再进行编译和部署
+- **编译部署前**：必须灵魂四问、回归审核，然后再进行编译和部署
 - **版本号**：编译命令必须包含 `-X main.version=$(git describe --tags --always --dirty)`，源码默认值为 `"dev"`
+- **⚠️ 部署铁律（最高优先级，违反=事故）**：
+  1. **先提交后部署**：`git commit + push` 必须在编译/部署**之前**完成。代码必须在 git 历史中先于部署生效。**禁止先部署后提交**。
+  2. **部署检查清单**（每次部署前逐条过一遍，不能跳过）：
+     - [ ] 灵魂四问全部通过？
+     - [ ] `git status` 是否有未提交的改动？→ 有则先 commit + push
+     - [ ] 需要打 tag 吗？→ `git tag vX.X.X && git push origin vX.X.X`
+     - [ ] 本次是纯后端改动？→ 不需要 vite build
+     - [ ] 本次涉及 `web/`？→ 必须 vite build → cp dist → go build（三步缺一不可）
 
-## 灵魂三问（每次代码改动后必须逐条审核）
+## 灵魂四问（每次代码改动后必须逐条审核）
 
 1. **nil 安全**：所有指针返回值是否检查了 nil？map 查找是否有 ok 判断？type assertion 是否用了 comma-ok 模式？
 2. **边界安全**：空输入/空 DB/context 取消/并发锁竞争等边界情况是否处理？`context.WithTimeout` 后是否都调了 `cancel()`？锁是否有嵌套导致死锁风险？
