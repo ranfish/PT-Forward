@@ -17,14 +17,14 @@
           :columns="candidateColumns"
           :data-source="candidates"
           :loading="candidatesLoading"
-          :pagination="{ current: candidatePage, pageSize: 20, total: candidateTotal, showSizeChanger: true, showTotal: (total: number) => t('common.totalCount', { count: total }) }"
+          :pagination="{ current: candidatePage, pageSize: candidatePageSize, total: candidateTotal, showSizeChanger: true, showTotal: (total: number) => t('common.totalCount', { count: total }) }"
           row-key="id"
           size="small"
-          @change="(pag: { current: number }) => { candidatePage = pag.current; fetchCandidates() }"
+          @change="(pag: { current?: number; pageSize?: number }) => { if (pag.current) candidatePage = pag.current; if (pag.pageSize) candidatePageSize = pag.pageSize; fetchCandidates() }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'publish_status'">
-              <a-tag :color="record.publish_status === 'pending' ? 'blue' : record.publish_status === 'completed' ? 'green' : record.publish_status === 'failed' ? 'red' : 'default'">
+              <a-tag :color="publishStatusColor(record.publish_status)">
                 {{ translatePublishStatus(record.publish_status) }}
               </a-tag>
             </template>
@@ -157,7 +157,7 @@ import { publishApi } from '@/api/publish'
 import { sitesApi } from '@/api/sites'
 import { useEnumLabels } from '@/utils/enumLabels'
 import type { PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from '@/api/types'
-import { formatTime } from '@/utils/format'
+import { formatTime, formatBytes } from '@/utils/format'
 
 const { t } = useI18n()
 const { translatePublishStatus, translatePublishType } = useEnumLabels()
@@ -167,6 +167,7 @@ const candidatesLoading = ref(false)
 const candidates = ref<PublishCandidate[]>([])
 const candidatePage = ref(1)
 const candidateTotal = ref(0)
+const candidatePageSize = ref(20)
 
 const groupsLoading = ref(false)
 const groups = ref<PublishGroup[]>([])
@@ -181,10 +182,13 @@ const results = ref<PublishResultRecord[]>([])
 
 const candidateColumns = [
   { title: t('publish.torrentName'), dataIndex: 'torrent_name', key: 'torrent_name', ellipsis: true },
-  { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 120 },
-  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
-  { title: t('publish.publishStatus'), key: 'publish_status', width: 100 },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
+  { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 100 },
+  { title: '目标站', dataIndex: 'target_sites', key: 'target_sites', width: 150, ellipsis: true },
+  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 90, customRender: ({ text }: { text: number }) => formatBytes(text) },
+  { title: t('publish.publishStatus'), key: 'publish_status', width: 90 },
+  { title: '重试', dataIndex: 'retry_count', key: 'retry_count', width: 60 },
+  { title: '结果', dataIndex: 'publish_result', key: 'publish_result', ellipsis: true },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 160, customRender: ({ text }: { text: string }) => formatTime(text) },
   { title: t('common.actions'), key: 'actions', width: 120 },
 ]
 
@@ -217,6 +221,11 @@ const resultColumns = [
   { title: t('publish.completedAt'), dataIndex: 'completed_at', key: 'completed_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 
+function publishStatusColor(status: string) {
+  const map: Record<string, string> = { pending: 'blue', downloading: 'cyan', completed: 'geekblue', publishing: 'orange', done: 'green', failed: 'red', skipped: 'default', orphan: 'volcano' }
+  return map[status] || 'default'
+}
+
 function taskStatusColor(status: string) {
   const map: Record<string, string> = { pending: 'blue', running: 'cyan', completed: 'green', failed: 'red', cancelled: 'default' }
   return map[status] || 'default'
@@ -225,7 +234,7 @@ function taskStatusColor(status: string) {
 async function fetchCandidates() {
   candidatesLoading.value = true
   try {
-    const resp = await publishApi.listCandidates({ page: candidatePage.value, size: 20, search: candidateSearch.value || undefined })
+    const resp = await publishApi.listCandidates({ page: candidatePage.value, size: candidatePageSize.value, search: candidateSearch.value || undefined })
     const body = resp.data.data
     candidates.value = body?.items || body || []
     candidateTotal.value = body?.total || 0

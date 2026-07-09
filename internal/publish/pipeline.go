@@ -604,6 +604,15 @@ func (p *Pipeline) finalizePublishStatus(ctx context.Context, id uint, published
 	return model.CandidateSkipped
 }
 
+func (p *Pipeline) ListAllCandidates(ctx context.Context, page, pageSize int) ([]model.PublishCandidate, int64, error) {
+	var total int64
+	q := p.db.WithContext(ctx).Model(&model.PublishCandidate{})
+	q.Count(&total)
+	var candidates []model.PublishCandidate
+	q.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&candidates)
+	return candidates, total, nil
+}
+
 func (p *Pipeline) ListPendingCandidates(ctx context.Context, limit int) ([]model.PublishCandidate, error) {
 	var candidates []model.PublishCandidate
 	q := p.db.WithContext(ctx).
