@@ -292,7 +292,7 @@ func (h *PublishHandler) handleListCandidates(w http.ResponseWriter, r *http.Req
 		pageSize = 20
 	}
 
-	candidates, total, err := h.pipeline.ListAllCandidates(r.Context(), page, pageSize)
+	candidates, total, err := h.pipeline.ListAllCandidates(r.Context(), page, pageSize, r.URL.Query().Get("status"), r.URL.Query().Get("search"))
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询发布候选失败")
 		return

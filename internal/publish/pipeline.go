@@ -604,9 +604,16 @@ func (p *Pipeline) finalizePublishStatus(ctx context.Context, id uint, published
 	return model.CandidateSkipped
 }
 
-func (p *Pipeline) ListAllCandidates(ctx context.Context, page, pageSize int) ([]model.PublishCandidate, int64, error) {
+func (p *Pipeline) ListAllCandidates(ctx context.Context, page, pageSize int, status, search string) ([]model.PublishCandidate, int64, error) {
 	var total int64
 	q := p.db.WithContext(ctx).Model(&model.PublishCandidate{})
+	if status != "" {
+		q = q.Where("publish_status = ?", status)
+	}
+	if search != "" {
+		like := "%" + search + "%"
+		q = q.Where("torrent_name LIKE ? OR source_site LIKE ? OR target_sites LIKE ?", like, like, like)
+	}
 	q.Count(&total)
 	var candidates []model.PublishCandidate
 	q.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&candidates)

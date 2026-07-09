@@ -2,7 +2,7 @@ import client from './client'
 import type { ApiResponse, ApiResponsePaginated, ListParams, ManualForwardSubmitRequest, PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from './types'
 
 export const publishApi = {
-  listCandidates(params?: ListParams) {
+  listCandidates(params?: ListParams & { status?: string }) {
     return client.get<ApiResponsePaginated<PublishCandidate>>('/publish/candidates', { params })
   },
   getCandidate(id: number) {
