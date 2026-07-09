@@ -498,13 +498,13 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 
 	type matchWithURL struct {
 		model.ReseedMatch
-		SourceDetailURL string `json:"source_detail_url"`
+		TargetDetailURL string `json:"target_detail_url"`
 	}
 	items := make([]matchWithURL, 0, len(matches))
 	for _, m := range matches {
 		item := matchWithURL{ReseedMatch: m}
-		if si, ok := siteInfos[m.SourceSite]; ok && m.SourceTorrentID != "" {
-			item.SourceDetailURL = buildDetailURL(si.BaseURL, si.Framework, m.SourceTorrentID)
+		if si, ok := siteInfos[m.TargetSite]; ok && m.TargetTorrentID != "" {
+			item.TargetDetailURL = buildDetailURL(si.BaseURL, si.Framework, m.TargetTorrentID)
 		}
 		items = append(items, item)
 	}
