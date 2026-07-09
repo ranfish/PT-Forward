@@ -1762,8 +1762,8 @@ func TestEngine_RunTask_WithProviders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
-	if result.Injected != 1 {
-		t.Errorf("expected 1 injected, got %d", result.Injected)
+	if result.Matched != 1 {
+		t.Errorf("expected 1 matched, got %d", result.Matched)
 	}
 }
 
