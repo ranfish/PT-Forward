@@ -115,7 +115,7 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 		return
 	}
 
-	client, err := h.clientMgr.Get(fmt.Sprintf("%d", clientID))
+	client, err := h.clientMgr.Get(cfg.Name)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("连接下载器失败: %v", err))
 		return
