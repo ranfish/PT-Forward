@@ -8,15 +8,41 @@
     </div>
     <a-tabs v-model:active-key="activeTab">
       <a-tab-pane key="candidates" :tab="t('publish.candidates')">
-        <div style="margin-bottom: 16px; display: flex; justify-content: space-between">
-          <a-space>
-            <a-input-search
-              v-model:value="candidateSearch"
-              :placeholder="t('common.search')"
-              style="width: 300px"
-              @search="fetchCandidates"
-            />
-          </a-space>
+        <div class="tab-toolbar">
+          <a-input-search
+            v-model:value="candidateSearch"
+            :placeholder="t('common.search')"
+            style="width: 260px"
+            allow-clear
+            @search="onCandidateFilterChange"
+          />
+          <a-select
+            v-model:value="candidateStatus"
+            style="width: 130px"
+            placeholder="状态筛选"
+            allow-clear
+            @change="onCandidateFilterChange"
+          >
+            <a-select-option value="pending">待处理</a-select-option>
+            <a-select-option value="downloading">下载中</a-select-option>
+            <a-select-option value="publishing">发布中</a-select-option>
+            <a-select-option value="done">已完成</a-select-option>
+            <a-select-option value="failed">失败</a-select-option>
+            <a-select-option value="skipped">已跳过</a-select-option>
+          </a-select>
+          <a-badge :count="candidateTotal" :number-style="{ backgroundColor: '#1890ff' }" :overflow-count="9999" />
+          <div class="tab-toolbar-right">
+            <a-button
+              v-if="selectedCandidateIds.length > 0"
+              type="primary"
+              size="small"
+              :loading="batchRetrying"
+              @click="batchRetry"
+            >
+              <template #icon><ReloadOutlined /></template>
+              批量重试 ({{ selectedCandidateIds.length }})
+            </a-button>
+          </div>
         </div>
 
         <a-table
@@ -26,17 +52,56 @@
           :pagination="{ current: candidatePage, pageSize: candidatePageSize, total: candidateTotal, showSizeChanger: true, showTotal: (total: number) => t('common.totalCount', { count: total }) }"
           row-key="id"
           size="small"
+          :row-selection="{ selectedRowKeys: selectedCandidateIds, onChange: (keys: number[]) => selectedCandidateIds = keys }"
+          :expand="{ expandedRowRender: undefined }"
           @change="(pag: { current?: number; pageSize?: number }) => { if (pag.current) candidatePage = pag.current; if (pag.pageSize) candidatePageSize = pag.pageSize; fetchCandidates() }"
         >
+          <template #expandedRowRender="{ record }">
+            <div class="candidate-detail">
+              <a-descriptions size="small" :column="3" bordered>
+                <a-descriptions-item label="InfoHash">
+                  <span style="font-family: monospace; font-size: 12px">{{ record.info_hash || '-' }}</span>
+                </a-descriptions-item>
+                <a-descriptions-item label="源种子ID">{{ record.source_torrent_id || '-' }}</a-descriptions-item>
+                <a-descriptions-item label="下载器">{{ record.client_id || '-' }}</a-descriptions-item>
+                <a-descriptions-item label="保存路径" :span="3">
+                  <span style="font-family: monospace; font-size: 12px">{{ record.local_save_path || '-' }}</span>
+                </a-descriptions-item>
+                <a-descriptions-item v-if="record.skip_reason" label="跳过原因" :span="3">
+                  <span style="color: #faad14">{{ record.skip_reason }}</span>
+                </a-descriptions-item>
+                <a-descriptions-item v-if="record.publish_result" label="发布结果" :span="3">
+                  <span style="color: #ff4d4f">{{ record.publish_result }}</span>
+                </a-descriptions-item>
+              </a-descriptions>
+            </div>
+          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'publish_status'">
-              <a-tag :color="publishStatusColor(record.publish_status)">
+              <a-tag :color="publishStatusColor(record.publish_status)" style="margin: 0">
                 {{ translatePublishStatus(record.publish_status) }}
               </a-tag>
             </template>
+            <template v-if="column.key === 'target_sites'">
+              <div class="target-site-tags">
+                <a-tag
+                  v-for="site in parseTargetSites(record.target_sites)"
+                  :key="site"
+                  size="small"
+                  :color="sitePublishColor(record.publish_status)"
+                >
+                  {{ site }}
+                </a-tag>
+              </div>
+            </template>
             <template v-if="column.key === 'actions'">
               <a-space>
-                <a-button type="link" size="small" :disabled="record.publish_status === 'completed'" @click="manualPublish(record.id)">
+                <a-button
+                  type="link"
+                  size="small"
+                  :disabled="record.publish_status === 'done' || record.publish_status === 'publishing'"
+                  @click="manualPublish(record.id)"
+                >
                   {{ t('publish.publishAction') }}
                 </a-button>
                 <a-popconfirm :title="t('publish.deleteConfirm')" @confirm="deleteCandidate(record.id)">
@@ -158,9 +223,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
+import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { publishApi } from '@/api/publish'
 import { sitesApi } from '@/api/sites'
 import { useEnumLabels } from '@/utils/enumLabels'
@@ -173,11 +239,14 @@ const { translatePublishStatus, translatePublishType } = useEnumLabels()
 const activeTab = ref('candidates')
 const wizardOpen = ref(false)
 const candidateSearch = ref('')
+const candidateStatus = ref<string | undefined>(undefined)
 const candidatesLoading = ref(false)
 const candidates = ref<PublishCandidate[]>([])
 const candidatePage = ref(1)
 const candidateTotal = ref(0)
 const candidatePageSize = ref(20)
+const selectedCandidateIds = ref<number[]>([])
+const batchRetrying = ref(false)
 
 const groupsLoading = ref(false)
 const groups = ref<PublishGroup[]>([])
@@ -192,14 +261,13 @@ const results = ref<PublishResultRecord[]>([])
 
 const candidateColumns = [
   { title: t('publish.torrentName'), dataIndex: 'torrent_name', key: 'torrent_name', ellipsis: true },
-  { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 100 },
-  { title: '目标站', dataIndex: 'target_sites', key: 'target_sites', width: 150, ellipsis: true },
-  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 90, customRender: ({ text }: { text: number }) => formatBytes(text) },
-  { title: t('publish.publishStatus'), key: 'publish_status', width: 90 },
-  { title: '重试', dataIndex: 'retry_count', key: 'retry_count', width: 60 },
-  { title: '结果', dataIndex: 'publish_result', key: 'publish_result', ellipsis: true },
-  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 160, customRender: ({ text }: { text: string }) => formatTime(text) },
-  { title: t('common.actions'), key: 'actions', width: 120 },
+  { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 90 },
+  { title: '目标站', key: 'target_sites', width: 200 },
+  { title: t('common.size'), dataIndex: 'size', key: 'size', width: 80, customRender: ({ text }: { text: number }) => formatBytes(text) },
+  { title: t('publish.publishStatus'), key: 'publish_status', width: 80 },
+  { title: '重试', dataIndex: 'retry_count', key: 'retry_count', width: 50 },
+  { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 150, customRender: ({ text }: { text: string }) => formatTime(text) },
+  { title: t('common.actions'), key: 'actions', width: 110 },
 ]
 
 const groupColumns = [
@@ -241,18 +309,113 @@ function taskStatusColor(status: string) {
   return map[status] || 'default'
 }
 
+function parseTargetSites(raw: string): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return raw.split(',').map(s => s.trim()).filter(Boolean)
+  }
+}
+
+function sitePublishColor(status: string): string {
+  const map: Record<string, string> = {
+    done: 'green', completed: 'green', published: 'green',
+    failed: 'red',
+    skipped: 'orange',
+    publishing: 'blue',
+    pending: 'default',
+    downloading: 'cyan',
+  }
+  return map[status] || 'default'
+}
+
+function onCandidateFilterChange() {
+  candidatePage.value = 1
+  fetchCandidates()
+}
+
+const hasActiveCandidates = computed(() =>
+  candidates.value.some(c =>
+    c.publish_status === 'pending' ||
+    c.publish_status === 'downloading' ||
+    c.publish_status === 'publishing'
+  )
+)
+
+let candidatePollTimer: ReturnType<typeof setInterval> | null = null
+
+function startCandidatePoll() {
+  if (candidatePollTimer) return
+  candidatePollTimer = setInterval(async () => {
+    if (activeTab.value !== 'candidates') return
+    if (!hasActiveCandidates.value) return
+    await fetchCandidatesSilent()
+  }, 5000)
+}
+
+function stopCandidatePoll() {
+  if (candidatePollTimer) {
+    clearInterval(candidatePollTimer)
+    candidatePollTimer = null
+  }
+}
+
+async function fetchCandidatesSilent() {
+  try {
+    const resp = await publishApi.listCandidates({
+      page: candidatePage.value,
+      size: candidatePageSize.value,
+      search: candidateSearch.value || undefined,
+      status: candidateStatus.value,
+    })
+    const body = resp.data?.data
+    candidates.value = body?.items || []
+    candidateTotal.value = body?.total || 0
+  } catch { /* silent */ }
+}
+
 async function fetchCandidates() {
   candidatesLoading.value = true
   try {
-    const resp = await publishApi.listCandidates({ page: candidatePage.value, size: candidatePageSize.value, search: candidateSearch.value || undefined })
-    const body = resp.data.data
-    candidates.value = body?.items || body || []
+    const resp = await publishApi.listCandidates({
+      page: candidatePage.value,
+      size: candidatePageSize.value,
+      search: candidateSearch.value || undefined,
+      status: candidateStatus.value,
+    })
+    const body = resp.data?.data
+    candidates.value = body?.items || []
     candidateTotal.value = body?.total || 0
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {
     candidatesLoading.value = false
   }
+}
+
+async function batchRetry() {
+  if (selectedCandidateIds.value.length === 0) return
+  batchRetrying.value = true
+  let ok = 0
+  let fail = 0
+  for (const id of selectedCandidateIds.value) {
+    try {
+      await publishApi.manualPublish(id)
+      ok++
+    } catch {
+      fail++
+    }
+  }
+  batchRetrying.value = false
+  selectedCandidateIds.value = []
+  if (fail === 0) {
+    message.success(`已重试 ${ok} 个候选`)
+  } else {
+    message.warning(`成功 ${ok}，失败 ${fail}`)
+  }
+  fetchCandidates()
 }
 
 async function fetchGroups() {
@@ -419,5 +582,34 @@ onMounted(() => {
   fetchTasks()
   fetchResults()
   fetchTaskSites()
+  startCandidatePoll()
+})
+
+onUnmounted(() => {
+  stopCandidatePoll()
 })
 </script>
+
+<style scoped>
+.tab-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.tab-toolbar-right {
+  margin-left: auto;
+}
+.target-site-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.target-site-tags :deep(.ant-tag) {
+  margin: 0;
+  font-size: 12px;
+}
+.candidate-detail {
+  padding: 8px 0;
+}
+</style>
