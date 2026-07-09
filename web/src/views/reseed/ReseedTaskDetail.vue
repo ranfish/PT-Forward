@@ -64,9 +64,9 @@
                 <template v-if="column.key === 'target_info_hash'">
                   <span style="cursor:pointer;font-family:monospace;font-size:12px" @click="copyHash(record.target_info_hash)">{{ record.target_info_hash }}</span>
                 </template>
-                <template v-if="column.key === 'source_torrent_id'">
-                  <a v-if="record.source_detail_url" :href="record.source_detail_url" target="_blank" rel="noopener" style="font-family:monospace;font-size:12px">{{ record.source_torrent_id }}</a>
-                  <span v-else style="font-family:monospace;font-size:12px">{{ record.source_torrent_id }}</span>
+                <template v-if="column.key === 'target_torrent_id'">
+                  <a v-if="record.target_detail_url" :href="record.target_detail_url" target="_blank" rel="noopener" style="font-family:monospace;font-size:12px">{{ record.target_torrent_id }}</a>
+                  <span v-else style="font-family:monospace;font-size:12px">{{ record.target_torrent_id }}</span>
                 </template>
                 <template v-if="column.key === 'directory'">
                   <span style="font-size:12px">{{ record.directory || '-' }}</span>
@@ -257,6 +257,7 @@ interface ReseedMatchItem {
   source_info_hash: string
   source_torrent_id: string
   source_detail_url?: string
+  target_detail_url?: string
   target_site: string
   target_info_hash: string
   match_method: string
@@ -330,7 +331,7 @@ const matchColumns = [
   { title: t('reseed.sourceInfoHash'), dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true, sorter: true },
   { title: '客户端', dataIndex: 'client_id', key: 'client_id', width: 100, sorter: true },
   { title: t('reseed.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120, sorter: true },
-  { title: '种子ID', dataIndex: 'source_torrent_id', key: 'source_torrent_id', width: 110, sorter: true },
+  { title: '种子ID', dataIndex: 'target_torrent_id', key: 'target_torrent_id', width: 110, sorter: true },
   { title: '资源文件夹', dataIndex: 'directory', key: 'directory', ellipsis: true, sorter: true },
   { title: t('reseed.targetInfoHash'), dataIndex: 'target_info_hash', key: 'target_info_hash', ellipsis: true },
   { title: t('reseed.matchMethod'), dataIndex: 'match_method', key: 'match_method', width: 100, customRender: ({ text }: { text: string }) => translateMatchMethod(text) },

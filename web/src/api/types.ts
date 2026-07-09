@@ -567,6 +567,7 @@ export interface ReseedMatch {
   next_retry_at: string | null
   directory?: string
   source_detail_url?: string
+	target_detail_url?: string
 }
 
 export interface CookieCloudConfig {
