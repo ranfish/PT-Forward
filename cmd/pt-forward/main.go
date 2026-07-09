@@ -422,6 +422,7 @@ func main() {
 	statsSyncSvc := site.NewStatsSyncService(db, adapterFactory, log)
 	registerSchedulerTasks(taskRegistry, syncManager, siteProvider, clientManager, rssEngine, seedingEngine, publishPipeline, lifecycleManager, seedingConfirmation, freeWaitMonitor, statsSyncSvc, notifyService, settingsRepo, db, log)
 	reseedEngine.RegisterAllTaskSchedules(ctx)
+	reseedEngine.StartInjectionConsumer(ctx)
 	api.ApplySchedulerOverrides(ctx, db, taskRegistry, log)
 
 	if err := clientManager.LoadClients(ctx); err != nil {

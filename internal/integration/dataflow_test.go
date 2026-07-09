@@ -501,10 +501,10 @@ func TestScenario_F7_SizeTitleMatchAndInject(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 0, result.Failed)
-	assert.True(t, result.Injected > 0 || result.Matched > 0, "should have at least one match or injection")
+	assert.True(t, result.Matched > 0, "should have at least one match")
 
-	assert.Equal(t, int32(1), atomic.LoadInt32(&downloadCalled))
-	assert.Equal(t, int32(1), atomic.LoadInt32(&addFromFileCalled))
+	// 两阶段架构：RunTask 只匹配不注入，注入由 StartInjectionConsumer 异步完成
+	// downloadCalled/addFromFileCalled 在注入阶段触发，这里不检查
 
 	var matches []model.ReseedMatch
 	db.Find(&matches)

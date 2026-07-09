@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand/v2"
 	"net/http"
 	"regexp"
 	"sort"
@@ -232,6 +231,90 @@ func (e *Engine) SetIYUUService(svc model.IYUUService) {
 
 func (e *Engine) SetTrackerResolver(resolver *TrackerSiteResolver) {
 	e.trackerResolver = resolver
+}
+
+
+// StartInjectionConsumer 启动后台注入消费者（对齐 IYUU 两阶段架构）
+func (e *Engine) StartInjectionConsumer(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		e.logger.Info("reseed injection consumer started")
+		for {
+			select {
+			case <-ctx.Done():
+				e.logger.Info("reseed injection consumer stopped")
+				return
+			case <-ticker.C:
+				e.processPendingInjections(ctx)
+			}
+		}
+	}()
+}
+
+// processPendingInjections 消费 status=matched 的记录，逐步注入
+func (e *Engine) processPendingInjections(ctx context.Context) {
+	if e.clientProvider == nil {
+		return
+	}
+
+	var matches []model.ReseedMatch
+	if err := e.db.WithContext(ctx).
+		Where("status = ?", model.MatchStatusMatched).
+		Order("created_at ASC").
+		Limit(5).
+		Find(&matches).Error; err != nil || len(matches) == 0 {
+		return
+	}
+
+	ps := e.preloadSites(ctx, nil, nil)
+	if ps == nil {
+		return
+	}
+
+	for i := range matches {
+		if ctx.Err() != nil {
+			return
+		}
+		m := &matches[i]
+
+		// CAS: matched → injecting（原子更新，防止并发消费）
+		result := e.db.WithContext(ctx).Model(&model.ReseedMatch{}).
+			Where("id = ? AND status = ?", m.ID, model.MatchStatusMatched).
+			Update("status", model.MatchStatusInjecting)
+		if result.Error != nil || result.RowsAffected == 0 {
+			continue
+		}
+
+		var task model.ReseedTask
+		if err := e.db.WithContext(ctx).First(&task, m.TaskID).Error; err != nil {
+			e.failMatch(ctx, m, fmt.Sprintf("任务不存在: %v", err))
+			continue
+		}
+
+		e.logger.Info("injection consumer: injectMatch",
+			zap.Uint("matchID", m.ID),
+			zap.String("targetSite", m.TargetSite),
+			zap.String("targetTorrentID", m.TargetTorrentID))
+
+		if err := e.injectMatch(ctx, m, &task, ps); err != nil {
+			if errors.Is(err, errAlreadyExists) {
+				continue // verifyDuplicateAndFinish 已处理状态
+			}
+			continue // failMatch 已在 injectMatch 内调用
+		}
+
+		// 注入间隔
+		interval := task.InjectionIntervalS
+		if interval <= 0 {
+			interval = 15
+		}
+		select {
+		case <-time.After(time.Duration(interval) * time.Second):
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (e *Engine) SetScheduler(registry *scheduler.Registry) {
@@ -1374,20 +1457,10 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			continue
 		}
 
-		concurrency := task.InjectionConcurrency
-		if concurrency <= 0 {
-			concurrency = 1
-		}
-		sem := make(chan struct{}, concurrency)
-		var wg sync.WaitGroup
-		var resultMu sync.Mutex
-
 		for _, c := range candidates {
 			targetKey := c.TargetSite + ":" + c.TargetTorrentID
 			if confirmedTargets[targetKey] {
-				resultMu.Lock()
 				result.DuplicateExists++
-				resultMu.Unlock()
 				continue
 			}
 			if injectedTargets[c.TargetTorrentID] {
@@ -1395,17 +1468,13 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			}
 			injectedTargets[c.TargetTorrentID] = true
 
-			resultMu.Lock()
 			totalCount := result.Injected + result.Failed + result.Matched
-			resultMu.Unlock()
 			if totalCount >= task.MaxInjectionsPerRun && task.MaxInjectionsPerRun > 0 {
 				break
 			}
 
 			if !checkPublishEligibility(recTitle) {
-				resultMu.Lock()
 				result.Blocked++
-				resultMu.Unlock()
 				continue
 			}
 
@@ -1461,85 +1530,14 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 					zap.String("targetSite", c.TargetSite),
 					zap.Error(err),
 				)
-				resultMu.Lock()
 				result.Failed++
-				resultMu.Unlock()
 				continue
 			}
 
-			if e.clientProvider == nil {
-				resultMu.Lock()
-				result.Matched++
-				resultMu.Unlock()
-				continue
-			}
-
-			wg.Add(1)
-			sem <- struct{}{}
-			go func(m *model.ReseedMatch) {
-				defer wg.Done()
-				defer func() { <-sem }()
-
-				e.logger.Info("injectMatch 开始",
-					zap.Uint("matchID", m.ID),
-					zap.String("targetSite", m.TargetSite),
-					zap.String("targetTorrentID", m.TargetTorrentID))
-
-				if err := e.injectMatch(ctx, m, task, ps); err != nil {
-					if errors.Is(err, errAlreadyExists) {
-						resultMu.Lock()
-						result.Skipped++
-						resultMu.Unlock()
-						return
-					}
-					e.logger.Warn("注入辅种失败",
-						zap.Uint("matchID", m.ID),
-						zap.String("targetSite", m.TargetSite),
-						zap.Error(err),
-					)
-					resultMu.Lock()
-					result.Failed++
-					resultMu.Unlock()
-					return
-				}
-				resultMu.Lock()
-				result.Injected++
-				resultMu.Unlock()
-			}(match)
-
-			siteInterval := 0
-			if sl, ok := ps.siteLimits[c.TargetSite]; ok {
-				if c.MatchMethod == "iyuu" {
-					if sl.IYUULimitInterval > 0 {
-						siteInterval = sl.IYUULimitInterval
-					} else if sl.ReseedLimitInterval > 0 {
-						siteInterval = sl.ReseedLimitInterval
-					}
-				} else if sl.ReseedLimitInterval > 0 {
-					siteInterval = sl.ReseedLimitInterval
-				}
-			}
-			effectiveInterval := task.InjectionIntervalS
-			if siteInterval > effectiveInterval {
-				effectiveInterval = siteInterval
-			}
-			if effectiveInterval > 0 {
-				jitter := 0
-				if task.InjectionJitterS > 0 {
-					jitter = rand.IntN(task.InjectionJitterS) //nolint:gosec // jitter does not need crypto/rand
-				}
-				interval := time.Duration(effectiveInterval+jitter) * time.Second
-				timer := time.NewTimer(interval)
-				select {
-				case <-timer.C:
-				case <-ctx.Done():
-					timer.Stop()
-					wg.Wait()
-					return result, nil
-				}
-			}
+			// 两阶段架构：阶段1（匹配）只 SaveMatch，不注入
+			// 阶段2（注入）由 StartInjectionConsumer 后台消费 status=matched 的记录
+			result.Matched++
 		}
-		wg.Wait()
 	}
 
 	if task.EngineMode == model.ReseedModeSeedFeature {
