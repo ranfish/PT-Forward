@@ -1,7 +1,7 @@
 <template>
   <div>
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px">
-      <a-button type="primary" @click="$router.push('/publish/manual')">
+      <a-button type="primary" @click="wizardOpen = true">
         <template #icon><PlusOutlined /></template>
         {{ t('publish.manualForward') }}
       </a-button>
@@ -129,6 +129,8 @@
       </a-tab-pane>
     </a-tabs>
 
+    <PublishWizardModal v-model:open="wizardOpen" @success="onWizardSuccess" />
+
     <a-modal v-model:open="showCreateTaskModal" :title="t('publish.tasks')" :confirm-loading="createTaskSubmitting" width="520px" @ok="createTask">
       <a-form layout="vertical">
         <a-form-item :label="t('publish.sourceSiteId')">
@@ -162,12 +164,14 @@ import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
 import { sitesApi } from '@/api/sites'
 import { useEnumLabels } from '@/utils/enumLabels'
+import PublishWizardModal from './PublishWizardModal.vue'
 import type { PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from '@/api/types'
 import { formatTime, formatBytes } from '@/utils/format'
 
 const { t } = useI18n()
 const { translatePublishStatus, translatePublishType } = useEnumLabels()
 const activeTab = ref('candidates')
+const wizardOpen = ref(false)
 const candidateSearch = ref('')
 const candidatesLoading = ref(false)
 const candidates = ref<PublishCandidate[]>([])
@@ -402,6 +406,11 @@ async function createTask() {
   } finally {
     createTaskSubmitting.value = false
   }
+}
+
+function onWizardSuccess() {
+  activeTab.value = 'candidates'
+  fetchCandidates()
 }
 
 onMounted(() => {
