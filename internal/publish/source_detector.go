@@ -137,13 +137,13 @@ func (d *SourceSiteDetector) lookupGroup(ctx context.Context, groupName string) 
 		return mapping.SiteName
 	}
 
-	// 按 domain 模糊匹配站点表（自动去除 www. 前缀）
+	// 按 domain 模糊匹配站点表（含 alternative_domains，自动去除 www.）
 	if mapping.Domain != "" {
 		bareDomain := strings.TrimPrefix(strings.ToLower(mapping.Domain), "www.")
 		var site model.Site
 		pattern := "%" + bareDomain + "%"
 		if err := d.db.WithContext(ctx).
-			Where("LOWER(REPLACE(domain, 'www.', '')) LIKE ? OR LOWER(REPLACE(base_url, 'www.', '')) LIKE ?", pattern, pattern).
+			Where("LOWER(REPLACE(domain, 'www.', '')) LIKE ? OR LOWER(REPLACE(base_url, 'www.', '')) LIKE ? OR LOWER(alternative_domains) LIKE ?", pattern, pattern, pattern).
 			First(&site).Error; err == nil {
 			resolved := site.Name
 			d.mu.Lock()
