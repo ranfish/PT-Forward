@@ -24,6 +24,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/auth"
 	"github.com/ranfish/pt-forward/internal/client"
+	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/cloudfp"
 	"github.com/ranfish/pt-forward/internal/config"
 	"github.com/ranfish/pt-forward/internal/cookiecloud"
@@ -339,6 +340,9 @@ func main() {
 	router.SetupManualForward(publishPipeline, siteProvider, clientManager)
 	router.SetConfigEventBus(configEventBus)
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
+
+	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
+	router.SetupPublishTorrents(coverageSvc, clientManager)
 
 	mux := http.NewServeMux()
 	runtimeCfg := setting.NewRuntimeConfig(settingsRepo, log)

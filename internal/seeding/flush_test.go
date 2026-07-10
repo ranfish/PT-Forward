@@ -89,6 +89,10 @@ func (m *flushMockClient) GetTrackerMessages(_ context.Context, _ string) (strin
 	return "", nil
 }
 
+func (m *flushMockClient) GetTrackers(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+
 type flushMockProvider struct {
 	clients map[string]model.DownloaderClient
 	list    []string

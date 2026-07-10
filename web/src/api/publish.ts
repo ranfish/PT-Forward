@@ -52,6 +52,48 @@ export const publishApi = {
   },
 }
 
+export const publishTorrentsApi = {
+  list(clientId?: number) {
+    return client.get<ApiResponse<{ items: PublishTorrentItem[]; total: number; total_sites: number }>>('/publish/torrents', { params: clientId ? { client_id: clientId } : {} })
+  },
+  queryCoverage(data: { client_id: number; info_hash: string }) {
+    return client.post<ApiResponse<CoverageResult>>('/publish/torrents/coverage', data)
+  },
+}
+
+export interface PublishTorrentItem {
+  info_hash: string
+  name: string
+  size: number
+  save_path: string
+  state: string
+  uploaded: number
+  coverage: {
+    has_count: number
+    total_sites: number
+    target_count: number
+    sites: CoverageSite[]
+  }
+}
+
+export interface CoverageSite {
+  site_name: string
+  status: string
+  source: string
+  confidence: number
+  torrent_id: string
+  detail_url: string
+  queried_at: string
+}
+
+export interface CoverageResult {
+  info_hash: string
+  sites: CoverageSite[]
+  has_count: number
+  total_sites: number
+  target_count: number
+}
+
 export const manualForwardApi = {
   seededTorrents(clientId?: number) {
     return client.get<ApiResponse<unknown[]>>('/manual-forward/seeded-torrents', { params: clientId ? { client_id: clientId } : {} })
