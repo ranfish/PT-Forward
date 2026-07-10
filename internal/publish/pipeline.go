@@ -104,6 +104,10 @@ func (p *Pipeline) UpdateTaskStatus(ctx context.Context, id uint, status model.P
 		}).Error
 }
 
+func (p *Pipeline) DeleteTask(ctx context.Context, id uint) error {
+	return p.db.WithContext(ctx).Delete(&model.PublishTask{}, id).Error
+}
+
 func (p *Pipeline) CreateCandidate(ctx context.Context, candidate *model.PublishCandidate) error {
 	return p.db.WithContext(ctx).Create(candidate).Error
 }
