@@ -306,6 +306,7 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	ptHandler := rt.chain(writeLimitMW, rt.publishTorrentsHandler.ServeHTTP)
 	mux.Handle("/api/v1/publish/torrents", ptHandler)
 	mux.Handle("/api/v1/publish/torrents/", ptHandler)
+	mux.Handle("/api/v1/publish/torrents/query-status", ptHandler)
 
 	dashboardHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/dashboard/overview", dashboardHandler)
