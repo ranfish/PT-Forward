@@ -97,6 +97,14 @@ func setupTestEnv(t *testing.T) *testEnv {
 	env.token = pair.AccessToken
 	env.taskRegistry = taskRegistry
 
+	t.Cleanup(func() {
+		close(env.stopCh)
+		authManager.Stop()
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	})
+
 	return env
 }
 
@@ -3114,6 +3122,9 @@ func TestReseed_ListMatches_WithHash(t *testing.T) {
 }
 
 func TestSite_Detect(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping network test in short mode")
+	}
 	env := setupTestEnv(t)
 	siteID := createTestSite(t, env, "DetectSite", "detect-site.com")
 
@@ -3129,6 +3140,9 @@ func TestSite_Detect(t *testing.T) {
 }
 
 func TestSite_Test(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping network test in short mode")
+	}
 	env := setupTestEnv(t)
 	siteID := createTestSite(t, env, "TestSite", "test-site.com")
 
@@ -5433,6 +5447,15 @@ func setupTestEnvWithClientMgr(t *testing.T) *testEnv {
 		t.Fatalf("issue token: %v", err)
 	}
 	env.token = pair.AccessToken
+
+	t.Cleanup(func() {
+		close(env.stopCh)
+		authManager.Stop()
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	})
+
 	return env
 }
 
