@@ -182,9 +182,10 @@
       <a-table
         :columns="mappingColumns"
         :data-source="mappings"
-        :pagination="{ pageSize: 20, size: 'small' }"
+        :pagination="mappingPagination"
         row-key="id"
         size="small"
+        @change="(pag: { current?: number; pageSize?: number }) => { if (pag.current) mappingPagination.current = pag.current; if (pag.pageSize) mappingPagination.pageSize = pag.pageSize }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'matched_site'">
@@ -500,6 +501,14 @@ const mappingColumns = [
   { title: '匹配站点', key: 'matched_site', width: 120 },
   { title: '操作', key: 'actions', width: 120 },
 ]
+const mappingPagination = reactive({
+  current: 1,
+  pageSize: 20,
+  showSizeChanger: true,
+  pageSizeOptions: ['20', '50', '100'],
+  showTotal: (total: number) => `共 ${total} 条`,
+  size: 'small' as const,
+})
 
 async function fetchMappings() {
   try {
