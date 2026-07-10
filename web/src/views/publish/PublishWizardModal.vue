@@ -274,6 +274,35 @@
                   placeholder="MediaInfo"
                 />
               </a-tab-pane>
+
+              <!-- Tab: 已过滤声明 -->
+              <a-tab-pane key="filtered" :tab="form.removedDeclarations.length ? `已过滤 (${form.removedDeclarations.length})` : '已过滤声明'">
+                <div v-if="form.removedDeclarations.length === 0" class="empty-hint">
+                  <CheckCircleFilled style="font-size: 32px; color: #52c41a" />
+                  <p>未检测到需要过滤的声明内容</p>
+                </div>
+                <div v-else>
+                  <a-alert
+                    type="info"
+                    show-icon
+                    message="以下声明内容已从简介中自动移除"
+                    description="点击「恢复」可将该声明放回简介；点击「删除」可永久移除。"
+                    style="margin-bottom: 16px"
+                  />
+                  <div
+                    v-for="(decl, i) in form.removedDeclarations"
+                    :key="i"
+                    class="decl-item"
+                  >
+                    <div class="decl-header">
+                      <a-tag color="red">已过滤 #{{ i + 1 }}</a-tag>
+                      <a-button type="link" size="small" @click="restoreDecl(i)">恢复到简介</a-button>
+                      <a-button type="link" danger size="small" @click="form.removedDeclarations.splice(i, 1)">删除</a-button>
+                    </div>
+                    <pre class="decl-content">{{ decl }}</pre>
+                  </div>
+                </div>
+              </a-tab-pane>
             </a-tabs>
           </div>
         </div>
@@ -558,6 +587,7 @@ interface AnalyzeResult {
   douban_link?: string
   imdb_link?: string
   tmdb_link?: string
+  removed_declarations?: string[]
 }
 
 const analyzing = ref(false)
@@ -578,6 +608,7 @@ const form = ref({
   imdbLink: '',
   tmdbLink: '',
   tags: [] as string[],
+  removedDeclarations: [] as string[],
 })
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null
@@ -655,6 +686,7 @@ async function enterAnalyze() {
           form.value.doubanLink = r.douban_link || ''
           form.value.imdbLink = r.imdb_link || ''
           form.value.tmdbLink = r.tmdb_link || ''
+          form.value.removedDeclarations = (r as Record<string, unknown>).removed_declarations as string[] || []
           analyzing.value = false
         } else if (task?.status === 'failed') {
           analyzeError.value = task.error || '分析失败'
@@ -892,7 +924,7 @@ function resetWizard() {
   submitError.value = ''
   submittedCandidateId.value = 0
   candidateStatus.value = null
-  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [] }
+  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [], removedDeclarations: [] }
   reviewTab.value = 'main'
 }
 
@@ -903,6 +935,13 @@ function handleCancel() {
 function handlePublishAnother() {
   resetWizard()
   fetchClients()
+}
+
+function restoreDecl(idx: number) {
+  const decl = form.value.removedDeclarations.splice(idx, 1)[0]
+  if (decl) {
+    form.value.description = '[quote]' + decl + '[/quote]\n' + form.value.description
+  }
 }
 
 function handleDone() {
@@ -1080,6 +1119,30 @@ onUnmounted(() => {
 }
 .poster-empty p {
   margin-top: 8px;
+}
+.decl-item {
+  margin-bottom: 16px;
+  border: 1px solid #ffa39e;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.decl-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #fff1f0;
+}
+.decl-content {
+  padding: 12px;
+  margin: 0;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fafafa;
 }
 .mono-font {
   font-family: 'Courier New', 'Consolas', monospace;
