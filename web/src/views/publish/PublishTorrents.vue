@@ -62,7 +62,7 @@
       }"
       row-key="info_hash"
       size="small"
-      :scroll="{ y: 520 }"
+      :sticky="{ offsetHeader: 48 }"
       @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
@@ -582,6 +582,11 @@ async function deleteMapping(id: number) {
   margin-bottom: 16px;
   flex-wrap: wrap;
   gap: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  padding: 8px 0;
 }
 .coverage-cell {
   font-size: 16px;
