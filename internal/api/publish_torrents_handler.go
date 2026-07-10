@@ -16,12 +16,22 @@ import (
 	"gorm.io/gorm"
 )
 
+type piecesHashSearcher interface {
+	SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error)
+}
+
+type SiteProviderGetter interface {
+	GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error)
+	GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error)
+}
+
 type PublishTorrentsHandler struct {
-	db        *gorm.DB
-	coverage  *coverage.Service
-	clientMgr MFClientProvider
-	logger    *zap.Logger
-	bgState   backgroundQueryState
+	db           *gorm.DB
+	coverage     *coverage.Service
+	clientMgr    MFClientProvider
+	siteProvider SiteProviderGetter
+	logger       *zap.Logger
+	bgState      backgroundQueryState
 }
 
 type backgroundQueryState struct {
@@ -41,6 +51,7 @@ func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger) *PublishTorrents
 
 func (h *PublishTorrentsHandler) SetCoverageService(s *coverage.Service) { h.coverage = s }
 func (h *PublishTorrentsHandler) SetClientProvider(c MFClientProvider)  { h.clientMgr = c }
+func (h *PublishTorrentsHandler) SetSiteProvider(s SiteProviderGetter)  { h.siteProvider = s }
 
 func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -248,6 +259,8 @@ func (h *PublishTorrentsHandler) startBackgroundQuery(clientID uint, cfg model.C
 type coverageQueryRequest struct {
 	ClientID  uint   `json:"client_id"`
 	InfoHash  string `json:"info_hash"`
+	Name      string `json:"name"`
+	Size      int64  `json:"size"`
 }
 
 func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *http.Request) {
@@ -278,21 +291,39 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
+	// L0: trackers
 	trackers, err := client.GetTrackers(ctx, req.InfoHash)
 	if err != nil {
 		h.logger.Warn("query coverage: get trackers failed", zap.Error(err))
 		trackers = nil
 	}
 
+	// 快车道：L0 + L1(缓存) + L2(IYUU)
 	_, err = h.coverage.QueryCoverage(ctx, req.InfoHash, trackers)
 	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("覆盖查询失败: %v", err))
-		return
+		h.logger.Warn("query coverage: fast query failed", zap.Error(err))
 	}
 
+	// 慢车道：L1 fresh（pieces-hash 本地计算 + 站点 API 查询）
+	torrentDir := extractTorrentDir(cfg.Config)
+	if h.siteProvider != nil && torrentDir != "" {
+		piecesHash, err := coverage.ComputePiecesHashFromDir(torrentDir, req.InfoHash)
+		if err != nil {
+			h.logger.Debug("query coverage: pieces_hash compute skipped", zap.String("hash", req.InfoHash[:8]), zap.Error(err))
+		} else {
+			h.queryPiecesHashSites(ctx, req.InfoHash, piecesHash)
+		}
+	}
+
+	// 慢车道：L3（名称/体积搜索）
+	if h.siteProvider != nil && req.Name != "" && req.Size > 0 {
+		h.queryNameSizeSites(ctx, req.InfoHash, req.Name, req.Size)
+	}
+
+	// 返回最终结果
 	cached, _ := h.coverage.GetCachedCoverage(ctx, req.InfoHash)
 
 	var totalSites int64
@@ -312,6 +343,140 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 		"total_sites":  totalSites,
 		"target_count": int(totalSites) - hasCount,
 	})
+}
+
+func (h *PublishTorrentsHandler) queryPiecesHashSites(ctx context.Context, infoHash, piecesHash string) {
+	var sites []model.Site
+	h.db.WithContext(ctx).
+		Where("enabled = ? AND is_target = ?", true, true).
+		Find(&sites)
+
+	now := time.Now()
+	ttl := now.Add(24 * time.Hour)
+
+	for _, site := range sites {
+		adapter, err := h.siteProvider.GetAdapter(ctx, site.Domain)
+		if err != nil || adapter == nil {
+			continue
+		}
+		if !adapter.SupportsSearchByPiecesHash() {
+			continue
+		}
+		searcher, ok := adapter.(piecesHashSearcher)
+		if !ok {
+			continue
+		}
+		config, err := h.siteProvider.GetSiteConfig(ctx, site.Domain)
+		if err != nil || config == nil {
+			continue
+		}
+
+		result, err := searcher.SearchByPiecesHash(ctx, config, []string{piecesHash})
+		if err != nil {
+			h.logger.Debug("pieces_hash query failed", zap.String("site", site.Name), zap.Error(err))
+			continue
+		}
+
+		if tid, found := result[piecesHash]; found {
+			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				InfoHash:   infoHash,
+				SiteName:   site.Name,
+				Status:     model.CoverageConfirmedHas,
+				Source:     model.CoverageSourcePiecesHash,
+				Confidence: 1.0,
+				TorrentID:  strconv.Itoa(tid),
+				QueriedAt:  now,
+				ExpiresAt:  ttl,
+			})
+		} else {
+			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				InfoHash:   infoHash,
+				SiteName:   site.Name,
+				Status:     model.CoverageConfirmedNot,
+				Source:     model.CoverageSourcePiecesHash,
+				Confidence: 0.95,
+				QueriedAt:  now,
+				ExpiresAt:  ttl,
+			})
+		}
+	}
+}
+
+func (h *PublishTorrentsHandler) queryNameSizeSites(ctx context.Context, infoHash, name string, size int64) {
+	coveredSites, _ := h.coverage.GetCoveredSiteNames(ctx, infoHash)
+
+	var sites []model.Site
+	query := h.db.WithContext(ctx).
+		Where("enabled = ? AND is_target = ?", true, true)
+	if len(coveredSites) > 0 {
+		query = query.Where("name NOT IN ?", coveredSites)
+	}
+	query.Find(&sites)
+
+	now := time.Now()
+	ttl := now.Add(24 * time.Hour)
+	keyword := extractSearchKeyword(name)
+	tolerance := size * 2 / 100
+
+	for _, site := range sites {
+		adapter, err := h.siteProvider.GetAdapter(ctx, site.Domain)
+		if err != nil || adapter == nil {
+			continue
+		}
+		config, err := h.siteProvider.GetSiteConfig(ctx, site.Domain)
+		if err != nil || config == nil {
+			continue
+		}
+
+		results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
+		if err != nil {
+			h.logger.Debug("name_size search failed", zap.String("site", site.Name), zap.Error(err))
+			continue
+		}
+
+		matched := false
+		for _, result := range results {
+			diff := result.Size - size
+			if diff < 0 {
+				diff = -diff
+			}
+			if diff <= tolerance {
+				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+					InfoHash:   infoHash,
+					SiteName:   site.Name,
+					Status:     model.CoverageProbablyHas,
+					Source:     model.CoverageSourceNameSize,
+					Confidence: 0.7,
+					TorrentID:  result.TorrentID,
+					QueriedAt:  now,
+					ExpiresAt:  ttl,
+				})
+				matched = true
+				break
+			}
+		}
+
+		if !matched {
+			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				InfoHash:   infoHash,
+				SiteName:   site.Name,
+				Status:     model.CoverageProbablyNot,
+				Source:     model.CoverageSourceNameSize,
+				Confidence: 0.7,
+				QueriedAt:  now,
+				ExpiresAt:  ttl,
+			})
+		}
+	}
+}
+
+func extractSearchKeyword(name string) string {
+	idx := strings.LastIndex(name, "-")
+	keyword := name
+	if idx > 10 {
+		keyword = name[:idx]
+	}
+	return strings.ReplaceAll(strings.ReplaceAll(keyword, ".", " "), "_", " ")
 }
 
 func (h *PublishTorrentsHandler) handleQueryStatus(w http.ResponseWriter, r *http.Request) {

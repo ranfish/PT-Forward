@@ -275,6 +275,20 @@ func (s *Service) upsertCoverage(ctx context.Context, record *model.SiteCoverage
 		FirstOrCreate(record).Error
 }
 
+func (s *Service) UpsertCoverage(ctx context.Context, record *model.SiteCoverageCache) error {
+	return s.upsertCoverage(ctx, record)
+}
+
+func (s *Service) GetCoveredSiteNames(ctx context.Context, infoHash string) ([]string, error) {
+	var names []string
+	err := s.db.WithContext(ctx).
+		Model(&model.SiteCoverageCache{}).
+		Where("info_hash = ? AND status IN ?", infoHash,
+			[]string{model.CoverageConfirmedHas, model.CoverageProbablyHas}).
+		Pluck("site_name", &names).Error
+	return names, err
+}
+
 func (s *Service) upsertQueryState(ctx context.Context, infoHash string, queriedAt, expiresAt time.Time) error {
 	state := model.CoverageQueryState{
 		InfoHash:  infoHash,

@@ -142,6 +142,7 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.manualForwardHandler.SetSiteManager(siteProvider)
 	rt.manualForwardHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
+	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)
 }
 
 func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr *client.Manager) {

@@ -56,7 +56,7 @@ export const publishTorrentsApi = {
   list(clientId?: number) {
     return client.get<ApiResponse<{ items: PublishTorrentItem[]; total: number; total_sites: number; querying: boolean; query_progress: { done: number; total: number } }>>('/publish/torrents', { params: clientId ? { client_id: clientId } : {} })
   },
-  queryCoverage(data: { client_id: number; info_hash: string }) {
+  queryCoverage(data: { client_id: number; info_hash: string; name?: string; size?: number }) {
     return client.post<ApiResponse<CoverageResult>>('/publish/torrents/coverage', data)
   },
   queryStatus(clientId: number) {
