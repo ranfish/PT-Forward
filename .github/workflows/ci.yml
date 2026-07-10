@@ -69,12 +69,10 @@ jobs:
         run: mkdir -p frontend/dist && echo '<html></html>' > frontend/dist/index.html
 
       - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v1.64.5
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.5
 
       - name: Lint
-        run: golangci-lint run ./internal/...
+        run: $(go env GOPATH)/bin/golangci-lint run --timeout 5m ./internal/...
 
   build:
     runs-on: ubuntu-latest
@@ -95,6 +93,9 @@ jobs:
 
       - name: Build frontend
         run: cd web && npm ci && npm run build
+
+      - name: Copy frontend dist
+        run: rm -rf frontend/dist && cp -r web/dist frontend/dist
 
       - name: Build
         run: CGO_ENABLED=1 go build -ldflags "-s -w" ./cmd/pt-forward/
