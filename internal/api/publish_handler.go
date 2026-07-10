@@ -242,12 +242,7 @@ func (h *PublishHandler) handleCreateTask(w http.ResponseWriter, r *http.Request
 }
 
 func (h *PublishHandler) handleDeleteTask(w http.ResponseWriter, r *http.Request, id uint) {
-	task, err := h.pipeline.GetTask(r.Context(), id)
-	if err != nil {
-		Error(w, http.StatusNotFound, 40400, "发布任务不存在")
-		return
-	}
-	if err := h.pipeline.UpdateTaskStatus(r.Context(), task.ID, model.PublishTaskFailed); err != nil {
+	if err := h.pipeline.DeleteTask(r.Context(), id); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除发布任务失败")
 		return
 	}
