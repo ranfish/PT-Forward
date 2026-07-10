@@ -32,3 +32,13 @@ type SiteCoverageCache struct {
 func (SiteCoverageCache) TableName() string {
 	return "site_coverage_cache"
 }
+
+type CoverageQueryState struct {
+	InfoHash  string    `gorm:"size:40;primaryKey" json:"info_hash"`
+	QueriedAt time.Time `gorm:"not null" json:"queried_at"`
+	ExpiresAt time.Time `gorm:"not null;index" json:"expires_at"`
+}
+
+func (CoverageQueryState) TableName() string {
+	return "coverage_query_state"
+}

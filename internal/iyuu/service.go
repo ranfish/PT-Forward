@@ -327,6 +327,26 @@ func (s *Service) GetSeededSites(ctx context.Context, infoHash string) ([]string
 	return sites, nil
 }
 
+func (s *Service) BatchGetSeededSites(ctx context.Context, infoHashes []string) (map[string][]string, error) {
+	if len(infoHashes) == 0 {
+		return map[string][]string{}, nil
+	}
+	results, err := s.QueryReseed(ctx, infoHashes)
+	if err != nil {
+		return nil, err
+	}
+	mappings := s.getSiteMappings(ctx)
+	out := make(map[string][]string)
+	for _, result := range results {
+		for _, target := range result.Targets {
+			if domain, ok := mappings[target.Sid]; ok {
+				out[result.SourceInfoHash] = append(out[result.SourceInfoHash], domain)
+			}
+		}
+	}
+	return out, nil
+}
+
 func (s *Service) GetSiteList(ctx context.Context) ([]model.IYUUSite, error) {
 	if !s.syncRunning.CompareAndSwap(false, true) {
 		s.logger.Info("IYUU 站点同步已在进行中，跳过")
