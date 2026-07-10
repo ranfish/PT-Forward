@@ -344,6 +344,7 @@ func main() {
 
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
 	sourceDetector := publish.NewSourceSiteDetector(db)
+	sourceDetector.SeedDefaultMappings(context.Background())
 	sourceDetector.RefreshCache(context.Background())
 	router.SetupPublishTorrents(coverageSvc, clientManager, sourceDetector)
 	if err := router.StartCoverageRefresh(taskRegistry); err != nil {
