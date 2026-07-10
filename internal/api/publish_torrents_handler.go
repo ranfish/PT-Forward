@@ -244,13 +244,18 @@ func (h *PublishTorrentsHandler) startBackgroundQuery(clientID uint, cfg model.C
 		return
 	}
 
-	// 批量查询
+	// 快车道：L0 + L1(缓存) + L2(IYUU 批量)
 	queryCtx, queryCancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer queryCancel()
 
 	err = h.coverage.QueryBatchCoverage(queryCtx, items)
 	if err != nil {
 		h.logger.Error("bg query: batch coverage failed", zap.Error(err))
+	}
+
+	// L1 fresh: 批量 pieces-hash 本地计算 + 站点 API 查询
+	if h.siteProvider != nil {
+		h.batchPiecesHashQuery(ctx, items, cfg)
 	}
 
 	h.bgState.setDone(len(torrents))
@@ -477,6 +482,109 @@ func extractSearchKeyword(name string) string {
 		keyword = name[:idx]
 	}
 	return strings.ReplaceAll(strings.ReplaceAll(keyword, ".", " "), "_", " ")
+}
+
+func (h *PublishTorrentsHandler) batchPiecesHashQuery(ctx context.Context, items []coverage.BatchItem, cfg model.ClientConfig) {
+	torrentDir := extractTorrentDir(cfg.Config)
+	if torrentDir == "" {
+		return
+	}
+
+	// 批量计算 pieces_hash
+	hashToPieces := make(map[string]string, len(items))
+	for _, item := range items {
+		ph, err := coverage.ComputePiecesHashFromDir(torrentDir, item.InfoHash)
+		if err != nil {
+			continue
+		}
+		hashToPieces[item.InfoHash] = ph
+	}
+	if len(hashToPieces) == 0 {
+		h.logger.Info("bg L1 fresh: no pieces_hash computed", zap.String("torrent_dir", torrentDir))
+		return
+	}
+
+	// 收集去重 pieces_hashes
+	allPieces := make([]string, 0, len(hashToPieces))
+	seen := make(map[string]bool)
+	for _, ph := range hashToPieces {
+		if !seen[ph] {
+			seen[ph] = true
+			allPieces = append(allPieces, ph)
+		}
+	}
+	h.logger.Info("bg L1 fresh: starting",
+		zap.Int("torrents", len(hashToPieces)),
+		zap.Int("unique_pieces", len(allPieces)))
+
+	// 获取全部目标站点
+	var sites []model.Site
+	h.db.WithContext(ctx).Where("enabled = ? AND is_target = ?", true, true).Find(&sites)
+
+	now := time.Now()
+	ttl := now.Add(24 * time.Hour)
+
+	for _, site := range sites {
+		adapter, err := h.siteProvider.GetAdapter(ctx, site.Domain)
+		if err != nil || adapter == nil {
+			continue
+		}
+		if !adapter.SupportsSearchByPiecesHash() {
+			continue
+		}
+		searcher, ok := adapter.(piecesHashSearcher)
+		if !ok {
+			continue
+		}
+		config, err := h.siteProvider.GetSiteConfig(ctx, site.Domain)
+		if err != nil || config == nil {
+			continue
+		}
+
+		// 批量查询（100/batch，NexusPHP 限制）
+		for i := 0; i < len(allPieces); i += 100 {
+			end := i + 100
+			if end > len(allPieces) {
+				end = len(allPieces)
+			}
+			batch := allPieces[i:end]
+
+			result, err := searcher.SearchByPiecesHash(ctx, config, batch)
+			if err != nil {
+				h.logger.Debug("bg L1 fresh: site query failed",
+					zap.String("site", site.Name), zap.Error(err))
+				continue
+			}
+
+			// 将结果映射回 info_hash
+			for infoHash, ph := range hashToPieces {
+				if tid, found := result[ph]; found {
+					h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+						InfoHash:   infoHash,
+						SiteName:   site.Name,
+						Status:     model.CoverageConfirmedHas,
+						Source:     model.CoverageSourcePiecesHash,
+						Confidence: 1.0,
+						TorrentID:  strconv.Itoa(tid),
+						QueriedAt:  now,
+						ExpiresAt:  ttl,
+					})
+				} else {
+					h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+						InfoHash:   infoHash,
+						SiteName:   site.Name,
+						Status:     model.CoverageConfirmedNot,
+						Source:     model.CoverageSourcePiecesHash,
+						Confidence: 0.95,
+						QueriedAt:  now,
+						ExpiresAt:  ttl,
+					})
+				}
+			}
+		}
+	}
+
+	h.logger.Info("bg L1 fresh: done", zap.Int("sites_checked", len(sites)))
 }
 
 func (h *PublishTorrentsHandler) handleQueryStatus(w http.ResponseWriter, r *http.Request) {
