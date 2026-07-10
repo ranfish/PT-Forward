@@ -58,3 +58,16 @@ export function formatDurationSec(seconds?: number): string {
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`
 }
+
+export function maskDomain(url: string | undefined): string {
+  if (!url) return ''
+  const m = url.match(/^(https?:\/\/)([^/]+)(.*)$/)
+  if (m) {
+    const parts = m[2].split('.')
+    if (parts.length >= 2) return `${m[1]}***.${parts[parts.length - 1]}${m[3]}`
+    return `${m[1]}***${m[3]}`
+  }
+  const parts = url.split('.')
+  if (parts.length >= 2) return `***.${parts[parts.length - 1]}`
+  return '***'
+}

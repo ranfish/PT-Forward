@@ -312,19 +312,6 @@ interface SiteStatsData {
 
 const { t } = useI18n()
 
-function maskDomain(url: string | undefined): string {
-  if (!url) return ''
-  const m = url.match(/^(https?:\/\/)([^/]+)(.*)$/)
-  if (m) {
-    const parts = m[2].split('.')
-    if (parts.length >= 2) return `${m[1]}***.${parts[parts.length - 1]}${m[3]}`
-    return `${m[1]}***${m[3]}`
-  }
-  const parts = url.split('.')
-  if (parts.length >= 2) return `***.${parts[parts.length - 1]}`
-  return '***'
-}
-
 const route = useRoute()
 const siteId = Number(route.params.id)
 
@@ -422,7 +409,7 @@ const statsLoading = ref(false)
 const statsSyncing = ref(false)
 const stats = ref<SiteStatsData>({})
 
-import { formatBytes, formatTime } from '@/utils/format'
+import { formatBytes, formatTime, maskDomain } from '@/utils/format'
 const frameworkColors: Record<string, string> = {
   nexusphp: 'blue', unit3d: 'green', gazelle: 'purple',
   mteam: 'orange', rousi: 'pink', tnode: 'cyan', luminance: 'magenta', generic: 'default',
