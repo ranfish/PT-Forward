@@ -508,6 +508,9 @@ const props = defineProps<{
     save_path: string
     client_id: number
     state: string
+    source_site?: string
+    source_site_id?: number
+    torrent_id?: string
   } | null
   presetClientId?: number
 }>()
@@ -687,6 +690,11 @@ async function enterAnalyze() {
           form.value.imdbLink = r.imdb_link || ''
           form.value.tmdbLink = r.tmdb_link || ''
           form.value.removedDeclarations = (r as Record<string, unknown>).removed_declarations as string[] || []
+          // 如果有预设源站（从源头站检测器），覆盖后端自动检测的源站
+          if (props.presetTorrent?.source_site) {
+            r.source_site = props.presetTorrent.source_site
+            r.source_site_id = props.presetTorrent.source_site_id
+          }
           analyzing.value = false
         } else if (task?.status === 'failed') {
           analyzeError.value = task.error || '分析失败'

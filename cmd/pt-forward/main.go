@@ -343,7 +343,9 @@ func main() {
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
-	router.SetupPublishTorrents(coverageSvc, clientManager)
+	sourceDetector := publish.NewSourceSiteDetector(db)
+	sourceDetector.RefreshCache(context.Background())
+	router.SetupPublishTorrents(coverageSvc, clientManager, sourceDetector)
 	if err := router.StartCoverageRefresh(taskRegistry); err != nil {
 		log.Warn("failed to register coverage refresh schedule", zap.Error(err))
 	}
