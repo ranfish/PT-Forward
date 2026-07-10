@@ -91,9 +91,15 @@ func (s *Service) GetBatchQueryState(ctx context.Context, infoHashes []string) (
 }
 
 type BatchItem struct {
-	InfoHash  string
-	Trackers  []string
+	InfoHash   string
+	Trackers   []string
 	TorrentDir string
+}
+
+type pubHit struct {
+	InfoHash   string
+	TargetSite string
+	TorrentID  string
 }
 
 func (s *Service) QueryBatchCoverage(ctx context.Context, items []BatchItem) error {
@@ -128,6 +134,40 @@ func (s *Service) QueryBatchCoverage(ctx context.Context, items []BatchItem) err
 		matchByHash[m.SourceInfoHash] = append(matchByHash[m.SourceInfoHash], m)
 	}
 
+	// 读 reseed_negative_caches（L1 负缓存：辅种引擎确认不存在的站点）
+	var negCaches []model.ReseedNegativeCache
+	s.db.WithContext(ctx).
+		Where("source_info_hash IN ? AND expires_at > ?", allHashes, now).
+		Find(&negCaches)
+	negByHash := make(map[string]map[string]bool)
+	for _, nc := range negCaches {
+		if nc.ExcludedTargets == "" {
+			continue
+		}
+		if negByHash[nc.SourceInfoHash] == nil {
+			negByHash[nc.SourceInfoHash] = make(map[string]bool)
+		}
+		for _, site := range strings.Split(nc.ExcludedTargets, ",") {
+			site = strings.TrimSpace(site)
+			if site != "" {
+				negByHash[nc.SourceInfoHash][site] = true
+			}
+		}
+	}
+
+	// 读 publish_result_records（L1 发布记录：我们自己的发布成功 = 确认存在）
+	var pubResults []pubHit
+	s.db.WithContext(ctx).
+		Table("publish_result_records").
+		Select("publish_candidates.info_hash AS info_hash, publish_result_records.target_site AS target_site, publish_result_records.torrent_id AS torrent_id").
+		Joins("JOIN publish_candidates ON publish_result_records.candidate_id = publish_candidates.id").
+		Where("publish_candidates.info_hash IN ? AND publish_result_records.status = ?", allHashes, model.PublishResultCompleted).
+		Scan(&pubResults)
+	pubByHash := make(map[string][]pubHit)
+	for _, pr := range pubResults {
+		pubByHash[pr.InfoHash] = append(pubByHash[pr.InfoHash], pr)
+	}
+
 	// L2: 批量 IYUU 查询
 	var iyuuMap map[string][]string
 	if s.iyuu != nil {
@@ -143,7 +183,7 @@ func (s *Service) QueryBatchCoverage(ctx context.Context, items []BatchItem) err
 
 	// 逐个种子处理 L0 + L1 + L2 结果并写缓存
 	for _, item := range items {
-		results := s.buildCoverageForItem(ctx, item, fpByHash, matchByHash, iyuuMap, now, ttl)
+		results := s.buildCoverageForItem(ctx, item, fpByHash, matchByHash, iyuuMap, negByHash, pubByHash, now, ttl)
 		for _, r := range results {
 			s.upsertCoverage(ctx, &r)
 		}
@@ -152,7 +192,9 @@ func (s *Service) QueryBatchCoverage(ctx context.Context, items []BatchItem) err
 
 	s.logger.Info("batch coverage query done",
 		zap.Int("torrents", len(items)),
-		zap.Int("iyuu_results", len(iyuuMap)))
+		zap.Int("iyuu_results", len(iyuuMap)),
+		zap.Int("neg_cache_records", len(negCaches)),
+		zap.Int("publish_records", len(pubResults)))
 	return nil
 }
 
@@ -162,6 +204,8 @@ func (s *Service) buildCoverageForItem(
 	fpByHash map[string][]model.ContentFingerprint,
 	matchByHash map[string][]model.ReseedMatch,
 	iyuuMap map[string][]string,
+	negByHash map[string]map[string]bool,
+	pubByHash map[string][]pubHit,
 	now, ttl time.Time,
 ) map[string]model.SiteCoverageCache {
 	results := make(map[string]model.SiteCoverageCache)
@@ -230,6 +274,37 @@ func (s *Service) buildCoverageForItem(
 				Confidence: 0.9,
 				QueriedAt:  now,
 				ExpiresAt:  ttl,
+			}
+		}
+	}
+
+	// L1c: reseed_negative_caches（辅种引擎确认不存在）
+	for siteName := range negByHash[item.InfoHash] {
+		if _, exists := results[siteName]; !exists {
+			results[siteName] = model.SiteCoverageCache{
+				InfoHash:   item.InfoHash,
+				SiteName:   siteName,
+				Status:     model.CoverageConfirmedNot,
+				Source:     model.CoverageSourcePiecesHash,
+				Confidence: 0.95,
+				QueriedAt:  now,
+				ExpiresAt:  ttl,
+			}
+		}
+	}
+
+	// L1d: publish_result_records（我们自己的发布成功记录）
+	for _, pr := range pubByHash[item.InfoHash] {
+		if _, exists := results[pr.TargetSite]; !exists {
+			results[pr.TargetSite] = model.SiteCoverageCache{
+				InfoHash:   item.InfoHash,
+				SiteName:   pr.TargetSite,
+				Status:     model.CoverageConfirmedHas,
+				Source:     model.CoverageSourcePublish,
+				Confidence: 1.0,
+				TorrentID:  pr.TorrentID,
+				QueriedAt:  now,
+				ExpiresAt:  now.Add(365 * 24 * time.Hour),
 			}
 		}
 	}

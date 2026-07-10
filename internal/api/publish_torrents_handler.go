@@ -484,6 +484,70 @@ func extractSearchKeyword(name string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(keyword, ".", " "), "_", " ")
 }
 
+func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
+	h.logger.Info("scheduled coverage refresh started")
+	var clients []model.ClientConfig
+	h.db.WithContext(ctx).Where("enabled = ?", true).Find(&clients)
+
+	for _, cfg := range clients {
+		client, err := h.clientMgr.Get(cfg.Name)
+		if err != nil {
+			h.logger.Warn("coverage refresh: client failed", zap.String("name", cfg.Name), zap.Error(err))
+			continue
+		}
+
+		tCtx, tCancel := context.WithTimeout(ctx, 2*time.Minute)
+		torrents, err := client.GetSeedingTorrents(tCtx)
+		tCancel()
+		if err != nil {
+			h.logger.Warn("coverage refresh: get torrents failed", zap.String("name", cfg.Name), zap.Error(err))
+			continue
+		}
+
+		allHashes := make([]string, 0, len(torrents))
+		for _, t := range torrents {
+			allHashes = append(allHashes, t.Hash)
+		}
+
+		qCtx, qCancel := context.WithTimeout(ctx, 10*time.Second)
+		queried, _ := h.coverage.GetBatchQueryState(qCtx, allHashes)
+		qCancel()
+
+		items := make([]coverage.BatchItem, 0, len(torrents))
+		for _, t := range torrents {
+			if queried[t.Hash] {
+				continue
+			}
+			trkCtx, trkCancel := context.WithTimeout(ctx, 5*time.Second)
+			trackers, _ := client.GetTrackers(trkCtx, t.Hash)
+			trkCancel()
+			items = append(items, coverage.BatchItem{
+				InfoHash:   t.Hash,
+				Trackers:   trackers,
+				TorrentDir: extractTorrentDir(cfg.Config),
+			})
+		}
+
+		if len(items) == 0 {
+			continue
+		}
+
+		h.logger.Info("coverage refresh: querying",
+			zap.String("client", cfg.Name),
+			zap.Int("torrents", len(items)))
+
+		batchCtx, batchCancel := context.WithTimeout(ctx, 5*time.Minute)
+		h.coverage.QueryBatchCoverage(batchCtx, items)
+		if h.siteProvider != nil {
+			h.batchPiecesHashQuery(batchCtx, items, cfg)
+		}
+		batchCancel()
+	}
+
+	h.logger.Info("scheduled coverage refresh done")
+	return nil
+}
+
 func (h *PublishTorrentsHandler) batchPiecesHashQuery(ctx context.Context, items []coverage.BatchItem, cfg model.ClientConfig) {
 	torrentDir := extractTorrentDir(cfg.Config)
 	if torrentDir == "" {
