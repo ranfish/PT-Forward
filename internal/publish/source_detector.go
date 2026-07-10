@@ -408,14 +408,24 @@ var groupDomainSeed = map[string]string{
 }
 
 func (d *SourceSiteDetector) SeedDefaultMappings(ctx context.Context) error {
-	for group, domain := range groupDomainSeed {
-		d.db.WithContext(ctx).Where("group_name = ?", group).
-			FirstOrCreate(&model.ReleaseGroupMapping{
-				GroupName:  group,
-				Domain:     domain,
-				IsOfficial: true,
-			})
+	var existingNames []string
+	d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Pluck("group_name", &existingNames)
+	existingSet := make(map[string]bool, len(existingNames))
+	for _, name := range existingNames {
+		existingSet[name] = true
 	}
+
+	for group, domain := range groupDomainSeed {
+		if existingSet[group] {
+			continue
+		}
+		d.db.WithContext(ctx).Create(&model.ReleaseGroupMapping{
+			GroupName:  group,
+			Domain:     domain,
+			IsOfficial: true,
+		})
+	}
+
 	d.RefreshCache(ctx)
 	return nil
 }

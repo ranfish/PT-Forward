@@ -196,14 +196,16 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 		}
 	}
 
+	_, progressDone, progressTotal := h.bgState.getProgress()
+
 	Success(w, map[string]interface{}{
 		"items":       items,
 		"total":       len(items),
 		"total_sites": totalSites,
 		"querying":    querying,
 		"query_progress": map[string]int{
-			"done":  h.bgState.done,
-			"total": h.bgState.total,
+			"done":  progressDone,
+			"total": progressTotal,
 		},
 	})
 }
@@ -669,10 +671,11 @@ func (h *PublishTorrentsHandler) handleQueryStatus(w http.ResponseWriter, r *htt
 	clientID, _ := strconv.ParseUint(clientIDStr, 10, 64)
 
 	querying := h.bgState.isQuerying(uint(clientID))
+	_, done, total := h.bgState.getProgress()
 	Success(w, map[string]interface{}{
 		"querying": querying,
-		"done":     h.bgState.done,
-		"total":    h.bgState.total,
+		"done":     done,
+		"total":    total,
 	})
 }
 
@@ -706,6 +709,12 @@ func (s *backgroundQueryState) setDone(n int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.done = n
+}
+
+func (s *backgroundQueryState) getProgress() (querying bool, done, total int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.active) > 0, s.done, s.total
 }
 
 func extractTorrentDir(configJSON string) string {
