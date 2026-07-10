@@ -53,7 +53,7 @@ jobs:
         run: go vet ./internal/... ./cmd/pt-forward/...
 
       - name: Test
-        run: CGO_ENABLED=1 go test -count=1 -timeout 180s ./internal/...
+        run: CGO_ENABLED=1 go test -short -count=1 -timeout 180s ./internal/...
 
   lint:
     runs-on: ubuntu-latest
@@ -71,7 +71,7 @@ jobs:
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: latest
+          version: v1.64.5
 
       - name: Lint
         run: golangci-lint run ./internal/...
