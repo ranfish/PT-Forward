@@ -188,6 +188,9 @@
         @change="(pag: { current?: number; pageSize?: number }) => { if (pag.current) mappingPagination.current = pag.current; if (pag.pageSize) mappingPagination.pageSize = pag.pageSize }"
       >
         <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'domain'">
+            {{ maskDomain(record.domain) }}
+          </template>
           <template v-if="column.key === 'matched_site'">
             <a-tag v-if="record.matched_site" color="green">{{ record.matched_site }}</a-tag>
             <a-tag v-else color="red">未匹配</a-tag>
@@ -228,7 +231,7 @@ import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
 import { message } from 'ant-design-vue'
 import { publishTorrentsApi, type PublishTorrentItem } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, maskDomain } from '@/utils/format'
 import PublishWizardModal from './PublishWizardModal.vue'
 
 const clients = ref<{ id: number; name: string; type: string }[]>([])
