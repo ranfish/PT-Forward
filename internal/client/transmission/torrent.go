@@ -415,3 +415,30 @@ func (c *TRClient) GetTrackerMessages(ctx context.Context, hash string) (string,
 	}
 	return "", nil
 }
+
+func (c *TRClient) GetTrackers(ctx context.Context, hash string) ([]string, error) {
+	resp, err := c.rpcCall(ctx, "torrent-get", map[string]interface{}{
+		"ids":    []string{hash},
+		"fields": []string{"trackers"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("torrent-get rpc: %w", err)
+	}
+	var torrents []struct {
+		Trackers []struct {
+			Announce string `json:"announce"`
+		} `json:"trackers"`
+	}
+	if err := json.Unmarshal(resp.Arguments, &torrents); err != nil {
+		return nil, fmt.Errorf("decode trackers: %w", err)
+	}
+	var urls []string
+	for _, t := range torrents {
+		for _, tr := range t.Trackers {
+			if tr.Announce != "" {
+				urls = append(urls, tr.Announce)
+			}
+		}
+	}
+	return urls, nil
+}

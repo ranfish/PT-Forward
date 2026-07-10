@@ -405,7 +405,18 @@ import { formatBytes } from '@/utils/format'
 
 const { translateQbState } = useEnumLabels()
 
-const props = defineProps<{ open: boolean }>()
+const props = defineProps<{
+  open: boolean
+  presetTorrent?: {
+    info_hash: string
+    name: string
+    size: number
+    save_path: string
+    client_id: number
+    state: string
+  } | null
+  presetClientId?: number
+}>()
 const emit = defineEmits<{
   'update:open': [value: boolean]
   success: []
@@ -760,7 +771,23 @@ function stopCandidatePoll() {
 watch(() => props.open, (val) => {
   if (val) {
     resetWizard()
-    fetchClients()
+    if (props.presetTorrent) {
+      selectedTorrent.value = {
+        info_hash: props.presetTorrent.info_hash,
+        name: props.presetTorrent.name,
+        size: props.presetTorrent.size,
+        save_path: props.presetTorrent.save_path,
+        client_id: props.presetTorrent.client_id,
+        upload_speed: 0,
+        seeders: 0,
+        state: props.presetTorrent.state,
+      }
+      selectedClientId.value = props.presetTorrent.client_id
+      currentStep.value = 1
+      enterAnalyze()
+    } else {
+      fetchClients()
+    }
   }
 })
 

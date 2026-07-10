@@ -221,6 +221,10 @@ func (m *DownloaderClient) GetTrackerMessages(ctx context.Context, hash string) 
 	return "", nil
 }
 
+func (m *DownloaderClient) GetTrackers(ctx context.Context, hash string) ([]string, error) {
+	return nil, nil
+}
+
 type DownloaderProvider struct {
 	Client        model.DownloaderClient
 	GetFn         func(clientID string) (model.DownloaderClient, error)

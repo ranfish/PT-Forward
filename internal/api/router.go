@@ -7,6 +7,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/adapter"
 	"github.com/ranfish/pt-forward/internal/auth"
 	"github.com/ranfish/pt-forward/internal/client"
+	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/filter"
 	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -35,6 +36,7 @@ type Router struct {
 	reseedHandler        *ReseedHandler
 	publishHandler       *PublishHandler
 	manualForwardHandler *ManualForwardHandler
+	publishTorrentsHandler *PublishTorrentsHandler
 	dashboardHandler     *DashboardHandler
 	systemHandler        *SystemHandler
 	iyuuHandler          *IYUUHandler
@@ -97,8 +99,9 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		seedingHandler:       NewSeedingHandler(db, logger, seedingEngine),
 		deleteRuleHandler:    NewDeleteRuleHandler(db, logger, clientMgrIface),
 		reseedHandler:        NewReseedHandler(reseedEngine, logger),
-		publishHandler:       NewPublishHandler(publishPipeline, logger, db),
-		manualForwardHandler: NewManualForwardHandler(db, logger),
+		publishHandler:         NewPublishHandler(publishPipeline, logger, db),
+		manualForwardHandler:   NewManualForwardHandler(db, logger),
+		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger),
 		dashboardHandler:     dashHandler,
 		systemHandler:        sysHandler,
 		iyuuHandler:          NewIYUUHandler(db, logger, iyuuSvc),
@@ -138,6 +141,12 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.manualForwardHandler.SetPipeline(pipeline)
 	rt.manualForwardHandler.SetSiteManager(siteProvider)
 	rt.manualForwardHandler.SetClientProvider(clientMgr)
+	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
+}
+
+func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr *client.Manager) {
+	rt.publishTorrentsHandler.SetCoverageService(coverageSvc)
+	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 }
 
 func (rt *Router) SetSiteProvider(p interface {
@@ -293,6 +302,10 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/manual-forward/submit/", mfHandler)
 	mux.Handle("/api/v1/manual-forward/batch-submit", mfHandler)
 	mux.Handle("/api/v1/manual-forward/batch-submit/", mfHandler)
+
+	ptHandler := rt.chain(writeLimitMW, rt.publishTorrentsHandler.ServeHTTP)
+	mux.Handle("/api/v1/publish/torrents", ptHandler)
+	mux.Handle("/api/v1/publish/torrents/", ptHandler)
 
 	dashboardHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/dashboard/overview", dashboardHandler)

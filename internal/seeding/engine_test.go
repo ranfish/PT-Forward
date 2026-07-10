@@ -99,6 +99,10 @@ func (m *mockDownloaderClient) GetTrackerMessages(_ context.Context, _ string) (
 	return "", nil
 }
 
+func (m *mockDownloaderClient) GetTrackers(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+
 type mockDownloaderProvider struct {
 	clients map[string]*mockDownloaderClient
 	list    []string

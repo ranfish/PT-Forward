@@ -57,6 +57,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&DownloadTask{},
 		&DownloadClientConfig{},
 		&SchemaMigration{},
+		&SiteCoverageCache{},
 		&setting.Setting{},
 	)
 }

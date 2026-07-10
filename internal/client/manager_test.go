@@ -392,3 +392,6 @@ func (s *stubClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTra
 func (s *stubClient) GetTrackerMessages(_ context.Context, _ string) (string, error) {
 	return "", nil
 }
+func (s *stubClient) GetTrackers(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}

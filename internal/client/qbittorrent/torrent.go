@@ -599,3 +599,32 @@ func (c *QBClient) GetTrackerMessages(ctx context.Context, hash string) (string,
 	}
 	return "", nil
 }
+
+func (c *QBClient) GetTrackers(ctx context.Context, hash string) ([]string, error) {
+	resp, err := c.get(ctx, "/api/v2/torrents/trackers?hash="+url.QueryEscape(hash))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("trackers API returned %d", resp.StatusCode)
+	}
+	var trackers []struct {
+		URL  string `json:"url"`
+		Msg  string `json:"msg"`
+		Tier int    `json:"tier"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&trackers); err != nil {
+		return nil, fmt.Errorf("decode trackers: %w", err)
+	}
+	var urls []string
+	for _, t := range trackers {
+		if strings.HasPrefix(t.URL, "**") {
+			continue
+		}
+		if strings.HasPrefix(t.URL, "http://") || strings.HasPrefix(t.URL, "https://") {
+			urls = append(urls, t.URL)
+		}
+	}
+	return urls, nil
+}
