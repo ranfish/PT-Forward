@@ -32,6 +32,9 @@
       <a-tag v-if="torrents.length" color="blue" style="margin-left: 8px">
         {{ filteredTorrents.length }} / {{ torrents.length }}
       </a-tag>
+      <a-button size="small" style="margin-left: auto" @click="groupMappingOpen = true">
+        制作组映射
+      </a-button>
       <!-- 后台查询进度 -->
       <div v-if="querying" class="query-progress">
         <a-progress
@@ -162,11 +165,65 @@
         </a-button>
       </div>
     </a-modal>
+
+    <a-modal
+      v-model:open="groupMappingOpen"
+      title="制作组 → 源站映射"
+      width="800px"
+      :footer="null"
+      destroy-on-close
+    >
+      <div style="margin-bottom: 12px; display: flex; gap: 8px">
+        <a-input v-model:value="newMapping.group_name" placeholder="制作组名（如 CMCTV）" style="width: 160px" />
+        <a-input v-model:value="newMapping.domain" placeholder="域名（如 springsunday.net）" style="width: 220px" />
+        <a-input v-model:value="newMapping.site_name" placeholder="站点名（留空自动匹配）" style="width: 160px" />
+        <a-button type="primary" size="small" @click="addMapping">添加</a-button>
+      </div>
+      <a-table
+        :columns="mappingColumns"
+        :data-source="mappings"
+        :pagination="{ pageSize: 20, size: 'small' }"
+        row-key="id"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'matched_site'">
+            <a-tag v-if="record.matched_site" color="green">{{ record.matched_site }}</a-tag>
+            <a-tag v-else color="red">未匹配</a-tag>
+          </template>
+          <template v-if="column.key === 'actions'">
+            <a-button type="link" size="small" @click="editMapping(record)">编辑</a-button>
+            <a-popconfirm title="确定删除？" @confirm="deleteMapping(record.id)">
+              <a-button type="link" danger size="small">删除</a-button>
+            </a-popconfirm>
+          </template>
+        </template>
+      </a-table>
+    </a-modal>
+
+    <a-modal
+      v-model:open="editMappingOpen"
+      title="编辑映射"
+      width="420px"
+      @ok="saveMapping"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="制作组名">
+          <a-input v-model:value="editingMapping.group_name" />
+        </a-form-item>
+        <a-form-item label="域名">
+          <a-input v-model:value="editingMapping.domain" />
+        </a-form-item>
+        <a-form-item label="站点名（手动指定，留空用域名自动匹配）">
+          <a-input v-model:value="editingMapping.site_name" placeholder="留空自动匹配" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
 import { message } from 'ant-design-vue'
 import { publishTorrentsApi, type PublishTorrentItem } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
@@ -429,6 +486,81 @@ onMounted(fetchClients)
 onUnmounted(() => {
   stopPolling()
 })
+
+// --- 映射管理 ---
+const groupMappingOpen = ref(false)
+const mappings = ref<Array<Record<string, unknown> & { id: number }>>([])
+const editMappingOpen = ref(false)
+const editingMapping = ref({ id: 0, group_name: '', domain: '', site_name: '' })
+const newMapping = reactive({ group_name: '', domain: '', site_name: '' })
+
+const mappingColumns = [
+  { title: '制作组', dataIndex: 'group_name', key: 'group_name', width: 120 },
+  { title: '域名', dataIndex: 'domain', key: 'domain', ellipsis: true },
+  { title: '匹配站点', key: 'matched_site', width: 120 },
+  { title: '操作', key: 'actions', width: 120 },
+]
+
+async function fetchMappings() {
+  try {
+    const resp = await publishTorrentsApi.listGroupMappings()
+    mappings.value = (resp.data?.data?.items || []) as Array<Record<string, unknown> & { id: number }>
+  } catch { /* ignore */ }
+}
+
+watch(groupMappingOpen, (val) => {
+  if (val) fetchMappings()
+})
+
+async function addMapping() {
+  if (!newMapping.group_name) return
+  try {
+    await publishTorrentsApi.createGroupMapping({
+      group_name: newMapping.group_name,
+      domain: newMapping.domain,
+      site_name: newMapping.site_name,
+    })
+    newMapping.group_name = ''
+    newMapping.domain = ''
+    newMapping.site_name = ''
+    fetchMappings()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  }
+}
+
+function editMapping(record: Record<string, unknown> & { id: number }) {
+  editingMapping.value = {
+    id: record.id,
+    group_name: record.group_name as string,
+    domain: record.domain as string,
+    site_name: record.site_name as string || '',
+  }
+  editMappingOpen.value = true
+}
+
+async function saveMapping() {
+  try {
+    await publishTorrentsApi.updateGroupMapping(editingMapping.value.id, {
+      group_name: editingMapping.value.group_name,
+      domain: editingMapping.value.domain,
+      site_name: editingMapping.value.site_name,
+    })
+    editMappingOpen.value = false
+    fetchMappings()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  }
+}
+
+async function deleteMapping(id: number) {
+  try {
+    await publishTorrentsApi.deleteGroupMapping(id)
+    fetchMappings()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  }
+}
 </script>
 
 <style scoped>

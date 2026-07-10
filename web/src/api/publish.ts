@@ -65,6 +65,18 @@ export const publishTorrentsApi = {
   detectSource(data: { info_hash: string; name: string }) {
     return client.post<ApiResponse<SourceDetectResult>>('/publish/torrents/detect-source', data)
   },
+  listGroupMappings() {
+    return client.get<ApiResponse<{ items: Array<Record<string, unknown> & { id: number }>; total: number }>>('/publish/torrents/group-mappings')
+  },
+  createGroupMapping(data: { group_name: string; domain: string; site_name: string }) {
+    return client.post<ApiResponse<unknown>>('/publish/torrents/group-mappings', data)
+  },
+  updateGroupMapping(id: number, data: { group_name: string; domain: string; site_name: string }) {
+    return client.put<ApiResponse<unknown>>(`/publish/torrents/group-mappings/${id}`, data)
+  },
+  deleteGroupMapping(id: number) {
+    return client.delete<ApiResponse<unknown>>(`/publish/torrents/group-mappings/${id}`)
+  },
 }
 
 export interface SourceDetectResult {

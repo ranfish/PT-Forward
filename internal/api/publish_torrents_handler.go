@@ -68,6 +68,14 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleQueryStatus(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/detect-source") && r.Method == http.MethodPost:
 		h.handleDetectSource(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/group-mappings") && r.Method == http.MethodGet:
+		h.handleListGroupMappings(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/group-mappings") && r.Method == http.MethodPost:
+		h.handleCreateGroupMapping(w, r)
+	case strings.Contains(path, "/publish/torrents/group-mappings/") && r.Method == http.MethodPut:
+		h.handleUpdateGroupMapping(w, r)
+	case strings.Contains(path, "/publish/torrents/group-mappings/") && r.Method == http.MethodDelete:
+		h.handleDeleteGroupMapping(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -780,4 +788,122 @@ func (h *PublishTorrentsHandler) handleDetectSource(w http.ResponseWriter, r *ht
 		"auto_detected":  detected.AutoDetected,
 		"candidates":     candidates,
 	})
+}
+
+func (h *PublishTorrentsHandler) handleListGroupMappings(w http.ResponseWriter, r *http.Request) {
+	var mappings []model.ReleaseGroupMapping
+	h.db.WithContext(r.Context()).Order("group_name ASC").Find(&mappings)
+
+	var sites []model.Site
+	h.db.WithContext(r.Context()).Where("enabled = ?", true).Find(&sites)
+	siteMap := make(map[string]string)
+	for _, s := range sites {
+		siteMap[strings.ToLower(s.Domain)] = s.Name
+	}
+
+	type mappingWithMatch struct {
+		model.ReleaseGroupMapping
+		MatchedSite string `json:"matched_site"`
+	}
+	result := make([]mappingWithMatch, 0, len(mappings))
+	for _, m := range mappings {
+		mw := mappingWithMatch{ReleaseGroupMapping: m}
+		if m.SiteName != "" {
+			mw.MatchedSite = m.SiteName
+		} else if m.Domain != "" {
+			for domain, name := range siteMap {
+				if strings.Contains(domain, strings.ToLower(m.Domain)) {
+					mw.MatchedSite = name
+					break
+				}
+			}
+		}
+		result = append(result, mw)
+	}
+
+	Success(w, map[string]interface{}{"items": result, "total": len(result)})
+}
+
+func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		GroupName  string `json:"group_name"`
+		Domain     string `json:"domain"`
+		SiteName   string `json:"site_name"`
+		IsOfficial bool   `json:"is_official"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.GroupName == "" {
+		Error(w, http.StatusBadRequest, 40001, "group_name 必填")
+		return
+	}
+	mapping := model.ReleaseGroupMapping{
+		GroupName:  req.GroupName,
+		Domain:     req.Domain,
+		SiteName:   req.SiteName,
+		IsOfficial: req.IsOfficial,
+	}
+	if err := h.db.Create(&mapping).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("创建失败: %v", err))
+		return
+	}
+	if h.sourceDetector != nil {
+		h.sourceDetector.RefreshCache(r.Context())
+	}
+	Success(w, mapping)
+}
+
+func (h *PublishTorrentsHandler) handleUpdateGroupMapping(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimRight(r.URL.Path, "/")
+	parts := strings.Split(path, "/")
+	idStr := parts[len(parts)-1]
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的 ID")
+		return
+	}
+	var req struct {
+		GroupName  string `json:"group_name"`
+		Domain     string `json:"domain"`
+		SiteName   string `json:"site_name"`
+		IsOfficial bool   `json:"is_official"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if err := h.db.Model(&model.ReleaseGroupMapping{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"group_name":  req.GroupName,
+		"domain":      req.Domain,
+		"site_name":   req.SiteName,
+		"is_official": req.IsOfficial,
+	}).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("更新失败: %v", err))
+		return
+	}
+	if h.sourceDetector != nil {
+		h.sourceDetector.RefreshCache(r.Context())
+	}
+	Success(w, map[string]interface{}{"message": "已更新"})
+}
+
+func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimRight(r.URL.Path, "/")
+	parts := strings.Split(path, "/")
+	idStr := parts[len(parts)-1]
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的 ID")
+		return
+	}
+	if err := h.db.Delete(&model.ReleaseGroupMapping{}, id).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("删除失败: %v", err))
+		return
+	}
+	if h.sourceDetector != nil {
+		h.sourceDetector.RefreshCache(r.Context())
+	}
+	Success(w, map[string]interface{}{"message": "已删除"})
 }
