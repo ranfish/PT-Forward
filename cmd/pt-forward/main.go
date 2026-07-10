@@ -343,6 +343,9 @@ func main() {
 
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
 	router.SetupPublishTorrents(coverageSvc, clientManager)
+	if err := router.StartCoverageRefresh(taskRegistry); err != nil {
+		log.Warn("failed to register coverage refresh schedule", zap.Error(err))
+	}
 
 	mux := http.NewServeMux()
 	runtimeCfg := setting.NewRuntimeConfig(settingsRepo, log)

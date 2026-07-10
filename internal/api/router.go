@@ -150,6 +150,10 @@ func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr 
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 }
 
+func (rt *Router) StartCoverageRefresh(scheduler *scheduler.Registry) error {
+	return scheduler.Register("coverage-refresh", "coverage", "0 */12 * * *", rt.publishTorrentsHandler.ScheduledRefresh)
+}
+
 func (rt *Router) SetSiteProvider(p interface {
 	GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error)
 	GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error)
