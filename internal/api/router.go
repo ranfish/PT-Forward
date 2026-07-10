@@ -137,10 +137,11 @@ func (rt *Router) SetCloudFPBreakerFn(fn func() bool) {
 
 
 // SetupManualForward 注入手动转发向导所需的依赖
-func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager) {
+func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter) {
 	rt.manualForwardHandler.SetPipeline(pipeline)
 	rt.manualForwardHandler.SetSiteManager(siteProvider)
 	rt.manualForwardHandler.SetClientProvider(clientMgr)
+	rt.manualForwardHandler.SetDeclarationFilter(declFilter)
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)
 }

@@ -12,18 +12,20 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/publish"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 type ManualForwardHandler struct {
-	db        *gorm.DB
-	logger    *zap.Logger
-	pipeline  PublishPipeline
-	siteMgr   SiteManager
-	clientMgr MFClientProvider
-	taskStore sync.Map
-	taskSeq   atomic.Int64
+	db           *gorm.DB
+	logger       *zap.Logger
+	pipeline     PublishPipeline
+	siteMgr      SiteManager
+	clientMgr    MFClientProvider
+	declFilter   *publish.DeclarationFilter
+	taskStore    sync.Map
+	taskSeq      atomic.Int64
 }
 
 type PublishPipeline interface {
@@ -50,6 +52,7 @@ func NewManualForwardHandler(db *gorm.DB, logger *zap.Logger) *ManualForwardHand
 func (h *ManualForwardHandler) SetPipeline(p PublishPipeline)        { h.pipeline = p }
 func (h *ManualForwardHandler) SetSiteManager(s SiteManager)         { h.siteMgr = s }
 func (h *ManualForwardHandler) SetClientProvider(c MFClientProvider) { h.clientMgr = c }
+func (h *ManualForwardHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
 
 func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -291,6 +294,17 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 		result["media_info"] = ""
 		result["screenshots"] = []string{}
 		result["poster_url"] = ""
+	}
+
+	// 声明过滤
+	if h.declFilter != nil {
+		desc, _ := result["description"].(string)
+		if desc != "" {
+			patterns := h.declFilter.GetPatterns(context.Background())
+			fr := h.declFilter.Filter(desc, patterns)
+			result["description"] = fr.CleanedText
+			result["removed_declarations"] = fr.RemovedDecls
+		}
 	}
 
 	task.setResult(result)
