@@ -811,8 +811,10 @@ func (h *PublishTorrentsHandler) handleListGroupMappings(w http.ResponseWriter, 
 		if m.SiteName != "" {
 			mw.MatchedSite = m.SiteName
 		} else if m.Domain != "" {
+			barePattern := strings.TrimPrefix(strings.ToLower(m.Domain), "www.")
 			for domain, name := range siteMap {
-				if strings.Contains(domain, strings.ToLower(m.Domain)) {
+				bareDomain := strings.TrimPrefix(domain, "www.")
+				if strings.Contains(bareDomain, barePattern) {
 					mw.MatchedSite = name
 					break
 				}
