@@ -799,6 +799,14 @@ func (h *PublishTorrentsHandler) handleListGroupMappings(w http.ResponseWriter, 
 	siteMap := make(map[string]string)
 	for _, s := range sites {
 		siteMap[strings.ToLower(s.Domain)] = s.Name
+		if s.AlternativeDomains != "" {
+			var altDomains []string
+			if err := json.Unmarshal([]byte(s.AlternativeDomains), &altDomains); err == nil {
+				for _, alt := range altDomains {
+					siteMap[strings.ToLower(alt)] = s.Name
+				}
+			}
+		}
 	}
 
 	type mappingWithMatch struct {
