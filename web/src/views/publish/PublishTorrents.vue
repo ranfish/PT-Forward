@@ -124,6 +124,44 @@
       :preset-client-id="selectedClientId"
       @success="onWizardSuccess"
     />
+
+    <a-modal
+      v-model:open="sourceSelectOpen"
+      title="选择转种源站"
+      width="520px"
+      :footer="null"
+    >
+      <div v-if="sourceDetectRecord" style="margin-bottom: 16px">
+        <span style="color: #666">种子：</span>
+        <span>{{ sourceDetectRecord.name }}</span>
+      </div>
+      <p style="color: #999; margin-bottom: 16px">
+        未自动识别制作组主站，请手动选择数据来源站点：
+      </p>
+      <a-radio-group v-model:value="selectedSourceSite" style="width: 100%">
+        <div
+          v-for="c in sourceCandidates"
+          :key="c.site_name"
+          style="display: flex; align-items: center; padding: 8px 0"
+        >
+          <a-radio :value="c.site_name" :disabled="!c.has_cookie">
+            {{ c.site_name }}
+          </a-radio>
+          <a-tag v-if="c.torrent_id" color="blue" size="small" style="margin-left: 8px">
+            ID: {{ c.torrent_id }}
+          </a-tag>
+          <a-tag v-if="!c.has_cookie" color="red" size="small" style="margin-left: 4px">
+            缺 cookie
+          </a-tag>
+        </div>
+      </a-radio-group>
+      <div style="text-align: right; margin-top: 16px">
+        <a-button style="margin-right: 8px" @click="sourceSelectOpen = false">取消</a-button>
+        <a-button type="primary" :disabled="!selectedSourceSite" @click="confirmSourceSite">
+          确定
+        </a-button>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -156,7 +194,7 @@ const queryTotal = ref(0)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const wizardOpen = ref(false)
-const presetTorrent = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; state: string } | null>(null)
+const presetTorrent = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; state: string; source_site?: string; source_site_id?: number; torrent_id?: string } | null>(null)
 
 const columns = [
   { title: '种子名称', dataIndex: 'name', key: 'name', ellipsis: true },
@@ -328,6 +366,57 @@ function startForward(record: PublishTorrentItem) {
     client_id: selectedClientId.value!,
     state: record.state,
   }
+  // 检测源头站
+  detectAndOpen(record)
+}
+
+async function detectAndOpen(record: PublishTorrentItem) {
+  try {
+    const resp = await publishTorrentsApi.detectSource({
+      info_hash: record.info_hash,
+      name: record.name,
+    })
+    const result = resp.data?.data
+    if (result?.source_site) {
+      // 自动检测成功（或降级选中）
+      presetTorrent.value = {
+        ...presetTorrent.value!,
+        source_site: result.source_site,
+        source_site_id: result.source_site_id,
+        torrent_id: result.torrent_id,
+      }
+      if (!result.auto_detected && result.candidates?.length > 1) {
+        // 非自动判断 + 多候选 → 弹选择弹窗
+        sourceCandidates.value = result.candidates
+        sourceDetectRecord.value = record
+        sourceSelectOpen.value = true
+        return
+      }
+    }
+    // 直接打开向导
+    wizardOpen.value = true
+  } catch {
+    // 检测失败 → 直接打开向导（用默认源站）
+    wizardOpen.value = true
+  }
+}
+
+// 源站选择弹窗
+const sourceSelectOpen = ref(false)
+const sourceCandidates = ref<{ site_name: string; torrent_id: string; has_cookie: boolean }[]>([])
+const sourceDetectRecord = ref<PublishTorrentItem | null>(null)
+const selectedSourceSite = ref<string>('')
+
+function confirmSourceSite() {
+  const cand = sourceCandidates.value.find(c => c.site_name === selectedSourceSite.value)
+  if (cand && presetTorrent.value) {
+    presetTorrent.value = {
+      ...presetTorrent.value,
+      source_site: cand.site_name,
+      torrent_id: cand.torrent_id,
+    }
+  }
+  sourceSelectOpen.value = false
   wizardOpen.value = true
 }
 

@@ -62,6 +62,18 @@ export const publishTorrentsApi = {
   queryStatus(clientId: number) {
     return client.get<ApiResponse<{ querying: boolean; done: number; total: number }>>('/publish/torrents/query-status', { params: { client_id: clientId } })
   },
+  detectSource(data: { info_hash: string; name: string }) {
+    return client.post<ApiResponse<SourceDetectResult>>('/publish/torrents/detect-source', data)
+  },
+}
+
+export interface SourceDetectResult {
+  source_site: string
+  source_site_id: number
+  group_name: string
+  torrent_id: string
+  auto_detected: boolean
+  candidates: { site_name: string; torrent_id: string; has_cookie: boolean }[]
 }
 
 export interface PublishTorrentItem {

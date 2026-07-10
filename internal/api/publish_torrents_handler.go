@@ -12,6 +12,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/publish"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -26,12 +27,13 @@ type SiteProviderGetter interface {
 }
 
 type PublishTorrentsHandler struct {
-	db           *gorm.DB
-	coverage     *coverage.Service
-	clientMgr    MFClientProvider
-	siteProvider SiteProviderGetter
-	logger       *zap.Logger
-	bgState      backgroundQueryState
+	db             *gorm.DB
+	coverage       *coverage.Service
+	clientMgr      MFClientProvider
+	siteProvider   SiteProviderGetter
+	sourceDetector *publish.SourceSiteDetector
+	logger         *zap.Logger
+	bgState        backgroundQueryState
 }
 
 type backgroundQueryState struct {
@@ -52,6 +54,7 @@ func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger) *PublishTorrents
 func (h *PublishTorrentsHandler) SetCoverageService(s *coverage.Service) { h.coverage = s }
 func (h *PublishTorrentsHandler) SetClientProvider(c MFClientProvider)  { h.clientMgr = c }
 func (h *PublishTorrentsHandler) SetSiteProvider(s SiteProviderGetter)  { h.siteProvider = s }
+func (h *PublishTorrentsHandler) SetSourceDetector(d *publish.SourceSiteDetector) { h.sourceDetector = d }
 
 func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -63,6 +66,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleQueryCoverage(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/query-status") && r.Method == http.MethodGet:
 		h.handleQueryStatus(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/detect-source") && r.Method == http.MethodPost:
+		h.handleDetectSource(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -706,4 +711,73 @@ func extractTorrentDir(configJSON string) string {
 		return ""
 	}
 	return cfg.TorrentDir
+}
+
+type detectSourceRequest struct {
+	InfoHash string `json:"info_hash"`
+	Name     string `json:"name"`
+}
+
+func (h *PublishTorrentsHandler) handleDetectSource(w http.ResponseWriter, r *http.Request) {
+	if h.sourceDetector == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "源站检测器未初始化")
+		return
+	}
+
+	var req detectSourceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.InfoHash == "" || req.Name == "" {
+		Error(w, http.StatusBadRequest, 40001, "info_hash 和 name 必填")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// 读覆盖数据
+	coverageSites, _ := h.coverage.GetCachedCoverage(ctx, req.InfoHash)
+
+	// 检测源头站
+	detected := h.sourceDetector.Detect(ctx, req.Name, req.InfoHash, coverageSites)
+
+	// 构建候选列表（用于前端降级选择）
+	type candidate struct {
+		SiteName  string `json:"site_name"`
+		TorrentID string `json:"torrent_id"`
+		HasCookie bool   `json:"has_cookie"`
+	}
+	var candidates []candidate
+	siteMap := make(map[string]string)
+	for _, c := range coverageSites {
+		if c.Status == model.CoverageConfirmedHas || c.Status == model.CoverageProbablyHas {
+			siteMap[c.SiteName] = c.TorrentID
+		}
+	}
+	if len(siteMap) > 0 {
+		var sites []model.Site
+		siteNames := make([]string, 0, len(siteMap))
+		for name := range siteMap {
+			siteNames = append(siteNames, name)
+		}
+		h.db.Where("name IN ?", siteNames).Find(&sites)
+		for _, site := range sites {
+			candidates = append(candidates, candidate{
+				SiteName:  site.Name,
+				TorrentID: siteMap[site.Name],
+				HasCookie: site.Cookie != "",
+			})
+		}
+	}
+
+	Success(w, map[string]interface{}{
+		"source_site":    detected.SourceSite,
+		"source_site_id": detected.SourceSiteID,
+		"group_name":     detected.GroupName,
+		"torrent_id":     detected.TorrentID,
+		"auto_detected":  detected.AutoDetected,
+		"candidates":     candidates,
+	})
 }

@@ -146,9 +146,10 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)
 }
 
-func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr *client.Manager) {
+func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr *client.Manager, sourceDetector *publish.SourceSiteDetector) {
 	rt.publishTorrentsHandler.SetCoverageService(coverageSvc)
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
+	rt.publishTorrentsHandler.SetSourceDetector(sourceDetector)
 }
 
 func (rt *Router) StartCoverageRefresh(scheduler *scheduler.Registry) error {
@@ -313,6 +314,7 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/publish/torrents", ptHandler)
 	mux.Handle("/api/v1/publish/torrents/", ptHandler)
 	mux.Handle("/api/v1/publish/torrents/query-status", ptHandler)
+	mux.Handle("/api/v1/publish/torrents/detect-source", ptHandler)
 
 	dashboardHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/dashboard/overview", dashboardHandler)
