@@ -169,101 +169,244 @@ func (d *SourceSiteDetector) RefreshCache(ctx context.Context) {
 	}
 }
 
-// groupDomainSeed: 制作组名 → 站点域名（数据源: examples/auto_feed_js）
-// site_name 留空，运行时按 domain 匹配站点表，用户可在 Web 页面修正
+// groupDomainSeed: 制作组名 → 站点域名
+// 数据源: examples/auto_feed_js default_site_info + reg_team_name
+// 一个站点多个官组后缀 = 多行
 var groupDomainSeed = map[string]string{
-	// springsunday.net
-	"CMCT":  "springsunday.net",
+	// springsunday.net (CMCT 系列)
+	"CMCT": "springsunday.net",
 	"CMCTV": "springsunday.net",
-	// m-team
+
+	// m-team (馒头)
 	"MTeam": "m-team",
-	// hdhome.org
+
+	// hdhome.org (家园)
 	"HDHome": "hdhome.org",
-	// ptchdbits.co
+
+	// ptchdbits.co (彩虹岛)
 	"CHDBits": "ptchdbits.co",
 	"CHD":     "ptchdbits.co",
 	"CHDPAD":  "ptchdbits.co",
 	"CHDTV":   "ptchdbits.co",
 	"CHDWEB":  "ptchdbits.co",
-	// hdsky.me
+
+	// hdsky.me (天空)
 	"HDSky":  "hdsky.me",
 	"HDSPAD": "hdsky.me",
 	"HDSWEB": "hdsky.me",
 	"HDSTV":  "hdsky.me",
 	"HDS":    "hdsky.me",
-	// pthome.net
+
+	// pthome.net (铂金家)
 	"PTHome": "pthome.net",
 	"PTH":    "pthome.net",
-	// totheglory.im
+
+	// totheglory.im (套套哥)
 	"TTG": "totheglory.im",
-	// ourbits.club
+
+	// ourbits.club (我堡)
 	"OurBits": "ourbits.club",
+
 	// hdroute.org
 	"HDRoute": "hdroute.org",
-	// hddolby.com
-	"HDDolby": "hddolby.com",
+
+	// hddolby.com (多个官组)
+	"HDDolby":   "hddolby.com",
+	"DBTV":      "hddolby.com",
+	"QHstudIo":  "hddolby.com",
+	"Dream":     "hddolby.com",
+
 	// hdarea.club
 	"HDArea": "hdarea.club",
+
 	// hdtime.org
 	"HDTime": "hdtime.org",
-	// hdvideo.top
+
+	// hdvideo.top (多个官组)
 	"HDVideo": "hdvideo.top",
+	"HDVWEB":  "hdvideo.top",
+	"HDVMV":   "hdvideo.top",
+
 	// joyhd.net
 	"JoyHD": "joyhd.net",
-	// btschool
+
+	// btschool.club
 	"BTSchool": "btschool.club",
-	// tjupt.org
+
+	// tjupt.org (北洋园)
 	"TJUPT": "tjupt.org",
-	// sjtu
+
+	// sjtu.edu.cn (葡萄)
 	"PuTao": "sjtu.edu.cn",
-	// hdchina
-	"HDChina": "hdchina",
-	"HDC":     "hdchina",
-	// agsvpt.com
-	"AGSV": "agsvpt.com",
-	// cyanbug.net
+	"putao": "sjtu.edu.cn",
+
+	// hdchina (高清瓦堡)
+	"HDChina":   "hdchina",
+	"HDC":       "hdchina",
+
+	// agsvpt.com (末日) — 9 个官组后缀
+	"AGSV":      "agsvpt.com",
+	"AGSVPT":    "agsvpt.com",
+	"AGSVE":     "agsvpt.com",
+	"AGSVWEB":   "agsvpt.com",
+	"AGSVREMUX": "agsvpt.com",
+	"AGSVRip":   "agsvpt.com",
+	"AGSVTV":    "agsvpt.com",
+	"AGSVDIY":   "agsvpt.com",
+	"AGSVMUS":   "agsvpt.com",
+
+	// cyanbug.net (青虫)
 	"CyanBug": "cyanbug.net",
-	// yemapt.org
+
+	// yemapt.org (野马)
 	"YemaPT": "yemapt.org",
-	// pterclub.net
+
+	// pterclub.net (大象)
 	"PTer": "pterclub.net",
-	// piggo.me
-	"PigGo": "piggo.me",
-	// open.cd
+
+	// piggo.me (猪猪) — 3 个官组
+	"PigGo":  "piggo.me",
+	"PigoHD": "piggo.me",
+	"PigoWeb": "piggo.me",
+	"PiGoNF": "piggo.me",
+
+	// open.cd (音乐站)
 	"OpenCD": "open.cd",
-	// hdchina official group
-	"DONATELLA": "hdchina",
-	// 52movie
-	"52MOVIE": "52movie.top",
-	// u2
-	"U2": "u2.dmhy.org",
-	// DarkLand
+
+	// nanyangpt.com (南洋)
+	"NYTV":   "nanyangpt.com",
+
+	// pt.eastgame.org (TLF)
+	"TLF":    "eastgame.org",
+
+	// darkland.top
 	"DarkLand": "darkland.top",
-	// SoulVoice
+
+	// soulvoice.club (灵魂之声)
 	"SoulVoice": "soulvoice.club",
-	// ICC
+
+	// icc2022.com
 	"ICC": "icc2022.com",
-	// TCCF / et8
+
+	// et8.org (高教)
 	"TCCF": "et8.org",
-	// HDU
+
+	// pt.upxin.net
 	"HDU": "upxin.net",
-	// HitPT
+
+	// hitpt.com
 	"HITPT": "hitpt.com",
-	// haidan
+
+	// haidan.video (海胆)
 	"HaiDan": "haidan.video",
-	// DiscFan
+
+	// discfan.net
 	"DiscFan": "discfan.net",
-	// FreeFarm
+
+	// pt.0ff.cc
 	"FreeFarm": "0ff.cc",
+
+	// ptlgs.org
+	"PTLGS": "ptlgs.org",
+
+	// hdfans.org
+	"HDFans": "hdfans.org",
+
+	// 52movie.top
+	"52MOVIE": "52movie.top",
+
+	// u2.dmhy.org
+	"U2": "u2.dmhy.org",
+
+	// carpt.net
+	"CarPT": "carpt.net",
+
+	// wintersakura.net (樱花) — 3 个官组
+	"SakuraWEB": "wintersakura.net",
+	"SakuraSUB": "wintersakura.net",
+	"WScode":    "wintersakura.net",
+
+	// star-space.net (影) — 6 个官组
+	"Ying":      "star-space.net",
+	"YingWEB":   "star-space.net",
+	"YingDIY":   "star-space.net",
+	"YingTV":    "star-space.net",
+	"YingMV":    "star-space.net",
+	"YingMUSIC": "star-space.net",
+
+	// hdkyl.in (麒麟) — 6 个官组
+	"HDKWEB":   "hdkyl.in",
+	"HDKTV":    "hdkyl.in",
+	"HDKMV":    "hdkyl.in",
+	"HDKGame":  "hdkyl.in",
+	"HDKDIY":   "hdkyl.in",
+	"HDKylin":  "hdkyl.in",
+
+	// hares web
+	"HaresWEB": "hares.club",
+	"HaresTV":  "hares.club",
+
+	// panda
+	"AilMWeb": "pandapt.net",
+	"PANDA":   "pandapt.net",
+
+	// ubits
+	"UBWEB": "ubits.club",
+
+	// ptcafe
+	"CafeWEB": "ptcafe.club",
+	"CafeTV":  "ptcafe.club",
+
+	// dj
+	"DJWEB": "dajiao",
+	"DJTV":  "dajiao",
+
+	// okpt
+	"OK":    "okpt.net",
+	"OKWEB": "okpt.net",
+
+	// filelist
+	"PlayHD":  "filelist.io",
+	"PlaySD":  "filelist.io",
+	"PlayWEB": "filelist.io",
+	"PlayTV":  "filelist.io",
+
+	// crabpt
+	"XHBWeb": "crabpt.vip",
+
+	// 红叶
+	"RLWEB":   "lemonhd.net",
+	"RLeaves": "lemonhd.net",
+	"RLTV":    "lemonhd.net",
+
+	// 青蛙
+	"FROG":    "qingwapt.com",
+	"FROGE":   "qingwapt.com",
+	"FROGWeb": "qingwapt.com",
+
+	// zmpt
+	"ZmWeb": "zmpt.cc",
+	"ZmPT":  "zmpt.cc",
+
+	// ptsbao
+	"FFans": "ptsbao.club",
+	"sBao":  "ptsbao.club",
+	"FHDMV": "ptsbao.club",
+
+	// 13city
+	"13City": "13city.org",
+
+	// FRDS
+	"FRDS": "frds",
+
+	// HHClub
+	"HHWEB": "hhclub",
+
+	// QingWa
+	"QingWa": "qingwapt.com",
 }
 
 func (d *SourceSiteDetector) SeedDefaultMappings(ctx context.Context) error {
-	var count int64
-	d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Count(&count)
-	if count > 0 {
-		return nil
-	}
-
 	for group, domain := range groupDomainSeed {
 		d.db.WithContext(ctx).Where("group_name = ?", group).
 			FirstOrCreate(&model.ReleaseGroupMapping{
@@ -272,7 +415,6 @@ func (d *SourceSiteDetector) SeedDefaultMappings(ctx context.Context) error {
 				IsOfficial: true,
 			})
 	}
-
 	d.RefreshCache(ctx)
 	return nil
 }
