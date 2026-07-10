@@ -150,9 +150,53 @@
                     <a-input v-model:value="form.title" size="large" />
                   </a-form-item>
                   <a-form-item label="副标题">
-                    <a-input v-model:value="form.subtitle" placeholder="可选，留空则不填" />
+                    <a-input v-model:value="form.subtitle" placeholder="中文标题或简介" />
+                  </a-form-item>
+                  <a-form-item label="标签">
+                    <a-select
+                      v-model:value="form.tags"
+                      mode="tags"
+                      style="width: 100%"
+                      placeholder="添加标签（禁转/中字/国语/原盘等）"
+                      :token-separators="[',']"
+                    />
                   </a-form-item>
                 </a-form>
+              </a-tab-pane>
+
+              <!-- Tab: 海报与声明 -->
+              <a-tab-pane key="poster" :tab="form.poster ? '海报与声明 ✓' : '海报与声明'">
+                <a-row :gutter="16">
+                  <a-col :span="14">
+                    <a-form layout="vertical">
+                      <a-form-item label="声明（官组声明/BBCode）">
+                        <a-textarea
+                          v-model:value="form.statement"
+                          :rows="8"
+                          placeholder="如 [quote][color=blue]官组作品[/color][/quote]"
+                        />
+                      </a-form-item>
+                      <a-form-item label="海报链接">
+                        <a-input v-model:value="form.poster" placeholder="海报图片 URL" />
+                      </a-form-item>
+                    </a-form>
+                  </a-col>
+                  <a-col :span="10">
+                    <div class="poster-preview-box">
+                      <a-image
+                        v-if="form.poster"
+                        :src="form.poster"
+                        :width="180"
+                        :height="270"
+                        class="poster-preview-img"
+                      />
+                      <div v-else class="poster-empty">
+                        <InboxOutlined style="font-size: 32px; color: #d9d9d9" />
+                        <p>暂无海报</p>
+                      </div>
+                    </div>
+                  </a-col>
+                </a-row>
               </a-tab-pane>
 
               <!-- Tab: 截图 -->
@@ -191,6 +235,36 @@
                 </div>
               </a-tab-pane>
 
+              <!-- Tab: 简介 -->
+              <a-tab-pane key="intro" :tab="form.description ? '简介 ✓' : '简介'">
+                <a-form layout="vertical">
+                  <a-form-item label="简介正文（BBCode）">
+                    <a-textarea
+                      v-model:value="form.description"
+                      :rows="16"
+                      placeholder="资源简介（PTGen 生成的 BBCode）"
+                    />
+                  </a-form-item>
+                  <a-row :gutter="16">
+                    <a-col :span="8">
+                      <a-form-item label="豆瓣链接">
+                        <a-input v-model:value="form.doubanLink" placeholder="https://movie.douban.com/..." />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :span="8">
+                      <a-form-item label="IMDb 链接">
+                        <a-input v-model:value="form.imdbLink" placeholder="https://www.imdb.com/title/..." />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :span="8">
+                      <a-form-item label="TMDb 链接">
+                        <a-input v-model:value="form.tmdbLink" placeholder="https://www.themoviedb.org/..." />
+                      </a-form-item>
+                    </a-col>
+                  </a-row>
+                </a-form>
+              </a-tab-pane>
+
               <!-- Tab: MediaInfo -->
               <a-tab-pane key="mediainfo" :tab="form.mediaInfo ? 'MediaInfo ✓' : 'MediaInfo'">
                 <a-textarea
@@ -198,15 +272,6 @@
                   :rows="18"
                   class="mono-font"
                   placeholder="MediaInfo"
-                />
-              </a-tab-pane>
-
-              <!-- Tab: 简介 -->
-              <a-tab-pane key="intro" :tab="form.description ? '简介 ✓' : '简介'">
-                <a-textarea
-                  v-model:value="form.description"
-                  :rows="18"
-                  placeholder="资源简介"
                 />
               </a-tab-pane>
             </a-tabs>
@@ -489,6 +554,10 @@ interface AnalyzeResult {
   forbidden?: boolean
   forbid_reason?: string
   blocked_targets?: string[]
+  poster_url?: string
+  douban_link?: string
+  imdb_link?: string
+  tmdb_link?: string
 }
 
 const analyzing = ref(false)
@@ -503,6 +572,12 @@ const form = ref({
   mediaInfo: '',
   description: '',
   screenshots: [] as string[],
+  statement: '',
+  poster: '',
+  doubanLink: '',
+  imdbLink: '',
+  tmdbLink: '',
+  tags: [] as string[],
 })
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null
@@ -576,6 +651,10 @@ async function enterAnalyze() {
           form.value.mediaInfo = r.media_info || ''
           form.value.description = r.description || ''
           form.value.screenshots = r.screenshots || []
+          form.value.poster = r.poster_url || ''
+          form.value.doubanLink = r.douban_link || ''
+          form.value.imdbLink = r.imdb_link || ''
+          form.value.tmdbLink = r.tmdb_link || ''
           analyzing.value = false
         } else if (task?.status === 'failed') {
           analyzeError.value = task.error || '分析失败'
@@ -720,9 +799,16 @@ async function doSubmit() {
       source_site: analyzeResult.value?.source_site,
       source_site_id: analyzeResult.value?.source_site_id,
       title: form.value.title,
+      subtitle: form.value.subtitle,
       description: form.value.description,
       media_info: form.value.mediaInfo,
       screenshots: form.value.screenshots,
+      poster: form.value.poster,
+      statement: form.value.statement,
+      douban_link: form.value.doubanLink,
+      imdb_link: form.value.imdbLink,
+      tmdb_link: form.value.tmdbLink,
+      tags: form.value.tags,
       target_sites: selectedTargets.value,
     })
     submittedCandidateId.value =
@@ -806,7 +892,7 @@ function resetWizard() {
   submitError.value = ''
   submittedCandidateId.value = 0
   candidateStatus.value = null
-  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [] }
+  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [] }
   reviewTab.value = 'main'
 }
 
@@ -973,6 +1059,27 @@ onUnmounted(() => {
   text-align: center;
   padding: 40px 0;
   color: #999;
+}
+.poster-preview-box {
+  text-align: center;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 6px;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.poster-preview-img {
+  border-radius: 6px;
+  border: 1px solid #e8e8e8;
+  object-fit: cover;
+}
+.poster-empty {
+  color: #999;
+}
+.poster-empty p {
+  margin-top: 8px;
 }
 .mono-font {
   font-family: 'Courier New', 'Consolas', monospace;

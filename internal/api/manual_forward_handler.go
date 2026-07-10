@@ -280,17 +280,10 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 		analyzeCtx, analyzeCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer analyzeCancel()
 		if analyzeResult, analyzeErr := h.pipeline.AnalyzeTorrent(analyzeCtx, name, savePath); analyzeErr == nil && analyzeResult != nil {
-			if v, ok := analyzeResult["description"]; ok {
-				result["description"] = v
-			}
-			if v, ok := analyzeResult["media_info"]; ok {
-				result["media_info"] = v
-			}
-			if v, ok := analyzeResult["screenshots"]; ok {
-				result["screenshots"] = v
-			}
-			if v, ok := analyzeResult["poster_url"]; ok {
-				result["poster_url"] = v
+			for _, k := range []string{"description", "media_info", "screenshots", "poster_url", "douban_link", "imdb_link", "tmdb_link", "subtitle"} {
+				if v, ok := analyzeResult[k]; ok {
+					result[k] = v
+				}
 			}
 		}
 	} else {
@@ -379,6 +372,13 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 		Screenshots []string `json:"screenshots"`
 		TargetSites []string `json:"target_sites"`
 		PosterURL   string   `json:"poster_url"`
+		Subtitle    string   `json:"subtitle"`
+		Statement   string   `json:"statement"`
+		Poster      string   `json:"poster"`
+		DoubanLink  string   `json:"douban_link"`
+		ImdbLink    string   `json:"imdb_link"`
+		TmdbLink    string   `json:"tmdb_link"`
+		Tags        []string `json:"tags"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -398,6 +398,25 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 	}
 
 	targetsJSON, _ := json.Marshal(req.TargetSites)
+
+	// 额外字段存入 user_overrides JSON
+	if req.PosterURL == "" {
+		req.PosterURL = req.Poster
+	}
+	overrides := map[string]interface{}{
+		"subtitle":    req.Subtitle,
+		"statement":   req.Statement,
+		"poster":      req.PosterURL,
+		"douban_link": req.DoubanLink,
+		"imdb_link":   req.ImdbLink,
+		"tmdb_link":   req.TmdbLink,
+		"tags":        req.Tags,
+		"media_info":  req.MediaInfo,
+		"screenshots": req.Screenshots,
+		"description": req.Description,
+	}
+	overridesJSON, _ := json.Marshal(overrides)
+
 	candidate := &model.PublishCandidate{
 		SourceSite:        req.SourceSite,
 		InfoHash:          req.InfoHash,
@@ -407,6 +426,7 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 		PublishStatus:     model.CandidatePending,
 		DownloadCompleted: true,
 		Role:              "manual",
+		UserOverrides:     string(overridesJSON),
 	}
 
 	if err := h.db.Create(candidate).Error; err != nil {
