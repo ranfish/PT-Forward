@@ -219,9 +219,13 @@ func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (m
 		"poster_url":  "",
 		"media_info":  "",
 		"screenshots": []string{},
+		"douban_link": "",
+		"imdb_link":   "",
+		"tmdb_link":   "",
+		"subtitle":    "",
 	}
 
-	// PTGen 查询（标题→简介/海报）
+	// PTGen 查询（标题→简介/海报/链接）
 	if p.ptgen != nil {
 		if ptgenResult, err := p.ptgen.Query(ctx, name); err == nil && ptgenResult != nil {
 			if ptgenResult.RawBBCode != "" {
@@ -229,6 +233,18 @@ func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (m
 			}
 			if ptgenResult.PosterURL != "" {
 				result["poster_url"] = ptgenResult.PosterURL
+			}
+			if ptgenResult.DoubanURL != "" {
+				result["douban_link"] = ptgenResult.DoubanURL
+			}
+			if ptgenResult.IMDBURL != "" {
+				result["imdb_link"] = ptgenResult.IMDBURL
+			}
+			if ptgenResult.TMDbURL != "" {
+				result["tmdb_link"] = ptgenResult.TMDbURL
+			}
+			if ptgenResult.ChineseTitle != "" {
+				result["subtitle"] = ptgenResult.ChineseTitle
 			}
 		}
 	}

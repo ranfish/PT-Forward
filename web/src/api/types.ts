@@ -684,9 +684,16 @@ export interface ManualForwardSubmitRequest {
   source_site_id?: number
   source_torrent_id?: string
   title?: string
+  subtitle?: string
   description?: string
   media_info?: string
   screenshots?: string | string[]
+  poster?: string
+  statement?: string
+  douban_link?: string
+  imdb_link?: string
+  tmdb_link?: string
+  tags?: string[]
   target_sites?: string[]
 }
 
