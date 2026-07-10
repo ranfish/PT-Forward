@@ -298,6 +298,8 @@ async function queryCoverage(record: PublishTorrentItem) {
     const resp = await publishTorrentsApi.queryCoverage({
       client_id: selectedClientId.value,
       info_hash: record.info_hash,
+      name: record.name,
+      size: record.size,
     })
     const result = resp.data?.data
     if (result) {
