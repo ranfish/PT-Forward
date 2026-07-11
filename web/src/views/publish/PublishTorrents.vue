@@ -35,6 +35,9 @@
       <a-button size="small" style="margin-left: auto" @click="groupMappingOpen = true">
         制作组映射
       </a-button>
+      <a-button size="small" @click="openDeclFilters">
+        过滤规则
+      </a-button>
       <a-button
         v-if="selectedHashes.length > 0"
         type="primary"
@@ -207,6 +210,52 @@
           </a-select>
         </a-form-item>
       </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="declFilterOpen"
+      title="声明过滤规则"
+      width="600px"
+      :footer="null"
+      destroy-on-close
+    >
+      <a-alert
+        type="info"
+        show-icon
+        message="过滤规则用于自动从简介中移除 ARDTU/CSAUTO 等工具声明"
+        style="margin-bottom: 16px"
+      />
+      <div v-if="declFilterIsDefault" style="margin-bottom: 12px">
+        <a-tag color="orange">当前使用默认规则</a-tag>
+      </div>
+      <a-list
+        :data-source="declFilterPatterns"
+        size="small"
+        bordered
+      >
+        <template #renderItem="{ item, index }">
+          <a-list-item>
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
+              <span style="font-family: monospace; font-size: 13px">{{ item }}</span>
+              <a-button type="link" danger size="small" @click="declFilterPatterns.splice(index, 1)">
+                删除
+              </a-button>
+            </div>
+          </a-list-item>
+        </template>
+      </a-list>
+      <div style="margin-top: 12px; display: flex; gap: 8px">
+        <a-input
+          v-model:value="newDeclPattern"
+          placeholder="输入过滤关键词（如 ARDTU工具自动发布）"
+          @press-enter="addDeclPattern"
+        />
+        <a-button type="primary" size="small" @click="addDeclPattern">添加</a-button>
+      </div>
+      <div style="margin-top: 16px; text-align: right">
+        <a-button @click="declFilterOpen = false" style="margin-right: 8px">取消</a-button>
+        <a-button type="primary" :loading="declFilterSaving" @click="saveDeclFilters">保存</a-button>
+      </div>
     </a-modal>
 
     <a-modal
@@ -709,6 +758,45 @@ async function deleteMapping(id: number) {
     fetchMappings()
   } catch (e: unknown) {
     message.error((e as Error).message)
+  }
+}
+
+// --- 声明过滤规则管理 ---
+const declFilterOpen = ref(false)
+const declFilterPatterns = ref<string[]>([])
+const declFilterIsDefault = ref(false)
+const declFilterSaving = ref(false)
+const newDeclPattern = ref('')
+
+async function openDeclFilters() {
+  try {
+    const resp = await publishTorrentsApi.getDeclarationFilters()
+    const data = resp.data?.data
+    declFilterPatterns.value = data?.patterns || []
+    declFilterIsDefault.value = data?.is_default ?? true
+  } catch { /* ignore */ }
+  newDeclPattern.value = ''
+  declFilterOpen.value = true
+}
+
+function addDeclPattern() {
+  const pattern = newDeclPattern.value.trim()
+  if (pattern && !declFilterPatterns.value.includes(pattern)) {
+    declFilterPatterns.value.push(pattern)
+    newDeclPattern.value = ''
+  }
+}
+
+async function saveDeclFilters() {
+  declFilterSaving.value = true
+  try {
+    await publishTorrentsApi.setDeclarationFilters(declFilterPatterns.value)
+    message.success('过滤规则已保存')
+    declFilterOpen.value = false
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    declFilterSaving.value = false
   }
 }
 </script>

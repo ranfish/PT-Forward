@@ -53,6 +53,10 @@ func (f *DeclarationFilter) GetPatterns(ctx context.Context) []string {
 	return patterns
 }
 
+func (f *DeclarationFilter) GetRawPatterns(ctx context.Context) (string, error) {
+	return f.repo.Get(ctx, "declaration_filter_patterns")
+}
+
 func (f *DeclarationFilter) SetPatterns(ctx context.Context, patterns []string) error {
 	data, _ := json.Marshal(patterns)
 	return f.repo.Set(ctx, "declaration_filter_patterns", string(data))

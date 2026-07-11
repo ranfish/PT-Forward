@@ -145,6 +145,7 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.manualForwardHandler.SetBDInfoScanner(bdinfoScanner)
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)
+	rt.publishTorrentsHandler.SetDeclarationFilter(declFilter)
 }
 
 func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr *client.Manager, sourceDetector *publish.SourceSiteDetector) {
