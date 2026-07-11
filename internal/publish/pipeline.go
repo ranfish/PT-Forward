@@ -2,6 +2,7 @@ package publish
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -546,6 +547,64 @@ func populateFormFields(fields map[string]string, detail *model.TorrentDetail) {
 	}
 }
 
+// applyUserOverrides 将手动转发时用户编辑的字段覆盖到 PublishRequest
+// UserOverrides 是 JSON 字符串，包含 subtitle/statement/poster/douban_link/imdb_link/tmdb_link/tags/media_info/screenshots/description
+func applyUserOverrides(pubReq *model.PublishRequest, overridesJSON string) {
+	if overridesJSON == "" {
+		return
+	}
+	var overrides map[string]interface{}
+	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
+		return
+	}
+
+	// 仅在用户提供了非空值时覆盖（不覆盖空值）
+	if v, ok := overrides["subtitle"].(string); ok && v != "" {
+		pubReq.Subtitle = v
+	}
+	if v, ok := overrides["description"].(string); ok && v != "" {
+		pubReq.Description = v
+	}
+	if v, ok := overrides["media_info"].(string); ok && v != "" {
+		pubReq.MediaInfo = v
+	}
+	if v, ok := overrides["douban_link"].(string); ok && v != "" {
+		pubReq.DoubanLink = v
+	}
+	if v, ok := overrides["imdb_link"].(string); ok && v != "" {
+		pubReq.IMDbLink = v
+	}
+	if v, ok := overrides["tmdb_link"].(string); ok && v != "" {
+		if pubReq.ExtraFields == nil {
+			pubReq.ExtraFields = make(map[string]string)
+		}
+		pubReq.ExtraFields["tmdb_id"] = extractTMDBID(v)
+	}
+	// screenshots 是 []interface{}
+	if screenshots, ok := overrides["screenshots"].([]interface{}); ok && len(screenshots) > 0 {
+		var urls []string
+		for _, s := range screenshots {
+			if str, ok := s.(string); ok && str != "" {
+				urls = append(urls, str)
+			}
+		}
+		if len(urls) > 0 {
+			pubReq.Screenshots = urls
+		}
+	}
+	// tags 是 []interface{}
+	if tags, ok := overrides["tags"].([]interface{}); ok && len(tags) > 0 {
+		if pubReq.TagFields == nil {
+			pubReq.TagFields = make(map[string]string)
+		}
+		for _, tag := range tags {
+			if str, ok := tag.(string); ok && str != "" {
+				pubReq.TagFields[str] = "1"
+			}
+		}
+	}
+}
+
 func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (*model.PublishRequest, error) {
 	title := candidate.TorrentName
 	desc := p.renderDescription(ctx, candidate.SourceSite, targetSite, title, sourceDetail)
@@ -573,6 +632,9 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 		pubReq.MediaInfo = sourceDetail.MediaInfo
 		pubReq.Screenshots = sourceDetail.Screenshots
 	}
+
+	// 手动转发的用户编辑覆盖（优先于源站/PTGen 数据）
+	applyUserOverrides(pubReq, candidate.UserOverrides)
 
 	if pubReq.DoubanLink != "" && pubReq.FormFields["douban"] == "" {
 		pubReq.FormFields["douban"] = pubReq.DoubanLink
