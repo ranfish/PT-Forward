@@ -22,11 +22,16 @@ import (
 )
 
 type SiteHandler struct {
-	repo      *site.Repository
-	db        *gorm.DB
-	logger    *zap.Logger
-	provider  SiteProvider
-	statsSync *site.StatsSyncService
+	repo           *site.Repository
+	db             *gorm.DB
+	logger         *zap.Logger
+	provider       SiteProvider
+	statsSync      *site.StatsSyncService
+	sourceDetector SourceDetectorHook
+}
+
+type SourceDetectorHook interface {
+	SyncSiteGroups(ctx context.Context, site *model.Site)
 }
 
 type SiteProvider interface {
@@ -36,6 +41,10 @@ type SiteProvider interface {
 
 func (h *SiteHandler) SetProvider(p SiteProvider) {
 	h.provider = p
+}
+
+func (h *SiteHandler) SetSourceDetector(s SourceDetectorHook) {
+	h.sourceDetector = s
 }
 
 func (h *SiteHandler) SetStatsSync(s *site.StatsSyncService) {
@@ -923,6 +932,11 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("site created", zap.String("name", s.Name), zap.String("domain", s.Domain))
 	auditLog(r, "site", "create", "site", fmt.Sprintf("%d", s.ID), s.Name, "success")
+
+	if h.sourceDetector != nil {
+		h.sourceDetector.SyncSiteGroups(r.Context(), &s)
+	}
+
 	Success(w, h.toResponse(&s))
 }
 
@@ -1128,6 +1142,11 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("site updated", zap.String("name", s.Name))
 	auditLog(r, "site", "update", "site", fmt.Sprintf("%d", id), s.Name, "success")
+
+	if h.sourceDetector != nil {
+		h.sourceDetector.SyncSiteGroups(r.Context(), s)
+	}
+
 	Success(w, h.toResponse(s))
 }
 

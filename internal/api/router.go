@@ -150,6 +150,7 @@ func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr 
 	rt.publishTorrentsHandler.SetCoverageService(coverageSvc)
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSourceDetector(sourceDetector)
+	rt.siteHandler.SetSourceDetector(sourceDetector)
 }
 
 func (rt *Router) StartCoverageRefresh(scheduler *scheduler.Registry) error {
