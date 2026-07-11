@@ -918,12 +918,33 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 		return
 	}
 
+	var mapping model.ReleaseGroupMapping
+	h.db.WithContext(r.Context()).First(&mapping, id)
+
 	if err := h.db.Delete(&model.ReleaseGroupMapping{}, id).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("删除失败: %v", err))
 		return
 	}
+
 	if h.sourceDetector != nil {
 		h.sourceDetector.RefreshCache(r.Context())
 	}
+
+	// 删除后如果该站已无任何映射，自动关闭 is_source
+	if mapping.SiteName != "" {
+		var remaining int64
+		h.db.WithContext(r.Context()).Model(&model.ReleaseGroupMapping{}).
+			Where("site_name = ?", mapping.SiteName).Count(&remaining)
+		if remaining == 0 {
+			result := h.db.Model(&model.Site{}).
+				Where("name = ? AND is_source = ?", mapping.SiteName, true).
+				Update("is_source", false)
+			if result.RowsAffected > 0 {
+				h.logger.Info("site is_source auto-disabled: no group mappings left",
+					zap.String("site", mapping.SiteName))
+			}
+		}
+	}
+
 	Success(w, map[string]interface{}{"message": "已删除"})
 }

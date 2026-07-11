@@ -32,6 +32,7 @@ type SiteHandler struct {
 
 type SourceDetectorHook interface {
 	SyncSiteGroups(ctx context.Context, site *model.Site)
+	HasGroupMappings(ctx context.Context, site *model.Site) bool
 }
 
 type SiteProvider interface {
@@ -928,14 +929,22 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 添加站点后自动带出官组映射
+	if h.sourceDetector != nil {
+		h.sourceDetector.SyncSiteGroups(r.Context(), &s)
+	}
+
+	// 有官组映射才允许 is_source=true
+	if s.IsSource && h.sourceDetector != nil && !h.sourceDetector.HasGroupMappings(r.Context(), &s) {
+		h.db.Model(&model.Site{}).Where("id = ?", s.ID).Update("is_source", false)
+		s.IsSource = false
+		h.logger.Info("site is_source disabled: no group mappings", zap.String("name", s.Name))
+	}
+
 	applySiteMaxConcurrent(s.Domain, s.MaxConcurrent)
 
 	h.logger.Info("site created", zap.String("name", s.Name), zap.String("domain", s.Domain))
 	auditLog(r, "site", "create", "site", fmt.Sprintf("%d", s.ID), s.Name, "success")
-
-	if h.sourceDetector != nil {
-		h.sourceDetector.SyncSiteGroups(r.Context(), &s)
-	}
 
 	Success(w, h.toResponse(&s))
 }
@@ -1131,6 +1140,11 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.IYUULimitInterval != nil {
 		s.IYUULimitInterval = *req.IYUULimitInterval
+	}
+
+	// 有官组映射才允许 is_source=true
+	if s.IsSource && h.sourceDetector != nil && !h.sourceDetector.HasGroupMappings(r.Context(), s) {
+		s.IsSource = false
 	}
 
 	if err := h.repo.Update(r.Context(), s); err != nil {
