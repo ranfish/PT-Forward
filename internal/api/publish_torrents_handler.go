@@ -13,6 +13,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -80,6 +81,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleGetDeclarationFilters(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/declaration-filters") && r.Method == http.MethodPut:
 		h.handleSetDeclarationFilters(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/preview-title") && r.Method == http.MethodPost:
+		h.handlePreviewTitle(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/group-mappings") && r.Method == http.MethodPost:
 		h.handleCreateGroupMapping(w, r)
 	case strings.Contains(path, "/publish/torrents/group-mappings/") && r.Method == http.MethodPut:
@@ -897,6 +900,63 @@ func (h *PublishTorrentsHandler) handleSetDeclarationFilters(w http.ResponseWrit
 	Success(w, map[string]interface{}{
 		"patterns": req.Patterns,
 		"message":  "已保存",
+	})
+}
+
+type previewTitleRequest struct {
+	TargetSite      string            `json:"target_site"`
+	TitleComponents map[string]string `json:"title_components"`
+}
+
+func (h *PublishTorrentsHandler) handlePreviewTitle(w http.ResponseWriter, r *http.Request) {
+	var req previewTitleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.TargetSite == "" {
+		Error(w, http.StatusBadRequest, 40001, "target_site 必填")
+		return
+	}
+
+	// 查目标站的 title_format
+	var site model.Site
+	if err := h.db.WithContext(r.Context()).Where("name = ?", req.TargetSite).First(&site).Error; err != nil {
+		Error(w, http.StatusNotFound, 40400, "站点不存在")
+		return
+	}
+
+	// 构建 TitleComponents
+	c := titleparser.TitleComponents{
+		MainTitle:      req.TitleComponents["main_title"],
+		SeasonEpisode:  req.TitleComponents["season_episode"],
+		Year:           req.TitleComponents["year"],
+		Resolution:     req.TitleComponents["resolution"],
+		Medium:         req.TitleComponents["medium"],
+		VideoCodec:     req.TitleComponents["video_codec"],
+		AudioCodec:     req.TitleComponents["audio_codec"],
+		HDRFormat:      req.TitleComponents["hdr_format"],
+		SourcePlatform: req.TitleComponents["source_platform"],
+		BitDepth:       req.TitleComponents["bit_depth"],
+		ReleaseVersion: req.TitleComponents["release_version"],
+		ReleaseGroup:   req.TitleComponents["release_group"],
+		ChinesePrefix:  req.TitleComponents["chinese_prefix"],
+	}
+
+	// 解析 title_format
+	var tf titleparser.TitleFormat
+	if site.TitleFormat != "" {
+		if err := json.Unmarshal([]byte(site.TitleFormat), &tf); err != nil {
+			tf = titleparser.DefaultTitleFormat()
+		}
+	} else {
+		tf = titleparser.DefaultTitleFormat()
+	}
+
+	result := titleparser.Reassemble(c, tf)
+	Success(w, map[string]interface{}{
+		"title":       result,
+		"target_site": req.TargetSite,
 	})
 }
 

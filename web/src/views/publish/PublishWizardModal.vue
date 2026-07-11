@@ -452,6 +452,17 @@
               </a-tooltip>
             </div>
           </a-spin>
+
+          <!-- 标题预览 -->
+          <div v-if="selectedTargets.length > 0 && titleComponents" class="title-preview-section">
+            <a-divider style="margin: 12px 0">标题预览</a-divider>
+            <div v-for="site in selectedTargets" :key="site" class="title-preview-item">
+              <span class="title-preview-site">{{ site }}</span>
+                <span class="title-preview-text" :title="titlePreviews[site] || '加载中...'">
+                  {{ titlePreviews[site] || '加载中...' }}
+                </span>
+              </div>
+            </div>
         </div>
 
         <!-- ─── Step 3: 发布结果 ─── -->
@@ -580,7 +591,7 @@ import {
   WarningFilled, DeleteOutlined, StopOutlined, InboxOutlined,
   LoadingOutlined, CloseCircleFilled,
 } from '@ant-design/icons-vue'
-import { manualForwardApi, publishApi } from '@/api/publish'
+import { manualForwardApi, publishApi, publishTorrentsApi } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
 import { useEnumLabels } from '@/utils/enumLabels'
 import { formatBytes } from '@/utils/format'
@@ -708,6 +719,7 @@ const form = ref({
 
 const titleComponents = ref<Record<string, string> | null>(null)
 const standardizedParams = ref<Record<string, string> | null>(null)
+const titlePreviews = ref<Record<string, string>>({})
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -869,9 +881,26 @@ function toggleSite(site: SiteItem) {
   const idx = selectedTargets.value.indexOf(site.name)
   if (idx >= 0) {
     selectedTargets.value.splice(idx, 1)
+    delete titlePreviews.value[site.name]
   } else {
     selectedTargets.value.push(site.name)
+    if (titleComponents.value) {
+      loadTitlePreview(site.name)
+    }
   }
+}
+
+async function loadTitlePreview(siteName: string) {
+  if (!titleComponents.value) return
+  try {
+    const resp = await publishTorrentsApi.previewTitle({
+      target_site: siteName,
+      title_components: titleComponents.value,
+    })
+    if (resp.data?.data?.title) {
+      titlePreviews.value[siteName] = resp.data.data.title
+    }
+  } catch { /* silent */ }
 }
 
 function selectAllAvailable() {
@@ -1253,6 +1282,32 @@ onUnmounted(() => {
   max-height: 200px;
   overflow-y: auto;
   background: #fafafa;
+}
+.title-preview-section {
+  margin-top: 8px;
+}
+.title-preview-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+.title-preview-site {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1677ff;
+  white-space: nowrap;
+  min-width: 60px;
+}
+.title-preview-text {
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 .mono-font {
   font-family: 'Courier New', 'Consolas', monospace;
