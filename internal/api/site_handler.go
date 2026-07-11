@@ -31,7 +31,6 @@ type SiteHandler struct {
 }
 
 type SourceDetectorHook interface {
-	SyncSiteGroups(ctx context.Context, site *model.Site)
 	HasGroupMappings(ctx context.Context, site *model.Site) bool
 }
 
@@ -929,11 +928,6 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 添加站点后自动带出官组映射
-	if h.sourceDetector != nil {
-		h.sourceDetector.SyncSiteGroups(r.Context(), &s)
-	}
-
 	// 有官组映射才允许 is_source=true
 	if s.IsSource && h.sourceDetector != nil && !h.sourceDetector.HasGroupMappings(r.Context(), &s) {
 		h.db.Model(&model.Site{}).Where("id = ?", s.ID).Update("is_source", false)
@@ -1156,10 +1150,6 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("site updated", zap.String("name", s.Name))
 	auditLog(r, "site", "update", "site", fmt.Sprintf("%d", id), s.Name, "success")
-
-	if h.sourceDetector != nil {
-		h.sourceDetector.SyncSiteGroups(r.Context(), s)
-	}
 
 	Success(w, h.toResponse(s))
 }

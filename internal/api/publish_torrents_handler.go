@@ -933,6 +933,11 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 	var mapping model.ReleaseGroupMapping
 	h.db.WithContext(r.Context()).First(&mapping, id)
 
+	if mapping.IsBuiltin {
+		Error(w, http.StatusForbidden, 40300, "内置官组不可删除")
+		return
+	}
+
 	if err := h.db.Delete(&model.ReleaseGroupMapping{}, id).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("删除失败: %v", err))
 		return
