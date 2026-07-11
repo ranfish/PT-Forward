@@ -70,6 +70,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleDetectSource(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/group-mappings") && r.Method == http.MethodGet:
 		h.handleListGroupMappings(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/group-mappings/sites") && r.Method == http.MethodGet:
+		h.handleListGroupedSiteNames(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/group-mappings") && r.Method == http.MethodPost:
 		h.handleCreateGroupMapping(w, r)
 	case strings.Contains(path, "/publish/torrents/group-mappings/") && r.Method == http.MethodPut:
@@ -841,6 +843,16 @@ func (h *PublishTorrentsHandler) handleListGroupMappings(w http.ResponseWriter, 
 	}
 
 	Success(w, map[string]interface{}{"items": result, "total": len(result)})
+}
+
+func (h *PublishTorrentsHandler) handleListGroupedSiteNames(w http.ResponseWriter, r *http.Request) {
+	var siteNames []string
+	h.db.WithContext(r.Context()).
+		Model(&model.ReleaseGroupMapping{}).
+		Where("site_name != ''").
+		Distinct("site_name").
+		Pluck("site_name", &siteNames)
+	Success(w, map[string]interface{}{"sites": siteNames})
 }
 
 func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter, r *http.Request) {

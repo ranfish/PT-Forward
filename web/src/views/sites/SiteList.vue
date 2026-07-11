@@ -76,7 +76,14 @@
           <a-switch :checked="record.participateAutoPublish" size="small" @change="(v: boolean) => toggleField(record, 'participateAutoPublish', v)" />
         </template>
         <template v-if="column.key === 'isSource'">
-          <a-switch :checked="record.isSource" size="small" @change="(v: boolean) => toggleField(record, 'isSource', v)" />
+          <a-tooltip :title="groupedSites.has(record.name) ? '' : '无官组映射，不能作为源站'">
+            <a-switch
+              :checked="record.isSource"
+              size="small"
+              :disabled="!groupedSites.has(record.name)"
+              @change="(v: boolean) => toggleField(record, 'isSource', v)"
+            />
+          </a-tooltip>
         </template>
         <template v-if="column.key === 'isTarget'">
           <a-switch :checked="record.isTarget" size="small" @change="(v: boolean) => toggleField(record, 'isTarget', v)" />
@@ -218,7 +225,12 @@
           <a-switch v-model:checked="form.enabled" />
         </a-form-item>
         <a-form-item :label="t('site.asSource')" name="isSource">
-          <a-switch v-model:checked="form.isSource" />
+          <a-tooltip :title="!editingSite || groupedSites.has(editingSite.name) ? '' : '该站点无官组映射，不能作为源站'">
+            <a-switch
+              v-model:checked="form.isSource"
+              :disabled="isCreateMode ? false : (editingSite ? !groupedSites.has(editingSite.name) : false)"
+            />
+          </a-tooltip>
         </a-form-item>
         <a-form-item :label="t('site.asTarget')" name="isTarget">
           <a-switch v-model:checked="form.isTarget" />
@@ -261,6 +273,7 @@ import type { UploadProps } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
 import { ensureSupportedSitesCache, type SupportedSite } from '@/api/supported-sites'
+import { publishTorrentsApi } from '@/api/publish'
 import { formatBytes, formatTime } from '@/utils/format'
 
 const { t } = useI18n()
@@ -448,6 +461,22 @@ function onSelectionChange(keys: number[]) {
 
 async function batchUpdate(field: string, value: boolean) {
   if (selectedRowKeys.value.length === 0) return
+  // 批量设为源站时，排除无官组的站
+  if (field === 'is_source' && value === true) {
+    const blocked = selectedRowKeys.value.filter(id => {
+      const site = allSites.value.find(s => s.id === id)
+      return site && !groupedSites.value.has(site.name)
+    })
+    if (blocked.length > 0) {
+      const ok = selectedRowKeys.value.filter(id => !blocked.includes(id))
+      if (ok.length === 0) {
+        message.warning('选中的站点均无官组映射，不能作为源站')
+        return
+      }
+      message.warning(`已跳过 ${blocked.length} 个无官组映射的站点`)
+      selectedRowKeys.value = ok
+    }
+  }
   try {
     const resp = await sitesApi.batchUpdate(selectedRowKeys.value, { [field]: value })
     const updated = resp.data?.data?.updated ?? 0
@@ -687,5 +716,17 @@ async function doImport(file: File) {
   }
 }
 
-onMounted(() => fetchAll())
+const groupedSites = ref<Set<string>>(new Set())
+
+async function fetchGroupedSites() {
+  try {
+    const resp = await publishTorrentsApi.listGroupedSiteNames()
+    groupedSites.value = new Set(resp.data?.data?.sites || [])
+  } catch { /* ignore */ }
+}
+
+onMounted(() => {
+  fetchAll()
+  fetchGroupedSites()
+})
 </script>
