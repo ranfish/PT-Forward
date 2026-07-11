@@ -32,6 +32,7 @@ type PublishTorrentsHandler struct {
 	clientMgr      MFClientProvider
 	siteProvider   SiteProviderGetter
 	sourceDetector *publish.SourceSiteDetector
+	declFilter     *publish.DeclarationFilter
 	logger         *zap.Logger
 	bgState        backgroundQueryState
 }
@@ -55,6 +56,7 @@ func (h *PublishTorrentsHandler) SetCoverageService(s *coverage.Service) { h.cov
 func (h *PublishTorrentsHandler) SetClientProvider(c MFClientProvider)  { h.clientMgr = c }
 func (h *PublishTorrentsHandler) SetSiteProvider(s SiteProviderGetter)  { h.siteProvider = s }
 func (h *PublishTorrentsHandler) SetSourceDetector(d *publish.SourceSiteDetector) { h.sourceDetector = d }
+func (h *PublishTorrentsHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
 
 func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -74,6 +76,10 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleListGroupMappings(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/group-mappings/sites") && r.Method == http.MethodGet:
 		h.handleListGroupedSiteNames(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/declaration-filters") && r.Method == http.MethodGet:
+		h.handleGetDeclarationFilters(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/declaration-filters") && r.Method == http.MethodPut:
+		h.handleSetDeclarationFilters(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/group-mappings") && r.Method == http.MethodPost:
 		h.handleCreateGroupMapping(w, r)
 	case strings.Contains(path, "/publish/torrents/group-mappings/") && r.Method == http.MethodPut:
@@ -855,6 +861,43 @@ func (h *PublishTorrentsHandler) handleListGroupedSiteNames(w http.ResponseWrite
 		Distinct("site_name").
 		Pluck("site_name", &siteNames)
 	Success(w, map[string]interface{}{"sites": siteNames})
+}
+
+func (h *PublishTorrentsHandler) handleGetDeclarationFilters(w http.ResponseWriter, r *http.Request) {
+	if h.declFilter == nil {
+		Success(w, map[string]interface{}{"patterns": []string{}, "is_default": true})
+		return
+	}
+	patterns := h.declFilter.GetPatterns(r.Context())
+	// 检查是否是默认值（DB 中没有存储）
+	val, err := h.declFilter.GetRawPatterns(r.Context())
+	isDefault := err != nil || val == ""
+	Success(w, map[string]interface{}{
+		"patterns":   patterns,
+		"is_default": isDefault,
+	})
+}
+
+func (h *PublishTorrentsHandler) handleSetDeclarationFilters(w http.ResponseWriter, r *http.Request) {
+	if h.declFilter == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "声明过滤器未初始化")
+		return
+	}
+	var req struct {
+		Patterns []string `json:"patterns"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if err := h.declFilter.SetPatterns(r.Context(), req.Patterns); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("保存失败: %v", err))
+		return
+	}
+	Success(w, map[string]interface{}{
+		"patterns": req.Patterns,
+		"message":  "已保存",
+	})
 }
 
 func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter, r *http.Request) {

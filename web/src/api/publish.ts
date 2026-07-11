@@ -83,6 +83,12 @@ export const publishTorrentsApi = {
   batchPublish(data: { client_id: number; source_site: string; target_site: string; items: { info_hash: string; name: string; size: number; save_path: string }[] }) {
     return client.post<ApiResponse<{ created: number; failed: number; candidate_ids: number[]; target_site: string }>>('/publish/torrents/batch-publish', data)
   },
+  getDeclarationFilters() {
+    return client.get<ApiResponse<{ patterns: string[]; is_default: boolean }>>('/publish/torrents/declaration-filters')
+  },
+  setDeclarationFilters(patterns: string[]) {
+    return client.put<ApiResponse<{ patterns: string[]; message: string }>>('/publish/torrents/declaration-filters', { patterns })
+  },
 }
 
 export interface SourceDetectResult {
