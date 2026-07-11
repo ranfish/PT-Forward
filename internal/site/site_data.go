@@ -44,6 +44,7 @@ type SiteSeedData struct {
 	AlternativeDomains    string         `json:"alternative_domains"`
 	SupportsPiecesHashAPI *bool          `json:"supports_pieces_hash_api,omitempty"`
 	Groups                []string       `json:"groups,omitempty"`
+	TitleFormat           string         `json:"title_format,omitempty"`
 	Form                  SiteFormConfig `json:"form"`
 }
 
@@ -128,6 +129,9 @@ func SeedSites(db *gorm.DB) error {
 
 		if s.SupportsPiecesHashAPI != nil {
 			site.SupportsPiecesHashAPI = *s.SupportsPiecesHashAPI
+		}
+		if s.TitleFormat != "" {
+			site.TitleFormat = s.TitleFormat
 		}
 
 		if err := db.Create(site).Error; err != nil {

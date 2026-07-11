@@ -83,6 +83,8 @@ type Site struct {
 	IYUULimitCount      int `json:"iyuu_limit_count" gorm:"default:0"`
 	IYUULimitInterval   int `json:"iyuu_limit_interval" gorm:"default:0"`
 
+	TitleFormat string `json:"title_format,omitempty" gorm:"type:text"`
+
 	UploadBytes   int64      `json:"upload_bytes" gorm:"default:0"`
 	DownloadBytes int64      `json:"download_bytes" gorm:"default:0"`
 	SeedingPoints float64    `json:"seeding_points" gorm:"default:0"`
