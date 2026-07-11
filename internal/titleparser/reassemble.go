@@ -12,10 +12,22 @@ type TitleFormat struct {
 	StripChinese   bool     `json:"strip_chinese"`    // 是否去除中文
 	Forbidden      []string `json:"forbidden"`        // 禁止内容
 	ChinesePrefix  bool     `json:"chinese_prefix"`   // 是否加 [中文名] 前缀
+	Hook           string   `json:"_hook,omitempty"`   // hook 名（复杂规则兜底）
 }
 
 // Reassemble 将标题组件按目标站模板重组为标题字符串
 func Reassemble(c TitleComponents, tf TitleFormat) string {
+	// 如果有 hook 名，优先用 hook
+	if tf.Hook != "" {
+		if hook := GetSiteHook(tf.Hook); hook != nil {
+			return hook(c, tf)
+		}
+	}
+	return reassembleWithTemplate(c, tf)
+}
+
+// reassembleWithTemplate 模板方式重组
+func reassembleWithTemplate(c TitleComponents, tf TitleFormat) string {
 	if tf.Separator == "" {
 		tf.Separator = " "
 	}
