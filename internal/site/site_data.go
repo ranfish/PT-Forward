@@ -250,6 +250,25 @@ func SeedFieldMappings(db *gorm.DB) error {
 	return nil
 }
 
+func SeedGroupMappings(db *gorm.DB) error {
+	for _, s := range seedSites() {
+		if len(s.Groups) == 0 {
+			continue
+		}
+		for _, group := range s.Groups {
+			db.Where("group_name = ?", group).
+				FirstOrCreate(&model.ReleaseGroupMapping{
+					GroupName:  group,
+					Domain:     s.Domain,
+					SiteName:   s.Name,
+					IsOfficial: true,
+					IsBuiltin:  true,
+				})
+		}
+	}
+	return nil
+}
+
 func SeedExclusions(db *gorm.DB) error {
 	for _, e := range loadSeedData().Exclusions {
 		var existing model.PublishExclusion

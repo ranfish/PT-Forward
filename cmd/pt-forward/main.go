@@ -179,6 +179,9 @@ func main() {
 		if err := site.SeedFormFieldOverrides(db); err != nil {
 			log.Warn("form override seed warning", zap.Error(err))
 		}
+		if err := site.SeedGroupMappings(db); err != nil {
+			log.Warn("group mapping seed warning", zap.Error(err))
+		}
 		log.Info("site seed completed")
 	}()
 
