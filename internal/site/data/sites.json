@@ -5559,6 +5559,9 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
+        "EPiC",
+        "HDATV",
+        "HDApad",
         "HDArea"
       ]
     },
@@ -15334,6 +15337,7 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "CMCT",
+        "CMCTA",
         "CMCTV"
       ]
     },
@@ -21491,6 +21495,7 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
+        "CornerMV",
         "DBTV",
         "Dream",
         "HDDolby",
