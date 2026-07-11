@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	bdinfo "github.com/autobrr/go-bdinfo/pkg/bdinfo"
+	bdinfo "github.com/ranfish/pt-forward/internal/bdinfo"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )

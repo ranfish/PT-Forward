@@ -4,6 +4,7 @@
 .vscode
 *.md
 docs/
+examples/
 pt-forward
 *.db
 *.db-journal

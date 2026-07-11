@@ -11,7 +11,6 @@ FROM golang:1.25-bookworm AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends git gcc libc6-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY go.mod go.sum ./
-COPY examples/go-bdinfo/ examples/go-bdinfo/
 RUN go mod download
 COPY . .
 COPY --from=frontend /build/web/dist frontend/dist
