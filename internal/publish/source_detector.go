@@ -181,6 +181,10 @@ var groupDomainSeed = map[string]string{
 
 	// m-team (馒头)
 	"MTeam": "m-team",
+	"BMDru": "m-team",
+	"MWEB":  "m-team",
+	"mpad":  "m-team",
+	"tnp":   "m-team",
 
 	// hdhome.org (家园)
 	"HDHome": "hdhome.org",
@@ -204,10 +208,21 @@ var groupDomainSeed = map[string]string{
 	"PTH":    "pthome.net",
 
 	// totheglory.im (套套哥)
-	"TTG": "totheglory.im",
+	"TTG":  "totheglory.im",
+	"WiKi": "totheglory.im",
+	"DoA":  "totheglory.im",
+	"NGB":  "totheglory.im",
+	"ARiN": "totheglory.im",
 
 	// ourbits.club (我堡)
-	"OurBits": "ourbits.club",
+	"OurBits":  "ourbits.club",
+	"Ao":       "ourbits.club",
+	"FLTTH":    "ourbits.club",
+	"IloveTV":  "ourbits.club",
+	"OurTV":    "ourbits.club",
+	"IloveHD":  "ourbits.club",
+	"OurPad":   "ourbits.club",
+	"MGs":      "ourbits.club",
 
 	// hdroute.org
 	"HDRoute": "hdroute.org",
@@ -260,6 +275,11 @@ var groupDomainSeed = map[string]string{
 
 	// pterclub.net (大象)
 	"PTer": "pterclub.net",
+
+	// audiences.me (人人)
+	"Audies": "audiences.me",
+	"ADE":    "audiences.me",
+	"ADWeb":  "audiences.me",
 
 	// piggo.me (猪猪) — 3 个官组
 	"PigGo":  "piggo.me",
