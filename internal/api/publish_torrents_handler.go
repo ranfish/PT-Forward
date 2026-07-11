@@ -62,6 +62,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	switch {
 	case strings.HasSuffix(path, "/publish/torrents") && r.Method == http.MethodGet:
 		h.handleListTorrents(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/batch-publish") && r.Method == http.MethodPost:
+		h.handleBatchPublish(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/coverage") && r.Method == http.MethodPost:
 		h.handleQueryCoverage(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/query-status") && r.Method == http.MethodGet:
@@ -964,4 +966,101 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 	}
 
 	Success(w, map[string]interface{}{"message": "已删除"})
+}
+
+type batchPublishRequest struct {
+	ClientID   uint   `json:"client_id"`
+	SourceSite string `json:"source_site"`
+	TargetSite string `json:"target_site"`
+	Items      []struct {
+		InfoHash string `json:"info_hash"`
+		Name     string `json:"name"`
+		Size     int64  `json:"size"`
+		SavePath string `json:"save_path"`
+	} `json:"items"`
+}
+
+func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *http.Request) {
+	var req batchPublishRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if len(req.Items) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "items 不能为空")
+		return
+	}
+	if req.TargetSite == "" {
+		Error(w, http.StatusBadRequest, 40001, "target_site 必填")
+		return
+	}
+	if req.SourceSite == "" {
+		Error(w, http.StatusBadRequest, 40001, "source_site 必填")
+		return
+	}
+
+	// 查目标站是否启用
+	var targetSite model.Site
+	if err := h.db.Where("name = ? AND enabled = ?", req.TargetSite, true).First(&targetSite).Error; err != nil {
+		Error(w, http.StatusBadRequest, 40001, "目标站点不存在或未启用")
+		return
+	}
+
+	// 查排除规则
+	var exclusions []model.PublishExclusion
+	h.db.Find(&exclusions)
+	blockedTargets := []string{}
+	for _, exc := range exclusions {
+		if exc.SourceSite == req.SourceSite {
+			blockedTargets = append(blockedTargets, exc.TargetSite)
+		}
+	}
+	for _, bt := range blockedTargets {
+		if bt == req.TargetSite {
+			Error(w, http.StatusBadRequest, 40001, "目标站点被互斥规则排除")
+			return
+		}
+	}
+
+	targetsJSON, _ := json.Marshal([]string{req.TargetSite})
+	createdIDs := make([]uint, 0, len(req.Items))
+	failed := 0
+
+	for _, item := range req.Items {
+		candidate := &model.PublishCandidate{
+			SourceSite:        req.SourceSite,
+			InfoHash:          item.InfoHash,
+			TorrentName:       item.Name,
+			ClientID:          fmt.Sprintf("%d", req.ClientID),
+			TargetSites:       string(targetsJSON),
+			PublishStatus:     model.CandidatePending,
+			DownloadCompleted: true,
+			Role:              "manual",
+		}
+		if err := h.db.Create(candidate).Error; err != nil {
+			h.logger.Warn("batch publish: create candidate failed",
+				zap.String("hash", item.InfoHash[:8]),
+				zap.Error(err))
+			failed++
+			continue
+		}
+		createdIDs = append(createdIDs, candidate.ID)
+
+		// 回写覆盖缓存（该种子已在目标站发布）
+		if h.coverage != nil {
+			h.coverage.UpdateFromPublishResult(r.Context(), item.InfoHash, req.TargetSite)
+		}
+	}
+
+	h.logger.Info("batch publish completed",
+		zap.Int("created", len(createdIDs)),
+		zap.Int("failed", failed),
+		zap.String("target", req.TargetSite))
+
+	Success(w, map[string]interface{}{
+		"created":       len(createdIDs),
+		"failed":        failed,
+		"candidate_ids": createdIDs,
+		"target_site":   req.TargetSite,
+	})
 }
