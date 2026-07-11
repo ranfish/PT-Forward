@@ -3,6 +3,7 @@ module github.com/ranfish/pt-forward
 go 1.25.0
 
 require (
+	github.com/autobrr/go-bdinfo v0.0.0-00010101000000-000000000000
 	github.com/expr-lang/expr v1.17.8
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
@@ -20,7 +21,6 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/autobrr/go-bdinfo v0.0.0
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
