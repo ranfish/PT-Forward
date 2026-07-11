@@ -429,3 +429,42 @@ func (d *SourceSiteDetector) SeedDefaultMappings(ctx context.Context) error {
 	d.RefreshCache(ctx)
 	return nil
 }
+
+// SyncSiteGroups 站点添加/更新时，自动从 groupDomainSeed 匹配并创建该站的官组映射
+func (d *SourceSiteDetector) SyncSiteGroups(ctx context.Context, site *model.Site) {
+	if site == nil {
+		return
+	}
+	siteDomain := strings.ToLower(site.Domain)
+	siteBaseURL := strings.ToLower(site.BaseURL)
+
+	for group, seedDomain := range groupDomainSeed {
+		seedDomainLower := strings.ToLower(seedDomain)
+		bareSeed := strings.TrimPrefix(seedDomainLower, "www.")
+		bareSite := strings.TrimPrefix(siteDomain, "www.")
+
+		matched := strings.Contains(bareSite, bareSeed) ||
+			strings.Contains(siteBaseURL, seedDomainLower)
+
+		if !matched {
+			continue
+		}
+
+		// 检查是否已存在（按 group_name + domain 去重）
+		var count int64
+		d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+			Where("group_name = ?", group).Count(&count)
+		if count > 0 {
+			continue
+		}
+
+		d.db.WithContext(ctx).Create(&model.ReleaseGroupMapping{
+			GroupName:  group,
+			Domain:     site.Domain,
+			SiteName:   site.Name,
+			IsOfficial: true,
+		})
+	}
+
+	d.RefreshCache(ctx)
+}
