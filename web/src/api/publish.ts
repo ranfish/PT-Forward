@@ -89,6 +89,9 @@ export const publishTorrentsApi = {
   setDeclarationFilters(patterns: string[]) {
     return client.put<ApiResponse<{ patterns: string[]; message: string }>>('/publish/torrents/declaration-filters', { patterns })
   },
+  previewTitle(data: { target_site: string; title_components: Record<string, string> }) {
+    return client.post<ApiResponse<{ title: string; target_site: string }>>('/publish/torrents/preview-title', data)
+  },
 }
 
 export interface SourceDetectResult {
