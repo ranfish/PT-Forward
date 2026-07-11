@@ -1,0 +1,118 @@
+package titleparser
+
+import (
+	"testing"
+)
+
+func TestParseTitle_Movie(t *testing.T) {
+	c := ParseTitle("The.Dark.Knight.2008.1080p.BluRay.x264-DTS-CMCT")
+	if c.MainTitle != "The Dark Knight" {
+		t.Errorf("MainTitle = %q, want %q", c.MainTitle, "The Dark Knight")
+	}
+	if c.Year != "2008" {
+		t.Errorf("Year = %q, want %q", c.Year, "2008")
+	}
+	if c.Resolution != "1080p" {
+		t.Errorf("Resolution = %q, want %q", c.Resolution, "1080p")
+	}
+	if c.VideoCodec != "x264" {
+		t.Errorf("VideoCodec = %q, want %q", c.VideoCodec, "x264")
+	}
+	if c.ReleaseGroup != "CMCT" {
+		t.Errorf("ReleaseGroup = %q, want %q", c.ReleaseGroup, "CMCT")
+	}
+}
+
+func TestParseTitle_TVSeries(t *testing.T) {
+	c := ParseTitle("House.of.the.Dragon.S01E03.2024.2160p.MAX.WEB-DL.H265.DDP.5.1-CMCTV")
+	if c.SeasonEpisode != "S01E03" {
+		t.Errorf("SeasonEpisode = %q, want %q", c.SeasonEpisode, "S01E03")
+	}
+	if c.Resolution != "2160p" {
+		t.Errorf("Resolution = %q, want %q", c.Resolution, "2160p")
+	}
+	if c.SourcePlatform != "MAX" {
+		t.Errorf("SourcePlatform = %q, want %q", c.SourcePlatform, "MAX")
+	}
+	if c.VideoCodec != "H265" && c.VideoCodec != "HEVC" {
+		t.Errorf("VideoCodec = %q, want H265 or HEVC", c.VideoCodec)
+	}
+	if c.AudioCodec != "DDP" {
+		t.Errorf("AudioCodec = %q, want %q", c.AudioCodec, "DDP")
+	}
+	if c.ReleaseGroup != "CMCTV" {
+		t.Errorf("ReleaseGroup = %q, want %q", c.ReleaseGroup, "CMCTV")
+	}
+}
+
+func TestParseTitle_ChinesePrefix(t *testing.T) {
+	c := ParseTitle("[蝙蝠侠] The Dark Knight 2008 1080p BluRay x264-CMCT")
+	if c.ChinesePrefix != "蝙蝠侠" {
+		t.Errorf("ChinesePrefix = %q, want %q", c.ChinesePrefix, "蝙蝠侠")
+	}
+	if c.MainTitle != "The Dark Knight" {
+		t.Errorf("MainTitle = %q, want %q", c.MainTitle, "The Dark Knight")
+	}
+}
+
+func TestParseTitle_HDR(t *testing.T) {
+	c := ParseTitle("Dune.2024.2160p.UHD.BluRay.HDR.HEVC.TrueHD.7.1-FraMeSToR")
+	if c.HDRFormat != "HDR" {
+		t.Errorf("HDRFormat = %q, want %q", c.HDRFormat, "HDR")
+	}
+	if c.AudioCodec != "TrueHD" {
+		t.Errorf("AudioCodec = %q, want %q", c.AudioCodec, "TrueHD")
+	}
+}
+
+func TestParseTitle_DoVi(t *testing.T) {
+	c := ParseTitle("Dune.2024.2160p.WEB-DL.DV.HDR10+.HEVC-PTer")
+	if c.HDRFormat != "DoVi HDR10+" {
+		t.Errorf("HDRFormat = %q, want %q", c.HDRFormat, "DoVi HDR10+")
+	}
+}
+
+func TestParseTitle_Empty(t *testing.T) {
+	c := ParseTitle("")
+	if c.MainTitle != "" {
+		t.Errorf("MainTitle = %q, want empty", c.MainTitle)
+	}
+}
+
+func TestNormalizeVideoCodecByMedium_Disc(t *testing.T) {
+	c := &TitleComponents{Medium: "UHD Blu-ray", VideoCodec: "HEVC"}
+	NormalizeVideoCodecByMedium(c, "")
+	if c.VideoCodec != "HEVC" {
+		t.Errorf("disc HEVC = %q, want HEVC", c.VideoCodec)
+	}
+}
+
+func TestNormalizeVideoCodecByMedium_Encode(t *testing.T) {
+	c := &TitleComponents{Medium: "BDRip", VideoCodec: "HEVC"}
+	NormalizeVideoCodecByMedium(c, "")
+	if c.VideoCodec != "x265" {
+		t.Errorf("rip HEVC = %q, want x265", c.VideoCodec)
+	}
+}
+
+func TestNormalizeVideoCodecByMedium_WEBDL(t *testing.T) {
+	c := &TitleComponents{Medium: "WEB-DL", VideoCodec: "AVC"}
+	NormalizeVideoCodecByMedium(c, "")
+	if c.VideoCodec != "H.264" {
+		t.Errorf("webdl AVC = %q, want H.264", c.VideoCodec)
+	}
+}
+
+func TestExtractGroup_NoGroup(t *testing.T) {
+	g := extractGroup("Some.Title.Without.Group")
+	if g != "" {
+		t.Errorf("extractGroup = %q, want empty", g)
+	}
+}
+
+func TestExtractResolution_4K(t *testing.T) {
+	r := extractResolution("Title.4K.WEB-DL")
+	if r != "4k" && r != "4K" {
+		t.Errorf("resolution = %q, want 4k/4K", r)
+	}
+}
