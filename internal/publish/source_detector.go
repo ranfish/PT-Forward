@@ -229,8 +229,6 @@ var groupDomainSeed = map[string]string{
 	"HDVWEB":  "hdvideo.top",
 	"HDVMV":   "hdvideo.top",
 
-	// joyhd.net
-	"JoyHD": "joyhd.net",
 
 	// btschool.club
 	"BTSchool": "btschool.club",
@@ -242,9 +240,6 @@ var groupDomainSeed = map[string]string{
 	"PuTao": "sjtu.edu.cn",
 	"putao": "sjtu.edu.cn",
 
-	// hdchina (高清瓦堡)
-	"HDChina":   "hdchina",
-	"HDC":       "hdchina",
 
 	// agsvpt.com (末日) — 9 个官组后缀
 	"AGSV":      "agsvpt.com",
@@ -281,14 +276,10 @@ var groupDomainSeed = map[string]string{
 	// pt.eastgame.org (TLF)
 	"TLF":    "eastgame.org",
 
-	// darkland.top
-	"DarkLand": "darkland.top",
 
 	// soulvoice.club (灵魂之声)
 	"SoulVoice": "soulvoice.club",
 
-	// icc2022.com
-	"ICC": "icc2022.com",
 
 	// et8.org (高教)
 	"TCCF": "et8.org",
@@ -300,7 +291,7 @@ var groupDomainSeed = map[string]string{
 	"HITPT": "hitpt.com",
 
 	// haidan.video (海胆)
-	"HaiDan": "haidan.video",
+	"HaiDan": "haidan.cc",
 
 	// discfan.net
 	"DiscFan": "discfan.net",
@@ -344,9 +335,6 @@ var groupDomainSeed = map[string]string{
 	"HDKDIY":   "hdkyl.in",
 	"HDKylin":  "hdkyl.in",
 
-	// hares web
-	"HaresWEB": "hares.club",
-	"HaresTV":  "hares.club",
 
 	// panda
 	"AilMWeb": "pandapt.net",
@@ -363,11 +351,6 @@ var groupDomainSeed = map[string]string{
 	"OK":    "okpt.net",
 	"OKWEB": "okpt.net",
 
-	// filelist
-	"PlayHD":  "filelist.io",
-	"PlaySD":  "filelist.io",
-	"PlayWEB": "filelist.io",
-	"PlayTV":  "filelist.io",
 
 	// crabpt
 	"XHBWeb": "crabpt.vip",
@@ -397,8 +380,6 @@ var groupDomainSeed = map[string]string{
 	// FRDS
 	"FRDS": "frds",
 
-	// HHClub
-	"HHWEB": "hhclub",
 
 	// QingWa
 	"QingWa": "qingwapt.com",
