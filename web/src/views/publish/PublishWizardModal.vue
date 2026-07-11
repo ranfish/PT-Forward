@@ -348,10 +348,19 @@
               <a-tab-pane key="mediainfo" :tab="form.mediaInfo ? 'MediaInfo ✓' : 'MediaInfo'">
                 <a-textarea
                   v-model:value="form.mediaInfo"
-                  :rows="18"
+                  :rows="14"
                   class="mono-font"
                   placeholder="MediaInfo"
                 />
+                <template v-if="form.bdinfo">
+                  <a-divider style="margin: 8px 0">BDInfo</a-divider>
+                  <a-textarea
+                    v-model:value="form.bdinfo"
+                    :rows="10"
+                    class="mono-font"
+                    placeholder="BDInfo"
+                  />
+                </template>
               </a-tab-pane>
 
               <!-- Tab: 已过滤声明 -->
@@ -672,6 +681,7 @@ interface AnalyzeResult {
   removed_declarations?: string[]
   title_components?: Record<string, string>
   standardized_params?: Record<string, string>
+  bdinfo?: string
 }
 
 const analyzing = ref(false)
@@ -693,6 +703,7 @@ const form = ref({
   tmdbLink: '',
   tags: [] as string[],
   removedDeclarations: [] as string[],
+  bdinfo: '',
 })
 
 const titleComponents = ref<Record<string, string> | null>(null)
@@ -774,6 +785,7 @@ async function enterAnalyze() {
           form.value.imdbLink = r.imdb_link || ''
           form.value.tmdbLink = r.tmdb_link || ''
           form.value.removedDeclarations = (r as Record<string, unknown>).removed_declarations as string[] || []
+          form.value.bdinfo = (r as Record<string, unknown>).bdinfo as string || ''
           titleComponents.value = (r as Record<string, unknown>).title_components as Record<string, string> || null
           standardizedParams.value = (r as Record<string, unknown>).standardized_params as Record<string, string> || null
           // 如果有预设源站（从源头站检测器），覆盖后端自动检测的源站
@@ -936,6 +948,7 @@ async function doSubmit() {
       tmdb_link: form.value.tmdbLink,
       tags: form.value.tags,
       title_components: titleComponents.value || undefined,
+      bdinfo: form.value.bdinfo || undefined,
       target_sites: selectedTargets.value,
     })
     submittedCandidateId.value =
@@ -1019,7 +1032,7 @@ function resetWizard() {
   submitError.value = ''
   submittedCandidateId.value = 0
   candidateStatus.value = null
-  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [], removedDeclarations: [] }
+  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [], removedDeclarations: [], bdinfo: '' }
   titleComponents.value = null
   standardizedParams.value = null
   reviewTab.value = 'main'
