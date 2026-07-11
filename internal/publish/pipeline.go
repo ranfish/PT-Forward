@@ -623,6 +623,42 @@ func overridesString(overridesJSON, key string) (string, bool) {
 	return "", false
 }
 
+// applyTitleComponents 用用户编辑的标题组件覆盖表单字段
+func applyTitleComponents(pubReq *model.PublishRequest, overridesJSON string) {
+	if overridesJSON == "" {
+		return
+	}
+	var overrides map[string]interface{}
+	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
+		return
+	}
+	tcRaw, ok := overrides["title_components"]
+	if !ok || tcRaw == nil {
+		return
+	}
+	tc, ok := tcRaw.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	// 用组件值覆盖表单字段（仅非空时）
+	if v, ok := tc["resolution"].(string); ok && v != "" {
+		pubReq.FormFields["resolution"] = v
+	}
+	if v, ok := tc["video_codec"].(string); ok && v != "" {
+		pubReq.FormFields["codec"] = v
+	}
+	if v, ok := tc["audio_codec"].(string); ok && v != "" {
+		pubReq.FormFields["audioCodec"] = v
+	}
+	if v, ok := tc["medium"].(string); ok && v != "" {
+		pubReq.FormFields["source"] = v
+	}
+	if v, ok := tc["release_group"].(string); ok && v != "" {
+		pubReq.FormFields["team"] = v
+	}
+}
+
 func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (*model.PublishRequest, error) {
 	title := candidate.TorrentName
 	desc := p.renderDescription(ctx, candidate.SourceSite, targetSite, title, sourceDetail)
@@ -653,6 +689,9 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 
 	// 手动转发的用户编辑覆盖（优先于源站/PTGen 数据）
 	applyUserOverrides(pubReq, candidate.UserOverrides)
+
+	// 标题组件覆盖：用用户编辑的组件填充表单字段
+	applyTitleComponents(pubReq, candidate.UserOverrides)
 
 	// BDInfo 报告（如果有）
 	if bdinfoText, ok := overridesString(candidate.UserOverrides, "bdinfo"); ok && bdinfoText != "" {
