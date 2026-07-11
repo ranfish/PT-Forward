@@ -3140,7 +3140,8 @@
         "ADE",
         "ADWeb",
         "Audies"
-      ]
+      ],
+      "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "cangbao.ge",
@@ -5563,7 +5564,8 @@
         "HDATV",
         "HDApad",
         "HDArea"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "hdhome.org",
@@ -6070,7 +6072,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "HDHome"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}"
     },
     {
       "domain": "hdsky.me",
@@ -6459,7 +6462,8 @@
         "HDSTV",
         "HDSWEB",
         "HDSky"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "hdtime.org",
@@ -7408,7 +7412,8 @@
         "RLTV",
         "RLWEB",
         "RLeaves"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}"
     },
     {
       "domain": "mua.xloli.cc",
@@ -15339,7 +15344,8 @@
         "CMCT",
         "CMCTA",
         "CMCTV"
-      ]
+      ],
+      "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"forbidden\": [\"BDMV\", \"BDISO\", \"BDBOX\", \"DVDISO\", \"MKV\", \"MP4\"]}"
     },
     {
       "domain": "tjupt.org",
@@ -21171,7 +21177,8 @@
         "AGSVRip",
         "AGSVTV",
         "AGSVWEB"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"resolution\", \"platform\", \"medium\", \"video_codec\", \"hdr\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.hddolby.com",
@@ -21500,7 +21507,8 @@
         "Dream",
         "HDDolby",
         "QHstudIo"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "ptlgs.org",
@@ -21874,7 +21882,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "HHWEB"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}"
     },
     {
       "domain": "www.qingwapt.com",
@@ -22377,7 +22386,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "PTer"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true, \"_hook\": \"pterclub\"}"
     },
     {
       "domain": "pt.gtkpw.xyz",
@@ -23608,7 +23618,8 @@
         "NGB",
         "TTG",
         "WiKi"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "hdroute.org",
@@ -27438,7 +27449,8 @@
         "OurBits",
         "OurPad",
         "OurTV"
-      ]
+      ],
+      "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "sunnypt.top",
@@ -29069,7 +29081,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "YemaPT"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"]}"
     },
     {
       "domain": "greatposterwall.com",
@@ -29790,7 +29803,8 @@
         "MWEB",
         "mpad",
         "tnp"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "cc.mypt.cc",
