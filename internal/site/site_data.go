@@ -43,6 +43,7 @@ type SiteSeedData struct {
 	CookieCloudDomain     string         `json:"cookiecloud_domain"`
 	AlternativeDomains    string         `json:"alternative_domains"`
 	SupportsPiecesHashAPI *bool          `json:"supports_pieces_hash_api,omitempty"`
+	Groups                []string       `json:"groups,omitempty"`
 	Form                  SiteFormConfig `json:"form"`
 }
 
@@ -136,6 +137,18 @@ func SeedSites(db *gorm.DB) error {
 		// Force update to set enabled=false for seeded sites.
 		if err := db.Model(site).Update("enabled", false).Error; err != nil {
 			return siteError(ErrSiteSeed, fmt.Sprintf("disable seeded site %s", s.Domain), err)
+		}
+
+		// 填充官组映射（内置，不可删除）
+		for _, group := range s.Groups {
+			db.Where("group_name = ?", group).
+				FirstOrCreate(&model.ReleaseGroupMapping{
+					GroupName:  group,
+					Domain:     s.Domain,
+					SiteName:   s.Name,
+					IsOfficial: true,
+					IsBuiltin:  true,
+				})
 		}
 	}
 

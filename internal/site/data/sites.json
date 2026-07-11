@@ -2407,7 +2407,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "13City"
+      ]
     },
     {
       "domain": "1ptba.com",
@@ -3132,7 +3135,12 @@
         ],
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "ADE",
+        "ADWeb",
+        "Audies"
+      ]
     },
     {
       "domain": "cangbao.ge",
@@ -3658,7 +3666,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "CarPT"
+      ]
     },
     {
       "domain": "cyanbug.net",
@@ -3977,7 +3988,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "CyanBug"
+      ]
     },
     {
       "domain": "discfan.net",
@@ -4144,7 +4158,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "DiscFan"
+      ]
     },
     {
       "domain": "dubhe.site",
@@ -4983,7 +5000,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "TCCF"
+      ]
     },
     {
       "domain": "www.haidan.cc",
@@ -5168,7 +5188,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "HaiDan"
+      ]
     },
     {
       "domain": "hdarea.club",
@@ -5534,7 +5557,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "HDArea"
+      ]
     },
     {
       "domain": "hdhome.org",
@@ -6038,7 +6064,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "HDHome"
+      ]
     },
     {
       "domain": "hdsky.me",
@@ -6420,7 +6449,14 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "HDS",
+        "HDSPAD",
+        "HDSTV",
+        "HDSWEB",
+        "HDSky"
+      ]
     },
     {
       "domain": "hdtime.org",
@@ -6734,7 +6770,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "HDTime"
+      ]
     },
     {
       "domain": "hdvideo.top",
@@ -7097,7 +7136,12 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "HDVMV",
+        "HDVWEB",
+        "HDVideo"
+      ]
     },
     {
       "domain": "lemonhd.net",
@@ -7356,7 +7400,12 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "RLTV",
+        "RLWEB",
+        "RLeaves"
+      ]
     },
     {
       "domain": "mua.xloli.cc",
@@ -7813,7 +7862,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "NYTV"
+      ]
     },
     {
       "domain": "njtupt.top",
@@ -8729,7 +8781,11 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "AilMWeb",
+        "PANDA"
+      ]
     },
     {
       "domain": "piggo.me",
@@ -9002,7 +9058,13 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "PiGoNF",
+        "PigGo",
+        "PigoHD",
+        "PigoWeb"
+      ]
     },
     {
       "domain": "pt.0ff.cc",
@@ -9459,7 +9521,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "FreeFarm"
+      ]
     },
     {
       "domain": "pt.aling.de",
@@ -9916,7 +9981,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "BTSchool"
+      ]
     },
     {
       "domain": "pt.cdy.skin",
@@ -10643,7 +10711,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "TLF"
+      ]
     },
     {
       "domain": "pt.hdupt.com",
@@ -10918,7 +10989,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "HDU"
+      ]
     },
     {
       "domain": "pt.luckpt.de",
@@ -12373,7 +12447,11 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "PuTao",
+        "putao"
+      ]
     },
     {
       "domain": "pt.tey.cc",
@@ -13471,7 +13549,11 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "CafeTV",
+        "CafeWEB"
+      ]
     },
     {
       "domain": "ptchdbits.co",
@@ -13783,7 +13865,14 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "CHD",
+        "CHDBits",
+        "CHDPAD",
+        "CHDTV",
+        "CHDWEB"
+      ]
     },
     {
       "domain": "ptfans.cc",
@@ -14362,7 +14451,11 @@
         ],
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "PTH",
+        "PTHome"
+      ]
     },
     {
       "domain": "sbpt.link",
@@ -15238,7 +15331,11 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "CMCT",
+        "CMCTV"
+      ]
     },
     {
       "domain": "tjupt.org",
@@ -15315,7 +15412,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "TJUPT"
+      ]
     },
     {
       "domain": "u2.dmhy.org",
@@ -15343,7 +15443,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "U2"
+      ]
     },
     {
       "domain": "ubits.club",
@@ -15703,7 +15806,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "UBWEB"
+      ]
     },
     {
       "domain": "www.dragonhd.xyz",
@@ -16300,7 +16406,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "HITPT"
+      ]
     },
     {
       "domain": "www.hxpt.org",
@@ -17369,7 +17478,11 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "OK",
+        "OKWEB"
+      ]
     },
     {
       "domain": "www.oshen.win",
@@ -18364,7 +18477,11 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "ZmPT",
+        "ZmWeb"
+      ]
     },
     {
       "domain": "zrpt.cc",
@@ -19335,7 +19452,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "HDFans"
+      ]
     },
     {
       "domain": "pt.ying.us.kg",
@@ -19846,7 +19966,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "OpenCD"
+      ]
     },
     {
       "domain": "cspt.top",
@@ -20666,7 +20789,15 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "HDKDIY",
+        "HDKGame",
+        "HDKMV",
+        "HDKTV",
+        "HDKWEB",
+        "HDKylin"
+      ]
     },
     {
       "domain": "www.agsvpt.com",
@@ -21025,7 +21156,18 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "AGSV",
+        "AGSVDIY",
+        "AGSVE",
+        "AGSVMUS",
+        "AGSVPT",
+        "AGSVREMUX",
+        "AGSVRip",
+        "AGSVTV",
+        "AGSVWEB"
+      ]
     },
     {
       "domain": "www.hddolby.com",
@@ -21347,7 +21489,13 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "DBTV",
+        "Dream",
+        "HDDolby",
+        "QHstudIo"
+      ]
     },
     {
       "domain": "ptlgs.org",
@@ -21654,7 +21802,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "PTLGS"
+      ]
     },
     {
       "domain": "hhanclub.net",
@@ -21715,7 +21866,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "HHWEB"
+      ]
     },
     {
       "domain": "www.qingwapt.com",
@@ -21989,7 +22143,13 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "FROG",
+        "FROGE",
+        "FROGWeb",
+        "QingWa"
+      ]
     },
     {
       "domain": "pterclub.net",
@@ -22209,7 +22369,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "PTer"
+      ]
     },
     {
       "domain": "pt.gtkpw.xyz",
@@ -23433,7 +23596,14 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "ARiN",
+        "DoA",
+        "NGB",
+        "TTG",
+        "WiKi"
+      ]
     },
     {
       "domain": "hdroute.org",
@@ -23614,7 +23784,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "HDRoute"
+      ]
     },
     {
       "domain": "star-space.net",
@@ -23933,7 +24106,15 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "Ying",
+        "YingDIY",
+        "YingMUSIC",
+        "YingMV",
+        "YingTV",
+        "YingWEB"
+      ]
     },
     {
       "domain": "52pt.site",
@@ -24807,7 +24988,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "XHBWeb"
+      ]
     },
     {
       "domain": "pt.itzmx.com",
@@ -25209,7 +25393,12 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "FFans",
+        "FHDMV",
+        "sBao"
+      ]
     },
     {
       "domain": "pt.soulvoice.club",
@@ -25409,7 +25598,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "SoulVoice"
+      ]
     },
     {
       "domain": "ptzone.xyz",
@@ -25989,7 +26181,12 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "SakuraSUB",
+        "SakuraWEB",
+        "WScode"
+      ]
     },
     {
       "domain": "www.htpt.cc",
@@ -26911,7 +27108,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "groups": [
+        "FRDS"
+      ]
     },
     {
       "domain": "pt.ptskit.org",
@@ -27223,7 +27423,17 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "Ao",
+        "FLTTH",
+        "IloveHD",
+        "IloveTV",
+        "MGs",
+        "OurBits",
+        "OurPad",
+        "OurTV"
+      ]
     },
     {
       "domain": "sunnypt.top",
@@ -28851,7 +29061,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "YemaPT"
+      ]
     },
     {
       "domain": "greatposterwall.com",
@@ -29565,7 +29778,14 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "BMDru",
+        "MTeam",
+        "MWEB",
+        "mpad",
+        "tnp"
+      ]
     },
     {
       "domain": "cc.mypt.cc",
@@ -30565,7 +30785,10 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "groups": [
+        "52MOVIE"
+      ]
     },
     {
       "domain": "www.musopia.vip",

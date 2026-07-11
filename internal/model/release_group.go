@@ -8,6 +8,7 @@ type ReleaseGroupMapping struct {
 	Domain     string    `gorm:"size:200;not null" json:"domain"`
 	SiteName   string    `gorm:"size:100" json:"site_name"`
 	IsOfficial bool      `gorm:"default:false" json:"is_official"`
+	IsBuiltin  bool      `gorm:"default:false" json:"is_builtin"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }

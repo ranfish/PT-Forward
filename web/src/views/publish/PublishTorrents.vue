@@ -197,9 +197,12 @@
           </template>
           <template v-if="column.key === 'actions'">
             <a-button type="link" size="small" @click="editMapping(record)">编辑</a-button>
-            <a-popconfirm title="确定删除？" @confirm="deleteMapping(record.id)">
+            <a-popconfirm v-if="!record.is_builtin" title="确定删除？" @confirm="deleteMapping(record.id)">
               <a-button type="link" danger size="small">删除</a-button>
             </a-popconfirm>
+            <a-tooltip v-else title="内置官组不可删除">
+              <a-button type="link" danger size="small" disabled>删除</a-button>
+            </a-tooltip>
           </template>
         </template>
       </a-table>
