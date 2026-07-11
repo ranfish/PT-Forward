@@ -788,6 +788,21 @@ func (p *Pipeline) ListResults(ctx context.Context, candidateID uint, limit int)
 	return results, err
 }
 
+func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, status, targetSite string) ([]model.PublishResultRecord, int64, error) {
+	var results []model.PublishResultRecord
+	var total int64
+	q := p.db.WithContext(ctx).Model(&model.PublishResultRecord{})
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	if targetSite != "" {
+		q = q.Where("target_site = ?", targetSite)
+	}
+	q.Count(&total)
+	q.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&results)
+	return results, total, nil
+}
+
 var (
 	forbiddenTransferKeywords = []string{"禁转", "独占", "谢绝转载", "限时禁转", "严禁转载", "禁止转载", "谢绝搬运"}
 	forbiddenTransferGroups   = []string{"CatEDU"}

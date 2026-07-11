@@ -171,23 +171,56 @@
       </a-tab-pane>
 
       <a-tab-pane key="results" :tab="t('publish.results')">
+        <div class="tab-toolbar">
+          <a-select v-model:value="resultStatusFilter" style="width: 120px" placeholder="状态" allow-clear @change="onResultFilterChange">
+            <a-select-option value="published">已发布</a-select-option>
+            <a-select-option value="publishing">发布中</a-select-option>
+            <a-select-option value="failed">失败</a-select-option>
+            <a-select-option value="skipped">已跳过</a-select-option>
+            <a-select-option value="pending">待发布</a-select-option>
+          </a-select>
+          <a-input-search
+            v-model:value="resultTargetFilter"
+            placeholder="目标站名称"
+            style="width: 160px; margin-left: 8px"
+            allow-clear
+            @search="onResultFilterChange"
+          />
+          <a-tag color="blue">{{ resultTotal }}</a-tag>
+        </div>
         <a-table
           :columns="resultColumns"
           :data-source="results"
           :loading="resultsLoading"
-          :pagination="{ pageSize: 20, showSizeChanger: true, showTotal: (total: number) => t('common.totalCount', { count: total }) }"
+          :pagination="{
+            current: resultPage,
+            pageSize: resultPageSize,
+            total: resultTotal,
+            showSizeChanger: true,
+            pageSizeOptions: ['20', '50', '100'],
+            showTotal: (total: number) => t('common.totalCount', { count: total }),
+            size: 'small',
+          }"
           row-key="id"
           size="small"
+          :sticky="{ offsetHeader: 48 }"
+          @change="(pag: { current?: number; pageSize?: number }) => { if (pag.current) resultPage = pag.current; if (pag.pageSize) resultPageSize = pag.pageSize; fetchResultsFiltered() }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
-              <a-tag :color="record.status === 'published' ? 'green' : record.status === 'skipped' ? 'orange' : record.status === 'failed' ? 'red' : 'blue'">
+              <a-tag :color="resultStatusColor(record.status)">
                 {{ translatePublishStatus(record.status) }}
               </a-tag>
             </template>
             <template v-if="column.key === 'publish_url'">
-              <a v-if="record.publish_url" :href="record.publish_url" target="_blank">{{ record.publish_url }}</a>
+              <a v-if="record.publish_url" :href="record.publish_url" target="_blank" style="font-size: 12px">查看种子</a>
               <span v-else>-</span>
+            </template>
+            <template v-if="column.key === 'created_at'">
+              {{ formatTime(record.created_at) }}
+            </template>
+            <template v-if="column.key === 'candidate_id'">
+              <a-button type="link" size="small" @click="jumpToCandidate(record.candidate_id)">{{ record.candidate_id }}</a-button>
             </template>
           </template>
         </a-table>
@@ -258,6 +291,11 @@ const taskTotal = ref(0)
 
 const resultsLoading = ref(false)
 const results = ref<PublishResultRecord[]>([])
+const resultStatusFilter = ref<string | undefined>(undefined)
+const resultTargetFilter = ref('')
+const resultPage = ref(1)
+const resultPageSize = ref(20)
+const resultTotal = ref(0)
 
 const candidateColumns = [
   { title: t('publish.torrentName'), dataIndex: 'torrent_name', key: 'torrent_name', ellipsis: true },
@@ -291,12 +329,13 @@ const taskColumns = [
 
 const resultColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 120 },
-  { title: t('publish.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120 },
-  { title: t('common.status'), key: 'status', width: 100 },
-  { title: t('publish.publishUrl'), key: 'publish_url', ellipsis: true },
+  { title: '候选ID', key: 'candidate_id', width: 80 },
+  { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 90 },
+  { title: t('publish.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 90 },
+  { title: t('common.status'), key: 'status', width: 80 },
+  { title: t('publish.publishUrl'), key: 'publish_url', width: 80 },
   { title: t('publish.errorMessage'), dataIndex: 'error_message', key: 'error_message', ellipsis: true },
-  { title: t('publish.completedAt'), dataIndex: 'completed_at', key: 'completed_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
+  { title: t('common.createdAt'), key: 'created_at', width: 140 },
 ]
 
 function publishStatusColor(status: string) {
@@ -307,6 +346,46 @@ function publishStatusColor(status: string) {
 function taskStatusColor(status: string) {
   const map: Record<string, string> = { pending: 'blue', running: 'cyan', completed: 'green', failed: 'red', cancelled: 'default' }
   return map[status] || 'default'
+}
+
+function resultStatusColor(status: string) {
+  const map: Record<string, string> = { published: 'green', publishing: 'processing', failed: 'red', skipped: 'orange', pending: 'blue' }
+  return map[status] || 'default'
+}
+
+function onResultFilterChange() {
+  resultPage.value = 1
+  fetchResultsFiltered()
+}
+
+async function fetchResultsFiltered() {
+  resultsLoading.value = true
+  try {
+    const resp = await publishApi.listResults({
+      page: resultPage.value,
+      size: resultPageSize.value,
+      status: resultStatusFilter.value,
+      target_site: resultTargetFilter.value || undefined,
+    })
+    const body = resp.data?.data
+    if (body?.items) {
+      results.value = body.items
+      resultTotal.value = body.total || 0
+    } else {
+      results.value = (body as unknown as PublishResultRecord[]) || []
+      resultTotal.value = results.value.length
+    }
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    resultsLoading.value = false
+  }
+}
+
+function jumpToCandidate(id: number) {
+  activeTab.value = 'candidates'
+  candidateSearch.value = String(id)
+  fetchCandidates()
 }
 
 function parseTargetSites(raw: string): string[] {
@@ -580,9 +659,8 @@ onMounted(() => {
   fetchCandidates()
   fetchGroups()
   fetchTasks()
-  fetchResults()
+  fetchResultsFiltered()
   fetchTaskSites()
-  startCandidatePoll()
 })
 
 onUnmounted(() => {

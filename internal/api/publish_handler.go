@@ -320,6 +320,34 @@ func (h *PublishHandler) handleGetCandidate(w http.ResponseWriter, r *http.Reque
 func (h *PublishHandler) handleListResults(w http.ResponseWriter, r *http.Request) {
 	candidateIDStr := r.URL.Query().Get("candidateId")
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	status := r.URL.Query().Get("status")
+	targetSite := r.URL.Query().Get("target_site")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+	if pageSize == 0 {
+		pageSize, _ = strconv.Atoi(r.URL.Query().Get("size"))
+	}
+
+	// 新模式：分页 + 筛选
+	if page > 0 {
+		if pageSize < 1 || pageSize > 200 {
+			pageSize = 20
+		}
+		results, total, err := h.pipeline.ListResultsFiltered(r.Context(), page, pageSize, status, targetSite)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "查询发布结果失败")
+			return
+		}
+		Success(w, map[string]interface{}{
+			"items":    results,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		})
+		return
+	}
+
+	// 旧模式：candidateId + limit（向后兼容）
 	if limit < 1 {
 		limit = 20
 	}
