@@ -256,14 +256,26 @@ func SeedGroupMappings(db *gorm.DB) error {
 			continue
 		}
 		for _, group := range s.Groups {
-			db.Where("group_name = ?", group).
-				FirstOrCreate(&model.ReleaseGroupMapping{
+			var existing model.ReleaseGroupMapping
+			if db.Where("group_name = ?", group).First(&existing).Error == nil {
+				// 已存在：标记为 builtin 并更新 domain/site_name
+				if !existing.IsBuiltin || existing.SiteName == "" {
+					db.Model(&existing).Updates(map[string]interface{}{
+						"is_builtin": true,
+						"domain":     s.Domain,
+						"site_name":  s.Name,
+					})
+				}
+			} else {
+				// 不存在：创建
+				db.Create(&model.ReleaseGroupMapping{
 					GroupName:  group,
 					Domain:     s.Domain,
 					SiteName:   s.Name,
 					IsOfficial: true,
 					IsBuiltin:  true,
 				})
+			}
 		}
 	}
 	return nil
