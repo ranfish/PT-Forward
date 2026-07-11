@@ -289,6 +289,7 @@ const searchText = ref('')
 const queryFilter = ref<string | undefined>(undefined)
 const queryingHash = ref('')
 const selectedHashes = ref<string[]>([])
+let coverageAbortController: AbortController | null = null
 
 // 分页
 const currentPage = ref(1)
@@ -354,6 +355,11 @@ function onTableChange(pag: { current?: number; pageSize?: number }) {
 
 function onClientChange() {
   currentPage.value = 1
+  selectedHashes.value = []
+  if (coverageAbortController) {
+    coverageAbortController.abort()
+    coverageAbortController = null
+  }
   fetchTorrents()
 }
 
@@ -439,6 +445,11 @@ watch(queryFilter, () => { currentPage.value = 1 })
 
 async function queryCoverage(record: PublishTorrentItem) {
   if (!selectedClientId.value) return
+  // 取消上一个正在进行的查询
+  if (coverageAbortController) {
+    coverageAbortController.abort()
+  }
+  coverageAbortController = new AbortController()
   queryingHash.value = record.info_hash
   try {
     const resp = await publishTorrentsApi.queryCoverage({
@@ -459,9 +470,13 @@ async function queryCoverage(record: PublishTorrentItem) {
       message.success(`覆盖查询完成：${result.has_count}/${result.total_sites}`)
     }
   } catch (e: unknown) {
+    if (e instanceof DOMException && e.name === 'AbortError') return
     message.error((e as Error).message)
   } finally {
-    queryingHash.value = ''
+    if (queryingHash.value === record.info_hash) {
+      queryingHash.value = ''
+      coverageAbortController = null
+    }
   }
 }
 
@@ -609,6 +624,9 @@ onMounted(fetchClients)
 
 onUnmounted(() => {
   stopPolling()
+  if (coverageAbortController) {
+    coverageAbortController.abort()
+  }
 })
 
 // --- 映射管理 ---
