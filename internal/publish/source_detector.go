@@ -466,3 +466,15 @@ func (d *SourceSiteDetector) SyncSiteGroups(ctx context.Context, site *model.Sit
 
 	d.RefreshCache(ctx)
 }
+
+// HasGroupMappings 检查站点是否有官组映射
+func (d *SourceSiteDetector) HasGroupMappings(ctx context.Context, site *model.Site) bool {
+	if site == nil {
+		return false
+	}
+	var count int64
+	d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+		Where("site_name = ? OR domain LIKE ?", site.Name, "%"+strings.ToLower(site.Domain)+"%").
+		Count(&count)
+	return count > 0
+}
