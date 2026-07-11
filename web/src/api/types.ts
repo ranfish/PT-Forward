@@ -695,6 +695,7 @@ export interface ManualForwardSubmitRequest {
   tmdb_link?: string
   tags?: string[]
   title_components?: Record<string, string>
+  bdinfo?: string
   target_sites?: string[]
 }
 
