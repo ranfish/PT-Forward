@@ -151,6 +151,9 @@
                   </a-form-item>
                   <a-form-item label="副标题">
                     <a-input v-model:value="form.subtitle" placeholder="中文标题或简介" />
+                    <div v-if="subtitleWarning" style="margin-top: 4px">
+                      <a-tag color="orange" size="small">{{ subtitleWarning }}</a-tag>
+                    </div>
                   </a-form-item>
                   <a-form-item label="标签">
                     <a-select
@@ -838,6 +841,19 @@ const targetsLoading = ref(false)
 
 const availableCount = computed(() => siteList.value.filter(s => !s.blocked).length)
 const blockedCount = computed(() => siteList.value.filter(s => s.blocked).length)
+
+// 副标题校验提示
+const subtitleWarning = computed(() => {
+  if (!form.value.subtitle) return ''
+  const sub = form.value.subtitle
+  // 禁止全角标点
+  if (/[\uFF00-\uFFEF]/.test(sub)) return '副标题含全角符号，部分站点可能拒绝'
+  // 家园/红叶：禁止重复英文片名
+  if (form.value.title && sub.includes(form.value.title.split(' ')[0])) {
+    return '副标题包含主标题英文名，家园/红叶可能拒绝'
+  }
+  return ''
+})
 
 async function enterSelectSites() {
   currentStep.value = 2
