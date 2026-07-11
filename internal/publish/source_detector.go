@@ -293,6 +293,9 @@ var groupDomainSeed = map[string]string{
 	// haidan.video (海胆)
 	"HaiDan": "haidan.cc",
 
+	// hhanclub.net (憨憨)
+	"HHWEB": "hhanclub.net",
+
 	// discfan.net
 	"DiscFan": "discfan.net",
 
