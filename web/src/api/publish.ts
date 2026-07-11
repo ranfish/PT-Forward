@@ -77,6 +77,9 @@ export const publishTorrentsApi = {
   deleteGroupMapping(id: number) {
     return client.delete<ApiResponse<unknown>>(`/publish/torrents/group-mappings/${id}`)
   },
+  listGroupedSiteNames() {
+    return client.get<ApiResponse<{ sites: string[] }>>('/publish/torrents/group-mappings/sites')
+  },
 }
 
 export interface SourceDetectResult {
