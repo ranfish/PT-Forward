@@ -13,6 +13,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -306,6 +307,28 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 			result["removed_declarations"] = fr.RemovedDecls
 		}
 	}
+
+	// 标题解析 + MediaInfo 纠正 + 标准化
+	mediaInfo, _ := result["media_info"].(string)
+	components := titleparser.ParseTitle(name)
+	if mediaInfo != "" {
+		if err := titleparser.CorrectWithMediaInfo(&components, mediaInfo); err != nil {
+			h.logger.Warn("analyze: MediaInfo correction failed", zap.Error(err))
+		}
+	}
+	// 分类推断
+	sourceCat := ""
+	if h.siteMgr != nil {
+		// 从源站详情页获取分类（如果有）
+	}
+	ptgenGenre := ""
+	category := titleparser.InferCategory(components, sourceCat, ptgenGenre, "")
+	// 标准化
+	stdParams, _ := titleparser.Standardize(components)
+	stdParams.Type = category
+
+	result["title_components"] = components
+	result["standardized_params"] = stdParams
 
 	task.setResult(result)
 }
