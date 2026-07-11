@@ -46,6 +46,9 @@ jobs:
       - name: Create frontend dist placeholder
         run: mkdir -p frontend/dist && echo '<html></html>' > frontend/dist/index.html
 
+      - name: Download Go modules
+        run: go mod download
+
       - name: Vet
         run: go vet ./internal/... ./cmd/pt-forward/...
 
