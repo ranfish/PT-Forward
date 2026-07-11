@@ -935,6 +935,7 @@ async function doSubmit() {
       imdb_link: form.value.imdbLink,
       tmdb_link: form.value.tmdbLink,
       tags: form.value.tags,
+      title_components: titleComponents.value || undefined,
       target_sites: selectedTargets.value,
     })
     submittedCandidateId.value =

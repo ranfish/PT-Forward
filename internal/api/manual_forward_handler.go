@@ -431,6 +431,7 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 		ImdbLink    string   `json:"imdb_link"`
 		TmdbLink    string   `json:"tmdb_link"`
 		Tags        []string `json:"tags"`
+		TitleComponents map[string]string `json:"title_components"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -466,6 +467,9 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 		"media_info":  req.MediaInfo,
 		"screenshots": req.Screenshots,
 		"description": req.Description,
+	}
+	if len(req.TitleComponents) > 0 {
+		overrides["title_components"] = req.TitleComponents
 	}
 	overridesJSON, _ := json.Marshal(overrides)
 

@@ -694,6 +694,7 @@ export interface ManualForwardSubmitRequest {
   imdb_link?: string
   tmdb_link?: string
   tags?: string[]
+  title_components?: Record<string, string>
   target_sites?: string[]
 }
 
