@@ -548,7 +548,7 @@ func populateFormFields(fields map[string]string, detail *model.TorrentDetail) {
 }
 
 // applyUserOverrides 将手动转发时用户编辑的字段覆盖到 PublishRequest
-// UserOverrides 是 JSON 字符串，包含 subtitle/statement/poster/douban_link/imdb_link/tmdb_link/tags/media_info/screenshots/description
+// UserOverrides 是 JSON 字符串，包含 subtitle/statement/poster/douban_link/imdb_link/tmdb_link/tags/media_info/screenshots/description/bdinfo
 func applyUserOverrides(pubReq *model.PublishRequest, overridesJSON string) {
 	if overridesJSON == "" {
 		return
@@ -567,6 +567,9 @@ func applyUserOverrides(pubReq *model.PublishRequest, overridesJSON string) {
 	}
 	if v, ok := overrides["media_info"].(string); ok && v != "" {
 		pubReq.MediaInfo = v
+	}
+	if v, ok := overrides["bdinfo"].(string); ok && v != "" {
+		pubReq.BDInfo = v
 	}
 	if v, ok := overrides["douban_link"].(string); ok && v != "" {
 		pubReq.DoubanLink = v
@@ -605,6 +608,21 @@ func applyUserOverrides(pubReq *model.PublishRequest, overridesJSON string) {
 	}
 }
 
+// overridesString 从 UserOverrides JSON 中提取字符串值
+func overridesString(overridesJSON, key string) (string, bool) {
+	if overridesJSON == "" {
+		return "", false
+	}
+	var overrides map[string]interface{}
+	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
+		return "", false
+	}
+	if v, ok := overrides[key].(string); ok {
+		return v, true
+	}
+	return "", false
+}
+
 func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (*model.PublishRequest, error) {
 	title := candidate.TorrentName
 	desc := p.renderDescription(ctx, candidate.SourceSite, targetSite, title, sourceDetail)
@@ -635,6 +653,11 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 
 	// 手动转发的用户编辑覆盖（优先于源站/PTGen 数据）
 	applyUserOverrides(pubReq, candidate.UserOverrides)
+
+	// BDInfo 报告（如果有）
+	if bdinfoText, ok := overridesString(candidate.UserOverrides, "bdinfo"); ok && bdinfoText != "" {
+		pubReq.BDInfo = bdinfoText
+	}
 
 	if pubReq.DoubanLink != "" && pubReq.FormFields["douban"] == "" {
 		pubReq.FormFields["douban"] = pubReq.DoubanLink

@@ -341,7 +341,8 @@ func main() {
 	)
 	router.SetSiteProvider(siteProvider)
 	declFilter := publish.NewDeclarationFilter(setting.NewRepository(db), log)
-	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter)
+	bdinfoScanner := publish.NewBDInfoScanner(log)
+	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner)
 	router.SetConfigEventBus(configEventBus)
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
