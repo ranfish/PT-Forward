@@ -25,6 +25,7 @@ type ManualForwardHandler struct {
 	siteMgr      SiteManager
 	clientMgr    MFClientProvider
 	declFilter   *publish.DeclarationFilter
+	bdinfoScanner *publish.BDInfoScanner
 	taskStore    sync.Map
 	taskSeq      atomic.Int64
 }
@@ -54,6 +55,7 @@ func (h *ManualForwardHandler) SetPipeline(p PublishPipeline)        { h.pipelin
 func (h *ManualForwardHandler) SetSiteManager(s SiteManager)         { h.siteMgr = s }
 func (h *ManualForwardHandler) SetClientProvider(c MFClientProvider) { h.clientMgr = c }
 func (h *ManualForwardHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
+func (h *ManualForwardHandler) SetBDInfoScanner(s *publish.BDInfoScanner) { h.bdinfoScanner = s }
 
 func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -305,6 +307,19 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 			fr := h.declFilter.Filter(desc, patterns)
 			result["description"] = fr.CleanedText
 			result["removed_declarations"] = fr.RemovedDecls
+		}
+	}
+
+	// BDInfo 扫描（检测到蓝光原盘时）
+	if h.bdinfoScanner != nil && savePath != "" {
+		bdinfoCtx, bdinfoCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		bdinfoReport, bdinfoErr := h.bdinfoScanner.ScanIfBD(bdinfoCtx, savePath)
+		bdinfoCancel()
+		if bdinfoErr != nil {
+			h.logger.Warn("analyze: BDInfo scan failed", zap.Error(bdinfoErr))
+		}
+		if bdinfoReport != "" {
+			result["bdinfo"] = bdinfoReport
 		}
 	}
 
