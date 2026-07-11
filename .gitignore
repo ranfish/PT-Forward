@@ -5,6 +5,7 @@
 # Data
 data/
 !internal/site/data/
+!internal/titleparser/data/
 *.db
 *.db-journal
 *.db-wal
