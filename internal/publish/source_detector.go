@@ -2,78 +2,21 @@ package publish
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"sync"
 
 	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/ranfish/pt-forward/internal/setting"
 	"gorm.io/gorm"
 )
 
-const deletedGroupsKey = "deleted_group_mappings"
-
 type SourceSiteDetector struct {
-	db       *gorm.DB
-	settings *setting.Repository
-	cache    map[string]string // group_name → site_name
-	deleted  map[string]bool   // 用户主动删除的 group_name
-	mu       sync.RWMutex
+	db    *gorm.DB
+	cache map[string]string // group_name → site_name
+	mu    sync.RWMutex
 }
 
 func NewSourceSiteDetector(db *gorm.DB) *SourceSiteDetector {
-	return &SourceSiteDetector{
-		db:       db,
-		settings: setting.NewRepository(db),
-		cache:    make(map[string]string),
-		deleted:  make(map[string]bool),
-	}
-}
-
-func (d *SourceSiteDetector) loadDeletedSet(ctx context.Context) {
-	val, err := d.settings.Get(ctx, deletedGroupsKey)
-	if err != nil || val == "" {
-		return
-	}
-	var list []string
-	if json.Unmarshal([]byte(val), &list) == nil {
-		d.mu.Lock()
-		for _, g := range list {
-			d.deleted[g] = true
-		}
-		d.mu.Unlock()
-	}
-}
-
-func (d *SourceSiteDetector) saveDeletedSet(ctx context.Context) {
-	d.mu.RLock()
-	list := make([]string, 0, len(d.deleted))
-	for g := range d.deleted {
-		list = append(list, g)
-	}
-	d.mu.RUnlock()
-	data, _ := json.Marshal(list)
-	_ = d.settings.Set(ctx, deletedGroupsKey, string(data))
-}
-
-func (d *SourceSiteDetector) MarkDeleted(ctx context.Context, groupName string) {
-	d.mu.Lock()
-	d.deleted[groupName] = true
-	d.mu.Unlock()
-	d.saveDeletedSet(ctx)
-}
-
-func (d *SourceSiteDetector) UnmarkDeleted(ctx context.Context, groupName string) {
-	d.mu.Lock()
-	delete(d.deleted, groupName)
-	d.mu.Unlock()
-	d.saveDeletedSet(ctx)
-}
-
-func (d *SourceSiteDetector) isDeleted(groupName string) bool {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	return d.deleted[groupName]
+	return &SourceSiteDetector{db: db, cache: make(map[string]string)}
 }
 
 // ExtractGroupName 从标题末尾提取制作组名
@@ -229,7 +172,8 @@ func (d *SourceSiteDetector) RefreshCache(ctx context.Context) {
 
 // groupDomainSeed: 制作组名 → 站点域名
 // 数据源: examples/auto_feed_js default_site_info + reg_team_name
-// 一个站点多个官组后缀 = 多行
+// 仅用于首次建表（SeedDefaultMappings）和新站点添加时查找（SyncSiteGroups）
+// 建表后数据由用户通过 Web UI 维护，不再自动同步
 var groupDomainSeed = map[string]string{
 	// springsunday.net (CMCT 系列)
 	"CMCT": "springsunday.net",
@@ -415,10 +359,6 @@ var groupDomainSeed = map[string]string{
 	"CafeWEB": "ptcafe.club",
 	"CafeTV":  "ptcafe.club",
 
-	// dj
-	"DJWEB": "dajiao",
-	"DJTV":  "dajiao",
-
 	// okpt
 	"OK":    "okpt.net",
 	"OKWEB": "okpt.net",
@@ -464,20 +404,16 @@ var groupDomainSeed = map[string]string{
 	"QingWa": "qingwapt.com",
 }
 
+// SeedDefaultMappings 仅在表为空时导入种子数据（一次性建表）
+// 建表后数据完全由用户通过 Web UI 维护，不再自动同步
 func (d *SourceSiteDetector) SeedDefaultMappings(ctx context.Context) error {
-	d.loadDeletedSet(ctx)
-
-	var existingNames []string
-	d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Pluck("group_name", &existingNames)
-	existingSet := make(map[string]bool, len(existingNames))
-	for _, name := range existingNames {
-		existingSet[name] = true
+	var count int64
+	d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Count(&count)
+	if count > 0 {
+		return nil // 表已有数据，不覆盖用户维护的数据
 	}
 
 	for group, domain := range groupDomainSeed {
-		if existingSet[group] || d.isDeleted(group) {
-			continue
-		}
 		d.db.WithContext(ctx).Create(&model.ReleaseGroupMapping{
 			GroupName:  group,
 			Domain:     domain,
@@ -489,11 +425,22 @@ func (d *SourceSiteDetector) SeedDefaultMappings(ctx context.Context) error {
 	return nil
 }
 
-// SyncSiteGroups 站点添加/更新时，自动从 groupDomainSeed 匹配并创建该站的官组映射
+// SyncSiteGroups 站点添加时，如果该站完全没有任何映射记录，
+// 从 groupDomainSeed 查找该站的官组并创建（仅对新站点，不覆盖已有）
 func (d *SourceSiteDetector) SyncSiteGroups(ctx context.Context, site *model.Site) {
 	if site == nil {
 		return
 	}
+
+	// 检查该站是否已有映射记录
+	var count int64
+	d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+		Where("site_name = ? OR domain LIKE ?", site.Name, "%"+strings.ToLower(site.Domain)+"%").
+		Count(&count)
+	if count > 0 {
+		return // 该站已有映射，不覆盖
+	}
+
 	siteDomain := strings.ToLower(site.Domain)
 	siteBaseURL := strings.ToLower(site.BaseURL)
 
@@ -505,15 +452,7 @@ func (d *SourceSiteDetector) SyncSiteGroups(ctx context.Context, site *model.Sit
 		matched := strings.Contains(bareSite, bareSeed) ||
 			strings.Contains(siteBaseURL, seedDomainLower)
 
-		if !matched || d.isDeleted(group) {
-			continue
-		}
-
-		// 检查是否已存在（按 group_name + domain 去重）
-		var count int64
-		d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
-			Where("group_name = ?", group).Count(&count)
-		if count > 0 {
+		if !matched {
 			continue
 		}
 

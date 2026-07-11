@@ -869,7 +869,6 @@ func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter,
 		return
 	}
 	if h.sourceDetector != nil {
-		h.sourceDetector.UnmarkDeleted(r.Context(), req.GroupName)
 		h.sourceDetector.RefreshCache(r.Context())
 	}
 	Success(w, mapping)
@@ -919,20 +918,12 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 		return
 	}
 
-	// 先查出 group_name 用于标记删除
-	var mapping model.ReleaseGroupMapping
-	h.db.WithContext(r.Context()).First(&mapping, id)
-
 	if err := h.db.Delete(&model.ReleaseGroupMapping{}, id).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("删除失败: %v", err))
 		return
 	}
-
-	// 标记为用户删除，防止 seed 重建
-	if h.sourceDetector != nil && mapping.GroupName != "" {
-		h.sourceDetector.MarkDeleted(r.Context(), mapping.GroupName)
+	if h.sourceDetector != nil {
 		h.sourceDetector.RefreshCache(r.Context())
 	}
-
 	Success(w, map[string]interface{}{"message": "已删除"})
 }
