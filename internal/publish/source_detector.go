@@ -2,21 +2,78 @@ package publish
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"gorm.io/gorm"
 )
 
+const deletedGroupsKey = "deleted_group_mappings"
+
 type SourceSiteDetector struct {
-	db    *gorm.DB
-	cache map[string]string // group_name → site_name
-	mu    sync.RWMutex
+	db       *gorm.DB
+	settings *setting.Repository
+	cache    map[string]string // group_name → site_name
+	deleted  map[string]bool   // 用户主动删除的 group_name
+	mu       sync.RWMutex
 }
 
 func NewSourceSiteDetector(db *gorm.DB) *SourceSiteDetector {
-	return &SourceSiteDetector{db: db, cache: make(map[string]string)}
+	return &SourceSiteDetector{
+		db:       db,
+		settings: setting.NewRepository(db),
+		cache:    make(map[string]string),
+		deleted:  make(map[string]bool),
+	}
+}
+
+func (d *SourceSiteDetector) loadDeletedSet(ctx context.Context) {
+	val, err := d.settings.Get(ctx, deletedGroupsKey)
+	if err != nil || val == "" {
+		return
+	}
+	var list []string
+	if json.Unmarshal([]byte(val), &list) == nil {
+		d.mu.Lock()
+		for _, g := range list {
+			d.deleted[g] = true
+		}
+		d.mu.Unlock()
+	}
+}
+
+func (d *SourceSiteDetector) saveDeletedSet(ctx context.Context) {
+	d.mu.RLock()
+	list := make([]string, 0, len(d.deleted))
+	for g := range d.deleted {
+		list = append(list, g)
+	}
+	d.mu.RUnlock()
+	data, _ := json.Marshal(list)
+	_ = d.settings.Set(ctx, deletedGroupsKey, string(data))
+}
+
+func (d *SourceSiteDetector) MarkDeleted(ctx context.Context, groupName string) {
+	d.mu.Lock()
+	d.deleted[groupName] = true
+	d.mu.Unlock()
+	d.saveDeletedSet(ctx)
+}
+
+func (d *SourceSiteDetector) UnmarkDeleted(ctx context.Context, groupName string) {
+	d.mu.Lock()
+	delete(d.deleted, groupName)
+	d.mu.Unlock()
+	d.saveDeletedSet(ctx)
+}
+
+func (d *SourceSiteDetector) isDeleted(groupName string) bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.deleted[groupName]
 }
 
 // ExtractGroupName 从标题末尾提取制作组名
@@ -408,6 +465,8 @@ var groupDomainSeed = map[string]string{
 }
 
 func (d *SourceSiteDetector) SeedDefaultMappings(ctx context.Context) error {
+	d.loadDeletedSet(ctx)
+
 	var existingNames []string
 	d.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Pluck("group_name", &existingNames)
 	existingSet := make(map[string]bool, len(existingNames))
@@ -416,7 +475,7 @@ func (d *SourceSiteDetector) SeedDefaultMappings(ctx context.Context) error {
 	}
 
 	for group, domain := range groupDomainSeed {
-		if existingSet[group] {
+		if existingSet[group] || d.isDeleted(group) {
 			continue
 		}
 		d.db.WithContext(ctx).Create(&model.ReleaseGroupMapping{
@@ -446,7 +505,7 @@ func (d *SourceSiteDetector) SyncSiteGroups(ctx context.Context, site *model.Sit
 		matched := strings.Contains(bareSite, bareSeed) ||
 			strings.Contains(siteBaseURL, seedDomainLower)
 
-		if !matched {
+		if !matched || d.isDeleted(group) {
 			continue
 		}
 
