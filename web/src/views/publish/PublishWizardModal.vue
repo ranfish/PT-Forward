@@ -161,6 +161,85 @@
                       :token-separators="[',']"
                     />
                   </a-form-item>
+
+                  <!-- 标题组件（P2 标题标准化） -->
+                  <template v-if="titleComponents">
+                    <a-divider style="margin: 8px 0">标题组件</a-divider>
+                    <a-row :gutter="12">
+                      <a-col :span="6">
+                        <a-form-item label="年份">
+                          <a-input v-model:value="titleComponents.year" size="small" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="6">
+                        <a-form-item label="季集">
+                          <a-input v-model:value="titleComponents.season_episode" size="small" placeholder="S01E02" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="6">
+                        <a-form-item label="分辨率">
+                          <a-input v-model:value="titleComponents.resolution" size="small" placeholder="1080p" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="6">
+                        <a-form-item label="媒介">
+                          <a-input v-model:value="titleComponents.medium" size="small" placeholder="BluRay" />
+                        </a-form-item>
+                      </a-col>
+                    </a-row>
+                    <a-row :gutter="12">
+                      <a-col :span="6">
+                        <a-form-item label="视频编码">
+                          <a-input v-model:value="titleComponents.video_codec" size="small" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="6">
+                        <a-form-item label="音频编码">
+                          <a-input v-model:value="titleComponents.audio_codec" size="small" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="6">
+                        <a-form-item label="HDR">
+                          <a-input v-model:value="titleComponents.hdr_format" size="small" placeholder="DoVi/HDR10+" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="6">
+                        <a-form-item label="制作组">
+                          <a-input v-model:value="titleComponents.release_group" size="small" />
+                        </a-form-item>
+                      </a-col>
+                    </a-row>
+                    <a-row :gutter="12">
+                      <a-col :span="6">
+                        <a-form-item label="片源平台">
+                          <a-input v-model:value="titleComponents.source_platform" size="small" placeholder="NF/AMZN" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="6">
+                        <a-form-item label="色深">
+                          <a-input v-model:value="titleComponents.bit_depth" size="small" placeholder="10bit" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="6">
+                        <a-form-item label="发布版本">
+                          <a-input v-model:value="titleComponents.release_version" size="small" placeholder="PROPER" />
+                        </a-form-item>
+                      </a-col>
+                      <a-col :span="6">
+                        <a-form-item label="标准分类">
+                          <a-tag v-if="standardizedParams?.type" color="blue">{{ standardizedParams.type }}</a-tag>
+                          <span v-else style="color:#999">未推断</span>
+                        </a-form-item>
+                      </a-col>
+                    </a-row>
+                    <a-alert
+                      v-if="titleComponents.unrecognized"
+                      type="warning"
+                      show-icon
+                      :message="`标题中有未识别内容: ${titleComponents.unrecognized}`"
+                      style="margin-top: 4px"
+                    />
+                  </template>
                 </a-form>
               </a-tab-pane>
 
@@ -591,6 +670,8 @@ interface AnalyzeResult {
   imdb_link?: string
   tmdb_link?: string
   removed_declarations?: string[]
+  title_components?: Record<string, string>
+  standardized_params?: Record<string, string>
 }
 
 const analyzing = ref(false)
@@ -613,6 +694,9 @@ const form = ref({
   tags: [] as string[],
   removedDeclarations: [] as string[],
 })
+
+const titleComponents = ref<Record<string, string> | null>(null)
+const standardizedParams = ref<Record<string, string> | null>(null)
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -690,6 +774,8 @@ async function enterAnalyze() {
           form.value.imdbLink = r.imdb_link || ''
           form.value.tmdbLink = r.tmdb_link || ''
           form.value.removedDeclarations = (r as Record<string, unknown>).removed_declarations as string[] || []
+          titleComponents.value = (r as Record<string, unknown>).title_components as Record<string, string> || null
+          standardizedParams.value = (r as Record<string, unknown>).standardized_params as Record<string, string> || null
           // 如果有预设源站（从源头站检测器），覆盖后端自动检测的源站
           if (props.presetTorrent?.source_site) {
             r.source_site = props.presetTorrent.source_site
@@ -933,6 +1019,8 @@ function resetWizard() {
   submittedCandidateId.value = 0
   candidateStatus.value = null
   form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [], removedDeclarations: [] }
+  titleComponents.value = null
+  standardizedParams.value = null
   reviewTab.value = 'main'
 }
 
