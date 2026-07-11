@@ -35,6 +35,15 @@
       <a-button size="small" style="margin-left: auto" @click="groupMappingOpen = true">
         制作组映射
       </a-button>
+      <a-button
+        v-if="selectedHashes.length > 0"
+        type="primary"
+        size="small"
+        :loading="batchPublishing"
+        @click="openBatchPublish"
+      >
+        批量发布 ({{ selectedHashes.length }})
+      </a-button>
       <!-- 后台查询进度 -->
       <div v-if="querying" class="query-progress">
         <a-progress
@@ -63,6 +72,7 @@
       row-key="info_hash"
       size="small"
       :sticky="{ offsetHeader: 48 }"
+      :row-selection="{ selectedRowKeys: selectedHashes, onChange: (keys: string[]) => selectedHashes = keys }"
       @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
@@ -167,6 +177,39 @@
     </a-modal>
 
     <a-modal
+      v-model:open="batchPublishOpen"
+      title="批量发布"
+      width="480px"
+      :confirm-loading="batchPublishing"
+      @ok="doBatchPublish"
+    >
+      <a-alert
+        type="info"
+        show-icon
+        :message="`将创建 ${selectedHashes.length} 个发布候选`"
+        description="系统将自动获取 MediaInfo/截图/简介并发布到目标站，无需逐个核对。"
+        style="margin-bottom: 16px"
+      />
+      <a-form layout="vertical">
+        <a-form-item label="源站">
+          <a-input v-model:value="batchForm.source_site" placeholder="源站名称" />
+        </a-form-item>
+        <a-form-item label="目标站">
+          <a-select v-model:value="batchForm.target_site" placeholder="选择目标站" show-search>
+            <a-select-option
+              v-for="site in batchTargetSites"
+              :key="site.name"
+              :value="site.name"
+              :label="site.name"
+            >
+              {{ site.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal
       v-model:open="groupMappingOpen"
       title="制作组 → 源站映射"
       width="800px"
@@ -245,6 +288,7 @@ const loading = ref(false)
 const searchText = ref('')
 const queryFilter = ref<string | undefined>(undefined)
 const queryingHash = ref('')
+const selectedHashes = ref<string[]>([])
 
 // 分页
 const currentPage = ref(1)
@@ -486,6 +530,79 @@ function confirmSourceSite() {
 
 function onWizardSuccess() {
   fetchTorrents()
+}
+
+// --- 批量发布 ---
+const batchPublishOpen = ref(false)
+const batchPublishing = ref(false)
+const batchTargetSites = ref<{ name: string }[]>([])
+const batchForm = reactive({ source_site: '', target_site: '' })
+
+async function openBatchPublish() {
+  batchForm.source_site = ''
+  batchForm.target_site = ''
+  // 自动检测源站（用第一个选中种子的制作组）
+  if (selectedHashes.value.length > 0 && torrents.value.length > 0) {
+    const firstHash = selectedHashes.value[0]
+    const torrent = torrents.value.find(t => t.info_hash === firstHash)
+    if (torrent) {
+      try {
+        const resp = await publishTorrentsApi.detectSource({
+          info_hash: torrent.info_hash,
+          name: torrent.name,
+        })
+        if (resp.data?.data?.source_site) {
+          batchForm.source_site = resp.data.data.source_site
+        }
+      } catch { /* ignore */ }
+    }
+  }
+  // 加载目标站列表
+  try {
+    const resp = await downloadersApi.list(1, 100)
+    // 用 sitesApi 获取目标站
+    const sitesResp = await import('@/api/sites').then(m => m.sitesApi.list(1, 200))
+    const data = sitesResp.data?.data
+    batchTargetSites.value = ((data?.items || data || []) as { name: string; is_target?: boolean }[])
+      .filter(s => s.is_target !== false)
+      .map(s => ({ name: s.name }))
+  } catch { /* ignore */ }
+  batchPublishOpen.value = true
+}
+
+async function doBatchPublish() {
+  if (!batchForm.source_site || !batchForm.target_site || !selectedClientId.value) {
+    message.warning('源站和目标站必填')
+    return
+  }
+  batchPublishing.value = true
+  try {
+    const items = selectedHashes.value.map(hash => {
+      const t = torrents.value.find(t => t.info_hash === hash)
+      return {
+        info_hash: hash,
+        name: t?.name || '',
+        size: t?.size || 0,
+        save_path: t?.save_path || '',
+      }
+    })
+    const resp = await publishTorrentsApi.batchPublish({
+      client_id: selectedClientId.value,
+      source_site: batchForm.source_site,
+      target_site: batchForm.target_site,
+      items,
+    })
+    const result = resp.data?.data
+    if (result) {
+      message.success(`已创建 ${result.created} 个发布候选${result.failed > 0 ? `，${result.failed} 个失败` : ''}`)
+    }
+    batchPublishOpen.value = false
+    selectedHashes.value = []
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    batchPublishing.value = false
+  }
 }
 
 onMounted(fetchClients)

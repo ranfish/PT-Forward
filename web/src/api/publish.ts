@@ -80,6 +80,9 @@ export const publishTorrentsApi = {
   listGroupedSiteNames() {
     return client.get<ApiResponse<{ sites: string[] }>>('/publish/torrents/group-mappings/sites')
   },
+  batchPublish(data: { client_id: number; source_site: string; target_site: string; items: { info_hash: string; name: string; size: number; save_path: string }[] }) {
+    return client.post<ApiResponse<{ created: number; failed: number; candidate_ids: number[]; target_site: string }>>('/publish/torrents/batch-publish', data)
+  },
 }
 
 export interface SourceDetectResult {
