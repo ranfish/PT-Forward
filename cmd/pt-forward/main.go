@@ -92,7 +92,7 @@ func main() {
 	log = reconfigureLogger(cfg.Log)
 	defer func() { _ = log.Sync() }()
 
-	db, err := initDB(cfg, log)
+	db, err := initDB(cfg, log, context.Background())
 	if err != nil {
 		log.Error("failed to init database", zap.Error(err))
 		os.Exit(1) //nolint:gocritic
@@ -665,7 +665,7 @@ func compressFile(path string) {
 	_ = os.Remove(path)
 }
 
-func initDB(cfg *config.Config, log *zap.Logger) (*gorm.DB, error) {
+func initDB(cfg *config.Config, log *zap.Logger, ctx context.Context) (*gorm.DB, error) {
 	var logLevel logger.LogLevel
 	switch cfg.Database.LogLevel {
 	case "silent":
@@ -714,6 +714,14 @@ func initDB(cfg *config.Config, log *zap.Logger) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
 	sqlDB.SetConnMaxLifetime(30 * time.Minute)
 	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+
+	if cfg.Database.Driver == "sqlite" {
+		if _, err := sqlDB.ExecContext(ctx, "PRAGMA wal_checkpoint(FULL)"); err != nil {
+			log.Warn("failed to checkpoint WAL on startup", zap.Error(err))
+		} else {
+			log.Info("sqlite WAL checkpoint completed on startup")
+		}
+	}
 
 	return db, nil
 }
