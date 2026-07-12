@@ -503,19 +503,13 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 
 // logOrphanTorrents: logs torrents that exist in the downloader but have no
 // tracking record at all (not even deleted). This runs only for clients that
-// have seeding records (i.e., actively managed by the seeding engine) to avoid
+// have seeding configs (i.e., actively managed by the seeding engine) to avoid
 // noise from non-seeding clients with many torrents. It only logs, never creates records.
 func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
-	hasRecords := false
-	e.mu.RLock()
-	for _, r := range e.recordMap {
-		if r.ClientID == clientID {
-			hasRecords = true
-			break
-		}
-	}
-	e.mu.RUnlock()
-	if !hasRecords {
+	var configCount int64
+	e.db.WithContext(ctx).Model(&model.SeedingClientConfig{}).
+		Where("client_id = ? AND enabled = ?", clientID, true).Count(&configCount)
+	if configCount == 0 {
 		return
 	}
 
@@ -525,13 +519,6 @@ func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrent
 			continue
 		}
 		lowerHash := strings.ToLower(hash)
-
-		e.mu.RLock()
-		_, inMem := e.recordMap[recordKey(clientID, lowerHash)]
-		e.mu.RUnlock()
-		if inMem {
-			continue
-		}
 
 		var count int64
 		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
