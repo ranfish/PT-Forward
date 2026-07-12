@@ -846,13 +846,33 @@ const blockedCount = computed(() => siteList.value.filter(s => s.blocked).length
 const subtitleWarning = computed(() => {
   if (!form.value.subtitle) return ''
   const sub = form.value.subtitle
-  // 禁止全角标点
-  if (/[\uFF00-\uFFEF]/.test(sub)) return '副标题含全角符号，部分站点可能拒绝'
-  // 家园/红叶：禁止重复英文片名
-  if (form.value.title && sub.includes(form.value.title.split(' ')[0])) {
-    return '副标题包含主标题英文名，家园/红叶可能拒绝'
+  const warnings: string[] = []
+
+  // 全角标点（所有站通用）
+  if (/[\uFF00-\uFFEF]/.test(sub)) {
+    warnings.push('含全角符号')
   }
-  return ''
+
+  // 英文片名重复（家园/红叶）
+  if (form.value.title) {
+    const firstWord = form.value.title.split(/[\s.]/)[0]
+    if (firstWord && firstWord.length > 2 && sub.toLowerCase().includes(firstWord.toLowerCase())) {
+      warnings.push('包含主标题英文名（家园/红叶可能拒绝）')
+    }
+  }
+
+  // 好大/我堡：副标题必须中文开头
+  const firstChar = sub.charAt(0)
+  if (!/[\u4e00-\u9fff]/.test(firstChar)) {
+    warnings.push('未以中文开头（好大/我堡可能拒绝）')
+  }
+
+  // 禁止转载来源（家园）
+  if (/转自|转载自|来源[:：]/.test(sub)) {
+    warnings.push('包含转载来源（家园禁止）')
+  }
+
+  return warnings.join('； ')
 })
 
 async function enterSelectSites() {
