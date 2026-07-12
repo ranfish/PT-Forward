@@ -609,6 +609,11 @@ func reconfigureLogger(cfg model.LogConfig) *zap.Logger {
 	w := newDateRotatingWriter(cfg.Directory, "pt-forward", cfg.Compress)
 	cores = append(cores, zapcore.NewCore(encoder, zapcore.AddSync(w), level))
 
+	// error 级别独立文件，方便快速排查
+	errW := newDateRotatingWriter(cfg.Directory, "pt-forward-error", cfg.Compress)
+	errLevel := zapcore.ErrorLevel
+	cores = append(cores, zapcore.NewCore(encoder, zapcore.AddSync(errW), errLevel))
+
 	cleanupOldLogs(cfg)
 
 	core := zapcore.NewTee(cores...)

@@ -91,6 +91,7 @@ type Engine struct {
 }
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
+	logger = logger.With(zap.String("component", "rss"))
 	return &Engine{
 		fetcher:    NewFetcher(logger),
 		repo:       NewRepository(db),

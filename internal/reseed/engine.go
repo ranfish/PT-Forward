@@ -201,6 +201,7 @@ type Engine struct {
 }
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
+	logger = logger.With(zap.String("component", "reseed"))
 	return &Engine{
 		db:      db,
 		logger:  logger,
@@ -292,7 +293,7 @@ func (e *Engine) processPendingInjections(ctx context.Context) {
 			continue
 		}
 
-		e.logger.Info("injection consumer: injectMatch",
+		e.logger.Debug("injection consumer: injectMatch",
 			zap.Uint("matchID", m.ID),
 			zap.String("targetSite", m.TargetSite),
 			zap.String("targetTorrentID", m.TargetTorrentID))
@@ -3022,15 +3023,15 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "already") || strings.Contains(err.Error(), "exist") {
-			e.logger.Info("辅种种子添加返回已存在（error 路径），验证下载器中是否真的存在",
-				zap.Uint("matchID", match.ID))
-			return e.verifyDuplicateAndFinish(ctx, dlClient, match, "")
-		}
-		return e.failMatch(ctx, match, fmt.Sprintf("注入种子到下载器失败: %v", err))
+		e.logger.Debug("辅种种子添加返回已存在（error 路径），验证下载器中是否真的存在",
+			zap.Uint("matchID", match.ID))
+		return e.verifyDuplicateAndFinish(ctx, dlClient, match, "")
+	}
+	return e.failMatch(ctx, match, fmt.Sprintf("注入种子到下载器失败: %v", err))
 	}
 
 	if addResult.IsDuplicate {
-		e.logger.Info("辅种种子添加返回已存在（duplicate），验证下载器中是否真的存在",
+		e.logger.Debug("辅种种子添加返回已存在（duplicate），验证下载器中是否真的存在",
 			zap.Uint("matchID", match.ID),
 			zap.String("hash", addResult.InfoHash))
 		return e.verifyDuplicateAndFinish(ctx, dlClient, match, addResult.InfoHash)
@@ -3149,7 +3150,11 @@ func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason
 		"retry_count":   match.RetryCount,
 		"updated_at":    time.Now(),
 	}).Error; err != nil {
-		e.logger.Error("failMatch update db error", zap.Uint("matchID", match.ID), zap.Error(err))
+		if errors.Is(err, context.Canceled) {
+			e.logger.Debug("failMatch update db skipped (context canceled)", zap.Uint("matchID", match.ID))
+		} else {
+			e.logger.Error("failMatch update db error", zap.Uint("matchID", match.ID), zap.Error(err))
+		}
 	}
 
 	// 不设负面缓存：瞬态失败（限流/超时/站点故障）允许快速重试。

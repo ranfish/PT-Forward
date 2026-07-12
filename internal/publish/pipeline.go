@@ -38,6 +38,7 @@ type Pipeline struct {
 }
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
+	logger = logger.With(zap.String("component", "publish"))
 	return &Pipeline{db: db, logger: logger, ptgen: ptgen.NewProvider(db, logger)}
 }
 

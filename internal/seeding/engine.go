@@ -229,6 +229,7 @@ type emaState struct {
 const emaAlpha = 0.3
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
+	logger = logger.With(zap.String("component", "seeding"))
 	e := &Engine{
 		db:              db,
 		logger:          logger,

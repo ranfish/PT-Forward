@@ -257,7 +257,6 @@ func (h *PublishTorrentsHandler) startBackgroundQuery(clientID uint, cfg model.C
 		// L0: 获取 trackers
 		trackers, err := client.GetTrackers(ctx, t.Hash)
 		if err != nil {
-			h.logger.Debug("bg query: get trackers failed", zap.String("hash", t.Hash[:8]), zap.Error(err))
 			trackers = nil
 		}
 
