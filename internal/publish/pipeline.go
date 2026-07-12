@@ -16,6 +16,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/ptgen"
 	"github.com/ranfish/pt-forward/internal/screenshot"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -624,6 +625,7 @@ func overridesString(overridesJSON, key string) (string, bool) {
 }
 
 // applyTitleComponents 用用户编辑的标题组件覆盖表单字段
+// 走标准化路径：原始值 → 标准键 → 规范显示名 → 表单字段
 func applyTitleComponents(pubReq *model.PublishRequest, overridesJSON string) {
 	if overridesJSON == "" {
 		return
@@ -641,22 +643,56 @@ func applyTitleComponents(pubReq *model.PublishRequest, overridesJSON string) {
 		return
 	}
 
-	// 用组件值覆盖表单字段（仅非空时）
-	if v, ok := tc["resolution"].(string); ok && v != "" {
-		pubReq.FormFields["resolution"] = v
+	// 构建 TitleComponents 并标准化
+	components := titleparser.TitleComponents{
+		Resolution:  getStringFromMap(tc, "resolution"),
+		VideoCodec:  getStringFromMap(tc, "video_codec"),
+		AudioCodec:  getStringFromMap(tc, "audio_codec"),
+		Medium:      getStringFromMap(tc, "medium"),
+		ReleaseGroup: getStringFromMap(tc, "release_group"),
 	}
-	if v, ok := tc["video_codec"].(string); ok && v != "" {
-		pubReq.FormFields["codec"] = v
+	stdParams, _ := titleparser.Standardize(components)
+
+	// 用标准键逆向映射为规范显示名，再填入表单
+	// 如果逆向映射失败（不在标准映射表中），回退到原始值
+	if components.Resolution != "" {
+		display := titleparser.ReverseLookup(stdParams.Resolution)
+		if display == "" {
+			display = components.Resolution
+		}
+		pubReq.FormFields["resolution"] = display
 	}
-	if v, ok := tc["audio_codec"].(string); ok && v != "" {
-		pubReq.FormFields["audioCodec"] = v
+	if components.VideoCodec != "" {
+		display := titleparser.ReverseLookup(stdParams.VideoCodec)
+		if display == "" {
+			display = components.VideoCodec
+		}
+		pubReq.FormFields["codec"] = display
 	}
-	if v, ok := tc["medium"].(string); ok && v != "" {
-		pubReq.FormFields["source"] = v
+	if components.AudioCodec != "" {
+		display := titleparser.ReverseLookup(stdParams.AudioCodec)
+		if display == "" {
+			display = components.AudioCodec
+		}
+		pubReq.FormFields["audioCodec"] = display
 	}
-	if v, ok := tc["release_group"].(string); ok && v != "" {
-		pubReq.FormFields["team"] = v
+	if components.Medium != "" {
+		display := titleparser.ReverseLookup(stdParams.Medium)
+		if display == "" {
+			display = components.Medium
+		}
+		pubReq.FormFields["source"] = display
 	}
+	if components.ReleaseGroup != "" {
+		pubReq.FormFields["team"] = components.ReleaseGroup
+	}
+}
+
+func getStringFromMap(m map[string]interface{}, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
 }
 
 func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (*model.PublishRequest, error) {
@@ -1790,6 +1826,27 @@ func (p *Pipeline) mapFieldValues(ctx context.Context, targetSite string, fields
 			mapped = mapKey("source", v)
 		}
 		fields["source"] = mapped
+	}
+	if v, ok := fields["audioCodec"]; ok {
+		mapped := mapKey("audiocodec_sel", v)
+		if mapped == v {
+			mapped = mapKey("audioCodec", v)
+		}
+		fields["audioCodec"] = mapped
+	}
+	if v, ok := fields["team"]; ok {
+		mapped := mapKey("team_sel", v)
+		if mapped == v {
+			mapped = mapKey("team", v)
+		}
+		fields["team"] = mapped
+	}
+	if v, ok := fields["medium"]; ok {
+		mapped := mapKey("medium_sel", v)
+		if mapped == v {
+			mapped = mapKey("medium", v)
+		}
+		fields["medium"] = mapped
 	}
 }
 
