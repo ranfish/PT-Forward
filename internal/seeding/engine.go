@@ -502,9 +502,23 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 }
 
 // logOrphanTorrents: logs torrents that exist in the downloader but have no
-// tracking record at all (not even deleted). This runs regardless of scope
-// to help diagnose "phantom torrent" issues. It only logs, never creates records.
+// tracking record at all (not even deleted). This runs only for clients that
+// have seeding records (i.e., actively managed by the seeding engine) to avoid
+// noise from non-seeding clients with many torrents. It only logs, never creates records.
 func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
+	hasRecords := false
+	e.mu.RLock()
+	for _, r := range e.recordMap {
+		if r.ClientID == clientID {
+			hasRecords = true
+			break
+		}
+	}
+	e.mu.RUnlock()
+	if !hasRecords {
+		return
+	}
+
 	var orphans []string
 	for hash, ti := range torrentMap {
 		if ti.State == "error" || ti.Removed {
@@ -533,11 +547,15 @@ func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrent
 	}
 
 	if len(orphans) > 0 {
+		logOrphans := orphans
+		if len(logOrphans) > 20 {
+			logOrphans = append(logOrphans[:20], fmt.Sprintf("... and %d more", len(orphans)-20))
+		}
 		e.logger.Warn("orphan torrents detected: in downloader but not tracked",
 			zap.String("client_id", clientID),
 			zap.Int("count", len(orphans)),
 			zap.Int("total_in_downloader", len(torrentMap)),
-			zap.Strings("orphans", orphans))
+			zap.Strings("orphans", logOrphans))
 	}
 }
 
