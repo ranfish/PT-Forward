@@ -1630,20 +1630,33 @@ func (e *Engine) markRelatedDeleted(ctx context.Context, relatedHashes []string,
 
 // deleteTorrentWithCompanions: deletes a torrent and its cross-seeded companions.
 // Uses companion.PlanDelete for shared planning logic.
+// Companions sharing the same save path as the main torrent are deleted with
+// deleteData=true to prevent orphan files; companions with different save
+// paths are deleted without data to avoid deleting unrelated files.
 func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateContext, infoHash string, deleteData bool, deleteCompanions bool) error {
 	ti := ec.torrentMap[infoHash]
 	plan := companion.PlanDelete(ti, ec.torrents, deleteCompanions, deleteData)
 
 	for _, compHash := range plan.CompanionHashes {
-		if err := ec.client.DeleteTorrent(ctx, compHash, false); err != nil {
+		compDeleteData := false
+		if plan.DeleteData && ti != nil {
+			if compTi, ok := ec.torrentMap[compHash]; ok && compTi != nil {
+				if compTi.SavePath == ti.SavePath {
+					compDeleteData = true
+				}
+			}
+		}
+		if err := ec.client.DeleteTorrent(ctx, compHash, compDeleteData); err != nil {
 			e.logger.Warn("companion delete failed (continuing)",
 				zap.String("companion_hash", compHash),
 				zap.String("main_hash", infoHash),
+				zap.Bool("delete_data", compDeleteData),
 				zap.Error(err))
 		} else {
 			e.logger.Info("companion deleted (cascade)",
 				zap.String("companion_hash", compHash),
-				zap.String("main_hash", infoHash))
+				zap.String("main_hash", infoHash),
+				zap.Bool("delete_data", compDeleteData))
 		}
 	}
 	if len(plan.CompanionHashes) > 0 {
@@ -2246,9 +2259,13 @@ func (e *Engine) Clear(ctx context.Context, clientID string) error {
 	}
 	e.mu.Unlock()
 
-	return e.db.WithContext(ctx).
-		Where("client_id = ? AND source = ?", clientID, "rss").
-		Delete(&model.SeedingTorrentRecord{}).Error
+	return e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+		Where("client_id = ? AND source = ? AND status != ?", clientID, "rss", model.SeedingStatusDeleted).
+		Updates(map[string]interface{}{
+			"status":         model.SeedingStatusDeleted,
+			"last_action_by": "clear",
+			"updated_at":     time.Now(),
+		}).Error
 }
 
 func (e *Engine) CollectTrafficStats(ctx context.Context) error {
