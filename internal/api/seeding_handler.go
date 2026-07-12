@@ -86,6 +86,14 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleUnregisteredKeywords(w, r)
 		return
 
+	case trimmed == "/api/v1/seeding/history" || trimmed == "/api/v1/seeding/history/":
+		if r.Method == http.MethodGet {
+			h.handleListHistory(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+
 	case strings.HasPrefix(trimmed, "/api/v1/seeding/stats/"):
 		h.handleStatsSubroute(w, r, trimmed)
 		return
@@ -1637,5 +1645,123 @@ func (h *SeedingHandler) handleDryrunBySub(w http.ResponseWriter, r *http.Reques
 		"subscriptionId": subID,
 		"candidates":     []interface{}{},
 		"total":          totalEvaluated,
+	})
+}
+
+func (h *SeedingHandler) handleListHistory(w http.ResponseWriter, r *http.Request) {
+	page, size := parsePagination(r)
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 || size > 200 {
+		size = 50
+	}
+
+	q := h.db.Model(&model.SeedingTorrentRecord{}).
+		Where("status = ?", "deleted")
+
+	if clientID := r.URL.Query().Get("client_id"); clientID != "" {
+		q = q.Where("client_id = ?", clientID)
+	}
+	if siteName := r.URL.Query().Get("site_name"); siteName != "" {
+		q = q.Where("site_name = ?", siteName)
+	}
+	if search := r.URL.Query().Get("search"); search != "" {
+		q = q.Where("info_hash LIKE ? OR torrent_id LIKE ? OR site_name LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+	}
+	if actionBy := r.URL.Query().Get("action_by"); actionBy != "" {
+		q = q.Where("last_action_by LIKE ?", "%"+actionBy+"%")
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询历史记录总数失败")
+		return
+	}
+
+	var records []model.SeedingTorrentRecord
+	offset := (page - 1) * size
+	if err := q.Session(&gorm.Session{}).Order("updated_at DESC").Offset(offset).Limit(size).Find(&records).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询历史记录失败")
+		return
+	}
+
+	type seenTitle struct {
+		SiteName  string
+		TorrentID string
+		Title     string
+	}
+	var titles []seenTitle
+	h.db.Model(&model.RSSTorrentSeen{}).
+		Select("site_name, torrent_id, title").
+		Find(&titles)
+	titleMap := make(map[string]string, len(titles))
+	for _, t := range titles {
+		titleMap[t.SiteName+"|"+t.TorrentID] = t.Title
+	}
+
+	type trafficInfo struct {
+		InfoHash    string
+		Uploaded    int64
+		Downloaded  int64
+		Ratio       float64
+		UploadSpeed int64
+	}
+	var traffics []trafficInfo
+	if len(records) > 0 {
+		hashes := make([]string, len(records))
+		for i, r := range records {
+			hashes[i] = r.InfoHash
+		}
+		h.db.Model(&model.TorrentTraffic{}).
+			Select("info_hash, uploaded, downloaded, ratio, upload_speed").
+			Where("info_hash IN ?", hashes).
+			Find(&traffics)
+	}
+	trafficMap := make(map[string]trafficInfo, len(traffics))
+	for _, t := range traffics {
+		trafficMap[t.InfoHash] = t
+	}
+
+	type siteInfo struct {
+		BaseURL   string
+		Framework string
+	}
+	var sites []model.Site
+	h.db.Select("name, base_url, framework").Find(&sites)
+	siteMap := make(map[string]siteInfo, len(sites))
+	for _, s := range sites {
+		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
+	}
+
+	type historyItem struct {
+		model.SeedingTorrentRecord
+		Title     string `json:"title"`
+		DetailURL string `json:"detail_url"`
+		Uploaded  int64  `json:"uploaded"`
+		Downloaded int64 `json:"downloaded"`
+		Ratio     float64 `json:"ratio"`
+	}
+	items := make([]historyItem, len(records))
+	for i := range records {
+		items[i] = historyItem{SeedingTorrentRecord: records[i]}
+		if title, ok := titleMap[records[i].SiteName+"|"+records[i].TorrentID]; ok {
+			items[i].Title = title
+		}
+		if si, ok := siteMap[records[i].SiteName]; ok && si.BaseURL != "" && records[i].TorrentID != "" {
+			items[i].DetailURL = buildDetailURL(si.BaseURL, si.Framework, records[i].TorrentID)
+		}
+		if t, ok := trafficMap[records[i].InfoHash]; ok {
+			items[i].Uploaded = t.Uploaded
+			items[i].Downloaded = t.Downloaded
+			items[i].Ratio = t.Ratio
+		}
+	}
+
+	Success(w, map[string]interface{}{
+		"items": items,
+		"total": total,
+		"page":  page,
+		"size":  size,
 	})
 }
