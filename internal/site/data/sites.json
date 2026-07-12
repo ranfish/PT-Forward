@@ -341,7 +341,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.hdclone.top",
@@ -575,7 +576,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.lajidui.top",
@@ -1080,7 +1082,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "kufei.org",
@@ -1475,7 +1478,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "yhpp.cc",
@@ -2027,7 +2031,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "13city.org",
@@ -2410,7 +2415,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "13City"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "1ptba.com",
@@ -2819,7 +2825,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "audiences.me",
@@ -3440,7 +3447,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "carpt.net",
@@ -3670,7 +3678,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "CarPT"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "cyanbug.net",
@@ -3992,7 +4001,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "CyanBug"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "discfan.net",
@@ -4162,7 +4172,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "DiscFan"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "dubhe.site",
@@ -4388,7 +4399,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "duckboobee.org",
@@ -4686,7 +4698,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "et8.org",
@@ -5004,7 +5017,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "TCCF"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.haidan.cc",
@@ -5192,7 +5206,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "HaiDan"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "hdarea.club",
@@ -6780,7 +6795,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "HDTime"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "hdvideo.top",
@@ -7148,7 +7164,8 @@
         "HDVMV",
         "HDVWEB",
         "HDVideo"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "lemonhd.net",
@@ -7797,7 +7814,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "nanyangpt.com",
@@ -7873,7 +7891,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "NYTV"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "njtupt.top",
@@ -8058,7 +8077,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "p.t-baozi.cc",
@@ -8409,7 +8429,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pandapt.net",
@@ -8793,7 +8814,8 @@
       "groups": [
         "AilMWeb",
         "PANDA"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "piggo.me",
@@ -9072,7 +9094,8 @@
         "PigGo",
         "PigoHD",
         "PigoWeb"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.0ff.cc",
@@ -9532,7 +9555,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "FreeFarm"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.aling.de",
@@ -9747,7 +9771,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.btschool.club",
@@ -9992,7 +10017,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "BTSchool"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.cdy.skin",
@@ -10226,7 +10252,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "bilibili.download",
@@ -10439,7 +10466,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.eastgame.org",
@@ -10722,7 +10750,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "TLF"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.hdupt.com",
@@ -11000,7 +11029,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "HDU"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.luckpt.de",
@@ -11343,7 +11373,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.muxuege.org",
@@ -11865,7 +11896,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.novahd.top",
@@ -12252,7 +12284,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.sjtu.edu.cn",
@@ -12459,7 +12492,8 @@
       "groups": [
         "PuTao",
         "putao"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.tey.cc",
@@ -12706,7 +12740,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.xingyungept.org",
@@ -13085,7 +13120,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "ptcafe.club",
@@ -13561,7 +13597,8 @@
       "groups": [
         "CafeTV",
         "CafeWEB"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "ptchdbits.co",
@@ -13880,7 +13917,8 @@
         "CHDPAD",
         "CHDTV",
         "CHDWEB"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "ptfans.cc",
@@ -14126,7 +14164,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pthome.net",
@@ -14463,7 +14502,8 @@
       "groups": [
         "PTH",
         "PTHome"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "sbpt.link",
@@ -14717,7 +14757,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "sewerpt.com",
@@ -15008,7 +15049,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "springsunday.net",
@@ -15425,7 +15467,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "TJUPT"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "u2.dmhy.org",
@@ -15456,7 +15499,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "U2"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "ubits.club",
@@ -15819,7 +15863,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "UBWEB"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.dragonhd.xyz",
@@ -16077,7 +16122,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.hitpt.com",
@@ -16419,7 +16465,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "HITPT"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.hxpt.org",
@@ -16996,7 +17043,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.okpt.net",
@@ -17492,7 +17540,8 @@
       "groups": [
         "OK",
         "OKWEB"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.oshen.win",
@@ -17718,7 +17767,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.tangpt.top",
@@ -18209,7 +18259,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "zmpt.cc",
@@ -18491,7 +18542,8 @@
       "groups": [
         "ZmPT",
         "ZmWeb"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "zrpt.cc",
@@ -18854,7 +18906,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "hdfans.org",
@@ -19465,7 +19518,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "HDFans"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.ying.us.kg",
@@ -19719,7 +19773,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "open.cd",
@@ -19979,7 +20034,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "OpenCD"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "cspt.top",
@@ -20322,7 +20378,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.hdkyl.in",
@@ -20807,7 +20864,8 @@
         "HDKTV",
         "HDKWEB",
         "HDKylin"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.agsvpt.com",
@@ -21818,7 +21876,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "PTLGS"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "hhanclub.net",
@@ -22163,7 +22222,8 @@
         "FROGE",
         "FROGWeb",
         "QingWa"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pterclub.net",
@@ -22637,7 +22697,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "monikadesign.uk",
@@ -22893,7 +22954,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "dicmusic.com",
@@ -23097,7 +23159,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "zhuque.in",
@@ -23266,7 +23329,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "rousi.pro",
@@ -23389,7 +23453,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "totheglory.im",
@@ -23803,7 +23868,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "HDRoute"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "star-space.net",
@@ -24130,7 +24196,8 @@
         "YingMV",
         "YingTV",
         "YingWEB"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "52pt.site",
@@ -24452,7 +24519,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "crabpt.vip",
@@ -25007,7 +25075,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "XHBWeb"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.itzmx.com",
@@ -25086,7 +25155,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "ptsbao.club",
@@ -25414,7 +25484,8 @@
         "FFans",
         "FHDMV",
         "sBao"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.soulvoice.club",
@@ -25617,7 +25688,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "SoulVoice"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "ptzone.xyz",
@@ -25867,7 +25939,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "wintersakura.net",
@@ -26202,7 +26275,8 @@
         "SakuraSUB",
         "SakuraWEB",
         "WScode"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.htpt.cc",
@@ -26298,7 +26372,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.ptlao.top",
@@ -26459,7 +26534,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.pttime.org",
@@ -26769,7 +26845,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.momentpt.top",
@@ -26814,7 +26891,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "hdcity.city",
@@ -27096,7 +27174,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.keepfrds.com",
@@ -27127,7 +27206,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "FRDS"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.ptskit.org",
@@ -27155,7 +27235,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "ourbits.club",
@@ -27478,7 +27559,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "xingwan.cc",
@@ -27722,7 +27804,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "xingtan.one",
@@ -28270,7 +28353,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "zeus.hamsters.space",
@@ -28464,7 +28548,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "pt.tu88.men",
@@ -28646,7 +28731,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.tokyo-manga.top",
@@ -28674,7 +28760,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true
+      "supports_pieces_hash_api": true,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.yemapt.org",
@@ -29368,7 +29455,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "api.m-team.cc",
@@ -30140,7 +30228,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "hdbao.cc",
@@ -30406,7 +30495,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "raingfh.top",
@@ -30748,7 +30838,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "playlet.cc",
@@ -30776,7 +30867,8 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": false
+      "supports_pieces_hash_api": false,
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.52movie.top",
@@ -30807,7 +30899,8 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "52MOVIE"
-      ]
+      ],
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "www.musopia.vip",
@@ -30822,7 +30915,8 @@
       "alternative_domains": "",
       "supports_pieces_hash_api": true,
       "verification_status": "verified",
-      "special_notes": ""
+      "special_notes": "",
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     },
     {
       "domain": "dstudio.me",
@@ -30837,7 +30931,8 @@
       "alternative_domains": "",
       "supports_pieces_hash_api": true,
       "verification_status": "verified",
-      "special_notes": "全站官种，只能做源站"
+      "special_notes": "全站官种，只能做源站",
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
     }
   ],
   "exclusions": [
