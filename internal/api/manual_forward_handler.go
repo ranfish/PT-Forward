@@ -165,18 +165,22 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 }
 
 type analyzeTask struct {
-	mu        sync.RWMutex           `json:"-"`
-	ID        int64                  `json:"id"`
-	Status    string                 `json:"status"`
-	Error     string                 `json:"error,omitempty"`
-	Result    map[string]interface{} `json:"result,omitempty"`
-	CreatedAt time.Time              `json:"created_at"`
+	mu            sync.RWMutex           `json:"-"`
+	ID            int64                  `json:"id"`
+	Status        string                 `json:"status"`
+	Error         string                 `json:"error,omitempty"`
+	Result        map[string]interface{} `json:"result,omitempty"`
+	CreatedAt     time.Time              `json:"created_at"`
+	Progress      int                    `json:"progress,omitempty"`
+	ProgressText  string                 `json:"progress_text,omitempty"`
 }
 
 func (t *analyzeTask) setError(err string) {
 	t.mu.Lock()
 	t.Error = err
 	t.Status = "failed"
+	t.Progress = 0
+	t.ProgressText = ""
 	t.mu.Unlock()
 }
 
@@ -184,6 +188,15 @@ func (t *analyzeTask) setResult(result map[string]interface{}) {
 	t.mu.Lock()
 	t.Result = result
 	t.Status = "completed"
+	t.Progress = 0
+	t.ProgressText = ""
+	t.mu.Unlock()
+}
+
+func (t *analyzeTask) setProgress(percent int, text string) {
+	t.mu.Lock()
+	t.Progress = percent
+	t.ProgressText = text
 	t.mu.Unlock()
 }
 
@@ -191,11 +204,13 @@ func (t *analyzeTask) snapshot() *analyzeTask {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return &analyzeTask{
-		ID:        t.ID,
-		Status:    t.Status,
-		Error:     t.Error,
-		Result:    t.Result,
-		CreatedAt: t.CreatedAt,
+		ID:           t.ID,
+		Status:       t.Status,
+		Error:        t.Error,
+		Result:       t.Result,
+		CreatedAt:    t.CreatedAt,
+		Progress:     t.Progress,
+		ProgressText: t.ProgressText,
 	}
 }
 
@@ -313,7 +328,9 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	// BDInfo 扫描（检测到蓝光原盘时）
 	if h.bdinfoScanner != nil && savePath != "" {
 		bdinfoCtx, bdinfoCancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		bdinfoReport, bdinfoErr := h.bdinfoScanner.ScanIfBD(bdinfoCtx, savePath)
+		bdinfoReport, bdinfoErr := h.bdinfoScanner.ScanIfBD(bdinfoCtx, savePath, func(percent int, text string) {
+			task.setProgress(percent, text)
+		})
 		bdinfoCancel()
 		if bdinfoErr != nil {
 			h.logger.Warn("analyze: BDInfo scan failed", zap.Error(bdinfoErr))

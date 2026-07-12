@@ -95,7 +95,15 @@
           <div v-if="analyzing" class="analyzing-state">
             <a-spin size="large" />
             <p style="margin-top: 16px; color: #666">正在分析种子信息（截图/MediaInfo/简介）...</p>
-            <p style="color: #999; font-size: 12px">这可能需要 30-60 秒，请耐心等待</p>
+            <template v-if="analyzeProgress > 0">
+              <a-progress
+                :percent="analyzeProgress"
+                status="active"
+                style="max-width: 400px; margin-top: 12px"
+              />
+              <p style="color: #1677ff; font-size: 12px; margin-top: 4px">{{ analyzeProgressText }}</p>
+            </template>
+            <p v-else style="color: #999; font-size: 12px">这可能需要 30-60 秒，请耐心等待</p>
           </div>
 
           <!-- 分析失败 -->
@@ -701,6 +709,8 @@ interface AnalyzeResult {
 const analyzing = ref(false)
 const analyzeResult = ref<AnalyzeResult | null>(null)
 const analyzeError = ref('')
+const analyzeProgress = ref(0)
+const analyzeProgressText = ref('')
 const reviewTab = ref('main')
 const screenshotPreviewVisible = ref(false)
 
@@ -809,10 +819,17 @@ async function enterAnalyze() {
             r.source_site_id = props.presetTorrent.source_site_id
           }
           analyzing.value = false
+          analyzeProgress.value = 0
+          analyzeProgressText.value = ''
         } else if (task?.status === 'failed') {
           analyzeError.value = task.error || '分析失败'
           analyzing.value = false
+          analyzeProgress.value = 0
+          analyzeProgressText.value = ''
         } else {
+          const taskAny = task as Record<string, unknown> | undefined
+          analyzeProgress.value = (taskAny?.progress as number) || 0
+          analyzeProgressText.value = (taskAny?.progress_text as string) || ''
           pollTimer = setTimeout(poll, 2000)
         }
       } catch (e: unknown) {
