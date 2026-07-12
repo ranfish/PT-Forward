@@ -253,7 +253,7 @@
         <a-button type="primary" size="small" @click="addDeclPattern">添加</a-button>
       </div>
       <div style="margin-top: 16px; text-align: right">
-        <a-button @click="declFilterOpen = false" style="margin-right: 8px">取消</a-button>
+        <a-button style="margin-right: 8px" @click="declFilterOpen = false">取消</a-button>
         <a-button type="primary" :loading="declFilterSaving" @click="saveDeclFilters">保存</a-button>
       </div>
     </a-modal>
@@ -623,7 +623,6 @@ async function openBatchPublish() {
   }
   // 加载目标站列表
   try {
-    const resp = await downloadersApi.list(1, 100)
     // 用 sitesApi 获取目标站
     const sitesResp = await import('@/api/sites').then(m => m.sitesApi.list(1, 200))
     const data = sitesResp.data?.data

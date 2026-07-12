@@ -425,6 +425,7 @@ const hasActiveCandidates = computed(() =>
 
 let candidatePollTimer: ReturnType<typeof setInterval> | null = null
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function startCandidatePoll() {
   if (candidatePollTimer) return
   candidatePollTimer = setInterval(async () => {
@@ -588,6 +589,7 @@ async function viewTaskResults() {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function fetchResults() {
   resultsLoading.value = true
   try {

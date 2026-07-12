@@ -3,18 +3,22 @@
     <a-page-header :title="t('downloads.title')" :subtitle="t('downloads.subtitle')">
       <template #extra>
         <a-space>
-          <a-select v-model:value="filterClient" style="width: 180px" allow-clear
-            :placeholder="t('downloads.filterClient')" @change="fetchData">
+          <a-select
+            v-model:value="filterClient" style="width: 180px" allow-clear
+            :placeholder="t('downloads.filterClient')" @change="fetchData"
+          >
             <a-select-option v-for="c in clientOptions" :key="c" :value="c">{{ c }}</a-select-option>
           </a-select>
-          <a-select v-model:value="filterStatus" style="width: 140px" allow-clear
-            :placeholder="t('downloads.filterStatus')" @change="fetchData">
+          <a-select
+            v-model:value="filterStatus" style="width: 140px" allow-clear
+            :placeholder="t('downloads.filterStatus')" @change="fetchData"
+          >
             <a-select-option value="downloading">{{ t('downloads.statusDownloading') }}</a-select-option>
             <a-select-option value="completed">{{ t('downloads.statusCompleted') }}</a-select-option>
             <a-select-option value="paused">{{ t('downloads.statusPaused') }}</a-select-option>
             <a-select-option value="error">{{ t('downloads.statusError') }}</a-select-option>
           </a-select>
-          <a-button @click="fetchData" :icon="h(ReloadOutlined)">{{ t('common.refresh') }}</a-button>
+          <a-button :icon="h(ReloadOutlined)" @click="fetchData">{{ t('common.refresh') }}</a-button>
         </a-space>
       </template>
     </a-page-header>
@@ -65,14 +69,14 @@
 
     <div style="margin-bottom: 16px">
       <a-space>
-        <a-button type="primary" @click="showAddModal = true" :icon="h(PlusOutlined)">{{ t('downloads.addDownload') }}</a-button>
+        <a-button type="primary" :icon="h(PlusOutlined)" @click="showAddModal = true">{{ t('downloads.addDownload') }}</a-button>
       </a-space>
     </div>
 
     <div v-if="selectedRowKeys.length > 0" style="margin-bottom: 16px">
       <a-space>
         <span>{{ selectedRowKeys.length }} {{ t('downloads.selected') }}</span>
-        <a-button size="small" @click="handleBulk('pause')" :disabled="!hasSelected">{{ t('downloads.pause') }}</a-button>
+        <a-button size="small" :disabled="!hasSelected" @click="handleBulk('pause')">{{ t('downloads.pause') }}</a-button>
         <a-button size="small" @click="handleBulk('resume')">{{ t('downloads.resume') }}</a-button>
         <a-button size="small" @click="handleBulk('recheck')">{{ t('downloads.recheck') }}</a-button>
         <a-popconfirm :title="t('downloads.bulkDeleteConfirm')" @confirm="handleBulkDelete">
@@ -95,8 +99,8 @@
         showSizeChanger: true,
         showTotal: (total: number) => `${total} ${t('common.items')}`,
       }"
-      @change="onPageChange"
       size="small"
+      @change="onPageChange"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'torrent_name'">
@@ -140,16 +144,20 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space size="small">
-            <a-button v-if="record.transfer_status === 'transfer_failed' || record.transfer_status === 'transfer_partial'"
-              type="link" size="small" @click="handleRetryTransfer(record)">{{ t('downloads.retryTransfer') }}</a-button>
+            <a-button
+              v-if="record.transfer_status === 'transfer_failed' || record.transfer_status === 'transfer_partial'"
+              type="link" size="small" @click="handleRetryTransfer(record)"
+            >
+              {{ t('downloads.retryTransfer') }}
+            </a-button>
             <a-popconfirm
               :title="t('downloads.deleteConfirm')"
-              @confirm="handleDelete(record)"
               :ok-text="t('common.confirm')"
               :cancel-text="t('common.cancel')"
+              @confirm="handleDelete(record)"
             >
               <template #description>
-                <a-radio-group v-model:value="deleteMode" style="margin-top: 8px" v-if="record.status !== 'deleted'">
+                <a-radio-group v-if="record.status !== 'deleted'" v-model:value="deleteMode" style="margin-top: 8px">
                   <a-radio :value="true">{{ t('downloads.deleteWithCompanions') }}</a-radio>
                   <a-radio :value="false">{{ t('downloads.deleteSiteOnly') }}</a-radio>
                 </a-radio-group>
@@ -163,7 +171,7 @@
       </template>
     </a-table>
 
-    <a-modal v-model:open="showAddModal" :title="t('downloads.addDownload')" :confirm-loading="adding" @ok="handleAdd" width="520px">
+    <a-modal v-model:open="showAddModal" :title="t('downloads.addDownload')" :confirm-loading="adding" width="520px" @ok="handleAdd">
       <a-form layout="vertical">
         <a-form-item label="目标下载器" required>
           <a-select v-model:value="addForm.client_id" :placeholder="t('downloads.selectClient')">
@@ -190,7 +198,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="configModalVisible" :title="t('downloads.configTitle')" :confirm-loading="configSubmitting" @ok="handleConfigSubmit" width="600px">
+    <a-modal v-model:open="configModalVisible" :title="t('downloads.configTitle')" :confirm-loading="configSubmitting" width="600px" @ok="handleConfigSubmit">
       <a-form layout="vertical">
         <a-form-item label="下载器" required>
           <a-select v-model:value="configForm.client_id" :disabled="!!editingConfig" :placeholder="t('downloads.selectClient')">
@@ -253,6 +261,7 @@ import { message } from 'ant-design-vue'
 import { ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { downloadsApi, type DownloadTask, type DownloadClientConfig, type SpaceStat } from '@/api/downloads'
 import { downloadersApi } from '@/api/downloaders'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { seedingApi, deleteRulesApi } from '@/api/seeding'
 import { formatBytes, formatTime } from '@/utils/format'
 

@@ -461,11 +461,11 @@
             <a-divider style="margin: 12px 0">标题预览</a-divider>
             <div v-for="site in selectedTargets" :key="site" class="title-preview-item">
               <span class="title-preview-site">{{ site }}</span>
-                <span class="title-preview-text" :title="titlePreviews[site] || '加载中...'">
-                  {{ titlePreviews[site] || '加载中...' }}
-                </span>
-              </div>
+              <span class="title-preview-text" :title="titlePreviews[site] || '加载中...'">
+                {{ titlePreviews[site] || '加载中...' }}
+              </span>
             </div>
+          </div>
         </div>
 
         <!-- ─── Step 3: 发布结果 ─── -->
