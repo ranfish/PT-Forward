@@ -688,10 +688,25 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 	addResult, err := fc.client.AddFromFile(ctx, torrentData, opts)
 	if err != nil {
 		e.logger.Warn("flush: add from file failed",
+			zap.String("client_id", fc.clientID),
 			zap.String("torrent_id", rec.TorrentID),
+			zap.String("site_name", rec.SiteName),
+			zap.String("info_hash", rec.InfoHash),
 			zap.Error(err))
 		return candidate, false
 	}
+
+	e.logger.Debug("flush: torrent pushed to downloader",
+		zap.String("client_id", fc.clientID),
+		zap.String("torrent_id", rec.TorrentID),
+		zap.String("site_name", rec.SiteName),
+		zap.String("expected_hash", rec.InfoHash),
+		zap.String("actual_hash", func() string {
+			if addResult != nil {
+				return addResult.InfoHash
+			}
+			return ""
+		}()))
 
 	e.mu.Lock()
 	key := recordKey(fc.clientID, rec.InfoHash)
@@ -781,6 +796,12 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 		e.logger.Error("flush: failed to update record status after push",
 			zap.String("info_hash", rec.InfoHash),
 			zap.Error(dbErr))
+	} else {
+		e.logger.Debug("flush: record updated to seeding",
+			zap.String("client_id", fc.clientID),
+			zap.String("info_hash", rec.InfoHash),
+			zap.String("site_name", rec.SiteName),
+			zap.String("torrent_id", rec.TorrentID))
 	}
 	rec.FlushedAt = &now
 	rec.Status = model.SeedingStatusSeeding

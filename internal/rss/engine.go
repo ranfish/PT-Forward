@@ -911,8 +911,12 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 		if e.seedingCounter != nil && sub.Enabled && sub.ClientID != "" {
 			for i := range torrentEvents {
 				if err := e.seedingCounter.Add(ctx, sub.ClientID, &torrentEvents[i]); err != nil {
-					e.logger.Debug("seeding counter add failed",
+					e.logger.Warn("seeding counter add failed",
+						zap.String("subscription", sub.Name),
+						zap.String("client_id", sub.ClientID),
+						zap.String("site_name", torrentEvents[i].SiteName),
 						zap.String("torrent_id", torrentEvents[i].TorrentID),
+						zap.String("info_hash", torrentEvents[i].InfoHash),
 						zap.Error(err))
 				} else {
 					e.repo.MarkStatus(ctx, torrentEvents[i].SiteName, torrentEvents[i].TorrentID, "pushed")
@@ -922,6 +926,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			if _, flushErr := e.seedingCounter.Flush(ctx, subIDStr); flushErr != nil {
 				e.logger.Warn("seeding counter flush failed",
 					zap.String("subscription", sub.Name),
+					zap.String("client_id", sub.ClientID),
 					zap.Error(flushErr))
 			}
 		}

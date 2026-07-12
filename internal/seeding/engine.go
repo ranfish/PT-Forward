@@ -63,6 +63,13 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 			if rec.FlushedAt != nil && now.Sub(*rec.FlushedAt) < syncGracePeriod {
 				continue
 			}
+			e.logger.Debug("syncStale: marking record as deleted (torrent gone from downloader)",
+				zap.String("client_id", clientID),
+				zap.String("info_hash", rec.InfoHash),
+				zap.String("site_name", rec.SiteName),
+				zap.String("prev_status", string(rec.Status)),
+				zap.Timep("flushed_at", rec.FlushedAt),
+				zap.Time("created_at", rec.CreatedAt))
 			staleKeys = append(staleKeys, key)
 			staleHashes = append(staleHashes, rec.InfoHash)
 			rec.Status = model.SeedingStatusDeleted
@@ -130,6 +137,11 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 			}
 			if ti := lowerMap[lowerHash]; ti != nil {
 				if deadStates[ti.State] && ti.Progress == 0 {
+					e.logger.Debug("syncStale: skipping recovery of dead-state torrent",
+						zap.String("client_id", clientID),
+						zap.String("info_hash", rec.InfoHash),
+						zap.String("qb_state", ti.State),
+						zap.Float64("progress", ti.Progress))
 					continue
 				}
 			}
@@ -138,7 +150,8 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 		if len(recoverHashes) > 0 {
 			e.logger.Info("recovering orphan torrents: deleted records still present in downloader",
 				zap.String("client_id", clientID),
-				zap.Int("count", len(recoverHashes)))
+				zap.Int("count", len(recoverHashes)),
+				zap.Strings("info_hashes", recoverHashes))
 			for i := 0; i < len(recoverHashes); i += sqliteVarLimit {
 				end := i + sqliteVarLimit
 				if end > len(recoverHashes) {
@@ -483,7 +496,48 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 		e.updateEMA(ctx, clientID, md, torrentMap)
 		e.syncStaleRecords(ctx, clientID, torrentMap)
 		e.checkUnregisteredTorrents(ctx, clientID, dlClient)
+		e.logOrphanTorrents(ctx, clientID, torrentMap)
 		e.syncUnmanagedTorrents(ctx, clientID, torrentMap)
+	}
+}
+
+// logOrphanTorrents: logs torrents that exist in the downloader but have no
+// tracking record at all (not even deleted). This runs regardless of scope
+// to help diagnose "phantom torrent" issues. It only logs, never creates records.
+func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
+	var orphans []string
+	for hash, ti := range torrentMap {
+		if ti.State == "error" || ti.Removed {
+			continue
+		}
+		lowerHash := strings.ToLower(hash)
+
+		e.mu.RLock()
+		_, inMem := e.recordMap[recordKey(clientID, lowerHash)]
+		e.mu.RUnlock()
+		if inMem {
+			continue
+		}
+
+		var count int64
+		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("client_id = ? AND LOWER(info_hash) = ?", clientID, lowerHash).
+			Count(&count)
+		if count == 0 {
+			shortHash := lowerHash
+			if len(shortHash) > 12 {
+				shortHash = shortHash[:12]
+			}
+			orphans = append(orphans, fmt.Sprintf("%s(%s)", ti.Name, shortHash))
+		}
+	}
+
+	if len(orphans) > 0 {
+		e.logger.Warn("orphan torrents detected: in downloader but not tracked",
+			zap.String("client_id", clientID),
+			zap.Int("count", len(orphans)),
+			zap.Int("total_in_downloader", len(torrentMap)),
+			zap.Strings("orphans", orphans))
 	}
 }
 
@@ -868,6 +922,9 @@ func (e *Engine) AddSeedingRecord(ctx context.Context, record *model.SeedingTorr
 }
 
 func (e *Engine) RemoveSeedingRecord(ctx context.Context, clientID, infoHash string) error {
+	e.logger.Info("RemoveSeedingRecord: manually removing seeding record",
+		zap.String("client_id", clientID),
+		zap.String("info_hash", infoHash))
 	if err := e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
 		Where("client_id = ? AND info_hash = ?", clientID, infoHash).
 		Update("status", model.SeedingStatusDeleted).Error; err != nil {
@@ -1506,6 +1563,14 @@ func (e *Engine) recheckDiscountForRecover(ctx context.Context, rec *model.Seedi
 func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, result *EvaluateResult) {
 	isDeleteFiles := true
 
+	e.logger.Debug("executeCleanup: starting delete",
+		zap.String("client_id", rec.ClientID),
+		zap.String("info_hash", rec.InfoHash),
+		zap.String("site_name", rec.SiteName),
+		zap.String("torrent_id", rec.TorrentID),
+		zap.String("last_action_by", rec.LastActionBy),
+		zap.Bool("delete_files", isDeleteFiles))
+
 	e.reannounceBeforeDelete(ctx, ec.client, rec.InfoHash, ec.cfg)
 
 	e.saveFinalTraffic(ctx, rec, ti)
@@ -1521,6 +1586,12 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 		}
 		return
 	}
+
+	e.logger.Info("executeCleanup: torrent deleted successfully",
+		zap.String("client_id", rec.ClientID),
+		zap.String("info_hash", rec.InfoHash),
+		zap.String("site_name", rec.SiteName),
+		zap.String("reason", rec.LastActionBy))
 
 	if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); err != nil {
 		e.logger.Error("更新删种状态失败", zap.Uint("id", rec.ID), zap.Error(err))
@@ -1655,8 +1726,16 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 	}
 
 	if len(ec.records) == 0 {
+		e.logger.Debug("evaluate: no records to evaluate",
+			zap.String("client_id", clientID))
 		return &EvaluateResult{}, nil
 	}
+
+	e.logger.Debug("evaluate: starting cycle",
+		zap.String("client_id", clientID),
+		zap.Int("records", len(ec.records)),
+		zap.Int("torrents_in_downloader", len(ec.torrentMap)),
+		zap.Bool("dry_run", dryRun))
 
 	result := &EvaluateResult{}
 	cycleID := time.Now().Format("20060102-150405")
@@ -1876,6 +1955,14 @@ func (e *Engine) executeRuleAction(ctx context.Context, rec *model.SeedingTorren
 
 func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, rule *model.DeleteRule, result *EvaluateResult) {
 
+	e.logger.Debug("executeRuleDelete: starting rule delete",
+		zap.String("client_id", rec.ClientID),
+		zap.String("info_hash", rec.InfoHash),
+		zap.String("site_name", rec.SiteName),
+		zap.String("rule_alias", rule.Alias),
+		zap.Uint("rule_id", rule.ID),
+		zap.Bool("delete_companions", rule.DeleteCompanions))
+
 	if rule.ReannounceBefore && ti != nil {
 		e.reannounceRuleBeforeDelete(ctx, ec.client, rec.InfoHash, rule)
 	}
@@ -1893,6 +1980,11 @@ func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorren
 		e.fitTimer.Remove(rec.InfoHash)
 		return
 	}
+	e.logger.Info("executeRuleDelete: torrent deleted by rule",
+		zap.String("client_id", rec.ClientID),
+		zap.String("info_hash", rec.InfoHash),
+		zap.String("site_name", rec.SiteName),
+		zap.String("rule_alias", rule.Alias))
 	if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "rule:"+rule.Alias); err != nil {
 		e.logger.Error("update rule delete status failed", zap.Uint("id", rec.ID), zap.Error(err))
 	}
@@ -2076,7 +2168,58 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 			First(&loaded).Error; err != nil {
 			return err
 		}
-		record = &loaded
+		if loaded.Status == model.SeedingStatusDeleted {
+			e.logger.Info("Add: restoring deleted seeding record",
+				zap.String("client_id", clientID),
+				zap.String("info_hash", event.InfoHash),
+				zap.String("site_name", event.SiteName),
+				zap.String("torrent_id", event.TorrentID),
+				zap.String("prev_last_action_by", loaded.LastActionBy))
+			now := time.Now()
+			if err := e.db.WithContext(ctx).Model(&loaded).Updates(map[string]interface{}{
+				"status":          model.SeedingStatusPending,
+				"site_name":       event.SiteName,
+				"torrent_id":      event.TorrentID,
+				"discount":        event.Discount,
+				"has_hr":          event.HasHR,
+				"hr_seed_time_h":  event.HRSeedTimeH,
+				"source":          "rss",
+				"subscription_id": event.SourceID,
+				"is_free":         record.IsFree,
+				"free_end_at":     event.FreeEndAt,
+				"torrent_size":    event.Size,
+				"flushed_at":      nil,
+				"last_action_by":  "",
+				"updated_at":      now,
+			}).Error; err != nil {
+				return fmt.Errorf("restore deleted record: %w", err)
+			}
+			loaded.Status = model.SeedingStatusPending
+			loaded.FlushedAt = nil
+			loaded.LastActionBy = ""
+			loaded.SiteName = event.SiteName
+			loaded.TorrentID = event.TorrentID
+			loaded.Discount = event.Discount
+			loaded.HasHR = event.HasHR
+			loaded.Source = "rss"
+			loaded.SubscriptionID = event.SourceID
+			loaded.IsFree = record.IsFree
+			loaded.FreeEndAt = event.FreeEndAt
+			loaded.TorrentSize = event.Size
+			record = &loaded
+		} else {
+			e.logger.Debug("Add: record already exists, skipping",
+				zap.String("client_id", clientID),
+				zap.String("info_hash", event.InfoHash),
+				zap.String("status", string(loaded.Status)))
+			record = &loaded
+		}
+	} else {
+		e.logger.Debug("Add: created new seeding record",
+			zap.String("client_id", clientID),
+			zap.String("info_hash", event.InfoHash),
+			zap.String("site_name", event.SiteName),
+			zap.String("torrent_id", event.TorrentID))
 	}
 
 	e.mu.Lock()
