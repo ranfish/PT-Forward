@@ -189,7 +189,7 @@
                   <a-input-number v-model:value="form.reannounce_interval_ms" :min="0" style="width: 100%" />
                 </a-form-item>
               </a-col>
-              <a-col :span="24" v-if="actionMode === 'delete'">
+              <a-col v-if="actionMode === 'delete'" :span="24">
                 <a-form-item :label="t('seeding.deleteCompanions')">
                   <a-radio-group v-model:value="form.delete_companions">
                     <a-radio :value="true">{{ t('seeding.deleteCompanionsOn') }}</a-radio>

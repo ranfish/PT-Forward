@@ -522,6 +522,7 @@ function openModal(record: SiteListItem) {
   modalVisible.value = true
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function openCreateModal() {
   isCreateMode.value = true
   editingSite.value = null

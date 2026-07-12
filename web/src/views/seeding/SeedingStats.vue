@@ -179,6 +179,7 @@ const overview = ref<SeedingStatsOverview>({
   todayAdded: 0,
 })
 const siteStats = ref<SeedingSiteStat[]>([])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const torrentStats = ref<any[]>([])
 const torrentTotal = ref(0)
 const torrentPage = ref(1)

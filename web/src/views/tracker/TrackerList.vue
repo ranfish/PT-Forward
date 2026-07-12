@@ -124,6 +124,7 @@ async function fetchHistory() {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function viewMember(hash: string) {
   if (!hash) return
   memberDetailVisible.value = true

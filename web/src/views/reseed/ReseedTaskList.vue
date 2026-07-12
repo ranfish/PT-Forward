@@ -382,6 +382,7 @@ async function fetchSites() {
   }
 }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function filterOption(input: string, option: any) {
   const label = option.label || option.value || ''
   return String(label).toLowerCase().includes(input.toLowerCase())

@@ -147,7 +147,7 @@
           @press-enter="addKeyword"
         />
         <a-button type="primary" size="small" @click="addKeyword">添加</a-button>
-        <a-button size="small" @click="saveKeywords" :loading="keywordsSaving">保存</a-button>
+        <a-button size="small" :loading="keywordsSaving" @click="saveKeywords">保存</a-button>
       </div>
       <div>
         <a-tag
@@ -275,6 +275,7 @@ async function fetchScoringConfig() {
 async function saveScoringConfig() {
   saving.value = true
   try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await seedingApi.updateScoringConfig({ ...scoringConfig, site_weights_json: siteWeightsToJSON() } as any, selectedSubId.value)
     message.success(t('common.configSaved'))
   } catch (e: unknown) {
