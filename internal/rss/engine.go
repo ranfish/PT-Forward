@@ -839,6 +839,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				HRSeedTimeH:    event.HRSeedTimeH,
 				FreeEndAt:      event.FreeEndAt,
 				Status:         "seen",
+				SourceCategory: event.Category,
 			}
 			if err := e.repo.MarkSeen(ctx, seen); err != nil {
 				e.logger.Warn("mark seen failed",

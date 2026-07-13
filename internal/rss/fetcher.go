@@ -108,6 +108,7 @@ func (f *Fetcher) ParseItems(feed *RSSFeed, sub *model.RSSSubscription, site *mo
 			SourceRSS: sub.Name,
 			SiteName:  sub.SiteName,
 			Title:     item.Title,
+			Category:  item.Category,
 			Metadata:  map[string]any{},
 		}
 
@@ -147,6 +148,7 @@ type RSSItem struct {
 	Description string `xml:"description"`
 	GUID        string `xml:"guid"`
 	PubDate     string `xml:"pubDate"`
+	Category    string `xml:"category"`
 
 	Enclosure RSSEnclosure `xml:"enclosure"`
 

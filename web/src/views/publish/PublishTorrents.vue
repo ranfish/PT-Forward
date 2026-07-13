@@ -21,6 +21,21 @@
       />
       <a-select
         v-if="torrents.length"
+        v-model:value="typeFilter"
+        style="width: 130px; margin-left: 12px"
+        placeholder="类型筛选"
+        allow-clear
+      >
+        <a-select-option value="category.movie">电影</a-select-option>
+        <a-select-option value="category.tv_series">电视剧</a-select-option>
+        <a-select-option value="category.animation">动漫</a-select-option>
+        <a-select-option value="category.documentaries">纪录片</a-select-option>
+        <a-select-option value="category.tv_shows">综艺</a-select-option>
+        <a-select-option value="category.music">音乐</a-select-option>
+        <a-select-option value="category.sports">体育</a-select-option>
+      </a-select>
+      <a-select
+        v-if="torrents.length"
         v-model:value="queryFilter"
         style="width: 130px; margin-left: 12px"
         placeholder="覆盖筛选"
@@ -336,6 +351,7 @@ const torrents = ref<PublishTorrentItem[]>([])
 const loading = ref(false)
 const searchText = ref('')
 const queryFilter = ref<string | undefined>(undefined)
+const typeFilter = ref<string | undefined>(undefined)
 const queryingHash = ref('')
 const selectedHashes = ref<string[]>([])
 let coverageAbortController: AbortController | null = null
@@ -372,6 +388,9 @@ const filteredTorrents = computed(() => {
     result = result.filter(t => t.queried)
   } else if (queryFilter.value === 'unqueried') {
     result = result.filter(t => !t.queried)
+  }
+  if (typeFilter.value) {
+    result = result.filter((t: any) => (t as any).standard_type === typeFilter.value)
   }
   return result
 })
@@ -491,6 +510,7 @@ function stopPolling() {
 }
 
 watch(queryFilter, () => { currentPage.value = 1 })
+watch(typeFilter, () => { currentPage.value = 1 })
 
 async function queryCoverage(record: PublishTorrentItem) {
   if (!selectedClientId.value) return

@@ -168,6 +168,20 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 		queriedMap = map[string]bool{}
 	}
 
+	metaTypeMap := map[string]string{}
+	if len(infoHashes) > 0 {
+		var metas []model.TorrentMetadata
+		h.db.WithContext(ctx).
+			Where("info_hash IN ?", infoHashes).
+			Order("updated_at DESC").
+			Find(&metas)
+		for _, m := range metas {
+			if _, exists := metaTypeMap[m.InfoHash]; !exists && m.StandardType != "" {
+				metaTypeMap[m.InfoHash] = m.StandardType
+			}
+		}
+	}
+
 	items := make([]map[string]interface{}, 0, len(torrents))
 	for _, t := range torrents {
 		cov := coverageMap[t.Hash]
@@ -178,13 +192,14 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 			}
 		}
 		items = append(items, map[string]interface{}{
-			"info_hash": t.Hash,
-			"name":      t.Name,
-			"size":      t.TotalSize,
-			"save_path": t.SavePath,
-			"state":     t.State,
-			"uploaded":  t.Uploaded,
-			"queried":   queriedMap[t.Hash],
+			"info_hash":     t.Hash,
+			"name":          t.Name,
+			"size":          t.TotalSize,
+			"save_path":     t.SavePath,
+			"state":         t.State,
+			"uploaded":      t.Uploaded,
+			"queried":       queriedMap[t.Hash],
+			"standard_type": metaTypeMap[t.Hash],
 			"coverage": map[string]interface{}{
 				"has_count":    hasCount,
 				"total_sites":  totalSites,
