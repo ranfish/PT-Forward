@@ -757,6 +757,12 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 	// 标题组件覆盖：用用户编辑的组件填充表单字段
 	applyTitleComponents(pubReq, candidate.UserOverrides)
 
+	// 截图默认在 description 内（大部分站点）；独立字段站点由适配器处理
+	pubReq.ScreenshotInDesc = true
+	if fw := p.getTargetFramework(ctx, targetSite); fw == "tnode" || fw == "zhuque" || fw == "haidan" || fw == "ptlgs" {
+		pubReq.ScreenshotInDesc = false
+	}
+
 	// BDInfo 报告（如果有）
 	if bdinfoText, ok := overridesString(candidate.UserOverrides, "bdinfo"); ok && bdinfoText != "" {
 		pubReq.BDInfo = bdinfoText
@@ -1967,4 +1973,14 @@ func (p *Pipeline) processDownloadCandidate(ctx context.Context, c *model.Publis
 	}
 
 	return nil
+}
+
+func (p *Pipeline) getTargetFramework(ctx context.Context, targetSite string) string {
+	if p.siteProvider == nil {
+		return ""
+	}
+	if siteInfo, err := p.siteProvider.GetSiteInfo(ctx, targetSite); err == nil && siteInfo != nil {
+		return string(siteInfo.Framework)
+	}
+	return ""
 }
