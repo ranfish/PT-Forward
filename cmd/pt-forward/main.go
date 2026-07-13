@@ -92,7 +92,8 @@ func main() {
 
 	defer func() { _ = log.Sync() }()
 
-	log = reconfigureLogger(cfg.Log)
+	logBroadcaster := api.NewLogBroadcaster()
+	log = reconfigureLogger(cfg.Log, logBroadcaster)
 	defer func() { _ = log.Sync() }()
 
 	db, err := initDB(cfg, log, context.Background())
@@ -357,6 +358,7 @@ func main() {
 		version,
 		wsHub,
 		imageHostMgr,
+		logBroadcaster,
 		log,
 	)
 	router.SetSiteProvider(siteProvider)
@@ -539,6 +541,20 @@ func main() {
 	log.Info("pt-forward stopped")
 }
 
+type broadcasterWriter struct {
+	b *api.LogBroadcaster
+}
+
+func (bw *broadcasterWriter) Write(p []byte) (int, error) {
+	line := strings.TrimRight(string(p), "\n")
+	if line != "" {
+		bw.b.Broadcast(line)
+	}
+	return len(p), nil
+}
+
+func (bw *broadcasterWriter) Sync() error { return nil }
+
 func newDefaultLogger() *zap.Logger {
 	encCfg := zap.NewProductionEncoderConfig()
 	encCfg.TimeKey = "ts"
@@ -610,7 +626,7 @@ func (w *dateRotatingWriter) Close() error {
 	return nil
 }
 
-func reconfigureLogger(cfg model.LogConfig) *zap.Logger {
+func reconfigureLogger(cfg model.LogConfig, broadcaster *api.LogBroadcaster) *zap.Logger {
 	var level zapcore.Level
 	if err := level.Set(cfg.Level); err != nil {
 		level = zapcore.InfoLevel
@@ -640,6 +656,12 @@ func reconfigureLogger(cfg model.LogConfig) *zap.Logger {
 	errW := newDateRotatingWriter(cfg.Directory, "pt-forward-error", cfg.Compress)
 	errLevel := zapcore.ErrorLevel
 	cores = append(cores, zapcore.NewCore(encoder, zapcore.AddSync(errW), errLevel))
+
+	// SSE 实时推送 core
+	if broadcaster != nil {
+		sseSyncer := &broadcasterWriter{b: broadcaster}
+		cores = append(cores, zapcore.NewCore(encoder, zapcore.AddSync(sseSyncer), level))
+	}
 
 	cleanupOldLogs(cfg)
 
