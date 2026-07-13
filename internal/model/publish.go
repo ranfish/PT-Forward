@@ -119,7 +119,7 @@ type PublishResultRecord struct {
 
 	CandidateID uint   `json:"candidate_id" gorm:"index"`
 	SourceSite  string `json:"source_site" gorm:"size:100"`
-	TargetSite  string `json:"target_site" gorm:"size:100"`
+	TargetSite  string `json:"target_site" gorm:"size:100;index"`
 	TorrentID   string `json:"torrent_id" gorm:"size:50"`
 
 	IsOfficial        bool   `json:"is_official"`
@@ -135,6 +135,14 @@ type PublishResultRecord struct {
 	PublishURL   string              `json:"publish_url" gorm:"size:500"`
 	ErrorMessage string              `json:"error_message" gorm:"size:500"`
 	CompletedAt  *time.Time          `json:"completed_at"`
+
+	Trigger      string `json:"trigger" gorm:"size:20"`       // manual/batch/reseed/wizard
+	BatchGroupID string `json:"batch_group_id" gorm:"size:36;index"` // 批量发布 UUID
+	Title        string `json:"title" gorm:"size:500"`
+	Subtitle     string `json:"subtitle" gorm:"size:500"`
+	DownloaderID string `json:"downloader_id" gorm:"size:50"`
+	CostMS       int64  `json:"cost_ms" gorm:"default:0"`
+	Logs         string `json:"logs" gorm:"type:text"`
 }
 
 func (PublishResultRecord) TableName() string { return "publish_result_records" }
@@ -188,3 +196,16 @@ type PublishResponse struct {
 	TargetSite   string `json:"target_site"`
 	InfoHash     string `json:"info_hash"`
 }
+
+// §46 — SitePublishLimit: 站点发布限制配置
+type SitePublishLimit struct {
+	ID          uint   `json:"id" gorm:"primaryKey;autoIncrement"`
+	SiteName    string `json:"site_name" gorm:"uniqueIndex;size:100"`
+	Enabled     bool   `json:"enabled" gorm:"default:false"`
+	MaxCount    int    `json:"max_count" gorm:"default:20"`
+	WindowHours int    `json:"window_hours" gorm:"default:24"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func (SitePublishLimit) TableName() string { return "site_publish_limits" }

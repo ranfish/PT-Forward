@@ -50,6 +50,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/seeding"
 	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/site"
+	"github.com/ranfish/pt-forward/internal/stats"
 	"github.com/ranfish/pt-forward/internal/util"
 	"github.com/ranfish/pt-forward/internal/watcher"
 
@@ -1007,4 +1008,9 @@ func registerSchedulerTasks(
 			return nil
 		})
 	}
+
+	trafficAggregator := stats.NewTrafficAggregator(db, log)
+	register("traffic_hourly_aggregate", "stats", "0 * * * *", func(ctx context.Context) error {
+		return trafficAggregator.AggregateHourly(ctx)
+	})
 }

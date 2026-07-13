@@ -49,6 +49,7 @@ type Router struct {
 	schedulerHandler     *SchedulerHandler
 	supportedSitesHandler *SupportedSitesHandler
 	downloadHandler       *DownloadHandler
+	publishLimitHandler   *PublishLimitHandler
 	wsHandler            *WSHandler
 	hub                  *Hub
 	authManager          *auth.AuthManager
@@ -102,6 +103,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		publishHandler:         NewPublishHandler(publishPipeline, logger, db),
 		manualForwardHandler:   NewManualForwardHandler(db, logger),
 		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger),
+		publishLimitHandler:   NewPublishLimitHandler(db, logger),
 		dashboardHandler:     dashHandler,
 		systemHandler:        sysHandler,
 		iyuuHandler:          NewIYUUHandler(db, logger, iyuuSvc),
@@ -240,6 +242,10 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 
 	exclusionHandler := rt.chain(rt.rateLimitMW, rt.siteHandler.handleExclusions)
 	mux.Handle("/api/v1/publish/exclusions", exclusionHandler)
+
+	publishLimitHandler := rt.chain(rt.rateLimitMW, rt.publishLimitHandler.ServeHTTP)
+	mux.Handle("/api/v1/publish/limits", publishLimitHandler)
+	mux.Handle("/api/v1/publish/limits/", publishLimitHandler)
 
 	rssHandler := rt.chain(rt.rateLimitMW, rt.rssHandler.ServeHTTP)
 	mux.Handle("/api/v1/rss/subscriptions", rssHandler)

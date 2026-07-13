@@ -39,6 +39,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&TorrentTraffic{},
 		&DownloaderSpeedSnapshot{},
 		&SiteTrafficDaily{},
+		&TrafficStatsHourly{},
 		&ReseedTask{},
 		&ReseedMatch{},
 		&ReseedNegativeCache{},
@@ -60,6 +61,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&SiteCoverageCache{},
 		&CoverageQueryState{},
 		&ReleaseGroupMapping{},
+		&SitePublishLimit{},
 		&setting.Setting{},
 	)
 }
