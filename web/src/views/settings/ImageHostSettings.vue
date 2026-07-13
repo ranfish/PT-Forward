@@ -44,6 +44,21 @@
     </a-card>
 
     <PublishLimitSettings />
+
+    <a-card title="PTGen 配置" style="margin-top: 24px">
+      <a-form layout="vertical" style="max-width: 600px">
+        <a-form-item label="PTGen 端点（# 分隔故障转移）">
+          <a-textarea
+            v-model:value="ptgenEndpoints"
+            :rows="3"
+            placeholder="https://ptgen.agsv.cc/api#https://ptgen.click/api"
+          />
+        </a-form-item>
+        <a-form-item>
+          <a-button type="primary" :loading="ptgenSaving" @click="savePtgen">保存</a-button>
+        </a-form-item>
+      </a-form>
+    </a-card>
   </div>
 </template>
 
@@ -51,12 +66,15 @@
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { imageHostApi, type ImageHostConfig } from '@/api/image-host'
+import { settingsApi } from '@/api/settings'
 import PublishLimitSettings from './PublishLimitSettings.vue'
 
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const agsvptPassword = ref('')
+const ptgenEndpoints = ref('')
+const ptgenSaving = ref(false)
 
 const config = reactive<ImageHostConfig>({
   hosts: [],
@@ -122,4 +140,30 @@ async function handleTest() {
 }
 
 onMounted(loadConfig)
+
+async function loadPtgen() {
+  try {
+    const { data } = await settingsApi.get('ptgen_endpoints')
+    const raw = data.data as any
+    if (raw && typeof raw === 'object') {
+      ptgenEndpoints.value = (raw as any).ptgen_endpoints || (raw as any).value || ''
+    }
+  } catch {
+    // ignore
+  }
+}
+
+async function savePtgen() {
+  ptgenSaving.value = true
+  try {
+    await settingsApi.update('ptgen_endpoints', { value: ptgenEndpoints.value })
+    message.success('PTGen 配置保存成功')
+  } catch {
+    message.error('保存失败')
+  } finally {
+    ptgenSaving.value = false
+  }
+}
+
+onMounted(loadPtgen)
 </script>

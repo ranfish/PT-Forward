@@ -541,6 +541,7 @@ func (a *MTeamAdapter) FetchItemsByAPI(ctx context.Context, config *model.SiteCo
 			IsFree:        dr.Level == model.DiscountFree || dr.Level == model.Discount2xFree || dr.Level == model.Discount2x50,
 			DiscountLevel: dr.Level,
 			FreeEndAt:     dr.FreeEndAt,
+			Category:      item.Category,
 			Metadata:      map[string]any{},
 		}
 		events = append(events, ev)
@@ -550,10 +551,11 @@ func (a *MTeamAdapter) FetchItemsByAPI(ctx context.Context, config *model.SiteCo
 
 // mTeamSearchItem mirrors the search API item shape (subset we care about).
 type mTeamSearchItem struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Size   flexInt `json:"size"`
-	Status struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Category string  `json:"category"`
+	Size     flexInt `json:"size"`
+	Status   struct {
 		Discount        string `json:"discount"`
 		DiscountEndTime string `json:"discountEndTime"`
 	} `json:"status"`

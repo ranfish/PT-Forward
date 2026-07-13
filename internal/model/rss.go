@@ -215,6 +215,7 @@ type RSSTorrentSeen struct {
 	HasHR          bool          `json:"has_hr" gorm:"default:false"`
 	HRSeedTimeH    int           `json:"hr_seed_time_h"`
 	Status         string        `json:"status" gorm:"size:20;not null;default:'seen';index:idx_torrent_seen_status"`
+	SourceCategory string        `json:"source_category" gorm:"size:100"`
 	MatchedRule    string        `json:"matched_rule" gorm:"size:100"`
 	SkipCount      int           `json:"skip_count" gorm:"not null;default:0"`
 	LastCheckTime  *time.Time    `json:"last_check_time" gorm:"index:idx_torrent_seen_last_check"`
