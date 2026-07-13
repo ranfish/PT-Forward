@@ -37,6 +37,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/health"
 	"github.com/ranfish/pt-forward/internal/httpclient"
+	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/iyuu"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/middleware"
@@ -226,6 +227,22 @@ func main() {
 
 	seedingEngine := seeding.NewEngine(db, log)
 
+	imageHostMgr := imagehost.NewManager(log)
+	imageHostMgr.Register(imagehost.NewPixhostHost(log))
+	if email, err := settingsRepo.Get(ctx, setting.KeyAGSVPTEmail); err == nil && email != "" {
+		if pass, err := settingsRepo.Get(ctx, setting.KeyAGSVPTPassword); err == nil {
+			imageHostMgr.Register(imagehost.NewAGSVPTHost(email, pass, log))
+		}
+	}
+	if defaultHost, err := settingsRepo.Get(ctx, setting.KeyImageHostDefault); err == nil && defaultHost != "" {
+		if err := imageHostMgr.SetDefault(defaultHost); err != nil {
+			log.Warn("failed to set default image host", zap.String("host", defaultHost), zap.Error(err))
+		}
+	}
+	if endpoints, err := settingsRepo.Get(ctx, setting.KeyPTGenEndpoints); err == nil && endpoints != "" {
+		publishPipeline.SetPTGenEndpoints(endpoints)
+	}
+
 	iyuuService := iyuu.NewService(db, log)
 	go iyuuService.StartSyncLoop(ctx, 24*time.Hour)
 
@@ -338,6 +355,7 @@ func main() {
 		iyuuService,
 		version,
 		wsHub,
+		imageHostMgr,
 		log,
 	)
 	router.SetSiteProvider(siteProvider)
