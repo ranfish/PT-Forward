@@ -510,6 +510,13 @@ export interface PublishResultRecord {
   publish_url: string
   error_message: string
   completed_at: string | null
+  trigger?: string
+  batch_group_id?: string
+  title?: string
+  subtitle?: string
+  downloader_id?: string
+  cost_ms?: number
+  logs?: string
 }
 
 export interface ReseedTask {
