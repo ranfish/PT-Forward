@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
@@ -15,16 +16,50 @@ import (
 )
 
 type Provider struct {
-	db     *gorm.DB
-	logger *zap.Logger
-	client *http.Client
+	db         *gorm.DB
+	logger     *zap.Logger
+	client     *http.Client
+	endpoints  []string
+	cacheMaxDays int
 }
+
+var defaultPTGenEndpoints = []string{
+	"https://ptgen.agsv.cc/api",
+	"https://ptgen.click/api",
+}
+
+const defaultPTGenCacheDays = 30
 
 func NewProvider(db *gorm.DB, logger *zap.Logger) *Provider {
 	return &Provider{
-		db:     db,
-		logger: logger,
-		client: &http.Client{Timeout: 30 * time.Second},
+		db:           db,
+		logger:       logger,
+		client:       &http.Client{Timeout: 30 * time.Second},
+		endpoints:    defaultPTGenEndpoints,
+		cacheMaxDays: defaultPTGenCacheDays,
+	}
+}
+
+func (p *Provider) SetEndpoints(raw string) {
+	if raw == "" {
+		return
+	}
+	parts := strings.Split(raw, "#")
+	var eps []string
+	for _, s := range parts {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			eps = append(eps, s)
+		}
+	}
+	if len(eps) > 0 {
+		p.endpoints = eps
+	}
+}
+
+func (p *Provider) SetCacheMaxDays(days int) {
+	if days > 0 {
+		p.cacheMaxDays = days
 	}
 }
 
@@ -70,9 +105,9 @@ func (p *Provider) SupportsNameSearch() bool {
 }
 
 func (p *Provider) queryRemote(ctx context.Context, query string) (*model.PTGenResult, error) {
-	endpoints := []string{
-		"https://ptgen.agsv.cc/api",
-		"https://ptgen.click/api",
+	endpoints := p.endpoints
+	if len(endpoints) == 0 {
+		endpoints = defaultPTGenEndpoints
 	}
 
 	var lastErr error
@@ -181,12 +216,14 @@ func (p *Provider) queryEndpoint(ctx context.Context, endpoint, query string) (*
 	return result, nil
 }
 
-const ptgenCacheMaxDays = 7
-
 func (p *Provider) getCache(ctx context.Context, query string) (*model.PTGenCache, error) {
+	days := p.cacheMaxDays
+	if days <= 0 {
+		days = defaultPTGenCacheDays
+	}
 	var cache model.PTGenCache
 	err := p.db.WithContext(ctx).
-		Where("query_key = ? AND updated_at > ?", query, time.Now().AddDate(0, 0, -ptgenCacheMaxDays)).
+		Where("query_key = ? AND updated_at > ?", query, time.Now().AddDate(0, 0, -days)).
 		First(&cache).Error
 	if err != nil {
 		return nil, err
