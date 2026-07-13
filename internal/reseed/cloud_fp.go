@@ -146,7 +146,7 @@ func (e *Engine) preloadCloudFingerprints(ctx context.Context, fc *fpCache, dr *
 
 	matches, err := e.cloudFPService.BatchLookup(ctx, allHashes, nil)
 	if err != nil {
-		e.logger.Warn("L1 云端指纹查询失败", zap.Int("hashes", len(allHashes)), zap.Error(err))
+		e.logger.Warn("L1 cloud fingerprint query failed", zap.Int("hashes", len(allHashes)), zap.Error(err))
 		return nil
 	}
 
@@ -158,7 +158,7 @@ func (e *Engine) preloadCloudFingerprints(ctx context.Context, fc *fpCache, dr *
 		}
 	}
 
-	e.logger.Info("L1 云端指纹预加载完成",
+	e.logger.Info("L1 cloud fingerprint preload completed",
 		zap.Int("hashes", len(allHashes)),
 		zap.Int("matched", len(translated)),
 	)
@@ -221,7 +221,7 @@ func (r *deleteReporter) Report(site, torrentID string) {
 	select {
 	case r.ch <- model.CloudFPDeleteReport{SiteName: site, TorrentID: torrentID}:
 	default:
-		r.logger.Warn("删除上报队列已满，丢弃")
+		r.logger.Warn("delete report queue full, dropping")
 	}
 }
 
@@ -263,9 +263,9 @@ func (r *deleteReporter) flush(batch []model.CloudFPDeleteReport) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := r.service.ReportDeleted(ctx, batch); err != nil {
-		r.logger.Warn("删除上报 flush 失败", zap.Int("count", len(batch)), zap.Error(err))
+		r.logger.Warn("delete report flush failed", zap.Int("count", len(batch)), zap.Error(err))
 	} else {
-		r.logger.Info("删除上报 flush 完成", zap.Int("count", len(batch)))
+		r.logger.Info("delete report flush completed", zap.Int("count", len(batch)))
 	}
 }
 
@@ -320,7 +320,7 @@ func (r *contributeReporter) Upload(records []model.CloudFPContribute) {
 		select {
 		case r.ch <- rec:
 		default:
-			r.logger.Warn("贡献数据队列已满，丢弃")
+			r.logger.Warn("contribution data queue full, dropping")
 			return
 		}
 	}
@@ -364,9 +364,9 @@ func (r *contributeReporter) flush(batch []model.CloudFPContribute) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := r.service.UploadRecords(ctx, batch); err != nil {
-		r.logger.Warn("贡献数据 flush 失败", zap.Int("count", len(batch)), zap.Error(err))
+		r.logger.Warn("contribution data flush failed", zap.Int("count", len(batch)), zap.Error(err))
 	} else {
-		r.logger.Info("贡献数据 flush 完成", zap.Int("count", len(batch)))
+		r.logger.Info("contribution data flush completed", zap.Int("count", len(batch)))
 	}
 }
 

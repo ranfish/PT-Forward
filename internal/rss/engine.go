@@ -1052,13 +1052,13 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 
 	adapter, err := e.siteProvider.GetAdapter(detectCtx, siteName)
 	if err != nil {
-		e.logger.Warn("获取适配器失败，跳过HR/折扣检测", zap.String("site", siteName), zap.Error(err))
+		e.logger.Warn("failed to get adapter, skipping HR/discount check", zap.String("site", siteName), zap.Error(err))
 		return
 	}
 
 	config, err := e.siteProvider.GetSiteConfig(detectCtx, siteName)
 	if err != nil {
-		e.logger.Warn("获取站点配置失败，跳过HR/折扣检测", zap.String("site", siteName), zap.Error(err))
+		e.logger.Warn("failed to get site config, skipping HR/discount check", zap.String("site", siteName), zap.Error(err))
 		return
 	}
 

@@ -1291,7 +1291,7 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 
 	dlClient, err := e.getClientProvider().Get(clientID)
 	if err != nil {
-		return nil, &model.AppError{Code: 50001, Message: "获取下载器失败", Cause: err}
+		return nil, &model.AppError{Code: 50001, Message: "failed to get downloader", Cause: err}
 	}
 
 	records, err := e.ListByClient(ctx, clientID)
@@ -1387,10 +1387,10 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 				resumedBy = "resumed_downloading"
 			}
 			if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusSeeding, resumedBy); err != nil {
-				e.logger.Warn("sync paused_rule→seeding failed", zap.Uint("id", rec.ID), zap.Error(err))
+				e.logger.Warn("sync paused_rule to seeding failed", zap.Uint("id", rec.ID), zap.Error(err))
 			} else {
 				rec.Status = model.SeedingStatusSeeding
-				e.logger.Info("检测到下载器中种子已手动恢复，同步状态为 seeding",
+				e.logger.Info("detected torrent manually restored in downloader, syncing status to seeding",
 					zap.String("info_hash", rec.InfoHash),
 					zap.String("state", ti.State))
 			}
@@ -1500,7 +1500,7 @@ func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) 
 		if rec.IsFree && rec.FreeEndAt != nil && rec.FreeEndAt.Before(time.Now()) {
 			stillFree := e.recheckDiscountForRecover(ctx, rec)
 			if !stillFree {
-				e.logger.Info("disk_protect 恢复: 免费期已过且不再免费，删除记录",
+				e.logger.Info("disk_protect recovery: free period expired and no longer free, deleting record",
 					zap.String("info_hash", rec.InfoHash),
 					zap.String("site", rec.SiteName),
 					zap.Time("free_end_at", *rec.FreeEndAt))
@@ -1508,7 +1508,7 @@ func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) 
 					"status":         model.SeedingStatusDeleted,
 					"last_action_by": "free_expired_while_paused",
 				}).Error; err != nil {
-					e.logger.Warn("disk_protect 恢复: 删除过期记录失败",
+					e.logger.Warn("disk_protect recovery: failed to delete expired record",
 						zap.Uint("id", rec.ID), zap.Error(err))
 				}
 				e.mu.Lock()
@@ -1516,7 +1516,7 @@ func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) 
 				e.mu.Unlock()
 				continue
 			}
-			e.logger.Info("disk_protect 恢复: 免费期已过但实时检测仍免费，继续恢复",
+			e.logger.Info("disk_protect recovery: free period expired but still free, continuing recovery",
 				zap.String("info_hash", rec.InfoHash),
 				zap.String("site", rec.SiteName))
 		}
@@ -1539,7 +1539,7 @@ func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) 
 			r.FlushedAt = nil
 		}
 		e.mu.Unlock()
-		e.logger.Info("disk_protect 恢复：种子重新进入 pending 队列",
+		e.logger.Info("disk_protect recovery: torrent re-enters pending queue",
 			zap.String("info_hash", rec.InfoHash),
 			zap.String("client_id", clientID))
 	}
@@ -1581,14 +1581,14 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 
 	e.saveFinalTraffic(ctx, rec, ti)
 	if err := e.deleteTorrentWithCompanions(ctx, ec, rec.InfoHash, isDeleteFiles, true); err != nil {
-		e.logger.Warn("删种失败",
+		e.logger.Warn("delete torrent failed",
 			zap.String("infoHash", rec.InfoHash),
 			zap.Bool("deleteFiles", isDeleteFiles),
 			zap.Error(err),
 		)
 		result.Errors++
 		if usErr := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleteFailed, "auto_cleanup"); usErr != nil {
-			e.logger.Error("更新删种失败状态出错", zap.Uint("id", rec.ID), zap.Error(usErr))
+			e.logger.Error("failed to update delete-failed status", zap.Uint("id", rec.ID), zap.Error(usErr))
 		}
 		return
 	}
@@ -1600,7 +1600,7 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 		zap.String("reason", rec.LastActionBy))
 
 	if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "auto_cleanup"); err != nil {
-		e.logger.Error("更新删种状态失败", zap.Uint("id", rec.ID), zap.Error(err))
+		e.logger.Error("failed to update delete status", zap.Uint("id", rec.ID), zap.Error(err))
 	}
 	audit.Log("system", "seeding", "delete", "torrent", rec.InfoHash,
 		fmt.Sprintf("自动删种 client=%s site=%s reason=%s", rec.ClientID, rec.SiteName, rec.LastActionBy), "success")
@@ -1764,7 +1764,7 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 		if ec.freeSpace >= minBytes {
 			e.recoverDiskProtectPaused(ctx, ec.clientID)
 		} else {
-			e.logger.Warn("disk_protect: 磁盘空间不足，flush 将暂停推送新种子",
+			e.logger.Warn("disk_protect: insufficient disk space, flush will pause pushing new torrents",
 				zap.Int64("freeSpace", ec.freeSpace),
 				zap.Float64("minGB", ec.cfg.MinDiskSpaceGB))
 		}
@@ -1790,7 +1790,7 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 					result.Deleted++
 					continue
 				}
-				e.logger.Info("pending 超时清理",
+				e.logger.Info("pending timeout cleanup",
 					zap.Uint("id", rec.ID),
 					zap.String("info_hash", rec.InfoHash),
 					zap.String("client_id", rec.ClientID),
@@ -1799,7 +1799,7 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 				ti := ec.torrentMap[rec.InfoHash]
 			if ti != nil {
 				if err := ec.client.DeleteTorrent(ctx, rec.InfoHash, true); err != nil {
-					e.logger.Warn("pending 超时清理：删除下载器种子失败", zap.Error(err))
+					e.logger.Warn("pending timeout cleanup: failed to delete downloader torrent", zap.Error(err))
 				}
 				// Cascade delete companions for pending timeout
 				if ec.torrentMap[rec.InfoHash] != nil {
@@ -1816,7 +1816,7 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 					"status":         model.SeedingStatusDeleted,
 					"last_action_by": "pending_timeout",
 				}).Error; err != nil {
-					e.logger.Warn("pending 超时清理：更新状态失败", zap.Uint("id", rec.ID), zap.Error(err))
+					e.logger.Warn("pending timeout cleanup: failed to update status", zap.Uint("id", rec.ID), zap.Error(err))
 				}
 				e.mu.Lock()
 				delete(e.recordMap, recordKey(rec.ClientID, rec.InfoHash))
@@ -1848,6 +1848,14 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 
 		ti := ec.torrentMap[rec.InfoHash]
 		e.executeCleanup(ctx, rec, ti, ec, result)
+	}
+
+	if e.wsBroadcaster != nil && result.Deleted > 0 {
+		e.wsBroadcaster.BroadcastWS("seeding.cleanup", map[string]interface{}{
+			"client_id": clientID,
+			"deleted":   result.Deleted,
+			"errors":    result.Errors,
+		})
 	}
 
 	return result, nil
@@ -2004,6 +2012,14 @@ func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorren
 		zap.String("info_hash", rec.InfoHash),
 		zap.String("site_name", rec.SiteName),
 		zap.String("rule_alias", rule.Alias))
+	if e.wsBroadcaster != nil {
+		e.wsBroadcaster.BroadcastWS("seeding.deleted", map[string]interface{}{
+			"info_hash":  rec.InfoHash,
+			"site_name":  rec.SiteName,
+			"rule_alias": rule.Alias,
+			"client_id":  rec.ClientID,
+		})
+	}
 	if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "rule:"+rule.Alias); err != nil {
 		e.logger.Error("update rule delete status failed", zap.Uint("id", rec.ID), zap.Error(err))
 	}
@@ -2287,14 +2303,14 @@ func (e *Engine) CollectTrafficStats(ctx context.Context) error {
 		if md == nil {
 			dlClient, err := e.getClientProvider().Get(clientID)
 			if err != nil {
-				e.logger.Debug("获取下载器失败，跳过", zap.String("clientID", clientID), zap.Error(err))
+				e.logger.Debug("failed to get downloader, skipping", zap.String("clientID", clientID), zap.Error(err))
 				continue
 			}
 
 			var fetchErr error
 			md, fetchErr = dlClient.GetMainData(ctx)
 			if fetchErr != nil || md == nil {
-				e.logger.Debug("获取下载器数据失败，跳过", zap.String("clientID", clientID), zap.Error(fetchErr))
+				e.logger.Debug("failed to get downloader data, skipping", zap.String("clientID", clientID), zap.Error(fetchErr))
 				continue
 			}
 		}
@@ -2314,7 +2330,7 @@ func (e *Engine) CollectTrafficStats(ctx context.Context) error {
 			RecordedAt:     now,
 		}
 		if err := e.db.WithContext(ctx).Create(snapshot).Error; err != nil {
-			e.logger.Warn("写入下载器速度快照失败", zap.String("clientID", clientID), zap.Error(err))
+			e.logger.Warn("failed to write downloader speed snapshot", zap.String("clientID", clientID), zap.Error(err))
 		}
 
 		e.collectSiteTrafficDaily(ctx, clientID, md, now)
@@ -2657,7 +2673,7 @@ func (e *Engine) refreshDiscountStatus(ctx context.Context, records []model.Seed
 				newDiscount = discResult.Level
 			}
 
-			e.logger.Info("refresh discount: 种子已不再免费",
+			e.logger.Info("refresh discount: torrent no longer free",
 				zap.String("site", siteName),
 				zap.String("torrent_id", rec.TorrentID),
 				zap.String("info_hash", rec.InfoHash),

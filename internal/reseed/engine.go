@@ -109,7 +109,7 @@ func (s *l2Stats) record(site string, result string) {
 func (s *l2Stats) log(e *Engine) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	e.logger.Info("L2搜索验证统计",
+	e.logger.Info("L2 search verification stats",
 		zap.Int("searched", len(s.searched)),
 		zap.Int("noKeyword", s.noKeyword),
 		zap.Int("noGroup", s.noGroup),
@@ -124,7 +124,7 @@ func (s *l2Stats) log(e *Engine) {
 	}
 	sort.Strings(sites)
 	for _, site := range sites {
-		e.logger.Info("L2站点统计",
+		e.logger.Info("L2 site stats",
 			zap.String("site", site),
 			zap.Int("searchCount", s.searched[site]),
 			zap.String("sampleResult", s.siteResults[site]))
@@ -408,7 +408,7 @@ func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []
 		for _, siteName := range targetSites {
 			info, err := e.siteProvider.GetSiteInfo(ctx, siteName)
 			if err != nil {
-				e.logger.Warn("获取目标站点信息失败", zap.String("site", siteName), zap.Error(err))
+				e.logger.Warn("failed to get target site info", zap.String("site", siteName), zap.Error(err))
 				continue
 			}
 			allSites = append(allSites, info)
@@ -416,7 +416,7 @@ func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []
 	} else {
 		sites, err := e.siteProvider.ListSites(ctx)
 		if err != nil {
-			e.logger.Warn("列出站点失败", zap.Error(err))
+			e.logger.Warn("failed to list sites", zap.Error(err))
 			return nil
 		}
 		allSites = sites
@@ -450,13 +450,13 @@ func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []
 
 		config, err := e.siteProvider.GetSiteConfig(ctx, info.Name)
 		if err != nil {
-			e.logger.Warn("获取站点配置失败", zap.String("site", info.Name), zap.Error(err))
+			e.logger.Warn("failed to get site config", zap.String("site", info.Name), zap.Error(err))
 			continue
 		}
 
 		adapter, err := e.siteProvider.GetAdapter(ctx, info.Name)
 		if err != nil {
-			e.logger.Warn("获取适配器失败", zap.String("site", info.Name), zap.Error(err))
+			e.logger.Warn("failed to get adapter", zap.String("site", info.Name), zap.Error(err))
 			continue
 		}
 
@@ -506,7 +506,7 @@ func (e *Engine) preloadFingerprints(ctx context.Context, infoHashes []string) *
 		for _, chunk := range chunkStrings(deduped, preloadBatchSize) {
 			batch, err := e.fpRepo.BatchGetByInfoHashes(ctx, chunk)
 			if err != nil {
-				e.logger.Warn("批量预加载指纹失败", zap.Error(err))
+				e.logger.Warn("batch preload fingerprints failed", zap.Error(err))
 				return &fpCache{byKey: make(map[string]*model.ContentFingerprint)}
 			}
 			fps = append(fps, batch...)
@@ -516,7 +516,7 @@ func (e *Engine) preloadFingerprints(ctx context.Context, infoHashes []string) *
 		for _, chunk := range chunkStrings(deduped, preloadBatchSize) {
 			var partial []model.ContentFingerprint
 			if err := e.db.WithContext(ctx).Where("info_hash IN ?", chunk).Find(&partial).Error; err != nil {
-				e.logger.Warn("批量预加载指纹失败(DB)", zap.Error(err))
+				e.logger.Warn("batch preload fingerprints failed (DB)", zap.Error(err))
 				return &fpCache{byKey: make(map[string]*model.ContentFingerprint)}
 			}
 			batch = append(batch, partial...)
@@ -545,7 +545,7 @@ func (e *Engine) preloadExistingMatches(ctx context.Context, infoHashes []string
 		if err := e.db.WithContext(ctx).
 			Where("source_info_hash IN ?", chunk).
 			Find(&partial).Error; err != nil {
-			e.logger.Warn("批量预加载已有匹配失败", zap.Error(err))
+			e.logger.Warn("batch preload existing matches failed", zap.Error(err))
 			return make(map[string][]model.ReseedMatch), 0
 		}
 		matches = append(matches, partial...)
@@ -580,7 +580,7 @@ func (e *Engine) preloadNegativeCache(ctx context.Context, infoHashes []string) 
 
 	entries, err := e.GetNegativeCacheByHashes(ctx, infoHashes)
 	if err != nil {
-		e.logger.Warn("预加载负面缓存失败", zap.Error(err))
+		e.logger.Warn("preload negative cache failed", zap.Error(err))
 		return make(map[string]map[string]bool)
 	}
 
@@ -676,7 +676,7 @@ func (e *Engine) preflightCheck(ctx context.Context, ps *preloadedSites, concurr
 			}
 			if err != nil {
 				httpclient.TripDomainCircuit(sc.domain)
-				e.logger.Warn("站点连接性检测失败(重试后)，已熔断",
+				e.logger.Warn("site connectivity check failed (after retry), circuit broken",
 					zap.String("site", sc.name),
 					zap.String("domain", sc.domain),
 					zap.Error(err))
@@ -687,7 +687,7 @@ func (e *Engine) preflightCheck(ctx context.Context, ps *preloadedSites, concurr
 				return
 			}
 			httpclient.TripDomainCircuit(sc.domain)
-			e.logger.Warn("站点连接性检测失败(5xx)，已熔断",
+			e.logger.Warn("site connectivity check failed (5xx), circuit broken",
 				zap.String("site", sc.name),
 				zap.String("domain", sc.domain),
 				zap.Int("status", status))
@@ -696,7 +696,7 @@ func (e *Engine) preflightCheck(ctx context.Context, ps *preloadedSites, concurr
 	}
 	wg.Wait()
 
-	e.logger.Info("站点连接性检测完成",
+	e.logger.Info("site connectivity check completed",
 		zap.Int("total", len(checks)),
 		zap.Int("failed", failed))
 }
@@ -818,7 +818,7 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 			}
 			defer func() {
 				if r := recover(); r != nil {
-					e.logger.Error("pieces_hash 查询 panic recovered",
+					e.logger.Error("pieces_hash query panic recovered",
 						zap.String("site", j.siteName),
 						zap.Any("panic", r))
 				}
@@ -837,7 +837,7 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 
 				matches, err := j.searcher.SearchByPiecesHash(ctx, j.config, batch)
 				if err != nil {
-					e.logger.Warn("批量 pieces_hash 查询失败",
+					e.logger.Warn("batch pieces_hash query failed",
 						zap.String("site", j.siteName),
 						zap.Int("batch", k/batchSize+1),
 						zap.Int("totalBatches", (len(j.hashes)+batchSize-1)/batchSize),
@@ -872,7 +872,7 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 			cache.bySite[r.siteName] = r.results
 		}
 
-		e.logger.Info("pieces_hash 批量查询完成",
+		e.logger.Info("pieces_hash batch query completed",
 			zap.String("site", r.siteName),
 			zap.Int("queried", r.queried),
 			zap.Int("matched", len(r.results)))
@@ -926,7 +926,7 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 		return
 	}
 
-	e.logger.Info("开始计算缺失指纹",
+	e.logger.Info("started computing missing fingerprints",
 		zap.Int("missing", len(missing)),
 		zap.Int("total", len(sources)))
 
@@ -939,7 +939,7 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 		torrentData, err := dlClient.ExportTorrent(ctx, m.src.InfoHash)
 		if err != nil {
 			if computed == 0 {
-				e.logger.Warn("导出种子文件失败（首个错误）",
+				e.logger.Warn("export torrent file failed (first error)",
 					zap.String("hash", m.src.InfoHash),
 					zap.String("client", m.clientName),
 					zap.Error(err))
@@ -953,7 +953,7 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 		_, err = e.fpRepo.ComputeAndSave(ctx, m.src.SiteName, "", torrentData, m.src.Name)
 		if err != nil {
 			if computed == 0 {
-				e.logger.Warn("计算指纹失败（首个错误）",
+				e.logger.Warn("fingerprint computation failed (first error)",
 					zap.String("hash", m.src.InfoHash),
 					zap.Error(err))
 			}
@@ -963,7 +963,7 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 	}
 
 	if computed > 0 {
-		e.logger.Info("指纹计算完成", zap.Int("computed", computed), zap.Int("missing", len(missing)))
+		e.logger.Info("fingerprint computation completed", zap.Int("computed", computed), zap.Int("missing", len(missing)))
 	}
 }
 
@@ -992,7 +992,7 @@ func (e *Engine) preloadIYUUResults(ctx context.Context, taskID uint, infoHashes
 	if err != nil {
 		logStatus = "error"
 		logMsg = err.Error()
-		e.logger.Warn("IYUU 批量查询失败", zap.Error(err))
+		e.logger.Warn("IYUU batch query failed", zap.Error(err))
 	} else {
 		for _, r := range results {
 			byHash[r.SourceInfoHash] = append(byHash[r.SourceInfoHash], r)
@@ -1236,12 +1236,12 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	for _, clientName := range clientNames {
 		dlClient, err := e.clientProvider.Get(clientName)
 		if err != nil {
-			e.logger.Warn("获取下载器失败", zap.String("client", clientName), zap.Error(err))
+			e.logger.Warn("failed to get downloader", zap.String("client", clientName), zap.Error(err))
 			continue
 		}
 		allTorrents, err := dlClient.GetAllTorrents(ctx)
 		if err != nil {
-			e.logger.Warn("获取所有种子失败", zap.String("client", clientName), zap.Error(err))
+			e.logger.Warn("failed to get all torrents", zap.String("client", clientName), zap.Error(err))
 			continue
 		}
 		for _, t := range allTorrents {
@@ -1284,7 +1284,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			multiSiteCount++
 		}
 	}
-	e.logger.Debug("辅种源种子解析完成",
+	e.logger.Debug("reseed source torrent parse completed",
 		zap.Int("totalSeeding", result.TotalSources),
 		zap.Int("multiSiteNames", multiSiteCount),
 		zap.String("taskID", fmt.Sprintf("%d", task.ID)))
@@ -1317,7 +1317,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 
 	e.computeMissingFingerprints(ctx, sourceTorrents, infoHashes)
 
-	e.logger.Info("preload 开始",
+	e.logger.Info("preload started",
 		zap.Int("sources", len(sourceTorrents)),
 		zap.Strings("targetSites", targetSites))
 
@@ -1365,7 +1365,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	if phCache != nil {
 		phSites = len(phCache.bySite)
 	}
-	e.logger.Info("preload 完成",
+	e.logger.Info("preload completed",
 		zap.Int("fpCache", len(fpCache.byKey)),
 		zap.Int("existingMatches", len(existingMatchesMap)),
 		zap.Int("deletedInClient", deletedCount),
@@ -1393,13 +1393,13 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	injectedTargets := make(map[string]bool)
 	for _, src := range sourceTorrents {
 		if ctx.Err() != nil {
-			e.logger.Warn("辅种主循环 context 取消", zap.Error(ctx.Err()))
+			e.logger.Warn("reseed main loop context canceled", zap.Error(ctx.Err()))
 			break
 		}
 
 		matchCount++
 		if matchCount <= 5 || matchCount%500 == 0 {
-			e.logger.Info("辅种进度",
+			e.logger.Info("reseed progress",
 				zap.Int("processed", matchCount),
 				zap.Int("total", len(sourceTorrents)),
 				zap.Int("matched", result.Matched),
@@ -1441,7 +1441,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		candidates := e.findCandidates(ctx, src, ps, fpCache, sizeTolerance, task, negCache, phCache, cfCache, l2s, confirmedTargets, nameSites)
 
 		if matchCount <= 10 {
-			e.logger.Info("findCandidates 结果",
+			e.logger.Info("findCandidates result",
 				zap.Int("idx", matchCount),
 				zap.String("src_site", src.SiteName),
 				zap.String("hash", truncHash(src.InfoHash)),
@@ -1490,7 +1490,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 					limitCount = sl.ReseedLimitCount
 				}
 				if limitCount > 0 && !e.limiter.checkAndIncr(c.TargetSite, limitCount) {
-					e.logger.Debug("站点辅种达到每日上限，跳过",
+					e.logger.Debug("site reseed daily limit reached, skipping",
 						zap.String("targetSite", c.TargetSite),
 						zap.Int("limit", limitCount),
 					)
@@ -1526,7 +1526,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			}
 
 			if err := e.SaveMatch(ctx, match); err != nil {
-				e.logger.Warn("保存匹配结果失败",
+				e.logger.Warn("failed to save match results",
 					zap.String("sourceHash", src.InfoHash),
 					zap.String("targetSite", c.TargetSite),
 					zap.Error(err),
@@ -1692,7 +1692,7 @@ func (e *Engine) verifyL0Size(ctx context.Context, adapter model.SiteAdapter, co
 	}
 	results, err := adapter.SearchTorrents(ctx, config, targetTorrentID, nil)
 	if err != nil {
-		e.logger.Debug("L0 size验证搜索失败，放行",
+		e.logger.Debug("L0 size verification search failed, allowing",
 			zap.String("site", siteName),
 			zap.String("torrentID", targetTorrentID),
 			zap.Error(err))
@@ -1708,13 +1708,13 @@ func (e *Engine) verifyL0Size(ctx context.Context, adapter model.SiteAdapter, co
 		}
 	}
 	if !found {
-		e.logger.Debug("L0 size验证未找到目标种子，放行",
+		e.logger.Debug("L0 size verification target not found, allowing",
 			zap.String("site", siteName),
 			zap.String("torrentID", targetTorrentID))
 		return true
 	}
 	if !CompareSizeDisplay(fp.TotalSize, targetSize) {
-		e.logger.Warn("L0 pieces_hash命中但size不匹配，降级",
+		e.logger.Warn("L0 pieces_hash hit but size mismatch, downgrading",
 			zap.String("site", siteName),
 			zap.String("torrentID", targetTorrentID),
 			zap.Int64("sourceSize", fp.TotalSize),
@@ -1746,7 +1746,7 @@ func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAd
 
 	matches, err := searcher.SearchByPiecesHash(ctx, config, []string{fp.PiecesHash})
 	if err != nil {
-		e.logger.Debug("Layer0 pieces_hash API 失败",
+		e.logger.Debug("Layer0 pieces_hash API failed",
 			zap.String("site", siteName),
 			zap.String("pieces_hash", fp.PiecesHash),
 			zap.Error(err))
@@ -1788,7 +1788,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		if (keyword == "" || keywordStartsWithYear(keyword)) && len(fp.FileTreeParsed) > 0 {
 			fileKeyword, fileGroup := extractFromFileTree(fp.FileTreeParsed)
 			if fileKeyword != "" && !keywordStartsWithYear(fileKeyword) {
-				e.logger.Debug("从视频文件名提取关键词",
+				e.logger.Debug("extracting keywords from video filename",
 					zap.String("title", fp.Title),
 					zap.String("originalKeyword", keyword),
 					zap.String("fileKeyword", fileKeyword),
@@ -1820,7 +1820,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 	}
 
 	if isMusic {
-		e.logger.Debug("音乐种子L2搜索",
+		e.logger.Debug("music torrent L2 search",
 			zap.String("site", siteName),
 			zap.String("title", fp.Title),
 			zap.String("keyword", keyword))
@@ -1867,7 +1867,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 			l2s.matched++
 			l2s.mu.Unlock()
 		}
-		e.logger.Info("L2命中",
+		e.logger.Info("L2 matched",
 			zap.String("site", siteName),
 			zap.String("keyword", keyword),
 			zap.String("groupName", groupName),
@@ -1884,7 +1884,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		}
 	}
 
-	e.logger.Info("L2搜索未匹配",
+	e.logger.Info("L2 search no match",
 		zap.String("site", siteName),
 		zap.String("keyword", keyword),
 		zap.String("groupName", groupName),
@@ -2580,7 +2580,7 @@ loop:
 	}
 
 	if retried > 0 {
-		e.logger.Info("辅种重试完成",
+		e.logger.Info("reseed retry completed",
 			zap.Uint("task_id", task.ID),
 			zap.Int("retried", retried),
 			zap.Int("succeeded", succeeded))
@@ -3023,7 +3023,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "already") || strings.Contains(err.Error(), "exist") {
-		e.logger.Debug("辅种种子添加返回已存在（error 路径），验证下载器中是否真的存在",
+		e.logger.Debug("reseed torrent add returned exists (error path), verifying existence in downloader",
 			zap.Uint("matchID", match.ID))
 		return e.verifyDuplicateAndFinish(ctx, dlClient, match, "")
 	}
@@ -3031,7 +3031,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	}
 
 	if addResult.IsDuplicate {
-		e.logger.Debug("辅种种子添加返回已存在（duplicate），验证下载器中是否真的存在",
+		e.logger.Debug("reseed torrent add returned duplicate, verifying existence in downloader",
 			zap.Uint("matchID", match.ID),
 			zap.String("hash", addResult.InfoHash))
 		return e.verifyDuplicateAndFinish(ctx, dlClient, match, addResult.InfoHash)
@@ -3049,7 +3049,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	}
 
 	if err := dlClient.ResumeTorrent(ctx, infoHash); err != nil {
-		e.logger.Warn("辅种恢复做种失败", zap.String("hash", infoHash), zap.Error(err))
+		e.logger.Warn("reseed restore seeding failed", zap.String("hash", infoHash), zap.Error(err))
 	}
 
 	now := time.Now()
@@ -3076,12 +3076,12 @@ func (e *Engine) verifyDuplicateAndFinish(ctx context.Context, dlClient model.Do
 	if checkHash != "" {
 		torrent, err := dlClient.GetTorrentByHash(ctx, checkHash)
 		if err != nil {
-			e.logger.Warn("验证重复种子时查询下载器失败，放行",
+			e.logger.Warn("failed to query downloader during duplicate verification, allowing",
 				zap.Uint("matchID", match.ID),
 				zap.String("hash", checkHash),
 				zap.Error(err))
 		} else if torrent == nil {
-			e.logger.Info("辅种种子被标记为重复但下载器中不存在，跳过",
+			e.logger.Info("reseed torrent marked as duplicate but not in downloader, skipping",
 				zap.Uint("matchID", match.ID),
 				zap.String("hash", checkHash))
 			return e.failMatch(ctx, match, "种子被下载器标记为重复但实际不存在于活动列表")

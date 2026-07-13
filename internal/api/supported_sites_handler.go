@@ -30,7 +30,7 @@ func (h *SupportedSitesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := site.SupportedSitesErr(); err != nil {
-		h.logger.Error("supported_sites.json 解析失败", zap.Error(err))
+		h.logger.Error("supported_sites.json parse failed", zap.Error(err))
 		ErrorWithDetail(w, http.StatusInternalServerError, 50001, "白名单数据加载失败", err.Error())
 		return
 	}

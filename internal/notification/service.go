@@ -97,7 +97,7 @@ func (s *Service) Send(ctx context.Context, msg model.FormattedMessage) error {
 					fbOk, fbErr := s.sendToChannel(ctx, fb, msg)
 					s.recordHistory(ctx, fb.ID, msg, fbOk, fbErr)
 					if fbOk {
-						s.logger.Info("故障转移到备用通道",
+						s.logger.Info("failover to backup channel",
 							zap.String("from", res.ch.Name),
 							zap.String("to", fb.Name),
 						)

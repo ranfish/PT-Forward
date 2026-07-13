@@ -161,7 +161,7 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 			}
 		}
 
-		m.logger.Info("free end monitor: 种子下载中免费到期，已暂停",
+		m.logger.Info("free end monitor: torrent download free period expired, paused",
 			zap.String("client", record.ClientID),
 			zap.String("info_hash", record.InfoHash),
 			zap.String("site", record.SiteName),
@@ -178,7 +178,7 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 			}
 		}
 
-		m.logger.Info("free end monitor: 种子已做完，免费到期，继续保种",
+		m.logger.Info("free end monitor: torrent completed, free period expired, continuing seed",
 			zap.String("client", record.ClientID),
 			zap.String("info_hash", record.InfoHash),
 			zap.String("site", record.SiteName),

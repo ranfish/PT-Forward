@@ -120,32 +120,52 @@ func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteCon
 	var result struct {
 		Response struct {
 			Torrent struct {
-				FilePath string `json:"filePath"`
-				Size     int64  `json:"size"`
-				InfoHash string `json:"infoHash"`
-				Seeders  int    `json:"seeders"`
-				Leechers int    `json:"leechers"`
+				FilePath    string `json:"filePath"`
+				Size        int64  `json:"size"`
+				InfoHash    string `json:"infoHash"`
+				Seeders     int    `json:"seeders"`
+				Leechers    int    `json:"leechers"`
+				Description string `json:"description"`
+				MediaInfo   string `json:"mediaInfo"`
 			} `json:"torrent"`
 			Group struct {
 				Name     string `json:"name"`
 				Category struct {
 					Name string `json:"name"`
 				} `json:"category"`
+				Tags []struct {
+					Name string `json:"name"`
+				} `json:"tags"`
 			} `json:"group"`
 		} `json:"response"`
 	}
 	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&result); err != nil {
-		return nil, parseError("解析 API 响应失败", err)
+		return nil, parseError("failed to parse API response", err)
 	}
 
 	t := result.Response.Torrent
 	g := result.Response.Group
-	return &model.TorrentDetail{
-		Title:    g.Name,
-		Size:     t.Size,
-		InfoHash: strings.ToLower(t.InfoHash),
-		Category: g.Category.Name,
-	}, nil
+	detail := &model.TorrentDetail{
+		Title:       g.Name,
+		Size:        t.Size,
+		InfoHash:    strings.ToLower(t.InfoHash),
+		Category:    g.Category.Name,
+		Description: t.Description,
+		MediaInfo:   t.MediaInfo,
+	}
+	for _, tag := range g.Tags {
+		if tag.Name != "" {
+			detail.Tags = append(detail.Tags, tag.Name)
+		}
+	}
+	if t.Description != "" {
+		detail.Screenshots = extractScreenshotsFromBBCode(t.Description)
+		if len(detail.Screenshots) > 0 {
+			detail.PosterURL = detail.Screenshots[0]
+			detail.Screenshots = detail.Screenshots[1:]
+		}
+	}
+	return detail, nil
 }
 
 func (a *GazelleAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -181,6 +201,14 @@ func (a *GazelleAdapter) detailViaWeb(ctx context.Context, config *model.SiteCon
 	if m := reGazelleSize.FindStringSubmatch(html); len(m) > 1 {
 		detail.Size = parseSizeStr(m[1])
 	}
+
+	if imdbURL := reIMDbURL.FindString(html); imdbURL != "" {
+		detail.IMDbURL = imdbURL
+	}
+	if doubanURL := reDoubanURL.FindString(html); doubanURL != "" {
+		detail.DoubanURL = doubanURL
+	}
+	detail.Flags = extractFlagsFromText(html + " " + detail.Title)
 
 	return detail, nil
 }

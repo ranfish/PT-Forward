@@ -687,7 +687,7 @@ func (a *TNodeAdapter) scrapeSecurityKeys(ctx context.Context, config *model.Sit
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		a.logger.Debug("请求安全信息失败", zap.Error(err))
+		a.logger.Debug("failed to request security info", zap.Error(err))
 		return
 	}
 	defer func() { drainBody(resp) }()
@@ -722,7 +722,7 @@ func (a *TNodeAdapter) scrapeSecurityKeys(ctx context.Context, config *model.Sit
 		stats.AuthKey = secResp.Data.TorrentKey
 	}
 
-	a.logger.Debug("采集到 tnode 安全密钥",
+	a.logger.Debug("collected tnode security keys",
 		zap.Bool("rss_key", stats.RSSKey != ""),
 		zap.Bool("torrent_key", stats.AuthKey != ""))
 }

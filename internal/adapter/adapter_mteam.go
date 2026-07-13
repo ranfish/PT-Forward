@@ -1268,21 +1268,21 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 	peerURL := resolveBaseURL(config) + "/api/tracker/myPeerStatistics"
 	peerReq, err := http.NewRequestWithContext(ctx, "POST", peerURL, nil)
 	if err != nil {
-		a.logger.Warn("构造 myPeerStatistics 请求失败", zap.Error(err))
+		a.logger.Warn("failed to construct myPeerStatistics request", zap.Error(err))
 		return stats, nil
 	}
 	a.setAPIHeaders(peerReq, config.APIKey)
 
 	peerResp, err := a.doer.Client.Do(peerReq)
 	if err != nil {
-		a.logger.Warn("myPeerStatistics 请求失败", zap.Error(err))
+		a.logger.Warn("myPeerStatistics request failed", zap.Error(err))
 		return stats, nil
 	}
 	defer func() { drainBody(peerResp) }()
 
 	peerBody, err := readBody(peerResp)
 	if err != nil {
-		a.logger.Warn("读取 myPeerStatistics 响应失败", zap.Error(err))
+		a.logger.Warn("failed to read myPeerStatistics response", zap.Error(err))
 		return stats, nil
 	}
 
@@ -1294,7 +1294,7 @@ func (a *MTeamAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Site
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(peerBody, &peerResult); err != nil {
-		a.logger.Warn("解析 myPeerStatistics 响应失败", zap.Error(err))
+		a.logger.Warn("failed to parse myPeerStatistics response", zap.Error(err))
 		return stats, nil
 	}
 
