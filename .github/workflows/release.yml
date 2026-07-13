@@ -37,8 +37,13 @@ jobs:
           VERSION=${GITHUB_REF_NAME}
           CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=${VERSION}" -o pt-forward-linux-amd64 ./cmd/pt-forward/
 
+      - name: Generate SHA256
+        run: sha256sum pt-forward-linux-amd64 > pt-forward-linux-amd64.sha256
+
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: pt-forward-linux-amd64
+          files: |
+            pt-forward-linux-amd64
+            pt-forward-linux-amd64.sha256
           generate_release_notes: true

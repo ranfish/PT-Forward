@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"crypto/sha256"
+	"encoding/hex"
 	"runtime"
 	"strings"
 	"time"
@@ -232,6 +234,23 @@ func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
 
 	h.logger.Info("OTA: download complete", zap.Int64("bytes", written))
 
+	// SHA256 校验（强制）
+	expectedHash, err := h.downloadSHA256(downloadURL + ".sha256")
+	if err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("download SHA256 checksum: %w", err)
+	}
+	actualHash, err := computeFileSHA256(tmpPath)
+	if err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("compute SHA256: %w", err)
+	}
+	if actualHash != expectedHash {
+		os.Remove(tmpPath)
+		return fmt.Errorf("SHA256 mismatch: expected %s, got %s", expectedHash, actualHash)
+	}
+	h.logger.Info("OTA: SHA256 verified", zap.String("hash", actualHash[:16]+"..."))
+
 	// Verify the downloaded file is executable
 	if err := os.Chmod(tmpPath, 0755); err != nil {
 		os.Remove(tmpPath)
@@ -264,4 +283,52 @@ func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
 
 	os.Remove(backupPath)
 	return nil
+}
+
+func (h *SystemHandler) downloadSHA256(url string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+	client := h.newHTTPClientWithProxy(30 * time.Second)
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("download checksum: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("checksum download HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
+	if err != nil {
+		return "", fmt.Errorf("read checksum: %w", err)
+	}
+
+	line := strings.TrimSpace(string(body))
+	parts := strings.Fields(line)
+	if len(parts) == 0 {
+		return "", fmt.Errorf("empty checksum file")
+	}
+
+	hash := parts[0]
+	if len(hash) != 64 {
+		return "", fmt.Errorf("invalid SHA256 length: %d", len(hash))
+	}
+	return hash, nil
+}
+
+func computeFileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
