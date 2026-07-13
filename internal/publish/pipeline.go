@@ -11,6 +11,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/description"
+	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
@@ -36,6 +37,8 @@ type Pipeline struct {
 	artifactGenerator *PublishArtifactGenerator
 	limitGuard        *PublishLimitGuard
 	declarationFilter *DeclarationFilter
+	metadataFetcher   *metadata.Fetcher
+	imageHostStrategy string
 	memberMu          sync.Map
 }
 
@@ -65,6 +68,16 @@ func (p *Pipeline) SetPTGenEndpoints(endpoints string) {
 
 func (p *Pipeline) SetDeclarationFilter(df *DeclarationFilter) {
 	p.declarationFilter = df
+}
+
+func (p *Pipeline) SetMetadataFetcher(f *metadata.Fetcher) {
+	p.metadataFetcher = f
+}
+
+func (p *Pipeline) SetImageHostStrategy(strategy string) {
+	if strategy != "" {
+		p.imageHostStrategy = strategy
+	}
 }
 
 func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
@@ -322,7 +335,25 @@ func (p *Pipeline) fetchFromDownloader(ctx context.Context, candidate *model.Pub
 	if p.artifactGenerator == nil {
 		return nil, nil, fmt.Errorf("artifact generator not configured, cannot generate MediaInfo")
 	}
-	artifact, aErr := p.artifactGenerator.Generate(ctx, savePath, "", nil)
+
+	var sourceScreenshots []string
+	var sourceMediaInfo string
+	if p.metadataFetcher != nil {
+		if meta, ok := p.metadataFetcher.GetMetadata(ctx, candidate.InfoHash, candidate.SourceSite); ok && meta != nil {
+			if meta.Screenshots != "" {
+				json.Unmarshal([]byte(meta.Screenshots), &sourceScreenshots)
+			}
+			if meta.SourceMediaInfo != "" {
+				sourceMediaInfo = meta.SourceMediaInfo
+			}
+		}
+	}
+
+	strategy := p.imageHostStrategy
+	if strategy == "" {
+		strategy = "auto"
+	}
+	artifact, aErr := p.artifactGenerator.GenerateWithStrategy(ctx, savePath, sourceMediaInfo, sourceScreenshots, strategy)
 	if aErr != nil {
 		return nil, nil, fmt.Errorf("local MediaInfo generation failed: %w", aErr)
 	}
@@ -332,6 +363,11 @@ func (p *Pipeline) fetchFromDownloader(ctx context.Context, candidate *model.Pub
 	detail.MediaInfo = artifact.MediaInfoText
 	if len(artifact.ScreenshotURLs) > 0 {
 		detail.Screenshots = artifact.ScreenshotURLs
+	}
+
+	// 存储 metadata（自动发布集成 §48.5）
+	if p.metadataFetcher != nil {
+		p.storeMetadataAsync(ctx, candidate, detail)
 	}
 
 	return torrentData, detail, nil
@@ -425,14 +461,16 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 						zap.String("title", dr.Title),
 						zap.Int64("size", dr.Size),
 					)
-					if err := p.CreateResult(ctx, &model.PublishResultRecord{
-						CandidateID:  candidate.ID,
-						SourceSite:   candidate.SourceSite,
-						TargetSite:   targetSite,
-						TorrentID:    dr.TorrentID,
-						Status:       model.PublishResultSkipped,
-						ErrorMessage: fmt.Sprintf("去重匹配: %s (size=%d)", dr.Title, dr.Size),
-					}); err != nil {
+				if err := p.CreateResult(ctx, &model.PublishResultRecord{
+					CandidateID:  candidate.ID,
+					SourceSite:   candidate.SourceSite,
+					TargetSite:   targetSite,
+					TorrentID:    dr.TorrentID,
+					Status:       model.PublishResultSkipped,
+					ErrorMessage: fmt.Sprintf("去重匹配: %s (size=%d)", dr.Title, dr.Size),
+					Title:        candidate.TorrentName,
+					DownloaderID: candidate.ClientID,
+				}); err != nil {
 						p.logger.Warn("记录发布结果失败", zap.Error(err))
 					}
 					return false, nil
@@ -448,6 +486,7 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 
 	start := time.Now()
 	resp, err := targetAdapter.UploadTorrent(ctx, targetConfig, pubReq)
+	costMS := time.Since(start).Milliseconds()
 	metrics.PublishDuration.WithLabelValues(targetSite).Observe(time.Since(start).Seconds())
 	if err != nil {
 		p.logger.Warn("上传到目标站失败",
@@ -464,6 +503,9 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 			TorrentID:    candidate.SourceTorrentID,
 			Status:       model.PublishResultFailed,
 			ErrorMessage: err.Error(),
+			Title:        candidate.TorrentName,
+			DownloaderID: candidate.ClientID,
+			CostMS:       costMS,
 		}); err != nil {
 			p.logger.Warn("记录发布结果失败", zap.Error(err))
 		}
@@ -472,13 +514,20 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 	audit.Log("system", "publish", "upload", "torrent", candidate.SourceTorrentID,
 		fmt.Sprintf("发布 %s → %s", candidate.SourceSite, targetSite), "success")
 
+	status := model.PublishResultCompleted
+	if resp != nil && resp.IsExisting {
+		status = model.PublishResultExists
+	}
 	if err := p.CreateResult(ctx, &model.PublishResultRecord{
 		CandidateID: candidate.ID,
 		SourceSite:  candidate.SourceSite,
 		TargetSite:  targetSite,
 		TorrentID:   resp.TorrentID,
-		Status:      model.PublishResultCompleted,
+		Status:      status,
 		PublishURL:  resp.DetailURL,
+		Title:       candidate.TorrentName,
+		DownloaderID: candidate.ClientID,
+		CostMS:      costMS,
 	}); err != nil {
 		p.logger.Warn("记录发布结果失败", zap.Error(err))
 	}
@@ -2036,4 +2085,57 @@ func (p *Pipeline) getTargetFramework(ctx context.Context, targetSite string) st
 		return string(siteInfo.Framework)
 	}
 	return ""
+}
+
+func (p *Pipeline) storeMetadataAsync(ctx context.Context, candidate *model.PublishCandidate, detail *model.TorrentDetail) {
+	if p.metadataFetcher == nil || candidate == nil || detail == nil {
+		return
+	}
+	if candidate.InfoHash == "" || candidate.SourceSite == "" || candidate.SourceTorrentID == "" {
+		return
+	}
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		meta := &model.TorrentMetadata{
+			InfoHash:        candidate.InfoHash,
+			SiteName:        candidate.SourceSite,
+			TorrentID:       candidate.SourceTorrentID,
+			Title:           detail.Title,
+			Subtitle:        detail.Subtitle,
+			Description:     detail.Description,
+			MediaInfo:       detail.MediaInfo,
+			MediaInfoSource: "local_generated",
+			FetchSource:     "auto_publish",
+			FetchedAt:       time.Now(),
+		}
+		if detail.Category != "" {
+			meta.SourceCategory = detail.Category
+		}
+		if len(detail.Tags) > 0 {
+			if data, err := json.Marshal(detail.Tags); err == nil {
+				meta.Tags = string(data)
+			}
+		}
+		if len(detail.Screenshots) > 0 {
+			if data, err := json.Marshal(detail.Screenshots); err == nil {
+				meta.Screenshots = string(data)
+			}
+		}
+		if detail.IMDbURL != "" {
+			meta.IMDbURL = detail.IMDbURL
+		}
+		if detail.DoubanURL != "" {
+			meta.DoubanURL = detail.DoubanURL
+		}
+
+		if err := p.db.WithContext(bgCtx).
+			Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
+			Assign(meta).
+			FirstOrCreate(meta).Error; err != nil {
+			p.logger.Debug("storeMetadataAsync: upsert failed",
+				zap.String("info_hash", candidate.InfoHash),
+				zap.Error(err))
+		}
+	}()
 }
