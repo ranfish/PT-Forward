@@ -23,9 +23,7 @@ type DatabaseConfig struct {
 type LogConfig struct {
 	Directory  string `yaml:"directory"    mapstructure:"directory"`
 	Level      string `yaml:"level"        mapstructure:"level"`
-	MaxSizeMB  int    `yaml:"max_size_mb"  mapstructure:"max_size_mb"`
 	MaxAgeDays int    `yaml:"max_age_days" mapstructure:"max_age_days"`
-	MaxBackups int    `yaml:"max_backups"  mapstructure:"max_backups"`
 	Compress   bool   `yaml:"compress"     mapstructure:"compress"`
 	Format     string `yaml:"format"       mapstructure:"format"`
 }

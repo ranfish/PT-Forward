@@ -53,9 +53,7 @@ func DefaultConfig() *Config {
 		Log: model.LogConfig{
 			Directory:  "./logs",
 			Level:      "info",
-			MaxSizeMB:  10,
 			MaxAgeDays: 30,
-			MaxBackups: 10,
 			Compress:   true,
 			Format:     "json",
 		},
