@@ -366,6 +366,7 @@ func main() {
 	publishPipeline.SetMetadataFetcher(metadataFetcher)
 	if strategy, err := settingsRepo.Get(ctx, setting.KeyImageHostStrategy); err == nil && strategy != "" {
 		publishPipeline.SetImageHostStrategy(strategy)
+		publishPipeline.SetImageHostManager(imageHostMgr)
 	}
 	bdinfoScanner := publish.NewBDInfoScanner(log)
 	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner, metadataFetcher)
