@@ -168,6 +168,8 @@
         </a-upload>
       </a-space>
     </a-card>
+
+    <ImageHostSettings />
   </div>
 </template>
 
@@ -177,6 +179,7 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi } from '@/api/settings'
 import { switchAutoSave } from '@/utils/switch-auto-save'
+import ImageHostSettings from './ImageHostSettings.vue'
 
 const { t } = useI18n()
 

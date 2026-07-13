@@ -1,0 +1,125 @@
+<template>
+  <div class="image-host-settings">
+    <a-card title="图床配置" style="margin-bottom: 24px">
+      <template #extra>
+        <a-button type="primary" size="small" :loading="testing" @click="handleTest">测试上传</a-button>
+      </template>
+      <a-form layout="vertical" style="max-width: 600px" v-loading="loading">
+        <a-form-item label="默认图床">
+          <a-select v-model:value="config.default" style="width: 200px">
+            <a-select-option v-for="h in config.hosts" :key="h" :value="h">{{ h }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="截图策略">
+          <a-select v-model:value="config.strategy" style="width: 320px">
+            <a-select-option value="auto">自动（源站优先+本地兜底）</a-select-option>
+            <a-select-option value="local_upload">始终本地截图</a-select-option>
+            <a-select-option value="source_rehost">源站截图转存</a-select-option>
+            <a-select-option value="source_direct">源站截图直用</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-divider>AGSVPT 配置</a-divider>
+        <a-form-item label="AGSVPT 邮箱">
+          <a-input v-model:value="config.agsvpt_email" placeholder="AGSVPT 注册邮箱" style="width: 300px" />
+        </a-form-item>
+        <a-form-item label="AGSVPT 密码">
+          <a-input-password v-model:value="agsvptPassword" placeholder="留空不修改" style="width: 300px" />
+        </a-form-item>
+        <a-form-item label="AGSVPT 状态">
+          <a-tag :color="config.agsvpt_configured ? 'green' : 'default'">
+            {{ config.agsvpt_configured ? '已配置' : '未配置' }}
+          </a-tag>
+        </a-form-item>
+        <a-divider>图床健康状态</a-divider>
+        <a-space wrap>
+          <a-tag v-for="(status, name) in config.health" :key="name"
+            :color="status === 'ok' ? 'green' : 'red'">
+            {{ name }}: {{ status === 'ok' ? '正常' : status }}
+          </a-tag>
+        </a-space>
+        <div style="margin-top: 16px">
+          <a-button type="primary" :loading="saving" @click="handleSave">保存</a-button>
+        </div>
+      </a-form>
+    </a-card>
+
+    <PublishLimitSettings />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, onMounted } from 'vue'
+import { message } from 'ant-design-vue'
+import { imageHostApi, type ImageHostConfig } from '@/api/image-host'
+import PublishLimitSettings from './PublishLimitSettings.vue'
+
+const loading = ref(false)
+const saving = ref(false)
+const testing = ref(false)
+const agsvptPassword = ref('')
+
+const config = reactive<ImageHostConfig>({
+  hosts: [],
+  default: 'pixhost',
+  strategy: 'auto',
+  agsvpt_email: '',
+  agsvpt_configured: false,
+  health: {},
+})
+
+async function loadConfig() {
+  loading.value = true
+  try {
+    const { data } = await imageHostApi.get()
+    const d = data.data
+    config.hosts = d.hosts || []
+    config.default = d.default || 'pixhost'
+    config.strategy = d.strategy || 'auto'
+    config.agsvpt_email = d.agsvpt_email || ''
+    config.agsvpt_configured = d.agsvpt_configured || false
+    config.health = d.health || {}
+  } catch {
+    message.error('加载图床配置失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleSave() {
+  saving.value = true
+  try {
+    const payload: Record<string, string> = {
+      default: config.default,
+      strategy: config.strategy,
+    }
+    if (config.agsvpt_email) payload.agsvpt_email = config.agsvpt_email
+    if (agsvptPassword.value) payload.agsvpt_password = agsvptPassword.value
+    await imageHostApi.update(payload)
+    message.success('保存成功')
+    agsvptPassword.value = ''
+    await loadConfig()
+  } catch {
+    message.error('保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleTest() {
+  testing.value = true
+  try {
+    const { data } = await imageHostApi.test(config.default)
+    if (data.data.success) {
+      message.success(`测试成功: ${data.data.url}`)
+    } else {
+      message.error('测试失败')
+    }
+  } catch (e: any) {
+    message.error('测试失败: ' + (e?.message || '未知错误'))
+  } finally {
+    testing.value = false
+  }
+}
+
+onMounted(loadConfig)
+</script>
