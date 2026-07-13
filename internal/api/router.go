@@ -54,6 +54,8 @@ type Router struct {
 	publishLimitHandler   *PublishLimitHandler
 	imageHostHandler      *ImageHostHandler
 	metadataHandler       *MetadataHandler
+	sseLogHandler         *SSELogHandler
+	logBroadcaster        *LogBroadcaster
 	wsHandler            *WSHandler
 	hub                  *Hub
 	authManager          *auth.AuthManager
@@ -66,7 +68,7 @@ type Router struct {
 	publicRateLimitMW    func(http.Handler) http.Handler
 }
 
-func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, imageHostMgr *imagehost.Manager, logger *zap.Logger) *Router {
+func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, imageHostMgr *imagehost.Manager, logBroadcaster *LogBroadcaster, logger *zap.Logger) *Router {
 	siteRepo := site.NewRepository(db)
 	rssRepo := rss.NewRepository(db)
 	filterRepo := filter.NewRepository(db)
@@ -110,6 +112,8 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		publishLimitHandler:   NewPublishLimitHandler(db, logger),
 		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),
 		metadataHandler:       NewMetadataHandler(db, logger),
+		logBroadcaster:        logBroadcaster,
+		sseLogHandler:         NewSSELogHandler(logBroadcaster, logger),
 		dashboardHandler:     dashHandler,
 		systemHandler:        sysHandler,
 		iyuuHandler:          NewIYUUHandler(db, logger, iyuuSvc),
@@ -362,6 +366,9 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/system/info/", systemHandler)
 	mux.Handle("/api/v1/system/logs", systemHandler)
 	mux.Handle("/api/v1/system/logs/", systemHandler)
+
+	sseLogHandler := rt.chain(rt.rateLimitMW, rt.sseLogHandler.ServeHTTP)
+	mux.Handle("/api/v1/system/logs/stream", sseLogHandler)
 	mux.Handle("/api/v1/system/audit-logs", systemHandler)
 	mux.Handle("/api/v1/system/audit-logs/", systemHandler)
 	mux.Handle("/api/v1/system/check-update", systemHandler)

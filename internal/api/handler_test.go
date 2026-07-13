@@ -70,7 +70,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	seedingEngine := seeding.NewEngine(db, logger)
 	taskRegistry := scheduler.NewRegistry(logger)
 
-	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, nil, taskRegistry, &mockIYUUQueryService{}, "test", nil, nil, logger)
+	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, nil, taskRegistry, &mockIYUUQueryService{}, "test", nil, nil, nil, logger)
 	mux := http.NewServeMux()
 	router.Register(mux, []string{"*"}, true, 120)
 
@@ -5424,7 +5424,7 @@ func setupTestEnvWithClientMgr(t *testing.T) *testEnv {
 	seedingEngine := seeding.NewEngine(db, logger)
 	taskRegistry := scheduler.NewRegistry(logger)
 	clientMgr := client.NewManager(db, logger)
-	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, clientMgr, taskRegistry, &mockIYUUQueryService{}, "test", nil, nil, logger)
+	router := NewRouter(authManager, db, rssEngine, notifyService, reseedEngine, publishPipeline, seedingEngine, clientMgr, taskRegistry, &mockIYUUQueryService{}, "test", nil, nil, nil, logger)
 	mux := http.NewServeMux()
 	router.Register(mux, []string{"*"}, true, 120)
 	env := &testEnv{
