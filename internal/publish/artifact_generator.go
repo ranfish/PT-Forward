@@ -3,10 +3,12 @@ package publish
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/screenshot"
 	"go.uber.org/zap"
@@ -38,6 +40,10 @@ type ArtifactResult struct {
 }
 
 func (g *PublishArtifactGenerator) Generate(ctx context.Context, torrentDir string, sourceMediaInfo string, sourceScreenshots []string) (*ArtifactResult, error) {
+	return g.GenerateWithStrategy(ctx, torrentDir, sourceMediaInfo, sourceScreenshots, "auto")
+}
+
+func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, torrentDir string, sourceMediaInfo string, sourceScreenshots []string, strategy string) (*ArtifactResult, error) {
 	result := &ArtifactResult{}
 
 	videoPath, err := g.findLargestVideo(torrentDir)
@@ -62,36 +68,93 @@ func (g *PublishArtifactGenerator) Generate(ctx context.Context, torrentDir stri
 		result.MediaInfoText = sourceMediaInfo
 	}
 
-	if g.screenshotEngine != nil && g.screenshotEngine.Available() {
-		subtitleSID := 0
-		if g.subtitleDetector.Available() {
-			if sid, err := g.subtitleDetector.FindSubtitleStreamID(ctx, videoPath); err == nil && sid > 0 {
-				subtitleSID = sid
-				g.logger.Info("detected chinese subtitle stream", zap.Int("sid", subtitleSID))
-			}
-		}
+	validSourceShots := g.validateScreenshots(ctx, sourceScreenshots)
 
-		localScreenshots, err := g.screenshotEngine.Capture(ctx, videoPath, subtitleSID)
-		if err != nil {
-			g.logger.Warn("local screenshot capture failed, using source screenshots",
-				zap.Error(err))
+	switch strategy {
+	case "source_direct":
+		result.ScreenshotURLs = sourceScreenshots
+	case "source_rehost":
+		result.ScreenshotURLs = g.rehostScreenshots(ctx, sourceScreenshots)
+	case "local_upload":
+		result.ScreenshotURLs = g.captureLocalScreenshots(ctx, videoPath)
+		if len(result.ScreenshotURLs) == 0 {
 			result.ScreenshotURLs = sourceScreenshots
-		} else if len(localScreenshots) > 0 {
-			if uploadedURLs, err := g.imageUploader.UploadMultiple(ctx, localScreenshots); err == nil && len(uploadedURLs) > 0 {
-				result.ScreenshotURLs = uploadedURLs
-				g.logger.Info("uploaded local screenshots",
-					zap.Int("count", len(uploadedURLs)))
-			} else {
-				g.logger.Warn("screenshot upload failed, using source screenshots",
-					zap.Error(err))
-				result.ScreenshotURLs = sourceScreenshots
+		}
+	default:
+		if len(validSourceShots) >= 3 {
+			result.ScreenshotURLs = g.rehostScreenshots(ctx, validSourceShots)
+		}
+		if len(result.ScreenshotURLs) < 3 {
+			localShots := g.captureLocalScreenshots(ctx, videoPath)
+			if len(localShots) > len(result.ScreenshotURLs) {
+				result.ScreenshotURLs = localShots
 			}
 		}
-	} else {
+		if len(result.ScreenshotURLs) == 0 {
+			result.ScreenshotURLs = sourceScreenshots
+		}
+	}
+
+	if len(result.ScreenshotURLs) == 0 {
 		result.ScreenshotURLs = sourceScreenshots
 	}
 
 	return result, nil
+}
+
+func (g *PublishArtifactGenerator) validateScreenshots(ctx context.Context, urls []string) []string {
+	if len(urls) == 0 {
+		return nil
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	var valid []string
+	for _, u := range urls {
+		req, err := http.NewRequestWithContext(ctx, "HEAD", u, nil)
+		if err != nil {
+			continue
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			g.logger.Debug("screenshot validation failed", zap.String("url", u), zap.Error(err))
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			valid = append(valid, u)
+		}
+	}
+	return valid
+}
+
+func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, videoPath string) []string {
+	if g.screenshotEngine == nil || !g.screenshotEngine.Available() {
+		return nil
+	}
+	subtitleSID := 0
+	if g.subtitleDetector.Available() {
+		if sid, err := g.subtitleDetector.FindSubtitleStreamID(ctx, videoPath); err == nil && sid > 0 {
+			subtitleSID = sid
+		}
+	}
+	localShots, err := g.screenshotEngine.Capture(ctx, videoPath, subtitleSID)
+	if err != nil || len(localShots) == 0 {
+		g.logger.Warn("local screenshot capture failed", zap.Error(err))
+		return nil
+	}
+	uploaded, err := g.imageUploader.UploadMultiple(ctx, localShots)
+	if err != nil || len(uploaded) == 0 {
+		g.logger.Warn("screenshot upload failed", zap.Error(err))
+		return nil
+	}
+	g.logger.Info("uploaded local screenshots", zap.Int("count", len(uploaded)))
+	return uploaded
+}
+
+func (g *PublishArtifactGenerator) rehostScreenshots(ctx context.Context, urls []string) []string {
+	if len(urls) == 0 {
+		return urls
+	}
+	return urls
 }
 
 func (g *PublishArtifactGenerator) findLargestVideo(dir string) (string, error) {

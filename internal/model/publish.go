@@ -173,6 +173,7 @@ type PublishRequest struct {
 	MediaInfo       string            `json:"media_info"`
 	BDInfo          string            `json:"bd_info"`
 	Screenshots     []string          `json:"screenshots"`
+	ScreenshotInDesc bool             `json:"screenshot_in_desc"`
 	IMDbLink        string            `json:"imdb_link"`
 	DoubanLink      string            `json:"douban_link"`
 	Anonymous       bool              `json:"anonymous"`
