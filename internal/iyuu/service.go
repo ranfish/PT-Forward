@@ -167,20 +167,20 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 		shouldDelay := true
 
 		if err := s.doPostFormWithToken(ctx, u, cfg.Token, form, &resp); err != nil {
-			s.logger.Warn("IYUU 批次查询网络失败",
+			s.logger.Warn("IYUU batch query network error",
 				zap.Int("batch", i/batchSize+1),
 				zap.Int("totalBatches", (len(infoHashes)+batchSize-1)/batchSize),
 				zap.Error(err),
 			)
 			consecutiveErrors++
 			if consecutiveErrors >= maxConsecutiveErrors {
-				s.logger.Warn("IYUU 连续网络错误，中止查询",
+				s.logger.Warn("IYUU consecutive network errors, aborting",
 					zap.Int("consecutiveErrors", consecutiveErrors),
 				)
 				shouldBreak = true
 			}
 		} else if resp.Code == 429 {
-			s.logger.Warn("IYUU 限速（429），中止查询",
+			s.logger.Warn("IYUU rate limited (429), aborting",
 				zap.Int("batch", i/batchSize+1),
 				zap.String("msg", resp.Msg),
 			)
@@ -194,21 +194,21 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 			)
 		} else if resp.Code == 400 {
 			// 限速（访问频率过快）：跳过该批，不累计错误，继续下一批
-			s.logger.Warn("IYUU 限速，跳过该批",
+			s.logger.Warn("IYUU rate limited, skipping batch",
 				zap.Int("batch", i/batchSize+1),
 				zap.String("msg", resp.Msg),
 			)
 			shouldDelay = true
 		} else if resp.Code != 0 {
 			consecutiveErrors++
-			s.logger.Warn("IYUU 服务器错误",
+			s.logger.Warn("IYUU server error",
 				zap.Int("batch", i/batchSize+1),
 				zap.String("msg", resp.Msg),
 				zap.Int("code", resp.Code),
 				zap.Int("consecutiveErrors", consecutiveErrors),
 			)
 			if consecutiveErrors >= maxConsecutiveErrors {
-				s.logger.Warn("IYUU 连续服务器错误，中止查询",
+				s.logger.Warn("IYUU consecutive server errors, aborting",
 					zap.Int("consecutiveErrors", consecutiveErrors),
 				)
 				shouldBreak = true
@@ -349,7 +349,7 @@ func (s *Service) BatchGetSeededSites(ctx context.Context, infoHashes []string) 
 
 func (s *Service) GetSiteList(ctx context.Context) ([]model.IYUUSite, error) {
 	if !s.syncRunning.CompareAndSwap(false, true) {
-		s.logger.Info("IYUU 站点同步已在进行中，跳过")
+		s.logger.Info("IYUU site sync already in progress, skipping")
 		return nil, iyuuError(ErrIYUUAPI, "sync already in progress", nil)
 	}
 	defer s.syncRunning.Store(false)
@@ -684,8 +684,8 @@ func (s *Service) doSync(ctx context.Context) {
 	}
 	_, err = s.GetSiteList(ctx)
 	if err != nil {
-		s.logger.Warn("IYUU 定时同步失败", zap.Error(err))
+		s.logger.Warn("IYUU scheduled sync failed", zap.Error(err))
 	} else {
-		s.logger.Info("IYUU 定时同步完成")
+		s.logger.Info("IYUU scheduled sync completed")
 	}
 }

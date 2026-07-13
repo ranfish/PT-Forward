@@ -187,7 +187,7 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 		torrentData, err = sourceAdapter.DownloadTorrent(ctx, sourceConfig, candidate.SourceTorrentID)
 		if err != nil {
 			if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("下载源种子失败: %v", err)); err != nil {
-				p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
+				p.logger.Warn("failed to update candidate status", zap.Uint("id", id), zap.Error(err))
 			}
 			return nil, &model.AppError{Code: 50001, Message: "下载源种子失败", Cause: err}
 		}
@@ -195,13 +195,13 @@ func (p *Pipeline) PublishCandidate(ctx context.Context, id uint) (*model.Publis
 		torrentData, sourceDetail, err = p.fetchFromDownloader(ctx, candidate)
 		if err != nil {
 			if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, fmt.Sprintf("从下载器导出种子失败: %v", err)); err != nil {
-				p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
+				p.logger.Warn("failed to update candidate status", zap.Uint("id", id), zap.Error(err))
 			}
 			return nil, &model.AppError{Code: 50001, Message: "从下载器导出种子失败", Cause: err}
 		}
 	} else {
 		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, "无法获取种子文件（无源站ID且无法从下载器导出）"); err != nil {
-			p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
+			p.logger.Warn("failed to update candidate status", zap.Uint("id", id), zap.Error(err))
 		}
 		return nil, &model.AppError{Code: 50001, Message: "无法获取种子文件"}
 	}
@@ -240,13 +240,13 @@ func (p *Pipeline) validateAndLoadCandidate(ctx context.Context, id uint) (*mode
 	eligible, reason := p.CheckPublishEligibility(ctx, &candidate, "")
 	if !eligible {
 		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateSkipped, reason); err != nil {
-			p.logger.Warn("更新候选状态失败", zap.Uint("id", id), zap.Error(err))
+			p.logger.Warn("failed to update candidate status", zap.Uint("id", id), zap.Error(err))
 		}
 		return nil, &model.AppError{Code: 40001, Message: fmt.Sprintf("发布合规检查未通过: %s", reason)}
 	}
 
 	if err := p.UpdateCandidateStatus(ctx, id, model.CandidatePublishing, ""); err != nil {
-		return nil, &model.AppError{Code: 40001, Message: "更新候选状态失败", Cause: err}
+		return nil, &model.AppError{Code: 40001, Message: "failed to update candidate status", Cause: err}
 	}
 
 	return &candidate, nil
@@ -398,7 +398,7 @@ func (p *Pipeline) fetchSourceInfo(ctx context.Context, candidate *model.Publish
 
 	sourceDetail, err := sourceAdapter.GetTorrentDetail(ctx, sourceConfig, candidate.SourceTorrentID)
 	if err != nil {
-		p.logger.Warn("获取源种子详情失败", zap.Error(err))
+		p.logger.Warn("failed to get source torrent detail", zap.Error(err))
 	}
 
 	if sourceDetail != nil {
@@ -462,7 +462,7 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 		if dedupErr == nil {
 			for _, dr := range dedupResults {
 				if dr.Size == candidate.Size && dr.Size > 0 {
-					p.logger.Info("目标站已存在相同资源，跳过发布",
+					p.logger.Info("target site already has same resource, skipping",
 						zap.String("target", targetSite),
 						zap.String("title", dr.Title),
 						zap.Int64("size", dr.Size),
@@ -477,7 +477,7 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 					Title:        candidate.TorrentName,
 					DownloaderID: candidate.ClientID,
 				}); err != nil {
-						p.logger.Warn("记录发布结果失败", zap.Error(err))
+						p.logger.Warn("failed to record publish result", zap.Error(err))
 					}
 					return false, nil
 				}
@@ -513,7 +513,7 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 			DownloaderID: candidate.ClientID,
 			CostMS:       costMS,
 		}); err != nil {
-			p.logger.Warn("记录发布结果失败", zap.Error(err))
+			p.logger.Warn("failed to record publish result", zap.Error(err))
 		}
 		return false, err
 	}
@@ -535,7 +535,7 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 		DownloaderID: candidate.ClientID,
 		CostMS:      costMS,
 	}); err != nil {
-		p.logger.Warn("记录发布结果失败", zap.Error(err))
+		p.logger.Warn("failed to record publish result", zap.Error(err))
 	}
 
 	metrics.PublishTasksTotal.WithLabelValues(targetSite, "completed").Inc()
@@ -1650,7 +1650,7 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 	if member.LastCompletedStep < StepDetail {
 		detail, detErr := sourceAdapter.GetTorrentDetail(ctx, sourceConfig, group.SourceTorrentID)
 		if detErr != nil {
-			p.logger.Warn("获取源种子详情失败", zap.Error(detErr))
+			p.logger.Warn("failed to get source torrent detail", zap.Error(detErr))
 		}
 		sourceDetail = detail
 		if err := p.advanceStep(ctx, member, StepDetail); err != nil {
@@ -1688,7 +1688,7 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 				if dedupErr == nil {
 					for _, dr := range dedupResults {
 						if dr.Size > 0 && sourceDetail != nil && dr.Size == sourceDetail.Size {
-							p.logger.Info("目标站已存在相同资源，跳过发布",
+							p.logger.Info("target site already has same resource, skipping",
 								zap.String("target", member.SiteName),
 								zap.String("title", dr.Title),
 								zap.Int64("size", dr.Size),

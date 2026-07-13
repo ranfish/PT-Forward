@@ -113,6 +113,28 @@
       </a-col>
     </a-row>
 
+    <a-collapse :bordered="false" style="margin-bottom: 24px">
+      <a-collapse-panel key="seeding" header="刷流详情">
+        <a-descriptions :column="4" size="small" v-if="seedingMonitor">
+          <a-descriptions-item v-for="(v, k) in (seedingMonitor as any).by_status" :key="k" :label="k">{{ v }}</a-descriptions-item>
+          <a-descriptions-item label="今日删种">{{ (seedingMonitor as any).deleted_today }}</a-descriptions-item>
+        </a-descriptions>
+        <a-empty v-else description="暂无数据" />
+      </a-collapse-panel>
+      <a-collapse-panel key="reseed" header="辅种详情">
+        <a-descriptions :column="4" size="small" v-if="reseedMonitor">
+          <a-descriptions-item v-for="(v, k) in (reseedMonitor as any).by_status" :key="k" :label="k">{{ v }}</a-descriptions-item>
+        </a-descriptions>
+        <a-empty v-else description="暂无数据" />
+      </a-collapse-panel>
+      <a-collapse-panel key="publish" header="发布详情">
+        <a-descriptions :column="4" size="small" v-if="publishMonitor">
+          <a-descriptions-item v-for="(v, k) in (publishMonitor as any).by_status" :key="k" :label="k">{{ v }}</a-descriptions-item>
+        </a-descriptions>
+        <a-empty v-else description="暂无数据" />
+      </a-collapse-panel>
+    </a-collapse>
+
     <a-card :title="t('dashboard.trends7d')" style="margin-bottom: 24px">
       <div ref="chartRef" style="height: 320px; width: 100%" />
     </a-card>
@@ -245,6 +267,9 @@ const { t } = useI18n()
 const loading = ref(false)
 const overview = ref<DashboardOverview>({})
 const sysDash = ref<SystemDashboard | null>(null)
+const seedingMonitor = ref<Record<string, unknown> | null>(null)
+const reseedMonitor = ref<Record<string, unknown> | null>(null)
+const publishMonitor = ref<Record<string, unknown> | null>(null)
 const activities = ref<ActivityItem[]>([])
 const activityPage = ref(1)
 const activitySize = ref(20)
@@ -379,6 +404,15 @@ async function fetchData() {
     await nextTick()
     initChart(trendData.trends || [])
     await fetchActivities()
+
+    const [seedMon, reseedMon, pubMon] = await Promise.all([
+      dashboardApi.getSeedingMonitor().catch(() => null),
+      dashboardApi.getReseedMonitor().catch(() => null),
+      dashboardApi.getPublishMonitor().catch(() => null),
+    ])
+    if (seedMon?.data?.data) seedingMonitor.value = seedMon.data.data as any
+    if (reseedMon?.data?.data) reseedMonitor.value = reseedMon.data.data as any
+    if (pubMon?.data?.data) publishMonitor.value = pubMon.data.data as any
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
   } finally {
