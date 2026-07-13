@@ -57,6 +57,8 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleReseedMonitor(w, r)
 	case strings.HasSuffix(trimmed, "/publish/monitor"):
 		h.handlePublishMonitor(w, r)
+	case strings.HasSuffix(trimmed, "/stats/traffic/hourly"):
+		h.handleTrafficHourly(w, r)
 	case strings.HasSuffix(trimmed, "/system/tasks/action") && r.Method == http.MethodPost:
 		h.handleTaskAction(w, r)
 	case strings.HasPrefix(trimmed, "/api/v1/torrent-events"):
@@ -652,4 +654,34 @@ func (h *DashboardHandler) handleTaskAction(w http.ResponseWriter, r *http.Reque
 	default:
 		Error(w, http.StatusBadRequest, 40001, "不支持的任务类型: "+req.Kind)
 	}
+}
+
+func (h *DashboardHandler) handleTrafficHourly(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	clientID := r.URL.Query().Get("client_id")
+	days := 7
+	if d := r.URL.Query().Get("days"); d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= 90 {
+			days = v
+		}
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -days)
+	query := h.db.WithContext(ctx).Model(&model.TrafficStatsHourly{}).
+		Where("hour >= ?", cutoff).
+		Order("hour ASC")
+	if clientID != "" {
+		query = query.Where("client_id = ?", clientID)
+	}
+
+	var records []model.TrafficStatsHourly
+	if err := query.Find(&records).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询流量统计失败")
+		return
+	}
+
+	Success(w, map[string]interface{}{
+		"items": records,
+		"total": len(records),
+	})
 }

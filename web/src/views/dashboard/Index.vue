@@ -117,6 +117,21 @@
       <div ref="chartRef" style="height: 320px; width: 100%" />
     </a-card>
 
+    <a-card title="流量统计" style="margin-bottom: 24px">
+      <template #extra>
+        <a-select v-model:value="trafficClientId" style="width: 160px" @change="fetchTraffic">
+          <a-select-option value="">全部</a-select-option>
+          <a-select-option v-for="c in trafficClients" :key="c" :value="c">{{ c }}</a-select-option>
+        </a-select>
+        <a-radio-group v-model:value="trafficDays" size="small" style="margin-left: 8px" @change="fetchTraffic">
+          <a-radio-button :value="1">24h</a-radio-button>
+          <a-radio-button :value="7">7天</a-radio-button>
+          <a-radio-button :value="30">30天</a-radio-button>
+        </a-radio-group>
+      </template>
+      <div ref="trafficChartRef" style="height: 280px; width: 100%" />
+    </a-card>
+
     <a-card :title="t('dashboard.recentActivity')">
       <a-table
         :columns="activityColumns"
@@ -164,6 +179,7 @@ import {
   ApiOutlined,
 } from '@ant-design/icons-vue'
 import { dashboardApi, type TrendPoint, type SystemDashboard } from '@/api/dashboard'
+import { statsApi, type TrafficHourlyPoint } from '@/api/stats'
 import { useWebSocketStore } from '@/stores/websocket'
 import { formatTime, copyToClipboard } from '@/utils/format'
 
@@ -235,8 +251,13 @@ const activitySize = ref(20)
 const activityTotal = ref(0)
 const chartRef = ref<HTMLElement>()
 let chartInstance: echarts.ECharts | null = null
+let trafficChart: echarts.ECharts | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 const wsStore = useWebSocketStore()
+const trafficClientId = ref('')
+const trafficDays = ref(7)
+const trafficClients = ref<string[]>([])
+const trafficChartRef = ref<HTMLElement>()
 
 const activityColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
@@ -306,6 +327,7 @@ function handleResize() {
   if (resizeTimer) clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
     chartInstance?.resize()
+    trafficChart?.resize()
   }, 200)
 }
 
@@ -366,6 +388,7 @@ async function fetchData() {
 
 onMounted(() => {
   fetchData()
+  fetchTraffic()
   window.addEventListener('resize', handleResize)
   wsStore.subscribe(['dashboard', 'torrent', 'system'])
 })
@@ -378,6 +401,54 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   if (resizeTimer) clearTimeout(resizeTimer)
   chartInstance?.dispose()
+  trafficChart?.dispose()
   wsStore.unsubscribe(['dashboard', 'torrent', 'system'])
 })
+
+async function fetchTraffic() {
+  try {
+    const { data } = await statsApi.getTrafficHourly(trafficClientId.value || undefined, trafficDays.value)
+    const items: TrafficHourlyPoint[] = (data.data as any)?.items || []
+    const clientSet = new Set<string>()
+    for (const item of items) {
+      if (item.client_id) clientSet.add(item.client_id)
+    }
+    trafficClients.value = [...clientSet].sort()
+    await nextTick()
+    initTrafficChart(items)
+  } catch {
+    // traffic stats optional, fail silently
+  }
+}
+
+function initTrafficChart(items: TrafficHourlyPoint[]) {
+  if (!trafficChartRef.value) return
+  if (trafficChart) trafficChart.dispose()
+  trafficChart = echarts.init(trafficChartRef.value)
+
+  const byHour = new Map<string, { up: number; down: number }>()
+  for (const item of items) {
+    const key = item.hour
+    const existing = byHour.get(key) || { up: 0, down: 0 }
+    existing.up += item.uploaded_delta || 0
+    existing.down += item.downloaded_delta || 0
+    byHour.set(key, existing)
+  }
+
+  const hours = [...byHour.keys()].sort()
+  const uploadData = hours.map(h => Math.round(((byHour.get(h)?.up || 0) / 1024 / 1024 / 1024) * 100) / 100)
+  const downloadData = hours.map(h => Math.round(((byHour.get(h)?.down || 0) / 1024 / 1024 / 1024) * 100) / 100)
+
+  trafficChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    legend: { data: ['上传 (GB)', '下载 (GB)'], bottom: 0 },
+    grid: { left: 50, right: 30, top: 20, bottom: 40 },
+    xAxis: { type: 'category', data: hours, axisLabel: { formatter: (v: string) => v.substring(5, 16) } },
+    yAxis: { type: 'value', name: 'GB' },
+    series: [
+      { name: '上传 (GB)', type: 'bar', data: uploadData, itemStyle: { color: '#52c41a' } },
+      { name: '下载 (GB)', type: 'bar', data: downloadData, itemStyle: { color: '#1890ff' } },
+    ],
+  })
+}
 </script>
