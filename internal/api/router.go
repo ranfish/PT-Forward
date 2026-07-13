@@ -339,6 +339,7 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/dashboard/activities/", dashboardHandler)
 	mux.Handle("/api/v1/dashboard/trends", dashboardHandler)
 	mux.Handle("/api/v1/dashboard/trends/", dashboardHandler)
+	mux.Handle("/api/v1/system/dashboard", dashboardHandler)
 
 	systemHandler := rt.chain(rt.rateLimitMW, rt.systemHandler.ServeHTTP)
 	publicSystemHandler := rt.public(rt.systemHandler.ServeHTTP)

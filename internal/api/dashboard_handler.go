@@ -48,6 +48,8 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleActivities(w, r)
 	case strings.HasSuffix(trimmed, "/dashboard/trends"):
 		h.handleTrends(w, r)
+	case strings.HasSuffix(trimmed, "/system/dashboard"):
+		h.handleSystemDashboard(w, r)
 	case strings.HasPrefix(trimmed, "/api/v1/torrent-events"):
 		h.handleTorrentEvents(w, r, trimmed)
 	default:
@@ -404,4 +406,119 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 
 func parseInt64(s string) (int64, error) {
 	return strconv.ParseInt(s, 10, 64)
+}
+
+func (h *DashboardHandler) handleSystemDashboard(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	today := time.Now().Truncate(24 * time.Hour)
+
+	// 刷流卡片
+	var seedingActive int64
+	h.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+		Where("status IN ?", []string{"pending", "seeding", "paused_free_end", "paused_rule"}).
+		Count(&seedingActive)
+
+	var seedingDeletedToday int64
+	h.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+		Where("status = ? AND updated_at >= ?", "deleted", today).
+		Count(&seedingDeletedToday)
+
+	var rssEnabled int64
+	h.db.WithContext(ctx).Model(&model.RSSSubscription{}).
+		Where("enabled = ?", true).Count(&rssEnabled)
+
+	var lastRSSFetch time.Time
+	h.db.WithContext(ctx).Model(&model.RSSFetchLog{}).
+		Order("created_at DESC").Limit(1).
+		Select("created_at").Row().Scan(&lastRSSFetch)
+
+	// 下载卡片
+	var dlDownloading, dlCompleted, dlError, dlTransferPending int64
+	h.db.WithContext(ctx).Model(&model.DownloadTask{}).
+		Where("status = ?", "downloading").Count(&dlDownloading)
+	h.db.WithContext(ctx).Model(&model.DownloadTask{}).
+		Where("status = ?", "completed").Count(&dlCompleted)
+	h.db.WithContext(ctx).Model(&model.DownloadTask{}).
+		Where("status = ?", "error").Count(&dlError)
+	h.db.WithContext(ctx).Model(&model.DownloadTask{}).
+		Where("status = ? AND transfer_status = ?", "completed", "transfer_pending").
+		Count(&dlTransferPending)
+
+	var dlCompletedToday int64
+	h.db.WithContext(ctx).Model(&model.DownloadTask{}).
+		Where("status = ? AND completed_at >= ?", "completed", today).
+		Count(&dlCompletedToday)
+
+	// 辅种卡片
+	var reseedActiveTasks int64
+	h.db.WithContext(ctx).Model(&model.ReseedTask{}).
+		Where("enabled = ? AND status IN ?", true, []string{"idle", "running"}).
+		Count(&reseedActiveTasks)
+
+	var reseedPendingInj int64
+	h.db.WithContext(ctx).Model(&model.ReseedMatch{}).
+		Where("status = ?", "pending").Count(&reseedPendingInj)
+
+	var reseedInjectedToday int64
+	h.db.WithContext(ctx).Model(&model.ReseedMatch{}).
+		Where("status = ? AND updated_at >= ?", "injected", today).
+		Count(&reseedInjectedToday)
+
+	// 发布卡片
+	var publishPublishing, publishPending, publishDone int64
+	h.db.WithContext(ctx).Model(&model.PublishCandidate{}).
+		Where("publish_status = ?", "publishing").Count(&publishPublishing)
+	h.db.WithContext(ctx).Model(&model.PublishCandidate{}).
+		Where("publish_status = ?", "pending").Count(&publishPending)
+	h.db.WithContext(ctx).Model(&model.PublishCandidate{}).
+		Where("publish_status = ?", "done").Count(&publishDone)
+
+	var publishToday int64
+	h.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+		Where("status IN ? AND created_at >= ?",
+			[]string{"completed", "exists", "edited"}, today).
+		Count(&publishToday)
+
+	// 系统
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	onlineCount := 0
+	if h.clientChecker != nil {
+		onlineCount = h.clientChecker.ConnectedCount()
+	}
+
+	Success(w, map[string]interface{}{
+		"seeding": map[string]interface{}{
+			"active":          seedingActive,
+			"deleted_today":   seedingDeletedToday,
+			"rss_enabled":     rssEnabled,
+			"last_rss_fetch":  lastRSSFetch,
+		},
+		"download": map[string]interface{}{
+			"downloading":      dlDownloading,
+			"completed":        dlCompleted,
+			"completed_today":  dlCompletedToday,
+			"error":            dlError,
+			"transfer_pending": dlTransferPending,
+		},
+		"reseed": map[string]interface{}{
+			"active_tasks":      reseedActiveTasks,
+			"pending_injection": reseedPendingInj,
+			"injected_today":    reseedInjectedToday,
+		},
+		"publish": map[string]interface{}{
+			"publishing":   publishPublishing,
+			"pending":      publishPending,
+			"done_total":   publishDone,
+			"done_today":   publishToday,
+		},
+		"system": map[string]interface{}{
+			"uptime":      time.Since(startTime).Seconds(),
+			"version":     h.version,
+			"goroutines":  runtime.NumGoroutine(),
+			"memory_mb":   memStats.Alloc / 1024 / 1024,
+			"clients":     onlineCount,
+		},
+	})
 }

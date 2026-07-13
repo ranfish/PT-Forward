@@ -35,6 +35,7 @@ type Pipeline struct {
 	backpressureCtrl  *BackpressureController
 	artifactGenerator *PublishArtifactGenerator
 	limitGuard        *PublishLimitGuard
+	declarationFilter *DeclarationFilter
 	memberMu          sync.Map
 }
 
@@ -60,6 +61,10 @@ func (p *Pipeline) SetPTGenEndpoints(endpoints string) {
 	if p.ptgen != nil {
 		p.ptgen.SetEndpoints(endpoints)
 	}
+}
+
+func (p *Pipeline) SetDeclarationFilter(df *DeclarationFilter) {
+	p.declarationFilter = df
 }
 
 func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
@@ -949,12 +954,30 @@ func (p *Pipeline) checkForbiddenContent(texts []string) (bool, string) {
 }
 
 func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model.PublishCandidate, targetSite string) (bool, string) {
+	// 1. 硬编码安全检查（始终运行，不可关闭）
 	if eligible, reason := p.checkForbiddenContent([]string{candidate.TorrentName}); !eligible {
 		return false, reason
 	}
 
 	if candidate.HasHR {
 		return false, "源站种子存在 H&R (Hit and Run) 标记，跳过发布"
+	}
+
+	// 2. flags 检查（优先，来自 torrent_metadata）
+	if p.checkFlagsFromMetadata(ctx, candidate.InfoHash, candidate.SourceSite) {
+		return false, fmt.Sprintf("源站 flags 标记禁转/独占（torrent_metadata），跳过发布")
+	}
+
+	// 3. declaration_filter 检查（flags 不可用时兜底）
+	if p.declarationFilter != nil {
+		texts := []string{candidate.TorrentName}
+		patterns := p.declarationFilter.GetPatterns(ctx)
+		if len(patterns) > 0 {
+			fr := p.declarationFilter.Filter(strings.Join(texts, " "), patterns)
+			if len(fr.RemovedDecls) > 0 {
+				return false, fmt.Sprintf("声明过滤命中: %v", fr.RemovedDecls)
+			}
+		}
 	}
 
 	// 硬编码互斥站点对（不可修改）
@@ -981,6 +1004,36 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 	}
 
 	return true, ""
+}
+
+func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteName string) bool {
+	if infoHash == "" {
+		return false
+	}
+	var meta model.TorrentMetadata
+	if err := p.db.WithContext(ctx).
+		Where("info_hash = ?", infoHash).
+		Order("updated_at DESC").
+		First(&meta).Error; err != nil {
+		return false
+	}
+	if meta.Flags == "" {
+		return false
+	}
+	var flags []string
+	if err := json.Unmarshal([]byte(meta.Flags), &flags); err != nil {
+		return false
+	}
+	forbiddenFlags := map[string]bool{
+		"禁转": true, "禁止转载": true, "谢绝转载": true,
+		"严禁转载": true, "谢绝搬运": true, "独占": true, "限时禁转": true,
+	}
+	for _, f := range flags {
+		if forbiddenFlags[f] {
+			return true
+		}
+	}
+	return false
 }
 
 // hardcodedExclusionPairs 硬编码互斥站点对（双向），禁止用户修改
