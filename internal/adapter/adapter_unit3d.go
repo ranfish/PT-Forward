@@ -25,6 +25,7 @@ var (
 	reUnit3DSize         = regexp.MustCompile(`(?i)(?:size|大小)[^<]*<[^>]*>([^<]+)`)
 	reUnit3DSeeders      = regexp.MustCompile(`(?i)(?:seeders?|做种)[^<]*<[^>]*>(\d+)`)
 	reUnit3DLeechers     = regexp.MustCompile(`(?i)(?:leechers?|下载)[^<]*<[^>]*>(\d+)`)
+	reUnit3DDescription  = regexp.MustCompile(`(?s)<div[^>]*id=["']description["'][^>]*>([\s\S]*?)</div>`)
 	reUnit3DTorrentID    = regexp.MustCompile(`/torrents/(\d+)`)
 	reUnit3DErrorClass   = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reUnit3DErrorLI      = regexp.MustCompile(`<li[^>]*>([^<]*(?:error|fail|失败|错误|duplicate|already)[^<]*)</li>`)
@@ -230,14 +231,18 @@ func (a *Unit3DAdapter) detailViaAPI(ctx context.Context, config *model.SiteConf
 
 	var result struct {
 		Data struct {
-			Name       string `json:"name"`
-			Size       int64  `json:"size"`
-			InfoHash   string `json:"info_hash"`
-			Category   string `json:"category"`
-			Seeders    int    `json:"seeders"`
-			Leechers   int    `json:"leechers"`
-			Type       string `json:"type"`
-			Resolution string `json:"resolution"`
+			Name        string `json:"name"`
+			Size        int64  `json:"size"`
+			InfoHash    string `json:"info_hash"`
+			Category    string `json:"category"`
+			Seeders     int    `json:"seeders"`
+			Leechers    int    `json:"leechers"`
+			Type        string `json:"type"`
+			Resolution  string `json:"resolution"`
+			Description string `json:"description"`
+			MediaInfo   string `json:"mediainfo"`
+			Imdb        string `json:"imdb"`
+			Tags        []string `json:"tags"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -245,14 +250,29 @@ func (a *Unit3DAdapter) detailViaAPI(ctx context.Context, config *model.SiteConf
 	}
 
 	d := result.Data
-	return &model.TorrentDetail{
-		Title:      d.Name,
-		Size:       d.Size,
-		InfoHash:   strings.ToLower(d.InfoHash),
-		Category:   d.Category,
-		Source:     d.Type,
-		Resolution: d.Resolution,
-	}, nil
+	detail := &model.TorrentDetail{
+		Title:       d.Name,
+		Size:        d.Size,
+		InfoHash:    strings.ToLower(d.InfoHash),
+		Category:    d.Category,
+		Source:      d.Type,
+		Resolution:  d.Resolution,
+		Description: d.Description,
+		MediaInfo:   d.MediaInfo,
+		Tags:        d.Tags,
+	}
+	if d.Imdb != "" {
+		detail.IMDbURL = "https://www.imdb.com/title/" + d.Imdb + "/"
+	}
+	if d.Description != "" {
+		detail.Screenshots = extractScreenshotsFromBBCode(d.Description)
+		if len(detail.Screenshots) > 0 {
+			detail.PosterURL = detail.Screenshots[0]
+			detail.Screenshots = detail.Screenshots[1:]
+		}
+	}
+	detail.Category = NormalizeCategory(detail.Category)
+	return detail, nil
 }
 
 func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -290,6 +310,24 @@ func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConf
 	if m := reUnit3DSize.FindStringSubmatch(html); len(m) > 1 {
 		detail.Size = parseSizeStr(m[1])
 	}
+
+	if desc := extractUnit3DDescription(html); desc != "" {
+		detail.Description = desc
+		detail.Screenshots = extractScreenshotsFromBBCode(desc)
+		if len(detail.Screenshots) > 0 {
+			detail.PosterURL = detail.Screenshots[0]
+			detail.Screenshots = detail.Screenshots[1:]
+		}
+	}
+
+	if imdbURL := reIMDbURL.FindString(html); imdbURL != "" {
+		detail.IMDbURL = imdbURL
+	}
+	if doubanURL := reDoubanURL.FindString(html); doubanURL != "" {
+		detail.DoubanURL = doubanURL
+	}
+
+	detail.Flags = extractFlagsFromText(html + " " + detail.Title)
 
 	return detail, nil
 }
@@ -426,7 +464,7 @@ func (a *Unit3DAdapter) GetBatchSLData(ctx context.Context, config *model.SiteCo
 	for _, id := range torrentIDs {
 		sl, err := a.GetPreciseSLData(ctx, config, id)
 		if err != nil {
-			a.logger.Warn("获取SL数据失败", zap.String("torrentID", id), zap.Error(err))
+			a.logger.Warn("failed to get SL data", zap.String("torrentID", id), zap.Error(err))
 			continue
 		}
 		result[id] = sl
@@ -955,4 +993,11 @@ func (a *Unit3DAdapter) scrapeUnit3DSecurityKeys(ctx context.Context, config *mo
 	} else {
 		a.logger.Warn("scrapeUnit3DSecurityKeys: no keys found", zap.String("domain", config.Domain), zap.Int("htmlLen", len(html)))
 	}
+}
+
+func extractUnit3DDescription(html string) string {
+	if m := reUnit3DDescription.FindStringSubmatch(html); len(m) > 1 {
+		return strings.TrimSpace(m[1])
+	}
+	return ""
 }

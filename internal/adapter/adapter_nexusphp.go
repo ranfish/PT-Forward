@@ -409,7 +409,7 @@ func (a *NexusPHPAdapter) GetBatchSLData(ctx context.Context, config *model.Site
 	for _, id := range torrentIDs {
 		sl, err := a.GetPreciseSLData(ctx, config, id)
 		if err != nil {
-			a.logger.Warn("获取SL数据失败", zap.String("torrentID", id), zap.Error(err))
+			a.logger.Warn("failed to get SL data", zap.String("torrentID", id), zap.Error(err))
 			continue
 		}
 		result[id] = sl
