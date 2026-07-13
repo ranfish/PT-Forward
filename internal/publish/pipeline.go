@@ -11,6 +11,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/description"
+	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -39,6 +40,7 @@ type Pipeline struct {
 	declarationFilter *DeclarationFilter
 	metadataFetcher   *metadata.Fetcher
 	imageHostStrategy string
+	imageHostMgr      *imagehost.Manager
 	memberMu          sync.Map
 }
 
@@ -78,6 +80,10 @@ func (p *Pipeline) SetImageHostStrategy(strategy string) {
 	if strategy != "" {
 		p.imageHostStrategy = strategy
 	}
+}
+
+func (p *Pipeline) SetImageHostManager(mgr *imagehost.Manager) {
+	p.imageHostMgr = mgr
 }
 
 func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
@@ -561,7 +567,7 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 
 	var result descResult
 	ptgenResult, ptgenErr := p.queryPTGen(ctx, title)
-	if ptgenErr == nil && ptgenResult != nil {
+	if ptgenErr == nil && ptgenResult != nil && ptgenResult.PosterURL != "" {
 		descData.PosterURL = ptgenResult.PosterURL
 		if ptgenResult.RawBBCode != "" {
 			descData.PTGenBody = ptgenResult.RawBBCode
@@ -571,6 +577,9 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 		if ptgenResult.TMDbURL != "" {
 			result.TMDBID = extractTMDBID(ptgenResult.TMDbURL)
 		}
+	} else if sourceDetail != nil && sourceDetail.PosterURL != "" {
+		rehostedURL := p.rehostPoster(ctx, sourceDetail.PosterURL)
+		descData.PosterURL = rehostedURL
 	}
 
 	if descriptionText == "" && descData.PTGenBody != "" {
@@ -2138,4 +2147,24 @@ func (p *Pipeline) storeMetadataAsync(ctx context.Context, candidate *model.Publ
 				zap.Error(err))
 		}
 	}()
+}
+
+func (p *Pipeline) rehostPoster(ctx context.Context, sourceURL string) string {
+	if sourceURL == "" {
+		return ""
+	}
+	if p.imageHostMgr == nil || p.imageHostMgr.DefaultHost() == nil {
+		return sourceURL
+	}
+	result, err := p.imageHostMgr.Rehost(ctx, sourceURL)
+	if err != nil || result == nil || result.URL == "" {
+		p.logger.Debug("poster rehost failed, using source URL",
+			zap.String("source_url", sourceURL),
+			zap.Error(err))
+		return sourceURL
+	}
+	p.logger.Debug("poster rehosted",
+		zap.String("source_url", sourceURL),
+		zap.String("rehosted_url", result.URL))
+	return result.URL
 }
