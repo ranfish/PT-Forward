@@ -62,6 +62,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&CoverageQueryState{},
 		&ReleaseGroupMapping{},
 		&SitePublishLimit{},
+		&TorrentMetadata{},
 		&setting.Setting{},
 	)
 }
