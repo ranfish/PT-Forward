@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/adapter"
+	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/filter"
 	"github.com/ranfish/pt-forward/internal/metrics"
@@ -403,6 +404,25 @@ func (e *Engine) needsSideLoading(ctx context.Context, siteName, infoHash string
 		return false
 	}
 	return infoHash == "" || len(infoHash) != 40 || isFakeHash(infoHash)
+}
+
+func isComplianceBlocked(title string) bool {
+	for _, kw := range compliance.AdultKeywords {
+		if strings.Contains(title, kw) || strings.Contains(strings.ToLower(title), strings.ToLower(kw)) {
+			return true
+		}
+	}
+	for _, kw := range compliance.ForbiddenTransferKeywords {
+		if strings.Contains(title, kw) {
+			return true
+		}
+	}
+	for _, g := range compliance.ForbiddenGroups {
+		if strings.Contains(title, g) {
+			return true
+		}
+	}
+	return false
 }
 
 func isFakeHash(h string) bool {
@@ -822,6 +842,25 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				} else {
 					event.Title = re.ReplaceAllString(event.Title, sub.ReplaceStr)
 				}
+			}
+
+			if isComplianceBlocked(event.Title) {
+				e.logger.Info("rss: compliance blocked, marking seen",
+					zap.String("title", event.Title),
+					zap.String("site", event.SiteName))
+				seen := &model.RSSTorrentSeen{
+					SiteName:       event.SiteName,
+					TorrentID:      event.TorrentID,
+					SubscriptionID: uintToString(sub.ID),
+					InfoHash:       event.InfoHash,
+					IsFakeHash:     isFakeHash(event.InfoHash) || event.InfoHash == "" || len(event.InfoHash) != 40,
+					Title:          event.Title,
+					Size:           event.Size,
+					Status:         "seen",
+					SourceCategory: event.Category,
+				}
+				_ = e.repo.MarkSeen(ctx, seen)
+				continue
 			}
 
 			seen := &model.RSSTorrentSeen{
