@@ -360,6 +360,7 @@ func main() {
 	)
 	router.SetSiteProvider(siteProvider)
 	declFilter := publish.NewDeclarationFilter(setting.NewRepository(db), log)
+	publishPipeline.SetDeclarationFilter(declFilter)
 	bdinfoScanner := publish.NewBDInfoScanner(log)
 	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner)
 	router.SetConfigEventBus(configEventBus)
