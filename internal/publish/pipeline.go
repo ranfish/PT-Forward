@@ -56,6 +56,12 @@ func (p *Pipeline) SetClientProvider(cp model.DownloaderProvider) {
 	p.clientProvider = cp
 }
 
+func (p *Pipeline) SetPTGenEndpoints(endpoints string) {
+	if p.ptgen != nil {
+		p.ptgen.SetEndpoints(endpoints)
+	}
+}
+
 func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
 	p.completionWatcher = w
 }

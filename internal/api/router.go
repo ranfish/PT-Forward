@@ -9,6 +9,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/filter"
+	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
@@ -50,6 +51,7 @@ type Router struct {
 	supportedSitesHandler *SupportedSitesHandler
 	downloadHandler       *DownloadHandler
 	publishLimitHandler   *PublishLimitHandler
+	imageHostHandler      *ImageHostHandler
 	wsHandler            *WSHandler
 	hub                  *Hub
 	authManager          *auth.AuthManager
@@ -62,7 +64,7 @@ type Router struct {
 	publicRateLimitMW    func(http.Handler) http.Handler
 }
 
-func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, logger *zap.Logger) *Router {
+func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, imageHostMgr *imagehost.Manager, logger *zap.Logger) *Router {
 	siteRepo := site.NewRepository(db)
 	rssRepo := rss.NewRepository(db)
 	filterRepo := filter.NewRepository(db)
@@ -104,6 +106,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		manualForwardHandler:   NewManualForwardHandler(db, logger),
 		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger),
 		publishLimitHandler:   NewPublishLimitHandler(db, logger),
+		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),
 		dashboardHandler:     dashHandler,
 		systemHandler:        sysHandler,
 		iyuuHandler:          NewIYUUHandler(db, logger, iyuuSvc),
@@ -246,6 +249,10 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	publishLimitHandler := rt.chain(rt.rateLimitMW, rt.publishLimitHandler.ServeHTTP)
 	mux.Handle("/api/v1/publish/limits", publishLimitHandler)
 	mux.Handle("/api/v1/publish/limits/", publishLimitHandler)
+
+	imageHostHandler := rt.chain(rt.rateLimitMW, rt.imageHostHandler.ServeHTTP)
+	mux.Handle("/api/v1/settings/image-host", imageHostHandler)
+	mux.Handle("/api/v1/settings/image-host/", imageHostHandler)
 
 	rssHandler := rt.chain(rt.rateLimitMW, rt.rssHandler.ServeHTTP)
 	mux.Handle("/api/v1/rss/subscriptions", rssHandler)

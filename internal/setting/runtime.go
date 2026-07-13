@@ -43,6 +43,12 @@ const (
 	KeySeedingDeleteRulesGlobal = "seeding_delete_rules_global"
 
 	KeyTransferCooldownSeconds = "transfer_cooldown_seconds"
+
+	KeyImageHostDefault   = "image_host_default"
+	KeyImageHostStrategy  = "image_host_strategy"
+	KeyAGSVPTEmail        = "agsvpt_email"
+	KeyAGSVPTPassword     = "agsvpt_password"
+	KeyPTGenEndpoints     = "ptgen_endpoints"
 )
 
 var DefaultSeeds = map[string]string{
@@ -75,6 +81,12 @@ var DefaultSeeds = map[string]string{
 	KeySeedingDeleteRulesGlobal: "false",
 
 	KeyTransferCooldownSeconds: "30",
+
+	KeyImageHostDefault:  "pixhost",
+	KeyImageHostStrategy: "auto",
+	KeyAGSVPTEmail:       "",
+	KeyAGSVPTPassword:    "",
+	KeyPTGenEndpoints:    "",
 }
 
 func SeedDefaults(ctx context.Context, repo *Repository, seeds map[string]string, logger *zap.Logger) {
