@@ -42,6 +42,62 @@ export interface PublishLimit {
   current_count?: number
 }
 
+export interface MetadataDetail {
+  info_hash: string
+  site_name: string
+  torrent_id: string
+  title: string
+  subtitle: string
+  source_category: string
+  standard_type: string
+  tags: string
+  flags: string
+  source_description: string
+  description: string
+  screenshots: string
+  poster: string
+  mediainfo: string
+  source_mediainfo: string
+  imdb_url: string
+  douban_url: string
+  reviewed: boolean
+  fetch_source: string
+}
+
+export const metadataApi = {
+  get(infoHash: string, siteName?: string) {
+    const params: Record<string, string> = { info_hash: infoHash }
+    if (siteName) params.site_name = siteName
+    return client.get<ApiResponse<{ items: MetadataDetail[]; total: number }>>('/metadata', { params })
+  },
+  update(data: {
+    info_hash: string
+    site_name?: string
+    title?: string
+    subtitle?: string
+    standard_type?: string
+    tags?: string
+    description?: string
+    screenshots?: string
+  }) {
+    return client.put<ApiResponse<{ success: boolean }>>('/metadata', data)
+  },
+  updateType(infoHash: string, standardType: string, siteName?: string) {
+    return client.put<ApiResponse<{ success: boolean }>>('/metadata/type', {
+      info_hash: infoHash,
+      standard_type: standardType,
+      site_name: siteName,
+    })
+  },
+  setReviewed(infoHash: string, reviewed: boolean, siteName?: string) {
+    return client.put<ApiResponse<{ success: boolean }>>('/metadata/review', {
+      info_hash: infoHash,
+      reviewed,
+      site_name: siteName,
+    })
+  },
+}
+
 export const publishLimitApi = {
   list() {
     return client.get<ApiResponse<{ items: PublishLimit[]; total: number }>>('/publish/limits')

@@ -170,6 +170,7 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 	}
 
 	metaTypeMap := map[string]string{}
+	metaReviewedMap := map[string]bool{}
 	if len(infoHashes) > 0 {
 		var metas []model.TorrentMetadata
 		h.db.WithContext(ctx).
@@ -177,8 +178,13 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 			Order("updated_at DESC").
 			Find(&metas)
 		for _, m := range metas {
-			if _, exists := metaTypeMap[m.InfoHash]; !exists && m.StandardType != "" {
-				metaTypeMap[m.InfoHash] = m.StandardType
+			if _, exists := metaTypeMap[m.InfoHash]; !exists {
+				if m.StandardType != "" {
+					metaTypeMap[m.InfoHash] = m.StandardType
+				}
+				if m.Reviewed {
+					metaReviewedMap[m.InfoHash] = true
+				}
 			}
 		}
 
@@ -217,15 +223,17 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 		if stdType == "" {
 			stdType = inferTypeFromName(t.Name)
 		}
+		reviewed := metaReviewedMap[t.Hash]
 		items = append(items, map[string]interface{}{
-			"info_hash":     t.Hash,
-			"name":          t.Name,
-			"size":          t.TotalSize,
-			"save_path":     t.SavePath,
-			"state":         t.State,
-			"uploaded":      t.Uploaded,
-			"queried":       queriedMap[t.Hash],
-			"standard_type": stdType,
+			"info_hash":        t.Hash,
+			"name":             t.Name,
+			"size":             t.TotalSize,
+			"save_path":        t.SavePath,
+			"state":            t.State,
+			"uploaded":         t.Uploaded,
+			"queried":          queriedMap[t.Hash],
+			"standard_type":    stdType,
+			"metadata_reviewed": reviewed,
 			"coverage": map[string]interface{}{
 				"has_count":    hasCount,
 				"total_sites":  totalSites,

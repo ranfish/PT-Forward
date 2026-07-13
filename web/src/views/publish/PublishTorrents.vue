@@ -90,6 +90,7 @@
       row-key="info_hash"
       size="small"
       :sticky="{ offsetHeader: 48 }"
+      :row-class-name="(record: any) => record.metadata_reviewed ? 'row-reviewed' : 'row-unreviewed'"
       :row-selection="{ selectedRowKeys: selectedHashes, onChange: (keys: string[]) => selectedHashes = keys }"
       @change="onTableChange"
     >
@@ -131,6 +132,13 @@
             <a-button
               type="link"
               size="small"
+              @click="openReview(record)"
+            >
+              核对
+            </a-button>
+            <a-button
+              type="link"
+              size="small"
               :loading="queryingHash === record.info_hash"
               @click="queryCoverage(record)"
             >
@@ -154,6 +162,13 @@
       :preset-torrent="presetTorrent"
       :preset-client-id="selectedClientId"
       @success="onWizardSuccess"
+    />
+
+    <MetadataReviewModal
+      v-model:open="reviewOpen"
+      :info-hash="reviewHash"
+      :torrent-name="reviewName"
+      @saved="onReviewSaved"
     />
 
     <a-modal
@@ -343,6 +358,7 @@ import { publishTorrentsApi, type PublishTorrentItem } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
 import { formatBytes, maskDomain } from '@/utils/format'
 import PublishWizardModal from './PublishWizardModal.vue'
+import MetadataReviewModal from './MetadataReviewModal.vue'
 
 const clients = ref<{ id: number; name: string; type: string }[]>([])
 const clientsLoading = ref(false)
@@ -368,6 +384,9 @@ const queryTotal = ref(0)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const wizardOpen = ref(false)
+const reviewOpen = ref(false)
+const reviewHash = ref('')
+const reviewName = ref('')
 const presetTorrent = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; state: string; source_site?: string; source_site_id?: number; torrent_id?: string } | null>(null)
 
 const columns = [
@@ -614,6 +633,19 @@ function confirmSourceSite() {
 
 function onWizardSuccess() {
   fetchTorrents()
+}
+
+function openReview(record: PublishTorrentItem) {
+  reviewHash.value = record.info_hash
+  reviewName.value = record.name
+  reviewOpen.value = true
+}
+
+function onReviewSaved(infoHash: string) {
+  const t = torrents.value.find((x: PublishTorrentItem) => x.info_hash === infoHash)
+  if (t) {
+    ;(t as any).metadata_reviewed = true
+  }
 }
 
 // --- 批量发布 ---
@@ -864,5 +896,14 @@ async function saveDeclFilters() {
   font-size: 12px;
   color: #666;
   white-space: nowrap;
+}
+</style>
+
+<style>
+.row-reviewed {
+  background-color: #f6ffed !important;
+}
+.row-unreviewed {
+  background-color: #fffbe6 !important;
 }
 </style>
