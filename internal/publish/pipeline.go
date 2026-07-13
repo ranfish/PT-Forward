@@ -304,14 +304,23 @@ func (p *Pipeline) fetchFromDownloader(ctx context.Context, candidate *model.Pub
 		savePath = torrent.SavePath
 	}
 
-	// 本地产物生成（截图 + MediaInfo）
-	if p.artifactGenerator != nil && savePath != "" {
-		if artifact, aErr := p.artifactGenerator.Generate(ctx, savePath, "", nil); aErr == nil && artifact != nil {
-			detail.MediaInfo = artifact.MediaInfoText
-			detail.Screenshots = artifact.ScreenshotURLs
-		} else if aErr != nil {
-			p.logger.Warn("artifact generation failed", zap.Error(aErr))
-		}
+	// 本地产物生成（截图 + MediaInfo）— 本地 MediaInfo 是发布前置条件（§48.9）
+	if savePath == "" {
+		return nil, nil, fmt.Errorf("local file path is empty, cannot verify file accessibility")
+	}
+	if p.artifactGenerator == nil {
+		return nil, nil, fmt.Errorf("artifact generator not configured, cannot generate MediaInfo")
+	}
+	artifact, aErr := p.artifactGenerator.Generate(ctx, savePath, "", nil)
+	if aErr != nil {
+		return nil, nil, fmt.Errorf("local MediaInfo generation failed: %w", aErr)
+	}
+	if artifact == nil || artifact.MediaInfoText == "" {
+		return nil, nil, fmt.Errorf("local MediaInfo is empty, file may be corrupted or inaccessible")
+	}
+	detail.MediaInfo = artifact.MediaInfoText
+	if len(artifact.ScreenshotURLs) > 0 {
+		detail.Screenshots = artifact.ScreenshotURLs
 	}
 
 	return torrentData, detail, nil
