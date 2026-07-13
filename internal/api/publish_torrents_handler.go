@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -1235,14 +1236,99 @@ func normalizeCategorySimple(raw string) string {
 
 func inferTypeFromName(name string) string {
 	lower := strings.ToLower(name)
-	if strings.Contains(lower, "s01e") || strings.Contains(lower, "s02e") || strings.Contains(lower, "s0") || strings.Contains(lower, ".s01.") || strings.Contains(lower, "complete") || strings.Contains(lower, "season") {
-		return "category.tv_series"
+
+	// 动画/动漫（优先检测，避免被 S01E 误判为电视剧）
+	animationPatterns := []string{
+		"anime", "animation", "oad", "ova", "oav",
+		"borgen.", "wiggenwald.", "naruto", "one.piece",
+		"dragon.ball", "demon.slayer", "attack.on.titan",
+		"my.hero", "jujutsu", "chainsaw", "dandadan",
+		"solo.leveling", "re.zero", "spy.x.family",
 	}
-	if strings.Contains(lower, "running.man") || strings.Contains(lower, "综艺") {
-		return "category.tv_shows"
+	for _, p := range animationPatterns {
+		if strings.Contains(lower, p) {
+			return "category.animation"
+		}
 	}
-	if strings.Contains(lower, "concert") || strings.Contains(lower, "音乐") || strings.Contains(lower, "mv.") {
-		return "category.music"
+
+	// 综艺/真人秀
+	varietyPatterns := []string{
+		"running.man", "variety", "show.s01", "tv.shows",
+		"h!6", "你好，星期六", "快乐大本营", "奔跑吧",
+		"极限挑战", "王牌对王牌", "乘风破浪",
+		"向往的生活", "密室大逃脱", "青春环游记",
 	}
+	for _, p := range varietyPatterns {
+		if strings.Contains(lower, p) {
+			return "category.tv_shows"
+		}
+	}
+
+	// 纪录片
+	docPatterns := []string{
+		"documentary", "documentaries", "nat.geo", "national.geographic",
+		"bbc.earth", "blue.planet", "our.planet", "nature",
+		" historia", "探索", "档案",
+	}
+	for _, p := range docPatterns {
+		if strings.Contains(lower, p) {
+			return "category.documentaries"
+		}
+	}
+
+	// 音乐/演唱会
+	musicPatterns := []string{
+		"concert", "live.", "mv.", "music.video",
+		"tour.", "festival.", "symphony", "opera.",
+	}
+	for _, p := range musicPatterns {
+		if strings.Contains(lower, p) {
+			return "category.music"
+		}
+	}
+
+	// 体育
+	sportPatterns := []string{
+		"nba.", "nfl.", "ufc.", "f1.", "motogp",
+		"world.cup", "euro.", "premier.league",
+		"champions.league", "olympic",
+	}
+	for _, p := range sportPatterns {
+		if strings.Contains(lower, p) {
+			return "category.sports"
+		}
+	}
+
+	// 电视剧（季集模式）
+	tvPatterns := []string{
+		"s01e", "s02e", "s03e", "s04e", "s05e", "s06e",
+		"s07e", "s08e", "s09e", "s1e", "s2e",
+		".s01.", ".s02.", ".s03.", ".s04.", ".s05.",
+		".s06.", ".s07.", ".s08.", ".s09.",
+		"complete", "season.1", "season.2", "season.3",
+		"season.4", "season.5", "ep01", "ep02", "ep03",
+		"ep04", "ep05", "ep06", "ep07", "ep08",
+		"e01.", "e02.", "e03.", "e04.", "e05.",
+		"e06.", "e07.", "e08.", "e09.", "e10.",
+		"episode.1", "episode.2", "episode.3",
+	}
+	for _, p := range tvPatterns {
+		if strings.Contains(lower, p) {
+			return "category.tv_series"
+		}
+	}
+
+	// 中文电视剧标题特征
+	cnTVPrefixes := []string{
+		"第.季", "第.部", "连续剧", "电视剧",
+	}
+	for _, p := range cnTVPrefixes {
+		matched, _ := regexp.MatchString(p, name)
+		if matched {
+			return "category.tv_series"
+		}
+	}
+
+	// 默认电影
 	return "category.movie"
 }

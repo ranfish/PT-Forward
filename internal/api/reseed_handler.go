@@ -439,6 +439,7 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	site := r.URL.Query().Get("site")
 	torrentID := r.URL.Query().Get("torrentId")
 	status := r.URL.Query().Get("status")
+	videoOnly := r.URL.Query().Get("video_only") == "1" || r.URL.Query().Get("video_only") == "true"
 	orderField := r.URL.Query().Get("orderField")
 	order := r.URL.Query().Get("order")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
@@ -463,6 +464,15 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	}
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if videoOnly {
+		query = query.Where("source_info_hash IN (?)",
+			h.engine.DB().Model(&model.TorrentMetadata{}).
+				Select("info_hash").
+				Where("standard_type IN ?", []string{
+					"category.movie", "category.tv_series", "category.animation",
+					"category.documentaries", "category.tv_shows",
+				}))
 	}
 
 	var total int64
