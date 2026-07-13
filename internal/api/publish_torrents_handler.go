@@ -180,6 +180,27 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 				metaTypeMap[m.InfoHash] = m.StandardType
 			}
 		}
+
+		missingHashes := make([]string, 0)
+		for _, hash := range infoHashes {
+			if _, ok := metaTypeMap[hash]; !ok {
+				missingHashes = append(missingHashes, hash)
+			}
+		}
+		if len(missingHashes) > 0 {
+			var seens []model.RSSTorrentSeen
+			h.db.WithContext(ctx).
+				Where("info_hash IN ? AND source_category != ''", missingHashes).
+				Find(&seens)
+			for _, s := range seens {
+				if _, exists := metaTypeMap[s.InfoHash]; !exists && s.SourceCategory != "" {
+					normalized := normalizeCategorySimple(s.SourceCategory)
+					if normalized != "" {
+						metaTypeMap[s.InfoHash] = normalized
+					}
+				}
+			}
+		}
 	}
 
 	items := make([]map[string]interface{}, 0, len(torrents))
@@ -191,6 +212,10 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 				hasCount++
 			}
 		}
+		stdType := metaTypeMap[t.Hash]
+		if stdType == "" {
+			stdType = inferTypeFromName(t.Name)
+		}
 		items = append(items, map[string]interface{}{
 			"info_hash":     t.Hash,
 			"name":          t.Name,
@@ -199,7 +224,7 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 			"state":         t.State,
 			"uploaded":      t.Uploaded,
 			"queried":       queriedMap[t.Hash],
-			"standard_type": metaTypeMap[t.Hash],
+			"standard_type": stdType,
 			"coverage": map[string]interface{}{
 				"has_count":    hasCount,
 				"total_sites":  totalSites,
@@ -1180,4 +1205,44 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 		"candidate_ids": createdIDs,
 		"target_site":   req.TargetSite,
 	})
+}
+
+func normalizeCategorySimple(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	lower := strings.ToLower(raw)
+	switch {
+	case strings.Contains(lower, "movie") || strings.Contains(raw, "电影"):
+		return "category.movie"
+	case strings.Contains(lower, "tv") || strings.Contains(lower, "series") || strings.Contains(raw, "电视剧") || strings.Contains(raw, "剧集"):
+		return "category.tv_series"
+	case strings.Contains(lower, "anim") || strings.Contains(raw, "动漫") || strings.Contains(raw, "动画"):
+		return "category.animation"
+	case strings.Contains(lower, "doc") || strings.Contains(raw, "纪录"):
+		return "category.documentaries"
+	case strings.Contains(lower, "variety") || strings.Contains(lower, "show") || strings.Contains(raw, "综艺"):
+		return "category.tv_shows"
+	case strings.Contains(lower, "music") || strings.Contains(raw, "音乐"):
+		return "category.music"
+	case strings.Contains(lower, "sport") || strings.Contains(raw, "体育"):
+		return "category.sports"
+	default:
+		return ""
+	}
+}
+
+func inferTypeFromName(name string) string {
+	lower := strings.ToLower(name)
+	if strings.Contains(lower, "s01e") || strings.Contains(lower, "s02e") || strings.Contains(lower, "s0") || strings.Contains(lower, ".s01.") || strings.Contains(lower, "complete") || strings.Contains(lower, "season") {
+		return "category.tv_series"
+	}
+	if strings.Contains(lower, "running.man") || strings.Contains(lower, "综艺") {
+		return "category.tv_shows"
+	}
+	if strings.Contains(lower, "concert") || strings.Contains(lower, "音乐") || strings.Contains(lower, "mv.") {
+		return "category.music"
+	}
+	return "category.movie"
 }
