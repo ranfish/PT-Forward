@@ -350,11 +350,15 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	}
 	// 分类推断
 	sourceCat := ""
-	if h.siteMgr != nil {
-		// 从源站详情页获取分类（如果有）
-	}
 	ptgenGenre := ""
-	category := titleparser.InferCategory(components, sourceCat, ptgenGenre, "")
+	if g, ok := result["ptgen_genre"].(string); ok {
+		ptgenGenre = g
+	}
+	ptgenEpisodes := ""
+	if e, ok := result["ptgen_episodes"].(string); ok {
+		ptgenEpisodes = e
+	}
+	category := titleparser.InferCategory(components, sourceCat, ptgenGenre, ptgenEpisodes)
 	// 标准化
 	stdParams, _ := titleparser.Standardize(components)
 	stdParams.Type = category

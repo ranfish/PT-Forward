@@ -255,6 +255,12 @@ func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (m
 			if ptgenResult.ChineseTitle != "" {
 				result["subtitle"] = ptgenResult.ChineseTitle
 			}
+			if len(ptgenResult.Genre) > 0 {
+				result["ptgen_genre"] = strings.Join(ptgenResult.Genre, ",")
+			}
+			if ptgenResult.Episodes != "" {
+				result["ptgen_episodes"] = ptgenResult.Episodes
+			}
 		}
 	}
 
