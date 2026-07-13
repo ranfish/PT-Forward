@@ -26,8 +26,14 @@ type ManualForwardHandler struct {
 	clientMgr    MFClientProvider
 	declFilter   *publish.DeclarationFilter
 	bdinfoScanner *publish.BDInfoScanner
+	metadataFetcher MetadataFetcherProvider
 	taskStore    sync.Map
 	taskSeq      atomic.Int64
+}
+
+type MetadataFetcherProvider interface {
+	GetMetadata(ctx context.Context, infoHash, siteName string) (*model.TorrentMetadata, bool)
+	FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)
 }
 
 type PublishPipeline interface {
@@ -56,6 +62,7 @@ func (h *ManualForwardHandler) SetSiteManager(s SiteManager)         { h.siteMgr
 func (h *ManualForwardHandler) SetClientProvider(c MFClientProvider) { h.clientMgr = c }
 func (h *ManualForwardHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
 func (h *ManualForwardHandler) SetBDInfoScanner(s *publish.BDInfoScanner) { h.bdinfoScanner = s }
+func (h *ManualForwardHandler) SetMetadataFetcher(f MetadataFetcherProvider) { h.metadataFetcher = f }
 
 func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -350,6 +357,25 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	}
 	// 分类推断
 	sourceCat := ""
+	// 查 torrent_metadata 获取已缓存的源站分类
+	if h.metadataFetcher != nil && infoHash != "" {
+		if meta, ok := h.metadataFetcher.GetMetadata(context.Background(), infoHash, sourceSite); ok && meta != nil {
+			if meta.StandardType != "" {
+				sourceCat = meta.StandardType
+			} else if meta.SourceCategory != "" {
+				sourceCat = meta.SourceCategory
+			}
+			if meta.Subtitle != "" && result["subtitle"] == nil {
+				result["subtitle"] = meta.Subtitle
+			}
+			if meta.IMDbURL != "" && result["imdb_link"] == nil {
+				result["imdb_link"] = meta.IMDbURL
+			}
+			if meta.DoubanURL != "" && result["douban_link"] == nil {
+				result["douban_link"] = meta.DoubanURL
+			}
+		}
+	}
 	ptgenGenre := ""
 	if g, ok := result["ptgen_genre"].(string); ok {
 		ptgenGenre = g

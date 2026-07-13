@@ -368,7 +368,7 @@ func main() {
 		publishPipeline.SetImageHostStrategy(strategy)
 	}
 	bdinfoScanner := publish.NewBDInfoScanner(log)
-	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner)
+	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner, metadataFetcher)
 	router.SetConfigEventBus(configEventBus)
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
