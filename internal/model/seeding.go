@@ -209,6 +209,24 @@ type SiteTrafficDaily struct {
 
 func (SiteTrafficDaily) TableName() string { return "site_traffic_daily" }
 
+// §47 — TrafficStatsHourly: 下载器级小时流量聚合
+type TrafficStatsHourly struct {
+	ID                uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	ClientID          string    `json:"client_id" gorm:"uniqueIndex:idx_client_hour;size:50"`
+	Hour              time.Time `json:"hour" gorm:"uniqueIndex:idx_client_hour"`
+	UploadedDelta     int64     `json:"uploaded_delta" gorm:"default:0"`
+	DownloadedDelta   int64     `json:"downloaded_delta" gorm:"default:0"`
+	AvgUploadSpeed    float64   `json:"avg_upload_speed" gorm:"default:0"`
+	AvgDownloadSpeed  float64   `json:"avg_download_speed" gorm:"default:0"`
+	PeakUploadSpeed   int64     `json:"peak_upload_speed" gorm:"default:0"`
+	PeakDownloadSpeed int64     `json:"peak_download_speed" gorm:"default:0"`
+	ActiveTorrents    int       `json:"active_torrents" gorm:"default:0"`
+	SampleCount       int       `json:"sample_count" gorm:"default:0"`
+	CreatedAt         time.Time `json:"created_at"`
+}
+
+func (TrafficStatsHourly) TableName() string { return "traffic_stats_hourly" }
+
 // §14 — FreezeEventRecord: 冻结事件持久化
 type FreezeEventRecord struct {
 	ID       uint      `json:"id" gorm:"primaryKey;autoIncrement"`

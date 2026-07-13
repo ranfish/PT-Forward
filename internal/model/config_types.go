@@ -256,6 +256,8 @@ const (
 	PublishResultPublishing PublishResultStatus = "publishing"
 	PublishResultCompleted  PublishResultStatus = "completed"
 	PublishResultFailed     PublishResultStatus = "failed"
+	PublishResultExists     PublishResultStatus = "exists"
+	PublishResultEdited     PublishResultStatus = "edited"
 )
 
 type Framework string

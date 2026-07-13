@@ -34,12 +34,18 @@ type Pipeline struct {
 	screenshotConfig  *screenshot.Config
 	backpressureCtrl  *BackpressureController
 	artifactGenerator *PublishArtifactGenerator
+	limitGuard        *PublishLimitGuard
 	memberMu          sync.Map
 }
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
 	logger = logger.With(zap.String("component", "publish"))
-	return &Pipeline{db: db, logger: logger, ptgen: ptgen.NewProvider(db, logger)}
+	return &Pipeline{
+		db:        db,
+		logger:    logger,
+		ptgen:     ptgen.NewProvider(db, logger),
+		limitGuard: NewPublishLimitGuard(db, logger),
+	}
 }
 
 func (p *Pipeline) SetSiteProvider(sp model.SiteInfoProvider) {
@@ -937,6 +943,13 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 			First(&exclusion).Error
 		if err == nil {
 			return false, fmt.Sprintf("源站 %s → 目标站 %s 存在发布排除规则", candidate.SourceSite, targetSite)
+		}
+	}
+
+	// 加种限制 Guard
+	if p.limitGuard != nil {
+		if allowed, reason := p.limitGuard.Check(ctx, targetSite); !allowed {
+			return false, fmt.Sprintf("目标站 %s 加种限制: %s", targetSite, reason)
 		}
 	}
 
