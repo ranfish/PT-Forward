@@ -10,6 +10,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/filter"
 	"github.com/ranfish/pt-forward/internal/imagehost"
+	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
@@ -52,6 +53,7 @@ type Router struct {
 	downloadHandler       *DownloadHandler
 	publishLimitHandler   *PublishLimitHandler
 	imageHostHandler      *ImageHostHandler
+	metadataHandler       *MetadataHandler
 	wsHandler            *WSHandler
 	hub                  *Hub
 	authManager          *auth.AuthManager
@@ -107,6 +109,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger),
 		publishLimitHandler:   NewPublishLimitHandler(db, logger),
 		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),
+		metadataHandler:       NewMetadataHandler(db, logger),
 		dashboardHandler:     dashHandler,
 		systemHandler:        sysHandler,
 		iyuuHandler:          NewIYUUHandler(db, logger, iyuuSvc),
@@ -142,12 +145,15 @@ func (rt *Router) SetCloudFPBreakerFn(fn func() bool) {
 
 
 // SetupManualForward 注入手动转发向导所需的依赖
-func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner) {
+func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner, metadataFetcher *metadata.Fetcher) {
 	rt.manualForwardHandler.SetPipeline(pipeline)
 	rt.manualForwardHandler.SetSiteManager(siteProvider)
 	rt.manualForwardHandler.SetClientProvider(clientMgr)
 	rt.manualForwardHandler.SetDeclarationFilter(declFilter)
 	rt.manualForwardHandler.SetBDInfoScanner(bdinfoScanner)
+	if metadataFetcher != nil {
+		rt.manualForwardHandler.SetMetadataFetcher(metadataFetcher)
+	}
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)
 	rt.publishTorrentsHandler.SetDeclarationFilter(declFilter)
@@ -253,6 +259,10 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	imageHostHandler := rt.chain(rt.rateLimitMW, rt.imageHostHandler.ServeHTTP)
 	mux.Handle("/api/v1/settings/image-host", imageHostHandler)
 	mux.Handle("/api/v1/settings/image-host/", imageHostHandler)
+
+	metadataHandler := rt.chain(rt.rateLimitMW, rt.metadataHandler.ServeHTTP)
+	mux.Handle("/api/v1/metadata", metadataHandler)
+	mux.Handle("/api/v1/metadata/", metadataHandler)
 
 	rssHandler := rt.chain(rt.rateLimitMW, rt.rssHandler.ServeHTTP)
 	mux.Handle("/api/v1/rss/subscriptions", rssHandler)
