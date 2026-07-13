@@ -36,6 +36,33 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, infoHash, siteName, torrent
 		return nil, fmt.Errorf("info_hash, site_name, torrent_id are required")
 	}
 
+	meta, err := f.fetchFromSite(ctx, infoHash, siteName, torrentID, "rss_detail")
+	if err != nil {
+		f.logger.Debug("primary site fetch failed, trying IYUU fallback",
+			zap.String("site", siteName),
+			zap.String("info_hash", infoHash),
+			zap.Error(err))
+
+		meta = f.fetchWithIYUUFallback(ctx, infoHash, siteName)
+		if meta == nil {
+			return nil, fmt.Errorf("all fetch attempts failed: primary=%w", err)
+		}
+	}
+
+	if err := f.store(ctx, meta); err != nil {
+		return nil, fmt.Errorf("store metadata: %w", err)
+	}
+
+	f.logger.Debug("metadata fetched and stored",
+		zap.String("info_hash", infoHash),
+		zap.String("site_name", siteName),
+		zap.String("standard_type", meta.StandardType),
+		zap.String("fetch_source", meta.FetchSource))
+
+	return meta, nil
+}
+
+func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrentID, fetchSource string) (*model.TorrentMetadata, error) {
 	if f.siteProvider == nil {
 		return nil, fmt.Errorf("site provider not configured")
 	}
@@ -59,19 +86,37 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, infoHash, siteName, torrent
 	}
 
 	meta := f.buildMetadata(infoHash, siteName, torrentID, detail)
+	meta.FetchSource = fetchSource
+	return meta, nil
+}
 
-	if err := f.store(ctx, meta); err != nil {
-		return nil, fmt.Errorf("store metadata: %w", err)
+func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash, primarySite string) *model.TorrentMetadata {
+	var caches []model.SiteCoverageCache
+	if err := f.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name != ? AND status = ? AND torrent_id != ''",
+			infoHash, primarySite, model.CoverageConfirmedHas).
+		Order("confidence DESC").
+		Limit(5).
+		Find(&caches).Error; err != nil || len(caches) == 0 {
+		return nil
 	}
 
-	f.logger.Debug("metadata fetched and stored",
-		zap.String("info_hash", infoHash),
-		zap.String("site_name", siteName),
-		zap.String("standard_type", meta.StandardType),
-		zap.Int("tags", len(strings.Split(meta.Tags, ","))),
-		zap.Int("screenshots", len(detail.Screenshots)))
+	for _, c := range caches {
+		f.logger.Debug("trying IYUU fallback site",
+			zap.String("fallback_site", c.SiteName),
+			zap.String("torrent_id", c.TorrentID),
+			zap.String("info_hash", infoHash))
 
-	return meta, nil
+		meta, err := f.fetchFromSite(ctx, infoHash, c.SiteName, c.TorrentID, "iyuu_cache")
+		if err != nil {
+			f.logger.Debug("IYUU fallback site failed",
+				zap.String("site", c.SiteName),
+				zap.Error(err))
+			continue
+		}
+		return meta
+	}
+	return nil
 }
 
 func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *model.TorrentDetail) *model.TorrentMetadata {

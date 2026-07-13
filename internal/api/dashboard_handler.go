@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -50,6 +51,14 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleTrends(w, r)
 	case strings.HasSuffix(trimmed, "/system/dashboard"):
 		h.handleSystemDashboard(w, r)
+	case strings.HasSuffix(trimmed, "/seeding/monitor"):
+		h.handleSeedingMonitor(w, r)
+	case strings.HasSuffix(trimmed, "/reseed/monitor"):
+		h.handleReseedMonitor(w, r)
+	case strings.HasSuffix(trimmed, "/publish/monitor"):
+		h.handlePublishMonitor(w, r)
+	case strings.HasSuffix(trimmed, "/system/tasks/action") && r.Method == http.MethodPost:
+		h.handleTaskAction(w, r)
 	case strings.HasPrefix(trimmed, "/api/v1/torrent-events"):
 		h.handleTorrentEvents(w, r, trimmed)
 	default:
@@ -521,4 +530,126 @@ func (h *DashboardHandler) handleSystemDashboard(w http.ResponseWriter, r *http.
 			"clients":     onlineCount,
 		},
 	})
+}
+
+func (h *DashboardHandler) handleSeedingMonitor(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var byStatus map[string]int64 = map[string]int64{}
+	var statuses = []string{"pending", "seeding", "paused_free_end", "paused_rule", "deleting", "delete_failed"}
+	for _, s := range statuses {
+		var c int64
+		h.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("status = ?", s).Count(&c)
+		byStatus[s] = c
+	}
+
+	var rssLogs []model.RSSFetchLog
+	h.db.WithContext(ctx).Order("created_at DESC").Limit(5).Find(&rssLogs)
+
+	var deletedToday int64
+	today := time.Now().Truncate(24 * time.Hour)
+	h.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+		Where("status = ? AND updated_at >= ?", "deleted", today).Count(&deletedToday)
+
+	Success(w, map[string]interface{}{
+		"by_status":     byStatus,
+		"deleted_today": deletedToday,
+		"recent_fetches": rssLogs,
+	})
+}
+
+func (h *DashboardHandler) handleReseedMonitor(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var byStatus map[string]int64 = map[string]int64{}
+	var statuses = []string{"pending", "injecting", "injected", "failed", "skipped"}
+	for _, s := range statuses {
+		var c int64
+		h.db.WithContext(ctx).Model(&model.ReseedMatch{}).
+			Where("status = ?", s).Count(&c)
+		byStatus[s] = c
+	}
+
+	var activeTasks []model.ReseedTask
+	h.db.WithContext(ctx).Where("enabled = ? AND status IN ?", true, []string{"idle", "running"}).Find(&activeTasks)
+
+	Success(w, map[string]interface{}{
+		"by_status":    byStatus,
+		"active_tasks": activeTasks,
+	})
+}
+
+func (h *DashboardHandler) handlePublishMonitor(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var byStatus map[string]int64 = map[string]int64{}
+	var statuses = []string{"pending", "downloading", "completed", "publishing", "done", "error"}
+	for _, s := range statuses {
+		var c int64
+		h.db.WithContext(ctx).Model(&model.PublishCandidate{}).
+			Where("publish_status = ?", s).Count(&c)
+		byStatus[s] = c
+	}
+
+	today := time.Now().Truncate(24 * time.Hour)
+	var resultsToday []model.PublishResultRecord
+	h.db.WithContext(ctx).Where("created_at >= ?", today).Order("created_at DESC").Limit(10).Find(&resultsToday)
+
+	Success(w, map[string]interface{}{
+		"by_status":     byStatus,
+		"recent_results": resultsToday,
+	})
+}
+
+func (h *DashboardHandler) handleTaskAction(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Kind   string `json:"kind"`
+		ID     string `json:"id"`
+		Action string `json:"action"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "参数解析失败")
+		return
+	}
+	if req.Kind == "" || req.ID == "" || req.Action == "" {
+		Error(w, http.StatusBadRequest, 40001, "kind, id, action 不能为空")
+		return
+	}
+
+	allowedActions := map[string]bool{"finish": true, "terminate": true}
+	if !allowedActions[req.Action] {
+		Error(w, http.StatusBadRequest, 40001, "不支持的操作: "+req.Action)
+		return
+	}
+
+	h.logger.Info("task action requested",
+		zap.String("kind", req.Kind),
+		zap.String("id", req.ID),
+		zap.String("action", req.Action))
+
+	switch req.Kind {
+	case "download_task":
+		var task model.DownloadTask
+		if err := h.db.Where("id = ?", req.ID).First(&task).Error; err != nil {
+			Error(w, http.StatusNotFound, 40400, "任务不存在")
+			return
+		}
+		if req.Action == "finish" {
+			h.db.Model(&task).Updates(map[string]interface{}{"status": "completed"})
+		}
+		Success(w, map[string]interface{}{"success": true})
+	case "publish_candidate":
+		var candidate model.PublishCandidate
+		if err := h.db.Where("id = ?", req.ID).First(&candidate).Error; err != nil {
+			Error(w, http.StatusNotFound, 40400, "任务不存在")
+			return
+		}
+		if req.Action == "finish" {
+			h.db.Model(&candidate).Updates(map[string]interface{}{"publish_status": "done", "skip_reason": "manual_finish"})
+		}
+		Success(w, map[string]interface{}{"success": true})
+	default:
+		Error(w, http.StatusBadRequest, 40001, "不支持的任务类型: "+req.Kind)
+	}
 }

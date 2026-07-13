@@ -316,8 +316,9 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 
 	d := result.Data
-	return &model.TorrentDetail{
+	detail := &model.TorrentDetail{
 		Title:        d.Name,
+		Subtitle:     d.SmallDescr,
 		Description:  d.Description,
 		Size:         int64(d.Size),
 		InfoHash:     strings.ToLower(d.InfoHash),
@@ -325,11 +326,28 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 		Source:       d.Source,
 		Resolution:   d.Standard,
 		Codec:        d.VideoCodec,
+		AudioCodec:   d.AudioCodec,
 		ReleaseGroup: d.Team,
 		MediaInfo:    d.MediaInfo,
 		IMDbID:       d.Imdb,
+		DoubanID:     d.Douban,
 		Tags:         d.Tags,
-	}, nil
+	}
+	if d.Imdb != "" {
+		detail.IMDbURL = "https://www.imdb.com/title/" + d.Imdb + "/"
+	}
+	if d.Douban != "" {
+		detail.DoubanURL = "https://movie.douban.com/subject/" + d.Douban + "/"
+	}
+	if d.Description != "" {
+		detail.Screenshots = extractScreenshotsFromBBCode(d.Description)
+		if len(detail.Screenshots) > 0 {
+			detail.PosterURL = detail.Screenshots[0]
+			detail.Screenshots = detail.Screenshots[1:]
+		}
+	}
+	detail.Category = NormalizeCategory(detail.Category)
+	return detail, nil
 }
 
 func (a *MTeamAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
