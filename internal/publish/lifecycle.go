@@ -374,7 +374,7 @@ func (m *LifecycleManager) removeHRTag(ctx context.Context, mem *model.PublishGr
 	hrTag := fmt.Sprintf("PROTECTED_HR_%s", site)
 	if dl, err := m.clientProvider.Get(mem.ClientID); err == nil {
 		if err := dl.RemoveTorrentTags(ctx, mem.InfoHash, []string{hrTag}); err != nil {
-			m.logger.Warn("lifecycle: 移除 HR 保护标签失败",
+			m.logger.Warn("lifecycle: failed to remove HR protect tag",
 				zap.String("clientID", mem.ClientID),
 				zap.String("infoHash", mem.InfoHash),
 				zap.Error(err),

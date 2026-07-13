@@ -440,19 +440,19 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 
 	eligible, reason := p.CheckPublishEligibility(ctx, candidate, targetSite)
 	if !eligible {
-		p.logger.Info("目标站发布排除", zap.String("target", targetSite), zap.String("reason", reason))
+		p.logger.Info("target site publish excluded", zap.String("target", targetSite), zap.String("reason", reason))
 		return false, nil
 	}
 
 	targetConfig, err := p.siteProvider.GetSiteConfig(ctx, targetSite)
 	if err != nil {
-		p.logger.Warn("获取目标站配置失败", zap.String("site", targetSite), zap.Error(err))
+		p.logger.Warn("failed to get target config", zap.String("site", targetSite), zap.Error(err))
 		return false, nil
 	}
 
 	targetAdapter, err := p.siteProvider.GetAdapter(ctx, targetSite)
 	if err != nil {
-		p.logger.Warn("获取目标站适配器失败", zap.String("site", targetSite), zap.Error(err))
+		p.logger.Warn("failed to get target adapter", zap.String("site", targetSite), zap.Error(err))
 		return false, nil
 	}
 
@@ -495,7 +495,7 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 	costMS := time.Since(start).Milliseconds()
 	metrics.PublishDuration.WithLabelValues(targetSite).Observe(time.Since(start).Seconds())
 	if err != nil {
-		p.logger.Warn("上传到目标站失败",
+		p.logger.Warn("upload to target site failed",
 			zap.String("target", targetSite),
 			zap.Error(err),
 		)
@@ -851,7 +851,7 @@ func (p *Pipeline) finalizePublishStatus(ctx context.Context, id uint, published
 				"completed_at":       &now,
 				"updated_at":         now,
 			}).Error; err != nil {
-			p.logger.Error("更新发布完成状态失败", zap.Uint("id", id), zap.Error(err))
+			p.logger.Error("failed to update publish-completed status", zap.Uint("id", id), zap.Error(err))
 		}
 		return model.CandidateDone
 	}
@@ -871,12 +871,12 @@ func (p *Pipeline) finalizePublishStatus(ctx context.Context, id uint, published
 			return model.CandidatePending
 		}
 		if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, lastErr.Error()); err != nil {
-			p.logger.Error("更新发布失败状态失败", zap.Uint("id", id), zap.Error(err))
+			p.logger.Error("failed to update publish-failed status", zap.Uint("id", id), zap.Error(err))
 		}
 		return model.CandidateFailed
 	}
 	if err := p.UpdateCandidateStatus(ctx, id, model.CandidateSkipped, "所有目标站点均被去重或合规检查跳过"); err != nil {
-		p.logger.Error("更新发布跳过状态失败", zap.Uint("id", id), zap.Error(err))
+		p.logger.Error("failed to update publish-skipped status", zap.Uint("id", id), zap.Error(err))
 	}
 	return model.CandidateSkipped
 }
@@ -1546,7 +1546,7 @@ func (p *Pipeline) addStatusHistory(ctx context.Context, groupID uint, memberHas
 		Reason:         reason,
 	}
 	if err := p.db.WithContext(ctx).Create(history).Error; err != nil {
-		p.logger.Warn("记录状态历史失败", zap.Uint("groupID", groupID), zap.Error(err))
+		p.logger.Warn("failed to record status history", zap.Uint("groupID", groupID), zap.Error(err))
 	}
 }
 
@@ -1790,21 +1790,21 @@ func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMembe
 
 	targetConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, member.SiteName)
 	if cfgErr != nil {
-		p.logger.Warn("HR 检测: 获取目标站配置失败", zap.Error(cfgErr))
+		p.logger.Warn("HR check: failed to get target config", zap.Error(cfgErr))
 		advanceHR()
 		return
 	}
 
 	targetAdapter, adpErr := p.siteProvider.GetAdapter(ctx, member.SiteName)
 	if adpErr != nil {
-		p.logger.Warn("HR 检测: 获取目标站适配器失败", zap.Error(adpErr))
+		p.logger.Warn("HR check: failed to get target adapter", zap.Error(adpErr))
 		advanceHR()
 		return
 	}
 
 	hrResult, hrErr := targetAdapter.DetectHR(ctx, targetConfig, member.TorrentID)
 	if hrErr != nil {
-		p.logger.Warn("HR 检测失败",
+		p.logger.Warn("HR check failed",
 			zap.String("site", member.SiteName),
 			zap.String("torrentID", member.TorrentID),
 			zap.Error(hrErr),
@@ -1844,7 +1844,7 @@ func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMembe
 					}
 				}
 				if tagErr := dl.SetTorrentTags(ctx, member.InfoHash, mergedTags); tagErr != nil {
-					p.logger.Warn("设置 HR 保护标签失败",
+					p.logger.Warn("failed to set HR protect tag",
 						zap.String("clientID", member.ClientID),
 						zap.String("infoHash", member.InfoHash),
 						zap.Error(tagErr),
@@ -1852,7 +1852,7 @@ func (p *Pipeline) detectHR(ctx context.Context, member *model.PublishGroupMembe
 				}
 			}
 		}
-		p.logger.Info("HR 检测: 种子已标记为 HR 保护",
+		p.logger.Info("HR check: torrent marked as HR protected",
 			zap.Uint("memberID", member.ID),
 			zap.String("site", member.SiteName),
 			zap.Int("seedTimeH", seedTimeH),
@@ -1900,7 +1900,7 @@ func (p *Pipeline) notifyPublishResult(ctx context.Context, member *model.Publis
 		Level:   level,
 	}
 	if err := p.notifyService.Send(ctx, msg); err != nil {
-		p.logger.Warn("发布通知发送失败", zap.Error(err))
+		p.logger.Warn("publish notification send failed", zap.Error(err))
 	}
 }
 

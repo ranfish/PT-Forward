@@ -114,7 +114,7 @@ func (a *Unit3DAdapter) ensureSession(ctx context.Context, config *model.SiteCon
 	config.Cookie = strings.Join(parts, "; ")
 	a.sessionReady[domain] = true
 
-	a.logger.Debug("Unit3D session 已建立",
+	a.logger.Debug("Unit3D session established",
 		zap.String("domain", domain),
 		zap.Int("new_cookies", len(newCookies)),
 	)
@@ -560,7 +560,7 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 
 	csrfToken, err := a.fetchCSRFToken(ctx, config, uploadURL)
 	if err != nil {
-		a.logger.Warn("获取 CSRF token 失败，尝试无 token 上传", zap.Error(err))
+		a.logger.Warn("failed to get CSRF token, trying upload without token", zap.Error(err))
 		csrfToken = ""
 	}
 

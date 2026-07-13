@@ -54,7 +54,7 @@ func (m *DiskBudgetManager) Reserve(clientID string, size int64, freeSpace int64
 	}
 	m.tickets[ticket.ID] = ticket
 
-	m.logger.Debug("磁盘预算预留",
+	m.logger.Debug("disk budget reserved",
 		zap.String("ticket", ticket.ID),
 		zap.String("client", clientID),
 		zap.Int64("size", size),
@@ -75,7 +75,7 @@ func (m *DiskBudgetManager) Release(ticket *DiskBudgetTicket) {
 
 	if _, ok := m.tickets[ticket.ID]; ok {
 		delete(m.tickets, ticket.ID)
-		m.logger.Debug("磁盘预算释放",
+		m.logger.Debug("disk budget released",
 			zap.String("ticket", ticket.ID),
 			zap.String("client", ticket.ClientID),
 			zap.Int64("size", ticket.Size),
@@ -107,7 +107,7 @@ func (m *DiskBudgetManager) Expire() {
 		}
 	}
 	if expired > 0 {
-		m.logger.Debug("磁盘预算过期清理", zap.Int("expired", expired))
+		m.logger.Debug("disk budget expired cleanup", zap.Int("expired", expired))
 	}
 }
 

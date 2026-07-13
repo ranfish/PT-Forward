@@ -2113,7 +2113,7 @@ func (h *SiteHandler) handleSearch(w http.ResponseWriter, r *http.Request, idStr
 
 	config, err := h.provider.GetSiteConfig(r.Context(), site.Domain)
 	if err != nil {
-		Error(w, http.StatusInternalServerError, 50003, "获取站点配置失败")
+		Error(w, http.StatusInternalServerError, 50003, "failed to get site config")
 		return
 	}
 
@@ -2193,7 +2193,7 @@ func (h *SiteHandler) handleDetectDiscount(w http.ResponseWriter, r *http.Reques
 
 	config, err := h.provider.GetSiteConfig(r.Context(), site.Domain)
 	if err != nil {
-		Error(w, http.StatusInternalServerError, 50003, "获取站点配置失败")
+		Error(w, http.StatusInternalServerError, 50003, "failed to get site config")
 		return
 	}
 
@@ -2239,7 +2239,7 @@ func (h *SiteHandler) handleDownloadTest(w http.ResponseWriter, r *http.Request,
 
 	config, err := h.provider.GetSiteConfig(r.Context(), site.Domain)
 	if err != nil {
-		Error(w, http.StatusInternalServerError, 50003, "获取站点配置失败")
+		Error(w, http.StatusInternalServerError, 50003, "failed to get site config")
 		return
 	}
 
