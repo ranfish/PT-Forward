@@ -136,12 +136,18 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 			subtitleSID = sid
 		}
 	}
-	localShots, err := g.screenshotEngine.Capture(ctx, videoPath, subtitleSID)
+	localShots, tmpDir, err := g.screenshotEngine.Capture(ctx, videoPath, subtitleSID)
 	if err != nil || len(localShots) == 0 {
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
+		}
 		g.logger.Warn("local screenshot capture failed", zap.Error(err))
 		return nil
 	}
 	uploaded, err := g.imageUploader.UploadMultiple(ctx, localShots)
+	if tmpDir != "" {
+		_ = os.RemoveAll(tmpDir)
+	}
 	if err != nil || len(uploaded) == 0 {
 		g.logger.Warn("screenshot upload failed", zap.Error(err))
 		return nil

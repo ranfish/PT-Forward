@@ -58,26 +58,30 @@ type videoInfo struct {
 	isHDR    bool
 }
 
-func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtitleStreamID int) ([]string, error) {
+func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtitleStreamID int) ([]string, string, error) {
 	if !e.Available() {
-		return nil, fmt.Errorf("screenshot tools not available (need ffprobe + mpv)")
+		return nil, "", fmt.Errorf("screenshot tools not available (need ffprobe + mpv)")
 	}
 
 	if _, err := os.Stat(videoPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("video file not found: %s", videoPath)
+		return nil, "", fmt.Errorf("video file not found: %s", videoPath)
 	}
 
 	info, err := e.probeVideo(ctx, videoPath)
 	if err != nil {
-		return nil, fmt.Errorf("probe video: %w", err)
+		return nil, "", fmt.Errorf("probe video: %w", err)
 	}
 
 	points := e.generateTimePoints(info.duration)
 	tmpDir, err := os.MkdirTemp("", "pt-screenshot-*")
 	if err != nil {
-		return nil, fmt.Errorf("create temp dir: %w", err)
+		return nil, "", fmt.Errorf("create temp dir: %w", err)
 	}
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	defer func() {
+		if err != nil {
+			_ = os.RemoveAll(tmpDir)
+		}
+	}()
 
 	var paths []string
 	for i, ts := range points {
@@ -94,9 +98,9 @@ func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtit
 	}
 
 	if len(paths) == 0 {
-		return nil, fmt.Errorf("all screenshot captures failed")
+		return nil, "", fmt.Errorf("all screenshot captures failed")
 	}
-	return paths, nil
+	return paths, tmpDir, nil
 }
 
 func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*videoInfo, error) {
