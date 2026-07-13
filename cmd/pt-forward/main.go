@@ -39,6 +39,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/iyuu"
+	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -361,6 +362,11 @@ func main() {
 	router.SetSiteProvider(siteProvider)
 	declFilter := publish.NewDeclarationFilter(setting.NewRepository(db), log)
 	publishPipeline.SetDeclarationFilter(declFilter)
+	metadataFetcher := metadata.NewFetcher(db, log, siteProvider)
+	publishPipeline.SetMetadataFetcher(metadataFetcher)
+	if strategy, err := settingsRepo.Get(ctx, setting.KeyImageHostStrategy); err == nil && strategy != "" {
+		publishPipeline.SetImageHostStrategy(strategy)
+	}
 	bdinfoScanner := publish.NewBDInfoScanner(log)
 	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner)
 	router.SetConfigEventBus(configEventBus)
