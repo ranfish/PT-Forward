@@ -58,6 +58,12 @@ var (
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|B)`)
 	reNexusTag            = regexp.MustCompile(`class="tag[^"]*"[^>]*>([^<]+)`)
+
+	reBBCodeImg      = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
+	reBBCodeHTMLImg  = regexp.MustCompile(`(?i)<img[^>]+src=["']([^"']+)["']`)
+	reBBCodeQuote    = regexp.MustCompile(`(?is)\[quote(?:=([^\]]*))?\](.*?)\[/quote\]`)
+	reIMDbURL        = regexp.MustCompile(`https?://(?:www\.)?imdb\.com/title/(?:tt\d+)`)
+	reDoubanURL      = regexp.MustCompile(`https?://(?:www\.)?(?:movie\.)?douban\.com/(?:subject|movie)/(?:\d+)`)
 )
 
 type NexusPHPAdapter struct {
@@ -273,8 +279,25 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 	}
 
 	detail.Tags = extractTags(html)
-
 	detail.Category = NormalizeCategory(detail.Category)
+
+	if detail.Description != "" {
+		detail.Screenshots = extractScreenshotsFromBBCode(detail.Description)
+		detail.MediaInfo = extractMediaInfoFromBBCode(detail.Description)
+	}
+
+	if len(detail.Screenshots) > 0 {
+		detail.PosterURL = detail.Screenshots[0]
+		detail.Screenshots = detail.Screenshots[1:]
+	}
+
+	detail.Flags = extractFlagsFromText(html + " " + detail.Title + " " + detail.Subtitle)
+	if imdbURL := reIMDbURL.FindString(html); imdbURL != "" {
+		detail.IMDbURL = imdbURL
+	}
+	if doubanURL := reDoubanURL.FindString(html); doubanURL != "" {
+		detail.DoubanURL = doubanURL
+	}
 
 	return detail, nil
 }
@@ -1856,8 +1879,9 @@ func (a *NexusPHPAdapter) enrichFromUserDetails(ctx context.Context, config *mod
 				if sv := reDetailSeedingVol.FindStringSubmatch(tdHTML); len(sv) > 1 {
 					if sz := parseSizeString(sv[1]); sz > 0 {
 						result.SeedingSize = sz
-					}
-				}
+	}
+}
+
 			}
 		}
 	}
@@ -2171,4 +2195,81 @@ func (a *NexusPHPAdapter) fetchSeedingSizeFromBonus(ctx context.Context, config 
 			result.SeedingSize = sz
 		}
 	}
+}
+
+func extractScreenshotsFromBBCode(text string) []string {
+	seen := make(map[string]bool)
+	var urls []string
+	for _, m := range reBBCodeImg.FindAllStringSubmatch(text, -1) {
+		if len(m) > 1 {
+			u := strings.TrimSpace(m[1])
+			if u != "" && !seen[u] && !isUnwantedImage(u) {
+				seen[u] = true
+				urls = append(urls, u)
+			}
+		}
+	}
+	for _, m := range reBBCodeHTMLImg.FindAllStringSubmatch(text, -1) {
+		if len(m) > 1 {
+			u := strings.TrimSpace(m[1])
+			if u != "" && !seen[u] && !isUnwantedImage(u) {
+				seen[u] = true
+				urls = append(urls, u)
+			}
+		}
+	}
+	return urls
+}
+
+func extractMediaInfoFromBBCode(text string) string {
+	for _, m := range reBBCodeQuote.FindAllStringSubmatch(text, -1) {
+		label := ""
+		if len(m) > 1 {
+			label = strings.ToLower(m[1])
+		}
+		content := ""
+		if len(m) > 2 {
+			content = strings.TrimSpace(m[2])
+		}
+		if content == "" {
+			continue
+		}
+		preview := content
+		if len(preview) > 200 {
+			preview = preview[:200]
+		}
+		if strings.Contains(label, "mediainfo") ||
+			strings.Contains(label, "bdinfo") ||
+			strings.Contains(label, "编码信息") ||
+			strings.Contains(strings.ToLower(preview), "general") {
+			return content
+		}
+	}
+	return ""
+}
+
+var flagKeywords = []string{"禁转", "禁止转载", "谢绝转载", "严禁转载", "谢绝搬运", "独占", "限时禁转"}
+
+func extractFlagsFromText(text string) []string {
+	var flags []string
+	seen := make(map[string]bool)
+	for _, kw := range flagKeywords {
+		if strings.Contains(text, kw) && !seen[kw] {
+			seen[kw] = true
+			flags = append(flags, kw)
+		}
+	}
+	return flags
+}
+
+var unwantedImagePatterns = []string{"ico", "logo", "banner", "icon", "emoji", "smiley", "rank_", "badge"}
+
+func isUnwantedImage(url string) bool {
+	lower := strings.ToLower(url)
+	for _, pattern := range unwantedImagePatterns {
+		if strings.Contains(lower, pattern) {
+			return true
+		}
+	}
+	return false
 }

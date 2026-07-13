@@ -13,12 +13,16 @@ type TorrentDetail struct {
 	Codec        string     `json:"codec"`
 	ReleaseGroup string     `json:"release_group"`
 	Tags         []string   `json:"tags"`
+	Flags        []string   `json:"flags"`
 	AudioCodec   string     `json:"audio_codec"`
 	Processing   string     `json:"processing"`
 	Region       string     `json:"region"`
 	NFO          string     `json:"nfo"`
 	IMDbID       string     `json:"imdb_id"`
 	DoubanID     string     `json:"douban_id"`
+	IMDbURL      string     `json:"imdb_url"`
+	DoubanURL    string     `json:"douban_url"`
+	TMDbURL      string     `json:"tmdb_url"`
 	PosterURL    string     `json:"poster_url"`
 	Screenshots  []string   `json:"screenshots"`
 	MediaInfo    string     `json:"media_info"`
