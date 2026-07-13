@@ -54,7 +54,7 @@ examples/
 media/
 temp/
 tr/
-
+review/
 # Downloader torrent caches (remote .torrent copies)
 tr/
 PT0/
