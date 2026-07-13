@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -24,8 +25,12 @@ func (h *MetadataHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasSuffix(path, "/metadata/type") && r.Method == http.MethodPut:
 		h.handleUpdateType(w, r)
+	case strings.HasSuffix(path, "/metadata/review") && r.Method == http.MethodPut:
+		h.handleReview(w, r)
 	case strings.HasSuffix(path, "/metadata") && r.Method == http.MethodGet:
 		h.handleGet(w, r)
+	case strings.HasSuffix(path, "/metadata") && r.Method == http.MethodPut:
+		h.handleUpdate(w, r)
 	case strings.Contains(path, "/metadata/") && r.Method == http.MethodGet:
 		h.handleGetByHash(w, r)
 	case strings.HasSuffix(path, "/metadata") && r.Method == http.MethodDelete:
@@ -174,4 +179,112 @@ func (h *MetadataHandler) handleUpdateType(w http.ResponseWriter, r *http.Reques
 	}
 
 	Success(w, map[string]interface{}{"success": true})
+}
+
+func (h *MetadataHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		InfoHash     string `json:"info_hash"`
+		SiteName     string `json:"site_name"`
+		Title        string `json:"title"`
+		Subtitle     string `json:"subtitle"`
+		StandardType string `json:"standard_type"`
+		Tags         string `json:"tags"`
+		Description  string `json:"description"`
+		Screenshots  string `json:"screenshots"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "参数解析失败")
+		return
+	}
+	if req.InfoHash == "" {
+		Error(w, http.StatusBadRequest, 40001, "info_hash 不能为空")
+		return
+	}
+
+	updates := map[string]interface{}{
+		"reviewed":     true,
+		"fetch_source": "manual",
+		"updated_at":   time.Now(),
+	}
+	if req.Title != "" {
+		updates["title"] = req.Title
+	}
+	if req.Subtitle != "" {
+		updates["subtitle"] = req.Subtitle
+	}
+	if req.StandardType != "" {
+		updates["standard_type"] = req.StandardType
+	}
+	if req.Tags != "" {
+		updates["tags"] = req.Tags
+	}
+	if req.Description != "" {
+		updates["description"] = req.Description
+	}
+	if req.Screenshots != "" {
+		updates["screenshots"] = req.Screenshots
+	}
+
+	query := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ?", req.InfoHash)
+	if req.SiteName != "" {
+		query = query.Where("site_name = ?", req.SiteName)
+	}
+
+	result := query.Updates(updates)
+	if result.Error != nil {
+		Error(w, http.StatusInternalServerError, 50000, "更新失败")
+		return
+	}
+	if result.RowsAffected == 0 {
+		meta := &model.TorrentMetadata{
+			InfoHash:      req.InfoHash,
+			SiteName:      req.SiteName,
+			Title:         req.Title,
+			Subtitle:      req.Subtitle,
+			StandardType:  req.StandardType,
+			Tags:          req.Tags,
+			Description:   req.Description,
+			Screenshots:   req.Screenshots,
+			Reviewed:      true,
+			FetchSource:   "manual",
+			FetchedAt:     time.Now(),
+		}
+		if err := h.db.WithContext(r.Context()).Create(meta).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "创建失败")
+			return
+		}
+	}
+
+	Success(w, map[string]interface{}{"success": true})
+}
+
+func (h *MetadataHandler) handleReview(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		InfoHash string `json:"info_hash"`
+		SiteName string `json:"site_name"`
+		Reviewed bool   `json:"reviewed"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "参数解析失败")
+		return
+	}
+	if req.InfoHash == "" {
+		Error(w, http.StatusBadRequest, 40001, "info_hash 不能为空")
+		return
+	}
+
+	query := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ?", req.InfoHash)
+	if req.SiteName != "" {
+		query = query.Where("site_name = ?", req.SiteName)
+	}
+
+	result := query.Update("reviewed", req.Reviewed)
+	if result.Error != nil {
+		Error(w, http.StatusInternalServerError, 50000, "更新失败")
+		return
+	}
+
+	Success(w, map[string]interface{}{"success": true, "affected": result.RowsAffected})
 }

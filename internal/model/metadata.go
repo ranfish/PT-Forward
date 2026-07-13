@@ -25,6 +25,7 @@ type TorrentMetadata struct {
 	DoubanURL         string    `json:"douban_url" gorm:"size:200"`
 	TMDbURL           string    `json:"tmdb_url" gorm:"size:200"`
 	FetchSource       string    `json:"fetch_source" gorm:"size:20;default:''"`
+	Reviewed          bool      `json:"reviewed" gorm:"default:false"`
 	FetchedAt         time.Time `json:"fetched_at"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
