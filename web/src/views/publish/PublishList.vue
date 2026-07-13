@@ -212,6 +212,10 @@
                 {{ translatePublishStatus(record.status) }}
               </a-tag>
             </template>
+            <template v-if="column.key === 'cost_ms'">
+              <span v-if="record.cost_ms">{{ record.cost_ms < 1000 ? record.cost_ms + 'ms' : (record.cost_ms / 1000).toFixed(1) + 's' }}</span>
+              <span v-else>-</span>
+            </template>
             <template v-if="column.key === 'publish_url'">
               <a v-if="record.publish_url" :href="record.publish_url" target="_blank" style="font-size: 12px">查看种子</a>
               <span v-else>-</span>
@@ -329,10 +333,11 @@ const taskColumns = [
 
 const resultColumns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '候选ID', key: 'candidate_id', width: 80 },
   { title: t('publish.sourceSite'), dataIndex: 'source_site', key: 'source_site', width: 90 },
   { title: t('publish.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 90 },
-  { title: t('common.status'), key: 'status', width: 80 },
+  { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true, width: 200 },
+  { title: t('common.status'), key: 'status', width: 90 },
+  { title: '耗时', key: 'cost_ms', width: 80 },
   { title: t('publish.publishUrl'), key: 'publish_url', width: 80 },
   { title: t('publish.errorMessage'), dataIndex: 'error_message', key: 'error_message', ellipsis: true },
   { title: t('common.createdAt'), key: 'created_at', width: 140 },
@@ -349,7 +354,7 @@ function taskStatusColor(status: string) {
 }
 
 function resultStatusColor(status: string) {
-  const map: Record<string, string> = { published: 'green', publishing: 'processing', failed: 'red', skipped: 'orange', pending: 'blue' }
+  const map: Record<string, string> = { published: 'green', publishing: 'processing', failed: 'red', skipped: 'orange', pending: 'blue', completed: 'green', exists: 'cyan', edited: 'gold' }
   return map[status] || 'default'
 }
 

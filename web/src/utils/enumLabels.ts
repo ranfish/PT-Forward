@@ -40,6 +40,9 @@ const publishStatusMap: Record<string, string> = {
   skipped: 'publish.statusSkipped',
   running: 'publish.statusRunning',
   cancelled: 'publish.statusCancelled',
+  done: 'publish.statusDone',
+  exists: 'publish.statusExists',
+  edited: 'publish.statusEdited',
 }
 
 const publishRoleMap: Record<string, string> = {
