@@ -70,6 +70,49 @@
       </a-col>
     </a-row>
 
+    <a-row :gutter="16" style="margin-bottom: 24px">
+      <a-col :span="6">
+        <a-card size="small" :bordered="true" style="height: 100%">
+          <template #title><ThunderboltOutlined /> 刷流</template>
+          <a-descriptions :column="1" size="small">
+            <a-descriptions-item label="活跃种子">{{ sysDash?.seeding?.active ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item label="今日删种">{{ sysDash?.seeding?.deleted_today ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item label="RSS 订阅">{{ sysDash?.seeding?.rss_enabled ?? '-' }}</a-descriptions-item>
+          </a-descriptions>
+        </a-card>
+      </a-col>
+      <a-col :span="6">
+        <a-card size="small" :bordered="true" style="height: 100%">
+          <template #title><CloudDownloadOutlined /> 下载</template>
+          <a-descriptions :column="1" size="small">
+            <a-descriptions-item label="下载中">{{ sysDash?.download?.downloading ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item label="今日完成">{{ sysDash?.download?.completed_today ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item label="待转移">{{ sysDash?.download?.transfer_pending ?? '-' }}</a-descriptions-item>
+          </a-descriptions>
+        </a-card>
+      </a-col>
+      <a-col :span="6">
+        <a-card size="small" :bordered="true" style="height: 100%">
+          <template #title><ApiOutlined /> 辅种</template>
+          <a-descriptions :column="1" size="small">
+            <a-descriptions-item label="活跃任务">{{ sysDash?.reseed?.active_tasks ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item label="待注入">{{ sysDash?.reseed?.pending_injection ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item label="今日注入">{{ sysDash?.reseed?.injected_today ?? '-' }}</a-descriptions-item>
+          </a-descriptions>
+        </a-card>
+      </a-col>
+      <a-col :span="6">
+        <a-card size="small" :bordered="true" style="height: 100%">
+          <template #title><SendOutlined /> 发布</template>
+          <a-descriptions :column="1" size="small">
+            <a-descriptions-item label="发布中">{{ sysDash?.publish?.publishing ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item label="今日完成">{{ sysDash?.publish?.done_today ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item label="待发布">{{ sysDash?.publish?.pending ?? '-' }}</a-descriptions-item>
+          </a-descriptions>
+        </a-card>
+      </a-col>
+    </a-row>
+
     <a-card :title="t('dashboard.trends7d')" style="margin-bottom: 24px">
       <div ref="chartRef" style="height: 320px; width: 100%" />
     </a-card>
@@ -118,8 +161,9 @@ import {
   CloudDownloadOutlined,
   ThunderboltOutlined,
   SendOutlined,
+  ApiOutlined,
 } from '@ant-design/icons-vue'
-import { dashboardApi, type TrendPoint } from '@/api/dashboard'
+import { dashboardApi, type TrendPoint, type SystemDashboard } from '@/api/dashboard'
 import { useWebSocketStore } from '@/stores/websocket'
 import { formatTime, copyToClipboard } from '@/utils/format'
 
@@ -184,6 +228,7 @@ interface WSMessage {
 const { t } = useI18n()
 const loading = ref(false)
 const overview = ref<DashboardOverview>({})
+const sysDash = ref<SystemDashboard | null>(null)
 const activities = ref<ActivityItem[]>([])
 const activityPage = ref(1)
 const activitySize = ref(20)
@@ -301,11 +346,13 @@ async function fetchActivities() {
 async function fetchData() {
   loading.value = true
   try {
-    const [overviewResp, trendsResp] = await Promise.all([
+    const [overviewResp, trendsResp, sysDashResp] = await Promise.all([
       dashboardApi.getOverview(),
       dashboardApi.getTrends(7),
+      dashboardApi.getSystemDashboard(),
     ])
     overview.value = overviewResp.data.data || {}
+    sysDash.value = sysDashResp.data.data || null
     const trendData = trendsResp.data.data || { trends: [] }
     await nextTick()
     initChart(trendData.trends || [])
