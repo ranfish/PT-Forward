@@ -350,6 +350,7 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/dashboard/trends", dashboardHandler)
 	mux.Handle("/api/v1/dashboard/trends/", dashboardHandler)
 	mux.Handle("/api/v1/system/dashboard", dashboardHandler)
+	mux.Handle("/api/v1/stats/traffic/hourly", dashboardHandler)
 	mux.Handle("/api/v1/seeding/monitor", dashboardHandler)
 	mux.Handle("/api/v1/reseed/monitor", dashboardHandler)
 	mux.Handle("/api/v1/publish/monitor", dashboardHandler)
