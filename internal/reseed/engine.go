@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/ranfish/pt-forward/internal/audit"
+	"github.com/ranfish/pt-forward/internal/compliance"
 	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/httpclient"
@@ -198,6 +199,7 @@ type Engine struct {
 	contributeReporter   *contributeReporter
 	currentCloudFPCache  *cloudFPCache
 	currentDomainResolver *domainResolver
+	complianceChecker    *compliance.Checker
 }
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
@@ -232,6 +234,10 @@ func (e *Engine) SetIYUUService(svc model.IYUUService) {
 
 func (e *Engine) SetTrackerResolver(resolver *TrackerSiteResolver) {
 	e.trackerResolver = resolver
+}
+
+func (e *Engine) SetComplianceChecker(c *compliance.Checker) {
+	e.complianceChecker = c
 }
 
 
@@ -1429,7 +1435,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			recTitle = fp.Title
 		}
 
-		if !checkPublishEligibility(recTitle) {
+		if !e.checkEligibility(ctx, recTitle, task) {
 			result.Blocked++
 			continue
 		}
@@ -1478,7 +1484,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				break
 			}
 
-			if !checkPublishEligibility(recTitle) {
+			if !e.checkEligibility(ctx, recTitle, task) {
 				result.Blocked++
 				continue
 			}
@@ -2750,7 +2756,7 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 	if fp := fpc.get(record.InfoHash, record.SiteName); fp != nil {
 		recTitle = fp.Title
 	}
-	if !checkPublishEligibility(recTitle) {
+	if !e.checkEligibility(ctx, recTitle, nil) {
 		e.logger.Info("auto reseed: blocked by publish eligibility", zap.String("title", recTitle))
 		return
 	}
@@ -2940,6 +2946,21 @@ var (
 	reseedForbiddenKeywords = []string{"禁转", "独占", "谢绝转载", "限时禁转", "严禁转载", "禁止转载", "谢绝搬运"}
 	reseedForbiddenGroups   = []string{"CatEDU"}
 )
+
+func (e *Engine) checkEligibility(ctx context.Context, title string, task *model.ReseedTask) bool {
+	if e.complianceChecker != nil && task != nil {
+		result := e.complianceChecker.CheckWithTask(ctx, title, task)
+		if !result.Passed {
+			e.logger.Info("compliance blocked",
+				zap.String("title", title),
+				zap.String("category", result.Category),
+				zap.String("reason", result.Reason))
+			return false
+		}
+		return true
+	}
+	return checkPublishEligibility(title)
+}
 
 func checkPublishEligibility(title string) bool {
 	if title == "" {

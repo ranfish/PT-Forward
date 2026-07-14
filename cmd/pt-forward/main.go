@@ -27,6 +27,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/cloudfp"
 	"github.com/ranfish/pt-forward/internal/config"
+	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/cookiecloud"
 	"github.com/ranfish/pt-forward/internal/crypto"
 	dbpkg "github.com/ranfish/pt-forward/internal/db"
@@ -364,6 +365,9 @@ func main() {
 	router.SetSiteProvider(siteProvider)
 	declFilter := publish.NewDeclarationFilter(setting.NewRepository(db), log)
 	publishPipeline.SetDeclarationFilter(declFilter)
+	complianceChecker := compliance.NewChecker(db, log)
+	publishPipeline.SetComplianceChecker(complianceChecker)
+	reseedEngine.SetComplianceChecker(complianceChecker)
 	metadataFetcher := metadata.NewFetcher(db, log, siteProvider)
 	publishPipeline.SetMetadataFetcher(metadataFetcher)
 	if strategy, err := settingsRepo.Get(ctx, setting.KeyImageHostStrategy); err == nil && strategy != "" {
