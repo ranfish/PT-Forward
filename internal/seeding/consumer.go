@@ -71,20 +71,25 @@ func (e *Engine) consumeLoop(ctx context.Context) {
 }
 
 func (e *Engine) scoreAndPush(ctx context.Context, events []*pusher.PushedEvent) {
-	byClient := make(map[string][]*pendingCandidate)
+	type groupKey struct {
+		clientID       string
+		subscriptionID string
+	}
+	groups := make(map[groupKey][]*pendingCandidate)
 	for _, ev := range events {
-		byClient[ev.ClientID] = append(byClient[ev.ClientID], &pendingCandidate{
+		key := groupKey{clientID: ev.ClientID, subscriptionID: ev.SubscriptionID}
+		groups[key] = append(groups[key], &pendingCandidate{
 			Event:     ev,
 			CreatedAt: ev.PushedAt,
 		})
 	}
 
-	for clientID, candidates := range byClient {
-		e.scoreAndPushForClient(ctx, clientID, candidates)
+	for key, candidates := range groups {
+		e.scoreAndPushForClient(ctx, key.clientID, key.subscriptionID, candidates)
 	}
 }
 
-func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID string, candidates []*pendingCandidate) {
+func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscriptionID string, candidates []*pendingCandidate) {
 	var clientCfg model.SeedingClientConfig
 	if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", clientID, true).First(&clientCfg).Error; err != nil {
 		return
@@ -113,7 +118,22 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID string, can
 		return
 	}
 
-	scoringCfg := e.loadScoringConfig(ctx, candidates[0].Event.SubscriptionID)
+	if clientCfg.DiskProtectEnabled && clientCfg.MinDiskSpaceGB > 0 && e.clientProvider != nil {
+		dlClient, err := e.clientProvider.Get(clientID)
+		if err == nil && dlClient != nil {
+			freeSpace, _ := dlClient.GetFreeSpace(ctx)
+			minBytes := int64(clientCfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
+			if freeSpace >= 0 && freeSpace < minBytes {
+				e.logger.Warn("scoreAndPush: disk space insufficient, pausing push",
+					zap.String("client_id", clientID),
+					zap.Int64("free_space", freeSpace),
+					zap.Float64("min_gb", clientCfg.MinDiskSpaceGB))
+				return
+			}
+		}
+	}
+
+	scoringCfg := e.loadScoringConfig(ctx, subscriptionID)
 	siteWeights := e.parseSiteWeights(scoringCfg.SiteWeightsJSON)
 
 	e.scoreCandidatesFull(ctx, candidates, scoringCfg, siteWeights)

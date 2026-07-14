@@ -266,7 +266,6 @@ func main() {
 	rssEngine.SetDispatcher(eventDispatcher)
 	rssEngine.SetSiteProvider(siteProvider)
 	rssEngine.SetClientProvider(clientManager)
-	rssEngine.SetSeedingCounter(seedingEngine)
 
 	torrentPusher := pusher.NewPusher(db, log)
 	torrentPusher.SetSiteProvider(siteProvider)
