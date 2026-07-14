@@ -1140,6 +1140,21 @@ func (p *Pipeline) ProcessPending(ctx context.Context) error {
 	for i := range candidates {
 		c := &candidates[i]
 
+		// 原子抢占：status pending → publishing，防止并发重复处理
+		result := p.db.WithContext(ctx).Model(&model.PublishCandidate{}).
+			Where("id = ? AND publish_status = ?", c.ID, model.CandidatePending).
+			Update("publish_status", model.CandidatePublishing)
+		if result.Error != nil {
+			p.logger.Warn("atomic claim failed",
+				zap.Uint("id", c.ID),
+				zap.Error(result.Error))
+			continue
+		}
+		if result.RowsAffected == 0 {
+			continue
+		}
+		c.PublishStatus = model.CandidatePublishing
+
 		eligible, reason := p.CheckPublishEligibility(ctx, c, "")
 		if !eligible {
 			if err := p.UpdateCandidateStatus(ctx, c.ID, model.CandidateSkipped, reason); err != nil {
