@@ -16,6 +16,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/dispatcher"
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/pusher"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -201,6 +202,8 @@ type Engine struct {
 	refreshCancel     context.CancelFunc
 	wg                sync.WaitGroup
 	reseedTrigger     ReseedTrigger
+	pusher            *pusher.Pusher
+	pendingEvents     chan *pusher.PushedEvent
 
 	unregisteredCursor   atomic.Int64
 	unregisteredChecking atomic.Bool
@@ -238,6 +241,7 @@ func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 		maindataCache:   make(map[string]*maindataEntry),
 		fitTimer:        NewFitTimer(),
 		freeWaitMonitor: NewFreeWaitMonitor(db, logger),
+		pendingEvents:   make(chan *pusher.PushedEvent, 1000),
 	}
 	e.freeEndMonitor = NewFreeEndMonitor(db, nil, logger)
 	e.freeEndMonitor.SetEngine(e)
@@ -419,6 +423,11 @@ func (e *Engine) Start(ctx context.Context) error {
 	e.refreshCancel = cancel
 	e.wg.Add(1)
 	go func() { defer e.wg.Done(); e.refreshMaindataLoop(refreshCtx) }()
+
+	if e.pusher != nil {
+		e.wg.Add(1)
+		go func() { defer e.wg.Done(); e.consumeLoop(ctx) }()
+	}
 
 	return nil
 }

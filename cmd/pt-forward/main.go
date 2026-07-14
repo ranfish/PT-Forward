@@ -272,7 +272,6 @@ func main() {
 	torrentPusher.SetSiteProvider(siteProvider)
 	torrentPusher.SetClientProvider(clientManager)
 	eventBus := pusher.NewEventBus(log, 256)
-	rssEngine.SetPusher(torrentPusher)
 	rssEngine.SetEventBus(eventBus)
 
 	rssEngine.SetWSBroadcaster(wsHub)
@@ -339,6 +338,7 @@ func main() {
 	seedingEngine.SetSiteProvider(siteProvider)
 	seedingEngine.SetWSBroadcaster(wsHub)
 	seedingEngine.SetReseedTrigger(reseedEngine)
+	seedingEngine.SetPusher(torrentPusher)
 
 	freeWaitMonitor := seeding.NewFreeWaitMonitor(db, log)
 	freeWaitMonitor.SetEngine(seedingEngine)
