@@ -108,6 +108,10 @@ func (e *Engine) OnPushed(ctx context.Context, event *pusher.PushedEvent) {
 		e.freeEndMonitor.Schedule(record)
 	}
 
+	if event.AutoReseed && len(event.ReseedClientIDs) > 0 && e.reseedTrigger != nil {
+		go e.reseedTrigger.OnTorrentSeeding(context.Background(), *record, event.ReseedClientIDs)
+	}
+
 	e.logger.Debug("OnPushed: seeding record created",
 		zap.String("client_id", event.ClientID),
 		zap.String("info_hash", event.InfoHash),

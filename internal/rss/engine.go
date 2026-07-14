@@ -255,18 +255,20 @@ func (e *Engine) pushViaPusher(ctx context.Context, sub *model.RSSSubscription, 
 			if e.eventBus != nil {
 				role := e.torrentPusher.GetClientRole(ctx, sub.ClientID)
 				e.eventBus.Publish(&pusher.PushedEvent{
-					ClientID:  sub.ClientID,
-					SiteName:  ev.SiteName,
-					TorrentID: ev.TorrentID,
-					InfoHash:  result.InfoHash,
-					Title:     ev.Title,
-					Size:      ev.Size,
-					Role:      role,
-					Discount:  ev.Discount,
-					HasHR:     ev.HasHR,
-					IsFree:    isFree,
-					FreeEndAt: ev.FreeEndAt,
-					PushedAt:  time.Now(),
+					ClientID:        sub.ClientID,
+					SiteName:        ev.SiteName,
+					TorrentID:       ev.TorrentID,
+					InfoHash:        result.InfoHash,
+					Title:           ev.Title,
+					Size:            ev.Size,
+					Role:            role,
+					Discount:        ev.Discount,
+					HasHR:           ev.HasHR,
+					IsFree:          isFree,
+					FreeEndAt:       ev.FreeEndAt,
+					AutoReseed:      sub.AutoReseed,
+					ReseedClientIDs: sub.ReseedClientIDs,
+					PushedAt:        time.Now(),
 				})
 			}
 		} else if result.AlreadyExist {
