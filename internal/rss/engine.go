@@ -15,6 +15,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/filter"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/pusher"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -76,6 +77,8 @@ type Engine struct {
 	clientProvider model.DownloaderProvider
 	diskBudget     *DiskBudgetManager
 	seedingCounter model.SeedingCollector
+	torrentPusher  *pusher.Pusher
+	eventBus       *pusher.EventBus
 	wsBroadcaster  event.WSBroadcaster
 	sideLoadMgr    *SideLoadManager
 	configBus      *ConfigEventBus
@@ -214,6 +217,95 @@ func (e *Engine) SetDispatcher(d *event.Dispatcher) {
 
 func (e *Engine) SetSeedingCounter(sc model.SeedingCollector) {
 	e.seedingCounter = sc
+}
+
+func (e *Engine) SetPusher(p *pusher.Pusher) {
+	e.torrentPusher = p
+}
+
+func (e *Engine) SetEventBus(bus *pusher.EventBus) {
+	e.eventBus = bus
+}
+
+func (e *Engine) pushViaPusher(ctx context.Context, sub *model.RSSSubscription, events []model.TorrentEvent) {
+	for i := range events {
+		ev := &events[i]
+		isFree := ev.Discount == model.DiscountFree || ev.Discount == model.Discount2xFree || ev.Discount == model.DiscountAssumeFree
+		req := &pusher.PushRequest{
+			ClientID:        sub.ClientID,
+			SiteName:        ev.SiteName,
+			TorrentID:       ev.TorrentID,
+			InfoHash:        ev.InfoHash,
+			Title:           ev.Title,
+			HasHR:           ev.HasHR,
+			Discount:        ev.Discount,
+			IsFree:          isFree,
+			FreeEndAt:       ev.FreeEndAt,
+			SavePath:        sub.SavePath,
+			Category:        sub.Category,
+			Tags:            strings.Join(sub.Tags, ","),
+			AddPaused:       sub.AddPaused,
+			AutoTMM:         sub.AutoTMM,
+			UploadLimitKB:   sub.UploadLimitKB,
+			DownloadLimitKB: sub.DownloadLimitKB,
+		}
+		result := e.torrentPusher.Push(ctx, req)
+		if result.Success {
+			e.repo.MarkStatus(ctx, ev.SiteName, ev.TorrentID, "pushed")
+			if e.eventBus != nil {
+				role := e.torrentPusher.GetClientRole(ctx, sub.ClientID)
+				e.eventBus.Publish(&pusher.PushedEvent{
+					ClientID:  sub.ClientID,
+					SiteName:  ev.SiteName,
+					TorrentID: ev.TorrentID,
+					InfoHash:  result.InfoHash,
+					Title:     ev.Title,
+					Size:      ev.Size,
+					Role:      role,
+					Discount:  ev.Discount,
+					HasHR:     ev.HasHR,
+					IsFree:    isFree,
+					FreeEndAt: ev.FreeEndAt,
+					PushedAt:  time.Now(),
+				})
+			}
+		} else if result.AlreadyExist {
+			e.repo.MarkStatus(ctx, ev.SiteName, ev.TorrentID, "pushed")
+		} else if result.SkipReason != "" {
+			e.logger.Debug("push skipped",
+				zap.String("subscription", sub.Name),
+				zap.String("torrent_id", ev.TorrentID),
+				zap.String("reason", result.SkipReason))
+		} else if result.Error != nil {
+			e.logger.Warn("push failed",
+				zap.String("subscription", sub.Name),
+				zap.String("torrent_id", ev.TorrentID),
+				zap.Error(result.Error))
+		}
+	}
+}
+
+func (e *Engine) pushViaSeedingCounter(ctx context.Context, sub *model.RSSSubscription, events []model.TorrentEvent) {
+	for i := range events {
+		if err := e.seedingCounter.Add(ctx, sub.ClientID, &events[i]); err != nil {
+			e.logger.Warn("seeding counter add failed",
+				zap.String("subscription", sub.Name),
+				zap.String("client_id", sub.ClientID),
+				zap.String("site_name", events[i].SiteName),
+				zap.String("torrent_id", events[i].TorrentID),
+				zap.String("info_hash", events[i].InfoHash),
+				zap.Error(err))
+		} else {
+			e.repo.MarkStatus(ctx, events[i].SiteName, events[i].TorrentID, "pushed")
+		}
+	}
+	subIDStr := uintToString(sub.ID)
+	if _, flushErr := e.seedingCounter.Flush(ctx, subIDStr); flushErr != nil {
+		e.logger.Warn("seeding counter flush failed",
+			zap.String("subscription", sub.Name),
+			zap.String("client_id", sub.ClientID),
+			zap.Error(flushErr))
+	}
 }
 
 func (e *Engine) SetWSBroadcaster(b event.WSBroadcaster) {
@@ -949,26 +1041,11 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 			}
 		}
 
-		if e.seedingCounter != nil && sub.Enabled && sub.ClientID != "" {
-			for i := range torrentEvents {
-				if err := e.seedingCounter.Add(ctx, sub.ClientID, &torrentEvents[i]); err != nil {
-					e.logger.Warn("seeding counter add failed",
-						zap.String("subscription", sub.Name),
-						zap.String("client_id", sub.ClientID),
-						zap.String("site_name", torrentEvents[i].SiteName),
-						zap.String("torrent_id", torrentEvents[i].TorrentID),
-						zap.String("info_hash", torrentEvents[i].InfoHash),
-						zap.Error(err))
-				} else {
-					e.repo.MarkStatus(ctx, torrentEvents[i].SiteName, torrentEvents[i].TorrentID, "pushed")
-				}
-			}
-			subIDStr := uintToString(sub.ID)
-			if _, flushErr := e.seedingCounter.Flush(ctx, subIDStr); flushErr != nil {
-				e.logger.Warn("seeding counter flush failed",
-					zap.String("subscription", sub.Name),
-					zap.String("client_id", sub.ClientID),
-					zap.Error(flushErr))
+		if sub.Enabled && sub.ClientID != "" {
+			if e.torrentPusher != nil {
+				e.pushViaPusher(ctx, sub, torrentEvents)
+			} else if e.seedingCounter != nil {
+				e.pushViaSeedingCounter(ctx, sub, torrentEvents)
 			}
 		}
 

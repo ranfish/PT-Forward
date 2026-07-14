@@ -46,6 +46,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/publish"
+	"github.com/ranfish/pt-forward/internal/pusher"
 	"github.com/ranfish/pt-forward/internal/screenshot"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/rss"
@@ -266,6 +267,14 @@ func main() {
 	rssEngine.SetSiteProvider(siteProvider)
 	rssEngine.SetClientProvider(clientManager)
 	rssEngine.SetSeedingCounter(seedingEngine)
+
+	torrentPusher := pusher.NewPusher(db, log)
+	torrentPusher.SetSiteProvider(siteProvider)
+	torrentPusher.SetClientProvider(clientManager)
+	eventBus := pusher.NewEventBus(log, 256)
+	rssEngine.SetPusher(torrentPusher)
+	rssEngine.SetEventBus(eventBus)
+
 	rssEngine.SetWSBroadcaster(wsHub)
 
 	sideLoadEmitter := rss.NewSideLoadEventEmitter()
