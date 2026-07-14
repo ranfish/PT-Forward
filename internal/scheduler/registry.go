@@ -13,16 +13,17 @@ import (
 type TaskFunc func(ctx context.Context) error
 
 type TaskEntry struct {
-	Name         string     `json:"name"`
-	Type         string     `json:"type"`
-	Schedule     string     `json:"schedule"`
-	Handler      TaskFunc   `json:"-"`
-	LastRunAt    *time.Time `json:"last_run_at"`
-	LastError    string     `json:"last_error"`
-	SuccessCount int64      `json:"success_count"`
-	ErrorCount   int64      `json:"error_count"`
-	Paused       bool       `json:"paused"`
-	Running      bool       `json:"running"`
+	Name              string     `json:"name"`
+	Type              string     `json:"type"`
+	Schedule          string     `json:"schedule"`
+	Handler           TaskFunc   `json:"-"`
+	LastRunAt         *time.Time `json:"last_run_at"`
+	LastError         string     `json:"last_error"`
+	SuccessCount      int64      `json:"success_count"`
+	ErrorCount        int64      `json:"error_count"`
+	ConsecutiveErrors int        `json:"consecutive_errors"`
+	Paused            bool       `json:"paused"`
+	Running           bool       `json:"running"`
 }
 
 type Registry struct {
@@ -291,9 +292,17 @@ func (r *Registry) runTask(ctx context.Context, entry *TaskEntry) error {
 	if err != nil {
 		entry.LastError = err.Error()
 		entry.ErrorCount++
+		entry.ConsecutiveErrors++
+		if entry.ConsecutiveErrors >= 5 && entry.ConsecutiveErrors%5 == 0 {
+			r.logger.Warn("task consecutive failures threshold reached",
+				zap.String("task", entry.Name),
+				zap.Int("consecutive_errors", entry.ConsecutiveErrors),
+				zap.String("last_error", entry.LastError))
+		}
 	} else {
 		entry.LastError = ""
 		entry.SuccessCount++
+		entry.ConsecutiveErrors = 0
 	}
 	r.statsMu.Unlock()
 
