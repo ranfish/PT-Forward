@@ -309,7 +309,9 @@ func (h *SystemHandler) handleListAuditLogs(w http.ResponseWriter, r *http.Reque
 	}
 
 	var total int64
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var logs []model.OperationAuditLog
 	if err := query.Order("created_at DESC").Offset((page - 1) * size).Limit(size).Find(&logs).Error; err != nil {

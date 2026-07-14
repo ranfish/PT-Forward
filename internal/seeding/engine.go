@@ -508,8 +508,10 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 // noise from non-seeding clients with many torrents. It only logs, never creates records.
 func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
 	var configCount int64
-	e.db.WithContext(ctx).Model(&model.SeedingClientConfig{}).
-		Where("client_id = ? AND enabled = ?", clientID, true).Count(&configCount)
+	if err := e.db.WithContext(ctx).Model(&model.SeedingClientConfig{}).
+		Where("client_id = ? AND enabled = ?", clientID, true).Count(&configCount).Error; err != nil {
+		return
+	}
 	if configCount == 0 {
 		return
 	}

@@ -104,7 +104,10 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 	clientIDStr := r.URL.Query().Get("client_id")
 	if clientIDStr == "" {
 		var clients []model.ClientConfig
-		h.db.Where("enabled = ?", true).Find(&clients)
+		if err := h.db.Where("enabled = ?", true).Find(&clients).Error; err != nil {
+			h.logger.Warn("query failed", zap.Error(err))
+		}
+
 		if len(clients) == 0 {
 			Success(w, map[string]interface{}{"items": []interface{}{}, "total": 0})
 			return
@@ -140,7 +143,9 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 	}
 
 	var totalSites int64
-	h.db.Model(&model.Site{}).Where("enabled = ? AND is_target = ?", true, true).Count(&totalSites)
+	if err := h.db.Model(&model.Site{}).Where("enabled = ? AND is_target = ?", true, true).Count(&totalSites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	infoHashes := make([]string, 0, len(torrents))
 	for _, t := range torrents {
@@ -408,7 +413,9 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 	cached, _ := h.coverage.GetCachedCoverage(ctx, req.InfoHash)
 
 	var totalSites int64
-	h.db.Model(&model.Site{}).Where("enabled = ? AND is_target = ?", true, true).Count(&totalSites)
+	if err := h.db.Model(&model.Site{}).Where("enabled = ? AND is_target = ?", true, true).Count(&totalSites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	hasCount := 0
 	for _, r := range cached {
@@ -492,7 +499,9 @@ func (h *PublishTorrentsHandler) queryNameSizeSites(ctx context.Context, infoHas
 	if len(coveredSites) > 0 {
 		query = query.Where("name NOT IN ?", coveredSites)
 	}
-	query.Find(&sites)
+	if err := query.Find(&sites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	now := time.Now()
 	ttl := now.Add(24 * time.Hour)
@@ -563,7 +572,9 @@ func extractSearchKeyword(name string) string {
 func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
 	h.logger.Info("scheduled coverage refresh started")
 	var clients []model.ClientConfig
-	h.db.WithContext(ctx).Where("enabled = ?", true).Find(&clients)
+	if err := h.db.WithContext(ctx).Where("enabled = ?", true).Find(&clients).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	for _, cfg := range clients {
 		client, err := h.clientMgr.Get(cfg.Name)
@@ -659,7 +670,9 @@ func (h *PublishTorrentsHandler) batchPiecesHashQuery(ctx context.Context, items
 
 	// 获取全部目标站点
 	var sites []model.Site
-	h.db.WithContext(ctx).Where("enabled = ? AND is_target = ?", true, true).Find(&sites)
+	if err := h.db.WithContext(ctx).Where("enabled = ? AND is_target = ?", true, true).Find(&sites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	now := time.Now()
 	ttl := now.Add(24 * time.Hour)
@@ -840,7 +853,10 @@ func (h *PublishTorrentsHandler) handleDetectSource(w http.ResponseWriter, r *ht
 		for name := range siteMap {
 			siteNames = append(siteNames, name)
 		}
-		h.db.Where("name IN ?", siteNames).Find(&sites)
+		if err := h.db.Where("name IN ?", siteNames).Find(&sites).Error; err != nil {
+			h.logger.Warn("query failed", zap.Error(err))
+		}
+
 		for _, site := range sites {
 			candidates = append(candidates, candidate{
 				SiteName:  site.Name,
@@ -862,10 +878,15 @@ func (h *PublishTorrentsHandler) handleDetectSource(w http.ResponseWriter, r *ht
 
 func (h *PublishTorrentsHandler) handleListGroupMappings(w http.ResponseWriter, r *http.Request) {
 	var mappings []model.ReleaseGroupMapping
-	h.db.WithContext(r.Context()).Order("group_name ASC").Find(&mappings)
+	if err := h.db.WithContext(r.Context()).Order("group_name ASC").Find(&mappings).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var sites []model.Site
-	h.db.WithContext(r.Context()).Where("enabled = ?", true).Find(&sites)
+	if err := h.db.WithContext(r.Context()).Where("enabled = ?", true).Find(&sites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	siteMap := make(map[string]string)
 	for _, s := range sites {
 		siteMap[strings.ToLower(s.Domain)] = s.Name
@@ -1159,7 +1180,10 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 
 	// 查排除规则
 	var exclusions []model.PublishExclusion
-	h.db.Find(&exclusions)
+	if err := h.db.Find(&exclusions).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	blockedTargets := []string{}
 	for _, exc := range exclusions {
 		if exc.SourceSite == req.SourceSite {

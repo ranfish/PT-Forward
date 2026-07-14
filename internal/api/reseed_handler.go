@@ -476,7 +476,9 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	}
 
 	var total int64
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	allowedOrders := map[string]bool{
 		"created_at": true, "status": true, "target_site": true, "source_site": true,
@@ -493,7 +495,9 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 	}
 
 	var matches []model.ReseedMatch
-	query.Order(orderClause).Offset((page - 1) * pageSize).Limit(pageSize).Find(&matches)
+	if err := query.Order(orderClause).Offset((page - 1) * pageSize).Limit(pageSize).Find(&matches).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	type siteBrief struct {
 		BaseURL   string
@@ -542,9 +546,15 @@ func (h *ReseedHandler) handleListFeatureLogs(w http.ResponseWriter, r *http.Req
 	}
 	query := h.engine.DB().Model(&model.ReseedFeatureLog{}).Where("task_id = ?", taskID)
 	var total int64
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	var logs []model.ReseedFeatureLog
-	query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs)
+	if err := query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	type featureStats struct {
 		TotalCalls   int64
 		TotalQueried int64
@@ -581,10 +591,14 @@ func (h *ReseedHandler) handleListIYUULogs(w http.ResponseWriter, r *http.Reques
 	query := h.engine.DB().Model(&model.ReseedIYUULog{}).Where("task_id = ?", taskID)
 
 	var total int64
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var logs []model.ReseedIYUULog
-	query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs)
+	if err := query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	type iyuuLogStats struct {
 		TotalCalls    int64
@@ -761,9 +775,15 @@ func (h *ReseedHandler) handleNegativeCache(w http.ResponseWriter, r *http.Reque
 		}
 		query := h.engine.DB().Model(&model.ReseedNegativeCache{})
 		var total int64
-		query.Count(&total)
+		if err := query.Count(&total).Error; err != nil {
+			h.logger.Warn("query failed", zap.Error(err))
+		}
+
 		var items []model.ReseedNegativeCache
-		query.Order("expires_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&items)
+		if err := query.Order("expires_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&items).Error; err != nil {
+			h.logger.Warn("query failed", zap.Error(err))
+		}
+
 		Success(w, map[string]interface{}{
 			"items":    items,
 			"total":    total,

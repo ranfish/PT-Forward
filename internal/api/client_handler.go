@@ -121,7 +121,9 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	light := r.URL.Query().Get("light") == "true"
 
 	var total int64
-	h.db.Model(&model.ClientConfig{}).Count(&total)
+	if err := h.db.Model(&model.ClientConfig{}).Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var clients []model.ClientConfig
 	h.db.

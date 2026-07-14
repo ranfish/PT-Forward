@@ -64,7 +64,9 @@ func (h *TrackerHandler) handleListMembers(w http.ResponseWriter, r *http.Reques
 	}
 
 	var total int64
-	q.Count(&total)
+	if err := q.Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var members []model.PublishGroupMember
 	if err := q.Order("created_at DESC").Limit(100).Find(&members).Error; err != nil {
@@ -111,7 +113,9 @@ func (h *TrackerHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 	}
 
 	var total int64
-	q.Count(&total)
+	if err := q.Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var histories []model.PublishGroupStatusHistory
 	if err := q.Order("created_at DESC").Limit(100).Find(&histories).Error; err != nil {
@@ -215,7 +219,9 @@ func (h *LifecycleHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Req
 
 func (h *LifecycleHandler) handleBackpressure(w http.ResponseWriter, _ *http.Request) {
 	var activePublishes int64
-	h.db.Model(&model.PublishCandidate{}).Where("publish_status = ?", "publishing").Count(&activePublishes)
+	if err := h.db.Model(&model.PublishCandidate{}).Where("publish_status = ?", "publishing").Count(&activePublishes).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	maxConcurrent := int64(5)
 	if val, err := h.getSettingFromDB("lifecycle.max_concurrent_publishes"); err == nil && val != "" {

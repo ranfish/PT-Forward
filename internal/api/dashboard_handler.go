@@ -194,7 +194,9 @@ func (h *DashboardHandler) handleActivities(w http.ResponseWriter, r *http.Reque
 	}
 
 	var total int64
-	h.db.Model(&model.RSSTorrentSeen{}).Count(&total)
+	if err := h.db.Model(&model.RSSTorrentSeen{}).Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var seen []model.RSSTorrentSeen
 	offset := int((page - 1) * size)
@@ -223,7 +225,10 @@ func (h *DashboardHandler) handleActivities(w http.ResponseWriter, r *http.Reque
 		Framework string
 	}
 	var sites []model.Site
-	h.db.Select("name, base_url, framework").Find(&sites)
+	if err := h.db.Select("name, base_url, framework").Find(&sites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	siteMap := make(map[string]siteInfo, len(sites))
 	for _, s := range sites {
 		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
@@ -365,7 +370,10 @@ func (h *DashboardHandler) handleTorrentEvents(w http.ResponseWriter, r *http.Re
 		if site := r.URL.Query().Get("site"); site != "" {
 			q = q.Where("site_name = ?", site)
 		}
-		q.Count(&total)
+		if err := q.Count(&total).Error; err != nil {
+			h.logger.Warn("query failed", zap.Error(err))
+		}
+
 		if err := q.Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "查询种子事件总数失败")
 			return
@@ -547,7 +555,9 @@ func (h *DashboardHandler) handleSeedingMonitor(w http.ResponseWriter, r *http.R
 	}
 
 	var rssLogs []model.RSSFetchLog
-	h.db.WithContext(ctx).Order("created_at DESC").Limit(5).Find(&rssLogs)
+	if err := h.db.WithContext(ctx).Order("created_at DESC").Limit(5).Find(&rssLogs).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var deletedToday int64
 	today := time.Now().Truncate(24 * time.Hour)
@@ -574,7 +584,9 @@ func (h *DashboardHandler) handleReseedMonitor(w http.ResponseWriter, r *http.Re
 	}
 
 	var activeTasks []model.ReseedTask
-	h.db.WithContext(ctx).Where("enabled = ? AND status IN ?", true, []string{"idle", "running"}).Find(&activeTasks)
+	if err := h.db.WithContext(ctx).Where("enabled = ? AND status IN ?", true, []string{"idle", "running"}).Find(&activeTasks).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	Success(w, map[string]interface{}{
 		"by_status":    byStatus,
@@ -596,7 +608,9 @@ func (h *DashboardHandler) handlePublishMonitor(w http.ResponseWriter, r *http.R
 
 	today := time.Now().Truncate(24 * time.Hour)
 	var resultsToday []model.PublishResultRecord
-	h.db.WithContext(ctx).Where("created_at >= ?", today).Order("created_at DESC").Limit(10).Find(&resultsToday)
+	if err := h.db.WithContext(ctx).Where("created_at >= ?", today).Order("created_at DESC").Limit(10).Find(&resultsToday).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	Success(w, map[string]interface{}{
 		"by_status":     byStatus,

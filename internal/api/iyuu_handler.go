@@ -154,7 +154,10 @@ func (h *IYUUHandler) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	var mappings []model.IYUUSiteMapping
-	h.db.Find(&mappings)
+	if err := h.db.Find(&mappings).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	domains := make([]string, 0, len(mappings))
 	for _, m := range mappings {
 		d := strings.TrimPrefix(m.SiteDomain, "https://")

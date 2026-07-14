@@ -577,7 +577,10 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 		Framework string
 	}
 	var sites []model.Site
-	h.db.Select("name, base_url, framework").Find(&sites)
+	if err := h.db.Select("name, base_url, framework").Find(&sites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	siteMap := make(map[string]siteInfo, len(sites))
 	for _, s := range sites {
 		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
@@ -819,7 +822,10 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 		Framework string
 	}
 	var sites []model.Site
-	h.db.Select("name, base_url, framework").Find(&sites)
+	if err := h.db.Select("name, base_url, framework").Find(&sites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	siteMap := make(map[string]siteInfo, len(sites))
 	for _, s := range sites {
 		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
@@ -1009,7 +1015,10 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 		Framework string
 	}
 	var siteList []model.Site
-	h.db.Select("name, base_url, framework").Find(&siteList)
+	if err := h.db.Select("name, base_url, framework").Find(&siteList).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	siteMap := make(map[string]siteInfo, len(siteList))
 	for _, s := range siteList {
 		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
@@ -1468,7 +1477,10 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 	}
 	siteMap := map[string]siteInfo{}
 	var siteList []model.Site
-	h.db.Select("name, base_url, framework").Find(&siteList)
+	if err := h.db.Select("name, base_url, framework").Find(&siteList).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	for _, s := range siteList {
 		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}
 	}
@@ -1728,7 +1740,10 @@ func (h *SeedingHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 		Framework string
 	}
 	var sites []model.Site
-	h.db.Select("name, base_url, framework").Find(&sites)
+	if err := h.db.Select("name, base_url, framework").Find(&sites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	siteMap := make(map[string]siteInfo, len(sites))
 	for _, s := range sites {
 		siteMap[s.Name] = siteInfo{BaseURL: s.BaseURL, Framework: s.Framework}

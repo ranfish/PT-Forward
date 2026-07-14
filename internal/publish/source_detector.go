@@ -6,17 +6,19 @@ import (
 	"sync"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 type SourceSiteDetector struct {
-	db    *gorm.DB
-	cache map[string]string // group_name → site_name
-	mu    sync.RWMutex
+	db     *gorm.DB
+	logger *zap.Logger
+	cache  map[string]string // group_name → site_name
+	mu     sync.RWMutex
 }
 
-func NewSourceSiteDetector(db *gorm.DB) *SourceSiteDetector {
-	return &SourceSiteDetector{db: db, cache: make(map[string]string)}
+func NewSourceSiteDetector(db *gorm.DB, logger *zap.Logger) *SourceSiteDetector {
+	return &SourceSiteDetector{db: db, logger: logger, cache: make(map[string]string)}
 }
 
 // ExtractGroupName 从标题末尾提取制作组名
@@ -85,7 +87,9 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 	}
 	if len(siteMap) > 0 {
 		var sites []model.Site
-		d.db.WithContext(ctx).Where("enabled = ? AND is_source = ?", true, true).Find(&sites)
+		if err := d.db.WithContext(ctx).Where("enabled = ? AND is_source = ?", true, true).Find(&sites).Error; err != nil {
+			return result
+		}
 		for _, site := range sites {
 			if c, ok := siteMap[site.Name]; ok {
 				if site.Cookie != "" {
@@ -158,7 +162,9 @@ func (d *SourceSiteDetector) lookupGroup(ctx context.Context, groupName string) 
 
 func (d *SourceSiteDetector) RefreshCache(ctx context.Context) {
 	var mappings []model.ReleaseGroupMapping
-	d.db.WithContext(ctx).Find(&mappings)
+	if err := d.db.WithContext(ctx).Find(&mappings).Error; err != nil {
+		d.logger.Warn("query group mappings failed", zap.Error(err))
+	}
 
 	d.mu.Lock()
 	defer d.mu.Unlock()

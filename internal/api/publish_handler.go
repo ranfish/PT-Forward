@@ -415,7 +415,9 @@ func (h *PublishHandler) handleListGroups(w http.ResponseWriter, r *http.Request
 	}
 
 	var total int64
-	q.Count(&total)
+	if err := q.Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var groups []model.PublishGroup
 	if err := q.Session(&gorm.Session{}).Order("created_at DESC").Limit(100).Find(&groups).Error; err != nil {

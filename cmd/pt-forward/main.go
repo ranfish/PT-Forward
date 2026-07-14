@@ -376,7 +376,7 @@ func main() {
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
-	sourceDetector := publish.NewSourceSiteDetector(db)
+	sourceDetector := publish.NewSourceSiteDetector(db, log)
 	sourceDetector.RefreshCache(context.Background())
 	router.SetupPublishTorrents(coverageSvc, clientManager, sourceDetector)
 	if err := router.StartCoverageRefresh(taskRegistry); err != nil {

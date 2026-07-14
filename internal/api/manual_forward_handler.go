@@ -109,7 +109,10 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 	clientIDStr := r.URL.Query().Get("client_id")
 	if clientIDStr == "" {
 		var clients []model.ClientConfig
-		h.db.Where("enabled = ?", true).Find(&clients)
+		if err := h.db.Where("enabled = ?", true).Find(&clients).Error; err != nil {
+			h.logger.Warn("query failed", zap.Error(err))
+		}
+
 		if len(clients) == 0 {
 			Success(w, []interface{}{})
 			return
@@ -269,7 +272,10 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	}
 
 	var sites []model.Site
-	h.db.Where("enabled = ? AND is_source = ?", true, true).Find(&sites)
+	if err := h.db.Where("enabled = ? AND is_source = ?", true, true).Find(&sites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	sourceSite := ""
 	for _, s := range sites {
 		result["source_site"] = s.Name
@@ -279,7 +285,10 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	}
 
 	var exclusions []model.PublishExclusion
-	h.db.Find(&exclusions)
+	if err := h.db.Find(&exclusions).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+
 	blockedTargets := []string{}
 	for _, exc := range exclusions {
 		if exc.SourceSite == sourceSite {
@@ -425,7 +434,9 @@ func (h *ManualForwardHandler) handleEligibleTargets(w http.ResponseWriter, r *h
 	}
 
 	var sites []model.Site
-	h.db.Where("enabled = ? AND is_target = ?", true, true).Find(&sites)
+	if err := h.db.Where("enabled = ? AND is_target = ?", true, true).Find(&sites).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	blockedSet := map[string]bool{}
 	for _, t := range req.BlockedTargets {
