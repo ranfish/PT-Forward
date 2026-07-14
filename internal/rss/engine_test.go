@@ -500,9 +500,17 @@ func TestEngine_FetchOnce_HappyPath(t *testing.T) {
 	require.Equal(t, int64(4700000000), dispatched[0].Size)
 	require.Equal(t, "testsit", dispatched[0].SiteName)
 
+	// After fetchOnce, status is "seen" (not yet "pushed"), so IsSeen should be false
+	// (IsSeen only returns true for status="pushed" or "blocked")
 	isSeen, err := eng.repo.IsSeen(context.Background(), "testsit", "501")
 	require.NoError(t, err)
-	require.True(t, isSeen)
+	require.False(t, isSeen, "status=seen should not be considered seen yet")
+
+	// Simulate pushed status
+	eng.repo.MarkStatus(context.Background(), "testsit", "501", "pushed")
+	isSeen2, err := eng.repo.IsSeen(context.Background(), "testsit", "501")
+	require.NoError(t, err)
+	require.True(t, isSeen2, "status=pushed should be considered seen")
 }
 
 func TestEngine_FetchOnce_AlreadySeen(t *testing.T) {
@@ -820,7 +828,7 @@ func TestEngine_FetchOnce_NoDispatcher(t *testing.T) {
 
 	isSeen, err := eng.repo.IsSeen(context.Background(), "testsit", "401")
 	require.NoError(t, err)
-	require.True(t, isSeen)
+	require.False(t, isSeen, "status=seen should not be IsSeen=true until pushed")
 }
 
 func TestEngine_FetchOnce_FreeTorrent(t *testing.T) {

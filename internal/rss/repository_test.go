@@ -139,7 +139,7 @@ func TestRepository_MarkSeen_AndIsSeen(t *testing.T) {
 		TorrentID:      "42",
 		SubscriptionID: "1",
 		Title:          "Test",
-		Status:         "seen",
+		Status:         "pushed",
 	}
 	if err := repo.MarkSeen(ctx, seen); err != nil {
 		t.Fatal(err)
@@ -156,6 +156,38 @@ func TestRepository_MarkSeen_AndIsSeen(t *testing.T) {
 	isSeen2, _ := repo.IsSeen(ctx, "example", "99")
 	if isSeen2 {
 		t.Error("should not be seen")
+	}
+
+	// status="seen" should NOT be considered seen (waiting for push)
+	seenWaiting := &model.RSSTorrentSeen{
+		SiteName:       "example",
+		TorrentID:      "43",
+		SubscriptionID: "1",
+		Title:          "Waiting",
+		Status:         "seen",
+	}
+	if err := repo.MarkSeen(ctx, seenWaiting); err != nil {
+		t.Fatal(err)
+	}
+	isSeen3, _ := repo.IsSeen(ctx, "example", "43")
+	if isSeen3 {
+		t.Error("status=seen should not be considered seen (waiting for push)")
+	}
+
+	// status="blocked" should be considered seen (compliance blocked)
+	blockedSeen := &model.RSSTorrentSeen{
+		SiteName:       "example",
+		TorrentID:      "44",
+		SubscriptionID: "1",
+		Title:          "Blocked",
+		Status:         "blocked",
+	}
+	if err := repo.MarkSeen(ctx, blockedSeen); err != nil {
+		t.Fatal(err)
+	}
+	isSeen4, _ := repo.IsSeen(ctx, "example", "44")
+	if !isSeen4 {
+		t.Error("status=blocked should be considered seen")
 	}
 }
 
