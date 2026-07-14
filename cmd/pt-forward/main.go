@@ -489,6 +489,9 @@ func main() {
 		log.Warn("seeding engine start warning", zap.Error(err))
 	}
 
+	eventBus.Register(seedingEngine)
+	eventBus.Register(publishPipeline)
+
 	if err := rssEngine.Start(ctx); err != nil {
 		log.Warn("rss engine start warning", zap.Error(err))
 	}
