@@ -56,16 +56,23 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 		return result, nil
 	}
 
-	if g.mediaInfoAnalyzer.Available() {
-		mi, err := g.mediaInfoAnalyzer.Analyze(ctx, videoPath)
-		if err != nil {
-			g.logger.Warn("local mediainfo failed", zap.Error(err))
-		} else if mi != nil {
-			result.MediaInfoText = mi.RawOutput
-		}
+	// MediaInfo analysis 与截图并行（V: 产物并行生成）
+	type miResult struct {
+		text string
+		err  error
 	}
-	if result.MediaInfoText == "" {
-		result.MediaInfoText = sourceMediaInfo
+	miCh := make(chan miResult, 1)
+	if g.mediaInfoAnalyzer.Available() {
+		go func() {
+			mi, err := g.mediaInfoAnalyzer.Analyze(ctx, videoPath)
+			text := ""
+			if err == nil && mi != nil {
+				text = mi.RawOutput
+			}
+			miCh <- miResult{text: text, err: err}
+		}()
+	} else {
+		miCh <- miResult{}
 	}
 
 	validSourceShots := g.validateScreenshots(ctx, sourceScreenshots)
@@ -97,6 +104,16 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 
 	if len(result.ScreenshotURLs) == 0 {
 		result.ScreenshotURLs = sourceScreenshots
+	}
+
+	// 等待 MediaInfo 完成
+	miRes := <-miCh
+	if miRes.err != nil {
+		g.logger.Warn("local mediainfo failed", zap.Error(miRes.err))
+	}
+	result.MediaInfoText = miRes.text
+	if result.MediaInfoText == "" {
+		result.MediaInfoText = sourceMediaInfo
 	}
 
 	return result, nil
