@@ -160,13 +160,13 @@ func MatchConditionExport(cond model.RuleCondition, ctx *EvalContext) bool {
 		if err != nil {
 			return false
 		}
-		return matchRegexWithTimeout(re, actual)
+		return matchRegexSafe(re, actual)
 	case model.CompareNotRegExp:
 		re, err := compileRegex(cond.Value)
 		if err != nil {
 			return false
 		}
-		return !matchRegexWithTimeout(re, actual)
+		return !matchRegexSafe(re, actual)
 	case model.CompareIncludeIn:
 		values := strings.Split(cond.Value, ",")
 		for _, v := range values {
@@ -226,6 +226,8 @@ func compareNumbers(a, b string) int {
 	return 0
 }
 
-func matchRegexWithTimeout(re *regexp.Regexp, s string) bool {
+// matchRegexSafe uses Go's RE2-based regexp engine which guarantees
+// linear-time matching and is immune to catastrophic backtracking (ReDoS).
+func matchRegexSafe(re *regexp.Regexp, s string) bool {
 	return re.MatchString(s)
 }
