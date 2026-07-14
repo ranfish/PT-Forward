@@ -2,6 +2,8 @@ package seeding
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
 
@@ -69,29 +71,15 @@ func (e *Engine) consumeLoop(ctx context.Context) {
 }
 
 func (e *Engine) scoreAndPush(ctx context.Context, events []*pusher.PushedEvent) {
-	bySub := make(map[string][]*pendingCandidate)
+	byClient := make(map[string][]*pendingCandidate)
 	for _, ev := range events {
-		subID := ""
-		if ev.TorrentID != "" {
-			var sub model.RSSSubscription
-			if err := e.db.WithContext(ctx).
-				Joins("JOIN rss_torrent_seen ON rss_torrent_seen.subscription_id = CAST(rss_subscriptions.id AS TEXT)").
-				Where("rss_torrent_seen.site_name = ? AND rss_torrent_seen.torrent_id = ?", ev.SiteName, ev.TorrentID).
-				First(&sub).Error; err == nil {
-				subID = sub.ClientID
-			}
-		}
-		key := ev.ClientID
-		if subID != "" {
-			key = subID
-		}
-		bySub[key] = append(bySub[key], &pendingCandidate{
+		byClient[ev.ClientID] = append(byClient[ev.ClientID], &pendingCandidate{
 			Event:     ev,
 			CreatedAt: ev.PushedAt,
 		})
 	}
 
-	for clientID, candidates := range bySub {
+	for clientID, candidates := range byClient {
 		e.scoreAndPushForClient(ctx, clientID, candidates)
 	}
 }
@@ -125,9 +113,10 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID string, can
 		return
 	}
 
-	for _, c := range candidates {
-		c.Score = e.calculateEventScore(ctx, c.Event)
-	}
+	scoringCfg := e.loadScoringConfig(ctx, candidates[0].Event.SubscriptionID)
+	siteWeights := e.parseSiteWeights(scoringCfg.SiteWeightsJSON)
+
+	e.scoreCandidatesFull(ctx, candidates, scoringCfg, siteWeights)
 
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].Score > candidates[j].Score
@@ -138,11 +127,16 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID string, can
 		topN = len(candidates)
 	}
 
-	for i := 0; i < topN; i++ {
+	pushed := 0
+	for i := 0; i < topN && pushed < remaining; i++ {
 		c := candidates[i]
-		if e.pusher == nil {
-			e.logger.Warn("scoreAndPush: pusher not configured")
-			return
+
+		if scoringCfg.Enabled && c.Score < scoringCfg.MinScore {
+			e.logger.Debug("scoreAndPush: candidate below min score, skipping",
+				zap.String("info_hash", c.Event.InfoHash),
+				zap.Float64("score", c.Score),
+				zap.Float64("min_score", scoringCfg.MinScore))
+			continue
 		}
 
 		key := recordKey(clientID, c.Event.InfoHash)
@@ -153,16 +147,9 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID string, can
 			continue
 		}
 
-		req := &pusher.PushRequest{
-			ClientID:    clientID,
-			SiteName:    c.Event.SiteName,
-			TorrentID:   c.Event.TorrentID,
-			InfoHash:    c.Event.InfoHash,
-			Title:       c.Event.Title,
-			HasHR:       c.Event.HasHR,
-			Discount:    c.Event.Discount,
-			IsFree:      c.Event.IsFree,
-			FreeEndAt:   c.Event.FreeEndAt,
+		req := e.buildPushRequest(ctx, clientID, c.Event)
+		if req == nil {
+			continue
 		}
 
 		result := e.pusher.Push(ctx, req)
@@ -171,42 +158,171 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID string, can
 				e.logger.Warn("scoreAndPush: push failed",
 					zap.String("client_id", clientID),
 					zap.String("info_hash", c.Event.InfoHash),
+					zap.Float64("score", c.Score),
 					zap.Error(result.Error))
 			}
 			continue
 		}
 
 		e.createRecordFromPush(ctx, clientID, c.Event, result.InfoHash)
+		pushed++
 	}
+
+	e.logger.Info("scoreAndPush: batch complete",
+		zap.String("client_id", clientID),
+		zap.Int("candidates", len(candidates)),
+		zap.Int("pushed", pushed),
+		zap.Int("remaining_capacity", remaining-pushed))
 }
 
-func (e *Engine) calculateEventScore(ctx context.Context, event *pusher.PushedEvent) float64 {
-	score := 1.0
-
-	if event.IsFree {
-		score += 50
-	}
-	if event.HasHR {
-		score -= 30
-	}
-
-	if event.Size > 0 {
-		if event.Size < 5*1024*1024*1024 {
-			score += 20
-		} else if event.Size > 50*1024*1024*1024 {
-			score -= 20
+func (e *Engine) scoreCandidatesFull(ctx context.Context, candidates []*pendingCandidate, scoringCfg model.SeedingScoringConfig, siteWeights map[string]float64) {
+	if !scoringCfg.Enabled {
+		for _, c := range candidates {
+			c.Score = 1.0
 		}
+		return
 	}
 
-	if e.siteProvider != nil && event.SiteName != "" {
-		if siteInfo, err := e.siteProvider.GetSiteInfo(ctx, event.SiteName); err == nil && siteInfo != nil {
-			if siteInfo.AssumeFree {
-				score += 10
+	needSLData := false
+	if scoringCfg.Enabled {
+		for _, c := range candidates {
+			if !c.Event.IsFree && (c.Event.Discount == model.DiscountNone || c.Event.Discount == "") {
+				needSLData = true
+				break
 			}
 		}
 	}
 
-	return score
+	var slDataMap map[string]*model.SLData
+	if needSLData && e.siteProvider != nil {
+		siteGroups := make(map[string][]string)
+		for _, c := range candidates {
+			siteGroups[c.Event.SiteName] = append(siteGroups[c.Event.SiteName], c.Event.TorrentID)
+		}
+		slDataMap = make(map[string]*model.SLData)
+		for site, ids := range siteGroups {
+			adapter, err := e.siteProvider.GetAdapter(ctx, site)
+			if err != nil || adapter == nil {
+				continue
+			}
+			siteCfg, cfgErr := e.siteProvider.GetSiteConfig(ctx, site)
+			if cfgErr != nil || siteCfg == nil {
+				continue
+			}
+			slCtx, slCancel := context.WithTimeout(ctx, 15*time.Second)
+			batch, slErr := adapter.GetBatchSLData(slCtx, siteCfg, ids)
+			slCancel()
+			if slErr == nil && batch != nil {
+				for id, sl := range batch {
+					if sl != nil {
+						slDataMap[site+"|"+id] = sl
+					}
+				}
+			}
+		}
+	}
+
+	now := time.Now()
+	for _, c := range candidates {
+		ev := c.Event
+		seeders, leechers := 0, 0
+		if sl, ok := slDataMap[ev.SiteName+"|"+ev.TorrentID]; ok && sl != nil {
+			seeders = sl.Seeders
+			leechers = sl.Leechers
+		}
+
+		ageHours := 0.0
+		if !ev.PushedAt.IsZero() {
+			ageHours = now.Sub(ev.PushedAt).Hours()
+		}
+
+		discount := ev.Discount
+		if discount == "" {
+			discount = model.DiscountNone
+		}
+
+		siteWeight := 1.0
+		if w, ok := siteWeights[ev.SiteName]; ok && w > 0 {
+			siteWeight = w
+		}
+
+		input := ScoreInput{
+			Seeders:       seeders,
+			Leechers:      leechers,
+			AgeHours:      ageHours,
+			Size:          ev.Size,
+			Discount:      discount,
+			HalfLifeHours: scoringCfg.HalfLifeHours,
+			SiteWeight:    siteWeight,
+		}
+
+		result := CalculateScore(input)
+		c.Score = result.EffectiveScore
+	}
+}
+
+func (e *Engine) loadScoringConfig(ctx context.Context, subscriptionID string) model.SeedingScoringConfig {
+	if subscriptionID == "" {
+		return model.SeedingScoringConfig{Enabled: false, MaxActiveSeeding: 0}
+	}
+	var cfg model.SeedingScoringConfig
+	var sub model.RSSSubscription
+	if err := e.db.WithContext(ctx).Where("id = ?", subscriptionID).First(&sub).Error; err != nil {
+		return model.SeedingScoringConfig{Enabled: false}
+	}
+	if err := e.db.WithContext(ctx).Where("subscription_id = ?", subscriptionID).First(&cfg).Error; err != nil {
+		return model.SeedingScoringConfig{Enabled: false}
+	}
+	return cfg
+}
+
+func (e *Engine) parseSiteWeights(jsonStr string) map[string]float64 {
+	weights := make(map[string]float64)
+	if jsonStr == "" {
+		return weights
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &weights); err != nil {
+		return weights
+	}
+	return weights
+}
+
+func (e *Engine) buildPushRequest(ctx context.Context, clientID string, event *pusher.PushedEvent) *pusher.PushRequest {
+	req := &pusher.PushRequest{
+		ClientID:    clientID,
+		SiteName:    event.SiteName,
+		TorrentID:   event.TorrentID,
+		InfoHash:    event.InfoHash,
+		Title:       event.Title,
+		HasHR:       event.HasHR,
+		Discount:    event.Discount,
+		IsFree:      event.IsFree,
+		FreeEndAt:   event.FreeEndAt,
+	}
+
+	if event.SubscriptionID != "" {
+		var sub model.RSSSubscription
+		if err := e.db.WithContext(ctx).Where("id = ?", event.SubscriptionID).First(&sub).Error; err == nil {
+			req.SavePath = sub.SavePath
+			req.Category = sub.Category
+			if len(sub.Tags) > 0 {
+				tagsStr := ""
+				for i, t := range sub.Tags {
+					if i > 0 {
+						tagsStr += ","
+					}
+					tagsStr += t
+				}
+				req.Tags = tagsStr
+			}
+			req.AddPaused = sub.AddPaused
+			req.AutoTMM = sub.AutoTMM
+			req.UploadLimitKB = sub.UploadLimitKB
+			req.DownloadLimitKB = sub.DownloadLimitKB
+		}
+	}
+
+	return req
 }
 
 func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, event *pusher.PushedEvent, actualHash string) {
@@ -224,16 +340,17 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 	}
 
 	record := &model.SeedingTorrentRecord{
-		ClientID:    clientID,
-		SiteName:    event.SiteName,
-		TorrentID:   event.TorrentID,
-		InfoHash:    infoHash,
-		HasHR:       event.HasHR,
-		Source:      "rss",
-		Status:      model.SeedingStatusSeeding,
-		IsFree:      event.IsFree,
-		FreeEndAt:   event.FreeEndAt,
-		TorrentSize: event.Size,
+		ClientID:       clientID,
+		SiteName:       event.SiteName,
+		TorrentID:      event.TorrentID,
+		InfoHash:       infoHash,
+		HasHR:          event.HasHR,
+		Source:         "rss",
+		Status:         model.SeedingStatusSeeding,
+		IsFree:         event.IsFree,
+		FreeEndAt:      event.FreeEndAt,
+		TorrentSize:    event.Size,
+		SubscriptionID: event.SubscriptionID,
 	}
 	if event.Discount != "" {
 		record.Discount = event.Discount
@@ -289,6 +406,7 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 
 	e.logger.Debug("createRecordFromPush: record created",
 		zap.String("client_id", clientID),
-		zap.String("info_hash", infoHash),
-		zap.Float64("score", e.calculateEventScore(ctx, event)))
+		zap.String("info_hash", infoHash))
 }
+
+var _ = fmt.Sprintf

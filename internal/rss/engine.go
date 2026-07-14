@@ -947,36 +947,35 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				zap.String("matchedRule", derefStr(event.MatchedRule)))
 		}
 
-		if len(torrentEvents) > 0 && e.dispatcher != nil {
-			if err := e.dispatcher.Dispatch(ctx, "rss_new", torrentEvents); err != nil {
-				e.logger.Warn("dispatch events failed",
-					zap.String("subscription", sub.Name),
-					zap.Error(err))
-			}
-		}
-
 		if sub.Enabled && sub.ClientID != "" {
 			for i := range torrentEvents {
 				ev := &torrentEvents[i]
 				isFree := ev.Discount == model.DiscountFree || ev.Discount == model.Discount2xFree || ev.Discount == model.DiscountAssumeFree
 				if e.eventBus != nil {
 					e.eventBus.Publish(&pusher.PushedEvent{
-						ClientID:       sub.ClientID,
-						SiteName:       ev.SiteName,
-						TorrentID:      ev.TorrentID,
-						InfoHash:       ev.InfoHash,
-						Title:          ev.Title,
-						Size:           ev.Size,
-						Discount:       ev.Discount,
-						HasHR:          ev.HasHR,
-						IsFree:         isFree,
-						FreeEndAt:      ev.FreeEndAt,
-						AutoReseed:     sub.AutoReseed,
+						ClientID:        sub.ClientID,
+						SiteName:        ev.SiteName,
+						TorrentID:       ev.TorrentID,
+						InfoHash:        ev.InfoHash,
+						Title:           ev.Title,
+						Size:            ev.Size,
+						Discount:        ev.Discount,
+						HasHR:           ev.HasHR,
+						IsFree:          isFree,
+						FreeEndAt:       ev.FreeEndAt,
+						SubscriptionID:  uintToString(sub.ID),
+						AutoReseed:      sub.AutoReseed,
 						ReseedClientIDs: sub.ReseedClientIDs,
-						PushedAt:       time.Now(),
+						PushedAt:        time.Now(),
 					})
 				}
 				e.repo.MarkStatus(ctx, ev.SiteName, ev.TorrentID, "seen")
+			}
+		} else if len(torrentEvents) > 0 && e.dispatcher != nil {
+			if err := e.dispatcher.Dispatch(ctx, "rss_new", torrentEvents); err != nil {
+				e.logger.Warn("dispatch events failed",
+					zap.String("subscription", sub.Name),
+					zap.Error(err))
 			}
 		}
 
