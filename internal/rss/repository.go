@@ -72,7 +72,8 @@ func (r *Repository) MarkSeen(ctx context.Context, seen *model.RSSTorrentSeen) e
 func (r *Repository) IsSeen(ctx context.Context, siteName, torrentID string) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
-		Where("site_name = ? AND torrent_id = ?", siteName, torrentID).
+		Where("site_name = ? AND torrent_id = ? AND status IN ?", siteName, torrentID,
+			[]string{"pushed", "blocked"}).
 		Count(&count).Error
 	return count > 0, err
 }

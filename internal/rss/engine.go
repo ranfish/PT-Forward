@@ -848,7 +848,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				e.logger.Info("rss: compliance blocked, marking seen",
 					zap.String("title", event.Title),
 					zap.String("site", event.SiteName))
-				seen := &model.RSSTorrentSeen{
+				blockedSeen := &model.RSSTorrentSeen{
 					SiteName:       event.SiteName,
 					TorrentID:      event.TorrentID,
 					SubscriptionID: uintToString(sub.ID),
@@ -856,10 +856,10 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 					IsFakeHash:     isFakeHash(event.InfoHash) || event.InfoHash == "" || len(event.InfoHash) != 40,
 					Title:          event.Title,
 					Size:           event.Size,
-					Status:         "seen",
+					Status:         "blocked",
 					SourceCategory: event.Category,
 				}
-				_ = e.repo.MarkSeen(ctx, seen)
+				_ = e.repo.MarkSeen(ctx, blockedSeen)
 				continue
 			}
 
