@@ -134,6 +134,7 @@
             <a-button type="link" size="small" @click="openModal(record)">{{ t('common.edit') }}</a-button>
             <a-button type="link" size="small" :loading="syncingSingleId === record.id" @click="syncSingleStats(record.id)">{{ t('site.syncStats') }}</a-button>
             <a-button type="link" size="small" @click="testConnection(record.id)">{{ t('common.test') }}</a-button>
+            <a-button type="link" size="small" :loading="dlTestingId === record.id" @click="downloadTest(record.id)">下载测试</a-button>
             <a-popconfirm :title="t('common.deleteConfirm')" @confirm="deleteSite(record.id)">
               <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
             </a-popconfirm>
@@ -315,6 +316,7 @@ const submitting = ref(false)
 const syncing = ref(false)
 const batchSyncing = ref(false)
 const syncingSingleId = ref<number | null>(null)
+const dlTestingId = ref<number | null>(null)
 const exporting = ref(false)
 const importing = ref(false)
 const editingSite = ref<SiteListItem | null>(null)
@@ -603,6 +605,23 @@ async function testConnection(id: number) {
     }
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
+  }
+}
+
+async function downloadTest(id: number) {
+  dlTestingId.value = id
+  try {
+    const resp = await sitesApi.downloadTest(id)
+    const data = resp.data?.data
+    if (data?.success) {
+      message.success(`下载测试成功: ${data.info_hash?.substring(0, 12) || ''} (${data.size ? (data.size / 1024 / 1024).toFixed(1) + 'MB' : ''})`)
+    } else {
+      message.warning(data?.message || '下载测试失败')
+    }
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  } finally {
+    dlTestingId.value = null
   }
 }
 

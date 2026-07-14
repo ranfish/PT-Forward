@@ -20,6 +20,9 @@ export const sitesApi = {
   testConnection(id: number) {
     return client.post<ApiResponse<{ success: boolean; message?: string }>>(`/sites/${id}/test`)
   },
+  downloadTest(id: number) {
+    return client.post<ApiResponse<{ success: boolean; message?: string; info_hash?: string; size?: number }>>(`/sites/${id}/download-test`)
+  },
   detect(id: number) {
     return client.post<ApiResponse<{ framework: string; detail?: string }>>(`/sites/${id}/detect`)
   },
