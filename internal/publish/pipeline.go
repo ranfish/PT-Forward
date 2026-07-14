@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/audit"
+	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/metadata"
@@ -38,6 +39,7 @@ type Pipeline struct {
 	artifactGenerator *PublishArtifactGenerator
 	limitGuard        *PublishLimitGuard
 	declarationFilter *DeclarationFilter
+	complianceChecker *compliance.Checker
 	metadataFetcher   *metadata.Fetcher
 	imageHostStrategy string
 	imageHostMgr      *imagehost.Manager
@@ -70,6 +72,10 @@ func (p *Pipeline) SetPTGenEndpoints(endpoints string) {
 
 func (p *Pipeline) SetDeclarationFilter(df *DeclarationFilter) {
 	p.declarationFilter = df
+}
+
+func (p *Pipeline) SetComplianceChecker(c *compliance.Checker) {
+	p.complianceChecker = c
 }
 
 func (p *Pipeline) SetMetadataFetcher(f *metadata.Fetcher) {
@@ -1024,8 +1030,13 @@ func (p *Pipeline) checkForbiddenContent(texts []string) (bool, string) {
 }
 
 func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model.PublishCandidate, targetSite string) (bool, string) {
-	// 1. 硬编码安全检查（始终运行，不可关闭）
-	if eligible, reason := p.checkForbiddenContent([]string{candidate.TorrentName}); !eligible {
+	// 1. 合规检查（compliance.Checker 优先，含成人/禁转/小组/用户关键词/站点黑名单）
+	if p.complianceChecker != nil {
+		result := p.complianceChecker.CheckWithSite(ctx, candidate.TorrentName, candidate.SourceSite)
+		if !result.Passed {
+			return false, fmt.Sprintf("compliance_blocked:%s — %s", result.Category, result.Reason)
+		}
+	} else if eligible, reason := p.checkForbiddenContent([]string{candidate.TorrentName}); !eligible {
 		return false, reason
 	}
 
@@ -1033,7 +1044,7 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 		return false, "源站种子存在 H&R (Hit and Run) 标记，跳过发布"
 	}
 
-	// 2. flags 检查（优先，来自 torrent_metadata）
+	// 2. flags 检查（来自 torrent_metadata）
 	if p.checkFlagsFromMetadata(ctx, candidate.InfoHash, candidate.SourceSite) {
 		return false, fmt.Sprintf("源站 flags 标记禁转/独占（torrent_metadata），跳过发布")
 	}
