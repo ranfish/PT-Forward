@@ -114,6 +114,8 @@ type DownloaderClient interface {
 	GetGlobalTransferStats(ctx context.Context) (*GlobalTransferStats, error)
 	GetTrackerMessages(ctx context.Context, hash string) (string, error)
 	GetTrackers(ctx context.Context, hash string) ([]string, error)
+
+	Close()
 }
 
 type DownloaderProvider interface {

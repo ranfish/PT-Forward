@@ -395,3 +395,5 @@ func (s *stubClient) GetTrackerMessages(_ context.Context, _ string) (string, er
 func (s *stubClient) GetTrackers(_ context.Context, _ string) ([]string, error) {
 	return nil, nil
 }
+
+func (s *stubClient) Close() {}
