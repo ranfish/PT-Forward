@@ -76,7 +76,6 @@ type Engine struct {
 	siteProvider   model.SiteInfoProvider
 	clientProvider model.DownloaderProvider
 	diskBudget     *DiskBudgetManager
-	seedingCounter model.SeedingCollector
 	eventBus       *pusher.EventBus
 	wsBroadcaster  event.WSBroadcaster
 	sideLoadMgr    *SideLoadManager
@@ -212,10 +211,6 @@ func (e *Engine) SetFilterEngine(fe *filter.Engine) {
 
 func (e *Engine) SetDispatcher(d *event.Dispatcher) {
 	e.dispatcher = d
-}
-
-func (e *Engine) SetSeedingCounter(sc model.SeedingCollector) {
-	e.seedingCounter = sc
 }
 
 func (e *Engine) SetEventBus(bus *pusher.EventBus) {

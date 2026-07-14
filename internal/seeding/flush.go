@@ -352,6 +352,9 @@ func (e *Engine) confirmTopN(ctx context.Context, candidates []*flushCandidate, 
 	}
 }
 
+// Deprecated: Flush is legacy code. Seeding Engine now uses consumeLoop
+// (EventBus → pendingEvents → scoreAndPush → Pusher.Push).
+// Kept for backward compatibility; not called in production.
 func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.SeedingCandidate, error) {
 	fc, err := e.buildFlushContext(ctx, subscriptionID)
 	if err != nil {
