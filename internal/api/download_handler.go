@@ -482,7 +482,10 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 	switch {
 	case rest == "" && r.Method == http.MethodGet:
 		var configs []model.DownloadClientConfig
-		h.db.WithContext(r.Context()).Order("client_id ASC").Find(&configs)
+		if err := h.db.WithContext(r.Context()).Order("client_id ASC").Find(&configs).Error; err != nil {
+			h.logger.Warn("query failed", zap.Error(err))
+		}
+
 		Success(w, configs)
 	case rest == "" && r.Method == http.MethodPost:
 		var req model.DownloadClientConfig

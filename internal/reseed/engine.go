@@ -437,7 +437,9 @@ func (e *Engine) preloadSites(ctx context.Context, targetSites, excludedSites []
 
 	if len(siteNames) > 0 {
 		var sites []model.Site
-		e.db.WithContext(ctx).Where("name IN ?", siteNames).Find(&sites)
+		if err := e.db.WithContext(ctx).Where("name IN ?", siteNames).Find(&sites).Error; err != nil {
+			e.logger.Warn("query sites for limits failed", zap.Error(err))
+		}
 		for i := range sites {
 			siteLimits[sites[i].Name] = &sites[i]
 		}
@@ -1221,7 +1223,9 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 
 	// 预加载 seeding_torrent_records 的 InfoHash→TorrentID 映射（关联源站数字种子ID）
 	var seedRecords []model.SeedingTorrentRecord
-	e.db.WithContext(ctx).Select("info_hash, torrent_id").Find(&seedRecords)
+		if err := e.db.WithContext(ctx).Select("info_hash, torrent_id").Find(&seedRecords).Error; err != nil {
+		e.logger.Warn("query seed records failed", zap.Error(err))
+	}
 	seedTorrentIDs := make(map[string]string, len(seedRecords))
 	for _, r := range seedRecords {
 		if r.InfoHash != "" && r.TorrentID != "" {

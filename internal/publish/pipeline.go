@@ -891,9 +891,15 @@ func (p *Pipeline) ListAllCandidates(ctx context.Context, page, pageSize int, st
 		like := "%" + search + "%"
 		q = q.Where("torrent_name LIKE ? OR source_site LIKE ? OR target_sites LIKE ?", like, like, like)
 	}
-	q.Count(&total)
+	if err := q.Count(&total).Error; err != nil {
+		p.logger.Warn("query failed", zap.Error(err))
+	}
+
 	var candidates []model.PublishCandidate
-	q.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&candidates)
+	if err := q.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&candidates).Error; err != nil {
+		p.logger.Warn("query failed", zap.Error(err))
+	}
+
 	return candidates, total, nil
 }
 
@@ -970,8 +976,14 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 	if targetSite != "" {
 		q = q.Where("target_site = ?", targetSite)
 	}
-	q.Count(&total)
-	q.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&results)
+	if err := q.Count(&total).Error; err != nil {
+		p.logger.Warn("query failed", zap.Error(err))
+	}
+
+	if err := q.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&results).Error; err != nil {
+		p.logger.Warn("query failed", zap.Error(err))
+	}
+
 	return results, total, nil
 }
 

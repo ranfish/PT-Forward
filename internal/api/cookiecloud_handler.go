@@ -202,7 +202,9 @@ func (h *CookieCloudHandler) handleListHistory(w http.ResponseWriter, r *http.Re
 	offset := (page - 1) * pageSize
 
 	var total int64
-	h.db.Model(&model.CookieCloudSyncHistory{}).Count(&total)
+	if err := h.db.Model(&model.CookieCloudSyncHistory{}).Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var histories []model.CookieCloudSyncHistory
 	if err := h.db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&histories).Error; err != nil {

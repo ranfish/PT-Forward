@@ -754,7 +754,9 @@ func (h *SiteHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var total int64
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
 
 	var sites []model.Site
 	query.Order("name ASC").
