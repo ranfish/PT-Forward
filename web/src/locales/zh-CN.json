@@ -486,7 +486,7 @@
     "automation": "自动化",
     "enableAutoPublish": "启用自动发布",
     "pushNotifyLabel": "推送通知",
-    "autoReseedLabel": "自动辅种",
+    "autoReseedLabel": "自动转移",
     "rssUrlPerLine": "每行一个 RSS 地址",
     "rssUrlPerLineShort": "每行一个 RSS URL",
     "cronExample": "如 */5 * * * *",
