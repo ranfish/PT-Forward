@@ -397,3 +397,11 @@ func buildMultipartBody(torrentData []byte, opts model.AddTorrentOptions) (*byte
 	}
 	return &buf, w.FormDataContentType(), nil
 }
+
+func (c *QBClient) Close() {
+	if c.client != nil && c.client.Transport != nil {
+		if tr, ok := c.client.Transport.(*http.Transport); ok {
+			tr.CloseIdleConnections()
+		}
+	}
+}

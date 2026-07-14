@@ -403,3 +403,5 @@ func TestParseIntSetting(t *testing.T) {
 		}
 	}
 }
+
+func (m *lifecycleMockDLClient) Close() {}

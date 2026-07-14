@@ -1322,3 +1322,5 @@ func TestFlush_DiskRecoverMaxActiveNoRecoverCandidates(t *testing.T) {
 		t.Errorf("expected 0 candidates when maxActive reached with no disk_recover, got %d", len(candidates))
 	}
 }
+
+func (m *flushMockClient) Close() {}

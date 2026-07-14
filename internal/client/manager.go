@@ -72,6 +72,9 @@ func (m *Manager) LoadClients(ctx context.Context) error {
 
 	for name := range m.clients {
 		if !activeIDs[name] {
+			if old, ok := m.clients[name]; ok {
+				old.Close()
+			}
 			delete(m.clients, name)
 		}
 	}

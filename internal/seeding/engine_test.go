@@ -1576,3 +1576,5 @@ func TestEngine_Reannounce_AllRetriesFail(t *testing.T) {
 		t.Errorf("expected 2 reannounce calls, got %d", mc.reannounceCalls)
 	}
 }
+
+func (m *mockDownloaderClient) Close() {}

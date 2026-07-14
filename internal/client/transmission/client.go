@@ -202,3 +202,11 @@ func buildTRLabels(category string, tags []string) []string {
 	}
 	return labels
 }
+
+func (c *TRClient) Close() {
+	if c.client != nil && c.client.Transport != nil {
+		if tr, ok := c.client.Transport.(*http.Transport); ok {
+			tr.CloseIdleConnections()
+		}
+	}
+}

@@ -247,3 +247,5 @@ func (p *DownloaderProvider) ListClients() []string {
 	}
 	return nil
 }
+
+func (m *DownloaderClient) Close() {}
