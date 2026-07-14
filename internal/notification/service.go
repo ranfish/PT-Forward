@@ -157,10 +157,33 @@ func (s *Service) Test(ctx context.Context) error {
 }
 
 func (s *Service) sendToChannel(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
-	timeout := s.channelTimeout(ch)
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	maxRetries := 2
 
+	var lastErr string
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(attempt*attempt) * time.Second
+			select {
+			case <-ctx.Done():
+				return false, "context canceled during retry"
+			case <-time.After(backoff):
+			}
+		}
+
+		timeout := s.channelTimeout(ch)
+		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
+		success, errMsg := s.sendToChannelOnce(attemptCtx, ch, msg)
+		cancel()
+
+		if success {
+			return true, ""
+		}
+		lastErr = errMsg
+	}
+	return false, lastErr
+}
+
+func (s *Service) sendToChannelOnce(ctx context.Context, ch *model.NotificationChannel, msg model.FormattedMessage) (bool, string) {
 	switch ch.Type {
 	case "telegram":
 		return s.sendTelegram(ctx, ch, msg)
@@ -173,7 +196,7 @@ func (s *Service) sendToChannel(ctx context.Context, ch *model.NotificationChann
 	case "dingtalk":
 		return s.sendDingTalk(ctx, ch, msg)
 	default:
-		return false, "不支持的通知类型: " + ch.Type
+		return false, "unsupported channel type: " + ch.Type
 	}
 }
 

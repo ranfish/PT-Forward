@@ -494,7 +494,7 @@ func TestScenario_F10_FailoverGroup(t *testing.T) {
 	}
 	_ = svc.Send(ctx, msg)
 
-	assert.Equal(t, int32(1), atomic.LoadInt32(&primaryCalled), "primary should be called once")
+	assert.Equal(t, int32(3), atomic.LoadInt32(&primaryCalled), "primary should be called 3 times (1 + 2 retries)")
 	assert.GreaterOrEqual(t, atomic.LoadInt32(&fallbackCalled), int32(1), "fallback should be called at least once")
 
 	var histories []model.NotificationHistory

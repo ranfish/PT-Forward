@@ -75,7 +75,9 @@ func (d *TorrentDispatcher) OnTorrents(ctx context.Context, events []model.Torre
 	for role, evts := range eventsByRole {
 		handler, ok := d.handlers[role]
 		if !ok {
-			d.logger.Debug("no handler registered for role", zap.String("role", string(role)))
+			d.logger.Warn("events dropped: no handler registered for role",
+				zap.String("role", string(role)),
+				zap.Int("event_count", len(evts)))
 			continue
 		}
 		if err := handler.OnTorrents(ctx, evts); err != nil {
