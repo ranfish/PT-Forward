@@ -41,20 +41,21 @@ type PushResult struct {
 }
 
 type PushedEvent struct {
-	ClientID       string
-	SiteName       string
-	TorrentID      string
-	InfoHash       string
-	Title          string
-	Size           int64
-	Role           string
-	Discount       model.DiscountLevel
-	HasHR          bool
-	IsFree         bool
-	FreeEndAt      *time.Time
-	AutoReseed     bool
+	ClientID        string
+	SiteName        string
+	TorrentID       string
+	InfoHash        string
+	Title           string
+	Size            int64
+	Role            string
+	Discount        model.DiscountLevel
+	HasHR           bool
+	IsFree          bool
+	FreeEndAt       *time.Time
+	SubscriptionID  string
+	AutoReseed      bool
 	ReseedClientIDs []string
-	PushedAt       time.Time
+	PushedAt        time.Time
 }
 
 type SiteProvider interface {
