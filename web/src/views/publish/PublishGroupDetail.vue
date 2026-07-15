@@ -46,6 +46,12 @@
                   {{ translatePublishStatus(record.status) }}
                 </a-tag>
               </template>
+              <template v-if="column.key === 'current_step'">
+                <a-tag v-if="stepProgress[record.id]" color="processing" style="font-size:11px">
+                  {{ stepProgress[record.id] }}
+                </a-tag>
+                <span v-else style="color:#999">-</span>
+              </template>
             </template>
           </a-table>
         </a-card>
@@ -55,19 +61,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
 import { formatTime, copyToClipboard } from '@/utils/format'
 import { useEnumLabels } from '@/utils/enumLabels'
+import { useWebSocketStore } from '@/stores/websocket'
 import type { PublishGroup } from '@/api/types'
 
 const route = useRoute()
 const groupId = Number(route.params.id)
 const { t } = useI18n()
 const { translatePublishStatus, translatePublishRole } = useEnumLabels()
+const wsStore = useWebSocketStore()
 
 function copyHash(text: string) {
   copyToClipboard(text)
@@ -88,6 +96,17 @@ const loading = ref(false)
 const membersLoading = ref(false)
 const group = ref<PublishGroup | null>(null)
 const members = ref<GroupMember[]>([])
+const stepProgress = ref<Record<number, string>>({})
+
+watch(() => wsStore.lastMessage, (msg) => {
+  if (!msg || msg.type !== 'publish.step_progress') return
+  const p = msg.payload as { member_id: number; step_name: string; status: string }
+  if (p.status === 'running') {
+    stepProgress.value[p.member_id] = p.step_name
+  } else {
+    delete stepProgress.value[p.member_id]
+  }
+})
 
 const memberColumns = [
   { title: t('common.site'), dataIndex: 'site_name', key: 'site_name', width: 120 },
@@ -95,8 +114,26 @@ const memberColumns = [
   { title: t('common.size'), dataIndex: 'size', key: 'size', width: 100 },
   { title: t('publish.columnRole'), dataIndex: 'role', key: 'role', width: 80, customRender: ({ text }: { text: string }) => translatePublishRole(text) },
   { title: t('common.status'), key: 'status', width: 100 },
+  { title: t('publish.currentStep'), key: 'current_step', width: 120 },
   { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
+
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+function startAutoRefresh() {
+  if (refreshTimer) return
+  refreshTimer = setInterval(() => {
+    if (group.value && (group.value.status === 'publishing' || group.value.status === 'active')) {
+      fetchMembers()
+    } else {
+      stopAutoRefresh()
+    }
+  }, 5000)
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
+}
 
 async function fetchGroup() {
   loading.value = true
@@ -155,5 +192,10 @@ async function lifecycleDeleteGroup() {
 onMounted(() => {
   fetchGroup()
   fetchMembers()
+  startAutoRefresh()
+})
+
+onUnmounted(() => {
+  stopAutoRefresh()
 })
 </script>

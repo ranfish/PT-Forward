@@ -948,6 +948,7 @@
     "sourceSitePlaceholder": "请输入源站点",
     "targetSitePlaceholder": "请输入目标站点",
     "columnRole": "角色",
+    "currentStep": "当前步骤",
     "sourceSiteId": "源站点ID",
     "manualCheck": "手动审核",
     "publishUrl": "发布链接",

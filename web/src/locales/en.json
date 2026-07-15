@@ -945,6 +945,7 @@
     "sourceSitePlaceholder": "Enter source site",
     "targetSitePlaceholder": "Enter target site",
     "columnRole": "Role",
+    "currentStep": "Current Step",
     "sourceSiteId": "Source Site ID",
     "manualCheck": "Manual Check",
     "publishUrl": "Publish URL",
