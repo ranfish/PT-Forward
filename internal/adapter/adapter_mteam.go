@@ -1032,8 +1032,8 @@ func (a *MTeamAdapter) uploadViaAPI(ctx context.Context, config *model.SiteConfi
 		return nil, err
 	}
 
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: API Key 无效或权限不足"}
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifySiteError(resp, "upload (API)")
 	}
 
 	var apiResp struct {
@@ -1146,8 +1146,8 @@ func (a *MTeamAdapter) uploadViaWeb(ctx context.Context, config *model.SiteConfi
 	}
 	html := string(body)
 
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 cookie 过期"}
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifySiteError(resp, "upload (web)")
 	}
 
 	if idMatch := reMTeamDetailID.FindStringSubmatch(html); len(idMatch) > 1 {

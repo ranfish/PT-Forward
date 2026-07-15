@@ -549,8 +549,8 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 	}
 	html := string(body)
 
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足"}
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifySiteError(resp, "upload")
 	}
 
 	if idMatch := reGazelleTorrentID.FindStringSubmatch(html); len(idMatch) > 1 {

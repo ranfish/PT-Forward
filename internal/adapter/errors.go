@@ -10,16 +10,18 @@ import (
 )
 
 const (
-	ErrAdapterNetwork   = 31001
-	ErrAdapterHTTP      = 31002
-	ErrAdapterParse     = 31003
-	ErrAdapterUpload    = 31004
-	ErrAdapterDownload  = 31005
-	ErrAdapterNotFound  = 31006
-	ErrAdapterConfig    = 31007
-	ErrAdapterAuth      = 31008
-	ErrAdapterRateLimit = 31009
-	ErrAdapterSearch    = 31010
+	ErrAdapterNetwork         = 31001
+	ErrAdapterHTTP            = 31002
+	ErrAdapterParse           = 31003
+	ErrAdapterUpload          = 31004
+	ErrAdapterDownload        = 31005
+	ErrAdapterNotFound        = 31006
+	ErrAdapterConfig          = 31007
+	ErrAdapterAuth            = 31008
+	ErrAdapterRateLimit       = 31009
+	ErrAdapterSearch          = 31010
+	ErrAdapterWAFBlocked      = 31011
+	ErrAdapterCredentialExpired = 31012
 )
 
 func adapterError(code int, msg string, cause error) *model.AppError {
@@ -65,6 +67,32 @@ func authError(msg string, err error) *model.AppError {
 
 func searchError(msg string, err error) *model.AppError {
 	return adapterError(ErrAdapterSearch, msg, err)
+}
+
+func classifySiteError(resp *http.Response, op string) *model.AppError {
+	reason := resp.Header.Get(httpclient.WAFReasonHeader)
+
+	if reason == "cloudflare_challenge" || reason == "cloudflare_5s_shield" {
+		return adapterError(ErrAdapterWAFBlocked,
+			fmtES("site blocked by WAF (%s) during %s", reason, op), nil)
+	}
+
+	if reason == "login_redirect" || resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return adapterError(ErrAdapterCredentialExpired,
+			fmtES("authentication failed (HTTP %d) during %s", resp.StatusCode, op), nil)
+	}
+
+	if resp.StatusCode == 419 {
+		return adapterError(ErrAdapterCredentialExpired,
+			fmtES("CSRF token expired during %s", op), nil)
+	}
+
+	return httpError(fmtES("HTTP %d during %s", resp.StatusCode, op), nil)
+}
+
+func isWAFBlocked(resp *http.Response) bool {
+	reason := resp.Header.Get(httpclient.WAFReasonHeader)
+	return reason == "cloudflare_challenge" || reason == "cloudflare_5s_shield"
 }
 
 func fmtES(format string, args ...interface{}) string {

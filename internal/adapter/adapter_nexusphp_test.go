@@ -389,8 +389,8 @@ func TestNexusPHP_UploadTorrent_Forbidden(t *testing.T) {
 		t.Fatal("expected error for 403")
 	}
 	var appErr *model.AppError
-	if !errors.As(err, &appErr) || appErr.Code != 14003 {
-		t.Fatalf("expected AppError 14003, got %v", err)
+	if !errors.As(err, &appErr) || appErr.Code != ErrAdapterCredentialExpired {
+		t.Fatalf("expected AppError %d, got %v", ErrAdapterCredentialExpired, err)
 	}
 	if result != nil {
 		t.Error("expected nil result")

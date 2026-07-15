@@ -176,15 +176,14 @@ func (a *Unit3DAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	}
 	defer func() { drainBody(resp) }()
 
-	if resp.StatusCode == http.StatusForbidden {
-		a.resetSession(config.Domain)
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 cookie 过期"}
-	}
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, notFoundError("种子不存在或已被删除")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
+		if !isWAFBlocked(resp) {
+			a.resetSession(config.Domain)
+		}
+		return nil, classifySiteError(resp, "download")
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 50*1024*1024))
@@ -672,14 +671,11 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 	}
 	html := string(body)
 
-	if resp.StatusCode == http.StatusForbidden {
-		a.resetSession(config.Domain)
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足或 CSRF token 过期"}
-	}
-
-	if resp.StatusCode == 419 {
-		a.resetSession(config.Domain)
-		return nil, &model.AppError{Code: 14003, Message: "419 CSRF token 过期，需要重建 session"}
+	if resp.StatusCode != http.StatusOK {
+		if !isWAFBlocked(resp) {
+			a.resetSession(config.Domain)
+		}
+		return nil, classifySiteError(resp, "upload")
 	}
 
 	if idMatch := reUnit3DTorrentID.FindStringSubmatch(html); len(idMatch) > 1 {

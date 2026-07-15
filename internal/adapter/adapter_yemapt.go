@@ -50,14 +50,11 @@ func (a *YemaptAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	}
 	defer func() { drainBody(resp) }()
 
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 认证失败"}
-	}
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, notFoundError("种子不存在或已被删除")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
+		return nil, classifySiteError(resp, "download")
 	}
 
 	ct := resp.Header.Get("Content-Type")
@@ -146,7 +143,7 @@ func (a *YemaptAdapter) FetchUserStats(ctx context.Context, config *model.SiteCo
 		return stats, nil
 	}
 
-	return nil, &model.AppError{Code: 14003, Message: "野马需要 API Key 或 Cookie"}
+	return nil, configError("野马需要 API Key 或 Cookie")
 }
 
 func (a *YemaptAdapter) fetchUserStatsOpenAPI(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) error {

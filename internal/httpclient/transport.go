@@ -136,19 +136,19 @@ func (t *domainLimiterTransport) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	if t.detector != nil {
-		freezeDuration := t.detector.Detect(resp)
+		freezeDuration, reason := t.detector.Detect(resp)
 		if freezeDuration > 0 {
 			t.limiter.FreezeWithBackoff(domain, freezeDuration)
 			if t.emitter != nil {
 				t.emitter.Emit(FreezeEvent{
 					Domain:   domain,
-					Reason:   t.detector.LastReason(),
+					Reason:   reason,
 					Duration: freezeDuration,
 					URL:      req.URL.String(),
 					At:       time.Now(),
 				})
 			}
-		} else if t.detector.LastReason() == "" && resp.StatusCode < 400 {
+		} else if reason == "" && resp.StatusCode < 400 {
 			t.limiter.ResetFreezeCounter(domain)
 		}
 	}
