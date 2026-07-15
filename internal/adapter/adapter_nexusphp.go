@@ -830,15 +830,6 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 
 		body, readErr := readBody(resp)
 		if readErr != nil {
-			if isHTTP2Error(readErr) {
-				drainBody(resp)
-				h1Body, h1Status, h1Err := retryWithHTTP1(searchURL, config.Cookie)
-				if h1Err == nil && h1Status == http.StatusOK {
-					return parseNexusPHPBrowse(string(h1Body), config), nil
-				}
-				lastErr = readErr
-				continue
-			}
 			lastErr = readErr
 			continue
 		}
