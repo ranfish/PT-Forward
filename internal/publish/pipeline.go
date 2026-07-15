@@ -12,6 +12,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/description"
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/metrics"
@@ -428,6 +429,41 @@ func (p *Pipeline) fetchSourceInfo(ctx context.Context, candidate *model.Publish
 	return sourceDetail, sourceConfig, sourceAdapter, nil
 }
 
+type piecesHashSearcher interface {
+	SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error)
+}
+
+func (p *Pipeline) dedupByPiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, torrentData []byte) (bool, string) {
+	if len(torrentData) == 0 {
+		return false, ""
+	}
+
+	meta, err := fingerprint.ComputeFromTorrent(torrentData)
+	if err != nil || meta == nil || meta.PiecesHash == "" {
+		return false, ""
+	}
+
+	if !adapter.SupportsSearchByPiecesHash() {
+		return false, ""
+	}
+
+	searcher, ok := adapter.(piecesHashSearcher)
+	if !ok {
+		return false, ""
+	}
+
+	matches, err := searcher.SearchByPiecesHash(ctx, config, []string{meta.PiecesHash})
+	if err != nil || len(matches) == 0 {
+		return false, ""
+	}
+
+	if torrentID, found := matches[meta.PiecesHash]; found && torrentID > 0 {
+		return true, meta.PiecesHash
+	}
+
+	return false, ""
+}
+
 func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.PublishCandidate, targetSite string, sourceDetail *model.TorrentDetail, torrentData []byte) (bool, error) {
 	var publishSucceeded bool
 	if p.backpressureCtrl != nil {
@@ -459,6 +495,25 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 	targetAdapter, err := p.siteProvider.GetAdapter(ctx, targetSite)
 	if err != nil {
 		p.logger.Warn("failed to get target adapter", zap.String("site", targetSite), zap.Error(err))
+		return false, nil
+	}
+
+	if found, ph := p.dedupByPiecesHash(ctx, targetAdapter, targetConfig, torrentData); found {
+		p.logger.Info("target site already has same pieces_hash, skipping",
+			zap.String("target", targetSite),
+			zap.String("pieces_hash", ph),
+		)
+		if err := p.CreateResult(ctx, &model.PublishResultRecord{
+			CandidateID:  candidate.ID,
+			SourceSite:   candidate.SourceSite,
+			TargetSite:   targetSite,
+			Status:       model.PublishResultSkipped,
+			ErrorMessage: fmt.Sprintf("pieces_hash 去重匹配: %s", ph),
+			Title:        candidate.TorrentName,
+			DownloaderID: candidate.ClientID,
+		}); err != nil {
+			p.logger.Warn("failed to record publish result", zap.Error(err))
+		}
 		return false, nil
 	}
 
@@ -1721,6 +1776,16 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 		}
 
 		if member.LastCompletedStep < StepDedup {
+			if found, ph := p.dedupByPiecesHash(ctx, targetAdapter, targetConfig, torrentData); found {
+				p.logger.Info("target site already has same pieces_hash, skipping",
+					zap.String("target", member.SiteName),
+					zap.String("pieces_hash", ph),
+				)
+				if err := p.advanceStep(ctx, member, StepDedup); err != nil {
+					p.logger.Warn("advanceStep dedup failed", zap.Error(err))
+				}
+				return nil
+			}
 			if title != "" && title != group.SourceTorrentID {
 				dedupResults, dedupErr := targetAdapter.SearchTorrents(ctx, targetConfig, title, nil)
 				if dedupErr == nil {
