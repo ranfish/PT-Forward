@@ -1586,20 +1586,19 @@ func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *prel
 			return nil
 		}
 
-		if hasMatchMethod(task.MatchMethods, "pieces_hash") {
-			c := e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, phCache)
-			if c != nil {
-				targetKey := siteInfo.Name + ":" + c.TargetTorrentID
-				if confirmedTargets != nil && confirmedTargets[targetKey] {
-					return nil
-				}
-				if !e.verifyL0Size(ctx, adapter, siteConfig, fc.get(src.InfoHash, src.SiteName), c.TargetTorrentID, siteInfo.Name) {
-					c = nil
-				} else {
+			if hasMatchMethod(task.MatchMethods, "pieces_hash") {
+				c := e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, phCache)
+				if c != nil {
+					targetKey := siteInfo.Name + ":" + c.TargetTorrentID
+					if confirmedTargets != nil && confirmedTargets[targetKey] {
+						return nil
+					}
+					if !e.verifyL0Size(ctx, adapter, siteConfig, fc.get(src.InfoHash, src.SiteName), c.TargetTorrentID, siteInfo.Name) {
+						return nil
+					}
 					return c
 				}
 			}
-		}
 
 		if hasMatchMethod(task.MatchMethods, "fingerprint") {
 			if phCache != nil && phCache.wasQueried(siteInfo.Name) {
@@ -1702,11 +1701,11 @@ func (e *Engine) verifyL0Size(ctx context.Context, adapter model.SiteAdapter, co
 	}
 	results, err := adapter.SearchTorrents(ctx, config, targetTorrentID, nil)
 	if err != nil {
-		e.logger.Debug("L0 size verification search failed, allowing",
+		e.logger.Warn("L0 size verification search failed, downgrading (fail-closed)",
 			zap.String("site", siteName),
 			zap.String("torrentID", targetTorrentID),
 			zap.Error(err))
-		return true
+		return false
 	}
 	var targetSize int64
 	found := false
@@ -1718,10 +1717,10 @@ func (e *Engine) verifyL0Size(ctx context.Context, adapter model.SiteAdapter, co
 		}
 	}
 	if !found {
-		e.logger.Debug("L0 size verification target not found, allowing",
+		e.logger.Warn("L0 size verification target not in results, downgrading (fail-closed)",
 			zap.String("site", siteName),
 			zap.String("torrentID", targetTorrentID))
-		return true
+		return false
 	}
 	if !CompareSizeDisplay(fp.TotalSize, targetSize) {
 		e.logger.Warn("L0 pieces_hash hit but size mismatch, downgrading",
