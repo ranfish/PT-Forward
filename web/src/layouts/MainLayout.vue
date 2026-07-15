@@ -111,6 +111,10 @@
             <template #icon><FileTextOutlined /></template>
             <span>{{ t('nav.logs') }}</span>
           </a-menu-item>
+          <a-menu-item key="/orphans" @click="$router.push('/orphans')">
+            <template #icon><FolderOpenOutlined /></template>
+            <span>{{ t('orphan.title') }}</span>
+          </a-menu-item>
           <a-menu-item key="/audit" @click="$router.push('/audit')">
             <template #icon><AuditOutlined /></template>
             <span>{{ t('nav.audit') }}</span>
@@ -215,6 +219,7 @@ import {
   ProfileOutlined,
   SafetyOutlined,
   FileTextOutlined,
+  FolderOpenOutlined,
   AuditOutlined,
   SettingOutlined,
   BulbOutlined,

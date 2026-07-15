@@ -41,6 +41,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/iyuu"
 	"github.com/ranfish/pt-forward/internal/metadata"
+	"github.com/ranfish/pt-forward/internal/orphan"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -430,6 +431,10 @@ func main() {
 	sourceDetector := publish.NewSourceSiteDetector(db, log)
 	sourceDetector.RefreshCache(context.Background())
 	router.SetupPublishTorrents(coverageSvc, clientManager, sourceDetector)
+
+	orphanScanner := orphan.NewScanner(clientManager, log)
+	orphanRecovery := orphan.NewRecovery(db, siteProvider, clientManager, log)
+	router.SetupOrphan(orphanScanner, orphanRecovery)
 	if err := router.StartCoverageRefresh(taskRegistry); err != nil {
 		log.Warn("failed to register coverage refresh schedule", zap.Error(err))
 	}

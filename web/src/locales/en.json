@@ -1165,6 +1165,22 @@
     "clearLogsConfirm": "Clear all log files?",
     "goroutines": "Goroutines"
   },
+  "orphan": {
+    "title": "Orphan Files",
+    "scan": "Scan",
+    "lastScan": "Last scan",
+    "itemsFound": "orphan(s) found",
+    "recover": "Recover",
+    "recoverResult": "Recovery Result",
+    "recoverSuccess": "Recovered",
+    "recoverFailed": "No match found",
+    "columnName": "Name",
+    "columnType": "Type",
+    "columnSize": "Size",
+    "columnClient": "Client",
+    "directory": "Dir",
+    "file": "File"
+  },
   "settings": {
     "title": "General Settings",
     "httpProxy": "HTTP Proxy",

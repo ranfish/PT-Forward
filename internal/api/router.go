@@ -14,6 +14,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/middleware"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
+	"github.com/ranfish/pt-forward/internal/orphan"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/rss"
@@ -55,6 +56,7 @@ type Router struct {
 	imageHostHandler      *ImageHostHandler
 	metadataHandler       *MetadataHandler
 	sseLogHandler         *SSELogHandler
+	orphanHandler         *OrphanHandler
 	logBroadcaster        *LogBroadcaster
 	wsHandler            *WSHandler
 	hub                  *Hub
@@ -161,6 +163,10 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)
 	rt.publishTorrentsHandler.SetDeclarationFilter(declFilter)
+}
+
+func (rt *Router) SetupOrphan(scanner *orphan.Scanner, recovery *orphan.Recovery) {
+	rt.orphanHandler = NewOrphanHandler(scanner, recovery, rt.logger)
 }
 
 func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr *client.Manager, sourceDetector *publish.SourceSiteDetector) {
@@ -341,6 +347,12 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/manual-forward/submit/", mfHandler)
 	mux.Handle("/api/v1/manual-forward/batch-submit", mfHandler)
 	mux.Handle("/api/v1/manual-forward/batch-submit/", mfHandler)
+
+	if rt.orphanHandler != nil {
+		orphanH := rt.chain(rt.rateLimitMW, rt.orphanHandler.ServeHTTP)
+		mux.Handle("/api/v1/orphans", orphanH)
+		mux.Handle("/api/v1/orphans/", orphanH)
+	}
 
 	ptHandler := rt.chain(writeLimitMW, rt.publishTorrentsHandler.ServeHTTP)
 	mux.Handle("/api/v1/publish/torrents", ptHandler)
