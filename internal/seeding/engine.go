@@ -769,6 +769,8 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 			Status:      model.SeedingStatusSeeding,
 			Source:      "imported",
 			TorrentSize: ti.TotalSize,
+			HasHR:       true,
+			HRSeedTimeH: defaultHRSeedTimeH(ctx, e.siteProvider, siteName),
 		})
 	}
 
@@ -796,6 +798,17 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 			zap.Int("total_in_downloader", len(torrentMap)),
 		)
 	}
+}
+
+func defaultHRSeedTimeH(ctx context.Context, provider model.SiteInfoProvider, siteName string) int {
+	if provider == nil || siteName == "" || siteName == "unknown" {
+		return 72
+	}
+	cfg, err := provider.GetSiteConfig(ctx, siteName)
+	if err != nil || cfg == nil {
+		return 72
+	}
+	return cfg.HR.SeedTimeH()
 }
 
 func (e *Engine) getCachedMaindata(clientID string) *maindataEntry {
