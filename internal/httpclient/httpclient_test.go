@@ -87,7 +87,7 @@ func TestDomainRateLimiter_CancelContext(t *testing.T) {
 func TestWAFDetector_HTTP429(t *testing.T) {
 	detector := NewWAFResponseDetector(nil)
 	resp := &http.Response{StatusCode: 429, Body: http.NoBody}
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 30*time.Second {
 		t.Errorf("expected 30s freeze for 429, got %v", dur)
 	}
@@ -104,7 +104,7 @@ func TestWAFDetector_CloudflareChallenge(t *testing.T) {
 		Body:       http.NoBody,
 	}
 	resp.Body = newStringBody(body)
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 5*time.Minute {
 		t.Errorf("expected 5min freeze for CF challenge, got %v", dur)
 	}
@@ -118,7 +118,7 @@ func TestWAFDetector_RateLimitText(t *testing.T) {
 		Body:       http.NoBody,
 	}
 	resp.Body = newStringBody(body)
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 25*time.Second {
 		t.Errorf("expected 25s freeze for rate limit text, got %v", dur)
 	}
@@ -132,7 +132,7 @@ func TestWAFDetector_LoginRedirect_NoFreeze(t *testing.T) {
 		Body:       http.NoBody,
 	}
 	resp.Body = newStringBody(body)
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 0 {
 		t.Errorf("expected 0 freeze for login redirect, got %v", dur)
 	}
@@ -144,7 +144,7 @@ func TestWAFDetector_EmptyResponse(t *testing.T) {
 		StatusCode: 200,
 		Body:       newStringBody("   "),
 	}
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 25*time.Second {
 		t.Errorf("expected 25s for empty response, got %v", dur)
 	}
@@ -158,7 +158,7 @@ func TestWAFDetector_NormalResponse(t *testing.T) {
 		Body:       http.NoBody,
 	}
 	resp.Body = newStringBody(body)
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 0 {
 		t.Errorf("expected 0 for normal response, got %v", dur)
 	}

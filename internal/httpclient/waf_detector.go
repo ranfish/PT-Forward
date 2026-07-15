@@ -108,15 +108,20 @@ var builtinWAFPatterns = []wafPattern{
 	},
 }
 
-func (d *WAFResponseDetector) Detect(resp *http.Response) time.Duration {
+const WAFReasonHeader = "X-PTForward-WAF-Reason"
+
+func (d *WAFResponseDetector) Detect(resp *http.Response) (time.Duration, string) {
 	for _, p := range d.patterns {
 		if p.MatchFunc(resp) {
 			d.lastReason.Store(p.Name)
-			return p.FreezeDur
+			if resp.Header != nil {
+				resp.Header.Set(WAFReasonHeader, p.Name)
+			}
+			return p.FreezeDur, p.Name
 		}
 	}
 	d.lastReason.Store("")
-	return 0
+	return 0, ""
 }
 
 func (d *WAFResponseDetector) LastReason() string {

@@ -116,14 +116,11 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 	}
 	defer func() { drainBody(resp) }()
 
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: cookie 可能已过期"}
-	}
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, notFoundError("种子不存在或已被删除")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
+		return nil, classifySiteError(resp, "download")
 	}
 
 	contentType := resp.Header.Get("Content-Type")
@@ -580,8 +577,8 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	}
 	html := string(body)
 
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足"}
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifySiteError(resp, "upload")
 	}
 
 	if idMatch := reGenericDetailID.FindStringSubmatch(html); len(idMatch) > 1 {
@@ -856,8 +853,8 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 	}
 	html := string(body)
 
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden: 权限不足"}
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifySiteError(resp, "upload")
 	}
 
 	if idMatch := reGenericTTGID.FindStringSubmatch(html); len(idMatch) > 1 {
@@ -1102,8 +1099,8 @@ func (a *GenericAdapter) doStarSpaceUpload(httpReq *http.Request, config *model.
 	}
 	html := string(body)
 
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, &model.AppError{Code: 14003, Message: "403 Forbidden"}
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifySiteError(resp, "upload")
 	}
 
 	if idMatch := reGenericStarSpaceDetailID.FindStringSubmatch(html); len(idMatch) > 1 {

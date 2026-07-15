@@ -630,7 +630,7 @@ func TestWAFDetector_CustomPatterns(t *testing.T) {
 		},
 	})
 	resp := &http.Response{StatusCode: 999, Body: http.NoBody}
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 42*time.Second {
 		t.Errorf("expected 42s for custom pattern, got %v", dur)
 	}
@@ -646,7 +646,7 @@ func TestWAFDetector_CloudflareChallenge_403(t *testing.T) {
 		StatusCode: 403,
 		Body:       newStringBody(body),
 	}
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 5*time.Minute {
 		t.Errorf("expected 5min for CF challenge 403, got %v", dur)
 	}
@@ -659,7 +659,7 @@ func TestWAFDetector_Cloudflare5sShield(t *testing.T) {
 		StatusCode: 503,
 		Body:       newStringBody(body),
 	}
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 5*time.Minute {
 		t.Errorf("expected 5min for CF 5s shield, got %v", dur)
 	}
@@ -689,7 +689,7 @@ func TestWAFDetector_LoginRedirect_Variants(t *testing.T) {
 				StatusCode: 200,
 				Body:       newStringBody(tc.body),
 			}
-			dur := detector.Detect(resp)
+			dur, _ := detector.Detect(resp)
 			if dur != tc.expect {
 				t.Errorf("expected %v, got %v", tc.expect, dur)
 			}
@@ -704,7 +704,7 @@ func TestWAFDetector_RateLimitText_English(t *testing.T) {
 		StatusCode: 200,
 		Body:       newStringBody(body),
 	}
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 25*time.Second {
 		t.Errorf("expected 25s for rate limit text, got %v", dur)
 	}
@@ -717,7 +717,7 @@ func TestWAFDetector_PeekBodyLimit(t *testing.T) {
 		StatusCode: 503,
 		Body:       newStringBody(longBody),
 	}
-	dur := detector.Detect(resp)
+	dur, _ := detector.Detect(resp)
 	if dur != 0 {
 		t.Errorf("pattern beyond peek limit should not match, got %v", dur)
 	}
