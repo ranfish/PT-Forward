@@ -29,16 +29,21 @@ var (
 )
 
 func getCodecBuffer(capacity int) []byte {
+	var pool *sync.Pool
 	switch capacity {
 	case maxStreamDataVideo:
-		return videoBufPool.Get().([]byte)[:0]
+		pool = &videoBufPool
 	case maxStreamDataAudio:
-		return audioBufPool.Get().([]byte)[:0]
+		pool = &audioBufPool
 	case maxStreamDataOther:
-		return otherBufPool.Get().([]byte)[:0]
+		pool = &otherBufPool
 	default:
 		return make([]byte, 0, capacity)
 	}
+	if b, ok := pool.Get().([]byte); ok {
+		return b[:0]
+	}
+	return make([]byte, 0, capacity)
 }
 
 func putCodecBuffer(buf []byte) {
