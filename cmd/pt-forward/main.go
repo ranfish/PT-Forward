@@ -141,6 +141,9 @@ func main() {
 	}
 
 	httpclient.Init(log)
+	if httpclient.GlobalEmitter != nil {
+		httpclient.GlobalEmitter.SetDB(db)
+	}
 	metrics.Init(version)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -261,6 +264,40 @@ func main() {
 	go wsHub.Run(stopCh)
 
 	eventDispatcher.SetWSBroadcaster(wsHub)
+
+	freezeCh := make(chan httpclient.FreezeEvent, 16)
+	httpclient.GlobalEmitter.Subscribe(freezeCh)
+	go func() {
+		var lastCookieSync time.Time
+		for ev := range freezeCh {
+			wsHub.BroadcastWS("system.site.frozen", map[string]interface{}{
+				"domain":   ev.Domain,
+				"reason":   ev.Reason,
+				"duration": ev.Duration.String(),
+				"at":       ev.At.Format(time.RFC3339),
+			})
+
+			if ev.Reason == "login_redirect" {
+				if time.Since(lastCookieSync) < 30*time.Second {
+					continue
+				}
+				lastCookieSync = time.Now()
+				go func(ev httpclient.FreezeEvent) {
+					syncSvc := cookiecloud.NewSyncService(db, log)
+					history, err := syncSvc.SyncAll(ctx)
+					if err != nil {
+						log.Warn("cookiecloud event-triggered sync failed",
+							zap.String("domain", ev.Domain),
+							zap.Error(err))
+					} else {
+						log.Info("cookiecloud event-triggered sync completed (login_redirect)",
+							zap.String("domain", ev.Domain),
+							zap.Int("synced", history.SyncedSites))
+					}
+				}(ev)
+			}
+		}
+	}()
 
 	rssEngine.SetFilterEngine(filterEngine)
 	rssEngine.SetDispatcher(eventDispatcher)
