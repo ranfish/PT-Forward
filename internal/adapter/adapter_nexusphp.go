@@ -818,21 +818,13 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 
 		resp, err := a.doer.Client.Do(req)
 		if err != nil {
-			a.logger.Debug("nexusphp search: request failed",
-				zap.String("site", config.Domain),
-				zap.String("path", bp),
-				zap.Error(err))
-			lastErr = searchError("搜索请求失败", err)
+			lastErr = searchError(fmtES("search %s failed: %v", bp, err), nil)
 			continue
 		}
 
 		if resp.StatusCode == http.StatusNotFound {
-			a.logger.Debug("nexusphp search: 404, trying next path",
-				zap.String("site", config.Domain),
-				zap.String("path", bp),
-				zap.Int("paths_remaining", len(browsePaths)))
 			drainBody(resp)
-			lastErr = httpError(fmtES("HTTP %d", resp.StatusCode), nil)
+			lastErr = httpError(fmtES("HTTP %d on %s", resp.StatusCode, bp), nil)
 			continue
 		}
 
