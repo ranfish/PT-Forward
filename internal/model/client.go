@@ -114,6 +114,8 @@ type Maindata struct {
 	FreeSpace      int64                  `json:"free_space,string"`
 	TotalDiskSpace int64                  `json:"total_disk_space,string"`
 	InflightBytes  int64                  `json:"inflight_bytes"`
+	FullUpdate      bool     `json:"full_update"`
+	TorrentsRemoved []string `json:"torrents_removed"`
 }
 
 type ServerState struct {

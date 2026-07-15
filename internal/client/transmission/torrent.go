@@ -111,6 +111,7 @@ func (c *TRClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.
 	if err != nil {
 		return nil, 0, err
 	}
+	md.FullUpdate = true
 	return md, rid + 1, nil
 }
 
