@@ -3,6 +3,7 @@ package publish
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -917,7 +918,17 @@ func (p *Pipeline) finalizePublishStatus(ctx context.Context, id uint, published
 		return model.CandidateDone
 	}
 	if lastErr != nil {
-		// 候选级重试：RetryCount < 3 → 改回 pending，等下次 ProcessPending 重试
+		var appErr *model.AppError
+		if errors.As(lastErr, &appErr) && !appErr.Retryable {
+			p.logger.Info("candidate failed with non-retryable error",
+				zap.Uint("id", id),
+				zap.Int("code", appErr.Code),
+				zap.String("error", lastErr.Error()))
+			if err := p.UpdateCandidateStatus(ctx, id, model.CandidateFailed, lastErr.Error()); err != nil {
+				p.logger.Error("failed to update publish-failed status", zap.Uint("id", id), zap.Error(err))
+			}
+			return model.CandidateFailed
+		}
 		var fc model.PublishCandidate
 		if err := p.db.WithContext(ctx).First(&fc, id).Error; err == nil && fc.RetryCount < 3 {
 			now := time.Now()
