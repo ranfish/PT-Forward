@@ -796,37 +796,53 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 	if !strings.HasPrefix(u, "http") {
 		u = "https://" + u
 	}
-	browsePath := "/browse.php"
+	browsePaths := []string{"/browse.php", "/torrents.php"}
 	if config.Paths.Browse != "" {
-		browsePath = config.Paths.Browse
+		browsePaths = []string{config.Paths.Browse}
 	}
-	searchURL := u + browsePath + "?search=" + url.QueryEscape(keyword)
+
+	catParam := ""
 	if opts != nil && opts.Category != "" {
-		searchURL += "&cat=" + opts.Category
+		catParam = "&cat=" + opts.Category
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
-	if err != nil {
-		return nil, searchError("构造搜索请求失败", err)
-	}
-	setCommonHeaders(req, config.Cookie)
+	var lastErr error
+	for _, bp := range browsePaths {
+		searchURL := u + bp + "?search=" + url.QueryEscape(keyword) + catParam
 
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return nil, searchError("搜索请求失败", err)
-	}
-	defer func() { drainBody(resp) }()
+		req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
+		if err != nil {
+			return nil, searchError("构造搜索请求失败", err)
+		}
+		setCommonHeaders(req, config.Cookie)
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
+		resp, err := a.doer.Client.Do(req)
+		if err != nil {
+			lastErr = searchError("搜索请求失败", err)
+			continue
+		}
+
+		if resp.StatusCode == http.StatusNotFound {
+			drainBody(resp)
+			lastErr = httpError(fmtES("HTTP %d", resp.StatusCode), nil)
+			continue
+		}
+
+		body, readErr := readBody(resp)
+		if readErr != nil {
+			lastErr = readErr
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			lastErr = classifySiteError(resp, "search")
+			continue
+		}
+
+		return parseNexusPHPBrowse(string(body), config), nil
 	}
 
-	body, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return parseNexusPHPBrowse(string(body), config), nil
+	return nil, lastErr
 }
 
 func (a *NexusPHPAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
