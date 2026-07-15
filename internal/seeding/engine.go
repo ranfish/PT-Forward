@@ -222,6 +222,9 @@ type maindataEntry struct {
 	FreeSpace      int64
 	TotalDiskSpace int64
 	UpdatedAt      time.Time
+	Rid            int
+	TorrentMap     map[string]*model.TorrentInfo
+	CyclesSinceFull int
 }
 
 type emaState struct {
@@ -460,6 +463,8 @@ func (e *Engine) refreshMaindataLoop(ctx context.Context) {
 	}
 }
 
+const forceFullSyncInterval = 30
+
 func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 	if e.getClientProvider() == nil {
 		return
@@ -476,39 +481,136 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 			continue
 		}
 
-		md, mdErr := dlClient.GetMainData(ctx)
-		if mdErr != nil || md == nil {
-			if mdErr != nil {
-				e.logger.Warn("refresh maindata failed",
-					zap.String("client", clientID),
-					zap.Error(mdErr),
-				)
-			}
+		e.maindataMu.RLock()
+		prev := e.maindataCache[clientID]
+		e.maindataMu.RUnlock()
+
+		torrentMap, freeSpace, totalDiskSpace, newRid, wasFull := e.syncMaindata(ctx, clientID, dlClient, prev)
+
+		if torrentMap == nil {
 			continue
 		}
 
+		cyclesSinceFull := 0
+		if prev != nil && !wasFull {
+			cyclesSinceFull = prev.CyclesSinceFull + 1
+		}
+
 		entry := &maindataEntry{
-			Maindata:       md,
-			FreeSpace:      md.FreeSpace,
-			TotalDiskSpace: md.TotalDiskSpace,
-			UpdatedAt:      time.Now(),
+			FreeSpace:       freeSpace,
+			TotalDiskSpace:  totalDiskSpace,
+			UpdatedAt:       time.Now(),
+			Rid:             newRid,
+			TorrentMap:      torrentMap,
+			CyclesSinceFull: cyclesSinceFull,
+		}
+		entry.Maindata = &model.Maindata{
+			Torrents:       make(map[string]model.TorrentInfo, len(torrentMap)),
+			FreeSpace:      freeSpace,
+			TotalDiskSpace: totalDiskSpace,
+		}
+		for hash, t := range torrentMap {
+			entry.Maindata.Torrents[hash] = *t
 		}
 
 		e.maindataMu.Lock()
 		e.maindataCache[clientID] = entry
 		e.maindataMu.Unlock()
 
-		torrentMap := make(map[string]*model.TorrentInfo, len(md.Torrents))
-		for hash, t := range md.Torrents {
-			tCopy := t
-			torrentMap[hash] = &tCopy
-		}
-		e.updateEMA(ctx, clientID, md, torrentMap)
+		e.updateEMA(ctx, clientID, entry.Maindata, torrentMap)
 		e.syncStaleRecords(ctx, clientID, torrentMap)
 		e.checkUnregisteredTorrents(ctx, clientID, dlClient)
 		e.logOrphanTorrents(ctx, clientID, torrentMap)
 		e.syncUnmanagedTorrents(ctx, clientID, torrentMap)
 	}
+}
+
+func (e *Engine) syncMaindata(ctx context.Context, clientID string, dlClient model.DownloaderClient, prev *maindataEntry) (torrentMap map[string]*model.TorrentInfo, freeSpace, totalDiskSpace int64, newRid int, wasFull bool) {
+	forceFull := prev == nil || prev.Rid == 0 || len(prev.TorrentMap) == 0 || prev.CyclesSinceFull >= forceFullSyncInterval
+
+	if forceFull {
+		md, err := dlClient.GetMainData(ctx)
+		if err != nil || md == nil {
+			if err != nil {
+				e.logger.Warn("refresh maindata (full) failed",
+					zap.String("client", clientID),
+					zap.Error(err))
+			}
+			return nil, 0, 0, 0, false
+		}
+		torrentMap = make(map[string]*model.TorrentInfo, len(md.Torrents))
+		for hash, t := range md.Torrents {
+			tCopy := t
+			torrentMap[strings.ToLower(hash)] = &tCopy
+		}
+		return torrentMap, md.FreeSpace, md.TotalDiskSpace, 0, true
+	}
+
+	md, rid, err := dlClient.GetMainDataIncremental(ctx, prev.Rid)
+	if err != nil || md == nil {
+		if err != nil {
+			e.logger.Debug("incremental maindata failed, falling back to full",
+				zap.String("client", clientID),
+				zap.Error(err))
+		}
+		mdFull, fullErr := dlClient.GetMainData(ctx)
+		if fullErr != nil || mdFull == nil {
+			if fullErr != nil {
+				e.logger.Warn("refresh maindata (fallback full) failed",
+					zap.String("client", clientID),
+					zap.Error(fullErr))
+			}
+			return nil, 0, 0, 0, false
+		}
+		torrentMap = make(map[string]*model.TorrentInfo, len(mdFull.Torrents))
+		for hash, t := range mdFull.Torrents {
+			tCopy := t
+			torrentMap[strings.ToLower(hash)] = &tCopy
+		}
+		return torrentMap, mdFull.FreeSpace, mdFull.TotalDiskSpace, 0, true
+	}
+
+	if md.FullUpdate {
+		torrentMap = make(map[string]*model.TorrentInfo, len(md.Torrents))
+		for hash, t := range md.Torrents {
+			tCopy := t
+			torrentMap[strings.ToLower(hash)] = &tCopy
+		}
+		freeSpace = md.FreeSpace
+		if freeSpace == 0 {
+			freeSpace = prev.FreeSpace
+		}
+		totalDiskSpace = prev.TotalDiskSpace
+		newRid = rid
+		e.logger.Debug("maindata full_update received, rebuilt map",
+			zap.String("client", clientID),
+			zap.Int("torrents", len(torrentMap)))
+		return torrentMap, freeSpace, totalDiskSpace, newRid, true
+	}
+
+	torrentMap = make(map[string]*model.TorrentInfo, len(prev.TorrentMap))
+	for hash, t := range prev.TorrentMap {
+		torrentMap[hash] = t
+	}
+
+	for _, hash := range md.TorrentsRemoved {
+		delete(torrentMap, strings.ToLower(hash))
+		delete(torrentMap, hash)
+	}
+
+	for hash, t := range md.Torrents {
+		tCopy := t
+		torrentMap[strings.ToLower(hash)] = &tCopy
+	}
+
+	freeSpace = md.FreeSpace
+	if freeSpace == 0 {
+		freeSpace = prev.FreeSpace
+	}
+	totalDiskSpace = prev.TotalDiskSpace
+	newRid = rid
+
+	return torrentMap, freeSpace, totalDiskSpace, newRid, false
 }
 
 // logOrphanTorrents: logs torrents that exist in the downloader but have no

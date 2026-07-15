@@ -224,6 +224,8 @@ func (c *QBClient) GetMainDataIncremental(ctx context.Context, rid int) (*model.
 		InflightBytes: inflightBytes,
 		CategoryMap:   categories,
 		Tags:          tags,
+		FullUpdate:     raw.FullUpdate,
+		TorrentsRemoved: raw.TorrentsRemoved,
 	}, raw.Rid, nil
 }
 
