@@ -13,6 +13,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/audit"
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/description"
+	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/metadata"
@@ -46,6 +47,7 @@ type Pipeline struct {
 	imageHostStrategy string
 	imageHostMgr      *imagehost.Manager
 	memberMu          sync.Map
+	wsBroadcaster     event.WSBroadcaster
 }
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
@@ -88,6 +90,37 @@ func (p *Pipeline) SetImageHostStrategy(strategy string) {
 	if strategy != "" {
 		p.imageHostStrategy = strategy
 	}
+}
+
+func (p *Pipeline) SetWSBroadcaster(b event.WSBroadcaster) {
+	p.wsBroadcaster = b
+}
+
+var stepNames = map[int]string{
+	StepEligibility: "合规检查",
+	StepDownload:    "下载源种",
+	StepDetail:      "获取详情",
+	StepDedup:       "去重检查",
+	StepRender:      "渲染描述",
+	StepUpload:      "上传目标站",
+	StepHRDetect:    "H&R 检测",
+}
+
+func (p *Pipeline) emitStepProgress(groupID uint, memberID uint, step int, status string) {
+	if p.wsBroadcaster == nil {
+		return
+	}
+	name := stepNames[step]
+	if name == "" {
+		name = fmt.Sprintf("Step %d", step)
+	}
+	p.wsBroadcaster.BroadcastWS("publish.step_progress", map[string]interface{}{
+		"group_id":  groupID,
+		"member_id": memberID,
+		"step":      step,
+		"step_name": name,
+		"status":    status,
+	})
 }
 
 func (p *Pipeline) SetImageHostManager(mgr *imagehost.Manager) {
@@ -1698,6 +1731,7 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 	}
 
 	if member.LastCompletedStep < StepEligibility {
+		p.emitStepProgress(member.PublishGroupID, member.ID, StepEligibility, "running")
 		title := group.SourceTorrentID
 		var candidate model.PublishCandidate
 		if err := p.db.WithContext(ctx).Where("id = ?", group.CandidateID).First(&candidate).Error; err == nil {
@@ -1740,6 +1774,7 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 
 	var torrentData []byte
 	if member.LastCompletedStep < StepDownload {
+		p.emitStepProgress(member.PublishGroupID, member.ID, StepDownload, "running")
 		td, dlErr := sourceAdapter.DownloadTorrent(ctx, sourceConfig, group.SourceTorrentID)
 		if dlErr != nil {
 			return p.failMember(ctx, member, StepDownload, fmt.Sprintf("下载源种子失败: %v", dlErr))
@@ -1789,6 +1824,7 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 		}
 
 		if member.LastCompletedStep < StepDedup {
+			p.emitStepProgress(member.PublishGroupID, member.ID, StepDedup, "running")
 			if found, ph := p.dedupByPiecesHash(ctx, targetAdapter, targetConfig, torrentData); found {
 				p.logger.Info("target site already has same pieces_hash, skipping",
 					zap.String("target", member.SiteName),
@@ -1826,6 +1862,7 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 		var imdbLink, doubanLink string
 
 		if member.LastCompletedStep < StepRender {
+			p.emitStepProgress(member.PublishGroupID, member.ID, StepRender, "running")
 			desc := p.renderDescription(ctx, group.SourceSite, member.SiteName, title, sourceDetail)
 			descriptionText = desc.Text
 			imdbLink = desc.IMDbLink
@@ -1861,6 +1898,7 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 		p.mapFieldValues(ctx, member.SiteName, pubReq.FormFields)
 
 		uploadStart := time.Now()
+		p.emitStepProgress(member.PublishGroupID, member.ID, StepUpload, "running")
 		resp, uploadErr := targetAdapter.UploadTorrent(ctx, targetConfig, pubReq)
 		metrics.PublishDuration.WithLabelValues(member.SiteName).Observe(time.Since(uploadStart).Seconds())
 		if uploadErr != nil {
@@ -1884,6 +1922,7 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 	}
 
 	if member.LastCompletedStep < StepHRDetect {
+		p.emitStepProgress(member.PublishGroupID, member.ID, StepHRDetect, "running")
 		p.detectHR(ctx, member)
 	}
 

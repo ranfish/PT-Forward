@@ -363,6 +363,7 @@ func main() {
 
 	bpCtrl := publish.NewBackpressureController(db, publish.DefaultBackpressureConfig(), log)
 	publishPipeline.SetBackpressureController(bpCtrl)
+	publishPipeline.SetWSBroadcaster(wsHub)
 	go bpCtrl.StartCleanup(ctx)
 
 	lifecycleManager := publish.NewLifecycleManager(db, log)
