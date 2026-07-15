@@ -30998,6 +30998,11 @@
       "site_name": "影",
       "field_path": "paths.browse",
       "field_value": "/p_torrent/video_list_g.php?area=name"
+    },
+    {
+      "site_name": "在脚下",
+      "field_path": "paths.browse",
+      "field_value": "/browse.php"
     }
   ]
 }

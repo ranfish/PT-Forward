@@ -160,7 +160,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 				return
 			}
 
-			siteCtx, siteCancel := context.WithTimeout(searchCtx, 15*time.Second)
+			siteCtx, siteCancel := context.WithTimeout(searchCtx, 20*time.Second)
 			results, err := adapter.SearchTorrents(siteCtx, config, searchKeyword, nil)
 			siteCancel()
 
