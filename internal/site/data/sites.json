@@ -30997,7 +30997,7 @@
     {
       "site_name": "影",
       "field_path": "paths.browse",
-      "field_value": "/p_torrent/video_list_g.php"
+      "field_value": "/p_torrent/video_list_g.php?area=name"
     }
   ]
 }
