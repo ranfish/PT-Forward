@@ -265,16 +265,20 @@ func scanAC3Frame(a *stream.AudioStream, data []byte) (int, bool) {
 			}
 		}
 		if frameType == 1 {
-			a.CoreStream = a.Clone().(*stream.AudioStream)
-			a.CoreStream.StreamType = stream.StreamTypeAC3Audio
+			if coreClone, ok := a.Clone().(*stream.AudioStream); ok {
+				a.CoreStream = coreClone
+				a.CoreStream.StreamType = stream.StreamTypeAC3Audio
+			}
 			if readBool() {
 				chanmap := read(16)
-				a.ChannelCount = a.CoreStream.ChannelCount
-				a.ChannelCount += ac3ChanMap(uint16(chanmap))
-				if layout := eac3ChannelMapLayout(uint16(chanmap)); layout != "" {
-					a.ChannelLayoutText = mergeAudioChannelLayouts(a.CoreStream.ChannelLayoutText, layout)
+				if a.CoreStream != nil {
+					a.ChannelCount = a.CoreStream.ChannelCount
+					a.ChannelCount += ac3ChanMap(uint16(chanmap))
+					if layout := eac3ChannelMapLayout(uint16(chanmap)); layout != "" {
+						a.ChannelLayoutText = mergeAudioChannelLayouts(a.CoreStream.ChannelLayoutText, layout)
+					}
+					lfeOn = uint64(a.CoreStream.LFE)
 				}
-				lfeOn = uint64(a.CoreStream.LFE)
 			}
 		}
 

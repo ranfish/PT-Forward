@@ -504,8 +504,9 @@ func (v *VideoStream) Base() *Stream {
 
 func (v *VideoStream) Clone() Info {
 	clone := *v
-	streamClone := v.Stream.Clone().(*Stream)
-	clone.Stream = *streamClone
+	if streamClone, ok := v.Stream.Clone().(*Stream); ok {
+		clone.Stream = *streamClone
+	}
 	return &clone
 }
 
@@ -671,10 +672,13 @@ func (a *AudioStream) Base() *Stream {
 
 func (a *AudioStream) Clone() Info {
 	clone := *a
-	streamClone := a.Stream.Clone().(*Stream)
-	clone.Stream = *streamClone
+	if streamClone, ok := a.Stream.Clone().(*Stream); ok {
+		clone.Stream = *streamClone
+	}
 	if a.CoreStream != nil {
-		clone.CoreStream = a.CoreStream.Clone().(*AudioStream)
+		if coreClone, ok := a.CoreStream.Clone().(*AudioStream); ok {
+			clone.CoreStream = coreClone
+		}
 	}
 	return &clone
 }
@@ -728,8 +732,9 @@ func (g *GraphicsStream) Base() *Stream {
 
 func (g *GraphicsStream) Clone() Info {
 	clone := *g
-	streamClone := g.Stream.Clone().(*Stream)
-	clone.Stream = *streamClone
+	if streamClone, ok := g.Stream.Clone().(*Stream); ok {
+		clone.Stream = *streamClone
+	}
 	return &clone
 }
 
@@ -753,7 +758,8 @@ func (t *TextStream) Base() *Stream {
 
 func (t *TextStream) Clone() Info {
 	clone := *t
-	streamClone := t.Stream.Clone().(*Stream)
-	clone.Stream = *streamClone
+	if streamClone, ok := t.Stream.Clone().(*Stream); ok {
+		clone.Stream = *streamClone
+	}
 	return &clone
 }
