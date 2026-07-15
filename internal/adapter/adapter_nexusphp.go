@@ -797,7 +797,7 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 		u = "https://" + u
 	}
 	browsePaths := []string{"/browse.php", "/torrents.php"}
-	if config.Paths.Browse != "" {
+	if config.Paths.Browse != "" && config.Paths.Browse != "/browse.php" {
 		browsePaths = []string{config.Paths.Browse}
 	}
 
