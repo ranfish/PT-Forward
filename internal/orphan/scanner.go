@@ -26,7 +26,10 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 	}
 
 	clientIDs := s.provider.ListClients()
-	var allOrphans []Entry
+
+	claimed := make(map[string]map[string]bool)
+	clientForPath := make(map[string]string)
+	scannedPaths := make(map[string]bool)
 
 	for _, clientID := range clientIDs {
 		if ctx.Err() != nil {
@@ -45,7 +48,6 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			continue
 		}
 
-		claimed := make(map[string]map[string]bool)
 		for _, t := range md.Torrents {
 			sp := t.SavePath
 			if sp == "" {
@@ -54,19 +56,26 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			sp = filepath.Clean(sp)
 			if claimed[sp] == nil {
 				claimed[sp] = make(map[string]bool)
+				clientForPath[sp] = clientID
 			}
 			claimed[sp][t.Name] = true
 		}
+	}
 
-		for savePath, claimedNames := range claimed {
-			orphans := s.scanDirectory(savePath, claimedNames, clientID)
-			allOrphans = append(allOrphans, orphans...)
+	var allOrphans []Entry
+	for savePath, claimedNames := range claimed {
+		if scannedPaths[savePath] {
+			continue
 		}
+		scannedPaths[savePath] = true
+		orphans := s.scanDirectory(savePath, claimedNames, clientForPath[savePath])
+		allOrphans = append(allOrphans, orphans...)
 	}
 
 	s.logger.Info("orphan scan completed",
 		zap.Int("orphans", len(allOrphans)),
-		zap.Int("clients", len(clientIDs)))
+		zap.Int("clients", len(clientIDs)),
+		zap.Int("save_paths", len(claimed)))
 
 	return allOrphans, nil
 }
