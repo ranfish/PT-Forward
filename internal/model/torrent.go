@@ -26,6 +26,7 @@ type TorrentDetail struct {
 	PosterURL    string     `json:"poster_url"`
 	Screenshots  []string   `json:"screenshots"`
 	MediaInfo    string     `json:"media_info"`
+	BDInfo       string     `json:"bd_info"`
 	Size         int64      `json:"size"`
 	FileTree     []FileInfo `json:"file_tree"`
 	InfoHash     string     `json:"info_hash"`

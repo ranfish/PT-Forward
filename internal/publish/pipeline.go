@@ -48,6 +48,7 @@ type Pipeline struct {
 	imageHostMgr      *imagehost.Manager
 	memberMu          sync.Map
 	wsBroadcaster     event.WSBroadcaster
+	bdinfoScanner     *BDInfoScanner
 }
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
@@ -94,6 +95,10 @@ func (p *Pipeline) SetImageHostStrategy(strategy string) {
 
 func (p *Pipeline) SetWSBroadcaster(b event.WSBroadcaster) {
 	p.wsBroadcaster = b
+}
+
+func (p *Pipeline) SetBDInfoScanner(s *BDInfoScanner) {
+	p.bdinfoScanner = s
 }
 
 var stepNames = map[int]string{
@@ -400,6 +405,22 @@ func (p *Pipeline) fetchFromDownloader(ctx context.Context, candidate *model.Pub
 	if strategy == "" {
 		strategy = "auto"
 	}
+
+	// BDMV detection: run BDInfo for Blu-ray discs (replaces MediaInfo in description)
+	if p.bdinfoScanner != nil {
+		bdPath := DetectBDPath(savePath)
+		if bdPath != "" {
+			bdinfoCtx, bdinfoCancel := context.WithTimeout(ctx, 5*time.Minute)
+			bdinfoText, bdErr := p.bdinfoScanner.Scan(bdinfoCtx, bdPath, nil)
+			bdinfoCancel()
+			if bdErr != nil {
+				p.logger.Warn("BDInfo scan failed, falling back to MediaInfo", zap.Error(bdErr))
+			} else if bdinfoText != "" {
+				detail.BDInfo = bdinfoText
+			}
+		}
+	}
+
 	artifact, aErr := p.artifactGenerator.GenerateWithStrategy(ctx, savePath, sourceMediaInfo, sourceScreenshots, strategy)
 	if aErr != nil {
 		return nil, nil, fmt.Errorf("local MediaInfo generation failed: %w", aErr)
@@ -658,6 +679,9 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 	if sourceDetail != nil {
 		descData.MediaInfoText = sourceDetail.MediaInfo
 		descData.Screenshots = sourceDetail.Screenshots
+		if sourceDetail.BDInfo != "" {
+			FillBDInfo(descData, sourceDetail.BDInfo)
+		}
 	}
 
 	var result descResult
