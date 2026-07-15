@@ -137,39 +137,59 @@ async function scan() {
 
 async function recover(orphan: OrphanEntry) {
   recovering.value = orphan.path
+  resultVisible.value = false
   message.loading(t('orphan.recovering'), 0)
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 200000)
     const resp = await fetch('/api/v1/orphans/recover', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${localStorage.getItem('pt-forward-access-token')}`
       },
-      body: JSON.stringify({ path: orphan.path }),
-      signal: controller.signal
+      body: JSON.stringify({ path: orphan.path })
     })
-    clearTimeout(timeout)
-    message.destroy()
     const data = await resp.json()
-    if (data.code === 0) {
-      recoverResult.value = data.data
-      resultVisible.value = true
-      if (data.data.found) {
-        message.success(t('orphan.recoverSuccess'))
-      }
-    } else {
+    if (data.code !== 0) {
+      message.destroy()
       message.error(data.message || 'Recovery failed')
+      return
     }
+    const taskID = data.data.task_id
+    // Poll for result
+    let pollCount = 0
+    const poll = async () => {
+      pollCount++
+      try {
+        const r = await fetch(`/api/v1/orphans/recover/${taskID}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('pt-forward-access-token')}` }
+        })
+        const d = await r.json()
+        if (d.code === 0 && d.data) {
+          const msg = d.data.message || ''
+          if (msg !== 'searching...' && msg !== '') {
+            message.destroy()
+            recoverResult.value = d.data
+            resultVisible.value = true
+            if (d.data.found) {
+              message.success(t('orphan.recoverSuccess'))
+            }
+            recovering.value = null
+            return
+          }
+        }
+      } catch { /* ignore poll errors */ }
+      if (pollCount < 60) {
+        setTimeout(poll, 3000)
+      } else {
+        message.destroy()
+        message.error(t('orphan.timeout'))
+        recovering.value = null
+      }
+    }
+    setTimeout(poll, 2000)
   } catch (e: unknown) {
     message.destroy()
-    if (e instanceof DOMException && e.name === 'AbortError') {
-      message.error(t('orphan.timeout'))
-    } else {
-      message.error(e instanceof Error ? e.message : String(e))
-    }
-  } finally {
+    message.error(e instanceof Error ? e.message : String(e))
     recovering.value = null
   }
 }

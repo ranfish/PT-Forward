@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/orphan"
@@ -17,9 +19,11 @@ type OrphanHandler struct {
 	recovery *orphan.Recovery
 	logger   *zap.Logger
 
-	mu          sync.RWMutex
-	lastResults []orphan.Entry
-	scannedAt   time.Time
+	mu            sync.RWMutex
+	lastResults   []orphan.Entry
+	scannedAt     time.Time
+	recoverStore  sync.Map
+	recoverSeq    atomic.Int64
 }
 
 func NewOrphanHandler(scanner *orphan.Scanner, recovery *orphan.Recovery, logger *zap.Logger) *OrphanHandler {
@@ -37,6 +41,8 @@ func (h *OrphanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleScan(w, r)
 	case strings.HasSuffix(path, "/orphans/recover") && r.Method == http.MethodPost:
 		h.handleRecover(w, r)
+	case strings.Contains(path, "/orphans/recover/") && r.Method == http.MethodGet:
+		h.handlePollRecover(w, r)
 	case strings.HasSuffix(path, "/orphans") && r.Method == http.MethodGet:
 		h.handleList(w, r)
 	default:
@@ -115,12 +121,33 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
-	defer cancel()
+	taskID := h.recoverSeq.Add(1)
+	h.recoverStore.Store(taskID, &orphan.RecoverResult{Orphan: target, Message: "searching..."})
 
-	result := h.recovery.Recover(ctx, target)
-	if ctx.Err() != nil && !result.Found {
-		result.Message = "recovery timed out, please check logs or try again"
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+		defer cancel()
+		result := h.recovery.Recover(ctx, target)
+		h.recoverStore.Store(taskID, result)
+	}()
+
+	Success(w, map[string]interface{}{"task_id": taskID})
+}
+
+func (h *OrphanHandler) handlePollRecover(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.TrimRight(r.URL.Path, "/"), "/")
+	taskIDStr := parts[len(parts)-1]
+	taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的 task_id")
+		return
 	}
+
+	val, ok := h.recoverStore.Load(taskID)
+	if !ok {
+		Error(w, http.StatusNotFound, 40400, "恢复任务不存在")
+		return
+	}
+	result := val.(*orphan.RecoverResult)
 	Success(w, result)
 }
