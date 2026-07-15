@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -124,7 +125,13 @@ var http1FallbackClient = &http.Client{
 }
 
 func isHTTP2Error(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "http2")
+	for err != nil {
+		if strings.Contains(err.Error(), "http2") {
+			return true
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
 }
 
 func retryWithHTTP1(originalURL, cookie string) ([]byte, int, error) {
