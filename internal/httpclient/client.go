@@ -36,6 +36,13 @@ func TripDomainCircuit(domain string) {
 	GlobalCircuitBreaker.TripCircuit(domain)
 }
 
+func ResetDomainCircuit(domain string) {
+	if GlobalCircuitBreaker == nil {
+		return
+	}
+	GlobalCircuitBreaker.ResetCircuit(domain)
+}
+
 type SiteHTTPConfig struct {
 	Domain              string
 	Timeout             time.Duration
