@@ -1168,6 +1168,22 @@
     "clearLogsConfirm": "确定清理所有日志文件？",
     "goroutines": "协程数"
   },
+  "orphan": {
+    "title": "孤儿文件",
+    "scan": "扫描",
+    "lastScan": "上次扫描",
+    "itemsFound": "个孤儿资源",
+    "recover": "恢复做种",
+    "recoverResult": "恢复结果",
+    "recoverSuccess": "恢复成功",
+    "recoverFailed": "未找到匹配",
+    "columnName": "名称",
+    "columnType": "类型",
+    "columnSize": "大小",
+    "columnClient": "下载器",
+    "directory": "目录",
+    "file": "文件"
+  },
   "settings": {
     "title": "基本设置",
     "httpProxy": "HTTP 代理地址",
