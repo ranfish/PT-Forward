@@ -30993,6 +30993,11 @@
       "site_name": "套套哥",
       "field_path": "download_url_template",
       "field_value": "dl/{id}/{passkey}"
+    },
+    {
+      "site_name": "影",
+      "field_path": "paths.browse",
+      "field_value": "/p_torrent/video_list_g.php"
     }
   ]
 }
