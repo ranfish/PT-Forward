@@ -338,8 +338,30 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 
 	result["title"] = name
 
-	// 调 pipeline 分析（PTGen 简介/海报 + 本地截图/MediaInfo）
-	if h.pipeline != nil {
+	// Check torrent_metadata for cached analysis (idempotent regeneration)
+	var cachedMeta model.TorrentMetadata
+	hasCache := false
+	if infoHash != "" {
+		if err := h.db.Where("info_hash = ? AND (media_info != '' OR screenshots != '')", infoHash).First(&cachedMeta).Error; err == nil {
+			hasCache = true
+		}
+	}
+
+	if hasCache {
+		result["description"] = cachedMeta.Description
+		result["media_info"] = cachedMeta.MediaInfo
+		result["poster_url"] = cachedMeta.Poster
+		result["imdb_link"] = cachedMeta.IMDbURL
+		result["douban_link"] = cachedMeta.DoubanURL
+		result["tmdb_link"] = cachedMeta.TMDbURL
+		result["subtitle"] = cachedMeta.Subtitle
+		if cachedMeta.Screenshots != "" {
+			result["screenshots"] = strings.Split(cachedMeta.Screenshots, "\n")
+		} else {
+			result["screenshots"] = []string{}
+		}
+		result["cached"] = true
+	} else if h.pipeline != nil {
 		analyzeCtx, analyzeCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer analyzeCancel()
 		if analyzeResult, analyzeErr := h.pipeline.AnalyzeTorrent(analyzeCtx, name, savePath); analyzeErr == nil && analyzeResult != nil {
@@ -428,6 +450,83 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	result["standardized_params"] = stdParams
 
 	task.setResult(result)
+
+	if !hasCache {
+		h.persistAnalysis(infoHash, sourceSite, result)
+	}
+}
+
+func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result map[string]interface{}) {
+	if infoHash == "" {
+		return
+	}
+
+	screenshots := ""
+	if ss, ok := result["screenshots"]; ok {
+		switch v := ss.(type) {
+		case []string:
+			screenshots = strings.Join(v, "\n")
+		case []interface{}:
+			parts := make([]string, 0, len(v))
+			for _, s := range v {
+				if str, ok := s.(string); ok {
+					parts = append(parts, str)
+				}
+			}
+			screenshots = strings.Join(parts, "\n")
+		}
+	}
+
+	title, _ := result["title"].(string)
+	desc, _ := result["description"].(string)
+	mediaInfo, _ := result["media_info"].(string)
+	poster, _ := result["poster_url"].(string)
+	imdb, _ := result["imdb_link"].(string)
+	douban, _ := result["douban_link"].(string)
+	tmdb, _ := result["tmdb_link"].(string)
+	subtitle, _ := result["subtitle"].(string)
+	now := time.Now()
+
+	var meta model.TorrentMetadata
+	h.db.Where("info_hash = ?", infoHash).First(&meta)
+
+	if meta.ID == 0 {
+		meta = model.TorrentMetadata{
+			InfoHash:    infoHash,
+			SiteName:    siteName,
+			Title:       title,
+			Description: desc,
+			MediaInfo:   mediaInfo,
+			Screenshots: screenshots,
+			Poster:      poster,
+			IMDbURL:     imdb,
+			DoubanURL:   douban,
+			TMDbURL:     tmdb,
+			Subtitle:    subtitle,
+			FetchSource: "analyze",
+			FetchedAt:   now,
+		}
+		if err := h.db.Create(&meta).Error; err != nil {
+			h.logger.Warn("persist analysis: create failed", zap.Error(err))
+		}
+	} else {
+		updates := map[string]interface{}{
+			"title":        title,
+			"description":  desc,
+			"media_info":   mediaInfo,
+			"screenshots":  screenshots,
+			"poster":       poster,
+			"imdb_url":     imdb,
+			"douban_url":   douban,
+			"tmdb_url":     tmdb,
+			"subtitle":     subtitle,
+			"fetch_source": "analyze",
+			"fetched_at":   now,
+		}
+		if err := h.db.Model(&meta).Updates(updates).Error; err != nil {
+			h.logger.Warn("persist analysis: update failed", zap.Error(err))
+		}
+	}
 }
 
 func (h *ManualForwardHandler) handlePollAnalyze(w http.ResponseWriter, r *http.Request) {
