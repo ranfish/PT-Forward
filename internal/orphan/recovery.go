@@ -115,11 +115,11 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 		site, torrentID, method string
 	}
 
-	searchCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	searchCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 
 	resultCh := make(chan matchResult, 1)
-	sem := make(chan struct{}, 5)
+	sem := make(chan struct{}, 10)
 	var wg sync.WaitGroup
 	var statsMu sync.Mutex
 
