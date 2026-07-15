@@ -9,10 +9,14 @@ import (
 var defaultSensitivePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(passkey[=:]\s*)\S+`),
 	regexp.MustCompile(`(?i)(cookie[=:]\s*)\S+`),
-	regexp.MustCompile(`(?i)(api_key[=:]\s*)\S+`),
+	regexp.MustCompile(`(?i)(api[_]?key[=:]\s*)\S+`),
 	regexp.MustCompile(`(?i)(bearer_token[=:]\s*)\S+`),
 	regexp.MustCompile(`(?i)(password[=:]\s*)\S+`),
 	regexp.MustCompile(`(?i)(encryption_key[=:]\s*)\S+`),
+	regexp.MustCompile(`(?i)(rss[_]?key[=:]\s*)\S+`),
+	regexp.MustCompile(`(?i)(auth[_]?key[=:]\s*)\S+`),
+	regexp.MustCompile(`(?i)(secret[=:]\s*)\S+`),
+	regexp.MustCompile(`(?i)(token[=:]\s*)\S+`),
 }
 
 type SanitizerCore struct {

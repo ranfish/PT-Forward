@@ -23,8 +23,16 @@ func TestSanitizerCore_MasksSensitiveFields(t *testing.T) {
 		{"cookie", "cookie=sid_abc123"},
 		{"password", "password=MyS3cr3t!"},
 		{"api_key", "api_key=key123"},
+		{"apikey", "apikey=key456"},
 		{"bearer_token", "bearer_token=bt_xyz"},
 		{"encryption_key", "encryption_key=enc_abc"},
+		{"rsskey", "rsskey=rss_abc"},
+		{"rss_key", "rss_key=rss_def"},
+		{"authkey", "authkey=auth_abc"},
+		{"auth_key", "auth_key=auth_def"},
+		{"secret", "secret=s3cr3t"},
+		{"token", "token=tok_abc123"},
+		{"url_with_passkey", "https://site.com/download.php?id=123&passkey=abc123def"},
 	}
 
 	for _, tt := range tests {
@@ -58,7 +66,7 @@ func TestSanitizerCore_Patterns(t *testing.T) {
 		t.Fatal("defaultSensitivePatterns should not be empty")
 	}
 
-	keywords := []string{"passkey", "cookie", "api_key", "bearer_token", "password", "encryption_key"}
+	keywords := []string{"passkey", "cookie", "api_key", "apikey", "bearer_token", "password", "encryption_key", "rsskey", "rss_key", "authkey", "auth_key", "secret", "token"}
 	for _, kw := range keywords {
 		found := false
 		for _, p := range defaultSensitivePatterns {

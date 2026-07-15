@@ -1751,14 +1751,16 @@ func (p *Pipeline) ProcessMemberWithResume(ctx context.Context, member *model.Pu
 	}
 
 	var sourceDetail *model.TorrentDetail
-	if member.LastCompletedStep < StepDetail {
+	{
 		detail, detErr := sourceAdapter.GetTorrentDetail(ctx, sourceConfig, group.SourceTorrentID)
 		if detErr != nil {
 			p.logger.Warn("failed to get source torrent detail", zap.Error(detErr))
 		}
 		sourceDetail = detail
-		if err := p.advanceStep(ctx, member, StepDetail); err != nil {
-			p.logger.Warn("advanceStep detail failed", zap.Error(err))
+		if member.LastCompletedStep < StepDetail {
+			if err := p.advanceStep(ctx, member, StepDetail); err != nil {
+				p.logger.Warn("advanceStep detail failed", zap.Error(err))
+			}
 		}
 	}
 
