@@ -1,9 +1,12 @@
 package adapter
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -111,4 +114,33 @@ func readBody(resp *http.Response) ([]byte, error) {
 
 func drainBody(resp *http.Response) {
 	httpclient.DrainBody(resp)
+}
+
+var http1FallbackClient = &http.Client{
+	Timeout: 20 * time.Second,
+	Transport: &http.Transport{
+		TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
+	},
+}
+
+func isHTTP2Error(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "http2")
+}
+
+func retryWithHTTP1(originalURL, cookie string) ([]byte, int, error) {
+	req, err := http.NewRequest("GET", originalURL, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	setCommonHeaders(req, cookie)
+	resp, err := http1FallbackClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { httpclient.DrainBody(resp) }()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
+	if err != nil {
+		return nil, resp.StatusCode, err
+	}
+	return body, resp.StatusCode, nil
 }
