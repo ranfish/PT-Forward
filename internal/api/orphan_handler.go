@@ -115,9 +115,12 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
 	defer cancel()
 
 	result := h.recovery.Recover(ctx, target)
+	if ctx.Err() != nil && !result.Found {
+		result.Message = "recovery timed out, please check logs or try again"
+	}
 	Success(w, result)
 }

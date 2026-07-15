@@ -137,15 +137,21 @@ async function scan() {
 
 async function recover(orphan: OrphanEntry) {
   recovering.value = orphan.path
+  message.loading(t('orphan.recovering'), 0)
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 200000)
     const resp = await fetch('/api/v1/orphans/recover', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${localStorage.getItem('pt-forward-access-token')}`
       },
-      body: JSON.stringify({ path: orphan.path })
+      body: JSON.stringify({ path: orphan.path }),
+      signal: controller.signal
     })
+    clearTimeout(timeout)
+    message.destroy()
     const data = await resp.json()
     if (data.code === 0) {
       recoverResult.value = data.data
@@ -157,7 +163,12 @@ async function recover(orphan: OrphanEntry) {
       message.error(data.message || 'Recovery failed')
     }
   } catch (e: unknown) {
-    message.error(e instanceof Error ? e.message : String(e))
+    message.destroy()
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      message.error(t('orphan.timeout'))
+    } else {
+      message.error(e instanceof Error ? e.message : String(e))
+    }
   } finally {
     recovering.value = null
   }

@@ -1174,6 +1174,8 @@
     "lastScan": "上次扫描",
     "itemsFound": "个孤儿资源",
     "recover": "恢复做种",
+    "recovering": "正在搜索匹配站点并恢复做种，请耐心等待...",
+    "timeout": "恢复超时，请查看日志或稍后重试",
     "recoverResult": "恢复结果",
     "recoverSuccess": "恢复成功",
     "recoverFailed": "未找到匹配",

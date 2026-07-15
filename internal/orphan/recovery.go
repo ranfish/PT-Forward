@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/titleparser"
@@ -88,43 +90,83 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry) (siteName, to
 
 	components := titleparser.ParseTitle(orphan.Name)
 	groupName := components.ReleaseGroup
-
 	sites := r.getSitePriority(ctx, groupName, orphan.Size)
-
-	for _, site := range sites {
-		if ctx.Err() != nil {
-			break
-		}
-
-		config, err := r.siteProvider.GetSiteConfig(ctx, site)
-		if err != nil || config == nil {
-			continue
-		}
-		adapter, err := r.siteProvider.GetAdapter(ctx, site)
-		if err != nil || adapter == nil {
-			continue
-		}
-
-		searchCtx, cancel := context.WithTimeout(ctx, 30*1000*1000*1000)
-		results, err := adapter.SearchTorrents(searchCtx, config, orphan.Name, nil)
-		cancel()
-		if err != nil || len(results) == 0 {
-			continue
-		}
-
-		for _, res := range results {
-			if res.Size > 0 && compareSize(orphan.Size, res.Size) {
-				r.logger.Info("orphan L2 match",
-					zap.String("orphan", orphan.Name),
-					zap.String("site", site),
-					zap.String("torrent_id", res.TorrentID),
-					zap.Int64("size", res.Size))
-				return site, res.TorrentID, "l2:search:" + site
-			}
-		}
+	if len(sites) == 0 {
+		return "", "", ""
 	}
 
-	return "", "", ""
+	type matchResult struct {
+		site, torrentID, method string
+	}
+
+	searchCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	resultCh := make(chan matchResult, 1)
+	sem := make(chan struct{}, 5)
+	var wg sync.WaitGroup
+
+	for _, site := range sites {
+		wg.Add(1)
+		go func(site string) {
+			defer wg.Done()
+
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-searchCtx.Done():
+				return
+			}
+
+			if searchCtx.Err() != nil {
+				return
+			}
+
+			config, err := r.siteProvider.GetSiteConfig(searchCtx, site)
+			if err != nil || config == nil {
+				return
+			}
+			adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
+			if err != nil || adapter == nil {
+				return
+			}
+
+			siteCtx, siteCancel := context.WithTimeout(searchCtx, 15*time.Second)
+			results, err := adapter.SearchTorrents(siteCtx, config, orphan.Name, nil)
+			siteCancel()
+			if err != nil || len(results) == 0 {
+				return
+			}
+
+			for _, res := range results {
+				if res.Size > 0 && compareSize(orphan.Size, res.Size) {
+					r.logger.Info("orphan L2 match",
+						zap.String("orphan", orphan.Name),
+						zap.String("site", site),
+						zap.String("torrent_id", res.TorrentID),
+						zap.Int64("size", res.Size))
+					select {
+					case resultCh <- matchResult{site, res.TorrentID, "l2:search:" + site}:
+					case <-searchCtx.Done():
+					}
+					return
+				}
+			}
+		}(site)
+	}
+
+	allDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(allDone)
+	}()
+
+	select {
+	case result := <-resultCh:
+		return result.site, result.torrentID, result.method
+	case <-allDone:
+		return "", "", ""
+	}
 }
 
 func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphanSize int64) []string {

@@ -1171,6 +1171,8 @@
     "lastScan": "Last scan",
     "itemsFound": "orphan(s) found",
     "recover": "Recover",
+    "recovering": "Searching sites and recovering, please wait...",
+    "timeout": "Recovery timed out, check logs or try again later",
     "recoverResult": "Recovery Result",
     "recoverSuccess": "Recovered",
     "recoverFailed": "No match found",
