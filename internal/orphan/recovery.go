@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/titleparser"
@@ -136,6 +137,11 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry) (siteName, to
 			if err != nil || config == nil {
 				return
 			}
+
+			if config.BaseURL != "" {
+				httpclient.ResetDomainCircuit(config.BaseURL)
+			}
+
 			adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
 			if err != nil || adapter == nil {
 				return
