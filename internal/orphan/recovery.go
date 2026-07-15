@@ -34,14 +34,18 @@ func NewRecovery(db *gorm.DB, sp model.SiteInfoProvider, cp model.DownloaderProv
 
 func (r *Recovery) Recover(ctx context.Context, orphan *Entry) *RecoverResult {
 	result := &RecoverResult{Orphan: orphan}
+	stats := &SearchStats{}
 
 	siteName, torrentID, method := r.tryDBMatch(ctx, orphan)
 	if siteName == "" {
-		siteName, torrentID, method = r.tryL2Search(ctx, orphan)
+		siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
 	}
 
+	result.SearchStats = stats
+
 	if siteName == "" {
-		result.Message = "no matching torrent found on any site"
+		result.Message = fmt.Sprintf("no matching torrent found on any site (searched: %d, skipped: %d, failed: %d)",
+			stats.Searched, stats.Skipped, len(stats.FailedSites))
 		return result
 	}
 
@@ -85,7 +89,7 @@ func (r *Recovery) tryDBMatch(ctx context.Context, orphan *Entry) (siteName, tor
 	return "", "", ""
 }
 
-func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry) (siteName, torrentID, method string) {
+func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *SearchStats) (siteName, torrentID, method string) {
 	if r.siteProvider == nil {
 		return "", "", ""
 	}
@@ -96,6 +100,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry) (siteName, to
 	if len(sites) == 0 {
 		return "", "", ""
 	}
+	stats.TotalSites = len(sites)
 
 	searchKeyword := reseed.ExtractSearchKeyword(orphan.Name)
 	if searchKeyword == "" {
@@ -116,6 +121,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry) (siteName, to
 	resultCh := make(chan matchResult, 1)
 	sem := make(chan struct{}, 5)
 	var wg sync.WaitGroup
+	var statsMu sync.Mutex
 
 	for _, site := range sites {
 		wg.Add(1)
@@ -135,22 +141,42 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry) (siteName, to
 
 			config, err := r.siteProvider.GetSiteConfig(searchCtx, site)
 			if err != nil || config == nil {
+				statsMu.Lock()
+				stats.Skipped++
+				statsMu.Unlock()
 				return
 			}
 
 			if config.BaseURL != "" {
 				httpclient.ResetDomainCircuit(config.BaseURL)
+				httpclient.GlobalLimiter.ManualUnfreeze(config.BaseURL)
 			}
 
 			adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
 			if err != nil || adapter == nil {
+				statsMu.Lock()
+				stats.Skipped++
+				statsMu.Unlock()
 				return
 			}
 
 			siteCtx, siteCancel := context.WithTimeout(searchCtx, 15*time.Second)
 			results, err := adapter.SearchTorrents(siteCtx, config, searchKeyword, nil)
 			siteCancel()
-			if err != nil || len(results) == 0 {
+
+			statsMu.Lock()
+			if err != nil {
+				stats.FailedSites = append(stats.FailedSites, SiteFailure{
+					Site:   site,
+					Reason: err.Error(),
+				})
+				statsMu.Unlock()
+				return
+			}
+			stats.Searched++
+			statsMu.Unlock()
+
+			if len(results) == 0 {
 				return
 			}
 
