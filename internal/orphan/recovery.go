@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -95,6 +96,15 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry) (siteName, to
 		return "", "", ""
 	}
 
+	searchKeyword := reseed.ExtractSearchKeyword(orphan.Name)
+	if searchKeyword == "" {
+		searchKeyword = orphan.Name
+	}
+	r.logger.Info("orphan L2 search starting",
+		zap.String("orphan", orphan.Name),
+		zap.String("keyword", searchKeyword),
+		zap.Int("sites", len(sites)))
+
 	type matchResult struct {
 		site, torrentID, method string
 	}
@@ -132,7 +142,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry) (siteName, to
 			}
 
 			siteCtx, siteCancel := context.WithTimeout(searchCtx, 15*time.Second)
-			results, err := adapter.SearchTorrents(siteCtx, config, orphan.Name, nil)
+			results, err := adapter.SearchTorrents(siteCtx, config, searchKeyword, nil)
 			siteCancel()
 			if err != nil || len(results) == 0 {
 				return
