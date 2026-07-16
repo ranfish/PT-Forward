@@ -11,7 +11,6 @@ import (
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
-	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -94,8 +93,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 		return "", "", ""
 	}
 
-	components := titleparser.ParseTitle(orphan.Name)
-	groupName := components.ReleaseGroup
+	groupName := reseed.ExtractGroupName(orphan.Name)
 	sites := r.getSitePriority(ctx, groupName, orphan.Size)
 	if len(sites) == 0 {
 		return "", "", ""
@@ -109,6 +107,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 	r.logger.Info("orphan L2 search starting",
 		zap.String("orphan", orphan.Name),
 		zap.String("keyword", searchKeyword),
+		zap.String("group", groupName),
 		zap.Int("sites", len(sites)))
 
 	type matchResult struct {
@@ -161,7 +160,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 			}
 
 			siteCtx, siteCancel := context.WithTimeout(searchCtx, 20*time.Second)
-			results, err := adapter.SearchTorrents(siteCtx, config, searchKeyword, nil)
+			match, err := reseed.SearchAndVerifyMatch(siteCtx, adapter, config, searchKeyword, groupName, orphan.Size)
 			siteCancel()
 
 			statsMu.Lock()
@@ -176,22 +175,17 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 			stats.Searched++
 			statsMu.Unlock()
 
-			if len(results) == 0 {
-				return
-			}
-
-			for _, res := range results {
-				if res.Size > 0 && compareSize(orphan.Size, res.Size) {
-					r.logger.Info("orphan L2 match",
-						zap.String("orphan", orphan.Name),
-						zap.String("site", site),
-						zap.String("torrent_id", res.TorrentID),
-						zap.Int64("size", res.Size))
-					select {
-					case resultCh <- matchResult{site, res.TorrentID, "l2:search:" + site}:
-					case <-searchCtx.Done():
-					}
-					return
+			if match != nil {
+				r.logger.Info("orphan L2 match",
+					zap.String("orphan", orphan.Name),
+					zap.String("site", site),
+					zap.String("torrent_id", match.TorrentID),
+					zap.String("matched_title", match.Title),
+					zap.Int64("orphan_size", orphan.Size),
+					zap.Int64("matched_size", match.Size))
+				select {
+				case resultCh <- matchResult{site, match.TorrentID, "l2:search:" + site}:
+				case <-searchCtx.Done():
 				}
 			}
 		}(site)
@@ -335,16 +329,4 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		zap.String("save_path", savePath))
 
 	return nil
-}
-
-func compareSize(sourceBytes, resultBytes int64) bool {
-	if sourceBytes <= 0 || resultBytes <= 0 {
-		return false
-	}
-	diff := sourceBytes - resultBytes
-	if diff < 0 {
-		diff = -diff
-	}
-	tolerance := float64(sourceBytes) * 0.02
-	return float64(diff) <= tolerance
 }
