@@ -2092,6 +2092,39 @@ func ExtractGroupName(title string) string {
 	return group
 }
 
+type L2MatchResult struct {
+	TorrentID string
+	Title     string
+	Size      int64
+}
+
+func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName string, sourceSize int64) (*L2MatchResult, error) {
+	if keyword == "" {
+		return nil, nil
+	}
+	results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range results {
+		if r.TorrentID == "" {
+			continue
+		}
+		if groupName != "" && !strings.Contains(r.Title, groupName) {
+			continue
+		}
+		if r.Size <= 0 || !CompareSizeDisplay(sourceSize, r.Size) {
+			continue
+		}
+		return &L2MatchResult{
+			TorrentID: r.TorrentID,
+			Title:     r.Title,
+			Size:      r.Size,
+		}, nil
+	}
+	return nil, nil
+}
+
 var videoExtensions = []string{".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".flv", ".mov"}
 
 func findMainVideoFile(fileTree map[string]int64) string {
