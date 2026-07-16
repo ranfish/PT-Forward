@@ -30,6 +30,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 	claimed := make(map[string]map[string]bool)
 	clientForPath := make(map[string]string)
 	scannedPaths := make(map[string]bool)
+	allSavePaths := make(map[string]bool)
 
 	for _, clientID := range clientIDs {
 		if ctx.Err() != nil {
@@ -59,6 +60,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 				clientForPath[sp] = clientID
 			}
 			claimed[sp][t.Name] = true
+			allSavePaths[sp] = true
 		}
 	}
 
@@ -68,7 +70,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			continue
 		}
 		scannedPaths[savePath] = true
-		orphans := s.scanDirectory(savePath, claimedNames, clientForPath[savePath])
+		orphans := s.scanDirectory(savePath, claimedNames, clientForPath[savePath], allSavePaths)
 		allOrphans = append(allOrphans, orphans...)
 	}
 
@@ -141,7 +143,7 @@ func stripChineseBracketPrefix(s string) string {
 	return s
 }
 
-func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, clientID string) []Entry {
+func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, clientID string, allSavePaths map[string]bool) []Entry {
 	entries, err := os.ReadDir(savePath)
 	if err != nil {
 		s.logger.Debug("orphan scan: cannot read directory",
@@ -164,6 +166,9 @@ func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, client
 		}
 
 		fullPath := filepath.Join(savePath, name)
+		if entry.IsDir() && allSavePaths[fullPath] {
+			continue
+		}
 		size := int64(0)
 		if entry.IsDir() {
 			size = dirSize(fullPath)
