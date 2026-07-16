@@ -105,6 +105,42 @@ func shouldSkip(name string) bool {
 	return false
 }
 
+func isClaimedFuzzy(dirName string, claimed map[string]bool) bool {
+	stripped := stripChineseBracketPrefix(dirName)
+	if stripped != dirName && claimed[stripped] {
+		return true
+	}
+	for cname := range claimed {
+		if cname == dirName {
+			return true
+		}
+		if stripChineseBracketPrefix(cname) == stripped && stripped != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func stripChineseBracketPrefix(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	r := []rune(s)
+	if len(r) >= 2 && (r[0] == '[' || r[0] == '【') {
+		close := ']'
+		if r[0] == '【' {
+			close = '】'
+		}
+		for i := 1; i < len(r); i++ {
+			if r[i] == close {
+				rest := strings.TrimLeft(string(r[i+1:]), ". ")
+				return rest
+			}
+		}
+	}
+	return s
+}
+
 func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, clientID string) []Entry {
 	entries, err := os.ReadDir(savePath)
 	if err != nil {
@@ -123,7 +159,7 @@ func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, client
 			continue
 		}
 
-		if claimed[name] {
+		if claimed[name] || isClaimedFuzzy(name, claimed) {
 			continue
 		}
 
