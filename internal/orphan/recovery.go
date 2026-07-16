@@ -313,7 +313,7 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		}
 	}
 
-	_, err = client.AddFromFile(ctx, torrentData, model.AddTorrentOptions{
+	addResult, err := client.AddFromFile(ctx, torrentData, model.AddTorrentOptions{
 		SavePath: savePath,
 		Category: category,
 		Tags:     tags,
@@ -323,10 +323,57 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		return fmt.Errorf("add to downloader: %w", err)
 	}
 
+	infoHash := addResult.InfoHash
+	if infoHash != "" {
+		if recheckErr := waitForRecheck(ctx, client, infoHash, 120*time.Second); recheckErr != nil {
+			r.logger.Warn("orphan recheck failed",
+				zap.String("orphan", orphan.Name),
+				zap.String("hash", infoHash),
+				zap.Error(recheckErr))
+		} else {
+			if resumeErr := client.ResumeTorrent(ctx, infoHash); resumeErr != nil {
+				r.logger.Warn("orphan resume failed",
+					zap.String("orphan", orphan.Name),
+					zap.String("hash", infoHash),
+					zap.Error(resumeErr))
+			}
+		}
+	}
+
 	r.logger.Info("orphan recovered",
 		zap.String("orphan", orphan.Name),
 		zap.String("site", siteName),
-		zap.String("save_path", savePath))
+		zap.String("save_path", savePath),
+		zap.String("hash", infoHash))
 
 	return nil
+}
+
+func waitForRecheck(ctx context.Context, dlClient model.DownloaderClient, infoHash string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	interval := 3 * time.Second
+	gracePeriod := 15 * time.Second
+	startTime := time.Now()
+
+	for time.Now().Before(deadline) {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		time.Sleep(interval)
+		ti, err := dlClient.GetTorrentByHash(ctx, infoHash)
+		if err != nil || ti == nil {
+			continue
+		}
+		if strings.HasPrefix(ti.State, "checking") {
+			continue
+		}
+		if ti.Progress >= 1.0 {
+			return nil
+		}
+		if time.Since(startTime) < gracePeriod {
+			continue
+		}
+		return fmt.Errorf("data verification incomplete: %.1f%% state=%s", ti.Progress*100, ti.State)
+	}
+	return fmt.Errorf("recheck timeout after %v", timeout)
 }
