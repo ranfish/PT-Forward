@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
@@ -129,55 +130,156 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 		}
 	}
 
-	var videoFiles []string
+	diskFiles := make(map[string]int64)
+	var videoFileNames []string
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
 		ext := strings.ToLower(filepath.Ext(e.Name()))
 		if searchableVideoExts[ext] {
-			videoFiles = append(videoFiles, e.Name())
+			info, err := e.Info()
+			if err != nil {
+				continue
+			}
+			diskFiles[e.Name()] = info.Size()
+			videoFileNames = append(videoFileNames, e.Name())
 		}
 	}
 
-	if len(videoFiles) == 0 || len(videoFiles) > maxFileLevelSearch {
+	if len(diskFiles) == 0 || len(diskFiles) > maxFileLevelSearch {
 		return nil
 	}
 
-	var results []FileRecoverResult
-	for _, fileName := range videoFiles {
-		filePath := filepath.Join(orphan.Path, fileName)
-		info, err := os.Stat(filePath)
-		if err != nil {
+	results := make([]FileRecoverResult, 0, len(videoFileNames))
+	covered := make(map[string]bool)
+
+	dirKeyword := reseed.ExtractSearchKeyword(orphan.Name)
+	dirGroup := reseed.ExtractGroupName(orphan.Name)
+	r.logger.Info("file-level recover: directory search",
+		zap.String("orphan", orphan.Name),
+		zap.String("keyword", dirKeyword),
+		zap.String("group", dirGroup),
+		zap.Int("disk_files", len(diskFiles)))
+
+	sites := r.getSitePriority(ctx, dirGroup, orphan.Size)
+	searchCtx, searchCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer searchCancel()
+
+	for _, site := range sites {
+		if searchCtx.Err() != nil {
+			break
+		}
+		if len(covered) == len(diskFiles) {
+			break
+		}
+
+		config, err := r.siteProvider.GetSiteConfig(searchCtx, site)
+		if err != nil || config == nil {
+			continue
+		}
+		if config.BaseURL != "" {
+			httpclient.ResetDomainCircuit(config.BaseURL)
+			httpclient.GlobalLimiter.ManualUnfreeze(config.BaseURL)
+		}
+		adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
+		if err != nil || adapter == nil {
 			continue
 		}
 
-		fileEntry := &Entry{
-			Path:       filePath,
-			Name:       fileName,
-			Size:       info.Size(),
-			IsDir:      false,
-			ClientIDs:  orphan.ClientIDs,
-			SavePath:   filepath.Dir(orphan.Path),
+		siteCtx, siteCancel := context.WithTimeout(searchCtx, 20*time.Second)
+		results2, err := adapter.SearchTorrents(siteCtx, config, dirKeyword, nil)
+		siteCancel()
+		if err != nil || len(results2) == 0 {
+			continue
 		}
 
-		siteName, torrentID, method := r.tryDBMatch(ctx, fileEntry)
-		if siteName == "" {
-			fileStats := &SearchStats{}
-			siteName, torrentID, method = r.tryL2Search(ctx, fileEntry, fileStats)
-		}
+		for _, res := range results2 {
+			if res.TorrentID == "" {
+				continue
+			}
+			if dirGroup != "" && !strings.Contains(res.Title, dirGroup) {
+				continue
+			}
 
-		fr := FileRecoverResult{FileName: fileName}
-		if siteName != "" {
-			if err := r.downloadAndAdd(ctx, fileEntry, siteName, torrentID, filepath.Dir(orphan.Path), orphan.ClientIDs[0]); err != nil {
-				fr.Message = fmt.Sprintf("download failed: %v", err)
-			} else {
-				fr.Found = true
-				fr.SiteName = siteName
-				fr.Message = method
+			dlCtx, dlCancel := context.WithTimeout(searchCtx, 30*time.Second)
+			torrentData, dlErr := adapter.DownloadTorrent(dlCtx, config, res.TorrentID)
+			dlCancel()
+			if dlErr != nil || len(torrentData) == 0 {
+				continue
+			}
+
+			meta, metaErr := fingerprint.ComputeFromTorrent(torrentData)
+			if metaErr != nil || meta == nil {
+				continue
+			}
+
+			var matchedFiles []string
+			allExist := true
+			for torrentFile := range meta.FileTree {
+				baseName := filepath.Base(torrentFile)
+				if _, exists := diskFiles[baseName]; !exists {
+					allExist = false
+					break
+				}
+				if covered[baseName] {
+					allExist = false
+					break
+				}
+				matchedFiles = append(matchedFiles, baseName)
+			}
+
+			if !allExist || len(matchedFiles) == 0 {
+				continue
+			}
+
+			r.logger.Info("file-level match found",
+				zap.String("orphan", orphan.Name),
+				zap.String("site", site),
+				zap.String("torrent_id", res.TorrentID),
+				zap.Strings("matched_files", matchedFiles))
+
+			parentSavePath := filepath.Dir(orphan.Path)
+			clientID := ""
+			if len(orphan.ClientIDs) > 0 {
+				clientID = orphan.ClientIDs[0]
+			}
+			addEntry := &Entry{
+				Path:      orphan.Path,
+				Name:      orphan.Name,
+				ClientIDs: orphan.ClientIDs,
+				SavePath:  parentSavePath,
+			}
+
+			category, tags := r.getCategoryAndTags(site)
+			addErr := r.addTorrentWithRecheck(ctx, addEntry, clientID, torrentData, parentSavePath, category, tags)
+			if addErr != nil {
+				r.logger.Warn("file-level add failed",
+					zap.String("torrent_id", res.TorrentID),
+					zap.Error(addErr))
+				continue
+			}
+
+			for _, mf := range matchedFiles {
+				covered[mf] = true
+				results = append(results, FileRecoverResult{
+					FileName: mf,
+					Found:    true,
+					SiteName: site,
+					Message:  fmt.Sprintf("file-level:%s", res.TorrentID),
+				})
 			}
 		}
-		results = append(results, fr)
+	}
+
+	for _, vf := range videoFileNames {
+		if !covered[vf] {
+			results = append(results, FileRecoverResult{
+				FileName: vf,
+				Found:    false,
+				Message:  "not found",
+			})
+		}
 	}
 
 	return results
@@ -359,43 +461,7 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 	return priority
 }
 
-func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string, savePathOverride string, targetClientID string) error {
-	config, err := r.siteProvider.GetSiteConfig(ctx, siteName)
-	if err != nil || config == nil {
-		return fmt.Errorf("get site config: %w", err)
-	}
-	adapter, err := r.siteProvider.GetAdapter(ctx, siteName)
-	if err != nil || adapter == nil {
-		return fmt.Errorf("get adapter: %w", err)
-	}
-
-	dlCtx, cancel := context.WithTimeout(ctx, 60*1000*1000*1000)
-	defer cancel()
-	torrentData, err := adapter.DownloadTorrent(dlCtx, config, torrentID)
-	if err != nil {
-		return fmt.Errorf("download torrent: %w", err)
-	}
-	if len(torrentData) == 0 {
-		return fmt.Errorf("downloaded torrent data is empty")
-	}
-
-	clientID := targetClientID
-	if clientID == "" && len(orphan.ClientIDs) > 0 {
-		clientID = orphan.ClientIDs[0]
-	}
-	client, err := r.clientProvider.Get(clientID)
-	if err != nil {
-		return fmt.Errorf("get downloader client: %w", err)
-	}
-
-	savePath := savePathOverride
-	if savePath == "" {
-		savePath = orphan.SavePath
-		if !orphan.IsDir {
-			savePath = filepath.Dir(orphan.Path)
-		}
-	}
-
+func (r *Recovery) getCategoryAndTags(siteName string) (string, []string) {
 	category := "orphan-recover"
 	tags := []string{"orphan-recover", "from:" + siteName}
 	if r.db != nil {
@@ -413,6 +479,14 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 			tags = append(tags, "from:"+siteName)
 		}
 	}
+	return category, tags
+}
+
+func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, clientID string, torrentData []byte, savePath, category string, tags []string) error {
+	client, err := r.clientProvider.Get(clientID)
+	if err != nil {
+		return fmt.Errorf("get downloader client: %w", err)
+	}
 
 	addResult, err := client.AddFromFile(ctx, torrentData, model.AddTorrentOptions{
 		SavePath: savePath,
@@ -421,17 +495,14 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		Paused:   true,
 	})
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "already") || strings.Contains(strings.ToLower(err.Error()), "exist") || strings.Contains(strings.ToLower(err.Error()), "duplicate") {
-			r.logger.Info("orphan torrent already in downloader, treating as recovered",
-				zap.String("orphan", orphan.Name),
-				zap.String("site", siteName))
+		lower := strings.ToLower(err.Error())
+		if strings.Contains(lower, "already") || strings.Contains(lower, "exist") || strings.Contains(lower, "duplicate") {
 			return nil
 		}
 		return fmt.Errorf("add to downloader: %w", err)
 	}
 
 	infoHash := addResult.InfoHash
-	recheckOK := false
 	if infoHash != "" {
 		if recheckErr := waitForRecheck(ctx, client, infoHash, 120*time.Second); recheckErr != nil {
 			r.logger.Warn("orphan recheck incomplete",
@@ -439,7 +510,6 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 				zap.String("hash", infoHash),
 				zap.Error(recheckErr))
 		} else {
-			recheckOK = true
 			if resumeErr := client.ResumeTorrent(ctx, infoHash); resumeErr != nil {
 				r.logger.Warn("orphan resume failed",
 					zap.String("orphan", orphan.Name),
@@ -448,20 +518,56 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 			}
 		}
 	}
+	return nil
+}
 
-	if recheckOK {
-		r.logger.Info("orphan recovered and seeding",
-			zap.String("orphan", orphan.Name),
-			zap.String("site", siteName),
-			zap.String("save_path", savePath),
-			zap.String("hash", infoHash))
-	} else {
-		r.logger.Info("orphan torrent added but verification incomplete",
-			zap.String("orphan", orphan.Name),
-			zap.String("site", siteName),
-			zap.String("save_path", savePath),
-			zap.String("hash", infoHash))
+func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string, savePathOverride string, targetClientID string) error {
+	config, err := r.siteProvider.GetSiteConfig(ctx, siteName)
+	if err != nil || config == nil {
+		return fmt.Errorf("get site config: %w", err)
 	}
+	adapter, err := r.siteProvider.GetAdapter(ctx, siteName)
+	if err != nil || adapter == nil {
+		return fmt.Errorf("get adapter: %w", err)
+	}
+
+	dlCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	torrentData, err := adapter.DownloadTorrent(dlCtx, config, torrentID)
+	if err != nil {
+		return fmt.Errorf("download torrent: %w", err)
+	}
+	if len(torrentData) == 0 {
+		return fmt.Errorf("downloaded torrent data is empty")
+	}
+
+	clientID := targetClientID
+	if clientID == "" && len(orphan.ClientIDs) > 0 {
+		clientID = orphan.ClientIDs[0]
+	}
+
+	savePath := savePathOverride
+	if savePath == "" {
+		savePath = orphan.SavePath
+		if !orphan.IsDir {
+			savePath = filepath.Dir(orphan.Path)
+		}
+	}
+
+	category, tags := r.getCategoryAndTags(siteName)
+
+	if err := r.addTorrentWithRecheck(ctx, orphan, clientID, torrentData, savePath, category, tags); err != nil {
+		return err
+	}
+
+	if infoHash := ""; false {
+		_ = infoHash
+	}
+
+	r.logger.Info("orphan recovered",
+		zap.String("orphan", orphan.Name),
+		zap.String("site", siteName),
+		zap.String("save_path", savePath))
 
 	return nil
 }
