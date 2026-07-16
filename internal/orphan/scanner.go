@@ -12,12 +12,20 @@ import (
 )
 
 type Scanner struct {
-	provider model.DownloaderProvider
-	logger   *zap.Logger
+	provider      model.DownloaderProvider
+	logger        *zap.Logger
+	ignoredPaths  map[string]bool
 }
 
 func NewScanner(provider model.DownloaderProvider, logger *zap.Logger) *Scanner {
 	return &Scanner{provider: provider, logger: logger.With(zap.String("component", "orphan"))}
+}
+
+func (s *Scanner) SetIgnoredPaths(paths []string) {
+	s.ignoredPaths = make(map[string]bool, len(paths))
+	for _, p := range paths {
+		s.ignoredPaths[filepath.Clean(p)] = true
+	}
 }
 
 func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
@@ -167,6 +175,9 @@ func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, client
 
 		fullPath := filepath.Join(savePath, name)
 		if entry.IsDir() && allSavePaths[fullPath] {
+			continue
+		}
+		if s.ignoredPaths != nil && s.ignoredPaths[fullPath] {
 			continue
 		}
 		size := int64(0)

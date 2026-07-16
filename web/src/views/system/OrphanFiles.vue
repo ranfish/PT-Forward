@@ -65,15 +65,25 @@
             <span v-else style="color:#999">-</span>
           </template>
           <template v-if="column.key === 'action'">
-            <a-button
-              size="small"
-              type="link"
-              :disabled="batchRecovering || record._status === 'found'"
-              :loading="recovering === record.path"
-              @click="recover(record)"
-            >
-              {{ t('orphan.recover') }}
-            </a-button>
+            <a-space size="small">
+              <a-button
+                size="small"
+                type="link"
+                :disabled="batchRecovering || record._status === 'found'"
+                :loading="recovering === record.path"
+                @click="recover(record)"
+              >
+                {{ t('orphan.recover') }}
+              </a-button>
+              <a-button size="small" type="link" :disabled="batchRecovering" @click="ignoreOrphan(record)">
+                {{ t('orphan.ignore') }}
+              </a-button>
+              <a-popconfirm :title="t('orphan.deleteConfirm')" @confirm="deleteOrphan(record)">
+                <a-button size="small" type="link" danger :disabled="batchRecovering">
+                  {{ t('orphan.deleteFile') }}
+                </a-button>
+              </a-popconfirm>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -364,6 +374,42 @@ async function batchRecover() {
   if (found > 0) {
     message.success(`${found} ${t('orphan.recoverSuccess')}`)
     setTimeout(() => fetchOrphans(), 2000)
+  }
+}
+
+async function ignoreOrphan(orphan: OrphanEntry) {
+  try {
+    const resp = await fetch('/api/v1/orphans/ignore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ path: orphan.path })
+    })
+    const data = await resp.json()
+    if (data.code === 0) {
+      orphans.value = orphans.value.filter(o => o.path !== orphan.path)
+      message.success(t('orphan.ignored'))
+    }
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  }
+}
+
+async function deleteOrphan(orphan: OrphanEntry) {
+  try {
+    const resp = await fetch('/api/v1/orphans/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ path: orphan.path })
+    })
+    const data = await resp.json()
+    if (data.code === 0) {
+      orphans.value = orphans.value.filter(o => o.path !== orphan.path)
+      message.success(t('orphan.deleted'))
+    } else {
+      message.error(data.message || 'Delete failed')
+    }
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 

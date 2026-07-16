@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,13 +12,16 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/orphan"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type OrphanHandler struct {
 	scanner  *orphan.Scanner
 	recovery *orphan.Recovery
 	logger   *zap.Logger
+	db       *gorm.DB
 
 	mu            sync.RWMutex
 	lastResults   []orphan.Entry
@@ -26,10 +30,11 @@ type OrphanHandler struct {
 	recoverSeq    atomic.Int64
 }
 
-func NewOrphanHandler(scanner *orphan.Scanner, recovery *orphan.Recovery, logger *zap.Logger) *OrphanHandler {
+func NewOrphanHandler(scanner *orphan.Scanner, recovery *orphan.Recovery, db *gorm.DB, logger *zap.Logger) *OrphanHandler {
 	return &OrphanHandler{
 		scanner:  scanner,
 		recovery: recovery,
+		db:       db,
 		logger:   logger,
 	}
 }
@@ -43,6 +48,14 @@ func (h *OrphanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleRecover(w, r)
 	case strings.Contains(path, "/orphans/recover/") && r.Method == http.MethodGet:
 		h.handlePollRecover(w, r)
+	case strings.HasSuffix(path, "/orphans/ignore") && r.Method == http.MethodPost:
+		h.handleIgnore(w, r)
+	case strings.HasSuffix(path, "/orphans/delete") && r.Method == http.MethodPost:
+		h.handleDelete(w, r)
+	case strings.HasSuffix(path, "/orphans/ignored") && r.Method == http.MethodGet:
+		h.handleListIgnored(w, r)
+	case strings.HasSuffix(path, "/orphans/ignored") && r.Method == http.MethodDelete:
+		h.handleUnignore(w, r)
 	case strings.HasSuffix(path, "/orphans") && r.Method == http.MethodGet:
 		h.handleList(w, r)
 	default:
@@ -55,6 +68,16 @@ func (h *OrphanHandler) handleScan(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusServiceUnavailable, 50001, "scanner not configured")
 		return
 	}
+
+	var ignoredPaths []string
+	if h.db != nil {
+		var settings []setting.Setting
+		h.db.Where("key = ?", "orphan_ignored_path").Find(&settings)
+		for _, s := range settings {
+			ignoredPaths = append(ignoredPaths, s.Value)
+		}
+	}
+	h.scanner.SetIgnoredPaths(ignoredPaths)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
@@ -161,4 +184,108 @@ func (h *OrphanHandler) handlePollRecover(w http.ResponseWriter, r *http.Request
 	}
 	result := val.(*orphan.RecoverResult)
 	Success(w, result)
+}
+
+func (h *OrphanHandler) handleIgnore(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.Path == "" {
+		Error(w, http.StatusBadRequest, 40001, "path 必填")
+		return
+	}
+
+	h.db.Where("key = ? AND value = ?", "orphan_ignored_path", req.Path).
+		FirstOrCreate(&setting.Setting{Key: "orphan_ignored_path", Value: req.Path})
+
+	h.mu.Lock()
+	var updated []orphan.Entry
+	for _, e := range h.lastResults {
+		if e.Path != req.Path {
+			updated = append(updated, e)
+		}
+	}
+	h.lastResults = updated
+	h.mu.Unlock()
+
+	Success(w, map[string]interface{}{"ignored": true})
+}
+
+func (h *OrphanHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.Path == "" {
+		Error(w, http.StatusBadRequest, 40001, "path 必填")
+		return
+	}
+
+	info, err := os.Stat(req.Path)
+	if err != nil {
+		Error(w, http.StatusNotFound, 40400, "路径不存在")
+		return
+	}
+
+	var deleted int64
+	if info.IsDir() {
+		err = os.RemoveAll(req.Path)
+	} else {
+		err = os.Remove(req.Path)
+	}
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50001, "删除失败: "+err.Error())
+		return
+	}
+	deleted = 1
+
+	h.mu.Lock()
+	var updated []orphan.Entry
+	for _, e := range h.lastResults {
+		if e.Path != req.Path {
+			updated = append(updated, e)
+		}
+	}
+	h.lastResults = updated
+	h.mu.Unlock()
+
+	h.logger.Info("orphan file deleted by user", zap.String("path", req.Path))
+	Success(w, map[string]interface{}{"deleted": deleted})
+}
+
+func (h *OrphanHandler) handleListIgnored(w http.ResponseWriter, r *http.Request) {
+	var settings []setting.Setting
+	h.db.Where("key = ?", "orphan_ignored_path").Find(&settings)
+	var paths []string
+	for _, s := range settings {
+		paths = append(paths, s.Value)
+	}
+	if paths == nil {
+		paths = []string{}
+	}
+	Success(w, map[string]interface{}{"ignored": paths, "count": len(paths)})
+}
+
+func (h *OrphanHandler) handleUnignore(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.Path == "" {
+		Error(w, http.StatusBadRequest, 40001, "path 必填")
+		return
+	}
+
+	h.db.Where("key = ? AND value = ?", "orphan_ignored_path", req.Path).Delete(&setting.Setting{})
+	Success(w, map[string]interface{}{"unignored": true})
 }

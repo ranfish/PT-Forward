@@ -434,7 +434,7 @@ func main() {
 
 	orphanScanner := orphan.NewScanner(clientManager, log)
 	orphanRecovery := orphan.NewRecovery(db, siteProvider, clientManager, log)
-	router.SetupOrphan(orphanScanner, orphanRecovery)
+	router.SetupOrphan(orphanScanner, orphanRecovery, db)
 	if err := router.StartCoverageRefresh(taskRegistry); err != nil {
 		log.Warn("failed to register coverage refresh schedule", zap.Error(err))
 	}

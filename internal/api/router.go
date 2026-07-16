@@ -165,8 +165,8 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.publishTorrentsHandler.SetDeclarationFilter(declFilter)
 }
 
-func (rt *Router) SetupOrphan(scanner *orphan.Scanner, recovery *orphan.Recovery) {
-	rt.orphanHandler = NewOrphanHandler(scanner, recovery, rt.logger)
+func (rt *Router) SetupOrphan(scanner *orphan.Scanner, recovery *orphan.Recovery, db *gorm.DB) {
+	rt.orphanHandler = NewOrphanHandler(scanner, recovery, db, rt.logger)
 }
 
 func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr *client.Manager, sourceDetector *publish.SourceSiteDetector) {
