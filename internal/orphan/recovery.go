@@ -222,6 +222,23 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 		return enabledSites
 	}
 
+	priority := make([]string, 0, len(enabledSites))
+	seen := make(map[string]bool)
+
+	if r.db != nil {
+		var sourceSites []string
+		r.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+			Where("group_name = ? AND site_name IN ?", groupName, enabledSites).
+			Order("is_official DESC").
+			Pluck("site_name", &sourceSites)
+		for _, site := range sourceSites {
+			if !seen[site] {
+				priority = append(priority, site)
+				seen[site] = true
+			}
+		}
+	}
+
 	type siteFreq struct {
 		Name string
 		Freq int
@@ -232,24 +249,6 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 		enabledSites,
 	).Scan(&freqs)
 
-	type groupSiteFreq struct {
-		SiteName string
-		Freq     int
-	}
-	var groupFreqs []groupSiteFreq
-	r.db.WithContext(ctx).Raw(
-		`SELECT site_name, COUNT(*) as freq FROM seeding_torrent_records WHERE site_name IN ? AND info_hash IN (
-			SELECT DISTINCT info_hash FROM publish_candidates WHERE torrent_name LIKE ?
-		) GROUP BY site_name ORDER BY freq DESC`,
-		enabledSites, "%-"+groupName,
-	).Scan(&groupFreqs)
-
-	priority := make([]string, 0, len(enabledSites))
-	seen := make(map[string]bool)
-	for _, gf := range groupFreqs {
-		priority = append(priority, gf.SiteName)
-		seen[gf.SiteName] = true
-	}
 	for _, sf := range freqs {
 		if !seen[sf.Name] {
 			priority = append(priority, sf.Name)
@@ -320,17 +319,25 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		Paused:   true,
 	})
 	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "already") || strings.Contains(strings.ToLower(err.Error()), "exist") || strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+			r.logger.Info("orphan torrent already in downloader, treating as recovered",
+				zap.String("orphan", orphan.Name),
+				zap.String("site", siteName))
+			return nil
+		}
 		return fmt.Errorf("add to downloader: %w", err)
 	}
 
 	infoHash := addResult.InfoHash
+	recheckOK := false
 	if infoHash != "" {
 		if recheckErr := waitForRecheck(ctx, client, infoHash, 120*time.Second); recheckErr != nil {
-			r.logger.Warn("orphan recheck failed",
+			r.logger.Warn("orphan recheck incomplete",
 				zap.String("orphan", orphan.Name),
 				zap.String("hash", infoHash),
 				zap.Error(recheckErr))
 		} else {
+			recheckOK = true
 			if resumeErr := client.ResumeTorrent(ctx, infoHash); resumeErr != nil {
 				r.logger.Warn("orphan resume failed",
 					zap.String("orphan", orphan.Name),
@@ -340,11 +347,19 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		}
 	}
 
-	r.logger.Info("orphan recovered",
-		zap.String("orphan", orphan.Name),
-		zap.String("site", siteName),
-		zap.String("save_path", savePath),
-		zap.String("hash", infoHash))
+	if recheckOK {
+		r.logger.Info("orphan recovered and seeding",
+			zap.String("orphan", orphan.Name),
+			zap.String("site", siteName),
+			zap.String("save_path", savePath),
+			zap.String("hash", infoHash))
+	} else {
+		r.logger.Info("orphan torrent added but verification incomplete",
+			zap.String("orphan", orphan.Name),
+			zap.String("site", siteName),
+			zap.String("save_path", savePath),
+			zap.String("hash", infoHash))
+	}
 
 	return nil
 }
