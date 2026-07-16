@@ -941,7 +941,8 @@ func isAPIOrWS(path string) bool {
 	return path == "/healthz" ||
 		path == "/metrics" ||
 		len(path) >= 5 && path[:5] == "/api/" ||
-		len(path) >= 3 && path[:3] == "/ws"
+		len(path) >= 3 && path[:3] == "/ws" ||
+		len(path) >= 13 && path[:13] == "/cookiecloud/"
 }
 
 func registerSchedulerTasks(
