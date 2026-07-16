@@ -106,6 +106,24 @@ func decryptCryptoJSAES(password, ciphertext string) ([]byte, error) {
 	return decrypted, nil
 }
 
+func DecryptFromEncrypted(encrypted, uuid, password string) (map[string][]CookieData, error) {
+	if encrypted == "" {
+		return nil, ccError(ErrCCParse, "no encrypted data", nil)
+	}
+	keyPassword := md5String(uuid, "-", password)[:16]
+	decrypted, err := decryptCryptoJSAES(keyPassword, encrypted)
+	if err != nil {
+		return nil, ccError(ErrCCCrypto, "decrypt", err)
+	}
+	var result struct {
+		CookieData map[string][]CookieData `json:"cookie_data"`
+	}
+	if err := json.Unmarshal(decrypted, &result); err != nil {
+		return nil, ccError(ErrCCParse, "parse decrypted json", err)
+	}
+	return result.CookieData, nil
+}
+
 func FetchAndDecrypt(serverURL, uuid, password string) (map[string][]CookieData, error) {
 	url := strings.TrimSuffix(serverURL, "/") + "/get/" + uuid
 
@@ -126,24 +144,8 @@ func FetchAndDecrypt(serverURL, uuid, password string) (map[string][]CookieData,
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return nil, ccError(ErrCCParse, "parse json", err)
 	}
-	if body.Encrypted == "" {
-		return nil, ccError(ErrCCParse, "no encrypted data in response", nil)
-	}
 
-	keyPassword := md5String(uuid, "-", password)[:16]
-	decrypted, err := decryptCryptoJSAES(keyPassword, body.Encrypted)
-	if err != nil {
-		return nil, ccError(ErrCCCrypto, "decrypt", err)
-	}
-
-	var result struct {
-		CookieData map[string][]CookieData `json:"cookie_data"`
-	}
-	if err := json.Unmarshal(decrypted, &result); err != nil {
-		return nil, ccError(ErrCCParse, "parse decrypted json", err)
-	}
-
-	return result.CookieData, nil
+	return DecryptFromEncrypted(body.Encrypted, uuid, password)
 }
 
 func normalizeDomain(d string) string {

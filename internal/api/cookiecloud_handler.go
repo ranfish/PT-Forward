@@ -86,6 +86,7 @@ func (h *CookieCloudHandler) handleGetConfig(w http.ResponseWriter, _ *http.Requ
 
 	Success(w, map[string]interface{}{
 		"id":           cfg.ID,
+		"mode":         cfg.Mode,
 		"serverUrl":    cfg.ServerURL,
 		"uuid":         cfg.UUID,
 		"syncEnabled":  cfg.SyncEnabled,
@@ -93,11 +94,13 @@ func (h *CookieCloudHandler) handleGetConfig(w http.ResponseWriter, _ *http.Requ
 		"cryptoType":   cfg.CryptoType,
 		"lastSyncAt":   cfg.LastSyncAt,
 		"hasPassword":  cfg.Password != "",
+		"hasEncrypted": cfg.LastEncrypted != "",
 	})
 }
 
 func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		Mode         string `json:"mode"`
 		ServerURL    string `json:"serverUrl"`
 		UUID         string `json:"uuid"`
 		Password     string `json:"password"`
@@ -118,10 +121,14 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 	switch {
 	case result.Error != nil && errors.Is(result.Error, gorm.ErrRecordNotFound):
 		cfg = model.CookieCloudConfig{
+			Mode:       req.Mode,
 			ServerURL:  req.ServerURL,
 			UUID:       req.UUID,
 			Password:   req.Password,
 			CryptoType: req.CryptoType,
+		}
+		if cfg.Mode == "" {
+			cfg.Mode = "remote"
 		}
 		if req.SyncEnabled != nil {
 			cfg.SyncEnabled = *req.SyncEnabled
@@ -143,6 +150,9 @@ func (h *CookieCloudHandler) handleUpdateConfig(w http.ResponseWriter, r *http.R
 		Error(w, http.StatusInternalServerError, 50000, "获取配置失败")
 		return
 	default:
+		if req.Mode != "" {
+			cfg.Mode = req.Mode
+		}
 		if req.ServerURL != "" {
 			cfg.ServerURL = req.ServerURL
 		}

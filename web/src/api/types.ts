@@ -579,6 +579,7 @@ export interface ReseedMatch {
 
 export interface CookieCloudConfig {
   id: number
+  mode: string
   serverUrl: string
   uuid: string
   hasPassword: boolean
@@ -586,6 +587,7 @@ export interface CookieCloudConfig {
   syncEnabled: boolean
   syncInterval: number
   lastSyncAt?: string | null
+  hasEncrypted?: boolean
 }
 
 export interface IYUUConfig {

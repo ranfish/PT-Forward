@@ -4,7 +4,22 @@
 
     <a-spin :spinning="loading">
       <a-form :model="form" layout="vertical" style="max-width: 600px">
-        <a-form-item :label="t('cookiecloud.serverUrl')">
+        <a-form-item label="CookieCloud 模式">
+          <a-radio-group v-model:value="form.mode" @change="handleModeChange">
+            <a-radio-button value="remote">远程服务器</a-radio-button>
+            <a-radio-button value="builtin">本地内置</a-radio-button>
+          </a-radio-group>
+        </a-form-item>
+
+        <template v-if="form.mode === 'builtin'">
+          <a-alert type="info" style="margin-bottom: 16px" show-icon>
+            <template #message>
+              浏览器插件配置地址：<a-typography-text copyable>{{ builtinUrl }}</a-typography-text>
+            </template>
+          </a-alert>
+        </template>
+
+        <a-form-item v-if="form.mode === 'remote'" :label="t('cookiecloud.serverUrl')">
           <a-input v-model:value="form.serverUrl" placeholder="https://cookiecloud.example.com" />
         </a-form-item>
         <a-form-item :label="t('cookiecloud.uuid')">
@@ -82,6 +97,7 @@ const historyLoading = ref(false)
 const histories = ref<Record<string, unknown>[]>([])
 
 const form = reactive({
+  mode: 'remote' as 'remote' | 'builtin',
   serverUrl: '',
   uuid: '',
   password: '',
@@ -89,6 +105,18 @@ const form = reactive({
   syncEnabled: false,
   syncInterval: 60,
 })
+
+const builtinUrl = ref('')
+
+function updateBuiltinUrl() {
+  const proto = window.location.protocol
+  const host = window.location.host
+  builtinUrl.value = `${proto}//${host}/cookiecloud`
+}
+
+function handleModeChange() {
+  updateBuiltinUrl()
+}
 
 const historyPagination = reactive({
   current: 1,
@@ -113,12 +141,14 @@ async function fetchConfig() {
   try {
     const resp = await cookiecloudApi.getConfig()
     const data = resp.data?.data || {}
+    form.mode = (data.mode || 'remote') as 'remote' | 'builtin'
     form.serverUrl = data.serverUrl || ''
     form.uuid = data.uuid || ''
     form.password = ''
     form.cryptoType = data.cryptoType || 'legacy'
     form.syncEnabled = data.syncEnabled || false
     form.syncInterval = data.syncInterval || 60
+    updateBuiltinUrl()
   } catch {
   } finally {
     loading.value = false
