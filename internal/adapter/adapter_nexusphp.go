@@ -82,6 +82,14 @@ func (a *NexusPHPAdapter) ParseRSS(_ context.Context, _ string, _ *model.SiteCon
 }
 
 func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+	domain := config.BaseURL
+	if domain == "" {
+		domain = config.Domain
+	}
+	if err := httpclient.GlobalDownloadLimiter.Acquire(domain); err != nil {
+		return nil, downloadError("下载限流: "+err.Error(), nil)
+	}
+
 	var u string
 	if config.DownloadMode == "signed" {
 		signedURL, err := a.resolveSignedDownloadURL(ctx, config, torrentID)

@@ -91,6 +91,12 @@ func (a *GenericAdapter) ParseRSS(_ context.Context, _ string, _ *model.SiteConf
 }
 
 func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+	domain := config.BaseURL
+	if domain == "" {
+		domain = config.Domain
+	}
+	httpclient.GlobalDownloadLimiter.Acquire(domain)
+
 	var u string
 	if config.DownloadURLTemplate != "" {
 		u = buildGenericURL(config, config.DownloadURLTemplate, torrentID)
