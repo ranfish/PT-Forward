@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -300,10 +301,28 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		savePath = filepath.Dir(orphan.Path)
 	}
 
+	category := "orphan-recover"
+	tags := []string{"orphan-recover", "from:" + siteName}
+	if r.db != nil {
+		var catVal, tagVal string
+		r.db.Raw("SELECT value FROM system_settings WHERE key = 'orphan_recover_category' LIMIT 1").Scan(&catVal)
+		if catVal != "" {
+			category = catVal
+		}
+		r.db.Raw("SELECT value FROM system_settings WHERE key = 'orphan_recover_tags' LIMIT 1").Scan(&tagVal)
+		if tagVal != "" {
+			tags = strings.Split(tagVal, ",")
+			for i := range tags {
+				tags[i] = strings.TrimSpace(tags[i])
+			}
+			tags = append(tags, "from:"+siteName)
+		}
+	}
+
 	_, err = client.AddFromFile(ctx, torrentData, model.AddTorrentOptions{
 		SavePath: savePath,
-		Category: "orphan-recover",
-		Tags:     []string{"orphan-recover", "from:" + siteName},
+		Category: category,
+		Tags:     tags,
 		Paused:   true,
 	})
 	if err != nil {

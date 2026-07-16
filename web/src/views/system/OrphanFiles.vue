@@ -23,6 +23,18 @@
       {{ orphans.length }} {{ t('orphan.itemsFound') }}
     </a-alert>
 
+    <div style="padding: 0 24px; margin-bottom: 16px">
+      <a-card size="small" :title="t('orphan.recoverSettings')">
+        <a-space>
+          <span>{{ t('orphan.categoryLabel') }}:</span>
+          <a-input v-model:value="recoverCategory" style="width: 200px" placeholder="orphan-recover" />
+          <span>{{ t('orphan.tagsLabel') }}:</span>
+          <a-input v-model:value="recoverTags" style="width: 300px" placeholder="orphan-recover,recovered" />
+          <a-button size="small" type="primary" @click="saveSettings">{{ t('common.save') }}</a-button>
+        </a-space>
+      </a-card>
+    </div>
+
     <div style="padding: 0 24px">
       <a-table
         :columns="columns"
@@ -146,6 +158,8 @@ const batchRecovering = ref(false)
 const batchResultVisible = ref(false)
 const batchResults = ref<BatchResult[]>([])
 const batchStats = ref({ total: 0, found: 0, notFound: 0, error: 0 })
+const recoverCategory = ref('orphan-recover')
+const recoverTags = ref('orphan-recover')
 
 const columns = [
   { title: t('orphan.columnName'), key: 'name', ellipsis: true },
@@ -163,7 +177,7 @@ function onSelectChange(keys: string[]) {
 async function fetchOrphans() {
   try {
     const resp = await fetch('/api/v1/orphans', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('pt-forward-access-token')}` }
+      headers: authHeaders()
     })
     const data = await resp.json()
     if (data.code === 0) {
@@ -174,6 +188,36 @@ async function fetchOrphans() {
     }
   } catch {
     // ignore
+  }
+}
+
+async function loadSettings() {
+  try {
+    for (const [key, ref_] of [['orphan_recover_category', recoverCategory], ['orphan_recover_tags', recoverTags]] as [string, { value: string }][]) {
+      const resp = await fetch(`/api/v1/settings/${key}`, { headers: authHeaders() })
+      const data = await resp.json()
+      if (data.code === 0 && data.data?.value) {
+        ref_.value = data.data.value
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+async function saveSettings() {
+  try {
+    await fetch('/api/v1/settings/orphan_recover_category', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ value: recoverCategory.value })
+    })
+    await fetch('/api/v1/settings/orphan_recover_tags', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ value: recoverTags.value })
+    })
+    message.success(t('common.saved'))
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
   }
 }
 
@@ -310,5 +354,6 @@ async function batchRecover() {
 
 onMounted(() => {
   fetchOrphans()
+  loadSettings()
 })
 </script>
