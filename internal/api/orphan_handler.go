@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/orphan"
 	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
@@ -56,6 +57,12 @@ func (h *OrphanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleListIgnored(w, r)
 	case strings.HasSuffix(path, "/orphans/ignored") && r.Method == http.MethodDelete:
 		h.handleUnignore(w, r)
+	case strings.HasSuffix(path, "/orphans/scan-configs") && r.Method == http.MethodGet:
+		h.handleListScanConfigs(w, r)
+	case strings.HasSuffix(path, "/orphans/scan-configs") && r.Method == http.MethodPost:
+		h.handleAddScanConfig(w, r)
+	case strings.HasSuffix(path, "/orphans/scan-configs") && r.Method == http.MethodDelete:
+		h.handleDeleteScanConfig(w, r)
 	case strings.HasSuffix(path, "/orphans") && r.Method == http.MethodGet:
 		h.handleList(w, r)
 	default:
@@ -118,7 +125,8 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Path string `json:"path"`
+		Path     string `json:"path"`
+		ClientID string `json:"client_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -150,7 +158,7 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 		defer cancel()
-		result := h.recovery.Recover(ctx, target)
+		result := h.recovery.Recover(ctx, target, req.ClientID)
 		h.recoverStore.Store(taskID, result)
 		if result.Found {
 			h.mu.Lock()
@@ -288,4 +296,56 @@ func (h *OrphanHandler) handleUnignore(w http.ResponseWriter, r *http.Request) {
 
 	h.db.Where("key = ? AND value = ?", "orphan_ignored_path", req.Path).Delete(&setting.Setting{})
 	Success(w, map[string]interface{}{"unignored": true})
+}
+
+func (h *OrphanHandler) handleListScanConfigs(w http.ResponseWriter, r *http.Request) {
+	var configs []model.OrphanScanConfig
+	h.db.Find(&configs)
+	Success(w, configs)
+}
+
+func (h *OrphanHandler) handleAddScanConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ClientID string `json:"client_id"`
+		ScanPath string `json:"scan_path"`
+		Enabled  bool   `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.ClientID == "" || req.ScanPath == "" {
+		Error(w, http.StatusBadRequest, 40001, "client_id 和 scan_path 必填")
+		return
+	}
+
+	cfg := model.OrphanScanConfig{
+		ClientID: req.ClientID,
+		ScanPath: req.ScanPath,
+		Enabled:  req.Enabled,
+	}
+	if err := h.db.Where("client_id = ? AND scan_path = ?", req.ClientID, req.ScanPath).
+		FirstOrCreate(&cfg).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50001, "保存失败")
+		return
+	}
+	if !cfg.Enabled && req.Enabled {
+		h.db.Model(&cfg).Update("enabled", true)
+	}
+	Success(w, cfg)
+}
+
+func (h *OrphanHandler) handleDeleteScanConfig(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		Error(w, http.StatusBadRequest, 40001, "id 必填")
+		return
+	}
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的 id")
+		return
+	}
+	h.db.Delete(&model.OrphanScanConfig{}, id)
+	Success(w, map[string]interface{}{"deleted": true})
 }

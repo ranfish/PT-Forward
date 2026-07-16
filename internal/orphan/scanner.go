@@ -9,16 +9,19 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type Scanner struct {
 	provider      model.DownloaderProvider
+	db            *gorm.DB
 	logger        *zap.Logger
 	ignoredPaths  map[string]bool
+	scanConfigs   []model.OrphanScanConfig
 }
 
-func NewScanner(provider model.DownloaderProvider, logger *zap.Logger) *Scanner {
-	return &Scanner{provider: provider, logger: logger.With(zap.String("component", "orphan"))}
+func NewScanner(provider model.DownloaderProvider, db *gorm.DB, logger *zap.Logger) *Scanner {
+	return &Scanner{provider: provider, db: db, logger: logger.With(zap.String("component", "orphan"))}
 }
 
 func (s *Scanner) SetIgnoredPaths(paths []string) {
@@ -28,19 +31,27 @@ func (s *Scanner) SetIgnoredPaths(paths []string) {
 	}
 }
 
+func (s *Scanner) loadScanConfigs() {
+	s.scanConfigs = nil
+	if s.db == nil {
+		return
+	}
+	s.db.Where("enabled = ?", true).Find(&s.scanConfigs)
+}
+
 func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 	if s.provider == nil {
 		return nil, nil
 	}
 
-	clientIDs := s.provider.ListClients()
+	s.loadScanConfigs()
 
 	claimed := make(map[string]map[string]bool)
-	clientForPath := make(map[string]string)
 	scannedPaths := make(map[string]bool)
 	allSavePaths := make(map[string]bool)
+	pathToClients := make(map[string][]string)
 
-	for _, clientID := range clientIDs {
+	for _, clientID := range s.provider.ListClients() {
 		if ctx.Err() != nil {
 			break
 		}
@@ -65,10 +76,27 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			sp = filepath.Clean(sp)
 			if claimed[sp] == nil {
 				claimed[sp] = make(map[string]bool)
-				clientForPath[sp] = clientID
+				pathToClients[sp] = append(pathToClients[sp], clientID)
 			}
 			claimed[sp][t.Name] = true
 			allSavePaths[sp] = true
+		}
+	}
+
+	for _, cfg := range s.scanConfigs {
+		sp := filepath.Clean(cfg.ScanPath)
+		if claimed[sp] == nil {
+			claimed[sp] = make(map[string]bool)
+		}
+		pathToClients[sp] = append(pathToClients[sp], cfg.ClientID)
+		s.logger.Debug("orphan scan: configured path",
+			zap.String("path", sp),
+			zap.String("client", cfg.ClientID))
+	}
+
+	for sp := range claimed {
+		if len(pathToClients[sp]) == 0 {
+			pathToClients[sp] = s.provider.ListClients()
 		}
 	}
 
@@ -78,14 +106,14 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			continue
 		}
 		scannedPaths[savePath] = true
-		orphans := s.scanDirectory(savePath, claimedNames, clientForPath[savePath], allSavePaths)
+		orphans := s.scanDirectory(savePath, claimedNames, pathToClients[savePath], allSavePaths)
 		allOrphans = append(allOrphans, orphans...)
 	}
 
 	s.logger.Info("orphan scan completed",
 		zap.Int("orphans", len(allOrphans)),
-		zap.Int("clients", len(clientIDs)),
-		zap.Int("save_paths", len(claimed)))
+		zap.Int("scan_paths", len(claimed)),
+		zap.Int("configured_paths", len(s.scanConfigs)))
 
 	return allOrphans, nil
 }
@@ -151,7 +179,7 @@ func stripChineseBracketPrefix(s string) string {
 	return s
 }
 
-func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, clientID string, allSavePaths map[string]bool) []Entry {
+func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, clientIDs []string, allSavePaths map[string]bool) []Entry {
 	entries, err := os.ReadDir(savePath)
 	if err != nil {
 		s.logger.Debug("orphan scan: cannot read directory",
@@ -194,7 +222,7 @@ func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, client
 			Name:       name,
 			Size:       size,
 			IsDir:      entry.IsDir(),
-			ClientID:   clientID,
+			ClientIDs:  clientIDs,
 			SavePath:   savePath,
 			DetectedAt: now,
 		})

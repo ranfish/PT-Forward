@@ -57,6 +57,14 @@
               {{ record.is_dir ? t('orphan.directory') : t('orphan.file') }}
             </a-tag>
           </template>
+          <template v-if="column.key === 'client'">
+            <a-select
+              v-model:value="record._selectedClient"
+              size="small"
+              style="width: 110px"
+              :options="(record.client_ids || []).map((c: string) => ({ label: c, value: c }))"
+            />
+          </template>
           <template v-if="column.key === 'status'">
             <a-tag v-if="record._status === 'searching'" color="processing">搜索中...</a-tag>
             <a-tag v-else-if="record._status === 'found'" color="success">已恢复</a-tag>
@@ -143,10 +151,11 @@ interface OrphanEntry {
   name: string
   size: number
   is_dir: boolean
-  client_id: string
+  client_ids: string[]
   save_path: string
   detected_at: string
   _status?: string
+  _selectedClient?: string
 }
 
 interface BatchResult {
@@ -190,9 +199,9 @@ const columns = [
   { title: t('orphan.columnName'), key: 'name', ellipsis: true },
   { title: t('orphan.columnType'), key: 'type', width: 80 },
   { title: t('orphan.columnSize'), key: 'size', width: 100 },
-  { title: t('orphan.columnClient'), dataIndex: 'client_id', key: 'client_id', width: 120 },
+  { title: t('orphan.columnClient'), key: 'client', width: 130 },
   { title: t('orphan.columnStatus'), key: 'status', width: 100 },
-  { title: t('common.action'), key: 'action', width: 100 },
+  { title: t('common.action'), key: 'action', width: 180 },
 ]
 
 function onSelectChange(keys: string[]) {
@@ -206,9 +215,8 @@ async function fetchOrphans() {
     })
     const data = await resp.json()
     if (data.code === 0) {
-      orphans.value = data.data.orphans || []
+      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_ids?.[0] }))
       if (data.data.scanned_at) {
-        scannedAt.value = new Date(data.data.scanned_at)
       }
     }
   } catch {
@@ -256,7 +264,7 @@ async function scan() {
     })
     const data = await resp.json()
     if (data.code === 0) {
-      orphans.value = data.data.orphans || []
+      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_ids?.[0] }))
       scannedAt.value = new Date(data.data.scanned_at)
       message.success(`${data.data.count} ${t('orphan.itemsFound')}`)
     } else {
@@ -273,11 +281,11 @@ function authHeaders(): HeadersInit {
   return { Authorization: `Bearer ${localStorage.getItem('pt-forward-access-token')}` }
 }
 
-async function recoverOrphan(path: string): Promise<{ found: boolean; site: string; message: string }> {
+async function recoverOrphan(path: string, clientID?: string): Promise<{ found: boolean; site: string; message: string }> {
   const resp = await fetch('/api/v1/orphans/recover', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ path })
+    body: JSON.stringify({ path, client_id: clientID })
   })
   const data = await resp.json()
   if (data.code !== 0) {
@@ -305,16 +313,7 @@ async function recover(orphan: OrphanEntry) {
   resultVisible.value = false
   message.loading(t('orphan.recovering'), 0)
   try {
-    const result = await recoverOrphan(orphan.path)
-    message.destroy()
-    recoverResult.value = { found: result.found, message: result.message }
-    resultVisible.value = true
-    if (result.found) {
-      orphan._status = 'found'
-      message.success(t('orphan.recoverSuccess'))
-    } else {
-      orphan._status = 'notfound'
-    }
+    const result = await recoverOrphan(orphan.path, orphan._selectedClient)
   } catch (e: unknown) {
     message.destroy()
     message.error(e instanceof Error ? e.message : String(e))
@@ -338,7 +337,7 @@ async function batchRecover() {
     orphan._status = 'searching'
     message.loading(t('orphan.batchRecovering') + ` (${i + 1}/${selected.length})`, 0)
     try {
-      const result = await recoverOrphan(orphan.path)
+      const result = await recoverOrphan(orphan.path, orphan._selectedClient)
       batchResults.value.push({
         path: orphan.path,
         name: orphan.name,

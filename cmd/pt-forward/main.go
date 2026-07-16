@@ -432,7 +432,7 @@ func main() {
 	sourceDetector.RefreshCache(context.Background())
 	router.SetupPublishTorrents(coverageSvc, clientManager, sourceDetector)
 
-	orphanScanner := orphan.NewScanner(clientManager, log)
+	orphanScanner := orphan.NewScanner(clientManager, db, log)
 	orphanRecovery := orphan.NewRecovery(db, siteProvider, clientManager, log)
 	router.SetupOrphan(orphanScanner, orphanRecovery, db)
 	if err := router.StartCoverageRefresh(taskRegistry); err != nil {

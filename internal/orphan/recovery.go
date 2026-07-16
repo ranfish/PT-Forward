@@ -32,7 +32,7 @@ func NewRecovery(db *gorm.DB, sp model.SiteInfoProvider, cp model.DownloaderProv
 	}
 }
 
-func (r *Recovery) Recover(ctx context.Context, orphan *Entry) *RecoverResult {
+func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID string) *RecoverResult {
 	result := &RecoverResult{Orphan: orphan}
 	stats := &SearchStats{}
 
@@ -47,7 +47,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry) *RecoverResult {
 		result.Found = true
 		result.Method = method
 		result.SiteName = siteName
-		if err := r.downloadAndAdd(ctx, orphan, siteName, torrentID, ""); err != nil {
+		if err := r.downloadAndAdd(ctx, orphan, siteName, torrentID, "", targetClientID); err != nil {
 			result.Found = false
 			result.Message = fmt.Sprintf("recovery failed: %v", err)
 			return result
@@ -155,7 +155,7 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 			Name:     fileName,
 			Size:     info.Size(),
 			IsDir:    false,
-			ClientID: orphan.ClientID,
+			ClientIDs: orphan.ClientIDs,
 			SavePath: orphan.Path,
 		}
 
@@ -167,7 +167,7 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 
 		fr := FileRecoverResult{FileName: fileName}
 		if siteName != "" {
-			if err := r.downloadAndAdd(ctx, fileEntry, siteName, torrentID, orphan.Path); err != nil {
+			if err := r.downloadAndAdd(ctx, fileEntry, siteName, torrentID, orphan.Path, orphan.ClientIDs[0]); err != nil {
 				fr.Message = fmt.Sprintf("download failed: %v", err)
 			} else {
 				fr.Found = true
@@ -357,7 +357,7 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 	return priority
 }
 
-func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string, savePathOverride string) error {
+func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string, savePathOverride string, targetClientID string) error {
 	config, err := r.siteProvider.GetSiteConfig(ctx, siteName)
 	if err != nil || config == nil {
 		return fmt.Errorf("get site config: %w", err)
@@ -377,7 +377,11 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		return fmt.Errorf("downloaded torrent data is empty")
 	}
 
-	client, err := r.clientProvider.Get(orphan.ClientID)
+	clientID := targetClientID
+	if clientID == "" && len(orphan.ClientIDs) > 0 {
+		clientID = orphan.ClientIDs[0]
+	}
+	client, err := r.clientProvider.Get(clientID)
 	if err != nil {
 		return fmt.Errorf("get downloader client: %w", err)
 	}
