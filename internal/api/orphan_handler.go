@@ -129,6 +129,17 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		result := h.recovery.Recover(ctx, target)
 		h.recoverStore.Store(taskID, result)
+		if result.Found {
+			h.mu.Lock()
+			var updated []orphan.Entry
+			for _, e := range h.lastResults {
+				if e.Path != target.Path {
+					updated = append(updated, e)
+				}
+			}
+			h.lastResults = updated
+			h.mu.Unlock()
+		}
 	}()
 
 	Success(w, map[string]interface{}{"task_id": taskID})
