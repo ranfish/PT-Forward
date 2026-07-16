@@ -319,9 +319,12 @@ async function loadAvailableClients() {
   try {
     const resp = await fetch('/api/v1/downloaders', { headers: authHeaders() })
     const data = await resp.json()
-    const clients = data.data?.clients || data.data || []
+    const clients = data.data?.items || data.data?.clients || []
     if (Array.isArray(clients)) {
-      availableClients.value = clients.map((c: { name?: string; client_id?: string }) => c.name || c.client_id || '').filter(Boolean)
+      availableClients.value = clients
+        .filter((c: { enabled?: boolean; connected?: boolean }) => c.enabled !== false)
+        .map((c: { name?: string }) => c.name || '')
+        .filter(Boolean)
     }
   } catch { /* ignore */ }
 }
