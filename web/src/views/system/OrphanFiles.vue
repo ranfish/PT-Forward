@@ -2,9 +2,19 @@
   <div>
     <a-page-header :title="t('orphan.title')">
       <template #extra>
-        <a-button type="primary" :loading="scanning" @click="scan">
-          {{ t('orphan.scan') }}
-        </a-button>
+        <a-space>
+          <a-button
+            type="primary"
+            :disabled="selectedRowKeys.length === 0 || batchRecovering"
+            :loading="batchRecovering"
+            @click="batchRecover"
+          >
+            {{ t('orphan.batchRecover') }} ({{ selectedRowKeys.length }})
+          </a-button>
+          <a-button :loading="scanning" @click="scan">
+            {{ t('orphan.scan') }}
+          </a-button>
+        </a-space>
       </template>
     </a-page-header>
 
@@ -19,6 +29,7 @@
         :data-source="orphans"
         :loading="scanning"
         :pagination="{ pageSize: 20 }"
+        :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
         row-key="path"
         size="small"
       >
@@ -34,10 +45,18 @@
               {{ record.is_dir ? t('orphan.directory') : t('orphan.file') }}
             </a-tag>
           </template>
+          <template v-if="column.key === 'status'">
+            <a-tag v-if="record._status === 'searching'" color="processing">搜索中...</a-tag>
+            <a-tag v-else-if="record._status === 'found'" color="success">已恢复</a-tag>
+            <a-tag v-else-if="record._status === 'notfound'" color="default">未找到</a-tag>
+            <a-tag v-else-if="record._status === 'error'" color="error">失败</a-tag>
+            <span v-else style="color:#999">-</span>
+          </template>
           <template v-if="column.key === 'action'">
             <a-button
               size="small"
               type="link"
+              :disabled="batchRecovering || record._status === 'found'"
               :loading="recovering === record.path"
               @click="recover(record)"
             >
@@ -60,6 +79,32 @@
         :sub-title="recoverResult.message"
       />
     </a-modal>
+
+    <a-modal
+      v-model:open="batchResultVisible"
+      :title="t('orphan.batchRecover')"
+      :footer="null"
+      width="600px"
+    >
+      <a-statistic
+        :title="t('orphan.batchTotal') + ': ' + batchStats.total"
+        :value="batchStats.found"
+        suffix="/ " + batchStats.total
+      >
+        <template #title>
+          <span>{{ t('orphan.batchFound') }}: {{ batchStats.found }} · {{ t('orphan.batchNotFound') }}: {{ batchStats.notFound }} · {{ t('orphan.batchError') }}: {{ batchStats.error }}</span>
+        </template>
+      </a-statistic>
+      <div style="margin-top:16px;max-height:300px;overflow-y:auto">
+        <div v-for="r in batchResults" :key="r.path" style="margin-bottom:4px;font-size:12px">
+          <a-tag :color="r.found ? 'success' : 'default'" style="font-size:11px">
+            {{ r.found ? '✅' : '❌' }}
+          </a-tag>
+          <span style="font-family:monospace">{{ r.name }}</span>
+          <span v-if="r.site" style="color:#52c41a;margin-left:8px">{{ r.site }}</span>
+        </div>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -79,6 +124,15 @@ interface OrphanEntry {
   client_id: string
   save_path: string
   detected_at: string
+  _status?: string
+}
+
+interface BatchResult {
+  path: string
+  name: string
+  found: boolean
+  site?: string
+  message?: string
 }
 
 const orphans = ref<OrphanEntry[]>([])
@@ -87,14 +141,24 @@ const scannedAt = ref<Date | null>(null)
 const recovering = ref<string | null>(null)
 const resultVisible = ref(false)
 const recoverResult = ref<{ found: boolean; message: string } | null>(null)
+const selectedRowKeys = ref<string[]>([])
+const batchRecovering = ref(false)
+const batchResultVisible = ref(false)
+const batchResults = ref<BatchResult[]>([])
+const batchStats = ref({ total: 0, found: 0, notFound: 0, error: 0 })
 
 const columns = [
   { title: t('orphan.columnName'), key: 'name', ellipsis: true },
   { title: t('orphan.columnType'), key: 'type', width: 80 },
   { title: t('orphan.columnSize'), key: 'size', width: 100 },
   { title: t('orphan.columnClient'), dataIndex: 'client_id', key: 'client_id', width: 120 },
+  { title: t('orphan.columnStatus'), key: 'status', width: 100 },
   { title: t('common.action'), key: 'action', width: 100 },
 ]
+
+function onSelectChange(keys: string[]) {
+  selectedRowKeys.value = keys
+}
 
 async function fetchOrphans() {
   try {
@@ -115,6 +179,7 @@ async function fetchOrphans() {
 
 async function scan() {
   scanning.value = true
+  selectedRowKeys.value = []
   try {
     const resp = await fetch('/api/v1/orphans/scan', {
       method: 'POST',
@@ -135,62 +200,111 @@ async function scan() {
   }
 }
 
+function authHeaders(): HeadersInit {
+  return { Authorization: `Bearer ${localStorage.getItem('pt-forward-access-token')}` }
+}
+
+async function recoverOrphan(path: string): Promise<{ found: boolean; site: string; message: string }> {
+  const resp = await fetch('/api/v1/orphans/recover', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ path })
+  })
+  const data = await resp.json()
+  if (data.code !== 0) {
+    return { found: false, site: '', message: data.message || 'failed' }
+  }
+  const taskID = data.data.task_id
+  for (let i = 0; i < 50; i++) {
+    await new Promise(r => setTimeout(r, 3000))
+    try {
+      const r = await fetch(`/api/v1/orphans/recover/${taskID}`, { headers: authHeaders() })
+      const d = await r.json()
+      if (d.code === 0 && d.data) {
+        const msg = d.data.message || ''
+        if (msg !== 'searching...' && msg !== '') {
+          return { found: !!d.data.found, site: d.data.site_name || '', message: msg }
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  return { found: false, site: '', message: 'timeout' }
+}
+
 async function recover(orphan: OrphanEntry) {
   recovering.value = orphan.path
   resultVisible.value = false
   message.loading(t('orphan.recovering'), 0)
   try {
-    const resp = await fetch('/api/v1/orphans/recover', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('pt-forward-access-token')}`
-      },
-      body: JSON.stringify({ path: orphan.path })
-    })
-    const data = await resp.json()
-    if (data.code !== 0) {
-      message.destroy()
-      message.error(data.message || 'Recovery failed')
-      return
+    const result = await recoverOrphan(orphan.path)
+    message.destroy()
+    recoverResult.value = { found: result.found, message: result.message }
+    resultVisible.value = true
+    if (result.found) {
+      orphan._status = 'found'
+      message.success(t('orphan.recoverSuccess'))
+    } else {
+      orphan._status = 'notfound'
     }
-    const taskID = data.data.task_id
-    // Poll for result
-    let pollCount = 0
-    const poll = async () => {
-      pollCount++
-      try {
-        const r = await fetch(`/api/v1/orphans/recover/${taskID}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('pt-forward-access-token')}` }
-        })
-        const d = await r.json()
-        if (d.code === 0 && d.data) {
-          const msg = d.data.message || ''
-          if (msg !== 'searching...' && msg !== '') {
-            message.destroy()
-            recoverResult.value = d.data
-            resultVisible.value = true
-            if (d.data.found) {
-              message.success(t('orphan.recoverSuccess'))
-            }
-            recovering.value = null
-            return
-          }
-        }
-      } catch { /* ignore poll errors */ }
-      if (pollCount < 60) {
-        setTimeout(poll, 3000)
-      } else {
-        message.destroy()
-        message.error(t('orphan.timeout'))
-        recovering.value = null
-      }
-    }
-    setTimeout(poll, 2000)
   } catch (e: unknown) {
     message.destroy()
     message.error(e instanceof Error ? e.message : String(e))
+    orphan._status = 'error'
+  } finally {
     recovering.value = null
+  }
+}
+
+async function batchRecover() {
+  const selected = orphans.value.filter(o => selectedRowKeys.value.includes(o.path) && o._status !== 'found')
+  if (selected.length === 0) return
+
+  batchRecovering.value = true
+  batchResults.value = []
+  batchStats.value = { total: selected.length, found: 0, notFound: 0, error: 0 }
+  message.loading(t('orphan.batchRecovering') + ` (0/${selected.length})`, 0)
+
+  for (let i = 0; i < selected.length; i++) {
+    const orphan = selected[i]
+    orphan._status = 'searching'
+    message.loading(t('orphan.batchRecovering') + ` (${i + 1}/${selected.length})`, 0)
+    try {
+      const result = await recoverOrphan(orphan.path)
+      batchResults.value.push({
+        path: orphan.path,
+        name: orphan.name,
+        found: result.found,
+        site: result.site,
+        message: result.message
+      })
+      if (result.found) {
+        orphan._status = 'found'
+        batchStats.value.found++
+      } else {
+        orphan._status = 'notfound'
+        batchStats.value.notFound++
+      }
+    } catch {
+      batchResults.value.push({
+        path: orphan.path,
+        name: orphan.name,
+        found: false,
+        message: 'error'
+      })
+      orphan._status = 'error'
+      batchStats.value.error++
+    }
+  }
+
+  message.destroy()
+  batchResultVisible.value = true
+  selectedRowKeys.value = []
+  batchRecovering.value = false
+
+  const found = batchStats.value.found
+  if (found > 0) {
+    message.success(`${found} ${t('orphan.recoverSuccess')}`)
+    setTimeout(() => fetchOrphans(), 2000)
   }
 }
 
