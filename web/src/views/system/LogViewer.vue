@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 
 const logs = ref<string[]>([])
 const maxLogs = 500
@@ -112,6 +112,10 @@ watch(autoScroll, () => {
   if (autoScroll.value) nextTick(scrollToEnd)
 })
 
+onMounted(() => {
+  connected.value = true
+  connect()
+})
 onUnmounted(disconnect)
 </script>
 
