@@ -35,6 +35,25 @@
       </a-card>
     </div>
 
+    <div style="padding: 0 24px; margin-bottom: 16px">
+      <a-card size="small" :title="t('orphan.scanConfigTitle')">
+        <div v-if="scanConfigs.length > 0" style="margin-bottom: 12px">
+          <a-tag v-for="cfg in scanConfigs" :key="cfg.id" closable @close="deleteScanConfig(cfg.id)" style="margin-bottom: 4px">
+            {{ cfg.client_id }}: {{ cfg.scan_path }}
+          </a-tag>
+        </div>
+        <a-space>
+          <a-select v-model:value="newConfigClient" style="width: 130px" :placeholder="t('orphan.selectClient')">
+            <a-select-option v-for="c in availableClients" :key="c" :value="c">{{ c }}</a-select-option>
+          </a-select>
+          <a-input v-model:value="newConfigPath" style="width: 300px" placeholder="/PT1/SSD" />
+          <a-button size="small" type="primary" :disabled="!newConfigClient || !newConfigPath" @click="addScanConfig">
+            {{ t('orphan.addScanPath') }}
+          </a-button>
+        </a-space>
+      </a-card>
+    </div>
+
     <div style="padding: 0 24px">
       <a-table
         :columns="columns"
@@ -180,6 +199,10 @@ const batchStats = ref({ total: 0, found: 0, notFound: 0, error: 0 })
 const recoverCategory = ref('orphan-recover')
 const recoverTags = ref('orphan-recover')
 const pageSize = ref(50)
+const scanConfigs = ref<{id: number; client_id: string; scan_path: string; enabled: boolean}[]>([])
+const newConfigClient = ref('')
+const newConfigPath = ref('')
+const availableClients = ref<string[]>([])
 
 const pagination = {
   pageSize: pageSize.value,
@@ -217,6 +240,7 @@ async function fetchOrphans() {
     if (data.code === 0) {
       orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_ids?.[0] }))
       if (data.data.scanned_at) {
+        scannedAt.value = new Date(data.data.scanned_at)
       }
     }
   } catch {
@@ -279,6 +303,57 @@ async function scan() {
 
 function authHeaders(): HeadersInit {
   return { Authorization: `Bearer ${localStorage.getItem('pt-forward-access-token')}` }
+}
+
+async function loadScanConfigs() {
+  try {
+    const resp = await fetch('/api/v1/orphans/scan-configs', { headers: authHeaders() })
+    const data = await resp.json()
+    if (data.code === 0) {
+      scanConfigs.value = data.data || []
+    }
+  } catch { /* ignore */ }
+}
+
+async function loadAvailableClients() {
+  try {
+    const resp = await fetch('/api/v1/downloaders', { headers: authHeaders() })
+    const data = await resp.json()
+    const clients = data.data?.clients || data.data || []
+    if (Array.isArray(clients)) {
+      availableClients.value = clients.map((c: { name?: string; client_id?: string }) => c.name || c.client_id || '').filter(Boolean)
+    }
+  } catch { /* ignore */ }
+}
+
+async function addScanConfig() {
+  if (!newConfigClient.value || !newConfigPath.value) return
+  try {
+    const resp = await fetch('/api/v1/orphans/scan-configs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ client_id: newConfigClient.value, scan_path: newConfigPath.value, enabled: true })
+    })
+    const data = await resp.json()
+    if (data.code === 0) {
+      scanConfigs.value.push(data.data)
+      newConfigPath.value = ''
+      message.success(t('orphan.added'))
+      fetchOrphans()
+    }
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  }
+}
+
+async function deleteScanConfig(id: number) {
+  try {
+    await fetch(`/api/v1/orphans/scan-configs?id=${id}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    })
+    scanConfigs.value = scanConfigs.value.filter(c => c.id !== id)
+  } catch { /* ignore */ }
 }
 
 async function recoverOrphan(path: string, clientID?: string): Promise<{ found: boolean; site: string; message: string }> {
@@ -415,5 +490,7 @@ async function deleteOrphan(orphan: OrphanEntry) {
 onMounted(() => {
   fetchOrphans()
   loadSettings()
+  loadScanConfigs()
+  loadAvailableClients()
 })
 </script>
