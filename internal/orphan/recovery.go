@@ -3,7 +3,6 @@ package orphan
 import (
 	"context"
 	"fmt"
-	"math"
 	"path/filepath"
 	"sync"
 	"time"
@@ -318,14 +317,13 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 }
 
 func compareSize(sourceBytes, resultBytes int64) bool {
-	const gb = 1073741824.0
-	const mb = 1048576.0
-	if sourceBytes >= int64(gb) || resultBytes >= int64(gb) {
-		sGB := math.Round(float64(sourceBytes)/gb*100) / 100
-		rGB := math.Round(float64(resultBytes)/gb*100) / 100
-		return sGB == rGB
+	if sourceBytes <= 0 || resultBytes <= 0 {
+		return false
 	}
-	sMB := math.Round(float64(sourceBytes)/mb*100) / 100
-	rMB := math.Round(float64(resultBytes)/mb*100) / 100
-	return sMB == rMB
+	diff := sourceBytes - resultBytes
+	if diff < 0 {
+		diff = -diff
+	}
+	tolerance := float64(sourceBytes) * 0.02
+	return float64(diff) <= tolerance
 }
