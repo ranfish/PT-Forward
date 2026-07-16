@@ -12,20 +12,28 @@ type Entry struct {
 	DetectedAt time.Time `json:"detected_at"`
 }
 
+type FileRecoverResult struct {
+	FileName string `json:"file_name"`
+	Found    bool   `json:"found"`
+	SiteName string `json:"site_name"`
+	Message  string `json:"message"`
+}
+
 type RecoverResult struct {
-	Orphan      *Entry        `json:"orphan"`
-	Found       bool          `json:"found"`
-	Method      string        `json:"method"`
-	SiteName    string        `json:"site_name"`
-	Message     string        `json:"message"`
-	SearchStats *SearchStats  `json:"search_stats,omitempty"`
+	Orphan      *Entry           `json:"orphan"`
+	Found       bool             `json:"found"`
+	Method      string           `json:"method"`
+	SiteName    string           `json:"site_name"`
+	Message     string           `json:"message"`
+	SearchStats *SearchStats     `json:"search_stats,omitempty"`
+	FileResults []FileRecoverResult `json:"file_results,omitempty"`
 }
 
 type SearchStats struct {
-	TotalSites    int            `json:"total_sites"`
-	Searched      int            `json:"searched"`
-	Skipped       int            `json:"skipped"`
-	FailedSites   []SiteFailure  `json:"failed_sites,omitempty"`
+	TotalSites  int           `json:"total_sites"`
+	Searched    int           `json:"searched"`
+	Skipped     int           `json:"skipped"`
+	FailedSites []SiteFailure `json:"failed_sites,omitempty"`
 }
 
 type SiteFailure struct {

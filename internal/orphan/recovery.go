@@ -3,6 +3,7 @@ package orphan
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -42,23 +43,39 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry) *RecoverResult {
 
 	result.SearchStats = stats
 
-	if siteName == "" {
-		result.Message = fmt.Sprintf("no matching torrent found on any site (searched: %d, skipped: %d, failed: %d)",
-			stats.Searched, stats.Skipped, len(stats.FailedSites))
+	if siteName != "" {
+		result.Found = true
+		result.Method = method
+		result.SiteName = siteName
+		if err := r.downloadAndAdd(ctx, orphan, siteName, torrentID, ""); err != nil {
+			result.Found = false
+			result.Message = fmt.Sprintf("recovery failed: %v", err)
+			return result
+		}
+		result.Message = fmt.Sprintf("recovered from %s (method=%s)", siteName, method)
 		return result
 	}
 
-	result.Found = true
-	result.Method = method
-	result.SiteName = siteName
-
-	if err := r.downloadAndAdd(ctx, orphan, siteName, torrentID); err != nil {
-		result.Found = false
-		result.Message = fmt.Sprintf("recovery failed: %v", err)
-		return result
+	if orphan.IsDir {
+		fileResults := r.tryFileLevelRecover(ctx, orphan)
+		if len(fileResults) > 0 {
+			recovered := 0
+			for _, fr := range fileResults {
+				if fr.Found {
+					recovered++
+				}
+			}
+			if recovered > 0 {
+				result.Found = true
+				result.FileResults = fileResults
+				result.Message = fmt.Sprintf("%d/%d files recovered", recovered, len(fileResults))
+				return result
+			}
+		}
 	}
 
-	result.Message = fmt.Sprintf("recovered from %s (torrent_id=%s, method=%s)", siteName, torrentID, method)
+	result.Message = fmt.Sprintf("no matching torrent found on any site (searched: %d, skipped: %d, failed: %d)",
+		stats.Searched, stats.Skipped, len(stats.FailedSites))
 	return result
 }
 
@@ -86,6 +103,82 @@ func (r *Recovery) tryDBMatch(ctx context.Context, orphan *Entry) (siteName, tor
 	}
 
 	return "", "", ""
+}
+
+var searchableVideoExts = map[string]bool{
+	".mkv": true, ".mp4": true, ".ts": true, ".m2ts": true, ".iso": true,
+}
+
+var skipSubDirs = map[string]bool{
+	"BDMV": true, "SAMPLE": true, "Sample": true, "Subs": true, "Proof": true,
+}
+
+const maxFileLevelSearch = 20
+
+func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []FileRecoverResult {
+	entries, err := os.ReadDir(orphan.Path)
+	if err != nil {
+		return nil
+	}
+
+	for _, e := range entries {
+		if e.IsDir() && skipSubDirs[e.Name()] {
+			return nil
+		}
+	}
+
+	var videoFiles []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(e.Name()))
+		if searchableVideoExts[ext] {
+			videoFiles = append(videoFiles, e.Name())
+		}
+	}
+
+	if len(videoFiles) == 0 || len(videoFiles) > maxFileLevelSearch {
+		return nil
+	}
+
+	var results []FileRecoverResult
+	for _, fileName := range videoFiles {
+		filePath := filepath.Join(orphan.Path, fileName)
+		info, err := os.Stat(filePath)
+		if err != nil {
+			continue
+		}
+
+		fileEntry := &Entry{
+			Path:     filePath,
+			Name:     fileName,
+			Size:     info.Size(),
+			IsDir:    false,
+			ClientID: orphan.ClientID,
+			SavePath: orphan.Path,
+		}
+
+		siteName, torrentID, method := r.tryDBMatch(ctx, fileEntry)
+		if siteName == "" {
+			fileStats := &SearchStats{}
+			siteName, torrentID, method = r.tryL2Search(ctx, fileEntry, fileStats)
+		}
+
+		fr := FileRecoverResult{FileName: fileName}
+		if siteName != "" {
+			if err := r.downloadAndAdd(ctx, fileEntry, siteName, torrentID, orphan.Path); err != nil {
+				fr.Message = fmt.Sprintf("download failed: %v", err)
+			} else {
+				fr.Found = true
+				fr.SiteName = siteName
+				fr.Message = method
+			}
+		}
+		results = append(results, fr)
+	}
+
+	return results
 }
 
 func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *SearchStats) (siteName, torrentID, method string) {
@@ -264,7 +357,7 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 	return priority
 }
 
-func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string) error {
+func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string, savePathOverride string) error {
 	config, err := r.siteProvider.GetSiteConfig(ctx, siteName)
 	if err != nil || config == nil {
 		return fmt.Errorf("get site config: %w", err)
@@ -289,9 +382,12 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		return fmt.Errorf("get downloader client: %w", err)
 	}
 
-	savePath := orphan.SavePath
-	if !orphan.IsDir {
-		savePath = filepath.Dir(orphan.Path)
+	savePath := savePathOverride
+	if savePath == "" {
+		savePath = orphan.SavePath
+		if !orphan.IsDir {
+			savePath = filepath.Dir(orphan.Path)
+		}
 	}
 
 	category := "orphan-recover"
