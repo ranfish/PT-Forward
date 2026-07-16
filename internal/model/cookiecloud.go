@@ -21,14 +21,16 @@ func (PTGenCache) TableName() string { return "ptgen_cache" }
 
 // CookieCloudConfig — CookieCloud 连接配置
 type CookieCloudConfig struct {
-	ID           uint       `json:"id" gorm:"primaryKey;autoIncrement"`
-	ServerURL    string     `json:"server_url" gorm:"size:512;not null"`
-	UUID         string     `json:"uuid" gorm:"size:128;not null"`
-	Password     string     `json:"password" gorm:"size:128;not null" encrypted:"true"`
-	CryptoType   string     `json:"crypto_type" gorm:"size:30;default:'legacy'"`
-	SyncEnabled  bool       `json:"sync_enabled" gorm:"default:false"`
-	SyncInterval int        `json:"sync_interval" gorm:"default:60"`
-	LastSyncAt   *time.Time `json:"last_sync_at"`
+	ID            uint       `json:"id" gorm:"primaryKey;autoIncrement"`
+	Mode          string     `json:"mode" gorm:"size:20;default:'remote'"`
+	ServerURL     string     `json:"server_url" gorm:"size:512"`
+	UUID          string     `json:"uuid" gorm:"size:128"`
+	Password      string     `json:"password" gorm:"size:128" encrypted:"true"`
+	CryptoType    string     `json:"crypto_type" gorm:"size:30;default:'legacy'"`
+	SyncEnabled   bool       `json:"sync_enabled" gorm:"default:false"`
+	SyncInterval  int        `json:"sync_interval" gorm:"default:60"`
+	LastSyncAt    *time.Time `json:"last_sync_at"`
+	LastEncrypted string     `json:"last_encrypted" gorm:"type:text"`
 }
 
 func (CookieCloudConfig) TableName() string { return "cookie_cloud_configs" }

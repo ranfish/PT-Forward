@@ -147,6 +147,96 @@ func (s *SyncService) SyncAll(ctx context.Context) (*model.CookieCloudSyncHistor
 	return history, nil
 }
 
+func (s *SyncService) SyncFromEncrypted(ctx context.Context, encrypted string) (*model.CookieCloudSyncHistory, error) {
+	start := time.Now()
+	history := &model.CookieCloudSyncHistory{
+		Status:     "running",
+		UpdateTime: start,
+		CreatedAt:  start,
+	}
+	s.db.Create(history)
+
+	cfg, err := s.getConfig(ctx)
+	if err != nil {
+		history.Status = "failed"
+		history.ErrorMessage = err.Error()
+		s.db.Save(history)
+		return history, err
+	}
+
+	cookies, err := DecryptFromEncrypted(encrypted, cfg.UUID, cfg.Password)
+	if err != nil {
+		history.Status = "failed"
+		history.ErrorMessage = fmt.Sprintf("decrypt failed: %v", err)
+		s.db.Save(history)
+		return history, err
+	}
+
+	var sites []model.Site
+	s.db.WithContext(ctx).Where("cookie_cloud_sync = ? AND enabled = ?", true, true).Find(&sites)
+	if len(sites) == 0 {
+		history.Status = "completed"
+		s.db.Save(history)
+		return history, nil
+	}
+
+	synced := 0
+	skipped := 0
+	for i := range sites {
+		site := &sites[i]
+		domains := s.buildCookieDomains(site)
+		if len(domains) == 0 {
+			skipped++
+			continue
+		}
+		var matched []CookieData
+		seen := make(map[string]bool)
+		for _, domain := range domains {
+			for _, c := range FilterCookiesByDomain(cookies, domain) {
+				key := c.Name + "@" + c.Domain
+				if !seen[key] {
+					seen[key] = true
+					matched = append(matched, c)
+				}
+			}
+		}
+		if len(matched) == 0 {
+			skipped++
+			continue
+		}
+		cookieStr := CookiesToString(matched)
+		if err := s.db.WithContext(ctx).Model(site).Update("cookie", cookieStr).Error; err != nil {
+			skipped++
+			continue
+		}
+		synced++
+		s.logger.Info("cookie synced (builtin push)",
+			zap.String("site", site.Name),
+			zap.Int("cookies", len(matched)))
+	}
+
+	history.Status = "completed"
+	history.SyncedSites = synced
+	history.SkippedSites = skipped
+	history.SyncDuration = time.Since(start)
+	s.db.Save(history)
+	s.updateConfigSyncTime(ctx)
+
+	s.logger.Info("cookie cloud builtin sync completed",
+		zap.Int("synced", synced),
+		zap.Int("skipped", skipped))
+
+	return history, nil
+}
+
+func (s *SyncService) GetConfig(ctx context.Context) (*model.CookieCloudConfig, error) {
+	return s.getConfig(ctx)
+}
+
+func (s *SyncService) GetDB() *gorm.DB {
+	return s.db
+}
+
 func (s *SyncService) getConfig(ctx context.Context) (*model.CookieCloudConfig, error) {
 	var cfg model.CookieCloudConfig
 	if err := s.db.WithContext(ctx).First(&cfg).Error; err != nil {
@@ -154,6 +244,12 @@ func (s *SyncService) getConfig(ctx context.Context) (*model.CookieCloudConfig, 
 	}
 	if !cfg.SyncEnabled {
 		return nil, ccError(ErrCCConfig, "cookie cloud sync is disabled", nil)
+	}
+	if cfg.Mode == "builtin" {
+		if cfg.UUID == "" || cfg.Password == "" {
+			return nil, ccError(ErrCCConfig, "cookie cloud config incomplete (uuid/password required for builtin mode)", nil)
+		}
+		return &cfg, nil
 	}
 	if cfg.ServerURL == "" || cfg.UUID == "" || cfg.Password == "" {
 		return nil, ccError(ErrCCConfig, "cookie cloud config incomplete (url/uuid/password required)", nil)

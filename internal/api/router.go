@@ -33,6 +33,7 @@ type Router struct {
 	rssHandler           *RSSHandler
 	filterHandler        *FilterHandler
 	notifyHandler        *NotifyHandler
+	cookiecloudServer     http.Handler
 	settingsHandler      *SettingsHandler
 	seedingHandler       *SeedingHandler
 	deleteRuleHandler    *DeleteRuleHandler
@@ -163,6 +164,10 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)
 	rt.publishTorrentsHandler.SetDeclarationFilter(declFilter)
+}
+
+func (rt *Router) SetCookieCloudServer(srv http.Handler) {
+	rt.cookiecloudServer = srv
 }
 
 func (rt *Router) SetupOrphan(scanner *orphan.Scanner, recovery *orphan.Recovery, db *gorm.DB) {
@@ -391,6 +396,13 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/system/encryption-key/", systemHandler)
 	mux.Handle("/api/v1/system/health", publicSystemHandler)
 	mux.Handle("/api/v1/system/health/", publicSystemHandler)
+
+	if rt.cookiecloudServer != nil {
+		mux.Handle("/cookiecloud/update", rt.cookiecloudServer)
+		mux.Handle("/cookiecloud/update/", rt.cookiecloudServer)
+		mux.Handle("/cookiecloud/get/", rt.cookiecloudServer)
+		mux.Handle("/cookiecloud/get", rt.cookiecloudServer)
+	}
 
 	torrentEventHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/torrent-events", torrentEventHandler)

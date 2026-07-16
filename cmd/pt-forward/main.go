@@ -427,6 +427,11 @@ func main() {
 	router.SetConfigEventBus(configEventBus)
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
+	ccSyncSvc := cookiecloud.NewSyncService(db, log)
+	ccServer := cookiecloud.NewServer(ccSyncSvc, db, log)
+	ccServer.RestoreFromDB(context.Background())
+	router.SetCookieCloudServer(ccServer)
+
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
 	sourceDetector := publish.NewSourceSiteDetector(db, log)
 	sourceDetector.RefreshCache(context.Background())
@@ -1040,6 +1045,9 @@ func registerSchedulerTasks(
 			return nil
 		}
 		if !cfg.SyncEnabled {
+			return nil
+		}
+		if cfg.Mode == "builtin" {
 			return nil
 		}
 		interval := cfg.SyncInterval
