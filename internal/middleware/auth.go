@@ -16,15 +16,19 @@ const UserIDKey contextKey = "user_id"
 func JWTAuth(authManager *auth.AuthManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				writeAuthError(w, http.StatusUnauthorized, 40100, "未提供认证 Token")
-				return
-			}
+			tokenStr := ""
 
-			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-			if tokenStr == authHeader {
-				writeAuthError(w, http.StatusUnauthorized, 40100, "认证格式错误，需要 Bearer Token")
+			authHeader := r.Header.Get("Authorization")
+			if authHeader != "" {
+				tokenStr = strings.TrimPrefix(authHeader, "Bearer ")
+				if tokenStr == authHeader {
+					writeAuthError(w, http.StatusUnauthorized, 40100, "认证格式错误，需要 Bearer Token")
+					return
+				}
+			} else if q := r.URL.Query().Get("token"); q != "" {
+				tokenStr = q
+			} else {
+				writeAuthError(w, http.StatusUnauthorized, 40100, "未提供认证 Token")
 				return
 			}
 
