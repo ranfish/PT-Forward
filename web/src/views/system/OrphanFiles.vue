@@ -40,7 +40,7 @@
         :columns="columns"
         :data-source="orphans"
         :loading="scanning"
-        :pagination="{ pageSize: 20 }"
+        :pagination="pagination"
         :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
         row-key="path"
         size="small"
@@ -160,6 +160,21 @@ const batchResults = ref<BatchResult[]>([])
 const batchStats = ref({ total: 0, found: 0, notFound: 0, error: 0 })
 const recoverCategory = ref('orphan-recover')
 const recoverTags = ref('orphan-recover')
+const pageSize = ref(50)
+
+const pagination = {
+  pageSize: pageSize.value,
+  showSizeChanger: true,
+  pageSizeOptions: ['50', '100', '200'],
+  onChange: (page: number, size: number) => {
+    pageSize.value = size
+    pagination.pageSize = size
+  },
+  onShowSizeChange: (_current: number, size: number) => {
+    pageSize.value = size
+    pagination.pageSize = size
+  },
+}
 
 const columns = [
   { title: t('orphan.columnName'), key: 'name', ellipsis: true },
