@@ -69,7 +69,8 @@ function toggleConnection(val: boolean | string | number) {
 
 function connect() {
   disconnect()
-  const params = levelFilter.value ? `?level=${levelFilter.value}` : ''
+  const token = localStorage.getItem('pt-forward-access-token') || ''
+  const params = levelFilter.value ? `?level=${levelFilter.value}&token=${token}` : `?token=${token}`
   const proto = window.location.protocol === 'https:' ? 'https:' : 'http:'
   const wsUrl = `${proto}//${window.location.host}/api/v1/system/logs/stream${params}`
   eventSource = new EventSource(wsUrl)
