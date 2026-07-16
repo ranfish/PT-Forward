@@ -1181,6 +1181,7 @@
     "batchFound": "Found",
     "batchNotFound": "Not Found",
     "batchError": "Error",
+    "columnClient": "Recover To",
     "columnStatus": "Status",
     "recoverSettings": "Recovery Settings",
     "categoryLabel": "Category",

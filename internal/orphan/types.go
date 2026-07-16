@@ -7,7 +7,7 @@ type Entry struct {
 	Name       string    `json:"name"`
 	Size       int64     `json:"size"`
 	IsDir      bool      `json:"is_dir"`
-	ClientID   string    `json:"client_id"`
+	ClientIDs  []string  `json:"client_ids"`
 	SavePath   string    `json:"save_path"`
 	DetectedAt time.Time `json:"detected_at"`
 }

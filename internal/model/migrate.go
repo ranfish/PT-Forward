@@ -61,6 +61,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&SiteCoverageCache{},
 		&CoverageQueryState{},
 		&ReleaseGroupMapping{},
+		&OrphanScanConfig{},
 		&SitePublishLimit{},
 		&TorrentMetadata{},
 		&setting.Setting{},

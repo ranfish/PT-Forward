@@ -1184,6 +1184,7 @@
     "batchFound": "成功",
     "batchNotFound": "未找到",
     "batchError": "失败",
+    "columnClient": "恢复到",
     "columnStatus": "状态",
     "recoverSettings": "恢复设置",
     "categoryLabel": "分类",
