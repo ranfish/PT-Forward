@@ -158,7 +158,7 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 			Size:       info.Size(),
 			IsDir:      false,
 			ClientIDs:  orphan.ClientIDs,
-			SavePath:   filepath.Dir(filePath),
+			SavePath:   filepath.Dir(orphan.Path),
 		}
 
 		siteName, torrentID, method := r.tryDBMatch(ctx, fileEntry)
@@ -169,7 +169,7 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 
 		fr := FileRecoverResult{FileName: fileName}
 		if siteName != "" {
-			if err := r.downloadAndAdd(ctx, fileEntry, siteName, torrentID, filepath.Dir(filePath), orphan.ClientIDs[0]); err != nil {
+			if err := r.downloadAndAdd(ctx, fileEntry, siteName, torrentID, filepath.Dir(orphan.Path), orphan.ClientIDs[0]); err != nil {
 				fr.Message = fmt.Sprintf("download failed: %v", err)
 			} else {
 				fr.Found = true
