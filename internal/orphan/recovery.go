@@ -302,6 +302,8 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 
 	_, err = client.AddFromFile(ctx, torrentData, model.AddTorrentOptions{
 		SavePath: savePath,
+		Category: "orphan-recover",
+		Tags:     []string{"orphan-recover", "from:" + siteName},
 		Paused:   true,
 	})
 	if err != nil {
