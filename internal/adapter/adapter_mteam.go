@@ -151,6 +151,12 @@ func (a *MTeamAdapter) setAPIHeaders(req *http.Request, apiKey string) {
 }
 
 func (a *MTeamAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
+	domain := config.BaseURL
+	if domain == "" {
+		domain = config.Domain
+	}
+	httpclient.GlobalDownloadLimiter.Acquire(domain)
+
 	if config.APIKey != "" {
 		return a.downloadViaAPI(ctx, config, torrentID)
 	}
