@@ -276,6 +276,14 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		Error(w, http.StatusBadRequest, 40001, "clientId 为必填项")
 		return
 	}
+	// §55.14 role 校验：/seeding 只接 role=seeding
+	var seedClient model.ClientConfig
+	if h.db.Where("name = ?", req.ClientID).First(&seedClient).Error == nil {
+		if seedClient.Role != "seeding" {
+			Error(w, http.StatusBadRequest, 40001, "刷流管理只接受刷流专用(role=seeding)下载器，普通下载器请到下载管理添加")
+			return
+		}
+	}
 
 	var count int64
 	if err := h.db.Model(&model.SeedingClientConfig{}).Where("client_id = ?", req.ClientID).Count(&count).Error; err != nil {

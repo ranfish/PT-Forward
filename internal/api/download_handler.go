@@ -497,6 +497,14 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 			Error(w, http.StatusBadRequest, 40001, "client_id 为必填项")
 			return
 		}
+		// §55.14 role 校验：/downloads 只接 role≠seeding
+		var dlClient model.ClientConfig
+		if h.db.WithContext(r.Context()).Where("name = ?", req.ClientID).First(&dlClient).Error == nil {
+			if dlClient.Role == "seeding" {
+				Error(w, http.StatusBadRequest, 40001, "刷流专用(role=seeding)下载器不能添加到下载管理，请到刷流管理添加")
+				return
+			}
+		}
 		if req.AutoDeleteCron == "" {
 			req.AutoDeleteCron = "*/30 * * * *"
 		}
