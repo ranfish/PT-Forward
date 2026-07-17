@@ -147,9 +147,20 @@ func (p *Provider) queryRemote(ctx context.Context, query string) (*model.PTGenR
 	return nil, ptgenError(ErrPTGenRemote, "all PTGen endpoints failed", lastErr)
 }
 
-func (p *Provider) queryEndpoint(ctx context.Context, endpoint, query string) (*model.PTGenResult, error) {
+func (p *Provider) queryEndpoint(ctx context.Context, endpointLine, query string) (*model.PTGenResult, error) {
+	endpoint := endpointLine
+	key := p.apiKey
+	if idx := strings.Index(endpointLine, "|"); idx >= 0 {
+		endpoint = strings.TrimSpace(endpointLine[:idx])
+		key = strings.TrimSpace(endpointLine[idx+1:])
+	}
+	endpoint = strings.TrimRight(endpoint, "/")
+
 	if strings.Contains(endpoint, "doubaninfo") {
-		return p.queryDoubanInfo(ctx, endpoint, query)
+		return p.queryDoubanInfo(ctx, endpoint, key, query)
+	}
+	if strings.Contains(endpoint, "cspt.top") {
+		return p.queryCspt(ctx, endpoint, key, query)
 	}
 	return p.queryStandard(ctx, endpoint, query)
 }
@@ -243,7 +254,7 @@ func (p *Provider) queryStandard(ctx context.Context, endpoint, query string) (*
 	return result, nil
 }
 
-func (p *Provider) queryDoubanInfo(ctx context.Context, endpoint, query string) (*model.PTGenResult, error) {
+func (p *Provider) queryDoubanInfo(ctx context.Context, endpoint, key, query string) (*model.PTGenResult, error) {
 	sep := "?"
 	if strings.Contains(endpoint, "?") {
 		sep = "&"
@@ -256,8 +267,8 @@ func (p *Provider) queryDoubanInfo(ctx context.Context, endpoint, query string) 
 	if err != nil {
 		return nil, err
 	}
-	if p.apiKey != "" {
-		req.Header.Set("X-API-KEY", p.apiKey)
+	if key != "" {
+		req.Header.Set("X-API-KEY", key)
 	}
 
 	resp, err := p.client.Do(req)
@@ -360,6 +371,107 @@ func (p *Provider) queryDoubanInfo(ctx context.Context, endpoint, query string) 
 		for _, d := range director {
 			if s, ok := d.(string); ok {
 				result.Director = append(result.Director, s)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+func (p *Provider) queryCspt(ctx context.Context, endpoint, token, query string) (*model.PTGenResult, error) {
+	if token == "" {
+		return nil, ptgenError(ErrPTGenResponse, "cspt.top API token 未配置（端点格式：https://cspt.top|<token>）", nil)
+	}
+	reqURL := endpoint + "/api/ptgen/query/" + token + "?url=" + url.QueryEscape(query)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, ptgenError(ErrPTGenRemote, fmt.Sprintf("request %s", endpoint), err)
+	}
+	respBody, err := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
+	if err != nil {
+		return nil, ptgenError(ErrPTGenResponse, "read response", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, ptgenError(ErrPTGenResponse, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)), nil)
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(respBody, &raw); err != nil {
+		return nil, ptgenError(ErrPTGenResponse, "decode response", err)
+	}
+
+	if success, ok := raw["success"].(bool); ok && !success {
+		return nil, ptgenError(ErrPTGenResponse, fmt.Sprintf("cspt API error: %v", raw["error"]), nil)
+	}
+
+	result := &model.PTGenResult{Source: endpoint}
+
+	if v, ok := raw["chinese_title"].(string); ok {
+		result.ChineseTitle = v
+	}
+	if v, ok := raw["foreign_title"].(string); ok {
+		result.ForeignTitle = v
+	}
+	if v, ok := raw["year"].(string); ok {
+		result.Year = v
+	}
+	if v, ok := raw["poster"].(string); ok {
+		result.PosterURL = v
+	}
+	if site, ok := raw["site"].(string); ok && site == "douban" {
+		if sid, ok2 := raw["sid"].(string); ok2 && sid != "" {
+			result.DoubanURL = "https://movie.douban.com/subject/" + sid + "/"
+		}
+	}
+	if v, ok := raw["imdb_id"].(string); ok && v != "" {
+		result.IMDBID = v
+	}
+	if v, ok := raw["imdb_link"].(string); ok && v != "" {
+		result.IMDBURL = v
+	}
+	if v, ok := raw["douban_rating_average"].(string); ok && v != "" {
+		result.DoubanRating = v
+	} else if v, ok := raw["douban_rating_average"].(float64); ok {
+		result.DoubanRating = fmt.Sprintf("%.1f", v)
+	}
+	if v, ok := raw["imdb_rating_average"].(string); ok && v != "" {
+		result.IMDBRating = v
+	} else if v, ok := raw["imdb_rating_average"].(float64); ok {
+		result.IMDBRating = fmt.Sprintf("%.1f", v)
+	}
+	if v, ok := raw["introduction"].(string); ok {
+		result.Introduction = v
+	}
+	if v, ok := raw["format"].(string); ok {
+		result.RawBBCode = v
+	}
+	if arr, ok := raw["region"].([]any); ok {
+		for _, r := range arr {
+			if s, ok := r.(string); ok {
+				result.Region = append(result.Region, s)
+			}
+		}
+	}
+	if arr, ok := raw["genre"].([]any); ok {
+		for _, g := range arr {
+			if s, ok := g.(string); ok {
+				result.Genre = append(result.Genre, s)
+			}
+		}
+	}
+	if arr, ok := raw["director"].([]any); ok {
+		for _, d := range arr {
+			if dm, ok := d.(map[string]any); ok {
+				if name, ok := dm["name"].(string); ok && name != "" {
+					result.Director = append(result.Director, name)
+				}
 			}
 		}
 	}
