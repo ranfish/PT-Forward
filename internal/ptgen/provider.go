@@ -244,13 +244,17 @@ func (p *Provider) queryStandard(ctx context.Context, endpoint, query string) (*
 }
 
 func (p *Provider) queryDoubanInfo(ctx context.Context, endpoint, query string) (*model.PTGenResult, error) {
+	sep := "?"
+	if strings.Contains(endpoint, "?") {
+		sep = "&"
+	}
 	params := url.Values{}
 	params.Set("url", query)
 	if p.apiKey != "" {
 		params.Set("key", p.apiKey)
 	}
 
-	reqURL := endpoint + "?" + params.Encode()
+	reqURL := endpoint + sep + params.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err
