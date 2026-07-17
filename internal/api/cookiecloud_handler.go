@@ -94,6 +94,7 @@ func (h *CookieCloudHandler) handleGetConfig(w http.ResponseWriter, _ *http.Requ
 		"cryptoType":   cfg.CryptoType,
 		"lastSyncAt":   cfg.LastSyncAt,
 		"hasPassword":  cfg.Password != "",
+		"password":     cfg.Password,
 		"hasEncrypted": cfg.LastEncrypted != "",
 	})
 }

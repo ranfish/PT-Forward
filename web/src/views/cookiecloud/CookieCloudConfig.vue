@@ -144,7 +144,7 @@ async function fetchConfig() {
     form.mode = (data.mode || 'remote') as 'remote' | 'builtin'
     form.serverUrl = data.serverUrl || ''
     form.uuid = data.uuid || ''
-    form.password = ''
+    form.password = data.password || ''
     form.cryptoType = data.cryptoType || 'legacy'
     form.syncEnabled = data.syncEnabled || false
     form.syncInterval = data.syncInterval || 60
