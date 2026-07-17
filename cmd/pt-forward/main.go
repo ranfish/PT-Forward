@@ -378,7 +378,6 @@ func main() {
 	seedingEngine.SetClientProvider(clientManager)
 	seedingEngine.SetSiteProvider(siteProvider)
 	seedingEngine.SetWSBroadcaster(wsHub)
-	seedingEngine.SetReseedTrigger(reseedEngine)
 	seedingEngine.SetPusher(torrentPusher)
 
 	freeWaitMonitor := seeding.NewFreeWaitMonitor(db, log)

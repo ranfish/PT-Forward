@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/audit"
+	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/companion"
 	"github.com/ranfish/pt-forward/internal/dispatcher"
 	"github.com/ranfish/pt-forward/internal/event"
@@ -201,20 +202,11 @@ type Engine struct {
 	freeWaitMonitor   *FreeWaitMonitor
 	refreshCancel     context.CancelFunc
 	wg                sync.WaitGroup
-	reseedTrigger     ReseedTrigger
 	pusher            *pusher.Pusher
 	pendingEvents     chan *pusher.PushedEvent
 
 	unregisteredCursor   atomic.Int64
 	unregisteredChecking atomic.Bool
-}
-
-type ReseedTrigger interface {
-	OnTorrentSeeding(ctx context.Context, record model.SeedingTorrentRecord, reseedClientIDs []string)
-}
-
-func (e *Engine) SetReseedTrigger(trigger ReseedTrigger) {
-	e.reseedTrigger = trigger
 }
 
 type maindataEntry struct {
@@ -344,17 +336,25 @@ func recordKey(clientID, infoHash string) string {
 func (e *Engine) Start(ctx context.Context) error {
 	var records []model.SeedingTorrentRecord
 	if err := e.db.WithContext(ctx).
-		Where("status IN ?", []string{"pending", "seeding", "paused_free_end", "paused_rule", "deleting"}).
+		Where("status IN ?", []string{"pending", "seeding", "transferring", "paused_free_end", "paused_rule", "deleting"}).
 		Find(&records).Error; err != nil {
 		return seedingError(ErrSeedingDB, "load seeding records", err)
 	}
 
 	e.mu.Lock()
 	for i := range records {
+		// 重启时把 transferring 回退为 seeding（转移被中断，下轮 refreshMaindataLoop 重试）
+		if records[i].Status == model.SeedingStatusTransferring {
+			records[i].Status = model.SeedingStatusSeeding
+		}
 		key := recordKey(records[i].ClientID, records[i].InfoHash)
 		e.recordMap[key] = &records[i]
 	}
 	e.mu.Unlock()
+	// DB 层面把残留的 transferring 回退为 seeding
+	e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+		Where("status = ?", model.SeedingStatusTransferring).
+		Update("status", model.SeedingStatusSeeding)
 
 	e.logger.Info("seeding engine started", zap.Int("records", len(records)))
 
@@ -522,6 +522,7 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 		e.checkUnregisteredTorrents(ctx, clientID, dlClient)
 		e.logOrphanTorrents(ctx, clientID, torrentMap)
 		e.syncUnmanagedTorrents(ctx, clientID, torrentMap)
+		e.checkAutoTransfer(ctx, clientID, torrentMap, dlClient)
 	}
 }
 
@@ -2959,4 +2960,126 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 			"last_action_by": "unregistered_patrol",
 		})
 	}
+}
+
+// checkAutoTransfer 检测下载完成的 record，触发自动转移（§55.11 方案B）。
+// 在 refreshMaindataOnce 里调用，复用已有的 torrentMap（10s 轮询），零额外网络成本。
+func (e *Engine) checkAutoTransfer(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo, dlClient model.DownloaderClient) {
+	if dlClient == nil {
+		return
+	}
+	deadStates := map[string]bool{"stalledDL": true, "missingFiles": true, "error": true, "unknown": true}
+
+	e.mu.RLock()
+	var pending []string
+	for key, rec := range e.recordMap {
+		if rec.ClientID != clientID || !rec.AutoTransfer || rec.Status != model.SeedingStatusSeeding || len(rec.TransferClientIDs) == 0 {
+			continue
+		}
+		ti, ok := torrentMap[strings.ToLower(rec.InfoHash)]
+		if !ok || ti == nil || ti.Progress < 1.0 || deadStates[ti.State] {
+			continue
+		}
+		pending = append(pending, key)
+	}
+	e.mu.RUnlock()
+
+	for _, key := range pending {
+		// CAS 状态 seeding→transferring（防 refreshMaindataLoop 重复触发）
+		e.mu.Lock()
+		rec, ok := e.recordMap[key]
+		if !ok || rec.Status != model.SeedingStatusSeeding {
+			e.mu.Unlock()
+			continue
+		}
+		rec.Status = model.SeedingStatusTransferring
+		e.mu.Unlock()
+		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).Where("id = ?", rec.ID).Update("status", model.SeedingStatusTransferring)
+
+		ti := torrentMap[strings.ToLower(rec.InfoHash)]
+		if ti == nil {
+			e.revertTransferring(ctx, key, rec.ID)
+			continue
+		}
+		recCopy := *rec
+		tiCopy := *ti
+		go e.transferRecord(context.Background(), recCopy, key, tiCopy)
+	}
+}
+
+// transferRecord 转移种子到目标下载器：ExportTorrent → MapPath → 遍历目标 AddFromFile → 删源(deleteData=false) → 删 record
+func (e *Engine) transferRecord(ctx context.Context, rec model.SeedingTorrentRecord, key string, ti model.TorrentInfo) {
+	if e.clientProvider == nil {
+		e.logger.Warn("auto transfer: clientProvider nil", zap.String("hash", rec.InfoHash))
+		e.revertTransferring(ctx, key, rec.ID)
+		return
+	}
+	sourceClient, err := e.clientProvider.Get(rec.ClientID)
+	if err != nil {
+		e.logger.Warn("auto transfer: get source client failed", zap.String("client", rec.ClientID), zap.Error(err))
+		e.revertTransferring(ctx, key, rec.ID)
+		return
+	}
+
+	torrentData, err := sourceClient.ExportTorrent(ctx, rec.InfoHash)
+	if err != nil {
+		e.logger.Warn("auto transfer: export torrent failed", zap.String("hash", rec.InfoHash), zap.Error(err))
+		e.revertTransferring(ctx, key, rec.ID)
+		return
+	}
+
+	reseedPath := client.MapPath(ti.SavePath, sourceClient.GetSharedPaths())
+
+	successCount := 0
+	for _, targetID := range rec.TransferClientIDs {
+		targetClient, err := e.clientProvider.Get(targetID)
+		if err != nil {
+			e.logger.Warn("auto transfer: get target client failed", zap.String("target", targetID), zap.Error(err))
+			continue
+		}
+		opts := model.AddTorrentOptions{
+			SavePath: reseedPath,
+			Category: ti.Category,
+			Tags:     ti.Tags,
+			Paused:   false,
+		}
+		if _, err := targetClient.AddFromFile(ctx, torrentData, opts); err != nil {
+			e.logger.Warn("auto transfer: add to target failed", zap.String("target", targetID), zap.String("hash", rec.InfoHash), zap.Error(err))
+			continue
+		}
+		successCount++
+		e.logger.Info("auto transfer: added to target", zap.String("target", targetID), zap.String("hash", rec.InfoHash))
+	}
+
+	if successCount == 0 {
+		e.logger.Warn("auto transfer: all targets failed, reverting", zap.String("hash", rec.InfoHash))
+		e.revertTransferring(ctx, key, rec.ID)
+		return
+	}
+
+	// 删除源种子（deleteData=false！数据已移交目标下载器，不能删文件）
+	if err := sourceClient.DeleteTorrent(ctx, rec.InfoHash, false); err != nil {
+		e.logger.Warn("auto transfer: delete source failed (targets already added)", zap.String("hash", rec.InfoHash), zap.Error(err))
+	}
+
+	// 删 record（源种子已移交，seedingEngine 不再管理）
+	e.mu.Lock()
+	delete(e.recordMap, key)
+	e.mu.Unlock()
+	e.db.WithContext(ctx).Where("id = ?", rec.ID).Delete(&model.SeedingTorrentRecord{})
+
+	e.logger.Info("auto transfer: completed",
+		zap.String("hash", rec.InfoHash),
+		zap.String("source", rec.ClientID),
+		zap.Int("targets", successCount))
+}
+
+// revertTransferring 转移失败回退 seeding，下轮 refreshMaindataLoop 重试
+func (e *Engine) revertTransferring(ctx context.Context, key string, recID uint) {
+	e.mu.Lock()
+	if rec, ok := e.recordMap[key]; ok && rec.Status == model.SeedingStatusTransferring {
+		rec.Status = model.SeedingStatusSeeding
+	}
+	e.mu.Unlock()
+	e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).Where("id = ?", recID).Update("status", model.SeedingStatusSeeding)
 }

@@ -54,8 +54,8 @@ type createRSSRequest struct {
 	PublishEnabled bool     `json:"publishEnabled"`
 	PublishTargets []string `json:"publishTargets,omitempty"`
 
-	AutoReseed      bool     `json:"autoReseed"`
-	ReseedClientIDs []string `json:"reseedClientIds,omitempty"`
+	AutoTransfer      bool     `json:"autoTransfer"`
+	TransferClientIDs []string `json:"transferClientIds,omitempty"`
 
 	SkipSameSize          bool `json:"skipSameSize"`
 	SkipSameSizeWindowMin int  `json:"skipSameSizeWindowMin"`
@@ -124,8 +124,8 @@ type updateRSSRequest struct {
 	PublishEnabled *bool     `json:"publishEnabled,omitempty"`
 	PublishTargets *[]string `json:"publishTargets,omitempty"`
 
-	AutoReseed      *bool     `json:"autoReseed,omitempty"`
-	ReseedClientIDs *[]string `json:"reseedClientIds,omitempty"`
+	AutoTransfer      *bool     `json:"autoTransfer,omitempty"`
+	TransferClientIDs *[]string `json:"transferClientIds,omitempty"`
 
 	SkipSameSize          *bool `json:"skipSameSize,omitempty"`
 	SkipSameSizeWindowMin *int  `json:"skipSameSizeWindowMin,omitempty"`
@@ -196,8 +196,8 @@ type rssResponse struct {
 	PublishEnabled bool     `json:"publishEnabled"`
 	PublishTargets []string `json:"publishTargets,omitempty"`
 
-	AutoReseed      bool     `json:"autoReseed"`
-	ReseedClientIDs []string `json:"reseedClientIds,omitempty"`
+	AutoTransfer      bool     `json:"autoTransfer"`
+	TransferClientIDs []string `json:"transferClientIds,omitempty"`
 
 	SkipSameSize    bool `json:"skipSameSize"`
 	AddCountPerHour int  `json:"addCountPerHour"`
@@ -283,8 +283,8 @@ func (h *RSSHandler) toResponse(s *model.RSSSubscription) rssResponse {
 		PublishEnabled: s.PublishEnabled,
 		PublishTargets: s.PublishTargets,
 
-		AutoReseed:      s.AutoReseed,
-		ReseedClientIDs: s.ReseedClientIDs,
+		AutoTransfer:      s.AutoTransfer,
+		TransferClientIDs: s.TransferClientIDs,
 
 		SkipSameSize:    s.SkipSameSize,
 		AddCountPerHour: s.AddCountPerHour,
@@ -511,8 +511,8 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		PublishEnabled: req.PublishEnabled,
 		PublishTargets: req.PublishTargets,
 
-		AutoReseed:      req.AutoReseed,
-		ReseedClientIDs: req.ReseedClientIDs,
+		AutoTransfer:      req.AutoTransfer,
+		TransferClientIDs: req.TransferClientIDs,
 
 		SkipSameSize:          req.SkipSameSize,
 		SkipSameSizeWindowMin: req.SkipSameSizeWindowMin,
@@ -690,11 +690,11 @@ func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.PublishTargets != nil {
 		sub.PublishTargets = *req.PublishTargets
 	}
-	if req.AutoReseed != nil {
-		sub.AutoReseed = *req.AutoReseed
+	if req.AutoTransfer != nil {
+		sub.AutoTransfer = *req.AutoTransfer
 	}
-	if req.ReseedClientIDs != nil {
-		sub.ReseedClientIDs = *req.ReseedClientIDs
+	if req.TransferClientIDs != nil {
+		sub.TransferClientIDs = *req.TransferClientIDs
 	}
 	if req.SkipSameSize != nil {
 		sub.SkipSameSize = *req.SkipSameSize

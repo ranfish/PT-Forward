@@ -959,8 +959,8 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 						IsFree:          isFree,
 						FreeEndAt:       ev.FreeEndAt,
 						SubscriptionID:  uintToString(sub.ID),
-						AutoReseed:      sub.AutoReseed,
-						ReseedClientIDs: sub.ReseedClientIDs,
+						AutoTransfer:    sub.AutoTransfer,
+						TransferClientIDs: sub.TransferClientIDs,
 						PushedAt:        time.Now(),
 					})
 				}

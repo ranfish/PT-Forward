@@ -52,10 +52,10 @@ type PushedEvent struct {
 	HasHR           bool
 	IsFree          bool
 	FreeEndAt       *time.Time
-	SubscriptionID  string
-	AutoReseed      bool
-	ReseedClientIDs []string
-	PushedAt        time.Time
+	SubscriptionID   string
+	AutoTransfer     bool
+	TransferClientIDs []string
+	PushedAt         time.Time
 }
 
 type SiteProvider interface {

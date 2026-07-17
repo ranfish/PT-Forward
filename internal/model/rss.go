@@ -111,8 +111,8 @@ type RSSSubscription struct {
 	RegexStr       string `json:"regex_str" gorm:"size:256"`
 	ReplaceStr     string `json:"replace_str" gorm:"size:256"`
 
-	AutoReseed      bool     `json:"auto_reseed" gorm:"default:false"`
-	ReseedClientIDs []string `json:"reseed_client_ids" gorm:"type:json;serializer:json"`
+	AutoTransfer      bool     `json:"auto_transfer" gorm:"column:auto_transfer;default:false"`
+	TransferClientIDs []string `json:"transfer_client_ids" gorm:"column:transfer_client_ids;type:json;serializer:json"`
 
 	PublishEnabled bool     `json:"publish_enabled" gorm:"default:false"`
 	PublishTargets []string `json:"publish_targets" gorm:"type:json;serializer:json"`
