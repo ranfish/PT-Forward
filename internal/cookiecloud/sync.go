@@ -59,13 +59,26 @@ func (s *SyncService) SyncAll(ctx context.Context) (*model.CookieCloudSyncHistor
 	if err != nil {
 		history.Status = "failed"
 		history.ErrorMessage = err.Error()
-		if saveErr := s.db.Save(history).Error; saveErr != nil {
+		if saveErr := s.db.Save(history).Error; err != nil {
 			s.logger.Error("save sync history failed", zap.Error(saveErr))
 		}
 		return history, err
 	}
 
-	cookies, err := FetchAndDecrypt(cfg.ServerURL, cfg.UUID, cfg.Password)
+	var cookies map[string][]CookieData
+	if cfg.Mode == "builtin" {
+		if cfg.LastEncrypted == "" {
+			history.Status = "completed"
+			history.SkippedSites = len(sites)
+			history.SyncDuration = time.Since(start)
+			s.db.Save(history)
+			s.logger.Info("builtin mode: no encrypted data yet, skipping sync")
+			return history, nil
+		}
+		cookies, err = DecryptFromEncrypted(cfg.LastEncrypted, cfg.UUID, cfg.Password)
+	} else {
+		cookies, err = FetchAndDecrypt(cfg.ServerURL, cfg.UUID, cfg.Password)
+	}
 	if err != nil {
 		history.Status = "failed"
 		history.ErrorMessage = fmt.Sprintf("fetch/decrypt failed: %v", err)
