@@ -582,6 +582,7 @@ export interface CookieCloudConfig {
   mode: string
   serverUrl: string
   uuid: string
+  password: string
   hasPassword: boolean
   cryptoType: string
   syncEnabled: boolean
