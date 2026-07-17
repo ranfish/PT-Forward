@@ -1058,14 +1058,17 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 func (h *SeedingHandler) handleTriggerClient(w http.ResponseWriter, r *http.Request, clientID string) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
-	var cfg model.SeedingClientConfig
-	cfgErr := h.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", clientID, true).First(&cfg).Error
 
-	if cfgErr != nil {
-		count := 0
-		if h.engine != nil {
-			count = h.engine.GetActiveCount(clientID)
-		}
+	if h.engine == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "刷流引擎未初始化")
+		return
+	}
+
+	// §55.15：统一配置加载入口（查 seeding_client_configs 或 download_client_configs），
+	// 避免仅查单表导致 role≠seeding 下载器手动触发评估时被误报 "no enabled config"。
+	cfg, ok := h.engine.LoadActiveClientConfig(ctx, clientID)
+	if !ok {
+		count := h.engine.GetActiveCount(clientID)
 		h.logger.Warn("seeding trigger: no enabled config, returning count only", zap.String("clientId", clientID))
 		Success(w, map[string]interface{}{
 			"processedCount": count,
@@ -1073,11 +1076,6 @@ func (h *SeedingHandler) handleTriggerClient(w http.ResponseWriter, r *http.Requ
 			"evaluated":      false,
 			"reason":         "no enabled config",
 		})
-		return
-	}
-
-	if h.engine == nil {
-		Error(w, http.StatusServiceUnavailable, 50001, "刷流引擎未初始化")
 		return
 	}
 

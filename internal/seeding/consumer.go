@@ -23,23 +23,29 @@ func (e *Engine) SetPusher(p *pusher.Pusher) {
 	e.pusher = p
 }
 
+// LoadActiveClientConfig 按 clientID 加载启用的客户端配置（§55.15 补全 §55.14 阶段3 遗漏）。
+// 先查 seeding_client_configs；未命中再查 download_client_configs 并经 downloadConfigToSeeding
+// 适配为 SeedingClientConfig 视图。统一 role=seeding 与 role≠seeding 下载器的配置加载入口，
+// 避免调用方各自内联查单表导致 role≠seeding 种子被静默丢弃。
+func (e *Engine) LoadActiveClientConfig(ctx context.Context, clientID string) (model.SeedingClientConfig, bool) {
+	var cfg model.SeedingClientConfig
+	if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", clientID, true).First(&cfg).Error; err == nil {
+		return cfg, true
+	}
+	var dlCfg model.DownloadClientConfig
+	if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", clientID, true).First(&dlCfg).Error; err == nil {
+		return *downloadConfigToSeeding(&dlCfg), true
+	}
+	return model.SeedingClientConfig{}, false
+}
+
 func (e *Engine) OnPushed(ctx context.Context, event *pusher.PushedEvent) {
 	if event == nil {
 		return
 	}
 
 	// §55.14 阶段3：查 seeding_client_configs 或 download_client_configs（统一管理 role=seeding 和 role≠seeding）
-	hasCfg := false
-	var seedCfg model.SeedingClientConfig
-	if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", event.ClientID, true).First(&seedCfg).Error; err == nil {
-		hasCfg = true
-	} else {
-		var dlCfg model.DownloadClientConfig
-		if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", event.ClientID, true).First(&dlCfg).Error; err == nil {
-			hasCfg = true
-		}
-	}
-	if !hasCfg {
+	if _, ok := e.LoadActiveClientConfig(ctx, event.ClientID); !ok {
 		return
 	}
 
@@ -96,8 +102,8 @@ func (e *Engine) scoreAndPush(ctx context.Context, events []*pusher.PushedEvent)
 }
 
 func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscriptionID string, candidates []*pendingCandidate) {
-	var clientCfg model.SeedingClientConfig
-	if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", clientID, true).First(&clientCfg).Error; err != nil {
+	clientCfg, ok := e.LoadActiveClientConfig(ctx, clientID)
+	if !ok {
 		return
 	}
 
