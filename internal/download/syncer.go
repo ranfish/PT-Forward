@@ -372,6 +372,84 @@ func (s *Syncer) processClientTransfers(ctx context.Context, clientName string) 
 	for _, task := range tasks {
 		s.processTransfer(ctx, &task)
 	}
+
+	// §55.16 修复 §55.14 副作用：role≠seeding 的 RSS 种子走 seeding record（不进 download_task），
+	// 补一条 record 转移源，让下载器级 transferTargetId 对这类种子也生效
+	s.processRecordTransfers(ctx, clientName)
+}
+
+// processRecordTransfers 处理 role≠seeding 的 seeding record 的下载器级转移（§55.16 修复 §55.14 副作用）。
+// §55.14 统一引擎让 role≠seeding 种子走 seeding_torrent_records（不建 download_task），但
+// processClientTransfers 原本只查 download_task → 下载器级 transferTargetId 永不触发。
+// 此函数补这条链路：对 role≠seeding AND auto_transfer=false（订阅没配转移，由下载器级兜底）
+// AND 下载器配了 transferTargetId 的 record，完成后转移到 transferTargetId。
+// auto_transfer=true 的由订阅级 transferRecord 处理（§55.11 协调，互斥不重复）。
+func (s *Syncer) processRecordTransfers(ctx context.Context, clientName string) {
+	sourceClient, err := s.clientMgr.Get(clientName)
+	if err != nil || sourceClient == nil {
+		return
+	}
+	if sourceClient.GetRole() == "seeding" {
+		return // 下载器级转移是 /downloads 体系职责，不碰刷流
+	}
+	targetID := sourceClient.GetTransferTargetID()
+	if targetID == "" {
+		return // 下载器没配转移目标
+	}
+	targetClient, err := s.clientMgr.Get(targetID)
+	if err != nil || targetClient == nil {
+		s.logger.Warn("record transfer: target client unavailable",
+			zap.String("source", clientName), zap.String("target", targetID), zap.Error(err))
+		return
+	}
+
+	var records []model.SeedingTorrentRecord
+	s.db.WithContext(ctx).
+		Where("client_id = ? AND role != ? AND status = ? AND auto_transfer = ?",
+			clientName, "seeding", model.SeedingStatusSeeding, false).
+		Find(&records)
+
+	for i := range records {
+		rec := &records[i]
+		ti, err := sourceClient.GetTorrentByHash(ctx, rec.InfoHash)
+		if err != nil || ti == nil {
+			continue
+		}
+		if ti.Progress < 1.0 {
+			continue // 未完成，跳过
+		}
+
+		// DB 层 CAS seeding→transferring（防 syncer 下轮与订阅级 transferRecord 并发）
+		res := s.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("id = ? AND status = ?", rec.ID, model.SeedingStatusSeeding).
+			Update("status", model.SeedingStatusTransferring)
+		if res.Error != nil || res.RowsAffected == 0 {
+			continue // 已被别处改状态，跳过
+		}
+
+		result, transferErr := client.TransferTorrent(ctx, sourceClient, targetClient, rec.InfoHash)
+		if transferErr != nil {
+			s.logger.Warn("record transfer: failed",
+				zap.String("source", clientName), zap.String("target", targetID),
+				zap.String("hash", rec.InfoHash), zap.Error(transferErr))
+			s.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+				Where("id = ?", rec.ID).Update("status", model.SeedingStatusSeeding)
+			continue
+		}
+
+		if err := sourceClient.DeleteTorrent(ctx, rec.InfoHash, false); err != nil {
+			s.logger.Warn("record transfer: delete source failed (target already added)",
+				zap.String("hash", rec.InfoHash), zap.Error(err))
+		}
+
+		s.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("id = ?", rec.ID).Update("status", model.SeedingStatusDeleted)
+
+		s.logger.Info("record transfer: completed",
+			zap.String("source", clientName), zap.String("target", targetID),
+			zap.String("hash", rec.InfoHash),
+			zap.Bool("duplicate", result.IsDuplicate))
+	}
 }
 
 func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) {
