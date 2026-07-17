@@ -28,10 +28,16 @@ func (e *Engine) OnPushed(ctx context.Context, event *pusher.PushedEvent) {
 		return
 	}
 
-	var cfg model.SeedingClientConfig
+	// §55.14 阶段3：查 seeding_client_configs 或 download_client_configs（统一管理 role=seeding 和 role≠seeding）
 	hasCfg := false
-	if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", event.ClientID, true).First(&cfg).Error; err == nil {
+	var seedCfg model.SeedingClientConfig
+	if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", event.ClientID, true).First(&seedCfg).Error; err == nil {
 		hasCfg = true
+	} else {
+		var dlCfg model.DownloadClientConfig
+		if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", event.ClientID, true).First(&dlCfg).Error; err == nil {
+			hasCfg = true
+		}
 	}
 	if !hasCfg {
 		return
@@ -133,10 +139,24 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 		}
 	}
 
-	scoringCfg := e.loadScoringConfig(ctx, subscriptionID)
-	siteWeights := e.parseSiteWeights(scoringCfg.SiteWeightsJSON)
+	// §55.14 阶段3：按下载器 role 决定是否评分（role≠seeding 顺序推送，不挑种子）
+	var roleClient model.ClientConfig
+	isSeedingRole := true
+	if err := e.db.WithContext(ctx).Where("name = ?", clientID).First(&roleClient).Error; err == nil {
+		isSeedingRole = roleClient.Role == "seeding"
+	}
 
-	e.scoreCandidatesFull(ctx, candidates, scoringCfg, siteWeights)
+	scoringCfg := model.SeedingScoringConfig{Enabled: false}
+	if isSeedingRole {
+		scoringCfg = e.loadScoringConfig(ctx, subscriptionID)
+		siteWeights := e.parseSiteWeights(scoringCfg.SiteWeightsJSON)
+		e.scoreCandidatesFull(ctx, candidates, scoringCfg, siteWeights)
+	} else {
+		// role≠seeding：不评分，Score=1.0 顺序推送（普通下载不挑种子）
+		for _, c := range candidates {
+			c.Score = 1.0
+		}
+	}
 
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].Score > candidates[j].Score
@@ -358,6 +378,13 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 		return
 	}
 
+	// §55.14 阶段2：查下载器 role 存入 record（consumeLoop 据此决定是否评分）
+	var dlClient model.ClientConfig
+	clientRole := ""
+	if err := e.db.WithContext(ctx).Where("name = ?", clientID).First(&dlClient).Error; err == nil {
+		clientRole = dlClient.Role
+	}
+
 	record := &model.SeedingTorrentRecord{
 		ClientID:          clientID,
 		SiteName:          event.SiteName,
@@ -372,6 +399,7 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 		SubscriptionID:    event.SubscriptionID,
 		AutoTransfer:      event.AutoTransfer,
 		TransferClientIDs: event.TransferClientIDs,
+		Role:              clientRole,
 	}
 	if event.Discount != "" {
 		record.Discount = event.Discount

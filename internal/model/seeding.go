@@ -38,6 +38,9 @@ type SeedingTorrentRecord struct {
 	AutoTransfer       bool     `json:"auto_transfer" gorm:"default:false"`
 	TransferClientIDs  []string `json:"transfer_client_ids" gorm:"type:json;serializer:json"`
 	TransferRetries    int      `json:"transfer_retries" gorm:"default:0"`
+
+	// §55.14 阶段2：下载器角色（seeding/download/source/reseed），consumeLoop 据此决定是否评分
+	Role string `json:"role" gorm:"size:20;default:''"`
 }
 
 func (SeedingTorrentRecord) TableName() string { return "seeding_torrent_records" }
