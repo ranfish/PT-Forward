@@ -46,20 +46,36 @@
     <PublishLimitSettings />
 
     <a-card title="PTGen 配置" style="margin-top: 24px">
-      <a-form layout="vertical" style="max-width: 600px">
-        <a-form-item label="PTGen 端点（# 分隔故障转移）">
-          <a-textarea
-            v-model:value="ptgenEndpoints"
-            :rows="3"
-            placeholder="https://doubaninfo.com/api/v1_douban.php"
-          />
-        </a-form-item>
-        <a-form-item label="API Key（豆影等需要 Key 的服务）">
-          <a-input-password v-model:value="ptgenApiKey" placeholder="可选，仅部分服务需要" />
-        </a-form-item>
-        <a-form-item>
+      <a-form layout="vertical" style="max-width: 720px">
+        <div class="ptgen-provider-list">
+          <div v-for="(p, idx) in ptgenProviders" :key="idx" class="ptgen-provider-row">
+            <a-input
+              v-model:value="p.url"
+              placeholder="端点 URL，如 https://doubaninfo.com/api/v1_douban.php 或 https://cspt.top"
+              style="flex: 1"
+            />
+            <a-input-password
+              v-model:value="p.key"
+              placeholder="API Key / Token"
+              style="width: 220px"
+            />
+            <a-button danger size="small" @click="ptgenProviders.splice(idx, 1)">删除</a-button>
+          </div>
+          <div v-if="ptgenProviders.length === 0" class="ptgen-empty">
+            暂未配置任何 PTGen 端点
+          </div>
+        </div>
+        <a-button type="dashed" size="small" @click="ptgenProviders.push({ url: '', key: '' })" style="margin-top: 8px">
+          + 添加端点
+        </a-button>
+        <div style="margin-top: 16px">
           <a-button type="primary" :loading="ptgenSaving" @click="savePtgen">保存</a-button>
-        </a-form-item>
+        </div>
+        <div class="ptgen-hint">
+          豆影：端点填 https://doubaninfo.com/api/v1_douban.php ，Key 填豆影 API Key<br>
+          财神：端点填 https://cspt.top ，Key 填财神 API Token（在财神站点 ptgen.php 页面生成）<br>
+          排在前面的端点优先使用，查询失败自动切换下一个。
+        </div>
       </a-form>
     </a-card>
   </div>
@@ -76,8 +92,8 @@ const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const agsvptPassword = ref('')
-const ptgenEndpoints = ref('')
-const ptgenApiKey = ref('')
+interface PtgenProvider { url: string; key: string }
+const ptgenProviders = ref<PtgenProvider[]>([])
 const ptgenSaving = ref(false)
 
 const config = reactive<ImageHostConfig>({
@@ -152,13 +168,22 @@ async function loadPtgen() {
       settingsApi.get('ptgen_api_key'),
     ])
     const epRaw = epResp.data.data as any
-    if (epRaw && typeof epRaw === 'object') {
-      ptgenEndpoints.value = (epRaw as any).ptgen_endpoints || (epRaw as any).value || ''
-    }
+    const epStr = epRaw?.ptgen_endpoints || epRaw?.value || ''
     const keyRaw = keyResp.data.data as any
-    if (keyRaw && typeof keyRaw === 'object') {
-      ptgenApiKey.value = (keyRaw as any).ptgen_api_key || (keyRaw as any).value || ''
+    const globalKey = keyRaw?.ptgen_api_key || keyRaw?.value || ''
+
+    const providers: PtgenProvider[] = []
+    for (const line of epStr.split('#')) {
+      const t = line.trim()
+      if (!t) continue
+      if (t.includes('|')) {
+        const i = t.indexOf('|')
+        providers.push({ url: t.slice(0, i).trim(), key: t.slice(i + 1).trim() })
+      } else {
+        providers.push({ url: t, key: globalKey })
+      }
     }
+    ptgenProviders.value = providers
   } catch {
     // ignore
   }
@@ -167,8 +192,12 @@ async function loadPtgen() {
 async function savePtgen() {
   ptgenSaving.value = true
   try {
-    await settingsApi.update('ptgen_endpoints', { value: ptgenEndpoints.value })
-    await settingsApi.update('ptgen_api_key', { value: ptgenApiKey.value })
+    const epStr = ptgenProviders.value
+      .filter(p => p.url.trim())
+      .map(p => `${p.url.trim()}|${p.key.trim()}`)
+      .join('#')
+    await settingsApi.update('ptgen_endpoints', { value: epStr })
+    await settingsApi.update('ptgen_api_key', { value: '' })
     message.success('PTGen 配置保存成功')
   } catch {
     message.error('保存失败')
@@ -179,3 +208,27 @@ async function savePtgen() {
 
 onMounted(loadPtgen)
 </script>
+
+<style scoped>
+.ptgen-provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ptgen-provider-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ptgen-empty {
+  color: #999;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.ptgen-hint {
+  margin-top: 12px;
+  color: #888;
+  font-size: 12px;
+  line-height: 1.8;
+}
+</style>
