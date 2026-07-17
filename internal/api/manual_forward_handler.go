@@ -689,10 +689,32 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// 手动转发提交后立即异步触发 7 步管线（避免等 30min publish_pending tick）
+	h.triggerPublishAsync(candidate.ID)
+
 	Success(w, map[string]interface{}{
 		"candidate_id": candidate.ID,
-		"status":       "created",
+		"status":       "publishing",
 	})
+}
+
+// triggerPublishAsync 异步触发候选发布，不阻塞 submit 响应。
+// 结果写 publish_result_records，前端通过 /publish/results?candidate_id= 或 WS 查看进度。
+func (h *ManualForwardHandler) triggerPublishAsync(candidateID uint) {
+	if h.pipeline == nil {
+		h.logger.Warn("manual forward: pipeline not configured, candidate will wait for publish_pending tick",
+			zap.Uint("candidate_id", candidateID))
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		if _, err := h.pipeline.PublishCandidate(ctx, candidateID); err != nil {
+			h.logger.Warn("manual forward: async publish failed",
+				zap.Uint("candidate_id", candidateID),
+				zap.Error(err))
+		}
+	}()
 }
 
 func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.Request) {
@@ -741,6 +763,7 @@ func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.
 				zap.Error(err))
 			continue
 		}
+		h.triggerPublishAsync(candidate.ID)
 		ids = append(ids, candidate.ID)
 	}
 
