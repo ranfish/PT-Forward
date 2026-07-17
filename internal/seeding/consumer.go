@@ -285,15 +285,14 @@ func (e *Engine) loadScoringConfig(ctx context.Context, subscriptionID string) m
 	if subscriptionID == "" {
 		return model.SeedingScoringConfig{Enabled: false, MaxActiveSeeding: 0}
 	}
-	var cfg model.SeedingScoringConfig
 	var sub model.RSSSubscription
 	if err := e.db.WithContext(ctx).Where("id = ?", subscriptionID).First(&sub).Error; err != nil {
 		return model.SeedingScoringConfig{Enabled: false}
 	}
-	if err := e.db.WithContext(ctx).Where("subscription_id = ?", subscriptionID).First(&cfg).Error; err != nil {
-		return model.SeedingScoringConfig{Enabled: false}
-	}
-	return cfg
+	// §55.10 评分配置是 RSSSubscription 的 embedded 字段（gorm:"embedded"），
+	// 平铺存储于 rss_subscriptions 表（scoring_enabled/half_life_hours 等），
+	// 不是独立表。直接返回 sub.ScoringConfig，避免查询不存在的 seeding_scoring_configs 表。
+	return sub.ScoringConfig
 }
 
 func (e *Engine) parseSiteWeights(jsonStr string) map[string]float64 {
