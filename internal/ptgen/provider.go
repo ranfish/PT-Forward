@@ -250,9 +250,6 @@ func (p *Provider) queryDoubanInfo(ctx context.Context, endpoint, query string) 
 	}
 	params := url.Values{}
 	params.Set("url", query)
-	if p.apiKey != "" {
-		params.Set("key", p.apiKey)
-	}
 
 	reqURL := endpoint + sep + params.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
