@@ -167,10 +167,10 @@ async function loadPtgen() {
       settingsApi.get('ptgen_endpoints'),
       settingsApi.get('ptgen_api_key'),
     ])
-    const epRaw = epResp.data.data as any
-    const epStr = epRaw?.ptgen_endpoints || epRaw?.value || ''
-    const keyRaw = keyResp.data.data as any
-    const globalKey = keyRaw?.ptgen_api_key || keyRaw?.value || ''
+    const epItems = (epResp.data.data as any)?.items || {}
+    const keyItems = (keyResp.data.data as any)?.items || {}
+    const epStr = epItems.ptgen_endpoints || ''
+    const globalKey = keyItems.ptgen_api_key || ''
 
     const providers: PtgenProvider[] = []
     for (const line of epStr.split('#')) {
