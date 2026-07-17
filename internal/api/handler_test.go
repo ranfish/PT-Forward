@@ -98,6 +98,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	env.taskRegistry = taskRegistry
 
 	t.Cleanup(func() {
+		env.router.Stop()
 		close(env.stopCh)
 		authManager.Stop()
 		if sqlDB, err := db.DB(); err == nil {
@@ -5449,6 +5450,7 @@ func setupTestEnvWithClientMgr(t *testing.T) *testEnv {
 	env.token = pair.AccessToken
 
 	t.Cleanup(func() {
+		env.router.Stop()
 		close(env.stopCh)
 		authManager.Stop()
 		if sqlDB, err := db.DB(); err == nil {

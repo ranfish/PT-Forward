@@ -142,7 +142,11 @@ func (rt *Router) Register(mux *http.ServeMux, corsOrigins []string, rateLimitEn
 
 func (rt *Router) Start(_ context.Context) {}
 
-func (rt *Router) Stop() {}
+func (rt *Router) Stop() {
+	if rt.manualForwardHandler != nil {
+		rt.manualForwardHandler.Close()
+	}
+}
 
 func (rt *Router) SetCloudFPBreakerFn(fn func() bool) {
 	if rt.cloudFPHandler != nil {
