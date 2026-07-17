@@ -305,6 +305,17 @@ func (s *Syncer) updateTaskProgress(ctx context.Context, clientID string, ti *mo
 }
 
 func (s *Syncer) importTask(ctx context.Context, clientID string, ti *model.TorrentInfo) {
+	// §55.14 阶段4：RSS 推送的种子已由 seedingEngine 管（seeding_torrent_records），
+	// 跳过导入避免双轨（record + download_task 重叠）
+	var recordCount int64
+	s.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+		Where("client_id = ? AND info_hash = ? AND status NOT IN ?", clientID, ti.Hash,
+			[]string{string(model.SeedingStatusDeleted), string(model.SeedingStatusArchived)}).
+		Count(&recordCount)
+	if recordCount > 0 {
+		return
+	}
+
 	task := &model.DownloadTask{
 		Source:       "import",
 		ClientID:     clientID,
