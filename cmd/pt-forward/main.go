@@ -250,6 +250,9 @@ func main() {
 	if endpoints, err := settingsRepo.Get(ctx, setting.KeyPTGenEndpoints); err == nil && endpoints != "" {
 		publishPipeline.SetPTGenEndpoints(endpoints)
 	}
+	if apiKey, err := settingsRepo.Get(ctx, "ptgen_api_key"); err == nil && apiKey != "" {
+		publishPipeline.SetPTGenAPIKey(apiKey)
+	}
 
 	iyuuService := iyuu.NewService(db, log)
 	go iyuuService.StartSyncLoop(ctx, 24*time.Hour)

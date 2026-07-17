@@ -75,6 +75,12 @@ func (p *Pipeline) SetPTGenEndpoints(endpoints string) {
 	}
 }
 
+func (p *Pipeline) SetPTGenAPIKey(key string) {
+	if p.ptgen != nil {
+		p.ptgen.SetAPIKey(key)
+	}
+}
+
 func (p *Pipeline) SetDeclarationFilter(df *DeclarationFilter) {
 	p.declarationFilter = df
 }
