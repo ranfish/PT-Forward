@@ -2252,8 +2252,51 @@ func (e *Engine) reannounceRuleBeforeDelete(ctx context.Context, client model.Do
 
 func (e *Engine) ListConfigs(ctx context.Context) ([]*model.SeedingClientConfig, error) {
 	var configs []*model.SeedingClientConfig
-	err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&configs).Error
-	return configs, err
+	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&configs).Error; err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool, len(configs))
+	for _, c := range configs {
+		seen[c.ClientID] = true
+	}
+	// §55.14 阶段3：补充 download_client_configs（role≠seeding 下载器，统一由刷流引擎管理）
+	var dlConfigs []model.DownloadClientConfig
+	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&dlConfigs).Error; err == nil {
+		for i := range dlConfigs {
+			if seen[dlConfigs[i].ClientID] {
+				continue
+			}
+			configs = append(configs, downloadConfigToSeeding(&dlConfigs[i]))
+		}
+	}
+	return configs, nil
+}
+
+// downloadConfigToSeeding 将 DownloadClientConfig 适配为 SeedingClientConfig 视图（§55.14 阶段3）。
+// role≠seeding 的下载器配置存于 download_client_configs，刷流引擎统一管理时需转换为 SeedingClientConfig。
+// MaxActiveSeeding 从 MaxActiveUploads/Downloads 映射（download_client_configs 无此字段）。
+func downloadConfigToSeeding(dc *model.DownloadClientConfig) *model.SeedingClientConfig {
+	maxActive := dc.MaxActiveUploads
+	if maxActive == 0 {
+		maxActive = dc.MaxActiveDownloads
+	}
+	return &model.SeedingClientConfig{
+		ClientID:            dc.ClientID,
+		Enabled:             dc.Enabled,
+		DeleteRuleIDs:       dc.DeleteRuleIDs,
+		AutoDeleteCron:      dc.AutoDeleteCron,
+		MainDataCron:        dc.MainDataCron,
+		DiskProtectEnabled:  dc.DiskProtectEnabled,
+		MinDiskSpaceGB:      dc.MinDiskSpaceGB,
+		SpaceAlarmEnabled:   dc.SpaceAlarmEnabled,
+		SpaceAlarmGB:        dc.SpaceAlarmGB,
+		MinDiskSpacePercent: dc.MinDiskSpacePercent,
+		MaxActiveUploads:    dc.MaxActiveUploads,
+		MaxActiveDownloads:  dc.MaxActiveDownloads,
+		MaxActiveSeeding:    maxActive,
+		SuperSeedingDefault: dc.SuperSeedingDefault,
+		Scope:               dc.Scope,
+	}
 }
 
 func (e *Engine) GetConfigByID(ctx context.Context, id uint) (*model.SeedingClientConfig, error) {
