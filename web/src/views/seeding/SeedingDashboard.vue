@@ -509,10 +509,12 @@ async function fetchDownloaders() {
   try {
     const resp = await downloadersApi.list(1, 100)
     const items = resp.data.data?.items || resp.data.data || []
-    downloaderOptions.value = items.map((d: ClientConfig) => ({
-      label: d.name || String(d.id),
-      value: d.name || String(d.id),
-    }))
+    downloaderOptions.value = items
+      .filter((d: ClientConfig) => d.role === 'seeding')
+      .map((d: ClientConfig) => ({
+        label: d.name || String(d.id),
+        value: d.name || String(d.id),
+      }))
   } catch {
   }
 }
