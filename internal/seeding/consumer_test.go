@@ -102,3 +102,78 @@ func TestLoadScoringConfig_ReadsEmbeddedScoringConfig(t *testing.T) {
 		t.Errorf("expected MinScore=0.5, got %v", cfg.MinScore)
 	}
 }
+
+func setupConfigTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(uniqueSQLiteDSN()), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.SeedingClientConfig{}, &model.DownloadClientConfig{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	return db
+}
+
+// TestLoadActiveClientConfig 验证 §55.15 修复（补全 §55.14 阶段3 遗漏）：
+// 配置加载优先 seeding_client_configs，未命中回退 download_client_configs 并经 downloadConfigToSeeding 适配。
+// 修复前 scoreAndPushForClient 内联只查单表，role≠seeding（仅有 download 配置）下载器的种子被静默丢弃。
+func TestLoadActiveClientConfig(t *testing.T) {
+	t.Run("seeding config hit", func(t *testing.T) {
+		db := setupConfigTestDB(t)
+		db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, MaxActiveSeeding: 7, MinDiskSpaceGB: 20})
+		e := NewEngine(db, zap.NewNop())
+		cfg, ok := e.LoadActiveClientConfig(context.Background(), "c1")
+		if !ok {
+			t.Fatal("expected ok=true for seeding config")
+		}
+		if cfg.ClientID != "c1" || cfg.MaxActiveSeeding != 7 || cfg.MinDiskSpaceGB != 20 {
+			t.Errorf("unexpected seeding cfg: client=%s max=%d min=%v",
+				cfg.ClientID, cfg.MaxActiveSeeding, cfg.MinDiskSpaceGB)
+		}
+	})
+
+	t.Run("fallback to download config", func(t *testing.T) {
+		db := setupConfigTestDB(t)
+		db.Create(&model.DownloadClientConfig{
+			ClientID:           "qb-dl",
+			Enabled:            true,
+			MaxActiveUploads:   5,
+			MinDiskSpaceGB:     30,
+			DiskProtectEnabled: true,
+		})
+		e := NewEngine(db, zap.NewNop())
+		cfg, ok := e.LoadActiveClientConfig(context.Background(), "qb-dl")
+		if !ok {
+			t.Fatal("expected ok=true falling back to download config (role≠seeding 不应被静默丢弃)")
+		}
+		if cfg.MaxActiveSeeding != 5 {
+			t.Errorf("expected MaxActiveSeeding=5 (mapped from MaxActiveUploads), got %d", cfg.MaxActiveSeeding)
+		}
+		if cfg.MinDiskSpaceGB != 30 || !cfg.DiskProtectEnabled {
+			t.Errorf("disk protect fields not mapped: min=%v protect=%v",
+				cfg.MinDiskSpaceGB, cfg.DiskProtectEnabled)
+		}
+	})
+
+	t.Run("neither config found", func(t *testing.T) {
+		db := setupConfigTestDB(t)
+		e := NewEngine(db, zap.NewNop())
+		_, ok := e.LoadActiveClientConfig(context.Background(), "ghost")
+		if ok {
+			t.Fatal("expected ok=false when no config exists")
+		}
+	})
+
+	t.Run("disabled config skipped", func(t *testing.T) {
+		db := setupConfigTestDB(t)
+		// 用 map 创建绕过 gorm default:true tag 对 bool 零值的覆盖
+		db.Model(&model.SeedingClientConfig{}).Create(map[string]interface{}{"client_id": "c2", "enabled": false})
+		db.Model(&model.DownloadClientConfig{}).Create(map[string]interface{}{"client_id": "c2", "enabled": false})
+		e := NewEngine(db, zap.NewNop())
+		_, ok := e.LoadActiveClientConfig(context.Background(), "c2")
+		if ok {
+			t.Fatal("expected ok=false for disabled configs")
+		}
+	})
+}
