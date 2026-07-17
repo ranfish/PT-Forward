@@ -29,6 +29,8 @@ type ManualForwardHandler struct {
 	metadataFetcher MetadataFetcherProvider
 	taskStore    sync.Map
 	taskSeq      atomic.Int64
+	stopCh       chan struct{}
+	stopOnce     sync.Once
 }
 
 type MetadataFetcherProvider interface {
@@ -54,6 +56,7 @@ func NewManualForwardHandler(db *gorm.DB, logger *zap.Logger) *ManualForwardHand
 	h := &ManualForwardHandler{
 		db:     db,
 		logger: logger,
+		stopCh: make(chan struct{}),
 	}
 	go h.cleanupTaskStore()
 	return h
@@ -65,6 +68,10 @@ func (h *ManualForwardHandler) SetClientProvider(c MFClientProvider) { h.clientM
 func (h *ManualForwardHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
 func (h *ManualForwardHandler) SetBDInfoScanner(s *publish.BDInfoScanner) { h.bdinfoScanner = s }
 func (h *ManualForwardHandler) SetMetadataFetcher(f MetadataFetcherProvider) { h.metadataFetcher = f }
+
+func (h *ManualForwardHandler) Close() {
+	h.stopOnce.Do(func() { close(h.stopCh) })
+}
 
 func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -107,21 +114,26 @@ const taskStoreTTL = 30 * time.Minute
 func (h *ManualForwardHandler) cleanupTaskStore() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		cutoff := time.Now().Add(-taskStoreTTL)
-		deleted := 0
-		h.taskStore.Range(func(key, value any) bool {
-			task, ok := value.(*analyzeTask)
-			if !ok || task.CreatedAt.Before(cutoff) {
-				h.taskStore.Delete(key)
-				deleted++
+	for {
+		select {
+		case <-h.stopCh:
+			return
+		case <-ticker.C:
+			cutoff := time.Now().Add(-taskStoreTTL)
+			deleted := 0
+			h.taskStore.Range(func(key, value any) bool {
+				task, ok := value.(*analyzeTask)
+				if !ok || task.CreatedAt.Before(cutoff) {
+					h.taskStore.Delete(key)
+					deleted++
+				}
+				return true
+			})
+			if deleted > 0 && h.logger != nil {
+				h.logger.Debug("manual forward task store cleanup",
+					zap.Int("deleted", deleted),
+				)
 			}
-			return true
-		})
-		if deleted > 0 && h.logger != nil {
-			h.logger.Debug("manual forward task store cleanup",
-				zap.Int("deleted", deleted),
-			)
 		}
 	}
 }

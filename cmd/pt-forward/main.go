@@ -581,6 +581,7 @@ func main() {
 		_ = seedingEngine.Stop(ctx)
 		reseedEngine.Stop()
 		completionWatcher.Stop()
+		router.Stop()
 		authManager.Stop()
 		memMonitor.Stop()
 		_ = writeQueue.Stop(ctx)
