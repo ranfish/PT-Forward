@@ -382,6 +382,9 @@ func (p *Provider) queryCspt(ctx context.Context, endpoint, token, query string)
 	if token == "" {
 		return nil, ptgenError(ErrPTGenResponse, "cspt.top API token 未配置（端点格式：https://cspt.top|<token>）", nil)
 	}
+	// 容错：用户可能填 https://cspt.top/api，去掉尾部 /api 避免双重拼接
+	endpoint = strings.TrimSuffix(endpoint, "/api")
+	endpoint = strings.TrimSuffix(endpoint, "/")
 	reqURL := endpoint + "/api/ptgen/query/" + token + "?url=" + url.QueryEscape(query)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
