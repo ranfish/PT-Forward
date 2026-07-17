@@ -134,12 +134,7 @@ func setupFlushTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(
-		&model.SeedingTorrentRecord{},
-		&model.SeedingClientConfig{},
-		&model.RSSSubscription{},
-		&model.Site{},
-	); err != nil {
+	if err := model.AutoMigrate(db); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return db
