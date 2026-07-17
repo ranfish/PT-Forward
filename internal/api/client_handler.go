@@ -257,6 +257,11 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, 40900, "下载器名称已存在")
 		return
 	}
+	var existingURL model.ClientConfig
+	if h.db.Where("url = ?", req.URL).First(&existingURL).Error == nil {
+		Error(w, http.StatusConflict, 40900, "下载器地址已存在（同一地址端口不能添加两次）")
+		return
+	}
 
 	client := model.ClientConfig{
 		Name:           req.Name,
@@ -374,6 +379,13 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	if client.TransferTargetID != "" && client.Type != "qbittorrent" {
 		Error(w, http.StatusBadRequest, 40001, "配置转移目标的下载器必须是 qbittorrent 类型（transmission 的种子导出依赖本地文件，跨机不可达）")
+		return
+	}
+
+	// url 唯一校验（排除自身，§55.14 地址唯一约束）
+	var dupURL model.ClientConfig
+	if h.db.Where("url = ? AND id != ?", client.URL, client.ID).First(&dupURL).Error == nil {
+		Error(w, http.StatusConflict, 40900, "下载器地址已存在（同一地址端口不能添加两次）")
 		return
 	}
 
