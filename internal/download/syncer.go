@@ -364,6 +364,19 @@ func (s *Syncer) processClientTransfers(ctx context.Context, clientName string) 
 }
 
 func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) {
+	// §55.11 协调：订阅级转移优先。若该种子被 seeding record 标记 AutoTransfer，由 transferRecord 处理，syncer 跳过。
+	var seedingManaged int64
+	s.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+		Where("client_id = ? AND info_hash = ? AND auto_transfer = ? AND status IN ?",
+			task.ClientID, task.InfoHash, true,
+			[]string{string(model.SeedingStatusSeeding), string(model.SeedingStatusTransferring)}).
+		Count(&seedingManaged)
+	if seedingManaged > 0 {
+		s.logger.Debug("transfer: skipped (managed by subscription-level transfer)",
+			zap.Uint("id", task.ID), zap.String("hash", task.InfoHash))
+		return
+	}
+
 	sourceClient, err := s.clientMgr.Get(task.ClientID)
 	if err != nil {
 		s.logger.Warn("transfer: source client unavailable",
@@ -388,27 +401,9 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 	if task.TransferStatus != model.TransferStatusPartial {
 		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetID, "")
 
-		torrentData, err := sourceClient.ExportTorrent(ctx, task.InfoHash)
+		result, err := client.TransferTorrent(ctx, sourceClient, targetClient, task.InfoHash)
 		if err != nil {
-			s.logger.Error("transfer: export torrent failed",
-				zap.Uint("id", task.ID), zap.Error(err))
-			s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetID, "")
-			return
-		}
-
-		sourceTorrent, _ := sourceClient.GetTorrentByHash(ctx, task.InfoHash)
-		var savePath string
-		if sourceTorrent != nil {
-			savePath = client.MapPath(sourceTorrent.SavePath, sourceClient.GetSharedPaths())
-		}
-
-		opts := model.AddTorrentOptions{
-			SavePath: savePath,
-			Paused:   false,
-		}
-		result, err := targetClient.AddFromFile(ctx, torrentData, opts)
-		if err != nil {
-			s.logger.Error("transfer: add to target failed",
+			s.logger.Error("transfer: failed",
 				zap.Uint("id", task.ID), zap.String("target", targetID), zap.Error(err))
 			s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetID, "")
 			return

@@ -3002,13 +3002,12 @@ func (e *Engine) checkAutoTransfer(ctx context.Context, clientID string, torrent
 			continue
 		}
 		recCopy := *rec
-		tiCopy := *ti
-		go e.transferRecord(context.Background(), recCopy, key, tiCopy)
+		go e.transferRecord(context.Background(), recCopy, key)
 	}
 }
 
-// transferRecord 转移种子到目标下载器：ExportTorrent → MapPath → 遍历目标 AddFromFile → 删源(deleteData=false) → 删 record
-func (e *Engine) transferRecord(ctx context.Context, rec model.SeedingTorrentRecord, key string, ti model.TorrentInfo) {
+// transferRecord 转移种子到目标下载器：遍历目标 client.TransferTorrent → 删源(deleteData=false) → 删 record
+func (e *Engine) transferRecord(ctx context.Context, rec model.SeedingTorrentRecord, key string) {
 	if e.clientProvider == nil {
 		e.logger.Warn("auto transfer: clientProvider nil", zap.String("hash", rec.InfoHash))
 		e.revertTransferring(ctx, key, rec.ID)
@@ -3021,15 +3020,6 @@ func (e *Engine) transferRecord(ctx context.Context, rec model.SeedingTorrentRec
 		return
 	}
 
-	torrentData, err := sourceClient.ExportTorrent(ctx, rec.InfoHash)
-	if err != nil {
-		e.logger.Warn("auto transfer: export torrent failed", zap.String("hash", rec.InfoHash), zap.Error(err))
-		e.revertTransferring(ctx, key, rec.ID)
-		return
-	}
-
-	reseedPath := client.MapPath(ti.SavePath, sourceClient.GetSharedPaths())
-
 	successCount := 0
 	for _, targetID := range rec.TransferClientIDs {
 		targetClient, err := e.clientProvider.Get(targetID)
@@ -3037,14 +3027,8 @@ func (e *Engine) transferRecord(ctx context.Context, rec model.SeedingTorrentRec
 			e.logger.Warn("auto transfer: get target client failed", zap.String("target", targetID), zap.Error(err))
 			continue
 		}
-		opts := model.AddTorrentOptions{
-			SavePath: reseedPath,
-			Category: ti.Category,
-			Tags:     ti.Tags,
-			Paused:   false,
-		}
-		if _, err := targetClient.AddFromFile(ctx, torrentData, opts); err != nil {
-			e.logger.Warn("auto transfer: add to target failed", zap.String("target", targetID), zap.String("hash", rec.InfoHash), zap.Error(err))
+		if _, err := client.TransferTorrent(ctx, sourceClient, targetClient, rec.InfoHash); err != nil {
+			e.logger.Warn("auto transfer: transfer to target failed", zap.String("target", targetID), zap.String("hash", rec.InfoHash), zap.Error(err))
 			continue
 		}
 		successCount++
