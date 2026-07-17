@@ -359,17 +359,19 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 	}
 
 	record := &model.SeedingTorrentRecord{
-		ClientID:       clientID,
-		SiteName:       event.SiteName,
-		TorrentID:      event.TorrentID,
-		InfoHash:       infoHash,
-		HasHR:          event.HasHR,
-		Source:         "rss",
-		Status:         model.SeedingStatusSeeding,
-		IsFree:         event.IsFree,
-		FreeEndAt:      event.FreeEndAt,
-		TorrentSize:    event.Size,
-		SubscriptionID: event.SubscriptionID,
+		ClientID:          clientID,
+		SiteName:          event.SiteName,
+		TorrentID:         event.TorrentID,
+		InfoHash:          infoHash,
+		HasHR:             event.HasHR,
+		Source:            "rss",
+		Status:            model.SeedingStatusSeeding,
+		IsFree:            event.IsFree,
+		FreeEndAt:         event.FreeEndAt,
+		TorrentSize:       event.Size,
+		SubscriptionID:    event.SubscriptionID,
+		AutoTransfer:      event.AutoTransfer,
+		TransferClientIDs: event.TransferClientIDs,
 	}
 	if event.Discount != "" {
 		record.Discount = event.Discount
@@ -417,10 +419,6 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 
 	if e.freeEndMonitor != nil && record.FreeEndAt != nil {
 		e.freeEndMonitor.Schedule(record)
-	}
-
-	if event.AutoReseed && len(event.ReseedClientIDs) > 0 && e.reseedTrigger != nil {
-		go e.reseedTrigger.OnTorrentSeeding(context.Background(), *record, event.ReseedClientIDs)
 	}
 
 	e.logger.Debug("createRecordFromPush: record created",

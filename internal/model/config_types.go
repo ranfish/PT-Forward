@@ -189,6 +189,7 @@ type SeedingTorrentStatus string
 const (
 	SeedingStatusPending       SeedingTorrentStatus = "pending"
 	SeedingStatusSeeding       SeedingTorrentStatus = "seeding"
+	SeedingStatusTransferring  SeedingTorrentStatus = "transferring"
 	SeedingStatusPausedFreeEnd SeedingTorrentStatus = "paused_free_end"
 	SeedingStatusPausedRule    SeedingTorrentStatus = "paused_rule"
 	SeedingStatusDeleting      SeedingTorrentStatus = "deleting"

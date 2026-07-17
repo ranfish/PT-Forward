@@ -34,6 +34,10 @@ type SeedingTorrentRecord struct {
 	Unregistered    bool       `json:"unregistered" gorm:"default:false"`
 	UnregisteredAt  *time.Time `json:"unregistered_at"`
 	UnregisteredMsg string     `json:"unregistered_msg" gorm:"size:200"`
+
+	AutoTransfer       bool     `json:"auto_transfer" gorm:"default:false"`
+	TransferClientIDs  []string `json:"transfer_client_ids" gorm:"type:json;serializer:json"`
+	TransferRetries    int      `json:"transfer_retries" gorm:"default:0"`
 }
 
 func (SeedingTorrentRecord) TableName() string { return "seeding_torrent_records" }

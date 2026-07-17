@@ -364,8 +364,8 @@ export interface RSSSubscription {
   notifyId?: string
   publishEnabled: boolean
   publishTargets?: string[]
-  autoReseed: boolean
-  reseedClientIds?: string[]
+  autoTransfer: boolean
+  transferClientIds?: string[]
   skipSameSize: boolean
   skipSameSizeWindowMin: number
   skipSameSizeStrict: boolean

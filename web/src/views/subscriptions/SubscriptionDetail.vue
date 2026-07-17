@@ -101,7 +101,7 @@
               </a-col>
               <a-col :span="8">
                 <a-form-item :label="t('subscription.autoReseedLabel')">
-                  <a-switch v-model:checked="configForm.autoReseed" />
+                  <a-switch v-model:checked="configForm.autoTransfer" />
                 </a-form-item>
               </a-col>
             </a-row>
@@ -123,10 +123,10 @@
                 </a-form-item>
               </a-col>
             </a-row>
-            <a-row v-if="configForm.autoReseed" :gutter="16">
+            <a-row v-if="configForm.autoTransfer" :gutter="16">
               <a-col :span="12">
                 <a-form-item :label="t('subscription.reseedClients')">
-                  <a-select v-model:value="configForm.reseedClientIds" mode="multiple" :placeholder="t('subscription.selectReseedClients')" :loading="downloadersLoading" style="width: 100%">
+                  <a-select v-model:value="configForm.transferClientIds" mode="multiple" :placeholder="t('subscription.selectReseedClients')" :loading="downloadersLoading" style="width: 100%">
                     <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">{{ d.name }}（{{ d.type }}）</a-select-option>
                   </a-select>
                 </a-form-item>
@@ -465,10 +465,10 @@ const configForm = reactive({
   scrapeHr: false,
   publishEnabled: false,
   pushNotify: false,
-  autoReseed: false,
+  autoTransfer: false,
   notifyId: '',
   publishTargets: [] as string[],
-  reseedClientIds: [] as string[],
+  transferClientIds: [] as string[],
   lifecyclePauseSeeders: 0,
   lifecycleDeleteSeeders: 0,
   lifecycleDeleteSeedHours: 0,
@@ -572,10 +572,10 @@ async function fetchSubscription() {
       scrapeHr: subscription.value.scrapeHr || false,
       publishEnabled: subscription.value.publishEnabled || false,
       pushNotify: subscription.value.pushNotify || false,
-      autoReseed: subscription.value.autoReseed || false,
+      autoTransfer: subscription.value.autoTransfer || false,
       notifyId: subscription.value.notifyId || '',
       publishTargets: subscription.value.publishTargets || [],
-      reseedClientIds: subscription.value.reseedClientIds || [],
+      transferClientIds: subscription.value.transferClientIds || [],
       lifecyclePauseSeeders: subscription.value.lifecyclePauseSeeders || 0,
       lifecycleDeleteSeeders: subscription.value.lifecycleDeleteSeeders || 0,
       lifecycleDeleteSeedHours: subscription.value.lifecycleDeleteSeedHours || 0,
@@ -641,10 +641,10 @@ async function saveConfig() {
       scrapeHr: configForm.scrapeHr,
       publishEnabled: configForm.publishEnabled,
       pushNotify: configForm.pushNotify,
-      autoReseed: configForm.autoReseed,
+      autoTransfer: configForm.autoTransfer,
       notifyId: configForm.notifyId,
       publishTargets: configForm.publishTargets,
-      reseedClientIds: configForm.reseedClientIds,
+      transferClientIds: configForm.transferClientIds,
       lifecyclePauseSeeders: configForm.lifecyclePauseSeeders,
       lifecycleDeleteSeeders: configForm.lifecycleDeleteSeeders,
       lifecycleDeleteSeedHours: configForm.lifecycleDeleteSeedHours,

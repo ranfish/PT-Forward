@@ -229,7 +229,7 @@ func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID ui
 			} else {
 				w.logger.Info("transfer to reseed completed",
 					zap.Uint("candidate_id", candidateID),
-					zap.String("reseed_client", reseedClientName),
+					zap.String("transfer_client", reseedClientName),
 					zap.String("reseed_hash", reseedHash),
 				)
 				candidate.ClientID = reseedClientName
