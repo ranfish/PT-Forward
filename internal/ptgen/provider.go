@@ -112,6 +112,23 @@ func (p *Provider) queryRemote(ctx context.Context, query string) (*model.PTGenR
 	if len(endpoints) == 0 {
 		endpoints = defaultPTGenEndpoints
 	}
+	if len(endpoints) == 0 && p.db != nil {
+		var epVal, keyVal string
+		p.db.WithContext(ctx).Raw("SELECT value FROM system_settings WHERE key = 'ptgen_endpoints' LIMIT 1").Scan(&epVal)
+		p.db.WithContext(ctx).Raw("SELECT value FROM system_settings WHERE key = 'ptgen_api_key' LIMIT 1").Scan(&keyVal)
+		if keyVal != "" && p.apiKey == "" {
+			p.apiKey = keyVal
+		}
+		for _, s := range strings.Split(epVal, "#") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				endpoints = append(endpoints, s)
+			}
+		}
+	}
+	if len(endpoints) == 0 {
+		return nil, ptgenError(ErrPTGenResponse, "no PTGen endpoint configured", nil)
+	}
 
 	var lastErr error
 	for _, endpoint := range endpoints {
