@@ -51,8 +51,11 @@
           <a-textarea
             v-model:value="ptgenEndpoints"
             :rows="3"
-            placeholder="https://ptgen.agsv.cc/api#https://ptgen.click/api"
+            placeholder="https://doubaninfo.com/api/v1_douban.php"
           />
+        </a-form-item>
+        <a-form-item label="API Key（豆影等需要 Key 的服务）">
+          <a-input-password v-model:value="ptgenApiKey" placeholder="可选，仅部分服务需要" />
         </a-form-item>
         <a-form-item>
           <a-button type="primary" :loading="ptgenSaving" @click="savePtgen">保存</a-button>
@@ -74,6 +77,7 @@ const saving = ref(false)
 const testing = ref(false)
 const agsvptPassword = ref('')
 const ptgenEndpoints = ref('')
+const ptgenApiKey = ref('')
 const ptgenSaving = ref(false)
 
 const config = reactive<ImageHostConfig>({
@@ -143,10 +147,17 @@ onMounted(loadConfig)
 
 async function loadPtgen() {
   try {
-    const { data } = await settingsApi.get('ptgen_endpoints')
-    const raw = data.data as any
-    if (raw && typeof raw === 'object') {
-      ptgenEndpoints.value = (raw as any).ptgen_endpoints || (raw as any).value || ''
+    const [epResp, keyResp] = await Promise.all([
+      settingsApi.get('ptgen_endpoints'),
+      settingsApi.get('ptgen_api_key'),
+    ])
+    const epRaw = epResp.data.data as any
+    if (epRaw && typeof epRaw === 'object') {
+      ptgenEndpoints.value = (epRaw as any).ptgen_endpoints || (epRaw as any).value || ''
+    }
+    const keyRaw = keyResp.data.data as any
+    if (keyRaw && typeof keyRaw === 'object') {
+      ptgenApiKey.value = (keyRaw as any).ptgen_api_key || (keyRaw as any).value || ''
     }
   } catch {
     // ignore
@@ -157,6 +168,7 @@ async function savePtgen() {
   ptgenSaving.value = true
   try {
     await settingsApi.update('ptgen_endpoints', { value: ptgenEndpoints.value })
+    await settingsApi.update('ptgen_api_key', { value: ptgenApiKey.value })
     message.success('PTGen 配置保存成功')
   } catch {
     message.error('保存失败')
