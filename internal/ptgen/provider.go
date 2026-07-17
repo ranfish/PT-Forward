@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -16,17 +17,15 @@ import (
 )
 
 type Provider struct {
-	db         *gorm.DB
-	logger     *zap.Logger
-	client     *http.Client
-	endpoints  []string
+	db           *gorm.DB
+	logger       *zap.Logger
+	client       *http.Client
+	endpoints    []string
+	apiKey       string
 	cacheMaxDays int
 }
 
-var defaultPTGenEndpoints = []string{
-	"https://ptgen.agsv.cc/api",
-	"https://ptgen.click/api",
-}
+var defaultPTGenEndpoints = []string{}
 
 const defaultPTGenCacheDays = 30
 
@@ -61,6 +60,10 @@ func (p *Provider) SetCacheMaxDays(days int) {
 	if days > 0 {
 		p.cacheMaxDays = days
 	}
+}
+
+func (p *Provider) SetAPIKey(key string) {
+	p.apiKey = strings.TrimSpace(key)
 }
 
 func (p *Provider) Query(ctx context.Context, query string) (*model.PTGenResult, error) {
@@ -128,6 +131,13 @@ func (p *Provider) queryRemote(ctx context.Context, query string) (*model.PTGenR
 }
 
 func (p *Provider) queryEndpoint(ctx context.Context, endpoint, query string) (*model.PTGenResult, error) {
+	if strings.Contains(endpoint, "doubaninfo") {
+		return p.queryDoubanInfo(ctx, endpoint, query)
+	}
+	return p.queryStandard(ctx, endpoint, query)
+}
+
+func (p *Provider) queryStandard(ctx context.Context, endpoint, query string) (*model.PTGenResult, error) {
 	payload := map[string]string{"query": query}
 	body, _ := json.Marshal(payload)
 
@@ -204,6 +214,129 @@ func (p *Provider) queryEndpoint(ctx context.Context, endpoint, query string) (*
 				result.Genre = append(result.Genre, s)
 			}
 		}
+	}
+	if director, ok := raw["director"].([]any); ok {
+		for _, d := range director {
+			if s, ok := d.(string); ok {
+				result.Director = append(result.Director, s)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+func (p *Provider) queryDoubanInfo(ctx context.Context, endpoint, query string) (*model.PTGenResult, error) {
+	params := url.Values{}
+	params.Set("url", query)
+	if p.apiKey != "" {
+		params.Set("key", p.apiKey)
+	}
+
+	reqURL := endpoint + "?" + params.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	if p.apiKey != "" {
+		req.Header.Set("X-API-KEY", p.apiKey)
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, ptgenError(ErrPTGenRemote, fmt.Sprintf("request %s", endpoint), err)
+	}
+	respBody, err := httpclient.ReadBody(resp)
+	httpclient.DrainBody(resp)
+	if err != nil {
+		return nil, ptgenError(ErrPTGenResponse, "read response", err)
+	}
+
+	if resp.StatusCode == 429 {
+		return nil, ptgenError(ErrPTGenRemote, fmt.Sprintf("rate limited (429): %s", string(respBody)), nil)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, ptgenError(ErrPTGenResponse, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)), nil)
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(respBody, &raw); err != nil {
+		return nil, ptgenError(ErrPTGenResponse, "decode response", err)
+	}
+
+	if success, ok := raw["success"].(bool); ok && !success {
+		return nil, ptgenError(ErrPTGenResponse, fmt.Sprintf("API error: %v", raw["error"]), nil)
+	}
+
+	result := &model.PTGenResult{Source: endpoint}
+
+	if title, ok := raw["chinese_title"].(string); ok {
+		result.ChineseTitle = title
+	}
+	if title, ok := raw["foreign_title"].(string); ok {
+		result.ForeignTitle = title
+	}
+	if title, ok := raw["title"].(string); ok && result.ChineseTitle == "" {
+		result.ChineseTitle = title
+	}
+	if year, ok := raw["year"].(string); ok {
+		result.Year = year
+	}
+	if poster, ok := raw["poster"].(string); ok {
+		result.PosterURL = poster
+	}
+	if cover, ok := raw["cover"].(string); ok && result.PosterURL == "" {
+		result.PosterURL = cover
+	}
+	if site, ok := raw["site"].(string); ok {
+		if sid, ok2 := raw["sid"].(string); ok2 && site == "douban" {
+			result.DoubanURL = "https://movie.douban.com/subject/" + sid + "/"
+		}
+	}
+	if douban, ok := raw["douban_url"].(string); ok {
+		result.DoubanURL = douban
+	}
+	if imdbID, ok := raw["imdb_id"].(string); ok {
+		result.IMDBID = imdbID
+		result.IMDBURL = "https://www.imdb.com/title/" + imdbID + "/"
+	}
+	if imdb, ok := raw["imdb_url"].(string); ok {
+		result.IMDBURL = imdb
+	}
+	if doubanRating, ok := raw["douban_rating"].(string); ok {
+		result.DoubanRating = doubanRating
+	}
+	if imdbRating, ok := raw["imdb_rating"].(string); ok {
+		result.IMDBRating = imdbRating
+	}
+	if summary, ok := raw["summary"].(string); ok {
+		result.Introduction = summary
+	}
+	if intro, ok := raw["introduction"].(string); ok && result.Introduction == "" {
+		result.Introduction = intro
+	}
+	if bbcode, ok := raw["bbcode"].(string); ok {
+		result.RawBBCode = bbcode
+	}
+	if region, ok := raw["region"].(string); ok && region != "" {
+		result.Region = append(result.Region, region)
+	}
+	if regionArr, ok := raw["region"].([]any); ok {
+		for _, r := range regionArr {
+			if s, ok := r.(string); ok {
+				result.Region = append(result.Region, s)
+			}
+		}
+	}
+	if genre, ok := raw["genre"].([]any); ok {
+		for _, g := range genre {
+			if s, ok := g.(string); ok {
+				result.Genre = append(result.Genre, s)
+			}
+		}
+	}
+	if genreStr, ok := raw["genre"].(string); ok && genreStr != "" {
+		result.Genre = append(result.Genre, genreStr)
 	}
 	if director, ok := raw["director"].([]any); ok {
 		for _, d := range director {
