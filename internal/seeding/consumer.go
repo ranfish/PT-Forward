@@ -427,6 +427,17 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 	e.logger.Debug("createRecordFromPush: record created",
 		zap.String("client_id", clientID),
 		zap.String("info_hash", infoHash))
+
+	// §55.5 P1 修复：推送成功后回写 rss_torrent_seen.status="pushed"，避免下轮 RSS 重复投递。
+	// 仅在 pusher.Push 成功（即调用 createRecordFromPush）后执行；推送失败保持 seen，下轮重试。
+	if err := e.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
+		Where("site_name = ? AND torrent_id = ?", event.SiteName, event.TorrentID).
+		Update("status", "pushed").Error; err != nil {
+		e.logger.Debug("mark rss seen as pushed failed",
+			zap.String("site", event.SiteName),
+			zap.String("torrent_id", event.TorrentID),
+			zap.Error(err))
+	}
 }
 
 var _ = fmt.Sprintf
