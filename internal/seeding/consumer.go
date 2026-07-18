@@ -360,9 +360,15 @@ func (e *Engine) buildPushRequest(ctx context.Context, clientID string, event *p
 				}
 				req.Tags = tagsStr
 			}
-			req.AddPaused = sub.AddPaused
+		req.AddPaused = sub.AddPaused
+		// 智能默认（§55.18）：配了 SavePath 强制 AutoTMM=false（保证 savepath 生效，
+		// 避免 qB 全局 TMM=true 覆盖 savepath）；没配 SavePath 保持用户配置（默认 false）。
+		if sub.SavePath != "" {
+			req.AutoTMM = false
+		} else {
 			req.AutoTMM = sub.AutoTMM
-			req.UploadLimitKB = sub.UploadLimitKB
+		}
+		req.UploadLimitKB = sub.UploadLimitKB
 			req.DownloadLimitKB = sub.DownloadLimitKB
 		}
 	}

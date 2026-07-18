@@ -1305,6 +1305,33 @@ func TestBuildMultipartBody_AllOptions(t *testing.T) {
 	}
 }
 
+// TestBuildMultipartBody_AutoTMMFalse 验证 §55.18 修复：AutoTMM=false 时必须显式写
+// autoTMM=false 字段。修复前 false 时跳过该字段，qB 用全局 DefaultTMMEnabled（默认 true）
+// 导致 savepath 被忽略（用户配的 SavePath 不生效）。
+func TestBuildMultipartBody_AutoTMMFalse(t *testing.T) {
+	data := loadTestTorrent(t)
+	opts := model.AddTorrentOptions{
+		SavePath: "/data/pt",
+		AutoTMM:  false,
+	}
+
+	buf, _, err := buildMultipartBody(data, opts)
+	if err != nil {
+		t.Fatalf("buildMultipartBody: %v", err)
+	}
+
+	body := buf.String()
+	if !strings.Contains(body, "autoTMM") {
+		t.Error("§55.18: AutoTMM=false 必须显式写 autoTMM 字段（否则 qB 用全局 TMM 覆盖 savepath）")
+	}
+	if !strings.Contains(body, "false") {
+		t.Error("AutoTMM=false 应写入值 'false'")
+	}
+	if !strings.Contains(body, "/data/pt") {
+		t.Error("应包含 savepath")
+	}
+}
+
 func TestQBClient_GetMainData_WithTags(t *testing.T) {
 	mock := &qbMock{version: "4.6.3", freeSpace: 999}
 	mock.torrents = []qbTorrent{sampleQBTorrent()}
