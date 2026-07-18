@@ -64,6 +64,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&OrphanScanConfig{},
 		&SitePublishLimit{},
 		&TorrentMetadata{},
+		&StandardKey{},
 		&setting.Setting{},
 	); err != nil {
 		return err
