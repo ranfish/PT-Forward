@@ -10,11 +10,15 @@
 - §56.1 标准化键体系（standard_keys 表 + 加载机制 + titleparser 对接）
 - §56.2 禁转标签检测（is_protected + 用户自定义 + 合规检查 DB 化）
 - §56.6 模块 2b.0 详情页采集架构决策（4 项核心决策 + 三源数据流 + JSON 列存储）
+- §56.7 模块 2b.0 + 2b.1 回归审核（HTML 框架 = goquery，4 项 P0 补充决策）
+- §56.8 模块 2b.2 数据模型设计（SeedData/IntroData/Engine/三源 JSON/MergedMetadata/TorrentMetadata 扩展）
 
 **§56 进行中**（详情页采集模块 2b）：
-- ✅ 2b.0 架构决策：`internal/metadata/extract/` 独立包 + adapter 双接口（保留 GetTorrentDetail + 新增 GetTorrentSeed）+ Fetcher 完善后启用 + PTGen 优先 + UI toggle
-- 🔄 2b.1 HTML 解析框架选型（进行中）
-- ⏳ 2b.2~2b.9 数据模型/BBCode/公共提取器/MediaInfo/图片/站点特殊/handler 接入/单测
+- ✅ 2b.0 架构决策（internal/metadata/extract/ + adapter 双接口 + Fetcher 完善后启用 + PTGen 优先 + UI toggle）
+- ✅ 2b.1 HTML 框架（goquery v1.12.0 + 统一入口 parser.go + a-Y 终态不保留）
+- ✅ 2b.2 数据模型设计（SeedData/IntroData/Engine/三源 JSON/MergedMetadata）
+- 🔄 2b.3 BBCode 转换器（进行中）
+- ⏳ 2b.4~2b.9 公共提取器/MediaInfo/图片/站点特殊/handler 接入/单测
 
 **§56 待打磨模块**（按 上游→中游→下游→交互 顺序）：
 - 上游：2d 简介分区（与 2b 并行）/ 2c PTGen 集成 / 4a 图床打通 / 4c 海报 fallback
