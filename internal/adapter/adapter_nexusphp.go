@@ -446,7 +446,12 @@ func (a *NexusPHPAdapter) GetPreciseSLData(ctx context.Context, config *model.Si
 		return nil, err
 	}
 
-	html := string(body)
+	return parseNexusSLFromHTML(string(body)), nil
+}
+
+// parseNexusSLFromHTML 从 nexusphp 详情页 HTML 提取 seeders/leechers。
+// §55.19 抽出复用：DetectHRDiscountAndSL 也调用本函数，避免重复抓 HTML。
+func parseNexusSLFromHTML(html string) *model.SLData {
 	sl := &model.SLData{}
 
 	seedersRe := reNexusSeedersCount
@@ -464,7 +469,7 @@ func (a *NexusPHPAdapter) GetPreciseSLData(ctx context.Context, config *model.Si
 				sl.Leechers, _ = strconv.Atoi(m[1])
 			}
 			if sl.Seeders > 0 || sl.Leechers > 0 {
-				return sl, nil
+				return sl
 			}
 		}
 
@@ -487,7 +492,7 @@ func (a *NexusPHPAdapter) GetPreciseSLData(ctx context.Context, config *model.Si
 		}
 	}
 
-	return sl, nil
+	return sl
 }
 
 func (a *NexusPHPAdapter) DetectDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
@@ -648,6 +653,64 @@ func (a *NexusPHPAdapter) DetectHRAndDiscount(ctx context.Context, config *model
 	discResult := DetectDiscountFromDetailsPage(html, &config.DiscountDetection)
 
 	return hrResult, discResult, nil
+}
+
+// §55.19 根本修复：DetectHRDiscountAndSL 在 detect 阶段顺便提取 SL 数据。
+// 复用 DetectHRAndDiscount 已抓取的详情页 HTML，避免评分阶段 GetBatchSLData 重复请求同一 URL。
+// 实现 CombinedHRDiscountSLDetector 接口（包装扩展，rss/engine.go 用类型断言优先调用）。
+func (a *NexusPHPAdapter) DetectHRDiscountAndSL(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, *model.DiscountResult, *model.SLData, error) {
+	if config.Discount.HasAPI && config.Discount.APIURL != "" {
+		// API 模式：HR/Discount 走 API，SL 必须抓详情页（无法合并，单独抓）
+		hr, err := a.DetectHR(ctx, config, torrentID)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		disc, err := a.DetectDiscount(ctx, config, torrentID)
+		if err != nil {
+			return hr, nil, nil, err
+		}
+		sl, slErr := a.GetPreciseSLData(ctx, config, torrentID)
+		if slErr != nil {
+			a.logger.Warn("DetectHRDiscountAndSL: get SL failed",
+				zap.String("torrent", torrentID), zap.Error(slErr))
+			sl = &model.SLData{}
+		}
+		return hr, disc, sl, nil
+	}
+
+	// 非 API 模式：抓一次 HTML，提取 HR + Discount + SL
+	u := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, nil, nil, networkError("构造请求失败", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		a.logger.Warn("DetectHRDiscountAndSL request failed",
+			zap.String("url", u),
+			zap.String("torrent", torrentID),
+			zap.Error(err))
+		return nil, nil, nil, networkError("请求详情页失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	rawHTML := string(body)
+	lowerHTML := strings.ToLower(rawHTML)
+
+	hrResult := &model.HRResult{HasHR: detectHRFromHTML(lowerHTML)}
+	if hrResult.HasHR {
+		hrResult.SeedTimeH = config.HR.SeedTimeH()
+	}
+	discResult := DetectDiscountFromDetailsPage(lowerHTML, &config.DiscountDetection)
+	sl := parseNexusSLFromHTML(rawHTML)
+
+	return hrResult, discResult, sl, nil
 }
 
 func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {

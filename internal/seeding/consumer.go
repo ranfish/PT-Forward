@@ -269,10 +269,14 @@ func (e *Engine) scoreCandidatesFull(ctx context.Context, candidates []*pendingC
 	now := time.Now()
 	for _, c := range candidates {
 		ev := c.Event
-		seeders, leechers := 0, 0
-		if sl, ok := slDataMap[ev.SiteName+"|"+ev.TorrentID]; ok && sl != nil {
-			seeders = sl.Seeders
-			leechers = sl.Leechers
+		// §55.19 根本修复：优先用 event 自带 SL（detect 阶段顺便提取），
+		// 缺失（=0）才 fallback 到 GetBatchSLData 二次抓取的 slDataMap。
+		seeders, leechers := ev.Seeders, ev.Leechers
+		if seeders == 0 && leechers == 0 {
+			if sl, ok := slDataMap[ev.SiteName+"|"+ev.TorrentID]; ok && sl != nil {
+				seeders = sl.Seeders
+				leechers = sl.Leechers
+			}
 		}
 
 		ageHours := 0.0

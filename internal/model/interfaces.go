@@ -25,6 +25,13 @@ type CombinedHRDiscountDetector interface {
 	DetectHRAndDiscount(ctx context.Context, config *SiteConfig, torrentID string) (*HRResult, *DiscountResult, error)
 }
 
+// §55.19 根本修复：扩展 CombinedHRDiscountDetector，detect 时顺便提取 SL 数据。
+// 避免评分阶段 GetBatchSLData 重复抓取同一个详情页（detect 已抓 HTML，但只提取 HR/Discount 扔掉 SL）。
+// 实现方按需提供（如 NexusPHPAdapter）；未实现的 adapter 通过类型断言 fallback 到老接口。
+type CombinedHRDiscountSLDetector interface {
+	DetectHRDiscountAndSL(ctx context.Context, config *SiteConfig, torrentID string) (*HRResult, *DiscountResult, *SLData, error)
+}
+
 type UserStatsResult struct {
 	Username      string
 	UserClass     string

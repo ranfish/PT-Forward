@@ -40,6 +40,11 @@ type TorrentEvent struct {
 	SideLoadStatus      SideLoadStatus `json:"side_load_status" gorm:"size:20;default:'not_required'"`
 	SideLoadStartedAt   *time.Time     `json:"side_load_started_at"`
 	SideLoadFinishedAt  *time.Time     `json:"side_load_finished_at"`
+
+	// §55.19 根本修复：detect 阶段顺便提取的 SL（不入库，只在内存 event 流通）。
+	// 评分时优先用这俩字段，避免评分阶段再次抓详情页。
+	Seeders   int   `json:"seeders" gorm:"-"`
+	Leechers  int   `json:"leechers" gorm:"-"`
 }
 
 func (TorrentEvent) TableName() string { return "torrent_events" }
@@ -71,6 +76,10 @@ type RSSTorrentEvent struct {
 	Category      string         `json:"category"`
 	Tags          []string       `json:"tags"`
 	Uploader      string         `json:"uploader"`
+	// §55.19 根本修复：detect 阶段顺便提取 SL（如果 adapter 支持 DetectHRDiscountAndSL）。
+	// 评分时优先用这俩字段，避免评分阶段再次抓取详情页。
+	Seeders  int `json:"seeders"`
+	Leechers int `json:"leechers"`
 }
 
 // §33.1.3 — RSSSubscription: 订阅配置（Sprint 89, 7 处合并）
