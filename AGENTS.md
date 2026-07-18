@@ -61,12 +61,14 @@
 **§56 实施进度**：
 - ✅ 第一阶段 5a/6a 完成（v0.0.228）：standard_keys 表 + 94 条标准键 + 启动同步
 - 🔄 第二阶段 2b.1~2b.6 进行中：extract 包核心
-  - ⏳ 2b.1 goquery 引入 + parser.go（下一个）
-  - ⏳ 2b.2 数据模型（SeedData/IntroData/Engine）
-  - ⏳ 2b.3 BBCode 转换器
-  - ⏳ 2b.4 公共提取器
-  - ⏳ 2b.5 MediaInfo 提取
-  - ⏳ 2b.6 图片分类
+  - ✅ 2b.1 goquery 引入 + parser.go（3 入口函数 + benchmark）
+  - ✅ 2b.2 数据模型（SeedData/IntroData/Engine + 三源 JSON + Merge + DB 扩展）
+  - ✅ 2b.3 BBCode 转换器（双栈 accumulator + 30 标签 + 样式映射）
+  - ✅ 2b.4 公共提取器骨架（11 子模块：8 实现 + 3 stub）
+    - ⏳ extract_intro 完善（quote 二分分段 + Statement 识别）
+    - ⏳ extract_ardtu 完善（28 项黑名单 + 14 条技术参数）
+  - ⏳ 2b.5 MediaInfo/BDInfo 提取（4 层候选源 + 合法性检测）
+  - ⏳ 2b.6 图片分类与黑名单
 - ⏳ 第三阶段~第十五阶段：详见 §56.5 实施计划
 
 **关键事实**（避免再被旧焦点段误导）：
