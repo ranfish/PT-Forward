@@ -25,11 +25,12 @@
 - §56.19 模块 5c 标题重组（含发布前校验）（7 site hooks + TitleFormat 扩展 + TitleValidator 8 类规则 + 自动修复 + title_rules 表）
 - §56.20 模块 5e 描述渲染（模板+site hooks + thanksQuote + BBCode→HTML + 副标题模板 + 4 站特殊 BuildDescription）
 - §56.21 模块 6b/6c 禁转小组 + 成人内容 DB 化（compliance_rules 表 + scope 字段 + Aho-Corasick 自动机 + 三套硬编码统一）
+- §56.22 模块 7b 多选 tag 表单填充（SiteTagConfig + TagApplier 4 种 Mode + MediaTagInferer 38 个 + 互斥规则引擎）
 
-**§56 模块 2b/2c/4a/4c/5c/5e/6b/6c 设计完成** ✅
+**§56 模块 2b/2c/4a/4c/5c/5e/6b/6c/7b 设计完成** ✅
 
 **§56 待打磨模块**（按 上游→中游→下游→交互 顺序）：
-- 下游：7b 多选 tag 表单 / 7e 已存在种子自动编辑
+- 下游：7e 已存在种子自动编辑
 - 交互：9d 字段预览（reverse mapping UI）
 
 **§56 实施进度（待启动）**：
@@ -44,6 +45,7 @@
 - 第九阶段：5c 标题重组 + 校验（15.5 天）
 - 第十阶段：5e 描述渲染（10.25 天）
 - 第十一阶段：6b/6c 禁转+成人 DB 化（6.75 天）
+- 第十二阶段：7b 多选 tag 表单（9.5 天）
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
