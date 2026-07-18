@@ -4,29 +4,34 @@
 
 **版本**：v0.0.227（已发布）。§55.19 刷流 19 天零推送根因全部修复完成。
 
-**已完成**（v0.0.224~227）：
-- §55.19 核心：`consumer.go:233 needSLData` bug（免费种评分=0 全过滤）
-- §55.19 放大器 1：`below min score` Debug → Info（诊断必备）
-- §55.19 补丁：`rss_torrent_seen.push_time` 推送成功后回写
-- §55.19 诊断：ScoringLog 加 `score_type` 字段区分 cleanup/push
-- §55.19 根本修复：detect 顺便提取 SL（包装接口 `CombinedHRDiscountSLDetector`，NexusPHPAdapter 实现）
-- 数据清理：DELETE PT5/PT3-辅种 历史 download_tasks（2230 条）+ 回填历史 push_time
+**当前主线**：§56 转载功能模块化设计（手动转载基础建设）。**不急于跑通全流程，先逐模块深度打磨**（字段映射/元数据采集/截图上传/PTGen/合规检查/...），打磨好每个细节后再串联。
+
+**§56 已完成设计**（待实施）：
+- §56.1 标准化键体系（standard_keys 表 + 加载机制 + titleparser 对接）
+- §56.2 禁转标签检测（is_protected + 用户自定义 + 合规检查 DB 化）
+
+**§56 待打磨模块**（按 上游→中游→下游→交互 顺序）：
+- 上游：2b 详情页采集 / 2d 简介分区 / 2c PTGen 集成 / 4a 图床打通 / 4c 海报 fallback
+- 中游：5c 标题重组 / 5e 描述渲染 / 6b 6c 禁转小组与成人内容 DB 化
+- 下游：7b 多选 tag 表单 / 7e 已存在种子自动编辑
+- 交互：9b 元数据审核 / 9d 字段预览
 
 **关键事实**（避免再被旧焦点段误导）：
-- §55.15-§55.19 全部已修并部署生产 v0.0.224+。
-- 生产 249 部署的最新镜像见 `docker images`（用户负责部署）。
-- 本地 `env-PT-Forward.md`（已 gitignore，不入 git）有 249/99 等环境访问信息。
-- 生产刷流 `min_score=0.05`（用户前端配），~33% 推送率。
+- §55.15-§55.19 全部已修并部署生产 v0.0.224+
+- 生产 249 部署的最新镜像见 `docker images`（用户负责部署）
+- 本地 `env-PT-Forward.md`（已 gitignore，不入 git）有 249/99 等环境访问信息
+- 生产刷流 `min_score=0.05`（用户前端配），~33% 推送率
+- 手动转发链路完整接线但从未端到端跑过（candidates=0）
 
-**待办**（v0.0.228 候选）：
-- 放大器 2：seen 状态超时降级（避免无限堆积，§55.19 放大器 2，未修）
-- 其他 adapter（generic/gazelle/tnode/unit3d/mteam/yemapt）实现 `DetectHRDiscountAndSL`（目前只 NexusPHPAdapter 实现，其他走老接口 fallback）
+**待办**（§56 实施顺序）：
+- 第一阶段：5a/6a 落地（~2 天）—— standard_keys 表 + 加载机制 + 合规检查 DB 化
+- 第二阶段起：按优先级逐模块讨论 → 设计 → 实施
 
 **后续**：
 - 多下载器聚合下载（§55.3-55.4，clientSelector 接入，待用户决策时机）
-- 转载功能验证（§55.7 publish_candidates）
+- 转载功能端到端跑通（§56 各模块打磨完成后）
 
-**完整设计文档**：`docs/31-模块设计决策记录.md` §55.1-§55.19（按需读特定章节，不要一次读全文，58000+ 行）。
+**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§56（按需读特定章节，不要一次读全文，58000+ 行）。
 
 ## 环境信息
 
