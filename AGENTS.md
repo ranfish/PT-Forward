@@ -13,7 +13,8 @@
 - §56.7 模块 2b.0 + 2b.1 回归审核（HTML 框架 = goquery，4 项 P0 补充决策）
 - §56.8 模块 2b.2 数据模型设计（SeedData/IntroData/Engine/三源 JSON/MergedMetadata/TorrentMetadata 扩展）
 - §56.9 模块 2b.3 BBCode 转换器（双栈 accumulator + 30 个标签 + 样式映射 + 4 文件拆分）
-- §56.10 模块 2b.4 公共提取器（11 子模块 + 简介分段算法 + 黄金样本迁移）
+- §56.10 模块 2b.4 公共提取器（11 子模块 + 简介分段算法 + 88 黄金样本迁移）
+- §56.11 模块 2b.5 MediaInfo/BDInfo 提取（4 层候选源 + 合法性检测 + 前缀去污染 + 空行压缩）
 
 **§56 进行中**（详情页采集模块 2b）：
 - ✅ 2b.0 架构决策（internal/metadata/extract/ + adapter 双接口 + Fetcher 完善后启用 + PTGen 优先 + UI toggle）
@@ -21,8 +22,9 @@
 - ✅ 2b.2 数据模型设计（SeedData/IntroData/Engine/三源 JSON/MergedMetadata）
 - ✅ 2b.3 BBCode 转换器（双栈 accumulator + 30 个标签 + 样式映射 + 4 文件拆分）
 - ✅ 2b.4 公共提取器（11 子模块 + 简介分段算法 + 88 黄金样本）
-- 🔄 2b.5 MediaInfo/BDInfo 提取（进行中）
-- ⏳ 2b.6~2b.9 图片/站点特殊/handler 接入/单测
+- ✅ 2b.5 MediaInfo/BDInfo 提取（4 层候选源 + 合法性 + 去污染 + 空行压缩）
+- 🔄 2b.6 图片分类与黑名单（进行中）
+- ⏳ 2b.7~2b.9 站点特殊/handler 接入/单测
 
 **§56 待打磨模块**（按 上游→中游→下游→交互 顺序）：
 - 上游：2d 简介分区（与 2b 并行）/ 2c PTGen 集成 / 4a 图床打通 / 4c 海报 fallback
