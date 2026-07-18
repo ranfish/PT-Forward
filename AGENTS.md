@@ -1,6 +1,32 @@
 # PT-Forward 项目 Agent 指令
 
-**完整设计文档**：`docs/31-模块设计决策记录.md` §55.1-§55.19（按需读特定章节，不要一次读全文）。
+## 当前任务焦点（新会话必读）
+
+**版本**：v0.0.227（已发布）。§55.19 刷流 19 天零推送根因全部修复完成。
+
+**已完成**（v0.0.224~227）：
+- §55.19 核心：`consumer.go:233 needSLData` bug（免费种评分=0 全过滤）
+- §55.19 放大器 1：`below min score` Debug → Info（诊断必备）
+- §55.19 补丁：`rss_torrent_seen.push_time` 推送成功后回写
+- §55.19 诊断：ScoringLog 加 `score_type` 字段区分 cleanup/push
+- §55.19 根本修复：detect 顺便提取 SL（包装接口 `CombinedHRDiscountSLDetector`，NexusPHPAdapter 实现）
+- 数据清理：DELETE PT5/PT3-辅种 历史 download_tasks（2230 条）+ 回填历史 push_time
+
+**关键事实**（避免再被旧焦点段误导）：
+- §55.15-§55.19 全部已修并部署生产 v0.0.224+。
+- 生产 249 部署的最新镜像见 `docker images`（用户负责部署）。
+- 本地 `env-PT-Forward.md`（已 gitignore，不入 git）有 249/99 等环境访问信息。
+- 生产刷流 `min_score=0.05`（用户前端配），~33% 推送率。
+
+**待办**（v0.0.228 候选）：
+- 放大器 2：seen 状态超时降级（避免无限堆积，§55.19 放大器 2，未修）
+- 其他 adapter（generic/gazelle/tnode/unit3d/mteam/yemapt）实现 `DetectHRDiscountAndSL`（目前只 NexusPHPAdapter 实现，其他走老接口 fallback）
+
+**后续**：
+- 多下载器聚合下载（§55.3-55.4，clientSelector 接入，待用户决策时机）
+- 转载功能验证（§55.7 publish_candidates）
+
+**完整设计文档**：`docs/31-模块设计决策记录.md` §55.1-§55.19（按需读特定章节，不要一次读全文，58000+ 行）。
 
 ## 环境信息
 
