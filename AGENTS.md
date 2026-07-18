@@ -9,12 +9,18 @@
 **§56 已完成设计**（待实施）：
 - §56.1 标准化键体系（standard_keys 表 + 加载机制 + titleparser 对接）
 - §56.2 禁转标签检测（is_protected + 用户自定义 + 合规检查 DB 化）
+- §56.6 模块 2b.0 详情页采集架构决策（4 项核心决策 + 三源数据流 + JSON 列存储）
+
+**§56 进行中**（详情页采集模块 2b）：
+- ✅ 2b.0 架构决策：`internal/metadata/extract/` 独立包 + adapter 双接口（保留 GetTorrentDetail + 新增 GetTorrentSeed）+ Fetcher 完善后启用 + PTGen 优先 + UI toggle
+- 🔄 2b.1 HTML 解析框架选型（进行中）
+- ⏳ 2b.2~2b.9 数据模型/BBCode/公共提取器/MediaInfo/图片/站点特殊/handler 接入/单测
 
 **§56 待打磨模块**（按 上游→中游→下游→交互 顺序）：
-- 上游：2b 详情页采集 / 2d 简介分区 / 2c PTGen 集成 / 4a 图床打通 / 4c 海报 fallback
+- 上游：2d 简介分区（与 2b 并行）/ 2c PTGen 集成 / 4a 图床打通 / 4c 海报 fallback
 - 中游：5c 标题重组 / 5e 描述渲染 / 6b 6c 禁转小组与成人内容 DB 化
 - 下游：7b 多选 tag 表单 / 7e 已存在种子自动编辑
-- 交互：9b 元数据审核 / 9d 字段预览
+- 交互：9b 元数据审核（含 toggle UI）/ 9d 字段预览
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
