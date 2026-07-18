@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -48,6 +49,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/pusher"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/screenshot"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/rss"
@@ -107,6 +109,11 @@ func main() {
 
 	if err := model.AutoMigrate(db); err != nil {
 		log.Error("failed to run auto migration", zap.Error(err))
+		os.Exit(1) //nolint:gocritic
+	}
+
+	if err := syncStandardKeys(db, log); err != nil {
+		log.Error("failed to sync standard keys", zap.Error(err))
 		os.Exit(1) //nolint:gocritic
 	}
 
@@ -1132,4 +1139,62 @@ func registerSchedulerTasks(
 	register("traffic_hourly_aggregate", "stats", "0 * * * *", func(ctx context.Context) error {
 		return trafficAggregator.AggregateHourly(ctx)
 	})
+}
+
+// syncStandardKeys §56.1: 启动时从 embed JSON 同步标准化键到 DB。
+// builtin 记录自动更新，user 记录跳过（保留用户自定义）。
+func syncStandardKeys(db *gorm.DB, log *zap.Logger) error {
+	keys, err := titleparser.LoadStandardKeys()
+	if err != nil {
+		return fmt.Errorf("load standard keys: %w", err)
+	}
+
+	var created, updated, skipped int
+	for _, k := range keys {
+		aliasesJSON, _ := json.Marshal(k.Aliases)
+
+		var existing model.StandardKey
+		result := db.Where("category = ? AND key = ?", k.Category, k.Key).First(&existing)
+
+		if result.Error != nil {
+			// 不存在 → 创建
+			if err := db.Create(&model.StandardKey{
+				Category:     k.Category,
+				Key:          k.Key,
+				StandardCode: k.Code,
+				AliasesJSON:  string(aliasesJSON),
+				IsProtected:  k.IsProtected,
+				Source:       "builtin",
+			}).Error; err != nil {
+				log.Warn("failed to create standard key",
+					zap.String("category", k.Category),
+					zap.String("key", k.Key),
+					zap.Error(err))
+			}
+			created++
+		} else if existing.Source == "builtin" {
+			// builtin → 更新
+			if err := db.Model(&existing).Updates(map[string]interface{}{
+				"standard_code": k.Code,
+				"aliases_json":  string(aliasesJSON),
+				"is_protected":  k.IsProtected,
+			}).Error; err != nil {
+				log.Warn("failed to update standard key",
+					zap.String("category", k.Category),
+					zap.String("key", k.Key),
+					zap.Error(err))
+			}
+			updated++
+		} else {
+			// user → 跳过
+			skipped++
+		}
+	}
+
+	log.Info("standard keys synced",
+		zap.Int("total", len(keys)),
+		zap.Int("created", created),
+		zap.Int("updated", updated),
+		zap.Int("skipped", skipped))
+	return nil
 }
