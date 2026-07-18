@@ -368,6 +368,16 @@ func buildMultipartBody(torrentData []byte, opts model.AddTorrentOptions) (*byte
 			_ = w.WriteField(key, "true")
 		}
 	}
+	// writeBoolExplicit 总是写入 true/false，用于必须显式传递的字段。
+	// autoTMM 必须显式发：qB 的 autoTMM 字段省略时会用全局 DefaultTMMEnabled（qB 默认 true），
+	// 导致 savepath 被忽略（§55.18 autoTMM bug 根因）。
+	writeBoolExplicit := func(key string, v bool) {
+		if v {
+			_ = w.WriteField(key, "true")
+		} else {
+			_ = w.WriteField(key, "false")
+		}
+	}
 
 	writeField("savepath", opts.SavePath)
 	writeField("category", opts.Category)
@@ -382,9 +392,7 @@ func buildMultipartBody(torrentData []byte, opts model.AddTorrentOptions) (*byte
 		writeField("dlLimit", strconv.FormatInt(opts.DownloadLimit, 10))
 	}
 	writeBool("skip_checking", opts.SkipChecking)
-	if opts.AutoTMM {
-		writeBool("autoTMM", true)
-	}
+	writeBoolExplicit("autoTMM", opts.AutoTMM)
 	if opts.RatioLimit > 0 {
 		writeField("ratioLimit", strconv.FormatFloat(opts.RatioLimit, 'f', -1, 64))
 	}
