@@ -56,6 +56,9 @@ type PushedEvent struct {
 	AutoTransfer     bool
 	TransferClientIDs []string
 	PushedAt         time.Time
+	// §55.19 根本修复：携带 detect 阶段提取的 SL，评分时直接用，避免二次抓详情页。
+	Seeders  int
+	Leechers int
 }
 
 type SiteProvider interface {

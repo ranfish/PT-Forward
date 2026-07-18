@@ -61,7 +61,10 @@ type detectCacheEntry struct {
 	discountLevel model.DiscountLevel
 	isFree        bool
 	freeEndAt     *time.Time
-	cachedAt      time.Time
+	// §55.19 根本修复：缓存 SL（detect 阶段顺便提取，避免评分时重复抓详情页）
+	seeders  int
+	leechers int
+	cachedAt time.Time
 }
 
 const detectCacheTTL = 5 * time.Minute
@@ -902,6 +905,8 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				HasHR:           event.HasHR,
 				MatchedRuleName: derefStr(event.MatchedRule),
 				Metadata:        event.Metadata,
+				Seeders:         event.Seeders,
+				Leechers:        event.Leechers,
 			}
 			if event.DiscountLevel != "" {
 				te.Discount = event.DiscountLevel
@@ -958,11 +963,13 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 						HasHR:           ev.HasHR,
 						IsFree:          isFree,
 						FreeEndAt:       ev.FreeEndAt,
-						SubscriptionID:  uintToString(sub.ID),
-						AutoTransfer:    sub.AutoTransfer,
-						TransferClientIDs: sub.TransferClientIDs,
-						PushedAt:        time.Now(),
-					})
+					SubscriptionID:  uintToString(sub.ID),
+					AutoTransfer:    sub.AutoTransfer,
+					TransferClientIDs: sub.TransferClientIDs,
+					PushedAt:        time.Now(),
+					Seeders:         ev.Seeders,
+					Leechers:        ev.Leechers,
+				})
 				}
 				e.repo.MarkStatus(ctx, ev.SiteName, ev.TorrentID, "seen")
 			}
@@ -1083,6 +1090,8 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 			event.DiscountLevel = entry.discountLevel
 			event.IsFree = entry.isFree
 			event.FreeEndAt = entry.freeEndAt
+			event.Seeders = entry.seeders
+			event.Leechers = entry.leechers
 			return
 		}
 		e.detectCache.Delete(cacheKey)
@@ -1100,6 +1109,48 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 	config, err := e.siteProvider.GetSiteConfig(detectCtx, siteName)
 	if err != nil {
 		e.logger.Warn("failed to get site config, skipping HR/discount check", zap.String("site", siteName), zap.Error(err))
+		return
+	}
+
+	// §55.19 根本修复：优先尝试 CombinedHRDiscountSLDetector（顺便提取 SL，避免评分重复抓详情页）
+	if slDetector, ok := adapter.(model.CombinedHRDiscountSLDetector); ok {
+		hrResult, discResult, slResult, err := slDetector.DetectHRDiscountAndSL(detectCtx, config, event.TorrentID)
+		if err != nil {
+			e.logger.Debug("combined SL detect failed", zap.String("site", siteName), zap.String("torrent", event.TorrentID), zap.Error(err))
+			return
+		}
+		if hrResult != nil {
+			event.HasHR = hrResult.HasHR
+			if event.HasHR {
+				event.HRSeedTimeH = hrResult.SeedTimeH
+				if event.HRSeedTimeH == 0 {
+					event.HRSeedTimeH = 72
+				}
+			}
+		}
+		if discResult != nil && discResult.Level != model.DiscountNone {
+			event.DiscountLevel = discResult.Level
+			event.IsFree = discResult.Level == model.DiscountFree ||
+				discResult.Level == model.Discount2xFree ||
+				discResult.Level == model.Discount2x50
+			if discResult.FreeEndAt != nil {
+				event.FreeEndAt = discResult.FreeEndAt
+			}
+		}
+		if slResult != nil {
+			event.Seeders = slResult.Seeders
+			event.Leechers = slResult.Leechers
+		}
+		e.detectCache.Store(cacheKey, &detectCacheEntry{
+			hasHR:         event.HasHR,
+			hrSeedTimeH:   event.HRSeedTimeH,
+			discountLevel: event.DiscountLevel,
+			isFree:        event.IsFree,
+			freeEndAt:     event.FreeEndAt,
+			seeders:       event.Seeders,
+			leechers:      event.Leechers,
+			cachedAt:      time.Now(),
+		})
 		return
 	}
 
@@ -1133,6 +1184,8 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 			discountLevel: event.DiscountLevel,
 			isFree:        event.IsFree,
 			freeEndAt:     event.FreeEndAt,
+			seeders:       event.Seeders,
+			leechers:      event.Leechers,
 			cachedAt:      time.Now(),
 		})
 		return
@@ -1190,6 +1243,8 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 		discountLevel: event.DiscountLevel,
 		isFree:        event.IsFree,
 		freeEndAt:     event.FreeEndAt,
+		seeders:       event.Seeders,
+		leechers:      event.Leechers,
 		cachedAt:      time.Now(),
 	})
 }
