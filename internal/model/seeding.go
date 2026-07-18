@@ -284,6 +284,17 @@ type CleanupScoreWeights struct {
 	DiskUsage   float64 `json:"disk_usage"`
 }
 
+// ScoringLog 记录评分历史。
+//
+// §55.19 语义澄清：本表设计含 demand/upload_val/recency/seeders/leechers 字段
+// 是为推送评分（CalculateScore）准备的，但 v0.0.224 之前实际只被 cleanup 评分
+// （CalculateCleanupScore）占用且只填了部分字段。诊断推送评分时**不要**只查本表，
+// 会跑偏（看到的 score 是删种评分，5 分制，常见 0.2-0.5；推送评分是另一套公式）。
+//
+// ScoreType 字段（v0.0.226 新增）区分：
+//   - "cleanup"（默认）: CalculateCleanupScore 写入，判断是否删种（engine.go evaluateForCleanup）
+//   - "push"           : CalculateScore 写入，判断是否推送（consumer.go scoreCandidatesFull）
+// 历史数据无 ScoreType 字段值时按 "cleanup" 处理（兼容）。
 type ScoringLog struct {
 	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	CycleID     string    `json:"cycle_id" gorm:"size:30;index;not null"`
@@ -291,6 +302,7 @@ type ScoringLog struct {
 	InfoHash    string    `json:"info_hash" gorm:"size:40;index;not null"`
 	SiteName    string    `json:"site_name" gorm:"size:100"`
 	TorrentID   string    `json:"torrent_id" gorm:"size:50"`
+	ScoreType   string    `json:"score_type" gorm:"size:20;default:'cleanup';index"`
 	Score       float64   `json:"score"`
 	Demand      float64   `json:"demand"`
 	UploadVal   float64   `json:"upload_val"`

@@ -1602,6 +1602,7 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 			InfoHash:    rec.InfoHash,
 			SiteName:    rec.SiteName,
 			TorrentID:   rec.TorrentID,
+			ScoreType:   "cleanup", // §55.19 显式标记：这是删种评分（CalculateCleanupScore），不是推送评分
 			Score:       score,
 			AgeHours:    ageHours,
 			Discount:    string(rec.Discount),
