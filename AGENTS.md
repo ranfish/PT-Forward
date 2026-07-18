@@ -1,5 +1,21 @@
 # PT-Forward 项目 Agent 指令
 
+## 当前任务焦点（新会话必读）
+
+**版本**：v0.0.217（路径2 四阶段已完成）
+
+**正在做**：修复 `consumer.go:92 scoreAndPushForClient` 仍只查 `SeedingClientConfig` 的遗漏——qb下载 已从 /seeding 删除，scoreAndPushForClient 查不到配置 → role≠seeding 的种子不推送。需改为也查 `download_client_configs`（和 OnPushed/ListConfigs 一样）。
+
+**背景**：§55.14 路径2（统一引擎管所有下载器 + 按 role 评分）。阶段1-4 已完成（v0.0.215-217），但 scoreAndPushForClient 的配置查询遗漏了，导致 SSD刷流/SSD电影（qb下载 role=source）能投递到 pendingEvents 但 consumeLoop 推送时查不到配置而中断。
+
+**修复后验证**：SSD刷流/SSD电影 有新 free 种子时，应推送成功（record.Role=source，不评分顺序推送，syncer importTask 排除）。
+
+**完整设计文档**：`docs/31-模块设计决策记录.md` §55.1-§55.14（按需读特定章节，不要一次读全文，太长）。
+
+**待办**（修复 scoreAndPushForClient 后）：
+- 路径2 全部完成，等待新种子验证完整链路
+- 下一个功能：多下载器聚合下载（§55.3-55.4，clientSelector 接入，待用户决策时机）
+
 ## 环境信息
 
 - **Go**：`/home/incast/.local/go/bin/go`（v1.25，系统 PATH 中无 go，必须用全路径）
