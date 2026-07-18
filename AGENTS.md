@@ -18,24 +18,25 @@
 - §56.12 模块 2b.6 图片分类与黑名单（embed JSON + DB 双轨 + 白名单 + 4 层海报识别 + URL 归一化）
 - §56.13 模块 2b.7 站点特殊提取器（8 站清单 + Runtime 注入 + site_code 列 + 逐站接入）
 - §56.14 模块 2b.8 manual_forward_handler 接入（三源 errgroup + /merge 接口 + publish_settings + toggle UI）
+- §56.15 模块 2b.9 单测与黄金样本（470 测试 + 7 层目录 + 自动脱敏 + benchmark）
 
-**§56 进行中**（详情页采集模块 2b）：
-- ✅ 2b.0 架构决策（internal/metadata/extract/ + adapter 双接口 + Fetcher 完善后启用 + PTGen 优先 + UI toggle）
-- ✅ 2b.1 HTML 框架（goquery v1.12.0 + 统一入口 parser.go + a-Y 终态不保留）
-- ✅ 2b.2 数据模型设计（SeedData/IntroData/Engine/三源 JSON/MergedMetadata）
-- ✅ 2b.3 BBCode 转换器（双栈 accumulator + 30 个标签 + 样式映射 + 4 文件拆分）
-- ✅ 2b.4 公共提取器（11 子模块 + 简介分段算法 + 88 黄金样本）
-- ✅ 2b.5 MediaInfo/BDInfo 提取（4 层候选源 + 合法性 + 去污染 + 空行压缩）
-- ✅ 2b.6 图片分类与黑名单（embed JSON + DB 双轨 + 白名单 + 4 层海报识别）
-- ✅ 2b.7 站点特殊提取器（8 站清单 + Runtime 注入 + site_code 列）
-- ✅ 2b.8 manual_forward_handler 接入（三源 errgroup + /merge 接口 + toggle UI）
-- 🔄 2b.9 单测与黄金样本（进行中，最后一项）
+**§56 模块 2b（详情页采集）设计全部完成** ✅
+- 子模块 2b.0 ~ 2b.9 共 10 项决策已落盘到 §56.6~§56.15
+- 总工作量预估：~27.5 天（5-6 周一人）
+- 实施顺序：2b.1 → 2b.2 → 2b.3 → 2b.4 → 2b.5 → 2b.6 → 2b.7（8 站并行）→ 2b.8 → 2b.9（与开发并行）
 
 **§56 待打磨模块**（按 上游→中游→下游→交互 顺序）：
-- 上游：2d 简介分区（与 2b 并行）/ 2c PTGen 集成 / 4a 图床打通 / 4c 海报 fallback
+- 上游：2c PTGen 深度集成（PTGenResult 28 字段当前仅消费 8）/ 4a 图床打通 / 4c 海报 fallback
 - 中游：5c 标题重组 / 5e 描述渲染 / 6b 6c 禁转小组与成人内容 DB 化
 - 下游：7b 多选 tag 表单 / 7e 已存在种子自动编辑
-- 交互：9b 元数据审核（含 toggle UI）/ 9d 字段预览
+- 交互：9d 字段预览（reverse mapping UI）
+
+**§56 实施进度（待启动）**：
+- 第一阶段：5a/6a 落地（standard_keys 表 + 加载机制 + 合规检查 DB 化）
+- 第二阶段：2b.1~2b.6（extract 包核心）+ 5a/6a 并行
+- 第三阶段：2b.7 站点特殊提取器（8 站逐个接入）
+- 第四阶段：2b.8 manual_forward_handler 接入
+- 第五阶段：2b.9 单测完善（与开发并行打磨）
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
