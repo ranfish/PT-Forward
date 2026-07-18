@@ -178,7 +178,9 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 		c := candidates[i]
 
 		if scoringCfg.Enabled && c.Score < scoringCfg.MinScore {
-			e.logger.Debug("scoreAndPush: candidate below min score, skipping",
+			// §55.19: Debug 改 Info——评分跳过是种子命运决定点，
+			// 必须在生产 Info 级可见，否则同类 bug 会再次因日志缺失而漏诊。
+			e.logger.Info("scoreAndPush: candidate below min score, skipping",
 				zap.String("info_hash", c.Event.InfoHash),
 				zap.Float64("score", c.Score),
 				zap.Float64("min_score", scoringCfg.MinScore))
@@ -229,18 +231,14 @@ func (e *Engine) scoreCandidatesFull(ctx context.Context, candidates []*pendingC
 		return
 	}
 
-	needSLData := false
-	if scoringCfg.Enabled {
-		for _, c := range candidates {
-			if !c.Event.IsFree && (c.Event.Discount == model.DiscountNone || c.Event.Discount == "") {
-				needSLData = true
-				break
-			}
-		}
-	}
+	// §55.19: 总是抓 SL 数据（不再按 IsFree/Discount 跳过）。
+	// 评分公式 CalculateScore 必须靠 leechers/seeders 算 demandScore，
+	// 免费种（刷流主力）也有 SL 数据，跳过会导致 score=0 < min_score 全过滤。
+	// 与 flush.go 的 fetchBatchSLData 行为一致。
+	needSLData := len(candidates) > 0 && e.siteProvider != nil
 
 	var slDataMap map[string]*model.SLData
-	if needSLData && e.siteProvider != nil {
+	if needSLData {
 		siteGroups := make(map[string][]string)
 		for _, c := range candidates {
 			siteGroups[c.Event.SiteName] = append(siteGroups[c.Event.SiteName], c.Event.TorrentID)
