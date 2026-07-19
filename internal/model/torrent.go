@@ -127,14 +127,16 @@ type PersonInfo struct {
 }
 
 // §33.1.75 — DescriptionData: 描述渲染输入
+// §56.16 决策 5: 加 PTGen 结构化字段（替代 PTGenBody 单字段，PTGenBody 保留向后兼容）
 type DescriptionData struct {
-	Statement     string   `json:"statement"`
-	PosterURL     string   `json:"poster_url"`
-	PTGenBody     string   `json:"ptgen_body"`
-	MediaInfoText string   `json:"mediainfo_text"`
-	BDInfoText    string   `json:"bdinfo_text"`
-	Screenshots   []string `json:"screenshots"`
-	SourceSite    string   `json:"source_site"`
+	Statement     string        `json:"statement"`
+	PosterURL     string        `json:"poster_url"`
+	PTGenBody     string        `json:"ptgen_body"`        // deprecated: 用 PTGen 替代，保留兼容
+	PTGen         *PTGenResult  `json:"ptgen,omitempty"`   // §56.16: 完整结构化 PTGen
+	MediaInfoText string        `json:"mediainfo_text"`
+	BDInfoText    string        `json:"bdinfo_text"`
+	Screenshots   []string      `json:"screenshots"`
+	SourceSite    string        `json:"source_site"`
 }
 
 // §33.1.28 — PublishStepResult: 21 步中间产物容器
