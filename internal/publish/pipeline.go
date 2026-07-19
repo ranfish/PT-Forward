@@ -699,6 +699,7 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 
 type descResult struct {
 	Text       string
+	Subtitle   string // §56.20: 副标题（PTGen 渲染）
 	IMDbLink   string
 	DoubanLink string
 	TMDBID     string
@@ -751,6 +752,15 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 		descData.PosterURL = ptgenPoster
 	} else if detailPoster != "" {
 		descData.PosterURL = p.rehostPoster(ctx, detailPoster)
+	}
+
+	// §56.20: 副标题渲染（PTGen 外文名 + 年份）
+	if ptgenResult != nil && (ptgenResult.ForeignTitle != "" || ptgenResult.ChineseTitle != "") {
+		result.Subtitle = description.RenderSubtitle("", description.SubtitleData{
+			PTGenForeignTitle: ptgenResult.ForeignTitle,
+			PTGenChineseTitle: ptgenResult.ChineseTitle,
+			PTGenYear:         ptgenResult.Year,
+		})
 	}
 
 	if descriptionText == "" && descData.PTGenBody != "" {
@@ -999,6 +1009,10 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 		FormFields:      make(map[string]string),
 		IMDbLink:        desc.IMDbLink,
 		DoubanLink:      desc.DoubanLink,
+	}
+	// §56.20: 副标题（PTGen 渲染，用户自定义优先 via applyUserOverrides）
+	if desc.Subtitle != "" {
+		pubReq.Subtitle = desc.Subtitle
 	}
 
 	if desc.TMDBID != "" {
