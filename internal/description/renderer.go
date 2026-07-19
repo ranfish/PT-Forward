@@ -38,8 +38,13 @@ func (r *Renderer) Render(data *model.DescriptionData, config model.SiteDescConf
 		sections = append(sections, r.renderPoster(data.PosterURL, format))
 	}
 
-	if data.PTGenBody != "" {
-		body := data.PTGenBody
+	// §56.16: 优先用结构化 PTGen（FormatPTGen），fallback PTGenBody（向后兼容）
+	ptgenBody := data.PTGenBody
+	if data.PTGen != nil {
+		ptgenBody = FormatPTGen(data.PTGen, PTGenTemplateDouban)
+	}
+	if ptgenBody != "" {
+		body := ptgenBody
 		if format == "markdown" {
 			body = BBCodeToMarkdown(body)
 		}

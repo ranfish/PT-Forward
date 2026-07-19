@@ -697,6 +697,7 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 		if ptgenResult.RawBBCode != "" {
 			descData.PTGenBody = ptgenResult.RawBBCode
 		}
+		descData.PTGen = ptgenResult // §56.16: 结构化 PTGen（renderer 优先用此字段）
 		result.IMDbLink = ptgenResult.IMDBURL
 		result.DoubanLink = ptgenResult.DoubanURL
 		if ptgenResult.TMDbURL != "" {
