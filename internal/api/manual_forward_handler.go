@@ -669,6 +669,7 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 		Tags        []string `json:"tags"`
 		TitleComponents map[string]string `json:"title_components"`
 		BDInfo       string   `json:"bdinfo"`
+		Anonymous   bool     `json:"anonymous"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -710,6 +711,10 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 	}
 	if req.BDInfo != "" {
 		overrides["bdinfo"] = req.BDInfo
+	}
+	// §56.29: 匿名发布
+	if req.Anonymous {
+		overrides["anonymous"] = true
 	}
 	overridesJSON, _ := json.Marshal(overrides)
 
@@ -767,6 +772,7 @@ func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.
 			SourceID    uint     `json:"source_site_id"`
 			TorrentName string   `json:"title"`
 			TargetSites []string `json:"target_sites"`
+			Anonymous   bool     `json:"anonymous"`
 		} `json:"items"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -788,6 +794,12 @@ func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.
 			continue
 		}
 		targetsJSON, _ := json.Marshal(item.TargetSites)
+		// §56.29: 批量发布支持匿名
+		batchOverrides := map[string]interface{}{}
+		if item.Anonymous {
+			batchOverrides["anonymous"] = true
+		}
+		batchOverridesJSON, _ := json.Marshal(batchOverrides)
 		candidate := &model.PublishCandidate{
 			SourceSite:        item.SourceSite,
 			InfoHash:          item.InfoHash,
@@ -797,6 +809,7 @@ func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.
 			PublishStatus:     model.CandidatePending,
 			DownloadCompleted: true,
 			Role:              "manual",
+			UserOverrides:     string(batchOverridesJSON),
 		}
 		if err := h.db.Create(candidate).Error; err != nil {
 			h.logger.Warn("batch submit: create candidate failed",
