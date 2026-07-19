@@ -20,11 +20,17 @@ var defaultBasicInfoLabels = map[string][]string{
 // TODO: §56.1 standard_keys 表 DB 驱动后替换此 const
 
 // fillBasicInfoFields 从详情页基本信息表填充结构化字段。
-// 扫描 dt/dd 或 th/td，按 defaultBasicInfoLabels 匹配标签。
+// 支持 3 种 HTML 模式（参考 PTNexus findDetailValueCellByLabels）：
+//  1. dt/dd 模式（HTML5 description list）
+//  2. th/td 模式（table header + cell）
+//  3. td/td 相邻模式（NexusPHP 标准种子信息表，如 <tr><td>类型</td><td>电视剧</td>...</tr>）
+//
+// 第 3 种是 PTer/HDSky/HHanClub 等 NexusPHP 站的主流模式，缺失会导致
+// medium/video_codec/resolution/release_group 全空（完整度从 80%+ 跌到 50%）。
 func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedData) {
 	values := map[string]string{}
 
-	// dt/dd 模式
+	// 模式 1: dt/dd
 	doc.Find("dt").Each(func(_ int, dt *goquery.Selection) {
 		dtText := strings.TrimSpace(dt.Text())
 		dd := dt.NextFiltered("dd")
@@ -42,7 +48,7 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 		}
 	})
 
-	// th/td 模式
+	// 模式 2: th/td
 	doc.Find("th").Each(func(_ int, th *goquery.Selection) {
 		thText := strings.TrimSpace(th.Text())
 		td := th.NextFiltered("td")
@@ -57,6 +63,38 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 			if _, exists := values[field]; !exists {
 				values[field] = tdText
 			}
+		}
+	})
+
+	// 模式 3: td/td 相邻（NexusPHP 标准，参考 PTNexus review_extract.go:999）
+	// 遍历所有 td，如果文本匹配 label，取下一个兄弟 td 的文本作为值。
+	doc.Find("td").Each(func(_ int, td *goquery.Selection) {
+		tdText := strings.TrimSpace(td.Text())
+		if tdText == "" {
+			return
+		}
+		field := matchBasicInfoLabel(tdText)
+		if field == "" {
+			return
+		}
+		// 仅当当前 td 没有子 td 时才视为"标签 td"（避免父容器误匹配）
+		if td.Find("td").Length() > 0 {
+			return
+		}
+		nextTD := td.NextFiltered("td")
+		if nextTD.Length() == 0 {
+			return
+		}
+		value := strings.TrimSpace(nextTD.Text())
+		if value == "" {
+			return
+		}
+		// 值 td 也不能含子 td（否则是嵌套表格）
+		if nextTD.Find("td").Length() > 0 {
+			return
+		}
+		if _, exists := values[field]; !exists {
+			values[field] = value
 		}
 	})
 
