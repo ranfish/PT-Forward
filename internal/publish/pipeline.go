@@ -649,6 +649,33 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 		return false, err
 	}
 
+	// §56.17: 图床兼容性检查 + 自动转存不兼容截图
+	if len(pubReq.Screenshots) > 0 {
+		var site model.Site
+		if p.db != nil {
+			p.db.Where("name = ? OR domain = ?", targetSite, targetSite).First(&site)
+		}
+		if site.ImageBlacklist != "" || site.ImageWhitelist != "" {
+			_, incompatible := CheckImageCompatibility(pubReq.Screenshots, &site)
+			if len(incompatible) > 0 && p.imageHostMgr != nil {
+				for i, url := range pubReq.Screenshots {
+					matched := false
+					for _, inc := range incompatible {
+						if url == inc {
+							matched = true
+							break
+						}
+					}
+					if matched {
+						if result, err := p.imageHostMgr.Rehost(ctx, url); err == nil && result != nil && result.URL != "" {
+							pubReq.Screenshots[i] = result.URL
+						}
+					}
+				}
+			}
+		}
+	}
+
 	start := time.Now()
 	resp, err := targetAdapter.UploadTorrent(ctx, targetConfig, pubReq)
 	costMS := time.Since(start).Milliseconds()
