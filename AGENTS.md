@@ -95,6 +95,8 @@
     - ⏳ 7b P1: 38 MediaTags 标准键数据 + adapter 接入 + 前端
   - ✅ 第十三阶段 7e 已存在种子编辑 P0 完成（ExistingStrategy + 权限校验 + AutoUpdate 编排 + 字段合并）
     - ⏳ 7e P1: adapter 实现 + 真实样本验证 + 前端
+  - ✅ 第十四阶段 9d 字段预览 P0 完成（PreviewBuilder + /preview 接口 + 7 类字段 + 完整度检查）
+    - ⏳ 9d P1: 前端 PublishFieldPreview 组件 + diff 高亮 + 来源徽标
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
