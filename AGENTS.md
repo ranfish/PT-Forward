@@ -78,7 +78,7 @@
     - 请求体扩展（source_site/source_torrent_id/metadata_priority，向后兼容）
     - ⏳ 前端 toggle UI + SourcesStatus 显示（需 vite build）
     - ⏳ 三源并行 errgroup（当前只集成 detail 源）
-- ⏳ 第四阶段~第十五阶段：详见 §56.5 实施计划
+- ✅ 第四阶段~第十五阶段 P0 全部完成:
   - ✅ 第六阶段 2c PTGen 深度集成 P0 完成（◎字段解析器 + ptgen_formatter + renderer 集成）
     - ⏳ 2c P1: Provider 接口拆分（doubaninfo.go/cspt.go/generic.go，代码组织优化）
   - ✅ 第七阶段 4a 图床打通 P0 完成（rehost 补全 + per-site 5 字段 + 兼容性检查 + 分级失效检测）
@@ -97,12 +97,16 @@
     - ⏳ 7e P1: adapter 实现 + 真实样本验证 + 前端
   - ✅ 第十四阶段 9d 字段预览 P0 完成（PreviewBuilder + /preview 接口 + 7 类字段 + 完整度检查）
     - ⏳ 9d P1: 前端 PublishFieldPreview 组件 + diff 高亮 + 来源徽标
-  - 🔄 第十五阶段 4b/7c/7d/8b 进行中:
+  - ✅ 第十五阶段 4b/7c/7d/8b P0 全部完成:
     - ✅ 7d 匿名发布字段 P0 完成（handleSubmit/batchSubmit 接收 anonymous + applyUserOverrides 处理）
     - ✅ 8b 加种回下载器 P0 完成（auto_reseed 编排 + PublishResultRecord.seeded 字段）
     - ✅ 4b 截图审核后端 P0 完成（ScreenshotInDesc toggle 接入）
       - ⏳ 4b 前端（截图 Tab 增强，需 vite build）
-    - ⏳ 7c 音乐站特殊路径（§56.28，需音乐站数据）
+    - ✅ 7c 音乐站特殊路径 P0 完成（Gazelle 16 release_type + 6 format + 9 media + 16 encoding + 音乐描述模板）
+      - 数据来源: examples/Gazelle/ 源码（无需用户采集）
+      - ⏳ 7c P1: adapter 接入 + group 搜索 + 前端
+
+**§56 转载功能全部 15 阶段 P0 后端任务完成** ✅
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
