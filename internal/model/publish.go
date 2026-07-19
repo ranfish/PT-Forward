@@ -172,6 +172,7 @@ type PublishRequest struct {
 	TorrentData     []byte            `json:"-"`
 	FormFields      map[string]string `json:"form_fields"`
 	TagFields       map[string]string `json:"tag_fields"`
+	TagConfig       string            `json:"tag_config,omitempty"` // §56.22: 站点 tag 配置 JSON（SiteTagConfig）
 	Title           string            `json:"title"`
 	Subtitle        string            `json:"subtitle"`
 	Description     string            `json:"description"`
@@ -187,7 +188,7 @@ type PublishRequest struct {
 	SourceInfoHash  string            `json:"source_info_hash"`
 	SourceTorrentID string            `json:"source_torrent_id"`
 	ClientID        string            `json:"client_id"`
-	GroupID         uint              `json:"group_id"`
+	GroupID         uint              `json:"group_group_id"`
 	TargetSite      string            `json:"target_site"`
 }
 
