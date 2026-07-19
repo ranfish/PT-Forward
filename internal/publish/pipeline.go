@@ -1155,6 +1155,17 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 	// 标题组件覆盖：用用户编辑的组件填充表单字段
 	applyTitleComponents(pubReq, candidate.UserOverrides)
 
+	// §56.22: MediaTagInferer 从 MediaInfo + 标题推断 MediaTags
+	if pubReq.MediaInfo != "" || pubReq.Title != "" {
+		inferer := NewMediaTagInferer()
+		inferredTags := inferer.Infer(pubReq.MediaInfo, pubReq.Title)
+		for _, tag := range inferredTags {
+			if pubReq.TagFields[tag] == "" {
+				pubReq.TagFields[tag] = "1"
+			}
+		}
+	}
+
 	// §56.22: TagApplier 处理（如果目标站有 TagConfig 配置）
 	if p.db != nil {
 		var site model.Site
