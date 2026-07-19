@@ -99,6 +99,12 @@ func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
+	case strings.HasSuffix(path, "/manual-forward/preview"):
+		if r.Method == http.MethodPost {
+			h.handlePreviewFields(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
 	case strings.HasSuffix(path, "/manual-forward/submit"):
 		if r.Method == http.MethodPost {
 			h.handleSubmit(w, r)
@@ -866,4 +872,42 @@ func (h *ManualForwardHandler) handleMerge(w http.ResponseWriter, r *http.Reques
 	}
 
 	Success(w, result)
+}
+
+// handlePreviewFields §56.24 Q3: 字段预览接口（reverse mapping UI）。
+// 请求体: { info_hash, target_site, mode }
+// 返回: PreviewResponse（字段列表 + 来源徽标 + 完整度检查）。
+func (h *ManualForwardHandler) handlePreviewFields(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		InfoHash    string            `json:"info_hash"`
+		TargetSite  string            `json:"target_site"`
+		Mode        string            `json:"mode"`
+		UserOverrides map[string]string `json:"user_overrides,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求参数错误")
+		return
+	}
+	if req.InfoHash == "" {
+		Error(w, http.StatusBadRequest, 40001, "info_hash 不能为空")
+		return
+	}
+	if req.Mode == "" {
+		req.Mode = model.MetadataPriorityDefault
+	}
+
+	// 从 DB 读 torrent_metadata
+	var meta model.TorrentMetadata
+	if err := h.db.WithContext(r.Context()).
+		Where("info_hash = ?", req.InfoHash).
+		Order("updated_at DESC").
+		First(&meta).Error; err != nil {
+		Error(w, http.StatusNotFound, 40401, "未找到该种子的元数据")
+		return
+	}
+
+	// 构建预览
+	builder := metadata.NewPreviewBuilder()
+	resp := builder.BuildPreviewFromMeta(&meta, req.UserOverrides, req.TargetSite, req.Mode)
+	Success(w, resp)
 }
