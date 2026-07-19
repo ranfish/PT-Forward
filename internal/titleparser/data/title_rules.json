@@ -1,0 +1,12 @@
+{
+  "rules": [
+    {"rule_type": "regex", "field": "resolution", "pattern": "(?i)\\b4K\\b", "replacement": "2160p", "auto_fix": true, "error_message": "4K 应写为 2160p"},
+    {"rule_type": "regex", "field": "resolution", "pattern": "(?i)\\b8K\\b", "replacement": "4320p", "auto_fix": true, "error_message": "8K 应写为 4320p"},
+    {"rule_type": "case", "field": "hdr", "pattern": "HDR10", "auto_fix": true, "error_message": "HDR10 必须大写"},
+    {"rule_type": "case", "field": "hdr", "pattern": "HDR", "auto_fix": true, "error_message": "HDR 必须大写"},
+    {"rule_type": "case", "field": "dolby_vision", "pattern": "DoVi", "auto_fix": true, "error_message": "DoVi 标记需规范"},
+    {"rule_type": "character", "field": "title", "pattern": "[（）]", "replacement": "", "auto_fix": true, "error_message": "标题不应含中文括号"},
+    {"rule_type": "required", "field": "year", "pattern": "(19|20)\\d{2}", "auto_fix": false, "error_message": "标题缺少年份"},
+    {"rule_type": "required", "field": "resolution", "pattern": "\\d{3,4}p", "auto_fix": false, "error_message": "标题缺少分辨率"}
+  ]
+}

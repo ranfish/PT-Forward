@@ -123,6 +123,12 @@ func main() {
 		os.Exit(1) //nolint:gocritic
 	}
 
+	// §56.19: 同步标题校验规则到 DB
+	if err := titleparser.SyncTitleRulesToDB(db); err != nil {
+		log.Error("failed to sync title rules", zap.Error(err))
+		os.Exit(1) //nolint:gocritic
+	}
+
 	if err := dbpkg.RunMigrations(db, log); err != nil {
 		log.Error("failed to run data migrations", zap.Error(err))
 		os.Exit(1) //nolint:gocritic
