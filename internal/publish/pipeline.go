@@ -21,6 +21,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/ptgen"
+	"github.com/ranfish/pt-forward/internal/pusher"
 	"github.com/ranfish/pt-forward/internal/screenshot"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
@@ -46,6 +47,7 @@ type Pipeline struct {
 	metadataFetcher   *metadata.Fetcher
 	imageHostStrategy string
 	imageHostMgr      *imagehost.Manager
+	pusher            *pusher.Pusher // §56.30: 发布后自动加种
 	memberMu          sync.Map
 	wsBroadcaster     event.WSBroadcaster
 	bdinfoScanner     *BDInfoScanner
@@ -136,10 +138,14 @@ func (p *Pipeline) emitStepProgress(groupID uint, memberID uint, step int, statu
 
 func (p *Pipeline) SetImageHostManager(mgr *imagehost.Manager) {
 	p.imageHostMgr = mgr
-	// §56.17 决策 2: 同时注入到 artifactGenerator（无论调用顺序）
 	if p.artifactGenerator != nil {
 		p.artifactGenerator.SetImageHostManager(mgr)
 	}
+}
+
+// SetPusher §56.30: 注入 pusher 用于发布后自动加种。
+func (p *Pipeline) SetPusher(pusher *pusher.Pusher) {
+	p.pusher = pusher
 }
 
 // isDetailFirst §56.18: 从 publish_settings 读取海报优先级 toggle。
@@ -677,6 +683,36 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 	if resp != nil && resp.IsExisting {
 		status = model.PublishResultExists
 	}
+
+	// §56.30: 发布成功后自动加种到源下载器（失败不阻断，仅记录）
+	seeded := false
+	seedErrorStr := ""
+	if p.pusher != nil && resp != nil && resp.TorrentID != "" && candidate.ClientID != "" {
+		seedCtx, seedCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		pushResult := p.pusher.Push(seedCtx, &pusher.PushRequest{
+			ClientID:  candidate.ClientID,
+			SiteName:  targetSite,
+			TorrentID: resp.TorrentID,
+			Title:     candidate.TorrentName,
+		})
+		seedCancel()
+		if pushResult != nil && pushResult.Success {
+			seeded = true
+			p.logger.Info("auto reseed after publish",
+				zap.String("target", targetSite),
+				zap.String("torrent_id", resp.TorrentID))
+		} else {
+			if pushResult != nil && pushResult.Error != nil {
+				seedErrorStr = pushResult.Error.Error()
+			}
+			p.logger.Warn("auto reseed after publish failed",
+				zap.String("target", targetSite),
+				zap.String("torrent_id", resp.TorrentID),
+				zap.String("error", seedErrorStr))
+		}
+	}
+
+	now := time.Now()
 	if err := p.CreateResult(ctx, &model.PublishResultRecord{
 		CandidateID: candidate.ID,
 		SourceSite:  candidate.SourceSite,
@@ -687,6 +723,9 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 		Title:       candidate.TorrentName,
 		DownloaderID: candidate.ClientID,
 		CostMS:      costMS,
+		Seeded:      seeded,
+		SeededAt: func() *time.Time { if seeded { return &now }; return nil }(),
+		SeedError:   seedErrorStr,
 	}); err != nil {
 		p.logger.Warn("failed to record publish result", zap.Error(err))
 	}
