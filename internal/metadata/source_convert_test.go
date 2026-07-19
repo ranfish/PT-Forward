@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -90,5 +91,79 @@ func TestArtifactToSource_RoundTrip(t *testing.T) {
 	}
 	if len(ss) != 2 {
 		t.Errorf("SourceToArtifact screenshots mismatch")
+	}
+}
+
+func TestUnmarshalDetailSource_Empty(t *testing.T) {
+	src, err := UnmarshalDetailSource("")
+	if err != nil {
+		t.Errorf("empty string should not error: %v", err)
+	}
+	if src != nil {
+		t.Errorf("empty string should return nil, got %v", src)
+	}
+}
+
+func TestUnmarshalDetailSource_Valid(t *testing.T) {
+	now := time.Now()
+	original := DetailSourceJSON{
+		Title:     "测试",
+		Type:      "电影",
+		FetchedAt: now,
+	}
+	data, _ := json.Marshal(original)
+
+	src, err := UnmarshalDetailSource(string(data))
+	if err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if src.Title != "测试" || src.Type != "电影" {
+		t.Errorf("round-trip mismatch: %+v", src)
+	}
+}
+
+func TestUnmarshalDetailSource_Invalid(t *testing.T) {
+	_, err := UnmarshalDetailSource("{invalid json}")
+	if err == nil {
+		t.Error("expected error for invalid json")
+	}
+}
+
+func TestUnmarshalPTGenSource_Empty(t *testing.T) {
+	src, err := UnmarshalPTGenSource("")
+	if err != nil {
+		t.Errorf("empty string should not error: %v", err)
+	}
+	if src != nil {
+		t.Errorf("empty string should return nil, got %v", src)
+	}
+}
+
+func TestUnmarshalLocalSource_Empty(t *testing.T) {
+	src, err := UnmarshalLocalSource("")
+	if err != nil {
+		t.Errorf("empty string should not error: %v", err)
+	}
+	if src != nil {
+		t.Errorf("empty string should return nil, got %v", src)
+	}
+}
+
+func TestMarshalDetailSource_RoundTrip(t *testing.T) {
+	original := DetailSourceJSON{
+		Title:  "往返",
+		Type:   "电视剧",
+		Tags:   []string{"tag1"},
+	}
+	s := MarshalDetailSource(original)
+	if s == "" {
+		t.Fatal("marshal returned empty")
+	}
+	back, err := UnmarshalDetailSource(s)
+	if err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if back.Title != original.Title || back.Type != original.Type {
+		t.Errorf("round-trip mismatch: %+v", back)
 	}
 }

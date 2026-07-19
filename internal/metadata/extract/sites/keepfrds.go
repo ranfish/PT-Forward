@@ -5,10 +5,9 @@ import "github.com/ranfish/pt-forward/internal/metadata/extract"
 // keepfrdsExtractor keepfrds 站特殊提取器。
 // PTNexus sites/keepfrds.go（229 行）。
 //
-// 注意：PT-Forward DB 中 pt.keepfrds.com 的站名是"朋友"。
-// 设计文档 §56.13 标注 keepfrds → "三月（别名）"，但实际 DB 中
-// "三月"对应 duckboobee.org，"朋友"对应 pt.keepfrds.com。
-// site_code 迁移时需确认正确站名。
+// 站名对照（生产 DB 验证 + 用户确认）：
+//   pt.keepfrds.com → PT-Forward 站名"朋友" → siteCode "keepfrds"
+//   duckboobee.org  → PT-Forward 站名"三月"（独立站点，非 keepfrds）
 type keepfrdsExtractor struct{}
 
 func newKeepfrdsExtractor() *keepfrdsExtractor { return &keepfrdsExtractor{} }

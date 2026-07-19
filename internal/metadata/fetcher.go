@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -161,6 +162,15 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 	if detail.MediaInfo != "" {
 		meta.SourceMediaInfo = detail.MediaInfo
 		meta.MediaInfoSource = "source_site"
+	}
+
+	// §56.14: 构建 detail_source_json（三源之一，/merge 接口使用）
+	seed := extract.DetailToSeed(detail)
+	detailSource := SeedToDetailSource(seed, now, extract.Meta{
+		ExtractorName: "adapter.GetTorrentDetail",
+	})
+	if data, err := json.Marshal(detailSource); err == nil {
+		meta.DetailSourceJSON = string(data)
 	}
 
 	return meta

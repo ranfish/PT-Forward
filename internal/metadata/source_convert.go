@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -81,4 +82,49 @@ func ArtifactToSource(mediainfo, bdinfo string, screenshots []string, generatedA
 // SourceToArtifact 将 LocalSourceJSON 还原为本地产物（合并层使用）。
 func SourceToArtifact(src LocalSourceJSON) (mediainfo, bdinfo string, screenshots []string) {
 	return src.MediaInfo, src.BDInfo, src.Screenshots
+}
+
+// UnmarshalDetailSource 反序列化 detail_source_json。空字符串返回 nil。
+func UnmarshalDetailSource(jsonStr string) (*DetailSourceJSON, error) {
+	if jsonStr == "" {
+		return nil, nil
+	}
+	var src DetailSourceJSON
+	if err := json.Unmarshal([]byte(jsonStr), &src); err != nil {
+		return nil, err
+	}
+	return &src, nil
+}
+
+// UnmarshalPTGenSource 反序列化 ptgen_source_json。空字符串返回 nil。
+func UnmarshalPTGenSource(jsonStr string) (*PTGenSourceJSON, error) {
+	if jsonStr == "" {
+		return nil, nil
+	}
+	var src PTGenSourceJSON
+	if err := json.Unmarshal([]byte(jsonStr), &src); err != nil {
+		return nil, err
+	}
+	return &src, nil
+}
+
+// UnmarshalLocalSource 反序列化 local_source_json。空字符串返回 nil。
+func UnmarshalLocalSource(jsonStr string) (*LocalSourceJSON, error) {
+	if jsonStr == "" {
+		return nil, nil
+	}
+	var src LocalSourceJSON
+	if err := json.Unmarshal([]byte(jsonStr), &src); err != nil {
+		return nil, err
+	}
+	return &src, nil
+}
+
+// MarshalDetailSource 序列化 DetailSourceJSON 为字符串。
+func MarshalDetailSource(src DetailSourceJSON) string {
+	data, err := json.Marshal(src)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
