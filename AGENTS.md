@@ -79,6 +79,8 @@
     - ⏳ 前端 toggle UI + SourcesStatus 显示（需 vite build）
     - ⏳ 三源并行 errgroup（当前只集成 detail 源）
 - ⏳ 第四阶段~第十五阶段：详见 §56.5 实施计划
+  - ✅ 第六阶段 2c PTGen 深度集成 P0 完成（◎字段解析器 + ptgen_formatter + renderer 集成）
+    - ⏳ 2c P1: Provider 接口拆分（doubaninfo.go/cspt.go/generic.go，代码组织优化）
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
