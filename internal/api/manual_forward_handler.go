@@ -345,22 +345,29 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 		result["source_site"] = sourceSite
 	}
 
-	// §56.14: 如果有 source_torrent_id，触发详情页采集（填充 detail_source_json）
+	// §56.14: 详情页采集（异步，与 AnalyzeTorrent 并行，节省 30s）
+	var detailFetched bool
+	var detailFetchError string
+	var detailWg sync.WaitGroup
 	if sourceTorrentID != "" && sourceSite != "" && h.metadataFetcher != nil && infoHash != "" {
-		fetchCtx, fetchCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		if fetchMeta, err := h.metadataFetcher.FetchAndStore(fetchCtx, infoHash, sourceSite, sourceTorrentID); err != nil {
-			h.logger.Warn("analyze: detail fetch failed",
-				zap.String("site", sourceSite),
-				zap.String("torrent_id", sourceTorrentID),
-				zap.Error(err))
-			result["detail_fetch_error"] = err.Error()
-		} else if fetchMeta != nil {
-			result["detail_fetched"] = true
-			h.logger.Info("analyze: detail fetched and stored",
-				zap.String("site", sourceSite),
-				zap.Int("detail_json_len", len(fetchMeta.DetailSourceJSON)))
-		}
-		fetchCancel()
+		detailWg.Add(1)
+		go func() {
+			defer detailWg.Done()
+			fetchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if fetchMeta, err := h.metadataFetcher.FetchAndStore(fetchCtx, infoHash, sourceSite, sourceTorrentID); err != nil {
+				h.logger.Warn("analyze: detail fetch failed",
+					zap.String("site", sourceSite),
+					zap.String("torrent_id", sourceTorrentID),
+					zap.Error(err))
+				detailFetchError = err.Error()
+			} else if fetchMeta != nil {
+				detailFetched = true
+				h.logger.Info("analyze: detail fetched and stored",
+					zap.String("site", sourceSite),
+					zap.Int("detail_json_len", len(fetchMeta.DetailSourceJSON)))
+			}
+		}()
 	}
 
 	var exclusions []model.PublishExclusion
@@ -455,6 +462,15 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 		if bdinfoReport != "" {
 			result["bdinfo"] = bdinfoReport
 		}
+	}
+
+	// §56.14: 等待详情页采集完成（与 AnalyzeTorrent 并行的 goroutine）
+	detailWg.Wait()
+	if detailFetched {
+		result["detail_fetched"] = true
+	}
+	if detailFetchError != "" {
+		result["detail_fetch_error"] = detailFetchError
 	}
 
 	// 标题解析 + MediaInfo 纠正 + 标准化
