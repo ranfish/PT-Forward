@@ -85,6 +85,13 @@ type Site struct {
 
 	TitleFormat string `json:"title_format,omitempty" gorm:"type:text"`
 
+	// §56.17 决策 3: per-site 图床配置（发布时截图/海报转存策略）
+	ImageHostOverride string `json:"image_host_override,omitempty" gorm:"size:200;default:''"`    // 指定图床名（覆盖全局默认）
+	ImageBlacklist    string `json:"image_blacklist,omitempty" gorm:"type:text;default:''"`        // 黑名单图床域名列表（逗号分隔）
+	ImageWhitelist    string `json:"image_whitelist,omitempty" gorm:"type:text;default:''"`        // 白名单图床域名列表
+	ImageUploadMode   string `json:"image_upload_mode" gorm:"size:20;default:'url'"`               // 'url' / 'base64' / 'file' / 'official'
+	ImageOfficialHost string `json:"image_official_host,omitempty" gorm:"size:255;default:''"`     // 官方图床 URL（如 image.zmpt.cc）
+
 	UploadBytes   int64      `json:"upload_bytes" gorm:"default:0"`
 	DownloadBytes int64      `json:"download_bytes" gorm:"default:0"`
 	SeedingPoints float64    `json:"seeding_points" gorm:"default:0"`
