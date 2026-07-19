@@ -20,17 +20,51 @@ var defaultBasicInfoLabels = map[string][]string{
 // TODO: §56.1 standard_keys 表 DB 驱动后替换此 const
 
 // fillBasicInfoFields 从详情页基本信息表填充结构化字段。
-// 支持 3 种 HTML 模式（参考 PTNexus findDetailValueCellByLabels）：
-//  1. dt/dd 模式（HTML5 description list）
-//  2. th/td 模式（table header + cell）
-//  3. td/td 相邻模式（NexusPHP 标准种子信息表，如 <tr><td>类型</td><td>电视剧</td>...</tr>）
+// 支持 4 种 HTML 模式（按精准度优先级）：
+//  1. td.rowhead + td.rowfollow（NexusPHP 种子信息表标准，PTer/HDSky 等用此模式）
+//  2. dt/dd 模式（HTML5 description list）
+//  3. th/td 模式（table header + cell）
+//  4. td/td 相邻模式（普通表格，限定不在 colhead 表内避免文件列表表头误匹配）
 //
-// 第 3 种是 PTer/HDSky/HHanClub 等 NexusPHP 站的主流模式，缺失会导致
-// medium/video_codec/resolution/release_group 全空（完整度从 80%+ 跌到 50%）。
+// 经验：PTer 详情页 table[10] 用 td.rowhead + td.rowfollow 模式，
+// 包含"副标题/类别与标签/基本信息/IMDb链接/豆瓣链接"等键值对。
+// 而 td.colhead 是文件列表表头（"类型/标题/大小"），不能用作 label-value。
 func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedData) {
 	values := map[string]string{}
 
-	// 模式 1: dt/dd
+	// 模式 1: td.rowhead + td.rowfollow（NexusPHP 种子信息表，最精准）
+	// 同时也匹配 td.rowhead_text（部分站变体）
+	doc.Find(`td[class*="rowhead"]`).Each(func(_ int, head *goquery.Selection) {
+		headText := strings.TrimSpace(head.Text())
+		field := matchBasicInfoLabel(headText)
+		if field == "" {
+			return
+		}
+		// 找同 tr 内下一个 td.rowfollow
+		follow := head.NextFiltered(`td[class*="rowfollow"]`)
+		if follow.Length() == 0 {
+			// 兜底：找下一个 td（不带 class 限制）
+			follow = head.NextFiltered("td")
+		}
+		if follow.Length() == 0 {
+			return
+		}
+		// 对 PTer 等站，rowfollow 可能含多个 img/a 子元素，取纯文本
+		value := strings.TrimSpace(follow.Text())
+		if value == "" {
+			return
+		}
+		// 排除"基本信息"这种聚合 td（值太长，含多个字段）
+		// 让 PTer 站点提取器单独解析这种聚合行
+		if field == "type" && len(value) > 50 {
+			return
+		}
+		if _, exists := values[field]; !exists {
+			values[field] = value
+		}
+	})
+
+	// 模式 2: dt/dd
 	doc.Find("dt").Each(func(_ int, dt *goquery.Selection) {
 		dtText := strings.TrimSpace(dt.Text())
 		dd := dt.NextFiltered("dd")
@@ -48,7 +82,7 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 		}
 	})
 
-	// 模式 2: th/td
+	// 模式 3: th/td
 	doc.Find("th").Each(func(_ int, th *goquery.Selection) {
 		thText := strings.TrimSpace(th.Text())
 		td := th.NextFiltered("td")
@@ -66,18 +100,21 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 		}
 	})
 
-	// 模式 3: td/td 相邻（NexusPHP 标准，参考 PTNexus review_extract.go:999）
-	// 遍历所有 td，如果文本匹配 label，取下一个兄弟 td 的文本作为值。
+	// 模式 4: td/td 相邻（普通表格 fallback）
+	// 加严格守卫：当前 td 不能是 colhead（文件列表表头），且不含子 td
 	doc.Find("td").Each(func(_ int, td *goquery.Selection) {
 		tdText := strings.TrimSpace(td.Text())
 		if tdText == "" {
 			return
 		}
+		cls, _ := td.Attr("class")
+		if strings.Contains(cls, "colhead") {
+			return // 跳过文件列表表头
+		}
 		field := matchBasicInfoLabel(tdText)
 		if field == "" {
 			return
 		}
-		// 仅当当前 td 没有子 td 时才视为"标签 td"（避免父容器误匹配）
 		if td.Find("td").Length() > 0 {
 			return
 		}
@@ -85,12 +122,18 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 		if nextTD.Length() == 0 {
 			return
 		}
+		nextCls, _ := nextTD.Attr("class")
+		if strings.Contains(nextCls, "colhead") {
+			return
+		}
 		value := strings.TrimSpace(nextTD.Text())
 		if value == "" {
 			return
 		}
-		// 值 td 也不能含子 td（否则是嵌套表格）
 		if nextTD.Find("td").Length() > 0 {
+			return
+		}
+		if field == "type" && len(value) > 50 {
 			return
 		}
 		if _, exists := values[field]; !exists {
