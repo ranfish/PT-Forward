@@ -142,6 +142,29 @@ func (p *Pipeline) SetImageHostManager(mgr *imagehost.Manager) {
 	}
 }
 
+// isDetailFirst §56.18: 从 publish_settings 读取海报优先级 toggle。
+func (p *Pipeline) isDetailFirst() bool {
+	if p.db == nil {
+		return false
+	}
+	var setting model.PublishSetting
+	if err := p.db.Where("key = ?", "metadata_priority").First(&setting).Error; err == nil {
+		return setting.Value == "detail_first"
+	}
+	return false
+}
+
+// loadTitleRules §56.19: 从 DB 加载目标站的标题校验规则。
+func (p *Pipeline) loadTitleRules(siteCode string) []model.TitleRule {
+	if p.db == nil {
+		return nil
+	}
+	var rules []model.TitleRule
+	// 查全局规则（site_code=''）+ 目标站规则
+	p.db.Where("site_code = ? OR site_code = ?", siteCode, "").Find(&rules)
+	return rules
+}
+
 func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
 	p.completionWatcher = w
 }
@@ -700,20 +723,34 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 
 	var result descResult
 	ptgenResult, ptgenErr := p.queryPTGen(ctx, title)
-	if ptgenErr == nil && ptgenResult != nil && ptgenResult.PosterURL != "" {
-		descData.PosterURL = ptgenResult.PosterURL
+	// PTGen 字段处理（独立于海报选择）
+	if ptgenErr == nil && ptgenResult != nil {
 		if ptgenResult.RawBBCode != "" {
 			descData.PTGenBody = ptgenResult.RawBBCode
 		}
-		descData.PTGen = ptgenResult // §56.16: 结构化 PTGen（renderer 优先用此字段）
+		descData.PTGen = ptgenResult // §56.16: 结构化 PTGen
 		result.IMDbLink = ptgenResult.IMDBURL
 		result.DoubanLink = ptgenResult.DoubanURL
 		if ptgenResult.TMDbURL != "" {
 			result.TMDBID = extractTMDBID(ptgenResult.TMDbURL)
 		}
-	} else if sourceDetail != nil && sourceDetail.PosterURL != "" {
-		rehostedURL := p.rehostPoster(ctx, sourceDetail.PosterURL)
-		descData.PosterURL = rehostedURL
+	}
+
+	// §56.18: 海报选择（toggle 支持 ptgen_first/detail_first）
+	ptgenPoster := ""
+	if ptgenResult != nil {
+		ptgenPoster = ptgenResult.PosterURL
+	}
+	detailPoster := ""
+	if sourceDetail != nil {
+		detailPoster = sourceDetail.PosterURL
+	}
+	if p.isDetailFirst() && detailPoster != "" {
+		descData.PosterURL = p.rehostPoster(ctx, detailPoster)
+	} else if ptgenPoster != "" {
+		descData.PosterURL = ptgenPoster
+	} else if detailPoster != "" {
+		descData.PosterURL = p.rehostPoster(ctx, detailPoster)
 	}
 
 	if descriptionText == "" && descData.PTGenBody != "" {
@@ -733,6 +770,14 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 		renderer := description.NewRenderer(descConfig.Format)
 		if rendered, err := renderer.Render(descData, descConfig); err == nil && rendered != "" {
 			descriptionText = rendered
+		}
+	}
+
+	// §56.20: 追加感谢引言（默认中文站配置）
+	if sourceSite != "" {
+		thanks := description.GenerateThanksQuote(sourceSite, false, nil)
+		if thanks != "" {
+			descriptionText = thanks + "\n\n" + descriptionText
 		}
 	}
 
@@ -1203,6 +1248,34 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 
 	if candidate.HasHR {
 		return false, "源站种子存在 H&R (Hit and Run) 标记，跳过发布"
+	}
+
+	// §56.19: 标题校验（TitleValidator，如果目标站有标题规则）
+	if rules := p.loadTitleRules(targetSite); len(rules) > 0 {
+		validator := titleparser.NewTitleValidator()
+		tpRules := make([]titleparser.TitleRule, len(rules))
+		for i, r := range rules {
+			tpRules[i] = titleparser.TitleRule{
+				RuleType:     r.RuleType,
+				Field:        r.Field,
+				Pattern:      r.Pattern,
+				Replacement:  r.Replacement,
+				AutoFix:      r.AutoFix,
+				ErrorMessage: r.ErrorMessage,
+			}
+		}
+		vResult := validator.Validate(candidate.TorrentName, tpRules)
+		if len(vResult.Errors) > 0 {
+			msgs := make([]string, len(vResult.Errors))
+			for i, e := range vResult.Errors {
+				msgs[i] = e.Message
+			}
+			return false, "标题校验失败: " + strings.Join(msgs, "; ")
+		}
+		// 自动修复后的标题覆盖
+		if vResult.Title != candidate.TorrentName {
+			candidate.TorrentName = vResult.Title
+		}
 	}
 
 	// 2. flags 检查（来自 torrent_metadata）
