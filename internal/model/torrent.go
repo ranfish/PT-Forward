@@ -195,11 +195,14 @@ type UploadFormField struct {
 	Value       string   `json:"value,omitempty"`
 }
 
+// §56.23 扩展: 加 Category + ExistingDesc 字段
 type EditForm struct {
-	TorrentID   string            `json:"torrent_id"`
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	Fields      map[string]string `json:"fields"`
+	TorrentID    string            `json:"torrent_id"`
+	Title        string            `json:"title"`
+	Description  string            `json:"description"`
+	Fields       map[string]string `json:"fields"`
+	Category     string            `json:"category,omitempty"`      // §56.23: 现有分类
+	ExistingDesc string            `json:"existing_desc,omitempty"` // §56.23: 现有描述（与 Description 同义，冗余但清晰）
 }
 
 type PublishDedupResult struct {

@@ -95,6 +95,9 @@ type Site struct {
 	// §56.22 决策 1: 站点 tag 配置（JSON 序列化 SiteTagConfig）
 	TagConfig string `json:"tag_config,omitempty" gorm:"type:text;default:''"`
 
+	// §56.23 决策 1: 已存在种子处理策略（per-site 覆盖全局默认）
+	ExistingStrategy string `json:"existing_strategy,omitempty" gorm:"size:20;default:''"`
+
 	UploadBytes   int64      `json:"upload_bytes" gorm:"default:0"`
 	DownloadBytes int64      `json:"download_bytes" gorm:"default:0"`
 	SeedingPoints float64    `json:"seeding_points" gorm:"default:0"`
