@@ -89,6 +89,8 @@
     - ⏳ 5c P1: 7 site hooks + embed JSON 默认规则 + 6 预设 + pipeline 接入
   - ✅ 第十阶段 5e 描述渲染 P0 完成（thanksQuote + BBCodeToHTML + 副标题模板 + renderer 12+ 变量）
     - ⏳ 5e P1: 4 站 site hooks + pipeline 接入 + 前端
+  - ✅ 第十一阶段 6b/6c 合规 DB 化 P0 完成（compliance_rules 表 + 26 条默认规则 + embed JSON + 启动同步）
+    - ⏳ 6b/6c P1: AC 自动机 + Checker 重构 + 删除三套硬编码 + CRUD API
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
