@@ -356,6 +356,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/manual-forward/submit/", mfHandler)
 	mux.Handle("/api/v1/manual-forward/batch-submit", mfHandler)
 	mux.Handle("/api/v1/manual-forward/batch-submit/", mfHandler)
+	mux.Handle("/api/v1/manual-forward/merge", mfHandler)
+	mux.Handle("/api/v1/manual-forward/merge/", mfHandler)
 
 	if rt.orphanHandler != nil {
 		orphanH := rt.chain(rt.rateLimitMW, rt.orphanHandler.ServeHTTP)
