@@ -14,8 +14,9 @@ const (
 type EditRequest struct {
 	TorrentID  string            `json:"torrent_id"`
 	FormFields map[string]string `json:"form_fields"`
-	Cookie     string            `json:"-"` // 站点 cookie（不序列化）
-	Referer    string            `json:"-"` // Referer URL
+	Cookie     string            `json:"-"`  // 站点 cookie（不序列化）
+	Referer    string            `json:"-"`  // Referer URL
+	BaseURL    string            `json:"-"`  // §56.23: 目标站 base URL
 }
 
 // ParseExistingStrategy 解析策略字符串，无效值返回默认 skip。
