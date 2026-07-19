@@ -51,9 +51,14 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	seed.Title = p.extractTitle(doc, input.FallbackTitle)
 	seed.Subtitle = p.extractSubtitle(doc, input.PageHTML)
 
-	// 阶段 2: 描述容器 HTML + BBCode 转换
+	// 阶段 2: 描述容器提取
+	// PTer 等站用 textarea 存 BBCode（优先提取），其他站用 HTML 容器 + 转换
 	descrHTML := p.extractDescriptionHTML(doc)
-	descrBBCode, _ := p.bbcodeConverter.Convert(descrHTML)
+	descrBBCode := p.extractDescriptionBBCode(doc) // PTer #descrcopyandpaster
+	if descrBBCode == "" {
+		// fallback: HTML → BBCode 转换
+		descrBBCode, _ = p.bbcodeConverter.Convert(descrHTML)
+	}
 
 	// 阶段 3: 简介分段
 	seed.Intro = p.splitIntroSections(descrHTML, descrBBCode)
@@ -93,6 +98,19 @@ func (p *PublicExtractor) extractDescriptionHTML(doc *goquery.Document) string {
 			if err == nil && htmlStr != "" {
 				return htmlStr
 			}
+		}
+	}
+	return ""
+}
+
+// extractDescriptionBBCode §56.13: 从 textarea 提取 BBCode（PTer 特殊模式）。
+// PTer 用 textarea#descrcopyandpaster 存完整 BBCode（含◎字段/海报/简介）。
+// 其他站返回空（走 HTML→BBCode 路径）。
+func (p *PublicExtractor) extractDescriptionBBCode(doc *goquery.Document) string {
+	// PTer 的 textarea
+	if s := doc.Find("#descrcopyandpaster").First(); s.Length() > 0 {
+		if text := s.Text(); text != "" {
+			return text
 		}
 	}
 	return ""
