@@ -170,7 +170,24 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 		g.logger.Warn("local screenshot capture failed", zap.Error(err))
 		return nil
 	}
-	uploaded, err := g.imageUploader.UploadMultiple(ctx, localShots)
+	// §56.17 决策 1: 优先用 imagehost.Manager.Upload（统一接口）
+	var uploaded []string
+	if g.imageHostMgr != nil {
+		for _, shotPath := range localShots {
+			data, readErr := os.ReadFile(shotPath)
+			if readErr != nil {
+				continue
+			}
+			result, uploadErr := g.imageHostMgr.Upload(ctx, data, filepath.Base(shotPath))
+			if uploadErr != nil || result == nil || result.URL == "" {
+				continue
+			}
+			uploaded = append(uploaded, result.URL)
+		}
+	} else {
+		// fallback: 旧版 ImageHostUploader（向后兼容）
+		uploaded, err = g.imageUploader.UploadMultiple(ctx, localShots)
+	}
 	if tmpDir != "" {
 		_ = os.RemoveAll(tmpDir)
 	}
