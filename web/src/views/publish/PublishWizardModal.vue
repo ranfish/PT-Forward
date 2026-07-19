@@ -782,6 +782,8 @@ async function enterAnalyze() {
       info_hash: selectedTorrent.value.info_hash,
       name: selectedTorrent.value.name,
       save_path: selectedTorrent.value.save_path,
+      source_site: (selectedTorrent.value as Record<string, unknown>).source_site as string || '',
+      source_torrent_id: String((selectedTorrent.value as Record<string, unknown>).source_torrent_id || (selectedTorrent.value as Record<string, unknown>).source_site_id || ''),
     })
     const respData = startResp.data?.data as Record<string, unknown> | undefined
     const taskId = Number(respData?.task_id ?? respData?.taskId)
@@ -1032,6 +1034,8 @@ async function doSubmit() {
       title_components: titleComponents.value || undefined,
       bdinfo: form.value.bdinfo || undefined,
       target_sites: selectedTargets.value,
+      anonymous: (form.value as Record<string, unknown>).anonymous as boolean || false,
+      screenshot_in_desc: (form.value as Record<string, unknown>).screenshot_in_desc as boolean || undefined,
     })
     submittedCandidateId.value =
       (resp.data?.data as unknown as { candidate_id?: number })?.candidate_id || 0

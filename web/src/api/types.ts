@@ -707,6 +707,8 @@ export interface ManualForwardSubmitRequest {
   title_components?: Record<string, string>
   bdinfo?: string
   target_sites?: string[]
+  anonymous?: boolean
+  screenshot_in_desc?: boolean
 }
 
 export type CreateWithoutId<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt' | 'created_at' | 'updated_at'>
