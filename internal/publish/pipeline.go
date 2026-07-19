@@ -1098,6 +1098,25 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 	// 标题组件覆盖：用用户编辑的组件填充表单字段
 	applyTitleComponents(pubReq, candidate.UserOverrides)
 
+	// §56.22: TagApplier 处理（如果目标站有 TagConfig 配置）
+	if p.db != nil {
+		var site model.Site
+		p.db.Where("name = ? OR domain = ?", targetSite, targetSite).First(&site)
+		if site.TagConfig != "" {
+			tagCfg := model.ParseTagConfig(site.TagConfig)
+			applier := NewTagApplier(tagCfg)
+			var tags []string
+			for tag := range pubReq.TagFields {
+				tags = append(tags, tag)
+			}
+			applier.Apply(tags, func(field, value string) {
+				pubReq.FormFields[field] = value
+			})
+			// 清空 TagFields（避免 adapter 旧逻辑重复处理）
+			pubReq.TagFields = make(map[string]string)
+		}
+	}
+
 	// 截图默认在 description 内（大部分站点）；独立字段站点由适配器处理
 	pubReq.ScreenshotInDesc = true
 	if fw := p.getTargetFramework(ctx, targetSite); fw == "tnode" || fw == "zhuque" || fw == "haidan" || fw == "ptlgs" {
