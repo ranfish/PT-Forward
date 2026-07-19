@@ -93,6 +93,8 @@
     - ⏳ 6b/6c P1: AC 自动机 + Checker 重构 + 删除三套硬编码 + CRUD API
   - ✅ 第十二阶段 7b 多选 tag P0 完成（SiteTagConfig + TagApplier 4 Mode + MediaTagInferer + 互斥规则）
     - ⏳ 7b P1: 38 MediaTags 标准键数据 + adapter 接入 + 前端
+  - ✅ 第十三阶段 7e 已存在种子编辑 P0 完成（ExistingStrategy + 权限校验 + AutoUpdate 编排 + 字段合并）
+    - ⏳ 7e P1: adapter 实现 + 真实样本验证 + 前端
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
