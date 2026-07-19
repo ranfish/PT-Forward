@@ -67,7 +67,18 @@
   - 2b.4 公共提取器（11 子模块 + 简介分段算法 + ARDTU 工具签名剥离）
   - 2b.5 MediaInfo/BDInfo 提取（4 层候选源 + 合法性检测 + 前缀去污染）
   - 2b.6 图片分类与黑名单（embed JSON + 归一化 + 4 层海报识别）
-- ⏳ 第三阶段~第十五阶段：详见 §56.5 实施计划
+- ✅ 第三阶段 2b.7~2b.8 完成（骨架 + 基础设施 + 核心流程）：
+  - 2b.7 站点特殊提取器骨架（8 站 stub + Registry + Engine 路由）
+    - ⏳ 逐站实施特殊逻辑（需真实 HTML 样本验证）
+  - 2b.8 manual_forward_handler 接入（基础设施 + 核心流程）
+    - detail_source_json 自动填充（Fetcher.buildMetadata 扩展）
+    - publish_settings 表 + MetadataPriorityDefault 常量
+    - /merge 接口（POST，三源 JSON 反序列化 + Merge 合并）
+    - runAnalyze 详情页采集集成（FetchAndStore 触发 + 30s 超时 + 容错）
+    - 请求体扩展（source_site/source_torrent_id/metadata_priority，向后兼容）
+    - ⏳ 前端 toggle UI + SourcesStatus 显示（需 vite build）
+    - ⏳ 三源并行 errgroup（当前只集成 detail 源）
+- ⏳ 第四阶段~第十五阶段：详见 §56.5 实施计划
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
