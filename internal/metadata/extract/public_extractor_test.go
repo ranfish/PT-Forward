@@ -19,8 +19,8 @@ const samplePTPage = `<!DOCTYPE html>
   <tr><th>Hash码</th><td>abc123def4567890abc123def4567890abc123de</td></tr>
 </table>
 <div class="tags">
-  <a class="tag" href="#">喜剧</a>
-  <a class="tag" href="#">动作</a>
+  <a class="torrent_tag" href="#">喜剧</a>
+  <a class="torrent_tag" href="#">动作</a>
 </div>
 <div id="kdescr">
   <p>官组声明（仅限本站）</p>
