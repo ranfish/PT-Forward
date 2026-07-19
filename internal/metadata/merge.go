@@ -33,6 +33,10 @@ type MergedMetadata struct {
 
 	// PTGen 独有字段（始终保留，detail_first 模式不影响）
 	PTGen model.PTGenResult `json:"ptgen"`
+
+	// §56.18: 海报来源标注（由 PosterResolver 设置，Merge 函数不设置）
+	// 值: "ptgen" / "detail" / ""（空表示无可用海报，用户需手动填写 URL）
+	PosterSource string `json:"poster_source,omitempty"`
 }
 
 // MergeMode 合并模式（对应 UI toggle）。
