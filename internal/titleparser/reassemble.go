@@ -1,18 +1,28 @@
 package titleparser
 
 import (
+	"regexp"
 	"strings"
 )
 
 // TitleFormat 站点标题格式模板
+// §56.19 决策 4: 加 MaxTitleLength + ReplacePatterns
 type TitleFormat struct {
-	Separator      string   `json:"separator"`       // 分隔符: "." 或 " "
-	Order          []string `json:"order"`            // 字段顺序
-	GroupConnector string   `json:"group_connector"`  // 制作组连接符: "-" (默认)
-	StripChinese   bool     `json:"strip_chinese"`    // 是否去除中文
-	Forbidden      []string `json:"forbidden"`        // 禁止内容
-	ChinesePrefix  bool     `json:"chinese_prefix"`   // 是否加 [中文名] 前缀
-	Hook           string   `json:"_hook,omitempty"`   // hook 名（复杂规则兜底）
+	Separator      string           `json:"separator"`       // 分隔符: "." 或 " "
+	Order          []string         `json:"order"`           // 字段顺序
+	GroupConnector string           `json:"group_connector"` // 制作组连接符: "-" (默认)
+	StripChinese   bool             `json:"strip_chinese"`   // 是否去除中文
+	Forbidden      []string         `json:"forbidden"`       // 禁止内容
+	ChinesePrefix  bool             `json:"chinese_prefix"`  // 是否加 [中文名] 前缀
+	Hook           string           `json:"_hook,omitempty"` // hook 名（复杂规则兜底)
+	MaxTitleLength int              `json:"max_title_length,omitempty"` // §56.19: 标题截断（如 M-Team 255）
+	ReplacePatterns []ReplacePattern `json:"replace_patterns,omitempty"` // §56.19: 字段值替换（如 1080p→FHD）
+}
+
+// ReplacePattern §56.19 决策 4: 字段值替换规则。
+type ReplacePattern struct {
+	From string `json:"from"` // 正则模式
+	To   string `json:"to"`   // 替换文本
 }
 
 // Reassemble 将标题组件按目标站模板重组为标题字符串
@@ -74,6 +84,23 @@ func reassembleWithTemplate(c TitleComponents, tf TitleFormat) string {
 	// 加中文名前缀
 	if tf.ChinesePrefix && c.ChinesePrefix != "" {
 		result = "[" + c.ChinesePrefix + "] " + result
+	}
+
+	// §56.19 决策 4: 字段值替换（如 1080p→FHD）
+	for _, rp := range tf.ReplacePatterns {
+		if rp.From == "" {
+			continue
+		}
+		if re, err := regexp.Compile(rp.From); err == nil {
+			result = re.ReplaceAllString(result, rp.To)
+		}
+	}
+
+	// §56.19 决策 4: 标题截断（按 rune，避免中文截半）
+	if tf.MaxTitleLength > 0 {
+		if runes := []rune(result); len(runes) > tf.MaxTitleLength {
+			result = string(runes[:tf.MaxTitleLength])
+		}
 	}
 
 	return strings.TrimSpace(result)

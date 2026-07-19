@@ -66,6 +66,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&TorrentMetadata{},
 		&StandardKey{},
 		&PublishSetting{},
+		&TitleRule{},
 		&setting.Setting{},
 	); err != nil {
 		return err
