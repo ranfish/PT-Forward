@@ -853,6 +853,21 @@ func overridesString(overridesJSON, key string) (string, bool) {
 	return "", false
 }
 
+// overridesBool 从 UserOverrides JSON 中提取布尔值（§56.27）
+func overridesBool(overridesJSON, key string) (bool, bool) {
+	if overridesJSON == "" {
+		return false, false
+	}
+	var overrides map[string]interface{}
+	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
+		return false, false
+	}
+	if v, ok := overrides[key].(bool); ok {
+		return v, true
+	}
+	return false, false
+}
+
 // applyTitleComponents 用用户编辑的标题组件覆盖表单字段
 // 走标准化路径：原始值 → 标准键 → 规范显示名 → 表单字段
 func applyTitleComponents(pubReq *model.PublishRequest, overridesJSON string) {
@@ -962,6 +977,10 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 	pubReq.ScreenshotInDesc = true
 	if fw := p.getTargetFramework(ctx, targetSite); fw == "tnode" || fw == "zhuque" || fw == "haidan" || fw == "ptlgs" {
 		pubReq.ScreenshotInDesc = false
+	}
+	// §56.27 决策 5: 用户可通过 UserOverrides 覆盖 ScreenshotInDesc
+	if v, ok := overridesBool(candidate.UserOverrides, "screenshot_in_desc"); ok {
+		pubReq.ScreenshotInDesc = v
 	}
 
 	// BDInfo 报告（如果有）
