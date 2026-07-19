@@ -28,8 +28,13 @@ type Checker struct {
 	userKeywords     []string
 	userKeywordsTS   time.Time
 	siteBlacklist    map[string][]string
+	siteBlacklistTS  time.Time
 
-	siteBlacklistTS time.Time
+	// §56.21: DB 驱动的合规规则缓存
+	rulesAdult     []string
+	rulesForbidden []string
+	rulesGroup     []string
+	rulesTS        time.Time
 }
 
 func NewChecker(db *gorm.DB, logger *zap.Logger) *Checker {
@@ -40,24 +45,91 @@ func NewChecker(db *gorm.DB, logger *zap.Logger) *Checker {
 	}
 }
 
+// getComplianceRules §56.21: 从 DB 加载合规规则（5 分钟缓存）。
+// DB 为空时 fallback 硬编码（keywords.go）。
+func (c *Checker) getComplianceRules(ctx context.Context) (adult, forbidden, group []string) {
+	c.mu.RLock()
+	if c.rulesAdult != nil && time.Since(c.rulesTS) < userKeywordCacheTTL {
+		result := c.rulesAdult
+		c.mu.RUnlock()
+		return result, c.rulesForbidden, c.rulesGroup
+	}
+	c.mu.RUnlock()
+
+	var rules []model.ComplianceRule
+	if c.db != nil {
+		c.db.WithContext(ctx).Find(&rules)
+	}
+
+	if len(rules) == 0 {
+		// fallback: 硬编码
+		return AdultKeywords, ForbiddenTransferKeywords, ForbiddenGroups
+	}
+
+	for _, r := range rules {
+		switch r.RuleType {
+		case model.RuleTypeAdult:
+			adult = append(adult, r.Pattern)
+		case model.RuleTypeForbiddenKeyword:
+			forbidden = append(forbidden, r.Pattern)
+		case model.RuleTypeForbiddenGroup:
+			group = append(group, r.Pattern)
+		}
+	}
+
+	// DB 可能缺某些类型，补充硬编码
+	if len(adult) == 0 {
+		adult = AdultKeywords
+	}
+	if len(forbidden) == 0 {
+		forbidden = ForbiddenTransferKeywords
+	}
+	if len(group) == 0 {
+		group = ForbiddenGroups
+	}
+
+	c.mu.Lock()
+	c.rulesAdult = adult
+	c.rulesForbidden = forbidden
+	c.rulesGroup = group
+	c.rulesTS = time.Now()
+	c.mu.Unlock()
+
+	return adult, forbidden, group
+}
+
+// InvalidateCache §56.21 Q6: CRUD 触发缓存失效。
+func (c *Checker) InvalidateCache() {
+	c.mu.Lock()
+	c.rulesAdult = nil
+	c.rulesForbidden = nil
+	c.rulesGroup = nil
+	c.userKeywords = nil
+	c.siteBlacklist = nil
+	c.mu.Unlock()
+}
+
 func (c *Checker) Check(ctx context.Context, title string) *Result {
 	if title == "" {
 		return Pass
 	}
 
-	for _, kw := range AdultKeywords {
+	// §56.21: 从 DB 加载规则（缓存 5 分钟）
+	adult, forbidden, group := c.getComplianceRules(ctx)
+
+	for _, kw := range adult {
 		if strings.Contains(title, kw) || strings.Contains(strings.ToLower(title), strings.ToLower(kw)) {
 			return &Result{Passed: false, Reason: kw, Category: "adult"}
 		}
 	}
 
-	for _, kw := range ForbiddenTransferKeywords {
+	for _, kw := range forbidden {
 		if strings.Contains(title, kw) {
 			return &Result{Passed: false, Reason: kw, Category: "forbidden_transfer"}
 		}
 	}
 
-	for _, g := range ForbiddenGroups {
+	for _, g := range group {
 		if strings.Contains(title, g) {
 			return &Result{Passed: false, Reason: g, Category: "forbidden_group"}
 		}
