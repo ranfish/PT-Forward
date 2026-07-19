@@ -1,0 +1,13 @@
+{
+  "image_whitelist": [
+    {"host": "pixhost.to", "category": "image_host"},
+    {"host": "imgdb.nn", "category": "image_host"},
+    {"host": "imgbb.com", "category": "image_host"},
+    {"host": "imageban.ru", "category": "image_host"},
+    {"host": "imagebam.com", "category": "image_host"},
+    {"host": "doubanio.com", "category": "metadata_host"},
+    {"host": "themoviedb.org", "category": "metadata_host"},
+    {"host": "image.tmdb.org", "category": "metadata_host"},
+    {"host": "m.media-amazon.com", "category": "metadata_host"}
+  ]
+}

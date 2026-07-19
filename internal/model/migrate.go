@@ -67,6 +67,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&StandardKey{},
 		&PublishSetting{},
 		&TitleRule{},
+		&ComplianceRule{},
 		&setting.Setting{},
 	); err != nil {
 		return err

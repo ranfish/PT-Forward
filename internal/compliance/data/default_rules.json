@@ -1,0 +1,32 @@
+{
+  "rules": [
+    {"rule_type": "adult", "pattern": "9KG", "scope": "share"},
+    {"rule_type": "adult", "pattern": "9kg", "scope": "share"},
+    {"rule_type": "adult", "pattern": "色情", "scope": "share"},
+    {"rule_type": "adult", "pattern": "成人内容", "scope": "share"},
+    {"rule_type": "adult", "pattern": "成人影片", "scope": "share"},
+    {"rule_type": "adult", "pattern": "AV", "scope": "share"},
+    {"rule_type": "adult", "pattern": "18+", "scope": "share"},
+    {"rule_type": "adult", "pattern": "NSFW", "scope": "share"},
+    {"rule_type": "adult", "pattern": "Adult", "scope": "share"},
+    {"rule_type": "adult", "pattern": "XXX", "scope": "share"},
+    {"rule_type": "adult", "pattern": "Porn", "scope": "share"},
+    {"rule_type": "adult", "pattern": "Erotic", "scope": "share"},
+    {"rule_type": "adult", "pattern": "Hentai", "scope": "share"},
+
+    {"rule_type": "forbidden_keyword", "pattern": "禁转", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "禁轉", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "独占", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "獨占", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "谢绝转载", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "謝絕轉載", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "限时禁转", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "限時禁轉", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "严禁转载", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "嚴禁轉載", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "禁止转载", "scope": "share"},
+    {"rule_type": "forbidden_keyword", "pattern": "谢绝搬运", "scope": "share"},
+
+    {"rule_type": "forbidden_group", "pattern": "CatEDU", "scope": "share"}
+  ]
+}
