@@ -136,6 +136,10 @@ func (p *Pipeline) emitStepProgress(groupID uint, memberID uint, step int, statu
 
 func (p *Pipeline) SetImageHostManager(mgr *imagehost.Manager) {
 	p.imageHostMgr = mgr
+	// §56.17 决策 2: 同时注入到 artifactGenerator（无论调用顺序）
+	if p.artifactGenerator != nil {
+		p.artifactGenerator.SetImageHostManager(mgr)
+	}
 }
 
 func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
@@ -149,6 +153,10 @@ func (p *Pipeline) SetNotifyService(ns *notification.Service) {
 func (p *Pipeline) SetScreenshotConfig(cfg screenshot.Config) {
 	p.screenshotConfig = &cfg
 	p.artifactGenerator = NewPublishArtifactGenerator(&cfg, p.logger)
+	// §56.17 决策 2: 如果 imageHostMgr 已设置，传递给新生成的 artifactGenerator
+	if p.imageHostMgr != nil {
+		p.artifactGenerator.SetImageHostManager(p.imageHostMgr)
+	}
 }
 
 func (p *Pipeline) SetBackpressureController(ctrl *BackpressureController) {

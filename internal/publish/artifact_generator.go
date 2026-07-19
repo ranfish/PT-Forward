@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/screenshot"
 	"go.uber.org/zap"
 )
@@ -19,6 +20,7 @@ type PublishArtifactGenerator struct {
 	subtitleDetector  *SubtitleDetector
 	mediaInfoAnalyzer *MediaInfoAnalyzer
 	imageUploader     *ImageHostUploader
+	imageHostMgr      *imagehost.Manager // §56.17 决策 2: 统一图床管理
 	logger            *zap.Logger
 }
 
@@ -31,6 +33,13 @@ func NewPublishArtifactGenerator(cfg *screenshot.Config, logger *zap.Logger) *Pu
 	g.mediaInfoAnalyzer = NewMediaInfoAnalyzer(logger)
 	g.imageUploader = NewImageHostUploader(logger)
 	return g
+}
+
+// SetImageHostManager §56.17 决策 2: 注入统一图床管理器。
+// 注入后 rehostScreenshots 会调用 Manager.Rehost 转存截图；
+// 未注入时保留原始 URL（向后兼容）。
+func (g *PublishArtifactGenerator) SetImageHostManager(mgr *imagehost.Manager) {
+	g.imageHostMgr = mgr
 }
 
 type ArtifactResult struct {
@@ -173,11 +182,30 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 	return uploaded
 }
 
+// rehostScreenshots §56.17 决策 2: 截图转存（补全空实现）。
+// 调用 imageHostMgr.Rehost 逐张转存，失败时 fallback 原始 URL。
+// 未配置 imageHostMgr 时保留原始 URL（向后兼容）。
 func (g *PublishArtifactGenerator) rehostScreenshots(ctx context.Context, urls []string) []string {
 	if len(urls) == 0 {
 		return urls
 	}
-	return urls
+	if g.imageHostMgr == nil {
+		return urls
+	}
+
+	rehosted := make([]string, 0, len(urls))
+	for _, url := range urls {
+		result, err := g.imageHostMgr.Rehost(ctx, url)
+		if err != nil || result == nil || result.URL == "" {
+			g.logger.Warn("screenshot rehost failed, using source url",
+				zap.String("url", url),
+				zap.Error(err))
+			rehosted = append(rehosted, url)
+			continue
+		}
+		rehosted = append(rehosted, result.URL)
+	}
+	return rehosted
 }
 
 func (g *PublishArtifactGenerator) findLargestVideo(dir string) (string, error) {
