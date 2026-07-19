@@ -133,7 +133,7 @@ func TestExtractQuoteBlocks_Empty(t *testing.T) {
 
 func TestSplitPosterAndScreenshots_FirstImage(t *testing.T) {
 	urls := []string{"shot1.jpg", "shot2.jpg", "shot3.jpg"}
-	poster, screenshots := splitPosterAndScreenshots(urls)
+	poster, screenshots := ClassifyPosterAndScreenshots(urls, "")
 	if poster != "shot1.jpg" {
 		t.Errorf("expected first image as poster, got %q", poster)
 	}
@@ -144,7 +144,7 @@ func TestSplitPosterAndScreenshots_FirstImage(t *testing.T) {
 
 func TestSplitPosterAndScreenshots_KeywordPriority(t *testing.T) {
 	urls := []string{"shot1.jpg", "https://img9.doubanio.com/poster.jpg", "shot2.jpg"}
-	poster, screenshots := splitPosterAndScreenshots(urls)
+	poster, screenshots := ClassifyPosterAndScreenshots(urls, "")
 	if !strings.Contains(poster, "doubanio") {
 		t.Errorf("expected doubanio URL as poster, got %q", poster)
 	}
@@ -154,7 +154,7 @@ func TestSplitPosterAndScreenshots_KeywordPriority(t *testing.T) {
 }
 
 func TestSplitPosterAndScreenshots_Empty(t *testing.T) {
-	poster, screenshots := splitPosterAndScreenshots(nil)
+	poster, screenshots := ClassifyPosterAndScreenshots(nil, "")
 	if poster != "" {
 		t.Errorf("expected empty poster, got %q", poster)
 	}
@@ -171,7 +171,12 @@ func TestFilterUnwantedImages(t *testing.T) {
 		"https://example.com/shot1.jpg",
 		"https://example.com/banner.gif",  // 黑名单
 	}
-	valid := filterUnwantedImages(urls)
+	valid := make([]string, 0, len(urls))
+	for _, u := range urls {
+		if !IsUnwantedImage(u) {
+			valid = append(valid, u)
+		}
+	}
 	if len(valid) != 2 {
 		t.Errorf("expected 2 valid images, got %d: %v", len(valid), valid)
 	}
