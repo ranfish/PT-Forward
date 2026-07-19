@@ -81,6 +81,9 @@
 - ⏳ 第四阶段~第十五阶段：详见 §56.5 实施计划
   - ✅ 第六阶段 2c PTGen 深度集成 P0 完成（◎字段解析器 + ptgen_formatter + renderer 集成）
     - ⏳ 2c P1: Provider 接口拆分（doubaninfo.go/cspt.go/generic.go，代码组织优化）
+  - ✅ 第七阶段 4a 图床打通 P0 完成（rehost 补全 + per-site 5 字段 + 兼容性检查 + 分级失效检测）
+    - ⏳ 4a P1: 两套统一（删除 publish/imagehost.go，改用 Manager.Upload）
+    - ⏳ 4a P1: 特殊图床支持（PTer/织梦/杏坛/肉丝，逐站实施）
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
