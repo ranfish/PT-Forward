@@ -162,9 +162,32 @@ func (r *Renderer) applyTemplate(template string, data *model.DescriptionData, f
 	result := template
 	result = strings.ReplaceAll(result, "{{poster}}", r.renderPoster(data.PosterURL, format))
 	result = strings.ReplaceAll(result, "{{statement}}", data.Statement)
-	result = strings.ReplaceAll(result, "{{ptgen}}", data.PTGenBody)
+	// §56.16: 优先用结构化 PTGen（FormatPTGen），fallback PTGenBody
+	ptgenBody := data.PTGenBody
+	if data.PTGen != nil {
+		ptgenBody = FormatPTGen(data.PTGen, PTGenTemplateDouban)
+	}
+	result = strings.ReplaceAll(result, "{{ptgen}}", ptgenBody)
 	result = strings.ReplaceAll(result, "{{mediainfo}}", r.FormatMediaInfo(data.MediaInfoText, model.MediaInfoFormat(format)))
+	result = strings.ReplaceAll(result, "{{bdinfo}}", r.FormatMediaInfo(data.BDInfoText, model.MediaInfoFormat(format)))
 	result = strings.ReplaceAll(result, "{{screenshots}}", r.FormatScreenshots(data.Screenshots, format))
 	result = strings.ReplaceAll(result, "{{source_site}}", data.SourceSite)
+
+	// §56.20 Q1: 扩展 PTGen 子变量 + thanks_quote
+	if data.PTGen != nil {
+		result = strings.ReplaceAll(result, "{{ptgen.title}}", data.PTGen.ForeignTitle)
+		result = strings.ReplaceAll(result, "{{ptgen.chinese_title}}", data.PTGen.ChineseTitle)
+		result = strings.ReplaceAll(result, "{{ptgen.rating}}", FormatRating(data.PTGen.IMDBRating, data.PTGen.IMDBVotes))
+		result = strings.ReplaceAll(result, "{{ptgen.cast}}", FormatPeople(data.PTGen.Cast, 5))
+		result = strings.ReplaceAll(result, "{{ptgen.director}}", strings.Join(data.PTGen.Director, " / "))
+		result = strings.ReplaceAll(result, "{{ptgen.awards}}", strings.Join(data.PTGen.Awards, " / "))
+	} else {
+		for _, v := range []string{"{{ptgen.title}}", "{{ptgen.chinese_title}}", "{{ptgen.rating}}", "{{ptgen.cast}}", "{{ptgen.director}}", "{{ptgen.awards}}"} {
+			result = strings.ReplaceAll(result, v, "")
+		}
+	}
+	// §56.20 决策 2: thanks_quote（默认中文站配置）
+	result = strings.ReplaceAll(result, "{{thanks_quote}}", GenerateThanksQuote(data.SourceSite, false, nil))
+
 	return result
 }
