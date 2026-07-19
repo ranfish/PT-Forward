@@ -103,6 +103,7 @@ func AutoUpdate(
 	if config != nil {
 		editReq.Cookie = config.Cookie
 		editReq.BaseURL = config.BaseURL
+		editReq.APIKey = config.APIKey
 		editReq.Referer = config.BaseURL + "/details.php?id=" + torrentID
 	}
 	if err := publisher.SubmitEdit(ctx, editReq); err != nil {

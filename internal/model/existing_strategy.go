@@ -17,6 +17,7 @@ type EditRequest struct {
 	Cookie     string            `json:"-"`  // 站点 cookie（不序列化）
 	Referer    string            `json:"-"`  // Referer URL
 	BaseURL    string            `json:"-"`  // §56.23: 目标站 base URL
+	APIKey     string            `json:"-"`  // §56.23: API 站认证 key
 }
 
 // ParseExistingStrategy 解析策略字符串，无效值返回默认 skip。
