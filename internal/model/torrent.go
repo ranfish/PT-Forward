@@ -89,6 +89,7 @@ type SearchOptions struct {
 }
 
 // §33.1.74 — PTGenResult: PTGen 查询结果
+// §56.16 决策 9: 加 Playdate 字段（◎上映日期）
 type PTGenResult struct {
 	ChineseTitle string       `json:"chinese_title"`
 	ForeignTitle string       `json:"foreign_title"`
@@ -98,6 +99,7 @@ type PTGenResult struct {
 	Language     []string     `json:"language"`
 	Episodes     string       `json:"episodes"`
 	Duration     string       `json:"duration"`
+	Playdate     string       `json:"playdate"` // §56.16 决策 9: ◎上映日期
 	Director     []string     `json:"director"`
 	Cast         []PersonInfo `json:"cast"`
 	Writer       []string     `json:"writer"`
