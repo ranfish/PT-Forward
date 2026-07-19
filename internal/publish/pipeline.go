@@ -171,6 +171,35 @@ func (p *Pipeline) loadTitleRules(siteCode string) []model.TitleRule {
 	return rules
 }
 
+// getExistingStrategy §56.23: 从 DB 读取目标站的已存在种子策略。
+func (p *Pipeline) getExistingStrategy(siteName string) model.ExistingStrategy {
+	if p.db == nil {
+		return model.ExistingSkip
+	}
+	var site model.Site
+	p.db.Where("name = ? OR domain = ?", siteName, siteName).First(&site)
+	return model.ParseExistingStrategy(site.ExistingStrategy)
+}
+
+// tryAutoUpdate §56.23: 尝试编辑已存在的种子（如果 adapter 支持）。
+func (p *Pipeline) tryAutoUpdate(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, torrentID string, candidate *model.PublishCandidate) bool {
+	ep, ok := adapter.(EditPublisher)
+	if !ok {
+		return false
+	}
+	detail, err := adapter.GetTorrentDetail(ctx, config, torrentID)
+	if err != nil || detail == nil {
+		p.logger.Warn("auto update: get detail failed", zap.Error(err))
+		return false
+	}
+	result, err := AutoUpdate(ctx, ep, config, detail.Description, torrentID, nil, model.ExistingUpdate, "nexusphp", p.logger)
+	if err != nil || result == nil || !result.Edited {
+		return false
+	}
+	p.logger.Info("auto update: edited existing torrent", zap.String("torrent_id", torrentID))
+	return true
+}
+
 func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
 	p.completionWatcher = w
 }
@@ -708,7 +737,21 @@ func (p *Pipeline) publishToTarget(ctx context.Context, candidate *model.Publish
 
 	status := model.PublishResultCompleted
 	if resp != nil && resp.IsExisting {
-		status = model.PublishResultExists
+		// §56.23: 按 ExistingStrategy 处理已存在种子
+		strategy := p.getExistingStrategy(targetSite)
+		switch strategy {
+		case model.ExistingForce:
+			status = model.PublishResultCompleted // 强制标记成功
+		case model.ExistingUpdate:
+			// 尝试编辑（如果 adapter 实现 EditPublisher 接口）
+			if p.tryAutoUpdate(ctx, targetAdapter, targetConfig, resp.TorrentID, candidate) {
+				status = model.PublishResultCompleted
+			} else {
+				status = model.PublishResultExists
+			}
+		default: // ExistingSkip
+			status = model.PublishResultExists
+		}
 	}
 
 	// §56.30: 发布成功后自动加种到源下载器（失败不阻断，仅记录）
