@@ -193,9 +193,10 @@ func mergeSeedIntoDetail(detail *model.TorrentDetail, seed extract.SeedData) {
 	if len(seed.Tags) > 0 {
 		detail.Tags = seed.Tags
 	}
-	if len(seed.Flags) > 0 {
-		detail.Flags = seed.Flags
-	}
+	// flags 始终用 Engine 输出覆盖（即使空），因为老 adapter 的 extractFlagsFromText
+	// 扫描整页 HTML 会把站点级"禁转声明"区块/评论区/相关推荐误识别为种子 flags。
+	// Engine 的 extractFlags 只扫 title+subtitle+descrBBCode，更精准。
+	detail.Flags = seed.Flags
 	if seed.IMDbLink != "" {
 		detail.IMDbURL = seed.IMDbLink
 	}
