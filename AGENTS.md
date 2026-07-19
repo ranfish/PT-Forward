@@ -100,8 +100,9 @@
   - 🔄 第十五阶段 4b/7c/7d/8b 进行中:
     - ✅ 7d 匿名发布字段 P0 完成（handleSubmit/batchSubmit 接收 anonymous + applyUserOverrides 处理）
     - ✅ 8b 加种回下载器 P0 完成（auto_reseed 编排 + PublishResultRecord.seeded 字段）
-    - ⏳ 4b 截图审核（§56.27）
-    - ⏳ 7c 音乐站特殊路径（§56.28）
+    - ✅ 4b 截图审核后端 P0 完成（ScreenshotInDesc toggle 接入）
+      - ⏳ 4b 前端（截图 Tab 增强，需 vite build）
+    - ⏳ 7c 音乐站特殊路径（§56.28，需音乐站数据）
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
