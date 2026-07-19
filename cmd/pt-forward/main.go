@@ -429,6 +429,7 @@ func main() {
 	publishPipeline.SetDeclarationFilter(declFilter)
 	complianceChecker := compliance.NewChecker(db, log)
 	publishPipeline.SetComplianceChecker(complianceChecker)
+	publishPipeline.SetPusher(torrentPusher) // §56.30: 发布后自动加种
 	reseedEngine.SetComplianceChecker(complianceChecker)
 	metadataFetcher := metadata.NewFetcher(db, log, siteProvider)
 	publishPipeline.SetMetadataFetcher(metadataFetcher)
