@@ -670,6 +670,7 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 		TitleComponents map[string]string `json:"title_components"`
 		BDInfo       string   `json:"bdinfo"`
 		Anonymous   bool     `json:"anonymous"`
+		ScreenshotInDesc *bool `json:"screenshot_in_desc,omitempty"` // §56.27: nil=默认，true/false=用户指定
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -715,6 +716,10 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 	// §56.29: 匿名发布
 	if req.Anonymous {
 		overrides["anonymous"] = true
+	}
+	// §56.27: ScreenshotInDesc toggle
+	if req.ScreenshotInDesc != nil {
+		overrides["screenshot_in_desc"] = *req.ScreenshotInDesc
 	}
 	overridesJSON, _ := json.Marshal(overrides)
 
