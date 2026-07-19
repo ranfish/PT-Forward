@@ -143,6 +143,11 @@ type PublishResultRecord struct {
 	DownloaderID string `json:"downloader_id" gorm:"size:50"`
 	CostMS       int64  `json:"cost_ms" gorm:"default:0"`
 	Logs         string `json:"logs" gorm:"type:text"`
+
+	// §56.30: 加种回下载器
+	Seeded    bool       `json:"seeded" gorm:"default:false"`      // 是否已加种
+	SeededAt  *time.Time `json:"seeded_at"`                         // 加种时间
+	SeedError string     `json:"seed_error" gorm:"size:500"`        // 加种失败原因
 }
 
 func (PublishResultRecord) TableName() string { return "publish_result_records" }
