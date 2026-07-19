@@ -271,10 +271,13 @@ func (t *analyzeTask) snapshot() *analyzeTask {
 
 func (h *ManualForwardHandler) handleStartAnalyze(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientID uint   `json:"client_id"`
-		InfoHash string `json:"info_hash"`
-		Name     string `json:"name"`
-		SavePath string `json:"save_path"`
+		ClientID         uint   `json:"client_id"`
+		InfoHash         string `json:"info_hash"`
+		Name             string `json:"name"`
+		SavePath         string `json:"save_path"`
+		SourceSite       string `json:"source_site,omitempty"`
+		SourceTorrentID  string `json:"source_torrent_id,omitempty"`
+		MetadataPriority string `json:"metadata_priority,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -297,12 +300,12 @@ func (h *ManualForwardHandler) handleStartAnalyze(w http.ResponseWriter, r *http
 	}
 	h.taskStore.Store(taskID, task)
 
-	go h.runAnalyze(task, req.ClientID, req.InfoHash, req.Name, req.SavePath)
+	go h.runAnalyze(task, req.ClientID, req.InfoHash, req.Name, req.SavePath, req.SourceSite, req.SourceTorrentID, req.MetadataPriority)
 
 	Success(w, map[string]interface{}{"task_id": taskID})
 }
 
-func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, infoHash, name, savePath string) {
+func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, infoHash, name, savePath, frontendSourceSite, frontendTorrentID, metadataPriority string) {
 	defer func() {
 		if r := recover(); r != nil {
 			task.setError(fmt.Sprintf("分析异常: %v", r))
@@ -327,6 +330,31 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 		result["source_site_id"] = s.ID
 		sourceSite = s.Name
 		break
+	}
+
+	// §56.14 决策 3: 前端传值优先 > 反查 > 跳过详情采集
+	sourceTorrentID := frontendTorrentID
+	if frontendSourceSite != "" {
+		sourceSite = frontendSourceSite
+		result["source_site"] = sourceSite
+	}
+
+	// §56.14: 如果有 source_torrent_id，触发详情页采集（填充 detail_source_json）
+	if sourceTorrentID != "" && sourceSite != "" && h.metadataFetcher != nil && infoHash != "" {
+		fetchCtx, fetchCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		if fetchMeta, err := h.metadataFetcher.FetchAndStore(fetchCtx, infoHash, sourceSite, sourceTorrentID); err != nil {
+			h.logger.Warn("analyze: detail fetch failed",
+				zap.String("site", sourceSite),
+				zap.String("torrent_id", sourceTorrentID),
+				zap.Error(err))
+			result["detail_fetch_error"] = err.Error()
+		} else if fetchMeta != nil {
+			result["detail_fetched"] = true
+			h.logger.Info("analyze: detail fetched and stored",
+				zap.String("site", sourceSite),
+				zap.Int("detail_json_len", len(fetchMeta.DetailSourceJSON)))
+		}
+		fetchCancel()
 	}
 
 	var exclusions []model.PublishExclusion
