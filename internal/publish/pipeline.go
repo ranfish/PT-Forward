@@ -832,6 +832,10 @@ func applyUserOverrides(pubReq *model.PublishRequest, overridesJSON string) {
 			}
 		}
 	}
+	// §56.29: 匿名发布字段
+	if v, ok := overrides["anonymous"].(bool); ok {
+		pubReq.Anonymous = v
+	}
 }
 
 // overridesString 从 UserOverrides JSON 中提取字符串值
