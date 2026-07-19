@@ -42,6 +42,8 @@ import (
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/iyuu"
 	"github.com/ranfish/pt-forward/internal/metadata"
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
+	siteextract "github.com/ranfish/pt-forward/internal/metadata/extract/sites"
 	"github.com/ranfish/pt-forward/internal/orphan"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/middleware"
@@ -438,6 +440,11 @@ func main() {
 	publishPipeline.SetPusher(torrentPusher) // §56.30: 发布后自动加种
 	reseedEngine.SetComplianceChecker(complianceChecker)
 	metadataFetcher := metadata.NewFetcher(db, log, siteProvider)
+	// §56.13: 构造 Engine（PublicExtractor + 8 站特殊提取器）注入 Fetcher
+	// public extractor siteCode/siteNickname 传空（共享实例，每次 Extract 由 input 带 site 信息）
+	publicExtractor := extract.NewPublicExtractor("", "")
+	engine := extract.NewEngine(publicExtractor, siteextract.NewSpecialExtractors())
+	metadataFetcher.SetEngine(engine)
 	publishPipeline.SetMetadataFetcher(metadataFetcher)
 	if strategy, err := settingsRepo.Get(ctx, setting.KeyImageHostStrategy); err == nil && strategy != "" {
 		publishPipeline.SetImageHostStrategy(strategy)

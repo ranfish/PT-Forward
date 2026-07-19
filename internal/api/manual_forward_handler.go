@@ -348,6 +348,7 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	// §56.14: 详情页采集（异步，与 AnalyzeTorrent 并行，节省 30s）
 	var detailFetched bool
 	var detailFetchError string
+	var detailMeta *model.TorrentMetadata
 	var detailWg sync.WaitGroup
 	if sourceTorrentID != "" && sourceSite != "" && h.metadataFetcher != nil && infoHash != "" {
 		detailWg.Add(1)
@@ -363,6 +364,7 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 				detailFetchError = err.Error()
 			} else if fetchMeta != nil {
 				detailFetched = true
+				detailMeta = fetchMeta
 				h.logger.Info("analyze: detail fetched and stored",
 					zap.String("site", sourceSite),
 					zap.Int("detail_json_len", len(fetchMeta.DetailSourceJSON)))
@@ -472,6 +474,29 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	if detailFetchError != "" {
 		result["detail_fetch_error"] = detailFetchError
 	}
+
+	// §56.21 接线: 合规检查补充读 detail_source flags（避免误放过详情页标记的禁转种子）
+	// 之前的 title 字符串扫描是快速预检，这里用 Engine 输出的精确 flags 做最终判定
+	if detailMeta != nil && detailMeta.Flags != "" {
+		var detailFlags []string
+		if err := json.Unmarshal([]byte(detailMeta.Flags), &detailFlags); err == nil {
+			for _, fl := range detailFlags {
+				for _, kw := range []string{"禁转", "禁止转载", "谢绝转载", "严禁转载", "谢绝搬运", "独占", "限时禁转"} {
+					if fl == kw {
+						forbidden = true
+						forbidReason = fmt.Sprintf("详情页标记 \"%s\"", kw)
+						break
+					}
+				}
+				if forbidden {
+					break
+				}
+			}
+			result["detail_flags"] = detailFlags
+		}
+	}
+	result["forbidden"] = forbidden
+	result["forbid_reason"] = forbidReason
 
 	// 标题解析 + MediaInfo 纠正 + 标准化
 	mediaInfo, _ := result["media_info"].(string)

@@ -31,6 +31,10 @@ type TorrentDetail struct {
 	FileTree     []FileInfo `json:"file_tree"`
 	InfoHash     string     `json:"info_hash"`
 	UploadTime   time.Time  `json:"upload_time"`
+
+	// RawHTML 原始详情页 HTML（§56.13 接线：暴露给 Engine + PublicExtractor）。
+	// 仅 NexusPHP/Unit3D 等 HTML 框架的 adapter 填充，MTeam API 模式留空。
+	RawHTML string `json:"raw_html,omitempty"`
 }
 
 // §33.1.23 — DiscountResult: 免费检测结果
