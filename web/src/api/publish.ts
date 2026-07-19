@@ -141,7 +141,7 @@ export const manualForwardApi = {
   seededTorrents(clientId?: number) {
     return client.get<ApiResponse<unknown[]>>('/manual-forward/seeded-torrents', { params: clientId ? { client_id: clientId } : {} })
   },
-  startAnalyze(data: { client_id: number; info_hash: string; name: string; save_path: string }) {
+  startAnalyze(data: { client_id: number; info_hash: string; name: string; save_path: string; source_site?: string; source_torrent_id?: string; metadata_priority?: string }) {
     return client.post<ApiResponse<{ taskId: number }>>('/manual-forward/analyze', data)
   },
   pollAnalyze(taskId: number) {
@@ -149,6 +149,12 @@ export const manualForwardApi = {
   },
   eligibleTargets(data: { source_site: string; blocked_targets?: string[] }) {
     return client.post<ApiResponse<string[]>>('/manual-forward/eligible-targets', data)
+  },
+  mergeFields(data: { info_hash: string; mode: string }) {
+    return client.post<ApiResponse<unknown>>('/manual-forward/merge', data)
+  },
+  previewFields(data: { info_hash: string; target_site: string; mode?: string }) {
+    return client.post<ApiResponse<unknown>>('/manual-forward/preview', data)
   },
   submit(data: ManualForwardSubmitRequest) {
     return client.post<ApiResponse<void>>('/manual-forward/submit', data)
