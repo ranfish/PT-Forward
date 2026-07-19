@@ -75,10 +75,19 @@ func (r *Renderer) Render(data *model.DescriptionData, config model.SiteDescConf
 	}
 
 	if config.TemplateOverride != "" {
-		return r.applyTemplate(config.TemplateOverride, data, format), nil
+		result := r.applyTemplate(config.TemplateOverride, data, format)
+		if format == "html" {
+			result = BBCodeToHTML(result)
+		}
+		return result, nil
 	}
 
-	return strings.Join(sections, "\n\n"), nil
+	result := strings.Join(sections, "\n\n")
+	// §56.20: html 格式整体转换
+	if format == "html" {
+		result = BBCodeToHTML(result)
+	}
+	return result, nil
 }
 
 func (r *Renderer) FormatMediaInfo(rawText string, format model.MediaInfoFormat) string {

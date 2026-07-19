@@ -885,7 +885,21 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 		}
 	}
 
-	if descConfig.Format != "" || descConfig.TemplateOverride != "" {
+	// §56.28: 音乐站用独立描述模板（Gazelle 框架）
+	if fw := p.getTargetFramework(ctx, targetSite); fw == "gazelle" {
+		albumData := &description.MusicAlbumData{
+			Title:       title,
+			Year:        "",
+			PosterURL:   descData.PosterURL,
+			Description: descriptionText,
+		}
+		if ptgenResult != nil {
+			albumData.Year = ptgenResult.Year
+		}
+		if musicDesc := description.FormatMusicDescription(albumData); musicDesc != "" {
+			descriptionText = musicDesc
+		}
+	} else if descConfig.Format != "" || descConfig.TemplateOverride != "" {
 		renderer := description.NewRenderer(descConfig.Format)
 		if rendered, err := renderer.Render(descData, descConfig); err == nil && rendered != "" {
 			descriptionText = rendered
@@ -1180,6 +1194,17 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 	}
 
 	p.mapFieldValues(ctx, targetSite, pubReq.FormFields)
+
+	// §56.17 Q7: 截图缓存复用（批量发布同次任务避免重复上传）
+	if len(pubReq.Screenshots) == 0 && p.metadataFetcher != nil && candidate.InfoHash != "" {
+		if meta, ok := p.metadataFetcher.GetMetadata(ctx, candidate.InfoHash, candidate.SourceSite); ok && meta != nil && meta.LocalSourceJSON != "" {
+			if local, err := metadata.UnmarshalLocalSource(meta.LocalSourceJSON); err == nil && local != nil && len(local.Screenshots) > 0 && !local.GeneratedAt.IsZero() {
+				if ResolveScreenshots(ctx, local.Screenshots, local.GeneratedAt, p.logger) {
+					pubReq.Screenshots = local.Screenshots
+				}
+			}
+		}
+	}
 
 	return pubReq, nil
 }
