@@ -74,7 +74,7 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	seed.InfoHash = p.extractInfoHash(input.PageHTML, doc)
 	seed.Size = p.extractSize(doc, input.PageHTML)
 	seed.IMDbLink, seed.DoubanLink, seed.TMDbLink = p.extractExternalLinks(doc, descrBBCode)
-	seed.Flags = p.extractFlags(seed.Title, seed.Subtitle, descrBBCode, input.PageHTML)
+	seed.Flags = p.extractFlags(seed.Title, seed.Subtitle, descrBBCode)
 
 	return seed.NormalizeWithFallback(input.FallbackTitle), nil
 }

@@ -12,9 +12,12 @@ var defaultForbiddenTransferKeywords = []string{
 }
 
 // extractFlags 从文本中检测禁转/限转标记。
-// 扫描范围：标题 + 副标题 + 简介 BBCode + 整页文本。
-func (p *PublicExtractor) extractFlags(title, subtitle, descrBBCode, pageText string) []string {
-	combined := title + " " + subtitle + " " + descrBBCode + " " + pageText
+// 扫描范围限定为：标题 + 副标题 + 简介 BBCode。
+// 故意不扫描整页 HTML（pageText）——站点模板中的"禁转声明"区块、
+// 评论区、相关推荐中的其他种子链接会触发误识别。
+// 站点级禁转声明应由 §56.21 compliance_rules 表显式配置。
+func (p *PublicExtractor) extractFlags(title, subtitle, descrBBCode string) []string {
+	combined := title + " " + subtitle + " " + descrBBCode
 	var flags []string
 	seen := make(map[string]struct{})
 	for _, kw := range defaultForbiddenTransferKeywords {

@@ -304,6 +304,9 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 		detail.DoubanURL = doubanURL
 	}
 
+	// §56.13: 暴露原始 HTML 供 Engine 提取（fetcher 调用 PublicExtractor + 站点 hook）
+	detail.RawHTML = html
+
 	return detail, nil
 }
 
