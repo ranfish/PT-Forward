@@ -117,6 +117,12 @@ func main() {
 		os.Exit(1) //nolint:gocritic
 	}
 
+	// §56.21: 同步合规规则到 DB
+	if err := compliance.SyncComplianceRulesToDB(db); err != nil {
+		log.Error("failed to sync compliance rules", zap.Error(err))
+		os.Exit(1) //nolint:gocritic
+	}
+
 	if err := dbpkg.RunMigrations(db, log); err != nil {
 		log.Error("failed to run data migrations", zap.Error(err))
 		os.Exit(1) //nolint:gocritic
