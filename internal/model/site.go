@@ -92,6 +92,9 @@ type Site struct {
 	ImageUploadMode   string `json:"image_upload_mode" gorm:"size:20;default:'url'"`               // 'url' / 'base64' / 'file' / 'official'
 	ImageOfficialHost string `json:"image_official_host,omitempty" gorm:"size:255;default:''"`     // 官方图床 URL（如 image.zmpt.cc）
 
+	// §56.22 决策 1: 站点 tag 配置（JSON 序列化 SiteTagConfig）
+	TagConfig string `json:"tag_config,omitempty" gorm:"type:text;default:''"`
+
 	UploadBytes   int64      `json:"upload_bytes" gorm:"default:0"`
 	DownloadBytes int64      `json:"download_bytes" gorm:"default:0"`
 	SeedingPoints float64    `json:"seeding_points" gorm:"default:0"`
