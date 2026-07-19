@@ -84,6 +84,9 @@
   - ✅ 第七阶段 4a 图床打通 P0 完成（rehost 补全 + per-site 5 字段 + 兼容性检查 + 分级失效检测）
     - ⏳ 4a P1: 两套统一（删除 publish/imagehost.go，改用 Manager.Upload）
     - ⏳ 4a P1: 特殊图床支持（PTer/织梦/杏坛/肉丝，逐站实施）
+  - ✅ 第八阶段 4c 海报 fallback 完成（PosterResolver 2 级自动 + toggle 支持）
+  - ✅ 第九阶段 5c 标题重组+校验 P0 完成（TitleFormat 扩展 + TitleValidator 8 类规则引擎）
+    - ⏳ 5c P1: 7 site hooks + embed JSON 默认规则 + 6 预设 + pipeline 接入
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
