@@ -87,6 +87,8 @@
   - ✅ 第八阶段 4c 海报 fallback 完成（PosterResolver 2 级自动 + toggle 支持）
   - ✅ 第九阶段 5c 标题重组+校验 P0 完成（TitleFormat 扩展 + TitleValidator 8 类规则引擎）
     - ⏳ 5c P1: 7 site hooks + embed JSON 默认规则 + 6 预设 + pipeline 接入
+  - ✅ 第十阶段 5e 描述渲染 P0 完成（thanksQuote + BBCodeToHTML + 副标题模板 + renderer 12+ 变量）
+    - ⏳ 5e P1: 4 站 site hooks + pipeline 接入 + 前端
 
 **关键事实**（避免再被旧焦点段误导）：
 - §55.15-§55.19 全部已修并部署生产 v0.0.224+
