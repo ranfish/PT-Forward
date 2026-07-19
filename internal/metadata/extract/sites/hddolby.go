@@ -1,6 +1,10 @@
 package sites
 
-import "github.com/ranfish/pt-forward/internal/metadata/extract"
+import (
+	"regexp"
+
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
+)
 
 // hdDolbyExtractor 不可杜站特殊提取器。
 // PTNexus sites/hddolby.go（220 行）。
@@ -10,15 +14,20 @@ func newHDDolbyExtractor() *hdDolbyExtractor { return &hdDolbyExtractor{} }
 
 func (e *hdDolbyExtractor) Name() string { return "hddolby_special" }
 
+// div#kimdb 中 IMDb 链接
+var kimdbImdbRe = regexp.MustCompile(`(?is)id="kimdb"[^>]*>.*?imdb\.com/title/(tt\d+)`)
+
 func (e *hdDolbyExtractor) Extract(input extract.Input) (extract.SeedData, error) {
 	seed, err := baseExtract(input)
 	if err != nil {
 		return seed, err
 	}
-	// TODO(2b.7): HDDolby 特殊覆盖
-	//   - l_ratio_poster 海报识别（与 SSD 类似）
-	//   - div#kimdb 抓 IMDb 链接（HDDolby 特有 IMDb 容器）
-	//   - 自定义 MediaInfo 容器
-	// 等真实样本验证后实施。
+	// HDDolby 特殊: div#kimdb 独立容器提取 IMDb（非简介中）
+	if seed.IMDbLink == "" {
+		if m := kimdbImdbRe.FindStringSubmatch(input.PageHTML); len(m) > 1 {
+			seed.IMDbLink = "https://www.imdb.com/title/" + m[1]
+		}
+	}
+	// l_ratio_poster 海报已在公共提取器的海报关键词中（doubanio）
 	return seed, nil
 }
