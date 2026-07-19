@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/titleparser"
@@ -89,6 +90,12 @@ func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	case strings.HasSuffix(path, "/manual-forward/eligible-targets"):
 		if r.Method == http.MethodPost {
 			h.handleEligibleTargets(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+	case strings.HasSuffix(path, "/manual-forward/merge"):
+		if r.Method == http.MethodPost {
+			h.handleMerge(w, r)
 		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
@@ -771,4 +778,64 @@ func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.
 		"created_count": len(ids),
 		"candidate_ids": ids,
 	})
+}
+
+// handleMerge §56.14 Q1: 前端 toggle 切换时重新合并三源数据。
+// 请求体: { info_hash, mode }
+// mode: "ptgen_first"（默认）| "detail_first"
+// 从 DB 读三源 JSON，调 metadata.Merge 合并，返回 MergedMetadata。
+func (h *ManualForwardHandler) handleMerge(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		InfoHash string `json:"info_hash"`
+		Mode     string `json:"mode"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求参数错误")
+		return
+	}
+	if req.InfoHash == "" {
+		Error(w, http.StatusBadRequest, 40001, "info_hash 不能为空")
+		return
+	}
+	if req.Mode == "" {
+		req.Mode = model.MetadataPriorityDefault
+	}
+
+	// 从 DB 读 torrent_metadata（取最新一条）
+	var meta model.TorrentMetadata
+	if err := h.db.WithContext(r.Context()).
+		Where("info_hash = ?", req.InfoHash).
+		Order("updated_at DESC").
+		First(&meta).Error; err != nil {
+		Error(w, http.StatusNotFound, 40401, "未找到该种子的元数据")
+		return
+	}
+
+	// 反序列化三源 JSON
+	detail, err := metadata.UnmarshalDetailSource(meta.DetailSourceJSON)
+	if err != nil {
+		h.logger.Warn("merge: unmarshal detail_source_json failed", zap.Error(err))
+	}
+	ptgen, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON)
+	if err != nil {
+		h.logger.Warn("merge: unmarshal ptgen_source_json failed", zap.Error(err))
+	}
+	local, err := metadata.UnmarshalLocalSource(meta.LocalSourceJSON)
+	if err != nil {
+		h.logger.Warn("merge: unmarshal local_source_json failed", zap.Error(err))
+	}
+
+	// 合并
+	merged := metadata.Merge(detail, ptgen, local, metadata.MergeMode(req.Mode))
+
+	// 附带三源状态（UI 显示用）
+	result := map[string]interface{}{
+		"merged":           merged,
+		"has_detail_source": meta.DetailSourceJSON != "",
+		"has_ptgen_source":  meta.PTGenSourceJSON != "",
+		"has_local_source":  meta.LocalSourceJSON != "",
+		"last_merge_mode":   meta.LastMergeMode,
+	}
+
+	Success(w, result)
 }
