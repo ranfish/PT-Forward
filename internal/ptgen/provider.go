@@ -96,6 +96,11 @@ func (p *Provider) Query(ctx context.Context, query string) (*model.PTGenResult,
 		return nil, err
 	}
 
+	// §56.16: 用 ParseBBCodeFormat 从 RawBBCode 补充空字段
+	if result != nil && result.RawBBCode != "" {
+		enrichFromBBCode(result)
+	}
+
 	if err := p.saveCache(ctx, query, result); err != nil {
 		p.logger.Warn("ptgen cache save failed", zap.Error(err))
 	}
@@ -105,6 +110,53 @@ func (p *Provider) Query(ctx context.Context, query string) (*model.PTGenResult,
 
 func (p *Provider) SupportsNameSearch() bool {
 	return true
+}
+
+// enrichFromBBCode §56.16: 用 ParseBBCodeFormat 从 RawBBCode 补充 PTGenResult 空字段。
+func enrichFromBBCode(result *model.PTGenResult) {
+	parsed := ParseBBCodeFormat(result.RawBBCode)
+	if parsed == nil {
+		return
+	}
+	if result.ChineseTitle == "" {
+		result.ChineseTitle = parsed.ChineseTitle
+	}
+	if result.ForeignTitle == "" {
+		result.ForeignTitle = parsed.ForeignTitle
+	}
+	if result.Year == "" {
+		result.Year = parsed.Year
+	}
+	if result.Playdate == "" {
+		result.Playdate = parsed.Playdate
+	}
+	if len(result.Region) == 0 {
+		result.Region = parsed.Region
+	}
+	if len(result.Genre) == 0 {
+		result.Genre = parsed.Genre
+	}
+	if result.Duration == "" {
+		result.Duration = parsed.Duration
+	}
+	if result.IMDBRating == "" {
+		result.IMDBRating = parsed.IMDBRating
+	}
+	if result.DoubanRating == "" {
+		result.DoubanRating = parsed.DoubanRating
+	}
+	if result.PosterURL == "" {
+		result.PosterURL = parsed.PosterURL
+	}
+	if len(result.Director) == 0 {
+		result.Director = parsed.Director
+	}
+	if len(result.Cast) == 0 {
+		result.Cast = parsed.Cast
+	}
+	if result.Introduction == "" {
+		result.Introduction = parsed.Introduction
+	}
 }
 
 func (p *Provider) queryRemote(ctx context.Context, query string) (*model.PTGenResult, error) {
