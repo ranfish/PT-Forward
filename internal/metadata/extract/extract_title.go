@@ -22,6 +22,7 @@ var (
 func (p *PublicExtractor) extractTitle(doc *goquery.Document, fallbackTitle string) string {
 	selectors := []string{
 		`#top`,
+		`#torrent-name`, // SSD（不可说）特有
 		`h1#top`,
 		`h1.title`,
 		`h1`,
