@@ -3,15 +3,11 @@
 /.pt-forward.new
 
 # Data
-data/
-!internal/site/data/
-!internal/titleparser/data/
-!internal/metadata/extract/data/
-!internal/compliance/data/
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
+data/cache/
 
 # Logs
 logs/
