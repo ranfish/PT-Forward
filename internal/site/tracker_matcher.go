@@ -19,12 +19,14 @@ type TrackerMatcher struct {
 }
 
 func NewTrackerMatcher(db *gorm.DB) *TrackerMatcher {
-	var sites []model.Site
-	db.Where("enabled = ? AND domain != ''", true).Find(&sites)
-
 	m := &TrackerMatcher{
 		hostMap:       map[string]string{},
 		uniqueCoreMap: map[string]string{},
+	}
+
+	var sites []model.Site
+	if err := db.Where("enabled = ? AND domain != ''", true).Find(&sites).Error; err != nil {
+		return m
 	}
 
 	coreMap := map[string]string{}
