@@ -72,6 +72,12 @@
             :scroll="{ y: 340 }"
           >
             <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'source_site'">
+                <a-tag v-if="record.source_site" color="blue" style="margin: 0">
+                  {{ record.source_site }}
+                </a-tag>
+                <span v-else style="color: #999">-</span>
+              </template>
               <template v-if="column.key === 'size'">
                 {{ formatBytes(record.size) }}
               </template>
@@ -643,6 +649,7 @@ interface SeededTorrent {
   seeders: number
   state: string
   client_id: number
+  source_site?: string
 }
 
 const clients = ref<{ id: number; name: string; type: string }[]>([])
@@ -661,6 +668,7 @@ const filteredTorrents = computed(() => {
 
 const torrentColumns = [
   { title: '种子名称', dataIndex: 'name', key: 'name', ellipsis: true },
+  { title: '来源站', key: 'source_site', width: 80 },
   { title: '大小', key: 'size', width: 90 },
   { title: '状态', key: 'state', width: 90 },
 ]
