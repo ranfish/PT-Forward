@@ -4,36 +4,28 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 )
 
 // hHanClubExtractor 憨憨站特殊提取器。
-// PTNexus sites/hhanclub.go（641 行）。
+// 基于 auto_feed_js auto_feed_2.1.1.2.js line 9514-9536 的 DOM 逻辑。
 //
-// HHanClub 使用 Tailwind CSS + 自定义 DOM（无标准 #kdescr 容器）。
-// 标题在 <title> 引号中，副标题在 font-bold leading-6 div 中，
-// 简介区在 </tbody> 后直接流式输出（无容器包裹）。
+// HHanClub 使用 Tailwind CSS + 自定义 DOM（无标准 NexusPHP #kdescr 容器）。
+// 字段标签在 div.font-bold.leading-6 中，值在 .next() 兄弟 div 中。
+// 基本信息是聚合文本（div:contains(基本信息):last → .next().text()）。
+// 字段名来自 PTNexus hhanclub.yaml source_parsers.source_params。
 type hHanClubExtractor struct{}
 
 func newHHanClubExtractor() *hHanClubExtractor { return &hHanClubExtractor{} }
 
 func (e *hHanClubExtractor) Name() string { return "hhanclub_special" }
 
-// HHanClub <title> 格式: HHCLUB :: 种子详情 &quot;English Title&quot; - Powered by NexusPHP
-// 支持 &quot; 和 " 两种引号
 var hhanclubTitleQuotedRe = regexp.MustCompile(`<title>[^<]*(?:&quot;|")([^"&<]+)(?:&quot;|")[^<]*</title>`)
 var hhanclubTitleFallbackRe = regexp.MustCompile(`<title>([^<]+)</title>`)
-
-// 副标题在 font-bold leading-6 的 div 中（第一个长文本）
-var hhanclubSubtitleRe = regexp.MustCompile(`class="font-bold leading-6"[^>]*>([^<]{10,})`)
-
-// 海报 l_ratio_poster 图片
 var hhanclubPosterRe = regexp.MustCompile(`src="(https?://[^"]*l_ratio_poster[^"]*)"`)
-
-// 简介区域：l_ratio_poster 图片后的内容（到 </body> 前）
 var hhanclubDescStartRe = regexp.MustCompile(`(?is)src="https?://[^"]*l_ratio_poster[^"]*"[^>]*>(.*?)(?:</div>\s*</div>\s*<div\s+class="footer|</body>)`)
-
-// IMDb/豆瓣链接正则（从 Body 补充提取）
 var hhanclubImdbRe = regexp.MustCompile(`https?://(?:www\.)?imdb\.com/title/(tt\d+)`)
 var hhanclubDoubanRe = regexp.MustCompile(`https?://(?:www\.)?(?:movie\.)?douban\.com/(?:subject|movie)/(\d+)`)
 
@@ -43,38 +35,26 @@ func (e *hHanClubExtractor) Extract(input extract.Input) (extract.SeedData, erro
 		return seed, err
 	}
 
-	// HHanClub 特殊 1: 标题从 <title> 引号提取
 	if title := extractHHanClubTitle(input.PageHTML); title != "" {
 		seed.Title = title
 	}
 
-	// HHanClub 特殊 2: 副标题从 font-bold leading-6 div 提取
-	if seed.Subtitle == "" {
-		if m := hhanclubSubtitleRe.FindStringSubmatch(input.PageHTML); len(m) > 1 {
-			seed.Subtitle = strings.TrimSpace(m[1])
-		}
-	}
-
-	// HHanClub 特殊 3: 海报从 l_ratio_poster 图片提取
 	if seed.Intro.Poster == "" {
 		if m := hhanclubPosterRe.FindStringSubmatch(input.PageHTML); len(m) > 1 {
 			seed.Intro.Poster = m[1]
 		}
 	}
 
-	// HHanClub 特殊 4: 简介区域提取（无标准容器，从海报图片后开始）
 	if seed.Intro.Body == "" {
 		if body := extractHHanClubDesc(input.PageHTML); body != "" {
 			seed.Intro.Body = body
 		}
 	}
 
-	// HHanClub 特殊 5: MediaInfo 提取（在简介区域中搜索）
 	if seed.MediaInfo == "" {
 		seed.MediaInfo, seed.BDInfo = extract.ExtractMediaInfo(seed.Intro.Body, seed.Intro.Body, "hhanclub")
 	}
 
-	// HHanClub 特殊 6: IMDb/豆瓣从 Body 补充提取（公共提取器可能找不到）
 	if seed.IMDbLink == "" && seed.Intro.Body != "" {
 		if m := hhanclubImdbRe.FindString(seed.Intro.Body); m != "" {
 			seed.IMDbLink = m
@@ -86,17 +66,139 @@ func (e *hHanClubExtractor) Extract(input extract.Input) (extract.SeedData, erro
 		}
 	}
 
-	return seed, nil
+	// §56.13 HHanClub Tailwind CSS 字段提取（移植 auto_feed_js line 9514-9536）
+	doc, parseErr := goquery.NewDocumentFromReader(strings.NewReader(input.PageHTML))
+	if parseErr != nil {
+		return seed.NormalizeWithFallback(input.FallbackTitle), nil
+	}
+
+	// 方式 1: div.font-bold.leading-6 = 字段标签，.next() = 值
+	doc.Find(`div[class*="font-bold"][class*="leading-6"]`).Each(func(_ int, label *goquery.Selection) {
+		labelText := strings.TrimSpace(label.Text())
+		next := label.Next()
+		if next.Length() == 0 {
+			return
+		}
+		valueText := strings.TrimSpace(next.Text())
+		if valueText == "" || len(valueText) > 200 {
+			return
+		}
+		assignHHanClubField(&seed, labelText, valueText)
+	})
+
+	// 方式 2: 基本信息聚合文本（div:contains(基本信息) → .next().text()）
+	doc.Find(`div:contains("基本信息")`).Each(func(_ int, div *goquery.Selection) {
+		if strings.TrimSpace(div.Text()) != "基本信息" {
+			return
+		}
+		next := div.Next()
+		if next.Length() == 0 {
+			return
+		}
+		infoText := strings.TrimSpace(next.Text())
+		if infoText == "" {
+			return
+		}
+		fillHHanClubFromBasicInfo(&seed, infoText, input.FallbackTitle)
+	})
+
+	return seed.NormalizeWithFallback(input.FallbackTitle), nil
 }
 
-// extractHHanClubTitle 从 <title> 标签提取标题。
-// 格式: HHCLUB :: 种子详情 "English Title" - Powered by NexusPHP
+var hhanclubFieldLabels = map[string]string{
+	"标题": "title", "標題": "title",
+	"副标题": "subtitle", "副標題": "subtitle",
+	"类型": "type", "類型": "type",
+	"媒介": "medium", "媒體": "medium",
+	"视频编码": "video_codec", "視頻編碼": "video_codec",
+	"音频编码": "audio_codec", "音頻編碼": "audio_codec",
+	"分辨率": "resolution", "解析度": "resolution",
+	"制作组": "team", "製作組": "team",
+	"处理": "source", "處理": "source",
+}
+
+func assignHHanClubField(seed *extract.SeedData, label, value string) {
+	field, ok := hhanclubFieldLabels[label]
+	if !ok {
+		return
+	}
+	switch field {
+	case "title":
+		if seed.Title == "" {
+			seed.Title = value
+		}
+	case "subtitle":
+		if seed.Subtitle == "" {
+			seed.Subtitle = value
+		}
+	case "type":
+		if seed.Type == "" {
+			seed.Type = value
+		}
+	case "medium":
+		if seed.Medium == "" {
+			seed.Medium = value
+		}
+	case "video_codec":
+		if seed.VideoCodec == "" {
+			seed.VideoCodec = value
+		}
+	case "audio_codec":
+		if seed.AudioCodec == "" {
+			seed.AudioCodec = value
+		}
+	case "resolution":
+		if seed.Resolution == "" {
+			seed.Resolution = value
+		}
+	case "team":
+		if seed.ReleaseGroup == "" {
+			seed.ReleaseGroup = value
+		}
+	case "source":
+		if seed.Source == "" {
+			seed.Source = value
+		}
+	}
+}
+
+func fillHHanClubFromBasicInfo(seed *extract.SeedData, infoText, fallbackTitle string) {
+	if seed.Type == "" {
+		if v := titleparser.ExtractType(infoText); v != "" {
+			seed.Type = v
+		}
+	}
+	if seed.Medium == "" {
+		if v := titleparser.ExtractMedium(infoText, fallbackTitle); v != "" {
+			seed.Medium = v
+		}
+	}
+	if seed.VideoCodec == "" {
+		if v := titleparser.ExtractCodec(infoText); v != "" {
+			seed.VideoCodec = v
+		}
+	}
+	if seed.AudioCodec == "" {
+		if v := titleparser.ExtractAudioCodec(infoText); v != "" {
+			seed.AudioCodec = v
+		}
+	}
+	if seed.Resolution == "" {
+		if v := titleparser.ExtractResolution(infoText); v != "" {
+			seed.Resolution = v
+		}
+	}
+	if seed.Source == "" {
+		if v := titleparser.ExtractSource(infoText); v != "" {
+			seed.Source = v
+		}
+	}
+}
+
 func extractHHanClubTitle(htmlStr string) string {
-	// 优先从引号中提取
 	if m := hhanclubTitleQuotedRe.FindStringSubmatch(htmlStr); len(m) > 1 {
 		return strings.TrimSpace(m[1])
 	}
-	// fallback: 去掉站点后缀
 	m := hhanclubTitleFallbackRe.FindStringSubmatch(htmlStr)
 	if len(m) < 2 {
 		return ""
@@ -110,31 +212,23 @@ func extractHHanClubTitle(htmlStr string) string {
 	return strings.TrimSpace(title)
 }
 
-// extractHHanClubDesc 从海报图片后提取简介区域。
-// HHanClub 简介无容器包裹，直接是 <img> + <br/> + <a> 标签。
 func extractHHanClubDesc(htmlStr string) string {
 	m := hhanclubDescStartRe.FindStringSubmatch(htmlStr)
 	if len(m) < 2 {
 		return ""
 	}
-	// 将渲染后的 HTML 转换为近似 BBCode
 	desc := m[1]
-	// <br/> → \n
 	desc = strings.ReplaceAll(desc, "<br />", "\n")
 	desc = strings.ReplaceAll(desc, "<br/>", "\n")
 	desc = strings.ReplaceAll(desc, "<br>", "\n")
-	// <img src="xxx"> → [img]xxx[/img]
 	imgRe := regexp.MustCompile(`(?i)<img[^>]*src="([^"]+)"[^>]*>`)
 	desc = imgRe.ReplaceAllString(desc, "[img]$1[/img]")
-	// <a href="xxx">text</a> → [url=xxx]text[/url]
 	linkRe := regexp.MustCompile(`(?i)<a[^>]*href='([^']+)'[^>]*>([^<]*)</a>`)
 	desc = linkRe.ReplaceAllString(desc, "[url=$1]$2[/url]")
 	linkRe2 := regexp.MustCompile(`(?i)<a[^>]*href="([^"]+)"[^>]*>([^<]*)</a>`)
 	desc = linkRe2.ReplaceAllString(desc, "[url=$1]$2[/url]")
-	// 移除剩余 HTML 标签
 	tagRe := regexp.MustCompile(`<[^>]+>`)
 	desc = tagRe.ReplaceAllString(desc, "")
-	// 清理多余空白
 	desc = strings.TrimSpace(desc)
 	if len(desc) < 10 {
 		return ""
