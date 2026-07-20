@@ -14,6 +14,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
+	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -197,19 +198,26 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 		return
 	}
 
+	matcher := site.NewTrackerMatcher(h.db)
+
 	type SeededTorrent struct {
-		InfoHash    string `json:"info_hash"`
-		Name        string `json:"name"`
-		Size        int64  `json:"size"`
-		SavePath    string `json:"save_path"`
-		UploadSpeed int64  `json:"upload_speed"`
-		Seeders     int    `json:"seeders"`
-		State       string `json:"state"`
-		ClientID    uint   `json:"client_id"`
+		InfoHash    string   `json:"info_hash"`
+		Name        string   `json:"name"`
+		Size        int64    `json:"size"`
+		SavePath    string   `json:"save_path"`
+		UploadSpeed int64    `json:"upload_speed"`
+		Seeders     int      `json:"seeders"`
+		State       string   `json:"state"`
+		ClientID    uint     `json:"client_id"`
+		SourceSite  string   `json:"source_site"`
 	}
 
 	var results []SeededTorrent
 	for _, t := range torrents {
+		sourceSite := ""
+		if t.TrackerURL != "" {
+			sourceSite = matcher.Match(t.TrackerURL)
+		}
 		results = append(results, SeededTorrent{
 			InfoHash:    t.Hash,
 			Name:        t.Name,
@@ -219,6 +227,7 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 			Seeders:     t.NumComplete,
 			State:       t.State,
 			ClientID:    uint(clientID),
+			SourceSite:  sourceSite,
 		})
 	}
 
