@@ -56,6 +56,10 @@ func isLikelySiteCode(s string) bool {
 // 顺序：specialByCode[input.SiteCode] > specialByNick[input.SiteNickname] > public。
 // 任一 special 失败或返回 IsMeaningful()=false，自动 fallback public。
 // UsedFallback=true 仅当尝试过 special 但需要回退；无 special 直接用 public 时为 false。
+//
+// v0.0.238: 末尾统一标准化字段值（不论哪个 extractor 提取，都经过 LookupStandardKey）。
+// 这样站点特殊提取器（如 PTer 的 extractPTerCategoryIcons）只需提供原始值，
+// 标准化（如 "电视剧 (TV Series)" → "category.tv_series"）由 Engine 统一处理。
 func (e *Engine) Extract(input Input) (SeedData, Meta) {
 	start := time.Now()
 	meta := Meta{}
@@ -70,6 +74,7 @@ func (e *Engine) Extract(input Input) (SeedData, Meta) {
 		} else if seed.IsMeaningful() {
 			// special 有有效结果，但仍 Normalize 裁剪空白 + 补齐默认容器
 			seed = seed.NormalizeWithFallback(input.FallbackTitle)
+			normalizeSeedFields(&seed)
 			meta.ExtractorName = special.Name()
 			meta.Duration = time.Since(start)
 			return seed, meta
@@ -91,6 +96,7 @@ func (e *Engine) Extract(input Input) (SeedData, Meta) {
 			return SeedData{}, meta
 		}
 		seed = seed.NormalizeWithFallback(input.FallbackTitle)
+		normalizeSeedFields(&seed)
 		meta.ExtractorName = e.public.Name()
 		meta.Duration = time.Since(start)
 		return seed, meta
@@ -102,6 +108,21 @@ func (e *Engine) Extract(input Input) (SeedData, Meta) {
 		meta.FallbackReason = "no extractor available"
 	}
 	return SeedData{}, meta
+}
+
+// normalizeSeedFields 统一标准化 seed 的所有结构化字段值。
+// 把原始值（如 "电视剧 (TV Series)"）映射到标准键（如 "category.tv_series"）。
+// 找不到映射时保留原值（不破坏可读性）。
+//
+// 注意：title/subtitle/intro 不标准化（保留原文），仅标准化 type/medium/codec/resolution/source/team。
+func normalizeSeedFields(seed *SeedData) {
+	seed.Type = standardizeFieldValue("type", seed.Type)
+	seed.Medium = standardizeFieldValue("medium", seed.Medium)
+	seed.VideoCodec = standardizeFieldValue("video_codec", seed.VideoCodec)
+	seed.AudioCodec = standardizeFieldValue("audio_codec", seed.AudioCodec)
+	seed.Resolution = standardizeFieldValue("resolution", seed.Resolution)
+	seed.ReleaseGroup = standardizeFieldValue("team", seed.ReleaseGroup)
+	seed.Source = standardizeFieldValue("source", seed.Source)
 }
 
 // lookupSpecial 按优先级查找特殊提取器（Code 优先于 Nickname）。
