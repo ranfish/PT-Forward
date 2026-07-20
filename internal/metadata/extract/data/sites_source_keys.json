@@ -1,0 +1,5054 @@
+{
+  "sites": {
+    "13city": {
+      "site_name": "13City",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "区域",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS-HD/DTS": "audio.dts",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "BluRay": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "WEB-DL": "medium.webdl",
+          "WEBRip": "medium.webrip"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "4K": "resolution.r2160p",
+          "8K": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "source": {
+          "Other（其他）": "source.other",
+          "中国（含港澳台）": "source.china",
+          "印度": "source.india",
+          "日本": "source.japan",
+          "欧美": "source.western",
+          "泰国": "source.thailand",
+          "韩国": "source.korea"
+        },
+        "team": {
+          "13City": "team.city13",
+          "52pt": "team.pt52",
+          "ADWeb": "team.adweb",
+          "AilMWeb": "team.ailmweb",
+          "CHDWEB": "team.chdweb",
+          "FRDS": "team.frds",
+          "HHWEB": "team.hhweb",
+          "MTeam": "team.mteam",
+          "Other": "team.other",
+          "PTerWEB": "team.pterweb",
+          "QHstudIo": "team.qhstudio",
+          "SewageWeb": "team.sewageweb",
+          "UBWEB": "team.ubweb",
+          "UBits": "team.ubits",
+          "WiKi": "team.wiki",
+          "ZmWeb": "team.zmweb",
+          "rainweb": "team.rainweb"
+        },
+        "type": {
+          "动漫/Animations": "category.animation",
+          "演唱会、MV/Music Videos": "category.mv",
+          "电子书\u0026有声读物/E-book": "category.ebook",
+          "电影/Movies": "category.movie",
+          "纪录片/Docmentaries": "category.documentaries",
+          "综艺/TV Shows": "category.tv_shows",
+          "连续剧/TV Series": "category.tv_series",
+          "音乐/Music": "category.music"
+        },
+        "video_codec": {
+          "AVC/H.264/x264": "video.h264",
+          "HEVC/H.265/x265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VPB/VP9": "video.vp9",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "agsv": {
+      "site_name": "AGSV",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "480p/480i": "resolution.r480p",
+          "4K/2160p/2160i": "resolution.r2160p",
+          "720p/720i": "resolution.r720p",
+          "8K/4320p/4320i": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "team": {
+          "AGSVMUS": "team.agsvmus",
+          "AGSVPT": "team.agsvpt",
+          "AGSVWEB": "team.agsvweb",
+          "BeiTai": "team.beitai",
+          "CatEDU": "team.catedu",
+          "DYZ": "team.dyz",
+          "GodDramas": "team.goddramas",
+          "Hares": "team.hares",
+          "Other": "team.other",
+          "Pack": "team.pack",
+          "RL": "team.rl"
+        },
+        "type": {
+          "Anime(动漫)": "category.animation",
+          "Audio(音频)": "category.audio",
+          "Documentaries(纪录片)": "category.documentaries",
+          "E-Book(电子书/有声书)": "category.ebook",
+          "Game(游戏)": "category.game",
+          "MV(演唱)": "category.mv",
+          "Movie(电影)": "category.movie",
+          "Music(音乐)": "category.music",
+          "Playlet（短剧）": "category.playlet",
+          "Sports(体育)": "category.sports",
+          "TV Series(电视剧)": "category.tv_series",
+          "TV Shows(综艺)": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "baozi": {
+      "site_name": "Baozi",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "DD/AC3": "audio.ac3",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray DIY": "medium.bluray",
+          "Blu-ray 原盘": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray DIY": "medium.uhd_bluray",
+          "UHD Blu-ray 原盘": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "4K": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K": "resolution.r4320p",
+          "None": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "CHD": "team.chd",
+          "HDS": "team.hds",
+          "MySiLU": "team.mysilu",
+          "Other": "team.other",
+          "WiKi": "team.wiki"
+        },
+        "type": {
+          "体育运动": "category.sports",
+          "其他": "category.other",
+          "剧集": "category.tv_series",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐视频": "category.mv",
+          "高品质音频": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264(AVC)": "video.h264",
+          "H.265(HEVC)": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "btschool": {
+      "site_name": "BTSchool",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS-HD/DTS": "audio.dts",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "Blu-rayUHD": "medium.uhd_bluray",
+          "CD": "medium.cd",
+          "DVDRip": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/i": "resolution.r1080p",
+          "4K_UHD": "resolution.r2160p",
+          "720p/i": "resolution.r720p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "BTSCHOOL": "team.btschool",
+          "BtsHD": "team.btshd",
+          "BtsPAD": "team.btspad",
+          "BtsTV": "team.btstv",
+          "CMCT": "team.cmct",
+          "HDB_iNT": "team.hdb_int",
+          "HDChina": "team.hdchina",
+          "M-team": "team.mteam",
+          "Other": "team.other",
+          "Ourbits": "team.ourbits",
+          "WiKi": "team.wiki",
+          "Zone": "team.zone"
+        },
+        "type": {
+          "体育/Sports": "category.sports",
+          "其他/Other": "category.other",
+          "动漫/Animation": "category.animation",
+          "游戏/Game": "category.game",
+          "电影/Movies": "category.movie",
+          "纪录片/Documentary": "category.documentaries",
+          "综艺/TV-Show": "category.tv_shows",
+          "资料/Education": "category.study",
+          "软件/Software": "category.software",
+          "连续剧/TV-Series": "category.tv_series",
+          "音乐/Music": "category.music"
+        },
+        "video_codec": {
+          "H.264/AVC/x264": "video.h264",
+          "H.265/HEVC/x265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "carpt": {
+      "site_name": "CarPT",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS-HD/DTS": "audio.dts",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "mp3": "audio.mp3",
+          "wav": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "Blu-rayUHD": "medium.uhd_bluray",
+          "CD": "medium.cd",
+          "DVDRip": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "WEB": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/i": "resolution.r1080p",
+          "4K_UHD": "resolution.r4k",
+          "720p/i": "resolution.r720p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "CMCT": "team.cmct",
+          "CarPT": "team.carpt",
+          "M-team": "team.mteam",
+          "Other": "team.other",
+          "WiKi": "team.wiki"
+        },
+        "type": {
+          "其他/Other": "category.other",
+          "动漫/Animation": "category.animation",
+          "电影/Movies": "category.movie",
+          "纪录片/Documentary": "category.documentaries",
+          "综艺/TV-Show": "category.tv_shows",
+          "连续剧/TV-Series": "category.tv_series",
+          "音乐/Music": "category.music"
+        },
+        "video_codec": {
+          "H.264/AVC/x264": "video.h264",
+          "H.265/HEVC/x265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "cbg": {
+      "site_name": "Cangbao",
+      "source_keys": {
+        "audio_codec": "音频",
+        "medium": "媒体",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "DDP": "audio.ddp",
+          "DTS": "audio.dts",
+          "FLAC": "audio.flac",
+          "MP3": "audio.mp3",
+          "Opus": "audio.opus",
+          "PCM": "audio.pcm",
+          "TrueHD": "audio.truehd"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Remux": "medium.remux",
+          "UHD": "medium.uhd_bluray",
+          "UHDTV": "medium.uhdtv",
+          "VCD": "medium.vcd",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p": "resolution.r1080p",
+          "1440p": "resolution.r1440p",
+          "2160p": "resolution.r2160p",
+          "4320p": "resolution.r4320p",
+          "480P": "resolution.r480p",
+          "540p": "resolution.r540p",
+          "720p": "resolution.r720p"
+        },
+        "team": {
+          "CBGER": "team.cbger",
+          "CBGWT": "team.cbgwt"
+        },
+        "type": {
+          "书籍": "category.books",
+          "儿童": "category.cartoon",
+          "剧集": "category.tv_series",
+          "动漫": "category.animation",
+          "动画": "category.anime",
+          "电影": "category.movie",
+          "短剧": "category.playlet",
+          "纪录": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVC": "video.h264",
+          "H.261": "video.h261",
+          "HEVC": "video.h265",
+          "MPEG-1": "video.mpeg1",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9"
+        }
+      }
+    },
+    "chdbits": {
+      "site_name": "CHDBits",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd_ma",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "Other": "audio.other",
+          "True-HD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "4K": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "source": {
+          "台剧": "source.taiwan",
+          "国剧": "source.china",
+          "新剧": "source.singapore",
+          "日剧": "source.japan",
+          "港剧": "source.hongkong",
+          "美剧": "source.western",
+          "英剧": "source.uk",
+          "韩剧": "source.korea",
+          "马剧": "source.malaysia"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "default": "",
+          "中字": "tag.中字",
+          "国语": "tag.国语",
+          "特效": "tag.特效",
+          "独占": "tag.禁转",
+          "限转": "tag.限转",
+          "首发": "tag.首发"
+        },
+        "team": {
+          "BMDru": "team.bmdru",
+          "CHDBits": "team.chdbits",
+          "CHDHKTV": "team.chdhktv",
+          "CHDPAD": "team.chdpad",
+          "CHDTV": "team.chdtv",
+          "CHDWEB": "team.chdweb",
+          "Destiny": "team.destiny",
+          "JKCT": "team.jkct",
+          "OneHD": "team.onehd",
+          "REMUX": "team.remux",
+          "SGNB": "team.sgnb",
+          "blucook": "team.blucook"
+        },
+        "type": {
+          "Animations": "category.animation",
+          "Documentaries": "category.documentaries",
+          "Game": "category.game",
+          "HQ Audio": "category.music",
+          "Movies": "category.movie",
+          "Music": "category.music",
+          "Sports": "category.sports",
+          "TV Series": "category.tv_series",
+          "TV Shows": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "crabpt": {
+      "site_name": "CrabPT",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "processing": "地区",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "Atmos": "audio.atmos",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DSD": "audio.dsd",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MPEG": "audio.mpeg",
+          "OGG": "audio.ogg",
+          "Opus": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "BluRay": "medium.bluray",
+          "CD": "medium.cd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "MVC": "medium.mvc",
+          "Other": "medium.other",
+          "ProRes": "medium.prores",
+          "Remux": "medium.remux",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl",
+          "Xvid": "medium.xvid"
+        },
+        "processing": {
+          "中国大陆（CN）": "processing.china",
+          "其他（Other）": "processing.other",
+          "印度（India）": "processing.india",
+          "日本（JP）": "processing.japan",
+          "欧美（EU/US）": "processing.western",
+          "港台（HK/TW）": "processing.hktw",
+          "韩国（KR）": "processing.korea"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "4K/2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K": "resolution.r8k",
+          "Other": "resolution.other"
+        },
+        "team": {
+          "ADWeb": "team.adweb",
+          "AGSVWEB": "team.agsvweb",
+          "Audiences": "team.audiences",
+          "CHD": "team.chd",
+          "CMCT": "team.cmct",
+          "DYZ-Movie": "team.dyz_movie",
+          "DYZ-TV": "team.dyz_tv",
+          "DYZ-WEB": "team.dyz_web",
+          "FFans": "team.ffans",
+          "FRDS": "team.frds",
+          "FROG": "team.frog",
+          "FROGWeb": "team.frogweb",
+          "HDFans": "team.hdfans",
+          "HDHome": "team.hdhome",
+          "HDS": "team.hds",
+          "HDVWEB": "team.hdvweb",
+          "HHWEB": "team.hhweb",
+          "MTeam": "team.mteam",
+          "Other": "team.other",
+          "OurBits": "team.ourbits",
+          "PiGoNF": "team.pigonf",
+          "PigoHD": "team.pigohd",
+          "PigoWeb": "team.pigoweb",
+          "Pter": "team.pter",
+          "QHstudIo": "team.qhstudio",
+          "UBWEB": "team.ubweb",
+          "UBits": "team.ubits",
+          "WiKi": "team.wiki",
+          "XHB": "team.xhb",
+          "ZmWeb": "team.zmweb",
+          "beAst": "team.beast",
+          "tlf": "team.tlf"
+        },
+        "type": {
+          "MV": "category.mv",
+          "体育竞技": "category.sports",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "学习": "category.study",
+          "有声书": "category.audiobook",
+          "游戏": "category.game",
+          "漫画": "category.cartoon",
+          "电子书": "category.ebook",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "短剧": "category.playlet",
+          "纪录片": "category.documentary",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVC/H.264/x264": "video.h264",
+          "H.266/VVC": "video.h266",
+          "HEVC/H.265/x265": "video.h265",
+          "MPEG": "video.mpeg",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9"
+        }
+      }
+    },
+    "cspt": {
+      "site_name": "Cspt",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "2K/1440p/1440i": "resolution.r1440p",
+          "480p/480i": "resolution.r480p",
+          "4K/2160p/2160i": "resolution.r2160p",
+          "720p/720i": "resolution.r720p",
+          "8K/4320p/4320i": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "HDR": "tag.HDR",
+          "HDR10+": "tag.HDR10+",
+          "Remux": "tag.Remux",
+          "中字": "tag.中字",
+          "儿童": "tag.儿童",
+          "分集": "tag.分集",
+          "喜剧": "tag.喜剧",
+          "国语": "tag.国语",
+          "外挂字幕": "tag.外挂字幕",
+          "大包": "tag.大包",
+          "完结": "tag.完结",
+          "杜比": "tag.杜比",
+          "特效": "tag.特效",
+          "独家": "tag.独家",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "自压": "tag.自压",
+          "补帧": "tag.补帧",
+          "超分": "tag.超分",
+          "重制": "tag.重制"
+        },
+        "team": {
+          "CSPT": "team.cspt",
+          "CSWEB": "team.csweb",
+          "HSPT": "team.hspt",
+          "HSWEB": "team.hsweb",
+          "Other": "team.other"
+        },
+        "type": {
+          "HQ音乐": "category.music",
+          "MV": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "dubhe": {
+      "site_name": "Dubhe",
+      "source_keys": {
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "2160p/2160i": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "Other/其他": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "CHD": "team.chd",
+          "DubheWeb": "team.dubheweb",
+          "HDS": "team.hds",
+          "MySiLU": "team.mysilu",
+          "Other": "team.other",
+          "WiKi": "team.wiki"
+        },
+        "type": {
+          "Animations": "category.animation",
+          "Books": "category.books",
+          "Documentaries": "category.documentaries",
+          "HQ Audio": "category.music",
+          "Misc": "category.other",
+          "Movies": "category.movie",
+          "Music Videos": "category.mv",
+          "Sports": "category.sports",
+          "TV Series": "category.tv_series",
+          "TV Shows": "category.tv_shows",
+          "photo": "category.photo"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid",
+          "x.265": "video.x265",
+          "x264": "video.x264"
+        }
+      }
+    },
+    "gtkpw": {
+      "site_name": "PTGTK",
+      "source_keys": {
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p/4K": "resolution.r2160p",
+          "4320p/8K": "resolution.r4320p",
+          "720p": "resolution.r720p",
+          "SD": "resolution.sd"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "HDR": "tag.HDR",
+          "中字": "tag.中字",
+          "国语": "tag.国语",
+          "禁转": "tag.禁转"
+        },
+        "team": {
+          "CHD": "team.chd",
+          "CMCT": "team.cmct",
+          "FRDS": "team.frds",
+          "HDS": "team.hds",
+          "MARK": "team.mark",
+          "MTeam": "team.mteam",
+          "MySiLU": "team.mysilu",
+          "Other": "team.other",
+          "PTHome": "team.pthome",
+          "WiKi": "team.wiki",
+          "beAst": "team.beast"
+        },
+        "type": {
+          "Animations(动画)": "category.animation",
+          "Book(图书)": "category.ebook",
+          "Documentaries(纪录片)": "category.documentaries",
+          "Education(资料)": "category.study",
+          "HQ Audio(高清音频)": "category.music",
+          "Misc(其他)": "category.other",
+          "Movies(电影)": "category.movie",
+          "Music Album(音乐专辑)": "category.music",
+          "Music Videos(MV)": "category.mv",
+          "Sports(运动题材)": "category.sports",
+          "TV Series(剧集)": "category.tv_series",
+          "TV Shows(综艺)": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "haidan": {
+      "site_name": "Haidan",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team_suffix": "制作组后缀",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "DTS-HDMA": "audio.dts_hd_ma",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "Other": "audio.other",
+          "True-HD": "audio.truehd"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Remux": "medium.remux",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p/4K": "resolution.r2160p",
+          "540P": "resolution.r540p",
+          "720p": "resolution.r720p"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "中字": "tag.中字",
+          "原盘": "tag.原盘",
+          "国语": "tag.国语",
+          "外语": "tag.外语",
+          "粤语": "tag.粤语"
+        },
+        "type": {
+          "Animations(动画片)": "category.animation",
+          "Documentaries(纪录片)": "category.documentaries",
+          "HQ Audio(音乐)": "category.music",
+          "Misc(其他)": "category.other",
+          "Movies(电影)": "category.movie",
+          "Music Videos(MV)": "category.mv",
+          "Sports(体育)": "category.sports",
+          "TV Series(电视剧)": "category.tv_series",
+          "TV Shows(综艺)": "category.tv_shows"
+        },
+        "video_codec": {
+          "H.264/AVC/X264": "video.h264",
+          "H.265/HEVC/X265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4/XviD/DivX": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "hdarea": {
+      "site_name": "HDArea",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "DD2.0/AC3": "audio.ac3",
+          "DD5.1/AC3": "audio.ac3",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "REMUX": "medium.remux",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "4K": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "CHD": "team.chd",
+          "CMCT": "team.cmct",
+          "EPiC": "team.epic",
+          "HDATV": "team.hdatv",
+          "HDAccess": "team.hdaccess",
+          "HDApad": "team.hdapad",
+          "HDArea": "team.hdarea",
+          "HDWING": "team.hdwing",
+          "MTeam": "team.mteam",
+          "TTG": "team.ttg",
+          "WiKi": "team.wiki",
+          "cXcY": "team.cxcy",
+          "other": "team.other"
+        },
+        "type": {
+          "Animations": "category.animation",
+          "Documentaries": "category.documentaries",
+          "HQ Audio": "category.music",
+          "Misc": "category.other",
+          "Movie UHD-4K": "category.movie",
+          "Movies 1080p": "category.movie",
+          "Movies 3D": "category.movie",
+          "Movies 720p": "category.movie",
+          "Movies Blu-ray": "category.movie",
+          "Movies DVD": "category.movie",
+          "Movies HDTV": "category.movie",
+          "Movies WEB-DL": "category.movie",
+          "Movies iPad": "category.movie",
+          "Music Videos": "category.mv",
+          "Sports": "category.sports",
+          "TV Series": "category.tv_series",
+          "TV Shows": "category.tv_shows"
+        },
+        "video_codec": {
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid",
+          "x264": "video.x264",
+          "x265": "video.x265"
+        }
+      }
+    },
+    "hddolby": {
+      "site_name": "HDDolby",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "tags[]": "标签",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "AV3A": "audio.av3a",
+          "AVSA": "audio.avsa",
+          "DD/AC3": "audio.ac3",
+          "DDP/EAC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS-X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "MPEG": "audio.mpeg",
+          "Opus": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "FEED": "medium.feed",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "UHD": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl",
+          "Webrip": "medium.webrip"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p/4K": "resolution.r2160p",
+          "4320/8K": "resolution.r4320p",
+          "720p": "resolution.r720p",
+          "Others": "resolution.other"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "DOLBY VISION": "tag.杜比",
+          "HDR Vivid": "tag.菁彩HDR",
+          "HDR10": "tag.HDR",
+          "HDR10+": "tag.HDR10+",
+          "HLG": "tag.HLG",
+          "中字": "tag.中字",
+          "国语": "tag.国语",
+          "完结": "tag.完结",
+          "日语": "tag.日语",
+          "特效": "tag.特效",
+          "粤语": "tag.粤语",
+          "连载": "tag.连载",
+          "韩语": "tag.韩语",
+          "高帧率": "tag.高帧率",
+          "高码率": "tag.高码率"
+        },
+        "team": {
+          "CHD": "team.chd",
+          "CMCT": "team.cmct",
+          "CornerMV": "team.cornermv",
+          "DBTV": "team.dbtv",
+          "Dream": "team.dream",
+          "FRDS": "team.frds",
+          "HDo": "team.hdo",
+          "MTeam": "team.mteam",
+          "Other": "team.other",
+          "PTHome": "team.pthome",
+          "QHstudIo": "team.qhstudio",
+          "Telesto": "team.telesto",
+          "WiKi": "team.wiki",
+          "beAst": "team.beast"
+        },
+        "type": {
+          "Animations动漫": "category.animation",
+          "Documentaries纪录片": "category.documentaries",
+          "Games游戏": "category.game",
+          "HQ Audio音乐": "category.music",
+          "Movies电影": "category.movie",
+          "Music Videos": "category.mv",
+          "Others其他": "category.other",
+          "Sports体育": "category.sports",
+          "Study学习": "category.study",
+          "TV Series电视剧": "category.tv_series",
+          "TV Shows综艺": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVS+": "video.avs_plus",
+          "AVS2": "video.avs2",
+          "AVS3": "video.avs3",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "H.266/VVC": "video.h266",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9"
+        }
+      }
+    },
+    "hdfans": {
+      "site_name": "HDFans",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "medium": {
+          "1080P/i压制": "medium.encode_1080p",
+          "720P压制": "medium.encode_720p",
+          "BD DIY": "medium.bluray",
+          "BD Remux": "medium.remux",
+          "BD原盘": "medium.bluray",
+          "CD": "medium.cd",
+          "CD+DVD": "medium.cd_dvd",
+          "CD+VCD": "medium.cd_vcd",
+          "DVD": "medium.dvd",
+          "HDTV": "medium.hdtv",
+          "MiniSD": "medium.minisd",
+          "Other": "medium.other",
+          "SACD": "medium.sacd",
+          "UHD DIY": "medium.uhd_bluray",
+          "UHD Remux": "medium.remux",
+          "UHD压制": "medium.encode_2160p",
+          "UHD原盘": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl",
+          "黑胶": "medium.vinyl"
+        },
+        "type": {
+          "Animations/动漫、动画": "category.animation",
+          "Audio Books/有声读物": "category.audiobook",
+          "Concert/演唱会": "category.stage",
+          "Documentaries/纪录片": "category.documentaries",
+          "Drama/戏剧": "category.drama",
+          "E-Books/电子书": "category.ebook",
+          "Education/教育": "category.study",
+          "Games/游戏": "category.game",
+          "Movies/电影": "category.movie",
+          "Music Videos/音乐视频": "category.mv",
+          "Music/音乐": "category.music",
+          "Others/其他": "category.other",
+          "Software/软件": "category.software",
+          "Sports/体育": "category.sports",
+          "TV Series/电视剧": "category.tv_series",
+          "TV Shows/综艺": "category.tv_shows"
+        }
+      }
+    },
+    "hdhome": {
+      "site_name": "HDHome",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3/DD": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "DTS-HDHRA": "audio.dts_hd_hr",
+          "DTS-HDMA:X 7.1": "audio.dts_hd_ma",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p/4K": "resolution.r2160p",
+          "4320p/8K": "resolution.r4320p",
+          "720p": "resolution.r720p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "tag": {
+          "Criterion": "tag.Criterion",
+          "DIY": "tag.DIY",
+          "Dolby Vision": "tag.杜比",
+          "HDR10": "tag.HDR",
+          "HDR10+": "tag.HDR10+",
+          "default": "",
+          "中字": "tag.中字",
+          "保种": "tag.保种",
+          "原创": "tag.原创",
+          "原生": "tag.原生",
+          "国语": "tag.国语",
+          "完结": "tag.完结",
+          "官字": "tag.官字",
+          "特效": "tag.特效",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "连载": "tag.连载",
+          "限转": "tag.限转",
+          "零魔": "tag.零魔",
+          "首发": "tag.首发"
+        },
+        "team": {
+          "BMDru": "team.bmdru",
+          "HDH": "team.hdh",
+          "HDHPad": "team.hdhpad",
+          "HDHTV": "team.hdhtv",
+          "HDHWEB": "team.hdhomeweb",
+          "HDHome": "team.hdhome",
+          "SHMA": "team.shma",
+          "TTG": "team.ttg"
+        },
+        "type": {
+          "Anime": "category.animation",
+          "Doc": "category.documentaries",
+          "Misc": "category.other",
+          "Movies": "category.movie",
+          "Musics": "category.music",
+          "Sports": "category.sports",
+          "TVMusic": "category.mv",
+          "TVSeries": "category.tv_series",
+          "TVShow": "category.tv_shows",
+          "TVShows": "category.tv_shows"
+        },
+        "video_codec": {
+          "AVC/H264/x264": "video.h264",
+          "HEVC/H265/x265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "hdkyl": {
+      "site_name": "HDKyl",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码",
+        "year": "年代"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD HR": "audio.dts_hd_hr",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "MPEG": "audio.mpeg",
+          "Opus": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray(原盘)": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD(原盘)": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "REMUX": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "480p/480i": "resolution.r480p",
+          "4K/2160p/2160i": "resolution.r2160p",
+          "720p/720i": "resolution.r720p",
+          "8K/4320p/4320i": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "source": {
+          "BR/巴西": "source.brazil",
+          "CA/加拿大": "source.canada",
+          "CN/中国": "source.china",
+          "DE/德国": "source.germany",
+          "DK/丹麦": "source.denmark",
+          "EU/欧洲": "source.europe",
+          "FR/法国": "source.france",
+          "GB/英国": "source.uk",
+          "HK/香港": "source.hongkong",
+          "IN/印度": "source.india",
+          "JPN/日本": "source.japan",
+          "Kr/韩国": "source.korea",
+          "Other/其他": "source.other",
+          "RU/俄罗斯": "source.russia",
+          "SE/瑞典": "source.sweden",
+          "TH/泰国": "source.thailand",
+          "TW/台湾": "source.taiwan",
+          "US/美国": "source.western"
+        },
+        "tag": {
+          "4 K": "tag.4K",
+          "Blu-ray": "tag.Blu-ray",
+          "DIY": "tag.DIY",
+          "Dolby Vision": "tag.杜比",
+          "HDR": "tag.HDR",
+          "LIVE现场": "tag.LIVE现场",
+          "default": "",
+          "中字": "tag.中字",
+          "分集": "tag.分集",
+          "国语": "tag.国语",
+          "完结": "tag.完结",
+          "特效字幕": "tag.特效",
+          "禁转": "tag.禁转",
+          "英字": "tag.英字"
+        },
+        "team": {
+          "CatEDU": "team.catedu",
+          "GodDramas": "team.goddramas",
+          "HDK": "team.hdk",
+          "HDKGame": "team.hdkgame",
+          "HDKWeb": "team.hdkweb",
+          "Kylin": "team.kylin",
+          "Other": "team.other",
+          "RedLeaves": "team.redleaves",
+          "StarfallWeb": "team.starfallweb"
+        },
+        "type": {
+          "Animations/动漫": "category.animation",
+          "Ebook/电子书": "category.ebook",
+          "Game/游戏": "category.game",
+          "HQ Audio/音乐": "category.music",
+          "Misc/其他": "category.other",
+          "Movies/电影": "category.movie",
+          "Music Videos/音乐视频": "category.mv",
+          "Playlet/短剧": "category.playlet",
+          "Record Education/纪录教育": "category.documentaries",
+          "Sports/体育运动": "category.sports",
+          "Study/学习": "category.study",
+          "TV Series/电视剧": "category.tv_series",
+          "TV Shows/综艺": "category.tv_shows",
+          "software/软件": "category.software"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2/MPEG-4": "video.mpeg",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        },
+        "year": {
+          "2016": "year.2016",
+          "2017": "year.2017",
+          "2018": "year.2018",
+          "2019": "year.2019",
+          "2020": "year.2020",
+          "2021": "year.2021",
+          "2022": "year.2022",
+          "2023": "year.2023",
+          "2024": "year.2024",
+          "2025": "year.2025",
+          "Earlier/更早": "year.earlier"
+        }
+      }
+    },
+    "hdsky": {
+      "site_name": "HDSky",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3/DD": "audio.ac3",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DDP with Dolby Atmos": "audio.atmos",
+          "DSD": "audio.dsd",
+          "DTS": "audio.dts",
+          "DTS-HD HR": "audio.dts_hd_hr",
+          "DTS-HDMA ": "audio.dts_hd_ma",
+          "DTS-HDMA:X 7.1": "audio.dts_x",
+          "E-AC3": "audio.eac3",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Opus": "audio.opus",
+          "Other": "audio.other",
+          "PCM": "audio.lpcm",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "3D Blu-ray": "medium.bluray_3d",
+          "Blu-ray": "medium.bluray",
+          "Blu-ray/DIY": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvd",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "SACD": "medium.sacd",
+          "Track": "medium.other",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "UHD Blu-ray/DIY": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "2K/1080p": "resolution.r1080p",
+          "4K/2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K/4320P": "resolution.r4320p",
+          "SD": "resolution.sd"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "DIY纯净版": "tag.DIY",
+          "DoVi+HDR": "tag.杜比",
+          "Dolby Vision": "tag.杜比",
+          "HDR10": "tag.HDR",
+          "default": "",
+          "中字": "tag.中字",
+          "全景声国语": "tag.国语",
+          "原生原盘": "tag.原生",
+          "去头尾广告纯净版": "tag.去头尾广告纯净版",
+          "国语": "tag.国语",
+          "次时代国语": "tag.国语",
+          "特效": "tag.特效",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "限转": "tag.限转"
+        },
+        "team": {
+          "AREA11/韩剧合作小组": "team.area11",
+          "Autoseed/自动发布机器人": "team.autoseed",
+          "BMDru小组": "team.bmdru",
+          "HDS/重编码及remux小组": "team.hds",
+          "HDS3D/3D重编码小组": "team.hds3d",
+          "HDSAB/有声书小组": "team.hdsab",
+          "HDSCD/无损音乐小组": "team.hdscd",
+          "HDSPad/移动视频小组": "team.hdspad",
+          "HDSTV/电视录制小组": "team.hdstv",
+          "HDSWEB/(网络视频小组合集专用)": "team.hdsweb_pack",
+          "HDSWEB/(补档专用)": "team.hdsweb_reup",
+          "HDSWEB/网络视频小组": "team.hdsweb",
+          "HDSky/原盘DIY小组": "team.hds",
+          "HDSpecial|稀缺资源": "team.hdspecial",
+          "Original/自制原创资源": "team.original",
+          "Other/其他制作组或转发资源": "team.other"
+        },
+        "type": {
+          "Animations/动漫": "category.animation",
+          "Documentaries/纪录片": "category.documentaries",
+          "HQ Audio/无损音乐": "category.music",
+          "Misc/其他": "category.other",
+          "Movies/电影": "category.movie",
+          "Music Videos/音乐MV": "category.music_video",
+          "Shortplay/短剧": "category.tv_series",
+          "Sports/体育": "category.sports",
+          "TV Series/剧集(分集）": "category.tv_series",
+          "TV Series/剧集(合集）": "category.tv_pack",
+          "TV Series/海外剧集(分集）": "category.tv_series",
+          "TV Series/海外剧集(合集）": "category.tv_pack",
+          "TV Shows/海外综艺(分集）": "category.tv_shows",
+          "TV Shows/海外综艺(合集）": "category.tv_shows",
+          "TV Shows/综艺": "category.tv_shows",
+          "iPad/iPad影视": "category.movie"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MVC": "video.h264",
+          "Other": "video.other",
+          "ProRes": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9",
+          "Xvid": "video.xvid",
+          "x264": "video.h264",
+          "x265": "video.h265"
+        }
+      }
+    },
+    "hdtime": {
+      "site_name": "HDTime",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "Audio Vivid/AV3A": "audio.audio_vivid",
+          "DD/AC3": "audio.ac3",
+          "DDP/EAC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "FLAC": "audio.flac",
+          "LPCM/PCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "WEB-DL": "medium.webdl"
+        },
+        "team": {
+          "AilMWeb": "team.ailmweb",
+          "CHD": "team.chd",
+          "CMCT": "team.cmct",
+          "HDT": "team.hdt",
+          "HDTime": "team.hdtime",
+          "HHWEB": "team.hhweb",
+          "Other": "team.other",
+          "PADTime": "team.padtime",
+          "QHstudIo": "team.qhstudio",
+          "VTime": "team.vtime",
+          "WiKi": "team.wiki",
+          "beAst": "team.beast",
+          "个人原创": "team.personal"
+        },
+        "type": {
+          "Blu-Ray原盘": "category.blu_ray",
+          "MV": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "剧集": "category.tv_series",
+          "动漫": "category.animation",
+          "文档": "category.document",
+          "游戏": "category.game",
+          "电影": "category.movie",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "软件": "category.software",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVC/H.264/x264": "video.h264",
+          "AVS3": "video.avs3",
+          "HEVC/H.265/x265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP8/VP9": "video.vp9",
+          "VVC/H.266/x266": "video.h266",
+          "x264-10bit": "video.x264_10bit",
+          "xvid": "video.xvid"
+        }
+      }
+    },
+    "hhanclub": {
+      "site_name": "HHCLUB",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "处理",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DD/AC3": "audio.ac3",
+          "DDP/EAC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD|HR": "audio.dts_hd_hr",
+          "DTS-HD|MA": "audio.dts_hd_ma",
+          "DTS-X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM/PCM": "audio.lpcm",
+          "MP2/3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Opus": "audio.opus",
+          "Other": "audio.other",
+          "TAA": "audio.taa",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "FHD Blu-ray": "medium.bluray",
+          "HDTV": "medium.hdtv",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "UHD REMUX": "medium.remux",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p/4K": "resolution.r2160p",
+          "4320p/8K": "resolution.r4320p",
+          "720p": "resolution.r720p",
+          "Other": "resolution.other"
+        },
+        "source": {
+          "其他": "source.other",
+          "台剧": "source.taiwan",
+          "大陆剧": "source.china",
+          "日剧": "source.japan",
+          "港剧": "source.hongkong",
+          "美剧": "source.western",
+          "英剧": "source.uk",
+          "韩剧": "source.korea"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "HDR": "tag.HDR",
+          "HLG": "tag.HLG",
+          "中字": "tag.中字",
+          "原创": "tag.原创",
+          "国语": "tag.国语",
+          "完结": "tag.完结",
+          "杜比视界": "tag.杜比",
+          "特效": "tag.特效",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "转载": "tag.转载",
+          "首发": "tag.首发"
+        },
+        "team": {
+          "HHWEB": "team.hhweb",
+          "Other": "team.other"
+        },
+        "type": {
+          "体育": "category.sports",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "短剧": "category.playlet",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows"
+        },
+        "video_codec": {
+          "AVC/H264/x264": "video.h264",
+          "HEVC/H265/x265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP8/9": "video.vp9"
+        }
+      }
+    },
+    "ilolicon": {
+      "site_name": "ilolicon",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "地区",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3/DD": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p/4K": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "source": {
+          "俄国 (RUS)": "source.russia",
+          "其它 (Other)": "source.other",
+          "印度 (IND)": "source.india",
+          "台湾 (TWN)": "source.taiwan",
+          "大陆 (CHN)": "source.china",
+          "日本 (JPN)": "source.japan",
+          "欧美 (West)": "source.western",
+          "泰国 (THA)": "source.thailand",
+          "韩国 (KOR)": "source.korea",
+          "香港 (HKG)": "source.hongkong"
+        },
+        "team": {
+          "7³ACG": "team.7acg",
+          "AI-Raws": "team.ai-raws",
+          "ANK-Raws": "team.ank-raws",
+          "CMCT": "team.cmct",
+          "GodDramas": "team.goddramas",
+          "LittleBakas!": "team.littlebakas",
+          "Moozzi2": "team.moozzi2",
+          "Other": "team.other",
+          "Snow-Raws": "team.snow-raws",
+          "VCB-Studio": "team.vcb-studio",
+          "beAst": "team.beast",
+          "jsum@U2": "team.jsum",
+          "mawen1250": "team.mawen1250"
+        },
+        "type": {
+          "Animation": "category.animation",
+          "Anime": "category.animation",
+          "动漫": "category.animation",
+          "动画": "category.animation"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVC/x264": "video.h264",
+          "HEVC/x265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "keepfrds": {
+      "site_name": "FRDS",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "DVD": "medium.dvd",
+          "HD DVD": "medium.hd_dvd",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "TV": "medium.tv",
+          "TVRip": "medium.tvrip",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl",
+          "WEB-Rip": "medium.webrip"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p(4k)": "resolution.r2160p",
+          "480p": "resolution.r480p",
+          "720p": "resolution.r720p",
+          "8K": "resolution.r4320p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "tag": {
+          "限时禁转": "tag.限转"
+        },
+        "team": {
+          "FRDS": "team.frds"
+        },
+        "type": {
+          "体育": "category.sports",
+          "偶像": "category.documentaries",
+          "其他类型": "category.other",
+          "剧集": "category.tv_series",
+          "动画": "category.animation",
+          "有声读物": "category.audiobook",
+          "游戏": "category.game",
+          "演唱会-音乐剧": "category.mv",
+          "电子书": "category.ebook",
+          "电影": "category.movie",
+          "纪录片-传记": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "舞台": "category.tv_shows",
+          "软件": "category.software",
+          "音乐": "category.music",
+          "音乐短片(MV)": "category.mv"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVC": "video.h264",
+          "HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9"
+        }
+      }
+    },
+    "kufei": {
+      "site_name": "Kufei",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "APE": "audio.ape",
+          "DDP Atmos": "audio.ddp_atmos",
+          "DDP/DD+": "audio.ddp",
+          "DSD": "audio.dsd",
+          "DTS": "audio.dts",
+          "DTS X": "audio.dtsx",
+          "DTS-HD HR": "audio.dts_hd_hr",
+          "DTS-HDMA": "audio.dts_hd_ma",
+          "Dolby Digital/DD": "audio.ac3",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "MPEG": "audio.mpeg",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TTA": "audio.tta",
+          "True-HD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "1080P/i 压制": "medium.encode_1080p",
+          "720P 压制": "medium.encode_720p",
+          "BD DIY": "medium.bluray_diy",
+          "BD Remux": "medium.remux",
+          "BD 原盘": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "MiniSD": "medium.minisd",
+          "Others": "medium.other",
+          "SACD": "medium.sacd",
+          "UHD DIY": "medium.uhd_diy",
+          "UHD Remux": "medium.uhd_remux",
+          "UHD 压制": "medium.uhd_encode",
+          "UHD原盘": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "4K/UHD/2160P": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K/4320P": "resolution.r4320p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "HDR": "tag.HDR",
+          "中字": "tag.中字",
+          "书籍": "tag.books",
+          "动漫": "tag.动漫",
+          "国语": "tag.国语",
+          "完结": "tag.完结",
+          "游戏": "tag.game",
+          "禁转": "tag.禁转",
+          "英语": "tag.英语",
+          "音乐": "tag.music"
+        },
+        "team": {
+          "CHD": "team.chd",
+          "HDS": "team.hds",
+          "MySiLU": "team.mysilu",
+          "Other": "team.other",
+          "WiKi": "team.wiki"
+        },
+        "type": {
+          "Animations/动画、动漫": "category.animation",
+          "Audio Books/有声读物": "category.audiobook",
+          "Concern/演唱会": "category.mv",
+          "Documentaries/纪录片": "category.documentaries",
+          "Drama/戏剧": "category.drama",
+          "E-Books/电子书": "category.ebook",
+          "Education/教育": "category.study",
+          "Games/游戏": "category.game",
+          "Movies/电影": "category.movie",
+          "Music Videos/音乐、视频": "category.mv",
+          "Others/其他": "category.other",
+          "Software/软件": "category.software",
+          "Sports/体育": "category.sports",
+          "TV Series/电视剧": "category.tv_series",
+          "TV Shows/综艺": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Othe": "video.other",
+          "VC-1": "video.vc1",
+          "X264": "video.x264",
+          "X265": "video.x265",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "lajidui": {
+      "site_name": "Lajidui",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "processing": "格式",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC-3": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "E-AC-3": "audio.ddp",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "WEB-DL": "medium.webdl"
+        },
+        "processing": {
+          "7z": "format.sevenz",
+          "AZW3": "format.azw3",
+          "DOCX": "format.docx",
+          "EPUB": "format.epub",
+          "ISO": "format.iso",
+          "MKV": "format.mkv",
+          "MOBI": "format.mobi",
+          "MP4": "format.mp4",
+          "Other": "format.other",
+          "PDF": "format.pdf",
+          "PPTX": "format.pptx",
+          "RAR": "format.rar",
+          "TXT": "format.txt",
+          "WPS": "format.wps",
+          "XLSX": "format.xlsx",
+          "ZIP": "format.zip"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2k": "resolution.r2160p",
+          "4k": "resolution.r4320p",
+          "720p": "resolution.r720p",
+          "8k": "resolution.r8640p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "source": {
+          "Other": "source.other",
+          "印度": "source.india",
+          "台湾": "source.taiwan",
+          "大陆": "source.china",
+          "日本": "source.japan",
+          "欧美": "source.western",
+          "韩国": "source.korea",
+          "香港": "source.hongkong"
+        },
+        "team": {
+          "ADE": "team.ade",
+          "AGSVWEB": "team.agsvweb",
+          "BMDru": "team.bmdru",
+          "BeiTai": "team.beitai",
+          "CHD": "team.chd",
+          "CMCT": "team.cmct",
+          "CatEDU": "team.catedu",
+          "FRDS": "team.frds",
+          "GodDramas": "team.goddramas",
+          "HDHome": "team.hdhome",
+          "HDSky": "team.hds",
+          "HHWEB": "team.hhweb",
+          "LHD": "team.lhd",
+          "Other": "team.other",
+          "Ourbits": "team.ourbits",
+          "Pter": "team.pter",
+          "QHstudIo": "team.qhstudio",
+          "TJUPT": "team.tjupt",
+          "UBits": "team.ubits",
+          "WiKi": "team.wiki",
+          "beAst": "team.beast",
+          "原创": "team.original"
+        },
+        "type": {
+          "APP/软件": "category.software",
+          "Animations/动漫": "category.animation",
+          "Audio/音频": "category.audio",
+          "Audiobook/有声书": "category.audiobook",
+          "Cartoon/少儿动画": "category.cartoon",
+          "Documentaries/纪录片": "category.documentaries",
+          "Ebook/电子书": "category.ebook",
+          "Education/教育视频": "category.study",
+          "Game/游戏": "category.game",
+          "Misc/其他": "category.other",
+          "Movies/电影": "category.movie",
+          "Music Videos/音乐视频": "category.mv",
+          "ShortDrama/短剧": "category.playlet",
+          "Sports/体育": "category.sports",
+          "TV Series/电视剧": "category.tv_series",
+          "TV Shows/综艺": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264": "video.h264",
+          "H.265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "lemonhd": {
+      "site_name": "LemonHD",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "地区",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3/DD": "audio.ac3",
+          "APE": "audio.ape",
+          "Atmos TrueHD": "audio.truehd_atmos",
+          "DTS": "audio.dts",
+          "DTS X": "audio.dtsx",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "EAC3/DDP": "audio.ddp",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "4K-UltraHD": "medium.uhd_bluray",
+          "8K-UltraHD": "medium.uhd_bluray",
+          "Blu-ray": "medium.bluray",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p": "resolution.r2160p",
+          "4320p": "resolution.r4320p",
+          "480p": "resolution.r480p",
+          "720p": "resolution.r720p",
+          "Other": "resolution.other"
+        },
+        "source": {
+          "CN 中国大陆": "source.china",
+          "EU/US 欧美": "source.western",
+          "HK/TW 港台": "source.hongkong",
+          "IN 印度": "source.india",
+          "JP/KO 日韩": "source.japan",
+          "Other 其他": "source.other"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "DV": "tag.DV",
+          "HDR": "tag.HDR",
+          "中字": "tag.中字",
+          "国语": "tag.国语",
+          "柠檬爱原盘": "tag.untouch",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语"
+        },
+        "type": {
+          "3D": "category.3d",
+          "Animations 动画": "category.animation",
+          "Documentaries 纪录片": "category.documentaries",
+          "Movies 电影": "category.movie",
+          "Music Videos MV": "category.mv",
+          "Music 音乐": "category.music",
+          "TV Series 剧集": "category.tv_series",
+          "TV Shows 综艺": "category.tv_shows"
+        },
+        "video_codec": {
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "longpt": {
+      "site_name": "LongPT",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DDP": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "UHD Blu-ray Remux": "medium.uhd_bluray_remux",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "2K/1440p/1440i": "resolution.r1440p",
+          "480p/480i": "resolution.r480p",
+          "4K/2160p/2160i": "resolution.r2160p",
+          "720p/720i": "resolution.r720p",
+          "8K/4320p/4320i": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "team": {
+          "CMCT": "team.cmct",
+          "HHWEB": "team.hhweb",
+          "LongA": "team.longa",
+          "LongPT": "team.longpt",
+          "LongWeb": "team.longweb",
+          "Other": "team.other",
+          "RL": "team.rl",
+          "WiKi": "team.wiki"
+        },
+        "type": {
+          "其他": "category.other",
+          "剧集": "category.tv_series",
+          "动画": "category.animation",
+          "有声书": "category.audiobook",
+          "电影": "category.movie",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐视频": "category.mv",
+          "音频": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "luckpt": {
+      "site_name": "Luckpt",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "2K/1440p/1440i": "resolution.r1440p",
+          "480p/480i": "resolution.r480p",
+          "4K/2160p/2160i": "resolution.r2160p",
+          "720p/720i": "resolution.r720p",
+          "8K/4320p/4320i": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "Dolby Vision": "tag.杜比",
+          "HDR10": "tag.HDR",
+          "HDR10+": "tag.HDR10+",
+          "中字": "tag.中字",
+          "合集": "tag.合集",
+          "国语": "tag.国语",
+          "大包": "tag.大包",
+          "完结": "tag.完结",
+          "特效": "tag.特效",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "英语": "tag.英语",
+          "菁彩HDR": "tag.菁彩HDR",
+          "连载": "tag.连载"
+        },
+        "team": {
+          "FRDS": "team.frds",
+          "LuckAni": "team.luckani",
+          "LuckDIY": "team.luckdiy",
+          "LuckDocu": "team.luckdocu",
+          "LuckMusic": "team.luckmusic",
+          "LuckWeb": "team.luckweb",
+          "Other": "team.other",
+          "StarfallWeb": "team.starfallweb"
+        },
+        "type": {
+          "MV": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "动画": "category.animation",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "短剧": "category.playlet",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4/XviD": "video.xvid",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "march": {
+      "site_name": "March",
+      "source_keys": {
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "medium": {
+          "Blu-Ray": "medium.bluray",
+          "DVD": "medium.dvd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160P": "resolution.r2160p",
+          "4320P": "resolution.r4320p",
+          "480P": "resolution.r480p",
+          "576P": "resolution.r576p",
+          "720p": "resolution.r720p"
+        },
+        "team": {
+          "3MWEB": "team.3mweb",
+          "Beast": "team.beast",
+          "CHD": "team.chd",
+          "CMCT": "team.cmct",
+          "HDSKY": "team.hds",
+          "HHWEB": "team.hhweb",
+          "M-Team": "team.mteam",
+          "Other": "team.other",
+          "OurBits": "team.ourbits",
+          "TTG": "team.ttg",
+          "WIKI": "team.wiki"
+        },
+        "type": {
+          "Cartoon": "category.animation",
+          "Documentaries": "category.documentaries",
+          "MTV": "category.mv",
+          "Misc": "category.other",
+          "Movies": "category.movie",
+          "Music": "category.music",
+          "Sports": "category.sports",
+          "TV Series": "category.tv_series",
+          "TV Shows": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264": "video.h264",
+          "H.265": "video.h265",
+          "HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "X.264": "video.x264",
+          "X.265": "video.x265",
+          "XVID": "video.xvid"
+        }
+      }
+    },
+    "muxuege": {
+      "site_name": "Muxuege",
+      "source_keys": {
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "web": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "3Mweb": "team.3mweb",
+          "AiMWeb": "team.aimweb",
+          "CHD": "team.chd",
+          "HDS": "team.hds",
+          "MTeam": "team.mteam",
+          "Mweb": "team.mweb",
+          "MySiLU": "team.mysilu",
+          "Other": "team.other",
+          "StarfallWeb": "team.starfallweb",
+          "TPTV": "team.tptv",
+          "Tmp": "team.tmp",
+          "WiKi": "team.wiki",
+          "likesnow": "team.likesnow"
+        },
+        "type": {
+          "Music Videos": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "系统镜像": "category.os",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "H.264": "video.h264",
+          "H.265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "novahd": {
+      "site_name": "Novahd",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/i": "resolution.r1080p",
+          "4K/2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K/4320p": "resolution.r4320p",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "AGSV": "team.agsv",
+          "BeiTai": "team.beitai",
+          "CHD": "team.chd",
+          "CMCT": "team.cmct",
+          "FRDS": "team.frds",
+          "HDHome": "team.hdhome",
+          "HDSky": "team.hds",
+          "M-Team": "team.mteam",
+          "MySiLU": "team.mysilu",
+          "NHDWeb": "team.nhdweb",
+          "Other": "team.other",
+          "TLF": "team.tlf",
+          "TTG": "team.ttg",
+          "WiKi": "team.wiki",
+          "beAst": "team.beast"
+        },
+        "type": {
+          "体育/Sports": "category.sports",
+          "其他/Othes": "category.other",
+          "动漫、动画/Animations": "category.animation",
+          "演唱会/MV": "category.mv",
+          "电影/Movies": "category.movie",
+          "电视剧/TV Series": "category.tv_series",
+          "综艺/TV Shows": "category.tv_shows",
+          "记录片/Documentaries": "category.documentaries",
+          "音乐/Music": "category.music"
+        },
+        "video_codec": {
+          "AVC/H.264/x264": "video.h264",
+          "HEVC/H.265/x265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "ourbits": {
+      "site_name": "OurBits",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "地区",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "DTS X": "audio.dtsx",
+          "DTS-HDMA": "audio.dts_hd_ma",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MPEG": "audio.mpeg",
+          "OPUS": "audio.opus",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "FHD Blu-ray": "medium.bluray",
+          "HDTV": "medium.hdtv",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "SD": "resolution.sd"
+        },
+        "source": {
+          "CN(中国大陆)": "source.china",
+          "HK/TW(港台)": "source.hongkong_taiwan",
+          "JP(日)": "source.japan",
+          "KR(韩)": "source.korea",
+          "OT(其他)": "source.other",
+          "US/EU(欧美)": "source.western"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "中字": "tag.中字",
+          "国语": "tag.国语",
+          "禁转": "tag.禁转"
+        },
+        "type": {
+          "Animation": "category.animation",
+          "Concert": "category.mv",
+          "Documentary": "category.documentaries",
+          "Movies": "category.movie",
+          "Movies-3D": "category.movie",
+          "Music": "category.music",
+          "Music-Video": "category.mv",
+          "Sports": "category.sports",
+          "TV-Episode": "category.tv_series",
+          "TV-Pack": "category.tv_series",
+          "TV-Show": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264": "video.h264",
+          "HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "pandapt": {
+      "site_name": "PandaPT",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "processing": "格式",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "AV3A": "audio.av3a",
+          "DD/AC3": "audio.ac3",
+          "DDP/EAC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd_ma",
+          "DTS-HR": "audio.dts_hr",
+          "DTS-X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM/PCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "UHDTV": "medium.uhdtv",
+          "WEB-DL": "medium.webdl"
+        },
+        "processing": {
+          "EPUB": "format.epub",
+          "EPUB/MOBI/PDF/AZW": "format.epub_mobi_pdf_azw",
+          "MOBI": "format.mobi",
+          "Other": "format.other",
+          "PDF": "format.pdf"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p/4K": "resolution.r2160p",
+          "4320k/8K": "resolution.r4320p",
+          "720p": "resolution.r720p",
+          "SD": "resolution.sd"
+        },
+        "source": {
+          "CHN(中国大陆)": "source.china",
+          "EU/US(欧美)": "source.western",
+          "HK/MAC/TW(港澳台地区)": "source.hongkong",
+          "IND(印度)": "source.india",
+          "JPN(日本)": "source.japan",
+          "KOR(韩国)": "source.korea",
+          "Other(其他)": "source.other",
+          "SEA(东南亚)": "source.southeast_asia"
+        },
+        "tag": {
+          "ASMR": "tag.ASMR",
+          "DIY": "tag.DIY",
+          "HDR10": "tag.HDR",
+          "HDR10+": "tag.HDR10+",
+          "中字": "tag.中字",
+          "分集": "tag.分集",
+          "国语": "tag.国语",
+          "完结": "tag.完结",
+          "杜比视界": "tag.杜比",
+          "漫画": "tag.漫画",
+          "特效": "tag.特效",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "纯净版": "tag.纯净版",
+          "网络小说": "tag.网络小说",
+          "菁彩HDR": "tag.菁彩HDR"
+        },
+        "team": {
+          "AilMTV(电视录制组)": "team.ailmtv",
+          "AilMUpscale(超分视频组)": "team.ailmupscale",
+          "AilMWeb(流媒体组)": "team.ailmweb",
+          "CatEDU(部分禁转)": "team.catedu",
+          "Other": "team.other",
+          "Panda(压制组)": "team.panda_encode",
+          "Panda(原盘Remux组)": "team.panda_remux",
+          "Panda(原盘diy组)": "team.panda_diy",
+          "Red Leaves (红叶)": "team.redleaves"
+        },
+        "type": {
+          "MV (音乐短片)": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "有声书": "category.audiobook",
+          "游戏": "category.game",
+          "演唱会/音乐会": "category.mv",
+          "电子书": "category.ebook",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "软件": "category.software",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "AVC/H.264/x264": "video.h264",
+          "HEVC/H.265/x265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP8/VP9": "video.vp9",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "pt0ffcc": {
+      "site_name": "0ffCC",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "processing": "内容分级",
+        "resolution": "分辨率",
+        "source": "地区",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3(DD)": "audio.ac3",
+          "AC3|DD": "audio.ac3",
+          "APE": "audio.ape",
+          "DSD": "audio.dsd",
+          "DTS": "audio.dts",
+          "DTS-HDMA": "audio.dts_hdma",
+          "DTS-HDMA:X 7.1": "audio.dts_hdma_x71",
+          "DTS-HD|HR": "audio.dts_hd_hr",
+          "DTS-HD|MA": "audio.dts_hd_ma",
+          "DTS-X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "OPUS": "audio.opus",
+          "PCM": "audio.pcm",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav",
+          "其它 (Other)": "audio.other"
+        },
+        "medium": {
+          "3D Blu-ray": "medium.3d_bluray",
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "IPTV": "medium.iptv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "SACD": "medium.sacd",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "UHDTV": "medium.uhdtv",
+          "WEB-DL": "medium.webdl",
+          "其它 (Other)": "medium.other"
+        },
+        "processing": {
+          "G/所有人": "processing.g",
+          "PG-13/13 岁+，建议陪同": "processing.pg13",
+          "PG/建议陪同": "processing.pg",
+          "TV-G/所有人": "processing.tv_g",
+          "TV-PG/建议陪同": "processing.tv_pg",
+          "TV-Y/所有儿童": "processing.tv_y",
+          "TV-Y7/7 岁+": "processing.tv_y7"
+        },
+        "resolution": {
+          "1080I": "resolution.r1080i",
+          "1080P": "resolution.r1080p",
+          "1440P": "resolution.r1440p",
+          "4K/2160P": "resolution.r2160p",
+          "720P": "resolution.r720p",
+          "8K/4320P": "resolution.r4320p",
+          "SD": "resolution.sd",
+          "其它 (Other)": "resolution.other"
+        },
+        "source": {
+          "其它 (Other)": "source.other",
+          "内地 (China,CHN)": "source.china",
+          "印度 (IND)": "source.india",
+          "台湾 (TWN,CHN)": "source.taiwan",
+          "日本 (JPN)": "source.japan",
+          "欧美 (Western)": "source.western",
+          "泰国 (Th)": "source.thailand",
+          "韩国 (KOR)": "source.korea",
+          "香港 (HKG,CHN)": "source.hongkong"
+        },
+        "team": {
+          "FFWEB": "team.ffweb",
+          "其它 (Other)": "team.other"
+        },
+        "type": {
+          "Animations|动漫": "category.animation",
+          "Audiobooks|有声读物": "category.audiobook",
+          "Children's TV series​|儿童剧集": "category.children_tv_series",
+          "Children's documentaries|儿童记录片": "category.children_documentaries",
+          "Children's film|儿童电影": "category.children_movie",
+          "Documentaries|纪录片": "category.documentaries",
+          "Education|学习教育": "category.study",
+          "Game|游戏": "category.game",
+          "HD Music|无损音乐": "category.music",
+          "Movies|电影": "category.movie",
+          "Music Videos|音乐视频": "category.mv",
+          "Others|其他": "category.other",
+          "Resources|网络资源": "category.resources",
+          "Sports|体育": "category.sports",
+          "TV Series|电视剧": "category.tv_series",
+          "TV Shows|综艺": "category.tv_shows",
+          "book|书籍": "category.book",
+          "picture books|书籍绘本": "category.picture_book",
+          "picture books|儿童音乐": "category.children_music",
+          "待定": "category.other"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "MVC": "video.mvc",
+          "ProRes": "video.prores",
+          "VC-1": "video.vc1",
+          "VP8/9": "video.vp9",
+          "X264": "video.x264",
+          "X265": "video.x265",
+          "Xvid": "video.xvid",
+          "其它 (Other)": "video.other"
+        }
+      }
+    },
+    "ptcafe": {
+      "site_name": "Ptcafe",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "APE": "audio.ape",
+          "Atmos": "audio.atmos",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "DTS-HDHR": "audio.dts_hd_hr",
+          "DTS-HDMA": "audio.dts_hdma",
+          "DTS-HDMA:X 7.1": "audio.dts_hdma_x71",
+          "DTS-X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray DIY": "medium.bluray_diy",
+          "Blu-ray 原盘": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "TV": "medium.hdtv",
+          "Track": "medium.track",
+          "UHD Blu-ray DIY": "medium.uhd_bluray_diy",
+          "UHD Blu-ray 原盘": "medium.uhd_bluray",
+          "UHD Remux": "medium.uhd_remux",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i/FHD": "resolution.r1080p",
+          "2160P/4K/UHD": "resolution.r2160p",
+          "360p/360i/SD": "resolution.r360p",
+          "4320P/8K/FUHD": "resolution.r4320p",
+          "720p/720i/HD": "resolution.r720p",
+          "Other": "resolution.other"
+        },
+        "source": {
+          "其他": "source.other",
+          "印度": "source.india",
+          "大陆": "source.china",
+          "日本": "source.japan",
+          "欧美": "source.western",
+          "港台": "source.hongkong",
+          "韩国": "source.korea"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "HDR": "tag.HDR",
+          "中字": "tag.中字",
+          "国语": "tag.国语",
+          "备胎": "tag.备胎",
+          "月月": "tag.月月",
+          "杜比视界": "tag.杜比",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "高码高帧": "tag.高码高帧"
+        },
+        "team": {
+          "ADE": "team.ade",
+          "ADWeb": "team.adweb",
+          "Audies": "team.audies",
+          "BeiTai": "team.beitai",
+          "BeyondHD": "team.beyondhd",
+          "BtsTV": "team.btstv",
+          "CHDBits": "team.chdbits",
+          "CHDWEB": "team.chdweb",
+          "CMCT": "team.cmct",
+          "CafeTV": "team.cafetv",
+          "CafeWEB": "team.cafeweb",
+          "DJWEB": "team.djweb",
+          "FRDS": "team.frds",
+          "HDCTV": "team.hdctv",
+          "HDH": "team.hdh",
+          "HDHome": "team.hdhome",
+          "HDSWEB": "team.hdsweb",
+          "HDSky": "team.hds",
+          "HHWEB": "team.hhweb",
+          "MTeam": "team.mteam",
+          "MWeb": "team.mweb",
+          "Other": "team.other",
+          "OurBits": "team.ourbits",
+          "OurTV": "team.ourtv",
+          "PTCafe": "team.ptcafe",
+          "PTerWEB": "team.pterweb",
+          "QHstudIo": "team.qhstudio",
+          "TTG": "team.ttg",
+          "WiKi": "team.wiki",
+          "beAst": "team.beast"
+        },
+        "type": {
+          "体育": "category.sports",
+          "其他": "category.other",
+          "剧集": "category.tv_series",
+          "动漫": "category.animation",
+          "演唱": "category.mv",
+          "电影": "category.movie",
+          "纪录": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "DIVX": "video.divx",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9",
+          "X264": "video.x264",
+          "X265": "video.x265",
+          "XVID": "video.xvid"
+        }
+      }
+    },
+    "ptchina": {
+      "site_name": "PTChina",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "处理",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "APE": "audio.ape",
+          "DDP/DD+": "audio.ddp",
+          "DDP/DD+/EAC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS X": "audio.dtsx",
+          "DTS-HD HR": "audio.dts_hd_hr",
+          "DTS-HDMA": "audio.dts_hd_ma",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "Other": "audio.other",
+          "True-HD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "1080p/i压制": "medium.encode",
+          "BD DIY": "medium.bluray_diy",
+          "BD Remux": "medium.bluray_remux",
+          "BD 原盘": "medium.bluray",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "UHD DIY": "medium.uhd_diy",
+          "UHD Remux": "medium.uhd_remux",
+          "UHD 压制": "medium.uhd_encode",
+          "UHD原盘": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2K/1440p": "resolution.r1440p",
+          "4K/UHD/2160P": "resolution.r2160p",
+          "Other": "resolution.other"
+        },
+        "source": {
+          "CN/中国大陆": "source.china",
+          "EU/欧洲": "source.europe",
+          "HK/香港": "source.hongkong",
+          "Other": "source.other",
+          "TW/台湾": "source.taiwan",
+          "UK/英国": "source.uk",
+          "US/美国": "source.western"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "Dolby Vision": "tag.杜比",
+          "HDR": "tag.HDR",
+          "中字": "tag.中字",
+          "国语": "tag.国语"
+        },
+        "team": {
+          "Audiences": "team.audiences",
+          "BTN/NTb": "team.btn",
+          "CHD/CHDBits": "team.chdbits",
+          "CMCT": "team.cmct",
+          "EPSiLON": "team.epsilon",
+          "FRDS": "team.frds",
+          "FraMeSToR": "team.framestor",
+          "HDC/HDChina": "team.hdchina",
+          "HDS/HDSky": "team.hds",
+          "Hares": "team.hares",
+          "LemonHD": "team.lemonhd",
+          "Other": "team.other",
+          "PTChina": "team.ptchina",
+          "PTHome": "team.pthome",
+          "PTer": "team.pter",
+          "TTG": "team.ttg",
+          "WiKi": "team.wiki",
+          "beAst": "team.beast"
+        },
+        "type": {
+          "Documentaries/纪录片": "category.documentaries",
+          "Movies/电影": "category.movie",
+          "TV Series/电视剧": "category.tv_series"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "X265": "video.h265",
+          "Xvid": "video.xvid",
+          "x264": "video.h264"
+        }
+      }
+    },
+    "pterclub": {
+      "site_name": "PTerClub",
+      "source_keys": {
+        "medium": "媒介",
+        "source": "区域",
+        "team": "制作组",
+        "type": "类型"
+      },
+      "standard_keys": {
+        "medium": {
+          "AZW": "medium.azw",
+          "BD Discs": "medium.bluray",
+          "DVD Discs": "medium.dvdr",
+          "Encode": "medium.encode",
+          "FLAC": "medium.flac",
+          "HDTV": "medium.hdtv",
+          "ISO": "medium.iso",
+          "MOBI": "medium.mobi",
+          "Other": "medium.other",
+          "PDF": "medium.pdf",
+          "PUB": "medium.pub",
+          "Remux": "medium.remux",
+          "UHD Discs": "medium.uhd_bluray",
+          "WAV": "medium.wav",
+          "WEB-DL": "medium.webdl"
+        },
+        "source": {
+          "其它 (Other)": "source.other",
+          "印度 (IND)": "source.india",
+          "台湾 (TWN,CHN)": "source.taiwan",
+          "大陆 (Mainland,CHN)": "source.china",
+          "日本 (JPN)": "source.japan",
+          "欧美 (Western)": "source.western",
+          "韩国 (KOR)": "source.korea",
+          "香港 (HKG,CHN)": "source.hongkong"
+        },
+        "type": {
+          "体育": "category.sports",
+          "其它": "category.other",
+          "动画": "category.animation",
+          "学习": "category.study",
+          "电子书": "category.ebook",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "舞台演出": "category.stage",
+          "软件": "category.software",
+          "音乐": "category.music",
+          "音乐短片": "category.mv"
+        }
+      }
+    },
+    "ptlgs": {
+      "site_name": "PTLGS",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC-3": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "BDRip": "medium.bdrip",
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "DVDRiP": "medium.dvdr",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "TVRip": "medium.tvrip",
+          "WEB-DL": "medium.webdl",
+          "WEBRiP": "medium.webrip"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "DYZ-Movie": "team.dyz_movie",
+          "DYZ-TV": "team.dyz_tv",
+          "DYZ-WEB": "team.dyz_web",
+          "Eleph": "team.eleph",
+          "Other": "team.other",
+          "ZmWeb": "team.zmweb",
+          "beAst": "team.beast"
+        },
+        "type": {
+          "体育": "category.sports",
+          "其他": "category.other",
+          "剧集": "category.tv_series",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "ptlover": {
+      "site_name": "PTLover",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "medium": {
+          "BDMV": "medium.bdmv",
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvd",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "WEB-DL(TV)": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160P": "resolution.r2160p",
+          "480P": "resolution.r480p",
+          "720p": "resolution.r720p",
+          "8K": "resolution.r4320p",
+          "SD": "resolution.sd"
+        },
+        "source": {
+          "Other": "source.other",
+          "印度": "source.india",
+          "台湾": "source.taiwan",
+          "大陆": "source.china",
+          "日本": "source.japan",
+          "欧美": "source.western",
+          "韩国": "source.korea",
+          "香港": "source.hongkong"
+        },
+        "team": {
+          "52pt": "team.pt52",
+          "ADWeb": "team.adweb",
+          "AilMWeb": "team.ailmweb",
+          "CHD": "team.chd",
+          "DBTV": "team.dbtv",
+          "DUSKLiGHT": "team.dusklight",
+          "FRDS": "team.frds",
+          "HDH": "team.hdh",
+          "HDHome": "team.hdhome",
+          "HDS": "team.hds",
+          "HHWEB": "team.hhweb",
+          "JPTVclub": "team.jptvclub",
+          "MrHulk": "team.mrhulk",
+          "MySiLU": "team.mysilu",
+          "NTb": "team.ntb",
+          "OpenCD": "team.opencd",
+          "Other": "team.other",
+          "PTerWEB": "team.pterweb",
+          "QHstudIo": "team.qhstudio",
+          "Raws": "team.raws",
+          "TTG": "team.ttg",
+          "UBWEB": "team.ubweb",
+          "WiKi": "team.wiki",
+          "ZWEX": "team.zwex",
+          "sunny": "team.sunny"
+        },
+        "type": {
+          "HQ音频": "category.music",
+          "MV": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "写真": "category.photography",
+          "动画": "category.animation",
+          "国产": "category.domestic",
+          "步兵": "category.unedited",
+          "游戏": "category.game",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "直播秀": "category.live_show",
+          "纪录片": "category.documentaries",
+          "绘本": "category.illustration",
+          "综艺": "category.tv_shows",
+          "脱口秀": "category.tv_shows",
+          "音频": "category.music",
+          "骑兵": "category.edited"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVC": "video.h264",
+          "H.264": "video.h264",
+          "H.265(HEVC)": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "ptskit": {
+      "site_name": "PTSKIT",
+      "source_keys": {
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "BluRay": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p": "resolution.r2160p",
+          "4K": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "CHD": "team.chd",
+          "HDS": "team.hds",
+          "MySiLU": "team.mysilu",
+          "Other": "team.other",
+          "WiKi": "team.wiki"
+        },
+        "type": {
+          "Anime": "category.animation",
+          "Game": "category.game",
+          "Movie": "category.movie",
+          "Music": "category.music",
+          "Other": "category.other",
+          "TV Series": "category.tv_series",
+          "TV Shows": "category.tv_shows",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "游戏": "category.game",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "H.264": "video.h264",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "ptzone": {
+      "site_name": "PTZone",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "APE": "audio.ape",
+          "DD/AC3": "audio.ac3",
+          "DDP/EAC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "FLAC": "audio.flac",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "4K": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K": "resolution.r4320p",
+          "SD": "resolution.sd"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "HDR": "tag.HDR",
+          "中字": "tag.中字",
+          "分集": "tag.分集",
+          "国语": "tag.国语",
+          "完结": "tag.完结",
+          "禁转": "tag.禁转"
+        },
+        "team": {
+          "CHD": "team.chd",
+          "HDS": "team.hds",
+          "MySiLU": "team.mysilu",
+          "Other": "team.other",
+          "PTZWeb": "team.ptzweb",
+          "WiKi": "team.wiki"
+        },
+        "type": {
+          "Animations(动漫)": "category.animation",
+          "Documentaries(纪录片)": "category.documentaries",
+          "Games(游戏)": "category.game",
+          "Movies(电影)": "category.movie",
+          "Music(音乐)": "category.music",
+          "Others(其它）": "category.other",
+          "Software(软件)": "category.software",
+          "Sports(体育)": "category.sports",
+          "TV Series(电视剧)": "category.tv_series",
+          "TV Shows(综艺)": "category.tv_shows"
+        },
+        "video_codec": {
+          "H.264": "video.h264",
+          "H.265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "qingwapt": {
+      "site_name": "QingwaPT",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "AV3A": "audio.av3a",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD HRA": "audio.dts_hd_hra",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2K/1440p": "resolution.r1440p",
+          "4K/2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K/4320p": "resolution.r4320p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "CatEDU": "team.catedu",
+          "FROG": "team.frog",
+          "FROGE": "team.froge",
+          "FROGWeb": "team.frogweb",
+          "Other": "team.other"
+        },
+        "type": {
+          "MV": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "剧集": "category.tv_series",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "短剧": "category.playlet",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9"
+        }
+      }
+    },
+    "raingfh": {
+      "site_name": "RaingFH",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd_ma",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "WEBDL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "1440p": "resolution.r1440p",
+          "2160p": "resolution.r2160p",
+          "4320p": "resolution.r4320p",
+          "720p": "resolution.r720p",
+          "ED": "resolution.ed",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "team": {
+          "Audies": "team.audies",
+          "BTN/NTb": "team.btn_ntb",
+          "CMCT": "team.cmct",
+          "FRDS": "team.frds",
+          "HDHome": "team.hdhome",
+          "HDS": "team.hds",
+          "HHClub": "team.hhclub",
+          "HHWEB": "team.hhweb",
+          "Hares": "team.hares",
+          "Other": "team.other",
+          "OurBits": "team.ourbits",
+          "PTHome": "team.pthome",
+          "PTP": "team.ptp",
+          "PTer": "team.pter",
+          "QHstudIo": "team.qhstudio",
+          "TLF": "team.tlf",
+          "TTG": "team.ttg",
+          "Ubits": "team.ubits",
+          "WiKi": "team.wiki",
+          "beAst": "team.beast",
+          "rain": "team.rain",
+          "rainweb": "team.rainweb"
+        },
+        "type": {
+          "Animations": "category.animation",
+          "Documentaries": "category.documentaries",
+          "HQ Audio": "category.music",
+          "Misc": "category.other",
+          "Movies": "category.movie",
+          "Music Videos": "category.mv",
+          "Sports": "category.sports",
+          "TV Series": "category.tv_series",
+          "TV Shows": "category.tv_shows",
+          "other": "category.other"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVC": "video.h264",
+          "H.264": "video.h264",
+          "H.265": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9",
+          "XviD": "video.xvid"
+        }
+      }
+    },
+    "rousi": {
+      "site_name": "Rousi",
+      "source_keys": {},
+      "standard_keys": {}
+    },
+    "sewerpt": {
+      "site_name": "SewerPT",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "AV3A": "audio.av3a",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "E-AC3": "audio.ddp",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "2K/1440p": "resolution.r1440p",
+          "480p": "resolution.r480p",
+          "4K/2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K/4320p": "resolution.r4320p",
+          "default": "resolution.r1080p"
+        },
+        "team": {
+          "Other": "team.other",
+          "SewageWeb": "team.sewageweb"
+        },
+        "type": {
+          "其他 / Misc": "category.other",
+          "动漫 / Animations": "category.animation",
+          "电影 / Movies": "category.movie",
+          "电视剧 / TV Series": "category.tv_series",
+          "纪录片 / Documentaries": "category.documentaries",
+          "综艺 / TV Shows": "category.tv_shows",
+          "音乐 / Music": "category.music"
+        },
+        "video_codec": {
+          "AVC": "video.h264",
+          "HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "ssd": {
+      "site_name": "SSD",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "产地",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC-3": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "E-AC-3": "audio.ddp",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "BDRip": "medium.bdrip",
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "DVDRip": "medium.dvdrip",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "TVRip": "medium.tvrip",
+          "WEB-DL": "medium.webdl",
+          "WEBRip": "medium.webrip"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "source": {
+          "Hongkong(香港)": "source.hongkong",
+          "India(印度)": "source.india",
+          "Japan(日本)": "source.japan",
+          "Korea(韩国)": "source.korea",
+          "Mainland(大陆)": "source.china",
+          "Other(其他地区)": "source.other",
+          "Russia(俄国)": "source.russia",
+          "Taiwan(台湾)": "source.taiwan",
+          "Thailand(泰国)": "source.thailand",
+          "West(欧美)": "source.western"
+        },
+        "tag": {
+          "3D": "tag.3d",
+          "4K": "tag.4K",
+          "Blu-ray": "tag.Blu-ray",
+          "CC": "tag.cc",
+          "DoVi": "tag.杜比",
+          "HDR10": "tag.HDR",
+          "HDR10+": "tag.HDR10+",
+          "HLG": "tag.HLG",
+          "LIVE现场": "tag.LIVE现场",
+          "default": "",
+          "中字": "tag.中字",
+          "动画": "tag.动画",
+          "原生": "tag.原生",
+          "合集": "tag.完结",
+          "国语": "tag.国语",
+          "国配": "tag.国语",
+          "杜比": "tag.杜比",
+          "特效": "tag.特效",
+          "特效字幕": "tag.特效",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "自译": "tag.自译",
+          "英字": "tag.英字",
+          "菁彩HDR": "tag.菁彩HDR"
+        },
+        "team": {
+          "BYNDR": "team.byndr",
+          "CMCT": "team.cmct",
+          "DOUHD": "team.douhd",
+          "HHWEB": "team.hhweb",
+          "HONE": "team.hone",
+          "MTeam": "team.mteam",
+          "WiKi": "team.wiki"
+        },
+        "type": {
+          "Audio(有声)": "category.audiobook",
+          "Docs(纪录)": "category.documentaries",
+          "MV(音乐视频)": "category.mv",
+          "Movies(电影)": "category.movie",
+          "Music(音乐)": "category.music",
+          "Other(其他类型)": "category.other",
+          "Sports(体育)": "category.sports",
+          "TV Series(剧集)": "category.tv_series",
+          "TV Shows(综艺)": "category.tv_shows",
+          "体育": "category.sports",
+          "剧集": "category.tv_series",
+          "有声": "category.audiobook",
+          "电影": "category.movie",
+          "纪录": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music",
+          "音乐视频": "category.mv"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "sunny": {
+      "site_name": "SSD",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC-3": "audio.ac3",
+          "AC3": "audio.ac3",
+          "AC3/EAC3": "audio.ac3",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "AV3A": "audio.av3a",
+          "AV3V": "audio.av3v",
+          "AVSA": "audio.avsa",
+          "DD": "audio.ac3",
+          "DD/AC3": "audio.ac3",
+          "DDP": "audio.ddp",
+          "DDP Atmos": "audio.ddp_atmos",
+          "DDP/DD+": "audio.ddp",
+          "DDP/DD+/EAC3": "audio.ddp",
+          "DDP/E-AC3": "audio.ddp",
+          "DDP/EAC3": "audio.ddp",
+          "DSD": "audio.dsd",
+          "DTS": "audio.dts",
+          "DTS-HD": "audio.dts_hd",
+          "DTS-HD HR": "audio.dts_hd_hr",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS-HD/DTS": "audio.dts",
+          "DTS-HDMA": "audio.dts_hd_ma",
+          "DTS-HD|MA": "audio.dts_hd_ma",
+          "DTS-X": "audio.dtsx",
+          "DTS:X": "audio.dtsx",
+          "Dolby Digital/DD": "audio.ac3",
+          "E-AC-3": "audio.ddp",
+          "E-AC3": "audio.ddp",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "MPEG": "audio.mpeg",
+          "OGG": "audio.ogg",
+          "OPUS": "audio.opus",
+          "Opus": "audio.opus",
+          "Other": "audio.other",
+          "Other/其他": "audio.other",
+          "PCM": "audio.pcm",
+          "TTA": "audio.tta",
+          "True-HD": "audio.truehd",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav",
+          "m4a": "audio.m4a"
+        },
+        "medium": {
+          "BDRip": "medium.bdrip",
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "DVDRip": "medium.dvdrip",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "TVRip": "medium.tvrip",
+          "WEB-DL": "medium.webdl",
+          "WEBRip": "medium.webrip"
+        },
+        "resolution": {
+          "1080p": "resolution.r1080p",
+          "2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "Dolby Vision": "tag.杜比",
+          "HDR": "tag.HDR",
+          "default": "",
+          "中字": "tag.中字",
+          "动画": "tag.动画",
+          "国语": "tag.国语",
+          "完结": "tag.完结",
+          "特效": "tag.特效",
+          "粤语": "tag.粤语"
+        },
+        "team": {
+          "Sunny": "team.sunny"
+        },
+        "type": {
+          "Documentaries": "category.documentaries",
+          "Movies": "category.movie",
+          "Music Videos": "category.mv",
+          "TV Series": "category.tv_series"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVC": "video.h264",
+          "AVC/H.264/x264": "video.h264",
+          "AVC/H264/x264": "video.h264",
+          "H.261": "video.h261",
+          "H.264": "video.h264",
+          "H.264/AVC": "video.h264",
+          "H.265": "video.h265",
+          "H.265(HEVC)": "video.h265",
+          "H.265/HEVC": "video.h265",
+          "H.266/VVC": "video.h266",
+          "HEVC": "video.h265",
+          "HEVC/H.265/x265": "video.h265",
+          "HEVC/H265/x265": "video.h265",
+          "MPEG-1": "video.mpeg1",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "MPEG/MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "Other/其他": "video.other",
+          "VC-1": "video.vc1",
+          "VP9": "video.vp9",
+          "VPB/VP9": "video.vp9",
+          "X264": "video.x264",
+          "X265": "video.x265",
+          "Xvid": "video.xvid",
+          "h264": "video.h264",
+          "h265": "video.h265",
+          "x264": "video.x264",
+          "x265": "video.x265"
+        }
+      }
+    },
+    "tangpt": {
+      "site_name": "TangPT",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "AV3V": "audio.av3v",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dtshd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080i/1080P": "resolution.r1080p",
+          "2K/1440i/1440P": "resolution.r1440p",
+          "480i/480P": "resolution.r480p",
+          "4K/2160i/2160P": "resolution.r2160p",
+          "720i/720P": "resolution.r720p",
+          "8K/4320i/4320P": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "team": {
+          "ADWeb": "team.adweb",
+          "AGSVWEB": "team.agsvweb",
+          "BtsHD": "team.btshd",
+          "CHD": "team.chd",
+          "CMCT": "team.cmct",
+          "CSPT": "team.cspt",
+          "FFansDIY": "team.ffansdiy",
+          "FRDS": "team.frds",
+          "HDArea": "team.hdarea",
+          "HDHome": "team.hdhome",
+          "HDS": "team.hds",
+          "HDSWEB": "team.hdsweb",
+          "HHWEB": "team.hhweb",
+          "MWeb": "team.mweb",
+          "MySiLU": "team.mysilu",
+          "OpenCD": "team.opencd",
+          "Other": "team.other",
+          "OurTV": "team.ourtv",
+          "PTerWEB": "team.pterweb",
+          "QHstudIo": "team.qhstudio",
+          "StarfallWeb": "team.starfallweb",
+          "U2": "team.u2",
+          "UBWEB": "team.ubweb",
+          "WiKi": "team.wiki",
+          "ZmWeb": "team.zmweb",
+          "beAst": "team.beast"
+        },
+        "type": {
+          "HQ音频": "category.hq_audio",
+          "MV": "category.mv",
+          "书籍": "category.books",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "短剧": "category.micro_drama",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "VP8/9": "video.vp9",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "tmpt": {
+      "site_name": "TMPT",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "tag": "标签",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "480p/480i": "resolution.r480p",
+          "4K/2160p/2160i": "resolution.r2160p",
+          "720p/720i": "resolution.r720p",
+          "8K/4320p/4320i": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "HDR": "tag.HDR",
+          "Remux": "tag.Remux",
+          "中字": "tag.中字",
+          "分集": "tag.分集",
+          "合并": "tag.合并",
+          "国语": "tag.国语",
+          "大包": "tag.大包",
+          "完结": "tag.完结",
+          "应求": "tag.应求",
+          "杜比": "tag.杜比",
+          "特效": "tag.特效",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "英字": "tag.英字",
+          "超分": "tag.超分",
+          "韩剧": "tag.韩剧",
+          "首发": "tag.首发"
+        },
+        "team": {
+          "CHD": "team.chd",
+          "HDS": "team.hds",
+          "MySiLU": "team.mysilu",
+          "Other": "team.other",
+          "TangPT": "team.tangpt",
+          "Tangweb": "team.tangweb",
+          "WiKi": "team.wiki",
+          "rain": "team.rain",
+          "rainweb": "team.rainweb"
+        },
+        "type": {
+          "MV": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "短剧": "category.playlet",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音乐": "category.music",
+          "音频": "category.audio"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "ubits": {
+      "site_name": "UBits",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "地区",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "APE": "audio.ape",
+          "DD(AC3)": "audio.ac3",
+          "DD+(Dolby Digital Plus)": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA/HR": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "Dolby Atmos": "audio.dolby_atmos",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd"
+        },
+        "medium": {
+          "4K UHD原盘(UltraHD Blu-ray)": "medium.uhd_bluray",
+          "DVDR": "medium.dvdr",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "Lossless Music": "medium.lossless_music",
+          "REMUX": "medium.remux",
+          "Track": "medium.track",
+          "压制(Encode)": "medium.encode",
+          "流媒体(WEB-DL)": "medium.webdl",
+          "蓝光原盘(Blu-ray)": "medium.bluray"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "1440p": "resolution.r1440p",
+          "2160p": "resolution.r2160p",
+          "4320p": "resolution.r4320p",
+          "720p": "resolution.r720p",
+          "SD": "resolution.sd"
+        },
+        "source": {
+          "中国台湾(China Taiwan)": "source.taiwan",
+          "中国大陆(China Mainland)": "source.china",
+          "中国香港(China HK)": "source.hongkong",
+          "俄罗斯(Russia)": "source.russia",
+          "其它(Other)": "source.other",
+          "印度(India)": "source.india",
+          "日本(Japanese)": "source.japan",
+          "欧美(Euro/American)": "source.western",
+          "泰国(Thailand)": "source.thailand",
+          "韩国(Korea)": "source.korea"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "HDR10": "tag.HDR",
+          "HDR10+": "tag.HDR10+",
+          "HLG": "tag.HLG",
+          "中字": "tag.中字",
+          "原生原盘": "tag.原生原盘",
+          "合集": "tag.完结",
+          "国语": "tag.国语",
+          "杜比视界": "tag.杜比",
+          "特效": "tag.特效",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "菁彩HDR": "tag.菁彩HDR",
+          "菜单修改": "tag.菜单修改",
+          "连载": "tag.连载",
+          "高分国剧": "tag.高分国剧"
+        },
+        "team": {
+          "Other": "team.other",
+          "UBTV": "team.ubtv",
+          "UBWEB": "team.ubweb",
+          "UBits": "team.ubits"
+        },
+        "type": {
+          "Other": "category.other",
+          "体育节目(Sports)": "category.sports",
+          "动漫(Animations)": "category.animation",
+          "演唱会(Misic Videos)": "category.mv",
+          "电影(Movie)": "category.movie",
+          "电视剧(TV Series)": "category.tv_series",
+          "纪录片(Documentaries)": "category.documentaries",
+          "综艺（TV Shows）": "category.tv_shows",
+          "音乐CD(Music CD Tracker)": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "AVS": "video.avs",
+          "H264(AVC/x264)": "video.h264",
+          "H265(HEVC/x265)": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid"
+        }
+      }
+    },
+    "upxin": {
+      "site_name": "Upxin",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "processing": "处理",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3/EAC3": "audio.ac3",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "DTS-HDMA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MPEG": "audio.mpeg",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "Encode TV": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Remux TV": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "UHD Remux": "medium.remux",
+          "UHD Remux TV": "medium.remux",
+          "WEB-DL/WEBRip": "medium.webdl",
+          "WEB-DL/WEBRip TV": "medium.webdl"
+        },
+        "processing": {
+          "CN": "processing.china",
+          "EU": "processing.western",
+          "HK": "processing.hongkong",
+          "IN": "processing.india",
+          "JP": "processing.japan",
+          "JPN": "processing.japan",
+          "KR": "processing.korea",
+          "Other": "processing.other",
+          "SEA": "processing.southeast_asia",
+          "TW": "processing.taiwan",
+          "US": "processing.western",
+          "东南亚": "processing.southeast_asia",
+          "中国": "processing.china",
+          "中国内地": "processing.china",
+          "印度": "processing.india",
+          "台湾": "processing.taiwan",
+          "大陆": "processing.china",
+          "日本": "processing.japan",
+          "欧洲": "processing.western",
+          "欧美": "processing.western",
+          "港台": "processing.hongkong_taiwan",
+          "美国": "processing.western",
+          "韩国": "processing.korea",
+          "香港": "processing.hongkong"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "4K/2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "Other": "resolution.other",
+          "SD": "resolution.sd",
+          "iPad": "resolution.ipad"
+        },
+        "team": {
+          "HDU": "team.hdu",
+          "Other": "team.other"
+        },
+        "type": {
+          "Animations/动画": "category.animation",
+          "Documentaries/纪录片": "category.documentaries",
+          "Games/游戏": "category.game",
+          "HQ Audio/无损音乐": "category.music",
+          "Misc/其他": "category.other",
+          "Movies/电影": "category.movie",
+          "Music Videos/音乐 MV": "category.mv",
+          "Sports/体育": "category.sports",
+          "TV Series/电视剧": "category.tv_series",
+          "TV Shows/综艺": "category.tv_shows"
+        },
+        "video_codec": {
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG/MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid",
+          "x264": "video.x264"
+        }
+      }
+    },
+    "xingyunge": {
+      "site_name": "Xingyunge",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "AV3V": "audio.av3v",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "480p/480i": "resolution.r480p",
+          "4K/2160p/2160i": "resolution.r2160p",
+          "720p/720i": "resolution.r720p",
+          "8k/4320p/4320i": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "tag": {
+          "DIY": "tag.DIY",
+          "HDR": "tag.HDR",
+          "中字": "tag.中字",
+          "分集": "tag.分集",
+          "原生": "tag.原生",
+          "去头尾广告纯净版": "tag.去头尾广告纯净版",
+          "国语": "tag.国语",
+          "大包": "tag.大包",
+          "完结": "tag.完结",
+          "杜比视界": "tag.杜比",
+          "特效": "tag.特效",
+          "特效字幕": "tag.特效",
+          "禁转": "tag.禁转",
+          "粤语": "tag.粤语",
+          "美剧": "tag.美剧",
+          "英字": "tag.英字",
+          "补帧": "tag.补帧",
+          "超分": "tag.超分",
+          "韩剧": "tag.韩剧"
+        },
+        "team": {
+          "AGSVWEB": "team.agsvweb",
+          "CHD": "team.chd",
+          "HDS": "team.hds",
+          "MySiLU": "team.mysilu",
+          "NatureWeb": "team.natureweb",
+          "Other": "team.other",
+          "Pure@StarfallWeb": "team.pure_starfallweb",
+          "Starfall": "team.starfall",
+          "StarfallWeb": "team.starfallweb",
+          "WiKi": "team.wiki",
+          "rain": "team.rain",
+          "rainweb": "team.rainweb"
+        },
+        "type": {
+          "MV": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "短剧": "category.playlet",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音频": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "xyg": {
+      "site_name": "Xingyunge",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "AV3V": "audio.av3v",
+          "DD/AC3": "audio.ac3",
+          "DDP/E-AC3": "audio.ddp",
+          "DTS": "audio.dts",
+          "DTS-HD MA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "M4A": "audio.m4a",
+          "MP3": "audio.mp3",
+          "OPUS": "audio.opus",
+          "Other": "audio.other",
+          "TrueHD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVD": "medium.dvd",
+          "Encode": "medium.encode",
+          "HDTV": "medium.hdtv",
+          "Other": "medium.other",
+          "Remux": "medium.remux",
+          "Track": "medium.track",
+          "UHD Blu-ray": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "480p/480i": "resolution.r480p",
+          "4K/2160p/2160i": "resolution.r2160p",
+          "720p/720i": "resolution.r720p",
+          "8k/4320p/4320i": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "team": {
+          "AGSVWEB": "team.agsvweb",
+          "CHD": "team.chd",
+          "HDS": "team.hds",
+          "MySiLU": "team.mysilu",
+          "Other": "team.other",
+          "Starfall": "team.starfall",
+          "StarfallWeb": "team.starfallweb",
+          "WiKi": "team.wiki",
+          "rain": "team.rain",
+          "rainweb": "team.rainweb"
+        },
+        "type": {
+          "MV": "category.mv",
+          "体育": "category.sports",
+          "其他": "category.other",
+          "动漫": "category.animation",
+          "电影": "category.movie",
+          "电视剧": "category.tv_series",
+          "短剧": "category.playlet",
+          "纪录片": "category.documentaries",
+          "综艺": "category.tv_shows",
+          "音频": "category.music"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "Other": "video.other",
+          "VC-1": "video.vc1"
+        }
+      }
+    },
+    "yhpp": {
+      "site_name": "YHPP",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "source": "地区",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DDP Atmos": "audio.ddp_atmos",
+          "DDP/DD+/EAC3": "audio.ddp",
+          "DSD": "audio.dsd",
+          "DTS": "audio.dts",
+          "DTS-HD HR": "audio.dts_hd_hr",
+          "DTS-HDMA": "audio.dts_hd_ma",
+          "DTS:X": "audio.dtsx",
+          "Dolby Digital/DD": "audio.ac3",
+          "FLAC": "audio.flac",
+          "LPCM": "audio.lpcm",
+          "MP3": "audio.mp3",
+          "MPEG": "audio.mpeg",
+          "OGG": "audio.ogg",
+          "Other/其他": "audio.other",
+          "TTA": "audio.tta",
+          "True-HD": "audio.truehd",
+          "TrueHD Atmos": "audio.truehd_atmos",
+          "WAV": "audio.wav",
+          "m4a": "audio.m4a"
+        },
+        "medium": {
+          "1080P/i压制": "medium.encode",
+          "720P压制": "medium.encode",
+          "BD DIY": "medium.bluray_diy",
+          "BD Remux": "medium.remux",
+          "BD原盘": "medium.bluray",
+          "CD": "medium.cd",
+          "CD+DVD": "medium.cd_dvd",
+          "CD+VCD": "medium.cd_vcd",
+          "DVD": "medium.dvd",
+          "HDTV": "medium.hdtv",
+          "MiniSD": "medium.minisd",
+          "Other/其他": "medium.other",
+          "SACD": "medium.sacd",
+          "UHD DIY": "medium.uhd_diy",
+          "UHD Remux": "medium.uhd_remux",
+          "UHD压制": "medium.uhd_encode",
+          "UHD原盘": "medium.uhd_bluray",
+          "WEB-DL": "medium.webdl",
+          "黑胶": "medium.vinyl"
+        },
+        "resolution": {
+          "1080i": "resolution.r1080i",
+          "1080p": "resolution.r1080p",
+          "4K/UHD/2160P": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K/4320P": "resolution.r4320p",
+          "Other/其他": "resolution.other",
+          "SD": "resolution.sd"
+        },
+        "source": {
+          "CN/中国大陆": "source.china",
+          "EU/欧洲": "source.europe",
+          "HK/香港": "source.hongkong",
+          "IN/印度": "source.india",
+          "JP/日本": "source.japan",
+          "KR/韩国": "source.korea",
+          "MY/马来西亚": "source.malaysia",
+          "Other/其他": "source.other",
+          "SG/新加坡": "source.singapore",
+          "TW/台湾": "source.taiwan",
+          "UK/英国": "source.uk",
+          "US/美国": "source.western"
+        },
+        "team": {
+          "Audies": "team.audies",
+          "BTN/NTb": "team.btn",
+          "CHDBits": "team.chdbits",
+          "CMCT": "team.cmct",
+          "DIC": "team.dic",
+          "EPSiLON": "team.epsilon",
+          "FRDS": "team.frds",
+          "FraMeSToR": "team.framestor",
+          "GGN": "team.ggn",
+          "HDC": "team.hdc",
+          "HDFans": "team.hdfans",
+          "HDHome": "team.hdhome",
+          "HDS": "team.hds",
+          "HHClub": "team.hhclub",
+          "Hares": "team.hares",
+          "LemonHD": "team.lemonhd",
+          "OpenCD": "team.opencd",
+          "Other/其他": "team.other",
+          "OurBits": "team.ourbits",
+          "PTHome": "team.pthome",
+          "PTP": "team.ptp",
+          "PTer": "team.pter",
+          "QHstudIo": "team.qhstudio",
+          "Red": "team.red",
+          "TLF": "team.tlf",
+          "TTG": "team.ttg",
+          "Ubits": "team.ubits",
+          "WiKi": "team.wiki",
+          "beAst": "team.beast"
+        },
+        "type": {
+          "Animations/动漫、动画": "category.animation",
+          "Documentaries/纪录片": "category.documentaries",
+          "Movies/电影": "category.movie",
+          "Music Videos/音乐视频": "category.mv",
+          "Music/音乐": "category.music",
+          "Others/其他": "category.other",
+          "Sports/体育": "category.sports",
+          "TV Series/电视剧": "category.tv_series",
+          "TV Shows/综艺": "category.tv_shows"
+        },
+        "video_codec": {
+          "AV1": "video.av1",
+          "H.264/AVC": "video.h264",
+          "H.265/HEVC": "video.h265",
+          "MPEG-2": "video.mpeg2",
+          "MPEG-4": "video.mpeg4",
+          "Other/其他": "video.other",
+          "VC-1": "video.vc1",
+          "Xvid": "video.xvid",
+          "x264": "video.x264",
+          "x265": "video.x265"
+        }
+      }
+    },
+    "zhuque": {
+      "site_name": "zhuque",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "tags[]": "标签",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {}
+    },
+    "zmpt": {
+      "site_name": "ZmPT",
+      "source_keys": {
+        "audio_codec": "音频编码",
+        "medium": "媒介",
+        "resolution": "分辨率",
+        "team": "制作组",
+        "type": "类型",
+        "video_codec": "视频编码"
+      },
+      "standard_keys": {
+        "audio_codec": {
+          "AAC": "audio.aac",
+          "AC3": "audio.ac3",
+          "ALAC": "audio.alac",
+          "APE": "audio.ape",
+          "DTS": "audio.dts",
+          "FLAC": "audio.flac",
+          "MP3": "audio.mp3",
+          "OGG": "audio.ogg",
+          "Other": "audio.other",
+          "WAV": "audio.wav"
+        },
+        "medium": {
+          "Blu-ray": "medium.bluray",
+          "CD": "medium.cd",
+          "DVDR": "medium.dvdr",
+          "Encode": "medium.encode",
+          "HD DVD": "medium.hddvd",
+          "HDTV": "medium.hdtv",
+          "MiniBD": "medium.minibd",
+          "Remux": "medium.remux",
+          "WEB-DL": "medium.webdl",
+          "其他资料": "medium.other"
+        },
+        "resolution": {
+          "1080p/1080i": "resolution.r1080p",
+          "2K/1440p": "resolution.r1440p",
+          "480p": "resolution.r480p",
+          "4K/2160p": "resolution.r2160p",
+          "720p": "resolution.r720p",
+          "8K/4320p": "resolution.r4320p",
+          "Other": "resolution.other"
+        },
+        "team": {
+          "DYZ-Movie": "team.dyztv",
+          "GodDramas": "team.goddramas",
+          "Other": "team.other",
+          "RL/RL4B": "team.rl",
+          "ZmAudio": "team.zmaudio",
+          "ZmMusic": "team.zmmusic",
+          "ZmPT": "team.zmpt",
+          "ZmWeb": "team.zmweb"
+        },
+        "type": {
+          "Anime": "category.animation",
+          "Audiobook": "category.audiobook",
+          "Game": "category.game",
+          "Misc": "category.other",
+          "Movies": "category.movie",
+          "Music": "category.music",
+          "Short Play": "category.playlet",
+          "Software": "category.software",
+          "TV Series": "category.tv_series",
+          "TV Shows": "category.tv_shows",
+          "documentary": "category.documentaries",
+          "其他 / Misc": "category.other",
+          "动漫 / Anime": "category.animation",
+          "有声书 / Audiobook": "category.audiobook",
+          "游戏 / Game": "category.game",
+          "电影 / Movies": "category.movie",
+          "电视剧 / TV Series": "category.tv_series",
+          "短剧 / Short Play": "category.playlet",
+          "纪录片 / documentary": "category.documentaries",
+          "综艺 / TV Shows": "category.tv_shows",
+          "软件 / Software": "category.software",
+          "音乐 / Music": "category.music"
+        }
+      }
+    }
+  }
+}
