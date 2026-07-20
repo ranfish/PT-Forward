@@ -279,6 +279,10 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		client.Config = string(cfgBytes)
 	}
 	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+		// 清除同名的软删除记录（避免 uniqueIndex 冲突，修复"删除后重新添加失败"bug）
+		if err := tx.Unscoped().Where("name = ?", client.Name).Delete(&model.ClientConfig{}).Error; err != nil {
+			return err
+		}
 		if err := dbimpl.ForceCreateTx(tx, &client); err != nil {
 			return err
 		}
