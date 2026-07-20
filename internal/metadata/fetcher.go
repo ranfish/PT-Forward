@@ -109,17 +109,21 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 // fillDetailFromTitle 用 titleparser 从详情页标题解析基本字段，补全 detail 中的空字段。
 // 仅补全空字段（不覆盖 Engine 已提取的）。所有补全的字段经 LookupStandardKey 标准化。
 //
+// 两层提取（v0.0.244 新增第二层）：
+//  1. titleparser.ParseTitle: 严格 scene 命名解析（resolution/codec/...）
+//  2. titleparser.ExtractXXX: 宽松正则匹配（移植 auto_feed_js，能从任意文本提取）
+//
 // 适用场景：
 //   - PTer 详情页"基本信息"聚合文本不含 codec/resolution（只有 type/size）
 //   - 但 h1 标题含完整 scene 命名（"Ride or Die S01 2026 1080p AMZN WEB-DL H.264 DDP 5.1 Atmos-CMCTV"）
 //   - titleparser 能从标题解析出 resolution/video_codec/audio_codec/release_group
 //
 // 字段语义映射（注意 detail.Source 实际语义是"媒介"）：
-//   - detail.Resolution ← titleparser components.Resolution
-//   - detail.Codec ← components.VideoCodec
-//   - detail.AudioCodec ← components.AudioCodec
+//   - detail.Resolution ← titleparser components.Resolution / ExtractResolution
+//   - detail.Codec ← components.VideoCodec / ExtractCodec
+//   - detail.AudioCodec ← components.AudioCodec / ExtractAudioCodec
 //   - detail.ReleaseGroup ← components.ReleaseGroup
-//   - detail.Source ← components.Medium（detail.Source 在 model 中语义=媒介）
+//   - detail.Source ← components.Medium / ExtractMedium（detail.Source 在 model 中语义=媒介）
 func fillDetailFromTitle(detail *model.TorrentDetail) {
 	title := strings.TrimSpace(detail.Title)
 	if title == "" {
@@ -160,6 +164,46 @@ func fillDetailFromTitle(detail *model.TorrentDetail) {
 			detail.Source = std
 		} else {
 			detail.Source = c.Medium
+		}
+	}
+
+	// 第二层 fallback（v0.0.244）: titleparser.ExtractXXX 从 title 宽松正则匹配。
+	// 仅当 ParseTitle 没提取到时尝试（互补关系）。
+	// 这些正则来自 auto_feed_js 实战验证，与 ParseTitle 的严格解析互补。
+	if detail.Resolution == "" {
+		if v := titleparser.ExtractResolution(title); v != "" {
+			if std := extract.LookupStandardKey("resolution", v); std != "" {
+				detail.Resolution = std
+			} else {
+				detail.Resolution = v
+			}
+		}
+	}
+	if detail.Codec == "" {
+		if v := titleparser.ExtractCodec(title); v != "" {
+			if std := extract.LookupStandardKey("video_codec", v); std != "" {
+				detail.Codec = std
+			} else {
+				detail.Codec = v
+			}
+		}
+	}
+	if detail.AudioCodec == "" {
+		if v := titleparser.ExtractAudioCodec(title); v != "" {
+			if std := extract.LookupStandardKey("audio_codec", v); std != "" {
+				detail.AudioCodec = std
+			} else {
+				detail.AudioCodec = v
+			}
+		}
+	}
+	if detail.Source == "" {
+		if v := titleparser.ExtractMedium(title, title); v != "" {
+			if std := extract.LookupStandardKey("medium", v); std != "" {
+				detail.Source = std
+			} else {
+				detail.Source = v
+			}
 		}
 	}
 }
