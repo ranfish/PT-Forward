@@ -9,12 +9,12 @@ import (
 // §56.10 决策 3：先硬编码 + TODO 接入 §56.1 standard_keys 表。
 // v0.0.238: defaultBasicInfoLabels 作为 fallback，PTNexus 配置（site_config.go）优先。
 var defaultBasicInfoLabels = map[string][]string{
-	"type":        {"类型", "類型", "category", "type"},
-	"medium":      {"媒介", "媒体", "媒體", "medium"},
-	"video_codec": {"视频编码", "視頻編碼", "编码", "編碼", "video codec", "codec"},
+	"type":        {"类型", "類型", "類別", "类别", "category", "type"},
+	"medium":      {"媒介", "媒体", "媒體", "格式", "medium"},
+	"video_codec": {"视频编码", "視頻編碼", "编码", "編碼", "视频编碼", "視頻编码", "video codec", "codec"},
 	"audio_codec": {"音频编码", "音頻編碼", "音频", "音頻", "audio codec", "audio"},
-	"resolution":  {"分辨率", "解析度", "resolution"},
-	"team":        {"制作组", "製作組", "团队", "團隊", "team"},
+	"resolution":  {"分辨率", "解析度", "resolution", "分辨率"},
+	"team":        {"制作组", "製作組", "团队", "團隊", "制作組", "製作组", "team"},
 	"source":      {"产地", "產地", "地区", "地區", "来源", "來源", "处理", "處理", "source"},
 }
 
@@ -57,7 +57,7 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 			return
 		}
 		// rowhead 本身不是字段标签（如 "基本信息"），看 rowfollow 内的 <span title="字段名">
-		if headText == "基本信息" || headText == "基本資料" || headText == "基本资料" {
+		if headText == "基本信息" || headText == "基本資料" || headText == "基本资料" || headText == "基本資訊" {
 			follow := head.NextFiltered(`td[class*="rowfollow"]`)
 			if follow.Length() == 0 {
 				follow = head.NextFiltered("td")
