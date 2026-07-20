@@ -13,13 +13,37 @@ var (
 )
 
 // extractSubtitle 从详情页提取副标题。
-// 三级回退：
-//  1. goquery 找 dt 含"副标题"的 dd / .subtitle 类 span
-//  2. 正则扫 HTML（兼容不规范 DOM）
-//  3. 空字符串（不强行填充）
+// 四级回退（v0.0.242 加 td.rowhead/rowfollow 模式，PTer/HDSky 等 NexusPHP 站用）：
+//  1. td[class*=rowhead] 含"副标题"的 td[class*=rowfollow]（NexusPHP 种子信息表标准）
+//  2. dt 含"副标题"的 dd（HTML5 description list）
+//  3. .subtitle 类 span
+//  4. 正则扫 HTML（兼容不规范 DOM）
+//  5. 空字符串（不强行填充）
 func (p *PublicExtractor) extractSubtitle(doc *goquery.Document, htmlStr string) string {
-	// 主路径 1: dt/dd
 	var subtitle string
+
+	// 主路径 1: td.rowhead + td.rowfollow（NexusPHP 种子信息表，如 PTer/HDSky）
+	doc.Find(`td[class*="rowhead"]`).Each(func(_ int, head *goquery.Selection) {
+		if subtitle != "" {
+			return
+		}
+		headText := strings.TrimSpace(head.Text())
+		if !strings.Contains(headText, "副标题") && !strings.Contains(headText, "副標題") {
+			return
+		}
+		follow := head.NextFiltered(`td[class*="rowfollow"]`)
+		if follow.Length() == 0 {
+			follow = head.NextFiltered("td")
+		}
+		if follow.Length() > 0 {
+			subtitle = strings.TrimSpace(follow.Text())
+		}
+	})
+	if subtitle != "" {
+		return subtitle
+	}
+
+	// 主路径 2: dt/dd
 	doc.Find("dt").Each(func(_ int, dt *goquery.Selection) {
 		if subtitle != "" {
 			return
@@ -36,7 +60,7 @@ func (p *PublicExtractor) extractSubtitle(doc *goquery.Document, htmlStr string)
 		return subtitle
 	}
 
-	// 主路径 2: .subtitle 类 span
+	// 主路径 3: .subtitle 类 span
 	doc.Find(`span[class*="subtitle"]`).Each(func(_ int, s *goquery.Selection) {
 		if subtitle != "" {
 			return
