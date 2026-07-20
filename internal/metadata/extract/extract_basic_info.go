@@ -19,8 +19,11 @@ var defaultBasicInfoLabels = map[string][]string{
 }
 
 // fillBasicInfoFields 从详情页基本信息表填充结构化字段。
-// 支持 4 种 HTML 模式（按精准度优先级）：
+// 支持 5 种 HTML 模式（按精准度优先级）：
 //  1. td.rowhead + td.rowfollow（NexusPHP 种子信息表标准，PTer/HDSky 等用此模式）
+//     - 子模式 a: rowfollow 纯文本（PTer "大小：18.53 GB 类型: 电视剧"）
+//     - 子模式 b: <span title="字段名">值</span>（SSD/Audiences）
+//     - 子模式 c: <b>字段名:</b>值 聚合 inline（HDSky/HDFans/CarPT/HDArea/HDTime 等 11 站）
 //  2. dt/dd 模式（HTML5 description list）
 //  3. th/td 模式（table header + cell）
 //  4. td/td 相邻模式（普通表格，限定不在 colhead 表内避免文件列表表头误匹配）
@@ -33,9 +36,10 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 	values := map[string]string{}
 
 	// 模式 1: td.rowhead + td.rowfollow（NexusPHP 种子信息表，最精准）
-	// 同时支持两种 rowfollow 内容形式：
+	// 同时支持三种 rowfollow 内容形式：
 	//   a) 纯文本（如 PTer "大小：18.53 GB 类型: 电视剧"）
 	//   b) <span title="字段名">值</span>（如 SSD "基本信息"中的 span 列表）
+	//   c) <b>字段名:</b>值 聚合 inline（HDSky/HDFans/CarPT 等 11 站）
 	doc.Find(`td[class*="rowhead"]`).Each(func(_ int, head *goquery.Selection) {
 		headText := strings.TrimSpace(head.Text())
 		// 先看 rowhead 本身是否就是字段标签（如 "类型"/"媒介"）
@@ -56,7 +60,7 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 			}
 			return
 		}
-		// rowhead 本身不是字段标签（如 "基本信息"），看 rowfollow 内的 <span title="字段名">
+		// rowhead 本身不是字段标签（如 "基本信息"），看 rowfollow 内的子模式 b/c
 		if headText == "基本信息" || headText == "基本資料" || headText == "基本资料" || headText == "基本資訊" {
 			follow := head.NextFiltered(`td[class*="rowfollow"]`)
 			if follow.Length() == 0 {
@@ -65,7 +69,7 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 			if follow.Length() == 0 {
 				return
 			}
-			// 提取 <span title="...">值</span> 形式（SSD/HDArea 等用此模式）
+			// 子模式 b: <span title="...">值</span>（SSD/HDArea 等用此模式）
 			follow.Find(`span[title]`).Each(func(_ int, span *goquery.Selection) {
 				spanTitle, _ := span.Attr("title")
 				spanTitle = strings.TrimSpace(spanTitle)
@@ -79,6 +83,36 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 				}
 				if _, exists := values[field]; !exists {
 					values[field] = value
+				}
+			})
+			// 子模式 c: <b>字段名:</b>值 聚合 inline（HDSky/HDFans/CarPT 等用此模式）
+			// 遍历所有 <b>，去掉末尾冒号后匹配字段标签，值取自 <b> 的下一个文本兄弟节点
+			follow.Find("b").Each(func(_ int, b *goquery.Selection) {
+				bText := strings.TrimSpace(b.Text())
+				if bText == "" {
+					return
+				}
+				// 去掉末尾的冒号（中英文）
+				label := strings.TrimRight(bText, ":：")
+				if label == bText {
+					return // 没冒号，不是字段标签
+				}
+				label = strings.TrimSpace(label)
+				field := matchFieldWithLabels(label, fieldLabels)
+				if field == "" {
+					return
+				}
+				// 取 <b> 之后的兄弟文本节点（值）
+				if node := b.Nodes[0]; node != nil && node.NextSibling != nil {
+					raw := node.NextSibling.Data
+					// 去掉 &nbsp; (\u00a0) 和空白
+					value := strings.TrimSpace(strings.TrimLeft(raw, " \t\n\r\u00a0"))
+					if value == "" || len(value) > 50 {
+						return
+					}
+					if _, exists := values[field]; !exists {
+						values[field] = value
+					}
 				}
 			})
 		}
