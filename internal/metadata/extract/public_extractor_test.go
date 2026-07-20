@@ -66,24 +66,25 @@ func TestPublicExtractor_EndToEnd(t *testing.T) {
 		t.Logf("Size = %d (expected ~%d)", seed.Size, expectedBytes)
 	}
 
-	// 类型
-	if seed.Type != "电影" {
+	// 类型（v0.0.238: 标准化为 code）
+	if seed.Type != "category.movie" {
 		t.Errorf("Type mismatch: %q", seed.Type)
 	}
 	// 媒介
-	if seed.Medium != "UHD Blu-ray" {
+	// v0.0.238: 字段值经 LookupStandardKey 标准化为 code
+	if seed.Medium != "medium.uhd_bluray" {
 		t.Errorf("Medium mismatch: %q", seed.Medium)
 	}
 	// 视频编码
-	if seed.VideoCodec != "H.265/HEVC" {
+	if seed.VideoCodec != "video.h265" {
 		t.Errorf("VideoCodec mismatch: %q", seed.VideoCodec)
 	}
 	// 分辨率
-	if seed.Resolution != "2160p" {
+	if seed.Resolution != "resolution.r2160p" {
 		t.Errorf("Resolution mismatch: %q", seed.Resolution)
 	}
 	// 制作组
-	if seed.ReleaseGroup != "FRDS" {
+	if seed.ReleaseGroup != "team.frds" {
 		t.Errorf("ReleaseGroup mismatch: %q", seed.ReleaseGroup)
 	}
 
