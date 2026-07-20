@@ -46,7 +46,9 @@ jobs:
           tags: |
             ghcr.io/ranfish/pt-forward:latest
             ghcr.io/ranfish/pt-forward:${{ steps.version.outputs.VERSION }}
-          build-args: VERSION=${{ steps.version.outputs.VERSION }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.VERSION }}
+            CACHEBUST=${{ github.sha }}
           cache-from: type=registry,ref=ghcr.io/ranfish/pt-forward:latest
           cache-to: type=inline
 
@@ -60,5 +62,7 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/pt-forward:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/pt-forward:${{ steps.version.outputs.VERSION }}
-          build-args: VERSION=${{ steps.version.outputs.VERSION }}
-          cache-from: type=registry,ref=ghcr.io/ranfish/pt-forward:latest
+          build-args: |
+            VERSION=${{ steps.version.outputs.VERSION }}
+            CACHEBUST=${{ github.sha }}
+          no-cache: true

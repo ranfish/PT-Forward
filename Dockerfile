@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git gcc libc6-d
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
+ARG CACHEBUST=1
 COPY . .
 COPY --from=frontend /build/web/dist frontend/dist
 ARG VERSION=dev
