@@ -161,14 +161,16 @@ func extractPTerBasicInfoText(doc *goquery.Document) string {
 }
 
 // fillFromPTerBasicInfoText 从"基本信息"聚合文本解析各字段。
-// 格式样例："大小：18.53 GB  类型: 电视剧 (TV Series)  产地：欧美  分辨率：1080p  ..."
+// PTer 详情页"基本信息"实际格式（基于 torrent_id=859990 真实样本）：
+//   "<b>大小：</b>18.53 GB  <b>类型:</b> 电视剧 (TV Series)  <b>质量: </b>WEB-DL  <b>地区: </b>欧美 (Western)"
+// 注意：PTer 用"质量"代替"媒介"，用"地区"代替"产地"（与 PTNexus yaml 配置不符）
 // 字段间用 \u00a0（NBSP）或多个空格分隔。
 var rePTerTypeField = regexp.MustCompile(`类型\s*[:：]\s*(\S+(?:\s*\([^)]+\))?)`)
-var rePTerMediumField = regexp.MustCompile(`媒介\s*[:：]\s*(\S+)`)
+var rePTerMediumField = regexp.MustCompile(`(?:媒介|媒体|媒體|质量|質量)\s*[:：]\s*(\S+)`)
 var rePTerCodecField = regexp.MustCompile(`(?:编码|視頻編碼|视频编码)\s*[:：]\s*(\S+)`)
 var rePTerResolutionField = regexp.MustCompile(`分辨率\s*[:：]\s*(\S+)`)
 var rePTerTeamField = regexp.MustCompile(`(?:制作组|製作組|团队|團隊)\s*[:：]\s*(\S+)`)
-var rePTerSourceField = regexp.MustCompile(`产地\s*[:：]\s*(\S+)`)
+var rePTerSourceField = regexp.MustCompile(`(?:产地|產地|地区|地區|区域|區域)\s*[:：]\s*(\S+(?:\s*\([^)]+\))?)`)
 
 func fillFromPTerBasicInfoText(seed *extract.SeedData, text string) {
 	text = strings.ReplaceAll(text, "\u00a0", " ")
