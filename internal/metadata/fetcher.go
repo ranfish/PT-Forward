@@ -10,6 +10,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -120,9 +121,73 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 		}
 	}
 
+	// §56.13 方案 1: 用 titleparser 从 h1/标题补全 detail 中空的基本字段。
+	// titleparser 已能解析 resolution/video_codec/audio_codec/release_group/medium。
+	// Engine 提取的字段优先（更精准），titleparser 仅补全空字段。
+	// 补全的字段经 LookupStandardKey 标准化为 code（与 Engine 输出格式一致）。
+	fillDetailFromTitle(detail)
+
 	meta := f.buildMetadata(infoHash, siteName, torrentID, detail, engineMeta)
 	meta.FetchSource = fetchSource
 	return meta, nil
+}
+
+// fillDetailFromTitle 用 titleparser 从详情页标题解析基本字段，补全 detail 中的空字段。
+// 仅补全空字段（不覆盖 Engine 已提取的）。所有补全的字段经 LookupStandardKey 标准化。
+//
+// 适用场景：
+//   - PTer 详情页"基本信息"聚合文本不含 codec/resolution（只有 type/size）
+//   - 但 h1 标题含完整 scene 命名（"Ride or Die S01 2026 1080p AMZN WEB-DL H.264 DDP 5.1 Atmos-CMCTV"）
+//   - titleparser 能从标题解析出 resolution/video_codec/audio_codec/release_group
+//
+// 字段语义映射（注意 detail.Source 实际语义是"媒介"）：
+//   - detail.Resolution ← titleparser components.Resolution
+//   - detail.Codec ← components.VideoCodec
+//   - detail.AudioCodec ← components.AudioCodec
+//   - detail.ReleaseGroup ← components.ReleaseGroup
+//   - detail.Source ← components.Medium（detail.Source 在 model 中语义=媒介）
+func fillDetailFromTitle(detail *model.TorrentDetail) {
+	title := strings.TrimSpace(detail.Title)
+	if title == "" {
+		return
+	}
+	c := titleparser.ParseTitle(title)
+	if detail.Resolution == "" && c.Resolution != "" {
+		if std := extract.LookupStandardKey("resolution", c.Resolution); std != "" {
+			detail.Resolution = std
+		} else {
+			detail.Resolution = c.Resolution
+		}
+	}
+	if detail.Codec == "" && c.VideoCodec != "" {
+		if std := extract.LookupStandardKey("video_codec", c.VideoCodec); std != "" {
+			detail.Codec = std
+		} else {
+			detail.Codec = c.VideoCodec
+		}
+	}
+	if detail.AudioCodec == "" && c.AudioCodec != "" {
+		if std := extract.LookupStandardKey("audio_codec", c.AudioCodec); std != "" {
+			detail.AudioCodec = std
+		} else {
+			detail.AudioCodec = c.AudioCodec
+		}
+	}
+	if detail.ReleaseGroup == "" && c.ReleaseGroup != "" {
+		if std := extract.LookupStandardKey("team", c.ReleaseGroup); std != "" {
+			detail.ReleaseGroup = std
+		} else {
+			detail.ReleaseGroup = c.ReleaseGroup
+		}
+	}
+	// detail.Source 语义=媒介，titleparser components.Medium 是媒介
+	if detail.Source == "" && c.Medium != "" {
+		if std := extract.LookupStandardKey("medium", c.Medium); std != "" {
+			detail.Source = std
+		} else {
+			detail.Source = c.Medium
+		}
+	}
 }
 
 // deriveSiteCode 从 site.Domain 推导 site_code（如 pterclub.net → "pterclub"）。
