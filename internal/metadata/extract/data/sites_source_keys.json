@@ -78,7 +78,7 @@
         "type": {
           "动漫/Animations": "category.animation",
           "演唱会、MV/Music Videos": "category.mv",
-          "电子书\u0026有声读物/E-book": "category.ebook",
+          "电子书&有声读物/E-book": "category.ebook",
           "电影/Movies": "category.movie",
           "纪录片/Docmentaries": "category.documentaries",
           "综艺/TV Shows": "category.tv_shows",
@@ -5048,6 +5048,35 @@
           "软件 / Software": "category.software",
           "音乐 / Music": "category.music"
         }
+      }
+    },
+    "1ptba": {
+      "site_name": "1PTBar",
+      "source_keys": {
+        "type": "类型",
+        "medium": "来源",
+        "video_codec": "视频编码",
+        "audio_codec": "音频编码",
+        "resolution": "分辨率",
+        "team": "制作组"
+      }
+    },
+    "hitpt": {
+      "site_name": "HitPT",
+      "source_keys": {
+        "type": "类型",
+        "medium": "来源",
+        "video_codec": "编码",
+        "audio_codec": "音频编码",
+        "resolution": "分辨率",
+        "team": "制作组"
+      }
+    },
+    "discfan": {
+      "site_name": "DiscFan",
+      "source_keys": {
+        "type": "類別",
+        "medium": "來源"
       }
     }
   }

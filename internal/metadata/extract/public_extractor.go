@@ -67,7 +67,13 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	seed.MediaInfo, seed.BDInfo = p.extractMediaInfo(descrHTML, descrBBCode)
 
 	// 阶段 5: 基本信息表格行
-	p.fillBasicInfoFields(doc, &seed)
+	// v0.0.252: 优先用 input.SiteCode（PublicExtractor 是单例，多 goroutine 并发时
+	// 不能改实例字段，否则会 race condition；用参数传递保证并发安全）
+	siteCode := input.SiteCode
+	if siteCode == "" {
+		siteCode = p.siteCode
+	}
+	p.fillBasicInfoFieldsWithCode(doc, &seed, siteCode)
 
 	// 阶段 6: 标签 + InfoHash + Size + URL + Flags
 	seed.Tags = p.extractTags(doc)

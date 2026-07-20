@@ -4,10 +4,14 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/html"
 )
 
 // §56.10 决策 3：先硬编码 + TODO 接入 §56.1 standard_keys 表。
 // v0.0.238: defaultBasicInfoLabels 作为 fallback，PTNexus 配置（site_config.go）优先。
+// v0.0.252: source 字段移除 "来源"/"來源"（与 medium 字段歧义），
+// 让 site-specific 配置（1ptba/hitpt/discfan 的 medium="来源"）控制，
+// 避免壹吧/百川/碟粉的 "来源: WEB-DL" 被误归到 source（产地）字段。
 var defaultBasicInfoLabels = map[string][]string{
 	"type":        {"类型", "類型", "類別", "类别", "category", "type"},
 	"medium":      {"媒介", "媒体", "媒體", "格式", "medium"},
@@ -15,7 +19,7 @@ var defaultBasicInfoLabels = map[string][]string{
 	"audio_codec": {"音频编码", "音頻編碼", "音频", "音頻", "audio codec", "audio"},
 	"resolution":  {"分辨率", "解析度", "resolution", "分辨率"},
 	"team":        {"制作组", "製作組", "团队", "團隊", "制作組", "製作组", "team"},
-	"source":      {"产地", "產地", "地区", "地區", "来源", "來源", "处理", "處理", "source"},
+	"source":      {"产地", "產地", "地区", "地區", "处理", "處理", "source"},
 }
 
 // fillBasicInfoFields 从详情页基本信息表填充结构化字段。
@@ -31,8 +35,13 @@ var defaultBasicInfoLabels = map[string][]string{
 // v0.0.238: 按 site_code 加载 PTNexus 移植的 source_key 配置（覆盖默认 label）。
 // 字段值经 LookupStandardKey 映射到标准键（如 "电视剧 (TV Series)" → "category.tv_series"）。
 func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedData) {
+	p.fillBasicInfoFieldsWithCode(doc, seed, p.siteCode)
+}
+
+// fillBasicInfoFieldsWithCode 显式传入 siteCode 的版本（并发安全）。
+func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, seed *SeedData, siteCode string) {
 	// 每个字段的候选 labels：site-specific source_key 优先 + default 变体
-	fieldLabels := buildFieldLabels(p.siteCode)
+	fieldLabels := buildFieldLabels(siteCode)
 	values := map[string]string{}
 
 	// 模式 1: td.rowhead + td.rowfollow（NexusPHP 种子信息表，最精准）
@@ -52,7 +61,7 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 				return
 			}
 			value := strings.TrimSpace(follow.Text())
-			if value == "" || len(value) > 50 {
+			if value == "" || len([]rune(value)) > 80 {
 				return
 			}
 			if _, exists := values[field]; !exists {
@@ -78,7 +87,7 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 					return
 				}
 				value := strings.TrimSpace(span.Text())
-				if value == "" || len(value) > 50 {
+				if value == "" || len([]rune(value)) > 80 {
 					return
 				}
 				if _, exists := values[field]; !exists {
@@ -86,28 +95,44 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 				}
 			})
 			// 子模式 c: <b>字段名:</b>值 聚合 inline（HDSky/HDFans/CarPT 等用此模式）
-			// 遍历所有 <b>，去掉末尾冒号后匹配字段标签，值取自 <b> 的下一个文本兄弟节点
+			// 遍历所有 <b>，去掉末尾冒号后匹配字段标签，值取自 <b> 的下一个兄弟节点（文本或 <span>）
+			// v0.0.252 修复：
+			//   1) 优先看 <b title="..."> 的 title 属性（织梦 zmpt.cc <b title="媒介">视频类:</b><span>WEB-DL</span>）
+			//   2) value 长度判断用 rune 计数（星湾 xingwan.cc 中文值 "Blu-ray / BD（蓝光原盘 ...）" UTF-8 字节超 50 被误过滤）
+			//   3) 兼容 <b>label</b><span>value</span> 结构（值在 span 里，非文本节点）
 			follow.Find("b").Each(func(_ int, b *goquery.Selection) {
-				bText := strings.TrimSpace(b.Text())
-				if bText == "" {
-					return
-				}
-				// 去掉末尾的冒号（中英文）
-				label := strings.TrimRight(bText, ":：")
-				if label == bText {
-					return // 没冒号，不是字段标签
-				}
+				// 1) 优先用 <b title="..."> 的 title 属性作 label
+				label, _ := b.Attr("title")
 				label = strings.TrimSpace(label)
+				if label == "" {
+					// 退化：用 b 的 text 去末尾冒号
+					bText := strings.TrimSpace(b.Text())
+					if bText == "" {
+						return
+					}
+					trimmed := strings.TrimRight(bText, ":：")
+					if trimmed == bText {
+						return // 没冒号，不是字段标签
+					}
+					label = strings.TrimSpace(trimmed)
+				}
 				field := matchFieldWithLabels(label, fieldLabels)
 				if field == "" {
 					return
 				}
-				// 取 <b> 之后的兄弟文本节点（值）
+				// 2) 取值：先看下一个兄弟节点
 				if node := b.Nodes[0]; node != nil && node.NextSibling != nil {
-					raw := node.NextSibling.Data
-					// 去掉 &nbsp; (\u00a0) 和空白
-					value := strings.TrimSpace(strings.TrimLeft(raw, " \t\n\r\u00a0"))
-					if value == "" || len(value) > 50 {
+					next := node.NextSibling
+					var value string
+					switch next.Type {
+					case html.TextNode:
+						// 文本节点：直接取 Data（已含实体解码后的文本）
+						value = strings.TrimSpace(strings.TrimLeft(next.Data, " \t\n\r\u00a0"))
+					case html.ElementNode:
+						// 元素节点（如 <span>value</span>）：取元素内文本
+						value = strings.TrimSpace(b.Next().Text())
+					}
+					if value == "" || len([]rune(value)) > 80 {
 						return
 					}
 					if _, exists := values[field]; !exists {
@@ -186,7 +211,7 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 		if nextTD.Find("td").Length() > 0 {
 			return
 		}
-		if len(value) > 50 {
+		if len([]rune(value)) > 80 {
 			return
 		}
 		if _, exists := values[field]; !exists {
