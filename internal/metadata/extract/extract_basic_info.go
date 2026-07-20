@@ -33,29 +33,54 @@ func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedD
 	values := map[string]string{}
 
 	// 模式 1: td.rowhead + td.rowfollow（NexusPHP 种子信息表，最精准）
+	// 同时支持两种 rowfollow 内容形式：
+	//   a) 纯文本（如 PTer "大小：18.53 GB 类型: 电视剧"）
+	//   b) <span title="字段名">值</span>（如 SSD "基本信息"中的 span 列表）
 	doc.Find(`td[class*="rowhead"]`).Each(func(_ int, head *goquery.Selection) {
 		headText := strings.TrimSpace(head.Text())
-		field := matchFieldWithLabels(headText, fieldLabels)
-		if field == "" {
+		// 先看 rowhead 本身是否就是字段标签（如 "类型"/"媒介"）
+		if field := matchFieldWithLabels(headText, fieldLabels); field != "" {
+			follow := head.NextFiltered(`td[class*="rowfollow"]`)
+			if follow.Length() == 0 {
+				follow = head.NextFiltered("td")
+			}
+			if follow.Length() == 0 {
+				return
+			}
+			value := strings.TrimSpace(follow.Text())
+			if value == "" || len(value) > 50 {
+				return
+			}
+			if _, exists := values[field]; !exists {
+				values[field] = value
+			}
 			return
 		}
-		follow := head.NextFiltered(`td[class*="rowfollow"]`)
-		if follow.Length() == 0 {
-			follow = head.NextFiltered("td")
-		}
-		if follow.Length() == 0 {
-			return
-		}
-		value := strings.TrimSpace(follow.Text())
-		if value == "" {
-			return
-		}
-		// 排除聚合 td（值太长，含多个字段，让站点提取器单独解析）
-		if len(value) > 50 {
-			return
-		}
-		if _, exists := values[field]; !exists {
-			values[field] = value
+		// rowhead 本身不是字段标签（如 "基本信息"），看 rowfollow 内的 <span title="字段名">
+		if headText == "基本信息" || headText == "基本資料" || headText == "基本资料" {
+			follow := head.NextFiltered(`td[class*="rowfollow"]`)
+			if follow.Length() == 0 {
+				follow = head.NextFiltered("td")
+			}
+			if follow.Length() == 0 {
+				return
+			}
+			// 提取 <span title="...">值</span> 形式（SSD/HDArea 等用此模式）
+			follow.Find(`span[title]`).Each(func(_ int, span *goquery.Selection) {
+				spanTitle, _ := span.Attr("title")
+				spanTitle = strings.TrimSpace(spanTitle)
+				field := matchFieldWithLabels(spanTitle, fieldLabels)
+				if field == "" {
+					return
+				}
+				value := strings.TrimSpace(span.Text())
+				if value == "" || len(value) > 50 {
+					return
+				}
+				if _, exists := values[field]; !exists {
+					values[field] = value
+				}
+			})
 		}
 	})
 
