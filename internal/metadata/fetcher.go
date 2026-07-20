@@ -96,6 +96,7 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 
 	// §56.13 接线: 拿到 rawHTML 后调 Engine.Extract（站点 hook + PublicExtractor）
 	engineMeta := extract.Meta{ExtractorName: "adapter.GetTorrentDetail"}
+	var engineSeed extract.SeedData // 保留 Engine 输出，buildMetadata 时用于补全 detail 中缺失的字段（如 Source 产地）
 	if f.engine != nil && detail.RawHTML != "" {
 		input := extract.Input{
 			SiteCode:      deriveSiteCode(siteCfg.Domain),
@@ -110,6 +111,7 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 			engineMeta = meta
 		}
 		if seed.IsMeaningful() {
+			engineSeed = seed
 			mergeSeedIntoDetail(detail, seed)
 			f.logger.Debug("engine extracted",
 				zap.String("extractor", meta.ExtractorName),
@@ -127,7 +129,7 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 	// 补全的字段经 LookupStandardKey 标准化为 code（与 Engine 输出格式一致）。
 	fillDetailFromTitle(detail)
 
-	meta := f.buildMetadata(infoHash, siteName, torrentID, detail, engineMeta)
+	meta := f.buildMetadata(infoHash, siteName, torrentID, detail, engineMeta, engineSeed)
 	meta.FetchSource = fetchSource
 	return meta, nil
 }
@@ -302,7 +304,7 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash, primarySi
 	return nil
 }
 
-func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *model.TorrentDetail, engineMeta extract.Meta) *model.TorrentMetadata {
+func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *model.TorrentDetail, engineMeta extract.Meta, engineSeed extract.SeedData) *model.TorrentMetadata {
 	now := time.Now()
 	meta := &model.TorrentMetadata{
 		InfoHash:        infoHash,
@@ -349,6 +351,12 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 	// §56.13 + §56.14: 构建 detail_source_json（三源之一，/merge 接口使用）
 	// 优先用 Engine 输出（更精准），fallback 用 adapter 字段
 	seed := extract.DetailToSeed(detail)
+	// §56.13 v0.0.241: detail 没有"产地"字段（model.TorrentDetail.Source 语义=媒介），
+	// 但 Engine 提取了 seed.Source（产地，如"欧美"），需要保留到 detail_source_json。
+	// 这里用 Engine seed.Source 补全（mergeSeedIntoDetail 因 detail 无对应字段会丢弃）。
+	if seed.Source == "" && engineSeed.Source != "" {
+		seed.Source = engineSeed.Source
+	}
 	detailSource := SeedToDetailSource(seed, now, engineMeta)
 	if data, err := json.Marshal(detailSource); err == nil {
 		meta.DetailSourceJSON = string(data)
