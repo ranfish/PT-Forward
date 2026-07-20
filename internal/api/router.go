@@ -85,7 +85,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 	if clientMgr != nil {
 		dashChecker = clientMgr
 	}
-	adapterFactory := adapter.NewFactory(logger)
+	adapterFactory := adapter.NewFactory(logger, nil) // router 内部用于 StatsSync，不需要 Engine
 	siteHandler := NewSiteHandler(siteRepo, logger, db)
 	siteHandler.SetStatsSync(site.NewStatsSyncService(db, adapterFactory, logger))
 	var clientMgrIface ClientManager

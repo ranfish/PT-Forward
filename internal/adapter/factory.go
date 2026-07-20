@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -27,18 +28,32 @@ func NewHTTPDoerWithSite(proxyURL string, skipSSLVerify bool) *HTTPDoer {
 	}
 }
 
+// Factory 按框架名创建 adapter 实例。
+// §56.13 方案 B: engine 可选注入到 NexusPHP/Unit3D 等 HTML 框架的 adapter。
 type Factory struct {
 	logger *zap.Logger
+	engine *extract.Engine
 }
 
-func NewFactory(logger *zap.Logger) *Factory {
-	return &Factory{logger: logger}
+// NewFactory 创建 adapter 工厂。engine 可为 nil（退化为 legacy regexp 提取）。
+func NewFactory(logger *zap.Logger, engine *extract.Engine) *Factory {
+	return &Factory{logger: logger, engine: engine}
+}
+
+// EngineInjector 接口：能接受 Engine 注入的 adapter 实现。
+// NexusPHPAdapter / Unit3DAdapter 实现；其他 adapter（MTeam/Gazelle 等）不实现。
+type EngineInjector interface {
+	SetEngine(*extract.Engine)
 }
 
 func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 	switch framework {
 	case "nexusphp":
-		return NewNexusPHPAdapter(doer, f.logger)
+		a := NewNexusPHPAdapter(doer, f.logger)
+		if f.engine != nil {
+			a.SetEngine(f.engine)
+		}
+		return a
 	case "tnode":
 		return NewTNodeAdapter(doer, f.logger)
 	case "yemapt":
@@ -46,7 +61,10 @@ func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 	case "mteam":
 		return NewMTeamAdapter(doer, f.logger)
 	case "unit3d":
-		return NewUnit3DAdapter(doer, f.logger)
+		a := NewUnit3DAdapter(doer, f.logger)
+		// Unit3D 暂未实现 SetEngine，先不注入（后续改造）
+		_ = f.engine
+		return a
 	case "gazelle":
 		return NewGazelleAdapter(doer, f.logger)
 	case "rousi":

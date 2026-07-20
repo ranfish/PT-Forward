@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -69,11 +70,16 @@ var (
 type NexusPHPAdapter struct {
 	doer   *HTTPDoer
 	logger *zap.Logger
+	engine *extract.Engine // §56.13 方案 B: 可选 Engine 引用，注入后 GetTorrentDetail 优先走 Engine
 }
 
 func NewNexusPHPAdapter(doer *HTTPDoer, logger *zap.Logger) *NexusPHPAdapter {
 	return &NexusPHPAdapter{doer: doer, logger: logger}
 }
+
+// SetEngine 注入 Engine（§56.13 方案 B）。
+// 启动时由 adapter.Factory.Create 调用。engine == nil 时退化为 legacy regexp 提取。
+func (a *NexusPHPAdapter) SetEngine(e *extract.Engine) { a.engine = e }
 
 func (a *NexusPHPAdapter) Framework() string { return "nexusphp" }
 
@@ -183,30 +189,81 @@ func (a *NexusPHPAdapter) resolveSignedDownloadURL(ctx context.Context, config *
 }
 
 func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
+	html, err := a.fetchDetailsHTML(ctx, config, torrentID)
+	if err != nil {
+		return nil, err
+	}
+
+	// §56.13 方案 B: 优先用 Engine 提取（更精准：goquery + 站点 hook + 标准化键映射）
+	if a.engine != nil {
+		detail, ok := a.extractWithEngine(html, config, torrentID)
+		if ok {
+			return detail, nil
+		}
+		if a.logger != nil {
+			a.logger.Warn("nexusphp: engine extraction not meaningful, fallback to legacy regexp")
+		}
+	}
+
+	// fallback: 老 regexp 提取（保留作 Engine 失败时的兜底）
+	return a.legacyExtractDetail(html), nil
+}
+
+// fetchDetailsHTML 负责详情页 HTTP GET，返回原始 HTML。
+func (a *NexusPHPAdapter) fetchDetailsHTML(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 	u := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, networkError("构造请求失败", err)
+		return "", networkError("构造请求失败", err)
 	}
 	setCommonHeaders(req, config.Cookie)
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return nil, networkError("请求详情页失败", err)
+		return "", networkError("请求详情页失败", err)
 	}
 	defer func() { drainBody(resp) }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
+		return "", httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
 	body, err := readBody(resp)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
+	return string(body), nil
+}
 
-	html := string(body)
+// extractWithEngine 用 Engine 提取详情页字段。
+// 返回 (detail, true) 表示提取有意义；返回 (nil, false) 表示 Engine 失败需 fallback。
+func (a *NexusPHPAdapter) extractWithEngine(html string, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, bool) {
+	input := extract.Input{
+		SiteCode:     deriveSiteCode(config.Domain),
+		SiteNickname: config.SiteName,
+		BaseURL:      config.BaseURL,
+		TorrentID:    torrentID,
+		PageHTML:     html,
+	}
+	seed, meta := a.engine.Extract(input)
+	if !seed.IsMeaningful() {
+		return nil, false
+	}
+	detail := extract.SeedToDetail(seed)
+	if detail == nil {
+		return nil, false
+	}
+	detail.RawHTML = html
+	if meta.ExtractorName != "" {
+		detail.EngineExtractorName = meta.ExtractorName
+	}
+	return detail, true
+}
+
+// legacyExtractDetail 老 regexp 提取逻辑（原 GetTorrentDetail 主体）。
+// 保留作 Engine 失败时的 fallback；Engine 成功时不会调用。
+func (a *NexusPHPAdapter) legacyExtractDetail(html string) *model.TorrentDetail {
 	detail := &model.TorrentDetail{}
 
 	if m := reNexusTitle.FindStringSubmatch(html); len(m) > 1 {
@@ -304,10 +361,9 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 		detail.DoubanURL = doubanURL
 	}
 
-	// §56.13: 暴露原始 HTML 供 Engine 提取（fetcher 调用 PublicExtractor + 站点 hook）
 	detail.RawHTML = html
-
-	return detail, nil
+	detail.EngineExtractorName = "legacy_regexp"
+	return detail
 }
 
 func cleanRowText(row string) string {
@@ -2359,4 +2415,25 @@ func isUnwantedImage(url string) bool {
 		}
 	}
 	return false
+}
+
+// deriveSiteCode 从 site.Domain 推导 site_code（如 pterclub.net → "pterclub"）。
+// Engine.specialByCode 用此 key 匹配站点特殊提取器（如 pterclub_special）。
+// 推导失败返回空串（Engine 会自动 fallback 到 public extractor）。
+func deriveSiteCode(domain string) string {
+	if domain == "" {
+		return ""
+	}
+	host := domain
+	if u, err := url.Parse(domain); err == nil && u.Hostname() != "" {
+		host = u.Hostname()
+	}
+	if i := strings.IndexByte(host, ':'); i > 0 {
+		host = host[:i]
+	}
+	parts := strings.Split(host, ".")
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.ToLower(parts[0])
 }

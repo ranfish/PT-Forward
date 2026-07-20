@@ -28,7 +28,7 @@ func debugSite() {
 	crypto.RegisterCallbacks(db, enc, zap.NewNop())
 
 	logger, _ := zap.NewProduction()
-	provider := site.NewProvider(db, adapter.NewFactory(logger), logger)
+	provider := site.NewProvider(db, adapter.NewFactory(logger, nil), logger)
 
 	var s model.Site
 	db.Where("name = ?", siteName).First(&s)
@@ -54,7 +54,7 @@ func debugSite() {
 	fmt.Printf("  Cookie (len): %d\n", len(config.Cookie))
 
 	doer := adapter.NewHTTPDoerWithSite(config.ProxyURL, config.SkipSSLVerify)
-	a := adapter.NewFactory(logger).Create(s.Framework, doer)
+	a := adapter.NewFactory(logger, nil).Create(s.Framework, doer)
 
 	dlCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()

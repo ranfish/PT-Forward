@@ -43,7 +43,7 @@ func createTestSite(t *testing.T, db *gorm.DB) *model.Site {
 func TestProvider_GetSiteInfo(t *testing.T) {
 	db := setupProviderDB(t)
 	createTestSite(t, db)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	info, err := p.GetSiteInfo(context.Background(), "test-site")
 	if err != nil {
@@ -62,7 +62,7 @@ func TestProvider_GetSiteInfo(t *testing.T) {
 
 func TestProvider_GetSiteInfo_NotFound(t *testing.T) {
 	db := setupProviderDB(t)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	_, err := p.GetSiteInfo(context.Background(), "nonexist")
 	if err == nil {
@@ -77,7 +77,7 @@ func TestProvider_GetSiteInfo_NotFound(t *testing.T) {
 func TestProvider_GetSiteConfig(t *testing.T) {
 	db := setupProviderDB(t)
 	createTestSite(t, db)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	config, err := p.GetSiteConfig(context.Background(), "test.example.com")
 	if err != nil {
@@ -96,7 +96,7 @@ func TestProvider_GetSiteConfig(t *testing.T) {
 
 func TestProvider_GetSiteConfig_NotFound(t *testing.T) {
 	db := setupProviderDB(t)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	_, err := p.GetSiteConfig(context.Background(), "nope.com")
 	if err == nil {
@@ -107,7 +107,7 @@ func TestProvider_GetSiteConfig_NotFound(t *testing.T) {
 func TestProvider_GetSiteDefault(t *testing.T) {
 	db := setupProviderDB(t)
 	createTestSite(t, db)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	def, err := p.GetSiteDefault(context.Background(), "test.example.com")
 	if err != nil {
@@ -128,7 +128,7 @@ func TestProvider_GetSiteDefault_UnknownFramework(t *testing.T) {
 		Framework: "custom_unknown", Enabled: true,
 	}
 	db.Create(site)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	def, err := p.GetSiteDefault(context.Background(), "unknown.com")
 	if err != nil {
@@ -142,7 +142,7 @@ func TestProvider_GetSiteDefault_UnknownFramework(t *testing.T) {
 func TestProvider_GetAdapter(t *testing.T) {
 	db := setupProviderDB(t)
 	createTestSite(t, db)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	a, err := p.GetAdapter(context.Background(), "test.example.com")
 	if err != nil {
@@ -159,7 +159,7 @@ func TestProvider_GetAdapter(t *testing.T) {
 func TestProvider_GetAdapter_Cached(t *testing.T) {
 	db := setupProviderDB(t)
 	createTestSite(t, db)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	a1, _ := p.GetAdapter(context.Background(), "test.example.com")
 	a2, _ := p.GetAdapter(context.Background(), "test.example.com")
@@ -170,7 +170,7 @@ func TestProvider_GetAdapter_Cached(t *testing.T) {
 
 func TestProvider_GetAdapter_NotFound(t *testing.T) {
 	db := setupProviderDB(t)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	_, err := p.GetAdapter(context.Background(), "nope.com")
 	if err == nil {
@@ -181,7 +181,7 @@ func TestProvider_GetAdapter_NotFound(t *testing.T) {
 func TestProvider_InvalidateAdapter(t *testing.T) {
 	db := setupProviderDB(t)
 	createTestSite(t, db)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	a1, _ := p.GetAdapter(context.Background(), "test.example.com")
 	p.InvalidateAdapter("test.example.com")
@@ -198,7 +198,7 @@ func TestProvider_ListSites(t *testing.T) {
 		Name: "site2", Domain: "site2.com", BaseURL: "https://site2.com",
 		Framework: "tnode", Enabled: false,
 	})
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	sites, err := p.ListSites(context.Background())
 	if err != nil {
@@ -211,7 +211,7 @@ func TestProvider_ListSites(t *testing.T) {
 
 func TestProvider_ListSites_Empty(t *testing.T) {
 	db := setupProviderDB(t)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	sites, err := p.ListSites(context.Background())
 	if err != nil {
@@ -225,7 +225,7 @@ func TestProvider_ListSites_Empty(t *testing.T) {
 func TestProvider_GetSiteInfoByURL(t *testing.T) {
 	db := setupProviderDB(t)
 	createTestSite(t, db)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	info, err := p.GetSiteInfoByURL(context.Background(), "https://test.example.com")
 	if err != nil {
@@ -238,7 +238,7 @@ func TestProvider_GetSiteInfoByURL(t *testing.T) {
 
 func TestProvider_GetSiteInfoByURL_NotFound(t *testing.T) {
 	db := setupProviderDB(t)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	_, err := p.GetSiteInfoByURL(context.Background(), "https://nope.com")
 	if err == nil {
@@ -249,7 +249,7 @@ func TestProvider_GetSiteInfoByURL_NotFound(t *testing.T) {
 func TestProvider_DetectFramework(t *testing.T) {
 	db := setupProviderDB(t)
 	createTestSite(t, db)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	result, err := p.DetectFramework(context.Background(), "test.example.com")
 	if err != nil {
@@ -265,7 +265,7 @@ func TestProvider_DetectFramework(t *testing.T) {
 
 func TestProvider_DetectFramework_NotFound(t *testing.T) {
 	db := setupProviderDB(t)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	_, err := p.DetectFramework(context.Background(), "nope.com")
 	if err == nil {
@@ -452,7 +452,7 @@ func TestProvider_BatchLoadSiteResources(t *testing.T) {
 	db.Create(&model.SiteConfigOverride{SiteName: "test-site", FieldPath: "passkey", FieldValue: "ov-pass"})
 	db.Create(&model.SiteConfigOverride{SiteName: "test-site", FieldPath: "user_id", FieldValue: "42"})
 
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 	res, err := p.BatchLoadSiteResources(context.Background(), []string{"https://test.example.com", "https://site2.com"})
 	if err != nil {
 		t.Fatal(err)
@@ -477,7 +477,7 @@ func TestProvider_BatchLoadSiteResources(t *testing.T) {
 
 func TestProvider_BatchLoadSiteResources_EmptyDomains(t *testing.T) {
 	db := setupProviderDB(t)
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 
 	res, err := p.BatchLoadSiteResources(context.Background(), []string{})
 	if err != nil {
@@ -498,7 +498,7 @@ func TestProvider_BatchLoadSiteResources_PublishFormFieldOverride(t *testing.T) 
 		SiteName: "test-site", FieldPath: "publish.form_fields.subtype", FieldValue: "anime",
 	})
 
-	p := NewProvider(db, adapter.NewFactory(zap.NewNop()), zap.NewNop())
+	p := NewProvider(db, adapter.NewFactory(zap.NewNop(), nil), zap.NewNop())
 	res, err := p.BatchLoadSiteResources(context.Background(), []string{"https://test.example.com"})
 	if err != nil {
 		t.Fatal(err)

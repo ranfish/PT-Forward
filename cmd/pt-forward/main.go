@@ -239,7 +239,10 @@ func main() {
 
 	eventDispatcher := event.NewDispatcher(log)
 
-	adapterFactory := adapter.NewFactory(log)
+	// §56.13 方案 B: 先创建 Engine，再传给 adapter.Factory（NexusPHP/Unit3D 内部用 Engine）
+	publicExtractor := extract.NewPublicExtractor("", "")
+	extractEngine := extract.NewEngine(publicExtractor, siteextract.NewSpecialExtractors())
+	adapterFactory := adapter.NewFactory(log, extractEngine)
 	siteProvider := site.NewProvider(db, adapterFactory, log)
 
 	clientManager := client.NewManager(db, log)
@@ -440,11 +443,8 @@ func main() {
 	publishPipeline.SetPusher(torrentPusher) // §56.30: 发布后自动加种
 	reseedEngine.SetComplianceChecker(complianceChecker)
 	metadataFetcher := metadata.NewFetcher(db, log, siteProvider)
-	// §56.13: 构造 Engine（PublicExtractor + 8 站特殊提取器）注入 Fetcher
-	// public extractor siteCode/siteNickname 传空（共享实例，每次 Extract 由 input 带 site 信息）
-	publicExtractor := extract.NewPublicExtractor("", "")
-	engine := extract.NewEngine(publicExtractor, siteextract.NewSpecialExtractors())
-	metadataFetcher.SetEngine(engine)
+	// §56.13 方案 B: Engine 已在前面注入到 adapter.Factory（line 244），
+	// fetcher 不再需要 SetEngine（adapter 内部已用 Engine 提取）。
 	publishPipeline.SetMetadataFetcher(metadataFetcher)
 	if strategy, err := settingsRepo.Get(ctx, setting.KeyImageHostStrategy); err == nil && strategy != "" {
 		publishPipeline.SetImageHostStrategy(strategy)

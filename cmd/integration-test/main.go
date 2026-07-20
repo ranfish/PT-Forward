@@ -27,8 +27,8 @@ func main() {
 	logger := zap.Must(zap.NewProduction())
 	defer logger.Sync()
 
-	provider := site.NewProvider(db, adapter.NewFactory(logger), logger)
-	factory := adapter.NewFactory(logger)
+	provider := site.NewProvider(db, adapter.NewFactory(logger, nil), logger)
+	factory := adapter.NewFactory(logger, nil)
 
 	var allSites []model.Site
 	if err := db.Find(&allSites).Error; err != nil {
