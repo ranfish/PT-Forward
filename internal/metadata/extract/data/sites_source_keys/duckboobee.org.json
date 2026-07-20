@@ -1,0 +1,72 @@
+{
+  "domain": "duckboobee.org",
+  "site_code": "duckboobee",
+  "site_name": "三月",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Movies": "category.movie",
+      "TV Series": "category.tv_series",
+      "TV Shows": "category.tv_shows",
+      "Documentaries": "category.documentaries",
+      "Cartoon": "category.animation",
+      "MTV": "category.mv",
+      "Sports": "category.sports",
+      "Music": "category.music",
+      "Misc": "category.other"
+    },
+    "medium": {
+      "WEB-DL": "medium.webdl",
+      "DVD": "medium.dvd",
+      "HDTV": "medium.hdtv",
+      "Other": "medium.other",
+      "Encode": "medium.encode",
+      "Remux": "medium.remux",
+      "DVDR": "medium.dvdr",
+      "Blu-Ray": "medium.bluray"
+    },
+    "video_codec": {
+      "H.264": "video.h264",
+      "HEVC": "video.h265",
+      "H.265": "video.h265",
+      "MPEG-2": "video.mpeg2",
+      "MPEG-4": "video.mpeg4",
+      "X.264": "video.x264",
+      "X.265": "video.x265",
+      "XVID": "video.xvid",
+      "AV1": "video.av1",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "576P": "resolution.r576p",
+      "2160P": "resolution.r2160p",
+      "480P": "resolution.r480p",
+      "4320P": "resolution.r4320p"
+    },
+    "team": {
+      "3MWEB": "team.3mweb",
+      "CHD": "team.chd",
+      "TTG": "team.ttg",
+      "CMCT": "team.cmct",
+      "HDSKY": "team.hds",
+      "OurBits": "team.ourbits",
+      "M-Team": "team.mteam",
+      "WIKI": "team.wiki",
+      "Beast": "team.beast",
+      "HHWEB": "team.hhweb",
+      "Other": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

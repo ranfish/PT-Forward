@@ -1,0 +1,110 @@
+{
+  "domain": "www.okpt.net",
+  "site_code": "okpt",
+  "site_name": "OKPT",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电视剧": "category.tv_series",
+      "电影": "category.movie",
+      "短剧": "category.playlet",
+      "动漫/动画": "category.animation",
+      "纪录片": "category.documentaries",
+      "综艺/真人秀": "category.tv_shows",
+      "电子书": "category.ebook",
+      "有声书": "category.audiobook",
+      "漫画书": "category.cartoon",
+      "游戏": "category.game",
+      "体育": "category.sports",
+      "软件": "category.software",
+      "其它": "category.other"
+    },
+    "medium": {
+      "其他（Other）": "medium.other",
+      "UHD Blu-ray": "medium.uhd_bluray",
+      "Blu-ray": "medium.bluray",
+      "Remux": "medium.remux",
+      "Encode": "medium.encode",
+      "WEB-DL": "medium.webdl",
+      "HDTV": "medium.hdtv",
+      "DVD": "medium.dvd",
+      "SACD": "medium.sacd",
+      "CD": "medium.cd",
+      "HDCD": "medium.cd",
+      "Web": "medium.webrip"
+    },
+    "video_codec": {
+      "HEVC/H.265/x265": "video.h265",
+      "AVC/H.264/x264": "video.h264",
+      "H.266/VVC": "video.h266",
+      "AV1": "video.av1",
+      "VP9": "video.vp9",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "8K": "resolution.r4320p",
+      "4K/2160p": "resolution.r2160p",
+      "1080p/1080i": "resolution.r1080p",
+      "720p": "resolution.r720p",
+      "Other": "resolution.other"
+    },
+    "audio_codec": {
+      "DTS:X": "audio.dtsx",
+      "MPEG": "audio.mpeg",
+      "MP3": "audio.mp3",
+      "APE": "audio.ape",
+      "WAV": "audio.wav",
+      "FLAC 分轨": "audio.flac",
+      "DTS": "audio.dts",
+      "LPCM": "audio.lpcm",
+      "TrueHD": "audio.truehd",
+      "DTS-HD": "audio.dts_hd",
+      "AAC": "audio.aac",
+      "DD/DD+": "audio.ac3",
+      "Other": "audio.other",
+      "WAV 整轨": "audio.wav"
+    },
+    "team": {
+      "ZmPT": "team.zmpt",
+      "U2": "team.u2",
+      "UBits": "team.ubits",
+      "TTG": "team.ttg",
+      "PTHome": "team.pthome",
+      "Red Leaves": "team.red",
+      "PterClub": "team.pter",
+      "Panda": "team.panda_encode",
+      "OurBits": "team.ourbits",
+      "M-Team": "team.mteam",
+      "LemonHD": "team.lemonhd",
+      "HDSky": "team.hds",
+      "HDHome": "team.hdhome",
+      "HDChina": "team.hdchina",
+      "HHClub": "team.hhclub",
+      "FRDS": "team.frds",
+      "CMCT": "team.cmct",
+      "CHDBits": "team.chdbits",
+      "BeiTai": "team.beitai",
+      "Audiences": "team.audiences",
+      "Other": "team.other"
+    },
+    "source": {
+      "中国大陆（CN）": "source.china",
+      "港澳台（HK/MAC/TW）": "source.hongkong",
+      "欧美（EU/US）": "source.europe",
+      "日本（JP）": "source.japan",
+      "韩国（KR）": "source.korea",
+      "印度（India）": "source.india",
+      "东南亚（SEA）": "source.sweden",
+      "其他（Other）": "source.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

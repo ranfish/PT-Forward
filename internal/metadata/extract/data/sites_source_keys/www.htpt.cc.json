@@ -1,0 +1,31 @@
+{
+  "domain": "www.htpt.cc",
+  "site_code": "htpt",
+  "site_name": "海棠",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "其他": "category.other",
+      "视频": "category.study"
+    },
+    "video_codec": {
+      "H.264/AVC/x264": "video.h264",
+      "H.265/HEVC/X.265": "video.h265"
+    },
+    "resolution": {
+      "4K": "resolution.r2160p",
+      "1080p": "resolution.r1080p",
+      "720p": "resolution.r720p",
+      "SD/标清": "resolution.sd"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

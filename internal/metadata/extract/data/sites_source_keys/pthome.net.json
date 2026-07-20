@@ -1,0 +1,78 @@
+{
+  "domain": "pthome.net",
+  "site_code": "pthome",
+  "site_name": "铂金家",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电影": "category.movie",
+      "纪录片": "category.documentaries",
+      "动漫": "category.animation",
+      "电视剧": "category.tv_series",
+      "综艺": "category.tv_shows",
+      "体育": "category.sports",
+      "音乐": "category.music",
+      "游戏": "category.game",
+      "软件": "category.software",
+      "学习": "category.study",
+      "其他": "category.other"
+    },
+    "medium": {
+      "UHD Blu-ray": "medium.uhd_bluray",
+      "UHD Blu-ray/DIY": "medium.uhd_bluray",
+      "Blu-ray(原盘)": "medium.bluray",
+      "Blu-ray/DIY": "medium.bluray",
+      "REMUX": "medium.remux",
+      "HDTV": "medium.hdtv",
+      "WEB-DL": "medium.webdl",
+      "DVD(原盘)": "medium.dvd",
+      "CD": "medium.cd",
+      "Track": "medium.track",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.265(HEVC)": "video.h265",
+      "H.264(AVC)": "video.h264",
+      "VC-1": "video.vc1",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "8K": "resolution.r4320p",
+      "4K": "resolution.r2160p",
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "None": "resolution.other"
+    },
+    "audio_codec": {
+      "DTS-HD MA": "audio.dts_hd_ma",
+      "TrueHD": "audio.truehd",
+      "LPCM": "audio.lpcm",
+      "DTS": "audio.dts",
+      "DD/AC3": "audio.ac3",
+      "AAC": "audio.aac",
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "WAV": "audio.wav",
+      "MP3": "audio.mp3",
+      "M4A": "audio.m4a",
+      "Other": "audio.other"
+    },
+    "team": {
+      "PTHome": "team.pthome",
+      "PTH": "team.pthome",
+      "Other": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

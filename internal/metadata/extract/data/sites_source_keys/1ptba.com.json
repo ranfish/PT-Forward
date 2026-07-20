@@ -1,0 +1,80 @@
+{
+  "domain": "1ptba.com",
+  "site_code": "1ptba",
+  "site_name": "1PTBar",
+  "source_keys": {
+    "type": "类型",
+    "medium": "来源",
+    "video_codec": "视频编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Movie(電影)": "category.movie",
+      "TV Series(電視影劇)": "category.tv_series",
+      "TV Shows(電視綜藝)": "category.tv_shows",
+      "Cartoon(卡通動漫)": "category.animation",
+      "Music Videos(音樂短片/演唱會)": "category.music",
+      "Sports(體育賽事)": "category.sports",
+      "HQ Audio(高品质音频)": "category.audio",
+      "Software(軟體)": "category.software",
+      "Games(電子遊戲)": "category.game",
+      "Misc(其他)": "category.other",
+      "Discovery(紀錄教育)": "category.documentaries"
+    },
+    "medium": {
+      "Track": "medium.track",
+      "CD": "medium.cd",
+      "DVDR": "medium.dvdr",
+      "HDTV": "medium.hdtv",
+      "MiniBD": "medium.minibd",
+      "Encode": "medium.encode",
+      "Remux": "medium.remux",
+      "HD DVD": "medium.hddvd",
+      "Blu-ray(原盘)": "medium.bluray",
+      "UHD Blu-ray": "medium.uhd_bluray",
+      "UHD Blu-ray/DIY": "medium.uhd_bluray",
+      "Blu-ray/DIY": "medium.bluray",
+      "DVD(原盘)": "medium.dvdr",
+      "WEB-DL": "medium.webdl",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.264(AVC)": "video.h264",
+      "VC-1": "video.vc1",
+      "Xvid": "video.xvid",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other",
+      "H.265(HEVC)": "video.h265"
+    },
+    "resolution": {
+      "1080p-HD(逐行)/1920×1080": "resolution.r1080p",
+      "1080i-HD(隔行)/1920×1080": "resolution.r1080i",
+      "720p-HD(逐行)/1280×720": "resolution.r720p",
+      "SD(标清)/720p×576p": "resolution.r720p",
+      "4K-UHD(超高清)/3840×2160": "resolution.r2160p",
+      "8K-UHD(超高清)/7680×4320": "resolution.r4320p"
+    },
+    "audio_codec": {
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "DTS": "audio.dts",
+      "MP3": "audio.mp3",
+      "OGG": "audio.ogg",
+      "AAC": "audio.aac",
+      "Other": "audio.other",
+      "TrueHD": "audio.truehd"
+    },
+    "team": {
+      "HDS": "team.hds",
+      "CHD": "team.chd",
+      "MySiLU": "team.mysilu",
+      "WiKi": "team.wiki",
+      "Other": "team.other"
+    }
+  },
+  "_note": "site-specific: source_sel 字段语义是媒介（不是产地）"
+}

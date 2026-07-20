@@ -1,0 +1,21 @@
+{
+  "domain": "www.momentpt.top",
+  "site_code": "momentpt",
+  "site_name": "瞬间",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "软件": "category.software",
+      "图书": "category.ebook"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

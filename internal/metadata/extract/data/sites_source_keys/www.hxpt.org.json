@@ -1,0 +1,43 @@
+{
+  "domain": "www.hxpt.org",
+  "site_code": "hxpt",
+  "site_name": "好学",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "教育": "category.study",
+      "纪录片": "category.documentaries"
+    },
+    "medium": {
+      "其他": "medium.other"
+    },
+    "video_codec": {
+      "其他": "video.other"
+    },
+    "resolution": {
+      "720p/720i": "resolution.r720p",
+      "1080p/1080i": "resolution.r1080p",
+      "4K/2160p/2160i": "resolution.r2160p",
+      "8K/4320p/4320i": "resolution.r4320p",
+      "Other": "resolution.other"
+    },
+    "audio_codec": {
+      "其他": "audio.other"
+    },
+    "team": {
+      "Other": "team.other"
+    },
+    "source": {
+      "其他": "source.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

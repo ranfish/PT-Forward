@@ -33,15 +33,16 @@ var defaultBasicInfoLabels = map[string][]string{
 //  4. td/td 相邻模式（普通表格，限定不在 colhead 表内避免文件列表表头误匹配）
 //
 // v0.0.238: 按 site_code 加载 PTNexus 移植的 source_key 配置（覆盖默认 label）。
+// v0.0.253: 改用 domain 主键（解决 site_code 冲突）。
 // 字段值经 LookupStandardKey 映射到标准键（如 "电视剧 (TV Series)" → "category.tv_series"）。
 func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedData) {
-	p.fillBasicInfoFieldsWithCode(doc, seed, p.siteCode)
+	p.fillBasicInfoFieldsWithCode(doc, seed, p.domain, p.siteCode)
 }
 
-// fillBasicInfoFieldsWithCode 显式传入 siteCode 的版本（并发安全）。
-func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, seed *SeedData, siteCode string) {
+// fillBasicInfoFieldsWithCode 显式传入 domain + siteCode 的版本（并发安全）。
+func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, seed *SeedData, domain, siteCode string) {
 	// 每个字段的候选 labels：site-specific source_key 优先 + default 变体
-	fieldLabels := buildFieldLabels(siteCode)
+	fieldLabels := buildFieldLabels(domain, siteCode)
 	values := map[string]string{}
 
 	// 模式 1: td.rowhead + td.rowfollow（NexusPHP 种子信息表，最精准）
@@ -220,37 +221,72 @@ func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, see
 	})
 
 	// 填充 seed + 标准化字段值
-	if v, ok := values["type"]; ok {
-		seed.Type = standardizeFieldValue("type", v)
+	// v0.0.253: standardizeFieldValue 优先用站点特定 standard_keys（按 domain）
+	for field, val := range values {
+		standardized := standardizeFieldValueWithDomain(domain, siteCode, field, val)
+		switch field {
+		case "type":
+			seed.Type = standardized
+		case "medium":
+			seed.Medium = standardized
+		case "video_codec":
+			seed.VideoCodec = standardized
+		case "audio_codec":
+			seed.AudioCodec = standardized
+		case "resolution":
+			seed.Resolution = standardized
+		case "team":
+			seed.ReleaseGroup = standardized
+		case "source":
+			seed.Source = standardized
+		}
 	}
-	if v, ok := values["medium"]; ok {
-		seed.Medium = standardizeFieldValue("medium", v)
+}
+
+// standardizeFieldValueWithDomain 优先用站点特定 standard_keys（v0.0.253）。
+// 查找顺序：site-specific by domain > site-specific by site_code > global standard_keys > 原值。
+func standardizeFieldValueWithDomain(domain, siteCode, category, raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
 	}
-	if v, ok := values["video_codec"]; ok {
-		seed.VideoCodec = standardizeFieldValue("video_codec", v)
+	// 1. site-specific by domain
+	if siteStd := LookupSiteStandardKeys(domain, siteCode); siteStd != nil {
+		if m, ok := siteStd[category]; ok && m != nil {
+			if std, ok := m[raw]; ok && std != "" {
+				return std
+			}
+			// 包含匹配（最长 key 优先）
+			bestKey, bestStd := "", ""
+			for k, v := range m {
+				if v == "" || len(k) < len(bestKey) {
+					continue
+				}
+				if strings.Contains(raw, k) {
+					bestKey, bestStd = k, v
+				}
+			}
+			if bestStd != "" {
+				return bestStd
+			}
+		}
 	}
-	if v, ok := values["audio_codec"]; ok {
-		seed.AudioCodec = standardizeFieldValue("audio_codec", v)
+	// 2. 全局 standard_keys
+	if std := LookupStandardKey(category, raw); std != "" {
+		return std
 	}
-	if v, ok := values["resolution"]; ok {
-		seed.Resolution = standardizeFieldValue("resolution", v)
-	}
-	if v, ok := values["team"]; ok {
-		seed.ReleaseGroup = standardizeFieldValue("team", v)
-	}
-	if v, ok := values["source"]; ok {
-		seed.Source = standardizeFieldValue("source", v)
-	}
+	return raw
 }
 
 // buildFieldLabels 构建每个字段的候选 label 列表（site-specific source_key 优先 + default 变体）。
 // 返回 map：field → 候选 labels 切片。
-func buildFieldLabels(siteCode string) map[string][]string {
+// v0.0.253: 加 domain 参数（优先按 domain 查）。
+func buildFieldLabels(domain, siteCode string) map[string][]string {
 	result := map[string][]string{}
 	for field := range defaultBasicInfoLabels {
 		labels := []string{}
-		// 1. site-specific source_key（最优先）
-		if sk := LookupSiteSourceKey(siteCode, field); sk != "" {
+		// 1. site-specific source_key（最优先，按 domain）
+		if sk := LookupSiteSourceKey(domain, siteCode, field); sk != "" {
 			labels = append(labels, sk)
 		}
 		// 2. default 变体
@@ -309,5 +345,5 @@ func standardizeFieldValue(category, raw string) string {
 
 // matchBasicInfoLabel 兼容旧调用（已弃用，新代码用 matchFieldWithLabels）。
 func matchBasicInfoLabel(label string) string {
-	return matchFieldWithLabels(label, buildFieldLabels(""))
+	return matchFieldWithLabels(label, buildFieldLabels("", ""))
 }

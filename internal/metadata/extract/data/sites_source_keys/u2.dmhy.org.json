@@ -1,0 +1,16 @@
+{
+  "domain": "u2.dmhy.org",
+  "site_code": "u2",
+  "site_name": "幼儿园",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {},
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

@@ -1,0 +1,58 @@
+{
+  "domain": "piggo.me",
+  "site_code": "piggo",
+  "site_name": "二师兄",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "纪录片": "category.documentaries",
+      "读书绘本": "category.illustration",
+      "音乐": "category.music",
+      "有声读物": "category.audiobook",
+      "儿童电影": "category.children_movie",
+      "儿童剧集": "category.children_tv_series"
+    },
+    "medium": {
+      "Remux": "medium.remux",
+      "Encode": "medium.encode",
+      "DIY": "medium.bluray",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.264/X.264": "video.h264",
+      "H.265/X.265": "video.h265",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "720p": "resolution.r720p",
+      "1080p/i": "resolution.r1080p",
+      "4K": "resolution.r2160p"
+    },
+    "audio_codec": {
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "DTS": "audio.dts",
+      "MP3": "audio.mp3",
+      "AAC": "audio.aac",
+      "Other": "audio.other",
+      "AC-3": "audio.ac3",
+      "DTS-HD MA": "audio.dts_hd_ma",
+      "TrueHD": "audio.truehd",
+      "LPCM": "audio.lpcm"
+    },
+    "team": {
+      "PigoWeb": "team.pigoweb",
+      "PigoHD": "team.pigohd",
+      "Other": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

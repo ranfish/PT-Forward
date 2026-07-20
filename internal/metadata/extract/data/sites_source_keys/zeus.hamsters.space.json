@@ -1,0 +1,56 @@
+{
+  "domain": "zeus.hamsters.space",
+  "site_code": "zeus",
+  "site_name": "蝴蝶",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "大陆电影": "category.movie",
+      "港台电影": "category.movie",
+      "亚洲电影": "category.movie",
+      "欧美电影": "category.movie",
+      "iPad": "category.movie",
+      "大陆剧集": "category.tv_series",
+      "港台剧集": "category.tv_series",
+      "亚洲剧集": "category.tv_series",
+      "欧美剧集": "category.tv_series",
+      "纪录片": "category.documentaries",
+      "体育": "category.sports",
+      "大陆综艺": "category.tv_shows",
+      "港台综艺": "category.tv_shows",
+      "亚洲综艺": "category.tv_shows",
+      "欧美综艺": "category.tv_shows",
+      "华语音乐": "category.music",
+      "日韩音乐": "category.music",
+      "欧美音乐": "category.music",
+      "古典音乐": "category.music",
+      "原声音乐": "category.music",
+      "音乐MV": "category.mv",
+      "其他": "category.other",
+      "电子书": "category.ebook",
+      "完结动漫": "category.animation",
+      "连载动漫": "category.animation",
+      "动漫周边": "category.animation",
+      "游戏": "category.game",
+      "游戏视频": "category.game",
+      "软件": "category.software",
+      "学习": "category.study"
+    },
+    "resolution": {
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "2160p/4K": "resolution.r2160p"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

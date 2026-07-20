@@ -1,0 +1,30 @@
+{
+  "domain": "tjupt.org",
+  "site_code": "tjupt",
+  "site_name": "不可羊",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电影": "category.movie",
+      "剧集": "category.tv_series",
+      "综艺": "category.tv_shows",
+      "资料": "category.study",
+      "动漫": "category.animation",
+      "音乐": "category.music",
+      "体育": "category.sports",
+      "软件": "category.software",
+      "游戏": "category.game",
+      "纪录片": "category.documentaries",
+      "其他": "category.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

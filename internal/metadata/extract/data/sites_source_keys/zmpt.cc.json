@@ -1,0 +1,166 @@
+{
+  "domain": "zmpt.cc",
+  "site_code": "zmpt",
+  "site_name": "ZmPT",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "视频编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组"
+  },
+  "standard_keys": {
+    "type": {
+      "其他 / Misc": "category.other",
+      "纪录片 / documentary": "category.documentaries",
+      "动漫 / Anime": "category.animation",
+      "短剧 / Short Play": "category.playlet",
+      "电影 / Movies": "category.movie",
+      "电视剧 / TV Series": "category.tv_series",
+      "综艺 / TV Shows": "category.tv_shows",
+      "音乐 / Music": "category.music",
+      "有声书 / Audiobook": "category.audiobook",
+      "软件 / Software": "category.software",
+      "游戏 / Game": "category.game",
+      "Misc": "category.other",
+      "documentary": "category.documentaries",
+      "Anime": "category.animation",
+      "Short Play": "category.playlet",
+      "Movies": "category.movie",
+      "TV Series": "category.tv_series",
+      "TV Shows": "category.tv_shows",
+      "Music": "category.music",
+      "Audiobook": "category.audiobook",
+      "Software": "category.software",
+      "Game": "category.game"
+    },
+    "medium": {
+      "其他资料": "medium.other",
+      "CD": "medium.cd",
+      "DVDR": "medium.dvdr",
+      "HDTV": "medium.hdtv",
+      "MiniBD": "medium.minibd",
+      "Encode": "medium.encode",
+      "Remux": "medium.remux",
+      "HD DVD": "medium.hddvd",
+      "Blu-ray": "medium.bluray",
+      "WEB-DL": "medium.webdl"
+    },
+    "audio_codec": {
+      "Other": "audio.other",
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "DTS": "audio.dts",
+      "OGG": "audio.ogg",
+      "AC3": "audio.ac3",
+      "AAC": "audio.aac",
+      "MP3": "audio.mp3",
+      "ALAC": "audio.alac",
+      "WAV": "audio.wav"
+    },
+    "resolution": {
+      "480p": "resolution.r480p",
+      "720p": "resolution.r720p",
+      "1080p/1080i": "resolution.r1080p",
+      "2K/1440p": "resolution.r1440p",
+      "4K/2160p": "resolution.r2160p",
+      "8K/4320p": "resolution.r4320p",
+      "Other": "resolution.other"
+    },
+    "team": {
+      "Other": "team.other",
+      "ZmWeb": "team.zmweb",
+      "ZmPT": "team.zmpt",
+      "ZmMusic": "team.zmmusic",
+      "ZmAudio": "team.zmaudio",
+      "DYZ-Movie": "team.dyztv",
+      "GodDramas": "team.goddramas",
+      "RL/RL4B": "team.rl"
+    }
+  },
+  "form_fields": {
+    "medium": "medium_sel[4]",
+    "audio_codec": "audiocodec_sel[4]",
+    "resolution": "standard_sel[4]",
+    "team": "team_sel[4]",
+    "category": "type"
+  },
+  "form_value_mappings": {
+    "type": {
+      "category.other": "409",
+      "category.documentaries": "422",
+      "category.animation": "417",
+      "category.short_play": "427",
+      "category.movie": "401",
+      "category.tv_series": "402",
+      "category.tv_shows": "403",
+      "category.music": "423",
+      "category.audiobook": "424",
+      "category.software": "425",
+      "category.game": "426",
+      "default": "409"
+    },
+    "medium": {
+      "medium.other": "12",
+      "medium.cd": "8",
+      "medium.dvdr": "6",
+      "medium.hdtv": "5",
+      "medium.minibd": "4",
+      "medium.encode": "7",
+      "medium.remux": "3",
+      "medium.hddvd": "2",
+      "medium.bluray": "1",
+      "medium.webdl": "10",
+      "default": "12"
+    },
+    "audio_codec": {
+      "audio.other": "7",
+      "audio.flac": "1",
+      "audio.ape": "2",
+      "audio.dts": "3",
+      "audio.ogg": "5",
+      "audio.ac3": "8",
+      "audio.aac": "6",
+      "audio.mp3": "4",
+      "audio.alac": "9",
+      "audio.wav": "10",
+      "default": "7"
+    },
+    "resolution": {
+      "resolution.r480p": "7",
+      "resolution.r720p": "8",
+      "resolution.r1080p": "1",
+      "resolution.r1440p": "6",
+      "resolution.r2160p": "5",
+      "resolution.r4320p": "9",
+      "resolution.other": "9",
+      "default": "9"
+    },
+    "team": {
+      "team.other": "5",
+      "team.zmweb": "7",
+      "team.zmpt": "6",
+      "team.zmmusic": "8",
+      "team.zmaudio": "11",
+      "team.dyztv": "9",
+      "team.goddramas": "10",
+      "team.rl": "12",
+      "default": "5"
+    },
+    "tag": {
+      "tag.国语": 5,
+      "tag.粤语": 15,
+      "tag.中字": 6,
+      "tag.DIY": 4,
+      "tag.杜比": 14,
+      "tag.HDR": 7,
+      "tag.无损": 16,
+      "tag.短剧": 13,
+      "tag.汉化": 11,
+      "tag.完结": 12,
+      "tag.分集": 8,
+      "tag.纯享版": 18
+    }
+  }
+}

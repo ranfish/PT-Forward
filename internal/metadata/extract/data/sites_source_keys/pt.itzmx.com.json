@@ -1,0 +1,34 @@
+{
+  "domain": "pt.itzmx.com",
+  "site_code": "pt",
+  "site_name": "分享站",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "动画": "category.animation",
+      "漫画": "category.cartoon",
+      "音乐": "category.music",
+      "电影": "category.movie",
+      "电视剧": "category.tv_series",
+      "综艺": "category.tv_shows",
+      "其他": "category.other"
+    },
+    "resolution": {
+      "1080p": "resolution.r1080p",
+      "720p": "resolution.r720p",
+      "2160p": "resolution.r2160p"
+    },
+    "team": {
+      "Other": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

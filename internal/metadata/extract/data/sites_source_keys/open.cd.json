@@ -1,0 +1,47 @@
+{
+  "domain": "open.cd",
+  "site_code": "open",
+  "site_name": "皇后",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "音乐(Music)": "category.music",
+      "演唱会(Vocal Concert)": "category.mv",
+      "其他(Other)": "category.other"
+    },
+    "medium": {
+      "CD": "medium.cd",
+      "24KCD": "medium.cd",
+      "LPCD": "medium.cd",
+      "HDCD": "medium.cd",
+      "SACD": "medium.sacd",
+      "SRCD": "medium.cd",
+      "K2CD": "medium.cd",
+      "Blu-ray": "medium.bluray",
+      "HD DVD": "medium.hddvd",
+      "HDTV": "medium.hdtv",
+      "DVD": "medium.dvd",
+      "HQCD": "medium.cd",
+      "XRCD": "medium.cd",
+      "SHM-CD": "medium.cd",
+      "Web": "medium.webrip",
+      "Other": "medium.other"
+    },
+    "resolution": {
+      "其它(Other)": "resolution.other"
+    },
+    "team": {
+      "OpenCD": "team.opencd",
+      "其他(Other)": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

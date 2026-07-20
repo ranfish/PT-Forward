@@ -1,0 +1,34 @@
+{
+  "domain": "discfan.net",
+  "site_code": "discfan",
+  "site_name": "DiscFan",
+  "source_keys": {
+    "type": "類別",
+    "medium": "來源"
+  },
+  "standard_keys": {
+    "type": {
+      "电影 - 中国大陆": "category.movie",
+      "电影 - 中国香港": "category.movie",
+      "电影 - 中国台湾": "category.movie",
+      "电影 - 泰国": "category.movie",
+      "电影 - 日本": "category.movie",
+      "电影 - 韩国": "category.movie",
+      "电影 - 世界": "category.movie",
+      "剧集": "category.tv_series",
+      "音乐": "category.music",
+      "纪录": "category.documentaries",
+      "综艺": "category.tv_shows",
+      "体育": "category.sports",
+      "动漫": "category.animation"
+    },
+    "medium": {
+      "Blu-ray Disc": "medium.bluray",
+      "4K UltraHD": "medium.uhd_bluray",
+      "HDTV": "medium.hdtv",
+      "DVD": "medium.dvdr",
+      "SDTV": "medium.sd"
+    }
+  },
+  "_note": "site-specific: 繁体标签 + source_sel=媒介（碟粉详情页只有这一个质量字段）"
+}

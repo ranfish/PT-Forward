@@ -1,0 +1,37 @@
+{
+  "domain": "totheglory.im",
+  "site_code": "totheglory",
+  "site_name": "套套哥",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电影DVDRip": "category.movie",
+      "电影720p": "category.movie",
+      "电影1080i/p": "category.movie",
+      "纪录片720p": "category.documentaries",
+      "纪录片1080i/p": "category.documentaries",
+      "纪录片BluRay原盘": "category.documentaries",
+      "高清动漫": "category.animation",
+      "动漫原盘": "category.animation",
+      "高清综艺": "category.tv_shows",
+      "日本综艺": "category.tv_shows",
+      "韩国综艺": "category.tv_shows",
+      "MV&演唱会": "category.mv",
+      "无损音乐FLAC&APE": "category.music",
+      "高清体育节目": "category.sports",
+      "Ebook": "category.ebook",
+      "iPhone/iPad游戏": "category.game",
+      "iPad书籍": "category.books",
+      "iPhone/iPad软件": "category.software"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

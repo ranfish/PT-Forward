@@ -1,0 +1,77 @@
+{
+  "domain": "et8.org",
+  "site_code": "et8",
+  "site_name": "他吹吹风",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Documentaries.纪录片": "category.documentaries",
+      "Elearning - 杂项学习": "category.study",
+      "Elearning - 电子书/小说": "category.ebook",
+      "Elearning - 电子书/非小说": "category.ebook",
+      "Elearning - 漫画": "category.cartoon",
+      "Elearning - 有声书": "category.audiobook"
+    },
+    "medium": {
+      "UHD Bluray": "medium.uhd_bluray",
+      "BluRay": "medium.bluray",
+      "Remux": "medium.remux",
+      "Encode": "medium.encode",
+      "WEB-DL": "medium.webdl",
+      "HDTV": "medium.hdtv",
+      "DVDR": "medium.dvdr",
+      "DVDRip": "medium.dvdr",
+      "Other": "medium.other",
+      "PDF": "medium.pdf",
+      "EPUB": "medium.pub",
+      "AZW3": "medium.azw",
+      "MOBI": "medium.mobi"
+    },
+    "video_codec": {
+      "H.264": "video.h264",
+      "x265": "video.x265",
+      "H265/HEVC": "video.h265",
+      "x264": "video.x264",
+      "VC-1": "video.vc1",
+      "Xvid": "video.xvid",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "2160/4K": "resolution.r2160p",
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd"
+    },
+    "audio_codec": {
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "DTS": "audio.dts",
+      "AC3": "audio.ac3",
+      "AAC": "audio.aac",
+      "DTS-HD": "audio.dts_hd",
+      "TrueHD": "audio.truehd",
+      "LPCM": "audio.lpcm",
+      "WAV": "audio.wav",
+      "MP3": "audio.mp3",
+      "Other": "audio.other"
+    },
+    "team": {
+      "TLF": "team.tlf",
+      "BMDru": "team.bmdru",
+      "CatEDU": "team.catedu",
+      "个人原创资源(Original)": "team.personal",
+      "其他(other)": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

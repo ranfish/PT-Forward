@@ -1,0 +1,91 @@
+{
+  "domain": "pt.hdupt.com",
+  "site_code": "pt",
+  "site_name": "好多油",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Movies/电影": "category.movie",
+      "TV Series/电视剧": "category.tv_series",
+      "TV Shows/综艺": "category.tv_shows",
+      "Documentaries/纪录片": "category.documentaries",
+      "Animations/动画": "category.animation",
+      "Music Videos/音乐 MV": "category.mv",
+      "Sports/体育": "category.sports",
+      "HQ Audio/无损音乐": "category.music",
+      "Misc/其他": "category.other",
+      "Games/游戏": "category.game"
+    },
+    "medium": {
+      "Blu-ray": "medium.bluray",
+      "UHD Blu-ray": "medium.uhd_bluray",
+      "HDTV": "medium.hdtv",
+      "DVD": "medium.dvd",
+      "Remux": "medium.remux",
+      "UHD Remux": "medium.remux",
+      "UHD Remux TV": "medium.remux",
+      "Remux TV": "medium.remux",
+      "Encode": "medium.encode",
+      "Encode TV": "medium.encode",
+      "WEB-DL/WEBRip": "medium.webdl",
+      "WEB-DL/WEBRip TV": "medium.webdl",
+      "MiniBD": "medium.minibd",
+      "CD": "medium.cd",
+      "Track": "medium.track"
+    },
+    "video_codec": {
+      "H.264/AVC": "video.h264",
+      "H.265/HEVC": "video.h265",
+      "VC-1": "video.vc1",
+      "x264": "video.x264",
+      "Xvid": "video.xvid",
+      "MPEG/MPEG-2": "video.mpeg2",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "4K/2160p": "resolution.r2160p",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "iPad": "resolution.ipad"
+    },
+    "audio_codec": {
+      "DTS:X": "audio.dtsx",
+      "DTS-HDMA": "audio.dts_hd_ma",
+      "TrueHD": "audio.truehd",
+      "LPCM": "audio.lpcm",
+      "DTS": "audio.dts",
+      "AC3/EAC3": "audio.ac3",
+      "AAC": "audio.aac",
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "WAV": "audio.wav",
+      "MPEG": "audio.mpeg",
+      "Other": "audio.other"
+    },
+    "team": {
+      "HDU": "team.hdu",
+      "Other": "team.other"
+    },
+    "source": {
+      "CN/中国内地": "source.china",
+      "HK/TW/港台": "source.hongkong",
+      "US/EU/欧美": "source.europe",
+      "JP/日本": "source.japan",
+      "KR/韩国": "source.korea",
+      "India/印度": "source.india",
+      "SEA/东南亚": "source.sweden",
+      "Other": "source.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

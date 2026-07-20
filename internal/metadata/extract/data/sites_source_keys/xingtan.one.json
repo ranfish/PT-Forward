@@ -1,0 +1,26 @@
+{
+  "domain": "xingtan.one",
+  "site_code": "xingtan",
+  "site_name": "杏坛",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "体育学": "category.sports",
+      "军事其他": "category.other"
+    },
+    "source": {
+      "JPG": "source.japan",
+      "其它": "source.other",
+      "CAJ": "source.canada"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

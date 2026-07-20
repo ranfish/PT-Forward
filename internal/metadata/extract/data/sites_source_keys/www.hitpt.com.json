@@ -1,0 +1,85 @@
+{
+  "domain": "www.hitpt.com",
+  "site_code": "hitpt",
+  "site_name": "HitPT",
+  "source_keys": {
+    "type": "类型",
+    "medium": "来源",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组"
+  },
+  "standard_keys": {
+    "type": {
+      "高清电影": "category.movie",
+      "高清剧集": "category.tv_series",
+      "动漫": "category.animation",
+      "体育": "category.sports",
+      "纪录片": "category.documentaries",
+      "综艺": "category.tv_shows",
+      "Music Video": "category.mv"
+    },
+    "video_codec": {
+      "H.265": "video.h265",
+      "H.264": "video.h264",
+      "X265": "video.x265",
+      "X264": "video.x264",
+      "VC-1": "video.vc1",
+      "MPEG-2": "video.mpeg2",
+      "MPEG-4": "video.mpeg4",
+      "Xvid": "video.xvid",
+      "VP9": "video.vp9",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "8K": "resolution.r4320p",
+      "4K": "resolution.r2160p",
+      "1440p": "resolution.r1440p",
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "Other": "resolution.other"
+    },
+    "audio_codec": {
+      "DTS-HDMA:X 7.1": "audio.dts_hd_ma",
+      "DTS-HDMA": "audio.dts_hd_ma",
+      "DTS-HDMR": "audio.dts",
+      "DTS-HD": "audio.dts_hd",
+      "DTS-X": "audio.dtsx",
+      "LPCM": "audio.lpcm",
+      "AC3": "audio.ac3",
+      "Atmos": "audio.atmos",
+      "AAC": "audio.aac",
+      "TrueHD": "audio.truehd",
+      "DTS": "audio.dts",
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "MP3": "audio.mp3",
+      "WAV": "audio.wav",
+      "OGG": "audio.ogg",
+      "Other": "audio.other"
+    },
+    "team": {
+      "PTer": "team.pter",
+      "HSPT": "team.hspt",
+      "OurBits": "team.ourbits",
+      "MTeam": "team.mteam",
+      "FRDS": "team.frds",
+      "beAst": "team.beast",
+      "CHDBits": "team.chdbits",
+      "CMCT": "team.cmct",
+      "WiKi": "team.wiki",
+      "其他": "team.other"
+    },
+    "medium": {
+      "UHD": "medium.uhd_bluray",
+      "Blu-ray": "medium.bluray",
+      "Remux": "medium.remux",
+      "HDTV": "medium.hdtv",
+      "WEB-DL": "medium.webdl"
+    }
+  },
+  "_note": "site-specific: source_sel 字段语义是媒介"
+}
