@@ -404,6 +404,10 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+		// 清除同名的软删除记录（排除自身，避免 uniqueIndex 冲突）
+		if err := tx.Unscoped().Where("name = ? AND id != ?", client.Name, client.ID).Delete(&model.ClientConfig{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Model(&client).Updates(map[string]interface{}{
 			"name":             client.Name,
 			"type":             client.Type,
