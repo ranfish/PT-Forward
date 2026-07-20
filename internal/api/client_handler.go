@@ -485,7 +485,7 @@ func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		if err := tx.Where("source_client_id = ? OR reseed_client_id = ?", client.ID, client.ID).Delete(&model.ClientPathMapping{}).Error; err != nil {
 			return err
 		}
-		return tx.Delete(&client).Error
+		return tx.Unscoped().Delete(&client).Error
 	}); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除下载器失败")
 		return
