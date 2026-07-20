@@ -2,126 +2,82 @@
 
 ## 当前任务焦点（新会话必读）
 
-**版本**：v0.0.227（已发布）。§55.19 刷流 19 天零推送根因全部修复完成。
+**版本**：v0.0.249（已发布）。
 
-**当前主线**：§56 转载功能模块化设计（手动转载基础建设）。**不急于跑通全流程，先逐模块深度打磨**（字段映射/元数据采集/截图上传/PTGen/合规检查/...），打磨好每个细节后再串联。
-
-**§56 已完成设计**（待实施）：
-- §56.1 标准化键体系（standard_keys 表 + 加载机制 + titleparser 对接）
-- §56.2 禁转标签检测（is_protected + 用户自定义 + 合规检查 DB 化）
-- §56.6 模块 2b.0 详情页采集架构决策（4 项核心决策 + 三源数据流 + JSON 列存储）
-- §56.7 模块 2b.0 + 2b.1 回归审核（HTML 框架 = goquery，4 项 P0 补充决策）
-- §56.8 模块 2b.2 数据模型设计（SeedData/IntroData/Engine/三源 JSON/MergedMetadata/TorrentMetadata 扩展）
-- §56.9 模块 2b.3 BBCode 转换器（双栈 accumulator + 30 个标签 + 样式映射 + 4 文件拆分）
-- §56.10 模块 2b.4 公共提取器（11 子模块 + 简介分段算法 + 88 黄金样本迁移）
-- §56.11 模块 2b.5 MediaInfo/BDInfo 提取（4 层候选源 + 合法性检测 + 前缀去污染 + 空行压缩）
-- §56.12 模块 2b.6 图片分类与黑名单（embed JSON + DB 双轨 + 白名单 + 4 层海报识别 + URL 归一化）
-- §56.13 模块 2b.7 站点特殊提取器（8 站清单 + Runtime 注入 + site_code 列 + 逐站接入）
-- §56.14 模块 2b.8 manual_forward_handler 接入（三源 errgroup + /merge 接口 + publish_settings + toggle UI）
-- §56.15 模块 2b.9 单测与黄金样本（470 测试 + 7 层目录 + 自动脱敏 + benchmark）
-- §56.16 模块 2c PTGen 深度集成（◎字段解析器 + 完整 Provider 接口 + 4 级查询链 + 多套模板）
-- §56.17 模块 4a 图床打通（统一 Manager + rehost 实现 + per-site 5 字段 + 兼容性检查 + 特殊图床 + 分级失效检测）
-- §56.18 模块 4c 海报 fallback（2 级自动 PTGen/detail + 用户 URL 覆盖，无 TMDb 国内被墙）
-- §56.19 模块 5c 标题重组（含发布前校验）（7 site hooks + TitleFormat 扩展 + TitleValidator 8 类规则 + 自动修复 + title_rules 表）
-- §56.20 模块 5e 描述渲染（模板+site hooks + thanksQuote + BBCode→HTML + 副标题模板 + 4 站特殊 BuildDescription）
-- §56.21 模块 6b/6c 禁转小组 + 成人内容 DB 化（compliance_rules 表 + scope 字段 + Aho-Corasick 自动机 + 三套硬编码统一）
-- §56.22 模块 7b 多选 tag 表单填充（SiteTagConfig + TagApplier 4 种 Mode + MediaTagInferer 38 个 + 互斥规则引擎）
-- §56.23 模块 7e 已存在种子自动编辑（ExistingStrategy 3 策略 + SitePublisher 接口扩展 + 4 框架编辑 + 4 步权限校验）
-- §56.24 模块 9d 字段预览（reverse mapping UI）（PreviewBuilder + diff 高亮 + 来源徽标 + 完整度检查 + 步骤 2 集成）
-- §56.25 §56 回归审查修正（歧义澄清：§56.2 vs §56.21 职责分工 + §56.22 vs §56.1 职责分工 + 3 处文档冗余清理）
-- §56.26 成人内容过滤分层策略（可下载不可分享）+ qui 精确识别引入（4 正则 + 误报排除 + ComplianceScope 分层）
-- §56.27 模块 4b 截图审核（完整编辑：增/删/排序/转存/重新生成/ScreenshotInDesc toggle）
-- §56.28 模块 7c 音乐站特殊路径（最小化：字段补全 + group 搜索 + 70 曲风映射 + 独立模板）
-- §56.29 模块 7d 匿名发布字段（全局配置 + per-request 覆盖 + Gazelle 补全）
-- §56.30 模块 8b 加种回下载器（auto_reseed 自动加种 source client + hash 检查 + SSE 进度）
-
-**§56 转载功能模块化设计全部完成（22 模块全覆盖 + 回归审查 + 成人内容分层）** ✅
-
-§56.1~§56.30 共 30 个子模块决策已落盘到 docs/31，覆盖 §56.0 总体架构全部 22 模块：
-- §56.1~§56.2 基础（standard_keys + 禁转）
-- §56.6~§56.15 模块 2b 详情页采集（2b.0~2b.9 共 10 子模块）
-- §56.16 模块 2c PTGen 深度集成
-- §56.17 模块 4a 图床打通
-- §56.18 模块 4c 海报 fallback
-- §56.19 模块 5c 标题重组 + 校验
-- §56.20 模块 5e 描述渲染
-- §56.21 模块 6b/6c 禁转 + 成人 DB 化
-- §56.22 模块 7b 多选 tag 表单
-- §56.23 模块 7e 已存在种子自动编辑
-- §56.24 模块 9d 字段预览
-- §56.25 回归审查修正（歧义澄清 + 文档冗余清理）
-- §56.26 成人内容过滤分层 + qui 引入
-- §56.27 模块 4b 截图审核
-- §56.28 模块 7c 音乐站特殊路径
-- §56.29 模块 7d 匿名发布字段
-- §56.30 模块 8b 加种回下载器
-
-**总工作量预估：~117.5 天（约 23-24 周一人）**
+**当前主线**：§56 转载功能核心提取层已完成。正在做端到端验收 + 多站适配。
 
 **§56 实施进度**：
-- ✅ 第一阶段 5a/6a 完成（v0.0.228）：standard_keys 表 + 94 条标准键 + 启动同步
-- ✅ 第二阶段 2b.1~2b.6 完成：extract 包核心全部就绪
-  - 2b.1 goquery 引入 + parser.go（3 入口函数 + benchmark）
-  - 2b.2 数据模型（SeedData/IntroData/Engine + 三源 JSON + Merge + DB 扩展）
-  - 2b.3 BBCode 转换器（双栈 accumulator + 30 标签 + 样式映射）
-  - 2b.4 公共提取器（11 子模块 + 简介分段算法 + ARDTU 工具签名剥离）
-  - 2b.5 MediaInfo/BDInfo 提取（4 层候选源 + 合法性检测 + 前缀去污染）
-  - 2b.6 图片分类与黑名单（embed JSON + 归一化 + 4 层海报识别）
-- ✅ 第三阶段 2b.7~2b.8 完成（骨架 + 基础设施 + 核心流程）：
-  - 2b.7 站点特殊提取器骨架（8 站 stub + Registry + Engine 路由）
-    - ⏳ 逐站实施特殊逻辑（需真实 HTML 样本验证）
-  - 2b.8 manual_forward_handler 接入（基础设施 + 核心流程）
-    - detail_source_json 自动填充（Fetcher.buildMetadata 扩展）
-    - publish_settings 表 + MetadataPriorityDefault 常量
-    - /merge 接口（POST，三源 JSON 反序列化 + Merge 合并）
-    - runAnalyze 详情页采集集成（FetchAndStore 触发 + 30s 超时 + 容错）
-    - 请求体扩展（source_site/source_torrent_id/metadata_priority，向后兼容）
-    - ⏳ 前端 toggle UI + SourcesStatus 显示（需 vite build）
-    - ⏳ 三源并行 errgroup（当前只集成 detail 源）
-- ✅ 第四阶段~第十五阶段 P0 全部完成:
-  - ✅ 第六阶段 2c PTGen 深度集成 P0 完成（◎字段解析器 + ptgen_formatter + renderer 集成）
-    - ⏳ 2c P1: Provider 接口拆分（doubaninfo.go/cspt.go/generic.go，代码组织优化）
-  - ✅ 第七阶段 4a 图床打通 P0 完成（rehost 补全 + per-site 5 字段 + 兼容性检查 + 分级失效检测）
-    - ⏳ 4a P1: 两套统一（删除 publish/imagehost.go，改用 Manager.Upload）
-    - ⏳ 4a P1: 特殊图床支持（PTer/织梦/杏坛/肉丝，逐站实施）
-  - ✅ 第八阶段 4c 海报 fallback 完成（PosterResolver 2 级自动 + toggle 支持）
-  - ✅ 第九阶段 5c 标题重组+校验 P0 完成（TitleFormat 扩展 + TitleValidator 8 类规则引擎）
-    - ⏳ 5c P1: 7 site hooks + embed JSON 默认规则 + 6 预设 + pipeline 接入
-  - ✅ 第十阶段 5e 描述渲染 P0 完成（thanksQuote + BBCodeToHTML + 副标题模板 + renderer 12+ 变量）
-    - ⏳ 5e P1: 4 站 site hooks + pipeline 接入 + 前端
-  - ✅ 第十一阶段 6b/6c 合规 DB 化 P0 完成（compliance_rules 表 + 26 条默认规则 + embed JSON + 启动同步）
-    - ⏳ 6b/6c P1: AC 自动机 + Checker 重构 + 删除三套硬编码 + CRUD API
-  - ✅ 第十二阶段 7b 多选 tag P0 完成（SiteTagConfig + TagApplier 4 Mode + MediaTagInferer + 互斥规则）
-    - ⏳ 7b P1: 38 MediaTags 标准键数据 + adapter 接入 + 前端
-  - ✅ 第十三阶段 7e 已存在种子编辑 P0 完成（ExistingStrategy + 权限校验 + AutoUpdate 编排 + 字段合并）
-    - ⏳ 7e P1: adapter 实现 + 真实样本验证 + 前端
-  - ✅ 第十四阶段 9d 字段预览 P0 完成（PreviewBuilder + /preview 接口 + 7 类字段 + 完整度检查）
-    - ⏳ 9d P1: 前端 PublishFieldPreview 组件 + diff 高亮 + 来源徽标
-  - ✅ 第十五阶段 4b/7c/7d/8b P0 全部完成:
-    - ✅ 7d 匿名发布字段 P0 完成（handleSubmit/batchSubmit 接收 anonymous + applyUserOverrides 处理）
-    - ✅ 8b 加种回下载器 P0 完成（auto_reseed 编排 + PublishResultRecord.seeded 字段）
-    - ✅ 4b 截图审核后端 P0 完成（ScreenshotInDesc toggle 接入）
-      - ⏳ 4b 前端（截图 Tab 增强，需 vite build）
-    - ✅ 7c 音乐站特殊路径 P0 完成（Gazelle 16 release_type + 6 format + 9 media + 16 encoding + 音乐描述模板）
-      - 数据来源: examples/Gazelle/ 源码（无需用户采集）
-      - ⏳ 7c P1: adapter 接入 + group 搜索 + 前端
 
-**§56 转载功能全部 15 阶段 P0 后端任务完成** ✅
+### ✅ 已完成（v0.0.228 → v0.0.249）
 
-**关键事实**（避免再被旧焦点段误导）：
-- §55.15-§55.19 全部已修并部署生产 v0.0.224+
-- 生产 249 部署的最新镜像见 `docker images`（用户负责部署）
-- 本地 `env-PT-Forward.md`（已 gitignore，不入 git）有 249/99 等环境访问信息
-- 生产刷流 `min_score=0.05`（用户前端配），~33% 推送率
-- 手动转发链路完整接线但从未端到端跑过（candidates=0）
+- ✅ 第一阶段 5a/6a（v0.0.228）：standard_keys 表 + 94 条标准键
+- ✅ 第二阶段 2b.1~2b.6：extract 包核心（goquery/BBCode/简介分段/MediaInfo/图片分类）
+- ✅ 第三阶段 2b.7~2b.8：8 站 stub + Registry + Engine 路由 + manual_forward_handler 接入
+- ✅ 第四~十五阶段 P0 全部完成（2c/4a/4c/5c/5e/6b-6c/7b/7e/9d/7d/8b/4b/7c）
+- ✅ **Engine 接入**（v0.0.232-v0.0.235）：
+  - Fetcher 调 Engine（PublicExtractor + 8 站特殊提取器）
+  - extractFlags 不扫整页 + extractTags 只查 torrent_tag + flags 始终用 Engine 覆盖
+  - 合规检查读 detail_source flags（移到 detailWg.Wait 后）
+- ✅ **PTNexus 配置移植**（v0.0.238-v0.0.239）：
+  - 55 站 source_keys + 9 类标准键变体（273 type + 96 medium + ...）
+  - PublicExtractor.fillBasicInfoFields 配置驱动 + Engine 末尾统一标准化
+- ✅ **titleparser 补全 + source 产地**（v0.0.240-v0.0.241）：
+  - fillDetailFromTitle 从 h1 标题反推字段
+  - PTer 基本信息"地区"提取 + Engine seed.Source 保留到 detail_source_json
+- ✅ **方案 B：adapter 内部用 Engine**（v0.0.242-v0.0.243）：
+  - NexusPHPAdapter.GetTorrentDetail 拆分为 fetchDetailsHTML + extractWithEngine + legacyExtractDetail
+  - fetcher 不再后处理（删除 mergeSeedIntoDetail + deriveSiteCode）
+  - extractSubtitle 支持 td.rowhead/rowfollow（v0.0.243 修复 subtitle 丢失）
+- ✅ **移植 auto_feed_js 正则**（v0.0.244）：
+  - 6 个字段提取函数合并到 titleparser（不新建包）
+  - fillDetailFromTitle 加第二层 fallback
+- ✅ **fillBasicInfoFields span title 模式**（v0.0.245）：
+  - 支持 SSD/Audiences 的 `<span title="字段名">值</span>` DOM
+- ✅ **Docker build cache 修复**（v0.0.246）：
+  - Dockerfile 加 ARG CACHEBUST + docker-publish.yml Docker Hub 加 no-cache: true
+- ✅ **繁体中文标签**（v0.0.247）：
+  - 碟粉等站支持（"基本資訊"/"類別"/"格式"等变体）
+- ✅ **下载器删除 bug 修复**（v0.0.248）：
+  - 软删除 + uniqueIndex 冲突（Unscoped().Delete 清除同名记录）
+- ✅ **tracker→站点匹配器**（v0.0.248-v0.0.249）：
+  - 移植 PTNexus refreshSiteMatcher 到 internal/site/tracker_matcher.go
+  - seeded-torrents API 返回 source_site 字段
+  - 前端种子列表显示"来源站"标签
 
-**待办**（§56 实施顺序）：
-- 第一阶段：5a/6a 落地（~2 天）—— standard_keys 表 + 加载机制 + 合规检查 DB 化
-- 第二阶段起：按优先级逐模块讨论 → 设计 → 实施
+### 49 站批量 DOM 分析结果
+- 24 站纯文本模式 ✅（fillBasicInfoFields 模式 1a 已支持）
+- 2 站 span title 模式 ✅（SSD/Audiences，v0.0.245 修复）
+- 1 站繁体中文 ✅（碟粉，v0.0.247 修复）
+- 1 站 Tailwind CSS ❌（憨憨 HHanClub，待适配）
+- 11 站 tid 不准（跨站 comment，非代码问题；tracker 匹配器已解决 source_site）
+- 2 站 HTTP 错误（二师兄 468/阿玲 502，非代码问题）
 
-**后续**：
-- 多下载器聚合下载（§55.3-55.4，clientSelector 接入，待用户决策时机）
-- 转载功能端到端跑通（§56 各模块打磨完成后）
+### 端到端验收状态
+
+| 端点 | 状态 |
+|------|------|
+| /seeded-torrents（含 source_site）| ✅ |
+| /analyze（Engine 提取，完整度 92%）| ✅ |
+| /merge（三源合并 + 标准化 code）| ✅ |
+| /preview（字段预览 + 完整度检查）| ✅ |
+| /eligible-targets（92 站）| ✅ |
+| /submit（真发布 21 步管线）| ❌ **未测** |
+
+**关键事实**：
+- 生产 249 Docker 部署（docker compose），端口 8765
+- Docker mirror `docker.fnnas.com` 可能缓存旧镜像，部署需确认镜像 SHA 已更新
+- tracker 匹配器自动识别来源站（不需 tid 反查）
+- 按 §56 决策 10：简介不复用源站（完全重建）
+- 按 §56.14 Q1：source_torrent_id 失败时跳过详情页（不阻塞转载）
+- PTer 实际完整度 100%（92% 是因为 bdinfo 不适用 WEB-DL）
+
+**待办**：
+- 测 /submit 真发布（高优先级）
+- 修复 CI lint/test 失败（中优先级）
+- HHanClub 适配（中优先级，Tailwind CSS）
+- §56 前端组件（tag/预览/截图 toggle 等，各需 vite build）
+- adapter 统一后续（Unit3D 评估 + 删死代码）
+- 11 站 RSS 配置后批量验证
 
 **完整设计文档**：`docs/31-模块设计决策记录.md` §55-§56（按需读特定章节，不要一次读全文，58000+ 行）。
 
