@@ -133,7 +133,8 @@ type Meta struct {
 
 // Input 提取器执行上下文。
 type Input struct {
-	SiteCode      string `json:"site_code"`      // "ssd" / "pterclub"
+	SiteCode      string `json:"site_code"`      // "ssd" / "pterclub"（fallback key）
+	Domain        string `json:"domain"`         // "pterclub.net"（主键，v0.0.253）
 	SiteNickname  string `json:"site_nickname"`  // "不可说" / "猫站"
 	BaseURL       string `json:"base_url"`
 	Cookie        string `json:"-"`              // 不序列化（敏感）

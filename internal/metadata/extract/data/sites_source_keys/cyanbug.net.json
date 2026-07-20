@@ -1,0 +1,89 @@
+{
+  "domain": "cyanbug.net",
+  "site_code": "cyanbug",
+  "site_name": "大青虫",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "其他": "category.other",
+      "MV": "category.mv",
+      "体育": "category.sports",
+      "综艺": "category.tv_shows",
+      "纪录片": "category.documentaries",
+      "动漫": "category.animation",
+      "电视剧": "category.tv_series",
+      "电影": "category.movie"
+    },
+    "medium": {
+      "Blu-ray": "medium.bluray",
+      "UHD Blu-ray": "medium.uhd_bluray",
+      "Remux": "medium.remux",
+      "Encode": "medium.encode",
+      "WEB-DL": "medium.webdl",
+      "HD DVD": "medium.hddvd",
+      "HDTV": "medium.hdtv",
+      "MiniBD": "medium.minibd",
+      "DVDR": "medium.dvdr",
+      "CD": "medium.cd",
+      "Track": "medium.track",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.265": "video.h265",
+      "H.264": "video.h264",
+      "VC-1": "video.vc1",
+      "Xvid": "video.xvid",
+      "MPEG-4": "video.mpeg4",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "2160p": "resolution.r2160p",
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd"
+    },
+    "audio_codec": {
+      "DTS-HD": "audio.dts_hd",
+      "DTS-HDMA:X 7.1": "audio.dts_hd_ma",
+      "DTS-HDMA": "audio.dts_hd_ma",
+      "TrueHD": "audio.truehd",
+      "Atmos": "audio.atmos",
+      "DTS": "audio.dts",
+      "DD/AC3": "audio.ac3",
+      "AAC": "audio.aac",
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "LPCM": "audio.lpcm",
+      "WAV": "audio.wav",
+      "Other": "audio.other"
+    },
+    "team": {
+      "PTer": "team.pter",
+      "HDS": "team.hds",
+      "CHD": "team.chd",
+      "HDC": "team.hdc",
+      "WiKi": "team.wiki",
+      "BeiTai": "team.beitai",
+      "OurBits": "team.ourbits",
+      "CMCT": "team.cmct",
+      "FRDS": "team.frds",
+      "HDH": "team.hdh",
+      "Pter": "team.pter",
+      "Audies": "team.audies",
+      "ADWeb": "team.adweb",
+      "HHWEB": "team.hhweb",
+      "Other": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

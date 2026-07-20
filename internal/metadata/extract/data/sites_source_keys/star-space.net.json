@@ -1,0 +1,83 @@
+{
+  "domain": "star-space.net",
+  "site_code": "star-space",
+  "site_name": "影",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电影": "category.movie",
+      "剧集": "category.tv_series",
+      "动画": "category.animation",
+      "纪录片": "category.documentaries",
+      "MV": "category.mv",
+      "体育": "category.sports",
+      "综艺": "category.tv_shows"
+    },
+    "medium": {
+      "Other": "medium.other",
+      "HDTV Encode": "medium.encode",
+      "HDTV": "medium.hdtv",
+      "DVD Encode": "medium.dvd",
+      "DVD Remux": "medium.dvd",
+      "DVD ISO": "medium.dvd",
+      "BD Encode": "medium.encode",
+      "BD Remux": "medium.remux",
+      "BD DIY": "medium.bluray",
+      "BD ISO": "medium.iso",
+      "UHD Encode": "medium.encode",
+      "UHD Remux": "medium.remux",
+      "UHD DIY": "medium.uhd_diy",
+      "UHD ISO": "medium.iso"
+    },
+    "video_codec": {
+      "H264 (AVC)": "video.h264",
+      "H265 (HEVC)": "video.h265",
+      "MPEG": "video.mpeg",
+      "Other": "video.other",
+      "VC-1": "video.vc1",
+      "x264": "video.x264",
+      "x265": "video.x265",
+      "Xvid": "video.xvid"
+    },
+    "resolution": {
+      "SD": "resolution.sd",
+      "720": "resolution.r720p",
+      "1080": "resolution.r1080i",
+      "2160": "resolution.r2160p",
+      "4320": "resolution.r4320p"
+    },
+    "audio_codec": {
+      "AAC": "audio.aac",
+      "APE": "audio.ape",
+      "DD/DD+/AC3": "audio.ac3",
+      "DTS": "audio.dts",
+      "DTS-HD HR": "audio.dts_hd_hr",
+      "DTS-HD MA": "audio.dts_hd_ma",
+      "DTS-X": "audio.dtsx",
+      "FLAC": "audio.flac",
+      "LPCM": "audio.lpcm",
+      "M4A": "audio.m4a",
+      "MP3": "audio.mp3",
+      "OGG": "audio.ogg",
+      "Other": "audio.other",
+      "TrueHD": "audio.truehd",
+      "TrueHD Atmos": "audio.truehd_atmos",
+      "WAV": "audio.wav"
+    },
+    "team": {
+      "YingHDTV": "team.hdt",
+      "CatEDU": "team.catedu",
+      "Telesto": "team.telesto",
+      "Other": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

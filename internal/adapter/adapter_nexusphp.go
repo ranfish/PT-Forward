@@ -241,6 +241,7 @@ func (a *NexusPHPAdapter) fetchDetailsHTML(ctx context.Context, config *model.Si
 func (a *NexusPHPAdapter) extractWithEngine(html string, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, bool) {
 	input := extract.Input{
 		SiteCode:     deriveSiteCode(config.Domain),
+		Domain:       config.Domain,
 		SiteNickname: config.SiteName,
 		BaseURL:      config.BaseURL,
 		TorrentID:    torrentID,

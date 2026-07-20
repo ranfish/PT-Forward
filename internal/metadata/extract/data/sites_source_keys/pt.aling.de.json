@@ -1,0 +1,51 @@
+{
+  "domain": "pt.aling.de",
+  "site_code": "pt",
+  "site_name": "阿玲",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "动画": "category.animation",
+      "电视剧": "category.tv_series",
+      "电影": "category.movie",
+      "纪录片": "category.documentaries"
+    },
+    "medium": {
+      "Blu-ray": "medium.bluray",
+      "Blu-ray DIY": "medium.bluray",
+      "Remux": "medium.remux",
+      "Encode": "medium.encode",
+      "TV": "medium.tv",
+      "WEB-DL": "medium.webdl",
+      "DVD 原盘": "medium.dvd",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.264(AVC)": "video.h264",
+      "H.265(HEVC)": "video.h265",
+      "AV1": "video.av1",
+      "MPEG-2": "video.mpeg2",
+      "VC-1": "video.vc1",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "8K": "resolution.r4320p",
+      "4K": "resolution.r2160p",
+      "1080p": "resolution.r1080p",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd"
+    },
+    "team": {
+      "Other": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

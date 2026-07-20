@@ -1,0 +1,62 @@
+{
+  "domain": "zhuque.in",
+  "site_code": "zhuque",
+  "site_name": "zhuque",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "视频编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "tags[]": "标签"
+  },
+  "form_fields": {
+    "category": "type",
+    "medium": "medium",
+    "video_codec": "video_codec",
+    "resolution": "resolution",
+    "tags[]": "tags[]"
+  },
+  "form_value_mappings": {
+    "type": {
+      "category.movie": "501",
+      "category.tv_series": "502",
+      "category.animation": "503",
+      "category.tv_shows": "504",
+      "category.other": "599"
+    },
+    "medium": {
+      "medium.uhd_bluray": "301",
+      "medium.bluray": "303",
+      "medium.remux": "305",
+      "medium.encode": "306",
+      "medium.hdtv": "308",
+      "medium.webdl": "309",
+      "medium.other": "399"
+    },
+    "video_codec": {
+      "video.h264": "101",
+      "video.h265": "102",
+      "video.x264": "103",
+      "video.x265": "104",
+      "default": "199"
+    },
+    "resolution": {
+      "resolution.r720p": "401",
+      "resolution.r1080i": "402",
+      "resolution.r1080p": "403",
+      "resolution.r2160p": "404",
+      "default": "499"
+    },
+    "tag": {
+      "tag.国语": "603",
+      "tag.中字": "604",
+      "tag.杜比": "611",
+      "tag.HDR": "613",
+      "tag.特效字幕": "614",
+      "tag.完结": "621",
+      "tag.分集": "622"
+    }
+  }
+}

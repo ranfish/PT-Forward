@@ -1,0 +1,67 @@
+{
+  "domain": "ptfans.cc",
+  "site_code": "ptfans",
+  "site_name": "PTFans",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Movies(电影)": "category.movie",
+      "TV Series(电视剧)": "category.tv_series",
+      "TV Shows(综艺)": "category.tv_shows",
+      "Documentaries(纪录片)": "category.documentaries",
+      "Sport(体育、竞技、武术及相关)": "category.sports",
+      "Games(游戏及相关)": "category.game",
+      "Music(音乐、专辑、MV、演唱会)": "category.mv",
+      "Book(书籍、杂志、报刊、有声书)": "category.books",
+      "Animate(3D动画、2.5次元)": "category.3d",
+      "ACGN(二次元、漫画)": "category.cartoon",
+      "Baby(婴幼、儿童、早教、小学及相关)": "category.cartoon",
+      "Resource(素材、数据、图片、文档、模板)": "category.document",
+      "Software(软件、系统、 程序、APP等)": "category.software"
+    },
+    "medium": {
+      "Other": "medium.other",
+      "Encode": "medium.encode",
+      "Blu-ray": "medium.bluray",
+      "MiniBD": "medium.minibd",
+      "Remux": "medium.remux",
+      "DVD": "medium.dvd",
+      "CD": "medium.cd"
+    },
+    "video_codec": {
+      "H.264(x264/AVC)": "video.h264",
+      "H.265(x265/HEVC)": "video.h265",
+      "Bluray(VC-1)": "video.vc1",
+      "Bluray(AVC)": "video.h264",
+      "Bluray(HEVC)": "video.h265",
+      "MPEG-2": "video.mpeg2",
+      "Xvid": "video.xvid",
+      "AV1": "video.av1",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "4K": "resolution.r2160p",
+      "8K": "resolution.r4320p"
+    },
+    "team": {
+      "HDS": "team.hds",
+      "CHD": "team.chd",
+      "MySiLU": "team.mysilu",
+      "WiKi": "team.wiki",
+      "Other": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

@@ -1,0 +1,70 @@
+{
+  "domain": "hdcity.city",
+  "site_code": "hdcity",
+  "site_name": "城市",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Movies/电影": "category.movie",
+      "Series/剧集": "category.tv_series",
+      "Doc/档案记录": "category.documentaries",
+      "Anim/动漫": "category.animation",
+      "MV/音乐视频": "category.mv",
+      "Sports/体育": "category.sports",
+      "Audio/音频": "category.audio",
+      "Edu/文档/教材": "category.document",
+      "Soft/软件": "category.software",
+      "Other/其他": "category.other"
+    },
+    "medium": {
+      "HDDVD原盘": "medium.dvd",
+      "Remux/重混流": "medium.remux",
+      "Encode/重编码": "medium.encode",
+      "MiniBD/微蓝光": "medium.minibd",
+      "HDTV/SNG/原始录制": "medium.hdtv",
+      "DVD原盘": "medium.dvd",
+      "CD/音乐/有声读物": "medium.cd",
+      "Track/外挂音轨": "medium.track"
+    },
+    "video_codec": {
+      "H.264/AVC": "video.h264",
+      "H.265/HEVC": "video.h265",
+      "MPEG-2": "video.mpeg2",
+      "DivX/XviD": "video.xvid",
+      "WMV/VC-1": "video.vc1",
+      "AV1": "video.av1",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "8K-4320p": "resolution.r4320p",
+      "8K-4320i": "resolution.r4320p",
+      "4K-2160p": "resolution.r2160p",
+      "4K-2160i": "resolution.r2160p",
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "720i": "resolution.r720p",
+      "540p": "resolution.r540p",
+      "480p": "resolution.r480p",
+      "SD": "resolution.sd"
+    },
+    "team": {
+      "HDCITY-NoVA": "team.hdc",
+      "HDCITY-NoPA": "team.hdc",
+      "HDCITY-NoTA": "team.hdc",
+      "HDCITY-NoXA": "team.hdc"
+    },
+    "source": {
+      "3D Alt/其他3D": "source.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

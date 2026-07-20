@@ -11,6 +11,7 @@ import (
 // 实现 Extractor 接口，可作为 Engine.public 注入。
 type PublicExtractor struct {
 	siteCode        string
+	domain          string
 	siteNickname    string
 	bbcodeConverter *HTMLToBBCodeConverter
 }
@@ -67,13 +68,17 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	seed.MediaInfo, seed.BDInfo = p.extractMediaInfo(descrHTML, descrBBCode)
 
 	// 阶段 5: 基本信息表格行
-	// v0.0.252: 优先用 input.SiteCode（PublicExtractor 是单例，多 goroutine 并发时
-	// 不能改实例字段，否则会 race condition；用参数传递保证并发安全）
+	// v0.0.253: 优先用 input.Domain（PublicExtractor 是单例，多 goroutine 并发时
+	// 不能改实例字段；用参数传递保证并发安全；domain 比 siteCode 更唯一）
+	domain := input.Domain
+	if domain == "" {
+		domain = p.domain
+	}
 	siteCode := input.SiteCode
 	if siteCode == "" {
 		siteCode = p.siteCode
 	}
-	p.fillBasicInfoFieldsWithCode(doc, &seed, siteCode)
+	p.fillBasicInfoFieldsWithCode(doc, &seed, domain, siteCode)
 
 	// 阶段 6: 标签 + InfoHash + Size + URL + Flags
 	seed.Tags = p.extractTags(doc)

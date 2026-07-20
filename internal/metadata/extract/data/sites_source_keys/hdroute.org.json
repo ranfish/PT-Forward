@@ -1,0 +1,60 @@
+{
+  "domain": "hdroute.org",
+  "site_code": "hdroute",
+  "site_name": "在脚下",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电影": "category.movie",
+      "纪录片": "category.documentaries",
+      "连续剧": "category.tv_series",
+      "动画片": "category.animation",
+      "演唱会": "category.mv",
+      "体育节目": "category.sports",
+      "电影音轨": "category.movie",
+      "无损音乐": "category.music",
+      "其他": "category.other"
+    },
+    "medium": {
+      "Blu-ray原盘": "medium.bluray",
+      "Remux": "medium.remux",
+      "HDTV/Rip": "medium.hdtv",
+      "CD": "medium.cd",
+      "其他": "medium.other"
+    },
+    "video_codec": {
+      "VC-1": "video.vc1",
+      "MPEG-2": "video.mpeg2",
+      "Xvid": "video.xvid",
+      "其他": "video.other",
+      "MVC": "video.mvc"
+    },
+    "resolution": {
+      "1080P": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720P": "resolution.r720p",
+      "其他": "resolution.other",
+      "4K2K": "resolution.r1440p"
+    },
+    "audio_codec": {
+      "LPCM": "audio.lpcm",
+      "DTSHDMA": "audio.dts",
+      "TrueHD": "audio.truehd",
+      "DTS/(Core)": "audio.dts",
+      "AC-3(DD)": "audio.ac3",
+      "APE": "audio.ape",
+      "FLAC": "audio.flac",
+      "其他": "audio.other",
+      "AAC": "audio.aac"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

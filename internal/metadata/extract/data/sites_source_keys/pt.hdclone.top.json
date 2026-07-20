@@ -1,0 +1,72 @@
+{
+  "domain": "pt.hdclone.top",
+  "site_code": "pt",
+  "site_name": "克隆",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Movies/电影": "category.movie",
+      "TV Series/电视剧": "category.tv_series",
+      "TV Shows/综艺": "category.tv_shows",
+      "Documentaries/纪录片": "category.documentaries",
+      "Animations/动漫": "category.animation",
+      "Othes/其他": "category.other",
+      "Music/音乐": "category.music",
+      "Playlet/短剧": "category.playlet",
+      "MV/演唱会": "category.mv"
+    },
+    "medium": {
+      "UHD Blu-ray": "medium.uhd_bluray",
+      "Blu-ray": "medium.bluray",
+      "Remux": "medium.remux",
+      "Encode": "medium.encode",
+      "WEB-DL": "medium.webdl",
+      "MiniBD": "medium.minibd",
+      "DVD": "medium.dvd",
+      "CD": "medium.cd",
+      "HDTV": "medium.hdtv",
+      "Track": "medium.track"
+    },
+    "video_codec": {
+      "H.264/x264/AVC": "video.h264",
+      "H265/HEVC/x265": "video.h265",
+      "VC-1": "video.vc1",
+      "AV1": "video.av1",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "4320p/8K": "resolution.r4320p",
+      "2160p/4K": "resolution.r2160p",
+      "1080p/1080i": "resolution.r1080p",
+      "720p": "resolution.r720p",
+      "SD/720p以下": "resolution.r720p",
+      "Other": "resolution.other"
+    },
+    "team": {
+      "M-Team": "team.mteam",
+      "CHD": "team.chd",
+      "BeiTai": "team.beitai",
+      "WiKi": "team.wiki",
+      "AGSV": "team.agsv",
+      "FRDS": "team.frds",
+      "TLF": "team.tlf",
+      "CMCT": "team.cmct",
+      "beAst": "team.beast",
+      "HDSky": "team.hds",
+      "HDHome": "team.hdhome",
+      "TTG": "team.ttg",
+      "UBits": "team.ubits",
+      "PTer": "team.pter"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

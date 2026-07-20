@@ -1,0 +1,30 @@
+{
+  "domain": "www.pttime.org",
+  "site_code": "pttime",
+  "site_name": "时间",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Movies(电影)": "category.movie",
+      "TV Series(连续剧)": "category.tv_series",
+      "TV Shows(综艺)": "category.tv_shows",
+      "Documentaries(纪录片)": "category.documentaries",
+      "Sport(体育)": "category.sports",
+      "ACG(动漫)": "category.animation",
+      "Baby(婴幼儿童)": "category.cartoon",
+      "Music(音乐)": "category.music",
+      "Games(游戏)": "category.game",
+      "Software(软件)": "category.software",
+      "Other(其它)": "category.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

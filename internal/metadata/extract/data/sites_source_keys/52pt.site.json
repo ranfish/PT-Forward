@@ -1,0 +1,95 @@
+{
+  "domain": "52pt.site",
+  "site_code": "52pt",
+  "site_name": "五二",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Movies/电影": "category.movie",
+      "Documentaries/纪录片": "category.documentaries",
+      "Animations/动漫(画)": "category.animation",
+      "TV Series/剧集": "category.tv_series",
+      "TV Shows/综艺": "category.tv_shows",
+      "Music Videos/音乐MV": "category.music_video",
+      "Sports/体育": "category.sports",
+      "HQ Audio/无损音乐": "category.music",
+      "Misc/其他": "category.other",
+      "Ebook/电子书": "category.ebook",
+      "Edu/学习教育": "category.study"
+    },
+    "medium": {
+      "Blu-ray DIY": "medium.bluray",
+      "Blu-ray Remux": "medium.bluray",
+      "Blu-ray原盘无中文": "medium.bluray",
+      "4K UHD无中文": "medium.uhd_bluray",
+      "Encode": "medium.encode",
+      "HDTV": "medium.hdtv",
+      "WEB-DL": "medium.webdl",
+      "DVD": "medium.dvd",
+      "CD": "medium.cd",
+      "Track": "medium.track",
+      "Other": "medium.other",
+      "Remux": "medium.remux",
+      "UHD Remux": "medium.remux",
+      "UHD Encode": "medium.encode"
+    },
+    "video_codec": {
+      "H.264/AVC": "video.h264",
+      "H.265(HEVC)": "video.h265",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other",
+      "X264": "video.x264",
+      "H.265": "video.h265",
+      "X265": "video.x265",
+      "VC-1": "video.vc1",
+      "AV1": "video.av1"
+    },
+    "resolution": {
+      "2K/1080p": "resolution.r1080p",
+      "4K/2160P": "resolution.r2160p",
+      "1080i": "resolution.r1080i",
+      "1080P-3D": "resolution.r1080p",
+      "720p": "resolution.r720p",
+      "8K/4320p": "resolution.r4320p"
+    },
+    "audio_codec": {
+      "DTS.HDMA": "audio.dts",
+      "TRUE.HD Atmos": "audio.atmos",
+      "DTS:X": "audio.dtsx",
+      "AC3/DD": "audio.ac3",
+      "LPCM": "audio.lpcm",
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "DTSES": "audio.dts",
+      "AAC": "audio.aac",
+      "DTS": "audio.dts",
+      "DTS.HD": "audio.dts",
+      "MP3": "audio.mp3",
+      "Other": "audio.other"
+    },
+    "team": {
+      "52PT REMUX": "team.remux",
+      "BeyondHD": "team.beyondhd",
+      "HDSKY": "team.hds",
+      "TTG": "team.ttg",
+      "MTeam": "team.mteam",
+      "FRDS": "team.frds",
+      "Other": "team.other",
+      "CMCT": "team.cmct",
+      "HDS": "team.hds",
+      "MySiLU": "team.mysilu",
+      "WiKi": "team.wiki",
+      "CHD": "team.chd",
+      "PTHome": "team.pthome"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

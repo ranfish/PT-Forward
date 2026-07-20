@@ -1,0 +1,58 @@
+{
+  "domain": "pt.sjtu.edu.cn",
+  "site_code": "pt",
+  "site_name": "葡萄",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "华语电影": "category.movie",
+      "欧美电影": "category.movie",
+      "亚洲电影": "category.movie",
+      "纪录片": "category.documentaries",
+      "港台电视剧": "category.tv_series",
+      "亚洲电视剧": "category.tv_series",
+      "大陆电视剧": "category.tv_series",
+      "欧美电视剧": "category.tv_series",
+      "大陆综艺节目": "category.tv_shows",
+      "港台综艺节目": "category.tv_shows",
+      "欧美综艺节目": "category.tv_shows",
+      "日韩综艺节目": "category.tv_shows",
+      "华语音乐": "category.music",
+      "日韩音乐": "category.music",
+      "欧美音乐": "category.music",
+      "原声音乐": "category.music",
+      "古典音乐": "category.music",
+      "Music Videos": "category.mv",
+      "游戏": "category.game",
+      "动漫": "category.animation",
+      "体育": "category.sports",
+      "软件": "category.software",
+      "学习": "category.study",
+      "其他": "category.other"
+    },
+    "video_codec": {
+      "H.264": "video.h264",
+      "VC-1": "video.vc1",
+      "Xvid": "video.xvid",
+      "MPEG-2": "video.mpeg2",
+      "其他": "video.other"
+    },
+    "resolution": {
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "其他": "resolution.other",
+      "4k": "resolution.r4320p"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

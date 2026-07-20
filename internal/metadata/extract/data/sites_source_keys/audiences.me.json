@@ -1,0 +1,78 @@
+{
+  "domain": "audiences.me",
+  "site_code": "audiences",
+  "site_name": "人人",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电影": "category.movie",
+      "剧集": "category.tv_series",
+      "综艺": "category.tv_shows",
+      "纪录片": "category.documentaries",
+      "音乐": "category.music",
+      "有声书": "category.audiobook",
+      "电子书": "category.ebook",
+      "体育": "category.sports",
+      "游戏": "category.game",
+      "学习": "category.study",
+      "其他": "category.other"
+    },
+    "medium": {
+      "UHD Blu-ray 原盘": "medium.uhd_bluray",
+      "UHD Blu-ray DIY": "medium.uhd_bluray",
+      "Blu-ray 原盘": "medium.bluray",
+      "Blu-ray DIY": "medium.bluray",
+      "REMUX": "medium.remux",
+      "Encode": "medium.encode",
+      "HDTV": "medium.hdtv",
+      "WEB-DL": "medium.webdl",
+      "DVD 原盘": "medium.dvd",
+      "CD": "medium.cd",
+      "Track": "medium.track",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.265(HEVC)": "video.h265",
+      "H.264(AVC)": "video.h264",
+      "VC-1": "video.vc1",
+      "MPEG-2": "video.mpeg2",
+      "AV1": "video.av1",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "8K": "resolution.r4320p",
+      "4K": "resolution.r2160p",
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "None": "resolution.other"
+    },
+    "audio_codec": {
+      "DTS:X": "audio.dtsx",
+      "TrueHD Atmos": "audio.truehd_atmos",
+      "DTS-HD MA": "audio.dts_hd_ma",
+      "TrueHD": "audio.truehd",
+      "LPCM": "audio.lpcm",
+      "DTS": "audio.dts",
+      "DD/AC3": "audio.ac3",
+      "OPUS": "audio.opus",
+      "AAC": "audio.aac",
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "WAV": "audio.wav",
+      "MP3": "audio.mp3",
+      "M4A": "audio.m4a",
+      "Other": "audio.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

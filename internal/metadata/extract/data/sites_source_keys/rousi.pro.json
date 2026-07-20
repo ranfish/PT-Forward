@@ -1,0 +1,49 @@
+{
+  "domain": "rousi.pro",
+  "site_code": "rousi",
+  "site_name": "Rousi",
+  "form_value_mappings": {
+    "type": {
+      "category.animation": "animation",
+      "category.movie": "movie",
+      "category.tv_series": "tv",
+      "category.tv_shows": "variety",
+      "category.music": "music",
+      "category.mv": "music",
+      "category.documentaries": "documentary",
+      "category.sports": "sports",
+      "category.software": "software",
+      "category.ebook": "ebook",
+      "category.game": "other",
+      "category.other": "other",
+      "default": "other"
+    },
+    "region": {
+      "source.china": "大陆",
+      "source.hongkong": "香港",
+      "source.taiwan": "台湾",
+      "source.japan": "日本",
+      "source.korea": "韩国",
+      "source.western": "美国",
+      "source.uk": "英国",
+      "source.france": "法国",
+      "source.germany": "德国",
+      "source.italy": "意大利",
+      "source.spain": "西班牙",
+      "source.russia": "俄罗斯",
+      "source.india": "印度",
+      "source.thailand": "泰国",
+      "source.australia": "澳大利亚",
+      "default": ""
+    },
+    "resolution": {
+      "resolution.r2160p": "4K / 2160p",
+      "resolution.r1080p": "1080p",
+      "resolution.r1080i": "1080i",
+      "resolution.r720p": "720p",
+      "resolution.sd": "SD",
+      "resolution.other": "其他",
+      "default": "其他"
+    }
+  }
+}

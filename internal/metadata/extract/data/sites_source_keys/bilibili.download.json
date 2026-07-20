@@ -1,0 +1,69 @@
+{
+  "domain": "bilibili.download",
+  "site_code": "bilibili",
+  "site_name": "轨道炮",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电影": "category.movie",
+      "剧集": "category.tv_series",
+      "综艺": "category.tv_shows",
+      "纪录片": "category.documentaries",
+      "动漫": "category.animation",
+      "MV": "category.mv",
+      "体育": "category.sports",
+      "音乐": "category.music",
+      "软件": "category.software",
+      "学习": "category.study",
+      "游戏": "category.game",
+      "漫画": "category.cartoon"
+    },
+    "medium": {
+      "Blu-ray": "medium.bluray",
+      "UHD": "medium.uhd_bluray",
+      "Remux": "medium.remux",
+      "WEB-DL": "medium.webdl",
+      "HDTV": "medium.hdtv",
+      "DVD": "medium.dvd",
+      "Encode": "medium.encode",
+      "CD": "medium.cd",
+      "Track": "medium.track"
+    },
+    "video_codec": {
+      "H264": "video.h264",
+      "H265": "video.h265",
+      "VC-1": "video.vc1",
+      "MPEG-2": "video.mpeg2",
+      "XVID": "video.xvid",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "4K": "resolution.r2160p",
+      "1080p/i": "resolution.r1080p",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "Other": "resolution.other",
+      "2K": "resolution.r1440p"
+    },
+    "audio_codec": {
+      "TrueHD/Atmos": "audio.atmos",
+      "DTS-HD/DTS-HDMA": "audio.dts",
+      "AC3": "audio.ac3",
+      "LPCM": "audio.lpcm",
+      "MP3": "audio.mp3",
+      "AAC": "audio.aac",
+      "APE": "audio.ape",
+      "Other": "audio.other",
+      "WAV": "audio.wav"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

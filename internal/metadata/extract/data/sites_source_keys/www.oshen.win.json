@@ -1,0 +1,65 @@
+{
+  "domain": "www.oshen.win",
+  "site_code": "oshen",
+  "site_name": "奥申",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "游戏/Game": "category.game",
+      "高清音乐": "category.music",
+      "音乐": "category.music",
+      "体育": "category.sports",
+      "MV(音乐视频)": "category.mv",
+      "综艺节目": "category.tv_shows",
+      "连续剧": "category.tv_series",
+      "动漫": "category.animation",
+      "纪录片": "category.documentaries",
+      "电影": "category.movie"
+    },
+    "medium": {
+      "Track": "medium.track",
+      "CD": "medium.cd",
+      "DVDR": "medium.dvdr",
+      "HDTV": "medium.hdtv",
+      "MiniBD": "medium.minibd",
+      "Encode": "medium.encode",
+      "Remux": "medium.remux",
+      "HD DVD": "medium.hddvd",
+      "Blu-ray": "medium.bluray"
+    },
+    "video_codec": {
+      "H.264": "video.h264",
+      "VC-1": "video.vc1",
+      "Xvid": "video.xvid",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other",
+      "H.265/HEVC": "video.h265"
+    },
+    "resolution": {
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "4K/UHD": "resolution.r2160p"
+    },
+    "team": {
+      "CMCT": "team.cmct",
+      "HDTIME": "team.hdt",
+      "HDS": "team.hds",
+      "CHD": "team.chd",
+      "MySiLU": "team.mysilu",
+      "WiKi": "team.wiki",
+      "Other": "team.other",
+      "52pt": "team.pt52"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

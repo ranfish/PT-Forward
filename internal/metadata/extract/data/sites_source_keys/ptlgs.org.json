@@ -1,0 +1,169 @@
+{
+  "domain": "ptlgs.org",
+  "site_code": "ptlgs",
+  "site_name": "PTLGS",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "视频编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组"
+  },
+  "standard_keys": {
+    "type": {
+      "电影": "category.movie",
+      "剧集": "category.tv_series",
+      "综艺": "category.tv_shows",
+      "动漫": "category.animation",
+      "纪录片": "category.documentaries",
+      "体育": "category.sports",
+      "音乐": "category.music",
+      "其他": "category.other"
+    },
+    "medium": {
+      "Blu-ray": "medium.bluray",
+      "Remux": "medium.remux",
+      "BDRip": "medium.bdrip",
+      "WEB-DL": "medium.webdl",
+      "WEBRiP": "medium.webrip",
+      "HDTV": "medium.hdtv",
+      "TVRip": "medium.tvrip",
+      "DVD": "medium.dvd",
+      "DVDRiP": "medium.dvdr",
+      "CD": "medium.cd",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.265/HEVC": "video.h265",
+      "H.264/AVC": "video.h264",
+      "VC-1": "video.vc1",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other"
+    },
+    "audio_codec": {
+      "DTS-HD": "audio.dts_hd",
+      "TrueHD": "audio.truehd",
+      "LPCM": "audio.lpcm",
+      "DTS": "audio.dts",
+      "AC-3": "audio.ac3",
+      "AAC": "audio.aac",
+      "FLAC": "audio.flac",
+      "APE": "audio.ape",
+      "WAV": "audio.wav",
+      "MP3": "audio.mp3",
+      "Other": "audio.other"
+    },
+    "resolution": {
+      "2160p": "resolution.r2160p",
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "Other": "resolution.other"
+    },
+    "team": {
+      "DYZ-WEB": "team.dyz_web",
+      "DYZ-Movie": "team.dyz_movie",
+      "DYZ-TV": "team.dyz_tv",
+      "Eleph": "team.eleph",
+      "beAst": "team.beast",
+      "ZmWeb": "team.zmweb",
+      "Other": "team.other"
+    }
+  },
+  "form_fields": {
+    "category": "type",
+    "medium": "medium_sel[4]",
+    "video_codec": "codec_sel[4]",
+    "audio_codec": "audiocodec_sel[4]",
+    "resolution": "standard_sel[4]",
+    "team": "team_sel[4]"
+  },
+  "form_value_mappings": {
+    "type": {
+      "category.movie": "401",
+      "category.tv_series": "402",
+      "category.tv_shows": "403",
+      "category.animation": "405",
+      "category.documentaries": "404",
+      "category.sports": "407",
+      "category.music": "406",
+      "category.other": "409",
+      "category.software": "411",
+      "default": "409"
+    },
+    "medium": {
+      "medium.bluray": "14",
+      "medium.remux": "8",
+      "medium.bdrip": "5",
+      "medium.encode": "5",
+      "medium.webdl": "4",
+      "medium.webrip": "7",
+      "medium.hdtv": "3",
+      "medium.dvd": "1",
+      "medium.dvdr": "11",
+      "medium.cd": "15",
+      "medium.other": "12",
+      "default": "12"
+    },
+    "video_codec": {
+      "video.h265": "6",
+      "video.h264": "7",
+      "video.vc1": "2",
+      "video.mpeg2": "4",
+      "video.other": "5",
+      "default": "5"
+    },
+    "audio_codec": {
+      "audio.dts_hd": "10",
+      "audio.truehd": "12",
+      "audio.lpcm": "8",
+      "audio.dts": "19",
+      "audio.ac3": "9",
+      "audio.aac": "11",
+      "audio.flac": "13",
+      "audio.ape": "14",
+      "audio.wav": "1",
+      "audio.mp3": "6",
+      "audio.other": "7",
+      "default": "7"
+    },
+    "resolution": {
+      "resolution.r2160p": "6",
+      "resolution.r1080p": "1",
+      "resolution.r1080i": "2",
+      "resolution.r720p": "3",
+      "resolution.sd": "4",
+      "resolution.other": "7",
+      "default": "7"
+    },
+    "team": {
+      "team.dyz_web": "17",
+      "team.dyz_movie": "15",
+      "team.dyz_tv": "14",
+      "team.eleph": "18",
+      "team.beast": "9",
+      "team.zmweb": "11",
+      "team.other": "13",
+      "default": "13"
+    },
+    "tag": {
+      "tag.DIY": "4",
+      "tag.中字": "6",
+      "tag.3D": "20",
+      "tag.国语": "5",
+      "tag.原盘": "9",
+      "tag.REMUX": "11",
+      "tag.WEB-DL": "14",
+      "tag.杜比": "8",
+      "tag.HDR": "7",
+      "tag.SDR": "12",
+      "tag.特效字幕": "10",
+      "tag.完结": "15",
+      "tag.分集": "16",
+      "tag.高码率": "18",
+      "tag.高帧率": "19"
+    }
+  }
+}

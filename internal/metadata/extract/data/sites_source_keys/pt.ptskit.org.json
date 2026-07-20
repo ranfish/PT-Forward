@@ -1,0 +1,133 @@
+{
+  "domain": "pt.ptskit.org",
+  "site_code": "ptskit",
+  "site_name": "PTSKIT",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "视频编码",
+    "resolution": "分辨率",
+    "team": "制作组"
+  },
+  "standard_keys": {
+    "type": {
+      "电影": "category.movie",
+      "电视剧": "category.tv_series",
+      "综艺": "category.tv_shows",
+      "游戏": "category.game",
+      "音乐": "category.music",
+      "动漫": "category.animation",
+      "其他": "category.other",
+      "Movie": "category.movie",
+      "TV Series": "category.tv_series",
+      "TV Shows": "category.tv_shows",
+      "Game": "category.game",
+      "Music": "category.music",
+      "Anime": "category.animation",
+      "Other": "category.other"
+    },
+    "medium": {
+      "Track": "medium.track",
+      "CD": "medium.cd",
+      "DVDR": "medium.dvdr",
+      "HDTV": "medium.hdtv",
+      "MiniBD": "medium.minibd",
+      "Encode": "medium.encode",
+      "Remux": "medium.remux",
+      "HD DVD": "medium.hddvd",
+      "Blu-ray": "medium.bluray",
+      "BluRay": "medium.bluray",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.264": "video.h264",
+      "VC-1": "video.vc1",
+      "Xvid": "video.xvid",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "1080p": "resolution.r1080p",
+      "1080i": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd",
+      "2160p": "resolution.r2160p",
+      "4K": "resolution.r2160p",
+      "Other": "resolution.other"
+    },
+    "team": {
+      "HDS": "team.hds",
+      "CHD": "team.chd",
+      "MySiLU": "team.mysilu",
+      "WiKi": "team.wiki",
+      "Other": "team.other"
+    }
+  },
+  "form_fields": {
+    "category": "type",
+    "medium": "medium",
+    "video_codec": "codec",
+    "resolution": "standard",
+    "team": "team"
+  },
+  "form_value_mappings": {
+    "type": {
+      "category.movie": "404",
+      "category.tv_series": "405",
+      "category.tv_shows": "409",
+      "category.game": "403",
+      "category.music": "408",
+      "category.animation": "407",
+      "category.other": "406",
+      "default": "406"
+    },
+    "medium": {
+      "medium.track": "9",
+      "medium.cd": "8",
+      "medium.dvdr": "6",
+      "medium.hdtv": "5",
+      "medium.minibd": "4",
+      "medium.encode": "7",
+      "medium.remux": "3",
+      "medium.hddvd": "2",
+      "medium.bluray": "1",
+      "medium.other": "13",
+      "default": "13"
+    },
+    "video_codec": {
+      "video.h264": "1",
+      "video.vc1": "2",
+      "video.xvid": "3",
+      "video.mpeg2": "4",
+      "video.other": "5",
+      "default": "5"
+    },
+    "resolution": {
+      "resolution.r1080p": "1",
+      "resolution.r1080i": "2",
+      "resolution.r720p": "3",
+      "resolution.sd": "4",
+      "resolution.r2160p": "5",
+      "resolution.other": "5",
+      "default": "5"
+    },
+    "team": {
+      "team.hds": "1",
+      "team.chd": "2",
+      "team.mysilu": "3",
+      "team.wiki": "4",
+      "team.other": "5",
+      "default": "5"
+    },
+    "tag": {
+      "tag.转载": "10",
+      "tag.电影": "23",
+      "tag.电视剧": "140",
+      "tag.综艺": "229",
+      "tag.游戏": "139",
+      "tag.音乐": "230",
+      "tag.动漫": "44",
+      "tag.其他": "237"
+    }
+  }
+}

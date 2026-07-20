@@ -1,0 +1,81 @@
+{
+  "domain": "www.dragonhd.xyz",
+  "site_code": "dragonhd",
+  "site_name": "龙之家",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电影": "category.movie",
+      "剧集": "category.tv_series",
+      "游戏": "category.game",
+      "纪录片": "category.documentaries",
+      "动漫": "category.animation",
+      "综艺": "category.tv_shows",
+      "MV": "category.mv",
+      "体育": "category.sports",
+      "音乐": "category.music",
+      "其他": "category.other"
+    },
+    "medium": {
+      "UHD": "medium.uhd_bluray",
+      "Blu-ray": "medium.bluray",
+      "Remux": "medium.remux",
+      "Encode": "medium.encode",
+      "WEB-DL": "medium.webdl",
+      "DVD": "medium.dvd",
+      "HDTV": "medium.hdtv",
+      "CD/SACD": "medium.cd",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "H.264(AVC)": "video.h264",
+      "H.265(HEVC)": "video.h265",
+      "VC-1": "video.vc1",
+      "MPEG-2": "video.mpeg2",
+      "VP9": "video.vp9",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "8K/4320p": "resolution.r4320p",
+      "4K/2160p": "resolution.r2160p",
+      "2K/1440p": "resolution.r1440p",
+      "1080p/1080i": "resolution.r1080p",
+      "720p": "resolution.r720p",
+      "SD": "resolution.sd"
+    },
+    "audio_codec": {
+      "TrueHD Atmos": "audio.truehd_atmos",
+      "TrueHD": "audio.truehd",
+      "DTS-X": "audio.dtsx",
+      "DTS-HD MA": "audio.dts_hd_ma",
+      "DTS-HD HR": "audio.dts_hd_hr",
+      "DTS": "audio.dts",
+      "FLAC": "audio.flac",
+      "AAC": "audio.aac",
+      "DD/DD+/AC3": "audio.ac3",
+      "LPCM": "audio.lpcm",
+      "MP3": "audio.mp3",
+      "OGG": "audio.ogg",
+      "APE": "audio.ape",
+      "WAV": "audio.wav",
+      "Other": "audio.other"
+    },
+    "team": {
+      "HDS": "team.hds",
+      "CHD": "team.chd",
+      "WiKi": "team.wiki",
+      "FRDS": "team.frds",
+      "CMCT": "team.cmct",
+      "Other": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

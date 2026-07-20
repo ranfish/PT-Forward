@@ -1,0 +1,69 @@
+{
+  "domain": "cc.mypt.cc",
+  "site_code": "cc",
+  "site_name": "我的PT",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "Movies/电影": "category.movie",
+      "TV Series/剧集": "category.tv_series",
+      "TV Shows/节目": "category.tv_shows",
+      "DOCU/纪录片": "category.documentaries",
+      "Animations/动画片": "category.animation",
+      "MTV/演唱会/唱片": "category.mv",
+      "Sports/运动/体育": "category.sports",
+      "Playlet/短剧": "category.playlet",
+      "music/音乐厅": "category.music",
+      "comic/漫画集": "category.cartoon",
+      "games/游戏库": "category.game",
+      "apps/软件库": "category.software",
+      "Audio/有声读物": "category.audio"
+    },
+    "medium": {
+      "Blu-ray": "medium.bluray",
+      "HD DVD": "medium.hddvd",
+      "Remux": "medium.remux",
+      "MiniBD": "medium.minibd",
+      "HDTV": "medium.hdtv",
+      "DVDR": "medium.dvdr",
+      "Encode": "medium.encode",
+      "CD": "medium.cd",
+      "Track": "medium.track",
+      "WEB-DL": "medium.webdl"
+    },
+    "video_codec": {
+      "H.264": "video.h264",
+      "H.265": "video.h265",
+      "Xvid": "video.xvid",
+      "MPEG-2": "video.mpeg2",
+      "Other": "video.other"
+    },
+    "resolution": {
+      "1080i/P": "resolution.r1080i",
+      "720p": "resolution.r720p",
+      "2k/高清": "resolution.r2160p",
+      "4k/超清": "resolution.r4320p",
+      "8k/蓝光": "resolution.r8640p",
+      "360p/480p": "resolution.r480p"
+    },
+    "audio_codec": {
+      "mp3/aac": "audio.mp3",
+      "Other": "audio.other"
+    },
+    "team": {
+      "HDS": "team.hds",
+      "CHD": "team.chd",
+      "MySiLU": "team.mysilu",
+      "Other/转载": "team.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}

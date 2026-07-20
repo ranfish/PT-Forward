@@ -1,0 +1,53 @@
+{
+  "domain": "pt.soulvoice.club",
+  "site_code": "pt",
+  "site_name": "聆音",
+  "source_keys": {
+    "type": "类型",
+    "medium": "媒介",
+    "video_codec": "编码",
+    "audio_codec": "音频编码",
+    "resolution": "分辨率",
+    "team": "制作组",
+    "source": "处理"
+  },
+  "standard_keys": {
+    "type": {
+      "电子书": "category.ebook",
+      "有声书": "category.audiobook"
+    },
+    "medium": {
+      "Blu-ray": "medium.bluray",
+      "MiniBD": "medium.minibd",
+      "Encode": "medium.encode",
+      "APE/FLAC": "medium.flac",
+      "Other": "medium.other"
+    },
+    "video_codec": {
+      "Other": "video.other",
+      "H.265": "video.h265",
+      "H.264": "video.h264"
+    },
+    "resolution": {
+      "Other": "resolution.other",
+      "2160P": "resolution.r2160p",
+      "1080I": "resolution.r1080i",
+      "1080P": "resolution.r1080p"
+    },
+    "audio_codec": {
+      "Other": "audio.other"
+    },
+    "team": {
+      "HDS": "team.hds",
+      "CHD": "team.chd",
+      "FRDS": "team.frds",
+      "CMCT": "team.cmct",
+      "Other": "team.other"
+    },
+    "source": {
+      "其它": "source.other",
+      "Other": "source.other"
+    }
+  },
+  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+}
