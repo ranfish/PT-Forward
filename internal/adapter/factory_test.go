@@ -7,7 +7,7 @@ import (
 )
 
 func TestFactory_Create_NexusPHP(t *testing.T) {
-	f := NewFactory(zap.NewNop())
+	f := NewFactory(zap.NewNop(), nil)
 	a := f.Create("nexusphp", NewHTTPDoer())
 	if a.Framework() != "nexusphp" {
 		t.Errorf("expected nexusphp, got %s", a.Framework())
@@ -15,7 +15,7 @@ func TestFactory_Create_NexusPHP(t *testing.T) {
 }
 
 func TestFactory_Create_Generic(t *testing.T) {
-	f := NewFactory(zap.NewNop())
+	f := NewFactory(zap.NewNop(), nil)
 	a := f.Create("unknown_framework", NewHTTPDoer())
 	if a.Framework() != "unknown_framework" {
 		t.Errorf("expected unknown_framework, got %s", a.Framework())
@@ -56,7 +56,7 @@ func TestNewHTTPDoer(t *testing.T) {
 }
 
 func TestFactory_Create_AllFrameworks(t *testing.T) {
-	f := NewFactory(zap.NewNop())
+	f := NewFactory(zap.NewNop(), nil)
 	cases := []struct {
 		framework string
 		want      string

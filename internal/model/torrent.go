@@ -35,6 +35,12 @@ type TorrentDetail struct {
 	// RawHTML 原始详情页 HTML（§56.13 接线：暴露给 Engine + PublicExtractor）。
 	// 仅 NexusPHP/Unit3D 等 HTML 框架的 adapter 填充，MTeam API 模式留空。
 	RawHTML string `json:"raw_html,omitempty"`
+
+	// §56.13 方案 B：Engine 提取的元信息（adapter 内部调 Engine 后填）
+	// SourceRegion 产地（如"欧美"），与 Source（语义=媒介）区分
+	SourceRegion string `json:"source_region,omitempty"`
+	// EngineExtractorName Engine 用的 extractor 名（如 "pterclub_special"），用于诊断
+	EngineExtractorName string `json:"engine_extractor_name,omitempty"`
 }
 
 // §33.1.23 — DiscountResult: 免费检测结果

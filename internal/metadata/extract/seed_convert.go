@@ -15,7 +15,7 @@ import (
 //     历史 adapter 都把 "WEB-DL" 等值存到 detail.Source。
 //   - extract.SeedData 拆分为 Medium（媒介）+ Source（产地）两个语义独立的字段。
 //   - 因此 SeedData.Medium ↔ Detail.Source（媒介对媒介）；
-//     SeedData.Source（产地）在 model.TorrentDetail 中没有对应字段，转换时丢弃。
+//     SeedData.Source（产地）↔ Detail.SourceRegion（§56.13 方案 B 新增字段）。
 //   - SeedData.Intro.Body → Detail.Description
 //   - SeedData.Intro.Poster → Detail.PosterURL
 //   - SeedData.Intro.ScreenshotURLs() → Detail.Screenshots
@@ -29,6 +29,7 @@ func SeedToDetail(seed SeedData) *model.TorrentDetail {
 		Description:  seed.Intro.Body,
 		Category:     seed.Type,
 		Source:       seed.Medium,
+		SourceRegion: seed.Source,
 		Resolution:   seed.Resolution,
 		Codec:        seed.VideoCodec,
 		ReleaseGroup: seed.ReleaseGroup,
@@ -58,7 +59,8 @@ func SeedToDetail(seed SeedData) *model.TorrentDetail {
 }
 
 // DetailToSeed 将 *TorrentDetail 转换为 SeedData（API adapter JSON → SeedData 时使用）。
-// 字段语义错位见 SeedToDetail 注释（detail.Source 实际语义是"媒介"，映射到 seed.Medium）。
+// 字段语义错位见 SeedToDetail 注释（detail.Source 实际语义是"媒介"，映射到 seed.Medium；
+// detail.SourceRegion 是产地，映射到 seed.Source）。
 func DetailToSeed(detail *model.TorrentDetail) SeedData {
 	if detail == nil {
 		return SeedData{}
@@ -73,6 +75,7 @@ func DetailToSeed(detail *model.TorrentDetail) SeedData {
 		AudioCodec:   detail.AudioCodec,
 		Resolution:   detail.Resolution,
 		Medium:       detail.Source,
+		Source:       detail.SourceRegion,
 		ReleaseGroup: detail.ReleaseGroup,
 		Tags:         detail.Tags,
 		Flags:        detail.Flags,
