@@ -2431,6 +2431,8 @@ func deriveSiteCode(domain string) string {
 	if i := strings.IndexByte(host, ':'); i > 0 {
 		host = host[:i]
 	}
+	// 剥掉 www. 前缀（v0.0.252：之前 www.xxx.com 会返回 "www"，导致 19 站 siteCode 都是 "www"）
+	host = strings.TrimPrefix(host, "www.")
 	parts := strings.Split(host, ".")
 	if len(parts) == 0 {
 		return ""
