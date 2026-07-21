@@ -119,10 +119,10 @@
       ]
     },
     "description_from_range": {
-      "start_pattern": "src=\"https?://[^\"]*l_ratio_poster[^\"]*\"[^>]*>",
-      "end_pattern": "</div>\\s*</div>\\s*<div\\s+class=\"footer"
+      "start_pattern": "id=['\"]cover-content['\"][^>]*src=['\"][^'\"]+['\"][^>]*>",
+      "end_pattern": "<div\\s+id=['\"]footer['\"][^>]*>"
     },
-    "poster_from_pattern": "src=\"(https?://[^\"]*l_ratio_poster[^\"]*)\"",
+    "poster_from_pattern": "id=['\"]cover-content['\"][^>]*src=['\"]([^'\"]+)['\"]",
     "basic_info_div_label": {
       "label_selector": "div[class*='font-bold'][class*='leading-6']",
       "value_getter": "container_label_grid_span",
@@ -130,5 +130,6 @@
       "label_class": "font-bold"
     }
   },
-  "_note_v0254": "v0.0.254: extractors 配置化（替代 hhanclub.go），Tailwind CSS DOM"
+  "_note_v0254": "v0.0.254: extractors 配置化（替代 hhanclub.go），Tailwind CSS DOM",
+  "_note_v0264": "v0.0.264: 修正 poster/description pattern（l_ratio_poster→cover-content，实际 HTML 用 id='cover-content'）+ basic_info_div_label fallthrough 启用副标题 sibling pair"
 }

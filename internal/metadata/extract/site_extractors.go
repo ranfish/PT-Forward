@@ -237,7 +237,9 @@ func (p *PublicExtractor) extractBasicInfoFromDivLabel(doc *goquery.Document, se
 	case "container_label_grid_span":
 		// HHanClub 新版：基本信息 → grid 内 span.font-bold + 下一个 span
 		p.extractBasicInfoFromGridSpan(doc, seed, cfg, fieldLabels, domain, siteCode)
-		return
+		// v0.0.264: 不 return，继续跑 next_sibling 处理容器外的 sibling pair
+		// （HHanClub "副标题"等容器外 label+value，DOM 结构相同）
+		fallthrough
 	case "next_sibling", "":
 		// HHanClub 旧版 / Tailwind 标签 + next div
 	}
