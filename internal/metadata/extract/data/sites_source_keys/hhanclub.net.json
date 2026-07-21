@@ -108,5 +108,27 @@
     "resolution": "standard_sel",
     "video_codec": "codec_sel",
     "audio_codec": "audiocodec_sel"
-  }
+  },
+  "extractors": {
+    "title_from_quoted": {
+      "quoted_pattern": "<title>[^<]*(?:&quot;|\")([^\"&<]+)(?:&quot;|\")",
+      "fallback_pattern": "<title>([^<]+)</title>",
+      "strip_suffix": [
+        " :: ",
+        " - Powered"
+      ]
+    },
+    "description_from_range": {
+      "start_pattern": "src=\"https?://[^\"]*l_ratio_poster[^\"]*\"[^>]*>",
+      "end_pattern": "</div>\\s*</div>\\s*<div\\s+class=\"footer"
+    },
+    "poster_from_pattern": "src=\"(https?://[^\"]*l_ratio_poster[^\"]*)\"",
+    "basic_info_div_label": {
+      "label_selector": "div[class*='font-bold'][class*='leading-6']",
+      "value_getter": "container_label_grid_span",
+      "container_label": "基本信息",
+      "label_class": "font-bold"
+    }
+  },
+  "_note_v0254": "v0.0.254: extractors 配置化（替代 hhanclub.go），Tailwind CSS DOM"
 }

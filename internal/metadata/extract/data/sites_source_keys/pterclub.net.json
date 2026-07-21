@@ -4,8 +4,8 @@
   "site_name": "PTerClub",
   "source_keys": {
     "type": "类型",
-    "medium": "媒介",
-    "source": "区域",
+    "medium": "质量",
+    "source": "地区",
     "team": "制作组"
   },
   "standard_keys": {
@@ -124,5 +124,41 @@
       "tag.自购": "yes",
       "tag.MV母盘": "yes"
     }
-  }
+  },
+  "extractors": {
+    "category_from_icons": {
+      "container_text": "类别与标签",
+      "alt_to_field": {
+        "电影 (Movie)": "type",
+        "电视剧 (TV Series)": "type",
+        "动画 (Animation)": "type",
+        "综艺 (TV Shows)": "type",
+        "纪录片 (Documentary)": "type",
+        "体育 (Sports)": "type",
+        "音乐 (Music)": "type",
+        "音乐短片 (MV)": "type",
+        "舞台演出 (Stage)": "type",
+        "学习 (Study)": "type",
+        "软件 (Software)": "type",
+        "电子书 (eBook)": "type",
+        "WEB-DL": "medium",
+        "Blu-ray": "medium",
+        "UHD Discs": "medium",
+        "BD Discs": "medium",
+        "DVD Discs": "medium",
+        "Remux": "medium",
+        "HDTV": "medium",
+        "Encode": "medium",
+        "大陆 (Mainland,CHN)": "source",
+        "香港 (HKG,CHN)": "source",
+        "台湾 (TWN,CHN)": "source",
+        "欧美 (Western)": "source",
+        "韩国 (KOR)": "source",
+        "日本 (JPN)": "source",
+        "印度 (IND)": "source",
+        "其它 (Other)": "source"
+      }
+    }
+  },
+  "_note_v0254": "v0.0.254: extractors 配置化（替代 pterclub.go），medium=质量/source=地区 站点特殊 label"
 }

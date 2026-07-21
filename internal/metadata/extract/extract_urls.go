@@ -15,6 +15,7 @@ var (
 // extractExternalLinks 从详情页提取 IMDb/豆瓣/TMDb 链接。
 // 主路径：goquery 找 <a href> 中的 IMDb/Douban/TMDb。
 // Fallback：正则扫 BBCode（用户可能贴纯文本 URL）。
+// v0.0.254: 加 div#kimdb 等独立容器 selector（hddolby 模式通用化，从特殊提取器迁移）
 func (p *PublicExtractor) extractExternalLinks(doc *goquery.Document, descrBBCode string) (imdb, douban, tmdb string) {
 	// goquery 主路径
 	doc.Find(`a[href*="imdb.com"]`).Each(func(_ int, s *goquery.Selection) {
@@ -47,6 +48,23 @@ func (p *PublicExtractor) extractExternalLinks(doc *goquery.Document, descrBBCod
 			}
 		}
 	})
+
+	// v0.0.254: 独立容器 selector（HDDolby div#kimdb 等站点把 IMDb 链接放在简介外的独立 div）
+	// 这些 selector 在 NexusPHP 标准外，但跨站通用
+	if imdb == "" {
+		doc.Find(`div#kimdb, div.imdb-box, div[data-imdb]`).Each(func(_ int, s *goquery.Selection) {
+			if imdb != "" {
+				return
+			}
+			htmlStr, _ := s.Html()
+			if htmlStr == "" {
+				htmlStr = s.Text()
+			}
+			if m := imdbURLRe.FindString(htmlStr); m != "" {
+				imdb = m
+			}
+		})
+	}
 
 	// Fallback：BBCode 正则（用户可能贴纯文本 URL，未包 <a>）
 	if imdb == "" {
