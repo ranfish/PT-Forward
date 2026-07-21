@@ -26,7 +26,9 @@ type PublishArtifactGenerator struct {
 
 func NewPublishArtifactGenerator(cfg *screenshot.Config, logger *zap.Logger) *PublishArtifactGenerator {
 	g := &PublishArtifactGenerator{logger: logger}
-	if cfg != nil {
+	// v0.0.255: MpvPath 为空时不创建 screenshotEngine（screenshot_enabled=false 场景）
+	// 但 MediaInfoAnalyzer/SubtitleDetector 始终创建（不依赖 screenshot 开关）
+	if cfg != nil && cfg.MpvPath != "" {
 		g.screenshotEngine = NewScreenshotEngine(cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, logger)
 	}
 	g.subtitleDetector = NewSubtitleDetector(logger)
