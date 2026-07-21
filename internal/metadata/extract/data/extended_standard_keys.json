@@ -1046,7 +1046,7 @@
     "演唱会、MV/Music Videos": "category.mv",
     "漫画": "category.cartoon",
     "电子书": "category.ebook",
-    "电子书\u0026有声读物/E-book": "category.ebook",
+    "电子书&有声读物/E-book": "category.ebook",
     "电影": "category.movie",
     "电影 / Movies": "category.movie",
     "电影(Movie)": "category.movie",
@@ -1095,7 +1095,13 @@
     "音乐视频": "category.mv",
     "音频": "category.audio",
     "骑兵": "category.edited",
-    "高品质音频": "category.music"
+    "高品质音频": "category.music",
+    "漫畫": "category.cartoon",
+    "相声": "category.stage",
+    "Nature": "category.documentaries",
+    "下架视频备份": "category.other",
+    "高等教育": "category.study",
+    "9kg": "category.other"
   },
   "video_codec": {
     "AV1": "video.av1",
