@@ -554,6 +554,13 @@
                 <a-tag :color="site.tagColor" size="small" style="margin: 0">
                   {{ site.label }}
                 </a-tag>
+                <!-- v0.0.255 §56.30: 加种状态显示 -->
+                <div v-if="site.seeded === true" class="result-site-card-seed seeded">
+                  <CheckCircleFilled /> 已加种
+                </div>
+                <div v-else-if="site.seeded === false && site.seedError" class="result-site-card-seed failed">
+                  <WarningFilled /> 加种失败
+                </div>
               </div>
             </div>
           </div>
@@ -620,6 +627,7 @@ import {
 } from '@ant-design/icons-vue'
 import { manualForwardApi, publishApi, publishTorrentsApi } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
+import type { PublishResultRecord } from '@/api/types'
 import { useEnumLabels } from '@/utils/enumLabels'
 import { formatBytes } from '@/utils/format'
 
@@ -987,6 +995,8 @@ const submitting = ref(false)
 const submitError = ref('')
 const submittedCandidateId = ref(0)
 const candidateStatus = ref<{ done_count?: number; fail_count?: number; total_count?: number; publish_status?: string } | null>(null)
+// v0.0.255 §56.30: 各目标站发布结果详情（含加种状态）
+const resultRecords = ref<Record<string, PublishResultRecord>>({})
 let candidatePollTimer: ReturnType<typeof setInterval> | null = null
 
 const publishPercent = computed(() => {
@@ -1002,6 +1012,9 @@ interface ResultSiteStatus {
   label: string
   tagColor: string
   icon: ReturnType<typeof markRaw>
+  // v0.0.255 §56.30: 加种状态（undefined=未发布或未拉取结果）
+  seeded?: boolean
+  seedError?: string
 }
 
 const resultSiteStatus = computed<ResultSiteStatus[]>(() => {
@@ -1015,7 +1028,13 @@ const resultSiteStatus = computed<ResultSiteStatus[]>(() => {
       skipped:     { label: '已跳过', tagColor: 'default',icon: markRaw(StopOutlined) },
     }
     const c = cfg[status] || cfg.queued
-    return { name, status, label: c.label, tagColor: c.tagColor, icon: c.icon }
+    // v0.0.255 §56.30: 从 resultRecords 取该站的加种状态
+    const record = resultRecords.value[name]
+    return {
+      name, status, label: c.label, tagColor: c.tagColor, icon: c.icon,
+      seeded: record?.seeded,
+      seedError: record?.seed_error,
+    }
   })
 })
 
@@ -1084,12 +1103,32 @@ function startCandidatePoll() {
           done_count: c.publish_status === 'done' ? selectedTargets.value.length : 0,
           fail_count: c.publish_status === 'failed' ? 1 : 0,
         }
+        // v0.0.255 §56.30: 候选 done/failed 后拉各目标站详情（含加种状态）
         if (c.publish_status === 'done' || c.publish_status === 'failed') {
           stopCandidatePoll()
+          await fetchResultRecords()
         }
       }
     } catch { /* silent */ }
   }, 3000)
+}
+
+// v0.0.255 §56.30: 拉取各目标站发布结果详情（含 seeded 加种状态）
+async function fetchResultRecords() {
+  if (!submittedCandidateId.value) return
+  try {
+    const resp = await publishApi.listResults({
+      page: 1,
+      pageSize: 100,
+      candidateId: submittedCandidateId.value,
+    } as Parameters<typeof publishApi.listResults>[0])
+    const items = (resp.data?.data?.items || []) as PublishResultRecord[]
+    const map: Record<string, PublishResultRecord> = {}
+    for (const r of items) {
+      map[r.target_site] = r
+    }
+    resultRecords.value = map
+  } catch { /* silent */ }
 }
 
 function stopCandidatePoll() {
@@ -1138,6 +1177,7 @@ function resetWizard() {
   submitError.value = ''
   submittedCandidateId.value = 0
   candidateStatus.value = null
+  resultRecords.value = {}
   form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [], removedDeclarations: [], bdinfo: '', anonymous: false }
   titleComponents.value = null
   standardizedParams.value = null
@@ -1601,6 +1641,21 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   margin: 6px 0 6px;
+}
+/* v0.0.255 §56.30 加种状态徽标 */
+.result-site-card-seed {
+  margin-top: 4px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+}
+.result-site-card-seed.seeded {
+  color: #52c41a;
+}
+.result-site-card-seed.failed {
+  color: #ff4d4f;
 }
 
 /* ═══ Footer ═══ */

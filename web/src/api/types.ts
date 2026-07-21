@@ -517,6 +517,10 @@ export interface PublishResultRecord {
   downloader_id?: string
   cost_ms?: number
   logs?: string
+  // v0.0.255 §56.30 加种状态（auto reseed 后端已实现）
+  seeded?: boolean
+  seeded_at?: string | null
+  seed_error?: string
 }
 
 export interface ReseedTask {
