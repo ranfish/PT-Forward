@@ -22,17 +22,17 @@ FROM debian:trixie-slim
 # §56.27: 先装基础工具（trixie-slim 不含 wget）
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && \
     rm -rf /var/lib/apt/lists/*
-# 加 MediaArea APT 源安装 mediainfo（Debian trixie 默认无 mediainfo 包）
-# 用 trusted=yes 跳过 GPG key 下载（CI 环境下 GPG key URL 可能不可达）
-RUN echo "deb [trusted=yes] https://mediaarea.net/repo/debian/ trixie main" > /etc/apt/sources.list.d/mediaarea.list && \
+# trixie 无 mediainfo 包，从 bookworm 源安装（glibc 向后兼容）
+RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/bookworm.list && \
     apt-get update && \
-    apt-get install -y --no-install-recommends \
+    apt-get install -y --no-install-recommends --no-install-suggests \
         tzdata \
         ffmpeg \
         mediainfo \
         fonts-noto-cjk \
         libass9 libfontconfig1 libharfbuzz0b libfribidi0 \
         libplacebo349 libzimg2 libjpeg62-turbo \
+    && rm /etc/apt/bookworm.list \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r pt-forward && useradd -r -g pt-forward pt-forward
 
