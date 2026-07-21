@@ -36,64 +36,12 @@
 
       <!-- ═══ Body: 可滚动内容区 ═══ -->
       <div ref="bodyRef" class="wizard-body">
-        <!-- ─── Step 0: 选择种子 ─── -->
-        <div v-if="currentStep === 0" class="step-content">
-          <div class="step-toolbar">
-            <a-select
-              v-model:value="selectedClientId"
-              style="width: 260px"
-              :loading="clientsLoading"
-              placeholder="选择下载器"
-              @change="fetchSeededTorrents"
-            >
-              <a-select-option v-for="c in clients" :key="c.id" :value="c.id">
-                {{ c.name }} ({{ c.type }})
-              </a-select-option>
-            </a-select>
-            <a-input-search
-              v-if="seededTorrents.length"
-              v-model:value="torrentSearch"
-              placeholder="搜索种子名称..."
-              style="width: 300px; margin-left: 12px"
-              allow-clear
-            />
-            <a-tag v-if="seededTorrents.length" color="blue" style="margin-left: 8px">
-              共 {{ filteredTorrents.length }} 个种子
-            </a-tag>
-          </div>
-          <a-table
-            :columns="torrentColumns"
-            :data-source="filteredTorrents"
-            :loading="torrentsLoading"
-            :pagination="{ pageSize: 8, showSizeChanger: false, size: 'small' }"
-            row-key="info_hash"
-            size="small"
-            :row-selection="{ type: 'radio', selectedRowKeys: selectedTorrent ? [selectedTorrent.info_hash] : [], onSelect: (r: unknown) => { selectedTorrent = r as SeededTorrent } }"
-            :scroll="{ y: 340 }"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'source_site'">
-                <a-tag v-if="record.source_site" color="blue" style="margin: 0">
-                  {{ record.source_site }}
-                </a-tag>
-                <span v-else style="color: #999">-</span>
-              </template>
-              <template v-if="column.key === 'size'">
-                {{ formatBytes(record.size) }}
-              </template>
-              <template v-if="column.key === 'state'">
-                <a-tag :color="qbStateColor(record.state)" style="margin: 0">
-                  {{ translateQbState(record.state) }}
-                </a-tag>
-              </template>
-            </template>
-          </a-table>
-          <a-empty
-            v-if="!torrentsLoading && !seededTorrents.length && selectedClientId"
-            description="该下载器没有做种种子"
-            style="padding: 40px 0"
-          />
-        </div>
+        <!-- ─── Step 0: 选择种子（v0.0.256 拆分到 WizardStepSelectTorrent）─── -->
+        <WizardStepSelectTorrent
+          v-if="currentStep === 0"
+          v-model="selectedTorrent"
+          :preset-client-id="presetClientId || presetTorrent?.client_id"
+        />
 
         <!-- ─── Step 1: 核对详情 ─── -->
         <div v-else-if="currentStep === 1" class="step-content">
@@ -628,10 +576,8 @@ import {
 import { manualForwardApi, publishApi, publishTorrentsApi } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
 import type { PublishResultRecord } from '@/api/types'
-import { useEnumLabels } from '@/utils/enumLabels'
 import { formatBytes } from '@/utils/format'
-
-const { translateQbState } = useEnumLabels()
+import WizardStepSelectTorrent from './WizardStepSelectTorrent.vue'
 
 const props = defineProps<{
   open: boolean
@@ -670,33 +616,17 @@ interface SeededTorrent {
   source_site?: string
 }
 
+// v0.0.256: step 0 的 clients/seededTorrents/torrentSearch 等已迁移到 WizardStepSelectTorrent
+// clients 仍保留在主文件（getClientName 在 step 1/3 显示用）
 const clients = ref<{ id: number; name: string; type: string }[]>([])
-const clientsLoading = ref(false)
-const selectedClientId = ref<number | undefined>(undefined)
-const seededTorrents = ref<SeededTorrent[]>([])
-const torrentsLoading = ref(false)
 const selectedTorrent = ref<SeededTorrent | null>(null)
-const torrentSearch = ref('')
 
-const filteredTorrents = computed(() => {
-  if (!torrentSearch.value) return seededTorrents.value
-  const q = torrentSearch.value.toLowerCase()
-  return seededTorrents.value.filter(t => t.name.toLowerCase().includes(q))
-})
-
-const torrentColumns = [
-  { title: '种子名称', dataIndex: 'name', key: 'name', ellipsis: true },
-  { title: '来源站', key: 'source_site', width: 80 },
-  { title: '大小', key: 'size', width: 90 },
-  { title: '状态', key: 'state', width: 90 },
-]
-
-function qbStateColor(state: string): string {
-  const map: Record<string, string> = {
-    uploadingUP: 'green', stalledUP: 'cyan', pausedUP: 'orange',
-    queuedUP: 'blue', checkingUP: 'geekblue', forcedUP: 'green',
-  }
-  return map[state] || 'default'
+async function loadClientsForDisplay() {
+  try {
+    const resp = await downloadersApi.list(1, 100)
+    const data = resp.data?.data
+    clients.value = (data?.items || data || []) as { id: number; name: string; type: string }[]
+  } catch { /* ignore */ }
 }
 
 function getClientName(id?: number): string {
@@ -768,34 +698,7 @@ onBeforeUnmount(() => {
   if (pollTimer !== null) clearTimeout(pollTimer)
 })
 
-async function fetchClients() {
-  clientsLoading.value = true
-  try {
-    const resp = await downloadersApi.list(1, 100)
-    const data = resp.data?.data
-    clients.value = (data?.items || data || []) as { id: number; name: string; type: string }[]
-    if (clients.value.length > 0 && !selectedClientId.value) {
-      selectedClientId.value = clients.value[0].id
-      fetchSeededTorrents()
-    }
-  } catch { /* ignore */ } finally {
-    clientsLoading.value = false
-  }
-}
-
-async function fetchSeededTorrents() {
-  if (!selectedClientId.value) return
-  torrentsLoading.value = true
-  selectedTorrent.value = null
-  try {
-    const resp = await manualForwardApi.seededTorrents(selectedClientId.value)
-    seededTorrents.value = (resp.data?.data || []) as SeededTorrent[]
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  } finally {
-    torrentsLoading.value = false
-  }
-}
+// v0.0.256: fetchClients/fetchSeededTorrents 迁移到 WizardStepSelectTorrent 子组件
 
 async function enterAnalyze() {
   if (!selectedTorrent.value) return
@@ -1142,7 +1045,9 @@ function stopCandidatePoll() {
 watch(() => props.open, (val) => {
   if (val) {
     resetWizard()
+    loadClientsForDisplay() // v0.0.256: 主文件保留 clients 列表用于 getClientName 显示
     if (props.presetTorrent) {
+      // 外部预设种子（PublishList/PublishTorrents 跳转），跳过 step 0 直接到 step 1
       selectedTorrent.value = {
         info_hash: props.presetTorrent.info_hash,
         name: props.presetTorrent.name,
@@ -1153,12 +1058,10 @@ watch(() => props.open, (val) => {
         seeders: 0,
         state: props.presetTorrent.state,
       }
-      selectedClientId.value = props.presetTorrent.client_id
       currentStep.value = 1
       enterAnalyze()
-    } else {
-      fetchClients()
     }
+    // v0.0.256: 无 preset 时由 WizardStepSelectTorrent 子组件 onMounted 自动 fetchClients
   }
 })
 
@@ -1190,7 +1093,7 @@ function handleCancel() {
 
 function handlePublishAnother() {
   resetWizard()
-  fetchClients()
+  // v0.0.256: WizardStepSelectTorrent 子组件 onMounted 会自动 fetchClients
 }
 
 function restoreDecl(idx: number) {
