@@ -38,6 +38,7 @@ func NewAGSVPTHost(email, password string, logger *zap.Logger) *AGSVPTHost {
 
 func (a *AGSVPTHost) Name() string { return "agsvpt" }
 
+
 func (a *AGSVPTHost) SetCredentials(email, password string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
