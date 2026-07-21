@@ -140,7 +140,7 @@ async function loadConfig() {
 async function onProxyChange(checked: boolean) {
   try {
     await settingsApi.update('image_host_use_proxy', { value: String(checked) })
-    message.success(checked ? '图床代理已开启（重启后生效）' : '图床代理已关闭（重启后生效）')
+    message.success(checked ? '图床代理已开启' : '图床代理已关闭')
   } catch {
     message.error('保存失败')
     useProxy.value = !checked

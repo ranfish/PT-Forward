@@ -357,11 +357,18 @@ func main() {
 			select {
 			case <-ctx.Done():
 				return
-			case _, ok := <-ch:
+			case ev, ok := <-ch:
 				if !ok {
 					return
 				}
 				setting.InvalidateAll()
+				// v0.0.256: 图床代理热更新（不重启）
+				for _, key := range ev.ChangedKeys {
+					if key == "image_host_use_proxy" || key == "httpProxy" {
+						reloadImageHostProxy(ctx, settingsRepo, imageHostMgr, log)
+						break
+					}
+				}
 			}
 		}
 	}()
@@ -1226,4 +1233,20 @@ func syncStandardKeys(db *gorm.DB, log *zap.Logger) error {
 		zap.Int("updated", updated),
 		zap.Int("skipped", skipped))
 	return nil
+}
+
+// reloadImageHostProxy 从 DB 读最新配置，热更新图床代理（v0.0.256）。
+// 无需重启服务，settings 变更后立即生效。
+func reloadImageHostProxy(ctx context.Context, repo *setting.Repository, mgr *imagehost.Manager, log *zap.Logger) {
+	useProxy, _ := repo.Get(ctx, "image_host_use_proxy")
+	if useProxy == "true" {
+		proxyURL, err := repo.Get(ctx, "httpProxy")
+		if err == nil && proxyURL != "" {
+			mgr.SetProxy(proxyURL)
+			log.Info("image host proxy reloaded", zap.String("proxy", proxyURL))
+		}
+	} else {
+		mgr.SetProxy("")
+		log.Info("image host proxy disabled (hot reload)")
+	}
 }
