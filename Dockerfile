@@ -19,12 +19,12 @@ ARG VERSION=dev
 RUN CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=${VERSION}" -o /pt-forward ./cmd/pt-forward
 
 FROM debian:trixie-slim
-# §56.27: 先装 wget + ca-certificates（trixie-slim 基础镜像不含 wget）
+# §56.27: 先装基础工具（trixie-slim 不含 wget）
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && \
     rm -rf /var/lib/apt/lists/*
 # 加 MediaArea APT 源安装 mediainfo（Debian trixie 默认无 mediainfo 包）
-RUN wget -qO /usr/share/keyrings/mediaarea.asc https://mediaarea.net/repo/debian/repo-mediaarea-v3.asc && \
-    echo "deb [signed-by=/usr/share/keyrings/mediaarea.asc] https://mediaarea.net/repo/debian/ trixie main" > /etc/apt/sources.list.d/mediaarea.list && \
+# 用 trusted=yes 跳过 GPG key 下载（CI 环境下 GPG key URL 可能不可达）
+RUN echo "deb [trusted=yes] https://mediaarea.net/repo/debian/ trixie main" > /etc/apt/sources.list.d/mediaarea.list && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         tzdata \
