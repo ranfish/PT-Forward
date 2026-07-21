@@ -19,8 +19,8 @@
     "source": {
       "JPG": "source.japan",
       "其它": "source.other",
-      "CAJ": "source.canada"
+      "CAJ": "source.china"
     }
   },
-  "_note": "auto-generated from sites.json form (PTNexus yaml missing)"
+  "_note": "CAJ=China Academic Journals 中国学术期刊（适配 source.china）"
 }
