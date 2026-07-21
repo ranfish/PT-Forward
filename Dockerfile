@@ -19,10 +19,14 @@ ARG VERSION=dev
 RUN CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=${VERSION}" -o /pt-forward ./cmd/pt-forward
 
 FROM debian:trixie-slim
-RUN apt-get update && \
+# §56.27: 加 MediaArea APT 源安装 mediainfo（Debian trixie 默认无 mediainfo 包）
+RUN wget -qO /usr/share/keyrings/mediaarea.asc https://mediaarea.net/repo/debian/repo-mediaarea-v3.asc && \
+    echo "deb [signed-by=/usr/share/keyrings/mediaarea.asc] https://mediaarea.net/repo/debian/ trixie main" > /etc/apt/sources.list.d/mediaarea.list && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates tzdata wget \
         ffmpeg \
+        mediainfo \
         fonts-noto-cjk \
         libass9 libfontconfig1 libharfbuzz0b libfribidi0 \
         libplacebo349 libzimg2 libjpeg62-turbo \
