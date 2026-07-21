@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -413,8 +415,21 @@ func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (m
 	}
 
 	// 本地产物（截图 + MediaInfo）
+	// §21.4: save_path 是根保存目录，实际种子内容在 save_path/<name> 下
+	// 单文件种子 fallback：save_path 直接就是文件
 	if p.artifactGenerator != nil && savePath != "" {
-		if artifact, err := p.artifactGenerator.Generate(ctx, savePath, "", nil); err == nil && artifact != nil {
+		torrentDir := savePath
+		if joined := filepath.Join(savePath, name); joined != savePath {
+			if info, statErr := os.Stat(joined); statErr == nil {
+				if info.IsDir() {
+					torrentDir = joined
+				} else {
+					// 单文件种子：<savePath>/<name> 是文件 → 取父目录
+					torrentDir = savePath
+				}
+			}
+		}
+		if artifact, err := p.artifactGenerator.Generate(ctx, torrentDir, "", nil); err == nil && artifact != nil {
 			if artifact.MediaInfoText != "" {
 				result["media_info"] = artifact.MediaInfoText
 			}
