@@ -118,13 +118,8 @@
                     </div>
                   </a-form-item>
                   <a-form-item label="标签">
-                    <a-select
-                      v-model:value="form.tags"
-                      mode="tags"
-                      style="width: 100%"
-                      placeholder="添加标签（禁转/中字/国语/原盘等）"
-                      :token-separators="[',']"
-                    />
+                    <!-- v0.0.256 §56.22 多选 tag（38 个 media_tag standard_keys + 自定义输入） -->
+                    <TagSelector v-model="form.tags" />
                   </a-form-item>
 
                   <!-- 标题组件（P2 标题标准化） -->
@@ -448,6 +443,7 @@ import { formatBytes } from '@/utils/format'
 import WizardStepSelectTorrent from './WizardStepSelectTorrent.vue'
 import WizardStepSelectTargets, { type SiteItem } from './WizardStepSelectTargets.vue'
 import WizardStepResult, { type CandidateStatus } from './WizardStepResult.vue'
+import TagSelector from './TagSelector.vue'
 
 const props = defineProps<{
   open: boolean
