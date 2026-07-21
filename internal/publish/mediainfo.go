@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"go.uber.org/zap"
@@ -57,7 +59,17 @@ func (a *MediaInfoAnalyzer) Analyze(ctx context.Context, filePath string) (*Medi
 		return nil, fmt.Errorf("mediainfo not found")
 	}
 
-	cmd := exec.CommandContext(ctx, a.mediainfoPath, "--Output=JSON", filePath) //nolint:gosec // intentional subprocess
+	// mediainfo 25.04 在某些 locale 下对非 ASCII 路径（中文/方括号等）静默失败。
+	// workaround：在 /tmp 创建 ASCII 软链接，对软链接执行 mediainfo。
+	analysisPath, cleanup, linkErr := a.makeASCIISymlink(filePath)
+	if linkErr == nil && cleanup != nil {
+		defer cleanup()
+	}
+	if analysisPath == "" {
+		analysisPath = filePath
+	}
+
+	cmd := exec.CommandContext(ctx, a.mediainfoPath, "--Output=JSON", analysisPath) //nolint:gosec // intentional subprocess
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("mediainfo execution: %w", err)
@@ -72,9 +84,21 @@ func (a *MediaInfoAnalyzer) Analyze(ctx context.Context, filePath string) (*Medi
 	}
 
 	if err := json.Unmarshal(output, &miJSON); err != nil {
-		rawText, textErr := a.getRawText(ctx, filePath)
+		rawText, textErr := a.getRawText(ctx, analysisPath)
 		if textErr != nil {
 			return nil, fmt.Errorf("parse mediainfo JSON: %w", textErr)
+		}
+		result.RawOutput = rawText
+		return result, nil
+	}
+
+	// media 为 null（mediainfo 无法读取文件）→ 尝试 raw text 输出
+	if len(miJSON.MediaInfo.Track) == 0 {
+		a.logger.Warn("mediainfo JSON returned empty tracks, falling back to raw text",
+			zap.String("path", filePath), zap.String("analysis_path", analysisPath))
+		rawText, textErr := a.getRawText(ctx, analysisPath)
+		if textErr != nil {
+			return result, nil // 返回空 result（保持向后兼容）
 		}
 		result.RawOutput = rawText
 		return result, nil
@@ -101,6 +125,26 @@ func (a *MediaInfoAnalyzer) Analyze(ctx context.Context, filePath string) (*Medi
 	}
 
 	return result, nil
+}
+
+// makeASCIISymlink 在 /tmp 创建 ASCII 软链接指向原文件（用于绕过 mediainfo 非 ASCII 路径 bug）。
+// 返回软链接路径 + cleanup 函数；创建失败时返回空字符串 + nil cleanup。
+func (a *MediaInfoAnalyzer) makeASCIISymlink(filePath string) (string, func(), error) {
+	if filePath == "" {
+		return "", nil, fmt.Errorf("empty path")
+	}
+	tmpDir, err := os.MkdirTemp("", "pt-mediainfo-")
+	if err != nil {
+		return "", nil, err
+	}
+	ext := filepath.Ext(filePath)
+	linkPath := filepath.Join(tmpDir, "media"+ext)
+	if err := os.Symlink(filePath, linkPath); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		return "", nil, err
+	}
+	cleanup := func() { _ = os.RemoveAll(tmpDir) }
+	return linkPath, cleanup, nil
 }
 
 func (a *MediaInfoAnalyzer) GetRawText(ctx context.Context, filePath string) (string, error) {
