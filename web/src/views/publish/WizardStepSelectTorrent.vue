@@ -56,7 +56,19 @@ import { downloadersApi } from '@/api/downloaders'
 import { manualForwardApi } from '@/api/publish'
 import { useEnumLabels } from '@/utils/enumLabels'
 import { formatBytes } from '@/utils/format'
-import type { SeededTorrent } from '@/composables/usePublishWizard'
+
+// v0.0.256: SeededTorrent 类型（与主文件保持一致）
+export interface SeededTorrent {
+  info_hash: string
+  name: string
+  size: number
+  save_path: string
+  upload_speed: number
+  seeders: number
+  state: string
+  client_id: number
+  source_site?: string
+}
 
 const props = defineProps<{
   modelValue: SeededTorrent | null

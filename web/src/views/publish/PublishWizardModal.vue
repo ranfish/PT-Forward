@@ -360,159 +360,26 @@
           </div>
         </div>
 
-        <!-- ─── Step 2: 选择站点 ─── -->
-        <div v-else-if="currentStep === 2" class="step-content">
-          <a-spin :spinning="targetsLoading">
-            <!-- 统计卡片 -->
-            <div class="site-stats">
-              <div class="site-stat-card stat-available">
-                <div class="site-stat-num">{{ availableCount }}</div>
-                <div class="site-stat-label">可发布</div>
-              </div>
-              <div class="site-stat-card stat-selected">
-                <div class="site-stat-num">{{ selectedTargets.length }}</div>
-                <div class="site-stat-label">已选择</div>
-              </div>
-              <div class="site-stat-card stat-blocked">
-                <div class="site-stat-num">{{ blockedCount }}</div>
-                <div class="site-stat-label">不可用</div>
-              </div>
-            </div>
+        <!-- ─── Step 2: 选择站点（v0.0.256 拆分到 WizardStepSelectTargets）─── -->
+        <WizardStepSelectTargets
+          v-else-if="currentStep === 2"
+          v-model="selectedTargets"
+          v-model:anonymous="form.anonymous"
+          :site-list="siteList"
+          :targets-loading="targetsLoading"
+          :title-components="titleComponents"
+        />
 
-            <!-- 操作栏 -->
-            <div class="site-toolbar">
-              <a-button size="small" type="primary" ghost @click="selectAllAvailable">
-                全选可用
-              </a-button>
-              <a-button size="small" @click="selectedTargets = []">清空</a-button>
-              <!-- v0.0.255 §56.29 匿名发布 toggle（全局） -->
-              <a-switch
-                v-model:checked="form.anonymous"
-                size="small"
-                style="margin-left: 12px"
-              />
-              <span style="margin-left: 6px; font-size: 12px; color: #666">匿名发布</span>
-              <a-tooltip title="勾选后所有目标站都以匿名身份发布（不支持的站点自动忽略此字段）">
-                <InfoCircleOutlined style="margin-left: 4px; color: #999; cursor: help" />
-              </a-tooltip>
-            </div>
-
-            <!-- 站点网格 -->
-            <div class="site-grid">
-              <a-tooltip
-                v-for="site in siteList"
-                :key="site.name"
-                :title="site.blocked ? site.blockReason : ''"
-                :disabled="!site.blocked"
-                placement="top"
-              >
-                <div
-                  class="site-btn"
-                  :class="{
-                    selected: selectedTargets.includes(site.name),
-                    blocked: site.blocked,
-                  }"
-                  @click="toggleSite(site)"
-                >
-                  <CheckCircleFilled
-                    v-if="selectedTargets.includes(site.name)"
-                    class="site-btn-check"
-                  />
-                  <span class="site-btn-name">{{ site.name }}</span>
-                  <StopOutlined
-                    v-if="site.blocked"
-                    class="site-btn-blocked-icon"
-                  />
-                </div>
-              </a-tooltip>
-            </div>
-          </a-spin>
-
-          <!-- 标题预览 -->
-          <div v-if="selectedTargets.length > 0 && titleComponents" class="title-preview-section">
-            <a-divider style="margin: 12px 0">标题预览</a-divider>
-            <div v-for="site in selectedTargets" :key="site" class="title-preview-item">
-              <span class="title-preview-site">{{ site }}</span>
-              <span class="title-preview-text" :title="titlePreviews[site] || '加载中...'">
-                {{ titlePreviews[site] || '加载中...' }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- ─── Step 3: 发布结果 ─── -->
-        <div v-else-if="currentStep === 3" class="step-content">
-          <a-result
-            v-if="submitError"
-            status="error"
-            title="发布失败"
-            :sub-title="submitError"
-            style="padding: 40px 0"
-          >
-            <template #extra>
-              <a-button @click="currentStep = 2">返回重试</a-button>
-            </template>
-          </a-result>
-
-          <div v-else class="results-section">
-            <!-- 成功头部 -->
-            <div class="results-header">
-              <CheckCircleFilled class="results-header-icon" />
-              <div>
-                <div class="results-header-title">
-                  已创建发布候选 #{{ submittedCandidateId }}
-                </div>
-                <div class="results-header-subtitle">
-                  候选已进入发布队列，系统将自动处理
-                </div>
-              </div>
-            </div>
-
-            <!-- 发布进度 -->
-            <div v-if="candidateStatus" class="progress-section">
-              <div class="progress-row">
-                <span class="progress-label">发布进度</span>
-                <a-progress
-                  :percent="publishPercent"
-                  :stroke-color="publishPercent === 100 ? '#52c41a' : '#1677ff'"
-                  size="small"
-                  style="flex: 1; margin: 0 12px"
-                />
-                <span class="progress-count">
-                  {{ candidateStatus.done_count || 0 }} / {{ candidateStatus.total_count || selectedTargets.length }}
-                </span>
-              </div>
-            </div>
-
-            <!-- 目标站点状态卡片 -->
-            <div class="result-site-grid">
-              <div
-                v-for="site in resultSiteStatus"
-                :key="site.name"
-                class="result-site-card"
-                :class="site.status"
-              >
-                <div class="result-site-card-bar" :class="site.status" />
-                <component
-                  :is="site.icon"
-                  class="result-site-card-icon"
-                  :spin="site.status === 'publishing'"
-                />
-                <div class="result-site-card-name">{{ site.name }}</div>
-                <a-tag :color="site.tagColor" size="small" style="margin: 0">
-                  {{ site.label }}
-                </a-tag>
-                <!-- v0.0.255 §56.30: 加种状态显示 -->
-                <div v-if="site.seeded === true" class="result-site-card-seed seeded">
-                  <CheckCircleFilled /> 已加种
-                </div>
-                <div v-else-if="site.seeded === false && site.seedError" class="result-site-card-seed failed">
-                  <WarningFilled /> 加种失败
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- ─── Step 3: 发布结果（v0.0.256 拆分到 WizardStepResult）─── -->
+        <WizardStepResult
+          v-else-if="currentStep === 3"
+          :submit-error="submitError"
+          :submitted-candidate-id="submittedCandidateId"
+          :candidate-status="candidateStatus"
+          :selected-targets="selectedTargets"
+          :result-records="resultRecords"
+          @back="currentStep = 2"
+        />
       </div>
 
       <!-- ═══ Footer: 固定按钮栏 ═══ -->
@@ -566,18 +433,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount, onUnmounted, markRaw } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onUnmounted } from 'vue'
 import { message } from 'ant-design-vue'
 import {
-  CheckOutlined, CheckCircleFilled, ClockCircleOutlined,
-  WarningFilled, DeleteOutlined, StopOutlined, InboxOutlined,
-  LoadingOutlined, CloseCircleFilled, InfoCircleOutlined,
+  CheckOutlined, CheckCircleFilled,
+  WarningFilled, DeleteOutlined, InboxOutlined,
 } from '@ant-design/icons-vue'
-import { manualForwardApi, publishApi, publishTorrentsApi } from '@/api/publish'
+import { manualForwardApi, publishApi } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
 import type { PublishResultRecord } from '@/api/types'
 import { formatBytes } from '@/utils/format'
 import WizardStepSelectTorrent from './WizardStepSelectTorrent.vue'
+import WizardStepSelectTargets, { type SiteItem } from './WizardStepSelectTargets.vue'
+import WizardStepResult, { type CandidateStatus } from './WizardStepResult.vue'
 
 const props = defineProps<{
   open: boolean
@@ -690,7 +558,7 @@ const form = ref({
 
 const titleComponents = ref<Record<string, string> | null>(null)
 const standardizedParams = ref<Record<string, string> | null>(null)
-const titlePreviews = ref<Record<string, string>>({})
+// v0.0.256: titlePreviews 迁移到 WizardStepSelectTargets 子组件
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -778,50 +646,27 @@ async function enterAnalyze() {
 }
 
 // --- Step 2: Select Sites ---
-interface SiteItem {
-  name: string
-  domain: string
-  blocked: boolean
-  blockReason: string
-}
-
+// v0.0.256: step 2 的 UI/toggleSite/loadTitlePreview/selectAllAvailable 迁移到 WizardStepSelectTargets
+// 主文件保留 siteList/targetsLoading/enterSelectSites（用于 step 1 → step 2 时拉取目标站列表）
 const siteList = ref<SiteItem[]>([])
 const selectedTargets = ref<string[]>([])
 const targetsLoading = ref(false)
 
-const availableCount = computed(() => siteList.value.filter(s => !s.blocked).length)
-const blockedCount = computed(() => siteList.value.filter(s => s.blocked).length)
-
-// 副标题校验提示
+// 副标题校验提示（step 1 显示用，保留主文件）
 const subtitleWarning = computed(() => {
   if (!form.value.subtitle) return ''
   const sub = form.value.subtitle
   const warnings: string[] = []
-
-  // 全角标点（所有站通用）
-  if (/[\uFF00-\uFFEF]/.test(sub)) {
-    warnings.push('含全角符号')
-  }
-
-  // 英文片名重复（家园/红叶）
+  if (/[\uFF00-\uFFEF]/.test(sub)) warnings.push('含全角符号')
   if (form.value.title) {
     const firstWord = form.value.title.split(/[\s.]/)[0]
     if (firstWord && firstWord.length > 2 && sub.toLowerCase().includes(firstWord.toLowerCase())) {
       warnings.push('包含主标题英文名（家园/红叶可能拒绝）')
     }
   }
-
-  // 好大/我堡：副标题必须中文开头
   const firstChar = sub.charAt(0)
-  if (!/[\u4e00-\u9fff]/.test(firstChar)) {
-    warnings.push('未以中文开头（好大/我堡可能拒绝）')
-  }
-
-  // 禁止转载来源（家园）
-  if (/转自|转载自|来源[:：]/.test(sub)) {
-    warnings.push('包含转载来源（家园禁止）')
-  }
-
+  if (!/[\u4e00-\u9fff]/.test(firstChar)) warnings.push('未以中文开头（好大/我堡可能拒绝）')
+  if (/转自|转载自|来源[:：]/.test(sub)) warnings.push('包含转载来源（家园禁止）')
   return warnings.join('； ')
 })
 
@@ -862,93 +707,19 @@ async function enterSelectSites() {
   }
 }
 
-function toggleSite(site: SiteItem) {
-  if (site.blocked) return
-  const idx = selectedTargets.value.indexOf(site.name)
-  if (idx >= 0) {
-    selectedTargets.value.splice(idx, 1)
-    delete titlePreviews.value[site.name]
-  } else {
-    selectedTargets.value.push(site.name)
-    if (titleComponents.value) {
-      loadTitlePreview(site.name)
-    }
-  }
-}
-
-async function loadTitlePreview(siteName: string) {
-  if (!titleComponents.value) return
-  try {
-    const resp = await publishTorrentsApi.previewTitle({
-      target_site: siteName,
-      title_components: titleComponents.value,
-    })
-    if (resp.data?.data?.title) {
-      titlePreviews.value[siteName] = resp.data.data.title
-    }
-  } catch { /* silent */ }
-}
-
-function selectAllAvailable() {
-  selectedTargets.value = siteList.value.filter(s => !s.blocked).map(s => s.name)
-}
+// v0.0.256: toggleSite/loadTitlePreview/selectAllAvailable/titlePreviews 全部迁移到 WizardStepSelectTargets
 
 // --- Step 3: Submit & Results ---
 const submitting = ref(false)
 const submitError = ref('')
 const submittedCandidateId = ref(0)
-const candidateStatus = ref<{ done_count?: number; fail_count?: number; total_count?: number; publish_status?: string } | null>(null)
+// v0.0.256: candidateStatus 类型用子组件导出的 CandidateStatus
+const candidateStatus = ref<CandidateStatus | null>(null)
 // v0.0.255 §56.30: 各目标站发布结果详情（含加种状态）
 const resultRecords = ref<Record<string, PublishResultRecord>>({})
 let candidatePollTimer: ReturnType<typeof setInterval> | null = null
 
-const publishPercent = computed(() => {
-  if (!candidateStatus.value || !candidateStatus.value.total_count) return 0
-  const done = candidateStatus.value.done_count || 0
-  const total = candidateStatus.value.total_count
-  return Math.round((done / total) * 100)
-})
-
-interface ResultSiteStatus {
-  name: string
-  status: 'queued' | 'publishing' | 'done' | 'failed' | 'skipped'
-  label: string
-  tagColor: string
-  icon: ReturnType<typeof markRaw>
-  // v0.0.255 §56.30: 加种状态（undefined=未发布或未拉取结果）
-  seeded?: boolean
-  seedError?: string
-}
-
-const resultSiteStatus = computed<ResultSiteStatus[]>(() => {
-  return selectedTargets.value.map(name => {
-    const status = inferSiteStatus(name)
-    const cfg: Record<string, { label: string; tagColor: string; icon: ReturnType<typeof markRaw> }> = {
-      queued:      { label: '排队中', tagColor: 'blue',   icon: markRaw(ClockCircleOutlined) },
-      publishing:  { label: '发布中', tagColor: 'processing', icon: markRaw(LoadingOutlined) },
-      done:        { label: '已完成', tagColor: 'green',  icon: markRaw(CheckCircleFilled) },
-      failed:      { label: '失败',   tagColor: 'red',    icon: markRaw(CloseCircleFilled) },
-      skipped:     { label: '已跳过', tagColor: 'default',icon: markRaw(StopOutlined) },
-    }
-    const c = cfg[status] || cfg.queued
-    // v0.0.255 §56.30: 从 resultRecords 取该站的加种状态
-    const record = resultRecords.value[name]
-    return {
-      name, status, label: c.label, tagColor: c.tagColor, icon: c.icon,
-      seeded: record?.seeded,
-      seedError: record?.seed_error,
-    }
-  })
-})
-
-function inferSiteStatus(_name: string): ResultSiteStatus['status'] {
-  if (!candidateStatus.value) return 'queued'
-  if (candidateStatus.value.publish_status === 'done') return 'done'
-  if (candidateStatus.value.publish_status === 'failed') return 'failed'
-  if (candidateStatus.value.publish_status === 'skipped') return 'skipped'
-  if (candidateStatus.value.publish_status === 'publishing') return 'publishing'
-  return 'queued'
-}
+// v0.0.256: publishPercent / resultSiteStatus / inferSiteStatus / ResultSiteStatus 迁移到 WizardStepResult
 
 async function doSubmit() {
   if (!selectedTorrent.value || selectedTargets.value.length === 0) return
