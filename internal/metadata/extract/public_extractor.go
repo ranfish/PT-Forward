@@ -87,6 +87,10 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	seed.IMDbLink, seed.DoubanLink, seed.TMDbLink = p.extractExternalLinks(doc, descrBBCode)
 	seed.Flags = p.extractFlags(seed.Title, seed.Subtitle, descrBBCode)
 
+	// 阶段 7: 站点特殊提取规则（v0.0.254，替代 Go 特殊提取器）
+	// 按站点 JSON 配置启用（category_from_icons/title_from_quoted/description_from_range 等）
+	p.applySiteExtractors(doc, &seed, input.PageHTML, input.FallbackTitle, domain, siteCode)
+
 	return seed.NormalizeWithFallback(input.FallbackTitle), nil
 }
 

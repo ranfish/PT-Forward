@@ -22,6 +22,11 @@ var (
 	bdInfoKeywords = []string{
 		"DISC INFO", "PLAYLIST REPORT", "QUICK SUMMARY", "FILES:", "CHAPTERS:", "DISC SIZE",
 	}
+
+	// bdInfoSubtitlesCutRe BDInfo SUBTITLES → FILES 段截断（v0.0.254 从 audiences 提取器通用化）。
+	// Audiences 等站的 BDInfo 中 SUBTITLES 到 FILES 之间是字幕文件列表（非 BDInfo 正文），需移除。
+	// BDInfo 标准格式：SUBTITLES: 段后跟 FILES: 段，中间字幕列表对技术信息无意义。
+	bdInfoSubtitlesCutRe = regexp.MustCompile(`(?is)(SUBTITLES:.*?)(FILES:)`)
 )
 
 // 前缀污染锚点正则。
@@ -65,6 +70,9 @@ func ExtractMediaInfo(descrHTML, descrBBCode, siteCode string) (mediainfo, bdinf
 		bdinfo = pickLongest(validBD)
 		bdinfo = trimBDInfoLeadingNoise(bdinfo)
 		bdinfo = compactBlankLinesForMediaReports(bdinfo)
+		// v0.0.254: 通用 BDInfo SUBTITLES → FILES 段截断（从 audiences 提取器迁移）
+		// 移除 SUBTITLES 到 FILES 之间的字幕文件列表（非 BDInfo 技术正文）
+		bdinfo = bdInfoSubtitlesCutRe.ReplaceAllString(bdinfo, "$2")
 	}
 	return mediainfo, bdinfo
 }

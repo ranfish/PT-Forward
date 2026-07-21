@@ -30,6 +30,64 @@ type siteConfigEntry struct {
 	SiteName     string                       `json:"site_name"`
 	SourceKeys   map[string]string            `json:"source_keys"`
 	StandardKeys map[string]map[string]string `json:"standard_keys"`
+	// v0.0.254: 站点特殊提取规则（替代 Go 代码的特殊提取器）
+	Extractors *siteExtractors `json:"extractors,omitempty"`
+}
+
+// siteExtractors 站点特殊提取规则（按需启用，全部可选）。
+// 设计原则：每个字段对应一种"无法用通用 selector 表达的 DOM 解析"。
+type siteExtractors struct {
+	// CategoryFromIcons 从 rowfollow 内 <img alt> 提取字段（PTer 模式）。
+	// container_text: rowhead 文本（如"类别与标签"），限定查找范围
+	// alt_to_field: alt 文本 → 字段名（"type"/"medium"/"source"/...），值再走 standard_keys 标准化
+	CategoryFromIcons *categoryIconsConfig `json:"category_from_icons,omitempty"`
+
+	// TitleFromQuoted 从带引号的 <title> 提取标题（HHanClub 模式）。
+	// quoted_pattern: 优先匹配引号内标题的正则
+	// fallback_pattern: fallback 正则
+	// strip_suffix: 要去除的后缀列表（如 " :: "）
+	TitleFromQuoted *titleQuotedConfig `json:"title_from_quoted,omitempty"`
+
+	// DescriptionFromRange 从 HTML 区间提取简介（HHanClub 模式）。
+	// start_pattern: 简介 start 标记的正则
+	// end_pattern: 简介 end 标记的正则
+	DescriptionFromRange *descriptionRangeConfig `json:"description_from_range,omitempty"`
+
+	// BasicInfoDivLabel 从 div 标签提取字段（HHanClub Tailwind 模式）。
+	// label_selector: 字段标签的 selector（如 "div[class*='font-bold'][class*='leading-6']"）
+	// value_getter: 值获取方式，目前支持 "next_sibling"（标签的下一个兄弟元素）
+	BasicInfoDivLabel *basicInfoDivLabelConfig `json:"basic_info_div_label,omitempty"`
+
+	// PosterFromPattern 从 URL 正则提取海报（HHanClub l_ratio_poster 模式）。
+	PosterFromPattern string `json:"poster_from_pattern,omitempty"`
+}
+
+type categoryIconsConfig struct {
+	ContainerText string            `json:"container_text"` // 如 "类别与标签"
+	AltToField    map[string]string `json:"alt_to_field"`   // alt → "type"/"medium"/"source"/...
+}
+
+type titleQuotedConfig struct {
+	QuotedPattern   string   `json:"quoted_pattern"`
+	FallbackPattern string   `json:"fallback_pattern"`
+	StripSuffix     []string `json:"strip_suffix"`
+}
+
+type descriptionRangeConfig struct {
+	StartPattern string `json:"start_pattern"`
+	EndPattern   string `json:"end_pattern"`
+}
+
+type basicInfoDivLabelConfig struct {
+	LabelSelector string `json:"label_selector"` // 如 "div[class*='font-bold'][class*='leading-6']"
+	ValueGetter   string `json:"value_getter"`   // "next_sibling" / "next_span_pair" / "container_label_grid_span"
+	// v0.0.254 增：用于 HHanClub 新版基本信息 grid 模式
+	// 当 ValueGetter="container_label_grid_span" 时：
+	//   - 找 LabelSelector 文本 == ContainerLabel 的元素
+	//   - 取下一个 grid 容器
+	//   - 遍历内部 div，每个 div 内 span.{LabelClass} 是字段标签，下一个 span 是值
+	ContainerLabel string `json:"container_label,omitempty"` // 如 "基本信息"
+	LabelClass     string `json:"label_class,omitempty"`     // 如 "font-bold"
 }
 
 var (
@@ -134,6 +192,23 @@ func LookupSiteStandardKeys(domain, siteCode string) map[string]map[string]strin
 			if len(cfg.StandardKeys) > 0 {
 				return cfg.StandardKeys
 			}
+		}
+	}
+	return nil
+}
+
+// LookupSiteExtractors 返回站点特殊提取规则（v0.0.254）。
+// 没配置时返回 nil（走 PublicExtractor 标准流程）。
+func LookupSiteExtractors(domain, siteCode string) *siteExtractors {
+	loadConfig()
+	if domain != "" {
+		if cfg, ok := sitesByDomain[strings.ToLower(strings.TrimSpace(domain))]; ok {
+			return cfg.Extractors
+		}
+	}
+	if siteCode != "" {
+		if cfg, ok := sitesByCode[strings.ToLower(strings.TrimSpace(siteCode))]; ok {
+			return cfg.Extractors
 		}
 	}
 	return nil

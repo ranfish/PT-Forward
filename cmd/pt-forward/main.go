@@ -43,7 +43,6 @@ import (
 	"github.com/ranfish/pt-forward/internal/iyuu"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
-	siteextract "github.com/ranfish/pt-forward/internal/metadata/extract/sites"
 	"github.com/ranfish/pt-forward/internal/orphan"
 	"github.com/ranfish/pt-forward/internal/metrics"
 	"github.com/ranfish/pt-forward/internal/middleware"
@@ -240,8 +239,9 @@ func main() {
 	eventDispatcher := event.NewDispatcher(log)
 
 	// §56.13 方案 B: 先创建 Engine，再传给 adapter.Factory（NexusPHP/Unit3D 内部用 Engine）
+	// v0.0.254: 不再注入特殊提取器（sites 包已删），所有站点走 PublicExtractor + 站点配置
 	publicExtractor := extract.NewPublicExtractor("", "")
-	extractEngine := extract.NewEngine(publicExtractor, siteextract.NewSpecialExtractors())
+	extractEngine := extract.NewEngine(publicExtractor, nil)
 	adapterFactory := adapter.NewFactory(log, extractEngine)
 	siteProvider := site.NewProvider(db, adapterFactory, log)
 
