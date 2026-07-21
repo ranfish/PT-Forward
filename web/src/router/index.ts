@@ -36,7 +36,6 @@ const routes: RouteRecordRaw[] = [
       { path: 'publish/torrents', name: 'PublishTorrents', component: () => import('@/views/publish/PublishTorrents.vue') },
       { path: 'publish/exclusions', name: 'PublishExclusions', component: () => import('@/views/publish/ExclusionList.vue') },
       { path: 'publish/groups/:id', name: 'PublishGroupDetail', component: () => import('@/views/publish/PublishGroupDetail.vue') },
-      { path: 'publish/manual', name: 'PublishManual', component: () => import('@/views/publish/PublishWizard.vue') },
       { path: 'fingerprints', name: 'Fingerprints', component: () => import('@/views/fingerprints/FingerprintList.vue') },
       { path: 'events', name: 'TorrentEvents', component: () => import('@/views/events/TorrentEventList.vue') },
       { path: 'iyuu', name: 'IYUU', component: () => import('@/views/iyuu/IYUUConfig.vue') },
