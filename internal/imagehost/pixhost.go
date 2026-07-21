@@ -31,6 +31,7 @@ func NewPixhostHost(logger *zap.Logger) *PixhostHost {
 
 func (p *PixhostHost) Name() string { return "pixhost" }
 
+
 func (p *PixhostHost) Upload(ctx context.Context, data []byte, filename string) (*UploadResult, error) {
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)

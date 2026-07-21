@@ -5,8 +5,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
+
+// toURL 把字符串转 *url.URL（供 Manager.SetProxy 用）
+func toURL(raw string) *url.URL {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil
+	}
+	return u
+}
 
 type ImageHost interface {
 	Name() string

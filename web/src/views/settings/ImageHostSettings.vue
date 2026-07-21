@@ -18,6 +18,13 @@
             <a-select-option value="source_direct">源站截图直用</a-select-option>
           </a-select>
         </a-form-item>
+        <!-- v0.0.256 图床代理开关 -->
+        <a-form-item label="图床代理">
+          <a-switch v-model:checked="useProxy" @change="onProxyChange" />
+          <span style="margin-left: 8px; color: #666; font-size: 12px">
+            {{ useProxy ? '使用系统 HTTP 代理上传截图' : '直连（不使用代理）' }}
+          </span>
+        </a-form-item>
         <a-divider>AGSVPT 配置</a-divider>
         <a-form-item label="AGSVPT 邮箱">
           <a-input v-model:value="config.agsvpt_email" placeholder="AGSVPT 注册邮箱" style="width: 300px" />
@@ -92,6 +99,7 @@ const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const agsvptPassword = ref('')
+const useProxy = ref(false)  // v0.0.256 图床代理开关
 interface PtgenProvider { url: string; key: string }
 const ptgenProviders = ref<PtgenProvider[]>([])
 const ptgenSaving = ref(false)
@@ -116,10 +124,26 @@ async function loadConfig() {
     config.agsvpt_email = d.agsvpt_email || ''
     config.agsvpt_configured = d.agsvpt_configured || false
     config.health = d.health || {}
+    // v0.0.256 读图床代理开关
+    try {
+      const { data: sd } = await settingsApi.get('image_host_use_proxy')
+      useProxy.value = sd.data?.['image_host_use_proxy'] === 'true'
+    } catch { /* defaults to false */ }
   } catch {
     message.error('加载图床配置失败')
   } finally {
     loading.value = false
+  }
+}
+
+// v0.0.256 图床代理开关变更
+async function onProxyChange(checked: boolean) {
+  try {
+    await settingsApi.update('image_host_use_proxy', { value: String(checked) })
+    message.success(checked ? '图床代理已开启（重启后生效）' : '图床代理已关闭（重启后生效）')
+  } catch {
+    message.error('保存失败')
+    useProxy.value = !checked
   }
 }
 

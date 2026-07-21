@@ -271,6 +271,12 @@ func main() {
 			log.Warn("failed to set default image host", zap.String("host", defaultHost), zap.Error(err))
 		}
 	}
+	// v0.0.256: 图床代理开关（复用系统 HTTP 代理地址）
+	if useProxy, err := settingsRepo.Get(ctx, "image_host_use_proxy"); err == nil && useProxy == "true" {
+		if proxyURL, err := settingsRepo.Get(ctx, "httpProxy"); err == nil && proxyURL != "" {
+			imageHostMgr.SetProxy(proxyURL)
+		}
+	}
 	if endpoints, err := settingsRepo.Get(ctx, setting.KeyPTGenEndpoints); err == nil && endpoints != "" {
 		publishPipeline.SetPTGenEndpoints(endpoints)
 	}
