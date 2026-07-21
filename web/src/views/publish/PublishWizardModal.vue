@@ -368,6 +368,8 @@
           :site-list="siteList"
           :targets-loading="targetsLoading"
           :title-components="titleComponents"
+          :info-hash="selectedTorrent?.info_hash || ''"
+          mode="ptgen_first"
         />
 
         <!-- ─── Step 3: 发布结果（v0.0.256 拆分到 WizardStepResult）─── -->
