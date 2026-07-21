@@ -588,7 +588,13 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 	douban, _ := result["douban_link"].(string)
 	tmdb, _ := result["tmdb_link"].(string)
 	subtitle, _ := result["subtitle"].(string)
+	bdinfo, _ := result["bdinfo"].(string)
 	now := time.Now()
+
+	// v0.0.255: 构建 MergedJSON（供 merge/preview API 读取，修复架构断裂）
+	stdParams, _ := result["standardized_params"].(map[string]interface{})
+	mergedJSON := buildMergedJSON(result, title, subtitle, desc, mediaInfo, bdinfo,
+		poster, imdb, douban, tmdb, screenshots, stdParams)
 
 	var meta model.TorrentMetadata
 	h.db.Where("info_hash = ?", infoHash).First(&meta)
@@ -606,6 +612,7 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			DoubanURL:   douban,
 			TMDbURL:     tmdb,
 			Subtitle:    subtitle,
+			MergedJSON:  mergedJSON,
 			FetchSource: "analyze",
 			FetchedAt:   now,
 		}
@@ -619,10 +626,11 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			"media_info":   mediaInfo,
 			"screenshots":  screenshots,
 			"poster":       poster,
-			"imdb_url":     imdb,
+			"im_db_url":     imdb,
 			"douban_url":   douban,
-			"tmdb_url":     tmdb,
+			"tm_db_url":    tmdb,
 			"subtitle":     subtitle,
+			"merged_json":  mergedJSON,
 			"fetch_source": "analyze",
 			"fetched_at":   now,
 		}
@@ -630,6 +638,50 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			h.logger.Warn("persist analysis: update failed", zap.Error(err))
 		}
 	}
+}
+
+// buildMergedJSON 从 analyze 结果构建 MergedMetadata JSON（v0.0.255）。
+func buildMergedJSON(result map[string]interface{}, title, subtitle, desc, mediaInfo, bdinfo,
+	poster, imdb, douban, tmdb, screenshots string, stdParams map[string]interface{}) string {
+
+	var ssList []string
+	if screenshots != "" {
+		for _, s := range strings.Split(screenshots, "\n") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				ssList = append(ssList, s)
+			}
+		}
+	}
+
+	merged := map[string]interface{}{
+		"title":      title,
+		"subtitle":   subtitle,
+		"mediainfo":  mediaInfo,
+		"bdinfo":     bdinfo,
+		"im_db_url":   imdb,
+		"douban_url": douban,
+		"tm_db_url":  tmdb,
+		"tags":       []string{},
+		"flags":      []string{},
+		"source_of":  map[string]string{},
+		"info_hash":  result["info_hash"],
+		"intro": map[string]interface{}{
+			"body":        desc,
+			"poster":      poster,
+			"screenshots": ssList,
+		},
+	}
+	if stdParams != nil {
+		for k, v := range stdParams {
+			merged[k] = v
+		}
+	}
+	data, err := json.Marshal(merged)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func (h *ManualForwardHandler) handlePollAnalyze(w http.ResponseWriter, r *http.Request) {
@@ -910,6 +962,20 @@ func (h *ManualForwardHandler) handleMerge(w http.ResponseWriter, r *http.Reques
 		Order("updated_at DESC").
 		First(&meta).Error; err != nil {
 		Error(w, http.StatusNotFound, 40401, "未找到该种子的元数据")
+		return
+	}
+
+	// v0.0.255: 优先用 MergedJSON（persistAnalysis 写入），fallback 到三源 JSON
+	if meta.MergedJSON != "" {
+		result := map[string]interface{}{
+			"merged":            json.RawMessage(meta.MergedJSON),
+			"has_detail_source": meta.DetailSourceJSON != "",
+			"has_ptgen_source":  meta.PTGenSourceJSON != "",
+			"has_local_source":  meta.LocalSourceJSON != "",
+			"last_merge_mode":   meta.LastMergeMode,
+			"source":            "merged_json",
+		}
+		Success(w, result)
 		return
 	}
 
