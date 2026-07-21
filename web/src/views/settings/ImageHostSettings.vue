@@ -127,7 +127,8 @@ async function loadConfig() {
     // v0.0.256 读图床代理开关
     try {
       const { data: sd } = await settingsApi.get('image_host_use_proxy')
-      useProxy.value = sd.data?.['image_host_use_proxy'] === 'true'
+      const items = (sd.data?.items as unknown as Record<string, string>) || {}
+      useProxy.value = items['image_host_use_proxy'] === 'true'
     } catch { /* defaults to false */ }
   } catch {
     message.error('加载图床配置失败')
@@ -139,7 +140,7 @@ async function loadConfig() {
 // v0.0.256 图床代理开关变更
 async function onProxyChange(checked: boolean) {
   try {
-    await settingsApi.update('image_host_use_proxy', { value: String(checked) })
+    await settingsApi.update('image_host_use_proxy', { value: checked ? 'true' : 'false' })
     message.success(checked ? '图床代理已开启' : '图床代理已关闭')
   } catch {
     message.error('保存失败')
