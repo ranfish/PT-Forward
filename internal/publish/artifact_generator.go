@@ -169,19 +169,26 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 		if tmpDir != "" {
 			_ = os.RemoveAll(tmpDir)
 		}
-		g.logger.Warn("local screenshot capture failed", zap.Error(err))
+		g.logger.Warn("local screenshot capture failed", zap.Int("shots", len(localShots)), zap.Error(err))
 		return nil
 	}
+	g.logger.Info("local screenshots captured", zap.Int("count", len(localShots)), zap.String("tmpDir", tmpDir))
 	// §56.17 决策 1: 优先用 imagehost.Manager.Upload（统一接口）
 	var uploaded []string
 	if g.imageHostMgr != nil {
-		for _, shotPath := range localShots {
+		for i, shotPath := range localShots {
 			data, readErr := os.ReadFile(shotPath)
 			if readErr != nil {
+				g.logger.Warn("screenshot read failed", zap.String("path", shotPath), zap.Error(readErr))
 				continue
 			}
 			result, uploadErr := g.imageHostMgr.Upload(ctx, data, filepath.Base(shotPath))
 			if uploadErr != nil || result == nil || result.URL == "" {
+				g.logger.Warn("screenshot upload skipped",
+					zap.Int("idx", i), zap.String("path", shotPath),
+					zap.Int("size", len(data)),
+					zap.NamedError("upload_err", uploadErr),
+					zap.Any("result", result))
 				continue
 			}
 			uploaded = append(uploaded, result.URL)
@@ -193,8 +200,8 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 	if tmpDir != "" {
 		_ = os.RemoveAll(tmpDir)
 	}
-	if err != nil || len(uploaded) == 0 {
-		g.logger.Warn("screenshot upload failed", zap.Error(err))
+	if len(uploaded) == 0 {
+		g.logger.Warn("screenshot upload all failed", zap.Int("captured", len(localShots)), zap.Error(err))
 		return nil
 	}
 	g.logger.Info("uploaded local screenshots", zap.Int("count", len(uploaded)))
