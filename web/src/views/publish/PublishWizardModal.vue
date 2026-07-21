@@ -437,6 +437,16 @@
                 全选可用
               </a-button>
               <a-button size="small" @click="selectedTargets = []">清空</a-button>
+              <!-- v0.0.255 §56.29 匿名发布 toggle（全局） -->
+              <a-switch
+                v-model:checked="form.anonymous"
+                size="small"
+                style="margin-left: 12px"
+              />
+              <span style="margin-left: 6px; font-size: 12px; color: #666">匿名发布</span>
+              <a-tooltip title="勾选后所有目标站都以匿名身份发布（不支持的站点自动忽略此字段）">
+                <InfoCircleOutlined style="margin-left: 4px; color: #999; cursor: help" />
+              </a-tooltip>
             </div>
 
             <!-- 站点网格 -->
@@ -606,7 +616,7 @@ import { message } from 'ant-design-vue'
 import {
   CheckOutlined, CheckCircleFilled, ClockCircleOutlined,
   WarningFilled, DeleteOutlined, StopOutlined, InboxOutlined,
-  LoadingOutlined, CloseCircleFilled,
+  LoadingOutlined, CloseCircleFilled, InfoCircleOutlined,
 } from '@ant-design/icons-vue'
 import { manualForwardApi, publishApi, publishTorrentsApi } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
@@ -736,6 +746,8 @@ const form = ref({
   tags: [] as string[],
   removedDeclarations: [] as string[],
   bdinfo: '',
+  // v0.0.255 §56.29 匿名发布 toggle（全局开关，所有目标站共用）
+  anonymous: false,
 })
 
 const titleComponents = ref<Record<string, string> | null>(null)
@@ -1042,7 +1054,7 @@ async function doSubmit() {
       title_components: titleComponents.value || undefined,
       bdinfo: form.value.bdinfo || undefined,
       target_sites: selectedTargets.value,
-      anonymous: (form.value as Record<string, unknown>).anonymous as boolean || false,
+      anonymous: form.value.anonymous,
       screenshot_in_desc: (form.value as Record<string, unknown>).screenshot_in_desc as boolean || undefined,
     })
     submittedCandidateId.value =
@@ -1126,7 +1138,7 @@ function resetWizard() {
   submitError.value = ''
   submittedCandidateId.value = 0
   candidateStatus.value = null
-  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [], removedDeclarations: [], bdinfo: '' }
+  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [], removedDeclarations: [], bdinfo: '', anonymous: false }
   titleComponents.value = null
   standardizedParams.value = null
   reviewTab.value = 'main'
