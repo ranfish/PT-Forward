@@ -1504,11 +1504,44 @@ func (h *SiteHandler) testSiteConnection(s *model.Site) (bool, string) {
 }
 
 func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, string) {
+	// v0.0.254: 先用不跟随重定向的方式检测 cookie 有效性（精准检测 SPA 站点）
+	// 对朱雀（302→/entry/login）/ 野马（200 SPA 壳）等非标准 NexusPHP 站点，
+	// 传统 HTML 关键字检测会误判。先用重定向检测，再退化到 HTML 检测。
+	noRedirectClient := &http.Client{
+		Timeout:   client.Timeout,
+		Transport: client.Transport,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse // 不跟随重定向
+		},
+	}
+
 	req, err := http.NewRequest("GET", s.BaseURL, nil) //nolint:gosec // admin test endpoint, URL from site config
 	if err != nil {
 		return false, "构造请求失败: " + err.Error()
 	}
 	req.Header.Set("Cookie", s.Cookie)
+
+	noRedirectResp, err := noRedirectClient.Do(req) //nolint:gosec // admin test endpoint
+	if err != nil {
+		return false, "连接失败: " + err.Error()
+	}
+
+	// v0.0.254: 3xx 重定向 → 检查是否到登录页
+	if noRedirectResp.StatusCode == 301 || noRedirectResp.StatusCode == 302 ||
+		noRedirectResp.StatusCode == 303 || noRedirectResp.StatusCode == 307 || noRedirectResp.StatusCode == 308 {
+		location := noRedirectResp.Header.Get("Location")
+		httpclient.DrainBody(noRedirectResp)
+		locLower := strings.ToLower(location)
+		// 重定向到 login 页 = cookie 明确无效
+		if strings.Contains(locLower, "login") || strings.Contains(locLower, "entry") {
+			return false, "Cookie 无效或已过期（重定向到登录页: " + location + "）"
+		}
+		// 重定向到其他页（如首页/种子列表）= cookie 可能有效，继续验证
+	} else {
+		httpclient.DrainBody(noRedirectResp)
+	}
+
+	// 用跟随重定向的 client 做完整检测（现有逻辑）
 	resp, err := client.Do(req) //nolint:gosec // admin test endpoint
 	if err != nil {
 		return false, "连接失败: " + err.Error()
@@ -1521,6 +1554,13 @@ func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, 
 	bodyData, _ := io.ReadAll(io.LimitReader(resp.Body, 128*1024))
 	bodyStr := string(bodyData)
 	lower := strings.ToLower(bodyStr)
+
+	// v0.0.254: SPA 壳页面检测（野马/朱雀等）
+	// SPA 站点首页只有 JS 壳（<div id="root">），登录态由 JS 渲染，HTML 不含关键字
+	if isSPAShell(bodyStr) {
+		// SPA 壳 + 无登录页重定向（前面已检查）= cookie 有效
+		return true, "连接成功（SPA 站点）"
+	}
 
 	loginIndicators := []string{
 		`type="password"`,
@@ -1555,6 +1595,19 @@ func (h *SiteHandler) testCookieAuth(client *http.Client, s *model.Site) (bool, 
 	}
 
 	return true, "连接成功"
+}
+
+// isSPAShell 检测是否为 SPA 壳页面（v0.0.254）。
+// SPA 站点（野马/朱雀等）首页只有 JS 壳 + <div id="root">，
+// 登录态由 JS 渲染，服务端 HTML 不含 userdetails/logout 等关键字。
+func isSPAShell(html string) bool {
+	// 特征 1: 含 id="root" 或 id="app"
+	hasRootContainer := strings.Contains(html, `id="root"`) || strings.Contains(html, `id="app"`)
+	// 特征 2: HTML 较小（< 10KB，SPA 壳通常 < 5KB）
+	isSmallHTML := len(html) < 10240
+	// 特征 3: 不含 NexusPHP 标准标识
+	noNexusPHP := !strings.Contains(html, "userdetails") && !strings.Contains(html, "logout")
+	return hasRootContainer && isSmallHTML && noNexusPHP
 }
 
 func (h *SiteHandler) testAPIKeyAuth(client *http.Client, s *model.Site) (bool, string) {
