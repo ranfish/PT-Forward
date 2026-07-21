@@ -3,6 +3,7 @@ package extract
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -89,6 +90,17 @@ func TestSiteExtractors_HHanClub(t *testing.T) {
 	// basic_info_div_label (container_label_grid_span) 应至少填充 type/medium/resolution
 	if seed.Type == "" && seed.Medium == "" {
 		t.Error("basic_info_div_label should fill Type or Medium")
+	}
+	// v0.0.264: 副标题 sibling pair 提取（fallthrough 到 next_sibling 模式）
+	if seed.Subtitle == "" {
+		t.Error("v0.0.264: Subtitle should be extracted from sibling pair (副标题 div + next div)")
+	}
+	// v0.0.264: 海报 cover-content pattern（替代 l_ratio_poster）
+	if seed.Intro.Poster == "" {
+		t.Error("v0.0.264: Poster should be extracted from cover-content pattern")
+	}
+	if !strings.HasPrefix(seed.Intro.Poster, "https://") {
+		t.Errorf("Poster should be https URL, got: %s", seed.Intro.Poster)
 	}
 }
 

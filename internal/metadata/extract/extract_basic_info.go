@@ -20,6 +20,8 @@ var defaultBasicInfoLabels = map[string][]string{
 	"resolution":  {"分辨率", "解析度", "resolution", "分辨率"},
 	"team":        {"制作组", "製作組", "团队", "團隊", "制作組", "製作组", "team"},
 	"source":      {"产地", "產地", "地区", "地區", "处理", "處理", "source"},
+	// v0.0.264: 加 subtitle（HHanClub Tailwind 模式 "副标题" sibling pair）
+	"subtitle": {"副标题", "副標題", "subtitle"},
 }
 
 // fillBasicInfoFields 从详情页基本信息表填充结构化字段。
