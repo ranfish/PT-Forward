@@ -240,38 +240,11 @@
 
               <!-- Tab: 截图 -->
               <a-tab-pane key="screenshots" :tab="`截图 (${form.screenshots.length})`">
-                <div v-if="form.screenshots.length === 0" class="empty-hint">
-                  <InboxOutlined style="font-size: 32px; color: #d9d9d9" />
-                  <p>暂无截图</p>
-                </div>
-                <div v-else class="screenshot-section">
-                  <div class="screenshot-grid">
-                    <div
-                      v-for="(url, i) in form.screenshots"
-                      :key="i"
-                      class="screenshot-item"
-                    >
-                      <a-image
-                        :src="url"
-                        :width="200"
-                        :height="113"
-                        class="screenshot-img"
-                        :preview="{ visible: screenshotPreviewVisible, onVisibleChange: (v: boolean) => screenshotPreviewVisible = v }"
-                      />
-                      <div class="screenshot-actions">
-                        <span class="screenshot-index">#{{ i + 1 }}</span>
-                        <a-button
-                          type="text"
-                          danger
-                          size="small"
-                          @click="form.screenshots.splice(i, 1)"
-                        >
-                          <DeleteOutlined />
-                        </a-button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <!-- v0.0.256 §56.27 截图管理（拖拽排序 + 添加 URL + ScreenshotInDesc toggle） -->
+                <ScreenshotManager
+                  v-model:screenshots="form.screenshots"
+                  v-model:screenshot-in-desc="form.screenshotInDesc"
+                />
               </a-tab-pane>
 
               <!-- Tab: 简介 -->
@@ -444,6 +417,7 @@ import WizardStepSelectTorrent from './WizardStepSelectTorrent.vue'
 import WizardStepSelectTargets, { type SiteItem } from './WizardStepSelectTargets.vue'
 import WizardStepResult, { type CandidateStatus } from './WizardStepResult.vue'
 import TagSelector from './TagSelector.vue'
+import ScreenshotManager from './ScreenshotManager.vue'
 
 const props = defineProps<{
   open: boolean
@@ -534,7 +508,7 @@ const analyzeError = ref('')
 const analyzeProgress = ref(0)
 const analyzeProgressText = ref('')
 const reviewTab = ref('main')
-const screenshotPreviewVisible = ref(false)
+// v0.0.256: screenshotPreviewVisible 迁移到 ScreenshotManager 子组件
 
 const form = ref({
   title: '',
@@ -552,6 +526,8 @@ const form = ref({
   bdinfo: '',
   // v0.0.255 §56.29 匿名发布 toggle（全局开关，所有目标站共用）
   anonymous: false,
+  // v0.0.256 §56.27 ScreenshotInDesc toggle（截图嵌入简介）
+  screenshotInDesc: false,
 })
 
 const titleComponents = ref<Record<string, string> | null>(null)
@@ -850,7 +826,7 @@ function resetWizard() {
   submittedCandidateId.value = 0
   candidateStatus.value = null
   resultRecords.value = {}
-  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [], removedDeclarations: [], bdinfo: '', anonymous: false }
+  form.value = { title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [], statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '', tags: [], removedDeclarations: [], bdinfo: '', anonymous: false, screenshotInDesc: false }
   titleComponents.value = null
   standardizedParams.value = null
   reviewTab.value = 'main'
