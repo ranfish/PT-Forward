@@ -476,22 +476,25 @@ func main() {
 	mux := http.NewServeMux()
 	runtimeCfg := setting.NewRuntimeConfig(settingsRepo, log)
 
+	// v0.0.255: 无条件创建 artifactGenerator（MediaInfo 提取不依赖 screenshot 开关）
+	// screenshot_enabled=false 时 MpvPath="" → screenshotEngine=nil → 不截图但 MediaInfo 正常提取
+	ssCfg := screenshot.Config{}
 	if runtimeCfg.GetBool(ctx, setting.KeyScreenshotEnabled) {
-		ssCfg := screenshot.Config{
-			MpvPath:     runtimeCfg.GetString(ctx, setting.KeyScreenshotMpvPath),
-			Count:       runtimeCfg.GetInt(ctx, setting.KeyScreenshotCount),
-			MinInterval: runtimeCfg.GetInt(ctx, setting.KeyScreenshotMinInterval),
-			JPEGQuality: runtimeCfg.GetInt(ctx, setting.KeyScreenshotJPEGQuality),
-		}
+		ssCfg.MpvPath = runtimeCfg.GetString(ctx, setting.KeyScreenshotMpvPath)
+		ssCfg.Count = runtimeCfg.GetInt(ctx, setting.KeyScreenshotCount)
+		ssCfg.MinInterval = runtimeCfg.GetInt(ctx, setting.KeyScreenshotMinInterval)
+		ssCfg.JPEGQuality = runtimeCfg.GetInt(ctx, setting.KeyScreenshotJPEGQuality)
 		if ssCfg.MpvPath == "" {
 			ssCfg.MpvPath = "mpv"
 		}
 		if ssCfg.Count == 0 {
 			ssCfg.Count = 6
 		}
-		publishPipeline.SetScreenshotConfig(ssCfg)
 		log.Info("screenshot engine enabled for publish", zap.String("mpv_path", ssCfg.MpvPath), zap.Int("count", ssCfg.Count))
+	} else {
+		log.Info("screenshot disabled, but MediaInfo extraction still active")
 	}
+	publishPipeline.SetScreenshotConfig(ssCfg)
 
 	rateLimitEnabled := runtimeCfg.GetBool(ctx, setting.KeyRateLimitEnabled)
 	rateLimitGlobal := runtimeCfg.GetInt(ctx, setting.KeyRateLimitGlobal)
