@@ -270,6 +270,35 @@ func (a *MTeamAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	return a.detailViaWeb(ctx, config, torrentID)
 }
 
+// mteamCategoryMap MTeam API category ID → 标准 code（v0.0.255）。
+// 数据源：site/data/sites.json 馒头 form.category。
+// MTeam API 返回纯数字 category（如 "407"），NormalizeCategory 无法匹配。
+var mteamCategoryMap = map[string]string{
+	"401": "category.movie",
+	"402": "category.tv_series",
+	"403": "category.documentaries",
+	"404": "category.animation",
+	"405": "category.tv_shows",
+	"406": "category.music",
+	"407": "category.sports",
+	"408": "category.other",
+	"409": "category.game",
+	"419": "category.audiobook",
+	"420": "category.ebook",
+	"421": "category.cartoon",
+	"422": "category.magazine",
+	"423": "category.study",
+	"427": "category.mv",
+	"434": "category.other",
+	"435": "category.mv",
+	"438": "category.software",
+	"439": "category.other",
+	"441": "category.stage",
+	"442": "category.sports",
+	"448": "category.playlet",
+	"449": "category.other",
+}
+
 func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
 	u := resolveBaseURL(config) + "/api/torrent/detail"
 	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader("id="+torrentID))
@@ -352,7 +381,12 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 			detail.Screenshots = detail.Screenshots[1:]
 		}
 	}
-	detail.Category = NormalizeCategory(detail.Category)
+	// v0.0.255: MTeam API 返回纯数字 category ID（如 "407"），先转标准 code
+	if stdCode, ok := mteamCategoryMap[detail.Category]; ok {
+		detail.Category = stdCode
+	} else {
+		detail.Category = NormalizeCategory(detail.Category)
+	}
 	return detail, nil
 }
 
