@@ -52,7 +52,7 @@ func (p *PixhostHost) Upload(ctx context.Context, data []byte, filename string) 
 		return nil, fmt.Errorf("close writer: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://pixhost.to/upload/api", &buf)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.pixhost.to/images", &buf)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
