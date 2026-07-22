@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	neturl "net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,6 +17,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/pusher"
+	"github.com/ranfish/pt-forward/internal/site"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -679,46 +679,8 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 		return
 	}
 
-	// Build site domain map from DB for tracker matching
-	var sites []model.Site
-	if err := e.db.WithContext(ctx).Find(&sites).Error; err != nil {
-		return
-	}
-	domainToName := make(map[string]string)
-	for i := range sites {
-		s := &sites[i]
-		if s.Name == "" {
-			continue
-		}
-		// From BaseURL
-		if s.BaseURL != "" {
-			u := s.BaseURL
-			u = strings.TrimPrefix(u, "https://")
-			u = strings.TrimPrefix(u, "http://")
-			parts := strings.SplitN(u, "/", 2)
-			if parts[0] != "" {
-				domainToName[parts[0]] = s.Name
-			}
-		}
-		// From AlternativeDomains
-		if s.AlternativeDomains != "" {
-			for _, d := range strings.Split(s.AlternativeDomains, ",") {
-				d = strings.TrimSpace(d)
-				if d != "" {
-					domainToName[d] = s.Name
-				}
-			}
-		}
-		// From TrackerDomains
-		if s.TrackerDomains != "" {
-			for _, d := range strings.Split(s.TrackerDomains, ",") {
-				d = strings.TrimSpace(d)
-				if d != "" {
-					domainToName[d] = s.Name
-				}
-			}
-		}
-	}
+	// v0.0.267: 统一用 site.TrackerMatcher（消除第 3 套内联匹配逻辑）
+	matcher := site.NewTrackerMatcher(e.db)
 
 	var newRecords []*model.SeedingTorrentRecord
 	for hash, ti := range torrentMap {
@@ -734,23 +696,9 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 		}
 
 		// Extract site name from tracker URL
-		siteName := "unknown"
-		if ti.TrackerURL != "" {
-			trackerHost := ti.TrackerURL
-			if u, err := neturl.Parse(ti.TrackerURL); err == nil && u.Host != "" {
-				trackerHost = u.Host
-			}
-			// Try exact match first, then suffix match
-			if name, ok := domainToName[trackerHost]; ok {
-				siteName = name
-			} else {
-				for domain, name := range domainToName {
-					if strings.HasSuffix(trackerHost, domain) {
-						siteName = name
-						break
-					}
-				}
-			}
+		siteName := matcher.Match(ti.TrackerURL)
+		if siteName == "" {
+			siteName = "unknown"
 		}
 
 		// Check DB to avoid duplicates (race condition safety)
