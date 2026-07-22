@@ -1,6 +1,7 @@
 package site
 
 import (
+	"encoding/json"
 	"net/url"
 	"strings"
 
@@ -34,6 +35,23 @@ func NewTrackerMatcher(db *gorm.DB) *TrackerMatcher {
 		if s.Name == "" || s.Domain == "" {
 			continue
 		}
+		// v0.0.266: 优先用显式配置的 TrackerDomains（精确，无歧义）
+		// 数据源：docs/00-站点域名.md → sites.json → DB.tracker_domains（JSON 数组）
+		var trackerDomains []string
+		if s.TrackerDomains != "" {
+			if err := json.Unmarshal([]byte(s.TrackerDomains), &trackerDomains); err == nil {
+				for _, td := range trackerDomains {
+					host := normalizeTrackerHost(td)
+					if host == "" {
+						continue
+					}
+					if _, exists := m.hostMap[host]; !exists {
+						m.hostMap[host] = s.Name
+					}
+				}
+			}
+		}
+		// 兜底：用 Domain + BaseURL 构建索引（核心域名启发式匹配）
 		candidates := []string{s.Domain}
 		if s.BaseURL != "" {
 			if u, err := url.Parse(s.BaseURL); err == nil && u.Hostname() != "" {
