@@ -95,6 +95,12 @@
       @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'source_site'">
+          <template v-if="record.source_sites && record.source_sites.length">
+            <a-tag v-for="s in record.source_sites" :key="s" color="blue" size="small" style="margin: 1px">{{ s }}</a-tag>
+          </template>
+          <span v-else style="color: #999; font-size: 12px">未知</span>
+        </template>
         <template v-if="column.key === 'size'">
           {{ formatBytes(record.size) }}
         </template>
@@ -391,6 +397,7 @@ const presetTorrent = ref<{ info_hash: string; name: string; size: number; save_
 
 const columns = [
   { title: '种子名称', dataIndex: 'name', key: 'name', ellipsis: true },
+  { title: '做种站点', key: 'source_site', width: 160 },
   { title: '大小', key: 'size', width: 90 },
   { title: '覆盖', key: 'coverage', width: 120, align: 'center' as const },
   { title: '可转', key: 'target_count', width: 100 },

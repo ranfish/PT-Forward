@@ -83,6 +83,25 @@ func (m *TrackerMatcher) Match(trackerURL string) string {
 	return ""
 }
 
+// MatchAll 遍历多个 tracker URL，返回所有匹配到的站点名（去重，保持顺序）。
+// v0.0.265: 用于 publish/torrents 列表展示"做种站点"列（一个种子可能在多站做种）。
+func (m *TrackerMatcher) MatchAll(trackerURLs []string) []string {
+	if len(trackerURLs) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	result := []string{}
+	for _, u := range trackerURLs {
+		name := m.Match(u)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		result = append(result, name)
+	}
+	return result
+}
+
 func parseTrackerHost(rawURL string) string {
 	trimmed := strings.TrimSpace(rawURL)
 	if trimmed == "" {

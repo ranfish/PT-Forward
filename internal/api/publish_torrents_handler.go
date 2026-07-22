@@ -14,6 +14,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
+	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -142,6 +143,9 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 		return
 	}
 
+	// v0.0.265: tracker → 站点匹配（用于列表展示"做种站点"列）
+	trackerMatcher := site.NewTrackerMatcher(h.db)
+
 	var totalSites int64
 	if err := h.db.Model(&model.Site{}).Where("enabled = ? AND is_target = ?", true, true).Count(&totalSites).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
@@ -229,6 +233,13 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 			stdType = inferTypeFromName(t.Name)
 		}
 		reviewed := metaReviewedMap[t.Hash]
+		// v0.0.265: tracker 匹配做种站点（支持多 tracker → 多站点）
+		var sourceSites []string
+		if len(t.TrackerURLs) > 0 {
+			sourceSites = trackerMatcher.MatchAll(t.TrackerURLs)
+		} else if t.TrackerURL != "" {
+			sourceSites = trackerMatcher.MatchAll([]string{t.TrackerURL})
+		}
 		items = append(items, map[string]interface{}{
 			"info_hash":        t.Hash,
 			"name":             t.Name,
@@ -239,6 +250,8 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 			"queried":          queriedMap[t.Hash],
 			"standard_type":    stdType,
 			"metadata_reviewed": reviewed,
+			"source_site":      strings.Join(sourceSites, ", "),
+			"source_sites":     sourceSites,
 			"coverage": map[string]interface{}{
 				"has_count":    hasCount,
 				"total_sites":  totalSites,

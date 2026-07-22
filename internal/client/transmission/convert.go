@@ -62,10 +62,17 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 
 	var numComplete, numIncomplete int
 	var trackerURL string
+	var trackerURLs []string
 	if len(t.TrackerStats) > 0 {
 		numComplete = t.TrackerStats[0].SeederCount
 		numIncomplete = t.TrackerStats[0].LeecherCount
 		trackerURL = t.TrackerStats[0].Announce
+		trackerURLs = make([]string, 0, len(t.TrackerStats))
+		for _, ts := range t.TrackerStats {
+			if ts.Announce != "" {
+				trackerURLs = append(trackerURLs, ts.Announce)
+			}
+		}
 	}
 
 	return &model.TorrentInfo{
@@ -91,6 +98,7 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 		SeedTime:      t.SecondsSeeding,
 		AddedAt:       time.Unix(t.AddedDate, 0),
 		TrackerURL:    trackerURL,
+		TrackerURLs:   trackerURLs,
 	}
 }
 

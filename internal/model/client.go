@@ -81,7 +81,9 @@ type TorrentInfo struct {
 	DownloadSpeed int64     `json:"download_speed"`
 	SeedTime      int64     `json:"seed_time"`
 	AddedAt       time.Time `json:"added_at"`
-	TrackerURL    string    `json:"tracker_url"`
+	TrackerURL    string   `json:"tracker_url"`
+	// v0.0.265: 所有 tracker URL（用于多站点匹配，transmission 填全量，qbittorrent 仅主 tracker）
+	TrackerURLs   []string `json:"tracker_urls"`
 }
 
 // §33.1.35 — AddTorrentOptions: 种子添加选项
