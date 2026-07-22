@@ -70,5 +70,14 @@ func (t qbTorrent) toModel() *model.TorrentInfo {
 		SeedTime:      t.SeedingTime,
 		AddedAt:       time.Unix(t.AddedOn, 0),
 		TrackerURL:    t.Tracker,
+		TrackerURLs:   trackerURLs(t.Tracker),
 	}
+}
+
+// trackerURLs 把单个 tracker URL 包装成切片（qbittorrent /torrents/info 只返回主 tracker）。
+func trackerURLs(primary string) []string {
+	if primary == "" {
+		return nil
+	}
+	return []string{primary}
 }
