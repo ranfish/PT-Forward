@@ -19,17 +19,32 @@ type TrackerMatcher struct {
 	uniqueCoreMap map[string]string
 }
 
+// NewTrackerMatcher 从 DB 查 enabled 站点构建 matcher。
 func NewTrackerMatcher(db *gorm.DB) *TrackerMatcher {
 	m := &TrackerMatcher{
 		hostMap:       map[string]string{},
 		uniqueCoreMap: map[string]string{},
 	}
-
 	var sites []model.Site
 	if err := db.Where("enabled = ? AND domain != ''", true).Find(&sites).Error; err != nil {
 		return m
 	}
+	m.buildIndex(sites)
+	return m
+}
 
+// NewTrackerMatcherFromSites 从内存站点列表构建 matcher（不需要 DB）。
+// v0.0.267: 供 reseed.TrackerSiteResolver 等不持有 *gorm.DB 的调用方使用。
+func NewTrackerMatcherFromSites(sites []model.Site) *TrackerMatcher {
+	m := &TrackerMatcher{
+		hostMap:       map[string]string{},
+		uniqueCoreMap: map[string]string{},
+	}
+	m.buildIndex(sites)
+	return m
+}
+
+func (m *TrackerMatcher) buildIndex(sites []model.Site) {
 	coreMap := map[string]string{}
 	for _, s := range sites {
 		if s.Name == "" || s.Domain == "" {
@@ -83,7 +98,6 @@ func NewTrackerMatcher(db *gorm.DB) *TrackerMatcher {
 			m.uniqueCoreMap[core] = name
 		}
 	}
-	return m
 }
 
 func (m *TrackerMatcher) Match(trackerURL string) string {

@@ -1,115 +1,30 @@
 package reseed
 
 import (
-	"encoding/json"
-	"net/url"
-	"strings"
-	"sync"
-
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/site"
 )
 
-var knownPrefixes = []string{
-	"tracker.", "t.", "on.", "announce.", "daisuki.", "relay01.",
-	"tracker-public.", "www.", "agsvpt.",
-}
-
+// TrackerSiteResolver 将 tracker URL 解析为站点名。
+// v0.0.267: 统一架构 — 内部代理 site.TrackerMatcher，消除 3 套独立匹配逻辑。
 type TrackerSiteResolver struct {
-	mu          sync.RWMutex
-	domainToSite map[string]string
+	matcher *site.TrackerMatcher
 }
 
 func NewTrackerSiteResolver() *TrackerSiteResolver {
 	return &TrackerSiteResolver{
-		domainToSite: make(map[string]string),
+		matcher: site.NewTrackerMatcherFromSites(nil),
 	}
 }
 
 func (r *TrackerSiteResolver) BuildIndex(sites []*model.Site) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	m := make(map[string]string)
-	for _, s := range sites {
-		siteName := s.Name
-
-		register(m, s.Domain, siteName)
-
-		if s.AlternativeDomains != "" {
-			var altDomains []string
-			if err := parseJSONStrings(s.AlternativeDomains, &altDomains); err == nil {
-				for _, d := range altDomains {
-					register(m, d, siteName)
-				}
-			}
-		}
-
-		if s.TrackerDomains != "" {
-			var trackerDomains []string
-			if err := parseJSONStrings(s.TrackerDomains, &trackerDomains); err == nil {
-				for _, td := range trackerDomains {
-					register(m, td, siteName)
-				}
-			}
-		}
+	list := make([]model.Site, len(sites))
+	for i, s := range sites {
+		list[i] = *s
 	}
-
-	r.domainToSite = m
-}
-
-func register(m map[string]string, domain, siteName string) {
-	d := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(domain), "/"))
-	if d == "" {
-		return
-	}
-	m[d] = siteName
+	r.matcher = site.NewTrackerMatcherFromSites(list)
 }
 
 func (r *TrackerSiteResolver) Resolve(trackerURL string) string {
-	if trackerURL == "" {
-		return ""
-	}
-
-	parsed, err := url.Parse(trackerURL)
-	if err != nil {
-		return ""
-	}
-	host := strings.ToLower(parsed.Hostname())
-	if host == "" {
-		return ""
-	}
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	if name, ok := r.domainToSite[host]; ok {
-		return name
-	}
-
-	stripped := host
-	for _, prefix := range knownPrefixes {
-		if strings.HasPrefix(stripped, prefix) {
-			stripped = stripped[len(prefix):]
-			if name, ok := r.domainToSite[stripped]; ok {
-				return name
-			}
-			break
-		}
-	}
-
-	for h := host; strings.Contains(h, "."); h = h[strings.Index(h, ".")+1:] {
-		rest := h[strings.Index(h, ".")+1:]
-		if !strings.Contains(rest, ".") {
-			break
-		}
-		if name, ok := r.domainToSite[rest]; ok {
-			return name
-		}
-	}
-
-	return ""
-}
-
-func parseJSONStrings(data string, out *[]string) error {
-	return json.Unmarshal([]byte(data), out)
+	return r.matcher.Match(trackerURL)
 }
