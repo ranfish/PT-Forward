@@ -346,18 +346,33 @@ func extractReleaseVersion(title string) string {
 func extractGroup(title string) string {
 	title = strings.TrimSpace(title)
 	idx := strings.LastIndex(title, "-")
-	if idx <= 0 || idx >= len(title)-1 {
-		return ""
+	if idx > 0 && idx < len(title)-1 {
+		raw := strings.TrimSpace(title[idx+1:])
+		upper := strings.ToUpper(raw)
+		if upper == "NOGROUP" || upper == "N/A" || upper == "NONE" || upper == "UNKNOWN" {
+			// 继续尝试 ￡ 分隔符
+		} else if len(raw) >= 2 && len(raw) <= 30 {
+			return raw
+		}
 	}
-	raw := strings.TrimSpace(title[idx+1:])
-	upper := strings.ToUpper(raw)
-	if upper == "NOGROUP" || upper == "N/A" || upper == "NONE" || upper == "UNKNOWN" {
-		return ""
+
+	// ￡ 分隔符（SSD 特有格式 ￡CMCT发布者，取连续英文 = 组名）
+	if pIdx := strings.LastIndex(title, "￡"); pIdx >= 0 {
+		rest := title[pIdx+len("￡"):]
+		var b strings.Builder
+		for _, r := range rest {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				b.WriteRune(r)
+			} else {
+				break
+			}
+		}
+		if b.Len() >= 2 {
+			return b.String()
+		}
 	}
-	if len(raw) < 2 || len(raw) > 30 {
-		return ""
-	}
-	return raw
+
+	return ""
 }
 
 func extractMainAndUnrecognized(remaining string) (mainTitle, unrecognized string) {
