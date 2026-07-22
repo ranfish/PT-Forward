@@ -152,6 +152,75 @@ func (h *ManualForwardHandler) cleanupTaskStore() {
 	}
 }
 
+type seededTorrent struct {
+	InfoHash    string `json:"info_hash"`
+	Name        string `json:"name"`
+	Size        int64  `json:"size"`
+	SavePath    string `json:"save_path"`
+	UploadSpeed int64  `json:"upload_speed"`
+	Seeders     int    `json:"seeders"`
+	State       string `json:"state"`
+	ClientID    uint   `json:"client_id"`
+	SourceSite  string `json:"source_site"`
+}
+
+// dedupSeededTorrents 按种子名称完全匹配去重。
+// 同组多条时优先保留官组源站（release_group_mappings 映射命中）的那条，
+// 无官组映射或组内无匹配则保留第一条。
+func (h *ManualForwardHandler) dedupSeededTorrents(ctx context.Context, items []seededTorrent) []seededTorrent {
+	if len(items) <= 1 {
+		return items
+	}
+
+	nameGroups := map[string][]int{}
+	nameOrder := []string{}
+	for i, r := range items {
+		if _, ok := nameGroups[r.Name]; !ok {
+			nameOrder = append(nameOrder, r.Name)
+		}
+		nameGroups[r.Name] = append(nameGroups[r.Name], i)
+	}
+
+	if len(nameOrder) == len(items) {
+		return items
+	}
+
+	groupSiteCache := map[string]string{}
+	deduped := make([]seededTorrent, 0, len(nameOrder))
+	for _, name := range nameOrder {
+		indices := nameGroups[name]
+		if len(indices) == 1 {
+			deduped = append(deduped, items[indices[0]])
+			continue
+		}
+
+		picked := indices[0]
+		groupName := publish.ExtractGroupName(name)
+		if groupName != "" {
+			officialSite, cached := groupSiteCache[groupName]
+			if !cached {
+				var mapping model.ReleaseGroupMapping
+				if err := h.db.WithContext(ctx).
+					Where("LOWER(group_name) = LOWER(?)", groupName).
+					First(&mapping).Error; err == nil {
+					officialSite = mapping.SiteName
+				}
+				groupSiteCache[groupName] = officialSite
+			}
+			if officialSite != "" {
+				for _, idx := range indices {
+					if items[idx].SourceSite == officialSite {
+						picked = idx
+						break
+					}
+				}
+			}
+		}
+		deduped = append(deduped, items[picked])
+	}
+	return deduped
+}
+
 func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *http.Request) {
 	if h.clientMgr == nil {
 		Error(w, http.StatusServiceUnavailable, 50001, "客户端管理器未初始化")
@@ -200,25 +269,13 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 
 	matcher := site.NewTrackerMatcher(h.db)
 
-	type SeededTorrent struct {
-		InfoHash    string   `json:"info_hash"`
-		Name        string   `json:"name"`
-		Size        int64    `json:"size"`
-		SavePath    string   `json:"save_path"`
-		UploadSpeed int64    `json:"upload_speed"`
-		Seeders     int      `json:"seeders"`
-		State       string   `json:"state"`
-		ClientID    uint     `json:"client_id"`
-		SourceSite  string   `json:"source_site"`
-	}
-
-	var results []SeededTorrent
+	var results []seededTorrent
 	for _, t := range torrents {
 		sourceSite := ""
 		if t.TrackerURL != "" {
 			sourceSite = matcher.Match(t.TrackerURL)
 		}
-		results = append(results, SeededTorrent{
+		results = append(results, seededTorrent{
 			InfoHash:    t.Hash,
 			Name:        t.Name,
 			Size:        t.TotalSize,
@@ -230,6 +287,8 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 			SourceSite:  sourceSite,
 		})
 	}
+
+	results = h.dedupSeededTorrents(ctx, results)
 
 	Success(w, results)
 }
