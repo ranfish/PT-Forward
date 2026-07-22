@@ -26,6 +26,7 @@ type ManualForwardHandler struct {
 	pipeline     PublishPipeline
 	siteMgr      SiteManager
 	clientMgr    MFClientProvider
+	seedingCache SeedingCacheProvider
 	declFilter   *publish.DeclarationFilter
 	bdinfoScanner *publish.BDInfoScanner
 	metadataFetcher MetadataFetcherProvider
@@ -33,6 +34,11 @@ type ManualForwardHandler struct {
 	taskSeq      atomic.Int64
 	stopCh       chan struct{}
 	stopOnce     sync.Once
+}
+
+// SeedingCacheProvider 从 seeding engine 读取已缓存的种子列表（避免直连下载器）。
+type SeedingCacheProvider interface {
+	GetCachedTorrents(clientName string) []*model.TorrentInfo
 }
 
 type MetadataFetcherProvider interface {
@@ -67,6 +73,7 @@ func NewManualForwardHandler(db *gorm.DB, logger *zap.Logger) *ManualForwardHand
 func (h *ManualForwardHandler) SetPipeline(p PublishPipeline)        { h.pipeline = p }
 func (h *ManualForwardHandler) SetSiteManager(s SiteManager)         { h.siteMgr = s }
 func (h *ManualForwardHandler) SetClientProvider(c MFClientProvider) { h.clientMgr = c }
+func (h *ManualForwardHandler) SetSeedingCache(s SeedingCacheProvider) { h.seedingCache = s }
 func (h *ManualForwardHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
 func (h *ManualForwardHandler) SetBDInfoScanner(s *publish.BDInfoScanner) { h.bdinfoScanner = s }
 func (h *ManualForwardHandler) SetMetadataFetcher(f MetadataFetcherProvider) { h.metadataFetcher = f }
@@ -261,15 +268,30 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
-	torrents, err := client.GetSeedingTorrents(ctx)
-	if err != nil {
-		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取种子列表失败: %v", err))
-		return
+	// 优先从 seeding engine 缓存读取（内存命中=毫秒级），缓存缺失才回退直连下载器
+	var torrents []*model.TorrentInfo
+	cacheHit := false
+	if h.seedingCache != nil {
+		if cached := h.seedingCache.GetCachedTorrents(cfg.Name); cached != nil {
+			torrents = filterSeedingTorrents(cached)
+			cacheHit = true
+			h.logger.Debug("seeded-torrents from cache",
+				zap.String("client", cfg.Name),
+				zap.Int("count", len(torrents)))
+		}
+	}
+	if !cacheHit {
+		var err error
+		torrents, err = client.GetSeedingTorrents(ctx)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取种子列表失败: %v", err))
+			return
+		}
 	}
 
 	matcher := site.NewTrackerMatcher(h.db)
 
-	var results []seededTorrent
+	results := make([]seededTorrent, 0, len(torrents))
 	for _, t := range torrents {
 		sourceSite := ""
 		if t.TrackerURL != "" {
@@ -291,6 +313,21 @@ func (h *ManualForwardHandler) handleSeededTorrents(w http.ResponseWriter, r *ht
 	results = h.dedupSeededTorrents(ctx, results)
 
 	Success(w, results)
+}
+
+// filterSeedingTorrents 从 maindataCache 全量种子中过滤出做种/已完成的。
+// qBittorrent 做种状态以 "UP" 结尾；Transmission 用 "uploading"（status 6）。
+func filterSeedingTorrents(all []*model.TorrentInfo) []*model.TorrentInfo {
+	result := make([]*model.TorrentInfo, 0, len(all))
+	for _, t := range all {
+		if t == nil || t.Removed {
+			continue
+		}
+		if strings.HasSuffix(t.State, "UP") || t.State == "uploading" {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 type analyzeTask struct {

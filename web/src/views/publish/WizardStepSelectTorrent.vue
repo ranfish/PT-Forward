@@ -6,12 +6,20 @@
         style="width: 240px"
         :loading="clientsLoading"
         placeholder="选择下载器"
-        @change="fetchSeededTorrents"
+        @change="onClientChange"
       >
         <a-select-option v-for="c in clients" :key="c.id" :value="c.id">
           {{ c.name }} ({{ c.type }})
         </a-select-option>
       </a-select>
+      <a-select
+        v-model:value="selectedSavePath"
+        style="width: 260px; margin-left: 12px"
+        placeholder="资源路径"
+        allow-clear
+        show-search
+        :options="savePathOptions"
+      />
       <a-input-search
         v-model:value="torrentSearch"
         placeholder="搜索种子名称"
@@ -57,7 +65,6 @@ import { manualForwardApi } from '@/api/publish'
 import { useEnumLabels } from '@/utils/enumLabels'
 import { formatBytes } from '@/utils/format'
 
-// v0.0.256: SeededTorrent 类型（与主文件保持一致）
 export interface SeededTorrent {
   info_hash: string
   name: string
@@ -80,7 +87,6 @@ const emit = defineEmits<{
 
 const { translateQbState } = useEnumLabels()
 
-// 双向绑定 selectedTorrent（v-model:torrent）
 const selectedTorrent = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v),
@@ -92,15 +98,33 @@ const selectedClientId = ref<number | undefined>(undefined)
 const seededTorrents = ref<SeededTorrent[]>([])
 const torrentsLoading = ref(false)
 const torrentSearch = ref('')
+const selectedSavePath = ref<string | undefined>(undefined)
+
+const savePathOptions = computed(() => {
+  const set = new Set<string>()
+  for (const t of seededTorrents.value) {
+    if (t.save_path) {
+      set.add(t.save_path)
+    }
+  }
+  return Array.from(set).sort().map(p => ({ label: p, value: p }))
+})
 
 const filteredTorrents = computed(() => {
-  if (!torrentSearch.value) return seededTorrents.value
-  const q = torrentSearch.value.toLowerCase()
-  return seededTorrents.value.filter(t => t.name.toLowerCase().includes(q))
+  let result = seededTorrents.value
+  if (selectedSavePath.value) {
+    result = result.filter(t => t.save_path === selectedSavePath.value)
+  }
+  if (torrentSearch.value) {
+    const q = torrentSearch.value.toLowerCase()
+    result = result.filter(t => t.name.toLowerCase().includes(q))
+  }
+  return result
 })
 
 const torrentColumns = [
   { title: '种子名称', dataIndex: 'name', key: 'name', ellipsis: true },
+  { title: '路径', dataIndex: 'save_path', key: 'save_path', width: 200, ellipsis: true },
   { title: '来源站', key: 'source_site', width: 80 },
   { title: '大小', key: 'size', width: 90 },
   { title: '状态', key: 'state', width: 90 },
@@ -114,6 +138,11 @@ function qbStateColor(state: string): string {
   return map[state] || 'default'
 }
 
+function onClientChange() {
+  selectedSavePath.value = undefined
+  fetchSeededTorrents()
+}
+
 async function fetchClients() {
   clientsLoading.value = true
   try {
@@ -121,7 +150,6 @@ async function fetchClients() {
     const data = resp.data?.data
     const items = (data?.items || data || []) as { id: number; name: string; type: string }[]
     clients.value = items
-    // preset client 优先，否则第一个
     if (props.presetClientId) {
       selectedClientId.value = props.presetClientId
     } else if (clients.value.length > 0 && !selectedClientId.value) {
@@ -148,7 +176,6 @@ async function fetchSeededTorrents() {
 
 onMounted(fetchClients)
 
-// 外部 presetClientId 变化时重新加载
 watch(() => props.presetClientId, (v) => {
   if (v && v !== selectedClientId.value) {
     selectedClientId.value = v

@@ -244,6 +244,24 @@ func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 	return e
 }
 
+// GetCachedTorrents 返回某个下载器在 maindataCache 中的全部种子（全部状态）。
+// 如果该下载器不在缓存中（未配置/engine 未启动/首次同步未完成），返回 nil。
+func (e *Engine) GetCachedTorrents(clientName string) []*model.TorrentInfo {
+	e.maindataMu.RLock()
+	defer e.maindataMu.RUnlock()
+	entry, ok := e.maindataCache[clientName]
+	if !ok || entry == nil || len(entry.TorrentMap) == 0 {
+		return nil
+	}
+	result := make([]*model.TorrentInfo, 0, len(entry.TorrentMap))
+	for _, t := range entry.TorrentMap {
+		if t != nil {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
 func (e *Engine) SetClientProvider(cp model.DownloaderProvider) {
 	e.clientProviderMu.Lock()
 	defer e.clientProviderMu.Unlock()

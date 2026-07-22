@@ -98,6 +98,10 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		dashHandler.SetSeedingEngine(seedingEngine)
 		sysHandler.SetSeedingEngine(seedingEngine)
 	}
+	manualForwardHandler := NewManualForwardHandler(db, logger)
+	if seedingEngine != nil {
+		manualForwardHandler.SetSeedingCache(seedingEngine)
+	}
 	return &Router{
 		authHandler:          NewAuthHandler(authManager),
 		clientHandler:        NewClientHandler(db, logger, clientMgrIface),
@@ -110,7 +114,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		deleteRuleHandler:    NewDeleteRuleHandler(db, logger, clientMgrIface),
 		reseedHandler:        NewReseedHandler(reseedEngine, logger),
 		publishHandler:         NewPublishHandler(publishPipeline, logger, db),
-		manualForwardHandler:   NewManualForwardHandler(db, logger),
+		manualForwardHandler:   manualForwardHandler,
 		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger),
 		publishLimitHandler:   NewPublishLimitHandler(db, logger),
 		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),
