@@ -22166,7 +22166,10 @@
       "groups": [
         "HHWEB"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}",
+      "tracker_domains": [
+        "tracker.hhanclub.net"
+      ]
     },
     {
       "domain": "www.qingwapt.com",
@@ -27183,7 +27186,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.momentpt.top"
+      ]
     },
     {
       "domain": "hdcity.city",
@@ -29081,7 +29087,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.tokyo-manga.top"
+      ]
     },
     {
       "domain": "www.yemapt.org",
@@ -29779,7 +29788,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.greatposterwall.com"
+      ]
     },
     {
       "domain": "api.m-team.cc",
@@ -30215,7 +30227,11 @@
         "mpad",
         "tnp"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.m-team.cc",
+        "tracker.m-team.io"
+      ]
     },
     {
       "domain": "cc.mypt.cc",
