@@ -1036,6 +1036,9 @@ func (h *PublishTorrentsHandler) handlePreviewTitle(w http.ResponseWriter, r *ht
 	}
 
 	result := titleparser.Reassemble(c, tf)
+	if result == "" {
+		result = c.MainTitle
+	}
 	Success(w, map[string]interface{}{
 		"title":       result,
 		"target_site": req.TargetSite,
