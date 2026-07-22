@@ -103,10 +103,16 @@ func SeedSites(db *gorm.DB) error {
 		var existing model.Site
 		err := db.Where("domain = ?", s.Domain).First(&existing).Error
 		if err == nil {
-			// 站点已存在：仅更新 tracker_domains（内置数据，不覆盖用户改的其他字段）
+			// 站点已存在：更新内置数据（不覆盖用户改的其他字段）
 			if existing.TrackerDomains != trackerDomainsJSON {
 				if err := db.Model(&existing).Update("tracker_domains", trackerDomainsJSON).Error; err != nil {
 					return siteError(ErrSiteSeed, fmt.Sprintf("update tracker_domains %s", s.Domain), err)
+				}
+			}
+			// v0.0.271: 同步 title_format（仅 DB 为空时填充，不覆盖用户自定义）
+			if existing.TitleFormat == "" && s.TitleFormat != "" {
+				if err := db.Model(&existing).Update("title_format", s.TitleFormat).Error; err != nil {
+					return siteError(ErrSiteSeed, fmt.Sprintf("update title_format %s", s.Domain), err)
 				}
 			}
 			continue
