@@ -85,6 +85,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleSetDeclarationFilters(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/preview-title") && r.Method == http.MethodPost:
 		h.handlePreviewTitle(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/preview-title-batch") && r.Method == http.MethodPost:
+		h.handlePreviewTitleBatch(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/group-mappings") && r.Method == http.MethodPost:
 		h.handleCreateGroupMapping(w, r)
 	case strings.Contains(path, "/publish/torrents/group-mappings/") && r.Method == http.MethodPut:
@@ -1043,6 +1045,57 @@ func (h *PublishTorrentsHandler) handlePreviewTitle(w http.ResponseWriter, r *ht
 		"title":       result,
 		"target_site": req.TargetSite,
 	})
+}
+
+func (h *PublishTorrentsHandler) handlePreviewTitleBatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		TargetSites     []string          `json:"target_sites"`
+		TitleComponents map[string]string `json:"title_components"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+
+	c := titleparser.TitleComponents{
+		MainTitle:      req.TitleComponents["main_title"],
+		SeasonEpisode:  req.TitleComponents["season_episode"],
+		Year:           req.TitleComponents["year"],
+		Resolution:     req.TitleComponents["resolution"],
+		Medium:         req.TitleComponents["medium"],
+		VideoCodec:     req.TitleComponents["video_codec"],
+		AudioCodec:     req.TitleComponents["audio_codec"],
+		HDRFormat:      req.TitleComponents["hdr_format"],
+		SourcePlatform: req.TitleComponents["source_platform"],
+		BitDepth:       req.TitleComponents["bit_depth"],
+		ReleaseVersion: req.TitleComponents["release_version"],
+		ReleaseGroup:   req.TitleComponents["release_group"],
+		ChinesePrefix:  req.TitleComponents["chinese_prefix"],
+	}
+
+	results := make(map[string]string, len(req.TargetSites))
+	for _, siteName := range req.TargetSites {
+		var site model.Site
+		if err := h.db.WithContext(r.Context()).Where("name = ?", siteName).First(&site).Error; err != nil {
+			results[siteName] = ""
+			continue
+		}
+		var tf titleparser.TitleFormat
+		if site.TitleFormat != "" {
+			if err := json.Unmarshal([]byte(site.TitleFormat), &tf); err != nil {
+			 tf = titleparser.DefaultTitleFormat()
+			}
+		} else {
+			tf = titleparser.DefaultTitleFormat()
+		}
+		title := titleparser.Reassemble(c, tf)
+		if title == "" {
+			title = c.MainTitle
+		}
+		results[siteName] = title
+	}
+
+	Success(w, map[string]interface{}{"results": results})
 }
 
 func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter, r *http.Request) {

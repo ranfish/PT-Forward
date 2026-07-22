@@ -246,10 +246,28 @@ async function loadTitlePreview(siteName: string) {
 
 function selectAllAvailable() {
   selectedTargets.value = props.siteList.filter(s => !s.blocked).map(s => s.name)
-  // 全选后默认预览第一个
+  if (props.titleComponents && selectedTargets.value.length > 0) {
+    loadAllTitlePreviews()
+  }
   if (selectedTargets.value.length > 0 && !previewTarget.value) {
     loadFieldPreview(selectedTargets.value[0])
   }
+}
+
+async function loadAllTitlePreviews() {
+  if (!props.titleComponents || selectedTargets.value.length === 0) return
+  try {
+    const resp = await publishTorrentsApi.previewTitleBatch({
+      target_sites: selectedTargets.value,
+      title_components: props.titleComponents,
+    })
+    const results = resp.data?.data?.results
+    if (results) {
+      for (const [site, title] of Object.entries(results)) {
+        titlePreviews.value[site] = title || '—'
+      }
+    }
+  } catch { /* ignore */ }
 }
 
 // 外部 infoHash 变化时清空预览（切到新种子）
