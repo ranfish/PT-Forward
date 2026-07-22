@@ -463,7 +463,7 @@ const selectedTorrent = ref<SeededTorrent | null>(null)
 
 async function loadClientsForDisplay() {
   try {
-    const resp = await downloadersApi.list(1, 100)
+    const resp = await downloadersApi.listLight(1, 100)
     const data = resp.data?.data
     clients.value = (data?.items || data || []) as { id: number; name: string; type: string }[]
   } catch { /* ignore */ }

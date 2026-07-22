@@ -284,7 +284,7 @@ async function fetchSites() {
 async function fetchDownloaders() {
   downloadersLoading.value = true
   try {
-    const resp = await downloadersApi.list(1, 200)
+    const resp = await downloadersApi.listLight(1, 200)
     downloaders.value = resp.data?.data?.items || resp.data?.data || []
   } catch {
     downloaders.value = []
