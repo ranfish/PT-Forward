@@ -159,7 +159,9 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					return
 				}
-				md, mdErr := dlClient.GetMainData(r.Context())
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				md, mdErr := dlClient.GetMainData(ctx)
 				if mdErr != nil || md == nil {
 					return
 				}
