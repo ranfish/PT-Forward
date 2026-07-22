@@ -579,6 +579,10 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	if detailFetchError != "" {
 		result["detail_fetch_error"] = detailFetchError
 	}
+	// 详情页 h1 标题比下载器种子名更准确（可能被下载器截断/改名）
+	if detailMeta != nil && detailMeta.Title != "" {
+		result["title"] = detailMeta.Title
+	}
 
 	// §56.21 接线: 合规检查补充读 detail_source flags（避免误放过详情页标记的禁转种子）
 	// 之前的 title 字符串扫描是快速预检，这里用 Engine 输出的精确 flags 做最终判定
@@ -605,7 +609,11 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 
 	// 标题解析 + MediaInfo 纠正 + 标准化
 	mediaInfo, _ := result["media_info"].(string)
-	components := titleparser.ParseTitle(name)
+	effectiveTitle, _ := result["title"].(string)
+	if effectiveTitle == "" {
+		effectiveTitle = name
+	}
+	components := titleparser.ParseTitle(effectiveTitle)
 	if mediaInfo != "" {
 		if err := titleparser.CorrectWithMediaInfo(&components, mediaInfo); err != nil {
 			h.logger.Warn("analyze: MediaInfo correction failed", zap.Error(err))
