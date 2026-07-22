@@ -460,7 +460,7 @@ function onClientChange() {
 async function fetchClients() {
   clientsLoading.value = true
   try {
-    const resp = await downloadersApi.list(1, 100)
+    const resp = await downloadersApi.listLight(1, 100)
     const data = resp.data?.data
     clients.value = (data?.items || data || []) as { id: number; name: string; type: string }[]
     if (clients.value.length > 0 && !selectedClientId.value) {

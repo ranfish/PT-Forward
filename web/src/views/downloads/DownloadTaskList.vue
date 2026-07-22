@@ -600,7 +600,7 @@ async function fetchSpaceStats() {
 
 onMounted(async () => {
   try {
-    const resp = await downloadersApi.list(1, 200)
+    const resp = await downloadersApi.listLight(1, 200)
     allClients.value = (resp.data.data?.items || []).filter((c: any) => c.role && c.role !== 'seeding').map((c: { name: string }) => c.name).sort()
   } catch {
     // ignore

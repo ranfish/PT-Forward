@@ -507,7 +507,7 @@ async function handlePauseRecord(recordId: number) {
 
 async function fetchDownloaders() {
   try {
-    const resp = await downloadersApi.list(1, 100)
+    const resp = await downloadersApi.listLight(1, 100)
     const items = resp.data.data?.items || resp.data.data || []
     downloaderOptions.value = items
       .filter((d: ClientConfig) => d.role === 'seeding')
