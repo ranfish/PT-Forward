@@ -28872,7 +28872,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "hudbt.hust.edu.cn"
+      ]
     },
     {
       "domain": "pt.tu88.men",
