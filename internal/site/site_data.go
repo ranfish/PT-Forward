@@ -46,6 +46,8 @@ type SiteSeedData struct {
 	Groups                []string       `json:"groups,omitempty"`
 	TitleFormat           string         `json:"title_format,omitempty"`
 	Form                  SiteFormConfig `json:"form"`
+	// v0.0.266: tracker 域名列表（数据源 docs/00-站点域名.md，matcher 优先用此精确匹配）
+	TrackerDomains []string `json:"tracker_domains,omitempty"`
 }
 
 type seedData struct {
@@ -90,9 +92,23 @@ func GetSiteSeedData(domain string) (*SiteSeedData, bool) {
 
 func SeedSites(db *gorm.DB) error {
 	for _, s := range seedSites() {
+		// v0.0.266: tracker_domains 序列化为 JSON 字符串（与 reseed.TrackerSiteResolver 格式一致）
+		var trackerDomainsJSON string
+		if len(s.TrackerDomains) > 0 {
+			if b, err := json.Marshal(s.TrackerDomains); err == nil {
+				trackerDomainsJSON = string(b)
+			}
+		}
+
 		var existing model.Site
 		err := db.Where("domain = ?", s.Domain).First(&existing).Error
 		if err == nil {
+			// 站点已存在：仅更新 tracker_domains（内置数据，不覆盖用户改的其他字段）
+			if existing.TrackerDomains != trackerDomainsJSON {
+				if err := db.Model(&existing).Update("tracker_domains", trackerDomainsJSON).Error; err != nil {
+					return siteError(ErrSiteSeed, fmt.Sprintf("update tracker_domains %s", s.Domain), err)
+				}
+			}
 			continue
 		}
 
@@ -117,6 +133,7 @@ func SeedSites(db *gorm.DB) error {
 			IsTarget:           s.IsTarget,
 			CookieCloudDomain:  s.CookieCloudDomain,
 			AlternativeDomains: s.AlternativeDomains,
+			TrackerDomains:     trackerDomainsJSON,
 
 			HashStrategy:        defs.HashStrategy,
 			SizeStrategy:        defs.SizeStrategy,

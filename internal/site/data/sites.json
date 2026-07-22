@@ -342,7 +342,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "longpt.org"
+      ]
     },
     {
       "domain": "pt.hdclone.top",
@@ -577,7 +580,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.hdclone.top"
+      ]
     },
     {
       "domain": "pt.lajidui.top",
@@ -1083,7 +1089,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.lajidui.top"
+      ]
     },
     {
       "domain": "kufei.org",
@@ -1479,7 +1488,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "kufei.org"
+      ]
     },
     {
       "domain": "yhpp.cc",
@@ -2032,7 +2044,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "www.yhpp.cc"
+      ]
     },
     {
       "domain": "13city.org",
@@ -2416,7 +2431,12 @@
       "groups": [
         "13City"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.13city.org",
+        "www.ptlover.cc",
+        "www.gamegamept.com"
+      ]
     },
     {
       "domain": "1ptba.com",
@@ -2826,7 +2846,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "1ptba.com"
+      ]
     },
     {
       "domain": "audiences.me",
@@ -3148,7 +3171,10 @@
         "ADWeb",
         "Audies"
       ],
-      "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "t.audiences.me"
+      ]
     },
     {
       "domain": "cangbao.ge",
@@ -3448,7 +3474,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "cangbao.ge"
+      ]
     },
     {
       "domain": "carpt.net",
@@ -3679,7 +3708,10 @@
       "groups": [
         "CarPT"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.carpt.net"
+      ]
     },
     {
       "domain": "cyanbug.net",
@@ -4002,7 +4034,10 @@
       "groups": [
         "CyanBug"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.cyanbug.net"
+      ]
     },
     {
       "domain": "discfan.net",
@@ -4173,7 +4208,11 @@
       "groups": [
         "DiscFan"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "discfan.net",
+        "tracker.tokyo-manga.top"
+      ]
     },
     {
       "domain": "dubhe.site",
@@ -4400,7 +4439,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "dubhe.site"
+      ]
     },
     {
       "domain": "duckboobee.org",
@@ -4699,7 +4741,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "duckboobee.org"
+      ]
     },
     {
       "domain": "et8.org",
@@ -5018,7 +5063,10 @@
       "groups": [
         "TCCF"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "t.et8.org"
+      ]
     },
     {
       "domain": "www.haidan.cc",
@@ -5207,7 +5255,10 @@
       "groups": [
         "HaiDan"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "announce.haidan.cc"
+      ]
     },
     {
       "domain": "hdarea.club",
@@ -5580,7 +5631,12 @@
         "HDApad",
         "HDArea"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.hdarea.club",
+        "pt.hdupt.com",
+        "pt.upxin.net"
+      ]
     },
     {
       "domain": "hdhome.org",
@@ -6088,7 +6144,10 @@
       "groups": [
         "HDHome"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}",
+      "tracker_domains": [
+        "t.hdhome.org"
+      ]
     },
     {
       "domain": "hdsky.me",
@@ -6478,7 +6537,11 @@
         "HDSWEB",
         "HDSky"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.hdsky.me",
+        "tracker.hdsky.my"
+      ]
     },
     {
       "domain": "hdtime.org",
@@ -6796,7 +6859,10 @@
       "groups": [
         "HDTime"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.hdtime.org"
+      ]
     },
     {
       "domain": "hdvideo.top",
@@ -7165,7 +7231,10 @@
         "HDVWEB",
         "HDVideo"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "hdvideo.top"
+      ]
     },
     {
       "domain": "lemonhd.net",
@@ -7430,7 +7499,11 @@
         "RLWEB",
         "RLeaves"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}",
+      "tracker_domains": [
+        "tracker.lemonhd.net",
+        "tracker01.ilovelemonhd.me"
+      ]
     },
     {
       "domain": "mua.xloli.cc",
@@ -7815,7 +7888,15 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "a.x-anime.cc",
+        "tracker.m-team.cc",
+        "tracker.m-team.io",
+        "tra1.m-team.cc",
+        "tra1.m-team.io",
+        "tra99.manfuz.co"
+      ]
     },
     {
       "domain": "nanyangpt.com",
@@ -7892,7 +7973,10 @@
       "groups": [
         "NYTV"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.nanyangpt.com"
+      ]
     },
     {
       "domain": "njtupt.top",
@@ -8078,7 +8162,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "njtupt.top"
+      ]
     },
     {
       "domain": "p.t-baozi.cc",
@@ -8430,7 +8517,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.t-baozi.cc"
+      ]
     },
     {
       "domain": "pandapt.net",
@@ -8815,7 +8905,10 @@
         "AilMWeb",
         "PANDA"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.pandapt.net"
+      ]
     },
     {
       "domain": "piggo.me",
@@ -9095,7 +9188,10 @@
         "PigoHD",
         "PigoWeb"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.piggo.me"
+      ]
     },
     {
       "domain": "pt.0ff.cc",
@@ -9556,7 +9652,10 @@
       "groups": [
         "FreeFarm"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.0ff.cc"
+      ]
     },
     {
       "domain": "pt.aling.de",
@@ -9772,7 +9871,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.aling.de"
+      ]
     },
     {
       "domain": "pt.btschool.club",
@@ -10018,7 +10120,10 @@
       "groups": [
         "BTSchool"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.btschool.club"
+      ]
     },
     {
       "domain": "pt.cdy.skin",
@@ -10467,7 +10572,11 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "bilibili.download",
+        "tracker.greatposterwall.com"
+      ]
     },
     {
       "domain": "pt.eastgame.org",
@@ -10751,7 +10860,10 @@
       "groups": [
         "TLF"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.eastgame.org"
+      ]
     },
     {
       "domain": "pt.hdupt.com",
@@ -11374,7 +11486,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.luckpt.de"
+      ]
     },
     {
       "domain": "pt.muxuege.org",
@@ -11897,7 +12012,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.muxuege.org"
+      ]
     },
     {
       "domain": "pt.novahd.top",
@@ -12285,7 +12403,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.novahd.top"
+      ]
     },
     {
       "domain": "pt.sjtu.edu.cn",
@@ -12493,7 +12614,10 @@
         "PuTao",
         "putao"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.sjtu.edu.cn"
+      ]
     },
     {
       "domain": "pt.tey.cc",
@@ -12741,7 +12865,11 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.tey.cc",
+        "tracker.tmpt.top"
+      ]
     },
     {
       "domain": "pt.xingyungept.org",
@@ -13121,7 +13249,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.xingyungept.org"
+      ]
     },
     {
       "domain": "ptcafe.club",
@@ -13598,7 +13729,13 @@
         "CafeTV",
         "CafeWEB"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.ptcafe.club",
+        "ipv4.joyhd.net",
+        "ipv6.joyhd.net",
+        "our.kelu.one"
+      ]
     },
     {
       "domain": "ptchdbits.co",
@@ -13918,7 +14055,12 @@
         "CHDTV",
         "CHDWEB"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.ptchdbits.co",
+        "tracker.rainbowisland.co",
+        "chdbits.xyz"
+      ]
     },
     {
       "domain": "ptfans.cc",
@@ -14165,7 +14307,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "ptfans.cc"
+      ]
     },
     {
       "domain": "pthome.net",
@@ -14503,7 +14648,11 @@
         "PTH",
         "PTHome"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "t.pthome.org",
+        "t.pthome.net"
+      ]
     },
     {
       "domain": "sbpt.link",
@@ -14758,7 +14907,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "sbpt.link"
+      ]
     },
     {
       "domain": "sewerpt.com",
@@ -15050,7 +15202,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "sewerpt.com"
+      ]
     },
     {
       "domain": "springsunday.net",
@@ -15387,7 +15542,10 @@
         "CMCTA",
         "CMCTV"
       ],
-      "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"forbidden\": [\"BDMV\", \"BDISO\", \"BDBOX\", \"DVDISO\", \"MKV\", \"MP4\"]}"
+      "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"forbidden\": [\"BDMV\", \"BDISO\", \"BDBOX\", \"DVDISO\", \"MKV\", \"MP4\"]}",
+      "tracker_domains": [
+        "on.springsunday.net"
+      ]
     },
     {
       "domain": "tjupt.org",
@@ -15468,7 +15626,10 @@
       "groups": [
         "TJUPT"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker-public.tjupt.org"
+      ]
     },
     {
       "domain": "u2.dmhy.org",
@@ -15500,7 +15661,10 @@
       "groups": [
         "U2"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "daydream.dmhy.best"
+      ]
     },
     {
       "domain": "ubits.club",
@@ -15864,7 +16028,10 @@
       "groups": [
         "UBWEB"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "t.ubits.club"
+      ]
     },
     {
       "domain": "www.dragonhd.xyz",
@@ -16123,7 +16290,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "www.dragonhd.xyz"
+      ]
     },
     {
       "domain": "www.hitpt.com",
@@ -16466,7 +16636,10 @@
       "groups": [
         "HITPT"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.hitpt.com"
+      ]
     },
     {
       "domain": "www.hxpt.org",
@@ -17044,7 +17217,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.hxpt.org"
+      ]
     },
     {
       "domain": "www.okpt.net",
@@ -17541,7 +17717,10 @@
         "OK",
         "OKWEB"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "www.okpt.net"
+      ]
     },
     {
       "domain": "www.oshen.win",
@@ -17768,7 +17947,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "www.oshen.win"
+      ]
     },
     {
       "domain": "www.tangpt.top",
@@ -18260,7 +18442,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "www.tangpt.top"
+      ]
     },
     {
       "domain": "zmpt.cc",
@@ -18543,7 +18728,10 @@
         "ZmPT",
         "ZmWeb"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "zmpt.cc"
+      ]
     },
     {
       "domain": "zrpt.cc",
@@ -19519,7 +19707,12 @@
       "groups": [
         "HDFans"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "hdfans.org",
+        "zeus.hamsters.space",
+        "hudbt.hust.edu.cn"
+      ]
     },
     {
       "domain": "pt.ying.us.kg",
@@ -19774,7 +19967,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.ying.us.kg"
+      ]
     },
     {
       "domain": "open.cd",
@@ -20035,7 +20231,10 @@
       "groups": [
         "OpenCD"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.open.cd"
+      ]
     },
     {
       "domain": "cspt.top",
@@ -20379,7 +20578,13 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "cspt.top",
+        "tracker.cspt.cc",
+        "tracker.cspt.top",
+        "tracker.cspt.date"
+      ]
     },
     {
       "domain": "www.hdkyl.in",
@@ -20865,7 +21070,12 @@
         "HDKWEB",
         "HDKylin"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.hdkyl.in",
+        "t.hdkylin.work",
+        "www.hdkylin.top"
+      ]
     },
     {
       "domain": "www.agsvpt.com",
@@ -21236,7 +21446,13 @@
         "AGSVTV",
         "AGSVWEB"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"resolution\", \"platform\", \"medium\", \"video_codec\", \"hdr\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"resolution\", \"platform\", \"medium\", \"video_codec\", \"hdr\", \"audio_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "agsvpt.trackers.work",
+        "tracker.agsvpt.cn",
+        "ipv6.agsvpt.cn",
+        "tracker.agsvpt.work"
+      ]
     },
     {
       "domain": "www.hddolby.com",
@@ -21566,7 +21782,11 @@
         "HDDolby",
         "QHstudIo"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "t.hddolby.com",
+        "tracker.azusa.wiki"
+      ]
     },
     {
       "domain": "ptlgs.org",
@@ -21877,7 +22097,11 @@
       "groups": [
         "PTLGS"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "ptl.gs",
+        "www.nicept.net"
+      ]
     },
     {
       "domain": "hhanclub.net",
@@ -22223,7 +22447,12 @@
         "FROGWeb",
         "QingWa"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.qingwapt.com",
+        "tracker.qingwa.pro",
+        "tracker.qingwapt.org"
+      ]
     },
     {
       "domain": "pterclub.net",
@@ -22447,7 +22676,10 @@
       "groups": [
         "PTer"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true, \"_hook\": \"pterclub\"}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true, \"_hook\": \"pterclub\"}",
+      "tracker_domains": [
+        "tracker.pterclub.net"
+      ]
     },
     {
       "domain": "pt.gtkpw.xyz",
@@ -22698,7 +22930,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "t.myaltbox.com"
+      ]
     },
     {
       "domain": "monikadesign.uk",
@@ -22955,7 +23190,13 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "anime-no-index.com",
+        "tracker.monikadesign.uk",
+        "daisuki.monikadesign.uk",
+        "daikirai.monikadesign.uk"
+      ]
     },
     {
       "domain": "dicmusic.com",
@@ -23160,7 +23401,11 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.52dic.vip",
+        "tracker.hhanclub.net"
+      ]
     },
     {
       "domain": "zhuque.in",
@@ -23330,7 +23575,11 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.zhuque.in",
+        "zrpt.cc"
+      ]
     },
     {
       "domain": "rousi.pro",
@@ -23454,7 +23703,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "rousi.pro"
+      ]
     },
     {
       "domain": "totheglory.im",
@@ -23684,7 +23936,10 @@
         "TTG",
         "WiKi"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.totheglory.im"
+      ]
     },
     {
       "domain": "hdroute.org",
@@ -23869,7 +24124,10 @@
       "groups": [
         "HDRoute"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "hdroute.org"
+      ]
     },
     {
       "domain": "star-space.net",
@@ -24197,7 +24455,10 @@
         "YingTV",
         "YingWEB"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "star-space.net"
+      ]
     },
     {
       "domain": "52pt.site",
@@ -24520,7 +24781,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "52pt.site"
+      ]
     },
     {
       "domain": "crabpt.vip",
@@ -25076,7 +25340,10 @@
       "groups": [
         "XHBWeb"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "crabpt.vip"
+      ]
     },
     {
       "domain": "pt.itzmx.com",
@@ -25156,7 +25423,11 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.itzmx.com",
+        "kamept.com"
+      ]
     },
     {
       "domain": "ptsbao.club",
@@ -25485,7 +25756,10 @@
         "FHDMV",
         "sBao"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "ptsbao.club"
+      ]
     },
     {
       "domain": "pt.soulvoice.club",
@@ -25689,7 +25963,10 @@
       "groups": [
         "SoulVoice"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.soulvoice.club"
+      ]
     },
     {
       "domain": "ptzone.xyz",
@@ -25940,7 +26217,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "ptzone.xyz"
+      ]
     },
     {
       "domain": "wintersakura.net",
@@ -26276,7 +26556,10 @@
         "SakuraWEB",
         "WScode"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.wintersakura.net"
+      ]
     },
     {
       "domain": "www.htpt.cc",
@@ -26535,7 +26818,11 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "ptlao.top",
+        "www.52movie.top"
+      ]
     },
     {
       "domain": "www.pttime.org",
@@ -26846,7 +27133,11 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "www.pttime.fun",
+        "www.pttime.org"
+      ]
     },
     {
       "domain": "www.momentpt.top",
@@ -27175,7 +27466,11 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "sync.leniter.org",
+        "pt.cdy.skin"
+      ]
     },
     {
       "domain": "pt.keepfrds.com",
@@ -27207,7 +27502,10 @@
       "groups": [
         "FRDS"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.keepfrds.com"
+      ]
     },
     {
       "domain": "pt.ptskit.org",
@@ -27236,7 +27534,12 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.ptskit.com",
+        "tracker.momentpt.top",
+        "si-qi.xyz"
+      ]
     },
     {
       "domain": "ourbits.club",
@@ -27531,7 +27834,10 @@
         "OurPad",
         "OurTV"
       ],
-      "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "ourbits.club"
+      ]
     },
     {
       "domain": "sunnypt.top",
@@ -27560,7 +27866,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "sunnytk.top"
+      ]
     },
     {
       "domain": "xingwan.cc",
@@ -27805,7 +28114,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "xingwan.cc"
+      ]
     },
     {
       "domain": "xingtan.one",
@@ -28354,7 +28666,12 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "xingtan.one",
+        "1.tracker.xingtan.one",
+        "2.tracker.xingtan.one"
+      ]
     },
     {
       "domain": "zeus.hamsters.space",
@@ -28732,7 +29049,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "t.tu88.men"
+      ]
     },
     {
       "domain": "www.tokyo-manga.top",
@@ -29169,7 +29489,10 @@
       "groups": [
         "YemaPT"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"]}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"video_codec\", \"audio_codec\", \"group\"]}",
+      "tracker_domains": [
+        "tracker.yemapt.org"
+      ]
     },
     {
       "domain": "greatposterwall.com",
@@ -30229,7 +30552,13 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "cc.mypt.cc",
+        "playlet.cc",
+        "www.musopia.vip",
+        "dstudio.me"
+      ]
     },
     {
       "domain": "hdbao.cc",
@@ -30496,7 +30825,11 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "tracker.hdbao.cc",
+        "www.htpt.cc"
+      ]
     },
     {
       "domain": "raingfh.top",
@@ -30839,7 +31172,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "raingfh.top"
+      ]
     },
     {
       "domain": "playlet.cc",
