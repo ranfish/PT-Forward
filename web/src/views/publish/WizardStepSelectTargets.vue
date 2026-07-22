@@ -233,10 +233,15 @@ async function loadTitlePreview(siteName: string) {
       target_site: siteName,
       title_components: props.titleComponents,
     })
-    if (resp.data?.data?.title) {
-      titlePreviews.value[siteName] = resp.data.data.title
+    const title = resp.data?.data?.title
+    if (title) {
+      titlePreviews.value[siteName] = title
+    } else {
+      titlePreviews.value[siteName] = '—'
     }
-  } catch { /* silent */ }
+  } catch (e: unknown) {
+    titlePreviews.value[siteName] = `错误: ${(e as Error).message}`
+  }
 }
 
 function selectAllAvailable() {
