@@ -92,6 +92,9 @@ export const publishTorrentsApi = {
   previewTitle(data: { target_site: string; title_components: Record<string, string> }) {
     return client.post<ApiResponse<{ title: string; target_site: string }>>('/publish/torrents/preview-title', data)
   },
+  previewTitleBatch(data: { target_sites: string[]; title_components: Record<string, string> }) {
+    return client.post<ApiResponse<{ results: Record<string, string> }>>('/publish/torrents/preview-title-batch', data)
+  },
 }
 
 export interface SourceDetectResult {
