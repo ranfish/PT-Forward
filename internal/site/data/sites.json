@@ -10358,7 +10358,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.cdy.skin"
+      ]
     },
     {
       "domain": "bilibili.download",
@@ -11142,7 +11145,10 @@
       "groups": [
         "HDU"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "pt.hdupt.com"
+      ]
     },
     {
       "domain": "pt.luckpt.de",
@@ -19095,7 +19101,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "zrpt.cc"
+      ]
     },
     {
       "domain": "hdfans.org",
@@ -26659,7 +26668,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "www.htpt.cc"
+      ]
     },
     {
       "domain": "www.ptlao.top",
@@ -31223,7 +31235,10 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": false,
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "playlet.cc"
+      ]
     },
     {
       "domain": "www.52movie.top",
@@ -31255,7 +31270,10 @@
       "groups": [
         "52MOVIE"
       ],
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "www.52movie.top"
+      ]
     },
     {
       "domain": "www.musopia.vip",
@@ -31271,7 +31289,10 @@
       "supports_pieces_hash_api": true,
       "verification_status": "verified",
       "special_notes": "",
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "www.musopia.vip"
+      ]
     },
     {
       "domain": "dstudio.me",
@@ -31287,7 +31308,10 @@
       "supports_pieces_hash_api": true,
       "verification_status": "verified",
       "special_notes": "全站官种，只能做源站",
-      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}"
+      "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"season\", \"resolution\", \"medium\", \"audio_codec\", \"video_codec\", \"group\"], \"strip_chinese\": true}",
+      "tracker_domains": [
+        "dstudio.me"
+      ]
     }
   ],
   "exclusions": [
