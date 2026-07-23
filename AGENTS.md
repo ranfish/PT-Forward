@@ -2,62 +2,51 @@
 
 ## 当前任务焦点（新会话必读）
 
-**版本**：v0.0.249（已发布）。
+**版本**：v0.0.283（已发布）。
 
-**当前主线**：§56 转载功能核心提取层已完成。正在做端到端验收 + 多站适配。
+**当前主线**：§56.33 手动转发字段采集链路重构已完成并验证（14/14 副标题获取成功）。§56.34 种子技术特征模型设计已完成（5 个决策 + 18 字段集 + 架构），待实施。
 
-**§56 实施进度**：
+### ✅ 已完成（v0.0.228 → v0.0.283）
 
-### ✅ 已完成（v0.0.228 → v0.0.249）
+- ✅ §56 转载功能核心提取层（v0.0.228~v0.0.249）：Engine/extract 包/8 站 stub/配置移植/titleparser 补全/adapter Engine 接入/auto_feed 正则/繁体中文/tracker 匹配器
+- ✅ **tracker→站点匹配 + 标题重组断裂点 1+2**（v0.0.266~v0.0.276）：109 站 tracker_domains + title_format 同步 + Reassemble 接入发布管线 + 批量标题预览
+- ✅ **￡ 制作组分隔符修复**（v0.0.277）：ExtractGroupName 支持 `￡`（SSD/CMCT 特有格式）
+- ✅ **MediaInfo JSON→纯文本**（v0.0.278）：去 `--Output=JSON`，删结构化字段死代码
+- ✅ **§56.33 手动转发字段采集链路重构**（v0.0.279~v0.0.283）：
+  - C1：接入 SourceSiteDetector.Detect + coverage，小组名（CMCTV）→ release_group_mappings → 源站精确识别
+  - D1：tid 四级链（前端 > coverage > torrent_metadata.TorrentID > FetchAndStoreBySearch L2 反查）
+  - A1：cachedMeta 退化为"本地产物缓存"，命中只跳过 AnalyzeLocalArtifacts
+  - B1：runAnalyze 改用 metadata.Merge(DetailFirst)，替代散乱填充
+  - P1：PTGen 始终跑，失败回退 cachedMeta 历史
+  - bug 修复：size=0 导致 L2 全过滤（v0.0.281）+ store GORM Assign 同变量 bug（v0.0.283）
+  - 端到端验证：14/14 /PT2/SSD 种子副标题全部 src=detail ✅
 
-- ✅ 第一阶段 5a/6a（v0.0.228）：standard_keys 表 + 94 条标准键
-- ✅ 第二阶段 2b.1~2b.6：extract 包核心（goquery/BBCode/简介分段/MediaInfo/图片分类）
-- ✅ 第三阶段 2b.7~2b.8：8 站 stub + Registry + Engine 路由 + manual_forward_handler 接入
-- ✅ 第四~十五阶段 P0 全部完成（2c/4a/4c/5c/5e/6b-6c/7b/7e/9d/7d/8b/4b/7c）
-- ✅ **Engine 接入**（v0.0.232-v0.0.235）：
-  - Fetcher 调 Engine（PublicExtractor + 8 站特殊提取器）
-  - extractFlags 不扫整页 + extractTags 只查 torrent_tag + flags 始终用 Engine 覆盖
-  - 合规检查读 detail_source flags（移到 detailWg.Wait 后）
-- ✅ **PTNexus 配置移植**（v0.0.238-v0.0.239）：
-  - 55 站 source_keys + 9 类标准键变体（273 type + 96 medium + ...）
-  - PublicExtractor.fillBasicInfoFields 配置驱动 + Engine 末尾统一标准化
-- ✅ **titleparser 补全 + source 产地**（v0.0.240-v0.0.241）：
-  - fillDetailFromTitle 从 h1 标题反推字段
-  - PTer 基本信息"地区"提取 + Engine seed.Source 保留到 detail_source_json
-- ✅ **方案 B：adapter 内部用 Engine**（v0.0.242-v0.0.243）：
-  - NexusPHPAdapter.GetTorrentDetail 拆分为 fetchDetailsHTML + extractWithEngine + legacyExtractDetail
-  - fetcher 不再后处理（删除 mergeSeedIntoDetail + deriveSiteCode）
-  - extractSubtitle 支持 td.rowhead/rowfollow（v0.0.243 修复 subtitle 丢失）
-- ✅ **移植 auto_feed_js 正则**（v0.0.244）：
-  - 6 个字段提取函数合并到 titleparser（不新建包）
-  - fillDetailFromTitle 加第二层 fallback
-- ✅ **fillBasicInfoFields span title 模式**（v0.0.245）：
-  - 支持 SSD/Audiences 的 `<span title="字段名">值</span>` DOM
-- ✅ **Docker build cache 修复**（v0.0.246）：
-  - Dockerfile 加 ARG CACHEBUST + docker-publish.yml Docker Hub 加 no-cache: true
-- ✅ **繁体中文标签**（v0.0.247）：
-  - 碟粉等站支持（"基本資訊"/"類別"/"格式"等变体）
-- ✅ **下载器删除 bug 修复**（v0.0.248）：
-  - 软删除 + uniqueIndex 冲突（Unscoped().Delete 清除同名记录）
-- ✅ **tracker→站点匹配器**（v0.0.248-v0.0.249）：
-  - 移植 PTNexus refreshSiteMatcher 到 internal/site/tracker_matcher.go
-  - seeded-torrents API 返回 source_site 字段
-  - 前端种子列表显示"来源站"标签
+### §56.34 种子技术特征模型设计（已完成设计，待实施）
 
-### 49 站批量 DOM 分析结果
-- 24 站纯文本模式 ✅（fillBasicInfoFields 模式 1a 已支持）
-- 2 站 span title 模式 ✅（SSD/Audiences，v0.0.245 修复）
-- 1 站繁体中文 ✅（碟粉，v0.0.247 修复）
-- 1 站 Tailwind CSS ❌（憨憨 HHanClub，待适配）
-- 11 站 tid 不准（跨站 comment，非代码问题；tracker 匹配器已解决 source_site）
-- 2 站 HTTP 错误（二师兄 468/阿玲 502，非代码问题）
+**问题本质**：种子的技术特征（分辨率/编码/HDR/音频/声道等）在三套系统里割裂描述（titleparser/Engine/MediaTagInferer），没有单一事实来源。
+
+**字段集**：18 字段，以青蛙站 v1.05 视频标题命名规范为权威定义 + chinese_prefix。
+
+**五个决策**：
+1. audio 独立三字段（codec + channels + technology），不合并
+2. container 剔除 + VideoFormat 去掉 + 3D 三层（source_type + specification + media_tag）
+3. standard_keys 不扩展（现有 11 category 足够）
+4. MediaInfo 为准（转发有本地文件 = MediaInfo 绝对准确，源标题人工填写可能错漏）
+5. 新建并行（策略 B，旧体系逐步废弃）
+
+**实施路径**（5 步）：
+1. 新建 TechProfile 模型 + MediaInfo 提取器 + 合并器（纯新增）
+2. ParseTitle 增强提取（补声道/Atmos/edition_info/cleanup 系统）
+3. Reassemble/Standardize 改造（从 TechProfile 按 v1.05 重组 + 映射）
+4. 接入点切换（runAnalyze/buildPublishRequest）
+5. 旧体系废弃
 
 ### 端到端验收状态
 
 | 端点 | 状态 |
 |------|------|
 | /seeded-torrents（含 source_site）| ✅ |
-| /analyze（Engine 提取，完整度 92%）| ✅ |
+| /analyze（§56.33 重构：C1 源站识别 + D1 tid 链 + B1 三源 Merge）| ✅ 14/14 副标题 |
 | /merge（三源合并 + 标准化 code）| ✅ |
 | /preview（字段预览 + 完整度检查）| ✅ |
 | /eligible-targets（92 站）| ✅ |
@@ -66,20 +55,20 @@
 **关键事实**：
 - 生产 249 Docker 部署（docker compose），端口 8765
 - Docker mirror `docker.fnnas.com` 可能缓存旧镜像，部署需确认镜像 SHA 已更新
-- tracker 匹配器自动识别来源站（不需 tid 反查）
+- tracker 匹配器自动识别来源站 + §56.33 SourceSiteDetector 小组名识别（CMCTV→SSD）
+- 按 §56.33 决策 4：MediaInfo 为准（本地文件绝对准确），标题为 fallback
 - 按 §56 决策 10：简介不复用源站（完全重建）
-- 按 §56.14 Q1：source_torrent_id 失败时跳过详情页（不阻塞转载）
 - PTer 实际完整度 100%（92% 是因为 bdinfo 不适用 WEB-DL）
 
 **待办**：
+- §56.34 实施：种子技术特征模型（高优先级，设计已完成）
 - 测 /submit 真发布（高优先级）
-- 修复 CI lint/test 失败（中优先级）
 - HHanClub 适配（中优先级，Tailwind CSS）
 - §56 前端组件（tag/预览/截图 toggle 等，各需 vite build）
 - adapter 统一后续（Unit3D 评估 + 删死代码）
 - 11 站 RSS 配置后批量验证
 
-**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§56（按需读特定章节，不要一次读全文，58000+ 行）。
+**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§56.34（64000+ 行，按需读特定章节，不要一次读全文）。
 
 ## 环境信息
 
