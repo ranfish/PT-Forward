@@ -465,7 +465,10 @@ func main() {
 	}
 	bdinfoScanner := publish.NewBDInfoScanner(log)
 	publishPipeline.SetBDInfoScanner(bdinfoScanner)
-	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner, metadataFetcher)
+	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
+	sourceDetector := publish.NewSourceSiteDetector(db, log)
+	sourceDetector.RefreshCache(context.Background())
+	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner, metadataFetcher, coverageSvc, sourceDetector)
 	router.SetConfigEventBus(configEventBus)
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 
@@ -474,9 +477,6 @@ func main() {
 	ccServer.RestoreFromDB(context.Background())
 	router.SetCookieCloudServer(ccServer)
 
-	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
-	sourceDetector := publish.NewSourceSiteDetector(db, log)
-	sourceDetector.RefreshCache(context.Background())
 	router.SetupPublishTorrents(coverageSvc, clientManager, sourceDetector)
 
 	orphanScanner := orphan.NewScanner(clientManager, db, log)

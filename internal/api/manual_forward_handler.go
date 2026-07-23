@@ -21,15 +21,17 @@ import (
 )
 
 type ManualForwardHandler struct {
-	db           *gorm.DB
-	logger       *zap.Logger
-	pipeline     PublishPipeline
-	siteMgr      SiteManager
-	clientMgr    MFClientProvider
-	seedingCache SeedingCacheProvider
-	declFilter   *publish.DeclarationFilter
+	db            *gorm.DB
+	logger        *zap.Logger
+	pipeline      PublishPipeline
+	siteMgr       SiteManager
+	clientMgr     MFClientProvider
+	seedingCache  SeedingCacheProvider
+	declFilter    *publish.DeclarationFilter
 	bdinfoScanner *publish.BDInfoScanner
 	metadataFetcher MetadataFetcherProvider
+	coverage        CoverageServiceProvider
+	sourceDetector  *publish.SourceSiteDetector
 	taskStore    sync.Map
 	taskSeq      atomic.Int64
 	stopCh       chan struct{}
@@ -41,14 +43,22 @@ type SeedingCacheProvider interface {
 	GetCachedTorrents(clientName string) []*model.TorrentInfo
 }
 
+// CoverageServiceProvider §56.33 决策 C1：源站识别用 coverage 历史数据查 tid。
+type CoverageServiceProvider interface {
+	GetCachedCoverage(ctx context.Context, infoHash string) ([]model.SiteCoverageCache, error)
+}
+
 type MetadataFetcherProvider interface {
 	GetMetadata(ctx context.Context, infoHash, siteName string) (*model.TorrentMetadata, bool)
 	FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)
+	FetchAndStoreBySearch(ctx context.Context, infoHash, siteName, torrentName string, size int64) (*model.TorrentMetadata, error)
 }
 
 type PublishPipeline interface {
 	PublishCandidate(ctx context.Context, id uint) (*model.PublishCandidate, error)
 	AnalyzeTorrent(ctx context.Context, name, savePath string) (map[string]interface{}, error)
+	AnalyzePTGen(ctx context.Context, name string) (*model.PTGenResult, error)
+	AnalyzeLocalArtifacts(ctx context.Context, name, savePath string) (map[string]interface{}, error)
 }
 
 type SiteManager interface {
@@ -77,6 +87,8 @@ func (h *ManualForwardHandler) SetSeedingCache(s SeedingCacheProvider) { h.seedi
 func (h *ManualForwardHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
 func (h *ManualForwardHandler) SetBDInfoScanner(s *publish.BDInfoScanner) { h.bdinfoScanner = s }
 func (h *ManualForwardHandler) SetMetadataFetcher(f MetadataFetcherProvider) { h.metadataFetcher = f }
+func (h *ManualForwardHandler) SetCoverageService(c CoverageServiceProvider) { h.coverage = c }
+func (h *ManualForwardHandler) SetSourceDetector(d *publish.SourceSiteDetector) { h.sourceDetector = d }
 
 func (h *ManualForwardHandler) Close() {
 	h.stopOnce.Do(func() { close(h.stopCh) })
@@ -416,6 +428,32 @@ func (h *ManualForwardHandler) handleStartAnalyze(w http.ResponseWriter, r *http
 	Success(w, map[string]interface{}{"task_id": taskID})
 }
 
+// getTorrentSize 从下载器查询种子大小（FetchAndStoreBySearch L2 过滤用，§56.33 决策 A）。
+// 查询失败返回 0（SearchAndVerifyMatch 会跳过 size 过滤）。
+func (h *ManualForwardHandler) getTorrentSize(clientID uint, infoHash string) int64 {
+	if h.clientMgr == nil || infoHash == "" {
+		return 0
+	}
+	dlClient, err := h.clientMgr.Get(strconv.FormatUint(uint64(clientID), 10))
+	if err != nil || dlClient == nil {
+		return 0
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	torrent, err := dlClient.GetTorrentByHash(ctx, infoHash)
+	if err != nil || torrent == nil {
+		return 0
+	}
+	return torrent.TotalSize
+}
+
+func pickNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
+}
+
 func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, infoHash, name, savePath, frontendSourceSite, frontendTorrentID, metadataPriority string) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -430,66 +468,7 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 		"client_id": clientID,
 	}
 
-	var sites []model.Site
-	if err := h.db.Where("enabled = ? AND is_source = ?", true, true).Find(&sites).Error; err != nil {
-		h.logger.Warn("query failed", zap.Error(err))
-	}
-
-	sourceSite := ""
-	for _, s := range sites {
-		result["source_site"] = s.Name
-		result["source_site_id"] = s.ID
-		sourceSite = s.Name
-		break
-	}
-
-	// §56.14 决策 3: 前端传值优先 > 反查 > 跳过详情采集
-	sourceTorrentID := frontendTorrentID
-	if frontendSourceSite != "" {
-		sourceSite = frontendSourceSite
-		result["source_site"] = sourceSite
-	}
-
-	// §56.14: 详情页采集（异步，与 AnalyzeTorrent 并行，节省 30s）
-	var detailFetched bool
-	var detailFetchError string
-	var detailMeta *model.TorrentMetadata
-	var detailWg sync.WaitGroup
-	if sourceTorrentID != "" && sourceSite != "" && h.metadataFetcher != nil && infoHash != "" {
-		detailWg.Add(1)
-		go func() {
-			defer detailWg.Done()
-			fetchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			if fetchMeta, err := h.metadataFetcher.FetchAndStore(fetchCtx, infoHash, sourceSite, sourceTorrentID); err != nil {
-				h.logger.Warn("analyze: detail fetch failed",
-					zap.String("site", sourceSite),
-					zap.String("torrent_id", sourceTorrentID),
-					zap.Error(err))
-				detailFetchError = err.Error()
-			} else if fetchMeta != nil {
-				detailFetched = true
-				detailMeta = fetchMeta
-				h.logger.Info("analyze: detail fetched and stored",
-					zap.String("site", sourceSite),
-					zap.Int("detail_json_len", len(fetchMeta.DetailSourceJSON)))
-			}
-		}()
-	}
-
-	var exclusions []model.PublishExclusion
-	if err := h.db.Find(&exclusions).Error; err != nil {
-		h.logger.Warn("query failed", zap.Error(err))
-	}
-
-	blockedTargets := []string{}
-	for _, exc := range exclusions {
-		if exc.SourceSite == sourceSite {
-			blockedTargets = append(blockedTargets, exc.TargetSite)
-		}
-	}
-	result["blocked_targets"] = blockedTargets
-
+	// ① 禁转预检（标题字符串快速预检）
 	nameLower := strings.ToLower(name)
 	forbidden := false
 	forbidReason := ""
@@ -502,61 +481,147 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	}
 	result["forbidden"] = forbidden
 	result["forbid_reason"] = forbidReason
-
 	result["title"] = name
 
-	// Check torrent_metadata for cached analysis (idempotent regeneration)
-	var cachedMeta model.TorrentMetadata
-	hasCache := false
-	if infoHash != "" {
-		if err := h.db.Where("info_hash = ? AND (media_info != '' OR screenshots != '')", infoHash).First(&cachedMeta).Error; err == nil {
-			hasCache = true
+	// ② 源站识别（§56.33 C1：SourceSiteDetector 小组名→站点 + coverage 取 tid）
+	sourceSite := frontendSourceSite
+	sourceTorrentID := frontendTorrentID
+	if h.sourceDetector != nil && infoHash != "" {
+		var coverageSites []model.SiteCoverageCache
+		if h.coverage != nil {
+			coverageSites, _ = h.coverage.GetCachedCoverage(context.Background(), infoHash)
+		}
+		detected := h.sourceDetector.Detect(context.Background(), name, infoHash, coverageSites)
+		if detected.SourceSite != "" {
+			if sourceSite == "" {
+				sourceSite = detected.SourceSite
+				result["source_site_id"] = detected.SourceSiteID
+			}
+			if sourceTorrentID == "" {
+				sourceTorrentID = detected.TorrentID
+			}
+			result["group_name"] = detected.GroupName
 		}
 	}
-
-	if hasCache {
-		result["description"] = cachedMeta.Description
-		result["media_info"] = cachedMeta.MediaInfo
-		result["poster_url"] = cachedMeta.Poster
-		result["imdb_link"] = cachedMeta.IMDbURL
-		result["douban_link"] = cachedMeta.DoubanURL
-		result["tmdb_link"] = cachedMeta.TMDbURL
-		result["subtitle"] = cachedMeta.Subtitle
-		if cachedMeta.Screenshots != "" {
-			result["screenshots"] = strings.Split(cachedMeta.Screenshots, "\n")
-		} else {
-			result["screenshots"] = []string{}
-		}
-		result["cached"] = true
-	} else if h.pipeline != nil {
-		analyzeCtx, analyzeCancel := context.WithTimeout(context.Background(), 3*time.Minute)
-		defer analyzeCancel()
-		if analyzeResult, analyzeErr := h.pipeline.AnalyzeTorrent(analyzeCtx, name, savePath); analyzeErr == nil && analyzeResult != nil {
-			for _, k := range []string{"description", "media_info", "screenshots", "poster_url", "douban_link", "imdb_link", "tmdb_link", "subtitle"} {
-				if v, ok := analyzeResult[k]; ok {
-					result[k] = v
-				}
+	if sourceSite != "" {
+		result["source_site"] = sourceSite
+	}
+	// fallback：默认第一个 is_source 站（Detect 未命中时）
+	if sourceSite == "" {
+		var sites []model.Site
+		if err := h.db.Where("enabled = ? AND is_source = ?", true, true).Find(&sites).Error; err == nil {
+			for _, s := range sites {
+				sourceSite = s.Name
+				result["source_site"] = sourceSite
+				result["source_site_id"] = s.ID
+				break
 			}
 		}
-	} else {
-		result["description"] = ""
-		result["media_info"] = ""
-		result["screenshots"] = []string{}
-		result["poster_url"] = ""
 	}
 
-	// 声明过滤
-	if h.declFilter != nil {
-		desc, _ := result["description"].(string)
-		if desc != "" {
-			patterns := h.declFilter.GetPatterns(context.Background())
-			fr := h.declFilter.Filter(desc, patterns)
-			result["description"] = fr.CleanedText
-			result["removed_declarations"] = fr.RemovedDecls
+	// ③ exclusions（保留）
+	var exclusions []model.PublishExclusion
+	if err := h.db.Find(&exclusions).Error; err != nil {
+		h.logger.Warn("query failed", zap.Error(err))
+	}
+	blockedTargets := []string{}
+	for _, exc := range exclusions {
+		if exc.SourceSite == sourceSite {
+			blockedTargets = append(blockedTargets, exc.TargetSite)
+		}
+	}
+	result["blocked_targets"] = blockedTargets
+
+	// ④ cachedMeta 查询（§56.33 A1：退化为"本地产物缓存"，命中只跳过本地产物生成）
+	var cachedMeta model.TorrentMetadata
+	hasLocalCache := false
+	if infoHash != "" {
+		if err := h.db.Where("info_hash = ? AND (media_info != '' OR screenshots != '')", infoHash).First(&cachedMeta).Error; err == nil {
+			hasLocalCache = true
 		}
 	}
 
-	// BDInfo 扫描（检测到蓝光原盘时）
+	// ⑤ D1 tid 链：torrent_metadata.TorrentID 历史缓存（FetchAndStore 曾写入）
+	if sourceTorrentID == "" && sourceSite != "" && h.metadataFetcher != nil && infoHash != "" {
+		if meta, ok := h.metadataFetcher.GetMetadata(context.Background(), infoHash, sourceSite); ok && meta != nil && meta.TorrentID != "" {
+			sourceTorrentID = meta.TorrentID
+		}
+	}
+
+	// ⑥ detail 源采集（§56.33 A1：cachedMeta 命中也不跳过；A：无 tid 时 L2 反查兜底）
+	var detailFetched bool
+	var detailFetchError string
+	var detailMeta *model.TorrentMetadata
+	var detailWg sync.WaitGroup
+	if sourceSite != "" && h.metadataFetcher != nil && infoHash != "" {
+		detailWg.Add(1)
+		go func() {
+			defer detailWg.Done()
+			fetchCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
+			var fetchMeta *model.TorrentMetadata
+			var err error
+			if sourceTorrentID != "" {
+				fetchMeta, err = h.metadataFetcher.FetchAndStore(fetchCtx, infoHash, sourceSite, sourceTorrentID)
+			} else {
+				// §56.33 决策 A：无 tid → FetchAndStoreBySearch L2 反查
+				size := h.getTorrentSize(clientID, infoHash)
+				fetchMeta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, infoHash, sourceSite, name, size)
+			}
+			if err != nil {
+				h.logger.Warn("analyze: detail fetch failed",
+					zap.String("site", sourceSite),
+					zap.String("torrent_id", sourceTorrentID),
+					zap.Error(err))
+				detailFetchError = err.Error()
+			} else if fetchMeta != nil {
+				detailFetched = true
+				detailMeta = fetchMeta
+				h.logger.Info("analyze: detail fetched",
+					zap.String("site", sourceSite),
+					zap.Int("detail_json_len", len(fetchMeta.DetailSourceJSON)))
+			}
+		}()
+	}
+
+	// ⑦ PTGen（§56.33 P1：始终跑，数据最新鲜；不耗时）
+	var ptgenResult *model.PTGenResult
+	if h.pipeline != nil {
+		ptgenCtx, ptgenCancel := context.WithTimeout(context.Background(), 60*time.Second)
+		if r, err := h.pipeline.AnalyzePTGen(ptgenCtx, name); err == nil && r != nil {
+			ptgenResult = r
+		}
+		ptgenCancel()
+	}
+	// P1 fallback：PTGen 实时查询空时，用 cachedMeta 历史 PTGen
+	if ptgenResult == nil && hasLocalCache && cachedMeta.PTGenSourceJSON != "" {
+		if src, err := metadata.UnmarshalPTGenSource(cachedMeta.PTGenSourceJSON); err == nil && src != nil {
+			ptgenResult = &src.PTGenResult
+		}
+	}
+
+	// local 源（§56.33 A1：cachedMeta 命中用缓存本地产物，否则跑 AnalyzeLocalArtifacts）
+	var localMediaInfo, localBDInfo string
+	var localScreenshots []string
+	if hasLocalCache {
+		localMediaInfo = cachedMeta.MediaInfo
+		if cachedMeta.Screenshots != "" {
+			localScreenshots = strings.Split(cachedMeta.Screenshots, "\n")
+		}
+	} else if h.pipeline != nil && savePath != "" {
+		localCtx, localCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		if r, err := h.pipeline.AnalyzeLocalArtifacts(localCtx, name, savePath); err == nil && r != nil {
+			if v, ok := r["media_info"].(string); ok {
+				localMediaInfo = v
+			}
+			if v, ok := r["screenshots"].([]string); ok {
+				localScreenshots = v
+			}
+		}
+		localCancel()
+	}
+
+	// ⑧ BDInfo 扫描（结果融入 local 源的 BDInfo 字段）
 	if h.bdinfoScanner != nil && savePath != "" {
 		bdinfoCtx, bdinfoCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		bdinfoReport, bdinfoErr := h.bdinfoScanner.ScanIfBD(bdinfoCtx, savePath, func(percent int, text string) {
@@ -567,11 +632,11 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 			h.logger.Warn("analyze: BDInfo scan failed", zap.Error(bdinfoErr))
 		}
 		if bdinfoReport != "" {
-			result["bdinfo"] = bdinfoReport
+			localBDInfo = bdinfoReport
 		}
 	}
 
-	// §56.14: 等待详情页采集完成（与 AnalyzeTorrent 并行的 goroutine）
+	// ⑨ 等待 detail 采集 + 三源 Merge（§56.33 B1）
 	detailWg.Wait()
 	if detailFetched {
 		result["detail_fetched"] = true
@@ -579,13 +644,64 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	if detailFetchError != "" {
 		result["detail_fetch_error"] = detailFetchError
 	}
-	// 详情页 h1 标题比下载器种子名更准确（可能被下载器截断/改名）
-	if detailMeta != nil && detailMeta.Title != "" {
-		result["title"] = detailMeta.Title
+
+	// 构造三源（detail 从 detailMeta.DetailSourceJSON 反序列化）
+	var detailSrc *metadata.DetailSourceJSON
+	if detailMeta != nil && detailMeta.DetailSourceJSON != "" {
+		if ds, err := metadata.UnmarshalDetailSource(detailMeta.DetailSourceJSON); err == nil {
+			detailSrc = ds
+		}
+	}
+	var ptgenSrc *metadata.PTGenSourceJSON
+	if ptgenResult != nil {
+		ps := metadata.PTGenToSource(*ptgenResult, time.Now())
+		ptgenSrc = &ps
+	}
+	localSrc := metadata.LocalSourceJSON{
+		MediaInfo:   localMediaInfo,
+		BDInfo:      localBDInfo,
+		Screenshots: localScreenshots,
+		GeneratedAt: time.Now(),
 	}
 
-	// §56.21 接线: 合规检查补充读 detail_source flags（避免误放过详情页标记的禁转种子）
-	// 之前的 title 字符串扫描是快速预检，这里用 Engine 输出的精确 flags 做最终判定
+	// Merge（DetailFirst：源站详情页 > PTGen；MediaInfo/截图 Local > Detail）
+	merged := metadata.Merge(detailSrc, ptgenSrc, &localSrc, metadata.MergeModeDetailFirst)
+
+	// 用 merged 填充 result
+	result["title"] = pickNonEmpty(merged.Title, name)
+	result["subtitle"] = merged.Subtitle
+	result["description"] = merged.Intro.Body
+	result["media_info"] = merged.MediaInfo
+	shots := merged.Intro.ScreenshotURLs()
+	if shots == nil {
+		shots = []string{}
+	}
+	result["screenshots"] = shots
+	result["poster_url"] = merged.Intro.Poster
+	result["imdb_link"] = merged.IMDbURL
+	result["douban_link"] = merged.DoubanURL
+	result["tmdb_link"] = merged.TMDbURL
+	result["bdinfo"] = merged.BDInfo
+	result["source_of"] = merged.SourceOf
+	result["cached"] = hasLocalCache
+	if len(merged.PTGen.Genre) > 0 {
+		result["ptgen_genre"] = strings.Join(merged.PTGen.Genre, ",")
+	}
+	if merged.PTGen.Episodes != "" {
+		result["ptgen_episodes"] = merged.PTGen.Episodes
+	}
+
+	// ⑩ 声明过滤（Merge 之后，过滤最终 description）
+	if h.declFilter != nil {
+		if desc, ok := result["description"].(string); ok && desc != "" {
+			patterns := h.declFilter.GetPatterns(context.Background())
+			fr := h.declFilter.Filter(desc, patterns)
+			result["description"] = fr.CleanedText
+			result["removed_declarations"] = fr.RemovedDecls
+		}
+	}
+
+	// ⑪ 合规检查（detailMeta.Flags 最终判定，保留原逻辑）
 	if detailMeta != nil && detailMeta.Flags != "" {
 		var detailFlags []string
 		if err := json.Unmarshal([]byte(detailMeta.Flags), &detailFlags); err == nil {
@@ -607,8 +723,8 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	result["forbidden"] = forbidden
 	result["forbid_reason"] = forbidReason
 
-	// 标题解析 + MediaInfo 纠正 + 标准化
-	mediaInfo, _ := result["media_info"].(string)
+	// ⑫ 标题解析 + MediaInfo 纠正 + 标准化（用 merged.MediaInfo）
+	mediaInfo := merged.MediaInfo
 	effectiveTitle, _ := result["title"].(string)
 	if effectiveTitle == "" {
 		effectiveTitle = name
@@ -621,7 +737,6 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	}
 	// 分类推断
 	sourceCat := ""
-	// 查 torrent_metadata 获取已缓存的源站分类
 	if h.metadataFetcher != nil && infoHash != "" {
 		if meta, ok := h.metadataFetcher.GetMetadata(context.Background(), infoHash, sourceSite); ok && meta != nil {
 			if meta.StandardType != "" {
@@ -629,27 +744,11 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 			} else if meta.SourceCategory != "" {
 				sourceCat = meta.SourceCategory
 			}
-			if meta.Subtitle != "" && result["subtitle"] == nil {
-				result["subtitle"] = meta.Subtitle
-			}
-			if meta.IMDbURL != "" && result["imdb_link"] == nil {
-				result["imdb_link"] = meta.IMDbURL
-			}
-			if meta.DoubanURL != "" && result["douban_link"] == nil {
-				result["douban_link"] = meta.DoubanURL
-			}
 		}
 	}
-	ptgenGenre := ""
-	if g, ok := result["ptgen_genre"].(string); ok {
-		ptgenGenre = g
-	}
-	ptgenEpisodes := ""
-	if e, ok := result["ptgen_episodes"].(string); ok {
-		ptgenEpisodes = e
-	}
+	ptgenGenre, _ := result["ptgen_genre"].(string)
+	ptgenEpisodes, _ := result["ptgen_episodes"].(string)
 	category := titleparser.InferCategory(components, sourceCat, ptgenGenre, ptgenEpisodes)
-	// 标准化
 	stdParams, _ := titleparser.Standardize(components)
 	stdParams.Type = category
 
@@ -658,7 +757,7 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 
 	task.setResult(result)
 
-	if !hasCache {
+	if !hasLocalCache {
 		h.persistAnalysis(infoHash, sourceSite, result)
 	}
 }
