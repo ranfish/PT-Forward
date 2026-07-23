@@ -398,6 +398,7 @@ func (h *ManualForwardHandler) handleStartAnalyze(w http.ResponseWriter, r *http
 		InfoHash         string `json:"info_hash"`
 		Name             string `json:"name"`
 		SavePath         string `json:"save_path"`
+		Size             int64  `json:"size,omitempty"`
 		SourceSite       string `json:"source_site,omitempty"`
 		SourceTorrentID  string `json:"source_torrent_id,omitempty"`
 		MetadataPriority string `json:"metadata_priority,omitempty"`
@@ -423,7 +424,7 @@ func (h *ManualForwardHandler) handleStartAnalyze(w http.ResponseWriter, r *http
 	}
 	h.taskStore.Store(taskID, task)
 
-	go h.runAnalyze(task, req.ClientID, req.InfoHash, req.Name, req.SavePath, req.SourceSite, req.SourceTorrentID, req.MetadataPriority)
+	go h.runAnalyze(task, req.ClientID, req.InfoHash, req.Name, req.SavePath, req.Size, req.SourceSite, req.SourceTorrentID, req.MetadataPriority)
 
 	Success(w, map[string]interface{}{"task_id": taskID})
 }
@@ -454,7 +455,7 @@ func pickNonEmpty(a, b string) string {
 	return b
 }
 
-func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, infoHash, name, savePath, frontendSourceSite, frontendTorrentID, metadataPriority string) {
+func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, infoHash, name, savePath string, frontendSize int64, frontendSourceSite, frontendTorrentID, metadataPriority string) {
 	defer func() {
 		if r := recover(); r != nil {
 			task.setError(fmt.Sprintf("分析异常: %v", r))
@@ -565,7 +566,10 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 				fetchMeta, err = h.metadataFetcher.FetchAndStore(fetchCtx, infoHash, sourceSite, sourceTorrentID)
 			} else {
 				// §56.33 决策 A：无 tid → FetchAndStoreBySearch L2 反查
-				size := h.getTorrentSize(clientID, infoHash)
+				size := frontendSize
+				if size == 0 {
+					size = h.getTorrentSize(clientID, infoHash)
+				}
 				fetchMeta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, infoHash, sourceSite, name, size)
 			}
 			if err != nil {
