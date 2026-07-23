@@ -555,6 +555,7 @@ async function enterAnalyze() {
       info_hash: selectedTorrent.value.info_hash,
       name: selectedTorrent.value.name,
       save_path: selectedTorrent.value.save_path,
+      size: Number((selectedTorrent.value as Record<string, unknown>).size) || 0,
       source_site: (selectedTorrent.value as Record<string, unknown>).source_site as string || '',
       source_torrent_id: String((selectedTorrent.value as Record<string, unknown>).source_torrent_id || (selectedTorrent.value as Record<string, unknown>).source_site_id || ''),
     })
