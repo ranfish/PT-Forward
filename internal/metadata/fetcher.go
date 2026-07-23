@@ -384,9 +384,14 @@ func (f *Fetcher) normalizeCategory(raw string) string {
 }
 
 func (f *Fetcher) store(ctx context.Context, meta *model.TorrentMetadata) error {
+	// §56.33: 分离 attrs 和 dest。
+	// 原 Assign(meta).FirstOrCreate(meta) 对已存在记录失效：FirstOrCreate 读 DB 旧值
+	// 到 dest（meta）时，Assign 的 attrs（同一 meta 指针）也被旧值覆盖，导致用旧值
+	// 更新=无效。修复：attrs 用 meta 的值副本，FirstOrCreate 的 dest 用 meta 本体。
+	attrs := *meta
 	return f.db.WithContext(ctx).
 		Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
-		Assign(meta).
+		Assign(&attrs).
 		FirstOrCreate(meta).Error
 }
 
