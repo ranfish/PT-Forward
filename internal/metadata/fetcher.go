@@ -9,6 +9,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -66,6 +67,61 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, infoHash, siteName, torrent
 		zap.String("fetch_source", meta.FetchSource))
 
 	return meta, nil
+}
+
+// FetchAndStoreBySearch 无 tid 时通过 L2 搜索反查 tid，再调 FetchAndStore。
+// §56.33 决策 A（方案 A）：复用 reseed.SearchAndVerifyMatch（辅种 L2 搜索能力）。
+// 调用时机（D1 tid 链的最后兜底）：前端传值 / coverage / torrent_metadata.TorrentID 都没拿到 tid 时。
+//
+// 参数：
+//   - torrentName: 下载器种子名（用于提取搜索关键词 + 制作组）
+//   - size: 种子大小（字节，用于 L2 搜索过滤，0 表示不按 size 过滤）
+//
+// 返回：反查到 tid 并采集成功 → *TorrentMetadata；反查失败 → nil, error
+func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName, torrentName string, size int64) (*model.TorrentMetadata, error) {
+	if infoHash == "" || siteName == "" || torrentName == "" {
+		return nil, fmt.Errorf("info_hash, site_name, torrent_name are required")
+	}
+	if f.siteProvider == nil {
+		return nil, fmt.Errorf("site provider not configured")
+	}
+
+	config, err := f.siteProvider.GetSiteConfig(ctx, siteName)
+	if err != nil || config == nil {
+		return nil, fmt.Errorf("get site config for %s: %w", siteName, err)
+	}
+	adapter, err := f.siteProvider.GetAdapter(ctx, siteName)
+	if err != nil || adapter == nil {
+		return nil, fmt.Errorf("get adapter for %s: %w", siteName, err)
+	}
+
+	keyword := reseed.ExtractSearchKeyword(torrentName)
+	groupName := reseed.ExtractGroupName(torrentName)
+	if keyword == "" {
+		return nil, fmt.Errorf("cannot extract search keyword from title: %s", torrentName)
+	}
+
+	f.logger.Debug("FetchAndStoreBySearch: L2 search",
+		zap.String("site", siteName),
+		zap.String("info_hash", infoHash),
+		zap.String("keyword", keyword),
+		zap.String("group", groupName),
+		zap.Int64("size", size))
+
+	match, err := reseed.SearchAndVerifyMatch(ctx, adapter, config, keyword, groupName, size)
+	if err != nil {
+		return nil, fmt.Errorf("L2 search failed on %s: %w", siteName, err)
+	}
+	if match == nil {
+		return nil, fmt.Errorf("L2 search no match on %s (keyword=%s group=%s)", siteName, keyword, groupName)
+	}
+
+	f.logger.Debug("FetchAndStoreBySearch: tid resolved",
+		zap.String("site", siteName),
+		zap.String("torrent_id", match.TorrentID),
+		zap.String("matched_title", match.Title))
+
+	return f.FetchAndStore(ctx, infoHash, siteName, match.TorrentID)
 }
 
 func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrentID, fetchSource string) (*model.TorrentMetadata, error) {

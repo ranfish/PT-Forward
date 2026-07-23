@@ -372,19 +372,17 @@ func (p *Pipeline) validateAndLoadCandidate(ctx context.Context, id uint) (*mode
 	return &candidate, nil
 }
 
-func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (map[string]interface{}, error) {
+// AnalyzePTGen 只跑 PTGen 查询（标题→简介/海报/链接/副标题）。
+// §56.33 决策 P1：cachedMeta 命中时仍跑 PTGen（数据更新、cachedMeta 可能过时、不耗时）。
+func (p *Pipeline) AnalyzePTGen(ctx context.Context, name string) (map[string]interface{}, error) {
 	result := map[string]interface{}{
 		"description": "",
 		"poster_url":  "",
-		"media_info":  "",
-		"screenshots": []string{},
 		"douban_link": "",
 		"imdb_link":   "",
 		"tmdb_link":   "",
 		"subtitle":    "",
 	}
-
-	// PTGen 查询（标题→简介/海报/链接）
 	if p.ptgen != nil {
 		if ptgenResult, err := p.ptgen.Query(ctx, name); err == nil && ptgenResult != nil {
 			if ptgenResult.RawBBCode != "" {
@@ -413,8 +411,16 @@ func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (m
 			}
 		}
 	}
+	return result, nil
+}
 
-	// 本地产物（截图 + MediaInfo）
+// AnalyzeLocalArtifacts 只跑本地产物生成（截图 + MediaInfo）。
+// §56.33 决策 A1：cachedMeta 命中时跳过此方法（用缓存本地产物），节省最耗时部分。
+func (p *Pipeline) AnalyzeLocalArtifacts(ctx context.Context, name, savePath string) (map[string]interface{}, error) {
+	result := map[string]interface{}{
+		"media_info":  "",
+		"screenshots": []string{},
+	}
 	// §21.4: save_path 是根保存目录，实际种子内容在 save_path/<name> 下
 	// 单文件种子 fallback：save_path 直接就是文件
 	if p.artifactGenerator != nil && savePath != "" {
@@ -440,7 +446,32 @@ func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (m
 			p.logger.Warn("analyze: artifact generation failed", zap.Error(err))
 		}
 	}
+	return result, nil
+}
 
+// AnalyzeTorrent PTGen + 本地产物一体化分析（向后兼容 wrapper）。
+// 新代码应分别调用 AnalyzePTGen / AnalyzeLocalArtifacts 以获得细粒度控制（§56.33）。
+func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (map[string]interface{}, error) {
+	result := map[string]interface{}{
+		"description": "",
+		"poster_url":  "",
+		"media_info":  "",
+		"screenshots": []string{},
+		"douban_link": "",
+		"imdb_link":   "",
+		"tmdb_link":   "",
+		"subtitle":    "",
+	}
+	if ptgenResult, err := p.AnalyzePTGen(ctx, name); err == nil {
+		for k, v := range ptgenResult {
+			result[k] = v
+		}
+	}
+	if localResult, err := p.AnalyzeLocalArtifacts(ctx, name, savePath); err == nil {
+		for k, v := range localResult {
+			result[k] = v
+		}
+	}
 	return result, nil
 }
 
