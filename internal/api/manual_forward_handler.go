@@ -576,7 +576,6 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 				h.logger.Warn("analyze: detail fetch failed",
 					zap.String("site", sourceSite),
 					zap.String("torrent_id", sourceTorrentID),
-					zap.Bool("used_l2", sourceTorrentID == ""),
 					zap.Error(err))
 				detailFetchError = err.Error()
 			} else if fetchMeta != nil {
@@ -584,11 +583,7 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 				detailMeta = fetchMeta
 				h.logger.Info("analyze: detail fetched",
 					zap.String("site", sourceSite),
-					zap.String("torrent_id", sourceTorrentID),
-					zap.Bool("used_l2", sourceTorrentID == ""),
-					zap.Int("detail_json_len", len(fetchMeta.DetailSourceJSON)),
-					zap.String("meta_tid", fetchMeta.TorrentID),
-					zap.String("meta_subtitle", fetchMeta.Subtitle))
+					zap.Int("detail_json_len", len(fetchMeta.DetailSourceJSON)))
 			}
 		}()
 	}
@@ -647,15 +642,6 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 
 	// ⑨ 等待 detail 采集 + 三源 Merge（§56.33 B1）
 	detailWg.Wait()
-	// 临时诊断（排查 detail_fetched=true 但 detail_source_json=空 的矛盾）
-	result["__dbg_src_tid"] = sourceTorrentID
-	result["__dbg_detail_nil"] = detailMeta == nil
-	if detailMeta != nil {
-		result["__dbg_dsj_len"] = len(detailMeta.DetailSourceJSON)
-		result["__dbg_meta_tid"] = detailMeta.TorrentID
-		result["__dbg_meta_site"] = detailMeta.SiteName
-		result["__dbg_meta_sub"] = detailMeta.Subtitle
-	}
 	if detailFetched {
 		result["detail_fetched"] = true
 	}
