@@ -160,7 +160,7 @@ func (rt *Router) SetCloudFPBreakerFn(fn func() bool) {
 
 
 // SetupManualForward 注入手动转发向导所需的依赖
-func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner, metadataFetcher *metadata.Fetcher) {
+func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner, metadataFetcher *metadata.Fetcher, coverageSvc *coverage.Service, sourceDetector *publish.SourceSiteDetector) {
 	rt.manualForwardHandler.SetPipeline(pipeline)
 	rt.manualForwardHandler.SetSiteManager(siteProvider)
 	rt.manualForwardHandler.SetClientProvider(clientMgr)
@@ -168,6 +168,12 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.manualForwardHandler.SetBDInfoScanner(bdinfoScanner)
 	if metadataFetcher != nil {
 		rt.manualForwardHandler.SetMetadataFetcher(metadataFetcher)
+	}
+	if coverageSvc != nil {
+		rt.manualForwardHandler.SetCoverageService(coverageSvc)
+	}
+	if sourceDetector != nil {
+		rt.manualForwardHandler.SetSourceDetector(sourceDetector)
 	}
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)

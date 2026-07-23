@@ -374,44 +374,45 @@ func (p *Pipeline) validateAndLoadCandidate(ctx context.Context, id uint) (*mode
 
 // AnalyzePTGen 只跑 PTGen 查询（标题→简介/海报/链接/副标题）。
 // §56.33 决策 P1：cachedMeta 命中时仍跑 PTGen（数据更新、cachedMeta 可能过时、不耗时）。
-func (p *Pipeline) AnalyzePTGen(ctx context.Context, name string) (map[string]interface{}, error) {
-	result := map[string]interface{}{
-		"description": "",
-		"poster_url":  "",
-		"douban_link": "",
-		"imdb_link":   "",
-		"tmdb_link":   "",
-		"subtitle":    "",
+// 返回原始 *PTGenResult：调用方可按需构造 PTGenSourceJSON（Merge 用）或 map（兼容用）。
+// ptgen 不可用或查询失败返回 (nil, err)。
+func (p *Pipeline) AnalyzePTGen(ctx context.Context, name string) (*model.PTGenResult, error) {
+	if p.ptgen == nil {
+		return nil, nil
 	}
-	if p.ptgen != nil {
-		if ptgenResult, err := p.ptgen.Query(ctx, name); err == nil && ptgenResult != nil {
-			if ptgenResult.RawBBCode != "" {
-				result["description"] = ptgenResult.RawBBCode
-			}
-			if ptgenResult.PosterURL != "" {
-				result["poster_url"] = ptgenResult.PosterURL
-			}
-			if ptgenResult.DoubanURL != "" {
-				result["douban_link"] = ptgenResult.DoubanURL
-			}
-			if ptgenResult.IMDBURL != "" {
-				result["imdb_link"] = ptgenResult.IMDBURL
-			}
-			if ptgenResult.TMDbURL != "" {
-				result["tmdb_link"] = ptgenResult.TMDbURL
-			}
-			if ptgenResult.ChineseTitle != "" {
-				result["subtitle"] = ptgenResult.ChineseTitle
-			}
-			if len(ptgenResult.Genre) > 0 {
-				result["ptgen_genre"] = strings.Join(ptgenResult.Genre, ",")
-			}
-			if ptgenResult.Episodes != "" {
-				result["ptgen_episodes"] = ptgenResult.Episodes
-			}
-		}
+	return p.ptgen.Query(ctx, name)
+}
+
+// ptgenToMap 把 PTGenResult 字段填入 map（AnalyzeTorrent wrapper 向后兼容用）。
+// 字段映射保持与 v0.0.278 之前的 AnalyzeTorrent 一致。
+func ptgenToMap(r *model.PTGenResult, result map[string]interface{}) {
+	if r == nil {
+		return
 	}
-	return result, nil
+	if r.RawBBCode != "" {
+		result["description"] = r.RawBBCode
+	}
+	if r.PosterURL != "" {
+		result["poster_url"] = r.PosterURL
+	}
+	if r.DoubanURL != "" {
+		result["douban_link"] = r.DoubanURL
+	}
+	if r.IMDBURL != "" {
+		result["imdb_link"] = r.IMDBURL
+	}
+	if r.TMDbURL != "" {
+		result["tmdb_link"] = r.TMDbURL
+	}
+	if r.ChineseTitle != "" {
+		result["subtitle"] = r.ChineseTitle
+	}
+	if len(r.Genre) > 0 {
+		result["ptgen_genre"] = strings.Join(r.Genre, ",")
+	}
+	if r.Episodes != "" {
+		result["ptgen_episodes"] = r.Episodes
+	}
 }
 
 // AnalyzeLocalArtifacts 只跑本地产物生成（截图 + MediaInfo）。
@@ -462,10 +463,8 @@ func (p *Pipeline) AnalyzeTorrent(ctx context.Context, name, savePath string) (m
 		"tmdb_link":   "",
 		"subtitle":    "",
 	}
-	if ptgenResult, err := p.AnalyzePTGen(ctx, name); err == nil {
-		for k, v := range ptgenResult {
-			result[k] = v
-		}
+	if ptgenResult, err := p.AnalyzePTGen(ctx, name); err == nil && ptgenResult != nil {
+		ptgenToMap(ptgenResult, result)
 	}
 	if localResult, err := p.AnalyzeLocalArtifacts(ctx, name, savePath); err == nil {
 		for k, v := range localResult {
