@@ -39,7 +39,10 @@ func ParseTitle(title string) TitleComponents {
 	// 剥离文件扩展名（部分站点的种子标题用文件名格式）
 	title = stripFileExtension(title)
 
-	// 移除末尾站点标签（[热门] [2X免费] (已审) 等含中文的标签后缀）
+	// 归一化 non-breaking space（源站标题可能含 U+00A0，用 Unicode 级替换避免破坏中文）
+	title = strings.ReplaceAll(title, "\u00a0", " ")
+
+	// 移除末尾站点标签（[热门] [2X免费] [50%] (已审) 等标签后缀）
 	title = reSiteTagSuffix.ReplaceAllString(title, "")
 	title = strings.TrimSpace(title)
 
