@@ -300,6 +300,72 @@ func TestMergeDOMInto_NilSafe(t *testing.T) {
 	MergeDOMInto(nilP, "WEB-DL", "1080p", "x264", "AAC") // 不 panic
 }
 
+func TestSelectBestAudioStream_SingleTrack(t *testing.T) {
+	streams := []miStream{
+		{name: "audio", fields: map[string]string{"format": "AAC"}},
+	}
+	best := selectBestAudioStream(streams)
+	codec, _ := audioFromMI(best.fields["format"], "")
+	assertEquals(t, "codec", "AAC", codec)
+}
+
+func TestSelectBestAudioStream_FirstIsHighest(t *testing.T) {
+	streams := []miStream{
+		{name: "audio", fields: map[string]string{"format": "DTS XLL"}},
+		{name: "audio", fields: map[string]string{"format": "AC-3"}},
+	}
+	best := selectBestAudioStream(streams)
+	codec, _ := audioFromMI(best.fields["format"], "")
+	assertEquals(t, "codec", "DTS-HD MA", codec)
+}
+
+func TestSelectBestAudioStream_SecondIsHighest(t *testing.T) {
+	// 关键场景：Audio #1 是兼容音轨(DD)，Audio #2 是最高规格(TrueHD)
+	streams := []miStream{
+		{name: "audio", fields: map[string]string{"format": "AC-3"}},
+		{name: "audio", fields: map[string]string{"format": "MLP FBA 16-ch"}},
+	}
+	best := selectBestAudioStream(streams)
+	codec, _ := audioFromMI(best.fields["format"], "")
+	assertEquals(t, "codec", "TrueHD", codec)
+}
+
+func TestSelectBestAudioStream_AtmosRank(t *testing.T) {
+	// DDP Atmos (75) > DDP (70)，但 < TrueHD (100)
+	streams := []miStream{
+		{name: "audio", fields: map[string]string{"format": "E-AC-3 JOC", "commercial name": "Dolby Digital Plus with Dolby Atmos"}},
+		{name: "audio", fields: map[string]string{"format": "E-AC-3"}},
+	}
+	best := selectBestAudioStream(streams)
+	codec, tech := audioFromMI(best.fields["format"], best.fields["commercial name"])
+	assertEquals(t, "codec", "DDP", codec)
+	assertEquals(t, "tech", "Atmos", tech)
+}
+
+func TestExtractMediaInfo_MultiAudioSelectHighest(t *testing.T) {
+	// Audio #1 = AC-3 (DD), Audio #2 = MLP FBA 16-ch (TrueHD)
+	// 应选 TrueHD（最高规格）
+	mi := `Video
+Format                                   : HEVC
+Width                                    : 3840 pixels
+
+Audio #1
+Format                                   : AC-3
+Commercial name                          : Dolby Digital
+Channel(s)                               : 6 channels
+Channel layout                           : L R C LFE Ls Rs
+
+Audio #2
+Format                                   : MLP FBA 16-ch
+Commercial name                          : Dolby TrueHD
+Channel(s)                               : 8 channels
+Channel layout                           : L R C LFE Ls Rs Lb Rb
+`
+	r := ExtractMediaInfo(mi)
+	assertEquals(t, "AudioCodec", "TrueHD", r.AudioCodec)
+	assertEquals(t, "AudioChannels", "7.1", r.AudioChannels)
+}
+
 func assertEquals(t *testing.T, field, want string, got string) {
 	t.Helper()
 	if got != want {
