@@ -20,6 +20,9 @@ var (
 	reBitDepth      = regexp.MustCompile(`(?i)\b(8|10|12|16|24)\s*BIT\b`)
 	reFrameRate     = regexp.MustCompile(`(?i)\b(\d{2,3}(?:\.\d+)?)\s*FPS\b`)
 	reVideoCodecToken = regexp.MustCompile(`(?i)\b(AV1|VP[89]|AVS2|X265|H\.?265|HEVC|X264|H\.?264|AVC|VC-?1|MPEG-?2)\b`)
+	reAudioCodecToken = regexp.MustCompile(`(?i)\b(TrueHD|True[-.\s]*HD|DTS[-.\s]*HD[-.\s]*(?:MA|HR)|DTS:X|DTS|E[-]?AC[-]?3|DDP|DD\+|AC[-]?3|DD|FLAC|ALAC|AAC|APE|WAV|OPUS|MP3|LPCM|PCM)\b`)
+	reAudioTracksCleanup = regexp.MustCompile(`(?i)\b\d+\s*Audios?\b`)
+	reSiteTagSuffix = regexp.MustCompile(`(?:\s*(?:\[[^\]]*[\p{Han}][^\]]*\]|\([^)]*[\p{Han}][^)]*\)))+\s*$`)
 )
 
 const sourcePlatformAlternatives = `MA|Apple\s?TV\+|ViuTV|MyTVSuper|MyTVS|DNSP|iT|NowE|MyVideo|TWN|LiTV|TVBAnywhere|DMM|iPad|TX|iQIYI|MUBI|TVB|YOUKU|NowPlay|AMZN|Amazon|Netflix|NF|DSNP|MAX|HMAX|HULU|ATVP|iTunes|friDay|USA|EUR|JPN|CEE|FRA|LINETV|PCOK|Hami|GBR|NowPlayer|CR|Crunchyroll|SEEZN|GER|CAN|CHN|Viu|WeTV|meWATCH|CATCHPLAY|AMC\+|TVING|Baha|KKTV|IQ|HKG|ITA|ESP|Disney\+|Disney`
@@ -35,6 +38,10 @@ func ParseTitle(title string) TitleComponents {
 
 	// 剥离文件扩展名（部分站点的种子标题用文件名格式）
 	title = stripFileExtension(title)
+
+	// 移除末尾站点标签（[热门] [2X免费] (已审) 等含中文的标签后缀）
+	title = reSiteTagSuffix.ReplaceAllString(title, "")
+	title = strings.TrimSpace(title)
 
 	// 剥离 [中文名] 前缀
 	c.ChinesePrefix, title = extractChinesePrefix(title)
@@ -63,7 +70,7 @@ func ParseTitle(title string) TitleComponents {
 	title = removeVideoCodecTokens(title)
 	// 音频编码
 	c.AudioCodec = extractAudio(title)
-	title = removeToken(title, c.AudioCodec)
+	title = removeAudioCodecTokens(title)
 	// 色深
 	c.BitDepth = extractBitDepth(title)
 	title = removeToken(title, c.BitDepth)
@@ -73,6 +80,9 @@ func ParseTitle(title string) TitleComponents {
 	// 片源平台
 	c.SourcePlatform = extractSourcePlatform(title)
 	title = removeToken(title, c.SourcePlatform)
+	// 移除音轨数 token（2Audios/3Audios 等）
+	title = reAudioTracksCleanup.ReplaceAllString(title, " ")
+	title = strings.TrimSpace(title)
 	// 制作组
 	c.ReleaseGroup = extractGroup(title)
 	title = removeGroupSuffix(title, c.ReleaseGroup)
@@ -426,10 +436,18 @@ func removeToken(title, token string) string {
 
 // removeVideoCodecTokens 移除标题中所有视频编码变体 token。
 //
-// extractVideoCodec 返回标准化名称（如 HEVC），但标题原文可能是 H265/H.265，
+// extractVideoCodec 返回标准化名称（如 HEVC），但标题原文可能是 H265，
 // removeToken 用标准名匹配原文会失败。本函数用正则一次性移除所有编码变体。
 func removeVideoCodecTokens(title string) string {
 	return strings.TrimSpace(reVideoCodecToken.ReplaceAllString(title, " "))
+}
+
+// removeAudioCodecTokens 移除标题中所有音频编码变体 token。
+//
+// 同 removeVideoCodecTokens 原理：extractAudio 返回标准化名称（如 DD），
+// 但标题原文可能是 AC3，removeToken 匹配失败。
+func removeAudioCodecTokens(title string) string {
+	return strings.TrimSpace(reAudioCodecToken.ReplaceAllString(title, " "))
 }
 
 func removeMediumTokens(title, medium string) string {
