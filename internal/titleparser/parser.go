@@ -33,6 +33,9 @@ func ParseTitle(title string) TitleComponents {
 		return c
 	}
 
+	// 剥离文件扩展名（部分站点的种子标题用文件名格式）
+	title = stripFileExtension(title)
+
 	// 剥离 [中文名] 前缀
 	c.ChinesePrefix, title = extractChinesePrefix(title)
 
