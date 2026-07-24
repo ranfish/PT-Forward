@@ -1,0 +1,161 @@
+package titleparser
+
+import "testing"
+
+func TestExtractEditionInfo(t *testing.T) {
+	tests := []struct {
+		title string
+		want  string
+	}{
+		{"Movie.2024.IMAX.1080p.BluRay", "IMAX"},
+		{"Movie.Extended.Cut.1999.1080p", "Extended Cut"},
+		{"Movie.Extended.1999.1080p", "Extended"},
+		{"Movie.Director's.Cut.2000", "Director's Cut"},
+		{"Movie.2009.10th.Anniversary.Edition", "Anniversary Edition"},
+		{"Movie.2010.Remastered.2160p", "Remastered"},
+		{"Movie.Hybrid.2020", "Hybrid"},
+		{"Movie.4K.Remaster.2015", "4K Remaster"},
+		{"Movie.IMAX.Enhanced.2024", "IMAX Enhanced"},
+		{"Movie.Open.Matte.1993", "Open Matte"},
+		{"Movie.MiniBD.2018", "MiniBD"},
+		{"Movie.2024.1080p.BluRay.x264", ""}, // 无版本信息
+	}
+	for _, tt := range tests {
+		got := extractEditionInfo(tt.title)
+		if got != tt.want {
+			t.Errorf("extractEditionInfo(%q) = %q, want %q", tt.title, got, tt.want)
+		}
+	}
+}
+
+func TestExtractEditionInfo_ConsumeNoDup(t *testing.T) {
+	// "Extended Cut" 被 "Extended Cut" pattern 消费后，"Extended" 不应重复匹配
+	got := extractEditionInfo("Movie.Extended.Cut.1999")
+	if got != "Extended Cut" {
+		t.Errorf("Extended Cut 消费测试：got %q, want %q", got, "Extended Cut")
+	}
+}
+
+func TestSplitMedium(t *testing.T) {
+	tests := []struct {
+		medium   string
+		srcType  string
+		spec     string
+	}{
+		{"WEB-DL", "", "WEB-DL"},
+		{"WEBRip", "", "WEBRip"},
+		{"Blu-ray", "Blu-ray", ""},
+		{"UHD Blu-ray", "UHD Blu-ray", ""},
+		{"UHD Blu-ray Remux", "UHD Blu-ray", "Remux"},
+		{"Blu-ray Remux", "Blu-ray", "Remux"},
+		{"HDTV", "", "HDTV"},
+		{"UHDTV", "", "UHDTV"},
+		{"3D Blu-ray", "3D Blu-ray", ""},
+		{"DVD", "DVD", ""},
+		{"DVDRip", "DVD", "DVDRip"},
+		{"", "", ""},
+	}
+	for _, tt := range tests {
+		st, sp := splitMedium(tt.medium)
+		if st != tt.srcType || sp != tt.spec {
+			t.Errorf("splitMedium(%q) = (%q, %q), want (%q, %q)",
+				tt.medium, st, sp, tt.srcType, tt.spec)
+		}
+	}
+}
+
+func TestExtractAudioChannelsFromTitle(t *testing.T) {
+	tests := []struct {
+		title string
+		want  string
+	}{
+		{"Movie DTS-HD MA 5.1", "5.1"},
+		{"Movie TrueHD 7.1 Atmos", "7.1"},
+		{"Movie AAC 2.0", "2.0"},
+		{"Movie 2024 1080p", ""},
+		{"Movie v2.0 Release", "2.0"}, // 边界：v2.0 中的 2.0 匹配，但 MediaInfo 会覆盖
+	}
+	for _, tt := range tests {
+		got := extractAudioChannelsFromTitle(tt.title)
+		if got != tt.want {
+			t.Errorf("extractAudioChannelsFromTitle(%q) = %q, want %q", tt.title, got, tt.want)
+		}
+	}
+}
+
+func TestExtractAudioTechnologyFromTitle(t *testing.T) {
+	assertEquals(t, "Atmos", "Atmos", extractAudioTechnologyFromTitle("Movie DDP 5.1 Atmos"))
+	assertEquals(t, "noAtmos", "", extractAudioTechnologyFromTitle("Movie DDP 5.1"))
+}
+
+func TestExtractAudioTracksFromTitle(t *testing.T) {
+	tests := []struct {
+		title string
+		want  int
+	}{
+		{"Movie 2Audios DTS", 2},
+		{"Movie 3Audios", 3},
+		{"Movie 2Audio", 2},
+		{"Movie 2024", 0},
+	}
+	for _, tt := range tests {
+		got := extractAudioTracksFromTitle(tt.title)
+		if got != tt.want {
+			t.Errorf("extractAudioTracksFromTitle(%q) = %d, want %d", tt.title, got, tt.want)
+		}
+	}
+}
+
+func TestParseTitleTech(t *testing.T) {
+	p := ParseTitleTech("Movie 2024 IMAX 2160p Blu-ray x265 TrueHD 7.1 Atmos")
+
+	assertEquals(t, "Resolution", "2160p", p.Resolution)
+	assertEquals(t, "EditionInfo", "IMAX", p.EditionInfo)
+	assertEquals(t, "SourceType", "Blu-ray", p.SourceType)
+	assertEquals(t, "VideoCodec", "x265", p.VideoCodec)
+	assertEquals(t, "AudioCodec", "TrueHD", p.AudioCodec)
+	assertEquals(t, "AudioChannels", "7.1", p.AudioChannels)
+	assertEquals(t, "AudioTechnology", "Atmos", p.AudioTechnology)
+}
+
+func TestParseTitleTech_WEBDL(t *testing.T) {
+	p := ParseTitleTech("Test.Show.2024.S01E03.1080p.NF.WEB-DL.DDP5.1.Atmos.H.264-NTb")
+
+	assertEquals(t, "SeasonEpisode", "S01E03", p.SeasonEpisode)
+	assertEquals(t, "Specification", "WEB-DL", p.Specification)
+	assertEquals(t, "AudioChannels", "5.1", p.AudioChannels)
+}
+
+func TestMergeMediaInfoInto(t *testing.T) {
+	p := ParseTitleTech("Movie 2024 1080p WEB-DL x264 AAC")
+	mi := &MediaInfoTech{
+		Resolution:    "2160p",
+		VideoCodec:    "HEVC",
+		AudioCodec:    "DDP",
+		AudioChannels: "5.1",
+		HDR:           "DoVi",
+		BitDepth:      "10bit",
+		AudioTracks:   2,
+		AudioTechnology: "Atmos",
+	}
+	MergeMediaInfoInto(&p, mi)
+
+	assertEquals(t, "Resolution", "2160p", p.Resolution)
+	assertEquals(t, "VideoCodec", "HEVC", p.VideoCodec)
+	assertEquals(t, "AudioCodec", "DDP", p.AudioCodec)
+	assertEquals(t, "AudioChannels", "5.1", p.AudioChannels)
+	assertEquals(t, "HDR", "DoVi", p.HDR)
+	assertEquals(t, "BitDepth", "10bit", p.BitDepth)
+	assertEqualsInt(t, "AudioTracks", 2, p.AudioTracks)
+	assertEquals(t, "AudioTechnology", "Atmos", p.AudioTechnology)
+	assertEquals(t, "MainTitle", "Movie", p.MainTitle)
+}
+
+func TestMergeMediaInfoInto_NilSafe(t *testing.T) {
+	p := ParseTitleTech("Movie 2024 1080p x264")
+	MergeMediaInfoInto(&p, nil) // 不 panic，不修改
+	assertEquals(t, "Resolution", "1080p", p.Resolution)
+
+	var nilP *TechProfile
+	MergeMediaInfoInto(nilP, &MediaInfoTech{Resolution: "2160p"}) // 不 panic
+}
