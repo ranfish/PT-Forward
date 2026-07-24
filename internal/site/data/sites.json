@@ -19989,7 +19989,7 @@
       "auth_type": "",
       "download_mode": "",
       "is_source": true,
-      "is_target": true,
+      "is_target": false,
       "cookiecloud_domain": "",
       "alternative_domains": "",
       "form": {
