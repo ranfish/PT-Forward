@@ -19,6 +19,10 @@ func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
 	if tf.SkipReassemble {
 		return ""
 	}
+	// 音乐类检测：Artist 非空时用音乐范式重组（§56.35 阶段 3）
+	if p.Artist != "" {
+		return reassembleMusic(p, tf)
+	}
 	// 按分类切换 paradigm（§56.35 阶段 3：ZMPT 电影 dot / 电视剧 space）
 	if tf.Category != "" && len(tf.Paradigms) > 0 {
 		if paradigm, ok := tf.Paradigms[tf.Category]; ok {
