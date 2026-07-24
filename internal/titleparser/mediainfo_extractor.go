@@ -62,12 +62,12 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 		}
 	}
 	if len(audioStreams) > 0 {
-		first := audioStreams[0]
+		best := selectBestAudioStream(audioStreams)
 		result.AudioCodec, result.AudioTechnology = audioFromMI(
-			first.fields["format"], first.fields["commercial name"],
+			best.fields["format"], best.fields["commercial name"],
 		)
 		result.AudioChannels = channelsFromMI(
-			first.fields["channel layout"], first.fields["channel(s)"],
+			best.fields["channel layout"], best.fields["channel(s)"],
 		)
 		result.AudioTracks = countAudioTracks(audioStreams)
 	}
@@ -379,4 +379,59 @@ func parseMIInt(val string) int {
 		}
 	}
 	return n
+}
+
+// audioSpecRank 音频编码规格排序（v1.05 :164 "多音轨仅标最高规格"）。
+// 数值越高规格越高。Atmos 额外 +5。
+var audioSpecRank = map[string]int{
+	"TrueHD":    100,
+	"DTS-HD MA": 90,
+	"FLAC":      85,
+	"DTS-HD HR": 80,
+	"DTS-ES":    75,
+	"DDP":       70,
+	"DTS":       60,
+	"DD":        50,
+	"LPCM":      45,
+	"AAC":       40,
+	"AV3A":      35,
+	"Opus":      30,
+	"xHE-AAC":   25,
+	"MP2":       20,
+	"MP3":       15,
+	"ALAC":      10,
+}
+
+// audioSpecRankOf 获取音轨的规格分数（含 Atmos 加分）。
+func audioSpecRankOf(stream miStream) int {
+	codec, tech := audioFromMI(stream.fields["format"], stream.fields["commercial name"])
+	rank := audioSpecRank[codec]
+	if tech == "Atmos" {
+		rank += 5
+	}
+	return rank
+}
+
+// selectBestAudioStream 按最高规格选择音轨（v1.05 :164）。
+//
+// 多音轨种子中，标题只标最高规格音轨。例如：
+//   - Audio #1 = DDP 5.1, Audio #2 = TrueHD Atmos 7.1 → 选 TrueHD Atmos（规格更高）
+//   - Audio #1 = DTS-HD MA, Audio #2 = AC-3 → 选 DTS-HD MA（规格更高）
+func selectBestAudioStream(streams []miStream) miStream {
+	if len(streams) <= 1 {
+		if len(streams) == 1 {
+			return streams[0]
+		}
+		return miStream{}
+	}
+	bestIdx := 0
+	bestRank := audioSpecRankOf(streams[0])
+	for i := 1; i < len(streams); i++ {
+		rank := audioSpecRankOf(streams[i])
+		if rank > bestRank {
+			bestIdx = i
+			bestRank = rank
+		}
+	}
+	return streams[bestIdx]
 }
