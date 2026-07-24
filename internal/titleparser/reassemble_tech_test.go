@@ -374,3 +374,68 @@ func TestReassembleFromTechProfile_RemoveSourcePrefix(t *testing.T) {
 		t.Errorf("source prefix should be removed, got %q", r)
 	}
 }
+
+func TestNormalizeHalfWidth(t *testing.T) {
+	assertEquals(t, "colon", "Movie:Title", normalizeHalfWidth("Movie：Title"))
+	assertEquals(t, "comma", "A,B", normalizeHalfWidth("A，B"))
+	assertEquals(t, "exclaim", "Wow!", normalizeHalfWidth("Wow！"))
+	assertEquals(t, "space", "A B", normalizeHalfWidth("A\u3000B"))
+	assertEquals(t, "already_ascii", "Movie: Title", normalizeHalfWidth("Movie: Title"))
+}
+
+func TestReassembleFromTechProfile_NormalizeHalfWidth(t *testing.T) {
+	p := TechProfile{
+		MainTitle:    "Movie：Title",
+		ReleaseGroup: "GRP",
+	}
+	tf := TitleFormat{
+		Separator:    " ",
+		Order:        []string{"title", "group"},
+		StripChinese: true,
+	}
+	r := ReassembleFromTechProfile(p, tf)
+	if contains(r, "：") {
+		t.Errorf("fullwidth colon should be normalized, got %q", r)
+	}
+	if !contains(r, ":") {
+		t.Errorf("halfwidth colon should be present, got %q", r)
+	}
+}
+
+func TestReassembleFromTechProfile_ParadigmsByCategory(t *testing.T) {
+	p := TechProfile{
+		MainTitle:    "Movie",
+		Year:         "2024",
+		ReleaseGroup: "GRP",
+	}
+	tf := TitleFormat{
+		Order:     []string{"title", "year", "group"},
+		Paradigms: map[string]string{"category.movie": "dot", "category.tv_series": "space"},
+	}
+
+	// 电影 → dot
+	tf.Category = "category.movie"
+	r1 := ReassembleFromTechProfile(p, tf)
+	if !contains(r1, "Movie.") {
+		t.Errorf("movie paradigm dot: got %q", r1)
+	}
+
+	// 电视剧 → space
+	tf.Category = "category.tv_series"
+	r2 := ReassembleFromTechProfile(p, tf)
+	if !contains(r2, "Movie 2024") {
+		t.Errorf("tv paradigm space: got %q", r2)
+	}
+}
+
+func TestReassembleFromTechProfile_SkipReassemble(t *testing.T) {
+	p := TechProfile{MainTitle: "Test", ReleaseGroup: "GRP"}
+	tf := TitleFormat{
+		SkipReassemble: true,
+		Order:          []string{"title"},
+	}
+	r := ReassembleFromTechProfile(p, tf)
+	if r != "" {
+		t.Errorf("SkipReassemble should return empty, got %q", r)
+	}
+}

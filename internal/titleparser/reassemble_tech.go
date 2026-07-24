@@ -16,6 +16,15 @@ import (
 //
 // 不支持 site hook（hook 绑定 TitleComponents，如需 hook 继续用 Reassemble）。
 func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
+	if tf.SkipReassemble {
+		return ""
+	}
+	// 按分类切换 paradigm（§56.35 阶段 3：ZMPT 电影 dot / 电视剧 space）
+	if tf.Category != "" && len(tf.Paradigms) > 0 {
+		if paradigm, ok := tf.Paradigms[tf.Category]; ok {
+			tf.Paradigm = paradigm
+		}
+	}
 	applyParadigm(&tf)
 	if tf.Separator == "" {
 		tf.Separator = " "
@@ -51,6 +60,7 @@ func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
 		result = strings.ReplaceAll(result, forbidden, "")
 	}
 	if tf.StripChinese {
+		result = normalizeHalfWidth(result)
 		result = stripChineseChars(result)
 	}
 	result = cleanSeparators(result, tf.Separator)
@@ -368,4 +378,26 @@ var reSourceTagPrefix = regexp.MustCompile(`^\[[^\]]{1,15}\]\s*`)
 // removeSourcePrefix 移除标题开头的 [站名] 源站标签前缀（§56.35 阶段 2）。
 func removeSourcePrefix(s string) string {
 	return reSourceTagPrefix.ReplaceAllString(s, "")
+}
+
+// normalizeHalfWidth 将全角字符归一化为半角 ASCII（§56.35 阶段 3：片名标点保护）。
+//
+// §56.26 规则 #50：全角标点 → 半角（：→: ，→, ！→! 等）。
+// 在 stripChineseChars 之前执行，确保全角标点被转换为半角（而非删除）。
+//
+//	0xFF01-0xFF5E（全角字母数字标点）→ 减 0xFEE0 → 0x21-0x7E（半角）
+//	0x3000（全角空格）→ 0x20（半角空格）
+func normalizeHalfWidth(s string) string {
+	var result []rune
+	for _, r := range s {
+		switch {
+		case r >= 0xFF01 && r <= 0xFF5E:
+			result = append(result, r-0xFEE0)
+		case r == 0x3000:
+			result = append(result, ' ')
+		default:
+			result = append(result, r)
+		}
+	}
+	return string(result)
 }

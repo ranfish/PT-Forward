@@ -27,6 +27,11 @@ type TitleFormat struct {
 	BracketsForbidden  bool   `json:"brackets_forbidden,omitempty"`  // 禁止 []（PTLGS）
 	ParensForbidden    bool   `json:"parens_forbidden,omitempty"`    // 禁止 ()（PTerClub）
 	RemoveSourcePrefix bool   `json:"remove_source_prefix,omitempty"` // 移除 [站名] 前缀
+
+	// §56.35 阶段 3：按分类切换范式 + 特殊标记
+	Paradigms    map[string]string `json:"paradigms,omitempty"` // 按分类覆盖 paradigm（如 {category.movie: "dot"}）
+	Category     string            `json:"-"`                  // 运行时设置（不从 JSON 解析），用于 Paradigms 查找
+	SkipReassemble bool            `json:"skip_reassemble,omitempty"` // 跳过重组（U2/TTG/HDRoute 等特殊站保留原标题）
 }
 
 // ReplacePattern §56.19 决策 4: 字段值替换规则。
