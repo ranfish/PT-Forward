@@ -417,37 +417,118 @@ func ptgenToMap(r *model.PTGenResult, result map[string]interface{}) {
 
 // AnalyzeLocalArtifacts 只跑本地产物生成（截图 + MediaInfo）。
 // §56.33 决策 A1：cachedMeta 命中时跳过此方法（用缓存本地产物），节省最耗时部分。
+// §56.35 修复：用 name 模糊匹配精确定位种子文件/目录，避免在根目录找到其他种子的文件。
 func (p *Pipeline) AnalyzeLocalArtifacts(ctx context.Context, name, savePath string) (map[string]interface{}, error) {
 	result := map[string]interface{}{
 		"media_info":  "",
 		"screenshots": []string{},
 	}
-	// §21.4: save_path 是根保存目录，实际种子内容在 save_path/<name> 下
-	// 单文件种子 fallback：save_path 直接就是文件
-	if p.artifactGenerator != nil && savePath != "" {
-		torrentDir := savePath
-		if joined := filepath.Join(savePath, name); joined != savePath {
-			if info, statErr := os.Stat(joined); statErr == nil {
-				if info.IsDir() {
-					torrentDir = joined
-				} else {
-					// 单文件种子：<savePath>/<name> 是文件 → 取父目录
-					torrentDir = savePath
-				}
-			}
+	if p.artifactGenerator == nil || savePath == "" {
+		return result, nil
+	}
+
+	// 精确定位种子内容路径
+	// 先精确匹配 savePath/name，失败时用英文关键词模糊匹配
+	// 避免在根目录中 findLargestVideo 找到其他种子的文件
+	torrentDir := savePath
+	if entryPath, isDir := findTorrentEntry(savePath, name); entryPath != "" {
+		// 精确匹配到文件或目录
+		// 文件路径：GenerateWithStrategy 会识别为文件直接分析
+		// 目录路径：findLargestVideo 在种子目录内搜索
+		torrentDir = entryPath
+		_ = isDir
+	}
+
+	if artifact, err := p.artifactGenerator.Generate(ctx, torrentDir, "", nil); err == nil && artifact != nil {
+		if artifact.MediaInfoText != "" {
+			result["media_info"] = artifact.MediaInfoText
 		}
-		if artifact, err := p.artifactGenerator.Generate(ctx, torrentDir, "", nil); err == nil && artifact != nil {
-			if artifact.MediaInfoText != "" {
-				result["media_info"] = artifact.MediaInfoText
-			}
-			if len(artifact.ScreenshotURLs) > 0 {
-				result["screenshots"] = artifact.ScreenshotURLs
-			}
-		} else if err != nil {
-			p.logger.Warn("analyze: artifact generation failed", zap.Error(err))
+		if len(artifact.ScreenshotURLs) > 0 {
+			result["screenshots"] = artifact.ScreenshotURLs
 		}
+	} else if err != nil {
+		p.logger.Warn("analyze: artifact generation failed", zap.Error(err))
 	}
 	return result, nil
+}
+
+// findTorrentEntry 在 dir 中查找 name 对应的种子内容路径。
+// 先精确匹配 filepath.Join(dir, name)，失败时用英文关键词模糊匹配。
+// 返回 (路径, 是否目录)。路径为空表示未找到。
+func findTorrentEntry(dir, name string) (string, bool) {
+	// 1. 精确匹配
+	joined := filepath.Join(dir, name)
+	if info, err := os.Stat(joined); err == nil {
+		return joined, info.IsDir()
+	}
+
+	// 2. 模糊匹配：用 name 的英文关键词（normalize 去掉分隔符差异）
+	keyword := extractMatchKeyword(name)
+	if len(keyword) < 5 {
+		return "", false
+	}
+
+	keywordNorm := normalizeKeyword(keyword)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", false
+	}
+
+	for _, entry := range entries {
+		entryNorm := normalizeKeyword(entry.Name())
+		if strings.Contains(entryNorm, keywordNorm) {
+			fullpath := filepath.Join(dir, entry.Name())
+			if info, err := os.Stat(fullpath); err == nil {
+				return fullpath, info.IsDir()
+			}
+		}
+	}
+
+	return "", false
+}
+
+// extractMatchKeyword 从种子名提取英文关键词用于模糊匹配。
+// 去掉中文前缀和扩展名，取第一个英文+数字+点号连续段（前 15 字符）。
+func extractMatchKeyword(name string) string {
+	if ext := filepath.Ext(name); ext != "" {
+		name = name[:len(name)-len(ext)]
+	}
+	if strings.HasPrefix(name, "[") {
+		if idx := strings.Index(name, "]"); idx > 0 {
+			name = name[idx+1:]
+		}
+	}
+	name = strings.TrimLeft(name, ".- _\u00a0")
+	var b strings.Builder
+	started := false
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			started = true
+		} else if r == '.' && started {
+			b.WriteRune(r)
+		} else if started {
+			break
+		}
+	}
+	result := strings.TrimSuffix(b.String(), ".")
+	if len(result) > 15 {
+		result = result[:15]
+	}
+	return result
+}
+
+// normalizeKeyword 去掉所有非字母数字字符（小写），用于模糊匹配时忽略分隔符差异。
+// "A.Long.Shot.2023" → "alongshot2023"
+// "A Long Shot 2023" → "alongshot2023"
+func normalizeKeyword(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // AnalyzeTorrent PTGen + 本地产物一体化分析（向后兼容 wrapper）。

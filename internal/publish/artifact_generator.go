@@ -57,14 +57,21 @@ func (g *PublishArtifactGenerator) Generate(ctx context.Context, torrentDir stri
 func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, torrentDir string, sourceMediaInfo string, sourceScreenshots []string, strategy string) (*ArtifactResult, error) {
 	result := &ArtifactResult{}
 
-	videoPath, err := g.findLargestVideo(torrentDir)
-	if err != nil {
-		g.logger.Warn("no video file found, using source artifacts",
-			zap.String("dir", torrentDir),
-			zap.Error(err))
-		result.MediaInfoText = sourceMediaInfo
-		result.ScreenshotURLs = sourceScreenshots
-		return result, nil
+	// 如果 torrentDir 是文件路径（非目录），直接分析该文件（精确匹配模式）
+	var videoPath string
+	if info, statErr := os.Stat(torrentDir); statErr == nil && !info.IsDir() {
+		videoPath = torrentDir
+	} else {
+		var err error
+		videoPath, err = g.findLargestVideo(torrentDir)
+		if err != nil {
+			g.logger.Warn("no video file found, using source artifacts",
+				zap.String("dir", torrentDir),
+				zap.Error(err))
+			result.MediaInfoText = sourceMediaInfo
+			result.ScreenshotURLs = sourceScreenshots
+			return result, nil
+		}
 	}
 
 	// MediaInfo analysis 与截图并行（V: 产物并行生成）
