@@ -738,6 +738,8 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 		miTech := titleparser.ExtractMediaInfo(mediaInfo)
 		titleparser.MergeMediaInfoInto(&profile, &miTech)
 	}
+	// DOM 源：媒介/分类 DOM > 标题 + 技术参数 fallback
+	titleparser.MergeDOMInto(&profile, merged.Medium, merged.Resolution, merged.VideoCodec, merged.AudioCodec)
 	components := titleparser.TechProfileToComponents(profile)
 	// 分类推断
 	sourceCat := ""

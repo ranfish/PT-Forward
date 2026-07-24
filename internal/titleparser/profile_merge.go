@@ -43,3 +43,31 @@ func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
 		p.BitDepth = mi.BitDepth
 	}
 }
+
+// MergeDOMInto 将详情页 DOM 字段合并到 TechProfile（§56.34 三源合并的第三源）。
+//
+// 合并优先级（决策 4）：
+//   - 媒介/分类（SourceType/Specification/Medium）：DOM 直接覆盖（DOM > 标题）
+//   - 技术参数（Resolution/VideoCodec/AudioCodec）：仅在 MediaInfo 和标题都没值时填充（DOM 是 fallback）
+func MergeDOMInto(p *TechProfile, medium, resolution, videoCodec, audioCodec string) {
+	if p == nil {
+		return
+	}
+	// 媒介/分类：DOM 完全覆盖（DOM > 标题，先清除旧值再填充）
+	if medium != "" {
+		sourceType, specification := splitMedium(medium)
+		p.SourceType = sourceType
+		p.Specification = specification
+		p.Medium = medium
+	}
+	// 技术参数：仅在为空时填充（DOM 是最低优先级 fallback）
+	if p.Resolution == "" && resolution != "" {
+		p.Resolution = resolution
+	}
+	if p.VideoCodec == "" && videoCodec != "" {
+		p.VideoCodec = videoCodec
+	}
+	if p.AudioCodec == "" && audioCodec != "" {
+		p.AudioCodec = audioCodec
+	}
+}
