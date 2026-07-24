@@ -63,7 +63,7 @@
 - PTer 实际完整度 100%（92% 是因为 bdinfo 不适用 WEB-DL）
 
 **待办**：
-- 音乐类/特殊站（U2/TTG/HDRoute）完整适配（可延后，当前用 SkipReassemble 标记跳过）
+- U2/TTG/HDRoute 特殊站专用重组（可延后，当前用 SkipReassemble 标记跳过）
 - 测 /submit 真发布（高优先级）
 - HHanClub 适配（中优先级，Tailwind CSS）
 - §56 前端组件（tag/预览/截图 toggle 等，各需 vite build）
