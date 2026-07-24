@@ -37,6 +37,14 @@ type TechProfile struct {
 	// === 过渡兼容字段（步骤 2/3 增强后迁移到正式字段）===
 	ReleaseVersion string `json:"release_version,omitempty"` // 发布版本（PROPER/REPACK），步骤 3 合并到 EditionInfo
 	Medium         string `json:"medium,omitempty"`          // 媒介（组合值），步骤 3 拆分到 SourceType + Specification
+
+	// === 音乐字段（§56.35 阶段 3，仅音乐类种子有值，视频类为空）===
+	Artist        string `json:"artist,omitempty"`         // 艺术家名
+	Album         string `json:"album,omitempty"`          // 专辑名
+	ChineseArtist string `json:"chinese_artist,omitempty"` // 中文艺术家名
+	ChineseAlbum  string `json:"chinese_album,omitempty"`  // 中文专辑名
+	SampleRate    string `json:"sample_rate,omitempty"`    // 采样率（如 "96.0"）
+	AudioBitDepth string `json:"audio_bit_depth,omitempty"` // 位深（如 "24"）
 }
 
 // TechProfileFromTitle 从 TitleComponents 构造 TechProfile（仅标题源，无 MediaInfo 纠正）。
