@@ -133,3 +133,37 @@ func TestExtractGroup_FileExtension(t *testing.T) {
 		}
 	}
 }
+
+func TestParseTitle_AC3TokenRemoved(t *testing.T) {
+	c := ParseTitle("Go.Lala.Go.2.2015.BluRay.720p.x264.AC3-CMCT")
+	if strings.Contains(strings.ToUpper(c.MainTitle), "AC3") {
+		t.Errorf("MainTitle = %q, AC3 should be removed", c.MainTitle)
+	}
+	if c.AudioCodec != "DD" {
+		t.Errorf("AudioCodec = %q, want DD", c.AudioCodec)
+	}
+}
+
+func TestParseTitle_AudioTracksTokenRemoved(t *testing.T) {
+	c := ParseTitle("Movie.2026.1080p.NF.WEB-DL.x264.DDP.5.1.Atmos.2Audios-CMCTV")
+	if strings.Contains(strings.ToUpper(c.MainTitle), "2AUDIOS") {
+		t.Errorf("MainTitle = %q, 2Audios should be removed", c.MainTitle)
+	}
+}
+
+func TestParseTitle_SiteTagSuffixRemoved(t *testing.T) {
+	c := ParseTitle("Movie.2024.BluRay.x264-CMCT [热门] [2X免费]")
+	if strings.Contains(c.MainTitle, "[") || strings.Contains(c.MainTitle, "热门") {
+		t.Errorf("MainTitle = %q, site tags should be removed", c.MainTitle)
+	}
+	if c.ReleaseGroup != "CMCT" {
+		t.Errorf("ReleaseGroup = %q, want CMCT", c.ReleaseGroup)
+	}
+}
+
+func TestParseTitle_SiteTagParenRemoved(t *testing.T) {
+	c := ParseTitle("Movie.1975.BluRay.1080p.x264.FLAC-CMCT (已审) [2X免费]")
+	if strings.Contains(c.MainTitle, "已审") || strings.Contains(c.MainTitle, "[") {
+		t.Errorf("MainTitle = %q, site tags should be removed", c.MainTitle)
+	}
+}
