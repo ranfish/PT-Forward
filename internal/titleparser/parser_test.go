@@ -1,6 +1,7 @@
 package titleparser
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -114,5 +115,45 @@ func TestExtractResolution_4K(t *testing.T) {
 	r := extractResolution("Title.4K.WEB-DL")
 	if r != "4k" && r != "4K" {
 		t.Errorf("resolution = %q, want 4k/4K", r)
+	}
+}
+
+func TestParseTitle_H265TokenRemoved(t *testing.T) {
+	c := ParseTitle("[温暖的抱抱].Warm.Hug.2020.2160p.WEB-DL.H265.AAC-UBWEB.mp4")
+	if c.VideoCodec != "HEVC" {
+		t.Errorf("VideoCodec = %q, want HEVC", c.VideoCodec)
+	}
+	if strings.Contains(strings.ToUpper(c.MainTitle), "265") {
+		t.Errorf("MainTitle = %q, H265 should be removed", c.MainTitle)
+	}
+	if c.ReleaseGroup != "UBWEB" {
+		t.Errorf("ReleaseGroup = %q, want UBWEB (without .mp4)", c.ReleaseGroup)
+	}
+}
+
+func TestParseTitle_H264TokenRemoved(t *testing.T) {
+	c := ParseTitle("Test.2024.1080p.NF.WEB-DL.H264.DDP-NTb")
+	if c.VideoCodec != "AVC" {
+		t.Errorf("VideoCodec = %q, want AVC", c.VideoCodec)
+	}
+	if strings.Contains(strings.ToUpper(c.MainTitle), "264") {
+		t.Errorf("MainTitle = %q, H264 should be removed", c.MainTitle)
+	}
+}
+
+func TestExtractGroup_FileExtension(t *testing.T) {
+	tests := []struct {
+		title string
+		want  string
+	}{
+		{"Movie.2020.1080p.AAC-UBWEB.mp4", "UBWEB"},
+		{"Movie.2020.1080p.AAC-FRDS.mkv", "FRDS"},
+		{"Movie.2020.1080p.AAC-CMCT", "CMCT"},
+	}
+	for _, tt := range tests {
+		got := extractGroup(tt.title)
+		if got != tt.want {
+			t.Errorf("extractGroup(%q) = %q, want %q", tt.title, got, tt.want)
+		}
 	}
 }

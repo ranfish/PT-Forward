@@ -19,6 +19,7 @@ var (
 	reChinesePrefix = regexp.MustCompile(`^\s*\[([^\]]+)\]\s*`)
 	reBitDepth      = regexp.MustCompile(`(?i)\b(8|10|12|16|24)\s*BIT\b`)
 	reFrameRate     = regexp.MustCompile(`(?i)\b(\d{2,3}(?:\.\d+)?)\s*FPS\b`)
+	reVideoCodecToken = regexp.MustCompile(`(?i)\b(AV1|VP[89]|AVS2|X265|H\.?265|HEVC|X264|H\.?264|AVC|VC-?1|MPEG-?2)\b`)
 )
 
 const sourcePlatformAlternatives = `MA|Apple\s?TV\+|ViuTV|MyTVSuper|MyTVS|DNSP|iT|NowE|MyVideo|TWN|LiTV|TVBAnywhere|DMM|iPad|TX|iQIYI|MUBI|TVB|YOUKU|NowPlay|AMZN|Amazon|Netflix|NF|DSNP|MAX|HMAX|HULU|ATVP|iTunes|friDay|USA|EUR|JPN|CEE|FRA|LINETV|PCOK|Hami|GBR|NowPlayer|CR|Crunchyroll|SEEZN|GER|CAN|CHN|Viu|WeTV|meWATCH|CATCHPLAY|AMC\+|TVING|Baha|KKTV|IQ|HKG|ITA|ESP|Disney\+|Disney`
@@ -56,7 +57,7 @@ func ParseTitle(title string) TitleComponents {
 	title = removeToken(title, c.HDRFormat)
 	// 视频编码
 	c.VideoCodec = extractVideoCodec(title)
-	title = removeToken(title, c.VideoCodec)
+	title = removeVideoCodecTokens(title)
 	// 视频格式
 	c.VideoFormat = extractVideoFormat(title)
 	// 音频编码
@@ -348,6 +349,7 @@ func extractGroup(title string) string {
 	idx := strings.LastIndex(title, "-")
 	if idx > 0 && idx < len(title)-1 {
 		raw := strings.TrimSpace(title[idx+1:])
+		raw = stripFileExtension(raw)
 		upper := strings.ToUpper(raw)
 		if upper == "NOGROUP" || upper == "N/A" || upper == "NONE" || upper == "UNKNOWN" {
 			// 继续尝试 ￡ 分隔符
@@ -373,6 +375,19 @@ func extractGroup(title string) string {
 	}
 
 	return ""
+}
+
+// stripFileExtension 剥离常见视频/容器文件扩展名。
+// 部分站点（如憨憨）的种子标题用文件名，导致 .mp4/.mkv 后缀混入 release_group。
+func stripFileExtension(s string) string {
+	exts := []string{".mp4", ".mkv", ".avi", ".iso", ".m2ts", ".ts", ".mov", ".flv", ".wmv", ".m4v", ".mpg", ".mpeg", ".vob", ".wtv"}
+	lower := strings.ToLower(s)
+	for _, ext := range exts {
+		if strings.HasSuffix(lower, ext) {
+			return s[:len(s)-len(ext)]
+		}
+	}
+	return s
 }
 
 func extractMainAndUnrecognized(remaining string) (mainTitle, unrecognized string) {
@@ -423,6 +438,14 @@ func removeToken(title, token string) string {
 	}
 	re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(token) + `\b`)
 	return strings.TrimSpace(re.ReplaceAllString(title, " "))
+}
+
+// removeVideoCodecTokens 移除标题中所有视频编码变体 token。
+//
+// extractVideoCodec 返回标准化名称（如 HEVC），但标题原文可能是 H265/H.265，
+// removeToken 用标准名匹配原文会失败。本函数用正则一次性移除所有编码变体。
+func removeVideoCodecTokens(title string) string {
+	return strings.TrimSpace(reVideoCodecToken.ReplaceAllString(title, " "))
 }
 
 func removeMediumTokens(title, medium string) string {
