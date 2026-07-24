@@ -14,7 +14,6 @@ type TitleComponents struct {
 	Medium          string `json:"medium"`            // 媒介 (BluRay/WEB-DL/Remux)
 	HDRFormat       string `json:"hdr_format"`        // HDR格式 (DV/HDR10+)
 	VideoCodec      string `json:"video_codec"`       // 视频编码 (x264/HEVC/AV1)
-	VideoFormat     string `json:"video_format"`      // 视频格式 (MKV/ISO)
 	BitDepth        string `json:"bit_depth"`         // 色深 (8bit/10bit)
 	AudioCodec      string `json:"audio_codec"`       // 音频编码 (DTS-HD MA/TrueHD)
 	ReleaseGroup    string `json:"release_group"`     // 制作组 (CMCT/PTer)

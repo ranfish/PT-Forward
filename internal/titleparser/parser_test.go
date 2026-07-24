@@ -80,30 +80,6 @@ func TestParseTitle_Empty(t *testing.T) {
 	}
 }
 
-func TestNormalizeVideoCodecByMedium_Disc(t *testing.T) {
-	c := &TitleComponents{Medium: "UHD Blu-ray", VideoCodec: "HEVC"}
-	NormalizeVideoCodecByMedium(c, "")
-	if c.VideoCodec != "HEVC" {
-		t.Errorf("disc HEVC = %q, want HEVC", c.VideoCodec)
-	}
-}
-
-func TestNormalizeVideoCodecByMedium_Encode(t *testing.T) {
-	c := &TitleComponents{Medium: "BDRip", VideoCodec: "HEVC"}
-	NormalizeVideoCodecByMedium(c, "")
-	if c.VideoCodec != "x265" {
-		t.Errorf("rip HEVC = %q, want x265", c.VideoCodec)
-	}
-}
-
-func TestNormalizeVideoCodecByMedium_WEBDL(t *testing.T) {
-	c := &TitleComponents{Medium: "WEB-DL", VideoCodec: "AVC"}
-	NormalizeVideoCodecByMedium(c, "")
-	if c.VideoCodec != "H.264" {
-		t.Errorf("webdl AVC = %q, want H.264", c.VideoCodec)
-	}
-}
-
 func TestExtractGroup_NoGroup(t *testing.T) {
 	g := extractGroup("Some.Title.Without.Group")
 	if g != "" {

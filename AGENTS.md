@@ -4,7 +4,7 @@
 
 **版本**：v0.0.284（已发布）。
 
-**当前主线**：§56.33 手动转发字段采集链路重构已完成并验证（14/14 副标题获取成功）。§56.34 种子技术特征模型**步骤 1-4 已完成并部署验证**（TechProfile 体系已接入运行时），步骤 5（旧体系废弃）待做。
+**当前主线**：§56.33 手动转发字段采集链路重构已完成并验证（14/14 副标题获取成功）。§56.34 种子技术特征模型**全部完成**（步骤 1-5，TechProfile 体系已接入运行时 + 旧体系已废弃）。
 
 ### ✅ 已完成（v0.0.228 → v0.0.283）
 
@@ -39,7 +39,7 @@
 2. ✅ ParseTitleTech 增强提取（补声道/Atmos/edition_info/Medium 拆分）
 3. ✅ Reassemble/Standardize 改造（从 TechProfile 按 v1.05 重组 + 映射）
 4. ✅ 接入点切换（runAnalyze/buildPublishRequest/preview 共 6 个使用点）
-5. ⬜ 旧体系废弃（CorrectWithMediaInfo/Standardize/Reassemble/extractTitleComponents 已无调用方，可删除）
+5. ✅ 旧体系废弃（CorrectWithMediaInfo/Standardize/Reassemble/extractTitleComponents/NormalizeVideoCodecByMedium/extractVideoFormat/VideoFormat 字段/site_hooks 已删除）
 
 **新增文件**（6 个，纯新增）：tech_profile.go / mediainfo_extractor.go / profile_merge.go / title_tech_parser.go / reassemble_tech.go / standardize_tech.go
 
@@ -63,8 +63,6 @@
 - PTer 实际完整度 100%（92% 是因为 bdinfo 不适用 WEB-DL）
 
 **待办**：
-- §56.34 步骤 5：旧体系废弃（CorrectWithMediaInfo/Standardize/Reassemble/extractTitleComponents 删除）
-- 打 tag 发版 §56.34 + ParseTitle 修复
 - 测 /submit 真发布（高优先级）
 - HHanClub 适配（中优先级，Tailwind CSS）
 - §56 前端组件（tag/预览/截图 toggle 等，各需 vite build）

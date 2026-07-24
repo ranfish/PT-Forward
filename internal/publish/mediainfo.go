@@ -14,7 +14,7 @@ import (
 //
 // 早期版本（v0.0.278 之前）曾用 --Output=JSON 解析成结构化字段
 // （General/Video/Audio/Text），但下游消费者全部基于纯文本扫描
-// （CorrectWithMediaInfo 找 "Format : xxx" 行、MediaTagInferer 关键字匹配、
+// （ExtractMediaInfo 找 "Format : xxx" 行、MediaTagInferer 关键字匹配、
 // artifact_generator 取 RawOutput 原样下发到目标站 mediainfo 字段），
 // 结构化分支从未被接通，且 JSON 输出会让上述文本扫描全部失效。
 // v0.0.278 移除死代码，回归 mediainfo 默认的纯文本（树状）输出。
@@ -42,7 +42,7 @@ func (a *MediaInfoAnalyzer) Available() bool {
 // Analyze 调用 mediainfo 二进制获取纯文本（树状）格式的 MediaInfo。
 //
 // 不使用 --Output=JSON：mediainfo 默认输出即 PT 站点通用格式，
-// 也是 CorrectWithMediaInfo / MediaTagInferer / 目标站 mediainfo 字段的预期输入。
+// 也是 ExtractMediaInfo / MediaTagInferer / 目标站 mediainfo 字段的预期输入。
 func (a *MediaInfoAnalyzer) Analyze(ctx context.Context, filePath string) (*MediaInfoResult, error) {
 	if !a.Available() {
 		return nil, fmt.Errorf("mediainfo not found")

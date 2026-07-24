@@ -154,26 +154,6 @@ func buildReverse(forward map[string]string) {
 	}
 }
 
-// Standardize 将 TitleComponents 转换为标准键
-func Standardize(c TitleComponents) (StandardParams, error) {
-	ensureMappings()
-	if loadErr != nil {
-		return StandardParams{}, loadErr
-	}
-
-	sp := StandardParams{
-		Resolution: lookupStandard(mappings.Resolution, c.Resolution),
-		VideoCodec: lookupStandard(mappings.VideoCodec, c.VideoCodec),
-		AudioCodec: lookupStandard(mappings.AudioCodec, c.AudioCodec),
-		HDR:        lookupStandard(mappings.HDR, c.HDRFormat),
-	}
-
-	// Medium 可能是组合值（如 "UHD Blu-ray Remux"），逐部分查找
-	sp.Medium = standardizeMedium(c.Medium)
-
-	return sp, nil
-}
-
 func standardizeMedium(medium string) string {
 	if medium == "" {
 		return ""

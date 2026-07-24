@@ -61,8 +61,6 @@ func ParseTitle(title string) TitleComponents {
 	// 视频编码
 	c.VideoCodec = extractVideoCodec(title)
 	title = removeVideoCodecTokens(title)
-	// 视频格式
-	c.VideoFormat = extractVideoFormat(title)
 	// 音频编码
 	c.AudioCodec = extractAudio(title)
 	title = removeToken(title, c.AudioCodec)
@@ -201,23 +199,6 @@ func extractVideoCodec(title string) string {
 	default:
 		return ""
 	}
-}
-
-func extractVideoFormat(title string) string {
-	upper := strings.ToUpper(title)
-	if strings.Contains(upper, ".MKV") || strings.Contains(upper, " MKV") {
-		return "MKV"
-	}
-	if strings.Contains(upper, ".ISO") || strings.Contains(upper, " ISO") {
-		return "ISO"
-	}
-	if strings.Contains(upper, ".M2TS") || strings.Contains(upper, " M2TS") {
-		return "M2TS"
-	}
-	if strings.Contains(upper, ".MP4") || strings.Contains(upper, " MP4") {
-		return "MP4"
-	}
-	return ""
 }
 
 func extractHDRFormat(title string) string {
@@ -473,68 +454,4 @@ func removeGroupSuffix(title, group string) string {
 	// 移除 -group 后缀
 	re := regexp.MustCompile(`(?i)[-.\s]+` + regexp.QuoteMeta(group) + `\s*$`)
 	return strings.TrimSpace(re.ReplaceAllString(title, ""))
-}
-
-// NormalizeVideoCodecByMedium 根据媒介类型纠正视频编码命名
-// 原盘→AVC/HEVC, WEB-DL→H.264/H.265, 压制→x264/x265
-func NormalizeVideoCodecByMedium(c *TitleComponents, mediaInfo string) {
-	if c.Medium == "" || c.VideoCodec == "" {
-		return
-	}
-	sourceType := classifySourceFromMedium(c.Medium)
-	if sourceType == "" {
-		return
-	}
-	family := detectCodecFamily(c.VideoCodec, mediaInfo)
-	if family == "" {
-		return
-	}
-	targetMap := map[string]map[string]string{
-		"disc":  {"h264": "AVC", "h265": "HEVC"},
-		"webdl": {"h264": "H.264", "h265": "H.265"},
-		"rip":   {"h264": "x264", "h265": "x265"},
-	}
-	if target, ok := targetMap[sourceType]; ok {
-		if codec, ok := target[family]; ok {
-			c.VideoCodec = codec
-		}
-	}
-}
-
-func classifySourceFromMedium(medium string) string {
-	if medium == "" {
-		return ""
-	}
-	if regexp.MustCompile(`(?i)\bWEB[-\s]?DL\b`).MatchString(medium) {
-		return "webdl"
-	}
-	if regexp.MustCompile(`(?i)\b(?:UHDTV|HDTV)\b`).MatchString(medium) {
-		return "webdl"
-	}
-	if regexp.MustCompile(`(?i)\b(?:TV|DVD|BD)[-?\s]?RIP\b`).MatchString(medium) {
-		return "rip"
-	}
-	if regexp.MustCompile(`(?i)\b(?:Blu.?ray|BD|UHD|Remux|DVD[59])\b`).MatchString(medium) {
-		return "disc"
-	}
-	if regexp.MustCompile(`(?i)\bWEBRip\b`).MatchString(medium) {
-		return "rip"
-	}
-	return ""
-}
-
-func detectCodecFamily(candidates ...string) string {
-	combined := strings.Join(candidates, " ")
-	if combined == "" {
-		return ""
-	}
-	hasH265 := regexp.MustCompile(`(?i)\b(HEVC|x265|H\s*\.?\s*265)\b`).MatchString(combined)
-	hasH264 := regexp.MustCompile(`(?i)\b(AVC|x264|H\s*\.?\s*264)\b`).MatchString(combined)
-	if hasH265 && !hasH264 {
-		return "h265"
-	}
-	if hasH264 && !hasH265 {
-		return "h264"
-	}
-	return ""
 }
