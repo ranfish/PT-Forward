@@ -167,3 +167,41 @@ func TestParseTitle_SiteTagParenRemoved(t *testing.T) {
 		t.Errorf("MainTitle = %q, site tags should be removed", c.MainTitle)
 	}
 }
+
+func TestParseTitle_HDRTokenRemoved(t *testing.T) {
+	tests := []string{
+		"Movie.2025.2160p.WEB-DL.HDRVivid.H265.10",
+		"Movie.2024.1080p.WEB-DL.HDR10+.H265",
+		"Movie.2024.2160p.WEB-DL.DV.HDR.H265",
+	}
+	for _, title := range tests {
+		c := ParseTitle(title)
+		mtu := strings.ToUpper(c.MainTitle)
+		if strings.Contains(mtu, "HDRVIVID") || strings.Contains(mtu, "HDR10") || strings.Contains(mtu, "VIVID") {
+			t.Errorf("title %q: MainTitle = %q, HDR token should be removed", title, c.MainTitle)
+		}
+	}
+}
+
+func TestParseTitle_1440pResolution(t *testing.T) {
+	c := ParseTitle("Movie.2025.1440p.WEB-DL.H265.DDP5.1-GRP")
+	if !strings.Contains(strings.ToLower(c.Resolution), "1440") {
+		t.Errorf("Resolution = %q, should contain 1440", c.Resolution)
+	}
+}
+
+func TestParseTitle_DDPChannelsMerged(t *testing.T) {
+	tests := []string{
+		"Movie.2025.1080p.WEB-DL.DDP5.1.H265-GRP",
+		"Movie.2025.1080p.WEB-DL.DDPA5.1.H265-GRP",
+		"Movie.2024.1080p.WEB-DL.AAC2.0.H264-GRP",
+	}
+	for _, title := range tests {
+		c := ParseTitle(title)
+		// 编码+声道不应残留在 main_title
+		mtu := strings.ToUpper(c.MainTitle)
+		if strings.Contains(mtu, "DDP5") || strings.Contains(mtu, "DDPA") || strings.Contains(mtu, "AAC2") {
+			t.Errorf("title %q: MainTitle = %q, codec+channels should be removed", title, c.MainTitle)
+		}
+	}
+}

@@ -312,7 +312,9 @@ func classifyMediumForCodec(medium string) string {
 }
 
 // normalizeResolution 分辨率大小写（§56.35：DuckBooBee 要求大写 P）。
+// 默认转为小写（v1.05 规范：p 不写 P）。upper 模式只转 p→P，不影响 i。
 func normalizeResolution(res, caseMode string) string {
+	res = strings.ToLower(res)
 	if caseMode == "upper" && strings.HasSuffix(res, "p") {
 		return res[:len(res)-1] + "P"
 	}

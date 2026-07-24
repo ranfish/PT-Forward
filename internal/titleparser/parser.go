@@ -8,7 +8,7 @@ import (
 var (
 	reSeasonEpisode = regexp.MustCompile(`(?i)\bS\d{1,2}(?:E\d{1,3}(?:[-~]E?\d{1,3})?)?\b`)
 	reYearToken     = regexp.MustCompile(`[\s.(]((?:19|20)\d{2})([\s.)]|$)`)
-	reResolutionTok = regexp.MustCompile(`(?i)\b(4320p|8k|2160p|4k|1080p|1080i|720p|480p)\b`)
+	reResolutionTok = regexp.MustCompile(`(?i)\b(4320p|8k|2160p|4k|1440p|1080p|1080i|720p|480p)\b`)
 	reBDRipToken    = regexp.MustCompile(`(?i)\bBD[-\s]?RIP\b`)
 	reTVRipToken    = regexp.MustCompile(`(?i)\bTV[-\s]?RIP\b`)
 	reDVDRipToken   = regexp.MustCompile(`(?i)\bDVD[-\s]?RIP\b`)
@@ -20,9 +20,10 @@ var (
 	reBitDepth      = regexp.MustCompile(`(?i)\b(8|10|12|16|24)\s*BIT\b`)
 	reFrameRate     = regexp.MustCompile(`(?i)\b(\d{2,3}(?:\.\d+)?)\s*FPS\b`)
 	reVideoCodecToken = regexp.MustCompile(`(?i)\b(AV1|VP[89]|AVS2|X265|H\.?265|HEVC|X264|H\.?264|AVC|VC-?1|MPEG-?2)\b`)
-	reAudioCodecToken = regexp.MustCompile(`(?i)\b(TrueHD|True[-.\s]*HD|DTS[-.\s]*HD[-.\s]*(?:MA|HR)|DTS:X|DTS|E[-]?AC[-]?3|DDP|DD\+|AC[-]?3|DD|FLAC|ALAC|AAC|APE|WAV|OPUS|MP3|LPCM|PCM)\b`)
+	reAudioCodecToken = regexp.MustCompile(`(?i)\b(TrueHD|True[-.\s]*HD|DTS[-.\s]*HD[-.\s]*(?:MA|HR)|DTS:X|DTS|E[-]?AC[-]?3|DDPA|DDP|DD\+|AC[-]?3|DD|FLAC|ALAC|AAC|APE|WAV|OPUS|MP3|LPCM|PCM)\d*(?:\.\d+)?`)
 	reAudioTracksCleanup = regexp.MustCompile(`(?i)\b\d+\s*Audios?\b`)
 	reSiteTagSuffix = regexp.MustCompile(`(?:\s*(?:\[[^\]]*\]|\([^)]*\)))+\s*$`)
+	reHDRToken = regexp.MustCompile(`(?i)\b(Dolby[-\s]?Vision|DoVi|DV|HDR[-\s]?Vivid|HDRVivid|HDR10[-\s]?Plus|HDR10\+|HDR10|PQ10|HLG|HDR|SDR)\b`)
 )
 
 const sourcePlatformAlternatives = `MA|Apple\s?TV\+|ViuTV|MyTVSuper|MyTVS|DNSP|iT|NowE|MyVideo|TWN|LiTV|TVBAnywhere|DMM|iPad|TX|iQIYI|MUBI|TVB|YOUKU|NowPlay|AMZN|Amazon|Netflix|NF|DSNP|MAX|HMAX|HULU|ATVP|iTunes|friDay|USA|EUR|JPN|CEE|FRA|LINETV|PCOK|Hami|GBR|NowPlayer|CR|Crunchyroll|SEEZN|GER|CAN|CHN|Viu|WeTV|meWATCH|CATCHPLAY|AMC\+|TVING|Baha|KKTV|IQ|HKG|ITA|ESP|Disney\+|Disney`
@@ -67,7 +68,7 @@ func ParseTitle(title string) TitleComponents {
 	title = removeMediumTokens(title, c.Medium)
 	// HDR
 	c.HDRFormat = extractHDRFormat(title)
-	title = removeToken(title, c.HDRFormat)
+	title = removeHDRTokens(title)
 	// 视频编码
 	c.VideoCodec = extractVideoCodec(title)
 	title = removeVideoCodecTokens(title)
@@ -449,8 +450,17 @@ func removeVideoCodecTokens(title string) string {
 //
 // 同 removeVideoCodecTokens 原理：extractAudio 返回标准化名称（如 DD），
 // 但标题原文可能是 AC3，removeToken 匹配失败。
+// 正则末尾 \d*(?:\.\d+)? 匹配编码后紧跟的声道数字（如 DDP5.1/DDPA5.1/AAC2.0）。
 func removeAudioCodecTokens(title string) string {
 	return strings.TrimSpace(reAudioCodecToken.ReplaceAllString(title, " "))
+}
+
+// removeHDRTokens 移除标题中所有 HDR/DV 变体 token。
+//
+// 同 removeVideoCodecTokens 原理：extractHDRFormat 返回标准化名称（如 "HDR Vivid"），
+// 但标题原文可能是 "HDRVivid"，removeToken 匹配失败。
+func removeHDRTokens(title string) string {
+	return strings.TrimSpace(reHDRToken.ReplaceAllString(title, " "))
 }
 
 func removeMediumTokens(title, medium string) string {
