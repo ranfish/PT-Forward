@@ -2,9 +2,9 @@
 
 ## 当前任务焦点（新会话必读）
 
-**版本**：v0.0.283（已发布）。
+**版本**：v0.0.283（已发布）+ §56.34 步骤 1-4（未打 tag）。
 
-**当前主线**：§56.33 手动转发字段采集链路重构已完成并验证（14/14 副标题获取成功）。§56.34 种子技术特征模型设计已完成（5 个决策 + 18 字段集 + 架构），待实施。
+**当前主线**：§56.33 手动转发字段采集链路重构已完成并验证（14/14 副标题获取成功）。§56.34 种子技术特征模型**步骤 1-4 已完成并部署验证**（TechProfile 体系已接入运行时），步骤 5（旧体系废弃）待做。
 
 ### ✅ 已完成（v0.0.228 → v0.0.283）
 
@@ -21,7 +21,7 @@
   - bug 修复：size=0 导致 L2 全过滤（v0.0.281）+ store GORM Assign 同变量 bug（v0.0.283）
   - 端到端验证：14/14 /PT2/SSD 种子副标题全部 src=detail ✅
 
-### §56.34 种子技术特征模型设计（已完成设计，待实施）
+### ✅ §56.34 种子技术特征模型（步骤 1-4 已完成）
 
 **问题本质**：种子的技术特征（分辨率/编码/HDR/音频/声道等）在三套系统里割裂描述（titleparser/Engine/MediaTagInferer），没有单一事实来源。
 
@@ -34,19 +34,21 @@
 4. MediaInfo 为准（转发有本地文件 = MediaInfo 绝对准确，源标题人工填写可能错漏）
 5. 新建并行（策略 B，旧体系逐步废弃）
 
-**实施路径**（5 步）：
-1. 新建 TechProfile 模型 + MediaInfo 提取器 + 合并器（纯新增）
-2. ParseTitle 增强提取（补声道/Atmos/edition_info/cleanup 系统）
-3. Reassemble/Standardize 改造（从 TechProfile 按 v1.05 重组 + 映射）
-4. 接入点切换（runAnalyze/buildPublishRequest）
-5. 旧体系废弃
+**实施路径**（5 步，步骤 1-4 已完成）：
+1. ✅ 新建 TechProfile 模型 + MediaInfo 提取器 + 合并器（纯新增）
+2. ✅ ParseTitleTech 增强提取（补声道/Atmos/edition_info/Medium 拆分）
+3. ✅ Reassemble/Standardize 改造（从 TechProfile 按 v1.05 重组 + 映射）
+4. ✅ 接入点切换（runAnalyze/buildPublishRequest/preview 共 6 个使用点）
+5. ⬜ 旧体系废弃（CorrectWithMediaInfo/Standardize/Reassemble/extractTitleComponents 已无调用方，可删除）
+
+**新增文件**（6 个，纯新增）：tech_profile.go / mediainfo_extractor.go / profile_merge.go / title_tech_parser.go / reassemble_tech.go / standardize_tech.go
 
 ### 端到端验收状态
 
 | 端点 | 状态 |
 |------|------|
 | /seeded-torrents（含 source_site）| ✅ |
-| /analyze（§56.33 重构：C1 源站识别 + D1 tid 链 + B1 三源 Merge）| ✅ 14/14 副标题 |
+| /analyze（§56.33 重构 + §56.34 TechProfile）| ✅ 14/14 副标题 + tech_profile |
 | /merge（三源合并 + 标准化 code）| ✅ |
 | /preview（字段预览 + 完整度检查）| ✅ |
 | /eligible-targets（92 站）| ✅ |
@@ -61,7 +63,8 @@
 - PTer 实际完整度 100%（92% 是因为 bdinfo 不适用 WEB-DL）
 
 **待办**：
-- §56.34 实施：种子技术特征模型（高优先级，设计已完成）
+- §56.34 步骤 5：旧体系废弃（CorrectWithMediaInfo/Standardize/Reassemble/extractTitleComponents 删除）+ ParseTitle 已有问题修复（H265 token 残留 + .mp4 后缀在 release_group）
+- 打 tag 发版 §56.34（步骤 1-4 已部署验证）
 - 测 /submit 真发布（高优先级）
 - HHanClub 适配（中优先级，Tailwind CSS）
 - §56 前端组件（tag/预览/截图 toggle 等，各需 vite build）
