@@ -16,6 +16,7 @@ import (
 //
 // 不支持 site hook（hook 绑定 TitleComponents，如需 hook 继续用 Reassemble）。
 func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
+	applyParadigm(&tf)
 	if tf.Separator == "" {
 		tf.Separator = " "
 	}
@@ -43,6 +44,9 @@ func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
 
 	result := strings.Join(parts, tf.Separator)
 
+	if tf.RemoveSourcePrefix && !tf.ChinesePrefix {
+		result = removeSourcePrefix(result)
+	}
 	for _, forbidden := range tf.Forbidden {
 		result = strings.ReplaceAll(result, forbidden, "")
 	}
@@ -52,6 +56,14 @@ func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
 	result = cleanSeparators(result, tf.Separator)
 	if tf.ChinesePrefix && p.ChinesePrefix != "" {
 		result = "[" + p.ChinesePrefix + "] " + result
+	}
+	if tf.BracketsForbidden {
+		result = strings.ReplaceAll(result, "[", "")
+		result = strings.ReplaceAll(result, "]", "")
+	}
+	if tf.ParensForbidden {
+		result = strings.ReplaceAll(result, "(", "")
+		result = strings.ReplaceAll(result, ")", "")
 	}
 	for _, rp := range tf.ReplacePatterns {
 		if rp.From == "" {
@@ -329,4 +341,31 @@ func audioCountWord(n int, suffix string) string {
 		return strconv.Itoa(n) + "Audio"
 	}
 	return strconv.Itoa(n) + "Audios"
+}
+
+// applyParadigm 根据范式自动推断 separator（§56.35 阶段 2）。
+//
+// 仅当 Separator 未显式配置时生效。StripChinese/ChinesePrefix 仍由站点显式配置。
+//
+//	dot              → "."
+//	space            → " "
+//	chinese_prefixed → " "
+func applyParadigm(tf *TitleFormat) {
+	if tf.Paradigm == "" || tf.Separator != "" {
+		return
+	}
+	switch tf.Paradigm {
+	case "dot":
+		tf.Separator = "."
+	case "space", "chinese_prefixed":
+		tf.Separator = " "
+	}
+}
+
+// reSourceTagPrefix 匹配开头的 [xxx] 源站标签前缀（1-15 字符）。
+var reSourceTagPrefix = regexp.MustCompile(`^\[[^\]]{1,15}\]\s*`)
+
+// removeSourcePrefix 移除标题开头的 [站名] 源站标签前缀（§56.35 阶段 2）。
+func removeSourcePrefix(s string) string {
+	return reSourceTagPrefix.ReplaceAllString(s, "")
 }
