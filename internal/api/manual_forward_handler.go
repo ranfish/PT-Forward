@@ -628,7 +628,7 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	// ⑧ BDInfo 扫描（结果融入 local 源的 BDInfo 字段）
 	if h.bdinfoScanner != nil && savePath != "" {
 		bdinfoCtx, bdinfoCancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		bdinfoReport, bdinfoErr := h.bdinfoScanner.ScanIfBD(bdinfoCtx, savePath, func(percent int, text string) {
+		bdinfoReport, bdinfoErr := h.bdinfoScanner.ScanIfBD(bdinfoCtx, savePath, name, func(percent int, text string) {
 			task.setProgress(percent, text)
 		})
 		bdinfoCancel()
