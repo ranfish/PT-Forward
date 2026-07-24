@@ -63,8 +63,8 @@
 - PTer 实际完整度 100%（92% 是因为 bdinfo 不适用 WEB-DL）
 
 **待办**：
-- §56.34 步骤 5：旧体系废弃（CorrectWithMediaInfo/Standardize/Reassemble/extractTitleComponents 删除）+ ParseTitle 已有问题修复（H265 token 残留 + .mp4 后缀在 release_group）
-- 打 tag 发版 §56.34（步骤 1-4 已部署验证）
+- §56.34 步骤 5：旧体系废弃（CorrectWithMediaInfo/Standardize/Reassemble/extractTitleComponents 删除）
+- 打 tag 发版 §56.34 + ParseTitle 修复
 - 测 /submit 真发布（高优先级）
 - HHanClub 适配（中优先级，Tailwind CSS）
 - §56 前端组件（tag/预览/截图 toggle 等，各需 vite build）
