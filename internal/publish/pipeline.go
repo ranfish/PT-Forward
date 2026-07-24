@@ -439,7 +439,8 @@ func (p *Pipeline) AnalyzeLocalArtifacts(ctx context.Context, name, savePath str
 		_ = isDir
 	}
 
-	if artifact, err := p.artifactGenerator.Generate(ctx, torrentDir, "", nil); err == nil && artifact != nil {
+	// 分析阶段用 source_direct 策略：只做 MediaInfo，跳过 mpv 截图（截图在发布阶段 buildPublishRequest 做）
+	if artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", nil, "source_direct"); err == nil && artifact != nil {
 		if artifact.MediaInfoText != "" {
 			result["media_info"] = artifact.MediaInfoText
 		}
