@@ -188,3 +188,94 @@ func containsStr(s, substr string) bool {
 	}
 	return false
 }
+
+func TestCodecStyle(t *testing.T) {
+	tests := []struct {
+		codec   string
+		medium  string
+		want    string
+	}{
+		// 原盘/Remux → AVC/HEVC
+		{"HEVC", "UHD Blu-ray", "HEVC"},
+		{"AVC", "Blu-ray", "AVC"},
+		{"HEVC", "Blu-ray Remux", "HEVC"},
+		// WEB-DL → H.264/H.265
+		{"HEVC", "WEB-DL", "H.265"},
+		{"AVC", "WEB-DL", "H.264"},
+		// HDTV → H264/H265（无点）
+		{"HEVC", "HDTV", "H265"},
+		{"AVC", "HDTV", "H264"},
+		// 压制编码器 x264/x265 直接返回
+		{"x264", "Encode", "x264"},
+		{"x265", "BDRip", "x265"},
+		{"x265", "WEB-DL", "x265"},
+		// 非 H.264/H.265 族原样返回
+		{"AV1", "WEB-DL", "AV1"},
+		{"VP9", "WEB-DL", "VP9"},
+		// 无法判断媒介
+		{"HEVC", "", "HEVC"},
+	}
+	for _, tt := range tests {
+		got := codecStyle(tt.codec, tt.medium)
+		if got != tt.want {
+			t.Errorf("codecStyle(%q, %q) = %q, want %q", tt.codec, tt.medium, got, tt.want)
+		}
+	}
+}
+
+func TestNormalizeResolution(t *testing.T) {
+	assertEquals(t, "lower", "1080p", normalizeResolution("1080p", ""))
+	assertEquals(t, "lower2", "1080p", normalizeResolution("1080p", "lower"))
+	assertEquals(t, "upper", "1080P", normalizeResolution("1080p", "upper"))
+}
+
+func TestNormalizeAudio(t *testing.T) {
+	assertEquals(t, "AC3", "DD", normalizeAudio("AC3"))
+	assertEquals(t, "AC-3", "DD", normalizeAudio("AC-3"))
+	assertEquals(t, "E-AC-3", "DDP", normalizeAudio("E-AC-3"))
+	assertEquals(t, "EAC3", "DDP", normalizeAudio("EAC3"))
+	assertEquals(t, "DDP_keep", "DDP", normalizeAudio("DDP"))
+	assertEquals(t, "DTS_keep", "DTS", normalizeAudio("DTS"))
+}
+
+func TestNormalizeHDR(t *testing.T) {
+	assertEquals(t, "hdr10_default", "HDR10", normalizeHDR("HDR10", false))
+	assertEquals(t, "hdr10_to_hdr", "HDR", normalizeHDR("HDR10", true))
+	assertEquals(t, "dvi_keep", "DoVi", normalizeHDR("DoVi", true))
+}
+
+func TestAudioCountWord(t *testing.T) {
+	assertEquals(t, "0", "", audioCountWord(0, ""))
+	assertEquals(t, "1", "", audioCountWord(1, ""))
+	assertEquals(t, "2s", "2Audios", audioCountWord(2, ""))
+	assertEquals(t, "2none", "2Audio", audioCountWord(2, "none"))
+}
+
+func TestReassembleFromTechProfile_FuncOverrides(t *testing.T) {
+	p := TechProfile{
+		MainTitle:    "Test",
+		Resolution:   "1080p",
+		VideoCodec:   "HEVC",
+		Specification: "WEB-DL",
+		AudioCodec:   "DDP",
+		ReleaseGroup: "GRP",
+	}
+	// 默认 func_overrides
+	tf1 := TitleFormat{
+		Separator: " ",
+		Order:     []string{"title", "resolution", "video_codec", "group"},
+	}
+	r1 := ReassembleFromTechProfile(p, tf1)
+	// WEB-DL + HEVC → H.265（codecStyle）
+	if !contains(r1, "H.265") {
+		t.Errorf("默认 codecStyle: got %q, should contain H.265", r1)
+	}
+
+	// DuckBooBee 大写 P
+	tf2 := tf1
+	tf2.ResolutionCase = "upper"
+	r2 := ReassembleFromTechProfile(p, tf2)
+	if !contains(r2, "1080P") {
+		t.Errorf("upper resolution: got %q, should contain 1080P", r2)
+	}
+}
