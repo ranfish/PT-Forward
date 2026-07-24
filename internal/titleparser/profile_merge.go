@@ -2,20 +2,22 @@ package titleparser
 
 // MergeTechProfile 三源字段级合并 → TechProfile（§56.34 决策 4）。
 //
-// 合并优先级（按字段类别）：
-//   - 技术参数（8 字段）：MediaInfo > 标题
-//   - 标题特有（8 字段）：标题（步骤 2 接入 DOM 后变 标题 > DOM）
-//   - 媒介/分类（2 字段）：标题（步骤 2 接入 DOM 后变 DOM > 标题）
-//
-// 步骤 1 实现：标题 + MediaInfo 合并。
-// mi 为 nil 时返回纯标题解析结果（无纠正）。
+// 步骤 1 兼容接口：从 TitleComponents + MediaInfo 构造 TechProfile。
+// 步骤 2 起推荐用 ParseTitleTech + MergeMediaInfoInto（支持增强字段）。
 func MergeTechProfile(tc TitleComponents, mi *MediaInfoTech) TechProfile {
 	p := TechProfileFromTitle(tc)
-	if mi == nil {
-		return p
-	}
+	MergeMediaInfoInto(&p, mi)
+	return p
+}
 
-	// 技术参数：MediaInfo 非空则覆盖标题
+// MergeMediaInfoInto 将 MediaInfo 技术参数合并到已有的 TechProfile。
+//
+// 决策 4：技术参数 MediaInfo 为准。MediaInfo 非空字段覆盖标题值。
+// mi 为 nil 时不修改 TechProfile（保留标题解析结果）。
+func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
+	if p == nil || mi == nil {
+		return
+	}
 	if mi.Resolution != "" {
 		p.Resolution = mi.Resolution
 	}
@@ -40,6 +42,4 @@ func MergeTechProfile(tc TitleComponents, mi *MediaInfoTech) TechProfile {
 	if mi.BitDepth != "" {
 		p.BitDepth = mi.BitDepth
 	}
-
-	return p
 }
