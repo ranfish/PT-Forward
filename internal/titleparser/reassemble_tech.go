@@ -137,6 +137,7 @@ func getFieldValueFromTechProfile(p TechProfile, field string) string {
 }
 
 // composeMedium 从 SourceType + Specification 拼接媒介组合值。
+// 当 SourceType + Specification 均为空时 fallback 到过渡字段 Medium（兼容旧数据）。
 func composeMedium(p TechProfile) string {
 	var parts []string
 	if p.SourceType != "" {
@@ -145,7 +146,11 @@ func composeMedium(p TechProfile) string {
 	if p.Specification != "" {
 		parts = append(parts, p.Specification)
 	}
-	return strings.Join(parts, " ")
+	composed := strings.Join(parts, " ")
+	if composed != "" {
+		return composed
+	}
+	return p.Medium
 }
 
 // composeAudio 按 v1.05 格式拼接完整音频串（编码 Atmos 声道 音轨数）。

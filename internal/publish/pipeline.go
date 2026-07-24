@@ -1112,13 +1112,14 @@ func applyTitleComponents(pubReq *model.PublishRequest, overridesJSON string) {
 
 	// 构建 TitleComponents 并标准化
 	components := titleparser.TitleComponents{
-		Resolution:  getStringFromMap(tc, "resolution"),
-		VideoCodec:  getStringFromMap(tc, "video_codec"),
-		AudioCodec:  getStringFromMap(tc, "audio_codec"),
-		Medium:      getStringFromMap(tc, "medium"),
+		Resolution:   getStringFromMap(tc, "resolution"),
+		VideoCodec:   getStringFromMap(tc, "video_codec"),
+		AudioCodec:   getStringFromMap(tc, "audio_codec"),
+		Medium:       getStringFromMap(tc, "medium"),
 		ReleaseGroup: getStringFromMap(tc, "release_group"),
 	}
-	stdParams, _ := titleparser.Standardize(components)
+	profile := titleparser.TechProfileFromTitle(components)
+	stdParams, _ := titleparser.StandardizeTechProfile(profile)
 
 	// 用标准键逆向映射为规范显示名，再填入表单
 	// 如果逆向映射失败（不在标准映射表中），回退到原始值
@@ -1222,8 +1223,8 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 			if _, hasManualTitle := overridesString(candidate.UserOverrides, "title"); !hasManualTitle {
 				var tf titleparser.TitleFormat
 				if err := json.Unmarshal([]byte(site.TitleFormat), &tf); err == nil {
-					components := extractTitleComponents(candidate.UserOverrides, pubReq.Title)
-					reassembled := titleparser.Reassemble(components, tf)
+				profile := extractTechProfile(candidate.UserOverrides, pubReq.Title)
+				reassembled := titleparser.ReassembleFromTechProfile(profile, tf)
 					if reassembled != "" {
 						pubReq.Title = reassembled
 					}
@@ -1306,6 +1307,42 @@ func extractTitleComponents(userOverrides, title string) titleparser.TitleCompon
 		}
 	}
 	return titleparser.ParseTitle(title)
+}
+
+// extractTechProfile 从 UserOverrides 或标题提取 TechProfile（§56.34 步骤 4）。
+//
+// 优先级：UserOverrides.tech_profile > UserOverrides.title_components > ParseTitleTech。
+// 兼容现有前端（发送 title_components map），同时支持将来前端发送 tech_profile。
+func extractTechProfile(userOverrides, title string) titleparser.TechProfile {
+	if userOverrides != "" {
+		var ov struct {
+			TechProfile     *titleparser.TechProfile `json:"tech_profile"`
+			TitleComponents map[string]string        `json:"title_components"`
+		}
+		if err := json.Unmarshal([]byte(userOverrides), &ov); err == nil {
+			if ov.TechProfile != nil {
+				return *ov.TechProfile
+			}
+			if len(ov.TitleComponents) > 0 {
+				return titleparser.TechProfileFromTitle(titleparser.TitleComponents{
+					MainTitle:      ov.TitleComponents["main_title"],
+					SeasonEpisode:  ov.TitleComponents["season_episode"],
+					Year:           ov.TitleComponents["year"],
+					Resolution:     ov.TitleComponents["resolution"],
+					Medium:         ov.TitleComponents["medium"],
+					VideoCodec:     ov.TitleComponents["video_codec"],
+					AudioCodec:     ov.TitleComponents["audio_codec"],
+					HDRFormat:      ov.TitleComponents["hdr_format"],
+					SourcePlatform: ov.TitleComponents["source_platform"],
+					BitDepth:       ov.TitleComponents["bit_depth"],
+					ReleaseVersion: ov.TitleComponents["release_version"],
+					ReleaseGroup:   ov.TitleComponents["release_group"],
+					ChinesePrefix:  ov.TitleComponents["chinese_prefix"],
+				})
+			}
+		}
+	}
+	return titleparser.ParseTitleTech(title)
 }
 
 func (p *Pipeline) finalizePublishStatus(ctx context.Context, id uint, publishedCount int, lastErr error) model.PublishCandidateStatus {

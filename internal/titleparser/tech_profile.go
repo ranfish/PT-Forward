@@ -61,3 +61,25 @@ func TechProfileFromTitle(c TitleComponents) TechProfile {
 		Medium:          c.Medium,
 	}
 }
+
+// TechProfileToComponents 从 TechProfile 回填 TitleComponents（兼容旧接口）。
+//
+// 用于 InferCategory（只依赖 SeasonEpisode）和前端兼容（result["title_components"]）。
+// 技术参数字段（Resolution/VideoCodec/AudioCodec/HDR/BitDepth）是 MediaInfo 合并后的值。
+func TechProfileToComponents(p TechProfile) TitleComponents {
+	return TitleComponents{
+		MainTitle:      p.MainTitle,
+		SeasonEpisode:  p.SeasonEpisode,
+		Year:           p.Year,
+		ReleaseVersion: p.ReleaseVersion,
+		Resolution:     p.Resolution,
+		SourcePlatform: p.SourcePlatform,
+		Medium:         p.Medium,
+		HDRFormat:      p.HDR,
+		VideoCodec:     p.VideoCodec,
+		BitDepth:       p.BitDepth,
+		AudioCodec:     p.AudioCodec,
+		ReleaseGroup:   p.ReleaseGroup,
+		ChinesePrefix:  p.ChinesePrefix,
+	}
+}

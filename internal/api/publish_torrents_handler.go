@@ -1037,7 +1037,7 @@ func (h *PublishTorrentsHandler) handlePreviewTitle(w http.ResponseWriter, r *ht
 		tf = titleparser.DefaultTitleFormat()
 	}
 
-	result := titleparser.Reassemble(c, tf)
+	result := titleparser.ReassembleFromTechProfile(titleparser.TechProfileFromTitle(c), tf)
 	if result == "" {
 		result = c.MainTitle
 	}
@@ -1088,7 +1088,7 @@ func (h *PublishTorrentsHandler) handlePreviewTitleBatch(w http.ResponseWriter, 
 		} else {
 			tf = titleparser.DefaultTitleFormat()
 		}
-		title := titleparser.Reassemble(c, tf)
+		title := titleparser.ReassembleFromTechProfile(titleparser.TechProfileFromTitle(c), tf)
 		if title == "" {
 			title = c.MainTitle
 		}
