@@ -271,6 +271,35 @@ func TestMergeTechProfile_PartialMediaInfo(t *testing.T) {
 	assertEquals(t, "AudioCodec", "DTS", p.AudioCodec)
 }
 
+func TestMergeDOMInto_MediumOverride(t *testing.T) {
+	p := ParseTitleTech("Movie 2024 1080p Blu-ray x264 DTS")
+	assertEquals(t, "SourceType(标题)", "Blu-ray", p.SourceType)
+	// DOM 覆盖媒介（DOM > 标题）
+	MergeDOMInto(&p, "WEB-DL", "", "", "")
+	assertEquals(t, "SourceType(DOM)", "", p.SourceType)
+	assertEquals(t, "Specification(DOM)", "WEB-DL", p.Specification)
+	assertEquals(t, "Medium(DOM)", "WEB-DL", p.Medium)
+}
+
+func TestMergeDOMInto_TechFallback(t *testing.T) {
+	p := TechProfile{} // 空 TechProfile
+	// DOM 技术参数只在为空时填充
+	MergeDOMInto(&p, "", "1080p", "x264", "AAC")
+	assertEquals(t, "Resolution(fallback)", "1080p", p.Resolution)
+	assertEquals(t, "VideoCodec(fallback)", "x264", p.VideoCodec)
+	assertEquals(t, "AudioCodec(fallback)", "AAC", p.AudioCodec)
+
+	// 已有值时 DOM 不覆盖
+	MergeDOMInto(&p, "", "2160p", "HEVC", "DTS")
+	assertEquals(t, "Resolution(不覆盖)", "1080p", p.Resolution)
+	assertEquals(t, "VideoCodec(不覆盖)", "x264", p.VideoCodec)
+}
+
+func TestMergeDOMInto_NilSafe(t *testing.T) {
+	var nilP *TechProfile
+	MergeDOMInto(nilP, "WEB-DL", "1080p", "x264", "AAC") // 不 panic
+}
+
 func assertEquals(t *testing.T, field, want string, got string) {
 	t.Helper()
 	if got != want {
