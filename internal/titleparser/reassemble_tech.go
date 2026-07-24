@@ -25,7 +25,7 @@ func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
 
 	var parts []string
 	for _, field := range tf.Order {
-		val := getFieldValueFromTechProfile(p, field)
+		val := getFieldValueFromTechProfile(p, field, tf)
 		if val == "" {
 			continue
 		}
@@ -89,7 +89,8 @@ func V105TitleFormat() TitleFormat {
 }
 
 // getFieldValueFromTechProfile 按 title_format 字段名从 TechProfile 取值。
-func getFieldValueFromTechProfile(p TechProfile, field string) string {
+// 应用 func_overrides 格式化（codecStyle/normalizeResolution/normalizeAudio 等）。
+func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) string {
 	switch field {
 	case "title":
 		return p.MainTitle
@@ -100,7 +101,7 @@ func getFieldValueFromTechProfile(p TechProfile, field string) string {
 	case "edition_info":
 		return p.EditionInfo
 	case "resolution":
-		return p.Resolution
+		return normalizeResolution(p.Resolution, tf.ResolutionCase)
 	case "region_code":
 		return p.RegionCode
 	case "platform":
@@ -110,23 +111,26 @@ func getFieldValueFromTechProfile(p TechProfile, field string) string {
 	case "specification":
 		return p.Specification
 	case "medium":
-		return composeMedium(p)
+		return normalizeMedium(composeMedium(p))
 	case "hdr":
-		return p.HDR
+		return normalizeHDR(p.HDR, tf.HDR10ToHDR)
 	case "bit_depth":
 		return formatBitDepthForTitle(p)
 	case "video_codec":
-		return p.VideoCodec
+		return codecStyle(p.VideoCodec, composeMedium(p))
 	case "audio_codec":
-		return p.AudioCodec
+		return normalizeAudio(p.AudioCodec)
 	case "audio_full":
 		return composeAudio(p)
 	case "audio_channels":
+		if shouldOmitChannels(p.AudioCodec, p.AudioChannels) {
+			return ""
+		}
 		return p.AudioChannels
 	case "audio_technology":
 		return p.AudioTechnology
 	case "audio_tracks":
-		return formatAudioTracksStr(p.AudioTracks)
+		return audioCountWord(p.AudioTracks, tf.AudioCountSuffix)
 	case "group":
 		return p.ReleaseGroup
 	case "release_version":
@@ -207,9 +211,122 @@ func formatBitDepthForTitle(p TechProfile) string {
 }
 
 // formatAudioTracksStr 音轨数 → 标题字符串（0/1 省略，≥2 输出 XAudios）。
+// §56.35: 被 audioCountWord 替代（支持 audio_count_suffix 站点覆盖），保留向后兼容。
 func formatAudioTracksStr(n int) string {
-	if n > 1 {
-		return strconv.Itoa(n) + "Audios"
+	return audioCountWord(n, "")
+}
+
+// codecStyle 按媒介上下文转换视频编码写法（§56.35 阶段 1，v1.05 :150-160）。
+//
+// 原盘/Remux → AVC / HEVC
+// WEB-DL     → H.264 / H.265
+// HDTV       → H264 / H265（无点）
+// 压制       → x264 / x265
+//
+// Writing Library 明确有 x264/x265 时（压制编码器），WEB/HDTV 也可写 x264/x265。
+func codecStyle(codec, medium string) string {
+	upper := strings.ToUpper(codec)
+	family := ""
+	switch {
+	case strings.Contains(upper, "HEVC") || strings.Contains(upper, "H.265") ||
+		strings.Contains(upper, "H265") || strings.Contains(upper, "X265"):
+		family = "h265"
+	case strings.Contains(upper, "AVC") || strings.Contains(upper, "H.264") ||
+		strings.Contains(upper, "H264") || strings.Contains(upper, "X264"):
+		family = "h264"
+	default:
+		return codec // AV1/VP9/MPEG-2 等非 H.264/H.265 族，原样返回
+	}
+
+	// x264/x265 是压制编码器，直接返回（不转换）
+	if strings.Contains(upper, "X264") || strings.Contains(upper, "X265") {
+		if family == "h264" {
+			return "x264"
+		}
+		return "x265"
+	}
+
+	switch classifyMediumForCodec(medium) {
+	case "disc":
+		if family == "h264" {
+			return "AVC"
+		}
+		return "HEVC"
+	case "web":
+		if family == "h264" {
+			return "H.264"
+		}
+		return "H.265"
+	case "hdtv":
+		if family == "h264" {
+			return "H264"
+		}
+		return "H265"
+	default:
+		return codec // 无法判断媒介，原样返回
+	}
+}
+
+// classifyMediumForCodec 从媒介字符串推断编码写法分类。
+func classifyMediumForCodec(medium string) string {
+	upper := strings.ToUpper(medium)
+	if strings.Contains(upper, "WEB-DL") || strings.Contains(upper, "WEBDL") {
+		return "web"
+	}
+	if strings.Contains(upper, "WEBRIP") || strings.Contains(upper, "BDRIP") || strings.Contains(upper, "ENCODE") {
+		return "encode"
+	}
+	if strings.Contains(upper, "UHDTV") || strings.Contains(upper, "HDTV") {
+		return "hdtv"
+	}
+	if strings.Contains(upper, "REMUX") || strings.Contains(upper, "BLU-RAY") || strings.Contains(upper, "BLURAY") {
+		return "disc"
 	}
 	return ""
+}
+
+// normalizeResolution 分辨率大小写（§56.35：DuckBooBee 要求大写 P）。
+func normalizeResolution(res, caseMode string) string {
+	if caseMode == "upper" && strings.HasSuffix(res, "p") {
+		return res[:len(res)-1] + "P"
+	}
+	return res
+}
+
+// normalizeAudio 音频编码归一化（§56.35：AC3→DD, E-AC3→DDP）。
+func normalizeAudio(codec string) string {
+	upper := strings.ToUpper(codec)
+	switch {
+	case strings.Contains(upper, "E-AC-3") || strings.Contains(upper, "EAC3") ||
+		strings.Contains(upper, "DDP") || strings.Contains(upper, "DD+"):
+		return "DDP"
+	case strings.Contains(upper, "AC-3") || strings.Contains(upper, "AC3"):
+		return "DD"
+	default:
+		return codec
+	}
+}
+
+// normalizeHDR HDR 格式归一化（§56.35：青蛙 HDR10→HDR 泛指）。
+func normalizeHDR(hdr string, hdr10ToHDR bool) string {
+	if hdr10ToHDR && hdr == "HDR10" {
+		return "HDR"
+	}
+	return hdr
+}
+
+// normalizeMedium 媒介归一化（预留扩展点）。
+func normalizeMedium(medium string) string {
+	return medium
+}
+
+// audioCountWord 音轨数 → 标题字符串（§56.35：支持 audio_count_suffix 站点覆盖）。
+func audioCountWord(n int, suffix string) string {
+	if n <= 1 {
+		return ""
+	}
+	if suffix == "none" {
+		return strconv.Itoa(n) + "Audio"
+	}
+	return strconv.Itoa(n) + "Audios"
 }
