@@ -727,18 +727,18 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	result["forbidden"] = forbidden
 	result["forbid_reason"] = forbidReason
 
-	// ⑫ 标题解析 + MediaInfo 纠正 + 标准化（用 merged.MediaInfo）
+	// ⑫ 标题解析 + MediaInfo 合并 + 标准化（§56.34 TechProfile 体系）
 	mediaInfo := merged.MediaInfo
 	effectiveTitle, _ := result["title"].(string)
 	if effectiveTitle == "" {
 		effectiveTitle = name
 	}
-	components := titleparser.ParseTitle(effectiveTitle)
+	profile := titleparser.ParseTitleTech(effectiveTitle)
 	if mediaInfo != "" {
-		if err := titleparser.CorrectWithMediaInfo(&components, mediaInfo); err != nil {
-			h.logger.Warn("analyze: MediaInfo correction failed", zap.Error(err))
-		}
+		miTech := titleparser.ExtractMediaInfo(mediaInfo)
+		titleparser.MergeMediaInfoInto(&profile, &miTech)
 	}
+	components := titleparser.TechProfileToComponents(profile)
 	// 分类推断
 	sourceCat := ""
 	if h.metadataFetcher != nil && infoHash != "" {
@@ -753,11 +753,12 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	ptgenGenre, _ := result["ptgen_genre"].(string)
 	ptgenEpisodes, _ := result["ptgen_episodes"].(string)
 	category := titleparser.InferCategory(components, sourceCat, ptgenGenre, ptgenEpisodes)
-	stdParams, _ := titleparser.Standardize(components)
+	stdParams, _ := titleparser.StandardizeTechProfile(profile)
 	stdParams.Type = category
 
 	result["title_components"] = components
 	result["standardized_params"] = stdParams
+	result["tech_profile"] = profile
 
 	task.setResult(result)
 
