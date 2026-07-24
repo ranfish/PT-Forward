@@ -1282,33 +1282,6 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 	return pubReq, nil
 }
 
-// extractTitleComponents 从 UserOverrides（手动转发有完整字段）或 ParseTitle（自动转载）获取标题组件。
-func extractTitleComponents(userOverrides, title string) titleparser.TitleComponents {
-	if userOverrides != "" {
-		var ov struct {
-			TitleComponents map[string]string `json:"title_components"`
-		}
-		if err := json.Unmarshal([]byte(userOverrides), &ov); err == nil && len(ov.TitleComponents) > 0 {
-			return titleparser.TitleComponents{
-				MainTitle:      ov.TitleComponents["main_title"],
-				SeasonEpisode:  ov.TitleComponents["season_episode"],
-				Year:           ov.TitleComponents["year"],
-				Resolution:     ov.TitleComponents["resolution"],
-				Medium:         ov.TitleComponents["medium"],
-				VideoCodec:     ov.TitleComponents["video_codec"],
-				AudioCodec:     ov.TitleComponents["audio_codec"],
-				HDRFormat:      ov.TitleComponents["hdr_format"],
-				SourcePlatform: ov.TitleComponents["source_platform"],
-				BitDepth:       ov.TitleComponents["bit_depth"],
-				ReleaseVersion: ov.TitleComponents["release_version"],
-				ReleaseGroup:   ov.TitleComponents["release_group"],
-				ChinesePrefix:  ov.TitleComponents["chinese_prefix"],
-			}
-		}
-	}
-	return titleparser.ParseTitle(title)
-}
-
 // extractTechProfile 从 UserOverrides 或标题提取 TechProfile（§56.34 步骤 4）。
 //
 // 优先级：UserOverrides.tech_profile > UserOverrides.title_components > ParseTitleTech。

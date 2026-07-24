@@ -1,7 +1,6 @@
 package titleparser
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -23,120 +22,6 @@ type TitleFormat struct {
 type ReplacePattern struct {
 	From string `json:"from"` // 正则模式
 	To   string `json:"to"`   // 替换文本
-}
-
-// Reassemble 将标题组件按目标站模板重组为标题字符串
-func Reassemble(c TitleComponents, tf TitleFormat) string {
-	// 如果有 hook 名，优先用 hook
-	if tf.Hook != "" {
-		if hook := GetSiteHook(tf.Hook); hook != nil {
-			return hook(c, tf)
-		}
-	}
-	return reassembleWithTemplate(c, tf)
-}
-
-// reassembleWithTemplate 模板方式重组
-func reassembleWithTemplate(c TitleComponents, tf TitleFormat) string {
-	if tf.Separator == "" {
-		tf.Separator = " "
-	}
-	if tf.GroupConnector == "" {
-		tf.GroupConnector = "-"
-	}
-
-	var parts []string
-
-	for _, field := range tf.Order {
-		val := getFieldValue(c, field)
-		if val == "" {
-			continue
-		}
-		if field == "group" {
-			// 制作组直接附加到上一个 part（不加 separator）
-			if len(parts) > 0 {
-				parts[len(parts)-1] = parts[len(parts)-1] + tf.GroupConnector + val
-			}
-		} else {
-			// 点分隔时，字段内的空格替换为点
-			if tf.Separator == "." {
-				val = strings.ReplaceAll(val, " ", ".")
-			}
-			parts = append(parts, val)
-		}
-	}
-
-	result := strings.Join(parts, tf.Separator)
-
-	// 清洗禁止内容
-	for _, forbidden := range tf.Forbidden {
-		result = strings.ReplaceAll(result, forbidden, "")
-	}
-
-	// 去除中文（如果要求）
-	if tf.StripChinese {
-		result = stripChineseChars(result)
-	}
-
-	// 清理多余分隔符
-	result = cleanSeparators(result, tf.Separator)
-
-	// 加中文名前缀
-	if tf.ChinesePrefix && c.ChinesePrefix != "" {
-		result = "[" + c.ChinesePrefix + "] " + result
-	}
-
-	// §56.19 决策 4: 字段值替换（如 1080p→FHD）
-	for _, rp := range tf.ReplacePatterns {
-		if rp.From == "" {
-			continue
-		}
-		if re, err := regexp.Compile(rp.From); err == nil {
-			result = re.ReplaceAllString(result, rp.To)
-		}
-	}
-
-	// §56.19 决策 4: 标题截断（按 rune，避免中文截半）
-	if tf.MaxTitleLength > 0 {
-		if runes := []rune(result); len(runes) > tf.MaxTitleLength {
-			result = string(runes[:tf.MaxTitleLength])
-		}
-	}
-
-	return strings.TrimSpace(result)
-}
-
-func getFieldValue(c TitleComponents, field string) string {
-	switch field {
-	case "title":
-		return c.MainTitle
-	case "year":
-		return c.Year
-	case "season":
-		return c.SeasonEpisode
-	case "resolution":
-		return c.Resolution
-	case "medium":
-		return c.Medium
-	case "video_codec":
-		return c.VideoCodec
-	case "audio_codec":
-		return c.AudioCodec
-	case "hdr":
-		return c.HDRFormat
-	case "platform":
-		return c.SourcePlatform
-	case "bit_depth":
-		return c.BitDepth
-	case "frame_rate":
-		return c.FrameRate
-	case "group":
-		return c.ReleaseGroup
-	case "release_version":
-		return c.ReleaseVersion
-	default:
-		return ""
-	}
 }
 
 func stripChineseChars(s string) string {
