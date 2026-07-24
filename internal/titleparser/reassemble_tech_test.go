@@ -279,3 +279,98 @@ func TestReassembleFromTechProfile_FuncOverrides(t *testing.T) {
 		t.Errorf("upper resolution: got %q, should contain 1080P", r2)
 	}
 }
+
+func TestApplyParadigm(t *testing.T) {
+	tests := []struct {
+		paradigm string
+		sep      string
+		want     string
+	}{
+		{"dot", "", "."},
+		{"space", "", " "},
+		{"chinese_prefixed", "", " "},
+		{"", "", ""},   // 无 paradigm 不改变
+		{"dot", " ", " "}, // 显式 separator 不覆盖
+	}
+	for _, tt := range tests {
+		tf := TitleFormat{Paradigm: tt.paradigm, Separator: tt.sep}
+		applyParadigm(&tf)
+		if tf.Separator != tt.want {
+			t.Errorf("applyParadigm(%q, sep=%q) = %q, want %q", tt.paradigm, tt.sep, tf.Separator, tt.want)
+		}
+	}
+}
+
+func TestRemoveSourcePrefix(t *testing.T) {
+	assertEquals(t, "馒头", "Movie 2024", removeSourcePrefix("[馒头] Movie 2024"))
+	assertEquals(t, "HDArea", "Movie.2024", removeSourcePrefix("[HDArea] Movie.2024"))
+	assertEquals(t, "none", "Movie 2024", removeSourcePrefix("Movie 2024"))
+}
+
+func TestReassembleFromTechProfile_ParadigmDot(t *testing.T) {
+	p := TechProfile{
+		MainTitle:     "Golden Kamuy",
+		Year:          "2024",
+		Resolution:    "1080p",
+		Specification: "WEB-DL",
+		AudioCodec:    "DDP",
+		ReleaseGroup:  "CMCTV",
+	}
+	tf := TitleFormat{
+		Paradigm: "dot",
+		Order:    []string{"title", "year", "resolution", "specification", "audio_codec", "group"},
+	}
+	r := ReassembleFromTechProfile(p, tf)
+	if !contains(r, "Golden.Kamuy") {
+		t.Errorf("dot paradigm should produce dot-separated title, got %q", r)
+	}
+}
+
+func TestReassembleFromTechProfile_BracketsForbidden(t *testing.T) {
+	p := TechProfile{
+		MainTitle:     "Test",
+		ChinesePrefix: "测试",
+		ReleaseGroup:  "GRP",
+	}
+	tf := TitleFormat{
+		Separator:        " ",
+		Order:            []string{"title", "group"},
+		BracketsForbidden: true,
+	}
+	r := ReassembleFromTechProfile(p, tf)
+	if contains(r, "[") || contains(r, "]") {
+		t.Errorf("brackets should be removed, got %q", r)
+	}
+}
+
+func TestReassembleFromTechProfile_ParensForbidden(t *testing.T) {
+	p := TechProfile{
+		MainTitle:    "Test (Movie)",
+		ReleaseGroup: "GRP",
+	}
+	tf := TitleFormat{
+		Separator:       " ",
+		Order:           []string{"title", "group"},
+		ParensForbidden: true,
+	}
+	r := ReassembleFromTechProfile(p, tf)
+	if contains(r, "(") || contains(r, ")") {
+		t.Errorf("parens should be removed, got %q", r)
+	}
+}
+
+func TestReassembleFromTechProfile_RemoveSourcePrefix(t *testing.T) {
+	p := TechProfile{
+		MainTitle:    "Movie Title",
+		ReleaseGroup: "GRP",
+	}
+	tf := TitleFormat{
+		Separator:           " ",
+		Order:               []string{"title", "group"},
+		RemoveSourcePrefix:  true,
+	}
+	r := ReassembleFromTechProfile(p, tf)
+	if contains(r, "[") {
+		t.Errorf("source prefix should be removed, got %q", r)
+	}
+}

@@ -21,6 +21,12 @@ type TitleFormat struct {
 	ResolutionCase   string `json:"resolution_case,omitempty"`    // "lower"(默认) / "upper"(DuckBooBee 大写 P)
 	HDR10ToHDR       bool   `json:"hdr10_to_hdr,omitempty"`       // HDR10→HDR 泛指（青蛙）
 	AudioCountSuffix string `json:"audio_count_suffix,omitempty"` // "s"(默认 4Audios) / "none"(HDArea 4Audio)
+
+	// §56.35 阶段 2：范式 + 后处理
+	Paradigm           string `json:"paradigm,omitempty"`            // "dot"/"space"/"chinese_prefixed"（为空时用显式 separator）
+	BracketsForbidden  bool   `json:"brackets_forbidden,omitempty"`  // 禁止 []（PTLGS）
+	ParensForbidden    bool   `json:"parens_forbidden,omitempty"`    // 禁止 ()（PTerClub）
+	RemoveSourcePrefix bool   `json:"remove_source_prefix,omitempty"` // 移除 [站名] 前缀
 }
 
 // ReplacePattern §56.19 决策 4: 字段值替换规则。
