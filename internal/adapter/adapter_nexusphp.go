@@ -194,6 +194,11 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 		return nil, err
 	}
 
+	// §56.34 OpenCD 专用提取（音乐站 DOM 与标准 NexusPHP 差异大）
+	if isOpenCDDomain(config.Domain) {
+		return extractOpenCDDetail(html), nil
+	}
+
 	// §56.13 方案 B: 优先用 Engine 提取（更精准：goquery + 站点 hook + 标准化键映射）
 	if a.engine != nil {
 		detail, ok := a.extractWithEngine(html, config, torrentID)
