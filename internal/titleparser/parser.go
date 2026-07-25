@@ -24,6 +24,7 @@ var (
 	reAudioTracksCleanup = regexp.MustCompile(`(?i)\b\d+\s*Audios?\b`)
 	reSiteTagSuffix = regexp.MustCompile(`(?:\s*(?:\[[^\]]*\]|\([^)]*\)))+\s*$`)
 	reHDRToken = regexp.MustCompile(`(?i)\b(Dolby[-\s]?Vision|DoVi|DV|HDR[-\s]?Vivid|HDRVivid|HDR10[-\s]?Plus|HDR10\+|HDR10|PQ10|HLG|HDR|SDR)\b`)
+	reChinesePrefixNoBracket = regexp.MustCompile(`^([\p{Han}][\p{Han}0-9：，、:（）\(\)]*)\.`)
 )
 
 const sourcePlatformAlternatives = `MA|Apple\s?TV\+|ViuTV|MyTVSuper|MyTVS|DNSP|iT|NowE|MyVideo|TWN|LiTV|TVBAnywhere|DMM|iPad|TX|iQIYI|MUBI|TVB|YOUKU|NowPlay|AMZN|Amazon|Netflix|NF|DSNP|MAX|HMAX|HULU|ATVP|iTunes|friDay|USA|EUR|JPN|CEE|FRA|LINETV|PCOK|Hami|GBR|NowPlayer|CR|Crunchyroll|SEEZN|GER|CAN|CHN|Viu|WeTV|meWATCH|CATCHPLAY|AMC\+|TVING|Baha|KKTV|IQ|HKG|ITA|ESP|Disney\+|Disney`
@@ -98,9 +99,26 @@ func ParseTitle(title string) TitleComponents {
 }
 
 func extractChinesePrefix(title string) (prefix, remaining string) {
+	// 1. [中文] 中括号格式
 	m := reChinesePrefix.FindStringSubmatch(title)
 	if m != nil {
 		return m[1], strings.TrimSpace(title[len(m[0]):])
+	}
+	// 2. 无中括号格式：中文片名.英文片名.技术信息（CSWEB/CMCT 格式）
+	// 正则匹配开头的连续中文段（含数字/中文标点），以 . 分隔
+	m = reChinesePrefixNoBracket.FindStringSubmatch(title)
+	if m != nil {
+		candidate := m[1]
+		// 至少 2 个中文字符才提取（避免误匹配单个中文标点）
+		hanCount := 0
+		for _, r := range candidate {
+			if r >= 0x4e00 && r <= 0x9fff {
+				hanCount++
+			}
+		}
+		if hanCount >= 2 {
+			return candidate, strings.TrimSpace(title[len(m[0]):])
+		}
 	}
 	return "", title
 }
