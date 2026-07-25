@@ -146,6 +146,8 @@ func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key 
 
 	h.logger.Info("setting updated", zap.String("key", key))
 	auditLog(r, "settings", "update", "setting", key, "", "success")
+	// §56.36: 立即刷新 RuntimeConfig 缓存，使限流等配置热更新
+	setting.InvalidateAll()
 	if h.configBus != nil {
 		h.configBus.Publish(rss.ConfigChangedEvent{
 			ChangedKeys: []string{key},
