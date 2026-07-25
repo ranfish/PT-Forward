@@ -173,13 +173,16 @@ func (a *RousiAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	}
 
 	d := result.Data
-	return &model.TorrentDetail{
+	detail := &model.TorrentDetail{
 		Title:     d.Title,
 		Size:      d.Size,
 		InfoHash:  strings.ToLower(d.InfoHash),
 		Category:  d.Category,
 		MediaInfo: d.MediaInfo,
-	}, nil
+	}
+	// 从结构化字段提取禁转标记（§56.37 合规修复）
+	detail.Flags = extractFlagsFromStructured(detail.Title, detail.Subtitle, detail.Tags)
+	return detail, nil
 }
 
 func (a *RousiAdapter) DetectDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {

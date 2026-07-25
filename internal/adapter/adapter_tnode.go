@@ -133,6 +133,9 @@ func (a *TNodeAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 
 	detail.Tags = extractTags(html)
 
+	// 从结构化字段提取禁转标记（§56.37 合规修复）
+	detail.Flags = extractFlagsFromStructured(detail.Title, detail.Subtitle, detail.Tags)
+
 	descRe := reTNodeDesc
 	if m := descRe.FindStringSubmatch(html); len(m) > 1 {
 		detail.Description = strings.TrimSpace(m[1])

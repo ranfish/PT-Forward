@@ -326,7 +326,7 @@ func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConf
 		detail.DoubanURL = doubanURL
 	}
 
-	detail.Flags = extractFlagsFromText(html + " " + detail.Title)
+	detail.Flags = extractFlagsFromStructured(detail.Title, "", detail.Tags)
 
 	// §56.13: 暴露原始 HTML 供 Engine 提取
 	detail.RawHTML = html

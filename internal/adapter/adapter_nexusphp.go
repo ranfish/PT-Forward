@@ -359,7 +359,8 @@ func (a *NexusPHPAdapter) legacyExtractDetail(html string) *model.TorrentDetail 
 		detail.Screenshots = detail.Screenshots[1:]
 	}
 
-	detail.Flags = extractFlagsFromText(html + " " + detail.Title + " " + detail.Subtitle)
+	// 只从结构化字段提取禁转标记（不扫描简介正文，避免误判）
+	detail.Flags = extractFlagsFromStructured(detail.Title, detail.Subtitle, detail.Tags)
 	if imdbURL := reIMDbURL.FindString(html); imdbURL != "" {
 		detail.IMDbURL = imdbURL
 	}
@@ -2398,6 +2399,16 @@ func extractMediaInfoFromBBCode(text string) string {
 }
 
 var flagKeywords = []string{"禁转", "禁止转载", "谢绝转载", "严禁转载", "谢绝搬运", "独占", "限时禁转"}
+
+// extractFlagsFromStructured 只从结构化字段（标题/副标题/标签）提取禁转标记。
+// 不扫描简介正文，避免"禁转PTT"等误判（§56.37 合规修复）。
+func extractFlagsFromStructured(title, subtitle string, tags []string) []string {
+	combined := title + " " + subtitle
+	for _, t := range tags {
+		combined += " " + t
+	}
+	return extractFlagsFromText(combined)
+}
 
 func extractFlagsFromText(text string) []string {
 	var flags []string

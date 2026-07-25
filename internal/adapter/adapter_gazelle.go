@@ -208,7 +208,7 @@ func (a *GazelleAdapter) detailViaWeb(ctx context.Context, config *model.SiteCon
 	if doubanURL := reDoubanURL.FindString(html); doubanURL != "" {
 		detail.DoubanURL = doubanURL
 	}
-	detail.Flags = extractFlagsFromText(html + " " + detail.Title)
+	detail.Flags = extractFlagsFromStructured(detail.Title, "", detail.Tags)
 
 	return detail, nil
 }
