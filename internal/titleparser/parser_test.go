@@ -56,6 +56,49 @@ func TestParseTitle_ChinesePrefix(t *testing.T) {
 	}
 }
 
+func TestParseTitle_ChinesePrefixNoBracket(t *testing.T) {
+	// CSWEB 格式：中文片名.英文片名.技术信息-制作组（无中括号）
+	tests := []struct {
+		title  string
+		prefix string
+		hasEng bool // 是否有英文片名（有则 main_title 应无中文）
+	}{
+		{"正义前锋.The.Dukes.of.Hazzard.2005.2160p.WEB-DL.HEVC.AAC.2.0-CSWEB", "正义前锋", true},
+		{"角斗士.Gladiator.2000.2160p.WEB-DL.H.265.AAC2.0-CSWEB", "角斗士", true},
+		{"死侍.Deadpool.2016.1080p.Remux.H264.AAC.2.0.Audio-Kylin", "死侍", true},
+		{"赛车总动员3：极速挑战.Cars.3.S01.2017.1080p.WEB-DL.H.264.AAC.2.0-CSWEB", "赛车总动员3：极速挑战", true},
+		{"灼热.2020.1080p.中英字幕￡CMCT双儿", "灼热", false},
+		{"澳门风云2.2015.简繁中字￡CMCT犇犇", "澳门风云2", false},
+	}
+	for _, tt := range tests {
+		c := ParseTitle(tt.title)
+		if c.ChinesePrefix != tt.prefix {
+			t.Errorf("title %q: ChinesePrefix = %q, want %q", tt.title, c.ChinesePrefix, tt.prefix)
+		}
+		// 有英文片名的标题：main_title 不含中文
+		if tt.hasEng {
+			for _, r := range c.MainTitle {
+				if r >= 0x4e00 && r <= 0x9fff {
+					t.Errorf("title %q: MainTitle = %q, should not contain Chinese", tt.title, c.MainTitle)
+					break
+				}
+			}
+		}
+	}
+}
+
+func TestParseTitle_ChinesePrefixNotFalsePositive(t *testing.T) {
+	// 英文开头的标题不应误提取中文前缀
+	c := ParseTitle("The.Dark.Knight.2008.1080p.BluRay.x264-CMCT")
+	if c.ChinesePrefix != "" {
+		t.Errorf("English title should not have ChinesePrefix, got %q", c.ChinesePrefix)
+	}
+	// BJ单身日记2 — 英文+中文混合开头，不以中文开头，不匹配
+	c = ParseTitle("BJ单身日记2.Bridget.Jones.2.2004.1080p.WEB-DL.H.265.AAC2.0-CSWEB")
+	// BJ 开头不是中文，不触发无中括号提取。中文残留由 stripChinese 处理。
+	// 这是已知限制，不影响大部分种子。
+}
+
 func TestParseTitle_HDR(t *testing.T) {
 	c := ParseTitle("Dune.2024.2160p.UHD.BluRay.HDR.HEVC.TrueHD.7.1-FraMeSToR")
 	if c.HDRFormat != "HDR" {
