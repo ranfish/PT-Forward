@@ -528,6 +528,15 @@ func main() {
 		zap.Int("write", rateLimitWrite),
 		zap.Int("download", rateLimitDownload),
 	)
+	// §56.36: 注入动态限流配置回调（热更新）
+	router.SetRateLimitConfig(func() (bool, int) {
+		enabled := runtimeCfg.GetBool(ctx, setting.KeyRateLimitEnabled)
+		limit := runtimeCfg.GetInt(ctx, setting.KeyRateLimitGlobal)
+		if limit <= 0 {
+			limit = 600
+		}
+		return enabled, limit
+	})
 	router.RegisterWithEndpointLimits(mux, cfg.Server.CORSOrigins, rateLimitEnabled, rateLimitGlobal, rateLimitWrite, rateLimitDownload)
 
 	healthChecker := health.NewHealthChecker(version)

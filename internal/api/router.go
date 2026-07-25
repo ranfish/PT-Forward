@@ -69,6 +69,7 @@ type Router struct {
 	authMW               func(http.Handler) http.Handler
 	rateLimitMW          func(http.Handler) http.Handler
 	publicRateLimitMW    func(http.Handler) http.Handler
+	rateLimitCfg         middleware.RateLimitConfigFunc
 }
 
 func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, imageHostMgr *imagehost.Manager, logBroadcaster *LogBroadcaster, logger *zap.Logger) *Router {
@@ -158,6 +159,12 @@ func (rt *Router) SetCloudFPBreakerFn(fn func() bool) {
 	}
 }
 
+// SetRateLimitConfig 注入动态限流配置回调（§56.36 热更新）。
+// 必须在 Register 之前调用。
+func (rt *Router) SetRateLimitConfig(cfg middleware.RateLimitConfigFunc) {
+	rt.rateLimitCfg = cfg
+}
+
 
 // SetupManualForward 注入手动转发向导所需的依赖
 func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner, metadataFetcher *metadata.Fetcher, coverageSvc *coverage.Service, sourceDetector *publish.SourceSiteDetector) {
@@ -217,7 +224,16 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	rt.authMW = middleware.JWTAuth(rt.authManager)
 
 	if rateLimitEnabled && rateLimitGlobal > 0 {
-		rt.rateLimitMW = middleware.RateLimit(rateLimitGlobal, 60)
+		defaultGlobal := rateLimitGlobal
+		if defaultGlobal <= 0 {
+			defaultGlobal = 600
+		}
+		// §56.36: DynamicRateLimit 热更新——修改 system_settings 后立即生效
+		if rt.rateLimitCfg != nil {
+			rt.rateLimitMW = middleware.DynamicRateLimit(rt.rateLimitCfg, defaultGlobal, 60)
+		} else {
+			rt.rateLimitMW = middleware.RateLimit(defaultGlobal, 60)
+		}
 	} else {
 		rt.rateLimitMW = func(next http.Handler) http.Handler { return next }
 	}
