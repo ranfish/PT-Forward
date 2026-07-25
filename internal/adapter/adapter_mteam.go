@@ -387,6 +387,8 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	} else {
 		detail.Category = NormalizeCategory(detail.Category)
 	}
+	// 从结构化字段提取禁转标记（§56.37 合规修复）
+	detail.Flags = extractFlagsFromStructured(detail.Title, detail.Subtitle, detail.Tags)
 	return detail, nil
 }
 

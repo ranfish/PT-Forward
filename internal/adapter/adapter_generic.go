@@ -232,6 +232,23 @@ func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 
 	detail.Category = NormalizeCategory(detail.Category)
 
+	// 从结构化字段提取禁转标记（标题/副标题/标签）
+	detail.Flags = extractFlagsFromStructured(detail.Title, detail.Subtitle, detail.Tags)
+
+	// TTG 特殊检测：页面结构中的禁转标记（非标签体系）
+	if strings.Contains(html, "本种子是禁转资源") || strings.Contains(html, `nodistr" value="yes"`) {
+		already := false
+		for _, f := range detail.Flags {
+			if f == "禁转" {
+				already = true
+				break
+			}
+		}
+		if !already {
+			detail.Flags = append(detail.Flags, "禁转")
+		}
+	}
+
 	return detail, nil
 }
 
