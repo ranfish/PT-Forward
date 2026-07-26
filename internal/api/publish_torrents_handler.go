@@ -93,6 +93,12 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleUpdateGroupMapping(w, r)
 	case strings.Contains(path, "/publish/torrents/group-mappings/") && r.Method == http.MethodDelete:
 		h.handleDeleteGroupMapping(w, r)
+	case strings.HasSuffix(path, "/publish/cached-sites") && r.Method == http.MethodGet:
+		h.handleCachedSites(w, r)
+	case strings.HasSuffix(path, "/publish/seed-data") && r.Method == http.MethodGet:
+		h.handleListSeedData(w, r)
+	case strings.Contains(path, "/publish/seed-data/") && r.Method == http.MethodPut:
+		h.handleSaveSeedData(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -1432,4 +1438,140 @@ func inferTypeFromName(name string) string {
 
 	// 默认电影
 	return "category.movie"
+}
+
+// handleCachedSites §56.37: 查询 info_hash 在 torrent_metadata 中已缓存的源站列表。
+// 用于 CrossSeedPanel 的源站选择器（遗漏 E：源站切换）。
+func (h *PublishTorrentsHandler) handleCachedSites(w http.ResponseWriter, r *http.Request) {
+	infoHash := r.URL.Query().Get("info_hash")
+	if infoHash == "" {
+		Error(w, http.StatusBadRequest, 40001, "info_hash 必填")
+		return
+	}
+
+	var metas []model.TorrentMetadata
+	h.db.WithContext(r.Context()).
+		Where("info_hash = ?", infoHash).
+		Select("site_name", "torrent_id", "reviewed", "fetched_at", "subtitle", "title").
+		Find(&metas)
+
+	type cachedSite struct {
+		SiteName  string `json:"site_name"`
+		TorrentID string `json:"torrent_id"`
+		Reviewed  bool   `json:"reviewed"`
+		FetchedAt string `json:"fetched_at"`
+		Title     string `json:"title"`
+		Subtitle  string `json:"subtitle"`
+	}
+	sites := make([]cachedSite, 0, len(metas))
+	for _, m := range metas {
+		sites = append(sites, cachedSite{
+			SiteName:  m.SiteName,
+			TorrentID: m.TorrentID,
+			Reviewed:  m.Reviewed,
+			FetchedAt: m.FetchedAt.Format("2006-01-02 15:04"),
+			Title:     m.Title,
+			Subtitle:  m.Subtitle,
+		})
+	}
+
+	Success(w, map[string]interface{}{
+		"info_hash": infoHash,
+		"sites":     sites,
+	})
+}
+
+// handleListSeedData §56.37: /publish/seed-data 列表（torrent_metadata 已 review 的记录）。
+// 用于 /publish/data 页面（一站多种）。P1 优先级，P0 先实现基本列表。
+func (h *PublishTorrentsHandler) handleListSeedData(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	page, _ := strconv.Atoi(q.Get("page"))
+	if page == 0 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(q.Get("page_size"))
+	if pageSize == 0 {
+		pageSize = 20
+	}
+	search := q.Get("search")
+	sourceSite := q.Get("source_site")
+
+	query := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
+		Where("torrent_id != '' AND torrent_id != '0'")
+
+	if search != "" {
+		query = query.Where("title LIKE ? OR subtitle LIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if sourceSite != "" {
+		query = query.Where("site_name = ?", sourceSite)
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var metas []model.TorrentMetadata
+	query.Order("updated_at DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&metas)
+
+	Success(w, map[string]interface{}{
+		"items":     metas,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
+}
+
+// handleSaveSeedData §56.37: PUT /publish/seed-data/{id} 保存用户编辑。
+// 写平铺字段 + reviewed=true（遗漏 D：CrossSeedPanel 保存时机）。
+func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimRight(r.URL.Path, "/")
+	parts := strings.Split(path, "/")
+	idStr := parts[len(parts)-1]
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的 ID")
+		return
+	}
+
+	var req struct {
+		Title       string `json:"title"`
+		Subtitle    string `json:"subtitle"`
+		Description string `json:"description"`
+		Screenshots string `json:"screenshots"`
+		Poster      string `json:"poster"`
+		MediaInfo   string `json:"mediainfo"`
+		Tags        string `json:"tags"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+
+	updates := map[string]interface{}{
+		"title":       req.Title,
+		"subtitle":    req.Subtitle,
+		"description": req.Description,
+		"screenshots": req.Screenshots,
+		"poster":      req.Poster,
+		"mediainfo":   req.MediaInfo,
+		"tags":        req.Tags,
+		"reviewed":    true,
+	}
+
+	result := h.db.WithContext(r.Context()).
+		Model(&model.TorrentMetadata{}).
+		Where("id = ?", id).
+		Updates(updates)
+	if result.Error != nil {
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("保存失败: %v", result.Error))
+		return
+	}
+	if result.RowsAffected == 0 {
+		Error(w, http.StatusNotFound, 40400, "记录不存在")
+		return
+	}
+
+	Success(w, map[string]interface{}{"success": true, "id": id})
 }

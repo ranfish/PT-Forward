@@ -170,6 +170,12 @@
       @success="onWizardSuccess"
     />
 
+    <CrossSeedPanel
+      v-model:open="crossSeedOpen"
+      :preset-torrent="presetTorrent"
+      @success="onWizardSuccess"
+    />
+
     <MetadataReviewModal
       v-model:open="reviewOpen"
       :info-hash="reviewHash"
@@ -364,6 +370,7 @@ import { publishTorrentsApi, type PublishTorrentItem } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
 import { formatBytes, maskDomain } from '@/utils/format'
 import PublishWizardModal from './PublishWizardModal.vue'
+import CrossSeedPanel from './CrossSeedPanel.vue'
 import MetadataReviewModal from './MetadataReviewModal.vue'
 
 const clients = ref<{ id: number; name: string; type: string }[]>([])
@@ -390,6 +397,7 @@ const queryTotal = ref(0)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const wizardOpen = ref(false)
+const crossSeedOpen = ref(false)
 const reviewOpen = ref(false)
 const reviewHash = ref('')
 const reviewName = ref('')
@@ -611,11 +619,11 @@ async function detectAndOpen(record: PublishTorrentItem) {
         return
       }
     }
-    // 直接打开向导
-    wizardOpen.value = true
+    // 直接打开 CrossSeedPanel
+    crossSeedOpen.value = true
   } catch {
-    // 检测失败 → 直接打开向导（用默认源站）
-    wizardOpen.value = true
+    // 检测失败 → 直接打开 CrossSeedPanel（用默认源站）
+    crossSeedOpen.value = true
   }
 }
 
@@ -635,7 +643,7 @@ function confirmSourceSite() {
     }
   }
   sourceSelectOpen.value = false
-  wizardOpen.value = true
+  crossSeedOpen.value = true
 }
 
 function onWizardSuccess() {

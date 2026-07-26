@@ -165,4 +165,19 @@ export const manualForwardApi = {
   batchSubmit(items: ManualForwardSubmitRequest[]) {
     return client.post<ApiResponse<{ succeeded: number; failed: number }>>('/manual-forward/batch-submit', { items })
   },
+  refresh(data: { type: string; name: string; save_path?: string; info_hash?: string; site_name?: string }) {
+    return client.post<ApiResponse<Record<string, unknown>>>('/manual-forward/refresh', data)
+  },
+}
+
+export const publishDataApi = {
+  cachedSites(infoHash: string) {
+    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ site_name: string; torrent_id: string; reviewed: boolean; fetched_at: string; title: string; subtitle: string }> }>>('/publish/cached-sites', { params: { info_hash: infoHash } })
+  },
+  listSeedData(params?: { page?: number; page_size?: number; search?: string; source_site?: string }) {
+    return client.get<ApiResponse<{ items: unknown[]; total: number; page: number; page_size: number }>>('/publish/seed-data', { params })
+  },
+  saveSeedData(id: number, data: { title?: string; subtitle?: string; description?: string; screenshots?: string; poster?: string; mediainfo?: string; tags?: string }) {
+    return client.put<ApiResponse<{ success: boolean; id: number }>>(`/publish/seed-data/${id}`, data)
+  },
 }

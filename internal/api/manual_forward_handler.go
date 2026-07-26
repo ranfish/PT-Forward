@@ -140,6 +140,12 @@ func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
+	case strings.HasSuffix(path, "/manual-forward/refresh"):
+		if r.Method == http.MethodPost {
+			h.handleRefresh(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -1278,4 +1284,111 @@ func (h *ManualForwardHandler) handlePreviewFields(w http.ResponseWriter, r *htt
 	builder := metadata.NewPreviewBuilder()
 	resp := builder.BuildPreviewFromMeta(&meta, req.UserOverrides, req.TargetSite, req.Mode)
 	Success(w, resp)
+}
+
+// handleRefresh §56.37: 分类型刷新（CrossSeedPanel 的 [重新获取] 按钮）。
+// type: poster|screenshots|intro|mediainfo|rehost_screenshots
+// 复用 AnalyzePTGen + AnalyzeLocalArtifacts。
+func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	if h.pipeline == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "pipeline 未配置")
+		return
+	}
+	var req struct {
+		Type     string `json:"type"`
+		Name     string `json:"name"`
+		SavePath string `json:"save_path"`
+		InfoHash string `json:"info_hash"`
+		SiteName string `json:"site_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.Name == "" {
+		Error(w, http.StatusBadRequest, 40001, "name 必填")
+		return
+	}
+
+	ctx := r.Context()
+	result := map[string]interface{}{}
+
+	switch req.Type {
+	case "poster", "intro":
+		ptgen, err := h.pipeline.AnalyzePTGen(ctx, req.Name)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("PTGen 失败: %v", err))
+			return
+		}
+		if ptgen != nil {
+			if req.Type == "poster" {
+				result["poster"] = ptgen.PosterURL
+				result["douban_link"] = ptgen.DoubanURL
+				result["imdb_link"] = ptgen.IMDBURL
+				result["tmdb_link"] = ptgen.TMDbURL
+			} else {
+				result["description"] = ptgen.RawBBCode
+				result["subtitle"] = ptgen.ChineseTitle
+			}
+		}
+
+	case "mediainfo":
+		artifacts, err := h.pipeline.AnalyzeLocalArtifacts(ctx, req.Name, req.SavePath)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("MediaInfo 获取失败: %v", err))
+			return
+		}
+		if mi, ok := artifacts["media_info"]; ok {
+			result["mediainfo"] = mi
+		}
+
+	case "screenshots":
+		artifacts, err := h.pipeline.AnalyzeLocalArtifacts(ctx, req.Name, req.SavePath)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("截图获取失败: %v", err))
+			return
+		}
+		if ss, ok := artifacts["screenshots"]; ok {
+			result["screenshots"] = ss
+		}
+
+	case "rehost_screenshots":
+		Error(w, http.StatusNotImplemented, 50100, "rehost_screenshots 暂未实现，请使用截图 Tab 手动操作")
+
+	default:
+		Error(w, http.StatusBadRequest, 40001, "未知 type: "+req.Type)
+		return
+	}
+
+	// 如果有 info_hash + site_name，更新 DB
+	if req.InfoHash != "" && req.SiteName != "" && len(result) > 0 {
+		updates := map[string]interface{}{}
+		if v, ok := result["poster"]; ok {
+			updates["poster"] = v
+		}
+		if v, ok := result["description"]; ok {
+			updates["description"] = v
+		}
+		if v, ok := result["mediainfo"]; ok {
+			updates["mediainfo"] = v
+		}
+		if v, ok := result["screenshots"]; ok {
+			if arr, ok := v.([]string); ok && len(arr) > 0 {
+				jsonBytes, _ := json.Marshal(arr)
+				updates["screenshots"] = string(jsonBytes)
+			}
+		}
+		if v, ok := result["subtitle"]; ok {
+			updates["subtitle"] = v
+		}
+		if len(updates) > 0 {
+			h.db.WithContext(ctx).
+				Model(&model.TorrentMetadata{}).
+				Where("info_hash = ? AND site_name = ?", req.InfoHash, req.SiteName).
+				Updates(updates)
+		}
+	}
+
+	result["type"] = req.Type
+	Success(w, result)
 }
