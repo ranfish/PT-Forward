@@ -62,6 +62,8 @@ func TestIsWhitelistedImage(t *testing.T) {
 		want bool
 	}{
 		{"https://pixhost.to/show/abc.jpg", true},
+		{"https://pixhost.cc/show/abc.jpg", true},
+		{"https://img2.pixhost.cc/images/123/test.png", true},
 		{"https://img9.doubanio.com/poster.jpg", true},
 		{"https://image.tmdb.org/poster.jpg", true},
 		{"https://m.media-amazon.com/poster.jpg", true},

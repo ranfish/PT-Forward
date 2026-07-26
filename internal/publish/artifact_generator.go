@@ -19,7 +19,6 @@ type PublishArtifactGenerator struct {
 	screenshotEngine  *ScreenshotEngine
 	subtitleDetector  *SubtitleDetector
 	mediaInfoAnalyzer *MediaInfoAnalyzer
-	imageUploader     *ImageHostUploader
 	imageHostMgr      *imagehost.Manager // §56.17 决策 2: 统一图床管理
 	logger            *zap.Logger
 }
@@ -33,7 +32,6 @@ func NewPublishArtifactGenerator(cfg *screenshot.Config, logger *zap.Logger) *Pu
 	}
 	g.subtitleDetector = NewSubtitleDetector(logger)
 	g.mediaInfoAnalyzer = NewMediaInfoAnalyzer(logger)
-	g.imageUploader = NewImageHostUploader(logger)
 	return g
 }
 
@@ -180,35 +178,36 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 		return nil
 	}
 	g.logger.Info("local screenshots captured", zap.Int("count", len(localShots)), zap.String("tmpDir", tmpDir))
-	// §56.17 决策 1: 优先用 imagehost.Manager.Upload（统一接口）
-	var uploaded []string
-	if g.imageHostMgr != nil {
-		for i, shotPath := range localShots {
-			data, readErr := os.ReadFile(shotPath)
-			if readErr != nil {
-				g.logger.Warn("screenshot read failed", zap.String("path", shotPath), zap.Error(readErr))
-				continue
-			}
-			result, uploadErr := g.imageHostMgr.Upload(ctx, data, filepath.Base(shotPath))
-			if uploadErr != nil || result == nil || result.URL == "" {
-				g.logger.Warn("screenshot upload skipped",
-					zap.Int("idx", i), zap.String("path", shotPath),
-					zap.Int("size", len(data)),
-					zap.NamedError("upload_err", uploadErr),
-					zap.Any("result", result))
-				continue
-			}
-			uploaded = append(uploaded, result.URL)
+	if g.imageHostMgr == nil {
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
-	} else {
-		// fallback: 旧版 ImageHostUploader（向后兼容）
-		uploaded, err = g.imageUploader.UploadMultiple(ctx, localShots)
+		g.logger.Warn("imageHostMgr not configured, skipping upload")
+		return nil
+	}
+	var uploaded []string
+	for i, shotPath := range localShots {
+		data, readErr := os.ReadFile(shotPath)
+		if readErr != nil {
+			g.logger.Warn("screenshot read failed", zap.String("path", shotPath), zap.Error(readErr))
+			continue
+		}
+		result, uploadErr := g.imageHostMgr.Upload(ctx, data, filepath.Base(shotPath))
+		if uploadErr != nil || result == nil || result.URL == "" {
+			g.logger.Warn("screenshot upload skipped",
+				zap.Int("idx", i), zap.String("path", shotPath),
+				zap.Int("size", len(data)),
+				zap.NamedError("upload_err", uploadErr),
+				zap.Any("result", result))
+			continue
+		}
+		uploaded = append(uploaded, result.URL)
 	}
 	if tmpDir != "" {
 		_ = os.RemoveAll(tmpDir)
 	}
 	if len(uploaded) == 0 {
-		g.logger.Warn("screenshot upload all failed", zap.Int("captured", len(localShots)), zap.Error(err))
+		g.logger.Warn("screenshot upload all failed", zap.Int("captured", len(localShots)))
 		return nil
 	}
 	g.logger.Info("uploaded local screenshots", zap.Int("count", len(uploaded)))
