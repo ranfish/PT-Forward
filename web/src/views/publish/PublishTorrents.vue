@@ -44,6 +44,22 @@
         <a-select-option value="queried">已查询</a-select-option>
         <a-select-option value="unqueried">未查询</a-select-option>
       </a-select>
+      <a-select
+        v-if="torrents.length"
+        v-model:value="stateFilter"
+        mode="multiple"
+        style="width: 160px; margin-left: 12px"
+        placeholder="状态筛选"
+        allow-clear
+        :max-tag-count="1"
+      >
+        <a-select-option value="uploading">上传中</a-select-option>
+        <a-select-option value="stalledUP">停滞做种</a-select-option>
+        <a-select-option value="pausedUP">暂停做种</a-select-option>
+        <a-select-option value="downloading">下载中</a-select-option>
+        <a-select-option value="pausedDL">暂停下载</a-select-option>
+        <a-select-option value="error">错误</a-select-option>
+      </a-select>
       <a-tag v-if="torrents.length" color="blue" style="margin-left: 8px">
         {{ filteredTorrents.length }} / {{ torrents.length }}
       </a-tag>
@@ -89,7 +105,7 @@
       }"
       row-key="info_hash"
       size="small"
-      :scroll="{ x: 1280 }"
+      :scroll="{ x: 1430 }"
       :sticky="{ offsetHeader: 48 }"
       :row-class-name="(record: any) => record.metadata_reviewed ? 'row-reviewed' : 'row-unreviewed'"
       :row-selection="{ selectedRowKeys: selectedHashes, onChange: (keys: string[]) => selectedHashes = keys }"
@@ -136,6 +152,11 @@
         </template>
         <template v-if="column.key === 'uploaded'">
           <span :style="{ color: record.uploaded > 0 ? '#52c41a' : '#999' }">{{ formatBytes(record.uploaded) }}</span>
+        </template>
+        <template v-if="column.key === 'save_path'">
+          <a-tooltip :title="record.save_path">
+            <span style="font-size: 11px; color: #666">{{ record.save_path }}</span>
+          </a-tooltip>
         </template>
         <template v-if="column.key === 'coverage'">
           <a-tooltip>
@@ -437,6 +458,7 @@ interface PersistedFilters {
   search?: string
   query_filter?: string
   type_filter?: string
+  state_filter?: string[]
   page_size?: number
 }
 
@@ -454,6 +476,7 @@ function persistFilters() {
     search: searchText.value || undefined,
     query_filter: queryFilter.value,
     type_filter: typeFilter.value,
+    state_filter: stateFilter.value,
     page_size: pageSize.value,
   }
   try {
@@ -469,6 +492,7 @@ const loading = ref(false)
 const searchText = ref(persisted.search || '')
 const queryFilter = ref<string | undefined>(persisted.query_filter)
 const typeFilter = ref<string | undefined>(persisted.type_filter)
+const stateFilter = ref<string[]>(persisted.state_filter || [])
 const queryingHash = ref('')
 const selectedHashes = ref<string[]>([])
 let coverageAbortController: AbortController | null = null
@@ -484,7 +508,7 @@ const queryTotal = ref(0)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
-watch([selectedClientId, searchText, queryFilter, typeFilter, pageSize], persistFilters)
+watch([selectedClientId, searchText, queryFilter, typeFilter, stateFilter, pageSize], persistFilters)
 
 const crossSeedOpen = ref(false)
 const reviewOpen = ref(false)
@@ -499,6 +523,7 @@ const columns = [
   { title: '状态', key: 'state', width: 90 },
   { title: '进度', key: 'progress', width: 110, align: 'center' as const },
   { title: '上传量', key: 'uploaded', width: 90 },
+  { title: '保存路径', key: 'save_path', width: 150, ellipsis: true },
   { title: '覆盖', key: 'coverage', width: 120, align: 'center' as const },
   { title: '可转', key: 'target_count', width: 100 },
   { title: '操作', key: 'actions', width: 180 },
@@ -517,6 +542,9 @@ const filteredTorrents = computed(() => {
   }
   if (typeFilter.value) {
     result = result.filter((t: any) => (t as any).standard_type === typeFilter.value)
+  }
+  if (stateFilter.value.length > 0) {
+    result = result.filter(t => stateFilter.value.includes(t.state))
   }
   return result
 })
