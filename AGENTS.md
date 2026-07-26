@@ -59,6 +59,10 @@
 - **CGO**：后端编译必须 `CGO_ENABLED=1`
 - **DB**：`data/pt-forward.db`（SQLite）
 - **服务**：`systemctl --user restart pt-forward`（用户级 systemd 服务，端口 8765）
+- **开发环境 29**：10.0.0.29，Agent 唯一可操作的机器（编译/测试/部署/DB）
+- **生产环境 249**：10.0.0.249 Docker（docker compose），端口 8765，**禁止 Agent 直接操作**
+- **PT8 环境 242**：10.0.0.242 Docker，**禁止 Agent 直接操作**
+- **22 环境 22**：10.0.0.22 Docker，**禁止 Agent 直接操作**
 - **代理**：`http://10.0.2.5:7897`（curl/docker pull 等访问外部网络时可用）
 - **Docker**：`sg docker -c "docker ..."`（当前用户不在 docker 组，需 sg 切换组）
 
@@ -73,6 +77,11 @@
 - **删除代码后**：必须跑 `go vet ./internal/... ./cmd/pt-forward/...`（**不要**用 `go vet ./...`，`cmd/verify-pieces-hash` 有已知冲突会报错），确保测试文件不引用已删符号
 - **编译部署前**：必须灵魂四问、回归审核，然后再进行编译和部署
 - **版本号**：编译命令必须包含 `-X main.version=$(git describe --tags --always --dirty)`，源码默认值为 `"dev"`
+- **⚠️ 环境隔离铁律（最高优先级，违反=事故）**：
+  1. **开发只在开发机（29）上进行**：所有代码编写、编译、测试、部署仅在开发环境 29 执行（`systemctl --user restart pt-forward`）。
+  2. **禁止直接操作生产环境**：不能 SSH 到生产机（249/242/22）编译、不能 scp 二进制到生产环境、不能在生产环境直接修改代码或数据。
+  3. **生产环境由用户自行更新**：生产环境的 Docker 镜像更新（`docker compose pull && docker compose up -d`）由用户自行执行。Agent 的职责是提交代码、打 tag、推送（触发 CI/CD 构建镜像），不负责生产部署。
+  4. **Agent 可以做的**：在 29 上编译部署验证 → commit + push → 打 tag → 告知用户生产环境需更新。
 - **⚠️ 部署铁律（最高优先级，违反=事故）**：
   1. **先提交后部署**：`git commit + push` 必须在编译/部署**之前**完成。代码必须在 git 历史中先于部署生效。**禁止先部署后提交**。
   2. **部署检查清单**（每次部署前逐条过一遍，不能跳过）：
