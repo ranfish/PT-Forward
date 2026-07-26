@@ -163,13 +163,6 @@
       </template>
     </a-table>
 
-    <PublishWizardModal
-      v-model:open="wizardOpen"
-      :preset-torrent="presetTorrent"
-      :preset-client-id="selectedClientId"
-      @success="onWizardSuccess"
-    />
-
     <CrossSeedPanel
       v-model:open="crossSeedOpen"
       :preset-torrent="presetTorrent"
@@ -369,7 +362,6 @@ import { message } from 'ant-design-vue'
 import { publishTorrentsApi, type PublishTorrentItem } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
 import { formatBytes, maskDomain } from '@/utils/format'
-import PublishWizardModal from './PublishWizardModal.vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import MetadataReviewModal from './MetadataReviewModal.vue'
 
@@ -396,7 +388,6 @@ const queryTotal = ref(0)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
-const wizardOpen = ref(false)
 const crossSeedOpen = ref(false)
 const reviewOpen = ref(false)
 const reviewHash = ref('')
