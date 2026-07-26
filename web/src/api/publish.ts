@@ -172,7 +172,7 @@ export const manualForwardApi = {
 
 export const publishDataApi = {
   cachedSites(infoHash: string) {
-    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ site_name: string; torrent_id: string; reviewed: boolean; fetched_at: string; title: string; subtitle: string }> }>>('/publish/cached-sites', { params: { info_hash: infoHash } })
+    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ id: number; site_name: string; torrent_id: string; reviewed: boolean; fetched_at: string; title: string; subtitle: string }> }>>('/publish/cached-sites', { params: { info_hash: infoHash } })
   },
   listSeedData(params?: { page?: number; page_size?: number; search?: string; source_site?: string }) {
     return client.get<ApiResponse<{ items: unknown[]; total: number; page: number; page_size: number }>>('/publish/seed-data', { params })

@@ -294,7 +294,7 @@ const bodyRef = ref<HTMLElement>()
 
 const selectedTorrent = ref<PresetTorrent | null>(null)
 const analyzeResult = ref<Record<string, any> | null>(null)
-const cachedSites = ref<Array<{ site_name: string; torrent_id: string; reviewed: boolean; fetched_at: string; title: string; subtitle: string }>>([])
+const cachedSites = ref<Array<{ id: number; site_name: string; torrent_id: string; reviewed: boolean; fetched_at: string; title: string; subtitle: string }>>([])
 const currentSourceSite = ref<string>('')
 
 const form = ref({
@@ -545,30 +545,20 @@ function prevStep() {
 
 async function saveToDB() {
   if (!selectedTorrent.value) return
+  // 直接从 cachedSites 找到 metadata ID，避免脆弱的搜索
+  const site = cachedSites.value.find(s => s.site_name === (currentSourceSite.value || selectedTorrent.value?.source_site))
+  if (!site || !site.id) return
   saving.value = true
   try {
-    // Find existing metadata record
-    const csResp = await publishDataApi.cachedSites(selectedTorrent.value.info_hash)
-    const sites = csResp.data?.data?.sites || []
-    const site = sites.find(s => s.site_name === (currentSourceSite.value || selectedTorrent.value?.source_site))
-    if (site && site.torrent_id) {
-      // Find the metadata ID by searching
-      // We need the metadata ID to save. Let's use the seed-data list to find it.
-      const listResp = await publishDataApi.listSeedData({ page: 1, page_size: 1, search: selectedTorrent.value.info_hash })
-      const items = listResp.data?.data?.items as Array<{ id: number; info_hash: string; site_name: string }> | undefined
-      const meta = items?.find(m => m.info_hash === selectedTorrent.value?.info_hash && m.site_name === (currentSourceSite.value || selectedTorrent.value?.source_site))
-      if (meta) {
-        await publishDataApi.saveSeedData(meta.id, {
-          title: form.value.title,
-          subtitle: form.value.subtitle,
-          description: form.value.description,
-          screenshots: JSON.stringify(form.value.screenshots),
-          poster: form.value.poster,
-          mediainfo: form.value.mediaInfo,
-          tags: JSON.stringify(form.value.tags),
-        })
-      }
-    }
+    await publishDataApi.saveSeedData(site.id, {
+      title: form.value.title,
+      subtitle: form.value.subtitle,
+      description: form.value.description,
+      screenshots: JSON.stringify(form.value.screenshots),
+      poster: form.value.poster,
+      mediainfo: form.value.mediaInfo,
+      tags: JSON.stringify(form.value.tags),
+    })
   } catch { /* silent */ } finally {
     saving.value = false
   }
