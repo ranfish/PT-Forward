@@ -1454,10 +1454,11 @@ func (h *PublishTorrentsHandler) handleCachedSites(w http.ResponseWriter, r *htt
 	var metas []model.TorrentMetadata
 	h.db.WithContext(r.Context()).
 		Where("info_hash = ?", infoHash).
-		Select("site_name", "torrent_id", "reviewed", "fetched_at", "subtitle", "title").
+		Select("id", "site_name", "torrent_id", "reviewed", "fetched_at", "subtitle", "title").
 		Find(&metas)
 
 	type cachedSite struct {
+		ID        uint   `json:"id"`
 		SiteName  string `json:"site_name"`
 		TorrentID string `json:"torrent_id"`
 		Reviewed  bool   `json:"reviewed"`
@@ -1468,6 +1469,7 @@ func (h *PublishTorrentsHandler) handleCachedSites(w http.ResponseWriter, r *htt
 	sites := make([]cachedSite, 0, len(metas))
 	for _, m := range metas {
 		sites = append(sites, cachedSite{
+			ID:        m.ID,
 			SiteName:  m.SiteName,
 			TorrentID: m.TorrentID,
 			Reviewed:  m.Reviewed,
@@ -1502,7 +1504,7 @@ func (h *PublishTorrentsHandler) handleListSeedData(w http.ResponseWriter, r *ht
 		Where("torrent_id != '' AND torrent_id != '0'")
 
 	if search != "" {
-		query = query.Where("title LIKE ? OR subtitle LIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("title LIKE ? OR subtitle LIKE ? OR info_hash LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
 	if sourceSite != "" {
 		query = query.Where("site_name = ?", sourceSite)
