@@ -406,6 +406,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/publish/cached-sites/", ptHandler)
 	mux.Handle("/api/v1/publish/seed-data", ptHandler)
 	mux.Handle("/api/v1/publish/seed-data/", ptHandler)
+	mux.Handle("/api/v1/publish/stats", ptHandler)
+	mux.Handle("/api/v1/publish/stats/", ptHandler)
 
 	dashboardHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/dashboard/overview", dashboardHandler)

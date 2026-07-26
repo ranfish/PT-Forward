@@ -1,5 +1,39 @@
 <template>
   <div>
+    <!-- ═══ 总览统计卡片 ═══ -->
+    <a-row v-if="dashboardStats" :gutter="16" style="margin-bottom: 16px">
+      <a-col :span="4">
+        <a-card size="small">
+          <a-statistic title="今日发布" :value="dashboardStats.today_publish" />
+        </a-card>
+      </a-col>
+      <a-col :span="4">
+        <a-card size="small">
+          <a-statistic title="成功" :value="dashboardStats.today_success" :value-style="{ color: '#3f8600' }" />
+        </a-card>
+      </a-col>
+      <a-col :span="4">
+        <a-card size="small">
+          <a-statistic title="失败" :value="dashboardStats.today_failed" :value-style="{ color: '#cf1322' }" />
+        </a-card>
+      </a-col>
+      <a-col :span="4">
+        <a-card size="small">
+          <a-statistic title="队列" :value="dashboardStats.pending_count" />
+        </a-card>
+      </a-col>
+      <a-col :span="4">
+        <a-card size="small">
+          <a-statistic title="已审核" :value="dashboardStats.reviewed_count" />
+        </a-card>
+      </a-col>
+      <a-col :span="4">
+        <a-card size="small">
+          <a-statistic title="数据总量" :value="dashboardStats.total_metadata" />
+        </a-card>
+      </a-col>
+    </a-row>
+
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px">
       <a-button type="primary" @click="wizardOpen = true">
         <template #icon><PlusOutlined /></template>
@@ -264,7 +298,7 @@ import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
-import { publishApi } from '@/api/publish'
+import { publishApi, publishDataApi } from '@/api/publish'
 import { sitesApi } from '@/api/sites'
 import { useEnumLabels } from '@/utils/enumLabels'
 import PublishWizardModal from './PublishWizardModal.vue'
@@ -274,6 +308,16 @@ import { formatTime, formatBytes } from '@/utils/format'
 const { t } = useI18n()
 const { translatePublishStatus, translatePublishType } = useEnumLabels()
 const activeTab = ref('candidates')
+
+// 总览统计
+const dashboardStats = ref<{ today_publish: number; today_success: number; today_failed: number; pending_count: number; reviewed_count: number; total_metadata: number } | null>(null)
+async function fetchStats() {
+  try {
+    const resp = await publishDataApi.stats()
+    dashboardStats.value = resp.data?.data?.stats || null
+  } catch { /* silent */ }
+}
+
 const wizardOpen = ref(false)
 const candidateSearch = ref('')
 const candidateStatus = ref<string | undefined>(undefined)
@@ -663,6 +707,7 @@ function onWizardSuccess() {
 }
 
 onMounted(() => {
+  fetchStats()
   fetchCandidates()
   fetchGroups()
   fetchTasks()

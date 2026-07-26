@@ -99,6 +99,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleListSeedData(w, r)
 	case strings.Contains(path, "/publish/seed-data/") && r.Method == http.MethodPut:
 		h.handleSaveSeedData(w, r)
+	case strings.HasSuffix(path, "/publish/stats") && r.Method == http.MethodGet:
+		h.handleStats(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -1574,4 +1576,51 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 	}
 
 	Success(w, map[string]interface{}{"success": true, "id": id})
+}
+
+// handleStats §56.37: 总览统计卡片。
+func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	var stats struct {
+		TodayPublish  int64 `json:"today_publish"`
+		TodaySuccess  int64 `json:"today_success"`
+		TodayFailed   int64 `json:"today_failed"`
+		PendingCount  int64 `json:"pending_count"`
+		ReviewedCount int64 `json:"reviewed_count"`
+		TotalMetadata int64 `json:"total_metadata"`
+	}
+
+	// 今日发布数
+	h.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+		Where("created_at >= ?", todayStart).Count(&stats.TodayPublish)
+	h.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+		Where("created_at >= ? AND status = ?", todayStart, "success").Count(&stats.TodaySuccess)
+	h.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+		Where("created_at >= ? AND status = ?", todayStart, "failed").Count(&stats.TodayFailed)
+
+	// 队列深度
+	h.db.WithContext(ctx).Model(&model.PublishCandidate{}).
+		Where("publish_status IN ?", []string{"active", "pending"}).Count(&stats.PendingCount)
+
+	// 已审核数据
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("reviewed = ? AND torrent_id != '' AND torrent_id != '0'", true).
+		Count(&stats.ReviewedCount)
+
+	// 总元数据数
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("torrent_id != '' AND torrent_id != '0'").
+		Count(&stats.TotalMetadata)
+
+	// 最近 10 条发布记录
+	var recent []model.PublishResultRecord
+	h.db.WithContext(ctx).Order("created_at DESC").Limit(10).Find(&recent)
+
+	Success(w, map[string]interface{}{
+		"stats":   stats,
+		"recent":  recent,
+	})
 }

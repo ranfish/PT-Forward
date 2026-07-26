@@ -57,6 +57,7 @@
             <template #icon><SendOutlined /></template>
             <template #title>{{ t('nav.publish') }}</template>
             <a-menu-item key="/publish" @click="$router.push('/publish')">总览</a-menu-item>
+            <a-menu-item key="/publish/data" @click="$router.push('/publish/data')">一站多种</a-menu-item>
             <a-menu-item key="/publish/torrents" @click="$router.push('/publish/torrents')">一种多站</a-menu-item>
             <a-menu-item key="/publish/exclusions" @click="$router.push('/publish/exclusions')">{{ t('nav.publishExclusions') }}</a-menu-item>
           </a-sub-menu>
