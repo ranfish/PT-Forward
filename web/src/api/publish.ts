@@ -183,4 +183,7 @@ export const publishDataApi = {
   stats() {
     return client.get<ApiResponse<{ stats: { today_publish: number; today_success: number; today_failed: number; pending_count: number; reviewed_count: number; total_metadata: number }; recent: unknown[] }>>('/publish/stats')
   },
+  coverageCache(infoHash: string) {
+    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ site_name: string; status: string; source: string }> }>>('/publish/coverage-cache', { params: { info_hash: infoHash } })
+  },
 }

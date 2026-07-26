@@ -101,6 +101,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleSaveSeedData(w, r)
 	case strings.HasSuffix(path, "/publish/stats") && r.Method == http.MethodGet:
 		h.handleStats(w, r)
+	case strings.HasSuffix(path, "/publish/coverage-cache") && r.Method == http.MethodGet:
+		h.handleCoverageCache(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -1624,5 +1626,43 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 	Success(w, map[string]interface{}{
 		"stats":   stats,
 		"recent":  recent,
+	})
+}
+
+// handleCoverageCache §56.37 遗漏 C: 轻量级覆盖缓存查询（只读 DB，不触发 L0/L1/L2/L3 查询）。
+// 用于 CrossSeedPanel Step 2 目标站三色排除。
+func (h *PublishTorrentsHandler) handleCoverageCache(w http.ResponseWriter, r *http.Request) {
+	infoHash := r.URL.Query().Get("info_hash")
+	if infoHash == "" {
+		Error(w, http.StatusBadRequest, 40001, "info_hash 必填")
+		return
+	}
+
+	if h.coverage == nil {
+		Success(w, map[string]interface{}{"info_hash": infoHash, "sites": []interface{}{}})
+		return
+	}
+
+	cached, _ := h.coverage.GetCachedCoverage(r.Context(), infoHash)
+
+	type siteStatus struct {
+		SiteName string `json:"site_name"`
+		Status   string `json:"status"`
+		Source   string `json:"source"`
+	}
+	sites := make([]siteStatus, 0, len(cached))
+	for _, c := range cached {
+		if c.Status == model.CoverageConfirmedHas || c.Status == model.CoverageProbablyHas {
+			sites = append(sites, siteStatus{
+				SiteName: c.SiteName,
+				Status:   c.Status,
+				Source:   c.Source,
+			})
+		}
+	}
+
+	Success(w, map[string]interface{}{
+		"info_hash": infoHash,
+		"sites":     sites,
 	})
 }
