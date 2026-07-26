@@ -424,7 +424,7 @@ async function enterAnalyze() {
       source_site: t.source_site || currentSourceSite.value,
       source_torrent_id: t.source_site_id ? String(t.source_site_id) : undefined,
     })
-    const taskId = resp.data?.data?.taskId
+    const taskId = (resp.data?.data as Record<string, unknown>)?.task_id as number
     if (!taskId) {
       loadError.value = '分析任务创建失败'
       loading.value = false
