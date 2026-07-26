@@ -1,6 +1,7 @@
 {
   "image_whitelist": [
     {"host": "pixhost.to", "category": "image_host"},
+    {"host": "pixhost.cc", "category": "image_host"},
     {"host": "imgdb.nn", "category": "image_host"},
     {"host": "imgbb.com", "category": "image_host"},
     {"host": "imageban.ru", "category": "image_host"},

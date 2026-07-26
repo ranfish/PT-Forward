@@ -15,24 +15,44 @@ import (
 	"go.uber.org/zap"
 )
 
-var rePixhostDirect = regexp.MustCompile(`https://img\d+\.pixhost\.to/images/[^"'\s]+\.jpg`)
+// rePixhostDirect 从 show 页面 HTML 提取直链。
+// 同时匹配 .to 和 .cc 域名，支持 jpg/jpeg/png 扩展名。
+var rePixhostDirect = regexp.MustCompile(`https://img\d+\.pixhost\.(?:to|cc)/images/[^"'\s]+\.(?:jpg|jpeg|png)`)
 
+// PixhostHost 支持 pixhost.cc / pixhost.to 双域名 fallback。
+// domains 按优先级排列：第一个可用域名优先使用。
 type PixhostHost struct {
-	client *http.Client
-	logger *zap.Logger
+	client  *http.Client
+	logger  *zap.Logger
+	domains []string
 }
 
 func NewPixhostHost(logger *zap.Logger) *PixhostHost {
 	return &PixhostHost{
-		client: &http.Client{Timeout: 180 * time.Second},
-		logger: logger,
+		client:  &http.Client{Timeout: 180 * time.Second},
+		logger:  logger,
+		domains: []string{"pixhost.cc", "pixhost.to"},
 	}
 }
 
 func (p *PixhostHost) Name() string { return "pixhost" }
 
-
 func (p *PixhostHost) Upload(ctx context.Context, data []byte, filename string) (*UploadResult, error) {
+	var lastErr error
+	for _, domain := range p.domains {
+		result, err := p.uploadToDomain(ctx, domain, data, filename)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		p.logger.Debug("pixhost upload failed on domain, trying next",
+			zap.String("domain", domain),
+			zap.Error(err))
+	}
+	return nil, fmt.Errorf("pixhost upload failed on all domains: %w", lastErr)
+}
+
+func (p *PixhostHost) uploadToDomain(ctx context.Context, domain string, data []byte, filename string) (*UploadResult, error) {
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 	part, err := writer.CreateFormFile("img", filename)
@@ -52,7 +72,8 @@ func (p *PixhostHost) Upload(ctx context.Context, data []byte, filename string) 
 		return nil, fmt.Errorf("close writer: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.pixhost.to/images", &buf)
+	apiURL := fmt.Sprintf("https://api.%s/images", domain)
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, &buf)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -61,7 +82,7 @@ func (p *PixhostHost) Upload(ctx context.Context, data []byte, filename string) 
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("upload: %w", err)
+		return nil, fmt.Errorf("upload to %s: %w", domain, err)
 	}
 	defer func() { httpclient.DrainBody(resp) }()
 
@@ -71,7 +92,7 @@ func (p *PixhostHost) Upload(ctx context.Context, data []byte, filename string) 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("upload status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("upload status %d from %s: %s", resp.StatusCode, domain, string(body))
 	}
 
 	var uploadResp struct {
@@ -83,7 +104,7 @@ func (p *PixhostHost) Upload(ctx context.Context, data []byte, filename string) 
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 	if uploadResp.ShowURL == "" {
-		return nil, fmt.Errorf("empty show_url")
+		return nil, fmt.Errorf("empty show_url from %s", domain)
 	}
 
 	directURL, err := p.resolveDirectURL(ctx, uploadResp.ShowURL)
@@ -107,7 +128,19 @@ func (p *PixhostHost) Rehost(ctx context.Context, sourceURL string) (*UploadResu
 }
 
 func (p *PixhostHost) HealthCheck(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, "HEAD", "https://pixhost.to/", nil)
+	var lastErr error
+	for _, domain := range p.domains {
+		err := p.healthCheckDomain(ctx, domain)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+	}
+	return fmt.Errorf("pixhost all domains unhealthy: %w", lastErr)
+}
+
+func (p *PixhostHost) healthCheckDomain(ctx context.Context, domain string) error {
+	req, err := http.NewRequestWithContext(ctx, "HEAD", fmt.Sprintf("https://%s/", domain), nil)
 	if err != nil {
 		return err
 	}
@@ -117,7 +150,7 @@ func (p *PixhostHost) HealthCheck(ctx context.Context) error {
 	}
 	defer func() { httpclient.DrainBody(resp) }()
 	if resp.StatusCode >= 500 {
-		return fmt.Errorf("pixhost unavailable: HTTP %d", resp.StatusCode)
+		return fmt.Errorf("pixhost.%s unavailable: HTTP %d", domain, resp.StatusCode)
 	}
 	return nil
 }
