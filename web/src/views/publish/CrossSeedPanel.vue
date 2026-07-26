@@ -591,6 +591,9 @@ async function loadPreview() {
   }
 }
 
+// 覆盖缓存（遗漏 C：目标站三色排除）
+const coveredSites = ref<Set<string>>(new Set())
+
 async function enterSelectSites() {
   selectedTargets.value = []
   targetsLoading.value = true
@@ -601,16 +604,38 @@ async function enterSelectSites() {
       blocked_targets: blockedTargets,
     })
     const raw = (resp.data?.data || []) as unknown[]
-    siteList.value = raw.map((item) => {
-      const obj = item as Record<string, unknown>
-      const blocked = !!obj.blocked
-      const name = obj.name as string
-      let blockReason = ''
-      if (blocked) {
-        blockReason = blockedTargets.includes(name) ? '互斥规则' : '缺少 cookie/passkey'
-      }
-      return { name, domain: (obj.domain as string) || '', blocked, blockReason }
-    })
+
+    // 查覆盖缓存（轻量级 DB 读，不触发慢查询）
+    const coveredNames = new Set<string>()
+    if (selectedTorrent.value?.info_hash) {
+      try {
+        const covResp = await publishDataApi.coverageCache(selectedTorrent.value.info_hash)
+        const covSites = covResp.data?.data?.sites || []
+        for (const s of covSites) coveredNames.add(s.site_name)
+      } catch { /* silent — 无覆盖数据则不过滤 */ }
+    }
+    coveredSites.value = coveredNames
+
+    // 过滤掉已覆盖站点（🟢做种中 + 🟡可辅种），保留 ⚪未发现 + 无覆盖数据
+    siteList.value = raw
+      .filter((item) => {
+        const obj = item as Record<string, unknown>
+        return !coveredNames.has(obj.name as string)
+      })
+      .map((item) => {
+        const obj = item as Record<string, unknown>
+        const blocked = !!obj.blocked
+        const name = obj.name as string
+        let blockReason = ''
+        if (blocked) {
+          blockReason = blockedTargets.includes(name) ? '互斥规则' : '缺少 cookie/passkey'
+        }
+        return { name, domain: (obj.domain as string) || '', blocked, blockReason }
+      })
+
+    if (coveredNames.size > 0) {
+      message.info(`已排除 ${coveredNames.size} 个已覆盖站点`)
+    }
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {
