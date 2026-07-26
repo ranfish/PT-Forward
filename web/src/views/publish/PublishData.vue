@@ -3,20 +3,25 @@
     <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center">
       <h3 style="margin: 0">一站多种</h3>
       <a-space>
+        <a-radio-group v-model:value="reviewStatus" button-style="solid" size="small" @change="onFilterChange">
+          <a-radio-button value="all">全部</a-radio-button>
+          <a-radio-button value="reviewed">已审核</a-radio-button>
+          <a-radio-button value="unreviewed">待审核</a-radio-button>
+        </a-radio-group>
         <a-button type="primary" @click="batchFetchOpen = true"><PlusOutlined /> 获取数据</a-button>
         <a-input-search
           v-model:value="searchQuery"
           placeholder="搜索标题或副标题"
           style="width: 300px"
           allow-clear
-          @search="fetchData"
+          @search="onFilterChange"
         />
         <a-select
           v-model:value="sourceSiteFilter"
           style="width: 200px"
           placeholder="源站筛选"
           allow-clear
-          @change="fetchData"
+          @change="onFilterChange"
         >
           <a-select-option v-for="s in sourceSites" :key="s" :value="s">{{ s }}</a-select-option>
         </a-select>
@@ -30,7 +35,7 @@
       :loading="loading"
       :pagination="pagination"
       row-key="id"
-      :scroll="{ x: 1200 }"
+      :scroll="{ x: 1380 }"
       size="small"
       :row-class-name="(record: SeedDataRow) => completenessPercent(record) < 50 ? 'row-incomplete' : ''"
       @change="onTableChange"
@@ -39,7 +44,7 @@
         <template v-if="column.key === 'title'">
           <div>
             <div v-if="record.subtitle" style="color: #666; font-size: 12px">{{ record.subtitle }}</div>
-            <div :style="{ color: record.title ? '' : '#cf1322' }">{{ record.title || '(空)' }}</div>
+            <div :class="{ 'cell-missing': !record.title }">{{ record.title || '(空)' }}</div>
           </div>
         </template>
         <template v-else-if="column.key === 'site_name'">
@@ -48,7 +53,20 @@
         </template>
         <template v-else-if="column.key === 'standard_type'">
           <span v-if="record.standard_type">{{ record.standard_type }}</span>
-          <span v-else style="color: #cf1322">未设置</span>
+          <span v-else class="cell-missing">未设置</span>
+        </template>
+        <template v-else-if="column.key === 'tags'">
+          <template v-if="parseTags(record.tags).length">
+            <a-tag
+              v-for="t in parseTags(record.tags)"
+              :key="t"
+              :color="isForbiddenTag(t) ? 'red' : 'blue'"
+              style="margin: 1px; font-size: 11px"
+            >
+              {{ t }}
+            </a-tag>
+          </template>
+          <span v-else class="cell-missing">无</span>
         </template>
         <template v-else-if="column.key === 'completeness'">
           <a-progress
@@ -116,6 +134,18 @@ const tableData = ref<SeedDataRow[]>([])
 const searchQuery = ref('')
 const sourceSiteFilter = ref<string | undefined>(undefined)
 const sourceSites = ref<string[]>([])
+const reviewStatus = ref<'all' | 'reviewed' | 'unreviewed'>('all')
+
+const forbiddenTagKeywords = ['禁转', '独占', '谢绝转载', '限时禁转', '严禁转载', '禁止转载', '谢绝搬运']
+
+function isForbiddenTag(tag: string): boolean {
+  return forbiddenTagKeywords.some(kw => tag.includes(kw))
+}
+
+function onFilterChange() {
+  pagination.value.current = 1
+  fetchData()
+}
 
 const pagination = ref({
   current: 1,
@@ -130,6 +160,7 @@ const columns = [
   { title: '种子ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 80 },
   { title: '标题', key: 'title', ellipsis: true },
   { title: '类型', key: 'standard_type', width: 100 },
+  { title: '标签', key: 'tags', width: 180 },
   { title: '完整度', key: 'completeness', width: 100, align: 'center' as const },
   { title: '标记', key: 'flags', width: 80 },
   { title: '更新时间', key: 'updated_at', width: 150 },
@@ -148,6 +179,7 @@ async function fetchData() {
       page_size: pagination.value.pageSize,
       search: searchQuery.value || undefined,
       source_site: sourceSiteFilter.value,
+      review_status: reviewStatus.value === 'all' ? undefined : reviewStatus.value,
     })
     const data = resp.data?.data
     if (data) {
@@ -221,5 +253,9 @@ onMounted(() => {
 }
 :deep(.row-incomplete:hover) {
   background-color: #ffe7e4;
+}
+.cell-missing {
+  color: #cf1322;
+  font-weight: 500;
 }
 </style>
