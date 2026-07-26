@@ -237,7 +237,7 @@ async function startBatchFetch() {
         save_path: torrent.save_path,
         size: torrent.size,
       })
-      const taskId = resp.data?.data?.taskId
+      const taskId = resp.data?.data?.task_id
       if (!taskId) throw new Error('任务创建失败')
       // Poll until done
       await pollTask(taskId)
