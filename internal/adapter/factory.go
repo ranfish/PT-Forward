@@ -40,12 +40,6 @@ func NewFactory(logger *zap.Logger, engine *extract.Engine) *Factory {
 	return &Factory{logger: logger, engine: engine}
 }
 
-// EngineInjector 接口：能接受 Engine 注入的 adapter 实现。
-// NexusPHPAdapter / Unit3DAdapter 实现；其他 adapter（MTeam/Gazelle 等）不实现。
-type EngineInjector interface {
-	SetEngine(*extract.Engine)
-}
-
 func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 	switch framework {
 	case "nexusphp":
@@ -62,8 +56,9 @@ func (f *Factory) Create(framework string, doer *HTTPDoer) model.SiteAdapter {
 		return NewMTeamAdapter(doer, f.logger)
 	case "unit3d":
 		a := NewUnit3DAdapter(doer, f.logger)
-		// Unit3D 暂未实现 SetEngine，先不注入（后续改造）
-		_ = f.engine
+		if f.engine != nil {
+			a.SetEngine(f.engine)
+		}
 		return a
 	case "gazelle":
 		return NewGazelleAdapter(doer, f.logger)

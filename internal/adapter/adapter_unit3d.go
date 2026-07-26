@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 )
@@ -31,7 +32,6 @@ var (
 	reUnit3DErrorLI      = regexp.MustCompile(`<li[^>]*>([^<]*(?:error|fail|失败|错误|duplicate|already)[^<]*)</li>`)
 	reUnit3DCSRFMeta     = regexp.MustCompile(`<meta\s+name="csrf-token"\s+content="([^"]+)"`)
 	reUnit3DCSRFInput    = regexp.MustCompile(`<input[^>]+name="_token"[^>]+value="([^"]+)"`)
-	reUnit3DIMDbID       = regexp.MustCompile(`tt\d+`)
 	reUnit3DUploaded     = regexp.MustCompile(`(?s)ratio-bar__uploaded[^>]*>.*?<i[^>]*></i>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
 	reUnit3DDownloaded   = regexp.MustCompile(`(?s)ratio-bar__downloaded[^>]*>.*?<i[^>]*></i>\s*([\d.,]+\s*(?:TiB|GiB|MiB|KiB|TB|GB|MB|KB))`)
 	reUnit3DRatio        = regexp.MustCompile(`(?s)top-nav__stats-ratio[^>]*>.*?<i[^>]*></i>\s*([\d.,]+)`)
@@ -47,6 +47,7 @@ type Unit3DAdapter struct {
 	*GenericAdapter
 	doer         *HTTPDoer
 	logger       *zap.Logger
+	engine       *extract.Engine
 	sessionMu    sync.Mutex
 	sessionReady map[string]bool
 }
@@ -61,6 +62,8 @@ func NewUnit3DAdapter(doer *HTTPDoer, logger *zap.Logger) *Unit3DAdapter {
 }
 
 func (a *Unit3DAdapter) Framework() string { return "unit3d" }
+
+func (a *Unit3DAdapter) SetEngine(e *extract.Engine) { a.engine = e }
 
 func (a *Unit3DAdapter) ensureSession(ctx context.Context, config *model.SiteConfig) error {
 	a.sessionMu.Lock()
@@ -84,7 +87,7 @@ func (a *Unit3DAdapter) ensureSession(ctx context.Context, config *model.SiteCon
 		return nil
 	}
 
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/", nil)
 	if err != nil {
 		return networkError("构造 session 请求失败", err)
@@ -150,7 +153,7 @@ func (a *Unit3DAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 	if err := a.ensureSession(ctx, config); err != nil {
 		return nil, err
 	}
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	downloadPath := "/torrents/download/" + torrentID
 	if config.RSSKey != "" {
 		downloadPath = "/torrents/download/" + torrentID + "." + config.RSSKey
@@ -207,7 +210,7 @@ func (a *Unit3DAdapter) GetTorrentDetail(ctx context.Context, config *model.Site
 }
 
 func (a *Unit3DAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents/" + url.PathEscape(torrentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -275,7 +278,7 @@ func (a *Unit3DAdapter) detailViaAPI(ctx context.Context, config *model.SiteConf
 }
 
 func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents/" + url.PathEscape(torrentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -328,6 +331,40 @@ func (a *Unit3DAdapter) detailViaWeb(ctx context.Context, config *model.SiteConf
 
 	detail.Flags = extractFlagsFromStructured(detail.Title, "", detail.Tags)
 
+	// Engine 提取（配置驱动，补充 regex 遗漏的字段）
+	if a.engine != nil {
+		input := extract.Input{
+			SiteCode:     deriveSiteCode(config.Domain),
+			Domain:       config.Domain,
+			SiteNickname: config.SiteName,
+			BaseURL:      config.BaseURL,
+			TorrentID:    torrentID,
+			PageHTML:     html,
+		}
+		if seed, _ := a.engine.Extract(input); seed.IsMeaningful() {
+			if engDetail := extract.SeedToDetail(seed); engDetail != nil {
+				if detail.Subtitle == "" && engDetail.Subtitle != "" {
+					detail.Subtitle = engDetail.Subtitle
+				}
+				if detail.PosterURL == "" && engDetail.PosterURL != "" {
+					detail.PosterURL = engDetail.PosterURL
+				}
+				if detail.Category == "" && engDetail.Category != "" {
+					detail.Category = engDetail.Category
+				}
+				if detail.Codec == "" && engDetail.Codec != "" {
+					detail.Codec = engDetail.Codec
+				}
+				if detail.Resolution == "" && engDetail.Resolution != "" {
+					detail.Resolution = engDetail.Resolution
+				}
+				if engDetail.EngineExtractorName != "" {
+					detail.EngineExtractorName = engDetail.EngineExtractorName
+				}
+			}
+		}
+	}
+
 	// §56.13: 暴露原始 HTML 供 Engine 提取
 	detail.RawHTML = html
 
@@ -338,7 +375,7 @@ func (a *Unit3DAdapter) DetectDiscount(ctx context.Context, config *model.SiteCo
 	if err := a.ensureSession(ctx, config); err != nil {
 		return nil, err
 	}
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents/" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -379,7 +416,7 @@ func (a *Unit3DAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, 
 	if err := a.ensureSession(ctx, config); err != nil {
 		return nil, err
 	}
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents/" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -415,7 +452,7 @@ func (a *Unit3DAdapter) DetectHRAndDiscount(ctx context.Context, config *model.S
 	if err := a.ensureSession(ctx, config); err != nil {
 		return nil, nil, err
 	}
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents/" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -485,7 +522,7 @@ func (a *Unit3DAdapter) GetPreciseSLData(ctx context.Context, config *model.Site
 }
 
 func (a *Unit3DAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/torrents/"+torrentID, nil)
 	if err != nil {
 		return nil, err
@@ -516,7 +553,7 @@ func (a *Unit3DAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, 
 }
 
 func (a *Unit3DAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/torrents/"+torrentID, nil)
 	if err != nil {
 		return nil, err
@@ -554,7 +591,7 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	uploadURL := baseURL + "/upload"
 	if config.Paths.Upload != "" {
 		uploadURL = baseURL + config.Paths.Upload
@@ -616,7 +653,7 @@ func (a *Unit3DAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 		}
 	}
 
-	if imdbID := extractIMDbID(req.IMDbLink); imdbID != "" {
+	if imdbID := extractIMDbIDGeneric(req.IMDbLink); imdbID != "" {
 		fw.writeField("imdb_id", imdbID)
 	}
 	if tmdbID, ok := req.ExtraFields["tmdb_id"]; ok {
@@ -735,14 +772,6 @@ func (a *Unit3DAdapter) fetchCSRFToken(ctx context.Context, config *model.SiteCo
 	return "", notFoundError("未找到 CSRF token")
 }
 
-func extractIMDbID(link string) string {
-	if link == "" {
-		return ""
-	}
-	m := reUnit3DIMDbID.FindString(link)
-	return m
-}
-
 func (a *Unit3DAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 	detail, err := a.GetTorrentDetail(ctx, config, torrentID)
 	if err != nil {
@@ -752,14 +781,6 @@ func (a *Unit3DAdapter) GetTorrentInfoHash(ctx context.Context, config *model.Si
 		return "", notFoundError("未找到 info_hash")
 	}
 	return detail.InfoHash, nil
-}
-
-func resolveBase(config *model.SiteConfig) string {
-	u := config.Domain
-	if !strings.HasPrefix(u, "http") {
-		u = "https://" + u
-	}
-	return strings.TrimRight(u, "/")
 }
 
 func (a *Unit3DAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
@@ -794,7 +815,7 @@ func (a *Unit3DAdapter) FetchUserStats(ctx context.Context, config *model.SiteCo
 }
 
 func (a *Unit3DAdapter) fetchUserStatsAPI(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
-	u := resolveBase(config) + "/api/user"
+	u := resolveBaseURL(config) + "/api/user"
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, err
@@ -946,7 +967,7 @@ var (
 )
 
 func (a *Unit3DAdapter) scrapeUnit3DSecurityKeys(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	if err := a.ensureSession(ctx, config); err != nil {
 		a.logger.Debug("scrapeUnit3DSecurityKeys: ensureSession failed", zap.Error(err))
 		return
