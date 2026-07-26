@@ -105,11 +105,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ReloadOutlined, CheckCircleFilled, PlusOutlined } from '@ant-design/icons-vue'
 import { publishDataApi } from '@/api/publish'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
 import { formatTime } from '@/utils/format'
+
+const route = useRoute()
+const router = useRouter()
 
 interface SeedDataRow {
   id: number
@@ -204,7 +208,10 @@ const panelOpen = ref(false)
 const batchFetchOpen = ref(false)
 const panelPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string; source_site_id?: number } | null>(null)
 
+let fetchSeq = 0
+
 async function fetchData() {
+  const seq = ++fetchSeq
   loading.value = true
   try {
     const resp = await publishDataApi.listSeedData({
@@ -214,6 +221,7 @@ async function fetchData() {
       source_site: sourceSiteFilter.value,
       review_status: reviewStatus.value === 'all' ? undefined : reviewStatus.value,
     })
+    if (seq !== fetchSeq) return
     const data = resp.data?.data
     if (data) {
       tableData.value = data.items as SeedDataRow[]
@@ -276,8 +284,33 @@ function openMaintenance(record: SeedDataRow) {
   panelOpen.value = true
 }
 
-onMounted(() => {
-  fetchData()
+async function tryOpenFromDeepLink() {
+  const infoHash = route.query.info_hash as string
+  const siteName = route.query.site_name as string
+  if (!infoHash) return
+  try {
+    const resp = await publishDataApi.listSeedData({ search: infoHash, page_size: 100 })
+    const items = resp.data?.data?.items as SeedDataRow[] | undefined
+    const match = items?.find(r => r.info_hash === infoHash && (!siteName || r.site_name === siteName))
+    if (match) {
+      openMaintenance(match)
+    }
+  } catch { /* silent */ }
+}
+
+function onPanelClose() {
+  if (route.query.info_hash || route.query.site_name) {
+    router.replace({ query: {} })
+  }
+}
+
+watch(panelOpen, (now, prev) => {
+  if (prev && !now) onPanelClose()
+})
+
+onMounted(async () => {
+  await fetchData()
+  tryOpenFromDeepLink()
 })
 </script>
 
