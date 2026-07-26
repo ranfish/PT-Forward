@@ -104,7 +104,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ReloadOutlined, CheckCircleFilled, PlusOutlined } from '@ant-design/icons-vue'
 import { publishDataApi } from '@/api/publish'
 import CrossSeedPanel from './CrossSeedPanel.vue'
@@ -129,12 +129,45 @@ interface SeedDataRow {
   updated_at: string
 }
 
+const STORAGE_KEY = 'publish_data_filters'
+
+interface PersistedFilters {
+  search?: string
+  source_site?: string
+  review_status?: 'all' | 'reviewed' | 'unreviewed'
+  page_size?: number
+}
+
+function loadPersistedFilters(): PersistedFilters {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) return JSON.parse(raw) as PersistedFilters
+  } catch { /* silent */ }
+  return {}
+}
+
+function persistFilters() {
+  const data: PersistedFilters = {
+    search: searchQuery.value || undefined,
+    source_site: sourceSiteFilter.value,
+    review_status: reviewStatus.value,
+    page_size: pagination.value.pageSize,
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch { /* silent */ }
+}
+
+const persisted = loadPersistedFilters()
+
 const loading = ref(false)
 const tableData = ref<SeedDataRow[]>([])
-const searchQuery = ref('')
-const sourceSiteFilter = ref<string | undefined>(undefined)
+const searchQuery = ref(persisted.search || '')
+const sourceSiteFilter = ref<string | undefined>(persisted.source_site)
 const sourceSites = ref<string[]>([])
-const reviewStatus = ref<'all' | 'reviewed' | 'unreviewed'>('all')
+const reviewStatus = ref<'all' | 'reviewed' | 'unreviewed'>(persisted.review_status || 'all')
+
+watch([searchQuery, sourceSiteFilter, reviewStatus], persistFilters)
 
 const forbiddenTagKeywords = ['禁转', '独占', '谢绝转载', '限时禁转', '严禁转载', '禁止转载', '谢绝搬运']
 
@@ -149,7 +182,7 @@ function onFilterChange() {
 
 const pagination = ref({
   current: 1,
-  pageSize: 20,
+  pageSize: persisted.page_size || 20,
   total: 0,
   showSizeChanger: true,
   showTotal: (total: number) => `共 ${total} 条`,
@@ -201,6 +234,7 @@ async function fetchData() {
 function onTableChange(pag: { current?: number; pageSize?: number }) {
   if (pag.current) pagination.value.current = pag.current
   if (pag.pageSize) pagination.value.pageSize = pag.pageSize
+  persistFilters()
   fetchData()
 }
 
