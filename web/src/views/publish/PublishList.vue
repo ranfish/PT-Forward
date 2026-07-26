@@ -35,7 +35,7 @@
     </a-row>
 
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px">
-      <a-button type="primary" @click="wizardOpen = true">
+      <a-button type="primary" @click="$router.push('/publish/torrents')">
         <template #icon><PlusOutlined /></template>
         {{ t('publish.manualForward') }}
       </a-button>
@@ -265,7 +265,12 @@
       </a-tab-pane>
     </a-tabs>
 
-    <PublishWizardModal v-model:open="wizardOpen" @success="onWizardSuccess" />
+
+    <CrossSeedPanel
+      v-model:open="crossSeedOpen"
+      :preset-torrent="null"
+      @success="onWizardSuccess"
+    />
 
     <a-modal v-model:open="showCreateTaskModal" :title="t('publish.tasks')" :confirm-loading="createTaskSubmitting" width="520px" @ok="createTask">
       <a-form layout="vertical">
@@ -301,7 +306,7 @@ import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { publishApi, publishDataApi } from '@/api/publish'
 import { sitesApi } from '@/api/sites'
 import { useEnumLabels } from '@/utils/enumLabels'
-import PublishWizardModal from './PublishWizardModal.vue'
+import CrossSeedPanel from './CrossSeedPanel.vue'
 import type { PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from '@/api/types'
 import { formatTime, formatBytes } from '@/utils/format'
 
@@ -318,7 +323,7 @@ async function fetchStats() {
   } catch { /* silent */ }
 }
 
-const wizardOpen = ref(false)
+const crossSeedOpen = ref(false)
 const candidateSearch = ref('')
 const candidateStatus = ref<string | undefined>(undefined)
 const candidatesLoading = ref(false)
