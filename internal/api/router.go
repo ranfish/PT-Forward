@@ -168,7 +168,7 @@ func (rt *Router) SetRateLimitConfig(cfg middleware.RateLimitConfigFunc) {
 
 
 // SetupManualForward 注入手动转发向导所需的依赖
-func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner, metadataFetcher *metadata.Fetcher, coverageSvc *coverage.Service, sourceDetector *publish.SourceSiteDetector, complianceChecker *compliance.Checker) {
+func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner, metadataFetcher *metadata.Fetcher, coverageSvc *coverage.Service, sourceDetector *publish.SourceSiteDetector, complianceChecker *compliance.Checker, imageHostMgr *imagehost.Manager) {
 	rt.manualForwardHandler.SetPipeline(pipeline)
 	rt.manualForwardHandler.SetSiteManager(siteProvider)
 	rt.manualForwardHandler.SetClientProvider(clientMgr)
@@ -185,6 +185,9 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	}
 	if complianceChecker != nil {
 		rt.manualForwardHandler.SetComplianceChecker(complianceChecker)
+	}
+	if imageHostMgr != nil {
+		rt.manualForwardHandler.SetImageHostManager(imageHostMgr)
 	}
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)

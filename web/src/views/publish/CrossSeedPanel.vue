@@ -159,6 +159,7 @@
             <a-tab-pane key="screenshots" tab="视频截图">
               <div style="margin-bottom: 12px; display: flex; gap: 8px">
                 <a-button :loading="refreshing === 'screenshots'" @click="doRefresh('screenshots')">重新获取截图（mpv）</a-button>
+                <a-button :loading="refreshing === 'rehost_screenshots'" :disabled="form.screenshots.length === 0" @click="doRefresh('rehost_screenshots')">一键转存到图床</a-button>
               </div>
               <ScreenshotManager
                 v-model:screenshots="form.screenshots"
@@ -496,13 +497,17 @@ async function doRefresh(type: string) {
   if (!selectedTorrent.value) return
   refreshing.value = type
   try {
-    const resp = await manualForwardApi.refresh({
+    const payload: { type: string; name: string; save_path?: string; info_hash?: string; site_name?: string; screenshots?: string[] } = {
       type,
       name: selectedTorrent.value.name,
       save_path: selectedTorrent.value.save_path,
       info_hash: selectedTorrent.value.info_hash,
       site_name: currentSourceSite.value || selectedTorrent.value.source_site || '',
-    })
+    }
+    if (type === 'rehost_screenshots') {
+      payload.screenshots = form.value.screenshots
+    }
+    const resp = await manualForwardApi.refresh(payload)
     const data = (resp.data?.data || {}) as Record<string, unknown>
     if (type === 'poster') {
       if (data.poster) form.value.poster = data.poster as string
@@ -515,6 +520,8 @@ async function doRefresh(type: string) {
     } else if (type === 'mediainfo') {
       if (data.mediainfo) form.value.mediaInfo = data.mediainfo as string
     } else if (type === 'screenshots') {
+      if (data.screenshots) form.value.screenshots = data.screenshots as string[]
+    } else if (type === 'rehost_screenshots') {
       if (data.screenshots) form.value.screenshots = data.screenshots as string[]
     }
     message.success(`${type} 刷新成功`)
