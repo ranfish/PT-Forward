@@ -95,6 +95,28 @@
       :row-selection="{ selectedRowKeys: selectedHashes, onChange: (keys: string[]) => selectedHashes = keys }"
       @change="onTableChange"
     >
+      <template #expandedRowRender="{ record }">
+        <div class="coverage-expand">
+          <template v-if="record.coverage?.sites?.length">
+            <div class="coverage-group">
+              <span class="coverage-label">🟢 做种中</span>
+              <a-tag v-for="s in coverageSitesOf(record, 'green')" :key="s.site_name" color="success" style="margin: 2px">{{ s.site_name }}</a-tag>
+              <span v-if="coverageSitesOf(record, 'green').length === 0" class="empty-hint">无</span>
+            </div>
+            <div class="coverage-group">
+              <span class="coverage-label">🟡 可辅种</span>
+              <a-tag v-for="s in coverageSitesOf(record, 'yellow')" :key="s.site_name" color="warning" style="margin: 2px">{{ s.site_name }}</a-tag>
+              <span v-if="coverageSitesOf(record, 'yellow').length === 0" class="empty-hint">无</span>
+            </div>
+            <div class="coverage-group">
+              <span class="coverage-label">⚪ 未发现</span>
+              <a-tag v-for="s in coverageSitesOf(record, 'white')" :key="s.site_name" :color="coverageSiteStatus(s) === 'cached_not' ? 'default' : ''" style="margin: 2px">{{ s.site_name }}</a-tag>
+              <span v-if="coverageSitesOf(record, 'white').length === 0" class="empty-hint">无</span>
+            </div>
+          </template>
+          <span v-else class="empty-hint">{{ record.queried ? '已查询，暂无已知覆盖数据' : '尚未查询覆盖' }}</span>
+        </div>
+      </template>
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'source_site'">
           <template v-if="record.source_sites && record.source_sites.length">
@@ -407,19 +429,53 @@ import MetadataReviewModal from './MetadataReviewModal.vue'
 
 const clients = ref<{ id: number; name: string; type: string }[]>([])
 const clientsLoading = ref(false)
-const selectedClientId = ref<number | undefined>(undefined)
+
+const STORAGE_KEY = 'publish_torrents_filters'
+
+interface PersistedFilters {
+  client_id?: number
+  search?: string
+  query_filter?: string
+  type_filter?: string
+  page_size?: number
+}
+
+function loadPersistedFilters(): PersistedFilters {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) return JSON.parse(raw) as PersistedFilters
+  } catch { /* silent */ }
+  return {}
+}
+
+function persistFilters() {
+  const data: PersistedFilters = {
+    client_id: selectedClientId.value,
+    search: searchText.value || undefined,
+    query_filter: queryFilter.value,
+    type_filter: typeFilter.value,
+    page_size: pageSize.value,
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch { /* silent */ }
+}
+
+const persisted = loadPersistedFilters()
+
+const selectedClientId = ref<number | undefined>(persisted.client_id)
 const torrents = ref<PublishTorrentItem[]>([])
 const loading = ref(false)
-const searchText = ref('')
-const queryFilter = ref<string | undefined>(undefined)
-const typeFilter = ref<string | undefined>(undefined)
+const searchText = ref(persisted.search || '')
+const queryFilter = ref<string | undefined>(persisted.query_filter)
+const typeFilter = ref<string | undefined>(persisted.type_filter)
 const queryingHash = ref('')
 const selectedHashes = ref<string[]>([])
 let coverageAbortController: AbortController | null = null
 
 // 分页
 const currentPage = ref(1)
-const pageSize = ref(50)
+const pageSize = ref(persisted.page_size || 50)
 
 // 后台查询状态
 const querying = ref(false)
@@ -427,6 +483,8 @@ const queryDone = ref(0)
 const queryTotal = ref(0)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
+
+watch([selectedClientId, searchText, queryFilter, typeFilter, pageSize], persistFilters)
 
 const crossSeedOpen = ref(false)
 const reviewOpen = ref(false)
@@ -500,6 +558,21 @@ function coverageCount(record: PublishTorrentItem, color: 'green' | 'yellow' | '
   }).length
 }
 
+function coverageSitesOf(record: PublishTorrentItem, color: 'green' | 'yellow' | 'white') {
+  const sites = record.coverage?.sites
+  if (!sites?.length) return []
+  return sites.filter((s: { status: string; source: string }) => {
+    const c = coverageColor(s.status, s.source)
+    if (color === 'green') return c === 'green'
+    if (color === 'yellow') return c === 'gold'
+    return c === 'default'
+  })
+}
+
+function coverageSiteStatus(s: { status: string }): string {
+  return s.status === 'confirmed_not' ? 'cached_not' : s.status
+}
+
 function onTableChange(pag: { current?: number; pageSize?: number }) {
   if (pag.current) currentPage.value = pag.current
   if (pag.pageSize) pageSize.value = pag.pageSize
@@ -521,8 +594,11 @@ async function fetchClients() {
     const resp = await downloadersApi.listLight(1, 100)
     const data = resp.data?.data
     clients.value = (data?.items || data || []) as { id: number; name: string; type: string }[]
-    if (clients.value.length > 0 && !selectedClientId.value) {
-      selectedClientId.value = clients.value[0].id
+    if (clients.value.length > 0) {
+      const exists = selectedClientId.value && clients.value.some(c => c.id === selectedClientId.value)
+      if (!exists) {
+        selectedClientId.value = clients.value[0].id
+      }
       fetchTorrents()
     }
   } catch { /* ignore */ } finally {
@@ -961,6 +1037,26 @@ async function saveDeclFilters() {
   font-size: 12px;
   color: #666;
   white-space: nowrap;
+}
+.coverage-expand {
+  padding: 8px 0;
+}
+.coverage-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.coverage-label {
+  font-size: 12px;
+  color: #666;
+  min-width: 80px;
+  font-weight: 500;
+}
+.empty-hint {
+  font-size: 12px;
+  color: #bbb;
 }
 </style>
 
