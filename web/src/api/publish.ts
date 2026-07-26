@@ -113,6 +113,8 @@ export interface PublishTorrentItem {
   save_path: string
   state: string
   uploaded: number
+  progress: number
+  ratio: number
   queried: boolean
   coverage: {
     has_count: number
