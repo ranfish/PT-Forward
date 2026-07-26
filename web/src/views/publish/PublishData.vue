@@ -3,6 +3,7 @@
     <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center">
       <h3 style="margin: 0">一站多种</h3>
       <a-space>
+        <a-button type="primary" @click="batchFetchOpen = true"><PlusOutlined /> 获取数据</a-button>
         <a-input-search
           v-model:value="searchQuery"
           placeholder="搜索标题或副标题"
@@ -68,14 +69,20 @@
       :preset-torrent="panelPreset"
       @success="fetchData"
     />
+
+    <BatchFetchPanel
+      v-model:open="batchFetchOpen"
+      @done="fetchData"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ReloadOutlined, CheckCircleFilled } from '@ant-design/icons-vue'
+import { ReloadOutlined, CheckCircleFilled, PlusOutlined } from '@ant-design/icons-vue'
 import { publishDataApi } from '@/api/publish'
 import CrossSeedPanel from './CrossSeedPanel.vue'
+import BatchFetchPanel from './BatchFetchPanel.vue'
 import { formatTime } from '@/utils/format'
 
 interface SeedDataRow {
@@ -121,6 +128,7 @@ const columns = [
 ]
 
 const panelOpen = ref(false)
+const batchFetchOpen = ref(false)
 const panelPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string; source_site_id?: number } | null>(null)
 
 async function fetchData() {
