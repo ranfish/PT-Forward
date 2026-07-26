@@ -180,4 +180,7 @@ export const publishDataApi = {
   saveSeedData(id: number, data: { title?: string; subtitle?: string; description?: string; screenshots?: string; poster?: string; mediainfo?: string; tags?: string }) {
     return client.put<ApiResponse<{ success: boolean; id: number }>>(`/publish/seed-data/${id}`, data)
   },
+  stats() {
+    return client.get<ApiResponse<{ stats: { today_publish: number; today_success: number; today_failed: number; pending_count: number; reviewed_count: number; total_metadata: number }; recent: unknown[] }>>('/publish/stats')
+  },
 }
