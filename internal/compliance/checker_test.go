@@ -16,6 +16,13 @@ func TestCheck_Adult(t *testing.T) {
 		{"Some.Show.NSFW", "adult"},
 		{"Adult.Movie.2024", "adult"},
 		{"Normal.Movie.2024", ""},
+		// qui detector cases (structural patterns, not keywords)
+		{"ABP-100.Some.Title", "adult"},         // JAV code
+		{"[2024.01.01].Some.Title", "adult"},     // bracket date
+		{"010124_001.Some.Title", "adult"},       // adult date pattern
+		// false positive checks
+		{"Movie.2024.1080p.BluRay.x264.AC3-FGT", ""},    // AC3 codec, not JAV
+		{"AAEJ-123.Some.Show.S01E02.1080p", ""},          // JAV-like + video markers
 	}
 	for _, tt := range tests {
 		r := c.Check(ctx, tt.title)

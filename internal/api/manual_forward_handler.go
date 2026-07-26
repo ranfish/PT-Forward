@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
@@ -32,6 +33,7 @@ type ManualForwardHandler struct {
 	metadataFetcher MetadataFetcherProvider
 	coverage        CoverageServiceProvider
 	sourceDetector  *publish.SourceSiteDetector
+	complianceChecker *compliance.Checker
 	taskStore    sync.Map
 	taskSeq      atomic.Int64
 	stopCh       chan struct{}
@@ -89,6 +91,7 @@ func (h *ManualForwardHandler) SetBDInfoScanner(s *publish.BDInfoScanner) { h.bd
 func (h *ManualForwardHandler) SetMetadataFetcher(f MetadataFetcherProvider) { h.metadataFetcher = f }
 func (h *ManualForwardHandler) SetCoverageService(c CoverageServiceProvider) { h.coverage = c }
 func (h *ManualForwardHandler) SetSourceDetector(d *publish.SourceSiteDetector) { h.sourceDetector = d }
+func (h *ManualForwardHandler) SetComplianceChecker(c *compliance.Checker)    { h.complianceChecker = c }
 
 func (h *ManualForwardHandler) Close() {
 	h.stopOnce.Do(func() { close(h.stopCh) })
@@ -1001,6 +1004,14 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// 合规检查（成人内容 / 禁转 / 禁转小组）
+	if h.complianceChecker != nil {
+		if r := h.complianceChecker.CheckWithSite(r.Context(), req.TorrentName, req.SourceSite); !r.Passed {
+			Error(w, http.StatusForbidden, 40301, fmt.Sprintf("合规拦截: [%s] %s", r.Category, r.Reason))
+			return
+		}
+	}
+
 	targetsJSON, _ := json.Marshal(req.TargetSites)
 
 	// 额外字段存入 user_overrides JSON
@@ -1106,9 +1117,21 @@ func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.
 	}
 
 	var ids []uint
+	var rejected []map[string]interface{}
 	for _, item := range req.Items {
 		if item.InfoHash == "" || item.ClientID == 0 || len(item.TargetSites) == 0 {
 			continue
+		}
+		// 合规检查（成人内容 / 禁转 / 禁转小组）
+		if h.complianceChecker != nil {
+			if r := h.complianceChecker.CheckWithSite(r.Context(), item.TorrentName, item.SourceSite); !r.Passed {
+				rejected = append(rejected, map[string]interface{}{
+					"title":   item.TorrentName,
+					"reason":  r.Reason,
+					"category": r.Category,
+				})
+				continue
+			}
 		}
 		targetsJSON, _ := json.Marshal(item.TargetSites)
 		// §56.29: 批量发布支持匿名
@@ -1141,6 +1164,7 @@ func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.
 	Success(w, map[string]interface{}{
 		"created_count": len(ids),
 		"candidate_ids": ids,
+		"rejected":      rejected,
 	})
 }
 

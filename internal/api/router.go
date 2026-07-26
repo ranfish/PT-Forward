@@ -7,6 +7,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/adapter"
 	"github.com/ranfish/pt-forward/internal/auth"
 	"github.com/ranfish/pt-forward/internal/client"
+	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/filter"
 	"github.com/ranfish/pt-forward/internal/imagehost"
@@ -167,7 +168,7 @@ func (rt *Router) SetRateLimitConfig(cfg middleware.RateLimitConfigFunc) {
 
 
 // SetupManualForward 注入手动转发向导所需的依赖
-func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner, metadataFetcher *metadata.Fetcher, coverageSvc *coverage.Service, sourceDetector *publish.SourceSiteDetector) {
+func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner, metadataFetcher *metadata.Fetcher, coverageSvc *coverage.Service, sourceDetector *publish.SourceSiteDetector, complianceChecker *compliance.Checker) {
 	rt.manualForwardHandler.SetPipeline(pipeline)
 	rt.manualForwardHandler.SetSiteManager(siteProvider)
 	rt.manualForwardHandler.SetClientProvider(clientMgr)
@@ -181,6 +182,9 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	}
 	if sourceDetector != nil {
 		rt.manualForwardHandler.SetSourceDetector(sourceDetector)
+	}
+	if complianceChecker != nil {
+		rt.manualForwardHandler.SetComplianceChecker(complianceChecker)
 	}
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)

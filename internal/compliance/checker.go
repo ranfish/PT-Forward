@@ -123,6 +123,11 @@ func (c *Checker) Check(ctx context.Context, title string) *Result {
 		}
 	}
 
+	// qui 精确正则检测（JAV 番号 / 日期格式 / XXX 关键词），补充关键词无法覆盖的结构化模式
+	if matched, reason := DetectAdult(title, ""); matched {
+		return &Result{Passed: false, Reason: reason, Category: "adult"}
+	}
+
 	for _, kw := range forbidden {
 		if strings.Contains(title, kw) {
 			return &Result{Passed: false, Reason: kw, Category: "forbidden_transfer"}
