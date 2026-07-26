@@ -34,6 +34,11 @@
       </a-col>
     </a-row>
 
+    <!-- 7 天发布趋势图 -->
+    <a-card v-if="trendData.length > 0" size="small" title="发布趋势（7 天）" style="margin-bottom: 16px">
+      <div ref="trendChartRef" style="width: 100%; height: 200px"></div>
+    </a-card>
+
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px">
       <a-button type="primary" @click="$router.push('/publish/torrents')">
         <template #icon><PlusOutlined /></template>
@@ -299,10 +304,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import * as echarts from 'echarts'
 import { publishApi, publishDataApi } from '@/api/publish'
 import { sitesApi } from '@/api/sites'
 import { useEnumLabels } from '@/utils/enumLabels'
@@ -316,11 +322,54 @@ const activeTab = ref('candidates')
 
 // 总览统计
 const dashboardStats = ref<{ today_publish: number; today_success: number; today_failed: number; pending_count: number; reviewed_count: number; total_metadata: number } | null>(null)
+const trendData = ref<Array<{ day: string; success: number; failed: number }>>([])
+const trendChartRef = ref<HTMLElement>()
+let trendChart: echarts.ECharts | null = null
+
 async function fetchStats() {
   try {
     const resp = await publishDataApi.stats()
-    dashboardStats.value = resp.data?.data?.stats || null
+    const data = resp.data?.data
+    dashboardStats.value = data?.stats || null
+    trendData.value = data?.trend || []
+    if (trendData.value.length > 0) {
+      await nextTick()
+      renderTrendChart()
+    }
   } catch { /* silent */ }
+}
+
+function renderTrendChart() {
+  if (!trendChartRef.value) return
+  if (!trendChart) {
+    trendChart = echarts.init(trendChartRef.value)
+  }
+  trendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['成功', '失败'], bottom: 0 },
+    grid: { left: 40, right: 20, top: 20, bottom: 40 },
+    xAxis: {
+      type: 'category',
+      data: trendData.value.map(d => d.day.slice(5)),
+    },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [
+      {
+        name: '成功',
+        type: 'bar',
+        stack: 'total',
+        itemStyle: { color: '#52c41a' },
+        data: trendData.value.map(d => d.success),
+      },
+      {
+        name: '失败',
+        type: 'bar',
+        stack: 'total',
+        itemStyle: { color: '#ff4d4f' },
+        data: trendData.value.map(d => d.failed),
+      },
+    ],
+  })
 }
 
 const crossSeedOpen = ref(false)
@@ -722,6 +771,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopCandidatePoll()
+  if (trendChart) {
+    trendChart.dispose()
+    trendChart = null
+  }
 })
 </script>
 
