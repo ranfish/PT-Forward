@@ -331,9 +331,9 @@ func TestResolveBase(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := resolveBase(&model.SiteConfig{Domain: tt.domain})
+		got := resolveBaseURL(&model.SiteConfig{Domain: tt.domain})
 		if got != tt.expect {
-			t.Errorf("resolveBase(%q) = %q, want %q", tt.domain, got, tt.expect)
+			t.Errorf("resolveBaseURL(%q) = %q, want %q", tt.domain, got, tt.expect)
 		}
 	}
 }

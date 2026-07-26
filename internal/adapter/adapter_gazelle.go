@@ -48,7 +48,7 @@ func NewGazelleAdapter(doer *HTTPDoer, logger *zap.Logger) *GazelleAdapter {
 func (a *GazelleAdapter) Framework() string { return "gazelle" }
 
 func (a *GazelleAdapter) DownloadTorrent(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents.php?action=download&id=" + url.QueryEscape(torrentID)
 	if config.AuthKey != "" {
 		u += "&authkey=" + url.QueryEscape(config.AuthKey)
@@ -96,7 +96,7 @@ func (a *GazelleAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 }
 
 func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/ajax.php?action=torrent&id=" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -169,7 +169,7 @@ func (a *GazelleAdapter) detailViaAPI(ctx context.Context, config *model.SiteCon
 }
 
 func (a *GazelleAdapter) detailViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents.php?torrentid=" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -214,7 +214,7 @@ func (a *GazelleAdapter) detailViaWeb(ctx context.Context, config *model.SiteCon
 }
 
 func (a *GazelleAdapter) DetectDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.DiscountResult, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents.php?torrentid=" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -252,7 +252,7 @@ func (a *GazelleAdapter) DetectDiscount(ctx context.Context, config *model.SiteC
 }
 
 func (a *GazelleAdapter) DetectHR(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents.php?torrentid=" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -284,7 +284,7 @@ func (a *GazelleAdapter) DetectHR(ctx context.Context, config *model.SiteConfig,
 }
 
 func (a *GazelleAdapter) DetectHRAndDiscount(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.HRResult, *model.DiscountResult, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := baseURL + "/torrents.php?torrentid=" + torrentID
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
@@ -350,7 +350,7 @@ func (a *GazelleAdapter) GetPreciseSLData(ctx context.Context, config *model.Sit
 }
 
 func (a *GazelleAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/ajax.php?action=torrent&id="+torrentID, nil)
 	if err != nil {
 		return nil, err
@@ -383,7 +383,7 @@ func (a *GazelleAdapter) slViaAPI(ctx context.Context, config *model.SiteConfig,
 }
 
 func (a *GazelleAdapter) slViaWeb(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.SLData, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/torrents.php?torrentid="+torrentID, nil)
 	if err != nil {
 		return nil, err
@@ -418,7 +418,7 @@ func (a *GazelleAdapter) UploadTorrent(ctx context.Context, config *model.SiteCo
 		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	uploadURL := baseURL + "/upload.php"
 	if config.Paths.Upload != "" {
 		uploadURL = baseURL + config.Paths.Upload
@@ -636,7 +636,7 @@ func (a *GazelleAdapter) FetchUserStats(ctx context.Context, config *model.SiteC
 }
 
 func (a *GazelleAdapter) fetchUserStatsAPI(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/ajax.php?action=index", nil)
 	if err != nil {
 		return nil, fmt.Errorf("构造请求失败: %w", err)
@@ -658,7 +658,7 @@ func (a *GazelleAdapter) fetchUserStatsAPI(ctx context.Context, config *model.Si
 }
 
 func (a *GazelleAdapter) fetchUserStatsCookie(ctx context.Context, config *model.SiteConfig) (*model.UserStatsResult, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/ajax.php?action=index", nil)
 	if err != nil {
 		return nil, fmt.Errorf("构造请求失败: %w", err)
@@ -754,7 +754,7 @@ func toInt64(v interface{}) int64 {
 }
 
 func (a *GazelleAdapter) fetchFromUserPHP(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/user.php", nil)
 	if err != nil {
 		return
@@ -799,7 +799,7 @@ func (a *GazelleAdapter) fetchSeedingFromCommunityStats(ctx context.Context, con
 	if userID == 0 {
 		return
 	}
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	u := fmt.Sprintf("%s/ajax.php?action=community_stats&userid=%d", baseURL, userID)
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
@@ -839,7 +839,7 @@ func (a *GazelleAdapter) fetchSeedingFromCommunityStats(ctx context.Context, con
 }
 
 func (a *GazelleAdapter) getUserID(ctx context.Context, config *model.SiteConfig) int64 {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/ajax.php?action=index", nil)
 	if err != nil {
 		return 0
@@ -874,7 +874,7 @@ func (a *GazelleAdapter) getUserID(ctx context.Context, config *model.SiteConfig
 var reGazelleBPRatesSize = regexp.MustCompile(`(?is)<thead>.*?大小.*?</thead>.*?<tbody>\s*<tr>\s*<td>\d+</td>\s*<td>([\d.,]+\s*(?:TB|GB|MB|TiB|GiB|MiB))</td>`)
 
 func (a *GazelleAdapter) fetchSeedingSizeFromBPRates(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/bonus.php?action=bprates", nil)
 	if err != nil {
 		return
@@ -901,7 +901,7 @@ func (a *GazelleAdapter) fetchSeedingSizeFromBPRates(ctx context.Context, config
 }
 
 func (a *GazelleAdapter) scrapeGazelleAuthKeys(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	pageURL := baseURL + "/torrents.php?page=1"
 
 	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)

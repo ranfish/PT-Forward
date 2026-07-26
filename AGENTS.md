@@ -48,10 +48,6 @@
 - PTer 实际完整度 100%（92% 是因为 bdinfo 不适用 WEB-DL）
 
 **待办**：
-- HHanClub 适配（中优先级，Tailwind CSS）
-- CrossSeedPanel 增强（rehost_screenshots / 三色覆盖状态 / BatchFetchPanel）
-- adapter 统一后续（Unit3D 评估 + 删死代码）
-- 旧组件清理（PublishWizardModal 等，待 CrossSeedPanel 验证后删除）
 - 11 站 RSS 配置后批量验证
 
 **完整设计文档**：`docs/31-模块设计决策记录.md` §55-§56.38（65400+ 行，按需读特定章节，不要一次读全文）。

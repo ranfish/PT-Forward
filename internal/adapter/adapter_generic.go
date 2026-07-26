@@ -799,7 +799,7 @@ func (a *GenericAdapter) uploadTTG(ctx context.Context, config *model.SiteConfig
 		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	uploadURL := baseURL + "/upload.php"
 	if config.Paths.Upload != "" {
 		uploadURL = baseURL + config.Paths.Upload
@@ -934,7 +934,7 @@ func (a *GenericAdapter) uploadStarSpace(ctx context.Context, config *model.Site
 }
 
 func (a *GenericAdapter) uploadStarSpaceVideo(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	uploadURL := baseURL + "/p_torrent/video_upload.php"
 	if config.Paths.Upload != "" {
 		uploadURL = baseURL + config.Paths.Upload
@@ -1031,7 +1031,7 @@ func (a *GenericAdapter) uploadStarSpaceVideo(ctx context.Context, config *model
 }
 
 func (a *GenericAdapter) uploadStarSpaceMusic(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	uploadURL := baseURL + "/p_music/music_upload.php"
 
 	var buf bytes.Buffer
@@ -1163,7 +1163,7 @@ func (a *GenericAdapter) uploadYemaPT(ctx context.Context, config *model.SiteCon
 		return nil, &model.AppError{Code: 40001, Message: "种子文件数据为空"}
 	}
 
-	baseURL := resolveBase(config)
+	baseURL := resolveBaseURL(config)
 	uploadURL := baseURL + "/api/torrent/add"
 	if config.Paths.Upload != "" {
 		uploadURL = baseURL + config.Paths.Upload
