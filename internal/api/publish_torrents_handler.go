@@ -1501,6 +1501,7 @@ func (h *PublishTorrentsHandler) handleListSeedData(w http.ResponseWriter, r *ht
 	}
 	search := q.Get("search")
 	sourceSite := q.Get("source_site")
+	reviewStatus := q.Get("review_status") // all（默认）/ reviewed / unreviewed
 
 	query := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
 		Where("torrent_id != '' AND torrent_id != '0'")
@@ -1510,6 +1511,12 @@ func (h *PublishTorrentsHandler) handleListSeedData(w http.ResponseWriter, r *ht
 	}
 	if sourceSite != "" {
 		query = query.Where("site_name = ?", sourceSite)
+	}
+	switch reviewStatus {
+	case "reviewed":
+		query = query.Where("reviewed = ?", true)
+	case "unreviewed":
+		query = query.Where("reviewed = ?", false)
 	}
 
 	var total int64
