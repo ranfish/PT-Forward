@@ -24,6 +24,7 @@
         </a-select>
         <a-range-picker v-model:value="dateRange" @change="onFilterChange" />
         <a-button @click="fetchData"><ReloadOutlined /></a-button>
+        <a-button @click="exportCSV" :disabled="tableData.length === 0"><DownloadOutlined /> CSV</a-button>
       </a-space>
     </div>
 
@@ -107,7 +108,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ReloadOutlined } from '@ant-design/icons-vue'
+import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import { publishApi } from '@/api/publish'
 import type { PublishResultRecord } from '@/api/types'
 import { formatTime } from '@/utils/format'
@@ -200,4 +201,26 @@ function formatCost(ms: number): string {
 onMounted(() => {
   fetchData()
 })
+
+function exportCSV() {
+  const headers = ['时间', '源站', '目标站', '标题', '状态', '耗时', '链接', '错误']
+  const rows = tableData.value.map((r: PublishResultRecord) => [
+    formatTime(r.created_at),
+    r.source_site || '',
+    r.target_site || '',
+    (r.title || r.subtitle || '').replace(/"/g, '""'),
+    r.status || '',
+    r.cost_ms ? formatCost(r.cost_ms) : '',
+    r.publish_url || '',
+    (r.error_message || '').replace(/"/g, '""').replace(/\n/g, ' '),
+  ])
+  const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `publish-logs-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
 </script>

@@ -1623,9 +1623,51 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 	var recent []model.PublishResultRecord
 	h.db.WithContext(ctx).Order("created_at DESC").Limit(10).Find(&recent)
 
+	// 7 天发布趋势
+	weekAgo := todayStart.AddDate(0, 0, -6)
+	type dayStat struct {
+		Day     string `json:"day"`
+		Success int64  `json:"success"`
+		Failed  int64  `json:"failed"`
+	}
+	var trend []dayStat
+	rows, _ := h.db.WithContext(ctx).
+		Model(&model.PublishResultRecord{}).
+		Select("DATE(created_at) as day, status, COUNT(*) as count").
+		Where("created_at >= ?", weekAgo).
+		Group("DATE(created_at), status").
+		Order("day").
+		Rows()
+	defer rows.Close()
+
+	dayMap := make(map[string]*dayStat)
+	for i := 0; i < 7; i++ {
+		d := weekAgo.AddDate(0, 0, i).Format("2006-01-02")
+		dayMap[d] = &dayStat{Day: d}
+	}
+	for rows.Next() {
+		var day, status string
+		var count int64
+		if err := rows.Scan(&day, &status, &count); err != nil {
+			continue
+		}
+		if ds, ok := dayMap[day]; ok {
+			if status == "success" {
+				ds.Success = count
+			} else if status == "failed" {
+				ds.Failed = count
+			}
+		}
+	}
+	for i := 0; i < 7; i++ {
+		d := weekAgo.AddDate(0, 0, i).Format("2006-01-02")
+		trend = append(trend, *dayMap[d])
+	}
+
 	Success(w, map[string]interface{}{
 		"stats":   stats,
 		"recent":  recent,
+		"trend":   trend,
 	})
 }
 

@@ -30,25 +30,33 @@
       :loading="loading"
       :pagination="pagination"
       row-key="id"
-      :scroll="{ x: 1400 }"
+      :scroll="{ x: 1200 }"
       size="small"
+      :row-class-name="(record: SeedDataRow) => completenessPercent(record) < 50 ? 'row-incomplete' : ''"
       @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'title'">
           <div>
             <div v-if="record.subtitle" style="color: #666; font-size: 12px">{{ record.subtitle }}</div>
-            <div>{{ record.title || '(空)' }}</div>
+            <div :style="{ color: record.title ? '' : '#cf1322' }">{{ record.title || '(空)' }}</div>
           </div>
         </template>
         <template v-else-if="column.key === 'site_name'">
           <a-tag color="blue">{{ record.site_name }}</a-tag>
           <CheckCircleFilled v-if="record.reviewed" style="color: #52c41a; margin-left: 4px" />
         </template>
-        <template v-else-if="column.key === 'tags'">
-          <div v-if="record.tags">
-            <a-tag v-for="t in parseTags(record.tags)" :key="t" size="small">{{ t }}</a-tag>
-          </div>
+        <template v-else-if="column.key === 'standard_type'">
+          <span v-if="record.standard_type">{{ record.standard_type }}</span>
+          <span v-else style="color: #cf1322">未设置</span>
+        </template>
+        <template v-else-if="column.key === 'completeness'">
+          <a-progress
+            type="circle"
+            :size="40"
+            :percent="completenessPercent(record)"
+            :stroke-color="completenessColor(record)"
+          />
         </template>
         <template v-else-if="column.key === 'flags'">
           <a-tag v-if="record.flags" color="red">{{ record.flags }}</a-tag>
@@ -119,10 +127,11 @@ const pagination = ref({
 
 const columns = [
   { title: '站点', key: 'site_name', width: 120 },
+  { title: '种子ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 80 },
   { title: '标题', key: 'title', ellipsis: true },
-  { title: '类型', dataIndex: 'standard_type', key: 'standard_type', width: 100 },
-  { title: '标签', key: 'tags', width: 200 },
-  { title: '标记', key: 'flags', width: 100 },
+  { title: '类型', key: 'standard_type', width: 100 },
+  { title: '完整度', key: 'completeness', width: 100, align: 'center' as const },
+  { title: '标记', key: 'flags', width: 80 },
   { title: '更新时间', key: 'updated_at', width: 150 },
   { title: '操作', key: 'action', width: 80, fixed: 'right' as const },
 ]
@@ -172,6 +181,22 @@ function parseTags(tagsStr: string): string[] {
   return tagsStr.split(',').map(t => t.trim()).filter(Boolean)
 }
 
+function completenessPercent(record: SeedDataRow): number {
+  const fields = ['title', 'subtitle', 'description', 'mediainfo', 'poster', 'screenshots']
+  const filled = fields.filter(f => {
+    const val = (record as unknown as Record<string, unknown>)[f]
+    return val && String(val).trim() && String(val).trim() !== '[]'
+  }).length
+  return Math.round((filled / fields.length) * 100)
+}
+
+function completenessColor(record: SeedDataRow): string {
+  const pct = completenessPercent(record)
+  if (pct >= 83) return '#52c41a'
+  if (pct >= 50) return '#faad14'
+  return '#cf1322'
+}
+
 function openMaintenance(record: SeedDataRow) {
   panelPreset.value = {
     info_hash: record.info_hash,
@@ -189,3 +214,12 @@ onMounted(() => {
   fetchData()
 })
 </script>
+
+<style scoped>
+:deep(.row-incomplete) {
+  background-color: #fff2f0;
+}
+:deep(.row-incomplete:hover) {
+  background-color: #ffe7e4;
+}
+</style>
