@@ -89,6 +89,7 @@
       }"
       row-key="info_hash"
       size="small"
+      :scroll="{ x: 1280 }"
       :sticky="{ offsetHeader: 48 }"
       :row-class-name="(record: any) => record.metadata_reviewed ? 'row-reviewed' : 'row-unreviewed'"
       :row-selection="{ selectedRowKeys: selectedHashes, onChange: (keys: string[]) => selectedHashes = keys }"
@@ -103,6 +104,16 @@
         </template>
         <template v-if="column.key === 'size'">
           {{ formatBytes(record.size) }}
+        </template>
+        <template v-if="column.key === 'state'">
+          <a-tag :color="stateColor(record.state)" style="margin: 0">{{ translateQbState(record.state) }}</a-tag>
+        </template>
+        <template v-if="column.key === 'progress'">
+          <a-progress :percent="Math.round(record.progress || 0)" :stroke-color="progressColor(record.progress || 0)" :show-info="false" />
+          <span style="font-size: 11px; color: #666">{{ Math.round(record.progress || 0) }}%</span>
+        </template>
+        <template v-if="column.key === 'uploaded'">
+          <span :style="{ color: record.uploaded > 0 ? '#52c41a' : '#999' }">{{ formatBytes(record.uploaded) }}</span>
         </template>
         <template v-if="column.key === 'coverage'">
           <a-tooltip>
@@ -367,6 +378,30 @@ import { message } from 'ant-design-vue'
 import { publishTorrentsApi, type PublishTorrentItem } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
 import { formatBytes, maskDomain } from '@/utils/format'
+import { useEnumLabels } from '@/utils/enumLabels'
+
+const { translateQbState } = useEnumLabels()
+
+function stateColor(state: string): string {
+  const colors: Record<string, string> = {
+    uploading: 'success',
+    stalledUP: 'success',
+    forcedUP: 'success',
+    pausedUP: 'warning',
+    pausedDL: 'warning',
+    downloading: 'processing',
+    stalledDL: 'processing',
+    error: 'error',
+    missingFiles: 'error',
+  }
+  return colors[state] || 'default'
+}
+
+function progressColor(pct: number): string {
+  if (pct >= 100) return '#52c41a'
+  if (pct >= 80) return '#faad14'
+  return '#1677ff'
+}
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import MetadataReviewModal from './MetadataReviewModal.vue'
 
@@ -403,6 +438,9 @@ const columns = [
   { title: '种子名称', dataIndex: 'name', key: 'name', ellipsis: true },
   { title: '做种站点', key: 'source_site', width: 160 },
   { title: '大小', key: 'size', width: 90 },
+  { title: '状态', key: 'state', width: 90 },
+  { title: '进度', key: 'progress', width: 110, align: 'center' as const },
+  { title: '上传量', key: 'uploaded', width: 90 },
   { title: '覆盖', key: 'coverage', width: 120, align: 'center' as const },
   { title: '可转', key: 'target_count', width: 100 },
   { title: '操作', key: 'actions', width: 180 },
