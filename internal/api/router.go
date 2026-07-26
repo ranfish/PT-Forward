@@ -390,6 +390,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/manual-forward/merge/", mfHandler)
 	mux.Handle("/api/v1/manual-forward/preview", mfHandler)
 	mux.Handle("/api/v1/manual-forward/preview/", mfHandler)
+	mux.Handle("/api/v1/manual-forward/refresh", mfHandler)
+	mux.Handle("/api/v1/manual-forward/refresh/", mfHandler)
 
 	if rt.orphanHandler != nil {
 		orphanH := rt.chain(rt.rateLimitMW, rt.orphanHandler.ServeHTTP)
@@ -400,6 +402,10 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	ptHandler := rt.chain(writeLimitMW, rt.publishTorrentsHandler.ServeHTTP)
 	mux.Handle("/api/v1/publish/torrents", ptHandler)
 	mux.Handle("/api/v1/publish/torrents/", ptHandler)
+	mux.Handle("/api/v1/publish/cached-sites", ptHandler)
+	mux.Handle("/api/v1/publish/cached-sites/", ptHandler)
+	mux.Handle("/api/v1/publish/seed-data", ptHandler)
+	mux.Handle("/api/v1/publish/seed-data/", ptHandler)
 
 	dashboardHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/dashboard/overview", dashboardHandler)
