@@ -108,29 +108,34 @@
           <a-tooltip>
             <template #title>
               <div v-if="record.coverage?.sites?.length">
-                <div v-for="s in record.coverage.sites" :key="s.site_name">
-                  <a-tag :color="coverageColor(s.status)" size="small" style="margin: 1px 0">
+                <div v-for="s in record.coverage.sites" :key="s.site_name" style="display: flex; align-items: center; gap: 4px; margin: 1px 0">
+                  <span>{{ coverageEmoji(s.status, s.source) }}</span>
+                  <a-tag :color="coverageColor(s.status, s.source)" size="small" style="margin: 0">
                     {{ s.site_name }}
                   </a-tag>
-                  <span style="font-size: 11px; color: #999">({{ s.source }})</span>
                 </div>
               </div>
               <div v-else-if="record.queried" style="color: #999">
                 已查询，暂无已知覆盖
               </div>
               <div v-else style="color: #999">尚未查询</div>
+              <div v-if="record.coverage?.sites?.length" style="margin-top: 4px; border-top: 1px solid #333; padding-top: 4px; font-size: 11px">
+                🟢 做种中 {{ coverageCount(record, 'green') }} · 🟡 可辅种 {{ coverageCount(record, 'yellow') }} · ⚪ 可发布 {{ coverageCount(record, 'white') }}
+              </div>
             </template>
             <div class="coverage-cell">
-              <span class="coverage-has">{{ record.coverage?.has_count ?? 0 }}</span>
-              <span class="coverage-sep">/</span>
-              <span class="coverage-total">{{ record.coverage?.total_sites ?? 0 }}</span>
+              <span v-if="coverageCount(record, 'green') > 0" style="color: #52c41a; font-weight: 600">{{ coverageCount(record, 'green') }}</span>
+              <span v-if="coverageCount(record, 'green') > 0" style="color: #999">·</span>
+              <span v-if="coverageCount(record, 'yellow') > 0" style="color: #faad14; font-weight: 600">{{ coverageCount(record, 'yellow') }}</span>
+              <span v-if="coverageCount(record, 'yellow') > 0" style="color: #999">·</span>
+              <span style="color: #999">{{ record.coverage?.total_sites ?? 0 }}</span>
               <a-tag v-if="!record.queried" color="orange" size="small" class="unqueried-tag">未查</a-tag>
             </div>
           </a-tooltip>
         </template>
         <template v-if="column.key === 'target_count'">
-          <a-tag :color="(record.coverage?.target_count ?? 0) > 0 ? 'green' : 'default'">
-            {{ record.coverage?.target_count ?? 0 }} 站可转
+          <a-tag :color="coverageCount(record, 'white') > 0 ? 'green' : 'default'">
+            {{ coverageCount(record, 'white') }} 站可转
           </a-tag>
         </template>
         <template v-if="column.key === 'actions'">
@@ -153,7 +158,7 @@
             <a-button
               type="primary"
               size="small"
-              :disabled="(record.coverage?.target_count ?? 0) === 0"
+              :disabled="false"
               @click="startForward(record)"
             >
               转种
@@ -430,15 +435,31 @@ const queryProgress = computed(() => {
   return Math.round((queryDone.value / queryTotal.value) * 100)
 })
 
-function coverageColor(status: string): string {
-  const map: Record<string, string> = {
-    confirmed_has: 'green',
-    probably_has: 'blue',
-    confirmed_not: 'default',
-    probably_not: 'default',
-    unknown: 'default',
+function coverageColor(status: string, source?: string): string {
+  if (status === 'confirmed_has' || status === 'probably_has') {
+    if (source === 'tracker') return 'green'
+    return 'gold'
   }
-  return map[status] || 'default'
+  return 'default'
+}
+
+function coverageEmoji(status: string, source?: string): string {
+  if (status === 'confirmed_has' || status === 'probably_has') {
+    if (source === 'tracker') return '🟢'
+    return '🟡'
+  }
+  return '⚪'
+}
+
+function coverageCount(record: PublishTorrentItem, color: 'green' | 'yellow' | 'white'): number {
+  const sites = record.coverage?.sites
+  if (!sites?.length) return 0
+  return sites.filter((s: { status: string; source: string }) => {
+    const c = coverageColor(s.status, s.source)
+    if (color === 'green') return c === 'green'
+    if (color === 'yellow') return c === 'gold'
+    return c === 'default'
+  }).length
 }
 
 function onTableChange(pag: { current?: number; pageSize?: number }) {
