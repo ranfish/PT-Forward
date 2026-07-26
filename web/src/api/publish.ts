@@ -165,7 +165,7 @@ export const manualForwardApi = {
   batchSubmit(items: ManualForwardSubmitRequest[]) {
     return client.post<ApiResponse<{ succeeded: number; failed: number }>>('/manual-forward/batch-submit', { items })
   },
-  refresh(data: { type: string; name: string; save_path?: string; info_hash?: string; site_name?: string }) {
+  refresh(data: { type: string; name: string; save_path?: string; info_hash?: string; site_name?: string; screenshots?: string[] }) {
     return client.post<ApiResponse<Record<string, unknown>>>('/manual-forward/refresh', data)
   },
 }

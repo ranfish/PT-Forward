@@ -468,7 +468,7 @@ func main() {
 	coverageSvc := coverage.NewService(db, iyuuService, trackerResolver, log)
 	sourceDetector := publish.NewSourceSiteDetector(db, log)
 	sourceDetector.RefreshCache(context.Background())
-	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner, metadataFetcher, coverageSvc, sourceDetector, complianceChecker)
+	router.SetupManualForward(publishPipeline, siteProvider, clientManager, declFilter, bdinfoScanner, metadataFetcher, coverageSvc, sourceDetector, complianceChecker, imageHostMgr)
 	router.SetConfigEventBus(configEventBus)
 	router.SetCloudFPBreakerFn(cloudFPService.IsBreakerOpen)
 

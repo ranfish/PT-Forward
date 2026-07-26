@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/compliance"
+	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
@@ -34,6 +35,7 @@ type ManualForwardHandler struct {
 	coverage        CoverageServiceProvider
 	sourceDetector  *publish.SourceSiteDetector
 	complianceChecker *compliance.Checker
+	imageHostMgr    *imagehost.Manager
 	taskStore    sync.Map
 	taskSeq      atomic.Int64
 	stopCh       chan struct{}
@@ -92,6 +94,7 @@ func (h *ManualForwardHandler) SetMetadataFetcher(f MetadataFetcherProvider) { h
 func (h *ManualForwardHandler) SetCoverageService(c CoverageServiceProvider) { h.coverage = c }
 func (h *ManualForwardHandler) SetSourceDetector(d *publish.SourceSiteDetector) { h.sourceDetector = d }
 func (h *ManualForwardHandler) SetComplianceChecker(c *compliance.Checker)    { h.complianceChecker = c }
+func (h *ManualForwardHandler) SetImageHostManager(m *imagehost.Manager)     { h.imageHostMgr = m }
 
 func (h *ManualForwardHandler) Close() {
 	h.stopOnce.Do(func() { close(h.stopCh) })
@@ -1295,11 +1298,12 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	var req struct {
-		Type     string `json:"type"`
-		Name     string `json:"name"`
-		SavePath string `json:"save_path"`
-		InfoHash string `json:"info_hash"`
-		SiteName string `json:"site_name"`
+		Type        string   `json:"type"`
+		Name        string   `json:"name"`
+		SavePath    string   `json:"save_path"`
+		InfoHash    string   `json:"info_hash"`
+		SiteName    string   `json:"site_name"`
+		Screenshots []string `json:"screenshots"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -1353,7 +1357,29 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		}
 
 	case "rehost_screenshots":
-		Error(w, http.StatusNotImplemented, 50100, "rehost_screenshots 暂未实现，请使用截图 Tab 手动操作")
+		if h.imageHostMgr == nil {
+			Error(w, http.StatusServiceUnavailable, 50001, "图床管理器未配置")
+			return
+		}
+		if len(req.Screenshots) == 0 {
+			Error(w, http.StatusBadRequest, 40001, "screenshots 必填")
+			return
+		}
+		rehosted := make([]string, 0, len(req.Screenshots))
+		for _, url := range req.Screenshots {
+			if url == "" {
+				continue
+			}
+			r, err := h.imageHostMgr.Rehost(ctx, url)
+			if err != nil || r == nil || r.URL == "" {
+				h.logger.Warn("rehost screenshot failed, keeping original",
+					zap.String("url", url), zap.Error(err))
+				rehosted = append(rehosted, url)
+				continue
+			}
+			rehosted = append(rehosted, r.URL)
+		}
+		result["screenshots"] = rehosted
 
 	default:
 		Error(w, http.StatusBadRequest, 40001, "未知 type: "+req.Type)
