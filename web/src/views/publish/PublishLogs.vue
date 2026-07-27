@@ -24,9 +24,27 @@
           <a-select-option value="exists">已存在</a-select-option>
           <a-select-option value="edited">已编辑</a-select-option>
         </a-select>
+        <a-select
+          v-model:value="triggerFilter"
+          style="width: 120px"
+          placeholder="触发"
+          allow-clear
+          @change="onFilterChange"
+        >
+          <a-select-option value="manual">手动</a-select-option>
+          <a-select-option value="batch">批量</a-select-option>
+          <a-select-option value="reseed">辅种</a-select-option>
+          <a-select-option value="wizard">向导</a-select-option>
+        </a-select>
         <a-range-picker v-model:value="dateRange" @change="onFilterChange" />
         <a-button @click="fetchData"><ReloadOutlined /></a-button>
         <a-button @click="exportCSV" :disabled="tableData.length === 0"><DownloadOutlined /> CSV</a-button>
+        <a-switch
+          v-model:checked="autoRefresh"
+          checked-children="自动"
+          un-checked-children="手动"
+          size="small"
+        />
       </a-space>
     </div>
 
@@ -36,11 +54,14 @@
       :loading="loading"
       :pagination="pagination"
       row-key="id"
-      :scroll="{ x: 1600 }"
+      :scroll="{ x: 1770 }"
       size="small"
       @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'trigger'">
+          <a-tag :color="triggerColor(record.trigger)" style="font-size: 11px">{{ triggerLabel(record.trigger) }}</a-tag>
+        </template>
         <template v-if="column.key === 'title'">
           <div>
             <div v-if="record.subtitle" style="color: #666; font-size: 12px">{{ record.subtitle }}</div>
@@ -109,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import type { Dayjs } from 'dayjs'
 import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import { publishApi } from '@/api/publish'
@@ -120,7 +141,9 @@ const loading = ref(false)
 const tableData = ref<PublishResultRecord[]>([])
 const searchTarget = ref('')
 const statusFilter = ref<string | undefined>(undefined)
+const triggerFilter = ref<string | undefined>(undefined)
 const dateRange = ref<[Dayjs, Dayjs] | undefined>(undefined)
+const autoRefresh = ref(true)
 
 const pagination = ref({
   current: 1,
@@ -131,8 +154,10 @@ const pagination = ref({
 })
 
 const columns = [
+  { title: '触发', key: 'trigger', width: 80 },
   { title: '源站', key: 'source_site', width: 100 },
   { title: '目标站', key: 'target_site', width: 100 },
+  { title: '种子ID', dataIndex: 'torrent_id', key: 'torrent_id', width: 90 },
   { title: '标题', key: 'title', ellipsis: true },
   { title: '状态', key: 'status', width: 80 },
   { title: '加种', key: 'seeded', width: 80 },
@@ -142,14 +167,20 @@ const columns = [
   { title: '操作', key: 'action', width: 70, fixed: 'right' as const },
 ]
 
-async function fetchData() {
-  loading.value = true
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollRefreshing = false
+
+async function fetchData(silent = false) {
+  if (!silent) loading.value = true
+  if (pollRefreshing) return
+  pollRefreshing = true
   try {
     const params: Record<string, unknown> = {
       page: pagination.value.current,
       pageSize: pagination.value.pageSize,
     }
     if (statusFilter.value) params.status = statusFilter.value
+    if (triggerFilter.value) params.trigger = triggerFilter.value
     if (searchTarget.value) params.target_site = searchTarget.value
     if (dateRange.value && dateRange.value[0] && dateRange.value[1]) {
       params.start_date = dateRange.value[0].format('YYYY-MM-DD')
@@ -165,8 +196,29 @@ async function fetchData() {
     // silent
   } finally {
     loading.value = false
+    pollRefreshing = false
   }
 }
+
+function startPolling() {
+  stopPolling()
+  pollTimer = setInterval(() => {
+    if (autoRefresh.value && !pollRefreshing) {
+      fetchData(true)
+    }
+  }, 3000)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+watch(autoRefresh, (on) => {
+  if (on) startPolling()
+})
 
 function onFilterChange() {
   pagination.value.current = 1
@@ -209,8 +261,33 @@ function formatCost(ms: number): string {
   return `${(ms / 60000).toFixed(1)}min`
 }
 
+function triggerColor(trigger: string): string {
+  const map: Record<string, string> = {
+    manual: 'blue',
+    batch: 'purple',
+    reseed: 'cyan',
+    wizard: 'geekblue',
+  }
+  return map[trigger] || 'default'
+}
+
+function triggerLabel(trigger: string): string {
+  const map: Record<string, string> = {
+    manual: '手动',
+    batch: '批量',
+    reseed: '辅种',
+    wizard: '向导',
+  }
+  return map[trigger] || trigger || '-'
+}
+
 onMounted(() => {
   fetchData()
+  startPolling()
+})
+
+onUnmounted(() => {
+  stopPolling()
 })
 
 function exportCSV() {
