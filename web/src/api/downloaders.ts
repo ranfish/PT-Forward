@@ -5,8 +5,8 @@ export const downloadersApi = {
   list(page = 1, size = 20) {
     return client.get<ApiResponsePaginated<ClientConfig>>('/downloaders', { params: { page, size } })
   },
-  listLight(page = 1, size = 200) {
-    return client.get<ApiResponsePaginated<ClientConfig>>('/downloaders', { params: { page, size, light: 'true' } })
+  listLight(page = 1, size = 200, role?: string) {
+    return client.get<ApiResponsePaginated<ClientConfig>>('/downloaders', { params: { page, size, light: 'true', role } })
   },
   get(id: number) {
     return client.get<ApiResponse<ClientConfig>>(`/downloaders/${id}`)

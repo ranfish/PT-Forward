@@ -119,16 +119,20 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 
 	page, size := parsePagination(r)
 	light := r.URL.Query().Get("light") == "true"
+	roleFilter := r.URL.Query().Get("role")
+
+	query := h.db.Model(&model.ClientConfig{})
+	if roleFilter != "" {
+		query = query.Where("role = ?", roleFilter)
+	}
 
 	var total int64
-	if err := h.db.Model(&model.ClientConfig{}).Count(&total).Error; err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
 	var clients []model.ClientConfig
-	h.db.
-		Offset(offset(page, size)).Limit(size).
-		Find(&clients)
+	query.Offset(offset(page, size)).Limit(size).Find(&clients)
 
 	items := make([]downloaderResponse, 0, len(clients))
 	for i := range clients {

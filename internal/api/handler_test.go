@@ -6432,6 +6432,7 @@ func TestSeeding_ExtractLastSegment(t *testing.T) {
 
 func TestSeeding_ListTorrents_Pagination(t *testing.T) {
 	env := setupTestEnv(t)
+	env.db.Create(&model.ClientConfig{Name: "c1", Type: "qbittorrent", Role: "seeding"})
 	for i := 0; i < 5; i++ {
 		env.db.Create(&model.SeedingTorrentRecord{
 			ClientID: "c1", InfoHash: fmt.Sprintf("pag%d", i), SiteName: "s1",

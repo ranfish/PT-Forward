@@ -126,7 +126,7 @@ watch(filters, () => {
 
 async function fetchDownloaders() {
   try {
-    const resp = await downloadersApi.listLight(1, 100)
+    const resp = await downloadersApi.listLight(1, 100, 'seeding')
     const items = resp.data.data?.items || resp.data.data || []
     downloaderOptions.value = items.map((d: { name?: string; id?: number }) => ({
       label: String(d.name || d.id),
