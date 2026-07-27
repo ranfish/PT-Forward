@@ -5,7 +5,6 @@
     {"rule_type": "adult", "pattern": "色情", "scope": "share"},
     {"rule_type": "adult", "pattern": "成人内容", "scope": "share"},
     {"rule_type": "adult", "pattern": "成人影片", "scope": "share"},
-    {"rule_type": "adult", "pattern": "AV", "scope": "share"},
     {"rule_type": "adult", "pattern": "18+", "scope": "share"},
     {"rule_type": "adult", "pattern": "NSFW", "scope": "share"},
     {"rule_type": "adult", "pattern": "Adult", "scope": "share"},
