@@ -822,7 +822,7 @@
     "scopeManaged": "已管理",
     "scopeAll": "全部",
     "scopeCustom": "自定义",
-    "fitTimeCheckMs": "FitTime 检查间隔(ms)",
+    "fitTimeCheckMs": "种子完美度 检查间隔(ms)",
     "emergencyBufferRatio": "紧急缓冲比例",
     "preFilter": "预过滤",
     "minDiskPercent": "最低磁盘百分比",
