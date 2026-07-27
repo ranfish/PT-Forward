@@ -27,6 +27,14 @@ func NewComplianceHandler(db *gorm.DB, logger *zap.Logger) *ComplianceHandler {
 func (h *ComplianceHandler) SetChecker(c *compliance.Checker) { h.checker = c }
 
 func (h *ComplianceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.HasSuffix(r.URL.Path, "/compliance/test") {
+		if r.Method == http.MethodPost {
+			h.handleTest(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40500, "method not allowed")
+		}
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
 		h.handleList(w, r)
@@ -144,4 +152,38 @@ func (h *ComplianceHandler) handleDelete(w http.ResponseWriter, r *http.Request)
 		h.checker.InvalidateCache()
 	}
 	Success(w, map[string]interface{}{"deleted": id})
+}
+
+// handleTest §56.40: 规则测试 — 输入标题/副标题/场景，返回命中结果。
+func (h *ComplianceHandler) handleTest(w http.ResponseWriter, r *http.Request) {
+	if h.checker == nil {
+		Error(w, http.StatusInternalServerError, 50000, "checker not initialized")
+		return
+	}
+	var req struct {
+		Title    string `json:"title"`
+		Subtitle string `json:"subtitle"`
+		Scope    string `json:"scope"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "invalid body")
+		return
+	}
+	if req.Title == "" && req.Subtitle == "" {
+		Error(w, http.StatusBadRequest, 40001, "title or subtitle required")
+		return
+	}
+
+	var scope compliance.CheckScope
+	switch req.Scope {
+	case "publish":
+		scope = compliance.ScopePublish
+	case "reseed":
+		scope = compliance.ScopeReseed
+	default:
+		scope = compliance.ScopeShare
+	}
+
+	result := h.checker.CheckWithScope(r.Context(), req.Title, req.Subtitle, scope)
+	Success(w, result)
 }
