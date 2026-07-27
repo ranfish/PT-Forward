@@ -207,6 +207,9 @@ type Engine struct {
 
 	unregisteredCursor   atomic.Int64
 	unregisteredChecking atomic.Bool
+
+	spaceAlarmMu   sync.Mutex
+	spaceAlarmLast map[string]time.Time
 }
 
 type maindataEntry struct {
@@ -234,9 +237,10 @@ func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 		recordMap:       make(map[string]*model.SeedingTorrentRecord),
 		emaStates:       make(map[string]*emaState),
 		maindataCache:   make(map[string]*maindataEntry),
-		fitTimer:        NewFitTimer(),
-		freeWaitMonitor: NewFreeWaitMonitor(db, logger),
-		pendingEvents:   make(chan *pusher.PushedEvent, 1000),
+		fitTimer:          NewFitTimer(),
+		freeWaitMonitor:  NewFreeWaitMonitor(db, logger),
+		pendingEvents:    make(chan *pusher.PushedEvent, 1000),
+		spaceAlarmLast:   make(map[string]time.Time),
 	}
 	e.freeEndMonitor = NewFreeEndMonitor(db, nil, logger)
 	e.freeEndMonitor.SetEngine(e)
@@ -450,6 +454,9 @@ func (e *Engine) Start(ctx context.Context) error {
 		go func() { defer e.wg.Done(); e.consumeLoop(ctx) }()
 	}
 
+	e.wg.Add(1)
+	go func() { defer e.wg.Done(); e.archiveLoop(refreshCtx) }()
+
 	return nil
 }
 
@@ -508,6 +515,8 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 		if torrentMap == nil {
 			continue
 		}
+
+		e.checkSpaceAlarm(ctx, clientID, freeSpace)
 
 		cyclesSinceFull := 0
 		if prev != nil && !wasFull {
@@ -2755,6 +2764,88 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 				zap.String("client_id", clientID),
 				zap.Error(err))
 		}
+	}
+}
+
+// checkSpaceAlarm §33.1.79 空间告警：剩余空间 < 阈值时发 WS 事件 + 日志（5 分钟节流）。
+func (e *Engine) checkSpaceAlarm(ctx context.Context, clientID string, freeSpace int64) {
+	if freeSpace < 0 {
+		return
+	}
+	cfg, ok := e.LoadActiveClientConfig(ctx, clientID)
+	if !ok || !cfg.SpaceAlarmEnabled || cfg.SpaceAlarmGB <= 0 {
+		return
+	}
+	threshold := int64(cfg.SpaceAlarmGB * 1024 * 1024 * 1024)
+	if freeSpace >= threshold {
+		return
+	}
+
+	e.spaceAlarmMu.Lock()
+	if last, ok := e.spaceAlarmLast[clientID]; ok && time.Since(last) < 5*time.Minute {
+		e.spaceAlarmMu.Unlock()
+		return
+	}
+	e.spaceAlarmLast[clientID] = time.Now()
+	e.spaceAlarmMu.Unlock()
+
+	level := "warning"
+	if freeSpace < threshold/2 {
+		level = "critical"
+	}
+
+	e.logger.Warn("disk space alarm triggered",
+		zap.String("client_id", clientID),
+		zap.Int64("freeSpace", freeSpace),
+		zap.Float64("thresholdGB", cfg.SpaceAlarmGB),
+		zap.String("level", level))
+
+	if e.wsBroadcaster != nil {
+		e.wsBroadcaster.BroadcastWS("system.disk.warning", map[string]interface{}{
+			"client_id":  clientID,
+			"freeSpace":  freeSpace,
+			"level":      level,
+			"threshold":  threshold,
+		})
+	}
+}
+
+// archiveLoop §14.16/S-P1-7: 每 6 小时归档已删除/暂停的旧记录。
+func (e *Engine) archiveLoop(ctx context.Context) {
+	ticker := time.NewTicker(6 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			e.archiveOldRecords(ctx)
+		}
+	}
+}
+
+func (e *Engine) archiveOldRecords(ctx context.Context) {
+	cutoff := time.Now().AddDate(0, 0, -14)
+	result := e.db.WithContext(ctx).
+		Model(&model.SeedingTorrentRecord{}).
+		Where("status IN ? AND updated_at < ?",
+			[]string{string(model.SeedingStatusDeleted), string(model.SeedingStatusPausedFreeEnd), string(model.SeedingStatusPausedRule)},
+			cutoff).
+		Update("status", string(model.SeedingStatusArchived))
+	if result.RowsAffected > 0 {
+		e.logger.Info("archive: records archived",
+			zap.Int64("count", result.RowsAffected),
+			zap.Time("cutoff", cutoff))
+	}
+
+	physicalCutoff := time.Now().AddDate(0, 0, -30)
+	delResult := e.db.WithContext(ctx).
+		Where("status = ? AND updated_at < ?", string(model.SeedingStatusArchived), physicalCutoff).
+		Delete(&model.SeedingTorrentRecord{})
+	if delResult.RowsAffected > 0 {
+		e.logger.Info("archive: records physically deleted",
+			zap.Int64("count", delResult.RowsAffected),
+			zap.Time("cutoff", physicalCutoff))
 	}
 }
 
