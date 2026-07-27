@@ -5,16 +5,23 @@
       <a-col :span="4">
         <a-card size="small">
           <a-statistic title="今日发布" :value="dashboardStats.today_publish" />
+          <div v-if="dashboardStats.yesterday_publish > 0 || dashboardStats.today_publish > 0" style="font-size: 11px; margin-top: 4px" :style="{ color: deltaColor(dashboardStats.today_publish, dashboardStats.yesterday_publish) }">
+            较昨日 {{ deltaText(dashboardStats.today_publish, dashboardStats.yesterday_publish) }}
+          </div>
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card size="small">
           <a-statistic title="成功" :value="dashboardStats.today_success" :value-style="{ color: '#3f8600' }" />
+          <div style="font-size: 11px; margin-top: 4px; color: #999">成功率 {{ successRate(dashboardStats.today_success, dashboardStats.today_publish) }}</div>
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card size="small">
           <a-statistic title="失败" :value="dashboardStats.today_failed" :value-style="{ color: '#cf1322' }" />
+          <div v-if="dashboardStats.today_failed > 0" style="font-size: 11px; margin-top: 4px">
+            <a style="font-size: 11px" @click="$router.push('/publish/logs?status=failed')">查看 →</a>
+          </div>
         </a-card>
       </a-col>
       <a-col :span="4">
@@ -24,7 +31,10 @@
       </a-col>
       <a-col :span="4">
         <a-card size="small">
-          <a-statistic title="已审核" :value="dashboardStats.reviewed_count" />
+          <a-statistic title="未审核" :value="dashboardStats.unreviewed_count" :value-style="{ color: dashboardStats.unreviewed_count > 0 ? '#faad14' : undefined }" />
+          <div v-if="dashboardStats.unreviewed_count > 0" style="font-size: 11px; margin-top: 4px">
+            <a style="font-size: 11px" @click="$router.push('/publish/data')">去审核 →</a>
+          </div>
         </a-card>
       </a-col>
       <a-col :span="4">
@@ -34,9 +44,16 @@
       </a-col>
     </a-row>
 
-    <!-- 7 天发布趋势图 -->
-    <a-card v-if="trendData.length > 0" size="small" title="发布趋势（7 天）" style="margin-bottom: 16px">
-      <div ref="trendChartRef" style="width: 100%; height: 200px"></div>
+    <!-- 7/30 天发布趋势图 -->
+    <a-card v-if="trendData.length > 0" size="small" style="margin-bottom: 16px">
+      <template #title>
+        发布趋势
+        <a-radio-group v-model:value="trendDays" size="small" style="margin-left: 12px">
+          <a-radio-button :value="7">7 天</a-radio-button>
+          <a-radio-button :value="30">30 天</a-radio-button>
+        </a-radio-group>
+      </template>
+      <div ref="trendChartRef" style="width: 100%; height: 220px" />
     </a-card>
 
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px">
@@ -321,14 +338,36 @@ const { translatePublishStatus, translatePublishType } = useEnumLabels()
 const activeTab = ref('candidates')
 
 // 总览统计
-const dashboardStats = ref<{ today_publish: number; today_success: number; today_failed: number; pending_count: number; reviewed_count: number; total_metadata: number } | null>(null)
+const dashboardStats = ref<{ today_publish: number; today_success: number; today_failed: number; pending_count: number; reviewed_count: number; total_metadata: number; yesterday_publish: number; yesterday_success: number; unreviewed_count: number } | null>(null)
 const trendData = ref<Array<{ day: string; success: number; failed: number }>>([])
+const trendDays = ref<7 | 30>(7)
 const trendChartRef = ref<HTMLElement>()
 let trendChart: echarts.ECharts | null = null
 
+function successRate(s: number, total: number): string {
+  if (total === 0) return '-'
+  return Math.round((s / total) * 100) + '%'
+}
+
+function deltaText(today: number, yesterday: number): string {
+  if (yesterday === 0) return today > 0 ? '↑ 新' : ''
+  const delta = today - yesterday
+  const pct = Math.round((delta / yesterday) * 100)
+  if (delta > 0) return `↑ ${pct}%`
+  if (delta < 0) return `↓ ${Math.abs(pct)}%`
+  return '持平'
+}
+
+function deltaColor(today: number, yesterday: number): string {
+  if (yesterday === 0) return today > 0 ? '#52c41a' : '#999'
+  if (today > yesterday) return '#52c41a'
+  if (today < yesterday) return '#cf1322'
+  return '#999'
+}
+
 async function fetchStats() {
   try {
-    const resp = await publishDataApi.stats()
+    const resp = await publishDataApi.stats(trendDays.value)
     const data = resp.data?.data
     dashboardStats.value = data?.stats || null
     trendData.value = data?.trend || []
@@ -339,34 +378,54 @@ async function fetchStats() {
   } catch { /* silent */ }
 }
 
+watch(trendDays, () => fetchStats())
+
 function renderTrendChart() {
   if (!trendChartRef.value) return
   if (!trendChart) {
     trendChart = echarts.init(trendChartRef.value)
   }
+  const successData = trendData.value.map(d => d.success)
+  const failedData = trendData.value.map(d => d.failed)
+  const rateData = trendData.value.map(d => {
+    const total = d.success + d.failed
+    return total > 0 ? Math.round((d.success / total) * 100) : null
+  })
   trendChart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['成功', '失败'], bottom: 0 },
-    grid: { left: 40, right: 20, top: 20, bottom: 40 },
+    legend: { data: ['成功', '失败', '成功率'], bottom: 0 },
+    grid: { left: 40, right: 50, top: 20, bottom: 40 },
     xAxis: {
       type: 'category',
       data: trendData.value.map(d => d.day.slice(5)),
     },
-    yAxis: { type: 'value', minInterval: 1 },
+    yAxis: [
+      { type: 'value', minInterval: 1, name: '数量' },
+      { type: 'value', max: 100, name: '成功率%', axisLabel: { formatter: '{value}%' } },
+    ],
     series: [
       {
         name: '成功',
         type: 'bar',
         stack: 'total',
         itemStyle: { color: '#52c41a' },
-        data: trendData.value.map(d => d.success),
+        data: successData,
       },
       {
         name: '失败',
         type: 'bar',
         stack: 'total',
         itemStyle: { color: '#ff4d4f' },
-        data: trendData.value.map(d => d.failed),
+        data: failedData,
+      },
+      {
+        name: '成功率',
+        type: 'line',
+        yAxisIndex: 1,
+        smooth: true,
+        itemStyle: { color: '#1677ff' },
+        lineStyle: { width: 2 },
+        data: rateData,
       },
     ],
   })
