@@ -478,6 +478,7 @@ func main() {
 	router.SetCookieCloudServer(ccServer)
 
 	router.SetupPublishTorrents(coverageSvc, clientManager, sourceDetector)
+	router.SetupCompliance(complianceChecker)
 
 	orphanScanner := orphan.NewScanner(clientManager, db, log)
 	orphanRecovery := orphan.NewRecovery(db, siteProvider, clientManager, log)

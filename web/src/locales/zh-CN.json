@@ -937,6 +937,7 @@
     "addExclusionRule": "添加排除规则",
     "targetSite": "目标站点",
     "exclusionHint": "添加后，从源站点抓取的种子将不会发布到目标站点",
+    "builtinCannotDelete": "内置规则不可删除",
     "deleteExclusionConfirm": "确定删除该排除规则？",
     "deleteConfirm": "确定删除？",
     "tasks": "发布任务",

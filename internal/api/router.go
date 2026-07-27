@@ -42,6 +42,7 @@ type Router struct {
 	publishHandler       *PublishHandler
 	manualForwardHandler *ManualForwardHandler
 	publishTorrentsHandler *PublishTorrentsHandler
+	complianceHandler    *ComplianceHandler
 	dashboardHandler     *DashboardHandler
 	systemHandler        *SystemHandler
 	iyuuHandler          *IYUUHandler
@@ -118,6 +119,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		publishHandler:         NewPublishHandler(publishPipeline, logger, db),
 		manualForwardHandler:   manualForwardHandler,
 		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger),
+		complianceHandler:      NewComplianceHandler(db, logger),
 		publishLimitHandler:   NewPublishLimitHandler(db, logger),
 		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),
 		metadataHandler:       NewMetadataHandler(db, logger),
@@ -200,6 +202,13 @@ func (rt *Router) SetCookieCloudServer(srv http.Handler) {
 
 func (rt *Router) SetupOrphan(scanner *orphan.Scanner, recovery *orphan.Recovery, db *gorm.DB) {
 	rt.orphanHandler = NewOrphanHandler(scanner, recovery, db, rt.logger)
+}
+
+// SetupCompliance §56.39: 注入 compliance.Checker（用于 CRUD 后 InvalidateCache）。
+func (rt *Router) SetupCompliance(checker *compliance.Checker) {
+	if rt.complianceHandler != nil && checker != nil {
+		rt.complianceHandler.SetChecker(checker)
+	}
 }
 
 func (rt *Router) SetupPublishTorrents(coverageSvc *coverage.Service, clientMgr *client.Manager, sourceDetector *publish.SourceSiteDetector) {
@@ -303,6 +312,10 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 
 	exclusionHandler := rt.chain(rt.rateLimitMW, rt.siteHandler.handleExclusions)
 	mux.Handle("/api/v1/publish/exclusions", exclusionHandler)
+
+	complianceHandler := rt.chain(rt.rateLimitMW, rt.complianceHandler.ServeHTTP)
+	mux.Handle("/api/v1/compliance/rules", complianceHandler)
+	mux.Handle("/api/v1/compliance/rules/", complianceHandler)
 
 	publishLimitHandler := rt.chain(rt.rateLimitMW, rt.publishLimitHandler.ServeHTTP)
 	mux.Handle("/api/v1/publish/limits", publishLimitHandler)

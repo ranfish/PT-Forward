@@ -934,6 +934,7 @@
     "addExclusionRule": "Add Exclusion Rule",
     "targetSite": "Target Site",
     "exclusionHint": "Torrents from the source site will not be published to the target site",
+    "builtinCannotDelete": "Built-in rules cannot be deleted",
     "deleteExclusionConfirm": "Delete this exclusion rule?",
     "deleteConfirm": "Confirm delete?",
     "tasks": "Publish Tasks",

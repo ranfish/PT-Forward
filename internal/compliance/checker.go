@@ -110,7 +110,16 @@ func (c *Checker) InvalidateCache() {
 }
 
 func (c *Checker) Check(ctx context.Context, title string) *Result {
-	if title == "" {
+	return c.checkFull(ctx, title, "")
+}
+
+// CheckWithTitleAndSubtitle §56.39: 带 subtitle 的合规检查（修复 DetectAdult subtitle 接入遗漏）。
+func (c *Checker) CheckWithTitleAndSubtitle(ctx context.Context, title, subtitle string) *Result {
+	return c.checkFull(ctx, title, subtitle)
+}
+
+func (c *Checker) checkFull(ctx context.Context, title, subtitle string) *Result {
+	if title == "" && subtitle == "" {
 		return Pass
 	}
 
@@ -121,15 +130,21 @@ func (c *Checker) Check(ctx context.Context, title string) *Result {
 		if strings.Contains(title, kw) || strings.Contains(strings.ToLower(title), strings.ToLower(kw)) {
 			return &Result{Passed: false, Reason: kw, Category: "adult"}
 		}
+		if subtitle != "" && (strings.Contains(subtitle, kw) || strings.Contains(strings.ToLower(subtitle), strings.ToLower(kw))) {
+			return &Result{Passed: false, Reason: kw, Category: "adult"}
+		}
 	}
 
 	// qui 精确正则检测（JAV 番号 / 日期格式 / XXX 关键词），补充关键词无法覆盖的结构化模式
-	if matched, reason := DetectAdult(title, ""); matched {
+	if matched, reason := DetectAdult(title, subtitle); matched {
 		return &Result{Passed: false, Reason: reason, Category: "adult"}
 	}
 
 	for _, kw := range forbidden {
 		if strings.Contains(title, kw) {
+			return &Result{Passed: false, Reason: kw, Category: "forbidden_transfer"}
+		}
+		if subtitle != "" && strings.Contains(subtitle, kw) {
 			return &Result{Passed: false, Reason: kw, Category: "forbidden_transfer"}
 		}
 	}
@@ -148,6 +163,9 @@ func (c *Checker) Check(ctx context.Context, title string) *Result {
 		if strings.Contains(title, kw) || strings.Contains(strings.ToLower(title), strings.ToLower(kw)) {
 			return &Result{Passed: false, Reason: kw, Category: "user_filter"}
 		}
+		if subtitle != "" && (strings.Contains(subtitle, kw) || strings.Contains(strings.ToLower(subtitle), strings.ToLower(kw))) {
+			return &Result{Passed: false, Reason: kw, Category: "user_filter"}
+		}
 	}
 
 	return Pass
@@ -158,6 +176,19 @@ func (c *Checker) CheckWithSite(ctx context.Context, title, siteName string) *Re
 	if !r.Passed {
 		return r
 	}
+	return c.checkSite(ctx, title, siteName)
+}
+
+// CheckWithSiteAndSubtitle §56.39: 带 subtitle + site 的合规检查。
+func (c *Checker) CheckWithSiteAndSubtitle(ctx context.Context, title, subtitle, siteName string) *Result {
+	r := c.checkFull(ctx, title, subtitle)
+	if !r.Passed {
+		return r
+	}
+	return c.checkSite(ctx, title, siteName)
+}
+
+func (c *Checker) checkSite(ctx context.Context, title, siteName string) *Result {
 
 	if siteName == "" {
 		return Pass
