@@ -2973,12 +2973,6 @@ func parseTags(tagsStr string, defaults ...string) []string {
 	return tags
 }
 
-var (
-	reseedAdultKeywords     = []string{"9KG", "9kg", "色情", "成人内容", "成人影片", "AV", "18+", "NSFW", "Adult", "XXX", "Porn", "Erotic", "Hentai"}
-	reseedForbiddenKeywords = []string{"禁转", "独占", "谢绝转载", "限时禁转", "严禁转载", "禁止转载", "谢绝搬运"}
-	reseedForbiddenGroups   = []string{"CatEDU"}
-)
-
 func (e *Engine) checkEligibility(ctx context.Context, title string, task *model.ReseedTask) bool {
 	if e.complianceChecker != nil && task != nil {
 		result := e.complianceChecker.CheckWithTask(ctx, title, task)
@@ -2998,17 +2992,17 @@ func checkPublishEligibility(title string) bool {
 	if title == "" {
 		return true
 	}
-	for _, kw := range reseedAdultKeywords {
+	for _, kw := range compliance.AdultKeywords {
 		if strings.Contains(title, kw) || strings.Contains(strings.ToLower(title), strings.ToLower(kw)) {
 			return false
 		}
 	}
-	for _, kw := range reseedForbiddenKeywords {
+	for _, kw := range compliance.ForbiddenTransferKeywords {
 		if strings.Contains(title, kw) {
 			return false
 		}
 	}
-	for _, g := range reseedForbiddenGroups {
+	for _, g := range compliance.ForbiddenGroups {
 		if strings.Contains(title, g) {
 			return false
 		}
