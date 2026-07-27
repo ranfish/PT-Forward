@@ -24,6 +24,15 @@
         style="width: 250px"
         allow-clear
       />
+      <a-select
+        v-if="torrents.length > 0"
+        v-model:value="pathFilter"
+        style="width: 220px"
+        placeholder="保存路径"
+        allow-clear
+      >
+        <a-select-option v-for="p in savePaths" :key="p" :value="p">{{ p }}</a-select-option>
+      </a-select>
       <a-button v-if="torrents.length > 0" @click="fetchTorrents"><ReloadOutlined /></a-button>
     </div>
 
@@ -124,6 +133,8 @@ const clientId = ref<number | undefined>(undefined)
 const torrents = ref<TorrentItem[]>([])
 const loadingTorrents = ref(false)
 const searchText = ref('')
+const pathFilter = ref<string | undefined>(undefined)
+const savePaths = ref<string[]>([])
 const selectedHashes = ref<string[]>([])
 
 const fetching = ref(false)
@@ -140,8 +151,15 @@ const columns = [
 ]
 
 const filteredTorrents = computed(() => {
-  if (!searchText.value) return torrents.value
-  return torrents.value.filter(t => t.name.toLowerCase().includes(searchText.value.toLowerCase()))
+  let result = torrents.value
+  if (pathFilter.value) {
+    result = result.filter(t => t.save_path === pathFilter.value)
+  }
+  if (searchText.value) {
+    const q = searchText.value.toLowerCase()
+    result = result.filter(t => t.name.toLowerCase().includes(q))
+  }
+  return result
 })
 
 watch(() => props.open, async (val) => {
@@ -155,6 +173,8 @@ function reset() {
   torrents.value = []
   selectedHashes.value = []
   searchText.value = ''
+  pathFilter.value = undefined
+  savePaths.value = []
   fetching.value = false
   doneCount.value = 0
   successCount.value = 0
@@ -204,6 +224,13 @@ async function fetchTorrents() {
         t.cachedSites = sites.map(s => s.site_name)
       }).catch(() => {})
     }
+    // 提取保存路径列表
+    const paths = new Set<string>()
+    for (const t of torrents.value) {
+      if (t.save_path) paths.add(t.save_path)
+    }
+    savePaths.value = [...paths].sort()
+    pathFilter.value = undefined
   } catch { /* silent */ } finally {
     loadingTorrents.value = false
   }
