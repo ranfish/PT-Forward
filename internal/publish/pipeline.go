@@ -1703,6 +1703,7 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 	forbiddenFlags := map[string]bool{
 		"禁转": true, "禁止转载": true, "谢绝转载": true,
 		"严禁转载": true, "谢绝搬运": true, "独占": true, "限时禁转": true,
+		"adult": true,
 	}
 	for _, f := range flags {
 		if forbiddenFlags[f] {
