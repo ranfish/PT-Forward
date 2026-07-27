@@ -762,7 +762,9 @@ func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Reque
 	}
 
 	var total int64
-	if err := h.db.Model(&model.SeedingTorrentRecord{}).Count(&total).Error; err != nil {
+	if err := h.db.Model(&model.SeedingTorrentRecord{}).
+		Where("client_id IN (SELECT name FROM clients WHERE role = 'seeding')").
+		Count(&total).Error; err != nil {
 		h.logger.Warn("engine status: query total count failed", zap.Error(err))
 	}
 
@@ -785,6 +787,9 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 
 	if clientID := r.URL.Query().Get("clientId"); clientID != "" {
 		q = q.Where("client_id = ?", clientID)
+	} else {
+		// §56.40: 默认只返回 role=seeding 下载器的种子（聚焦刷流业务）
+		q = q.Where("client_id IN (SELECT name FROM clients WHERE role = 'seeding')")
 	}
 
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
