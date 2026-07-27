@@ -131,12 +131,16 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import { publishApi } from '@/api/publish'
 import type { PublishResultRecord } from '@/api/types'
 import { formatTime } from '@/utils/format'
+
+const route = useRoute()
+const router = useRouter()
 
 const STORAGE_KEY = 'publish_logs_filters'
 
@@ -325,9 +329,30 @@ function triggerLabel(trigger: string): string {
 }
 
 onMounted(() => {
+  applyRouteQuery()
   fetchData()
   startPolling()
 })
+
+function applyRouteQuery() {
+  const q = route.query
+  let hasQuery = false
+  if (q.status) {
+    statusFilter.value = q.status as string
+    hasQuery = true
+  }
+  if (q.trigger) {
+    triggerFilter.value = q.trigger as string
+    hasQuery = true
+  }
+  if (q.target_site) {
+    searchTarget.value = q.target_site as string
+    hasQuery = true
+  }
+  if (hasQuery) {
+    router.replace({ query: {} })
+  }
+}
 
 onUnmounted(() => {
   stopPolling()
