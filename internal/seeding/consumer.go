@@ -130,16 +130,22 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 		return
 	}
 
-	if clientCfg.DiskProtectEnabled && clientCfg.MinDiskSpaceGB > 0 && e.clientProvider != nil {
+	if clientCfg.DiskProtectEnabled && e.clientProvider != nil {
 		dlClient, err := e.clientProvider.Get(clientID)
 		if err == nil && dlClient != nil {
 			freeSpace, _ := dlClient.GetFreeSpace(ctx)
-			minBytes := int64(clientCfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
-			if freeSpace >= 0 && freeSpace < minBytes {
+			totalSpace := int64(0)
+			if md, mdErr := dlClient.GetMainData(ctx); mdErr == nil && md != nil {
+				totalSpace = md.TotalDiskSpace
+			}
+			minBytes := calcDiskMinBytes(&clientCfg, totalSpace)
+			if minBytes > 0 && freeSpace >= 0 && freeSpace < minBytes {
 				e.logger.Warn("scoreAndPush: disk space insufficient, pausing push",
 					zap.String("client_id", clientID),
 					zap.Int64("free_space", freeSpace),
-					zap.Float64("min_gb", clientCfg.MinDiskSpaceGB))
+					zap.Int64("min_bytes", minBytes),
+					zap.Float64("min_gb", clientCfg.MinDiskSpaceGB),
+					zap.Float64("emergency_buffer", clientCfg.EmergencyBuffer))
 				return
 			}
 		}
