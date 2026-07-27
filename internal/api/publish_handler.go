@@ -322,6 +322,8 @@ func (h *PublishHandler) handleListResults(w http.ResponseWriter, r *http.Reques
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	status := r.URL.Query().Get("status")
 	targetSite := r.URL.Query().Get("target_site")
+	startDate := r.URL.Query().Get("start_date")
+	endDate := r.URL.Query().Get("end_date")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
 	if pageSize == 0 {
@@ -333,7 +335,7 @@ func (h *PublishHandler) handleListResults(w http.ResponseWriter, r *http.Reques
 		if pageSize < 1 || pageSize > 200 {
 			pageSize = 20
 		}
-		results, total, err := h.pipeline.ListResultsFiltered(r.Context(), page, pageSize, status, targetSite)
+		results, total, err := h.pipeline.ListResultsFiltered(r.Context(), page, pageSize, status, targetSite, startDate, endDate)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "查询发布结果失败")
 			return

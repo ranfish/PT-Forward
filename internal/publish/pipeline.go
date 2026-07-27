@@ -1536,7 +1536,7 @@ func (p *Pipeline) ListResults(ctx context.Context, candidateID uint, limit int)
 	return results, err
 }
 
-func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, status, targetSite string) ([]model.PublishResultRecord, int64, error) {
+func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, status, targetSite, startDate, endDate string) ([]model.PublishResultRecord, int64, error) {
 	var results []model.PublishResultRecord
 	var total int64
 	q := p.db.WithContext(ctx).Model(&model.PublishResultRecord{})
@@ -1545,6 +1545,12 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 	}
 	if targetSite != "" {
 		q = q.Where("target_site = ?", targetSite)
+	}
+	if startDate != "" {
+		q = q.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		q = q.Where("created_at <= ?", endDate+" 23:59:59")
 	}
 	if err := q.Count(&total).Error; err != nil {
 		p.logger.Warn("query failed", zap.Error(err))
