@@ -1693,10 +1693,41 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 		trend = append(trend, *dayMap[d])
 	}
 
+	// 目标站分布 Top 10
+	type siteCount struct {
+		Site  string `json:"site"`
+		Count int64  `json:"count"`
+	}
+	var targetSiteTop []siteCount
+	h.db.WithContext(ctx).
+		Model(&model.PublishResultRecord{}).
+		Select("target_site as site, COUNT(*) as count").
+		Where("target_site != ''").
+		Group("target_site").
+		Order("count DESC").
+		Limit(10).
+		Find(&targetSiteTop)
+
+	// 状态分布
+	type statusCount struct {
+		Status string `json:"status"`
+		Count  int64  `json:"count"`
+	}
+	var statusDist []statusCount
+	h.db.WithContext(ctx).
+		Model(&model.PublishResultRecord{}).
+		Select("status, COUNT(*) as count").
+		Where("status != ''").
+		Group("status").
+		Order("count DESC").
+		Find(&statusDist)
+
 	Success(w, map[string]interface{}{
-		"stats":   stats,
-		"recent":  recent,
-		"trend":   trend,
+		"stats":             stats,
+		"recent":            recent,
+		"trend":             trend,
+		"target_site_top":   targetSiteTop,
+		"status_distribution": statusDist,
 	})
 }
 
