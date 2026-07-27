@@ -189,6 +189,19 @@ func (e *Engine) collectCandidates(fc *flushContext) []*flushCandidate {
 			continue
 		}
 
+		// §14.21/§56.40: 预过滤 — 用 RSS 已有属性快速筛选，减少无效候选
+		if fc.clientCfg.PreFilterEnabled {
+			// 空间预过滤：种子大小 >= 剩余空间 → 肯定下不了，跳过
+			if rec.TorrentSize > 0 && fc.freeSpace > 0 && rec.TorrentSize >= fc.freeSpace {
+				e.logger.Debug("flush: pre-filter skip (torrent too large for free space)",
+					zap.String("site", rec.SiteName),
+					zap.Int64("torrentSize", rec.TorrentSize),
+					zap.Int64("freeSpace", fc.freeSpace),
+					zap.String("torrent_id", rec.TorrentID))
+				continue
+			}
+		}
+
 		if rec.IsFree && rec.FreeEndAt != nil && rec.FreeEndAt.Before(now) {
 			continue
 		}
