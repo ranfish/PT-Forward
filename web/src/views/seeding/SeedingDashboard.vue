@@ -228,9 +228,9 @@
               <a-col :span="12">
                 <a-form-item label="归档粒度">
                   <a-select v-model:value="configForm.archiveGranularity">
-                    <a-select-option value="daily">daily</a-select-option>
-                    <a-select-option value="hourly">hourly</a-select-option>
-                    <a-select-option value="weekly">weekly</a-select-option>
+                    <a-select-option value="daily">按天</a-select-option>
+                    <a-select-option value="hourly">按小时</a-select-option>
+                    <a-select-option value="weekly">按周</a-select-option>
                   </a-select>
                 </a-form-item>
               </a-col>
