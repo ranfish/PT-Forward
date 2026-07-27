@@ -70,6 +70,28 @@
       </a-col>
     </a-row>
 
+    <!-- 最近活动时间轴 -->
+    <a-card v-if="recentLogs.length > 0" size="small" title="最近活动" style="margin-bottom: 16px">
+      <a-timeline>
+        <a-timeline-item
+          v-for="log in recentLogs.slice(0, 10)"
+          :key="log.id"
+          :color="recentColor(log.status)"
+        >
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+            <span style="font-size: 12px; color: #999; white-space: nowrap">{{ formatTime(log.created_at) }}</span>
+            <a-tag size="small" style="margin: 0">{{ log.source_site || '?' }}</a-tag>
+            <span style="color: #999">→</span>
+            <a-tag color="blue" size="small" style="margin: 0">{{ log.target_site || '?' }}</a-tag>
+            <a-tag :color="recentStatusColor(log.status)" size="small" style="margin: 0">{{ recentStatusLabel(log.status) }}</a-tag>
+          </div>
+          <div v-if="log.title" style="font-size: 13px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
+            {{ log.title }}
+          </div>
+        </a-timeline-item>
+      </a-timeline>
+    </a-card>
+
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px">
       <a-button type="primary" @click="$router.push('/publish/torrents')">
         <template #icon><PlusOutlined /></template>
@@ -359,6 +381,7 @@ const trendChartRef = ref<HTMLElement>()
 let trendChart: echarts.ECharts | null = null
 const targetSiteTop = ref<Array<{ site: string; count: number }>>([])
 const statusDist = ref<Array<{ status: string; count: number }>>([])
+const recentLogs = ref<Array<{ id: number; source_site: string; target_site: string; title: string; subtitle: string; status: string; created_at: string }>>([])
 const siteChartRef = ref<HTMLElement>()
 const statusChartRef = ref<HTMLElement>()
 let siteChart: echarts.ECharts | null = null
@@ -393,6 +416,7 @@ async function fetchStats() {
     trendData.value = data?.trend || []
     targetSiteTop.value = data?.target_site_top || []
     statusDist.value = data?.status_distribution || []
+    recentLogs.value = (data?.recent as typeof recentLogs.value) || []
     await nextTick()
     if (trendData.value.length > 0) renderTrendChart()
     if (targetSiteTop.value.length > 0) renderSiteChart()
@@ -491,6 +515,28 @@ function renderStatusChart() {
       })),
     }],
   })
+}
+
+function recentColor(status: string): string {
+  if (status === 'completed' || status === 'edited') return 'green'
+  if (status === 'failed') return 'red'
+  return 'gray'
+}
+
+function recentStatusColor(status: string): string {
+  const map: Record<string, string> = {
+    completed: 'green', edited: 'green', failed: 'red',
+    skipped: 'orange', exists: 'gold', publishing: 'blue',
+  }
+  return map[status] || 'default'
+}
+
+function recentStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    completed: '成功', edited: '已编辑', failed: '失败',
+    skipped: '跳过', exists: '已存在', publishing: '发布中',
+  }
+  return map[status] || status
 }
 
 const crossSeedOpen = ref(false)
