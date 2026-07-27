@@ -1509,8 +1509,16 @@ func (h *PublishTorrentsHandler) handleListSeedData(w http.ResponseWriter, r *ht
 	sourceSite := q.Get("source_site")
 	reviewStatus := q.Get("review_status") // all（默认）/ reviewed / unreviewed
 
+	fetchSource := q.Get("fetch_source")
+	if fetchSource == "" {
+		fetchSource = "batch_fetch"
+	}
+
 	query := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
 		Where("torrent_id != '' AND torrent_id != '0'")
+	if fetchSource != "all" {
+		query = query.Where("fetch_source = ?", fetchSource)
+	}
 
 	if search != "" {
 		query = query.Where("title LIKE ? OR subtitle LIKE ? OR info_hash LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
