@@ -2052,15 +2052,33 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusInternalServerError, 50000, "failed to list exclusions")
 			return
 		}
+		// 先收集 DB 已有的 (source,target) 对，用于硬编码去重
+		dbPairs := make(map[string]bool, len(exclusions))
+		result := make([]map[string]interface{}, 0, len(exclusions)+8)
+		for _, e := range exclusions {
+			result = append(result, map[string]interface{}{
+				"id":          e.ID,
+				"target_site": e.TargetSite,
+				"source_site": e.SourceSite,
+				"created_at":  e.CreatedAt,
+				"is_hardcoded": false,
+			})
+			dbPairs[e.SourceSite+"→"+e.TargetSite] = true
+		}
 		for src, targets := range publish.PublishHardcodedExclusionPairs() {
 			for tgt := range targets {
-				exclusions = append(exclusions, model.PublishExclusion{
-					SourceSite: src,
-					TargetSite: tgt,
+				key := src + "→" + tgt
+				if dbPairs[key] {
+					continue
+				}
+				result = append(result, map[string]interface{}{
+					"target_site":  tgt,
+					"source_site":  src,
+					"is_hardcoded": true,
 				})
 			}
 		}
-		Success(w, exclusions)
+		Success(w, result)
 
 	case http.MethodPost:
 		var req struct {

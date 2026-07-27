@@ -1013,9 +1013,9 @@ func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// 合规检查（成人内容 / 禁转 / 禁转小组）
+	// 合规检查（成人内容 / 禁转 / 禁转小组）— §56.39: 接入 subtitle（修复 DetectAdult 副标题检测遗漏）
 	if h.complianceChecker != nil {
-		if r := h.complianceChecker.CheckWithSite(r.Context(), req.TorrentName, req.SourceSite); !r.Passed {
+		if r := h.complianceChecker.CheckWithSiteAndSubtitle(r.Context(), req.TorrentName, req.Subtitle, req.SourceSite); !r.Passed {
 			Error(w, http.StatusForbidden, 40301, fmt.Sprintf("合规拦截: [%s] %s", r.Category, r.Reason))
 			return
 		}
