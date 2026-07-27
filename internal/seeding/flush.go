@@ -173,6 +173,29 @@ type flushCandidate struct {
 	InfoHash  string
 }
 
+// getDiscountFromCache §14.21 EnhancementCacheTTL: 从缓存获取折扣查询结果。
+func (e *Engine) getDiscountFromCache(torrentID string, ttlSec int) (*model.DiscountResult, bool) {
+	if ttlSec <= 0 {
+		return nil, false
+	}
+	e.discountCacheMu.Lock()
+	defer e.discountCacheMu.Unlock()
+	if entry, ok := e.discountCache[torrentID]; ok {
+		if time.Since(entry.CheckedAt) < time.Duration(ttlSec)*time.Second {
+			return entry.Result, true
+		}
+		delete(e.discountCache, torrentID)
+	}
+	return nil, false
+}
+
+// setDiscountCache §14.21: 写入折扣查询缓存。
+func (e *Engine) setDiscountCache(torrentID string, result *model.DiscountResult) {
+	e.discountCacheMu.Lock()
+	defer e.discountCacheMu.Unlock()
+	e.discountCache[torrentID] = &discountCacheEntry{Result: result, CheckedAt: time.Now()}
+}
+
 func (e *Engine) collectCandidates(fc *flushContext) []*flushCandidate {
 	scoringCfg := fc.scoringCfg
 	maxCandidates := scoringCfg.MaxCandidates
@@ -515,6 +538,11 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 		qualified = qualified[:batchLimit]
 	}
 
+	// §14.21 EnhancementBatchSize: 限制需要查详情的候选数（减少站点 API 调用）
+	if fc.clientCfg != nil && fc.clientCfg.EnhancementBatchSize > 0 && len(qualified) > fc.clientCfg.EnhancementBatchSize {
+		qualified = qualified[:fc.clientCfg.EnhancementBatchSize]
+	}
+
 	var results []*model.SeedingCandidate
 	var batchPendingBytes int64
 	for _, c := range qualified {
@@ -605,7 +633,15 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 	}
 
 	if rec.IsFree && rec.FreeEndAt == nil && rec.Discount != model.DiscountAssumeFree && e.siteProvider != nil && rec.SiteName != "" {
-		if adapter, adpErr := e.siteProvider.GetAdapter(ctx, rec.SiteName); adpErr == nil {
+		cacheTTL := 0
+		if fc.clientCfg != nil {
+			cacheTTL = fc.clientCfg.EnhancementCacheTTL
+		}
+		if cached, ok := e.getDiscountFromCache(rec.TorrentID, cacheTTL); ok {
+			if cached == nil || !cached.Level.IsFree() {
+				return candidate, false
+			}
+		} else if adapter, adpErr := e.siteProvider.GetAdapter(ctx, rec.SiteName); adpErr == nil {
 			if siteCfg, cfgErr := e.siteProvider.GetSiteConfig(ctx, rec.SiteName); cfgErr == nil && siteCfg != nil {
 				recheckCtx, recheckCancel := context.WithTimeout(ctx, 10*time.Second)
 				discResult, discErr := adapter.DetectDiscount(recheckCtx, siteCfg, rec.TorrentID)
@@ -617,6 +653,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 						zap.Error(discErr))
 					return candidate, false
 				}
+				e.setDiscountCache(rec.TorrentID, discResult)
 				if discResult == nil || !discResult.Level.IsFree() {
 					e.logger.Info("flush: free status expired before push, skipping",
 						zap.String("torrent_id", rec.TorrentID),
