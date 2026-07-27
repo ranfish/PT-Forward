@@ -102,6 +102,9 @@
           >
             详情
           </a-button>
+          <a-popconfirm title="确定删除此记录？" @confirm="handleDelete(record)">
+            <a-button size="small" type="link" danger>删除</a-button>
+          </a-popconfirm>
         </template>
       </template>
 
@@ -135,6 +138,7 @@ import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons-vue'
+import { message } from 'ant-design-vue'
 import { publishApi } from '@/api/publish'
 import type { PublishResultRecord } from '@/api/types'
 import { formatTime } from '@/utils/format'
@@ -208,7 +212,7 @@ const columns = [
   { title: '耗时', key: 'cost_ms', width: 80 },
   { title: '链接', key: 'publish_url', width: 60 },
   { title: '时间', key: 'created_at', width: 150 },
-  { title: '操作', key: 'action', width: 70, fixed: 'right' as const },
+  { title: '操作', key: 'action', width: 120, fixed: 'right' as const },
 ]
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -276,6 +280,16 @@ function onTableChange(pag: { current?: number; pageSize?: number }) {
   if (pag.pageSize) pagination.value.pageSize = pag.pageSize
   persistFilters()
   fetchData()
+}
+
+async function handleDelete(record: PublishResultRecord) {
+  try {
+    await publishApi.deleteResult(record.id)
+    message.success('已删除')
+    fetchData()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  }
 }
 
 function statusColor(status: string): string {
