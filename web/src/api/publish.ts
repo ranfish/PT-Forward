@@ -149,7 +149,7 @@ export const manualForwardApi = {
   seededTorrents(clientId?: number) {
     return client.get<ApiResponse<unknown[]>>('/manual-forward/seeded-torrents', { params: clientId ? { client_id: clientId } : {} })
   },
-  startAnalyze(data: { client_id: number; info_hash: string; name: string; save_path: string; size?: number; source_site?: string; source_torrent_id?: string; metadata_priority?: string }) {
+  startAnalyze(data: { client_id: number; info_hash: string; name: string; save_path: string; size?: number; source_site?: string; source_torrent_id?: string; metadata_priority?: string; fetch_source?: string }) {
     return client.post<ApiResponse<{ task_id: number }>>('/manual-forward/analyze', data)
   },
   pollAnalyze(taskId: number) {

@@ -236,6 +236,7 @@ async function startBatchFetch() {
         name: torrent.name,
         save_path: torrent.save_path,
         size: torrent.size,
+        fetch_source: 'batch_fetch',
       })
       const taskId = resp.data?.data?.task_id
       if (!taskId) throw new Error('任务创建失败')

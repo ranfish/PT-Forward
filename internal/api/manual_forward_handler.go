@@ -363,6 +363,7 @@ type analyzeTask struct {
 	CreatedAt     time.Time              `json:"created_at"`
 	Progress      int                    `json:"progress,omitempty"`
 	ProgressText  string                 `json:"progress_text,omitempty"`
+	FetchSource   string                 `json:"-"`
 }
 
 func (t *analyzeTask) setError(err string) {
@@ -414,6 +415,7 @@ func (h *ManualForwardHandler) handleStartAnalyze(w http.ResponseWriter, r *http
 		SourceSite       string `json:"source_site,omitempty"`
 		SourceTorrentID  string `json:"source_torrent_id,omitempty"`
 		MetadataPriority string `json:"metadata_priority,omitempty"`
+		FetchSource      string `json:"fetch_source,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -430,9 +432,10 @@ func (h *ManualForwardHandler) handleStartAnalyze(w http.ResponseWriter, r *http
 
 	taskID := h.taskSeq.Add(1)
 	task := &analyzeTask{
-		ID:        taskID,
-		Status:    "running",
-		CreatedAt: time.Now(),
+		ID:          taskID,
+		Status:      "running",
+		CreatedAt:   time.Now(),
+		FetchSource: req.FetchSource,
 	}
 	h.taskStore.Store(taskID, task)
 
@@ -475,10 +478,11 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	}()
 
 	result := map[string]interface{}{
-		"name":      name,
-		"info_hash": infoHash,
-		"save_path": savePath,
-		"client_id": clientID,
+		"name":         name,
+		"info_hash":    infoHash,
+		"save_path":    savePath,
+		"client_id":    clientID,
+		"fetch_source": task.FetchSource,
 	}
 
 	// ① 禁转预检（标题字符串快速预检）
@@ -786,6 +790,11 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 		return
 	}
 
+	fetchSource := "analyze"
+	if fs, ok := result["fetch_source"].(string); ok && fs != "" {
+		fetchSource = fs
+	}
+
 	screenshots := ""
 	if ss, ok := result["screenshots"]; ok {
 		switch v := ss.(type) {
@@ -835,7 +844,7 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			TMDbURL:     tmdb,
 			Subtitle:    subtitle,
 			MergedJSON:  mergedJSON,
-			FetchSource: "analyze",
+			FetchSource: fetchSource,
 			FetchedAt:   now,
 		}
 		if err := h.db.Create(&meta).Error; err != nil {
@@ -853,7 +862,7 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			"tm_db_url":    tmdb,
 			"subtitle":     subtitle,
 			"merged_json":  mergedJSON,
-			"fetch_source": "analyze",
+			"fetch_source": fetchSource,
 			"fetched_at":   now,
 		}
 		if err := h.db.Model(&meta).Updates(updates).Error; err != nil {
