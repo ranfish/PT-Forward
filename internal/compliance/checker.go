@@ -138,6 +138,11 @@ func (c *Checker) CheckWithTitleAndSubtitle(ctx context.Context, title, subtitle
 	return c.checkFull(ctx, title, subtitle, ScopeShare)
 }
 
+// CheckWithScope §56.40: 指定场景的合规检查（规则测试用）。
+func (c *Checker) CheckWithScope(ctx context.Context, title, subtitle string, scope CheckScope) *Result {
+	return c.checkFull(ctx, title, subtitle, scope)
+}
+
 func (c *Checker) checkFull(ctx context.Context, title, subtitle string, scope CheckScope) *Result {
 	if title == "" && subtitle == "" {
 		return Pass

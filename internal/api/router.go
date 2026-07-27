@@ -316,6 +316,7 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	complianceHandler := rt.chain(rt.rateLimitMW, rt.complianceHandler.ServeHTTP)
 	mux.Handle("/api/v1/compliance/rules", complianceHandler)
 	mux.Handle("/api/v1/compliance/rules/", complianceHandler)
+	mux.Handle("/api/v1/compliance/test", complianceHandler)
 
 	publishLimitHandler := rt.chain(rt.rateLimitMW, rt.publishLimitHandler.ServeHTTP)
 	mux.Handle("/api/v1/publish/limits", publishLimitHandler)
