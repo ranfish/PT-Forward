@@ -5,6 +5,7 @@ var (
 		"9KG", "9kg", "色情", "成人内容", "成人影片",
 		"AV", "18+", "NSFW", "Adult", "XXX",
 		"Porn", "Erotic", "Hentai",
+		"轮奸", "性处理", "无码", "中出", "痴女", "女优",
 	}
 
 	ForbiddenTransferKeywords = []string{

@@ -13,6 +13,12 @@
     {"rule_type": "adult", "pattern": "Porn", "scope": "share"},
     {"rule_type": "adult", "pattern": "Erotic", "scope": "share"},
     {"rule_type": "adult", "pattern": "Hentai", "scope": "share"},
+    {"rule_type": "adult", "pattern": "轮奸", "scope": "share"},
+    {"rule_type": "adult", "pattern": "性处理", "scope": "share"},
+    {"rule_type": "adult", "pattern": "无码", "scope": "share"},
+    {"rule_type": "adult", "pattern": "中出", "scope": "share"},
+    {"rule_type": "adult", "pattern": "痴女", "scope": "share"},
+    {"rule_type": "adult", "pattern": "女优", "scope": "share"},
 
     {"rule_type": "forbidden_keyword", "pattern": "禁转", "scope": "share"},
     {"rule_type": "forbidden_keyword", "pattern": "禁轉", "scope": "share"},
