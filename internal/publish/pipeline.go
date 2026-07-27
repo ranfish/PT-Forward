@@ -1566,12 +1566,6 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 	return results, total, nil
 }
 
-var (
-	forbiddenTransferKeywords = []string{"禁转", "独占", "谢绝转载", "限时禁转", "严禁转载", "禁止转载", "谢绝搬运"}
-	forbiddenTransferGroups   = []string{"CatEDU"}
-	adultContentKeywords      = []string{"9KG", "9kg", "色情", "成人内容", "成人影片", "AV", "18+", "NSFW", "Adult", "XXX", "Porn", "Erotic", "Hentai"}
-)
-
 func containsAnyKeyword(text string, keywords []string) (string, bool) {
 	lower := strings.ToLower(text)
 	for _, kw := range keywords {
@@ -1587,13 +1581,13 @@ func (p *Pipeline) checkForbiddenContent(texts []string) (bool, string) {
 		if text == "" {
 			continue
 		}
-		if kw, found := containsAnyKeyword(text, adultContentKeywords); found {
+		if kw, found := containsAnyKeyword(text, compliance.AdultKeywords); found {
 			return false, fmt.Sprintf("内容包含成人/色情关键词: %s (§30.5 规则 1)", kw)
 		}
-		if kw, found := containsAnyKeyword(text, forbiddenTransferKeywords); found {
+		if kw, found := containsAnyKeyword(text, compliance.ForbiddenTransferKeywords); found {
 			return false, fmt.Sprintf("标题/副标题包含禁止转载关键词: %s (§30.5 规则 2)", kw)
 		}
-		for _, grp := range forbiddenTransferGroups {
+		for _, grp := range compliance.ForbiddenGroups {
 			if strings.Contains(text, grp) {
 				return false, fmt.Sprintf("禁止转载小组资源: %s (§30.5 规则 3)", grp)
 			}
