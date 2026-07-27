@@ -2856,6 +2856,20 @@ func (e *Engine) archiveOldRecords(ctx context.Context) {
 			zap.Int64("count", delResult.RowsAffected),
 			zap.Time("cutoff", physicalCutoff))
 	}
+
+	// 清理过期的 discount 缓存（超过 30 分钟未访问）
+	e.discountCacheMu.Lock()
+	evicted := 0
+	for k, v := range e.discountCache {
+		if time.Since(v.CheckedAt) > 30*time.Minute {
+			delete(e.discountCache, k)
+			evicted++
+		}
+	}
+	e.discountCacheMu.Unlock()
+	if evicted > 0 {
+		e.logger.Debug("archive: discount cache evicted", zap.Int("count", evicted))
+	}
 }
 
 func (e *Engine) refreshDiscountStatus(ctx context.Context, records []model.SeedingTorrentRecord) {
