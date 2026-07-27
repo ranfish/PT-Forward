@@ -131,23 +131,63 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
+import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import { publishApi } from '@/api/publish'
 import type { PublishResultRecord } from '@/api/types'
 import { formatTime } from '@/utils/format'
 
+const STORAGE_KEY = 'publish_logs_filters'
+
+interface PersistedFilters {
+  search?: string
+  status?: string
+  trigger?: string
+  page_size?: number
+  date_start?: string
+  date_end?: string
+}
+
+function loadPersistedFilters(): PersistedFilters {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) return JSON.parse(raw) as PersistedFilters
+  } catch { /* silent */ }
+  return {}
+}
+
+function persistFilters() {
+  const data: PersistedFilters = {
+    search: searchTarget.value || undefined,
+    status: statusFilter.value,
+    trigger: triggerFilter.value,
+    page_size: pagination.value.pageSize,
+    date_start: dateRange.value?.[0]?.format('YYYY-MM-DD'),
+    date_end: dateRange.value?.[1]?.format('YYYY-MM-DD'),
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch { /* silent */ }
+}
+
+const persisted = loadPersistedFilters()
+
 const loading = ref(false)
 const tableData = ref<PublishResultRecord[]>([])
-const searchTarget = ref('')
-const statusFilter = ref<string | undefined>(undefined)
-const triggerFilter = ref<string | undefined>(undefined)
-const dateRange = ref<[Dayjs, Dayjs] | undefined>(undefined)
+const searchTarget = ref(persisted.search || '')
+const statusFilter = ref<string | undefined>(persisted.status)
+const triggerFilter = ref<string | undefined>(persisted.trigger)
+const dateRange = ref<[Dayjs, Dayjs] | undefined>(
+  persisted.date_start && persisted.date_end
+    ? [dayjs(persisted.date_start), dayjs(persisted.date_end)]
+    : undefined
+)
 const autoRefresh = ref(true)
 
 const pagination = ref({
   current: 1,
-  pageSize: 20,
+  pageSize: persisted.page_size || 20,
   total: 0,
   showSizeChanger: true,
   showTotal: (total: number) => `共 ${total} 条`,
@@ -220,6 +260,8 @@ watch(autoRefresh, (on) => {
   if (on) startPolling()
 })
 
+watch([searchTarget, statusFilter, triggerFilter, dateRange], persistFilters)
+
 function onFilterChange() {
   pagination.value.current = 1
   fetchData()
@@ -228,6 +270,7 @@ function onFilterChange() {
 function onTableChange(pag: { current?: number; pageSize?: number }) {
   if (pag.current) pagination.value.current = pag.current
   if (pag.pageSize) pagination.value.pageSize = pag.pageSize
+  persistFilters()
   fetchData()
 }
 
