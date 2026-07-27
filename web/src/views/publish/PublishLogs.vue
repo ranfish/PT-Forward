@@ -17,10 +17,12 @@
           allow-clear
           @change="onFilterChange"
         >
-          <a-select-option value="success">成功</a-select-option>
+          <a-select-option value="completed">成功</a-select-option>
           <a-select-option value="failed">失败</a-select-option>
           <a-select-option value="skipped">跳过</a-select-option>
-          <a-select-option value="pending">待发布</a-select-option>
+          <a-select-option value="publishing">发布中</a-select-option>
+          <a-select-option value="exists">已存在</a-select-option>
+          <a-select-option value="edited">已编辑</a-select-option>
         </a-select>
         <a-range-picker v-model:value="dateRange" @change="onFilterChange" />
         <a-button @click="fetchData"><ReloadOutlined /></a-button>
@@ -108,6 +110,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import type { Dayjs } from 'dayjs'
 import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import { publishApi } from '@/api/publish'
 import type { PublishResultRecord } from '@/api/types'
@@ -117,7 +120,7 @@ const loading = ref(false)
 const tableData = ref<PublishResultRecord[]>([])
 const searchTarget = ref('')
 const statusFilter = ref<string | undefined>(undefined)
-const dateRange = ref<[string, string] | undefined>(undefined)
+const dateRange = ref<[Dayjs, Dayjs] | undefined>(undefined)
 
 const pagination = ref({
   current: 1,
@@ -148,6 +151,10 @@ async function fetchData() {
     }
     if (statusFilter.value) params.status = statusFilter.value
     if (searchTarget.value) params.target_site = searchTarget.value
+    if (dateRange.value && dateRange.value[0] && dateRange.value[1]) {
+      params.start_date = dateRange.value[0].format('YYYY-MM-DD')
+      params.end_date = dateRange.value[1].format('YYYY-MM-DD')
+    }
     const resp = await publishApi.listResults(params as Parameters<typeof publishApi.listResults>[0])
     const data = resp.data?.data
     if (data) {
@@ -174,20 +181,24 @@ function onTableChange(pag: { current?: number; pageSize?: number }) {
 
 function statusColor(status: string): string {
   const map: Record<string, string> = {
-    success: 'green',
+    completed: 'green',
+    edited: 'green',
     failed: 'red',
     skipped: 'orange',
-    pending: 'blue',
+    exists: 'gold',
+    publishing: 'blue',
   }
   return map[status] || 'default'
 }
 
 function statusLabel(status: string): string {
   const map: Record<string, string> = {
-    success: '成功',
+    completed: '成功',
+    edited: '已编辑',
     failed: '失败',
     skipped: '跳过',
-    pending: '待发布',
+    exists: '已存在',
+    publishing: '发布中',
   }
   return map[status] || status
 }
