@@ -13,6 +13,25 @@ import (
 	"go.uber.org/zap"
 )
 
+// calcDiskMinBytes 计算磁盘保护阈值（取 GB、百分比、紧急缓冲的最大值）。
+// §56.40: 修复 min_disk_space_percent 和 emergency_buffer 未生效的问题。
+func calcDiskMinBytes(cfg *model.SeedingClientConfig, totalSpace int64) int64 {
+	minBytes := int64(cfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
+	if totalSpace > 0 {
+		if cfg.MinDiskSpacePercent > 0 {
+			if pct := int64(float64(totalSpace) * cfg.MinDiskSpacePercent / 100.0); pct > minBytes {
+				minBytes = pct
+			}
+		}
+		if cfg.EmergencyBuffer > 0 {
+			if buf := int64(float64(totalSpace) * cfg.EmergencyBuffer); buf > minBytes {
+				minBytes = buf
+			}
+		}
+	}
+	return minBytes
+}
+
 type flushContext struct {
 	subscriptionID   string
 	sub              *model.RSSSubscription
@@ -82,17 +101,22 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 	}
 
 	freeSpace := int64(-1)
+	var totalSpace int64
 	if md, mdErr := dlClient.GetMainData(ctx); mdErr == nil && md != nil {
 		freeSpace = md.FreeSpace
+		totalSpace = md.TotalDiskSpace
 	}
 
-	if hasConfig && cfg.DiskProtectEnabled && cfg.MinDiskSpaceGB > 0 && freeSpace >= 0 {
-		minBytes := int64(cfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
-		if freeSpace < minBytes {
+	if hasConfig && cfg.DiskProtectEnabled && freeSpace >= 0 {
+		minBytes := calcDiskMinBytes(&cfg, totalSpace)
+		if minBytes > 0 && freeSpace < minBytes {
 			e.logger.Warn("flush: disk protect active, skipping push",
 				zap.String("client_id", clientID),
 				zap.Int64("freeSpace", freeSpace),
-				zap.Float64("minGB", cfg.MinDiskSpaceGB))
+				zap.Int64("minBytes", minBytes),
+				zap.Float64("minGB", cfg.MinDiskSpaceGB),
+				zap.Float64("minPercent", cfg.MinDiskSpacePercent),
+				zap.Float64("emergencyBuffer", cfg.EmergencyBuffer))
 			return nil, nil
 		}
 	}
@@ -485,33 +509,35 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 			break
 		}
 
-		if fc.clientCfg != nil && fc.clientCfg.DiskProtectEnabled && fc.clientCfg.MinDiskSpaceGB > 0 {
+		if fc.clientCfg != nil && fc.clientCfg.DiskProtectEnabled {
 			if md, mdErr := fc.client.GetMainData(ctx); mdErr == nil && md != nil {
-				minBytes := int64(fc.clientCfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
-				inflightBytes := md.InflightBytes + batchPendingBytes
-				effectiveFree := md.FreeSpace - inflightBytes
-				if effectiveFree < minBytes {
-					e.logger.Warn("flush: disk protect triggered during batch, stopping",
-						zap.String("client_id", fc.clientID),
-						zap.Int64("freeSpace", md.FreeSpace),
-						zap.Int64("inflightBytes", inflightBytes),
-						zap.Int64("batchPendingBytes", batchPendingBytes),
-						zap.Int64("effectiveFree", effectiveFree),
-						zap.Float64("minGB", fc.clientCfg.MinDiskSpaceGB),
-						zap.Int("pushed", len(results)))
-					break
-				}
-				torrentSize := c.Record.TorrentSize
-				if torrentSize > 0 && effectiveFree-torrentSize < minBytes {
-					e.logger.Info("flush: disk budget insufficient for torrent, skipping",
-						zap.String("client_id", fc.clientID),
-						zap.Int64("freeSpace", md.FreeSpace),
-						zap.Int64("inflightBytes", inflightBytes),
-						zap.Int64("effectiveFree", effectiveFree),
-						zap.Int64("torrentSize", torrentSize),
-						zap.Float64("minGB", fc.clientCfg.MinDiskSpaceGB),
-						zap.String("torrent_id", c.TorrentID))
-					continue
+				minBytes := calcDiskMinBytes(fc.clientCfg, md.TotalDiskSpace)
+				if minBytes > 0 {
+					inflightBytes := md.InflightBytes + batchPendingBytes
+					effectiveFree := md.FreeSpace - inflightBytes
+					if effectiveFree < minBytes {
+						e.logger.Warn("flush: disk protect triggered during batch, stopping",
+							zap.String("client_id", fc.clientID),
+							zap.Int64("freeSpace", md.FreeSpace),
+							zap.Int64("inflightBytes", inflightBytes),
+							zap.Int64("batchPendingBytes", batchPendingBytes),
+							zap.Int64("effectiveFree", effectiveFree),
+							zap.Int64("minBytes", minBytes),
+							zap.Int("pushed", len(results)))
+						break
+					}
+					torrentSize := c.Record.TorrentSize
+					if torrentSize > 0 && effectiveFree-torrentSize < minBytes {
+						e.logger.Info("flush: disk budget insufficient for torrent, skipping",
+							zap.String("client_id", fc.clientID),
+							zap.Int64("freeSpace", md.FreeSpace),
+							zap.Int64("inflightBytes", inflightBytes),
+							zap.Int64("effectiveFree", effectiveFree),
+							zap.Int64("torrentSize", torrentSize),
+							zap.Int64("minBytes", minBytes),
+							zap.String("torrent_id", c.TorrentID))
+						continue
+					}
 				}
 			}
 		}
