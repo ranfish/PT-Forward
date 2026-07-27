@@ -12,7 +12,7 @@ import (
 
 var (
 	reAdultXXX    = regexp.MustCompile(`(?i)\bxxx\b`)
-	reJAV         = regexp.MustCompile(`(?i)\b(?:[A-Z0-9]{3,4})-\d{3,4}\b`)
+	reJAV         = regexp.MustCompile(`(?i)\b(?:[A-Z]{2,8})-\d{2,5}\b`)
 	reAdultDate   = regexp.MustCompile(`\b\d{6,8}[_-]\d{3}\b`)
 	reBracketDate = regexp.MustCompile(`\[[12]\d{3}\.\d{2}\.\d{2}\]`)
 	reRIAJ        = regexp.MustCompile(`(?i)\b[A-Z]{4}-?\d{3,5}\b`)
