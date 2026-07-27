@@ -210,6 +210,14 @@ type Engine struct {
 
 	spaceAlarmMu   sync.Mutex
 	spaceAlarmLast map[string]time.Time
+
+	discountCache   map[string]*discountCacheEntry
+	discountCacheMu sync.Mutex
+}
+
+type discountCacheEntry struct {
+	Result    *model.DiscountResult
+	CheckedAt time.Time
 }
 
 type maindataEntry struct {
@@ -241,6 +249,7 @@ func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 		freeWaitMonitor:  NewFreeWaitMonitor(db, logger),
 		pendingEvents:    make(chan *pusher.PushedEvent, 1000),
 		spaceAlarmLast:   make(map[string]time.Time),
+		discountCache:    make(map[string]*discountCacheEntry),
 	}
 	e.freeEndMonitor = NewFreeEndMonitor(db, nil, logger)
 	e.freeEndMonitor.SetEngine(e)
