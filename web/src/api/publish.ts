@@ -183,7 +183,7 @@ export const publishDataApi = {
     return client.put<ApiResponse<{ success: boolean; id: number }>>(`/publish/seed-data/${id}`, data)
   },
   stats(days?: number) {
-    return client.get<ApiResponse<{ stats: { today_publish: number; today_success: number; today_failed: number; pending_count: number; reviewed_count: number; total_metadata: number; yesterday_publish: number; yesterday_success: number; unreviewed_count: number }; recent: unknown[]; trend: Array<{ day: string; success: number; failed: number }> }>>('/publish/stats', { params: days ? { days } : undefined })
+    return client.get<ApiResponse<{ stats: { today_publish: number; today_success: number; today_failed: number; pending_count: number; reviewed_count: number; total_metadata: number; yesterday_publish: number; yesterday_success: number; unreviewed_count: number }; recent: unknown[]; trend: Array<{ day: string; success: number; failed: number }>; target_site_top: Array<{ site: string; count: number }>; status_distribution: Array<{ status: string; count: number }> }>>('/publish/stats', { params: days ? { days } : undefined })
   },
   coverageCache(infoHash: string) {
     return client.get<ApiResponse<{ info_hash: string; sites: Array<{ site_name: string; status: string; source: string }> }>>('/publish/coverage-cache', { params: { info_hash: infoHash } })

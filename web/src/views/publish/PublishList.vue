@@ -56,6 +56,20 @@
       <div ref="trendChartRef" style="width: 100%; height: 220px" />
     </a-card>
 
+    <!-- 饼图：目标站分布 + 状态分布 -->
+    <a-row v-if="targetSiteTop.length > 0 || statusDist.length > 0" :gutter="16" style="margin-bottom: 16px">
+      <a-col :span="12">
+        <a-card v-if="targetSiteTop.length > 0" size="small" title="目标站分布 Top 10">
+          <div ref="siteChartRef" style="width: 100%; height: 240px" />
+        </a-card>
+      </a-col>
+      <a-col :span="12">
+        <a-card v-if="statusDist.length > 0" size="small" title="发布状态分布">
+          <div ref="statusChartRef" style="width: 100%; height: 240px" />
+        </a-card>
+      </a-col>
+    </a-row>
+
     <div style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px">
       <a-button type="primary" @click="$router.push('/publish/torrents')">
         <template #icon><PlusOutlined /></template>
@@ -343,6 +357,12 @@ const trendData = ref<Array<{ day: string; success: number; failed: number }>>([
 const trendDays = ref<7 | 30>(7)
 const trendChartRef = ref<HTMLElement>()
 let trendChart: echarts.ECharts | null = null
+const targetSiteTop = ref<Array<{ site: string; count: number }>>([])
+const statusDist = ref<Array<{ status: string; count: number }>>([])
+const siteChartRef = ref<HTMLElement>()
+const statusChartRef = ref<HTMLElement>()
+let siteChart: echarts.ECharts | null = null
+let statusChart: echarts.ECharts | null = null
 
 function successRate(s: number, total: number): string {
   if (total === 0) return '-'
@@ -371,10 +391,12 @@ async function fetchStats() {
     const data = resp.data?.data
     dashboardStats.value = data?.stats || null
     trendData.value = data?.trend || []
-    if (trendData.value.length > 0) {
-      await nextTick()
-      renderTrendChart()
-    }
+    targetSiteTop.value = data?.target_site_top || []
+    statusDist.value = data?.status_distribution || []
+    await nextTick()
+    if (trendData.value.length > 0) renderTrendChart()
+    if (targetSiteTop.value.length > 0) renderSiteChart()
+    if (statusDist.value.length > 0) renderStatusChart()
   } catch { /* silent */ }
 }
 
@@ -428,6 +450,46 @@ function renderTrendChart() {
         data: rateData,
       },
     ],
+  })
+}
+
+function renderSiteChart() {
+  if (!siteChartRef.value) return
+  if (!siteChart) siteChart = echarts.init(siteChartRef.value)
+  siteChart.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    series: [{
+      type: 'pie',
+      radius: ['40%', '70%'],
+      label: { fontSize: 11 },
+      data: targetSiteTop.value.map(s => ({ name: s.site, value: s.count })),
+    }],
+  })
+}
+
+function renderStatusChart() {
+  if (!statusChartRef.value) return
+  if (!statusChart) statusChart = echarts.init(statusChartRef.value)
+  const colorMap: Record<string, string> = {
+    completed: '#52c41a', edited: '#95de64', failed: '#ff4d4f',
+    skipped: '#faad14', exists: '#d48806', publishing: '#1677ff',
+  }
+  const labelMap: Record<string, string> = {
+    completed: '成功', edited: '已编辑', failed: '失败',
+    skipped: '跳过', exists: '已存在', publishing: '发布中',
+  }
+  statusChart.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    series: [{
+      type: 'pie',
+      radius: ['40%', '70%'],
+      label: { fontSize: 11 },
+      data: statusDist.value.map(s => ({
+        name: labelMap[s.status] || s.status,
+        value: s.count,
+        itemStyle: { color: colorMap[s.status] },
+      })),
+    }],
   })
 }
 
@@ -830,10 +892,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopCandidatePoll()
-  if (trendChart) {
-    trendChart.dispose()
-    trendChart = null
-  }
+  if (trendChart) { trendChart.dispose(); trendChart = null }
+  if (siteChart) { siteChart.dispose(); siteChart = null }
+  if (statusChart) { statusChart.dispose(); statusChart = null }
 })
 </script>
 
