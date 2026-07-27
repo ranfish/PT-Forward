@@ -58,6 +58,21 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.Contains(trimmed, "/publish/results/") {
+		idStr := strings.TrimPrefix(trimmed, "/api/v1/publish/results/")
+		id, err := strconv.ParseUint(idStr, 10, 64)
+		if err != nil || id == 0 {
+			Error(w, http.StatusBadRequest, 40001, "无效的结果 ID")
+			return
+		}
+		if r.Method == http.MethodDelete {
+			h.handleDeleteResult(w, r, uint(id))
+			return
+		}
+		Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		return
+	}
+
 	if strings.Contains(trimmed, "/publish/tasks/") {
 		remaining := extractLastSegment(trimmed, "/api/v1/publish/tasks/")
 		parts := strings.SplitN(remaining, "/", 2)
@@ -255,6 +270,15 @@ func (h *PublishHandler) handleDeleteTask(w http.ResponseWriter, r *http.Request
 		"message": "发布任务已删除",
 		"id":      id,
 	})
+}
+
+func (h *PublishHandler) handleDeleteResult(w http.ResponseWriter, r *http.Request, id uint) {
+	if err := h.db.WithContext(r.Context()).Delete(&model.PublishResultRecord{}, id).Error; err != nil {
+		h.logger.Warn("delete publish result failed", zap.Uint("id", id), zap.Error(err))
+		Error(w, http.StatusInternalServerError, 50000, "删除发布记录失败")
+		return
+	}
+	Success(w, map[string]interface{}{"deleted": id})
 }
 
 func (h *PublishHandler) handleCancelTask(w http.ResponseWriter, r *http.Request, id uint) {

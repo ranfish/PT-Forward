@@ -47,8 +47,11 @@ export const publishApi = {
   cancelTask(id: number) {
     return client.post<ApiResponse<void>>(`/publish/tasks/${id}/cancel`)
   },
-  listResults(params?: ListParams & { status?: string; target_site?: string }) {
+  listResults(params?: ListParams & { status?: string; target_site?: string; trigger?: string; start_date?: string; end_date?: string }) {
     return client.get<ApiResponsePaginated<PublishResultRecord>>('/publish/results', { params })
+  },
+  deleteResult(id: number) {
+    return client.delete<ApiResponse<{ deleted: number }>>(`/publish/results/${id}`)
   },
 }
 
