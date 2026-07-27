@@ -1598,21 +1598,37 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	var stats struct {
-		TodayPublish  int64 `json:"today_publish"`
-		TodaySuccess  int64 `json:"today_success"`
-		TodayFailed   int64 `json:"today_failed"`
-		PendingCount  int64 `json:"pending_count"`
-		ReviewedCount int64 `json:"reviewed_count"`
-		TotalMetadata int64 `json:"total_metadata"`
+		TodayPublish   int64 `json:"today_publish"`
+		TodaySuccess   int64 `json:"today_success"`
+		TodayFailed    int64 `json:"today_failed"`
+		PendingCount   int64 `json:"pending_count"`
+		ReviewedCount  int64 `json:"reviewed_count"`
+		TotalMetadata  int64 `json:"total_metadata"`
+		YesterdayPublish int64 `json:"yesterday_publish"`
+		YesterdaySuccess int64 `json:"yesterday_success"`
+		UnreviewedCount  int64 `json:"unreviewed_count"`
 	}
+
+	yesterdayStart := todayStart.AddDate(0, 0, -1)
 
 	// 今日发布数
 	h.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
 		Where("created_at >= ?", todayStart).Count(&stats.TodayPublish)
 	h.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
-		Where("created_at >= ? AND status = ?", todayStart, "success").Count(&stats.TodaySuccess)
+		Where("created_at >= ? AND status = ?", todayStart, "completed").Count(&stats.TodaySuccess)
 	h.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
 		Where("created_at >= ? AND status = ?", todayStart, "failed").Count(&stats.TodayFailed)
+
+	// 昨日数据（环比）
+	h.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+		Where("created_at >= ? AND created_at < ?", yesterdayStart, todayStart).Count(&stats.YesterdayPublish)
+	h.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+		Where("created_at >= ? AND created_at < ? AND status = ?", yesterdayStart, todayStart, "completed").Count(&stats.YesterdaySuccess)
+
+	// 未审核元数据
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("reviewed = ? AND torrent_id != '' AND torrent_id != '0'", false).
+		Count(&stats.UnreviewedCount)
 
 	// 队列深度
 	h.db.WithContext(ctx).Model(&model.PublishCandidate{}).
@@ -1632,8 +1648,12 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 	var recent []model.PublishResultRecord
 	h.db.WithContext(ctx).Order("created_at DESC").Limit(10).Find(&recent)
 
-	// 7 天发布趋势
-	weekAgo := todayStart.AddDate(0, 0, -6)
+	// 趋势图（可切换 7/30 天）
+	days := 7
+	if d := r.URL.Query().Get("days"); d == "30" {
+		days = 30
+	}
+	weekAgo := todayStart.AddDate(0, 0, -(days - 1))
 	type dayStat struct {
 		Day     string `json:"day"`
 		Success int64  `json:"success"`
@@ -1650,7 +1670,7 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 	defer rows.Close()
 
 	dayMap := make(map[string]*dayStat)
-	for i := 0; i < 7; i++ {
+	for i := 0; i < days; i++ {
 		d := weekAgo.AddDate(0, 0, i).Format("2006-01-02")
 		dayMap[d] = &dayStat{Day: d}
 	}
@@ -1661,14 +1681,14 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 			continue
 		}
 		if ds, ok := dayMap[day]; ok {
-			if status == "success" {
-				ds.Success = count
+			if status == "completed" || status == "edited" {
+				ds.Success += count
 			} else if status == "failed" {
-				ds.Failed = count
+				ds.Failed += count
 			}
 		}
 	}
-	for i := 0; i < 7; i++ {
+	for i := 0; i < days; i++ {
 		d := weekAgo.AddDate(0, 0, i).Format("2006-01-02")
 		trend = append(trend, *dayMap[d])
 	}
