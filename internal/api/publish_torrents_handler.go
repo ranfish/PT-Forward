@@ -97,6 +97,10 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleCachedSites(w, r)
 	case strings.HasSuffix(path, "/publish/seed-data") && r.Method == http.MethodGet:
 		h.handleListSeedData(w, r)
+	case strings.HasSuffix(path, "/publish/seed-data/batch-review") && r.Method == http.MethodPost:
+		h.handleBatchReview(w, r)
+	case strings.HasSuffix(path, "/publish/seed-data/batch-delete") && r.Method == http.MethodPost:
+		h.handleBatchDelete(w, r)
 	case strings.Contains(path, "/publish/seed-data/") && r.Method == http.MethodPut:
 		h.handleSaveSeedData(w, r)
 	case strings.HasSuffix(path, "/publish/stats") && r.Method == http.MethodGet:
@@ -1591,7 +1595,56 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 	Success(w, map[string]interface{}{"success": true, "id": id})
 }
 
-// handleStats §56.37: 总览统计卡片。
+// handleBatchReview §56.40: 批量审核（标记 reviewed）。
+func (h *PublishTorrentsHandler) handleBatchReview(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs      []uint `json:"ids"`
+		Reviewed bool   `json:"reviewed"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "invalid body")
+		return
+	}
+	if len(req.IDs) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "ids required")
+		return
+	}
+	result := h.db.WithContext(r.Context()).
+		Model(&model.TorrentMetadata{}).
+		Where("id IN ?", req.IDs).
+		Update("reviewed", req.Reviewed)
+	if result.Error != nil {
+		h.logger.Warn("batch review failed", zap.Error(result.Error))
+		Error(w, http.StatusInternalServerError, 50000, "db error")
+		return
+	}
+	Success(w, map[string]interface{}{"updated": result.RowsAffected})
+}
+
+// handleBatchDelete §56.40: 批量删除元数据（硬删除，仅删快照不删种子）。
+func (h *PublishTorrentsHandler) handleBatchDelete(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs []uint `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "invalid body")
+		return
+	}
+	if len(req.IDs) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "ids required")
+		return
+	}
+	result := h.db.WithContext(r.Context()).
+		Where("id IN ?", req.IDs).
+		Delete(&model.TorrentMetadata{})
+	if result.Error != nil {
+		h.logger.Warn("batch delete failed", zap.Error(result.Error))
+		Error(w, http.StatusInternalServerError, 50000, "db error")
+		return
+	}
+	h.logger.Info("batch delete metadata", zap.Int("count", int(result.RowsAffected)))
+	Success(w, map[string]interface{}{"deleted": result.RowsAffected})
+}
 func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	now := time.Now()

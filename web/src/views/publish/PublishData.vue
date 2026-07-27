@@ -1,7 +1,18 @@
 <template>
   <div style="padding: 24px">
     <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center">
-      <h3 style="margin: 0">一站多种</h3>
+      <a-space>
+        <h3 style="margin: 0">一站多种</h3>
+        <template v-if="selectedIds.length > 0">
+          <a-button size="small" type="primary" @click="batchReview(true)">
+            批量审核 ({{ selectedIds.length }})
+          </a-button>
+          <a-button size="small" @click="batchReview(false)">取消审核</a-button>
+          <a-popconfirm :title="`确定删除选中的 ${selectedIds.length} 条记录？`" @confirm="batchDelete">
+            <a-button size="small" danger>批量删除</a-button>
+          </a-popconfirm>
+        </template>
+      </a-space>
       <a-space>
         <a-radio-group v-model:value="reviewStatus" button-style="solid" size="small" @change="onFilterChange">
           <a-radio-button value="all">全部</a-radio-button>
@@ -38,6 +49,7 @@
       :scroll="{ x: 1380 }"
       size="small"
       :row-class-name="(record: SeedDataRow) => completenessPercent(record) < 50 ? 'row-incomplete' : ''"
+      :row-selection="{ selectedRowKeys: selectedIds, onChange: (keys: number[]) => selectedIds = keys }"
       @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
@@ -107,6 +119,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ReloadOutlined, CheckCircleFilled, PlusOutlined } from '@ant-design/icons-vue'
+import { message } from 'ant-design-vue'
 import { publishDataApi } from '@/api/publish'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
@@ -206,6 +219,7 @@ const columns = [
 
 const panelOpen = ref(false)
 const batchFetchOpen = ref(false)
+const selectedIds = ref<number[]>([])
 const panelPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string; source_site_id?: number } | null>(null)
 
 let fetchSeq = 0
@@ -244,6 +258,28 @@ function onTableChange(pag: { current?: number; pageSize?: number }) {
   if (pag.pageSize) pagination.value.pageSize = pag.pageSize
   persistFilters()
   fetchData()
+}
+
+async function batchReview(reviewed: boolean) {
+  try {
+    const resp = await publishDataApi.batchReview([...selectedIds.value], reviewed)
+    message.success(`已${reviewed ? '审核' : '取消审核'} ${resp.data?.data?.updated || 0} 条`)
+    selectedIds.value = []
+    fetchData()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  }
+}
+
+async function batchDelete() {
+  try {
+    const resp = await publishDataApi.batchDelete([...selectedIds.value])
+    message.success(`已删除 ${resp.data?.data?.deleted || 0} 条`)
+    selectedIds.value = []
+    fetchData()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  }
 }
 
 function parseTags(tagsStr: string): string[] {
