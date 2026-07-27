@@ -191,4 +191,10 @@ export const publishDataApi = {
   coverageCache(infoHash: string) {
     return client.get<ApiResponse<{ info_hash: string; sites: Array<{ site_name: string; status: string; source: string }> }>>('/publish/coverage-cache', { params: { info_hash: infoHash } })
   },
+  batchReview(ids: number[], reviewed: boolean) {
+    return client.post<ApiResponse<{ updated: number }>>('/publish/seed-data/batch-review', { ids, reviewed })
+  },
+  batchDelete(ids: number[]) {
+    return client.post<ApiResponse<{ deleted: number }>>('/publish/seed-data/batch-delete', { ids })
+  },
 }
