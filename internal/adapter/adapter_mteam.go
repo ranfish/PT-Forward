@@ -270,6 +270,15 @@ func (a *MTeamAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 	return a.detailViaWeb(ctx, config, torrentID)
 }
 
+// mteamAdultCategories 馒头成人区 category 编码（mode=adult）。
+// 常规区与成人区 category 完全隔离，命中以下编码即为成人内容。
+var mteamAdultCategories = map[string]bool{
+	"410": true, "411": true, "412": true, "413": true,
+	"424": true, "425": true, "426": true,
+	"429": true, "430": true, "431": true, "432": true, "433": true,
+	"437": true,
+}
+
 // mteamCategoryMap MTeam API category ID → 标准 code（v0.0.255）。
 // 数据源：site/data/sites.json 馒头 form.category。
 // MTeam API 返回纯数字 category（如 "407"），NormalizeCategory 无法匹配。
@@ -382,6 +391,12 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 		}
 	}
 	// v0.0.255: MTeam API 返回纯数字 category ID（如 "407"），先转标准 code
+	// 成人区 category 检测：命中则在 flags 标记 adult（§56.40 合规增强）
+	if mteamAdultCategories[detail.Category] {
+		detail.Category = "category.adult"
+		detail.Flags = []string{"adult"}
+		return detail, nil
+	}
 	if stdCode, ok := mteamCategoryMap[detail.Category]; ok {
 		detail.Category = stdCode
 	} else {
