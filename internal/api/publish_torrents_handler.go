@@ -546,20 +546,51 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 	}
 
 	// ② tracker 映射批量 → 🟢（后写覆盖）
+	// 使用 GetTorrents 一次获取所有种子的 TrackerURLs（和列表端点一致，避免 GetTrackers 对某些下载器的兼容问题）
 	tm := site.NewTrackerMatcher(h.db)
+	hashSet := make(map[string]bool, len(req.InfoHashes))
+	for _, h := range req.InfoHashes {
+		hashSet[h] = true
+	}
+	allTorrents, err := client.GetAllTorrents(ctx)
+	if err == nil {
+		for _, t := range allTorrents {
+			if !hashSet[t.Hash] {
+				continue
+			}
+			var trackerURLs []string
+			if len(t.TrackerURLs) > 0 {
+				trackerURLs = t.TrackerURLs
+			} else if t.TrackerURL != "" {
+				trackerURLs = []string{t.TrackerURL}
+			}
+			trackerSites := tm.MatchAll(trackerURLs)
+			for _, sn := range trackerSites {
+				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+					InfoHash: t.Hash, SiteName: sn,
+					Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
+					Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
+				})
+			}
+		}
+	} else {
+		// fallback: 逐个 GetTrackers
+		for _, infoHash := range req.InfoHashes {
+			trackers, err := client.GetTrackers(ctx, infoHash)
+			if err != nil || len(trackers) == 0 {
+				continue
+			}
+			trackerSites := tm.MatchAll(trackers)
+			for _, sn := range trackerSites {
+				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+					InfoHash: infoHash, SiteName: sn,
+					Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
+					Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
+				})
+			}
+		}
+	}
 	for _, infoHash := range req.InfoHashes {
-		trackers, err := client.GetTrackers(ctx, infoHash)
-		if err != nil || len(trackers) == 0 {
-			continue
-		}
-		trackerSites := tm.MatchAll(trackers)
-		for _, sn := range trackerSites {
-			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
-				InfoHash: infoHash, SiteName: sn,
-				Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
-				Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
-			})
-		}
 		h.coverage.MarkQueried(ctx, infoHash, now, ttl)
 	}
 
