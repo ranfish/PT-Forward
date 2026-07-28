@@ -3165,7 +3165,7 @@
         ],
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "ADE",
         "ADWeb",
@@ -5059,7 +5059,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "TCCF"
       ],
@@ -6140,7 +6140,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "HDHome"
       ],
@@ -6529,7 +6529,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "HDS",
         "HDSPAD",
@@ -7887,7 +7887,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "a.x-anime.cc",
@@ -7969,7 +7969,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "NYTV"
       ],
@@ -8900,7 +8900,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "AilMWeb",
         "PANDA"
@@ -10116,7 +10116,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "BTSchool"
       ],
@@ -10357,7 +10357,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "pt.cdy.skin"
@@ -10859,7 +10859,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "TLF"
       ],
@@ -11141,7 +11141,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "HDU"
       ],
@@ -12615,7 +12615,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "PuTao",
         "putao"
@@ -14053,7 +14053,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "CHD",
         "CHDBits",
@@ -15542,7 +15542,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "CMCT",
         "CMCTA",
@@ -15628,7 +15628,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "TJUPT"
       ],
@@ -15663,7 +15663,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "U2"
       ],
@@ -16295,7 +16295,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "www.dragonhd.xyz"
@@ -17952,7 +17952,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "www.oshen.win"
@@ -20236,7 +20236,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "OpenCD"
       ],
@@ -22171,7 +22171,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "HHWEB"
       ],
@@ -22684,7 +22684,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "PTer"
       ],
@@ -24792,7 +24792,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "52pt.site"
@@ -25434,7 +25434,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "pt.itzmx.com",
@@ -26667,7 +26667,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "www.htpt.cc"
@@ -27483,7 +27483,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "sync.leniter.org",
@@ -27883,7 +27883,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "sunnytk.top"
@@ -28683,7 +28683,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "xingtan.one",
@@ -28883,7 +28883,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "hudbt.hust.edu.cn"
