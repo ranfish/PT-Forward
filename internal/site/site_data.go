@@ -102,21 +102,27 @@ func SeedSites(db *gorm.DB) error {
 
 		var existing model.Site
 		err := db.Where("domain = ?", s.Domain).First(&existing).Error
-		if err == nil {
-			// 站点已存在：更新内置数据（不覆盖用户改的其他字段）
-			if existing.TrackerDomains != trackerDomainsJSON {
-				if err := db.Model(&existing).Update("tracker_domains", trackerDomainsJSON).Error; err != nil {
-					return siteError(ErrSiteSeed, fmt.Sprintf("update tracker_domains %s", s.Domain), err)
-				}
+	if err == nil {
+		// 站点已存在：更新内置数据（不覆盖用户改的其他字段）
+		if existing.TrackerDomains != trackerDomainsJSON {
+			if err := db.Model(&existing).Update("tracker_domains", trackerDomainsJSON).Error; err != nil {
+				return siteError(ErrSiteSeed, fmt.Sprintf("update tracker_domains %s", s.Domain), err)
 			}
-			// v0.0.271: 同步 title_format（仅 DB 为空时填充，不覆盖用户自定义）
-			if existing.TitleFormat == "" && s.TitleFormat != "" {
-				if err := db.Model(&existing).Update("title_format", s.TitleFormat).Error; err != nil {
-					return siteError(ErrSiteSeed, fmt.Sprintf("update title_format %s", s.Domain), err)
-				}
-			}
-			continue
 		}
+		// v0.0.271: 同步 title_format（仅 DB 为空时填充，不覆盖用户自定义）
+		if existing.TitleFormat == "" && s.TitleFormat != "" {
+			if err := db.Model(&existing).Update("title_format", s.TitleFormat).Error; err != nil {
+				return siteError(ErrSiteSeed, fmt.Sprintf("update title_format %s", s.Domain), err)
+			}
+		}
+		// v0.0.368: 同步 supports_pieces_hash_api（OTA 自动修正）
+		if s.SupportsPiecesHashAPI != nil && existing.SupportsPiecesHashAPI != *s.SupportsPiecesHashAPI {
+			if err := db.Model(&existing).Update("supports_pieces_hash_api", *s.SupportsPiecesHashAPI).Error; err != nil {
+				return siteError(ErrSiteSeed, fmt.Sprintf("update supports_pieces_hash_api %s", s.Domain), err)
+			}
+		}
+		continue
+	}
 
 		defs, ok := adapter.FrameworkDefaults[s.Framework]
 		if !ok {
