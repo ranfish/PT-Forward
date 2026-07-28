@@ -842,37 +842,20 @@ function pollAnalyzeTask(taskId: number): Promise<void> {
 async function batchQueryCoverage() {
   if (selectedHashes.value.length === 0 || !selectedClientId.value) return
   batchQuerying.value = true
-  let done = 0
-  let ok = 0
-  for (const hash of selectedHashes.value) {
-    const record = torrents.value.find(t => t.info_hash === hash)
-    if (!record) continue
-    queryingHash.value = hash
-    try {
-      const resp = await publishTorrentsApi.queryCoverage({
-        client_id: selectedClientId.value,
-        info_hash: record.info_hash,
-        name: record.name,
-        size: record.size,
-      })
-      const result = resp.data?.data
-      if (result) {
-        record.coverage = {
-          has_count: result.has_count,
-          total_sites: result.total_sites,
-          target_count: result.target_count,
-          sites: result.sites,
-        }
-        record.queried = true
-        ok++
-      }
-    } catch { /* continue */ }
-    done++
+  queryingHash.value = '批量查询中...'
+  try {
+    await publishTorrentsApi.batchQueryCoverage({
+      client_id: selectedClientId.value,
+      info_hashes: [...selectedHashes.value],
+    })
+    message.success(`批量查询完成: ${selectedHashes.value.length} 个种子`)
+    await fetchTorrents()
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    batchQuerying.value = false
+    queryingHash.value = ''
   }
-  batchQuerying.value = false
-  queryingHash.value = ''
-  message.success(`批量查询完成: ${ok}/${done} 成功`)
-  fetchTorrents()
 }
 
 function startForward(record: PublishTorrentItem) {

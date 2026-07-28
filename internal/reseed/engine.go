@@ -3429,3 +3429,150 @@ func (e *Engine) QuerySingleCoverage(ctx context.Context, infoHash string, clien
 
 	return hits
 }
+
+// QueryBatchCoverage 批量查询多个种子的覆盖状态（IYUU 批量 + pieces_hash API 批量）。
+// 复用辅种引擎的批量查询逻辑：IYUU 一次传所有 hash（Service 内部 200/批），pieces_hash 批量获取 + 并发站点查询。
+func (e *Engine) QueryBatchCoverage(ctx context.Context, infoHashes []string, client model.DownloaderClient) map[string][]model.CoverageHit {
+	result := make(map[string][]model.CoverageHit)
+
+	// ① IYUU 批量查询（一次传所有 hash）
+	if e.iyuuService != nil && len(infoHashes) > 0 {
+		sidMap := e.preloadIYUUSiteMappings(ctx)
+		iyuuResults, err := e.iyuuService.QueryReseed(ctx, infoHashes)
+		if err == nil {
+			for _, r := range iyuuResults {
+				for _, t := range r.Targets {
+					if siteName, ok := sidMap[t.Sid]; ok && siteName != "" {
+						result[r.SourceInfoHash] = append(result[r.SourceInfoHash], model.CoverageHit{
+							SiteName:  siteName,
+							TorrentID: strconv.Itoa(t.TorrentID),
+							Source:    "iyuu",
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// ② pieces_hash 批量获取（DB 优先 + ExportTorrent 补全）
+	if e.fpRepo == nil || client == nil {
+		return result
+	}
+	hashToPieces := make(map[string]string, len(infoHashes))
+	var missing []string
+	for _, ih := range infoHashes {
+		fp, err := e.fpRepo.GetByInfoHash(ctx, ih)
+		if err == nil && fp != nil && fp.PiecesHash != "" {
+			hashToPieces[ih] = fp.PiecesHash
+		} else {
+			missing = append(missing, ih)
+		}
+	}
+	// 补全缺失指纹（串行 ExportTorrent，但只对缺失的）
+	for _, ih := range missing {
+		if ctx.Err() != nil {
+			break
+		}
+		ph := e.getOrComputePiecesHash(ctx, ih, client)
+		if ph != "" {
+			hashToPieces[ih] = ph
+		}
+	}
+	if len(hashToPieces) == 0 {
+		return result
+	}
+
+	// ③ pieces_hash API 批量查询（并发，每站批量 100/次）
+	if e.siteProvider == nil {
+		return result
+	}
+	var sites []model.Site
+	e.db.WithContext(ctx).Where("enabled = ? AND is_target = ?", true, true).Find(&sites)
+
+	// 去重 pieces_hash 列表
+	allPieces := make([]string, 0, len(hashToPieces))
+	seenPieces := make(map[string]bool)
+	for _, ph := range hashToPieces {
+		if !seenPieces[ph] {
+			seenPieces[ph] = true
+			allPieces = append(allPieces, ph)
+		}
+	}
+
+	type siteBatchResult struct {
+		siteName string
+		matches  map[string]int
+	}
+	var batchResults []siteBatchResult
+	sem := make(chan struct{}, 10)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for _, site := range sites {
+		adapter, err := e.siteProvider.GetAdapter(ctx, site.Domain)
+		if err != nil || adapter == nil || !adapter.SupportsSearchByPiecesHash() {
+			continue
+		}
+		searcher, ok := adapter.(piecesHashSearcher)
+		if !ok {
+			continue
+		}
+		config, err := e.siteProvider.GetSiteConfig(ctx, site.Domain)
+		if err != nil || config == nil {
+			continue
+		}
+
+		wg.Add(1)
+		go func(sn string, cfg *model.SiteConfig, sr piecesHashSearcher) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
+			defer func() {
+				if r := recover(); r != nil {
+					e.logger.Error("QueryBatchCoverage panic recovered", zap.String("site", sn), zap.Any("panic", r))
+				}
+			}()
+
+			siteMatches := make(map[string]int)
+			for i := 0; i < len(allPieces); i += 100 {
+				end := i + 100
+				if end > len(allPieces) {
+					end = len(allPieces)
+				}
+				batch := allPieces[i:end]
+				matches, err := sr.SearchByPiecesHash(ctx, cfg, batch)
+				if err != nil {
+					return
+				}
+				for ph, tid := range matches {
+					siteMatches[ph] = tid
+				}
+			}
+			if len(siteMatches) > 0 {
+				mu.Lock()
+				batchResults = append(batchResults, siteBatchResult{siteName: sn, matches: siteMatches})
+				mu.Unlock()
+			}
+		}(site.Name, config, searcher)
+	}
+	wg.Wait()
+
+	// ④ 将 pieces_hash API 结果映射回 infoHash
+	for infoHash, ph := range hashToPieces {
+		for _, br := range batchResults {
+			if tid, found := br.matches[ph]; found {
+				result[infoHash] = append(result[infoHash], model.CoverageHit{
+					SiteName:  br.siteName,
+					TorrentID: strconv.Itoa(tid),
+					Source:    "pieces_hash",
+				})
+			}
+		}
+	}
+
+	return result
+}

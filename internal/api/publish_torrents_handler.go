@@ -74,6 +74,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleBatchPublish(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/coverage") && r.Method == http.MethodPost:
 		h.handleQueryCoverage(w, r)
+	case strings.HasSuffix(path, "/publish/torrents/batch-coverage") && r.Method == http.MethodPost:
+		h.handleBatchQueryCoverage(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/query-status") && r.Method == http.MethodGet:
 		h.handleQueryStatus(w, r)
 	case strings.HasSuffix(path, "/publish/torrents/detect-source") && r.Method == http.MethodPost:
@@ -487,6 +489,82 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 		"has_count":    hasCount,
 		"total_sites":  totalSites,
 		"target_count": int(totalSites) - hasCount,
+	})
+}
+
+// handleBatchQueryCoverage §56.40: 批量覆盖查询（一次请求查多个种子）。
+func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter, r *http.Request) {
+	if h.coverage == nil || h.clientMgr == nil || h.reseedEngine == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "覆盖服务或辅种引擎未初始化")
+		return
+	}
+	var req struct {
+		ClientID  uint     `json:"client_id"`
+		InfoHashes []string `json:"info_hashes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.ClientID == 0 || len(req.InfoHashes) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "client_id 和 info_hashes 必填")
+		return
+	}
+
+	var cfg model.ClientConfig
+	if err := h.db.First(&cfg, req.ClientID).Error; err != nil {
+		Error(w, http.StatusNotFound, 40400, "下载器不存在")
+		return
+	}
+	client, err := h.clientMgr.Get(cfg.Name)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("连接下载器失败: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 300*time.Second)
+	defer cancel()
+
+	now := time.Now()
+	ttl := now.Add(24 * time.Hour)
+
+	// ① 辅种引擎批量查询 → 🟡
+	hitsByHash := h.reseedEngine.QueryBatchCoverage(ctx, req.InfoHashes, client)
+	for infoHash, hits := range hitsByHash {
+		for _, hit := range hits {
+			source := model.CoverageSourceIYUU
+			if hit.Source == "pieces_hash" {
+				source = model.CoverageSourcePiecesHash
+			}
+			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				InfoHash: infoHash, SiteName: hit.SiteName,
+				Status: model.CoverageConfirmedHas, Source: source,
+				Confidence: 1.0, TorrentID: hit.TorrentID,
+				QueriedAt: now, ExpiresAt: ttl,
+			})
+		}
+	}
+
+	// ② tracker 映射批量 → 🟢（后写覆盖）
+	tm := site.NewTrackerMatcher(h.db)
+	for _, infoHash := range req.InfoHashes {
+		trackers, err := client.GetTrackers(ctx, infoHash)
+		if err != nil || len(trackers) == 0 {
+			continue
+		}
+		trackerSites := tm.MatchAll(trackers)
+		for _, sn := range trackerSites {
+			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				InfoHash: infoHash, SiteName: sn,
+				Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
+				Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
+			})
+		}
+		h.coverage.MarkQueried(ctx, infoHash, now, ttl)
+	}
+
+	Success(w, map[string]interface{}{
+		"queried": len(req.InfoHashes),
 	})
 }
 

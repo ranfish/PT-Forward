@@ -62,6 +62,9 @@ export const publishTorrentsApi = {
   queryCoverage(data: { client_id: number; info_hash: string; name?: string; size?: number }) {
     return client.post<ApiResponse<CoverageResult>>('/publish/torrents/coverage', data)
   },
+  batchQueryCoverage(data: { client_id: number; info_hashes: string[] }) {
+    return client.post<ApiResponse<{ queried: number }>>('/publish/torrents/batch-coverage', data)
+  },
   queryStatus(clientId: number) {
     return client.get<ApiResponse<{ querying: boolean; done: number; total: number }>>('/publish/torrents/query-status', { params: { client_id: clientId } })
   },
