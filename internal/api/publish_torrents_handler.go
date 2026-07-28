@@ -107,6 +107,10 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleStats(w, r)
 	case strings.HasSuffix(path, "/publish/coverage-cache") && r.Method == http.MethodGet:
 		h.handleCoverageCache(w, r)
+	case strings.HasSuffix(path, "/publish/source-priority") && r.Method == http.MethodGet:
+		h.handleGetSourcePriority(w, r)
+	case strings.HasSuffix(path, "/publish/source-priority") && r.Method == http.MethodPut:
+		h.handleSetSourcePriority(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -1817,10 +1821,10 @@ func (h *PublishTorrentsHandler) handleCoverageCache(w http.ResponseWriter, r *h
 	for _, c := range cached {
 		if c.Status == model.CoverageConfirmedHas || c.Status == model.CoverageProbablyHas {
 			sites = append(sites, siteStatus{
-				SiteName: c.SiteName,
-				Status:   c.Status,
-				Source:   c.Source,
-			})
+			SiteName: c.SiteName,
+			Status:   c.Status,
+			Source:   c.Source,
+		})
 		}
 	}
 
@@ -1828,4 +1832,74 @@ func (h *PublishTorrentsHandler) handleCoverageCache(w http.ResponseWriter, r *h
 		"info_hash": infoHash,
 		"sites":     sites,
 	})
+}
+
+// handleGetSourcePriority §56.40: 读取源站点优先级配置。
+func (h *PublishTorrentsHandler) handleGetSourcePriority(w http.ResponseWriter, r *http.Request) {
+	priority := h.getSourcePriority(r.Context())
+	if len(priority) == 0 {
+		priority = h.defaultSourcePriority(r.Context())
+	}
+	Success(w, map[string]interface{}{"priority": priority})
+}
+
+// handleSetSourcePriority §56.40: 保存源站点优先级配置。
+func (h *PublishTorrentsHandler) handleSetSourcePriority(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Priority []string `json:"priority"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "invalid body")
+		return
+	}
+	data, _ := json.Marshal(req.Priority)
+	h.db.WithContext(r.Context()).Exec(
+		"INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+		"source_priority", string(data))
+	Success(w, map[string]interface{}{"priority": req.Priority})
+}
+
+func (h *PublishTorrentsHandler) getSourcePriority(ctx context.Context) []string {
+	var val string
+	if err := h.db.WithContext(ctx).Raw("SELECT value FROM system_settings WHERE key = 'source_priority' LIMIT 1").Row().Scan(&val); err != nil {
+		return nil
+	}
+	var priority []string
+	if err := json.Unmarshal([]byte(val), &priority); err != nil {
+		return nil
+	}
+	return priority
+}
+
+// defaultSourcePriority 生成默认优先级：官组映射站在前，其余 is_source 站按名称排序。
+func (h *PublishTorrentsHandler) defaultSourcePriority(ctx context.Context) []string {
+	var builtinSites []string
+	h.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+		Distinct("site_name").
+		Where("is_builtin = ?", true).
+		Pluck("site_name", &builtinSites)
+
+	var sourceSites []string
+	h.db.WithContext(ctx).Model(&model.Site{}).
+		Where("enabled = ? AND is_source = ?", true, true).
+		Order("name").
+		Pluck("name", &sourceSites)
+
+	builtinSet := make(map[string]bool, len(builtinSites))
+	for _, s := range builtinSites {
+		builtinSet[s] = true
+	}
+
+	var result []string
+	for _, s := range builtinSites {
+		if s != "" {
+			result = append(result, s)
+		}
+	}
+	for _, s := range sourceSites {
+		if !builtinSet[s] {
+			result = append(result, s)
+		}
+	}
+	return result
 }
