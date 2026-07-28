@@ -14649,7 +14649,7 @@
         ],
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "PTH",
         "PTHome"
@@ -21783,7 +21783,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "CornerMV",
         "DBTV",
