@@ -147,7 +147,7 @@ const fetchDone = ref(false)
 const columns = [
   { title: '种子名', key: 'name', ellipsis: true },
   { title: '大小', key: 'size', width: 80 },
-  { title: '已有数据', key: 'cached', width: 200 },
+  { title: '做种站点', key: 'cached', width: 200 },
 ]
 
 const filteredTorrents = computed(() => {
@@ -217,9 +217,9 @@ async function fetchTorrents() {
         cachedSites: [],
       }
     })
-    // 异步加载每个种子的已缓存站点
+    // 异步加载每个种子的做种站点（覆盖状态）
     for (const t of torrents.value) {
-      publishDataApi.cachedSites(t.info_hash).then(resp => {
+      publishDataApi.coverageCache(t.info_hash).then(resp => {
         const sites = resp.data?.data?.sites || []
         t.cachedSites = sites.map(s => s.site_name)
       }).catch(() => {})
