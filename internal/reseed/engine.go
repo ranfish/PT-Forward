@@ -3320,7 +3320,7 @@ func (e *Engine) getOrComputePiecesHash(ctx context.Context, infoHash string, cl
 	}
 	torrentData, err := client.ExportTorrent(ctx, infoHash)
 	if err != nil || len(torrentData) == 0 {
-		e.logger.Debug("getOrComputePiecesHash: export failed", zap.String("hash", infoHash[:8]), zap.Error(err))
+		e.logger.Debug("getOrComputePiecesHash: export failed", zap.String("hash", infoHash), zap.Error(err))
 		return ""
 	}
 	fp2, err := e.fpRepo.ComputeAndSave(ctx, "", "", torrentData, "")
