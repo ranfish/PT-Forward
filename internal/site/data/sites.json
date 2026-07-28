@@ -5624,7 +5624,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "groups": [
         "EPiC",
         "HDATV",
@@ -27147,7 +27147,7 @@
         "music_publish_sel": null,
         "music_tags": null
       },
-      "supports_pieces_hash_api": true,
+      "supports_pieces_hash_api": false,
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "www.pttime.fun",
