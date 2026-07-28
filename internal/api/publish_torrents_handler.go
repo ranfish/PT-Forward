@@ -431,20 +431,12 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 		h.logger.Warn("query coverage: fast query failed", zap.Error(err))
 	}
 
-	// 慢车道：L1 fresh（pieces-hash 本地计算 + 站点 API 查询）
-	torrentDir := extractTorrentDir(cfg.Config)
-	if h.siteProvider != nil && torrentDir != "" {
-		piecesHash, err := coverage.ComputePiecesHashFromDir(torrentDir, req.InfoHash)
-		if err != nil {
-			h.logger.Debug("query coverage: pieces_hash compute skipped", zap.String("hash", req.InfoHash[:8]), zap.Error(err))
-		} else {
-			h.queryPiecesHashSites(ctx, req.InfoHash, piecesHash)
+	// L1 fresh: 从 content_fingerprints 表读 pieces_hash（复用辅种指纹，不计算种子文件）
+	if h.siteProvider != nil {
+		var fp model.ContentFingerprint
+		if err := h.db.WithContext(ctx).Where("info_hash = ?", req.InfoHash).First(&fp).Error; err == nil && fp.PiecesHash != "" {
+			h.queryPiecesHashSites(ctx, req.InfoHash, fp.PiecesHash)
 		}
-	}
-
-	// 慢车道：L3（名称/体积搜索）
-	if h.siteProvider != nil && req.Name != "" && req.Size > 0 {
-		h.queryNameSizeSites(ctx, req.InfoHash, req.Name, req.Size)
 	}
 
 	// 返回最终结果
