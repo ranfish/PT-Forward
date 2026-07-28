@@ -197,4 +197,10 @@ export const publishDataApi = {
   batchDelete(ids: number[]) {
     return client.post<ApiResponse<{ deleted: number }>>('/publish/seed-data/batch-delete', { ids })
   },
+  getSourcePriority() {
+    return client.get<ApiResponse<{ priority: string[] }>>('/publish/source-priority')
+  },
+  setSourcePriority(priority: string[]) {
+    return client.put<ApiResponse<{ priority: string[] }>>('/publish/source-priority', { priority })
+  },
 }

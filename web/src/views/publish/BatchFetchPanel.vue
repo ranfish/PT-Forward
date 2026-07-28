@@ -34,6 +34,7 @@
         <a-select-option v-for="p in savePaths" :key="p" :value="p">{{ p }}</a-select-option>
       </a-select>
       <a-button v-if="torrents.length > 0" @click="fetchTorrents"><ReloadOutlined /></a-button>
+      <a-button v-if="torrents.length > 0" size="small" @click="openPriorityDialog">设置优先级</a-button>
     </div>
 
     <!-- 进度条 -->
@@ -88,6 +89,28 @@
     </a-table>
 
     <a-empty v-else-if="!loadingTorrents && clientId" description="该下载器无做种" />
+
+    <!-- 优先级设置弹窗 -->
+    <a-modal
+      v-model:open="priorityDialogVisible"
+      title="源站点优先级设置"
+      width="500px"
+      :confirm-loading="prioritySaving"
+      @ok="savePriority"
+    >
+      <a-alert
+        type="info"
+        show-icon
+        style="margin-bottom: 12px"
+        message="系统将按此顺序查找第一个可用的源站点获取数据"
+      />
+      <div v-for="(site, index) in priorityList" :key="site" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+        <span style="color: #999; width: 24px">{{ index + 1 }}</span>
+        <a-tag color="blue" style="cursor: move; flex: 1; text-align: center">{{ site }}</a-tag>
+        <a-button size="small" type="text" :disabled="index === 0" @click="movePriority(index, -1)">↑</a-button>
+        <a-button size="small" type="text" :disabled="index === priorityList.length - 1" @click="movePriority(index, 1)">↓</a-button>
+      </div>
+    </a-modal>
 
     <!-- Footer -->
     <div style="margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px">
@@ -144,6 +167,10 @@ const successCount = ref(0)
 const failCount = ref(0)
 const fetchDone = ref(false)
 
+const priorityDialogVisible = ref(false)
+const prioritySaving = ref(false)
+const priorityList = ref<string[]>([])
+
 const columns = [
   { title: '种子名', key: 'name', ellipsis: true },
   { title: '大小', key: 'size', width: 80 },
@@ -168,6 +195,34 @@ watch(() => props.open, async (val) => {
     await fetchClients()
   }
 })
+
+async function openPriorityDialog() {
+  try {
+    const resp = await publishDataApi.getSourcePriority()
+    priorityList.value = resp.data?.data?.priority || []
+  } catch { /* silent */ }
+  priorityDialogVisible.value = true
+}
+
+function movePriority(index: number, delta: number) {
+  const newIndex = index + delta
+  if (newIndex < 0 || newIndex >= priorityList.value.length) return
+  const item = priorityList.value.splice(index, 1)[0]
+  priorityList.value.splice(newIndex, 0, item)
+}
+
+async function savePriority() {
+  prioritySaving.value = true
+  try {
+    await publishDataApi.setSourcePriority([...priorityList.value])
+    message.success('优先级已保存')
+    priorityDialogVisible.value = false
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    prioritySaving.value = false
+  }
+}
 
 function reset() {
   torrents.value = []

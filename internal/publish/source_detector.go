@@ -2,6 +2,7 @@ package publish
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 
@@ -68,6 +69,28 @@ type SourceDetectResult struct {
 
 func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string, coverageSites []model.SiteCoverageCache) SourceDetectResult {
 	result := SourceDetectResult{}
+
+	// §56.40: 用户配置的优先级列表优先（用户配置 > 自动检测）
+	if priority := d.getSourcePriority(ctx); len(priority) > 0 && len(coverageSites) > 0 {
+		siteMap := make(map[string]model.SiteCoverageCache)
+		for _, c := range coverageSites {
+			if c.Status == model.CoverageConfirmedHas || c.Status == model.CoverageProbablyHas {
+				siteMap[c.SiteName] = c
+			}
+		}
+		for _, siteName := range priority {
+			if c, ok := siteMap[siteName]; ok {
+				var site model.Site
+				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+					result.SourceSite = site.Name
+					result.SourceSiteID = site.ID
+					result.TorrentID = c.TorrentID
+					result.AutoDetected = false
+					return result
+				}
+			}
+		}
+	}
 
 	groupName := ExtractGroupName(title)
 	result.GroupName = groupName
@@ -199,4 +222,17 @@ func (d *SourceSiteDetector) HasGroupMappings(ctx context.Context, site *model.S
 		Where("site_name = ? OR domain LIKE ?", site.Name, "%"+strings.ToLower(site.Domain)+"%").
 		Count(&count)
 	return count > 0
+}
+
+// getSourcePriority §56.40: 从 system_settings 读取用户配置的源站点优先级。
+func (d *SourceSiteDetector) getSourcePriority(ctx context.Context) []string {
+	var val string
+	if err := d.db.WithContext(ctx).Raw("SELECT value FROM system_settings WHERE key = 'source_priority' LIMIT 1").Row().Scan(&val); err != nil {
+		return nil
+	}
+	var priority []string
+	if err := json.Unmarshal([]byte(val), &priority); err != nil {
+		return nil
+	}
+	return priority
 }
