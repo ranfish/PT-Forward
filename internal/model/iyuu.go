@@ -45,3 +45,10 @@ type IYUUSiteMapping struct {
 }
 
 func (IYUUSiteMapping) TableName() string { return "iyuu_site_mappings" }
+
+// CoverageHit 覆盖查询结果（辅种引擎返回给覆盖查询的单条命中）。
+type CoverageHit struct {
+	SiteName  string `json:"site_name"`
+	TorrentID string `json:"torrent_id"`
+	Source    string `json:"source"` // "iyuu" / "pieces_hash"
+}

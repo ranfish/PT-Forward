@@ -14,6 +14,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
+	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
@@ -36,6 +37,7 @@ type PublishTorrentsHandler struct {
 	siteProvider   SiteProviderGetter
 	sourceDetector *publish.SourceSiteDetector
 	declFilter     *publish.DeclarationFilter
+	reseedEngine   *reseed.Engine
 	logger         *zap.Logger
 	bgState        backgroundQueryState
 }
@@ -56,6 +58,7 @@ func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger) *PublishTorrents
 }
 
 func (h *PublishTorrentsHandler) SetCoverageService(s *coverage.Service) { h.coverage = s }
+func (h *PublishTorrentsHandler) SetReseedEngine(e *reseed.Engine)     { h.reseedEngine = e }
 func (h *PublishTorrentsHandler) SetClientProvider(c MFClientProvider)  { h.clientMgr = c }
 func (h *PublishTorrentsHandler) SetSiteProvider(s SiteProviderGetter)  { h.siteProvider = s }
 func (h *PublishTorrentsHandler) SetSourceDetector(d *publish.SourceSiteDetector) { h.sourceDetector = d }
@@ -418,26 +421,50 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
-	// L0: trackers
-	trackers, err := client.GetTrackers(ctx, req.InfoHash)
-	if err != nil {
-		h.logger.Warn("query coverage: get trackers failed", zap.Error(err))
-		trackers = nil
-	}
+	now := time.Now()
+	ttl := now.Add(24 * time.Hour)
 
-	// 快车道：L0 + L1(缓存) + L2(IYUU)
-	_, err = h.coverage.QueryCoverage(ctx, req.InfoHash, trackers)
-	if err != nil {
-		h.logger.Warn("query coverage: fast query failed", zap.Error(err))
-	}
-
-	// L1 fresh: 从 content_fingerprints 表读 pieces_hash（复用辅种指纹，不计算种子文件）
-	if h.siteProvider != nil {
-		var fp model.ContentFingerprint
-		if err := h.db.WithContext(ctx).Where("info_hash = ?", req.InfoHash).First(&fp).Error; err == nil && fp.PiecesHash != "" {
-			h.queryPiecesHashSites(ctx, req.InfoHash, fp.PiecesHash)
+	// ① 辅种引擎查询：IYUU + pieces_hash API → 🟡 可辅种（先写）
+	if h.reseedEngine != nil {
+		hits := h.reseedEngine.QuerySingleCoverage(ctx, req.InfoHash, client)
+		for _, hit := range hits {
+			source := model.CoverageSourceIYUU
+			if hit.Source == "pieces_hash" {
+				source = model.CoverageSourcePiecesHash
+			}
+			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				InfoHash:   req.InfoHash,
+				SiteName:   hit.SiteName,
+				Status:     model.CoverageConfirmedHas,
+				Source:     source,
+				Confidence: 1.0,
+				TorrentID:  hit.TorrentID,
+				QueriedAt:  now,
+				ExpiresAt:  ttl,
+			})
 		}
 	}
+
+	// ② tracker 映射 → 🟢 做种中（后写，覆盖同名 🟡）
+	trackers, err := client.GetTrackers(ctx, req.InfoHash)
+	if err == nil && len(trackers) > 0 {
+		tm := site.NewTrackerMatcher(h.db)
+		trackerSites := tm.MatchAll(trackers)
+		for _, sn := range trackerSites {
+			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				InfoHash:   req.InfoHash,
+				SiteName:   sn,
+				Status:     model.CoverageConfirmedHas,
+				Source:     model.CoverageSourceTracker,
+				Confidence: 1.0,
+				QueriedAt:  now,
+				ExpiresAt:  ttl,
+			})
+		}
+	}
+
+	// 标记查询状态
+	h.coverage.MarkQueried(ctx, req.InfoHash, now, ttl)
 
 	// 返回最终结果
 	cached, _ := h.coverage.GetCachedCoverage(ctx, req.InfoHash)

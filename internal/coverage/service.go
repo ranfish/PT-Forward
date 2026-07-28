@@ -373,6 +373,11 @@ func (s *Service) upsertQueryState(ctx context.Context, infoHash string, queried
 	return s.db.WithContext(ctx).Save(&state).Error
 }
 
+// MarkQueried 标记查询完成（供外部调用）。
+func (s *Service) MarkQueried(ctx context.Context, infoHash string, queriedAt, expiresAt time.Time) {
+	s.upsertQueryState(ctx, infoHash, queriedAt, expiresAt)
+}
+
 // QueryCoverage 单种子查询（保留兼容）
 func (s *Service) QueryCoverage(ctx context.Context, infoHash string, trackers []string) ([]model.SiteCoverageCache, error) {
 	items := []BatchItem{{InfoHash: infoHash, Trackers: trackers}}
