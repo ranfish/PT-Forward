@@ -3305,3 +3305,127 @@ func (e *Engine) iyuuSidToSite(ctx context.Context, sid int) string {
 
 	return mapping.SiteName
 }
+
+// getOrComputePiecesHash 获取单个种子的 pieces_hash（DB 优先 + ExportTorrent 补全）。
+func (e *Engine) getOrComputePiecesHash(ctx context.Context, infoHash string, client model.DownloaderClient) string {
+	if e.fpRepo == nil {
+		return ""
+	}
+	fp, err := e.fpRepo.GetByInfoHash(ctx, infoHash)
+	if err == nil && fp != nil && fp.PiecesHash != "" {
+		return fp.PiecesHash
+	}
+	if client == nil {
+		return ""
+	}
+	torrentData, err := client.ExportTorrent(ctx, infoHash)
+	if err != nil || len(torrentData) == 0 {
+		e.logger.Debug("getOrComputePiecesHash: export failed", zap.String("hash", infoHash[:8]), zap.Error(err))
+		return ""
+	}
+	fp2, err := e.fpRepo.ComputeAndSave(ctx, "", "", torrentData, "")
+	if err != nil || fp2 == nil {
+		return ""
+	}
+	return fp2.PiecesHash
+}
+
+// QuerySingleCoverage 查询单个种子的覆盖状态（IYUU + pieces_hash API）。
+// 复用辅种引擎的查询方法，结果供覆盖查询写入 site_coverage_cache。
+func (e *Engine) QuerySingleCoverage(ctx context.Context, infoHash string, client model.DownloaderClient) []model.CoverageHit {
+	var hits []model.CoverageHit
+
+	// IYUU 查询
+	if e.iyuuService != nil {
+		sidMap := e.preloadIYUUSiteMappings(ctx)
+		results, err := e.iyuuService.QueryReseed(ctx, []string{infoHash})
+		if err == nil {
+			for _, r := range results {
+				for _, t := range r.Targets {
+					if siteName, ok := sidMap[t.Sid]; ok && siteName != "" {
+						hits = append(hits, model.CoverageHit{
+							SiteName:  siteName,
+							TorrentID: strconv.Itoa(t.TorrentID),
+							Source:    "iyuu",
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// pieces_hash 获取
+	piecesHash := e.getOrComputePiecesHash(ctx, infoHash, client)
+	if piecesHash == "" {
+		return hits
+	}
+
+	// pieces_hash API 查询（并发）
+	if e.siteProvider == nil {
+		return hits
+	}
+	var sites []model.Site
+	e.db.WithContext(ctx).Where("enabled = ? AND is_target = ?", true, true).Find(&sites)
+
+	type phResult struct {
+		siteName string
+		tid      int
+		found    bool
+	}
+	var phResults []phResult
+	sem := make(chan struct{}, 10)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for _, site := range sites {
+		adapter, err := e.siteProvider.GetAdapter(ctx, site.Domain)
+		if err != nil || adapter == nil || !adapter.SupportsSearchByPiecesHash() {
+			continue
+		}
+		searcher, ok := adapter.(piecesHashSearcher)
+		if !ok {
+			continue
+		}
+		config, err := e.siteProvider.GetSiteConfig(ctx, site.Domain)
+		if err != nil || config == nil {
+			continue
+		}
+
+		wg.Add(1)
+		go func(sn string, cfg *model.SiteConfig, sr piecesHashSearcher) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
+			defer func() {
+				if r := recover(); r != nil {
+					e.logger.Error("QuerySingleCoverage panic recovered", zap.String("site", sn), zap.Any("panic", r))
+				}
+			}()
+
+			result, err := sr.SearchByPiecesHash(ctx, cfg, []string{piecesHash})
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if tid, found := result[piecesHash]; found {
+				phResults = append(phResults, phResult{siteName: sn, tid: tid, found: true})
+			}
+		}(site.Name, config, searcher)
+	}
+	wg.Wait()
+
+	for _, r := range phResults {
+		hits = append(hits, model.CoverageHit{
+			SiteName:  r.siteName,
+			TorrentID: strconv.Itoa(r.tid),
+			Source:    "pieces_hash",
+		})
+	}
+
+	return hits
+}

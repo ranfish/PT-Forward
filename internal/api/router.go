@@ -105,7 +105,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 	if seedingEngine != nil {
 		manualForwardHandler.SetSeedingCache(seedingEngine)
 	}
-	return &Router{
+	rt := &Router{
 		authHandler:          NewAuthHandler(authManager),
 		clientHandler:        NewClientHandler(db, logger, clientMgrIface),
 		siteHandler:          siteHandler,
@@ -119,8 +119,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		publishHandler:         NewPublishHandler(publishPipeline, logger, db),
 		manualForwardHandler:   manualForwardHandler,
 		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger),
-		complianceHandler:      NewComplianceHandler(db, logger),
-		publishLimitHandler:   NewPublishLimitHandler(db, logger),
+		complianceHandler:      NewComplianceHandler(db, logger),		publishLimitHandler:   NewPublishLimitHandler(db, logger),
 		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),
 		metadataHandler:       NewMetadataHandler(db, logger),
 		logBroadcaster:        logBroadcaster,
@@ -142,6 +141,8 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		authManager:          authManager,
 		logger:               logger,
 	}
+	rt.publishTorrentsHandler.SetReseedEngine(reseedEngine)
+	return rt
 }
 
 func (rt *Router) Register(mux *http.ServeMux, corsOrigins []string, rateLimitEnabled bool, rateLimitGlobal int) {
