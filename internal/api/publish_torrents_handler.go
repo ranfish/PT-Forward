@@ -283,6 +283,9 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 		})
 	}
 
+	// §56.40: 按 name+size 去重，同组优先保留官方小组源站的行
+	items = h.dedupTorrentItems(r.Context(), items)
+
 	// 如果有未查询的种子，触发后台批量查询
 	querying := h.bgState.isQuerying(uint(clientID))
 	if !querying && h.coverage != nil {
@@ -1832,6 +1835,61 @@ func (h *PublishTorrentsHandler) handleCoverageCache(w http.ResponseWriter, r *h
 		"info_hash": infoHash,
 		"sites":     sites,
 	})
+}
+
+// dedupTorrentItems §56.40: 按 name+size 去重，同组优先保留官方小组源站的行。
+func (h *PublishTorrentsHandler) dedupTorrentItems(ctx context.Context, items []map[string]interface{}) []map[string]interface{} {
+	seen := make(map[string]int)
+	var result []map[string]interface{}
+	groupCache := make(map[string]string)
+
+	for _, item := range items {
+		name, _ := item["name"].(string)
+		size, _ := item["size"].(int64)
+		key := name + "|" + strconv.FormatInt(size, 10)
+
+		if idx, ok := seen[key]; ok {
+			if officialSite := h.lookupOfficialSite(ctx, name, groupCache); officialSite != "" {
+				if itemHasSite(item, officialSite) && !itemHasSite(result[idx], officialSite) {
+					result[idx] = item
+				}
+			}
+			continue
+		}
+		seen[key] = len(result)
+		result = append(result, item)
+	}
+	return result
+}
+
+func itemHasSite(item map[string]interface{}, site string) bool {
+	sites, ok := item["source_sites"].([]string)
+	if !ok {
+		return false
+	}
+	for _, s := range sites {
+		if s == site {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *PublishTorrentsHandler) lookupOfficialSite(ctx context.Context, name string, cache map[string]string) string {
+	groupName := publish.ExtractGroupName(name)
+	if groupName == "" {
+		return ""
+	}
+	if site, ok := cache[groupName]; ok {
+		return site
+	}
+	var mapping model.ReleaseGroupMapping
+	if err := h.db.WithContext(ctx).Where("LOWER(group_name) = LOWER(?)", groupName).First(&mapping).Error; err == nil {
+		cache[groupName] = mapping.SiteName
+		return mapping.SiteName
+	}
+	cache[groupName] = ""
+	return ""
 }
 
 // handleGetSourcePriority §56.40: 读取源站点优先级配置。
