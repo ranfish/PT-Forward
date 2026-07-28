@@ -161,8 +161,8 @@
             </div>
             <div class="coverage-group">
               <span class="coverage-label">⚪ 未发现</span>
-              <a-tag v-for="s in coverageSitesOf(record, 'white')" :key="s.site_name" :color="coverageSiteStatus(s) === 'cached_not' ? 'default' : ''" style="margin: 2px">{{ s.site_name }}</a-tag>
-              <span v-if="coverageSitesOf(record, 'white').length === 0" class="empty-hint">无</span>
+              <span v-if="(record.coverage?.target_count ?? 0) > 0" style="font-size: 12px; color: #999">{{ record.coverage?.target_count }} 站（可转载发布）</span>
+              <span v-else class="empty-hint">无</span>
             </div>
           </template>
           <span v-else class="empty-hint">{{ record.queried ? '已查询，暂无已知覆盖数据' : '尚未查询覆盖' }}</span>
@@ -209,7 +209,7 @@
               </div>
               <div v-else style="color: #999">尚未查询</div>
               <div v-if="record.coverage?.sites?.length" style="margin-top: 4px; border-top: 1px solid #333; padding-top: 4px; font-size: 11px">
-                🟢 做种中 {{ coverageCount(record, 'green') }} · 🟡 可辅种 {{ coverageCount(record, 'yellow') }} · ⚪ 可发布 {{ coverageCount(record, 'white') }}
+                🟢 做种中 {{ coverageCount(record, 'green') }} · 🟡 可辅种 {{ coverageCount(record, 'yellow') }} · ⚪ 未发现 {{ record.coverage?.target_count ?? 0 }}
               </div>
             </template>
             <div class="coverage-cell">
@@ -217,14 +217,14 @@
               <span v-if="coverageCount(record, 'green') > 0" style="color: #999">·</span>
               <span v-if="coverageCount(record, 'yellow') > 0" style="color: #faad14; font-weight: 600">{{ coverageCount(record, 'yellow') }}</span>
               <span v-if="coverageCount(record, 'yellow') > 0" style="color: #999">·</span>
-              <span style="color: #999">{{ record.coverage?.total_sites ?? 0 }}</span>
+              <span style="color: #999">{{ record.coverage?.target_count ?? 0 }}</span>
               <a-tag v-if="!record.queried" color="orange" size="small" class="unqueried-tag">未查</a-tag>
             </div>
           </a-tooltip>
         </template>
         <template v-if="column.key === 'target_count'">
-          <a-tag :color="coverageCount(record, 'white') > 0 ? 'green' : 'default'">
-            {{ coverageCount(record, 'white') }} 站可转
+          <a-tag :color="(record.coverage?.target_count ?? 0) > 0 ? 'green' : 'default'">
+            {{ record.coverage?.target_count ?? 0 }} 站可转
           </a-tag>
         </template>
         <template v-if="column.key === 'actions'">
