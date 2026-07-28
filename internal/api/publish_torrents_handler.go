@@ -666,22 +666,23 @@ func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
 }
 
 func (h *PublishTorrentsHandler) batchPiecesHashQuery(ctx context.Context, items []coverage.BatchItem, cfg model.ClientConfig) {
-	torrentDir := extractTorrentDir(cfg.Config)
-	if torrentDir == "" {
-		return
+	// 从 content_fingerprints 表批量读 pieces_hash（复用辅种指纹，不计算种子文件）
+	infoHashes := make([]string, 0, len(items))
+	for _, item := range items {
+		infoHashes = append(infoHashes, item.InfoHash)
 	}
 
-	// 批量计算 pieces_hash
-	hashToPieces := make(map[string]string, len(items))
-	for _, item := range items {
-		ph, err := coverage.ComputePiecesHashFromDir(torrentDir, item.InfoHash)
-		if err != nil {
-			continue
+	var fps []model.ContentFingerprint
+	h.db.WithContext(ctx).Where("info_hash IN ?", infoHashes).Find(&fps)
+
+	hashToPieces := make(map[string]string, len(fps))
+	for _, fp := range fps {
+		if fp.PiecesHash != "" {
+			hashToPieces[fp.InfoHash] = fp.PiecesHash
 		}
-		hashToPieces[item.InfoHash] = ph
 	}
 	if len(hashToPieces) == 0 {
-		h.logger.Info("bg L1 fresh: no pieces_hash computed", zap.String("torrent_dir", torrentDir))
+		h.logger.Info("bg L1 fresh: no pieces_hash from fingerprints", zap.Int("torrents", len(items)))
 		return
 	}
 
