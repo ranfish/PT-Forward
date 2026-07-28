@@ -60,6 +60,15 @@
         <a-select-option value="pausedDL">暂停下载</a-select-option>
         <a-select-option value="error">错误</a-select-option>
       </a-select>
+      <a-select
+        v-if="torrents.length"
+        v-model:value="pathFilter"
+        style="width: 180px; margin-left: 12px"
+        placeholder="保存路径"
+        allow-clear
+      >
+        <a-select-option v-for="p in savePaths" :key="p" :value="p">{{ p }}</a-select-option>
+      </a-select>
       <a-tag v-if="torrents.length" color="blue" style="margin-left: 8px">
         {{ filteredTorrents.length }} / {{ torrents.length }}
       </a-tag>
@@ -68,6 +77,14 @@
       </a-button>
       <a-button size="small" @click="openDeclFilters">
         过滤规则
+      </a-button>
+      <a-button
+        v-if="selectedHashes.length > 0"
+        size="small"
+        :loading="batchQuerying"
+        @click="batchQueryCoverage"
+      >
+        批量查询 ({{ selectedHashes.length }})
       </a-button>
       <a-button
         v-if="selectedHashes.length > 0"
@@ -493,6 +510,8 @@ const searchText = ref(persisted.search || '')
 const queryFilter = ref<string | undefined>(persisted.query_filter)
 const typeFilter = ref<string | undefined>(persisted.type_filter)
 const stateFilter = ref<string[]>(persisted.state_filter || [])
+const pathFilter = ref<string | undefined>(undefined)
+const savePaths = ref<string[]>([])
 const queryingHash = ref('')
 const selectedHashes = ref<string[]>([])
 let coverageAbortController: AbortController | null = null
@@ -545,6 +564,9 @@ const filteredTorrents = computed(() => {
   }
   if (stateFilter.value.length > 0) {
     result = result.filter(t => stateFilter.value.includes(t.state))
+  }
+  if (pathFilter.value) {
+    result = result.filter(t => t.save_path === pathFilter.value)
   }
   return result
 })
@@ -641,6 +663,13 @@ async function fetchTorrents() {
     const resp = await publishTorrentsApi.list(selectedClientId.value)
     const data = resp.data?.data
     torrents.value = data?.items || []
+    // 提取保存路径列表
+    const paths = new Set<string>()
+    for (const t of torrents.value) {
+      if (t.save_path) paths.add(t.save_path)
+    }
+    savePaths.value = [...paths].sort()
+    pathFilter.value = undefined
     querying.value = data?.querying ?? false
     queryDone.value = data?.query_progress?.done ?? 0
     queryTotal.value = data?.query_progress?.total ?? 0
@@ -737,6 +766,42 @@ async function queryCoverage(record: PublishTorrentItem) {
   }
 }
 
+async function batchQueryCoverage() {
+  if (selectedHashes.value.length === 0 || !selectedClientId.value) return
+  batchQuerying.value = true
+  let done = 0
+  let ok = 0
+  for (const hash of selectedHashes.value) {
+    const record = torrents.value.find(t => t.info_hash === hash)
+    if (!record) continue
+    queryingHash.value = hash
+    try {
+      const resp = await publishTorrentsApi.queryCoverage({
+        client_id: selectedClientId.value,
+        info_hash: record.info_hash,
+        name: record.name,
+        size: record.size,
+      })
+      const result = resp.data?.data
+      if (result) {
+        record.coverage = {
+          has_count: result.has_count,
+          total_sites: result.total_sites,
+          target_count: result.target_count,
+          sites: result.sites,
+        }
+        record.queried = true
+        ok++
+      }
+    } catch { /* continue */ }
+    done++
+  }
+  batchQuerying.value = false
+  queryingHash.value = ''
+  message.success(`批量查询完成: ${ok}/${done} 成功`)
+  fetchTorrents()
+}
+
 function startForward(record: PublishTorrentItem) {
   presetTorrent.value = {
     info_hash: record.info_hash,
@@ -820,6 +885,7 @@ function onReviewSaved(infoHash: string) {
 // --- 批量发布 ---
 const batchPublishOpen = ref(false)
 const batchPublishing = ref(false)
+const batchQuerying = ref(false)
 const batchTargetSites = ref<{ name: string }[]>([])
 const batchForm = reactive({ source_site: '', target_site: '' })
 
