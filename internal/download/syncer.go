@@ -363,8 +363,8 @@ func (s *Syncer) processClientTransfers(ctx context.Context, clientName string) 
 			clientName)
 
 	if cooldown := s.runtimeCfg.GetInt(ctx, setting.KeyTransferCooldownSeconds); cooldown > 0 {
-		cutoff := time.Now().Add(-time.Duration(cooldown) * time.Second)
-		query = query.Where("(completed_at IS NULL OR completed_at < ?)", cutoff)
+		cutoff := time.Now().Add(-time.Duration(cooldown) * time.Second).UTC().Format("2006-01-02 15:04:05")
+		query = query.Where("(completed_at IS NULL OR datetime(completed_at) < datetime(?))", cutoff)
 	}
 
 	query.Find(&tasks)
