@@ -254,15 +254,28 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 				continue
 			}
 
+			r.logger.Info("file-level recover: downloading torrent",
+				zap.String("site", site),
+				zap.String("torrent_id", res.TorrentID),
+				zap.String("title", res.Title[:min(80, len(res.Title))]))
+
 			dlCtx, dlCancel := context.WithTimeout(searchCtx, 30*time.Second)
 			torrentData, dlErr := adapter.DownloadTorrent(dlCtx, config, res.TorrentID)
 			dlCancel()
 			if dlErr != nil || len(torrentData) == 0 {
+				r.logger.Info("file-level recover: download failed",
+					zap.String("site", site),
+					zap.String("torrent_id", res.TorrentID),
+					zap.Error(dlErr))
 				continue
 			}
 
 			meta, metaErr := fingerprint.ComputeFromTorrent(torrentData)
 			if metaErr != nil || meta == nil {
+				r.logger.Info("file-level recover: fingerprint failed",
+					zap.String("site", site),
+					zap.String("torrent_id", res.TorrentID),
+					zap.Error(metaErr))
 				continue
 			}
 
@@ -272,6 +285,10 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 				baseName := filepath.Base(torrentFile)
 				if _, exists := diskFiles[baseName]; !exists {
 					allExist = false
+					r.logger.Info("file-level recover: file name mismatch",
+						zap.String("site", site),
+						zap.String("torrent_file", baseName),
+						zap.Strings("disk_files", keysFromMap(diskFiles)))
 					break
 				}
 				if covered[baseName] {
@@ -647,4 +664,12 @@ func waitForRecheck(ctx context.Context, dlClient model.DownloaderClient, infoHa
 		return fmt.Errorf("data verification incomplete: %.1f%% state=%s", ti.Progress*100, ti.State)
 	}
 	return fmt.Errorf("recheck timeout after %v", timeout)
+}
+
+func keysFromMap(m map[string]int64) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
