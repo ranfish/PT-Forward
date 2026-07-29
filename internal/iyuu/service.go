@@ -561,7 +561,11 @@ func (s *Service) getSiteMappings(ctx context.Context) map[int]string {
 
 	result := make(map[int]string, len(mappings))
 	for _, m := range mappings {
-		result[m.IYUUSid] = m.SiteDomain
+		if m.SiteName != "" {
+			result[m.IYUUSid] = m.SiteName
+		} else {
+			result[m.IYUUSid] = m.SiteDomain
+		}
 	}
 	return result
 }
