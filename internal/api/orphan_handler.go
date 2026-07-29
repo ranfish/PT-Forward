@@ -19,24 +19,30 @@ import (
 )
 
 type OrphanHandler struct {
-	scanner  *orphan.Scanner
-	recovery *orphan.Recovery
-	logger   *zap.Logger
-	db       *gorm.DB
+	scanner     *orphan.Scanner
+	recovery    *orphan.Recovery
+	logger      *zap.Logger
+	db          *gorm.DB
+	authManager PasswordVerifier
 
-	mu            sync.RWMutex
-	lastResults   []orphan.Entry
-	scannedAt     time.Time
-	recoverStore  sync.Map
-	recoverSeq    atomic.Int64
+	mu           sync.RWMutex
+	lastResults  []orphan.Entry
+	scannedAt    time.Time
+	recoverStore sync.Map
+	recoverSeq   atomic.Int64
 }
 
-func NewOrphanHandler(scanner *orphan.Scanner, recovery *orphan.Recovery, db *gorm.DB, logger *zap.Logger) *OrphanHandler {
+type PasswordVerifier interface {
+	VerifyPassword(ctx context.Context, password string) error
+}
+
+func NewOrphanHandler(scanner *orphan.Scanner, recovery *orphan.Recovery, db *gorm.DB, authMgr PasswordVerifier, logger *zap.Logger) *OrphanHandler {
 	return &OrphanHandler{
-		scanner:  scanner,
-		recovery: recovery,
-		db:       db,
-		logger:   logger,
+		scanner:     scanner,
+		recovery:    recovery,
+		db:          db,
+		authManager: authMgr,
+		logger:      logger,
 	}
 }
 
@@ -227,7 +233,8 @@ func (h *OrphanHandler) handleIgnore(w http.ResponseWriter, r *http.Request) {
 
 func (h *OrphanHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Path string `json:"path"`
+		Path     string `json:"path"`
+		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -236,6 +243,18 @@ func (h *OrphanHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if req.Path == "" {
 		Error(w, http.StatusBadRequest, 40001, "path 必填")
 		return
+	}
+	if req.Password == "" {
+		Error(w, http.StatusBadRequest, 40001, "删除磁盘文件需要密码确认")
+		return
+	}
+
+	// 密码验证
+	if h.authManager != nil {
+		if err := h.authManager.VerifyPassword(r.Context(), req.Password); err != nil {
+			Error(w, http.StatusForbidden, 40301, "密码错误")
+			return
+		}
 	}
 
 	// 安全校验：路径必须在最近扫描结果中
