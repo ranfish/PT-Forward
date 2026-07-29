@@ -60,7 +60,16 @@
       closable
       style="margin-bottom: 12px"
       @close="fetchDone = false"
-    />
+    >
+      <div v-if="fetchResults.length > 0" style="max-height: 200px; overflow-y: auto; margin-top: 8px">
+        <div v-for="r in fetchResults" :key="r.hash" style="display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 12px">
+          <span v-if="r.status === 'success'" style="color: #52c41a">✓</span>
+          <span v-else-if="r.status === 'failed'" style="color: #ff4d4f">✗</span>
+          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ r.name }}</span>
+          <span v-if="r.status === 'failed'" style="color: #999; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ r.error }}</span>
+        </div>
+      </div>
+    </a-alert>
 
     <!-- 种子列表 -->
     <a-table
@@ -177,6 +186,7 @@ const currentFetching = ref('')
 const successCount = ref(0)
 const failCount = ref(0)
 const fetchDone = ref(false)
+const fetchResults = ref<Array<{ hash: string; name: string; status: 'success' | 'failed'; error?: string }>>([])
 
 const priorityDialogVisible = ref(false)
 const prioritySaving = ref(false)
@@ -257,6 +267,7 @@ function reset() {
   doneCount.value = 0
   successCount.value = 0
   failCount.value = 0
+  fetchResults.value = []
   fetchDone.value = false
   currentFetching.value = ''
 }
@@ -329,6 +340,7 @@ async function startBatchFetch() {
   doneCount.value = 0
   successCount.value = 0
   failCount.value = 0
+  fetchResults.value = []
 
   for (const hash of selectedHashes.value) {
     const torrent = torrents.value.find(t => t.info_hash === hash)
@@ -348,8 +360,10 @@ async function startBatchFetch() {
       // Poll until done
       await pollTask(taskId)
       successCount.value++
-    } catch {
+      fetchResults.value.push({ hash, name: torrent.name, status: 'success' })
+    } catch (e) {
       failCount.value++
+      fetchResults.value.push({ hash, name: torrent.name, status: 'failed', error: (e as Error).message })
     }
     doneCount.value++
   }
