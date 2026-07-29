@@ -22,6 +22,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/scheduler"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -2068,47 +2069,7 @@ func truncateToResolution(s string) string {
 }
 
 func ExtractGroupName(title string) string {
-	if title == "" {
-		return ""
-	}
-	// Remove file extension
-	clean := title
-	for _, ext := range []string{".mkv", ".mp4", ".avi", ".ts", ".wmv", ".flv"} {
-		if strings.HasSuffix(strings.ToLower(clean), ext) {
-			clean = clean[:len(clean)-len(ext)]
-			break
-		}
-	}
-	// Find last '-'
-	lastDash := strings.LastIndex(clean, "-")
-	if lastDash >= 0 && lastDash < len(clean)-1 {
-		group := clean[lastDash+1:]
-		// §56.40: @ 分隔符处理（老种子格式：-uploader@GROUP）
-		// 例: -hyb9373@CMCT → CMCT
-		if atIdx := strings.LastIndex(group, "@"); atIdx >= 0 && atIdx < len(group)-1 {
-			group = group[atIdx+1:]
-		}
-		group = strings.TrimSpace(group)
-		if group != "" {
-			return group
-		}
-	}
-	// ￡ 分隔符（SSD 特有格式 ￡CMCT发布者，取连续英文 = 组名）
-	if pIdx := strings.LastIndex(clean, "￡"); pIdx >= 0 && pIdx < len(clean)-len("￡") {
-		rest := clean[pIdx+len("￡"):]
-		var b strings.Builder
-		for _, r := range rest {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
-				b.WriteRune(r)
-			} else {
-				break
-			}
-		}
-		if b.Len() >= 2 {
-			return b.String()
-		}
-	}
-	return ""
+	return util.ExtractGroupName(title)
 }
 
 type L2MatchResult struct {
