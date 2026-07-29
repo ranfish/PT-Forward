@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -22,41 +23,9 @@ func NewSourceSiteDetector(db *gorm.DB, logger *zap.Logger) *SourceSiteDetector 
 	return &SourceSiteDetector{db: db, logger: logger, cache: make(map[string]string)}
 }
 
-// ExtractGroupName 从标题末尾提取制作组名
+// ExtractGroupName 从标题末尾提取制作组名（委托至 util.ExtractGroupName）
 func ExtractGroupName(title string) string {
-	title = strings.TrimSpace(title)
-	if title == "" {
-		return ""
-	}
-	idx := strings.LastIndex(title, "-")
-	if idx > 0 && idx < len(title)-1 {
-		raw := strings.TrimSpace(title[idx+1:])
-		upper := strings.ToUpper(raw)
-		ignore := map[string]bool{
-			"NOGROUP": true, "N/A": true, "NONE": true, "UNKNOWN": true,
-		}
-		if !ignore[upper] && len(raw) >= 2 && len(raw) <= 30 {
-			return raw
-		}
-	}
-
-	// ￡ 分隔符（SSD 特有格式 ￡CMCT发布者，取连续英文 = 组名）
-	if pIdx := strings.LastIndex(title, "￡"); pIdx >= 0 {
-		rest := title[pIdx+len("￡"):]
-		var b strings.Builder
-		for _, r := range rest {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
-				b.WriteRune(r)
-			} else {
-				break
-			}
-		}
-		if b.Len() >= 2 {
-			return b.String()
-		}
-	}
-
-	return ""
+	return util.ExtractGroupName(title)
 }
 
 type SourceDetectResult struct {
