@@ -94,7 +94,7 @@
     <a-modal
       v-model:open="priorityDialogVisible"
       title="源站点优先级设置"
-      width="500px"
+      width="520px"
       :confirm-loading="prioritySaving"
       @ok="savePriority"
     >
@@ -102,14 +102,25 @@
         type="info"
         show-icon
         style="margin-bottom: 12px"
-        message="系统将按此顺序查找第一个可用的源站点获取数据"
+        message="设置批量获取种子数据时的源站点优先级顺序，系统将按顺序查找第一个可用的源站点获取数据"
       />
-      <div v-for="(site, index) in priorityList" :key="site" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
-        <span style="color: #999; width: 24px">{{ index + 1 }}</span>
-        <a-tag color="blue" style="cursor: move; flex: 1; text-align: center">{{ site }}</a-tag>
-        <a-button size="small" type="text" :disabled="index === 0" @click="movePriority(index, -1)">↑</a-button>
-        <a-button size="small" type="text" :disabled="index === priorityList.length - 1" @click="movePriority(index, 1)">↓</a-button>
+      <div style="margin-bottom: 8px; font-size: 13px; color: #666; font-weight: 500">源站点优先级顺序：</div>
+      <div style="min-height: 40px">
+        <a-tag
+          v-for="(site, index) in priorityList"
+          :key="site"
+          :color="priorityTagColor(index)"
+          style="margin: 4px; cursor: move; user-select: none; font-size: 13px; padding: 4px 12px"
+          draggable="true"
+          @dragstart="onDragStart(index)"
+          @dragover.prevent
+          @drop="onDrop(index)"
+        >
+          {{ index + 1 }}. {{ site }}
+        </a-tag>
+        <span v-if="priorityList.length === 0" style="color: #999; font-size: 12px">未配置源站点优先级</span>
       </div>
+      <div style="margin-top: 8px; font-size: 12px; color: #999">拖拽调整优先级顺序</div>
     </a-modal>
 
     <!-- Footer -->
@@ -170,6 +181,25 @@ const fetchDone = ref(false)
 const priorityDialogVisible = ref(false)
 const prioritySaving = ref(false)
 const priorityList = ref<string[]>([])
+const draggedIndex = ref<number | null>(null)
+
+function priorityTagColor(index: number): string {
+  if (index === 0) return 'success'
+  if (index === 1) return 'processing'
+  if (index === 2) return 'warning'
+  return 'default'
+}
+
+function onDragStart(index: number) {
+  draggedIndex.value = index
+}
+
+function onDrop(dropIndex: number) {
+  if (draggedIndex.value === null) return
+  const draggedItem = priorityList.value.splice(draggedIndex.value, 1)[0]
+  priorityList.value.splice(dropIndex, 0, draggedItem)
+  draggedIndex.value = null
+}
 
 const columns = [
   { title: '种子名', key: 'name', ellipsis: true },
@@ -202,13 +232,6 @@ async function openPriorityDialog() {
     priorityList.value = resp.data?.data?.priority || []
   } catch { /* silent */ }
   priorityDialogVisible.value = true
-}
-
-function movePriority(index: number, delta: number) {
-  const newIndex = index + delta
-  if (newIndex < 0 || newIndex >= priorityList.value.length) return
-  const item = priorityList.value.splice(index, 1)[0]
-  priorityList.value.splice(newIndex, 0, item)
 }
 
 async function savePriority() {

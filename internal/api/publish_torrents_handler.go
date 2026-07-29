@@ -2128,6 +2128,7 @@ func (h *PublishTorrentsHandler) getSourcePriority(ctx context.Context) []string
 
 // defaultSourcePriority 生成默认优先级：官组映射站在前，其余 is_source 站按名称排序。
 func (h *PublishTorrentsHandler) defaultSourcePriority(ctx context.Context) []string {
+	// 只返回 is_source=true 且有 cookie 的站点（对齐 PTNexus）
 	var builtinSites []string
 	h.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
 		Distinct("site_name").
@@ -2136,7 +2137,7 @@ func (h *PublishTorrentsHandler) defaultSourcePriority(ctx context.Context) []st
 
 	var sourceSites []string
 	h.db.WithContext(ctx).Model(&model.Site{}).
-		Where("enabled = ? AND is_source = ?", true, true).
+		Where("enabled = ? AND is_source = ? AND cookie != ''", true, true).
 		Order("name").
 		Pluck("name", &sourceSites)
 
@@ -2146,8 +2147,13 @@ func (h *PublishTorrentsHandler) defaultSourcePriority(ctx context.Context) []st
 	}
 
 	var result []string
+	// builtin 官组站排前面（且必须在 sourceSites 列表里，即有 cookie）
+	sourceSet := make(map[string]bool, len(sourceSites))
+	for _, s := range sourceSites {
+		sourceSet[s] = true
+	}
 	for _, s := range builtinSites {
-		if s != "" {
+		if s != "" && sourceSet[s] {
 			result = append(result, s)
 		}
 	}
