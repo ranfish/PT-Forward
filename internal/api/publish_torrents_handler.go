@@ -344,45 +344,92 @@ func (h *PublishTorrentsHandler) startBackgroundQuery(clientID uint, cfg model.C
 
 	queried, _ := h.coverage.GetBatchQueryState(peerCtx, allHashes)
 
-	items := make([]coverage.BatchItem, 0, len(torrents))
+	unqueriedHashes := make([]string, 0, len(torrents))
 	for _, t := range torrents {
 		if queried[t.Hash] {
 			h.bgState.incDone()
 			continue
 		}
-
-		// L0: 获取 trackers
-		trackers, err := client.GetTrackers(ctx, t.Hash)
-		if err != nil {
-			trackers = nil
-		}
-
-		items = append(items, coverage.BatchItem{
-			InfoHash:   t.Hash,
-			Trackers:   trackers,
-			TorrentDir: extractTorrentDir(cfg.Config),
-		})
+		unqueriedHashes = append(unqueriedHashes, t.Hash)
 	}
 
-	if len(items) == 0 {
+	if len(unqueriedHashes) == 0 {
 		return
 	}
 
-	// 快车道：L0 + L1(缓存) + L2(IYUU 批量)
-	queryCtx, queryCancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer queryCancel()
+	// 统一调辅种引擎（IYUU 批量 + pieces_hash API + tracker 映射）
+	now := time.Now()
+	ttl := now.Add(24 * time.Hour)
 
-	err = h.coverage.QueryBatchCoverage(queryCtx, items)
-	if err != nil {
-		h.logger.Error("bg query: batch coverage failed", zap.Error(err))
+	if h.reseedEngine != nil {
+		hitsByHash := h.reseedEngine.QueryBatchCoverage(ctx, unqueriedHashes, client)
+		for infoHash, hits := range hitsByHash {
+			for _, hit := range hits {
+				source := model.CoverageSourceIYUU
+				if hit.Source == "pieces_hash" {
+					source = model.CoverageSourcePiecesHash
+				}
+				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+					InfoHash: infoHash, SiteName: hit.SiteName,
+					Status: model.CoverageConfirmedHas, Source: source,
+					Confidence: 1.0, TorrentID: hit.TorrentID,
+					QueriedAt: now, ExpiresAt: ttl,
+				})
+			}
+		}
 	}
 
-	// L1 fresh: 批量 pieces-hash 本地计算 + 站点 API 查询
-	if h.siteProvider != nil {
-		h.batchPiecesHashQuery(ctx, items, cfg)
+	// tracker 映射（GetAllTorrents，和 handleBatchQueryCoverage 一致）
+	h.bgTrackerCoverage(ctx, unqueriedHashes, client, now, ttl)
+
+	for _, hash := range unqueriedHashes {
+		h.coverage.MarkQueried(ctx, hash, now, ttl)
 	}
 
 	h.bgState.setDone(len(torrents))
+}
+
+// bgTrackerCoverage 后台查询的 tracker 映射（复用 handleBatchQueryCoverage 的逻辑）
+func (h *PublishTorrentsHandler) bgTrackerCoverage(ctx context.Context, hashes []string, client model.DownloaderClient, now, ttl time.Time) {
+	if h.db == nil {
+		return
+	}
+	tm := site.NewTrackerMatcher(h.db)
+	hashSet := make(map[string]bool, len(hashes))
+	for _, ih := range hashes {
+		hashSet[ih] = true
+	}
+	allTorrents, err := client.GetAllTorrents(ctx)
+	if err != nil {
+		return
+	}
+	for _, t := range allTorrents {
+		if !hashSet[t.Hash] {
+			continue
+		}
+		var trackerURLs []string
+		if len(t.TrackerURLs) > 0 {
+			trackerURLs = t.TrackerURLs
+		} else if t.TrackerURL != "" {
+			trackerURLs = []string{t.TrackerURL}
+		}
+		if len(trackerURLs) == 0 {
+			continue
+		}
+		trackerSites := tm.MatchAll(trackerURLs)
+		for _, sn := range trackerSites {
+			result := h.db.WithContext(ctx).Model(&model.SiteCoverageCache{}).
+				Where("info_hash = ? AND site_name = ?", t.Hash, sn).
+				Update("source", model.CoverageSourceTracker)
+			if result.RowsAffected == 0 {
+				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+					InfoHash: t.Hash, SiteName: sn,
+					Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
+					Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
+				})
+			}
+		}
+	}
 }
 
 type coverageQueryRequest struct {
@@ -750,6 +797,9 @@ func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
 		h.logger.Warn("query failed", zap.Error(err))
 	}
 
+	now := time.Now()
+	ttl := now.Add(24 * time.Hour)
+
 	for _, cfg := range clients {
 		client, err := h.clientMgr.Get(cfg.Name)
 		if err != nil {
@@ -774,33 +824,43 @@ func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
 		queried, _ := h.coverage.GetBatchQueryState(qCtx, allHashes)
 		qCancel()
 
-		items := make([]coverage.BatchItem, 0, len(torrents))
+		var unqueriedHashes []string
 		for _, t := range torrents {
-			if queried[t.Hash] {
-				continue
+			if !queried[t.Hash] {
+				unqueriedHashes = append(unqueriedHashes, t.Hash)
 			}
-			trkCtx, trkCancel := context.WithTimeout(ctx, 5*time.Second)
-			trackers, _ := client.GetTrackers(trkCtx, t.Hash)
-			trkCancel()
-			items = append(items, coverage.BatchItem{
-				InfoHash:   t.Hash,
-				Trackers:   trackers,
-				TorrentDir: extractTorrentDir(cfg.Config),
-			})
 		}
 
-		if len(items) == 0 {
+		if len(unqueriedHashes) == 0 {
 			continue
 		}
 
 		h.logger.Info("coverage refresh: querying",
 			zap.String("client", cfg.Name),
-			zap.Int("torrents", len(items)))
+			zap.Int("torrents", len(unqueriedHashes)))
 
+		// 统一调辅种引擎
 		batchCtx, batchCancel := context.WithTimeout(ctx, 5*time.Minute)
-		h.coverage.QueryBatchCoverage(batchCtx, items)
-		if h.siteProvider != nil {
-			h.batchPiecesHashQuery(batchCtx, items, cfg)
+		if h.reseedEngine != nil {
+			hitsByHash := h.reseedEngine.QueryBatchCoverage(batchCtx, unqueriedHashes, client)
+			for infoHash, hits := range hitsByHash {
+				for _, hit := range hits {
+					source := model.CoverageSourceIYUU
+					if hit.Source == "pieces_hash" {
+						source = model.CoverageSourcePiecesHash
+					}
+					h.coverage.UpsertCoverage(batchCtx, &model.SiteCoverageCache{
+						InfoHash: infoHash, SiteName: hit.SiteName,
+						Status: model.CoverageConfirmedHas, Source: source,
+						Confidence: 1.0, TorrentID: hit.TorrentID,
+						QueriedAt: now, ExpiresAt: ttl,
+					})
+				}
+			}
+		}
+		h.bgTrackerCoverage(batchCtx, unqueriedHashes, client, now, ttl)
+		for _, hash := range unqueriedHashes {
+			h.coverage.MarkQueried(batchCtx, hash, now, ttl)
 		}
 		batchCancel()
 	}
