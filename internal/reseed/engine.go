@@ -2081,20 +2081,34 @@ func ExtractGroupName(title string) string {
 	}
 	// Find last '-'
 	lastDash := strings.LastIndex(clean, "-")
-	if lastDash < 0 || lastDash >= len(clean)-1 {
-		return ""
+	if lastDash >= 0 && lastDash < len(clean)-1 {
+		group := clean[lastDash+1:]
+		// §56.40: @ 分隔符处理（老种子格式：-uploader@GROUP）
+		// 例: -hyb9373@CMCT → CMCT
+		if atIdx := strings.LastIndex(group, "@"); atIdx >= 0 && atIdx < len(group)-1 {
+			group = group[atIdx+1:]
+		}
+		group = strings.TrimSpace(group)
+		if group != "" {
+			return group
+		}
 	}
-	group := clean[lastDash+1:]
-	// §56.40: @ 分隔符处理（老种子格式：-uploader@GROUP）
-	// 例: -hyb9373@CMCT → CMCT
-	if atIdx := strings.LastIndex(group, "@"); atIdx >= 0 && atIdx < len(group)-1 {
-		group = group[atIdx+1:]
+	// ￡ 分隔符（SSD 特有格式 ￡CMCT发布者，取连续英文 = 组名）
+	if pIdx := strings.LastIndex(clean, "￡"); pIdx >= 0 && pIdx < len(clean)-len("￡") {
+		rest := clean[pIdx+len("￡"):]
+		var b strings.Builder
+		for _, r := range rest {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				b.WriteRune(r)
+			} else {
+				break
+			}
+		}
+		if b.Len() >= 2 {
+			return b.String()
+		}
 	}
-	group = strings.TrimSpace(group)
-	if group == "" {
-		return ""
-	}
-	return group
+	return ""
 }
 
 type L2MatchResult struct {
