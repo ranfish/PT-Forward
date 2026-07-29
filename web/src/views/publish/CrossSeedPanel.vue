@@ -692,15 +692,24 @@ function startCandidatePoll(candidateId: number) {
       const c = resp.data?.data
       if (!c) return
       const status = c.publish_status as string
+
+      // 每次轮询都拉 result records（增量进度）
+      await fetchResultRecords()
+
+      // 从 resultRecords 计算逐站进度
+      const records = Object.values(resultRecords.value)
+      const doneCount = records.filter(r => ['completed', 'skipped', 'exists', 'edited'].includes(r.status)).length
+      const failCount = records.filter(r => r.status === 'failed').length
+
       candidateStatus.value = {
         status,
         total_count: selectedTargets.value.length,
-        done_count: status === 'done' ? selectedTargets.value.length : 0,
-        fail_count: status === 'failed' ? 1 : 0,
+        done_count: doneCount,
+        fail_count: failCount,
       }
+
       if (status === 'done' || status === 'failed') {
         stopCandidatePoll()
-        await fetchResultRecords()
       }
     } catch { /* silent */ }
   }, 3000)
