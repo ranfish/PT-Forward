@@ -50,11 +50,14 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 		return nil, nil
 	}
 
-	// 第一遍：收集所有下载器的 save_path（用于检测嵌套子目录，避免误报）
-	// 同时按 client → savePath → []torrentName 分组存储
+	// 只查询配置的下载器（不遍历全部下载器）
 	allSavePaths := make(map[string]bool)
 	clientByPath := make(map[string]map[string][]string) // clientID → savePath → torrent names
-	for _, clientID := range s.provider.ListClients() {
+	queriedClients := make(map[string]bool)
+	for _, cfg := range s.scanConfigs {
+		queriedClients[cfg.ClientID] = true
+	}
+	for clientID := range queriedClients {
 		if ctx.Err() != nil {
 			break
 		}
