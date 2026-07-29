@@ -1,6 +1,8 @@
 package util
 
-import "strings"
+import (
+	"strings"
+)
 
 // ExtractGroupName 从标题末尾提取制作组名。
 //
@@ -9,7 +11,8 @@ import "strings"
 //   - "@"  老种子格式：-uploader@GROUP → GROUP
 //   - "￡"  SSD 特有格式：￡CMCT发布者 → CMCT（取连续英文）
 //
-// 自动忽略 NOGROUP/N/A/NONE/UNKNOWN，自动去除文件扩展名。
+// 所有分支统一剥离尾部中文（发布者名），自动忽略 NOGROUP/N/A/NONE/UNKNOWN，
+// 自动去除文件扩展名。
 func ExtractGroupName(title string) string {
 	title = strings.TrimSpace(title)
 	if title == "" {
@@ -24,13 +27,14 @@ func ExtractGroupName(title string) string {
 		}
 	}
 
+	// 尝试 "-" 分隔符
 	lastDash := strings.LastIndex(clean, "-")
 	if lastDash > 0 && lastDash < len(clean)-1 {
 		group := strings.TrimSpace(clean[lastDash+1:])
 		if atIdx := strings.LastIndex(group, "@"); atIdx >= 0 && atIdx < len(group)-1 {
 			group = group[atIdx+1:]
 		}
-		group = strings.TrimSpace(group)
+		group = stripTrailingNonASCII(strings.TrimSpace(group))
 		upper := strings.ToUpper(group)
 		ignore := map[string]bool{"NOGROUP": true, "N/A": true, "NONE": true, "UNKNOWN": true}
 		if !ignore[upper] && len(group) >= 2 && len(group) <= 30 {
@@ -38,6 +42,7 @@ func ExtractGroupName(title string) string {
 		}
 	}
 
+	// 尝试 "￡" 分隔符（SSD 特有格式）
 	if pIdx := strings.LastIndex(clean, "￡"); pIdx >= 0 && pIdx < len(clean)-len("￡") {
 		rest := clean[pIdx+len("￡"):]
 		var b strings.Builder
@@ -54,4 +59,19 @@ func ExtractGroupName(title string) string {
 	}
 
 	return ""
+}
+
+// stripTrailingNonASCII 剥离尾部的非 ASCII 字符（中文发布者名）。
+// 例: "CMCT九洲客" → "CMCT", "CMCTV蒙太奇" → "CMCTV"
+func stripTrailingNonASCII(s string) string {
+	out := []rune(s)
+	for len(out) > 0 {
+		r := out[len(out)-1]
+		if r >= 128 {
+			out = out[:len(out)-1]
+		} else {
+			break
+		}
+	}
+	return string(out)
 }
