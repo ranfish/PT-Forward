@@ -56,6 +56,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 	scannedPaths := make(map[string]bool)
 	allSavePaths := make(map[string]bool)
 	pathToClients := make(map[string][]string)
+	queriedClients := make(map[string]bool) // 成功查询 GetMainData 的 client
 
 	for _, clientID := range s.provider.ListClients() {
 		if ctx.Err() != nil {
@@ -73,6 +74,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 				zap.String("client", clientID), zap.Error(err))
 			continue
 		}
+		queriedClients[clientID] = true
 
 		for _, t := range md.Torrents {
 			sp := t.SavePath
@@ -96,8 +98,15 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 		}
 	}
 
-	// 配置路径：覆盖 pathToClients（只保留配置 client）
+	// 配置路径：检查配置 client 是否可达，不可达则跳过（防止假孤儿）
 	for sp, cfgClient := range configuredClient {
+		if !queriedClients[cfgClient] {
+			s.logger.Warn("orphan scan: configured client unreachable, skipping path",
+				zap.String("path", sp),
+				zap.String("client", cfgClient))
+			delete(claimed, sp)
+			continue
+		}
 		if claimed[sp] == nil {
 			claimed[sp] = make(map[string]bool)
 		}
