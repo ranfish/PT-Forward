@@ -177,6 +177,7 @@
     <a-layout>
       <a-layout-header class="header">
         <div class="header-right">
+          <!-- TODO: 全局任务监控面板（暂注释，待功能完善后启用）
           <a-popover trigger="click" placement="bottomRight">
             <a-badge :count="activeTaskCount" :offset="[-2, 4]" size="small">
               <a-button type="text" :loading="taskLoading">
@@ -196,6 +197,7 @@
               </div>
             </template>
           </a-popover>
+          -->
           <a-select
             :value="locale"
             size="small"
@@ -306,41 +308,41 @@ watch(
   { immediate: true },
 )
 
-// 全局任务监控
-const taskLoading = ref(false)
-const activeTasks = ref<Array<{ key: string; label: string; running: boolean; detail?: string }>>([])
-const activeTaskCount = computed(() => activeTasks.value.filter(t => t.running).length)
-let taskPollTimer: ReturnType<typeof setInterval> | null = null
+// 全局任务监控（暂注释，待功能完善后启用）
+// const taskLoading = ref(false)
+// const activeTasks = ref<Array<{ key: string; label: string; running: boolean; detail?: string }>>([])
+// const activeTaskCount = computed(() => activeTasks.value.filter(t => t.running).length)
+// let taskPollTimer: ReturnType<typeof setInterval> | null = null
 
-async function pollBackgroundTasks() {
-  taskLoading.value = true
-  const tasks: typeof activeTasks.value = []
-  try {
-    const resp = await systemApi.info()
-    const data = resp.data?.data as Record<string, unknown> | undefined
-    const seedingActive = (data?.seedingActive as number) || 0
-    if (seedingActive > 0) {
-      tasks.push({ key: 'seeding', label: '刷流引擎', running: true, detail: `${seedingActive} 种子做种中` })
-    }
-  } catch { /* silent */ }
-  if (tasks.length === 0) {
-    tasks.push({ key: 'idle', label: '所有系统正常', running: false })
-  }
-  activeTasks.value = tasks
-  taskLoading.value = false
-}
+// async function pollBackgroundTasks() {
+//   taskLoading.value = true
+//   const tasks: typeof activeTasks.value = []
+//   try {
+//     const resp = await systemApi.info()
+//     const data = resp.data?.data as Record<string, unknown> | undefined
+//     const seedingActive = (data?.seedingActive as number) || 0
+//     if (seedingActive > 0) {
+//       tasks.push({ key: 'seeding', label: '刷流引擎', running: true, detail: `${seedingActive} 种子做种中` })
+//     }
+//   } catch { /* silent */ }
+//   if (tasks.length === 0) {
+//     tasks.push({ key: 'idle', label: '所有系统正常', running: false })
+//   }
+//   activeTasks.value = tasks
+//   taskLoading.value = false
+// }
 
 onMounted(() => {
   wsStore.connect()
   systemApi.health().then((resp) => {
     backendVersion.value = resp.data?.data?.version || '-'
   }).catch(() => {})
-  pollBackgroundTasks()
-  taskPollTimer = setInterval(pollBackgroundTasks, 15000)
+  // pollBackgroundTasks()
+  // taskPollTimer = setInterval(pollBackgroundTasks, 15000)
 })
 
 onUnmounted(() => {
-  if (taskPollTimer) clearInterval(taskPollTimer)
+  // if (taskPollTimer) clearInterval(taskPollTimer)
 })
 
 async function checkUpdate() {
