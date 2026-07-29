@@ -177,6 +177,25 @@
     <a-layout>
       <a-layout-header class="header">
         <div class="header-right">
+          <a-popover trigger="click" placement="bottomRight">
+            <a-badge :count="activeTaskCount" :offset="[-2, 4]" size="small">
+              <a-button type="text" :loading="taskLoading">
+                <template #icon><ThunderboltOutlined /></template>
+              </a-button>
+            </a-badge>
+            <template #content>
+              <div style="min-width: 260px">
+                <div style="font-weight: 600; margin-bottom: 8px">后台任务</div>
+                <div v-if="activeTasks.length === 0" style="color: #999; font-size: 12px">无运行中的任务</div>
+                <div v-for="task in activeTasks" :key="task.key" style="display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px">
+                  <a-spin v-if="task.running" size="small" />
+                  <CheckCircleFilled v-else style="color: #52c41a" />
+                  <span style="flex: 1">{{ task.label }}</span>
+                  <span v-if="task.detail" style="color: #999">{{ task.detail }}</span>
+                </div>
+              </div>
+            </template>
+          </a-popover>
           <a-select
             :value="locale"
             size="small"
@@ -205,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { message as antMessage } from 'ant-design-vue'
@@ -215,6 +234,7 @@ import {
   CloudDownloadOutlined,
   NotificationOutlined,
   ThunderboltOutlined,
+  CheckCircleFilled,
   CopyOutlined,
   SendOutlined,
   DownloadOutlined,
@@ -286,11 +306,41 @@ watch(
   { immediate: true },
 )
 
+// 全局任务监控
+const taskLoading = ref(false)
+const activeTasks = ref<Array<{ key: string; label: string; running: boolean; detail?: string }>>([])
+const activeTaskCount = computed(() => activeTasks.value.filter(t => t.running).length)
+let taskPollTimer: ReturnType<typeof setInterval> | null = null
+
+async function pollBackgroundTasks() {
+  taskLoading.value = true
+  const tasks: typeof activeTasks.value = []
+  try {
+    const resp = await systemApi.info()
+    const data = resp.data?.data as Record<string, unknown> | undefined
+    const seedingActive = (data?.seedingActive as number) || 0
+    if (seedingActive > 0) {
+      tasks.push({ key: 'seeding', label: '刷流引擎', running: true, detail: `${seedingActive} 种子做种中` })
+    }
+  } catch { /* silent */ }
+  if (tasks.length === 0) {
+    tasks.push({ key: 'idle', label: '所有系统正常', running: false })
+  }
+  activeTasks.value = tasks
+  taskLoading.value = false
+}
+
 onMounted(() => {
   wsStore.connect()
   systemApi.health().then((resp) => {
     backendVersion.value = resp.data?.data?.version || '-'
   }).catch(() => {})
+  pollBackgroundTasks()
+  taskPollTimer = setInterval(pollBackgroundTasks, 15000)
+})
+
+onUnmounted(() => {
+  if (taskPollTimer) clearInterval(taskPollTimer)
 })
 
 async function checkUpdate() {
