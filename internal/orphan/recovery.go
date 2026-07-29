@@ -279,26 +279,31 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 				continue
 			}
 
-			var matchedFiles []string
-			allExist := true
+			// 检查磁盘上的视频文件是否都能被种子覆盖
+			// （种子可能含额外文件如 .jpg 封面、.nfo 等，不要求它们在磁盘上存在）
+			torrentFileSet := make(map[string]bool)
 			for torrentFile := range meta.FileTree {
-				baseName := filepath.Base(torrentFile)
-				if _, exists := diskFiles[baseName]; !exists {
-					allExist = false
-					r.logger.Info("file-level recover: file name mismatch",
-						zap.String("site", site),
-						zap.String("torrent_file", baseName),
-						zap.Strings("disk_files", keysFromMap(diskFiles)))
-					break
-				}
-				if covered[baseName] {
-					allExist = false
-					break
-				}
-				matchedFiles = append(matchedFiles, baseName)
+				torrentFileSet[filepath.Base(torrentFile)] = true
 			}
 
-			if !allExist || len(matchedFiles) == 0 {
+			var matchedFiles []string
+			allDiskCovered := true
+			for diskFile := range diskFiles {
+				if covered[diskFile] {
+					continue
+				}
+				if torrentFileSet[diskFile] {
+					matchedFiles = append(matchedFiles, diskFile)
+				} else {
+					allDiskCovered = false
+					r.logger.Info("file-level recover: disk file not in torrent",
+						zap.String("site", site),
+						zap.String("disk_file", diskFile),
+						zap.Int("torrent_file_count", len(torrentFileSet)))
+				}
+			}
+
+			if !allDiskCovered || len(matchedFiles) == 0 {
 				continue
 			}
 
