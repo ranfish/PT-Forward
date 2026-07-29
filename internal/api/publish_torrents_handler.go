@@ -553,12 +553,7 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 		hashSet[ih] = true
 	}
 	allTorrents, err := client.GetAllTorrents(ctx)
-	matchedCount := 0
-	emptyTrackerCount := 0
 	if err == nil {
-		h.logger.Info("batch coverage: tracker debug",
-			zap.Int("all_torrents", len(allTorrents)),
-			zap.Int("hash_set_size", len(hashSet)))
 		for _, t := range allTorrents {
 			if !hashSet[t.Hash] {
 				continue
@@ -570,20 +565,14 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 				trackerURLs = []string{t.TrackerURL}
 			}
 			if len(trackerURLs) == 0 {
-				emptyTrackerCount++
 				continue
 			}
 			trackerSites := tm.MatchAll(trackerURLs)
-			if len(trackerSites) > 0 {
-				matchedCount++
-			}
 			for _, sn := range trackerSites {
-				// 直接 UPDATE source（不依赖 UpsertCoverage 的 FirstOrCreate+Assign）
 				result := h.db.WithContext(ctx).Model(&model.SiteCoverageCache{}).
 					Where("info_hash = ? AND site_name = ?", t.Hash, sn).
 					Update("source", model.CoverageSourceTracker)
 				if result.RowsAffected == 0 {
-					// 记录不存在 → 创建
 					h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
 						InfoHash: t.Hash, SiteName: sn,
 						Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
@@ -592,9 +581,6 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 				}
 			}
 		}
-		h.logger.Info("batch coverage: tracker result",
-			zap.Int("matched", matchedCount),
-			zap.Int("empty_tracker", emptyTrackerCount))
 	} else {
 		// fallback: 逐个 GetTrackers
 		for _, infoHash := range req.InfoHashes {
