@@ -81,14 +81,6 @@
       <a-button
         v-if="selectedHashes.length > 0"
         size="small"
-        :loading="batchFetching"
-        @click="batchFetchData"
-      >
-        获取数据 ({{ selectedHashes.length }})
-      </a-button>
-      <a-button
-        v-if="selectedHashes.length > 0"
-        size="small"
         :loading="batchQuerying"
         @click="batchQueryCoverage"
       >
@@ -112,16 +104,6 @@
           style="width: 200px"
         />
         <span class="progress-text">{{ queryDone }} / {{ queryTotal }}</span>
-      </div>
-      <!-- 批量获取数据进度 -->
-      <div v-if="batchFetching" class="query-progress">
-        <a-progress
-          :percent="batchFetchProgress"
-          size="small"
-          status="active"
-          style="width: 200px"
-        />
-        <span class="progress-text">{{ batchFetchDone }} / {{ selectedHashes.length }}</span>
       </div>
     </div>
 
@@ -229,14 +211,7 @@
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button
-              type="link"
-              size="small"
-              @click="openReview(record)"
-            >
-              核对
-            </a-button>
-            <a-button
+          <a-button
               type="link"
               size="small"
               :loading="queryingHash === record.info_hash"
@@ -261,13 +236,6 @@
       v-model:open="crossSeedOpen"
       :preset-torrent="presetTorrent"
       @success="onWizardSuccess"
-    />
-
-    <MetadataReviewModal
-      v-model:open="reviewOpen"
-      :info-hash="reviewHash"
-      :torrent-name="reviewName"
-      @saved="onReviewSaved"
     />
 
     <a-modal
@@ -453,7 +421,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
 import { message } from 'ant-design-vue'
-import { publishTorrentsApi, manualForwardApi, type PublishTorrentItem } from '@/api/publish'
+import { publishTorrentsApi, type PublishTorrentItem } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
 import { formatBytes, maskDomain } from '@/utils/format'
 import { useEnumLabels } from '@/utils/enumLabels'
@@ -481,7 +449,6 @@ function progressColor(pct: number): string {
   return '#1677ff'
 }
 import CrossSeedPanel from './CrossSeedPanel.vue'
-import MetadataReviewModal from './MetadataReviewModal.vue'
 
 const clients = ref<{ id: number; name: string; type: string }[]>([])
 const clientsLoading = ref(false)
@@ -548,9 +515,6 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 watch([selectedClientId, searchText, queryFilter, typeFilter, stateFilter, pageSize], persistFilters)
 
 const crossSeedOpen = ref(false)
-const reviewOpen = ref(false)
-const reviewHash = ref('')
-const reviewName = ref('')
 const presetTorrent = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; state: string; source_site?: string; source_site_id?: number; torrent_id?: string } | null>(null)
 
 const columns = [
@@ -784,61 +748,6 @@ async function queryCoverage(record: PublishTorrentItem) {
   }
 }
 
-const batchFetchProgress = computed(() => {
-  if (!selectedHashes.value.length) return 0
-  return Math.round(batchFetchDone.value / selectedHashes.value.length * 100)
-})
-
-async function batchFetchData() {
-  if (selectedHashes.value.length === 0 || !selectedClientId.value) return
-  batchFetching.value = true
-  batchFetchDone.value = 0
-  let ok = 0
-  let fail = 0
-  for (const hash of selectedHashes.value) {
-    const t = torrents.value.find(item => item.info_hash === hash)
-    if (!t) continue
-    try {
-      const resp = await manualForwardApi.startAnalyze({
-        client_id: selectedClientId.value,
-        info_hash: t.info_hash,
-        name: t.name,
-        save_path: t.save_path,
-        size: t.size,
-        fetch_source: 'batch_fetch',
-      })
-      const taskId = resp.data?.data?.task_id
-      if (!taskId) throw new Error('任务创建失败')
-      await pollAnalyzeTask(taskId)
-      ok++
-    } catch {
-      fail++
-    }
-    batchFetchDone.value++
-  }
-  batchFetching.value = false
-  message.success(`获取数据完成: ${ok} 成功, ${fail} 失败`)
-}
-
-function pollAnalyzeTask(taskId: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    async function poll() {
-      try {
-        const resp = await manualForwardApi.pollAnalyze(taskId)
-        const task = resp.data?.data as Record<string, unknown> | undefined
-        if (!task) { resolve(); return }
-        const status = task.status as string
-        if (status === 'done') { resolve(); return }
-        if (status === 'failed') { reject(new Error(task.error as string || '分析失败')); return }
-        setTimeout(poll, 2000)
-      } catch (e) {
-        reject(e)
-      }
-    }
-    setTimeout(poll, 1500)
-  })
-}
-
 async function batchQueryCoverage() {
   if (selectedHashes.value.length === 0 || !selectedClientId.value) return
   batchQuerying.value = true
@@ -925,25 +834,10 @@ function onWizardSuccess() {
   fetchTorrents()
 }
 
-function openReview(record: PublishTorrentItem) {
-  reviewHash.value = record.info_hash
-  reviewName.value = record.name
-  reviewOpen.value = true
-}
-
-function onReviewSaved(infoHash: string) {
-  const t = torrents.value.find((x: PublishTorrentItem) => x.info_hash === infoHash)
-  if (t) {
-    ;(t as any).metadata_reviewed = true
-  }
-}
-
 // --- 批量发布 ---
 const batchPublishOpen = ref(false)
 const batchPublishing = ref(false)
 const batchQuerying = ref(false)
-const batchFetching = ref(false)
-const batchFetchDone = ref(0)
 const batchTargetSites = ref<{ name: string }[]>([])
 const batchForm = reactive({ source_site: '', target_site: '' })
 

@@ -96,7 +96,10 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space size="small">
+          <a-space size="small">
+            <a-button size="small" type="link" @click="openReview(record)">核对</a-button>
             <a-button size="small" type="link" @click="openMaintenance(record)">维护</a-button>
+          </a-space>
           </a-space>
         </template>
       </template>
@@ -112,6 +115,13 @@
       v-model:open="batchFetchOpen"
       @done="fetchData"
     />
+
+    <MetadataReviewModal
+      v-model:open="reviewOpen"
+      :info-hash="reviewHash"
+      :torrent-name="reviewName"
+      @saved="fetchData"
+    />
   </div>
 </template>
 
@@ -123,6 +133,7 @@ import { message } from 'ant-design-vue'
 import { publishDataApi } from '@/api/publish'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
+import MetadataReviewModal from './MetadataReviewModal.vue'
 import { formatTime } from '@/utils/format'
 
 const route = useRoute()
@@ -219,6 +230,9 @@ const columns = [
 
 const panelOpen = ref(false)
 const batchFetchOpen = ref(false)
+const reviewOpen = ref(false)
+const reviewHash = ref('')
+const reviewName = ref('')
 const selectedIds = ref<number[]>([])
 const panelPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string; source_site_id?: number } | null>(null)
 
@@ -318,6 +332,12 @@ function openMaintenance(record: SeedDataRow) {
     source_site_id: parseInt(record.torrent_id) || 0,
   }
   panelOpen.value = true
+}
+
+function openReview(record: SeedDataRow) {
+  reviewHash.value = record.info_hash
+  reviewName.value = record.title || record.subtitle || ''
+  reviewOpen.value = true
 }
 
 async function tryOpenFromDeepLink() {
