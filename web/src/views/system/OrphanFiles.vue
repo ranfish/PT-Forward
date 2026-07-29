@@ -14,6 +14,9 @@
           <a-button :loading="scanning" @click="scan">
             {{ t('orphan.scan') }}
           </a-button>
+          <a-button size="small" @click="showIgnored = !showIgnored; if (showIgnored) fetchIgnored()">
+            忽略列表 ({{ ignoredPaths.length }})
+          </a-button>
         </a-space>
       </template>
     </a-page-header>
@@ -22,6 +25,16 @@
       {{ t('orphan.lastScan') }}: {{ formatTime(scannedAt.toISOString()) }} ·
       {{ orphans.length }} {{ t('orphan.itemsFound') }}
     </a-alert>
+
+    <div style="padding: 0 24px; margin-bottom: 16px">
+      <a-card v-if="showIgnored" size="small" title="忽略列表（这些路径不会被扫描）" style="margin-bottom: 16px">
+        <div v-if="ignoredPaths.length === 0" style="color: #999">无忽略记录</div>
+        <div v-for="path in ignoredPaths" :key="path" style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
+          <code style="flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ path }}</code>
+          <a-button size="small" type="link" danger @click="deleteIgnored(path)">移除</a-button>
+        </div>
+      </a-card>
+    </div>
 
     <div style="padding: 0 24px; margin-bottom: 16px">
       <a-card size="small" :title="t('orphan.recoverSettings')">
@@ -188,6 +201,8 @@ interface BatchResult {
 const orphans = ref<OrphanEntry[]>([])
 const scanning = ref(false)
 const scannedAt = ref<Date | null>(null)
+const showIgnored = ref(false)
+const ignoredPaths = ref<string[]>([])
 const recovering = ref<string | null>(null)
 const resultVisible = ref(false)
 const recoverResult = ref<{ found: boolean; message: string } | null>(null)
@@ -465,6 +480,32 @@ async function ignoreOrphan(orphan: OrphanEntry) {
     if (data.code === 0) {
       orphans.value = orphans.value.filter(o => o.path !== orphan.path)
       message.success(t('orphan.ignored'))
+    }
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : String(e))
+  }
+}
+
+async function fetchIgnored() {
+  try {
+    const resp = await fetch('/api/v1/orphans/ignored', { headers: authHeaders() })
+    const data = await resp.json()
+    if (data.code === 0) {
+      ignoredPaths.value = data.data || []
+    }
+  } catch { /* silent */ }
+}
+
+async function deleteIgnored(path: string) {
+  try {
+    const resp = await fetch(`/api/v1/orphans/ignored?path=${encodeURIComponent(path)}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    })
+    const data = await resp.json()
+    if (data.code === 0) {
+      ignoredPaths.value = ignoredPaths.value.filter(p => p !== path)
+      message.success('已移除忽略记录')
     }
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
