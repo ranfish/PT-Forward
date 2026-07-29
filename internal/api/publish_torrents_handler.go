@@ -578,11 +578,18 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 				matchedCount++
 			}
 			for _, sn := range trackerSites {
-				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
-					InfoHash: t.Hash, SiteName: sn,
-					Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
-					Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
-				})
+				// 直接 UPDATE source（不依赖 UpsertCoverage 的 FirstOrCreate+Assign）
+				result := h.db.WithContext(ctx).Model(&model.SiteCoverageCache{}).
+					Where("info_hash = ? AND site_name = ?", t.Hash, sn).
+					Update("source", model.CoverageSourceTracker)
+				if result.RowsAffected == 0 {
+					// 记录不存在 → 创建
+					h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+						InfoHash: t.Hash, SiteName: sn,
+						Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
+						Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
+					})
+				}
 			}
 		}
 		h.logger.Info("batch coverage: tracker result",
