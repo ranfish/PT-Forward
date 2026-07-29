@@ -454,12 +454,10 @@ async function batchRecover() {
   batchRecovering.value = true
   batchResults.value = []
   batchStats.value = { total: selected.length, found: 0, notFound: 0, error: 0 }
-  message.loading(t('orphan.batchRecovering') + ` (0/${selected.length})`, 0)
 
   for (let i = 0; i < selected.length; i++) {
     const orphan = selected[i]
     orphan._status = 'searching'
-    message.loading(t('orphan.batchRecovering') + ` (${i + 1}/${selected.length})`, 0)
     try {
       const result = await recoverOrphan(orphan.path, orphan._selectedClient)
       batchResults.value.push({
