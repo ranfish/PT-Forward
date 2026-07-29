@@ -118,11 +118,9 @@
               <a-button size="small" type="link" :disabled="batchRecovering" @click="ignoreOrphan(record)">
                 {{ t('orphan.ignore') }}
               </a-button>
-              <a-popconfirm :title="t('orphan.deleteConfirm')" @confirm="deleteOrphan(record)">
-                <a-button size="small" type="link" danger :disabled="batchRecovering">
-                  {{ t('orphan.deleteFile') }}
-                </a-button>
-              </a-popconfirm>
+              <a-button size="small" type="link" danger :disabled="batchRecovering" @click="confirmDelete(record)">
+                {{ t('orphan.deleteFile') }}
+              </a-button>
             </a-space>
           </template>
         </template>
@@ -167,6 +165,26 @@
         </div>
       </div>
     </a-modal>
+
+    <a-modal
+      v-model:open="deleteModalVisible"
+      title="删除文件确认"
+      :ok-text="t('common.confirm')"
+      cancel-text="取消"
+      :ok-button-props="{ danger: true, loading: deleting }"
+      :ok-type="'default'"
+      @ok="doDelete"
+    >
+      <a-alert type="error" style="margin-bottom: 16px" message="此操作将从磁盘永久删除以下文件，不可恢复！" />
+      <div style="margin-bottom: 16px; font-size: 12px; color: #999; word-break: break-all">
+        {{ deleteTarget?.path }}
+      </div>
+      <a-input-password
+        v-model:value="deletePassword"
+        placeholder="请输入登录密码以确认删除"
+        @press-enter="doDelete"
+      />
+    </a-modal>
   </div>
 </template>
 
@@ -204,6 +222,10 @@ const scannedAt = ref<Date | null>(null)
 const showIgnored = ref(false)
 const ignoredPaths = ref<string[]>([])
 const recovering = ref<string | null>(null)
+const deleteModalVisible = ref(false)
+const deleteTarget = ref<OrphanEntry | null>(null)
+const deletePassword = ref('')
+const deleting = ref(false)
 const resultVisible = ref(false)
 const recoverResult = ref<{ found: boolean; message: string } | null>(null)
 const selectedRowKeys = ref<string[]>([])
@@ -521,22 +543,33 @@ async function deleteIgnored(path: string) {
   }
 }
 
-async function deleteOrphan(orphan: OrphanEntry) {
+function confirmDelete(orphan: OrphanEntry) {
+  deleteTarget.value = orphan
+  deletePassword.value = ''
+  deleteModalVisible.value = true
+}
+
+async function doDelete() {
+  if (!deleteTarget.value || !deletePassword.value) return
+  deleting.value = true
   try {
     const resp = await fetch('/api/v1/orphans/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ path: orphan.path })
+      body: JSON.stringify({ path: deleteTarget.value.path, password: deletePassword.value })
     })
     const data = await resp.json()
     if (data.code === 0) {
-      orphans.value = orphans.value.filter(o => o.path !== orphan.path)
+      orphans.value = orphans.value.filter(o => o.path !== deleteTarget.value?.path)
       message.success(t('orphan.deleted'))
+      deleteModalVisible.value = false
     } else {
       message.error(data.message || 'Delete failed')
     }
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : String(e))
+  } finally {
+    deleting.value = false
   }
 }
 

@@ -202,7 +202,7 @@ func (rt *Router) SetCookieCloudServer(srv http.Handler) {
 }
 
 func (rt *Router) SetupOrphan(scanner *orphan.Scanner, recovery *orphan.Recovery, db *gorm.DB) {
-	rt.orphanHandler = NewOrphanHandler(scanner, recovery, db, rt.logger)
+	rt.orphanHandler = NewOrphanHandler(scanner, recovery, db, rt.authManager, rt.logger)
 }
 
 // SetupCompliance §56.39: 注入 compliance.Checker（用于 CRUD 后 InvalidateCache）。
