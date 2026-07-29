@@ -154,8 +154,34 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 	results := make([]FileRecoverResult, 0, len(videoFileNames))
 	covered := make(map[string]bool)
 
+	// §56.40: 优先从种子名提取关键词/制作组；提取不到时从目录内最大文件名提取
+	// 老种子的种子名不标准（纯中文/特殊分隔符），但文件名遵循 PT 命名规则
 	dirKeyword := reseed.ExtractSearchKeyword(orphan.Name)
 	dirGroup := reseed.ExtractGroupName(orphan.Name)
+	if dirKeyword == "" || dirGroup == "" {
+		var largestFile string
+		var largestSize int64
+		for fname, fsize := range diskFiles {
+			if fsize > largestSize {
+				largestSize = fsize
+				largestFile = fname
+			}
+		}
+		if largestFile != "" {
+			baseName := strings.TrimSuffix(largestFile, filepath.Ext(largestFile))
+			if dirKeyword == "" {
+				dirKeyword = reseed.ExtractSearchKeyword(baseName)
+			}
+			if dirGroup == "" {
+				dirGroup = reseed.ExtractGroupName(baseName)
+			}
+			r.logger.Info("file-level recover: keyword from largest file",
+				zap.String("orphan", orphan.Name),
+				zap.String("file", largestFile),
+				zap.String("keyword", dirKeyword),
+				zap.String("group", dirGroup))
+		}
+	}
 	r.logger.Info("file-level recover: directory search",
 		zap.String("orphan", orphan.Name),
 		zap.String("keyword", dirKeyword),
