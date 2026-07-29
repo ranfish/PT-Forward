@@ -410,6 +410,7 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/manual-forward/preview/", mfHandler)
 	mux.Handle("/api/v1/manual-forward/refresh", mfHandler)
 	mux.Handle("/api/v1/manual-forward/refresh/", mfHandler)
+	mux.Handle("/api/v1/manual-forward/parse-title", mfHandler)
 
 	if rt.orphanHandler != nil {
 		orphanH := rt.chain(rt.rateLimitMW, rt.orphanHandler.ServeHTTP)
