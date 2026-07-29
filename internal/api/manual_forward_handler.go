@@ -149,6 +149,8 @@ func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
+	case strings.HasSuffix(path, "/manual-forward/parse-title") && r.Method == http.MethodPost:
+		h.handleParseTitle(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -1426,4 +1428,32 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 
 	result["type"] = req.Type
 	Success(w, result)
+}
+
+// handleParseTitle §56.40: 标题重新解析（不触发完整 analyze，只解析标题）
+func (h *ManualForwardHandler) handleParseTitle(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Title string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if req.Title == "" {
+		Error(w, http.StatusBadRequest, 40001, "title 必填")
+		return
+	}
+
+	components := titleparser.ParseTitle(req.Title)
+	profile := titleparser.ParseTitleTech(req.Title)
+	stdParams, _ := titleparser.StandardizeTechProfile(profile)
+	tcMap := titleparser.TechProfileToComponents(profile)
+	category := titleparser.InferCategory(tcMap, "", "", "")
+
+	Success(w, map[string]interface{}{
+		"components":         components,
+		"title_components":   tcMap,
+		"standardized":       stdParams,
+		"category":          category,
+	})
 }

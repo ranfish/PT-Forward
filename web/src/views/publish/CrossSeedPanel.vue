@@ -82,6 +82,13 @@
                     </a-form-item>
                   </a-col>
                 </a-row>
+                <div style="margin-bottom: 8px">
+                  <a-button size="small" :loading="reparsing" @click="reparseTitle">
+                    <template #icon><ReloadOutlined /></template>
+                    重新解析标题
+                  </a-button>
+                  <span v-if="reparseResult" style="margin-left: 8px; font-size: 12px" :style="{ color: reparseResult.includes('失败') ? '#cf1322' : '#52c41a' }">{{ reparseResult }}</span>
+                </div>
                 <a-row :gutter="16">
                   <a-col :span="6">
                     <a-form-item label="分辨率">
@@ -251,7 +258,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { CheckCircleFilled } from '@ant-design/icons-vue'
+import { CheckCircleFilled, ReloadOutlined } from '@ant-design/icons-vue'
 import { manualForwardApi, publishDataApi, publishApi } from '@/api/publish'
 import type { ManualForwardSubmitRequest, PreviewField, PreviewCompleteness, PublishResultRecord } from '@/api/types'
 import TagSelector from './TagSelector.vue'
@@ -290,6 +297,8 @@ const loadingProgress = ref(0)
 const loadError = ref('')
 const saving = ref(false)
 const submitting = ref(false)
+const reparsing = ref(false)
+const reparseResult = ref('')
 const refreshing = ref('')
 const bodyRef = ref<HTMLElement>()
 
@@ -644,6 +653,34 @@ async function enterSelectSites() {
 }
 
 // --- Submit ---
+async function reparseTitle() {
+  const title = form.value.title || selectedTorrent.value?.name || ''
+  if (!title) {
+    message.warning('请先输入标题')
+    return
+  }
+  reparsing.value = true
+  reparseResult.value = ''
+  try {
+    const resp = await manualForwardApi.parseTitle(title)
+    const data = resp.data?.data
+    if (data?.title_components) {
+      const tc = data.title_components
+      // 只更新有值的字段（不覆盖用户手动修改的空字段）
+      for (const [key, val] of Object.entries(tc)) {
+        if (val) form.value.titleComponents[key] = val
+      }
+      reparseResult.value = `解析成功：${data.category || ''} ${tc.resolution || ''} ${tc.medium || ''} ${tc.video_codec || ''}`.trim()
+    } else {
+      reparseResult.value = '解析完成（无额外信息）'
+    }
+  } catch (e: unknown) {
+    reparseResult.value = `解析失败: ${(e as Error).message}`
+  } finally {
+    reparsing.value = false
+  }
+}
+
 async function doSubmit() {
   if (!selectedTorrent.value || selectedTargets.value.length === 0) return
   submitting.value = true
