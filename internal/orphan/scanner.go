@@ -106,7 +106,17 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			continue
 		}
 		scannedPaths[savePath] = true
-		orphans := s.scanDirectory(savePath, claimedNames, pathToClients[savePath], allSavePaths)
+		// 去重 clientIDs（同一下载器可能有多个名字指向同一实例）
+		rawClients := pathToClients[savePath]
+		seenClients := make(map[string]bool, len(rawClients))
+		dedupedClients := make([]string, 0, len(rawClients))
+		for _, c := range rawClients {
+			if !seenClients[c] {
+				seenClients[c] = true
+				dedupedClients = append(dedupedClients, c)
+			}
+		}
+		orphans := s.scanDirectory(savePath, claimedNames, dedupedClients, allSavePaths)
 		allOrphans = append(allOrphans, orphans...)
 	}
 
