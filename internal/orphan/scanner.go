@@ -46,6 +46,12 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 
 	s.loadScanConfigs()
 
+	// 配置的扫描路径 → 所属 client（用户明确指定"这个路径在这个下载器的磁盘上"）
+	configuredClient := make(map[string]string)
+	for _, cfg := range s.scanConfigs {
+		configuredClient[filepath.Clean(cfg.ScanPath)] = cfg.ClientID
+	}
+
 	claimed := make(map[string]map[string]bool)
 	scannedPaths := make(map[string]bool)
 	allSavePaths := make(map[string]bool)
@@ -74,24 +80,31 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 				continue
 			}
 			sp = filepath.Clean(sp)
+			// 配置路径只认配置 client 的种子（跨机器同路径不混入）
+			if cfgClient, ok := configuredClient[sp]; ok && cfgClient != clientID {
+				continue
+			}
 			if claimed[sp] == nil {
 				claimed[sp] = make(map[string]bool)
-				pathToClients[sp] = append(pathToClients[sp], clientID)
 			}
 			claimed[sp][t.Name] = true
 			allSavePaths[sp] = true
+			// 非配置路径：从遍历结果构建 pathToClients
+			if _, ok := configuredClient[sp]; !ok {
+				pathToClients[sp] = append(pathToClients[sp], clientID)
+			}
 		}
 	}
 
-	for _, cfg := range s.scanConfigs {
-		sp := filepath.Clean(cfg.ScanPath)
+	// 配置路径：覆盖 pathToClients（只保留配置 client）
+	for sp, cfgClient := range configuredClient {
 		if claimed[sp] == nil {
 			claimed[sp] = make(map[string]bool)
 		}
-		pathToClients[sp] = append(pathToClients[sp], cfg.ClientID)
+		pathToClients[sp] = []string{cfgClient}
 		s.logger.Debug("orphan scan: configured path",
 			zap.String("path", sp),
-			zap.String("client", cfg.ClientID))
+			zap.String("client", cfgClient))
 	}
 
 	for sp := range claimed {
@@ -106,17 +119,17 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			continue
 		}
 		scannedPaths[savePath] = true
-		// 去重 clientIDs（同一下载器可能有多个名字指向同一实例）
+		// 去重 clientIDs（多个客户端名字可能指向同一实例）
 		rawClients := pathToClients[savePath]
-		seenClients := make(map[string]bool, len(rawClients))
-		dedupedClients := make([]string, 0, len(rawClients))
+		seen := make(map[string]bool, len(rawClients))
+		clients := make([]string, 0, len(rawClients))
 		for _, c := range rawClients {
-			if !seenClients[c] {
-				seenClients[c] = true
-				dedupedClients = append(dedupedClients, c)
+			if !seen[c] {
+				seen[c] = true
+				clients = append(clients, c)
 			}
 		}
-		orphans := s.scanDirectory(savePath, claimedNames, dedupedClients, allSavePaths)
+		orphans := s.scanDirectory(savePath, claimedNames, clients, allSavePaths)
 		allOrphans = append(allOrphans, orphans...)
 	}
 
