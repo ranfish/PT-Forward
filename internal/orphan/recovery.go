@@ -194,6 +194,9 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 
 	for _, site := range sites {
 		if searchCtx.Err() != nil {
+			r.logger.Info("file-level recover: search context expired",
+				zap.String("orphan", orphan.Name),
+				zap.String("last_site", site))
 			break
 		}
 		if len(covered) == len(diskFiles) {
@@ -202,6 +205,8 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 
 		config, err := r.siteProvider.GetSiteConfig(searchCtx, site)
 		if err != nil || config == nil {
+			r.logger.Debug("file-level recover: site config failed",
+				zap.String("site", site), zap.Error(err))
 			continue
 		}
 		if config.BaseURL != "" {
@@ -210,21 +215,42 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 		}
 		adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
 		if err != nil || adapter == nil {
+			r.logger.Debug("file-level recover: adapter failed",
+				zap.String("site", site), zap.Error(err))
 			continue
 		}
 
 		siteCtx, siteCancel := context.WithTimeout(searchCtx, 20*time.Second)
 		results2, err := adapter.SearchTorrents(siteCtx, config, dirKeyword, nil)
 		siteCancel()
-		if err != nil || len(results2) == 0 {
+		if err != nil {
+			r.logger.Info("file-level recover: search error",
+				zap.String("site", site),
+				zap.String("keyword", dirKeyword),
+				zap.Error(err))
 			continue
 		}
+		if len(results2) == 0 {
+			r.logger.Debug("file-level recover: no results",
+				zap.String("site", site),
+				zap.String("keyword", dirKeyword))
+			continue
+		}
+
+		r.logger.Info("file-level recover: got results",
+			zap.String("site", site),
+			zap.Int("count", len(results2)),
+			zap.String("first_title", results2[0].Title[:min(80, len(results2[0].Title))]))
 
 		for _, res := range results2 {
 			if res.TorrentID == "" {
 				continue
 			}
 			if dirGroup != "" && !strings.Contains(res.Title, dirGroup) {
+				r.logger.Debug("file-level recover: title group mismatch",
+					zap.String("site", site),
+					zap.String("title", res.Title[:min(80, len(res.Title))]),
+					zap.String("expected_group", dirGroup))
 				continue
 			}
 
