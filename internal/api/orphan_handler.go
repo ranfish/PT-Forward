@@ -158,8 +158,10 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 		defer cancel()
-		result := h.recovery.Recover(ctx, target, req.ClientID)
-		h.recoverStore.Store(taskID, result)
+	result := h.recovery.Recover(ctx, target, req.ClientID)
+			h.recoverStore.Store(taskID, result)
+			// 延迟清理任务结果（前端有 50×3s=150s 轮询窗口）
+			time.AfterFunc(10*time.Minute, func() { h.recoverStore.Delete(taskID) })
 		if result.Found {
 			h.mu.Lock()
 			var updated []orphan.Entry
@@ -233,6 +235,21 @@ func (h *OrphanHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Path == "" {
 		Error(w, http.StatusBadRequest, 40001, "path 必填")
+		return
+	}
+
+	// 安全校验：路径必须在最近扫描结果中
+	h.mu.RLock()
+	found := false
+	for _, e := range h.lastResults {
+		if e.Path == req.Path {
+			found = true
+			break
+		}
+	}
+	h.mu.RUnlock()
+	if !found {
+		Error(w, http.StatusBadRequest, 40001, "该路径不在扫描结果中，拒绝删除")
 		return
 	}
 

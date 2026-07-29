@@ -407,6 +407,15 @@ async function recover(orphan: OrphanEntry) {
   message.loading(t('orphan.recovering'), 0)
   try {
     const result = await recoverOrphan(orphan.path, orphan._selectedClient)
+    message.destroy()
+    if (result.found) {
+      orphan._status = 'found'
+      message.success(t('orphan.recoverSuccess') + ': ' + result.site)
+      setTimeout(() => fetchOrphans(), 2000)
+    } else {
+      orphan._status = 'notfound'
+      message.warning(result.message || t('orphan.recoverFailed'))
+    }
   } catch (e: unknown) {
     message.destroy()
     message.error(e instanceof Error ? e.message : String(e))
@@ -491,7 +500,7 @@ async function fetchIgnored() {
     const resp = await fetch('/api/v1/orphans/ignored', { headers: authHeaders() })
     const data = await resp.json()
     if (data.code === 0) {
-      ignoredPaths.value = data.data || []
+      ignoredPaths.value = data.data.ignored || []
     }
   } catch { /* silent */ }
 }

@@ -586,10 +586,6 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		return err
 	}
 
-	if infoHash := ""; false {
-		_ = infoHash
-	}
-
 	r.logger.Info("orphan recovered",
 		zap.String("orphan", orphan.Name),
 		zap.String("site", siteName),
