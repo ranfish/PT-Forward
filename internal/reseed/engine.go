@@ -2085,6 +2085,11 @@ func ExtractGroupName(title string) string {
 		return ""
 	}
 	group := clean[lastDash+1:]
+	// §56.40: @ 分隔符处理（老种子格式：-uploader@GROUP）
+	// 例: -hyb9373@CMCT → CMCT
+	if atIdx := strings.LastIndex(group, "@"); atIdx >= 0 && atIdx < len(group)-1 {
+		group = group[atIdx+1:]
+	}
 	group = strings.TrimSpace(group)
 	if group == "" {
 		return ""
