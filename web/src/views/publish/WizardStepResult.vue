@@ -117,28 +117,45 @@ const publishPercent = computed(() => {
   return Math.round((done / total) * 100)
 })
 
-function inferSiteStatus(_name: string): ResultSiteStatus['status'] {
+function inferSiteStatus(name: string): ResultSiteStatus['status'] {
+  // 优先从 resultRecords 获取该站独立状态
+  const record = props.resultRecords[name]
+  if (record) {
+    switch (record.status) {
+      case 'completed':
+      case 'exists':
+      case 'edited':
+        return 'done'
+      case 'failed':
+        return 'failed'
+      case 'skipped':
+        return 'skipped'
+      case 'publishing':
+        return 'publishing'
+    }
+  }
+  // 无记录时根据整体状态推断
   if (!props.candidateStatus) return 'queued'
-  if (props.candidateStatus.publish_status === 'done') return 'done'
-  if (props.candidateStatus.publish_status === 'failed') return 'failed'
-  if (props.candidateStatus.publish_status === 'skipped') return 'skipped'
-  if (props.candidateStatus.publish_status === 'publishing') return 'publishing'
+  const overall = props.candidateStatus.publish_status
+  if (overall === 'done') return 'done'
+  if (overall === 'failed') return 'failed'
+  if (overall === 'skipped') return 'skipped'
+  // 整体还在发布中，该站还没轮到 → 排队中
   return 'queued'
 }
 
 const resultSiteStatus = computed<ResultSiteStatus[]>(() => {
   return props.selectedTargets.map(name => {
     const status = inferSiteStatus(name)
+    const record = props.resultRecords[name]
     const cfg: Record<string, { label: string; tagColor: string; icon: ReturnType<typeof markRaw> }> = {
       queued:      { label: '排队中', tagColor: 'blue',   icon: markRaw(ClockCircleOutlined) },
       publishing:  { label: '发布中', tagColor: 'processing', icon: markRaw(LoadingOutlined) },
-      done:        { label: '已完成', tagColor: 'green',  icon: markRaw(CheckCircleFilled) },
+      done:        { label: record?.status === 'exists' ? '已存在' : (record?.status === 'edited' ? '已编辑' : '已完成'), tagColor: 'green',  icon: markRaw(CheckCircleFilled) },
       failed:      { label: '失败',   tagColor: 'red',    icon: markRaw(CloseCircleFilled) },
       skipped:     { label: '已跳过', tagColor: 'default',icon: markRaw(StopOutlined) },
     }
     const c = cfg[status] || cfg.queued
-    // v0.0.255 §56.30: 从 resultRecords 取该站的加种状态
-    const record = props.resultRecords[name]
     return {
       name, status, label: c.label, tagColor: c.tagColor, icon: c.icon,
       seeded: record?.seeded,
