@@ -46,105 +46,71 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 
 	s.loadScanConfigs()
 
-	// 配置的扫描路径 → 所属 client（用户明确指定"这个路径在这个下载器的磁盘上"）
-	configuredClient := make(map[string]string)
-	for _, cfg := range s.scanConfigs {
-		configuredClient[filepath.Clean(cfg.ScanPath)] = cfg.ClientID
+	if len(s.scanConfigs) == 0 {
+		return nil, nil
 	}
 
-	claimed := make(map[string]map[string]bool)
-	scannedPaths := make(map[string]bool)
+	// 第一遍：收集所有下载器的 save_path（用于检测嵌套子目录，避免误报）
+	// 同时按 client → savePath → []torrentName 分组存储
 	allSavePaths := make(map[string]bool)
-	pathToClients := make(map[string][]string)
-	queriedClients := make(map[string]bool) // 成功查询 GetMainData 的 client
-
+	clientByPath := make(map[string]map[string][]string) // clientID → savePath → torrent names
 	for _, clientID := range s.provider.ListClients() {
 		if ctx.Err() != nil {
 			break
 		}
-
 		client, err := s.provider.Get(clientID)
 		if err != nil {
 			continue
 		}
-
 		md, err := client.GetMainData(ctx)
 		if err != nil || md == nil {
 			s.logger.Debug("orphan scan: get maindata failed",
 				zap.String("client", clientID), zap.Error(err))
 			continue
 		}
-		queriedClients[clientID] = true
-
+		byPath := make(map[string][]string)
 		for _, t := range md.Torrents {
-			sp := t.SavePath
-			if sp == "" {
+			if t.SavePath == "" {
 				continue
 			}
-			sp = filepath.Clean(sp)
-			// 配置路径只认配置 client 的种子（跨机器同路径不混入）
-			if cfgClient, ok := configuredClient[sp]; ok && cfgClient != clientID {
-				continue
-			}
-			if claimed[sp] == nil {
-				claimed[sp] = make(map[string]bool)
-			}
-			claimed[sp][t.Name] = true
+			sp := filepath.Clean(t.SavePath)
 			allSavePaths[sp] = true
-			// 非配置路径：从遍历结果构建 pathToClients
-			if _, ok := configuredClient[sp]; !ok {
-				pathToClients[sp] = append(pathToClients[sp], clientID)
-			}
+			byPath[sp] = append(byPath[sp], t.Name)
 		}
+		clientByPath[clientID] = byPath
 	}
 
-	// 配置路径：检查配置 client 是否可达，不可达则跳过（防止假孤儿）
-	for sp, cfgClient := range configuredClient {
-		if !queriedClients[cfgClient] {
+	// 第二遍：只扫描配置的路径，用配置 client 的种子构建 claimed
+	var allOrphans []Entry
+	for _, cfg := range s.scanConfigs {
+		sp := filepath.Clean(cfg.ScanPath)
+
+		byPath, ok := clientByPath[cfg.ClientID]
+		if !ok {
 			s.logger.Warn("orphan scan: configured client unreachable, skipping path",
 				zap.String("path", sp),
-				zap.String("client", cfgClient))
-			delete(claimed, sp)
+				zap.String("client", cfg.ClientID))
 			continue
 		}
-		if claimed[sp] == nil {
-			claimed[sp] = make(map[string]bool)
-		}
-		pathToClients[sp] = []string{cfgClient}
-		s.logger.Debug("orphan scan: configured path",
-			zap.String("path", sp),
-			zap.String("client", cfgClient))
-	}
 
-	for sp := range claimed {
-		if len(pathToClients[sp]) == 0 {
-			pathToClients[sp] = s.provider.ListClients()
+		// 从配置 client 的种子中，筛出 save_path == sp 的种子名
+		claimedNames := make(map[string]bool)
+		for _, name := range byPath[sp] {
+			claimedNames[name] = true
 		}
-	}
 
-	var allOrphans []Entry
-	for savePath, claimedNames := range claimed {
-		if scannedPaths[savePath] {
-			continue
-		}
-		scannedPaths[savePath] = true
-		// 去重 clientIDs（多个客户端名字可能指向同一实例）
-		rawClients := pathToClients[savePath]
-		seen := make(map[string]bool, len(rawClients))
-		clients := make([]string, 0, len(rawClients))
-		for _, c := range rawClients {
-			if !seen[c] {
-				seen[c] = true
-				clients = append(clients, c)
-			}
-		}
-		orphans := s.scanDirectory(savePath, claimedNames, clients, allSavePaths)
+		orphans := s.scanDirectory(sp, claimedNames, []string{cfg.ClientID}, allSavePaths)
 		allOrphans = append(allOrphans, orphans...)
+
+		s.logger.Debug("orphan scan: configured path scanned",
+			zap.String("path", sp),
+			zap.String("client", cfg.ClientID),
+			zap.Int("claimed", len(claimedNames)),
+			zap.Int("orphans", len(orphans)))
 	}
 
 	s.logger.Info("orphan scan completed",
 		zap.Int("orphans", len(allOrphans)),
-		zap.Int("scan_paths", len(claimed)),
 		zap.Int("configured_paths", len(s.scanConfigs)))
 
 	return allOrphans, nil
