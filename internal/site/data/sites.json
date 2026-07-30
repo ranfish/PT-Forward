@@ -345,6 +345,11 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "longpt.org"
+      ],
+      "groups": [
+        "LongA",
+        "LongWeb",
+        "LongPT"
       ]
     },
     {
@@ -2849,6 +2854,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "1ptba.com"
+      ],
+      "groups": [
+        "1PTBA"
       ]
     },
     {
@@ -3477,6 +3485,10 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "cangbao.ge"
+      ],
+      "groups": [
+        "CBGWT",
+        "CBGER"
       ]
     },
     {
@@ -4442,6 +4454,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "dubhe.site"
+      ],
+      "groups": [
+        "DubheWeb"
       ]
     },
     {
@@ -4744,6 +4759,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "duckboobee.org"
+      ],
+      "groups": [
+        "3MWEB"
       ]
     },
     {
@@ -8520,6 +8538,10 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.t-baozi.cc"
+      ],
+      "groups": [
+        "BAOZIWEB",
+        "Baozi"
       ]
     },
     {
@@ -9874,6 +9896,10 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "pt.aling.de"
+      ],
+      "groups": [
+        "aling",
+        "alingWEB"
       ]
     },
     {
@@ -11495,6 +11521,13 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.luckpt.de"
+      ],
+      "groups": [
+        "LuckWeb",
+        "LuckMusic",
+        "LuckAni",
+        "LuckDIY",
+        "LuckDocu"
       ]
     },
     {
@@ -12021,6 +12054,10 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "pt.muxuege.org"
+      ],
+      "groups": [
+        "MxWeb",
+        "StarfallWeb"
       ]
     },
     {
@@ -12412,6 +12449,10 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.novahd.top"
+      ],
+      "groups": [
+        "NHDWeb",
+        "NDJWEB"
       ]
     },
     {
@@ -12875,6 +12916,9 @@
       "tracker_domains": [
         "tracker.tey.cc",
         "tracker.tmpt.top"
+      ],
+      "groups": [
+        "Tey"
       ]
     },
     {
@@ -13258,6 +13302,12 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.xingyungept.org"
+      ],
+      "groups": [
+        "StarfallWeb",
+        "Starfall",
+        "rain",
+        "rainweb"
       ]
     },
     {
@@ -16032,7 +16082,9 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
-        "UBWEB"
+        "UBits",
+        "UBWEB",
+        "UBTV"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -16299,6 +16351,10 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "www.dragonhd.xyz"
+      ],
+      "groups": [
+        "DragonHD",
+        "LeagueHD"
       ]
     },
     {
@@ -18451,6 +18507,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "www.tangpt.top"
+      ],
+      "groups": [
+        "TPWEB"
       ]
     },
     {
@@ -19104,6 +19163,11 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "zrpt.cc"
+      ],
+      "groups": [
+        "ZRPT",
+        "Nature",
+        "NatureWeb"
       ]
     },
     {
@@ -19979,6 +20043,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "pt.ying.us.kg"
+      ],
+      "groups": [
+        "YHWeb"
       ]
     },
     {
@@ -20593,6 +20660,12 @@
         "tracker.cspt.cc",
         "tracker.cspt.top",
         "tracker.cspt.date"
+      ],
+      "groups": [
+        "CSPT",
+        "CSWEB",
+        "HSPT",
+        "HSWEB"
       ]
     },
     {
@@ -23591,6 +23664,9 @@
       "tracker_domains": [
         "tracker.zhuque.in",
         "zrpt.cc"
+      ],
+      "groups": [
+        "ZWEX"
       ]
     },
     {
@@ -24796,6 +24872,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "52pt.site"
+      ],
+      "groups": [
+        "52PT"
       ]
     },
     {
@@ -26232,6 +26311,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "ptzone.xyz"
+      ],
+      "groups": [
+        "PTZWeb"
       ]
     },
     {
@@ -26671,6 +26753,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "www.htpt.cc"
+      ],
+      "groups": [
+        "HTPT"
       ]
     },
     {
@@ -26837,6 +26922,9 @@
       "tracker_domains": [
         "ptlao.top",
         "www.52movie.top"
+      ],
+      "groups": [
+        "PTL"
       ]
     },
     {
@@ -27488,6 +27576,12 @@
       "tracker_domains": [
         "sync.leniter.org",
         "pt.cdy.skin"
+      ],
+      "groups": [
+        "HDCITY-NoVA",
+        "HDCITY-NoPA",
+        "HDCITY-NoTA",
+        "HDCITY-NoXA"
       ]
     },
     {
@@ -27557,6 +27651,9 @@
         "tracker.ptskit.com",
         "tracker.momentpt.top",
         "si-qi.xyz"
+      ],
+      "groups": [
+        "PTSKIT"
       ]
     },
     {
