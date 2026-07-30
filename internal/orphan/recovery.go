@@ -376,6 +376,16 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 		searchKeyword = orphan.Name
 	}
 
+	// 关键词以年份开头 = 纯中文标题，stripChinesePrefix 跳过了整个标题
+	// 只剩 年份+分辨率+地区码，太泛会误匹配 → 跳过 L2，直接落入文件级恢复
+	if reseed.KeywordStartsWithYear(searchKeyword) {
+		r.logger.Info("orphan L2: skipped (keyword starts with year, pure Chinese title)",
+			zap.String("orphan", orphan.Name),
+			zap.String("keyword", searchKeyword),
+			zap.String("group", groupName))
+		return "", "", ""
+	}
+
 	// Phase 1: 源站优先——getSitePriority 已把 release_group_mappings(is_official) 的站排在 sites[0]
 	if groupName != "" && len(sites) > 1 {
 		sourceSite := sites[0]

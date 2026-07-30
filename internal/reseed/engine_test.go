@@ -2674,9 +2674,9 @@ func TestKeywordStartsWithYear(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.keyword, func(t *testing.T) {
-			got := keywordStartsWithYear(tt.keyword)
+			got := KeywordStartsWithYear(tt.keyword)
 			if got != tt.want {
-				t.Errorf("keywordStartsWithYear(%q) = %v, want %v", tt.keyword, got, tt.want)
+				t.Errorf("KeywordStartsWithYear(%q) = %v, want %v", tt.keyword, got, tt.want)
 			}
 		})
 	}

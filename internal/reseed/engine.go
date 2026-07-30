@@ -1795,9 +1795,9 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		keyword = ExtractSearchKeyword(fp.Title)
 		groupName = ExtractGroupName(fp.Title)
 
-		if (keyword == "" || keywordStartsWithYear(keyword)) && len(fp.FileTreeParsed) > 0 {
+		if (keyword == "" || KeywordStartsWithYear(keyword)) && len(fp.FileTreeParsed) > 0 {
 			fileKeyword, fileGroup := extractFromFileTree(fp.FileTreeParsed)
-			if fileKeyword != "" && !keywordStartsWithYear(fileKeyword) {
+			if fileKeyword != "" && !KeywordStartsWithYear(fileKeyword) {
 				e.logger.Debug("extracting keywords from video filename",
 					zap.String("title", fp.Title),
 					zap.String("originalKeyword", keyword),
@@ -1993,23 +1993,23 @@ func ExtractSearchKeyword(title string) string {
 		return ""
 	}
 	raw = strings.ReplaceAll(raw, ".", " ")
-	// 去掉介质/来源词：这些词在不同站点有变体（Blu-ray/Bluray、Web-DL/WebDL），
-	// NexusPHP 搜索引擎对变体分词不一致，去掉后用 标题+年份+分辨率 搜索即可
-	for _, term := range mediumTerms {
+	// 去掉介质/来源词和地区码：这些词在不同站点有变体或与标题无关
+	for _, term := range mediumAndRegionTerms {
 		raw = strings.ReplaceAll(raw, term, " ")
 	}
 	raw = strings.Join(strings.Fields(raw), " ")
 	return raw
 }
 
-var mediumTerms = []string{
-	"Blu-ray", "Bluray", "Blu ray",
-	"BluRay", "Blue-ray",
-	"Web-DL", "WebDL", "Web DL",
-	"HDTV", "WEBRip",
-	"UHD", "HD-DVD", "HDDVD",
-	"DVDR", "DVDRip",
-	"Remux", "REMUX",
+var mediumAndRegionTerms = []string{
+	// 介质/来源词（变体问题：Blu-ray/Bluray、Web-DL/WebDL）
+	"Blu-ray", "Bluray", "Blu ray", "BluRay", "Blue-ray",
+	"Web-DL", "WebDL", "Web DL", "WEBRip",
+	"HDTV", "UHD", "HD-DVD", "HDDVD",
+	"DVDR", "DVDRip", "Remux", "REMUX",
+	// 地区码（§56.34 field #6，仅原盘类，非标题内容）
+	"GBR", "USA", "JPN", "HKG", "TWN", "KOR", "EUR",
+	"CAN", "AUS", "FRA", "GER", "CZE", "NOR", "ITA",
 }
 
 func stripChinesePrefix(title string) string {
@@ -2151,7 +2151,7 @@ func extractFromFileTree(fileTree map[string]int64) (keyword, groupName string) 
 	return
 }
 
-func keywordStartsWithYear(keyword string) bool {
+func KeywordStartsWithYear(keyword string) bool {
 	if len(keyword) < 4 {
 		return false
 	}
