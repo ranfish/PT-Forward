@@ -218,7 +218,6 @@ func (h *ManualForwardHandler) dedupSeededTorrents(ctx context.Context, items []
 		return items
 	}
 
-	groupSiteCache := map[string]string{}
 	deduped := make([]seededTorrent, 0, len(nameOrder))
 	for _, name := range nameOrder {
 		indices := nameGroups[name]
@@ -229,17 +228,8 @@ func (h *ManualForwardHandler) dedupSeededTorrents(ctx context.Context, items []
 
 		picked := indices[0]
 		groupName := publish.ExtractGroupName(name)
-		if groupName != "" {
-			officialSite, cached := groupSiteCache[groupName]
-			if !cached {
-				var mapping model.ReleaseGroupMapping
-				if err := h.db.WithContext(ctx).
-					Where("LOWER(group_name) = LOWER(?)", groupName).
-					First(&mapping).Error; err == nil {
-					officialSite = mapping.SiteName
-				}
-				groupSiteCache[groupName] = officialSite
-			}
+		if groupName != "" && h.sourceDetector != nil {
+			officialSite := h.sourceDetector.LookupGroup(ctx, groupName)
 			if officialSite != "" {
 				for _, idx := range indices {
 					if items[idx].SourceSite == officialSite {
