@@ -388,12 +388,79 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 	searchCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 
+	// Phase 1: 官方源站优先——顺序搜索前几个优先级站（不并发）
+	// getSitePriority 已把官站（is_official）排在最前
+	priorityCount := 3
+	if priorityCount > len(sites) {
+		priorityCount = len(sites)
+	}
+	for i := 0; i < priorityCount; i++ {
+		if searchCtx.Err() != nil {
+			break
+		}
+		site := sites[i]
+
+		config, err := r.siteProvider.GetSiteConfig(searchCtx, site)
+		if err != nil || config == nil {
+			r.logger.Debug("orphan L2 priority: site config failed",
+				zap.String("site", site), zap.Error(err))
+			stats.Skipped++
+			continue
+		}
+		if config.BaseURL != "" {
+			httpclient.ResetDomainCircuit(config.BaseURL)
+			httpclient.GlobalLimiter.ManualUnfreeze(config.BaseURL)
+		}
+		adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
+		if err != nil || adapter == nil {
+			r.logger.Debug("orphan L2 priority: adapter failed",
+				zap.String("site", site), zap.Error(err))
+			stats.Skipped++
+			continue
+		}
+
+		siteCtx, siteCancel := context.WithTimeout(searchCtx, 20*time.Second)
+		match, err := reseed.SearchAndVerifyMatch(siteCtx, adapter, config, searchKeyword, groupName, orphan.Size)
+		siteCancel()
+
+		if err != nil {
+			r.logger.Debug("orphan L2 priority: search error",
+				zap.String("site", site),
+				zap.String("keyword", searchKeyword),
+				zap.Error(err))
+			stats.FailedSites = append(stats.FailedSites, SiteFailure{Site: site, Reason: err.Error()})
+			continue
+		}
+		stats.Searched++
+
+		if match != nil {
+			r.logger.Info("orphan L2 match (priority)",
+				zap.String("orphan", orphan.Name),
+				zap.String("site", site),
+				zap.String("torrent_id", match.TorrentID),
+				zap.String("matched_title", match.Title),
+				zap.Int64("orphan_size", orphan.Size),
+				zap.Int64("matched_size", match.Size))
+			return site, match.TorrentID, "l2:priority:" + site
+		}
+		r.logger.Debug("orphan L2 priority: no match",
+			zap.String("site", site),
+			zap.String("keyword", searchKeyword),
+			zap.String("group", groupName))
+	}
+
+	// Phase 2: 并发搜索剩余站
+	remainingSites := sites[priorityCount:]
+	if len(remainingSites) == 0 {
+		return "", "", ""
+	}
+
 	resultCh := make(chan matchResult, 1)
 	sem := make(chan struct{}, 10)
 	var wg sync.WaitGroup
 	var statsMu sync.Mutex
 
-	for _, site := range sites {
+	for _, site := range remainingSites {
 		wg.Add(1)
 		go func(site string) {
 			defer wg.Done()
