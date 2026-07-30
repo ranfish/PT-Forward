@@ -2,15 +2,12 @@ package site
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
-	"net"
-	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/adapter"
+	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -174,13 +171,6 @@ func (s *StatsSyncService) SyncAllSites(ctx context.Context) (synced int, failed
 }
 
 func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site) error {
-	transport := &http.Transport{
-		DialContext:         (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: site.SkipSSLVerify},
-		TLSHandshakeTimeout: 10 * time.Second,
-		ForceAttemptHTTP2:   true,
-		MaxIdleConnsPerHost: 5,
-	}
 	// Resolve proxy: site proxy_url > global proxy (if use_global_proxy) > direct
 	effectiveProxy := site.ProxyURL
 	if effectiveProxy == "" && site.UseGlobalProxy {
@@ -188,12 +178,14 @@ func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site)
 		s.db.Raw("SELECT value FROM system_settings WHERE key = 'httpProxy' LIMIT 1").Scan(&globalProxy)
 		effectiveProxy = globalProxy
 	}
-	if effectiveProxy != "" {
-		if pu, err := url.Parse(effectiveProxy); err == nil {
-			transport.Proxy = http.ProxyURL(pu)
-		}
-	}
-	doer := &adapter.HTTPDoer{Client: &http.Client{Timeout: 20 * time.Second, Transport: transport}}
+	// 使用 NewSiteHTTPClient（经过 GlobalLimiter 流控 + 断路器 + WAF 检测）
+	doer := &adapter.HTTPDoer{Client: httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
+		Domain:              site.Domain,
+		Timeout:             20 * time.Second,
+		ProxyURL:            effectiveProxy,
+		SkipSSLVerify:       site.SkipSSLVerify,
+		MaxIdleConnsPerHost: 5,
+	})}
 	a := s.factory.Create(site.Framework, doer)
 
 	config := &model.SiteConfig{
