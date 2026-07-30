@@ -421,7 +421,10 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 						zap.Int("result_count", len(results)),
 						zap.Int64("orphan_size", orphan.Size))
 					for _, res := range results {
-						hasGroup := groupName == "" || strings.Contains(res.Title, groupName)
+						// 标题被截断（以 .. 结尾）时放宽 group 过滤：
+						// 源站搜索的上下文已保证组别正确，截断标题不含组名不是不匹配
+						titleTruncated := strings.HasSuffix(strings.TrimSpace(res.Title), "..")
+						hasGroup := groupName == "" || titleTruncated || strings.Contains(res.Title, groupName)
 						sizeOk := res.Size > 0 && reseed.CompareSizeDisplay(orphan.Size, res.Size)
 						if hasGroup && sizeOk {
 							cancel()
@@ -429,7 +432,8 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
 								zap.String("torrent_id", res.TorrentID),
-								zap.String("matched_title", res.Title))
+								zap.String("matched_title", res.Title),
+								zap.Bool("title_truncated", titleTruncated))
 							return sourceSite, res.TorrentID, "l2:priority:" + sourceSite
 						}
 						r.logger.Debug("orphan L2 priority: result skipped",
