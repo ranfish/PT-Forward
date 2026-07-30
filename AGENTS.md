@@ -100,6 +100,11 @@
   3. **查数据表内容**（`release_group_mappings`、`SiteCoverageCache`、`torrent_metadata` 等表可能已有你需要的数据，用 `sqlite3 data/pt-forward.db "SELECT ..."` 确认）
   4. 确认是"**能力缺失**"（需新建）还是"**接入遗漏**"（已有设施没调用）
 - **典型案例**（§56.33 讨论）：tid 反查（`reseed.SearchAndVerifyMatch` 已有，orphan/recovery 已调用）、源站识别（`SourceSiteDetector.Detect` 已有，publish_torrents 已接入）、三源字段合并（`metadata.Merge` 已有，handleMerge 已调用）—— 六个看似需要"新建"的问题，实际全是"接入遗漏"。
+- **⚠️ 优先使用公共函数（最高优先级）**：遇到功能需求时，**必须先 grep 查是否已有公共实现**，禁止重复造轮子。
+  1. `grep -rn 'func.*Xxx' internal/` 查全项目是否已有同名/同义函数
+  2. 特别注意跨包重复：`publish.ExtractGroupName` 和 `reseed.ExtractGroupName` 曾经是两份副本，改一处漏一处导致 bug（已合并到 `util.ExtractGroupName`）
+  3. **典型清单**：`util.ExtractGroupName`（制作组名提取，支持 `-`/`@`/`￡` 三种分隔符）、`reseed.ExtractSearchKeyword`（搜索关键词提取）、`publish.SourceSiteDetector.lookupGroup`（group→源站映射）、`reseed.SearchAndVerifyMatch`（搜索+验证匹配）、`getSitePriority`（站点优先级排序，源站排首位）
+  4. 如果已有函数是私有的且跨包需要，**先考虑提升为公共函数**（改首字母大写或委托到 `util` 包），而非在新包重写一份
 
 ## 灵魂四问（每次代码改动后必须逐条审核）
 
