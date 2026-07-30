@@ -2038,7 +2038,6 @@ func (h *PublishTorrentsHandler) handleCoverageCache(w http.ResponseWriter, r *h
 func (h *PublishTorrentsHandler) dedupTorrentItems(ctx context.Context, items []map[string]interface{}) []map[string]interface{} {
 	seen := make(map[string]int)
 	var result []map[string]interface{}
-	groupCache := make(map[string]string)
 
 	for _, item := range items {
 		name, _ := item["name"].(string)
@@ -2046,9 +2045,14 @@ func (h *PublishTorrentsHandler) dedupTorrentItems(ctx context.Context, items []
 		key := name + "|" + strconv.FormatInt(size, 10)
 
 		if idx, ok := seen[key]; ok {
-			if officialSite := h.lookupOfficialSite(ctx, name, groupCache); officialSite != "" {
-				if itemHasSite(item, officialSite) && !itemHasSite(result[idx], officialSite) {
-					result[idx] = item
+			if h.sourceDetector != nil {
+				groupName := publish.ExtractGroupName(name)
+				if groupName != "" {
+					if officialSite := h.sourceDetector.LookupGroup(ctx, groupName); officialSite != "" {
+						if itemHasSite(item, officialSite) && !itemHasSite(result[idx], officialSite) {
+							result[idx] = item
+						}
+					}
 				}
 			}
 			continue
@@ -2070,23 +2074,6 @@ func itemHasSite(item map[string]interface{}, site string) bool {
 		}
 	}
 	return false
-}
-
-func (h *PublishTorrentsHandler) lookupOfficialSite(ctx context.Context, name string, cache map[string]string) string {
-	groupName := publish.ExtractGroupName(name)
-	if groupName == "" {
-		return ""
-	}
-	if site, ok := cache[groupName]; ok {
-		return site
-	}
-	var mapping model.ReleaseGroupMapping
-	if err := h.db.WithContext(ctx).Where("LOWER(group_name) = LOWER(?)", groupName).First(&mapping).Error; err == nil {
-		cache[groupName] = mapping.SiteName
-		return mapping.SiteName
-	}
-	cache[groupName] = ""
-	return ""
 }
 
 // handleGetSourcePriority §56.40: 读取源站点优先级配置。

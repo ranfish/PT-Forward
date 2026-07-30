@@ -65,7 +65,7 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 	result.GroupName = groupName
 
 	if groupName != "" {
-		siteName := d.lookupGroup(ctx, groupName)
+		siteName := d.LookupGroup(ctx, groupName)
 		if siteName != "" {
 			var site model.Site
 			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ?", siteName, true).First(&site).Error; err == nil {
@@ -123,7 +123,7 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 	return result
 }
 
-func (d *SourceSiteDetector) lookupGroup(ctx context.Context, groupName string) string {
+func (d *SourceSiteDetector) LookupGroup(ctx context.Context, groupName string) string {
 	d.mu.RLock()
 	if siteName, ok := d.cache[groupName]; ok {
 		d.mu.RUnlock()
