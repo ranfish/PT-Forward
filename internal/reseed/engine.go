@@ -2102,7 +2102,30 @@ func truncateToResolution(s string) string {
 	if bestIdx < 0 {
 		return ""
 	}
-	return s[:bestEnd]
+	end := bestEnd
+	// 3D 检测：标题含 3D 时，延伸到 HSBS/HOU（区分左右半宽和上下半宽）
+	if has3D(lower) {
+		afterRes := s[bestEnd:]
+		afterLower := lower[bestEnd:]
+		for _, spec := range []string{"hsbs", "hou"} {
+			idx := strings.Index(afterLower, spec)
+			if idx >= 0 {
+				pos := idx + len(spec)
+				// 确认是独立词（前面是 . 或空格）
+				if idx == 0 || afterRes[idx-1] == '.' || afterRes[idx-1] == ' ' || afterRes[idx-1] == '-' {
+					end = bestEnd + pos
+					break
+				}
+			}
+		}
+	}
+	return s[:end]
+}
+
+var re3D = regexp.MustCompile(`(?i)\b3d\b`)
+
+func has3D(lowerS string) bool {
+	return re3D.MatchString(lowerS)
 }
 
 var yearTruncateRe = regexp.MustCompile(`(?:19|20)\d{2}`)
