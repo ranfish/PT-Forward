@@ -1987,19 +1987,33 @@ func ExtractSearchKeyword(title string) string {
 	if rest == "" {
 		return ""
 	}
+
+	// 剧集检测：stripChinesePrefix 后以 S01/S01E01 等开头 = 中文剧名被跳过了
+	// 保留中文剧名用于搜索（NexusPHP 支持中文搜索）
+	trimmed := strings.TrimLeft(rest, ". ")
+	if seasonPattern.MatchString(trimmed) {
+		rest = title // 回退原始标题，保留中文剧名
+	}
+
 	raw := truncateToResolution(rest)
 	raw = strings.TrimLeft(raw, ".")
 	if raw == "" {
 		return ""
 	}
 	raw = strings.ReplaceAll(raw, ".", " ")
-	// 去掉介质/来源词和地区码：这些词在不同站点有变体或与标题无关
+	// 去掉介质/来源词和地区码
 	for _, term := range mediumAndRegionTerms {
 		raw = strings.ReplaceAll(raw, term, " ")
 	}
+	// 去掉中文集数描述（全16集、16集等）
+	raw = chineseEpisodeCountRe.ReplaceAllString(raw, " ")
 	raw = strings.Join(strings.Fields(raw), " ")
 	return raw
 }
+
+var seasonPattern = regexp.MustCompile(`(?i)^S\d{1,2}(?:E\d{1,3})?`)
+
+var chineseEpisodeCountRe = regexp.MustCompile(`全?\d+集`)
 
 var mediumAndRegionTerms = []string{
 	// 介质/来源词（变体问题：Blu-ray/Bluray、Web-DL/WebDL）
