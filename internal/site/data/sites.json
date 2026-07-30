@@ -3177,7 +3177,10 @@
       "groups": [
         "ADE",
         "ADWeb",
-        "Audies"
+        "Audies",
+        "ADAudio",
+        "ADeBook",
+        "ADMusic"
       ],
       "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -4043,9 +4046,6 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
-      "groups": [
-        "CyanBug"
-      ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.cyanbug.net"
@@ -5079,6 +5079,7 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
+        "TorrentCCF",
         "TCCF"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
@@ -6160,7 +6161,11 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
-        "HDHome"
+        "HDHome",
+        "HDH",
+        "HDHTV",
+        "HDHPad",
+        "HDHWEB"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}",
       "tracker_domains": [
@@ -6549,11 +6554,16 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
+        "HDStar",
         "HDS",
         "HDSPAD",
         "HDSTV",
         "HDSWEB",
-        "HDSky"
+        "HDSky",
+        "HDS3D",
+        "HDSCD",
+        "HDSpecial",
+        "HDSAB"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -6875,7 +6885,10 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
-        "HDTime"
+        "HDTime",
+        "PADTime",
+        "VTime",
+        "HDT"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -7245,9 +7258,10 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
+        "HDV",
         "HDVMV",
         "HDVWEB",
-        "HDVideo"
+        "DHVTV"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -7513,9 +7527,7 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
-        "RLTV",
-        "RLWEB",
-        "RLeaves"
+        "LemonHD"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}",
       "tracker_domains": [
@@ -7989,7 +8001,10 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
-        "NYTV"
+        "NYTV",
+        "NYHD",
+        "NYPAD",
+        "NYPT"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -8924,8 +8939,10 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
+        "PANDA",
         "AilMWeb",
-        "PANDA"
+        "AilMTV",
+        "AilMUpscale"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -9205,10 +9222,10 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
-        "PiGoNF",
-        "PigGo",
+        "PigoWeb",
         "PigoHD",
-        "PigoWeb"
+        "PigoNF",
+        "PigoAD"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -10144,7 +10161,10 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
-        "BTSchool"
+        "BTSchool",
+        "BtsHD",
+        "BtsTV",
+        "BtsPAD"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -13305,9 +13325,7 @@
       ],
       "groups": [
         "StarfallWeb",
-        "Starfall",
-        "rain",
-        "rainweb"
+        "Starfall"
       ]
     },
     {
@@ -13783,7 +13801,8 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "CafeTV",
-        "CafeWEB"
+        "CafeWEB",
+        "PTCafe"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -14109,7 +14128,9 @@
         "CHDBits",
         "CHDPAD",
         "CHDTV",
-        "CHDWEB"
+        "CHDWEB",
+        "SGNB",
+        "CHDHKTV"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -14702,7 +14723,12 @@
       "supports_pieces_hash_api": false,
       "groups": [
         "PTH",
-        "PTHome"
+        "PTHome",
+        "PTHweb",
+        "PTHtv",
+        "PTHAudio",
+        "PTHeBook",
+        "PTHmusic"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -15715,7 +15741,9 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
-        "U2"
+        "U2",
+        "U2-Rip",
+        "U2-RBD"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true, \"skip_reassemble\": true}",
       "tracker_domains": [
@@ -16353,8 +16381,7 @@
         "www.dragonhd.xyz"
       ],
       "groups": [
-        "DragonHD",
-        "LeagueHD"
+        "DragonHD"
       ]
     },
     {
@@ -17282,6 +17309,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.hxpt.org"
+      ],
+      "groups": [
+        "HX"
       ]
     },
     {
@@ -18012,6 +18042,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "www.oshen.win"
+      ],
+      "groups": [
+        "OshenPT"
       ]
     },
     {
@@ -18791,7 +18824,9 @@
       "supports_pieces_hash_api": true,
       "groups": [
         "ZmPT",
-        "ZmWeb"
+        "ZmWeb",
+        "ZmMusic",
+        "ZmAudio"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -21150,7 +21185,8 @@
         "HDKMV",
         "HDKTV",
         "HDKWEB",
-        "HDKylin"
+        "HDKylin",
+        "HDK"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -21518,15 +21554,9 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
-        "AGSV",
-        "AGSVDIY",
-        "AGSVE",
-        "AGSVMUS",
         "AGSVPT",
-        "AGSVREMUX",
-        "AGSVRip",
-        "AGSVTV",
-        "AGSVWEB"
+        "AGSVWEB",
+        "AGSVMUS"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -21861,7 +21891,6 @@
         "CornerMV",
         "DBTV",
         "Dream",
-        "HDDolby",
         "QHstudIo"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
@@ -22177,7 +22206,10 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
-        "PTLGS"
+        "PTLGS",
+        "DYZ-WEB",
+        "DYZ-Movie",
+        "DYZ-TV"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -22759,7 +22791,10 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
-        "PTer"
+        "PTer",
+        "PTerWEB",
+        "PTerMV",
+        "PTerMusic"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true, \"_hook\": \"pterclub\"}",
       "tracker_domains": [
@@ -25429,7 +25464,7 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
-        "XHBWeb"
+        "XHB"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -25845,7 +25880,12 @@
       "groups": [
         "FFans",
         "FHDMV",
-        "sBao"
+        "sBao",
+        "FFansAIeNcE",
+        "FFansDVD",
+        "FFansTV",
+        "FFansWEB",
+        "FFansBD"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -26646,9 +26686,11 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
-        "SakuraSUB",
         "SakuraWEB",
-        "WScode"
+        "WScode",
+        "WS",
+        "SakuraSUB",
+        "SakuraAcademic"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -27289,6 +27331,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.momentpt.top"
+      ],
+      "groups": [
+        "Moment"
       ]
     },
     {
@@ -27984,6 +28029,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "sunnytk.top"
+      ],
+      "groups": [
+        "Sunny"
       ]
     },
     {
@@ -30333,11 +30381,9 @@
       },
       "supports_pieces_hash_api": false,
       "groups": [
-        "BMDru",
+        "Mweb",
         "MTeam",
-        "MWEB",
-        "mpad",
-        "tnp"
+        "TPTV"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -30957,6 +31003,9 @@
       "tracker_domains": [
         "tracker.hdbao.cc",
         "www.htpt.cc"
+      ],
+      "groups": [
+        "HDBao"
       ]
     },
     {
@@ -31335,6 +31384,9 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "playlet.cc"
+      ],
+      "groups": [
+        "GodDramas"
       ]
     },
     {
@@ -31408,6 +31460,12 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "dstudio.me"
+      ],
+      "groups": [
+        "DS",
+        "DStudio",
+        "DepWeb",
+        "DSAudio"
       ]
     }
   ],
