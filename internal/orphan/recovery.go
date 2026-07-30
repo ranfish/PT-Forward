@@ -159,7 +159,7 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 	dirKeyword := reseed.ExtractSearchKeyword(orphan.Name)
 	dirGroup := reseed.ExtractGroupName(orphan.Name)
 	// 关键词以年份开头 = 纯中文标题残留（只剩年份+分辨率），太泛需要从文件名提取
-	if dirKeyword == "" || dirGroup == "" || reseed.KeywordStartsWithYear(dirKeyword) {
+	if dirKeyword == "" || dirGroup == "" || reseed.KeywordHasNoTitle(dirKeyword) {
 		var largestFile string
 		var largestSize int64
 		for fname, fsize := range diskFiles {
@@ -173,7 +173,7 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 			fileKeyword := reseed.ExtractSearchKeyword(baseName)
 			fileGroup := reseed.ExtractGroupName(baseName)
 			// 用文件名提取的结果覆盖（仅当文件名提取到更好的关键词/组名时）
-			if fileKeyword != "" && !reseed.KeywordStartsWithYear(fileKeyword) {
+			if fileKeyword != "" && !reseed.KeywordHasNoTitle(fileKeyword) {
 				dirKeyword = fileKeyword
 			}
 			if fileGroup != "" {
@@ -380,10 +380,9 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 		searchKeyword = orphan.Name
 	}
 
-	// 关键词以年份开头 = 纯中文标题，stripChinesePrefix 跳过了整个标题
-	// 只剩 年份+分辨率+地区码，太泛会误匹配 → 跳过 L2，直接落入文件级恢复
-	if reseed.KeywordStartsWithYear(searchKeyword) {
-		r.logger.Info("orphan L2: skipped (keyword starts with year, pure Chinese title)",
+	// 关键词缺少有效标题内容（纯中文标题残留或续集编号）→ 跳过 L2，走文件级恢复
+	if reseed.KeywordHasNoTitle(searchKeyword) {
+		r.logger.Info("orphan L2: skipped (keyword has no title)",
 			zap.String("orphan", orphan.Name),
 			zap.String("keyword", searchKeyword),
 			zap.String("group", groupName))
