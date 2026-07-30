@@ -1993,31 +1993,23 @@ func ExtractSearchKeyword(title string) string {
 		return ""
 	}
 	raw = strings.ReplaceAll(raw, ".", " ")
-	// 归一化连字符变体：NexusPHP 搜索引擎把词内 - 当特殊字符处理
-	// Blu-ray → Bluray, Web-DL → WebDL, DTS-HD → DTSHD
-	raw = normalizeCompoundTerms(raw)
+	// 去掉介质/来源词：这些词在不同站点有变体（Blu-ray/Bluray、Web-DL/WebDL），
+	// NexusPHP 搜索引擎对变体分词不一致，去掉后用 标题+年份+分辨率 搜索即可
+	for _, term := range mediumTerms {
+		raw = strings.ReplaceAll(raw, term, " ")
+	}
 	raw = strings.Join(strings.Fields(raw), " ")
 	return raw
 }
 
-// normalizeCompoundTerms 把 PT 命名中的连字符复合词合并为无连字符形式，
-// 避免 NexusPHP 搜索引擎把 - 当作排除操作符或分词符导致搜索失败。
-// 仅处理词内的连字符（字母-字母），不影响独立词之间的空格分隔。
-func normalizeCompoundTerms(s string) string {
-	replacements := []string{
-		"Blu-ray", "Bluray",
-		"Blu ray", "Bluray",
-		"Web-DL", "WebDL",
-		"Web DL", "WebDL",
-		"DTS-HD", "DTSHD",
-		"DTS HD", "DTSHD",
-		"E-AC3", "EAC3",
-		"x264", "x264", // no-op, just documenting
-	}
-	for i := 0; i < len(replacements); i += 2 {
-		s = strings.ReplaceAll(s, replacements[i], replacements[i+1])
-	}
-	return s
+var mediumTerms = []string{
+	"Blu-ray", "Bluray", "Blu ray",
+	"BluRay", "Blue-ray",
+	"Web-DL", "WebDL", "Web DL",
+	"HDTV", "WEBRip",
+	"UHD", "HD-DVD", "HDDVD",
+	"DVDR", "DVDRip",
+	"Remux", "REMUX",
 }
 
 func stripChinesePrefix(title string) string {
