@@ -1996,6 +1996,9 @@ func ExtractSearchKeyword(title string) string {
 	}
 
 	raw := truncateToResolution(rest)
+	if raw == "" {
+		raw = truncateToYear(rest)
+	}
 	raw = strings.TrimLeft(raw, ".")
 	if raw == "" {
 		return ""
@@ -2095,6 +2098,17 @@ func truncateToResolution(s string) string {
 		return ""
 	}
 	return s[:bestEnd]
+}
+
+var yearTruncateRe = regexp.MustCompile(`(?:19|20)\d{2}`)
+
+// truncateToYear 截取到第一个年份（含），用于无分辨率的种子名（如 DVDRip）。
+func truncateToYear(s string) string {
+	loc := yearTruncateRe.FindStringIndex(s)
+	if loc == nil {
+		return ""
+	}
+	return s[:loc[1]]
 }
 
 func ExtractGroupName(title string) string {
