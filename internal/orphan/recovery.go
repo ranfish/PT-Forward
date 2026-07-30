@@ -154,11 +154,12 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 	results := make([]FileRecoverResult, 0, len(videoFileNames))
 	covered := make(map[string]bool)
 
-	// §56.40: 优先从种子名提取关键词/制作组；提取不到时从目录内最大文件名提取
+	// §56.40: 优先从种子名提取关键词/制作组；提取不到或关键词太泛时从目录内最大文件名提取
 	// 老种子的种子名不标准（纯中文/特殊分隔符），但文件名遵循 PT 命名规则
 	dirKeyword := reseed.ExtractSearchKeyword(orphan.Name)
 	dirGroup := reseed.ExtractGroupName(orphan.Name)
-	if dirKeyword == "" || dirGroup == "" {
+	// 关键词以年份开头 = 纯中文标题残留（只剩年份+分辨率），太泛需要从文件名提取
+	if dirKeyword == "" || dirGroup == "" || reseed.KeywordStartsWithYear(dirKeyword) {
 		var largestFile string
 		var largestSize int64
 		for fname, fsize := range diskFiles {
@@ -169,11 +170,14 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 		}
 		if largestFile != "" {
 			baseName := strings.TrimSuffix(largestFile, filepath.Ext(largestFile))
-			if dirKeyword == "" {
-				dirKeyword = reseed.ExtractSearchKeyword(baseName)
+			fileKeyword := reseed.ExtractSearchKeyword(baseName)
+			fileGroup := reseed.ExtractGroupName(baseName)
+			// 用文件名提取的结果覆盖（仅当文件名提取到更好的关键词/组名时）
+			if fileKeyword != "" && !reseed.KeywordStartsWithYear(fileKeyword) {
+				dirKeyword = fileKeyword
 			}
-			if dirGroup == "" {
-				dirGroup = reseed.ExtractGroupName(baseName)
+			if fileGroup != "" {
+				dirGroup = fileGroup
 			}
 			r.logger.Info("file-level recover: keyword from largest file",
 				zap.String("orphan", orphan.Name),
