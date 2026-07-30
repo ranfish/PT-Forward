@@ -409,56 +409,69 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 				return
 			}
 
-			config, err := r.siteProvider.GetSiteConfig(searchCtx, site)
-			if err != nil || config == nil {
-				statsMu.Lock()
-				stats.Skipped++
-				statsMu.Unlock()
-				return
-			}
-
-			if config.BaseURL != "" {
-				httpclient.ResetDomainCircuit(config.BaseURL)
-				httpclient.GlobalLimiter.ManualUnfreeze(config.BaseURL)
-			}
-
-			adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
-			if err != nil || adapter == nil {
-				statsMu.Lock()
-				stats.Skipped++
-				statsMu.Unlock()
-				return
-			}
-
-			siteCtx, siteCancel := context.WithTimeout(searchCtx, 20*time.Second)
-			match, err := reseed.SearchAndVerifyMatch(siteCtx, adapter, config, searchKeyword, groupName, orphan.Size)
-			siteCancel()
-
+		config, err := r.siteProvider.GetSiteConfig(searchCtx, site)
+		if err != nil || config == nil {
+			r.logger.Debug("orphan L2: site config failed",
+				zap.String("site", site), zap.Error(err))
 			statsMu.Lock()
-			if err != nil {
-				stats.FailedSites = append(stats.FailedSites, SiteFailure{
-					Site:   site,
-					Reason: err.Error(),
-				})
-				statsMu.Unlock()
-				return
-			}
-			stats.Searched++
+			stats.Skipped++
 			statsMu.Unlock()
+			return
+		}
 
-			if match != nil {
-				r.logger.Info("orphan L2 match",
-					zap.String("orphan", orphan.Name),
-					zap.String("site", site),
-					zap.String("torrent_id", match.TorrentID),
-					zap.String("matched_title", match.Title),
-					zap.Int64("orphan_size", orphan.Size),
-					zap.Int64("matched_size", match.Size))
-				select {
-				case resultCh <- matchResult{site, match.TorrentID, "l2:search:" + site}:
-				case <-searchCtx.Done():
-				}
+		if config.BaseURL != "" {
+			httpclient.ResetDomainCircuit(config.BaseURL)
+			httpclient.GlobalLimiter.ManualUnfreeze(config.BaseURL)
+		}
+
+		adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
+		if err != nil || adapter == nil {
+			r.logger.Debug("orphan L2: adapter failed",
+				zap.String("site", site), zap.Error(err))
+			statsMu.Lock()
+			stats.Skipped++
+			statsMu.Unlock()
+			return
+		}
+
+		siteCtx, siteCancel := context.WithTimeout(searchCtx, 20*time.Second)
+		match, err := reseed.SearchAndVerifyMatch(siteCtx, adapter, config, searchKeyword, groupName, orphan.Size)
+		siteCancel()
+
+		statsMu.Lock()
+		if err != nil {
+			r.logger.Debug("orphan L2: search error",
+				zap.String("site", site),
+				zap.String("keyword", searchKeyword),
+				zap.Error(err))
+			stats.FailedSites = append(stats.FailedSites, SiteFailure{
+				Site:   site,
+				Reason: err.Error(),
+			})
+			statsMu.Unlock()
+			return
+		}
+		stats.Searched++
+		statsMu.Unlock()
+
+		if match != nil {
+			r.logger.Info("orphan L2 match",
+				zap.String("orphan", orphan.Name),
+				zap.String("site", site),
+				zap.String("torrent_id", match.TorrentID),
+				zap.String("matched_title", match.Title),
+				zap.Int64("orphan_size", orphan.Size),
+				zap.Int64("matched_size", match.Size))
+			select {
+			case resultCh <- matchResult{site, match.TorrentID, "l2:search:" + site}:
+			case <-searchCtx.Done():
 			}
+		} else {
+			r.logger.Debug("orphan L2: no match",
+				zap.String("site", site),
+				zap.String("keyword", searchKeyword),
+				zap.String("group", groupName))
+		}
 		}(site)
 	}
 
