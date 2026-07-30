@@ -1985,7 +1985,12 @@ func ExtractSearchKeyword(title string) string {
 	}
 	rest := stripChinesePrefix(title)
 	if rest == "" {
-		return ""
+		// stripChinesePrefix 失败（如 三国.全95集.2010...，分隔符后是中文）
+		// 在原始标题上截取年份兜底，产出"剧名 年份"
+		rest = truncateToYear(title)
+		if rest == "" {
+			return ""
+		}
 	}
 
 	// 剧集检测：stripChinesePrefix 后以 S01/S01E01 等开头 = 中文剧名被跳过了
