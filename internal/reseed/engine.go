@@ -2218,6 +2218,24 @@ func KeywordStartsWithYear(keyword string) bool {
 	return year >= 1920 && year <= 2030
 }
 
+// KeywordHasNoTitle 判断关键词是否缺少有效标题内容（应跳过 L2，走文件级恢复）。
+// 三种情况：
+//   - 空关键词
+//   - 以年份开头（纯中文标题残留）
+//   - 第一个词是 1-3 位纯数字（续集编号，如 招魂2 → "2 2016 1080p"）
+func KeywordHasNoTitle(keyword string) bool {
+	if keyword == "" || KeywordStartsWithYear(keyword) {
+		return true
+	}
+	fields := strings.Fields(keyword)
+	if len(fields) > 0 && len(fields[0]) <= 3 {
+		if _, err := strconv.Atoi(fields[0]); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 var audioExtensions = []string{".flac", ".wav", ".ape", ".tta", ".wv", ".mp3", ".m4a", ".ogg", ".opus", ".aac", ".dsf", ".dff"}
 
 func detectContentType(fileTree map[string]int64) string {
