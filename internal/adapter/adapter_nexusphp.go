@@ -1207,8 +1207,8 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 
 		start := loc[0]
 		end := loc[1]
-		if end+10000 <= len(html) {
-			end += 10000
+		if end+20000 <= len(html) {
+			end += 20000
 		} else {
 			end = len(html)
 		}
