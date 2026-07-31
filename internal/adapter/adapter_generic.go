@@ -627,6 +627,9 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 }
 
 func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	if strings.Contains(config.Domain, "zhuque") {
+		a.logger.Info("GENERIC SearchTorrents called for tnode site!", zap.String("domain", config.Domain), zap.String("framework", a.framework))
+	}
 	u := buildSearchURL(config, a.framework, keyword)
 	if u == "" {
 		return nil, configError("未配置浏览页路径 (paths.browse)")
