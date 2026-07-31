@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/fingerprint"
-	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"go.uber.org/zap"
@@ -217,10 +216,6 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry, stats
 			stats.Skipped++
 			continue
 		}
-		if config.BaseURL != "" {
-			httpclient.ResetDomainCircuit(config.BaseURL)
-			httpclient.GlobalLimiter.ManualUnfreeze(config.BaseURL)
-		}
 		adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
 		if err != nil || adapter == nil {
 			r.logger.Debug("file-level recover: adapter failed",
@@ -397,8 +392,10 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 	}
 
 	// Phase 1: 源站优先——getSitePriority 已把 release_group_mappings(is_official) 的站排在 sites[0]
+	phase1Searched := ""
 	if groupName != "" && len(sites) > 1 {
 		sourceSite := sites[0]
+		phase1Searched = sourceSite
 		r.logger.Info("orphan L2: searching source site first",
 			zap.String("orphan", orphan.Name),
 			zap.String("keyword", searchKeyword),
@@ -408,10 +405,6 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 		searchCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		config, err := r.siteProvider.GetSiteConfig(searchCtx, sourceSite)
 		if err == nil && config != nil {
-			if config.BaseURL != "" {
-				httpclient.ResetDomainCircuit(config.BaseURL)
-				httpclient.GlobalLimiter.ManualUnfreeze(config.BaseURL)
-			}
 			adapter, err := r.siteProvider.GetAdapter(searchCtx, sourceSite)
 			if err == nil && adapter != nil {
 				results, searchErr := adapter.SearchTorrents(searchCtx, config, searchKeyword, nil)
@@ -478,6 +471,9 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 	var statsMu sync.Mutex
 
 	for _, site := range sites {
+		if site == phase1Searched {
+			continue
+		}
 		wg.Add(1)
 		go func(site string) {
 			defer wg.Done()
@@ -501,11 +497,6 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 				stats.Skipped++
 				statsMu.Unlock()
 				return
-			}
-
-			if config.BaseURL != "" {
-				httpclient.ResetDomainCircuit(config.BaseURL)
-				httpclient.GlobalLimiter.ManualUnfreeze(config.BaseURL)
 			}
 
 			adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
