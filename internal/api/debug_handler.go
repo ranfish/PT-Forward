@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/site"
+	"go.uber.org/zap"
 )
 
 func NewDebugSearchHandler(siteProvider *site.Provider) http.HandlerFunc {
@@ -33,6 +34,11 @@ func NewDebugSearchHandler(siteProvider *site.Provider) http.HandlerFunc {
 			Error(w, http.StatusNotFound, 40400, "adapter not found: "+siteName)
 			return
 		}
+
+		zap.L().Info("debug search adapter type",
+			zap.String("site", siteName),
+			zap.String("adapter_type", fmt.Sprintf("%T", adapter)),
+			zap.String("framework", adapter.Framework()))
 
 		results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
 		if err != nil {
