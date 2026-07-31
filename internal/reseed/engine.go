@@ -1857,20 +1857,9 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		return nil
 	}
 
-	var filteredByGroup, filteredBySize, filteredByEmptyID int
-	for _, r := range results {
-		if r.TorrentID == "" {
-			filteredByEmptyID++
-			continue
-		}
-		if !isMusic && !strings.Contains(r.Title, groupName) {
-			filteredByGroup++
-			continue
-		}
-		if !CompareSizeDisplay(fp.TotalSize, r.Size) {
-			filteredBySize++
-			continue
-		}
+	match, filterStats := VerifyMatchWithStats(results, groupName, fp.TotalSize)
+
+	if match != nil {
 		if l2s != nil {
 			l2s.record(siteName, "命中")
 			l2s.mu.Lock()
@@ -1882,13 +1871,13 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 			zap.String("keyword", keyword),
 			zap.String("groupName", groupName),
 			zap.Bool("music", isMusic),
-			zap.String("targetTorrentID", r.TorrentID),
-			zap.String("targetTitle", r.Title),
-			zap.Int64("targetSize", r.Size),
+			zap.String("targetTorrentID", match.TorrentID),
+			zap.String("targetTitle", match.Title),
+			zap.Int64("targetSize", match.Size),
 			zap.Int64("sourceSize", fp.TotalSize))
 		return &model.Candidate{
 			TargetSite:      siteName,
-			TargetTorrentID: r.TorrentID,
+			TargetTorrentID: match.TorrentID,
 			Confidence:      0.95,
 			MatchMethod:     "search_verify",
 		}
@@ -1900,15 +1889,15 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		zap.String("groupName", groupName),
 		zap.Bool("music", isMusic),
 		zap.Int("results", len(results)),
-		zap.Int("noTorrentID", filteredByEmptyID),
-		zap.Int("groupMismatch", filteredByGroup),
-		zap.Int("sizeMismatch", filteredBySize))
+		zap.Int("noTorrentID", filterStats.EmptyID),
+		zap.Int("groupMismatch", filterStats.GroupMiss),
+		zap.Int("sizeMismatch", filterStats.SizeMiss))
 	if l2s != nil {
-		reason := fmt.Sprintf("未匹配(group=%d,size=%d)", filteredByGroup, filteredBySize)
+		reason := fmt.Sprintf("未匹配(group=%d,size=%d)", filterStats.GroupMiss, filterStats.SizeMiss)
 		l2s.record(siteName, reason)
 		l2s.mu.Lock()
-		l2s.groupMismatch += filteredByGroup
-		l2s.sizeMismatch += filteredBySize
+		l2s.groupMismatch += filterStats.GroupMiss
+		l2s.sizeMismatch += filterStats.SizeMiss
 		l2s.mu.Unlock()
 	}
 
@@ -2149,24 +2138,39 @@ type L2MatchResult struct {
 	Size      int64
 }
 
-func VerifyMatch(results []*model.SeedingSearchResult, groupName string, sourceSize int64) *L2MatchResult {
+type MatchFilterStats struct {
+	EmptyID   int
+	GroupMiss int
+	SizeMiss  int
+}
+
+func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string, sourceSize int64) (*L2MatchResult, *MatchFilterStats) {
+	stats := &MatchFilterStats{}
 	for _, r := range results {
 		if r.TorrentID == "" {
+			stats.EmptyID++
 			continue
 		}
 		if groupName != "" && !strings.Contains(r.Title, groupName) {
+			stats.GroupMiss++
 			continue
 		}
 		if r.Size <= 0 || !CompareSizeDisplay(sourceSize, r.Size) {
+			stats.SizeMiss++
 			continue
 		}
 		return &L2MatchResult{
 			TorrentID: r.TorrentID,
 			Title:     r.Title,
 			Size:      r.Size,
-		}
+		}, stats
 	}
-	return nil
+	return nil, stats
+}
+
+func VerifyMatch(results []*model.SeedingSearchResult, groupName string, sourceSize int64) *L2MatchResult {
+	match, _ := VerifyMatchWithStats(results, groupName, sourceSize)
+	return match
 }
 
 func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName string, sourceSize int64) (*L2MatchResult, error) {
