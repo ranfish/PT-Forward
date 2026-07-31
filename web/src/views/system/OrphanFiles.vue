@@ -403,32 +403,39 @@ async function recoverOrphan(
   onProgress?: (elapsedSec: number) => void
 ): Promise<{ found: boolean; site: string; message: string }> {
   const startTime = Date.now()
-  const resp = await fetch('/api/v1/orphans/recover', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ path, client_id: clientID })
-  })
-  const data = await resp.json()
-  if (data.code !== 0) {
-    return { found: false, site: '', message: data.message || 'failed' }
-  }
-  const taskID = data.data.task_id
-  for (let i = 0; i < 100; i++) {
-    await new Promise(r => setTimeout(r, 3000))
-    const elapsed = Math.floor((Date.now() - startTime) / 1000)
-    onProgress?.(elapsed)
-    try {
-      const r = await fetch(`/api/v1/orphans/recover/${taskID}`, { headers: authHeaders() })
-      const d = await r.json()
-      if (d.code === 0 && d.data) {
-        const msg = d.data.message || ''
-        if (msg !== 'searching...' && msg !== '') {
-          return { found: !!d.data.found, site: d.data.site_name || '', message: msg }
+  const timer = onProgress ? setInterval(() => {
+    onProgress(Math.floor((Date.now() - startTime) / 1000))
+  }, 1000) : undefined
+  if (onProgress) onProgress(0)
+
+  try {
+    const resp = await fetch('/api/v1/orphans/recover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ path, client_id: clientID })
+    })
+    const data = await resp.json()
+    if (data.code !== 0) {
+      return { found: false, site: '', message: data.message || 'failed' }
+    }
+    const taskID = data.data.task_id
+    for (let i = 0; i < 100; i++) {
+      await new Promise(r => setTimeout(r, 3000))
+      try {
+        const r = await fetch(`/api/v1/orphans/recover/${taskID}`, { headers: authHeaders() })
+        const d = await r.json()
+        if (d.code === 0 && d.data) {
+          const msg = d.data.message || ''
+          if (msg !== 'searching...' && msg !== '') {
+            return { found: !!d.data.found, site: d.data.site_name || '', message: msg }
+          }
         }
-      }
-    } catch { /* ignore */ }
+      } catch { /* ignore */ }
+    }
+    return { found: false, site: '', message: '恢复超时（5分钟），请重试' }
+  } finally {
+    if (timer) clearInterval(timer)
   }
-  return { found: false, site: '', message: '恢复超时（5分钟），请重试' }
 }
 
 async function recover(orphan: OrphanEntry) {
