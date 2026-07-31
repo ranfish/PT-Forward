@@ -297,15 +297,15 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 			}
 
 			siteCtx, siteCancel := context.WithTimeout(searchCtx, 20*time.Second)
-			match, err := reseed.SearchAndVerifyMatch(siteCtx, adapter, config, searchKeyword, groupName, orphan.Size)
+			results2, err := adapter.SearchTorrents(siteCtx, config, searchKeyword, nil)
 			siteCancel()
 
-			statsMu.Lock()
 			if err != nil {
 				r.logger.Debug("orphan L2: search error",
 					zap.String("site", site),
 					zap.String("keyword", searchKeyword),
 					zap.Error(err))
+				statsMu.Lock()
 				stats.FailedSites = append(stats.FailedSites, SiteFailure{
 					Site:   site,
 					Reason: err.Error(),
@@ -313,26 +313,36 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 				statsMu.Unlock()
 				return
 			}
+
+			statsMu.Lock()
 			stats.Searched++
 			statsMu.Unlock()
 
-			if match != nil {
-				r.logger.Info("orphan L2 match",
-					zap.String("orphan", orphan.Name),
+			if len(results2) == 0 {
+				return
+			}
+
+			match, filterStats := reseed.VerifyMatchWithStats(results2, groupName, orphan.Size)
+			if match == nil {
+				r.logger.Debug("orphan L2: verify breakdown",
 					zap.String("site", site),
-					zap.String("torrent_id", match.TorrentID),
-					zap.String("matched_title", match.Title),
-					zap.Int64("orphan_size", orphan.Size),
-					zap.Int64("matched_size", match.Size))
-				select {
-				case resultCh <- matchResult{site, match.TorrentID, "l2:search:" + site}:
-				case <-searchCtx.Done():
-				}
-			} else {
-				r.logger.Debug("orphan L2: no match",
-					zap.String("site", site),
-					zap.String("keyword", searchKeyword),
-					zap.String("group", groupName))
+					zap.Int("results", len(results2)),
+					zap.Int("empty_id", filterStats.EmptyID),
+					zap.Int("group_miss", filterStats.GroupMiss),
+					zap.Int("size_miss", filterStats.SizeMiss))
+				return
+			}
+
+			r.logger.Info("orphan L2 match",
+				zap.String("orphan", orphan.Name),
+				zap.String("site", site),
+				zap.String("torrent_id", match.TorrentID),
+				zap.String("matched_title", match.Title),
+				zap.Int64("orphan_size", orphan.Size),
+				zap.Int64("matched_size", match.Size))
+			select {
+			case resultCh <- matchResult{site, match.TorrentID, "l2:search:" + site}:
+			case <-searchCtx.Done():
 			}
 		}(site)
 	}

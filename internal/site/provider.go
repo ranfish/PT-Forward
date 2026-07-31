@@ -148,6 +148,8 @@ func (p *Provider) applyOverrides(ctx context.Context, siteName string, config *
 			config.Paths.TakeUpload = o.FieldValue
 		case "paths.browse":
 			config.Paths.Browse = o.FieldValue
+		case "paths.search_param":
+			config.Paths.SearchParam = o.FieldValue
 		case "paths.detail":
 			config.Paths.Detail = o.FieldValue
 		default:
@@ -319,6 +321,8 @@ func (p *Provider) applyOverridesFromList(config *model.SiteConfig, overrides []
 			config.Paths.TakeUpload = o.FieldValue
 		case "paths.browse":
 			config.Paths.Browse = o.FieldValue
+		case "paths.search_param":
+			config.Paths.SearchParam = o.FieldValue
 		case "paths.detail":
 			config.Paths.Detail = o.FieldValue
 		default:
