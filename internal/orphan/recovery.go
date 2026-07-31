@@ -58,7 +58,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 	}
 
 	if orphan.IsDir {
-		fileResults := r.tryFileLevelRecover(ctx, orphan)
+		fileResults := r.tryFileLevelRecover(ctx, orphan, stats)
 		if len(fileResults) > 0 {
 			recovered := 0
 			for _, fr := range fileResults {
@@ -118,7 +118,7 @@ var skipSubDirs = map[string]bool{
 
 const maxFileLevelSearch = 20
 
-func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []FileRecoverResult {
+func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry, stats *SearchStats) []FileRecoverResult {
 	entries, err := os.ReadDir(orphan.Path)
 	if err != nil {
 		return nil
@@ -193,6 +193,9 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 		zap.Int("disk_files", len(diskFiles)))
 
 	sites := r.getSitePriority(ctx, dirGroup, orphan.Size)
+	if stats.TotalSites == 0 {
+		stats.TotalSites = len(sites)
+	}
 	searchCtx, searchCancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer searchCancel()
 
@@ -211,6 +214,7 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 		if err != nil || config == nil {
 			r.logger.Debug("file-level recover: site config failed",
 				zap.String("site", site), zap.Error(err))
+			stats.Skipped++
 			continue
 		}
 		if config.BaseURL != "" {
@@ -221,6 +225,7 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 		if err != nil || adapter == nil {
 			r.logger.Debug("file-level recover: adapter failed",
 				zap.String("site", site), zap.Error(err))
+			stats.Skipped++
 			continue
 		}
 
@@ -232,8 +237,10 @@ func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry) []Fil
 				zap.String("site", site),
 				zap.String("keyword", dirKeyword),
 				zap.Error(err))
+			stats.FailedSites = append(stats.FailedSites, SiteFailure{Site: site, Reason: err.Error()})
 			continue
 		}
+		stats.Searched++
 		if len(results2) == 0 {
 			r.logger.Debug("file-level recover: no results",
 				zap.String("site", site),
@@ -761,12 +768,4 @@ func waitForRecheck(ctx context.Context, dlClient model.DownloaderClient, infoHa
 		return fmt.Errorf("data verification incomplete: %.1f%% state=%s", ti.Progress*100, ti.State)
 	}
 	return fmt.Errorf("recheck timeout after %v", timeout)
-}
-
-func keysFromMap(m map[string]int64) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }
