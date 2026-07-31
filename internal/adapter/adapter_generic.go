@@ -753,6 +753,11 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 		title := stripTags(strings.TrimSpace(linkMatch[4]))
 
 		if len(results) > 0 && results[len(results)-1].TorrentID == torrentID {
+			if results[len(results)-1].Size == 0 {
+				if m := sizeRe.FindStringSubmatch(row); len(m) > 2 {
+					results[len(results)-1].Size = parseSizeStr(m[1] + " " + m[2])
+				}
+			}
 			continue
 		}
 
