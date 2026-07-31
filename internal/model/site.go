@@ -212,9 +212,10 @@ type SiteAuthConfig struct {
 }
 
 type SitePathsConfig struct {
-	Browse     string `yaml:"browse"`
-	Detail     string `yaml:"detail"`
-	Upload     string `yaml:"upload"`
+	Browse      string `yaml:"browse"`
+	SearchParam string `yaml:"search_param"`
+	Detail      string `yaml:"detail"`
+	Upload      string `yaml:"upload"`
 	TakeUpload string `yaml:"takeupload"`
 	RSS        string `yaml:"rss"`
 }

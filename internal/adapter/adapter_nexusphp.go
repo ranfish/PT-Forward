@@ -938,6 +938,11 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 		browsePaths = []string{config.Paths.Browse}
 	}
 
+	searchParam := config.Paths.SearchParam
+	if searchParam == "" {
+		searchParam = "search"
+	}
+
 	catParam := ""
 	if opts != nil && opts.Category != "" {
 		catParam = "&cat=" + opts.Category
@@ -945,7 +950,7 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 
 	var lastErr error
 	for _, bp := range browsePaths {
-		searchURL := u + bp + "?search=" + url.QueryEscape(keyword) + catParam
+		searchURL := u + bp + "?" + searchParam + "=" + url.QueryEscape(keyword) + catParam
 
 		req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 		if err != nil {

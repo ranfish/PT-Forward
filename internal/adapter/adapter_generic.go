@@ -627,26 +627,11 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 }
 
 func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-	browsePath := config.Paths.Browse
-	if browsePath == "" {
-		browsePath = "/torrents.php"
-		switch a.framework {
-		case "unit3d":
-			browsePath = "/torrents"
-		case "gazelle":
-			browsePath = "/torrents.php"
-		}
-	}
-	u := buildGenericURL(config, browsePath, "")
+	u := buildSearchURL(config, a.framework, keyword)
 	if u == "" {
 		return nil, configError("未配置浏览页路径 (paths.browse)")
 	}
 
-	if strings.Contains(u, "?") {
-		u += "&search=" + url.QueryEscape(keyword)
-	} else {
-		u += "?search=" + url.QueryEscape(keyword)
-	}
 	if opts != nil && opts.Category != "" {
 		u += "&cat=" + opts.Category
 	}
