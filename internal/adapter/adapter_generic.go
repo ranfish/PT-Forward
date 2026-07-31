@@ -32,8 +32,8 @@ var (
 	reGenericErrorClass        = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reGenericStripTags         = regexp.MustCompile(`<[^>]+>`)
 	reGenericBrowseRow         = regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
-	reGenericBrowseDetailLink  = regexp.MustCompile(`(?s)href="[^"]*(?:details?|torrent)[^"]*id=(\d+)[^"]*"[^>]*>(.*?)</a>`)
-	reGenericBrowseSize        = regexp.MustCompile(`(?i)([\d.]+)\s*(TB|GB|MB|KB)`)
+	reGenericBrowseDetailLink  = regexp.MustCompile(`(?s)href="(?:/t/|[^"]*\bdetails?\.php\?id=)(\d+)[^"]*"[^>]*>(.*?)</a>`)
+	reGenericBrowseSize        = regexp.MustCompile(`(?i)([\d.]+)\s*(?:<br\s*/?>)?\s*(TB|GB|MB|KB)`)
 	reGenericBrowseSeeders     = regexp.MustCompile(`>(\d+)</a>\s*</td>\s*$`)
 	reGenericBrowseLeechers    = regexp.MustCompile(`(\d+)\s*</td>\s*$`)
 	reGenericDigits            = regexp.MustCompile(`(\d+)`)
@@ -657,12 +657,7 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 		return nil, err
 	}
 
-	htmlStr := string(body)
-	if len(htmlStr) > 3000 {
-		a.logger.Debug("generic search raw html", zap.String("domain", config.Domain), zap.String("html_preview", htmlStr[:3000]))
-	}
-
-	return parseGenericBrowse(htmlStr, config), nil
+	return parseGenericBrowse(string(body), config), nil
 }
 
 func (a *GenericAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
