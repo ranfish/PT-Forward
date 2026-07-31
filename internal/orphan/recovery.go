@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"go.uber.org/zap"
@@ -40,6 +39,9 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 	if siteName == "" {
 		siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
 	}
+	if siteName == "" && orphan.IsDir {
+		siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
+	}
 
 	result.SearchStats = stats
 
@@ -54,26 +56,6 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 		}
 		result.Message = fmt.Sprintf("recovered from %s (method=%s)", siteName, method)
 		return result
-	}
-
-	if orphan.IsDir {
-		fileResults := r.tryFileLevelRecover(ctx, orphan, stats)
-		if len(fileResults) > 0 {
-			recovered := 0
-			for _, fr := range fileResults {
-				if fr.Found {
-					recovered++
-				}
-			}
-			result.FileResults = fileResults
-			if recovered > 0 {
-				result.Found = true
-				result.Message = fmt.Sprintf("%d/%d files recovered", recovered, len(fileResults))
-				return result
-			}
-			result.Message = fmt.Sprintf("0/%d files recovered (file-level search completed, no matches)", len(fileResults))
-			return result
-		}
 	}
 
 	result.Message = fmt.Sprintf("no matching torrent found on any site (searched: %d, skipped: %d, failed: %d)",
@@ -111,278 +93,60 @@ var searchableVideoExts = map[string]bool{
 	".mkv": true, ".mp4": true, ".ts": true, ".m2ts": true, ".iso": true,
 }
 
-var skipSubDirs = map[string]bool{
-	"BDMV": true, "SAMPLE": true, "Sample": true, "Subs": true, "Proof": true,
-}
-
-const maxFileLevelSearch = 20
-
-func (r *Recovery) tryFileLevelRecover(ctx context.Context, orphan *Entry, stats *SearchStats) []FileRecoverResult {
+func (r *Recovery) tryFileLevelL2Search(ctx context.Context, orphan *Entry, stats *SearchStats) (siteName, torrentID, method string) {
 	entries, err := os.ReadDir(orphan.Path)
-	if err != nil {
-		return nil
+	if err != nil || len(entries) == 0 {
+		return "", "", ""
 	}
 
-	for _, e := range entries {
-		if e.IsDir() && skipSubDirs[e.Name()] {
-			return nil
-		}
-	}
-
-	diskFiles := make(map[string]int64)
-	var videoFileNames []string
+	var largestFile string
+	var largestSize int64
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
 		ext := strings.ToLower(filepath.Ext(e.Name()))
-		if searchableVideoExts[ext] {
-			info, err := e.Info()
-			if err != nil {
-				continue
-			}
-			diskFiles[e.Name()] = info.Size()
-			videoFileNames = append(videoFileNames, e.Name())
-		}
-	}
-
-	if len(diskFiles) == 0 || len(diskFiles) > maxFileLevelSearch {
-		return nil
-	}
-
-	results := make([]FileRecoverResult, 0, len(videoFileNames))
-	covered := make(map[string]bool)
-
-	// §56.40: 优先从种子名提取关键词/制作组；提取不到或关键词太泛时从目录内最大文件名提取
-	// 老种子的种子名不标准（纯中文/特殊分隔符），但文件名遵循 PT 命名规则
-	dirKeyword := reseed.ExtractSearchKeyword(orphan.Name)
-	dirGroup := reseed.ExtractGroupName(orphan.Name)
-	// 关键词以年份开头 = 纯中文标题残留（只剩年份+分辨率），太泛需要从文件名提取
-	if dirKeyword == "" || dirGroup == "" || reseed.KeywordHasNoTitle(dirKeyword) {
-		var largestFile string
-		var largestSize int64
-		for fname, fsize := range diskFiles {
-			if fsize > largestSize {
-				largestSize = fsize
-				largestFile = fname
-			}
-		}
-		if largestFile != "" {
-			baseName := strings.TrimSuffix(largestFile, filepath.Ext(largestFile))
-			fileKeyword := reseed.ExtractSearchKeyword(baseName)
-			fileGroup := reseed.ExtractGroupName(baseName)
-			// 用文件名提取的结果覆盖（仅当文件名提取到更好的关键词/组名时）
-			if fileKeyword != "" && !reseed.KeywordHasNoTitle(fileKeyword) {
-				dirKeyword = fileKeyword
-			}
-			if fileGroup != "" {
-				dirGroup = fileGroup
-			}
-			r.logger.Info("file-level recover: keyword from largest file",
-				zap.String("orphan", orphan.Name),
-				zap.String("file", largestFile),
-				zap.String("keyword", dirKeyword),
-				zap.String("group", dirGroup))
-		}
-	}
-	r.logger.Info("file-level recover: directory search",
-		zap.String("orphan", orphan.Name),
-		zap.String("keyword", dirKeyword),
-		zap.String("group", dirGroup),
-		zap.Int("disk_files", len(diskFiles)))
-
-	sites := r.getSitePriority(ctx, dirGroup, orphan.Size)
-	if stats.TotalSites == 0 {
-		stats.TotalSites = len(sites)
-	}
-	searchCtx, searchCancel := context.WithTimeout(ctx, 3*time.Minute)
-	defer searchCancel()
-
-	for _, site := range sites {
-		if searchCtx.Err() != nil {
-			r.logger.Info("file-level recover: search context expired",
-				zap.String("orphan", orphan.Name),
-				zap.String("last_site", site))
-			break
-		}
-		if len(covered) == len(diskFiles) {
-			break
-		}
-
-		config, err := r.siteProvider.GetSiteConfig(searchCtx, site)
-		if err != nil || config == nil {
-			r.logger.Debug("file-level recover: site config failed",
-				zap.String("site", site), zap.Error(err))
-			stats.Skipped++
+		if !searchableVideoExts[ext] {
 			continue
 		}
-		adapter, err := r.siteProvider.GetAdapter(searchCtx, site)
-		if err != nil || adapter == nil {
-			r.logger.Debug("file-level recover: adapter failed",
-				zap.String("site", site), zap.Error(err))
-			stats.Skipped++
-			continue
-		}
-
-		siteCtx, siteCancel := context.WithTimeout(searchCtx, 20*time.Second)
-		results2, err := adapter.SearchTorrents(siteCtx, config, dirKeyword, nil)
-		siteCancel()
+		info, err := e.Info()
 		if err != nil {
-			r.logger.Info("file-level recover: search error",
-				zap.String("site", site),
-				zap.String("keyword", dirKeyword),
-				zap.Error(err))
-			stats.FailedSites = append(stats.FailedSites, SiteFailure{Site: site, Reason: err.Error()})
 			continue
 		}
-		stats.Searched++
-		if len(results2) == 0 {
-			r.logger.Debug("file-level recover: no results",
-				zap.String("site", site),
-				zap.String("keyword", dirKeyword))
-			continue
-		}
-
-		r.logger.Info("file-level recover: got results",
-			zap.String("site", site),
-			zap.Int("count", len(results2)),
-			zap.String("first_title", results2[0].Title[:min(80, len(results2[0].Title))]))
-
-		for _, res := range results2 {
-			if res.TorrentID == "" {
-				continue
-			}
-			if dirGroup != "" && !strings.Contains(res.Title, dirGroup) {
-				r.logger.Debug("file-level recover: title group mismatch",
-					zap.String("site", site),
-					zap.String("title", res.Title[:min(80, len(res.Title))]),
-					zap.String("expected_group", dirGroup))
-				continue
-			}
-
-			r.logger.Info("file-level recover: downloading torrent",
-				zap.String("site", site),
-				zap.String("torrent_id", res.TorrentID),
-				zap.String("title", res.Title[:min(80, len(res.Title))]))
-
-			dlCtx, dlCancel := context.WithTimeout(searchCtx, 30*time.Second)
-			torrentData, dlErr := adapter.DownloadTorrent(dlCtx, config, res.TorrentID)
-			dlCancel()
-			if dlErr != nil || len(torrentData) == 0 {
-				r.logger.Info("file-level recover: download failed",
-					zap.String("site", site),
-					zap.String("torrent_id", res.TorrentID),
-					zap.Error(dlErr))
-				continue
-			}
-
-			meta, metaErr := fingerprint.ComputeFromTorrent(torrentData)
-			if metaErr != nil || meta == nil {
-				r.logger.Info("file-level recover: fingerprint failed",
-					zap.String("site", site),
-					zap.String("torrent_id", res.TorrentID),
-					zap.Error(metaErr))
-				continue
-			}
-
-			// 检查磁盘上的视频文件是否都能被种子覆盖
-			// （种子可能含额外文件如 .jpg 封面、.nfo 等，不要求它们在磁盘上存在）
-			torrentFileSet := make(map[string]bool)
-			for torrentFile := range meta.FileTree {
-				torrentFileSet[filepath.Base(torrentFile)] = true
-			}
-
-			var matchedFiles []string
-			allDiskCovered := true
-			for diskFile := range diskFiles {
-				if covered[diskFile] {
-					continue
-				}
-				if torrentFileSet[diskFile] {
-					matchedFiles = append(matchedFiles, diskFile)
-				} else {
-					allDiskCovered = false
-					r.logger.Info("file-level recover: disk file not in torrent",
-						zap.String("site", site),
-						zap.String("disk_file", diskFile),
-						zap.Int("torrent_file_count", len(torrentFileSet)))
-				}
-			}
-
-			if !allDiskCovered || len(matchedFiles) == 0 {
-				continue
-			}
-
-			r.logger.Info("file-level match found",
-				zap.String("orphan", orphan.Name),
-				zap.String("site", site),
-				zap.String("torrent_id", res.TorrentID),
-				zap.Strings("matched_files", matchedFiles))
-
-			parentSavePath := filepath.Dir(orphan.Path)
-			clientID := ""
-			if len(orphan.ClientIDs) > 0 {
-				clientID = orphan.ClientIDs[0]
-			}
-			addEntry := &Entry{
-				Path:      orphan.Path,
-				Name:      orphan.Name,
-				ClientIDs: orphan.ClientIDs,
-				SavePath:  parentSavePath,
-			}
-
-			category, tags := r.getCategoryAndTags(site)
-			addErr := r.addTorrentWithRecheck(ctx, addEntry, clientID, torrentData, parentSavePath, category, tags)
-			if addErr != nil {
-				r.logger.Warn("file-level add failed",
-					zap.String("torrent_id", res.TorrentID),
-					zap.Error(addErr))
-				continue
-			}
-
-			for _, mf := range matchedFiles {
-				covered[mf] = true
-				results = append(results, FileRecoverResult{
-					FileName: mf,
-					Found:    true,
-					SiteName: site,
-					Message:  fmt.Sprintf("file-level:%s", res.TorrentID),
-				})
-			}
+		if info.Size() > largestSize {
+			largestSize = info.Size()
+			largestFile = e.Name()
 		}
 	}
-
-	for _, vf := range videoFileNames {
-		if !covered[vf] {
-			results = append(results, FileRecoverResult{
-				FileName: vf,
-				Found:    false,
-				Message:  "not found",
-			})
-		}
+	if largestFile == "" {
+		return "", "", ""
 	}
 
-	return results
+	baseName := strings.TrimSuffix(largestFile, filepath.Ext(largestFile))
+	fileKeyword := reseed.ExtractSearchKeyword(baseName)
+	fileGroup := reseed.ExtractGroupName(baseName)
+
+	dirKeyword := reseed.ExtractSearchKeyword(orphan.Name)
+	if fileKeyword == "" || reseed.KeywordHasNoTitle(fileKeyword) || fileKeyword == dirKeyword {
+		return "", "", ""
+	}
+
+	r.logger.Info("orphan file-level L2: keyword from largest file",
+		zap.String("orphan", orphan.Name),
+		zap.String("file", largestFile),
+		zap.String("keyword", fileKeyword),
+		zap.String("group", fileGroup))
+
+	return r.tryL2SearchCore(ctx, orphan, stats, fileKeyword, fileGroup)
 }
 
 func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *SearchStats) (siteName, torrentID, method string) {
-	if r.siteProvider == nil {
-		return "", "", ""
-	}
-
-	groupName := reseed.ExtractGroupName(orphan.Name)
-	sites := r.getSitePriority(ctx, groupName, orphan.Size)
-	if len(sites) == 0 {
-		return "", "", ""
-	}
-	stats.TotalSites = len(sites)
-
 	searchKeyword := reseed.ExtractSearchKeyword(orphan.Name)
 	if searchKeyword == "" {
 		searchKeyword = orphan.Name
 	}
+	groupName := reseed.ExtractGroupName(orphan.Name)
 
-	// 关键词缺少有效标题内容（纯中文标题残留或续集编号）→ 跳过 L2，走文件级恢复
 	if reseed.KeywordHasNoTitle(searchKeyword) {
 		r.logger.Info("orphan L2: skipped (keyword has no title)",
 			zap.String("orphan", orphan.Name),
@@ -390,6 +154,20 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 			zap.String("group", groupName))
 		return "", "", ""
 	}
+
+	return r.tryL2SearchCore(ctx, orphan, stats, searchKeyword, groupName)
+}
+
+func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *SearchStats, searchKeyword, groupName string) (siteName, torrentID, method string) {
+	if r.siteProvider == nil {
+		return "", "", ""
+	}
+
+	sites := r.getSitePriority(ctx, groupName, orphan.Size)
+	if len(sites) == 0 {
+		return "", "", ""
+	}
+	stats.TotalSites = len(sites)
 
 	// Phase 1: 源站优先——getSitePriority 已把 release_group_mappings(is_official) 的站排在 sites[0]
 	phase1Searched := ""
