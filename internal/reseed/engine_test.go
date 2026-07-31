@@ -2681,3 +2681,102 @@ func TestKeywordStartsWithYear(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifyMatch(t *testing.T) {
+	const gb = int64(1073741824)
+	sourceSize := 10 * gb
+
+	makeResults := func(items ...struct{ id, title string; size int64 }) []*model.SeedingSearchResult {
+		out := make([]*model.SeedingSearchResult, len(items))
+		for i, it := range items {
+			out[i] = &model.SeedingSearchResult{TorrentID: it.id, Title: it.title, Size: it.size}
+		}
+		return out
+	}
+
+	tests := []struct {
+		name      string
+		results   []*model.SeedingSearchResult
+		groupName string
+		sourceSz  int64
+		wantID    string
+	}{
+		{
+			name:     "empty results",
+			results:  nil,
+			wantID:   "",
+		},
+		{
+			name:    "group in title, size match",
+			results: makeResults(struct{ id, title string; size int64 }{"t1", "Movie.1999.GROUP", sourceSize}),
+			groupName: "GROUP",
+			sourceSz:  sourceSize,
+			wantID:    "t1",
+		},
+		{
+			name:    "group not in title, strict skip",
+			results: makeResults(struct{ id, title string; size int64 }{"t1", "Movie.1999.OTHER", sourceSize}),
+			groupName: "GROUP",
+			sourceSz:  sourceSize,
+			wantID:    "",
+		},
+		{
+			name:    "empty group, match on size only",
+			results: makeResults(struct{ id, title string; size int64 }{"t2", "Movie.1999.ANY", sourceSize}),
+			groupName: "",
+			sourceSz:  sourceSize,
+			wantID:    "t2",
+		},
+		{
+			name:    "size mismatch",
+			results: makeResults(struct{ id, title string; size int64 }{"t3", "Movie.1999.GROUP", 5 * gb}),
+			groupName: "GROUP",
+			sourceSz:  sourceSize,
+			wantID:    "",
+		},
+		{
+			name:    "empty torrent id skipped",
+			results: makeResults(
+				struct{ id, title string; size int64 }{"", "Movie.1999.GROUP", sourceSize},
+				struct{ id, title string; size int64 }{"t4", "Movie.1999.GROUP", sourceSize},
+			),
+			groupName: "GROUP",
+			sourceSz:  sourceSize,
+			wantID:    "t4",
+		},
+		{
+			name:    "truncated title strict, no match",
+			results: makeResults(struct{ id, title string; size int64 }{"t5", "Movie.1999..", sourceSize}),
+			groupName: "GROUP",
+			sourceSz:  sourceSize,
+			wantID:    "",
+		},
+		{
+			name:    "truncated title relaxed via empty group",
+			results: makeResults(struct{ id, title string; size int64 }{"t6", "Movie.1999..", sourceSize}),
+			groupName: "",
+			sourceSz:  sourceSize,
+			wantID:    "t6",
+		},
+		{
+			name:    "zero size skipped",
+			results: makeResults(struct{ id, title string; size int64 }{"t7", "Movie.1999.GROUP", 0}),
+			groupName: "GROUP",
+			sourceSz:  sourceSize,
+			wantID:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := VerifyMatch(tt.results, tt.groupName, tt.sourceSz)
+			gotID := ""
+			if got != nil {
+				gotID = got.TorrentID
+			}
+			if gotID != tt.wantID {
+				t.Errorf("VerifyMatch() = %q, want %q", gotID, tt.wantID)
+			}
+		})
+	}
+}
