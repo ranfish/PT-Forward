@@ -119,7 +119,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 	return allOrphans, nil
 }
 
-var skipSuffixes = []string{".!qB", ".parts", ".tmp"}
+var skipSuffixes = []string{".!qb", ".parts", ".tmp"}
 var skipNames = map[string]bool{
 	".DS_Store":          true,
 	"Thumbs.db":          true,
