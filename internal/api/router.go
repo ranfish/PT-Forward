@@ -60,6 +60,7 @@ type Router struct {
 	metadataHandler       *MetadataHandler
 	sseLogHandler         *SSELogHandler
 	orphanHandler         *OrphanHandler
+	debugSiteProvider     *site.Provider
 	logBroadcaster        *LogBroadcaster
 	wsHandler            *WSHandler
 	hub                  *Hub
@@ -203,6 +204,10 @@ func (rt *Router) SetCookieCloudServer(srv http.Handler) {
 
 func (rt *Router) SetupOrphan(scanner *orphan.Scanner, recovery *orphan.Recovery, db *gorm.DB) {
 	rt.orphanHandler = NewOrphanHandler(scanner, recovery, db, rt.authManager, rt.logger)
+}
+
+func (rt *Router) SetupDebug(siteProvider *site.Provider) {
+	rt.debugSiteProvider = siteProvider
 }
 
 // SetupCompliance §56.39: 注入 compliance.Checker（用于 CRUD 后 InvalidateCache）。
@@ -416,6 +421,11 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 		orphanH := rt.chain(rt.rateLimitMW, rt.orphanHandler.ServeHTTP)
 		mux.Handle("/api/v1/orphans", orphanH)
 		mux.Handle("/api/v1/orphans/", orphanH)
+	}
+
+	if rt.debugSiteProvider != nil {
+		debugH := rt.protected(NewDebugSearchHandler(rt.debugSiteProvider))
+		mux.Handle("/api/v1/debug/search", debugH)
 	}
 
 	ptHandler := rt.chain(writeLimitMW, rt.publishTorrentsHandler.ServeHTTP)
