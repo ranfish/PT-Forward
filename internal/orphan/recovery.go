@@ -324,12 +324,20 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 
 			match, filterStats := reseed.VerifyMatchWithStats(results2, groupName, orphan.Size)
 			if match == nil {
+				firstTitle := ""
+				if len(results2) > 0 {
+					t := results2[0].Title
+					if len(t) > 80 { t = t[:80] }
+					firstTitle = t
+				}
 				r.logger.Debug("orphan L2: verify breakdown",
 					zap.String("site", site),
 					zap.Int("results", len(results2)),
 					zap.Int("empty_id", filterStats.EmptyID),
 					zap.Int("group_miss", filterStats.GroupMiss),
-					zap.Int("size_miss", filterStats.SizeMiss))
+					zap.Int("size_miss", filterStats.SizeMiss),
+					zap.String("first_title", firstTitle),
+					zap.String("expected_group", groupName))
 				return
 			}
 
