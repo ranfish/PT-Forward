@@ -98,7 +98,7 @@
             />
           </template>
           <template v-if="column.key === 'status'">
-            <a-tag v-if="record._status === 'searching'" color="processing">搜索中...</a-tag>
+            <a-tag v-if="record._status === 'searching'" color="processing">搜索中 {{ record._elapsed || 0 }}s</a-tag>
             <a-tag v-else-if="record._status === 'found'" color="success">已恢复</a-tag>
             <a-tag v-else-if="record._status === 'notfound'" color="default">未找到</a-tag>
             <a-tag v-else-if="record._status === 'error'" color="error">失败</a-tag>
@@ -206,6 +206,7 @@ interface OrphanEntry {
   detected_at: string
   _status?: string
   _selectedClient?: string
+  _elapsed?: number
 }
 
 interface BatchResult {
@@ -396,7 +397,12 @@ async function deleteScanConfig(id: number) {
   } catch { /* ignore */ }
 }
 
-async function recoverOrphan(path: string, clientID?: string): Promise<{ found: boolean; site: string; message: string }> {
+async function recoverOrphan(
+  path: string,
+  clientID?: string,
+  onProgress?: (elapsedSec: number) => void
+): Promise<{ found: boolean; site: string; message: string }> {
+  const startTime = Date.now()
   const resp = await fetch('/api/v1/orphans/recover', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -407,8 +413,10 @@ async function recoverOrphan(path: string, clientID?: string): Promise<{ found: 
     return { found: false, site: '', message: data.message || 'failed' }
   }
   const taskID = data.data.task_id
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 100; i++) {
     await new Promise(r => setTimeout(r, 3000))
+    const elapsed = Math.floor((Date.now() - startTime) / 1000)
+    onProgress?.(elapsed)
     try {
       const r = await fetch(`/api/v1/orphans/recover/${taskID}`, { headers: authHeaders() })
       const d = await r.json()
@@ -420,7 +428,7 @@ async function recoverOrphan(path: string, clientID?: string): Promise<{ found: 
       }
     } catch { /* ignore */ }
   }
-  return { found: false, site: '', message: 'timeout' }
+  return { found: false, site: '', message: '恢复超时（5分钟），请重试' }
 }
 
 async function recover(orphan: OrphanEntry) {
@@ -428,7 +436,9 @@ async function recover(orphan: OrphanEntry) {
   resultVisible.value = false
   message.loading(t('orphan.recovering'), 0)
   try {
-    const result = await recoverOrphan(orphan.path, orphan._selectedClient)
+    const result = await recoverOrphan(orphan.path, orphan._selectedClient, (sec) => {
+      orphan._elapsed = sec
+    })
     message.destroy()
     if (result.found) {
       orphan._status = 'found'
@@ -466,7 +476,9 @@ async function batchRecover() {
       const orphan = selected[index++]
       orphan._status = 'searching'
       try {
-        const result = await recoverOrphan(orphan.path, orphan._selectedClient)
+    const result = await recoverOrphan(orphan.path, orphan._selectedClient, (sec) => {
+      orphan._elapsed = sec
+    })
         batchResults.value.push({
           path: orphan.path,
           name: orphan.name,

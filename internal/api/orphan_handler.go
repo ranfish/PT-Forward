@@ -162,11 +162,11 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 	h.recoverStore.Store(taskID, &orphan.RecoverResult{Orphan: target, Message: "searching..."})
 
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 		result := h.recovery.Recover(ctx, target, req.ClientID)
 		h.recoverStore.Store(taskID, result)
-		// 延迟清理任务结果（前端有 50×3s=150s 轮询窗口）
+		// 延迟清理任务结果（前端有 100×3s=300s 轮询窗口）
 		time.AfterFunc(10*time.Minute, func() { h.recoverStore.Delete(taskID) })
 		if result.Found {
 			h.mu.Lock()
