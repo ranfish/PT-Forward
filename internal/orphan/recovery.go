@@ -197,26 +197,23 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 						zap.Int("result_count", len(results)),
 						zap.Int64("orphan_size", orphan.Size))
 
-					match, filterStats := reseed.VerifyMatchWithStats(results, groupName, orphan.Size)
+					match, filterStats := reseed.VerifyMatchWithTruncationCheck(results, groupName, orphan.Size)
 
 					if match == nil {
+						firstTitle := ""
+						if len(results) > 0 {
+							t := results[0].Title
+							if len(t) > 80 { t = t[:80] }
+							firstTitle = t
+						}
 						r.logger.Debug("orphan L2 priority: verify breakdown",
 							zap.String("site", sourceSite),
 							zap.Int("results", len(results)),
 							zap.Int("empty_id", filterStats.EmptyID),
 							zap.Int("group_miss", filterStats.GroupMiss),
-							zap.Int("size_miss", filterStats.SizeMiss))
-					}
-
-					if match == nil && groupName != "" {
-						for _, res := range results {
-							if strings.HasSuffix(strings.TrimSpace(res.Title), "..") {
-								r.logger.Debug("orphan L2 priority: truncated titles found, retrying without group filter",
-									zap.String("site", sourceSite))
-								match = reseed.VerifyMatch(results, "", orphan.Size)
-								break
-							}
-						}
+							zap.Int("size_miss", filterStats.SizeMiss),
+							zap.String("first_title", firstTitle),
+							zap.String("expected_group", groupName))
 					}
 
 					if match != nil {
@@ -322,7 +319,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 				return
 			}
 
-			match, filterStats := reseed.VerifyMatchWithStats(results2, groupName, orphan.Size)
+			match, filterStats := reseed.VerifyMatchWithTruncationCheck(results2, groupName, orphan.Size)
 			if match == nil {
 				firstTitle := ""
 				if len(results2) > 0 {

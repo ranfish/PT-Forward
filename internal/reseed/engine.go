@@ -1857,7 +1857,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		return nil
 	}
 
-	match, filterStats := VerifyMatchWithStats(results, groupName, fp.TotalSize)
+	match, filterStats := VerifyMatchWithTruncationCheck(results, groupName, fp.TotalSize)
 
 	if match != nil {
 		if l2s != nil {
@@ -2173,6 +2173,18 @@ func VerifyMatch(results []*model.SeedingSearchResult, groupName string, sourceS
 	return match
 }
 
+func VerifyMatchWithTruncationCheck(results []*model.SeedingSearchResult, groupName string, sourceSize int64) (*L2MatchResult, *MatchFilterStats) {
+	match, stats := VerifyMatchWithStats(results, groupName, sourceSize)
+	if match == nil && groupName != "" {
+		for _, r := range results {
+			if strings.HasSuffix(strings.TrimSpace(r.Title), "..") {
+				return VerifyMatchWithStats(results, "", sourceSize)
+			}
+		}
+	}
+	return match, stats
+}
+
 func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName string, sourceSize int64) (*L2MatchResult, error) {
 	if keyword == "" {
 		return nil, nil
@@ -2181,7 +2193,8 @@ func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config
 	if err != nil {
 		return nil, err
 	}
-	return VerifyMatch(results, groupName, sourceSize), nil
+	match, _ := VerifyMatchWithTruncationCheck(results, groupName, sourceSize)
+	return match, nil
 }
 
 var videoExtensions = []string{".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".flv", ".mov"}
