@@ -753,10 +753,16 @@ func (a *TNodeAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 		return nil, err
 	}
 
+	bodyStr := string(body)
+	a.logger.Debug("tnode search response",
+		zap.String("url", u),
+		zap.Int("status", resp.StatusCode),
+		zap.Int("body_len", len(bodyStr)),
+		zap.Bool("has_csrf", csrfToken != ""),
+		zap.String("preview", truncStr(bodyStr, 500)))
+
 	if resp.StatusCode != http.StatusOK {
-		snippet := string(body)
-		if len(snippet) > 200 { snippet = snippet[:200] }
-		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
+		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, truncStr(bodyStr, 200)), nil)
 	}
 
 	var apiResp struct {
@@ -835,4 +841,11 @@ func toInt(v interface{}) int {
 	default:
 		return 0
 	}
+}
+
+func truncStr(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
 }
