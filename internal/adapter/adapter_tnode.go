@@ -728,6 +728,7 @@ func (a *TNodeAdapter) scrapeSecurityKeys(ctx context.Context, config *model.Sit
 }
 
 func (a *TNodeAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	a.logger.Info("tnode SearchTorrents called", zap.String("domain", config.Domain), zap.String("keyword", keyword))
 	baseURL := resolveBaseURL(config)
 	csrfToken, _ := a.fetchCSRFToken(ctx, config, baseURL+"/index")
 
