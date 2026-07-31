@@ -1189,7 +1189,6 @@
     "selectClient": "Select Downloader",
     "addScanPath": "Add Scan Path",
     "added": "Added",
-    "recoverSettings": "Recovery Settings",
     "categoryLabel": "Category",
     "tagsLabel": "Tags (comma-separated)",
     "recovering": "Searching sites and recovering, please wait...",

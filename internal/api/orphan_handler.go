@@ -318,19 +318,23 @@ func (h *OrphanHandler) handleListIgnored(w http.ResponseWriter, r *http.Request
 }
 
 func (h *OrphanHandler) handleUnignore(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Path string `json:"path"`
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		var req struct {
+			Path string `json:"path"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+			return
+		}
+		path = req.Path
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
-		return
-	}
-	if req.Path == "" {
+	if path == "" {
 		Error(w, http.StatusBadRequest, 40001, "path 必填")
 		return
 	}
 
-	h.db.Where("key = ? AND value = ?", "orphan_ignored_path", req.Path).Delete(&setting.Setting{})
+	h.db.Where("key = ? AND value = ?", "orphan_ignored_path", path).Delete(&setting.Setting{})
 	Success(w, map[string]interface{}{"unignored": true})
 }
 
