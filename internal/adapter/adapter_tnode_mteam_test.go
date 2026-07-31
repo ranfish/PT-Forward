@@ -971,17 +971,19 @@ func TestMTeamAdapter_GenDlToken_EmptyData(t *testing.T) {
 }
 
 func TestTNode_VerifyExists_Found(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>
-		<tr><td><a href="details.php?id=42">Found Torrent</a></td></tr>
-		</body></html>`))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/index") {
+			w.Write([]byte(`<html><meta name="x-csrf-token" content="testcsrf"/></html>`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":200,"data":{"list":[{"id":"42","name":"Found Torrent","size":1024}]}}`))
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewTNodeAdapter(doer, zap.NewNop())
 	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
-	config.Paths.Browse = "/browse.php"
 
 	found, err := a.VerifyExists(context.Background(), config, "42")
 	if err != nil {
@@ -993,17 +995,19 @@ func TestTNode_VerifyExists_Found(t *testing.T) {
 }
 
 func TestTNode_VerifyExists_NotFound(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>
-		<tr><td><a href="details.php?id=99">Other Torrent</a></td></tr>
-		</body></html>`))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/index") {
+			w.Write([]byte(`<html><meta name="x-csrf-token" content="testcsrf"/></html>`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":200,"data":{"list":[{"id":"99","name":"Other Torrent","size":1024}]}}`))
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewTNodeAdapter(doer, zap.NewNop())
 	config := &model.SiteConfig{Domain: srv.URL, Cookie: "sid=test"}
-	config.Paths.Browse = "/browse.php"
 
 	found, err := a.VerifyExists(context.Background(), config, "42")
 	if err != nil {
