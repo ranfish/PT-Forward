@@ -657,7 +657,12 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 		return nil, err
 	}
 
-	return parseGenericBrowse(string(body), config), nil
+	htmlStr := string(body)
+	if len(htmlStr) > 3000 {
+		a.logger.Debug("generic search raw html", zap.String("domain", config.Domain), zap.String("html_preview", htmlStr[:3000]))
+	}
+
+	return parseGenericBrowse(htmlStr, config), nil
 }
 
 func (a *GenericAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
