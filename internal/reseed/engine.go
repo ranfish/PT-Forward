@@ -2149,14 +2149,7 @@ type L2MatchResult struct {
 	Size      int64
 }
 
-func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName string, sourceSize int64) (*L2MatchResult, error) {
-	if keyword == "" {
-		return nil, nil
-	}
-	results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
-	if err != nil {
-		return nil, err
-	}
+func VerifyMatch(results []*model.SeedingSearchResult, groupName string, sourceSize int64) *L2MatchResult {
 	for _, r := range results {
 		if r.TorrentID == "" {
 			continue
@@ -2171,9 +2164,20 @@ func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config
 			TorrentID: r.TorrentID,
 			Title:     r.Title,
 			Size:      r.Size,
-		}, nil
+		}
 	}
-	return nil, nil
+	return nil
+}
+
+func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName string, sourceSize int64) (*L2MatchResult, error) {
+	if keyword == "" {
+		return nil, nil
+	}
+	results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
+	if err != nil {
+		return nil, err
+	}
+	return VerifyMatch(results, groupName, sourceSize), nil
 }
 
 var videoExtensions = []string{".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".flv", ".mov"}

@@ -414,7 +414,6 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 			}
 			adapter, err := r.siteProvider.GetAdapter(searchCtx, sourceSite)
 			if err == nil && adapter != nil {
-				// 诊断模式：直接搜索并逐条日志，而非调用 SearchAndVerifyMatch
 				results, searchErr := adapter.SearchTorrents(searchCtx, config, searchKeyword, nil)
 				if searchErr != nil {
 					r.logger.Debug("orphan L2 priority: search error",
@@ -426,29 +425,28 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 						zap.String("site", sourceSite),
 						zap.Int("result_count", len(results)),
 						zap.Int64("orphan_size", orphan.Size))
-					for _, res := range results {
-						// 标题被截断（以 .. 结尾）时放宽 group 过滤：
-						// 源站搜索的上下文已保证组别正确，截断标题不含组名不是不匹配
-						titleTruncated := strings.HasSuffix(strings.TrimSpace(res.Title), "..")
-						hasGroup := groupName == "" || titleTruncated || strings.Contains(res.Title, groupName)
-						sizeOk := res.Size > 0 && reseed.CompareSizeDisplay(orphan.Size, res.Size)
-						if hasGroup && sizeOk {
-							cancel()
-							r.logger.Info("orphan L2 match (priority)",
-								zap.String("orphan", orphan.Name),
-								zap.String("site", sourceSite),
-								zap.String("torrent_id", res.TorrentID),
-								zap.String("matched_title", res.Title),
-								zap.Bool("title_truncated", titleTruncated))
-							return sourceSite, res.TorrentID, "l2:priority:" + sourceSite
+
+					match := reseed.VerifyMatch(results, groupName, orphan.Size)
+
+					if match == nil && groupName != "" {
+						for _, res := range results {
+							if strings.HasSuffix(strings.TrimSpace(res.Title), "..") {
+								r.logger.Debug("orphan L2 priority: truncated titles found, retrying without group filter",
+									zap.String("site", sourceSite))
+								match = reseed.VerifyMatch(results, "", orphan.Size)
+								break
+							}
 						}
-						r.logger.Debug("orphan L2 priority: result skipped",
+					}
+
+					if match != nil {
+						cancel()
+						r.logger.Info("orphan L2 match (priority)",
+							zap.String("orphan", orphan.Name),
 							zap.String("site", sourceSite),
-							zap.String("tid", res.TorrentID),
-							zap.String("title", res.Title[:min(60, len(res.Title))]),
-							zap.Int64("size", res.Size),
-							zap.Bool("has_group", hasGroup),
-							zap.Bool("size_ok", sizeOk))
+							zap.String("torrent_id", match.TorrentID),
+							zap.String("matched_title", match.Title))
+						return sourceSite, match.TorrentID, "l2:priority:" + sourceSite
 					}
 					r.logger.Debug("orphan L2 priority: no match",
 						zap.String("site", sourceSite))
