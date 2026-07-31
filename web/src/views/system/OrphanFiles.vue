@@ -434,6 +434,7 @@ async function recoverOrphan(
 async function recover(orphan: OrphanEntry) {
   recovering.value = orphan.path
   resultVisible.value = false
+  orphan._elapsed = 0
   message.loading(t('orphan.recovering'), 0)
   try {
     const result = await recoverOrphan(orphan.path, orphan._selectedClient, (sec) => {
@@ -475,10 +476,11 @@ async function batchRecover() {
     while (index < selected.length) {
       const orphan = selected[index++]
       orphan._status = 'searching'
+      orphan._elapsed = 0
       try {
-    const result = await recoverOrphan(orphan.path, orphan._selectedClient, (sec) => {
-      orphan._elapsed = sec
-    })
+        const result = await recoverOrphan(orphan.path, orphan._selectedClient, (sec) => {
+          orphan._elapsed = sec
+        })
         batchResults.value.push({
           path: orphan.path,
           name: orphan.name,
