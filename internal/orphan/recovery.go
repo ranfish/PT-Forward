@@ -197,7 +197,16 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 						zap.Int("result_count", len(results)),
 						zap.Int64("orphan_size", orphan.Size))
 
-					match := reseed.VerifyMatch(results, groupName, orphan.Size)
+					match, filterStats := reseed.VerifyMatchWithStats(results, groupName, orphan.Size)
+
+					if match == nil {
+						r.logger.Debug("orphan L2 priority: verify breakdown",
+							zap.String("site", sourceSite),
+							zap.Int("results", len(results)),
+							zap.Int("empty_id", filterStats.EmptyID),
+							zap.Int("group_miss", filterStats.GroupMiss),
+							zap.Int("size_miss", filterStats.SizeMiss))
+					}
 
 					if match == nil && groupName != "" {
 						for _, res := range results {
