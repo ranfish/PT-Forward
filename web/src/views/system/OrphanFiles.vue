@@ -455,38 +455,54 @@ async function batchRecover() {
   batchResults.value = []
   batchStats.value = { total: selected.length, found: 0, notFound: 0, error: 0 }
 
-  for (let i = 0; i < selected.length; i++) {
-    const orphan = selected[i]
-    orphan._status = 'searching'
-    try {
-      const result = await recoverOrphan(orphan.path, orphan._selectedClient)
-      batchResults.value.push({
-        path: orphan.path,
-        name: orphan.name,
-        found: result.found,
-        site: result.site,
-        message: result.message
-      })
-      if (result.found) {
-        orphan._status = 'found'
-        batchStats.value.found++
-      } else {
-        orphan._status = 'notfound'
-        batchStats.value.notFound++
+  const MAX_CONCURRENT = 5
+  let index = 0
+  let done = 0
+
+  message.loading({ content: `${t('orphan.batchRecovering')} 0/${selected.length}`, key: 'batch-recover', duration: 0 })
+
+  const worker = async () => {
+    while (index < selected.length) {
+      const orphan = selected[index++]
+      orphan._status = 'searching'
+      try {
+        const result = await recoverOrphan(orphan.path, orphan._selectedClient)
+        batchResults.value.push({
+          path: orphan.path,
+          name: orphan.name,
+          found: result.found,
+          site: result.site,
+          message: result.message
+        })
+        if (result.found) {
+          orphan._status = 'found'
+          batchStats.value.found++
+        } else {
+          orphan._status = 'notfound'
+          batchStats.value.notFound++
+        }
+      } catch {
+        batchResults.value.push({
+          path: orphan.path,
+          name: orphan.name,
+          found: false,
+          message: 'error'
+        })
+        orphan._status = 'error'
+        batchStats.value.error++
       }
-    } catch {
-      batchResults.value.push({
-        path: orphan.path,
-        name: orphan.name,
-        found: false,
-        message: 'error'
-      })
-      orphan._status = 'error'
-      batchStats.value.error++
+      done++
+      message.loading({ content: `${t('orphan.batchRecovering')} ${done}/${selected.length}`, key: 'batch-recover', duration: 0 })
     }
   }
 
-  message.destroy()
+  const workers = []
+  for (let i = 0; i < Math.min(MAX_CONCURRENT, selected.length); i++) {
+    workers.push(worker())
+  }
+  await Promise.all(workers)
+
+  message.destroy('batch-recover')
   batchResultVisible.value = true
   selectedRowKeys.value = []
   batchRecovering.value = false
