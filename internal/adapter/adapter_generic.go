@@ -32,7 +32,7 @@ var (
 	reGenericErrorClass        = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reGenericStripTags         = regexp.MustCompile(`<[^>]+>`)
 	reGenericBrowseRow         = regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
-	reGenericBrowseDetailLink  = regexp.MustCompile(`(?s)href="(?:/t/|[^"]*\bdetails?\.php\?id=)(\d+)[^"]*"[^>]*>(.*?)</a>`)
+	reGenericBrowseDetailLink  = regexp.MustCompile(`(?s)href="(?:/t/(\d+)/|[^"]*\bdetails?\.php\?id=(\d+)|[^"]*torrent[s]?\.php\?(?:torrent)?id=(\d+))[^"]*"[^>]*>(.*?)</a>`)
 	reGenericBrowseSize        = regexp.MustCompile(`(?i)([\d.]+)\s*(?:<br\s*/?>)?\s*(TB|GB|MB|KB)`)
 	reGenericBrowseSeeders     = regexp.MustCompile(`>(\d+)</a>\s*</td>\s*$`)
 	reGenericBrowseLeechers    = regexp.MustCompile(`(\d+)\s*</td>\s*$`)
@@ -739,12 +739,18 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 	rows := rowRe.FindAllString(html, -1)
 	for _, row := range rows {
 		linkMatch := detailLinkRe.FindStringSubmatch(row)
-		if len(linkMatch) < 3 {
+		if len(linkMatch) < 5 {
 			continue
 		}
 
 		torrentID := linkMatch[1]
-		title := stripTags(strings.TrimSpace(linkMatch[2]))
+		if torrentID == "" {
+			torrentID = linkMatch[2]
+		}
+		if torrentID == "" {
+			torrentID = linkMatch[3]
+		}
+		title := stripTags(strings.TrimSpace(linkMatch[4]))
 
 		if len(results) > 0 && results[len(results)-1].TorrentID == torrentID {
 			continue
