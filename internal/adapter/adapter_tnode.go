@@ -726,3 +726,113 @@ func (a *TNodeAdapter) scrapeSecurityKeys(ctx context.Context, config *model.Sit
 		zap.Bool("rss_key", stats.RSSKey != ""),
 		zap.Bool("torrent_key", stats.AuthKey != ""))
 }
+
+func (a *TNodeAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	baseURL := resolveBaseURL(config)
+	csrfToken, _ := a.fetchCSRFToken(ctx, config, baseURL+"/index")
+
+	u := baseURL + "/api/torrent/list?page=1&pageSize=20&search=" + url.QueryEscape(keyword)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, searchError("构造搜索请求失败", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+	if csrfToken != "" {
+		req.Header.Set("x-csrf-token", csrfToken)
+	}
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, searchError("搜索请求失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 200 { snippet = snippet[:200] }
+		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
+	}
+
+	var apiResp struct {
+		Status  int             `json:"status"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, searchError("解析搜索结果失败", err)
+	}
+
+	var results []*model.SeedingSearchResult
+	var dataMap map[string]json.RawMessage
+	if json.Unmarshal(apiResp.Data, &dataMap) == nil {
+		for _, key := range []string{"list", "data", "torrents", "rows"} {
+			if raw, ok := dataMap[key]; ok {
+				results = parseTNodeList(raw)
+				if len(results) > 0 { break }
+			}
+		}
+	}
+	if len(results) == 0 {
+		results = parseTNodeList(apiResp.Data)
+	}
+
+	return results, nil
+}
+
+func parseTNodeList(raw json.RawMessage) []*model.SeedingSearchResult {
+	var items []map[string]interface{}
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return nil
+	}
+	var results []*model.SeedingSearchResult
+	for _, item := range items {
+		r := &model.SeedingSearchResult{}
+		r.TorrentID = toString(item["id"])
+		r.Title = toString(item["name"])
+		if r.Title == "" {
+			r.Title = toString(item["title"])
+		}
+		r.Size = toInt64(item["size"])
+		r.Seeders = toInt(item["seeders"])
+		if r.TorrentID != "" {
+			results = append(results, r)
+		}
+	}
+	return results
+}
+
+func toString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	switch val := v.(type) {
+	case string:
+		return val
+	case float64:
+		return strconv.FormatInt(int64(val), 10)
+	case json.Number:
+		return val.String()
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+func toInt(v interface{}) int {
+	if v == nil {
+		return 0
+	}
+	switch val := v.(type) {
+	case float64:
+		return int(val)
+	case json.Number:
+		n, _ := val.Int64()
+		return int(n)
+	default:
+		return 0
+	}
+}
