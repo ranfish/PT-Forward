@@ -981,7 +981,15 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 			continue
 		}
 
-		return parseNexusPHPBrowse(string(body), config), nil
+		results := parseNexusPHPBrowse(string(body), config)
+		if len(results) > 0 {
+			a.logger.Debug("nexusphp search parsed",
+				zap.String("domain", config.Domain),
+				zap.Int("count", len(results)),
+				zap.String("first_title", func() string { t := results[0].Title; if len(t) > 60 { t = t[:60] }; return t }()),
+				zap.Int64("first_size", results[0].Size))
+		}
+		return results, nil
 	}
 
 	return nil, lastErr
