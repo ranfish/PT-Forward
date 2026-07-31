@@ -558,6 +558,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 
 	select {
 	case result := <-resultCh:
+		cancel()
 		return result.site, result.torrentID, result.method
 	case <-allDone:
 		return "", "", ""
