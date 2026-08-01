@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 	htmllib "html"
-	"io/ioutil"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -54,8 +53,8 @@ var (
 	reNexusDetailID       = regexp.MustCompile(`(?:details|detail)\.php\?id=(\d+)`)
 	reNexusErrorClass     = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reNexusErrorP         = regexp.MustCompile(`<p[^>]*>([^<]*(?:失败|错误|error|fail|拒绝|duplicate|already)[^<]*)</p>`)
-	reNexusBrowseLink     = regexp.MustCompile(`(?s)href="details\.php\?id=(\d+)"[^>]*><b>\s*&nbsp;([^<]+)</b>`)
-	reNexusBrowseAltLink  = regexp.MustCompile(`(?s)href="details\.php\?id=(\d+)[^"]*"[^>]*>(.*?)</a>`)
+	reNexusBrowseLink     = regexp.MustCompile(`(?s)href=["']details\.php\?id=(\d+)["'][^>]*><b>\s*&nbsp;([^<]+)</b>`)
+	reNexusBrowseAltLink  = regexp.MustCompile(`(?s)href=["']details\.php\?id=(\d+)[^"']*["'][^>]*>(.*?)</a>`)
 	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?rowfollow["']?[^>]*>([\d.]+)\s*(?:<br\s*/?>)?\s*(TB|GB|MB|KB|T|G|M)\b`)
 	reNexusBrowseSeeders  = regexp.MustCompile(`dllist=1#seeders">\s*(\d+)\s*</a>`)
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
@@ -984,9 +983,6 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 			continue
 		}
 
-		if strings.Contains(config.Domain, "hhanclub") {
-			ioutil.WriteFile("/logs/hanhan_debug.html", body, 0644)
-		}
 		return parseNexusPHPBrowse(string(body), config), nil
 	}
 
