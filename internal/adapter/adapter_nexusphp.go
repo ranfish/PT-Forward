@@ -1188,7 +1188,6 @@ func setCommonHeaders(req *http.Request, cookie string) {
 }
 
 func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
-	var results []*model.SeedingSearchResult
 
 	detailLinkRe := reNexusBrowseLink
 	altDetailLinkRe := reNexusBrowseAltLink
@@ -1202,6 +1201,10 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		detailMatches = altDetailLinkRe.FindAllStringSubmatchIndex(html, -1)
 	}
 
+	// Two-pass strategy: first collect text-link entries (list table with sizes),
+	// then if not enough, fall back to image-only/domTT entries (poster grid).
+	var textResults, imgResults []*model.SeedingSearchResult
+
 	for _, loc := range detailMatches {
 		torrentID := html[loc[2]:loc[3]]
 		if seen[torrentID] {
@@ -1210,11 +1213,9 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 
 		rawContent := html[loc[4]:loc[5]]
 		title := strings.TrimSpace(stripTags(strings.ReplaceAll(rawContent, "&nbsp;", " ")))
-
-		// Poster grid entries: link contains only <img>, no text
 		isImageOnly := title == "" && strings.Contains(rawContent, "<img")
 
-		// domTT fallback: extract title from onmouseover when link text is empty
+		// domTT fallback
 		if title == "" {
 			linkTag := html[loc[0]:min(loc[0]+1000, len(html))]
 			if dm := reNexusDomTTTitle.FindStringSubmatch(linkTag); len(dm) > 1 {
@@ -1230,28 +1231,6 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			}
 		}
 
-		// Skip poster grid entries (image-only links with domTT title)
-		// These don't have rowfollow size cells nearby.
-		// List table entries (with real text) will be picked up instead.
-		if isImageOnly && title != "" {
-			// Check if this torrent ID also appears in a text-link entry
-			hasTextEntry := false
-			for _, loc2 := range detailMatches {
-				if html[loc2[2]:loc2[3]] == torrentID {
-					t2 := strings.TrimSpace(stripTags(html[loc2[4]:loc2[5]]))
-					if t2 != "" && !strings.Contains(html[loc2[4]:loc2[5]], "<img") {
-						hasTextEntry = true
-						break
-					}
-				}
-			}
-			if hasTextEntry {
-				seen[torrentID] = true
-				continue
-			}
-		}
-
-		// Skip if still no title after all fallbacks
 		if title == "" {
 			seen[torrentID] = true
 			continue
@@ -1289,14 +1268,23 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		}
 
 		result.PublishAt = time.Now()
-		results = append(results, result)
 
-		if len(results) >= 50 {
+		if isImageOnly {
+			imgResults = append(imgResults, result)
+		} else {
+			textResults = append(textResults, result)
+		}
+
+		if len(textResults)+len(imgResults) >= 50 {
 			break
 		}
 	}
 
-	return results
+	// Prefer text-link results (list table with sizes), fall back to image-only (poster grid)
+	if len(textResults) > 0 {
+		return textResults
+	}
+	return imgResults
 }
 
 func parseSizeStr(s string) int64 {
