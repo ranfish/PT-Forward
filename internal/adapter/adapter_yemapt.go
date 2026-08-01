@@ -357,3 +357,87 @@ func (a *YemaptAdapter) UploadTorrent(ctx context.Context, config *model.SiteCon
 func (a *YemaptAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
 	return a.GenericAdapter.VerifyExists(ctx, config, torrentID)
 }
+
+func (a *YemaptAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
+	baseURL := resolveBaseURL(config)
+
+	searchBody := fmt.Sprintf(`{"page":1,"size":20,"keyword":%q}`, keyword)
+	u := baseURL + "/api/torrent/search"
+
+	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader(searchBody))
+	if err != nil {
+		return nil, searchError("构造搜索请求失败", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	setCommonHeaders(req, config.Cookie)
+
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, searchError("搜索请求失败", err)
+	}
+	defer func() { drainBody(resp) }()
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 200 { snippet = snippet[:200] }
+		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
+	}
+
+	var apiResp struct {
+		Success bool            `json:"success"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, searchError("解析搜索结果失败", err)
+	}
+	if !apiResp.Success {
+		return nil, searchError("API 返回失败", nil)
+	}
+
+	var results []*model.SeedingSearchResult
+
+	var dataMap map[string]json.RawMessage
+	if json.Unmarshal(apiResp.Data, &dataMap) == nil {
+		for _, key := range []string{"list", "torrents", "rows", "records"} {
+			if raw, ok := dataMap[key]; ok {
+				results = parseYeMPTList(raw)
+				if len(results) > 0 { break }
+			}
+		}
+	}
+	if len(results) == 0 {
+		results = parseYeMPTList(apiResp.Data)
+	}
+
+	return results, nil
+}
+
+func parseYeMPTList(raw json.RawMessage) []*model.SeedingSearchResult {
+	var items []map[string]interface{}
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return nil
+	}
+	var results []*model.SeedingSearchResult
+	for _, item := range items {
+		r := &model.SeedingSearchResult{}
+		r.TorrentID = toString(item["id"])
+		r.Title = toString(item["title"])
+		if r.Title == "" {
+			r.Title = toString(item["name"])
+		}
+		r.Size = toInt64(item["size"])
+		if r.Size == 0 {
+			r.Size = toInt64(item["fileSize"])
+		}
+		r.Seeders = toInt(item["seeders"])
+		if r.TorrentID != "" {
+			results = append(results, r)
+		}
+	}
+	return results
+}
