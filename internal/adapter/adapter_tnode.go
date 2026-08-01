@@ -731,12 +731,14 @@ func (a *TNodeAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	baseURL := resolveBaseURL(config)
 	csrfToken, _ := a.fetchCSRFToken(ctx, config, baseURL+"/index")
 
-	u := baseURL + "/api/torrent/list?page=1&size=20&type=title&keyword=" + url.QueryEscape(keyword)
+	searchBody := fmt.Sprintf(`{"page":1,"size":20,"type":"title","keyword":%q,"tags":[],"category":[],"medium":[],"videoCoding":[],"resolution":[],"connStatus":0,"downloadStatus":0,"order":"","more":false}`, keyword)
+	u := baseURL + "/api/torrent/search"
 
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader(searchBody))
 	if err != nil {
 		return nil, searchError("构造搜索请求失败", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 	setCommonHeaders(req, config.Cookie)
 	if csrfToken != "" {
 		req.Header.Set("x-csrf-token", csrfToken)
