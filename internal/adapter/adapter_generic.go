@@ -799,7 +799,7 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 	return results
 }
 
-var reHDRouteEntry = regexp.MustCompile(`(?s)title_eng[^>]*>([^<]+)</p>.*?details\.php\?id=(\d+).*?torrent_size[^>]*>([^<]+)`)
+var reHDRouteEntry = regexp.MustCompile(`(?s)title_eng[^>]*>([^<]+)</p>.*?details\.php\?id=(\d+).*?torrent_size[^>]*>([\d.]+)\s*(?:<br\s*/?>)?\s*(GB|MB|TB)`)
 var reHDRouteSize = regexp.MustCompile(`([\d.]+)\s*(GB|MB|TB|GiB|MiB)`)
 
 func parseGenericBrowseDiv(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
@@ -810,7 +810,6 @@ func parseGenericBrowseDiv(html string, config *model.SiteConfig) []*model.Seedi
 	for _, m := range matches {
 		title := strings.TrimSpace(m[1])
 		torrentID := m[2]
-		sizeStr := strings.TrimSpace(m[3])
 
 		result := &model.SeedingSearchResult{
 			TorrentID: torrentID,
@@ -818,10 +817,8 @@ func parseGenericBrowseDiv(html string, config *model.SiteConfig) []*model.Seedi
 			DetailURL: config.Domain + "/details.php?id=" + torrentID,
 		}
 
-		if sm := reHDRouteSize.FindStringSubmatch(sizeStr); len(sm) > 2 {
-			result.Size = parseSizeStr(sm[1] + " " + sm[2])
-		} else if sm := sizeRe.FindStringSubmatch(sizeStr); len(sm) > 2 {
-			result.Size = parseSizeStr(sm[1] + " " + sm[2])
+		if len(m) > 4 {
+			result.Size = parseSizeStr(m[3] + " " + m[4])
 		}
 
 		results = append(results, result)
