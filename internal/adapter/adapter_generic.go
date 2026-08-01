@@ -9,7 +9,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -658,12 +657,7 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 		return nil, err
 	}
 
-
-	if strings.Contains(config.Domain, "hdroute") || strings.Contains(config.Domain, "star-space") {
-			os.WriteFile("/logs/hdroute_debug.html", body, 0644)
-			a.logger.Info("generic search url", zap.String("url", u), zap.Int("status", resp.StatusCode), zap.Int("body_len", len(body)))
-		}
-		return parseGenericBrowse(string(body), config), nil
+	return parseGenericBrowse(string(body), config), nil
 }
 
 func (a *GenericAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
@@ -743,6 +737,12 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 	leechersRe := reGenericBrowseLeechers
 
 	rows := rowRe.FindAllString(html, -1)
+
+	// HDRoute: no <tr> rows, use div-based parsing
+	if len(rows) == 0 {
+		return parseGenericBrowseDiv(html, config)
+	}
+
 	for _, row := range rows {
 		linkMatch := detailLinkRe.FindStringSubmatch(row)
 		if len(linkMatch) < 6 {
@@ -791,6 +791,40 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 		result.PublishAt = time.Now()
 		results = append(results, result)
 
+		if len(results) >= 50 {
+			break
+		}
+	}
+
+	return results
+}
+
+var reHDRouteEntry = regexp.MustCompile(`(?s)title_eng[^>]*>([^<]+)</p>.*?details\.php\?id=(\d+).*?torrent_size[^>]*>([^<]+)`)
+var reHDRouteSize = regexp.MustCompile(`([\d.]+)\s*(GB|MB|TB|GiB|MiB)`)
+
+func parseGenericBrowseDiv(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
+	var results []*model.SeedingSearchResult
+	sizeRe := reGenericBrowseSize
+
+	matches := reHDRouteEntry.FindAllStringSubmatch(html, -1)
+	for _, m := range matches {
+		title := strings.TrimSpace(m[1])
+		torrentID := m[2]
+		sizeStr := strings.TrimSpace(m[3])
+
+		result := &model.SeedingSearchResult{
+			TorrentID: torrentID,
+			Title:     title,
+			DetailURL: config.Domain + "/details.php?id=" + torrentID,
+		}
+
+		if sm := reHDRouteSize.FindStringSubmatch(sizeStr); len(sm) > 2 {
+			result.Size = parseSizeStr(sm[1] + " " + sm[2])
+		} else if sm := sizeRe.FindStringSubmatch(sizeStr); len(sm) > 2 {
+			result.Size = parseSizeStr(sm[1] + " " + sm[2])
+		}
+
+		results = append(results, result)
 		if len(results) >= 50 {
 			break
 		}
