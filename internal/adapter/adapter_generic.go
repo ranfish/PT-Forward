@@ -33,7 +33,7 @@ var (
 	reGenericErrorClass        = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reGenericStripTags         = regexp.MustCompile(`<[^>]+>`)
 	reGenericBrowseRow         = regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
-	reGenericBrowseDetailLink  = regexp.MustCompile(`(?s)href=["'](?:/t/(\d+)/|[^"']*\bdetails?\.php\?id=(\d+)|[^"']*torrent[s]?\.php\?(?:torrent)?id=(\d+)|[^"']*video_detail\.php\?tid=(\d+)["'])["'][^>]*>(.*?)</a>`)
+	reGenericBrowseDetailLink  = regexp.MustCompile(`(?s)href=["'](?:/t/(\d+)/|[^"']*\bdetails?\.php\?id=(\d+)|[^"']*torrent[s]?\.php\?(?:torrent)?id=(\d+)|[^"']*video_detail\.php\?tid=(\d+)(?:&\w+=[^"']*)?)["'][^>]*>(.*?)</a>`)
 	reGenericBrowseSize        = regexp.MustCompile(`(?i)([\d.]+)\s*(?:<br\s*/?>)?\s*(TB|GB|MB|KB|T|G|M)\b`)
 	reGenericBrowseSeeders     = regexp.MustCompile(`>(\d+)</a>\s*</td>\s*$`)
 	reGenericBrowseLeechers    = regexp.MustCompile(`(\d+)\s*</td>\s*$`)
