@@ -989,7 +989,7 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 				zap.String("first_id", results[0].TorrentID))
 			// Dump first 2000 chars for analysis
 			preview := string(body)
-			if len(preview) > 2000 { preview = preview[:2000] }
+			if len(preview) > 8000 { preview = preview[:8000] }
 			a.logger.Debug("nexusphp title-empty html",
 				zap.String("domain", config.Domain),
 				zap.String("preview", preview))
