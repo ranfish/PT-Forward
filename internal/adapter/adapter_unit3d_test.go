@@ -498,16 +498,14 @@ func TestUnit3D_GetPreciseSLData_WebFull(t *testing.T) {
 
 func TestUnit3D_VerifyExists_Found(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>
-		<tr><td><a href="details.php?id=42">Found Torrent</a></td></tr>
-		</body></html>`))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"42","name":"Found Torrent","size":1024}]}`))
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewUnit3DAdapter(doer, zap.NewNop())
 	config := &model.SiteConfig{Domain: srv.URL, Cookie: "laravel_session=test"}
-	config.Paths.Browse = "/torrents"
 
 	found, err := a.VerifyExists(context.Background(), config, "42")
 	if err != nil {
@@ -520,16 +518,14 @@ func TestUnit3D_VerifyExists_Found(t *testing.T) {
 
 func TestUnit3D_VerifyExists_NotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>
-		<tr><td><a href="details.php?id=99">Other Torrent</a></td></tr>
-		</body></html>`))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"99","name":"Other Torrent","size":1024}]}`))
 	}))
 	defer srv.Close()
 
 	doer := &HTTPDoer{Client: srv.Client()}
 	a := NewUnit3DAdapter(doer, zap.NewNop())
 	config := &model.SiteConfig{Domain: srv.URL, Cookie: "laravel_session=test"}
-	config.Paths.Browse = "/torrents"
 
 	found, err := a.VerifyExists(context.Background(), config, "42")
 	if err != nil {
