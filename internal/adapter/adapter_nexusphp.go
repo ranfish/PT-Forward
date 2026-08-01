@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 	htmllib "html"
+	"io/ioutil"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -1282,6 +1283,11 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 
 	// Prefer text-link results (list table with sizes), fall back to image-only (poster grid)
 	if len(textResults) > 0 {
+		if len(textResults) > 0 && textResults[0].Size == 0 {
+			preview := html[:min(2000, len(html))]
+			_ = preview
+			ioutil.WriteFile("/logs/size_debug_"+config.Domain+".html", []byte(html), 0644)
+		}
 		return textResults
 	}
 	return imgResults
