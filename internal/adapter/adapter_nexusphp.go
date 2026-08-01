@@ -1286,9 +1286,12 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		if len(textResults) > 0 && textResults[0].Size == 0 {
 			preview := html[:min(2000, len(html))]
 			_ = preview
-			ioutil.WriteFile("/logs/size_debug_"+config.Domain+".html", []byte(html), 0644)
+			ioutil.WriteFile("/logs/size_debug_"+strings.ReplaceAll(config.Domain, ".", "_")+".html", []byte(html), 0644)
 		}
 		return textResults
+	}
+	if len(imgResults) > 0 && imgResults[0].Size == 0 {
+		ioutil.WriteFile("/logs/size_debug_"+strings.ReplaceAll(config.Domain, ".", "_")+".html", []byte(html), 0644)
 	}
 	return imgResults
 }
