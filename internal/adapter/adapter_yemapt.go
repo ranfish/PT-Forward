@@ -393,6 +393,7 @@ func (a *YemaptAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 		zap.String("url", u),
 		zap.Int("status", resp.StatusCode),
 		zap.Int("body_len", len(body)),
+		zap.Int("cookie_len", len(config.Cookie)),
 		zap.String("body", string(body[:min(500, len(body))])))
 
 	var apiResp struct {
