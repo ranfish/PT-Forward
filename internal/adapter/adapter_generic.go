@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -658,7 +659,11 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 	}
 
 
-	return parseGenericBrowse(string(body), config), nil
+	if strings.Contains(config.Domain, "hdroute") {
+			os.WriteFile("/logs/hdroute_debug.html", body, 0644)
+			a.logger.Info("hdroute search", zap.String("url", u), zap.Int("status", resp.StatusCode), zap.Int("body_len", len(body)))
+		}
+		return parseGenericBrowse(string(body), config), nil
 }
 
 func (a *GenericAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
