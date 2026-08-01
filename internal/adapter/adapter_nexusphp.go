@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 	htmllib "html"
-	"io/ioutil"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -1197,6 +1196,12 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 	leechersRe := reNexusBrowseLeechers
 
 	seen := map[string]bool{}
+
+	// Check for "no results" page (poster grid shows latest torrents, not search results)
+	if strings.Contains(html, "没有种子") || strings.Contains(html, "Nothing found") {
+		return nil
+	}
+
 	detailMatches := detailLinkRe.FindAllStringSubmatchIndex(html, -1)
 	if len(detailMatches) == 0 {
 		detailMatches = altDetailLinkRe.FindAllStringSubmatchIndex(html, -1)
@@ -1283,15 +1288,7 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 
 	// Prefer text-link results (list table with sizes), fall back to image-only (poster grid)
 	if len(textResults) > 0 {
-		if len(textResults) > 0 && textResults[0].Size == 0 {
-			preview := html[:min(2000, len(html))]
-			_ = preview
-			ioutil.WriteFile("/logs/size_debug_"+strings.ReplaceAll(config.Domain, ".", "_")+".html", []byte(html), 0644)
-		}
 		return textResults
-	}
-	if len(imgResults) > 0 && imgResults[0].Size == 0 {
-		ioutil.WriteFile("/logs/size_debug_"+strings.ReplaceAll(config.Domain, ".", "_")+".html", []byte(html), 0644)
 	}
 	return imgResults
 }
