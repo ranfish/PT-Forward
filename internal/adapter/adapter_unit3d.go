@@ -1054,6 +1054,8 @@ func (a *Unit3DAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
 	}
 
+	a.logger.Debug("unit3d search raw", zap.String("domain", config.Domain), zap.Int("body_len", len(body)), zap.String("preview", string(body[:min(500, len(body))])))
+
 	var result struct {
 		Data []struct {
 			ID       json.Number `json:"id"`
