@@ -1264,13 +1264,13 @@ func parseSizeStr(s string) int64 {
 	}
 
 	switch strings.ToUpper(m[2]) {
-	case "TB", "TIB":
+	case "TB", "TIB", "T":
 		return int64(val * 1024 * 1024 * 1024 * 1024)
-	case "GB", "GIB":
+	case "GB", "GIB", "G":
 		return int64(val * 1024 * 1024 * 1024)
-	case "MB", "MIB":
+	case "MB", "MIB", "M":
 		return int64(val * 1024 * 1024)
-	case "KB", "KIB":
+	case "KB", "KIB", "K":
 		return int64(val * 1024)
 	default:
 		return int64(val)
