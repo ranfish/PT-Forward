@@ -981,7 +981,20 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 			continue
 		}
 
-		return parseNexusPHPBrowse(string(body), config), nil
+		results := parseNexusPHPBrowse(string(body), config)
+		if len(results) > 0 && results[0].Title == "" {
+			a.logger.Debug("nexusphp title-empty debug",
+				zap.String("domain", config.Domain),
+				zap.Int("count", len(results)),
+				zap.String("first_id", results[0].TorrentID))
+			// Dump first 2000 chars for analysis
+			preview := string(body)
+			if len(preview) > 2000 { preview = preview[:2000] }
+			a.logger.Debug("nexusphp title-empty html",
+				zap.String("domain", config.Domain),
+				zap.String("preview", preview))
+		}
+		return results, nil
 	}
 
 	return nil, lastErr
