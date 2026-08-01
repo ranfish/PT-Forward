@@ -1208,12 +1208,14 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			continue
 		}
 
-		title := html[loc[4]:loc[5]]
-		title = strings.TrimSpace(stripTags(strings.ReplaceAll(title, "&nbsp;", " ")))
+		rawContent := html[loc[4]:loc[5]]
+		title := strings.TrimSpace(stripTags(strings.ReplaceAll(rawContent, "&nbsp;", " ")))
 
-		// Skip image-only links (poster grid entries without text titles)
-		if title == "" && len(detailMatches) > len(results)+1 {
-			// Try domTT title extraction before skipping
+		// Poster grid entries: link contains only <img>, no text
+		isImageOnly := title == "" && strings.Contains(rawContent, "<img")
+
+		// domTT fallback: extract title from onmouseover when link text is empty
+		if title == "" {
 			linkTag := html[loc[0]:min(loc[0]+1000, len(html))]
 			if dm := reNexusDomTTTitle.FindStringSubmatch(linkTag); len(dm) > 1 {
 				title = strings.TrimSpace(stripTags(htmllib.UnescapeString(dm[1])))
@@ -1226,10 +1228,33 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 					title = title[:idx]
 				}
 			}
-			if title == "" {
+		}
+
+		// Skip poster grid entries (image-only links with domTT title)
+		// These don't have rowfollow size cells nearby.
+		// List table entries (with real text) will be picked up instead.
+		if isImageOnly && title != "" {
+			// Check if this torrent ID also appears in a text-link entry
+			hasTextEntry := false
+			for _, loc2 := range detailMatches {
+				if html[loc2[2]:loc2[3]] == torrentID {
+					t2 := strings.TrimSpace(stripTags(html[loc2[4]:loc2[5]]))
+					if t2 != "" && !strings.Contains(html[loc2[4]:loc2[5]], "<img") {
+						hasTextEntry = true
+						break
+					}
+				}
+			}
+			if hasTextEntry {
 				seen[torrentID] = true
 				continue
 			}
+		}
+
+		// Skip if still no title after all fallbacks
+		if title == "" {
+			seen[torrentID] = true
+			continue
 		}
 		seen[torrentID] = true
 
