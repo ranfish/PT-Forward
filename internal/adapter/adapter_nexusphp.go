@@ -1258,6 +1258,18 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			}
 		}
 
+		// Size fallback: search a wider range including BEFORE the detail link
+		if result.Size == 0 {
+			wideStart := start - 2000
+			if wideStart < 0 { wideStart = 0 }
+			wideEnd := start + 2000
+			if wideEnd > len(html) { wideEnd = len(html) }
+			wideChunk := html[wideStart:wideEnd]
+			if sm := reNexusSizeStr.FindStringSubmatch(wideChunk); len(sm) > 2 {
+				result.Size = parseSizeStr(sm[1] + " " + sm[2])
+			}
+		}
+
 		// Debug: dump chunk when size is still 0
 		if result.Size == 0 && len(results) == 0 {
 			chunkPreview := chunk
