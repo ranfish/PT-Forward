@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -1255,6 +1256,13 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			if sm := reNexusSizeTd.FindStringSubmatch(chunk); len(sm) > 2 {
 				result.Size = parseSizeStr(sm[1] + " " + sm[2])
 			}
+		}
+
+		// Debug: dump chunk when size is still 0
+		if result.Size == 0 && len(results) == 0 {
+			chunkPreview := chunk
+			if len(chunkPreview) > 1000 { chunkPreview = chunkPreview[:1000] }
+			fmt.Fprintf(os.Stderr, "SIZE_DEBUG domain=%s id=%s chunk=%s\n", config.Domain, torrentID, chunkPreview)
 		}
 
 		if m := seedersRe.FindStringSubmatch(chunk); len(m) > 1 {
