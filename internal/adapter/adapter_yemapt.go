@@ -361,7 +361,7 @@ func (a *YemaptAdapter) VerifyExists(ctx context.Context, config *model.SiteConf
 func (a *YemaptAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 	baseURL := resolveBaseURL(config)
 
-	searchBody := fmt.Sprintf(`{"keyword":%q,"page":1,"size":20}`, keyword)
+	searchBody := fmt.Sprintf(`{"keyword":%q,"page":1,"size":20,"medium":[],"standard":[],"codec":[],"audiocodec":[],"region":[],"team":[],"tags":[]}`, keyword)
 	u := baseURL + "/api/torrent/fetchOpenTorrentList"
 
 	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader(searchBody))
