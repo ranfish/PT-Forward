@@ -388,6 +388,12 @@ func (a *YemaptAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
 	}
 
+	a.logger.Info("yemapt search response",
+		zap.String("url", u),
+		zap.Int("status", resp.StatusCode),
+		zap.Int("body_len", len(body)),
+		zap.String("body", string(body[:min(500, len(body))])))
+
 	var apiResp struct {
 		Success bool            `json:"success"`
 		Data    json.RawMessage `json:"data"`
