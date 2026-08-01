@@ -56,7 +56,7 @@ var (
 	reNexusErrorP         = regexp.MustCompile(`<p[^>]*>([^<]*(?:失败|错误|error|fail|拒绝|duplicate|already)[^<]*)</p>`)
 	reNexusBrowseLink     = regexp.MustCompile(`(?s)href=["']details\.php\?id=(\d+)["'][^>]*><b>\s*&nbsp;([^<]+)</b>`)
 	reNexusBrowseAltLink  = regexp.MustCompile(`(?s)href=["']details\.php\?id=(\d+)[^"']*["'][^>]*>(.*?)</a>`)
-	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?rowfollow["']?[^>]*>([\d.]+)\s*(?:<br\s*/?>)?\s*(TB|GB|MB|KB|T|G|M)\b`)
+	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?rowfollow["']?[^>]*>([\d.]+)\s*(?:<br\s*/?>)?\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M)\b`)
 	reNexusBrowseSeeders  = regexp.MustCompile(`dllist=1#seeders">\s*(\d+)\s*</a>`)
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M|B)`)
@@ -1245,17 +1245,17 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			DetailURL: config.Domain + "/details.php?id=" + torrentID,
 		}
 
+		// Size: search chunk first, then full HTML for rowfollow cells
 		if m := sizeRe.FindStringSubmatch(chunk); len(m) > 2 {
 			result.Size = parseSizeStr(m[1] + " " + m[2])
 		} else if m := reNexusSizeStr.FindStringSubmatch(chunk); len(m) > 2 {
 			result.Size = parseSizeStr(m[1] + " " + m[2])
 		}
 
-		// Size fallback: look for number+unit in <td> with size-related class
+		// Fallback: search full HTML for this torrent's rowfollow size cell
+		// (poster grid sites have detail link far from size cell)
 		if result.Size == 0 {
-			if sm := reNexusSizeTd.FindStringSubmatch(chunk); len(sm) > 2 {
-				result.Size = parseSizeStr(sm[1] + " " + sm[2])
-			}
+			result.Size = findSizeForTorrentID(html, torrentID)
 		}
 
 		// Size fallback: search a wider range including BEFORE the detail link
@@ -1292,6 +1292,31 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 	}
 
 	return results
+}
+
+var reNexusRowfollowSize = regexp.MustCompile(`(?i)class=["']?rowfollow["']?[^>]*>([\d.]+)\s*(?:<br\s*/?>)?\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M)\b`)
+
+func findSizeForTorrentID(html, torrentID string) int64 {
+	// Find ALL detail links for this torrent ID
+	// Each torrent has multiple detail links (poster grid + list table)
+	// The list table has rowfollow size cells nearby
+	for _, loc := range reNexusBrowseAltLink.FindAllStringSubmatchIndex(html, -1) {
+		tid := html[loc[2]:loc[3]]
+		if tid != torrentID {
+			continue
+		}
+		// Search 3000 chars after this detail link for a rowfollow size cell
+		start := loc[0]
+		end := start + 3000
+		if end > len(html) {
+			end = len(html)
+		}
+		chunk := html[start:end]
+		if m := reNexusRowfollowSize.FindStringSubmatch(chunk); len(m) > 2 {
+			return parseSizeStr(m[1] + " " + m[2])
+		}
+	}
+	return 0
 }
 
 func parseSizeStr(s string) int64 {
