@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 	htmllib "html"
+	"os"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -1287,10 +1288,16 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 	}
 
 	// Prefer text-link results (list table with sizes), fall back to image-only (poster grid)
+	var finalResults []*model.SeedingSearchResult
 	if len(textResults) > 0 {
-		return textResults
+		finalResults = textResults
+	} else {
+		finalResults = imgResults
 	}
-	return imgResults
+	if len(finalResults) > 0 && finalResults[0].Size == 0 {
+		os.WriteFile("/logs/size_debug_"+strings.ReplaceAll(config.Domain, ".", "_")+".html", []byte(html), 0644)
+	}
+	return finalResults
 }
 
 func parseSizeStr(s string) int64 {
