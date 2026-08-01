@@ -1219,7 +1219,7 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 
 		rawContent := html[loc[4]:loc[5]]
 		title := strings.TrimSpace(stripTags(strings.ReplaceAll(rawContent, "&nbsp;", " ")))
-		isImageOnly := title == "" && strings.Contains(rawContent, "<img")
+		isImageOnly := strings.Contains(rawContent, "<img") || strings.Contains(html[loc[0]:loc[1]], "onmouseover")
 
 		// domTT fallback
 		if title == "" {
