@@ -59,7 +59,7 @@ var (
 	reNexusBrowseSeeders  = regexp.MustCompile(`dllist=1#seeders">\s*(\d+)\s*</a>`)
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M|B)`)
-	reNexusDomTTTitle     = regexp.MustCompile(`(?s)onmouseover="domTT_activate\([^,]+,\s*event,\s*'content',\s*'([^']+)`)
+	reNexusDomTTTitle     = regexp.MustCompile(`(?s)onmouseover="domTT_activate\([^,]+,\s*event,\s*'content',\s*'(.*?)'\s*,\s*'trail'`)
 	reNexusTag            = regexp.MustCompile(`class="tag[^"]*"[^>]*>([^<]+)`)
 
 	reBBCodeImg      = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
