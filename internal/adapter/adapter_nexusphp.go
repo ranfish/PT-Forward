@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 	htmllib "html"
-	"io/ioutil"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -61,7 +60,6 @@ var (
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M|B)`)
 	reNexusDomTTTitle     = regexp.MustCompile(`(?s)onmouseover="domTT_activate\([^,]+,\s*event,\s*'content',\s*'(.*?)'\s*,\s*'trail'`)
-	reNexusSizeTd         = regexp.MustCompile(`(?i)class=["'][^"']*(?:size|filesize|torrent.size|td_size|col_size|大小)[^"']*["'][^>]*>\s*([\d.]+)\s*(?:<br\s*/?>)?\s*(TB|GB|MB|KB|T|G|M)`)
 	reNexusTag            = regexp.MustCompile(`class="tag[^"]*"[^>]*>([^<]+)`)
 
 	reBBCodeImg      = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
@@ -1209,23 +1207,14 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		if seen[torrentID] {
 			continue
 		}
-		seen[torrentID] = true
 
 		title := html[loc[4]:loc[5]]
 		title = strings.TrimSpace(stripTags(strings.ReplaceAll(title, "&nbsp;", " ")))
 
-		start := loc[0]
-		end := loc[1]
-		if end+20000 <= len(html) {
-			end += 20000
-		} else {
-			end = len(html)
-		}
-		chunk := html[start:end]
-
-		// domTT fallback: extract title from onmouseover when link text is empty
-		if title == "" {
-			linkTag := html[start:min(start+1000, len(html))]
+		// Skip image-only links (poster grid entries without text titles)
+		if title == "" && len(detailMatches) > len(results)+1 {
+			// Try domTT title extraction before skipping
+			linkTag := html[loc[0]:min(loc[0]+1000, len(html))]
 			if dm := reNexusDomTTTitle.FindStringSubmatch(linkTag); len(dm) > 1 {
 				title = strings.TrimSpace(stripTags(htmllib.UnescapeString(dm[1])))
 				title = strings.ReplaceAll(title, "\\'", "'")
@@ -1237,7 +1226,21 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 					title = title[:idx]
 				}
 			}
+			if title == "" {
+				seen[torrentID] = true
+				continue
+			}
 		}
+		seen[torrentID] = true
+
+		start := loc[0]
+		end := loc[1]
+		if end+20000 <= len(html) {
+			end += 20000
+		} else {
+			end = len(html)
+		}
+		chunk := html[start:end]
 
 		result := &model.SeedingSearchResult{
 			TorrentID: torrentID,
@@ -1245,34 +1248,11 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			DetailURL: config.Domain + "/details.php?id=" + torrentID,
 		}
 
-		// Size: search chunk first, then full HTML for rowfollow cells
+		// Size: search chunk for rowfollow size cell
 		if m := sizeRe.FindStringSubmatch(chunk); len(m) > 2 {
 			result.Size = parseSizeStr(m[1] + " " + m[2])
 		} else if m := reNexusSizeStr.FindStringSubmatch(chunk); len(m) > 2 {
 			result.Size = parseSizeStr(m[1] + " " + m[2])
-		}
-
-		// Fallback: search full HTML for this torrent's rowfollow size cell
-		// (poster grid sites have detail link far from size cell)
-		if result.Size == 0 {
-			result.Size = findSizeForTorrentID(html, torrentID)
-		}
-
-		// Size fallback: search a wider range including BEFORE the detail link
-		if result.Size == 0 {
-			wideStart := start - 2000
-			if wideStart < 0 { wideStart = 0 }
-			wideEnd := start + 2000
-			if wideEnd > len(html) { wideEnd = len(html) }
-			wideChunk := html[wideStart:wideEnd]
-			if sm := reNexusSizeStr.FindStringSubmatch(wideChunk); len(sm) > 2 {
-				result.Size = parseSizeStr(sm[1] + " " + sm[2])
-			}
-		}
-
-		// Dump full HTML when size still 0 (for debugging)
-		if result.Size == 0 && len(results) == 0 {
-			ioutil.WriteFile("/logs/size_debug_"+config.Domain+".html", []byte(html), 0644)
 		}
 
 		if m := seedersRe.FindStringSubmatch(chunk); len(m) > 1 {
@@ -1294,37 +1274,11 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 	return results
 }
 
-var reNexusRowfollowSize = regexp.MustCompile(`(?i)class=["']?rowfollow["']?[^>]*>([\d.]+)\s*(?:<br\s*/?>)?\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M)\b`)
-
-func findSizeForTorrentID(html, torrentID string) int64 {
-	// Find ALL detail links for this torrent ID
-	// Each torrent has multiple detail links (poster grid + list table)
-	// The list table has rowfollow size cells nearby
-	for _, loc := range reNexusBrowseAltLink.FindAllStringSubmatchIndex(html, -1) {
-		tid := html[loc[2]:loc[3]]
-		if tid != torrentID {
-			continue
-		}
-		// Search 3000 chars after this detail link for a rowfollow size cell
-		start := loc[0]
-		end := start + 3000
-		if end > len(html) {
-			end = len(html)
-		}
-		chunk := html[start:end]
-		if m := reNexusRowfollowSize.FindStringSubmatch(chunk); len(m) > 2 {
-			return parseSizeStr(m[1] + " " + m[2])
-		}
-	}
-	return 0
-}
-
 func parseSizeStr(s string) int64 {
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, ",", "")
 
-	valRe := reNexusSizeStr
-	m := valRe.FindStringSubmatch(s)
+	m := reNexusSizeStr.FindStringSubmatch(s)
 	if len(m) < 3 {
 		return 0
 	}
