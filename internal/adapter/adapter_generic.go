@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -655,6 +656,10 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 	body, err := readBody(resp)
 	if err != nil {
 		return nil, err
+	}
+
+	if strings.Contains(config.Domain, "hdroute") {
+		os.WriteFile("/logs/hdroute_debug.html", body, 0644)
 	}
 
 	return parseGenericBrowse(string(body), config), nil
