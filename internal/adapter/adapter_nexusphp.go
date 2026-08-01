@@ -9,13 +9,13 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 	htmllib "html"
-	"os"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -984,7 +984,18 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 			continue
 		}
 
-		return parseNexusPHPBrowse(string(body), config), nil
+		parsedResults := parseNexusPHPBrowse(string(body), config)
+		if len(parsedResults) == 0 {
+			domain := config.Domain
+			domains := []string{"audiences.me", "hdcity.city", "haidan.cc", "hamsters.space"}
+			for _, d := range domains {
+				if strings.Contains(domain, d) {
+					os.WriteFile("/logs/zero_debug_"+strings.ReplaceAll(domain, ".", "_")+".html", body, 0644)
+					break
+				}
+			}
+		}
+		return parsedResults, nil
 	}
 
 	return nil, lastErr
