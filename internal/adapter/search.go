@@ -45,7 +45,11 @@ func buildSearchURL(config *model.SiteConfig, framework, keyword string) string 
 		searchParam = "search"
 	}
 
-	u := resolveBaseURL(config) + browsePath
+	baseURL := config.BaseURL
+	if baseURL == "" {
+		baseURL = resolveBaseURL(config)
+	}
+	u := baseURL + browsePath
 	suffix := searchParam + "=" + url.QueryEscape(keyword)
 	if d, ok := siteSearchDefaults[config.Domain]; ok && d.Extra != "" {
 		suffix += "&" + d.Extra
