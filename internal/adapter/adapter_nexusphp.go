@@ -9,12 +9,12 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	htmllib "html"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -55,10 +55,11 @@ var (
 	reNexusErrorP         = regexp.MustCompile(`<p[^>]*>([^<]*(?:失败|错误|error|fail|拒绝|duplicate|already)[^<]*)</p>`)
 	reNexusBrowseLink     = regexp.MustCompile(`(?s)href="details\.php\?id=(\d+)"[^>]*><b>\s*&nbsp;([^<]+)</b>`)
 	reNexusBrowseAltLink  = regexp.MustCompile(`(?s)href="details\.php\?id=(\d+)[^"]*"[^>]*>(.*?)</a>`)
-	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?rowfollow["']?[^>]*>([\d.]+)\s*<br\s*/?>\s*(TB|GB|MB|KB)`)
+	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?rowfollow["']?[^>]*>([\d.]+)\s*(?:<br\s*/?>)?\s*(TB|GB|MB|KB|T|G|M)\b`)
 	reNexusBrowseSeeders  = regexp.MustCompile(`dllist=1#seeders">\s*(\d+)\s*</a>`)
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M|B)`)
+	reNexusDomTTTitle     = regexp.MustCompile(`(?s)onmouseover="domTT_activate\([^,]+,\s*event,\s*'content',\s*'([^']+)`)
 	reNexusTag            = regexp.MustCompile(`class="tag[^"]*"[^>]*>([^<]+)`)
 
 	reBBCodeImg      = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
@@ -982,21 +983,7 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 			continue
 		}
 
-		results := parseNexusPHPBrowse(string(body), config)
-		if len(results) > 0 && results[0].Title == "" {
-			a.logger.Debug("nexusphp title-empty debug",
-				zap.String("domain", config.Domain),
-				zap.Int("count", len(results)),
-				zap.String("first_id", results[0].TorrentID))
-			// Dump first 2000 chars for analysis
-			preview := string(body)
-			if len(preview) > 8000 { preview = preview[:8000] }
-			os.WriteFile("/logs/nexusphp_debug.html", body, 0644)
-			a.logger.Debug("nexusphp title-empty html",
-				zap.String("domain", config.Domain),
-				zap.String("preview", preview))
-		}
-		return results, nil
+		return parseNexusPHPBrowse(string(body), config), nil
 	}
 
 	return nil, lastErr
@@ -1234,6 +1221,17 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		}
 		chunk := html[start:end]
 
+		// domTT fallback: extract title from onmouseover when link text is empty
+		if title == "" {
+			linkTag := html[start:min(start+1000, len(html))]
+			if dm := reNexusDomTTTitle.FindStringSubmatch(linkTag); len(dm) > 1 {
+				title = strings.TrimSpace(stripTags(htmllib.UnescapeString(dm[1])))
+				if idx := strings.Index(title, "\n"); idx > 0 {
+					title = title[:idx]
+				}
+			}
+		}
+
 		result := &model.SeedingSearchResult{
 			TorrentID: torrentID,
 			Title:     title,
@@ -1241,6 +1239,8 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		}
 
 		if m := sizeRe.FindStringSubmatch(chunk); len(m) > 2 {
+			result.Size = parseSizeStr(m[1] + " " + m[2])
+		} else if m := reNexusSizeStr.FindStringSubmatch(chunk); len(m) > 2 {
 			result.Size = parseSizeStr(m[1] + " " + m[2])
 		}
 
