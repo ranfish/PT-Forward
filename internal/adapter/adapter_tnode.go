@@ -9,7 +9,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -729,7 +728,6 @@ func (a *TNodeAdapter) scrapeSecurityKeys(ctx context.Context, config *model.Sit
 }
 
 func (a *TNodeAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-	a.logger.Info("tnode SearchTorrents called", zap.String("domain", config.Domain), zap.String("keyword", keyword))
 	baseURL := resolveBaseURL(config)
 	csrfToken, _ := a.fetchCSRFToken(ctx, config, baseURL+"/index")
 
@@ -756,63 +754,51 @@ func (a *TNodeAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	}
 
 	bodyStr := string(body)
-	os.WriteFile("/logs/zhuque_debug.json", body, 0644)
-	a.logger.Debug("tnode search response",
-		zap.String("url", u),
-		zap.Int("status", resp.StatusCode),
-		zap.Int("body_len", len(bodyStr)),
-		zap.Bool("has_csrf", csrfToken != ""),
-		zap.String("preview", truncStr(bodyStr, 500)))
-
 	if resp.StatusCode != http.StatusOK {
-		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, truncStr(bodyStr, 200)), nil)
+		snippet := bodyStr
+		if len(snippet) > 200 { snippet = snippet[:200] }
+		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
 	}
 
 	var apiResp struct {
-		Status  int             `json:"status"`
-		Data    json.RawMessage `json:"data"`
+		Status int             `json:"status"`
+		Data   json.RawMessage `json:"data"`
 	}
 	if err := json.Unmarshal(body, &apiResp); err != nil {
 		return nil, searchError("解析搜索结果失败", err)
 	}
 
-	var results []*model.SeedingSearchResult
 	var dataMap map[string]json.RawMessage
-	if json.Unmarshal(apiResp.Data, &dataMap) == nil {
-		for _, key := range []string{"list", "data", "torrents", "rows"} {
-			if raw, ok := dataMap[key]; ok {
-				results = parseTNodeList(raw)
-				if len(results) > 0 { break }
+	if json.Unmarshal(apiResp.Data, &dataMap) != nil {
+		return nil, nil
+	}
+
+	var results []*model.SeedingSearchResult
+
+	if raw, ok := dataMap["tmdbs"]; ok {
+		var tmdbs []struct {
+			Title    string                   `json:"title"`
+			Torrents []map[string]interface{} `json:"torrents"`
+		}
+		if json.Unmarshal(raw, &tmdbs) == nil {
+			for _, tmdb := range tmdbs {
+				for _, t := range tmdb.Torrents {
+					r := &model.SeedingSearchResult{}
+					r.TorrentID = toString(t["id"])
+					r.Title = toString(t["title"])
+					if r.Title == "" {
+						r.Title = tmdb.Title
+					}
+					r.Size = toInt64(t["size"])
+					if r.TorrentID != "" {
+						results = append(results, r)
+					}
+				}
 			}
 		}
 	}
-	if len(results) == 0 {
-		results = parseTNodeList(apiResp.Data)
-	}
 
 	return results, nil
-}
-
-func parseTNodeList(raw json.RawMessage) []*model.SeedingSearchResult {
-	var items []map[string]interface{}
-	if err := json.Unmarshal(raw, &items); err != nil {
-		return nil
-	}
-	var results []*model.SeedingSearchResult
-	for _, item := range items {
-		r := &model.SeedingSearchResult{}
-		r.TorrentID = toString(item["id"])
-		r.Title = toString(item["name"])
-		if r.Title == "" {
-			r.Title = toString(item["title"])
-		}
-		r.Size = toInt64(item["size"])
-		r.Seeders = toInt(item["seeders"])
-		if r.TorrentID != "" {
-			results = append(results, r)
-		}
-	}
-	return results
 }
 
 func toString(v interface{}) string {
@@ -844,11 +830,4 @@ func toInt(v interface{}) int {
 	default:
 		return 0
 	}
-}
-
-func truncStr(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
-	}
-	return s
 }
