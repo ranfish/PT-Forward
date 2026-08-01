@@ -1226,6 +1226,11 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			linkTag := html[start:min(start+1000, len(html))]
 			if dm := reNexusDomTTTitle.FindStringSubmatch(linkTag); len(dm) > 1 {
 				title = strings.TrimSpace(stripTags(htmllib.UnescapeString(dm[1])))
+				title = strings.ReplaceAll(title, "\\'", "'")
+				title = strings.ReplaceAll(title, "\\\"", "\"")
+				if idx := strings.IndexAny(title, "["); idx > 10 {
+					title = strings.TrimSpace(title[:idx])
+				}
 				if idx := strings.Index(title, "\n"); idx > 0 {
 					title = title[:idx]
 				}
