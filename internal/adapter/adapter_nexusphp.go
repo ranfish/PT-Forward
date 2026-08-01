@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 	htmllib "html"
+	"io/ioutil"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -983,6 +984,9 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 			continue
 		}
 
+		if strings.Contains(config.Domain, "hhanclub") {
+			ioutil.WriteFile("/logs/hanhan_debug.html", body, 0644)
+		}
 		return parseNexusPHPBrowse(string(body), config), nil
 	}
 
