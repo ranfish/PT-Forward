@@ -370,6 +370,7 @@ func (a *YemaptAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 	}
 	req.Header.Set("Content-Type", "application/json")
 	setCommonHeaders(req, config.Cookie)
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
