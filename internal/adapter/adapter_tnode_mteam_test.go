@@ -977,7 +977,7 @@ func TestTNode_VerifyExists_Found(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":200,"data":{"list":[{"id":"42","name":"Found Torrent","size":1024}]}}`))
+		w.Write([]byte(`{"status":200,"data":{"tmdbs":[{"title":"Test","torrents":[{"id":"42","title":"Found Torrent","size":1024}]}]}}`))
 	}))
 	defer srv.Close()
 
@@ -1001,7 +1001,7 @@ func TestTNode_VerifyExists_NotFound(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":200,"data":{"list":[{"id":"99","name":"Other Torrent","size":1024}]}}`))
+		w.Write([]byte(`{"status":200,"data":{"tmdbs":[{"title":"Test","torrents":[{"id":"99","title":"Other Torrent","size":1024}]}]}}`))
 	}))
 	defer srv.Close()
 
