@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -657,7 +658,11 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 		return nil, err
 	}
 
-	return parseGenericBrowse(string(body), config), nil
+	results := parseGenericBrowse(string(body), config)
+	if len(results) > 0 && results[0].Size == 0 {
+		os.WriteFile("/logs/gazelle_debug_"+strings.ReplaceAll(config.Domain, ".", "_")+".html", body, 0644)
+	}
+	return results, nil
 }
 
 func (a *GenericAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
