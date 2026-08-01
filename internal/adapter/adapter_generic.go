@@ -658,7 +658,7 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 		return nil, err
 	}
 
-	if strings.Contains(config.Domain, "hdroute") {
+	if strings.Contains(config.Domain, "hdroute") || strings.Contains(config.Domain, "star-space") {
 		os.WriteFile("/logs/hdroute_debug.html", body, 0644)
 	}
 
