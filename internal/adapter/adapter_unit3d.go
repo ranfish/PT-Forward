@@ -1054,14 +1054,15 @@ func (a *Unit3DAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 		return nil, httpError(fmtES("HTTP %d: %s", resp.StatusCode, snippet), nil)
 	}
 
-	a.logger.Debug("unit3d search raw", zap.String("domain", config.Domain), zap.Int("body_len", len(body)), zap.String("preview", string(body[:min(500, len(body))])))
 
 	var result struct {
 		Data []struct {
-			ID       json.Number `json:"id"`
-			Name     string      `json:"name"`
-			Size     int64       `json:"size"`
-			Seeders  int         `json:"seeders"`
+			ID         string `json:"id"`
+			Attributes struct {
+				Name string `json:"name"`
+				Size int64  `json:"size"`
+				Seeders int `json:"seeders"`
+			} `json:"attributes"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -1071,10 +1072,10 @@ func (a *Unit3DAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 	items := make([]*model.SeedingSearchResult, 0, len(result.Data))
 	for _, t := range result.Data {
 		items = append(items, &model.SeedingSearchResult{
-			TorrentID: t.ID.String(),
-			Title:     t.Name,
-			Size:      t.Size,
-			Seeders:   t.Seeders,
+			TorrentID: t.ID,
+			Title:     t.Attributes.Name,
+			Size:      t.Attributes.Size,
+			Seeders:   t.Attributes.Seeders,
 		})
 	}
 	return items, nil
