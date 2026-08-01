@@ -361,14 +361,12 @@ func (a *YemaptAdapter) VerifyExists(ctx context.Context, config *model.SiteConf
 func (a *YemaptAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 	baseURL := resolveBaseURL(config)
 
-	searchBody := fmt.Sprintf(`{"page":1,"size":20,"keyword":%q}`, keyword)
-	u := baseURL + "/api/torrent/search"
+	u := baseURL + "/api/torrent/fetchList?keyword=" + url.QueryEscape(keyword) + "&page=1&size=20"
 
-	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader(searchBody))
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, searchError("构造搜索请求失败", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
 	setCommonHeaders(req, config.Cookie)
 	req.Header.Set("Accept", "application/json")
 
