@@ -56,7 +56,7 @@ var (
 	reNexusErrorP         = regexp.MustCompile(`<p[^>]*>([^<]*(?:失败|错误|error|fail|拒绝|duplicate|already)[^<]*)</p>`)
 	reNexusBrowseLink     = regexp.MustCompile(`(?s)href=["']details\.php\?id=(\d+)["'][^>]*><b>\s*&nbsp;([^<]+)</b>`)
 	reNexusBrowseAltLink  = regexp.MustCompile(`(?s)href=["']details\.php\?id=(\d+)[^"']*["'][^>]*>(.*?)</a>`)
-	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?rowfollow["']?[^>]*>([\d.]+)\s*(?:<br\s*/?>)?\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M)\b`)
+	reNexusBrowseSize     = regexp.MustCompile(`(?i)class=["']?rowfollow["']?[^>]*>([\d.]+)\s*(?:&nbsp;)?\s*(?:<br\s*/?>)?\s*(?:&nbsp;)?\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M)\b`)
 	reNexusBrowseSeeders  = regexp.MustCompile(`dllist=1#seeders">\s*(\d+)\s*</a>`)
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M|B)`)
