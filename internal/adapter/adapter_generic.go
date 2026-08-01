@@ -9,7 +9,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -33,7 +32,7 @@ var (
 	reGenericErrorClass        = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reGenericStripTags         = regexp.MustCompile(`<[^>]+>`)
 	reGenericBrowseRow         = regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
-	reGenericBrowseDetailLink  = regexp.MustCompile(`(?s)href=["'](?:/t/(\d+)/|[^"']*\bdetails?\.php\?id=(\d+)|[^"']*torrent[s]?\.php\?(?:torrent)?id=(\d+)|[^"']*video_detail\.php\?tid=(\d+))["'][^>]*>(.*?)</a>`)
+	reGenericBrowseDetailLink  = regexp.MustCompile(`(?s)href=["'](?:/t/(\d+)/|[^"']*\bdetails?\.php\?id=(\d+)[^"']*|[^"']*torrent[s]?\.php\?(?:torrent)?id=(\d+)[^"']*|[^"']*video_detail\.php\?tid=(\d+)[^"']*)["'][^>]*>(.*?)</a>`)
 	reGenericBrowseSize        = regexp.MustCompile(`(?i)([\d.]+)\s*(?:<br\s*/?>)?\s*(TB|GB|MB|KB|T|G|M)\b`)
 	reGenericBrowseSeeders     = regexp.MustCompile(`>(\d+)</a>\s*</td>\s*$`)
 	reGenericBrowseLeechers    = regexp.MustCompile(`(\d+)\s*</td>\s*$`)
@@ -658,11 +657,7 @@ func (a *GenericAdapter) SearchTorrents(ctx context.Context, config *model.SiteC
 		return nil, err
 	}
 
-	results := parseGenericBrowse(string(body), config)
-	if len(results) > 0 && results[0].Size == 0 {
-		os.WriteFile("/logs/gazelle_debug_"+strings.ReplaceAll(config.Domain, ".", "_")+".html", body, 0644)
-	}
-	return results, nil
+	return parseGenericBrowse(string(body), config), nil
 }
 
 func (a *GenericAdapter) GetTorrentInfoHash(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
