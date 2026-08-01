@@ -434,13 +434,16 @@ func parseYeMPTList(raw json.RawMessage) []*model.SeedingSearchResult {
 	for _, item := range items {
 		r := &model.SeedingSearchResult{}
 		r.TorrentID = toString(item["id"])
-		r.Title = toString(item["title"])
+		r.Title = toString(item["showName"])
+		if r.Title == "" {
+			r.Title = toString(item["title"])
+		}
 		if r.Title == "" {
 			r.Title = toString(item["name"])
 		}
-		r.Size = toInt64(item["size"])
+		r.Size = toInt64(item["fileSize"])
 		if r.Size == 0 {
-			r.Size = toInt64(item["fileSize"])
+			r.Size = toInt64(item["size"])
 		}
 		r.Seeders = toInt(item["seeders"])
 		if r.TorrentID != "" {
