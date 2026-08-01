@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -755,6 +756,7 @@ func (a *TNodeAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	}
 
 	bodyStr := string(body)
+	os.WriteFile("/logs/zhuque_debug.json", body, 0644)
 	a.logger.Debug("tnode search response",
 		zap.String("url", u),
 		zap.Int("status", resp.StatusCode),
