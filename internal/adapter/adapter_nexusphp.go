@@ -9,13 +9,13 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 	htmllib "html"
+	"io/ioutil"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -1270,11 +1270,9 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			}
 		}
 
-		// Debug: dump chunk when size is still 0
+		// Dump full HTML when size still 0 (for debugging)
 		if result.Size == 0 && len(results) == 0 {
-			chunkPreview := chunk
-			if len(chunkPreview) > 1000 { chunkPreview = chunkPreview[:1000] }
-			fmt.Fprintf(os.Stderr, "SIZE_DEBUG domain=%s id=%s chunk=%s\n", config.Domain, torrentID, chunkPreview)
+			ioutil.WriteFile("/logs/size_debug_"+config.Domain+".html", []byte(html), 0644)
 		}
 
 		if m := seedersRe.FindStringSubmatch(chunk); len(m) > 1 {
