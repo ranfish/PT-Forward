@@ -10,10 +10,12 @@ import (
 type searchDefaults struct {
 	Browse  string
 	Param   string
+	Extra   string
 }
 
 var siteSearchDefaults = map[string]searchDefaults{
-	"totheglory.im": {Browse: "/browse.php", Param: "search_field"},
+	"totheglory.im":  {Browse: "/browse.php", Param: "search_field"},
+	"hdroute.org":    {Browse: "/browse.php", Param: "s", Extra: "dp=0&add=0&action=s&or=1&imdb="},
 }
 
 func buildSearchURL(config *model.SiteConfig, framework, keyword string) string {
@@ -44,11 +46,14 @@ func buildSearchURL(config *model.SiteConfig, framework, keyword string) string 
 	}
 
 	u := resolveBaseURL(config) + browsePath
-	if strings.Contains(u, "?") {
-		u += "&"
-	} else {
-		u += "?"
+	suffix := searchParam + "=" + url.QueryEscape(keyword)
+	if d, ok := siteSearchDefaults[config.Domain]; ok && d.Extra != "" {
+		suffix += "&" + d.Extra
 	}
-	u += searchParam + "=" + url.QueryEscape(keyword)
+	if strings.Contains(u, "?") {
+		u += "&" + suffix
+	} else {
+		u += "?" + suffix
+	}
 	return u
 }
