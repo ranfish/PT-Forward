@@ -60,6 +60,7 @@ var (
 	reNexusBrowseLeechers = regexp.MustCompile(`dllist=1#leechers">\s*(\d+)\s*</a>`)
 	reNexusSizeStr        = regexp.MustCompile(`([\d.]+)\s*(TiB|GiB|MiB|KiB|TB|GB|MB|KB|T|G|M|B)`)
 	reNexusDomTTTitle     = regexp.MustCompile(`(?s)onmouseover="domTT_activate\([^,]+,\s*event,\s*'content',\s*'(.*?)'\s*,\s*'trail'`)
+	reNexusSizeTd         = regexp.MustCompile(`(?i)class=["'][^"']*(?:size|filesize|torrent.size|td_size|col_size|大小)[^"']*["'][^>]*>\s*([\d.]+)\s*(?:<br\s*/?>)?\s*(TB|GB|MB|KB|T|G|M)`)
 	reNexusTag            = regexp.MustCompile(`class="tag[^"]*"[^>]*>([^<]+)`)
 
 	reBBCodeImg      = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
@@ -1247,6 +1248,13 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			result.Size = parseSizeStr(m[1] + " " + m[2])
 		} else if m := reNexusSizeStr.FindStringSubmatch(chunk); len(m) > 2 {
 			result.Size = parseSizeStr(m[1] + " " + m[2])
+		}
+
+		// Size fallback: look for number+unit in <td> with size-related class
+		if result.Size == 0 {
+			if sm := reNexusSizeTd.FindStringSubmatch(chunk); len(sm) > 2 {
+				result.Size = parseSizeStr(sm[1] + " " + sm[2])
+			}
 		}
 
 		if m := seedersRe.FindStringSubmatch(chunk); len(m) > 1 {
