@@ -800,11 +800,9 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 }
 
 var reHDRouteEntry = regexp.MustCompile(`(?s)title_eng[^>]*>([^<]+)</p>.*?details\.php\?id=(\d+).*?torrent_size[^>]*>([\d.]+)\s*(?:<br\s*/?>)?\s*(GB|MB|TB)`)
-var reHDRouteSize = regexp.MustCompile(`([\d.]+)\s*(GB|MB|TB|GiB|MiB)`)
 
 func parseGenericBrowseDiv(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
 	var results []*model.SeedingSearchResult
-	sizeRe := reGenericBrowseSize
 
 	matches := reHDRouteEntry.FindAllStringSubmatch(html, -1)
 	for _, m := range matches {
