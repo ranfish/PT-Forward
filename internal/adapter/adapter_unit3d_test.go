@@ -499,7 +499,7 @@ func TestUnit3D_GetPreciseSLData_WebFull(t *testing.T) {
 func TestUnit3D_VerifyExists_Found(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"id":"42","name":"Found Torrent","size":1024}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"id":"42","attributes":{"name":"Found Torrent","size":1024}}]}`))
 	}))
 	defer srv.Close()
 
@@ -519,7 +519,7 @@ func TestUnit3D_VerifyExists_Found(t *testing.T) {
 func TestUnit3D_VerifyExists_NotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"id":"99","name":"Other Torrent","size":1024}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"id":"99","attributes":{"name":"Other Torrent","size":1024}}]}`))
 	}))
 	defer srv.Close()
 
