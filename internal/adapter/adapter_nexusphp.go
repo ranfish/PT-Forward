@@ -1275,6 +1275,17 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			}
 		}
 
+		// Check if entry is in a list table row (has rowfollow nearby)
+		// vs poster grid (no rowfollow)
+		trStart := strings.LastIndex(html[:loc[0]], "<tr")
+		trEnd := strings.Index(html[loc[0]:], "</tr>")
+		if trStart >= 0 && trEnd > 0 {
+			trContent := html[trStart : loc[0]+trEnd+5]
+			if strings.Contains(trContent, "rowfollow") {
+				isImageOnly = false
+			}
+		}
+
 		if title == "" {
 			seen[torrentID] = true
 			continue
