@@ -1332,12 +1332,13 @@ var reHDCiTYEntry = regexp.MustCompile(`href="t-(\d+)"[^>]*>([^<]+)`)
 var reHDCiTYSize = regexp.MustCompile(`([\d.]+)\s*(GB|MB|TB|GiB|MiB)`)
 
 func parseHDCiTYBrowse(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
-	matches := reHDCiTYEntry.FindAllStringSubmatch(html, -1)
+	matches := reHDCiTYEntry.FindAllStringSubmatchIndex(html, -1)
 	var results []*model.SeedingSearchResult
-	for _, m := range matches {
-		tid := m[1]
-		title := strings.TrimSpace(m[2])
-		if len(title) < 5 {
+	for _, loc := range matches {
+		tid := html[loc[2]:loc[3]]
+		title := strings.TrimSpace(html[loc[4]:loc[5]])
+		title = strings.ReplaceAll(title, "&nbsp;", " ")
+		if len(title) < 5 || strings.HasPrefix(title, "[") {
 			continue
 		}
 		result := &model.SeedingSearchResult{
@@ -1345,10 +1346,10 @@ func parseHDCiTYBrowse(html string, config *model.SiteConfig) []*model.SeedingSe
 			Title:     title,
 			DetailURL: config.Domain + "/t-" + tid,
 		}
-		idx := strings.Index(html, m[0])
-		if idx >= 0 {
-			chunk := html[idx : idx+3000]
-			if sm := reHDCiTYSize.FindStringSubmatch(chunk); len(sm) > 2 {
+		chunk := html[loc[0]:min(loc[0]+2000, len(html))]
+		if sm := reHDCiTYSize.FindStringSubmatch(chunk); len(sm) > 2 {
+			val, _ := strconv.ParseFloat(sm[1], 64)
+			if val > 0 && val < 1000 {
 				result.Size = parseSizeStr(sm[1] + " " + sm[2])
 			}
 		}
