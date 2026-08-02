@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -990,7 +989,16 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 
 		parsed := parseNexusPHPBrowse(string(body), config)
 		if len(parsed) == 0 && strings.Contains(config.Domain, "audiences") {
-			fmt.Fprintf(os.Stderr, "AUDIENCES_DEBUG url=%s body_len=%d first_500=%s\n", u, len(body), string(body[:min(500, len(body))]))
+			a.logger.Info("audiences parse result",
+				zap.String("bp", bp),
+				zap.Int("body_len", len(body)),
+				zap.Int("parsed_count", len(parsed)),
+				zap.String("title_match", func() string {
+					if m := regexp.MustCompile(`<title>([^<]+)`).FindStringSubmatch(string(body)); len(m) > 1 {
+						return m[1][:50]
+                    }
+                    return "no title"
+                }()))
 		}
 		return parsed, nil
 	}
