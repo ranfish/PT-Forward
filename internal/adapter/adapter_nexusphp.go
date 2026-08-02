@@ -1315,6 +1315,16 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 					imgResults = append(imgResults[:i], imgResults[i+1:]...)
 				}
 			}
+			alreadyInText := false
+			for _, r := range textResults {
+				if r.TorrentID == torrentID {
+					alreadyInText = true
+					break
+				}
+			}
+			if alreadyInText {
+				continue
+			}
 		}
 		if seen[torrentID] && isImageOnly {
 			continue
