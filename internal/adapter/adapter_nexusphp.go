@@ -1294,21 +1294,18 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		// Short titles (<=3 chars) without image = seeders/leechers count links
 		// Use them to update existing entry's size, then skip
 		if len(title) <= 3 && !isImageOnly && seen[torrentID] {
-			start := loc[0]
-			end := loc[1]
-			if end+20000 <= len(html) {
-				end += 20000
-			} else {
-				end = len(html)
-			}
-			chunk := html[start:end]
-			// Update size in both textResults and imgResults
+			// Search both directions from the link for rowfollow size cell
+			wideStart := loc[0] - 500
+			if wideStart < 0 { wideStart = 0 }
+			wideEnd := loc[1] + 500
+			if wideEnd > len(html) { wideEnd = len(html) }
+			wideChunk := html[wideStart:wideEnd]
 			for _, list := range [][]*model.SeedingSearchResult{textResults, imgResults} {
 				for _, r := range list {
 					if r.TorrentID == torrentID && r.Size == 0 {
-						if m := sizeRe.FindStringSubmatch(chunk); len(m) > 2 {
+						if m := sizeRe.FindStringSubmatch(wideChunk); len(m) > 2 {
 							r.Size = parseSizeStr(m[1] + " " + m[2])
-						} else if m := reNexusSizeStr.FindStringSubmatch(chunk); len(m) > 2 {
+						} else if m := reNexusSizeStr.FindStringSubmatch(wideChunk); len(m) > 2 {
 							r.Size = parseSizeStr(m[1] + " " + m[2])
 						}
 					}
