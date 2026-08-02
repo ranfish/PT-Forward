@@ -1237,6 +1237,11 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		detailMatches = altDetailLinkRe.FindAllStringSubmatchIndex(html, -1)
 	}
 
+	// Fallback: HDCiTY uses href="t-{id}" format (no .php, no details)
+	if len(detailMatches) == 0 {
+		return parseHDCiTYBrowse(html, config)
+	}
+
 	// Two-pass strategy: first collect text-link entries (list table with sizes),
 	// then if not enough, fall back to image-only/domTT entries (poster grid).
 	var textResults, imgResults []*model.SeedingSearchResult
@@ -1321,6 +1326,38 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		return textResults
 	}
 	return imgResults
+}
+
+var reHDCiTYEntry = regexp.MustCompile(`href="t-(\d+)"[^>]*>([^<]+)`)
+var reHDCiTYSize = regexp.MustCompile(`([\d.]+)\s*(GB|MB|TB|GiB|MiB)`)
+
+func parseHDCiTYBrowse(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
+	matches := reHDCiTYEntry.FindAllStringSubmatch(html, -1)
+	var results []*model.SeedingSearchResult
+	for _, m := range matches {
+		tid := m[1]
+		title := strings.TrimSpace(m[2])
+		if len(title) < 5 {
+			continue
+		}
+		result := &model.SeedingSearchResult{
+			TorrentID: tid,
+			Title:     title,
+			DetailURL: config.Domain + "/t-" + tid,
+		}
+		idx := strings.Index(html, m[0])
+		if idx >= 0 {
+			chunk := html[idx : idx+3000]
+			if sm := reHDCiTYSize.FindStringSubmatch(chunk); len(sm) > 2 {
+				result.Size = parseSizeStr(sm[1] + " " + sm[2])
+			}
+		}
+		results = append(results, result)
+		if len(results) >= 50 {
+			break
+		}
+	}
+	return results
 }
 
 func parseSizeStr(s string) int64 {
