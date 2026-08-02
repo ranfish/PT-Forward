@@ -1329,7 +1329,7 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 }
 
 var reHDCiTYEntry = regexp.MustCompile(`href="t-(\d+)"[^>]*>([^<]+)`)
-var reHDCiTYSize = regexp.MustCompile(`([\d.]+)\s*(GB|MB|TB|GiB|MiB)`)
+var reHDCiTYSize = regexp.MustCompile(`sd_storage[^>]*>\s*([\d.]+)\s*(GB|MB|TB|GiB|MiB)`)
 
 func parseHDCiTYBrowse(html string, config *model.SiteConfig) []*model.SeedingSearchResult {
 	matches := reHDCiTYEntry.FindAllStringSubmatchIndex(html, -1)
