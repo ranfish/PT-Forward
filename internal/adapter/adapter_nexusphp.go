@@ -1346,12 +1346,9 @@ func parseHDCiTYBrowse(html string, config *model.SiteConfig) []*model.SeedingSe
 			Title:     title,
 			DetailURL: config.Domain + "/t-" + tid,
 		}
-		chunk := html[loc[0]:min(loc[0]+2000, len(html))]
+		chunk := html[loc[0]:min(loc[0]+5000, len(html))]
 		if sm := reHDCiTYSize.FindStringSubmatch(chunk); len(sm) > 2 {
-			val, _ := strconv.ParseFloat(sm[1], 64)
-			if val > 0 && val < 1000 {
-				result.Size = parseSizeStr(sm[1] + " " + sm[2])
-			}
+			result.Size = parseSizeStr(sm[1] + " " + sm[2])
 		}
 		results = append(results, result)
 		if len(results) >= 50 {
