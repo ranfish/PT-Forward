@@ -952,7 +952,7 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 
 	var lastErr error
 	for _, bp := range browsePaths {
-		searchURL := u + bp + "?" + searchParam + "=" + url.QueryEscape(keyword) + catParam
+		searchURL := u + bp + "?" + searchParam + "=" + url.QueryEscape(keyword) + "&search_area=0&search_mode=0" + catParam
 
 		if strings.Contains(config.Domain, "audiences") {
 			a.logger.Info("nexusphp search debug", zap.String("url", searchURL), zap.String("bp", bp))
