@@ -1363,6 +1363,9 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		if isImageOnly {
 			imgResults = append(imgResults, result)
 		} else {
+			if torrentID == "582" && strings.Contains(config.Domain, "tey") {
+				fmt.Fprintf(os.Stderr, "TEY_582_TEXT size=%d chunk_has_rowfollow=%v\n", result.Size, strings.Contains(chunk, "rowfollow"))
+			}
 			textResults = append(textResults, result)
 		}
 
