@@ -743,7 +743,9 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 		return parseGenericBrowseDiv(html, config)
 	}
 
-	for _, row := range rows {
+	rowIdx := 0
+	for ; rowIdx < len(rows); rowIdx++ {
+		row := rows[rowIdx]
 		linkMatch := detailLinkRe.FindStringSubmatch(row)
 		if len(linkMatch) < 6 {
 			continue
@@ -792,6 +794,34 @@ func parseGenericBrowse(html string, config *model.SiteConfig) []*model.SeedingS
 		results = append(results, result)
 
 		if len(results) >= 50 {
+			// Gazelle multi-row: last result may be movieInfo (no size),
+			// rowTitle with size was never processed. Scan remaining rows.
+			if results[len(results)-1].Size == 0 {
+				lastTid := results[len(results)-1].TorrentID
+				for j := rowIdx + 1; j < len(rows); j++ {
+					lm := detailLinkRe.FindStringSubmatch(rows[j])
+					if len(lm) < 6 {
+						continue
+					}
+					tid2 := lm[1]
+					if tid2 == "" {
+						tid2 = lm[2]
+					}
+					if tid2 == "" {
+						tid2 = lm[3]
+					}
+					if tid2 == "" {
+						tid2 = lm[4]
+					}
+					if tid2 != lastTid {
+						break
+					}
+					if m := sizeRe.FindStringSubmatch(rows[j]); len(m) > 2 {
+						results[len(results)-1].Size = parseSizeStr(m[1] + " " + m[2])
+						break
+					}
+				}
+			}
 			break
 		}
 	}
