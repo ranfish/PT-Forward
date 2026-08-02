@@ -1,16 +1,15 @@
 package adapter
 
 import (
+	"fmt"
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"regexp"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -999,10 +998,8 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 
 		parsed := parseNexusPHPBrowse(string(body), config)
 		if strings.Contains(config.Domain, "tey.cc") {
-			os.WriteFile("/logs/tey_debug.html", body, 0644)
 		}
 		if len(parsed) == 0 && (strings.Contains(config.Domain, "haidan") || strings.Contains(config.Domain, "hdcity")) {
-			os.WriteFile("/logs/city_debug_"+strings.ReplaceAll(config.Domain, ".", "_")+"_"+strings.ReplaceAll(bp, "/", "_")+".html", body, 0644)
 			a.logger.Info("haidan debug", zap.String("bp", bp), zap.Int("body_len", len(body)))
 		}
 		if len(parsed) == 0 && strings.Contains(config.Domain, "audiences") {
@@ -1251,9 +1248,6 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 
 	for _, loc := range detailMatches {
 		torrentID := html[loc[2]:loc[3]]
-		if seen[torrentID] {
-			continue
-		}
 
 		rawContent := html[loc[4]:loc[5]]
 		title := strings.TrimSpace(stripTags(strings.ReplaceAll(rawContent, "&nbsp;", " ")))
@@ -1294,7 +1288,6 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		// Short titles (<=3 chars) without image = seeders/leechers count links
 		// Use them to update existing entry's size, then skip
 		if len(title) <= 3 && !isImageOnly && seen[torrentID] {
-			fmt.Fprintf(os.Stderr, "SHORT_DEDUP domain=%s tid=%s title=%s img=%v seen=%v\n", config.Domain, torrentID, title, isImageOnly, seen[torrentID]) //
 			// Search both directions from the link for rowfollow size cell
 			wideStart := loc[0] - 500
 			if wideStart < 0 { wideStart = 0 }
@@ -1364,7 +1357,6 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			imgResults = append(imgResults, result)
 		} else {
 			if torrentID == "582" && strings.Contains(config.Domain, "tey") {
-				fmt.Fprintf(os.Stderr, "TEY_582_TEXT size=%d chunk_has_rowfollow=%v\n", result.Size, strings.Contains(chunk, "rowfollow"))
 			}
 			textResults = append(textResults, result)
 		}
