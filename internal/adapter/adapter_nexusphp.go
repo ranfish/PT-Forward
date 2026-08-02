@@ -989,16 +989,17 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 
 		parsed := parseNexusPHPBrowse(string(body), config)
 		if len(parsed) == 0 && strings.Contains(config.Domain, "audiences") {
+			titleStr := "no title"
+			if m := regexp.MustCompile(`<title>([^<]+)`).FindStringSubmatch(string(body)); len(m) > 1 {
+				titleStr = m[1]
+				if len(titleStr) > 50 {
+					titleStr = titleStr[:50]
+				}
+			}
 			a.logger.Info("audiences parse result",
 				zap.String("bp", bp),
 				zap.Int("body_len", len(body)),
-				zap.Int("parsed_count", len(parsed)),
-				zap.String("title_match", func() string {
-					if m := regexp.MustCompile(`<title>([^<]+)`).FindStringSubmatch(string(body)); len(m) > 1 {
-						return m[1][:50]
-                    }
-                    return "no title"
-                }()))
+				zap.String("title", titleStr))
 		}
 		return parsed, nil
 	}
