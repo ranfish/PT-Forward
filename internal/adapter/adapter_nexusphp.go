@@ -936,12 +936,21 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 	if !strings.HasPrefix(u, "http") {
 		u = "https://" + u
 	}
+
 	browsePaths := []string{"/browse.php", "/torrents.php"}
-	if config.Paths.Browse != "" && config.Paths.Browse != "/browse.php" {
+	searchParam := config.Paths.SearchParam
+
+	if browsePaths[0] != config.Paths.Browse && config.Paths.Browse != "" {
 		browsePaths = []string{config.Paths.Browse}
+	} else if d, ok := getSiteSearchDefaults(config.Domain); ok {
+		if d.Browse != "" {
+			browsePaths = []string{d.Browse}
+		}
+		if searchParam == "" && d.Param != "" {
+			searchParam = d.Param
+		}
 	}
 
-	searchParam := config.Paths.SearchParam
 	if searchParam == "" {
 		searchParam = "search"
 	}
