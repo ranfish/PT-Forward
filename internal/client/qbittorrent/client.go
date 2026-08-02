@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha1" //nolint:gosec // SHA1 required by BitTorrent protocol for info_hash
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -68,6 +69,18 @@ func (c *QBClient) GetRole() string                           { return c.cfg.Rol
 func (c *QBClient) GetTransferTargetID() string                 { return c.cfg.TransferTargetID }
 func (c *QBClient) GetID() uint                               { return c.cfg.ID }
 func (c *QBClient) GetSharedPaths() []model.SharedPathMapping { return c.sharedPaths }
+func (c *QBClient) GetTorrentDir() string {
+	if c.cfg.Config == "" {
+		return ""
+	}
+	var v struct {
+		TorrentDir string `json:"torrent_dir"`
+	}
+	if err := json.Unmarshal([]byte(c.cfg.Config), &v); err != nil {
+		return ""
+	}
+	return v.TorrentDir
+}
 
 func (c *QBClient) IsIPBanned() bool {
 	c.mu.RLock()

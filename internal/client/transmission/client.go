@@ -69,6 +69,18 @@ func (c *TRClient) GetRole() string                           { return c.cfg.Rol
 func (c *TRClient) GetTransferTargetID() string                 { return c.cfg.TransferTargetID }
 func (c *TRClient) GetID() uint                               { return c.cfg.ID }
 func (c *TRClient) GetSharedPaths() []model.SharedPathMapping { return c.sharedPaths }
+func (c *TRClient) GetTorrentDir() string {
+	if c.cfg.Config == "" {
+		return ""
+	}
+	var v struct {
+		TorrentDir string `json:"torrent_dir"`
+	}
+	if err := json.Unmarshal([]byte(c.cfg.Config), &v); err != nil {
+		return ""
+	}
+	return v.TorrentDir
+}
 
 func (c *TRClient) rpcCall(ctx context.Context, method string, args interface{}) (*rpcResponse, error) {
 	body, err := json.Marshal(rpcRequest{Method: method, Arguments: args})

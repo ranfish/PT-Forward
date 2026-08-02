@@ -44,6 +44,7 @@ func (m *DownloaderClient) GetRole() string                           { return m
 func (m *DownloaderClient) GetTransferTargetID() string                 { return m.TransferTargetID }
 func (m *DownloaderClient) GetID() uint                               { return m.ID }
 func (m *DownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
+func (m *DownloaderClient) GetTorrentDir() string                      { return "" }
 
 func (m *DownloaderClient) GetTorrentByHash(ctx context.Context, hash string) (*model.TorrentInfo, error) {
 	if m.GetTorrentByHashFn != nil {
