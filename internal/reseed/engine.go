@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/ranfish/pt-forward/internal/audit"
+	clientpkg "github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/compliance"
 	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
@@ -945,12 +946,14 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 			break
 		}
 		dlClient := clientCache[m.clientName]
-		torrentData, err := dlClient.ExportTorrent(ctx, m.src.InfoHash)
+		torrentDir := dlClient.GetTorrentDir()
+		torrentData, err := clientpkg.ReadTorrentFile(torrentDir, m.src.InfoHash)
 		if err != nil {
 			if computed == 0 {
-				e.logger.Warn("export torrent file failed (first error)",
+				e.logger.Warn("read torrent file failed (first error)",
 					zap.String("hash", m.src.InfoHash),
 					zap.String("client", m.clientName),
+					zap.String("torrent_dir", torrentDir),
 					zap.Error(err))
 			}
 			continue
@@ -3408,9 +3411,10 @@ func (e *Engine) getOrComputePiecesHash(ctx context.Context, infoHash string, cl
 	if client == nil {
 		return ""
 	}
-	torrentData, err := client.ExportTorrent(ctx, infoHash)
+	torrentDir := client.GetTorrentDir()
+	torrentData, err := clientpkg.ReadTorrentFile(torrentDir, infoHash)
 	if err != nil || len(torrentData) == 0 {
-		e.logger.Debug("getOrComputePiecesHash: export failed", zap.String("hash", infoHash), zap.Error(err))
+		e.logger.Debug("getOrComputePiecesHash: read torrent failed", zap.String("hash", infoHash), zap.Error(err))
 		return ""
 	}
 	fp2, err := e.fpRepo.ComputeAndSave(ctx, "", "", torrentData, "")

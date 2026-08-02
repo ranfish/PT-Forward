@@ -92,6 +92,7 @@ func (m *mockDownloaderClient) GetRole() string                           { retu
 func (m *mockDownloaderClient) GetTransferTargetID() string                 { return "" }
 func (m *mockDownloaderClient) GetID() uint                               { return 0 }
 func (m *mockDownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
+func (m *mockDownloaderClient) GetTorrentDir() string                      { return "" }
 func (m *mockDownloaderClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
 	return &model.GlobalTransferStats{}, nil
 }

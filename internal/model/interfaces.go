@@ -88,6 +88,7 @@ type DownloaderClient interface {
 	GetTransferTargetID() string
 	GetID() uint
 	GetSharedPaths() []SharedPathMapping
+	GetTorrentDir() string
 
 	GetTorrentByHash(ctx context.Context, hash string) (*TorrentInfo, error)
 	GetSeedingTorrents(ctx context.Context) ([]*TorrentInfo, error)

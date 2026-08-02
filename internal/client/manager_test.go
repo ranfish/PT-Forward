@@ -344,6 +344,7 @@ func (s *stubClient) GetRole() string                           { return "downlo
 func (s *stubClient) GetTransferTargetID() string                 { return "" }
 func (s *stubClient) GetID() uint                               { return 0 }
 func (s *stubClient) GetSharedPaths() []model.SharedPathMapping { return nil }
+func (s *stubClient) GetTorrentDir() string                      { return "" }
 func (s *stubClient) GetTorrentByHash(_ context.Context, _ string) (*model.TorrentInfo, error) {
 	return nil, nil
 }

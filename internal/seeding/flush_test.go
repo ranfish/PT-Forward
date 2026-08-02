@@ -29,6 +29,7 @@ func (m *flushMockClient) GetRole() string                           { return "s
 func (m *flushMockClient) GetTransferTargetID() string                 { return "" }
 func (m *flushMockClient) GetID() uint                               { return 1 }
 func (m *flushMockClient) GetSharedPaths() []model.SharedPathMapping { return nil }
+func (m *flushMockClient) GetTorrentDir() string                      { return "" }
 func (m *flushMockClient) GetMainData(_ context.Context) (*model.Maindata, error) {
 	return m.maindata, m.maindataErr
 }
