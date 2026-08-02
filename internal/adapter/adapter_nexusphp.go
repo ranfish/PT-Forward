@@ -1294,6 +1294,7 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		// Short titles (<=3 chars) without image = seeders/leechers count links
 		// Use them to update existing entry's size, then skip
 		if len(title) <= 3 && !isImageOnly && seen[torrentID] {
+			fmt.Fprintf(os.Stderr, "SHORT_DEDUP domain=%s tid=%s title=%s img=%v seen=%v\n", config.Domain, torrentID, title, isImageOnly, seen[torrentID]) //
 			// Search both directions from the link for rowfollow size cell
 			wideStart := loc[0] - 500
 			if wideStart < 0 { wideStart = 0 }
