@@ -1291,9 +1291,34 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			continue
 		}
 
+		// Short titles (<=3 chars) without image = seeders/leechers count links
+		// Use them to update existing entry's size, then skip
+		if len(title) <= 3 && !isImageOnly && seen[torrentID] {
+			start := loc[0]
+			end := loc[1]
+			if end+20000 <= len(html) {
+				end += 20000
+			} else {
+				end = len(html)
+			}
+			chunk := html[start:end]
+			// Update size in both textResults and imgResults
+			for _, list := range [][]*model.SeedingSearchResult{textResults, imgResults} {
+				for _, r := range list {
+					if r.TorrentID == torrentID && r.Size == 0 {
+						if m := sizeRe.FindStringSubmatch(chunk); len(m) > 2 {
+							r.Size = parseSizeStr(m[1] + " " + m[2])
+						} else if m := reNexusSizeStr.FindStringSubmatch(chunk); len(m) > 2 {
+							r.Size = parseSizeStr(m[1] + " " + m[2])
+						}
+					}
+				}
+			}
+			continue
+		}
+
 		// Allow list table entries (non-image) to override poster grid entries
 		if !isImageOnly && seen[torrentID] {
-			// Remove any existing imgResult with same tid
 			for i := len(imgResults) - 1; i >= 0; i-- {
 				if imgResults[i].TorrentID == torrentID {
 					imgResults = append(imgResults[:i], imgResults[i+1:]...)
