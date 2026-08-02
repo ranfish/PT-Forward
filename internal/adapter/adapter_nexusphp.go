@@ -955,6 +955,10 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 	for _, bp := range browsePaths {
 		searchURL := u + bp + "?" + searchParam + "=" + url.QueryEscape(keyword) + catParam
 
+		if strings.Contains(config.Domain, "audiences") {
+			a.logger.Info("nexusphp search debug", zap.String("url", searchURL), zap.String("bp", bp))
+		}
+
 		req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 		if err != nil {
 			return nil, searchError("构造搜索请求失败", err)
