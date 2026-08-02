@@ -1290,6 +1290,19 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			seen[torrentID] = true
 			continue
 		}
+
+		// Allow list table entries (non-image) to override poster grid entries
+		if !isImageOnly && seen[torrentID] {
+			// Remove any existing imgResult with same tid
+			for i := len(imgResults) - 1; i >= 0; i-- {
+				if imgResults[i].TorrentID == torrentID {
+					imgResults = append(imgResults[:i], imgResults[i+1:]...)
+				}
+			}
+		}
+		if seen[torrentID] && isImageOnly {
+			continue
+		}
 		seen[torrentID] = true
 
 		start := loc[0]
