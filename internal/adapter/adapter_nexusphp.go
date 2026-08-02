@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -988,13 +989,15 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 		}
 
 		parsed := parseNexusPHPBrowse(string(body), config)
+		if len(parsed) == 0 && strings.Contains(config.Domain, "haidan") {
+			os.WriteFile("/logs/haidan_debug_"+bp[1:]+".html", body, 0644)
+			a.logger.Info("haidan debug", zap.String("bp", bp), zap.Int("body_len", len(body)))
+		}
 		if len(parsed) == 0 && strings.Contains(config.Domain, "audiences") {
 			titleStr := "no title"
 			if m := regexp.MustCompile(`<title>([^<]+)`).FindStringSubmatch(string(body)); len(m) > 1 {
 				titleStr = m[1]
-				if len(titleStr) > 50 {
-					titleStr = titleStr[:50]
-				}
+				if len(titleStr) > 50 { titleStr = titleStr[:50] }
 			}
 			a.logger.Info("audiences parse result",
 				zap.String("bp", bp),
