@@ -2526,7 +2526,7 @@ func has3D(lowerS string) bool {
 	return re3D.MatchString(lowerS)
 }
 
-var yearTruncateRe = regexp.MustCompile(`(?:19|20)\d{2}`)
+var yearTruncateRe = regexp.MustCompile(`(?:19|20)\d{2}(?:-(?:19|20)\d{2})?`)
 
 // truncateToYear 截取到第一个年份（含），用于无分辨率的种子名（如 DVDRip）。
 // 跳过位置 0 的年份——标题本身以年份开头（如 "2012世界末日.2009..."）时，
