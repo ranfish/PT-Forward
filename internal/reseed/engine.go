@@ -2419,7 +2419,7 @@ func stripBrandColonPrefix(s string) string {
 
 var seasonPattern = regexp.MustCompile(`(?i)^S\d{1,2}(?:E\d{1,3})?`)
 
-var chineseEpisodeCountRe = regexp.MustCompile(`全?\d+集`)
+var chineseEpisodeCountRe = regexp.MustCompile(`全?\d+集全?`)
 
 var mediumAndRegionTerms = []string{
 	// 介质/来源词（变体问题：Blu-ray/Bluray、Web-DL/WebDL）

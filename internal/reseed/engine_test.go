@@ -2820,6 +2820,7 @@ func TestExtractSearchKeyword_ChineseTitleFallback(t *testing.T) {
 		{"乾隆王朝.2002.40集全.国语.简体中字￡CMCT小鱼", "乾隆王朝 2002"},
 		{"三国.全95集.2010.简繁中字￡CMCT小五&呆呆熊", "三国 2010"},
 		{"易中天品三国.2006.52集全.国语中字￡CMCT阳阳", "易中天品三国 2006"},
+		{"潜伏.30集全.2008.内嵌简体中字￡CMCT暮雨潇潇", "潜伏 2008"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.title, func(t *testing.T) {
