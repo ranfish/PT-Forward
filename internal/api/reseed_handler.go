@@ -161,7 +161,6 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		EngineMode           string  `json:"engineMode"`
 		InjectionIntervalS   int     `json:"injectionIntervalS"`
 		InjectionJitterS     int     `json:"injectionJitterS"`
-		InjectionConcurrency int     `json:"injectionConcurrency"`
 		ScanConcurrency      int     `json:"scanConcurrency"`
 		MaxRetries           int     `json:"maxRetries"`
 		RetryIntervalH       int     `json:"retryIntervalH"`
@@ -197,7 +196,6 @@ func (h *ReseedHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		EngineMode:           req.EngineMode,
 		InjectionIntervalS:   req.InjectionIntervalS,
 		InjectionJitterS:     req.InjectionJitterS,
-		InjectionConcurrency: req.InjectionConcurrency,
 		ScanConcurrency:      req.ScanConcurrency,
 		MaxRetries:           req.MaxRetries,
 		RetryIntervalH:       req.RetryIntervalH,
@@ -329,9 +327,6 @@ func (h *ReseedHandler) handleUpdate(w http.ResponseWriter, r *http.Request, id 
 	}
 	if v, ok := req["injectionJitterS"].(float64); ok {
 		task.InjectionJitterS = int(v)
-	}
-	if v, ok := req["injectionConcurrency"].(float64); ok {
-		task.InjectionConcurrency = int(v)
 	}
 	if v, ok := req["scanConcurrency"].(float64); ok {
 		task.ScanConcurrency = int(v)

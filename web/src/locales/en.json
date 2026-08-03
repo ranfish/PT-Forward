@@ -900,7 +900,7 @@
     "iyuuCloud": "IYUU Cloud Reseed",
     "injectionIntervalS": "Injection Interval (sec)",
     "injectionJitterS": "Injection Jitter (sec)",
-    "injectionConcurrency": "Injection Concurrency",
+
     "scanConcurrency": "Scan Concurrency",
     "maxRetries": "Max Retries",
     "retryIntervalH": "Retry Interval (hour)",

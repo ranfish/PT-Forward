@@ -321,7 +321,7 @@ func (e *Engine) processPendingInjections(ctx context.Context) {
 		// 注入间隔
 		interval := task.InjectionIntervalS
 		if interval <= 0 {
-			interval = 15
+			interval = 1
 		}
 		select {
 		case <-time.After(time.Duration(interval) * time.Second):
