@@ -2359,6 +2359,7 @@ func ExtractSearchKeyword(title string) string {
 		return ""
 	}
 	raw = strings.ReplaceAll(raw, ".", " ")
+	raw = stripBrandColonPrefix(raw)
 	// 去掉介质/来源词和地区码
 	for _, term := range mediumAndRegionTerms {
 		raw = strings.ReplaceAll(raw, term, " ")
@@ -2367,6 +2368,33 @@ func ExtractSearchKeyword(title string) string {
 	raw = chineseEpisodeCountRe.ReplaceAllString(raw, " ")
 	raw = strings.Join(strings.Fields(raw), " ")
 	return raw
+}
+
+// stripBrandColonPrefix 剥离"品牌+中文描述："前缀。
+// 当冒号（：或:）前的部分同时含 ASCII 字母和 CJK 字符时（如 "HBO史诗巨著"），
+// 判定为频道/品牌描述前缀，返回冒号后的内容。
+// 纯 CJK 标题（如 "忍者神龟：变种时代"）不剥离。
+func stripBrandColonPrefix(s string) string {
+	for _, colon := range []string{"：", ":"} {
+		idx := strings.Index(s, colon)
+		if idx <= 0 {
+			continue
+		}
+		prefix := s[:idx]
+		hasASCII, hasCJK := false, false
+		for _, r := range prefix {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				hasASCII = true
+			}
+			if (r >= 0x4E00 && r <= 0x9FFF) || (r >= 0x3400 && r <= 0x4DBF) {
+				hasCJK = true
+			}
+		}
+		if hasASCII && hasCJK {
+			return s[idx+len(colon):]
+		}
+	}
+	return s
 }
 
 var seasonPattern = regexp.MustCompile(`(?i)^S\d{1,2}(?:E\d{1,3})?`)
