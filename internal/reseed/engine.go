@@ -134,6 +134,11 @@ func (s *l2Stats) log(e *Engine) {
 	}
 }
 
+func drainChannel[T any](ch <-chan T) {
+	for range ch {
+	}
+}
+
 type piecesHashCache struct {
 	bySite       map[string]map[string]int
 	queriedSites map[string]bool
@@ -1402,6 +1407,374 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 
 	l2s := newL2Stats()
 
+	if task.EngineMode == model.ReseedModeSeedFeature {
+		e.runSeedFeatureScan(ctx, task, ps, sourceTorrents, sourceSites, fpCache, negCache, phCache, cfCache, l2s, confirmedTargets, nameSites, iyuuResults, iyuuSidMap, targetSites, excludedSites, result)
+	} else {
+		e.runLegacyScan(ctx, task, ps, sourceTorrents, sourceSites, fpCache, sizeTolerance, negCache, phCache, cfCache, l2s, confirmedTargets, nameSites, iyuuResults, iyuuSidMap, targetSites, excludedSites, result)
+	}
+
+	if task.EngineMode == model.ReseedModeSeedFeature {
+		l2s.log(e)
+	}
+	return result, nil
+}
+
+type matchConfig struct {
+	ctx              context.Context
+	ps               *preloadedSites
+	fc               *fpCache
+	task             *model.ReseedTask
+	negCache         map[string]map[string]bool
+	phCache          *piecesHashCache
+	cfCache          *cloudFPCache
+	l2s              *l2Stats
+	confirmedTargets map[string]bool
+	nameSites        map[string]map[string]bool
+}
+
+func (e *Engine) matchAtSite(mc *matchConfig, src sourceTorrent, siteInfo *model.SiteInfo) *model.Candidate {
+	if siteInfo.Name == src.SiteName {
+		return nil
+	}
+	if mc.nameSites != nil {
+		if sites := mc.nameSites[src.Name]; sites != nil && sites[siteInfo.Name] {
+			return nil
+		}
+	}
+	if mc.negCache != nil && mc.negCache[src.InfoHash] != nil && mc.negCache[src.InfoHash][siteInfo.Name] {
+		return nil
+	}
+	siteConfig := mc.ps.configs[siteInfo.Name]
+	if siteConfig == nil {
+		return nil
+	}
+	adapter := mc.ps.adapters[siteInfo.Name]
+	if adapter == nil {
+		return nil
+	}
+	if httpclient.IsDomainCircuitOpen(siteConfig.Domain) {
+		return nil
+	}
+
+	if hasMatchMethod(mc.task.MatchMethods, "pieces_hash") {
+		c := e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, mc.fc, mc.phCache)
+		if c != nil {
+			targetKey := siteInfo.Name + ":" + c.TargetTorrentID
+			if mc.confirmedTargets != nil && mc.confirmedTargets[targetKey] {
+				return nil
+			}
+			if !e.verifyL0Size(mc.ctx, adapter, siteConfig, mc.fc.get(src.InfoHash, src.SiteName), c.TargetTorrentID, siteInfo.Name) {
+				return nil
+			}
+			return c
+		}
+	}
+
+	if hasMatchMethod(mc.task.MatchMethods, "fingerprint") {
+		if mc.phCache != nil && mc.phCache.wasQueried(siteInfo.Name) {
+		} else {
+			c := e.matchLayer1FromCloudCache(src.InfoHash, src.SiteName, siteInfo.Name, mc.fc, mc.cfCache)
+			if c != nil {
+				return c
+			}
+		}
+	}
+
+	if hasMatchMethod(mc.task.MatchMethods, "size_title") {
+		if mc.phCache != nil && mc.phCache.wasQueried(siteInfo.Name) {
+		} else {
+			c := e.matchLayer2SearchVerify(mc.ctx, adapter, siteConfig, src.InfoHash, src.SiteName, siteInfo.Name, mc.fc, mc.l2s)
+			if c != nil {
+				return c
+			}
+		}
+	}
+
+	return nil
+}
+
+// runSeedFeatureScan implements per-site worker model (Model C):
+// each site gets a dedicated goroutine that processes all eligible torrents sequentially.
+// Sites run fully in parallel; site-internal rate limiting is natural (one request at a time per site).
+func (e *Engine) runSeedFeatureScan(
+	ctx context.Context,
+	task *model.ReseedTask,
+	ps *preloadedSites,
+	sourceTorrents []sourceTorrent,
+	sourceSites []string,
+	fpc *fpCache,
+	negCache map[string]map[string]bool,
+	phCache *piecesHashCache,
+	cfCache *cloudFPCache,
+	l2s *l2Stats,
+	confirmedTargets map[string]bool,
+	nameSites map[string]map[string]bool,
+	iyuuResults map[string][]*model.IYUUReseedResult,
+	iyuuSidMap map[int]string,
+	targetSites []string,
+	excludedSites []string,
+	result *model.ReseedExecutionResult,
+) {
+	// Phase 1: Pre-filter eligible torrents (single-threaded)
+	var eligible []sourceTorrent
+	seenPiecesHashes := make(map[string]bool)
+	for _, src := range sourceTorrents {
+		if len(sourceSites) > 0 {
+			found := false
+			for _, s := range sourceSites {
+				if src.SiteName == s {
+					found = true
+					break
+				}
+			}
+			if !found {
+				result.Skipped++
+				continue
+			}
+		}
+		var recTitle string
+		if fp := fpc.get(src.InfoHash, src.SiteName); fp != nil {
+			recTitle = fp.Title
+		}
+		if !e.checkEligibility(ctx, recTitle, task) {
+			result.Blocked++
+			continue
+		}
+		if fp := fpc.get(src.InfoHash, src.SiteName); fp != nil && fp.PiecesHash != "" {
+			if seenPiecesHashes[fp.PiecesHash] {
+				result.Skipped++
+				continue
+			}
+			seenPiecesHashes[fp.PiecesHash] = true
+		}
+		eligible = append(eligible, src)
+	}
+
+	e.logger.Info("seed feature scan started",
+		zap.Int("eligible", len(eligible)),
+		zap.Int("total", len(sourceTorrents)),
+		zap.Int("targetSites", len(ps.infos)))
+
+	if len(eligible) == 0 || ps == nil {
+		return
+	}
+
+	// Phase 2: Per-site workers
+	type siteResult struct {
+		src       sourceTorrent
+		candidate model.Candidate
+		recTitle  string
+	}
+
+	resultCh := make(chan siteResult, 200)
+	mc := &matchConfig{
+		ctx:              ctx,
+		ps:               ps,
+		fc:               fpc,
+		task:             task,
+		negCache:         negCache,
+		phCache:          phCache,
+		cfCache:          cfCache,
+		l2s:              l2s,
+		confirmedTargets: confirmedTargets,
+		nameSites:        nameSites,
+	}
+
+	workerCtx, workerCancel := context.WithCancel(ctx)
+	defer workerCancel()
+
+	var siteWg sync.WaitGroup
+	for i := range ps.infos {
+		siteWg.Add(1)
+		go func(siteInfo *model.SiteInfo) {
+			defer siteWg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					e.logger.Error("matchAtSite panic recovered",
+						zap.String("site", siteInfo.Name),
+						zap.Any("panic", r))
+				}
+			}()
+			for _, src := range eligible {
+				if workerCtx.Err() != nil {
+					return
+				}
+				c := e.matchAtSite(mc, src, siteInfo)
+				if c != nil {
+					var recTitle string
+					if fp := fpc.get(src.InfoHash, src.SiteName); fp != nil {
+						recTitle = fp.Title
+					}
+					select {
+					case resultCh <- siteResult{src: src, candidate: *c, recTitle: recTitle}:
+					case <-workerCtx.Done():
+						return
+					}
+				}
+			}
+		}(ps.infos[i])
+	}
+
+	go func() {
+		siteWg.Wait()
+		close(resultCh)
+	}()
+
+	// Phase 3: Result consumer (single goroutine, no mutex needed)
+	injectedTargets := make(map[string]bool)
+	matchCount := 0
+	for sr := range resultCh {
+		if ctx.Err() != nil {
+			break
+		}
+
+		c := sr.candidate
+		targetKey := c.TargetSite + ":" + c.TargetTorrentID
+		if confirmedTargets[targetKey] {
+			result.DuplicateExists++
+			continue
+		}
+		if injectedTargets[c.TargetTorrentID] {
+			continue
+		}
+		injectedTargets[c.TargetTorrentID] = true
+
+		totalCount := result.Injected + result.Failed + result.Matched
+		if totalCount >= task.MaxInjectionsPerRun && task.MaxInjectionsPerRun > 0 {
+			e.logger.Info("max injections per run reached, stopping",
+				zap.Int("limit", task.MaxInjectionsPerRun))
+			workerCancel()
+			go func() { drainChannel(resultCh) }()
+			break
+		}
+
+		if !e.checkEligibility(ctx, sr.recTitle, task) {
+			result.Blocked++
+			continue
+		}
+
+		if sl, ok := ps.siteLimits[c.TargetSite]; ok {
+			var limitCount int
+			if c.MatchMethod == "iyuu" {
+				limitCount = sl.IYUULimitCount
+				if limitCount <= 0 {
+					limitCount = sl.ReseedLimitCount
+				}
+			} else {
+				limitCount = sl.ReseedLimitCount
+			}
+			if limitCount > 0 && !e.limiter.checkAndIncr(c.TargetSite, limitCount) {
+				e.logger.Debug("site reseed daily limit reached, skipping",
+					zap.String("targetSite", c.TargetSite),
+					zap.Int("limit", limitCount),
+				)
+				continue
+			}
+		}
+
+		decision := model.DecisionMatch
+		switch {
+		case c.TargetInfoHash == sr.src.InfoHash && c.TargetInfoHash != "":
+			decision = model.DecisionSameInfoHash
+		case c.MatchMethod == "iyuu":
+			decision = model.DecisionMatch
+		case c.MatchMethod == "fingerprint" || c.MatchMethod == "cloud_fingerprint":
+			decision = model.DecisionMatchPartial
+		case c.MatchMethod == "size_title":
+			decision = model.DecisionMatchSizeOnly
+		}
+
+		match := &model.ReseedMatch{
+			TaskID:          task.ID,
+			ClientID:        sr.src.ClientID,
+			SourceSite:      sr.src.SiteName,
+			SourceTorrentID: sr.src.TorrentID,
+			SourceInfoHash:  sr.src.InfoHash,
+			TargetSite:      c.TargetSite,
+			TargetTorrentID: c.TargetTorrentID,
+			TargetInfoHash:  c.TargetInfoHash,
+			MatchMethod:     c.MatchMethod,
+			Confidence:      c.Confidence,
+			DecisionType:    string(decision),
+			Status:          model.MatchStatusMatched,
+		}
+
+		if err := e.SaveMatch(ctx, match); err != nil {
+			e.logger.Warn("failed to save match results",
+				zap.String("sourceHash", sr.src.InfoHash),
+				zap.String("targetSite", c.TargetSite),
+				zap.Error(err),
+			)
+			result.Failed++
+			continue
+		}
+
+		result.Matched++
+		matchCount++
+		if matchCount <= 10 || matchCount%500 == 0 {
+			e.logger.Info("reseed progress",
+				zap.Int("matched", result.Matched),
+				zap.Int("duplicates", result.DuplicateExists),
+				zap.Int("failed", result.Failed))
+		}
+	}
+
+	// IYUU fallback for unprocessed torrents
+	if iyuuResults != nil {
+		for _, src := range eligible {
+			if ctx.Err() != nil {
+				break
+			}
+			iyuuCandidates := e.filterIYUUResults(src, iyuuResults, iyuuSidMap, targetSites, excludedSites)
+			for _, c := range iyuuCandidates {
+				if injectedTargets[c.TargetTorrentID] {
+					continue
+				}
+				injectedTargets[c.TargetTorrentID] = true
+
+				match := &model.ReseedMatch{
+					TaskID:          task.ID,
+					ClientID:        src.ClientID,
+					SourceSite:      src.SiteName,
+					SourceTorrentID: src.TorrentID,
+					SourceInfoHash:  src.InfoHash,
+					TargetSite:      c.TargetSite,
+					TargetTorrentID: c.TargetTorrentID,
+					TargetInfoHash:  c.TargetInfoHash,
+					MatchMethod:     c.MatchMethod,
+					Confidence:      c.Confidence,
+					DecisionType:    string(model.DecisionMatch),
+					Status:          model.MatchStatusMatched,
+				}
+				if err := e.SaveMatch(ctx, match); err == nil {
+					result.Matched++
+				}
+			}
+		}
+	}
+}
+
+// runLegacyScan preserves the original per-torrent loop for IYUU cloud mode.
+func (e *Engine) runLegacyScan(
+	ctx context.Context,
+	task *model.ReseedTask,
+	ps *preloadedSites,
+	sourceTorrents []sourceTorrent,
+	sourceSites []string,
+	fpc *fpCache,
+	sizeTolerance float64,
+	negCache map[string]map[string]bool,
+	phCache *piecesHashCache,
+	cfCache *cloudFPCache,
+	l2s *l2Stats,
+	confirmedTargets map[string]bool,
+	nameSites map[string]map[string]bool,
+	iyuuResults map[string][]*model.IYUUReseedResult,
+	iyuuSidMap map[int]string,
+	targetSites []string,
+	excludedSites []string,
+	result *model.ReseedExecutionResult,
+) {
 	matchCount := 0
 	seenPiecesHashes := make(map[string]bool)
 	injectedTargets := make(map[string]bool)
@@ -1435,7 +1808,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		}
 
 		var recTitle string
-		if fp := fpCache.get(src.InfoHash, src.SiteName); fp != nil {
+		if fp := fpc.get(src.InfoHash, src.SiteName); fp != nil {
 			recTitle = fp.Title
 		}
 
@@ -1444,7 +1817,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			continue
 		}
 
-		if fp := fpCache.get(src.InfoHash, src.SiteName); fp != nil && fp.PiecesHash != "" {
+		if fp := fpc.get(src.InfoHash, src.SiteName); fp != nil && fp.PiecesHash != "" {
 			if seenPiecesHashes[fp.PiecesHash] {
 				result.Skipped++
 				continue
@@ -1452,15 +1825,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 			seenPiecesHashes[fp.PiecesHash] = true
 		}
 
-		candidates := e.findCandidates(ctx, src, ps, fpCache, sizeTolerance, task, negCache, phCache, cfCache, l2s, confirmedTargets, nameSites)
-
-		if matchCount <= 10 {
-			e.logger.Info("findCandidates result",
-				zap.Int("idx", matchCount),
-				zap.String("src_site", src.SiteName),
-				zap.String("hash", truncHash(src.InfoHash)),
-				zap.Int("candidates", len(candidates)))
-		}
+		candidates := e.findCandidates(ctx, src, ps, fpc, sizeTolerance, task, negCache, phCache, cfCache, l2s, confirmedTargets, nameSites)
 
 		if iyuuResults != nil {
 			iyuuCandidates := e.filterIYUUResults(src, iyuuResults, iyuuSidMap, targetSites, excludedSites)
@@ -1549,16 +1914,9 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				continue
 			}
 
-			// 两阶段架构：阶段1（匹配）只 SaveMatch，不注入
-			// 阶段2（注入）由 StartInjectionConsumer 后台消费 status=matched 的记录
 			result.Matched++
 		}
 	}
-
-	if task.EngineMode == model.ReseedModeSeedFeature {
-		l2s.log(e)
-	}
-	return result, nil
 }
 
 func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *preloadedSites, fc *fpCache, sizeTolerance float64, task *model.ReseedTask, negCache map[string]map[string]bool, phCache *piecesHashCache, cfCache *cloudFPCache, l2s *l2Stats, confirmedTargets map[string]bool, nameSites map[string]map[string]bool) []model.Candidate {
