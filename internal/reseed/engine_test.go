@@ -2682,6 +2682,89 @@ func TestKeywordStartsWithYear(t *testing.T) {
 	}
 }
 
+func TestTruncateToYear_SkipLeadingYear(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		// 年份在标题开头（片名以年份开头）→ 跳过位置 0，截到下一个年份
+		{"2012世界末日.2009.国英双语", "2012世界末日.2009"},
+		{"2001.A.Space.Odyssey.1968.DVDRip", "2001.A.Space.Odyssey.1968"},
+		// 年份不在开头 → 正常截取
+		{"The.Matrix.1999.DVDRip", "The.Matrix.1999"},
+		{"肖申克的救赎.1994", "肖申克的救赎.1994"},
+		// 无年份
+		{"Some.Movie.without.year", ""},
+		// 只有一个年份且在开头 → 跳过后无年份 → 返回空
+		{"2012", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := truncateToYear(tt.input)
+			if got != tt.want {
+				t.Errorf("truncateToYear(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestKeywordHasNoTitle_YearPrefix(t *testing.T) {
+	tests := []struct {
+		keyword string
+		want    bool
+	}{
+		// 年份开头 + CJK → 有标题（片名以年份开头）
+		{"2001太空漫游 4K", false},
+		{"2012世界末日 2009", false},
+		// 年份开头 + 英文片名 → 有标题
+		{"2001 A Space Odyssey 1968 1080p", false},
+		// 年份开头 + 纯规格词 → 无标题（中文标题残留）
+		{"2016 1080p BluRay", true},
+		{"1934 FRA 1080p", true},
+		// 纯年份 → 无标题（太泛）
+		{"2012", true},
+		// 空关键词
+		{"", true},
+		// 正常标题
+		{"The Matrix 1999 1080p", false},
+		// 续集编号开头
+		{"2 2016 1080p", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.keyword, func(t *testing.T) {
+			got := KeywordHasNoTitle(tt.keyword)
+			if got != tt.want {
+				t.Errorf("KeywordHasNoTitle(%q) = %v, want %v", tt.keyword, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExtractSearchKeyword_YearTitle(t *testing.T) {
+	tests := []struct {
+		title    string
+		wantEmpty bool
+		wantNoTitle bool
+	}{
+		{"2001太空漫游.4K修复版.1968.中英字幕￡CMCT旧梦", false, false},
+		{"2012世界末日.2009.国英双语.中英字幕￡CMCT九洲客", false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.title, func(t *testing.T) {
+			kw := ExtractSearchKeyword(tt.title)
+			if tt.wantEmpty && kw != "" {
+				t.Errorf("ExtractSearchKeyword(%q) = %q, want empty", tt.title, kw)
+			}
+			if !tt.wantEmpty && kw == "" {
+				t.Errorf("ExtractSearchKeyword(%q) = empty, want non-empty", tt.title)
+			}
+			if !tt.wantNoTitle && KeywordHasNoTitle(kw) {
+				t.Errorf("ExtractSearchKeyword(%q) → %q → KeywordHasNoTitle=true, want false", tt.title, kw)
+			}
+		})
+	}
+}
+
 func TestVerifyMatch(t *testing.T) {
 	const gb = int64(1073741824)
 	sourceSize := 10 * gb

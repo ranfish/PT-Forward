@@ -2481,12 +2481,23 @@ func has3D(lowerS string) bool {
 var yearTruncateRe = regexp.MustCompile(`(?:19|20)\d{2}`)
 
 // truncateToYear 截取到第一个年份（含），用于无分辨率的种子名（如 DVDRip）。
+// 跳过位置 0 的年份——标题本身以年份开头（如 "2012世界末日.2009..."）时，
+// 位置 0 的年份是片名组成部分，不是发布年份分隔符。
 func truncateToYear(s string) string {
-	loc := yearTruncateRe.FindStringIndex(s)
-	if loc == nil {
-		return ""
+	searchStart := 0
+	for {
+		loc := yearTruncateRe.FindStringIndex(s[searchStart:])
+		if loc == nil {
+			return ""
+		}
+		absStart := searchStart + loc[0]
+		absEnd := searchStart + loc[1]
+		if absStart == 0 {
+			searchStart = absEnd
+			continue
+		}
+		return s[:absEnd]
 	}
-	return s[:loc[1]]
 }
 
 func ExtractGroupName(title string) string {
@@ -2603,11 +2614,17 @@ func KeywordStartsWithYear(keyword string) bool {
 // KeywordHasNoTitle 判断关键词是否缺少有效标题内容（应跳过 L2，走文件级恢复）。
 // 三种情况：
 //   - 空关键词
-//   - 以年份开头（纯中文标题残留）
+//   - 以年份开头且后续只有规格词（纯中文标题残留，如 "2016 1080p BluRay"）
 //   - 第一个词是 1-3 位纯数字（续集编号，如 招魂2 → "2 2016 1080p"）
+//
+// 以年份开头但后续含 CJK 字符或非规格英文词时不视为"无标题"
+// （片名本身以年份开头，如 "2001太空漫游"、"2001 A Space Odyssey"）。
 func KeywordHasNoTitle(keyword string) bool {
-	if keyword == "" || KeywordStartsWithYear(keyword) {
+	if keyword == "" {
 		return true
+	}
+	if KeywordStartsWithYear(keyword) {
+		return !hasTitleAfterYear(keyword[4:])
 	}
 	fields := strings.Fields(keyword)
 	if len(fields) > 0 && len(fields[0]) <= 3 {
@@ -2616,6 +2633,34 @@ func KeywordHasNoTitle(keyword string) bool {
 		}
 	}
 	return false
+}
+
+// hasTitleAfterYear 检查年份前缀之后是否有有效标题内容：
+// CJK 字符或 4+ 字母且非规格术语的英文词。
+func hasTitleAfterYear(rest string) bool {
+	rest = strings.TrimSpace(rest)
+	if rest == "" {
+		return false
+	}
+	for _, r := range rest {
+		if (r >= 0x4E00 && r <= 0x9FFF) || (r >= 0x3400 && r <= 0x4DBF) {
+			return true
+		}
+	}
+	for _, f := range strings.Fields(rest) {
+		lower := strings.ToLower(strings.Trim(f, "0123456789"))
+		if len(lower) >= 4 && !yearPrefixSpecTerms[lower] {
+			return true
+		}
+	}
+	return false
+}
+
+var yearPrefixSpecTerms = map[string]bool{
+	"bluray": true, "remux": true, "remastered": true,
+	"web-dl": true, "webdl": true, "webrip": true,
+	"hdtv": true, "dvdrip": true, "hd-dvd": true,
+	"atmos": true, "truehd": true,
 }
 
 var audioExtensions = []string{".flac", ".wav", ".ape", ".tta", ".wv", ".mp3", ".m4a", ".ogg", ".opus", ".aac", ".dsf", ".dff"}
@@ -3560,17 +3605,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	}
 
 	if err := dlClient.ResumeTorrent(ctx, infoHash); err != nil {
-		e.logger.Warn("reseed restore seeding failed, retrying in 10s", zap.String("hash", infoHash), zap.Error(err))
-		select {
-		case <-time.After(10 * time.Second):
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-		if err2 := dlClient.ResumeTorrent(ctx, infoHash); err2 != nil {
-			e.logger.Error("reseed restore seeding retry failed", zap.String("hash", infoHash), zap.Error(err2))
-			return e.failMatch(ctx, match, fmt.Sprintf("恢复做种失败: %v", err2))
-		}
-		e.logger.Info("reseed restore seeding retry succeeded", zap.String("hash", infoHash))
+		e.logger.Warn("reseed restore seeding failed", zap.String("hash", infoHash), zap.Error(err))
 	}
 
 	now := time.Now()
