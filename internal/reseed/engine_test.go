@@ -2765,6 +2765,53 @@ func TestExtractSearchKeyword_YearTitle(t *testing.T) {
 	}
 }
 
+func TestExtractSearchKeyword_BrandColonPrefix(t *testing.T) {
+	tests := []struct {
+		title      string
+		wantHas    string
+		wantNotHas string
+	}{
+		{"HBO史诗巨著：冰与火之歌.权力的游戏.第六季全.2016.中英字幕￡CMCT梦幻", "冰与火之歌", "HBO"},
+		{"BBC纪录片：蓝色星球.2017.1080p", "蓝色星球", "BBC"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.title, func(t *testing.T) {
+			kw := ExtractSearchKeyword(tt.title)
+			if !strings.Contains(kw, tt.wantHas) {
+				t.Errorf("keyword=%q, want contains %q", kw, tt.wantHas)
+			}
+			if strings.Contains(kw, tt.wantNotHas) {
+				t.Errorf("keyword=%q, should not contain %q", kw, tt.wantNotHas)
+			}
+		})
+	}
+}
+
+func TestStripBrandColonPrefix(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		// ASCII+CJK before colon → strip
+		{"HBO史诗巨著：冰与火之歌", "冰与火之歌"},
+		{"BBC纪录片:蓝色星球", "蓝色星球"},
+		// Pure CJK before colon → preserve
+		{"忍者神龟：变种时代", "忍者神龟：变种时代"},
+		// Pure ASCII before colon → preserve
+		{"Mission: Impossible", "Mission: Impossible"},
+		// No colon → preserve
+		{"BBC王朝 全五集", "BBC王朝 全五集"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := stripBrandColonPrefix(tt.input)
+			if got != tt.want {
+				t.Errorf("stripBrandColonPrefix(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestVerifyMatch(t *testing.T) {
 	const gb = int64(1073741824)
 	sourceSize := 10 * gb
