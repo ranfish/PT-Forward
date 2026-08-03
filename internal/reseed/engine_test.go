@@ -2812,6 +2812,25 @@ func TestStripBrandColonPrefix(t *testing.T) {
 	}
 }
 
+func TestExtractSearchKeyword_ChineseTitleFallback(t *testing.T) {
+	tests := []struct {
+		title string
+		want  string
+	}{
+		{"乾隆王朝.2002.40集全.国语.简体中字￡CMCT小鱼", "乾隆王朝 2002"},
+		{"三国.全95集.2010.简繁中字￡CMCT小五&呆呆熊", "三国 2010"},
+		{"易中天品三国.2006.52集全.国语中字￡CMCT阳阳", "易中天品三国 2006"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.title, func(t *testing.T) {
+			kw := ExtractSearchKeyword(tt.title)
+			if kw != tt.want {
+				t.Errorf("ExtractSearchKeyword(%q) = %q, want %q", tt.title, kw, tt.want)
+			}
+		})
+	}
+}
+
 func TestVerifyMatch(t *testing.T) {
 	const gb = int64(1073741824)
 	sourceSize := 10 * gb

@@ -2367,7 +2367,27 @@ func ExtractSearchKeyword(title string) string {
 	// 去掉中文集数描述（全16集、16集等）
 	raw = chineseEpisodeCountRe.ReplaceAllString(raw, " ")
 	raw = strings.Join(strings.Fields(raw), " ")
+	if KeywordHasNoTitle(raw) {
+		if fb := chineseTitleFallback(title); fb != "" && fb != raw {
+			return fb
+		}
+	}
 	return raw
+}
+
+// chineseTitleFallback 在英文关键词提取失败（hasNoTitle=true）时，
+// 用原始标题截到第一个年份，保留中文标题用于 NexusPHP 中文搜索。
+// "乾隆王朝.2002.40集全..." → "乾隆王朝 2002"
+func chineseTitleFallback(title string) string {
+	fb := truncateToYear(title)
+	if fb == "" {
+		return ""
+	}
+	fb = strings.ReplaceAll(fb, ".", " ")
+	fb = stripBrandColonPrefix(fb)
+	fb = chineseEpisodeCountRe.ReplaceAllString(fb, " ")
+	fb = strings.Join(strings.Fields(fb), " ")
+	return fb
 }
 
 // stripBrandColonPrefix 剥离"品牌+中文描述："前缀。
