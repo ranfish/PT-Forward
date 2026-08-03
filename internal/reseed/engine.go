@@ -3560,7 +3560,17 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	}
 
 	if err := dlClient.ResumeTorrent(ctx, infoHash); err != nil {
-		e.logger.Warn("reseed restore seeding failed", zap.String("hash", infoHash), zap.Error(err))
+		e.logger.Warn("reseed restore seeding failed, retrying in 10s", zap.String("hash", infoHash), zap.Error(err))
+		select {
+		case <-time.After(10 * time.Second):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		if err2 := dlClient.ResumeTorrent(ctx, infoHash); err2 != nil {
+			e.logger.Error("reseed restore seeding retry failed", zap.String("hash", infoHash), zap.Error(err2))
+			return e.failMatch(ctx, match, fmt.Sprintf("恢复做种失败: %v", err2))
+		}
+		e.logger.Info("reseed restore seeding retry succeeded", zap.String("hash", infoHash))
 	}
 
 	now := time.Now()
