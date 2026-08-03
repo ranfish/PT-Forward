@@ -37,7 +37,7 @@ func ExtractGroupName(title string) string {
 		group = stripTrailingNonASCII(strings.TrimSpace(group))
 		upper := strings.ToUpper(group)
 		ignore := map[string]bool{"NOGROUP": true, "N/A": true, "NONE": true, "UNKNOWN": true}
-		if !ignore[upper] && len(group) >= 2 && len(group) <= 30 {
+		if !ignore[upper] && len(group) >= 2 && len(group) <= 30 && isValidGroupName(group) {
 			return group
 		}
 	}
@@ -74,4 +74,16 @@ func stripTrailingNonASCII(s string) string {
 		}
 	}
 	return string(out)
+}
+
+// isValidGroupName 判定 "-" 分支提取的候选是否为合法制作组名。
+// 含非 ASCII 字符（CJK/特殊符号）或点时返回 false——
+// "2016.国语中字￡CMCT" 不是组名，应 fall through 到 ￡ 分支。
+func isValidGroupName(s string) bool {
+	for _, r := range s {
+		if r >= 128 || r == '.' {
+			return false
+		}
+	}
+	return true
 }
