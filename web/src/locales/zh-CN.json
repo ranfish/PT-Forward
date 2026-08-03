@@ -903,7 +903,7 @@
     "iyuuCloud": "IYUU云端辅种",
     "injectionIntervalS": "注入间隔(秒)",
     "injectionJitterS": "注入抖动(秒)",
-    "injectionConcurrency": "注入并发",
+
     "scanConcurrency": "扫描并发",
     "maxRetries": "最大重试",
     "retryIntervalH": "重试间隔(小时)",

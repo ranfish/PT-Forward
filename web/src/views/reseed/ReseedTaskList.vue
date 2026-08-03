@@ -219,11 +219,6 @@
             </a-row>
             <a-row :gutter="16">
               <a-col :span="12">
-                <a-form-item :label="t('reseed.injectionConcurrency')" name="injectionConcurrency">
-                  <a-input-number v-model:value="form.injectionConcurrency" :min="1" :max="20" style="width: 100%" />
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
                 <a-form-item :label="t('reseed.scanConcurrency')" name="scanConcurrency">
                   <a-input-number v-model:value="form.scanConcurrency" :min="1" :max="20" style="width: 100%" />
                 </a-form-item>
@@ -423,7 +418,6 @@ const defaultForm = {
   engineMode: 'seed_feature',
   injectionIntervalS: 1,
   injectionJitterS: 5,
-  injectionConcurrency: 10,
   scanConcurrency: 5,
   maxRetries: 3,
   retryIntervalH: 24,
@@ -480,7 +474,6 @@ function openModal(record?: ReseedTask) {
       engineMode: record.engine_mode || 'seed_feature',
       injectionIntervalS: record.injection_interval_s ?? 1,
       injectionJitterS: record.injection_jitter_s ?? 5,
-      injectionConcurrency: record.injection_concurrency ?? 10,
       scanConcurrency: record.scan_concurrency ?? 5,
       maxRetries: record.max_retries ?? 3,
       retryIntervalH: record.retry_interval_h ?? 24,

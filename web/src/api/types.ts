@@ -545,7 +545,6 @@ export interface ReseedTask {
   max_injections_per_run: number
   injection_interval_s: number
   injection_jitter_s: number
-  injection_concurrency: number
   scan_concurrency: number
   reseed_category: string
   reseed_tags: string
