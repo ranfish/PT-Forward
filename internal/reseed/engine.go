@@ -2747,7 +2747,7 @@ var yearPrefixSpecTerms = map[string]bool{
 	"atmos": true, "truehd": true,
 }
 
-var audioExtensions = []string{".flac", ".wav", ".ape", ".tta", ".wv", ".mp3", ".m4a", ".ogg", ".opus", ".aac", ".dsf", ".dff"}
+var audioExtensions = []string{".flac", ".wav", ".ape", ".tta", ".wv", ".mp3", ".m4a", ".ogg", ".opus", ".aac", ".dsf", ".dff", ".wma", ".aiff", ".m4b"}
 
 func detectContentType(fileTree map[string]int64) string {
 	if len(fileTree) == 0 {
@@ -2814,6 +2814,7 @@ func ExtractMusicKeyword(title string) string {
 	s = musicStripDatePrefix(s)
 	s = musicStripYearParens(s)
 	s = musicStripTrailingFormat(s)
+	s = musicStripFormatNoise(s)
 	return musicNormalize(s)
 }
 
@@ -3023,6 +3024,18 @@ func musicStripTrailingFormat(s string) string {
 		if !changed {
 			break
 		}
+	}
+	return s
+}
+
+var musicFormatNoisePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\b(FLAC|APE|WAV|MP3|AAC|M4A|OGG|DSD|DSF|CUE)\b`),
+	regexp.MustCompile(`(?i)\b\d+bit\b`),
+}
+
+func musicStripFormatNoise(s string) string {
+	for _, p := range musicFormatNoisePatterns {
+		s = p.ReplaceAllString(s, " ")
 	}
 	return s
 }
