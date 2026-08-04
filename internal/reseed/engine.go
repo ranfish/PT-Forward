@@ -2369,12 +2369,20 @@ func ExtractSearchKeyword(title string) string {
 	// 去掉中文集数描述（全16集、16集等）
 	raw = chineseEpisodeCountRe.ReplaceAllString(raw, " ")
 	raw = strings.Join(strings.Fields(raw), " ")
+	raw = stripApostrophes(raw)
 	if KeywordHasNoTitle(raw) {
 		if fb := chineseTitleFallback(title); fb != "" && fb != raw {
-			return fb
+			return stripApostrophes(fb)
 		}
 	}
 	return raw
+}
+
+// stripApostrophes 剥离直撇号和弯撇号，防止 NexusPHP SQL LIKE 注入式失败。
+func stripApostrophes(s string) string {
+	s = strings.ReplaceAll(s, "'", " ")
+	s = strings.ReplaceAll(s, "\u2019", " ")
+	return strings.Join(strings.Fields(s), " ")
 }
 
 // chineseTitleFallback 在英文关键词提取失败（hasNoTitle=true）时，
@@ -2804,18 +2812,103 @@ func ExtractMusicKeyword(title string) string {
 	if title == "" {
 		return ""
 	}
-	s := musicStripCurlyBraces(title)
-	s = musicProcessSquareBrackets(s)
 
-	if result, ok := musicSceneNaming(s); ok {
+	// Scene naming: Artist-Album-24BIT-FLAC-2023-GRP
+	if result, ok := musicSceneNaming(title); ok {
 		return musicNormalize(result)
 	}
 
+	// Freeform naming: Artist - Album Year [Params]
+	if keyword, ok := musicFreeformNaming(title); ok {
+		keyword = musicStripFormatNoise(keyword)
+		return musicNormalize(keyword)
+	}
+
+	// Fallback: no ' - ' separator, process brackets and noise
+	s := musicStripCurlyBraces(title)
+	s = musicProcessSquareBrackets(s)
 	s = musicStripDatePrefix(s)
 	s = musicStripYearParens(s)
 	s = musicStripTrailingFormat(s)
 	s = musicStripFormatNoise(s)
 	return musicNormalize(s)
+}
+
+var musicFreeformDashRe = regexp.MustCompile(`\s+[-–—]\s+`)
+var musicAlbumYearRe = regexp.MustCompile(`\s+[\(\[\{]?(19|20)\d{2}[\)\]\}]?`)
+
+// musicFreeformNaming 处理 "Artist - Album Year [Params]" 格式。
+// 第一个 ' - '/' – ' 分割 Artist 和 Album；Album 中的年份标记名称/参数分界线。
+// 年份保留（区分同名专辑），年份后内容全部丢弃（FLAC/目录号/规格等参数）。
+func musicFreeformNaming(title string) (string, bool) {
+	prefixYear, s := musicExtractDatePrefix(title)
+
+	dashLoc := musicFreeformDashRe.FindStringIndex(s)
+	if dashLoc == nil {
+		return "", false
+	}
+	artist := strings.TrimSpace(s[:dashLoc[0]])
+	rest := strings.TrimSpace(s[dashLoc[1]:])
+	if artist == "" || rest == "" {
+		return "", false
+	}
+
+	yearLoc := musicAlbumYearRe.FindStringIndex(rest)
+
+	var album string
+	year := prefixYear
+	if yearLoc != nil {
+		album = strings.TrimSpace(rest[:yearLoc[0]])
+		if year == "" {
+			year = strings.Trim(rest[yearLoc[0]:yearLoc[1]], " ()[]{}")
+		}
+	} else {
+		album = musicStripAllBrackets(rest)
+	}
+
+	if album == "" {
+		album = rest
+	}
+
+	keyword := artist + " " + album
+	if year != "" {
+		keyword += " " + year
+	}
+	return keyword, true
+}
+
+// musicExtractDatePrefix 提取日期前缀中的年份。
+// "2013 - Artist..." → ("2013", "Artist...")
+// "[2021.09.09] Artist..." → ("2021", "Artist...")
+func musicExtractDatePrefix(s string) (year, rest string) {
+	if m := regexp.MustCompile(`^(\d{4})\s*[-–—]\s+`).FindStringSubmatch(s); m != nil {
+		return m[1], s[len(m[0]):]
+	}
+	if m := regexp.MustCompile(`^\[(\d{4})(?:\.\d{2}(?:\.\d{2})?)?\]\s*`).FindStringSubmatch(s); m != nil {
+		return m[1], s[len(m[0]):]
+	}
+	if m := regexp.MustCompile(`^(\d{4})\.\d{2}\.\d{2}\s*[-–—]?\s*`).FindStringSubmatch(s); m != nil {
+		return m[1], s[len(m[0]):]
+	}
+	return "", s
+}
+
+// musicStripAllBrackets 剥离所有括号及其内容。
+func musicStripAllBrackets(s string) string {
+	for _, pair := range [][2]string{{"(", ")"}, {"[", "]"}, {"{", "}"}} {
+		for {
+			i := strings.Index(s, pair[0])
+			if i < 0 {
+				break
+			}
+			j := strings.Index(s[i:], pair[1])
+			if j < 0 {
+				break
+			}
+			s = s[:i] + " " + s[i+j+len(pair[1]):]
+		}
+	}
+	return strings.TrimSpace(s)
 }
 
 func musicStripCurlyBraces(s string) string {
