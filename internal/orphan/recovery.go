@@ -147,7 +147,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 			zap.String("orphan", orphan.Name),
 			zap.String("keyword", musicKeyword))
 		if musicKeyword != "" {
-			return r.tryL2SearchCore(ctx, orphan, stats, musicKeyword, "")
+			return r.tryL2SearchCore(ctx, orphan, stats, musicKeyword, "OpenCD")
 		}
 	}
 
