@@ -2458,23 +2458,27 @@ func stripChinesePrefix(title string) string {
 			continue
 		}
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
-			// ASCII 紧跟 CJK（无分隔符）：可能是中文标题的续集号/编号（II、5、3D），
-			// 也可能是英文标题开头（Back）。≤3 字符视为续集号跳过，≥4 字符视为英文标题。
+			// ASCII 紧跟 CJK（无分隔符）：可能是中文标题的续集号/编号（II、5、3D、VIII），
+			// 也可能是英文标题开头（Back）。≤3 字符或全大写/纯数字 ≤4 字符视为续集号跳过。
 			if i > 0 {
 				prevRune, _ := utf8.DecodeLastRuneInString(title[:i])
 				if (prevRune >= 0x4E00 && prevRune <= 0x9FFF) || (prevRune >= 0x3400 && prevRune <= 0x4DBF) {
 					segLen := 0
+					allUpperOrDigit := true
 					j := i
 					for j < len(title) {
 						r2, size2 := utf8.DecodeRuneInString(title[j:])
 						if (r2 >= 'a' && r2 <= 'z') || (r2 >= 'A' && r2 <= 'Z') || (r2 >= '0' && r2 <= '9') {
+							if r2 >= 'a' && r2 <= 'z' {
+								allUpperOrDigit = false
+							}
 							segLen++
 							j += size2
 						} else {
 							break
 						}
 					}
-					if segLen <= 3 {
+					if segLen <= 3 || (allUpperOrDigit && segLen == 4) {
 						i = j
 						continue
 					}
