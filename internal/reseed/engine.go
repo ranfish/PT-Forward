@@ -2596,10 +2596,18 @@ func VerifyMatch(results []*model.SeedingSearchResult, groupName string, sourceS
 func VerifyMatchWithTruncationCheck(results []*model.SeedingSearchResult, groupName string, sourceSize int64) (*L2MatchResult, *MatchFilterStats) {
 	match, stats := VerifyMatchWithStats(results, groupName, sourceSize)
 	if match == nil && groupName != "" {
+		needFallback := false
 		for _, r := range results {
 			if strings.HasSuffix(strings.TrimSpace(r.Title), "..") {
-				return VerifyMatchWithStats(results, "", sourceSize)
+				needFallback = true
+				break
 			}
+		}
+		if !needFallback && stats.GroupMiss > 0 && stats.SizeMiss == 0 {
+			needFallback = true
+		}
+		if needFallback {
+			return VerifyMatchWithStats(results, "", sourceSize)
 		}
 	}
 	return match, stats
