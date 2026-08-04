@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -2770,6 +2772,32 @@ func detectContentType(fileTree map[string]int64) string {
 		return "music"
 	}
 	return "video"
+}
+
+// DetectMusicFromDir 读取目录内容，判断是否为音乐资源（有音频文件且无视频文件）。
+func DetectMusicFromDir(dirPath string) bool {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil || len(entries) == 0 {
+		return false
+	}
+	hasAudio := false
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(e.Name()))
+		for _, v := range videoExtensions {
+			if ext == v {
+				return false
+			}
+		}
+		for _, a := range audioExtensions {
+			if ext == a {
+				hasAudio = true
+			}
+		}
+	}
+	return hasAudio
 }
 
 func ExtractMusicKeyword(title string) string {

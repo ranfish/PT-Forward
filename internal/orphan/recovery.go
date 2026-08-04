@@ -39,7 +39,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 	if siteName == "" {
 		siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
 	}
-	if siteName == "" && orphan.IsDir {
+	if siteName == "" && orphan.IsDir && !reseed.DetectMusicFromDir(orphan.Path) {
 		siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
 	}
 
@@ -141,6 +141,16 @@ func (r *Recovery) tryFileLevelL2Search(ctx context.Context, orphan *Entry, stat
 }
 
 func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *SearchStats) (siteName, torrentID, method string) {
+	if orphan.IsDir && reseed.DetectMusicFromDir(orphan.Path) {
+		musicKeyword := reseed.ExtractMusicKeyword(orphan.Name)
+		r.logger.Info("orphan L2: music detected",
+			zap.String("orphan", orphan.Name),
+			zap.String("keyword", musicKeyword))
+		if musicKeyword != "" {
+			return r.tryL2SearchCore(ctx, orphan, stats, musicKeyword, "")
+		}
+	}
+
 	searchKeyword := reseed.ExtractSearchKeyword(orphan.Name)
 	if searchKeyword == "" {
 		searchKeyword = orphan.Name
