@@ -2870,7 +2870,7 @@ func musicFreeformNaming(title string) (string, bool) {
 		album = rest
 	}
 
-	keyword := artist + " " + album
+	keyword := album
 	if year != "" {
 		keyword += " " + year
 	}
