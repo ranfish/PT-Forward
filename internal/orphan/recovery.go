@@ -199,10 +199,6 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 
 					match, filterStats := reseed.VerifyMatchWithTruncationCheck(results, groupName, orphan.Size)
 
-					if match == nil && groupName != "" && filterStats.GroupMiss > 0 && filterStats.SizeMiss == 0 {
-						match = reseed.VerifyMatch(results, "", orphan.Size)
-					}
-
 					if match == nil {
 						firstTitle := ""
 						if len(results) > 0 {
@@ -324,9 +320,6 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 			}
 
 			match, filterStats := reseed.VerifyMatchWithTruncationCheck(results2, groupName, orphan.Size)
-			if match == nil && groupName != "" && filterStats.GroupMiss > 0 && filterStats.SizeMiss == 0 {
-				match = reseed.VerifyMatch(results2, "", orphan.Size)
-			}
 			if match == nil {
 				firstTitle := ""
 				if len(results2) > 0 {
