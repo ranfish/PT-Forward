@@ -2638,7 +2638,7 @@ func VerifyMatchWithTruncationCheck(results []*model.SeedingSearchResult, groupN
 				break
 			}
 		}
-		if !needFallback && stats.GroupMiss > 0 && stats.SizeMiss == 0 {
+		if !needFallback && stats.GroupMiss > 0 {
 			needFallback = true
 		}
 		if needFallback {
