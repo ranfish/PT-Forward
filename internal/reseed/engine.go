@@ -2783,7 +2783,13 @@ func detectContentType(fileTree map[string]int64) string {
 
 // DetectMusicFromDir 读取目录内容，判断是否为音乐资源（有音频文件且无视频文件）。
 // 检查直接子文件和一级子目录（CD1/CD2 等分碟结构）。
+// SACD ISO 镜像（.iso 无标准音频扩展名）通过目录名含 "SACD" 识别。
 func DetectMusicFromDir(dirPath string) bool {
+	// SACD（Super Audio CD）是纯音频格式，目录名含 SACD 直接判定为音乐
+	if strings.Contains(strings.ToUpper(filepath.Base(dirPath)), "SACD") {
+		return true
+	}
+
 	hasAudio := detectAudioInDir(dirPath)
 	if !hasAudio {
 		// 检查一级子目录（CD1/CD2 分碟结构）
