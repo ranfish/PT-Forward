@@ -3209,8 +3209,14 @@ func musicNormalize(s string) string {
 		}
 	}
 	result := musicMultiSpaceRe.ReplaceAllString(buf.String(), " ")
+	// CJK 和数字之间插入空格，帮助 NexusPHP 分词匹配
+	result = musicCJKDigitRe.ReplaceAllString(result, "$1 $2")
+	result = musicDigitCJKRe.ReplaceAllString(result, "$1 $2")
 	return strings.TrimSpace(result)
 }
+
+var musicCJKDigitRe = regexp.MustCompile(`([\p{Han}\p{Hiragana}\p{Katakana}])(\d)`)
+var musicDigitCJKRe = regexp.MustCompile(`(\d)([\p{Han}\p{Hiragana}\p{Katakana}])`)
 
 func hasCJKChar(s string) bool {
 	for _, r := range s {
