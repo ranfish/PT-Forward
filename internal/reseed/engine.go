@@ -2624,11 +2624,13 @@ func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string
 			}, stats
 		}
 		// 容差匹配作为备选
-		if fuzzyMatch == nil && CompareSizeDisplay(sourceSize, r.Size) {
-			fuzzyMatch = &L2MatchResult{
-				TorrentID: r.TorrentID,
-				Title:     r.Title,
-				Size:      r.Size,
+		if CompareSizeDisplay(sourceSize, r.Size) {
+			if fuzzyMatch == nil {
+				fuzzyMatch = &L2MatchResult{
+					TorrentID: r.TorrentID,
+					Title:     r.Title,
+					Size:      r.Size,
+				}
 			}
 		} else {
 			stats.SizeMiss++
