@@ -377,11 +377,12 @@ func (p *Provider) InvalidateAdapter(domain string) {
 }
 
 func siteToInfo(s *model.Site) *model.SiteInfo {
-	return &model.SiteInfo{
+	info := &model.SiteInfo{
 		Name:                s.Name,
 		BaseURL:             s.BaseURL,
 		Framework:           s.Framework,
 		Enabled:             s.Enabled,
+		ContentType:         lookupContentType(s.Domain),
 		Passkey:             s.Passkey,
 		Cookie:              s.Cookie,
 		APIKey:              s.APIKey,
@@ -408,6 +409,17 @@ func siteToInfo(s *model.Site) *model.SiteInfo {
 		SkipSSLVerify:       s.SkipSSLVerify,
 		AssumeFree:          s.AssumeFree,
 	}
+	return info
+}
+
+// lookupContentType 从内置 seed data 查找站点内容类型。
+func lookupContentType(domain string) string {
+	for _, s := range seedSites() {
+		if s.Domain == domain {
+			return s.ContentType
+		}
+	}
+	return ""
 }
 
 func siteToConfig(s *model.Site) *model.SiteConfig {

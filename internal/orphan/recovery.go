@@ -390,12 +390,40 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 		}
 	}
 
+	// 音乐资源（groupName="OpenCD"）：排除纯视频站
+	isMusicSearch := groupName == "OpenCD"
+	if isMusicSearch {
+		videoSites := make(map[string]bool)
+		for _, s := range sites {
+			if s.Enabled && s.ContentType == "video" {
+				videoSites[s.Name] = true
+			}
+		}
+		filtered := make([]string, 0, len(enabledSites))
+		for _, name := range enabledSites {
+			if !videoSites[name] {
+				filtered = append(filtered, name)
+			}
+		}
+		enabledSites = filtered
+	}
+
 	if groupName == "" {
 		return enabledSites
 	}
 
 	priority := make([]string, 0, len(enabledSites))
 	seen := make(map[string]bool)
+
+	// 音乐搜索：纯音乐站优先
+	if isMusicSearch {
+		for _, s := range sites {
+			if s.Enabled && s.ContentType == "music" && !seen[s.Name] {
+				priority = append(priority, s.Name)
+				seen[s.Name] = true
+			}
+		}
+	}
 
 	if r.db != nil {
 		var sourceSites []string

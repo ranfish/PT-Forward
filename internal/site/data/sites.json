@@ -4049,7 +4049,8 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.cyanbug.net"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "discfan.net",
@@ -5085,7 +5086,8 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "t.et8.org"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "www.haidan.cc",
@@ -9917,7 +9919,8 @@
       "groups": [
         "aling",
         "alingWEB"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "pt.btschool.club",
@@ -13326,7 +13329,8 @@
       "groups": [
         "StarfallWeb",
         "Starfall"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "ptcafe.club",
@@ -17313,7 +17317,8 @@
       ],
       "groups": [
         "HX"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "www.okpt.net",
@@ -17813,7 +17818,8 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "www.okpt.net"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "www.oshen.win",
@@ -20082,7 +20088,8 @@
       ],
       "groups": [
         "YHWeb"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "open.cd",
@@ -20346,7 +20353,8 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.open.cd"
-      ]
+      ],
+      "content_type": "music"
     },
     {
       "domain": "cspt.top",
@@ -22284,7 +22292,8 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true, \"chinese_prefix\": true}",
       "tracker_domains": [
         "tracker.hhanclub.net"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "www.qingwapt.com",
@@ -23526,7 +23535,8 @@
       "tracker_domains": [
         "tracker.52dic.vip",
         "tracker.hhanclub.net"
-      ]
+      ],
+      "content_type": "music"
     },
     {
       "domain": "zhuque.in",
@@ -23703,7 +23713,8 @@
       ],
       "groups": [
         "ZWEX"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "rousi.pro",
@@ -24582,7 +24593,8 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "star-space.net"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "52pt.site",
@@ -28835,7 +28847,8 @@
         "xingtan.one",
         "1.tracker.xingtan.one",
         "2.tracker.xingtan.one"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "zeus.hamsters.space",
@@ -29952,7 +29965,8 @@
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "tracker.greatposterwall.com"
-      ]
+      ],
+      "content_type": "video"
     },
     {
       "domain": "api.m-team.cc",
