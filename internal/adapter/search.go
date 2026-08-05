@@ -49,7 +49,12 @@ func buildSearchURL(config *model.SiteConfig, framework, keyword string) string 
 		}
 	}
 	if searchParam == "" {
-		searchParam = "search"
+		switch framework {
+		case "gazelle":
+			searchParam = "searchstr"
+		default:
+			searchParam = "search"
+		}
 	}
 
 	baseURL := config.BaseURL
