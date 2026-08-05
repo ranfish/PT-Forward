@@ -399,10 +399,6 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 				videoSites[s.Name] = true
 			}
 		}
-		r.logger.Info("orphan music search: content_type filter",
-			zap.Int("enabled_before", len(enabledSites)),
-			zap.Int("video_sites", len(videoSites)),
-			zap.Strings("video_site_names", keysOfMap(videoSites)))
 		filtered := make([]string, 0, len(enabledSites))
 		for _, name := range enabledSites {
 			if !videoSites[name] {
@@ -602,12 +598,4 @@ func waitForRecheck(ctx context.Context, dlClient model.DownloaderClient, infoHa
 		return fmt.Errorf("data verification incomplete: %.1f%% state=%s", ti.Progress*100, ti.State)
 	}
 	return fmt.Errorf("recheck timeout after %v", timeout)
-}
-
-func keysOfMap(m map[string]bool) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }
