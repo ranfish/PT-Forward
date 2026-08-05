@@ -2782,9 +2782,32 @@ func detectContentType(fileTree map[string]int64) string {
 }
 
 // DetectMusicFromDir 读取目录内容，判断是否为音乐资源（有音频文件且无视频文件）。
+// 检查直接子文件和一级子目录（CD1/CD2 等分碟结构）。
 func DetectMusicFromDir(dirPath string) bool {
+	hasAudio := detectAudioInDir(dirPath)
+	if !hasAudio {
+		// 检查一级子目录（CD1/CD2 分碟结构）
+		entries, err := os.ReadDir(dirPath)
+		if err != nil {
+			return false
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			if detectAudioInDir(filepath.Join(dirPath, e.Name())) {
+				hasAudio = true
+				break
+			}
+		}
+	}
+	return hasAudio
+}
+
+// detectAudioInDir 检查目录内是否有音频文件（无视频文件）。
+func detectAudioInDir(dirPath string) bool {
 	entries, err := os.ReadDir(dirPath)
-	if err != nil || len(entries) == 0 {
+	if err != nil {
 		return false
 	}
 	hasAudio := false
