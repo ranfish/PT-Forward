@@ -3146,6 +3146,7 @@ func musicStripTrailingFormat(s string) string {
 var musicFormatNoisePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\b(FLAC|APE|WAV|MP3|AAC|M4A|OGG|DSD|DSF|CUE)\b`),
 	regexp.MustCompile(`(?i)\b\d+bit\b`),
+	regexp.MustCompile(`\b\d{1,2}-\d{2,3}\b`), // 24-96, 16-44 (bitdepth-samplerate)
 }
 
 func musicStripFormatNoise(s string) string {
