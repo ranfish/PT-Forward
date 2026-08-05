@@ -2524,35 +2524,18 @@ func stripChinesePrefix(title string) string {
 func truncateToResolution(s string) string {
 	lower := strings.ToLower(s)
 	bestIdx := -1
-	bestEnd := 0
 	for _, kw := range resolutionKeywords {
 		idx := strings.Index(lower, kw)
 		if idx >= 0 && (bestIdx < 0 || idx < bestIdx) {
 			bestIdx = idx
-			bestEnd = idx + len(kw)
 		}
 	}
 	if bestIdx < 0 {
 		return ""
 	}
-	end := bestEnd
-	// 3D 检测：标题含 3D 时，延伸到 HSBS/HOU（区分左右半宽和上下半宽）
-	if has3D(lower) {
-		afterRes := s[bestEnd:]
-		afterLower := lower[bestEnd:]
-		for _, spec := range []string{"hsbs", "hou"} {
-			idx := strings.Index(afterLower, spec)
-			if idx >= 0 {
-				pos := idx + len(spec)
-				// 确认是独立词（前面是 . 或空格）
-				if idx == 0 || afterRes[idx-1] == '.' || afterRes[idx-1] == ' ' || afterRes[idx-1] == '-' {
-					end = bestEnd + pos
-					break
-				}
-			}
-		}
-	}
-	return s[:end]
+	// 截到分辨率关键词之前（不含分辨率本身），分辨率是元数据不是标题。
+	// 分辨率后的内容（codec/audio/group）也一并丢弃。
+	return s[:bestIdx]
 }
 
 var re3D = regexp.MustCompile(`(?i)\b3d\b`)
