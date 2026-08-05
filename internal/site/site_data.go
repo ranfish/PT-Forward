@@ -48,6 +48,8 @@ type SiteSeedData struct {
 	Form                  SiteFormConfig `json:"form"`
 	// v0.0.266: tracker 域名列表（数据源 docs/00-站点域名.md，matcher 优先用此精确匹配）
 	TrackerDomains []string `json:"tracker_domains,omitempty"`
+	// ContentType 标识站点内容类型：music=纯音乐站, video=纯视频站, 空=综合站
+	ContentType   string   `json:"content_type,omitempty"`
 }
 
 type seedData struct {

@@ -150,10 +150,11 @@ func (SiteFieldMapping) TableName() string { return "site_field_mappings" }
 
 // §33.1.37 — SiteInfo: 站点运行时信息
 type SiteInfo struct {
-	Name      string `json:"name"`
-	BaseURL   string `json:"base_url"`
-	Framework string `json:"framework"`
-	Enabled   bool   `json:"enabled"`
+	Name        string `json:"name"`
+	BaseURL     string `json:"base_url"`
+	Framework   string `json:"framework"`
+	Enabled     bool   `json:"enabled"`
+	ContentType string `json:"content_type,omitempty"`
 
 	Passkey     string `json:"passkey,omitempty"`
 	Cookie      string `json:"cookie,omitempty"`
