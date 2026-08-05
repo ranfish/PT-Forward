@@ -2880,7 +2880,7 @@ func musicFreeformNaming(title string) (string, bool) {
 	var album string
 	year := prefixYear
 	if yearLoc != nil {
-		album = strings.TrimSpace(rest[:yearLoc[0]])
+		album = musicStripAllBrackets(strings.TrimSpace(rest[:yearLoc[0]]))
 		if year == "" {
 			year = strings.Trim(rest[yearLoc[0]:yearLoc[1]], " ()[]{}")
 		}
