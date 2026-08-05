@@ -415,16 +415,7 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 	priority := make([]string, 0, len(enabledSites))
 	seen := make(map[string]bool)
 
-	// 音乐搜索：纯音乐站优先
-	if isMusicSearch {
-		for _, s := range sites {
-			if s.Enabled && s.ContentType == "music" && !seen[s.Name] {
-				priority = append(priority, s.Name)
-				seen[s.Name] = true
-			}
-		}
-	}
-
+	// 官组映射优先（OpenCD→皇后），确保主音乐站排第一
 	if r.db != nil {
 		var sourceSites []string
 		r.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
@@ -435,6 +426,16 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 			if !seen[site] {
 				priority = append(priority, site)
 				seen[site] = true
+			}
+		}
+	}
+
+	// 音乐搜索：其他纯音乐站次优先（海豚等）
+	if isMusicSearch {
+		for _, s := range sites {
+			if s.Enabled && s.ContentType == "music" && !seen[s.Name] {
+				priority = append(priority, s.Name)
+				seen[s.Name] = true
 			}
 		}
 	}
