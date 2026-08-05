@@ -2602,6 +2602,7 @@ type MatchFilterStats struct {
 func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string, sourceSize int64) (*L2MatchResult, *MatchFilterStats) {
 	stats := &MatchFilterStats{}
 	var fuzzyMatch *L2MatchResult
+	var fuzzyBestDiff int64
 	for _, r := range results {
 		if r.TorrentID == "" {
 			stats.EmptyID++
@@ -2623,14 +2624,19 @@ func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string
 				Size:      r.Size,
 			}, stats
 		}
-		// 容差匹配作为备选
+		// 容差匹配：保存差值最小的结果
 		if CompareSizeDisplay(sourceSize, r.Size) {
-			if fuzzyMatch == nil {
+			diff := r.Size - sourceSize
+			if diff < 0 {
+				diff = -diff
+			}
+			if fuzzyMatch == nil || diff < fuzzyBestDiff {
 				fuzzyMatch = &L2MatchResult{
 					TorrentID: r.TorrentID,
 					Title:     r.Title,
 					Size:      r.Size,
 				}
+				fuzzyBestDiff = diff
 			}
 		} else {
 			stats.SizeMiss++
