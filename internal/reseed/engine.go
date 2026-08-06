@@ -2330,9 +2330,6 @@ func NormalizeTitle(title string) string {
 
 var resolutionKeywords = []string{"2160p", "1080p", "1080i", "720p", "576p", "576i", "480p", "480i", "1440p", "4320p", "4k"}
 
-// resolutionNormalizeRe 把复合分辨率词归一化：MINBD1080P → 1080P
-var resolutionNormalizeRe = regexp.MustCompile(`(?i)[A-Z]*(\d{3,4}[PI])[A-Z]*`)
-
 func ExtractSearchKeyword(title string) string {
 	if title == "" {
 		return ""
@@ -2364,8 +2361,6 @@ func ExtractSearchKeyword(title string) string {
 	}
 	raw = strings.ReplaceAll(raw, ".", " ")
 	raw = stripBrandColonPrefix(raw)
-	// 归一化复合分辨率词：MINBD1080P → 1080P，BluRay2160p → 2160p
-	raw = resolutionNormalizeRe.ReplaceAllString(raw, " $1")
 	// 去掉介质/来源词和地区码
 	for _, term := range mediumAndRegionTerms {
 		raw = strings.ReplaceAll(raw, term, " ")
@@ -2540,7 +2535,22 @@ func truncateToResolution(s string) string {
 	if bestIdx < 0 {
 		return ""
 	}
-	return s[:bestEnd]
+	end := bestEnd
+	if has3D(lower) {
+		afterRes := s[bestEnd:]
+		afterLower := lower[bestEnd:]
+		for _, spec := range []string{"hsbs", "hou"} {
+			idx := strings.Index(afterLower, spec)
+			if idx >= 0 {
+				pos := idx + len(spec)
+				if idx == 0 || afterRes[idx-1] == '.' || afterRes[idx-1] == ' ' || afterRes[idx-1] == '-' {
+					end = bestEnd + pos
+					break
+				}
+			}
+		}
+	}
+	return s[:end]
 }
 
 var re3D = regexp.MustCompile(`(?i)\b3d\b`)
