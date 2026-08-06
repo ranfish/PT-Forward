@@ -66,6 +66,8 @@ var editionPatterns = []editionPattern{
 	{regexp.MustCompile(`(?i)\bHybrid\b`), "Hybrid"},
 	// MiniBD（优先级 9）
 	{regexp.MustCompile(`(?i)\bMiniBD\b`), "MiniBD"},
+	// CC = Criterion Collection 缩写，PT 标题中出现在年份后片源前（如 1972.CC.BluRay）
+	{regexp.MustCompile(`(?i)(?:^|[.\s\-_])CC(?:[.\s\-_]|$)`), "Criterion Collection"},
 }
 
 // extractEditionInfo 从标题提取版本信息。
