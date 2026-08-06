@@ -24,6 +24,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/scheduler"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -2219,7 +2220,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		return nil
 	}
 
-	match, filterStats := VerifyMatchWithTruncationCheck(results, groupName, fp.TotalSize)
+	match, filterStats := VerifyMatchWithTruncationCheckAndSource(results, groupName, fp.TotalSize, fp.Title)
 
 	if match != nil {
 		if l2s != nil {
@@ -2655,6 +2656,20 @@ type MatchFilterStats struct {
 }
 
 func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string, sourceSize int64) (*L2MatchResult, *MatchFilterStats) {
+	return VerifyMatchWithStatsAndSource(results, groupName, sourceSize, "")
+}
+
+// VerifyMatchWithStatsAndSource 在 VerifyMatchWithStats 基础上增加 TechProfile 比较。
+// sourceTitle 非空时，对候选标题解析 TechProfile，按规则 A/B 过滤：
+//   - 规则 A：双方都有值且不同 → 拒绝（VideoCodec/AudioCodec/HDR/Specification/RegionCode）
+//   - 规则 B：候选有版本定义 Token 而源无 → 降为精确匹配（EditionInfo/RegionCode/SourcePlatform）
+func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupName string, sourceSize int64, sourceTitle string) (*L2MatchResult, *MatchFilterStats) {
+	var srcProfile *titleparser.TechProfile
+	if sourceTitle != "" {
+		p := titleparser.ParseTitleTech(sourceTitle)
+		srcProfile = &p
+	}
+
 	stats := &MatchFilterStats{}
 	var fuzzyMatch *L2MatchResult
 	var fuzzyBestDiff int64
@@ -2679,8 +2694,18 @@ func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string
 				Size:      r.Size,
 			}, stats
 		}
+		// TechProfile 比较：规则 A 双方有值且不同 → 跳过
+		if srcProfile != nil && techProfileConflict(*srcProfile, r.Title) {
+			stats.SizeMiss++
+			continue
+		}
+		// TechProfile 比较：规则 B 候选有版本 Token 源无 → 不允许容差匹配
+		allowFuzzy := true
+		if srcProfile != nil && techProfileVersionDefined(*srcProfile, r.Title) {
+			allowFuzzy = false
+		}
 		// 容差匹配：保存差值最小的结果
-		if CompareSizeDisplay(sourceSize, r.Size) {
+		if allowFuzzy && CompareSizeDisplay(sourceSize, r.Size) {
 			diff := r.Size - sourceSize
 			if diff < 0 {
 				diff = -diff
@@ -2703,13 +2728,50 @@ func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string
 	return nil, stats
 }
 
+// techProfileConflict 规则 A：源标题和候选标题都有某 Token 且值不同 → 冲突。
+func techProfileConflict(src titleparser.TechProfile, candidateTitle string) bool {
+	cand := titleparser.ParseTitleTech(candidateTitle)
+	fields := []struct{ name, s, c string }{
+		{"VideoCodec", src.VideoCodec, cand.VideoCodec},
+		{"AudioCodec", src.AudioCodec, cand.AudioCodec},
+		{"HDR", src.HDR, cand.HDR},
+		{"Specification", src.Specification, cand.Specification},
+		{"RegionCode", src.RegionCode, cand.RegionCode},
+	}
+	for _, f := range fields {
+		if f.s != "" && f.c != "" && !strings.EqualFold(f.s, f.c) {
+			return true
+		}
+	}
+	return false
+}
+
+// techProfileVersionDefined 规则 B：候选有版本定义 Token（EditionInfo/RegionCode/SourcePlatform）而源无。
+func techProfileVersionDefined(src titleparser.TechProfile, candidateTitle string) bool {
+	cand := titleparser.ParseTitleTech(candidateTitle)
+	if cand.EditionInfo != "" && src.EditionInfo == "" {
+		return true
+	}
+	if cand.RegionCode != "" && src.RegionCode == "" {
+		return true
+	}
+	if cand.SourcePlatform != "" && src.SourcePlatform == "" {
+		return true
+	}
+	return false
+}
+
 func VerifyMatch(results []*model.SeedingSearchResult, groupName string, sourceSize int64) *L2MatchResult {
 	match, _ := VerifyMatchWithStats(results, groupName, sourceSize)
 	return match
 }
 
 func VerifyMatchWithTruncationCheck(results []*model.SeedingSearchResult, groupName string, sourceSize int64) (*L2MatchResult, *MatchFilterStats) {
-	match, stats := VerifyMatchWithStats(results, groupName, sourceSize)
+	return VerifyMatchWithTruncationCheckAndSource(results, groupName, sourceSize, "")
+}
+
+func VerifyMatchWithTruncationCheckAndSource(results []*model.SeedingSearchResult, groupName string, sourceSize int64, sourceTitle string) (*L2MatchResult, *MatchFilterStats) {
+	match, stats := VerifyMatchWithStatsAndSource(results, groupName, sourceSize, sourceTitle)
 	if match == nil && groupName != "" {
 		needFallback := false
 		for _, r := range results {
@@ -2722,7 +2784,7 @@ func VerifyMatchWithTruncationCheck(results []*model.SeedingSearchResult, groupN
 			needFallback = true
 		}
 		if needFallback {
-			return VerifyMatchWithStats(results, "", sourceSize)
+			return VerifyMatchWithStatsAndSource(results, "", sourceSize, sourceTitle)
 		}
 	}
 	return match, stats
