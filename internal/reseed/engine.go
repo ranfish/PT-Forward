@@ -2334,7 +2334,7 @@ var mediaTypeKeywords = []string{
 	"Blu-ray", "BluRay", "Bluray", "Blu ray", "Blue-ray",
 	"WEB-DL", "WebDL", "WEBRip",
 	"HDTV", "HD-DVD", "HDDVD",
-	"DVDRip",
+	"UHD", "DVDRip",
 }
 
 func ExtractSearchKeyword(title string) string {
