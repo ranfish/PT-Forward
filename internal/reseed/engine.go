@@ -2330,6 +2330,9 @@ func NormalizeTitle(title string) string {
 
 var resolutionKeywords = []string{"2160p", "1080p", "1080i", "720p", "576p", "576i", "480p", "480i", "1440p", "4320p", "4k"}
 
+// resolutionNormalizeRe 把复合分辨率词归一化：MINBD1080P → 1080P
+var resolutionNormalizeRe = regexp.MustCompile(`(?i)[A-Z]*(\d{3,4}[PI])[A-Z]*`)
+
 func ExtractSearchKeyword(title string) string {
 	if title == "" {
 		return ""
@@ -2361,6 +2364,8 @@ func ExtractSearchKeyword(title string) string {
 	}
 	raw = strings.ReplaceAll(raw, ".", " ")
 	raw = stripBrandColonPrefix(raw)
+	// 归一化复合分辨率词：MINBD1080P → 1080P，BluRay2160p → 2160p
+	raw = resolutionNormalizeRe.ReplaceAllString(raw, " $1")
 	// 去掉介质/来源词和地区码
 	for _, term := range mediumAndRegionTerms {
 		raw = strings.ReplaceAll(raw, term, " ")
@@ -2524,18 +2529,18 @@ func stripChinesePrefix(title string) string {
 func truncateToResolution(s string) string {
 	lower := strings.ToLower(s)
 	bestIdx := -1
+	bestEnd := 0
 	for _, kw := range resolutionKeywords {
 		idx := strings.Index(lower, kw)
 		if idx >= 0 && (bestIdx < 0 || idx < bestIdx) {
 			bestIdx = idx
+			bestEnd = idx + len(kw)
 		}
 	}
 	if bestIdx < 0 {
 		return ""
 	}
-	// 截到分辨率关键词之前（不含分辨率本身），分辨率是元数据不是标题。
-	// 分辨率后的内容（codec/audio/group）也一并丢弃。
-	return s[:bestIdx]
+	return s[:bestEnd]
 }
 
 var re3D = regexp.MustCompile(`(?i)\b3d\b`)
