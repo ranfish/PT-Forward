@@ -419,7 +419,7 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 	if r.db != nil {
 		var sourceSites []string
 		r.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
-			Where("group_name = ? AND site_name IN ?", groupName, enabledSites).
+			Where("LOWER(group_name) = LOWER(?) AND site_name IN ?", groupName, enabledSites).
 			Order("is_official DESC").
 			Pluck("site_name", &sourceSites)
 		for _, site := range sourceSites {

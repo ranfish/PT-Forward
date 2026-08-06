@@ -2663,7 +2663,7 @@ func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string
 			stats.EmptyID++
 			continue
 		}
-		if groupName != "" && !strings.Contains(r.Title, groupName) {
+		if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
 			stats.GroupMiss++
 			continue
 		}
