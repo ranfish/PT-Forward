@@ -2385,10 +2385,14 @@ func stripApostrophes(s string) string {
 }
 
 // chineseTitleFallback 在英文关键词提取失败（hasNoTitle=true）时，
-// 用原始标题截到第一个年份，保留中文标题用于 NexusPHP 中文搜索。
+// 用原始标题截到分辨率或年份，保留中文标题用于 NexusPHP 中文搜索。
 // "乾隆王朝.2002.40集全..." → "乾隆王朝 2002"
+// "男人.2022.1080p..." → "男人 2022 1080p"
 func chineseTitleFallback(title string) string {
-	fb := truncateToYear(title)
+	fb := truncateToResolution(title)
+	if fb == "" {
+		fb = truncateToYear(title)
+	}
 	if fb == "" {
 		return ""
 	}
