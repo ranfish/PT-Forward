@@ -2330,6 +2330,13 @@ func NormalizeTitle(title string) string {
 
 var resolutionKeywords = []string{"2160p", "1080p", "1080i", "720p", "576p", "576i", "480p", "480i", "1440p", "4320p", "4k"}
 
+var mediaTypeKeywords = []string{
+	"Blu-ray", "BluRay", "Bluray", "Blu ray", "Blue-ray",
+	"WEB-DL", "WebDL", "WEBRip",
+	"HDTV", "HD-DVD", "HDDVD",
+	"DVDRip",
+}
+
 func ExtractSearchKeyword(title string) string {
 	if title == "" {
 		return ""
@@ -2371,10 +2378,10 @@ func ExtractSearchKeyword(title string) string {
 	raw = stripApostrophes(raw)
 	if KeywordHasNoTitle(raw) {
 		if fb := chineseTitleFallback(title); fb != "" && fb != raw {
-			return stripApostrophes(fb)
+			return appendMediaAfterResolution(stripApostrophes(fb), title)
 		}
 	}
-	return raw
+	return appendMediaAfterResolution(raw, title)
 }
 
 // stripApostrophes 剥离直撇号和弯撇号，防止 NexusPHP SQL LIKE 注入式失败。
@@ -2382,6 +2389,52 @@ func stripApostrophes(s string) string {
 	s = strings.ReplaceAll(s, "'", " ")
 	s = strings.ReplaceAll(s, "\u2019", " ")
 	return strings.Join(strings.Fields(s), " ")
+}
+
+// appendMediaAfterResolution 从原始标题中提取紧跟分辨率后的媒体类型（如 Blu-ray、WEB-DL），
+// 追加到关键词中提高搜索精度。关键词过宽导致搜索结果太多、正确种子不在第一页。
+// "IF 2024 1080p" + "IF.2024.1080p.Blu-ray.REPACK..." → "IF 2024 1080p Blu-ray"
+func appendMediaAfterResolution(keyword, originalTitle string) string {
+	lowerKW := strings.ToLower(keyword)
+	lowerOrig := strings.ToLower(originalTitle)
+
+	for _, res := range resolutionKeywords {
+		kwResIdx := strings.Index(lowerKW, res)
+		if kwResIdx < 0 {
+			continue
+		}
+		origResIdx := strings.Index(lowerOrig, res)
+		if origResIdx < 0 {
+			continue
+		}
+		afterResStart := origResIdx + len(res)
+		if afterResStart >= len(originalTitle) {
+			break
+		}
+		afterRes := originalTitle[afterResStart:]
+		trimmed := strings.TrimLeft(afterRes, ". _-")
+		for _, media := range mediaTypeKeywords {
+			if len(trimmed) < len(media) {
+				continue
+			}
+			if !strings.EqualFold(trimmed[:len(media)], media) {
+				continue
+			}
+			afterMediaIdx := len(media)
+			if afterMediaIdx < len(trimmed) {
+				ch := trimmed[afterMediaIdx]
+				if ch != '.' && ch != ' ' && ch != '_' && ch != '-' {
+					continue
+				}
+			}
+			if strings.Contains(lowerKW, strings.ToLower(media)) {
+				break
+			}
+			return keyword + " " + media
+		}
+		break
+	}
+	return keyword
 }
 
 // chineseTitleFallback 在英文关键词提取失败（hasNoTitle=true）时，
