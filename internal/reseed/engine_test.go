@@ -2004,10 +2004,10 @@ func TestEngine_matchLayer2SizeTitle_GroupMismatch(t *testing.T) {
 	rec := model.SeedingTorrentRecord{InfoHash: "ih_best", SiteName: "source_site"}
 	fc := e.preloadFingerprints(context.Background(), []string{rec.InfoHash})
 	c := e.matchLayer2SizeTitle(context.Background(), adapter, &model.SiteConfig{}, rec.InfoHash, rec.SiteName, "target_site", 1.0, fc)
-	// 组名不同但体积一致：VerifyMatchWithTruncationCheck 会 fallback 去组名匹配，
-	// 下载器收到后自动校验，误匹配零后果。
-	if c == nil {
-		t.Error("expected match with group variant fallback (same size, different group)")
+	// PT 生态中不同小组的作品编码参数不同，pieces_hash 不可能匹配，跨组辅种不存在。
+	// 组名不同时不应 fallback 匹配。
+	if c != nil {
+		t.Error("expected nil for different group (no cross-group matching)")
 	}
 }
 

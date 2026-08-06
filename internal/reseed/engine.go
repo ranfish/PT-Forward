@@ -2686,6 +2686,11 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 			stats.SizeMiss++
 			continue
 		}
+		// TechProfile 比较：规则 A 双方有值且不同 → 跳过
+		if srcProfile != nil && techProfileConflict(*srcProfile, r.Title) {
+			stats.SizeMiss++
+			continue
+		}
 		// 精确匹配（字节相同）优先返回
 		if r.Size == sourceSize {
 			return &L2MatchResult{
@@ -2693,11 +2698,6 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 				Title:     r.Title,
 				Size:      r.Size,
 			}, stats
-		}
-		// TechProfile 比较：规则 A 双方有值且不同 → 跳过
-		if srcProfile != nil && techProfileConflict(*srcProfile, r.Title) {
-			stats.SizeMiss++
-			continue
 		}
 		// TechProfile 比较：规则 B 候选有版本 Token 源无 → 不允许容差匹配
 		allowFuzzy := true
@@ -2779,9 +2779,6 @@ func VerifyMatchWithTruncationCheckAndSource(results []*model.SeedingSearchResul
 				needFallback = true
 				break
 			}
-		}
-		if !needFallback && stats.GroupMiss > 0 {
-			needFallback = true
 		}
 		if needFallback {
 			return VerifyMatchWithStatsAndSource(results, "", sourceSize, sourceTitle)
