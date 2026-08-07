@@ -4012,14 +4012,11 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		(match.MatchMethod == "search_verify" && e.fpRepo != nil && match.SourceInfoHash != "")
 	if needsMeta {
 		if meta, err := fingerprint.ComputeFromTorrent(torrentData); err == nil {
-			// 体积校验：search_verify 用任务配置容差（默认 1%），其他方法用 10%
+			// 体积校验：所有匹配方法统一使用任务配置的注入体积容差（默认 1%，最大 5%）
 			if sourceSize > 0 && meta.TotalSize > 0 {
-				sizeThreshold := 10.0
-				if match.MatchMethod == "search_verify" {
-					sizeThreshold = task.SizeTolerancePercent
-					if sizeThreshold <= 0 {
-						sizeThreshold = 1.0
-					}
+				sizeThreshold := task.InjectionSizeTolerance
+				if sizeThreshold <= 0 || sizeThreshold > 5 {
+					sizeThreshold = 1.0
 				}
 				if diffPct := util.SizeDiffPercent(sourceSize, meta.TotalSize); diffPct > sizeThreshold {
 					return e.failMatch(ctx, match, fmt.Sprintf(

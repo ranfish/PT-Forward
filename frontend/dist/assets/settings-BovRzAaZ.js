@@ -1,1 +1,0 @@
-import{t as e}from"./client-DF22Lxer.js";var t={get(t){let n={};return t&&(n.prefix=t),e.get(`/settings`,{params:n})},update(t,n){return e.put(`/settings/${t}`,n)},remove(t){return e.delete(`/settings/${t}`)},backup(){return e.get(`/settings/backup`)},restore(t){return e.post(`/settings/restore`,t)}};export{t};

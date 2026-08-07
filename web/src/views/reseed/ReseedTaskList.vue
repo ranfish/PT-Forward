@@ -143,12 +143,17 @@
           </a-col>
         </a-row>
         <a-row :gutter="16">
-          <a-col :span="12">
+          <a-col :span="8">
             <a-form-item :label="t('reseed.sizeTolerancePercent')" name="sizeTolerancePercent">
               <a-input-number v-model:value="form.sizeTolerancePercent" :min="0" :max="100" :step="0.1" style="width: 100%" placeholder="1.0" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :span="8">
+            <a-form-item label="注入体积容差(%)" name="injectionSizeTolerance">
+              <a-input-number v-model:value="form.injectionSizeTolerance" :min="0.1" :max="5" :step="0.1" style="width: 100%" placeholder="1.0" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
             <a-form-item :label="t('reseed.confidenceThreshold')" name="confidenceThreshold">
               <a-input-number v-model:value="form.confidenceThreshold" :min="0" :max="1" :step="0.05" style="width: 100%" placeholder="0.7" />
             </a-form-item>
@@ -403,6 +408,7 @@ const defaultForm = {
   sourceSiteIds: [] as string[],
   targetSiteIds: [] as string[],
   sizeTolerancePercent: 1.0,
+  injectionSizeTolerance: 1.0,
   confidenceThreshold: 0.7,
   schedule: '0 */6 * * *',
   maxInjectionsPerRun: 0,
@@ -459,6 +465,7 @@ function openModal(record?: ReseedTask) {
       sourceSiteIds: record.source_site_ids ? record.source_site_ids.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
       targetSiteIds: record.target_site_ids ? record.target_site_ids.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
       sizeTolerancePercent: record.size_tolerance_percent ?? 1.0,
+      injectionSizeTolerance: record.injection_size_tolerance ?? 1.0,
       confidenceThreshold: record.confidence_threshold ?? 0.7,
       schedule: record.schedule || '0 */6 * * *',
       maxInjectionsPerRun: record.max_injections_per_run ?? 0,
@@ -492,6 +499,7 @@ async function handleSubmit() {
   try {
     const payload = {
       ...form,
+      injection_size_tolerance: form.injectionSizeTolerance,
       clientIds: Array.isArray(form.clientIds) ? form.clientIds.join(',') : form.clientIds,
       sourceSiteIds: (form.sourceSiteIds as string[]).join(','),
       targetSiteIds: (form.targetSiteIds as string[]).join(','),

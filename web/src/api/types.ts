@@ -542,6 +542,7 @@ export interface ReseedTask {
   max_fallbacks: number
   engine_mode: string
   size_tolerance_percent: number
+  injection_size_tolerance: number
   max_injections_per_run: number
   injection_interval_s: number
   injection_jitter_s: number
