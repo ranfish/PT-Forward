@@ -854,6 +854,15 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 
 				matches, err := j.searcher.SearchByPiecesHash(ctx, j.config, batch)
 				if err != nil {
+					errStr := err.Error()
+					if strings.Contains(errStr, "Too Many Attempts") || strings.Contains(errStr, "rate limit") {
+						e.logger.Warn("pieces_hash rate limited, skipping remaining batches",
+							zap.String("site", j.siteName),
+							zap.Int("batch", k/batchSize+1),
+							zap.Int("totalBatches", (len(j.hashes)+batchSize-1)/batchSize),
+							zap.Int("completed", batchOK))
+						break
+					}
 					e.logger.Warn("batch pieces_hash query failed",
 						zap.String("site", j.siteName),
 						zap.Int("batch", k/batchSize+1),
