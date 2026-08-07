@@ -3941,15 +3941,30 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		Paused:   true,
 	}
 
+	var sourceSize int64
 	if match.SourceInfoHash != "" {
 		sourceTorrent, serr := dlClient.GetTorrentByHash(ctx, match.SourceInfoHash)
 		if serr == nil && sourceTorrent != nil && sourceTorrent.SavePath != "" {
 			opts.SavePath = sourceTorrent.SavePath
+			sourceSize = sourceTorrent.TotalSize
 		}
 	}
 
 	if len(torrentData) == 0 {
 		return e.failMatch(ctx, match, "种子数据为空")
+	}
+
+	// 体积校验：源种子与目标种子体积差异超 10% → 拒绝（拦截 IYUU 云端错误关联）
+	if sourceSize > 0 {
+		if meta, err := fingerprint.ComputeFromTorrent(torrentData); err == nil && meta.TotalSize > 0 {
+			if diffPct := util.SizeDiffPercent(sourceSize, meta.TotalSize); diffPct > 10 {
+				return e.failMatch(ctx, match, fmt.Sprintf(
+					"体积差异过大: 源 %.2f GiB vs 目标 %.2f GiB (%.1f%%)",
+					float64(sourceSize)/1024/1024/1024,
+					float64(meta.TotalSize)/1024/1024/1024,
+					diffPct))
+			}
+		}
 	}
 
 	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)
