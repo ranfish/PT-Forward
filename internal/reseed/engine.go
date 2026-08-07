@@ -2387,6 +2387,15 @@ func ExtractSearchKeyword(title string) string {
 	raw = chineseEpisodeCountRe.ReplaceAllString(raw, " ")
 	raw = strings.Join(strings.Fields(raw), " ")
 	raw = stripApostrophes(raw)
+
+	// stripChinesePrefix 剥离了 CJK 片名时，raw 缺少电影名称。
+	// 用 chineseTitleFallback（基于原始标题）补回片名。
+	strippedCJK := len(rest) < len(title)
+	if strippedCJK {
+		if fb := chineseTitleFallback(title); fb != "" && fb != raw {
+			return appendMediaAfterResolution(stripApostrophes(fb), title)
+		}
+	}
 	if KeywordHasNoTitle(raw) {
 		if fb := chineseTitleFallback(title); fb != "" && fb != raw {
 			return appendMediaAfterResolution(stripApostrophes(fb), title)
@@ -2462,6 +2471,9 @@ func chineseTitleFallback(title string) string {
 	}
 	fb = strings.ReplaceAll(fb, ".", " ")
 	fb = stripBrandColonPrefix(fb)
+	for _, term := range mediumAndRegionTerms {
+		fb = strings.ReplaceAll(fb, term, " ")
+	}
 	fb = chineseEpisodeCountRe.ReplaceAllString(fb, " ")
 	fb = strings.Join(strings.Fields(fb), " ")
 	return fb
@@ -2594,10 +2606,28 @@ func truncateToResolution(s string) string {
 	bestIdx := -1
 	bestEnd := 0
 	for _, kw := range resolutionKeywords {
-		idx := strings.Index(lower, kw)
-		if idx >= 0 && (bestIdx < 0 || idx < bestIdx) {
-			bestIdx = idx
-			bestEnd = idx + len(kw)
+		searchFrom := 0
+		for searchFrom < len(lower) {
+			relIdx := strings.Index(lower[searchFrom:], kw)
+			if relIdx < 0 {
+				break
+			}
+			idx := searchFrom + relIdx
+			endIdx := idx + len(kw)
+			// 短关键词（≤2 字符如 "4k"）要求匹配后有词边界（分隔符或 EOF），
+			// 防止 "4K修复版" 中的 "4k" 被误认为分辨率标记。
+			if len(kw) <= 2 && endIdx < len(lower) {
+				next := lower[endIdx]
+				if next != '.' && next != ' ' && next != '-' && next != '_' {
+					searchFrom = endIdx
+					continue
+				}
+			}
+			if bestIdx < 0 || idx < bestIdx {
+				bestIdx = idx
+				bestEnd = endIdx
+			}
+			break
 		}
 	}
 	if bestIdx < 0 {
