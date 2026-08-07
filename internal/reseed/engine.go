@@ -3988,8 +3988,10 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		return e.failMatch(ctx, match, "种子数据为空")
 	}
 
-	// 体积校验 + 组名校验（共用一次 ComputeFromTorrent）
-	if sourceSize > 0 || sourceName != "" {
+	// 体积/组名/文件结构校验（共用一次 ComputeFromTorrent）
+	needsMeta := sourceSize > 0 || sourceName != "" ||
+		(match.MatchMethod == "search_verify" && e.fpRepo != nil && match.SourceInfoHash != "")
+	if needsMeta {
 		if meta, err := fingerprint.ComputeFromTorrent(torrentData); err == nil {
 			// 体积校验：search_verify 用任务配置容差（默认 1%），其他方法用 10%
 			if sourceSize > 0 && meta.TotalSize > 0 {
@@ -4015,6 +4017,17 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 				if sourceGroup != "" && targetGroup != "" && !strings.EqualFold(sourceGroup, targetGroup) {
 					return e.failMatch(ctx, match, fmt.Sprintf(
 						"制作组不同: 源 %s vs 目标 %s", sourceGroup, targetGroup))
+				}
+			}
+			// 文件结构校验（仅 search_verify）：文件数差异 >3 倍 → 拒绝（如 MKV 1 文件 vs BDMV 10+ 文件）
+			if match.MatchMethod == "search_verify" && e.fpRepo != nil && match.SourceInfoHash != "" {
+				if srcFP, ferr := e.fpRepo.GetByInfoHash(ctx, match.SourceInfoHash); ferr == nil && srcFP != nil && srcFP.FileCount > 0 && meta.FileCount > 0 {
+					ratio := float64(meta.FileCount) / float64(srcFP.FileCount)
+					if ratio > 3 || ratio < 1.0/3 {
+						return e.failMatch(ctx, match, fmt.Sprintf(
+							"文件结构不同: 源 %d 文件 vs 目标 %d 文件",
+							srcFP.FileCount, meta.FileCount))
+					}
 				}
 			}
 		}
