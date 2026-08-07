@@ -3961,14 +3961,21 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	// 体积校验 + 组名校验（共用一次 ComputeFromTorrent）
 	if sourceSize > 0 || sourceName != "" {
 		if meta, err := fingerprint.ComputeFromTorrent(torrentData); err == nil {
-			// 体积校验：差异超 10% → 拒绝
+			// 体积校验：search_verify 用任务配置容差（默认 1%），其他方法用 10%
 			if sourceSize > 0 && meta.TotalSize > 0 {
-				if diffPct := util.SizeDiffPercent(sourceSize, meta.TotalSize); diffPct > 10 {
+				sizeThreshold := 10.0
+				if match.MatchMethod == "search_verify" {
+					sizeThreshold = task.SizeTolerancePercent
+					if sizeThreshold <= 0 {
+						sizeThreshold = 1.0
+					}
+				}
+				if diffPct := util.SizeDiffPercent(sourceSize, meta.TotalSize); diffPct > sizeThreshold {
 					return e.failMatch(ctx, match, fmt.Sprintf(
-						"体积差异过大: 源 %.2f GiB vs 目标 %.2f GiB (%.1f%%)",
+						"体积差异过大: 源 %.2f GiB vs 目标 %.2f GiB (%.1f%%, 阈值 %.0f%%)",
 						float64(sourceSize)/1024/1024/1024,
 						float64(meta.TotalSize)/1024/1024/1024,
-						diffPct))
+						diffPct, sizeThreshold))
 				}
 			}
 			// 组名校验（仅 search_verify）：源与目标制作组不同 → 拒绝
