@@ -42,3 +42,26 @@ func ContentTypeCompatible(torrentType, siteType string) bool {
 	}
 	return torrentType == siteType
 }
+
+// SizeDiffPercent 计算两个体积的差异百分比。
+// 返回 |sourceSize-targetSize| / sourceSize * 100，sourceSize<=0 时返回 -1。
+func SizeDiffPercent(sourceSize, targetSize int64) float64 {
+	if sourceSize <= 0 {
+		return -1
+	}
+	diff := targetSize - sourceSize
+	if diff < 0 {
+		diff = -diff
+	}
+	return float64(diff) / float64(sourceSize) * 100
+}
+
+// SizeWithinTolerance 判断目标体积是否在源体积的容差范围内。
+// tolerancePercent 为百分比阈值（如 1.0 表示 1%）。
+// sourceSize<=0 或 targetSize<=0 时返回 true（跳过校验）。
+func SizeWithinTolerance(sourceSize, targetSize int64, tolerancePercent float64) bool {
+	if sourceSize <= 0 || targetSize <= 0 {
+		return true
+	}
+	return SizeDiffPercent(sourceSize, targetSize) <= tolerancePercent
+}
