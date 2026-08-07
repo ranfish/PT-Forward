@@ -2858,6 +2858,52 @@ func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config
 	return match, nil
 }
 
+// ValidateInjection 校验目标种子数据是否与源种子兼容，在注入下载器前调用。
+// 返回 error 表示拒绝注入（包含拒绝原因），nil 表示通过或降级跳过。
+//   - sourceSize: 0 跳过体积校验
+//   - sourceName: "" 跳过组名校验
+//   - sourceFileCount: 0 跳过文件结构校验
+//   - sizeTolerance: 百分比阈值（如 1.0 = 1%），<=0 或 >5 时回退 1.0
+func ValidateInjection(torrentData []byte, sourceSize int64, sourceName string, sourceFileCount int, sizeTolerance float64) error {
+	if len(torrentData) == 0 {
+		return fmt.Errorf("种子数据为空")
+	}
+	if sizeTolerance <= 0 || sizeTolerance > 5 {
+		sizeTolerance = 1.0
+	}
+
+	meta, err := fingerprint.ComputeFromTorrent(torrentData)
+	if err != nil {
+		return nil
+	}
+
+	if sourceSize > 0 && meta.TotalSize > 0 {
+		if diffPct := util.SizeDiffPercent(sourceSize, meta.TotalSize); diffPct > sizeTolerance {
+			return fmt.Errorf("体积差异过大: 源 %.2f GiB vs 目标 %.2f GiB (%.1f%%, 阈值 %.0f%%)",
+				float64(sourceSize)/1024/1024/1024,
+				float64(meta.TotalSize)/1024/1024/1024,
+				diffPct, sizeTolerance)
+		}
+	}
+
+	if sourceName != "" && meta.Name != "" {
+		sourceGroup := util.ExtractGroupName(sourceName)
+		targetGroup := util.ExtractGroupName(meta.Name)
+		if sourceGroup != "" && targetGroup != "" && !strings.EqualFold(sourceGroup, targetGroup) {
+			return fmt.Errorf("制作组不同: 源 %s vs 目标 %s", sourceGroup, targetGroup)
+		}
+	}
+
+	if sourceFileCount > 0 && meta.FileCount > 0 {
+		ratio := float64(meta.FileCount) / float64(sourceFileCount)
+		if ratio > 3 || ratio < 1.0/3 {
+			return fmt.Errorf("文件结构不同: 源 %d 文件 vs 目标 %d 文件", sourceFileCount, meta.FileCount)
+		}
+	}
+
+	return nil
+}
+
 var videoExtensions = []string{".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".flv", ".mov"}
 
 func findMainVideoFile(fileTree map[string]int64) string {
@@ -4007,46 +4053,19 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		return e.failMatch(ctx, match, "种子数据为空")
 	}
 
-	// 体积/组名/文件结构校验（共用一次 ComputeFromTorrent）
-	needsMeta := sourceSize > 0 || sourceName != "" ||
-		(match.MatchMethod == "search_verify" && e.fpRepo != nil && match.SourceInfoHash != "")
-	if needsMeta {
-		if meta, err := fingerprint.ComputeFromTorrent(torrentData); err == nil {
-			// 体积校验：所有匹配方法统一使用任务配置的注入体积容差（默认 1%，最大 5%）
-			if sourceSize > 0 && meta.TotalSize > 0 {
-				sizeThreshold := task.InjectionSizeTolerance
-				if sizeThreshold <= 0 || sizeThreshold > 5 {
-					sizeThreshold = 1.0
-				}
-				if diffPct := util.SizeDiffPercent(sourceSize, meta.TotalSize); diffPct > sizeThreshold {
-					return e.failMatch(ctx, match, fmt.Sprintf(
-						"体积差异过大: 源 %.2f GiB vs 目标 %.2f GiB (%.1f%%, 阈值 %.0f%%)",
-						float64(sourceSize)/1024/1024/1024,
-						float64(meta.TotalSize)/1024/1024/1024,
-						diffPct, sizeThreshold))
-				}
-			}
-			// 组名校验（仅 search_verify）：源与目标制作组不同 → 拒绝
-			if match.MatchMethod == "search_verify" && sourceName != "" && meta.Name != "" {
-				sourceGroup := util.ExtractGroupName(sourceName)
-				targetGroup := util.ExtractGroupName(meta.Name)
-				if sourceGroup != "" && targetGroup != "" && !strings.EqualFold(sourceGroup, targetGroup) {
-					return e.failMatch(ctx, match, fmt.Sprintf(
-						"制作组不同: 源 %s vs 目标 %s", sourceGroup, targetGroup))
-				}
-			}
-			// 文件结构校验（仅 search_verify）：文件数差异 >3 倍 → 拒绝（如 MKV 1 文件 vs BDMV 10+ 文件）
-			if match.MatchMethod == "search_verify" && e.fpRepo != nil && match.SourceInfoHash != "" {
-				if srcFP, ferr := e.fpRepo.GetByInfoHash(ctx, match.SourceInfoHash); ferr == nil && srcFP != nil && srcFP.FileCount > 0 && meta.FileCount > 0 {
-					ratio := float64(meta.FileCount) / float64(srcFP.FileCount)
-					if ratio > 3 || ratio < 1.0/3 {
-						return e.failMatch(ctx, match, fmt.Sprintf(
-							"文件结构不同: 源 %d 文件 vs 目标 %d 文件",
-							srcFP.FileCount, meta.FileCount))
-					}
-				}
+	// 注入前校验（体积/组名/文件结构）
+	sourceNameForCheck := ""
+	sourceFileCountForCheck := 0
+	if match.MatchMethod == "search_verify" {
+		sourceNameForCheck = sourceName
+		if e.fpRepo != nil && match.SourceInfoHash != "" {
+			if srcFP, ferr := e.fpRepo.GetByInfoHash(ctx, match.SourceInfoHash); ferr == nil && srcFP != nil {
+				sourceFileCountForCheck = srcFP.FileCount
 			}
 		}
+	}
+	if err := ValidateInjection(torrentData, sourceSize, sourceNameForCheck, sourceFileCountForCheck, task.InjectionSizeTolerance); err != nil {
+		return e.failMatch(ctx, match, err.Error())
 	}
 
 	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)

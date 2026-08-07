@@ -208,7 +208,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 						zap.Int("result_count", len(results)),
 						zap.Int64("orphan_size", orphan.Size))
 
-					match, filterStats := reseed.VerifyMatchWithTruncationCheck(results, groupName, orphan.Size)
+					match, filterStats := reseed.VerifyMatchWithTruncationCheckAndSource(results, groupName, orphan.Size, orphan.Name)
 
 					if match == nil {
 						firstTitle := ""
@@ -541,6 +541,10 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 	}
 	if len(torrentData) == 0 {
 		return fmt.Errorf("downloaded torrent data is empty")
+	}
+
+	if err := reseed.ValidateInjection(torrentData, orphan.Size, orphan.Name, 0, 1.0); err != nil {
+		return fmt.Errorf("注入校验失败: %w", err)
 	}
 
 	clientID := targetClientID
