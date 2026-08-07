@@ -1458,6 +1458,16 @@ func (e *Engine) matchAtSite(mc *matchConfig, src sourceTorrent, siteInfo *model
 		return nil
 	}
 
+	// 站点 content_type 过滤：纯视频站不搜音乐种子，纯音乐站不搜视频种子
+	if siteInfo.ContentType != "" {
+		if fp := mc.fc.get(src.InfoHash, src.SiteName); fp != nil {
+			torrentType := util.DetectContentType(fp.FileTreeParsed)
+			if !util.ContentTypeCompatible(torrentType, siteInfo.ContentType) {
+				return nil
+			}
+		}
+	}
+
 	if hasMatchMethod(mc.task.MatchMethods, "pieces_hash") {
 		c := e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, mc.fc, mc.phCache)
 		if c != nil {
@@ -2149,7 +2159,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		return nil
 	}
 
-	isMusic := detectContentType(fp.FileTreeParsed) == "music"
+	isMusic := util.DetectContentType(fp.FileTreeParsed) == "music"
 
 	var keyword, groupName string
 	if isMusic {
@@ -2895,30 +2905,6 @@ var yearPrefixSpecTerms = map[string]bool{
 
 var audioExtensions = []string{".flac", ".wav", ".ape", ".tta", ".wv", ".mp3", ".m4a", ".ogg", ".opus", ".aac", ".dsf", ".dff", ".wma", ".aiff", ".m4b"}
 
-func detectContentType(fileTree map[string]int64) string {
-	if len(fileTree) == 0 {
-		return "video"
-	}
-	hasAudio := false
-	hasVideo := false
-	for path := range fileTree {
-		lower := strings.ToLower(path)
-		for _, ext := range audioExtensions {
-			if strings.HasSuffix(lower, ext) {
-				hasAudio = true
-			}
-		}
-		for _, ext := range videoExtensions {
-			if strings.HasSuffix(lower, ext) {
-				hasVideo = true
-			}
-		}
-	}
-	if hasAudio && !hasVideo {
-		return "music"
-	}
-	return "video"
-}
 
 // DetectMusicFromDir 读取目录内容，判断是否为音乐资源（有音频文件且无视频文件）。
 // 检查直接子文件和一级子目录（CD1/CD2 等分碟结构）。

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -384,26 +385,23 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 	}
 
 	enabledSites := make([]string, 0, len(sites))
+	siteContentTypeMap := make(map[string]string, len(sites))
 	for _, s := range sites {
 		if s.Enabled {
 			enabledSites = append(enabledSites, s.Name)
+			siteContentTypeMap[s.Name] = s.ContentType
 		}
 	}
 
 	// 音乐资源（groupName="OpenCD"）：排除纯视频站
 	isMusicSearch := groupName == "OpenCD"
 	if isMusicSearch {
-		videoSites := make(map[string]bool)
-		for _, s := range sites {
-			if s.Enabled && s.ContentType == "video" {
-				videoSites[s.Name] = true
-			}
-		}
 		filtered := make([]string, 0, len(enabledSites))
 		for _, name := range enabledSites {
-			if !videoSites[name] {
-				filtered = append(filtered, name)
+			if !util.ContentTypeCompatible("music", siteContentTypeMap[name]) {
+				continue
 			}
+			filtered = append(filtered, name)
 		}
 		enabledSites = filtered
 	}
@@ -432,10 +430,10 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 
 	// 音乐搜索：其他纯音乐站次优先（海豚等）
 	if isMusicSearch {
-		for _, s := range sites {
-			if s.Enabled && s.ContentType == "music" && !seen[s.Name] {
-				priority = append(priority, s.Name)
-				seen[s.Name] = true
+		for _, name := range enabledSites {
+			if siteContentTypeMap[name] == "music" && !seen[name] {
+				priority = append(priority, name)
+				seen[name] = true
 			}
 		}
 	}
