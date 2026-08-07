@@ -134,6 +134,7 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 	const maxConsecutiveErrors = 5
 	var allResults []*model.IYUUReseedResult
 	consecutiveErrors := 0
+	lastDetail := "" // IYUU 返回的具体错误信息（含限速详情）
 
 	for i := 0; i < len(infoHashes); i += batchSize {
 		end := i + batchSize
@@ -180,9 +181,11 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 				shouldBreak = true
 			}
 		} else if resp.Code == 429 {
+			lastDetail = fmt.Sprintf("IYUU 限速(429): %s [%s]", resp.Msg, string(resp.Data))
 			s.logger.Warn("IYUU rate limited (429), aborting",
 				zap.Int("batch", i/batchSize+1),
 				zap.String("msg", resp.Msg),
+				zap.String("data", string(resp.Data)),
 			)
 			shouldBreak = true
 			shouldDelay = false
@@ -200,6 +203,7 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 			)
 			shouldDelay = true
 		} else if resp.Code != 0 {
+			lastDetail = fmt.Sprintf("IYUU 错误(code=%d): %s", resp.Code, resp.Msg)
 			consecutiveErrors++
 			s.logger.Warn("IYUU server error",
 				zap.Int("batch", i/batchSize+1),
@@ -234,7 +238,11 @@ func (s *Service) QueryReseed(ctx context.Context, infoHashes []string) ([]*mode
 
 		if shouldBreak {
 			if len(allResults) == 0 {
-				return nil, iyuuError(ErrIYUUAPI, "IYUU 查询中止（连续错误或限速），无有效结果", nil)
+				msg := "IYUU 查询中止（连续错误或限速），无有效结果"
+				if lastDetail != "" {
+					msg = lastDetail
+				}
+				return nil, iyuuError(ErrIYUUAPI, msg, nil)
 			}
 			break
 		}
