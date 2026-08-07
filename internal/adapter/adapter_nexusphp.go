@@ -1136,7 +1136,7 @@ func (a *NexusPHPAdapter) doPiecesHashRequest(ctx context.Context, apiURL string
 	var apiResp struct {
 		Ret  int            `json:"ret"`
 		Msg  string         `json:"msg"`
-		Data map[string]int `json:"data"`
+		Data map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
 		return nil, parseError("解析 pieces_hash 响应失败", err)
@@ -1146,7 +1146,18 @@ func (a *NexusPHPAdapter) doPiecesHashRequest(ctx context.Context, apiURL string
 		return nil, authError(fmtES("pieces_hash API 返回错误: %s", apiResp.Msg), nil)
 	}
 
-	return apiResp.Data, nil
+	result := make(map[string]int, len(apiResp.Data))
+	for ph, v := range apiResp.Data {
+		switch n := v.(type) {
+		case float64:
+			result[ph] = int(n)
+		case string:
+			if id, err := strconv.Atoi(n); err == nil {
+				result[ph] = id
+			}
+		}
+	}
+	return result, nil
 }
 
 func (a *NexusPHPAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
