@@ -62,7 +62,8 @@ type ReseedTask struct {
 
 	EngineMode string `json:"engine_mode" gorm:"size:20;default:'seed_feature'"`
 
-	SizeTolerancePercent float64 `json:"size_tolerance_percent" gorm:"default:1.0"`
+	SizeTolerancePercent   float64 `json:"size_tolerance_percent" gorm:"default:1.0"`
+	InjectionSizeTolerance float64 `json:"injection_size_tolerance" gorm:"default:1.0"`
 
 	MaxInjectionsPerRun  int    `json:"max_injections_per_run"`
 	InjectionIntervalS   int    `json:"injection_interval_s" gorm:"default:1"`

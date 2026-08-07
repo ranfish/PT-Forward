@@ -1,1 +1,0 @@
-import{t as e}from"./client-DF22Lxer.js";var t={status(){return e.get(`/auth/status`)},setup(t){return e.post(`/auth/setup`,t)},login(t){return e.post(`/auth/login`,t)},changePassword(t,n){return e.put(`/auth/password`,{oldPassword:t,newPassword:n})},getProfile(){return e.get(`/auth/profile`)},updateProfile(t){return e.put(`/auth/profile`,t)}};export{t};
