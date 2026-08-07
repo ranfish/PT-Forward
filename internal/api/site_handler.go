@@ -1960,8 +1960,27 @@ func (h *SiteHandler) handleDomainFreezeByID(w http.ResponseWriter, r *http.Requ
 func (h *SiteHandler) handleFreezeStatus(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		statuses := httpclient.GlobalLimiter.GetDomainStatuses()
-		Success(w, statuses)
+		freezeMap := httpclient.GlobalLimiter.GetDomainStatuses()
+
+		var sites []model.Site
+		h.db.Where("enabled = ?", true).Find(&sites)
+
+		type freezeRow struct {
+			Name   string `json:"name"`
+			Domain string `json:"domain"`
+			Frozen bool   `json:"frozen"`
+			Reason string `json:"reason,omitempty"`
+		}
+		result := make([]freezeRow, 0, len(sites))
+		for _, s := range sites {
+			row := freezeRow{Name: s.Name, Domain: s.Domain}
+			if fs, ok := freezeMap[s.Domain]; ok {
+				row.Frozen = fs.Frozen
+				row.Reason = fs.Reason
+			}
+			result = append(result, row)
+		}
+		Success(w, result)
 	case http.MethodDelete:
 		var req struct {
 			Domain string `json:"domain"`
@@ -1982,17 +2001,38 @@ func (h *SiteHandler) handleFreezeStatus(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *SiteHandler) handleCircuitStatus(w http.ResponseWriter, r *http.Request) {
-	if httpclient.GlobalCircuitBreaker == nil {
-		Success(w, map[string]interface{}{})
-		return
-	}
-
 	switch r.Method {
 	case http.MethodGet:
-		statuses := httpclient.GlobalCircuitBreaker.GetAllCircuitStatuses()
-		Success(w, statuses)
+		var circuitMap map[string]httpclient.CircuitStatus
+		if httpclient.GlobalCircuitBreaker != nil {
+			circuitMap = httpclient.GlobalCircuitBreaker.GetAllCircuitStatuses()
+		}
+
+		var sites []model.Site
+		h.db.Where("enabled = ?", true).Find(&sites)
+
+		type circuitRow struct {
+			Name     string `json:"name"`
+			Domain   string `json:"domain"`
+			State    string `json:"state"`
+			Failures int    `json:"failures"`
+		}
+		result := make([]circuitRow, 0, len(sites))
+		for _, s := range sites {
+			row := circuitRow{Name: s.Name, Domain: s.Domain, State: "closed"}
+			if cs, ok := circuitMap[s.Domain]; ok {
+				row.State = cs.State.String()
+				row.Failures = cs.Failures
+			}
+			result = append(result, row)
+		}
+		Success(w, result)
 
 	case http.MethodPost:
+		if httpclient.GlobalCircuitBreaker == nil {
+			Success(w, map[string]interface{}{})
+			return
+		}
 		var req struct {
 			Domain string `json:"domain"`
 		}
