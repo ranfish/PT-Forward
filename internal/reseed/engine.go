@@ -3942,11 +3942,15 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	}
 
 	var sourceSize int64
+	var sourceName string
 	if match.SourceInfoHash != "" {
 		sourceTorrent, serr := dlClient.GetTorrentByHash(ctx, match.SourceInfoHash)
-		if serr == nil && sourceTorrent != nil && sourceTorrent.SavePath != "" {
-			opts.SavePath = sourceTorrent.SavePath
+		if serr == nil && sourceTorrent != nil {
+			if sourceTorrent.SavePath != "" {
+				opts.SavePath = sourceTorrent.SavePath
+			}
 			sourceSize = sourceTorrent.TotalSize
+			sourceName = sourceTorrent.Name
 		}
 	}
 
@@ -3954,15 +3958,27 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		return e.failMatch(ctx, match, "种子数据为空")
 	}
 
-	// 体积校验：源种子与目标种子体积差异超 10% → 拒绝（拦截 IYUU 云端错误关联）
-	if sourceSize > 0 {
-		if meta, err := fingerprint.ComputeFromTorrent(torrentData); err == nil && meta.TotalSize > 0 {
-			if diffPct := util.SizeDiffPercent(sourceSize, meta.TotalSize); diffPct > 10 {
-				return e.failMatch(ctx, match, fmt.Sprintf(
-					"体积差异过大: 源 %.2f GiB vs 目标 %.2f GiB (%.1f%%)",
-					float64(sourceSize)/1024/1024/1024,
-					float64(meta.TotalSize)/1024/1024/1024,
-					diffPct))
+	// 体积校验 + 组名校验（共用一次 ComputeFromTorrent）
+	if sourceSize > 0 || sourceName != "" {
+		if meta, err := fingerprint.ComputeFromTorrent(torrentData); err == nil {
+			// 体积校验：差异超 10% → 拒绝
+			if sourceSize > 0 && meta.TotalSize > 0 {
+				if diffPct := util.SizeDiffPercent(sourceSize, meta.TotalSize); diffPct > 10 {
+					return e.failMatch(ctx, match, fmt.Sprintf(
+						"体积差异过大: 源 %.2f GiB vs 目标 %.2f GiB (%.1f%%)",
+						float64(sourceSize)/1024/1024/1024,
+						float64(meta.TotalSize)/1024/1024/1024,
+						diffPct))
+				}
+			}
+			// 组名校验（仅 search_verify）：源与目标制作组不同 → 拒绝
+			if match.MatchMethod == "search_verify" && sourceName != "" && meta.Name != "" {
+				sourceGroup := util.ExtractGroupName(sourceName)
+				targetGroup := util.ExtractGroupName(meta.Name)
+				if sourceGroup != "" && targetGroup != "" && !strings.EqualFold(sourceGroup, targetGroup) {
+					return e.failMatch(ctx, match, fmt.Sprintf(
+						"制作组不同: 源 %s vs 目标 %s", sourceGroup, targetGroup))
+				}
 			}
 		}
 	}
