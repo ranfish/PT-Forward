@@ -2273,6 +2273,7 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		zap.Int("results", len(results)),
 		zap.Int("noTorrentID", filterStats.EmptyID),
 		zap.Int("groupMismatch", filterStats.GroupMiss),
+		zap.Int("titleMismatch", filterStats.TitleMiss),
 		zap.Int("sizeMismatch", filterStats.SizeMiss))
 	if l2s != nil {
 		reason := fmt.Sprintf("未匹配(group=%d,size=%d)", filterStats.GroupMiss, filterStats.SizeMiss)
@@ -2702,6 +2703,7 @@ type MatchFilterStats struct {
 	EmptyID   int
 	GroupMiss int
 	SizeMiss  int
+	TitleMiss int
 }
 
 func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string, sourceSize int64) (*L2MatchResult, *MatchFilterStats) {
@@ -2722,6 +2724,10 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 	stats := &MatchFilterStats{}
 	var fuzzyMatch *L2MatchResult
 	var fuzzyBestDiff int64
+
+	meaningfulWords := extractMeaningfulTitleWords(sourceTitle, groupName)
+	sourceCJK := extractCJKSubstrings(sourceTitle)
+
 	for _, r := range results {
 		if r.TorrentID == "" {
 			stats.EmptyID++
@@ -2729,6 +2735,10 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 		}
 		if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
 			stats.GroupMiss++
+			continue
+		}
+		if sourceTitle != "" && !titleKeywordRelevant(meaningfulWords, sourceCJK, r.Title) {
+			stats.TitleMiss++
 			continue
 		}
 		if r.Size <= 0 {
@@ -4538,4 +4548,121 @@ func (e *Engine) QueryBatchCoverage(ctx context.Context, infoHashes []string, cl
 	}
 
 	return result
+}
+
+// extractMeaningfulTitleWords 从标题中提取有意义的 ASCII 词（≥4 字符），
+// 排除年份、分辨率、介质/地区词、编解码术语、组名等通用词。
+func extractMeaningfulTitleWords(title, groupName string) []string {
+	if title == "" {
+		return nil
+	}
+	lower := strings.ToLower(title)
+	groupLower := strings.ToLower(groupName)
+	words := strings.FieldsFunc(lower, func(r rune) bool {
+		return r == ' ' || r == '.' || r == '-' || r == '_' || r == '/' ||
+			r == '(' || r == ')' || r == '[' || r == ']' || r == '￡' || r == ':'
+	})
+	var meaningful []string
+	for _, w := range words {
+		if len(w) < 4 {
+			continue
+		}
+		hasCJK := false
+		for _, r := range w {
+			if (r >= 0x4E00 && r <= 0x9FFF) || (r >= 0x3400 && r <= 0x4DBF) {
+				hasCJK = true
+				break
+			}
+		}
+		if hasCJK {
+			continue
+		}
+		if _, err := strconv.Atoi(w); err == nil {
+			continue
+		}
+		skip := false
+		for _, res := range resolutionKeywords {
+			if w == res || strings.Contains(w, res) {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+		for _, term := range mediumAndRegionTerms {
+			if w == strings.ToLower(term) {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+		switch w {
+		case "x264", "x265", "h264", "h265", "hevc", "avc", "vc1",
+			"10bit", "8bit", "mnhd", "minbd", "ddp5", "ddp",
+			"atmos", "truehd", "ac3", "aac", "flac", "lpcm",
+			"hdr", "dovi", "sdr", "repack", "remux", "extended",
+			"uncut", "imax", "hybrid", "internal", "readnfo",
+			"proper", "diy", "hsbs", "sbs", "2audio", "audio",
+			"movie", "season", "complete", "series", "part",
+			"collection", "trilogy", "duology", "multi", "oar":
+			continue
+		}
+		if w == groupLower {
+			continue
+		}
+		meaningful = append(meaningful, w)
+	}
+	return meaningful
+}
+
+func extractCJKSubstrings(s string) []string {
+	var result []string
+	var current []rune
+	for _, r := range s {
+		if (r >= 0x4E00 && r <= 0x9FFF) || (r >= 0x3400 && r <= 0x4DBF) {
+			current = append(current, r)
+		} else {
+			if len(current) >= 2 {
+				result = append(result, string(current))
+			}
+			current = nil
+		}
+	}
+	if len(current) >= 2 {
+		result = append(result, string(current))
+	}
+	return result
+}
+
+// titleKeywordRelevant 检查源标题与候选标题是否有内容关联。
+// 返回 true 表示关联或无法判定（跳过检查），false 表示确定无关联。
+func titleKeywordRelevant(meaningfulWords []string, sourceCJK []string, candidateTitle string) bool {
+	if candidateTitle == "" {
+		return true
+	}
+	if len(meaningfulWords) == 0 && len(sourceCJK) == 0 {
+		return true
+	}
+	candLower := strings.ToLower(candidateTitle)
+	if len(meaningfulWords) > 0 {
+		for _, w := range meaningfulWords {
+			if strings.Contains(candLower, w) {
+				return true
+			}
+		}
+		return false
+	}
+	candCJK := extractCJKSubstrings(candidateTitle)
+	if len(sourceCJK) > 0 && len(candCJK) > 0 {
+		for _, s := range sourceCJK {
+			if strings.Contains(candidateTitle, s) {
+				return true
+			}
+		}
+		return false
+	}
+	return true
 }
