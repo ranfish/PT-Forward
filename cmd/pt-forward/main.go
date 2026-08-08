@@ -1169,7 +1169,7 @@ func registerSchedulerTasks(
 	}
 
 	if freeWaitMonitor != nil && siteProvider != nil {
-		register("seeding_free_wait_check", "seeding", "*/15 * * * *", func(ctx context.Context) error {
+		register("seeding_free_wait_check", "seeding", "* * * * *", func(ctx context.Context) error {
 			processed := seedingEngine.FreeWaitCheckOnce(ctx)
 			if processed > 0 {
 				log.Info("free wait check completed", zap.Int("processed", processed))
