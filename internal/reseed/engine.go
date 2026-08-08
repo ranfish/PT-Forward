@@ -4592,6 +4592,17 @@ func (e *Engine) QueryBatchCoverage(ctx context.Context, infoHashes []string, cl
 }
 
 // extractMeaningfulTitleWords 从标题中提取有意义的 ASCII 词（≥4 字符），
+var shortStopwords = map[string]bool{
+	"the": true, "and": true, "for": true, "but": true, "not": true,
+	"you": true, "all": true, "any": true, "was": true, "had": true,
+	"has": true, "her": true, "his": true, "its": true, "our": true,
+	"who": true, "did": true, "can": true, "how": true, "too": true,
+	"own": true, "off": true, "out": true, "get": true, "let": true,
+	"via": true, "per": true, "yet": true, "nor": true, "put": true,
+	"set": true, "try": true, "end": true, "are": true, "been": true,
+	"into": true, "from": true, "with": true,
+}
+
 // 排除年份、分辨率、介质/地区词、编解码术语、组名等通用词。
 func extractMeaningfulTitleWords(title, groupName string) []string {
 	if title == "" {
@@ -4605,7 +4616,10 @@ func extractMeaningfulTitleWords(title, groupName string) []string {
 	})
 	var meaningful []string
 	for _, w := range words {
-		if len(w) < 4 {
+		if len(w) < 3 {
+			continue
+		}
+		if len(w) == 3 && shortStopwords[w] {
 			continue
 		}
 		hasCJK := false
