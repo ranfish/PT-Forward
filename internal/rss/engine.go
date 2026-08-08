@@ -1210,21 +1210,6 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 	})
 }
 
-func (e *Engine) RecheckWaiting(ctx context.Context) error {
-	subs, err := e.repo.ListActive(ctx)
-	if err != nil {
-		return err
-	}
-
-	for i := range subs {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		e.fetchOnce(ctx, &subs[i])
-	}
-	return nil
-}
-
 func (e *Engine) ExpireDiskBudget() {
 	if e.diskBudget != nil {
 		e.diskBudget.Expire()

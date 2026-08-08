@@ -104,7 +104,6 @@ const taskNameMap: Record<string, string> = {
   seeding_auto_delete: '刷流自动删除',
   seeding_traffic_stats: '刷流流量统计',
   rss_disk_budget_expire: 'RSS 磁盘预算过期',
-  rss_recheck_waiting: 'RSS 重新检查等待',
   rss_cleanup_old_seen: 'RSS 清理旧记录',
   notification_cleanup_history: '通知历史清理',
   site_stats_sync: '站点统计同步',

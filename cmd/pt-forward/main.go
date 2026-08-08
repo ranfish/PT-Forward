@@ -1093,10 +1093,6 @@ func registerSchedulerTasks(
 		return nil
 	})
 
-	register("rss_recheck_waiting", "rss", "*/15 * * * *", func(ctx context.Context) error {
-		return rssEngine.RecheckWaiting(ctx)
-	})
-
 	register("cookiecloud_sync", "maintenance", "*/5 * * * *", func(ctx context.Context) error {
 		var cfg model.CookieCloudConfig
 		if err := db.WithContext(ctx).First(&cfg).Error; err != nil {
