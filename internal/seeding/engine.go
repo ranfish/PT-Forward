@@ -2251,11 +2251,15 @@ func (e *Engine) ListConfigs(ctx context.Context) ([]*model.SeedingClientConfig,
 	for _, c := range configs {
 		seen[c.ClientID] = true
 	}
-	// §55.14 阶段3：补充 download_client_configs（role≠seeding 下载器，统一由刷流引擎管理）
+	// §55.14 阶段3：补充 download_client_configs（仅纳入显式配置了 DeleteRuleIDs 的下载器）
+	// 没有 DeleteRuleIDs 的下载器（如辅种器 tr）不应被评分清理自动删种
 	var dlConfigs []model.DownloadClientConfig
 	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&dlConfigs).Error; err == nil {
 		for i := range dlConfigs {
 			if seen[dlConfigs[i].ClientID] {
+				continue
+			}
+			if strings.TrimSpace(dlConfigs[i].DeleteRuleIDs) == "" {
 				continue
 			}
 			configs = append(configs, downloadConfigToSeeding(&dlConfigs[i]))
