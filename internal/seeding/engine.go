@@ -1414,6 +1414,12 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 		minScore, minAgeHours, weights = e.applyConfig(cfg, minScore, minAgeHours, weights)
 	}
 
+	// 评分清理只对 seeding_client_configs 中显式配置刷流的下载器生效。
+	// 仅来自 download_client_configs 的下载器（如辅种器）只执行删除规则，不做评分清理。
+	if cfg != nil && !cfg.ScoringCleanupEnabled {
+		minScore = -1
+	}
+
 	torrents, err := dlClient.GetAllTorrents(ctx)
 	if err != nil {
 		return nil, &model.AppError{Code: 50001, Message: "获取种子列表失败", Cause: err}
@@ -2231,6 +2237,26 @@ func (e *Engine) ListConfigs(ctx context.Context) ([]*model.SeedingClientConfig,
 	var configs []*model.SeedingClientConfig
 	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&configs).Error; err != nil {
 		return nil, err
+	}
+	for _, c := range configs {
+		c.ScoringCleanupEnabled = true
+	}
+	seen := make(map[string]bool, len(configs))
+	for _, c := range configs {
+		seen[c.ClientID] = true
+	}
+	// 补充 download_client_configs（仅纳入显式配置了 DeleteRuleIDs 的下载器）
+	var dlConfigs []model.DownloadClientConfig
+	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&dlConfigs).Error; err == nil {
+		for i := range dlConfigs {
+			if seen[dlConfigs[i].ClientID] {
+				continue
+			}
+			if strings.TrimSpace(dlConfigs[i].DeleteRuleIDs) == "" {
+				continue
+			}
+			configs = append(configs, downloadConfigToSeeding(&dlConfigs[i]))
+		}
 	}
 	return configs, nil
 }

@@ -92,6 +92,10 @@ type SeedingClientConfig struct {
 	ReannounceWaitMs     int  `json:"reannounce_wait_ms" gorm:"default:2000"`
 
 	MinSeedHoursBeforeDelete float64 `json:"min_seed_hours_before_delete" gorm:"default:1"`
+
+	// ScoringCleanupEnabled 标记此配置是否来自 seeding_client_configs。
+	// 仅 seeding_client_configs 客户端启用评分清理；download_client_configs 仅执行删除规则。
+	ScoringCleanupEnabled bool `json:"-" gorm:"-"`
 }
 
 func (SeedingClientConfig) TableName() string { return "seeding_client_configs" }
