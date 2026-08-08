@@ -2846,7 +2846,7 @@ func VerifyMatchWithTruncationCheckAndSource(results []*model.SeedingSearchResul
 	return match, stats
 }
 
-func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName string, sourceSize int64) (*L2MatchResult, error) {
+func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName string, sourceSize int64, sourceTitle string) (*L2MatchResult, error) {
 	if keyword == "" {
 		return nil, nil
 	}
@@ -2854,7 +2854,7 @@ func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config
 	if err != nil {
 		return nil, err
 	}
-	match, _ := VerifyMatchWithTruncationCheck(results, groupName, sourceSize)
+	match, _ := VerifyMatchWithTruncationCheckAndSource(results, groupName, sourceSize, sourceTitle)
 	return match, nil
 }
 

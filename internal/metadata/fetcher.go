@@ -108,7 +108,7 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 		zap.String("group", groupName),
 		zap.Int64("size", size))
 
-	match, err := reseed.SearchAndVerifyMatch(ctx, adapter, config, keyword, groupName, size)
+	match, err := reseed.SearchAndVerifyMatch(ctx, adapter, config, keyword, groupName, size, torrentName)
 	if err != nil {
 		return nil, fmt.Errorf("L2 search failed on %s: %w", siteName, err)
 	}

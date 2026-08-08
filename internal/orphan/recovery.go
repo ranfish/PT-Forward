@@ -330,7 +330,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 				return
 			}
 
-			match, filterStats := reseed.VerifyMatchWithTruncationCheck(results2, groupName, orphan.Size)
+			match, filterStats := reseed.VerifyMatchWithTruncationCheckAndSource(results2, groupName, orphan.Size, orphan.Name)
 			if match == nil {
 				firstTitle := ""
 				if len(results2) > 0 {
