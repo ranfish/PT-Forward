@@ -3678,20 +3678,41 @@ func (e *Engine) DeleteNegativeCache(ctx context.Context, infoHash, site string)
 }
 
 func (e *Engine) SetNegativeCache(ctx context.Context, sourceSite, sourceInfoHash, targetSite, method string, layerDepth int, ttl time.Duration) error {
+	now := time.Now()
+	expiresAt := now.Add(ttl)
+
+	var existing model.ReseedNegativeCache
+	err := e.db.WithContext(ctx).
+		Where("source_info_hash = ? AND expires_at > ?", sourceInfoHash, now).
+		First(&existing).Error
+	if err == nil {
+		for _, t := range strings.Split(existing.ExcludedTargets, ",") {
+			if strings.TrimSpace(t) == targetSite {
+				return nil
+			}
+		}
+		newList := existing.ExcludedTargets
+		if newList != "" {
+			newList += ","
+		}
+		newList += targetSite
+		return e.db.WithContext(ctx).Model(&existing).Updates(map[string]interface{}{
+			"excluded_targets": newList,
+			"last_method":      method,
+			"layer_depth":      layerDepth,
+			"expires_at":       expiresAt,
+		}).Error
+	}
+
 	entry := &model.ReseedNegativeCache{
 		SourceSite:      sourceSite,
 		SourceInfoHash:  sourceInfoHash,
 		ExcludedTargets: targetSite,
 		LastMethod:      method,
 		LayerDepth:      layerDepth,
-		ExpiresAt:       time.Now().Add(ttl),
+		ExpiresAt:       expiresAt,
 	}
-	return e.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "source_info_hash"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"excluded_targets", "last_method", "layer_depth", "expires_at",
-		}),
-	}).Create(entry).Error
+	return e.db.WithContext(ctx).Create(entry).Error
 }
 
 func (e *Engine) GetNegativeCacheByHashes(ctx context.Context, hashes []string) ([]model.ReseedNegativeCache, error) {
@@ -4205,10 +4226,14 @@ func (e *Engine) failMatch(ctx context.Context, match *model.ReseedMatch, reason
 		}
 	}
 
-	// 不设负面缓存：瞬态失败（限流/超时/站点故障）允许快速重试。
-	// 种子不存在的情况由 pieces_hash API 自然处理——下次查询不会返回已删除的种子。
-	// 仅对禁转/独占设置长 TTL 负面缓存。
-	if decisionType == model.DecisionBlockedRelease {
+	// 确定性失败（每次结果相同）设负面缓存，避免无限重试。
+	// 瞬态失败（限流/超时/站点故障/数据校验）不设，允许快速重试。
+	isDeterministic := decisionType == model.DecisionBlockedRelease ||
+		strings.Contains(reason, "制作组不同") ||
+		strings.Contains(reason, "体积差异过大") ||
+		strings.Contains(reason, "文件结构不同") ||
+		strings.Contains(reason, "种子数据为空")
+	if isDeterministic {
 		if err := e.SetNegativeCache(ctx, match.SourceSite, match.SourceInfoHash, match.TargetSite, match.MatchMethod, 1, 168*time.Hour); err != nil {
 			e.logger.Debug("set negative cache failed", zap.Uint("matchID", match.ID), zap.Error(err))
 		}
