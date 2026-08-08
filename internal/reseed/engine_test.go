@@ -2936,6 +2936,27 @@ func TestVerifyMatch(t *testing.T) {
 	}
 }
 
+func TestTitleKeywordRelevant_ShortEnglishTitle(t *testing.T) {
+	sourceTitle := "The.One.2001.BluRay.720p.x264-WiKi"
+	sourceCJK := extractCJKSubstrings(sourceTitle)
+	meaningful := extractMeaningfulTitleWords(sourceTitle, "WiKi")
+
+	if len(meaningful) == 0 {
+		t.Fatalf("expected meaningful words from 'The One', got empty")
+	}
+	t.Logf("meaningful words: %v", meaningful)
+
+	waterboys := "Waterboys.2001.720p.BluRay.x264-WiKi"
+	if titleKeywordRelevant(meaningful, sourceCJK, sourceTitle, waterboys) {
+		t.Errorf("The One vs Waterboys should be IRRELEVANT")
+	}
+
+	sameMovie := "The.One.2001.BluRay.1080p.x264-WiKi"
+	if !titleKeywordRelevant(meaningful, sourceCJK, sourceTitle, sameMovie) {
+		t.Errorf("The One vs The One (diff resolution) should be RELEVANT")
+	}
+}
+
 func TestExtractSequelNumber(t *testing.T) {
 	tests := []struct {
 		title string
