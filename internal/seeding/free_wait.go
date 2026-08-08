@@ -267,6 +267,44 @@ func (m *FreeWaitMonitor) PendingCount() int {
 	return len(m.pending)
 }
 
+type FreeWaitEntryInfo struct {
+	SiteName       string    `json:"siteName"`
+	TorrentID      string    `json:"torrentID"`
+	Title          string    `json:"title"`
+	Size           int64     `json:"size"`
+	ClientID       string    `json:"clientId"`
+	SubscriptionID string    `json:"subscriptionID"`
+	AddedAt        time.Time `json:"addedAt"`
+	CheckBefore    *time.Time `json:"checkBefore,omitempty"`
+	CheckCount     int       `json:"checkCount"`
+	RecheckSec     int       `json:"recheckSec"`
+	LastCheckAt    time.Time `json:"lastCheckAt"`
+	MinRemainMin   int       `json:"minRemainMin"`
+}
+
+func (m *FreeWaitMonitor) ListPending() []FreeWaitEntryInfo {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]FreeWaitEntryInfo, 0, len(m.pending))
+	for _, e := range m.pending {
+		result = append(result, FreeWaitEntryInfo{
+			SiteName:       e.SiteName,
+			TorrentID:      e.TorrentID,
+			Title:          e.Title,
+			Size:           e.Size,
+			ClientID:       e.ClientID,
+			SubscriptionID: e.SubscriptionID,
+			AddedAt:        e.AddedAt,
+			CheckBefore:    e.CheckBefore,
+			CheckCount:     e.CheckCount,
+			RecheckSec:     int(e.RecheckInterval.Seconds()),
+			LastCheckAt:    e.LastCheckAt,
+			MinRemainMin:   e.MinRemainMin,
+		})
+	}
+	return result
+}
+
 func (m *FreeWaitMonitor) ClearAll() {
 	m.mu.Lock()
 	m.pending = make(map[string]*freeWaitEntry)
