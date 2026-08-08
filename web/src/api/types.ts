@@ -378,10 +378,6 @@ export interface RSSSubscription {
   freeWaitMaxWaitSec: number
   freeWaitRecheckSec: number
   freeWaitMinRemain: number
-  recheckEnabled: boolean
-  recheckIntervalH: number
-  recheckMaxCount: number
-  recheckMaxAgeH: number
   feasibilityEnabled: boolean
   feasibilitySpeedLimit: number
   feasibilitySizeLimit: number
