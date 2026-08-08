@@ -295,16 +295,8 @@ func (e *Engine) GetGlobalTransferStats(ctx context.Context) *model.GlobalTransf
 	if e.getClientProvider() == nil {
 		return result
 	}
-	configs, err := e.ListConfigs(ctx)
-	if err != nil {
-		e.logger.Debug("list seeding configs failed for global stats", zap.Error(err))
-		return result
-	}
-	for _, cfg := range configs {
-		if !cfg.Enabled {
-			continue
-		}
-		client, err := e.getClientProvider().Get(cfg.ClientID)
+	for _, clientID := range e.getClientProvider().ListClients() {
+		client, err := e.getClientProvider().Get(clientID)
 		if err != nil {
 			continue
 		}
@@ -326,15 +318,8 @@ func (e *Engine) GetTodayTransferDelta(ctx context.Context) *model.GlobalTransfe
 	if e.getClientProvider() == nil {
 		return result
 	}
-	configs, err := e.ListConfigs(ctx)
-	if err != nil {
-		return result
-	}
-	for _, cfg := range configs {
-		if !cfg.Enabled {
-			continue
-		}
-		client, err := e.getClientProvider().Get(cfg.ClientID)
+	for _, clientID := range e.getClientProvider().ListClients() {
+		client, err := e.getClientProvider().Get(clientID)
 		if err != nil {
 			continue
 		}
@@ -343,7 +328,7 @@ func (e *Engine) GetTodayTransferDelta(ctx context.Context) *model.GlobalTransfe
 			continue
 		}
 		var dbState model.SeedingClientState
-		if err := e.db.WithContext(ctx).Where("client_id = ?", cfg.ClientID).First(&dbState).Error; err != nil {
+		if err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&dbState).Error; err != nil {
 			continue
 		}
 		result.AllTimeUpload += currentStats.AllTimeUpload - dbState.DayStartUpload
@@ -2246,24 +2231,6 @@ func (e *Engine) ListConfigs(ctx context.Context) ([]*model.SeedingClientConfig,
 	var configs []*model.SeedingClientConfig
 	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&configs).Error; err != nil {
 		return nil, err
-	}
-	seen := make(map[string]bool, len(configs))
-	for _, c := range configs {
-		seen[c.ClientID] = true
-	}
-	// §55.14 阶段3：补充 download_client_configs（仅纳入显式配置了 DeleteRuleIDs 的下载器）
-	// 没有 DeleteRuleIDs 的下载器（如辅种器 tr）不应被评分清理自动删种
-	var dlConfigs []model.DownloadClientConfig
-	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&dlConfigs).Error; err == nil {
-		for i := range dlConfigs {
-			if seen[dlConfigs[i].ClientID] {
-				continue
-			}
-			if strings.TrimSpace(dlConfigs[i].DeleteRuleIDs) == "" {
-				continue
-			}
-			configs = append(configs, downloadConfigToSeeding(&dlConfigs[i]))
-		}
 	}
 	return configs, nil
 }
