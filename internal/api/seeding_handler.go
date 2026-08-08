@@ -66,6 +66,10 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleEngineStatus(w, r)
 		return
 
+	case trimmed == "/api/v1/seeding/free-wait-queue" || trimmed == "/api/v1/seeding/free-wait-queue/":
+		h.handleFreeWaitQueue(w, r)
+		return
+
 	case trimmed == "/api/v1/seeding/torrents" || trimmed == "/api/v1/seeding/torrents/":
 		h.handleListTorrents(w, r)
 		return
@@ -779,6 +783,15 @@ func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Reque
 			"realDownloading": realDownloading,
 		},
 	})
+}
+
+func (h *SeedingHandler) handleFreeWaitQueue(w http.ResponseWriter, _ *http.Request) {
+	if h.engine == nil {
+		Success(w, map[string]interface{}{"items": []interface{}{}, "total": 0})
+		return
+	}
+	items := h.engine.FreeWaitQueue()
+	Success(w, map[string]interface{}{"items": items, "total": len(items)})
 }
 
 func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Request) {

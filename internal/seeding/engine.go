@@ -802,6 +802,13 @@ func (e *Engine) getCachedMaindata(clientID string) *maindataEntry {
 	return e.maindataCache[clientID]
 }
 
+func (e *Engine) FreeWaitQueue() []FreeWaitEntryInfo {
+	if e.freeWaitMonitor == nil {
+		return nil
+	}
+	return e.freeWaitMonitor.ListPending()
+}
+
 func (e *Engine) FreeWaitCheckOnce(ctx context.Context) int {
 	if e.freeWaitMonitor == nil || e.freeWaitMonitor.PendingCount() == 0 {
 		return 0

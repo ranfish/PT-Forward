@@ -363,6 +363,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/seeding/scoring-dryrun/", seedingHandler)
 	mux.Handle("/api/v1/seeding/status", seedingHandler)
 	mux.Handle("/api/v1/seeding/status/", seedingHandler)
+	mux.Handle("/api/v1/seeding/free-wait-queue", seedingHandler)
+	mux.Handle("/api/v1/seeding/free-wait-queue/", seedingHandler)
 	mux.Handle("/api/v1/seeding/torrents", seedingHandler)
 	mux.Handle("/api/v1/seeding/torrents/", seedingHandler)
 	mux.Handle("/api/v1/seeding/clients", seedingHandler)
