@@ -17,4 +17,6 @@ type FreeWaitEntry struct {
 	HRSeedTimeH    int
 	CheckBefore    *time.Time
 	CheckCount     int `gorm:"default:0"`
+	RecheckSec     int `gorm:"default:600"`
+	LastCheckAt    *time.Time `gorm:"index"`
 }

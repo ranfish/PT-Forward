@@ -1254,7 +1254,7 @@ func (e *Engine) OnTorrents(ctx context.Context, events []model.TorrentEvent) er
 						deadline := time.Now().Add(time.Duration(sub.FreeWaitMaxWaitSec) * time.Second)
 						checkBefore = &deadline
 					}
-					e.freeWaitMonitor.Add(ev.SiteName, ev.TorrentID, ev.InfoHash, ev.Title, ev.Size, checkBefore, clientID, ev.SourceID, ev.HasHR, ev.HRSeedTimeH)
+					e.freeWaitMonitor.Add(ev.SiteName, ev.TorrentID, ev.InfoHash, ev.Title, ev.Size, checkBefore, clientID, ev.SourceID, ev.HasHR, ev.HRSeedTimeH, sub.FreeWaitRecheckSec)
 					continue
 				}
 			}

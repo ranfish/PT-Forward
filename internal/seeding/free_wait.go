@@ -31,6 +31,8 @@ type freeWaitEntry struct {
 	AddedAt        time.Time
 	CheckBefore    *time.Time
 	CheckCount     int
+	RecheckInterval time.Duration
+	LastCheckAt     time.Time
 }
 
 func NewFreeWaitMonitor(db *gorm.DB, logger *zap.Logger) *FreeWaitMonitor {
@@ -55,18 +57,24 @@ func (m *FreeWaitMonitor) RecoverOnStartup(ctx context.Context) {
 		dbEntry := &entries[i]
 		key := dbEntry.SiteName + "|" + dbEntry.TorrentID
 		m.pending[key] = &freeWaitEntry{
-			SiteName:       dbEntry.SiteName,
-			TorrentID:      dbEntry.TorrentID,
-			InfoHash:       dbEntry.InfoHash,
-			Title:          dbEntry.Title,
-			Size:           dbEntry.Size,
-			ClientID:       dbEntry.ClientID,
-			SubscriptionID: dbEntry.SubscriptionID,
-			HasHR:          dbEntry.HasHR,
-			HRSeedTimeH:    dbEntry.HRSeedTimeH,
-			AddedAt:        dbEntry.CreatedAt,
-			CheckBefore:    dbEntry.CheckBefore,
-			CheckCount:     dbEntry.CheckCount,
+			SiteName:        dbEntry.SiteName,
+			TorrentID:       dbEntry.TorrentID,
+			InfoHash:        dbEntry.InfoHash,
+			Title:           dbEntry.Title,
+			Size:            dbEntry.Size,
+			ClientID:        dbEntry.ClientID,
+			SubscriptionID:  dbEntry.SubscriptionID,
+			HasHR:           dbEntry.HasHR,
+			HRSeedTimeH:     dbEntry.HRSeedTimeH,
+			AddedAt:         dbEntry.CreatedAt,
+			CheckBefore:     dbEntry.CheckBefore,
+			CheckCount:      dbEntry.CheckCount,
+			RecheckInterval: time.Duration(dbEntry.RecheckSec) * time.Second,
+		}
+		if dbEntry.LastCheckAt != nil {
+			m.pending[key].LastCheckAt = *dbEntry.LastCheckAt
+		} else {
+			m.pending[key].LastCheckAt = dbEntry.CreatedAt
 		}
 	}
 	if len(entries) > 0 {
@@ -74,10 +82,16 @@ func (m *FreeWaitMonitor) RecoverOnStartup(ctx context.Context) {
 	}
 }
 
-func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size int64, checkBefore *time.Time, clientID, subscriptionID string, hasHR bool, hrSeedTimeH int) {
+func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size int64, checkBefore *time.Time, clientID, subscriptionID string, hasHR bool, hrSeedTimeH int, recheckSec int) {
 	if torrentID == "" {
 		return
 	}
+
+	if recheckSec < 60 {
+		recheckSec = 600
+	}
+	recheckInterval := time.Duration(recheckSec) * time.Second
+	now := time.Now()
 
 	key := siteName + "|" + torrentID
 
@@ -87,17 +101,19 @@ func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size 
 		return
 	}
 	entry := &freeWaitEntry{
-		SiteName:       siteName,
-		TorrentID:      torrentID,
-		InfoHash:       infoHash,
-		Title:          title,
-		Size:           size,
-		ClientID:       clientID,
-		SubscriptionID: subscriptionID,
-		HasHR:          hasHR,
-		HRSeedTimeH:    hrSeedTimeH,
-		AddedAt:        time.Now(),
-		CheckBefore:    checkBefore,
+		SiteName:        siteName,
+		TorrentID:       torrentID,
+		InfoHash:        infoHash,
+		Title:           title,
+		Size:            size,
+		ClientID:        clientID,
+		SubscriptionID:  subscriptionID,
+		HasHR:           hasHR,
+		HRSeedTimeH:     hrSeedTimeH,
+		AddedAt:         now,
+		CheckBefore:     checkBefore,
+		RecheckInterval: recheckInterval,
+		LastCheckAt:     now,
 	}
 	m.pending[key] = entry
 	m.mu.Unlock()
@@ -113,6 +129,8 @@ func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size 
 		HasHR:          hasHR,
 		HRSeedTimeH:    hrSeedTimeH,
 		CheckBefore:    checkBefore,
+		RecheckSec:     recheckSec,
+		LastCheckAt:    &now,
 	}
 	if err := m.db.Create(dbEntry).Error; err != nil {
 		m.logger.Warn("free wait: persist to DB failed", zap.String("key", key), zap.Error(err))
@@ -165,6 +183,14 @@ func (m *FreeWaitMonitor) CheckOnce(ctx context.Context, checker DiscountChecker
 			continue
 		}
 
+		interval := e.RecheckInterval
+		if interval == 0 {
+			interval = 10 * time.Minute
+		}
+		if now.Sub(e.LastCheckAt) < interval {
+			continue
+		}
+
 		discount, err := checker.CheckDiscount(ctx, e.SiteName, e.TorrentID)
 		if err != nil {
 			m.logger.Warn("free wait: check discount failed",
@@ -198,16 +224,20 @@ func (m *FreeWaitMonitor) CheckOnce(ctx context.Context, checker DiscountChecker
 				zap.String("title", e.Title),
 				zap.String("discount", string(discount)),
 			)
-		} else {
-			m.mu.Lock()
-			if entry, ok := m.pending[e.SiteName+"|"+e.TorrentID]; ok {
-				entry.CheckCount++
-				m.db.Model(&model.FreeWaitEntry{}).
-					Where("site_name = ? AND torrent_id = ?", e.SiteName, e.TorrentID).
-					Update("check_count", entry.CheckCount)
-			}
-			m.mu.Unlock()
+	} else {
+		m.mu.Lock()
+		if entry, ok := m.pending[e.SiteName+"|"+e.TorrentID]; ok {
+			entry.CheckCount++
+			entry.LastCheckAt = now
+			m.db.Model(&model.FreeWaitEntry{}).
+				Where("site_name = ? AND torrent_id = ?", e.SiteName, e.TorrentID).
+				Updates(map[string]interface{}{
+					"check_count":   entry.CheckCount,
+					"last_check_at": now,
+				})
 		}
+		m.mu.Unlock()
+	}
 	}
 
 	return processed
