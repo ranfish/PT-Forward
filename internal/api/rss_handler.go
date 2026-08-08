@@ -71,11 +71,6 @@ type createRSSRequest struct {
 	FreeWaitRecheckSec int  `json:"freeWaitRecheckSec"`
 	FreeWaitMinRemain  int  `json:"freeWaitMinRemain"`
 
-	RecheckEnabled   bool `json:"recheckEnabled"`
-	RecheckIntervalH int  `json:"recheckIntervalH"`
-	RecheckMaxCount  int  `json:"recheckMaxCount"`
-	RecheckMaxAgeH   int  `json:"recheckMaxAgeH"`
-
 	FeasibilityEnabled    bool    `json:"feasibilityEnabled"`
 	FeasibilitySpeedLimit float64 `json:"feasibilitySpeedLimit"`
 	FeasibilitySizeLimit  float64 `json:"feasibilitySizeLimit"`
@@ -141,11 +136,6 @@ type updateRSSRequest struct {
 	FreeWaitRecheckSec *int  `json:"freeWaitRecheckSec,omitempty"`
 	FreeWaitMinRemain  *int  `json:"freeWaitMinRemain,omitempty"`
 
-	RecheckEnabled   *bool `json:"recheckEnabled,omitempty"`
-	RecheckIntervalH *int  `json:"recheckIntervalH,omitempty"`
-	RecheckMaxCount  *int  `json:"recheckMaxCount,omitempty"`
-	RecheckMaxAgeH   *int  `json:"recheckMaxAgeH,omitempty"`
-
 	FeasibilityEnabled    *bool    `json:"feasibilityEnabled,omitempty"`
 	FeasibilitySpeedLimit *float64 `json:"feasibilitySpeedLimit,omitempty"`
 	FeasibilitySizeLimit  *float64 `json:"feasibilitySizeLimit,omitempty"`
@@ -210,11 +200,6 @@ type rssResponse struct {
 	FreeWaitMaxWaitSec int  `json:"freeWaitMaxWaitSec"`
 	FreeWaitRecheckSec int  `json:"freeWaitRecheckSec"`
 	FreeWaitMinRemain  int  `json:"freeWaitMinRemain"`
-
-	RecheckEnabled   bool `json:"recheckEnabled"`
-	RecheckIntervalH int  `json:"recheckIntervalH"`
-	RecheckMaxCount  int  `json:"recheckMaxCount"`
-	RecheckMaxAgeH   int  `json:"recheckMaxAgeH"`
 
 	FeasibilityEnabled    bool    `json:"feasibilityEnabled"`
 	FeasibilitySpeedLimit float64 `json:"feasibilitySpeedLimit"`
@@ -297,11 +282,6 @@ func (h *RSSHandler) toResponse(s *model.RSSSubscription) rssResponse {
 		FreeWaitMaxWaitSec: s.FreeWaitMaxWaitSec,
 		FreeWaitRecheckSec: s.FreeWaitRecheckSec,
 		FreeWaitMinRemain:  s.FreeWaitMinRemain,
-
-		RecheckEnabled:   s.RecheckEnabled,
-		RecheckIntervalH: s.RecheckIntervalH,
-		RecheckMaxCount:  s.RecheckMaxCount,
-		RecheckMaxAgeH:   s.RecheckMaxAgeH,
 
 		FeasibilityEnabled:    s.FeasibilityEnabled,
 		FeasibilitySpeedLimit: s.FeasibilitySpeedLimit,
@@ -528,11 +508,6 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		FreeWaitRecheckSec: req.FreeWaitRecheckSec,
 		FreeWaitMinRemain:  req.FreeWaitMinRemain,
 
-		RecheckEnabled:   req.RecheckEnabled,
-		RecheckIntervalH: req.RecheckIntervalH,
-		RecheckMaxCount:  req.RecheckMaxCount,
-		RecheckMaxAgeH:   req.RecheckMaxAgeH,
-
 		FeasibilityEnabled:    req.FeasibilityEnabled,
 		FeasibilitySpeedLimit: req.FeasibilitySpeedLimit,
 		FeasibilitySizeLimit:  req.FeasibilitySizeLimit,
@@ -728,18 +703,6 @@ func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.FreeWaitMinRemain != nil {
 		sub.FreeWaitMinRemain = *req.FreeWaitMinRemain
-	}
-	if req.RecheckEnabled != nil {
-		sub.RecheckEnabled = *req.RecheckEnabled
-	}
-	if req.RecheckIntervalH != nil {
-		sub.RecheckIntervalH = *req.RecheckIntervalH
-	}
-	if req.RecheckMaxCount != nil {
-		sub.RecheckMaxCount = *req.RecheckMaxCount
-	}
-	if req.RecheckMaxAgeH != nil {
-		sub.RecheckMaxAgeH = *req.RecheckMaxAgeH
 	}
 	if req.FeasibilityEnabled != nil {
 		sub.FeasibilityEnabled = *req.FeasibilityEnabled

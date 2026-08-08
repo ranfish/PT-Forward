@@ -217,28 +217,6 @@
                   </a-col>
                 </a-row>
 
-                <a-divider>{{ t('subscription.recheckConfig') }}</a-divider>
-                <a-form-item :label="t('subscription.recheckEnabled')">
-                  <a-switch v-model:checked="configForm.recheckEnabled" />
-                </a-form-item>
-                <a-row v-if="configForm.recheckEnabled" :gutter="16">
-                  <a-col :span="8">
-                    <a-form-item :label="t('subscription.recheckIntervalH')">
-                      <a-input-number v-model:value="configForm.recheckIntervalH" :min="0" style="width: 100%" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="8">
-                    <a-form-item :label="t('subscription.recheckMaxCount')">
-                      <a-input-number v-model:value="configForm.recheckMaxCount" :min="0" style="width: 100%" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="8">
-                    <a-form-item :label="t('subscription.recheckMaxAgeH')">
-                      <a-input-number v-model:value="configForm.recheckMaxAgeH" :min="0" style="width: 100%" />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
-
                 <a-divider>{{ t('subscription.feasibility') }}</a-divider>
                 <a-form-item :label="t('subscription.feasibilityEnabled')">
                   <a-switch v-model:checked="configForm.feasibilityEnabled" />
@@ -483,10 +461,6 @@ const configForm = reactive({
   freeWaitMaxWaitSec: 7200,
   freeWaitRecheckSec: 600,
   freeWaitMinRemain: 30,
-  recheckEnabled: false,
-  recheckIntervalH: 6,
-  recheckMaxCount: 5,
-  recheckMaxAgeH: 72,
   feasibilityEnabled: false,
   feasibilitySpeedLimit: 0,
   feasibilitySizeLimit: 0,
@@ -590,10 +564,6 @@ async function fetchSubscription() {
       freeWaitMaxWaitSec: subscription.value.freeWaitMaxWaitSec || 7200,
       freeWaitRecheckSec: subscription.value.freeWaitRecheckSec || 600,
       freeWaitMinRemain: subscription.value.freeWaitMinRemain || 30,
-      recheckEnabled: subscription.value.recheckEnabled || false,
-      recheckIntervalH: subscription.value.recheckIntervalH || 6,
-      recheckMaxCount: subscription.value.recheckMaxCount || 5,
-      recheckMaxAgeH: subscription.value.recheckMaxAgeH || 72,
       feasibilityEnabled: subscription.value.feasibilityEnabled || false,
       feasibilitySpeedLimit: subscription.value.feasibilitySpeedLimit || 0,
       feasibilitySizeLimit: subscription.value.feasibilitySizeLimit || 0,
@@ -659,10 +629,6 @@ async function saveConfig() {
       freeWaitMaxWaitSec: configForm.freeWaitMaxWaitSec,
       freeWaitRecheckSec: configForm.freeWaitRecheckSec,
       freeWaitMinRemain: configForm.freeWaitMinRemain,
-      recheckEnabled: configForm.recheckEnabled,
-      recheckIntervalH: configForm.recheckIntervalH,
-      recheckMaxCount: configForm.recheckMaxCount,
-      recheckMaxAgeH: configForm.recheckMaxAgeH,
       feasibilityEnabled: configForm.feasibilityEnabled,
       feasibilitySpeedLimit: configForm.feasibilitySpeedLimit,
       feasibilitySizeLimit: configForm.feasibilitySizeLimit,

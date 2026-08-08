@@ -134,10 +134,10 @@ type RSSSubscription struct {
 	FreeWaitRecheckSec int  `json:"free_wait_recheck_sec" gorm:"default:600"`
 	FreeWaitMinRemain  int  `json:"free_wait_min_remain" gorm:"default:30"`
 
-	RecheckEnabled   bool `json:"recheck_enabled" gorm:"default:false"`
-	RecheckIntervalH int  `json:"recheck_interval_h" gorm:"default:6"`
-	RecheckMaxCount  int  `json:"recheck_max_count" gorm:"default:5"`
-	RecheckMaxAgeH   int  `json:"recheck_max_age_h" gorm:"default:72"`
+	RecheckEnabled   bool `json:"-" gorm:"default:false"` // Deprecated: NonFreeRecheck 设计已废弃，字段保留仅用于 DB 兼容
+	RecheckIntervalH int  `json:"-" gorm:"default:6"`     // Deprecated: 同上
+	RecheckMaxCount  int  `json:"-" gorm:"default:5"`     // Deprecated: 同上
+	RecheckMaxAgeH   int  `json:"-" gorm:"default:72"`    // Deprecated: 同上
 
 	FeasibilityEnabled    bool    `json:"feasibility_enabled" gorm:"default:false"`
 	FeasibilitySpeedLimit float64 `json:"feasibility_speed_limit"`
