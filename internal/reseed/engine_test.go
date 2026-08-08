@@ -2935,3 +2935,60 @@ func TestVerifyMatch(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractSequelNumber(t *testing.T) {
+	tests := []struct {
+		title string
+		want  int
+	}{
+		{"白发魔女传I.1993.1080P.国粤双语￡CMCT风潇潇", 1},
+		{"白发魔女传II.1993", 2},
+		{"白发魔女传III.1993", 3},
+		{"白发魔女传IV.1993", 4},
+		{"白发魔女传V.1993", 5},
+		{"白发魔女传VI.1993", 6},
+		{"白发魔女传VII.1993", 7},
+		{"白发魔女传VIII.1993", 8},
+		{"白发魔女传IX.1993", 9},
+		{"招魂2.2013", 2},
+		{"速度与激情7.2015", 7},
+		{"白发魔女传2.1993", 2},
+		{"[香港][白发魔女2][The.Bride.with.White.Hair.II]", 2},
+		{"The Bride with White Hair II 1993 BluRay 1080p x264 LPCM 2.0 2Audios-CMCT", 2},
+		{"Rocky IV 1985 BluRay", 4},
+		{"The Lord of the Rings III 2001", 3},
+		{"The Bride with White Hair I 1993", 0},
+		{"白发魔女传.1993.1080P", 0},
+		{"The Matrix 1999 BluRay", 0},
+		{"LPCM 2.0 2Audios-CMCT", 0},
+		{"白发魔女传3D.1993", 0},
+		{"", 0},
+	}
+	for _, tt := range tests {
+		got := extractSequelNumber(tt.title)
+		if got != tt.want {
+			t.Errorf("extractSequelNumber(%q) = %d, want %d", tt.title, got, tt.want)
+		}
+	}
+}
+
+func TestTitleKeywordRelevant_SequelMismatch(t *testing.T) {
+	sourceTitle := "白发魔女传I.1993.1080P.国粤双语￡CMCT风潇潇"
+	candidate1 := "The Bride with White Hair II 1993 BluRay 1080p x264 LPCM 2.0 2Audios-CMCT"
+	sourceCJK := extractCJKSubstrings(sourceTitle)
+	meaningful := extractMeaningfulTitleWords(sourceTitle, "CMCT")
+
+	if titleKeywordRelevant(meaningful, sourceCJK, sourceTitle, candidate1) {
+		t.Errorf("白发魔女传I vs White Hair II should be IRRELEVANT (sequel mismatch)")
+	}
+
+	candidate2 := "The Bride with White Hair 1993 BluRay 1080p x264 FLAC-CMCT"
+	if !titleKeywordRelevant(meaningful, sourceCJK, sourceTitle, candidate2) {
+		t.Errorf("白发魔女传I vs White Hair (no sequel) should be RELEVANT")
+	}
+
+	candidate3 := "The Bride with White Hair I 1993 BluRay 1080p x264 FLAC-CMCT"
+	if !titleKeywordRelevant(meaningful, sourceCJK, sourceTitle, candidate3) {
+		t.Errorf("白发魔女传I vs White Hair I should be RELEVANT (I excluded from English)")
+	}
+}

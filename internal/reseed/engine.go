@@ -2737,7 +2737,7 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 			stats.GroupMiss++
 			continue
 		}
-		if sourceTitle != "" && !titleKeywordRelevant(meaningfulWords, sourceCJK, r.Title) {
+		if sourceTitle != "" && !titleKeywordRelevant(meaningfulWords, sourceCJK, sourceTitle, r.Title) {
 			stats.TitleMiss++
 			continue
 		}
@@ -4653,9 +4653,114 @@ func extractCJKSubstrings(s string) []string {
 	return result
 }
 
+// romanToValue 将罗马数字（I~IX）转为整数，无效返回 0。
+func romanToValue(s string) int {
+	switch strings.ToUpper(s) {
+	case "I":
+		return 1
+	case "II":
+		return 2
+	case "III":
+		return 3
+	case "IV":
+		return 4
+	case "V":
+		return 5
+	case "VI":
+		return 6
+	case "VII":
+		return 7
+	case "VIII":
+		return 8
+	case "IX":
+		return 9
+	default:
+		return 0
+	}
+}
+
+// extractSequelNumber 从标题中提取续集号（1-9），返回 0 表示未检测到。
+//
+// 检测策略：
+//  1. CJK 字符后紧跟的 ASCII 段（无分隔符）：白发魔女传I → 1, 招魂2 → 2
+//     CJK 后缀中 I~IX 和 1~9 均有效（无歧义）。
+//  2. 英文标题中独立的罗马数字词（II~IX，排除歧义的 I）：
+//     The Bride with White Hair II → 2, Rocky IV → 4
+//     仅扫描年份（1900~2099）之前出现的词，避免误匹配技术元数据。
+func extractSequelNumber(title string) int {
+	if title == "" {
+		return 0
+	}
+
+	// 策略 1：CJK 后紧跟的 ASCII 段
+	runes := []rune(title)
+	for i := 1; i < len(runes); i++ {
+		prev := runes[i-1]
+		if !((prev >= 0x4E00 && prev <= 0x9FFF) || (prev >= 0x3400 && prev <= 0x4DBF)) {
+			continue
+		}
+		r := runes[i]
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
+			continue
+		}
+		var seg []rune
+		for j := i; j < len(runes); j++ {
+			rj := runes[j]
+			if (rj >= 'a' && rj <= 'z') || (rj >= 'A' && rj <= 'Z') || (rj >= '0' && rj <= '9') {
+				seg = append(seg, rj)
+			} else {
+				break
+			}
+		}
+		s := string(seg)
+		if n, err := strconv.Atoi(s); err == nil && n >= 1 && n <= 9 {
+			return n
+		}
+		if n := romanToValue(s); n > 0 {
+			return n
+		}
+		var alphaPrefix []rune
+		for _, c := range seg {
+			if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+				alphaPrefix = append(alphaPrefix, c)
+			} else {
+				break
+			}
+		}
+		if len(alphaPrefix) >= 1 && len(alphaPrefix) <= 4 {
+			if n := romanToValue(string(alphaPrefix)); n > 0 {
+				return n
+			}
+		}
+	}
+
+	// 策略 2：英文标题中独立的罗马数字词（II~IX），扫描到年份停止
+	lower := strings.ToLower(title)
+	words := strings.FieldsFunc(lower, func(r rune) bool {
+		return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'))
+	})
+	for _, w := range words {
+		if n, err := strconv.Atoi(w); err == nil && n >= 1900 && n <= 2099 {
+			break
+		}
+		if n := romanToValue(w); n >= 2 && n <= 9 {
+			return n
+		}
+	}
+
+	return 0
+}
+
 // titleKeywordRelevant 检查源标题与候选标题是否有内容关联。
 // 返回 true 表示关联或无法判定（跳过检查），false 表示确定无关联。
-func titleKeywordRelevant(meaningfulWords []string, sourceCJK []string, candidateTitle string) bool {
+func titleKeywordRelevant(meaningfulWords []string, sourceCJK []string, sourceTitle, candidateTitle string) bool {
+	// 续集号比较（硬过滤）：双方都有续集号且不同 → 拒绝
+	sourceSequel := extractSequelNumber(sourceTitle)
+	candidateSequel := extractSequelNumber(candidateTitle)
+	if sourceSequel > 0 && candidateSequel > 0 && sourceSequel != candidateSequel {
+		return false
+	}
+
 	if candidateTitle == "" {
 		return true
 	}
