@@ -37,6 +37,9 @@ func forceCreateDB(d *gorm.DB, obj interface{}) error {
 			pkField = &fv
 			continue
 		}
+		if f.DBName == "" {
+			continue
+		}
 		fv := rv.FieldByName(f.Name)
 		if !fv.IsValid() {
 			continue

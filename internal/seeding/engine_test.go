@@ -778,6 +778,7 @@ func TestEngine_ApplyConfig(t *testing.T) {
 
 	t.Run("valid weights", func(t *testing.T) {
 		cfg := &model.SeedingClientConfig{
+   ScoringCleanupEnabled: true,
 			CleanupScoreWeights: `{"seed_hours":0.5,"upload_speed":0.3,"ratio":0.1,"disk_usage":0.1}`,
 		}
 		_, _, weights := e.applyConfig(cfg, 0.3, 48.0, DefaultCleanupWeights())
@@ -1135,6 +1136,7 @@ func TestEngine_Evaluate_DiskProtection(t *testing.T) {
 	cfg := &model.SeedingClientConfig{
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
+ ScoringCleanupEnabled: true,
 	}
 	result, err := e.Evaluate(ctx, "c1", cfg)
 	if err != nil {
@@ -1180,6 +1182,7 @@ func TestEngine_Evaluate_DiskProtectRecovery(t *testing.T) {
 	cfg := &model.SeedingClientConfig{
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
+ ScoringCleanupEnabled: true,
 	}
 	_, err := e.Evaluate(ctx, "c1", cfg)
 	if err != nil {
@@ -1227,6 +1230,7 @@ func TestEngine_Evaluate_DiskProtectNoRecoveryWhenFull(t *testing.T) {
 	cfg := &model.SeedingClientConfig{
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
+ ScoringCleanupEnabled: true,
 	}
 	_, err := e.Evaluate(ctx, "c1", cfg)
 	if err != nil {
@@ -1271,6 +1275,7 @@ func TestEngine_Evaluate_PausedDiskProtect_InQB_TooYoung(t *testing.T) {
 	cfg := &model.SeedingClientConfig{
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
+ ScoringCleanupEnabled: true,
 	}
 	_, err := e.Evaluate(ctx, "c1", cfg)
 	if err != nil {
@@ -1470,6 +1475,7 @@ func TestEngine_Reannounce_AbortsDelete(t *testing.T) {
 		ReannounceRetries:    2,
 		ReannounceIntervalMs: 100,
 		ReannounceWaitMs:     100,
+ ScoringCleanupEnabled: true,
 	}
 
 	result, err := e.Evaluate(ctx, "c1", cfg)
@@ -1514,6 +1520,7 @@ func TestEngine_Reannounce_Disabled(t *testing.T) {
 		ClientID:         "c1",
 		Enabled:          true,
 		ReannounceBefore: false,
+ ScoringCleanupEnabled: true,
 	}
 
 	result, err := e.Evaluate(ctx, "c1", cfg)
@@ -1564,6 +1571,7 @@ func TestEngine_Reannounce_AllRetriesFail(t *testing.T) {
 		ReannounceRetries:    2,
 		ReannounceIntervalMs: 50,
 		ReannounceWaitMs:     50,
+ ScoringCleanupEnabled: true,
 	}
 
 	result, err := e.Evaluate(ctx, "c1", cfg)
