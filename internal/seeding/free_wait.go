@@ -33,6 +33,7 @@ type freeWaitEntry struct {
 	CheckCount     int
 	RecheckInterval time.Duration
 	LastCheckAt     time.Time
+	MinRemainMin    int
 }
 
 func NewFreeWaitMonitor(db *gorm.DB, logger *zap.Logger) *FreeWaitMonitor {
@@ -82,7 +83,7 @@ func (m *FreeWaitMonitor) RecoverOnStartup(ctx context.Context) {
 	}
 }
 
-func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size int64, checkBefore *time.Time, clientID, subscriptionID string, hasHR bool, hrSeedTimeH int, recheckSec int) {
+func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size int64, checkBefore *time.Time, clientID, subscriptionID string, hasHR bool, hrSeedTimeH int, recheckSec, minRemainMin int) {
 	if torrentID == "" {
 		return
 	}
@@ -114,6 +115,7 @@ func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size 
 		CheckBefore:     checkBefore,
 		RecheckInterval: recheckInterval,
 		LastCheckAt:     now,
+		MinRemainMin:    minRemainMin,
 	}
 	m.pending[key] = entry
 	m.mu.Unlock()
@@ -155,7 +157,7 @@ func (m *FreeWaitMonitor) Remove(siteName, torrentID string) {
 }
 
 type DiscountChecker interface {
-	CheckDiscount(ctx context.Context, siteName, torrentID string) (model.DiscountLevel, error)
+	CheckDiscount(ctx context.Context, siteName, torrentID string) (model.DiscountLevel, *time.Time, error)
 }
 
 func (m *FreeWaitMonitor) CheckOnce(ctx context.Context, checker DiscountChecker, addFunc func(ctx context.Context, entry *freeWaitEntry) error) int {
@@ -191,7 +193,7 @@ func (m *FreeWaitMonitor) CheckOnce(ctx context.Context, checker DiscountChecker
 			continue
 		}
 
-		discount, err := checker.CheckDiscount(ctx, e.SiteName, e.TorrentID)
+		discount, freeEndAt, err := checker.CheckDiscount(ctx, e.SiteName, e.TorrentID)
 		if err != nil {
 			m.logger.Warn("free wait: check discount failed",
 				zap.String("site", e.SiteName),
@@ -204,6 +206,22 @@ func (m *FreeWaitMonitor) CheckOnce(ctx context.Context, checker DiscountChecker
 		if discount == model.DiscountFree || discount == model.Discount2xFree ||
 			discount == model.Discount2xUp || discount == model.Discount2x50 ||
 			discount == model.DiscountPercent50 {
+
+			if freeEndAt != nil && e.MinRemainMin > 0 {
+				remaining := time.Until(*freeEndAt)
+				if remaining < time.Duration(e.MinRemainMin)*time.Minute {
+					m.logger.Info("free wait: became free but remaining time too short, skipping",
+						zap.String("site", e.SiteName),
+						zap.String("torrent_id", e.TorrentID),
+						zap.String("title", e.Title),
+						zap.Duration("remaining", remaining),
+						zap.Int("min_remain_min", e.MinRemainMin),
+					)
+					m.Remove(e.SiteName, e.TorrentID)
+					continue
+				}
+			}
+
 			if addFunc != nil {
 				if err := addFunc(ctx, e); err != nil {
 					m.logger.Error("free wait: add torrent failed",

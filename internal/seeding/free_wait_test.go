@@ -29,15 +29,15 @@ type mockDiscountChecker struct {
 	err       error
 }
 
-func (m *mockDiscountChecker) CheckDiscount(ctx context.Context, siteName, torrentID string) (model.DiscountLevel, error) {
+func (m *mockDiscountChecker) CheckDiscount(ctx context.Context, siteName, torrentID string) (model.DiscountLevel, *time.Time, error) {
 	if m.err != nil {
-		return model.DiscountNone, m.err
+		return model.DiscountNone, nil, m.err
 	}
 	key := siteName + "|" + torrentID
 	if d, ok := m.discounts[key]; ok {
-		return d, nil
+		return d, nil, nil
 	}
-	return model.DiscountNone, nil
+	return model.DiscountNone, nil, nil
 }
 
 func ageEntries(m *FreeWaitMonitor) {
@@ -53,10 +53,10 @@ func TestFreeWaitMonitor_Add(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil, "client1", "1", false, 0, 0)
+	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil, "client1", "1", false, 0, 0, 0)
 	assert.Equal(t, 1, m.PendingCount())
 
-	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil, "client1", "1", false, 0, 0)
+	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil, "client1", "1", false, 0, 0, 0)
 	assert.Equal(t, 1, m.PendingCount())
 }
 
@@ -64,7 +64,7 @@ func TestFreeWaitMonitor_Remove(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0)
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0, 0)
 	assert.Equal(t, 1, m.PendingCount())
 
 	m.Remove("site-a", "123")
@@ -75,8 +75,8 @@ func TestFreeWaitMonitor_CheckOnce_BecameFree(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil, "client1", "1", false, 0, 0)
-	m.Add("site-a", "456", "hash2", "Not Free", 2048, nil, "client1", "1", false, 0, 0)
+	m.Add("site-a", "123", "hash1", "Test Torrent", 1024, nil, "client1", "1", false, 0, 0, 0)
+	m.Add("site-a", "456", "hash2", "Not Free", 2048, nil, "client1", "1", false, 0, 0, 0)
 
 	ageEntries(m)
 
@@ -103,7 +103,7 @@ func TestFreeWaitMonitor_CheckOnce_Expired(t *testing.T) {
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
 	before := time.Now().Add(-1 * time.Hour)
-	m.Add("site-a", "123", "hash1", "Test", 1024, &before, "client1", "1", false, 0, 0)
+	m.Add("site-a", "123", "hash1", "Test", 1024, &before, "client1", "1", false, 0, 0, 0)
 
 	checker := &mockDiscountChecker{}
 	processed := m.CheckOnce(context.Background(), checker, nil)
@@ -115,7 +115,7 @@ func TestFreeWaitMonitor_CheckOnce_NoneFree(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0)
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0, 0)
 
 	ageEntries(m)
 
@@ -132,8 +132,8 @@ func TestFreeWaitMonitor_ClearAll(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0)
-	m.Add("site-b", "456", "hash2", "Test2", 2048, nil, "client1", "1", false, 0, 0)
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0, 0)
+	m.Add("site-b", "456", "hash2", "Test2", 2048, nil, "client1", "1", false, 0, 0, 0)
 
 	m.ClearAll()
 	assert.Equal(t, 0, m.PendingCount())
@@ -143,7 +143,7 @@ func TestFreeWaitMonitor_AddEmptyTorrentID(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0)
+	m.Add("site-a", "", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0, 0)
 	assert.Equal(t, 0, m.PendingCount())
 }
 
@@ -151,8 +151,8 @@ func TestFreeWaitMonitor_RecoverOnStartup(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0)
-	m.Add("site-b", "456", "hash2", "Test2", 2048, nil, "client1", "2", true, 72, 0)
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0, 0)
+	m.Add("site-b", "456", "hash2", "Test2", 2048, nil, "client1", "2", true, 72, 0, 0)
 	assert.Equal(t, 2, m.PendingCount())
 
 	m2 := NewFreeWaitMonitor(db, zap.NewNop())
@@ -166,7 +166,7 @@ func TestFreeWaitMonitor_RemoveDeletesFromDB(t *testing.T) {
 	db := setupFreeWaitDB(t)
 	m := NewFreeWaitMonitor(db, zap.NewNop())
 
-	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0)
+	m.Add("site-a", "123", "hash1", "Test", 1024, nil, "client1", "1", false, 0, 0, 0)
 	assert.Equal(t, 1, m.PendingCount())
 
 	m.Remove("site-a", "123")
