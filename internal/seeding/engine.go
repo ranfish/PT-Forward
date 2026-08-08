@@ -995,20 +995,20 @@ type siteDiscountChecker struct {
 	provider model.SiteInfoProvider
 }
 
-func (c *siteDiscountChecker) CheckDiscount(ctx context.Context, siteName, torrentID string) (model.DiscountLevel, error) {
+func (c *siteDiscountChecker) CheckDiscount(ctx context.Context, siteName, torrentID string) (model.DiscountLevel, *time.Time, error) {
 	adapter, err := c.provider.GetAdapter(ctx, siteName)
 	if err != nil {
-		return model.DiscountNone, err
+		return model.DiscountNone, nil, err
 	}
 	cfg, cfgErr := c.provider.GetSiteConfig(ctx, siteName)
 	if cfgErr != nil {
-		return model.DiscountNone, cfgErr
+		return model.DiscountNone, nil, cfgErr
 	}
 	result, err := adapter.DetectDiscount(ctx, cfg, torrentID)
 	if err != nil || result == nil {
-		return model.DiscountNone, err
+		return model.DiscountNone, nil, err
 	}
-	return result.Level, nil
+	return result.Level, result.FreeEndAt, nil
 }
 
 func (e *Engine) AddSeedingRecord(ctx context.Context, record *model.SeedingTorrentRecord) error {
@@ -1254,7 +1254,7 @@ func (e *Engine) OnTorrents(ctx context.Context, events []model.TorrentEvent) er
 						deadline := time.Now().Add(time.Duration(sub.FreeWaitMaxWaitSec) * time.Second)
 						checkBefore = &deadline
 					}
-					e.freeWaitMonitor.Add(ev.SiteName, ev.TorrentID, ev.InfoHash, ev.Title, ev.Size, checkBefore, clientID, ev.SourceID, ev.HasHR, ev.HRSeedTimeH, sub.FreeWaitRecheckSec)
+					e.freeWaitMonitor.Add(ev.SiteName, ev.TorrentID, ev.InfoHash, ev.Title, ev.Size, checkBefore, clientID, ev.SourceID, ev.HasHR, ev.HRSeedTimeH, sub.FreeWaitRecheckSec, sub.FreeWaitMinRemain)
 					continue
 				}
 			}
