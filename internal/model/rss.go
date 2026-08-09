@@ -207,12 +207,12 @@ type ScoredCandidate struct {
 	LeechersConfirmed int           `json:"leechers_confirmed"`
 }
 
-// §33.1.44 — RSSTorrentSeen: RSS 种子去重记录
+// §33.1.44 — RSSTorrentSeen: RSS 种子去重记录（每订阅独立）
 type RSSTorrentSeen struct {
 	ID             uint          `json:"id" gorm:"primaryKey;autoIncrement"`
-	SiteName       string        `json:"site_name" gorm:"size:100;not null;uniqueIndex:idx_site_torrent,composite:site_name"`
-	TorrentID      string        `json:"torrent_id" gorm:"size:100;not null;uniqueIndex:idx_site_torrent,composite:torrent_id"`
-	SubscriptionID string        `json:"subscription_id" gorm:"size:100;not null"`
+	SiteName       string        `json:"site_name" gorm:"size:100;not null;uniqueIndex:idx_site_torrent_sub,composite:site_name"`
+	TorrentID      string        `json:"torrent_id" gorm:"size:100;not null;uniqueIndex:idx_site_torrent_sub,composite:torrent_id"`
+	SubscriptionID string        `json:"subscription_id" gorm:"size:100;not null;uniqueIndex:idx_site_torrent_sub,composite:subscription_id;index"`
 	InfoHash       string        `json:"info_hash" gorm:"size:40;index:idx_torrent_seen_info_hash"`
 	IsFakeHash     bool          `json:"is_fake_hash" gorm:"default:false"`
 	Title          string        `json:"title" gorm:"size:500"`

@@ -474,7 +474,7 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 	// 仅在 pusher.Push 成功（即调用 createRecordFromPush）后执行；推送失败保持 seen，下轮重试。
 	// §55.19 补丁：同时回写 push_time（之前只写 status，导致诊断时看不到推送时间）。
 	if err := e.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
-		Where("site_name = ? AND torrent_id = ?", event.SiteName, event.TorrentID).
+		Where("site_name = ? AND torrent_id = ? AND subscription_id = ?", event.SiteName, event.TorrentID, event.SubscriptionID).
 		Updates(map[string]interface{}{
 			"status":    "pushed",
 			"push_time": now,
