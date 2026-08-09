@@ -82,8 +82,8 @@ func (s *Syncer) runOnce(ctx context.Context) {
 			s.schedules[name] = sched
 		}
 
-		var cfg model.DownloadClientConfig
-		hasCfg := s.db.WithContext(ctx).Where("client_id = ?", name).First(&cfg).Error == nil
+		var cfg model.SeedingClientConfig
+		hasCfg := s.db.WithContext(ctx).Where("client_id = ? AND role = ?", name, "download").First(&cfg).Error == nil
 
 		syncInterval := 20 * time.Second
 		evalInterval := 30 * time.Second
@@ -530,7 +530,7 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 		zap.String("target", targetID))
 }
 
-func (s *Syncer) evaluateClientRules(ctx context.Context, c model.DownloaderClient, cfg *model.DownloadClientConfig) {
+func (s *Syncer) evaluateClientRules(ctx context.Context, c model.DownloaderClient, cfg *model.SeedingClientConfig) {
 	name := c.GetName()
 	now := time.Now()
 

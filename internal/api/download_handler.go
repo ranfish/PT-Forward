@@ -481,14 +481,14 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 	rest = strings.TrimPrefix(rest, "/")
 	switch {
 	case rest == "" && r.Method == http.MethodGet:
-		var configs []model.DownloadClientConfig
-		if err := h.db.WithContext(r.Context()).Order("client_id ASC").Find(&configs).Error; err != nil {
+		var configs []model.SeedingClientConfig
+		if err := h.db.WithContext(r.Context()).Where("role = ?", "download").Order("client_id ASC").Find(&configs).Error; err != nil {
 			h.logger.Warn("query failed", zap.Error(err))
 		}
 
 		Success(w, configs)
 	case rest == "" && r.Method == http.MethodPost:
-		var req model.DownloadClientConfig
+		var req model.SeedingClientConfig
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 			return
@@ -497,7 +497,7 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 			Error(w, http.StatusBadRequest, 40001, "client_id 为必填项")
 			return
 		}
-		// §55.14 role 校验：/downloads 只接 role≠seeding
+		// role 校验：/downloads 只接 role≠seeding 的下载器
 		var dlClient model.ClientConfig
 		if h.db.WithContext(r.Context()).Where("name = ?", req.ClientID).First(&dlClient).Error == nil {
 			if dlClient.Role == "seeding" {
@@ -505,6 +505,7 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 				return
 			}
 		}
+		req.Role = "download"
 		if req.AutoDeleteCron == "" {
 			req.AutoDeleteCron = "*/30 * * * *"
 		}
@@ -538,16 +539,17 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 			}
 			delete(req, "id")
 			delete(req, "created_at")
+			delete(req, "role")
 			req["updated_at"] = time.Now()
-			if err := h.db.WithContext(r.Context()).Model(&model.DownloadClientConfig{}).Where("id = ?", id).Updates(req).Error; err != nil {
+			if err := h.db.WithContext(r.Context()).Model(&model.SeedingClientConfig{}).Where("id = ? AND role = ?", id, "download").Updates(req).Error; err != nil {
 				Error(w, http.StatusInternalServerError, 50000, "更新配置失败")
 				return
 			}
-			var updated model.DownloadClientConfig
+			var updated model.SeedingClientConfig
 			h.db.WithContext(r.Context()).First(&updated, id)
 			Success(w, updated)
 		case http.MethodDelete:
-			if err := h.db.WithContext(r.Context()).Delete(&model.DownloadClientConfig{}, id).Error; err != nil {
+			if err := h.db.WithContext(r.Context()).Where("role = ?", "download").Delete(&model.SeedingClientConfig{}, id).Error; err != nil {
 				Error(w, http.StatusInternalServerError, 50000, "删除配置失败")
 				return
 			}

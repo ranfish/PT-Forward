@@ -1414,9 +1414,9 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 		minScore, minAgeHours, weights = e.applyConfig(cfg, minScore, minAgeHours, weights)
 	}
 
-	// 评分清理只对 seeding_client_configs 中显式配置刷流的下载器生效。
-	// 仅来自 download_client_configs 的下载器（如辅种器）只执行删除规则，不做评分清理。
-	if cfg != nil && !cfg.ScoringCleanupEnabled {
+	// 评分清理只对 Role=seeding 的下载器生效。
+	// Role=download 的下载器（原 download_client_configs）仅执行删除规则，不做评分清理。
+	if cfg != nil && cfg.Role != "seeding" {
 		minScore = -1
 	}
 
@@ -2239,53 +2239,11 @@ func (e *Engine) ListConfigs(ctx context.Context) ([]*model.SeedingClientConfig,
 		return nil, err
 	}
 	for _, c := range configs {
-		c.ScoringCleanupEnabled = true
-	}
-	seen := make(map[string]bool, len(configs))
-	for _, c := range configs {
-		seen[c.ClientID] = true
-	}
-	// 补充 download_client_configs（仅纳入显式配置了 DeleteRuleIDs 的下载器）
-	var dlConfigs []model.DownloadClientConfig
-	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&dlConfigs).Error; err == nil {
-		for i := range dlConfigs {
-			if seen[dlConfigs[i].ClientID] {
-				continue
-			}
-			if strings.TrimSpace(dlConfigs[i].DeleteRuleIDs) == "" {
-				continue
-			}
-			configs = append(configs, downloadConfigToSeeding(&dlConfigs[i]))
+		if c.Role == "" {
+			c.Role = "seeding"
 		}
 	}
 	return configs, nil
-}
-
-// downloadConfigToSeeding 将 DownloadClientConfig 适配为 SeedingClientConfig 视图（§55.14 阶段3）。
-// role≠seeding 的下载器配置存于 download_client_configs，刷流引擎统一管理时需转换为 SeedingClientConfig。
-// MaxActiveSeeding 从 MaxActiveUploads/Downloads 映射（download_client_configs 无此字段）。
-func downloadConfigToSeeding(dc *model.DownloadClientConfig) *model.SeedingClientConfig {
-	maxActive := dc.MaxActiveUploads
-	if maxActive == 0 {
-		maxActive = dc.MaxActiveDownloads
-	}
-	return &model.SeedingClientConfig{
-		ClientID:            dc.ClientID,
-		Enabled:             dc.Enabled,
-		DeleteRuleIDs:       dc.DeleteRuleIDs,
-		AutoDeleteCron:      dc.AutoDeleteCron,
-		MainDataCron:        dc.MainDataCron,
-		DiskProtectEnabled:  dc.DiskProtectEnabled,
-		MinDiskSpaceGB:      dc.MinDiskSpaceGB,
-		SpaceAlarmEnabled:   dc.SpaceAlarmEnabled,
-		SpaceAlarmGB:        dc.SpaceAlarmGB,
-		MinDiskSpacePercent: dc.MinDiskSpacePercent,
-		MaxActiveUploads:    dc.MaxActiveUploads,
-		MaxActiveDownloads:  dc.MaxActiveDownloads,
-		MaxActiveSeeding:    maxActive,
-		SuperSeedingDefault: dc.SuperSeedingDefault,
-		Scope:               dc.Scope,
-	}
 }
 
 func (e *Engine) GetConfigByID(ctx context.Context, id uint) (*model.SeedingClientConfig, error) {

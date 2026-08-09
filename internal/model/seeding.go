@@ -93,9 +93,9 @@ type SeedingClientConfig struct {
 
 	MinSeedHoursBeforeDelete float64 `json:"min_seed_hours_before_delete" gorm:"default:1"`
 
-	// ScoringCleanupEnabled 标记此配置是否来自 seeding_client_configs。
-	// 仅 seeding_client_configs 客户端启用评分清理；download_client_configs 仅执行删除规则。
-	ScoringCleanupEnabled bool `json:"-" gorm:"-"`
+	// Role 标识配置来源：seeding=刷流配置（启用评分清理），download=通用下载器配置（仅删除规则）。
+	// 合并自 download_client_configs，用于替代原 transient ScoringCleanupEnabled。
+	Role string `json:"role" gorm:"size:20;not null;default:'seeding'"`
 }
 
 func (SeedingClientConfig) TableName() string { return "seeding_client_configs" }

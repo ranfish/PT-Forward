@@ -115,13 +115,12 @@ func setupConfigTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// TestLoadActiveClientConfig 验证 §55.15 修复（补全 §55.14 阶段3 遗漏）：
-// 配置加载优先 seeding_client_configs，未命中回退 download_client_configs 并经 downloadConfigToSeeding 适配。
-// 修复前 scoreAndPushForClient 内联只查单表，role≠seeding（仅有 download 配置）下载器的种子被静默丢弃。
+// TestLoadActiveClientConfig 验证统一表配置加载。
+// 合并后 download_client_configs 数据已迁入 seeding_client_configs（Role=download）。
 func TestLoadActiveClientConfig(t *testing.T) {
 	t.Run("seeding config hit", func(t *testing.T) {
 		db := setupConfigTestDB(t)
-		db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, MaxActiveSeeding: 7, MinDiskSpaceGB: 20})
+		db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, Role: "seeding", MaxActiveSeeding: 7, MinDiskSpaceGB: 20})
 		e := NewEngine(db, zap.NewNop())
 		cfg, ok := e.LoadActiveClientConfig(context.Background(), "c1")
 		if !ok {
@@ -133,22 +132,23 @@ func TestLoadActiveClientConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("fallback to download config", func(t *testing.T) {
+	t.Run("download role config hit", func(t *testing.T) {
 		db := setupConfigTestDB(t)
-		db.Create(&model.DownloadClientConfig{
+		db.Create(&model.SeedingClientConfig{
 			ClientID:           "qb-dl",
 			Enabled:            true,
-			MaxActiveUploads:   5,
+			Role:               "download",
+			MaxActiveSeeding:   5,
 			MinDiskSpaceGB:     30,
 			DiskProtectEnabled: true,
 		})
 		e := NewEngine(db, zap.NewNop())
 		cfg, ok := e.LoadActiveClientConfig(context.Background(), "qb-dl")
 		if !ok {
-			t.Fatal("expected ok=true falling back to download config (role≠seeding 不应被静默丢弃)")
+			t.Fatal("expected ok=true for download role config")
 		}
 		if cfg.MaxActiveSeeding != 5 {
-			t.Errorf("expected MaxActiveSeeding=5 (mapped from MaxActiveUploads), got %d", cfg.MaxActiveSeeding)
+			t.Errorf("expected MaxActiveSeeding=5, got %d", cfg.MaxActiveSeeding)
 		}
 		if cfg.MinDiskSpaceGB != 30 || !cfg.DiskProtectEnabled {
 			t.Errorf("disk protect fields not mapped: min=%v protect=%v",
