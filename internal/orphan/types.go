@@ -13,12 +13,13 @@ type Entry struct {
 }
 
 type RecoverResult struct {
-	Orphan      *Entry       `json:"orphan"`
-	Found       bool         `json:"found"`
-	Method      string       `json:"method"`
-	SiteName    string       `json:"site_name"`
-	Message     string       `json:"message"`
-	SearchStats *SearchStats `json:"search_stats,omitempty"`
+	Orphan         *Entry       `json:"orphan"`
+	Found          bool         `json:"found"`
+	Method         string       `json:"method"`
+	SiteName       string       `json:"site_name"`
+	Message        string       `json:"message"`
+	SearchStats    *SearchStats `json:"search_stats,omitempty"`
+	RecoveredCount int          `json:"recovered_count"` // 恢复的种子总数（含同站扩展）
 }
 
 type SearchStats struct {

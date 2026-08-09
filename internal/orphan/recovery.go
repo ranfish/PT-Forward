@@ -97,13 +97,101 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 			result.Message = fmt.Sprintf("recovery failed: %v", err)
 			return result
 		}
-		result.Message = fmt.Sprintf("recovered from %s (method=%s)", siteName, method)
+		result.RecoveredCount = 1
+
+		// 同站扩展：在命中的站点搜索其他集
+		if classification != nil && len(classification.VideoFiles) > 1 {
+			additional := r.expandSameSite(ctx, orphan, classification, siteName, targetClientID)
+			result.RecoveredCount += additional
+		}
+
+		if result.RecoveredCount > 1 {
+			result.Message = fmt.Sprintf("recovered %d episodes from %s (method=%s, includes same-site expansion)",
+				result.RecoveredCount, siteName, method)
+		} else {
+			result.Message = fmt.Sprintf("recovered from %s (method=%s)", siteName, method)
+		}
 		return result
 	}
 
 	result.Message = fmt.Sprintf("no matching torrent found on any site (searched: %d, skipped: %d, failed: %d)",
 		stats.Searched, stats.Skipped, len(stats.FailedSites))
 	return result
+}
+
+// expandSameSite 在主恢复命中的站点上，搜索并恢复其他视频文件（同站扩展）。
+// classification.VideoFiles[0] 已被主恢复恢复，从 [1] 开始。
+func (r *Recovery) expandSameSite(ctx context.Context, orphan *Entry, classification *util.DirClassification, siteName, targetClientID string) int {
+	if len(classification.VideoFiles) <= 1 {
+		return 0
+	}
+
+	largestBase := strings.TrimSuffix(classification.VideoFiles[0].Name, filepath.Ext(classification.VideoFiles[0].Name))
+	groupName := reseed.ExtractGroupName(largestBase)
+	dirKeyword := reseed.ExtractSearchKeyword(orphan.Name)
+
+	recovered := 0
+	for i := 1; i < len(classification.VideoFiles); i++ {
+		if ctx.Err() != nil {
+			break
+		}
+
+		vf := classification.VideoFiles[i]
+		fileBase := strings.TrimSuffix(vf.Name, filepath.Ext(vf.Name))
+		fileKeyword := reseed.ExtractSearchKeyword(fileBase)
+
+		if fileKeyword == "" || fileKeyword == dirKeyword {
+			continue
+		}
+
+		tid := r.searchSingleSite(ctx, siteName, fileKeyword, groupName, vf.Size, fileBase)
+		if tid == "" {
+			continue
+		}
+
+		err := r.downloadAndAdd(ctx, orphan, siteName, tid, "", targetClientID, vf.Size, fileBase)
+		if err != nil {
+			r.logger.Warn("orphan same-site expansion failed",
+				zap.String("file", vf.Name),
+				zap.String("site", siteName),
+				zap.Error(err))
+			continue
+		}
+
+		recovered++
+		r.logger.Info("orphan same-site expansion recovered",
+			zap.String("file", vf.Name),
+			zap.String("site", siteName),
+			zap.String("torrent_id", tid))
+	}
+
+	return recovered
+}
+
+// searchSingleSite 在单个站点搜索并验证匹配。
+func (r *Recovery) searchSingleSite(ctx context.Context, siteName, keyword, groupName string, sourceSize int64, sourceTitle string) string {
+	config, err := r.siteProvider.GetSiteConfig(ctx, siteName)
+	if err != nil || config == nil {
+		return ""
+	}
+	adapter, err := r.siteProvider.GetAdapter(ctx, siteName)
+	if err != nil || adapter == nil {
+		return ""
+	}
+
+	searchCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	results, err := adapter.SearchTorrents(searchCtx, config, keyword, nil)
+	if err != nil {
+		return ""
+	}
+
+	match, _ := reseed.VerifyMatchWithTruncationCheckAndSource(results, groupName, sourceSize, sourceTitle)
+	if match == nil {
+		return ""
+	}
+	return match.TorrentID
 }
 
 func (r *Recovery) tryDBMatch(ctx context.Context, orphan *Entry) (siteName, torrentID, method string) {
