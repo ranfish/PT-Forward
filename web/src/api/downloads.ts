@@ -1,27 +1,7 @@
 import client from './client'
-import type { ApiResponse } from './types'
+import type { ApiResponse, SeedingClientConfig } from './types'
 
-export interface DownloadClientConfig {
-  id: number
-  client_id: string
-  enabled: boolean
-  delete_rule_ids: string
-  auto_delete_cron: string
-  main_data_cron: string
-  disk_protect_enabled: boolean
-  min_disk_space_gb: number
-  space_alarm_enabled: boolean
-  space_alarm_gb: number
-  min_disk_space_percent: number
-  max_active_uploads: number
-  max_active_downloads: number
-  super_seeding_default: boolean
-  scope: string
-  reannounce_before: boolean
-  reannounce_retries: number
-  reannounce_interval_ms: number
-  reannounce_wait_ms: number
-}
+export type DownloadClientConfig = SeedingClientConfig
 
 export interface DownloadTask {
   id: number

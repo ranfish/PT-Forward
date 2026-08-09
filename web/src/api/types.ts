@@ -89,6 +89,7 @@ export interface SeedingClientConfig {
   reannounce_interval_ms: number
   reannounce_wait_ms: number
   min_seed_hours_before_delete: number
+  role: string
 }
 
 export interface SeedingTorrentRecord {

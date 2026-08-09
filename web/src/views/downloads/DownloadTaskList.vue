@@ -228,7 +228,7 @@
         <a-row :gutter="16">
           <a-col :span="12">
             <a-form-item label="数据同步周期">
-              <a-input v-model:value="configForm.main_data_cron" placeholder="*/20 * * * *" />
+              <a-input v-model:value="configForm.maindata_cron" placeholder="*/20 * * * *" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -290,7 +290,7 @@ const configForm = reactive({
   enabled: true,
   deleteRuleIds: [] as number[],
   auto_delete_cron: '*/30 * * * *',
-  main_data_cron: '*/20 * * * *',
+  maindata_cron: '*/20 * * * *',
   disk_protect_enabled: true,
   min_disk_space_gb: 50,
   scope: 'managed',
@@ -511,7 +511,7 @@ function openConfigModal(record?: DownloadClientConfig) {
       enabled: record.enabled,
       deleteRuleIds: record.delete_rule_ids ? record.delete_rule_ids.split(',').filter(Boolean).map(Number) : [],
       auto_delete_cron: record.auto_delete_cron || '*/30 * * * *',
-      main_data_cron: record.main_data_cron || '*/20 * * * *',
+      maindata_cron: record.maindata_cron || '*/20 * * * *',
       disk_protect_enabled: record.disk_protect_enabled,
       min_disk_space_gb: record.min_disk_space_gb || 50,
       scope: record.scope || 'managed',
@@ -519,7 +519,7 @@ function openConfigModal(record?: DownloadClientConfig) {
   } else {
     Object.assign(configForm, {
       client_id: '', enabled: true, deleteRuleIds: [],
-      auto_delete_cron: '*/30 * * * *', main_data_cron: '*/20 * * * *',
+      auto_delete_cron: '*/30 * * * *', maindata_cron: '*/20 * * * *',
       disk_protect_enabled: true, min_disk_space_gb: 50, scope: 'managed',
     })
   }
@@ -538,7 +538,7 @@ async function handleConfigSubmit() {
       enabled: configForm.enabled,
       delete_rule_ids: configForm.deleteRuleIds.join(','),
       auto_delete_cron: configForm.auto_delete_cron,
-      main_data_cron: configForm.main_data_cron,
+      maindata_cron: configForm.maindata_cron,
       disk_protect_enabled: configForm.disk_protect_enabled,
       min_disk_space_gb: configForm.min_disk_space_gb,
       scope: configForm.scope,
