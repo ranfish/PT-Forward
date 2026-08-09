@@ -37,11 +37,39 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 	stats := &SearchStats{}
 
 	siteName, torrentID, method := r.tryDBMatch(ctx, orphan)
-	if siteName == "" {
-		siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
+
+	// 分类孤儿类型，按 Form 选择搜索策略
+	var classification *util.DirClassification
+	if siteName == "" && orphan.IsDir {
+		classification, _ = util.ClassifyFromDir(orphan.Path, orphan.Name)
+		if classification != nil {
+			r.logger.Info("orphan classified",
+				zap.String("orphan", orphan.Name),
+				zap.String("category", classification.Type.Category),
+				zap.String("form", classification.Type.Form),
+				zap.Int("video_files", len(classification.VideoFiles)),
+				zap.Int64("total_size", classification.TotalSize))
+		}
 	}
-	if siteName == "" && orphan.IsDir && !reseed.DetectMusicFromDir(orphan.Path) {
-		siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
+
+	if siteName == "" {
+		form := ""
+		if classification != nil {
+			form = classification.Type.Form
+		}
+
+		switch form {
+		case "single_episode", "partial_pack":
+			// 单集/部分合集：直接走文件级搜索（用单集大小匹配）
+			siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
+		default:
+			// 全集/电影/音乐/未知：走目录级搜索
+			siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
+			// 未知形态：目录级失败后回退文件级
+			if siteName == "" && orphan.IsDir && form == "unknown" {
+				siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
+			}
+		}
 	}
 
 	result.SearchStats = stats
