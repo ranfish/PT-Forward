@@ -126,7 +126,16 @@ func init() {
 			if err := tx.Exec(`ALTER TABLE rss_torrent_seen_new RENAME TO rss_torrent_seen`).Error; err != nil {
 				return err
 			}
-			return tx.Exec(`CREATE INDEX idx_torrent_seen_info_hash ON rss_torrent_seen(info_hash)`).Error
+			if err := tx.Exec(`CREATE INDEX idx_torrent_seen_info_hash ON rss_torrent_seen(info_hash)`).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec(`CREATE INDEX idx_torrent_seen_status ON rss_torrent_seen(status)`).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec(`CREATE INDEX idx_rss_torrent_seen_subscription_id ON rss_torrent_seen(subscription_id)`).Error; err != nil {
+				return err
+			}
+			return nil
 		})
 	})
 }
