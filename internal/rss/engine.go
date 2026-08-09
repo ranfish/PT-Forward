@@ -282,7 +282,7 @@ func (e *Engine) DryRun(ctx context.Context, sub *model.RSSSubscription) (*DryRu
 				Size:      ev.Size,
 			}
 
-			seen, err := e.repo.IsSeen(ctx, ev.SiteName, ev.TorrentID)
+			seen, err := e.repo.IsSeen(ctx, ev.SiteName, ev.TorrentID, uintToString(sub.ID))
 			if err != nil {
 				e.logger.Warn("dryrun seen check failed", zap.Error(err))
 			}
@@ -628,7 +628,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 		var detectItems []detectItem
 
 		for i, event := range events {
-			isSeen, seenErr := e.repo.IsSeen(ctx, event.SiteName, event.TorrentID)
+			isSeen, seenErr := e.repo.IsSeen(ctx, event.SiteName, event.TorrentID, uintToString(sub.ID))
 			if seenErr != nil {
 				e.logger.Warn("check seen status failed, skipping torrent",
 					zap.String("site", event.SiteName),

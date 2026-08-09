@@ -145,7 +145,7 @@ func TestRepository_MarkSeen_AndIsSeen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	isSeen, err := repo.IsSeen(ctx, "example", "42")
+	isSeen, err := repo.IsSeen(ctx, "example", "42", "1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestRepository_MarkSeen_AndIsSeen(t *testing.T) {
 		t.Error("should be seen")
 	}
 
-	isSeen2, _ := repo.IsSeen(ctx, "example", "99")
+	isSeen2, _ := repo.IsSeen(ctx, "example", "99", "1")
 	if isSeen2 {
 		t.Error("should not be seen")
 	}
@@ -169,7 +169,7 @@ func TestRepository_MarkSeen_AndIsSeen(t *testing.T) {
 	if err := repo.MarkSeen(ctx, seenWaiting); err != nil {
 		t.Fatal(err)
 	}
-	isSeen3, _ := repo.IsSeen(ctx, "example", "43")
+	isSeen3, _ := repo.IsSeen(ctx, "example", "43", "1")
 	if isSeen3 {
 		t.Error("status=seen should not be considered seen (waiting for push)")
 	}
@@ -185,7 +185,7 @@ func TestRepository_MarkSeen_AndIsSeen(t *testing.T) {
 	if err := repo.MarkSeen(ctx, blockedSeen); err != nil {
 		t.Fatal(err)
 	}
-	isSeen4, _ := repo.IsSeen(ctx, "example", "44")
+	isSeen4, _ := repo.IsSeen(ctx, "example", "44", "1")
 	if !isSeen4 {
 		t.Error("status=blocked should be considered seen")
 	}

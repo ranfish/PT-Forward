@@ -502,13 +502,13 @@ func TestEngine_FetchOnce_HappyPath(t *testing.T) {
 
 	// After fetchOnce, status is "seen" (not yet "pushed"), so IsSeen should be false
 	// (IsSeen only returns true for status="pushed" or "blocked")
-	isSeen, err := eng.repo.IsSeen(context.Background(), "testsit", "501")
+	isSeen, err := eng.repo.IsSeen(context.Background(), "testsit", "501", "1")
 	require.NoError(t, err)
 	require.False(t, isSeen, "status=seen should not be considered seen yet")
 
 	// Simulate pushed status
 	eng.repo.MarkStatus(context.Background(), "testsit", "501", "pushed")
-	isSeen2, err := eng.repo.IsSeen(context.Background(), "testsit", "501")
+	isSeen2, err := eng.repo.IsSeen(context.Background(), "testsit", "501", "1")
 	require.NoError(t, err)
 	require.True(t, isSeen2, "status=pushed should be considered seen")
 }
@@ -529,7 +529,7 @@ func TestEngine_FetchOnce_AlreadySeen(t *testing.T) {
 	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
 
 	require.NoError(t, eng.repo.MarkSeen(context.Background(), &model.RSSTorrentSeen{
-		SiteName: "testsit", TorrentID: "600", SubscriptionID: uintToString(sub.ID), Status: "seen",
+		SiteName: "testsit", TorrentID: "600", SubscriptionID: uintToString(sub.ID), Status: "pushed",
 	}))
 
 	dispatchCount := 0
@@ -826,7 +826,7 @@ func TestEngine_FetchOnce_NoDispatcher(t *testing.T) {
 		eng.fetchOnce(context.Background(), sub)
 	})
 
-	isSeen, err := eng.repo.IsSeen(context.Background(), "testsit", "401")
+	isSeen, err := eng.repo.IsSeen(context.Background(), "testsit", "401", "1")
 	require.NoError(t, err)
 	require.False(t, isSeen, "status=seen should not be IsSeen=true until pushed")
 }
@@ -888,7 +888,7 @@ func TestEngine_FetchOnce_MixedSeenAndNew(t *testing.T) {
 	eng.fetcher = NewFetcherWithClient(srv.Client(), zap.NewNop())
 
 	require.NoError(t, eng.repo.MarkSeen(context.Background(), &model.RSSTorrentSeen{
-		SiteName: "testsit", TorrentID: "501", SubscriptionID: uintToString(sub.ID), Status: "seen",
+		SiteName: "testsit", TorrentID: "501", SubscriptionID: uintToString(sub.ID), Status: "pushed",
 	}))
 
 	var dispatched []model.TorrentEvent

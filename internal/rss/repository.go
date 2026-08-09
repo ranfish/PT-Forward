@@ -7,6 +7,7 @@ import (
 	dbimpl "github.com/ranfish/pt-forward/internal/db"
 	"github.com/ranfish/pt-forward/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Repository struct {
@@ -66,13 +67,24 @@ func (r *Repository) ExistsByName(ctx context.Context, name string, excludeID ui
 }
 
 func (r *Repository) MarkSeen(ctx context.Context, seen *model.RSSTorrentSeen) error {
-	return r.db.WithContext(ctx).Save(seen).Error
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "site_name"}, {Name: "torrent_id"}, {Name: "subscription_id"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"info_hash", "is_fake_hash", "title", "size",
+			"is_free", "free_end_at", "free_level", "discount",
+			"has_hr", "hr_seed_time_h", "status", "source_category",
+			"updated_at",
+		}),
+	}).Create(seen).Error
 }
 
-func (r *Repository) IsSeen(ctx context.Context, siteName, torrentID string) (bool, error) {
+func (r *Repository) IsSeen(ctx context.Context, siteName, torrentID, subscriptionID string) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
-		Where("site_name = ? AND torrent_id = ? AND status IN ?", siteName, torrentID,
+		Where("site_name = ? AND torrent_id = ? AND subscription_id = ? AND status IN ?",
+			siteName, torrentID, subscriptionID,
 			[]string{"pushed", "blocked"}).
 		Count(&count).Error
 	return count > 0, err

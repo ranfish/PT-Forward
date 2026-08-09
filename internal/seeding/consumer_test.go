@@ -36,11 +36,12 @@ func TestCreateRecordFromPush_MarksRSSTorrentSeenPushed(t *testing.T) {
 
 	// 调用 createRecordFromPush（模拟推送成功路径）
 	e.createRecordFromPush(context.Background(), "c1", &pusher.PushedEvent{
-		ClientID:  "c1",
-		SiteName:  "site1",
-		TorrentID: "t100",
-		InfoHash:  "hash100",
-		Size:      1024,
+		ClientID:       "c1",
+		SiteName:       "site1",
+		TorrentID:      "t100",
+		SubscriptionID: "1",
+		InfoHash:       "hash100",
+		Size:           1024,
 	}, "")
 
 	// 验证 rss_torrent_seen.status 升级为 "pushed"
