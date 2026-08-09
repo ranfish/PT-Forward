@@ -138,7 +138,7 @@ func (r *Recovery) tryFileLevelL2Search(ctx context.Context, orphan *Entry, stat
 		zap.String("keyword", fileKeyword),
 		zap.String("group", fileGroup))
 
-	return r.tryL2SearchCore(ctx, orphan, stats, fileKeyword, fileGroup)
+	return r.tryL2SearchCore(ctx, orphan, stats, fileKeyword, fileGroup, largestSize, baseName)
 }
 
 func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *SearchStats) (siteName, torrentID, method string) {
@@ -148,7 +148,7 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 			zap.String("orphan", orphan.Name),
 			zap.String("keyword", musicKeyword))
 		if musicKeyword != "" {
-			return r.tryL2SearchCore(ctx, orphan, stats, musicKeyword, "OpenCD")
+			return r.tryL2SearchCore(ctx, orphan, stats, musicKeyword, "OpenCD", orphan.Size, orphan.Name)
 		}
 	}
 
@@ -166,15 +166,22 @@ func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *Search
 		return "", "", ""
 	}
 
-	return r.tryL2SearchCore(ctx, orphan, stats, searchKeyword, groupName)
+	return r.tryL2SearchCore(ctx, orphan, stats, searchKeyword, groupName, orphan.Size, orphan.Name)
 }
 
-func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *SearchStats, searchKeyword, groupName string) (siteName, torrentID, method string) {
+func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *SearchStats, searchKeyword, groupName string, sourceSize int64, sourceTitle string) (siteName, torrentID, method string) {
 	if r.siteProvider == nil {
 		return "", "", ""
 	}
 
-	sites := r.getSitePriority(ctx, groupName, orphan.Size)
+	if sourceSize <= 0 {
+		sourceSize = orphan.Size
+	}
+	if sourceTitle == "" {
+		sourceTitle = orphan.Name
+	}
+
+	sites := r.getSitePriority(ctx, groupName, sourceSize)
 	if len(sites) == 0 {
 		return "", "", ""
 	}
@@ -208,7 +215,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 						zap.Int("result_count", len(results)),
 						zap.Int64("orphan_size", orphan.Size))
 
-					match, filterStats := reseed.VerifyMatchWithTruncationCheckAndSource(results, groupName, orphan.Size, orphan.Name)
+					match, filterStats := reseed.VerifyMatchWithTruncationCheckAndSource(results, groupName, sourceSize, sourceTitle)
 
 					if match == nil {
 						firstTitle := ""
@@ -330,7 +337,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 				return
 			}
 
-			match, filterStats := reseed.VerifyMatchWithTruncationCheckAndSource(results2, groupName, orphan.Size, orphan.Name)
+			match, filterStats := reseed.VerifyMatchWithTruncationCheckAndSource(results2, groupName, sourceSize, sourceTitle)
 			if match == nil {
 				firstTitle := ""
 				if len(results2) > 0 {
