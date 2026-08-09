@@ -2955,6 +2955,18 @@ func TestTitleKeywordRelevant_ShortEnglishTitle(t *testing.T) {
 	if !titleKeywordRelevant(meaningful, sourceCJK, sourceTitle, sameMovie) {
 		t.Errorf("The One vs The One (diff resolution) should be RELEVANT")
 	}
+
+	// truncation retry 场景：groupName="" 时仍应排除组名
+	meaningfulNoGroup := extractMeaningfulTitleWords(sourceTitle, "")
+	t.Logf("meaningful words (no group): %v", meaningfulNoGroup)
+	for _, w := range meaningfulNoGroup {
+		if w == "wiki" {
+			t.Errorf("group name 'wiki' should be excluded even when groupName=\"\"")
+		}
+	}
+	if titleKeywordRelevant(meaningfulNoGroup, sourceCJK, sourceTitle, waterboys) {
+		t.Errorf("The One vs Waterboys should be IRRELEVANT even in truncation retry (groupName=\"\")")
+	}
 }
 
 func TestExtractSequelNumber(t *testing.T) {
