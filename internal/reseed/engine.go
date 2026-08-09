@@ -4608,6 +4608,10 @@ func extractMeaningfulTitleWords(title, groupName string) []string {
 	if title == "" {
 		return nil
 	}
+	// truncation retry 时 groupName 为空，需从标题自动提取，否则组名会成为 meaningful word
+	if groupName == "" {
+		groupName = ExtractGroupName(title)
+	}
 	lower := strings.ToLower(title)
 	groupLower := strings.ToLower(groupName)
 	words := strings.FieldsFunc(lower, func(r rune) bool {
