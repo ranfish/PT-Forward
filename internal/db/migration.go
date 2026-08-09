@@ -111,8 +111,7 @@ func init() {
 				matched_rule text,
 				skip_count integer NOT NULL DEFAULT 0,
 				last_check_time datetime,
-				push_time datetime,
-				UNIQUE(site_name, torrent_id, subscription_id)
+				push_time datetime
 			)`
 			if err := tx.Exec(tableDef).Error; err != nil {
 				return err
@@ -124,6 +123,9 @@ func init() {
 				return err
 			}
 			if err := tx.Exec(`ALTER TABLE rss_torrent_seen_new RENAME TO rss_torrent_seen`).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec(`CREATE UNIQUE INDEX idx_site_torrent_sub ON rss_torrent_seen(site_name, torrent_id, subscription_id)`).Error; err != nil {
 				return err
 			}
 			if err := tx.Exec(`CREATE INDEX idx_torrent_seen_info_hash ON rss_torrent_seen(info_hash)`).Error; err != nil {
