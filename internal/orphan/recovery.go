@@ -57,18 +57,18 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 		if classification != nil {
 			form = classification.Type.Form
 		}
+		hasVideoFiles := classification != nil && len(classification.VideoFiles) > 0
 
-		switch form {
-		case "single_episode", "partial_pack":
+		switch {
+		case form == "single_episode" || form == "partial_pack":
 			// 单集/部分合集：直接走文件级搜索（用单集大小匹配）
 			siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
+		case form == "unknown" && hasVideoFiles:
+			// S01 无 Complete 无 Exx + 有视频文件：直接走文件级（用文件名 SxxExx 搜索）
+			siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
 		default:
-			// 全集/电影/音乐/未知：走目录级搜索
+			// 全集/电影/音乐：走目录级搜索
 			siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
-			// 未知形态：目录级失败后回退文件级
-			if siteName == "" && orphan.IsDir && form == "unknown" {
-				siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
-			}
 		}
 	}
 
@@ -78,7 +78,21 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 		result.Found = true
 		result.Method = method
 		result.SiteName = siteName
-		if err := r.downloadAndAdd(ctx, orphan, siteName, torrentID, "", targetClientID); err != nil {
+
+		// 确定注入校验用的 sourceSize/sourceName
+		// 文件级搜索（单集/部分合集/unknown+视频）用最大视频文件大小
+		// 目录级搜索（全集/电影）用目录总大小
+		injectSize := orphan.Size
+		injectName := orphan.Name
+		if classification != nil && len(classification.VideoFiles) > 0 {
+			form := classification.Type.Form
+			if form == "single_episode" || form == "partial_pack" || form == "unknown" {
+				injectSize = classification.VideoFiles[0].Size
+				injectName = classification.VideoFiles[0].Name
+			}
+		}
+
+		if err := r.downloadAndAdd(ctx, orphan, siteName, torrentID, "", targetClientID, injectSize, injectName); err != nil {
 			result.Found = false
 			result.Message = fmt.Sprintf("recovery failed: %v", err)
 			return result
@@ -558,7 +572,13 @@ func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, cli
 	return nil
 }
 
-func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string, savePathOverride string, targetClientID string) error {
+func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string, savePathOverride string, targetClientID string, sourceSize int64, sourceName string) error {
+	if sourceSize <= 0 {
+		sourceSize = orphan.Size
+	}
+	if sourceName == "" {
+		sourceName = orphan.Name
+	}
 	config, err := r.siteProvider.GetSiteConfig(ctx, siteName)
 	if err != nil || config == nil {
 		return fmt.Errorf("get site config: %w", err)
@@ -578,7 +598,7 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		return fmt.Errorf("downloaded torrent data is empty")
 	}
 
-	if err := reseed.ValidateInjection(torrentData, orphan.Size, orphan.Name, 0, 1.0); err != nil {
+	if err := reseed.ValidateInjection(torrentData, sourceSize, sourceName, 0, 1.0); err != nil {
 		return fmt.Errorf("注入校验失败: %w", err)
 	}
 
