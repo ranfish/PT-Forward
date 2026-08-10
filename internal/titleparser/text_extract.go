@@ -181,44 +181,6 @@ func ExtractResolution(text string) string {
 	return ""
 }
 
-// ExtractType 从文本识别类型（移植 auto_feed_js String.prototype.get_type）。
-// 先去掉"来源"后缀，再正则匹配。
-// 返回值：电影/动漫/综艺/纪录/短剧/剧集/MV/有声小说/音乐/体育/学习/软件/游戏/书籍/""。
-func ExtractType(text string) string {
-	if text == "" {
-		return ""
-	}
-	// 去掉"来源"后缀（auto_feed_js: split('來源')[0]）
-	if idx := strings.IndexAny(text, "來源来源"); idx > 0 {
-		text = text[:idx]
-	}
-	cases := []struct {
-		re     *regexp.Regexp
-		result string
-	}{
-		{regexp.MustCompile(`(?i)Movie|电影|UHD原盘|films|電影|剧场`), "电影"},
-		{regexp.MustCompile(`(?i)Animation|动漫|動畫|动画|Anime|Cartoons?`), "动漫"},
-		{regexp.MustCompile(`(?i)TV.*Show|综艺`), "综艺"},
-		{regexp.MustCompile(`(?i)Docu|纪录|Documentary`), "纪录"},
-		{regexp.MustCompile(`短剧`), "短剧"},
-		{regexp.MustCompile(`(?i)TV.*Series|影劇|剧|TV-PACK|TV-Episode|TV`), "剧集"},
-		{regexp.MustCompile(`(?i)Music Videos|音乐短片|MV\(演唱\)|MV.演唱会|MV\(音乐视频\)|Music Video|Musics MV|Music-Video|音乐视频|演唱会/MV|MV/MV`), "MV"},
-		{regexp.MustCompile(`(?i)有声小说|Audio\(有声\)|有声书|有聲書`), "有声小说"},
-		{regexp.MustCompile(`(?i)Music|音乐`), "音乐"},
-		{regexp.MustCompile(`(?i)Sport|体育|運動`), "体育"},
-		{regexp.MustCompile(`(?i)学习|资料|Study`), "学习"},
-		{regexp.MustCompile(`(?i)Software|软件|軟體`), "软件"},
-		{regexp.MustCompile(`(?i)Game|游戏|PC遊戲`), "游戏"},
-		{regexp.MustCompile(`(?i)eBook|電子書|电子书|书籍|book`), "书籍"},
-	}
-	for _, c := range cases {
-		if c.re.MatchString(text) {
-			return c.result
-		}
-	}
-	return ""
-}
-
 // ExtractSource 从文本识别产地（移植 auto_feed_js String.prototype.source_sel）。
 // 返回值：大陆/港台/欧美/日韩/香港/台湾/日本/韩国/印度/""。
 func ExtractSource(text string) string {
