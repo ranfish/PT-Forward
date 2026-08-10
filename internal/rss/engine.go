@@ -294,6 +294,21 @@ func (e *Engine) DryRun(ctx context.Context, sub *model.RSSSubscription) (*DryRu
 				continue
 			}
 
+			// 从 rss_torrent_seen 恢复缓存的免费状态（试运行不做站点 API 检测）
+			var cached model.RSSTorrentSeen
+			if e.db.WithContext(ctx).
+				Where("site_name = ? AND torrent_id = ?", ev.SiteName, ev.TorrentID).
+				First(&cached).Error == nil {
+				if cached.IsFree {
+					ev.IsFree = true
+				}
+				if cached.Discount != "" {
+					ev.DiscountLevel = cached.Discount
+				} else if cached.FreeLevel != "" {
+					ev.DiscountLevel = model.DiscountLevel(cached.FreeLevel)
+				}
+			}
+
 			discountStr := string(ev.DiscountLevel)
 			if discountStr == "" {
 				if ev.IsFree {

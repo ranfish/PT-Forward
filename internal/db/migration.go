@@ -150,4 +150,7 @@ func init() {
 			return nil
 		})
 	})
+	RegisterMigration(6, "drop_legacy_download_client_configs", func(gormDB *gorm.DB) error {
+		return gormDB.Migrator().DropTable("download_client_configs")
+	})
 }
