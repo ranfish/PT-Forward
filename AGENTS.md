@@ -2,55 +2,62 @@
 
 ## 当前任务焦点（新会话必读）
 
-**版本**：v0.0.310（已发布）。
+**版本**：v0.0.547（已发布）。
 
-**当前主线**：§56.37 发布管理界面重构 **P0+P1 全部完成**（CrossSeedPanel + 5 页面 + 5 后端 API）。§56.34 种子技术特征模型**全部完成**。§56.35 标题重组范式引擎**全部完成**。§56.36 RateLimit 热更新**已完成**。成人内容精确检测（qui 移植）**已完成**。pixhost 域名 fallback **已完成**。
+**当前主线**：辅种误匹配修复 + 孤儿恢复重构 + RSS recheck 状态机重构 + 配置表合并 **全部完成**。
 
-### ✅ 已完成（v0.0.228 → v0.0.310）
+### ✅ 已完成（v0.0.228 → v0.0.547）
 
-- ✅ §56 转载功能核心提取层（v0.0.228~v0.0.249）：Engine/extract 包/8 站 stub/配置移植/titleparser 补全/adapter Engine 接入/auto_feed 正则/繁体中文/tracker 匹配器
-- ✅ **tracker→站点匹配 + 标题重组断裂点 1+2**（v0.0.266~v0.0.276）：109 站 tracker_domains + title_format 同步 + Reassemble 接入发布管线 + 批量标题预览
-- ✅ **§56.33 手动转发字段采集链路重构**（v0.0.279~v0.0.283）：SourceSiteDetector + tid 四级链 + cachedMeta 退化 + metadata.Merge(DetailFirst) + PTGen 回退
-- ✅ **§56.34 种子技术特征模型**（v0.0.284~v0.0.298）：TechProfile 18 字段 + MediaInfo 提取器 + 三源合并 + ParseTitleTech + Reassemble/Standardize 改造 + 旧体系废弃（6 个新文件）
-- ✅ **§56.35 标题重组范式引擎**（v0.0.288~v0.0.302）：codecStyle + v1.05 完整 order（109 站）+ paradigm 自动推断 + normalizeHalfWidth + 音乐类 + U2/HDRoute 特殊站
-- ✅ **§56.36 RateLimit 热更新**（v0.0.301）：DynamicRateLimit 中间件 + cfg 回调注入
-- ✅ **禁转检测漏洞修复**（v0.0.304）：8 框架统一 extractFlagsFromStructured（只扫 Title+Subtitle+Tags）
-- ✅ **成人内容精确检测**（v0.0.305）：qui 移植 4 正则模式 + JAV strip-reparse + manual_forward 合规拦截
-- ✅ **pixhost 域名 fallback**（v0.0.306）：域名列表 [cc,to] + 正则双兼容 + 删旧版 imagehost.go
-- ✅ **OpenCD adapter**（v0.0.303）：extractOpenCDDetail + is_target=false
-- ✅ **§56.37 发布管理界面重构**（v0.0.307~v0.0.310）：
-  - CrossSeedPanel.vue（4 步 Drawer + 5 Tab Step 0 + 源站切换 + [重新获取]）
-  - 后端 5 API：cached-sites / seed-data / seed-data PUT / stats / refresh
-  - PublishTorrents.vue 接入 CrossSeedPanel
-  - /publish/data 一站多种 + /publish/logs 发布日志
-  - /publish 总览统计卡片
-  - 菜单 5 项结构（总览/一站多种/一种多站/发布日志/排除规则）
+**Phase 1（v0.0.228~v0.0.310）：转载/发布/标题重组/技术特征模型** — 详见 §56 全系列。
+
+**Phase 2（v0.0.522~v0.0.547）：辅种/孤儿/RSS/配置表**
+
+- ✅ **辅种误匹配修复栈**（§59.1~§59.9）：
+  - ValidateInjection 公共方法 + 孤儿恢复接入（v0.0.522）
+  - 续集号比较 extractSequelNumber（I~IX，v0.0.528~v0.0.529）
+  - 标题关键词词长 4→3 + 停用词（v0.0.531）
+  - truncation retry 组名泄漏修复（v0.0.541）
+  - negative cache 确定性失败 + 覆盖→追加 bug（v0.0.530）
+- ✅ **孤儿恢复重构**（§59.14~§59.16）：
+  - ClassifyTorrent 统一分类系统（movie/tv_series/music + season_pack/partial_pack/single_episode）
+  - 按分类选择搜索策略 + 文件级大小匹配修复（v0.0.537~v0.0.539）
+  - 同站扩展：主恢复命中后在同一站点搜索其他集（v0.0.540）
+  - 剧集孤儿修复（目录总大小→单集文件大小，v0.0.537）
+- ✅ **RSS recheck 状态机重构**（§59.12）：
+  - 移除 rss_recheck_waiting 全局任务（v0.0.523）
+  - 废弃 NonFreeRecheck/PendingScoringQueue/skipped_nonstate（v0.0.524）
+  - FreeWaitRecheckSec/MinRemain 生效 + wait-queue API（v0.0.525~v0.0.527）
+- ✅ **配置表合并**（§59.13）：
+  - seeding_client_configs + download_client_configs → 统一表（阶段 A/B/C，v0.0.535~v0.0.546）
+  - Role 字段区分 seeding/download，评分清理只对 seeding 生效（v0.0.534）
+- ✅ **RSS seen 每订阅独立**（§59.17）：UNIQUE 约束加 subscription_id + IsSeen 每订阅 + MarkSeen UPSERT（v0.0.543~v0.0.545）
+- ✅ **DryRun 缓存修复**（§59.18）：试运行从 rss_torrent_seen 恢复缓存的免费状态（v0.0.546）
+- ✅ **死代码清理**：删除 ExtractType（v0.0.547）、海胆 pieces_hash_api 修正（v0.0.542）
 
 ### 端到端验收状态
 
-| 端点 | 状态 |
+| 端点/功能 | 状态 |
 |------|------|
-| /seeded-torrents（含 source_site）| ✅ |
-| /analyze（§56.33 重构 + §56.34 TechProfile）| ✅ 14/14 副标题 + tech_profile |
-| /merge（三源合并 + 标准化 code）| ✅ |
-| /preview（字段预览 + 完整度检查）| ✅ |
-| /eligible-targets（92 站）| ✅ |
-| /submit（真发布 21 步管线）| 手动测试 |
-| CrossSeedPanel（4 步发布流程）| ✅ 已部署，待用户验证 |
+| 辅种引擎（L0/L1/L2 + 注入校验 + 续集号 + 标题关联性）| ✅ |
+| 孤儿恢复（分类 + 文件级搜索 + 同站扩展 + 注入校验）| ✅ |
+| RSS 订阅（每订阅独立 seen + FreeWait + DryRun 缓存）| ✅ |
+| 配置表统一（seeding + download 合并，阶段 A/B/C 完成）| ✅ |
+| 发布管线（CrossSeedPanel + 5 API + 手动转发）| ✅ |
 
 **关键事实**：
 - 开发环境 29（systemctl --user pt-forward，端口 8765）
-- 生产环境 249 Docker（docker compose），端口 8765
-- Docker mirror `docker.fnnas.com` 可能缓存旧镜像，部署需确认镜像 SHA 已更新
-- tracker 匹配器自动识别来源站 + §56.33 SourceSiteDetector 小组名识别（CMCTV→SSD）
-- 按 §56.33 决策 4：MediaInfo 为准（本地文件绝对准确），标题为 fallback
-- 按 §56 决策 10：简介不复用源站（完全重建）
-- PTer 实际完整度 100%（92% 是因为 bdinfo 不适用 WEB-DL）
+- 多生产环境 Docker（249/243/65/12/pt30），端口 8765
+- 辅种引擎三层匹配：L0 pieces_hash、L1 fingerprint、L2 search_verify
+- 孤儿恢复：ClassifyFromDir 分类 → 按类型选择搜索策略 → 同站扩展
+- 辅种引擎与孤儿恢复共享 VerifyMatchWithTruncationCheckAndSource + ValidateInjection
+- 配置表合并后统一表 seeding_client_configs（Role=seeding/download 区分）
+- RSS seen 去重已改为每订阅独立（UNIQUE: site_name + torrent_id + subscription_id）
+- 下载器是去重的唯一权威（同 info_hash 拒绝），RSS 引擎不做跨订阅去重
 
 **待办**：
 - （暂无）
 
-**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§56.38（65400+ 行，按需读特定章节，不要一次读全文）。
+**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§59.18（71000+ 行，按需读特定章节，不要一次读全文）。
 
 ## 环境信息
 
@@ -61,6 +68,10 @@
 - **服务**：`systemctl --user restart pt-forward`（用户级 systemd 服务，端口 8765）
 - **开发环境 29**：10.0.0.29，Agent 唯一可操作的机器（编译/测试/部署/DB）
 - **生产环境 249**：10.0.0.249 Docker（docker compose），端口 8765，**禁止 Agent 直接操作**
+- **pt30 环境**：pt30.ranfish.uk（192.168.100.30）Docker，**禁止 Agent 直接操作**
+- **65 环境**：10.0.0.65 Docker，**禁止 Agent 直接操作**
+- **243 环境**：10.0.0.243 Docker，SSH root/~/.ssh/xsy，**禁止 Agent 直接操作**
+- **12 环境**：10.0.0.12 Docker，**禁止 Agent 直接操作**
 - **PT8 环境 242**：10.0.0.242 Docker，**禁止 Agent 直接操作**
 - **22 环境 22**：10.0.0.22 Docker，**禁止 Agent 直接操作**
 - **代理**：`http://10.0.2.5:7897`（curl/docker pull 等访问外部网络时可用）
@@ -104,7 +115,7 @@
 - **⚠️ 优先使用公共函数（最高优先级）**：遇到功能需求时，**必须先 grep 查是否已有公共实现**，禁止重复造轮子。
   1. `grep -rn 'func.*Xxx' internal/` 查全项目是否已有同名/同义函数
   2. 特别注意跨包重复：`publish.ExtractGroupName` 和 `reseed.ExtractGroupName` 曾经是两份副本，改一处漏一处导致 bug（已合并到 `util.ExtractGroupName`）
-  3. **典型清单**：`util.ExtractGroupName`（制作组名提取，支持 `-`/`@`/`￡` 三种分隔符）、`reseed.ExtractSearchKeyword`（搜索关键词提取）、`publish.SourceSiteDetector.lookupGroup`（group→源站映射）、`reseed.SearchAndVerifyMatch`（搜索+验证匹配）、`getSitePriority`（站点优先级排序，源站排首位）
+  3. **典型清单**：`util.ExtractGroupName`（制作组名提取）、`reseed.ExtractSearchKeyword`（搜索关键词提取）、`reseed.SearchAndVerifyMatch`（搜索+验证匹配）、`reseed.VerifyMatchWithTruncationCheckAndSource`（匹配验证核心）、`reseed.ValidateInjection`（注入前校验）、`util.ClassifyTorrent`/`util.ClassifyFromDir`（种子类型分类）、`util.DetectContentType`（音乐/视频检测原语）
   4. 如果已有函数是私有的且跨包需要，**先考虑提升为公共函数**（改首字母大写或委托到 `util` 包），而非在新包重写一份
 
 ## 灵魂四问（每次代码改动后必须逐条审核）
