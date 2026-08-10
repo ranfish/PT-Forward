@@ -33,6 +33,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'reseed', name: 'ReseedTasks', component: () => import('@/views/reseed/ReseedTaskList.vue') },
       { path: 'reseed/tasks/:id', name: 'ReseedTaskDetail', component: () => import('@/views/reseed/ReseedTaskDetail.vue') },
       { path: 'publish', name: 'PublishList', component: () => import('@/views/publish/PublishList.vue') },
+      { path: 'publish/seeds', name: 'SeedConfig', component: () => import('@/views/publish/SeedConfig.vue') },
       { path: 'publish/data', name: 'PublishData', component: () => import('@/views/publish/PublishData.vue') },
       { path: 'publish/torrents', name: 'PublishTorrents', component: () => import('@/views/publish/PublishTorrents.vue') },
       { path: 'publish/logs', name: 'PublishLogs', component: () => import('@/views/publish/PublishLogs.vue') },
