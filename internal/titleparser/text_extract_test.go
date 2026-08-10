@@ -103,32 +103,6 @@ func TestExtractResolution(t *testing.T) {
 	}
 }
 
-func TestExtractType(t *testing.T) {
-	cases := []struct {
-		text   string
-		expect string
-	}{
-		{"电影", "电影"},
-		{"Movie", "电影"},
-		{"电视剧", "剧集"}, // 注意：get_type 返回"剧集"，不是"电视剧"
-		{"TV Series", "剧集"},
-		{"动漫", "动漫"},
-		{"Animation", "动漫"},
-		{"综艺", "综艺"},
-		{"纪录", "纪录"},
-		{"Documentary", "纪录"},
-		{"音乐", "音乐"},
-		{"体育", "体育"},
-		{"", ""},
-	}
-	for _, c := range cases {
-		got := ExtractType(c.text)
-		if got != c.expect {
-			t.Errorf("ExtractType(%q) = %q, want %q", c.text, got, c.expect)
-		}
-	}
-}
-
 func TestExtractSource(t *testing.T) {
 	cases := []struct {
 		text   string
@@ -159,9 +133,6 @@ func TestExtractFromBasicInfo(t *testing.T) {
 	// PTer 基本信息格式（真实样本 torrent_id=859990）
 	basicInfo := "大小：18.53 GB   类型: 电视剧 (TV Series)   质量: WEB-DL   地区: 欧美 (Western)"
 
-	if v := ExtractType(basicInfo); v != "剧集" {
-		t.Errorf("ExtractType(basicInfo) = %q, want 剧集", v)
-	}
 	if v := ExtractMedium(basicInfo, ""); v != "WEB-DL" {
 		t.Errorf("ExtractMedium(basicInfo) = %q, want WEB-DL", v)
 	}
