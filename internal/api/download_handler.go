@@ -70,6 +70,15 @@ func (h *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if path == "/api/v1/downloads/snapshot-paths" || path == "/api/v1/downloads/snapshot-paths/" {
+		if r.Method == http.MethodGet {
+			h.handleSnapshotPaths(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
 	idStr := ""
 	for _, seg := range splitPath(path) {
 		if _, err := strconv.ParseUint(seg, 10, 32); err == nil {
@@ -475,6 +484,40 @@ func (h *DownloadHandler) handleSpaceStats(w http.ResponseWriter, r *http.Reques
 	}
 
 	Success(w, stats)
+}
+
+func (h *DownloadHandler) handleSnapshotPaths(w http.ResponseWriter, r *http.Request) {
+	type pathEntry struct {
+		Path     string `json:"path"`
+		Count    int64  `json:"count"`
+	}
+	type clientPaths struct {
+		ClientID string      `json:"clientId"`
+		Paths    []pathEntry `json:"paths"`
+	}
+
+	var snapshots []model.TorrentSnapshot
+	h.db.WithContext(r.Context()).
+		Select("client_id, save_path, COUNT(*) as count").
+		Where("is_hidden = ? AND save_path != ?", false, "").
+		Group("client_id, save_path").
+		Order("client_id, save_path").
+		Find(&snapshots)
+
+	clientMap := make(map[string][]pathEntry)
+	for _, s := range snapshots {
+		clientMap[s.ClientID] = append(clientMap[s.ClientID], pathEntry{
+			Path:  s.SavePath,
+			Count: s.Size,
+		})
+	}
+
+	result := make([]clientPaths, 0, len(clientMap))
+	for cid, paths := range clientMap {
+		result = append(result, clientPaths{ClientID: cid, Paths: paths})
+	}
+
+	Success(w, result)
 }
 
 func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, rest string) {

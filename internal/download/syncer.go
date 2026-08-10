@@ -12,6 +12,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/setting"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Syncer struct {
@@ -217,6 +218,9 @@ func (s *Syncer) syncClient(ctx context.Context, c model.DownloaderClient) {
 		return
 	}
 
+	// 同步种子快照（含 save_path，用于种子配置页路径选择）
+	s.syncSnapshots(ctx, clientID, torrents)
+
 	torrentMap := make(map[string]*model.TorrentInfo, len(torrents))
 	for _, t := range torrents {
 		torrentMap[t.Hash] = t
@@ -250,6 +254,50 @@ func (s *Syncer) syncClient(ctx context.Context, c model.DownloaderClient) {
 			}
 		}
 	}
+}
+
+// syncSnapshots 将下载器全量种子同步到 torrent_snapshots 表（含 save_path）。
+// UPSERT by (hash, client_id)，消失的种子标记 is_hidden=true。
+func (s *Syncer) syncSnapshots(ctx context.Context, clientID string, torrents []*model.TorrentInfo) {
+	now := time.Now()
+	seenHashes := make(map[string]bool, len(torrents))
+
+	if len(torrents) == 0 {
+		return
+	}
+
+	records := make([]model.TorrentSnapshot, 0, len(torrents))
+	for _, t := range torrents {
+		seenHashes[t.Hash] = true
+		records = append(records, model.TorrentSnapshot{
+			Hash:     t.Hash,
+			ClientID: clientID,
+			Name:     t.Name,
+			SavePath: t.SavePath,
+			Size:     t.TotalSize,
+			State:    t.State,
+			Progress: t.Progress,
+			Uploaded: t.Uploaded,
+			IsHidden: false,
+			LastSeen: now,
+		})
+	}
+
+	for i := range records {
+		s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "hash"}, {Name: "client_id"},
+			},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"name", "save_path", "size", "state", "progress", "uploaded",
+				"is_hidden", "last_seen", "updated_at",
+			}),
+		}).Create(&records[i])
+	}
+
+	s.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_id = ? AND last_seen < ? AND is_hidden = ?", clientID, now, false).
+		Update("is_hidden", true)
 }
 
 func (s *Syncer) updateTaskProgress(ctx context.Context, clientID string, ti *model.TorrentInfo) {
