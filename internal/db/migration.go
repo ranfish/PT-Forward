@@ -116,7 +116,17 @@ func init() {
 			if err := tx.Exec(tableDef).Error; err != nil {
 				return err
 			}
-			if err := tx.Exec(`INSERT INTO rss_torrent_seen_new SELECT * FROM rss_torrent_seen`).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO rss_torrent_seen_new (
+				id, created_at, updated_at, site_name, torrent_id, subscription_id,
+				info_hash, is_fake_hash, title, size, is_free, free_end_at,
+				free_level, discount, has_hr, hr_seed_time_h, status,
+				source_category, matched_rule, skip_count, last_check_time, push_time
+			) SELECT
+				id, created_at, updated_at, site_name, torrent_id, subscription_id,
+				info_hash, COALESCE(is_fake_hash, 0), title, size, COALESCE(is_free, 0), free_end_at,
+				free_level, COALESCE(discount, 'NONE'), COALESCE(has_hr, 0), COALESCE(hr_seed_time_h, 0), COALESCE(status, 'seen'),
+				source_category, matched_rule, COALESCE(skip_count, 0), last_check_time, push_time
+			FROM rss_torrent_seen`).Error; err != nil {
 				return err
 			}
 			if err := tx.Exec(`DROP TABLE rss_torrent_seen`).Error; err != nil {
