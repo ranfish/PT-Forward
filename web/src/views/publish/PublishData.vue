@@ -113,7 +113,7 @@
 
     <BatchFetchPanel
       v-model:open="batchFetchOpen"
-      @done="fetchData"
+      @completed="fetchData"
     />
 
     <MetadataReviewModal

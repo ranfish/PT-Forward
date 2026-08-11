@@ -210,3 +210,97 @@ export const publishDataApi = {
     return client.put<ApiResponse<{ priority: string[] }>>('/publish/source-priority', { priority })
   },
 }
+
+// §59.20 种子配置页 API
+export interface SeedListItem {
+  hash: string
+  name: string
+  size: number
+  client_id: string
+  save_path: string
+  site_name?: string
+  title?: string
+  subtitle?: string
+  poster?: string
+  reviewed?: boolean
+  flags?: string
+  source_category?: string
+  fetch_source?: string
+  has_mediainfo?: boolean
+  has_description?: boolean
+  has_screenshots?: boolean
+  fetched_at?: string
+  fetched?: boolean
+  status: string // forbidden / system_forbidden / no_mapping / reviewed / pending / incomplete / unfetched
+}
+
+export interface SeedDetail {
+  info_hash: string
+  site_name: string
+  title: string
+  subtitle: string
+  poster: string
+  description: string
+  screenshots: string[]
+  mediainfo: string
+  bdinfo: string
+  statement: string
+  imdb_url: string
+  douban_url: string
+  tmdb_url: string
+  flags: string
+  source_category: string
+  reviewed: boolean
+  fetched_at: string
+  fetch_source: string
+  // 14 DB 平铺字段
+  category: string
+  form: string
+  resolution: string
+  video_codec: string
+  audio_codec: string
+  audio_channels: string
+  audio_tech: string
+  hdr: string
+  bit_depth: string
+  source_type: string
+  specification: string
+  source_platform: string
+  edition_info: string
+  region_code: string
+  // 5 ParseTitleTech 字段
+  main_title: string
+  season_episode: string
+  year: string
+  release_group: string
+  chinese_prefix: string
+  // 校验
+  missing_fields: string[]
+}
+
+export const seedConfigApi = {
+  listSeeds(params: { client_id: string; save_path: string; page?: number; page_size?: number }) {
+    return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params })
+  },
+  getSeed(infoHash: string) {
+    return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`)
+  },
+  putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; site_name?: string }) {
+    return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[] }>>(`/publish/seeds/${infoHash}`, data)
+  },
+  batchFetch(items: Array<{ hash: string; name: string; size: number }>) {
+    return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items })
+  },
+  batchFetchProgress() {
+    return client.get<ApiResponse<{ active: boolean; total: number; done: number; failed: number; items: Array<{ hash: string; name: string; status: string; error?: string }> }>>('/publish/seeds/batch-fetch-progress')
+  },
+  snapshotUnconfigured(clientId: string, savePath: string) {
+    return client.get<ApiResponse<{ items: Array<{ hash: string; name: string; size: number; client_id: string; save_path: string }>; total: number }>>('/downloads/snapshot-unconfigured', { params: { client_id: clientId, save_path: savePath } })
+  },
+  getFetchPriority() {
+    return client.get<ApiResponse<{ priority: string[] }>>('/publish/fetch-priority')
+  },
+  setFetchPriority(priority: string[]) {
+    return client.put<ApiResponse<{ priority: string[] }>>('/publish/fetch-priority', { priority })
+  },
+}
