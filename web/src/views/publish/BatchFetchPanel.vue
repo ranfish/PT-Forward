@@ -217,10 +217,10 @@ async function startBatchFetch() {
   if (selectedHashes.value.length === 0) return
   const items = torrents.value
     .filter(t => selectedHashes.value.includes(t.hash))
-    .map(t => ({ hash: t.hash, name: t.name, size: t.size }))
+    .map(t => ({ hash: t.hash, name: t.name, size: t.size, save_path: t.save_path }))
 
   try {
-    await seedConfigApi.batchFetch(items)
+    await seedConfigApi.batchFetch(items, props.clientId || '')
     fetching.value = true
     fetchDone.value = false
     progress.value = { active: true, total: items.length, done: 0, failed: 0, items: [] }

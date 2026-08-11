@@ -263,7 +263,7 @@
             <!-- Tab 3: 视频截图 -->
             <a-tab-pane key="screenshots" tab="视频截图">
               <div style="margin-bottom: 12px; display: flex; gap: 8px">
-                <a-button :loading="refreshing === 'screenshots'" @click="doRefresh('screenshots')">重新获取截图（mpv）</a-button>
+                <a-button :loading="refreshing === 'screenshots'" @click="doRefresh('screenshots')">{{ seedIsLocal ? '重新获取截图（mpv）' : '从源站重新获取截图' }}</a-button>
                 <a-button :loading="refreshing === 'rehost_screenshots'" :disabled="form.screenshots.length === 0" @click="doRefresh('rehost_screenshots')">一键转存到图床</a-button>
               </div>
               <ScreenshotManager
@@ -291,7 +291,7 @@
             <!-- Tab 5: 媒体信息 -->
             <a-tab-pane key="mediainfo" tab="媒体信息">
               <div style="margin-bottom: 8px; display: flex; gap: 8px">
-                <a-button v-if="!maintenanceOnly" :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">重新获取 MediaInfo</a-button>
+                <a-button v-if="!maintenanceOnly" :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">{{ seedIsLocal ? '重新获取 MediaInfo' : '从源站重新获取 MediaInfo' }}</a-button>
               </div>
               <a-textarea v-model:value="form.mediaInfo" :rows="20" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
               <a-form-item v-if="form.bdinfo" label="BDInfo" style="margin-top: 12px">
@@ -584,7 +584,7 @@ async function loadSeedDetail(infoHash: string) {
   loading.value = true
   loadError.value = ''
   try {
-    const resp = await seedConfigApi.getSeed(infoHash)
+    const resp = await seedConfigApi.getSeed(infoHash, String(props.presetTorrent?.client_id || ''))
     const d: SeedDetail | undefined = resp.data?.data
     if (d) {
       form.value.title = d.title || form.value.title
@@ -623,6 +623,7 @@ async function loadSeedDetail(infoHash: string) {
       // 状态
       seedMissingFields.value = d.missing_fields || []
       seedReviewed.value = d.reviewed || false
+      seedIsLocal.value = (d as any).is_local ?? true
       currentSourceSite.value = d.site_name || ''
     }
   } catch (e: unknown) {
@@ -635,6 +636,7 @@ async function loadSeedDetail(infoHash: string) {
 // §59.20: 种子配置页状态
 const seedMissingFields = ref<string[]>([])
 const seedReviewed = ref(false)
+const seedIsLocal = ref(true) // §59.21: 默认 true（向后兼容）
 // §59.20 ⑨: 预览模式（保存即预览）
 const seedPreviewMode = ref(false)
 const previewRenderedDesc = ref('')
@@ -764,12 +766,13 @@ async function doRefresh(type: string) {
   if (!selectedTorrent.value) return
   refreshing.value = type
   try {
-    const payload: { type: string; name: string; save_path?: string; info_hash?: string; site_name?: string; screenshots?: string[] } = {
+    const payload: { type: string; name: string; save_path?: string; info_hash?: string; site_name?: string; screenshots?: string[]; client_id?: string } = {
       type,
       name: selectedTorrent.value.name,
       save_path: selectedTorrent.value.save_path,
       info_hash: selectedTorrent.value.info_hash,
       site_name: currentSourceSite.value || selectedTorrent.value.source_site || '',
+      client_id: String(selectedTorrent.value.client_id || ''),
     }
     if (type === 'rehost_screenshots') {
       payload.screenshots = form.value.screenshots

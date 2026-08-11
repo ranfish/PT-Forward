@@ -202,6 +202,9 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	if complianceChecker != nil {
 		rt.publishTorrentsHandler.SetComplianceChecker(complianceChecker)
 	}
+	if pipeline != nil {
+		rt.publishTorrentsHandler.SetSeedPipeline(pipeline)
+	}
 }
 
 func (rt *Router) SetCookieCloudServer(srv http.Handler) {
