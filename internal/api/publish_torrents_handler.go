@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
@@ -38,8 +39,11 @@ type PublishTorrentsHandler struct {
 	sourceDetector *publish.SourceSiteDetector
 	declFilter     *publish.DeclarationFilter
 	reseedEngine   *reseed.Engine
+	metadataFetcher MetadataFetcherProvider
+	complianceChecker *compliance.Checker
 	logger         *zap.Logger
 	bgState        backgroundQueryState
+	batchFetch     batchFetchState
 }
 
 type backgroundQueryState struct {
@@ -47,6 +51,22 @@ type backgroundQueryState struct {
 	active      map[uint]bool // clientID → querying
 	total       int
 	done        int
+}
+
+type batchFetchState struct {
+	mu     sync.Mutex
+	active bool
+	total  int
+	done   int
+	failed int
+	items  []batchFetchItem
+}
+
+type batchFetchItem struct {
+	Hash   string `json:"hash"`
+	Name   string `json:"name"`
+	Status string `json:"status"` // pending / done / failed
+	Error  string `json:"error,omitempty"`
 }
 
 func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger) *PublishTorrentsHandler {
@@ -63,6 +83,8 @@ func (h *PublishTorrentsHandler) SetClientProvider(c MFClientProvider)  { h.clie
 func (h *PublishTorrentsHandler) SetSiteProvider(s SiteProviderGetter)  { h.siteProvider = s }
 func (h *PublishTorrentsHandler) SetSourceDetector(d *publish.SourceSiteDetector) { h.sourceDetector = d }
 func (h *PublishTorrentsHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
+func (h *PublishTorrentsHandler) SetMetadataFetcher(f MetadataFetcherProvider)      { h.metadataFetcher = f }
+func (h *PublishTorrentsHandler) SetComplianceChecker(c *compliance.Checker)        { h.complianceChecker = c }
 
 func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -116,6 +138,20 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleGetSourcePriority(w, r)
 	case strings.HasSuffix(path, "/publish/source-priority") && r.Method == http.MethodPut:
 		h.handleSetSourcePriority(w, r)
+	case strings.HasSuffix(path, "/publish/fetch-priority") && r.Method == http.MethodGet:
+		h.handleGetFetchPriority(w, r)
+	case strings.HasSuffix(path, "/publish/fetch-priority") && r.Method == http.MethodPut:
+		h.handleSetFetchPriority(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/batch-fetch") && r.Method == http.MethodPost:
+		h.handleBatchFetch(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/batch-fetch-progress") && r.Method == http.MethodGet:
+		h.handleBatchFetchProgress(w, r)
+	case strings.HasSuffix(path, "/publish/seeds") && r.Method == http.MethodGet:
+		h.handleListSeeds(w, r)
+	case strings.Contains(path, "/publish/seeds/") && r.Method == http.MethodGet:
+		h.handleGetSeed(w, r)
+	case strings.Contains(path, "/publish/seeds/") && r.Method == http.MethodPut:
+		h.handlePutSeed(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -2150,4 +2186,558 @@ func (h *PublishTorrentsHandler) defaultSourcePriority(ctx context.Context) []st
 		}
 	}
 	return result
+}
+
+// handleGetFetchPriority §59.20: 读取"获取数据"站点优先级。
+func (h *PublishTorrentsHandler) handleGetFetchPriority(w http.ResponseWriter, r *http.Request) {
+	priority := h.getFetchPrioritySetting(r.Context())
+	if len(priority) == 0 {
+		priority = h.defaultSourcePriority(r.Context())
+	}
+	Success(w, map[string]interface{}{"priority": priority})
+}
+
+// handleSetFetchPriority §59.20: 保存"获取数据"站点优先级。
+func (h *PublishTorrentsHandler) handleSetFetchPriority(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Priority []string `json:"priority"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "invalid body")
+		return
+	}
+	data, _ := json.Marshal(req.Priority)
+	h.db.WithContext(r.Context()).Exec(
+		"INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+		"fetch_priority", string(data))
+	Success(w, map[string]interface{}{"priority": req.Priority})
+}
+
+func (h *PublishTorrentsHandler) getFetchPrioritySetting(ctx context.Context) []string {
+	var val string
+	if err := h.db.WithContext(ctx).Raw("SELECT value FROM system_settings WHERE key = 'fetch_priority' LIMIT 1").Row().Scan(&val); err != nil {
+		return nil
+	}
+	var priority []string
+	if err := json.Unmarshal([]byte(val), &priority); err != nil {
+		return nil
+	}
+	return priority
+}
+
+// ==================== 种子配置页 API（§59.20） ====================
+
+// handleBatchFetch §59.20: 异步批量获取种子 metadata（"获取数据"按钮）。
+func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http.Request) {
+	if h.metadataFetcher == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "metadata fetcher 未初始化")
+		return
+	}
+	if h.sourceDetector == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "source detector 未初始化")
+		return
+	}
+
+	var req struct {
+		Items []struct {
+			Hash string `json:"hash"`
+			Name string `json:"name"`
+			Size int64  `json:"size"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if len(req.Items) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "items 为空")
+		return
+	}
+
+	h.batchFetch.mu.Lock()
+	if h.batchFetch.active {
+		h.batchFetch.mu.Unlock()
+		Error(w, http.StatusConflict, 40901, "已有批量获取任务在运行")
+		return
+	}
+	h.batchFetch.active = true
+	h.batchFetch.total = len(req.Items)
+	h.batchFetch.done = 0
+	h.batchFetch.failed = 0
+	h.batchFetch.items = make([]batchFetchItem, len(req.Items))
+	for i, item := range req.Items {
+		h.batchFetch.items[i] = batchFetchItem{Hash: item.Hash, Name: item.Name, Status: "pending"}
+	}
+	h.batchFetch.mu.Unlock()
+
+	go h.runBatchFetch(req.Items)
+
+	Success(w, map[string]interface{}{"message": "已开始", "total": len(req.Items)})
+}
+
+func (h *PublishTorrentsHandler) runBatchFetch(items []struct {
+	Hash string `json:"hash"`
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}) {
+	ctx := context.Background()
+	for i, item := range items {
+		h.batchFetch.mu.Lock()
+		h.batchFetch.items[i].Status = "pending"
+		h.batchFetch.mu.Unlock()
+
+		err := h.fetchSingleTorrent(ctx, item.Hash, item.Name, item.Size)
+
+		h.batchFetch.mu.Lock()
+		h.batchFetch.done++
+		if err != nil {
+			h.batchFetch.failed++
+			h.batchFetch.items[i].Status = "failed"
+			h.batchFetch.items[i].Error = err.Error()
+		} else {
+			h.batchFetch.items[i].Status = "done"
+		}
+		h.batchFetch.mu.Unlock()
+
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	h.batchFetch.mu.Lock()
+	h.batchFetch.active = false
+	h.batchFetch.mu.Unlock()
+}
+
+func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, name string, size int64) error {
+	var coverageSites []model.SiteCoverageCache
+	if h.coverage != nil {
+		cs, err := h.coverage.GetCachedCoverage(ctx, hash)
+		if err == nil {
+			coverageSites = cs
+		}
+	}
+
+	result := h.sourceDetector.SelectFetchSite(ctx, name, coverageSites)
+	if result.SourceSite == "" {
+		return fmt.Errorf("无可用源站（制作组未映射 + 无覆盖）")
+	}
+
+	fetchCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	if result.TorrentID != "" {
+		_, err := h.metadataFetcher.FetchAndStore(fetchCtx, hash, result.SourceSite, result.TorrentID)
+		return err
+	}
+	_, err := h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size)
+	return err
+}
+
+// handleBatchFetchProgress §59.20: 查询批量获取进度。
+func (h *PublishTorrentsHandler) handleBatchFetchProgress(w http.ResponseWriter, r *http.Request) {
+	h.batchFetch.mu.Lock()
+	defer h.batchFetch.mu.Unlock()
+	Success(w, map[string]interface{}{
+		"active": h.batchFetch.active,
+		"total":  h.batchFetch.total,
+		"done":   h.batchFetch.done,
+		"failed": h.batchFetch.failed,
+		"items":  h.batchFetch.items,
+	})
+}
+
+// handleListSeeds §59.20: 种子配置页列表 API。
+// 数据流：snapshots(JOIN client+path) → metadata(源站行去重) → compliance+mapping 状态标注 → 5 态标签
+func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.Request) {
+	clientID := r.URL.Query().Get("client_id")
+	savePath := r.URL.Query().Get("save_path")
+	if clientID == "" || savePath == "" {
+		Error(w, http.StatusBadRequest, 40001, "client_id 和 save_path 为必填")
+		return
+	}
+
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page == 0 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+	if pageSize == 0 {
+		pageSize = 50
+	}
+
+	// 1. 查 snapshots（分页）
+	var total int64
+	h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
+		Where("client_id = ? AND save_path = ? AND is_hidden = ?", clientID, savePath, false).
+		Count(&total)
+
+	var snapshots []model.TorrentSnapshot
+	h.db.WithContext(r.Context()).
+		Where("client_id = ? AND save_path = ? AND is_hidden = ?", clientID, savePath, false).
+		Order("updated_at DESC").
+		Offset((page - 1) * pageSize).Limit(pageSize).
+		Find(&snapshots)
+
+	if len(snapshots) == 0 {
+		Success(w, map[string]interface{}{"items": []interface{}{}, "total": 0})
+		return
+	}
+
+	// 2. 收集 hash → 查 metadata
+	hashes := make([]string, len(snapshots))
+	for i, s := range snapshots {
+		hashes[i] = s.Hash
+	}
+	var metas []model.TorrentMetadata
+	h.db.WithContext(r.Context()).
+		Where("info_hash IN ?", hashes).
+		Find(&metas)
+
+	// 3. 按 hash 分组 metadata，选出源站行（制作组映射命中优先，否则 updated_at 最新）
+	metaByHash := h.groupMetasByHash(metas)
+
+	// 4. 组装结果 + compliance + 映射检查
+	items := make([]map[string]interface{}, 0, len(snapshots))
+	for _, snap := range snapshots {
+		item := map[string]interface{}{
+			"hash":      snap.Hash,
+			"name":      snap.Name,
+			"size":      snap.Size,
+			"client_id": snap.ClientID,
+			"save_path": snap.SavePath,
+		}
+
+		// 查找源站行 metadata
+		var meta *model.TorrentMetadata
+		if metas, ok := metaByHash[snap.Hash]; ok && len(metas) > 0 {
+			meta = h.selectSourceMeta(metas)
+		}
+
+		if meta != nil {
+			item["site_name"] = meta.SiteName
+			item["title"] = meta.Title
+			item["subtitle"] = meta.Subtitle
+			item["poster"] = meta.Poster
+			item["reviewed"] = meta.Reviewed
+			item["flags"] = meta.Flags
+			item["source_category"] = meta.SourceCategory
+			item["fetch_source"] = meta.FetchSource
+			item["has_mediainfo"] = meta.MediaInfo != ""
+			item["has_description"] = meta.Description != ""
+			item["has_screenshots"] = meta.Screenshots != ""
+			item["fetched_at"] = meta.FetchedAt
+		} else {
+			item["reviewed"] = false
+			item["fetched"] = false
+		}
+
+		// 5 态标注
+		status := h.classifySeedStatus(r.Context(), snap.Name, meta)
+		item["status"] = status
+
+		items = append(items, item)
+	}
+
+	Success(w, map[string]interface{}{
+		"items": items,
+		"total": total,
+	})
+}
+
+// groupMetasByHash 按 info_hash 分组 metadata。
+func (h *PublishTorrentsHandler) groupMetasByHash(metas []model.TorrentMetadata) map[string][]model.TorrentMetadata {
+	result := make(map[string][]model.TorrentMetadata)
+	for _, m := range metas {
+		result[m.InfoHash] = append(result[m.InfoHash], m)
+	}
+	return result
+}
+
+// selectSourceMeta 从同一 hash 的多行 metadata 中选出源站行（制作组映射命中优先，否则 updated_at 最新）。
+func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata) *model.TorrentMetadata {
+	if len(metas) == 0 {
+		return nil
+	}
+	ctx := context.Background()
+	var best *model.TorrentMetadata
+	for i := range metas {
+		if best == nil || metas[i].UpdatedAt.After(best.UpdatedAt) {
+			best = &metas[i]
+		}
+	}
+	// 尝试找制作组映射命中行
+	if h.sourceDetector != nil {
+		for i := range metas {
+			group := publish.ExtractGroupName(metas[i].Title)
+			if group != "" {
+				site := h.sourceDetector.LookupGroup(ctx, group)
+				if site == metas[i].SiteName {
+					return &metas[i]
+				}
+			}
+		}
+	}
+	return best
+}
+
+// classifySeedStatus §59.20: 种子 5 态分类。
+func (h *PublishTorrentsHandler) classifySeedStatus(ctx context.Context, name string, meta *model.TorrentMetadata) string {
+	// ① flags 检查
+	if meta != nil && meta.Flags != "" {
+		lower := strings.ToLower(meta.Flags)
+		forbiddenKeywords := []string{"禁转", "谢绝转载", "独占", "限时禁转", "forbidden", "exclusive"}
+		for _, kw := range forbiddenKeywords {
+			if strings.Contains(lower, strings.ToLower(kw)) {
+				return "forbidden"
+			}
+		}
+	}
+
+	// ② compliance 检查
+	if h.complianceChecker != nil && meta != nil {
+		siteName := ""
+		if meta.SiteName != "" {
+			siteName = meta.SiteName
+		}
+		if r := h.complianceChecker.CheckWithSite(ctx, name, siteName); r != nil && !r.Passed {
+			return "system_forbidden"
+		}
+	}
+
+	// ③ 制作组映射检查
+	if h.sourceDetector != nil {
+		group := publish.ExtractGroupName(name)
+		if group == "" {
+			return "no_mapping"
+		}
+		site := h.sourceDetector.LookupGroup(ctx, group)
+		if site == "" {
+			return "no_mapping"
+		}
+	}
+
+	// 无 metadata → 未获取
+	if meta == nil {
+		return "unfetched"
+	}
+
+	// ④ reviewed=true
+	if meta.Reviewed {
+		return "reviewed"
+	}
+
+	// ⑤⑥ 9 字段校验
+	missing := h.checkRequiredFields(meta)
+	if len(missing) > 0 {
+		return "incomplete"
+	}
+	return "pending"
+}
+
+// checkRequiredFields §59.20: 9 必需字段校验，返回缺失字段名列表。
+func (h *PublishTorrentsHandler) checkRequiredFields(meta *model.TorrentMetadata) []string {
+	var missing []string
+	if meta.Title == "" {
+		missing = append(missing, "title")
+	}
+	if meta.Poster == "" {
+		missing = append(missing, "poster")
+	}
+	if meta.Screenshots == "" {
+		missing = append(missing, "screenshots")
+	}
+	if meta.Description == "" {
+		missing = append(missing, "description")
+	}
+	if meta.MediaInfo == "" {
+		missing = append(missing, "mediainfo")
+	}
+	if meta.Resolution == "" {
+		missing = append(missing, "resolution")
+	}
+	if meta.VideoCodec == "" {
+		missing = append(missing, "video_codec")
+	}
+	if meta.AudioCodec == "" {
+		missing = append(missing, "audio_codec")
+	}
+	// 制作组从标题解析
+	if h.sourceDetector != nil {
+		if g := publish.ExtractGroupName(meta.Title); g == "" {
+			missing = append(missing, "release_group")
+		}
+	}
+	return missing
+}
+
+// extractSeedHash 从 URL 路径 /api/v1/publish/seeds/:info_hash 提取 info_hash。
+func extractSeedHash(r *http.Request) string {
+	path := strings.TrimRight(r.URL.Path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
+}
+
+// handleGetSeed §59.20: 读取单个种子 metadata（GET /publish/seeds/:info_hash）。
+// 返回 DB 14 平铺字段 + ParseTitleTech 解析 5 字段 = 完整 18 TechProfile + 编辑字段。
+func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Request) {
+	infoHash := extractSeedHash(r)
+	if infoHash == "" || infoHash == "seeds" {
+		Error(w, http.StatusBadRequest, 40001, "缺少 info_hash")
+		return
+	}
+
+	var metas []model.TorrentMetadata
+	h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash).Find(&metas)
+
+	if len(metas) == 0 {
+		Error(w, http.StatusNotFound, 40401, "未找到 metadata")
+		return
+	}
+
+	meta := h.selectSourceMeta(metas)
+	if meta == nil {
+		Error(w, http.StatusNotFound, 40401, "未找到源站行 metadata")
+		return
+	}
+
+	// screenshots 换行分隔 → 数组
+	var screenshots []string
+	if meta.Screenshots != "" {
+		for _, line := range strings.Split(meta.Screenshots, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				screenshots = append(screenshots, line)
+			}
+		}
+	}
+
+	// ParseTitleTech 补全 5 字段（main_title, season_episode, year, release_group, chinese_prefix）
+	profile := titleparser.ParseTitleTech(meta.Title)
+
+	result := map[string]interface{}{
+		"info_hash":       meta.InfoHash,
+		"site_name":       meta.SiteName,
+		"title":           meta.Title,
+		"subtitle":        meta.Subtitle,
+		"poster":          meta.Poster,
+		"description":     meta.Description,
+		"screenshots":     screenshots,
+		"mediainfo":       meta.MediaInfo,
+		"bdinfo":          meta.BDInfo,
+		"statement":       meta.Statement,
+		"imdb_url":        meta.IMDbURL,
+		"douban_url":      meta.DoubanURL,
+		"tmdb_url":        meta.TMDbURL,
+		"flags":           meta.Flags,
+		"source_category": meta.SourceCategory,
+		"reviewed":        meta.Reviewed,
+		"fetched_at":      meta.FetchedAt,
+		"fetch_source":    meta.FetchSource,
+
+		// 14 DB 平铺字段
+		"category":        meta.Category,
+		"form":            meta.Form,
+		"resolution":      meta.Resolution,
+		"video_codec":     meta.VideoCodec,
+		"audio_codec":     meta.AudioCodec,
+		"audio_channels":  meta.AudioChannels,
+		"audio_tech":      meta.AudioTech,
+		"hdr":             meta.HDR,
+		"bit_depth":       meta.BitDepth,
+		"source_type":     meta.SourceType,
+		"specification":   meta.Specification,
+		"source_platform": meta.SourcePlatform,
+		"edition_info":    meta.EditionInfo,
+		"region_code":     meta.RegionCode,
+
+		// 5 ParseTitleTech 解析字段
+		"main_title":       profile.MainTitle,
+		"season_episode":   profile.SeasonEpisode,
+		"year":             profile.Year,
+		"release_group":    profile.ReleaseGroup,
+		"chinese_prefix":   profile.ChinesePrefix,
+
+		// 状态
+		"missing_fields": h.checkRequiredFields(meta),
+	}
+
+	Success(w, result)
+}
+
+// handlePutSeed §59.20: 保存种子配置（PUT /publish/seeds/:info_hash）。
+// 写入编辑字段（poster/screenshots/description）→ 9 字段校验 → Reviewed → 预览渲染。
+func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Request) {
+	infoHash := extractSeedHash(r)
+	if infoHash == "" || infoHash == "seeds" {
+		Error(w, http.StatusBadRequest, 40001, "缺少 info_hash")
+		return
+	}
+
+	var req struct {
+		Poster       string   `json:"poster"`
+		Screenshots  []string `json:"screenshots"`
+		Description  string   `json:"description"`
+		SiteName     string   `json:"site_name"` // 可选，指定更新哪行
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+
+	// 找到目标行
+	query := h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash)
+	if req.SiteName != "" {
+		query = query.Where("site_name = ?", req.SiteName)
+	}
+	var metas []model.TorrentMetadata
+	query.Find(&metas)
+	if len(metas) == 0 {
+		Error(w, http.StatusNotFound, 40401, "未找到 metadata")
+		return
+	}
+	meta := h.selectSourceMeta(metas)
+	if meta == nil {
+		meta = &metas[0]
+	}
+
+	// 写入编辑字段
+	updates := map[string]interface{}{
+		"poster":       req.Poster,
+		"screenshots":  strings.Join(req.Screenshots, "\n"),
+		"description":  req.Description,
+	}
+
+	// 9 字段校验 → Reviewed
+	meta.Poster = req.Poster
+	meta.Screenshots = strings.Join(req.Screenshots, "\n")
+	meta.Description = req.Description
+	missing := h.checkRequiredFields(meta)
+	updates["reviewed"] = len(missing) == 0
+
+	h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
+		Where("id = ?", meta.ID).
+		Updates(updates)
+
+	// 重新查询获取更新后的数据
+	var updated model.TorrentMetadata
+	h.db.WithContext(r.Context()).Where("id = ?", meta.ID).First(&updated)
+
+	// 返回结果（同 GET 但加 reviewed 和 missing_fields）
+	profile := titleparser.ParseTitleTech(updated.Title)
+
+	result := map[string]interface{}{
+		"info_hash":    updated.InfoHash,
+		"site_name":    updated.SiteName,
+		"title":        updated.Title,
+		"subtitle":     updated.Subtitle,
+		"poster":       updated.Poster,
+		"description":  updated.Description,
+		"reviewed":     updated.Reviewed,
+		"missing_fields": missing,
+		"main_title":    profile.MainTitle,
+		"release_group":  profile.ReleaseGroup,
+	}
+	Success(w, result)
 }
