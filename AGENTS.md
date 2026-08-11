@@ -2,9 +2,9 @@
 
 ## 当前任务焦点（新会话必读）
 
-**版本**：v0.0.551（已发布）。种子配置页设计讨论全部完成（§59.20），待实施。
+**版本**：v0.0.557（已发布）。种子配置页 §59.19-§59.20 + is_local §59.21 全部实施完成。
 
-**当前主线**：种子配置页实施（§59.19-§59.20 设计完成，20 项后端 + 17 项前端改动待编码）。
+**当前主线**：种子配置页已全部完成（后端 20 + 前端 17 + is_local 7 项），等待端到端测试和生产环境部署。
 
 ### ✅ 已完成（v0.0.228 → v0.0.547）
 
@@ -34,36 +34,52 @@
 - ✅ **DryRun 缓存修复**（§59.18）：试运行从 rss_torrent_seen 恢复缓存的免费状态（v0.0.546）
 - ✅ **死代码清理**：删除 ExtractType（v0.0.547）、海胆 pieces_hash_api 修正（v0.0.542）
 
-### 🔧 种子配置页（§59.19~§59.20，设计完成待实施）
+### ✅ 种子配置页（§59.19~§59.21，全部完成）
 
-**Phase 3 基础设施（v0.0.548~v0.0.551，已完成）**：
+**Phase 3 基础设施（v0.0.548~v0.0.551）**：
 - ✅ torrent_snapshots 快照表 + syncer 扩展 + snapshot-paths API（v0.0.549）
 - ✅ torrent_metadata 加 14 TechProfile 平铺字段 + category/form（v0.0.550）
 - ✅ CrossSeedPanel maintenanceOnly prop + fillFormFromPreset + saveOnly（v0.0.551）
 - ✅ SeedConfig.vue 种子配置页框架（mock 数据）（v0.0.548）
 
-**设计讨论全部完成**（§59.20，2026-08-11）：
-- ✅ 3 个冲突 + 9 个回归点 + 发布预览 + 过渡期，全部解决
-- ⏸ 遗漏 3（一种多站/一站多种重构）暂缓，待种子配置页有数据后再讨论
+**后端实施（v0.0.552~v0.0.553，20/20 完成）**：
+- ✅ torrent_metadata 加 statement + bdinfo 列 + 22 个无映射站点关闭 is_source（migration #7）
+- ✅ Detect() Step 2 加 cookie 检查 + SelectFetchSite() 新函数（制作组优先）
+- ✅ GET/PUT /publish/seeds 列表/读写 API（含 compliance + 9 字段校验 + 5 态标注）
+- ✅ GET /downloads/snapshot-unconfigured + POST batch-fetch 异步批量获取 + 进度轮询
+- ✅ GET/PUT /publish/fetch-priority（获取数据站点优先级）
+- ✅ GenerateThanksQuote 加 {group_name} + 渲染器始终添加致谢
+- ✅ handleRefresh('mediainfo') 联动 BDInfo + handleRefresh('intro') 不再返回 subtitle
+- ✅ CheckPublishEligibility 增加源站映射检查（第 0 层合规）
+- ✅ persistAnalysis 写入 statement + bdinfo
+- ✅ MainDataCron 列名 bug 修复 + /seeding role 过滤（v0.0.553）
 
-**待实施（20 后端 + 17 前端）**，详见 §59.20 第十七章/十八章完整清单。核心改动：
+**前端实施（v0.0.552~v0.0.555，17/17 完成）**：
+- ✅ SeedConfig.vue 接真实 API + snake_case + 5 态标签 + 禁转/无映射只读（v0.0.552）
+- ✅ CrossSeedPanel 六 Tab 改造（18 字段只读 / 海报 / 截图左右分栏 / 简介 / 媒体信息 / 已过滤声明）（v0.0.552）
+- ✅ CrossSeedPanel 维护模式 GET/PUT API + 编辑→预览→完成三步流程（v0.0.554）
+- ✅ BatchFetchPanel.vue 批量获取弹窗 + 进度轮询（v0.0.552）
+- ✅ BBCode→HTML parseBBCode 工具函数（v0.0.554）
+- ✅ 发布预览页面（方案 A：保存即预览）（v0.0.554）
+- ✅ 截图左右分栏布局（URL 列表 + 大图预览）（v0.0.555）
+- ✅ 路由 /publish/exclusions → /publish/rules（4 Tab 含声明过滤 + 小组映射只读）（v0.0.552）
+- ✅ 导航简化（隐藏一站多种/一种多站）（v0.0.552）
 
-后端：
-- torrent_metadata 加 statement + bdinfo 列（migration）
-- 22 个无小组映射站点关闭 is_source（migration）
-- Detect() Step 2 加 cookie 检查 + SelectFetchSite() 新函数（制作组优先）
-- GET/PUT /publish/seeds 列表/读写 API（含 compliance + 9 字段校验 + 标准化 + 预览渲染）
-- GET /downloads/snapshot-unconfigured + POST batch-fetch 异步批量获取
-- GenerateThanksQuote 加 {group_name} + 渲染器始终添加致谢
-- handleRefresh('mediainfo') 联动 TechProfile + handleRefresh('intro') 修正
-- CheckPublishEligibility 增加源站映射检查（第 0 层合规）
+**回归审核修复（v0.0.556）**：
+- ✅ batch-fetch runBatchFetch 加 defer recover()
+- ✅ Migration #8 错误不再忽略
+- ✅ handleRefresh('mediainfo') BDInfo 改调 bdinfoScanner.ScanIfBD
 
-前端：
-- SeedConfig.vue 字段名统一 snake_case + 5 态标签 + 禁转/无映射只读
-- CrossSeedPanel 六 Tab 改造（种子详情 18 字段只读 / 海报可编辑 / 截图左右分栏 / 简介可编辑 / 媒体信息只读 / 已过滤声明只读）
-- 发布前预览页面（方案 A：保存即预览）
-- BatchFetchPanel.vue 批量获取弹窗 + 进度轮询
-- 路由 /publish/exclusions → /publish/rules（4 Tab 含小组映射只读查看）
+**is_local 本地发布 vs 转种上盒（§59.21，v0.0.557）**：
+- ✅ ClientConfig 加 IsLocal bool（用户添加下载器时必填）
+- ✅ batch-fetch：is_local=true 追加本地 mediainfo，is_local=false 仅源站采集
+- ✅ GET API 通过 client_id 查 is_local 返回前端（后端是唯一真相源）
+- ✅ handleRefresh：is_local=false 时从源站重抓（mediainfo/screenshots）
+- ✅ 下载器编辑表单加 is_local 必填 radio（本地发布/转种上盒）
+- ✅ CrossSeedPanel 按钮文案根据 is_local 切换
+
+**暂缓**：
+- ⏸ 遗漏 3（一种多站/一站多种重构），待种子配置页有数据后再讨论
 
 ### 端到端验收状态
 
@@ -73,8 +89,9 @@
 | 孤儿恢复（分类 + 文件级搜索 + 同站扩展 + 注入校验）| ✅ |
 | RSS 订阅（每订阅独立 seen + FreeWait + DryRun 缓存）| ✅ |
 | 配置表统一（seeding + download 合并，阶段 A/B/C 完成）| ✅ |
-| 种子配置页（基础设施 + 设计）| ✅ 基础设施完成，设计完成 |
-| 种子配置页（前后端实施）| 🔧 待实施 |
+| 种子配置页（基础设施 + 设计）| ✅ |
+| 种子配置页（前后端实施）| ✅ v0.0.552-555 |
+| 种子配置页 is_local（本地发布 vs 转种上盒）| ✅ v0.0.557 |
 
 **关键事实**：
 - 开发环境 29（systemctl --user pt-forward，端口 8765）
@@ -89,11 +106,13 @@
 - 种子 5 态：禁转(flags)/系统禁转(compliance)/无源站映射/已审核/待审核+配置不完整
 - 源站约束：制作组不在 release_group_mappings 的种子不可转发，无映射站点不可开启 is_source
 - 发布预览采用方案 A（保存即预览）：PUT 同时保存+标准化+9字段校验+渲染
+- is_local 区分本地发布（本地 mediainfo/mpv）和转种上盒（源站数据引用），后端是唯一真相源
 
 **待办**：
-- 种子配置页实施（20 后端 + 17 前端，§59.20 第十七章/十八章）
+- 端到端测试（需有本地下载器的环境验证 is_local=true 全流程）
+- 生产环境部署（用户 OTA / docker compose pull）
 
-**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§59.20（67000+ 行，按需读特定章节，不要一次读全文）。
+**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§59.21（67000+ 行，按需读特定章节，不要一次读全文）。
 
 ## 环境信息
 
