@@ -36,7 +36,7 @@ func EnsureAdminUser(ctx context.Context, repo model.AuthRepository, logger *zap
 		return authError(ErrAuthInit, "create admin user", err)
 	}
 
-	logger.Info("========================================================",
+	logger.Info("============================",
 		zap.String("username", "admin"),
 		zap.String("password", password),
 		zap.String("action", "Please login and change password immediately."),

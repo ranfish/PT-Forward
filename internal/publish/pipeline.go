@@ -26,6 +26,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/pusher"
 	"github.com/ranfish/pt-forward/internal/screenshot"
 	"github.com/ranfish/pt-forward/internal/titleparser"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -949,6 +950,7 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 
 	descData := &model.DescriptionData{
 		SourceSite: sourceSite,
+		Title:      title, // §59.20: 渲染器提取制作组名生成致谢
 	}
 	if sourceDetail != nil {
 		descData.MediaInfoText = sourceDetail.MediaInfo
@@ -1033,13 +1035,7 @@ func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite
 		}
 	}
 
-	// §56.20: 追加感谢引言（默认中文站配置）
-	if sourceSite != "" {
-		thanks := description.GenerateThanksQuote(sourceSite, false, nil)
-		if thanks != "" {
-			descriptionText = thanks + "\n\n" + descriptionText
-		}
-	}
+	// §59.20: 感谢引言由渲染器 Render() 始终添加，不再手动 prepend（避免重复）
 
 	result.Text = descriptionText
 	return result
@@ -1597,6 +1593,24 @@ func (p *Pipeline) checkForbiddenContent(texts []string) (bool, string) {
 }
 
 func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model.PublishCandidate, targetSite string) (bool, string) {
+	// §59.20: 第 0 层——源站映射检查（制作组不在 release_group_mappings 中 → 不可发布）
+	// 仅当映射表有数据时生效（测试环境/全新安装跳过）
+	var totalMappings int64
+	p.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Count(&totalMappings)
+	if totalMappings > 0 {
+		groupName := util.ExtractGroupName(candidate.TorrentName)
+		if groupName == "" {
+			return false, "无法提取制作组名（无组名资源不可发布，§59.20）"
+		}
+		var mappingCount int64
+		p.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+			Where("LOWER(group_name) = LOWER(?)", groupName).
+			Count(&mappingCount)
+		if mappingCount == 0 {
+			return false, fmt.Sprintf("制作组 %s 不在源站映射表中，不可发布（§59.20）", groupName)
+		}
+	}
+
 	// 1. 合规检查（compliance.Checker 优先，含成人/禁转/小组/用户关键词/站点黑名单）
 	if p.complianceChecker != nil {
 		result := p.complianceChecker.CheckWithSite(ctx, candidate.TorrentName, candidate.SourceSite)

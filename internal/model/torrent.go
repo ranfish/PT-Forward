@@ -147,6 +147,7 @@ type DescriptionData struct {
 	BDInfoText    string        `json:"bdinfo_text"`
 	Screenshots   []string      `json:"screenshots"`
 	SourceSite    string        `json:"source_site"`
+	Title         string        `json:"title"`             // §59.20: 种子标题（用于提取制作组名生成致谢）
 }
 
 // §33.1.28 — PublishStepResult: 21 步中间产物容器

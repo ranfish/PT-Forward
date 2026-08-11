@@ -8,19 +8,25 @@ import (
 // ===== thanks_quote.go 测试 =====
 
 func TestGenerateThanksQuote_DefaultChinese(t *testing.T) {
-	result := GenerateThanksQuote("猫站", false, nil)
+	result := GenerateThanksQuote("猫站", "FRDS", false, nil)
 	if !strings.Contains(result, "猫站") {
 		t.Errorf("should contain source site, got %q", result)
 	}
-	if !strings.Contains(result, "感谢原发布者") {
+	if !strings.Contains(result, "FRDS") {
+		t.Errorf("should contain group name, got %q", result)
+	}
+	if !strings.Contains(result, "感谢原制作者发布") {
 		t.Errorf("should contain default chinese template, got %q", result)
 	}
 }
 
 func TestGenerateThanksQuote_DefaultEnglish(t *testing.T) {
-	result := GenerateThanksQuote("HDHome", true, nil)
+	result := GenerateThanksQuote("HDHome", "FRDS", true, nil)
 	if !strings.Contains(result, "HDHome") {
 		t.Errorf("should contain source site, got %q", result)
+	}
+	if !strings.Contains(result, "FRDS") {
+		t.Errorf("should contain group name, got %q", result)
 	}
 	if !strings.Contains(result, "original uploader") {
 		t.Errorf("should contain default english template, got %q", result)
@@ -29,7 +35,7 @@ func TestGenerateThanksQuote_DefaultEnglish(t *testing.T) {
 
 func TestGenerateThanksQuote_Disabled(t *testing.T) {
 	config := &ThanksQuoteConfig{Enabled: false}
-	if result := GenerateThanksQuote("猫站", false, config); result != "" {
+	if result := GenerateThanksQuote("猫站", "FRDS", false, config); result != "" {
 		t.Errorf("disabled should return empty, got %q", result)
 	}
 }
@@ -39,7 +45,7 @@ func TestGenerateThanksQuote_CustomTemplate(t *testing.T) {
 		Enabled:         true,
 		ChineseTemplate: "来自 {source_site}",
 	}
-	result := GenerateThanksQuote("猫站", false, config)
+	result := GenerateThanksQuote("猫站", "FRDS", false, config)
 	if result != "来自 猫站" {
 		t.Errorf("custom template mismatch, got %q", result)
 	}
@@ -50,19 +56,17 @@ func TestGenerateThanksQuote_SiteOverride(t *testing.T) {
 		Enabled:      true,
 		SiteTemplate: "站点专属: {source_site}",
 	}
-	result := GenerateThanksQuote("猫站", false, config)
+	result := GenerateThanksQuote("猫站", "FRDS", false, config)
 	if result != "站点专属: 猫站" {
 		t.Errorf("site override mismatch, got %q", result)
 	}
 }
 
 func TestGenerateThanksQuote_EmptySourceSite(t *testing.T) {
-	result := GenerateThanksQuote("", false, nil)
-	if !strings.Contains(result, ThanksQuotePlaceholder) {
-		// 占位符被替换为空，但仍含模板其他内容
-		if !strings.Contains(result, "感谢原发布者") {
-			t.Errorf("should still contain template, got %q", result)
-		}
+	result := GenerateThanksQuote("", "FRDS", false, nil)
+	// 占位符被替换为空，但仍含模板其他内容
+	if !strings.Contains(result, "感谢原制作者发布") {
+		t.Errorf("should still contain template, got %q", result)
 	}
 }
 

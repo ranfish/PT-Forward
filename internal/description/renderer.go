@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/util"
 )
 
 type Renderer struct {
@@ -72,6 +73,15 @@ func (r *Renderer) Render(data *model.DescriptionData, config model.SiteDescConf
 	if data.SourceSite != "" {
 		note := fmt.Sprintf("转载自 %s", data.SourceSite)
 		sections = append(sections, r.renderSection("来源", note, format))
+	}
+
+	// §59.20: 始终添加致谢（不只 TemplateOverride 时）
+	if data.SourceSite != "" {
+		group := util.ExtractGroupName(data.Title)
+		quote := GenerateThanksQuote(data.SourceSite, group, false, nil)
+		if quote != "" {
+			sections = append(sections, r.renderSection("致谢", quote, format))
+		}
 	}
 
 	if config.TemplateOverride != "" {
@@ -196,7 +206,7 @@ func (r *Renderer) applyTemplate(template string, data *model.DescriptionData, f
 		}
 	}
 	// §56.20 决策 2: thanks_quote（默认中文站配置）
-	result = strings.ReplaceAll(result, "{{thanks_quote}}", GenerateThanksQuote(data.SourceSite, false, nil))
+	result = strings.ReplaceAll(result, "{{thanks_quote}}", GenerateThanksQuote(data.SourceSite, util.ExtractGroupName(data.Title), false, nil))
 
 	return result
 }
