@@ -62,6 +62,68 @@
 
         <!-- Step 0: 编辑详情（5 Tab） -->
         <div v-else-if="currentStep === 0" class="csp-step-content">
+          <!-- §59.20 ⑨: maintenanceOnly 预览模式 -->
+          <template v-if="maintenanceOnly && seedPreviewMode">
+            <div style="max-width: 900px">
+              <a-typography-title :level="5">发布预览</a-typography-title>
+
+              <!-- 标题 + 副标题 -->
+              <div style="margin-bottom: 16px">
+                <h3 style="margin: 0">{{ form.title || '—' }}</h3>
+                <div v-if="form.subtitle" style="color: #666; font-size: 14px">{{ form.subtitle }}</div>
+              </div>
+
+              <!-- 标准化参数 -->
+              <a-descriptions :column="4" bordered size="small" style="margin-bottom: 16px">
+                <a-descriptions-item label="分辨率">{{ form.titleComponents.resolution || '—' }}</a-descriptions-item>
+                <a-descriptions-item label="视频编码">{{ form.titleComponents.video_codec || '—' }}</a-descriptions-item>
+                <a-descriptions-item label="音频编码">{{ form.titleComponents.audio_codec || '—' }}</a-descriptions-item>
+                <a-descriptions-item label="制作组">{{ form.titleComponents.release_group || '—' }}</a-descriptions-item>
+              </a-descriptions>
+
+              <!-- 海报 -->
+              <div v-if="form.poster" style="margin-bottom: 16px; text-align: center">
+                <img :src="form.poster" style="max-height: 300px; border-radius: 4px" />
+              </div>
+
+              <!-- MediaInfo -->
+              <div v-if="form.mediaInfo" style="margin-bottom: 16px">
+                <div style="font-weight: 600; margin-bottom: 4px">MediaInfo</div>
+                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap">{{ form.mediaInfo }}</pre>
+              </div>
+
+              <!-- BDInfo -->
+              <div v-if="form.bdinfo" style="margin-bottom: 16px">
+                <div style="font-weight: 600; margin-bottom: 4px">BDInfo</div>
+                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 200px; overflow: auto; white-space: pre-wrap">{{ form.bdinfo }}</pre>
+              </div>
+
+              <!-- 截图 -->
+              <div v-if="form.screenshots.length > 0" style="margin-bottom: 16px">
+                <div style="font-weight: 600; margin-bottom: 8px">截图</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                  <img v-for="(url, i) in form.screenshots" :key="i" :src="url" style="width: 200px; border-radius: 4px" />
+                </div>
+              </div>
+
+              <!-- 简介（BBCode → HTML） -->
+              <div v-if="previewRenderedDesc" style="margin-bottom: 16px">
+                <div style="font-weight: 600; margin-bottom: 8px">简介</div>
+                <div style="padding: 16px; background: #fafafa; border-radius: 4px; line-height: 1.8" v-html="previewRenderedDesc"></div>
+              </div>
+
+              <!-- 校验状态 -->
+              <a-alert
+                :type="seedMissingFields.length === 0 ? 'success' : 'warning'"
+                show-icon
+                style="margin-top: 16px"
+                :message="seedMissingFields.length === 0 ? '✓ 9 必需字段齐全，已自动审核' : `⚠ 仍缺 ${seedMissingFields.length} 个字段：${seedMissingFields.join(', ')}`"
+              />
+            </div>
+          </template>
+
+          <!-- 编辑模式 -->
+          <template v-else>
           <a-alert
             v-if="forbiddenFlag" type="error" show-icon style="margin-bottom: 16px"
             :message="`⛔ 禁止转载：${forbiddenFlag}`" description="该种子被源站标记为禁止转载，无法继续发布。"
@@ -251,7 +313,8 @@
               </div>
               <a-empty v-else description="当前简介无匹配的过滤声明" />
             </a-tab-pane>
-          </a-tabs>
+           </a-tabs>
+          </template><!-- v-else (editing mode) -->
         </div>
 
         <!-- Step 1: 参数预览 -->
@@ -301,9 +364,17 @@
         <div class="csp-footer-right">
           <a-button @click="handleClose">取消</a-button>
           <template v-if="maintenanceOnly">
-            <a-button type="primary" :loading="saving" :disabled="loading || !!loadError" @click="saveOnly">
-              保存
-            </a-button>
+            <!-- §59.20 ⑨: 预览模式 → 返回编辑 + 确认完成 -->
+            <template v-if="seedPreviewMode">
+              <a-button @click="backToEdit">返回编辑</a-button>
+              <a-button type="primary" @click="confirmDone">确认完成</a-button>
+            </template>
+            <!-- 编辑模式 → 预览按钮 -->
+            <template v-else>
+              <a-button type="primary" :loading="saving" :disabled="loading || !!loadError" @click="saveOnly">
+                预览
+              </a-button>
+            </template>
           </template>
           <template v-else>
             <a-button v-if="currentStep === 0" type="primary" :disabled="!canProceed" :loading="saving" @click="nextStep">
@@ -326,6 +397,7 @@ import { message } from 'ant-design-vue'
 import { CheckCircleFilled, ReloadOutlined } from '@ant-design/icons-vue'
 import { manualForwardApi, publishDataApi, publishApi, publishTorrentsApi, seedConfigApi } from '@/api/publish'
 import type { SeedDetail } from '@/api/publish'
+import { parseBBCode } from '@/utils/bbcode'
 import type { ManualForwardSubmitRequest, PreviewField, PreviewCompleteness, PublishResultRecord } from '@/api/types'
 import TagSelector from './TagSelector.vue'
 import ScreenshotManager from './ScreenshotManager.vue'
@@ -467,6 +539,8 @@ function resetPanel() {
   previewCompleteness.value = null
   previewLoading.value = false
   submitError.value = ''
+  seedPreviewMode.value = false
+  previewRenderedDesc.value = ''
   form.value = {
     title: '', subtitle: '', mediaInfo: '', description: '', screenshots: [],
     statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '',
@@ -561,6 +635,9 @@ async function loadSeedDetail(infoHash: string) {
 // §59.20: 种子配置页状态
 const seedMissingFields = ref<string[]>([])
 const seedReviewed = ref(false)
+// §59.20 ⑨: 预览模式（保存即预览）
+const seedPreviewMode = ref(false)
+const previewRenderedDesc = ref('')
 
 // §59.20: 已过滤声明 Tab 预览
 const declPatterns = ref<string[]>([])
@@ -761,7 +838,7 @@ async function saveToDB() {
   }
 }
 
-// §59.20: maintenanceOnly 模式保存——调 PUT /publish/seeds/:info_hash
+// §59.20: maintenanceOnly 模式保存——调 PUT /publish/seeds/:info_hash → 保存+预览
 async function saveOnly() {
   if (!selectedTorrent.value?.info_hash) {
     message.error('缺少 info_hash')
@@ -779,21 +856,26 @@ async function saveOnly() {
     if (result) {
       seedReviewed.value = result.reviewed || false
       seedMissingFields.value = result.missing_fields || []
-      if (result.missing_fields && result.missing_fields.length > 0) {
-        message.warning(`已保存，仍缺 ${result.missing_fields.length} 个字段：${result.missing_fields.join(', ')}`)
-      } else {
-        message.success('保存成功，配置完整已自动审核')
-      }
-    } else {
-      message.success('保存成功')
     }
-    emit('success')
-    emit('update:open', false)
+    // §59.20 ⑨: 渲染预览（前端 BBCode→HTML）
+    previewRenderedDesc.value = parseBBCode(form.value.description)
+    seedPreviewMode.value = true
   } catch (e: unknown) {
     message.error('保存失败: ' + (e as Error).message)
   } finally {
     saving.value = false
   }
+}
+
+// §59.20 ⑨: 确认完成——数据已在预览时存好，直接关闭
+function confirmDone() {
+  emit('success')
+  emit('update:open', false)
+}
+
+// §59.20 ⑨: 返回编辑
+function backToEdit() {
+  seedPreviewMode.value = false
 }
 
 async function loadPreview() {
