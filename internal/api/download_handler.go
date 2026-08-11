@@ -79,6 +79,15 @@ func (h *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if path == "/api/v1/downloads/snapshot-unconfigured" || path == "/api/v1/downloads/snapshot-unconfigured/" {
+		if r.Method == http.MethodGet {
+			h.handleSnapshotUnconfigured(w, r)
+		} else {
+			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
+		}
+		return
+	}
+
 	idStr := ""
 	for _, seg := range splitPath(path) {
 		if _, err := strconv.ParseUint(seg, 10, 32); err == nil {
@@ -518,6 +527,39 @@ func (h *DownloadHandler) handleSnapshotPaths(w http.ResponseWriter, r *http.Req
 	}
 
 	Success(w, result)
+}
+
+// handleSnapshotUnconfigured §59.20: 查找快照中有但 torrent_metadata 中无记录的种子（"获取数据"目标）。
+func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *http.Request) {
+	clientID := r.URL.Query().Get("client_id")
+	savePath := r.URL.Query().Get("save_path")
+	if clientID == "" || savePath == "" {
+		Error(w, http.StatusBadRequest, 40001, "client_id 和 save_path 为必填")
+		return
+	}
+
+	type unconfiguredItem struct {
+		Hash     string `json:"hash"`
+		Name     string `json:"name"`
+		Size     int64  `json:"size"`
+		ClientID string `json:"client_id"`
+		SavePath string `json:"save_path"`
+	}
+
+	var items []unconfiguredItem
+	h.db.WithContext(r.Context()).
+		Table("torrent_snapshots AS s").
+		Select("s.hash, s.name, s.size, s.client_id, s.save_path").
+		Joins("LEFT JOIN torrent_metadata m ON s.hash = m.info_hash").
+		Where("s.client_id = ? AND s.save_path = ? AND s.is_hidden = ? AND m.id IS NULL",
+			clientID, savePath, false).
+		Order("s.updated_at DESC").
+		Find(&items)
+
+	Success(w, map[string]interface{}{
+		"items": items,
+		"total": len(items),
+	})
 }
 
 func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, rest string) {

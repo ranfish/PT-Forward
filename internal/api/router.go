@@ -196,6 +196,12 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)
 	rt.publishTorrentsHandler.SetDeclarationFilter(declFilter)
+	if metadataFetcher != nil {
+		rt.publishTorrentsHandler.SetMetadataFetcher(metadataFetcher)
+	}
+	if complianceChecker != nil {
+		rt.publishTorrentsHandler.SetComplianceChecker(complianceChecker)
+	}
 }
 
 func (rt *Router) SetCookieCloudServer(srv http.Handler) {
@@ -442,6 +448,9 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/publish/coverage-cache", ptHandler)
 	mux.Handle("/api/v1/publish/coverage-cache/", ptHandler)
 	mux.Handle("/api/v1/publish/source-priority", ptHandler)
+	mux.Handle("/api/v1/publish/fetch-priority", ptHandler)
+	mux.Handle("/api/v1/publish/seeds", ptHandler)
+	mux.Handle("/api/v1/publish/seeds/", ptHandler)
 
 	dashboardHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/dashboard/overview", dashboardHandler)
