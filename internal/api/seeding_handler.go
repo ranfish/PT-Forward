@@ -221,7 +221,8 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *SeedingHandler) handleListConfigs(w http.ResponseWriter, r *http.Request) {
 	var configs []model.SeedingClientConfig
-	if err := h.db.Find(&configs).Error; err != nil {
+	// §59.13: 统一表后必须过滤 role=seeding，否则 download 配置也会出现在 /seeding 页面
+	if err := h.db.Where("role = ? OR role = ?", "seeding", "").Find(&configs).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
 		return
 	}

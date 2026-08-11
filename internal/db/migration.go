@@ -158,4 +158,21 @@ func init() {
 			SELECT DISTINCT site_name FROM release_group_mappings WHERE site_name != ''
 		)`).Error
 	})
+	RegisterMigration(8, "rename_main_data_cron_column", func(gormDB *gorm.DB) error {
+		// §59.20: MainDataCron JSON tag 是 maindata_cron，GORM 蛇形推导是 main_data_cron
+		// 加 column:maindata_cron tag 后需要处理列名变更
+		var oldExists, newExists string
+		gormDB.Raw(`SELECT name FROM pragma_table_info('seeding_client_configs') WHERE name = 'main_data_cron' LIMIT 1`).Scan(&oldExists)
+		gormDB.Raw(`SELECT name FROM pragma_table_info('seeding_client_configs') WHERE name = 'maindata_cron' LIMIT 1`).Scan(&newExists)
+		if oldExists == "main_data_cron" && newExists == "maindata_cron" {
+			// 两列都存在（AutoMigrate 已创建新列）→ 复制数据后删旧列
+			gormDB.Exec(`UPDATE seeding_client_configs SET maindata_cron = main_data_cron WHERE maindata_cron = '' OR maindata_cron IS NULL`)
+			gormDB.Exec(`ALTER TABLE seeding_client_configs DROP COLUMN main_data_cron`)
+		} else if oldExists == "main_data_cron" && newExists == "" {
+			// 仅有旧列 → 直接重命名
+			return gormDB.Exec(`ALTER TABLE seeding_client_configs RENAME COLUMN main_data_cron TO maindata_cron`).Error
+		}
+		// 只有新列或都不存在 → 无需操作
+		return nil
+	})
 }
