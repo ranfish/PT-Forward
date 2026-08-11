@@ -2280,6 +2280,14 @@ func (h *PublishTorrentsHandler) runBatchFetch(items []struct {
 	Name string `json:"name"`
 	Size int64  `json:"size"`
 }) {
+	defer func() {
+		if r := recover(); r != nil {
+			h.logger.Error("runBatchFetch panic", zap.Any("panic", r))
+		}
+		h.batchFetch.mu.Lock()
+		h.batchFetch.active = false
+		h.batchFetch.mu.Unlock()
+	}()
 	ctx := context.Background()
 	for i, item := range items {
 		h.batchFetch.mu.Lock()
@@ -2301,10 +2309,6 @@ func (h *PublishTorrentsHandler) runBatchFetch(items []struct {
 
 		time.Sleep(50 * time.Millisecond)
 	}
-
-	h.batchFetch.mu.Lock()
-	h.batchFetch.active = false
-	h.batchFetch.mu.Unlock()
 }
 
 func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, name string, size int64) error {

@@ -166,8 +166,10 @@ func init() {
 		gormDB.Raw(`SELECT name FROM pragma_table_info('seeding_client_configs') WHERE name = 'maindata_cron' LIMIT 1`).Scan(&newExists)
 		if oldExists == "main_data_cron" && newExists == "maindata_cron" {
 			// 两列都存在（AutoMigrate 已创建新列）→ 复制数据后删旧列
-			gormDB.Exec(`UPDATE seeding_client_configs SET maindata_cron = main_data_cron WHERE maindata_cron = '' OR maindata_cron IS NULL`)
-			gormDB.Exec(`ALTER TABLE seeding_client_configs DROP COLUMN main_data_cron`)
+			if err := gormDB.Exec(`UPDATE seeding_client_configs SET maindata_cron = main_data_cron WHERE maindata_cron = '' OR maindata_cron IS NULL`).Error; err != nil {
+				return err
+			}
+			return gormDB.Exec(`ALTER TABLE seeding_client_configs DROP COLUMN main_data_cron`).Error
 		} else if oldExists == "main_data_cron" && newExists == "" {
 			// 仅有旧列 → 直接重命名
 			return gormDB.Exec(`ALTER TABLE seeding_client_configs RENAME COLUMN main_data_cron TO maindata_cron`).Error
