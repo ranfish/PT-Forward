@@ -13,53 +13,70 @@
           添加
         </a-button>
       </a-input-group>
-      <!-- §56.27 决策 5: ScreenshotInDesc toggle -->
       <a-tooltip title="开启后截图以 [img] 标签嵌入简介正文，关闭则作为独立附件">
-        <a-switch
-          v-model:checked="screenshotInDesc"
-          size="small"
-        />
+        <a-switch v-model:checked="screenshotInDesc" size="small" />
         <span class="toggle-label">截图嵌入简介</span>
       </a-tooltip>
     </div>
 
-    <!-- 截图列表（拖拽排序） -->
-    <div v-if="!screenshots.length" class="empty-hint">
-      <InboxOutlined style="font-size: 32px; color: #d9d9d9" />
-      <p>暂无截图</p>
-    </div>
-    <div v-else class="screenshot-grid">
-      <div
-        v-for="(url, i) in screenshots"
-        :key="url + i"
-        class="screenshot-item"
-        :class="{ dragging: dragIndex === i, 'drag-over': dragOverIndex === i }"
-        draggable="true"
-        @dragstart="onDragStart(i)"
-        @dragover.prevent="onDragOver(i)"
-        @dragend="onDragEnd"
-        @drop.prevent="onDrop(i)"
-      >
-        <a-image
-          :src="url"
-          :width="200"
-          :height="113"
-          class="screenshot-img"
-          :preview="{ visible: previewVisible, onVisibleChange: (v: boolean) => previewVisible = v }"
-        />
-        <div class="screenshot-actions">
-          <span class="screenshot-index">#{{ i + 1 }}</span>
+    <!-- 左右分栏 -->
+    <div v-if="screenshots.length" class="split-layout">
+      <!-- 左侧：URL 列表 -->
+      <div class="url-list">
+        <div
+          v-for="(url, i) in screenshots"
+          :key="url + i"
+          class="url-item"
+          :class="{
+            dragging: dragIndex === i,
+            'drag-over': dragOverIndex === i,
+            selected: selectedIndex === i,
+          }"
+          draggable="true"
+          @dragstart="onDragStart(i)"
+          @dragover.prevent="onDragOver(i)"
+          @dragend="onDragEnd"
+          @drop.prevent="onDrop(i)"
+          @click="selectedIndex = i"
+        >
+          <span class="url-index">{{ i + 1 }}</span>
           <span v-if="i > 0" class="drag-handle" title="拖拽排序">≡</span>
-          <a-button type="text" danger size="small" @click="remove(i)">
+          <input
+            class="url-text"
+            :value="url"
+            @input="updateUrl(i, ($event.target as HTMLInputElement).value)"
+            @click.stop
+          />
+          <a-button type="text" danger size="small" @click.stop="remove(i)">
             <DeleteOutlined />
           </a-button>
         </div>
       </div>
+
+      <!-- 右侧：大图预览 -->
+      <div class="preview-panel">
+        <a-image
+          v-if="selectedIndex >= 0 && selectedIndex < screenshots.length"
+          :src="screenshots[selectedIndex]"
+          style="max-width: 100%; max-height: 500px; border-radius: 4px"
+          :preview="{ visible: previewVisible, onVisibleChange: (v: boolean) => previewVisible = v }"
+        />
+        <div v-else class="preview-empty">
+          <InboxOutlined style="font-size: 32px; color: #d9d9d9" />
+          <p>选择左侧截图查看大图</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 空状态 -->
+    <div v-else class="empty-hint">
+      <InboxOutlined style="font-size: 32px; color: #d9d9d9" />
+      <p>暂无截图</p>
     </div>
 
     <!-- 截图统计 -->
     <div v-if="screenshots.length" class="stats-hint">
-      共 {{ screenshots.length }} 张截图 · 拖拽调整顺序 · 点击 ≡ 拖动
+      共 {{ screenshots.length }} 张截图 · 拖拽调整顺序 · 点击查看大图
     </div>
   </div>
 </template>
@@ -78,7 +95,6 @@ const emit = defineEmits<{
   'update:screenshotInDesc': [value: boolean]
 }>()
 
-// v-model 双向（避免 mutating props）
 const screenshots = computed({
   get: () => props.screenshots,
   set: (v: string[]) => emit('update:screenshots', v),
@@ -92,16 +108,15 @@ const newUrl = ref('')
 const previewVisible = ref(false)
 const dragIndex = ref(-1)
 const dragOverIndex = ref(-1)
+const selectedIndex = ref(0)
 
 function addUrl() {
   const url = newUrl.value.trim()
   if (!url) return
-  // 简单 URL 校验
-  if (!/^https?:\/\//i.test(url)) {
-    return
-  }
+  if (!/^https?:\/\//i.test(url)) return
   const arr = [...screenshots.value, url]
   screenshots.value = arr
+  selectedIndex.value = arr.length - 1
   newUrl.value = ''
 }
 
@@ -109,9 +124,17 @@ function remove(idx: number) {
   const arr = [...screenshots.value]
   arr.splice(idx, 1)
   screenshots.value = arr
+  if (selectedIndex.value >= arr.length) {
+    selectedIndex.value = Math.max(0, arr.length - 1)
+  }
 }
 
-// 原生 HTML5 拖拽排序
+function updateUrl(idx: number, value: string) {
+  const arr = [...screenshots.value]
+  arr[idx] = value
+  screenshots.value = arr
+}
+
 function onDragStart(idx: number) {
   dragIndex.value = idx
 }
@@ -128,6 +151,10 @@ function onDrop(targetIdx: number) {
   const [moved] = arr.splice(srcIdx, 1)
   arr.splice(targetIdx, 0, moved)
   screenshots.value = arr
+  // 保持选中项跟随移动
+  if (selectedIndex.value === srcIdx) {
+    selectedIndex.value = targetIdx
+  }
   onDragEnd()
 }
 function onDragEnd() {
@@ -151,62 +178,103 @@ function onDragEnd() {
   font-size: 12px;
   color: #666;
 }
-.empty-hint {
-  text-align: center;
-  padding: 40px 0;
-  color: #999;
+
+/* 左右分栏 */
+.split-layout {
+  display: flex;
+  gap: 16px;
+  min-height: 400px;
 }
-.screenshot-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-}
-.screenshot-item {
-  position: relative;
+
+/* 左侧 URL 列表 */
+.url-list {
+  width: 420px;
+  min-width: 320px;
+  max-height: 500px;
+  overflow-y: auto;
   border: 1px solid #f0f0f0;
   border-radius: 4px;
-  overflow: hidden;
-  background: #fff;
-  cursor: grab;
-  transition: all 0.2s;
 }
-.screenshot-item:hover {
-  border-color: #1677ff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-.screenshot-item.dragging {
-  opacity: 0.5;
-  cursor: grabbing;
-}
-.screenshot-item.drag-over {
-  border-color: #52c41a;
-  border-width: 2px;
-}
-.screenshot-img {
-  display: block;
-  width: 100%;
-}
-.screenshot-actions {
+.url-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.04);
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  transition: background 0.15s;
 }
-.screenshot-index {
+.url-item:hover {
+  background: #f0f5ff;
+}
+.url-item.selected {
+  background: #e6f4ff;
+  border-left: 3px solid #1677ff;
+  padding-left: 5px;
+}
+.url-item.dragging {
+  opacity: 0.4;
+}
+.url-item.drag-over {
+  border-top: 2px solid #52c41a;
+}
+.url-index {
   font-size: 12px;
-  color: #666;
+  color: #999;
   font-weight: 600;
+  min-width: 24px;
+  text-align: center;
 }
 .drag-handle {
   cursor: grab;
-  color: #999;
-  font-size: 16px;
-  line-height: 1;
+  color: #ccc;
+  font-size: 14px;
   user-select: none;
 }
 .drag-handle:hover {
   color: #1677ff;
+}
+.url-text {
+  flex: 1;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: #333;
+  background: transparent;
+  outline: none;
+  min-width: 0;
+}
+.url-text:focus {
+  border-color: #1677ff;
+  background: #fff;
+}
+
+/* 右侧预览 */
+.preview-panel {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: #fafafa;
+  border-radius: 4px;
+  padding: 16px;
+  min-height: 400px;
+}
+.preview-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+}
+
+/* 空状态 */
+.empty-hint {
+  text-align: center;
+  padding: 40px 0;
+  color: #999;
 }
 .stats-hint {
   margin-top: 8px;
