@@ -1389,9 +1389,17 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		if mi, ok := artifacts["media_info"]; ok {
 			result["mediainfo"] = mi
 		}
-		// §59.20: 同时返回 BDInfo（如有蓝光结构）
-		if bd, ok := artifacts["bdinfo"]; ok {
-			result["bdinfo"] = bd
+		// §59.20: 同时扫描 BDInfo（如有蓝光结构）
+		if h.bdinfoScanner != nil && req.SavePath != "" {
+			bdCtx, bdCancel := context.WithTimeout(ctx, 2*time.Minute)
+			bdReport, bdErr := h.bdinfoScanner.ScanIfBD(bdCtx, req.SavePath, req.Name, nil)
+			bdCancel()
+			if bdErr != nil {
+				h.logger.Warn("refresh: BDInfo scan failed", zap.Error(bdErr))
+			}
+			if bdReport != "" {
+				result["bdinfo"] = bdReport
+			}
 		}
 
 	case "screenshots":
