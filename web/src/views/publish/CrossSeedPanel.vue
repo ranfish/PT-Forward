@@ -35,7 +35,7 @@
       </div>
 
       <!-- ═══ Steps ═══ -->
-      <div class="csp-steps">
+      <div v-if="!maintenanceOnly" class="csp-steps">
         <a-steps :current="currentStep" size="small" style="padding: 8px 24px">
           <a-step title="编辑详情" />
           <a-step title="参数预览" />
@@ -238,17 +238,24 @@
       <!-- ═══ Footer ═══ -->
       <div class="csp-footer">
         <div class="csp-footer-left">
-          <a-button v-if="currentStep > 0" @click="prevStep">上一步</a-button>
+          <a-button v-if="currentStep > 0 && !maintenanceOnly" @click="prevStep">上一步</a-button>
         </div>
         <div class="csp-footer-right">
           <a-button @click="handleClose">取消</a-button>
-          <a-button v-if="currentStep === 0" type="primary" :disabled="!canProceed" :loading="saving" @click="nextStep">
-            保存并预览
-          </a-button>
-          <a-button v-else-if="currentStep === 1" type="primary" @click="nextStep">下一步</a-button>
-          <a-button v-else-if="currentStep === 2" type="primary" :loading="submitting" :disabled="selectedTargets.length === 0" @click="doSubmit">
-            立即发布（{{ selectedTargets.length }} 站）
-          </a-button>
+          <template v-if="maintenanceOnly">
+            <a-button type="primary" :loading="saving" :disabled="loading || !!loadError" @click="saveOnly">
+              保存
+            </a-button>
+          </template>
+          <template v-else>
+            <a-button v-if="currentStep === 0" type="primary" :disabled="!canProceed" :loading="saving" @click="nextStep">
+              保存并预览
+            </a-button>
+            <a-button v-else-if="currentStep === 1" type="primary" @click="nextStep">下一步</a-button>
+            <a-button v-else-if="currentStep === 2" type="primary" :loading="submitting" :disabled="selectedTargets.length === 0" @click="doSubmit">
+              立即发布（{{ selectedTargets.length }} 站）
+            </a-button>
+          </template>
         </div>
       </div>
     </div>
@@ -281,6 +288,7 @@ interface PresetTorrent {
 const props = defineProps<{
   open: boolean
   presetTorrent?: PresetTorrent | null
+  maintenanceOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -578,6 +586,13 @@ async function saveToDB() {
   } catch { /* silent */ } finally {
     saving.value = false
   }
+}
+
+async function saveOnly() {
+  await saveToDB()
+  message.success('保存成功')
+  emit('success')
+  emit('update:open', false)
 }
 
 async function loadPreview() {
