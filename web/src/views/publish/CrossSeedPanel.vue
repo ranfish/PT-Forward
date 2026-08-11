@@ -377,7 +377,11 @@ watch(() => props.open, (val) => {
     resetPanel()
     if (props.presetTorrent) {
       selectedTorrent.value = props.presetTorrent
-      enterAnalyze()
+      if (props.maintenanceOnly) {
+        fillFormFromPreset()
+      } else {
+        enterAnalyze()
+      }
     }
   }
 })
@@ -413,6 +417,28 @@ function resetPanel() {
 
 function handleClose() {
   emit('update:open', false)
+}
+
+function fillFormFromPreset() {
+  const t = props.presetTorrent
+  if (!t) return
+  form.value = {
+    title: t.name || '',
+    subtitle: '',
+    mediaInfo: '',
+    description: '',
+    screenshots: [],
+    statement: '',
+    poster: '',
+    doubanLink: '', imdbLink: '', tmdbLink: '',
+    tags: [],
+    removedDeclarations: [],
+    bdinfo: '',
+    anonymous: false,
+    screenshotInDesc: false,
+    titleComponents: {},
+  }
+  loading.value = false
 }
 
 // --- Analyze ---
@@ -589,7 +615,9 @@ async function saveToDB() {
 }
 
 async function saveOnly() {
-  await saveToDB()
+  if (!props.maintenanceOnly) {
+    await saveToDB()
+  }
   message.success('保存成功')
   emit('success')
   emit('update:open', false)

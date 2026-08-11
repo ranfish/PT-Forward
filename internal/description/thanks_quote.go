@@ -17,19 +17,24 @@ type ThanksQuoteConfig struct {
 
 // 默认模板常量。
 const (
-	DefaultChineseThanksQuote = "转自[b]{source_site}[/b]，感谢原发布者！"
-	DefaultEnglishThanksQuote = "Torrent from [b]{source_site}[/b].\nAll thanks to the original uploader!"
+	// §59.20: 加 {group_name} 占位符
+	DefaultChineseThanksQuote = "{group_name}官组作品，转自[b]{source_site}[/b]，感谢原制作者发布。"
+	DefaultEnglishThanksQuote = "Group {group_name} release from [b]{source_site}[/b].\nAll thanks to the original uploader!"
 
 	// ThanksQuotePlaceholder 源站名占位符。
 	ThanksQuotePlaceholder = "{source_site}"
+
+	// GroupNamePlaceholder §59.20: 制作组名占位符。
+	GroupNamePlaceholder = "{group_name}"
 )
 
 // GenerateThanksQuote 生成感谢引言。
 //   sourceSite: 源站名
+//   groupName: 制作组名（§59.20 新增）
 //   isEnglishSite: 是否英文站（true=用英文模板）
 //   config: 配置（nil=默认配置，Enabled=true）
 // 返回空字符串表示禁用或模板为空。
-func GenerateThanksQuote(sourceSite string, isEnglishSite bool, config *ThanksQuoteConfig) string {
+func GenerateThanksQuote(sourceSite, groupName string, isEnglishSite bool, config *ThanksQuoteConfig) string {
 	if config != nil && !config.Enabled {
 		return ""
 	}
@@ -39,7 +44,9 @@ func GenerateThanksQuote(sourceSite string, isEnglishSite bool, config *ThanksQu
 		return ""
 	}
 
-	return strings.ReplaceAll(template, ThanksQuotePlaceholder, sourceSite)
+	result := strings.ReplaceAll(template, ThanksQuotePlaceholder, sourceSite)
+	result = strings.ReplaceAll(result, GroupNamePlaceholder, groupName)
+	return result
 }
 
 // selectTemplate 按优先级选择模板（SiteTemplate > 全局对应语言模板 > 默认模板）。

@@ -68,7 +68,8 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 		siteName := d.LookupGroup(ctx, groupName)
 		if siteName != "" {
 			var site model.Site
-			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ?", siteName, true).First(&site).Error; err == nil {
+			// §59.20: Step 2 加 cookie 检查——源站无 cookie 时降级到 Step 3
+			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
 				result.SourceSite = site.Name
 				result.SourceSiteID = site.ID
 				result.AutoDetected = true
@@ -204,4 +205,79 @@ func (d *SourceSiteDetector) getSourcePriority(ctx context.Context) []string {
 		return nil
 	}
 	return priority
+}
+
+// getFetchPriority §59.20: 从 system_settings 读取用户配置的获取优先级（与 source_priority 独立）。
+func (d *SourceSiteDetector) getFetchPriority(ctx context.Context) []string {
+	var val string
+	if err := d.db.WithContext(ctx).Raw("SELECT value FROM system_settings WHERE key = 'fetch_priority' LIMIT 1").Row().Scan(&val); err != nil {
+		return nil
+	}
+	var priority []string
+	if err := json.Unmarshal([]byte(val), &priority); err != nil {
+		return nil
+	}
+	return priority
+}
+
+// SelectFetchSite §59.20: "获取数据"时的站点选择（制作组优先 → fetch_priority → 兜底）。
+// 与 Detect()（发布流程，source_priority 优先）的区别：制作组映射优先于 fetch_priority。
+func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, coverageSites []model.SiteCoverageCache) SourceDetectResult {
+	result := SourceDetectResult{}
+
+	siteMap := make(map[string]model.SiteCoverageCache)
+	for _, c := range coverageSites {
+		if c.Status == model.CoverageConfirmedHas || c.Status == model.CoverageProbablyHas {
+			siteMap[c.SiteName] = c
+		}
+	}
+
+	// ① 制作组映射 → 源站（有 cookie AND 在覆盖列表中）
+	groupName := ExtractGroupName(title)
+	result.GroupName = groupName
+	if groupName != "" {
+		siteName := d.LookupGroup(ctx, groupName)
+		if siteName != "" {
+			if c, ok := siteMap[siteName]; ok {
+				var site model.Site
+				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+					result.SourceSite = site.Name
+					result.SourceSiteID = site.ID
+					result.TorrentID = c.TorrentID
+					result.AutoDetected = true
+					return result
+				}
+			}
+		}
+	}
+
+	// ② fetch_priority ∩ coverage ∩ cookie
+	if priority := d.getFetchPriority(ctx); len(priority) > 0 {
+		for _, siteName := range priority {
+			if c, ok := siteMap[siteName]; ok {
+				var site model.Site
+				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+					result.SourceSite = site.Name
+					result.SourceSiteID = site.ID
+					result.TorrentID = c.TorrentID
+					result.AutoDetected = false
+					return result
+				}
+			}
+		}
+	}
+
+	// ③ coverage ∩ cookie 兜底
+	for siteName, c := range siteMap {
+		var site model.Site
+		if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+			result.SourceSite = site.Name
+			result.SourceSiteID = site.ID
+			result.TorrentID = c.TorrentID
+			result.AutoDetected = false
+			return result
+		}
+	}
+
+	return result
 }

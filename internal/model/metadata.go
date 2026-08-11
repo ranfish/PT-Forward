@@ -42,6 +42,10 @@ type TorrentMetadata struct {
 	// §56.8 合并模式记录（UI toggle 显示）
 	LastMergeMode string `json:"last_merge_mode" gorm:"column:last_merge_mode;size:20;default:'ptgen_first'"`
 
+	// §59.20 源站声明 + BDInfo 持久化
+	Statement string `json:"statement" gorm:"type:text"` // §59.20: 源站官组声明（仅"获取数据"时写入）
+	BDInfo    string `json:"bdinfo" gorm:"type:text"`     // §59.20: 蓝光原盘 BDInfo（BDMV/M2TS）
+
 	// §59.19 TechProfile 平铺字段（从 MergedJSON 提取，种子配置页展示/筛选用）
 	Category      string `json:"category" gorm:"size:20;default:''"`       // movie/tv_series/music/animation/...
 	Form          string `json:"form" gorm:"size:20;default:''"`           // season_pack/partial_pack/single_episode/unknown

@@ -153,4 +153,9 @@ func init() {
 	RegisterMigration(6, "drop_legacy_download_client_configs", func(gormDB *gorm.DB) error {
 		return gormDB.Migrator().DropTable("download_client_configs")
 	})
+	RegisterMigration(7, "close_is_source_for_sites_without_group_mappings", func(gormDB *gorm.DB) error {
+		return gormDB.Exec(`UPDATE sites SET is_source = 0 WHERE is_source = 1 AND name NOT IN (
+			SELECT DISTINCT site_name FROM release_group_mappings WHERE site_name != ''
+		)`).Error
+	})
 }

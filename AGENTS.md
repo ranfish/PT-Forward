@@ -2,9 +2,9 @@
 
 ## 当前任务焦点（新会话必读）
 
-**版本**：v0.0.547（已发布）。
+**版本**：v0.0.551（已发布）。种子配置页设计讨论全部完成（§59.20），待实施。
 
-**当前主线**：辅种误匹配修复 + 孤儿恢复重构 + RSS recheck 状态机重构 + 配置表合并 **全部完成**。
+**当前主线**：种子配置页实施（§59.19-§59.20 设计完成，20 项后端 + 17 项前端改动待编码）。
 
 ### ✅ 已完成（v0.0.228 → v0.0.547）
 
@@ -34,6 +34,37 @@
 - ✅ **DryRun 缓存修复**（§59.18）：试运行从 rss_torrent_seen 恢复缓存的免费状态（v0.0.546）
 - ✅ **死代码清理**：删除 ExtractType（v0.0.547）、海胆 pieces_hash_api 修正（v0.0.542）
 
+### 🔧 种子配置页（§59.19~§59.20，设计完成待实施）
+
+**Phase 3 基础设施（v0.0.548~v0.0.551，已完成）**：
+- ✅ torrent_snapshots 快照表 + syncer 扩展 + snapshot-paths API（v0.0.549）
+- ✅ torrent_metadata 加 14 TechProfile 平铺字段 + category/form（v0.0.550）
+- ✅ CrossSeedPanel maintenanceOnly prop + fillFormFromPreset + saveOnly（v0.0.551）
+- ✅ SeedConfig.vue 种子配置页框架（mock 数据）（v0.0.548）
+
+**设计讨论全部完成**（§59.20，2026-08-11）：
+- ✅ 3 个冲突 + 9 个回归点 + 发布预览 + 过渡期，全部解决
+- ⏸ 遗漏 3（一种多站/一站多种重构）暂缓，待种子配置页有数据后再讨论
+
+**待实施（20 后端 + 17 前端）**，详见 §59.20 第十七章/十八章完整清单。核心改动：
+
+后端：
+- torrent_metadata 加 statement + bdinfo 列（migration）
+- 22 个无小组映射站点关闭 is_source（migration）
+- Detect() Step 2 加 cookie 检查 + SelectFetchSite() 新函数（制作组优先）
+- GET/PUT /publish/seeds 列表/读写 API（含 compliance + 9 字段校验 + 标准化 + 预览渲染）
+- GET /downloads/snapshot-unconfigured + POST batch-fetch 异步批量获取
+- GenerateThanksQuote 加 {group_name} + 渲染器始终添加致谢
+- handleRefresh('mediainfo') 联动 TechProfile + handleRefresh('intro') 修正
+- CheckPublishEligibility 增加源站映射检查（第 0 层合规）
+
+前端：
+- SeedConfig.vue 字段名统一 snake_case + 5 态标签 + 禁转/无映射只读
+- CrossSeedPanel 六 Tab 改造（种子详情 18 字段只读 / 海报可编辑 / 截图左右分栏 / 简介可编辑 / 媒体信息只读 / 已过滤声明只读）
+- 发布前预览页面（方案 A：保存即预览）
+- BatchFetchPanel.vue 批量获取弹窗 + 进度轮询
+- 路由 /publish/exclusions → /publish/rules（4 Tab 含小组映射只读查看）
+
 ### 端到端验收状态
 
 | 端点/功能 | 状态 |
@@ -42,7 +73,8 @@
 | 孤儿恢复（分类 + 文件级搜索 + 同站扩展 + 注入校验）| ✅ |
 | RSS 订阅（每订阅独立 seen + FreeWait + DryRun 缓存）| ✅ |
 | 配置表统一（seeding + download 合并，阶段 A/B/C 完成）| ✅ |
-| 发布管线（CrossSeedPanel + 5 API + 手动转发）| ✅ |
+| 种子配置页（基础设施 + 设计）| ✅ 基础设施完成，设计完成 |
+| 种子配置页（前后端实施）| 🔧 待实施 |
 
 **关键事实**：
 - 开发环境 29（systemctl --user pt-forward，端口 8765）
@@ -53,11 +85,15 @@
 - 配置表合并后统一表 seeding_client_configs（Role=seeding/download 区分）
 - RSS seen 去重已改为每订阅独立（UNIQUE: site_name + torrent_id + subscription_id）
 - 下载器是去重的唯一权威（同 info_hash 拒绝），RSS 引擎不做跨订阅去重
+- 种子配置页六 Tab：种子详情/海报与声明/视频截图/简介详情/媒体信息/已过滤声明，仅截图和简介可编辑
+- 种子 5 态：禁转(flags)/系统禁转(compliance)/无源站映射/已审核/待审核+配置不完整
+- 源站约束：制作组不在 release_group_mappings 的种子不可转发，无映射站点不可开启 is_source
+- 发布预览采用方案 A（保存即预览）：PUT 同时保存+标准化+9字段校验+渲染
 
 **待办**：
-- （暂无）
+- 种子配置页实施（20 后端 + 17 前端，§59.20 第十七章/十八章）
 
-**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§59.18（71000+ 行，按需读特定章节，不要一次读全文）。
+**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§59.20（67000+ 行，按需读特定章节，不要一次读全文）。
 
 ## 环境信息
 

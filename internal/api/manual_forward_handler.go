@@ -694,6 +694,7 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	result["douban_link"] = merged.DoubanURL
 	result["tmdb_link"] = merged.TMDbURL
 	result["bdinfo"] = merged.BDInfo
+	result["statement"] = merged.Intro.Statement // §59.20: 源站声明持久化
 	result["source_of"] = merged.SourceOf
 	result["cached"] = hasLocalCache
 	if len(merged.PTGen.Genre) > 0 {
@@ -812,6 +813,7 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 	tmdb, _ := result["tmdb_link"].(string)
 	subtitle, _ := result["subtitle"].(string)
 	bdinfo, _ := result["bdinfo"].(string)
+	statement, _ := result["statement"].(string) // §59.20
 	now := time.Now()
 
 	// v0.0.255: 构建 MergedJSON（供 merge/preview API 读取，修复架构断裂）
@@ -855,8 +857,10 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			IMDbURL:     imdb,
 			DoubanURL:   douban,
 			TMDbURL:     tmdb,
-			Subtitle:    subtitle,
-			MergedJSON:  mergedJSON,
+		Subtitle:    subtitle,
+		Statement:   statement, // §59.20
+		BDInfo:      bdinfo,    // §59.20
+		MergedJSON:  mergedJSON,
 			FetchSource: fetchSource,
 			FetchedAt:   now,
 			Category:    catStr,
@@ -886,8 +890,10 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			"im_db_url":     imdb,
 			"douban_url":   douban,
 			"tm_db_url":    tmdb,
-			"subtitle":     subtitle,
-			"merged_json":  mergedJSON,
+		"subtitle":     subtitle,
+		"statement":    statement, // §59.20
+		"bdinfo":       bdinfo,    // §59.20
+		"merged_json":  mergedJSON,
 			"fetch_source": fetchSource,
 			"fetched_at":   now,
 		}
@@ -1369,8 +1375,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 				result["imdb_link"] = ptgen.IMDBURL
 				result["tmdb_link"] = ptgen.TMDbURL
 			} else {
-				result["description"] = ptgen.RawBBCode
-				result["subtitle"] = ptgen.ChineseTitle
+			result["description"] = ptgen.RawBBCode
+			// §59.20: 不再返回 subtitle——副标题来自源站，PTGen 不覆盖
 			}
 		}
 
@@ -1382,6 +1388,10 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		}
 		if mi, ok := artifacts["media_info"]; ok {
 			result["mediainfo"] = mi
+		}
+		// §59.20: 同时返回 BDInfo（如有蓝光结构）
+		if bd, ok := artifacts["bdinfo"]; ok {
+			result["bdinfo"] = bd
 		}
 
 	case "screenshots":
