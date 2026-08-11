@@ -41,6 +41,7 @@ type PublishTorrentsHandler struct {
 	reseedEngine   *reseed.Engine
 	metadataFetcher MetadataFetcherProvider
 	complianceChecker *compliance.Checker
+	seedPipeline    SeedArtifactAnalyzer
 	logger         *zap.Logger
 	bgState        backgroundQueryState
 	batchFetch     batchFetchState
@@ -85,6 +86,12 @@ func (h *PublishTorrentsHandler) SetSourceDetector(d *publish.SourceSiteDetector
 func (h *PublishTorrentsHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
 func (h *PublishTorrentsHandler) SetMetadataFetcher(f MetadataFetcherProvider)      { h.metadataFetcher = f }
 func (h *PublishTorrentsHandler) SetComplianceChecker(c *compliance.Checker)        { h.complianceChecker = c }
+func (h *PublishTorrentsHandler) SetSeedPipeline(p SeedArtifactAnalyzer)             { h.seedPipeline = p }
+
+// §59.21: 本地产物分析接口（只跑 mediainfo，不跑截图）
+type SeedArtifactAnalyzer interface {
+	AnalyzeLocalArtifacts(ctx context.Context, name, savePath string) (map[string]interface{}, error)
+}
 
 func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -2239,10 +2246,12 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 	}
 
 	var req struct {
-		Items []struct {
-			Hash string `json:"hash"`
-			Name string `json:"name"`
-			Size int64  `json:"size"`
+		ClientID string `json:"client_id"`
+		Items    []struct {
+			Hash     string `json:"hash"`
+			Name     string `json:"name"`
+			Size     int64  `json:"size"`
+			SavePath string `json:"save_path"`
 		} `json:"items"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -2270,15 +2279,16 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 	}
 	h.batchFetch.mu.Unlock()
 
-	go h.runBatchFetch(req.Items)
+	go h.runBatchFetch(req.ClientID, req.Items)
 
 	Success(w, map[string]interface{}{"message": "已开始", "total": len(req.Items)})
 }
 
-func (h *PublishTorrentsHandler) runBatchFetch(items []struct {
-	Hash string `json:"hash"`
-	Name string `json:"name"`
-	Size int64  `json:"size"`
+func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
+	Hash     string `json:"hash"`
+	Name     string `json:"name"`
+	Size     int64  `json:"size"`
+	SavePath string `json:"save_path"`
 }) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -2289,12 +2299,20 @@ func (h *PublishTorrentsHandler) runBatchFetch(items []struct {
 		h.batchFetch.mu.Unlock()
 	}()
 	ctx := context.Background()
+	// §59.21: 查下载器 is_local
+	isLocal := false
+	if clientID != "" {
+		var client model.ClientConfig
+		if err := h.db.WithContext(ctx).Where("name = ?", clientID).First(&client).Error; err == nil {
+			isLocal = client.IsLocal
+		}
+	}
 	for i, item := range items {
 		h.batchFetch.mu.Lock()
 		h.batchFetch.items[i].Status = "pending"
 		h.batchFetch.mu.Unlock()
 
-		err := h.fetchSingleTorrent(ctx, item.Hash, item.Name, item.Size)
+		err := h.fetchSingleTorrent(ctx, item.Hash, item.Name, item.Size, item.SavePath, isLocal)
 
 		h.batchFetch.mu.Lock()
 		h.batchFetch.done++
@@ -2311,7 +2329,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(items []struct {
 	}
 }
 
-func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, name string, size int64) error {
+func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, name string, size int64, savePath string, isLocal bool) error {
 	var coverageSites []model.SiteCoverageCache
 	if h.coverage != nil {
 		cs, err := h.coverage.GetCachedCoverage(ctx, hash)
@@ -2328,12 +2346,33 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 	fetchCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
+	var meta *model.TorrentMetadata
+	var err error
 	if result.TorrentID != "" {
-		_, err := h.metadataFetcher.FetchAndStore(fetchCtx, hash, result.SourceSite, result.TorrentID)
+		meta, err = h.metadataFetcher.FetchAndStore(fetchCtx, hash, result.SourceSite, result.TorrentID)
+	} else {
+		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size)
+	}
+	if err != nil {
 		return err
 	}
-	_, err := h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size)
-	return err
+
+	// §59.21: is_local=true 时追加本地 mediainfo（AnalyzeLocalArtifacts 只跑 mediainfo 不跑截图）
+	if isLocal && savePath != "" && h.seedPipeline != nil && meta != nil {
+		artifacts, artErr := h.seedPipeline.AnalyzeLocalArtifacts(ctx, name, savePath)
+		if artErr != nil {
+			h.logger.Warn("batch-fetch: local mediainfo failed", zap.String("hash", hash), zap.Error(artErr))
+		} else if mi, ok := artifacts["media_info"]; ok && mi != "" {
+			// 更新 metadata 的 MediaInfo + LocalSourceJSON
+			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
+				Updates(map[string]interface{}{
+					"media_info":       mi,
+					"mediainfo_source": "local",
+				})
+		}
+	}
+	return nil
 }
 
 // handleBatchFetchProgress §59.20: 查询批量获取进度。
@@ -2676,6 +2715,15 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 
 		// 状态
 		"missing_fields": h.checkRequiredFields(meta),
+	}
+
+	// §59.21: 返回 is_local（从 client_id 查询）
+	clientID := r.URL.Query().Get("client_id")
+	if clientID != "" {
+		var client model.ClientConfig
+		if err := h.db.WithContext(r.Context()).Where("name = ?", clientID).First(&client).Error; err == nil {
+			result["is_local"] = client.IsLocal
+		}
 	}
 
 	Success(w, result)

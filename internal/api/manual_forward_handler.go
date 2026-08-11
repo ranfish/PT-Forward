@@ -1348,6 +1348,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		InfoHash    string   `json:"info_hash"`
 		SiteName    string   `json:"site_name"`
 		Screenshots []string `json:"screenshots"`
+		ClientID    string   `json:"client_id"` // §59.21: 查 is_local
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -1360,6 +1361,15 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 
 	ctx := r.Context()
 	result := map[string]interface{}{}
+
+	// §59.21: 查下载器 is_local
+	isLocal := true // 默认 true（向后兼容：无 client_id 时走本地路径）
+	if req.ClientID != "" {
+		var client model.ClientConfig
+		if err := h.db.WithContext(ctx).Where("name = ?", req.ClientID).First(&client).Error; err == nil {
+			isLocal = client.IsLocal
+		}
+	}
 
 	switch req.Type {
 	case "poster", "intro":
@@ -1381,6 +1391,23 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		}
 
 	case "mediainfo":
+		if !isLocal {
+			// §59.21: 转种上盒——从源站重新抓取
+			if req.InfoHash != "" && req.SiteName != "" && h.metadataFetcher != nil {
+				meta, err := h.metadataFetcher.FetchAndStore(ctx, req.InfoHash, req.SiteName, "")
+				if err != nil {
+					Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("源站重新获取失败: %v", err))
+					return
+				}
+				if meta != nil {
+					result["mediainfo"] = meta.MediaInfo
+					if meta.BDInfo != "" {
+						result["bdinfo"] = meta.BDInfo
+					}
+				}
+			}
+			break
+		}
 		artifacts, err := h.pipeline.AnalyzeLocalArtifacts(ctx, req.Name, req.SavePath)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("MediaInfo 获取失败: %v", err))
@@ -1403,6 +1430,27 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		}
 
 	case "screenshots":
+		if !isLocal {
+			// §59.21: 转种上盒——从源站重新抓取
+			if req.InfoHash != "" && req.SiteName != "" && h.metadataFetcher != nil {
+				meta, err := h.metadataFetcher.FetchAndStore(ctx, req.InfoHash, req.SiteName, "")
+				if err != nil {
+					Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("源站重新获取失败: %v", err))
+					return
+				}
+				if meta != nil && meta.Screenshots != "" {
+					var shots []string
+					for _, line := range strings.Split(meta.Screenshots, "\n") {
+						line = strings.TrimSpace(line)
+						if line != "" {
+							shots = append(shots, line)
+						}
+					}
+					result["screenshots"] = shots
+				}
+			}
+			break
+		}
 		artifacts, err := h.pipeline.AnalyzeLocalArtifacts(ctx, req.Name, req.SavePath)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("截图获取失败: %v", err))

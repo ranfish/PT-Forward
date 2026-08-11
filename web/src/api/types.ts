@@ -177,6 +177,7 @@ export interface ClientConfig {
   url: string
   username: string
   role: string
+  isLocal?: boolean | null // §59.21
   transferTargetId?: string
   enabled: boolean
   isDefault: boolean

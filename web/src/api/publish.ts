@@ -282,14 +282,14 @@ export const seedConfigApi = {
   listSeeds(params: { client_id: string; save_path: string; page?: number; page_size?: number }) {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params })
   },
-  getSeed(infoHash: string) {
-    return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`)
+  getSeed(infoHash: string, clientId?: string) {
+    return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`, { params: clientId ? { client_id: clientId } : undefined })
   },
   putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; site_name?: string }) {
     return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[] }>>(`/publish/seeds/${infoHash}`, data)
   },
-  batchFetch(items: Array<{ hash: string; name: string; size: number }>) {
-    return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items })
+  batchFetch(items: Array<{ hash: string; name: string; size: number; save_path: string }>, clientId: string) {
+    return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items, client_id: clientId })
   },
   batchFetchProgress() {
     return client.get<ApiResponse<{ active: boolean; total: number; done: number; failed: number; items: Array<{ hash: string; name: string; status: string; error?: string }> }>>('/publish/seeds/batch-fetch-progress')
