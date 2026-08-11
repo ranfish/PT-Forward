@@ -62,81 +62,117 @@
 
         <!-- Step 0: 编辑详情（5 Tab） -->
         <div v-else-if="currentStep === 0" class="csp-step-content">
-          <a-alert v-if="forbiddenFlag" type="error" show-icon style="margin-bottom: 16px"
-            :message="`⛔ 禁止转载：${forbiddenFlag}`" description="该种子被源站标记为禁止转载，无法继续发布。" />
+          <a-alert
+            v-if="forbiddenFlag" type="error" show-icon style="margin-bottom: 16px"
+            :message="`⛔ 禁止转载：${forbiddenFlag}`" description="该种子被源站标记为禁止转载，无法继续发布。"
+          />
 
-          <a-tabs v-model:activeKey="activeTab">
+          <a-tabs v-model:active-key="activeTab">
             <!-- Tab 1: 种子详情 -->
             <a-tab-pane key="detail" tab="种子详情">
-              <a-form layout="vertical" style="max-width: 800px">
-                <a-row :gutter="16">
-                  <a-col :span="12">
-                    <a-form-item label="主标题（英文）">
-                      <a-input v-model:value="form.title" placeholder="English.Title" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="12">
-                    <a-form-item label="中文副标题">
-                      <a-input v-model:value="form.subtitle" placeholder="中文名" />
-                      <div v-if="subtitleWarning" style="color: #faad14; font-size: 12px; margin-top: 4px">{{ subtitleWarning }}</div>
-                    </a-form-item>
-                  </a-col>
-                </a-row>
-                <div style="margin-bottom: 8px">
-                  <a-button size="small" :loading="reparsing" @click="reparseTitle">
-                    <template #icon><ReloadOutlined /></template>
-                    重新解析标题
-                  </a-button>
-                  <span v-if="reparseResult" style="margin-left: 8px; font-size: 12px" :style="{ color: reparseResult.includes('失败') ? '#cf1322' : '#52c41a' }">{{ reparseResult }}</span>
+              <!-- §59.20 maintenanceOnly 模式：18 TechProfile 字段只读展示 -->
+              <template v-if="maintenanceOnly">
+                <a-descriptions :column="3" bordered size="small" style="max-width: 900px">
+                  <a-descriptions-item label="主标题" :span="3">{{ form.title || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="副标题" :span="3">{{ form.subtitle || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="中文名">{{ form.titleComponents.chinese_prefix || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="剧名">{{ form.titleComponents.main_title || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="季集">{{ form.titleComponents.season_episode || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="年份">{{ form.titleComponents.year || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="制作组">{{ form.titleComponents.release_group || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="类型">{{ form.titleComponents.category || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="分辨率">{{ form.titleComponents.resolution || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="视频编码">{{ form.titleComponents.video_codec || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="片源类型">{{ form.titleComponents.source_type || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="规格">{{ form.titleComponents.specification || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="音频编码">{{ form.titleComponents.audio_codec || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="声道">{{ form.titleComponents.audio_channels || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="音频技术">{{ form.titleComponents.audio_technology || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="HDR">{{ form.titleComponents.hdr || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="bit">{{ form.titleComponents.bit_depth || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="分发方">{{ form.titleComponents.source_platform || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="版本">{{ form.titleComponents.edition_info || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="地区码">{{ form.titleComponents.region_code || '—' }}</a-descriptions-item>
+                </a-descriptions>
+                <div v-if="seedMissingFields.length > 0" style="margin-top: 12px; padding: 8px 12px; background: #fffbe6; border-radius: 4px; font-size: 13px">
+                  <span style="color: #faad14">⚠ 缺失字段：</span>{{ seedMissingFields.join(', ') }}
                 </div>
-                <a-row :gutter="16">
-                  <a-col :span="6">
-                    <a-form-item label="分辨率">
-                      <a-input v-model:value="form.titleComponents.resolution" placeholder="1080p" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="6">
-                    <a-form-item label="视频编码">
-                      <a-input v-model:value="form.titleComponents.video_codec" placeholder="x265" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="6">
-                    <a-form-item label="音频编码">
-                      <a-input v-model:value="form.titleComponents.audio_codec" placeholder="AC3" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="6">
-                    <a-form-item label="媒介">
-                      <a-input v-model:value="form.titleComponents.medium" placeholder="BluRay" />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
-                <a-row :gutter="16">
-                  <a-col :span="6">
-                    <a-form-item label="制作组">
-                      <a-input v-model:value="form.titleComponents.release_group" placeholder="-GROUP" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="6">
-                    <a-form-item label="HDR">
-                      <a-input v-model:value="form.titleComponents.hdr" placeholder="HDR" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="6">
-                    <a-form-item label="年份/季集">
-                      <a-input v-model:value="form.titleComponents.year" placeholder="2024 / S01E01" />
-                    </a-form-item>
-                  </a-col>
-                  <a-col :span="6">
-                    <a-form-item label="版本信息">
-                      <a-input v-model:value="form.titleComponents.edition_info" placeholder="Remux" />
-                    </a-form-item>
-                  </a-col>
-                </a-row>
-                <a-form-item label="标签">
-                  <TagSelector v-model="form.tags" />
-                </a-form-item>
-              </a-form>
+                <div v-else-if="seedReviewed" style="margin-top: 12px; padding: 8px 12px; background: #f6ffed; border-radius: 4px; font-size: 13px; color: #52c41a">
+                  ✓ 已审核（9 必需字段齐全）
+                </div>
+              </template>
+              <!-- 普通发布流程：可编辑表单 -->
+              <template v-else>
+                <a-form layout="vertical" style="max-width: 800px">
+                  <a-row :gutter="16">
+                    <a-col :span="12">
+                      <a-form-item label="主标题（英文）">
+                        <a-input v-model:value="form.title" placeholder="English.Title" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :span="12">
+                      <a-form-item label="中文副标题">
+                        <a-input v-model:value="form.subtitle" placeholder="中文名" />
+                        <div v-if="subtitleWarning" style="color: #faad14; font-size: 12px; margin-top: 4px">{{ subtitleWarning }}</div>
+                      </a-form-item>
+                    </a-col>
+                  </a-row>
+                  <div style="margin-bottom: 8px">
+                    <a-button size="small" :loading="reparsing" @click="reparseTitle">
+                      <template #icon><ReloadOutlined /></template>
+                      重新解析标题
+                    </a-button>
+                    <span v-if="reparseResult" style="margin-left: 8px; font-size: 12px" :style="{ color: reparseResult.includes('失败') ? '#cf1322' : '#52c41a' }">{{ reparseResult }}</span>
+                  </div>
+                  <a-row :gutter="16">
+                    <a-col :span="6">
+                      <a-form-item label="分辨率">
+                        <a-input v-model:value="form.titleComponents.resolution" placeholder="1080p" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :span="6">
+                      <a-form-item label="视频编码">
+                        <a-input v-model:value="form.titleComponents.video_codec" placeholder="x265" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :span="6">
+                      <a-form-item label="音频编码">
+                        <a-input v-model:value="form.titleComponents.audio_codec" placeholder="AC3" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :span="6">
+                      <a-form-item label="媒介">
+                        <a-input v-model:value="form.titleComponents.medium" placeholder="BluRay" />
+                      </a-form-item>
+                    </a-col>
+                  </a-row>
+                  <a-row :gutter="16">
+                    <a-col :span="6">
+                      <a-form-item label="制作组">
+                        <a-input v-model:value="form.titleComponents.release_group" placeholder="-GROUP" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :span="6">
+                      <a-form-item label="HDR">
+                        <a-input v-model:value="form.titleComponents.hdr" placeholder="HDR" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :span="6">
+                      <a-form-item label="年份/季集">
+                        <a-input v-model:value="form.titleComponents.year" placeholder="2024 / S01E01" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :span="6">
+                      <a-form-item label="版本信息">
+                        <a-input v-model:value="form.titleComponents.edition_info" placeholder="Remux" />
+                      </a-form-item>
+                    </a-col>
+                  </a-row>
+                  <a-form-item label="标签">
+                    <TagSelector v-model="form.tags" />
+                  </a-form-item>
+                </a-form>
+              </template><!-- v-else (non-maintenanceOnly) -->
             </a-tab-pane>
 
             <!-- Tab 2: 海报与声明 -->
@@ -150,9 +186,9 @@
                   <a-image v-if="form.poster" :src="form.poster" :width="120" style="margin-top: 8px" />
                 </a-form-item>
                 <a-form-item label="声明">
-                  <a-textarea v-model:value="form.statement" :rows="3" placeholder="免责声明等" />
+                  <a-textarea v-model:value="form.statement" :rows="3" placeholder="源站官组声明（只读）" :disabled="maintenanceOnly" />
                 </a-form-item>
-                <a-form-item label="豆瓣 / IMDb / TMDb">
+                <a-form-item v-if="!maintenanceOnly" label="豆瓣 / IMDb / TMDb">
                   <a-row :gutter="8">
                     <a-col :span="8"><a-input v-model:value="form.doubanLink" placeholder="豆瓣链接" /></a-col>
                     <a-col :span="8"><a-input v-model:value="form.imdbLink" placeholder="IMDb 链接" /></a-col>
@@ -178,20 +214,42 @@
             <!-- Tab 4: 简介详情 -->
             <a-tab-pane key="intro" tab="简介详情">
               <div style="margin-bottom: 8px; display: flex; gap: 8px">
-                <a-button :loading="refreshing === 'intro'" @click="doRefresh('intro')">重新获取简介（PTGen）</a-button>
+                <a-button v-if="!maintenanceOnly" :loading="refreshing === 'intro'" @click="doRefresh('intro')">重新获取简介（PTGen）</a-button>
               </div>
               <a-textarea v-model:value="form.description" :rows="20" placeholder="BBCode 简介正文" style="font-family: monospace" />
+              <!-- §59.20: maintenanceOnly 模式下外部链接只读展示 -->
+              <div v-if="maintenanceOnly && (form.doubanLink || form.imdbLink || form.tmdbLink)" style="margin-top: 12px">
+                <span style="color: #999; font-size: 12px; margin-right: 12px">外部链接：</span>
+                <a v-if="form.doubanLink" :href="form.doubanLink" target="_blank" style="margin-right: 8px; font-size: 12px">豆瓣</a>
+                <a v-if="form.imdbLink" :href="form.imdbLink" target="_blank" style="margin-right: 8px; font-size: 12px">IMDb</a>
+                <a v-if="form.tmdbLink" :href="form.tmdbLink" target="_blank" style="font-size: 12px">TMDb</a>
+              </div>
             </a-tab-pane>
 
             <!-- Tab 5: 媒体信息 -->
             <a-tab-pane key="mediainfo" tab="媒体信息">
               <div style="margin-bottom: 8px; display: flex; gap: 8px">
-                <a-button :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">重新获取 MediaInfo</a-button>
+                <a-button v-if="!maintenanceOnly" :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">重新获取 MediaInfo</a-button>
               </div>
-              <a-textarea v-model:value="form.mediaInfo" :rows="20" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" />
+              <a-textarea v-model:value="form.mediaInfo" :rows="20" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
               <a-form-item v-if="form.bdinfo" label="BDInfo" style="margin-top: 12px">
-                <a-textarea v-model:value="form.bdinfo" :rows="10" style="font-family: monospace; font-size: 12px" />
+                <a-textarea v-model:value="form.bdinfo" :rows="10" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
               </a-form-item>
+            </a-tab-pane>
+
+            <!-- §59.20 Tab 6: 已过滤声明（只读预览） -->
+            <a-tab-pane v-if="maintenanceOnly" key="filtered" tab="已过滤声明">
+              <a-alert
+                type="info" show-icon style="margin-bottom: 12px"
+                message="以下声明将在发布时被自动过滤。可在「发布规则 → 声明过滤规则」中管理过滤模式。"
+              />
+              <div v-if="filteredDeclarations.length > 0">
+                <div v-for="(item, idx) in filteredDeclarations" :key="idx" style="margin-bottom: 8px; padding: 8px; background: #fafafa; border-radius: 4px; border-left: 3px solid #ff4d4f">
+                  <div style="font-size: 12px; color: #ff4d4f; margin-bottom: 4px">命中模式: {{ item.pattern }}</div>
+                  <pre style="margin: 0; font-size: 12px; white-space: pre-wrap; color: #666">{{ item.text }}</pre>
+                </div>
+              </div>
+              <a-empty v-else description="当前简介无匹配的过滤声明" />
             </a-tab-pane>
           </a-tabs>
         </div>
@@ -266,7 +324,8 @@
 import { ref, computed, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { CheckCircleFilled, ReloadOutlined } from '@ant-design/icons-vue'
-import { manualForwardApi, publishDataApi, publishApi } from '@/api/publish'
+import { manualForwardApi, publishDataApi, publishApi, publishTorrentsApi, seedConfigApi } from '@/api/publish'
+import type { SeedDetail } from '@/api/publish'
 import type { ManualForwardSubmitRequest, PreviewField, PreviewCompleteness, PublishResultRecord } from '@/api/types'
 import TagSelector from './TagSelector.vue'
 import ScreenshotManager from './ScreenshotManager.vue'
@@ -379,6 +438,7 @@ watch(() => props.open, (val) => {
       selectedTorrent.value = props.presetTorrent
       if (props.maintenanceOnly) {
         fillFormFromPreset()
+        loadDeclPatterns()
       } else {
         enterAnalyze()
       }
@@ -439,6 +499,93 @@ function fillFormFromPreset() {
     titleComponents: {},
   }
   loading.value = false
+  // §59.20: maintenanceOnly 模式从后端加载已存 metadata
+  if (t.info_hash) {
+    loadSeedDetail(t.info_hash)
+  }
+}
+
+// §59.20: 从 GET /publish/seeds/:info_hash 加载种子配置
+async function loadSeedDetail(infoHash: string) {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const resp = await seedConfigApi.getSeed(infoHash)
+    const d: SeedDetail | undefined = resp.data?.data
+    if (d) {
+      form.value.title = d.title || form.value.title
+      form.value.subtitle = d.subtitle || ''
+      form.value.mediaInfo = d.mediainfo || ''
+      form.value.description = d.description || ''
+      form.value.screenshots = d.screenshots || []
+      form.value.statement = d.statement || ''
+      form.value.poster = d.poster || ''
+      form.value.bdinfo = d.bdinfo || ''
+      form.value.doubanLink = d.douban_url || ''
+      form.value.imdbLink = d.imdb_url || ''
+      form.value.tmdbLink = d.tmdb_url || ''
+      // 18 TechProfile 字段 → titleComponents（Tab 1 只读展示）
+      form.value.titleComponents = {
+        main_title: d.main_title || '',
+        season_episode: d.season_episode || '',
+        year: d.year || '',
+        release_group: d.release_group || '',
+        chinese_prefix: d.chinese_prefix || '',
+        resolution: d.resolution || '',
+        video_codec: d.video_codec || '',
+        audio_codec: d.audio_codec || '',
+        audio_channels: d.audio_channels || '',
+        audio_technology: d.audio_tech || '',
+        hdr: d.hdr || '',
+        bit_depth: d.bit_depth || '',
+        source_type: d.source_type || '',
+        specification: d.specification || '',
+        source_platform: d.source_platform || '',
+        edition_info: d.edition_info || '',
+        region_code: d.region_code || '',
+        category: d.category || '',
+        form: d.form || '',
+      }
+      // 状态
+      seedMissingFields.value = d.missing_fields || []
+      seedReviewed.value = d.reviewed || false
+      currentSourceSite.value = d.site_name || ''
+    }
+  } catch (e: unknown) {
+    loadError.value = (e as Error).message
+  } finally {
+    loading.value = false
+  }
+}
+
+// §59.20: 种子配置页状态
+const seedMissingFields = ref<string[]>([])
+const seedReviewed = ref(false)
+
+// §59.20: 已过滤声明 Tab 预览
+const declPatterns = ref<string[]>([])
+const filteredDeclarations = computed(() => {
+  if (!form.value.description || declPatterns.value.length === 0) return []
+  const results: Array<{ pattern: string; text: string }> = []
+  const quoteRe = /\[quote\]([\s\S]*?)\[\/quote\]/g
+  let match: RegExpExecArray | null
+  while ((match = quoteRe.exec(form.value.description)) !== null) {
+    const blockText = match[1].trim()
+    for (const pattern of declPatterns.value) {
+      if (blockText.toLowerCase().includes(pattern.toLowerCase())) {
+        results.push({ pattern, text: blockText })
+        break
+      }
+    }
+  }
+  return results
+})
+
+async function loadDeclPatterns() {
+  try {
+    const resp = await publishTorrentsApi.getDeclarationFilters()
+    declPatterns.value = resp.data?.data?.patterns || []
+  } catch { /* silent */ }
 }
 
 // --- Analyze ---
@@ -614,13 +761,39 @@ async function saveToDB() {
   }
 }
 
+// §59.20: maintenanceOnly 模式保存——调 PUT /publish/seeds/:info_hash
 async function saveOnly() {
-  if (!props.maintenanceOnly) {
-    await saveToDB()
+  if (!selectedTorrent.value?.info_hash) {
+    message.error('缺少 info_hash')
+    return
   }
-  message.success('保存成功')
-  emit('success')
-  emit('update:open', false)
+  saving.value = true
+  try {
+    const resp = await seedConfigApi.putSeed(selectedTorrent.value.info_hash, {
+      poster: form.value.poster,
+      screenshots: form.value.screenshots,
+      description: form.value.description,
+      site_name: currentSourceSite.value || undefined,
+    })
+    const result = resp.data?.data
+    if (result) {
+      seedReviewed.value = result.reviewed || false
+      seedMissingFields.value = result.missing_fields || []
+      if (result.missing_fields && result.missing_fields.length > 0) {
+        message.warning(`已保存，仍缺 ${result.missing_fields.length} 个字段：${result.missing_fields.join(', ')}`)
+      } else {
+        message.success('保存成功，配置完整已自动审核')
+      }
+    } else {
+      message.success('保存成功')
+    }
+    emit('success')
+    emit('update:open', false)
+  } catch (e: unknown) {
+    message.error('保存失败: ' + (e as Error).message)
+  } finally {
+    saving.value = false
+  }
 }
 
 async function loadPreview() {

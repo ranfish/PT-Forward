@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a-page-header :title="t('publish.exclusionRules')" :subtitle="t('publish.exclusionSubtitle')" @back="$router.push('/publish')" />
+    <a-page-header title="发布规则" subtitle="站点互斥、合规规则、声明过滤、小组映射" @back="$router.push('/publish')" />
 
     <a-tabs v-model:active-key="activeTab" style="padding: 0 24px">
       <!-- Tab 1: 站点互斥 -->
@@ -148,6 +148,45 @@
           </a-typography-text>
         </a-modal>
       </a-tab-pane>
+
+      <!-- §59.20 Tab 3: 声明过滤规则 -->
+      <a-tab-pane key="decl-filters" tab="声明过滤">
+        <div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center">
+          <a-switch v-model:checked="declFiltersEnabled" />
+          <span style="font-size: 13px; color: #666">启用声明过滤（发布时自动移除匹配的 [quote] 块）</span>
+        </div>
+        <div style="margin-bottom: 8px">
+          <a-button type="primary" size="small" @click="addDeclPattern">添加模式</a-button>
+        </div>
+        <a-list :data-source="declPatterns" bordered size="small">
+          <template #renderItem="{ index }">
+            <a-list-item>
+              <div style="display: flex; gap: 8px; align-items: center; width: 100%">
+                <a-input v-model:value="declPatterns[index]" size="small" style="flex: 1" />
+                <a-button size="small" danger @click="declPatterns.splice(index, 1)">删除</a-button>
+              </div>
+            </a-list-item>
+          </template>
+        </a-list>
+        <div style="margin-top: 12px">
+          <a-button type="primary" :loading="declSaving" @click="saveDeclPatterns">保存</a-button>
+          <a-button style="margin-left: 8px" @click="fetchDeclPatterns">重置</a-button>
+        </div>
+      </a-tab-pane>
+
+      <!-- §59.20 Tab 4: 小组源站映射（只读） -->
+      <a-tab-pane key="group-mappings" tab="小组映射">
+        <a-alert type="info" show-icon style="margin-bottom: 12px"
+          message="制作组到源站的映射关系决定种子是否可转发。映射管理请联系开发维护人员。" />
+        <a-table
+          :data-source="groupMappings"
+          :columns="groupMappingColumns"
+          :loading="groupMappingsLoading"
+          row-key="id"
+          size="small"
+          :pagination="{ pageSize: 50, showSizeChanger: false }"
+        />
+      </a-tab-pane>
     </a-tabs>
   </div>
 </template>
@@ -158,6 +197,7 @@ import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { exclusionsApi, complianceApi } from '@/api/exclusions'
+import { publishTorrentsApi } from '@/api/publish'
 import type { ExclusionRule, ComplianceRule } from '@/api/exclusions'
 import { formatTime } from '@/utils/format'
 
@@ -337,5 +377,58 @@ async function handleComplianceDelete(record: ComplianceRule) {
 onMounted(() => {
   fetchExclusions()
   fetchCompliance()
+  fetchDeclPatterns()
+  fetchGroupMappings()
 })
+
+// ============ §59.20 Tab 3: 声明过滤 ============
+const declPatterns = ref<string[]>([])
+const declFiltersEnabled = ref(true)
+const declSaving = ref(false)
+
+async function fetchDeclPatterns() {
+  try {
+    const resp = await publishTorrentsApi.getDeclarationFilters()
+    declPatterns.value = resp.data?.data?.patterns || []
+  } catch { /* silent */ }
+}
+
+function addDeclPattern() {
+  declPatterns.value.push('')
+}
+
+async function saveDeclPatterns() {
+  declSaving.value = true
+  try {
+    const filtered = declPatterns.value.filter(p => p.trim() !== '')
+    await publishTorrentsApi.setDeclarationFilters(filtered)
+    declPatterns.value = filtered
+    message.success('声明过滤规则已保存')
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    declSaving.value = false
+  }
+}
+
+// ============ §59.20 Tab 4: 小组映射（只读） ============
+const groupMappings = ref<Array<{ id: number; group_name: string; domain: string; site_name: string; is_official: boolean; is_builtin: boolean }>>([])
+const groupMappingsLoading = ref(false)
+const groupMappingColumns = [
+  { title: '制作组', dataIndex: 'group_name', key: 'group_name', width: 120 },
+  { title: '站点', dataIndex: 'site_name', key: 'site_name', width: 100 },
+  { title: '域名', dataIndex: 'domain', key: 'domain', ellipsis: true },
+  { title: '官组', dataIndex: 'is_official', key: 'is_official', width: 60 },
+  { title: '内置', dataIndex: 'is_builtin', key: 'is_builtin', width: 60 },
+]
+
+async function fetchGroupMappings() {
+  groupMappingsLoading.value = true
+  try {
+    const resp = await publishTorrentsApi.listGroupMappings()
+    groupMappings.value = (resp.data?.data?.items || []) as unknown as typeof groupMappings.value
+  } catch { /* silent */ } finally {
+    groupMappingsLoading.value = false
+  }
+}
 </script>

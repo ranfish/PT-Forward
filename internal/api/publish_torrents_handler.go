@@ -2425,6 +2425,17 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			item["has_description"] = meta.Description != ""
 			item["has_screenshots"] = meta.Screenshots != ""
 			item["fetched_at"] = meta.FetchedAt
+			// 技术参数（列表展示用）
+			item["resolution"] = meta.Resolution
+			item["video_codec"] = meta.VideoCodec
+			item["audio_codec"] = meta.AudioCodec
+			item["audio_channels"] = meta.AudioChannels
+			item["audio_tech"] = meta.AudioTech
+			item["hdr"] = meta.HDR
+			item["source_type"] = meta.SourceType
+			item["specification"] = meta.Specification
+			item["category"] = meta.Category
+			item["form"] = meta.Form
 		} else {
 			item["reviewed"] = false
 			item["fetched"] = false

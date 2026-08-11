@@ -1,22 +1,14 @@
 <template>
   <a-modal
     :open="open"
-    title="批量获取数据"
-    width="950px"
+    title="获取种子数据"
+    width="900px"
     :footer="null"
     destroy-on-close
-    @cancel="$emit('update:open', false)"
+    @cancel="handleClose"
   >
-    <!-- 下载器选择 -->
-    <div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center">
-      <a-select
-        v-model:value="clientId"
-        style="width: 200px"
-        placeholder="选择下载器"
-        @change="fetchTorrents"
-      >
-        <a-select-option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
-      </a-select>
+    <!-- 工具栏 -->
+    <div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
       <a-input-search
         v-if="torrents.length > 0"
         v-model:value="searchText"
@@ -24,49 +16,39 @@
         style="width: 250px"
         allow-clear
       />
-      <a-select
-        v-if="torrents.length > 0"
-        v-model:value="pathFilter"
-        style="width: 220px"
-        placeholder="保存路径"
-        allow-clear
-      >
-        <a-select-option v-for="p in savePaths" :key="p" :value="p">{{ p }}</a-select-option>
-      </a-select>
-      <a-button v-if="torrents.length > 0" @click="fetchTorrents"><ReloadOutlined /></a-button>
-      <a-button v-if="torrents.length > 0" size="small" @click="openPriorityDialog">设置优先级</a-button>
+      <a-button size="small" @click="openPriorityDialog">获取优先级</a-button>
+      <a-button v-if="torrents.length > 0" size="small" @click="loadUnconfigured">刷新</a-button>
+      <a-tag v-if="torrents.length > 0" color="blue">{{ torrents.length }} 个未配置</a-tag>
     </div>
 
     <!-- 进度条 -->
     <a-alert
       v-if="fetching"
-      :message="`正在获取数据... ${doneCount}/${selectedHashes.length}`"
+      :message="`正在获取数据... ${progress.done}/${progress.total}`"
       type="info"
       show-icon
       style="margin-bottom: 12px"
     >
-      <a-progress :percent="Math.round(doneCount / selectedHashes.length * 100)" size="small" />
-      <div v-if="currentFetching" style="font-size: 12px; color: #666; margin-top: 4px">
-        {{ currentFetching }}
-      </div>
+      <a-progress :percent="progress.total > 0 ? Math.round(progress.done / progress.total * 100) : 0" size="small" />
     </a-alert>
 
-    <!-- 完成/失败汇总 -->
+    <!-- 完成汇总 -->
     <a-alert
       v-if="fetchDone"
-      :message="`完成: ${successCount} 成功, ${failCount} 失败`"
-      :type="failCount > 0 ? 'warning' : 'success'"
+      :message="`完成: ${progress.done - progress.failed} 成功${progress.failed > 0 ? ', ' + progress.failed + ' 失败' : ''}`"
+      :type="progress.failed > 0 ? 'warning' : 'success'"
       show-icon
       closable
       style="margin-bottom: 12px"
       @close="fetchDone = false"
     >
-      <div v-if="fetchResults.length > 0" style="max-height: 200px; overflow-y: auto; margin-top: 8px">
-        <div v-for="r in fetchResults" :key="r.hash" style="display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 12px">
-          <span v-if="r.status === 'success'" style="color: #52c41a">✓</span>
-          <span v-else-if="r.status === 'failed'" style="color: #ff4d4f">✗</span>
-          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ r.name }}</span>
-          <span v-if="r.status === 'failed'" style="color: #999; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ r.error }}</span>
+      <div v-if="progress.items.length > 0" style="max-height: 200px; overflow-y: auto; margin-top: 8px">
+        <div v-for="item in progress.items" :key="item.hash" style="display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 12px">
+          <span v-if="item.status === 'done'" style="color: #52c41a">✓</span>
+          <span v-else-if="item.status === 'failed'" style="color: #ff4d4f">✗</span>
+          <span v-else style="color: #999">…</span>
+          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ item.name }}</span>
+          <span v-if="item.error" style="color: #999; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ item.error }}</span>
         </div>
       </div>
     </a-alert>
@@ -76,11 +58,11 @@
       v-if="torrents.length > 0"
       :data-source="filteredTorrents"
       :columns="columns"
-      :loading="loadingTorrents"
-      row-key="info_hash"
+      :loading="loading"
+      row-key="hash"
       size="small"
       :scroll="{ y: 400 }"
-      :row-selection="{ selectedRowKeys: selectedHashes, onChange: onSelectChange, getCheckboxProps: disableCheckbox }"
+      :row-selection="{ selectedRowKeys: selectedHashes, onChange: onSelectChange }"
       :pagination="{ pageSize: 50, showSizeChanger: false, size: 'small' }"
     >
       <template #bodyCell="{ column, record }">
@@ -90,19 +72,15 @@
         <template v-if="column.key === 'size'">
           {{ formatBytes(record.size) }}
         </template>
-        <template v-if="column.key === 'cached'">
-          <a-tag v-for="s in record.cachedSites" :key="s" color="green" style="margin: 1px; font-size: 11px">{{ s }}</a-tag>
-          <span v-if="!record.cachedSites?.length" style="color: #ccc; font-size: 12px">无</span>
-        </template>
       </template>
     </a-table>
 
-    <a-empty v-else-if="!loadingTorrents && clientId" description="该下载器无做种" />
+    <a-empty v-else-if="!loading" description="无未配置种子（全部已获取或无快照）" />
 
     <!-- 优先级设置弹窗 -->
     <a-modal
       v-model:open="priorityDialogVisible"
-      title="源站点优先级设置"
+      title="获取站点优先级"
       width="520px"
       :confirm-loading="prioritySaving"
       @ok="savePriority"
@@ -111,37 +89,36 @@
         type="info"
         show-icon
         style="margin-bottom: 12px"
-        message="设置批量获取种子数据时的源站点优先级顺序，系统将按顺序查找第一个可用的源站点获取数据"
+        message="设置「获取数据」时的站点优先级（制作组映射命中优先于本列表）"
       />
-      <div style="margin-bottom: 8px; font-size: 13px; color: #666; font-weight: 500">源站点优先级顺序：</div>
       <div style="min-height: 40px">
         <a-tag
           v-for="(site, index) in priorityList"
           :key="site"
-          :color="priorityTagColor(index)"
+          :color="index < 3 ? ['success', 'processing', 'warning'][index] : 'default'"
           style="margin: 4px; cursor: move; user-select: none; font-size: 13px; padding: 4px 12px"
           draggable="true"
-          @dragstart="onDragStart(index)"
+          @dragstart="draggedIndex = index"
           @dragover.prevent
           @drop="onDrop(index)"
         >
           {{ index + 1 }}. {{ site }}
         </a-tag>
-        <span v-if="priorityList.length === 0" style="color: #999; font-size: 12px">未配置源站点优先级</span>
+        <span v-if="priorityList.length === 0" style="color: #999; font-size: 12px">未配置（使用默认优先级）</span>
       </div>
-      <div style="margin-top: 8px; font-size: 12px; color: #999">拖拽调整优先级顺序</div>
+      <div style="margin-top: 8px; font-size: 12px; color: #999">拖拽调整顺序</div>
     </a-modal>
 
     <!-- Footer -->
     <div style="margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px">
-      <a-button @click="$emit('update:open', false)">关闭</a-button>
+      <a-button @click="handleClose">关闭</a-button>
       <a-button
         type="primary"
         :loading="fetching"
         :disabled="selectedHashes.length === 0"
         @click="startBatchFetch"
       >
-        批量获取（{{ selectedHashes.length }}）
+        获取数据（{{ selectedHashes.length }}）
       </a-button>
     </div>
   </a-modal>
@@ -150,95 +127,149 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { ReloadOutlined } from '@ant-design/icons-vue'
-import { downloadersApi } from '@/api/downloaders'
-import { manualForwardApi, publishDataApi } from '@/api/publish'
+import { seedConfigApi } from '@/api/publish'
 import { formatBytes } from '@/utils/format'
 
-const props = defineProps<{ open: boolean }>()
+const props = defineProps<{
+  open: boolean
+  clientId?: string
+  savePath?: string
+}>()
 const emit = defineEmits<{
   (e: 'update:open', val: boolean): void
-  (e: 'done'): void
+  (e: 'completed'): void
 }>()
 
-interface ClientItem { id: number; name: string }
-interface TorrentItem {
-  info_hash: string
+interface UnconfiguredTorrent {
+  hash: string
   name: string
   size: number
+  client_id: string
   save_path: string
-  state: string
-  cachedSites?: string[]
 }
 
-const clients = ref<ClientItem[]>([])
-const clientId = ref<number | undefined>(undefined)
-const torrents = ref<TorrentItem[]>([])
-const loadingTorrents = ref(false)
+const torrents = ref<UnconfiguredTorrent[]>([])
+const loading = ref(false)
 const searchText = ref('')
-const pathFilter = ref<string | undefined>(undefined)
-const savePaths = ref<string[]>([])
 const selectedHashes = ref<string[]>([])
 
 const fetching = ref(false)
-const doneCount = ref(0)
-const currentFetching = ref('')
-const successCount = ref(0)
-const failCount = ref(0)
 const fetchDone = ref(false)
-const fetchResults = ref<Array<{ hash: string; name: string; status: 'success' | 'failed'; error?: string }>>([])
+const progress = ref({
+  active: false,
+  total: 0,
+  done: 0,
+  failed: 0,
+  items: [] as Array<{ hash: string; name: string; status: string; error?: string }>,
+})
 
 const priorityDialogVisible = ref(false)
 const prioritySaving = ref(false)
 const priorityList = ref<string[]>([])
 const draggedIndex = ref<number | null>(null)
 
-function priorityTagColor(index: number): string {
-  if (index === 0) return 'success'
-  if (index === 1) return 'processing'
-  if (index === 2) return 'warning'
-  return 'default'
-}
-
-function onDragStart(index: number) {
-  draggedIndex.value = index
-}
-
-function onDrop(dropIndex: number) {
-  if (draggedIndex.value === null) return
-  const draggedItem = priorityList.value.splice(draggedIndex.value, 1)[0]
-  priorityList.value.splice(dropIndex, 0, draggedItem)
-  draggedIndex.value = null
-}
-
 const columns = [
   { title: '种子名', key: 'name', ellipsis: true },
   { title: '大小', key: 'size', width: 80 },
-  { title: '做种站点', key: 'cached', width: 200 },
 ]
 
 const filteredTorrents = computed(() => {
-  let result = torrents.value
-  if (pathFilter.value) {
-    result = result.filter(t => t.save_path === pathFilter.value)
-  }
-  if (searchText.value) {
-    const q = searchText.value.toLowerCase()
-    result = result.filter(t => t.name.toLowerCase().includes(q))
-  }
-  return result
+  if (!searchText.value) return torrents.value
+  const q = searchText.value.toLowerCase()
+  return torrents.value.filter(t => t.name.toLowerCase().includes(q))
 })
 
 watch(() => props.open, async (val) => {
   if (val) {
     reset()
-    await fetchClients()
+    await loadUnconfigured()
   }
 })
 
+function reset() {
+  torrents.value = []
+  selectedHashes.value = []
+  searchText.value = ''
+  fetching.value = false
+  fetchDone.value = false
+  progress.value = { active: false, total: 0, done: 0, failed: 0, items: [] }
+}
+
+async function loadUnconfigured() {
+  if (!props.clientId || !props.savePath) return
+  loading.value = true
+  try {
+    const resp = await seedConfigApi.snapshotUnconfigured(props.clientId, props.savePath)
+    torrents.value = resp.data?.data?.items || []
+  } catch {
+    message.error('加载未配置种子失败')
+    torrents.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+function onSelectChange(keys: string[]) {
+  selectedHashes.value = keys
+}
+
+async function startBatchFetch() {
+  if (selectedHashes.value.length === 0) return
+  const items = torrents.value
+    .filter(t => selectedHashes.value.includes(t.hash))
+    .map(t => ({ hash: t.hash, name: t.name, size: t.size }))
+
+  try {
+    await seedConfigApi.batchFetch(items)
+    fetching.value = true
+    fetchDone.value = false
+    progress.value = { active: true, total: items.length, done: 0, failed: 0, items: [] }
+    pollProgress()
+  } catch (e) {
+    message.error('启动批量获取失败：' + (e as Error).message)
+  }
+}
+
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+
+function pollProgress() {
+  pollTimer = setTimeout(async () => {
+    try {
+      const resp = await seedConfigApi.batchFetchProgress()
+      const data = resp.data?.data
+      if (data) {
+        progress.value = {
+          active: data.active,
+          total: data.total,
+          done: data.done,
+          failed: data.failed,
+          items: data.items || [],
+        }
+      }
+      if (data?.active) {
+        pollProgress()
+      } else {
+        fetching.value = false
+        fetchDone.value = true
+        const success = (data?.done || 0) - (data?.failed || 0)
+        message.success(`获取完成: ${success} 成功${(data?.failed || 0) > 0 ? ', ' + data.failed + ' 失败' : ''}`)
+        emit('completed')
+        await loadUnconfigured()
+      }
+    } catch {
+      if (fetching.value) pollProgress()
+    }
+  }, 1500)
+}
+
+function handleClose() {
+  if (pollTimer) clearTimeout(pollTimer)
+  emit('update:open', false)
+}
+
 async function openPriorityDialog() {
   try {
-    const resp = await publishDataApi.getSourcePriority()
+    const resp = await seedConfigApi.getFetchPriority()
     priorityList.value = resp.data?.data?.priority || []
   } catch { /* silent */ }
   priorityDialogVisible.value = true
@@ -247,150 +278,20 @@ async function openPriorityDialog() {
 async function savePriority() {
   prioritySaving.value = true
   try {
-    await publishDataApi.setSourcePriority([...priorityList.value])
+    await seedConfigApi.setFetchPriority([...priorityList.value])
     message.success('优先级已保存')
     priorityDialogVisible.value = false
-  } catch (e: unknown) {
+  } catch (e) {
     message.error((e as Error).message)
   } finally {
     prioritySaving.value = false
   }
 }
 
-function reset() {
-  torrents.value = []
-  selectedHashes.value = []
-  searchText.value = ''
-  pathFilter.value = undefined
-  savePaths.value = []
-  fetching.value = false
-  doneCount.value = 0
-  successCount.value = 0
-  failCount.value = 0
-  fetchResults.value = []
-  fetchDone.value = false
-  currentFetching.value = ''
-}
-
-async function fetchClients() {
-  try {
-    const resp = await downloadersApi.listLight(1, 100)
-    const items = resp.data?.data?.items || []
-    clients.value = items.map((c) => ({
-      id: c.id,
-      name: c.name,
-    }))
-    if (clients.value.length > 0 && !clientId.value) {
-      clientId.value = clients.value[0].id
-      await fetchTorrents()
-    }
-  } catch { /* silent */ }
-}
-
-async function fetchTorrents() {
-  if (!clientId.value) return
-  loadingTorrents.value = true
-  torrents.value = []
-  selectedHashes.value = []
-  try {
-    const resp = await manualForwardApi.seededTorrents(clientId.value)
-    const items = (resp.data?.data || []) as unknown[]
-    torrents.value = items.map((item) => {
-      const obj = item as Record<string, unknown>
-      return {
-        info_hash: obj.info_hash as string,
-        name: obj.name as string,
-        size: obj.size as number,
-        save_path: obj.save_path as string,
-        state: obj.state as string,
-        cachedSites: [],
-      }
-    })
-    // 异步加载每个种子的做种站点（覆盖状态）
-    for (const t of torrents.value) {
-      publishDataApi.coverageCache(t.info_hash).then(resp => {
-        const sites = resp.data?.data?.sites || []
-        t.cachedSites = sites.map(s => s.site_name)
-      }).catch(() => {})
-    }
-    // 提取保存路径列表
-    const paths = new Set<string>()
-    for (const t of torrents.value) {
-      if (t.save_path) paths.add(t.save_path)
-    }
-    savePaths.value = [...paths].sort()
-    pathFilter.value = undefined
-  } catch { /* silent */ } finally {
-    loadingTorrents.value = false
-  }
-}
-
-function onSelectChange(keys: string[]) {
-  selectedHashes.value = keys
-}
-
-function disableCheckbox(record: TorrentItem) {
-  return { disabled: record.cachedSites?.length ? false : false }
-}
-
-async function startBatchFetch() {
-  if (selectedHashes.value.length === 0) return
-  fetching.value = true
-  fetchDone.value = false
-  doneCount.value = 0
-  successCount.value = 0
-  failCount.value = 0
-  fetchResults.value = []
-
-  for (const hash of selectedHashes.value) {
-    const torrent = torrents.value.find(t => t.info_hash === hash)
-    if (!torrent) continue
-    currentFetching.value = torrent.name
-    try {
-      const resp = await manualForwardApi.startAnalyze({
-        client_id: clientId.value!,
-        info_hash: torrent.info_hash,
-        name: torrent.name,
-        save_path: torrent.save_path,
-        size: torrent.size,
-        fetch_source: 'batch_fetch',
-      })
-      const taskId = resp.data?.data?.task_id
-      if (!taskId) throw new Error('任务创建失败')
-      // Poll until done
-      await pollTask(taskId)
-      successCount.value++
-      fetchResults.value.push({ hash, name: torrent.name, status: 'success' })
-    } catch (e) {
-      failCount.value++
-      fetchResults.value.push({ hash, name: torrent.name, status: 'failed', error: (e as Error).message })
-    }
-    doneCount.value++
-  }
-
-  fetching.value = false
-  currentFetching.value = ''
-  fetchDone.value = true
-  message.success(`批量获取完成: ${successCount.value} 成功, ${failCount.value} 失败`)
-  emit('done')
-}
-
-function pollTask(taskId: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    async function poll() {
-      try {
-        const resp = await manualForwardApi.pollAnalyze(taskId)
-        const task = resp.data?.data as Record<string, unknown> | undefined
-        if (!task) { resolve(); return }
-        const status = task.status as string
-        if (status === 'done') { resolve(); return }
-        if (status === 'failed') { reject(new Error(task.error as string || '分析失败')); return }
-        setTimeout(poll, 2000)
-      } catch (e) {
-        reject(e)
-      }
-    }
-    setTimeout(poll, 1500)
-  })
+function onDrop(dropIndex: number) {
+  if (draggedIndex.value === null) return
+  const item = priorityList.value.splice(draggedIndex.value, 1)[0]
+  priorityList.value.splice(dropIndex, 0, item)
+  draggedIndex.value = null
 }
 </script>
