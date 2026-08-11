@@ -773,11 +773,11 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	task.setResult(result)
 
 	if !hasLocalCache {
-		h.persistAnalysis(infoHash, sourceSite, result)
+		h.persistAnalysis(infoHash, sourceSite, result, profile)
 	}
 }
 
-func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result map[string]interface{}) {
+func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result map[string]interface{}, profile titleparser.TechProfile) {
 	if infoHash == "" {
 		return
 	}
@@ -822,6 +822,27 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 	var meta model.TorrentMetadata
 	h.db.Where("info_hash = ?", infoHash).First(&meta)
 
+	// §59.19 TechProfile 平铺字段提取
+	catStr := ""
+	if t, ok := stdParams["type"]; ok {
+		catStr, _ = t.(string)
+	}
+	tpFields := map[string]interface{}{
+		"category":       catStr,
+		"resolution":     profile.Resolution,
+		"video_codec":    profile.VideoCodec,
+		"audio_codec":    profile.AudioCodec,
+		"audio_channels": profile.AudioChannels,
+		"audio_tech":     profile.AudioTechnology,
+		"hdr":            profile.HDR,
+		"bit_depth":      profile.BitDepth,
+		"source_type":    profile.SourceType,
+		"specification":  profile.Specification,
+		"source_platform": profile.SourcePlatform,
+		"edition_info":   profile.EditionInfo,
+		"region_code":    profile.RegionCode,
+	}
+
 	if meta.ID == 0 {
 		meta = model.TorrentMetadata{
 			InfoHash:    infoHash,
@@ -838,6 +859,19 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			MergedJSON:  mergedJSON,
 			FetchSource: fetchSource,
 			FetchedAt:   now,
+			Category:    catStr,
+			Resolution:  profile.Resolution,
+			VideoCodec:  profile.VideoCodec,
+			AudioCodec:  profile.AudioCodec,
+			AudioChannels: profile.AudioChannels,
+			AudioTech:   profile.AudioTechnology,
+			HDR:         profile.HDR,
+			BitDepth:    profile.BitDepth,
+			SourceType:  profile.SourceType,
+			Specification: profile.Specification,
+			SourcePlatform: profile.SourcePlatform,
+			EditionInfo: profile.EditionInfo,
+			RegionCode:  profile.RegionCode,
 		}
 		if err := h.db.Create(&meta).Error; err != nil {
 			h.logger.Warn("persist analysis: create failed", zap.Error(err))
@@ -856,6 +890,9 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			"merged_json":  mergedJSON,
 			"fetch_source": fetchSource,
 			"fetched_at":   now,
+		}
+		for k, v := range tpFields {
+			updates[k] = v
 		}
 		if err := h.db.Model(&meta).Updates(updates).Error; err != nil {
 			h.logger.Warn("persist analysis: update failed", zap.Error(err))

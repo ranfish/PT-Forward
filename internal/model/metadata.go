@@ -41,6 +41,22 @@ type TorrentMetadata struct {
 
 	// §56.8 合并模式记录（UI toggle 显示）
 	LastMergeMode string `json:"last_merge_mode" gorm:"column:last_merge_mode;size:20;default:'ptgen_first'"`
+
+	// §59.19 TechProfile 平铺字段（从 MergedJSON 提取，种子配置页展示/筛选用）
+	Category      string `json:"category" gorm:"size:20;default:''"`       // movie/tv_series/music/animation/...
+	Form          string `json:"form" gorm:"size:20;default:''"`           // season_pack/partial_pack/single_episode/unknown
+	Resolution    string `json:"resolution" gorm:"size:20;default:''"`     // 2160p/1080p/720p
+	VideoCodec    string `json:"video_codec" gorm:"size:20;default:''"`    // x264/x265/H265
+	AudioCodec    string `json:"audio_codec" gorm:"size:20;default:''"`    // DTS/TrueHD/AAC
+	AudioChannels string `json:"audio_channels" gorm:"size:20;default:''"`  // 5.1/7.1/2.0
+	AudioTech     string `json:"audio_tech" gorm:"size:20;default:''"`     // Atmos/Auro3D
+	HDR           string `json:"hdr" gorm:"size:30;default:''"`            // DV/HDR/HDR10+
+	BitDepth      string `json:"bit_depth" gorm:"size:10;default:''"`      // 8bit/10bit
+	SourceType    string `json:"source_type" gorm:"size:30;default:''"`    // UHD Blu-ray/BluRay
+	Specification string `json:"specification" gorm:"size:20;default:''"`  // Remux/WEB-DL
+	SourcePlatform string `json:"source_platform" gorm:"size:30;default:''"` // NF/AMZN/DSNP
+	EditionInfo   string `json:"edition_info" gorm:"size:30;default:''"`   // REPACK/REMUX
+	RegionCode    string `json:"region_code" gorm:"size:10;default:''"`    // USA/JPN/ITA
 }
 
 func (TorrentMetadata) TableName() string { return "torrent_metadata" }
