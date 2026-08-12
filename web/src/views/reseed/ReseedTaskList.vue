@@ -335,12 +335,7 @@ const filteredTargetSites = computed(() => {
   if (form.engineMode === 'iyuu_cloud') {
     return targetSites.value.filter(s => iyuuSupportedIds.value.has(String(s.id)))
   }
-  // seed_feature 模式：仅 L0 勾选时，只显示支持 pieces_hash API 的站点
-  const hasL1 = matchLayers.value.includes('fingerprint')
-  const hasL2 = matchLayers.value.includes('size_title')
-  if (!hasL1 && !hasL2) {
-    return targetSites.value.filter(s => s.supportsPiecesHashApi)
-  }
+  // seed_feature 模式：所有启用站点都可选，引擎运行时自动跳过不支持 pieces_hash 的站点
   return targetSites.value
 })
 
