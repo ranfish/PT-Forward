@@ -11,7 +11,6 @@
         <a-descriptions bordered :column="2" style="margin-bottom: 24px">
           <a-descriptions-item :label="t('common.name')">{{ task.name }}</a-descriptions-item>
           <a-descriptions-item :label="t('common.status')">{{ translateReseedStatus(task.status) }}</a-descriptions-item>
-          <a-descriptions-item :label="t('reseed.sourceSite')">{{ resolveSiteIDs(task.source_site_ids) }}</a-descriptions-item>
           <a-descriptions-item :label="t('reseed.targetSite')">{{ resolveSiteIDs(task.target_site_ids) }}</a-descriptions-item>
           <a-descriptions-item :label="t('reseed.client')">{{ resolveDownloaderIDs(task.client_ids) }}</a-descriptions-item>
           <a-descriptions-item :label="t('common.createdAt')">{{ formatTime(task.created_at) }}</a-descriptions-item>

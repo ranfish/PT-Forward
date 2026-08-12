@@ -90,21 +90,7 @@
           </a-col>
         </a-row>
         <a-row :gutter="16">
-          <a-col v-if="form.engineMode !== 'iyuu_cloud'" :span="12">
-            <a-form-item name="sourceSiteIds" :rules="form.engineMode === 'iyuu_cloud' ? [] : [{ required: true, message: t('reseed.pleaseEnterSourceSite') }]">
-              <template #label>
-                {{ t('reseed.sourceSiteIds') }}
-                <a-button type="link" size="small" @click="selectAllSource">{{ t('common.selectAll') }}</a-button>
-                <a-button type="link" size="small" @click="form.sourceSiteIds = []">{{ t('common.deselectAll') }}</a-button>
-              </template>
-              <a-select v-model:value="form.sourceSiteIds" mode="multiple" :placeholder="t('reseed.sourceSiteIdsPlaceholder')" :loading="sitesLoading" show-search :filter-option="filterOption" allow-clear>
-                <a-select-option v-for="s in sourceSites" :key="s.id" :value="String(s.id)" :label="s.name">
-                  {{ s.name }}
-                </a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-          <a-col :span="form.engineMode === 'iyuu_cloud' ? 24 : 12">
+          <a-col :span="24">
             <a-form-item name="targetSiteIds" :rules="[{ required: true, message: t('reseed.pleaseEnterTargetSite') }]">
               <template #label>
                 {{ t('reseed.targetSiteIds') }}
