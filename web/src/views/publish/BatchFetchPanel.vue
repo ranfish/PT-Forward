@@ -144,8 +144,8 @@ interface UnconfiguredTorrent {
   hash: string
   name: string
   size: number
-  client_id: string
-  save_path: string
+  clientId: string
+  savePath: string
 }
 
 const torrents = ref<UnconfiguredTorrent[]>([])
@@ -217,7 +217,7 @@ async function startBatchFetch() {
   if (selectedHashes.value.length === 0) return
   const items = torrents.value
     .filter(t => selectedHashes.value.includes(t.hash))
-    .map(t => ({ hash: t.hash, name: t.name, size: t.size, save_path: t.save_path }))
+    .map(t => ({ hash: t.hash, name: t.name, size: t.size, savePath: t.savePath }))
 
   try {
     await seedConfigApi.batchFetch(items, props.clientId || '')

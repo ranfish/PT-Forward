@@ -26,8 +26,8 @@
             placeholder="选择源站"
             @change="onSourceSiteChange"
           >
-            <a-select-option v-for="s in cachedSites" :key="s.site_name" :value="s.site_name">
-              {{ s.site_name }}
+            <a-select-option v-for="s in cachedSites" :key="s.siteName" :value="s.siteName">
+              {{ s.siteName }}
               <CheckCircleFilled v-if="s.reviewed" style="color: #52c41a; margin-left: 4px" />
             </a-select-option>
           </a-select>
@@ -443,7 +443,7 @@ const bodyRef = ref<HTMLElement>()
 
 const selectedTorrent = ref<PresetTorrent | null>(null)
 const analyzeResult = ref<Record<string, any> | null>(null)
-const cachedSites = ref<Array<{ id: number; site_name: string; torrent_id: string; reviewed: boolean; fetched_at: string; title: string; subtitle: string }>>([])
+const cachedSites = ref<Array<{ id: number; siteName: string; torrentId: string; reviewed: boolean; fetchedAt: string; title: string; subtitle: string }>>([])
 const currentSourceSite = ref<string>('')
 
 const form = ref({
@@ -680,7 +680,7 @@ async function enterAnalyze() {
     const csResp = await publishDataApi.cachedSites(selectedTorrent.value.info_hash)
     cachedSites.value = csResp.data?.data?.sites || []
     if (cachedSites.value.length > 0 && !currentSourceSite.value) {
-      currentSourceSite.value = cachedSites.value[0].site_name
+      currentSourceSite.value = cachedSites.value[0].siteName
     }
 
     const t = selectedTorrent.value
@@ -766,13 +766,13 @@ async function doRefresh(type: string) {
   if (!selectedTorrent.value) return
   refreshing.value = type
   try {
-    const payload: { type: string; name: string; save_path?: string; info_hash?: string; site_name?: string; screenshots?: string[]; client_id?: string } = {
+    const payload: { type: string; name: string; savePath?: string; infoHash?: string; siteName?: string; screenshots?: string[]; clientId?: string } = {
       type,
       name: selectedTorrent.value.name,
-      save_path: selectedTorrent.value.save_path,
-      info_hash: selectedTorrent.value.info_hash,
-      site_name: currentSourceSite.value || selectedTorrent.value.source_site || '',
-      client_id: String(selectedTorrent.value.client_id || ''),
+      savePath: selectedTorrent.value.save_path,
+      infoHash: selectedTorrent.value.info_hash,
+      siteName: currentSourceSite.value || selectedTorrent.value.source_site || '',
+      clientId: String(selectedTorrent.value.client_id || ''),
     }
     if (type === 'rehost_screenshots') {
       payload.screenshots = form.value.screenshots
@@ -823,7 +823,7 @@ function prevStep() {
 async function saveToDB() {
   if (!selectedTorrent.value) return
   // 直接从 cachedSites 找到 metadata ID，避免脆弱的搜索
-  const site = cachedSites.value.find(s => s.site_name === (currentSourceSite.value || selectedTorrent.value?.source_site))
+  const site = cachedSites.value.find(s => s.siteName === (currentSourceSite.value || selectedTorrent.value?.source_site))
   if (!site || !site.id) return
   saving.value = true
   try {
@@ -853,7 +853,7 @@ async function saveOnly() {
       poster: form.value.poster,
       screenshots: form.value.screenshots,
       description: form.value.description,
-      site_name: currentSourceSite.value || undefined,
+      siteName: currentSourceSite.value || undefined,
     })
     const result = resp.data?.data
     if (result) {

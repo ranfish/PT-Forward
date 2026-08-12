@@ -254,16 +254,16 @@
       <a-radio-group v-model:value="selectedSourceSite" style="width: 100%">
         <div
           v-for="c in sourceCandidates"
-          :key="c.site_name"
+          :key="c.siteName"
           style="display: flex; align-items: center; padding: 8px 0"
         >
-          <a-radio :value="c.site_name" :disabled="!c.has_cookie">
-            {{ c.site_name }}
+          <a-radio :value="c.siteName" :disabled="!c.hasCookie">
+            {{ c.siteName }}
           </a-radio>
-          <a-tag v-if="c.torrent_id" color="blue" size="small" style="margin-left: 8px">
-            ID: {{ c.torrent_id }}
+          <a-tag v-if="c.torrentId" color="blue" size="small" style="margin-left: 8px">
+            ID: {{ c.torrentId }}
           </a-tag>
-          <a-tag v-if="!c.has_cookie" color="red" size="small" style="margin-left: 4px">
+          <a-tag v-if="!c.hasCookie" color="red" size="small" style="margin-left: 4px">
             缺 cookie
           </a-tag>
         </div>
@@ -813,17 +813,17 @@ async function detectAndOpen(record: PublishTorrentItem) {
 
 // 源站选择弹窗
 const sourceSelectOpen = ref(false)
-const sourceCandidates = ref<{ site_name: string; torrent_id: string; has_cookie: boolean }[]>([])
+const sourceCandidates = ref<{ siteName: string; torrentId: string; hasCookie: boolean }[]>([])
 const sourceDetectRecord = ref<PublishTorrentItem | null>(null)
 const selectedSourceSite = ref<string>('')
 
 function confirmSourceSite() {
-  const cand = sourceCandidates.value.find(c => c.site_name === selectedSourceSite.value)
+  const cand = sourceCandidates.value.find(c => c.siteName === selectedSourceSite.value)
   if (cand && presetTorrent.value) {
     presetTorrent.value = {
       ...presetTorrent.value,
-      source_site: cand.site_name,
-      torrent_id: cand.torrent_id,
+      source_site: cand.siteName,
+      torrent_id: cand.torrentId,
     }
   }
   sourceSelectOpen.value = false
@@ -953,9 +953,9 @@ async function addMapping() {
   if (!newMapping.group_name) return
   try {
     await publishTorrentsApi.createGroupMapping({
-      group_name: newMapping.group_name,
+      groupName: newMapping.group_name,
       domain: newMapping.domain,
-      site_name: newMapping.site_name,
+      siteName: newMapping.site_name,
     })
     newMapping.group_name = ''
     newMapping.domain = ''
@@ -979,9 +979,9 @@ function editMapping(record: Record<string, unknown> & { id: number }) {
 async function saveMapping() {
   try {
     await publishTorrentsApi.updateGroupMapping(editingMapping.value.id, {
-      group_name: editingMapping.value.group_name,
+      groupName: editingMapping.value.group_name,
       domain: editingMapping.value.domain,
-      site_name: editingMapping.value.site_name,
+      siteName: editingMapping.value.site_name,
     })
     editMappingOpen.value = false
     fetchMappings()
