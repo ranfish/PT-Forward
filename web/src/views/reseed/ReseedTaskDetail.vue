@@ -545,9 +545,9 @@ function handleFeatureChange(pag: { current?: number; pageSize?: number }) {
   fetchFeatureLogs()
 }
 
-onMounted(() => {
-  fetchSiteMap()
-  fetchDownloaderMap()
+onMounted(async () => {
+  await fetchSiteMap()
+  await fetchDownloaderMap()
   fetchTask()
   fetchMatches()
   fetchIYUULogs()

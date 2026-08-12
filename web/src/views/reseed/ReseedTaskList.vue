@@ -550,9 +550,9 @@ async function handleDelete(id: number) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   pagination.fetch()
-  fetchDownloaders()
-  fetchSites()
+  await fetchDownloaders()
+  await fetchSites()
 })
 </script>
