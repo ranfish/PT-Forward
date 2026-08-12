@@ -921,7 +921,7 @@ async function enterSelectSites() {
       try {
         const covResp = await publishDataApi.coverageCache(selectedTorrent.value.info_hash)
         const covSites = covResp.data?.data?.sites || []
-        for (const s of covSites) coveredNames.add(s.site_name)
+        for (const s of covSites) coveredNames.add(s.siteName)
       } catch { /* silent — 无覆盖数据则不过滤 */ }
     }
     coveredSites.value = coveredNames

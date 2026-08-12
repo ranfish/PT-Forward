@@ -381,7 +381,7 @@
             {{ maskDomain(record.domain) }}
           </template>
           <template v-if="column.key === 'matched_site'">
-            <a-tag v-if="record.matched_site" color="green">{{ record.matched_site }}</a-tag>
+            <a-tag v-if="record.matchedSite" color="green">{{ record.matchedSite }}</a-tag>
             <a-tag v-else color="red">未匹配</a-tag>
           </template>
           <template v-if="column.key === 'actions'">
