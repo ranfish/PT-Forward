@@ -130,6 +130,45 @@ func (m *Manager) Reload(ctx context.Context) error {
 	return m.LoadClients(ctx)
 }
 
+// ReloadClient 重连单个客户端（编辑下载器时用，避免全量 Reload 阻塞其他客户端）
+func (m *Manager) ReloadClient(ctx context.Context, name string) error {
+	var cfg model.ClientConfig
+	if err := m.db.WithContext(ctx).Where("name = ? AND enabled = ?", name, true).First(&cfg).Error; err != nil {
+		// 客户端被禁用或删除 → 从池中移除
+		m.mu.Lock()
+		if old, ok := m.clients[name]; ok {
+			old.Close()
+			delete(m.clients, name)
+		}
+		m.mu.Unlock()
+		return nil
+	}
+
+	paths := m.loadPaths(cfg.ID)
+	client, err := m.createClient(&cfg, paths)
+	if err != nil {
+		m.logger.Warn("reloadClient: failed to create client", zap.String("name", name), zap.Error(err))
+		return err
+	}
+
+	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if connected, err := m.connectClient(connectCtx, client); !connected {
+		m.logger.Warn("reloadClient: connect failed", zap.String("name", name), zap.Error(err))
+		return err
+	}
+
+	m.mu.Lock()
+	if old, ok := m.clients[name]; ok {
+		old.Close()
+	}
+	m.clients[name] = client
+	m.mu.Unlock()
+
+	m.logger.Info("client reloaded", zap.String("name", name), zap.String("type", cfg.Type))
+	return nil
+}
+
 func (m *Manager) ConnectedCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
