@@ -177,4 +177,7 @@ func init() {
 		// 只有新列或都不存在 → 无需操作
 		return nil
 	})
+	RegisterMigration(9, "enable_pieces_hash_api_for_yemapt", func(gormDB *gorm.DB) error {
+		return gormDB.Exec(`UPDATE sites SET supports_pieces_hash_api = 1 WHERE framework = 'yemapt' AND enabled = 1`).Error
+	})
 }
