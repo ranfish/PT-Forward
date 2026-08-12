@@ -97,10 +97,10 @@
             <a-select-option value="reseed">{{ t('downloader.roleReseed') }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="媒体文件位置" name="isLocal" :rules="[{ required: true, message: '请选择媒体文件位置' }]">
+        <a-form-item label="下载器类型" name="isLocal" :rules="[{ required: true, message: '请选择下载器类型' }]">
           <a-radio-group v-model:value="form.isLocal">
-            <a-radio :value="true">本地发布（媒体文件在本机可访问）</a-radio>
-            <a-radio :value="false">转种上盒（媒体文件不在本机，使用源站数据）</a-radio>
+            <a-radio :value="true">本地</a-radio>
+            <a-radio :value="false">远程</a-radio>
           </a-radio-group>
         </a-form-item>
         <a-form-item :label="t('common.enable')" name="enabled">
