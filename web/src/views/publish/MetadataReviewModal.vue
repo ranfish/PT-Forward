@@ -186,11 +186,11 @@ async function handleSave() {
   saving.value = true
   try {
     await metadataApi.update({
-      info_hash: props.infoHash,
-      site_name: meta.value?.site_name,
+      infoHash: props.infoHash,
+      siteName: meta.value?.site_name,
       title: form.title,
       subtitle: form.subtitle,
-      standard_type: form.standard_type,
+      standardType: form.standard_type,
       tags: form.tags,
       description: form.description,
     })

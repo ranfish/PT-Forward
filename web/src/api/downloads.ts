@@ -102,11 +102,11 @@ export const downloadsApi = {
 }
 
 export interface SpaceStat {
-  client_id: string
-  free_space: number
-  total_space: number
-  pending_bytes: number
-  effective_free: number
-  torrent_count: number
-  downloading_count: number
+  clientId: string
+  freeSpace: number
+  totalSpace: number
+  pendingBytes: number
+  effectiveFree: number
+  torrentCount: number
+  downloadingCount: number
 }

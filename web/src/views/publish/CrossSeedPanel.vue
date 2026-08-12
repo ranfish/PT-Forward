@@ -723,7 +723,7 @@ function pollAnalyze(taskId: number) {
         loading.value = false
       } else {
         loadingProgress.value = task.progress || 0
-        loadingText.value = task.progress_text || '正在分析...'
+        loadingText.value = task.progressText || '正在分析...'
         pollTimer = setTimeout(poll, 2000)
       }
     } catch (e: unknown) {
