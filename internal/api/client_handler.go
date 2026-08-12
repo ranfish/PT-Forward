@@ -44,6 +44,7 @@ type createDownloaderRequest struct {
 	Username       string               `json:"username"`
 	Password       string               `json:"password"`
 	Role           string               `json:"role"`
+	IsLocal        *bool                `json:"isLocal"` // §59.21: 指针类型区分"未传"和"false"
 	TransferTargetID string               `json:"transferTargetId"`
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
@@ -63,6 +64,7 @@ type downloaderResponse struct {
 	URL            string               `json:"url"`
 	Username       string               `json:"username"`
 	Role           string               `json:"role"`
+	IsLocal        bool                 `json:"isLocal"`
 	TransferTargetID string               `json:"transferTargetId,omitempty"`
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
@@ -85,6 +87,7 @@ func (h *ClientHandler) toResponse(c *model.ClientConfig, mappings []model.Clien
 		URL:            c.URL,
 		Username:       c.Username,
 		Role:           c.Role,
+		IsLocal:        c.IsLocal,
 		TransferTargetID: c.TransferTargetID,
 		Enabled:        c.Enabled,
 		IsDefault:      c.IsDefault,
@@ -278,6 +281,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Enabled:        req.Enabled,
 		IsDefault:      req.IsDefault,
 		Role:           req.Role,
+		IsLocal:        req.IsLocal != nil && *req.IsLocal,
 		TransferTargetID: req.TransferTargetID,
 	}
 	if req.TorrentDir != "" {
@@ -386,6 +390,9 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	client.TransferTargetID = req.TransferTargetID
 	client.Enabled = req.Enabled
 	client.IsDefault = req.IsDefault
+	if req.IsLocal != nil {
+		client.IsLocal = *req.IsLocal
+	}
 
 	if client.TransferTargetID != "" && client.Type != "qbittorrent" {
 		Error(w, http.StatusBadRequest, 40001, "配置转移目标的下载器必须是 qbittorrent 类型（transmission 的种子导出依赖本地文件，跨机不可达）")
