@@ -343,10 +343,12 @@ function filterSupportedSite(input: string, option: { value: string }) {
 }
 
 // 选中支持站点后，从 seed 同步 authType 到 form（仅前端展示，后端会强制覆盖）
+const showCookieOverride = ref(false)
 function onSupportedSiteChange(domain: string) {
   const s = supportedSites.value.find(x => x.domain === domain)
   if (s) {
     form.authType = s.auth_type || 'cookie'
+    showCookieOverride.value = s.show_cookie === true && s.auth_type !== 'cookie'
   }
 }
 
@@ -415,7 +417,7 @@ const form = reactive({
   skipSslVerify: false,
 })
 
-const showCookieField = computed(() => form.authType === 'cookie')
+const showCookieField = computed(() => form.authType === 'cookie' || showCookieOverride.value)
 const showPasskeyField = computed(() => form.authType === 'passkey')
 const showApiKeyField = computed(() => form.authType === 'apikey')
 const isCookieAuth = computed(() => form.authType === 'cookie')
@@ -502,12 +504,15 @@ async function toggleField(record: SiteListItem, field: string, value: boolean) 
 function openModal(record: SiteListItem) {
   isCreateMode.value = false
   editingSite.value = record
+  // §野马OpenAPI: 编辑时也检查 show_cookie override
+  const ss = supportedSites.value.find(s => s.domain === record.domain)
+  showCookieOverride.value = ss?.show_cookie === true && (record.authType || 'cookie') !== 'cookie'
   Object.assign(form, {
     name: record.name || '',
     domain: record.domain || '',
     baseUrl: (record as Record<string, string | number | boolean>).baseUrl as string || '',
     framework: record.framework || '',
-    authType: record.authType || 'cookie',
+        authType: record.authType || 'cookie',
     cookie: '',
     passkey: '',
     apiKey: '',
@@ -528,6 +533,7 @@ function openModal(record: SiteListItem) {
 function openCreateModal() {
   isCreateMode.value = true
   editingSite.value = null
+  showCookieOverride.value = false
   Object.assign(form, {
     name: '',
     domain: '',
