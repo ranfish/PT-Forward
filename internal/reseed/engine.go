@@ -745,6 +745,7 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 			continue
 		}
 		if _, ok := adapter.(piecesHashSearcher); !ok {
+			e.logger.Info("piecesHash preload skip: type assertion失败", zap.String("site", siteInfo.Name))
 			continue
 		}
 		eligibleSites[siteInfo.Name] = struct {
