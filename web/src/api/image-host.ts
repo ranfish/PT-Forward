@@ -71,11 +71,11 @@ export const metadataApi = {
     return client.get<ApiResponse<{ items: MetadataDetail[]; total: number }>>('/metadata', { params })
   },
   update(data: {
-    info_hash: string
-    site_name?: string
+    infoHash: string
+    siteName?: string
     title?: string
     subtitle?: string
-    standard_type?: string
+    standardType?: string
     tags?: string
     description?: string
     screenshots?: string
@@ -84,16 +84,16 @@ export const metadataApi = {
   },
   updateType(infoHash: string, standardType: string, siteName?: string) {
     return client.put<ApiResponse<{ success: boolean }>>('/metadata/type', {
-      info_hash: infoHash,
-      standard_type: standardType,
-      site_name: siteName,
+      infoHash: infoHash,
+      standardType: standardType,
+      siteName: siteName,
     })
   },
   setReviewed(infoHash: string, reviewed: boolean, siteName?: string) {
     return client.put<ApiResponse<{ success: boolean }>>('/metadata/review', {
-      info_hash: infoHash,
+      infoHash: infoHash,
       reviewed,
-      site_name: siteName,
+      siteName: siteName,
     })
   },
 }
