@@ -195,7 +195,7 @@ export const publishDataApi = {
     return client.get<ApiResponse<{ stats: { todayPublish: number; todaySuccess: number; todayFailed: number; pendingCount: number; reviewedCount: number; totalMetadata: number; yesterdayPublish: number; yesterdaySuccess: number; unreviewedCount: number }; recent: unknown[]; trend: Array<{ day: string; success: number; failed: number }>; target_site_top: Array<{ site: string; count: number }>; status_distribution: Array<{ status: string; count: number }> }>>('/publish/stats', { params: days ? { days } : undefined })
   },
   coverageCache(infoHash: string) {
-    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ site_name: string; status: string; source: string }> }>>('/publish/coverage-cache', { params: { info_hash: infoHash } })
+    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ siteName: string; status: string; source: string }> }>>('/publish/coverage-cache', { params: { info_hash: infoHash } })
   },
   batchReview(ids: number[], reviewed: boolean) {
     return client.post<ApiResponse<{ updated: number }>>('/publish/seed-data/batch-review', { ids, reviewed })
