@@ -184,7 +184,9 @@ func init() {
 		return gormDB.Exec(`UPDATE sites SET auth_type = 'apikey' WHERE framework = 'yemapt'`).Error
 	})
 	RegisterMigration(11, "enable_yemapt_pieces_hash_via_gorm", func(gormDB *gorm.DB) error {
-		// migration #9 用 raw SQL 可能列名不匹配，用 GORM API 确保
-		return gormDB.Model(&model.Site{}).Where("framework = ?", "yemapt").Update("supports_pieces_hash_api", true).Error
+		// SupportsPiecesHashAPI GORM 列名是 supports_pieces_hashapi（API 不拆分），
+		// 用 struct Updates 让 GORM 自动解析列名
+		return gormDB.Model(&model.Site{}).Where("framework = ?", "yemapt").
+			Updates(model.Site{SupportsPiecesHashAPI: true}).Error
 	})
 }
