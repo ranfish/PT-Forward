@@ -325,7 +325,8 @@ const sites = ref<Site[]>([])
 const sitesLoading = ref(false)
 
 const sourceSites = computed(() => sites.value.filter(s => s.isSource))
-const targetSites = computed(() => sites.value.filter(s => s.isTarget))
+// §59.24: 辅种目标站不按 isTarget 过滤，所有启用站点都可选
+const targetSites = computed(() => sites.value.filter(s => s.enabled))
 
 const iyuuSupportedIds = ref<Set<string>>(new Set())
 const iyuuSupportedLoading = ref(false)
