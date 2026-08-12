@@ -10,9 +10,9 @@
 
 ## 当前任务焦点（新会话必读）
 
-**版本**：v0.0.557（已发布）。种子配置页 §59.19-§59.20 + is_local §59.21 全部实施完成。
+**版本**：v0.0.562（已发布）。
 
-**当前主线**：种子配置页已全部完成（后端 20 + 前端 17 + is_local 7 项），等待端到端测试和生产环境部署。
+**当前主线**：种子配置页 + is_local + 野马 OpenAPI + 下载器连接管理全部完成。等待端到端测试和生产环境部署。
 
 ### ✅ 已完成（v0.0.228 → v0.0.547）
 
@@ -89,6 +89,23 @@
 **暂缓**：
 - ⏸ 遗漏 3（一种多站/一站多种重构），待种子配置页有数据后再讨论
 
+### ✅ 野马 OpenAPI 适配（§59.22，v0.0.558~v0.0.560）
+
+- ✅ pieces_hash 接入（`SearchByPiecesHash` 调 `/openApi/torrent/fetchTorrentIdWithPiecesHash.json`，APIKey 认证）
+- ✅ generateDownloadKey 迁移 POST OpenAPI（优先 APIKey + fallback Cookie）
+- ✅ fetchBasicInfo GET→POST（原 GET 已废弃）
+- ✅ 搜索迁移 Open API（`/openApi/torrent/fetchOpenTorrentList.json`）
+- ✅ migration #9-#12：supports_pieces_hash_api + auth_type=apikey
+- ✅ updateSiteRequest 补 SupportsPiecesHashAPI 字段（camelCase + nil 守卫）
+- ✅ Cookie/APIKey 双输入框显示（show_cookie override）
+
+### ✅ 下载器连接管理修复（§59.22，v0.0.561~v0.0.562）
+
+- ✅ Reload 用 `context.Background()` 替代 `r.Context()`（3 处 create/update/delete）
+- ✅ update handler 改用 `ReloadClient(name)` 只重连被编辑的客户端
+- ✅ is_local 字段持久化遗漏修复（Updates map 缺 is_local 列）
+- ✅ JSON 命名规范加入 AGENTS.md + 强制清单
+
 ### 端到端验收状态
 
 | 端点/功能 | 状态 |
@@ -100,6 +117,8 @@
 | 种子配置页（基础设施 + 设计）| ✅ |
 | 种子配置页（前后端实施）| ✅ v0.0.552-555 |
 | 种子配置页 is_local（本地发布 vs 转种上盒）| ✅ v0.0.557 |
+| 野马 OpenAPI 适配（pieces_hash + 下载 + 搜索 + 认证）| ✅ v0.0.558-560 |
+| 下载器连接管理（Reload context + 单客户端重连）| ✅ v0.0.561-562 |
 
 **关键事实**：
 - 开发环境 29（systemctl --user pt-forward，端口 8765）
@@ -115,12 +134,14 @@
 - 源站约束：制作组不在 release_group_mappings 的种子不可转发，无映射站点不可开启 is_source
 - 发布预览采用方案 A（保存即预览）：PUT 同时保存+标准化+9字段校验+渲染
 - is_local 区分本地发布（本地 mediainfo/mpv）和转种上盒（源站数据引用），后端是唯一真相源
+- 野马 OpenAPI 认证：APIKey 优先（Header `Authorization`，无 Bearer），fallback Cookie
+- 下载器编辑触发 ReloadClient（单客户端重连），create/delete 触发全量 Reload
 
 **待办**：
 - 端到端测试（需有本地下载器的环境验证 is_local=true 全流程）
 - 生产环境部署（用户 OTA / docker compose pull）
 
-**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§59.21（67000+ 行，按需读特定章节，不要一次读全文）。
+**完整设计文档**：`docs/31-模块设计决策记录.md` §55-§59.22（67000+ 行，按需读特定章节，不要一次读全文）。
 
 ## JSON 字段命名规范
 
