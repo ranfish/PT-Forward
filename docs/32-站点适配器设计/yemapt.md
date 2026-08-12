@@ -6,14 +6,15 @@
 |------|-----|
 | 站点名称 | 野马（YemaPT） |
 | 域名 | www.yemapt.org |
-| 框架 | 自研 SPA（Umi.js + Ant Design Vue），归类 `generic` |
+| 框架 | 自研 SPA（Umi.js + Ant Design），适配器注册名 `yemapt` |
 | 前端技术 | Umi.js + Ant Design，前端静态资源托管于 static-ui.yemapt.org |
 | 后端 API | REST JSON，所有接口返回 `{"success":bool,"showType":int,"data":...}` |
 | CookieCloud 域名 | `yemapt.org`（非 www） |
-| 认证方式 | Cookie（`auth` 字段） |
+| 认证方式 | **APIKey**（OpenAPI，Header `Authorization` 无 Bearer，有效期 180 天）+ **Cookie**（Web API，有效期 30 天） |
+| Pieces Hash API | ✅ `/openApi/torrent/fetchTorrentIdWithPiecesHash.json`（APIKey 认证） |
 | Cloudflare | 是（Turnstile 验证） |
 | 候选制 | 是（Level 6 及以上或发布种子数 > 10 可开启免候选） |
-| MediaInfo | 否（无独立字段） |
+| MediaInfo | 从详情页 HTML 提取（无独立上传字段） |
 | IMDb | 是（`imdb` 字段，仅填 ID） |
 | 豆瓣 | 是（`douban` 字段，仅填 ID） |
 | 匿名发布 | 是（`uploadUserAnonymous` radio） |
@@ -389,6 +390,58 @@
 - 获取途径：签到、发布种子、做种、被赠送、娱乐场、契约
 - 赠送积分收取 30% 手续费
 
+## OpenAPI（v0.0.558+ 适配）
+
+野马提供开放 API（`/openApi/` 前缀），使用 **APIKey 认证**（Header `Authorization` 直接填 Key，不加 `Bearer`）。APIKey 在个人详情页创建，有效期 180 天。
+
+PT-Forward 适配器策略：**APIKey 优先 + Cookie fallback**。有 APIKey 时走 OpenAPI，无 APIKey 时 fallback Web API（Cookie 认证）。
+
+### 已接入端点
+
+| 端点 | 方法 | 认证 | 用途 |
+|------|------|------|------|
+| `/openApi/torrent/fetchTorrentIdWithPiecesHash.json` | POST | APIKey | pieces_hash → 种子 ID（辅种 L0 匹配） |
+| `/openApi/torrent/generateDownloadKey.json?id=X` | POST | APIKey | 生成下载凭证（30 分钟有效） |
+| `/openApi/torrent/fetchOpenTorrentList.json` | POST | APIKey | 搜索种子列表 |
+| `/openApi/user/fetchBasicInfo.json` | POST | APIKey | 用户基本信息（等级/积分/促销量） |
+
+### 已废弃端点（fallback 用）
+
+| 端点 | 方法 | 认证 | 说明 |
+|------|------|------|------|
+| `/api/torrent/generateDownloadKey?id=X` | GET | Cookie | 原下载凭证接口，OpenAPI POST 优先 |
+| `/api/torrent/fetchOpenTorrentList` | POST | Cookie | 原搜索接口，OpenAPI 优先 |
+| `GET /openApi/user/fetchBasicInfo.json` | GET | APIKey | 已废弃，改 POST |
+
+### 下载流程（两步）
+
+```
+① POST /openApi/torrent/generateDownloadKey.json?id={torrentId}
+   Header: Authorization: {APIKey}
+   → {"success":true,"data":"<downloadKey>"}
+
+② GET /api/torrent/download1?token={downloadKey}
+   → .torrent 文件（不需要 Authorization）
+```
+
+### pieces_hash 查询
+
+```
+POST /openApi/torrent/fetchTorrentIdWithPiecesHash.json
+Header: Authorization: {APIKey}
+Body: {"piecesHashList":["hash1","hash2",...]}  // 最多 100 个/次
+→ {"success":true,"data":{"hash1":100,"hash2":200}}
+```
+
+未命中的 hash 不会出现在 data 中。
+
+### 认证说明
+
+- **APIKey**：Header `Authorization` 直接填值，**不加 `Bearer` 前缀**
+- **Cookie**：传统 Web API 用 Cookie 认证
+- Cookie auth **不能**用于 `/openApi/` 端点（返回 `{"errorCode":403,"errorMessage":"need api auth"}`）
+- 前端 `/sites` 页面同时显示 APIKey 和 Cookie 两个输入框
+
 ## 适配器实现要点
 
 ### 1. REST API 发布
@@ -452,4 +505,4 @@ RSS 标题末尾带 `[HR]` 表示该种子有 HR 惩罚。
 10. **教育大类**：含教育书籍(19)、教育音频(20)、教育视频(21) 三个子分类
 11. **RSS HR 标记**：标题末尾 `[HR]` 标识带 HR 惩罚的种子
 
-*数据来源: Playwright 采集 upload 页面 + wiki.yemapt.org 规则页面（2026-05-04）*
+*数据来源: Playwright 采集 upload 页面 + wiki.yemapt.org 规则页面（2026-05-04）；OpenAPI 文档 wiki.yemapt.org/developer（2026-08-12）*
