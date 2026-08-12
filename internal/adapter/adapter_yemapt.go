@@ -74,6 +74,38 @@ func (a *YemaptAdapter) DownloadTorrent(ctx context.Context, config *model.SiteC
 }
 
 func (a *YemaptAdapter) generateDownloadKey(ctx context.Context, config *model.SiteConfig, baseURL, torrentID string) (string, error) {
+	// §野马OpenAPI: 优先用 POST /openApi/torrent/generateDownloadKey.json（APIKey 认证）
+	if config.APIKey != "" {
+		u := baseURL + "/openApi/torrent/generateDownloadKey.json?id=" + url.QueryEscape(torrentID)
+		req, err := http.NewRequestWithContext(ctx, "POST", u, nil)
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Authorization", config.APIKey)
+
+		resp, err := a.doer.Client.Do(req)
+		if err != nil {
+			a.logger.Debug("openApi generateDownloadKey failed, trying web api", zap.Error(err))
+		} else {
+			defer func() { drainBody(resp) }()
+			body, _ := readBody(resp)
+			var result struct {
+				Success      bool        `json:"success"`
+				ErrorMessage string      `json:"errorMessage"`
+				ErrorCode    int         `json:"errorCode"`
+				Data         interface{} `json:"data"`
+			}
+			if json.Unmarshal(body, &result) == nil && result.Success {
+				if s, ok := result.Data.(string); ok {
+					return s, nil
+				}
+			}
+			a.logger.Debug("openApi generateDownloadKey failed, trying web api",
+				zap.String("body", string(body)))
+		}
+	}
+
+	// fallback: GET /api/torrent/generateDownloadKey（Cookie 认证）
 	u := baseURL + "/api/torrent/generateDownloadKey?id=" + url.QueryEscape(torrentID)
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
@@ -150,7 +182,7 @@ func (a *YemaptAdapter) fetchUserStatsOpenAPI(ctx context.Context, config *model
 	baseURL := resolveBaseURL(config)
 	u := baseURL + "/openApi/user/fetchBasicInfo.json"
 
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", u, nil)
 	if err != nil {
 		return err
 	}
@@ -362,14 +394,25 @@ func (a *YemaptAdapter) SearchTorrents(ctx context.Context, config *model.SiteCo
 	baseURL := resolveBaseURL(config)
 
 	searchBody := fmt.Sprintf(`{"keyword":%q,"pageParam":{"current":1,"pageSize":20},"sorter":{}}`, keyword)
-	u := baseURL + "/api/torrent/fetchOpenTorrentList"
+
+	// §野马OpenAPI: 优先用 /openApi/ 端点（APIKey），fallback /api/ 端点（Cookie）
+	var u string
+	if config.APIKey != "" {
+		u = baseURL + "/openApi/torrent/fetchOpenTorrentList.json"
+	} else {
+		u = baseURL + "/api/torrent/fetchOpenTorrentList"
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader(searchBody))
 	if err != nil {
 		return nil, searchError("构造搜索请求失败", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	setCommonHeaders(req, config.Cookie)
+	if config.APIKey != "" {
+		req.Header.Set("Authorization", config.APIKey)
+	} else {
+		setCommonHeaders(req, config.Cookie)
+	}
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := a.doer.Client.Do(req)
@@ -451,4 +494,71 @@ func parseYeMPTList(raw json.RawMessage) []*model.SeedingSearchResult {
 		}
 	}
 	return results
+}
+
+// SupportsSearchByPiecesHash §野马OpenAPI: 野马提供 pieces_hash 查询（/openApi/torrent/fetchTorrentIdWithPiecesHash.json）
+func (a *YemaptAdapter) SupportsSearchByPiecesHash() bool { return true }
+
+// SearchByPiecesHash 通过 pieces_hash 批量查询种子 ID（野马 OpenAPI）
+func (a *YemaptAdapter) SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error) {
+	if len(piecesHashes) == 0 {
+		return map[string]int{}, nil
+	}
+	if config.APIKey == "" {
+		return nil, fmt.Errorf("野马 pieces_hash 查询需要 APIKey")
+	}
+
+	baseURL := resolveBaseURL(config)
+	u := baseURL + "/openApi/torrent/fetchTorrentIdWithPiecesHash.json"
+
+	// 最多 100 个/次
+	result := make(map[string]int)
+	for i := 0; i < len(piecesHashes); i += 100 {
+		end := i + 100
+		if end > len(piecesHashes) {
+			end = len(piecesHashes)
+		}
+		batch := piecesHashes[i:end]
+
+		body, _ := json.Marshal(map[string][]string{"piecesHashList": batch})
+		req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader(string(body)))
+		if err != nil {
+			return nil, fmt.Errorf("构造请求失败: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", config.APIKey)
+
+		resp, err := a.doer.Client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("pieces_hash 请求失败: %w", err)
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		var result_struct struct {
+			Success      bool              `json:"success"`
+			ErrorMessage string            `json:"errorMessage"`
+			Data         map[string]interface{} `json:"data"`
+		}
+		if err := json.Unmarshal(respBody, &result_struct); err != nil {
+			return nil, fmt.Errorf("pieces_hash 响应解析失败: %w", err)
+		}
+		if !result_struct.Success {
+			return nil, fmt.Errorf("pieces_hash 查询失败: %s", result_struct.ErrorMessage)
+		}
+
+		for hash, v := range result_struct.Data {
+			id := 0
+			switch n := v.(type) {
+			case float64:
+				id = int(n)
+			case string:
+				fmt.Sscanf(n, "%d", &id)
+			}
+			if id > 0 {
+				result[hash] = id
+			}
+		}
+	}
+	return result, nil
 }
