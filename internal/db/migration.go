@@ -178,10 +178,9 @@ func init() {
 		return nil
 	})
 	RegisterMigration(9, "enable_pieces_hash_api_for_yemapt", func(gormDB *gorm.DB) error {
-		if err := gormDB.Exec(`UPDATE sites SET supports_pieces_hash_api = 1 WHERE framework = 'yemapt' AND enabled = 1`).Error; err != nil {
-			return err
-		}
-		// 同步 auth_type=apikey（supported_sites.json 定义为 apikey，但建站时可能默认 cookie）
+		return gormDB.Exec(`UPDATE sites SET supports_pieces_hash_api = 1 WHERE framework = 'yemapt' AND enabled = 1`).Error
+	})
+	RegisterMigration(10, "sync_yemapt_auth_type", func(gormDB *gorm.DB) error {
 		return gormDB.Exec(`UPDATE sites SET auth_type = 'apikey' WHERE framework = 'yemapt'`).Error
 	})
 }
