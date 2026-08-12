@@ -685,13 +685,13 @@ async function enterAnalyze() {
 
     const t = selectedTorrent.value
     const resp = await manualForwardApi.startAnalyze({
-      client_id: t.client_id,
-      info_hash: t.info_hash,
+      clientId: t.client_id,
+      infoHash: t.info_hash,
       name: t.name,
-      save_path: t.save_path,
+      savePath: t.save_path,
       size: t.size,
-      source_site: t.source_site || currentSourceSite.value,
-      source_torrent_id: t.source_site_id ? String(t.source_site_id) : undefined,
+      sourceSite: t.source_site || currentSourceSite.value,
+      sourceTorrentId: t.source_site_id ? String(t.source_site_id) : undefined,
     })
     const taskId = (resp.data?.data as Record<string, unknown>)?.task_id as number
     if (!taskId) {
@@ -886,8 +886,8 @@ async function loadPreview() {
   previewLoading.value = true
   try {
     const resp = await manualForwardApi.previewFields({
-      info_hash: selectedTorrent.value.info_hash,
-      target_site: '',
+      infoHash: selectedTorrent.value.info_hash,
+      targetSite: '',
       mode: analyzeResult.value?.last_merge_mode || 'ptgen_first',
     })
     const data = resp.data?.data as unknown as Record<string, unknown> | undefined
@@ -910,8 +910,8 @@ async function enterSelectSites() {
   try {
     const blockedTargets = (analyzeResult.value?.blocked_targets as string[]) || []
     const resp = await manualForwardApi.eligibleTargets({
-      source_site: analyzeResult.value?.source_site || '',
-      blocked_targets: blockedTargets,
+      sourceSite: analyzeResult.value?.source_site || '',
+      blockedTargets: blockedTargets,
     })
     const raw = (resp.data?.data || []) as unknown[]
 
@@ -988,26 +988,26 @@ async function doSubmit() {
   try {
     const t = selectedTorrent.value
     const req: ManualForwardSubmitRequest = {
-      client_id: t.client_id,
-      info_hash: t.info_hash,
+      clientId: t.client_id,
+      infoHash: t.info_hash,
       title: t.name,
-      source_site: analyzeResult.value?.source_site || t.source_site || '',
-      source_site_id: t.source_site_id || 0,
+      sourceSite: analyzeResult.value?.source_site || t.source_site || '',
+      sourceSiteId: t.source_site_id || 0,
       description: form.value.description,
-      media_info: form.value.mediaInfo,
+      mediaInfo: form.value.mediaInfo,
       screenshots: form.value.screenshots,
-      target_sites: selectedTargets.value,
+      targetSites: selectedTargets.value,
       subtitle: form.value.subtitle,
       statement: form.value.statement,
       poster: form.value.poster,
-      douban_link: form.value.doubanLink,
-      imdb_link: form.value.imdbLink,
-      tmdb_link: form.value.tmdbLink,
+      doubanLink: form.value.doubanLink,
+      imdbLink: form.value.imdbLink,
+      tmdbLink: form.value.tmdbLink,
       tags: form.value.tags,
       bdinfo: form.value.bdinfo,
       anonymous: form.value.anonymous,
-      screenshot_in_desc: form.value.screenshotInDesc,
-      title_components: form.value.titleComponents,
+      screenshotInDesc: form.value.screenshotInDesc,
+      titleComponents: form.value.titleComponents,
     }
     const resp = await manualForwardApi.submit(req)
     const candId = (resp.data?.data as unknown as Record<string, unknown>)?.candidate_id as number

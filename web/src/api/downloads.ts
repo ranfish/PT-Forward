@@ -56,20 +56,20 @@ export const downloadsApi = {
   },
 
   delete(id: number, deleteCompanions: boolean) {
-    return client.delete<ApiResponse<unknown>>(`/downloads/${id}`, { data: { delete_companions: deleteCompanions } })
+    return client.delete<ApiResponse<unknown>>(`/downloads/${id}`, { data: { deleteCompanions } })
   },
 
   bulkAction(ids: number[], action: string, deleteCompanions?: boolean) {
     return client.post<ApiResponse<{ succeeded: number; failed: number }>>(`/downloads/bulk-action`, {
       ids,
       action,
-      delete_companions: deleteCompanions,
+      deleteCompanions,
     })
   },
 
   addByUrl(clientId: string, url: string, category?: string, paused?: boolean) {
     return client.post<ApiResponse<DownloadTask>>('/downloads', {
-      client_id: clientId,
+      clientId,
       url,
       category: category || '',
       paused: paused || false,

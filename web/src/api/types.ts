@@ -688,29 +688,30 @@ export interface SettingsRestoreRequest {
 }
 
 export interface ManualForwardSubmitRequest {
-  client_id?: number
-  info_hash?: string
+  clientId?: number
+  infoHash?: string
   name?: string
-  save_path?: string
-  source_site?: string
-  source_site_id?: number
-  source_torrent_id?: string
+  savePath?: string
+  sourceSite?: string
+  sourceSiteId?: number
+  sourceTorrentId?: string
   title?: string
   subtitle?: string
   description?: string
-  media_info?: string
+  mediaInfo?: string
   screenshots?: string | string[]
   poster?: string
+  posterUrl?: string
   statement?: string
-  douban_link?: string
-  imdb_link?: string
-  tmdb_link?: string
+  doubanLink?: string
+  imdbLink?: string
+  tmdbLink?: string
   tags?: string[]
-  title_components?: Record<string, string>
+  titleComponents?: Record<string, string>
   bdinfo?: string
-  target_sites?: string[]
+  targetSites?: string[]
   anonymous?: boolean
-  screenshot_in_desc?: boolean
+  screenshotInDesc?: boolean
 }
 
 export type CreateWithoutId<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt' | 'created_at' | 'updated_at'>

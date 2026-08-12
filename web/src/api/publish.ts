@@ -59,16 +59,16 @@ export const publishTorrentsApi = {
   list(clientId?: number) {
     return client.get<ApiResponse<{ items: PublishTorrentItem[]; total: number; total_sites: number; querying: boolean; query_progress: { done: number; total: number } }>>('/publish/torrents', { params: clientId ? { client_id: clientId } : {} })
   },
-  queryCoverage(data: { client_id: number; info_hash: string; name?: string; size?: number }) {
+  queryCoverage(data: { clientId: number; infoHash: string; name?: string; size?: number }) {
     return client.post<ApiResponse<CoverageResult>>('/publish/torrents/coverage', data)
   },
-  batchQueryCoverage(data: { client_id: number; info_hashes: string[] }) {
+  batchQueryCoverage(data: { clientId: number; infoHashes: string[] }) {
     return client.post<ApiResponse<{ queried: number }>>('/publish/torrents/batch-coverage', data)
   },
   queryStatus(clientId: number) {
     return client.get<ApiResponse<{ querying: boolean; done: number; total: number }>>('/publish/torrents/query-status', { params: { client_id: clientId } })
   },
-  detectSource(data: { info_hash: string; name: string }) {
+  detectSource(data: { infoHash: string; name: string }) {
     return client.post<ApiResponse<SourceDetectResult>>('/publish/torrents/detect-source', data)
   },
   listGroupMappings() {
@@ -86,7 +86,7 @@ export const publishTorrentsApi = {
   listGroupedSiteNames() {
     return client.get<ApiResponse<{ sites: string[] }>>('/publish/torrents/group-mappings/sites')
   },
-  batchPublish(data: { client_id: number; source_site: string; target_site: string; items: { info_hash: string; name: string; size: number; save_path: string }[] }) {
+  batchPublish(data: { clientId: number; sourceSite: string; targetSite: string; items: { infoHash: string; name: string; size: number; savePath: string }[] }) {
     return client.post<ApiResponse<{ created: number; failed: number; candidate_ids: number[]; target_site: string }>>('/publish/torrents/batch-publish', data)
   },
   getDeclarationFilters() {
@@ -95,10 +95,10 @@ export const publishTorrentsApi = {
   setDeclarationFilters(patterns: string[]) {
     return client.put<ApiResponse<{ patterns: string[]; message: string }>>('/publish/torrents/declaration-filters', { patterns })
   },
-  previewTitle(data: { target_site: string; title_components: Record<string, string> }) {
+  previewTitle(data: { targetSite: string; titleComponents: Record<string, string> }) {
     return client.post<ApiResponse<{ title: string; target_site: string }>>('/publish/torrents/preview-title', data)
   },
-  previewTitleBatch(data: { target_sites: string[]; title_components: Record<string, string> }) {
+  previewTitleBatch(data: { targetSites: string[]; titleComponents: Record<string, string> }) {
     return client.post<ApiResponse<{ results: Record<string, string> }>>('/publish/torrents/preview-title-batch', data)
   },
 }
@@ -152,7 +152,7 @@ export const manualForwardApi = {
   seededTorrents(clientId?: number) {
     return client.get<ApiResponse<unknown[]>>('/manual-forward/seeded-torrents', { params: clientId ? { client_id: clientId } : {} })
   },
-  startAnalyze(data: { client_id: number; info_hash: string; name: string; save_path: string; size?: number; source_site?: string; source_torrent_id?: string; metadata_priority?: string; fetch_source?: string }) {
+  startAnalyze(data: { clientId: number; infoHash: string; name: string; savePath: string; size?: number; sourceSite?: string; sourceTorrentId?: string; metadataPriority?: string; fetchSource?: string }) {
     return client.post<ApiResponse<{ task_id: number }>>('/manual-forward/start-analyze', data)
   },
   parseTitle(title: string) {
@@ -161,13 +161,13 @@ export const manualForwardApi = {
   pollAnalyze(taskId: number) {
     return client.get<ApiResponse<{ status: string; result?: unknown }>>(`/manual-forward/analyze/${taskId}`)
   },
-  eligibleTargets(data: { source_site: string; blocked_targets?: string[] }) {
+  eligibleTargets(data: { sourceSite: string; blockedTargets?: string[] }) {
     return client.post<ApiResponse<string[]>>('/manual-forward/eligible-targets', data)
   },
-  mergeFields(data: { info_hash: string; mode: string }) {
+  mergeFields(data: { infoHash: string; mode: string }) {
     return client.post<ApiResponse<unknown>>('/manual-forward/merge', data)
   },
-  previewFields(data: { info_hash: string; target_site: string; mode?: string }) {
+  previewFields(data: { infoHash: string; targetSite: string; mode?: string; userOverrides?: Record<string, string> }) {
     return client.post<ApiResponse<unknown>>('/manual-forward/preview', data)
   },
   submit(data: ManualForwardSubmitRequest) {
@@ -176,7 +176,7 @@ export const manualForwardApi = {
   batchSubmit(items: ManualForwardSubmitRequest[]) {
     return client.post<ApiResponse<{ succeeded: number; failed: number }>>('/manual-forward/batch-submit', { items })
   },
-  refresh(data: { type: string; name: string; save_path?: string; info_hash?: string; site_name?: string; screenshots?: string[] }) {
+  refresh(data: { type: string; name: string; savePath?: string; infoHash?: string; siteName?: string; screenshots?: string[] }) {
     return client.post<ApiResponse<Record<string, unknown>>>('/manual-forward/refresh', data)
   },
 }
