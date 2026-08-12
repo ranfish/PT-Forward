@@ -177,7 +177,7 @@ type updateSiteRequest struct {
 	AlternativeDomains *string `json:"alternativeDomains,omitempty"`
 	Enabled            *bool   `json:"enabled,omitempty"`
 
-	SupportsPiecesHashAPI *bool `json:"supports_pieces_hash_api,omitempty"`
+	SupportsPiecesHashAPI *bool `json:"supportsPiecesHashApi,omitempty"`
 
 	OverrideRSSURL   *string `json:"overrideRssUrl,omitempty"`
 	OverrideSavePath *string `json:"overrideSavePath,omitempty"`
@@ -1144,7 +1144,9 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if s.IsSource && h.sourceDetector != nil && !h.sourceDetector.HasGroupMappings(r.Context(), s) {
 		s.IsSource = false
 	}
-	s.SupportsPiecesHashAPI = req.SupportsPiecesHashAPI != nil && *req.SupportsPiecesHashAPI
+	if req.SupportsPiecesHashAPI != nil {
+		s.SupportsPiecesHashAPI = *req.SupportsPiecesHashAPI
+	}
 
 	if err := h.repo.Update(r.Context(), s); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "更新站点失败")
