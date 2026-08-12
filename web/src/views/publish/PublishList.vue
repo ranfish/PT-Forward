@@ -4,42 +4,42 @@
     <a-row v-if="dashboardStats" :gutter="16" style="margin-bottom: 16px">
       <a-col :span="4">
         <a-card size="small">
-          <a-statistic title="今日发布" :value="dashboardStats.today_publish" />
-          <div v-if="dashboardStats.yesterday_publish > 0 || dashboardStats.today_publish > 0" style="font-size: 11px; margin-top: 4px" :style="{ color: deltaColor(dashboardStats.today_publish, dashboardStats.yesterday_publish) }">
-            较昨日 {{ deltaText(dashboardStats.today_publish, dashboardStats.yesterday_publish) }}
+          <a-statistic title="今日发布" :value="dashboardStats.todayPublish" />
+          <div v-if="dashboardStats.yesterdayPublish > 0 || dashboardStats.todayPublish > 0" style="font-size: 11px; margin-top: 4px" :style="{ color: deltaColor(dashboardStats.todayPublish, dashboardStats.yesterdayPublish) }">
+            较昨日 {{ deltaText(dashboardStats.todayPublish, dashboardStats.yesterdayPublish) }}
           </div>
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card size="small">
-          <a-statistic title="成功" :value="dashboardStats.today_success" :value-style="{ color: '#3f8600' }" />
-          <div style="font-size: 11px; margin-top: 4px; color: #999">成功率 {{ successRate(dashboardStats.today_success, dashboardStats.today_publish) }}</div>
+          <a-statistic title="成功" :value="dashboardStats.todaySuccess" :value-style="{ color: '#3f8600' }" />
+          <div style="font-size: 11px; margin-top: 4px; color: #999">成功率 {{ successRate(dashboardStats.todaySuccess, dashboardStats.todayPublish) }}</div>
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card size="small">
-          <a-statistic title="失败" :value="dashboardStats.today_failed" :value-style="{ color: '#cf1322' }" />
-          <div v-if="dashboardStats.today_failed > 0" style="font-size: 11px; margin-top: 4px">
+          <a-statistic title="失败" :value="dashboardStats.todayFailed" :value-style="{ color: '#cf1322' }" />
+          <div v-if="dashboardStats.todayFailed > 0" style="font-size: 11px; margin-top: 4px">
             <a style="font-size: 11px" @click="$router.push('/publish/logs?status=failed')">查看 →</a>
           </div>
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card size="small">
-          <a-statistic title="队列" :value="dashboardStats.pending_count" />
+          <a-statistic title="队列" :value="dashboardStats.pendingCount" />
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card size="small">
-          <a-statistic title="未审核" :value="dashboardStats.unreviewed_count" :value-style="{ color: dashboardStats.unreviewed_count > 0 ? '#faad14' : undefined }" />
-          <div v-if="dashboardStats.unreviewed_count > 0" style="font-size: 11px; margin-top: 4px">
+          <a-statistic title="未审核" :value="dashboardStats.unreviewedCount" :value-style="{ color: dashboardStats.unreviewedCount > 0 ? '#faad14' : undefined }" />
+          <div v-if="dashboardStats.unreviewedCount > 0" style="font-size: 11px; margin-top: 4px">
             <a style="font-size: 11px" @click="$router.push('/publish/data')">去审核 →</a>
           </div>
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card size="small">
-          <a-statistic title="数据总量" :value="dashboardStats.total_metadata" />
+          <a-statistic title="数据总量" :value="dashboardStats.totalMetadata" />
         </a-card>
       </a-col>
     </a-row>
@@ -374,7 +374,7 @@ const { translatePublishStatus, translatePublishType } = useEnumLabels()
 const activeTab = ref('candidates')
 
 // 总览统计
-const dashboardStats = ref<{ today_publish: number; today_success: number; today_failed: number; pending_count: number; reviewed_count: number; total_metadata: number; yesterday_publish: number; yesterday_success: number; unreviewed_count: number } | null>(null)
+const dashboardStats = ref<{ todayPublish: number; todaySuccess: number; todayFailed: number; pendingCount: number; reviewedCount: number; totalMetadata: number; yesterdayPublish: number; yesterdaySuccess: number; unreviewedCount: number } | null>(null)
 const trendData = ref<Array<{ day: string; success: number; failed: number }>>([])
 const trendDays = ref<7 | 30>(7)
 const trendChartRef = ref<HTMLElement>()
