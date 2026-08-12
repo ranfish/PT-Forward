@@ -74,10 +74,10 @@ export const publishTorrentsApi = {
   listGroupMappings() {
     return client.get<ApiResponse<{ items: Array<Record<string, unknown> & { id: number }>; total: number }>>('/publish/torrents/group-mappings')
   },
-  createGroupMapping(data: { group_name: string; domain: string; site_name: string }) {
+  createGroupMapping(data: { groupName: string; domain: string; siteName: string }) {
     return client.post<ApiResponse<unknown>>('/publish/torrents/group-mappings', data)
   },
-  updateGroupMapping(id: number, data: { group_name: string; domain: string; site_name: string }) {
+  updateGroupMapping(id: number, data: { groupName: string; domain: string; siteName: string }) {
     return client.put<ApiResponse<unknown>>(`/publish/torrents/group-mappings/${id}`, data)
   },
   deleteGroupMapping(id: number) {
@@ -109,7 +109,7 @@ export interface SourceDetectResult {
   group_name: string
   torrent_id: string
   auto_detected: boolean
-  candidates: { site_name: string; torrent_id: string; has_cookie: boolean }[]
+  candidates: { siteName: string; torrentId: string; hasCookie: boolean }[]
 }
 
 export interface PublishTorrentItem {
@@ -183,7 +183,7 @@ export const manualForwardApi = {
 
 export const publishDataApi = {
   cachedSites(infoHash: string) {
-    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ id: number; site_name: string; torrent_id: string; reviewed: boolean; fetched_at: string; title: string; subtitle: string }> }>>('/publish/cached-sites', { params: { info_hash: infoHash } })
+    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ id: number; siteName: string; torrentId: string; reviewed: boolean; fetchedAt: string; title: string; subtitle: string }> }>>('/publish/cached-sites', { params: { info_hash: infoHash } })
   },
   listSeedData(params?: { page?: number; page_size?: number; search?: string; source_site?: string; review_status?: 'all' | 'reviewed' | 'unreviewed' }) {
     return client.get<ApiResponse<{ items: unknown[]; total: number; page: number; page_size: number }>>('/publish/seed-data', { params })
@@ -285,17 +285,17 @@ export const seedConfigApi = {
   getSeed(infoHash: string, clientId?: string) {
     return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`, { params: clientId ? { client_id: clientId } : undefined })
   },
-  putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; site_name?: string }) {
+  putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; siteName?: string }) {
     return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[] }>>(`/publish/seeds/${infoHash}`, data)
   },
-  batchFetch(items: Array<{ hash: string; name: string; size: number; save_path: string }>, clientId: string) {
-    return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items, client_id: clientId })
+  batchFetch(items: Array<{ hash: string; name: string; size: number; savePath: string }>, clientId: string) {
+    return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items, clientId })
   },
   batchFetchProgress() {
     return client.get<ApiResponse<{ active: boolean; total: number; done: number; failed: number; items: Array<{ hash: string; name: string; status: string; error?: string }> }>>('/publish/seeds/batch-fetch-progress')
   },
   snapshotUnconfigured(clientId: string, savePath: string) {
-    return client.get<ApiResponse<{ items: Array<{ hash: string; name: string; size: number; client_id: string; save_path: string }>; total: number }>>('/downloads/snapshot-unconfigured', { params: { client_id: clientId, save_path: savePath } })
+    return client.get<ApiResponse<{ items: Array<{ hash: string; name: string; size: number; clientId: string; savePath: string }>; total: number }>>('/downloads/snapshot-unconfigured', { params: { client_id: clientId, save_path: savePath } })
   },
   getFetchPriority() {
     return client.get<ApiResponse<{ priority: string[] }>>('/publish/fetch-priority')
