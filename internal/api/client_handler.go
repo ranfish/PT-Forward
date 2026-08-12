@@ -429,6 +429,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 			"username":         client.Username,
 			"password":         client.Password,
 			"role":             client.Role,
+			"is_local":         client.IsLocal,
 			"reseed_target_id": client.TransferTargetID,
 			"enabled":          client.Enabled,
 			"is_default":       client.IsDefault,
