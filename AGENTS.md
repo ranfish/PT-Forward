@@ -114,6 +114,17 @@
 
 **完整设计文档**：`docs/31-模块设计决策记录.md` §55-§59.21（67000+ 行，按需读特定章节，不要一次读全文）。
 
+## JSON 字段命名规范
+
+| 场景 | 风格 | 示例 |
+|------|------|------|
+| Go model JSON tag | snake_case | `json:"supports_pieces_hash_api"` |
+| API 专用请求/响应 struct（site/downloader 等） | **camelCase** | `json:"supportsPiecesHashApi"` |
+| API raw map 响应（publish/seeds 等新 handler） | snake_case | `"info_hash": hash` |
+| 前端 TS 类型 | 跟 API（struct 端点 camelCase，raw map 端点 snake_case） | — |
+
+**核心规则**：在已使用 camelCase 的专用 struct（如 `updateSiteRequest`、`siteResponse`、`downloaderResponse`）中新增字段时，**必须用 camelCase**，否则前端反序列化失败。
+
 ## 环境信息
 
 - **Go**：`/home/incast/.local/go/bin/go`（v1.25，系统 PATH 中无 go，必须用全路径）
