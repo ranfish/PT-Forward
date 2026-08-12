@@ -28,6 +28,7 @@ type ClientHandler struct {
 type ClientManager interface {
 	Get(clientID string) (model.DownloaderClient, error)
 	Reload(ctx context.Context) error
+	ReloadClient(ctx context.Context, name string) error
 	ConnectedCount() int
 	ListClients() []string
 	IsConnected(name string) bool
@@ -318,7 +319,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	auditLog(r, "client", "create", "client", fmt.Sprintf("%d", client.ID), client.Name, "success")
 
 	if h.clientMgr != nil {
-		_ = h.clientMgr.Reload(r.Context())
+		_ = h.clientMgr.Reload(context.Background())
 	}
 
 	var mappings []model.ClientPathMapping
@@ -462,7 +463,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	auditLog(r, "client", "update", "client", fmt.Sprintf("%d", id), client.Name, "success")
 
 	if h.clientMgr != nil {
-		_ = h.clientMgr.Reload(r.Context())
+		_ = h.clientMgr.ReloadClient(context.Background(), client.Name)
 	}
 
 	var mappings []model.ClientPathMapping
@@ -508,7 +509,7 @@ func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	auditLog(r, "client", "delete", "client", fmt.Sprintf("%d", id), client.Name, "success")
 
 	if h.clientMgr != nil {
-		_ = h.clientMgr.Reload(r.Context())
+		_ = h.clientMgr.Reload(context.Background())
 	}
 
 	Success(w, nil)
