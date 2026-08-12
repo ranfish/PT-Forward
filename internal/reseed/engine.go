@@ -730,7 +730,8 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 
 	for _, siteInfo := range ps.infos {
 		siteConfig := ps.configs[siteInfo.Name]
-		if siteConfig == nil || !siteConfig.SupportsPiecesHashAPI {
+		siteAdapter := ps.adapters[siteInfo.Name]
+		if siteConfig == nil || !supportsPiecesHash(siteConfig, siteAdapter) {
 			continue
 		}
 		if siteConfig.Passkey == "" && siteConfig.Cookie == "" {
@@ -2116,8 +2117,19 @@ func (e *Engine) verifyL0Size(ctx context.Context, adapter model.SiteAdapter, co
 	return true
 }
 
+// supportsPiecesHash 检查站点是否支持 pieces_hash 去重（DB 字段或适配器方法）
+func supportsPiecesHash(config *model.SiteConfig, adapter model.SiteAdapter) bool {
+	if config != nil && config.SupportsPiecesHashAPI {
+		return true
+	}
+	if adapter != nil && adapter.SupportsSearchByPiecesHash() {
+		return true
+	}
+	return false
+}
+
 func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
-	if !config.SupportsPiecesHashAPI {
+	if !supportsPiecesHash(config, adapter) {
 		return nil
 	}
 	if !adapter.SupportsSearchByPiecesHash() {
