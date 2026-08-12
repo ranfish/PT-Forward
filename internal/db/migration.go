@@ -183,4 +183,8 @@ func init() {
 	RegisterMigration(10, "sync_yemapt_auth_type", func(gormDB *gorm.DB) error {
 		return gormDB.Exec(`UPDATE sites SET auth_type = 'apikey' WHERE framework = 'yemapt'`).Error
 	})
+	RegisterMigration(11, "enable_yemapt_pieces_hash_via_gorm", func(gormDB *gorm.DB) error {
+		// migration #9 用 raw SQL 可能列名不匹配，用 GORM API 确保
+		return gormDB.Model(&model.Site{}).Where("framework = ?", "yemapt").Update("supports_pieces_hash_api", true).Error
+	})
 }
