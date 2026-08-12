@@ -734,7 +734,7 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 		if siteConfig == nil || !supportsPiecesHash(siteConfig, siteAdapter) {
 			continue
 		}
-		if siteConfig.Passkey == "" && siteConfig.Cookie == "" {
+		if siteConfig.Passkey == "" && siteConfig.Cookie == "" && siteConfig.APIKey == "" {
 			continue
 		}
 		if httpclient.IsDomainCircuitOpen(siteConfig.Domain) {
