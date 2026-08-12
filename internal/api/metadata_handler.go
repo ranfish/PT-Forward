@@ -62,9 +62,9 @@ func (h *MetadataHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	type metaItem struct {
 		model.TorrentMetadata
-		TagsList        []string `json:"tags_list"`
-		FlagsList       []string `json:"flags_list"`
-		ScreenshotsList []string `json:"screenshots_list"`
+		TagsList        []string `json:"tagsList"`
+		FlagsList       []string `json:"flagsList"`
+		ScreenshotsList []string `json:"screenshotsList"`
 	}
 
 	items := make([]metaItem, 0, len(records))
@@ -130,9 +130,9 @@ func (h *MetadataHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 func (h *MetadataHandler) handleUpdateType(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		InfoHash     string `json:"info_hash"`
-		SiteName     string `json:"site_name"`
-		StandardType string `json:"standard_type"`
+		InfoHash     string `json:"infoHash"`
+		SiteName     string `json:"siteName"`
+		StandardType string `json:"standardType"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "参数解析失败")
@@ -183,11 +183,11 @@ func (h *MetadataHandler) handleUpdateType(w http.ResponseWriter, r *http.Reques
 
 func (h *MetadataHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		InfoHash     string `json:"info_hash"`
-		SiteName     string `json:"site_name"`
+		InfoHash     string `json:"infoHash"`
+		SiteName     string `json:"siteName"`
 		Title        string `json:"title"`
 		Subtitle     string `json:"subtitle"`
-		StandardType string `json:"standard_type"`
+		StandardType string `json:"standardType"`
 		Tags         string `json:"tags"`
 		Description  string `json:"description"`
 		Screenshots  string `json:"screenshots"`
@@ -261,8 +261,8 @@ func (h *MetadataHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 func (h *MetadataHandler) handleReview(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		InfoHash string `json:"info_hash"`
-		SiteName string `json:"site_name"`
+		InfoHash string `json:"infoHash"`
+		SiteName string `json:"siteName"`
 		Reviewed bool   `json:"reviewed"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

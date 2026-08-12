@@ -186,15 +186,15 @@ func (h *ManualForwardHandler) cleanupTaskStore() {
 }
 
 type seededTorrent struct {
-	InfoHash    string `json:"info_hash"`
+	InfoHash    string `json:"infoHash"`
 	Name        string `json:"name"`
 	Size        int64  `json:"size"`
-	SavePath    string `json:"save_path"`
-	UploadSpeed int64  `json:"upload_speed"`
+	SavePath    string `json:"savePath"`
+	UploadSpeed int64  `json:"uploadSpeed"`
 	Seeders     int    `json:"seeders"`
 	State       string `json:"state"`
-	ClientID    uint   `json:"client_id"`
-	SourceSite  string `json:"source_site"`
+	ClientID    uint   `json:"clientId"`
+	SourceSite  string `json:"sourceSite"`
 }
 
 // dedupSeededTorrents 按种子名称完全匹配去重。
@@ -352,9 +352,9 @@ type analyzeTask struct {
 	Status        string                 `json:"status"`
 	Error         string                 `json:"error,omitempty"`
 	Result        map[string]interface{} `json:"result,omitempty"`
-	CreatedAt     time.Time              `json:"created_at"`
+	CreatedAt     time.Time              `json:"createdAt"`
 	Progress      int                    `json:"progress,omitempty"`
-	ProgressText  string                 `json:"progress_text,omitempty"`
+	ProgressText  string                 `json:"progressText,omitempty"`
 	FetchSource   string                 `json:"-"`
 }
 
@@ -399,15 +399,15 @@ func (t *analyzeTask) snapshot() *analyzeTask {
 
 func (h *ManualForwardHandler) handleStartAnalyze(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientID         uint   `json:"client_id"`
-		InfoHash         string `json:"info_hash"`
+		ClientID         uint   `json:"clientId"`
+		InfoHash         string `json:"infoHash"`
 		Name             string `json:"name"`
-		SavePath         string `json:"save_path"`
+		SavePath         string `json:"savePath"`
 		Size             int64  `json:"size,omitempty"`
-		SourceSite       string `json:"source_site,omitempty"`
-		SourceTorrentID  string `json:"source_torrent_id,omitempty"`
-		MetadataPriority string `json:"metadata_priority,omitempty"`
-		FetchSource      string `json:"fetch_source,omitempty"`
+		SourceSite       string `json:"sourceSite,omitempty"`
+		SourceTorrentID  string `json:"sourceTorrentId,omitempty"`
+		MetadataPriority string `json:"metadataPriority,omitempty"`
+		FetchSource      string `json:"fetchSource,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -971,8 +971,8 @@ func (h *ManualForwardHandler) handlePollAnalyze(w http.ResponseWriter, r *http.
 
 func (h *ManualForwardHandler) handleEligibleTargets(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		SourceSite     string   `json:"source_site"`
-		BlockedTargets []string `json:"blocked_targets"`
+		SourceSite     string   `json:"sourceSite"`
+		BlockedTargets []string `json:"blockedTargets"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -993,8 +993,8 @@ func (h *ManualForwardHandler) handleEligibleTargets(w http.ResponseWriter, r *h
 		ID       uint   `json:"id"`
 		Name     string `json:"name"`
 		Domain   string `json:"domain"`
-		BaseURL  string `json:"base_url"`
-		AuthType string `json:"auth_type"`
+		BaseURL  string `json:"baseUrl"`
+		AuthType string `json:"authType"`
 		Blocked  bool   `json:"blocked"`
 	}
 
@@ -1018,27 +1018,27 @@ func (h *ManualForwardHandler) handleEligibleTargets(w http.ResponseWriter, r *h
 
 func (h *ManualForwardHandler) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientID    uint     `json:"client_id"`
-		InfoHash    string   `json:"info_hash"`
-		SourceSite  string   `json:"source_site"`
-		SourceID    uint     `json:"source_site_id"`
+		ClientID    uint     `json:"clientId"`
+		InfoHash    string   `json:"infoHash"`
+		SourceSite  string   `json:"sourceSite"`
+		SourceID    uint     `json:"sourceSiteId"`
 		TorrentName string   `json:"title"`
 		Description string   `json:"description"`
-		MediaInfo   string   `json:"media_info"`
+		MediaInfo   string   `json:"mediaInfo"`
 		Screenshots []string `json:"screenshots"`
-		TargetSites []string `json:"target_sites"`
-		PosterURL   string   `json:"poster_url"`
+		TargetSites []string `json:"targetSites"`
+		PosterURL   string   `json:"posterUrl"`
 		Subtitle    string   `json:"subtitle"`
 		Statement   string   `json:"statement"`
 		Poster      string   `json:"poster"`
-		DoubanLink  string   `json:"douban_link"`
-		ImdbLink    string   `json:"imdb_link"`
-		TmdbLink    string   `json:"tmdb_link"`
+		DoubanLink  string   `json:"doubanLink"`
+		ImdbLink    string   `json:"imdbLink"`
+		TmdbLink    string   `json:"tmdbLink"`
 		Tags        []string `json:"tags"`
-		TitleComponents map[string]string `json:"title_components"`
+		TitleComponents map[string]string `json:"titleComponents"`
 		BDInfo       string   `json:"bdinfo"`
 		Anonymous   bool     `json:"anonymous"`
-		ScreenshotInDesc *bool `json:"screenshot_in_desc,omitempty"` // §56.27: nil=默认，true/false=用户指定
+		ScreenshotInDesc *bool `json:"screenshotInDesc,omitempty"` // §56.27: nil=默认，true/false=用户指定
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -1147,12 +1147,12 @@ func (h *ManualForwardHandler) triggerPublishAsync(candidateID uint) {
 func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Items []struct {
-			ClientID    uint     `json:"client_id"`
-			InfoHash    string   `json:"info_hash"`
-			SourceSite  string   `json:"source_site"`
-			SourceID    uint     `json:"source_site_id"`
+			ClientID    uint     `json:"clientId"`
+			InfoHash    string   `json:"infoHash"`
+			SourceSite  string   `json:"sourceSite"`
+			SourceID    uint     `json:"sourceSiteId"`
 			TorrentName string   `json:"title"`
-			TargetSites []string `json:"target_sites"`
+			TargetSites []string `json:"targetSites"`
 			Anonymous   bool     `json:"anonymous"`
 		} `json:"items"`
 	}
@@ -1227,7 +1227,7 @@ func (h *ManualForwardHandler) handleBatchSubmit(w http.ResponseWriter, r *http.
 // 从 DB 读三源 JSON，调 metadata.Merge 合并，返回 MergedMetadata。
 func (h *ManualForwardHandler) handleMerge(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		InfoHash string `json:"info_hash"`
+		InfoHash string `json:"infoHash"`
 		Mode     string `json:"mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1300,10 +1300,10 @@ func (h *ManualForwardHandler) handleMerge(w http.ResponseWriter, r *http.Reques
 // 返回: PreviewResponse（字段列表 + 来源徽标 + 完整度检查）。
 func (h *ManualForwardHandler) handlePreviewFields(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		InfoHash    string            `json:"info_hash"`
-		TargetSite  string            `json:"target_site"`
+		InfoHash    string            `json:"infoHash"`
+		TargetSite  string            `json:"targetSite"`
 		Mode        string            `json:"mode"`
-		UserOverrides map[string]string `json:"user_overrides,omitempty"`
+		UserOverrides map[string]string `json:"userOverrides,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求参数错误")
@@ -1344,11 +1344,11 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 	var req struct {
 		Type        string   `json:"type"`
 		Name        string   `json:"name"`
-		SavePath    string   `json:"save_path"`
-		InfoHash    string   `json:"info_hash"`
-		SiteName    string   `json:"site_name"`
+		SavePath    string   `json:"savePath"`
+		InfoHash    string   `json:"infoHash"`
+		SiteName    string   `json:"siteName"`
 		Screenshots []string `json:"screenshots"`
-		ClientID    string   `json:"client_id"` // §59.21: 查 is_local
+		ClientID    string   `json:"clientId"` // §59.21: 查 is_local
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")

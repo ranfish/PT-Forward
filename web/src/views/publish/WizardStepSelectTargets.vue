@@ -187,8 +187,8 @@ async function loadFieldPreview(siteName: string) {
   previewData.value = null
   try {
     const resp = await manualForwardApi.previewFields({
-      info_hash: props.infoHash,
-      target_site: siteName,
+      infoHash: props.infoHash,
+      targetSite: siteName,
       mode: props.mode || 'ptgen_first',
     })
     previewData.value = (resp.data?.data as unknown as PreviewResponse) || null
@@ -230,8 +230,8 @@ async function loadTitlePreview(siteName: string) {
   if (!props.titleComponents) return
   try {
     const resp = await publishTorrentsApi.previewTitle({
-      target_site: siteName,
-      title_components: props.titleComponents,
+      targetSite: siteName,
+      titleComponents: props.titleComponents,
     })
     const title = resp.data?.data?.title
     if (title) {
@@ -258,8 +258,8 @@ async function loadAllTitlePreviews() {
   if (!props.titleComponents || selectedTargets.value.length === 0) return
   try {
     const resp = await publishTorrentsApi.previewTitleBatch({
-      target_sites: selectedTargets.value,
-      title_components: props.titleComponents,
+      targetSites: selectedTargets.value,
+      titleComponents: props.titleComponents,
     })
     const results = resp.data?.data?.results
     if (results) {

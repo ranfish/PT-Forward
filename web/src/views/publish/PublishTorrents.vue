@@ -721,8 +721,8 @@ async function queryCoverage(record: PublishTorrentItem) {
   queryingHash.value = record.info_hash
   try {
     const resp = await publishTorrentsApi.queryCoverage({
-      client_id: selectedClientId.value,
-      info_hash: record.info_hash,
+      clientId: selectedClientId.value,
+      infoHash: record.info_hash,
       name: record.name,
       size: record.size,
     })
@@ -754,8 +754,8 @@ async function batchQueryCoverage() {
   queryingHash.value = '批量查询中...'
   try {
     await publishTorrentsApi.batchQueryCoverage({
-      client_id: selectedClientId.value,
-      info_hashes: [...selectedHashes.value],
+      clientId: selectedClientId.value,
+      infoHashes: [...selectedHashes.value],
     })
     message.success(`批量查询完成: ${selectedHashes.value.length} 个种子`)
     await fetchTorrents()
@@ -783,7 +783,7 @@ function startForward(record: PublishTorrentItem) {
 async function detectAndOpen(record: PublishTorrentItem) {
   try {
     const resp = await publishTorrentsApi.detectSource({
-      info_hash: record.info_hash,
+      infoHash: record.info_hash,
       name: record.name,
     })
     const result = resp.data?.data
@@ -851,7 +851,7 @@ async function openBatchPublish() {
     if (torrent) {
       try {
         const resp = await publishTorrentsApi.detectSource({
-          info_hash: torrent.info_hash,
+          infoHash: torrent.info_hash,
           name: torrent.name,
         })
         if (resp.data?.data?.source_site) {
@@ -882,16 +882,16 @@ async function doBatchPublish() {
     const items = selectedHashes.value.map(hash => {
       const t = torrents.value.find(t => t.info_hash === hash)
       return {
-        info_hash: hash,
+        infoHash: hash,
         name: t?.name || '',
         size: t?.size || 0,
-        save_path: t?.save_path || '',
+        savePath: t?.save_path || '',
       }
     })
     const resp = await publishTorrentsApi.batchPublish({
-      client_id: selectedClientId.value,
-      source_site: batchForm.source_site,
-      target_site: batchForm.target_site,
+      clientId: selectedClientId.value,
+      sourceSite: batchForm.source_site,
+      targetSite: batchForm.target_site,
       items,
     })
     const result = resp.data?.data

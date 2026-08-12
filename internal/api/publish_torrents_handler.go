@@ -476,8 +476,8 @@ func (h *PublishTorrentsHandler) bgTrackerCoverage(ctx context.Context, hashes [
 }
 
 type coverageQueryRequest struct {
-	ClientID  uint   `json:"client_id"`
-	InfoHash  string `json:"info_hash"`
+	ClientID  uint   `json:"clientId"`
+	InfoHash  string `json:"infoHash"`
 	Name      string `json:"name"`
 	Size      int64  `json:"size"`
 }
@@ -589,8 +589,8 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 		return
 	}
 	var req struct {
-		ClientID  uint     `json:"client_id"`
-		InfoHashes []string `json:"info_hashes"`
+		ClientID  uint     `json:"clientId"`
+		InfoHashes []string `json:"infoHashes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -1083,7 +1083,7 @@ func extractTorrentDir(configJSON string) string {
 }
 
 type detectSourceRequest struct {
-	InfoHash string `json:"info_hash"`
+	InfoHash string `json:"infoHash"`
 	Name     string `json:"name"`
 }
 
@@ -1114,9 +1114,9 @@ func (h *PublishTorrentsHandler) handleDetectSource(w http.ResponseWriter, r *ht
 
 	// 构建候选列表（用于前端降级选择）
 	type candidate struct {
-		SiteName  string `json:"site_name"`
-		TorrentID string `json:"torrent_id"`
-		HasCookie bool   `json:"has_cookie"`
+		SiteName  string `json:"siteName"`
+		TorrentID string `json:"torrentId"`
+		HasCookie bool   `json:"hasCookie"`
 	}
 	var candidates []candidate
 	siteMap := make(map[string]string)
@@ -1180,7 +1180,7 @@ func (h *PublishTorrentsHandler) handleListGroupMappings(w http.ResponseWriter, 
 
 	type mappingWithMatch struct {
 		model.ReleaseGroupMapping
-		MatchedSite string `json:"matched_site"`
+		MatchedSite string `json:"matchedSite"`
 	}
 	result := make([]mappingWithMatch, 0, len(mappings))
 	for _, m := range mappings {
@@ -1251,8 +1251,8 @@ func (h *PublishTorrentsHandler) handleSetDeclarationFilters(w http.ResponseWrit
 }
 
 type previewTitleRequest struct {
-	TargetSite      string            `json:"target_site"`
-	TitleComponents map[string]string `json:"title_components"`
+	TargetSite      string            `json:"targetSite"`
+	TitleComponents map[string]string `json:"titleComponents"`
 }
 
 func (h *PublishTorrentsHandler) handlePreviewTitle(w http.ResponseWriter, r *http.Request) {
@@ -1312,8 +1312,8 @@ func (h *PublishTorrentsHandler) handlePreviewTitle(w http.ResponseWriter, r *ht
 
 func (h *PublishTorrentsHandler) handlePreviewTitleBatch(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		TargetSites     []string          `json:"target_sites"`
-		TitleComponents map[string]string `json:"title_components"`
+		TargetSites     []string          `json:"targetSites"`
+		TitleComponents map[string]string `json:"titleComponents"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -1363,10 +1363,10 @@ func (h *PublishTorrentsHandler) handlePreviewTitleBatch(w http.ResponseWriter, 
 
 func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		GroupName  string `json:"group_name"`
+		GroupName  string `json:"groupName"`
 		Domain     string `json:"domain"`
-		SiteName   string `json:"site_name"`
-		IsOfficial bool   `json:"is_official"`
+		SiteName   string `json:"siteName"`
+		IsOfficial bool   `json:"isOfficial"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -1402,10 +1402,10 @@ func (h *PublishTorrentsHandler) handleUpdateGroupMapping(w http.ResponseWriter,
 		return
 	}
 	var req struct {
-		GroupName  string `json:"group_name"`
+		GroupName  string `json:"groupName"`
 		Domain     string `json:"domain"`
-		SiteName   string `json:"site_name"`
-		IsOfficial bool   `json:"is_official"`
+		SiteName   string `json:"siteName"`
+		IsOfficial bool   `json:"isOfficial"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -1473,14 +1473,14 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 }
 
 type batchPublishRequest struct {
-	ClientID   uint   `json:"client_id"`
-	SourceSite string `json:"source_site"`
-	TargetSite string `json:"target_site"`
+	ClientID   uint   `json:"clientId"`
+	SourceSite string `json:"sourceSite"`
+	TargetSite string `json:"targetSite"`
 	Items      []struct {
-		InfoHash string `json:"info_hash"`
+		InfoHash string `json:"infoHash"`
 		Name     string `json:"name"`
 		Size     int64  `json:"size"`
-		SavePath string `json:"save_path"`
+		SavePath string `json:"savePath"`
 	} `json:"items"`
 }
 
@@ -1714,10 +1714,10 @@ func (h *PublishTorrentsHandler) handleCachedSites(w http.ResponseWriter, r *htt
 
 	type cachedSite struct {
 		ID        uint   `json:"id"`
-		SiteName  string `json:"site_name"`
-		TorrentID string `json:"torrent_id"`
+		SiteName  string `json:"siteName"`
+		TorrentID string `json:"torrentId"`
 		Reviewed  bool   `json:"reviewed"`
-		FetchedAt string `json:"fetched_at"`
+		FetchedAt string `json:"fetchedAt"`
 		Title     string `json:"title"`
 		Subtitle  string `json:"subtitle"`
 	}
@@ -1906,15 +1906,15 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	var stats struct {
-		TodayPublish   int64 `json:"today_publish"`
-		TodaySuccess   int64 `json:"today_success"`
-		TodayFailed    int64 `json:"today_failed"`
-		PendingCount   int64 `json:"pending_count"`
-		ReviewedCount  int64 `json:"reviewed_count"`
-		TotalMetadata  int64 `json:"total_metadata"`
-		YesterdayPublish int64 `json:"yesterday_publish"`
-		YesterdaySuccess int64 `json:"yesterday_success"`
-		UnreviewedCount  int64 `json:"unreviewed_count"`
+		TodayPublish   int64 `json:"todayPublish"`
+		TodaySuccess   int64 `json:"todaySuccess"`
+		TodayFailed    int64 `json:"todayFailed"`
+		PendingCount   int64 `json:"pendingCount"`
+		ReviewedCount  int64 `json:"reviewedCount"`
+		TotalMetadata  int64 `json:"totalMetadata"`
+		YesterdayPublish int64 `json:"yesterdayPublish"`
+		YesterdaySuccess int64 `json:"yesterdaySuccess"`
+		UnreviewedCount  int64 `json:"unreviewedCount"`
 	}
 
 	yesterdayStart := todayStart.AddDate(0, 0, -1)
@@ -2056,7 +2056,7 @@ func (h *PublishTorrentsHandler) handleCoverageCache(w http.ResponseWriter, r *h
 	cached, _ := h.coverage.GetCachedCoverage(r.Context(), infoHash)
 
 	type siteStatus struct {
-		SiteName string `json:"site_name"`
+		SiteName string `json:"siteName"`
 		Status   string `json:"status"`
 		Source   string `json:"source"`
 	}
@@ -2246,12 +2246,12 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 	}
 
 	var req struct {
-		ClientID string `json:"client_id"`
+		ClientID string `json:"clientId"`
 		Items    []struct {
 			Hash     string `json:"hash"`
 			Name     string `json:"name"`
 			Size     int64  `json:"size"`
-			SavePath string `json:"save_path"`
+			SavePath string `json:"savePath"`
 		} `json:"items"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -2288,7 +2288,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
 	Hash     string `json:"hash"`
 	Name     string `json:"name"`
 	Size     int64  `json:"size"`
-	SavePath string `json:"save_path"`
+	SavePath string `json:"savePath"`
 }) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -2742,7 +2742,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		Poster       string   `json:"poster"`
 		Screenshots  []string `json:"screenshots"`
 		Description  string   `json:"description"`
-		SiteName     string   `json:"site_name"` // 可选，指定更新哪行
+		SiteName     string   `json:"siteName"` // 可选，指定更新哪行
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")

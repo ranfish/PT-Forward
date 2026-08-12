@@ -163,7 +163,7 @@ func (h *DownloadHandler) handleGet(w http.ResponseWriter, r *http.Request, id u
 }
 
 type deleteTaskRequest struct {
-	DeleteCompanions bool `json:"delete_companions"`
+	DeleteCompanions bool `json:"deleteCompanions"`
 }
 
 func (h *DownloadHandler) handleDelete(w http.ResponseWriter, r *http.Request, id uint) {
@@ -218,7 +218,7 @@ func splitPath(path string) []string {
 type bulkActionRequest struct {
 	IDs    []uint `json:"ids"`
 	Action string `json:"action"` // pause|resume|recheck|delete
-	DeleteCompanions *bool `json:"delete_companions,omitempty"`
+	DeleteCompanions *bool `json:"deleteCompanions,omitempty"`
 }
 
 func (h *DownloadHandler) handleBulkAction(w http.ResponseWriter, r *http.Request) {
@@ -306,7 +306,7 @@ func (h *DownloadHandler) doRecheck(ctx context.Context, task *model.DownloadTas
 }
 
 type addTaskRequest struct {
-	ClientID string `json:"client_id"`
+	ClientID string `json:"clientId"`
 	URL      string `json:"url"`
 	Category string `json:"category"`
 	Paused   bool   `json:"paused"`
@@ -427,13 +427,13 @@ func (h *DownloadHandler) handleRetryTransfer(w http.ResponseWriter, r *http.Req
 var _ = fmt.Sprintf
 
 type spaceStat struct {
-	ClientID        string `json:"client_id"`
-	FreeSpace       int64  `json:"free_space"`
-	TotalSpace      int64  `json:"total_space"`
-	PendingBytes    int64  `json:"pending_bytes"`
-	EffectiveFree   int64  `json:"effective_free"`
-	TorrentCount    int    `json:"torrent_count"`
-	DownloadingCount int   `json:"downloading_count"`
+	ClientID        string `json:"clientId"`
+	FreeSpace       int64  `json:"freeSpace"`
+	TotalSpace      int64  `json:"totalSpace"`
+	PendingBytes    int64  `json:"pendingBytes"`
+	EffectiveFree   int64  `json:"effectiveFree"`
+	TorrentCount    int    `json:"torrentCount"`
+	DownloadingCount int   `json:"downloadingCount"`
 }
 
 func (h *DownloadHandler) handleSpaceStats(w http.ResponseWriter, r *http.Request) {
@@ -542,8 +542,8 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 		Hash     string `json:"hash"`
 		Name     string `json:"name"`
 		Size     int64  `json:"size"`
-		ClientID string `json:"client_id"`
-		SavePath string `json:"save_path"`
+		ClientID string `json:"clientId"`
+		SavePath string `json:"savePath"`
 	}
 
 	var items []unconfiguredItem
