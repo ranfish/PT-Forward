@@ -92,32 +92,14 @@
         message="设置「获取数据」时的站点优先级（制作组映射命中优先于本列表）"
       />
       <div style="min-height: 40px">
-        <span
-          v-for="(site, index) in priorityList"
-          :key="site"
-          :style="{
-            display: 'inline-block',
-            margin: '4px',
-            cursor: 'move',
-            userSelect: 'none',
-            fontSize: '13px',
-            padding: '4px 12px',
-            borderRadius: '4px',
-            background: index < 3 ? ['#f6ffed', '#e6f4ff', '#fffbe6'][index] : '#fafafa',
-            border: '1px solid ' + (index < 3 ? ['#b7eb8f', '#91caff', '#ffe58f'][index] : '#d9d9d9'),
-            color: index < 3 ? ['#52c41a', '#1677ff', '#faad14'][index] : '#333',
-          }"
-          draggable="true"
-          @dragstart="draggedIndex = index"
-          @dragover.prevent
-          @drop="onDrop(index)"
-          @dragend="draggedIndex = null"
-        >
-          {{ index + 1 }}. {{ site }}
-        </span>
-        <span v-if="priorityList.length === 0" style="color: #999; font-size: 12px">未配置（使用默认优先级）</span>
+        <div v-for="(site, index) in priorityList" :key="site" style="display: flex; align-items: center; gap: 8px; padding: 4px 0">
+          <span style="color: #999; font-size: 12px; min-width: 24px">{{ index + 1 }}.</span>
+          <span style="font-size: 13px; flex: 1">{{ site }}</span>
+          <a-button size="small" type="text" :disabled="index === 0" @click="movePriority(index, -1)">↑</a-button>
+          <a-button size="small" type="text" :disabled="index === priorityList.length - 1" @click="movePriority(index, 1)">↓</a-button>
+        </div>
+        <a-empty v-if="priorityList.length === 0" description="未配置（使用默认优先级）" :image="null" style="padding: 12px 0" />
       </div>
-      <div style="margin-top: 8px; font-size: 12px; color: #999">拖拽调整顺序</div>
     </a-modal>
 
     <!-- Footer -->
@@ -177,7 +159,6 @@ const progress = ref({
 const priorityDialogVisible = ref(false)
 const prioritySaving = ref(false)
 const priorityList = ref<string[]>([])
-const draggedIndex = ref<number | null>(null)
 
 const columns = [
   { title: '种子名', key: 'name', ellipsis: true },
@@ -299,10 +280,10 @@ async function savePriority() {
   }
 }
 
-function onDrop(dropIndex: number) {
-  if (draggedIndex.value === null) return
-  const item = priorityList.value.splice(draggedIndex.value, 1)[0]
-  priorityList.value.splice(dropIndex, 0, item)
-  draggedIndex.value = null
+function movePriority(index: number, direction: number) {
+  const target = index + direction
+  if (target < 0 || target >= priorityList.value.length) return
+  const item = priorityList.value.splice(index, 1)[0]
+  priorityList.value.splice(target, 0, item)
 }
 </script>
