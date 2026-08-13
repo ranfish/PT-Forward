@@ -2156,6 +2156,9 @@ func piecesHashForAdapter(fp *model.ContentFingerprint, adapter model.SiteAdapte
 
 // lazyComputeBencodeHash §59.25: 旧指纹缺 PiecesHashBencode 时从 .torrent 现算并回写
 func (e *Engine) lazyComputeBencodeHash(ctx context.Context, src sourceTorrent, fp *model.ContentFingerprint) string {
+	if e.clientProvider == nil {
+		return ""
+	}
 	dlClient, err := e.clientProvider.Get(src.ClientID)
 	if err != nil {
 		return ""
