@@ -2439,7 +2439,7 @@ func TestEngine_matchLayer0PiecesHash_SiteConfigDisabled(t *testing.T) {
 
 	called := false
 	adapter := &testPiecesHashAdapter{
-		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true},
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: false},
 		searchByPiecesHashFn: func(_ context.Context, _ *model.SiteConfig, _ []string) (map[string]int, error) {
 			called = true
 			return map[string]int{"ph_abc": 1}, nil
@@ -2455,10 +2455,10 @@ func TestEngine_matchLayer0PiecesHash_SiteConfigDisabled(t *testing.T) {
 
 	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, rec.InfoHash, rec.SiteName, "site2", fc)
 	if c != nil {
-		t.Error("expected nil when site config disables pieces_hash API")
+		t.Error("expected nil when neither config nor adapter supports pieces_hash API")
 	}
 	if called {
-		t.Error("SearchByPiecesHash should not be called when SupportsPiecesHashAPI is false")
+		t.Error("SearchByPiecesHash should not be called when neither supports pieces_hash")
 	}
 }
 

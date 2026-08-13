@@ -11,14 +11,15 @@ import (
 )
 
 type TorrentMeta struct {
-	Name        string
-	InfoHash    string
-	PiecesHash  string
-	TotalSize   int64
-	FileCount   int
-	FileTree    map[string]int64
-	LargestFile int64
-	FilesHash   string
+	Name             string
+	InfoHash         string
+	PiecesHash       string
+	PiecesHashBencode string // §59.25: 野马专用
+	TotalSize        int64
+	FileCount        int
+	FileTree         map[string]int64
+	LargestFile      int64
+	FilesHash        string
 }
 
 func ComputeFromTorrent(data []byte) (*TorrentMeta, error) {
@@ -53,6 +54,7 @@ func ComputeFromTorrent(data []byte) (*TorrentMeta, error) {
 
 	name := getStr(infoDict, "name")
 	piecesHash := computePiecesHash(infoDict)
+	piecesHashBencode := computePiecesHashBencode(infoDict)
 	fileTree := extractFileTree(infoDict)
 	totalSize := computeTotalSize(fileTree)
 	fileCount := len(fileTree)
@@ -67,7 +69,8 @@ func ComputeFromTorrent(data []byte) (*TorrentMeta, error) {
 	return &TorrentMeta{
 		Name:        name,
 		InfoHash:    infoHash,
-		PiecesHash:  piecesHash,
+		PiecesHash:        piecesHash,
+		PiecesHashBencode: piecesHashBencode,
 		TotalSize:   totalSize,
 		FileCount:   fileCount,
 		FileTree:    fileTree,
@@ -91,6 +94,18 @@ func computePiecesHash(infoDict map[string]any) string {
 		return ""
 	}
 	h := sha1.Sum([]byte(pieces)) //nolint:gosec // SHA1 required by BitTorrent protocol
+	return hex.EncodeToString(h[:])
+}
+
+// computePiecesHashBencode §59.25: 野马专用 pieces_hash = SHA1(bencode(info.pieces))
+// bencode 字节串格式："{长度}:{原始字节}"，与 yema 官方工具一致
+func computePiecesHashBencode(infoDict map[string]any) string {
+	pieces, ok := infoDict["pieces"].(string)
+	if !ok {
+		return ""
+	}
+	bencoded := fmt.Sprintf("%d:", len(pieces)) + pieces
+	h := sha1.Sum([]byte(bencoded)) //nolint:gosec // SHA1 required by BitTorrent protocol
 	return hex.EncodeToString(h[:])
 }
 

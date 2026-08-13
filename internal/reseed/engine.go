@@ -758,23 +758,28 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 		return nil
 	}
 
+	// §59.25: sitePiecesHashes 按目标站框架选择 pieces_hash 格式
 	sitePiecesHashes := make(map[string]map[string]string)
 	for _, src := range sources {
 		fp := fc.get(src.InfoHash, src.SiteName)
 		if fp == nil || fp.PiecesHash == "" {
 			continue
 		}
-		for siteName := range eligibleSites {
+		for siteName, eligible := range eligibleSites {
 			if siteName == src.SiteName {
 				continue
 			}
 			if negCache != nil && negCache[src.InfoHash] != nil && negCache[src.InfoHash][siteName] {
 				continue
 			}
+			ph := piecesHashForAdapter(fp, eligible.adapter)
+			if ph == "" {
+				continue
+			}
 			if sitePiecesHashes[siteName] == nil {
 				sitePiecesHashes[siteName] = make(map[string]string)
 			}
-			sitePiecesHashes[siteName][fp.PiecesHash] = src.InfoHash
+			sitePiecesHashes[siteName][ph] = src.InfoHash
 		}
 	}
 
@@ -2068,7 +2073,11 @@ func (e *Engine) matchLayer0FromCache(sourceInfoHash, sourceSiteName, siteName s
 	if fp == nil || fp.PiecesHash == "" {
 		return nil
 	}
+	// §59.25: phCache 存的是框架特定的 hash，需要尝试两种格式
 	torrentID, found := phCache.get(siteName, fp.PiecesHash)
+	if !found && fp.PiecesHashBencode != "" {
+		torrentID, found = phCache.get(siteName, fp.PiecesHashBencode)
+	}
 	if !found || torrentID == 0 {
 		return nil
 	}
@@ -2129,6 +2138,17 @@ func supportsPiecesHash(config *model.SiteConfig, adapter model.SiteAdapter) boo
 	return false
 }
 
+// piecesHashForAdapter §59.25: 按目标站框架选择 pieces_hash 格式
+func piecesHashForAdapter(fp *model.ContentFingerprint, adapter model.SiteAdapter) string {
+	if fp == nil {
+		return ""
+	}
+	if adapter != nil && adapter.Framework() == "yemapt" {
+		return fp.PiecesHashBencode
+	}
+	return fp.PiecesHash
+}
+
 func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
 	if !supportsPiecesHash(config, adapter) {
 		return nil
@@ -2140,7 +2160,7 @@ func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAd
 	if !ok {
 		return nil
 	}
-	if config.Passkey == "" && config.Cookie == "" {
+	if config.Passkey == "" && config.Cookie == "" && config.APIKey == "" {
 		return nil
 	}
 
@@ -2149,16 +2169,21 @@ func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAd
 		return nil
 	}
 
-	matches, err := searcher.SearchByPiecesHash(ctx, config, []string{fp.PiecesHash})
+	// §59.25: 按目标站框架选择 pieces_hash 格式
+	ph := piecesHashForAdapter(fp, adapter)
+	if ph == "" {
+		return nil
+	}
+
+	matches, err := searcher.SearchByPiecesHash(ctx, config, []string{ph})
 	if err != nil {
 		e.logger.Debug("Layer0 pieces_hash API failed",
 			zap.String("site", siteName),
-			zap.String("pieces_hash", fp.PiecesHash),
 			zap.Error(err))
 		return nil
 	}
 
-	torrentID, found := matches[fp.PiecesHash]
+	torrentID, found := matches[ph]
 	if !found || torrentID == 0 {
 		return nil
 	}
