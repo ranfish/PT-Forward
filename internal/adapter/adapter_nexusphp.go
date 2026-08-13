@@ -1359,17 +1359,19 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 
 		// §59.26: 标题补全——部分 NexusPHP 站点（如 keepfrds）在 <a> 内只放中文格式化标题，
 		// 原始英文名（含分辨率+制作组后缀）在 </a> 后的同 <td> 内。
-		// 如果提取的标题不含分辨率关键词，在 </a> 后搜索原始种子名。
-		if title != "" && !containsResolutionKeyword(title) {
+		// 如果提取的标题不含制作组后缀模式（-XXXXX），在 </a> 后搜索原始种子名。
+		if title != "" && !hasGroupSuffix(title) {
 			afterLink := html[loc[1]:min(loc[1]+2000, len(html))]
 			afterText := stripTags(strings.ReplaceAll(afterLink, "&nbsp;", " "))
 			afterText = strings.TrimSpace(afterText)
 			if containsResolutionKeyword(afterText) {
-				// 取第一个换行或 < 之前的内容
 				if idx := strings.IndexAny(afterText, "\n<"); idx > 10 {
 					afterText = strings.TrimSpace(afterText[:idx])
 				}
-				if afterText != "" && len(afterText) > len(title) {
+				// 清理尾部 []（stripTags 残留）
+				afterText = strings.TrimRight(afterText, "[]")
+				afterText = strings.TrimSpace(afterText)
+				if afterText != "" {
 					title = afterText
 				}
 			}
@@ -1457,6 +1459,11 @@ func containsResolutionKeyword(s string) bool {
 		}
 	}
 	return false
+}
+
+// hasGroupSuffix §59.26: 检查标题末尾是否有制作组后缀模式（-XXXXX 至少 2 个字母数字）
+func hasGroupSuffix(s string) bool {
+	return regexp.MustCompile(`-[A-Za-z0-9]{2,}$`).MatchString(strings.TrimSpace(s))
 }
 
 func parseSizeStr(s string) int64 {
