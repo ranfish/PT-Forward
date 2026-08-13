@@ -11,6 +11,7 @@ type ContentFingerprint struct {
 	SiteName        string           `json:"site_name" gorm:"size:50;uniqueIndex:idx_site_hash"`
 	TorrentID       string           `json:"torrent_id" gorm:"size:50"`
 	PiecesHash      string           `json:"pieces_hash" gorm:"size:40;index"`
+	PiecesHashBencode string         `json:"pieces_hash_bencode" gorm:"size:40;index"` // §59.25: 野马 bencode 版 pieces_hash
 	PiecesRoot      string           `json:"pieces_root" gorm:"size:64"`
 	TotalSize       int64            `json:"total_size"`
 	FileCount       int              `json:"file_count"`
