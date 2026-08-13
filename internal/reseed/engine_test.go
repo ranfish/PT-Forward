@@ -2462,6 +2462,32 @@ func TestEngine_matchLayer0PiecesHash_SiteConfigDisabled(t *testing.T) {
 	}
 }
 
+func TestEngine_matchLayer0PiecesHash_AdapterOverridesConfig(t *testing.T) {
+	db := setupReseedDB(t)
+	e := NewEngine(db, zap.NewNop())
+
+	adapter := &testPiecesHashAdapter{
+		SiteAdapter: &mocks.SiteAdapter{SupportsSearchByPiecesHashVal: true, FrameworkVal: "yemapt"},
+		searchByPiecesHashFn: func(_ context.Context, _ *model.SiteConfig, hashes []string) (map[string]int, error) {
+			return map[string]int{hashes[0]: 42}, nil
+		},
+	}
+
+	fc := &fpCache{byKey: map[string]*model.ContentFingerprint{
+		"ih1|site1": {PiecesHash: "ph_nexusphp", PiecesHashBencode: "ph_bencode"},
+	}}
+
+	config := &model.SiteConfig{Passkey: "pk", SupportsPiecesHashAPI: false, APIKey: "ak"}
+
+	c := e.matchLayer0PiecesHash(context.Background(), adapter, config, "ih1", "site1", "site2", fc)
+	if c == nil {
+		t.Fatal("expected match when adapter supports pieces_hash even if config disabled")
+	}
+	if c.TargetTorrentID != "42" {
+		t.Errorf("expected torrent ID 42, got %s", c.TargetTorrentID)
+	}
+}
+
 func TestEngine_matchLayer0PiecesHash_NoCreds(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())

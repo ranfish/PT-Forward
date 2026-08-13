@@ -4,22 +4,22 @@ import "time"
 
 // §33.1.33 — ContentFingerprint: 内容指纹统一（12 字段 DB 模型）
 type ContentFingerprint struct {
-	ID              uint             `json:"id" gorm:"primaryKey;autoIncrement"`
-	CreatedAt       time.Time        `json:"created_at"`
-	UpdatedAt       time.Time        `json:"updated_at"`
-	InfoHash        string           `json:"info_hash" gorm:"size:40;uniqueIndex:idx_site_hash"`
-	SiteName        string           `json:"site_name" gorm:"size:50;uniqueIndex:idx_site_hash"`
-	TorrentID       string           `json:"torrent_id" gorm:"size:50"`
-	PiecesHash      string           `json:"pieces_hash" gorm:"size:40;index"`
-	PiecesHashBencode string         `json:"pieces_hash_bencode" gorm:"size:40;index"` // §59.25: 野马 bencode 版 pieces_hash
-	PiecesRoot      string           `json:"pieces_root" gorm:"size:64"`
-	TotalSize       int64            `json:"total_size"`
-	FileCount       int              `json:"file_count"`
-	LargestFileSize int64            `json:"largest_file_size"`
-	FileTree        []byte           `json:"file_tree" gorm:"type:blob"`
-	FileTreeParsed  map[string]int64 `json:"-" gorm:"-"`
-	Title           string           `json:"title" gorm:"size:500"`
-	FilesHash       string           `json:"files_hash" gorm:"size:128;index"`
+	ID                uint             `json:"id" gorm:"primaryKey;autoIncrement"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
+	InfoHash          string           `json:"info_hash" gorm:"size:40;uniqueIndex:idx_site_hash"`
+	SiteName          string           `json:"site_name" gorm:"size:50;uniqueIndex:idx_site_hash"`
+	TorrentID         string           `json:"torrent_id" gorm:"size:50"`
+	PiecesHash        string           `json:"pieces_hash" gorm:"size:40;index"`
+	PiecesHashBencode string           `json:"pieces_hash_bencode" gorm:"size:40;index"` // §59.25: 野马 bencode 版 pieces_hash
+	PiecesRoot        string           `json:"pieces_root" gorm:"size:64"`
+	TotalSize         int64            `json:"total_size"`
+	FileCount         int              `json:"file_count"`
+	LargestFileSize   int64            `json:"largest_file_size"`
+	FileTree          []byte           `json:"file_tree" gorm:"type:blob"`
+	FileTreeParsed    map[string]int64 `json:"-" gorm:"-"`
+	Title             string           `json:"title" gorm:"size:500"`
+	FilesHash         string           `json:"files_hash" gorm:"size:128;index"`
 }
 
 func (ContentFingerprint) TableName() string { return "content_fingerprints" }
@@ -66,12 +66,12 @@ type ReseedTask struct {
 	SizeTolerancePercent   float64 `json:"size_tolerance_percent" gorm:"default:1.0"`
 	InjectionSizeTolerance float64 `json:"injection_size_tolerance" gorm:"default:1.0"`
 
-	MaxInjectionsPerRun  int    `json:"max_injections_per_run"`
-	InjectionIntervalS   int    `json:"injection_interval_s" gorm:"default:1"`
-	InjectionJitterS     int    `json:"injection_jitter_s" gorm:"default:5"`
-	ScanConcurrency      int    `json:"scan_concurrency" gorm:"default:5"`
-	ReseedCategory       string `json:"reseed_category" gorm:"size:100;default:'cross-seed'"`
-	ReseedTags           string `json:"reseed_tags" gorm:"size:200;default:'reseed,pt-forward'"`
+	MaxInjectionsPerRun int    `json:"max_injections_per_run"`
+	InjectionIntervalS  int    `json:"injection_interval_s" gorm:"default:1"`
+	InjectionJitterS    int    `json:"injection_jitter_s" gorm:"default:5"`
+	ScanConcurrency     int    `json:"scan_concurrency" gorm:"default:5"`
+	ReseedCategory      string `json:"reseed_category" gorm:"size:100;default:'cross-seed'"`
+	ReseedTags          string `json:"reseed_tags" gorm:"size:200;default:'reseed,pt-forward'"`
 
 	Schedule string           `json:"schedule" gorm:"size:100;default:'0 */6 * * *'"`
 	Status   ReseedTaskStatus `json:"status" gorm:"size:20;default:'idle'"`
@@ -212,7 +212,7 @@ type Candidate struct {
 type ReseedIYUULog struct {
 	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	CreatedAt       time.Time `json:"created_at"`
-	TaskID      uint              `json:"task_id" gorm:"index;default:0"`
+	TaskID          uint      `json:"task_id" gorm:"index;default:0"`
 	RequestHashes   int       `json:"request_hashes"`
 	ResponseTargets int       `json:"response_targets"`
 	MatchedHashes   int       `json:"matched_hashes"`
@@ -225,13 +225,13 @@ func (ReseedIYUULog) TableName() string { return "reseed_iyuu_logs" }
 
 // ReseedFeatureLog: 特征辅种 pieces_hash 查询日志
 type ReseedFeatureLog struct {
-	ID         uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	CreatedAt  time.Time `json:"created_at"`
-	TaskID     uint      `json:"task_id" gorm:"index;not null"`
-	Site       string    `json:"site" gorm:"size:50"`
-	Queried    int       `json:"queried"`
-	Matched    int       `json:"matched"`
-	Status     string    `json:"status" gorm:"size:20;not null;default:'success'"`
+	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	CreatedAt time.Time `json:"created_at"`
+	TaskID    uint      `json:"task_id" gorm:"index;not null"`
+	Site      string    `json:"site" gorm:"size:50"`
+	Queried   int       `json:"queried"`
+	Matched   int       `json:"matched"`
+	Status    string    `json:"status" gorm:"size:20;not null;default:'success'"`
 }
 
 func (ReseedFeatureLog) TableName() string { return "reseed_feature_logs" }

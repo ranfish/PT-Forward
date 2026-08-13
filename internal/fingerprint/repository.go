@@ -50,6 +50,13 @@ func (r *Repository) Save(ctx context.Context, fp *model.ContentFingerprint) err
 	return r.db.WithContext(ctx).Save(fp).Error
 }
 
+// UpdateField §59.25: 更新单个字段（懒计算回写用）
+func (r *Repository) UpdateField(ctx context.Context, infoHash, siteName, field, value string) error {
+	return r.db.WithContext(ctx).Model(&model.ContentFingerprint{}).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		Update(field, value).Error
+}
+
 func (r *Repository) ComputeAndSave(ctx context.Context, siteName, torrentID string, torrentData []byte, title string) (*model.ContentFingerprint, error) {
 	meta, err := ComputeFromTorrent(torrentData)
 	if err != nil {
@@ -62,18 +69,18 @@ func (r *Repository) ComputeAndSave(ctx context.Context, siteName, torrentID str
 	}
 
 	fp := &model.ContentFingerprint{
-		InfoHash:        meta.InfoHash,
-		SiteName:        siteName,
-		TorrentID:       torrentID,
+		InfoHash:          meta.InfoHash,
+		SiteName:          siteName,
+		TorrentID:         torrentID,
 		PiecesHash:        meta.PiecesHash,
 		PiecesHashBencode: meta.PiecesHashBencode,
-		TotalSize:       meta.TotalSize,
-		FileCount:       meta.FileCount,
-		LargestFileSize: meta.LargestFile,
-		FileTree:        fileTreeJSON,
-		FileTreeParsed:  meta.FileTree,
-		Title:           title,
-		FilesHash:       meta.FilesHash,
+		TotalSize:         meta.TotalSize,
+		FileCount:         meta.FileCount,
+		LargestFileSize:   meta.LargestFile,
+		FileTree:          fileTreeJSON,
+		FileTreeParsed:    meta.FileTree,
+		Title:             title,
+		FilesHash:         meta.FilesHash,
 	}
 
 	var existing model.ContentFingerprint

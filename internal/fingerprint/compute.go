@@ -11,15 +11,15 @@ import (
 )
 
 type TorrentMeta struct {
-	Name             string
-	InfoHash         string
-	PiecesHash       string
+	Name              string
+	InfoHash          string
+	PiecesHash        string
 	PiecesHashBencode string // §59.25: 野马专用
-	TotalSize        int64
-	FileCount        int
-	FileTree         map[string]int64
-	LargestFile      int64
-	FilesHash        string
+	TotalSize         int64
+	FileCount         int
+	FileTree          map[string]int64
+	LargestFile       int64
+	FilesHash         string
 }
 
 func ComputeFromTorrent(data []byte) (*TorrentMeta, error) {
@@ -67,15 +67,15 @@ func ComputeFromTorrent(data []byte) (*TorrentMeta, error) {
 	filesHash := computeFilesHash(fileTree)
 
 	return &TorrentMeta{
-		Name:        name,
-		InfoHash:    infoHash,
+		Name:              name,
+		InfoHash:          infoHash,
 		PiecesHash:        piecesHash,
 		PiecesHashBencode: piecesHashBencode,
-		TotalSize:   totalSize,
-		FileCount:   fileCount,
-		FileTree:    fileTree,
-		LargestFile: largestFile,
-		FilesHash:   filesHash,
+		TotalSize:         totalSize,
+		FileCount:         fileCount,
+		FileTree:          fileTree,
+		LargestFile:       largestFile,
+		FilesHash:         filesHash,
 	}, nil
 }
 
