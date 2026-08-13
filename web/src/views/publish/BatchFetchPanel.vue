@@ -92,18 +92,29 @@
         message="设置「获取数据」时的站点优先级（制作组映射命中优先于本列表）"
       />
       <div style="min-height: 40px">
-        <a-tag
+        <span
           v-for="(site, index) in priorityList"
           :key="site"
-          :color="index < 3 ? ['success', 'processing', 'warning'][index] : 'default'"
-          style="margin: 4px; cursor: move; user-select: none; font-size: 13px; padding: 4px 12px"
+          :style="{
+            display: 'inline-block',
+            margin: '4px',
+            cursor: 'move',
+            userSelect: 'none',
+            fontSize: '13px',
+            padding: '4px 12px',
+            borderRadius: '4px',
+            background: index < 3 ? ['#f6ffed', '#e6f4ff', '#fffbe6'][index] : '#fafafa',
+            border: '1px solid ' + (index < 3 ? ['#b7eb8f', '#91caff', '#ffe58f'][index] : '#d9d9d9'),
+            color: index < 3 ? ['#52c41a', '#1677ff', '#faad14'][index] : '#333',
+          }"
           draggable="true"
           @dragstart="draggedIndex = index"
           @dragover.prevent
           @drop="onDrop(index)"
+          @dragend="draggedIndex = null"
         >
           {{ index + 1 }}. {{ site }}
-        </a-tag>
+        </span>
         <span v-if="priorityList.length === 0" style="color: #999; font-size: 12px">未配置（使用默认优先级）</span>
       </div>
       <div style="margin-top: 8px; font-size: 12px; color: #999">拖拽调整顺序</div>
