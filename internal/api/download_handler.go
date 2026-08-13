@@ -507,7 +507,7 @@ func (h *DownloadHandler) handleSnapshotPaths(w http.ResponseWriter, r *http.Req
 
 	var snapshots []model.TorrentSnapshot
 	h.db.WithContext(r.Context()).
-		Select("client_id, save_path, COUNT(*) as count").
+		Select("client_id, save_path, COUNT(*) as size").
 		Where("is_hidden = ? AND save_path != ?", false, "").
 		Group("client_id, save_path").
 		Order("client_id, save_path").
