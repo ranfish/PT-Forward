@@ -2100,11 +2100,12 @@ func (e *Engine) verifyL0Size(ctx context.Context, adapter model.SiteAdapter, co
 	}
 	results, err := adapter.SearchTorrents(ctx, config, targetTorrentID, nil)
 	if err != nil {
-		e.logger.Warn("L0 size verification search failed, downgrading (fail-closed)",
+		// §59.25: 搜索失败时降级放行，由注入阶段 ValidateInjection 精确校验
+		e.logger.Info("L0 size verification search failed, deferring to injection validation",
 			zap.String("site", siteName),
 			zap.String("torrentID", targetTorrentID),
 			zap.Error(err))
-		return false
+		return true
 	}
 	var targetSize int64
 	found := false
@@ -2116,10 +2117,12 @@ func (e *Engine) verifyL0Size(ctx context.Context, adapter model.SiteAdapter, co
 		}
 	}
 	if !found {
-		e.logger.Warn("L0 size verification target not in results, downgrading (fail-closed)",
+		// §59.25: 搜索结果中找不到目标种子时降级放行（如野马按 torrentID 搜不到）
+		// 注入阶段 ValidateInjection 会从 .torrent 文件精确校验 size
+		e.logger.Info("L0 size verification target not in search results, deferring to injection validation",
 			zap.String("site", siteName),
 			zap.String("torrentID", targetTorrentID))
-		return false
+		return true
 	}
 	if !CompareSizeDisplay(fp.TotalSize, targetSize) {
 		e.logger.Warn("L0 pieces_hash hit but size mismatch, downgrading",
