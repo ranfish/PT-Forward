@@ -10,7 +10,7 @@
           @change="onClientChange"
         >
           <a-select-option v-for="c in clientOptions" :key="c.clientId" :value="c.clientId">
-            {{ c.clientName || c.clientId }}
+            {{ c.clientName || c.clientId }}{{ c.isLocal === false ? '（远程）' : c.isLocal === true ? '（本地）' : '' }}
           </a-select-option>
         </a-select>
         <a-select
@@ -169,6 +169,7 @@ import type { ApiResponse } from '@/api/types'
 interface ClientPathOption {
   clientId: string
   clientName?: string
+  isLocal?: boolean
 }
 interface PathEntry {
   path: string
@@ -184,7 +185,18 @@ async function fetchSnapshotPaths() {
   try {
     const resp = await client.get<ApiResponse<Array<{ clientId: string; paths: PathEntry[] }>>>('/downloads/snapshot-paths')
     const data = resp.data?.data || []
-    clientOptions.value = data.map(d => ({ clientId: d.clientId }))
+    // 查下载器 isLocal 标志
+    let localMap: Record<string, boolean> = {}
+    try {
+      const dlResp = await client.get<ApiResponse<{ items: Array<{ name: string; isLocal: boolean | null }> }>>('/downloaders?pageSize=200')
+      for (const d of (dlResp.data?.data?.items || [])) {
+        localMap[d.name] = d.isLocal ?? false
+      }
+    } catch { /* silent */ }
+    clientOptions.value = data.map(d => ({
+      clientId: d.clientId,
+      isLocal: localMap[d.clientId],
+    }))
     // 展开所有路径，切换 client 时过滤
     const found = data.find(d => d.clientId === selectedClient.value)
     pathOptions.value = found ? found.paths : []
