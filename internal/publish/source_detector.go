@@ -238,6 +238,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 	if groupName != "" {
 		siteName := d.LookupGroup(ctx, groupName)
 		if siteName != "" {
+			// 优先：coverage 命中 + cookie → 有 tid 可直接获取
 			if c, ok := siteMap[siteName]; ok {
 				var site model.Site
 				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
@@ -247,6 +248,14 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 					result.AutoDetected = true
 					return result
 				}
+			}
+			// §59.25: 无 coverage 时也允许选站（batch-fetch 场景），用搜索方式获取
+			var site model.Site
+			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+				result.SourceSite = site.Name
+				result.SourceSiteID = site.ID
+				result.AutoDetected = true
+				return result
 			}
 		}
 	}
