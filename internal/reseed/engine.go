@@ -1428,6 +1428,11 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		iyuuSidMap = e.preloadIYUUSiteMappings(ctx)
 	}
 
+	// §59.26: IYUU 覆盖联动——将 IYUU 查询结果同步到 site_coverage_cache
+	if iyuuResults != nil && iyuuSidMap != nil {
+		e.syncIYUUCoverage(ctx, iyuuResults, iyuuSidMap)
+	}
+
 	l2s := newL2Stats()
 
 	if task.EngineMode == model.ReseedModeSeedFeature {
@@ -2185,6 +2190,79 @@ func (e *Engine) lazyComputeBencodeHash(ctx context.Context, src sourceTorrent, 
 	e.logger.Info("lazyComputeBencodeHash: computed and saved",
 		zap.String("hash", src.InfoHash))
 	return meta.PiecesHashBencode
+}
+
+// syncIYUUCoverage §59.26: 将 IYUU 查询结果同步到 site_coverage_cache
+func (e *Engine) syncIYUUCoverage(ctx context.Context, iyuuResults map[string][]*model.IYUUReseedResult, iyuuSidMap map[int]string) {
+	now := time.Now()
+	ttl := now.Add(7 * 24 * time.Hour)
+
+	// 收集所有 (hash, site, torrent_id) 三元组
+	type covEntry struct {
+		infoHash  string
+		siteName  string
+		torrentID string
+	}
+	var entries []covEntry
+	for hash, results := range iyuuResults {
+		for _, r := range results {
+			for _, t := range r.Targets {
+				siteName := iyuuSidMap[t.Sid]
+				if siteName == "" {
+					continue
+				}
+				entries = append(entries, covEntry{
+					infoHash:  hash,
+					siteName:  siteName,
+					torrentID: strconv.Itoa(t.TorrentID),
+				})
+			}
+		}
+	}
+
+	if len(entries) == 0 {
+		return
+	}
+
+	// 步骤 1: 批量 INSERT OR IGNORE（每 500 行一批）
+	batchSize := 500
+	for i := 0; i < len(entries); i += batchSize {
+		end := i + batchSize
+		if end > len(entries) {
+			end = len(entries)
+		}
+		batch := entries[i:end]
+
+		var placeholders []string
+		var args []interface{}
+		for _, e := range batch {
+			placeholders = append(placeholders, "(?, ?, ?, ?, ?, ?, ?, ?)")
+			args = append(args,
+				e.infoHash, e.siteName, "probably_has", "iyuu",
+				0.9, e.torrentID, now, ttl,
+			)
+		}
+		sql := "INSERT OR IGNORE INTO site_coverage_cache (info_hash, site_name, status, source, confidence, torrent_id, queried_at, expires_at) VALUES " +
+			strings.Join(placeholders, ", ")
+		e.db.WithContext(ctx).Exec(sql, args...)
+	}
+
+	// 步骤 2: 补全已有记录的 torrent_id（confidence >= 0.9 且 torrent_id 为空）
+	for _, ent := range entries {
+		if ent.torrentID == "" {
+			continue
+		}
+		e.db.WithContext(ctx).Model(&model.SiteCoverageCache{}).
+			Where("info_hash = ? AND site_name = ? AND (torrent_id = '' OR torrent_id IS NULL) AND confidence >= ?", ent.infoHash, ent.siteName, 0.9).
+			Updates(map[string]interface{}{
+				"torrent_id": ent.torrentID,
+				"expires_at": ttl,
+				"queried_at": now,
+			})
+	}
+
+	e.logger.Info("syncIYUUCoverage: synced",
+		zap.Int("entries", len(entries)))
 }
 
 func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
