@@ -21,9 +21,9 @@ type SiteAdapterProvider interface {
 }
 
 type Fetcher struct {
-	db            *gorm.DB
-	logger        *zap.Logger
-	siteProvider  SiteAdapterProvider
+	db           *gorm.DB
+	logger       *zap.Logger
+	siteProvider SiteAdapterProvider
 }
 
 func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvider) *Fetcher {
@@ -100,13 +100,6 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 	if keyword == "" {
 		return nil, fmt.Errorf("cannot extract search keyword from title: %s", torrentName)
 	}
-
-	f.logger.Debug("FetchAndStoreBySearch: L2 search",
-		zap.String("site", siteName),
-		zap.String("info_hash", infoHash),
-		zap.String("keyword", keyword),
-		zap.String("group", groupName),
-		zap.Int64("size", size))
 
 	match, err := reseed.SearchAndVerifyMatch(ctx, adapter, config, keyword, groupName, size, torrentName)
 	if err != nil {
@@ -301,20 +294,20 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash, primarySi
 func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *model.TorrentDetail, engineMeta extract.Meta) *model.TorrentMetadata {
 	now := time.Now()
 	meta := &model.TorrentMetadata{
-		InfoHash:        infoHash,
-		SiteName:        siteName,
-		TorrentID:       torrentID,
-		Title:           detail.Title,
-		Subtitle:        detail.Subtitle,
-		SourceCategory:  detail.Category,
+		InfoHash:          infoHash,
+		SiteName:          siteName,
+		TorrentID:         torrentID,
+		Title:             detail.Title,
+		Subtitle:          detail.Subtitle,
+		SourceCategory:    detail.Category,
 		SourceDescription: detail.Description,
-		Description:     detail.Description,
-		Poster:          detail.PosterURL,
-		IMDbURL:         detail.IMDbURL,
-		DoubanURL:       detail.DoubanURL,
-		TMDbURL:         detail.TMDbURL,
-		FetchSource:     "rss_detail",
-		FetchedAt:       now,
+		Description:       detail.Description,
+		Poster:            detail.PosterURL,
+		IMDbURL:           detail.IMDbURL,
+		DoubanURL:         detail.DoubanURL,
+		TMDbURL:           detail.TMDbURL,
+		FetchSource:       "rss_detail",
+		FetchedAt:         now,
 	}
 
 	meta.StandardType = f.normalizeCategory(detail.Category)

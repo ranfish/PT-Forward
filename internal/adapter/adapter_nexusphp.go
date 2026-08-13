@@ -1,10 +1,11 @@
 package adapter
 
 import (
-	"fmt"
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	htmllib "html"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -14,7 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	htmllib "html"
 
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
@@ -62,11 +62,11 @@ var (
 	reNexusDomTTTitle     = regexp.MustCompile(`(?s)onmouseover="domTT_activate\([^,]+,\s*event,\s*'content',\s*'(.*?)'\s*,\s*'trail'`)
 	reNexusTag            = regexp.MustCompile(`class="tag[^"]*"[^>]*>([^<]+)`)
 
-	reBBCodeImg      = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
-	reBBCodeHTMLImg  = regexp.MustCompile(`(?i)<img[^>]+src=["']([^"']+)["']`)
-	reBBCodeQuote    = regexp.MustCompile(`(?is)\[quote(?:=([^\]]*))?\](.*?)\[/quote\]`)
-	reIMDbURL        = regexp.MustCompile(`https?://(?:www\.)?imdb\.com/title/(?:tt\d+)`)
-	reDoubanURL      = regexp.MustCompile(`https?://(?:www\.)?(?:movie\.)?douban\.com/(?:subject|movie)/(?:\d+)`)
+	reBBCodeImg     = regexp.MustCompile(`(?i)\[img\](.*?)\[/img\]`)
+	reBBCodeHTMLImg = regexp.MustCompile(`(?i)<img[^>]+src=["']([^"']+)["']`)
+	reBBCodeQuote   = regexp.MustCompile(`(?is)\[quote(?:=([^\]]*))?\](.*?)\[/quote\]`)
+	reIMDbURL       = regexp.MustCompile(`https?://(?:www\.)?imdb\.com/title/(?:tt\d+)`)
+	reDoubanURL     = regexp.MustCompile(`https?://(?:www\.)?(?:movie\.)?douban\.com/(?:subject|movie)/(?:\d+)`)
 )
 
 type NexusPHPAdapter struct {
@@ -1006,7 +1006,9 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 			titleStr := "no title"
 			if m := regexp.MustCompile(`<title>([^<]+)`).FindStringSubmatch(string(body)); len(m) > 1 {
 				titleStr = m[1]
-				if len(titleStr) > 50 { titleStr = titleStr[:50] }
+				if len(titleStr) > 50 {
+					titleStr = titleStr[:50]
+				}
 			}
 			a.logger.Info("audiences parse result",
 				zap.String("bp", bp),
@@ -1301,9 +1303,13 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		if len(title) <= 3 && !isImageOnly && seen[torrentID] {
 			// Search both directions from the link for rowfollow size cell
 			wideStart := loc[0] - 500
-			if wideStart < 0 { wideStart = 0 }
+			if wideStart < 0 {
+				wideStart = 0
+			}
 			wideEnd := loc[1] + 500
-			if wideEnd > len(html) { wideEnd = len(html) }
+			if wideEnd > len(html) {
+				wideEnd = len(html)
+			}
 			wideChunk := html[wideStart:wideEnd]
 			for _, list := range [][]*model.SeedingSearchResult{textResults, imgResults} {
 				for _, r := range list {
@@ -1350,6 +1356,24 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			end = len(html)
 		}
 		chunk := html[start:end]
+
+		// §59.26: 标题补全——部分 NexusPHP 站点（如 keepfrds）在 <a> 内只放中文格式化标题，
+		// 原始英文名（含分辨率+制作组后缀）在 </a> 后的同 <td> 内。
+		// 如果提取的标题不含分辨率关键词，在 </a> 后搜索原始种子名。
+		if title != "" && !containsResolutionKeyword(title) {
+			afterLink := html[loc[1]:min(loc[1]+2000, len(html))]
+			afterText := stripTags(strings.ReplaceAll(afterLink, "&nbsp;", " "))
+			afterText = strings.TrimSpace(afterText)
+			if containsResolutionKeyword(afterText) {
+				// 取第一个换行或 < 之前的内容
+				if idx := strings.IndexAny(afterText, "\n<"); idx > 10 {
+					afterText = strings.TrimSpace(afterText[:idx])
+				}
+				if afterText != "" && len(afterText) > len(title) {
+					title = afterText
+				}
+			}
+		}
 
 		result := &model.SeedingSearchResult{
 			TorrentID: torrentID,
@@ -1422,6 +1446,17 @@ func parseHDCiTYBrowse(html string, config *model.SiteConfig) []*model.SeedingSe
 		}
 	}
 	return results
+}
+
+// containsResolutionKeyword §59.26: 检查标题是否含分辨率关键词（2160p/1080p 等）
+func containsResolutionKeyword(s string) bool {
+	lower := strings.ToLower(s)
+	for _, kw := range []string{"2160p", "1080p", "1080i", "720p", "576p", "480p", "1440p", "4320p", "4k"} {
+		if strings.Contains(lower, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseSizeStr(s string) int64 {
@@ -2209,8 +2244,8 @@ func (a *NexusPHPAdapter) enrichFromUserDetails(ctx context.Context, config *mod
 				if sv := reDetailSeedingVol.FindStringSubmatch(tdHTML); len(sv) > 1 {
 					if sz := parseSizeString(sv[1]); sz > 0 {
 						result.SeedingSize = sz
-	}
-}
+					}
+				}
 
 			}
 		}
