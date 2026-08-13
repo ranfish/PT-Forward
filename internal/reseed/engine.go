@@ -34,10 +34,10 @@ import (
 const errAdapterNotFoundCode = 31006
 
 type preloadedSites struct {
-	infos       []*model.SiteInfo
-	configs     map[string]*model.SiteConfig
-	adapters    map[string]model.SiteAdapter
-	siteLimits  map[string]*model.Site
+	infos      []*model.SiteInfo
+	configs    map[string]*model.SiteConfig
+	adapters   map[string]model.SiteAdapter
+	siteLimits map[string]*model.Site
 }
 
 type siteLimitEntry struct {
@@ -46,8 +46,8 @@ type siteLimitEntry struct {
 }
 
 type siteLimiter struct {
-	mu      sync.Mutex
-	counts  map[string]*siteLimitEntry
+	mu     sync.Mutex
+	counts map[string]*siteLimitEntry
 }
 
 func newSiteLimiter() *siteLimiter {
@@ -85,16 +85,16 @@ func (l *siteLimiter) getCount(siteName string) int {
 }
 
 type l2Stats struct {
-	mu             sync.Mutex
-	searched       map[string]int
-	noKeyword      int
-	noGroup        int
-	searchFailed   int
-	searchEmpty    int
-	groupMismatch  int
-	sizeMismatch   int
-	matched        int
-	siteResults    map[string]string
+	mu            sync.Mutex
+	searched      map[string]int
+	noKeyword     int
+	noGroup       int
+	searchFailed  int
+	searchEmpty   int
+	groupMismatch int
+	sizeMismatch  int
+	matched       int
+	siteResults   map[string]string
 }
 
 func newL2Stats() *l2Stats {
@@ -192,23 +192,23 @@ func (c *fpCache) get(infoHash, siteName string) *model.ContentFingerprint {
 }
 
 type Engine struct {
-	db                   *gorm.DB
-	logger               *zap.Logger
-	siteProvider         model.SiteInfoProvider
-	clientProvider       model.DownloaderProvider
-	iyuuService          model.IYUUService
-	fpRepo               *fingerprint.Repository
-	trackerResolver      *TrackerSiteResolver
-	scheduler            *scheduler.Registry
-	limiter              *siteLimiter
-	mu                   sync.RWMutex
-	tasks                map[uint]context.CancelFunc
-	cloudFPService       model.CloudFPService
-	deleteReporter       *deleteReporter
-	contributeReporter   *contributeReporter
-	currentCloudFPCache  *cloudFPCache
+	db                    *gorm.DB
+	logger                *zap.Logger
+	siteProvider          model.SiteInfoProvider
+	clientProvider        model.DownloaderProvider
+	iyuuService           model.IYUUService
+	fpRepo                *fingerprint.Repository
+	trackerResolver       *TrackerSiteResolver
+	scheduler             *scheduler.Registry
+	limiter               *siteLimiter
+	mu                    sync.RWMutex
+	tasks                 map[uint]context.CancelFunc
+	cloudFPService        model.CloudFPService
+	deleteReporter        *deleteReporter
+	contributeReporter    *contributeReporter
+	currentCloudFPCache   *cloudFPCache
 	currentDomainResolver *domainResolver
-	complianceChecker    *compliance.Checker
+	complianceChecker     *compliance.Checker
 }
 
 func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
@@ -248,7 +248,6 @@ func (e *Engine) SetTrackerResolver(resolver *TrackerSiteResolver) {
 func (e *Engine) SetComplianceChecker(c *compliance.Checker) {
 	e.complianceChecker = c
 }
-
 
 // StartInjectionConsumer 启动后台注入消费者（对齐 IYUU 两阶段架构）
 func (e *Engine) StartInjectionConsumer(ctx context.Context) {
@@ -774,7 +773,13 @@ func (e *Engine) preloadPiecesHashCache(ctx context.Context, sources []sourceTor
 			}
 			ph := piecesHashForAdapter(fp, eligible.adapter)
 			if ph == "" {
-				continue
+				// §59.25: 懒计算——旧指纹缺 PiecesHashBencode，从 .torrent 现算
+				if eligible.adapter != nil && eligible.adapter.Framework() == "yemapt" && fp.PiecesHash != "" {
+					ph = e.lazyComputeBencodeHash(ctx, src, fp)
+				}
+				if ph == "" {
+					continue
+				}
 			}
 			if sitePiecesHashes[siteName] == nil {
 				sitePiecesHashes[siteName] = make(map[string]string)
@@ -1256,7 +1261,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 
 	// 预加载 seeding_torrent_records 的 InfoHash→TorrentID 映射（关联源站数字种子ID）
 	var seedRecords []model.SeedingTorrentRecord
-		if err := e.db.WithContext(ctx).Select("info_hash, torrent_id").Find(&seedRecords).Error; err != nil {
+	if err := e.db.WithContext(ctx).Select("info_hash, torrent_id").Find(&seedRecords).Error; err != nil {
 		e.logger.Warn("query seed records failed", zap.Error(err))
 	}
 	seedTorrentIDs := make(map[string]string, len(seedRecords))
@@ -1976,19 +1981,19 @@ func (e *Engine) findCandidates(ctx context.Context, src sourceTorrent, ps *prel
 			return nil
 		}
 
-			if hasMatchMethod(task.MatchMethods, "pieces_hash") {
-				c := e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, phCache)
-				if c != nil {
-					targetKey := siteInfo.Name + ":" + c.TargetTorrentID
-					if confirmedTargets != nil && confirmedTargets[targetKey] {
-						return nil
-					}
-					if !e.verifyL0Size(ctx, adapter, siteConfig, fc.get(src.InfoHash, src.SiteName), c.TargetTorrentID, siteInfo.Name) {
-						return nil
-					}
-					return c
+		if hasMatchMethod(task.MatchMethods, "pieces_hash") {
+			c := e.matchLayer0FromCache(src.InfoHash, src.SiteName, siteInfo.Name, fc, phCache)
+			if c != nil {
+				targetKey := siteInfo.Name + ":" + c.TargetTorrentID
+				if confirmedTargets != nil && confirmedTargets[targetKey] {
+					return nil
 				}
+				if !e.verifyL0Size(ctx, adapter, siteConfig, fc.get(src.InfoHash, src.SiteName), c.TargetTorrentID, siteInfo.Name) {
+					return nil
+				}
+				return c
 			}
+		}
 
 		if hasMatchMethod(task.MatchMethods, "fingerprint") {
 			if phCache != nil && phCache.wasQueried(siteInfo.Name) {
@@ -2149,6 +2154,33 @@ func piecesHashForAdapter(fp *model.ContentFingerprint, adapter model.SiteAdapte
 	return fp.PiecesHash
 }
 
+// lazyComputeBencodeHash §59.25: 旧指纹缺 PiecesHashBencode 时从 .torrent 现算并回写
+func (e *Engine) lazyComputeBencodeHash(ctx context.Context, src sourceTorrent, fp *model.ContentFingerprint) string {
+	dlClient, err := e.clientProvider.Get(src.ClientID)
+	if err != nil {
+		return ""
+	}
+	torrentDir := dlClient.GetTorrentDir()
+	torrentData, err := clientpkg.ReadTorrentFile(torrentDir, src.InfoHash)
+	if err != nil {
+		e.logger.Debug("lazyComputeBencodeHash: read torrent failed",
+			zap.String("hash", src.InfoHash), zap.Error(err))
+		return ""
+	}
+	meta, err := fingerprint.ComputeFromTorrent(torrentData)
+	if err != nil || meta.PiecesHashBencode == "" {
+		return ""
+	}
+	// 回写 DB 和内存
+	if e.fpRepo != nil {
+		e.fpRepo.UpdateField(ctx, fp.InfoHash, fp.SiteName, "pieces_hash_bencode", meta.PiecesHashBencode)
+	}
+	fp.PiecesHashBencode = meta.PiecesHashBencode
+	e.logger.Info("lazyComputeBencodeHash: computed and saved",
+		zap.String("hash", src.InfoHash))
+	return meta.PiecesHashBencode
+}
+
 func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, sourceInfoHash, sourceSiteName, siteName string, fc *fpCache) *model.Candidate {
 	if !supportsPiecesHash(config, adapter) {
 		return nil
@@ -2179,6 +2211,7 @@ func (e *Engine) matchLayer0PiecesHash(ctx context.Context, adapter model.SiteAd
 	if err != nil {
 		e.logger.Debug("Layer0 pieces_hash API failed",
 			zap.String("site", siteName),
+			zap.String("pieces_hash", ph),
 			zap.Error(err))
 		return nil
 	}
@@ -3037,7 +3070,6 @@ var yearPrefixSpecTerms = map[string]bool{
 }
 
 var audioExtensions = []string{".flac", ".wav", ".ape", ".tta", ".wv", ".mp3", ".m4a", ".ogg", ".opus", ".aac", ".dsf", ".dff", ".wma", ".aiff", ".m4b"}
-
 
 // DetectMusicFromDir 读取目录内容，判断是否为音乐资源（有音频文件且无视频文件）。
 // 检查直接子文件和一级子目录（CD1/CD2 等分碟结构）。
@@ -4130,11 +4162,11 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 	addResult, err := dlClient.AddFromFile(ctx, torrentData, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "already") || strings.Contains(err.Error(), "exist") {
-		e.logger.Debug("reseed torrent add returned exists (error path), verifying existence in downloader",
-			zap.Uint("matchID", match.ID))
-		return e.verifyDuplicateAndFinish(ctx, dlClient, match, "")
-	}
-	return e.failMatch(ctx, match, fmt.Sprintf("注入种子到下载器失败: %v", err))
+			e.logger.Debug("reseed torrent add returned exists (error path), verifying existence in downloader",
+				zap.Uint("matchID", match.ID))
+			return e.verifyDuplicateAndFinish(ctx, dlClient, match, "")
+		}
+		return e.failMatch(ctx, match, fmt.Sprintf("注入种子到下载器失败: %v", err))
 	}
 
 	if addResult.IsDuplicate {
