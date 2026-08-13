@@ -10,9 +10,9 @@
 
 ## 当前任务焦点（新会话必读）
 
-**版本**：v0.0.562（已发布）。
+**版本**：v0.0.579（已发布）。
 
-**当前主线**：种子配置页 + is_local + 野马 OpenAPI + 下载器连接管理全部完成。等待端到端测试和生产环境部署。
+**当前主线**：种子配置页 + is_local + 野马 OpenAPI + snake_case 统一 + 野马 pieces_hash bencode 辅种全部完成并通过端到端验证。
 
 ### ✅ 已完成（v0.0.228 → v0.0.547）
 
@@ -106,6 +106,24 @@
 - ✅ is_local 字段持久化遗漏修复（Updates map 缺 is_local 列）
 - ✅ JSON 命名规范加入 AGENTS.md + 强制清单
 
+### ✅ P2 snake_case 统一（v0.0.563~v0.0.567）
+
+- ✅ 后端 4 个文件 34 个 struct 106 个字段 snake_case → camelCase
+  - publish_torrents_handler.go / manual_forward_handler.go / metadata_handler.go / download_handler.go
+- ✅ 前端 types.ts + publish.ts + downloads.ts + image-host.ts API 层全量对齐
+- ✅ 前端 7 个 Vue 组件 API 调用参数 + 响应类型 + 模板引用全量对齐
+- ✅ 5 轮回归审核，修复 13 处遗漏（vue-tsc 无法检测的运行时 JSON key 不匹配）
+- ✅ 保留 snake_case：Go model JSON tag / raw map 响应 / DB 列名 / URL query param
+
+### ✅ 野马 pieces_hash bencode 辅种（§59.24-§59.25，v0.0.570~v0.0.579）
+
+- ✅ 辅种移除"源站"概念（§59.24，与发布业务解耦）
+- ✅ 野马 pieces_hash bencode 算法分支（§59.25，SHA1(bencode(info.pieces))）
+- ✅ ContentFingerprint 加 PiecesHashBencode + 懒计算回写
+- ✅ 引擎按 adapter.Framework() 选择 hash 格式
+- ✅ verifyL0Size 搜索失败时降级放行（方案 A，注入阶段 ValidateInjection 兜底）
+- ✅ 端到端验证通过（249 环境，4 个种子 matched + injected）
+
 ### 端到端验收状态
 
 | 端点/功能 | 状态 |
@@ -119,6 +137,9 @@
 | 种子配置页 is_local（本地发布 vs 转种上盒）| ✅ v0.0.557 |
 | 野马 OpenAPI 适配（pieces_hash + 下载 + 搜索 + 认证）| ✅ v0.0.558-560 |
 | 下载器连接管理（Reload context + 单客户端重连）| ✅ v0.0.561-562 |
+| P2 snake_case 统一（106 字段 + 5 轮审核）| ✅ v0.0.563-567 |
+| 辅种移除源站概念 + 目标站不按 isTarget 过滤 | ✅ v0.0.570-571 |
+| 野马 pieces_hash bencode 辅种（端到端验证通过）| ✅ v0.0.576-579 |
 
 **关键事实**：
 - 开发环境 29（systemctl --user pt-forward，端口 8765）
