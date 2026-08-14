@@ -248,7 +248,7 @@
                   <a-image v-if="form.poster" :src="form.poster" :width="120" style="margin-top: 8px" />
                 </a-form-item>
                 <a-form-item label="声明">
-                  <a-textarea v-model:value="form.statement" :rows="3" placeholder="源站官组声明（只读）" :disabled="maintenanceOnly" />
+                  <a-textarea v-model:value="form.statement" :auto-size="{ minRows: 3, maxRows: 25 }" placeholder="源站官组声明（只读）" :disabled="maintenanceOnly" />
                 </a-form-item>
                 <a-form-item v-if="!maintenanceOnly" label="豆瓣 / IMDb / TMDb">
                   <a-row :gutter="8">
