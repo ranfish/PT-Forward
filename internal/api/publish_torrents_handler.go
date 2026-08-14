@@ -18,6 +18,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -2421,19 +2422,12 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		Find(&rawSnapshots)
 
 	// §59.26: 按 name 去重——同一路径下同一资源的多个站点种子只显示一行
-	seen := make(map[string]bool)
-	snapshots := make([]model.TorrentSnapshot, 0, len(rawSnapshots))
-	for _, s := range rawSnapshots {
-		key := s.Name
-		if key == "" {
-			key = s.Hash
+	snapshots := util.DedupByKey(rawSnapshots, func(s model.TorrentSnapshot) string {
+		if s.Name != "" {
+			return s.Name
 		}
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		snapshots = append(snapshots, s)
-	}
+		return s.Hash
+	})
 	total = int64(len(snapshots))
 
 	if len(snapshots) == 0 {
