@@ -1364,7 +1364,8 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 			afterLink := html[loc[1]:min(loc[1]+2000, len(html))]
 			afterText := stripTags(strings.ReplaceAll(afterLink, "&nbsp;", " "))
 			afterText = strings.TrimSpace(afterText)
-			if containsResolutionKeyword(afterText) {
+			// 判定信号：分辨率词（完整显示）或 年份+大写开头（站点 CSS 截断显示，如 "216.."）
+			if containsResolutionKeyword(afterText) || looksLikeSceneName(afterText) {
 				if idx := strings.IndexAny(afterText, "\n<"); idx > 10 {
 					afterText = strings.TrimSpace(afterText[:idx])
 				}
@@ -1459,6 +1460,21 @@ func containsResolutionKeyword(s string) bool {
 		}
 	}
 	return false
+}
+
+// looksLikeSceneName §59.26: 判定 </a> 后文本是否像 scene 命名的原始种子名。
+// 用于站点 CSS 截断显示（如 "216.." 替代 "2160p"）时分辨率词缺失的兜底：
+// 要求首词大写字母开头 + 含年份（19xx/20xx）+ 总长 ≥ 15。
+func looksLikeSceneName(s string) bool {
+	s = strings.TrimSpace(s)
+	if len(s) < 15 {
+		return false
+	}
+	first := rune(s[0])
+	if !(first >= 'A' && first <= 'Z') {
+		return false
+	}
+	return regexp.MustCompile(`\b(19|20)\d{2}\b`).MatchString(s)
 }
 
 // hasGroupSuffix §59.26: 检查标题末尾是否有制作组后缀模式（-XXXXX 至少 2 个字母数字）

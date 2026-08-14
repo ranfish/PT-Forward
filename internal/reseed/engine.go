@@ -2889,8 +2889,13 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 			continue
 		}
 		if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
-			stats.GroupMiss++
-			continue
+			// §59.26: 站点 CSS 截断的标题（含 .. 且含分辨率词）可能截掉制作组后缀，
+			// 跳过组名过滤，交给 size + title 关键词验证兜底。
+			// 无分辨率词的截断标题（如 "Movie.1999.."）仍然严格拒绝。
+			if !(strings.Contains(r.Title, "..") && hasResolutionToken(r.Title)) {
+				stats.GroupMiss++
+				continue
+			}
 		}
 		if sourceTitle != "" && !titleKeywordRelevant(meaningfulWords, sourceCJK, sourceTitle, r.Title) {
 			stats.TitleMiss++
@@ -3010,7 +3015,72 @@ func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config
 		return nil, err
 	}
 	match, _ := VerifyMatchWithTruncationCheckAndSource(results, groupName, sourceSize, sourceTitle)
+
+	// §59.26 CJK 降级重试：混合关键词（中文+英文）在部分站点（如 keepfrds
+	// 标题=中文/副标题=英文）search_area=0 下跨字段无法命中。
+	// 无结果且关键词同时含 CJK 和 ASCII 词时，分别用两种纯词重搜：
+	//   ① 剥离 CJK（保留英文，适用标题=英文的站点）
+	//   ② 剥离 ASCII（保留中文，适用标题=中文的站点，如 keepfrds 互换前）
+	if match == nil && hasCJKWord(keyword) {
+		for _, retryKW := range []string{stripCJKWords(keyword), stripASCIIWords(keyword)} {
+			if retryKW == "" || retryKW == keyword {
+				continue
+			}
+			retry, rErr := adapter.SearchTorrents(ctx, config, retryKW, nil)
+			if rErr != nil {
+				continue
+			}
+			if m, _ := VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m != nil {
+				return m, nil
+			}
+		}
+	}
 	return match, nil
+}
+
+// hasResolutionWord 判断标题是否含分辨率词（2160p/1080p/720p 等）。
+func hasResolutionToken(s string) bool {
+	lower := strings.ToLower(s)
+	for _, kw := range []string{"2160p", "1080p", "1080i", "720p", "576p", "480p", "1440p", "4320p"} {
+		if strings.Contains(lower, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasCJKWord 判断关键词是否含 CJK 词（触发降级重试的条件）。
+func hasCJKWord(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) {
+			return true
+		}
+	}
+	return false
+}
+
+// stripCJKWords 剥离关键词中的 CJK 词，保留 ASCII 部分。
+func stripCJKWords(s string) string {
+	fields := strings.Fields(s)
+	var out []string
+	for _, f := range fields {
+		if !hasCJKWord(f) {
+			out = append(out, f)
+		}
+	}
+	return strings.Join(out, " ")
+}
+
+// stripASCIIWords 剥离关键词中的 ASCII 词，保留 CJK 部分。
+func stripASCIIWords(s string) string {
+	fields := strings.Fields(s)
+	var out []string
+	for _, f := range fields {
+		if hasCJKWord(f) {
+			out = append(out, f)
+		}
+	}
+	return strings.Join(out, " ")
 }
 
 // ValidateInjection 校验目标种子数据是否与源种子兼容，在注入下载器前调用。
