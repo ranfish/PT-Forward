@@ -303,4 +303,10 @@ export const seedConfigApi = {
   setFetchPriority(priority: string[]) {
     return client.put<ApiResponse<{ priority: string[] }>>('/publish/fetch-priority', { priority })
   },
+  fetchSingleSeed(infoHash: string, clientId: string) {
+    return client.post<ApiResponse<{ message: string }>>(`/publish/seeds/${infoHash}/fetch`, {}, { params: { client_id: clientId } })
+  },
+  deleteSeed(infoHash: string) {
+    return client.delete<ApiResponse<{ message: string }>>(`/publish/seeds/${infoHash}`)
+  },
 }
