@@ -2409,6 +2409,15 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 				updates["description"] = fr.CleanedText
 			}
 
+			// §59.26: 声明末尾追加转载致谢（官组名 + 禁转PTT）
+			if profile.ReleaseGroup != "" && profile.ReleaseGroup != "NOGROUP" {
+				thanks := fmt.Sprintf(
+					"\n\n[quote][b][color=blue][size=5]%s官组作品，感谢原制作者发布。[/size][/color][/b][/quote]\n"+
+						"[quote][b][color=red][size=5]请遵守PT互相遵重共识，禁转PTT[/size][/color][/b][/quote]",
+					profile.ReleaseGroup)
+				updates["statement"] = finalMeta.Statement + thanks
+			}
+
 			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 				Updates(updates)
