@@ -13,6 +13,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/download"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -557,19 +558,12 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 		Find(&rawItems)
 
 	// §59.26: 按 name 去重（与种子配置页列表一致）
-	seen := make(map[string]bool)
-	items := make([]unconfiguredItem, 0, len(rawItems))
-	for _, item := range rawItems {
-		key := item.Name
-		if key == "" {
-			key = item.Hash
+	items := util.DedupByKey(rawItems, func(i unconfiguredItem) string {
+		if i.Name != "" {
+			return i.Name
 		}
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		items = append(items, item)
-	}
+		return i.Hash
+	})
 
 	Success(w, map[string]interface{}{
 		"items": items,
