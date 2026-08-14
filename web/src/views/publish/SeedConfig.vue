@@ -123,14 +123,34 @@
         </template>
 
         <template v-else-if="column.key === 'action'">
-          <a-button
-            size="small"
-            type="link"
-            :disabled="!canEdit(record.status)"
-            @click="openEdit(record)"
-          >
-            {{ canEdit(record.status) ? '编辑' : '只读' }}
-          </a-button>
+          <a-space :size="0">
+            <a-button
+              size="small"
+              type="link"
+              :loading="fetchingSet.has(record.hash)"
+              @click="fetchSingle(record)"
+            >
+              {{ record.status === 'unfetched' ? '获取' : '重获' }}
+            </a-button>
+            <a-button
+              v-if="record.status !== 'unfetched'"
+              size="small"
+              type="link"
+              danger
+              :loading="clearingSet.has(record.hash)"
+              @click="clearSingle(record)"
+            >
+              清除
+            </a-button>
+            <a-button
+              v-if="canEdit(record.status)"
+              size="small"
+              type="link"
+              @click="openEdit(record)"
+            >
+              编辑
+            </a-button>
+          </a-space>
         </template>
       </template>
     </a-table>
@@ -327,7 +347,7 @@ const columns = [
   { title: '大小', key: 'size', width: 80 },
   { title: '技术参数', key: 'tech', width: 200 },
   { title: '字段', key: 'fields', width: 150 },
-  { title: '操作', key: 'action', width: 70, fixed: 'right' as const },
+  { title: '操作', key: 'action', width: 200, fixed: 'right' as const },
 ]
 
 // ==================== 编辑 ====================
@@ -354,6 +374,37 @@ function openEdit(item: SeedListItem) {
 
 function onEditSuccess() {
   fetchList()
+}
+
+// ==================== 单种子获取/清除 ====================
+
+const fetchingSet = ref<Set<string>>(new Set())
+const clearingSet = ref<Set<string>>(new Set())
+
+async function fetchSingle(item: SeedListItem) {
+  fetchingSet.value.add(item.hash)
+  try {
+    await seedConfigApi.fetchSingleSeed(item.hash, item.client_id)
+    message.success(item.status === 'unfetched' ? '获取成功' : '已重新获取，请重新审核')
+    await fetchList()
+  } catch (e: any) {
+    message.error('获取失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
+  } finally {
+    fetchingSet.value.delete(item.hash)
+  }
+}
+
+async function clearSingle(item: SeedListItem) {
+  clearingSet.value.add(item.hash)
+  try {
+    await seedConfigApi.deleteSeed(item.hash)
+    message.success('已清除')
+    await fetchList()
+  } catch (e: any) {
+    message.error('清除失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
+  } finally {
+    clearingSet.value.delete(item.hash)
+  }
 }
 
 // ==================== 批量获取 ====================

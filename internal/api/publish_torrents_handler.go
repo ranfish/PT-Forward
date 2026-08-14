@@ -156,10 +156,14 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleBatchFetchProgress(w, r)
 	case strings.HasSuffix(path, "/publish/seeds") && r.Method == http.MethodGet:
 		h.handleListSeeds(w, r)
+	case strings.Contains(path, "/publish/seeds/") && strings.HasSuffix(path, "/fetch") && r.Method == http.MethodPost:
+		h.handleFetchSingleSeed(w, r)
 	case strings.Contains(path, "/publish/seeds/") && r.Method == http.MethodGet:
 		h.handleGetSeed(w, r)
 	case strings.Contains(path, "/publish/seeds/") && r.Method == http.MethodPut:
 		h.handlePutSeed(w, r)
+	case strings.Contains(path, "/publish/seeds/") && r.Method == http.MethodDelete:
+		h.handleDeleteSeed(w, r)
 	default:
 		Error(w, http.StatusNotFound, 40400, "接口不存在")
 	}
@@ -2813,4 +2817,59 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"release_group":  profile.ReleaseGroup,
 	}
 	Success(w, result)
+}
+
+// handleFetchSingleSeed §59.26: 单种子获取（复用 fetchSingleTorrent + is_local 支持）
+func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimRight(r.URL.Path, "/")
+	infoHash := strings.TrimSuffix(path, "/fetch")
+	parts := strings.Split(infoHash, "/")
+	if len(parts) > 0 {
+		infoHash = parts[len(parts)-1]
+	}
+	if infoHash == "" || infoHash == "seeds" {
+		Error(w, http.StatusBadRequest, 40001, "缺少 info_hash")
+		return
+	}
+	clientID := r.URL.Query().Get("client_id")
+	if clientID == "" {
+		Error(w, http.StatusBadRequest, 40001, "client_id 为必填")
+		return
+	}
+
+	var snap model.TorrentSnapshot
+	if err := h.db.WithContext(r.Context()).Where("hash = ? AND client_id = ?", infoHash, clientID).First(&snap).Error; err != nil {
+		Error(w, http.StatusNotFound, 40401, "快照中未找到该种子")
+		return
+	}
+
+	isLocal := false
+	var client model.ClientConfig
+	if h.db.WithContext(r.Context()).Where("name = ?", clientID).First(&client).Error == nil {
+		isLocal = client.IsLocal
+	}
+
+	if err := h.fetchSingleTorrent(r.Context(), infoHash, snap.Name, snap.Size, snap.SavePath, isLocal); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", err))
+		return
+	}
+
+	// §59.26: 获取（含重新获取）后 reviewed=false，必须重新走预览审核
+	h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ?", infoHash).
+		Update("reviewed", false)
+
+	Success(w, map[string]interface{}{"message": "获取成功"})
+}
+
+// handleDeleteSeed §59.26: 清除单种子 metadata（coverage 不清除）
+func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http.Request) {
+	infoHash := extractSeedHash(r)
+	if infoHash == "" || infoHash == "seeds" {
+		Error(w, http.StatusBadRequest, 40001, "缺少 info_hash")
+		return
+	}
+
+	h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash).Delete(&model.TorrentMetadata{})
+	Success(w, map[string]interface{}{"message": "已清除"})
 }
