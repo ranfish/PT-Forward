@@ -442,7 +442,8 @@ func isLikelyTitleWord(s string) bool {
 	}
 	upper := strings.ToUpper(s)
 	switch upper {
-	case "UHD", "HDR", "SDR", "HLG", "DV", "DOVI", "ATMOS", "HYBRID", "REMASTER", "REMASTERED":
+	case "UHD", "HDR", "SDR", "HLG", "DV", "DOVI", "ATMOS", "HYBRID", "REMASTER", "REMASTERED",
+		"MUHD", "MHD", "MSD":
 		return false
 	}
 	return true
