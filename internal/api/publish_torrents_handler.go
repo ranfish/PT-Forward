@@ -2414,6 +2414,24 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 				updates["description"] = fr.CleanedText
 			}
 
+			// §59.27: flags 以本次 detail 为准（detail_source_json.flags 是新提取值，
+			// 但 GORM Assign 忽略零值导致 DB 旧 flags 残留——map 显式覆盖空值）
+			var detailFlags []string
+			if finalMeta.DetailSourceJSON != "" {
+				var ds struct {
+					Flags []string `json:"flags"`
+				}
+				if json.Unmarshal([]byte(finalMeta.DetailSourceJSON), &ds) == nil {
+					detailFlags = ds.Flags
+				}
+			}
+			if detailFlags == nil {
+				detailFlags = []string{}
+			}
+			if newFlags, err := json.Marshal(detailFlags); err == nil {
+				updates["flags"] = string(newFlags)
+			}
+
 			// §59.26: 声明末尾追加转载致谢（官组名 + 禁转PTT）
 			if profile.ReleaseGroup != "" && profile.ReleaseGroup != "NOGROUP" {
 				thanks := fmt.Sprintf(
