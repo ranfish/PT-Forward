@@ -143,9 +143,9 @@ func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) s
 	case "bit_depth":
 		return formatBitDepthForTitle(p)
 	case "video_codec":
-		return codecStyle(p.VideoCodec, composeMedium(p))
+		return codecStyle(VideoTitleForm(p.VideoCodec), composeMedium(p))
 	case "audio_codec":
-		return normalizeAudio(p.AudioCodec)
+		return normalizeAudio(AudioTitleForm(p.AudioCodec))
 	case "audio_full":
 		return composeAudio(p)
 	case "audio_channels":

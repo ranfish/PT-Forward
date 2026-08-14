@@ -52,6 +52,9 @@ var videoCodecRegistry = []TokenDef{
 	{Canonical: "VP9", Pattern: `\bVP[89]\b`},
 	{Canonical: "AVS2", Pattern: `\bAVS2\b`},
 	{Canonical: "AVS+", Pattern: `\bAVS\+`},
+	// §59.27 P3：值域演进（对齐 standard_keys）
+	{Canonical: "VVC", Pattern: `\bVVC\b|\bH[._\- ]?266\b`},
+	{Canonical: "Xvid", Pattern: `\bXvid\b|\bXviD\b`},
 	{Canonical: "x265", Pattern: `\bX265\b`},
 	// H.265 / H265 / HEVC
 	{Canonical: "HEVC", Pattern: `\bH[._\- ]?265\b|\bHEVC\b`},
@@ -91,6 +94,8 @@ var audioCodecRegistry = []TokenDef{
 	// §59.27 P2：音乐/新编码演进（对齐 MI 侧值域）
 	{Canonical: "MP2", Pattern: `\bMP2\b|\bMPEG[._\- ]?Audio\b`},
 	{Canonical: "AV3A", Pattern: `\bAV3A\b`},
+	// §59.27 P3：值域演进（对齐 standard_keys）
+	{Canonical: "DSD", Pattern: `\bDSD\b`},
 }
 
 // === HDR（v1.05 字段 10，组合值由 extractHDRFormat 合成，此处为原子 token）===
@@ -115,6 +120,24 @@ func lookupToken(registry []TokenDef, s string) string {
 	}
 	return ""
 }
+
+// titleFormOfToken canonical → 重组形式（§59.27 P3 重组显式出口）。
+// registry 未收录的值原样返回（EditionInfo 等自由文本不经过 registry）。
+func titleFormOfToken(registry []TokenDef, canonical string) string {
+	if canonical == "" {
+		return ""
+	}
+	for _, t := range registry {
+		if t.Canonical == canonical {
+			return t.titleForm()
+		}
+	}
+	return canonical
+}
+
+// AudioTitleForm / VideoTitleForm / HDRTitleForm 对外出口（重组器使用）。
+func AudioTitleForm(canonical string) string { return titleFormOfToken(audioCodecRegistry, canonical) }
+func VideoTitleForm(canonical string) string { return titleFormOfToken(videoCodecRegistry, canonical) }
 
 // removeAllTokenPatterns 从 registry 合成移除正则（替代手写 remove*Tokens）。
 // 返回移除所有变体后的字符串。

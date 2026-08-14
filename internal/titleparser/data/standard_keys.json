@@ -272,6 +272,15 @@
     },
     {
       "category": "audio_codec",
+      "key": "DTS-ES",
+      "code": "audio.dts_es",
+      "aliases": [
+        "DTS ES",
+        "DTS-ES"
+      ]
+    },
+    {
+      "category": "audio_codec",
       "key": "DTS",
       "code": "audio.dts",
       "aliases": []

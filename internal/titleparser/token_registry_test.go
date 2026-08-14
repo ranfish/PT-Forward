@@ -188,6 +188,89 @@ func TestMIVideoCanonicalAlignment(t *testing.T) {
 	}
 }
 
+// TestRegistryStandardKeysAlignment registry canonical ↔ standard_keys 值域一致性（§59.27 P3）。
+// registry 新增 canonical 时必须同步 standard_keys.json（或列入豁免清单）。
+func TestRegistryStandardKeysAlignment(t *testing.T) {
+	keys, err := LoadStandardKeys()
+	if err != nil {
+		t.Fatalf("load standard keys: %v", err)
+	}
+	skSet := map[string]map[string]bool{}
+	for _, k := range keys {
+		if skSet[k.Category] == nil {
+			skSet[k.Category] = map[string]bool{}
+		}
+		skSet[k.Category][k.Key] = true
+		// aliases 也计入值域（H.264 → AVC 别名等）
+		for _, a := range k.Aliases {
+			skSet[k.Category][a] = true
+		}
+	}
+
+	// 豁免：registry 有而 standard_keys 故意不收的值
+	// - AVS+/AVS2/MP2/AV3A/xHE-AAC/DSD：小众/新编码，站点表单尚未提供选项
+	// - DoVi HDR10/PQ10：hdr 组合值超集（标准侧拆为原子）
+	exempt := map[string]bool{
+		"AVS+": true, "AVS2": true, "MP2": true, "AV3A": true,
+		"xHE-AAC": true, "DSD": true, "VVC": true, "Xvid": true,
+		"DoVi HDR10": true, "PQ10": true,
+	}
+
+	check := func(category string, registry []TokenDef) {
+		for _, def := range registry {
+			if exempt[def.Canonical] {
+				continue
+			}
+			if !skSet[category][def.Canonical] {
+				t.Errorf("registry %s canonical %q not in standard_keys (add to json or exempt list)", category, def.Canonical)
+			}
+		}
+	}
+	check("video_codec", videoCodecRegistry)
+	check("audio_codec", audioCodecRegistry)
+	check("hdr", hdrTokenRegistry)
+}
+
+// TestTokenRoundTripFullFields round-trip 全字段（§59.27 P3）：
+// V105 完整字段序 + 点/空格两种分隔符，全部技术字段 round-trip。
+func TestTokenRoundTripFullFields(t *testing.T) {
+	profiles := []TechProfile{
+		{MainTitle: "Carrie", Year: "1976", Resolution: "2160p", VideoCodec: "x265", AudioCodec: "DTS-HD MA", HDR: "DoVi HDR", ReleaseGroup: "FRDS"},
+		{MainTitle: "Father", Year: "2020", Resolution: "1080p", VideoCodec: "x265", AudioCodec: "DDP", HDR: "HDR10+", ReleaseGroup: "GROUP"},
+		{MainTitle: "Gilda", Year: "1946", Resolution: "2160p", VideoCodec: "x265", AudioCodec: "FLAC", HDR: "DoVi HDR", ReleaseGroup: "FRDS"},
+		{MainTitle: "Old", Year: "1990", Resolution: "1080p", VideoCodec: "AVC", AudioCodec: "TrueHD", HDR: "HDR Vivid", ReleaseGroup: "GRP"},
+		{MainTitle: "Test", Year: "2024", Resolution: "2160p", VideoCodec: "HEVC", AudioCodec: "DTS:X", HDR: "HDR10", ReleaseGroup: "GRP"},
+		{MainTitle: "LPCM Movie", Year: "2000", Resolution: "1080p", VideoCodec: "x264", AudioCodec: "LPCM", HDR: "", ReleaseGroup: "GRP"},
+	}
+	for _, sep := range []string{".", " "} {
+		tf := V105TitleFormat()
+		tf.Separator = sep
+		for _, p := range profiles {
+			title := ReassembleFromTechProfile(p, tf)
+			if title == "" {
+				t.Fatalf("reassemble empty: %+v sep=%q", p, sep)
+			}
+			re := ParseTitleTech(title)
+			if re.VideoCodec != p.VideoCodec {
+				t.Errorf("sep=%q title=%q VideoCodec %q != %q", sep, title, re.VideoCodec, p.VideoCodec)
+			}
+			if re.AudioCodec != p.AudioCodec {
+				t.Errorf("sep=%q title=%q AudioCodec %q != %q", sep, title, re.AudioCodec, p.AudioCodec)
+			}
+			if re.Resolution != p.Resolution {
+				t.Errorf("sep=%q title=%q Resolution %q != %q", sep, title, re.Resolution, p.Resolution)
+			}
+			if re.ReleaseGroup != p.ReleaseGroup {
+				t.Errorf("sep=%q title=%q ReleaseGroup %q != %q", sep, title, re.ReleaseGroup, p.ReleaseGroup)
+			}
+			// DTS:X 按 v1.05 不标注（重组时 DTS:X 输出但解析归 DTS？——重组输出 DTS:X 原样，解析 registry DTS:X 命中）
+			if p.HDR != "" && re.HDR == "" {
+				t.Errorf("sep=%q title=%q HDR lost: want %q", sep, title, p.HDR)
+			}
+		}
+	}
+}
+
 // TestTokenRoundTrip round-trip：TechProfile → 重组标题 → 再解析 == 原 profile 关键字段。
 // 这是匹配业务（techProfileConflict）正确性的基础保证。
 func TestTokenRoundTrip(t *testing.T) {
