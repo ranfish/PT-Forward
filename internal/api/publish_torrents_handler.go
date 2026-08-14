@@ -2413,12 +2413,28 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		Where("client_id = ? AND save_path = ? AND is_hidden = ?", clientID, savePath, false).
 		Count(&total)
 
-	var snapshots []model.TorrentSnapshot
+	var rawSnapshots []model.TorrentSnapshot
 	h.db.WithContext(r.Context()).
 		Where("client_id = ? AND save_path = ? AND is_hidden = ?", clientID, savePath, false).
 		Order("updated_at DESC").
 		Offset((page - 1) * pageSize).Limit(pageSize).
-		Find(&snapshots)
+		Find(&rawSnapshots)
+
+	// §59.26: 按 name 去重——同一路径下同一资源的多个站点种子只显示一行
+	seen := make(map[string]bool)
+	snapshots := make([]model.TorrentSnapshot, 0, len(rawSnapshots))
+	for _, s := range rawSnapshots {
+		key := s.Name
+		if key == "" {
+			key = s.Hash
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		snapshots = append(snapshots, s)
+	}
+	total = int64(len(snapshots))
 
 	if len(snapshots) == 0 {
 		Success(w, map[string]interface{}{"items": []interface{}{}, "total": 0})
