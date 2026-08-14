@@ -75,5 +75,8 @@
     "resolution": "standard_sel",
     "video_codec": "codec_sel",
     "audio_codec": "audiocodec_sel"
+  },
+  "extractors": {
+    "poster_from_pattern": "class=\"imdbwp__img\"[^>]*?src=\"([^\"]+)\""
   }
 }
