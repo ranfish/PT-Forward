@@ -2368,7 +2368,6 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 		if artErr != nil {
 			h.logger.Warn("batch-fetch: local mediainfo failed", zap.String("hash", hash), zap.Error(artErr))
 		} else if mi, ok := artifacts["media_info"]; ok && mi != "" {
-			// 更新 metadata 的 MediaInfo + LocalSourceJSON
 			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 				Updates(map[string]interface{}{
@@ -2377,6 +2376,45 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 				})
 		}
 	}
+
+	// §59.26: TechProfile 三源合并 + 分类推断 + 声明过滤（与 runAnalyze ⑫ 统一管线）
+	if meta != nil {
+		var finalMeta model.TorrentMetadata
+		h.db.WithContext(ctx).Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).First(&finalMeta)
+
+		if finalMeta.Title != "" {
+			profile := titleparser.BuildTechProfile(finalMeta.Title, finalMeta.MediaInfo, "", "", "", "")
+			components := titleparser.TechProfileToComponents(profile)
+			category := titleparser.InferCategory(components, finalMeta.SourceCategory, "", "")
+
+			updates := map[string]interface{}{
+				"category":        category,
+				"resolution":      profile.Resolution,
+				"video_codec":     profile.VideoCodec,
+				"audio_codec":     profile.AudioCodec,
+				"audio_channels":  profile.AudioChannels,
+				"audio_tech":      profile.AudioTechnology,
+				"hdr":             profile.HDR,
+				"bit_depth":       profile.BitDepth,
+				"source_type":     profile.SourceType,
+				"specification":   profile.Specification,
+				"source_platform": profile.SourcePlatform,
+				"edition_info":    profile.EditionInfo,
+				"region_code":     profile.RegionCode,
+			}
+
+			if h.declFilter != nil && finalMeta.Description != "" {
+				patterns := h.declFilter.GetPatterns(ctx)
+				fr := h.declFilter.Filter(finalMeta.Description, patterns)
+				updates["description"] = fr.CleanedText
+			}
+
+			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
+				Updates(updates)
+		}
+	}
+
 	return nil
 }
 
@@ -2681,8 +2719,11 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// ParseTitleTech 补全 5 字段（main_title, season_episode, year, release_group, chinese_prefix）
-	profile := titleparser.ParseTitleTech(meta.Title)
+	// §59.26: BuildTechProfile 三源合并（标题 + MediaInfo），5 标题字段始终用 profile，
+	// 14 平铺字段 DB 为空时 fallback 到 profile（兼容历史数据）
+	profile := titleparser.BuildTechProfile(meta.Title, meta.MediaInfo, "", "", "", "")
+	components := titleparser.TechProfileToComponents(profile)
+	inferredCategory := titleparser.InferCategory(components, meta.SourceCategory, "", "")
 
 	result := map[string]interface{}{
 		"info_hash":       meta.InfoHash,
@@ -2704,28 +2745,28 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"fetched_at":      meta.FetchedAt,
 		"fetch_source":    meta.FetchSource,
 
-		// 14 DB 平铺字段
-		"category":        meta.Category,
+		// 14 DB 平铺字段（DB 为空 → profile fallback）
+		"category":        pickNonEmpty(meta.Category, inferredCategory),
 		"form":            meta.Form,
-		"resolution":      meta.Resolution,
-		"video_codec":     meta.VideoCodec,
-		"audio_codec":     meta.AudioCodec,
-		"audio_channels":  meta.AudioChannels,
-		"audio_tech":      meta.AudioTech,
-		"hdr":             meta.HDR,
-		"bit_depth":       meta.BitDepth,
-		"source_type":     meta.SourceType,
-		"specification":   meta.Specification,
-		"source_platform": meta.SourcePlatform,
-		"edition_info":    meta.EditionInfo,
-		"region_code":     meta.RegionCode,
+		"resolution":      pickNonEmpty(meta.Resolution, profile.Resolution),
+		"video_codec":     pickNonEmpty(meta.VideoCodec, profile.VideoCodec),
+		"audio_codec":     pickNonEmpty(meta.AudioCodec, profile.AudioCodec),
+		"audio_channels":  pickNonEmpty(meta.AudioChannels, profile.AudioChannels),
+		"audio_tech":      pickNonEmpty(meta.AudioTech, profile.AudioTechnology),
+		"hdr":             pickNonEmpty(meta.HDR, profile.HDR),
+		"bit_depth":       pickNonEmpty(meta.BitDepth, profile.BitDepth),
+		"source_type":     pickNonEmpty(meta.SourceType, profile.SourceType),
+		"specification":   pickNonEmpty(meta.Specification, profile.Specification),
+		"source_platform": pickNonEmpty(meta.SourcePlatform, profile.SourcePlatform),
+		"edition_info":    pickNonEmpty(meta.EditionInfo, profile.EditionInfo),
+		"region_code":     pickNonEmpty(meta.RegionCode, profile.RegionCode),
 
-		// 5 ParseTitleTech 解析字段
-		"main_title":       profile.MainTitle,
-		"season_episode":   profile.SeasonEpisode,
-		"year":             profile.Year,
-		"release_group":    profile.ReleaseGroup,
-		"chinese_prefix":   profile.ChinesePrefix,
+		// 5 标题解析字段
+		"main_title":     profile.MainTitle,
+		"season_episode": profile.SeasonEpisode,
+		"year":           profile.Year,
+		"release_group":  profile.ReleaseGroup,
+		"chinese_prefix": profile.ChinesePrefix,
 
 		// 状态
 		"missing_fields": h.checkRequiredFields(meta),
