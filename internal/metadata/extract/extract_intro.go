@@ -161,9 +161,9 @@ func classifyBeforePosterQuotes(quotes []quoteBlock) (statements, ardtuFulls, st
 			ardtuFulls = append(ardtuFulls, q.Full)
 			continue
 		}
-		// 3. 官组声明 → 归 Statement，整块从 Body 移除
+		// 3. 官组声明 → 归 Statement（完整 BBCode），整块从 Body 移除
 		if IsAcknowledgmentQuote(text) {
-			statements = append(statements, text)
+			statements = append(statements, q.Full)
 			stmtFulls = append(stmtFulls, q.Full)
 			continue
 		}
