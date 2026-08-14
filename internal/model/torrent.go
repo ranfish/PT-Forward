@@ -25,6 +25,7 @@ type TorrentDetail struct {
 	TMDbURL      string     `json:"tmdb_url"`
 	PosterURL    string     `json:"poster_url"`
 	Screenshots  []string   `json:"screenshots"`
+	Statement    string     `json:"statement"` // §59.26: 源站官组声明（从 Intro.Statement 映射）
 	MediaInfo    string     `json:"media_info"`
 	BDInfo       string     `json:"bd_info"`
 	Size         int64      `json:"size"`

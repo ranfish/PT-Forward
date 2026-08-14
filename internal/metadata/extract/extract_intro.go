@@ -9,6 +9,7 @@ package extract
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -67,30 +68,66 @@ func (p *PublicExtractor) splitIntroSections(descrHTML, descrBBCode string) Intr
 }
 
 // extractQuoteBlocks 从 BBCode 中提取所有 [quote] 块（含位置信息）。
+// §59.26: 栈式解析器，正确处理嵌套 [quote][quote][/quote][/quote]。
+// 仅提取最外层匹配对（内层嵌套作为外层 inner 的原样内容保留）。
 func extractQuoteBlocks(bbcode string) []quoteBlock {
-	indices := quoteBlockRe.FindAllStringSubmatchIndex(bbcode, -1)
-	if len(indices) == 0 {
-		return nil
+	openRe := regexp.MustCompile(`(?i)\[quote(?:=[^\]]*)?\]`)
+	closeTagLower := "[/quote]"
+
+	type token struct {
+		pos   int // tag 起始位置
+		end   int // tag 结束位置（exclusive）
+		isOpen bool
 	}
-	blocks := make([]quoteBlock, 0, len(indices))
-	for _, idx := range indices {
-		fullStart, fullEnd := idx[0], idx[1]
-		innerStart, innerEnd := idx[2], idx[3]
-		blocks = append(blocks, quoteBlock{
-			Start: fullStart,
-			End:   fullEnd,
-			Full:  bbcode[fullStart:fullEnd],
-			Inner: bbcode[innerStart:innerEnd],
-		})
+
+	var tokens []token
+	for _, m := range openRe.FindAllStringIndex(bbcode, -1) {
+		tokens = append(tokens, token{pos: m[0], end: m[1], isOpen: true})
+	}
+	lower := strings.ToLower(bbcode)
+	searchFrom := 0
+	for {
+		idx := strings.Index(lower[searchFrom:], closeTagLower)
+		if idx < 0 {
+			break
+		}
+		absIdx := searchFrom + idx
+		closeEnd := absIdx + len(closeTagLower)
+		tokens = append(tokens, token{pos: absIdx, end: closeEnd, isOpen: false})
+		searchFrom = closeEnd
+	}
+
+	sort.Slice(tokens, func(i, j int) bool { return tokens[i].pos < tokens[j].pos })
+
+	var stack []token
+	var blocks []quoteBlock
+	for _, tok := range tokens {
+		if tok.isOpen {
+			stack = append(stack, tok)
+		} else {
+			if len(stack) == 0 {
+				continue
+			}
+			openTag := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if len(stack) == 0 {
+				blocks = append(blocks, quoteBlock{
+					Start: openTag.pos,
+					End:   tok.end,
+					Full:  bbcode[openTag.pos:tok.end],
+					Inner: bbcode[openTag.end:tok.pos],
+				})
+			}
+		}
 	}
 	return blocks
 }
 
 // splitQuotesByPosition 按 posterIdx 二分 quote 块。
-// posterIdx < 0（无首图）→ 全部归 after。
+// posterIdx < 0（无首图）→ 全部归 before（跑声明分类，不丢内容）。
 func splitQuotesByPosition(quotes []quoteBlock, posterIdx int) (before, after []quoteBlock) {
 	if posterIdx < 0 {
-		return nil, quotes
+		return quotes, nil
 	}
 	for _, q := range quotes {
 		if q.End <= posterIdx {

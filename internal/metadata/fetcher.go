@@ -309,6 +309,7 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 		SourceCategory:    detail.Category,
 		SourceDescription: detail.Description,
 		Description:       detail.Description,
+		Statement:         detail.Statement,
 		Poster:            detail.PosterURL,
 		IMDbURL:           detail.IMDbURL,
 		DoubanURL:         detail.DoubanURL,

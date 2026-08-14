@@ -41,6 +41,7 @@ func SeedToDetail(seed SeedData) *model.TorrentDetail {
 		TMDbURL:      seed.TMDbLink,
 		PosterURL:    seed.Intro.Poster,
 		Screenshots:  seed.Intro.ScreenshotURLs(),
+		Statement:    seed.Intro.Statement,
 		MediaInfo:    seed.MediaInfo,
 		BDInfo:       seed.BDInfo,
 		Size:         seed.Size,
@@ -87,6 +88,7 @@ func DetailToSeed(detail *model.TorrentDetail) SeedData {
 	}
 	seed.Intro.Body = detail.Description
 	seed.Intro.Poster = detail.PosterURL
+	seed.Intro.Statement = detail.Statement
 	seed.Intro.SetScreenshotURLs(detail.Screenshots)
 	if seed.Tags == nil {
 		seed.Tags = []string{}
