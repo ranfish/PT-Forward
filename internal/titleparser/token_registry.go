@@ -51,6 +51,7 @@ var videoCodecRegistry = []TokenDef{
 	{Canonical: "AV1", Pattern: `\bAV1\b`},
 	{Canonical: "VP9", Pattern: `\bVP[89]\b`},
 	{Canonical: "AVS2", Pattern: `\bAVS2\b`},
+	{Canonical: "AVS+", Pattern: `\bAVS\+`},
 	{Canonical: "x265", Pattern: `\bX265\b`},
 	// H.265 / H265 / HEVC
 	{Canonical: "HEVC", Pattern: `\bH[._\- ]?265\b|\bHEVC\b`},
@@ -65,22 +66,31 @@ var videoCodecRegistry = []TokenDef{
 var audioCodecRegistry = []TokenDef{
 	{Canonical: "TrueHD", Pattern: `\bTrue[._\- ]?HD\b|\bMLP FBA\b`},
 	{Canonical: "DTS:X", Pattern: `\bDTS[._\- :]?[Xx]\b`},
-	// DTS-HD MA / DTS HD MA / DTS-HD.MA / DTSHDMA
-	{Canonical: "DTS-HD MA", TitleForm: "DTS-HD.MA", Pattern: `\bDTS[._\- ]?HD[._\- ]*MA\b`},
-	{Canonical: "DTS-HD HR", TitleForm: "DTS-HD.HR", Pattern: `\bDTS[._\- ]?HD[._\- ]*HR\b`},
+	// DTS XLL X = DTS:X 的 MI 内部名，按 v1.05 规范 DTS:X 不标注 → 归 DTS。
+	// 必须在 DTS-HD MA（DTS XLL）之前判定。
+	{Canonical: "DTS", Pattern: `\bDTS[._\- ]?XLL[._\- ]?X\b`},
+	// DTS-HD MA / DTS HD MA / DTS-HD.MA / DTSHDMA / DTS XLL（MI 内部名）
+	{Canonical: "DTS-HD MA", TitleForm: "DTS-HD.MA", Pattern: `\bDTS[._\- ]?HD[._\- ]*MA\b|\bDTS[._\- ]?XLL\b`},
+	{Canonical: "DTS-HD HR", TitleForm: "DTS-HD.HR", Pattern: `\bDTS[._\- ]?HD[._\- ]*HR\b|\bDTS[._\- ]?LBR\b`},
 	{Canonical: "DTS-ES", TitleForm: "DTS-ES", Pattern: `\bDTS[._\- ]?ES\b`},
-	{Canonical: "DTS", Pattern: `\bDTS\b`},
-	// E-AC-3 / EAC3 / DDP / DD+ / DDPlus
+	// DTS-UHD 是 DTS:X 的 UHD 变体，归 DTS
+	{Canonical: "DTS", Pattern: `\bDTS\b|\bDTS[._\- ]?UHD\b`},
+	// E-AC-3 / EAC3 / DDP / DD+ / DDPlus（含声道后缀 DDP5.1）
 	{Canonical: "DDP", Pattern: `\bE[._\- ]?AC[._\- ]?3\b|\bDDP5?[._\d]*|\bDD\+|\bDDPlus\b`},
 	{Canonical: "DD", Pattern: `\bDD\b|\bAC[._\- ]?3\b`},
 	{Canonical: "FLAC", Pattern: `\bFLAC\b`},
+	// xHE-AAC（USAC）必须在 AAC 之前（AAC 是其子串）
+	{Canonical: "xHE-AAC", Pattern: `\bx[._\- ]?HE[._\- ]?AAC\b|\bUSAC\b`},
 	{Canonical: "AAC", Pattern: `\bAAC(?:[._\d]+)?\b`},
 	{Canonical: "ALAC", Pattern: `\bALAC\b`},
 	{Canonical: "APE", Pattern: `\bAPE\b`},
 	{Canonical: "WAV", Pattern: `\bWAV\b`},
 	{Canonical: "Opus", TitleForm: "Opus", Pattern: `\bOpus\b|\bOPUS\b`},
 	{Canonical: "MP3", Pattern: `\bMP3\b`},
-	{Canonical: "LPCM", Pattern: `\bLPCM\b`},
+	{Canonical: "LPCM", Pattern: `\bLPCM\b|\bPCM\b`},
+	// §59.27 P2：音乐/新编码演进（对齐 MI 侧值域）
+	{Canonical: "MP2", Pattern: `\bMP2\b|\bMPEG[._\- ]?Audio\b`},
+	{Canonical: "AV3A", Pattern: `\bAV3A\b`},
 }
 
 // === HDR（v1.05 字段 10，组合值由 extractHDRFormat 合成，此处为原子 token）===

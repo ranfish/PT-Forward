@@ -145,8 +145,8 @@ func resolutionFromWidth(widthStr string) string {
 //
 // Writing Library 优先：x264/x265 是压制编码器（覆盖 Format）。
 // 其他 Writing Library（V265/mgtv/ptw/VOLO/mp4ff/o264/DOVI）不改变编码 → 用 Format。
+// §59.27 P2：canonical 值域由 videoCodecRegistry 保证（MI 特有输入 MPEG VIDEO 由 pattern 覆盖）。
 func codecFromMI(format, writingLibrary string) string {
-	upper := strings.ToUpper(strings.TrimSpace(format))
 	libLower := strings.ToLower(writingLibrary)
 
 	if strings.Contains(libLower, "x264") {
@@ -156,22 +156,15 @@ func codecFromMI(format, writingLibrary string) string {
 		return "x265"
 	}
 
+	// registry 顺序即优先级；MI Format 值（HEVC/AVC/AVS+/AVS2/AV1/VP9/VC-1/MPEG-2）
+	// 与标题变体共用 pattern（MPEG VIDEO → MPEG-2 由追加映射覆盖）。
+	if c := lookupToken(videoCodecRegistry, format); c != "" {
+		return c
+	}
+	// MI 特有 Format 值兜底
+	upper := strings.ToUpper(strings.TrimSpace(format))
 	switch {
-	case strings.Contains(upper, "HEVC") || strings.Contains(upper, "H.265"):
-		return "HEVC"
-	case strings.Contains(upper, "AVC") || strings.Contains(upper, "H.264"):
-		return "AVC"
-	case strings.Contains(upper, "AVS+"):
-		return "AVS+"
-	case strings.Contains(upper, "AVS2"):
-		return "AVS2"
-	case strings.Contains(upper, "AV1"):
-		return "AV1"
-	case strings.Contains(upper, "VP9"):
-		return "VP9"
-	case strings.Contains(upper, "VC-1"):
-		return "VC-1"
-	case strings.Contains(upper, "MPEG-2") || strings.Contains(upper, "MPEG VIDEO"):
+	case strings.Contains(upper, "MPEG VIDEO"):
 		return "MPEG-2"
 	}
 	return ""
@@ -181,59 +174,18 @@ func codecFromMI(format, writingLibrary string) string {
 //
 // 返回 (codec, technology)。technology 非空时为 "Atmos"。
 // DTS:X 不标注（v1.05 规范）。
+// §59.27 P2：canonical 值域由 audioCodecRegistry 保证（MI 内部名 DTS XLL / MLP FBA /
+// E-AC-3 JOC / MPEG AUDIO / USAC 已纳入 registry pattern，两侧单一来源）。
 func audioFromMI(format, commercialName string) (codec, technology string) {
 	upper := strings.ToUpper(strings.TrimSpace(format))
 	commLower := strings.ToLower(commercialName)
 
-	switch {
-	// TrueHD 系列（MLP FBA = Meridian Lossless Packing FBA = TrueHD 内部格式）
-	case strings.Contains(upper, "MLP FBA"):
-		codec = "TrueHD"
-	case strings.Contains(upper, "TRUEHD"):
-		codec = "TrueHD"
-
-	// DTS 系列（从特例到一般，顺序敏感）
-	case strings.Contains(upper, "DTS-UHD"):
-		codec = "DTS"
-	case strings.Contains(upper, "DTS ES"):
-		codec = "DTS-ES"
-	case strings.Contains(upper, "DTS XLL X"):
-		codec = "DTS"
-	case strings.Contains(upper, "DTS XLL"):
-		codec = "DTS-HD MA"
-	case strings.Contains(upper, "DTS LBR"):
-		codec = "DTS-HD HR"
-	case strings.HasPrefix(upper, "DTS"):
-		codec = "DTS"
-
-	// E-AC-3 系列（JOC = Atmos）
-	case strings.Contains(upper, "E-AC-3 JOC") || strings.Contains(upper, "EAC3 JOC"):
+	// Atmos 优先检测（E-AC-3 JOC = DDP Atmos，必须在普通 E-AC-3 之前）
+	if strings.Contains(upper, "E-AC-3 JOC") || strings.Contains(upper, "EAC3 JOC") {
 		codec = "DDP"
 		technology = "Atmos"
-	case strings.Contains(upper, "E-AC-3") || strings.Contains(upper, "EAC3"):
-		codec = "DDP"
-
-	// AC-3（必须在 E-AC-3 之后，因为 "E-AC-3" 也 Contains "AC-3"）
-	case strings.Contains(upper, "AC-3") || strings.Contains(upper, "AC3"):
-		codec = "DD"
-
-	// 其他编码
-	case strings.Contains(upper, "FLAC"):
-		codec = "FLAC"
-	case strings.Contains(upper, "PCM"):
-		codec = "LPCM"
-	case strings.HasPrefix(upper, "AAC"):
-		codec = "AAC"
-	case strings.Contains(upper, "MPEG AUDIO"):
-		codec = "MP2"
-	case upper == "AV3A":
-		codec = "AV3A"
-	case strings.Contains(upper, "OPUS"):
-		codec = "Opus"
-	case strings.Contains(upper, "USAC"):
-		codec = "xHE-AAC"
-	case strings.Contains(upper, "ALAC"):
-		codec = "ALAC"
+	} else if c := lookupToken(audioCodecRegistry, format); c != "" {
+		codec = c
 	}
 
 	// Atmos 补充检测（Commercial name）

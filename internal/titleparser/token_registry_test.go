@@ -116,6 +116,78 @@ func TestTokenExtractRemoveSymmetry(t *testing.T) {
 	}
 }
 
+// TestMITitleCanonicalAlignment MI 侧与标题侧 canonical 值域对齐（§59.27 P2）。
+// 同一物理编码：MI Format 值与标题写法必须产出相同 Canonical。
+func TestMITitleCanonicalAlignment(t *testing.T) {
+	cases := []struct {
+		miFormat  string
+		titleForm string
+		want      string
+	}{
+		{"MLP FBA", "Movie.TrueHD.5.1", "TrueHD"},
+		{"TrueHD", "Movie TrueHD", "TrueHD"},
+		{"DTS XLL", "Movie.DTS-HD.MA.5.1", "DTS-HD MA"},
+		{"DTS LBR", "Movie.DTS-HD.HR", "DTS-HD HR"},
+		{"DTS ES XLL", "Movie.DTS-ES", "DTS-ES"},
+		{"DTS-UHD", "Movie.DTS", "DTS"},
+		{"DTS XLL X", "Movie.DTS", "DTS"}, // DTS:X MI 内部名，v1.05 不标注
+		{"E-AC-3", "Movie.DDP5.1", "DDP"},
+		{"AC-3", "Movie.DD.5.1", "DD"},
+		{"FLAC", "Movie.FLAC.1.0", "FLAC"},
+		{"PCM", "Movie.LPCM", "LPCM"},
+		{"MPEG AUDIO", "Movie.MP2", "MP2"},
+		{"AV3A", "Movie.AV3A", "AV3A"},
+		{"USAC", "Movie.xHE-AAC", "xHE-AAC"},
+		{"Opus", "Movie.Opus", "Opus"},
+	}
+	for _, c := range cases {
+		miCodec, _ := audioFromMI(c.miFormat, "")
+		titleCodec := extractAudio(c.titleForm)
+		if miCodec != c.want {
+			t.Errorf("audioFromMI(%q) = %q, want %q", c.miFormat, miCodec, c.want)
+		}
+		if titleCodec != c.want {
+			t.Errorf("extractAudio(%q) = %q, want %q", c.titleForm, titleCodec, c.want)
+		}
+	}
+}
+
+// TestMIVideoCanonicalAlignment MI 视频编码与标题侧对齐。
+func TestMIVideoCanonicalAlignment(t *testing.T) {
+	cases := []struct {
+		miFormat  string
+		titleForm string
+		want      string
+	}{
+		{"HEVC", "Movie.H.265", "HEVC"},
+		{"AVC", "Movie.H.264", "AVC"},
+		{"AVS+", "Movie.AVS+", "AVS+"},
+		{"AVS2", "Movie.AVS2", "AVS2"},
+		{"AV1", "Movie.AV1", "AV1"},
+		{"VP9", "Movie.VP9", "VP9"},
+		{"VC-1", "Movie.VC-1", "VC-1"},
+		{"MPEG VIDEO", "Movie.MPEG-2", "MPEG-2"},
+		{"MPEG-2", "Movie.MPEG-2", "MPEG-2"},
+	}
+	for _, c := range cases {
+		miCodec := codecFromMI(c.miFormat, "")
+		titleCodec := extractVideoCodec(c.titleForm)
+		if miCodec != c.want {
+			t.Errorf("codecFromMI(%q) = %q, want %q", c.miFormat, miCodec, c.want)
+		}
+		if titleCodec != c.want {
+			t.Errorf("extractVideoCodec(%q) = %q, want %q", c.titleForm, titleCodec, c.want)
+		}
+	}
+	// Writing Library 优先级保持
+	if got := codecFromMI("HEVC", "x265 ..."); got != "x265" {
+		t.Errorf("codecFromMI writing library priority broken: %q", got)
+	}
+	if got := codecFromMI("AVC", "x264 ..."); got != "x264" {
+		t.Errorf("codecFromMI writing library priority broken: %q", got)
+	}
+}
+
 // TestTokenRoundTrip round-trip：TechProfile → 重组标题 → 再解析 == 原 profile 关键字段。
 // 这是匹配业务（techProfileConflict）正确性的基础保证。
 func TestTokenRoundTrip(t *testing.T) {
