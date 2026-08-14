@@ -111,9 +111,9 @@ func (c *HTMLToBBCodeConverter) convertNode(s *goquery.Selection, depth int) str
 	}
 	node := s.Nodes[0]
 
-	// 文本节点直接返回数据
+	// 文本节点直接返回数据（剥离前导 \r\n，避免与 <br/> 产生的 \n 叠加成空行）
 	if node.Type == html.TextNode {
-		return node.Data
+		return strings.TrimLeft(node.Data, "\r\n")
 	}
 	if node.Type != html.ElementNode {
 		return ""
