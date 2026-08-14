@@ -2383,7 +2383,12 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 		h.db.WithContext(ctx).Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).First(&finalMeta)
 
 		if finalMeta.Title != "" {
-			profile := titleparser.BuildTechProfile(finalMeta.Title, finalMeta.MediaInfo, "", "", "", "")
+			// §59.26: MI 优先 local（MediaInfo），fallback 源站（SourceMediaInfo）
+			miForProfile := finalMeta.MediaInfo
+			if miForProfile == "" {
+				miForProfile = finalMeta.SourceMediaInfo
+			}
+			profile := titleparser.BuildTechProfile(finalMeta.Title, miForProfile, "", "", "", "")
 			components := titleparser.TechProfileToComponents(profile)
 			category := titleparser.InferCategory(components, finalMeta.SourceCategory, "", "")
 
@@ -2459,6 +2464,15 @@ func dedupStringSlice(in []string) []string {
 		}
 	}
 	return out
+}
+
+// extractChineseFromSubtitle 从副标题提取【中文名】（§59.26 朋友站格式）。
+func extractChineseFromSubtitle(subtitle string) string {
+	re := regexp.MustCompile(`^[【\[]([^】\]]+)[】\]]`)
+	if m := re.FindStringSubmatch(strings.TrimSpace(subtitle)); len(m) > 1 {
+		return m[1]
+	}
+	return ""
 }
 
 // handleBatchFetchProgress §59.20: 查询批量获取进度。
@@ -2764,7 +2778,12 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 
 	// §59.26: BuildTechProfile 三源合并（标题 + MediaInfo），5 标题字段始终用 profile，
 	// 14 平铺字段 DB 为空时 fallback 到 profile（兼容历史数据）
-	profile := titleparser.BuildTechProfile(meta.Title, meta.MediaInfo, "", "", "", "")
+	// MI 优先 local（MediaInfo），fallback 源站（SourceMediaInfo）
+	miForProfile := meta.MediaInfo
+	if miForProfile == "" {
+		miForProfile = meta.SourceMediaInfo
+	}
+	profile := titleparser.BuildTechProfile(meta.Title, miForProfile, "", "", "", "")
 	components := titleparser.TechProfileToComponents(profile)
 	inferredCategory := titleparser.InferCategory(components, meta.SourceCategory, "", "")
 
@@ -2776,7 +2795,7 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"poster":          meta.Poster,
 		"description":     meta.Description,
 		"screenshots":     screenshots,
-		"mediainfo":       meta.MediaInfo,
+		"mediainfo":       miForProfile,
 		"bdinfo":          meta.BDInfo,
 		"statement":       meta.Statement,
 		"imdb_url":        meta.IMDbURL,
@@ -2804,12 +2823,12 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"edition_info":    pickNonEmpty(meta.EditionInfo, profile.EditionInfo),
 		"region_code":     pickNonEmpty(meta.RegionCode, profile.RegionCode),
 
-		// 5 标题解析字段
+		// 5 标题解析字段（chinese_prefix fallback 到副标题【中文名】）
 		"main_title":     profile.MainTitle,
 		"season_episode": profile.SeasonEpisode,
 		"year":           profile.Year,
 		"release_group":  profile.ReleaseGroup,
-		"chinese_prefix": profile.ChinesePrefix,
+		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle)),
 
 		// 状态
 		"missing_fields": h.checkRequiredFields(meta),
