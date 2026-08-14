@@ -2525,17 +2525,13 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		pageSize = 50
 	}
 
-	// 1. 查 snapshots（分页）
-	var total int64
-	h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
-		Where("client_id = ? AND save_path = ? AND is_hidden = ?", clientID, savePath, false).
-		Count(&total)
-
+	// 1. 查 snapshots（全量）——§59.26 修复：先去重再分页。
+	// 同一路径下同一资源有多个站点 hash（如阿甘正传 78 个 tracker 变体），
+	// 若先 Offset/Limit 分页再去重，第一页会被同一资源的重复行占满。
 	var rawSnapshots []model.TorrentSnapshot
 	h.db.WithContext(r.Context()).
 		Where("client_id = ? AND save_path = ? AND is_hidden = ?", clientID, savePath, false).
 		Order("updated_at DESC").
-		Offset((page - 1) * pageSize).Limit(pageSize).
 		Find(&rawSnapshots)
 
 	// §59.26: 按 name 去重——同一路径下同一资源的多个站点种子只显示一行
@@ -2545,7 +2541,19 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		}
 		return s.Hash
 	})
-	total = int64(len(snapshots))
+	var total int64 = int64(len(snapshots))
+
+	// 去重后再分页
+	start := (page - 1) * pageSize
+	if start > len(snapshots) {
+		snapshots = nil
+	} else {
+		end := start + pageSize
+		if end > len(snapshots) {
+			end = len(snapshots)
+		}
+		snapshots = snapshots[start:end]
+	}
 
 	if len(snapshots) == 0 {
 		Success(w, map[string]interface{}{"items": []interface{}{}, "total": 0})
