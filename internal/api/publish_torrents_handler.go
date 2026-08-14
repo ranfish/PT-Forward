@@ -2418,6 +2418,27 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 				updates["statement"] = finalMeta.Statement + thanks
 			}
 
+			// §59.26: 标签推断（对齐 auto_feed：副标题+标题+简介+MI 多源关键词匹配）
+			inferer := publish.NewMediaTagInferer()
+			inferredTags := inferer.InferFull(publish.TagInput{
+				MediaInfo:   finalMeta.MediaInfo,
+				Title:       finalMeta.Title,
+				Subtitle:    finalMeta.Subtitle,
+				Description: finalMeta.Description,
+				NFO:         finalMeta.BDInfo,
+			})
+			// 源站显式标签优先，推断只补空
+			var existingTags []string
+			if finalMeta.Tags != "" {
+				json.Unmarshal([]byte(finalMeta.Tags), &existingTags)
+			}
+			if len(inferredTags) > 0 {
+				all := append(existingTags, inferredTags...)
+				if data, err := json.Marshal(dedupStringSlice(all)); err == nil {
+					updates["tags"] = string(data)
+				}
+			}
+
 			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 				Updates(updates)
@@ -2425,6 +2446,19 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 	}
 
 	return nil
+}
+
+// dedupStringSlice 保序去重（§59.26 标签合并用）。
+func dedupStringSlice(in []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range in {
+		if s != "" && !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // handleBatchFetchProgress §59.20: 查询批量获取进度。
@@ -2781,6 +2815,17 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"missing_fields": h.checkRequiredFields(meta),
 	}
 
+	// §59.26: 返回 tags（DB JSON 数组字符串 → []string）
+	if meta.Tags != "" {
+		var tags []string
+		if err := json.Unmarshal([]byte(meta.Tags), &tags); err == nil && len(tags) > 0 {
+			result["tags"] = tags
+		}
+	}
+	if result["tags"] == nil {
+		result["tags"] = []string{}
+	}
+
 	// §59.21: 返回 is_local（从 client_id 查询）
 	clientID := r.URL.Query().Get("client_id")
 	if clientID != "" {
@@ -2806,6 +2851,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		Poster       string   `json:"poster"`
 		Screenshots  []string `json:"screenshots"`
 		Description  string   `json:"description"`
+		Tags         []string `json:"tags"`      // §59.26: 标签编辑
 		SiteName     string   `json:"siteName"` // 可选，指定更新哪行
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -2834,6 +2880,12 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"poster":       req.Poster,
 		"screenshots":  strings.Join(req.Screenshots, "\n"),
 		"description":  req.Description,
+	}
+	// §59.26: 标签编辑（JSON 数组字符串）
+	if req.Tags != nil {
+		if data, err := json.Marshal(req.Tags); err == nil {
+			updates["tags"] = string(data)
+		}
 	}
 
 	// 9 字段校验 → Reviewed

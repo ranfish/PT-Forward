@@ -106,6 +106,7 @@ const tagGroups: TagGroup[] = [
     name: '字幕',
     tags: [
       { key: 'chinese_subtitle', label: '中字', aliases: 'CHS/简繁' },
+      { key: 'english_subtitle', label: '英字', aliases: 'ENG' },
       { key: 'hardcoded_subs', label: '硬字幕', aliases: '硬字' },
       { key: 'encoded_subs', label: '内嵌字幕', aliases: '' },
       { key: 'external_subtitles', label: '外挂字幕', aliases: '' },
@@ -142,6 +143,7 @@ const tagGroups: TagGroup[] = [
     name: '其他',
     tags: [
       { key: 'commentary', label: '评论音轨', aliases: 'Commentary' },
+      { key: 'complete', label: '完结', aliases: '全集' },
     ],
   },
 ]

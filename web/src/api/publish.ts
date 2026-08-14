@@ -253,6 +253,7 @@ export interface SeedDetail {
   reviewed: boolean
   fetched_at: string
   fetch_source: string
+  tags?: string[]
   // 14 DB 平铺字段
   category: string
   form: string
@@ -285,7 +286,7 @@ export const seedConfigApi = {
   getSeed(infoHash: string, clientId?: string) {
     return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`, { params: clientId ? { client_id: clientId } : undefined })
   },
-  putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; siteName?: string }) {
+  putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; tags?: string[]; siteName?: string }) {
     return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[] }>>(`/publish/seeds/${infoHash}`, data)
   },
   batchFetch(items: Array<{ hash: string; name: string; size: number; savePath: string }>, clientId: string) {
