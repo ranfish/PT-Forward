@@ -14,7 +14,7 @@ var (
 	reDVDRipToken   = regexp.MustCompile(`(?i)\bDVD[-\s]?RIP\b`)
 	reDVDDiscToken  = regexp.MustCompile(`(?i)\bDVD(?:5|9)\b`)
 	reHDRTitleToken = regexp.MustCompile(`(?i)Dolby Vision|DoVi|HDR10\+|HDRVivid|HDR10|HLG|HDR|SDR|EDR|DV|Vivid`)
-	reAudioDTSHDMA  = regexp.MustCompile(`(?i)\bDTS[-\s]?HD\s*MA\b`)
+	reAudioDTSHDMA  = regexp.MustCompile(`(?i)\bDTS[-._\s]?HD[-._\s]*MA\b`)
 	reAudioCodecDD  = regexp.MustCompile(`(?i)\bDD\b`)
 	reChinesePrefix = regexp.MustCompile(`^\s*\[([^\]]+)\]\s*`)
 	reBitDepth      = regexp.MustCompile(`(?i)\b(8|10|12|16|24)\s*BIT\b`)
