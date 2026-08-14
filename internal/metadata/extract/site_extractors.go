@@ -65,7 +65,11 @@ func (p *PublicExtractor) applySiteExtractors(
 		re, err := regexp.Compile(ext.PosterFromPattern)
 		if err == nil {
 			if m := re.FindStringSubmatch(pageHTML); len(m) > 1 {
-				seed.Intro.Poster = m[1]
+				posterURL := m[1]
+				if strings.HasPrefix(posterURL, "/") && domain != "" {
+					posterURL = "https://" + domain + posterURL
+				}
+				seed.Intro.Poster = posterURL
 			} else if m := re.FindString(pageHTML); m != "" {
 				seed.Intro.Poster = m
 			}

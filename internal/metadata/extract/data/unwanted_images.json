@@ -19,6 +19,7 @@
     {"pattern": "twemoji.com", "match_type": "host", "category": "emoji"},
     {"pattern": "emoji-cdn.com", "match_type": "host", "category": "emoji"},
     {"pattern": "/pic/smiley/", "match_type": "substring", "category": "emoji"},
-    {"pattern": "/static/emoji/", "match_type": "substring", "category": "emoji"}
+    {"pattern": "/static/emoji/", "match_type": "substring", "category": "emoji"},
+    {"pattern": "pic/trans", "match_type": "substring", "category": "site_logo"}
   ]
 }
