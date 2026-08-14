@@ -44,6 +44,13 @@
       <div class="toolbar-right">
         <a-button
           v-if="selectedClient && selectedPath"
+          :loading="loading"
+          @click="fetchList"
+        >
+          <ReloadOutlined /> 刷新
+        </a-button>
+        <a-button
+          v-if="selectedClient && selectedPath"
           type="primary"
           :loading="batchFetchActive"
           @click="showBatchFetch = true"
@@ -176,7 +183,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
