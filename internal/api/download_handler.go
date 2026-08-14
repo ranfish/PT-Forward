@@ -546,7 +546,7 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 		SavePath string `json:"savePath"`
 	}
 
-	var items []unconfiguredItem
+	var rawItems []unconfiguredItem
 	h.db.WithContext(r.Context()).
 		Table("torrent_snapshots AS s").
 		Select("s.hash, s.name, s.size, s.client_id, s.save_path").
@@ -554,7 +554,22 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 		Where("s.client_id = ? AND s.save_path = ? AND s.is_hidden = ? AND m.id IS NULL",
 			clientID, savePath, false).
 		Order("s.updated_at DESC").
-		Find(&items)
+		Find(&rawItems)
+
+	// §59.26: 按 name 去重（与种子配置页列表一致）
+	seen := make(map[string]bool)
+	items := make([]unconfiguredItem, 0, len(rawItems))
+	for _, item := range rawItems {
+		key := item.Name
+		if key == "" {
+			key = item.Hash
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		items = append(items, item)
+	}
 
 	Success(w, map[string]interface{}{
 		"items": items,
