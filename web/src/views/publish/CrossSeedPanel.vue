@@ -156,6 +156,10 @@
                   <a-descriptions-item label="版本">{{ form.titleComponents.edition_info || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="地区码">{{ form.titleComponents.region_code || '—' }}</a-descriptions-item>
                 </a-descriptions>
+                <!-- §59.26: 标签（可编辑，供发布使用） -->
+                <a-form-item label="标签" style="max-width: 900px; margin-top: 16px">
+                  <TagSelector v-model="form.tags" />
+                </a-form-item>
                 <div v-if="seedMissingFields.length > 0" style="margin-top: 12px; padding: 8px 12px; background: #fffbe6; border-radius: 4px; font-size: 13px">
                   <span style="color: #faad14">⚠ 缺失字段：</span>{{ seedMissingFields.join(', ') }}
                 </div>
@@ -625,6 +629,8 @@ async function loadSeedDetail(infoHash: string) {
       seedReviewed.value = d.reviewed || false
       seedIsLocal.value = (d as any).is_local ?? true
       currentSourceSite.value = d.site_name || ''
+      // §59.26: 标签（获取时推断，编辑时可修正）
+      form.value.tags = d.tags || []
     }
   } catch (e: unknown) {
     loadError.value = (e as Error).message
@@ -853,6 +859,7 @@ async function saveOnly() {
       poster: form.value.poster,
       screenshots: form.value.screenshots,
       description: form.value.description,
+      tags: form.value.tags,
       siteName: currentSourceSite.value || undefined,
     })
     const result = resp.data?.data
