@@ -207,30 +207,9 @@ func preferredBlurayToken(title string) string {
 	return ""
 }
 
+// extractVideoCodec 从标题提取视频编码（§59.27: token registry 派生）。
 func extractVideoCodec(title string) string {
-	upper := strings.ToUpper(title)
-	switch {
-	case strings.Contains(upper, "AV1"):
-		return "AV1"
-	case strings.Contains(upper, "VP9"), strings.Contains(upper, "VP8"):
-		return "VP9"
-	case strings.Contains(upper, "AVS2"):
-		return "AVS2"
-	case strings.Contains(upper, "X265"):
-		return "x265"
-	case strings.Contains(upper, "H.265"), strings.Contains(upper, "H265"), strings.Contains(upper, "HEVC"):
-		return "HEVC"
-	case strings.Contains(upper, "X264"):
-		return "x264"
-	case strings.Contains(upper, "H.264"), strings.Contains(upper, "H264"), strings.Contains(upper, "AVC"):
-		return "AVC"
-	case strings.Contains(upper, "VC-1"), strings.Contains(upper, "VC1"):
-		return "VC-1"
-	case strings.Contains(upper, "MPEG-2"):
-		return "MPEG-2"
-	default:
-		return ""
-	}
+	return lookupToken(videoCodecRegistry, title)
 }
 
 func extractHDRFormat(title string) string {
@@ -238,7 +217,7 @@ func extractHDRFormat(title string) string {
 	if len(matches) == 0 {
 		return ""
 	}
-	hasDoVi, hasHDR10Plus, hasHDR, hasHLG, hasVivid, hasSDR := false, false, false, false, false, false
+	hasDoVi, hasHDR10Plus, hasHDR10, hasHDR, hasHLG, hasVivid, hasSDR := false, false, false, false, false, false, false
 	for _, item := range matches {
 		switch strings.ToUpper(strings.TrimSpace(item)) {
 		case "DOLBY VISION", "DOVI", "DV":
@@ -246,7 +225,7 @@ func extractHDRFormat(title string) string {
 		case "HDR10+":
 			hasHDR10Plus = true
 		case "HDR10":
-			hasHDR = true
+			hasHDR10 = true
 		case "HLG":
 			hasHLG = true
 		case "HDRVIVID":
@@ -260,6 +239,9 @@ func extractHDRFormat(title string) string {
 	if hasDoVi && hasHDR10Plus {
 		return "DoVi HDR10+"
 	}
+	if hasDoVi && hasHDR10 {
+		return "DoVi HDR10"
+	}
 	if hasDoVi && hasHDR {
 		return "DoVi HDR"
 	}
@@ -268,6 +250,9 @@ func extractHDRFormat(title string) string {
 	}
 	if hasHDR10Plus {
 		return "HDR10+"
+	}
+	if hasHDR10 {
+		return "HDR10"
 	}
 	if hasVivid {
 		return "HDR Vivid"
@@ -288,42 +273,9 @@ func findHDRTokens(title string) []string {
 	return reHDRTitleToken.FindAllString(title, -1)
 }
 
+// extractAudio 从标题提取音频编码（§59.27: token registry 派生）。
 func extractAudio(title string) string {
-	upper := strings.ToUpper(title)
-	switch {
-	case strings.Contains(upper, "TRUEHD"):
-		return "TrueHD"
-	case strings.Contains(upper, "DTS:X"), strings.Contains(upper, "DTS X"):
-		return "DTS:X"
-	case strings.Contains(upper, "DTS-HD MA"), strings.Contains(upper, "DTS HD MA"), reAudioDTSHDMA.MatchString(title):
-		return "DTS-HD MA"
-	case strings.Contains(upper, "DTS-HD HR"), strings.Contains(upper, "DTS HD HR"):
-		return "DTS-HD HR"
-	case strings.Contains(upper, "DTS"):
-		return "DTS"
-	case strings.Contains(upper, "E-AC-3"), strings.Contains(upper, "DDP"), strings.Contains(upper, "DD+"):
-		return "DDP"
-	case reAudioCodecDD.MatchString(title), strings.Contains(upper, "AC-3"), strings.Contains(upper, "AC3"):
-		return "DD"
-	case strings.Contains(upper, "FLAC"):
-		return "FLAC"
-	case strings.Contains(upper, "AAC"):
-		return "AAC"
-	case strings.Contains(upper, "ALAC"):
-		return "ALAC"
-	case strings.Contains(upper, "APE"):
-		return "APE"
-	case strings.Contains(upper, "WAV"):
-		return "WAV"
-	case strings.Contains(upper, "OPUS"):
-		return "Opus"
-	case strings.Contains(upper, "MP3"):
-		return "MP3"
-	case strings.Contains(upper, "LPCM"):
-		return "LPCM"
-	default:
-		return ""
-	}
+	return lookupToken(audioCodecRegistry, title)
 }
 
 func extractBitDepth(title string) string {
@@ -458,20 +410,16 @@ func removeToken(title, token string) string {
 }
 
 // removeVideoCodecTokens 移除标题中所有视频编码变体 token。
-//
-// extractVideoCodec 返回标准化名称（如 HEVC），但标题原文可能是 H265，
-// removeToken 用标准名匹配原文会失败。本函数用正则一次性移除所有编码变体。
+// §59.27: 从 videoCodecRegistry 自动合成，与 extractVideoCodec 单一来源。
 func removeVideoCodecTokens(title string) string {
-	return strings.TrimSpace(reVideoCodecToken.ReplaceAllString(title, " "))
+	return strings.TrimSpace(removeAllTokenPatterns(videoCodecRegistry, title))
 }
 
 // removeAudioCodecTokens 移除标题中所有音频编码变体 token。
-//
-// 同 removeVideoCodecTokens 原理：extractAudio 返回标准化名称（如 DD），
-// 但标题原文可能是 AC3，removeToken 匹配失败。
-// 正则末尾 \d*(?:\.\d+)? 匹配编码后紧跟的声道数字（如 DDP5.1/DDPA5.1/AAC2.0）。
+// §59.27: 从 audioCodecRegistry 自动合成，与 extractAudio 单一来源。
+// 正则末尾的 [._\d]*(?:\.[\d]+)? 语义由 registry pattern 内生（如 DDP5.1/AAC2.0）。
 func removeAudioCodecTokens(title string) string {
-	return strings.TrimSpace(reAudioCodecToken.ReplaceAllString(title, " "))
+	return strings.TrimSpace(removeAllTokenPatterns(audioCodecRegistry, title))
 }
 
 // removeHDRTokens 移除标题中所有 HDR/DV 变体 token。
