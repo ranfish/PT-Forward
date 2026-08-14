@@ -598,17 +598,6 @@ async function loadSeedDetail(infoHash: string) {
       form.value.doubanLink = d.douban_url || ''
       form.value.imdbLink = d.imdb_url || ''
       form.value.tmdbLink = d.tmdb_url || ''
-
-      // §59.26: 声明末尾追加转载致谢（官组名 + 禁转PTT）
-      const groupName = d.release_group || ''
-      if (groupName && groupName !== 'NOGROUP') {
-        const thanks =
-          '[quote][b][color=blue][size=5]' + groupName + '官组作品，感谢原制作者发布。[/size][/color][/b][/quote]\n' +
-          '[quote][b][color=red][size=5]请遵守PT互相遵重共识，禁转PTT[/size][/color][/b][/quote]'
-        form.value.statement = form.value.statement
-          ? form.value.statement + '\n\n' + thanks
-          : thanks
-      }
       // 18 TechProfile 字段 → titleComponents（Tab 1 只读展示）
       form.value.titleComponents = {
         main_title: d.main_title || '',
