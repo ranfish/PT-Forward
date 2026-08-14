@@ -3,6 +3,7 @@ package extract
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -61,6 +62,9 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 		descrBBCode, _ = p.bbcodeConverter.Convert(descrHTML)
 	}
 
+	// §59.26: 剥离 NexusPHP [quote] 渲染头 "引用"（HTML→BBCode 逆转换伪影）
+	descrBBCode = stripNexusPHPQuoteHeaders(descrBBCode)
+
 	// 阶段 3: 简介分段
 	seed.Intro = p.splitIntroSections(descrHTML, descrBBCode)
 
@@ -92,6 +96,16 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	p.applySiteExtractors(doc, &seed, input.PageHTML, input.FallbackTitle, domain, siteCode)
 
 	return seed.NormalizeWithFallback(input.FallbackTitle), nil
+}
+
+// nexusphpQuoteHeaderRe 匹配 NexusPHP [quote] 渲染头伪影。
+// NexusPHP 将 [quote] 渲染为 <h4>引用</h4>，HTML→BBCode 逆转换后
+// "引用" 混入正文。此正则剥离 [quote] 标签后的 "引用" 头。
+var nexusphpQuoteHeaderRe = regexp.MustCompile(`(?i)(\[quote(?:=[^\]]*)?\])\s*引用(\s*[:：]\s*[^\n\[\]]+)?\s*\n*`)
+
+// stripNexusPHPQuoteHeaders 剥离 NexusPHP [quote] 渲染头 "引用" 伪影。
+func stripNexusPHPQuoteHeaders(bbcode string) string {
+	return nexusphpQuoteHeaderRe.ReplaceAllString(bbcode, "$1\n")
 }
 
 // extractDescriptionHTML 提取描述容器 HTML（NexusPHP #kdescr 优先）。
