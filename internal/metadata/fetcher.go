@@ -140,6 +140,13 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 		return nil, fmt.Errorf("nil detail returned from %s", siteName)
 	}
 
+	// §59.26 方案 A: keepfrds（朋友站）title/subtitle 互换
+	// 朋友站部分种子 title=中文格式化标题，subtitle=英文 v1.05 发种名。
+	// 副标题非空时无条件互换（PTNexus 同款逻辑）。
+	if strings.Contains(siteCfg.Domain, "keepfrds") && detail.Subtitle != "" {
+		detail.Title, detail.Subtitle = detail.Subtitle, detail.Title
+	}
+
 	// §56.13 方案 B: adapter 内部已用 Engine 提取（如 NexusPHPAdapter）。
 	// fetcher 不再调 Engine，仅做 titleparser 补全（fallback，针对 Engine 没提取到的字段）。
 	fillDetailFromTitle(detail)
