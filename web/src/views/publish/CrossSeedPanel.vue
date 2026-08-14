@@ -142,7 +142,7 @@
                   <a-descriptions-item label="季集">{{ form.titleComponents.season_episode || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="年份">{{ form.titleComponents.year || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="制作组">{{ form.titleComponents.release_group || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="类型">{{ form.titleComponents.category || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="类型">{{ categoryLabel(form.titleComponents.category) }}</a-descriptions-item>
                   <a-descriptions-item label="分辨率">{{ form.titleComponents.resolution || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="视频编码">{{ form.titleComponents.video_codec || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="片源类型">{{ form.titleComponents.source_type || '—' }}</a-descriptions-item>
@@ -951,6 +951,27 @@ async function enterSelectSites() {
   } finally {
     targetsLoading.value = false
   }
+}
+
+// --- helpers ---
+const categoryMap: Record<string, string> = {
+  'category.movie': '电影',
+  'category.tv_series': '剧集',
+  'category.tv_shows': '综艺',
+  'category.animation': '动画',
+  'category.documentary': '纪录片',
+  'category.music': '音乐',
+  'category.mv': 'MV',
+  'category.sports': '体育',
+  'category.audiobook': '有声读物',
+  'category.ebook': '电子书',
+  'category.game': '游戏',
+  'category.software': '软件',
+  'category.other': '其他',
+}
+function categoryLabel(v?: string): string {
+  if (!v) return '—'
+  return categoryMap[v] || v
 }
 
 // --- Submit ---
