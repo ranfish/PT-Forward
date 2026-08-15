@@ -2636,7 +2636,6 @@ func extractMediaInfoFromBBCode(text string) string {
 	return ""
 }
 
-var flagKeywords = []string{"禁转", "禁止转载", "谢绝转载", "严禁转载", "谢绝搬运", "独占", "限时禁转"}
 
 // extractFlagsFromStructured 只从结构化字段（标题/副标题/标签）提取禁转标记。
 // 不扫描简介正文，避免"禁转PTT"等误判（§56.37 合规修复）。
@@ -2648,16 +2647,11 @@ func extractFlagsFromStructured(title, subtitle string, tags []string) []string 
 	return extractFlagsFromText(combined)
 }
 
+// extractFlagsFromText legacy 正则兜底路径的禁转标记提取。
+// §59.28 I1: 复用 extract 包两层检测（站点标记形态 + 跨词/定向排除），
+// 与 Engine 主路径口径一致（原裸 Contains 会跨词伪命中"严禁转发"）。
 func extractFlagsFromText(text string) []string {
-	var flags []string
-	seen := make(map[string]bool)
-	for _, kw := range flagKeywords {
-		if strings.Contains(text, kw) && !seen[kw] {
-			seen[kw] = true
-			flags = append(flags, kw)
-		}
-	}
-	return flags
+	return extract.ExtractFlagsFromText(text)
 }
 
 var unwantedImagePatterns = []string{"ico", "logo", "banner", "icon", "emoji", "smiley", "rank_", "badge"}

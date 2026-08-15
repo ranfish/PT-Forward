@@ -866,9 +866,17 @@ async function saveOnly() {
     if (result) {
       seedReviewed.value = result.reviewed || false
       seedMissingFields.value = result.missing_fields || []
+      // §59.28 C（方案A ④）: 服务端渲染的完整描述（声明+致谢+海报+正文+截图）
+      if (result.rendered_description) {
+        previewRenderedDesc.value = parseBBCode(result.rendered_description)
+      } else {
+        previewRenderedDesc.value = parseBBCode(form.value.description)
+      }
+      // §59.28 C（方案A ②）: 标准化重组标题回填预览
+      if (result.reassembled_title) {
+        form.value.title = result.reassembled_title
+      }
     }
-    // §59.20 ⑨: 渲染预览（前端 BBCode→HTML）
-    previewRenderedDesc.value = parseBBCode(form.value.description)
     seedPreviewMode.value = true
   } catch (e: unknown) {
     message.error('保存失败: ' + (e as Error).message)
