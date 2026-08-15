@@ -63,7 +63,7 @@
       size="small"
       :scroll="{ y: 400 }"
       :row-selection="{ selectedRowKeys: selectedHashes, onChange: onSelectChange }"
-      :pagination="{ pageSize: 50, showSizeChanger: false, size: 'small' }"
+      :pagination="{ pageSize: dialogPageSize, showSizeChanger: true, pageSizeOptions: ['20', '50', '100', '200'], showTotal: (t: number) => `共 ${t} 条`, size: 'small' }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'name'">
@@ -144,6 +144,11 @@ interface UnconfiguredTorrent {
 const torrents = ref<UnconfiguredTorrent[]>([])
 const loading = ref(false)
 const searchText = ref('')
+// §59.29: 弹窗每页条数（可调 20/50/100/200，localStorage 持久化）
+const dialogPageSize = ref<number>(parseInt(localStorage.getItem('batch-fetch-page-size') || '50', 10) || 50)
+watch(dialogPageSize, v => {
+  try { localStorage.setItem('batch-fetch-page-size', String(v)) } catch { /* silent */ }
+})
 const selectedHashes = ref<string[]>([])
 
 const fetching = ref(false)
