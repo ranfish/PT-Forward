@@ -280,8 +280,11 @@ export interface SeedDetail {
 }
 
 export const seedConfigApi = {
-  listSeeds(params: { client_id: string; save_path: string; page?: number; page_size?: number }) {
+  listSeeds(params: { client_id?: string; save_path?: string; status?: string; search?: string; page?: number; page_size?: number }) {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params })
+  },
+  uniquePaths() {
+    return client.get<ApiResponse<{ clients: Array<{ client_id: string; paths: Array<{ save_path: string; count: number }> }> }>>('/publish/seeds/unique-paths')
   },
   getSeed(infoHash: string, clientId?: string) {
     return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`, { params: clientId ? { client_id: clientId } : undefined })

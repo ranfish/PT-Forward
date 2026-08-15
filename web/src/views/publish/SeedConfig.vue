@@ -3,54 +3,38 @@
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <a-select
-          v-model:value="selectedClient"
-          style="width: 180px"
-          placeholder="选择下载器"
-          @change="onClientChange"
-        >
-          <a-select-option v-for="c in clientOptions" :key="c.clientId" :value="c.clientId">
-            {{ c.clientName || c.clientId }}{{ c.isLocal === false ? '（远程）' : c.isLocal === true ? '（本地）' : '' }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-if="selectedClient && pathOptions.length > 0"
-          v-model:value="selectedPath"
-          style="width: 280px"
-          placeholder="资源路径"
-          allow-clear
-          @change="fetchList"
-        >
-          <a-select-option v-for="p in pathOptions" :key="p.path" :value="p.path">
-            {{ p.path }} ({{ p.count }})
-          </a-select-option>
-        </a-select>
         <a-input-search
-          v-if="selectedClient && selectedPath"
           v-model:value="searchText"
-          placeholder="搜索标题..."
-          style="width: 240px"
+          placeholder="搜索标题/种子名..."
+          style="width: 260px"
           allow-clear
+          @search="onFilterChange"
         />
-        <a-radio-group v-if="selectedClient && selectedPath" v-model:value="statusFilter" button-style="solid" size="small">
+        <a-radio-group v-model:value="statusFilter" button-style="solid" size="small" @change="onFilterChange">
           <a-radio-button value="all">全部</a-radio-button>
           <a-radio-button value="reviewed">已审核</a-radio-button>
           <a-radio-button value="pending">待审核</a-radio-button>
           <a-radio-button value="incomplete">不完整</a-radio-button>
+          <a-radio-button value="unfetched">未获取</a-radio-button>
           <a-radio-button value="issues">禁转/无映射</a-radio-button>
         </a-radio-group>
-        <a-tag v-if="total > 0" color="blue">{{ total }} 条</a-tag>
+
+        <!-- 已激活的筛选 tag -->
+        <a-tag v-if="hasActiveFilters" closable color="blue" @close.prevent="clearFilters">
+          {{ activeFilterText }}
+        </a-tag>
+
+        <a-tag v-if="total > 0">{{ total }} 条</a-tag>
       </div>
       <div class="toolbar-right">
-        <a-button
-          v-if="selectedClient && selectedPath"
-          :loading="loading"
-          @click="fetchList"
-        >
+        <a-button :loading="loading" @click="fetchList">
           <ReloadOutlined /> 刷新
         </a-button>
+        <a-button @click="filterVisible = true">
+          <FilterOutlined /> 筛选
+        </a-button>
         <a-button
-          v-if="selectedClient && selectedPath"
+          v-if="filterClient && filterPath"
           type="primary"
           :loading="batchFetchActive"
           @click="showBatchFetch = true"
@@ -60,18 +44,10 @@
       </div>
     </div>
 
-    <!-- Empty state when no client/path selected -->
-    <a-empty
-      v-if="!selectedClient || !selectedPath"
-      description="请选择下载器和路径查看种子列表"
-      style="margin-top: 80px"
-    />
-
     <!-- Table -->
     <a-table
-      v-else
       :columns="columns"
-      :data-source="filteredData"
+      :data-source="tableData"
       :loading="loading"
       :pagination="{
         current: currentPage,
@@ -96,6 +72,13 @@
               {{ record.title || record.name || '(未获取)' }}
             </div>
             <div v-if="record.subtitle" class="title-sub">{{ record.subtitle }}</div>
+          </div>
+        </template>
+
+        <template v-else-if="column.key === 'client'">
+          <div class="client-cell">
+            <div>{{ record.client_id }}</div>
+            <div class="client-path" :title="record.save_path">{{ shortPath(record.save_path) }}</div>
           </div>
         </template>
 
@@ -162,6 +145,40 @@
       </template>
     </a-table>
 
+    <!-- Filter Modal（二级筛选页） -->
+    <a-modal
+      v-model:open="filterVisible"
+      title="筛选选项"
+      ok-text="确认"
+      cancel-text="取消"
+      :width="520"
+      @ok="applyFilters"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="下载器">
+          <a-select
+            v-model:value="tempClient"
+            placeholder="全部下载器"
+            allow-clear
+            style="width: 100%"
+            :options="clientSelectOptions"
+            @change="tempPath = undefined"
+          />
+        </a-form-item>
+        <a-form-item label="保存路径">
+          <a-select
+            v-model:value="tempPath"
+            placeholder="全部路径"
+            allow-clear
+            style="width: 100%"
+            :disabled="!tempClient"
+            :options="pathSelectOptions"
+          />
+          <div v-if="!tempClient" style="color: #999; font-size: 12px">选择下载器后可筛选具体路径</div>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
     <!-- Edit Panel -->
     <CrossSeedPanel
       v-model:open="editOpen"
@@ -172,95 +189,143 @@
 
     <!-- Batch Fetch Panel -->
     <BatchFetchPanel
-      v-if="selectedClient && selectedPath"
+      v-if="filterClient && filterPath"
       v-model:open="showBatchFetch"
-      :client-id="selectedClient"
-      :save-path="selectedPath"
+      :client-id="filterClient"
+      :save-path="filterPath"
       @completed="onBatchFetchCompleted"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { PlusOutlined, ReloadOutlined, FilterOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
 import { seedConfigApi, type SeedListItem } from '@/api/publish'
-import client from '@/api/client'
-import type { ApiResponse } from '@/api/types'
 
-// ==================== 下载器/路径选择 ====================
+// ==================== 筛选状态（§59.29：挂载即查，筛选弹层选路径） ====================
 
-interface ClientPathOption {
-  clientId: string
-  clientName?: string
-  isLocal?: boolean
-}
-interface PathEntry {
-  path: string
-  count: number
+interface ClientPathEntry {
+  client_id: string
+  paths: Array<{ save_path: string; count: number }>
 }
 
-const clientOptions = ref<ClientPathOption[]>([])
-const pathOptions = ref<PathEntry[]>([])
-const selectedClient = ref<string | undefined>(undefined)
-const selectedPath = ref<string | undefined>(undefined)
+const clientPathTree = ref<ClientPathEntry[]>([])
 
-async function fetchSnapshotPaths() {
+// 生效的筛选（传给 API）
+const filterClient = ref<string | undefined>(undefined)
+const filterPath = ref<string | undefined>(undefined)
+const statusFilter = ref('all')
+const searchText = ref('')
+
+// 弹层临时状态
+const filterVisible = ref(false)
+const tempClient = ref<string | undefined>(undefined)
+const tempPath = ref<string | undefined>(undefined)
+
+// 持久化 key
+const LS_KEY = 'seed-config-filters'
+
+function loadPersistedFilters() {
   try {
-    const resp = await client.get<ApiResponse<Array<{ clientId: string; paths: PathEntry[] }>>>('/downloads/snapshot-paths')
-    const data = resp.data?.data || []
-    // 查下载器 isLocal 标志
-    let localMap: Record<string, boolean> = {}
-    try {
-      const dlResp = await client.get<ApiResponse<{ items: Array<{ name: string; isLocal: boolean | null }> }>>('/downloaders?pageSize=200')
-      for (const d of (dlResp.data?.data?.items || [])) {
-        localMap[d.name] = d.isLocal ?? false
-      }
-    } catch { /* silent */ }
-    clientOptions.value = data.map(d => ({
-      clientId: d.clientId,
-      isLocal: localMap[d.clientId],
+    const raw = localStorage.getItem(LS_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    filterClient.value = saved.client || undefined
+    filterPath.value = saved.path || undefined
+    statusFilter.value = saved.status || 'all'
+    tempClient.value = filterClient.value
+    tempPath.value = filterPath.value
+  } catch { /* silent */ }
+}
+
+function persistFilters() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      client: filterClient.value || '',
+      path: filterPath.value || '',
+      status: statusFilter.value,
     }))
-    // 展开所有路径，切换 client 时过滤
-    const found = data.find(d => d.clientId === selectedClient.value)
-    pathOptions.value = found ? found.paths : []
+  } catch { /* silent */ }
+}
+
+const clientSelectOptions = computed(() =>
+  clientPathTree.value.map(c => ({ value: c.client_id, label: c.client_id }))
+)
+
+const pathSelectOptions = computed(() => {
+  const entry = clientPathTree.value.find(c => c.client_id === tempClient.value)
+  return (entry?.paths || []).map(p => ({ value: p.save_path, label: `${p.save_path} (${p.count})` }))
+})
+
+const hasActiveFilters = computed(() => !!filterClient.value || !!filterPath.value)
+
+const activeFilterText = computed(() => {
+  if (!filterClient.value) return ''
+  if (!filterPath.value) return filterClient.value
+  return `${filterClient.value}:${shortPath(filterPath.value)}`
+})
+
+function shortPath(p: string): string {
+  const parts = p.split('/').filter(Boolean)
+  return parts.length > 2 ? '.../' + parts.slice(-2).join('/') : p
+}
+
+async function fetchClientPaths() {
+  try {
+    const resp = await seedConfigApi.uniquePaths()
+    clientPathTree.value = resp.data?.data?.clients || []
   } catch {
-    clientOptions.value = []
+    clientPathTree.value = []
   }
 }
 
-function onClientChange() {
-  selectedPath.value = undefined
-  // 更新路径列表
-  fetchSnapshotPaths()
-  // 如果只有一个路径自动选中
-  if (pathOptions.value.length === 1) {
-    selectedPath.value = pathOptions.value[0].path
-    fetchList()
-  }
+function applyFilters() {
+  filterClient.value = tempClient.value || undefined
+  filterPath.value = tempPath.value || undefined
+  // 切筛选重置到第一页
+  currentPage.value = 1
+  persistFilters()
+  filterVisible.value = false
+  fetchList()
 }
 
-// ==================== 列表数据 ====================
+function clearFilters() {
+  filterClient.value = undefined
+  filterPath.value = undefined
+  tempClient.value = undefined
+  tempPath.value = undefined
+  currentPage.value = 1
+  persistFilters()
+  fetchList()
+}
+
+function onFilterChange() {
+  currentPage.value = 1
+  persistFilters()
+  fetchList()
+}
+
+// ==================== 列表数据（§59.29：状态/搜索后端过滤） ====================
 
 const loading = ref(false)
 const tableData = ref<SeedListItem[]>([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(50)
-const searchText = ref('')
-const statusFilter = ref('all')
 const batchFetchActive = ref(false)
 
 async function fetchList() {
-  if (!selectedClient.value || !selectedPath.value) return
   loading.value = true
   try {
     const resp = await seedConfigApi.listSeeds({
-      client_id: selectedClient.value,
-      save_path: selectedPath.value,
+      client_id: filterClient.value || '',
+      save_path: filterPath.value || '',
+      status: statusFilter.value === 'all' ? '' : (statusFilter.value === 'issues' ? 'issues' : statusFilter.value),
+      search: searchText.value,
       page: currentPage.value,
       page_size: pageSize.value,
     })
@@ -274,27 +339,6 @@ async function fetchList() {
     loading.value = false
   }
 }
-
-const filteredData = computed(() => {
-  let result = tableData.value
-  if (searchText.value) {
-    const q = searchText.value.toLowerCase()
-    result = result.filter(item =>
-      (item.title || '').toLowerCase().includes(q) ||
-      (item.name || '').toLowerCase().includes(q)
-    )
-  }
-  if (statusFilter.value === 'reviewed') {
-    result = result.filter(i => i.status === 'reviewed')
-  } else if (statusFilter.value === 'pending') {
-    result = result.filter(i => i.status === 'pending')
-  } else if (statusFilter.value === 'incomplete') {
-    result = result.filter(i => i.status === 'incomplete')
-  } else if (statusFilter.value === 'issues') {
-    result = result.filter(i => i.status === 'forbidden' || i.status === 'system_forbidden' || i.status === 'no_mapping')
-  }
-  return result
-})
 
 function onTableChange(pag: { current?: number; pageSize?: number }) {
   if (pag.current) currentPage.value = pag.current
@@ -351,6 +395,7 @@ function formatSize(bytes: number): string {
 
 const columns = [
   { title: '标题', key: 'title', ellipsis: true, width: 280 },
+  { title: '下载器/路径', key: 'client', width: 140 },
   { title: '状态', key: 'status', width: 90 },
   { title: '大小', key: 'size', width: 80 },
   { title: '技术参数', key: 'tech', width: 200 },
@@ -427,7 +472,16 @@ function onBatchFetchCompleted() {
 // ==================== 初始化 ====================
 
 onMounted(() => {
-  fetchSnapshotPaths()
+  loadPersistedFilters()
+  fetchClientPaths()
+  fetchList()
+})
+
+// 搜索防抖（输入停顿后自动查）
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(searchText, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => onFilterChange(), 400)
 })
 </script>
 
@@ -457,6 +511,14 @@ onMounted(() => {
 .title-cell .title-sub {
   font-size: 12px;
   color: #999;
+}
+.client-cell .client-path {
+  font-size: 11px;
+  color: #999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
 }
 .tech-cell {
   display: flex;

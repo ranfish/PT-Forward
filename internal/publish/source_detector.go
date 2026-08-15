@@ -125,6 +125,9 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 }
 
 func (d *SourceSiteDetector) LookupGroup(ctx context.Context, groupName string) string {
+	if groupName == "" {
+		return ""
+	}
 	d.mu.RLock()
 	if siteName, ok := d.cache[groupName]; ok {
 		d.mu.RUnlock()
@@ -136,6 +139,11 @@ func (d *SourceSiteDetector) LookupGroup(ctx context.Context, groupName string) 
 	if err := d.db.WithContext(ctx).
 		Where("LOWER(group_name) = LOWER(?)", groupName).
 		First(&mapping).Error; err != nil {
+		// §59.29: 缓存 miss 结果——大列表（2w+ 行）循环中未映射组名
+		// 会反复触发 DB 查询（不同 title 同组名），miss 缓存消除重复查询
+		d.mu.Lock()
+		d.cache[groupName] = ""
+		d.mu.Unlock()
 		return ""
 	}
 

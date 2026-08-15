@@ -157,6 +157,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleBatchFetchProgress(w, r)
 	case strings.HasSuffix(path, "/publish/seeds") && r.Method == http.MethodGet:
 		h.handleListSeeds(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/unique-paths") && r.Method == http.MethodGet:
+		h.handleSeedUniquePaths(w, r)
 	case strings.Contains(path, "/publish/seeds/") && strings.HasSuffix(path, "/fetch") && r.Method == http.MethodPost:
 		h.handleFetchSingleSeed(w, r)
 	case strings.Contains(path, "/publish/seeds/") && r.Method == http.MethodGet:
@@ -2562,15 +2564,15 @@ func (h *PublishTorrentsHandler) handleBatchFetchProgress(w http.ResponseWriter,
 	})
 }
 
-// handleListSeeds §59.20: 种子配置页列表 API。
-// 数据流：snapshots(JOIN client+path) → metadata(源站行去重) → compliance+mapping 状态标注 → 5 态标签
+// handleListSeeds §59.20 §59.29: 种子配置页列表 API。
+// 数据流：snapshots(可选 client/path 过滤) → name 去重 → metadata → 状态标注 →
+// 状态/搜索后端过滤 → 分页。
+// §59.29: client_id/save_path 全可选（空=全部），进页面即有数据（方案 A 全部视图）。
 func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.Request) {
 	clientID := r.URL.Query().Get("client_id")
 	savePath := r.URL.Query().Get("save_path")
-	if clientID == "" || savePath == "" {
-		Error(w, http.StatusBadRequest, 40001, "client_id 和 save_path 为必填")
-		return
-	}
+	statusFilter := r.URL.Query().Get("status")
+	search := strings.TrimSpace(r.URL.Query().Get("search"))
 
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page == 0 {
@@ -2581,55 +2583,89 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		pageSize = 50
 	}
 
-	// 1. 查 snapshots（全量）——§59.26 修复：先去重再分页。
-	// 同一路径下同一资源有多个站点 hash（如阿甘正传 78 个 tracker 变体），
-	// 若先 Offset/Limit 分页再去重，第一页会被同一资源的重复行占满。
-	var rawSnapshots []model.TorrentSnapshot
-	h.db.WithContext(r.Context()).
-		Where("client_id = ? AND save_path = ? AND is_hidden = ?", clientID, savePath, false).
-		Order("updated_at DESC").
-		Find(&rawSnapshots)
+	// 1. 查 snapshots——§59.26: 先去重再分页；§59.29: SQL 层分组去重（20w+ 行时
+	// 避免 Go 全量载入）。同 client+path+name 的多站点 hash 只取 updated_at 最新一行。
+	// 无 name 的行按 hash 自成一组（name='' 时 MAX(hash) 无意义但保持行为：空名行退化
+	// 为按 hash 去重等价于不去重）。
+	snapQuery := h.db.WithContext(r.Context()).
+		Table("torrent_snapshots AS s").
+		Select("s.*").
+		Where("s.is_hidden = ?", false)
 
-	// §59.26: 按 name 去重——同一路径下同一资源的多个站点种子只显示一行
+	// SQLite/MySQL 兼容的"组内最新行"：子查询取每组 MAX(id)。
+	// name 为空时用 hash 作为组键（等效不去重）。
+	sub := h.db.WithContext(r.Context()).
+		Table("torrent_snapshots").
+		Select("MAX(id) AS id").
+		Where("is_hidden = ?", false).
+		Group("client_id, save_path, CASE WHEN name = '' THEN hash ELSE name END")
+	if clientID != "" {
+		snapQuery = snapQuery.Where("s.client_id = ?", clientID)
+		sub = sub.Where("client_id = ?", clientID)
+	}
+	if savePath != "" {
+		snapQuery = snapQuery.Where("s.save_path = ?", savePath)
+		sub = sub.Where("save_path = ?", savePath)
+	}
+	// §59.29: 搜索下推 SQL（name LIKE），20w+ 行时避免 Go 层全量过滤
+	if search != "" {
+		snapQuery = snapQuery.Where("s.name LIKE ?", "%"+search+"%")
+		sub = sub.Where("name LIKE ?", "%"+search+"%")
+	}
+	var rawSnapshots []model.TorrentSnapshot
+	if err := snapQuery.
+		Where("s.id IN (?)", sub).
+		Order("s.updated_at DESC").
+		Find(&rawSnapshots).Error; err != nil {
+		Success(w, map[string]interface{}{"items": []interface{}{}, "total": 0})
+		return
+	}
+
+	// §59.26: 按 name 去重（SQL 分组已去重，此处为双保险 + 保序语义）。
+	// §59.29: 全部视图下 key 为 client+path+name（不同下载器/路径的同名资源是不同实体）
 	snapshots := util.DedupByKey(rawSnapshots, func(s model.TorrentSnapshot) string {
 		if s.Name != "" {
-			return s.Name
+			return s.ClientID + "|" + s.SavePath + "|" + s.Name
 		}
 		return s.Hash
 	})
-	var total int64 = int64(len(snapshots))
-
-	// 去重后再分页
-	start := (page - 1) * pageSize
-	if start > len(snapshots) {
-		snapshots = nil
-	} else {
-		end := start + pageSize
-		if end > len(snapshots) {
-			end = len(snapshots)
-		}
-		snapshots = snapshots[start:end]
-	}
 
 	if len(snapshots) == 0 {
 		Success(w, map[string]interface{}{"items": []interface{}{}, "total": 0})
 		return
 	}
 
-	// 2. 收集 hash → 查 metadata
-	hashes := make([]string, len(snapshots))
+	// 2. 收集 hash → 查 metadata（§59.29 性能：2.2w hash 的 IN 查询过慢，
+	// 改为子查询 JOIN——同名资源的所有站点 hash 的 metadata 一并取出，
+	// 解决去重保留行 hash 与 metadata 行 hash 不一致时丢数据的问题（§59.28 H1））
+	nameList := make([]string, len(snapshots))
 	for i, s := range snapshots {
-		hashes[i] = s.Hash
+		nameList[i] = s.Name
 	}
 	var metas []model.TorrentMetadata
 	h.db.WithContext(r.Context()).
-		Where("info_hash IN ?", hashes).
+		Where("info_hash IN (SELECT hash FROM torrent_snapshots WHERE name IN ? AND is_hidden = 0)", nameList).
 		Find(&metas)
 
-	// 3. 按 hash 分组 metadata，选出源站行（制作组映射命中优先，否则 updated_at 最新）
-	metaByHash := h.groupMetasByHash(metas)
+	// 3. 按 name 关联 metadata（§59.29: name → 同名所有 hash 的 metadata 行，
+	// 解决去重保留行与 metadata 行 hash 不一致时丢数据 §59.28 H1）
+	nameByHash := make(map[string]string, len(rawSnapshots))
+	for _, s := range rawSnapshots {
+		if s.Name != "" {
+			nameByHash[s.Hash] = s.Name
+		}
+	}
+	metaByName := make(map[string][]model.TorrentMetadata, len(snapshots))
+	for _, m := range metas {
+		if name, ok := nameByHash[m.InfoHash]; ok {
+			metaByName[name] = append(metaByName[name], m)
+		}
+	}
 
-	// 4. 组装结果 + compliance + 映射检查
+	// 4. 组装结果（§59.29 性能：轻量状态标注全量执行——flags/映射/reviewed 纯内存或
+	// 带缓存查询；compliance（含 per-row DB 查询）延迟到分页后的当前页执行，
+	// 未筛选 system_forbidden 时默认降级为轻量判定，筛该态时对全量补跑）
+	needFullCompliance := statusFilter == "system_forbidden"
 	items := make([]map[string]interface{}, 0, len(snapshots))
 	for _, snap := range snapshots {
 		item := map[string]interface{}{
@@ -2640,9 +2676,9 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			"save_path": snap.SavePath,
 		}
 
-		// 查找源站行 metadata
+		// 查找源站行 metadata（按 name 关联，含同名兄弟 hash 的行）
 		var meta *model.TorrentMetadata
-		if metas, ok := metaByHash[snap.Hash]; ok && len(metas) > 0 {
+		if metas, ok := metaByName[snap.Name]; ok && len(metas) > 0 {
 			meta = h.selectSourceMeta(metas)
 		}
 
@@ -2673,19 +2709,120 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		} else {
 			item["reviewed"] = false
 			item["fetched"] = false
+			item["title"] = ""
 		}
 
-		// 5 态标注
-		status := h.classifySeedStatus(r.Context(), snap.Name, meta)
+		// 5 态标注（轻量：跳过 compliance）
+		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta)
 		item["status"] = status
 
+		// §59.29: 后端过滤（状态 + 搜索），与分页解耦
+		if statusFilter != "" && statusFilter != "system_forbidden" {
+			if statusFilter == "issues" {
+				// 复合态：禁转/系统禁转/无映射
+				if status != "forbidden" && status != "no_mapping" {
+					continue
+				}
+			} else if status != statusFilter {
+				continue
+			}
+		}
+		if search != "" {
+			sLower := strings.ToLower(search)
+			if !strings.Contains(strings.ToLower(snap.Name), sLower) &&
+				!strings.Contains(strings.ToLower(item["title"].(string)), sLower) {
+				continue
+			}
+		}
+
 		items = append(items, item)
+	}
+
+	// §59.29: 筛 system_forbidden 时对全量补跑 compliance（结果集已缩小）
+	if needFullCompliance {
+		filtered := items[:0]
+		for _, item := range items {
+			name, _ := item["name"].(string)
+			siteName, _ := item["site_name"].(string)
+			if r2 := h.complianceChecker.CheckWithSite(r.Context(), name, siteName); r2 != nil && !r2.Passed {
+				item["status"] = "system_forbidden"
+				filtered = append(filtered, item)
+			}
+		}
+		items = filtered
+	}
+
+	total := int64(len(items))
+
+	// 去重+过滤后再分页
+	start := (page - 1) * pageSize
+	if start > len(items) {
+		items = nil
+	} else {
+		end := start + pageSize
+		if end > len(items) {
+			end = len(items)
+		}
+		items = items[start:end]
+	}
+
+	// §59.29: 当前页补跑 compliance（未筛选时全量循环已跳过）——
+	// 只影响本页状态标注精度，50 行可接受
+	if !needFullCompliance && h.complianceChecker != nil {
+		for _, item := range items {
+			name, _ := item["name"].(string)
+			siteName, _ := item["site_name"].(string)
+			status, _ := item["status"].(string)
+			// 轻量态非禁转/无映射的行才需要 compliance 精化
+			if status != "forbidden" && status != "no_mapping" {
+				if r2 := h.complianceChecker.CheckWithSite(r.Context(), name, siteName); r2 != nil && !r2.Passed {
+					item["status"] = "system_forbidden"
+				}
+			}
+		}
 	}
 
 	Success(w, map[string]interface{}{
 		"items": items,
 		"total": total,
 	})
+}
+
+// handleSeedUniquePaths §59.29: 返回有快照的 下载器→路径 树（筛选弹层数据源）。
+func (h *PublishTorrentsHandler) handleSeedUniquePaths(w http.ResponseWriter, r *http.Request) {
+	type pathRow struct {
+		ClientID string
+		SavePath string
+		Count    int64
+	}
+	var rows []pathRow
+	h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
+		Select("client_id, save_path, COUNT(*) as count").
+		Where("is_hidden = ?", false).
+		Group("client_id, save_path").
+		Order("client_id, save_path").
+		Find(&rows)
+
+	clients := make([]map[string]interface{}, 0, len(rows))
+	byClient := map[string]*map[string]interface{}{}
+	for _, row := range rows {
+		c, ok := byClient[row.ClientID]
+		if !ok {
+			entry := map[string]interface{}{
+				"client_id": row.ClientID,
+				"paths":     make([]map[string]interface{}, 0, 4),
+			}
+			byClient[row.ClientID] = &entry
+			clients = append(clients, entry)
+			c = &entry
+		}
+		(*c)["paths"] = append((*c)["paths"].([]map[string]interface{}), map[string]interface{}{
+			"save_path": row.SavePath,
+			"count":     row.Count,
+		})
+	}
+
+	Success(w, map[string]interface{}{"clients": clients})
 }
 
 // groupMetasByHash 按 info_hash 分组 metadata。
@@ -2751,6 +2888,28 @@ func (h *PublishTorrentsHandler) classifySeedStatus(ctx context.Context, name st
 		}
 		if r := h.complianceChecker.CheckWithSite(ctx, name, siteName); r != nil && !r.Passed {
 			return "system_forbidden"
+		}
+	}
+
+	return h.classifySeedStatusLite(ctx, name, meta)
+}
+
+// classifySeedStatusLite §59.29: 轻量状态标注（跳过 compliance 的 per-row DB 查询）。
+// 全量循环用；compliance 由调用方对当前页（或筛选 system_forbidden 时对全量）补跑。
+func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, name string, meta *model.TorrentMetadata) string {
+	// ① flags 检查
+	if meta != nil && meta.Flags != "" {
+		var flags []string
+		if err := json.Unmarshal([]byte(meta.Flags), &flags); err == nil {
+			forbiddenSet := map[string]bool{
+				"禁转": true, "禁止转载": true, "谢绝转载": true, "严禁转载": true,
+				"谢绝搬运": true, "独占": true, "限时禁转": true, "限转": true,
+			}
+			for _, f := range flags {
+				if forbiddenSet[f] {
+					return "forbidden"
+				}
+			}
 		}
 	}
 
