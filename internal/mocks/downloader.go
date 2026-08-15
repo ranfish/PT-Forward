@@ -222,6 +222,10 @@ func (m *DownloaderClient) GetTrackerMessages(ctx context.Context, hash string) 
 	return "", nil
 }
 
+func (m *DownloaderClient) GetTrackerMessagesAll(ctx context.Context, hash string) ([]model.TrackerMessage, error) {
+	return nil, nil
+}
+
 func (m *DownloaderClient) GetTrackers(ctx context.Context, hash string) ([]string, error) {
 	return nil, nil
 }

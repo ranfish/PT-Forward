@@ -179,11 +179,12 @@ func sampleTRTorrent() trTorrent {
 		SecondsSeeding: 7200,
 		IsFinished:     true,
 		TrackerStats: []struct {
-			SeederCount  int    `json:"seederCount"`
-			LeecherCount int    `json:"leecherCount"`
-			Announce     string `json:"announce"`
+			SeederCount        int    `json:"seederCount"`
+			LeecherCount       int    `json:"leecherCount"`
+			Announce           string `json:"announce"`
+			LastAnnounceResult string `json:"lastAnnounceResult"`
 		}{
-			{SeederCount: 10, LeecherCount: 3, Announce: "https://tracker.example.com/announce"},
+			{SeederCount: 10, LeecherCount: 3, Announce: "https://tracker.example.com/announce", LastAnnounceResult: "Success"},
 		},
 		TorrentFile: "/data/torrents/test-movie.mkv.torrent",
 		ID:          1,

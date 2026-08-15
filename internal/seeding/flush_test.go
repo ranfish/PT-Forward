@@ -90,6 +90,10 @@ func (m *flushMockClient) GetTrackerMessages(_ context.Context, _ string) (strin
 	return "", nil
 }
 
+func (m *flushMockClient) GetTrackerMessagesAll(_ context.Context, _ string) ([]model.TrackerMessage, error) {
+	return nil, nil
+}
+
 func (m *flushMockClient) GetTrackers(_ context.Context, _ string) ([]string, error) {
 	return nil, nil
 }

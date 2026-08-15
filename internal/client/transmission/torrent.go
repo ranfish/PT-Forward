@@ -389,6 +389,36 @@ func (c *TRClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTra
 	}, nil
 }
 
+// GetTrackerMessagesAll §59.31: 返回种子全部 tracker 的消息（单种子查询形态；
+// 轮询批量形态走 TorrentInfo.TrackerMsgs——maindata 时已自带，无需本方法）。
+func (c *TRClient) GetTrackerMessagesAll(ctx context.Context, hash string) ([]model.TrackerMessage, error) {
+	resp, err := c.rpcCall(ctx, "torrent-get", map[string]interface{}{
+		"ids":    []string{hash},
+		"fields": []string{"trackerStats"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("torrent-get rpc: %w", err)
+	}
+	var torrents []struct {
+		TrackerStats []struct {
+			Announce           string `json:"announce"`
+			LastAnnounceResult string `json:"lastAnnounceResult"`
+		} `json:"trackerStats"`
+	}
+	if err := json.Unmarshal(resp.Arguments, &torrents); err != nil {
+		return nil, fmt.Errorf("decode trackerStats: %w", err)
+	}
+	var out []model.TrackerMessage
+	for _, t := range torrents {
+		for _, ts := range t.TrackerStats {
+			if ts.Announce != "" {
+				out = append(out, model.TrackerMessage{URL: ts.Announce, Msg: ts.LastAnnounceResult})
+			}
+		}
+	}
+	return out, nil
+}
+
 func (c *TRClient) GetTrackerMessages(ctx context.Context, hash string) (string, error) {
 	resp, err := c.rpcCall(ctx, "torrent-get", map[string]interface{}{
 		"ids":    []string{hash},

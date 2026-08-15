@@ -34,6 +34,8 @@ type SeedingTorrentRecord struct {
 	Unregistered    bool       `json:"unregistered" gorm:"default:false"`
 	UnregisteredAt  *time.Time `json:"unregistered_at"`
 	UnregisteredMsg string     `json:"unregistered_msg" gorm:"size:200"`
+	// §59.31: 命中关键词的 tracker 域名（诊断展示用，非规则条件键）
+	UnregisteredTracker string    `json:"unregistered_tracker" gorm:"size:200"`
 
 	AutoTransfer       bool     `json:"auto_transfer" gorm:"default:false"`
 	TransferClientIDs  []string `json:"transfer_client_ids" gorm:"type:json;serializer:json"`

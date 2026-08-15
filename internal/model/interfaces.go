@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"strings"
 )
 
 type SiteAdapter interface {
@@ -121,9 +122,31 @@ type DownloaderClient interface {
 	CheckExists(ctx context.Context, infoHash string) (bool, error)
 	GetGlobalTransferStats(ctx context.Context) (*GlobalTransferStats, error)
 	GetTrackerMessages(ctx context.Context, hash string) (string, error)
+	// GetTrackerMessagesAll §59.31: 返回种子全部 tracker 的消息（URL+Msg）。
+	// 幽灵种子巡检用：逐条过关键词表，任一命中即标记（PT 无跨站多 tracker，
+	// 多 tracker 必同站官方镜像，任一命中=站点删种）。
+	GetTrackerMessagesAll(ctx context.Context, hash string) ([]TrackerMessage, error)
 	GetTrackers(ctx context.Context, hash string) ([]string, error)
 
 	Close()
+}
+
+// TrackerMessage §59.31: 单个 tracker 的消息（幽灵种子巡检诊断/匹配用）。
+type TrackerMessage struct {
+	URL string `json:"url"` // tracker URL（同站官方镜像；标记时按域名脱敏存储）
+	Msg string `json:"msg"` // tracker 返回文本
+}
+
+// TrackerDomain 提取 tracker URL 的域名（诊断存储用，剥离 passkey 等敏感参数）。
+func (t TrackerMessage) TrackerDomain() string {
+	u := t.URL
+	if idx := strings.Index(u, "://"); idx >= 0 {
+		u = u[idx+3:]
+	}
+	if idx := strings.IndexAny(u, "/:?#"); idx >= 0 {
+		u = u[:idx]
+	}
+	return u
 }
 
 type DownloaderProvider interface {
