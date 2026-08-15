@@ -547,13 +547,19 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 		SavePath string `json:"savePath"`
 	}
 
+	// §59.29: 资源级（name）判定"未配置"——同 name 的所有 hash 变体中
+	// 只要有一个挂了 metadata 就算已配置（与列表页 name→hash 桥口径一致，
+	// 修复 §59.28 H1 在弹窗的体现：按去重保留行 hash 判定会误报已获取资源）。
 	var rawItems []unconfiguredItem
 	h.db.WithContext(r.Context()).
 		Table("torrent_snapshots AS s").
 		Select("s.hash, s.name, s.size, s.client_id, s.save_path").
-		Joins("LEFT JOIN torrent_metadata m ON s.hash = m.info_hash").
-		Where("s.client_id = ? AND s.save_path = ? AND s.is_hidden = ? AND m.id IS NULL",
-			clientID, savePath, false).
+		Where("s.client_id = ? AND s.save_path = ? AND s.is_hidden = ?", clientID, savePath, false).
+		Where("s.name NOT IN (?)",
+			h.db.Table("torrent_snapshots AS s2").
+				Joins("INNER JOIN torrent_metadata m ON s2.hash = m.info_hash").
+				Where("s2.client_id = ? AND s2.save_path = ? AND s2.is_hidden = 0 AND s2.name != ''", clientID, savePath).
+				Select("DISTINCT s2.name")).
 		Order("s.updated_at DESC").
 		Find(&rawItems)
 
