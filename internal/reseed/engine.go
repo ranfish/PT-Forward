@@ -2948,6 +2948,38 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 }
 
 // techProfileConflict 规则 A：源标题和候选标题都有某 Token 且值不同 → 冲突。
+// webSpecEquivalents §59.30: 来源标注等价组——同一资源在不同站点的来源标注
+// 差异（Yumi 组站内标 WEBRip、下载器名为 WEB-DL，size 差 0.05% 实为同资源）。
+// 规格字段属于此类等价变体时不视为 TechProfile 冲突。
+var webSpecEquivalents = map[string]map[string]bool{
+	"WEB-DL": {"WEBRip": true},
+	"WEBRip": {"WEB-DL": true},
+}
+
+// codecEquivalents §59.30: 编码标注等价组——x265 是 HEVC 的编码器实现
+// （x264↔AVC 同理）。朋友站中文标题写 "10bit HEVC版本"、种子名用 x265，
+// 是同一资源的标注习惯差异。
+var codecEquivalents = map[string]map[string]bool{
+	"x265": {"HEVC": true},
+	"HEVC": {"x265": true},
+	"x264": {"AVC": true},
+	"AVC":  {"x264": true},
+}
+
+func specEquivalent(a, b string) bool {
+	if eq, ok := webSpecEquivalents[strings.TrimSpace(a)]; ok && eq[strings.TrimSpace(b)] {
+		return true
+	}
+	return false
+}
+
+func codecEquivalent(a, b string) bool {
+	if eq, ok := codecEquivalents[strings.TrimSpace(a)]; ok && eq[strings.TrimSpace(b)] {
+		return true
+	}
+	return false
+}
+
 func techProfileConflict(src titleparser.TechProfile, candidateTitle string) bool {
 	cand := titleparser.ParseTitleTech(candidateTitle)
 	fields := []struct{ name, s, c string }{
@@ -2959,6 +2991,14 @@ func techProfileConflict(src titleparser.TechProfile, candidateTitle string) boo
 	}
 	for _, f := range fields {
 		if f.s != "" && f.c != "" && !strings.EqualFold(f.s, f.c) {
+			// §59.30: Specification 等价组豁免（WEB-DL ≈ WEBRip 站点标注差异）
+			if f.name == "Specification" && specEquivalent(f.s, f.c) {
+				continue
+			}
+			// §59.30: VideoCodec 等价组豁免（x265 ≈ HEVC 标注习惯差异）
+			if f.name == "VideoCodec" && codecEquivalent(f.s, f.c) {
+				continue
+			}
 			return true
 		}
 	}
@@ -3035,6 +3075,16 @@ func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config
 			}
 		}
 	}
+
+	// §59.30 area=1 降级重试：部分站点（keepfrds）英文种子名不在标题索引，
+	// 纯英文关键词（剧集 WEB-DL 类）search_area=0 搜不到。用简介字段重搜一轮。
+	if match == nil {
+		if retry, rErr := adapter.SearchTorrents(ctx, config, keyword, &model.SearchOptions{SearchArea: "1"}); rErr == nil && len(retry) > 0 {
+			if m, _ := VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m != nil {
+				return m, nil
+			}
+		}
+	}
 	return match, nil
 }
 
@@ -3047,6 +3097,146 @@ func hasResolutionToken(s string) bool {
 		}
 	}
 	return false
+}
+
+// SearchAndVerifyLoose §59.30: 元数据获取专用宽松验证——跳过 size 匹配，
+// 仅按 组名 + 标题相关性 + TechProfile 冲突校验。适用站内同资源重发
+// （REPACK 替换）导致 size 与本地不一致的场景。禁止用于注入决策
+// （注入必须走 VerifyMatchWithTruncationCheckAndSource + ValidateInjection）。
+func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName, sourceTitle string) *L2MatchResult {
+	if keyword == "" {
+		return nil
+	}
+	// §59.30 渐进降关键词：NexusPHP 多词 AND 语义，长关键词（含分辨率/媒介词）
+	// 在简介搜索（area=1）下可能全词无法命中。逐轮缩短：
+	//   ① 原关键词（area1）
+	//   ② 剥离分辨率词（area1）
+	//   ③ 短词：剥 CJK+媒介+年份（area0 → area1）
+	// §59.30 频率收敛：keepfrds 等站对连续搜索静默限流（返回默认列表），
+	// loose 轮请求上限 4 次，命中即停。
+	orderedKWs := []string{keyword}
+	if kw2 := stripResolutionTokens(keyword); kw2 != "" && kw2 != keyword {
+		orderedKWs = append(orderedKWs, kw2)
+	}
+	short := stripYearToken(stripCJKWords(stripResolutionTokens(stripMediumTokensLoose(keyword))))
+	if short == "" || short == keyword {
+		if hasCJKWord(keyword) {
+			short = stripCJKWords(keyword)
+		}
+	}
+	if short != "" && short != keyword {
+		orderedKWs = append(orderedKWs, short)
+	}
+
+	type round struct {
+		kw  string
+		opt *model.SearchOptions
+	}
+	rounds := []round{
+		{keyword, &model.SearchOptions{SearchArea: "1"}},
+	}
+	if len(orderedKWs) > 1 {
+		rounds = append(rounds, round{orderedKWs[1], &model.SearchOptions{SearchArea: "1"}})
+	}
+	if len(orderedKWs) > 2 {
+		rounds = append(rounds, round{orderedKWs[2], nil})
+		rounds = append(rounds, round{orderedKWs[2], &model.SearchOptions{SearchArea: "1"}})
+	}
+	for i, rd := range rounds {
+		if i >= 4 {
+			break
+		}
+		results, err := adapter.SearchTorrents(ctx, config, rd.kw, rd.opt)
+		if err != nil || len(results) == 0 {
+			continue
+		}
+		if m := loosePick(results, groupName, sourceTitle); m != nil {
+			return m
+		}
+	}
+	return nil
+}
+
+// stripYearToken 剥离关键词中的年份 token。
+func stripYearToken(kw string) string {
+	out := kw
+	for _, f := range strings.Fields(kw) {
+		if len(f) == 4 && (strings.HasPrefix(f, "19") || strings.HasPrefix(f, "20")) {
+			out = strings.ReplaceAll(out, " "+f, "")
+			out = strings.ReplaceAll(out, f+" ", "")
+		}
+	}
+	return strings.TrimSpace(strings.Join(strings.Fields(out), " "))
+}
+
+// stripResolutionTokens 剥离关键词中的分辨率词。
+func stripResolutionTokens(kw string) string {
+	out := kw
+	for _, res := range []string{"2160p", "1080p", "1080i", "720p", "480p", "4320p"} {
+		out = strings.ReplaceAll(out, " "+res, "")
+		out = strings.ReplaceAll(out, res+" ", "")
+	}
+	return strings.TrimSpace(strings.Join(strings.Fields(out), " "))
+}
+
+// stripMediumTokensLoose 剥离关键词中的媒介词。
+func stripMediumTokensLoose(kw string) string {
+	out := kw
+	for _, m := range []string{"Blu-ray", "BluRay", "WEB-DL", "WEBRip", "UHD", "HDTV"} {
+		out = strings.ReplaceAll(out, " "+m, "")
+		out = strings.ReplaceAll(out, m+" ", "")
+	}
+	return strings.TrimSpace(strings.Join(strings.Fields(out), " "))
+}
+
+// loosePick 宽松候选筛选（组名/标题相关/TechProfile 三层，各含标注差异豁免）。
+func loosePick(results []*model.SeedingSearchResult, groupName, sourceTitle string) *L2MatchResult {
+		for _, r := range results {
+			if r.TorrentID == "" {
+				continue
+			}
+			// 组名（CSS 截断标题放宽，与主路径一致；
+			// §59.30 纯中文标题（如 keepfrds 部分行 </a> 后无英文名）不含组名，
+			// 候选含源标题 CJK 片段时视为同资源放行）
+			if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
+				truncRelaxed := strings.Contains(r.Title, "..") && hasResolutionToken(r.Title)
+				cjkRelaxed := false
+				for _, cjk := range extractCJKSubstrings(sourceTitle) {
+					if len([]rune(cjk)) >= 2 && strings.Contains(r.Title, cjk) {
+						cjkRelaxed = true
+						break
+					}
+				}
+				if !truncRelaxed && !cjkRelaxed {
+					continue
+				}
+			}
+			// 标题相关性 + TechProfile
+			// §59.30: 候选纯中文标题（无英文词）时 meaningfulWords 英文匹配必败，
+			// 需补 CJK 分支判定（源中文名命中候选中文标题）
+			if !titleKeywordRelevant(extractMeaningfulTitleWords(sourceTitle, groupName), extractCJKSubstrings(sourceTitle), sourceTitle, r.Title) {
+				cjkHit := false
+				for _, cjk := range extractCJKSubstrings(sourceTitle) {
+					if len([]rune(cjk)) >= 2 && strings.Contains(r.Title, cjk) {
+						cjkHit = true
+						break
+					}
+				}
+				if !cjkHit {
+					continue
+				}
+			}
+			// §59.30: CSS 截断标题（含 ..）的 token 不完整（如 DTS-H.. 解析成 DTS），
+			// TechProfile 比较失真 → 跳过冲突检查，靠组名+标题相关性+size（主轮）兜底
+			if !strings.Contains(r.Title, "..") {
+				p := titleparser.ParseTitleTech(sourceTitle)
+				if techProfileConflict(p, r.Title) {
+					continue
+				}
+			}
+		return &L2MatchResult{TorrentID: r.TorrentID, Title: r.Title, Size: r.Size}
+	}
+	return nil
 }
 
 // hasCJKWord 判断关键词是否含 CJK 词（触发降级重试的条件）。
