@@ -26,6 +26,11 @@ type qbTorrent struct {
 	SeedingTime   int64   `json:"seeding_time"`
 	AddedOn       int64   `json:"added_on"`
 	Tracker       string  `json:"tracker"`
+
+	// §59.31: qb 5.2+ 聚合 announce 信号（旧版无此键，零值回退全量轮询档）
+	HasTrackerError       bool `json:"has_tracker_error"`
+	HasTrackerWarning     bool `json:"has_tracker_warning"`
+	HasOtherAnnounceError bool `json:"has_other_announce_error"`
 }
 
 func (t qbTorrent) toModel() *model.TorrentInfo {
@@ -71,6 +76,11 @@ func (t qbTorrent) toModel() *model.TorrentInfo {
 		AddedAt:       time.Unix(t.AddedOn, 0),
 		TrackerURL:    t.Tracker,
 		TrackerURLs:   trackerURLs(t.Tracker),
+
+		// §59.31: 调度信号透传（幽灵种子巡检圈怀疑池用）
+		HasTrackerError:       t.HasTrackerError,
+		HasTrackerWarning:     t.HasTrackerWarning,
+		HasOtherAnnounceError: t.HasOtherAnnounceError,
 	}
 }
 

@@ -572,6 +572,38 @@ func (c *QBClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTra
 	}, nil
 }
 
+// GetTrackerMessagesAll §59.31: 返回种子全部 http/https tracker 的消息。
+// 幽灵种子巡检用：与 GetTrackerMessages 同一次 API，逐条返回（排除 ** 前缀的
+// qb 内置 tracker：DHT/PEX/LSD 伪条目，它们的 msg 不是站点 tracker 应答）。
+func (c *QBClient) GetTrackerMessagesAll(ctx context.Context, hash string) ([]model.TrackerMessage, error) {
+	resp, err := c.get(ctx, "/api/v2/torrents/trackers?hash="+url.QueryEscape(hash))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("trackers API returned %d", resp.StatusCode)
+	}
+	var trackers []struct {
+		URL  string `json:"url"`
+		Msg  string `json:"msg"`
+		Tier int    `json:"tier"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&trackers); err != nil {
+		return nil, fmt.Errorf("decode trackers: %w", err)
+	}
+	var out []model.TrackerMessage
+	for _, t := range trackers {
+		if strings.HasPrefix(t.URL, "**") {
+			continue // qb 内置伪 tracker（DHT/PEX/LSD）
+		}
+		if strings.HasPrefix(t.URL, "http://") || strings.HasPrefix(t.URL, "https://") {
+			out = append(out, model.TrackerMessage{URL: t.URL, Msg: t.Msg})
+		}
+	}
+	return out, nil
+}
+
 func (c *QBClient) GetTrackerMessages(ctx context.Context, hash string) (string, error) {
 	resp, err := c.get(ctx, "/api/v2/torrents/trackers?hash="+url.QueryEscape(hash))
 	if err != nil {

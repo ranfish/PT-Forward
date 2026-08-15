@@ -100,6 +100,10 @@ func (m *mockDownloaderClient) GetTrackerMessages(_ context.Context, _ string) (
 	return "", nil
 }
 
+func (m *mockDownloaderClient) GetTrackerMessagesAll(_ context.Context, _ string) ([]model.TrackerMessage, error) {
+	return nil, nil
+}
+
 func (m *mockDownloaderClient) GetTrackers(_ context.Context, _ string) ([]string, error) {
 	return nil, nil
 }

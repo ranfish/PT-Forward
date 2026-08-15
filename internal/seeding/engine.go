@@ -208,6 +208,10 @@ type Engine struct {
 	unregisteredCursor   atomic.Int64
 	unregisteredChecking atomic.Bool
 
+	// §59.31: 怀疑池冷却（内存态，重启重建）
+	patrolMu         sync.Mutex
+	patrolCooldowns  map[string]*patrolCooldownEntry
+
 	spaceAlarmMu   sync.Mutex
 	spaceAlarmLast map[string]time.Time
 
@@ -540,7 +544,7 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 
 		e.updateEMA(ctx, clientID, entry.Maindata, torrentMap)
 		e.syncStaleRecords(ctx, clientID, torrentMap)
-		e.checkUnregisteredTorrents(ctx, clientID, dlClient)
+		e.checkUnregisteredTorrents(ctx, clientID, dlClient, torrentMap)
 		e.logOrphanTorrents(ctx, clientID, torrentMap)
 		e.syncUnmanagedTorrents(ctx, clientID, torrentMap)
 		e.checkAutoTransfer(ctx, clientID, torrentMap, dlClient)
@@ -2944,18 +2948,43 @@ func (e *Engine) getUnregisteredKeywords() []string {
 	return defaultUnregisteredKeywords
 }
 
-func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string, dlClient model.DownloaderClient) {
+// checkUnregisteredTorrents §59.31 v2: 幽灵种子巡检——纯检测组件。
+//
+// 只标记（unregistered=true + msg 快照 + tracker 域名诊断），不做任何处置；
+// 处置完全交给 /rules 删种规则体系（用户绑定到 /seeding 任务或 /downloads 下载器，
+// 未绑定则无为）。
+//
+// 判定唯一权威：tracker msg 文本 × 关键词表（seeding.unregistered_keywords，
+// /seeding/scoring UI 用户可编辑）。任一 tracker msg 命中即标记（PT 无跨站
+// 多 tracker——那是作弊行为；多 tracker 必同站官方镜像，任一命中=站点删种）。
+//
+// 三档调度（按框架/版本自动分档）：
+//   - TR：torrentMap 自带全部 tracker 消息（TrackerMsgs），每轮全量关键词匹配，
+//     零额外请求、无冷却
+//   - qb 5.2+：maindata HasTrackerError 圈怀疑池（仅调度信号，永不参与判定），
+//     池内逐个 GetTrackerMessagesAll；查过不命中冷却 30 分钟
+//   - qb <5.2：无可靠免费信号（不做启发式推断——宁可慢不可错），全量低频轮询：
+//     每 10s tick 批 N=50（patrol.batch_size 可配），周期指针循环
+//
+// 标记单向：已标记种子跳过后续扫描（检测职责完成，移交规则）；
+// 闭环出口=规则删种 → syncStaleRecords 回收 → 扫描池收缩。
+func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string, dlClient model.DownloaderClient, torrentMap map[string]*model.TorrentInfo) {
 	if !e.unregisteredChecking.CompareAndSwap(false, true) {
 		return
 	}
 	defer e.unregisteredChecking.Store(false)
 
 	keywords := e.getUnregisteredKeywords()
+	if len(keywords) == 0 {
+		return
+	}
 
+	// 收集本客户端的候选记录（活跃做种且未标记）
 	e.mu.RLock()
 	var candidates []*model.SeedingTorrentRecord
 	for _, rec := range e.recordMap {
-		if rec.ClientID == clientID && !rec.Unregistered && (rec.Status == model.SeedingStatusSeeding || rec.Status == model.SeedingStatusPausedFreeEnd || rec.Status == model.SeedingStatusPausedRule) {
+		if rec.ClientID == clientID && !rec.Unregistered &&
+			(rec.Status == model.SeedingStatusSeeding || rec.Status == model.SeedingStatusPausedFreeEnd || rec.Status == model.SeedingStatusPausedRule) {
 			candidates = append(candidates, rec)
 		}
 	}
@@ -2965,7 +2994,96 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 		return
 	}
 
-	batchSize := 20
+	framework := e.clientFramework(clientID)
+	switch framework {
+	case "transmission":
+		// TR 档：torrentMap 自带全部消息，全量匹配（零额外请求）
+		e.patrolMatchFromTorrentMap(ctx, clientID, candidates, torrentMap, keywords)
+	case "qbittorrent":
+		// qb 档：优先用 5.2+ 怀疑池信号；无信号（旧版）回退全量轮询
+		var suspects []*model.SeedingTorrentRecord
+		hasSignal := false
+		for _, rec := range candidates {
+			ti, ok := torrentMap[rec.InfoHash]
+			if !ok {
+				continue
+			}
+			if ti.HasTrackerError || ti.HasTrackerWarning || ti.HasOtherAnnounceError {
+				hasSignal = true
+				suspects = append(suspects, rec)
+			}
+		}
+		if hasSignal {
+			// 5.2+ 档：怀疑池逐个查询（带冷却）
+			e.patrolConfirmBatch(ctx, clientID, dlClient, suspects, keywords)
+			return
+		}
+		// <5.2 档：全量低频轮询（批 N，周期指针）
+		e.patrolFullScanBatch(ctx, clientID, dlClient, candidates, keywords)
+	default:
+		// 未知框架：按 qb 全量轮询兜底
+		e.patrolFullScanBatch(ctx, clientID, dlClient, candidates, keywords)
+	}
+}
+
+// patrolMatchFromTorrentMap TR 档：torrentMap 全量消息关键词匹配（零额外请求）。
+func (e *Engine) patrolMatchFromTorrentMap(ctx context.Context, clientID string, candidates []*model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, keywords []string) {
+	for _, rec := range candidates {
+		if ctx.Err() != nil {
+			return
+		}
+		ti, ok := torrentMap[rec.InfoHash]
+		if !ok || len(ti.TrackerMsgs) == 0 {
+			continue
+		}
+		for _, tm := range ti.TrackerMsgs {
+			msg := strings.TrimSpace(tm.Msg)
+			if msg == "" || strings.EqualFold(msg, "success") || strings.EqualFold(msg, "ok") {
+				continue
+			}
+			if hitKeyword(msg, keywords) {
+				e.markUnregistered(ctx, rec, msg, tm.TrackerDomain())
+				break
+			}
+		}
+	}
+}
+
+// patrolConfirmBatch qb 5.2+ 档：怀疑池逐个确认（带冷却，防 tracker 站点故障时反复浪费额度）。
+func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClient model.DownloaderClient, suspects []*model.SeedingTorrentRecord, keywords []string) {
+	now := time.Now()
+	for _, rec := range suspects {
+		if ctx.Err() != nil {
+			return
+		}
+		if e.inUnregCooldown(clientID, rec.InfoHash, now) {
+			continue
+		}
+		msgs, err := dlClient.GetTrackerMessagesAll(ctx, rec.InfoHash)
+		if err != nil {
+			continue
+		}
+		matched := false
+		for _, tm := range msgs {
+			msg := strings.TrimSpace(tm.Msg)
+			if msg == "" {
+				continue
+			}
+			if hitKeyword(msg, keywords) {
+				e.markUnregistered(ctx, rec, msg, tm.TrackerDomain())
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			e.setUnregCooldown(clientID, rec.InfoHash, now)
+		}
+	}
+}
+
+// patrolFullScanBatch qb <5.2 档：全量低频轮询（批 N，周期指针循环）。
+func (e *Engine) patrolFullScanBatch(ctx context.Context, clientID string, dlClient model.DownloaderClient, candidates []*model.SeedingTorrentRecord, keywords []string) {
+	batchSize := e.patrolBatchSize()
 	cursor := int(e.unregisteredCursor.Load())
 	if cursor >= len(candidates) {
 		cursor = 0
@@ -2981,71 +3099,134 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 		if ctx.Err() != nil {
 			return
 		}
-		msg, err := dlClient.GetTrackerMessages(ctx, rec.InfoHash)
-		if err != nil || msg == "" {
+		msgs, err := dlClient.GetTrackerMessagesAll(ctx, rec.InfoHash)
+		if err != nil {
 			continue
 		}
-		msgLowered := strings.ToLower(msg)
-		matched := false
-		for _, kw := range keywords {
-			if strings.Contains(msgLowered, strings.ToLower(kw)) {
-				matched = true
+		for _, tm := range msgs {
+			msg := strings.TrimSpace(tm.Msg)
+			if msg == "" {
+				continue
+			}
+			if hitKeyword(msg, keywords) {
+				e.markUnregistered(ctx, rec, msg, tm.TrackerDomain())
 				break
 			}
 		}
-		if !matched {
-			continue
-		}
-
-		e.logger.Info("unregistered torrent detected",
-			zap.String("client_id", clientID),
-			zap.String("site", rec.SiteName),
-			zap.String("torrent_id", rec.TorrentID),
-			zap.String("info_hash", rec.InfoHash),
-			zap.String("tracker_msg", msg))
-
-		if err := dlClient.PauseTorrent(ctx, rec.InfoHash); err != nil {
-			e.logger.Warn("unregistered: pause failed", zap.String("hash", rec.InfoHash), zap.Error(err))
-		}
-
-		now := time.Now()
-		if err := e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
-			"status":           model.SeedingStatusUnregistered,
-			"unregistered":     true,
-			"unregistered_at":  now,
-			"unregistered_msg": msg,
-			"last_action_by":   "unregistered_patrol",
-		}).Error; err != nil {
-			e.logger.Warn("unregistered: update DB failed", zap.Error(err))
-			continue
-		}
-
-		e.mu.Lock()
-		rec.Status = model.SeedingStatusUnregistered
-		rec.Unregistered = true
-		rec.UnregisteredAt = &now
-		rec.UnregisteredMsg = msg
-		e.mu.Unlock()
-
-		if err := dlClient.DeleteTorrent(ctx, rec.InfoHash, true); err != nil {
-			e.logger.Warn("unregistered: delete torrent+files failed", zap.String("hash", rec.InfoHash), zap.Error(err))
-		} else {
-			e.logger.Info("unregistered: deleted torrent and files",
-				zap.String("info_hash", rec.InfoHash),
-				zap.String("site", rec.SiteName),
-				zap.String("torrent_id", rec.TorrentID))
-		}
-
-		key := recordKey(rec.ClientID, rec.InfoHash)
-		e.mu.Lock()
-		delete(e.recordMap, key)
-		e.mu.Unlock()
-
-		e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
-			"status":         model.SeedingStatusDeleted,
-			"last_action_by": "unregistered_patrol",
-		})
 	}
+}
+
+// markUnregistered §59.31: 标记幽灵种子（纯标记，无副作用——不暂停不删除）。
+func (e *Engine) markUnregistered(ctx context.Context, rec *model.SeedingTorrentRecord, msg, trackerDomain string) {
+	e.logger.Info("unregistered torrent detected",
+		zap.String("client_id", rec.ClientID),
+		zap.String("site", rec.SiteName),
+		zap.String("torrent_id", rec.TorrentID),
+		zap.String("info_hash", rec.InfoHash),
+		zap.String("tracker", trackerDomain),
+		zap.String("tracker_msg", msg),
+		zap.String("disposition", "marked (rules consume)"))
+
+	now := time.Now()
+	if err := e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+		Where("id = ?", rec.ID).
+		Updates(map[string]interface{}{
+			"unregistered":         true,
+			"unregistered_at":      now,
+			"unregistered_msg":     msg,
+			"unregistered_tracker": trackerDomain,
+		}).Error; err != nil {
+		e.logger.Warn("unregistered: update DB failed", zap.Error(err))
+		return
+	}
+
+	e.mu.Lock()
+	rec.Unregistered = true
+	rec.UnregisteredAt = &now
+	rec.UnregisteredMsg = msg
+	rec.UnregisteredTracker = trackerDomain
+	e.mu.Unlock()
+}
+
+// hitKeyword msg 文本 × 关键词表（大小写不敏感 Contains）。
+func hitKeyword(msg string, keywords []string) bool {
+	msgLower := strings.ToLower(msg)
+	for _, kw := range keywords {
+		if kw == "" {
+			continue
+		}
+		if strings.Contains(msgLower, strings.ToLower(kw)) {
+			return true
+		}
+	}
+	return false
+}
+
+// patrolCooldown §59.31 遗漏 A：怀疑池冷却状态（内存态，重启重建，不持久化）。
+type patrolCooldownEntry struct {
+	lastChecked time.Time
+}
+
+func (e *Engine) cooldownMap() map[string]*patrolCooldownEntry {
+	e.patrolMu.Lock()
+	defer e.patrolMu.Unlock()
+	if e.patrolCooldowns == nil {
+		e.patrolCooldowns = make(map[string]*patrolCooldownEntry)
+	}
+	return e.patrolCooldowns
+}
+
+func (e *Engine) inUnregCooldown(clientID, hash string, now time.Time) bool {
+	m := e.cooldownMap()
+	e.patrolMu.Lock()
+	defer e.patrolMu.Unlock()
+	key := clientID + "|" + hash
+	if entry, ok := m[key]; ok {
+		return now.Sub(entry.lastChecked) < e.patrolCooldownDuration()
+	}
+	return false
+}
+
+func (e *Engine) setUnregCooldown(clientID, hash string, now time.Time) {
+	m := e.cooldownMap()
+	e.patrolMu.Lock()
+	defer e.patrolMu.Unlock()
+	m[clientID+"|"+hash] = &patrolCooldownEntry{lastChecked: now}
+}
+
+// patrolCooldownDuration 冷却时长（默认 30 分钟；全局可配 patrol.recheck_cooldown_min）。
+func (e *Engine) patrolCooldownDuration() time.Duration {
+	minutes := 30
+	var val string
+	row := e.db.Raw("SELECT value FROM system_settings WHERE key = 'patrol.recheck_cooldown_min' LIMIT 1").Row()
+	if row != nil && row.Scan(&val) == nil && val != "" {
+		if n, err := strconv.Atoi(val); err == nil && n > 0 {
+			minutes = n
+		}
+	}
+	return time.Duration(minutes) * time.Minute
+}
+
+// patrolBatchSize 全量轮询批量（默认 50；全局可配 patrol.batch_size）。
+func (e *Engine) patrolBatchSize() int {
+	var val string
+	row := e.db.Raw("SELECT value FROM system_settings WHERE key = 'patrol.batch_size' LIMIT 1").Row()
+	if row != nil && row.Scan(&val) == nil && val != "" {
+		if n, err := strconv.Atoi(val); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 50
+}
+
+// clientFramework 查下载器框架（clients.type：qbittorrent/transmission）。
+// DB 查询在 patrol 低频路径上（每客户端每 10s 一次），可接受；结果语义稳定。
+func (e *Engine) clientFramework(clientID string) string {
+	var t string
+	if err := e.db.Raw("SELECT type FROM clients WHERE name = ? AND deleted_at IS NULL LIMIT 1", clientID).Row().Scan(&t); err != nil {
+		return ""
+	}
+	return t
 }
 
 // checkAutoTransfer 检测下载完成的 record，触发自动转移（§55.11 方案B）。

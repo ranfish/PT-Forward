@@ -29,6 +29,8 @@ type trTorrent struct {
 		SeederCount  int    `json:"seederCount"`
 		LeecherCount int    `json:"leecherCount"`
 		Announce     string `json:"announce"`
+		// §59.31: 幽灵种子巡检关键字段（此前请求了 trackerStats 但丢弃）
+		LastAnnounceResult string `json:"lastAnnounceResult"`
 	} `json:"trackerStats"`
 	TorrentFile string `json:"torrentFile"`
 	ID          int    `json:"id"`
@@ -63,14 +65,20 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 	var numComplete, numIncomplete int
 	var trackerURL string
 	var trackerURLs []string
+	var trackerMsgs []model.TrackerMessage
 	if len(t.TrackerStats) > 0 {
 		numComplete = t.TrackerStats[0].SeederCount
 		numIncomplete = t.TrackerStats[0].LeecherCount
 		trackerURL = t.TrackerStats[0].Announce
 		trackerURLs = make([]string, 0, len(t.TrackerStats))
+		trackerMsgs = make([]model.TrackerMessage, 0, len(t.TrackerStats))
 		for _, ts := range t.TrackerStats {
 			if ts.Announce != "" {
 				trackerURLs = append(trackerURLs, ts.Announce)
+				trackerMsgs = append(trackerMsgs, model.TrackerMessage{
+					URL: ts.Announce,
+					Msg: ts.LastAnnounceResult,
+				})
 			}
 		}
 	}
@@ -99,6 +107,10 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 		AddedAt:       time.Unix(t.AddedDate, 0),
 		TrackerURL:    trackerURL,
 		TrackerURLs:   trackerURLs,
+
+		// §59.31: TR 轮询自带全部 tracker 消息（含 lastAnnounceResult），
+		// 幽灵种子巡检每轮全量匹配，零额外请求
+		TrackerMsgs: trackerMsgs,
 	}
 }
 

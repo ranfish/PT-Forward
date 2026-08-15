@@ -85,6 +85,15 @@ type TorrentInfo struct {
 	TrackerURL    string   `json:"tracker_url"`
 	// v0.0.265: 所有 tracker URL（用于多站点匹配，transmission 填全量，qbittorrent 仅主 tracker）
 	TrackerURLs   []string `json:"tracker_urls"`
+	// §59.31: qb 5.2+ maindata 聚合 announce 信号（旧版 qb 无此字段，零值=走全量轮询档）。
+	// 仅作幽灵种子巡检的调度信号（圈怀疑池），永不直接参与判定。
+	HasTrackerError        bool `json:"has_tracker_error"`
+	HasTrackerWarning      bool `json:"has_tracker_warning"`
+	HasOtherAnnounceError  bool `json:"has_other_announce_error"`
+
+	// §59.31: TR 轮询自带全部 tracker 消息（qb 为空——需逐个调 GetTrackerMessagesAll）。
+	// 幽灵种子巡检：TR 每轮全量关键词匹配零额外请求。
+	TrackerMsgs []TrackerMessage `json:"tracker_msgs,omitempty"`
 }
 
 // §33.1.35 — AddTorrentOptions: 种子添加选项

@@ -138,7 +138,7 @@
       </a-col>
     </a-row>
 
-    <a-card title="站点删种检测关键词（tracker 返回信息包含以下关键词时，自动删除种子及文件）" style="margin-top: 16px">
+    <a-card title="站点删种检测关键词（tracker 返回信息包含以下关键词时，标记该种子为站点删种；处置由绑定的删种规则执行，未绑定规则则只标记不删除）" style="margin-top: 16px">
       <div style="margin-bottom: 8px; display: flex; gap: 8px; align-items: center">
         <a-input
           v-model:value="newKeyword"
