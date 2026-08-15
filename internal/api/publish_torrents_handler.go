@@ -13,6 +13,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/coverage"
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
@@ -2388,7 +2389,10 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 			if miForProfile == "" {
 				miForProfile = finalMeta.SourceMediaInfo
 			}
-			profile := titleparser.BuildTechProfile(finalMeta.Title, miForProfile, "", "", "", "")
+			// §59.28 D1: DOM 源接入（DetailSourceJSON 的 medium/codec/resolution），
+			// 种子配置页与 runAnalyze 走同一套三源合并管线（§59.26 设计）
+			domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(finalMeta.DetailSourceJSON)
+			profile := titleparser.BuildTechProfile(finalMeta.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 			components := titleparser.TechProfileToComponents(profile)
 			category := titleparser.InferCategory(components, finalMeta.SourceCategory, "", "")
 
@@ -2432,13 +2436,17 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 				updates["flags"] = string(newFlags)
 			}
 
-			// §59.26: 声明末尾追加转载致谢（官组名 + 禁转PTT）
+			// §59.26 §59.28: 声明末尾追加转载致谢（幂等——重获不累积）
+			// 第一段用 GenerateThanksQuote（含"转自{source_site}"权威模板），
+			// 第二段禁转PTT 是用户指定的固定引言（v0.0.597）。
 			if profile.ReleaseGroup != "" && profile.ReleaseGroup != "NOGROUP" {
-				thanks := fmt.Sprintf(
-					"\n\n[quote][b][color=blue][size=5]%s官组作品，感谢原制作者发布。[/size][/color][/b][/quote]\n"+
-						"[quote][b][color=red][size=5]请遵守PT互相遵重共识，禁转PTT[/size][/color][/b][/quote]",
-					profile.ReleaseGroup)
-				updates["statement"] = finalMeta.Statement + thanks
+				thanksLine := description.GenerateThanksQuote(meta.SiteName, profile.ReleaseGroup, false, nil)
+				noTransferLine := "[quote][b][color=red][size=5]请遵守PT互相遵重共识，禁转PTT[/size][/color][/b][/quote]"
+				thanks := "\n\n[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + noTransferLine
+
+				// 幂等：先剥离历史追加的致谢块（v0.0.607 修复重获累积）
+				base := stripAppendedThanks(finalMeta.Statement)
+				updates["statement"] = base + thanks
 			}
 
 			// §59.26: 标签推断（对齐 auto_feed：副标题+标题+简介+MI 多源关键词匹配）
@@ -2450,10 +2458,14 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 				Description: finalMeta.Description,
 				NFO:         finalMeta.BDInfo,
 			})
-			// 源站显式标签优先，推断只补空
+			// 源站显式标签优先，推断只补空（§59.28 G：坏 JSON 不静默——记录并按空处理）
 			var existingTags []string
 			if finalMeta.Tags != "" {
-				json.Unmarshal([]byte(finalMeta.Tags), &existingTags)
+				if err := json.Unmarshal([]byte(finalMeta.Tags), &existingTags); err != nil {
+					h.logger.Warn("seed fetch: tags column invalid json, resetting",
+						zap.String("hash", hash), zap.Error(err))
+					existingTags = nil
+				}
 			}
 			if len(inferredTags) > 0 {
 				all := append(existingTags, inferredTags...)
@@ -2471,6 +2483,24 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 	return nil
 }
 
+// domFieldsFromDetailSource §59.28 D1：从 DetailSourceJSON 解析 DOM 源四字段
+// （medium/resolution/video_codec/audio_codec），供 BuildTechProfile 三源合并。
+func domFieldsFromDetailSource(detailJSON string) (medium, resolution, videoCodec, audioCodec string) {
+	if detailJSON == "" {
+		return
+	}
+	var ds struct {
+		Medium     string `json:"medium"`
+		Resolution string `json:"resolution"`
+		VideoCodec string `json:"video_codec"`
+		AudioCodec string `json:"audio_codec"`
+	}
+	if json.Unmarshal([]byte(detailJSON), &ds) != nil {
+		return
+	}
+	return ds.Medium, ds.Resolution, ds.VideoCodec, ds.AudioCodec
+}
+
 // dedupStringSlice 保序去重（§59.26 标签合并用）。
 func dedupStringSlice(in []string) []string {
 	seen := map[string]bool{}
@@ -2482,6 +2512,32 @@ func dedupStringSlice(in []string) []string {
 		}
 	}
 	return out
+}
+
+// thanksAppendMarker §59.28 致谢追加分隔标记：statement 中该标记之后的内容
+// 是我们追加的致谢块（重获时剥离，保证幂等）。
+const thanksAppendMarker = "FRDS官组作品"
+
+// stripAppendedThanks 剥离历史追加的致谢块（§59.28 幂等修复）。
+// 追加格式固定为 "\n\n[quote]...官组作品...[/quote]\n[quote]...禁转PTT...[/quote]"，
+// 识别第二个 quote 块（禁转PTT）定位追加起点。
+var noTransferQuoteRe = regexp.MustCompile(`(?s)\s*\[quote\]\[b\]\[color=red\]\[size=5\]请遵守PT互相遵重共识，禁转PTT\[/size\]\[/color\]\[/b\]\[/quote\]`)
+
+func stripAppendedThanks(statement string) string {
+	if !strings.Contains(statement, thanksAppendMarker) {
+		return statement
+	}
+	// 从最后一个 "官组作品" quote 块的起始 [quote] 剥离到末尾
+	idx := strings.LastIndex(statement, thanksAppendMarker)
+	if idx < 0 {
+		return statement
+	}
+	// 回溯到包裹它的 [quote] 起点
+	start := strings.LastIndex(statement[:idx], "[quote]")
+	if start < 0 {
+		return statement
+	}
+	return strings.TrimSpace(statement[:start])
 }
 
 // extractChineseFromSubtitle 从副标题提取【中文名】（§59.26 朋友站格式）。
@@ -2670,13 +2726,19 @@ func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata)
 
 // classifySeedStatus §59.20: 种子 5 态分类。
 func (h *PublishTorrentsHandler) classifySeedStatus(ctx context.Context, name string, meta *model.TorrentMetadata) string {
-	// ① flags 检查
+	// ① flags 检查（§59.28 A1：关键词集对齐 extract_flags.go 生产域，
+	// 与发布侧 checkFlagsFromMetadata 精确匹配口径一致）
 	if meta != nil && meta.Flags != "" {
-		lower := strings.ToLower(meta.Flags)
-		forbiddenKeywords := []string{"禁转", "谢绝转载", "独占", "限时禁转", "forbidden", "exclusive"}
-		for _, kw := range forbiddenKeywords {
-			if strings.Contains(lower, strings.ToLower(kw)) {
-				return "forbidden"
+		var flags []string
+		if err := json.Unmarshal([]byte(meta.Flags), &flags); err == nil {
+			forbiddenSet := map[string]bool{
+				"禁转": true, "禁止转载": true, "谢绝转载": true, "严禁转载": true,
+				"谢绝搬运": true, "独占": true, "限时禁转": true, "限转": true,
+			}
+			for _, f := range flags {
+				if forbiddenSet[f] {
+					return "forbidden"
+				}
 			}
 		}
 	}
@@ -2802,14 +2864,16 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// §59.26: BuildTechProfile 三源合并（标题 + MediaInfo），5 标题字段始终用 profile，
+	// §59.26: BuildTechProfile 三源合并（标题 + MediaInfo + DOM），5 标题字段始终用 profile，
 	// 14 平铺字段 DB 为空时 fallback 到 profile（兼容历史数据）
 	// MI 优先 local（MediaInfo），fallback 源站（SourceMediaInfo）
 	miForProfile := meta.MediaInfo
 	if miForProfile == "" {
 		miForProfile = meta.SourceMediaInfo
 	}
-	profile := titleparser.BuildTechProfile(meta.Title, miForProfile, "", "", "", "")
+	// §59.28 D1: DOM 源接入（与 fetchSingleTorrent 同一套三源合并）
+	domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(meta.DetailSourceJSON)
+	profile := titleparser.BuildTechProfile(meta.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 	components := titleparser.TechProfileToComponents(profile)
 	inferredCategory := titleparser.InferCategory(components, meta.SourceCategory, "", "")
 
@@ -2944,12 +3008,44 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		Where("id = ?", meta.ID).
 		Updates(updates)
 
-	// 重新查询获取更新后的数据
+	// 重新查询获取更新后的数据（§59.28 C：并发删除时返回明确错误而非零值）
 	var updated model.TorrentMetadata
-	h.db.WithContext(r.Context()).Where("id = ?", meta.ID).First(&updated)
+	if err := h.db.WithContext(r.Context()).Where("id = ?", meta.ID).First(&updated).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50001, "保存后读取失败: "+err.Error())
+		return
+	}
 
-	// 返回结果（同 GET 但加 reviewed 和 missing_fields）
-	profile := titleparser.ParseTitleTech(updated.Title)
+	// §59.28 C（方案A ②）：ReassembleFromTechProfile 标准化重组标题（预览用，不落库——
+	// 发布时按目标站 title_format 重组，这里用 v1.05 默认模板展示标准化效果）
+	// §59.28 C（方案A ④）：Renderer.Render 生成完整描述（声明+致谢+海报+正文+截图）
+	miForProfile := updated.MediaInfo
+	if miForProfile == "" {
+		miForProfile = updated.SourceMediaInfo
+	}
+	domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(updated.DetailSourceJSON)
+	profile := titleparser.BuildTechProfile(updated.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
+	reassembledTitle := titleparser.ReassembleFromTechProfile(profile, titleparser.V105TitleFormat())
+
+	renderer := description.NewRenderer("")
+	var screenshots []string
+	if updated.Screenshots != "" {
+		for _, line := range strings.Split(updated.Screenshots, "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				screenshots = append(screenshots, line)
+			}
+		}
+	}
+	descData := &model.DescriptionData{
+		Statement:      updated.Statement,
+		PosterURL:      updated.Poster,
+		PTGenBody:      updated.Description,
+		MediaInfoText:  miForProfile,
+		BDInfoText:     updated.BDInfo,
+		Screenshots:    screenshots,
+		SourceSite:     updated.SiteName,
+		Title:          updated.Title,
+	}
+	renderedDesc, renderErr := renderer.Render(descData, model.SiteDescConfig{})
 
 	result := map[string]interface{}{
 		"info_hash":    updated.InfoHash,
@@ -2962,6 +3058,13 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"missing_fields": missing,
 		"main_title":    profile.MainTitle,
 		"release_group":  profile.ReleaseGroup,
+
+		// §59.28 C（方案A ②④）：标准化重组标题 + 渲染后完整描述（预览）
+		"reassembled_title": reassembledTitle,
+		"rendered_description": renderedDesc,
+	}
+	if renderErr != nil {
+		result["render_error"] = renderErr.Error()
 	}
 	Success(w, result)
 }
@@ -2994,6 +3097,12 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 	var client model.ClientConfig
 	if h.db.WithContext(r.Context()).Where("name = ?", clientID).First(&client).Error == nil {
 		isLocal = client.IsLocal
+	}
+
+	// §59.28 nil 守卫（与 handleBatchFetch 对齐）
+	if h.sourceDetector == nil || h.metadataFetcher == nil {
+		Error(w, http.StatusInternalServerError, 50002, "服务未就绪（detector/fetcher 未注入）")
+		return
 	}
 
 	if err := h.fetchSingleTorrent(r.Context(), infoHash, snap.Name, snap.Size, snap.SavePath, isLocal); err != nil {

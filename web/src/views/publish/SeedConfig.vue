@@ -289,7 +289,7 @@ const filteredData = computed(() => {
   } else if (statusFilter.value === 'pending') {
     result = result.filter(i => i.status === 'pending')
   } else if (statusFilter.value === 'incomplete') {
-    result = result.filter(i => i.status === 'incomplete' || i.status === 'unfetched')
+    result = result.filter(i => i.status === 'incomplete')
   } else if (statusFilter.value === 'issues') {
     result = result.filter(i => i.status === 'forbidden' || i.status === 'system_forbidden' || i.status === 'no_mapping')
   }
@@ -337,7 +337,8 @@ function statusRowClass(status: string): string {
 }
 
 function canEdit(status: string): boolean {
-  return status === 'reviewed' || status === 'pending' || status === 'incomplete' || status === 'unfetched'
+  // §59.28: unfetched 无 metadata，编辑必 404，不提供编辑入口
+  return status === 'reviewed' || status === 'pending' || status === 'incomplete'
 }
 
 // ==================== 工具函数 ====================

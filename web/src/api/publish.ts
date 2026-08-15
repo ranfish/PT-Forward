@@ -287,7 +287,7 @@ export const seedConfigApi = {
     return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`, { params: clientId ? { client_id: clientId } : undefined })
   },
   putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; tags?: string[]; siteName?: string }) {
-    return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[] }>>(`/publish/seeds/${infoHash}`, data)
+    return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[]; reassembled_title?: string; rendered_description?: string; render_error?: string }>>(`/publish/seeds/${infoHash}`, data)
   },
   batchFetch(items: Array<{ hash: string; name: string; size: number; savePath: string }>, clientId: string) {
     return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items, clientId })

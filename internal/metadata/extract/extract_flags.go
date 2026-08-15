@@ -139,3 +139,10 @@ func isFalsePositiveHit(runes []rune, i, n int) bool {
 func isDirectedRune(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
 }
+
+// ExtractFlagsFromText 公共出口（§59.28 I1）：legacy 正则兜底路径复用两层检测。
+// 输入文本（title/subtitle/tags 拼接），输出 flags（与 Engine 主路径口径一致）。
+func ExtractFlagsFromText(text string) []string {
+	p := PublicExtractor{}
+	return p.extractFlags(text, "", "")
+}
