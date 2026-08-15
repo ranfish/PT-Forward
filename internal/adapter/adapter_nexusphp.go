@@ -958,10 +958,16 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 	if opts != nil && opts.Category != "" {
 		catParam = "&cat=" + opts.Category
 	}
+	// §59.30: search_area 可选（默认 0=标题；1=简介——keepfrds 等站英文种子名
+	// 只出现在简介/副标题区，标题字段仅索引中文格式化名）
+	areaParam := "0"
+	if opts != nil && opts.SearchArea != "" {
+		areaParam = opts.SearchArea
+	}
 
 	var lastErr error
 	for _, bp := range browsePaths {
-		searchURL := u + bp + "?" + searchParam + "=" + url.QueryEscape(keyword) + "&search_area=0&search_mode=0&incldead=1" + catParam
+		searchURL := u + bp + "?" + searchParam + "=" + url.QueryEscape(keyword) + "&search_area=" + areaParam + "&search_mode=0&incldead=1" + catParam
 
 		if strings.Contains(config.Domain, "audiences") {
 			a.logger.Info("nexusphp search debug", zap.String("url", searchURL), zap.String("bp", bp))
@@ -997,8 +1003,29 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 		}
 
 		parsed := parseNexusPHPBrowse(string(body), config)
-		if strings.Contains(config.Domain, "tey.cc") {
+
+		// §59.30: 间歇性 session 失效防护——请求带 search 参数但返回页无搜索结果
+		// 标记（NexusPHP 对失效 session 忽略参数返回默认列表），重试一次。
+		if len(parsed) > 0 && !strings.Contains(string(body), "搜索结果") && !strings.Contains(string(body), "没有种子") && !strings.Contains(string(body), "Nothing") {
+			if a.logger != nil {
+				a.logger.Warn("nexusphp search: response is default list (session dropped?), retrying",
+					zap.String("domain", config.Domain), zap.Int("parsed", len(parsed)))
+			}
+			retryReq, rErr := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
+			if rErr == nil {
+				setCommonHeaders(retryReq, config.Cookie)
+				if retryResp, rrErr := a.doer.Client.Do(retryReq); rrErr == nil {
+					retryBody, rbErr := readBody(retryResp)
+					drainBody(retryResp)
+					if rbErr == nil && retryResp.StatusCode == http.StatusOK {
+						if strings.Contains(string(retryBody), "搜索结果") || strings.Contains(string(retryBody), "没有种子") {
+							parsed = parseNexusPHPBrowse(string(retryBody), config)
+						}
+					}
+				}
+			}
 		}
+
 		if len(parsed) == 0 && (strings.Contains(config.Domain, "haidan") || strings.Contains(config.Domain, "hdcity")) {
 			a.logger.Info("haidan debug", zap.String("bp", bp), zap.Int("body_len", len(body)))
 		}

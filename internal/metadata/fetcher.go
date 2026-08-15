@@ -105,6 +105,21 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 	if err != nil {
 		return nil, fmt.Errorf("L2 search failed on %s: %w", siteName, err)
 	}
+
+	// §59.30 元数据获取宽松降级：size 校验失败（站内 REPACK 重发替换原版等
+	// 同资源不同版本场景）时，仅按 标题相关性+组名+TechProfile 验证重试一轮。
+	// 元数据（海报/声明/简介）与版本无关，可安全获取；注入校验由
+	// ValidateInjection 独立兜底（§59.25），不受此放宽影响。
+	if match == nil && size > 0 {
+		if m := reseed.SearchAndVerifyLoose(ctx, adapter, config, keyword, groupName, torrentName); m != nil {
+			match = m
+			f.logger.Info("FetchAndStoreBySearch: loose match (size skipped)",
+				zap.String("site", siteName),
+				zap.String("torrent_id", m.TorrentID),
+				zap.String("matched_title", m.Title))
+		}
+	}
+
 	if match == nil {
 		return nil, fmt.Errorf("L2 search no match on %s (keyword=%s group=%s)", siteName, keyword, groupName)
 	}

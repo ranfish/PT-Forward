@@ -97,6 +97,7 @@ type SearchOptions struct {
 	FreeOnly   bool   `json:"free_only"`
 	SortBy     string `json:"sort_by"`
 	MaxResults int    `json:"max_results"`
+	SearchArea string `json:"search_area,omitempty"` // §59.30: NexusPHP search_area（0=标题 1=简介），空=默认 0
 }
 
 // §33.1.74 — PTGenResult: PTGen 查询结果
