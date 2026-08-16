@@ -63,7 +63,14 @@
       size="small"
       :scroll="{ y: 400 }"
       :row-selection="{ selectedRowKeys: selectedHashes, onChange: onSelectChange }"
-      :pagination="{ pageSize: dialogPageSize, showSizeChanger: true, pageSizeOptions: ['20', '50', '100', '200'], showTotal: (t: number) => `共 ${t} 条`, size: 'small' }"
+      :pagination="{
+        pageSize: dialogPageSize,
+        showSizeChanger: true,
+        pageSizeOptions: ['20', '50', '100', '200'],
+        showTotal: (t: number) => `共 ${t} 条`,
+        size: 'small',
+        onShowSizeChange: (_current: number, size: number) => { dialogPageSize = size },
+      }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'name'">
