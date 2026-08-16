@@ -9,7 +9,7 @@
         :color="isStandardTag(tag) ? 'blue' : 'default'"
         @close="removeTag(tag)"
       >
-        {{ tag }}
+        {{ tagLabel(tag) }}
       </a-tag>
     </div>
     <div v-else class="empty-hint">未选择标签</div>
@@ -105,8 +105,8 @@ const tagGroups: TagGroup[] = [
   {
     name: '字幕',
     tags: [
-      { key: 'chinese_subtitle', label: '中字', aliases: 'CHS/简繁' },
-      { key: 'english_subtitle', label: '英字', aliases: 'ENG' },
+      { key: 'chinese_subtitle', label: '中文字幕', aliases: 'CHS/简繁' },
+      { key: 'english_subtitle', label: '英文字幕', aliases: 'ENG' },
       { key: 'hardcoded_subs', label: '硬字幕', aliases: '硬字' },
       { key: 'encoded_subs', label: '内嵌字幕', aliases: '' },
       { key: 'external_subtitles', label: '外挂字幕', aliases: '' },
@@ -163,6 +163,16 @@ const activeGroups = ref<string[]>(['HDR/色彩'])  // 默认展开第一组
 
 function isStandardTag(tag: string): boolean {
   return allStandardKeys.value.includes(tag)
+}
+
+// §59.32: 已选区显示通用标签文字（label），自定义标签显示原文
+function tagLabel(tag: string): string {
+  for (const g of tagGroups) {
+    for (const t of g.tags) {
+      if (t.key === tag) return t.label
+    }
+  }
+  return tag
 }
 
 function toggleTag(key: string) {
