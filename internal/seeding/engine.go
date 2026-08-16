@@ -3064,12 +3064,13 @@ func (e *Engine) patrolMatchFromTorrentMap(ctx context.Context, clientID string,
 func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClient trackerMsgGetter, suspects []*model.SeedingTorrentRecord, keywords []string) {
 	now := time.Now()
 	cooldown := e.patrolCooldownDuration()
+	batchSize := e.patrolBatchSize() // §59.31 三审 NEW-F：外提，防循环内逐候选 SQL（#7 模式）
 	checked := 0
 	for _, rec := range suspects {
 		if ctx.Err() != nil {
 			return
 		}
-		if checked >= e.patrolBatchSize() {
+		if checked >= batchSize {
 			return
 		}
 		if e.inUnregCooldown(clientID, rec.InfoHash, now, cooldown) {
@@ -3249,7 +3250,7 @@ func (e *Engine) patrolBatchSize() int {
 }
 
 // clientFramework 查下载器框架（clients.type：qbittorrent/transmission）。
-// DB 查询在 patrol 低频路径上（每客户端每 10s 一次），可接受；结果语义稳定。
+// 每客户端每 tick 一次点查，结果语义稳定。
 func (e *Engine) clientFramework(clientID string) string {
 	var t string
 	if err := e.db.Raw("SELECT type FROM clients WHERE name = ? AND deleted_at IS NULL LIMIT 1", clientID).Row().Scan(&t); err != nil {
