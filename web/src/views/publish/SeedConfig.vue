@@ -30,6 +30,16 @@
         <a-button :loading="loading" @click="fetchList">
           <ReloadOutlined /> 刷新
         </a-button>
+        <a-popconfirm
+          :title="`确定清除 ${selectedHashes.length} 个种子的已获取数据？`"
+          ok-text="清除"
+          cancel-text="取消"
+          @confirm="batchClear"
+        >
+          <a-button danger :loading="batchClearing" :disabled="selectedHashes.length === 0">
+            <ClearOutlined /> 批量清除{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
+          </a-button>
+        </a-popconfirm>
         <a-button @click="filterVisible = true">
           <FilterOutlined /> 筛选
         </a-button>
@@ -63,6 +73,11 @@
       :scroll="{ x: 1400 }"
       :sticky="{ offsetHeader: 48 }"
       :row-class-name="(record: SeedListItem) => statusRowClass(record.status)"
+      :row-selection="{
+        selectedRowKeys: selectedHashes,
+        onChange: onSelectChange,
+        getCheckboxProps: (record: SeedListItem) => ({ disabled: record.status === 'unfetched' }),
+      }"
       @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
@@ -200,7 +215,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { PlusOutlined, ReloadOutlined, FilterOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, FilterOutlined, ClearOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
@@ -444,6 +459,36 @@ async function fetchSingle(item: SeedListItem) {
     message.error('获取失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
   } finally {
     fetchingSet.value.delete(item.hash)
+  }
+}
+
+const selectedHashes = ref<string[]>([])
+const batchClearing = ref(false)
+
+function onSelectChange(keys: string[]) {
+  selectedHashes.value = keys
+}
+
+async function batchClear() {
+  if (selectedHashes.value.length === 0) return
+  batchClearing.value = true
+  let ok = 0
+  let fail = 0
+  try {
+    for (const h of selectedHashes.value) {
+      try {
+        await seedConfigApi.deleteSeed(h)
+        ok++
+      } catch {
+        fail++
+      }
+    }
+    if (fail === 0) message.success(`已清除 ${ok} 个种子`)
+    else message.warning(`清除完成：成功 ${ok}，失败 ${fail}`)
+    selectedHashes.value = []
+    await fetchList()
+  } finally {
+    batchClearing.value = false
   }
 }
 
