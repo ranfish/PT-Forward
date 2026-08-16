@@ -180,6 +180,9 @@ func TestPatrolDispatch(t *testing.T) {
 	if e.recordMap[recordKey("QB1", "hash-b")].Unregistered {
 		t.Error("hash-b should not be marked")
 	}
+	if e.recordMap[recordKey("QB1", "hash-c")].Unregistered {
+		t.Error("hash-c should not be marked")
+	}
 }
 
 // TestPatrolCapAttempts 上限按尝试计（含失败，二审 NEW-2）。
@@ -247,5 +250,11 @@ func TestPatrolCursorRoundRobin(t *testing.T) {
 	e.patrolFullScanBatch(context.Background(), "QB2", mock, records, []string{"kw"})
 	if len(mock.calls) != 7 {
 		t.Fatalf("after wrap: %d calls, want 7 (cursor wrapped)", len(mock.calls))
+	}
+	// §59.31 三审缺口1：排序确定性守护——按 InfoHash 升序（删 sort.Slice 此处失败）
+	for i, call := range mock.calls {
+		if want := fmt.Sprintf("h%d", i); call != want {
+			t.Errorf("call[%d] = %q, want %q (sorted round-robin)", i, call, want)
+		}
 	}
 }
