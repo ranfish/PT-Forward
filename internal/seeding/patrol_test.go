@@ -228,7 +228,9 @@ func TestPatrolCursorRoundRobin(t *testing.T) {
 
 	mock := &patrolMockClient{msgs: map[string][]model.TrackerMessage{}}
 	var records []*model.SeedingTorrentRecord
-	for i := 0; i < 7; i++ {
+	// §59.31 四审：倒序构造输入——排序守护必须依赖无序输入（正序输入时
+	// 删掉 sort.Slice 断言仍绿 = 假守护）
+	for i := 6; i >= 0; i-- {
 		h := fmt.Sprintf("h%d", i)
 		rec := &model.SeedingTorrentRecord{
 			ClientID: "QB2", InfoHash: h, SiteName: "测试",

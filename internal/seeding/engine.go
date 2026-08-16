@@ -3014,7 +3014,9 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 		var suspects []*model.SeedingTorrentRecord
 		var rest []*model.SeedingTorrentRecord
 		for _, rec := range candidates {
-			ti, ok := torrentMap[rec.InfoHash]
+			// §59.31 四审：torrentMap 键恒为小写（与 syncStaleRecords 等消费点一致，
+			// 防 TR 2.x 大写 hashString 记录被静默跳过）
+			ti, ok := torrentMap[strings.ToLower(rec.InfoHash)]
 			if ok && (ti.HasTrackerError || ti.HasTrackerWarning || ti.HasOtherAnnounceError) {
 				suspects = append(suspects, rec)
 			} else {
@@ -3039,7 +3041,7 @@ func (e *Engine) patrolMatchFromTorrentMap(ctx context.Context, clientID string,
 		if ctx.Err() != nil {
 			return
 		}
-		ti, ok := torrentMap[rec.InfoHash]
+		ti, ok := torrentMap[strings.ToLower(rec.InfoHash)]
 		if !ok || len(ti.TrackerMsgs) == 0 {
 			continue
 		}
