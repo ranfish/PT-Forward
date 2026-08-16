@@ -260,10 +260,10 @@ async function fetchUnregisteredKeywords() {
 
 function addKeyword() {
   const kw = newKeyword.value.trim()
+  newKeyword.value = ''
   if (!kw) return
   if (unregisteredKeywords.value.includes(kw)) return
   unregisteredKeywords.value.push(kw)
-  newKeyword.value = ''
 }
 
 function removeKeyword(i: number) {

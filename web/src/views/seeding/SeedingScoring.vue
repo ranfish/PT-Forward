@@ -300,9 +300,6 @@ async function fetchSubscriptions() {
 }
 
 
-
-
-
 onMounted(() => {
   fetchSubscriptions()
   fetchScoringConfig()
