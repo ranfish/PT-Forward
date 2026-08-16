@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -417,34 +416,6 @@ func (c *TRClient) GetTrackerMessagesAll(ctx context.Context, hash string) ([]mo
 		}
 	}
 	return out, nil
-}
-
-func (c *TRClient) GetTrackerMessages(ctx context.Context, hash string) (string, error) {
-	resp, err := c.rpcCall(ctx, "torrent-get", map[string]interface{}{
-		"ids":    []string{hash},
-		"fields": []string{"trackerStats"},
-	})
-	if err != nil {
-		return "", fmt.Errorf("torrent-get rpc: %w", err)
-	}
-	var torrents []struct {
-		TrackerStats []struct {
-			LastAnnounceResult string `json:"lastAnnounceResult"`
-			Host               string `json:"host"`
-		} `json:"trackerStats"`
-	}
-	if err := json.Unmarshal(resp.Arguments, &torrents); err != nil {
-		return "", fmt.Errorf("decode trackerStats: %w", err)
-	}
-	for _, t := range torrents {
-		for _, ts := range t.TrackerStats {
-			msg := strings.TrimSpace(ts.LastAnnounceResult)
-			if msg != "" && !strings.EqualFold(msg, "success") {
-				return msg, nil
-			}
-		}
-	}
-	return "", nil
 }
 
 func (c *TRClient) GetTrackers(ctx context.Context, hash string) ([]string, error) {

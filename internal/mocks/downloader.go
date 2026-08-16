@@ -218,10 +218,6 @@ func (m *DownloaderClient) GetGlobalTransferStats(ctx context.Context) (*model.G
 	return &model.GlobalTransferStats{}, nil
 }
 
-func (m *DownloaderClient) GetTrackerMessages(ctx context.Context, hash string) (string, error) {
-	return "", nil
-}
-
 func (m *DownloaderClient) GetTrackerMessagesAll(ctx context.Context, hash string) ([]model.TrackerMessage, error) {
 	return nil, nil
 }

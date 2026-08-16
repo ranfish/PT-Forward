@@ -121,7 +121,6 @@ type DownloaderClient interface {
 
 	CheckExists(ctx context.Context, infoHash string) (bool, error)
 	GetGlobalTransferStats(ctx context.Context) (*GlobalTransferStats, error)
-	GetTrackerMessages(ctx context.Context, hash string) (string, error)
 	// GetTrackerMessagesAll §59.31: 返回种子全部 tracker 的消息（URL+Msg）。
 	// 幽灵种子巡检用：逐条过关键词表，任一命中即标记（PT 无跨站多 tracker，
 	// 多 tracker 必同站官方镜像，任一命中=站点删种）。
