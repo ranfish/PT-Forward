@@ -3277,7 +3277,10 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 	Success(w, map[string]interface{}{"message": "获取成功"})
 }
 
-// handleDeleteSeed §59.26: 清除单种子 metadata（coverage 不清除）
+// handleDeleteSeed §59.26 §59.32: 清除种子 metadata（资源级——删同名全部 hash）。
+// coverage 不清除。多站聚合下载器同资源多 hash 变体，metadata 只挂其一；
+// "未配置"判定是资源级（任一 hash 有 = 已配置），故清除也必须资源级，
+// 否则资源永远无法回到未获取态（20 清除 → 12 未配置 的根因）。
 func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http.Request) {
 	infoHash := extractSeedHash(r)
 	if infoHash == "" || infoHash == "seeds" {
@@ -3285,6 +3288,30 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 		return
 	}
 
-	h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash).Delete(&model.TorrentMetadata{})
+	// 查该 hash 的 name → 同名全部 hash
+	var name string
+	h.db.WithContext(r.Context()).
+		Table("torrent_snapshots").
+		Select("name").
+		Where("hash = ? AND name != ''", infoHash).
+		Limit(1).
+		Row().Scan(&name)
+
+	result := h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash).Delete(&model.TorrentMetadata{})
+	if name != "" {
+		// 资源级：删同名全部 hash 的 metadata（含代表 hash 自身，幂等）
+		var siblingHashes []string
+		h.db.WithContext(r.Context()).
+			Table("torrent_snapshots").
+			Select("hash").
+			Where("name = ?", name).
+			Find(&siblingHashes)
+		if len(siblingHashes) > 0 {
+			result = h.db.WithContext(r.Context()).
+				Where("info_hash IN ?", siblingHashes).
+				Delete(&model.TorrentMetadata{})
+		}
+	}
+	_ = result
 	Success(w, map[string]interface{}{"message": "已清除"})
 }
