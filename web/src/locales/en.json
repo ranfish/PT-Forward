@@ -74,7 +74,8 @@
     "advancedOptions": "Advanced Options",
     "requestFailed": "Request failed",
     "networkError": "Network error",
-    "saveSuccess": "Saved successfully"
+    "saveSuccess": "Saved successfully",
+    "add": "Add"
   },
   "auth": {
     "login": "Login",
@@ -839,7 +840,10 @@
     "deleteCompanions": "Delete Companions",
     "deleteCompanionsHint": "Only delete the triggered site torrent. Keep data if other sites are still seeding; delete data if no companions exist.",
     "deleteCompanionsOn": "Delete companions + data",
-    "deleteCompanionsOff": "Only this site"
+    "deleteCompanionsOff": "Only this site",
+    "unregisteredKeywordsTitle": "Site-Deleted Detection Keywords",
+    "unregisteredKeywordsHint": "When tracker messages contain these keywords, the torrent is marked as site-deleted; disposal is done by bound delete rules (marked only if unbound)",
+    "unregisteredKeywordsPlaceholder": "Enter keyword, e.g. unregistered torrent"
   },
   "reseed": {
     "addTask": "Create Task",
@@ -900,7 +904,6 @@
     "iyuuCloud": "IYUU Cloud Reseed",
     "injectionIntervalS": "Injection Interval (sec)",
     "injectionJitterS": "Injection Jitter (sec)",
-
     "scanConcurrency": "Scan Concurrency",
     "maxRetries": "Max Retries",
     "retryIntervalH": "Retry Interval (hour)",
@@ -1182,7 +1185,7 @@
     "batchFound": "Found",
     "batchNotFound": "Not Found",
     "batchError": "Error",
-    "columnClient": "Recover To",
+    "columnClient": "Client",
     "columnStatus": "Status",
     "recoverSettings": "Recovery Settings",
     "scanConfigTitle": "Scan Path Config",
@@ -1199,7 +1202,6 @@
     "columnName": "Name",
     "columnType": "Type",
     "columnSize": "Size",
-    "columnClient": "Client",
     "directory": "Dir",
     "file": "File"
   },

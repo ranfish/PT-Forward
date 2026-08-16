@@ -137,30 +137,6 @@
         </a-card>
       </a-col>
     </a-row>
-
-    <a-card title="站点删种检测关键词（tracker 返回信息包含以下关键词时，标记该种子为站点删种；处置由绑定的删种规则执行，未绑定规则则只标记不删除）" style="margin-top: 16px">
-      <div style="margin-bottom: 8px; display: flex; gap: 8px; align-items: center">
-        <a-input
-          v-model:value="newKeyword"
-          placeholder="输入关键词，如 unregistered torrent"
-          style="width: 300px"
-          @press-enter="addKeyword"
-        />
-        <a-button type="primary" size="small" @click="addKeyword">添加</a-button>
-        <a-button size="small" :loading="keywordsSaving" @click="saveKeywords">保存</a-button>
-      </div>
-      <div>
-        <a-tag
-          v-for="(kw, i) in unregisteredKeywords"
-          :key="i"
-          closable
-          style="margin-bottom: 4px"
-          @close="removeKeyword(i)"
-        >
-          {{ kw }}
-        </a-tag>
-      </div>
-    </a-card>
   </div>
 </template>
 
@@ -190,9 +166,6 @@ const saving = ref(false)
 const dryrunLoading = ref(false)
 const logsLoading = ref(false)
 const dryrunResult = ref<DryrunResult | null>(null)
-const unregisteredKeywords = ref<string[]>([])
-const newKeyword = ref('')
-const keywordsSaving = ref(false)
 const subscriptions = ref<{ id: number; name: string; site_name?: string }[]>([])
 const selectedSubId = ref<number | undefined>(undefined)
 const scoringConfig = reactive({
@@ -326,42 +299,13 @@ async function fetchSubscriptions() {
   }
 }
 
-async function fetchUnregisteredKeywords() {
-  try {
-    const resp = await seedingApi.getUnregisteredKeywords()
-    unregisteredKeywords.value = resp.data.data?.keywords || []
-  } catch {
-  }
-}
 
-function addKeyword() {
-  const kw = newKeyword.value.trim()
-  if (kw && !unregisteredKeywords.value.includes(kw)) {
-    unregisteredKeywords.value.push(kw)
-  }
-  newKeyword.value = ''
-}
 
-function removeKeyword(idx: number) {
-  unregisteredKeywords.value.splice(idx, 1)
-}
 
-async function saveKeywords() {
-  keywordsSaving.value = true
-  try {
-    await seedingApi.updateUnregisteredKeywords(unregisteredKeywords.value)
-    message.success(t('common.saveSuccess'))
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  } finally {
-    keywordsSaving.value = false
-  }
-}
 
 onMounted(() => {
   fetchSubscriptions()
   fetchScoringConfig()
   fetchScoringLogs()
-  fetchUnregisteredKeywords()
 })
 </script>
