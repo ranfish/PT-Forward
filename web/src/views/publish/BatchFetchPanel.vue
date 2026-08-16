@@ -5,6 +5,8 @@
     width="900px"
     :footer="null"
     destroy-on-close
+    :mask-closable="!fetching"
+    :keyboard="!fetching"
     @cancel="handleClose"
   >
     <!-- 工具栏 -->
@@ -185,6 +187,26 @@ const filteredTorrents = computed(() => {
 
 watch(() => props.open, async (val) => {
   if (val) {
+    // §59.32: 恢复运行中的批量获取任务（后端仍在跑时直接进入进度视图）
+    try {
+      const resp = await seedConfigApi.batchFetchProgress()
+      const p = resp.data?.data
+      if (p?.active) {
+        progress.value = {
+          active: true,
+          total: p.total || 0,
+          done: p.done || 0,
+          failed: p.failed || 0,
+          items: (p.items || []).map((it: { hash: string; name: string; status: string; error?: string }) => ({ ...it })),
+        }
+        fetching.value = true
+        fetchDone.value = false
+        torrents.value = []
+        selectedHashes.value = []
+        startPolling()
+        return
+      }
+    } catch { /* 查询失败按全新弹窗处理 */ }
     reset()
     await loadUnconfigured()
   }
@@ -236,6 +258,10 @@ async function startBatchFetch() {
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 
+function startPolling() {
+  pollProgress()
+}
+
 function pollProgress() {
   pollTimer = setTimeout(async () => {
     try {
@@ -268,6 +294,9 @@ function pollProgress() {
 
 function handleClose() {
   if (pollTimer) clearTimeout(pollTimer)
+  if (fetching.value) {
+    message.info('批量获取将在后台继续，重新打开此弹窗可查看进度')
+  }
   emit('update:open', false)
 }
 
