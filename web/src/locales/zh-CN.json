@@ -77,7 +77,8 @@
     "saveSuccess": "保存成功",
     "action": "操作",
     "confirm": "确认",
-    "items": "条"
+    "items": "条",
+    "add": "添加"
   },
   "auth": {
     "login": "登录",
@@ -842,7 +843,10 @@
     "deleteCompanions": "删除辅种",
     "deleteCompanionsHint": "仅删除命中规则的站点种子。其它站点仍有辅种时保留数据文件；无辅种时一并删除数据文件。",
     "deleteCompanionsOn": "删除辅种 + 数据",
-    "deleteCompanionsOff": "仅删本站种子"
+    "deleteCompanionsOff": "仅删本站种子",
+    "unregisteredKeywordsTitle": "站点删种检测关键词",
+    "unregisteredKeywordsHint": "tracker 返回信息包含以下关键词时，标记该种子为站点删种；处置由绑定的删种规则执行，未绑定规则则只标记不删除",
+    "unregisteredKeywordsPlaceholder": "输入关键词，如 unregistered torrent"
   },
   "reseed": {
     "addTask": "创建任务",
@@ -903,7 +907,6 @@
     "iyuuCloud": "IYUU云端辅种",
     "injectionIntervalS": "注入间隔(秒)",
     "injectionJitterS": "注入抖动(秒)",
-
     "scanConcurrency": "扫描并发",
     "maxRetries": "最大重试",
     "retryIntervalH": "重试间隔(小时)",
@@ -1185,7 +1188,7 @@
     "batchFound": "成功",
     "batchNotFound": "未找到",
     "batchError": "失败",
-    "columnClient": "恢复到",
+    "columnClient": "下载器",
     "columnStatus": "状态",
     "recoverSettings": "恢复设置",
     "scanConfigTitle": "扫描路径配置",
@@ -1202,7 +1205,6 @@
     "columnName": "名称",
     "columnType": "类型",
     "columnSize": "大小",
-    "columnClient": "下载器",
     "directory": "目录",
     "file": "文件"
   },

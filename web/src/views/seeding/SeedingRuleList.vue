@@ -203,6 +203,32 @@
         </a-collapse>
       </a-form>
     </a-modal>
+
+    <!-- §59.31: 站点删种检测关键词（从 /seeding/scoring 迁入——本质是删种规则的判定材料） -->
+    <a-card :title="t('seeding.unregisteredKeywordsTitle')" style="margin-top: 16px">
+      <div style="margin-bottom: 8px; display: flex; gap: 8px; align-items: center">
+        <a-input
+          v-model:value="newKeyword"
+          :placeholder="t('seeding.unregisteredKeywordsPlaceholder')"
+          style="width: 300px"
+          @press-enter="addKeyword"
+        />
+        <a-button type="primary" size="small" @click="addKeyword">{{ t('common.add') }}</a-button>
+        <a-button size="small" :loading="keywordsSaving" @click="saveKeywords">{{ t('common.save') }}</a-button>
+      </div>
+      <div>
+        <a-tag
+          v-for="(kw, i) in unregisteredKeywords"
+          :key="i"
+          closable
+          style="margin-bottom: 4px"
+          @close.prevent="removeKeyword(i)"
+        >
+          {{ kw }}
+        </a-tag>
+      </div>
+      <div style="color: #999; font-size: 12px; margin-top: 8px">{{ t('seeding.unregisteredKeywordsHint') }}</div>
+    </a-card>
   </div>
 </template>
 
@@ -211,12 +237,50 @@ import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { PlusOutlined } from '@ant-design/icons-vue'
-import { deleteRulesApi } from '@/api/seeding'
+import { deleteRulesApi, seedingApi } from '@/api/seeding'
 import type { DeleteRule } from '@/api/types'
 
 const { t } = useI18n()
 const loading = ref(false)
 const showRawJson = ref(false)
+
+// ==================== §59.31 站点删种检测关键词 ====================
+const unregisteredKeywords = ref<string[]>([])
+const newKeyword = ref('')
+const keywordsSaving = ref(false)
+
+async function fetchUnregisteredKeywords() {
+  try {
+    const resp = await seedingApi.getUnregisteredKeywords()
+    unregisteredKeywords.value = resp.data?.data?.keywords || []
+  } catch {
+    unregisteredKeywords.value = []
+  }
+}
+
+function addKeyword() {
+  const kw = newKeyword.value.trim()
+  if (!kw) return
+  if (unregisteredKeywords.value.includes(kw)) return
+  unregisteredKeywords.value.push(kw)
+  newKeyword.value = ''
+}
+
+function removeKeyword(i: number) {
+  unregisteredKeywords.value.splice(i, 1)
+}
+
+async function saveKeywords() {
+  keywordsSaving.value = true
+  try {
+    await seedingApi.updateUnregisteredKeywords(unregisteredKeywords.value)
+    message.success(t('common.saveSuccess'))
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    keywordsSaving.value = false
+  }
+}
 
 const actionLabels: Record<string, string> = {
   delete: t('seeding.deleteTorrent'),
@@ -747,5 +811,8 @@ async function toggleRule(record: DeleteRule) {
   }
 }
 
-onMounted(fetchRules)
+onMounted(() => {
+  fetchRules()
+  fetchUnregisteredKeywords()
+})
 </script>
