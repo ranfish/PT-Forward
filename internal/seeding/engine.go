@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -3060,7 +3061,7 @@ func (e *Engine) patrolMatchFromTorrentMap(ctx context.Context, clientID string,
 // 单 tick 上限（审计 #3）：站点故障爆发首 tick 冷却表为空，若不限量会全池
 // 串行打完并阻塞 refreshMaindataLoop——限 50/tick，溢出留待下 tick（此时
 // 已有冷却记录，不重复）。
-func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClient model.DownloaderClient, suspects []*model.SeedingTorrentRecord, keywords []string) {
+func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClient trackerMsgGetter, suspects []*model.SeedingTorrentRecord, keywords []string) {
 	now := time.Now()
 	cooldown := e.patrolCooldownDuration()
 	checked := 0
@@ -3074,11 +3075,13 @@ func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClie
 		if e.inUnregCooldown(clientID, rec.InfoHash, now, cooldown) {
 			continue
 		}
+		// §59.31 二审 NEW-2：尝试即计数（含失败）——错误风暴（CSRF 过期/客户端
+		// 抖动导致逐个失败）同样消耗 tick 预算，防单 tick 串行打满全池
+		checked++
 		msgs, err := dlClient.GetTrackerMessagesAll(ctx, rec.InfoHash)
 		if err != nil {
 			continue
 		}
-		checked++
 		matched := false
 		for _, tm := range msgs {
 			msg := strings.TrimSpace(tm.Msg)
@@ -3099,7 +3102,14 @@ func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClie
 
 // patrolFullScanBatch 全量兜底轮询（批 N，per-client 周期指针循环）。
 // qb <5.2 主路径；qb 5.2+ 的无信号候选兜底（审计 #1）。
-func (e *Engine) patrolFullScanBatch(ctx context.Context, clientID string, dlClient model.DownloaderClient, candidates []*model.SeedingTorrentRecord, keywords []string) {
+func (e *Engine) patrolFullScanBatch(ctx context.Context, clientID string, dlClient trackerMsgGetter, candidates []*model.SeedingTorrentRecord, keywords []string) {
+	// §59.31 二审 A：按 InfoHash 排序使游标为确定性轮转（recordMap 迭代序随机，
+	// 不排序时游标是对随机排列的滑窗采样，最坏覆盖延迟 ~2× 标称周期）
+	sorted := make([]*model.SeedingTorrentRecord, len(candidates))
+	copy(sorted, candidates)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].InfoHash < sorted[j].InfoHash })
+	candidates = sorted
+
 	batchSize := e.patrolBatchSize()
 	e.patrolMu.Lock()
 	if e.patrolCursors == nil {
@@ -3182,6 +3192,11 @@ func hitKeyword(msg string, keywords []string) bool {
 		}
 	}
 	return false
+}
+
+// trackerMsgGetter §59.31：巡检 batch 函数的最小依赖（便于单测 mock）。
+type trackerMsgGetter interface {
+	GetTrackerMessagesAll(ctx context.Context, hash string) ([]model.TrackerMessage, error)
 }
 
 // patrolCooldown §59.31 遗漏 A：怀疑池冷却状态（内存态，重启重建，不持久化）。

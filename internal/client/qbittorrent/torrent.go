@@ -573,8 +573,8 @@ func (c *QBClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTra
 }
 
 // GetTrackerMessagesAll §59.31: 返回种子全部 http/https tracker 的消息。
-// 幽灵种子巡检用：与 GetTrackerMessages 同一次 API，逐条返回（排除 ** 前缀的
-// qb 内置 tracker：DHT/PEX/LSD 伪条目，它们的 msg 不是站点 tracker 应答）。
+// 幽灵种子巡检用：单次 trackers API，逐条返回（排除 ** 前缀的 qb 内置
+// tracker：DHT/PEX/LSD 伪条目，它们的 msg 不是站点 tracker 应答）。
 func (c *QBClient) GetTrackerMessagesAll(ctx context.Context, hash string) ([]model.TrackerMessage, error) {
 	resp, err := c.get(ctx, "/api/v2/torrents/trackers?hash="+url.QueryEscape(hash))
 	if err != nil {
