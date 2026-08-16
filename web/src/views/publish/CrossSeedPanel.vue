@@ -6,6 +6,8 @@
     placement="right"
     :body-style="{ padding: '0' }"
     :header-style="{ display: 'none' }"
+    :mask-closable="!taskRunning"
+    :keyboard="!taskRunning"
     destroy-on-close
     @close="handleClose"
   >
@@ -509,6 +511,27 @@ const subtitleWarning = computed(() => {
 // --- Lifecycle ---
 watch(() => props.open, (val) => {
   if (val) {
+    // §59.32: 恢复进行中任务（分析/发布）——不重置、不重新发起
+    const active = restoreActiveTask()
+    if (active) {
+      resetPanel()
+      if (props.presetTorrent) selectedTorrent.value = props.presetTorrent
+      if (active.candidateId) {
+        // 发布阶段恢复：直接进入结果步骤，续轮询
+        currentStep.value = 2
+        submittedCandidateId.value = active.candidateId
+        startCandidatePoll(active.candidateId)
+        return
+      }
+      if (active.taskId) {
+        // 分析阶段恢复：loading 视图 + 续轮询
+        loading.value = true
+        loadingProgress.value = 0
+        loadingText.value = '正在分析（已恢复）...'
+        pollAnalyze(active.taskId)
+        return
+      }
+    }
     resetPanel()
     if (props.presetTorrent) {
       selectedTorrent.value = props.presetTorrent
@@ -525,6 +548,43 @@ watch(() => props.open, (val) => {
 watch(currentStep, () => {
   if (bodyRef.value) bodyRef.value.scrollTop = 0
 })
+
+// §59.32: 后台任务运行态（分析 loading 或 发布轮询中）
+const taskRunning = computed(() => loading.value || !!candidatePollTimer)
+
+// §59.32: 任务恢复——sessionStorage 记录进行中任务（infoHash 匹配才恢复，防跨种子串台）
+const SS_TASK_KEY = 'csp-active-task'
+
+function saveActiveTask(infoHash: string, taskId?: number, candidateId?: number) {
+  try {
+    const prev = JSON.parse(sessionStorage.getItem(SS_TASK_KEY) || '{}')
+    sessionStorage.setItem(SS_TASK_KEY, JSON.stringify({
+      infoHash,
+      taskId: taskId ?? prev.taskId,
+      candidateId: candidateId ?? prev.candidateId,
+    }))
+  } catch { /* silent */ }
+}
+
+function clearActiveTask() {
+  try { sessionStorage.removeItem(SS_TASK_KEY) } catch { /* silent */ }
+}
+
+function restoreActiveTask(): { infoHash: string; taskId?: number; candidateId?: number } | null {
+  try {
+    const raw = sessionStorage.getItem(SS_TASK_KEY)
+    if (!raw) return null
+    const t = JSON.parse(raw)
+    if (!t?.infoHash) return null
+    if (!t.taskId && !t.candidateId) return null
+    // infoHash 匹配当前预设种子才恢复（跨种子不串台）
+    if (props.presetTorrent?.info_hash && t.infoHash !== props.presetTorrent.info_hash) {
+      sessionStorage.removeItem(SS_TASK_KEY)
+      return null
+    }
+    return t
+  } catch { return null }
+}
 
 function resetPanel() {
   stopCandidatePoll()
@@ -554,6 +614,9 @@ function resetPanel() {
 }
 
 function handleClose() {
+  if (taskRunning.value) {
+    message.info('任务将在后台继续，重新打开此种子可恢复进度')
+  }
   emit('update:open', false)
 }
 
@@ -705,6 +768,9 @@ async function enterAnalyze() {
       loading.value = false
       return
     }
+    if (props.presetTorrent?.info_hash) {
+      saveActiveTask(props.presetTorrent.info_hash, taskId)
+    }
     pollAnalyze(taskId)
   } catch (e: unknown) {
     loadError.value = (e as Error).message
@@ -724,9 +790,11 @@ function pollAnalyze(taskId: number) {
         fillForm(r)
         loading.value = false
         loadingProgress.value = 0
+        clearActiveTask()
       } else if (task.status === 'failed') {
         loadError.value = task.error || '分析失败'
         loading.value = false
+        clearActiveTask()
       } else {
         loadingProgress.value = task.progress || 0
         loadingText.value = task.progressText || '正在分析...'
@@ -1049,6 +1117,9 @@ async function doSubmit() {
     const candId = (resp.data?.data as unknown as Record<string, unknown>)?.candidate_id as number
     if (candId) {
       submittedCandidateId.value = candId
+      if (props.presetTorrent?.info_hash) {
+        saveActiveTask(props.presetTorrent.info_hash, undefined, candId)
+      }
       currentStep.value = 3
       startCandidatePoll(candId)
     }
@@ -1084,6 +1155,7 @@ function startCandidatePoll(candidateId: number) {
 
       if (status === 'done' || status === 'failed') {
         stopCandidatePoll()
+        clearActiveTask()
       }
     } catch { /* silent */ }
   }, 3000)

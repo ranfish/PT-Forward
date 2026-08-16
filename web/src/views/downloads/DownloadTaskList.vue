@@ -255,7 +255,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, h } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
@@ -614,9 +614,10 @@ onMounted(async () => {
   fetchConfigs()
   fetchSpaceStats()
   fetchData()
-  setInterval(() => {
+  const refreshTimer = setInterval(() => {
     fetchData()
     fetchSpaceStats()
   }, 30000)
+  onUnmounted(() => clearInterval(refreshTimer))
 })
 </script>

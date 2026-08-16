@@ -138,7 +138,7 @@
       </div>
     </a-layout-sider>
 
-    <a-modal v-model:open="updateModalVisible" title="系统更新" :footer="null" width="500px">
+    <a-modal v-model:open="updateModalVisible" title="系统更新" :footer="null" width="500px" :mask-closable="!updating" :keyboard="!updating">
       <div v-if="updateChecking" style="text-align: center; padding: 20px;">
         <a-spin tip="正在检查更新..." />
       </div>

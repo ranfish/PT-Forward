@@ -695,7 +695,18 @@ const hasActiveCandidates = computed(() =>
 
 let candidatePollTimer: ReturnType<typeof setInterval> | null = null
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// §59.32 #4: 恢复进行中的 candidate 轮询（发布未完成时进页面自动续看）
+async function resumeRunningCandidates() {
+  try {
+    const resp = await publishApi.listCandidates({ page: 1, pageSize: 20 })
+    const items = (resp.data?.data?.items || []) as Array<{ id: number; publish_status: string }>
+    const running = items.find(c => c.publish_status === 'running' || c.publish_status === 'pending')
+    if (running) {
+      startCandidatePoll()
+    }
+  } catch { /* silent */ }
+}
+
 function startCandidatePoll() {
   if (candidatePollTimer) return
   candidatePollTimer = setInterval(async () => {
@@ -928,6 +939,8 @@ function onWizardSuccess() {
 }
 
 onMounted(() => {
+  // §59.32 #4: 存在进行中的发布 candidate 时自动续轮询（兜底恢复）
+  resumeRunningCandidates()
   fetchStats()
   fetchCandidates()
   fetchGroups()
