@@ -41,10 +41,6 @@
             <a-menu-item key="/seeding/torrents" @click="$router.push('/seeding/torrents')">{{ t('nav.seedingTorrents') }}</a-menu-item>
             <a-menu-item key="/seeding/stats" @click="$router.push('/seeding/stats')">{{ t('nav.seedingStats') }}</a-menu-item>
           </a-sub-menu>
-          <a-menu-item key="/rules" @click="$router.push('/rules')">
-            <template #icon><ProfileOutlined /></template>
-            <span>{{ t('nav.deleteRules') }}</span>
-          </a-menu-item>
           <a-sub-menu key="publish-sub">
             <template #icon><SendOutlined /></template>
             <template #title>{{ t('nav.publish') }}</template>
@@ -60,6 +56,10 @@
           <a-menu-item key="/downloads" @click="$router.push('/downloads')">
             <template #icon><DownloadOutlined /></template>
             <span>{{ t('nav.downloads') }}</span>
+          </a-menu-item>
+          <a-menu-item key="/rules" @click="$router.push('/rules')">
+            <template #icon><ProfileOutlined /></template>
+            <span>{{ t('nav.deleteRules') }}</span>
           </a-menu-item>
           <a-menu-item key="/iyuu" @click="$router.push('/iyuu')">
             <template #icon><ApiOutlined /></template>
