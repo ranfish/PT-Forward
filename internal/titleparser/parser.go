@@ -304,7 +304,9 @@ func extractSeriesStatus(title string) string {
 
 func extractReleaseVersion(title string) string {
 	upper := strings.ToUpper(title)
-	for _, kw := range []string{"PROPER", "REPACK", "RERIP", "DIRFIX", "INTERNAL", "REMUX"} {
+	// §59.32: REMUX 不在此表——v1.05 中 Remux 是规格（specification），
+	// 由 extractMedium→splitMedium 产出；此处抢词会提前剥掉 token 导致规格丢失
+	for _, kw := range []string{"PROPER", "REPACK", "RERIP", "DIRFIX", "INTERNAL"} {
 		if strings.Contains(upper, kw) {
 			return kw
 		}
