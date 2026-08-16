@@ -86,10 +86,6 @@ func (m *flushMockClient) CheckExists(_ context.Context, hash string) (bool, err
 func (m *flushMockClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
 	return &model.GlobalTransferStats{}, nil
 }
-func (m *flushMockClient) GetTrackerMessages(_ context.Context, _ string) (string, error) {
-	return "", nil
-}
-
 func (m *flushMockClient) GetTrackerMessagesAll(_ context.Context, _ string) ([]model.TrackerMessage, error) {
 	return nil, nil
 }

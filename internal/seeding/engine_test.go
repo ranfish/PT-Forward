@@ -96,10 +96,6 @@ func (m *mockDownloaderClient) GetTorrentDir() string                      { ret
 func (m *mockDownloaderClient) GetGlobalTransferStats(_ context.Context) (*model.GlobalTransferStats, error) {
 	return &model.GlobalTransferStats{}, nil
 }
-func (m *mockDownloaderClient) GetTrackerMessages(_ context.Context, _ string) (string, error) {
-	return "", nil
-}
-
 func (m *mockDownloaderClient) GetTrackerMessagesAll(_ context.Context, _ string) ([]model.TrackerMessage, error) {
 	return nil, nil
 }

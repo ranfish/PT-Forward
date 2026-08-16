@@ -604,36 +604,6 @@ func (c *QBClient) GetTrackerMessagesAll(ctx context.Context, hash string) ([]mo
 	return out, nil
 }
 
-func (c *QBClient) GetTrackerMessages(ctx context.Context, hash string) (string, error) {
-	resp, err := c.get(ctx, "/api/v2/torrents/trackers?hash="+url.QueryEscape(hash))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("trackers API returned %d", resp.StatusCode)
-	}
-	var trackers []struct {
-		URL  string `json:"url"`
-		Msg  string `json:"msg"`
-		Tier int    `json:"tier"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&trackers); err != nil {
-		return "", fmt.Errorf("decode trackers: %w", err)
-	}
-	for _, t := range trackers {
-		if strings.HasPrefix(t.URL, "**") {
-			continue
-		}
-		if strings.HasPrefix(t.URL, "http://") || strings.HasPrefix(t.URL, "https://") {
-			if t.Msg != "" && !strings.EqualFold(t.Msg, "ok") && !strings.Contains(t.Msg, "Success") {
-				return t.Msg, nil
-			}
-		}
-	}
-	return "", nil
-}
-
 func (c *QBClient) GetTrackers(ctx context.Context, hash string) ([]string, error) {
 	resp, err := c.get(ctx, "/api/v2/torrents/trackers?hash="+url.QueryEscape(hash))
 	if err != nil {

@@ -205,12 +205,15 @@ type Engine struct {
 	pusher            *pusher.Pusher
 	pendingEvents     chan *pusher.PushedEvent
 
-	unregisteredCursor   atomic.Int64
 	unregisteredChecking atomic.Bool
 
-	// §59.31: 怀疑池冷却（内存态，重启重建）
-	patrolMu         sync.Mutex
-	patrolCooldowns  map[string]*patrolCooldownEntry
+	// §59.31: 巡检调度状态（内存态，重启重建）
+	//   patrolCursors: per-client 全量轮询游标（审计 #4：Engine 级单游标会让
+	//     小客户端每 tick 重置，饿死大客户端的扫描段）
+	//   patrolCooldowns: 怀疑池冷却（遗漏 A）
+	patrolMu        sync.Mutex
+	patrolCursors   map[string]int
+	patrolCooldowns map[string]*patrolCooldownEntry
 
 	spaceAlarmMu   sync.Mutex
 	spaceAlarmLast map[string]time.Time
@@ -3000,28 +3003,31 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 		// TR 档：torrentMap 自带全部消息，全量匹配（零额外请求）
 		e.patrolMatchFromTorrentMap(ctx, clientID, candidates, torrentMap, keywords)
 	case "qbittorrent":
-		// qb 档：优先用 5.2+ 怀疑池信号；无信号（旧版）回退全量轮询
+		// qb 档（§59.31 审计修复 #1/#2）：5.2+ 信号字段只做调度加速，
+		// 不改变覆盖语义——每个 tick 同时跑两路：
+		//   ① 怀疑池即时确认（有信号者，带冷却 + 单 tick 上限防爆）
+		//   ② 周期性全量兜底批扫（无信号者按游标轮转，覆盖
+		//      PausedFreeEnd/PausedRule 不 announce → 信号恒零的候选，
+		//      以及增量 maindata 信号被清零的窗口）
+		// 旧版 qb（信号恒零）自然退化为纯 ②——与设计 <5.2 档一致。
 		var suspects []*model.SeedingTorrentRecord
-		hasSignal := false
+		var rest []*model.SeedingTorrentRecord
 		for _, rec := range candidates {
 			ti, ok := torrentMap[rec.InfoHash]
-			if !ok {
-				continue
-			}
-			if ti.HasTrackerError || ti.HasTrackerWarning || ti.HasOtherAnnounceError {
-				hasSignal = true
+			if ok && (ti.HasTrackerError || ti.HasTrackerWarning || ti.HasOtherAnnounceError) {
 				suspects = append(suspects, rec)
+			} else {
+				rest = append(rest, rec)
 			}
 		}
-		if hasSignal {
-			// 5.2+ 档：怀疑池逐个查询（带冷却）
+		if len(suspects) > 0 {
 			e.patrolConfirmBatch(ctx, clientID, dlClient, suspects, keywords)
-			return
 		}
-		// <5.2 档：全量低频轮询（批 N，周期指针）
-		e.patrolFullScanBatch(ctx, clientID, dlClient, candidates, keywords)
+		if len(rest) > 0 {
+			e.patrolFullScanBatch(ctx, clientID, dlClient, rest, keywords)
+		}
 	default:
-		// 未知框架：按 qb 全量轮询兜底
+		// 未知框架：全量轮询兜底
 		e.patrolFullScanBatch(ctx, clientID, dlClient, candidates, keywords)
 	}
 }
@@ -3049,20 +3055,30 @@ func (e *Engine) patrolMatchFromTorrentMap(ctx context.Context, clientID string,
 	}
 }
 
-// patrolConfirmBatch qb 5.2+ 档：怀疑池逐个确认（带冷却，防 tracker 站点故障时反复浪费额度）。
+// patrolConfirmBatch qb 5.2+ 档：怀疑池逐个确认（带冷却 + 单 tick 上限）。
+// 冷却（遗漏 A）：查过不命中 30 分钟内不重查，防 tracker 站点故障反复浪费额度。
+// 单 tick 上限（审计 #3）：站点故障爆发首 tick 冷却表为空，若不限量会全池
+// 串行打完并阻塞 refreshMaindataLoop——限 50/tick，溢出留待下 tick（此时
+// 已有冷却记录，不重复）。
 func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClient model.DownloaderClient, suspects []*model.SeedingTorrentRecord, keywords []string) {
 	now := time.Now()
+	cooldown := e.patrolCooldownDuration()
+	checked := 0
 	for _, rec := range suspects {
 		if ctx.Err() != nil {
 			return
 		}
-		if e.inUnregCooldown(clientID, rec.InfoHash, now) {
+		if checked >= e.patrolBatchSize() {
+			return
+		}
+		if e.inUnregCooldown(clientID, rec.InfoHash, now, cooldown) {
 			continue
 		}
 		msgs, err := dlClient.GetTrackerMessagesAll(ctx, rec.InfoHash)
 		if err != nil {
 			continue
 		}
+		checked++
 		matched := false
 		for _, tm := range msgs {
 			msg := strings.TrimSpace(tm.Msg)
@@ -3081,10 +3097,15 @@ func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClie
 	}
 }
 
-// patrolFullScanBatch qb <5.2 档：全量低频轮询（批 N，周期指针循环）。
+// patrolFullScanBatch 全量兜底轮询（批 N，per-client 周期指针循环）。
+// qb <5.2 主路径；qb 5.2+ 的无信号候选兜底（审计 #1）。
 func (e *Engine) patrolFullScanBatch(ctx context.Context, clientID string, dlClient model.DownloaderClient, candidates []*model.SeedingTorrentRecord, keywords []string) {
 	batchSize := e.patrolBatchSize()
-	cursor := int(e.unregisteredCursor.Load())
+	e.patrolMu.Lock()
+	if e.patrolCursors == nil {
+		e.patrolCursors = make(map[string]int)
+	}
+	cursor := e.patrolCursors[clientID]
 	if cursor >= len(candidates) {
 		cursor = 0
 	}
@@ -3092,8 +3113,9 @@ func (e *Engine) patrolFullScanBatch(ctx context.Context, clientID string, dlCli
 	if end > len(candidates) {
 		end = len(candidates)
 	}
+	e.patrolCursors[clientID] = end
+	e.patrolMu.Unlock()
 	batch := candidates[cursor:end]
-	e.unregisteredCursor.Store(int64(end))
 
 	for _, rec := range batch {
 		if ctx.Err() != nil {
@@ -3167,31 +3189,23 @@ type patrolCooldownEntry struct {
 	lastChecked time.Time
 }
 
-func (e *Engine) cooldownMap() map[string]*patrolCooldownEntry {
-	e.patrolMu.Lock()
-	defer e.patrolMu.Unlock()
-	if e.patrolCooldowns == nil {
-		e.patrolCooldowns = make(map[string]*patrolCooldownEntry)
-	}
-	return e.patrolCooldowns
-}
-
-func (e *Engine) inUnregCooldown(clientID, hash string, now time.Time) bool {
-	m := e.cooldownMap()
+func (e *Engine) inUnregCooldown(clientID, hash string, now time.Time, cooldown time.Duration) bool {
 	e.patrolMu.Lock()
 	defer e.patrolMu.Unlock()
 	key := clientID + "|" + hash
-	if entry, ok := m[key]; ok {
-		return now.Sub(entry.lastChecked) < e.patrolCooldownDuration()
+	if entry, ok := e.patrolCooldowns[key]; ok {
+		return now.Sub(entry.lastChecked) < cooldown
 	}
 	return false
 }
 
 func (e *Engine) setUnregCooldown(clientID, hash string, now time.Time) {
-	m := e.cooldownMap()
 	e.patrolMu.Lock()
 	defer e.patrolMu.Unlock()
-	m[clientID+"|"+hash] = &patrolCooldownEntry{lastChecked: now}
+	if e.patrolCooldowns == nil {
+		e.patrolCooldowns = make(map[string]*patrolCooldownEntry)
+	}
+	e.patrolCooldowns[clientID+"|"+hash] = &patrolCooldownEntry{lastChecked: now}
 }
 
 // patrolCooldownDuration 冷却时长（默认 30 分钟；全局可配 patrol.recheck_cooldown_min）。

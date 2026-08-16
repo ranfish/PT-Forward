@@ -394,9 +394,6 @@ func (s *stubClient) GetTrackerMessagesAll(_ context.Context, _ string) ([]model
 	return nil, nil
 }
 
-func (s *stubClient) GetTrackerMessages(_ context.Context, _ string) (string, error) {
-	return "", nil
-}
 func (s *stubClient) GetTrackers(_ context.Context, _ string) ([]string, error) {
 	return nil, nil
 }
