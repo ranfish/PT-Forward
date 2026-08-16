@@ -45,14 +45,6 @@
             <template #icon><ProfileOutlined /></template>
             <span>{{ t('nav.deleteRules') }}</span>
           </a-menu-item>
-          <a-menu-item key="/downloads" @click="$router.push('/downloads')">
-            <template #icon><DownloadOutlined /></template>
-            <span>{{ t('nav.downloads') }}</span>
-          </a-menu-item>
-          <a-menu-item key="/reseed" @click="$router.push('/reseed')">
-            <template #icon><CopyOutlined /></template>
-            <span>{{ t('nav.reseed') }}</span>
-          </a-menu-item>
           <a-sub-menu key="publish-sub">
             <template #icon><SendOutlined /></template>
             <template #title>{{ t('nav.publish') }}</template>
@@ -61,6 +53,14 @@
             <a-menu-item key="/publish/logs" @click="$router.push('/publish/logs')">发布日志</a-menu-item>
             <a-menu-item key="/publish/rules" @click="$router.push('/publish/rules')">发布规则</a-menu-item>
           </a-sub-menu>
+          <a-menu-item key="/reseed" @click="$router.push('/reseed')">
+            <template #icon><CopyOutlined /></template>
+            <span>{{ t('nav.reseed') }}</span>
+          </a-menu-item>
+          <a-menu-item key="/downloads" @click="$router.push('/downloads')">
+            <template #icon><DownloadOutlined /></template>
+            <span>{{ t('nav.downloads') }}</span>
+          </a-menu-item>
           <a-menu-item key="/iyuu" @click="$router.push('/iyuu')">
             <template #icon><ApiOutlined /></template>
             <span>{{ t('nav.iyuu') }}</span>
