@@ -1,25 +1,114 @@
 {
   "unwanted_images": [
-    {"pattern": "ico_", "match_type": "substring", "category": "site_logo"},
-    {"pattern": "logo", "match_type": "substring", "category": "site_logo"},
-    {"pattern": "banner", "match_type": "substring", "category": "ad"},
-    {"pattern": "icon", "match_type": "substring", "category": "site_logo"},
-    {"pattern": "emoji", "match_type": "substring", "category": "emoji"},
-    {"pattern": "smiley", "match_type": "substring", "category": "emoji"},
-    {"pattern": "rank_", "match_type": "substring", "category": "site_logo"},
-    {"pattern": "badge", "match_type": "substring", "category": "site_logo"},
-    {"pattern": "Mediainfo.png", "match_type": "substring", "category": "site_logo"},
-    {"pattern": "MoreScreenshot.png", "match_type": "substring", "category": "site_logo"},
-    {"pattern": "wawawa.me/team/frogteam.svg", "match_type": "substring", "category": "team_logo"},
-    {"pattern": "pterclub.net/pic/", "match_type": "substring", "category": "site_logo"},
-    {"pattern": "img.pterclub.net/images/", "match_type": "substring", "category": "site_logo"},
-    {"pattern": "jinzhuan", "match_type": "substring", "category": "team_logo"},
-    {"pattern": "thumbsup", "match_type": "substring", "category": "emoji"},
-    {"pattern": "kralimarko", "match_type": "substring", "category": "emoji"},
-    {"pattern": "twemoji.com", "match_type": "host", "category": "emoji"},
-    {"pattern": "emoji-cdn.com", "match_type": "host", "category": "emoji"},
-    {"pattern": "/pic/smiley/", "match_type": "substring", "category": "emoji"},
-    {"pattern": "/static/emoji/", "match_type": "substring", "category": "emoji"},
-    {"pattern": "pic/trans", "match_type": "substring", "category": "site_logo"}
+    {
+      "pattern": "ico_",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "logo",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "banner",
+      "match_type": "substring",
+      "category": "ad"
+    },
+    {
+      "pattern": "icon",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "emoji",
+      "match_type": "substring",
+      "category": "emoji"
+    },
+    {
+      "pattern": "smiley",
+      "match_type": "substring",
+      "category": "emoji"
+    },
+    {
+      "pattern": "rank_",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "badge",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "Mediainfo.png",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "MoreScreenshot.png",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "wawawa.me/team/frogteam.svg",
+      "match_type": "substring",
+      "category": "team_logo"
+    },
+    {
+      "pattern": "pterclub.net/pic/",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "img.pterclub.net/images/",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "jinzhuan",
+      "match_type": "substring",
+      "category": "team_logo"
+    },
+    {
+      "pattern": "thumbsup",
+      "match_type": "substring",
+      "category": "emoji"
+    },
+    {
+      "pattern": "kralimarko",
+      "match_type": "substring",
+      "category": "emoji"
+    },
+    {
+      "pattern": "twemoji.com",
+      "match_type": "host",
+      "category": "emoji"
+    },
+    {
+      "pattern": "emoji-cdn.com",
+      "match_type": "host",
+      "category": "emoji"
+    },
+    {
+      "pattern": "/pic/smiley/",
+      "match_type": "substring",
+      "category": "emoji"
+    },
+    {
+      "pattern": "/static/emoji/",
+      "match_type": "substring",
+      "category": "emoji"
+    },
+    {
+      "pattern": "pic/trans",
+      "match_type": "substring",
+      "category": "site_logo"
+    },
+    {
+      "pattern": "/pic/smilies/",
+      "match_type": "substring",
+      "category": "emoji"
+    }
   ]
 }
