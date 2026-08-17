@@ -575,7 +575,14 @@
     "selectReseedClients": "Select transfer target downloaders",
     "paused": "Paused",
     "unitHours": "hours",
-    "maxActiveSeedingHint": "Max concurrent seeding tasks for this subscription"
+    "maxActiveSeedingHint": "Max concurrent seeding tasks for this subscription",
+    "seenHistory": "Seen Torrents",
+    "clearSeen": "Clear & Re-dispatch",
+    "clearSeenHint": "Cleared torrents will be re-evaluated on next fetch (must still be in RSS feed; free status re-detected live)",
+    "clearSeenConfirm": "Clear {count} seen records?",
+    "clearSeenDone": "Cleared {count}, waiting for next fetch",
+    "torrentId": "Torrent ID",
+    "freeStatus": "Free"
   },
   "seeding": {
     "activeTorrents": "Active Torrents",

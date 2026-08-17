@@ -397,6 +397,15 @@ func (h *RSSHandler) handleRouteByPath(w http.ResponseWriter, r *http.Request) {
 		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
+	case "seen":
+		// §59.33: /seen 列表 + /seen/clear 清除重推
+		if len(parts) >= 3 && parts[2] == "clear" && r.Method == http.MethodPost {
+			h.handleClearSeen(w, r, idStr)
+		} else if len(parts) == 2 && r.Method == http.MethodGet {
+			h.handleListSeen(w, r, idStr)
+		} else {
+			Error(w, http.StatusNotFound, 40400, "路径不存在")
+		}
 	default:
 		Error(w, http.StatusNotFound, 40400, "路径不存在")
 	}
@@ -959,4 +968,73 @@ func (h *RSSHandler) handleUpdateRules(w http.ResponseWriter, r *http.Request, i
 		"rejectRuleIds": req.RejectRuleIDs,
 		"conditions":    req.Conditions,
 	})
+}
+
+// handleClearSeen §59.33: 清 seen 重推。
+// POST /api/v1/rss/subscriptions/{id}/seen/clear
+// body: {"torrent_ids": [...]} 指定清（推荐）或 {"all": true} 全清。
+// 清后下轮 RSS 视为新种子，过滤链全量重新评估（免费态实时重判）。
+func (h *RSSHandler) handleClearSeen(w http.ResponseWriter, r *http.Request, idStr string) {
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的订阅 ID")
+		return
+	}
+	sub, err := h.repo.GetByID(r.Context(), uint(id))
+	if err != nil {
+		Error(w, http.StatusNotFound, 13002, "订阅不存在")
+		return
+	}
+
+	var req struct {
+		TorrentIDs []string `json:"torrent_ids"`
+		All        bool     `json:"all"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
+		return
+	}
+	if !req.All && len(req.TorrentIDs) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "torrent_ids 与 all 至少提供一项")
+		return
+	}
+	if req.All && len(req.TorrentIDs) > 0 {
+		Error(w, http.StatusBadRequest, 40001, "torrent_ids 与 all 不可同时提供")
+		return
+	}
+
+	cleared, err := h.repo.ClearSeen(r.Context(), fmt.Sprintf("%d", sub.ID), req.TorrentIDs)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 13003, "清除失败: "+err.Error())
+		return
+	}
+	h.logger.Info("seen cleared for re-dispatch",
+		zap.Uint("subscription_id", sub.ID),
+		zap.Int("requested", len(req.TorrentIDs)),
+		zap.Int64("cleared", cleared))
+
+	Success(w, map[string]interface{}{
+		"cleared": cleared,
+		"message": "已清除，下轮抓取将重新评估（种子需仍在 RSS feed 内才会重推）",
+	})
+}
+
+// handleListSeen §59.33: 订阅 seen 历史列表。
+// GET /api/v1/rss/subscriptions/{id}/seen
+func (h *RSSHandler) handleListSeen(w http.ResponseWriter, r *http.Request, idStr string) {
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		Error(w, http.StatusBadRequest, 40001, "无效的订阅 ID")
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	seen, err := h.repo.ListSeenBySubscription(r.Context(), fmt.Sprintf("%d", id), limit)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, 13003, "查询失败")
+		return
+	}
+	if seen == nil {
+		seen = []model.RSSTorrentSeen{}
+	}
+	Success(w, map[string]interface{}{"items": seen, "total": len(seen)})
 }
