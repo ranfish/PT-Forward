@@ -124,6 +124,33 @@ func TestDictForwardAnchors(t *testing.T) {
 	}
 }
 
+// §59.35 边界用例（审计修正后固化）：CI 匹配语义与旧 lookupStandard 等价
+// （"uhd bluray" CI 命中 "UHD BluRay"）；contains 方向为 raw 包含 variant
+// （"电视" 不含 "电视剧" → 空）；垃圾 key 返回空（§59.34 MergeDOMInto 防御依赖）。
+func TestDictLookupEdges(t *testing.T) {
+	cases := []struct{ domain, raw, want string }{
+		{"type", "movies", "category.movie"},
+		{"type", "TV SERIES", "category.tv_series"},
+		{"medium", "web-dl", "medium.webdl"},
+		{"medium", "uhd bluray", "medium.uhd_bluray"}, // CI 命中 "UHD BluRay"（旧 lookupStandard 同）
+		{"type", "电视剧 (TV Series)", "category.tv_series"}, // contains 最长匹配
+		{"medium", "UHD Blu-ray Remux", "medium.uhd_remux"},
+		{"medium", "Blu-ray Remux", "medium.remux"},
+		{"type", "电视", ""},    // 短输入不含长变体（与旧一致）
+		{"medium", "UNK0", ""},  // 垃圾值（§59.34 防御依赖）
+		{"video_codec", "UNK11", ""},
+		{"hdr", "unknown", ""},
+		{"type", "  ", ""},
+		{"", "x", ""},
+		{"notexist", "x", ""},
+	}
+	for _, c := range cases {
+		if got := LookupDictKey(c.domain, c.raw); got != c.want {
+			t.Errorf("LookupDictKey(%q, %q) = %q, want %q", c.domain, c.raw, got, c.want)
+		}
+	}
+}
+
 // §59.35 一致性测试：等价组（比较视图）——成员双向等价，非成员不等价
 func TestDictEquivGroups(t *testing.T) {
 	pairs := [][2]string{

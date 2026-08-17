@@ -10,20 +10,3 @@ package titleparser
 func ReverseLookup(standardKey string) string {
 	return ensureDict().reverse[standardKey]
 }
-
-// ReverseLookupWithFallback 标准键 → 规范显示名，带降级链
-func ReverseLookupWithFallback(standardKey string, fallbackChains map[string][]string) string {
-	display := ReverseLookup(standardKey)
-	if display != "" {
-		return display
-	}
-	// 降级链：category.animation → [category.movie, category.other]
-	if chain, ok := fallbackChains[standardKey]; ok {
-		for _, fb := range chain {
-			if d := ReverseLookup(fb); d != "" {
-				return d
-			}
-		}
-	}
-	return ""
-}
