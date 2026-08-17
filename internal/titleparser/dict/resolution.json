@@ -1,0 +1,60 @@
+{
+  "tokens": [
+    {
+      "canonical": "4320p",
+      "standard_key": "resolution.r4320p",
+      "variants": [
+        "4320p",
+        "8k",
+        "8K"
+      ]
+    },
+    {
+      "canonical": "2160p",
+      "standard_key": "resolution.r2160p",
+      "variants": [
+        "2160p",
+        "4k",
+        "4K"
+      ]
+    },
+    {
+      "canonical": "1440p",
+      "standard_key": "resolution.r1440p",
+      "variants": [
+        "1440p",
+        "1440i",
+        "2K",
+        "2k"
+      ]
+    },
+    {
+      "canonical": "1080p",
+      "standard_key": "resolution.r1080p",
+      "variants": [
+        "1080p"
+      ]
+    },
+    {
+      "canonical": "1080i",
+      "standard_key": "resolution.r1080i",
+      "variants": [
+        "1080i"
+      ]
+    },
+    {
+      "canonical": "720p",
+      "standard_key": "resolution.r720p",
+      "variants": [
+        "720p"
+      ]
+    },
+    {
+      "canonical": "480p",
+      "standard_key": "resolution.r480p",
+      "variants": [
+        "480p"
+      ]
+    }
+  ]
+}

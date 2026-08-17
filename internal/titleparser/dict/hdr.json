@@ -1,0 +1,84 @@
+{
+  "tokens": [
+    {
+      "canonical": "Dolby Vision",
+      "title_form": "DoVi",
+      "pattern": "\\bDolby[._\\- ]?Vision\\b|\\bDoVi\\b|\\bDV\\b",
+      "standard_key": "hdr.dv",
+      "display": "DoVi",
+      "variants": [
+        "DoVi"
+      ]
+    },
+    {
+      "canonical": "DoVi HDR",
+      "pattern": null,
+      "standard_key": "hdr.dv_hdr",
+      "variants": [
+        "DoVi HDR"
+      ]
+    },
+    {
+      "canonical": "DoVi HDR10+",
+      "pattern": null,
+      "standard_key": "hdr.dv_hdr10plus",
+      "variants": [
+        "DoVi HDR10+"
+      ]
+    },
+    {
+      "canonical": "HDR10+",
+      "pattern": "\\bHDR10\\+?\\b",
+      "standard_key": "hdr.hdr10plus",
+      "variants": [
+        "HDR10+"
+      ]
+    },
+    {
+      "canonical": "HDR10",
+      "pattern": "\\bHDR10\\b",
+      "standard_key": "hdr.hdr10",
+      "variants": [
+        "HDR10"
+      ]
+    },
+    {
+      "canonical": "HDR Vivid",
+      "title_form": "HDRVivid",
+      "pattern": "\\bHDR[._\\- ]?Vivid\\b|\\bHDRVivid\\b",
+      "standard_key": "hdr.hdr_vivid",
+      "variants": [
+        "HDR Vivid"
+      ]
+    },
+    {
+      "canonical": "HLG",
+      "pattern": "\\bHLG\\b",
+      "standard_key": "hdr.hlg",
+      "variants": [
+        "HLG"
+      ]
+    },
+    {
+      "canonical": "HDR",
+      "pattern": "\\bHDR\\b",
+      "standard_key": "hdr.hdr",
+      "variants": [
+        "HDR"
+      ]
+    },
+    {
+      "canonical": "SDR",
+      "pattern": "\\bSDR\\b",
+      "standard_key": "hdr.sdr",
+      "variants": [
+        "SDR"
+      ]
+    },
+    {
+      "canonical": "PQ10",
+      "pattern": "\\bPQ10\\b",
+      "variants": []
+    }
+  ]
+}

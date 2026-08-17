@@ -1,0 +1,111 @@
+{
+  "tokens": [
+    {
+      "canonical": "Blu-ray",
+      "standard_key": "medium.bluray",
+      "variants": [
+        "Blu-ray",
+        "BluRay",
+        "Blu ray"
+      ]
+    },
+    {
+      "canonical": "UHD Blu-ray",
+      "standard_key": "medium.uhd_bluray",
+      "variants": [
+        "UHD Blu-ray",
+        "UHD BluRay"
+      ]
+    },
+    {
+      "canonical": "3D Blu-ray",
+      "standard_key": "medium.bluray_3d",
+      "variants": [
+        "3D Blu-ray"
+      ]
+    },
+    {
+      "canonical": "Remux",
+      "standard_key": "medium.remux",
+      "variants": [
+        "Remux",
+        "Blu-ray Remux"
+      ]
+    },
+    {
+      "canonical": "UHD Blu-ray Remux",
+      "standard_key": "medium.uhd_remux",
+      "variants": [
+        "UHD Blu-ray Remux"
+      ]
+    },
+    {
+      "canonical": "Encode",
+      "standard_key": "medium.encode",
+      "variants": [
+        "Encode"
+      ]
+    },
+    {
+      "canonical": "WEB-DL",
+      "standard_key": "medium.webdl",
+      "equivalence_group": "web_delivery",
+      "variants": [
+        "WEB-DL",
+        "WEBDL",
+        "WEB DL"
+      ]
+    },
+    {
+      "canonical": "WEBRip",
+      "standard_key": "medium.webrip",
+      "equivalence_group": "web_delivery",
+      "variants": [
+        "WEBRip"
+      ]
+    },
+    {
+      "canonical": "HDTV",
+      "standard_key": "medium.hdtv",
+      "variants": [
+        "HDTV"
+      ]
+    },
+    {
+      "canonical": "UHDTV",
+      "standard_key": "medium.uhdtv",
+      "variants": [
+        "UHDTV"
+      ]
+    },
+    {
+      "canonical": "DVDRip",
+      "standard_key": "medium.dvdrip",
+      "variants": [
+        "DVDRip"
+      ]
+    },
+    {
+      "canonical": "BDRip",
+      "standard_key": "medium.bdrip",
+      "variants": [
+        "BDRip"
+      ]
+    },
+    {
+      "canonical": "TVRip",
+      "standard_key": "medium.tvrip",
+      "variants": [
+        "TVRip"
+      ]
+    },
+    {
+      "canonical": "DVD",
+      "standard_key": "medium.dvd",
+      "variants": [
+        "DVD5",
+        "DVD9"
+      ]
+    }
+  ]
+}
