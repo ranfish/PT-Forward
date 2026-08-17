@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -211,6 +212,46 @@ func init() {
 			for _, row := range rows {
 				lastID = row.ID
 				p := titleparser.ParseTitleTech(row.Title)
+				if err := gormDB.Model(&model.TorrentMetadata{}).Where("id = ?", row.ID).
+					Updates(map[string]interface{}{
+						"source_type":   p.SourceType,
+						"specification": p.Specification,
+					}).Error; err != nil {
+					return err
+				}
+			}
+		}
+	})
+	// §59.34 审计修复: #13 只按 title 重算，丢了 BuildTechProfile 的 DOM>title
+	// 优先级（fetch 写入时 DetailSourceJSON.medium 覆盖 title 值）。本迁移按
+	// fetch 同款管线重算：有 DOM medium 的行以 DOM 为准。
+	RegisterMigration(14, "recompute_source_type_with_dom_priority", func(gormDB *gorm.DB) error {
+		const batchSize = 500
+		var lastID uint
+		for {
+			var rows []model.TorrentMetadata
+			if err := gormDB.Where("id > ? AND title != ''", lastID).
+				Order("id ASC").Limit(batchSize).Find(&rows).Error; err != nil {
+				return err
+			}
+			if len(rows) == 0 {
+				return nil
+			}
+			for _, row := range rows {
+				lastID = row.ID
+				var domMedium string
+				if row.DetailSourceJSON != "" {
+					var ds struct {
+						Medium string `json:"medium"`
+					}
+					if json.Unmarshal([]byte(row.DetailSourceJSON), &ds) == nil {
+						// standard key（medium.webdl/UNK*）→ 规范显示名；
+						// 未映射 key → 空（保留 title 派生值）
+						domMedium = titleparser.ReverseLookup(ds.Medium)
+					}
+				}
+				// MI 不影响 source_type/specification（只填技术参数），传空
+				p := titleparser.BuildTechProfile(row.Title, "", domMedium, "", "", "")
 				if err := gormDB.Model(&model.TorrentMetadata{}).Where("id = ?", row.ID).
 					Updates(map[string]interface{}{
 						"source_type":   p.SourceType,

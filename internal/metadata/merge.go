@@ -3,6 +3,7 @@ package metadata
 import (
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 )
 
 // MergedMetadata 三源合并后的统一表示，传给渲染层和表单填充层。
@@ -102,12 +103,14 @@ func Merge(detail *DetailSourceJSON, ptgen *PTGenSourceJSON, local *LocalSourceJ
 	m.Intro.SetScreenshotURLs(screenshots)
 
 	// 结构化字段（始终保留 Detail 的值）
+	// §59.34 审计: detail 提取器存的是 standard key（medium.webdl/resolution.r2160p/
+	// UNK*），ReverseLookup 归一化为规范显示名；未映射 key → 空值（下游跳过）
 	if detail != nil {
 		m.Type = detail.Type
-		m.Medium = detail.Medium
-		m.VideoCodec = detail.VideoCodec
-		m.AudioCodec = detail.AudioCodec
-		m.Resolution = detail.Resolution
+		m.Medium = titleparser.ReverseLookup(detail.Medium)
+		m.VideoCodec = titleparser.ReverseLookup(detail.VideoCodec)
+		m.AudioCodec = titleparser.ReverseLookup(detail.AudioCodec)
+		m.Resolution = titleparser.ReverseLookup(detail.Resolution)
 		m.Source = detail.Source
 		m.ReleaseGroup = detail.ReleaseGroup
 		m.Tags = appendNonEmpty(m.Tags, detail.Tags)

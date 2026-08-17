@@ -181,8 +181,9 @@ func TestMerge_PTGenOnly_FallsBackToDetail(t *testing.T) {
 func TestMerge_StructuredFields_FromDetail(t *testing.T) {
 	d := makeDetail("title", "body")
 	d.Type = "电视剧"
-	d.Resolution = "2160p"
-	d.VideoCodec = "H.265"
+	// §59.34: detail 提取器存 standard key（生产形态），Merge 出口 ReverseLookup 归一化
+	d.Resolution = "resolution.r2160p"
+	d.VideoCodec = "video.h265"
 	d.ReleaseGroup = "FRDS"
 	m := Merge(d, nil, nil, MergeModePTGenFirst)
 
@@ -192,7 +193,7 @@ func TestMerge_StructuredFields_FromDetail(t *testing.T) {
 	if m.Resolution != "2160p" {
 		t.Errorf("Resolution mismatch: %q", m.Resolution)
 	}
-	if m.VideoCodec != "H.265" {
+	if m.VideoCodec != "HEVC" {
 		t.Errorf("VideoCodec mismatch: %q", m.VideoCodec)
 	}
 	if m.ReleaseGroup != "FRDS" {
