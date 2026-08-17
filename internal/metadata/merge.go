@@ -40,6 +40,17 @@ type MergedMetadata struct {
 	PosterSource string `json:"poster_source,omitempty"`
 }
 
+// reverseLookupOrRaw standard key → 规范显示名；未映射（如 team.* 无映射表）保留 raw。
+func reverseLookupOrRaw(v string) string {
+	if v == "" {
+		return ""
+	}
+	if d := titleparser.ReverseLookup(v); d != "" {
+		return d
+	}
+	return v
+}
+
 // MergeMode 合并模式（对应 UI toggle）。
 type MergeMode string
 
@@ -104,15 +115,16 @@ func Merge(detail *DetailSourceJSON, ptgen *PTGenSourceJSON, local *LocalSourceJ
 
 	// 结构化字段（始终保留 Detail 的值）
 	// §59.34 审计: detail 提取器存的是 standard key（medium.webdl/resolution.r2160p/
-	// UNK*），ReverseLookup 归一化为规范显示名；未映射 key → 空值（下游跳过）
+	// UNK*），ReverseLookup 归一化为规范显示名；未映射 key 保留 raw（team.* 无映射表，
+	// 保留 "team.hhweb" 原样比空值好）
 	if detail != nil {
-		m.Type = detail.Type
+		m.Type = reverseLookupOrRaw(detail.Type)
 		m.Medium = titleparser.ReverseLookup(detail.Medium)
 		m.VideoCodec = titleparser.ReverseLookup(detail.VideoCodec)
 		m.AudioCodec = titleparser.ReverseLookup(detail.AudioCodec)
 		m.Resolution = titleparser.ReverseLookup(detail.Resolution)
-		m.Source = detail.Source
-		m.ReleaseGroup = detail.ReleaseGroup
+		m.Source = reverseLookupOrRaw(detail.Source)
+		m.ReleaseGroup = reverseLookupOrRaw(detail.ReleaseGroup)
 		m.Tags = appendNonEmpty(m.Tags, detail.Tags)
 		m.Flags = appendNonEmpty(m.Flags, detail.Flags)
 	}
