@@ -266,6 +266,7 @@ export interface SeedDetail {
   bit_depth: string
   source_type: string
   specification: string
+  encode?: boolean
   source_platform: string
   edition_info: string
   region_code: string

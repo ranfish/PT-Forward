@@ -158,11 +158,13 @@ func extractMedium(title string) string {
 	if regexp.MustCompile(`(?i)\bHDTV\b`).MatchString(title) {
 		parts = append(parts, "HDTV")
 	}
-	if strings.Contains(upper, "UHD") {
+	blurayToken := preferredBlurayToken(title)
+	// 独立 UHD 修饰（如 "2160p UHD"）：UHD BluRay 组合已含 UHD 语义，不再重复追加
+	if strings.Contains(upper, "UHD") && !strings.HasPrefix(blurayToken, "UHD") {
 		parts = append(parts, "UHD")
 	}
 
-	if blurayToken := preferredBlurayToken(title); blurayToken != "" {
+	if blurayToken != "" {
 		if regexp.MustCompile(`(?i)\bDIY\b`).MatchString(title) {
 			parts = append(parts, blurayToken+" DIY")
 		} else {
@@ -193,16 +195,24 @@ func extractMedium(title string) string {
 	return strings.Join(parts, " ")
 }
 
+// preferredBlurayToken 蓝光片源 token（v1.05 原盘/压制以连字符区分写法）。
+//
+// 原盘：Blu-ray / UHD Blu-ray / 3D Blu-ray（带连字符或点分隔的 "RAY"）
+// 压制：BluRay / UHD BluRay / 3D BluRay（无连字符）
 func preferredBlurayToken(title string) string {
 	upper := strings.ToUpper(title)
-	if strings.Contains(upper, "UHD BLU") || strings.Contains(upper, "UHDBLU") {
-		return "UHD Blu-ray"
+	// 带分隔的 RAY → 原盘写法；其余（BLURAY/UHDBluRay）→ 压制写法
+	suffix := "BluRay"
+	if strings.Contains(upper, "BLU-RAY") || strings.Contains(upper, "BLU.RAY") {
+		suffix = "Blu-ray"
 	}
-	if strings.Contains(upper, "3D BLU") || strings.Contains(upper, "3DBLU") {
-		return "3D Blu-ray"
-	}
-	if strings.Contains(upper, "BLU") {
-		return "Blu-ray"
+	switch {
+	case strings.Contains(upper, "UHD BLU") || strings.Contains(upper, "UHDBLU"):
+		return "UHD " + suffix
+	case strings.Contains(upper, "3D BLU") || strings.Contains(upper, "3DBLU"):
+		return "3D " + suffix
+	case strings.Contains(upper, "BLU"):
+		return suffix
 	}
 	return ""
 }

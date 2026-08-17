@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -191,5 +192,33 @@ func init() {
 		// #11 用字符串列名仍不匹配，用 struct 让 GORM 自己解析
 		return gormDB.Model(&model.Site{}).Where("framework = ?", "yemapt").
 			Updates(model.Site{SupportsPiecesHashAPI: true}).Error
+	})
+	// §59.34: 存量 source_type/specification 重算。
+	// 旧 splitMedium 把压制写法（BluRay/UHD BluRay 无连字符）一律归为原盘写法
+	// （带连字符），Encode 语义丢失。按 v1.05 忠实原文写法重算。
+	RegisterMigration(13, "recompute_torrent_metadata_source_type", func(gormDB *gorm.DB) error {
+		const batchSize = 500
+		var lastID uint
+		for {
+			var rows []model.TorrentMetadata
+			if err := gormDB.Where("id > ? AND title != ''", lastID).
+				Order("id ASC").Limit(batchSize).Find(&rows).Error; err != nil {
+				return err
+			}
+			if len(rows) == 0 {
+				return nil
+			}
+			for _, row := range rows {
+				lastID = row.ID
+				p := titleparser.ParseTitleTech(row.Title)
+				if err := gormDB.Model(&model.TorrentMetadata{}).Where("id = ?", row.ID).
+					Updates(map[string]interface{}{
+						"source_type":   p.SourceType,
+						"specification": p.Specification,
+					}).Error; err != nil {
+					return err
+				}
+			}
+		}
 	})
 }

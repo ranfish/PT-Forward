@@ -99,15 +99,18 @@ func extractEditionInfo(title string) string {
 // splitMedium 从 TitleComponents.Medium 组合值拆分片源类型 + 规格。
 //
 // v1.05 区分：
-//   - 片源类型（source_type）：原盘带连字符（Blu-ray）vs 压制无连字符（BluRay）
+//   - 片源类型（source_type）：原盘带连字符（Blu-ray/UHD Blu-ray）vs 压制无连字符（BluRay/UHD BluRay）
 //   - 规格（specification）：Remux/WEB-DL/WEBRip/HDTV/UHDTV
 //
-// 原盘类不填规格。WEB/HDTV 类不填片源类型（由 source_platform 标识来源）。
+// 原盘类和 Encode（压制）类规格均为空（v1.05：Encode 规格为空，由片源写法区分）。
+// WEB/HDTV 类不填片源类型（由 source_platform 标识来源）。
 func splitMedium(medium string) (sourceType, specification string) {
 	if medium == "" {
 		return "", ""
 	}
 	upper := strings.ToUpper(medium)
+	// 带分隔的 RAY → 原盘写法；纯 BLURAY → 压制写法（v1.05 原盘/压制以连字符区分）
+	discSuffix := strings.Contains(upper, "BLU-RAY") || strings.Contains(upper, "BLU.RAY")
 
 	switch {
 	case strings.Contains(upper, "WEB-DL") || strings.Contains(upper, "WEBDL"):
@@ -130,11 +133,23 @@ func splitMedium(medium string) (sourceType, specification string) {
 
 	switch {
 	case strings.Contains(upper, "3D BLU"):
-		sourceType = "3D Blu-ray"
+		if discSuffix {
+			sourceType = "3D Blu-ray"
+		} else {
+			sourceType = "3D BluRay"
+		}
 	case strings.Contains(upper, "UHD BLU"):
-		sourceType = "UHD Blu-ray"
+		if discSuffix {
+			sourceType = "UHD Blu-ray"
+		} else {
+			sourceType = "UHD BluRay"
+		}
 	case strings.Contains(upper, "BLU-RAY") || strings.Contains(upper, "BLURAY") || strings.Contains(upper, "BLU DIY"):
-		sourceType = "Blu-ray"
+		if discSuffix {
+			sourceType = "Blu-ray"
+		} else {
+			sourceType = "BluRay"
+		}
 	case strings.Contains(upper, "DVD"):
 		sourceType = "DVD"
 	}

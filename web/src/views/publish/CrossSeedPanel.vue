@@ -148,7 +148,7 @@
                   <a-descriptions-item label="分辨率">{{ form.titleComponents.resolution || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="视频编码">{{ form.titleComponents.video_codec || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="片源类型">{{ form.titleComponents.source_type || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="规格">{{ form.titleComponents.specification || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="规格">{{ specDisplay }}</a-descriptions-item>
                   <a-descriptions-item label="音频编码">{{ form.titleComponents.audio_codec || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="声道">{{ form.titleComponents.audio_channels || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="音频技术">{{ form.titleComponents.audio_technology || '—' }}</a-descriptions-item>
@@ -690,6 +690,7 @@ async function loadSeedDetail(infoHash: string) {
       // 状态
       seedMissingFields.value = d.missing_fields || []
       seedReviewed.value = d.reviewed || false
+      seedEncode.value = d.encode ?? false
       seedIsLocal.value = (d as any).is_local ?? true
       currentSourceSite.value = d.site_name || ''
       // §59.26: 标签（获取时推断，编辑时可修正）
@@ -705,6 +706,11 @@ async function loadSeedDetail(infoHash: string) {
 // §59.20: 种子配置页状态
 const seedMissingFields = ref<string[]>([])
 const seedReviewed = ref(false)
+// §59.34: Encode 派生标识（后端真相源；v1.05 Encode 规格为空，规格栏显示 Encode）
+const seedEncode = ref(false)
+const specDisplay = computed(() =>
+  form.value.titleComponents.specification || (seedEncode.value ? 'Encode' : '—')
+)
 const seedIsLocal = ref(true) // §59.21: 默认 true（向后兼容）
 // §59.20 ⑨: 预览模式（保存即预览）
 const seedPreviewMode = ref(false)
