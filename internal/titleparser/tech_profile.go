@@ -47,6 +47,28 @@ type TechProfile struct {
 	AudioBitDepth string `json:"audio_bit_depth,omitempty"` // 位深（如 "24"）
 }
 
+// IsEncode 判定 Encode（压制）资源（v1.05：Encode 规格为空，由片源写法/编码族区分）。
+//
+// 判定信号（任一命中且非 Remux/WEB/HDTV 规格）：
+//   - 片源为压制写法（BluRay/UHD BluRay/3D BluRay，无连字符）
+//   - 视频编码为压制族（x264/x265/Xvid）
+func IsEncode(p TechProfile) bool {
+	switch p.Specification {
+	case "Remux", "WEB-DL", "WEBRip", "HDTV", "UHDTV", "BDRip", "DVDRip", "TVRip":
+		return false
+	}
+	switch p.SourceType {
+	case "BluRay", "UHD BluRay", "3D BluRay":
+		return true
+	}
+	switch p.VideoCodec {
+	case "x264", "x265", "Xvid":
+		// 编码族为压制，但片源写法为原盘（Blu-ray 带连字符）时以片源为准
+		return p.SourceType != "Blu-ray" && p.SourceType != "UHD Blu-ray" && p.SourceType != "3D Blu-ray"
+	}
+	return false
+}
+
 // TechProfileFromTitle 从 TitleComponents 构造 TechProfile（仅标题源，无 MediaInfo 纠正）。
 //
 // 步骤 1 过渡实现：只映射 TitleComponents 中已有的字段。

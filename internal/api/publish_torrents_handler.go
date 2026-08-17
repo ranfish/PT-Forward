@@ -2695,17 +2695,23 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			item["has_description"] = meta.Description != ""
 			item["has_screenshots"] = meta.Screenshots != ""
 			item["fetched_at"] = meta.FetchedAt
-			// 技术参数（列表展示用）
-			item["resolution"] = meta.Resolution
-			item["video_codec"] = meta.VideoCodec
-			item["audio_codec"] = meta.AudioCodec
-			item["audio_channels"] = meta.AudioChannels
-			item["audio_tech"] = meta.AudioTech
-			item["hdr"] = meta.HDR
-			item["source_type"] = meta.SourceType
-			item["specification"] = meta.Specification
-			item["category"] = meta.Category
-			item["form"] = meta.Form
+		// 技术参数（列表展示用）
+		item["resolution"] = meta.Resolution
+		item["video_codec"] = meta.VideoCodec
+		item["audio_codec"] = meta.AudioCodec
+		item["audio_channels"] = meta.AudioChannels
+		item["audio_tech"] = meta.AudioTech
+		item["hdr"] = meta.HDR
+		item["source_type"] = meta.SourceType
+		item["specification"] = meta.Specification
+		// §59.34: Encode 派生（v1.05 Encode 规格为空，由片源写法/编码族区分）
+		item["encode"] = titleparser.IsEncode(titleparser.TechProfile{
+			SourceType:    meta.SourceType,
+			Specification: meta.Specification,
+			VideoCodec:    meta.VideoCodec,
+		})
+		item["category"] = meta.Category
+		item["form"] = meta.Form
 		} else {
 			item["reviewed"] = false
 			item["fetched"] = false
@@ -3036,6 +3042,13 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 	components := titleparser.TechProfileToComponents(profile)
 	inferredCategory := titleparser.InferCategory(components, meta.SourceCategory, "", "")
 
+	// §59.34: Encode 派生（基于最终展示组合值：DB 优先 fallback profile）
+	displayProfile := titleparser.TechProfile{
+		SourceType:    pickNonEmpty(meta.SourceType, profile.SourceType),
+		Specification: pickNonEmpty(meta.Specification, profile.Specification),
+		VideoCodec:    pickNonEmpty(meta.VideoCodec, profile.VideoCodec),
+	}
+
 	result := map[string]interface{}{
 		"info_hash":       meta.InfoHash,
 		"site_name":       meta.SiteName,
@@ -3066,8 +3079,10 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"audio_tech":      pickNonEmpty(meta.AudioTech, profile.AudioTechnology),
 		"hdr":             pickNonEmpty(meta.HDR, profile.HDR),
 		"bit_depth":       pickNonEmpty(meta.BitDepth, profile.BitDepth),
-		"source_type":     pickNonEmpty(meta.SourceType, profile.SourceType),
-		"specification":   pickNonEmpty(meta.Specification, profile.Specification),
+		"source_type":     displayProfile.SourceType,
+		"specification":   displayProfile.Specification,
+		// §59.34: Encode 派生标识（前端规格展示用，不参与重组）
+		"encode":          titleparser.IsEncode(displayProfile),
 		"source_platform": pickNonEmpty(meta.SourcePlatform, profile.SourcePlatform),
 		"edition_info":    pickNonEmpty(meta.EditionInfo, profile.EditionInfo),
 		"region_code":     pickNonEmpty(meta.RegionCode, profile.RegionCode),

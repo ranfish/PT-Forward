@@ -66,36 +66,41 @@ var videoCodecRegistry = []TokenDef{
 
 // === 音频编码（v1.05 字段 13，顺序即提取优先级：特例在前）===
 
+// audioTailDigits 音频 token 尾随声道数字（TrueHD7.1/DD5.1/FLAC2.0 紧贴写法）：
+// 与声道数字整体消费（声道提取用原始标题，AAC/DDP 同模式先例）。
+// \b 在字母→数字之间不成立（TrueHD7 无边界），必须显式吃进数字才能命中。
+const audioTailDigits = `(?:[._\d]+)?`
+
 var audioCodecRegistry = []TokenDef{
-	{Canonical: "TrueHD", Pattern: `\bTrue[._\- ]?HD\b|\bMLP FBA\b`},
+	{Canonical: "TrueHD", Pattern: `\bTrue[._\- ]?HD` + audioTailDigits + `\b|\bMLP FBA\b`},
 	{Canonical: "DTS:X", Pattern: `\bDTS[._\- :]?[Xx]\b`},
 	// DTS XLL X = DTS:X 的 MI 内部名，按 v1.05 规范 DTS:X 不标注 → 归 DTS。
 	// 必须在 DTS-HD MA（DTS XLL）之前判定。
 	{Canonical: "DTS", Pattern: `\bDTS[._\- ]?XLL[._\- ]?X\b`},
 	// DTS-HD MA / DTS HD MA / DTS-HD.MA / DTSHDMA / DTS XLL（MI 内部名）
-	{Canonical: "DTS-HD MA", TitleForm: "DTS-HD.MA", Pattern: `\bDTS[._\- ]?HD[._\- ]*MA\b|\bDTS[._\- ]?XLL\b`},
-	{Canonical: "DTS-HD HR", TitleForm: "DTS-HD.HR", Pattern: `\bDTS[._\- ]?HD[._\- ]*HR\b|\bDTS[._\- ]?LBR\b`},
-	{Canonical: "DTS-ES", TitleForm: "DTS-ES", Pattern: `\bDTS[._\- ]?ES\b`},
+	{Canonical: "DTS-HD MA", TitleForm: "DTS-HD.MA", Pattern: `\bDTS[._\- ]?HD[._\- ]*MA` + audioTailDigits + `\b|\bDTS[._\- ]?XLL\b`},
+	{Canonical: "DTS-HD HR", TitleForm: "DTS-HD.HR", Pattern: `\bDTS[._\- ]?HD[._\- ]*HR` + audioTailDigits + `\b|\bDTS[._\- ]?LBR\b`},
+	{Canonical: "DTS-ES", TitleForm: "DTS-ES", Pattern: `\bDTS[._\- ]?ES` + audioTailDigits + `\b`},
 	// DTS-UHD 是 DTS:X 的 UHD 变体，归 DTS
-	{Canonical: "DTS", Pattern: `\bDTS\b|\bDTS[._\- ]?UHD\b`},
+	{Canonical: "DTS", Pattern: `\bDTS` + audioTailDigits + `\b|\bDTS[._\- ]?UHD\b`},
 	// E-AC-3 / EAC3 / DDP / DD+ / DDPlus（含声道后缀 DDP5.1）
 	{Canonical: "DDP", Pattern: `\bE[._\- ]?AC[._\- ]?3\b|\bDDP5?[._\d]*|\bDD\+|\bDDPlus\b`},
-	{Canonical: "DD", Pattern: `\bDD\b|\bAC[._\- ]?3\b`},
-	{Canonical: "FLAC", Pattern: `\bFLAC\b`},
+	{Canonical: "DD", Pattern: `\bDD` + audioTailDigits + `\b|\bAC[._\- ]?3\b`},
+	{Canonical: "FLAC", Pattern: `\bFLAC` + audioTailDigits + `\b`},
 	// xHE-AAC（USAC）必须在 AAC 之前（AAC 是其子串）
-	{Canonical: "xHE-AAC", Pattern: `\bx[._\- ]?HE[._\- ]?AAC\b|\bUSAC\b`},
+	{Canonical: "xHE-AAC", Pattern: `\bx[._\- ]?HE[._\- ]?AAC` + audioTailDigits + `\b|\bUSAC\b`},
 	{Canonical: "AAC", Pattern: `\bAAC(?:[._\d]+)?\b`},
-	{Canonical: "ALAC", Pattern: `\bALAC\b`},
-	{Canonical: "APE", Pattern: `\bAPE\b`},
-	{Canonical: "WAV", Pattern: `\bWAV\b`},
+	{Canonical: "ALAC", Pattern: `\bALAC` + audioTailDigits + `\b`},
+	{Canonical: "APE", Pattern: `\bAPE` + audioTailDigits + `\b`},
+	{Canonical: "WAV", Pattern: `\bWAV` + audioTailDigits + `\b`},
 	{Canonical: "Opus", TitleForm: "Opus", Pattern: `\bOpus\b|\bOPUS\b`},
-	{Canonical: "MP3", Pattern: `\bMP3\b`},
-	{Canonical: "LPCM", Pattern: `\bLPCM\b|\bPCM\b`},
+	{Canonical: "MP3", Pattern: `\bMP3` + audioTailDigits + `\b`},
+	{Canonical: "LPCM", Pattern: `\bLPCM` + audioTailDigits + `\b|\bPCM` + audioTailDigits + `\b`},
 	// §59.27 P2：音乐/新编码演进（对齐 MI 侧值域）
-	{Canonical: "MP2", Pattern: `\bMP2\b|\bMPEG[._\- ]?Audio\b`},
-	{Canonical: "AV3A", Pattern: `\bAV3A\b`},
+	{Canonical: "MP2", Pattern: `\bMP2` + audioTailDigits + `\b|\bMPEG[._\- ]?Audio\b`},
+	{Canonical: "AV3A", Pattern: `\bAV3A` + audioTailDigits + `\b`},
 	// §59.27 P3：值域演进（对齐 standard_keys）
-	{Canonical: "DSD", Pattern: `\bDSD\b`},
+	{Canonical: "DSD", Pattern: `\bDSD` + audioTailDigits + `\b`},
 }
 
 // === HDR（v1.05 字段 10，组合值由 extractHDRFormat 合成，此处为原子 token）===
