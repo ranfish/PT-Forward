@@ -151,11 +151,16 @@ func (c *Checker) checkFull(ctx context.Context, title, subtitle string, scope C
 	// §56.39: 从 DB 加载规则并按 scope 过滤（缓存 5 分钟）
 	adult, forbidden, group := c.getFilteredRules(ctx, scope)
 
+	// §56.2x: 预计算 lowercase + matchKeyword 防误伤统一入口（ASCII 词边界/中文子串）
+	titleLower := strings.ToLower(title)
+	subtitleLower := strings.ToLower(subtitle)
+
 	for _, kw := range adult {
-		if strings.Contains(title, kw) || strings.Contains(strings.ToLower(title), strings.ToLower(kw)) {
-			return &Result{Passed: false, Reason: kw, Category: "adult"}
-		}
-		if subtitle != "" && (strings.Contains(subtitle, kw) || strings.Contains(strings.ToLower(subtitle), strings.ToLower(kw))) {
+		if matchKeyword(kw, title, titleLower) || matchKeyword(kw, subtitle, subtitleLower) {
+			// §56.2x: 中文误报排除（成人教育/高考/大学/学院）
+			if isChineseFalsePositive(title, kw) || isChineseFalsePositive(subtitle, kw) {
+				continue
+			}
 			return &Result{Passed: false, Reason: kw, Category: "adult"}
 		}
 	}
@@ -166,16 +171,13 @@ func (c *Checker) checkFull(ctx context.Context, title, subtitle string, scope C
 	}
 
 	for _, kw := range forbidden {
-		if strings.Contains(title, kw) {
-			return &Result{Passed: false, Reason: kw, Category: "forbidden_transfer"}
-		}
-		if subtitle != "" && strings.Contains(subtitle, kw) {
+		if matchKeyword(kw, title, titleLower) || matchKeyword(kw, subtitle, subtitleLower) {
 			return &Result{Passed: false, Reason: kw, Category: "forbidden_transfer"}
 		}
 	}
 
 	for _, g := range group {
-		if strings.Contains(title, g) {
+		if matchKeyword(g, title, titleLower) {
 			return &Result{Passed: false, Reason: g, Category: "forbidden_group"}
 		}
 	}
@@ -185,10 +187,7 @@ func (c *Checker) checkFull(ctx context.Context, title, subtitle string, scope C
 		if kw == "" {
 			continue
 		}
-		if strings.Contains(title, kw) || strings.Contains(strings.ToLower(title), strings.ToLower(kw)) {
-			return &Result{Passed: false, Reason: kw, Category: "user_filter"}
-		}
-		if subtitle != "" && (strings.Contains(subtitle, kw) || strings.Contains(strings.ToLower(subtitle), strings.ToLower(kw))) {
+		if matchKeyword(kw, title, titleLower) || matchKeyword(kw, subtitle, subtitleLower) {
 			return &Result{Passed: false, Reason: kw, Category: "user_filter"}
 		}
 	}
