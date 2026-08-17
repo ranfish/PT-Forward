@@ -154,7 +154,12 @@
                   <a-descriptions-item label="音频技术">{{ form.titleComponents.audio_technology || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="HDR">{{ form.titleComponents.hdr || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="bit">{{ form.titleComponents.bit_depth || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="分发方">{{ form.titleComponents.source_platform || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="分发方">
+                    {{ form.titleComponents.source_platform || '—' }}
+                    <a-tooltip v-if="PLATFORM_FULLNAMES[form.titleComponents.source_platform]" :title="PLATFORM_FULLNAMES[form.titleComponents.source_platform]">
+                      <InfoCircleOutlined style="color: #999; margin-left: 4px" />
+                    </a-tooltip>
+                  </a-descriptions-item>
                   <a-descriptions-item label="版本">{{ form.titleComponents.edition_info || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="地区码">{{ form.titleComponents.region_code || '—' }}</a-descriptions-item>
                 </a-descriptions>
@@ -404,6 +409,8 @@ import { CheckCircleFilled, ReloadOutlined } from '@ant-design/icons-vue'
 import { manualForwardApi, publishDataApi, publishApi, publishTorrentsApi, seedConfigApi } from '@/api/publish'
 import type { SeedDetail } from '@/api/publish'
 import { parseBBCode } from '@/utils/bbcode'
+import { CATEGORY_LABELS, PLATFORM_FULLNAMES } from '@/generated/dict'
+import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import type { ManualForwardSubmitRequest, PreviewField, PreviewCompleteness, PublishResultRecord } from '@/api/types'
 import TagSelector from './TagSelector.vue'
 import ScreenshotManager from './ScreenshotManager.vue'
@@ -1043,24 +1050,21 @@ async function enterSelectSites() {
 }
 
 // --- helpers ---
-const categoryMap: Record<string, string> = {
-  'category.movie': '电影',
-  'category.tv_series': '剧集',
-  'category.tv_shows': '综艺',
-  'category.animation': '动画',
-  'category.documentary': '纪录片',
-  'category.music': '音乐',
+// §59.35 P3: 分级 label——Layer 1 字典优先（generated/dict.ts，与后端同源），
+// 扩展分类（adapter 源站直传的 category.mv/game/software 等）本地兜底
+const extendedCategoryLabels: Record<string, string> = {
   'category.mv': 'MV',
-  'category.sports': '体育',
   'category.audiobook': '有声读物',
   'category.ebook': '电子书',
   'category.game': '游戏',
   'category.software': '软件',
-  'category.other': '其他',
+}
+function categoryLabelOf(v?: string): string {
+  if (!v) return '—'
+  return CATEGORY_LABELS[v] || extendedCategoryLabels[v] || v
 }
 function categoryLabel(v?: string): string {
-  if (!v) return '—'
-  return categoryMap[v] || v
+  return categoryLabelOf(v)
 }
 
 // --- Submit ---

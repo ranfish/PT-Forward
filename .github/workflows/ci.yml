@@ -52,6 +52,11 @@ jobs:
       - name: Vet
         run: go vet ./internal/... ./cmd/pt-forward/...
 
+      - name: Dict drift check
+        run: |
+          go run ./cmd/gen-dict
+          git diff --exit-code web/src/generated/dict.ts || (echo "ERROR: dict.ts 与 dict/*.json 不同步，运行 go run ./cmd/gen-dict 并提交" && exit 1)
+
       - name: Test
         run: CGO_ENABLED=1 go test -short -count=1 -timeout 180s ./internal/...
 
