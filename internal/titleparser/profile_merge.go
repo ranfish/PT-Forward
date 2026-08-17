@@ -49,6 +49,9 @@ func MergeMediaInfoInto(p *TechProfile, mi *MediaInfoTech) {
 // 合并优先级（决策 4）：
 //   - 媒介/分类（SourceType/Specification/Medium）：DOM 直接覆盖（DOM > 标题）
 //   - 技术参数（Resolution/VideoCodec/AudioCodec）：仅在 MediaInfo 和标题都没值时填充（DOM 是 fallback）
+//
+// §59.34 审计防御：DOM medium 解析不出有效片源/规格时（如未映射的 UNK* key），
+// 不覆盖标题派生值——避免垃圾 DOM 值抹空 title 解析结果。
 func MergeDOMInto(p *TechProfile, medium, resolution, videoCodec, audioCodec string) {
 	if p == nil {
 		return
@@ -56,9 +59,11 @@ func MergeDOMInto(p *TechProfile, medium, resolution, videoCodec, audioCodec str
 	// 媒介/分类：DOM 完全覆盖（DOM > 标题，先清除旧值再填充）
 	if medium != "" {
 		sourceType, specification := splitMedium(medium)
-		p.SourceType = sourceType
-		p.Specification = specification
-		p.Medium = medium
+		if sourceType != "" || specification != "" {
+			p.SourceType = sourceType
+			p.Specification = specification
+			p.Medium = medium
+		}
 	}
 	// 技术参数：仅在为空时填充（DOM 是最低优先级 fallback）
 	if p.Resolution == "" && resolution != "" {

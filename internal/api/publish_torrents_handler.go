@@ -2500,7 +2500,12 @@ func domFieldsFromDetailSource(detailJSON string) (medium, resolution, videoCode
 	if json.Unmarshal([]byte(detailJSON), &ds) != nil {
 		return
 	}
-	return ds.Medium, ds.Resolution, ds.VideoCodec, ds.AudioCodec
+	// §59.34 审计: detail 提取器存 standard key（medium.webdl/UNK*），
+	// ReverseLookup 归一化；未映射 key → 空（MergeDOMInto 跳过，保留 title 值）
+	return titleparser.ReverseLookup(ds.Medium),
+		titleparser.ReverseLookup(ds.Resolution),
+		titleparser.ReverseLookup(ds.VideoCodec),
+		titleparser.ReverseLookup(ds.AudioCodec)
 }
 
 // dedupStringSlice 保序去重（§59.26 标签合并用）。
