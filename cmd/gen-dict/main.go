@@ -29,6 +29,22 @@ type tokenDef struct {
 	Display     string   `json:"display,omitempty"`
 	FullName    string   `json:"full_name,omitempty"`
 	Variants    []string `json:"variants,omitempty"`
+
+	// tag 域（§59.35 P4）
+	Label   string `json:"label,omitempty"`
+	Aliases string `json:"aliases,omitempty"`
+	Group   string `json:"group,omitempty"`
+}
+
+type tagDef struct {
+	Key     string `json:"key"`
+	Label   string `json:"label"`
+	Aliases string `json:"aliases"`
+}
+
+type tagGroupDef struct {
+	Name string   `json:"name"`
+	Tags []tagDef `json:"tags"`
 }
 
 func main() {
@@ -45,6 +61,8 @@ func main() {
 	// 语义顺序：电影/电视剧/综艺...，字母序会让动漫排首位）
 	domains := map[string][][2]string{}
 	platforms := map[string]string{}
+	// tag 域分组结构（§59.35 P4）：group → [(key, label, aliases)]，保持源顺序
+	tagGroups := []tagGroupDef{}
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
 			continue
@@ -70,6 +88,28 @@ func main() {
 			if domain == "platform" {
 				if t.FullName != "" && platforms[t.Canonical] == "" {
 					platforms[t.Canonical] = t.FullName
+				}
+				continue
+			}
+			if domain == "tag" {
+				label := t.Label
+				if label == "" {
+					label = t.Canonical
+				}
+				g := t.Group
+				if g == "" {
+					g = "其他"
+				}
+				found := false
+				for i := range tagGroups {
+					if tagGroups[i].Name == g {
+						tagGroups[i].Tags = append(tagGroups[i].Tags, tagDef{Key: t.Canonical, Label: label, Aliases: t.Aliases})
+						found = true
+						break
+					}
+				}
+				if !found {
+					tagGroups = append(tagGroups, tagGroupDef{Name: g, Tags: []tagDef{{Key: t.Canonical, Label: label, Aliases: t.Aliases}}})
 				}
 				continue
 			}
@@ -107,6 +147,16 @@ func main() {
 	}
 	sort.Slice(platPairs, func(i, j int) bool { return platPairs[i][0] < platPairs[j][0] })
 	emitMap("PLATFORM_FULLNAMES", "platform 域：canonical → 厂商全名（Tab1 分发方 tooltip）", platPairs)
+
+	// tag 域分组（§59.35 P4，TagSelector 数据源）
+	fmt.Fprintf(&b, "// tag 域分组结构（TagSelector 数据源，派生自 dict/tag.json group 字段）\n")
+	fmt.Fprintf(&b, "export interface TagDef { key: string; label: string; aliases: string }\n")
+	fmt.Fprintf(&b, "export interface TagGroup { name: string; tags: TagDef[] }\n")
+	fmt.Fprintf(&b, "export const TAG_GROUPS: TagGroup[] = ")
+	tagJSON, _ := json.MarshalIndent(tagGroups, "", "  ")
+	tagJSON = []byte(strings.ReplaceAll(string(tagJSON), "\n", "\n  "))
+	b.Write(tagJSON)
+	b.WriteString("\n\n")
 
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)

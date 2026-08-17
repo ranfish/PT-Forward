@@ -41,6 +41,17 @@ type TokenDef struct {
 	CaseSensitive  bool     `json:"case_sensitive,omitempty"`   // pattern 大小写敏感（iP/iT/Baha 等 wiki 明确写法）
 	Origin         string   `json:"origin,omitempty"`           // 词条来源："wiki"（v1.05 附件）/"legacy"（本站历史行为保留）——空默认 wiki
 	Note           string   `json:"note,omitempty"`             // 词条备注（legacy 词条说明保留原因）
+
+	// === tag 域专用（§59.35 P4，label/aliases/group 是展示结构，infer_* 是推断规则）===
+	Label          string   `json:"label,omitempty"`            // 显示名（tag 域，空 = Canonical）
+	Aliases        string   `json:"aliases,omitempty"`          // 别名提示（tag 域 UI）
+	Group          string   `json:"group,omitempty"`            // 分组（tag 域领域结构，TagSelector 派生）
+	InferPattern   string   `json:"infer_pattern,omitempty"`    // 推断正则（tag_inferer 查表化数据源）
+	InferPattern2  string   `json:"infer_pattern2,omitempty"`   // 推断正则第二源（如 PTGen 简介行）
+	InferPatternNeg string  `json:"infer_pattern_neg,omitempty"` // 推断负向排除（命中则不提取）
+	InferScope     string   `json:"infer_scope,omitempty"`      // 匹配范围: all/all_raw/all_mi/title/title_raw/subtitle_raw/desc_raw
+	InferScope2    string   `json:"infer_scope2,omitempty"`     // 第二源范围
+	InferExclude   string   `json:"infer_exclude,omitempty"`    // 命中文本含此词则排除（"国家" 误匹配防御）
 }
 
 // re 返回编译缓存的正则。CaseSensitive 词条不加 (?i)（iP/iT/Baha 等 wiki 明确写法，
@@ -164,6 +175,25 @@ func loadDict() (*dictState, error) {
 			if t.Requires != "" && t.Requires != "web" {
 				return nil, fmt.Errorf("dict/%s: token %q unknown requires %q", e.Name(), t.Canonical, t.Requires)
 			}
+			// infer pattern 编译冒烟 + scope 值域（tag 域）
+			for _, p := range []string{t.InferPattern, t.InferPattern2, t.InferPatternNeg} {
+				if p == "" {
+					continue
+				}
+				if _, err := regexp.Compile(`(?i)` + p); err != nil {
+					return nil, fmt.Errorf("dict/%s: token %q infer pattern: %w", e.Name(), t.Canonical, err)
+				}
+			}
+			for _, sc := range []string{t.InferScope, t.InferScope2} {
+				if sc == "" {
+					continue
+				}
+				switch sc {
+				case "all", "all_raw", "all_mi", "title", "title_raw", "subtitle_raw", "desc_raw":
+				default:
+					return nil, fmt.Errorf("dict/%s: token %q unknown infer_scope %q", e.Name(), t.Canonical, sc)
+				}
+			}
 			// standard_key 全局唯一
 			if t.StandardKey != "" {
 				if dom, dup := seenKey[t.StandardKey]; dup {
@@ -261,6 +291,140 @@ func DictDomains() []string {
 		domains = append(domains, d)
 	}
 	return domains
+}
+
+// tagOf 返回 tag 域词条的展示形式（Label 优先，空则 Canonical）。
+func (t TokenDef) tagLabel() string {
+	if t.Label != "" {
+		return t.Label
+	}
+	return t.Canonical
+}
+
+// TagGroups 返回 tag 域分组结构（组名 → 词条列表，保持 dict 文件顺序）。
+// TagSelector / codegen 数据源（§59.35 P4）。
+func TagGroups() []struct {
+	Name  string
+	Tags  []TokenDef
+} {
+	var out []struct {
+		Name string
+		Tags []TokenDef
+	}
+	idx := map[string]int{}
+	for _, t := range ensureDict().tokens["tag"] {
+		g := t.Group
+		if g == "" {
+			g = "其他"
+		}
+		if i, ok := idx[g]; ok {
+			out[i].Tags = append(out[i].Tags, t)
+		} else {
+			idx[g] = len(out)
+			out = append(out, struct {
+				Name string
+				Tags []TokenDef
+			}{g, []TokenDef{t}})
+		}
+	}
+	return out
+}
+
+// TagInferInput tag 推断输入（§59.35 P4，tag_inferer 查表化）。
+type TagInferInput struct {
+	Subtitle     string
+	Title        string
+	Description  string
+	MediaInfo    string
+	NFO          string
+}
+
+// TagInferMatches 按词条 infer_* 规则对输入文本做匹配，返回命中的 canonical 列表（dict 顺序）。
+//
+// scope 语义（迁移自 tag_inferer if 链）：
+//   - all / all_raw：全文本拼接（all 为 lowercase Contains、all_raw 为原文 regex——迁移后统一 regex，
+//     原 Contains 语义按 (?i) regex 等价表达）
+//   - all_mi：allLower Contains(p) OR miLower Contains(10 bit 变体)——10_bit 专用组合，
+//     迁移为 pattern 内 alternation（10bit|10 bit|10-bit）+ all 范围（MI 文本是 all 子集，
+//     变体已并入 pattern，无行为差）
+//   - title / title_raw：标题+副标题（Title + " " + Subtitle）
+//   - subtitle_raw：副标题
+//   - desc_raw：简介（PTGen 行）
+func TagInferMatches(in TagInferInput) []string {
+	all := in.Subtitle + in.Title + in.Description + in.MediaInfo + in.NFO
+	title := in.Title + " " + in.Subtitle
+
+	var hits []string
+	for _, t := range ensureDict().tokens["tag"] {
+		if t.InferPattern == "" {
+			continue
+		}
+		if tagMatchOne(t.InferPattern, t.InferScope, all, title, in, false) &&
+			!(t.InferPatternNeg != "" && tagMatchOne(t.InferPatternNeg, t.InferScope, all, title, in, true)) &&
+			!tagExcluded(t, all) {
+			hits = append(hits, t.Canonical)
+			continue
+		}
+		// 第二源（如 PTGen 简介行）
+		if t.InferPattern2 != "" && tagMatchOne(t.InferPattern2, t.InferScope2, all, title, in, false) {
+			hits = append(hits, t.Canonical)
+		}
+	}
+	return hits
+}
+
+// tagMatchOne 单 pattern 单 scope 匹配。neg=true 时用于负向判定（范围跟随正向 scope）。
+func tagMatchOne(pattern, scope string, all, title string, in TagInferInput, neg bool) bool {
+	if pattern == "" || scope == "" {
+		return false
+	}
+	re := compileInferRe(pattern)
+	var text string
+	switch scope {
+	case "all", "all_raw", "all_mi":
+		text = all
+	case "title", "title_raw":
+		text = title
+	case "subtitle_raw":
+		text = in.Subtitle
+	case "desc_raw":
+		text = in.Description
+	default:
+		return false
+	}
+	return re.MatchString(text)
+}
+
+// tagExcluded 命中文本含排除词则不提取（"国家" 误匹配防御）。
+func tagExcluded(t TokenDef, all string) bool {
+	if t.InferExclude == "" {
+		return false
+	}
+	// 语义迁移：旧代码对 reChineseAud 的**命中片段**做 Contains("国家") 检查。
+	// 等价实现：排除词出现在 pattern 命中区域附近——简化为命中文本含排除词。
+	return strings.Contains(strings.ToLower(all), t.InferExclude) && chineseAudHit(t, all)
+}
+
+// chineseAudHit 仅 chinese_audio 的旧语义需要命中片段级排除（FindString 结果检查）。
+// 其余词条 InferExclude 未使用。等价迁移：命中片段含排除词。
+func chineseAudHit(t TokenDef, all string) bool {
+	if t.Canonical != "chinese_audio" {
+		return false
+	}
+	m := compileInferRe(t.InferPattern).FindString(all)
+	return strings.Contains(strings.ToLower(m), t.InferExclude)
+}
+
+// compileInferRe 推断正则缓存编译。
+var inferReCache = map[string]*regexp.Regexp{}
+
+func compileInferRe(pattern string) *regexp.Regexp {
+	if re, ok := inferReCache[pattern]; ok {
+		return re
+	}
+	re := regexp.MustCompile(`(?i)` + pattern)
+	inferReCache[pattern] = re
+	return re
 }
 
 // LookupDictKey DOM 显示值 → standard key（forward，§59.35 派生自词条 Variants）。

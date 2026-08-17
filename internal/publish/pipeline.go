@@ -1283,9 +1283,14 @@ func (p *Pipeline) buildPublishRequest(ctx context.Context, candidate *model.Pub
 	if pubReq.MediaInfo != "" || pubReq.Title != "" {
 		inferer := NewMediaTagInferer()
 		inferredTags := inferer.Infer(pubReq.MediaInfo, pubReq.Title)
-		for _, tag := range inferredTags {
-			if pubReq.TagFields[tag] == "" {
-				pubReq.TagFields[tag] = "1"
+		if len(inferredTags) > 0 {
+			if pubReq.TagFields == nil {
+				pubReq.TagFields = map[string]string{} // §59.35 P4: 推断产出非空时防御初始化（测试环境无表单时 nil）
+			}
+			for _, tag := range inferredTags {
+				if pubReq.TagFields[tag] == "" {
+					pubReq.TagFields[tag] = "1"
+				}
 			}
 		}
 	}
