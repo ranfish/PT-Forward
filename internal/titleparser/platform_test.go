@@ -81,7 +81,33 @@ func TestPlatformDictIntegrity(t *testing.T) {
 	}
 }
 
-// §59.35 P2：词条顺序语义——长缩写在前（HMAX 不得被 MAX 抢、CMAX 不得被 MAX 抢）
+// §59.35 P2 审计固化: platform pattern 全量自检——每词条 pattern 必须命中自身
+// canonical（独立成词），且无死词条（pattern 空=永不参与提取）。
+// 新增词条自动进入护航。
+func TestPlatformPatternSelfMatch(t *testing.T) {
+	for _, tok := range platformRegistry {
+		if tok.Pattern == "" {
+			t.Errorf("platform 死词条（pattern 空）: %q", tok.Canonical)
+			continue
+		}
+		if !tok.matchesWithRequires("X "+tok.Canonical+" Y", true) {
+			t.Errorf("platform 词条 %q pattern 不命中自身: %q", tok.Canonical, tok.Pattern)
+		}
+	}
+	// 大小写敏感词条不误命中其大写形态（iT≠IT/iP≠IP）
+	cs := map[string]string{"iT": "IT", "iP": "IP", "FUNi": "FUNI", "Baha": "BAHA", "friDay": "FRIDAY", "Sentai": "SENTAI"}
+	for canonical, upper := range cs {
+		for _, tok := range platformRegistry {
+			if tok.Canonical == canonical {
+				if tok.re().MatchString("X " + upper + " Y") {
+					t.Errorf("大小写敏感词条 %q 误命中大写形态 %q", canonical, upper)
+				}
+			}
+		}
+	}
+}
+
+// §59.35 P2: 词条顺序语义——长缩写在前（HMAX 不得被 MAX 抢、CMAX 不得被 MAX 抢）
 func TestPlatformLongestFirst(t *testing.T) {
 	order := map[string]int{}
 	for i, tok := range DictTokens("platform") {
