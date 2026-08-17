@@ -35,7 +35,9 @@
 
 **支线完成**：幽灵种子巡检 v2（§59.31）；Token Registry P1-P3（§59.27）；清 seen 重推（§59.33）；侧栏信息架构重排（§59.32）；Remux 规格解析修复（v0.0.629）；Tab1 片源写法与 Encode 判定 + DOM key 归一化（§59.34，v0.0.632-634，两轮审计）。
 
-**遗留**：Tab 3 截图 / Tab 4 PTGen 端到端验证（字典 P1-P4 后）；发布页重构（含 tag_config 激活，§56.22，字典完成后启动）；MarkStatus 跨订阅写（§59.17 违反，预存在）；runAnalyze 分级（读 DB 跳过重拉）。
+**支线插曲（v0.0.642-643）**：compliance 关键词层防误伤（§56.2x 修正）——"The Pornographers" 被 "Porn" 子串误标系统禁转；修复 = ASCII 关键词词边界匹配（compliance.MatchKeyword 单一入口，checker/reseed/pipeline 三套统一）+ 中文误报排除补实现（成人+教育/高考/大学/学院，设计稿落地）。已知边界：xXx 由 qui 层白名单覆盖、Adult Swim 待案例。
+
+**遗留**：Tab 3 截图 / Tab 4 PTGen 端到端验证（当前主线下一步）；发布页重构（含 tag_config 激活，§56.22，字典完成后启动）；MarkStatus 跨订阅写（§59.17 违反，预存在）；runAnalyze 分级（读 DB 跳过重拉）；integration TestE2E_SeedingFullChain flaky（eng2.Start 竞态，§59.35 P3 记录）。
 
 ### ✅ 已完成（v0.0.228 → v0.0.547）
 
