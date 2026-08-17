@@ -1005,7 +1005,7 @@ func (h *RSSHandler) handleClearSeen(w http.ResponseWriter, r *http.Request, idS
 
 	cleared, err := h.repo.ClearSeen(r.Context(), fmt.Sprintf("%d", sub.ID), req.TorrentIDs)
 	if err != nil {
-		Error(w, http.StatusInternalServerError, 13003, "清除失败: "+err.Error())
+		Error(w, http.StatusInternalServerError, 50000, "清除失败: "+err.Error())
 		return
 	}
 	h.logger.Info("seen cleared for re-dispatch",
@@ -1027,10 +1027,14 @@ func (h *RSSHandler) handleListSeen(w http.ResponseWriter, r *http.Request, idSt
 		Error(w, http.StatusBadRequest, 40001, "无效的订阅 ID")
 		return
 	}
+	if _, err := h.repo.GetByID(r.Context(), uint(id)); err != nil {
+		Error(w, http.StatusNotFound, 13002, "订阅不存在")
+		return
+	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	seen, err := h.repo.ListSeenBySubscription(r.Context(), fmt.Sprintf("%d", id), limit)
 	if err != nil {
-		Error(w, http.StatusInternalServerError, 13003, "查询失败")
+		Error(w, http.StatusInternalServerError, 50000, "查询失败")
 		return
 	}
 	if seen == nil {

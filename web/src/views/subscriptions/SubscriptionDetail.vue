@@ -447,7 +447,7 @@ const selectedSeenIds = ref<string[]>([])
 const seenColumns = [
   { title: t('subscription.torrentId'), dataIndex: 'torrent_id', width: 100 },
   { title: t('subscription.title'), dataIndex: 'title', ellipsis: true },
-  { title: t('subscription.status'), dataIndex: 'status', width: 90 },
+  { title: t('common.status'), dataIndex: 'status', width: 90 },
   { title: t('subscription.freeStatus'), dataIndex: 'is_free', width: 80,
     customRender: ({ text }: { text: boolean }) => (text ? '✓' : '—') },
 ]
@@ -457,7 +457,8 @@ async function loadSeen() {
   try {
     const resp = await subscriptionsApi.listSeen(id, 200)
     seenList.value = (resp.data?.data?.items || []) as Array<Record<string, unknown>>
-    selectedSeenIds.value = []
+    // §59.33: 默认全选当前页（设计规定；用户可取消勾选）
+    selectedSeenIds.value = seenList.value.map(i => String(i['torrent_id'] || ''))
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {
