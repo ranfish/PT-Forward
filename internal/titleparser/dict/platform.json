@@ -1,0 +1,1288 @@
+{
+  "tokens": [
+    {
+      "canonical": "9NOW",
+      "full_name": "9Now",
+      "pattern": "\\b9NOW\\b"
+    },
+    {
+      "canonical": "AE",
+      "full_name": "A&E",
+      "pattern": "\\bAE\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "AUBC",
+      "full_name": "ABC (AU) iView",
+      "pattern": "\\bAUBC\\b"
+    },
+    {
+      "canonical": "AMBC",
+      "full_name": "ABC (US)",
+      "pattern": "\\bAMBC\\b"
+    },
+    {
+      "canonical": "AS",
+      "full_name": "Adult Swim",
+      "pattern": "\\bAS\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "AJAZ",
+      "full_name": "Al Jazeera English",
+      "pattern": "\\bAJAZ\\b"
+    },
+    {
+      "canonical": "ALL4",
+      "full_name": "All4 (Channel 4, ex-4oD)",
+      "pattern": "\\bALL4\\b"
+    },
+    {
+      "canonical": "AMZN",
+      "full_name": "Amazon, Prime Video",
+      "pattern": "\\bAMZN\\b"
+    },
+    {
+      "canonical": "AMC",
+      "full_name": "AMC",
+      "pattern": "\\bAMC\\b"
+    },
+    {
+      "canonical": "ATK",
+      "full_name": "America's Test Kitchen",
+      "pattern": "\\bATK\\b"
+    },
+    {
+      "canonical": "ANPL",
+      "full_name": "Animal Planet",
+      "pattern": "\\bANPL\\b"
+    },
+    {
+      "canonical": "ANLB",
+      "full_name": "AnimeLab",
+      "pattern": "\\bANLB\\b"
+    },
+    {
+      "canonical": "AOL",
+      "full_name": "AOL",
+      "pattern": "\\bAOL\\b"
+    },
+    {
+      "canonical": "ATVP",
+      "full_name": "Apple TV+",
+      "pattern": "\\bATVP\\b"
+    },
+    {
+      "canonical": "ARD",
+      "full_name": "ARD",
+      "pattern": "\\bARD\\b"
+    },
+    {
+      "canonical": "Baha",
+      "full_name": "巴哈姆特動畫瘋",
+      "pattern": "(?:^|[^A-Za-z])Baha(?:$|[^A-Za-z])",
+      "case_sensitive": true
+    },
+    {
+      "canonical": "iP",
+      "full_name": "BBC iPlayer",
+      "pattern": "(?:^|[^A-Za-z])iP(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "requires": "web"
+    },
+    {
+      "canonical": "BNGE",
+      "full_name": "Binge",
+      "pattern": "\\bBNGE\\b"
+    },
+    {
+      "canonical": "BKPL",
+      "full_name": "Blackpills",
+      "pattern": "\\bBKPL\\b"
+    },
+    {
+      "canonical": "BOOM",
+      "full_name": "Boomerang",
+      "pattern": "\\bBOOM\\b"
+    },
+    {
+      "canonical": "BRAV",
+      "full_name": "BravoTV",
+      "pattern": "\\bBRAV\\b"
+    },
+    {
+      "canonical": "CMOR",
+      "full_name": "C More",
+      "pattern": "\\bCMOR\\b"
+    },
+    {
+      "canonical": "CNLP",
+      "full_name": "Canal+",
+      "pattern": "\\bCNLP\\b"
+    },
+    {
+      "canonical": "CN",
+      "full_name": "Cartoon Network",
+      "pattern": "\\bCN\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "CBC",
+      "full_name": "CBC",
+      "pattern": "\\bCBC\\b"
+    },
+    {
+      "canonical": "CBS",
+      "full_name": "CBS",
+      "pattern": "\\bCBS\\b"
+    },
+    {
+      "canonical": "CHGD",
+      "full_name": "CHRGD",
+      "pattern": "\\bCHGD\\b"
+    },
+    {
+      "canonical": "CMAX",
+      "full_name": "Cinemax",
+      "pattern": "\\bCMAX\\b"
+    },
+    {
+      "canonical": "CLBI",
+      "full_name": "Club illico",
+      "pattern": "\\bCLBI\\b"
+    },
+    {
+      "canonical": "CNBC",
+      "full_name": "CNBC",
+      "pattern": "\\bCNBC\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "CCGC",
+      "full_name": "Comedians in Cars Getting Coffee",
+      "pattern": "\\bCCGC\\b"
+    },
+    {
+      "canonical": "CC",
+      "full_name": "Comedy Central",
+      "pattern": "\\bCC\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "COOK",
+      "full_name": "Cooking Channel",
+      "pattern": "\\bCOOK\\b"
+    },
+    {
+      "canonical": "CMT",
+      "full_name": "Country Music Television",
+      "pattern": "\\bCMT\\b"
+    },
+    {
+      "canonical": "CRKL",
+      "full_name": "Crackle",
+      "pattern": "\\bCRKL\\b"
+    },
+    {
+      "canonical": "CRAV",
+      "full_name": "Crave",
+      "pattern": "\\bCRAV\\b"
+    },
+    {
+      "canonical": "CR",
+      "full_name": "Crunchy Roll",
+      "pattern": "\\bCR\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "CSPN",
+      "full_name": "CSpan",
+      "pattern": "\\bCSPN\\b"
+    },
+    {
+      "canonical": "CTV",
+      "full_name": "CTV",
+      "pattern": "\\bCTV\\b"
+    },
+    {
+      "canonical": "CUR",
+      "full_name": "CuriosityStream",
+      "pattern": "\\bCUR\\b"
+    },
+    {
+      "canonical": "CW",
+      "full_name": "The CW",
+      "pattern": "\\bCW\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "CWS",
+      "full_name": "CWSeed",
+      "pattern": "\\bCWS\\b"
+    },
+    {
+      "canonical": "DSKI",
+      "full_name": "Daisuki",
+      "pattern": "\\bDSKI\\b"
+    },
+    {
+      "canonical": "DCU",
+      "full_name": "DC Universe",
+      "pattern": "\\bDCU\\b"
+    },
+    {
+      "canonical": "DHF",
+      "full_name": "Deadhouse Films",
+      "pattern": "\\bDHF\\b"
+    },
+    {
+      "canonical": "DEST",
+      "full_name": "Destination America",
+      "pattern": "\\bDEST\\b"
+    },
+    {
+      "canonical": "DDY",
+      "full_name": "Digiturk Dilediğin Yerde",
+      "pattern": "\\bDDY\\b"
+    },
+    {
+      "canonical": "DTV",
+      "full_name": "DirecTV Now",
+      "pattern": "\\bDTV\\b"
+    },
+    {
+      "canonical": "DISC",
+      "full_name": "Discovery Channel",
+      "pattern": "\\bDISC\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "DSCP",
+      "full_name": "Discovery+",
+      "pattern": "\\bDSCP\\b"
+    },
+    {
+      "canonical": "DSNY",
+      "full_name": "Disney",
+      "pattern": "\\bDSNY\\b"
+    },
+    {
+      "canonical": "DSNP",
+      "full_name": "Disney+",
+      "pattern": "\\bDSNP\\b"
+    },
+    {
+      "canonical": "DIY",
+      "full_name": "DIY Network",
+      "pattern": "\\bDIY\\b"
+    },
+    {
+      "canonical": "DOCC",
+      "full_name": "Doc Club",
+      "pattern": "\\bDOCC\\b"
+    },
+    {
+      "canonical": "DPLY",
+      "full_name": "DPlay (Rebranded as Discovery+)",
+      "pattern": "\\bDPLY\\b"
+    },
+    {
+      "canonical": "DF",
+      "full_name": "DramaFever",
+      "pattern": "\\bDF\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "DRPO",
+      "full_name": "Dropout",
+      "pattern": "\\bDRPO\\b"
+    },
+    {
+      "canonical": "ETV",
+      "full_name": "E!",
+      "pattern": "\\bETV\\b"
+    },
+    {
+      "canonical": "ETTV",
+      "full_name": "El Trece",
+      "pattern": "\\bETTV\\b"
+    },
+    {
+      "canonical": "EPIX",
+      "full_name": "EPIX",
+      "pattern": "\\bEPIX\\b"
+    },
+    {
+      "canonical": "ESPN",
+      "full_name": "ESPN",
+      "pattern": "\\bESPN\\b"
+    },
+    {
+      "canonical": "ESQ",
+      "full_name": "Esquire",
+      "pattern": "\\bESQ\\b"
+    },
+    {
+      "canonical": "FAM",
+      "full_name": "Family",
+      "pattern": "\\bFAM\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "FJR",
+      "full_name": "Family Jr",
+      "pattern": "\\bFJR\\b"
+    },
+    {
+      "canonical": "FOOD",
+      "full_name": "Food Network",
+      "pattern": "\\bFOOD\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "FOX",
+      "full_name": "Fox",
+      "pattern": "\\bFOX\\b"
+    },
+    {
+      "canonical": "FUNi",
+      "full_name": "FUNimation",
+      "pattern": "(?:^|[^A-Za-z])FUNi(?:$|[^A-Za-z])",
+      "case_sensitive": true
+    },
+    {
+      "canonical": "FXTL",
+      "full_name": "Foxtel Now",
+      "pattern": "\\bFXTL\\b"
+    },
+    {
+      "canonical": "FPT",
+      "full_name": "FPT Play",
+      "pattern": "\\bFPT\\b"
+    },
+    {
+      "canonical": "FTV",
+      "full_name": "France.tv",
+      "pattern": "\\bFTV\\b"
+    },
+    {
+      "canonical": "FREE",
+      "full_name": "Freeform",
+      "pattern": "\\bFREE\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "FUNI",
+      "full_name": "Funimation",
+      "pattern": "\\bFUNI\\b"
+    },
+    {
+      "canonical": "FYI",
+      "full_name": "FYI Network",
+      "pattern": "\\bFYI\\b"
+    },
+    {
+      "canonical": "GLBL",
+      "full_name": "Global",
+      "pattern": "\\bGLBL\\b"
+    },
+    {
+      "canonical": "GLOB",
+      "full_name": "GloboSat Play",
+      "pattern": "\\bGLOB\\b"
+    },
+    {
+      "canonical": "GO90",
+      "full_name": "go90",
+      "pattern": "\\bGO90\\b"
+    },
+    {
+      "canonical": "PLAY",
+      "full_name": "Google Play",
+      "pattern": "\\bPLAY\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "GYAO",
+      "full_name": "GYAO!",
+      "pattern": "\\bGYAO\\b"
+    },
+    {
+      "canonical": "HLMK",
+      "full_name": "Hallmark",
+      "pattern": "\\bHLMK\\b"
+    },
+    {
+      "canonical": "Hami",
+      "full_name": "Hami Video",
+      "pattern": "(?:^|[^A-Za-z])Hami(?:$|[^A-Za-z])",
+      "case_sensitive": true
+    },
+    {
+      "canonical": "HBO",
+      "full_name": "HBO",
+      "pattern": "\\bHBO\\b"
+    },
+    {
+      "canonical": "HMAX",
+      "full_name": "HBO Max",
+      "pattern": "\\bHMAX\\b"
+    },
+    {
+      "canonical": "HGTV",
+      "full_name": "HGTV",
+      "pattern": "\\bHGTV\\b"
+    },
+    {
+      "canonical": "HIDI",
+      "full_name": "HIDIVE",
+      "pattern": "\\bHIDI\\b"
+    },
+    {
+      "canonical": "HIST",
+      "full_name": "History Channel",
+      "pattern": "\\bHIST\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "HTSR",
+      "full_name": "Hotstar",
+      "pattern": "\\bHTSR\\b"
+    },
+    {
+      "canonical": "HULU",
+      "full_name": "Hulu",
+      "pattern": "\\bHULU\\b"
+    },
+    {
+      "canonical": "TOU",
+      "full_name": "Ici TOU.TV",
+      "pattern": "\\bTOU\\b"
+    },
+    {
+      "canonical": "IFC",
+      "full_name": "IFC",
+      "pattern": "\\bIFC\\b"
+    },
+    {
+      "canonical": "ID",
+      "full_name": "Investigation Discovery",
+      "pattern": "\\bID\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "iT",
+      "full_name": "iTunes",
+      "pattern": "(?:^|[^A-Za-z])iT(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "requires": "web"
+    },
+    {
+      "canonical": "ITV",
+      "full_name": "ITV",
+      "pattern": "\\bITV\\b"
+    },
+    {
+      "canonical": "KNPY",
+      "full_name": "Kanopy",
+      "pattern": "\\bKNPY\\b"
+    },
+    {
+      "canonical": "KAYO",
+      "full_name": "Kayo Sports",
+      "pattern": "\\bKAYO\\b"
+    },
+    {
+      "canonical": "KNOW",
+      "full_name": "Knowledge Network",
+      "pattern": "\\bKNOW\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "LIFE",
+      "full_name": "Lifetime",
+      "pattern": "\\bLIFE\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "LN",
+      "full_name": "Loving Nature",
+      "pattern": "\\bLN\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "MBC",
+      "full_name": "MBC",
+      "pattern": "\\bMBC\\b"
+    },
+    {
+      "canonical": "MTOD",
+      "full_name": "Motor Trend OnDemand",
+      "pattern": "\\bMTOD\\b"
+    },
+    {
+      "canonical": "MNBC",
+      "full_name": "MSNBC",
+      "pattern": "\\bMNBC\\b"
+    },
+    {
+      "canonical": "MTV",
+      "full_name": "MTV",
+      "pattern": "\\bMTV\\b"
+    },
+    {
+      "canonical": "NATG",
+      "full_name": "National Geographic",
+      "pattern": "\\bNATG\\b"
+    },
+    {
+      "canonical": "NBA",
+      "full_name": "NBA League Pass",
+      "pattern": "\\bNBA\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "NBC",
+      "full_name": "NBC",
+      "pattern": "\\bNBC\\b"
+    },
+    {
+      "canonical": "NF",
+      "full_name": "Netflix",
+      "pattern": "\\bNF\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "NFL",
+      "full_name": "NFL Network",
+      "pattern": "\\bNFL\\b"
+    },
+    {
+      "canonical": "NFLN",
+      "full_name": "NFL Now",
+      "pattern": "\\bNFLN\\b"
+    },
+    {
+      "canonical": "GC",
+      "full_name": "NHL GameCenter",
+      "pattern": "\\bGC\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "NICK",
+      "full_name": "Nickelodeon",
+      "pattern": "\\bNICK\\b"
+    },
+    {
+      "canonical": "NRK",
+      "full_name": "Norsk Rikskringkasting",
+      "pattern": "\\bNRK\\b"
+    },
+    {
+      "canonical": "NOW",
+      "full_name": "Now (Sky)",
+      "pattern": "\\bNOW\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "ODK",
+      "full_name": "OnDemandKorea",
+      "pattern": "\\bODK\\b"
+    },
+    {
+      "canonical": "OXGN",
+      "full_name": "Oxygen",
+      "pattern": "\\bOXGN\\b"
+    },
+    {
+      "canonical": "PMNT",
+      "full_name": "Paramount Network",
+      "pattern": "\\bPMNT\\b"
+    },
+    {
+      "canonical": "PMTP",
+      "full_name": "Paramount+",
+      "pattern": "\\bPMTP\\b"
+    },
+    {
+      "canonical": "PBS",
+      "full_name": "PBS",
+      "pattern": "\\bPBS\\b"
+    },
+    {
+      "canonical": "PBSK",
+      "full_name": "PBS Kids",
+      "pattern": "\\bPBSK\\b"
+    },
+    {
+      "canonical": "PCOK",
+      "full_name": "Peacock",
+      "pattern": "\\bPCOK\\b"
+    },
+    {
+      "canonical": "PSN",
+      "full_name": "Playstation Network",
+      "pattern": "\\bPSN\\b"
+    },
+    {
+      "canonical": "PLUZ",
+      "full_name": "Pluzz",
+      "pattern": "\\bPLUZ\\b"
+    },
+    {
+      "canonical": "POGO",
+      "full_name": "PokerGo",
+      "pattern": "\\bPOGO\\b"
+    },
+    {
+      "canonical": "PA",
+      "full_name": "Project Alpha",
+      "pattern": "\\bPA\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "PUHU",
+      "full_name": "puhutv",
+      "pattern": "\\bPUHU\\b"
+    },
+    {
+      "canonical": "QIBI",
+      "full_name": "Quibi",
+      "pattern": "\\bQIBI\\b"
+    },
+    {
+      "canonical": "RKTN",
+      "full_name": "Rakuten TV",
+      "pattern": "\\bRKTN\\b"
+    },
+    {
+      "canonical": "ROKU",
+      "full_name": "The Roku Channel",
+      "pattern": "\\bROKU\\b"
+    },
+    {
+      "canonical": "RSTR",
+      "full_name": "Rooster Teeth",
+      "pattern": "\\bRSTR\\b"
+    },
+    {
+      "canonical": "RTE",
+      "full_name": "RTÉ",
+      "pattern": "\\bRTE\\b"
+    },
+    {
+      "canonical": "SBS",
+      "full_name": "SBS (AU)",
+      "pattern": "\\bSBS\\b"
+    },
+    {
+      "canonical": "SESO",
+      "full_name": "Seeso",
+      "pattern": "\\bSESO\\b"
+    },
+    {
+      "canonical": "Sentai",
+      "full_name": "Sentai Filmworks",
+      "pattern": "(?:^|[^A-Za-z])Sentai(?:$|[^A-Za-z])",
+      "case_sensitive": true
+    },
+    {
+      "canonical": "SHMI",
+      "full_name": "Shomi",
+      "pattern": "\\bSHMI\\b"
+    },
+    {
+      "canonical": "SHO",
+      "full_name": "Showtime",
+      "pattern": "\\bSHO\\b"
+    },
+    {
+      "canonical": "SHDR",
+      "full_name": "Shudder",
+      "pattern": "\\bSHDR\\b"
+    },
+    {
+      "canonical": "SPIK",
+      "full_name": "Spike",
+      "pattern": "\\bSPIK\\b"
+    },
+    {
+      "canonical": "SNET",
+      "full_name": "Sportsnet",
+      "pattern": "\\bSNET\\b"
+    },
+    {
+      "canonical": "SPRT",
+      "full_name": "Sprout",
+      "pattern": "\\bSPRT\\b"
+    },
+    {
+      "canonical": "STAN",
+      "full_name": "Stan",
+      "pattern": "\\bSTAN\\b"
+    },
+    {
+      "canonical": "STRP",
+      "full_name": "Star+",
+      "pattern": "\\bSTRP\\b"
+    },
+    {
+      "canonical": "STZ",
+      "full_name": "Starz",
+      "pattern": "\\bSTZ\\b"
+    },
+    {
+      "canonical": "SVT",
+      "full_name": "Sveriges Television",
+      "pattern": "\\bSVT\\b"
+    },
+    {
+      "canonical": "SWER",
+      "full_name": "SwearNet",
+      "pattern": "\\bSWER\\b"
+    },
+    {
+      "canonical": "SYFY",
+      "full_name": "SyFy",
+      "pattern": "\\bSYFY\\b"
+    },
+    {
+      "canonical": "TBS",
+      "full_name": "TBS",
+      "pattern": "\\bTBS\\b"
+    },
+    {
+      "canonical": "TEN",
+      "full_name": "TenPlay",
+      "pattern": "\\bTEN\\b"
+    },
+    {
+      "canonical": "TFOU",
+      "full_name": "TFOU",
+      "pattern": "\\bTFOU\\b"
+    },
+    {
+      "canonical": "TIMV",
+      "full_name": "TIMvision",
+      "pattern": "\\bTIMV\\b"
+    },
+    {
+      "canonical": "TLC",
+      "full_name": "TLC",
+      "pattern": "\\bTLC\\b"
+    },
+    {
+      "canonical": "TRVL",
+      "full_name": "Travel Channel",
+      "pattern": "\\bTRVL\\b"
+    },
+    {
+      "canonical": "TUBI",
+      "full_name": "TubiTV",
+      "pattern": "\\bTUBI\\b"
+    },
+    {
+      "canonical": "TV3",
+      "full_name": "TV3 (IE)",
+      "pattern": "\\bTV3\\b"
+    },
+    {
+      "canonical": "TV4",
+      "full_name": "TV4 (SE)",
+      "pattern": "\\bTV4\\b"
+    },
+    {
+      "canonical": "TVING",
+      "full_name": "TVING",
+      "pattern": "\\bTVING\\b"
+    },
+    {
+      "canonical": "TVL",
+      "full_name": "TVLand",
+      "pattern": "\\bTVL\\b"
+    },
+    {
+      "canonical": "U-NEXT",
+      "full_name": "U-NEXT",
+      "pattern": "(?:^|[^A-Za-z])U\\-NEXT(?:$|[^A-Za-z])",
+      "case_sensitive": true
+    },
+    {
+      "canonical": "UFC",
+      "full_name": "UFC",
+      "pattern": "\\bUFC\\b"
+    },
+    {
+      "canonical": "UKTV",
+      "full_name": "UKTV",
+      "pattern": "\\bUKTV\\b"
+    },
+    {
+      "canonical": "UNIV",
+      "full_name": "Univision",
+      "pattern": "\\bUNIV\\b"
+    },
+    {
+      "canonical": "USAN",
+      "full_name": "USA Network",
+      "pattern": "\\bUSAN\\b"
+    },
+    {
+      "canonical": "VLCT",
+      "full_name": "Velocity",
+      "pattern": "\\bVLCT\\b"
+    },
+    {
+      "canonical": "VH1",
+      "full_name": "VH1",
+      "pattern": "\\bVH1\\b"
+    },
+    {
+      "canonical": "VIAP",
+      "full_name": "Viaplay",
+      "pattern": "\\bVIAP\\b"
+    },
+    {
+      "canonical": "VICE",
+      "full_name": "Viceland",
+      "pattern": "\\bVICE\\b"
+    },
+    {
+      "canonical": "VIKI",
+      "full_name": "Viki",
+      "pattern": "\\bVIKI\\b"
+    },
+    {
+      "canonical": "VMEO",
+      "full_name": "Vimeo",
+      "pattern": "\\bVMEO\\b"
+    },
+    {
+      "canonical": "VRV",
+      "full_name": "VRV",
+      "pattern": "\\bVRV\\b"
+    },
+    {
+      "canonical": "WNET",
+      "full_name": "W Network",
+      "pattern": "\\bWNET\\b"
+    },
+    {
+      "canonical": "WME",
+      "full_name": "WatchMe",
+      "pattern": "\\bWME\\b"
+    },
+    {
+      "canonical": "WWEN",
+      "full_name": "WWE Network",
+      "pattern": "\\bWWEN\\b"
+    },
+    {
+      "canonical": "XBOX",
+      "full_name": "Xbox Video",
+      "pattern": "\\bXBOX\\b"
+    },
+    {
+      "canonical": "YHOO",
+      "full_name": "Yahoo",
+      "pattern": "\\bYHOO\\b"
+    },
+    {
+      "canonical": "YT",
+      "full_name": "YouTube Movies",
+      "pattern": "\\bYT\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "RED",
+      "full_name": "YouTube Red",
+      "pattern": "\\bRED\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "ZDF",
+      "full_name": "ZDF",
+      "pattern": "\\bZDF\\b"
+    },
+    {
+      "canonical": "friDay",
+      "full_name": "friDay",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])friDay(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "FriDay 影音"
+    },
+    {
+      "canonical": "NowE",
+      "full_name": "NowE",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])NowE(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "NowE（香港）"
+    },
+    {
+      "canonical": "NowPlay",
+      "full_name": "NowPlay",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])NowPlay(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "Now Play（香港）"
+    },
+    {
+      "canonical": "NowPlayer",
+      "full_name": "NowPlayer",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])NowPlayer(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "Now Player（香港）"
+    },
+    {
+      "canonical": "ViuTV",
+      "full_name": "ViuTV",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])ViuTV(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "ViuTV（香港）"
+    },
+    {
+      "canonical": "Viu",
+      "full_name": "Viu",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])Viu(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "Viu（东南亚）"
+    },
+    {
+      "canonical": "WeTV",
+      "full_name": "WeTV",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])WeTV(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "WeTV 腾讯海外"
+    },
+    {
+      "canonical": "MyTVSuper",
+      "full_name": "MyTVSuper",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])MyTVSuper(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "MyTV SUPER（香港）"
+    },
+    {
+      "canonical": "MyTVS",
+      "full_name": "MyTVS",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])MyTVS(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "MyTV SUPER 缩写"
+    },
+    {
+      "canonical": "MyVideo",
+      "full_name": "MyVideo",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])MyVideo(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "MyVideo（德国）"
+    },
+    {
+      "canonical": "LiTV",
+      "full_name": "LiTV",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])LiTV(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "LiTV（台湾）"
+    },
+    {
+      "canonical": "KKTV",
+      "full_name": "KKTV",
+      "origin": "legacy",
+      "pattern": "\\bKKTV\\b",
+      "note": "KKTV（台湾）"
+    },
+    {
+      "canonical": "TVB",
+      "full_name": "TVB",
+      "origin": "legacy",
+      "pattern": "\\bTVB\\b",
+      "note": "TVB（香港）"
+    },
+    {
+      "canonical": "TVBAnywhere",
+      "full_name": "TVBAnywhere",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])TVBAnywhere(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "TVB Anywhere"
+    },
+    {
+      "canonical": "YOUKU",
+      "full_name": "YOUKU",
+      "origin": "legacy",
+      "pattern": "\\bYOUKU\\b",
+      "note": "优酷"
+    },
+    {
+      "canonical": "iQIYI",
+      "full_name": "iQIYI",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])iQIYI(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "爱奇艺"
+    },
+    {
+      "canonical": "meWATCH",
+      "full_name": "meWATCH",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])meWATCH(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "meWATCH（新加坡）"
+    },
+    {
+      "canonical": "CATCHPLAY",
+      "full_name": "CATCHPLAY",
+      "origin": "legacy",
+      "pattern": "\\bCATCHPLAY\\b",
+      "note": "CATCHPLAY（台湾）"
+    },
+    {
+      "canonical": "DMM",
+      "full_name": "DMM",
+      "origin": "legacy",
+      "pattern": "\\bDMM\\b",
+      "note": "DMM（日本）"
+    },
+    {
+      "canonical": "iPad",
+      "full_name": "iPad",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])iPad(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "iPad（设备）"
+    },
+    {
+      "canonical": "TX",
+      "full_name": "TX",
+      "origin": "legacy",
+      "pattern": "\\bTX\\b",
+      "requires": "web",
+      "note": "腾讯视频"
+    },
+    {
+      "canonical": "Netflix",
+      "full_name": "Netflix",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])Netflix(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "Netflix 全拼"
+    },
+    {
+      "canonical": "Amazon",
+      "full_name": "Amazon",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])Amazon(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "Amazon 全拼"
+    },
+    {
+      "canonical": "Crunchyroll",
+      "full_name": "Crunchyroll",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])Crunchyroll(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "Crunchyroll 全拼"
+    },
+    {
+      "canonical": "Disney",
+      "full_name": "Disney",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])Disney(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "Disney 全拼"
+    },
+    {
+      "canonical": "Disney+",
+      "full_name": "Disney+",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])Disney\\+(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "Disney+ 全拼"
+    },
+    {
+      "canonical": "AMC+",
+      "full_name": "AMC+",
+      "origin": "legacy",
+      "pattern": "(?:^|[^A-Za-z])AMC\\+(?:$|[^A-Za-z])",
+      "case_sensitive": true,
+      "note": "AMC+"
+    },
+    {
+      "canonical": "USA",
+      "full_name": "USA",
+      "origin": "legacy",
+      "pattern": "\\bUSA\\b",
+      "note": "美国（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "EUR",
+      "full_name": "EUR",
+      "origin": "legacy",
+      "pattern": "\\bEUR\\b",
+      "note": "欧洲（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "JPN",
+      "full_name": "JPN",
+      "origin": "legacy",
+      "pattern": "\\bJPN\\b",
+      "note": "日本（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "CEE",
+      "full_name": "CEE",
+      "origin": "legacy",
+      "pattern": "\\bCEE\\b",
+      "note": "中东欧（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "FRA",
+      "full_name": "FRA",
+      "origin": "legacy",
+      "pattern": "\\bFRA\\b",
+      "note": "法国（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "GBR",
+      "full_name": "GBR",
+      "origin": "legacy",
+      "pattern": "\\bGBR\\b",
+      "note": "英国（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "CAN",
+      "full_name": "CAN",
+      "origin": "legacy",
+      "pattern": "\\bCAN\\b",
+      "note": "加拿大（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "CHN",
+      "full_name": "CHN",
+      "origin": "legacy",
+      "pattern": "\\bCHN\\b",
+      "note": "中国（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "HKG",
+      "full_name": "HKG",
+      "origin": "legacy",
+      "pattern": "\\bHKG\\b",
+      "note": "香港（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "ITA",
+      "full_name": "ITA",
+      "origin": "legacy",
+      "pattern": "\\bITA\\b",
+      "note": "意大利（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "ESP",
+      "full_name": "ESP",
+      "origin": "legacy",
+      "pattern": "\\bESP\\b",
+      "note": "西班牙（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "GER",
+      "full_name": "GER",
+      "origin": "legacy",
+      "pattern": "\\bGER\\b",
+      "note": "德国（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "MA",
+      "full_name": "MA",
+      "origin": "legacy",
+      "pattern": "\\bMA\\b",
+      "requires": "web",
+      "note": "Movie Anywhere（历史上首个，2字符）"
+    },
+    {
+      "canonical": "IQ",
+      "full_name": "IQ",
+      "origin": "legacy",
+      "pattern": "\\bIQ\\b",
+      "requires": "web",
+      "note": "爱奇艺短缩写（历史）"
+    },
+    {
+      "canonical": "SEEZN",
+      "full_name": "SEEZN",
+      "origin": "legacy",
+      "pattern": "\\bSEEZN\\b",
+      "note": "SEEZN（韩国）"
+    },
+    {
+      "canonical": "DNSP",
+      "full_name": "DNSP",
+      "origin": "legacy",
+      "pattern": "\\bDNSP\\b",
+      "note": "Disney+ 拼写变体（历史）"
+    },
+    {
+      "canonical": "LINETV",
+      "full_name": "LINETV",
+      "origin": "legacy",
+      "pattern": "\\bLINETV\\b",
+      "note": "LINE TV"
+    },
+    {
+      "canonical": "MUBI",
+      "full_name": "MUBI",
+      "origin": "legacy",
+      "pattern": "\\bMUBI\\b",
+      "note": "Mubi"
+    },
+    {
+      "canonical": "TWN",
+      "full_name": "台湾",
+      "pattern": "\\bTWN\\b",
+      "origin": "legacy",
+      "note": "台湾（地区码兼容）",
+      "requires": "web"
+    },
+    {
+      "canonical": "MAX",
+      "full_name": "Max（原 HBO Max 更名）",
+      "pattern": "\\bMAX\\b"
+    },
+    {
+      "canonical": "STAR",
+      "full_name": "Disney+ Hotstar",
+      "pattern": "\\bSTAR\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "MY5",
+      "full_name": "Channel 5",
+      "pattern": "\\bMY5\\b"
+    },
+    {
+      "canonical": "BFI",
+      "full_name": "BFI Player",
+      "pattern": "\\bBFI\\b"
+    }
+  ]
+}

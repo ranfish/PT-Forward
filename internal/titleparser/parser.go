@@ -27,10 +27,6 @@ var (
 	reChinesePrefixNoBracket = regexp.MustCompile(`^([\p{Han}][\p{Han}0-9：，、:（）\(\)]*)\.`)
 )
 
-const sourcePlatformAlternatives = `MA|Apple\s?TV\+|ViuTV|MyTVSuper|MyTVS|DNSP|iT|NowE|MyVideo|TWN|LiTV|TVBAnywhere|DMM|iPad|TX|iQIYI|MUBI|TVB|YOUKU|NowPlay|AMZN|Amazon|Netflix|NF|DSNP|MAX|HMAX|HULU|ATVP|iTunes|friDay|USA|EUR|JPN|CEE|FRA|LINETV|PCOK|Hami|GBR|NowPlayer|CR|Crunchyroll|SEEZN|GER|CAN|CHN|Viu|WeTV|meWATCH|CATCHPLAY|AMC\+|TVING|Baha|KKTV|IQ|HKG|ITA|ESP|Disney\+|Disney`
-
-var reSourcePlatformBoundary = regexp.MustCompile("(?i)(?:^|[^\\p{L}\\p{N}_])(" + sourcePlatformAlternatives + ")(?:$|[^\\p{L}\\p{N}_])")
-
 // ParseTitle 解析标题，返回结构化组件
 func ParseTitle(title string) TitleComponents {
 	c := TitleComponents{}
@@ -50,6 +46,10 @@ func ParseTitle(title string) TitleComponents {
 
 	// 剥离 [中文名] 前缀
 	c.ChinesePrefix, title = extractChinesePrefix(title)
+
+	// §59.35: WEB 上下文在 token 消费开始前判定（platform 提取点位于 medium/audio
+	// 移除之后，彼时 WEB-DL/HDTV token 已被剥除，上下文会丢失）
+	webCtx := hasWebContext(title)
 
 	// 季集
 	c.SeasonEpisode, title = extractSeasonEpisodeAndRemove(title)
@@ -83,7 +83,8 @@ func ParseTitle(title string) TitleComponents {
 	c.FrameRate = extractFrameRate(title)
 	title = removeToken(title, c.FrameRate)
 	// 片源平台
-	c.SourcePlatform = extractSourcePlatform(title)
+	// §59.35: webCtx 来自解析起点（见函数开头），消费后标题已无 WEB token
+	c.SourcePlatform = extractSourcePlatformWithContext(title, webCtx)
 	title = removeToken(title, c.SourcePlatform)
 	// 移除音轨数 token（2Audios/3Audios 等）
 	title = reAudioTracksCleanup.ReplaceAllString(title, " ")
@@ -296,12 +297,28 @@ func extractFrameRate(title string) string {
 	return strings.TrimSpace(reFrameRate.FindString(title))
 }
 
+// reWebContext WEB 上下文判定（§59.35 决策 2）：标题含 WEB/HDTV/UHDTV token
+// 时 platform 域 requires=web 词条（2 字符缩写）才启用。
+var reWebContext = regexp.MustCompile(`(?i)\bWEB[._\- ]?(?:DL|RIP)?\b|\bU?HDTV\b`)
+
+// hasWebContext 标题是否证实为 WEB 类资源。
+func hasWebContext(title string) bool {
+	return reWebContext.MatchString(title)
+}
+
+// extractSourcePlatform 从标题提取流媒体厂商缩写（§59.35：platform 字典域）。
+//
+// 词条顺序即优先级（canonical 长度降序，加载器排序）；
+// 2 字符缩写挂 requires=web——仅 WEB 上下文启用，误命中方向从
+// "剥词污染主标题" 变为 "不提取"（空值无损）。
 func extractSourcePlatform(title string) string {
-	match := reSourcePlatformBoundary.FindStringSubmatch(title)
-	if match == nil {
-		return ""
-	}
-	return match[1]
+	return extractSourcePlatformWithContext(title, hasWebContext(title))
+}
+
+// extractSourcePlatformWithContext 显式传入 webContext（ParseTitle 用原始标题判定，
+// 避免前置 token 剥除导致上下文丢失）。
+func extractSourcePlatformWithContext(title string, webContext bool) string {
+	return lookupTokenWebContext(platformRegistry, title, webContext)
 }
 
 func extractSeriesStatus(title string) string {
@@ -417,6 +434,14 @@ func removeToken(title, token string) string {
 	if token == "" {
 		return title
 	}
+	// §59.35: platform token 按词条 pattern 移除——
+	// 1) 大小写敏感缩写（iT/iP/FUNi）(?i) 会把 "IT" 等普通词剥掉污染主标题
+	// 2) 点分隔标题中 \b 对 "Movie.1080p.NF.WEB-DL" 的 NF 边界判定不可靠
+	for _, t := range platformRegistry {
+		if t.Canonical == token {
+			return strings.TrimSpace(t.re().ReplaceAllString(title, " "))
+		}
+	}
 	re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(token) + `\b`)
 	return strings.TrimSpace(re.ReplaceAllString(title, " "))
 }
@@ -424,14 +449,14 @@ func removeToken(title, token string) string {
 // removeVideoCodecTokens 移除标题中所有视频编码变体 token。
 // §59.27: 从 videoCodecRegistry 自动合成，与 extractVideoCodec 单一来源。
 func removeVideoCodecTokens(title string) string {
-	return strings.TrimSpace(removeAllTokenPatterns(videoCodecRegistry, title))
+	return strings.TrimSpace(removeAllTokenPatterns(videoCodecRegistry, title, false))
 }
 
 // removeAudioCodecTokens 移除标题中所有音频编码变体 token。
 // §59.27: 从 audioCodecRegistry 自动合成，与 extractAudio 单一来源。
 // 正则末尾的 [._\d]*(?:\.[\d]+)? 语义由 registry pattern 内生（如 DDP5.1/AAC2.0）。
 func removeAudioCodecTokens(title string) string {
-	return strings.TrimSpace(removeAllTokenPatterns(audioCodecRegistry, title))
+	return strings.TrimSpace(removeAllTokenPatterns(audioCodecRegistry, title, false))
 }
 
 // removeHDRTokens 移除标题中所有 HDR/DV 变体 token。
