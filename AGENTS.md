@@ -31,7 +31,7 @@
 
 **版本**：v0.0.631（已发布）。
 
-**当前主线**：**v1.05 公共字典（Token Registry v2，§59.35，窗口 a：主线 Tab 3/4 验证之前）**。四决策定案：JSON 分域文件 + go:embed / platform Requires 语义约束一次性全量 / codegen 进 git + CI drift / P1-P4 每阶段独立发版。种子配置页主线（§59.19-§59.33）已完成至清 seen 重推，Tab 3/4 验证排在字典重构之后。
+**当前主线**：**v1.05 公共字典（Token Registry v2，§59.35）P1-P4 全部完成**（v0.0.635-641）：dict/*.json 8 域 304 词条（含 platform 224 + tag 40）单一真相源；②③④⑦⑧五份手写副本消灭 + extended tag 域 117 对死数据删除；codegen dict.ts + CI drift；platform Requires 语义约束 + tag_inferer 查表化。下一步回到种子配置页主线：Tab 3 截图 / Tab 4 PTGen 端到端验证，之后发布页重构（tag_config 激活，§56.22——站点标签数据已在 108 份适配文档备齐）。
 
 **支线完成**：幽灵种子巡检 v2（§59.31）；Token Registry P1-P3（§59.27）；清 seen 重推（§59.33）；侧栏信息架构重排（§59.32）；Remux 规格解析修复（v0.0.629）；Tab1 片源写法与 Encode 判定 + DOM key 归一化（§59.34，v0.0.632-634，两轮审计）。
 
