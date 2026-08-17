@@ -74,6 +74,12 @@ func matchKeyword(kw, text, textLower string) bool {
 	return strings.Contains(text, kw) || strings.Contains(textLower, strings.ToLower(kw))
 }
 
+// MatchKeyword 防误伤匹配导出版（§56.2x：pipeline/reseed 等外部关键词循环统一接入，
+// 替代裸 strings.Contains——"Porn" ⊄ "The Pornographers"）。
+func MatchKeyword(kw, text string) bool {
+	return matchKeyword(kw, text, strings.ToLower(text))
+}
+
 // isChineseFalsePositive 中文关键词误报排除：命中文本含排除词则放行。
 // 对齐设计稿 chineseFalsePositivePatterns（成人教育/成人高考/成人大学/成人学院）。
 func isChineseFalsePositive(text, matchedKeyword string) bool {

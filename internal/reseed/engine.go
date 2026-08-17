@@ -4373,18 +4373,20 @@ func checkPublishEligibility(title string) bool {
 	if title == "" {
 		return true
 	}
+	// §56.2x: MatchKeyword 防误伤（ASCII 词边界）——原裸 Contains 会把
+	// "The Pornographers" 误判成人（"Porn" 子串），与 compliance.Checker 行为不一致
 	for _, kw := range compliance.AdultKeywords {
-		if strings.Contains(title, kw) || strings.Contains(strings.ToLower(title), strings.ToLower(kw)) {
+		if compliance.MatchKeyword(kw, title) {
 			return false
 		}
 	}
 	for _, kw := range compliance.ForbiddenTransferKeywords {
-		if strings.Contains(title, kw) {
+		if compliance.MatchKeyword(kw, title) {
 			return false
 		}
 	}
 	for _, g := range compliance.ForbiddenGroups {
-		if strings.Contains(title, g) {
+		if compliance.MatchKeyword(g, title) {
 			return false
 		}
 	}
