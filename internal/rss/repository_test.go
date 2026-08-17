@@ -234,3 +234,61 @@ func TestParseCronInterval(t *testing.T) {
 		}
 	}
 }
+
+// TestClearSeen §59.33: 清 seen 重推语义（指定清 / 全清 / is_fake_hash 排除）。
+func TestClearSeen(t *testing.T) {
+	db := setupRepoTestDB(t)
+	repo := NewRepository(db)
+
+	// 造 3 行：2 真实 + 1 fake_hash
+	for i, tid := range []string{"t1", "t2", "t3"} {
+		seen := &model.RSSTorrentSeen{
+			SiteName: "站A", TorrentID: tid, SubscriptionID: "7",
+			Title: "x", Status: "seen",
+			IsFakeHash: i == 2, // t3 是侧载
+		}
+		if err := repo.MarkSeen(context.Background(), seen); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// 指定清 t1
+	n, err := repo.ClearSeen(context.Background(), "7", []string{"t1"})
+	if err != nil || n != 1 {
+		t.Fatalf("clear t1: n=%d err=%v", n, err)
+	}
+	var cnt int64
+	db.Model(&model.RSSTorrentSeen{}).Where("subscription_id = ? AND torrent_id = ?", "7", "t1").Count(&cnt)
+	if cnt != 0 {
+		t.Error("t1 should be hard-deleted")
+	}
+
+	// 全清：只剩 t2（t3 是 fake 不清）
+	n, err = repo.ClearSeen(context.Background(), "7", nil)
+	if err != nil || n != 1 {
+		t.Fatalf("clear all: n=%d err=%v (want 1, t3 fake excluded)", n, err)
+	}
+	db.Model(&model.RSSTorrentSeen{}).Where("subscription_id = ?", "7").Count(&cnt)
+	if cnt != 1 {
+		t.Errorf("fake_hash row must survive, got %d rows", cnt)
+	}
+}
+
+// TestListSeenBySubscription §59.33: 列表按 updated_at 倒序 + limit。
+func TestListSeenBySubscription(t *testing.T) {
+	db := setupRepoTestDB(t)
+	repo := NewRepository(db)
+	for _, tid := range []string{"a", "b", "c"} {
+		repo.MarkSeen(context.Background(), &model.RSSTorrentSeen{
+			SiteName: "站A", TorrentID: tid, SubscriptionID: "9", Status: "seen",
+		})
+	}
+	items, err := repo.ListSeenBySubscription(context.Background(), "9", 2)
+	if err != nil || len(items) != 2 {
+		t.Fatalf("list: %v %d", err, len(items))
+	}
+	other, _ := repo.ListSeenBySubscription(context.Background(), "8", 10)
+	if len(other) != 0 {
+		t.Error("subscription isolation broken")
+	}
+}

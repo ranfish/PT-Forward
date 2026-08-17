@@ -34,7 +34,7 @@ export const subscriptionsApi = {
   },
   // §59.33: 清 seen 重推
   listSeen(id: number, limit?: number) {
-    return client.get<ApiResponse<{ items: Array<{ torrentId: string; title: string; status: string; isFree: boolean }>; total: number }>>(`/rss/subscriptions/${id}/seen`, { params: limit ? { limit } : undefined })
+    return client.get<ApiResponse<{ items: Array<{ torrent_id: string; title: string; status: string; is_free: boolean }>; total: number }>>(`/rss/subscriptions/${id}/seen`, { params: limit ? { limit } : undefined })
   },
   clearSeen(id: number, data: { torrent_ids?: string[]; all?: boolean }) {
     return client.post<ApiResponse<{ cleared: number; message: string }>>(`/rss/subscriptions/${id}/seen/clear`, data)
