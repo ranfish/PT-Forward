@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -27,15 +28,47 @@ var dictFS embed.FS
 
 // TokenDef 单个技术词条定义（v2）。
 type TokenDef struct {
-	Category    string   `json:"-"`                      // 词条域（加载时填充）：video_codec/audio_codec/hdr/medium/resolution/type/source
-	Canonical   string   `json:"canonical"`              // 内部规范值（解析产物/比较值）
-	TitleForm   string   `json:"title_form,omitempty"`   // 重组标题点分隔形式，空 = Canonical
-	Pattern     string   `json:"pattern,omitempty"`      // 标题变体匹配正则（空 = 不参与标题解析，仅 DOM 归一化）
-	StandardKey string   `json:"standard_key,omitempty"` // 桥接 standard key（如 medium.webdl），全局唯一
-	EquivGroup  string   `json:"equivalence_group,omitempty"` // 等价组名（如 hevc_impl = {x265, HEVC}），仅比较视图使用
-	Display     string   `json:"display,omitempty"`      // 逆向显示名（空 = Canonical）；正逆向不对称时用（AVC→video.h264 但 video.h264→H.264）
-	Requires    string   `json:"requires,omitempty"`     // 启用条件（"web"：仅 WEB 上下文，2 字符 platform 缩写专用，P2）
-	Variants    []string `json:"variants,omitempty"`     // DOM 显示名变体（forward map 数据源）
+	Category       string   `json:"-"`                          // 词条域（加载时填充）：video_codec/audio_codec/hdr/medium/resolution/type/source/platform
+	Canonical      string   `json:"canonical"`                  // 内部规范值（解析产物/比较值）
+	TitleForm      string   `json:"title_form,omitempty"`       // 重组标题点分隔形式，空 = Canonical
+	Pattern        string   `json:"pattern,omitempty"`          // 标题变体匹配正则（空 = 不参与标题解析，仅 DOM 归一化）
+	StandardKey    string   `json:"standard_key,omitempty"`     // 桥接 standard key（如 medium.webdl），全局唯一
+	EquivGroup     string   `json:"equivalence_group,omitempty"` // 等价组名（如 hevc_impl = {x265, HEVC}），仅比较视图使用
+	Display        string   `json:"display,omitempty"`          // 逆向显示名（空 = Canonical）；正逆向不对称时用（AVC→video.h264 但 video.h264→H.264）
+	Requires       string   `json:"requires,omitempty"`         // 启用条件："web" = 仅 WEB 上下文（2 字符 platform 缩写专用，§59.35 决策 2）
+	Variants       []string `json:"variants,omitempty"`         // DOM 显示名变体（forward map 数据源）
+	FullName       string   `json:"full_name,omitempty"`        // 厂商全名（platform 域，展示/审计用）
+	CaseSensitive  bool     `json:"case_sensitive,omitempty"`   // pattern 大小写敏感（iP/iT/Baha 等 wiki 明确写法）
+	Origin         string   `json:"origin,omitempty"`           // 词条来源："wiki"（v1.05 附件）/"legacy"（本站历史行为保留）——空默认 wiki
+	Note           string   `json:"note,omitempty"`             // 词条备注（legacy 词条说明保留原因）
+}
+
+// re 返回编译缓存的正则。CaseSensitive 词条不加 (?i)（iP/iT/Baha 等 wiki 明确写法，
+// 大小写敏感避免 "IT"/"IP" 等普通词误命中）。
+func (t TokenDef) re() *regexp.Regexp {
+	if re, ok := tokenReC2[t.Pattern]; ok {
+		return re
+	}
+	pattern := t.Pattern
+	if !t.CaseSensitive {
+		pattern = `(?i)` + pattern
+	}
+	re := regexp.MustCompile(pattern)
+	tokenReC2[t.Pattern] = re
+	return re
+}
+
+// matchesWithRequires 按 Requires 约束判定词条是否参与匹配。
+// requires="web"：仅 WEB 上下文（标题含 WEB/HDTV token 或上下文未知时按 caller 传入的
+// webContext 决定）——§59.35 决策 2：2 字符缩写误命中方向从"剥词污染标题"变为"不提取"。
+func (t TokenDef) matchesWithRequires(s string, webContext bool) bool {
+	if t.Pattern == "" {
+		return false
+	}
+	if t.Requires == "web" && !webContext {
+		return false
+	}
+	return t.re().MatchString(s)
 }
 
 // titleForm 返回重组形式（空则用 Canonical）。
@@ -119,9 +152,17 @@ func loadDict() (*dictState, error) {
 			seenCanonical[ck] = domain
 			// pattern 编译冒烟（编译期安全由启动校验补位）
 			if t.Pattern != "" {
-				if _, err := regexp.Compile(`(?i)` + t.Pattern); err != nil {
+				pattern := t.Pattern
+				if !t.CaseSensitive {
+					pattern = `(?i)` + pattern
+				}
+				if _, err := regexp.Compile(pattern); err != nil {
 					return nil, fmt.Errorf("dict/%s: token %q pattern: %w", e.Name(), t.Canonical, err)
 				}
+			}
+			// requires 值域（当前仅 "web"）
+			if t.Requires != "" && t.Requires != "web" {
+				return nil, fmt.Errorf("dict/%s: token %q unknown requires %q", e.Name(), t.Canonical, t.Requires)
 			}
 			// standard_key 全局唯一
 			if t.StandardKey != "" {
@@ -167,6 +208,18 @@ func loadDict() (*dictState, error) {
 				st.equivGroup[t.EquivGroup] = append(st.equivGroup[t.EquivGroup], t.Canonical)
 			}
 			st.tokens[domain] = append(st.tokens[domain], t)
+		}
+	}
+
+	// §59.35 P2: platform 域确定性排序——canonical 长度降序（稳定排序，
+	// 同长度保持文件次序）。长缩写优先是提取语义（HMAX 不得被 MAX 抢、
+	// TVBAnywhere 不得被 TVB 抢），数据文件追加词条不再需要手工维护顺序。
+	for domain := range st.tokens {
+		if domain == "platform" {
+			toks := st.tokens[domain]
+			sort.SliceStable(toks, func(i, j int) bool {
+				return len(toks[i].Canonical) > len(toks[j].Canonical)
+			})
 		}
 	}
 

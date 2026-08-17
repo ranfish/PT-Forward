@@ -13,20 +13,9 @@
 //   parse(reassemble(profile)) == profile
 package titleparser
 
-import "regexp"
 
-// compileToken 编译 token pattern（长 token 在前由 dict 文件顺序保证，
-// 此处只做词边界包裹）。flagI 大小写不敏感。
-var tokenReCache = map[string]*regexp.Regexp{}
-
-func (t TokenDef) re() *regexp.Regexp {
-	if re, ok := tokenReCache[t.Pattern]; ok {
-		return re
-	}
-	re := regexp.MustCompile(`(?i)` + t.Pattern)
-	tokenReCache[t.Pattern] = re
-	return re
-}
+// compileToken 编译 token pattern（长 token 在前由 dict 文件顺序保证）。
+// re() 方法在 dict_loader.go（v2：CaseSensitive 支持）。
 
 // === 标题解析 registry（§59.35：dict 分域数据填充，顺序即提取优先级）===
 
@@ -34,12 +23,24 @@ var (
 	videoCodecRegistry = DictTokens("video_codec")
 	audioCodecRegistry = DictTokens("audio_codec")
 	hdrTokenRegistry   = DictTokens("hdr")
+	platformRegistry   = DictTokens("platform")
 )
 
 // lookupToken 从 registry 找首个命中 token（顺序即优先级）。
 func lookupToken(registry []TokenDef, s string) string {
 	for _, t := range registry {
-		if t.Pattern != "" && t.re().MatchString(s) {
+		if t.matchesWithRequires(s, false) {
+			return t.Canonical
+		}
+	}
+	return ""
+}
+
+// lookupTokenWebContext 同 lookupToken，但 requires=web 的词条按 webContext 启用。
+// webContext = 标题已证实为 WEB 类资源（含 WEB/HDTV/UHDTV token）。
+func lookupTokenWebContext(registry []TokenDef, s string, webContext bool) string {
+	for _, t := range registry {
+		if t.matchesWithRequires(s, webContext) {
 			return t.Canonical
 		}
 	}
@@ -65,10 +66,11 @@ func AudioTitleForm(canonical string) string { return titleFormOfToken(audioCode
 func VideoTitleForm(canonical string) string { return titleFormOfToken(videoCodecRegistry, canonical) }
 
 // removeAllTokenPatterns 从 registry 合成移除正则（替代手写 remove*Tokens）。
-// 返回移除所有变体后的字符串。
-func removeAllTokenPatterns(registry []TokenDef, s string) string {
+// 返回移除所有变体后的字符串。requires=web 词条仅在 webContext 时移除
+//（否则不提取也不剥词——2 字符缩写误命中不得污染主标题）。
+func removeAllTokenPatterns(registry []TokenDef, s string, webContext bool) string {
 	for _, t := range registry {
-		if t.Pattern != "" {
+		if t.matchesWithRequires(s, webContext) {
 			s = t.re().ReplaceAllString(s, " ")
 		}
 	}
