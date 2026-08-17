@@ -1,0 +1,64 @@
+{
+  "tokens": [
+    {
+      "canonical": "中国大陆",
+      "standard_key": "source.china",
+      "variants": [
+        "中国大陆",
+        "中国"
+      ]
+    },
+    {
+      "canonical": "中国香港",
+      "standard_key": "source.hongkong",
+      "variants": [
+        "中国香港",
+        "香港"
+      ]
+    },
+    {
+      "canonical": "中国台湾",
+      "standard_key": "source.taiwan",
+      "variants": [
+        "中国台湾",
+        "台湾"
+      ]
+    },
+    {
+      "canonical": "美国",
+      "standard_key": "source.western",
+      "variants": [
+        "美国",
+        "欧美"
+      ]
+    },
+    {
+      "canonical": "英国",
+      "standard_key": "source.uk",
+      "variants": [
+        "英国"
+      ]
+    },
+    {
+      "canonical": "日本",
+      "standard_key": "source.japan",
+      "variants": [
+        "日本"
+      ]
+    },
+    {
+      "canonical": "韩国",
+      "standard_key": "source.korea",
+      "variants": [
+        "韩国"
+      ]
+    },
+    {
+      "canonical": "其他",
+      "standard_key": "source.other",
+      "variants": [
+        "其他"
+      ]
+    }
+  ]
+}

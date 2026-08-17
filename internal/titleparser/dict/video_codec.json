@@ -1,0 +1,106 @@
+{
+  "tokens": [
+    {
+      "canonical": "AV1",
+      "pattern": "\\bAV1\\b",
+      "standard_key": "video.av1",
+      "variants": [
+        "AV1"
+      ]
+    },
+    {
+      "canonical": "VP9",
+      "pattern": "\\bVP[89]\\b",
+      "standard_key": "video.vp9",
+      "variants": [
+        "VP9",
+        "VP8"
+      ]
+    },
+    {
+      "canonical": "AVS2",
+      "pattern": "\\bAVS2\\b",
+      "standard_key": "video.avs2",
+      "variants": [
+        "AVS2"
+      ]
+    },
+    {
+      "canonical": "AVS+",
+      "pattern": "\\bAVS\\+",
+      "variants": []
+    },
+    {
+      "canonical": "VVC",
+      "pattern": "\\bVVC\\b|\\bH[._\\- ]?266\\b",
+      "standard_key": "video.h266",
+      "variants": ["H.266"]
+    },
+    {
+      "canonical": "Xvid",
+      "pattern": "\\bXvid\\b|\\bXviD\\b",
+      "standard_key": "video.xvid",
+      "variants": ["Xvid", "XviD", "XVID"]
+    },
+    {
+      "canonical": "x265",
+      "pattern": "\\bX265\\b",
+      "standard_key": "video.x265",
+      "equivalence_group": "hevc_impl",
+      "variants": [
+        "x265",
+        "X265",
+        "x.265"
+      ]
+    },
+    {
+      "canonical": "HEVC",
+      "pattern": "\\bH[._\\- ]?265\\b|\\bHEVC\\b",
+      "standard_key": "video.h265",
+      "equivalence_group": "hevc_impl",
+      "display": "HEVC",
+      "variants": [
+        "H.265",
+        "H265",
+        "HEVC"
+      ]
+    },
+    {
+      "canonical": "x264",
+      "pattern": "\\bX264\\b",
+      "standard_key": "video.x264",
+      "equivalence_group": "avc_impl",
+      "variants": [
+        "x264",
+        "X264",
+        "x.264"
+      ]
+    },
+    {
+      "canonical": "AVC",
+      "pattern": "\\bH[._\\- ]?264\\b|\\bAVC\\b",
+      "standard_key": "video.h264",
+      "equivalence_group": "avc_impl",
+      "display": "H.264",
+      "variants": [
+        "AVC"
+      ]
+    },
+    {
+      "canonical": "VC-1",
+      "pattern": "\\bVC[._\\- ]?1\\b",
+      "standard_key": "video.vc1",
+      "variants": [
+        "VC-1"
+      ]
+    },
+    {
+      "canonical": "MPEG-2",
+      "pattern": "\\bMPEG[._\\- ]?2\\b",
+      "standard_key": "video.mpeg2",
+      "variants": [
+        "MPEG-2"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "tokens": [
+    {
+      "canonical": "TrueHD",
+      "pattern": "\\bTrue[._\\- ]?HD(?:[._\\d]+)?\\b|\\bMLP FBA\\b",
+      "standard_key": "audio.truehd",
+      "variants": [
+        "TrueHD"
+      ]
+    },
+    {
+      "canonical": "DTS:X",
+      "pattern": "\\bDTS[._\\- :]?[Xx]\\b",
+      "standard_key": "audio.dts_x",
+      "variants": [
+        "DTS:X",
+        "DTS X"
+      ]
+    },
+    {
+      "canonical": "DTS",
+      "pattern": "\\bDTS[._\\- ]?XLL[._\\- ]?X\\b|\\bDTS[._\\- ]?UHD\\b",
+      "variants": []
+    },
+    {
+      "canonical": "DTS-HD MA",
+      "title_form": "DTS-HD.MA",
+      "pattern": "\\bDTS[._\\- ]?HD[._\\- ]*MA(?:[._\\d]+)?\\b|\\bDTS[._\\- ]?XLL\\b",
+      "standard_key": "audio.dts_hd_ma",
+      "variants": [
+        "DTS-HD MA",
+        "DTS HD MA"
+      ]
+    },
+    {
+      "canonical": "DTS-HD HR",
+      "title_form": "DTS-HD.HR",
+      "pattern": "\\bDTS[._\\- ]?HD[._\\- ]*HR(?:[._\\d]+)?\\b|\\bDTS[._\\- ]?LBR\\b",
+      "standard_key": "audio.dts_hd_hr",
+      "variants": [
+        "DTS-HD HR",
+        "DTS HD HR"
+      ]
+    },
+    {
+      "canonical": "DTS-ES",
+      "pattern": "\\bDTS[._\\- ]?ES(?:[._\\d]+)?\\b",
+      "variants": []
+    },
+    {
+      "canonical": "DTS",
+      "pattern": "\\bDTS(?:[._\\d]+)?\\b",
+      "standard_key": "audio.dts",
+      "variants": [
+        "DTS"
+      ]
+    },
+    {
+      "canonical": "DDP",
+      "pattern": "\\bE[._\\- ]?AC[._\\- ]?3\\b|\\bDDP5?[._\\d]*|\\bDD\\+|\\bDDPlus\\b",
+      "standard_key": "audio.ddp",
+      "variants": [
+        "DDP",
+        "DD+",
+        "E-AC-3"
+      ]
+    },
+    {
+      "canonical": "DD",
+      "pattern": "\\bDD(?:[._\\d]+)?\\b|\\bAC[._\\- ]?3\\b",
+      "standard_key": "audio.dd",
+      "variants": [
+        "DD",
+        "AC-3",
+        "AC3"
+      ]
+    },
+    {
+      "canonical": "FLAC",
+      "pattern": "\\bFLAC(?:[._\\d]+)?\\b",
+      "standard_key": "audio.flac",
+      "variants": [
+        "FLAC"
+      ]
+    },
+    {
+      "canonical": "xHE-AAC",
+      "pattern": "\\bx[._\\- ]?HE[._\\- ]?AAC(?:[._\\d]+)?\\b|\\bUSAC\\b",
+      "variants": []
+    },
+    {
+      "canonical": "AAC",
+      "pattern": "\\bAAC(?:[._\\d]+)?\\b",
+      "standard_key": "audio.aac",
+      "variants": [
+        "AAC"
+      ]
+    },
+    {
+      "canonical": "ALAC",
+      "pattern": "\\bALAC(?:[._\\d]+)?\\b",
+      "standard_key": "audio.alac",
+      "variants": [
+        "ALAC"
+      ]
+    },
+    {
+      "canonical": "APE",
+      "pattern": "\\bAPE(?:[._\\d]+)?\\b",
+      "standard_key": "audio.ape",
+      "variants": [
+        "APE"
+      ]
+    },
+    {
+      "canonical": "WAV",
+      "pattern": "\\bWAV(?:[._\\d]+)?\\b",
+      "standard_key": "audio.wav",
+      "variants": [
+        "WAV"
+      ]
+    },
+    {
+      "canonical": "Opus",
+      "pattern": "\\bOpus\\b|\\bOPUS\\b",
+      "standard_key": "audio.opus",
+      "variants": [
+        "Opus"
+      ]
+    },
+    {
+      "canonical": "MP3",
+      "pattern": "\\bMP3(?:[._\\d]+)?\\b",
+      "standard_key": "audio.mp3",
+      "variants": [
+        "MP3"
+      ]
+    },
+    {
+      "canonical": "LPCM",
+      "pattern": "\\bLPCM(?:[._\\d]+)?\\b|\\bPCM(?:[._\\d]+)?\\b",
+      "standard_key": "audio.lpcm",
+      "variants": [
+        "LPCM",
+        "PCM"
+      ]
+    },
+    {
+      "canonical": "MP2",
+      "pattern": "\\bMP2(?:[._\\d]+)?\\b|\\bMPEG[._\\- ]?Audio\\b",
+      "variants": []
+    },
+    {
+      "canonical": "AV3A",
+      "pattern": "\\bAV3A(?:[._\\d]+)?\\b",
+      "variants": []
+    },
+    {
+      "canonical": "DSD",
+      "pattern": "\\bDSD(?:[._\\d]+)?\\b",
+      "standard_key": "audio.dsd",
+      "variants": [
+        "DSD"
+      ]
+    }
+  ]
+}

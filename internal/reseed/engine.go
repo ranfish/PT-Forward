@@ -2948,36 +2948,15 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 }
 
 // techProfileConflict 规则 A：源标题和候选标题都有某 Token 且值不同 → 冲突。
-// webSpecEquivalents §59.30: 来源标注等价组——同一资源在不同站点的来源标注
-// 差异（Yumi 组站内标 WEBRip、下载器名为 WEB-DL，size 差 0.05% 实为同资源）。
-// 规格字段属于此类等价变体时不视为 TechProfile 冲突。
-var webSpecEquivalents = map[string]map[string]bool{
-	"WEB-DL": {"WEBRip": true},
-	"WEBRip": {"WEB-DL": true},
-}
-
-// codecEquivalents §59.30: 编码标注等价组——x265 是 HEVC 的编码器实现
-// （x264↔AVC 同理）。朋友站中文标题写 "10bit HEVC版本"、种子名用 x265，
-// 是同一资源的标注习惯差异。
-var codecEquivalents = map[string]map[string]bool{
-	"x265": {"HEVC": true},
-	"HEVC": {"x265": true},
-	"x264": {"AVC": true},
-	"AVC":  {"x264": true},
-}
-
+// §59.35: 等价组迁移至公共字典（dict/*.json equivalence_group，titleparser.Equivalent）。
+// web_delivery = {WEB-DL, WEBRip}；hevc_impl = {x265, HEVC}；avc_impl = {x264, AVC}。
+// 仅比较视图使用（辅种冲突豁免）；重组/发布视图禁止等价替换。
 func specEquivalent(a, b string) bool {
-	if eq, ok := webSpecEquivalents[strings.TrimSpace(a)]; ok && eq[strings.TrimSpace(b)] {
-		return true
-	}
-	return false
+	return titleparser.Equivalent(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
 func codecEquivalent(a, b string) bool {
-	if eq, ok := codecEquivalents[strings.TrimSpace(a)]; ok && eq[strings.TrimSpace(b)] {
-		return true
-	}
-	return false
+	return titleparser.Equivalent(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
 func techProfileConflict(src titleparser.TechProfile, candidateTitle string) bool {

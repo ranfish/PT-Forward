@@ -1,0 +1,73 @@
+{
+  "tokens": [
+    {
+      "canonical": "电影",
+      "standard_key": "category.movie",
+      "variants": [
+        "电影",
+        "Movies",
+        "Movie"
+      ]
+    },
+    {
+      "canonical": "电视剧",
+      "standard_key": "category.tv_series",
+      "variants": [
+        "电视剧",
+        "剧集",
+        "TV Series",
+        "TV-Series"
+      ]
+    },
+    {
+      "canonical": "综艺",
+      "standard_key": "category.tv_shows",
+      "variants": [
+        "综艺",
+        "TV Shows"
+      ]
+    },
+    {
+      "canonical": "动漫",
+      "standard_key": "category.animation",
+      "variants": [
+        "动漫",
+        "动画",
+        "Anime",
+        "Animation"
+      ]
+    },
+    {
+      "canonical": "纪录片",
+      "standard_key": "category.documentary",
+      "variants": [
+        "纪录片",
+        "Documentary"
+      ]
+    },
+    {
+      "canonical": "音乐",
+      "standard_key": "category.music",
+      "variants": [
+        "音乐",
+        "Music"
+      ]
+    },
+    {
+      "canonical": "体育",
+      "standard_key": "category.sports",
+      "variants": [
+        "体育",
+        "Sports"
+      ]
+    },
+    {
+      "canonical": "其他",
+      "standard_key": "category.other",
+      "variants": [
+        "其他",
+        "Other"
+      ]
+    }
+  ]
+}
