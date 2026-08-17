@@ -56,97 +56,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { CheckCircleFilled } from '@ant-design/icons-vue'
+import { TAG_GROUPS } from '@/generated/dict'
 
-// v0.0.256 §56.22 38 个 media_tag standard_keys（按类别分组）
-// 数据源：DB standard_keys 表 + titleparser/data/standard_keys.json
-interface MediaTag {
-  key: string   // standard_key（如 hdr10）
-  label: string // 显示名（如 "HDR10"）
-  aliases: string // 别名提示（如 "HDR 10"）
-}
-
-interface TagGroup {
-  name: string
-  tags: MediaTag[]
-}
-
-const tagGroups: TagGroup[] = [
-  {
-    name: 'HDR/色彩',
-    tags: [
-      { key: 'hdr10', label: 'HDR10', aliases: 'HDR 10' },
-      { key: 'hdr10_plus', label: 'HDR10+', aliases: '' },
-      { key: 'dolby_vision', label: 'Dolby Vision', aliases: 'DV/DoVi' },
-      { key: 'hdr_vivid', label: 'HDR Vivid', aliases: '国标 HDR' },
-      { key: 'hlg', label: 'HLG', aliases: '' },
-      { key: '10_bit', label: '10bit', aliases: '10-bit 色深' },
-    ],
-  },
-  {
-    name: '音频编码',
-    tags: [
-      { key: 'dolby_atmos', label: 'Dolby Atmos', aliases: '全景声' },
-      { key: 'dts_x', label: 'DTS:X', aliases: '' },
-      { key: 'lossless', label: '无损', aliases: '' },
-      { key: 'lossy', label: '有损', aliases: '' },
-    ],
-  },
-  {
-    name: '语言音轨',
-    tags: [
-      { key: 'chinese_audio', label: '国语', aliases: '普通话/国配' },
-      { key: 'cantonese_audio', label: '粤语', aliases: '' },
-      { key: 'japanese_audio', label: '日语', aliases: '原声' },
-      { key: 'korean_audio', label: '韩语', aliases: '' },
-      { key: 'original_audio', label: '原声', aliases: '' },
-      { key: 'dubbed', label: '配音', aliases: 'Dub' },
-    ],
-  },
-  {
-    name: '字幕',
-    tags: [
-      { key: 'chinese_subtitle', label: '中文字幕', aliases: 'CHS/简繁' },
-      { key: 'english_subtitle', label: '英文字幕', aliases: 'ENG' },
-      { key: 'hardcoded_subs', label: '硬字幕', aliases: '硬字' },
-      { key: 'encoded_subs', label: '内嵌字幕', aliases: '' },
-      { key: 'external_subtitles', label: '外挂字幕', aliases: '' },
-      { key: 'subtitles_include', label: '含字幕', aliases: '' },
-    ],
-  },
-  {
-    name: '版本类型',
-    tags: [
-      { key: 'diy', label: 'DIY', aliases: '' },
-      { key: 'scene', label: 'Scene', aliases: 'Scene Release' },
-      { key: 'remux', label: 'Remux', aliases: '' },
-      { key: 'internal', label: 'Internal', aliases: 'iNTERNAL' },
-      { key: 'exclusive', label: '独占', aliases: '专属' },
-      { key: 'retail', label: 'Retail', aliases: '' },
-      { key: 'web_release', label: 'WEB Release', aliases: '' },
-      { key: 'promotional', label: '宣传版', aliases: 'Promo' },
-      { key: 'hybrid', label: 'Hybrid', aliases: '' },
-    ],
-  },
-  {
-    name: '特别版',
-    tags: [
-      { key: 'special_edition', label: '特别版', aliases: 'Special Edition' },
-      { key: 'director_s_cut', label: '导演剪辑', aliases: "Director's Cut" },
-      { key: 'anniversary_edition', label: '纪念版', aliases: 'Anniversary' },
-      { key: 'criterion', label: 'Criterion', aliases: 'CC' },
-      { key: 'the_criterion_collection', label: 'CC 收藏', aliases: 'Criterion Collection' },
-      { key: '4k_remaster', label: '4K Remaster', aliases: '4K 重制' },
-      { key: '4k_restoration', label: '4K Restoration', aliases: '4K 修复' },
-    ],
-  },
-  {
-    name: '其他',
-    tags: [
-      { key: 'commentary', label: '评论音轨', aliases: 'Commentary' },
-      { key: 'complete', label: '完结', aliases: '全集' },
-    ],
-  },
-]
+// §59.35 P4: tag 分组数据源切换 generated/dict.ts（dict/tag.json 唯一真相源，
+// 原前端 38 组硬编码副本删除）
+const tagGroups = TAG_GROUPS
 
 // 所有标准 tag key（用于判断是否标准）
 const allStandardKeys = computed(() => tagGroups.flatMap(g => g.tags.map(t => t.key)))
