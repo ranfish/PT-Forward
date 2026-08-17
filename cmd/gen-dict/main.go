@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
+	"path/filepath"
 	"strings"
 )
 
@@ -41,8 +41,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// domain → key → display
-	domains := map[string]map[string]string{}
+	// domain → [(key, display)]（保持 tokens 源顺序——select v-for 消费依赖
+	// 语义顺序：电影/电视剧/综艺...，字母序会让动漫排首位）
+	domains := map[string][][2]string{}
 	platforms := map[string]string{}
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
@@ -75,10 +76,7 @@ func main() {
 			if t.StandardKey == "" {
 				continue
 			}
-			if domains[domain] == nil {
-				domains[domain] = map[string]string{}
-			}
-			domains[domain][t.StandardKey] = display
+			domains[domain] = append(domains[domain], [2]string{t.StandardKey, display})
 		}
 	}
 
@@ -87,15 +85,10 @@ func main() {
 	b.WriteString("// 数据源：internal/titleparser/dict/*.json（唯一真相源）。\n")
 	b.WriteString("// 重新生成：go run ./cmd/gen-dict（CI drift 检查强制同步）。\n\n")
 
-	emitMap := func(name, comment string, m map[string]string) {
+	emitMap := func(name, comment string, pairs [][2]string) {
 		fmt.Fprintf(&b, "// %s\nexport const %s: Record<string, string> = {\n", comment, name)
-		keys := make([]string, 0, len(m))
-		for k := range m {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			fmt.Fprintf(&b, "  %q: %q,\n", k, m[k])
+		for _, p := range pairs {
+			fmt.Fprintf(&b, "  %q: %q,\n", p[0], p[1])
 		}
 		b.WriteString("}\n\n")
 	}
@@ -107,7 +100,13 @@ func main() {
 	emitMap("AUDIO_CODEC_LABELS", "audio_codec 域：standard_key → 显示名", domains["audio_codec"])
 	emitMap("RESOLUTION_LABELS", "resolution 域：standard_key → 显示名", domains["resolution"])
 	emitMap("SOURCE_LABELS", "source 域：standard_key → 显示名", domains["source"])
-	emitMap("PLATFORM_FULLNAMES", "platform 域：canonical → 厂商全名（Tab1 分发方 tooltip）", platforms)
+	// platform 按字典序输出（无语义顺序需求）
+	platPairs := make([][2]string, 0, len(platforms))
+	for k, v := range platforms {
+		platPairs = append(platPairs, [2]string{k, v})
+	}
+	sort.Slice(platPairs, func(i, j int) bool { return platPairs[i][0] < platPairs[j][0] })
+	emitMap("PLATFORM_FULLNAMES", "platform 域：canonical → 厂商全名（Tab1 分发方 tooltip）", platPairs)
 
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)
@@ -118,8 +117,8 @@ func main() {
 		os.Exit(1)
 	}
 	n := 0
-	for _, m := range domains {
-		n += len(m)
+	for _, pairs := range domains {
+		n += len(pairs)
 	}
 	fmt.Printf("%s: %d 词条 + %d platform\n", outPath, n, len(platforms))
 }

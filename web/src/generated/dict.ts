@@ -4,32 +4,32 @@
 
 // type 域：standard_key → 显示名（categoryLabel 数据源）
 export const CATEGORY_LABELS: Record<string, string> = {
-  "category.animation": "动漫",
-  "category.documentary": "纪录片",
   "category.movie": "电影",
-  "category.music": "音乐",
-  "category.other": "其他",
-  "category.sports": "体育",
   "category.tv_series": "电视剧",
   "category.tv_shows": "综艺",
+  "category.animation": "动漫",
+  "category.documentary": "纪录片",
+  "category.music": "音乐",
+  "category.sports": "体育",
+  "category.other": "其他",
 }
 
 // medium 域：standard_key → 显示名
 export const MEDIUM_LABELS: Record<string, string> = {
-  "medium.bdrip": "BDRip",
   "medium.bluray": "Blu-ray",
-  "medium.bluray_3d": "3D Blu-ray",
-  "medium.dvd": "DVD",
-  "medium.dvdrip": "DVDRip",
-  "medium.encode": "Encode",
-  "medium.hdtv": "HDTV",
-  "medium.remux": "Remux",
-  "medium.tvrip": "TVRip",
   "medium.uhd_bluray": "UHD Blu-ray",
+  "medium.bluray_3d": "3D Blu-ray",
+  "medium.remux": "Remux",
   "medium.uhd_remux": "UHD Blu-ray Remux",
-  "medium.uhdtv": "UHDTV",
+  "medium.encode": "Encode",
   "medium.webdl": "WEB-DL",
   "medium.webrip": "WEBRip",
+  "medium.hdtv": "HDTV",
+  "medium.uhdtv": "UHDTV",
+  "medium.dvdrip": "DVDRip",
+  "medium.bdrip": "BDRip",
+  "medium.tvrip": "TVRip",
+  "medium.dvd": "DVD",
 }
 
 // hdr 域：standard_key → 显示名
@@ -37,70 +37,70 @@ export const HDR_LABELS: Record<string, string> = {
   "hdr.dv": "DoVi",
   "hdr.dv_hdr": "DoVi HDR",
   "hdr.dv_hdr10plus": "DoVi HDR10+",
-  "hdr.hdr": "HDR",
-  "hdr.hdr10": "HDR10",
   "hdr.hdr10plus": "HDR10+",
+  "hdr.hdr10": "HDR10",
   "hdr.hdr_vivid": "HDR Vivid",
   "hdr.hlg": "HLG",
+  "hdr.hdr": "HDR",
   "hdr.sdr": "SDR",
 }
 
 // video_codec 域：standard_key → 显示名
 export const VIDEO_CODEC_LABELS: Record<string, string> = {
   "video.av1": "AV1",
-  "video.avs2": "AVS2",
-  "video.h264": "H.264",
-  "video.h265": "HEVC",
-  "video.h266": "VVC",
-  "video.mpeg2": "MPEG-2",
-  "video.vc1": "VC-1",
   "video.vp9": "VP9",
-  "video.x264": "x264",
-  "video.x265": "x265",
+  "video.avs2": "AVS2",
+  "video.h266": "VVC",
   "video.xvid": "Xvid",
+  "video.x265": "x265",
+  "video.h265": "HEVC",
+  "video.x264": "x264",
+  "video.h264": "H.264",
+  "video.vc1": "VC-1",
+  "video.mpeg2": "MPEG-2",
 }
 
 // audio_codec 域：standard_key → 显示名
 export const AUDIO_CODEC_LABELS: Record<string, string> = {
+  "audio.truehd": "TrueHD",
+  "audio.dts_x": "DTS:X",
+  "audio.dts_hd_ma": "DTS-HD MA",
+  "audio.dts_hd_hr": "DTS-HD HR",
+  "audio.dts": "DTS",
+  "audio.ddp": "DDP",
+  "audio.dd": "DD",
+  "audio.flac": "FLAC",
   "audio.aac": "AAC",
   "audio.alac": "ALAC",
   "audio.ape": "APE",
-  "audio.dd": "DD",
-  "audio.ddp": "DDP",
-  "audio.dsd": "DSD",
-  "audio.dts": "DTS",
-  "audio.dts_hd_hr": "DTS-HD HR",
-  "audio.dts_hd_ma": "DTS-HD MA",
-  "audio.dts_x": "DTS:X",
-  "audio.flac": "FLAC",
-  "audio.lpcm": "LPCM",
-  "audio.mp3": "MP3",
-  "audio.opus": "Opus",
-  "audio.truehd": "TrueHD",
   "audio.wav": "WAV",
+  "audio.opus": "Opus",
+  "audio.mp3": "MP3",
+  "audio.lpcm": "LPCM",
+  "audio.dsd": "DSD",
 }
 
 // resolution 域：standard_key → 显示名
 export const RESOLUTION_LABELS: Record<string, string> = {
-  "resolution.r1080i": "1080i",
-  "resolution.r1080p": "1080p",
-  "resolution.r1440p": "1440p",
-  "resolution.r2160p": "2160p",
   "resolution.r4320p": "4320p",
-  "resolution.r480p": "480p",
+  "resolution.r2160p": "2160p",
+  "resolution.r1440p": "1440p",
+  "resolution.r1080p": "1080p",
+  "resolution.r1080i": "1080i",
   "resolution.r720p": "720p",
+  "resolution.r480p": "480p",
 }
 
 // source 域：standard_key → 显示名
 export const SOURCE_LABELS: Record<string, string> = {
   "source.china": "中国大陆",
   "source.hongkong": "中国香港",
+  "source.taiwan": "中国台湾",
+  "source.western": "美国",
+  "source.uk": "英国",
   "source.japan": "日本",
   "source.korea": "韩国",
   "source.other": "其他",
-  "source.taiwan": "中国台湾",
-  "source.uk": "英国",
-  "source.western": "美国",
 }
 
 // platform 域：canonical → 厂商全名（Tab1 分发方 tooltip）
