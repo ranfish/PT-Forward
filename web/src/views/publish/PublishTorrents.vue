@@ -26,13 +26,7 @@
         placeholder="类型筛选"
         allow-clear
       >
-        <a-select-option value="category.movie">电影</a-select-option>
-        <a-select-option value="category.tv_series">电视剧</a-select-option>
-        <a-select-option value="category.animation">动漫</a-select-option>
-        <a-select-option value="category.documentaries">纪录片</a-select-option>
-        <a-select-option value="category.tv_shows">综艺</a-select-option>
-        <a-select-option value="category.music">音乐</a-select-option>
-        <a-select-option value="category.sports">体育</a-select-option>
+        <a-select-option v-for="label, key in CATEGORY_LABELS" :key="key" :value="key">{{ label }}</a-select-option>
       </a-select>
       <a-select
         v-if="torrents.length"
@@ -424,6 +418,7 @@ import { message } from 'ant-design-vue'
 import { publishTorrentsApi, type PublishTorrentItem } from '@/api/publish'
 import { downloadersApi } from '@/api/downloaders'
 import { formatBytes, maskDomain } from '@/utils/format'
+import { CATEGORY_LABELS } from '@/generated/dict'
 import { useEnumLabels } from '@/utils/enumLabels'
 
 const { translateQbState } = useEnumLabels()

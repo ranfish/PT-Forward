@@ -25,13 +25,7 @@
           <a-col :span="8">
             <a-form-item label="类型">
               <a-select v-model:value="form.standard_type" style="width: 100%">
-                <a-select-option value="category.movie">电影</a-select-option>
-                <a-select-option value="category.tv_series">电视剧</a-select-option>
-                <a-select-option value="category.animation">动漫</a-select-option>
-                <a-select-option value="category.documentaries">纪录片</a-select-option>
-                <a-select-option value="category.tv_shows">综艺</a-select-option>
-                <a-select-option value="category.music">音乐</a-select-option>
-                <a-select-option value="category.sports">体育</a-select-option>
+                <a-select-option v-for="label, key in CATEGORY_LABELS" :key="key" :value="key">{{ label }}</a-select-option>
               </a-select>
             </a-form-item>
           </a-col>
@@ -97,6 +91,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { message, Empty } from 'ant-design-vue'
 import { metadataApi, type MetadataDetail } from '@/api/image-host'
+import { CATEGORY_LABELS } from '@/generated/dict'
 
 const props = defineProps<{
   open: boolean
