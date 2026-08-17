@@ -43,7 +43,7 @@ var (
 // canonicalDisplay 每个标准键的规范显示名（逆向映射优先使用）
 var canonicalDisplay = map[string]string{
 	// resolution
-	"resolution.r4320p": "2160p",
+	"resolution.r4320p": "4320p",
 	"resolution.r2160p": "2160p",
 	"resolution.r1080p": "1080p",
 	"resolution.r1080i": "1080i",

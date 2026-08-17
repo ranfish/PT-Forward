@@ -6,11 +6,11 @@ import "testing"
 // 不覆盖标题派生值（UNK* key / "Encode" 等非媒介语义值）。
 func TestMergeDOMIntoGarbageMediumDefense(t *testing.T) {
 	cases := []struct {
-		name        string
-		title       string
-		domMedium   string
-		wantSrc     string
-		wantSpec    string
+		name      string
+		title     string
+		domMedium string
+		wantSrc   string
+		wantSpec  string
 	}{
 		// 垃圾 DOM medium：不覆盖 title 值
 		{"unk_key", "Movie 2160p UHD BluRay x265 GRP", "UNK0", "UHD BluRay", ""},
@@ -43,6 +43,19 @@ func TestReverseLookupMediumChain(t *testing.T) {
 		{"UNK0", ""},
 		{"UNK11", ""},
 		{"", ""},
+	}
+	for _, c := range cases {
+		if got := ReverseLookup(c.key); got != c.want {
+			t.Errorf("ReverseLookup(%q) = %q, want %q", c.key, got, c.want)
+		}
+	}
+}
+
+// §59.34 审计二轮: r4320p 反查 8K 显示名（曾误映射 2160p）
+func TestReverseLookup4320p(t *testing.T) {
+	cases := []struct{ key, want string }{
+		{"resolution.r4320p", "4320p"},
+		{"resolution.r2160p", "2160p"},
 	}
 	for _, c := range cases {
 		if got := ReverseLookup(c.key); got != c.want {
