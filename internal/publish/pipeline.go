@@ -1568,9 +1568,9 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 }
 
 func containsAnyKeyword(text string, keywords []string) (string, bool) {
-	lower := strings.ToLower(text)
+	// §56.2x: MatchKeyword 防误伤（ASCII 词边界）——与 compliance.Checker 行为一致
 	for _, kw := range keywords {
-		if strings.Contains(text, kw) || strings.Contains(lower, strings.ToLower(kw)) {
+		if compliance.MatchKeyword(kw, text) {
 			return kw, true
 		}
 	}
@@ -1589,7 +1589,7 @@ func (p *Pipeline) checkForbiddenContent(texts []string) (bool, string) {
 			return false, fmt.Sprintf("标题/副标题包含禁止转载关键词: %s (§30.5 规则 2)", kw)
 		}
 		for _, grp := range compliance.ForbiddenGroups {
-			if strings.Contains(text, grp) {
+			if compliance.MatchKeyword(grp, text) {
 				return false, fmt.Sprintf("禁止转载小组资源: %s (§30.5 规则 3)", grp)
 			}
 		}
