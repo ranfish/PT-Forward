@@ -319,6 +319,25 @@
             size="small"
           />
         </a-tab-pane>
+        <!-- §59.33: 已见种子（清 seen 重推） -->
+        <a-tab-pane key="seen" :tab="t('subscription.seenHistory')">
+          <div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center">
+            <a-button :loading="seenLoading" @click="loadSeen">{{ t('common.refresh') }}</a-button>
+            <a-button danger :disabled="selectedSeenIds.length === 0" @click="confirmClearSeen">
+              {{ t('subscription.clearSeen') }}（{{ selectedSeenIds.length }}）
+            </a-button>
+            <span style="color: #999; font-size: 12px">{{ t('subscription.clearSeenHint') }}</span>
+          </div>
+          <a-table
+            :columns="seenColumns"
+            :data-source="seenList"
+            :loading="seenLoading"
+            :pagination="{ pageSize: 20 }"
+            row-key="torrent_id"
+            size="small"
+            :row-selection="{ selectedRowKeys: selectedSeenIds, onChange: (keys: string[]) => selectedSeenIds = keys }"
+          />
+        </a-tab-pane>
         <a-tab-pane key="rules" :tab="t('subscription.rules')">
           <p style="color: #666; margin-bottom: 16px">
             {{ t('subscription.rulesHint') }}
@@ -386,9 +405,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted , watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { subscriptionsApi } from '@/api/subscriptions'
 import { formatTime } from '@/utils/format'
@@ -420,6 +439,55 @@ const subscription = ref<Partial<RSSSubscription>>({})
 const dryrunResults = ref<Record<string, unknown>[]>([])
 const history = ref<Record<string, unknown>[]>([])
 const activeTab = ref('config')
+
+// §59.33: 已见种子（清 seen 重推）
+const seenLoading = ref(false)
+const seenList = ref<Array<Record<string, unknown>>>([])
+const selectedSeenIds = ref<string[]>([])
+const seenColumns = [
+  { title: t('subscription.torrentId'), dataIndex: 'torrent_id', width: 100 },
+  { title: t('subscription.title'), dataIndex: 'title', ellipsis: true },
+  { title: t('subscription.status'), dataIndex: 'status', width: 90 },
+  { title: t('subscription.freeStatus'), dataIndex: 'is_free', width: 80,
+    customRender: ({ text }: { text: boolean }) => (text ? '✓' : '—') },
+]
+
+async function loadSeen() {
+  seenLoading.value = true
+  try {
+    const resp = await subscriptionsApi.listSeen(id, 200)
+    seenList.value = (resp.data?.data?.items || []) as Array<Record<string, unknown>>
+    selectedSeenIds.value = []
+  } catch (e: unknown) {
+    message.error((e as Error).message)
+  } finally {
+    seenLoading.value = false
+  }
+}
+
+async function confirmClearSeen() {
+  Modal.confirm({
+    title: t('subscription.clearSeenConfirm', { count: selectedSeenIds.value.length }),
+    content: t('subscription.clearSeenHint'),
+    okText: t('subscription.clearSeen'),
+    okType: 'danger',
+    cancelText: t('common.cancel'),
+    onOk: async () => {
+      try {
+        const resp = await subscriptionsApi.clearSeen(id, { torrent_ids: selectedSeenIds.value })
+        const cleared = resp.data?.data?.cleared ?? 0
+        message.success(t('subscription.clearSeenDone', { count: cleared }))
+        await loadSeen()
+      } catch (e: unknown) {
+        message.error((e as Error).message)
+      }
+    },
+  })
+}
+
+watch(activeTab, (v) => {
+  if (v === 'seen' && seenList.value.length === 0) loadSeen()
+})
 const downloaders = ref<Partial<ClientConfig>[]>([])
 const downloadersLoading = ref(false)
 const notifyChannels = ref<NotificationChannel[]>([])

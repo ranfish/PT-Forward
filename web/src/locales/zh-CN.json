@@ -578,7 +578,14 @@
     "reseedClients": "转移目标下载器",
     "selectReseedClients": "选择转移目标下载器",
     "paused": "已暂停",
-    "unitHours": "小时"
+    "unitHours": "小时",
+    "seenHistory": "已见种子",
+    "clearSeen": "清除重推",
+    "clearSeenHint": "清除后下轮抓取将重新评估这些种子（需仍在 RSS feed 内；免费态实时重判，不免费会被正确过滤）",
+    "clearSeenConfirm": "确定清除 {count} 条已见记录？",
+    "clearSeenDone": "已清除 {count} 条，等待下轮抓取",
+    "torrentId": "种子ID",
+    "freeStatus": "免费"
   },
   "seeding": {
     "activeTorrents": "活跃种子",

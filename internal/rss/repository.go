@@ -119,3 +119,30 @@ func (r *Repository) MarkStatus(ctx context.Context, siteName, torrentID, status
 		Where("site_name = ? AND torrent_id = ?", siteName, torrentID).
 		Update("status", status)
 }
+
+// ClearSeen §59.33: 清除订阅的 seen 记录（指定 tid 或全部），返回清除数。
+// is_fake_hash 侧载记录不清（避免重新侧载风暴）。清后下轮 RSS 视为新种子
+// 重走完整过滤链（免费态实时重判，不用 seen 旧值）。
+func (r *Repository) ClearSeen(ctx context.Context, subscriptionID string, torrentIDs []string) (int64, error) {
+	q := r.db.WithContext(ctx).
+		Where("subscription_id = ? AND is_fake_hash = ?", subscriptionID, false)
+	if len(torrentIDs) > 0 {
+		q = q.Where("torrent_id IN ?", torrentIDs)
+	}
+	result := q.Delete(&model.RSSTorrentSeen{})
+	return result.RowsAffected, result.Error
+}
+
+// ListSeenBySubscription §59.33: 订阅的 seen 记录列表（前端历史/清除用）。
+func (r *Repository) ListSeenBySubscription(ctx context.Context, subscriptionID string, limit int) ([]model.RSSTorrentSeen, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	var seen []model.RSSTorrentSeen
+	err := r.db.WithContext(ctx).
+		Where("subscription_id = ?", subscriptionID).
+		Order("updated_at DESC").
+		Limit(limit).
+		Find(&seen).Error
+	return seen, err
+}
