@@ -39,6 +39,11 @@ const (
 )
 
 func newRealFetcher(t *testing.T) (*Fetcher, *gorm.DB) {
+	// 真实站依赖（keepfrds 搜索响应波动敏感）：显式开启才跑，
+	// 29 手动验证 / 定向 CI；全量 go test ./... 免受站点限流 flaky 影响
+	if os.Getenv("PTF_E2E_REAL_SITE") == "" {
+		t.Skip("真实站 E2E：设置 PTF_E2E_REAL_SITE=1 开启")
+	}
 	if _, err := os.Stat("/home/incast/PT-Forward/data/pt-forward.db"); err != nil {
 		t.Skip("非 29 环境")
 	}
