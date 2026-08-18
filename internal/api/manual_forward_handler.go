@@ -1395,7 +1395,16 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 					return
 				}
 				if meta != nil {
-					result["mediainfo"] = meta.MediaInfo
+					// §59.36: 远程场景返回源站列——meta.MediaInfo 是本地列（远程下载器
+					// 恒空），空则 fallback SourceMediaInfo（重抓源站得到的正是它）。
+					// v0.0.557 is_local 改造遗漏。
+					mi := meta.MediaInfo
+					if mi == "" {
+						mi = meta.SourceMediaInfo
+					}
+					if mi != "" {
+						result["mediainfo"] = mi
+					}
 					if meta.BDInfo != "" {
 						result["bdinfo"] = meta.BDInfo
 					}

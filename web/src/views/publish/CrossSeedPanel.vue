@@ -302,8 +302,10 @@
             <!-- Tab 5: 媒体信息 -->
             <a-tab-pane key="mediainfo" tab="媒体信息">
               <div style="margin-bottom: 8px; display: flex; gap: 8px">
-                <a-button v-if="!maintenanceOnly" :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">{{ seedIsLocal ? '重新获取 MediaInfo' : '从源站重新获取 MediaInfo' }}</a-button>
+                <!-- §59.36: MI 重获是数据源修复动作（与 Tab3 截图同性质），维护模式放开 -->
+                <a-button :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">{{ seedIsLocal ? '重新获取 MediaInfo' : '从源站重新获取 MediaInfo' }}</a-button>
               </div>
+              <!-- §59.36: 维护模式 MI 只读展示，重获走上方按钮（数据修复动作） -->
               <a-textarea v-model:value="form.mediaInfo" :rows="20" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
               <a-form-item v-if="form.bdinfo" label="BDInfo" style="margin-top: 12px">
                 <a-textarea v-model:value="form.bdinfo" :rows="10" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
