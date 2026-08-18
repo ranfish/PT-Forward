@@ -76,9 +76,15 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, infoHash, siteName, torrent
 // 参数：
 //   - torrentName: 下载器种子名（用于提取搜索关键词 + 制作组）
 //   - size: 种子大小（字节，用于 L2 搜索过滤，0 表示不按 size 过滤）
+//   - sourceLocalMI: 源侧本地文件 MediaInfo（§59.36 修订，可选）——音频 token
+//     冲突时做 MI 仲裁；空则降级 skipAudio 放行（v0.0.644 行为）。
 //
 // 返回：反查到 tid 并采集成功 → *TorrentMetadata；反查失败 → nil, error
-func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName, torrentName string, size int64) (*model.TorrentMetadata, error) {
+func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName, torrentName string, size int64, sourceLocalMI ...string) (*model.TorrentMetadata, error) {
+	localMI := ""
+	if len(sourceLocalMI) > 0 {
+		localMI = sourceLocalMI[0]
+	}
 	if infoHash == "" || siteName == "" || torrentName == "" {
 		return nil, fmt.Errorf("info_hash, site_name, torrent_name are required")
 	}
@@ -101,9 +107,26 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 		return nil, fmt.Errorf("cannot extract search keyword from title: %s", torrentName)
 	}
 
-	match, err := reseed.SearchAndVerifyMatch(ctx, adapter, config, keyword, groupName, size, torrentName)
+	match, allResults, err := reseed.SearchAndVerifyMatchWithResults(ctx, adapter, config, keyword, groupName, size, torrentName)
 	if err != nil {
 		return nil, fmt.Errorf("L2 search failed on %s: %w", siteName, err)
+	}
+
+	// §59.36 修订: 主轮 + loose 轮的音频冲突候选收集（组名/相关性/其余字段全过，
+	// 仅音频 token 冲突）→ MI 仲裁（源 local MI 可得时）或降级放行。
+	if match == nil {
+		var ambiguous []*reseed.L2MatchResult
+		ambiguous = append(ambiguous, reseed.AudioConflictCandidates(allResults, groupName, size, torrentName)...)
+		if len(ambiguous) > 0 {
+			if m := f.resolveAudioConflict(ctx, adapter, config, siteName, ambiguous, localMI); m != nil {
+				match = m
+				f.logger.Info("FetchAndStoreBySearch: audio conflict resolved",
+					zap.String("site", siteName),
+					zap.String("torrent_id", m.TorrentID),
+					zap.String("matched_title", m.Title),
+					zap.Bool("mi_arbitrated", localMI != ""))
+			}
+		}
 	}
 
 	// §59.30 元数据获取宽松降级：size 校验失败（站内 REPACK 重发替换原版等
@@ -130,6 +153,26 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 		zap.String("matched_title", match.Title))
 
 	return f.FetchAndStore(ctx, infoHash, siteName, match.TorrentID)
+}
+
+// resolveAudioConflict §59.36 修订: 音频冲突候选 MI 仲裁。
+// 候选 MI 现场抓详情页（tid 已知 +1 请求，音频冲突低频触发）；
+// 源 local MI 可得走①仲裁，否则②盲放行（ResolveAudioConflict 内部处理）。
+func (f *Fetcher) resolveAudioConflict(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, siteName string, candidates []*reseed.L2MatchResult, sourceLocalMI string) *reseed.L2MatchResult {
+	// 仅源 local MI 可得时才需要候选 MI（②盲放行不抓详情页，省请求）
+	candidateMI := map[string]string{}
+	if sourceLocalMI != "" {
+		for _, c := range candidates {
+			detail, err := adapter.GetTorrentDetail(ctx, config, c.TorrentID)
+			if err != nil || detail == nil {
+				continue
+			}
+			if detail.MediaInfo != "" {
+				candidateMI[c.TorrentID] = detail.MediaInfo
+			}
+		}
+	}
+	return reseed.ResolveAudioConflict(candidates, sourceLocalMI, candidateMI)
 }
 
 func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrentID, fetchSource string) (*model.TorrentMetadata, error) {
