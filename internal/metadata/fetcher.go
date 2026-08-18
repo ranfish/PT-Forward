@@ -114,17 +114,27 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 
 	// §59.36 修订: 主轮 + loose 轮的音频冲突候选收集（组名/相关性/其余字段全过，
 	// 仅音频 token 冲突）→ MI 仲裁（源 local MI 可得时）或降级放行。
+	// 源 local MI 可得且仲裁返回 nil = 全员 MI 不一致确定性出局（站内真无此
+	// 音频版本）——此时不进 loose 轮（loose 的 skipAudio 豁免会推翻确定性判定，
+	// 拿错版本元数据），直接失败。
+	arbitratedOut := false
 	if match == nil {
 		var ambiguous []*reseed.L2MatchResult
 		ambiguous = append(ambiguous, reseed.AudioConflictCandidates(allResults, groupName, size, torrentName)...)
 		if len(ambiguous) > 0 {
-			if m := f.resolveAudioConflict(ctx, adapter, config, siteName, ambiguous, localMI); m != nil {
+			m := f.resolveAudioConflict(ctx, adapter, config, siteName, ambiguous, localMI)
+			if m != nil {
 				match = m
 				f.logger.Info("FetchAndStoreBySearch: audio conflict resolved",
 					zap.String("site", siteName),
 					zap.String("torrent_id", m.TorrentID),
 					zap.String("matched_title", m.Title),
 					zap.Bool("mi_arbitrated", localMI != ""))
+			} else if localMI != "" {
+				arbitratedOut = true
+				f.logger.Info("FetchAndStoreBySearch: audio conflict arbitrated out (MI mismatch)",
+					zap.String("site", siteName),
+					zap.Int("candidates", len(ambiguous)))
 			}
 		}
 	}
@@ -133,7 +143,9 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 	// 同资源不同版本场景）时，仅按 标题相关性+组名+TechProfile 验证重试一轮。
 	// 元数据（海报/声明/简介）与版本无关，可安全获取；注入校验由
 	// ValidateInjection 独立兜底（§59.25），不受此放宽影响。
-	if match == nil && size > 0 {
+	// §59.36 修订: 仲裁确定性出局（arbitratedOut）时跳过——loose 的 skipAudio
+	// 豁免（降级②路径）只服务"源 MI 不可得"场景，不得推翻 MI 仲裁判定。
+	if match == nil && size > 0 && !arbitratedOut {
 		if m := reseed.SearchAndVerifyLoose(ctx, adapter, config, keyword, groupName, torrentName); m != nil {
 			match = m
 			f.logger.Info("FetchAndStoreBySearch: loose match (size skipped)",
