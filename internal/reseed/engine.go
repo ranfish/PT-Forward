@@ -2960,6 +2960,13 @@ func codecEquivalent(a, b string) bool {
 }
 
 func techProfileConflict(src titleparser.TechProfile, candidateTitle string) bool {
+	return techProfileConflictFields(src, candidateTitle, false)
+}
+
+// techProfileConflictFields 字段级冲突检查。skipAudio 豁免 AudioCodec 冲突
+//（§59.36 元数据获取宽松场景：站点文件名/标题音轨标注不一致是站点数据瑕疵，
+// 非不同资源信号；视频编码/分辨率/HDR/规格仍严格——错那些的元数据才致命）。
+func techProfileConflictFields(src titleparser.TechProfile, candidateTitle string, skipAudio bool) bool {
 	cand := titleparser.ParseTitleTech(candidateTitle)
 	fields := []struct{ name, s, c string }{
 		{"VideoCodec", src.VideoCodec, cand.VideoCodec},
@@ -2969,6 +2976,9 @@ func techProfileConflict(src titleparser.TechProfile, candidateTitle string) boo
 		{"RegionCode", src.RegionCode, cand.RegionCode},
 	}
 	for _, f := range fields {
+		if f.name == "AudioCodec" && skipAudio {
+			continue
+		}
 		if f.s != "" && f.c != "" && !strings.EqualFold(f.s, f.c) {
 			// §59.30: Specification 等价组豁免（WEB-DL ≈ WEBRip 站点标注差异）
 			if f.name == "Specification" && specEquivalent(f.s, f.c) {
@@ -3207,9 +3217,13 @@ func loosePick(results []*model.SeedingSearchResult, groupName, sourceTitle stri
 			}
 			// §59.30: CSS 截断标题（含 ..）的 token 不完整（如 DTS-H.. 解析成 DTS），
 			// TechProfile 比较失真 → 跳过冲突检查，靠组名+标题相关性+size（主轮）兜底
+			// §59.36: 音频冲突豁免（元数据获取场景）——站点数据源头的文件名/标题
+			// 音轨标注不一致（FRDS 挽救计划案例：文件名 DTS-HD MA、站内标题 TrueHD7.1，
+			// .torrent 实证同一资源，内容物实为 TrueHD+国配 AC-3）。音频规格差异
+			// 不影响海报/声明/简介正确性；注入层 ValidateInjection 独立兜底。
 			if !strings.Contains(r.Title, "..") {
 				p := titleparser.ParseTitleTech(sourceTitle)
-				if techProfileConflict(p, r.Title) {
+				if techProfileConflictFields(p, r.Title, true) {
 					continue
 				}
 			}
