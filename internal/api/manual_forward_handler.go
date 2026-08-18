@@ -1331,6 +1331,20 @@ func (h *ManualForwardHandler) handlePreviewFields(w http.ResponseWriter, r *htt
 // handleRefresh §56.37: 分类型刷新（CrossSeedPanel 的 [重新获取] 按钮）。
 // type: poster|screenshots|intro|mediainfo|rehost_screenshots
 // 复用 AnalyzePTGen + AnalyzeLocalArtifacts。
+// refreshFromSource §59.36 审计: 源站重获的 tid 链——DB 已有 tid 直接 FetchAndStore；
+// 无 tid（元数据缺失）走 FetchAndStoreBySearch 反查（size 查不到传 0 = 不按 size 过滤）。
+// v0.0.557 原实现直接传空 tid，FetchAndStore 参数校验必然失败（维护模式屏蔽按钮期间无人踩到）。
+func (h *ManualForwardHandler) refreshFromSource(ctx context.Context, infoHash, siteName, torrentName string) (*model.TorrentMetadata, error) {
+	var existing model.TorrentMetadata
+	h.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		First(&existing)
+	if existing.TorrentID != "" {
+		return h.metadataFetcher.FetchAndStore(ctx, infoHash, siteName, existing.TorrentID)
+	}
+	return h.metadataFetcher.FetchAndStoreBySearch(ctx, infoHash, siteName, torrentName, 0)
+}
+
 func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	if h.pipeline == nil {
 		Error(w, http.StatusServiceUnavailable, 50001, "pipeline 未配置")
@@ -1388,8 +1402,11 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 	case "mediainfo":
 		if !isLocal {
 			// §59.21: 转种上盒——从源站重新抓取
+			// §59.36 审计: tid 链——DB 已有 tid 直接用；无 tid（元数据缺失场景）
+			// 走 FetchAndStoreBySearch 反查（v0.0.557 原实现传空 tid 必然失败，
+			// 维护模式屏蔽按钮期间无人踩到）
 			if req.InfoHash != "" && req.SiteName != "" && h.metadataFetcher != nil {
-				meta, err := h.metadataFetcher.FetchAndStore(ctx, req.InfoHash, req.SiteName, "")
+				meta, err := h.refreshFromSource(ctx, req.InfoHash, req.SiteName, req.Name)
 				if err != nil {
 					Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("源站重新获取失败: %v", err))
 					return
@@ -1435,9 +1452,9 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 
 	case "screenshots":
 		if !isLocal {
-			// §59.21: 转种上盒——从源站重新抓取
+			// §59.21: 转种上盒——从源站重新抓取（§59.36 审计: tid 链同 mediainfo）
 			if req.InfoHash != "" && req.SiteName != "" && h.metadataFetcher != nil {
-				meta, err := h.metadataFetcher.FetchAndStore(ctx, req.InfoHash, req.SiteName, "")
+				meta, err := h.refreshFromSource(ctx, req.InfoHash, req.SiteName, req.Name)
 				if err != nil {
 					Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("源站重新获取失败: %v", err))
 					return
