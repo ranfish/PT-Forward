@@ -1362,8 +1362,27 @@ func (e *Engine) CleanupStale(ctx context.Context) (int64, error) {
 	e.maindataMu.Unlock()
 
 	scoringCutoff := time.Now().Add(-scoringCutoffHours)
-	if dbErr := e.db.WithContext(ctx).Where("created_at < ?", scoringCutoff).Delete(&model.ScoringLog{}).Error; dbErr != nil {
-		e.logger.Warn("cleanup scoring logs failed", zap.Error(dbErr))
+	// §59.37: 分批删除——单事务 DELETE 24 万行（243 实证 rows:240936, 2.5s 长事务）
+	// 阻塞 WAL checkpoint（WAL 涨至 4.5GB 主因之一）。每批 5 万行循环删至清空，
+	// 批间释放锁给 checkpoint 窗口。
+	{
+		const batch = 50000
+		var totalDeleted int64
+		for {
+			res := e.db.WithContext(ctx).Where("id IN (SELECT id FROM scoring_logs WHERE created_at < ? LIMIT ?)",
+				scoringCutoff, batch).Delete(&model.ScoringLog{})
+			if res.Error != nil {
+				e.logger.Warn("cleanup scoring logs batch failed", zap.Error(res.Error))
+				break
+			}
+			totalDeleted += res.RowsAffected
+			if res.RowsAffected < batch {
+				break
+			}
+		}
+		if totalDeleted > 0 {
+			e.logger.Info("cleanup scoring logs completed", zap.Int64("deleted", totalDeleted))
+		}
 	}
 
 	e.logger.Info("seeding cleanup completed",
@@ -2503,11 +2522,33 @@ func (e *Engine) collectTorrentTraffic(ctx context.Context, clientID string, md 
 	}
 
 	if len(trafficBatch) > 0 {
-		if err := e.db.WithContext(ctx).Create(&trafficBatch).Error; err != nil {
-			e.logger.Warn("batch write torrent_traffic failed",
+		// §59.37: 分块写入——SQLite 单条 INSERT 变量上限 999（默认），2 万种子
+		// 单条批量写必然 too many SQL variables（243 实证每轮 2 次失败）。
+		// 每行 9 列 → chunk 100 行 = 900 变量，安全上限内。
+		const chunk = 100
+		written, failed := 0, 0
+		for i := 0; i < len(trafficBatch); i += chunk {
+			end := i + chunk
+			if end > len(trafficBatch) {
+				end = len(trafficBatch)
+			}
+			if err := e.db.WithContext(ctx).Create(trafficBatch[i:end]).Error; err != nil {
+				failed++
+				if failed == 1 { // 首次失败记录，后续不刷屏
+					e.logger.Warn("batch write torrent_traffic chunk failed",
+						zap.String("clientID", clientID),
+						zap.Int("chunk_index", i/chunk),
+						zap.Error(err))
+				}
+			} else {
+				written += end - i
+			}
+		}
+		if failed > 0 {
+			e.logger.Warn("batch write torrent_traffic partial failure",
 				zap.String("clientID", clientID),
-				zap.Int("count", len(trafficBatch)),
-				zap.Error(err))
+				zap.Int("written", written),
+				zap.Int("failed_chunks", failed))
 		}
 	}
 }
