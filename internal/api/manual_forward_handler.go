@@ -1526,7 +1526,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		if v, ok := result["mediainfo"]; ok {
 			updates["media_info"] = v // DB 列名（torrent_metadata.media_info）
 			if isLocal {
-				updates["mediainfo_source"] = "local"
+				updates["media_info_source"] = "local"
 			}
 		}
 		if v, ok := result["bdinfo"]; ok {
