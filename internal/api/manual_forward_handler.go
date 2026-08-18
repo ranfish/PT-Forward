@@ -1512,6 +1512,9 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 	}
 
 	// 如果有 info_hash + site_name，更新 DB
+	// §59.36 审计: updates 键必须是真实 DB 列名（mediainfo → media_info 拼写修复，
+	// v0.0.557 起该列名错误导致 MI 重获从未持久化；且行不存在时静默 0 行——
+	// 元数据缺失场景先建行再更新）
 	if req.InfoHash != "" && req.SiteName != "" && len(result) > 0 {
 		updates := map[string]interface{}{}
 		if v, ok := result["poster"]; ok {
@@ -1521,7 +1524,13 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			updates["description"] = v
 		}
 		if v, ok := result["mediainfo"]; ok {
-			updates["mediainfo"] = v
+			updates["media_info"] = v // DB 列名（torrent_metadata.media_info）
+			if isLocal {
+				updates["mediainfo_source"] = "local"
+			}
+		}
+		if v, ok := result["bdinfo"]; ok {
+			updates["bd_info"] = v
 		}
 		if v, ok := result["screenshots"]; ok {
 			if arr, ok := v.([]string); ok && len(arr) > 0 {
@@ -1533,6 +1542,18 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			updates["subtitle"] = v
 		}
 		if len(updates) > 0 {
+			// 行不存在（unfetched 种子直接点重获）→ 先建骨架行再更新
+			var cnt int64
+			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+				Where("info_hash = ? AND site_name = ?", req.InfoHash, req.SiteName).
+				Count(&cnt)
+			if cnt == 0 {
+				h.db.WithContext(ctx).Create(&model.TorrentMetadata{
+					InfoHash: req.InfoHash,
+					SiteName: req.SiteName,
+					Title:    req.Name,
+				})
+			}
 			h.db.WithContext(ctx).
 				Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", req.InfoHash, req.SiteName).
