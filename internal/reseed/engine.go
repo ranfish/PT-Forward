@@ -3035,15 +3035,115 @@ func VerifyMatchWithTruncationCheckAndSource(results []*model.SeedingSearchResul
 	return match, stats
 }
 
+// AudioConflictCandidates §59.36 修订: 从候选中提取"仅因音频 token 冲突被拒"的
+// ambiguous 候选（组名/标题相关性/size 全通过，视频编码/HDR/规格等其余字段无冲突）。
+// 供元数据获取层 MI 仲裁；辅种/注入路径不消费（严格性保护）。
+func AudioConflictCandidates(results []*model.SeedingSearchResult, groupName string, sourceSize int64, sourceTitle string) []*L2MatchResult {
+	var srcProfile *titleparser.TechProfile
+	if sourceTitle != "" {
+		p := titleparser.ParseTitleTech(sourceTitle)
+		srcProfile = &p
+	}
+	meaningfulWords := extractMeaningfulTitleWords(sourceTitle, groupName)
+	sourceCJK := extractCJKSubstrings(sourceTitle)
+	var out []*L2MatchResult
+	for _, r := range results {
+		if r.TorrentID == "" || r.Size <= 0 {
+			continue
+		}
+		if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
+			if !(strings.Contains(r.Title, "..") && hasResolutionToken(r.Title)) {
+				continue
+			}
+		}
+		if sourceTitle != "" && !titleKeywordRelevant(meaningfulWords, sourceCJK, sourceTitle, r.Title) {
+			continue
+		}
+		if srcProfile == nil {
+			continue
+		}
+		// 仅音频冲突（其余字段无冲突）才可仲裁；其他冲突仍出局
+		if techProfileConflictFields(*srcProfile, r.Title, true) {
+			continue // skipAudio 下仍冲突 = 视频/HDR/规格冲突，不可仲裁
+		}
+		if !techProfileConflictFields(*srcProfile, r.Title, false) {
+			continue // 全字段无冲突——这不是冲突候选（正常匹配路径已处理）
+		}
+		out = append(out, &L2MatchResult{TorrentID: r.TorrentID, Title: r.Title, Size: r.Size})
+	}
+	return out
+}
+
+// ResolveAudioConflict §59.36 修订: MI 仲裁三级链——音频 token 冲突候选的仲裁。
+//
+// 证据可靠性: local MI（真测量）> 站内 MI（发布者粘贴）> token（描述）。
+// 源侧必须是 local MI（双侧"声称 MI"比对会假确定性——源站 MI 贴错场景）。
+//
+// 参数:
+//   - candidates: AudioConflictCandidates 提取的 ambiguous 候选（主轮+loose 轮合并）
+//   - sourceLocalMI: 源侧本地文件 MediaInfo 文本（空 = 不可得 → 全体降级②）
+//   - candidateMI: 候选 tid → 站内 MI 文本（fetcher 抓详情页现场收集）
+//
+// 返回: 仲裁胜出候选（①MI 一致 or ②降级放行），nil = 无可放行候选。
+// AudioCodec canonical 比较（Atmos 不参与）；任一侧解析空值 = 证据不足不判拒（走②）。
+func ResolveAudioConflict(candidates []*L2MatchResult, sourceLocalMI string, candidateMI map[string]string) *L2MatchResult {
+	if len(candidates) == 0 {
+		return nil
+	}
+	// ① 源 local MI 可得 → 仲裁路径
+	srcAudio := ""
+	if sourceLocalMI != "" {
+		srcAudio = titleparser.ExtractMediaInfo(sourceLocalMI).AudioCodec
+	}
+	if sourceLocalMI != "" && srcAudio != "" {
+		var fallback *L2MatchResult
+		for _, c := range candidates {
+			mi := candidateMI[c.TorrentID]
+			if mi == "" {
+				if fallback == nil {
+					fallback = c // 候选 MI 缺失 → ②降级（记首个，一致者优先后被覆盖）
+				}
+				continue
+			}
+			candAudio := titleparser.ExtractMediaInfo(mi).AudioCodec
+			if candAudio == "" {
+				if fallback == nil {
+					fallback = c // 解析空值 = 证据不足 → ②
+				}
+				continue
+			}
+			if strings.EqualFold(srcAudio, candAudio) {
+				return c // MI 一致 → 同资源，确定性胜出
+			}
+			// MI 不一致 → 该候选出局（真不同版本）
+		}
+		return fallback
+	}
+	// ② 源 local MI 不可得 → skipAudio 盲放行（v0.0.644 行为，首个候选）
+	return candidates[0]
+}
+
 func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName string, sourceSize int64, sourceTitle string) (*L2MatchResult, error) {
+	m, _, err := SearchAndVerifyMatchWithResults(ctx, adapter, config, keyword, groupName, sourceSize, sourceTitle)
+	return m, err
+}
+
+// SearchAndVerifyMatchWithResults §59.36 修订: 额外返回主轮（area=0）原始搜索结果，
+// 供元数据获取层收集音频冲突候选做 MI 仲裁（主轮候选相关性最强，不可丢）。
+// 辅种/注入路径用 SearchAndVerifyMatch（行为不变）。
+func SearchAndVerifyMatchWithResults(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword, groupName string, sourceSize int64, sourceTitle string) (*L2MatchResult, []*model.SeedingSearchResult, error) {
 	if keyword == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	match, _ := VerifyMatchWithTruncationCheckAndSource(results, groupName, sourceSize, sourceTitle)
+	var allResults []*model.SeedingSearchResult
+	if match == nil {
+		allResults = results
+	}
 
 	// §59.26 CJK 降级重试：混合关键词（中文+英文）在部分站点（如 keepfrds
 	// 标题=中文/副标题=英文）search_area=0 下跨字段无法命中。
@@ -3059,8 +3159,9 @@ func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config
 			if rErr != nil {
 				continue
 			}
+			allResults = append(allResults, retry...)
 			if m, _ := VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m != nil {
-				return m, nil
+				return m, nil, nil
 			}
 		}
 	}
@@ -3069,12 +3170,13 @@ func SearchAndVerifyMatch(ctx context.Context, adapter model.SiteAdapter, config
 	// 纯英文关键词（剧集 WEB-DL 类）search_area=0 搜不到。用简介字段重搜一轮。
 	if match == nil {
 		if retry, rErr := adapter.SearchTorrents(ctx, config, keyword, &model.SearchOptions{SearchArea: "1"}); rErr == nil && len(retry) > 0 {
+			allResults = append(allResults, retry...)
 			if m, _ := VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m != nil {
-				return m, nil
+				return m, nil, nil
 			}
 		}
 	}
-	return match, nil
+	return match, allResults, nil
 }
 
 // hasResolutionWord 判断标题是否含分辨率词（2160p/1080p/720p 等）。

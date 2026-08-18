@@ -2354,30 +2354,37 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 	fetchCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
+	// §59.36 修订: is_local=true 时本地 MI 提前获取（搜索反查前）——
+	// 音频 token 冲突时作为 MI 仲裁的源侧证据（真测量）。失败不阻断（降级②盲放行）。
+	var localMI string
+	if isLocal && savePath != "" && h.seedPipeline != nil {
+		artifacts, artErr := h.seedPipeline.AnalyzeLocalArtifacts(ctx, name, savePath)
+		if artErr != nil {
+			h.logger.Warn("batch-fetch: pre-fetch local mediainfo failed", zap.String("hash", hash), zap.Error(artErr))
+		} else if mi, ok := artifacts["media_info"]; ok {
+			localMI, _ = mi.(string)
+		}
+	}
+
 	var meta *model.TorrentMetadata
 	var err error
 	if result.TorrentID != "" {
 		meta, err = h.metadataFetcher.FetchAndStore(fetchCtx, hash, result.SourceSite, result.TorrentID)
 	} else {
-		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size)
+		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI)
 	}
 	if err != nil {
 		return err
 	}
 
-	// §59.21: is_local=true 时追加本地 mediainfo（AnalyzeLocalArtifacts 只跑 mediainfo 不跑截图）
-	if isLocal && savePath != "" && h.seedPipeline != nil && meta != nil {
-		artifacts, artErr := h.seedPipeline.AnalyzeLocalArtifacts(ctx, name, savePath)
-		if artErr != nil {
-			h.logger.Warn("batch-fetch: local mediainfo failed", zap.String("hash", hash), zap.Error(artErr))
-		} else if mi, ok := artifacts["media_info"]; ok && mi != "" {
-			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
-				Updates(map[string]interface{}{
-					"media_info":       mi,
-					"mediainfo_source": "local",
-				})
-		}
+	// §59.21: is_local=true 时落库本地 mediainfo（localMI 已在搜索前获取，直接复用）
+	if isLocal && localMI != "" && meta != nil {
+		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
+			Updates(map[string]interface{}{
+				"media_info":       localMI,
+				"mediainfo_source": "local",
+			})
 	}
 
 	// §59.26: TechProfile 三源合并 + 分类推断 + 声明过滤（与 runAnalyze ⑫ 统一管线）
