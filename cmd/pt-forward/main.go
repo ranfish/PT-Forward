@@ -870,7 +870,9 @@ func initDB(cfg *config.Config, log *zap.Logger, ctx context.Context) (*gorm.DB,
 		if dbDir != "" && dbDir != "." {
 			_ = os.MkdirAll(dbDir, 0o750)
 		}
-		dsn := cfg.Database.SQLitePath + "?_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL"
+		// §59.37: _wal_autocheckpoint=4000（16MB）——默认 1000 页在有持续读事务 +
+		// 长事务 DELETE 的负载下 checkpoint 长期被阻塞，WAL 无限增长（243 实证 4.5GB）
+		dsn := cfg.Database.SQLitePath + "?_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL&_wal_autocheckpoint=4000"
 		db, err = gorm.Open(sqlite.Open(dsn), gormCfg)
 	default:
 		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Database.Driver)
@@ -896,6 +898,22 @@ func initDB(cfg *config.Config, log *zap.Logger, ctx context.Context) (*gorm.DB,
 		} else {
 			log.Info("sqlite WAL checkpoint completed on startup")
 		}
+		// §59.37: 周期性 TRUNCATE checkpoint——WAL 文件只复用不自动收缩，
+		// TRUNCATE 模式 checkpoint 后物理归零。每 6h 一次，避开启动期 IO 高峰（+1min）。
+		go func() {
+			time.Sleep(time.Minute)
+			ticker := time.NewTicker(6 * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
+				cctx, ccancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				if _, err := sqlDB.ExecContext(cctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+					log.Warn("periodic WAL truncate checkpoint failed", zap.Error(err))
+				} else {
+					log.Info("periodic WAL truncate checkpoint completed")
+				}
+				ccancel()
+			}
+		}()
 	}
 
 	return db, nil

@@ -327,16 +327,28 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID strin
 		CycleID  string
 	}
 	var latestRows []latestRow
-	if dbErr := re.db.WithContext(ctx).Model(&model.ScoringLog{}).
-		Select("info_hash, score, cycle_id").
-		Where("client_id = ? AND info_hash IN ? AND id IN (?)",
-			clientID, hashes,
-			re.db.WithContext(ctx).Model(&model.ScoringLog{}).
-				Select("MAX(id)").Where("client_id = ? AND info_hash IN ?", clientID, hashes).
-				Group("info_hash"),
-		).
-		Find(&latestRows).Error; dbErr != nil {
-		re.logger.Warn("preload scoring cache: query latest scores failed", zap.Error(dbErr))
+	// §59.37: IN 子句分块——SQLite 变量上限 999，2 万 hashes 单查询 too many SQL
+	// variables（243 实证）。chunk 500 安全。
+	const chunk = 500
+	for i := 0; i < len(hashes); i += chunk {
+		end := i + chunk
+		if end > len(hashes) {
+			end = len(hashes)
+		}
+		var rows []latestRow
+		if dbErr := re.db.WithContext(ctx).Model(&model.ScoringLog{}).
+			Select("info_hash, score, cycle_id").
+			Where("client_id = ? AND info_hash IN ? AND id IN (?)",
+				clientID, hashes[i:end],
+				re.db.WithContext(ctx).Model(&model.ScoringLog{}).
+					Select("MAX(id)").Where("client_id = ? AND info_hash IN ?", clientID, hashes[i:end]).
+					Group("info_hash"),
+			).
+			Find(&rows).Error; dbErr != nil {
+			re.logger.Warn("preload scoring cache: query latest scores failed", zap.Error(dbErr))
+			continue
+		}
+		latestRows = append(latestRows, rows...)
 	}
 
 	cycleIDs := make(map[string]struct{})
