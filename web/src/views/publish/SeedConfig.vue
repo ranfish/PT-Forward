@@ -110,7 +110,7 @@
         </template>
 
         <template v-else-if="column.key === 'size'">
-          {{ formatSize(record.size) }}
+          {{ formatBytes(record.size) }}
         </template>
 
         <template v-else-if="column.key === 'tech'">
@@ -234,6 +234,7 @@ import { PlusOutlined, ReloadOutlined, FilterOutlined, ClearOutlined } from '@an
 import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
+import { formatBytes } from '@/utils/format'
 import { seedConfigApi, type SeedListItem } from '@/api/publish'
 
 // ==================== 筛选状态（§59.29：挂载即查，筛选弹层选路径） ====================
@@ -451,11 +452,7 @@ function canEdit(status: string): boolean {
 
 // ==================== 工具函数 ====================
 
-function formatSize(bytes: number): string {
-  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GiB'
-  if (bytes >= 1048576) return (bytes / 1048576).toFixed(0) + ' MiB'
-  return bytes + ' B'
-}
+// §59.43: 全局 formatBytes（二进制后缀+两位小数），私有副本删除
 
 const columns = [
   { title: '标题', key: 'title', ellipsis: true, width: 280 },
