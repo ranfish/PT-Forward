@@ -58,14 +58,17 @@ func TestPixhostRegex_NoMatch(t *testing.T) {
 
 func TestPixhostDomainList(t *testing.T) {
 	host := NewPixhostHost(nil)
-	if len(host.domains) != 2 {
-		t.Fatalf("expected 2 domains, got %d", len(host.domains))
+	if len(host.domains) != 3 {
+		t.Fatalf("expected 3 domains, got %d", len(host.domains))
 	}
 	if host.domains[0] != "pixhost.cc" {
 		t.Errorf("first domain should be pixhost.cc (priority), got %q", host.domains[0])
 	}
 	if host.domains[1] != "pixhost.to" {
 		t.Errorf("second domain should be pixhost.to (fallback), got %q", host.domains[1])
+	}
+	if host.domains[2] != "pixho.st" {
+		t.Errorf("third domain should be pixho.st (§59.42), got %q", host.domains[2])
 	}
 }
 
