@@ -32,13 +32,13 @@
           <ReloadOutlined /> 刷新
         </a-button>
         <a-popconfirm
-          :title="`确定清除 ${selectedHashes.length} 个种子的已获取数据？`"
-          ok-text="清除"
+          :title="statusFilter === 'observing' ? `确定清理 ${selectedHashes.length} 个观察期资源？（快照+元数据，发布记录保留）` : `确定清除 ${selectedHashes.length} 个种子的已获取数据？`"
+          :ok-text="statusFilter === 'observing' ? '清理' : '清除'"
           cancel-text="取消"
-          @confirm="batchClear"
+          @confirm="statusFilter === 'observing' ? batchPurgeObserving : batchClear"
         >
           <a-button danger :loading="batchClearing" :disabled="selectedHashes.length === 0">
-            <ClearOutlined /> 批量清除{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
+            <ClearOutlined /> {{ statusFilter === 'observing' ? '批量清理' : '批量清除' }}{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
           </a-button>
         </a-popconfirm>
         <a-button @click="filterVisible = true">
@@ -516,6 +516,35 @@ const batchClearing = ref(false)
 
 function onSelectChange(keys: string[]) {
   selectedHashes.value = keys
+}
+
+// §59.38 审计四: 观察期批量清理——行 key 为造键 client|name（组聚合无 hash 语义），
+// 不能走 deleteSeed（活跃视图按 info_hash 清 metadata）
+async function batchPurgeObserving() {
+  if (selectedHashes.value.length === 0) return
+  batchClearing.value = true
+  let ok = 0
+  let fail = 0
+  try {
+    for (const key of selectedHashes.value) {
+      const sep = key.indexOf('|')
+      if (sep <= 0) { fail++; continue }
+      const clientId = key.slice(0, sep)
+      const name = key.slice(sep + 1)
+      try {
+        await seedConfigApi.purgeObserving(clientId, name)
+        ok++
+      } catch {
+        fail++
+      }
+    }
+    if (fail === 0) message.success(`已清理 ${ok} 个资源`)
+    else message.warning(`清理完成：成功 ${ok}，失败 ${fail}`)
+    selectedHashes.value = []
+    await fetchList()
+  } finally {
+    batchClearing.value = false
+  }
 }
 
 async function batchClear() {
