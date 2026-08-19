@@ -620,7 +620,7 @@ async function downloadTest(id: number) {
     const resp = await sitesApi.downloadTest(id)
     const data = resp.data?.data
     if (data?.success) {
-      message.success(`下载测试成功: ${data.info_hash?.substring(0, 12) || ''} (${data.size ? (data.size / 1024 / 1024).toFixed(1) + 'MB' : ''})`)
+      message.success(`下载测试成功: ${data.info_hash?.substring(0, 12) || ''} (${data.size ? formatBytes(data.size) : ''})`)
     } else {
       message.warning(data?.message || '下载测试失败')
     }

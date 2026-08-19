@@ -234,6 +234,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
+import { formatBytes } from '@/utils/format'
 import { filterRulesApi } from '@/api/filter-rules'
 import type { FilterRule, RuleCondition } from '@/api/types'
 import { usePagination } from '@/composables/usePagination'
@@ -300,10 +301,7 @@ const pagination = usePagination<FilterRule>((page, size) => filterRulesApi.list
 function formatValue(c: RuleCondition) {
   const v = c.value || ''
   if (c.key === 'size' && v) {
-    const n = Number(v)
-    if (n >= 1073741824) return (n / 1073741824).toFixed(1) + ' GB'
-    if (n >= 1048576) return (n / 1048576).toFixed(0) + ' MB'
-    return v + ' B'
+    return formatBytes(v)
   }
   return v
 }

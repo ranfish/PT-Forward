@@ -410,7 +410,7 @@ import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { subscriptionsApi } from '@/api/subscriptions'
-import { formatTime } from '@/utils/format'
+import { formatBytes, formatTime } from '@/utils/format'
 import { downloadersApi } from '@/api/downloaders'
 import { notificationsApi } from '@/api/notifications'
 import { sitesApi } from '@/api/sites'
@@ -759,7 +759,7 @@ async function runDryrun() {
     const torrents = (data.items || data.recentTorrents || []) as Record<string, unknown>[]
     dryrunResults.value = torrents.map((torrent: Record<string, unknown>) => ({
       title: torrent.title || torrent.name || '-',
-      size: torrent.size ? (Number(torrent.size) / 1073741824).toFixed(2) + ' GB' : '-',
+      size: torrent.size ? formatBytes(Number(torrent.size)) : '-',
       matched: torrent.status === 'matched' ? t('common.yes') : t('common.no'),
       reason: dryrunReason(torrent),
     }))
