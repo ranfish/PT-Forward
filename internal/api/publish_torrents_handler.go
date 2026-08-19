@@ -2648,7 +2648,7 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 		ClientID string
 		Name     string
 		Variants int64
-		LastSeen time.Time
+		LastSeen string // MAX() 聚合返回 string（driver 层），解析用
 		SavePath string
 		Size     int64
 	}
@@ -2678,11 +2678,17 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 	items := make([]map[string]interface{}, 0, len(rows))
 	now := time.Now()
 	for _, row := range rows {
-		elapsed := now.Sub(row.LastSeen)
-		remaining := observingGracePeriod - elapsed
-		remainingDays := int(remaining.Hours() / 24)
-		if remainingDays < 0 {
-			remainingDays = 0
+		lastSeen, _ := time.Parse("2006-01-02 15:04:05.999999999-07:00", row.LastSeen)
+		if lastSeen.IsZero() {
+			lastSeen, _ = time.Parse(time.RFC3339, row.LastSeen)
+		}
+		remainingDays := 0
+		if !lastSeen.IsZero() {
+			remaining := observingGracePeriod - now.Sub(lastSeen)
+			remainingDays = int(remaining.Hours() / 24)
+			if remainingDays < 0 {
+				remainingDays = 0
+			}
 		}
 		items = append(items, map[string]interface{}{
 			"client_id":       row.ClientID,
