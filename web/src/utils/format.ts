@@ -3,14 +3,16 @@ export function formatBytes(bytes?: number | string): string {
   const n = typeof bytes === 'string' ? Number(bytes) : bytes
   if (!Number.isFinite(n) || n < 0) return '-'
   if (n === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+  // §59.43: 全站统一 1024 制 + 二进制规范后缀（对齐 NexusPHP 站方 GiB/TiB 写法）
+  // + 非 B 单位统一两位小数（toFixed 四舍五入，第三位决定第二位）
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']
   let i = 0
   let val = n
   while (val >= 1024 && i < units.length - 1) {
     val /= 1024
     i++
   }
-  return `${val.toFixed(i === 0 ? 0 : i >= 3 ? 2 : 1)} ${units[i]}`
+  return `${val.toFixed(i === 0 ? 0 : 2)} ${units[i]}`
 }
 
 export function formatSpeed(bytes?: number): string {
