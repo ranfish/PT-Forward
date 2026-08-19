@@ -163,7 +163,7 @@ func TestExtractSize_ParseSizeToBytes(t *testing.T) {
 
 func TestExtractFlags_Default(t *testing.T) {
 	p := NewPublicExtractor("test", "测试")
-	flags := p.extractFlags("电影标题", "副标题 禁转", "正文")
+	flags := p.extractFlags("电影标题", "副标题 禁转", "", "正文")
 	if len(flags) == 0 {
 		t.Error("should detect '禁转' flag")
 	}
