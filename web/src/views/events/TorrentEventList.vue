@@ -30,7 +30,7 @@
           <a-tag>{{ record.site_name }}</a-tag>
         </template>
         <template v-if="column.key === 'size'">
-          {{ formatSize(record.size) }}
+          {{ formatBytes(record.size) }}
         </template>
         <template v-if="column.key === 'source_id'">
           <a-typography-text :copyable="record.source_id ? { text: record.source_id } : false" style="font-size: 12px">
@@ -53,7 +53,7 @@ import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { torrentEventsApi } from '@/api/torrent-events'
-import { formatTime } from '@/utils/format'
+import { formatBytes, formatTime } from '@/utils/format'
 
 const { t } = useI18n()
 
@@ -71,15 +71,6 @@ const columns = [
   { title: t('event.sourceId'), key: 'source_id', width: 140 },
   { title: t('common.time'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
-
-function formatSize(bytes: number) {
-  if (!bytes) return '-'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let i = 0
-  let val = bytes
-  while (val >= 1024 && i < units.length - 1) { val /= 1024; i++ }
-  return `${val.toFixed(1)} ${units[i]}`
-}
 
 async function fetchEvents() {
   loading.value = true

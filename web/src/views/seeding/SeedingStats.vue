@@ -3,28 +3,28 @@
     <a-row :gutter="16" style="margin-bottom: 24px">
       <a-col :span="4">
         <a-card>
-          <a-statistic :title="t('seeding.totalUpload')" :value="formatSize(overview.totalUploadBytes || 0)" :value-style="{ color: '#52c41a' }">
+          <a-statistic :title="t('seeding.totalUpload')" :value="formatBytes(overview.totalUploadBytes || 0)" :value-style="{ color: '#52c41a' }">
             <template #prefix><CloudUploadOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card>
-          <a-statistic :title="t('seeding.todayUpload')" :value="formatSize(overview.todayUploadBytes || 0)" :value-style="{ color: '#73d13d' }">
+          <a-statistic :title="t('seeding.todayUpload')" :value="formatBytes(overview.todayUploadBytes || 0)" :value-style="{ color: '#73d13d' }">
             <template #prefix><CloudUploadOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card>
-          <a-statistic :title="t('seeding.totalDownload')" :value="formatSize(overview.totalDownloadBytes || 0)" :value-style="{ color: '#1890ff' }">
+          <a-statistic :title="t('seeding.totalDownload')" :value="formatBytes(overview.totalDownloadBytes || 0)" :value-style="{ color: '#1890ff' }">
             <template #prefix><CloudDownloadOutlined /></template>
           </a-statistic>
         </a-card>
       </a-col>
       <a-col :span="4">
         <a-card>
-          <a-statistic :title="t('seeding.todayDownload')" :value="formatSize(overview.todayDownloadBytes || 0)" :value-style="{ color: '#40a9ff' }">
+          <a-statistic :title="t('seeding.todayDownload')" :value="formatBytes(overview.todayDownloadBytes || 0)" :value-style="{ color: '#40a9ff' }">
             <template #prefix><CloudDownloadOutlined /></template>
           </a-statistic>
         </a-card>
@@ -65,8 +65,8 @@
               <a-table-summary-cell>{{ siteSummary.todayDeleted }}</a-table-summary-cell>
               <a-table-summary-cell>{{ siteSummary.activeFree }}</a-table-summary-cell>
               <a-table-summary-cell>{{ siteSummary.activeNonFree }}</a-table-summary-cell>
-              <a-table-summary-cell>{{ formatSize(siteSummary.todayUploadBytes) }}</a-table-summary-cell>
-              <a-table-summary-cell>{{ formatSize(siteSummary.historyUploadBytes) }}</a-table-summary-cell>
+              <a-table-summary-cell>{{ formatBytes(siteSummary.todayUploadBytes) }}</a-table-summary-cell>
+              <a-table-summary-cell>{{ formatBytes(siteSummary.historyUploadBytes) }}</a-table-summary-cell>
               <a-table-summary-cell>{{ siteSummary.totalCount }}</a-table-summary-cell>
             </a-table-summary-row>
           </a-table-summary>
@@ -155,6 +155,7 @@ import {
   ClockCircleOutlined,
   PieChartOutlined,
 } from '@ant-design/icons-vue'
+import { formatBytes } from '@/utils/format'
 import { seedingApi, seedingStatsApi } from '@/api/seeding'
 import { useEnumLabels } from '@/utils/enumLabels'
 import { useTorrentColumns } from '@/composables/useTorrentColumns'
@@ -208,8 +209,8 @@ const siteColumns = [
   { title: t('seeding.todayDeleted'), dataIndex: 'todayDeleted', key: 'todayDeleted', width: 100 },
   { title: t('seeding.activeFree'), dataIndex: 'activeFree', key: 'activeFree', width: 100 },
   { title: t('seeding.activeNonFree'), dataIndex: 'activeNonFree', key: 'activeNonFree', width: 120 },
-  { title: t('seeding.todayUpload'), dataIndex: 'todayUploadBytes', key: 'todayUploadBytes', width: 120, customRender: ({ text }: { text: number }) => formatSize(text || 0) },
-  { title: t('seeding.historyUpload'), dataIndex: 'historyUploadBytes', key: 'historyUploadBytes', width: 120, customRender: ({ text }: { text: number }) => formatSize(text || 0) },
+  { title: t('seeding.todayUpload'), dataIndex: 'todayUploadBytes', key: 'todayUploadBytes', width: 120, customRender: ({ text }: { text: number }) => formatBytes(text || 0) },
+  { title: t('seeding.historyUpload'), dataIndex: 'historyUploadBytes', key: 'historyUploadBytes', width: 120, customRender: ({ text }: { text: number }) => formatBytes(text || 0) },
   { title: t('seeding.totalCount'), dataIndex: 'totalCount', key: 'totalCount', width: 80 },
 ]
 
@@ -217,15 +218,6 @@ const { columns: torrentColumns } = useTorrentColumns({
   show: ['title', 'site_name', 'torrent_id', 'status', 'discount', 'is_free', 'has_hr', 'torrent_size', 'latest_upload', 'info_hash', 'flushed_at'],
   statusRender: (record) => translateSeedingStatus(record.status as string),
 })
-
-function formatSize(bytes: number) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let i = 0
-  let val = bytes
-  while (val >= 1024 && i < units.length - 1) { val /= 1024; i++ }
-  return `${val.toFixed(1)} ${units[i]}`
-}
 
 async function fetchTorrentStats(p?: number) {
   torrentLoading.value = true
@@ -373,7 +365,7 @@ function renderPies() {
   const todayData = data.filter(d => d.today > 0).map(d => ({ name: d.name, value: d.today }))
   const historyData = data.filter(d => d.history > 0).map(d => ({ name: d.name, value: d.history }))
   const pieOption = (pieData: { name: string; value: number }[]) => ({
-    tooltip: { trigger: 'item', formatter: (p: { name: string; value: number; percent: number }) => `${p.name}<br/>${formatSize(p.value)} (${p.percent}%)` },
+    tooltip: { trigger: 'item', formatter: (p: { name: string; value: number; percent: number }) => `${p.name}<br/>${formatBytes(p.value)} (${p.percent}%)` },
     legend: { top: 0, textStyle: { fontSize: 11 } },
     color: pieColors,
     series: [{ type: 'pie', radius: ['40%', '70%'], center: ['50%', '55%'], label: { formatter: '{b}: {d}%', fontSize: 11 }, data: pieData }],

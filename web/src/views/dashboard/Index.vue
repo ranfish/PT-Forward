@@ -180,7 +180,7 @@
             <span v-else style="color: #999">-</span>
           </template>
           <template v-if="column.key === 'size'">
-            {{ formatSize(record.size) }}
+            {{ formatBytes(record.size) }}
           </template>
         </template>
       </a-table>
@@ -203,7 +203,7 @@ import {
 import { dashboardApi, type TrendPoint, type SystemDashboard } from '@/api/dashboard'
 import { statsApi, type TrafficHourlyPoint } from '@/api/stats'
 import { useWebSocketStore } from '@/stores/websocket'
-import { formatTime, copyToClipboard } from '@/utils/format'
+import { formatBytes, formatTime, copyToClipboard } from '@/utils/format'
 
 const torrentStatusLabels: Record<string, string> = {
   pushed: '已入库',
@@ -295,12 +295,6 @@ const activityColumns = [
   { title: t('common.createdAt'), dataIndex: 'created_at', key: 'created_at', width: 180, customRender: ({ text }: { text: string }) => formatTime(text) },
 ]
 
-function formatSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i]
-}
 
 function initChart(points: TrendPoint[]) {
   if (!chartRef.value) return
