@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -221,6 +222,40 @@ func init() {
 				}
 			}
 		}
+	})
+	// §59.39: 存量 flags 重刷——extractFlags 关键词层新增 quote 剥离后，
+	// 上游声明（引用块内禁转词）误标的行解除。4/4 实证全部为同类误标。
+	RegisterMigration(15, "rescan_torrent_metadata_flags_quote", func(gormDB *gorm.DB) error {
+		var rows []model.TorrentMetadata
+		if err := gormDB.
+			Where("flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ? OR flags LIKE ?",
+				"%禁转%", "%禁止转载%", "%谢绝%", "%严禁%", "%独占%", "%限转%").
+			Find(&rows).Error; err != nil {
+			return err
+		}
+		for _, row := range rows {
+			title, descr := "", ""
+			if row.DetailSourceJSON != "" {
+				var ds struct {
+					Title string `json:"title"`
+					Intro struct {
+						Body string `json:"body"`
+					} `json:"intro"`
+				}
+				if json.Unmarshal([]byte(row.DetailSourceJSON), &ds) == nil {
+					title, descr = ds.Title, ds.Intro.Body
+				}
+			}
+			newFlags := extract.ExtractFlagsFromText(title + " " + descr)
+			nf, _ := json.Marshal(newFlags)
+			if string(nf) != row.Flags {
+				if err := gormDB.Model(&model.TorrentMetadata{}).Where("id = ?", row.ID).
+					Update("flags", string(nf)).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
 	// §59.34 审计修复: #13 只按 title 重算，丢了 BuildTechProfile 的 DOM>title
 	// 优先级（fetch 写入时 DetailSourceJSON.medium 覆盖 title 值）。本迁移按
