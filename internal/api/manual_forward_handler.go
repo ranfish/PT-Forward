@@ -1382,7 +1382,11 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 
 	switch req.Type {
 	case "poster", "intro":
-		ptgen, err := h.pipeline.AnalyzePTGen(ctx, req.Name)
+		// §59.42 延伸: PTGen query 优先级——DB douban_url > imdb_url > 种子名。
+		// 现配 endpoint（doubaninfo/cspt）只接受资源 URL，种子名必然失败
+		//（用户报"重新获取海报报 无法解析资源URL"根因）；与 applyPosterFallback 同款语义。
+		query := h.resolvePTGenQuery(ctx, req.InfoHash, req.SiteName, req.Name)
+		ptgen, err := h.pipeline.AnalyzePTGen(ctx, query)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("PTGen 失败: %v", err))
 			return
@@ -1591,4 +1595,28 @@ func (h *ManualForwardHandler) handleParseTitle(w http.ResponseWriter, r *http.R
 		"standardized":       stdParams,
 		"category":          category,
 	})
+}
+
+// resolvePTGenQuery §59.42 延伸: PTGen 查询词解析——DB douban_url > imdb_url > 种子名兜底。
+// 现配 endpoint（doubaninfo/cspt）只接受豆瓣/IMDb/TMDb 链接作 query；
+// 种子名留给未来支持标题搜索的 endpoint 作兜底。
+func (h *ManualForwardHandler) resolvePTGenQuery(ctx context.Context, infoHash, siteName, fallbackName string) string {
+	if infoHash != "" {
+		var m model.TorrentMetadata
+		q := h.db.WithContext(ctx).
+			Where("info_hash = ?", infoHash).
+			Order("updated_at DESC")
+		if siteName != "" {
+			q = q.Where("site_name = ?", siteName)
+		}
+		if err := q.First(&m).Error; err == nil {
+			if m.DoubanURL != "" {
+				return m.DoubanURL
+			}
+			if m.IMDbURL != "" {
+				return m.IMDbURL
+			}
+		}
+	}
+	return fallbackName
 }
