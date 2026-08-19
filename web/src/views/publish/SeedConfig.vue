@@ -35,7 +35,7 @@
           :title="statusFilter === 'observing' ? `确定清理 ${selectedHashes.length} 个观察期资源？（快照+元数据，发布记录保留）` : `确定清除 ${selectedHashes.length} 个种子的已获取数据？`"
           :ok-text="statusFilter === 'observing' ? '清理' : '清除'"
           cancel-text="取消"
-          @confirm="statusFilter === 'observing' ? batchPurgeObserving : batchClear"
+          @confirm="(statusFilter === 'observing' ? batchPurgeObserving : batchClear)()"
         >
           <a-button danger :loading="batchClearing" :disabled="selectedHashes.length === 0">
             <ClearOutlined /> {{ statusFilter === 'observing' ? '批量清理' : '批量清除' }}{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
