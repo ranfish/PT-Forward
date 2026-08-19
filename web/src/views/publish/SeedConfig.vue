@@ -17,6 +17,7 @@
           <a-radio-button value="incomplete">不完整</a-radio-button>
           <a-radio-button value="unfetched">未获取</a-radio-button>
           <a-radio-button value="issues">禁转/无映射</a-radio-button>
+          <a-radio-button value="observing">观察期</a-radio-button>
         </a-radio-group>
 
         <!-- 已激活的筛选 tag -->
@@ -98,7 +99,12 @@
         </template>
 
         <template v-else-if="column.key === 'status'">
-          <a-tag :color="statusColor(record.status)" size="small">
+          <a-tooltip v-if="record.status === 'observing'" :title="`消失于 ${new Date(record.last_seen || '').toLocaleString()}（${record.variants || 0} 个变体）`">
+            <a-tag :color="statusColor(record.status)" size="small">
+              观察期 {{ record.cleanup_in_days }}天
+            </a-tag>
+          </a-tooltip>
+          <a-tag v-else :color="statusColor(record.status)" size="small">
             {{ statusLabel(record.status) }}
           </a-tag>
         </template>
@@ -128,7 +134,16 @@
         </template>
 
         <template v-else-if="column.key === 'action'">
-          <a-space :size="0">
+          <a-space v-if="record.status === 'observing'" :size="0">
+            <a-button
+              size="small"
+              type="link"
+              danger
+              :loading="purgingSet.has(`${record.client_id}|${record.name}`)"
+              @click="purgeObserving(record)"
+            >立即清理</a-button>
+          </a-space>
+          <a-space v-else :size="0">
             <a-button
               size="small"
               type="link"
@@ -216,7 +231,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { PlusOutlined, ReloadOutlined, FilterOutlined, ClearOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
 import { seedConfigApi, type SeedListItem } from '@/api/publish'
@@ -336,15 +351,23 @@ const batchFetchActive = ref(false)
 async function fetchList() {
   loading.value = true
   try {
-    const resp = await seedConfigApi.listSeeds({
+    const params = {
       client_id: filterClient.value || '',
       save_path: filterPath.value || '',
       status: statusFilter.value === 'all' ? '' : (statusFilter.value === 'issues' ? 'issues' : statusFilter.value),
       search: searchText.value,
       page: currentPage.value,
       page_size: pageSize.value,
-    })
-    tableData.value = resp.data?.data?.items || []
+    }
+    // §59.38: 观察期独立 API（返回结构同 listSeeds，字段 observing 专属）
+    const resp = statusFilter.value === 'observing'
+      ? await seedConfigApi.listObserving(params)
+      : await seedConfigApi.listSeeds(params)
+    tableData.value = ((resp.data?.data?.items || []) as SeedListItem[]).map((it) => ({
+      ...it,
+      // 观察期行无 hash 语义（组聚合），造 key 供 rowKey
+      hash: it.hash || `${it.client_id}|${it.name}`,
+    }))
     total.value = resp.data?.data?.total || 0
   } catch {
     message.error('加载列表失败')
@@ -372,6 +395,7 @@ function statusLabel(status: string): string {
     pending: '待审核',
     incomplete: '不完整',
     unfetched: '未获取',
+  observing: '观察期',
   }
   return map[status] || status
 }
@@ -385,6 +409,7 @@ function statusColor(status: string): string {
     pending: 'warning',
     incomplete: 'default',
     unfetched: 'default',
+  observing: 'orange',
   }
   return map[status] || 'default'
 }
@@ -393,6 +418,30 @@ function statusRowClass(status: string): string {
   if (status === 'forbidden' || status === 'system_forbidden') return 'row-forbidden'
   if (status === 'no_mapping') return 'row-disabled'
   return ''
+}
+
+const purgingSet = ref(new Set<string>())
+
+async function purgeObserving(item: SeedListItem) {
+  const key = `${item.client_id}|${item.name}`
+  Modal.confirm({
+    title: '立即清理确认',
+    content: `将删除「${(item.name || '').slice(0, 50)}」的快照与元数据（发布记录保留），该操作不可撤销。`,
+    okText: '清理',
+    okType: 'danger',
+    onOk: async () => {
+      purgingSet.value.add(key)
+      try {
+        await seedConfigApi.purgeObserving(item.client_id, item.name || '')
+        message.success('已清理')
+        await fetchList()
+      } catch (e: unknown) {
+        message.error(`清理失败: ${(e as Error).message}`)
+      } finally {
+        purgingSet.value.delete(key)
+      }
+    },
+  })
 }
 
 function canEdit(status: string): boolean {

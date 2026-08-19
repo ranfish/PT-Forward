@@ -218,6 +218,10 @@ export interface SeedListItem {
   size: number
   client_id: string
   save_path: string
+  // §59.38 观察期行（组聚合，hash 为造键 client|name）
+  variants?: number
+  last_seen?: string
+  cleanup_in_days?: number
   site_name?: string
   title?: string
   subtitle?: string
@@ -281,6 +285,14 @@ export interface SeedDetail {
 }
 
 export const seedConfigApi = {
+  // §59.38: 观察期列表（返回结构同 listSeeds：items/total；行字段 client_id/name/variants/last_seen/save_path/size/cleanup_in_days）
+  listObserving(params: { client_id?: string; save_path?: string; search?: string; page?: number; page_size?: number }) {
+    return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params: { ...params, status: 'observing' } })
+  },
+  // §59.38: 观察期立即清理
+  purgeObserving(clientId: string, name: string) {
+    return client.post<ApiResponse<{ message: string; deleted_snaps: number; deleted_metas: number }>>('/publish/seeds/observing/purge', { clientId, name })
+  },
   listSeeds(params: { client_id?: string; save_path?: string; status?: string; search?: string; page?: number; page_size?: number }) {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params })
   },
