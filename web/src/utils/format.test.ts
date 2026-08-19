@@ -14,24 +14,40 @@ describe('formatBytes', () => {
     expect(formatBytes(512)).toBe('512 B')
   })
 
-  it('formats kilobytes', () => {
-    expect(formatBytes(1024)).toBe('1.0 KB')
+  // §59.43: 二进制规范后缀 + 非 B 单位统一两位
+  it('formats kibibytes', () => {
+    expect(formatBytes(1024)).toBe('1.00 KiB')
   })
 
-  it('formats megabytes', () => {
-    expect(formatBytes(1048576)).toBe('1.0 MB')
+  it('formats mebibytes', () => {
+    expect(formatBytes(1048576)).toBe('1.00 MiB')
   })
 
-  it('formats gigabytes', () => {
-    expect(formatBytes(1073741824)).toBe('1.00 GB')
+  it('formats gibibytes', () => {
+    expect(formatBytes(1073741824)).toBe('1.00 GiB')
   })
 
-  it('formats terabytes', () => {
-    expect(formatBytes(1099511627776)).toBe('1.00 TB')
+  it('formats tebibytes', () => {
+    expect(formatBytes(1099511627776)).toBe('1.00 TiB')
   })
 
-  it('formats large terabytes', () => {
-    expect(formatBytes(5 * 1099511627776)).toBe('5.00 TB')
+  it('formats large tebibytes', () => {
+    expect(formatBytes(5 * 1099511627776)).toBe('5.00 TiB')
+  })
+
+  // §59.43: 四舍五入锚定（站方同款实测值：Sisu 2 = 26520672317 B → 24.70 GiB）
+  it('rounds third decimal to second (site-verified value)', () => {
+    expect(formatBytes(26520672317)).toBe('24.70 GiB')
+  })
+
+  it('rounds third decimal down (<5)', () => {
+    // 1.004 GiB → 1.00（第三位 4 舍）
+    expect(formatBytes(1073741824 + 4 * 1024 * 1024)).toBe('1.00 GiB')
+  })
+
+  it('rounds third decimal up (>=5)', () => {
+    // 1.006 GiB（=1GiB+6MiB，浮点真值 1.00586）→ 1.01（第三位入）
+    expect(formatBytes(1073741824 + 6 * 1024 * 1024)).toBe('1.01 GiB')
   })
 })
 
