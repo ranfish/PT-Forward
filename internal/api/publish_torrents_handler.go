@@ -44,6 +44,7 @@ type PublishTorrentsHandler struct {
 	metadataFetcher MetadataFetcherProvider
 	complianceChecker *compliance.Checker
 	seedPipeline    SeedArtifactAnalyzer
+	ptgen           PTGenAnalyzer
 	logger         *zap.Logger
 	bgState        backgroundQueryState
 	batchFetch     batchFetchState
@@ -133,10 +134,16 @@ func (h *PublishTorrentsHandler) SetDeclarationFilter(f *publish.DeclarationFilt
 func (h *PublishTorrentsHandler) SetMetadataFetcher(f MetadataFetcherProvider)      { h.metadataFetcher = f }
 func (h *PublishTorrentsHandler) SetComplianceChecker(c *compliance.Checker)        { h.complianceChecker = c }
 func (h *PublishTorrentsHandler) SetSeedPipeline(p SeedArtifactAnalyzer)             { h.seedPipeline = p }
+func (h *PublishTorrentsHandler) SetPTGenAnalyzer(p PTGenAnalyzer)                    { h.ptgen = p }
 
 // §59.21: 本地产物分析接口（只跑 mediainfo，不跑截图）
 type SeedArtifactAnalyzer interface {
 	AnalyzeLocalArtifacts(ctx context.Context, name, savePath string) (map[string]interface{}, error)
+}
+
+// PTGenAnalyzer PTGen 查询接口（§59.42 海报 fallback 链用）
+type PTGenAnalyzer interface {
+	AnalyzePTGen(ctx context.Context, name string) (*model.PTGenResult, error)
 }
 
 func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -2423,6 +2430,11 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 		return err
 	}
 
+	// §59.42: 海报可信图源白名单替换（异步，不阻塞采集主流程）
+	if meta != nil && meta.Poster != "" {
+		go h.applyPosterFallback(meta.InfoHash, meta.SiteName, meta.Poster, name)
+	}
+
 	// §59.21: is_local=true 时落库本地 mediainfo（localMI 已在搜索前获取，直接复用）
 	if isLocal && localMI != "" && meta != nil {
 		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
@@ -3592,4 +3604,45 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 	}
 	_ = result
 	Success(w, map[string]interface{}{"message": "已清除"})
+}
+
+// applyPosterFallback §59.42: 海报替换链落库（goroutine 内执行）。
+// 优先用已落库的 douban_url 作 query（精确），无则种子名；两级 PTGen + HEAD 探活。
+func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePoster, name string) {
+	if h.ptgen == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	query := name
+	var m model.TorrentMetadata
+	if err := h.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		First(&m).Error; err == nil && m.DoubanURL != "" {
+		query = m.DoubanURL
+	}
+
+	var queriers []publish.PTGenQuerier
+	queriers = append(queriers, func(ctx context.Context, q string) (string, error) {
+		r, err := h.ptgen.AnalyzePTGen(ctx, q)
+		if err != nil || r == nil {
+			return "", err
+		}
+		return r.PosterURL, nil
+	})
+	res := publish.RunPosterFallback(ctx, sitePoster, query, queriers)
+	if res.Source == "site" {
+		return // 可信原图，无需更新
+	}
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		Updates(map[string]interface{}{
+			"poster": res.Poster,
+		})
+	h.logger.Info("poster fallback applied",
+		zap.String("hash", infoHash[:10]),
+		zap.String("source", res.Source),
+		zap.String("original", res.Original[:min(60, len(res.Original))]),
+		zap.String("final", res.Poster[:min(60, len(res.Poster))]))
 }
