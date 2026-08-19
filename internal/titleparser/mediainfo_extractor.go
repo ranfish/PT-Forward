@@ -194,6 +194,13 @@ func audioFromMI(format, commercialName string) (codec, technology string) {
 			technology = "Atmos"
 		}
 	}
+	// Auro3D 检测（§59.41，v1.05 对象信息值域另一半）——MI Commercial name
+	// 形态 "Auro-3D"/"Auro-C"（Barco Auro 编码器产物，与 Dolby 系并列）
+	if technology == "" && codec != "" {
+		if strings.Contains(commLower, "auro") {
+			technology = "Auro3D"
+		}
+	}
 
 	return codec, technology
 }

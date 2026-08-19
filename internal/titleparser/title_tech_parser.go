@@ -172,10 +172,15 @@ func extractAudioChannelsFromTitle(title string) string {
 	return ""
 }
 
-// extractAudioTechnologyFromTitle 从标题提取音频技术（Atmos）。
+// extractAudioTechnologyFromTitle 从标题提取音频技术（对象信息，v1.05 :193）。
+// 值域：Atmos / Auro3D（DTS:X 是编码即对象，不在此标）。
+// Auro3D 变体：Auro3D / Auro-3D / Auro 3D（§59.41，对齐 MI Commercial name 形态）。
 func extractAudioTechnologyFromTitle(title string) string {
 	if regexp.MustCompile(`(?i)\bAtmos\b`).MatchString(title) {
 		return "Atmos"
+	}
+	if regexp.MustCompile(`(?i)\bAuro[-. ]?3D\b`).MatchString(title) {
+		return "Auro3D"
 	}
 	return ""
 }

@@ -379,6 +379,11 @@ export const TAG_GROUPS: TagGroup[] = [
           "aliases": "全景声"
         },
         {
+          "key": "auro_3d",
+          "label": "Auro3D",
+          "aliases": "Auro-3D"
+        },
+        {
           "key": "dts_x",
           "label": "DTS:X",
           "aliases": ""
