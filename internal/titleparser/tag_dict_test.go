@@ -56,11 +56,11 @@ func TestTagGroupsStructure(t *testing.T) {
 			}
 		}
 	}
-	if total != 40 {
-		t.Errorf("tag 词条 %d, want 40", total)
+	if total != 41 {
+		t.Errorf("tag 词条 %d, want 41（§59.41 +auro_3d）", total)
 	}
 	// 关键词条锚定
-	for _, k := range []string{"dolby_vision", "chinese_subtitle", "chinese_audio", "complete", "10_bit", "hdr10_plus"} {
+	for _, k := range []string{"dolby_vision", "chinese_subtitle", "chinese_audio", "complete", "10_bit", "hdr10_plus", "auro_3d"} {
 		if !seen[k] {
 			t.Errorf("tag 缺关键词条 %q", k)
 		}

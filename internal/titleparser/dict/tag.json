@@ -58,6 +58,14 @@
       "infer_scope": "all"
     },
     {
+      "canonical": "auro_3d",
+      "label": "Auro3D",
+      "aliases": "Auro-3D",
+      "group": "音频编码",
+      "infer_pattern": "auro[-. ]?3d",
+      "infer_scope": "all"
+    },
+    {
       "canonical": "dts_x",
       "label": "DTS:X",
       "aliases": "",
