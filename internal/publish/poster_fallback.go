@@ -19,6 +19,7 @@ var trustedPosterSuffixes = []string{
 	"doubaninfo.com",
 	"pixhost.to",
 	"pixhost.cc",
+	"pixho.st", // pixhost 短域家族（§59.42 用户补充）
 }
 
 // IsTrustedPoster 判定海报 URL 是否可信图源（域名后缀匹配）。
