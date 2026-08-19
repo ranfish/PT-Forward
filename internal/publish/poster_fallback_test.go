@@ -15,6 +15,7 @@ func TestIsTrustedPoster(t *testing.T) {
 		{"https://doubaninfo.com/dbposter/doubaninfo_com_1294182.jpg", true},
 		{"https://img3.pixhost.cc/images/5068/760562844_ptgen_poster_gkji6w.jpg", true},
 		{"https://img9.pixhost.to/abc/123.jpg", true},
+		{"https://t1.pixho.st/abc/123.jpg", true},
 		{"https://pt.keepfrds.com/poster_douban/w185/2782320.webp", false}, // 朋友站代理豆瓣（实测 404 形态）
 		{"https://img9.doubanio.com/view/photo/l/public/p123.jpg", false},  // 豆瓣官方（外发必裂）
 		{"", false},
