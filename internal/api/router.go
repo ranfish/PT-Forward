@@ -195,6 +195,8 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	}
 	rt.publishTorrentsHandler.SetClientProvider(clientMgr)
 	rt.publishTorrentsHandler.SetSiteProvider(siteProvider)
+	// §59.38: 观察期定时清理（日级，7 天滞后期；ctx 自管理，进程退出即止）
+	rt.publishTorrentsHandler.StartObservingCleanup()
 	rt.publishTorrentsHandler.SetDeclarationFilter(declFilter)
 	if metadataFetcher != nil {
 		rt.publishTorrentsHandler.SetMetadataFetcher(metadataFetcher)

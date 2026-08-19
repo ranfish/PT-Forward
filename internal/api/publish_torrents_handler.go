@@ -80,6 +80,50 @@ func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger) *PublishTorrents
 	}
 }
 
+// StartObservingCleanup §59.38: 观察期定时清理——日级扫描超 7 天的观察组并
+// 执行两级清理（立即清理与定时共用 purgeObservingResource）。启动 +5min 避开
+// 启动 IO 高峰，此后每 24h 一轮。
+func (h *PublishTorrentsHandler) StartObservingCleanup() {
+	go func() {
+		time.Sleep(5 * time.Minute)
+		h.runObservingCleanup(context.Background())
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			h.runObservingCleanup(context.Background())
+		}
+	}()
+}
+
+func (h *PublishTorrentsHandler) runObservingCleanup(ctx context.Context) {
+	cutoff := time.Now().Add(-observingGracePeriod)
+	type obsGroup struct {
+		ClientID string
+		Name     string
+	}
+	var groups []obsGroup
+	h.db.WithContext(ctx).
+		Table("torrent_snapshots").
+		Select("client_id, name").
+		Where("is_hidden = ? AND name != '' AND last_seen < ?", true, cutoff).
+		Group("client_id, name").
+		Having("SUM(CASE WHEN is_hidden = 0 THEN 1 ELSE 0 END) = 0").
+		Find(&groups)
+	if len(groups) == 0 {
+		return
+	}
+	var totalSnaps, totalMetas int64
+	for _, g := range groups {
+		res := h.purgeObservingResource(ctx, g.ClientID, g.Name)
+		totalSnaps += res.snapRows
+		totalMetas += res.metaRows
+	}
+	h.logger.Info("observing cleanup completed",
+		zap.Int("groups", len(groups)),
+		zap.Int64("snaps", totalSnaps),
+		zap.Int64("metas", totalMetas))
+}
+
 func (h *PublishTorrentsHandler) SetCoverageService(s *coverage.Service) { h.coverage = s }
 func (h *PublishTorrentsHandler) SetReseedEngine(e *reseed.Engine)     { h.reseedEngine = e }
 func (h *PublishTorrentsHandler) SetClientProvider(c MFClientProvider)  { h.clientMgr = c }
@@ -159,6 +203,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleListSeeds(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/unique-paths") && r.Method == http.MethodGet:
 		h.handleSeedUniquePaths(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/observing/purge") && r.Method == http.MethodPost:
+		h.handlePurgeObserving(w, r)
 	case strings.Contains(path, "/publish/seeds/") && strings.HasSuffix(path, "/fetch") && r.Method == http.MethodPost:
 		h.handleFetchSingleSeed(w, r)
 	case strings.Contains(path, "/publish/seeds/") && r.Method == http.MethodGet:
@@ -2580,11 +2626,192 @@ func (h *PublishTorrentsHandler) handleBatchFetchProgress(w http.ResponseWriter,
 // 数据流：snapshots(可选 client/path 过滤) → name 去重 → metadata → 状态标注 →
 // 状态/搜索后端过滤 → 分页。
 // §59.29: client_id/save_path 全可选（空=全部），进页面即有数据（方案 A 全部视图）。
+// observingGracePeriod §59.38: 观察期滞后期——(client,name) 全变体 hidden 持续
+// 满 7 天自动清理（TR 维护/移路径/误删重加的恢复窗口）。
+const observingGracePeriod = 7 * 24 * time.Hour
+
+// handleListObserving §59.38: 观察期视图——辅种组（client+name）全部变体 hidden 的资源。
+// 行内容：name + 变体数 + 消失时间（max last_seen）+ 清理倒计时 + 下载器/路径。
+// 资源实体语义（用户定案）：辅种 = 同下载器同资源不同站点；跨下载器为独立副本互不影响。
+func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *http.Request, clientID, savePath, search string) {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page == 0 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+	if pageSize == 0 {
+		pageSize = 50
+	}
+
+	// 观察组 = (client, name) 聚合：全变体 hidden（组内无活跃行）且 name 非空
+	type obsRow struct {
+		ClientID string
+		Name     string
+		Variants int64
+		LastSeen time.Time
+		SavePath string
+		Size     int64
+	}
+	q := h.db.WithContext(r.Context()).
+		Table("torrent_snapshots").
+		Select(`client_id, name, COUNT(*) AS variants, MAX(last_seen) AS last_seen,
+			(SELECT save_path FROM torrent_snapshots s2 WHERE s2.client_id = torrent_snapshots.client_id AND s2.name = torrent_snapshots.name ORDER BY last_seen DESC LIMIT 1) AS save_path,
+			MAX(size) AS size`).
+		Where("is_hidden = ? AND name != ''", true).
+		Group("client_id, name").
+		Having("SUM(CASE WHEN is_hidden = 0 THEN 1 ELSE 0 END) = 0")
+	if clientID != "" {
+		q = q.Where("client_id = ?", clientID)
+	}
+	if savePath != "" {
+		q = q.Where("client_id IN (SELECT client_id FROM torrent_snapshots WHERE save_path = ?)", savePath)
+	}
+	if search != "" {
+		q = q.Where("name LIKE ?", "%"+search+"%")
+	}
+	var rows []obsRow
+	if err := q.Order("last_seen DESC").Find(&rows).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询观察期失败: "+err.Error())
+		return
+	}
+
+	items := make([]map[string]interface{}, 0, len(rows))
+	now := time.Now()
+	for _, row := range rows {
+		elapsed := now.Sub(row.LastSeen)
+		remaining := observingGracePeriod - elapsed
+		remainingDays := int(remaining.Hours() / 24)
+		if remainingDays < 0 {
+			remainingDays = 0
+		}
+		items = append(items, map[string]interface{}{
+			"client_id":       row.ClientID,
+			"name":            row.Name,
+			"variants":        row.Variants,
+			"last_seen":       row.LastSeen,
+			"save_path":       row.SavePath,
+			"size":            row.Size,
+			"cleanup_in_days": remainingDays,
+			"status":          "observing",
+		})
+	}
+
+	total := len(items)
+	start := (page - 1) * pageSize
+	if start >= total {
+		items = []map[string]interface{}{}
+	} else {
+		end := start + pageSize
+		if end > total {
+			end = total
+		}
+		items = items[start:end]
+	}
+	Success(w, map[string]interface{}{"items": items, "total": total})
+}
+
+// handlePurgeObserving §59.38: 立即清理——观察期资源主动确认不等 7 天。
+// 两级判定（防跨下载器 metadata 误删）：
+//   ① 删该 (client, name) 的全部 hidden 快照行
+//   ② metadata 仅当 info_hash 不被任何其他下载器活跃/观察期快照引用才删
+func (h *PublishTorrentsHandler) handlePurgeObserving(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ClientID string `json:"clientId"`
+		Name     string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ClientID == "" || req.Name == "" {
+		Error(w, http.StatusBadRequest, 40001, "clientId 和 name 必填")
+		return
+	}
+	deleted := h.purgeObservingResource(r.Context(), req.ClientID, req.Name)
+	Success(w, map[string]interface{}{
+		"message":        "已清理",
+		"deleted_snaps":  deleted.snapRows,
+		"deleted_metas":  deleted.metaRows,
+	})
+}
+
+type purgeResult struct {
+	snapRows  int64
+	metaRows  int64
+}
+
+// purgeObservingResource 两级清理（立即清理与定时任务共用）。
+// 安全前置：仅当该组确无活跃行才执行（活跃=误判，拒绝清理）。
+func (h *PublishTorrentsHandler) purgeObservingResource(ctx context.Context, clientID, name string) purgeResult {
+	var active int64
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_id = ? AND name = ? AND is_hidden = ?", clientID, name, false).
+		Count(&active)
+	if active > 0 {
+		return purgeResult{}
+	}
+
+	// ① 该组全部 hash
+	var hashes []string
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_id = ? AND name = ?", clientID, name).
+		Pluck("hash", &hashes)
+	if len(hashes) == 0 {
+		return purgeResult{}
+	}
+
+	// ② metadata 两级判定：hash 被其他下载器（或本下载器其他组）活跃引用则跳过
+	var referenced []string
+	h.db.WithContext(ctx).
+		Table("torrent_snapshots").
+		Where("hash IN ? AND is_hidden = ? AND (client_id != ? OR name != ?)", hashes, false, clientID, name).
+		Distinct("hash").
+		Pluck("hash", &referenced)
+	refSet := make(map[string]bool, len(referenced))
+	for _, h2 := range referenced {
+		refSet[h2] = true
+	}
+	purgeHashes := make([]string, 0, len(hashes))
+	for _, h2 := range hashes {
+		if !refSet[h2] {
+			purgeHashes = append(purgeHashes, h2)
+		}
+	}
+
+	var res purgeResult
+	// 删 metadata（发布记录不动——发布域史实）
+	if len(purgeHashes) > 0 {
+		d := h.db.WithContext(ctx).Where("info_hash IN ?", purgeHashes).
+			Delete(&model.TorrentMetadata{})
+		res.metaRows = d.RowsAffected
+	}
+	// 删该组快照行
+	d := h.db.WithContext(ctx).Where("client_id = ? AND name = ?", clientID, name).
+		Delete(&model.TorrentSnapshot{})
+	res.snapRows = d.RowsAffected
+	h.logger.Info("observing resource purged",
+		zap.String("client", clientID),
+		zap.String("name", name[:min(len(name), 50)]),
+		zap.Int64("snaps", res.snapRows),
+		zap.Int64("metas", res.metaRows))
+	return res
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.Request) {
 	clientID := r.URL.Query().Get("client_id")
 	savePath := r.URL.Query().Get("save_path")
 	statusFilter := r.URL.Query().Get("status")
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
+
+	// §59.38: 观察期视图——独立分支（hidden 组按 (client,name) 聚合，
+	// 不与活跃视图共用查询/状态机）
+	if statusFilter == "observing" {
+		h.handleListObserving(w, r, clientID, savePath, search)
+		return
+	}
 
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page == 0 {
@@ -2661,10 +2888,31 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 
 	// 3. 按 name 关联 metadata（§59.29: name → 同名所有 hash 的 metadata 行，
 	// 解决去重保留行与 metadata 行 hash 不一致时丢数据 §59.28 H1）
-	nameByHash := make(map[string]string, len(rawSnapshots))
-	for _, s := range rawSnapshots {
-		if s.Name != "" {
-			nameByHash[s.Hash] = s.Name
+	// §59.38 修复: nameByHash 域放宽到 (client,path) 全部活跃行（原 rawSnapshots
+	// 是分组去重保留行——同资源多变体场景 metadata 挂在非保留行上时映射丢失，
+	// 列表假阴性标 unfetched。H1 只放宽了 metas 查询没放宽映射域，半修）
+	nameByHash := make(map[string]string, len(rawSnapshots)*2)
+	{
+		var hashNameRows []struct {
+			Hash string
+			Name string
+		}
+		hashQ := h.db.WithContext(r.Context()).
+			Table("torrent_snapshots").
+			Select("hash, name").
+			Where("is_hidden = ? AND name != ''", false)
+		if clientID != "" {
+			hashQ = hashQ.Where("client_id = ?", clientID)
+		}
+		if savePath != "" {
+			hashQ = hashQ.Where("save_path = ?", savePath)
+		}
+		if search != "" {
+			hashQ = hashQ.Where("name LIKE ?", "%"+search+"%")
+		}
+		hashQ.Find(&hashNameRows)
+		for _, r := range hashNameRows {
+			nameByHash[r.Hash] = r.Name
 		}
 	}
 	metaByName := make(map[string][]model.TorrentMetadata, len(snapshots))
