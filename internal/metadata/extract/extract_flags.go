@@ -26,6 +26,39 @@ var siteForbiddenMarkers = []string{
 // 是发种者/致谢模板对特定站点的定向声明，非全站禁转。
 var directedNoTransferSites = []string{"PTT", "BT", "PTT "}
 
+// stripQuoteBlocks 剥离 BBCode [quote]...[/quote] 块（§59.39）。
+// 逐段扫描，块内文本丢弃；嵌套以 [quote 计数、[/quote] 减计数处理；
+// 不成对标签保守保留其后文本（宁可多扫不可漏扫）。
+func stripQuoteBlocks(s string) string {
+	var b strings.Builder
+	depth := 0
+	for len(s) > 0 {
+		qi := strings.Index(s, "[quote")
+		ei := strings.Index(s, "[/quote]")
+		if qi >= 0 && (ei < 0 || qi < ei) {
+			if depth == 0 {
+				b.WriteString(s[:qi])
+			}
+			tagEnd := strings.Index(s[qi:], "]")
+			if tagEnd < 0 {
+				return b.String()
+			}
+			s = s[qi+tagEnd+1:]
+			depth++
+		} else if ei >= 0 {
+			if depth > 0 {
+				depth--
+			}
+			s = s[ei+len("[/quote]"):]
+		} else {
+			// §59.39 保守语义：未闭合 quote 的剩余文本按正文保留（宁可多扫不可漏扫）
+			b.WriteString(s)
+			return b.String()
+		}
+	}
+	return b.String()
+}
+
 // extractFlags 从文本中检测禁转/限转标记。
 // 扫描范围限定为：标题 + 副标题 + 简介 BBCode。
 //
@@ -33,6 +66,10 @@ var directedNoTransferSites = []string{"PTT", "BT", "PTT "}
 //  1. 站点标记形态（[禁转]/[限时禁转] 等）— 精确匹配，权威源
 //  2. 关键词匹配 — "禁转"/"限转" 短词逐命中点检查上下文：
 //     排除跨词伪命中（"严禁转发"中"禁转"二字相邻）和定向禁转（"禁转PTT"）
+//
+// §59.39: 关键词层扫描文本剥离 [quote] 引用块——发布者引用的上游声明
+// （"美版原盘@AdBlue…仅在PD22测试,未经允许禁止转载"类溯源文本）约束的是
+// 上游站点，非本种子禁转标记；站点标记层不排除（站方权威标记不会藏在上游引用里）。
 func (p *PublicExtractor) extractFlags(title, subtitle, descrBBCode string) []string {
 	combined := title + " " + subtitle + " " + descrBBCode
 	var flags []string
@@ -45,7 +82,7 @@ func (p *PublicExtractor) extractFlags(title, subtitle, descrBBCode string) []st
 		}
 	}
 
-	// 1. 站点标记形态：精确匹配（权威源，直接命中）
+	// 1. 站点标记形态：精确匹配（权威源，直接命中）——不剥离 quote（§59.39）
 	for _, marker := range siteForbiddenMarkers {
 		if strings.Contains(combined, marker) {
 			switch {
@@ -59,16 +96,17 @@ func (p *PublicExtractor) extractFlags(title, subtitle, descrBBCode string) []st
 		}
 	}
 
-	// 2. 关键词匹配
+	// 2. 关键词匹配——剥离 quote 引用块后扫描（§59.39：只判发布者自身文本）
+	ownText := stripQuoteBlocks(combined)
 	for _, kw := range defaultForbiddenTransferKeywords {
-		if !strings.Contains(combined, kw) {
+		if !strings.Contains(ownText, kw) {
 			continue
 		}
 		// 长词（禁止转载/谢绝转载/严禁转载/谢绝搬运/独占/限时禁转/分集）
 		// 语义自足，直接命中。
 		// 注意："限时禁转" 含 "禁转" 子串，先于 "禁转" 判定（defaultForbiddenTransferKeywords 顺序）。
 		if kw == "禁转" || kw == "限转" {
-			if !hasGenuineHit(combined, kw) {
+			if !hasGenuineHit(ownText, kw) {
 				continue
 			}
 		}
