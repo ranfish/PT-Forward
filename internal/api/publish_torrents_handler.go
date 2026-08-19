@@ -2799,12 +2799,6 @@ func (h *PublishTorrentsHandler) purgeObservingResource(ctx context.Context, cli
 	return res
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
 
 func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.Request) {
 	clientID := r.URL.Query().Get("client_id")
