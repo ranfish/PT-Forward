@@ -17,9 +17,11 @@ import (
 
 // rePixhostDirect 从 show 页面 HTML 提取直链。
 // 同时匹配 .to 和 .cc 域名，支持 jpg/jpeg/png 扩展名。
-var rePixhostDirect = regexp.MustCompile(`https://img\d+\.pixhost\.(?:to|cc)/images/[^"'\s]+\.(?:jpg|jpeg|png)`)
+var rePixhostDirect = regexp.MustCompile(`https://img\d+\.pixhost\.(?:to|cc)/images/[^"'\s]+\.(?:jpg|jpeg|png)|https://img\d+\.pixho\.st/images/[^"'\s]+\.(?:jpg|jpeg|png)`)
 
-// PixhostHost 支持 pixhost.cc / pixhost.to 双域名 fallback。
+// PixhostHost 支持 pixhost.cc / pixhost.to / pixho.st 三域名 fallback（§59.42）。
+// pixho.st 为 pixhost 短域家族：API api.pixho.st/images 同协议（实测 200）、
+// 直链形态 img3.pixho.st/images/...、show 页同结构。
 // domains 按优先级排列：第一个可用域名优先使用。
 type PixhostHost struct {
 	client  *http.Client
@@ -31,7 +33,7 @@ func NewPixhostHost(logger *zap.Logger) *PixhostHost {
 	return &PixhostHost{
 		client:  &http.Client{Timeout: 180 * time.Second},
 		logger:  logger,
-		domains: []string{"pixhost.cc", "pixhost.to"},
+		domains: []string{"pixhost.cc", "pixhost.to", "pixho.st"},
 	}
 }
 
