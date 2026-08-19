@@ -54,7 +54,7 @@ func TestExtractFlagsQuoteExclusion(t *testing.T) {
 		"谢绝搬运": true, "独占": true, "限时禁转": true, "限转": true,
 	}
 	for _, c := range cases {
-		flags := p.extractFlags(c.title, c.subtitle, c.descr)
+		flags := p.extractFlags(c.title, c.subtitle, "", c.descr)
 		hit := false
 		for _, f := range flags {
 			if forbiddenSet[f] {
@@ -80,6 +80,47 @@ func TestStripQuoteBlocks(t *testing.T) {
 	for _, c := range cases {
 		if got := stripQuoteBlocks(c.in); strings.TrimSpace(got) != strings.TrimSpace(c.want) {
 			t.Errorf("stripQuoteBlocks(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// §59.40: 站方标签禁转检测——tags 并入两层
+func TestExtractFlagsTags(t *testing.T) {
+	p := PublicExtractor{}
+	forbiddenSet := map[string]bool{
+		"禁转": true, "禁止转载": true, "谢绝转载": true, "严禁转载": true,
+		"谢绝搬运": true, "独占": true, "限时禁转": true, "限转": true,
+	}
+	cases := []struct {
+		name, title, subtitle, tags, descr string
+		want                               bool
+	}{
+		// 标签禁转（§33 模式 1 主流形态）
+		{"标签_禁转", "Movie 2024 BluRay x264-GROUP", "副标题", "禁转 首发 国语", "简介正文", true},
+		{"标签_禁止转载", "Movie 2024", "", "禁止转载", "", true},
+		{"标签_独占", "Movie 2024", "", "独占", "", true},
+		// 标签形态的站点标记（cspt [禁转] checkbox 值形态）
+		{"标签_标记形态", "Movie 2024", "", "[禁转]", "", true},
+		// 正常标签不受影响
+		{"标签_正常", "Movie 2024", "", "dolby_vision hdr10 chinese_subtitle", "简介", false},
+		// 空 tags 回归
+		{"无标签_副标题禁转回归", "Movie 2024", "禁转资源", "", "简介", true},
+		// 标签禁转 + 简介里引用上游（两者独立，标签命中即可）
+		{"标签命中_引用不干扰", "Movie 2024", "", "禁转", "[quote]上游禁止转载[/quote]正文", true},
+		// 描述+标签组合：quote 剥离只作用于 descr，tags 原文参与
+		{"仅引用_标签也无_不标", "Movie 2024", "", "国语", "[quote]上游禁止转载[/quote]", false},
+	}
+	for _, c := range cases {
+		flags := p.extractFlags(c.title, c.subtitle, c.tags, c.descr)
+		hit := false
+		for _, f := range flags {
+			if forbiddenSet[f] {
+				hit = true
+				break
+			}
+		}
+		if hit != c.want {
+			t.Errorf("%s: hit=%v flags=%v, want %v", c.name, hit, flags, c.want)
 		}
 	}
 }

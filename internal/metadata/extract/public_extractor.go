@@ -2,6 +2,7 @@
 package extract
 
 import (
+	"strings"
 	"fmt"
 	"regexp"
 
@@ -89,7 +90,9 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	seed.InfoHash = p.extractInfoHash(input.PageHTML, doc)
 	seed.Size = p.extractSize(doc, input.PageHTML)
 	seed.IMDbLink, seed.DoubanLink, seed.TMDbLink = p.extractExternalLinks(doc, descrBBCode)
-	seed.Flags = p.extractFlags(seed.Title, seed.Subtitle, descrBBCode)
+	// §59.40: tags 并入禁转检测——站方标签（cspt 禁转标签/ourbits tags[]=jz 等
+	// §33 检测模式 1）是主流禁转形态；tags 为站方数据，权威性同副标题标记
+	seed.Flags = p.extractFlags(seed.Title, seed.Subtitle, strings.Join(seed.Tags, " "), descrBBCode)
 
 	// 阶段 7: 站点特殊提取规则（v0.0.254，替代 Go 特殊提取器）
 	// 按站点 JSON 配置启用（category_from_icons/title_from_quoted/description_from_range 等）

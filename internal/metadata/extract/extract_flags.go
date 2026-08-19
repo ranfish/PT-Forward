@@ -60,7 +60,7 @@ func stripQuoteBlocks(s string) string {
 }
 
 // extractFlags 从文本中检测禁转/限转标记。
-// 扫描范围限定为：标题 + 副标题 + 简介 BBCode。
+// 扫描范围限定为：标题 + 副标题 + 站方标签 + 简介 BBCode。
 //
 // §32 keepfrds.md 对齐的两层检测：
 //  1. 站点标记形态（[禁转]/[限时禁转] 等）— 精确匹配，权威源
@@ -70,8 +70,11 @@ func stripQuoteBlocks(s string) string {
 // §59.39: 关键词层扫描文本剥离 [quote] 引用块——发布者引用的上游声明
 // （"美版原盘@AdBlue…仅在PD22测试,未经允许禁止转载"类溯源文本）约束的是
 // 上游站点，非本种子禁转标记；站点标记层不排除（站方权威标记不会藏在上游引用里）。
-func (p *PublicExtractor) extractFlags(title, subtitle, descrBBCode string) []string {
-	combined := title + " " + subtitle + " " + descrBBCode
+//
+// §59.40: tags（站方标签）并入两层检测——cspt 禁转标签/ourbits tags[]=jz 等
+// §33 检测模式 1；tags 是站方数据非发布者声明，无需剥 quote，权威性同副标题标记。
+func (p *PublicExtractor) extractFlags(title, subtitle, tags, descrBBCode string) []string {
+	combined := title + " " + subtitle + " " + tags + " " + descrBBCode
 	var flags []string
 	seen := make(map[string]struct{})
 
@@ -182,5 +185,5 @@ func isDirectedRune(r rune) bool {
 // 输入文本（title/subtitle/tags 拼接），输出 flags（与 Engine 主路径口径一致）。
 func ExtractFlagsFromText(text string) []string {
 	p := PublicExtractor{}
-	return p.extractFlags(text, "", "")
+	return p.extractFlags(text, "", "", "")
 }

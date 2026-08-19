@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -222,6 +223,43 @@ func init() {
 				}
 			}
 		}
+	})
+	// §59.40: 存量 tags 重刷——extractFlags 并入站方标签后，detail_source.tags
+	// 有值的行重算 flags（标签禁转形态补检）。29 现存 tags 全空实际零行受影响，
+	// 保险性补齐（其他环境若有标签禁转站采集数据则生效）。
+	RegisterMigration(16, "rescan_flags_with_tags", func(gormDB *gorm.DB) error {
+		var rows []model.TorrentMetadata
+		if err := gormDB.
+			Where("detail_source_json LIKE '%\"tags\": [%'").
+			Find(&rows).Error; err != nil {
+			return err
+		}
+		for _, row := range rows {
+			title, subtitle, tags, descr := "", "", "", ""
+			if row.DetailSourceJSON != "" {
+				var ds struct {
+					Title    string   `json:"title"`
+					Subtitle string   `json:"subtitle"`
+					Tags     []string `json:"tags"`
+					Intro    struct {
+						Body string `json:"body"`
+					} `json:"intro"`
+				}
+				if json.Unmarshal([]byte(row.DetailSourceJSON), &ds) == nil {
+					title, subtitle, descr = ds.Title, ds.Subtitle, ds.Intro.Body
+					tags = strings.Join(ds.Tags, " ")
+				}
+			}
+			newFlags := extract.ExtractFlagsFromText(title + " " + subtitle + " " + tags + " " + descr)
+			nf, _ := json.Marshal(newFlags)
+			if string(nf) != row.Flags {
+				if err := gormDB.Model(&model.TorrentMetadata{}).Where("id = ?", row.ID).
+					Update("flags", string(nf)).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
 	// §59.39: 存量 flags 重刷——extractFlags 关键词层新增 quote 剥离后，
 	// 上游声明（引用块内禁转词）误标的行解除。4/4 实证全部为同类误标。

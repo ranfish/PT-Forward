@@ -45,7 +45,7 @@ func TestExtractFlags(t *testing.T) {
 		{"clean", "Movie 2024 2160p", "中字", "普通简介", nil},
 	}
 	for _, c := range cases {
-		got := p.extractFlags(c.title, c.subtitle, c.descr)
+		got := p.extractFlags(c.title, c.subtitle, "", c.descr)
 		want := c.want
 		if want == nil {
 			want = []string{}
