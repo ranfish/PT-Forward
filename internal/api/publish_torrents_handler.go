@@ -105,9 +105,9 @@ func (h *PublishTorrentsHandler) runObservingCleanup(ctx context.Context) {
 	h.db.WithContext(ctx).
 		Table("torrent_snapshots").
 		Select("client_id, name").
-		Where("is_hidden = ? AND name != '' AND last_seen < ?", true, cutoff).
+		Where("name != '' AND last_seen < ?", cutoff).
 		Group("client_id, name").
-		Having("SUM(CASE WHEN is_hidden = 0 THEN 1 ELSE 0 END) = 0").
+		Having("SUM(CASE WHEN is_hidden = 0 THEN 1 ELSE 0 END) = 0 AND SUM(CASE WHEN is_hidden = 1 THEN 1 ELSE 0 END) > 0").
 		Find(&groups)
 	if len(groups) == 0 {
 		return
@@ -2657,14 +2657,17 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 		Select(`client_id, name, COUNT(*) AS variants, MAX(last_seen) AS last_seen,
 			(SELECT save_path FROM torrent_snapshots s2 WHERE s2.client_id = torrent_snapshots.client_id AND s2.name = torrent_snapshots.name ORDER BY last_seen DESC LIMIT 1) AS save_path,
 			MAX(size) AS size`).
-		Where("is_hidden = ? AND name != ''", true).
+		// §59.38 审计修正: WHERE 不限 hidden——HAVING 活跃检测需全组行进聚合域
+		//（原 is_hidden=1 使 SUM(active) 恒 0，组内仍有活跃行的资源被误列观察期）
+		Where("name != ''").
 		Group("client_id, name").
-		Having("SUM(CASE WHEN is_hidden = 0 THEN 1 ELSE 0 END) = 0")
+		Having("SUM(CASE WHEN is_hidden = 0 THEN 1 ELSE 0 END) = 0 AND SUM(CASE WHEN is_hidden = 1 THEN 1 ELSE 0 END) > 0")
 	if clientID != "" {
 		q = q.Where("client_id = ?", clientID)
 	}
 	if savePath != "" {
-		q = q.Where("client_id IN (SELECT client_id FROM torrent_snapshots WHERE save_path = ?)", savePath)
+		// §59.38 审计修正: 按 (client_id, name) 组过滤——原 IN client 放大返回该下载器全部组
+		q = q.Where("client_id || '|' || name IN (SELECT client_id || '|' || name FROM torrent_snapshots WHERE save_path = ?)", savePath)
 	}
 	if search != "" {
 		q = q.Where("name LIKE ?", "%"+search+"%")
