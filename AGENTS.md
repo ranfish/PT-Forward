@@ -189,6 +189,12 @@
 
 **完整设计文档**：`docs/31-模块设计决策记录.md` §55-§59.22（67000+ 行，按需读特定章节，不要一次读全文）。
 
+## 前端格式化函数规范（§59.43）
+
+- **禁止页面私有字节/速率格式化函数**：所有体积/速率展示必须 `import { formatBytes / formatSpeed } from '@/utils/format'`（单点维护，防 toFixed 位数/进制/后缀漂移）
+- ESLint 硬约束已启用（no-restricted-syntax）：私有 formatSize/formatBytes 同名副本 + toFixed×字节单位拼接形态直接报 error；utils/format.ts 本体豁免；非字节场景 `eslint-disable-next-line` 注释豁免
+- 历史教训：§59.26 snake_case、§59.43 字节副本——"知道该统一"不等于"不会漏"，靠机制不靠记忆
+
 ## JSON 字段命名规范
 
 | 场景 | 风格 | 示例 |

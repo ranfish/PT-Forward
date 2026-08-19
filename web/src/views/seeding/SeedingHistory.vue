@@ -58,7 +58,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { seedingApi } from '@/api/seeding'
-import { formatTime } from '@/utils/format'
+import { formatBytes, formatTime } from '@/utils/format'
 
 const loading = ref(false)
 const records = ref<any[]>([])
@@ -91,12 +91,7 @@ function statusColor(status: string): string {
   return map[status] || 'default'
 }
 
-function formatBytes(bytes: number): string {
-  if (!bytes || bytes === 0) return '-'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i]
-}
+// §59.43: 私有副本删除，改用全局 formatBytes（utils/format）
 
 async function fetchData() {
   loading.value = true
