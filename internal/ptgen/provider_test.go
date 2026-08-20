@@ -3,6 +3,7 @@ package ptgen
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -215,5 +216,24 @@ func TestProvider_QueryEndpoint_Error(t *testing.T) {
 	_, err := p.queryEndpoint(context.Background(), server.URL, "tt1")
 	if err == nil {
 		t.Error("expected error for 500 response")
+	}
+}
+
+// §59.46: doubaninfo format 字段解析（BBCode 口径统一）
+func TestQueryDoubanInfoFormatFallback(t *testing.T) {
+	// mock doubaninfo 响应：无 bbcode 只有 format
+	payload := `{"success":true,"chinese_title":"幻想","poster":"https://doubaninfo.com/dbposter/x.jpg",
+		"format":"[img]https://doubaninfo.com/dbposter/x.jpg[/img]\n\n◎片　　名　幻想"}`
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(payload), &raw); err != nil {
+		t.Fatal(err)
+	}
+	got := parseBBCodeField(raw)
+	if got == "" || !strings.Contains(got, "◎片") {
+		t.Errorf("format 应兜底: %q", got)
+	}
+	raw2 := map[string]any{"bbcode": "BB", "format": "FF"}
+	if parseBBCodeField(raw2) != "BB" {
+		t.Error("bbcode 应优先于 format")
 	}
 }

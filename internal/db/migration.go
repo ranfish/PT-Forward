@@ -225,6 +225,14 @@ func init() {
 			}
 		}
 	})
+	// §59.46: 清 doubaninfo 坏路径时期写入的空 BBCode 缓存——
+	// queryDoubanInfo 修复前 raw_bbcode 恒空落缓存（140 行），30 天 TTL 内
+	// 命中即短路远端重取，修复不生效。删行让下次 Query 穿透（poster_url 为
+	// 独立列但整行删除后海报穿透一次 doubaninfo ~1s，代价可忽略）。
+	RegisterMigration(18, "purge_empty_bbcode_ptgen_cache", func(gormDB *gorm.DB) error {
+		return gormDB.Where("json_data LIKE '%\"raw_bbcode\":\"\"%'").
+			Delete(&model.PTGenCache{}).Error
+	})
 	// §59.44: 存量尾斜杠路径归一——TR 上报的历史脏数据（"PT6/SSD/" vs "PT6/SSD"）
 	// 在三元组资源键下劈裂资源，统一 Clean 形态（与 syncer 前置修复配套）。
 	RegisterMigration(17, "normalize_snapshot_save_path", func(gormDB *gorm.DB) error {

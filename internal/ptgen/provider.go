@@ -396,9 +396,7 @@ func (p *Provider) queryDoubanInfo(ctx context.Context, endpoint, key, query str
 	if intro, ok := raw["introduction"].(string); ok && result.Introduction == "" {
 		result.Introduction = intro
 	}
-	if bbcode, ok := raw["bbcode"].(string); ok {
-		result.RawBBCode = bbcode
-	}
+	result.RawBBCode = parseBBCodeField(raw)
 	if region, ok := raw["region"].(string); ok && region != "" {
 		result.Region = append(result.Region, region)
 	}
@@ -428,6 +426,19 @@ func (p *Provider) queryDoubanInfo(ctx context.Context, endpoint, key, query str
 	}
 
 	return result, nil
+}
+
+// parseBBCodeField BBCode 字段解析（§59.46 统一口径）：
+// bbcode 优先，format 兜底——doubaninfo 字段名是 format（实测 652 字符完整 ◎
+// 文档），cspt 亦用 format；PTNexus 同款（format/content）。
+func parseBBCodeField(raw map[string]any) string {
+	if v, ok := raw["bbcode"].(string); ok && v != "" {
+		return v
+	}
+	if v, ok := raw["format"].(string); ok {
+		return v
+	}
+	return ""
 }
 
 func (p *Provider) queryCspt(ctx context.Context, endpoint, token, query string) (*model.PTGenResult, error) {
