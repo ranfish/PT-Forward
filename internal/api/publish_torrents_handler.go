@@ -43,8 +43,9 @@ type PublishTorrentsHandler struct {
 	reseedEngine   *reseed.Engine
 	metadataFetcher MetadataFetcherProvider
 	complianceChecker *compliance.Checker
-	seedPipeline    SeedArtifactAnalyzer
-	ptgen           PTGenAnalyzer
+	seedPipeline       SeedArtifactAnalyzer
+	ptgen              PTGenAnalyzer
+	resourceResolver   *publish.ResourceResolver
 	logger         *zap.Logger
 	bgState        backgroundQueryState
 	batchFetch     batchFetchState
@@ -75,9 +76,10 @@ type batchFetchItem struct {
 
 func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger) *PublishTorrentsHandler {
 	return &PublishTorrentsHandler{
-		db:      db,
-		logger:  logger,
-		bgState: backgroundQueryState{active: make(map[uint]bool)},
+		db:               db,
+		logger:           logger,
+		bgState:          backgroundQueryState{active: make(map[uint]bool)},
+		resourceResolver: publish.NewResourceResolver(db),
 	}
 }
 
@@ -3279,19 +3281,19 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	var metas []model.TorrentMetadata
-	h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash).Find(&metas)
-
-	if len(metas) == 0 {
+	// §59.44: 资源视图解析——按 (client,path,name) 圈全部活跃 hash 聚合 metadata，
+	// 修复挂载 hash≠保留行 hash 的 404（49% 资源组）；hidden 兜底覆盖编辑期间删种
+	rv := h.resourceResolver.ResolveResource(r.Context(), infoHash)
+	if rv == nil || rv.Meta == nil {
 		Error(w, http.StatusNotFound, 40401, "未找到 metadata")
 		return
 	}
-
-	meta := h.selectSourceMeta(metas)
+	meta := h.selectSourceMeta(rv.AllMetas)
 	if meta == nil {
-		Error(w, http.StatusNotFound, 40401, "未找到源站行 metadata")
-		return
+		meta = rv.Meta
 	}
+	// 后续更新定位用资源视图的元数据行 hash（数据在谁名下就更新谁）
+	infoHash = meta.InfoHash
 
 	// screenshots 换行分隔 → 数组
 	var screenshots []string
@@ -3418,6 +3420,11 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	}
 
 	// 找到目标行
+	// §59.44: 资源视图解析——前端传的 hash 可能是列表保留行（无 metadata 挂靠），
+	// 按 (client,path,name) 圈 hash 后用挂载行 hash 定位更新目标
+	if rv := h.resourceResolver.ResolveResource(r.Context(), infoHash); rv != nil && rv.Meta != nil {
+		infoHash = rv.Meta.InfoHash
+	}
 	query := h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash)
 	if req.SiteName != "" {
 		query = query.Where("site_name = ?", req.SiteName)
@@ -3560,8 +3567,13 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 	}
 
 	// §59.26: 获取（含重新获取）后 reviewed=false，必须重新走预览审核
+	// §59.44: 资源视图圈 hash——获取可能落在资源键内其他 hash（tid 反查），全组重置
+	resetHashes := []string{infoHash}
+	if rv := h.resourceResolver.ResolveResource(r.Context(), infoHash); rv != nil && len(rv.Hashes) > 0 {
+		resetHashes = rv.Hashes
+	}
 	h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
-		Where("info_hash = ?", infoHash).
+		Where("info_hash IN ?", resetHashes).
 		Update("reviewed", false)
 
 	Success(w, map[string]interface{}{"message": "获取成功"})
