@@ -31,7 +31,7 @@
 
 **版本**：v0.0.631（已发布）。
 
-**当前主线**：**v1.05 公共字典（Token Registry v2，§59.35）P1-P4 全部完成**（v0.0.635-641）：dict/*.json 8 域 304 词条（含 platform 224 + tag 40）单一真相源；②③④⑦⑧五份手写副本消灭 + extended tag 域 117 对死数据删除；codegen dict.ts + CI drift；platform Requires 语义约束 + tag_inferer 查表化。下一步回到种子配置页主线：Tab 3 截图 / Tab 4 PTGen 端到端验证，之后发布页重构（tag_config 激活，§56.22——站点标签数据已在 108 份适配文档备齐）。
+**当前主线**：**种子配置页（数据层）打磨中**。字典（§59.35）已完成后回线，近期完成：§59.42 海报可信图源白名单+PTGen fallback（doubaninfo/pixhost 家族+pixho.st，Tab2 闭环）；§59.43 全站字节显示统一（KiB/MiB/GiB+两位）+ ESLint 硬约束防私有副本；§59.44 资源视图（虚拟种子）——(client,path,name) 三元组键 + ResourceResolver 正式接口，修复 49% 编辑 404（158/158 组全通）；§59.45 Tab4 简介对齐 PTGen 为准——朋友站 kdouban 框逆向提取（139 MI 污染修复面，8 发布者自贴保留）。编辑器六 Tab 已闭环：Tab2 海报/Tab4 简介/Tab5 MI。**下一步：Tab 3 截图端到端（编辑器最后一块）→ 预览→审核闭环全流程 → 发布页重构（tag_config 激活，§56.22）。**
 
 **支线完成**：幽灵种子巡检 v2（§59.31）；Token Registry P1-P3（§59.27）；清 seen 重推（§59.33）；侧栏信息架构重排（§59.32）；Remux 规格解析修复（v0.0.629）；Tab1 片源写法与 Encode 判定 + DOM key 归一化（§59.34，v0.0.632-634，两轮审计）。
 
