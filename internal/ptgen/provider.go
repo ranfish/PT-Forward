@@ -516,9 +516,7 @@ func (p *Provider) queryCspt(ctx context.Context, endpoint, token, query string)
 	if v, ok := raw["introduction"].(string); ok {
 		result.Introduction = v
 	}
-	if v, ok := raw["format"].(string); ok {
-		result.RawBBCode = v
-	}
+	result.RawBBCode = parseBBCodeField(raw) // §59.46 审计: 与 queryDoubanInfo 统一口径
 	if arr, ok := raw["region"].([]any); ok {
 		for _, r := range arr {
 			if s, ok := r.(string); ok {
