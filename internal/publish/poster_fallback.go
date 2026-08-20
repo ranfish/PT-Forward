@@ -115,3 +115,21 @@ func RunPosterFallback(ctx context.Context, sitePoster, query string, queriers [
 	}
 	return res
 }
+
+// CheckPosterAlive 海报可达性检查（含 1 次重试防网络抖动，§59.49）。
+// 供采集链在 PTGen 全失败后判定原 URL 存活——死链清空的依据。
+func CheckPosterAlive(ctx context.Context, posterURL string) bool {
+	if posterURL == "" {
+		return false
+	}
+	if posterAliveFn(ctx, posterURL) {
+		return true
+	}
+	// 重试 1 次（间隔 500ms）
+	select {
+	case <-time.After(500 * time.Millisecond):
+	case <-ctx.Done():
+		return false
+	}
+	return posterAliveFn(ctx, posterURL)
+}

@@ -2436,6 +2436,10 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 	if meta != nil && meta.Poster != "" {
 		go h.applyPosterFallback(meta.InfoHash, meta.SiteName, meta.Poster, name)
 	}
+	// §59.49: 截图获取时探活（异步）——清死留活，全死全清，字段列诚实化
+	if meta != nil && meta.Screenshots != "" && meta.Screenshots != "[]" {
+		go h.purgeDeadScreenshots(meta.InfoHash, meta.SiteName)
+	}
 
 	// §59.21: is_local=true 时落库本地 mediainfo（localMI 已在搜索前获取，直接复用）
 	if isLocal && localMI != "" && meta != nil {
@@ -3650,6 +3654,24 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 	if res.Source == "site" {
 		return // 可信原图，无需更新
 	}
+	// §59.49: ptgen_dead（两级 PTGen 全失败且原站 URL 不可信）时探活原 URL——
+	// 死链清空（poster=""，字段列诚实显红叉）；活链保留（下次重取再试 PTGen 替换）。
+	// 原 URL 进日志可追溯。
+	if res.Source == "ptgen_dead" {
+		if publish.CheckPosterAlive(ctx, sitePoster) {
+			h.logger.Info("poster fallback: ptgen dead but site URL alive, keeping",
+				zap.String("hash", infoHash[:10]),
+				zap.String("poster", sitePoster[:min(60, len(sitePoster))]))
+			return
+		}
+		h.logger.Warn("poster fallback: dead link purged",
+			zap.String("hash", infoHash[:10]),
+			zap.String("dead_url", sitePoster[:min(80, len(sitePoster))]))
+		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+			Update("poster", "")
+		return
+	}
 	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
 		Updates(map[string]interface{}{
@@ -3660,4 +3682,72 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		zap.String("source", res.Source),
 		zap.String("original", res.Original[:min(60, len(res.Original))]),
 		zap.String("final", res.Poster[:min(60, len(res.Poster))]))
+}
+
+// purgeDeadScreenshots §59.49: 截图获取时探活——HEAD（含 1 次重试）逐张检查，
+// 清死留活；全死全清（screenshots=[]）。只反映获取时点存活状态。
+func (h *PublishTorrentsHandler) purgeDeadScreenshots(infoHash, siteName string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	var meta model.TorrentMetadata
+	if err := h.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		First(&meta).Error; err != nil {
+		return
+	}
+	urls := model.ParseScreenshotColumn(meta.Screenshots)
+	if len(urls) == 0 {
+		return
+	}
+
+	// 并发探活（每张 HEAD + 失败重试 1 次）
+	type result struct {
+		idx   int
+		alive bool
+	}
+	ch := make(chan result, len(urls))
+	sem := make(chan struct{}, 6) // 并发上限 6
+	for i, u := range urls {
+		go func(idx int, u string) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			ch <- result{idx, publish.CheckPosterAlive(ctx, u)}
+		}(i, u)
+	}
+	alive := make([]bool, len(urls))
+	for range urls {
+		r := <-ch
+		alive[r.idx] = r.alive
+	}
+
+	var kept []string
+	var dead []string
+	for i, u := range urls {
+		if alive[i] {
+			kept = append(kept, u)
+		} else {
+			dead = append(dead, u)
+		}
+	}
+	if len(dead) == 0 {
+		return // 全活，无需更新
+	}
+	for _, d := range dead {
+		h.logger.Warn("screenshot dead link purged",
+			zap.String("hash", infoHash[:10]),
+			zap.String("dead_url", d[:min(80, len(d))]))
+	}
+	data, _ := json.Marshal(kept) // 全死时 kept=nil → "null" 需转 "[]"
+	if kept == nil {
+		data = []byte("[]")
+	}
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		Update("screenshots", string(data))
+	h.logger.Info("screenshot purge completed",
+		zap.String("hash", infoHash[:10]),
+		zap.Int("total", len(urls)),
+		zap.Int("kept", len(kept)),
+		zap.Int("purged", len(dead)))
 }
