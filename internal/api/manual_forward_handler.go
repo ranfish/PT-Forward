@@ -63,6 +63,7 @@ type PublishPipeline interface {
 	AnalyzeTorrent(ctx context.Context, name, savePath string) (map[string]interface{}, error)
 	AnalyzePTGen(ctx context.Context, name string) (*model.PTGenResult, error)
 	AnalyzeLocalArtifacts(ctx context.Context, name, savePath string) (map[string]interface{}, error)
+	CaptureScreenshots(ctx context.Context, name, savePath string, sourceScreenshots []string) []string
 }
 
 type SiteManager interface {
@@ -1484,13 +1485,14 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			}
 			break
 		}
-		artifacts, err := h.pipeline.AnalyzeLocalArtifacts(ctx, req.Name, req.SavePath)
-		if err != nil {
-			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("截图获取失败: %v", err))
-			return
-		}
-		if ss, ok := artifacts["screenshots"]; ok {
-			result["screenshots"] = ss
+		// §59.50: 本地 mpv 截图（local_upload 策略）——原 AnalyzeLocalArtifacts 是
+		// MI 场景的 source_direct（跳过截图恒返回空），mpv/字幕检测/HDR/图床上传
+		// 能力从未接到本按钮。源站截图作 fallback（本地全失败时回源站值）。
+		capCtx, capCancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer capCancel()
+		shots := h.pipeline.CaptureScreenshots(capCtx, req.Name, req.SavePath, nil)
+		if len(shots) > 0 {
+			result["screenshots"] = shots
 		}
 
 	case "rehost_screenshots":
