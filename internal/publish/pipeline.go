@@ -2839,3 +2839,25 @@ func (p *Pipeline) rehostPoster(ctx context.Context, sourceURL string) string {
 		zap.String("rehosted_url", result.URL))
 	return result.URL
 }
+
+// CaptureScreenshots §59.50: 本地 mpv 截图（Tab3 "重新获取截图（mpv）" 专用）。
+//
+// 与 AnalyzeLocalArtifacts 的区别：后者是 MI 场景（source_direct 跳过截图），
+// 本方法走 local_upload 策略——mpv 截图 + 字幕检测 + HDR tone-mapping + 图床上传，
+// 失败回源站截图（调用方传 sourceScreenshots 作 fallback）。
+// 返回截图 URL 列表（本地截图全失败且无源站值时为空列表）。
+func (p *Pipeline) CaptureScreenshots(ctx context.Context, name, savePath string, sourceScreenshots []string) []string {
+	if p.artifactGenerator == nil || savePath == "" {
+		return sourceScreenshots
+	}
+	torrentDir := savePath
+	if entryPath, _ := findTorrentEntry(savePath, name); entryPath != "" {
+		torrentDir = entryPath
+	}
+	artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", sourceScreenshots, "local_upload")
+	if err != nil || artifact == nil {
+		p.logger.Warn("capture screenshots failed", zap.Error(err))
+		return sourceScreenshots
+	}
+	return artifact.ScreenshotURLs
+}
