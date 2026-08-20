@@ -3295,16 +3295,9 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 	// 后续更新定位用资源视图的元数据行 hash（数据在谁名下就更新谁）
 	infoHash = meta.InfoHash
 
-	// screenshots 换行分隔 → 数组
-	var screenshots []string
-	if meta.Screenshots != "" {
-		for _, line := range strings.Split(meta.Screenshots, "\n") {
-			line = strings.TrimSpace(line)
-			if line != "" {
-				screenshots = append(screenshots, line)
-			}
-		}
-	}
+	// §59.47: screenshots 列统一解析（JSON 数组优先/换行回退）——
+	// 原 strings.Split("\n") 对 JSON 格式列拆出整个 JSON 串当 URL（1 张损坏图）
+	screenshots := model.ParseScreenshotColumn(meta.Screenshots)
 
 	// §59.26: BuildTechProfile 三源合并（标题 + MediaInfo + DOM），5 标题字段始终用 profile，
 	// 14 平铺字段 DB 为空时 fallback 到 profile（兼容历史数据）
@@ -3500,14 +3493,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	reassembledTitle := titleparser.ReassembleFromTechProfile(profile, titleparser.V105TitleFormat())
 
 	renderer := description.NewRenderer("")
-	var screenshots []string
-	if updated.Screenshots != "" {
-		for _, line := range strings.Split(updated.Screenshots, "\n") {
-			if line = strings.TrimSpace(line); line != "" {
-				screenshots = append(screenshots, line)
-			}
-		}
-	}
+	screenshots := model.ParseScreenshotColumn(updated.Screenshots) // §59.47
 	descData := &model.DescriptionData{
 		Statement:      updated.Statement,
 		PosterURL:      updated.Poster,
