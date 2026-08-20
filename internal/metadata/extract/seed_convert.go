@@ -40,7 +40,7 @@ func SeedToDetail(seed SeedData) *model.TorrentDetail {
 		DoubanURL:    seed.DoubanLink,
 		TMDbURL:      seed.TMDbLink,
 		PosterURL:    seed.Intro.Poster,
-		Screenshots:  seed.Intro.ScreenshotURLs(),
+		Screenshots:  ExpandKFImageUrls(seed.Intro.ScreenshotURLs()), // §59.48: keepfrds 缩略图展开为原图直链
 		Statement:    seed.Intro.Statement,
 		MediaInfo:    seed.MediaInfo,
 		BDInfo:       seed.BDInfo,
