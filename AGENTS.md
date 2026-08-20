@@ -265,6 +265,10 @@
   3. **典型清单**：`util.ExtractGroupName`（制作组名提取）、`reseed.ExtractSearchKeyword`（搜索关键词提取）、`reseed.SearchAndVerifyMatch`（搜索+验证匹配）、`reseed.VerifyMatchWithTruncationCheckAndSource`（匹配验证核心）、`reseed.ValidateInjection`（注入前校验）、`util.ClassifyTorrent`/`util.ClassifyFromDir`（种子类型分类）、`util.DetectContentType`（音乐/视频检测原语）
   4. 如果已有函数是私有的且跨包需要，**先考虑提升为公共函数**（改首字母大写或委托到 `util` 包），而非在新包重写一份
 
+## 回归审核第一项（每次审核先查）
+
+- **AGENTS.md 任务焦点同步**：`git log --oneline -10` 的版本推进与"当前主线"描述对照——主线/支线完成项是否已反映？滞后即先补（历史教训：v0.0.631、v0.0.642、v0.0.670 三次同类违规）。
+
 ## 灵魂四问（每次代码改动后必须逐条审核）
 
 1. **nil 安全**：所有指针返回值是否检查了 nil？map 查找是否有 ok 判断？type assertion 是否用了 comma-ok 模式？
