@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -223,6 +224,26 @@ func init() {
 				}
 			}
 		}
+	})
+	// §59.44: 存量尾斜杠路径归一——TR 上报的历史脏数据（"PT6/SSD/" vs "PT6/SSD"）
+	// 在三元组资源键下劈裂资源，统一 Clean 形态（与 syncer 前置修复配套）。
+	RegisterMigration(17, "normalize_snapshot_save_path", func(gormDB *gorm.DB) error {
+		var rows []model.TorrentSnapshot
+		if err := gormDB.Where("save_path LIKE ?", "%/").Find(&rows).Error; err != nil {
+			return err
+		}
+		for _, row := range rows {
+			clean := filepath.Clean(row.SavePath)
+			if clean == row.SavePath {
+				continue
+			}
+			// 同 (hash,client) UPSERT 键无冲突；仅路径串更新
+			if err := gormDB.Model(&model.TorrentSnapshot{}).Where("id = ?", row.ID).
+				Update("save_path", clean).Error; err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	// §59.40: 存量 tags 重刷——extractFlags 并入站方标签后，detail_source.tags
 	// 有值的行重算 flags（标签禁转形态补检）。29 现存 tags 全空实际零行受影响，

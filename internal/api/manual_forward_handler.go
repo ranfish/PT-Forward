@@ -1335,12 +1335,29 @@ func (h *ManualForwardHandler) handlePreviewFields(w http.ResponseWriter, r *htt
 // 无 tid（元数据缺失）走 FetchAndStoreBySearch 反查（size 查不到传 0 = 不按 size 过滤）。
 // v0.0.557 原实现直接传空 tid，FetchAndStore 参数校验必然失败（维护模式屏蔽按钮期间无人踩到）。
 func (h *ManualForwardHandler) refreshFromSource(ctx context.Context, infoHash, siteName, torrentName string) (*model.TorrentMetadata, error) {
+	// §59.44: 资源视图解析——传入 hash 可能是列表保留行（无 tid），按资源键圈
+	// hash 后查任一挂载行的 tid，避免不必要的搜索反查（挂载行有 tid 直接重抓）
+	var hashes []string
+	var row model.TorrentSnapshot
+	if err := h.db.WithContext(ctx).
+		Where("hash = ? AND is_hidden = ?", infoHash, false).
+		First(&row).Error; err == nil && row.Name != "" {
+		h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+			Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = ?",
+				row.ClientID, row.SavePath, row.Name, false).
+			Pluck("hash", &hashes)
+	}
+	candidates := []string{infoHash}
+	if len(hashes) > 0 {
+		candidates = hashes
+	}
 	var existing model.TorrentMetadata
 	h.db.WithContext(ctx).
-		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		Where("info_hash IN ? AND site_name = ? AND torrent_id != ''", candidates, siteName).
+		Order("updated_at DESC").
 		First(&existing)
 	if existing.TorrentID != "" {
-		return h.metadataFetcher.FetchAndStore(ctx, infoHash, siteName, existing.TorrentID)
+		return h.metadataFetcher.FetchAndStore(ctx, existing.InfoHash, siteName, existing.TorrentID)
 	}
 	return h.metadataFetcher.FetchAndStoreBySearch(ctx, infoHash, siteName, torrentName, 0)
 }

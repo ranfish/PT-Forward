@@ -1,6 +1,7 @@
 package download
 
 import (
+	"path/filepath"
 	"context"
 	"fmt"
 	"time"
@@ -269,11 +270,13 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientID string, torrents []
 	records := make([]model.TorrentSnapshot, 0, len(torrents))
 	for _, t := range torrents {
 		seenHashes[t.Hash] = true
+		// §59.44: 路径规范化——TR 上报可能带尾斜杠（"PT6/SSD/" vs "PT6/SSD"），
+		// 字符串差异会劈裂三元组资源键，Clean 统一形态
 		records = append(records, model.TorrentSnapshot{
 			Hash:     t.Hash,
 			ClientID: clientID,
 			Name:     t.Name,
-			SavePath: t.SavePath,
+			SavePath: filepath.Clean(t.SavePath),
 			Size:     t.TotalSize,
 			State:    t.State,
 			Progress: t.Progress,
