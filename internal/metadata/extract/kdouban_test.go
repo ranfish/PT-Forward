@@ -80,3 +80,11 @@ func TestIsMIPollutedIntro(t *testing.T) {
 		}
 	}
 }
+
+// §59.46: 空 body 也回退 kdouban（纯声明形态）——IsMIPollutedIntro("") 为 false，
+// 由调用层 body=="" || IsMIPolluted 组合判定，此处锚定 IsMIPolluted 对空串语义
+func TestIsMIPollutedEmptyNotPolluted(t *testing.T) {
+	if IsMIPollutedIntro("") {
+		t.Error("空 body 不应判污染（调用层用 body==\"\" 独立判定回退）")
+	}
+}

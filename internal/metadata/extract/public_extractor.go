@@ -89,7 +89,9 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	//（发布者约定 descr 只放声明+MI+截图，body 从 descr 取会 93% MI 污染）。
 	// 判定：descr-body 含 ◎（发布者自贴完整简介）保留；MI 污染形态 → kdouban 替换。
 	if strings.Contains(domain, "keepfrds") {
-		if IsMIPollutedIntro(seed.Intro.Body) {
+		// §59.46: 空_body 也回退——纯声明形态（descr 全是 Source 声明无简介正文，
+		// 黑暗侵袭 tid=2782261 实证）是朋友站发布者另一类常见写法
+		if seed.Intro.Body == "" || IsMIPollutedIntro(seed.Intro.Body) {
 			if kd := ExtractKDouban(doc); kd.Body != "" {
 				seed.Intro.Body = kd.Body
 			}

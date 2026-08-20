@@ -3326,13 +3326,30 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		VideoCodec:    pickNonEmpty(meta.VideoCodec, profile.VideoCodec),
 	}
 
+	// §59.46: 展示优先级兜底——description 列为空（源站无简介形态）时按
+	// douban_url 查 ptgen_cache（format BBCode）；非空不覆盖（尊重源站/用户编辑）
+	descriptionOut := meta.Description
+	if descriptionOut == "" && meta.DoubanURL != "" {
+		var cached model.PTGenCache
+		if err := h.db.WithContext(r.Context()).
+			Where("query_key = ?", meta.DoubanURL).
+			Order("updated_at DESC").First(&cached).Error; err == nil {
+			var pr struct {
+				RawBBCode string `json:"raw_bbcode"`
+			}
+			if json.Unmarshal([]byte(cached.JSONData), &pr) == nil && pr.RawBBCode != "" {
+				descriptionOut = pr.RawBBCode
+			}
+		}
+	}
+
 	result := map[string]interface{}{
 		"info_hash":       meta.InfoHash,
 		"site_name":       meta.SiteName,
 		"title":           meta.Title,
 		"subtitle":        meta.Subtitle,
 		"poster":          meta.Poster,
-		"description":     meta.Description,
+		"description":     descriptionOut,
 		"screenshots":     screenshots,
 		"mediainfo":       miForProfile,
 		"bdinfo":          meta.BDInfo,
