@@ -9,7 +9,7 @@ func TestNormalizeImageURL(t *testing.T) {
 	cases := []struct {
 		in, want string
 	}{
-		{"https://Example.com/Poster.JPG", "https://example.com/poster.jpg"},
+		{"https://Example.com/Poster.JPG", "https://example.com/Poster.JPG"}, // §59.48: path 保留大小写（base64/签名敏感）
 		{"https://example.com/img.jpg?q=123", "https://example.com/img.jpg"},
 		{"https://example.com/img.jpg#frag", "https://example.com/img.jpg"},
 		{"https://example.com/path/", "https://example.com/path"},
@@ -168,7 +168,7 @@ func TestExtractImages_NormalizationApplied(t *testing.T) {
 	if len(urls) != 1 {
 		t.Fatalf("expected 1 image, got %d", len(urls))
 	}
-	if urls[0] != "https://example.com/poster.jpg" {
+	if urls[0] != "https://example.com/Poster.JPG" { // §59.48: path 保留大小写
 		t.Errorf("URL not normalized, got %q", urls[0])
 	}
 }
