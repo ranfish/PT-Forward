@@ -617,9 +617,7 @@ func (h *ManualForwardHandler) runAnalyze(task *analyzeTask, clientID uint, info
 	var localScreenshots []string
 	if hasLocalCache {
 		localMediaInfo = cachedMeta.MediaInfo
-		if cachedMeta.Screenshots != "" {
-			localScreenshots = strings.Split(cachedMeta.Screenshots, "\n")
-		}
+		localScreenshots = model.ParseScreenshotColumn(cachedMeta.Screenshots) // §59.47
 	} else if h.pipeline != nil && savePath != "" {
 		localCtx, localCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		if r, err := h.pipeline.AnalyzeLocalArtifacts(localCtx, name, savePath); err == nil && r != nil {
@@ -1480,15 +1478,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 					Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("源站重新获取失败: %v", err))
 					return
 				}
-				if meta != nil && meta.Screenshots != "" {
-					var shots []string
-					for _, line := range strings.Split(meta.Screenshots, "\n") {
-						line = strings.TrimSpace(line)
-						if line != "" {
-							shots = append(shots, line)
-						}
-					}
-					result["screenshots"] = shots
+				if meta != nil && len(model.ParseScreenshotColumn(meta.Screenshots)) > 0 {
+					result["screenshots"] = model.ParseScreenshotColumn(meta.Screenshots)
 				}
 			}
 			break
