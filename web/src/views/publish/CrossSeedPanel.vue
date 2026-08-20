@@ -287,7 +287,8 @@
             <!-- Tab 4: 简介详情 -->
             <a-tab-pane key="intro" tab="简介详情">
               <div style="margin-bottom: 8px; display: flex; gap: 8px">
-                <a-button v-if="!maintenanceOnly" :loading="refreshing === 'intro'" @click="doRefresh('intro')">重新获取简介（PTGen）</a-button>
+                <!-- §59.45: 简介重获是数据源修复动作（与 Tab3/Tab5 同性质），维护模式放开 -->
+                <a-button :loading="refreshing === 'intro'" @click="doRefresh('intro')">重新获取简介（PTGen）</a-button>
               </div>
               <a-textarea v-model:value="form.description" :rows="20" placeholder="BBCode 简介正文" style="font-family: monospace" />
               <!-- §59.20: maintenanceOnly 模式下外部链接只读展示 -->
