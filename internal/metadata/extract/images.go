@@ -82,7 +82,14 @@ func NormalizeImageURL(raw string) string {
 	}
 	u.RawQuery = ""
 	u.Fragment = ""
-	return strings.ToLower(strings.TrimRight(u.String(), "/"))
+	// §59.48: 只 lower scheme+host（域名大小写不敏感），path 保留原大小写——
+	// URL 路径大小写敏感是 Web 常识，keepfrds 截图 URL 的 base64 段被整体 lower
+	// 后无法解码（imgproxy 签名/base64 均大小写敏感），原图展开链断裂。
+	// 历史行为 lower 全 URL 的动机是"其他站路径多小写防重复"——去重由
+	// Normalize 之前的 seen map 承担（:47 已有），全 lower 是冗余且有害的。
+	u.Scheme = strings.ToLower(u.Scheme)
+	u.Host = strings.ToLower(u.Host)
+	return strings.TrimRight(u.String(), "/")
 }
 
 // pickImageURL 从 <img> selection 提取 URL（优先 data-src 系列）。
