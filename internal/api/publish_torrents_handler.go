@@ -2454,13 +2454,19 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 	}
 
 	// §59.21: is_local=true 时落库本地 mediainfo（localMI 已在搜索前获取，直接复用）
+	// §59.56: 列名笔误修复（mediainfo_source → media_info_source，v0.0.650 同族第三处）
+	// + .Error 检查（原静默吞错——243 实测 760 次失败无声，148 组本地 MI 全空）
 	if isLocal && localMI != "" && meta != nil {
-		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 			Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 			Updates(map[string]interface{}{
-				"media_info":       localMI,
-				"mediainfo_source": "local",
-			})
+				"media_info":        localMI,
+				"media_info_source": "local",
+			}).Error; err != nil {
+			h.logger.Error("local mediainfo persist failed",
+				zap.String("hash", meta.InfoHash[:10]),
+				zap.Error(err))
+		}
 	}
 
 	// §59.26: TechProfile 三源合并 + 分类推断 + 声明过滤（与 runAnalyze ⑫ 统一管线）
