@@ -278,6 +278,7 @@
                 <a-button :loading="refreshing === 'rehost_screenshots'" :disabled="form.screenshots.length === 0" @click="doRefresh('rehost_screenshots')">一键转存到图床</a-button>
               </div>
               <ScreenshotManager
+                ref="shotManagerRef"
                 v-model:screenshots="form.screenshots"
                 :screenshot-in-desc="form.screenshotInDesc"
                 @update:screenshot-in-desc="form.screenshotInDesc = $event"
@@ -417,6 +418,9 @@ import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import type { ManualForwardSubmitRequest, PreviewField, PreviewCompleteness, PublishResultRecord } from '@/api/types'
 import TagSelector from './TagSelector.vue'
 import ScreenshotManager from './ScreenshotManager.vue'
+
+// §59.54: 截图管理器引用（转存前快照）
+const shotManagerRef = ref<InstanceType<typeof ScreenshotManager> | null>(null)
 import PublishFieldPreview from './PublishFieldPreview.vue'
 import WizardStepSelectTargets from './WizardStepSelectTargets.vue'
 import WizardStepResult from './WizardStepResult.vue'
@@ -915,6 +919,9 @@ async function doRefresh(type: string) {
     }
     if (type === 'rehost_screenshots') {
       payload.screenshots = form.value.screenshots
+      // §59.54: 转存前快照（恢复引用按钮的还原源）
+      const sm = shotManagerRef.value as unknown as { snapshotBeforeRehost?: () => void } | null
+      sm?.snapshotBeforeRehost?.()
     }
     const resp = await manualForwardApi.refresh(payload)
     const data = (resp.data?.data || {}) as Record<string, unknown>

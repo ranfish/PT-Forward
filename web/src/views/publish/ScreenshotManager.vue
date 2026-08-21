@@ -13,12 +13,34 @@
           添加
         </a-button>
       </a-input-group>
+      <!-- §59.54: 批量粘贴——多行输入，支持裸 URL / [img] / <img> 三形态解析 -->
+      <a-button @click="bulkPasteVisible = true">批量粘贴</a-button>
+      <!-- §59.54: 恢复引用——转存前快照存在时显示，一键还原 -->
+      <a-button v-if="rehostSnapshot" type="link" @click="restoreFromSnapshot">恢复引用</a-button>
+
       <a-tooltip title="开启后截图以 [img] 标签嵌入简介正文，关闭则作为独立附件">
         <a-switch v-model:checked="screenshotInDesc" size="small" />
         <span class="toggle-label">截图嵌入简介</span>
       </a-tooltip>
     </div>
 
+    <!-- §59.54: 批量粘贴弹窗 -->
+    <a-modal
+      v-model:open="bulkPasteVisible"
+      title="批量粘贴截图"
+      ok-text="解析并添加"
+      cancel-text="取消"
+      @ok="applyBulkPaste"
+    >
+      <a-textarea
+        v-model:value="bulkPasteText"
+        :rows="8"
+        placeholder="粘贴含截图的内容，支持裸 URL / [img] 标签 / img 标签三种形态，自动提取去重" 
+      />
+      <div v-if="bulkParsedPreview.length" style="margin-top: 8px; color: #666; font-size: 12px">
+        已解析 {{ bulkParsedPreview.length }} 个 URL（点击确定添加）
+      </div>
+    </a-modal>
     <!-- 左右分栏 -->
     <div v-if="screenshots.length" class="split-layout">
       <!-- 左侧：URL 列表 -->
@@ -101,6 +123,54 @@ const screenshotInDesc = computed({
 })
 
 const newUrl = ref('')
+// §59.54: 批量粘贴
+const bulkPasteVisible = ref(false)
+const bulkPasteText = ref('')
+// §59.54: 恢复引用——转存前快照（null = 无可恢复）
+const rehostSnapshot = ref<string[] | null>(null)
+
+// §59.54: 三形态解析（裸 URL / [img]url[/img] / <img src="url">）——与后端 ExtractImages 同口径
+function parseBulkPaste(text: string): string[] {
+  const urls: string[] = []
+  const seen = new Set<string>()
+  const push = (u: string) => {
+    if (u && !seen.has(u)) {
+      seen.add(u)
+      urls.push(u)
+    }
+  }
+  // [img]url[/img]
+  for (const m of text.matchAll(/\[img\]\s*([^\s[]+?)\s*\[\/img\]/gi)) push(m[1])
+  // <img src="url"> / <img src='url'>
+  for (const m of text.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) push(m[1])
+  // 裸 URL（图片扩展名放宽：jpg/jpeg/png/gif/webp + 任意带图片路径特征的 URL）
+  for (const m of text.matchAll(/https?:\/\/[^\s["'<>]+/gi)) {
+    const u = m[0].replace(/[),.;，。]+$/, '')
+    push(u)
+  }
+  return urls
+}
+
+const bulkParsedPreview = computed(() => (bulkPasteText.value ? parseBulkPaste(bulkPasteText.value) : []))
+
+function applyBulkPaste() {
+  const urls = bulkParsedPreview.value.filter((u) => !screenshots.value.includes(u))
+  if (urls.length) {
+    screenshots.value = [...screenshots.value, ...urls]
+  }
+  bulkPasteText.value = ''
+  bulkPasteVisible.value = false
+}
+
+function snapshotBeforeRehost() {
+  rehostSnapshot.value = [...screenshots.value]
+}
+
+function restoreFromSnapshot() {
+  if (!rehostSnapshot.value) return
+  screenshots.value = [...rehostSnapshot.value]
+  rehostSnapshot.value = null
+}
 const dragIndex = ref(-1)
 const dragOverIndex = ref(-1)
 const selectedIndex = ref(0)
@@ -293,3 +363,6 @@ function onDragEnd() {
   text-align: right;
 }
 </style>
+
+// §59.54: 暴露给父组件（CrossSeedPanel 转存前调快照）
+defineExpose({ snapshotBeforeRehost })
