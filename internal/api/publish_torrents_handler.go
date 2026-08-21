@@ -3655,17 +3655,36 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		query = m.DoubanURL
 	}
 
+	// §59.55: 双字段消费——querier 捕获完整 PTGenResult（PosterURL + RawBBCode），
+	// 海报走 RunPosterFallback 语义不变；description 增量写（format 非空才覆盖）
+	ptgenDesc := ""
 	var queriers []publish.PTGenQuerier
 	queriers = append(queriers, func(ctx context.Context, q string) (string, error) {
 		r, err := h.ptgen.AnalyzePTGen(ctx, q)
 		if err != nil || r == nil {
 			return "", err
 		}
+		if r.RawBBCode != "" {
+			ptgenDesc = r.RawBBCode
+		}
 		return r.PosterURL, nil
 	})
 	res := publish.RunPosterFallback(ctx, sitePoster, query, queriers)
+
+	// §59.55: description 增量写——PTGen format 非空即覆盖（PTGen 为准落库），
+	// 失败/空不动（kdouban/descr 回退保留）。与海报分支结果无关（PTGen 可能
+	// 成功返回了 format 但 PosterURL 恰为空/非白名单直信）。
+	if ptgenDesc != "" {
+		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+			Update("description", ptgenDesc)
+		h.logger.Info("ptgen description applied",
+			zap.String("hash", infoHash[:10]),
+			zap.Int("length", len(ptgenDesc)))
+	}
+
 	if res.Source == "site" {
-		return // 可信原图，无需更新
+		return // 可信原图，无需更新（description 已在上面处理）
 	}
 	// §59.49: ptgen_dead（两级 PTGen 全失败且原站 URL 不可信）时探活原 URL——
 	// 死链清空（poster=""，字段列诚实显红叉）；活链保留（下次重取再试 PTGen 替换）。
