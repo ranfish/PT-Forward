@@ -1691,6 +1691,17 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 	h.capture.mu.Unlock()
 
 	go func() {
+		// §59.51 审计: panic 防护——CaptureScreenshots panic 会让 active 永久 true（单例死锁），
+		// batch-fetch runBatchFetch defer recover 同款
+		defer func() {
+			if p := recover(); p != nil {
+				h.capture.mu.Lock()
+				h.capture.active = false
+				h.capture.status = "failed"
+				h.capture.error = fmt.Sprintf("internal panic: %v", p)
+				h.capture.mu.Unlock()
+			}
+		}()
 		// §59.51: 脱离 HTTP 请求生命周期（§59.50 审计根因）——Background + 5min
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
