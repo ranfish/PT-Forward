@@ -53,15 +53,23 @@
         </div>
       </div>
 
-      <!-- 右侧：大图预览 -->
+      <!-- 右侧：大图预览（§59.52: ImageGroup 全量预览——点任意图进入可翻页查看所有截图） -->
       <div class="preview-panel">
-        <a-image
-          v-if="selectedIndex >= 0 && selectedIndex < screenshots.length"
-          :src="screenshots[selectedIndex]"
-          style="max-width: 100%; max-height: 500px; border-radius: 4px"
-          :preview="{ visible: previewVisible, onVisibleChange: (v: boolean) => previewVisible = v }"
-        />
-        <div v-else class="preview-empty">
+        <a-image-preview-group>
+          <a-image
+            v-if="selectedIndex >= 0 && selectedIndex < screenshots.length"
+            :src="screenshots[selectedIndex]"
+            style="max-width: 100%; max-height: 500px; border-radius: 4px; cursor: zoom-in"
+          />
+          <!-- 隐藏其余图片：仅注册进 group 供翻页，不占布局 -->
+          <a-image
+            v-for="(u, i) in screenshots"
+            v-show="false"
+            :key="i"
+            :src="u"
+          />
+        </a-image-preview-group>
+        <div v-if="!screenshots.length" class="preview-empty">
           <InboxOutlined style="font-size: 32px; color: #d9d9d9" />
           <p>选择左侧截图查看大图</p>
         </div>
@@ -76,7 +84,7 @@
 
     <!-- 截图统计 -->
     <div v-if="screenshots.length" class="stats-hint">
-      共 {{ screenshots.length }} 张截图 · 拖拽调整顺序 · 点击查看大图
+      共 {{ screenshots.length }} 张截图 · 拖拽调整顺序 · 点击大图可翻页查看全部
     </div>
   </div>
 </template>
@@ -105,7 +113,6 @@ const screenshotInDesc = computed({
 })
 
 const newUrl = ref('')
-const previewVisible = ref(false)
 const dragIndex = ref(-1)
 const dragOverIndex = ref(-1)
 const selectedIndex = ref(0)
