@@ -982,7 +982,10 @@ async function saveToDB() {
       mediainfo: form.value.mediaInfo,
       tags: JSON.stringify(form.value.tags),
     })
-  } catch { /* silent */ } finally {
+  } catch (e: unknown) {
+    // §59.56 审计: 静默吞错导致列名笔误长期不可见——保存失败必须提示
+    message.error('保存失败: ' + (e as Error).message)
+  } finally {
     saving.value = false
   }
 }

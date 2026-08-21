@@ -1899,7 +1899,7 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 		"description": req.Description,
 		"screenshots": req.Screenshots,
 		"poster":      req.Poster,
-		"mediainfo":   req.MediaInfo,
+		"media_info":  req.MediaInfo, // §59.56 审计: 列名笔误同族第四处（mediainfo→media_info）
 		"tags":        req.Tags,
 		"reviewed":    true,
 	}
