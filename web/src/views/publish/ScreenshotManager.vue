@@ -53,25 +53,13 @@
         </div>
       </div>
 
-      <!-- 右侧：大图预览（§59.52: ImageGroup 全量预览——点任意图进入可翻页查看所有截图） -->
+      <!-- 右侧：按顺序平铺全部截图（§59.52: 纵向列表一次看全，点任一放大） -->
       <div class="preview-panel">
-        <a-image-preview-group>
-          <a-image
-            v-if="selectedIndex >= 0 && selectedIndex < screenshots.length"
-            :src="screenshots[selectedIndex]"
-            style="max-width: 100%; max-height: 500px; border-radius: 4px; cursor: zoom-in"
-          />
-          <!-- 隐藏其余图片：仅注册进 group 供翻页，不占布局 -->
-          <a-image
-            v-for="(u, i) in screenshots"
-            v-show="false"
-            :key="i"
-            :src="u"
-          />
-        </a-image-preview-group>
-        <div v-if="!screenshots.length" class="preview-empty">
-          <InboxOutlined style="font-size: 32px; color: #d9d9d9" />
-          <p>选择左侧截图查看大图</p>
+        <div class="preview-stack">
+          <div v-for="(u, i) in screenshots" :key="i" class="preview-item">
+            <span class="preview-idx">{{ i + 1 }}</span>
+            <a-image :src="u" style="width: 100%; border-radius: 4px; cursor: zoom-in" />
+          </div>
         </div>
       </div>
     </div>
@@ -84,7 +72,7 @@
 
     <!-- 截图统计 -->
     <div v-if="screenshots.length" class="stats-hint">
-      共 {{ screenshots.length }} 张截图 · 拖拽调整顺序 · 点击大图可翻页查看全部
+      共 {{ screenshots.length }} 张截图 · 拖拽调整顺序 · 点击任一图片查看大图
     </div>
   </div>
 </template>
@@ -257,22 +245,37 @@ function onDragEnd() {
   background: #fff;
 }
 
-/* 右侧预览 */
+/* 右侧预览：纵向平铺（§59.52） */
 .preview-panel {
   flex: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
   background: #fafafa;
   border-radius: 4px;
-  padding: 16px;
+  padding: 12px;
   min-height: 400px;
+  max-height: 500px;
+  overflow-y: auto;
 }
-.preview-empty {
+.preview-stack {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  gap: 12px;
+}
+.preview-item {
+  position: relative;
+}
+.preview-idx {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.preview-empty {
+  display: none;
   height: 100%;
   color: #999;
 }
