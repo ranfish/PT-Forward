@@ -44,6 +44,7 @@ type PublishTorrentsHandler struct {
 	metadataFetcher MetadataFetcherProvider
 	complianceChecker *compliance.Checker
 	seedPipeline       SeedArtifactAnalyzer
+	shotStrategy       ScreenshotStrategyRunner
 	ptgen              PTGenAnalyzer
 	resourceResolver   *publish.ResourceResolver
 	logger         *zap.Logger
@@ -136,11 +137,17 @@ func (h *PublishTorrentsHandler) SetDeclarationFilter(f *publish.DeclarationFilt
 func (h *PublishTorrentsHandler) SetMetadataFetcher(f MetadataFetcherProvider)      { h.metadataFetcher = f }
 func (h *PublishTorrentsHandler) SetComplianceChecker(c *compliance.Checker)        { h.complianceChecker = c }
 func (h *PublishTorrentsHandler) SetSeedPipeline(p SeedArtifactAnalyzer)             { h.seedPipeline = p }
+func (h *PublishTorrentsHandler) SetScreenshotStrategyRunner(p ScreenshotStrategyRunner) { h.shotStrategy = p }
 func (h *PublishTorrentsHandler) SetPTGenAnalyzer(p PTGenAnalyzer)                    { h.ptgen = p }
 
 // §59.21: 本地产物分析接口（只跑 mediainfo，不跑截图）
 type SeedArtifactAnalyzer interface {
 	AnalyzeLocalArtifacts(ctx context.Context, name, savePath string) (map[string]interface{}, error)
+}
+
+// §59.53: 采集链截图策略（pipeline 实现）——auto 全策略/远程只转存
+type ScreenshotStrategyRunner interface {
+	ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool) []string
 }
 
 // PTGenAnalyzer PTGen 查询接口（§59.42 海报 fallback 链用）
@@ -2440,6 +2447,11 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 	if meta != nil && meta.Screenshots != "" && meta.Screenshots != "[]" {
 		go h.purgeDeadScreenshots(meta.InfoHash, meta.SiteName)
 	}
+	// §59.53: 采集链截图策略（双跑之批量/单种获取）——白名单逐张/转存/差额 mpv 补足/
+	// 无图全量（本地）；远程只转存。异步执行（mpv 分钟级），完成后落库覆盖。
+	if meta != nil && h.shotStrategy != nil && savePath != "" {
+		go h.applyScreenshotStrategy(meta.InfoHash, meta.SiteName, name, savePath, isLocal)
+	}
 
 	// §59.21: is_local=true 时落库本地 mediainfo（localMI 已在搜索前获取，直接复用）
 	if isLocal && localMI != "" && meta != nil {
@@ -3239,7 +3251,8 @@ func (h *PublishTorrentsHandler) checkRequiredFields(meta *model.TorrentMetadata
 	if meta.Poster == "" {
 		missing = append(missing, "poster")
 	}
-	if meta.Screenshots == "" {
+	// §59.53: 门槛升级——非空 → 解析后 < MinScreenshots 即缺失（凑数+审核双保险）
+	if len(model.ParseScreenshotColumn(meta.Screenshots)) < publish.MinScreenshots {
 		missing = append(missing, "screenshots")
 	}
 	if meta.Description == "" {
@@ -3750,4 +3763,50 @@ func (h *PublishTorrentsHandler) purgeDeadScreenshots(infoHash, siteName string)
 		zap.Int("total", len(urls)),
 		zap.Int("kept", len(kept)),
 		zap.Int("purged", len(dead)))
+}
+
+// applyScreenshotStrategy §59.53: 采集链截图策略异步执行（goroutine 内）。
+// 读当前库值（§59.49 purge 可能已完成或竞态进行中——本函数读到的即输入，
+// purge 完成后若清掉了死链，其 Update 与本函数 Update 全列覆盖 last-write-wins，
+// 两侧产物均为活链无害）→ 策略 → 落库。
+func (h *PublishTorrentsHandler) applyScreenshotStrategy(infoHash, siteName, name, savePath string, isLocal bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	strategyCtx, scancel := context.WithTimeout(ctx, 4*time.Minute)
+	defer scancel()
+
+	var meta model.TorrentMetadata
+	if err := h.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		First(&meta).Error; err != nil {
+		return
+	}
+	source := model.ParseScreenshotColumn(meta.Screenshots)
+	final := h.shotStrategy.ApplyScreenshotStrategy(strategyCtx, name, savePath, source, isLocal)
+	if len(final) == len(source) {
+		// 无变化（无图且截图失败/全白名单保留/远程无图）——不覆盖
+		same := true
+		for i := range final {
+			if final[i] != source[i] {
+				same = false
+				break
+			}
+		}
+		if same {
+			return
+		}
+	}
+	data, _ := json.Marshal(final)
+	if final == nil {
+		data = []byte("[]")
+	}
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		Update("screenshots", string(data))
+	h.logger.Info("screenshot strategy applied",
+		zap.String("hash", infoHash[:10]),
+		zap.Bool("local", isLocal),
+		zap.Int("source", len(source)),
+		zap.Int("final", len(final)))
 }
