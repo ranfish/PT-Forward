@@ -105,7 +105,16 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 		//   不足 MinScreenshots → mpv 差额补足（补足者不竞争）
 		//   0 张 → mpv 全量（按 Count 配置）
 		//   mpv 失败/不可用 → 有几张算几张（<3 由审核门槛挡，§59.53 第7点）
-		result.ScreenshotURLs = g.processScreenshotsAuto(ctx, sourceScreenshots)
+		// §59.53 补丁: 上限 MinScreenshots+5=8 张（疯狂动物城2 129 张案例——
+		// 发布者异常全贴图集，全量转存慢且发布简介无用；库值保留全量可手动加回）
+		autoSource := sourceScreenshots
+		if len(autoSource) > MinScreenshots+5 {
+			autoSource = autoSource[:MinScreenshots+5]
+			g.logger.Info("screenshot auto capped",
+				zap.Int("source_total", len(sourceScreenshots)),
+				zap.Int("capped_to", MinScreenshots+5))
+		}
+		result.ScreenshotURLs = g.processScreenshotsAuto(ctx, autoSource)
 		if len(result.ScreenshotURLs) < MinScreenshots {
 			need := MinScreenshots - len(result.ScreenshotURLs)
 			var localShots []string
