@@ -430,6 +430,9 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/manual-forward/preview/", mfHandler)
 	mux.Handle("/api/v1/manual-forward/refresh", mfHandler)
 	mux.Handle("/api/v1/manual-forward/refresh/", mfHandler)
+	// §59.51: 后台截图任务 + 轮询（长任务脱离 HTTP 请求生命周期）
+	mux.Handle("/api/v1/manual-forward/screenshot-capture", mfHandler)
+	mux.Handle("/api/v1/manual-forward/screenshot-capture-progress", mfHandler)
 	mux.Handle("/api/v1/manual-forward/parse-title", mfHandler)
 
 	if rt.orphanHandler != nil {

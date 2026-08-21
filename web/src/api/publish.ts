@@ -179,6 +179,13 @@ export const manualForwardApi = {
   refresh(data: { type: string; name: string; savePath?: string; infoHash?: string; siteName?: string; screenshots?: string[] }) {
     return client.post<ApiResponse<Record<string, unknown>>>('/manual-forward/refresh', data)
   },
+  // §59.51: 后台截图任务（is_local=true 专用，长任务轮询）
+  startScreenshotCapture(data: { name: string; savePath: string; clientId: string; infoHash?: string; siteName?: string }) {
+    return client.post<ApiResponse<{ started: boolean }>>('/manual-forward/screenshot-capture', data)
+  },
+  screenshotCaptureProgress() {
+    return client.get<ApiResponse<{ active: boolean; status: string; name: string; screenshots: string[] | null; error: string }>>('/manual-forward/screenshot-capture-progress')
+  },
 }
 
 export const publishDataApi = {

@@ -26,6 +26,7 @@ type ManualForwardHandler struct {
 	db            *gorm.DB
 	logger        *zap.Logger
 	pipeline      PublishPipeline
+	capture       screenshotCaptureState // §59.51 后台截图任务（全局单例）
 	siteMgr       SiteManager
 	clientMgr     MFClientProvider
 	seedingCache  SeedingCacheProvider
@@ -144,6 +145,10 @@ func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		} else {
 			Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
 		}
+	case strings.HasSuffix(path, "/manual-forward/screenshot-capture") && r.Method == http.MethodPost:
+		h.handleScreenshotCaptureStart(w, r)
+	case strings.HasSuffix(path, "/manual-forward/screenshot-capture-progress") && r.Method == http.MethodGet:
+		h.handleScreenshotCaptureProgress(w, r)
 	case strings.HasSuffix(path, "/manual-forward/refresh"):
 		if r.Method == http.MethodPost {
 			h.handleRefresh(w, r)
@@ -1485,6 +1490,9 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 			}
 			break
 		}
+		// §59.51: 本地 mpv 截图已迁移后台任务（POST /manual-forward/screenshot-capture +
+		// 轮询 progress）——长任务绑 HTTP 请求生命周期会被前端超时取消（§59.50 审计）。
+		// 本分支保留兼容旧客户端（同步退化行为），新前端按 seedIsLocal 分流不再调此路径。
 		// §59.50: 本地 mpv 截图（local_upload 策略）——原 AnalyzeLocalArtifacts 是
 		// MI 场景的 source_direct（跳过截图恒返回空），mpv/字幕检测/HDR/图床上传
 		// 能力从未接到本按钮。源站截图作 fallback（本地全失败时回源站值）。
@@ -1629,4 +1637,100 @@ func (h *ManualForwardHandler) resolvePTGenQuery(ctx context.Context, infoHash, 
 		}
 	}
 	return fallbackName
+}
+
+// screenshotCaptureState §59.51: 后台截图任务全局单例状态（内存态，batch-fetch 同款）。
+type screenshotCaptureState struct {
+	mu         sync.Mutex
+	active     bool
+	status     string // running / done / failed
+	name       string // 发起时的种子名（前端会话一致性校验）
+	screenshots []string
+	error      string
+}
+
+// handleScreenshotCaptureStart §59.51: 启动后台 mpv 截图任务。
+// is_local=true 专用（守卫拒绝非本地下载器）；全局单例；结果落库。
+func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWriter, r *http.Request) {
+	if h.pipeline == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "pipeline 未配置")
+		return
+	}
+	var req struct {
+		Name     string `json:"name"`
+		SavePath string `json:"savePath"`
+		ClientID string `json:"clientId"`
+		InfoHash string `json:"infoHash"`
+		SiteName string `json:"siteName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.SavePath == "" || req.ClientID == "" {
+		Error(w, http.StatusBadRequest, 40001, "name/savePath/clientId 必填")
+		return
+	}
+
+	// §59.51 遗漏2: is_local 守卫——本端点只服务本地下载器
+	var client model.ClientConfig
+	if err := h.db.WithContext(r.Context()).Where("name = ?", req.ClientID).First(&client).Error; err != nil || !client.IsLocal {
+		Error(w, http.StatusBadRequest, 40001, "该下载器非本地（is_local=false 请走源站重获）")
+		return
+	}
+
+	// 全局单例
+	h.capture.mu.Lock()
+	if h.capture.active {
+		busy := h.capture.name
+		h.capture.mu.Unlock()
+		Error(w, http.StatusConflict, 40901, "截图任务进行中: "+busy)
+		return
+	}
+	h.capture.active = true
+	h.capture.status = "running"
+	h.capture.name = req.Name
+	h.capture.screenshots = nil
+	h.capture.error = ""
+	h.capture.mu.Unlock()
+
+	go func() {
+		// §59.51: 脱离 HTTP 请求生命周期（§59.50 审计根因）——Background + 5min
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		shots := h.pipeline.CaptureScreenshots(ctx, req.Name, req.SavePath, nil)
+
+		h.capture.mu.Lock()
+		defer h.capture.mu.Unlock()
+		h.capture.active = false
+		h.capture.screenshots = shots
+		if len(shots) > 0 {
+			h.capture.status = "done"
+		} else {
+			h.capture.status = "failed"
+			h.capture.error = "mpv 截图失败（本地无可用视频文件或上传全失败）"
+		}
+
+		// 落库（事实源：编辑器重新打开从 detail 读到）
+		if len(shots) > 0 && req.InfoHash != "" && h.db != nil {
+			data, _ := json.Marshal(shots)
+			q := h.db.Model(&model.TorrentMetadata{}).Where("info_hash = ?", req.InfoHash)
+			if req.SiteName != "" {
+				q = q.Where("site_name = ?", req.SiteName)
+			}
+			q.Update("screenshots", string(data))
+		}
+	}()
+
+	Success(w, map[string]interface{}{"started": true})
+}
+
+// handleScreenshotCaptureProgress §59.51: 轮询任务状态。
+func (h *ManualForwardHandler) handleScreenshotCaptureProgress(w http.ResponseWriter, r *http.Request) {
+	h.capture.mu.Lock()
+	defer h.capture.mu.Unlock()
+	Success(w, map[string]interface{}{
+		"active":      h.capture.active,
+		"status":      h.capture.status,
+		"name":        h.capture.name,
+		"screenshots": h.capture.screenshots,
+		"error":       h.capture.error,
+	})
 }
