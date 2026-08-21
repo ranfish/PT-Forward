@@ -3,12 +3,10 @@ package publish
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/screenshot"
@@ -91,8 +89,6 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 		miCh <- miResult{}
 	}
 
-	validSourceShots := g.validateScreenshots(ctx, sourceScreenshots)
-
 	switch strategy {
 	case "source_direct":
 		result.ScreenshotURLs = sourceScreenshots
@@ -104,17 +100,21 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 			result.ScreenshotURLs = sourceScreenshots
 		}
 	default:
-		if len(validSourceShots) >= 3 {
-			result.ScreenshotURLs = g.rehostScreenshots(ctx, validSourceShots)
-		}
-		if len(result.ScreenshotURLs) < 3 {
-			localShots := g.captureLocalScreenshots(ctx, videoPath)
-			if len(localShots) > len(result.ScreenshotURLs) {
-				result.ScreenshotURLs = localShots
+		// §59.53 auto 重构（探活归位 §59.49——调用方传入列表已探活，此处不再 validate）：
+		//   白名单逐张保留 / 非白名单逐张转存（无 ≥3 阈值）
+		//   不足 MinScreenshots → mpv 差额补足（补足者不竞争）
+		//   0 张 → mpv 全量（按 Count 配置）
+		//   mpv 失败/不可用 → 有几张算几张（<3 由审核门槛挡，§59.53 第7点）
+		result.ScreenshotURLs = g.processScreenshotsAuto(ctx, sourceScreenshots)
+		if len(result.ScreenshotURLs) < MinScreenshots {
+			need := MinScreenshots - len(result.ScreenshotURLs)
+			var localShots []string
+			if len(result.ScreenshotURLs) == 0 {
+				localShots = g.captureLocalScreenshots(ctx, videoPath) // 全量（按 Count）
+			} else {
+				localShots = g.captureLocalScreenshotsCount(ctx, videoPath, need) // 差额
 			}
-		}
-		if len(result.ScreenshotURLs) == 0 {
-			result.ScreenshotURLs = sourceScreenshots
+			result.ScreenshotURLs = append(result.ScreenshotURLs, localShots...) // 源站在前补足在后
 		}
 	}
 
@@ -133,30 +133,6 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 	}
 
 	return result, nil
-}
-
-func (g *PublishArtifactGenerator) validateScreenshots(ctx context.Context, urls []string) []string {
-	if len(urls) == 0 {
-		return nil
-	}
-	client := &http.Client{Timeout: 10 * time.Second}
-	var valid []string
-	for _, u := range urls {
-		req, err := http.NewRequestWithContext(ctx, "HEAD", u, nil)
-		if err != nil {
-			continue
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			g.logger.Debug("screenshot validation failed", zap.String("url", u), zap.Error(err))
-			continue
-		}
-		resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			valid = append(valid, u)
-		}
-	}
-	return valid
 }
 
 func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, videoPath string) []string {
@@ -279,4 +255,55 @@ func (g *PublishArtifactGenerator) findLargestVideo(dir string) (string, error) 
 	})
 
 	return candidates[0], nil
+}
+
+// processScreenshotsAuto §59.53: 源站截图逐张处置——白名单（pixhost 家族/
+// doubaninfo）保留原样，非白名单转存到系统图床。转存失败保留源 URL（活链有价值，
+// §59.53 第3点：转存失败≠死链）。
+func (g *PublishArtifactGenerator) processScreenshotsAuto(ctx context.Context, urls []string) []string {
+	if len(urls) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(urls))
+	for _, u := range urls {
+		if IsTrustedImageSource(u) {
+			out = append(out, u) // 白名单保留
+			continue
+		}
+		if g.imageHostMgr == nil {
+			out = append(out, u) // 无图床配置保留原样
+			continue
+		}
+		if r, err := g.imageHostMgr.Rehost(ctx, u); err == nil && r != nil && r.URL != "" {
+			out = append(out, r.URL)
+		} else {
+			g.logger.Warn("screenshot rehost failed, keeping source",
+				zap.String("url", u[:min(60, len(u))]), zap.Error(err))
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
+// captureLocalScreenshotsCount §59.53: mpv 截指定张数（差额补足）。
+// 内部复用全量截图后取前 n 张（时间点均布，前 n 张即为按序补足）。
+func (g *PublishArtifactGenerator) captureLocalScreenshotsCount(ctx context.Context, videoPath string, n int) []string {
+	if n <= 0 {
+		return nil
+	}
+	all := g.captureLocalScreenshots(ctx, videoPath)
+	if len(all) <= n {
+		return all
+	}
+	return all[:n]
+}
+
+// ProcessScreenshotsRemote §59.53 第6点: 远程下载器策略——只逐张处置（白名单保留/
+// 非白名单转存），不截图。0 张返回 nil（留空，审核挡）。
+func (g *PublishArtifactGenerator) ProcessScreenshotsRemote(urls []string) []string {
+	if len(urls) == 0 {
+		return nil
+	}
+	// 无 ctx 需求时用 context.Background（Rehost 内部有自身超时）
+	return g.processScreenshotsAuto(context.Background(), urls)
 }

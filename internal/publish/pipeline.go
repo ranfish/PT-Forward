@@ -2861,3 +2861,25 @@ func (p *Pipeline) CaptureScreenshots(ctx context.Context, name, savePath string
 	}
 	return artifact.ScreenshotURLs
 }
+
+// ApplyScreenshotStrategy §59.53: 采集链截图策略——按库内截图值跑 auto
+// （白名单逐张/转存/差额补足/无图全量），isLocal=false 时只转存不截图（远程无图留空）。
+// 返回最终截图列表（落库由调用方执行）。
+func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath string, sourceScreenshots []string, isLocal bool) []string {
+	if p.artifactGenerator == nil {
+		return sourceScreenshots
+	}
+	torrentDir := savePath
+	if entryPath, _ := findTorrentEntry(savePath, name); entryPath != "" {
+		torrentDir = entryPath
+	}
+	if !isLocal {
+		// §59.53 第6点: 远程只转存（白名单逐张判定），无图留空——不截图
+		return p.artifactGenerator.ProcessScreenshotsRemote(sourceScreenshots)
+	}
+	artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", sourceScreenshots, "auto")
+	if err != nil || artifact == nil {
+		return sourceScreenshots
+	}
+	return artifact.ScreenshotURLs
+}

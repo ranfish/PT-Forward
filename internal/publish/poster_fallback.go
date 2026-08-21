@@ -22,6 +22,15 @@ var trustedPosterSuffixes = []string{
 	"pixho.st", // pixhost 短域家族（§59.42 用户补充）
 }
 
+// MinScreenshots §59.53: 简介截图审核门槛（全局常量，站点差异由用户审核判断）。
+const MinScreenshots = 3
+
+// IsTrustedImageSource 判定图片 URL 是否可信图源（§59.53 从海报白名单泛化，
+// 海报与截图共用：pixhost 家族 + doubaninfo）。空 URL 返回 false。
+func IsTrustedImageSource(u string) bool {
+	return IsTrustedPoster(u)
+}
+
 // IsTrustedPoster 判定海报 URL 是否可信图源（域名后缀匹配）。
 // 空 URL 返回 false（无可信性可言，走 fallback 链）。
 func IsTrustedPoster(posterURL string) bool {

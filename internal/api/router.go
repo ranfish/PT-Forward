@@ -206,6 +206,8 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	}
 	if pipeline != nil {
 		rt.publishTorrentsHandler.SetSeedPipeline(pipeline)
+	// §59.53: 采集链截图策略
+	rt.publishTorrentsHandler.SetScreenshotStrategyRunner(pipeline)
 	// §59.42: PTGen 海报 fallback 链
 	rt.publishTorrentsHandler.SetPTGenAnalyzer(pipeline)
 	}
