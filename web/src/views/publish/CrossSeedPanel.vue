@@ -406,7 +406,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { CheckCircleFilled, ReloadOutlined } from '@ant-design/icons-vue'
 import { manualForwardApi, publishDataApi, publishApi, publishTorrentsApi, seedConfigApi } from '@/api/publish'
@@ -852,8 +852,57 @@ async function onSourceSiteChange() {
 }
 
 // --- Refresh ---
+// §59.51: 后台截图任务——启动 + 2s 轮询 + 会话一致性校验
+let capturePollTimer: ReturnType<typeof setInterval> | null = null
+
+async function startScreenshotCaptureTask() {
+  if (!selectedTorrent.value) return
+  refreshing.value = 'screenshots'
+  const taskName = selectedTorrent.value.name
+  try {
+    await manualForwardApi.startScreenshotCapture({
+      name: taskName,
+      savePath: selectedTorrent.value.save_path || '',
+      clientId: String(selectedTorrent.value.client_id || ''),
+      infoHash: selectedTorrent.value.info_hash,
+      siteName: currentSourceSite.value || selectedTorrent.value.source_site || '',
+    })
+    message.info('截图中…（约 1-2 分钟）')
+    capturePollTimer = setInterval(async () => {
+      try {
+        const resp = await manualForwardApi.screenshotCaptureProgress()
+        const st = resp.data?.data
+        if (!st || st.active) return
+        if (capturePollTimer) { clearInterval(capturePollTimer); capturePollTimer = null }
+        refreshing.value = ''
+        if (st.status === 'done' && st.screenshots && st.screenshots.length > 0) {
+          // §59.51 遗漏5: 会话一致性——用户可能已切换到另一个种子
+          if (selectedTorrent.value && selectedTorrent.value.name === taskName) {
+            form.value.screenshots = st.screenshots
+            message.success(`截图完成（${st.screenshots.length} 张）`)
+          } else {
+            message.info(`「${taskName.slice(0, 30)}」截图已完成，重新打开编辑器可见`)
+          }
+        } else {
+          message.error('截图失败: ' + (st.error || '未知错误'))
+        }
+      } catch {
+        // 轮询单次失败忽略（网络抖动），下轮继续
+      }
+    }, 2000)
+  } catch (e: unknown) {
+    refreshing.value = ''
+    message.error(`截图任务启动失败: ${(e as Error).message}`)
+  }
+}
+
 async function doRefresh(type: string) {
   if (!selectedTorrent.value) return
+  // §59.51: 本地截图走后台任务（长任务轮询），源站截图保持旧同步链
+  if (type === 'screenshots' && seedIsLocal.value) {
+    await startScreenshotCaptureTask()
+    return
+  }
   refreshing.value = type
   try {
     const payload: { type: string; name: string; savePath?: string; infoHash?: string; siteName?: string; screenshots?: string[]; clientId?: string } = {
@@ -1246,3 +1295,8 @@ function stopCandidatePoll() {
   gap: 8px;
 }
 </style>
+
+// §59.51: 组件卸载清轮询
+onUnmounted(() => {
+  if (capturePollTimer) { clearInterval(capturePollTimer); capturePollTimer = null }
+})
