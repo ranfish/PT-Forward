@@ -274,7 +274,7 @@
             <!-- Tab 3: 视频截图 -->
             <a-tab-pane key="screenshots" tab="视频截图">
               <div style="margin-bottom: 12px; display: flex; gap: 8px">
-                <a-button :loading="refreshing === 'screenshots'" @click="doRefresh('screenshots')">{{ seedIsLocal ? '重新获取截图（mpv）' : '从源站重新获取截图' }}</a-button>
+                <a-button :loading="refreshing === 'screenshots'" @click="doRefresh('screenshots')">{{ seedIsLocal ? '重新获取截图' : '从源站重新获取截图' }}</a-button>
                 <a-button :loading="refreshing === 'rehost_screenshots'" :disabled="form.screenshots.length === 0" @click="doRefresh('rehost_screenshots')">一键转存到图床</a-button>
               </div>
               <ScreenshotManager
