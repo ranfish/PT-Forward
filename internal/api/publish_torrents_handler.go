@@ -1905,7 +1905,7 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 		"title":       req.Title,
 		"subtitle":    req.Subtitle,
 		"description": req.Description,
-		"screenshots": req.Screenshots,
+		"screenshots": model.NormalizeScreenshotColumn(req.Screenshots), // §59.59 附二: 透传写点归一（原碰巧正确，靠前端 JSON.stringify）
 		"poster":      req.Poster,
 		"media_info":  req.MediaInfo, // §59.56 审计: 列名笔误同族第四处（mediainfo→media_info）
 		"tags":        req.Tags,
@@ -3535,7 +3535,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	// 写入编辑字段
 	updates := map[string]interface{}{
 		"poster":       req.Poster,
-		"screenshots":  strings.Join(req.Screenshots, "\n"),
+		"screenshots":  model.FormatScreenshotColumn(req.Screenshots), // §59.59 附二: 写侧单点（原 Join("\n") 第五处残留）
 		"description":  req.Description,
 	}
 	// §59.26: 标签编辑（JSON 数组字符串）
@@ -3547,7 +3547,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 
 	// 9 字段校验 → Reviewed
 	meta.Poster = req.Poster
-	meta.Screenshots = strings.Join(req.Screenshots, "\n")
+	meta.Screenshots = model.FormatScreenshotColumn(req.Screenshots)
 	meta.Description = req.Description
 	missing := h.checkRequiredFields(meta)
 	updates["reviewed"] = len(missing) == 0

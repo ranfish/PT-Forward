@@ -1,11 +1,14 @@
-// Package model screenshots 列解析（§59.47）。
+// Package model screenshots 列解析与写入（§59.47 / §59.59 附二）。
 //
 // torrent_metadata.screenshots 列存在两种历史格式：
-//   - JSON 数组字符串（现行写入格式，fetcher.buildMetadata json.Marshal）
+//   - JSON 数组字符串（现行权威格式，fetcher.buildMetadata json.Marshal）
 //   - 换行分隔（老 rss_detail 约定，理论存在的历史行）
 //
 // 读取方（detail API / refresh / 转存链）必须经 ParseScreenshotColumn 统一解析，
 // 禁止直接 strings.Split——写读格式分裂曾致所有截图显示为 1 张损坏图（§59.47）。
+// 写入方必须经 FormatScreenshotColumn / NormalizeScreenshotColumn——禁止 Join("\n")
+// 或裸透传（§59.59 附二第五处残留：handlePutSeed/persistAnalysis 换行写回，
+// e96ec7d0e1 实锤；读侧兼容掩盖了分裂，列格式卫生靠单点机制不靠记忆）。
 package model
 
 import (
@@ -40,4 +43,23 @@ func ParseScreenshotColumn(s string) []string {
 		}
 	}
 	return out
+}
+
+// FormatScreenshotColumn URL 列表 → 列值（JSON 数组字符串，权威格式）。
+// 空列表写 "[]"（与空串读侧语义等同，但保持列格式统一）。
+func FormatScreenshotColumn(urls []string) string {
+	if len(urls) == 0 {
+		return "[]" // json.Marshal(nil) 产出 "null"——§59.57 同款坑，显式拦截
+	}
+	data, err := json.Marshal(urls)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
+// NormalizeScreenshotColumn 透传写点归一：任意历史格式（换行/裸 URL/JSON）→ 权威 JSON。
+// JSON 输入幂等。用于前端原样回传或手动输入的写路径。
+func NormalizeScreenshotColumn(raw string) string {
+	return FormatScreenshotColumn(ParseScreenshotColumn(raw))
 }

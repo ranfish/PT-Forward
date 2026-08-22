@@ -787,21 +787,21 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 		fetchSource = fs
 	}
 
-	screenshots := ""
+	// §59.59 附二: 写侧单点——原 Join("\n") 第五处残留（换行落库，读侧兼容掩盖分裂）
+	var shotURLs []string
 	if ss, ok := result["screenshots"]; ok {
 		switch v := ss.(type) {
 		case []string:
-			screenshots = strings.Join(v, "\n")
+			shotURLs = v
 		case []interface{}:
-			parts := make([]string, 0, len(v))
 			for _, s := range v {
 				if str, ok := s.(string); ok {
-					parts = append(parts, str)
+					shotURLs = append(shotURLs, str)
 				}
 			}
-			screenshots = strings.Join(parts, "\n")
 		}
 	}
+	screenshots := model.FormatScreenshotColumn(shotURLs)
 
 	title, _ := result["title"].(string)
 	desc, _ := result["description"].(string)
