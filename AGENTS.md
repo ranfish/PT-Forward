@@ -1,5 +1,17 @@
 # PT-Forward 项目 Agent 指令
 
+## Skills 索引（按需加载，正文在 .claude/skills/）
+
+| skill | 用途 | 触发时机 |
+|-------|------|---------|
+| `ptf-dev-protocol` | 开发前协议：设计文档优先 + 复用优先 | 任何开发/修复/优化动手前 |
+| `ptf-quality-gate` | 灵魂四问 + 回归审核 + 强制清单 | 任何代码改动后、commit 前 |
+| `ptf-deploy` | 编译部署脚本 + 打 tag 发布 | 部署到 29、发版时 |
+| `ptf-infra-notes` | mpv 编译/截图引擎/采集策略/CookieCloud/Playwright | 涉及基础设施时 |
+| `pt-idx-ops` | PT-IDX 云端指纹服务运维 | 操作 PT-IDX 时 |
+
+> ⚠️ 强制流程内容（铁律/灵魂四问/强制清单）已内嵌本文件，**必须执行**；skills 是其扩展细节，加载 skill 不替代本文件的强制项。
+
 ## 开发流程铁律（最高优先级，v0.0.606 教训）
 
 **任何开发、修复、优化，动手前必须先查设计文档**：
@@ -31,7 +43,7 @@
 
 **版本**：v0.0.631（已发布）。
 
-**当前主线**：**种子配置页（数据层）打磨中**。字典（§59.35）已完成后回线，近期完成：§59.42 海报可信图源白名单+PTGen fallback（doubaninfo/pixhost 家族+pixho.st，Tab2 闭环）；§59.43 全站字节显示统一（KiB/MiB/GiB+两位）+ ESLint 硬约束防私有副本；§59.44 资源视图（虚拟种子）——(client,path,name) 三元组键 + ResourceResolver 正式接口，修复 49% 编辑 404（158/158 组全通）；§59.45 Tab4 简介对齐 PTGen 为准——朋友站 kdouban 框逆向提取（139 MI 污染修复面，8 发布者自贴保留）；§59.46 Tab4 PTGen 四项修复——doubaninfo format 解析/清空 BBCode 缓存/展示兜底/kdouban 空 body 回退（行业基准：PT-Gen 数据类型 = format BBCode，examples 四项目实证）；§59.47 screenshots 写读格式分裂修复（ParseScreenshotColumn 四消费点，Tab3 数据层）；§59.48 keepfrds 截图 URL 三层展开（缩略图 403 → imgfetch 代理 → picgo 原图直链，采集层归一；v0.0.675 补丁：NormalizeImageURL 保留 path 大小写——base64 段被 lower 破坏是二次根因）；§59.49 采集时图片探活——海报死链清空（§59.42 链③改语义）+ 截图清死留活/全死全清，字段列诚实化（获取时点存活状态即绿红依据）。**Tab3 打磨进行中**（243 为本地环境）：§59.50 mpv 按钮接线 + §59.51 后台截图任务+轮询已完成（v0.0.678：长任务脱离 HTTP 生命周期——243 实测上传 4/5 context canceled 根因修复；API 冒烟守卫/进度端点通过，待 243 OTA 端到端）；§59.52 预览全量化（纵向平铺+点击放大）+ 按钮文案简化；§59.53 auto 截图策略重构七点定案落地（白名单逐张保留/非白名单转存/差额 mpv 补足/无图全量/远程只转存无图留空/checkRequiredFields ≥3 门槛/采集链双跑）；§59.54 批量粘贴+恢复引用完成（三形态解析/转存前快照还原，纯前端）。v0.0.684 补丁：auto 截图上限 8 张（129 张异常案例）+ ptgen_dead 探活语义核对确认（v0.0.676 已正确）。243 全量 148 种子已获取验证（五策略形态全触发/六 Tab 数据完整/142+6 重试全通）；§59.55 获取链 PTGen 双字段消费（一次调用产海报+简介——Tab4 落库与 PTGen 查询不一致的根因修复，29 实测 description kdouban 484 字 → format 1735 字）；§59.56 本地 MI 落库列名笔误修复（v0.0.686-687 同族四处终清：fetchSingleTorrent + handleSaveSeedData 两处列名 + 前端静默 catch——243 实测 760 次静默失败、148 组本地 MI 全灭根因；GORM Updates/Update 必查 Error 并入规范）；§59.57 截图探活与策略竞态修复（v0.0.688：purge 内联 strategy 前序串行化——原双 goroutine 竞态致 strategy 读 purge 前死链→same 早退→永不 mpv 补图，ptpimg.me 全死链 8 组复现）。**243 全量 148 组终态全绿：MI 148/148 local、截图 148/148 ≥3 张——Tab3 端到端总验证完成，编辑器六 Tab 全部收官**。遗留观察：批量链并发截图限流已实施（§59.58 信号量 5 路，v0.0.689）。编辑器六 Tab 已闭环：Tab2 海报/Tab4 简介/Tab5 MI。**Tab 3 已收官（§59.47-54 八轮：数据层三重修复/mpv 接线/后台任务/预览平铺/auto 策略/批量粘贴/恢复引用）。下一步：243 OTA 后 Tab3 端到端总验证 → 预览→审核闭环全流程 → 发布页重构（tag_config 激活，§56.22）。**
+**当前主线**：**种子配置页（数据层）打磨中**。字典（§59.35）已完成后回线，近期完成：§59.42 海报可信图源白名单+PTGen fallback（doubaninfo/pixhost 家族+pixho.st，Tab2 闭环）；§59.43 全站字节显示统一（KiB/MiB/GiB+两位）+ ESLint 硬约束防私有副本；§59.44 资源视图（虚拟种子）——(client,path,name) 三元组键 + ResourceResolver 正式接口，修复 49% 编辑 404（158/158 组全通）；§59.45 Tab4 简介对齐 PTGen 为准——朋友站 kdouban 框逆向提取（139 MI 污染修复面，8 发布者自贴保留）；§59.46 Tab4 PTGen 四项修复——doubaninfo format 解析/清空 BBCode 缓存/展示兜底/kdouban 空 body 回退（行业基准：PT-Gen 数据类型 = format BBCode，examples 四项目实证）；§59.47 screenshots 写读格式分裂修复（ParseScreenshotColumn 四消费点，Tab3 数据层）；§59.48 keepfrds 截图 URL 三层展开（缩略图 403 → imgfetch 代理 → picgo 原图直链，采集层归一；v0.0.675 补丁：NormalizeImageURL 保留 path 大小写——base64 段被 lower 破坏是二次根因）；§59.49 采集时图片探活——海报死链清空（§59.42 链③改语义）+ 截图清死留活/全死全清，字段列诚实化（获取时点存活状态即绿红依据）。**Tab3 打磨进行中**（243 为本地环境）：§59.50 mpv 按钮接线 + §59.51 后台截图任务+轮询已完成（v0.0.678：长任务脱离 HTTP 生命周期——243 实测上传 4/5 context canceled 根因修复；API 冒烟守卫/进度端点通过，待 243 OTA 端到端）；§59.52 预览全量化（纵向平铺+点击放大）+ 按钮文案简化；§59.53 auto 截图策略重构七点定案落地（白名单逐张保留/非白名单转存/差额 mpv 补足/无图全量/远程只转存无图留空/checkRequiredFields ≥3 门槛/采集链双跑）；§59.54 批量粘贴+恢复引用完成（三形态解析/转存前快照还原，纯前端）。v0.0.684 补丁：auto 截图上限 8 张（129 张异常案例）+ ptgen_dead 探活语义核对确认（v0.0.676 已正确）。243 全量 148 种子已获取验证（五策略形态全触发/六 Tab 数据完整/142+6 重试全通）；§59.55 获取链 PTGen 双字段消费（一次调用产海报+简介——Tab4 落库与 PTGen 查询不一致的根因修复，29 实测 description kdouban 484 字 → format 1735 字）；§59.56 本地 MI 落库列名笔误修复（v0.0.686-687 同族四处终清：fetchSingleTorrent + handleSaveSeedData 两处列名 + 前端静默 catch——243 实测 760 次静默失败、148 组本地 MI 全灭根因；GORM Updates/Update 必查 Error 并入规范）；§59.57 截图探活与策略竞态修复（v0.0.688：purge 内联 strategy 前序串行化——原双 goroutine 竞态致 strategy 读 purge 前死链→same 早退→永不 mpv 补图，ptpimg.me 全死链 8 组复现）。**243 全量 148 组终态全绿：MI 148/148 local、截图 148/148 ≥3 张——Tab3 端到端总验证完成，编辑器六 Tab 全部收官**。遗留观察：批量链并发截图限流已实施（§59.58 信号量 5 路，v0.0.689）。编辑器六 Tab 已闭环：Tab2 海报/Tab4 简介/Tab5 MI。**Tab 3 已收官（§59.47-58 九轮：数据层三重修复/mpv 接线/后台任务/预览平铺/auto 策略/批量粘贴/恢复引用/竞态修复/并发限流，243 全量 148 组终态全绿）。下一步：预览→审核闭环全流程 → 发布页重构（tag_config 激活，§56.22）。**
 
 **支线完成**：幽灵种子巡检 v2（§59.31）；Token Registry P1-P3（§59.27）；清 seen 重推（§59.33）；侧栏信息架构重排（§59.32）；Remux 规格解析修复（v0.0.629）；Tab1 片源写法与 Encode 判定 + DOM key 归一化（§59.34，v0.0.632-634，两轮审计）。
 
@@ -276,143 +288,15 @@
 3. **回归通过**：`go vet` + `go test` + `vue-tsc` + `eslint` 是否全部通过？
 4. **前端构建**：本次改动是否涉及 `web/` 目录？如果是，是否执行了 `vite build → cp -r web/dist frontend/dist`？`vue-tsc`/`eslint` 只是验证，**不是构建**。`go build` embed 的是 `frontend/dist`，不是 `web/src`。跳过构建 = 前端改动不生效。
 
-## 后端验证与部署
+## 验证与部署
 
-改完后端代码，回归审核通过后执行完整编译部署流程：
+后端/前端验证部署完整流程与脚本：见 skill `ptf-deploy`（`bash .claude/skills/ptf-deploy/scripts/build-backend.sh` / `build-frontend.sh` / `release-tag.sh vX.X.X`）。关键点：Go/Node 必须全路径（系统 PATH 无）；CGO_ENABLED=1；版本号 ldflags；前端三步缺一不可（vite build → cp dist → go build）；systemd 必须 Restart=always（OTA 兼容）。
 
-1. `go vet ./internal/... ./cmd/pt-forward/...`（**不要**用 `./...`）
-2. `go test ./internal/... -count=1 -timeout 180s`
-3. `CGO_ENABLED=1 /home/incast/.local/go/bin/go build -ldflags "-s -w -X main.version=$(git describe --tags --always --dirty)" -o pt-forward ./cmd/pt-forward/`
-4. `systemctl --user restart pt-forward && sleep 2 && systemctl --user is-active pt-forward`
+<!-- 镜像地址/Dockerfile/本地构建/CI 发布/用户部署：已抽出至 skill ptf-deploy（.claude/skills/ptf-deploy/SKILL.md）-->
 
-**systemd 服务配置（OTA 兼容）**：`~/.config/systemd/user/pt-forward.service` 的 `[Service]` 段必须用 `Restart=always`（**不能**用 `on-failure`）。原因：OTA 热更新流程是"下载新二进制 → 校验 → 原子 rename → 主动 `exit 0` 等待 systemd 重启"，`on-failure` 不重启正常退出，会导致 OTA 后服务永久停止、网页连不上。修改配置后执行 `systemctl --user daemon-reload`。`systemctl --user stop` 仍可正常停服务（`Restart=always` 只影响进程退出/崩溃，管理员 `stop` 不触发重启）。
+<!-- mpv 编译/截图工具引擎/数据采集策略/CookieCloud/Playwright 注意事项：已抽出至 skill ptf-infra-notes（.claude/skills/ptf-infra-notes/SKILL.md）-->
 
-## 前端验证与部署
-
-改完前端代码后跑 `vue-tsc -b --noEmit` + `npx eslint src/` 确认零错误。
-
-前端是 Go embed（`frontend/spa.go` 用 `//go:embed all:dist`），修改前端后必须重新构建并重新编译 Go 二进制才能生效，完整流程：
-
-1. `cd web/ && rm -rf node_modules/.vite && PATH="/home/incast/.local/bin:$PATH" ./node_modules/.bin/vite build`
-2. `rm -rf frontend/dist && cp -r web/dist frontend/dist`
-3. `CGO_ENABLED=1 /home/incast/.local/go/bin/go build -ldflags "-s -w -X main.version=$(git describe --tags --always --dirty)" -o pt-forward ./cmd/pt-forward/`
-4. `systemctl --user restart pt-forward && sleep 2 && systemctl --user is-active pt-forward`
-
-## Docker 镜像
-
-### 镜像地址
-
-- **GHCR**：`ghcr.io/ranfish/pt-forward:latest`（国外用户，public）
-- **Docker Hub**：`ranfish/pt-forward:latest`（国内用户，配合加速器）
-- 国内 Docker 加速器配置在 `/etc/docker/daemon.json`（`registry-mirrors`）
-
-### Dockerfile
-
-- 运行时镜像：`debian:trixie-slim`（glibc 2.40）
-- mpv：`bin/amd64/mpv-new`（1.5MB 精简编译版，编译方法见下方"mpv 编译"）
-- ffmpeg/ffprobe：`apt install ffmpeg`（不再用预编译二进制）
-- 中文字体：`apt install fonts-noto-cjk`
-- 数据卷：`/data`（SQLite）、`/config`（配置）、`/logs`（日志）
-- WORKDIR `/`（让 `./logs` → `/logs`）
-- ENTRYPOINT `/usr/local/bin/pt-forward`
-
-### Docker 本地构建
-
-```
-sg docker -c "docker build --build-arg VERSION=$(git describe --tags --always --dirty) -t pt-forward:latest ."
-```
-
-### GitHub Actions 自动发布
-
-- **docker-publish.yml**：push 到 main 或打 tag 时自动构建推送到 GHCR + Docker Hub
-- **release.yml**：打 tag `v*` 时自动编译二进制上传到 GitHub Release（OTA 用）
-- **GitHub Secrets**：`DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`（Docker Hub Personal Access Token）
-
-### 用户部署
-
-```bash
-mkdir -p data config logs
-# 下载 docker-compose.yml
-docker compose up -d
-```
-
-更新方式：
-- **OTA**：前端侧栏 → 检查更新 → 立即更新（自动下载替换二进制 + 重启）
-- **镜像**：`docker compose pull && docker compose up -d`
-
-## mpv 编译
-
-- **源码**：`examples/mpv/`（git tag v0.40.0）
-- **编译脚本**：`scripts/build-mpv-compile.sh`
-- **Docker 编译环境**：`docker/Dockerfile.mpv-build`（Debian trixie）
-- **产出**：`bin/amd64/mpv-new`（1.5MB，启用 zimg，禁用 GL/X11/音频/GPU）
-- **重新编译**：`sg docker -c "docker run --rm -v /home/incast/PT-Forward:/work mpv-build bash /work/scripts/build-mpv-compile.sh"`
-- **ARM 编译**：在任意 ARM Linux + Docker 上用相同脚本（meson 自动检测架构）
-
-## 截图工具
-
-- **引擎**：mpv `--vo=image` + zimg 色彩转换（`internal/publish/screenshot.go`）
-- **HDR 视频**：自动加 `--vf=lavfi=[tonemap=mobius]`（高光控制）
-- **DoVi**：偏绿偏紫（已知限制，zimg 不做 MMR reshaping，详见 §40.35）
-- **字幕**：`--blend-subtitles=yes` + `fonts-noto-cjk`
-- **独立脚本**：`scripts/screenshot.sh`（CLI 截图，匹配 `examples/screenshot/screenshot_v2.py` 策略）
-
-## 数据采集策略
-
-- **优先直连**：采集站点数据时，优先使用 `--noproxy '*'` 直连（如 curl 直连 IPv6）
-- **直连失败再走代理**：仅当直连无法访问时，才尝试代理访问（`-x http://10.0.2.5:7897`）
-- **采集后清理**：抓取完页面后立即清理 `/tmp/` 下的临时 HTML/JS 文件
-- **WebFetch 失败**：必须立即告知用户，不能忽略或静默跳过
-
-## CookieCloud 工具
-
-- 路径：`/home/incast/PT-Forward/tools/cookiecloud/cookiecloud`
-- 用法：`cookiecloud -domain <domain> -json`
-- 需设置环境变量：`COOKIECLOUD_URL` / `COOKIECLOUD_UUID` / `COOKIECLOUD_PASSWORD`
-
-## Playwright 采集注意事项
-
-- 脚本必须用 CJS 格式（`require` + `async function main()`），不能用 `.mjs` 的 `import` + top-level await
-- CookieCloud 工具域名匹配要求**精确匹配**（如 `pterclub.net` 而非 `.pterclub.net`）
-- sameSite 必须映射为 `Strict`/`Lax`/`None`，`unspecified` 要转为 `Lax`
-- `page.evaluate()` 中的变量必须用闭包或参数传递，不能直接引用外层 `const` 变量
-- `innerText` 抓取可能遗漏 JS 动态渲染的 `<select>` 选项，需要用 DOM query 做 deep inspect
-- NODE_PATH：`NODE_PATH=/home/incast/.npm-global/lib/node_modules`
-
-## 全局转载发布规则（§30.5）
-
-1. **禁止向任何站点发布 9KG/色情/成人内容资源**
-2. **禁止发布源站带 禁转/独占/谢绝转载/限时禁转 标签或标题/副标题中带上述字样的种子**
-3. **CatEDU 小组资源默认禁转**
-
-## PT-IDX 项目（云端指纹服务）
-
-- **项目路径**：`/home/incast/PT-IDX`
-- **Go module**：`github.com/ranfish/pt-idx`
-- **DB**：PostgreSQL，本地实例，数据库名 `pt_idx`
-- **服务**：`systemctl --user restart pt-idx`（用户级 systemd 服务，端口 8766）
-- **CGO**：不需要（纯 Go + pgx 驱动）
-
-### PT-IDX 验证与部署
-
-1. `go vet ./...`
-2. `go test ./... -count=1 -timeout 180s`
-3. `/home/incast/.local/go/bin/go build -ldflags "-s -w" -o pt-idx ./cmd/pt-idx/`
-4. `systemctl --user restart pt-idx && sleep 2 && systemctl --user is-active pt-idx`
-
-### PT-IDX 代码复用规则
-
-- `bencode.go` + `compute.go` 从 PT-Forward **手动复制**，禁止 import PT-Forward 包
-- pieces_hash 计算逻辑必须与 PT-Forward **逐字节一致**
-- PT-Forward 侧 bencode/compute 如有修改，PT-IDX 侧必须同步
-
-### PT-IDX 数据采集规则
-
-- 批量采集器/RSS 订阅器下载 .torrent 后立即计算 pieces_hash，**丢弃 .torrent 数据**
-- 禁止在磁盘上持久化 .torrent 文件
-- 站点凭证（cookie/passkey）必须 AES-GCM 加密存 PostgreSQL
-- 禁止在日志中出现任何凭证
-- 配置文件含敏感信息，必须加入 `.gitignore`
+<!-- PT-IDX 云端指纹服务（路径/DB/部署/代码复用/采集规则）：已抽出至 skill pt-idx-ops（.claude/skills/pt-idx-ops/SKILL.md）-->
 
 ## 版本管理
 
