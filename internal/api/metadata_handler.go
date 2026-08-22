@@ -222,7 +222,7 @@ func (h *MetadataHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		updates["description"] = req.Description
 	}
 	if req.Screenshots != "" {
-		updates["screenshots"] = req.Screenshots
+		updates["screenshots"] = model.NormalizeScreenshotColumn(req.Screenshots) // §59.59 附二: 透传写点归一
 	}
 
 	query := h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).

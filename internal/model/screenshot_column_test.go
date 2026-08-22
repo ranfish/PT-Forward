@@ -41,3 +41,45 @@ func TestParseScreenshotColumn(t *testing.T) {
 		t.Errorf("空白元素应过滤: %v", got6)
 	}
 }
+
+// §59.47 同族第五处修复: 写侧单点写手锚定——列格式权威 = JSON 数组字符串
+func TestFormatScreenshotColumn(t *testing.T) {
+	// 事实锚定（fetcher.buildMetadata 现行格式，字面量而非 Marshal 重算——反同义反复）
+	if got := FormatScreenshotColumn([]string{"https://a/1.jpg", "https://a/2.jpg"}); got != `["https://a/1.jpg","https://a/2.jpg"]` {
+		t.Errorf("格式: got %s", got)
+	}
+	if got := FormatScreenshotColumn(nil); got != "[]" {
+		t.Errorf("空列表应写 []: got %s", got)
+	}
+	if got := FormatScreenshotColumn([]string{}); got != "[]" {
+		t.Errorf("空切片应写 []: got %s", got)
+	}
+	// 往返等价
+	urls := []string{"https://a/1.jpg", "https://a/2.jpg", "https://a/3.jpg"}
+	if rt := ParseScreenshotColumn(FormatScreenshotColumn(urls)); len(rt) != 3 || rt[2] != "https://a/3.jpg" {
+		t.Errorf("往返: got %v", rt)
+	}
+}
+
+// NormalizeScreenshotColumn: 透传写点归一——历史换行/裸 URL 一律转 JSON，JSON 幂等
+func TestNormalizeScreenshotColumn(t *testing.T) {
+	// e96ec7d0e1 实锤形态（243，换行 5 张）→ JSON
+	nl := "https://img3.pixhost.cc/images/5143/761625249_shot_000.jpg\nhttps://img3.pixhost.cc/images/5143/761625263_shot_001.jpg"
+	want := `["https://img3.pixhost.cc/images/5143/761625249_shot_000.jpg","https://img3.pixhost.cc/images/5143/761625263_shot_001.jpg"]`
+	if got := NormalizeScreenshotColumn(nl); got != want {
+		t.Errorf("换行归一: got %s", got)
+	}
+	// JSON 幂等
+	j := `["https://a/1.jpg"]`
+	if got := NormalizeScreenshotColumn(j); got != j {
+		t.Errorf("JSON 幂等: got %s", got)
+	}
+	// 空归一
+	if got := NormalizeScreenshotColumn(""); got != "[]" {
+		t.Errorf("空归一: got %s", got)
+	}
+	// 裸单 URL
+	if got := NormalizeScreenshotColumn("https://a/1.jpg"); got != `["https://a/1.jpg"]` {
+		t.Errorf("裸 URL: got %s", got)
+	}
+}
