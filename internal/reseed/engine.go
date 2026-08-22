@@ -2966,9 +2966,13 @@ func techProfileConflict(src titleparser.TechProfile, candidateTitle string) boo
 // techProfileConflictFields 字段级冲突检查。skipAudio 豁免 AudioCodec 冲突
 //（§59.36 元数据获取宽松场景：站点文件名/标题音轨标注不一致是站点数据瑕疵，
 // 非不同资源信号；视频编码/分辨率/HDR/规格仍严格——错那些的元数据才致命）。
+// §59.59 修复: 字段清单补 Resolution——原清单缺失致 1080p vs 2160p 不判冲突
+//（时空奇旅案：本地 2160p UHD 错配 1080p REPACK2 元数据，仲裁候选与 loose 轮
+// 双路径漏放行。分辨率是版本身份强信号，任何标注差异都不等价，无需豁免组）。
 func techProfileConflictFields(src titleparser.TechProfile, candidateTitle string, skipAudio bool) bool {
 	cand := titleparser.ParseTitleTech(candidateTitle)
 	fields := []struct{ name, s, c string }{
+		{"Resolution", src.Resolution, cand.Resolution},
 		{"VideoCodec", src.VideoCodec, cand.VideoCodec},
 		{"AudioCodec", src.AudioCodec, cand.AudioCodec},
 		{"HDR", src.HDR, cand.HDR},
