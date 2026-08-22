@@ -2443,14 +2443,15 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 	if meta != nil && meta.Poster != "" {
 		go h.applyPosterFallback(meta.InfoHash, meta.SiteName, meta.Poster, name)
 	}
-	// §59.49: 截图获取时探活（异步）——清死留活，全死全清，字段列诚实化
-	if meta != nil && meta.Screenshots != "" && meta.Screenshots != "[]" {
-		go h.purgeDeadScreenshots(meta.InfoHash, meta.SiteName)
-	}
-	// §59.53: 采集链截图策略（双跑之批量/单种获取）——白名单逐张/转存/差额 mpv 补足/
-	// 无图全量（本地）；远程只转存。异步执行（mpv 分钟级），完成后落库覆盖。
-	if meta != nil && h.shotStrategy != nil && savePath != "" {
-		go h.applyScreenshotStrategy(meta.InfoHash, meta.SiteName, name, savePath, isLocal)
+	// §59.49+§59.57: 截图探活与策略——strategy 可用时探活内联进其前序（串行消除竞态：
+	// 原双 goroutine 并发，strategy 读到 purge 前死链 → rehost 失败保源 → same 早退 → 永不捕获）；
+	// strategy 不可用（远程/无 savePath）时探活独立异步执行。
+	if meta != nil {
+		if h.shotStrategy != nil && savePath != "" {
+			go h.applyScreenshotStrategy(meta.InfoHash, meta.SiteName, name, savePath, isLocal)
+		} else if meta.Screenshots != "" && meta.Screenshots != "[]" {
+			go h.purgeDeadScreenshots(meta.InfoHash, meta.SiteName)
+		}
 	}
 
 	// §59.21: is_local=true 时落库本地 mediainfo（localMI 已在搜索前获取，直接复用）
@@ -3791,12 +3792,16 @@ func (h *PublishTorrentsHandler) purgeDeadScreenshots(infoHash, siteName string)
 }
 
 // applyScreenshotStrategy §59.53: 采集链截图策略异步执行（goroutine 内）。
-// 读当前库值（§59.49 purge 可能已完成或竞态进行中——本函数读到的即输入，
-// purge 完成后若清掉了死链，其 Update 与本函数 Update 全列覆盖 last-write-wins，
-// 两侧产物均为活链无害）→ 策略 → 落库。
+// §59.57 竞态修复: purgeDeadScreenshots 内联前序（串行）——原双 goroutine 并发时
+// 本函数可能读到 purge 前的死链列表，rehost 失败保源后 final==source → same 早退
+// → 永不触发 mpv 补图（243 实测 8 组 ptpimg.me 全死链复现）。探活先行，本函数
+// 读到的必为活链集，再走策略（白名单/转存/差额补足/无图全量）→ 落库。
 func (h *PublishTorrentsHandler) applyScreenshotStrategy(infoHash, siteName, name, savePath string, isLocal bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
+
+	// §59.57: 探活内联前序（自带 90s 独立 ctx，读自身快照；HEAD 秒级不占策略预算）
+	h.purgeDeadScreenshots(infoHash, siteName)
 
 	strategyCtx, scancel := context.WithTimeout(ctx, 4*time.Minute)
 	defer scancel()
