@@ -3296,12 +3296,14 @@ func (h *PublishTorrentsHandler) handleAuditInfoHash(w http.ResponseWriter, r *h
 		Error(w, http.StatusInternalServerError, 50002, fmt.Sprintf("解析 .torrent 失败: %v", err))
 		return
 	}
+	noSrc, _ := fingerprint.ComputeNoSourceHash(data)
 	Success(w, map[string]interface{}{
-		"site":        req.Site,
-		"torrent_id":  req.TorrentID,
-		"info_hash":   meta.InfoHash,
-		"expect_hash": req.ExpectHash,
-		"match":       strings.EqualFold(meta.InfoHash, req.ExpectHash),
+		"site":              req.Site,
+		"torrent_id":        req.TorrentID,
+		"info_hash":         meta.InfoHash,
+		"expect_hash":       req.ExpectHash,
+		"match":             strings.EqualFold(meta.InfoHash, req.ExpectHash),
+		"info_hash_no_source": noSrc,
 	})
 }
 
