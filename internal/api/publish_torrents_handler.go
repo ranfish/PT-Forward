@@ -13,6 +13,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/coverage"
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
@@ -216,6 +217,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleGetFetchPriority(w, r)
 	case strings.HasSuffix(path, "/publish/fetch-priority") && r.Method == http.MethodPut:
 		h.handleSetFetchPriority(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/audit-infohash") && r.Method == http.MethodPost:
+		h.handleAuditInfoHash(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/batch-fetch") && r.Method == http.MethodPost:
 		h.handleBatchFetch(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/batch-fetch-progress") && r.Method == http.MethodGet:
@@ -3252,6 +3255,54 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 		return "incomplete"
 	}
 	return "pending"
+}
+
+// handleAuditInfoHash §59.59 审计: 诊断端点——下载指定站点的 .torrent 并计算
+// infohash 与期望值比对（获取链路正确性的确定性判据）。独立于获取链，不写库。
+func (h *PublishTorrentsHandler) handleAuditInfoHash(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Site       string `json:"site"`
+		TorrentID  string `json:"torrent_id"`
+		ExpectHash string `json:"expect_hash"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Site == "" || req.TorrentID == "" {
+		Error(w, http.StatusBadRequest, 40001, "site/torrent_id 必填")
+		return
+	}
+	if h.siteProvider == nil {
+		Error(w, http.StatusServiceUnavailable, 50001, "site provider 未配置")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+
+	config, err := h.siteProvider.GetSiteConfig(ctx, req.Site)
+	if err != nil || config == nil {
+		Error(w, http.StatusBadGateway, 50201, fmt.Sprintf("获取站点配置失败: %v", err))
+		return
+	}
+	adapter, err := h.siteProvider.GetAdapter(ctx, req.Site)
+	if err != nil || adapter == nil {
+		Error(w, http.StatusBadGateway, 50202, fmt.Sprintf("获取适配器失败: %v", err))
+		return
+	}
+	data, err := adapter.DownloadTorrent(ctx, config, req.TorrentID)
+	if err != nil {
+		Error(w, http.StatusBadGateway, 50203, fmt.Sprintf("下载 .torrent 失败: %v", err))
+		return
+	}
+	meta, err := fingerprint.ComputeFromTorrent(data)
+	if err != nil || meta == nil {
+		Error(w, http.StatusInternalServerError, 50002, fmt.Sprintf("解析 .torrent 失败: %v", err))
+		return
+	}
+	Success(w, map[string]interface{}{
+		"site":        req.Site,
+		"torrent_id":  req.TorrentID,
+		"info_hash":   meta.InfoHash,
+		"expect_hash": req.ExpectHash,
+		"match":       strings.EqualFold(meta.InfoHash, req.ExpectHash),
+	})
 }
 
 // checkRequiredFields §59.20: 9 必需字段校验，返回缺失字段名列表。
