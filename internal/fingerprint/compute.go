@@ -199,3 +199,29 @@ func toInt64(v any) int64 {
 		return 0
 	}
 }
+
+// ComputeNoSourceHash §59.59 审计: 计算 info dict 剔除 source 字段后的 infohash——
+// NP 站跨站防辅种 source 标记使同内容跨站 infohash 必异，内容等价判据 =
+// 双侧剔除 source 后 hash 一致。local 侧可传 TR 存储的原始 .torrent。
+func ComputeNoSourceHash(data []byte) (string, error) {
+	if len(data) == 0 {
+		return "", fpError(ErrFPCompute, "empty torrent data", nil)
+	}
+	d, err := decodeBencode(data)
+	if err != nil {
+		return "", fpError(ErrFPCompute, "bencode decode", err)
+	}
+	root, ok := d.(map[string]any)
+	if !ok {
+		return "", fpError(ErrFPCompute, "torrent root is not a dictionary", nil)
+	}
+	info, ok := root["info"].(map[string]any)
+	if !ok {
+		return "", fpError(ErrFPCompute, "missing info dictionary", nil)
+	}
+	delete(info, "source")
+	delete(root, "info")
+	h, err := computeInfoHash(info)
+	_ = root
+	return h, err
+}
