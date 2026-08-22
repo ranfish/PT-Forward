@@ -156,7 +156,8 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 	}
 
 	if match == nil {
-		return nil, fmt.Errorf("L2 search no match on %s (keyword=%s group=%s)", siteName, keyword, groupName)
+		// §59.59 审计: 附搜索结果统计（区分"站内无结果"与"结果被验证拒绝"）
+		return nil, fmt.Errorf("L2 search no match on %s (keyword=%s group=%s results=%d)", siteName, keyword, groupName, len(allResults))
 	}
 
 	f.logger.Debug("FetchAndStoreBySearch: tid resolved",
