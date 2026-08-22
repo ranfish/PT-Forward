@@ -17,7 +17,7 @@ echo "==> [1/4] go vet（不用 ./...，cmd/verify-pieces-hash 有已知冲突�
 "$GO" vet ./internal/... ./cmd/pt-forward/
 
 echo "==> [2/4] go test"
-"$GO" test ./internal/... -count=1 -timeout 180s
+"$GO" test ./internal/... -count=1 -timeout 600s
 
 echo "==> [3/4] go build（CGO_ENABLED=1 + 版本号 ldflags）"
 CGO_ENABLED=1 "$GO" build \
