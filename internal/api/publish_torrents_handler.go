@@ -50,6 +50,7 @@ type PublishTorrentsHandler struct {
 	logger         *zap.Logger
 	bgState        backgroundQueryState
 	batchFetch     batchFetchState
+	strategySem    chan struct{} // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
 }
 
 type backgroundQueryState struct {
@@ -76,11 +77,15 @@ type batchFetchItem struct {
 }
 
 func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger) *PublishTorrentsHandler {
+	// §59.58: 容量 5——8 核实测每路 mpv ~6 核，5 路摊薄后单种子 ~145s < 4min ctx（60% 余量）。
+	// CPU 总量守恒：并发数不改变批量总时长，只消除无界并发导致的 ctx 超时作废功。
+	// §59.51 手动截图按钮不经过此信号量（独立单例，不与批量竞争）。
 	return &PublishTorrentsHandler{
 		db:               db,
 		logger:           logger,
 		bgState:          backgroundQueryState{active: make(map[uint]bool)},
 		resourceResolver: publish.NewResourceResolver(db),
+		strategySem:      make(chan struct{}, 5),
 	}
 }
 
@@ -3797,6 +3802,16 @@ func (h *PublishTorrentsHandler) purgeDeadScreenshots(infoHash, siteName string)
 // → 永不触发 mpv 补图（243 实测 8 组 ptpimg.me 全死链复现）。探活先行，本函数
 // 读到的必为活链集，再走策略（白名单/转存/差额补足/无图全量）→ 落库。
 func (h *PublishTorrentsHandler) applyScreenshotStrategy(infoHash, siteName, name, savePath string, isLocal bool) {
+	// §59.58: 并发额度闸门——批量链 N 路 fire-and-forget 无界并发挤爆 CPU/代理（243 实测
+	// >20 路时 mpv 摊薄 15 倍 → 撞 4min ctx → 差额补足作废）。排队在闸门外等，不烧 ctx 预算
+	// （ctx 在获得额度后才创建）。CPU 总量守恒：总时长不变，换来每单稳定完成。
+	sem := h.strategySem
+	if sem == nil {
+		sem = make(chan struct{}, 5) // 兜底（零值 handler，如测试构造）
+	}
+	sem <- struct{}{}
+	defer func() { <-sem }()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
