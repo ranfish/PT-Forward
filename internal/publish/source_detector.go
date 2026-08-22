@@ -254,6 +254,8 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 					result.SourceSiteID = site.ID
 					result.TorrentID = c.TorrentID
 					result.AutoDetected = true
+					// §59.59: 层选可观测——审计"匹配源站"正确性的回放依据（永久保留）
+					d.logSelect("①组映射+coverage_tid", groupName, site.Name, c.TorrentID, c.Source)
 					return result
 				}
 			}
@@ -263,6 +265,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 				result.SourceSite = site.Name
 				result.SourceSiteID = site.ID
 				result.AutoDetected = true
+				d.logSelect("①b组映射_搜索", groupName, site.Name, "", "")
 				return result
 			}
 		}
@@ -278,13 +281,15 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 					result.SourceSiteID = site.ID
 					result.TorrentID = c.TorrentID
 					result.AutoDetected = false
+					d.logSelect("②priority+coverage_tid", groupName, site.Name, c.TorrentID, c.Source)
 					return result
 				}
 			}
 		}
 	}
 
-	// ③ coverage ∩ cookie 兜底
+	// ③ coverage ∩ cookie 兜底（map 遍历无序——tid 来源为确定性证据时直达，
+	// §59.59 Q3b 定案保持现状）
 	for siteName, c := range siteMap {
 		var site model.Site
 		if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
@@ -292,9 +297,24 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 			result.SourceSiteID = site.ID
 			result.TorrentID = c.TorrentID
 			result.AutoDetected = false
+			d.logSelect("③coverage兜底", groupName, site.Name, c.TorrentID, c.Source)
 			return result
 		}
 	}
 
 	return result
+}
+
+// logSelect §59.59: 选站层选日志——记录命中层级/组名/站点/tid 及其证据来源，
+// "为什么从这站获取"的永久回放依据。layer 为空串时不记（防御）。
+func (d *SourceSiteDetector) logSelect(layer, groupName, siteName, torrentID, evidence string) {
+	if d.logger == nil || layer == "" {
+		return
+	}
+	d.logger.Info("source site selected",
+		zap.String("layer", layer),
+		zap.String("group", groupName),
+		zap.String("site", siteName),
+		zap.String("tid", torrentID),
+		zap.String("evidence", evidence))
 }
