@@ -38,6 +38,27 @@ func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvide
 // 保留为空操作避免破坏外部调用。
 func (f *Fetcher) SetEngine(_ *extract.Engine) {}
 
+// FetchAndStoreDirect §59.61: comment 直达入口——拉详情后 D3-C 标题轻校验
+// （不过则报错，调用方降级下一 tid 来源/搜索）。sourceName = 本地种子名。
+func (f *Fetcher) FetchAndStoreDirect(ctx context.Context, infoHash, siteName, torrentID, sourceName string) (*model.TorrentMetadata, error) {
+	meta, err := f.FetchAndStore(ctx, infoHash, siteName, torrentID)
+	if err != nil {
+		return nil, err
+	}
+	// D3=C 轻校验：标题相关性（不校验 size/分辨率——元数据版本不敏感）
+	if meta != nil && meta.Title != "" && sourceName != "" {
+		if !reseed.TitleRelevant(sourceName, meta.Title) {
+			f.logger.Warn("direct fetch title mismatch (D3 reject)",
+				zap.String("site", siteName),
+				zap.String("torrent_id", torrentID),
+				zap.String("source", sourceName[:min(len(sourceName), 50)]),
+				zap.String("detail", meta.Title[:min(len(meta.Title), 50)]))
+			return nil, fmt.Errorf("直达标题不相关（D3 拒绝, tid=%s）", torrentID)
+		}
+	}
+	return meta, nil
+}
+
 func (f *Fetcher) FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error) {
 	if infoHash == "" || siteName == "" || torrentID == "" {
 		return nil, fmt.Errorf("info_hash, site_name, torrent_id are required")

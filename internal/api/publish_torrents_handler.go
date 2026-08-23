@@ -2390,7 +2390,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
 		h.batchFetch.items[i].Status = "pending"
 		h.batchFetch.mu.Unlock()
 
-		err := h.fetchSingleTorrent(ctx, item.Hash, item.Name, item.Size, item.SavePath, isLocal)
+		err := h.fetchSingleTorrent(ctx, clientID, item.Hash, item.Name, item.Size, item.SavePath, isLocal)
 
 		h.batchFetch.mu.Lock()
 		h.batchFetch.done++
@@ -2407,7 +2407,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
 	}
 }
 
-func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, name string, size int64, savePath string, isLocal bool) error {
+func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientID, hash, name string, size int64, savePath string, isLocal bool) error {
 	var coverageSites []model.SiteCoverageCache
 	if h.coverage != nil {
 		cs, err := h.coverage.GetCachedCoverage(ctx, hash)
@@ -2416,7 +2416,10 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 		}
 	}
 
-	result := h.sourceDetector.SelectFetchSite(ctx, name, coverageSites)
+	// §59.61: 簇 comment 直达候选——(client_id, save_path, name) 群聚合（管道 b 快照表）
+	clusterTargets := h.buildClusterTargets(ctx, clientID, savePath, name, hash)
+
+	result := h.sourceDetector.SelectFetchSite(ctx, name, coverageSites, clusterTargets)
 	if result.SourceSite == "" {
 		return fmt.Errorf("无可用源站（制作组未映射 + 无覆盖）")
 	}
@@ -2439,13 +2442,25 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, hash, n
 	var meta *model.TorrentMetadata
 	var err error
 	if result.TorrentID != "" {
-		meta, err = h.metadataFetcher.FetchAndStore(fetchCtx, hash, result.SourceSite, result.TorrentID)
+		// §59.61: tid 来源含 coverage_tid/comment_tid——统一走 D3 轻校验入口
+		// （coverage_tid 历史也校验：错缓存宁可降级搜索，符合审计精神）
+		meta, err = h.metadataFetcher.FetchAndStoreDirect(fetchCtx, hash, result.SourceSite, result.TorrentID, name)
+		if err == nil {
+			goto fetched
+		}
+		// 直达失败（D3 拒绝/tid 失效）→ 降级搜索（同站重搜，五闸门验证）
+		h.logger.Info("direct fetch failed, fallback to search",
+			zap.String("hash", hash[:min(10, len(hash))]),
+			zap.String("site", result.SourceSite),
+			zap.Error(err))
+		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI)
 	} else {
 		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI)
 	}
 	if err != nil {
 		return err
 	}
+fetched:
 
 	// §59.42: 海报可信图源白名单替换（异步，不阻塞采集主流程）
 	if meta != nil && meta.Poster != "" {
@@ -3646,7 +3661,7 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 		return
 	}
 
-	if err := h.fetchSingleTorrent(r.Context(), infoHash, snap.Name, snap.Size, snap.SavePath, isLocal); err != nil {
+	if err := h.fetchSingleTorrent(r.Context(), clientID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", err))
 		return
 	}
