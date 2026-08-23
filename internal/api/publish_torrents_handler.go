@@ -2390,6 +2390,19 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
 		h.batchFetch.items[i].Status = "pending"
 		h.batchFetch.mu.Unlock()
 
+		// §59.61 第 4 步: 簇内已有完整数据（先前副本获取后传播）→ 跳过（同簇去重:
+		// 站点数据/MI/截图各一次；显式单种子获取不受影响）
+		if h.hasCompleteMetadata(ctx, item.Hash) {
+			h.logger.Info("cluster skip: metadata exists",
+				zap.String("hash", item.Hash[:min(10, len(item.Hash))]))
+			h.batchFetch.mu.Lock()
+			h.batchFetch.done++
+			h.batchFetch.items[i].Status = "done"
+			h.batchFetch.mu.Unlock()
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+
 		err := h.fetchSingleTorrent(ctx, clientID, item.Hash, item.Name, item.Size, item.SavePath, isLocal)
 
 		h.batchFetch.mu.Lock()
@@ -2471,7 +2484,7 @@ fetched:
 	// strategy 不可用（远程/无 savePath）时探活独立异步执行。
 	if meta != nil {
 		if h.shotStrategy != nil && savePath != "" {
-			go h.applyScreenshotStrategy(meta.InfoHash, meta.SiteName, name, savePath, isLocal)
+			go h.applyScreenshotStrategy(clientID, meta.InfoHash, meta.SiteName, name, savePath, isLocal)
 		} else if meta.Screenshots != "" && meta.Screenshots != "[]" {
 			go h.purgeDeadScreenshots(meta.InfoHash, meta.SiteName)
 		}
@@ -2594,6 +2607,9 @@ fetched:
 				Updates(updates)
 		}
 	}
+
+	// §59.61 第 4 步: 簇元数据传播——站点数据+MI 复制到簇内缺行副本
+	h.propagateClusterMetadata(ctx, clientID, savePath, name, hash, meta.SiteName)
 
 	return nil
 }
@@ -3869,7 +3885,7 @@ func (h *PublishTorrentsHandler) purgeDeadScreenshots(infoHash, siteName string)
 // 本函数可能读到 purge 前的死链列表，rehost 失败保源后 final==source → same 早退
 // → 永不触发 mpv 补图（243 实测 8 组 ptpimg.me 全死链复现）。探活先行，本函数
 // 读到的必为活链集，再走策略（白名单/转存/差额补足/无图全量）→ 落库。
-func (h *PublishTorrentsHandler) applyScreenshotStrategy(infoHash, siteName, name, savePath string, isLocal bool) {
+func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientID, infoHash, siteName, name, savePath string, isLocal bool) {
 	// §59.58: 并发额度闸门——批量链 N 路 fire-and-forget 无界并发挤爆 CPU/代理（243 实测
 	// >20 路时 mpv 摊薄 15 倍 → 撞 4min ctx → 差额补足作废）。排队在闸门外等，不烧 ctx 预算
 	// （ctx 在获得额度后才创建）。CPU 总量守恒：总时长不变，换来每单稳定完成。
@@ -3914,9 +3930,15 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(infoHash, siteName, nam
 	if final == nil {
 		data = []byte("[]")
 	}
-	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+	if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
-		Update("screenshots", string(data))
+		Update("screenshots", string(data)).Error; err != nil {
+		h.logger.Error("screenshot strategy persist failed",
+			zap.String("hash", infoHash[:10]), zap.Error(err))
+		return
+	}
+	// §59.61 第 4 步: 截图二次传播（策略异步完成后补簇内空行——元数据传播时未就绪）
+	h.propagateClusterScreenshots(ctx, clientID, savePath, name, infoHash, string(data))
 	h.logger.Info("screenshot strategy applied",
 		zap.String("hash", infoHash[:10]),
 		zap.Bool("local", isLocal),
