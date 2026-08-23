@@ -148,3 +148,40 @@ func TestPropagateClusterPosters(t *testing.T) {
 		t.Errorf("独立数据行（非 cluster）不应被覆盖: %+v", own)
 	}
 }
+
+// §59.61 附2: propagateClusterPosters 不依赖内存 map——从 snapshots 反查簇上下文。
+// 4005 批次实锤: posterClusterCtx 容量清空把尾部 3 部上下文丢掉 → PTGen 修复不回传。
+func TestPropagateClusterPosters_NoMemoryMap(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	db.Create(&model.TorrentSnapshot{Hash: "rself000000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentSnapshot{Hash: "rsib0000000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentMetadata{InfoHash: "rself000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
+		Poster: "https://doubaninfo.com/dbposter/y.jpg", Description: "d2", FetchSource: "rss_detail"})
+	db.Create(&model.TorrentMetadata{InfoHash: "rsib0000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
+		Poster: "https://img.keepfrds.com/dead2", FetchSource: "cluster"})
+
+	// 不注册 posterClusterCtx（模拟 map 被清空/进程重启后）——直接调用也必须回传成功
+	h.propagateClusterPosters(context.Background(), "PT0", "/r", "R", "rself000000000000000000000000000000000000")
+	var sib model.TorrentMetadata
+	db.Where("info_hash = ?", "rsib0000000000000000000000000000000000000").First(&sib)
+	if sib.Poster != "https://doubaninfo.com/dbposter/y.jpg" {
+		t.Errorf("反查回传失败: %q", sib.Poster)
+	}
+}
+
+// §59.61 附2: clusterCtxFor 反查——map 空/丢失时从 snapshots 恢复上下文
+func TestClusterCtxFor_FallbackToSnapshots(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	db.Create(&model.TorrentSnapshot{Hash: "ctxhash00000000000000000000000000000000", ClientID: "PT7", Name: "Ctx", SavePath: "/ctx"})
+	// map 为空（未注册）
+	c, ok := h.clusterCtxFor(context.Background(), "ctxhash00000000000000000000000000000000")
+	if !ok || c.clientID != "PT7" || c.name != "Ctx" || c.savePath != "/ctx" {
+		t.Errorf("反查失败: %+v ok=%v", c, ok)
+	}
+	// 未知 hash
+	if _, ok := h.clusterCtxFor(context.Background(), "nonexist000000000000000000000000000000"); ok {
+		t.Error("未知 hash 应返回 false")
+	}
+}
