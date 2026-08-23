@@ -134,11 +134,62 @@ func (h *PublishTorrentsHandler) propagateClusterScreenshots(ctx context.Context
 	if len(siblingHashes) == 0 {
 		return
 	}
+	// §59.61 附: 覆盖条件含 cluster 行——站内 2 张部分截图须被策略终态（5 张）覆盖
+	// （原仅补空行——243 墓碑镇实锤：簇行残留部分截图不回传）
 	res := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-		Where("info_hash IN ? AND (screenshots = '' OR screenshots = '[]')", siblingHashes).
+		Where("info_hash IN ? AND (screenshots = '' OR screenshots = '[]' OR fetch_source = 'cluster')", siblingHashes).
 		Update("screenshots", screenshotsJSON)
 	if res.RowsAffected > 0 {
 		h.logger.Info("cluster screenshots propagated",
+			zap.String("hash", selfHash[:min(10, len(selfHash))]),
+			zap.Int64("rows", res.RowsAffected))
+	}
+}
+
+// propagateClusterPosters §59.61 附（传播竞态修复）：异步修复（PTGen 海报/简介）
+// 完成后把首副本终态回传簇行——仅覆盖 fetch_source='cluster' 的传播行
+// （独立获取行 rss_detail 不动，尊重显式数据）。243 墓碑镇 57 副本裂图根因：
+// t1 传播不完整态 → t2 PTGen 只修首副本 → 簇行永久残缺。
+func (h *PublishTorrentsHandler) propagateClusterPosters(ctx context.Context, clientID, savePath, name, selfHash string) {
+	if h.db == nil || clientID == "" || savePath == "" || name == "" {
+		return
+	}
+	var src model.TorrentMetadata
+	if err := h.db.WithContext(ctx).
+		Where("info_hash = ?", selfHash).First(&src).Error; err != nil {
+		return
+	}
+	if src.Poster == "" && src.Description == "" {
+		return
+	}
+	var siblingHashes []string
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = 0 AND hash != ?",
+			clientID, savePath, name, selfHash).
+		Pluck("hash", &siblingHashes)
+	if len(siblingHashes) == 0 {
+		return
+	}
+	updates := map[string]interface{}{}
+	if src.Poster != "" {
+		updates["poster"] = src.Poster
+	}
+	if src.Description != "" {
+		updates["description"] = src.Description
+	}
+	// 仅传播行（cluster）——首副本的致谢声明等后处理也会带上（簇共享语义）
+	if src.Statement != "" {
+		updates["statement"] = src.Statement
+	}
+	res := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ? AND fetch_source = 'cluster'", siblingHashes).
+		Updates(updates)
+	if res.Error != nil {
+		h.logger.Error("cluster poster propagate failed", zap.Error(res.Error))
+		return
+	}
+	if res.RowsAffected > 0 {
+		h.logger.Info("cluster posters propagated",
 			zap.String("hash", selfHash[:min(10, len(selfHash))]),
 			zap.Int64("rows", res.RowsAffected))
 	}

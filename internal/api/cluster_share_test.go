@@ -96,3 +96,55 @@ func TestPropagateClusterScreenshots(t *testing.T) {
 		t.Error("非簇行不应被写")
 	}
 }
+
+// §59.61 附: 传播竞态修复——异步修复（PTGen 海报/简介、截图策略）完成后必须回传簇行。
+// 场景实锤（243 墓碑镇 57 副本）: t1 传播不完整态 → t2 PTGen 只修首副本 → 簇行永久裂图。
+func TestPropagateClusterScreenshots_OverwritePartialClusterRows(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	// 簇行带 2 张部分截图（fetch_source=cluster）——必须被覆盖（非仅空行）
+	db.Create(&model.TorrentSnapshot{Hash: "pself000000000000000000000000000000000000", ClientID: "PT0", Name: "P", SavePath: "/p"})
+	db.Create(&model.TorrentSnapshot{Hash: "psib0000000000000000000000000000000000000", ClientID: "PT0", Name: "P", SavePath: "/p"})
+	db.Create(&model.TorrentMetadata{InfoHash: "pself000000000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: `["https://a/5.jpg"]`})
+	db.Create(&model.TorrentMetadata{InfoHash: "psib0000000000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: `["https://a/1.jpg","https://a/2.jpg"]`, FetchSource: "cluster"})
+
+	h.propagateClusterScreenshots(context.Background(), "PT0", "/p", "P",
+		"pself000000000000000000000000000000000000", `["https://a/5.jpg"]`)
+
+	var sib model.TorrentMetadata
+	db.Where("info_hash = ?", "psib0000000000000000000000000000000000000").First(&sib)
+	if sib.Screenshots != `["https://a/5.jpg"]` {
+		t.Errorf("cluster 部分截图行应被覆盖: %q", sib.Screenshots)
+	}
+}
+
+// PTGen 修复回传: propagateClusterPosters 把首副本终态 poster/description 复制到簇行
+func TestPropagateClusterPosters(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	db.Create(&model.TorrentSnapshot{Hash: "qself000000000000000000000000000000000000", ClientID: "PT0", Name: "Q", SavePath: "/q"})
+	db.Create(&model.TorrentSnapshot{Hash: "qsib0000000000000000000000000000000000000", ClientID: "PT0", Name: "Q", SavePath: "/q"})
+	// 首副本已被 PTGen 修复
+	db.Create(&model.TorrentMetadata{InfoHash: "qself000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
+		Poster: "https://doubaninfo.com/dbposter/x.jpg", Description: "PTGen简介", FetchSource: "rss_detail"})
+	// 簇行残留裂图+垃圾简介
+	db.Create(&model.TorrentMetadata{InfoHash: "qsib0000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
+		Poster: "https://img.keepfrds.com/dead", Description: "[url=javascript:void(0)] MediaInfo: x.", FetchSource: "cluster"})
+	// 同簇但有独立数据的行（rss_detail）——不可被覆盖
+	db.Create(&model.TorrentSnapshot{Hash: "qown0000000000000000000000000000000000000", ClientID: "PT0", Name: "Q", SavePath: "/q"})
+	db.Create(&model.TorrentMetadata{InfoHash: "qown0000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
+		Poster: "own", Description: "own-desc", FetchSource: "rss_detail"})
+
+	h.propagateClusterPosters(context.Background(), "PT0", "/q", "Q", "qself000000000000000000000000000000000000")
+
+	var sib model.TorrentMetadata
+	db.Where("info_hash = ?", "qsib0000000000000000000000000000000000000").First(&sib)
+	if sib.Poster != "https://doubaninfo.com/dbposter/x.jpg" || sib.Description != "PTGen简介" {
+		t.Errorf("簇行应被 PTGen 终态覆盖: poster=%q desc=%q", sib.Poster, sib.Description)
+	}
+	var own model.TorrentMetadata
+	db.Where("info_hash = ?", "qown0000000000000000000000000000000000000").First(&own)
+	if own.Poster != "own" || own.Description != "own-desc" {
+		t.Errorf("独立数据行（非 cluster）不应被覆盖: %+v", own)
+	}
+}
