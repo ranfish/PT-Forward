@@ -283,6 +283,7 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientID string, torrents []
 			Uploaded: t.Uploaded,
 			IsHidden: false,
 			LastSeen: now,
+			Comment:  t.Comment, // §59.61: 簇直达判据凭证
 		})
 	}
 
@@ -293,7 +294,7 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientID string, torrents []
 			},
 			DoUpdates: clause.AssignmentColumns([]string{
 				"name", "save_path", "size", "state", "progress", "uploaded",
-				"is_hidden", "last_seen", "updated_at",
+				"is_hidden", "last_seen", "updated_at", "comment", // §59.61
 			}),
 		}).Create(&records[i])
 	}

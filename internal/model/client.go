@@ -72,6 +72,7 @@ type TorrentInfo struct {
 	NumIncomplete int       `json:"num_incomplete"`
 	Ratio         float64   `json:"ratio"`
 	SavePath      string    `json:"save_path"`
+	Comment       string    `json:"comment,omitempty"` // §59.61: 种子 comment（TR/qb 同步，簇直达判据凭证）
 	Tags          []string  `json:"tags"`
 	TotalSize     int64     `json:"total_size"`
 	Category      string    `json:"category"`

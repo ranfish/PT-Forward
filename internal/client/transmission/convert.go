@@ -34,13 +34,14 @@ type trTorrent struct {
 	} `json:"trackerStats"`
 	TorrentFile string `json:"torrentFile"`
 	ID          int    `json:"id"`
+	Comment     string `json:"comment"` // §59.61: 种子 comment（簇直达判据凭证）
 }
 
 var allFields = []string{
 	"hashString", "name", "totalSize", "percentDone", "uploadedEver", "downloadedEver",
 	"rateUpload", "rateDownload", "uploadRatio", "status", "error",
 	"errorString", "downloadDir", "labels", "addedDate", "secondsSeeding",
-	"isFinished", "trackerStats", "torrentFile", "id",
+	"isFinished", "trackerStats", "torrentFile", "id", "comment",
 }
 
 func (t trTorrent) toModel() *model.TorrentInfo {
@@ -111,6 +112,7 @@ func (t trTorrent) toModel() *model.TorrentInfo {
 		// §59.31: TR 轮询自带全部 tracker 消息（含 lastAnnounceResult），
 		// 幽灵种子巡检每轮全量匹配，零额外请求
 		TrackerMsgs: trackerMsgs,
+		Comment:     t.Comment, // §59.61: 簇直达判据凭证
 	}
 }
 
