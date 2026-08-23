@@ -31,6 +31,8 @@ type qbTorrent struct {
 	HasTrackerError       bool `json:"has_tracker_error"`
 	HasTrackerWarning     bool `json:"has_tracker_warning"`
 	HasOtherAnnounceError bool `json:"has_other_announce_error"`
+
+	Comment string `json:"comment"` // §59.61: 种子 comment（/api/v2/torrents/info 原生返回；AutoDUT 5620/5620 实证）
 }
 
 func (t qbTorrent) toModel() *model.TorrentInfo {
@@ -55,6 +57,7 @@ func (t qbTorrent) toModel() *model.TorrentInfo {
 	return &model.TorrentInfo{
 		Hash:          t.Hash,
 		Name:          t.Name,
+		Comment:       t.Comment, // §59.61: 簇直达判据凭证
 		IsFinished:    t.Progress >= 1.0,
 		IsPaused:      t.State == "pausedDL" || t.State == "pausedUP" || t.State == "stoppedDL" || t.State == "stoppedUP",
 		Removed:       false,

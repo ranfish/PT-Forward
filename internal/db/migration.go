@@ -233,6 +233,25 @@ func init() {
 		return gormDB.Where("json_data LIKE '%\"raw_bbcode\":\"\"%'").
 			Delete(&model.PTGenCache{}).Error
 	})
+	// §59.61 管道层: torrent_snapshots 加 comment 列——簇直达判据凭证。
+	// 新库 AutoMigrate 已带列；存量库（29/243 等）ALTER 补列 + 复合簇索引。
+	RegisterMigration(19, "snapshot_add_comment_column", func(gormDB *gorm.DB) error {
+		var hasCol int64
+		gormDB.Raw("SELECT COUNT(*) FROM pragma_table_info('torrent_snapshots') WHERE name='comment'").Scan(&hasCol)
+		if hasCol == 0 {
+			if err := gormDB.Exec("ALTER TABLE torrent_snapshots ADD COLUMN comment text").Error; err != nil {
+				return err
+			}
+		}
+		var hasIdx int64
+		gormDB.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_snapshots_cluster'").Scan(&hasIdx)
+		if hasIdx == 0 {
+			if err := gormDB.Exec("CREATE INDEX idx_snapshots_cluster ON torrent_snapshots(client_id, save_path, name)").Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	// §59.44: 存量尾斜杠路径归一——TR 上报的历史脏数据（"PT6/SSD/" vs "PT6/SSD"）
 	// 在三元组资源键下劈裂资源，统一 Clean 形态（与 syncer 前置修复配套）。
 	RegisterMigration(17, "normalize_snapshot_save_path", func(gormDB *gorm.DB) error {
