@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/ranfish/pt-forward/internal/comment"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
@@ -53,3 +55,91 @@ func (h *PublishTorrentsHandler) lookupTrackerHost(ctx context.Context, hash str
 }
 
 var _ = site.NewTrackerMatcher // 保持 site 包引用（HostResolverFromSites 内部使用）
+
+// §59.61 第 4 步: 簇共享三方法——批内跳过 / 元数据传播 / 截图二次传播
+
+// hasCompleteMetadata 该 hash 是否已有完整数据行（poster/description 任一非空）
+// ——runBatchFetch 批内跳过判据（簇内先前副本已获取或传播）。
+func (h *PublishTorrentsHandler) hasCompleteMetadata(ctx context.Context, hash string) bool {
+	if hash == "" {
+		return false
+	}
+	var n int64
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ? AND (poster != '' OR description != '')", hash).
+		Count(&n)
+	return n > 0
+}
+
+// propagateClusterMetadata 获取成功后（fetchSingleTorrent 末尾）：站点侧数据 + MI
+// 复制到簇内无数据副本（已有行不覆盖——尊重显式获取/编辑）。fetch_source=cluster 审计可辨。
+func (h *PublishTorrentsHandler) propagateClusterMetadata(ctx context.Context, clientID, savePath, name, selfHash, siteName string) {
+	if h.db == nil || clientID == "" || savePath == "" || name == "" {
+		return
+	}
+	// 源行（本站数据最全——TechProfile/tags/MI 均已后处理完）
+	var src model.TorrentMetadata
+	if err := h.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", selfHash, siteName).
+		First(&src).Error; err != nil {
+		return
+	}
+	// 簇内缺行副本
+	var siblingHashes []string
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = 0 AND hash != ?",
+			clientID, savePath, name, selfHash).
+		Pluck("hash", &siblingHashes)
+	if len(siblingHashes) == 0 {
+		return
+	}
+	var have []string
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ?", siblingHashes).Pluck("info_hash", &have)
+	haveSet := map[string]bool{}
+	for _, hh := range have {
+		haveSet[hh] = true
+	}
+	n := 0
+	for _, hh := range siblingHashes {
+		if haveSet[hh] {
+			continue
+		}
+		cpy := src
+		cpy.ID = 0
+		cpy.InfoHash = hh
+		cpy.FetchSource = "cluster"
+		if err := h.db.WithContext(ctx).Create(&cpy).Error; err == nil {
+			n++
+		}
+	}
+	if n > 0 {
+		h.logger.Info("cluster metadata propagated",
+			zap.String("hash", selfHash[:min(10, len(selfHash))]),
+			zap.Int("replicas", n))
+	}
+}
+
+// propagateClusterScreenshots 截图策略完成后：补簇内空截图行
+// （策略是分钟级异步任务，元数据传播时截图未就绪——此为二次传播）。
+func (h *PublishTorrentsHandler) propagateClusterScreenshots(ctx context.Context, clientID, savePath, name, selfHash, screenshotsJSON string) {
+	if h.db == nil || clientID == "" || savePath == "" || name == "" || screenshotsJSON == "" || screenshotsJSON == "[]" {
+		return
+	}
+	var siblingHashes []string
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = 0 AND hash != ?",
+			clientID, savePath, name, selfHash).
+		Pluck("hash", &siblingHashes)
+	if len(siblingHashes) == 0 {
+		return
+	}
+	res := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ? AND (screenshots = '' OR screenshots = '[]')", siblingHashes).
+		Update("screenshots", screenshotsJSON)
+	if res.RowsAffected > 0 {
+		h.logger.Info("cluster screenshots propagated",
+			zap.String("hash", selfHash[:min(10, len(selfHash))]),
+			zap.Int64("rows", res.RowsAffected))
+	}
+}
