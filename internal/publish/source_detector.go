@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"github.com/ranfish/pt-forward/internal/comment"
 	"context"
 	"encoding/json"
 	"strings"
@@ -230,7 +231,11 @@ func (d *SourceSiteDetector) getFetchPriority(ctx context.Context) []string {
 
 // SelectFetchSite §59.20: "获取数据"时的站点选择（制作组优先 → fetch_priority → 兜底）。
 // 与 Detect()（发布流程，source_priority 优先）的区别：制作组映射优先于 fetch_priority。
-func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, coverageSites []model.SiteCoverageCache) SourceDetectResult {
+// SelectFetchSite §59.61: clusterTargets = 簇 comment 解析出的直达候选
+// （(client_id, save_path, name) 群内各副本 comment 聚合，调用方经
+// GetClusterComments + comment.Resolve 产出）。官组链消费指向源站的候选（J1/J1b），
+// 非官组链消费任意候选（J2）。nil 表示无簇数据（旧调用方等价行为）。
+func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, coverageSites []model.SiteCoverageCache, clusterTargets []comment.DirectTarget) SourceDetectResult {
 	result := SourceDetectResult{}
 
 	siteMap := make(map[string]model.SiteCoverageCache)
@@ -246,6 +251,23 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 	if groupName != "" {
 		siteName := d.LookupGroup(ctx, groupName)
 		if siteName != "" {
+			// §59.61 ①c: 簇 comment tid（J1 源站副本自指 / J1b 溯源指向源站）——
+			// 指向源站的直达候选即原发页凭证，优先于 coverage_tid（确定性证据：
+			// 文件出生地声明 vs 系统历史缓存）
+			for _, ct := range clusterTargets {
+				if ct.SiteName != siteName || ct.TorrentID == "" {
+					continue
+				}
+				var site2 model.Site
+				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site2).Error; err == nil {
+					result.SourceSite = site2.Name
+					result.SourceSiteID = site2.ID
+					result.TorrentID = ct.TorrentID
+					result.AutoDetected = true
+					d.logSelect("①组映射+comment_tid", groupName, site2.Name, ct.TorrentID, "cluster")
+					return result
+				}
+			}
 			// 优先：coverage 命中 + cookie → 有 tid 可直接获取
 			if c, ok := siteMap[siteName]; ok {
 				var site model.Site
@@ -268,6 +290,23 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 				d.logSelect("①b组映射_搜索", groupName, site.Name, "", "")
 				return result
 			}
+		}
+	}
+
+	// §59.61 ②a: 非官组簇 comment 直达（J2）——无组映射种子，
+	// 簇内任意副本 comment 可解析即直达该站（PT0 实测 99% 覆盖）
+	for _, ct := range clusterTargets {
+		if ct.TorrentID == "" {
+			continue
+		}
+		var site2 model.Site
+		if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", ct.SiteName, true).First(&site2).Error; err == nil {
+			result.SourceSite = site2.Name
+			result.SourceSiteID = site2.ID
+			result.TorrentID = ct.TorrentID
+			result.AutoDetected = false
+			d.logSelect("②a簇comment_tid", groupName, site2.Name, ct.TorrentID, "cluster")
+			return result
 		}
 	}
 

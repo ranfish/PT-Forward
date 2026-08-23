@@ -57,6 +57,7 @@ type MetadataFetcherProvider interface {
 	GetMetadata(ctx context.Context, infoHash, siteName string) (*model.TorrentMetadata, bool)
 	FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)
 	FetchAndStoreBySearch(ctx context.Context, infoHash, siteName, torrentName string, size int64, sourceLocalMI ...string) (*model.TorrentMetadata, error)
+	FetchAndStoreDirect(ctx context.Context, infoHash, siteName, torrentID, sourceName string) (*model.TorrentMetadata, error) // §59.61 D3
 }
 
 type PublishPipeline interface {

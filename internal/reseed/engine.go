@@ -5311,6 +5311,14 @@ func extractSequelNumber(title string) int {
 
 // titleKeywordRelevant 检查源标题与候选标题是否有内容关联。
 // 返回 true 表示关联或无法判定（跳过检查），false 表示确定无关联。
+// TitleRelevant §59.61 D3: 直达后标题轻校验（公开包装——metadata 直达链复用，
+// 判定语义与 L2 搜索闸门一致：本地名关键词 vs 详情标题相关性）。
+func TitleRelevant(sourceTitle, candidateTitle string) bool {
+	meaningfulWords := extractMeaningfulTitleWords(sourceTitle, ExtractGroupName(sourceTitle))
+	sourceCJK := extractCJKSubstrings(sourceTitle)
+	return titleKeywordRelevant(meaningfulWords, sourceCJK, sourceTitle, candidateTitle)
+}
+
 func titleKeywordRelevant(meaningfulWords []string, sourceCJK []string, sourceTitle, candidateTitle string) bool {
 	// 续集号比较（硬过滤）：双方都有续集号且不同 → 拒绝
 	sourceSequel := extractSequelNumber(sourceTitle)
