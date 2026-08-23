@@ -329,8 +329,9 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 
 	var result struct {
-		Code json.Number `json:"code"`
-		Data struct {
+		Code    json.Number `json:"code"`
+		Message string      `json:"message"`
+		Data    struct {
 			Name        string   `json:"name"`
 			SmallDescr  string   `json:"smallDescr"`
 			Description string   `json:"description"`
@@ -357,6 +358,11 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, parseError("解析 API 响应失败", err)
+	}
+	// §59.60 B1: code≠0（无效 tid/限流/域名熔断）必须报错——原实现直接解空 data
+	// 构造全空 detail 伪成功（243 实测空行落库且降级链不触发）。照抄 search :577 模式。
+	if result.Code.String() != "0" {
+		return nil, parseError(fmt.Sprintf("API 详情失败: %s", result.Message), nil)
 	}
 
 	d := result.Data

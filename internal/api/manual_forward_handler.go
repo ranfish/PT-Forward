@@ -891,7 +891,7 @@ func (h *ManualForwardHandler) persistAnalysis(infoHash, siteName string, result
 			"tm_db_url":    tmdb,
 		"subtitle":     subtitle,
 		"statement":    statement, // §59.20
-		"bdinfo":       bdinfo,    // §59.20
+		"bd_info":      bdinfo,    // §59.60 B2: 列名笔误第六处（错名致整组 Updates 静默失败）
 		"merged_json":  mergedJSON,
 			"fetch_source": fetchSource,
 			"fetched_at":   now,
