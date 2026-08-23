@@ -2427,12 +2427,29 @@ type posterClusterContext struct {
 	name     string
 }
 
-func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientID, hash, name string, size int64, savePath string, isLocal bool) error {
-	// §59.61 附: 注册簇上下文（applyPosterFallback 异步回传用；固定小容量防泄漏——批量串行覆盖）
+// clusterCtxFor §59.61 附2: 簇上下文获取——map 加速, miss 从 snapshots 反查
+// （4005 批次实锤: map 容量清空丢尾部上下文 → PTGen 修复不回传。反查为权威来源）。
+func (h *PublishTorrentsHandler) clusterCtxFor(ctx context.Context, hash string) (posterClusterContext, bool) {
+	if h.posterClusterCtx != nil {
+		if c, ok := h.posterClusterCtx[hash]; ok {
+			return c, true
+		}
+	}
+	var snap model.TorrentSnapshot
+	if err := h.db.WithContext(ctx).Where("hash = ? AND is_hidden = 0", hash).First(&snap).Error; err != nil {
+		return posterClusterContext{}, false
+	}
+	c := posterClusterContext{clientID: snap.ClientID, savePath: snap.SavePath, name: snap.Name}
 	if h.posterClusterCtx == nil {
 		h.posterClusterCtx = make(map[string]posterClusterContext, 256)
 	}
-	if len(h.posterClusterCtx) > 4096 {
+	h.posterClusterCtx[hash] = c
+	return c, true
+}
+
+func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientID, hash, name string, size int64, savePath string, isLocal bool) error {
+	// §59.61 附: 注册簇上下文（applyPosterFallback 异步回传用；固定小容量防泄漏——批量串行覆盖）
+	if h.posterClusterCtx == nil {
 		h.posterClusterCtx = make(map[string]posterClusterContext, 256)
 	}
 	h.posterClusterCtx[hash] = posterClusterContext{clientID: clientID, savePath: savePath, name: name}
@@ -3792,11 +3809,9 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		h.logger.Info("ptgen description applied",
 			zap.String("hash", infoHash[:10]),
 			zap.Int("length", len(ptgenDesc)))
-		// §59.61 附: 简介终态同步回传簇（poster 可能尚在处理——propagateClusterPosters 幂等可重复）
-		if h.posterClusterCtx != nil {
-			if c, ok := h.posterClusterCtx[infoHash]; ok {
-				h.propagateClusterPosters(ctx, c.clientID, c.savePath, c.name, infoHash)
-			}
+		// §59.61 附2: 简介终态同步回传簇（map miss 反查; 幂等可重复）
+		if c, ok := h.clusterCtxFor(ctx, infoHash); ok {
+			h.propagateClusterPosters(ctx, c.clientID, c.savePath, c.name, infoHash)
 		}
 	}
 
@@ -3826,11 +3841,9 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		Updates(map[string]interface{}{
 			"poster": res.Poster,
 		})
-	// §59.61 附: PTGen 终态回传簇（clientID/savePath/name 由闭包携带）
-	if h.posterClusterCtx != nil {
-		if c, ok := h.posterClusterCtx[infoHash]; ok {
-			h.propagateClusterPosters(ctx, c.clientID, c.savePath, c.name, infoHash)
-		}
+	// §59.61 附2: PTGen 终态回传簇（map miss 反查 snapshots——4005 批次实锤修复）
+	if c, ok := h.clusterCtxFor(ctx, infoHash); ok {
+		h.propagateClusterPosters(ctx, c.clientID, c.savePath, c.name, infoHash)
 	}
 	h.logger.Info("poster fallback applied",
 		zap.String("hash", infoHash[:10]),
