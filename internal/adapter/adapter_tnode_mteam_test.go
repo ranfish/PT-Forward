@@ -562,6 +562,7 @@ func TestMTeamAdapter_DetailViaAPI(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
+			"code": 0,
 			"data": {
 				"name": "API Torrent",
 				"size": 1073741824,
@@ -669,7 +670,7 @@ func TestMTeamAdapter_GetPreciseSLData_API(t *testing.T) {
 func TestMTeamAdapter_GetTorrentInfoHash(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":{"name":"Hash Test","size":0,"infoHash":"CCDDEEFF00112233445566778899AABBCCDDEEFF","category":"movie","seeders":0,"leechers":0,"status":{"discount":"","hr":false},"tags":[]}}`))
+		_, _ = w.Write([]byte(`{"code":0,"data":{"name":"Hash Test","size":0,"infoHash":"CCDDEEFF00112233445566778899AABBCCDDEEFF","category":"movie","seeders":0,"leechers":0,"status":{"discount":"","hr":false},"tags":[]}}`))
 	}))
 	defer srv.Close()
 

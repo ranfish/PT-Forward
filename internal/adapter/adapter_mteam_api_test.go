@@ -207,3 +207,25 @@ func TestFetchItemsByAPI_APIError(t *testing.T) {
 		t.Errorf("expected error to contain 'Unauthorized', got %v", err)
 	}
 }
+
+// §59.60 B1: detailViaAPI 必须检查 result.Code——API 错误（无效 tid/限流/熔断）
+// 返回非 0 code 时应报错，不得构造空 detail 伪成功（243 实测空行落库根因）。
+func TestGetTorrentDetail_APIError_MustFail(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"code":"404","message":"NO_DATA_BY_ID"}`)
+	}))
+	defer srv.Close()
+
+	doer := &HTTPDoer{Client: srv.Client()}
+	a := NewMTeamAdapter(doer, zap.NewNop())
+	config := &model.SiteConfig{Domain: srv.URL, APIKey: "test-key"}
+
+	detail, err := a.GetTorrentDetail(context.Background(), config, "1094449")
+	if err == nil {
+		t.Fatal("API code≠0 必须返回错误（原 bug: 返回空 detail 伪成功）")
+	}
+	if detail != nil {
+		t.Fatalf("错误时不应返回 detail, got %+v", detail)
+	}
+}

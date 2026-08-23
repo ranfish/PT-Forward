@@ -14,6 +14,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/auth"
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	notificationPkg "github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
@@ -10599,5 +10600,39 @@ func TestScheduler_HandleReschedule_NotFound(t *testing.T) {
 	})
 	if w.Code != http.StatusNotFound && w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400/404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// §59.60 B2: persistAnalysis Updates 列名锚定——bdinfo 必须是 bd_info（表列名），
+// 错列名导致整组 Updates 静默失败（243 日志 no such column: bdinfo 实锤，§59.56 同族第六处）。
+func TestPersistAnalysis_ColumnNames(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := model.AutoMigrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	h := NewManualForwardHandler(db, zap.NewNop())
+	meta := &model.TorrentMetadata{InfoHash: "b2coltest0001", SiteName: "朋友", Title: "t"}
+	if err := db.Create(meta).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	result := map[string]interface{}{
+		"info_hash":  "b2coltest0001",
+		"title":      "B2 列名测试",
+		"media_info": "mi-text",
+		"bdinfo":     "bd-text",
+	}
+	h.persistAnalysis("b2coltest0001", "朋友", result, titleparser.TechProfile{})
+	var got model.TorrentMetadata
+	if err := db.Where("info_hash = ?", "b2coltest0001").First(&got).Error; err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if got.MediaInfo != "mi-text" {
+		t.Errorf("media_info 落库失败: %q（列名错会整组 Updates 失败）", got.MediaInfo)
+	}
+	if got.BDInfo != "bd-text" {
+		t.Errorf("bd_info 落库失败: %q（bdinfo→bd_info 笔误）", got.BDInfo)
 	}
 }
