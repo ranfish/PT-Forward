@@ -52,6 +52,7 @@ type PublishTorrentsHandler struct {
 	bgState        backgroundQueryState
 	batchFetch     batchFetchState
 	strategySem    chan struct{} // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
+	posterClusterCtx map[string]posterClusterContext // §59.61 附: infoHash → 簇上下文（异步修复回传用）
 }
 
 type backgroundQueryState struct {
@@ -2420,7 +2421,21 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
 	}
 }
 
+type posterClusterContext struct {
+	clientID string
+	savePath string
+	name     string
+}
+
 func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientID, hash, name string, size int64, savePath string, isLocal bool) error {
+	// §59.61 附: 注册簇上下文（applyPosterFallback 异步回传用；固定小容量防泄漏——批量串行覆盖）
+	if h.posterClusterCtx == nil {
+		h.posterClusterCtx = make(map[string]posterClusterContext, 256)
+	}
+	if len(h.posterClusterCtx) > 4096 {
+		h.posterClusterCtx = make(map[string]posterClusterContext, 256)
+	}
+	h.posterClusterCtx[hash] = posterClusterContext{clientID: clientID, savePath: savePath, name: name}
 	var coverageSites []model.SiteCoverageCache
 	if h.coverage != nil {
 		cs, err := h.coverage.GetCachedCoverage(ctx, hash)
@@ -3777,6 +3792,12 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		h.logger.Info("ptgen description applied",
 			zap.String("hash", infoHash[:10]),
 			zap.Int("length", len(ptgenDesc)))
+		// §59.61 附: 简介终态同步回传簇（poster 可能尚在处理——propagateClusterPosters 幂等可重复）
+		if h.posterClusterCtx != nil {
+			if c, ok := h.posterClusterCtx[infoHash]; ok {
+				h.propagateClusterPosters(ctx, c.clientID, c.savePath, c.name, infoHash)
+			}
+		}
 	}
 
 	if res.Source == "site" {
@@ -3805,6 +3826,12 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		Updates(map[string]interface{}{
 			"poster": res.Poster,
 		})
+	// §59.61 附: PTGen 终态回传簇（clientID/savePath/name 由闭包携带）
+	if h.posterClusterCtx != nil {
+		if c, ok := h.posterClusterCtx[infoHash]; ok {
+			h.propagateClusterPosters(ctx, c.clientID, c.savePath, c.name, infoHash)
+		}
+	}
 	h.logger.Info("poster fallback applied",
 		zap.String("hash", infoHash[:10]),
 		zap.String("source", res.Source),
