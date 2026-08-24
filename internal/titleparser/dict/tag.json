@@ -281,10 +281,10 @@
    "label": "完结",
    "aliases": "全集",
    "group": "其他",
-   "infer_pattern": "[\\. ]S\\d+\\b",
-   "infer_pattern_neg": "S\\d+\\.?E\\d+",
+   "infer_pattern": "([\\. ]S\\d+\\b|[\\. ](?:全\\d+集|全集|全季|已完结)(?:[\\. ]|$))",
+   "infer_pattern_neg": "(S\\d+\\.?E\\d+|[\\. ]S\\d+-S?\\d+|第\\d+-\\d+季|合集|EP?\\d{1,2}\\b|第\\d+集|[\\. ]E\\d{1,2}\\b|E\\d+-E?\\d+)",
    "infer_scope": "title_raw",
-   "infer_pattern2": "全\\d+集",
+   "infer_pattern2": "(全集|全季|已完结|完结|全\\d+集|集全|期全)",
    "infer_scope2": "subtitle_raw"
   },
   {
@@ -308,6 +308,24 @@
    "label": "高分",
    "group": "规格",
    "note": "§59.70 数值判据(豆瓣评分≥8.0, 8.0算7.9不算, 无评分不命中)在 MediaTagInferer.InferFull 代码层——评分行由 PTGen 简介落库后 t2 重推补上"
+  },
+  {
+   "canonical": "episode_split",
+   "label": "分集",
+   "group": "剧集状态",
+   "note": "§59.71 B1 藏宝阁7.6判据; 与complete/collection互斥(优先级: 分集/合集 抑制 完结, 完结抑制分集——藏宝阁原文双向, 实现为单互斥组按命中序)",
+   "infer_pattern": "([\\. ]S\\d+E\\d+|\\bEP?\\d{1,2}\\b|E\\d+-E?\\d+|第\\d+集|[\\. ]E\\d{1,2}\\b)",
+   "infer_scope": "title_raw"
+  },
+  {
+   "canonical": "collection",
+   "label": "合集",
+   "group": "剧集状态",
+   "note": "§59.71 B1 藏宝阁7.6/劳改所判据; S01-S02 季范围/第N-M季/合集/集全/期全(副标题); 与连载互斥(ubits)待 B2 连载词条",
+   "infer_pattern": "([\\. ]S\\d+-S?\\d+|第\\d+-\\d+季|合集)",
+   "infer_scope": "title_raw",
+   "infer_pattern2": "(合集|集全|期全)",
+   "infer_scope2": "subtitle_raw"
   }
  ]
 }

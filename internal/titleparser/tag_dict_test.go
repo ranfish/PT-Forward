@@ -19,7 +19,7 @@ func TestTagInferAnchors(t *testing.T) {
 		{"国语 PTGen 行", TagInferInput{Description: "◎语　言　汉语普通话"}, []string{"chinese_audio"}},
 		{"complete S01 无 E", TagInferInput{Title: "Show S01 Complete"}, []string{"complete"}},
 		{"complete 全N集副标题", TagInferInput{Title: "Show", Subtitle: "全12集"}, []string{"complete"}},
-		{"S01E01 不判 complete", TagInferInput{Title: "Show S01E01"}, nil},
+		{"S01E01 不判 complete(分集命中)", TagInferInput{Title: "Show S01E01"}, []string{"episode_split"}},
 	}
 	for _, c := range cases {
 		got := TagInferMatches(c.in)
@@ -39,8 +39,8 @@ func TestTagInferAnchors(t *testing.T) {
 // §59.35 P4: TagGroups 分组结构派生（TagSelector 数据源）
 func TestTagGroupsStructure(t *testing.T) {
 	groups := TagGroups()
-	if len(groups) != 8 {
-		t.Errorf("分组数 %d, want 8（HDR/色彩、音频编码、语言音轨、字幕、版本类型、特别版、规格、其他）", len(groups))
+	if len(groups) != 9 {
+		t.Errorf("分组数 %d, want 9（…+剧集状态）", len(groups))
 	}
 	total := 0
 	seen := map[string]bool{}
@@ -56,8 +56,8 @@ func TestTagGroupsStructure(t *testing.T) {
 			}
 		}
 	}
-	if total != 44 {
-		t.Errorf("tag 词条 %d, want 44（§59.41 +auro_3d +§59.69 高码/高帧 +§59.70 高分）", total)
+	if total != 46 {
+		t.Errorf("tag 词条 %d, want 46（§59.41 +auro_3d +§59.69/70 规格 +§59.71 分集/合集）", total)
 	}
 	// 关键词条锚定
 	for _, k := range []string{"dolby_vision", "chinese_subtitle", "chinese_audio", "complete", "10_bit", "hdr10_plus", "auro_3d"} {

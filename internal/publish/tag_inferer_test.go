@@ -76,3 +76,33 @@ func TestInferHighRating(t *testing.T) {
 		}
 	}
 }
+
+// §59.71 B1: 分集/合集/完结 三标签（藏宝阁 7.6 判定优先级权威）。
+func TestInferEpisodeSplitCollectionComplete(t *testing.T) {
+	cases := []struct {
+		name         string
+		title, sub   string
+		wantSplit    bool // episode_split
+		wantColl     bool // collection
+		wantComplete bool // complete
+	}{
+		{"S01E01 分集", "Show.S01E01.1080p", "", true, false, false},
+		{"EP01 分集", "Show.EP01.1080p", "", true, false, false},
+		{"第1集 分集", "剧.第1集", "", true, false, false},
+		{"E13-E21 范围分集", "Show.E13-E21.1080p", "", true, false, false},
+		{"S01-S02 合集", "Show.S01-S02.1080p", "", false, true, false},
+		{"副标题合集", "Show.S01", "第1-2季合集", false, true, false},
+		{"副标题集全", "Show.S01", "全集", false, false, true},
+		{"已完结", "Show.2024", "已完结", false, false, true},
+		{"全34集 完结", "剧.全34集", "", false, false, true},
+		{"电影无标识", "Movie.2024.1080p", "", false, false, false},
+		{"分集在场压制完结(藏宝阁7.6第一句)", "Show.S01E01.全34集", "", true, false, false},
+	}
+	for _, c := range cases {
+		got := NewMediaTagInferer().InferFull(TagInput{Title: c.title, Subtitle: c.sub})
+		has := func(k string) bool { for _, g := range got { if g == k { return true } }; return false }
+		if has("episode_split") != c.wantSplit || has("collection") != c.wantColl || has("complete") != c.wantComplete {
+			t.Errorf("%s: split=%v coll=%v complete=%v got=%v", c.name, has("episode_split"), has("collection"), has("complete"), got)
+		}
+	}
+}

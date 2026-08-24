@@ -15,6 +15,9 @@ var tagCoverRules = map[string]string{
 // tagMutexGroups 互斥规则组（组内仅保留首个命中的）。
 var tagMutexGroups = [][]string{
 	{"hdr10", "hdr10_plus", "hlg", "sdr"}, // HDR 标准互斥（DV 可共存）
+	// §59.71 B1 剧集状态互斥（藏宝阁 7.6 判定优先级：检测到完结不算分集；
+	// 检测到分集或合集不算完结——同族标识互斥，序=抑制方向）
+	{"complete", "episode_split", "collection"},
 }
 
 // ApplyTagRules 应用互斥/覆盖规则。
