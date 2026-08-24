@@ -16,6 +16,37 @@ import (
 // quoteBlockRe 提取 BBCode [quote] 块（含位置信息）。
 var quoteBlockRe = regexp.MustCompile(`(?is)\[quote(?:=[^\]]*)?\](.*?)\[/quote\]`)
 
+// stripQuoteLayoutImages §59.66: quote 引用内容剥离站内相对路径布局图（方案 A）。
+// NexusPHP 站点用 1px 透明图（trans.gif 等）做行首对齐——转发到目标站解析为
+// 小黑点/占位符，无信息量。仅剥: ①无 scheme 的站内相对路径 [img] ②已知布局图
+// 文件名（任何域）。绝对 URL 内容图保留（真截图在 screenshots 字段单独管理，
+// quote 内 http 图可能是源信息的一部分）。
+var quoteImgRe = regexp.MustCompile(`(?is)\[img\](.*?)\[/img\]`)
+
+func stripQuoteLayoutImages(bbcode string) string {
+	return quoteImgRe.ReplaceAllStringFunc(bbcode, func(m string) string {
+		sub := quoteImgRe.FindStringSubmatch(m)
+		if len(sub) < 2 {
+			return m
+		}
+		u := strings.TrimSpace(sub[1])
+		if u == "" {
+			return ""
+		}
+		// 站内相对路径: 无 scheme（不以 http:// https:// 开头）
+		if !strings.HasPrefix(strings.ToLower(u), "http://") && !strings.HasPrefix(strings.ToLower(u), "https://") {
+			return ""
+		}
+		// 已知布局图文件名（绝对 URL 形态的站点道具）
+		for _, prop := range []string{"trans.gif", "cattrans.gif", "spacer.gif", "pixel.gif"} {
+			if strings.HasSuffix(strings.ToLower(u), "/"+prop) || strings.EqualFold(u[strings.LastIndex(u, "/")+1:], prop) {
+				return ""
+			}
+		}
+		return m
+	})
+}
+
 // quoteBlock BBCode 中的 quote 块（含位置信息）。
 type quoteBlock struct {
 	Start int    // 在 BBCode 中的起始位置（含 [quote] 标签）
@@ -38,8 +69,12 @@ func (p *PublicExtractor) splitIntroSections(descrHTML, descrBBCode string) Intr
 	intro.Poster = posterURL
 	intro.SetScreenshotURLs(screenshots)
 
-	// 3. 提取 quote 块
+	// 3. 提取 quote 块（§59.66: 引用内容剥站内布局图——trans.gif 类小黑点）
 	quotes := extractQuoteBlocks(descrBBCode)
+	for i := range quotes {
+		quotes[i].Full = stripQuoteLayoutImages(quotes[i].Full)
+		quotes[i].Inner = stripQuoteLayoutImages(quotes[i].Inner)
+	}
 
 	// 4. 确定拆分点：海报位置 > MediaInfo 位置 > 全部归类
 	posterIdx := -1
