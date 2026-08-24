@@ -282,7 +282,7 @@
    "aliases": "全集",
    "group": "其他",
    "infer_pattern": "([\\. ]S\\d+\\b|[\\. ](?:全\\d+集|全集|全季|已完结)(?:[\\. ]|$))",
-   "infer_pattern_neg": "(S\\d+\\.?E\\d+|[\\. ]S\\d+-S?\\d+|第\\d+-\\d+季|合集|EP?\\d{1,2}\\b|第\\d+集|[\\. ]E\\d{1,2}\\b|E\\d+-E?\\d+)",
+   "infer_pattern_neg": "(S\\d+\\.?E\\d+|[\\. ]S\\d+-S?\\d+|第\\d+-\\d+季|合集|EP?\\d{1,4}\\b|第\\d+集|[\\. ]E\\d{1,4}\\b|E\\d{1,4}-E?\\d{1,4})",
    "infer_scope": "title_raw",
    "infer_pattern2": "(全集|全季|已完结|完结|全\\d+集|集全|期全)",
    "infer_scope2": "subtitle_raw"
@@ -314,7 +314,7 @@
    "label": "分集",
    "group": "剧集状态",
    "note": "§59.71 B1 藏宝阁7.6判据; 与complete/collection互斥(优先级: 分集/合集 抑制 完结, 完结抑制分集——藏宝阁原文双向, 实现为单互斥组按命中序)",
-   "infer_pattern": "([\\. ]S\\d+E\\d+|\\bEP?\\d{1,2}\\b|E\\d+-E?\\d+|第\\d+集|[\\. ]E\\d{1,2}\\b)",
+   "infer_pattern": "([\\. ]S\\d+E\\d+|\\bEP?\\d{1,4}\\b|E\\d{1,4}-E?\\d{1,4}|第\\d+集|[\\. ]E\\d{1,4}\\b)",
    "infer_scope": "title_raw"
   },
   {
