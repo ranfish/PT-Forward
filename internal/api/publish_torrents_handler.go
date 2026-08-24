@@ -46,6 +46,7 @@ type PublishTorrentsHandler struct {
 	complianceChecker *compliance.Checker
 	seedPipeline       SeedArtifactAnalyzer
 	shotStrategy       ScreenshotStrategyRunner
+	screenshotCacheDays int // §59.63: 截图链接缓存观察期（天，<=0 关闭）
 	ptgen              PTGenAnalyzer
 	resourceResolver   *publish.ResourceResolver
 	logger         *zap.Logger
@@ -88,6 +89,7 @@ func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger) *PublishTorrents
 		bgState:          backgroundQueryState{active: make(map[uint]bool)},
 		resourceResolver: publish.NewResourceResolver(db),
 		strategySem:      make(chan struct{}, 5),
+		screenshotCacheDays: 30, // §59.63: 观察期默认 30 天（SetScreenshotCacheDays 由 settings 覆盖）
 	}
 }
 
@@ -145,6 +147,9 @@ func (h *PublishTorrentsHandler) SetMetadataFetcher(f MetadataFetcherProvider)  
 func (h *PublishTorrentsHandler) SetComplianceChecker(c *compliance.Checker)        { h.complianceChecker = c }
 func (h *PublishTorrentsHandler) SetSeedPipeline(p SeedArtifactAnalyzer)             { h.seedPipeline = p }
 func (h *PublishTorrentsHandler) SetScreenshotStrategyRunner(p ScreenshotStrategyRunner) { h.shotStrategy = p }
+
+// SetScreenshotCacheDays §59.63: 截图链接缓存观察期（天）。<=0 关闭。
+func (h *PublishTorrentsHandler) SetScreenshotCacheDays(days int) { h.screenshotCacheDays = days }
 func (h *PublishTorrentsHandler) SetPTGenAnalyzer(p PTGenAnalyzer)                    { h.ptgen = p }
 
 // §59.21: 本地产物分析接口（只跑 mediainfo，不跑截图）
@@ -3946,6 +3951,23 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientID, infoHash, sit
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
+	// §59.63: 截图链接缓存（观察期）——簇键命中且未过期直接复用，跳过探活/转存/
+	// mpv/上传全链（Q3 缓存优先：本批源站截图不消费）。锚点=最近一次成功写穿，
+	// 手动捕获结果也刷新锚点（Q4）。过期=miss 走既有策略（Q2=A：源站充足仍转存
+	// 源站，不足才 mpv——与 §59.53 语义一致）。
+	if cached, ok := h.lookupScreenshotCache(clientID, savePath, name); ok {
+		data, _ := json.Marshal(cached)
+		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+			Update("screenshots", string(data)).Error; err == nil {
+			h.propagateClusterScreenshots(ctx, clientID, savePath, name, infoHash, string(data))
+			h.logger.Info("screenshot cache hit",
+				zap.String("hash", infoHash[:min(10, len(infoHash))]),
+				zap.Int("shots", len(cached)))
+		}
+		return
+	}
+
 	// §59.57: 探活内联前序（自带 90s 独立 ctx，读自身快照；HEAD 秒级不占策略预算）
 	h.purgeDeadScreenshots(infoHash, siteName)
 
@@ -3999,4 +4021,7 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientID, infoHash, sit
 		zap.Bool("local", isLocal),
 		zap.Int("source", len(source)),
 		zap.Int("final", len(final)))
+
+	// §59.63: 成功落库写穿缓存（final 非空才到达此处——same 早退/失败路径不写）
+	upsertClusterScreenshotCache(h.db, h.logger, h.screenshotCacheDays, clientID, savePath, name, final)
 }

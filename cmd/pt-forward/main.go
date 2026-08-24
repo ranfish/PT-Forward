@@ -510,6 +510,8 @@ func main() {
 		log.Info("screenshot disabled, but MediaInfo extraction still active")
 	}
 	publishPipeline.SetScreenshotConfig(ssCfg)
+	// §59.63: 截图链接缓存观察期（settings 可配，默认 30 天；<=0 关闭）——批量链 + 手动链同配
+	router.SetScreenshotCacheDays(runtimeCfg.GetInt(ctx, setting.KeyScreenshotCacheDays))
 
 	rateLimitEnabled := runtimeCfg.GetBool(ctx, setting.KeyRateLimitEnabled)
 	rateLimitGlobal := runtimeCfg.GetInt(ctx, setting.KeyRateLimitGlobal)

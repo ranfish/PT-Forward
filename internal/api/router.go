@@ -213,6 +213,14 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	}
 }
 
+// SetScreenshotCacheDays §59.63: 截图链接缓存观察期（天，<=0 关闭）——批量链与手动链同配。
+func (rt *Router) SetScreenshotCacheDays(days int) {
+	rt.publishTorrentsHandler.SetScreenshotCacheDays(days)
+	if rt.manualForwardHandler != nil {
+		rt.manualForwardHandler.SetScreenshotCacheDays(days)
+	}
+}
+
 func (rt *Router) SetCookieCloudServer(srv http.Handler) {
 	rt.cookiecloudServer = srv
 }
