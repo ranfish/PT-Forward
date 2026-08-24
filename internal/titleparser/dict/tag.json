@@ -1,291 +1,307 @@
 {
-  "tokens": [
-    {
-      "canonical": "dolby_vision",
-      "label": "Dolby Vision",
-      "aliases": "DV/DoVi",
-      "group": "HDR/色彩",
-      "infer_pattern": "dolby vision|dovi",
-      "infer_scope": "all",
-      "infer_pattern2": "dv ",
-      "infer_scope2": "title"
-    },
-    {
-      "canonical": "hdr10_plus",
-      "label": "HDR10+",
-      "aliases": "",
-      "group": "HDR/色彩",
-      "infer_pattern": "hdr10\\+",
-      "infer_scope": "all"
-    },
-    {
-      "canonical": "hdr10",
-      "label": "HDR10",
-      "aliases": "HDR 10",
-      "group": "HDR/色彩",
-      "infer_pattern": "hdr10",
-      "infer_scope": "all",
-      "infer_exclusive_with": "hdr10_plus"
-    },
-    {
-      "canonical": "hdr_vivid",
-      "label": "HDR Vivid",
-      "aliases": "国标 HDR",
-      "group": "HDR/色彩"
-    },
-    {
-      "canonical": "hlg",
-      "label": "HLG",
-      "aliases": "",
-      "group": "HDR/色彩",
-      "infer_pattern": "hlg",
-      "infer_scope": "all"
-    },
-    {
-      "canonical": "10_bit",
-      "label": "10bit",
-      "aliases": "10-bit 色深",
-      "group": "HDR/色彩",
-      "infer_pattern": "10bit|10 bit|10-bit",
-      "infer_scope": "all_mi"
-    },
-    {
-      "canonical": "dolby_atmos",
-      "label": "Dolby Atmos",
-      "aliases": "全景声",
-      "group": "音频编码",
-      "infer_pattern": "dolby atmos|atmos",
-      "infer_scope": "all"
-    },
-    {
-      "canonical": "auro_3d",
-      "label": "Auro3D",
-      "aliases": "Auro-3D",
-      "group": "音频编码",
-      "infer_pattern": "auro[-. ]?3d",
-      "infer_scope": "all"
-    },
-    {
-      "canonical": "dts_x",
-      "label": "DTS:X",
-      "aliases": "",
-      "group": "音频编码",
-      "infer_pattern": "dts:x",
-      "infer_scope": "all"
-    },
-    {
-      "canonical": "lossless",
-      "label": "无损",
-      "aliases": "",
-      "group": "音频编码"
-    },
-    {
-      "canonical": "lossy",
-      "label": "有损",
-      "aliases": "",
-      "group": "音频编码"
-    },
-    {
-      "canonical": "chinese_audio",
-      "label": "国语",
-      "aliases": "普通话/国配",
-      "group": "语言音轨",
-      "infer_pattern": "([^多]国.{0,3}语|国.{0,3}配|台.{0,3}语|台.{0,3}配|(Audio[^\\n]*Chinese)|(Audio[^\\n]*mandarin))",
-      "infer_scope": "all_raw",
-      "infer_exclude": "国家",
-      "infer_pattern2": "◎语.*?言　汉语普通话",
-      "infer_scope2": "desc_raw"
-    },
-    {
-      "canonical": "cantonese_audio",
-      "label": "粤语",
-      "aliases": "",
-      "group": "语言音轨",
-      "infer_pattern": "(粤.{0,3}语|粤.{0,3}配|(Audio[^\\n]*cantonese))",
-      "infer_scope": "all_raw",
-      "infer_pattern2": "◎语.*?言　粤语",
-      "infer_scope2": "desc_raw"
-    },
-    {
-      "canonical": "japanese_audio",
-      "label": "日语",
-      "aliases": "原声",
-      "group": "语言音轨"
-    },
-    {
-      "canonical": "korean_audio",
-      "label": "韩语",
-      "aliases": "",
-      "group": "语言音轨"
-    },
-    {
-      "canonical": "original_audio",
-      "label": "原声",
-      "aliases": "",
-      "group": "语言音轨"
-    },
-    {
-      "canonical": "dubbed",
-      "label": "配音",
-      "aliases": "Dub",
-      "group": "语言音轨"
-    },
-    {
-      "canonical": "chinese_subtitle",
-      "label": "中文字幕",
-      "aliases": "CHS/简繁",
-      "group": "字幕",
-      "infer_pattern": "([简繁].{0,12}字幕|[简繁中].{0,3}字|简中|DIY.{1,5}字|内封.{0,3}[繁中字]|Presentation Graphics.*Chinese|(Text[^\\n]*Chinese)|(subtitles?[^\\n]*chs)|(subtitles?[^\\n]*mandarin)|(subtitle[^\\n]*chinese))",
-      "infer_scope": "all_raw"
-    },
-    {
-      "canonical": "english_subtitle",
-      "label": "英文字幕",
-      "aliases": "ENG",
-      "group": "字幕",
-      "infer_pattern": "(英.{0,12}字幕|英.{0,3}字|内封.{0,3}英.{0,3}字|(Text[^\\n]*English)|(subtitles?[^\\n]*eng)|(subtitle[^\\n]*english)|(Graphics[^\\n]*English))",
-      "infer_scope": "all_raw"
-    },
-    {
-      "canonical": "hardcoded_subs",
-      "label": "硬字幕",
-      "aliases": "硬字",
-      "group": "字幕"
-    },
-    {
-      "canonical": "encoded_subs",
-      "label": "内嵌字幕",
-      "aliases": "",
-      "group": "字幕"
-    },
-    {
-      "canonical": "external_subtitles",
-      "label": "外挂字幕",
-      "aliases": "",
-      "group": "字幕"
-    },
-    {
-      "canonical": "subtitles_include",
-      "label": "含字幕",
-      "aliases": "",
-      "group": "字幕"
-    },
-    {
-      "canonical": "diy",
-      "label": "DIY",
-      "aliases": "",
-      "group": "版本类型",
-      "infer_pattern": "diy",
-      "infer_scope": "title"
-    },
-    {
-      "canonical": "scene",
-      "label": "Scene",
-      "aliases": "Scene Release",
-      "group": "版本类型"
-    },
-    {
-      "canonical": "remux",
-      "label": "Remux",
-      "aliases": "",
-      "group": "版本类型",
-      "infer_pattern": "remux",
-      "infer_scope": "title"
-    },
-    {
-      "canonical": "internal",
-      "label": "Internal",
-      "aliases": "iNTERNAL",
-      "group": "版本类型"
-    },
-    {
-      "canonical": "exclusive",
-      "label": "独占",
-      "aliases": "专属",
-      "group": "版本类型"
-    },
-    {
-      "canonical": "retail",
-      "label": "Retail",
-      "aliases": "",
-      "group": "版本类型"
-    },
-    {
-      "canonical": "web_release",
-      "label": "WEB Release",
-      "aliases": "",
-      "group": "版本类型"
-    },
-    {
-      "canonical": "promotional",
-      "label": "宣传版",
-      "aliases": "Promo",
-      "group": "版本类型"
-    },
-    {
-      "canonical": "hybrid",
-      "label": "Hybrid",
-      "aliases": "",
-      "group": "版本类型"
-    },
-    {
-      "canonical": "special_edition",
-      "label": "特别版",
-      "aliases": "Special Edition",
-      "group": "特别版"
-    },
-    {
-      "canonical": "director_s_cut",
-      "label": "导演剪辑",
-      "aliases": "Director's Cut",
-      "group": "特别版"
-    },
-    {
-      "canonical": "anniversary_edition",
-      "label": "纪念版",
-      "aliases": "Anniversary",
-      "group": "特别版"
-    },
-    {
-      "canonical": "criterion",
-      "label": "Criterion",
-      "aliases": "CC",
-      "group": "特别版"
-    },
-    {
-      "canonical": "the_criterion_collection",
-      "label": "CC 收藏",
-      "aliases": "Criterion Collection",
-      "group": "特别版"
-    },
-    {
-      "canonical": "4k_remaster",
-      "label": "4K Remaster",
-      "aliases": "4K 重制",
-      "group": "特别版"
-    },
-    {
-      "canonical": "4k_restoration",
-      "label": "4K Restoration",
-      "aliases": "4K 修复",
-      "group": "特别版"
-    },
-    {
-      "canonical": "commentary",
-      "label": "评论音轨",
-      "aliases": "Commentary",
-      "group": "其他"
-    },
-    {
-      "canonical": "complete",
-      "label": "完结",
-      "aliases": "全集",
-      "group": "其他",
-      "infer_pattern": "[\\. ]S\\d+\\b",
-      "infer_pattern_neg": "S\\d+\\.?E\\d+",
-      "infer_scope": "title_raw",
-      "infer_pattern2": "全\\d+集",
-      "infer_scope2": "subtitle_raw"
-    }
-  ]
+ "tokens": [
+  {
+   "canonical": "dolby_vision",
+   "label": "Dolby Vision",
+   "aliases": "DV/DoVi",
+   "group": "HDR/色彩",
+   "infer_pattern": "dolby vision|dovi",
+   "infer_scope": "all",
+   "infer_pattern2": "dv ",
+   "infer_scope2": "title"
+  },
+  {
+   "canonical": "hdr10_plus",
+   "label": "HDR10+",
+   "aliases": "",
+   "group": "HDR/色彩",
+   "infer_pattern": "hdr10\\+",
+   "infer_scope": "all"
+  },
+  {
+   "canonical": "hdr10",
+   "label": "HDR10",
+   "aliases": "HDR 10",
+   "group": "HDR/色彩",
+   "infer_pattern": "hdr10",
+   "infer_scope": "all",
+   "infer_exclusive_with": "hdr10_plus"
+  },
+  {
+   "canonical": "hdr_vivid",
+   "label": "HDR Vivid",
+   "aliases": "国标 HDR",
+   "group": "HDR/色彩"
+  },
+  {
+   "canonical": "hlg",
+   "label": "HLG",
+   "aliases": "",
+   "group": "HDR/色彩",
+   "infer_pattern": "hlg",
+   "infer_scope": "all"
+  },
+  {
+   "canonical": "10_bit",
+   "label": "10bit",
+   "aliases": "10-bit 色深",
+   "group": "HDR/色彩",
+   "infer_pattern": "10bit|10 bit|10-bit",
+   "infer_scope": "all_mi"
+  },
+  {
+   "canonical": "dolby_atmos",
+   "label": "Dolby Atmos",
+   "aliases": "全景声",
+   "group": "音频编码",
+   "infer_pattern": "dolby atmos|atmos",
+   "infer_scope": "all"
+  },
+  {
+   "canonical": "auro_3d",
+   "label": "Auro3D",
+   "aliases": "Auro-3D",
+   "group": "音频编码",
+   "infer_pattern": "auro[-. ]?3d",
+   "infer_scope": "all"
+  },
+  {
+   "canonical": "dts_x",
+   "label": "DTS:X",
+   "aliases": "",
+   "group": "音频编码",
+   "infer_pattern": "dts:x",
+   "infer_scope": "all"
+  },
+  {
+   "canonical": "lossless",
+   "label": "无损",
+   "aliases": "",
+   "group": "音频编码"
+  },
+  {
+   "canonical": "lossy",
+   "label": "有损",
+   "aliases": "",
+   "group": "音频编码"
+  },
+  {
+   "canonical": "chinese_audio",
+   "label": "国语",
+   "aliases": "普通话/国配",
+   "group": "语言音轨",
+   "infer_pattern": "([^多]国.{0,3}语|国.{0,3}配|台.{0,3}语|台.{0,3}配|(Audio[^\\n]*Chinese)|(Audio[^\\n]*mandarin))",
+   "infer_scope": "all_raw",
+   "infer_exclude": "国家",
+   "infer_pattern2": "◎语.*?言　汉语普通话",
+   "infer_scope2": "desc_raw"
+  },
+  {
+   "canonical": "cantonese_audio",
+   "label": "粤语",
+   "aliases": "",
+   "group": "语言音轨",
+   "infer_pattern": "(粤.{0,3}语|粤.{0,3}配|(Audio[^\\n]*cantonese))",
+   "infer_scope": "all_raw",
+   "infer_pattern2": "◎语.*?言　粤语",
+   "infer_scope2": "desc_raw"
+  },
+  {
+   "canonical": "japanese_audio",
+   "label": "日语",
+   "aliases": "原声",
+   "group": "语言音轨"
+  },
+  {
+   "canonical": "korean_audio",
+   "label": "韩语",
+   "aliases": "",
+   "group": "语言音轨"
+  },
+  {
+   "canonical": "original_audio",
+   "label": "原声",
+   "aliases": "",
+   "group": "语言音轨"
+  },
+  {
+   "canonical": "dubbed",
+   "label": "配音",
+   "aliases": "Dub",
+   "group": "语言音轨"
+  },
+  {
+   "canonical": "chinese_subtitle",
+   "label": "中文字幕",
+   "aliases": "CHS/简繁",
+   "group": "字幕",
+   "infer_pattern": "([简繁].{0,12}字幕|[简繁中].{0,3}字|简中|DIY.{1,5}字|内封.{0,3}[繁中字]|Presentation Graphics.*Chinese|(Text[^\\n]*Chinese)|(subtitles?[^\\n]*chs)|(subtitles?[^\\n]*mandarin)|(subtitle[^\\n]*chinese))",
+   "infer_scope": "all_raw"
+  },
+  {
+   "canonical": "english_subtitle",
+   "label": "英文字幕",
+   "aliases": "ENG",
+   "group": "字幕",
+   "infer_pattern": "(英.{0,12}字幕|英.{0,3}字|内封.{0,3}英.{0,3}字|(Text[^\\n]*English)|(subtitles?[^\\n]*eng)|(subtitle[^\\n]*english)|(Graphics[^\\n]*English))",
+   "infer_scope": "all_raw"
+  },
+  {
+   "canonical": "hardcoded_subs",
+   "label": "硬字幕",
+   "aliases": "硬字",
+   "group": "字幕"
+  },
+  {
+   "canonical": "encoded_subs",
+   "label": "内嵌字幕",
+   "aliases": "",
+   "group": "字幕"
+  },
+  {
+   "canonical": "external_subtitles",
+   "label": "外挂字幕",
+   "aliases": "",
+   "group": "字幕"
+  },
+  {
+   "canonical": "subtitles_include",
+   "label": "含字幕",
+   "aliases": "",
+   "group": "字幕"
+  },
+  {
+   "canonical": "diy",
+   "label": "DIY",
+   "aliases": "",
+   "group": "版本类型",
+   "infer_pattern": "diy",
+   "infer_scope": "title"
+  },
+  {
+   "canonical": "scene",
+   "label": "Scene",
+   "aliases": "Scene Release",
+   "group": "版本类型"
+  },
+  {
+   "canonical": "remux",
+   "label": "Remux",
+   "aliases": "",
+   "group": "版本类型",
+   "infer_pattern": "remux",
+   "infer_scope": "title"
+  },
+  {
+   "canonical": "internal",
+   "label": "Internal",
+   "aliases": "iNTERNAL",
+   "group": "版本类型"
+  },
+  {
+   "canonical": "exclusive",
+   "label": "独占",
+   "aliases": "专属",
+   "group": "版本类型"
+  },
+  {
+   "canonical": "retail",
+   "label": "Retail",
+   "aliases": "",
+   "group": "版本类型"
+  },
+  {
+   "canonical": "web_release",
+   "label": "WEB Release",
+   "aliases": "",
+   "group": "版本类型"
+  },
+  {
+   "canonical": "promotional",
+   "label": "宣传版",
+   "aliases": "Promo",
+   "group": "版本类型"
+  },
+  {
+   "canonical": "hybrid",
+   "label": "Hybrid",
+   "aliases": "",
+   "group": "版本类型"
+  },
+  {
+   "canonical": "special_edition",
+   "label": "特别版",
+   "aliases": "Special Edition",
+   "group": "特别版"
+  },
+  {
+   "canonical": "director_s_cut",
+   "label": "导演剪辑",
+   "aliases": "Director's Cut",
+   "group": "特别版"
+  },
+  {
+   "canonical": "anniversary_edition",
+   "label": "纪念版",
+   "aliases": "Anniversary",
+   "group": "特别版"
+  },
+  {
+   "canonical": "criterion",
+   "label": "Criterion",
+   "aliases": "CC",
+   "group": "特别版"
+  },
+  {
+   "canonical": "the_criterion_collection",
+   "label": "CC 收藏",
+   "aliases": "Criterion Collection",
+   "group": "特别版"
+  },
+  {
+   "canonical": "4k_remaster",
+   "label": "4K Remaster",
+   "aliases": "4K 重制",
+   "group": "特别版"
+  },
+  {
+   "canonical": "4k_restoration",
+   "label": "4K Restoration",
+   "aliases": "4K 修复",
+   "group": "特别版"
+  },
+  {
+   "canonical": "commentary",
+   "label": "评论音轨",
+   "aliases": "Commentary",
+   "group": "其他"
+  },
+  {
+   "canonical": "complete",
+   "label": "完结",
+   "aliases": "全集",
+   "group": "其他",
+   "infer_pattern": "[\\. ]S\\d+\\b",
+   "infer_pattern_neg": "S\\d+\\.?E\\d+",
+   "infer_scope": "title_raw",
+   "infer_pattern2": "全\\d+集",
+   "infer_scope2": "subtitle_raw"
+  },
+  {
+   "canonical": "high_bitrate",
+   "label": "高码",
+   "group": "规格",
+   "infer_pattern": "高码率|高码|高比特率",
+   "infer_scope": "title_raw",
+   "note": "§59.69 数值判据(MI Overall≥15Mb/s@≥4K / ≥9Mb/s@<4K)在 MediaTagInferer.InferFull 代码层"
+  },
+  {
+   "canonical": "high_frame_rate",
+   "label": "高帧",
+   "group": "规格",
+   "infer_pattern": "高帧率|高帧|60\\s*fps|120\\s*fps",
+   "infer_scope": "title_raw",
+   "note": "§59.69 数值判据(MI Frame rate≥60, 59.940 NTSC 不算)在 MediaTagInferer.InferFull 代码层"
+  }
+ ]
 }
