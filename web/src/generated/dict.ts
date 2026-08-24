@@ -439,6 +439,11 @@ export const TAG_GROUPS: TagGroup[] = [
       "name": "字幕",
       "tags": [
         {
+          "key": "special_effects_subs",
+          "label": "特效字幕",
+          "aliases": ""
+        },
+        {
           "key": "chinese_subtitle",
           "label": "中文字幕",
           "aliases": "CHS/简繁"

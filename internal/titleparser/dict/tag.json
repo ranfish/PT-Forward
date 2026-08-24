@@ -8,7 +8,14 @@
    "infer_pattern": "dolby vision|dovi",
    "infer_scope": "all",
    "infer_pattern2": "dv ",
-   "infer_scope2": "title"
+   "infer_scope2": "title",
+   "standard_key": "tag.dolby_vision",
+   "variants": [
+    "杜比",
+    "杜比视界",
+    "DV",
+    "DoVi"
+   ]
   },
   {
    "canonical": "hdr10_plus",
@@ -16,7 +23,11 @@
    "aliases": "",
    "group": "HDR/色彩",
    "infer_pattern": "hdr10\\+",
-   "infer_scope": "all"
+   "infer_scope": "all",
+   "standard_key": "tag.hdr10_plus",
+   "variants": [
+    "HDR10+"
+   ]
   },
   {
    "canonical": "hdr10",
@@ -25,13 +36,22 @@
    "group": "HDR/色彩",
    "infer_pattern": "hdr10",
    "infer_scope": "all",
-   "infer_exclusive_with": "hdr10_plus"
+   "infer_exclusive_with": "hdr10_plus",
+   "standard_key": "tag.hdr10",
+   "variants": [
+    "HDR"
+   ]
   },
   {
    "canonical": "hdr_vivid",
    "label": "HDR Vivid",
    "aliases": "国标 HDR",
-   "group": "HDR/色彩"
+   "group": "HDR/色彩",
+   "standard_key": "tag.hdr_vivid",
+   "variants": [
+    "HDR Vivid",
+    "菁彩HDR"
+   ]
   },
   {
    "canonical": "hlg",
@@ -47,7 +67,12 @@
    "aliases": "10-bit 色深",
    "group": "HDR/色彩",
    "infer_pattern": "10bit|10 bit|10-bit",
-   "infer_scope": "all_mi"
+   "infer_scope": "all_mi",
+   "standard_key": "tag.10_bit",
+   "variants": [
+    "10bit",
+    "10Bit"
+   ]
   },
   {
    "canonical": "dolby_atmos",
@@ -55,7 +80,13 @@
    "aliases": "全景声",
    "group": "音频编码",
    "infer_pattern": "dolby atmos|atmos",
-   "infer_scope": "all"
+   "infer_scope": "all",
+   "standard_key": "tag.dolby_atmos",
+   "variants": [
+    "Atmos",
+    "全景声",
+    "杜比全景声"
+   ]
   },
   {
    "canonical": "auro_3d",
@@ -94,7 +125,13 @@
    "infer_scope": "all_raw",
    "infer_exclude": "国家",
    "infer_pattern2": "◎语.*?言　汉语普通话",
-   "infer_scope2": "desc_raw"
+   "infer_scope2": "desc_raw",
+   "standard_key": "tag.chinese_audio",
+   "variants": [
+    "国语",
+    "国语配音",
+    "中配"
+   ]
   },
   {
    "canonical": "cantonese_audio",
@@ -104,7 +141,11 @@
    "infer_pattern": "(粤.{0,3}语|粤.{0,3}配|(Audio[^\\n]*cantonese))",
    "infer_scope": "all_raw",
    "infer_pattern2": "◎语.*?言　粤语",
-   "infer_scope2": "desc_raw"
+   "infer_scope2": "desc_raw",
+   "standard_key": "tag.cantonese_audio",
+   "variants": [
+    "粤语"
+   ]
   },
   {
    "canonical": "japanese_audio",
@@ -131,12 +172,37 @@
    "group": "语言音轨"
   },
   {
+   "canonical": "special_effects_subs",
+   "label": "特效字幕",
+   "group": "字幕",
+   "note": "§59.73 B1 补遗: 副标题/标题 特效字幕|特效中字 + 引用(statement)第二源——发布者声明区; description 是 PTGen 剧情简介(§59.55)不承载声明, 裸'特效'不命中",
+   "infer_pattern": "(特效字幕|特效中字)",
+   "infer_scope": "title_raw",
+   "infer_pattern2": "(特效字幕)",
+   "infer_scope2": "statement_raw",
+   "standard_key": "tag.special_effects_subs",
+   "variants": [
+    "特效",
+    "特效字幕"
+   ]
+  },
+  {
    "canonical": "chinese_subtitle",
    "label": "中文字幕",
    "aliases": "CHS/简繁",
    "group": "字幕",
    "infer_pattern": "([简繁].{0,12}字幕|[简繁中].{0,3}字|简中|DIY.{1,5}字|内封.{0,3}[繁中字]|Presentation Graphics.*Chinese|(Text[^\\n]*Chinese)|(subtitles?[^\\n]*chs)|(subtitles?[^\\n]*mandarin)|(subtitle[^\\n]*chinese))",
-   "infer_scope": "all_raw"
+   "infer_scope": "all_raw",
+   "standard_key": "tag.chinese_subtitle",
+   "variants": [
+    "中字",
+    "中文字幕",
+    "简中",
+    "繁中",
+    "简繁",
+    "CHS",
+    "CHT"
+   ]
   },
   {
    "canonical": "english_subtitle",
@@ -144,7 +210,12 @@
    "aliases": "ENG",
    "group": "字幕",
    "infer_pattern": "(英.{0,12}字幕|英.{0,3}字|内封.{0,3}英.{0,3}字|(Text[^\\n]*English)|(subtitles?[^\\n]*eng)|(subtitle[^\\n]*english)|(Graphics[^\\n]*English))",
-   "infer_scope": "all_raw"
+   "infer_scope": "all_raw",
+   "standard_key": "tag.english_subtitle",
+   "variants": [
+    "英字",
+    "英文字幕"
+   ]
   },
   {
    "canonical": "hardcoded_subs",
@@ -176,7 +247,11 @@
    "aliases": "",
    "group": "版本类型",
    "infer_pattern": "diy",
-   "infer_scope": "title"
+   "infer_scope": "title",
+   "standard_key": "tag.diy",
+   "variants": [
+    "DIY"
+   ]
   },
   {
    "canonical": "scene",
@@ -190,7 +265,11 @@
    "aliases": "",
    "group": "版本类型",
    "infer_pattern": "remux",
-   "infer_scope": "title"
+   "infer_scope": "title",
+   "standard_key": "tag.remux",
+   "variants": [
+    "Remux"
+   ]
   },
   {
    "canonical": "internal",
@@ -285,7 +364,13 @@
    "infer_pattern_neg": "(S\\d+\\.?E\\d+|[\\. ]S\\d+-S?\\d+|第\\d+-\\d+季|合集|EP?\\d{1,4}\\b|第\\d+集|[\\. ]E\\d{1,4}\\b|E\\d{1,4}-E?\\d{1,4})",
    "infer_scope": "title_raw",
    "infer_pattern2": "(全集|全季|已完结|完结|全\\d+集|集全|期全)",
-   "infer_scope2": "subtitle_raw"
+   "infer_scope2": "subtitle_raw",
+   "standard_key": "tag.complete",
+   "variants": [
+    "完结",
+    "已完结",
+    "全集"
+   ]
   },
   {
    "canonical": "high_bitrate",
@@ -293,7 +378,13 @@
    "group": "规格",
    "infer_pattern": "高码率|高码|高比特率",
    "infer_scope": "title_raw",
-   "note": "§59.69 数值判据(MI Overall≥15Mb/s@≥4K / ≥9Mb/s@<4K)在 MediaTagInferer.InferFull 代码层"
+   "note": "§59.69 数值判据(MI Overall≥15Mb/s@≥4K / ≥9Mb/s@<4K)在 MediaTagInferer.InferFull 代码层",
+   "standard_key": "tag.high_bitrate",
+   "variants": [
+    "高码",
+    "高码率",
+    "高比特率"
+   ]
   },
   {
    "canonical": "high_frame_rate",
@@ -301,13 +392,22 @@
    "group": "规格",
    "infer_pattern": "高帧率|高帧|60\\s*fps|120\\s*fps",
    "infer_scope": "title_raw",
-   "note": "§59.69 数值判据(MI Frame rate≥60, 59.940 NTSC 不算)在 MediaTagInferer.InferFull 代码层"
+   "note": "§59.69 数值判据(MI Frame rate≥60, 59.940 NTSC 不算)在 MediaTagInferer.InferFull 代码层",
+   "standard_key": "tag.high_frame_rate",
+   "variants": [
+    "高帧",
+    "高帧率"
+   ]
   },
   {
    "canonical": "high_rating",
    "label": "高分",
    "group": "规格",
-   "note": "§59.70 数值判据(豆瓣评分≥8.0, 8.0算7.9不算, 无评分不命中)在 MediaTagInferer.InferFull 代码层——评分行由 PTGen 简介落库后 t2 重推补上"
+   "note": "§59.70 数值判据(豆瓣评分≥8.0, 8.0算7.9不算, 无评分不命中)在 MediaTagInferer.InferFull 代码层——评分行由 PTGen 简介落库后 t2 重推补上",
+   "standard_key": "tag.high_rating",
+   "variants": [
+    "高分"
+   ]
   },
   {
    "canonical": "episode_split",
@@ -315,7 +415,11 @@
    "group": "剧集状态",
    "note": "§59.71 B1 藏宝阁7.6判据; 与complete/collection互斥(优先级: 分集/合集 抑制 完结, 完结抑制分集——藏宝阁原文双向, 实现为单互斥组按命中序)",
    "infer_pattern": "([\\. ]S\\d+E\\d+|\\bEP?\\d{1,4}\\b|E\\d{1,4}-E?\\d{1,4}|第\\d+集|[\\. ]E\\d{1,4}\\b)",
-   "infer_scope": "title_raw"
+   "infer_scope": "title_raw",
+   "standard_key": "tag.episode_split",
+   "variants": [
+    "分集"
+   ]
   },
   {
    "canonical": "collection",
@@ -325,19 +429,31 @@
    "infer_pattern": "([\\. ]S\\d+-S?\\d+|第\\d+-\\d+季|合集)",
    "infer_scope": "title_raw",
    "infer_pattern2": "(合集|集全|期全)",
-   "infer_scope2": "subtitle_raw"
+   "infer_scope2": "subtitle_raw",
+   "standard_key": "tag.collection",
+   "variants": [
+    "合集"
+   ]
   },
   {
    "canonical": "ongoing",
    "label": "连载",
    "group": "剧集状态",
-   "note": "§59.72 B2 组合判据(episode_split && !complete && !collection, ubits 连载=分集资源)在 MediaTagInferer.InferFull 代码层; 与 collection 互斥(ubits)"
+   "note": "§59.72 B2 组合判据(episode_split && !complete && !collection, ubits 连载=分集资源)在 MediaTagInferer.InferFull 代码层; 与 collection 互斥(ubits)",
+   "standard_key": "tag.ongoing",
+   "variants": [
+    "连载"
+   ]
   },
   {
    "canonical": "big_pack",
    "label": "大包",
    "group": "规格",
-   "note": "§59.72 B2 size>1TB(AGSV 审核硬规则 >1T 必须标注)在 InferFull 代码层(TagInput.Size)"
+   "note": "§59.72 B2 size>1TB(AGSV 审核硬规则 >1T 必须标注)在 InferFull 代码层(TagInput.Size)",
+   "standard_key": "tag.big_pack",
+   "variants": [
+    "大包"
+   ]
   }
  ]
 }
