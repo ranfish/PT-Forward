@@ -45,3 +45,34 @@ func TestInferHighBitrate(t *testing.T) {
 		}
 	}
 }
+
+// §59.70: 高分标签——豆瓣评分 ≥8.0（8.0 算 7.9 不算；无评分/暂无评分不命中）。
+// 评分行来自 PTGen 简介落库后（"◎豆瓣评分　8.2/10 (N 人评价)"，全角空格），
+// t0 推断时 PTGen 未落库 → applyPosterFallback t2 后重推补上（api 层锚）。
+func TestInferHighRating(t *testing.T) {
+	cases := []struct {
+		name string
+		desc string
+		want bool
+	}{
+		{"8.2 命中", "◎豆瓣评分　8.2/10 (19214 人评价)", true},
+		{"8.0 边界含", "◎豆瓣评分　8.0/10 (500 人评价)", true},
+		{"7.9 不算", "◎豆瓣评分　7.9/10 (99999 人评价)", false},
+		{"无评分行", "◎豆瓣评分　暂无评分", false},
+		{"完全没有", "剧情简介正文", false},
+		{"IMDb 行不消费", "◎IMDb评分  8.5/10 (61992 人评价)", false},
+		{"全角空格+普通空格变体", "◎豆瓣评分 8.6/10", true},
+	}
+	for _, c := range cases {
+		got := NewMediaTagInferer().InferFull(TagInput{Title: "M.2024", Description: c.desc})
+		has := false
+		for _, g := range got {
+			if g == "high_rating" {
+				has = true
+			}
+		}
+		if has != c.want {
+			t.Errorf("%s: high_rating=%v want %v (desc=%q)", c.name, has, c.want, c.desc)
+		}
+	}
+}

@@ -50,6 +50,9 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	// 高帧: MI Frame rate ≥60（59.940 NTSC 不算）
 	// 仅视频类种子（无 Video 段解析不到宽度/帧率，自然不命中）
 	hasHB, hasHF := inferNumericSpecTags(in.MediaInfo)
+	// §59.70: 高分——豆瓣评分 ≥8.0（Description 源——PTGen 简介行，
+	// "◎豆瓣评分　8.2/10"；无评分/暂无评分不命中）
+	hasHR := parseDoubanRatingScore(in.Description) >= 8.0
 	has := func(k string) bool {
 		for _, t := range tags {
 			if t == k {
@@ -63,6 +66,9 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	}
 	if hasHF && !has("high_frame_rate") {
 		tags = append(tags, "high_frame_rate")
+	}
+	if hasHR && !has("high_rating") {
+		tags = append(tags, "high_rating")
 	}
 	return ApplyTagRules(dedupTags(tags))
 }
@@ -121,6 +127,23 @@ func parseMIWidthPixels(mi string) int {
 	}
 	n, _ := strconv.Atoi(strings.ReplaceAll(m[1], " ", ""))
 	return n
+}
+
+// doubanRatingLineRe §59.70: PTGen 豌豆评分行——全角/半角空格、"N.N"或"N.N/10" 形态。
+// IMDb 行因前缀不同（◎IMDb评分）天然不匹配。
+var doubanRatingLineRe = regexp.MustCompile(`◎豆瓣评分[\s\x{3000}]+([0-9]+(?:\.[0-9]+)?)(?:\s*/\s*10)?`)
+
+// parseDoubanRatingScore 从简介文本解析豆瓣评分（无行/暂无评分返回 0）。
+func parseDoubanRatingScore(desc string) float64 {
+	m := doubanRatingLineRe.FindStringSubmatch(desc)
+	if m == nil {
+		return 0
+	}
+	v, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		return 0
+	}
+	return v
 }
 
 // parseMIFrameRate 解析 Video 段 Frame rate（取最大值——多段 MI 场景保守）。

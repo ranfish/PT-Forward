@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -221,5 +222,28 @@ func TestFinalizeClusterPropagation_WaitsForFallback(t *testing.T) {
 	}
 	if sib.FetchSource != "cluster" {
 		t.Errorf("传播行应为 cluster: %q", sib.FetchSource)
+	}
+}
+
+// §59.70: PTGen 简介落库后 t2 重推标签——豆瓣评分行在 t0 不存在，t2 补推 high_rating。
+func TestRefreshInferredTags_AfterPTGen(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	hash := "hself00000000000000000000000000000000000"
+	db.Create(&model.TorrentMetadata{InfoHash: hash, SiteName: "朋友", Title: "电影.2024.1080p",
+		Description: "◎豆瓣评分　8.4/10 (12345 人评价)\n◎简　介　剧情", Tags: `["chinese_subtitle"]`, FetchSource: "rss_detail"})
+
+	h.refreshInferredTags(context.Background(), hash, "朋友")
+
+	var m model.TorrentMetadata
+	db.Where("info_hash = ?", hash).First(&m)
+	var tags []string
+	_ = json.Unmarshal([]byte(m.Tags), &tags)
+	has := func(k string) bool { for _, x := range tags { if x == k { return true } }; return false }
+	if !has("high_rating") {
+		t.Errorf("t2 重推应补 high_rating: %v", tags)
+	}
+	if !has("chinese_subtitle") {
+		t.Errorf("既有标签不可丢: %v", tags)
 	}
 }

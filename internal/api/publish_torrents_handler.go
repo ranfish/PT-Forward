@@ -3810,6 +3810,58 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 	Success(w, map[string]interface{}{"message": "已清除"})
 }
 
+// refreshInferredTags §59.70: t2 重推标签——PTGen 简介落库后评分行才存在
+//（t0 InferFull 时 Description 尚无 "◎豆瓣评分" 行），此处重跑推断并合并
+//（既有标签全保留——直采/用户标签优先，推断只补差）。
+func (h *PublishTorrentsHandler) refreshInferredTags(ctx context.Context, infoHash, siteName string) {
+	var m model.TorrentMetadata
+	if err := h.db.WithContext(ctx).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		First(&m).Error; err != nil {
+		return
+	}
+	inferred := publish.NewMediaTagInferer().InferFull(publish.TagInput{
+		MediaInfo:   m.MediaInfo,
+		Title:       m.Title,
+		Subtitle:    m.Subtitle,
+		Description: m.Description,
+		NFO:         m.BDInfo,
+	})
+	var existing []string
+	if m.Tags != "" {
+		if err := json.Unmarshal([]byte(m.Tags), &existing); err != nil {
+			existing = nil
+		}
+	}
+	merged := false
+	for _, t := range inferred {
+		found := false
+		for _, x := range existing {
+			if x == t {
+				found = true
+				break
+			}
+		}
+		if !found {
+			existing = append(existing, t)
+			merged = true
+		}
+	}
+	if !merged {
+		return
+	}
+	data, _ := json.Marshal(existing)
+	if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		Update("tags", string(data)).Error; err != nil {
+		h.logger.Warn("refresh inferred tags failed", zap.Error(err))
+		return
+	}
+	h.logger.Info("inferred tags refreshed",
+		zap.String("hash", infoHash[:min(10, len(infoHash))]),
+		zap.Int("tags_total", len(existing)))
+}
+
 // applyPosterFallback §59.42: 海报替换链落库（goroutine 内执行）。
 // 优先用已落库的 douban_url 作 query（精确），无则种子名；两级 PTGen + HEAD 探活。
 func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePoster, name string) {
@@ -3853,6 +3905,8 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		h.logger.Info("ptgen description applied",
 			zap.String("hash", infoHash[:10]),
 			zap.Int("length", len(ptgenDesc)))
+		// §59.70: t2 重推标签——评分行此刻才进 Description（豆瓣评分≥8 → high_rating）
+		h.refreshInferredTags(ctx, infoHash, siteName)
 		// §59.61 附2: 简介终态同步回传簇（map miss 反查; 幂等可重复）
 		if c, ok := h.clusterCtxFor(ctx, infoHash); ok {
 			h.propagateClusterPosters(ctx, c.clientID, c.savePath, c.name, infoHash)
