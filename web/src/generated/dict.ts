@@ -592,6 +592,11 @@ export const TAG_GROUPS: TagGroup[] = [
           "key": "high_rating",
           "label": "高分",
           "aliases": ""
+        },
+        {
+          "key": "big_pack",
+          "label": "大包",
+          "aliases": ""
         }
       ]
     },
@@ -606,6 +611,11 @@ export const TAG_GROUPS: TagGroup[] = [
         {
           "key": "collection",
           "label": "合集",
+          "aliases": ""
+        },
+        {
+          "key": "ongoing",
+          "label": "连载",
           "aliases": ""
         }
       ]

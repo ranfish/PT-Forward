@@ -27,6 +27,7 @@ type TagInput struct {
 	Subtitle    string // 副标题
 	Description string // 简介（BBCode）
 	NFO         string // NFO/BDInfo
+	Size        int64  // §59.72 B2: 种子体积（字节）——big_pack >1TB 判据（AGSV 审核硬规则）
 }
 
 // Infer 从多源文本推断 MediaTags。
@@ -69,6 +70,15 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	}
 	if hasHR && !has("high_rating") {
 		tags = append(tags, "high_rating")
+	}
+	// §59.72 B2: 组合判据——连载 = 分集 && 非完结 && 非合集
+	//（ubits: 连载=分集资源; 词条 regex 表达不了依赖，代码层）
+	if has("episode_split") && !has("complete") && !has("collection") && !has("ongoing") {
+		tags = append(tags, "ongoing")
+	}
+	// §59.72 B2: 大包 = size > 1TB（AGSV 审核脚本硬规则，字面 >1T）
+	if in.Size > 1024*1024*1024*1024 && !has("big_pack") {
+		tags = append(tags, "big_pack")
 	}
 	return ApplyTagRules(dedupTags(tags))
 }

@@ -326,6 +326,18 @@
    "infer_scope": "title_raw",
    "infer_pattern2": "(合集|集全|期全)",
    "infer_scope2": "subtitle_raw"
+  },
+  {
+   "canonical": "ongoing",
+   "label": "连载",
+   "group": "剧集状态",
+   "note": "§59.72 B2 组合判据(episode_split && !complete && !collection, ubits 连载=分集资源)在 MediaTagInferer.InferFull 代码层; 与 collection 互斥(ubits)"
+  },
+  {
+   "canonical": "big_pack",
+   "label": "大包",
+   "group": "规格",
+   "note": "§59.72 B2 size>1TB(AGSV 审核硬规则 >1T 必须标注)在 InferFull 代码层(TagInput.Size)"
   }
  ]
 }

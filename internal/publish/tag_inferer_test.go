@@ -106,3 +106,32 @@ func TestInferEpisodeSplitCollectionComplete(t *testing.T) {
 		}
 	}
 }
+
+// §59.72 B2: 连载(episode_split && !complete && !collection 组合) + 大包(size>1TB, AGSV 硬规则)。
+func TestInferOngoingAndBigPack(t *testing.T) {
+	const tb = 1024 * 1024 * 1024 * 1024
+	cases := []struct {
+		name         string
+		title        string
+		size         int64
+		wantOngoing  bool
+		wantBigPack  bool
+		wantComplete bool
+	}{
+		{"分集→连载", "Show.S01E05.1080p", 0, true, false, false},
+		{"完结抑制连载", "Show.S01.1080p", 0, false, false, true},
+		{"合集抑制连载", "Show.S01-S02.1080p", 0, false, false, false},
+		{"1TB+1B 大包", "Movie.2024.2160p", tb + 1, false, true, false},
+		{"恰 1TB 不算(>1T 字面)", "Movie.2024.2160p", tb, false, false, false},
+		{"999G 不算", "Movie.2024.2160p", tb - 5*1024*1024*1024, false, false, false},
+		{"分集+大包 独立", "Show.S01E05.UHD", 2 * tb, true, true, false},
+		{"电影无形态", "Movie.2024.1080p", 20 * 1024 * 1024 * 1024, false, false, false},
+	}
+	for _, c := range cases {
+		got := NewMediaTagInferer().InferFull(TagInput{Title: c.title, Size: c.size})
+		has := func(k string) bool { for _, g := range got { if g == k { return true } }; return false }
+		if has("ongoing") != c.wantOngoing || has("big_pack") != c.wantBigPack || has("complete") != c.wantComplete {
+			t.Errorf("%s: ongoing=%v big_pack=%v complete=%v got=%v", c.name, has("ongoing"), has("big_pack"), has("complete"), got)
+		}
+	}
+}
