@@ -2498,12 +2498,44 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientI
 		if err == nil {
 			goto fetched
 		}
-		// 直达失败（D3 拒绝/tid 失效）→ 降级搜索（同站重搜，五闸门验证）
-		h.logger.Info("direct fetch failed, fallback to search",
+		// 直达失败（D3 拒绝/tid 失效）→ 降级链 §59.65（方案 B，The.Boys 实锤重排——
+		// 老 FetchAndStore 内嵌 IYUU 兜底在此抢跑，克隆 iyuu_cache 覆盖源站语义）:
+		//   ② 同站搜索（五闸门验证）→ ③ ②a 簇内其他 comment 直达（D3 校验）
+		//   → ④ IYUU coverage 末位兜底（保数据完整性，fetch_source=iyuu_cache 审计可辨）
+		h.logger.Info("direct fetch failed, fallback chain start",
 			zap.String("hash", hash[:min(10, len(hash))]),
 			zap.String("site", result.SourceSite),
 			zap.Error(err))
 		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI)
+		if err != nil {
+			h.logger.Info("same-site search failed, trying cluster comments",
+				zap.String("hash", hash[:min(10, len(hash))]),
+				zap.Error(err))
+			// ③ ②a: 簇内其他副本的 comment 凭证逐个直达（排除已试源站；D3 校验内建）
+			for _, tgt := range clusterTargets {
+				if tgt.TorrentID == "" || tgt.SiteName == result.SourceSite {
+					continue
+				}
+				meta, err = h.metadataFetcher.FetchAndStoreDirect(fetchCtx, hash, tgt.SiteName, tgt.TorrentID, name)
+				if err == nil {
+					h.logger.Info("cluster comment direct hit",
+						zap.String("hash", hash[:min(10, len(hash))]),
+						zap.String("site", tgt.SiteName),
+						zap.String("tid", tgt.TorrentID))
+					goto fetched
+				}
+			}
+			// ④ IYUU coverage 末位兜底
+			h.logger.Info("cluster comments exhausted, IYUU fallback",
+				zap.String("hash", hash[:min(10, len(hash))]))
+			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, result.SourceSite)
+			if err != nil {
+				return err
+			}
+			h.logger.Info("IYUU fallback hit",
+				zap.String("hash", hash[:min(10, len(hash))]),
+				zap.String("site", meta.SiteName))
+		}
 	} else {
 		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI)
 	}

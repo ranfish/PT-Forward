@@ -40,8 +40,11 @@ func (f *Fetcher) SetEngine(_ *extract.Engine) {}
 
 // FetchAndStoreDirect §59.61: comment 直达入口——拉详情后 D3-C 标题轻校验
 // （不过则报错，调用方降级下一 tid 来源/搜索）。sourceName = 本地种子名。
+// §59.65: 内部改走 FetchFromSiteNoFallback——老 FetchAndStore 内嵌 IYUU 兜底
+// 会抢跑调用方降级链（The.Boys 实锤: 朋友抖动 → 克隆 iyuu_cache 覆盖源站语义，
+// 簇内 zmpt/青蛙等 comment 直达凭证全浪费）。直达失败必须原样报错。
 func (f *Fetcher) FetchAndStoreDirect(ctx context.Context, infoHash, siteName, torrentID, sourceName string) (*model.TorrentMetadata, error) {
-	meta, err := f.FetchAndStore(ctx, infoHash, siteName, torrentID)
+	meta, err := f.FetchFromSiteNoFallback(ctx, infoHash, siteName, torrentID)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +58,35 @@ func (f *Fetcher) FetchAndStoreDirect(ctx context.Context, infoHash, siteName, t
 				zap.String("detail", meta.Title[:min(len(meta.Title), 50)]))
 			return nil, fmt.Errorf("直达标题不相关（D3 拒绝, tid=%s）", torrentID)
 		}
+	}
+	return meta, nil
+}
+
+// FetchFromSiteNoFallback §59.65: 单站直取（fetch_source=rss_detail），失败报错
+// ——不内嵌 IYUU 兜底。降级序由调用方编排（§59.61 七章 + 附6）。
+func (f *Fetcher) FetchFromSiteNoFallback(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error) {
+	if infoHash == "" || siteName == "" || torrentID == "" {
+		return nil, fmt.Errorf("info_hash, site_name, torrent_id are required")
+	}
+	meta, err := f.fetchFromSite(ctx, infoHash, siteName, torrentID, "rss_detail")
+	if err != nil {
+		return nil, err
+	}
+	if err := f.store(ctx, meta); err != nil {
+		return nil, fmt.Errorf("store metadata: %w", err)
+	}
+	return meta, nil
+}
+
+// FetchAndStoreIYUU §59.65: IYUU coverage 兜底公开化——降级链最后一环
+//（老 FetchAndStore 内嵌私有版抢跑问题已摘除直达链；本方法供调用方显式编排）。
+func (f *Fetcher) FetchAndStoreIYUU(ctx context.Context, infoHash, excludeSite string) (*model.TorrentMetadata, error) {
+	meta := f.fetchWithIYUUFallback(ctx, infoHash, excludeSite)
+	if meta == nil {
+		return nil, fmt.Errorf("iyuu fallback exhausted: %s", infoHash)
+	}
+	if err := f.store(ctx, meta); err != nil {
+		return nil, fmt.Errorf("store metadata: %w", err)
 	}
 	return meta, nil
 }
