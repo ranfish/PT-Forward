@@ -189,7 +189,7 @@ func loadDict() (*dictState, error) {
 					continue
 				}
 				switch sc {
-				case "all", "all_raw", "all_mi", "title", "title_raw", "subtitle_raw", "desc_raw":
+				case "all", "all_raw", "all_mi", "title", "title_raw", "subtitle_raw", "desc_raw", "statement_raw":
 				default:
 					return nil, fmt.Errorf("dict/%s: token %q unknown infer_scope %q", e.Name(), t.Canonical, sc)
 				}
@@ -337,6 +337,7 @@ type TagInferInput struct {
 	Description  string
 	MediaInfo    string
 	NFO          string
+	Statement    string // §59.73: 引用/声明区（源站简介 quote 块——发布者声明，PTGen 不覆盖）
 }
 
 // TagInferMatches 按词条 infer_* 规则对输入文本做匹配，返回命中的 canonical 列表（dict 顺序）。
@@ -389,6 +390,8 @@ func tagMatchOne(pattern, scope string, all, title string, in TagInferInput, neg
 		text = in.Subtitle
 	case "desc_raw":
 		text = in.Description
+	case "statement_raw":
+		text = in.Statement
 	default:
 		return false
 	}
@@ -425,6 +428,21 @@ func compileInferRe(pattern string) *regexp.Regexp {
 	re := regexp.MustCompile(`(?i)` + pattern)
 	inferReCache[pattern] = re
 	return re
+}
+
+// NormalizeTagDisplay §59.73: 直采标签归一——DOM 显示名（源站 torrent_tag 文本，
+// 如 "特效"/"国语"/"HDR"）→ tag 域 canonical（"special_effects_subs"）。
+// miss（自定义/未收录显示名）返回原文——保留源站语义，前端可读可编辑。
+func NormalizeTagDisplay(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	key := LookupDictKey("tag", raw)
+	if key == "" {
+		return raw
+	}
+	return strings.TrimPrefix(key, "tag.")
 }
 
 // LookupDictKey DOM 显示值 → standard key（forward，§59.35 派生自词条 Variants）。

@@ -56,13 +56,34 @@ func TestTagGroupsStructure(t *testing.T) {
 			}
 		}
 	}
-	if total != 48 {
-		t.Errorf("tag 词条 %d, want 48（+§59.72 连载/大包）", total)
+	if total != 49 {
+		t.Errorf("tag 词条 %d, want 49（+§59.73 特效字幕）", total)
 	}
 	// 关键词条锚定
 	for _, k := range []string{"dolby_vision", "chinese_subtitle", "chinese_audio", "complete", "10_bit", "hdr10_plus", "auro_3d"} {
 		if !seen[k] {
 			t.Errorf("tag 缺关键词条 %q", k)
+		}
+	}
+}
+
+// §59.73: 直采标签归一——DOM 显示名(源站 torrent_tag) → canonical。
+func TestNormalizeTagDisplay(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"中字", "chinese_subtitle"},
+		{"特效", "special_effects_subs"},
+		{"特效字幕", "special_effects_subs"},
+		{"国语", "chinese_audio"},
+		{"杜比", "dolby_vision"},
+		{"HDR", "hdr10"},
+		{"高码率", "high_bitrate"},
+		{"完结", "complete"},
+		{"自定义标签", "自定义标签"}, // miss 保留原文
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := NormalizeTagDisplay(c.in); got != c.want {
+			t.Errorf("NormalizeTagDisplay(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

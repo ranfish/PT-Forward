@@ -28,6 +28,7 @@ type TagInput struct {
 	Description string // 简介（BBCode）
 	NFO         string // NFO/BDInfo
 	Size        int64  // §59.72 B2: 种子体积（字节）——big_pack >1TB 判据（AGSV 审核硬规则）
+	Statement   string // §59.73: 引用/声明区（源站 quote 块）——特效字幕等发布者声明
 }
 
 // Infer 从多源文本推断 MediaTags。
@@ -45,6 +46,7 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 		Description: in.Description,
 		MediaInfo:   in.MediaInfo,
 		NFO:         in.NFO,
+		Statement:   in.Statement,
 	})
 	// §59.69: 高码/高帧数值判据（regex 表达不了阈值比较，代码层判定）。
 	// 高码: MI Overall bit rate(General 段,用户定案) ≥15Mb/s@宽度≥4K / ≥9Mb/s@宽度<4K

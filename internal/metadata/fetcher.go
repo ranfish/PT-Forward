@@ -445,6 +445,12 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 	meta.StandardType = f.normalizeCategory(detail.Category)
 
 	if len(detail.Tags) > 0 {
+		// §59.73: 直采标签归一——DOM 显示名("特效"/"国语")→canonical，与推断产物
+		//（InferFull 标准键）统一形态；miss 保留原文（自定义标签）。原样落库会与
+		// 推断键混存（"特效"+"special_effects_subs" 双份同语义）。
+		for i, t := range detail.Tags {
+			detail.Tags[i] = titleparser.NormalizeTagDisplay(t)
+		}
 		if data, err := json.Marshal(detail.Tags); err == nil {
 			meta.Tags = string(data)
 		}

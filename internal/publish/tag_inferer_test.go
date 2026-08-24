@@ -135,3 +135,32 @@ func TestInferOngoingAndBigPack(t *testing.T) {
 		}
 	}
 }
+
+// §59.73 B1 补遗: 特效字幕(17 站消费, B1 清单漏做)——auto_feed 全站判据 特效字幕/特效中字,
+// 副标题+标题(title_raw) + 简介第二源(desc_raw, HDRoute 行为)。
+func TestInferSpecialEffectsSubs(t *testing.T) {
+	cases := []struct {
+		name, title, sub, desc, stmt string
+		want                         bool
+	}{
+		{"副标题特效字幕", "Show.S01", "特效字幕", "", "", true},
+		{"副标题特效中字", "Show.S01", "特效中字", "", "", true},
+		{"标题特效字幕", "Movie.2024.特效字幕", "", "", "", true},
+		{"引用声明特效字幕(第二源)", "Movie.2024", "", "", "[quote]内封特效字幕[/quote]", true},
+		{"PTGen 剧情简介特效不命中", "Movie.2024", "", "影片以特效见长", "", false},
+		{"裸特效不命中(防误判)", "Movie.2024.特效大片", "", "", "", false},
+		{"无关", "Movie.2024", "简体中文", "", "", false},
+	}
+	for _, c := range cases {
+		got := NewMediaTagInferer().InferFull(TagInput{Title: c.title, Subtitle: c.sub, Description: c.desc, Statement: c.stmt})
+		has := false
+		for _, g := range got {
+			if g == "special_effects_subs" {
+				has = true
+			}
+		}
+		if has != c.want {
+			t.Errorf("%s: special_effects_subs=%v want %v", c.name, has, c.want)
+		}
+	}
+}
