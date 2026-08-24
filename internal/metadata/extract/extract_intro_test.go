@@ -265,3 +265,25 @@ func TestSplitIntroSections_LogoFiltered(t *testing.T) {
 		t.Errorf("expected 1 screenshot, got %v", urls)
 	}
 }
+
+// §59.66: quote 引用内容剥离站内相对路径布局图（trans.gif 类）——保留绝对 URL 内容图。
+func TestStripQuoteLayoutImages(t *testing.T) {
+	cases := []struct{ in, want string }{
+		// 站内相对路径（NexusPHP 布局 hack）——剥
+		{"[img]/static/pic/trans.gif[/img][b]Source #1:[/b]", "[b]Source #1:[/b]"},
+		{"[img]pic/trans.gif[/img]文本", "文本"},
+		// 已知布局图文件名（绝对 URL 形态的站点道具）——剥
+		{"[img]https://pt.keepfrds.com/static/pic/trans.gif[/img][url=https://x.com]链接[/url]", "[url=https://x.com]链接[/url]"},
+		// 绝对 URL 内容图——保留（方案 A）
+		{"前[img]https://img.example.com/a.jpg[/img]后", "前[img]https://img.example.com/a.jpg[/img]后"},
+		// 文本/格式/链接不动
+		{"[b]加粗[/b] [i]斜体[/i] [url=https://b.com]链接[/url]", "[b]加粗[/b] [i]斜体[/i] [url=https://b.com]链接[/url]"},
+		// 多个布局图混排
+		{"[img]/static/pic/trans.gif[/img]A\n[img]/static/pic/trans.gif[/img]B", "A\nB"},
+	}
+	for _, c := range cases {
+		if got := stripQuoteLayoutImages(c.in); got != c.want {
+			t.Errorf("stripQuoteLayoutImages(%q)\n = %q\n want %q", c.in, got, c.want)
+		}
+	}
+}
