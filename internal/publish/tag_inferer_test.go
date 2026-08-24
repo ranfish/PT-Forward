@@ -164,3 +164,32 @@ func TestInferSpecialEffectsSubs(t *testing.T) {
 		}
 	}
 }
+
+// §59.74: 直采+推断合并单点——跨源冲突在合并结果上仲裁(发布时不再出现互斥并存)。
+func TestMergeTags(t *testing.T) {
+	cases := []struct {
+		name             string
+		existing, in     []string
+		want             []string
+	}{
+		{"同语义去重(直采显示名归一)", []string{"特效", "国语"}, []string{"special_effects_subs", "chinese_audio"}, []string{"special_effects_subs", "chinese_audio"}},
+		{"跨源互斥直采赢(完结vs分集)", []string{"complete"}, []string{"episode_split"}, []string{"complete"}},
+		{"跨源互斥直采赢(分集vs完结)", []string{"episode_split"}, []string{"complete"}, []string{"episode_split"}},
+		{"覆盖规则作用于合并结果", []string{"hdr10"}, []string{"hdr10_plus"}, []string{"hdr10_plus"}},
+		{"miss 显示名保留", []string{"自定义标签"}, nil, []string{"自定义标签"}},
+		{"空并集", nil, nil, nil},
+	}
+	for _, c := range cases {
+		got := MergeTags(c.existing, c.in)
+		if len(got) != len(c.want) {
+			t.Errorf("%s: got %v want %v", c.name, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("%s: got %v want %v", c.name, got, c.want)
+				break
+			}
+		}
+	}
+}

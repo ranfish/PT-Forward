@@ -2672,8 +2672,9 @@ fetched:
 				}
 			}
 			if len(inferredTags) > 0 {
-				all := append(existingTags, inferredTags...)
-				if data, err := json.Marshal(dedupStringSlice(all)); err == nil {
+				// §59.74: MergeTags 单点——归一+直采优先+互斥/覆盖仲裁于合并结果
+				all := publish.MergeTags(existingTags, inferredTags)
+				if data, err := json.Marshal(all); err == nil {
 					updates["tags"] = string(data)
 				}
 			}
@@ -3839,24 +3840,12 @@ func (h *PublishTorrentsHandler) refreshInferredTags(ctx context.Context, infoHa
 			existing = nil
 		}
 	}
-	merged := false
-	for _, t := range inferred {
-		found := false
-		for _, x := range existing {
-			if x == t {
-				found = true
-				break
-			}
-		}
-		if !found {
-			existing = append(existing, t)
-			merged = true
-		}
-	}
-	if !merged {
+	// §59.74: MergeTags 单点——归一+直采优先+互斥/覆盖仲裁；无变化不写
+	all := publish.MergeTags(existing, inferred)
+	data, _ := json.Marshal(all)
+	if string(data) == m.Tags {
 		return
 	}
-	data, _ := json.Marshal(existing)
 	if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
 		Update("tags", string(data)).Error; err != nil {

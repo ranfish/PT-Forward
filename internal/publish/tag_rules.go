@@ -6,6 +6,8 @@
 //   - HDR10+ 存在时自动移除 HDR10（超集关系）
 package publish
 
+import "github.com/ranfish/pt-forward/internal/titleparser"
+
 // tagCoverRules 覆盖规则（key 是超集，value 是被覆盖的子集）。
 // 当 key 存在时，自动移除 value。
 var tagCoverRules = map[string]string{
@@ -20,6 +22,22 @@ var tagMutexGroups = [][]string{
 	{"complete", "episode_split", "collection"},
 	// §59.72 B2: 连载↔合集互斥（ubits 文档: 连载/合集二选一）
 	{"ongoing", "collection"},
+}
+
+// MergeTags §59.74: 直采+推断标签合并单点。
+// ①直采惰性归一（NormalizeTagDisplay——自愈 v0.0.718 前落库的显示名旧数据，miss 保留原文）
+// ②直采在前（互斥组保序=直采赢——"直采优先，推断补差"在冲突时强制成立）
+// ③并集去重 → ApplyTagRules 互斥/覆盖规则作用于**合并结果**（跨源冲突不再并存：
+// 直采 hdr10+推断 hdr10_plus → hdr10_plus；直采 完结+推断 分集 → 完结）
+func MergeTags(existing, inferred []string) []string {
+	norm := make([]string, 0, len(existing)+len(inferred))
+	for _, t := range existing {
+		if n := titleparser.NormalizeTagDisplay(t); n != "" {
+			norm = append(norm, n)
+		}
+	}
+	norm = append(norm, inferred...)
+	return ApplyTagRules(norm)
 }
 
 // ApplyTagRules 应用互斥/覆盖规则。
@@ -52,12 +70,17 @@ func ApplyTagRules(tags []string) []string {
 		}
 	}
 
-	// 2. 互斥规则（仅保留首个命中的）
+	// 2. 互斥规则（仅保留首个命中的——§59.74 改输入序：合并路径直采在前=直采赢；
+	// 推断-only 路径输入序=字典命中序，与原组序行为一致）
 	for _, group := range tagMutexGroups {
-		firstHit := ""
+		memberSet := make(map[string]bool, len(group))
 		for _, member := range group {
-			if containsTag(deduped, member) {
-				firstHit = member
+			memberSet[member] = true
+		}
+		firstHit := ""
+		for _, t := range deduped {
+			if memberSet[t] {
+				firstHit = t
 				break
 			}
 		}
