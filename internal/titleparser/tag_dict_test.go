@@ -39,8 +39,8 @@ func TestTagInferAnchors(t *testing.T) {
 // §59.35 P4: TagGroups 分组结构派生（TagSelector 数据源）
 func TestTagGroupsStructure(t *testing.T) {
 	groups := TagGroups()
-	if len(groups) != 7 {
-		t.Errorf("分组数 %d, want 7（HDR/色彩、音频编码、语言音轨、字幕、版本类型、特别版、其他）", len(groups))
+	if len(groups) != 8 {
+		t.Errorf("分组数 %d, want 8（HDR/色彩、音频编码、语言音轨、字幕、版本类型、特别版、规格、其他）", len(groups))
 	}
 	total := 0
 	seen := map[string]bool{}
@@ -56,8 +56,8 @@ func TestTagGroupsStructure(t *testing.T) {
 			}
 		}
 	}
-	if total != 41 {
-		t.Errorf("tag 词条 %d, want 41（§59.41 +auro_3d）", total)
+	if total != 43 {
+		t.Errorf("tag 词条 %d, want 43（§59.41 +auro_3d +§59.69 高码/高帧）", total)
 	}
 	// 关键词条锚定
 	for _, k := range []string{"dolby_vision", "chinese_subtitle", "chinese_audio", "complete", "10_bit", "hdr10_plus", "auro_3d"} {

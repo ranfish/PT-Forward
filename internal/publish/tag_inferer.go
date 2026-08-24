@@ -5,6 +5,10 @@
 package publish
 
 import (
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/ranfish/pt-forward/internal/titleparser"
 )
 
@@ -41,7 +45,93 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 		MediaInfo:   in.MediaInfo,
 		NFO:         in.NFO,
 	})
+	// §59.69: 高码/高帧数值判据（regex 表达不了阈值比较，代码层判定）。
+	// 高码: MI Overall bit rate(General 段,用户定案) ≥15Mb/s@宽度≥4K / ≥9Mb/s@宽度<4K
+	// 高帧: MI Frame rate ≥60（59.940 NTSC 不算）
+	// 仅视频类种子（无 Video 段解析不到宽度/帧率，自然不命中）
+	hasHB, hasHF := inferNumericSpecTags(in.MediaInfo)
+	has := func(k string) bool {
+		for _, t := range tags {
+			if t == k {
+				return true
+			}
+		}
+		return false
+	}
+	if hasHB && !has("high_bitrate") {
+		tags = append(tags, "high_bitrate")
+	}
+	if hasHF && !has("high_frame_rate") {
+		tags = append(tags, "high_frame_rate")
+	}
 	return ApplyTagRules(dedupTags(tags))
+}
+
+// inferNumericSpecTags §59.69: 从 MI 文本解析码率/宽度/帧率做阈值判定。
+// MI 数字含千分位空格（"3 840"），单位 Mb/s 或 kb/s。
+func inferNumericSpecTags(mi string) (highBitrate, highFrameRate bool) {
+	rate := parseMIOverallBitrateMbps(mi)
+	width := parseMIWidthPixels(mi)
+	fps := parseMIFrameRate(mi)
+
+	if rate > 0 && width > 0 {
+		if width >= 3840 { // ≥4K（2160p/4320p，DCI 4096 同覆盖）
+			highBitrate = rate >= 15
+		} else { // <4K（1080p 及以下）
+			highBitrate = rate >= 9
+		}
+	}
+	if fps >= 60 { // 59.940 NTSC 不算（用户定案：字面 ≥60）
+		highFrameRate = true
+	}
+	return highBitrate, highFrameRate
+}
+
+var (
+	miOverallBitrateRe = regexp.MustCompile(`(?i)Overall bit rate\s*:\s*([\d\s.,]+)\s*(Mb/s|kb/s|Gb/s)`)
+	miWidthRe          = regexp.MustCompile(`(?im)^\s*Width\s*:\s*([\d\s]+)\s*pixels`)
+	miFpsRe            = regexp.MustCompile(`(?im)^\s*Frame rate\s*:\s*([\d.]+)\s*FPS`)
+)
+
+// parseMIOverallBitrateMbps 解析 General 段 Overall bit rate，归一 Mb/s。
+func parseMIOverallBitrateMbps(mi string) float64 {
+	m := miOverallBitrateRe.FindStringSubmatch(mi)
+	if m == nil {
+		return 0
+	}
+	num, _ := strconv.ParseFloat(strings.ReplaceAll(strings.ReplaceAll(m[1], " ", ""), ",", ""), 64)
+	if num == 0 {
+		return 0
+	}
+	switch strings.ToLower(m[2]) {
+	case "gb/s":
+		return num * 1000
+	case "kb/s":
+		return num / 1000
+	default:
+		return num
+	}
+}
+
+// parseMIWidthPixels 解析 Video 段 Width（像素，含千分位空格）。
+func parseMIWidthPixels(mi string) int {
+	m := miWidthRe.FindStringSubmatch(mi)
+	if m == nil {
+		return 0
+	}
+	n, _ := strconv.Atoi(strings.ReplaceAll(m[1], " ", ""))
+	return n
+}
+
+// parseMIFrameRate 解析 Video 段 Frame rate（取最大值——多段 MI 场景保守）。
+func parseMIFrameRate(mi string) float64 {
+	var max float64
+	for _, m := range miFpsRe.FindAllStringSubmatch(mi, -1) {
+		if v, err := strconv.ParseFloat(m[1], 64); err == nil && v > max {
+			max = v
+		}
+	}
+	return max
 }
 
 // dedupTags 保序去重。
