@@ -3963,6 +3963,14 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientID, infoHash, sit
 			}
 		}
 		if same {
+			// §59.61 附4: 全失败可见性——source=0 且 final=0 是捕获/上传全灭
+			// （243 实测: pixhost 早高峰 16 簇三层重试全打穿后静默退出，行永久
+			// 空 12.5h 无任何日志）。打点 warn 让停摆可观测，人工/下轮重取补。
+			if len(source) == 0 && isLocal {
+				h.logger.Warn("screenshot strategy total failure",
+					zap.String("hash", infoHash[:10]),
+					zap.String("name", name))
+			}
 			return
 		}
 	}
