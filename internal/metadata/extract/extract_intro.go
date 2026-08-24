@@ -75,6 +75,9 @@ func (p *PublicExtractor) splitIntroSections(descrHTML, descrBBCode string) Intr
 		quotes[i].Full = stripQuoteLayoutImages(quotes[i].Full)
 		quotes[i].Inner = stripQuoteLayoutImages(quotes[i].Inner)
 	}
+	// §59.67: 仅保留顶层块——嵌套块随外层原样承载（外层 Inner 含内层完整原文），
+	// 内层若再分类会重复入 statement（嵌套重复采集 bug 实锤修复）。
+	quotes = topLevelQuotes(quotes)
 
 	// 4. 确定拆分点：海报位置 > MediaInfo 位置 > 全部归类
 	posterIdx := -1
@@ -157,6 +160,28 @@ func extractQuoteBlocks(bbcode string) []quoteBlock {
 		}
 	}
 	return blocks
+}
+
+// topLevelQuotes §59.67: 过滤掉被其他块包含的嵌套块（外层 Inner 已含内层原样，
+// 分类只看顶层——嵌套引用"依原样"由外层承载，内层不再独立分类避免重复采集）。
+func topLevelQuotes(quotes []quoteBlock) []quoteBlock {
+	var out []quoteBlock
+	for _, q := range quotes {
+		nested := false
+		for _, o := range quotes {
+			if &o == &q {
+				continue
+			}
+			if o.Start < q.Start && q.End <= o.End {
+				nested = true
+				break
+			}
+		}
+		if !nested {
+			out = append(out, q)
+		}
+	}
+	return out
 }
 
 // findMediaInfoPosition 在 BBCode 中查找 MediaInfo 段的起始位置。
