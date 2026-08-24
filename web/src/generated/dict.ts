@@ -594,6 +594,21 @@ export const TAG_GROUPS: TagGroup[] = [
           "aliases": ""
         }
       ]
+    },
+    {
+      "name": "剧集状态",
+      "tags": [
+        {
+          "key": "episode_split",
+          "label": "分集",
+          "aliases": ""
+        },
+        {
+          "key": "collection",
+          "label": "合集",
+          "aliases": ""
+        }
+      ]
     }
   ]
 
