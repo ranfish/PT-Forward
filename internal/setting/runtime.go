@@ -28,6 +28,7 @@ const (
 	KeyScreenshotCount       = "screenshot_count"
 	KeyScreenshotMinInterval = "screenshot_min_interval"
 	KeyScreenshotJPEGQuality = "screenshot_jpeg_quality"
+	KeyScreenshotCacheDays   = "screenshot_cache_days" // §59.63: 截图链接缓存观察期（天，<=0 关闭）
 
 	KeyDataCleanupTorrentEventDays   = "data_cleanup_torrent_event_days"
 	KeyDataCleanupPublishResultDays  = "data_cleanup_publish_result_days"
@@ -66,6 +67,7 @@ var DefaultSeeds = map[string]string{
 	KeyScreenshotCount:       "6",
 	KeyScreenshotMinInterval: "60",
 	KeyScreenshotJPEGQuality: "85",
+	KeyScreenshotCacheDays:   "30",
 
 	KeyDataCleanupTorrentEventDays:   "30",
 	KeyDataCleanupPublishResultDays:  "30",

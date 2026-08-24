@@ -252,6 +252,10 @@ func init() {
 		}
 		return nil
 	})
+	// §59.63: 簇截图链接缓存表（观察期复用——清簇重取免重截重传）
+	RegisterMigration(20, "cluster_screenshot_cache", func(gormDB *gorm.DB) error {
+		return gormDB.Migrator().CreateTable(&model.ClusterScreenshotCache{})
+	})
 	// §59.44: 存量尾斜杠路径归一——TR 上报的历史脏数据（"PT6/SSD/" vs "PT6/SSD"）
 	// 在三元组资源键下劈裂资源，统一 Clean 形态（与 syncer 前置修复配套）。
 	RegisterMigration(17, "normalize_snapshot_save_path", func(gormDB *gorm.DB) error {

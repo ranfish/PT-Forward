@@ -2,9 +2,13 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/ranfish/pt-forward/internal/comment"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -70,6 +74,51 @@ func (h *PublishTorrentsHandler) hasCompleteMetadata(ctx context.Context, hash s
 		Where("info_hash = ? AND (poster != '' OR description != '')", hash).
 		Count(&n)
 	return n > 0
+}
+
+// upsertClusterScreenshotCache §59.63: 截图链接缓存写穿（自动链成功点 + 手动捕获
+// 完成点共用）。ttlDays<=0 视为功能关闭。UPSERT——同簇双 leader 后写赢（第二个
+// 本就是缓存命中，链接一致）。
+func upsertClusterScreenshotCache(db *gorm.DB, logger *zap.Logger, ttlDays int, clientID, savePath, name string, shots []string) {
+	if db == nil || logger == nil || ttlDays <= 0 || clientID == "" || savePath == "" || name == "" || len(shots) == 0 {
+		return
+	}
+	data, err := json.Marshal(shots)
+	if err != nil {
+		return
+	}
+	row := model.ClusterScreenshotCache{
+		ClientID: clientID, SavePath: savePath, Name: name,
+		Screenshots: string(data), UpdatedAt: time.Now(),
+	}
+	err = db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "client_id"}, {Name: "save_path"}, {Name: "name"}},
+		DoUpdates: clause.AssignmentColumns([]string{"screenshots", "updated_at"}),
+	}).Create(&row).Error
+	if err != nil {
+		logger.Warn("screenshot cache upsert failed", zap.Error(err))
+	}
+}
+
+// lookupScreenshotCache §59.63: 观察期判定（惰性，Q5——无后台扫描，获取事件时判）。
+// 命中且 updated_at + ttlDays > now → 返回缓存链接；否则 miss。
+func (h *PublishTorrentsHandler) lookupScreenshotCache(clientID, savePath, name string) ([]string, bool) {
+	if h.db == nil || h.screenshotCacheDays <= 0 {
+		return nil, false
+	}
+	var row model.ClusterScreenshotCache
+	if err := h.db.Where("client_id = ? AND save_path = ? AND name = ?", clientID, savePath, name).
+		First(&row).Error; err != nil {
+		return nil, false
+	}
+	if time.Since(row.UpdatedAt) > time.Duration(h.screenshotCacheDays)*24*time.Hour {
+		return nil, false
+	}
+	shots := model.ParseScreenshotColumn(row.Screenshots)
+	if len(shots) == 0 {
+		return nil, false
+	}
+	return shots, true
 }
 
 // finalizeClusterPropagation §59.61 附5: fetch 尾部终局传播。竞态实锤（疯狂动物城2

@@ -37,6 +37,7 @@ type ManualForwardHandler struct {
 	sourceDetector  *publish.SourceSiteDetector
 	complianceChecker *compliance.Checker
 	imageHostMgr    *imagehost.Manager
+	screenshotCacheDays int // §59.63: 手动捕获结果写穿缓存（观察期与自动链同配）
 	taskStore    sync.Map
 	taskSeq      atomic.Int64
 	stopCh       chan struct{}
@@ -86,6 +87,9 @@ func NewManualForwardHandler(db *gorm.DB, logger *zap.Logger) *ManualForwardHand
 	go h.cleanupTaskStore()
 	return h
 }
+
+// SetScreenshotCacheDays §59.63: 手动捕获写穿缓存的观察期（天）。
+func (h *ManualForwardHandler) SetScreenshotCacheDays(days int) { h.screenshotCacheDays = days }
 
 func (h *ManualForwardHandler) SetPipeline(p PublishPipeline)        { h.pipeline = p }
 func (h *ManualForwardHandler) SetSiteManager(s SiteManager)         { h.siteMgr = s }
@@ -1715,6 +1719,9 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 		h.capture.screenshots = shots
 		if len(shots) > 0 {
 			h.capture.status = "done"
+			// §59.63 Q4: 手动捕获行为不变（每次全新截传），结果写穿缓存——
+			// 缓存语义 = 簇最新已知好链接，供下轮批量直接复用
+			upsertClusterScreenshotCache(h.db, h.logger, h.screenshotCacheDays, req.ClientID, req.SavePath, req.Name, shots)
 		} else {
 			h.capture.status = "failed"
 			h.capture.error = "mpv 截图失败（本地无可用视频文件或上传全失败）"
