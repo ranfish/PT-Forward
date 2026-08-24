@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
@@ -183,5 +185,41 @@ func TestClusterCtxFor_FallbackToSnapshots(t *testing.T) {
 	// 未知 hash
 	if _, ok := h.clusterCtxFor(context.Background(), "nonexist000000000000000000000000000000"); ok {
 		t.Error("未知 hash 应返回 false")
+	}
+}
+
+// §59.61 附5: 尾部终局传播——fetchSingleTorrent 的 INSERT 循环与异步 applyPosterFallback
+// 的回传 UPDATE 并发竞态（疯狂动物城2 BluRay 27/54 行残留站点态实锤）。修复:
+// finalizeClusterPropagation 等 fallback 终局后 INSERT + 终态回传。
+func TestFinalizeClusterPropagation_WaitsForFallback(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	db.Create(&model.TorrentSnapshot{Hash: "fself00000000000000000000000000000000000", ClientID: "PT0", Name: "F", SavePath: "/f"})
+	db.Create(&model.TorrentSnapshot{Hash: "fsib000000000000000000000000000000000000", ClientID: "PT0", Name: "F", SavePath: "/f"})
+	// 首副本初始为站点态（fallback 尚未完成）
+	db.Create(&model.TorrentMetadata{InfoHash: "fself00000000000000000000000000000000000", SiteName: "朋友", Title: "t",
+		Poster: "https://img.keepfrds.com/site", Description: "site-desc", FetchSource: "rss_detail"})
+
+	// 模拟异步 fallback: 50ms 后把首副本修复为 PTGen 终态
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(50 * time.Millisecond)
+		db.Model(&model.TorrentMetadata{}).
+			Where("info_hash = ?", "fself00000000000000000000000000000000000").
+			Update("poster", "https://doubaninfo.com/dbposter/f.jpg")
+	}()
+
+	h.finalizeClusterPropagation(context.Background(), &wg, "PT0", "/f", "F",
+		"fself00000000000000000000000000000000000", "朋友")
+
+	var sib model.TorrentMetadata
+	db.Where("info_hash = ?", "fsib000000000000000000000000000000000000").First(&sib)
+	if sib.Poster != "https://doubaninfo.com/dbposter/f.jpg" {
+		t.Errorf("尾部传播必须等 fallback 终局后携带终态: poster=%q", sib.Poster)
+	}
+	if sib.FetchSource != "cluster" {
+		t.Errorf("传播行应为 cluster: %q", sib.FetchSource)
 	}
 }

@@ -2507,9 +2507,15 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientI
 	}
 fetched:
 
-	// §59.42: 海报可信图源白名单替换（异步，不阻塞采集主流程）
+	// §59.42: 海报可信图源白名单替换（异步；§59.61 附5: 尾部 finalize 会等其终局
+	// 再传播——INSERT 与回传 UPDATE 的竞态已由 WaitGroup 消除）
+	var posterFallbackWg sync.WaitGroup
 	if meta != nil && meta.Poster != "" {
-		go h.applyPosterFallback(meta.InfoHash, meta.SiteName, meta.Poster, name)
+		posterFallbackWg.Add(1)
+		go func() {
+			defer posterFallbackWg.Done()
+			h.applyPosterFallback(meta.InfoHash, meta.SiteName, meta.Poster, name)
+		}()
 	}
 	// §59.49+§59.57: 截图探活与策略——strategy 可用时探活内联进其前序（串行消除竞态：
 	// 原双 goroutine 并发，strategy 读到 purge 前死链 → rehost 失败保源 → same 早退 → 永不捕获）；
@@ -2640,8 +2646,9 @@ fetched:
 		}
 	}
 
-	// §59.61 第 4 步: 簇元数据传播——站点数据+MI 复制到簇内缺行副本
-	h.propagateClusterMetadata(ctx, clientID, savePath, name, hash, meta.SiteName)
+	// §59.61 第 4 步 + 附5: 簇终局传播——等海报 fallback 终局后 INSERT 缺行
+	// （携带终态）+ 终态回传（幂等）
+	h.finalizeClusterPropagation(ctx, &posterFallbackWg, clientID, savePath, name, hash, meta.SiteName)
 
 	return nil
 }

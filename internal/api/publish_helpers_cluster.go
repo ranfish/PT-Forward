@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -69,6 +70,19 @@ func (h *PublishTorrentsHandler) hasCompleteMetadata(ctx context.Context, hash s
 		Where("info_hash = ? AND (poster != '' OR description != '')", hash).
 		Count(&n)
 	return n > 0
+}
+
+// finalizeClusterPropagation §59.61 附5: fetch 尾部终局传播。竞态实锤（疯狂动物城2
+// BluRay 27/54 行残留站点态）: propagateClusterMetadata 的 INSERT 循环（54 行/178ms，
+// src 只读一次）与异步 applyPosterFallback 的回传 UPDATE 并发——循环尾段 INSERT 的行
+// 携带过期站点态落地，"已有行不覆盖"语义保证无人再修。修复: 等 fallback 终局后
+// INSERT（携带终态），再显式回传一次（幂等兜底，覆盖既有传播行）。
+func (h *PublishTorrentsHandler) finalizeClusterPropagation(ctx context.Context, fallbackWg *sync.WaitGroup, clientID, savePath, name, hash, siteName string) {
+	if fallbackWg != nil {
+		fallbackWg.Wait()
+	}
+	h.propagateClusterMetadata(ctx, clientID, savePath, name, hash, siteName)
+	h.propagateClusterPosters(ctx, clientID, savePath, name, hash)
 }
 
 // propagateClusterMetadata 获取成功后（fetchSingleTorrent 末尾）：站点侧数据 + MI
