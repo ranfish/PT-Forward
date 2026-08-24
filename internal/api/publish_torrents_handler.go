@@ -2660,6 +2660,7 @@ fetched:
 				Subtitle:    finalMeta.Subtitle,
 				Description: finalMeta.Description,
 				NFO:         finalMeta.BDInfo,
+				Size:        size, // §59.72 B2: big_pack >1TB
 			})
 			// 源站显式标签优先，推断只补空（§59.28 G：坏 JSON 不静默——记录并按空处理）
 			var existingTags []string
@@ -3820,12 +3821,17 @@ func (h *PublishTorrentsHandler) refreshInferredTags(ctx context.Context, infoHa
 		First(&m).Error; err != nil {
 		return
 	}
+	// §59.72 B2: big_pack 需 size——从快照查（簇内同 size）
+	var snapSize int64
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("hash = ?", infoHash).Select("COALESCE(MAX(size),0)").Scan(&snapSize)
 	inferred := publish.NewMediaTagInferer().InferFull(publish.TagInput{
 		MediaInfo:   m.MediaInfo,
 		Title:       m.Title,
 		Subtitle:    m.Subtitle,
 		Description: m.Description,
 		NFO:         m.BDInfo,
+		Size:        snapSize,
 	})
 	var existing []string
 	if m.Tags != "" {

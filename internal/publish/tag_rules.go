@@ -18,6 +18,8 @@ var tagMutexGroups = [][]string{
 	// §59.71 B1 剧集状态互斥（藏宝阁 7.6 判定优先级：检测到完结不算分集；
 	// 检测到分集或合集不算完结——同族标识互斥，序=抑制方向）
 	{"complete", "episode_split", "collection"},
+	// §59.72 B2: 连载↔合集互斥（ubits 文档: 连载/合集二选一）
+	{"ongoing", "collection"},
 }
 
 // ApplyTagRules 应用互斥/覆盖规则。
