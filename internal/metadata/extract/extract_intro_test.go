@@ -287,3 +287,53 @@ func TestStripQuoteLayoutImages(t *testing.T) {
 		}
 	}
 }
+
+// §59.67: 引用三细节——多引用全采集/嵌套原样/MI 引用不入声明。
+func TestSplitIntroSections_MultipleQuotesAllCollected(t *testing.T) {
+	bb := `[quote]第一个声明：感谢原制作者[/quote]
+中间文本
+[quote]第二个声明：仅供学习交流[/quote]
+[img]https://img.example.com/poster.jpg[/img]
+正文与截图`
+	d := (&PublicExtractor{}).splitIntroSections("", bb)
+	if !strings.Contains(d.Statement, "第一个声明") || !strings.Contains(d.Statement, "第二个声明") {
+		t.Errorf("多个声明应全部依次采集: %q", d.Statement)
+	}
+	if strings.Index(d.Statement, "第一个") > strings.Index(d.Statement, "第二个") {
+		t.Errorf("声明应保持原序: %q", d.Statement)
+	}
+}
+
+// 嵌套引用: 外层承载内层原样——内层不得重复采入 statement
+func TestSplitIntroSections_NestedQuoteNoDuplicate(t *testing.T) {
+	bb := `[quote]Remux来自X
+[quote]内层引用：感谢字幕组[/quote]
+外层尾[/quote]
+[img]https://img.example.com/p.jpg[/img]
+正文`
+	d := (&PublicExtractor{}).splitIntroSections("", bb)
+	n := strings.Count(d.Statement, "内层引用：感谢字幕组")
+	if n != 1 {
+		t.Errorf("嵌套内容应仅随外层原样出现一次(实得 %d 次): %q", n, d.Statement)
+	}
+	if !strings.Contains(d.Statement, "[quote]内层引用：感谢字幕组[/quote]") {
+		t.Errorf("嵌套 quote 标签应原样保留: %q", d.Statement)
+	}
+}
+
+// MediaInfo 以 quote 形式放简介区: 不得入 statement; MI 文本仍应可被 MI 提取层捕获
+func TestSplitIntroSections_MediaInfoQuoteNotStatement(t *testing.T) {
+	mi := "General\nUnique ID : 123\nComplete name : /x/a.mkv\nFormat : Matroska\nFile size : 50 GiB\nVideo\nFormat : HEVC\nBit rate : 50 Mbps\nAudio\nFormat : TrueHD\nChannel(s) : 8\n"
+	bb := `[quote]声明：感谢原制作者[/quote]
+[img]https://img.example.com/p.jpg[/img]
+正文描述
+[quote]` + mi + `[/quote]`
+	d := (&PublicExtractor{}).splitIntroSections("", bb)
+	if strings.Contains(d.Statement, "Unique ID") {
+		t.Errorf("MI quote 不得归入声明: %q", d.Statement)
+	}
+	gotMI, _ := ExtractMediaInfo("", bb, "test")
+	if gotMI == "" {
+		t.Error("quote 形态 MI 应被 MI 提取层捕获(发布需要)")
+	}
+}
