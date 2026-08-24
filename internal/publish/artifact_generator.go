@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"errors"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/screenshot"
@@ -144,6 +146,36 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 	return result, nil
 }
 
+// uploadWithRetry §59.61 附3 层1+2: 单张上传重试（指数退避）+ 独立每张超时。
+// 4005 批次实锤: pixhost 限流时 4min strategyCtx 尾部被排前的张占完, 后续全
+// context deadline exceeded（"丢尾部"模式, 370 行 2 张截图根因）——上传预算与
+// 捕获 ctx 解耦: 每张独立 60s, 重试 2 次（共 3 次尝试, 退避 2s/8s）。
+func uploadWithRetry(parent context.Context,
+	upload func(ctx context.Context, data []byte, name string) (string, error),
+	data []byte, name string, attempts int) (string, error) {
+
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		if i > 0 {
+			// 退避: 2s, 8s（parent 取消则提前退出）
+			backoff := time.Duration(1<<uint(2*i-1)) * time.Second // i=1:2s, i=2:8s
+			select {
+			case <-parent.Done():
+				return "", parent.Err()
+			case <-time.After(backoff):
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 60*time.Second)
+		u, err := upload(ctx, data, name)
+		cancel()
+		if err == nil && u != "" {
+			return u, nil
+		}
+		lastErr = err
+	}
+	return "", lastErr
+}
+
 func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, videoPath string) []string {
 	if g.screenshotEngine == nil || !g.screenshotEngine.Available() {
 		return nil
@@ -170,33 +202,88 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 		g.logger.Warn("imageHostMgr not configured, skipping upload")
 		return nil
 	}
+	uploaded, failedPaths := g.uploadShotsWithRetry(ctx, localShots)
+	if tmpDir != "" {
+		if len(uploaded) >= MinScreenshots || len(failedPaths) == 0 {
+			_ = os.RemoveAll(tmpDir)
+		}
+		// §59.61 附3 层3: 不足 Min 且有失败张——tmpDir 保留给二次补传（defer 兜底清理）
+		defer os.RemoveAll(tmpDir)
+	}
+	if len(uploaded) == 0 {
+		g.logger.Warn("screenshot upload all failed", zap.Int("captured", len(localShots)))
+		return uploaded
+	}
+	if len(failedPaths) > 0 {
+		g.logger.Warn("screenshot upload partial failure",
+			zap.Int("captured", len(localShots)),
+			zap.Int("uploaded", len(uploaded)),
+			zap.Int("failed", len(failedPaths)))
+	}
+	g.logger.Info("uploaded local screenshots", zap.Int("count", len(uploaded)))
+	return uploaded
+}
+
+// uploadShotsWithRetry §59.61 附3: 批量上传 + 重试 + 层3 不足 Min 二次补传。
+// 返回 (成功URL列表, 失败文件路径列表——供补传)。
+func (g *PublishArtifactGenerator) uploadShotsWithRetry(ctx context.Context, localShots []string) ([]string, []string) {
+	if g.imageHostMgr == nil {
+		g.logger.Warn("imageHostMgr not configured, skipping upload")
+		return nil, nil
+	}
+	uploader := func(ctx context.Context, data []byte, name string) (string, error) {
+		result, err := g.imageHostMgr.Upload(ctx, data, name)
+		if err != nil {
+			return "", err
+		}
+		if result == nil || result.URL == "" {
+			return "", errors.New("empty upload result")
+		}
+		return result.URL, nil
+	}
 	var uploaded []string
+	var failedPaths []string
 	for i, shotPath := range localShots {
 		data, readErr := os.ReadFile(shotPath)
 		if readErr != nil {
 			g.logger.Warn("screenshot read failed", zap.String("path", shotPath), zap.Error(readErr))
 			continue
 		}
-		result, uploadErr := g.imageHostMgr.Upload(ctx, data, filepath.Base(shotPath))
-		if uploadErr != nil || result == nil || result.URL == "" {
-			g.logger.Warn("screenshot upload skipped",
+		u, err := uploadWithRetry(ctx, uploader, data, filepath.Base(shotPath), 3)
+		if err != nil {
+			g.logger.Warn("screenshot upload skipped after retries",
 				zap.Int("idx", i), zap.String("path", shotPath),
 				zap.Int("size", len(data)),
-				zap.NamedError("upload_err", uploadErr),
-				zap.Any("result", result))
+				zap.NamedError("upload_err", err))
+			failedPaths = append(failedPaths, shotPath)
 			continue
 		}
-		uploaded = append(uploaded, result.URL)
+		uploaded = append(uploaded, u)
 	}
-	if tmpDir != "" {
-		_ = os.RemoveAll(tmpDir)
+	// 层3: 达标不足 MinScreenshots 且有失败张 → 失败张二次补传（退避后再试一轮）
+	if len(uploaded) < MinScreenshots && len(failedPaths) > 0 {
+		g.logger.Info("screenshot upload below minimum, retrying failed",
+			zap.Int("uploaded", len(uploaded)), zap.Int("failed", len(failedPaths)))
+		select {
+		case <-ctx.Done():
+		case <-time.After(10 * time.Second):
+		}
+		var still []string
+		for _, shotPath := range failedPaths {
+			data, readErr := os.ReadFile(shotPath)
+			if readErr != nil {
+				continue
+			}
+			u, err := uploadWithRetry(ctx, uploader, data, filepath.Base(shotPath), 3)
+			if err != nil {
+				still = append(still, shotPath)
+				continue
+			}
+			uploaded = append(uploaded, u)
+		}
+		failedPaths = still
 	}
-	if len(uploaded) == 0 {
-		g.logger.Warn("screenshot upload all failed", zap.Int("captured", len(localShots)))
-		return nil
-	}
-	g.logger.Info("uploaded local screenshots", zap.Int("count", len(uploaded)))
-	return uploaded
+	return uploaded, failedPaths
 }
 
 // rehostScreenshots §56.17 决策 2: 截图转存（补全空实现）。
