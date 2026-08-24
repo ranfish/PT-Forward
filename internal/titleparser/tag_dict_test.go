@@ -56,8 +56,8 @@ func TestTagGroupsStructure(t *testing.T) {
 			}
 		}
 	}
-	if total != 43 {
-		t.Errorf("tag 词条 %d, want 43（§59.41 +auro_3d +§59.69 高码/高帧）", total)
+	if total != 44 {
+		t.Errorf("tag 词条 %d, want 44（§59.41 +auro_3d +§59.69 高码/高帧 +§59.70 高分）", total)
 	}
 	// 关键词条锚定
 	for _, k := range []string{"dolby_vision", "chinese_subtitle", "chinese_audio", "complete", "10_bit", "hdr10_plus", "auro_3d"} {

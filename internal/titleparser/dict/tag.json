@@ -302,6 +302,12 @@
    "infer_pattern": "高帧率|高帧|60\\s*fps|120\\s*fps",
    "infer_scope": "title_raw",
    "note": "§59.69 数值判据(MI Frame rate≥60, 59.940 NTSC 不算)在 MediaTagInferer.InferFull 代码层"
+  },
+  {
+   "canonical": "high_rating",
+   "label": "高分",
+   "group": "规格",
+   "note": "§59.70 数值判据(豆瓣评分≥8.0, 8.0算7.9不算, 无评分不命中)在 MediaTagInferer.InferFull 代码层——评分行由 PTGen 简介落库后 t2 重推补上"
   }
  ]
 }
