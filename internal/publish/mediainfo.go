@@ -55,7 +55,32 @@ func (a *MediaInfoAnalyzer) Analyze(ctx context.Context, filePath string) (*Medi
 		return nil, fmt.Errorf("mediainfo execution: %w", err)
 	}
 
-	return &MediaInfoResult{RawOutput: strings.TrimSpace(string(output))}, nil
+	return &MediaInfoResult{RawOutput: sanitizeCompleteName(strings.TrimSpace(string(output)))}, nil
+}
+
+// sanitizeCompleteName §59.62: Complete name 行去路径只留文件名——本地 MI 会原样
+// 下发到目标站 mediainfo 字段，携带服务器磁盘路径（/home/pt/...）属信息泄漏；
+// 消费方（extract/kdouban/ardtu）只把 Complete name 当 MI 存在性标记，不读路径值。
+// 行格式: "Complete name<填充空格> : /path/to/file.mkv"。
+func sanitizeCompleteName(raw string) string {
+	lines := strings.Split(raw, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimLeft(line, " ")
+		if !strings.HasPrefix(trimmed, "Complete name") {
+			continue
+		}
+		// 首个 ": " 是 key/value 分隔符（填充空格不含冒号）；值内含 ": "（Windows
+		// 盘符等）不会被误切——LastIndex 会切进路径值。
+		sep := strings.Index(line, ": ")
+		if sep < 0 {
+			continue
+		}
+		val := line[sep+2:]
+		if j := strings.LastIndexAny(val, `/\`); j >= 0 {
+			lines[i] = line[:sep+2] + val[j+1:]
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // mediainfoEnv 返回调用 mediainfo 用的环境变量。
