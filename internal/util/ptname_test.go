@@ -33,3 +33,23 @@ func TestExtractGroupName(t *testing.T) {
 		})
 	}
 }
+
+// §59.64: 尾部促销标记（克隆站把促销状态渲染进种子标题，NBSP 分隔）不阻断组名提取。
+func TestExtractGroupName_PromoSuffix(t *testing.T) {
+	cases := []struct{ in, want string }{
+		// NBSP + 促销标记（243 The.Boys 实锤形态）
+		{"The Boys S03 2022 1080p WEBRip DDP5.1 x265 10bit-Yumi@FRDS\u00a0\u00a0\u00a0 [2X 50%]", "FRDS"},
+		// 多枚连贴
+		{"Show.2024.1080p-CMRG [Free] [2X 50%]", "CMRG"},
+		// 普通空格 + 单标记
+		{"Movie.2023.2160p-BHD [Free]", "BHD"},
+		// 干净标题不受影响（既有行为回归锚）
+		{"The Boys S04 2024 1080p WEBRip DDP5.1 x265 10bit-Yumi@FRDS", "FRDS"},
+		{"Title.2024-CMRG", "CMRG"},
+	}
+	for _, c := range cases {
+		if got := ExtractGroupName(c.in); got != c.want {
+			t.Errorf("ExtractGroupName(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
