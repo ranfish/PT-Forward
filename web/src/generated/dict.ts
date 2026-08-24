@@ -574,6 +574,26 @@ export const TAG_GROUPS: TagGroup[] = [
           "aliases": "全集"
         }
       ]
+    },
+    {
+      "name": "规格",
+      "tags": [
+        {
+          "key": "high_bitrate",
+          "label": "高码",
+          "aliases": ""
+        },
+        {
+          "key": "high_frame_rate",
+          "label": "高帧",
+          "aliases": ""
+        },
+        {
+          "key": "high_rating",
+          "label": "高分",
+          "aliases": ""
+        }
+      ]
     }
   ]
 
