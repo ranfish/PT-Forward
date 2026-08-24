@@ -27,6 +27,24 @@ func ExtractGroupName(title string) string {
 		}
 	}
 
+	// §59.64: 克隆站等站点把促销状态渲染进种子标题尾部——
+	// "…10bit-Yumi@FRDS\u00a0\u00a0\u00a0 [2X 50%]"（NBSP 分隔，243 The.Boys 实锤）。
+	// NBSP(U+00A0) ≥128 会被 isValidGroupName 判非 ASCII 连坐整个候选（→ 空组名，
+	// 编辑器报"缺失字段：release_group"）；普通空格变体则产出脏组名"BHD [Free]"
+	//（release_group_mappings 必失配）。归一 NBSP + 循环剥离尾部 [..] 标记后提取。
+	clean = strings.ReplaceAll(clean, "\u00a0", " ")
+	for {
+		trimmed := strings.TrimRight(clean, " ")
+		if !strings.HasSuffix(trimmed, "]") {
+			break
+		}
+		open := strings.LastIndex(trimmed, "[")
+		if open <= 0 {
+			break
+		}
+		clean = strings.TrimRight(trimmed[:open], " ")
+	}
+
 	// 尝试 "-" 分隔符
 	lastDash := strings.LastIndex(clean, "-")
 	if lastDash > 0 && lastDash < len(clean)-1 {
