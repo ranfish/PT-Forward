@@ -9,8 +9,8 @@ import (
 
 func TestGenerateThanksQuote_DefaultChinese(t *testing.T) {
 	result := GenerateThanksQuote("猫站", "FRDS", false, nil)
-	if !strings.Contains(result, "猫站") {
-		t.Errorf("should contain source site, got %q", result)
+	if strings.Contains(result, "猫站") || strings.Contains(result, "转自") {
+		t.Errorf("§59.68 中文模板不应披露转载来源, got %q", result)
 	}
 	if !strings.Contains(result, "FRDS") {
 		t.Errorf("should contain group name, got %q", result)
@@ -22,8 +22,8 @@ func TestGenerateThanksQuote_DefaultChinese(t *testing.T) {
 
 func TestGenerateThanksQuote_DefaultEnglish(t *testing.T) {
 	result := GenerateThanksQuote("HDHome", "FRDS", true, nil)
-	if !strings.Contains(result, "HDHome") {
-		t.Errorf("should contain source site, got %q", result)
+	if strings.Contains(result, "HDHome") || strings.Contains(result, "from [b]") {
+		t.Errorf("§59.68 英文模板不应披露转载来源, got %q", result)
 	}
 	if !strings.Contains(result, "FRDS") {
 		t.Errorf("should contain group name, got %q", result)

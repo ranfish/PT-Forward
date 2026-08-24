@@ -18,8 +18,9 @@ type ThanksQuoteConfig struct {
 // 默认模板常量。
 const (
 	// §59.20: 加 {group_name} 占位符
-	DefaultChineseThanksQuote = "{group_name}官组作品，转自[b]{source_site}[/b]，感谢原制作者发布。"
-	DefaultEnglishThanksQuote = "Group {group_name} release from [b]{source_site}[/b].\nAll thanks to the original uploader!"
+	// §59.68: 中文模板去"转自{source_site}"段（用户定案——致谢不披露转载来源）
+	DefaultChineseThanksQuote = "{group_name}官组作品，感谢原制作者发布。"
+	DefaultEnglishThanksQuote = "Group {group_name} release.\nAll thanks to the original uploader!"
 
 	// ThanksQuotePlaceholder 源站名占位符。
 	ThanksQuotePlaceholder = "{source_site}"
