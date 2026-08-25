@@ -66,7 +66,7 @@
         <div v-else-if="currentStep === 0" class="csp-step-content">
           <!-- §59.20 ⑨: maintenanceOnly 预览模式 -->
           <template v-if="maintenanceOnly && seedPreviewMode">
-            <div style="max-width: 900px">
+            <div style="max-width: 1100px">
               <a-typography-title :level="5">发布预览</a-typography-title>
 
               <!-- 标题 + 副标题 -->
@@ -75,13 +75,43 @@
                 <div v-if="form.subtitle" style="color: #666; font-size: 14px">{{ form.subtitle }}</div>
               </div>
 
-              <!-- 标准化参数 -->
-              <a-descriptions :column="4" bordered size="small" style="margin-bottom: 16px">
-                <a-descriptions-item label="分辨率">{{ form.titleComponents.resolution || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="视频编码">{{ form.titleComponents.video_codec || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="音频编码">{{ form.titleComponents.audio_codec || '—' }}</a-descriptions-item>
-                <a-descriptions-item label="制作组">{{ form.titleComponents.release_group || '—' }}</a-descriptions-item>
+              <!-- §59.81: v1.05 全字段参数区（4 列紧凑） -->
+              <a-descriptions :column="4" bordered size="small" style="margin-bottom: 12px">
+                <a-descriptions-item label="季集">{{ pv('season_episode') }}</a-descriptions-item>
+                <a-descriptions-item label="年份">{{ pv('year') }}</a-descriptions-item>
+                <a-descriptions-item label="分辨率">{{ pv('resolution') }}</a-descriptions-item>
+                <a-descriptions-item label="HDR">{{ pv('hdr') }}</a-descriptions-item>
+                <a-descriptions-item label="bit">{{ pv('bit_depth') }}</a-descriptions-item>
+                <a-descriptions-item label="视频编码">{{ pv('video_codec') }}</a-descriptions-item>
+                <a-descriptions-item label="音频编码">{{ pv('audio_codec') }}</a-descriptions-item>
+                <a-descriptions-item label="声道">{{ pv('audio_channels') }}</a-descriptions-item>
+                <a-descriptions-item label="对象信息">{{ pv('audio_tech') }}</a-descriptions-item>
+                <a-descriptions-item label="音轨数">{{ pv('audio_tracks') }}</a-descriptions-item>
+                <a-descriptions-item label="片源">{{ pv('source_type') }}</a-descriptions-item>
+                <a-descriptions-item label="规格">{{ pv('specification') }}</a-descriptions-item>
+                <a-descriptions-item label="分发方">{{ pv('source_platform') }}</a-descriptions-item>
+                <a-descriptions-item label="版本">{{ pv('edition_info') }}</a-descriptions-item>
+                <a-descriptions-item label="地区码">{{ pv('region_code') }}</a-descriptions-item>
+                <a-descriptions-item label="Encode">{{ pv('encode') }}</a-descriptions-item>
               </a-descriptions>
+
+              <!-- §59.81: 产地 / 类型 -->
+              <div v-if="pvRegion.length || pvGenre.length" style="margin-bottom: 12px">
+                <span v-if="pvRegion.length" style="margin-right: 16px">
+                  产地：<a-tag v-for="r in pvRegion" :key="r" color="geekblue">{{ r }}</a-tag>
+                </span>
+                <span v-if="pvGenre.length">
+                  类型：<a-tag v-for="g in pvGenre" :key="g" color="purple">{{ g }}</a-tag>
+                </span>
+              </div>
+
+              <!-- §59.81: 标签区（着色: 禁转类红 / 其余蓝） -->
+              <div v-if="previewTags.length" style="margin-bottom: 12px">
+                标签：
+                <a-tag v-for="t in previewTags" :key="t" :color="isRestrictedTag(t) ? 'red' : 'blue'">
+                  {{ tagDisplayName(t) }}
+                </a-tag>
+              </div>
 
               <!-- 海报 -->
               <div v-if="form.poster" style="margin-bottom: 16px; text-align: center">
@@ -100,18 +130,41 @@
                 <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 200px; overflow: auto; white-space: pre-wrap">{{ form.bdinfo }}</pre>
               </div>
 
-              <!-- 截图 -->
+              <!-- §59.81: 截图（点击放大） -->
               <div v-if="form.screenshots.length > 0" style="margin-bottom: 16px">
                 <div style="font-weight: 600; margin-bottom: 8px">截图</div>
                 <div style="display: flex; flex-wrap: wrap; gap: 8px">
-                  <img v-for="(url, i) in form.screenshots" :key="i" :src="url" style="width: 200px; border-radius: 4px" />
+                  <img
+                    v-for="(url, i) in form.screenshots" :key="i" :src="url"
+                    style="width: 200px; border-radius: 4px; cursor: zoom-in"
+                    @click="previewShotPreview = url"
+                  />
                 </div>
               </div>
+              <a-modal :open="!!previewShotPreview" :footer="null" width="900px" @cancel="previewShotPreview = ''">
+                <img v-if="previewShotPreview" :src="previewShotPreview" style="width: 100%" />
+              </a-modal>
 
-              <!-- 简介（BBCode → HTML） -->
-              <div v-if="previewRenderedDesc" style="margin-bottom: 16px">
-                <div style="font-weight: 600; margin-bottom: 8px">简介</div>
-                <div style="padding: 16px; background: #fafafa; border-radius: 4px; line-height: 1.8" v-html="previewRenderedDesc"></div>
+              <!-- §59.81: 发布简介（四段结构化 + 源码/渲染切换） -->
+              <div v-if="previewRenderedDesc || previewStatement" style="margin-bottom: 16px">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+                  <div style="font-weight: 600">发布简介（按发布描述组装顺序）</div>
+                  <a-radio-group v-model:value="previewDescMode" size="small">
+                    <a-radio-button value="rendered">渲染效果</a-radio-button>
+                    <a-radio-button value="source">BBCode 源码</a-radio-button>
+                  </a-radio-group>
+                </div>
+                <template v-if="previewDescMode === 'rendered'">
+                  <div v-if="previewStatement" style="padding: 12px; background: #fafafa; border-radius: 4px; margin-bottom: 8px">
+                    <div style="color: #999; font-size: 12px; margin-bottom: 4px">— 声明 —</div>
+                    <div style="line-height: 1.8" v-html="previewStatementHTML"></div>
+                  </div>
+                  <div v-if="form.poster" style="text-align: center; margin-bottom: 8px">
+                    <img :src="form.poster" style="max-height: 260px; border-radius: 4px" />
+                  </div>
+                  <div v-if="previewRenderedDesc" style="padding: 12px; background: #fafafa; border-radius: 4px; line-height: 1.8" v-html="previewRenderedDesc"></div>
+                </template>
+                <pre v-else style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 500px; overflow: auto; white-space: pre-wrap">{{ previewDescSource }}</pre>
               </div>
 
               <!-- 校验状态 -->
@@ -423,6 +476,7 @@ import { CheckCircleFilled, ReloadOutlined } from '@ant-design/icons-vue'
 import { manualForwardApi, publishDataApi, publishApi, publishTorrentsApi, seedConfigApi } from '@/api/publish'
 import type { SeedDetail } from '@/api/publish'
 import { parseBBCode } from '@/utils/bbcode'
+import { TAG_GROUPS } from '@/generated/dict'
 import { CATEGORY_LABELS, PLATFORM_FULLNAMES } from '@/generated/dict'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import type { ManualForwardSubmitRequest, PreviewField, PreviewCompleteness, PublishResultRecord } from '@/api/types'
@@ -754,6 +808,40 @@ const seedIsLocal = ref(true) // §59.21: 默认 true（向后兼容）
 // §59.20 ⑨: 预览模式（保存即预览）
 const seedPreviewMode = ref(false)
 const previewRenderedDesc = ref('')
+// §59.81: 发布预览增强——全字段/标签着色/分段渲染/源码切换
+const previewFieldsData = ref<Record<string, unknown>>({})
+const previewShotPreview = ref('')
+const previewDescMode = ref<'rendered' | 'source'>('rendered')
+const previewStatement = ref('')
+const previewDescSource = ref('')
+
+const pv = (key: string): string => {
+  const v = previewFieldsData.value[key]
+  if (v === undefined || v === null || v === '' || v === 0) return '—'
+  return String(v)
+}
+const pvRegion = computed(() => {
+  const r = previewFieldsData.value.region as { labels?: string[] } | undefined
+  return r?.labels || []
+})
+const pvGenre = computed(() => {
+  const g = previewFieldsData.value.genre as { labels?: string[] } | undefined
+  return g?.labels || []
+})
+const previewTags = computed<string[]>(() => (previewFieldsData.value.tags as string[]) || [])
+// §59.81: 禁转类标签红色（easy-upload getTagType 借鉴）
+const isRestrictedTag = (t: string): boolean =>
+  t === '禁转' || t === 'tag.禁转' || t === '限转' || t === 'tag.限转' || t === 'no_transfer'
+// 标签显示名（dict label 优先）
+const tagDisplayName = (t: string): string => {
+  for (const g of TAG_GROUPS) {
+    for (const tk of g.tags) {
+      if (tk.key === t) return tk.label
+    }
+  }
+  return t
+}
+const previewStatementHTML = computed(() => parseBBCode(previewStatement.value))
 
 // §59.20: 已过滤声明 Tab 预览
 const declPatterns = ref<string[]>([])
@@ -1037,9 +1125,14 @@ async function saveOnly() {
       // §59.28 C（方案A ④）: 服务端渲染的完整描述（声明+致谢+海报+正文+截图）
       if (result.rendered_description) {
         previewRenderedDesc.value = parseBBCode(result.rendered_description)
+        previewDescSource.value = result.rendered_description
       } else {
         previewRenderedDesc.value = parseBBCode(form.value.description)
+        previewDescSource.value = form.value.description
       }
+      // §59.81: 预览增强素材——全字段/标签/产地类型/声明段
+      previewFieldsData.value = { ...result } as Record<string, unknown>
+      previewStatement.value = (result as { statement?: string }).statement || form.value.statement
       // §59.28 C（方案A ②）: 标准化重组标题回填预览
       if (result.reassembled_title) {
         form.value.title = result.reassembled_title

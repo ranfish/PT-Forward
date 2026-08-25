@@ -3721,14 +3721,40 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"subtitle":     updated.Subtitle,
 		"poster":       updated.Poster,
 		"description":  updated.Description,
+		"statement":    updated.Statement,
+		"tags":         updated.Tags,
 		"reviewed":     updated.Reviewed,
 		"missing_fields": missing,
 		"main_title":    profile.MainTitle,
 		"release_group":  profile.ReleaseGroup,
 
+		// §59.81: v1.05 全字段（发布预览参数区扩容——对齐 Tab1 资产）
+		"season_episode": profile.SeasonEpisode,
+		"year":           profile.Year,
+		"resolution":     profile.Resolution,
+		"hdr":            profile.HDR,
+		"bit_depth":      profile.BitDepth,
+		"video_codec":    profile.VideoCodec,
+		"audio_codec":    profile.AudioCodec,
+		"audio_channels": profile.AudioChannels,
+		"audio_tech":     profile.AudioTechnology,
+		"audio_tracks":   profile.AudioTracks,
+		"source_type":    profile.SourceType,
+		"specification":  profile.Specification,
+		"source_platform": profile.SourcePlatform,
+		"edition_info":   pickNonEmpty(updated.EditionInfo, profile.EditionInfo),
+		"region_code":    profile.RegionCode,
+		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(updated.Subtitle)),
+		"encode":         titleparser.IsEncode(profile),
+
 		// §59.28 C（方案A ②④）：标准化重组标题 + 渲染后完整描述（预览）
 		"reassembled_title": reassembledTitle,
 		"rendered_description": renderedDesc,
+	}
+	// §59.81: 产地/类型 + 分段渲染素材（简介四段结构化展示）
+	if src, err := metadata.UnmarshalPTGenSource(updated.PTGenSourceJSON); err == nil && src != nil {
+		result["region"] = normalizeDomainValues("region", src.Region)
+		result["genre"] = normalizeDomainValues("genre", src.Genre)
 	}
 	if renderErr != nil {
 		result["render_error"] = renderErr.Error()
