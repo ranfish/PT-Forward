@@ -277,3 +277,22 @@ func TestRender_NoSourceNoThanksSections(t *testing.T) {
 		t.Errorf("声明/正文保留: %q", out[:min(200, len(out))])
 	}
 }
+
+// §59.88: PTGen 正文自带海报时 renderPoster 去重——doubaninfo PTGen format 头部
+// 含海报图，与 poster 列同 URL；不查重则 rendered 内海报双份（兵人实锤）。
+func TestRender_PosterDedupeWithPTGenBody(t *testing.T) {
+	r := NewRenderer("")
+	poster := "https://doubaninfo.com/dbposter/x.jpg"
+	out, err := r.Render(&model.DescriptionData{
+		PosterURL: poster,
+		PTGenBody: "[img]" + poster + "[/img]\n◎简　介　剧情",
+		SourceSite: "",
+	}, model.SiteDescConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := strings.Count(out, poster)
+	if n != 1 {
+		t.Errorf("海报应只出现一次(正文自带时跳过注入), 实得 %d 次:\n%s", n, out[:min(200, len(out))])
+	}
+}
