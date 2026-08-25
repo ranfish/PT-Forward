@@ -184,6 +184,35 @@ func topLevelQuotes(quotes []quoteBlock) []quoteBlock {
 	return out
 }
 
+// miFragmentLineRe §59.78: MI 段名/字段行形态。
+// mUHD 制作者把 MI 摘要拆成多个小 quote（[quote]General[/quote]、
+// [quote]Container: Matroska\nRuntime...[/quote]）——"短文本即声明"启发式
+// 对其失效（墓碑镇实锤混入 Statement）。整块每一行都匹配才判定。
+var miFragmentLineRe = regexp.MustCompile(`(?i)^(general|video(\s*\(\d+\))?|audio(\s*\(\d+\))?|subtitles?(\s*\(\d+\))?|text(\s*\(\d+\))?|chapters?|menu|image(?:\s*\(\d+\))?|(container|runtime|size|format|overall bit rate|width|height|bit rate|frame rate|writing library|codec id|duration)\s*:.*)$`)
+
+// isMISectionQuote 判定 quote 块是否为 MI 碎片（索引段名或元数据字段块）。
+// 每行（剥空白）都必须匹配 MI 形态；混有任何非 MI 行即不是碎片。
+func isMISectionQuote(inner string) bool {
+	trimmedInner := strings.TrimSpace(inner)
+	if trimmedInner == "" {
+		return false
+	}
+	lines := strings.Split(trimmedInner, "\n")
+	if len(lines) == 0 {
+		return false
+	}
+	for _, ln := range lines {
+		ln = strings.TrimSpace(ln)
+		if ln == "" {
+			continue
+		}
+		if !miFragmentLineRe.MatchString(ln) {
+			return false
+		}
+	}
+	return true
+}
+
 // findMediaInfoPosition 在 BBCode 中查找 MediaInfo 段的起始位置。
 // §59.26: 无海报时用 MediaInfo 位置作声明/正文的拆分点。
 var mediaInfoMarkerRe = regexp.MustCompile(`(?im)(?:^|\n)\s*(?:\[url[^\]]*\]\s*)?MediaInfo\s*[:：]|(?:^|\n)\s*\[quote\]\s*General\s*\n`)
@@ -218,6 +247,11 @@ func classifyBeforePosterQuotes(quotes []quoteBlock) (statements, ardtuFulls, st
 	for _, q := range quotes {
 		text := strings.TrimSpace(q.Inner)
 		if text == "" {
+			continue
+		}
+		// 0. §59.78 MI 碎片引用（mUHD 摘要形态）→ 整块剥离（不入 Statement 也不留 Body）
+		if isMISectionQuote(q.Inner) {
+			ardtuFulls = append(ardtuFulls, q.Full)
 			continue
 		}
 		// 1. By ARDTU@... 前缀 → 剥离前缀归 Statement，整块从 Body 移除
