@@ -468,6 +468,13 @@ func (h *ManualForwardHandler) getTorrentSize(clientID uint, infoHash string) in
 	return torrent.TotalSize
 }
 
+func pickNonZero(a, b int) int {
+	if a != 0 {
+		return a
+	}
+	return b
+}
+
 func pickNonEmpty(a, b string) string {
 	if a != "" {
 		return a

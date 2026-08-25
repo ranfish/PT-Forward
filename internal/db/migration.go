@@ -253,6 +253,14 @@ func init() {
 		return nil
 	})
 	// §59.63: 簇截图链接缓存表（观察期复用——清簇重取免重截重传）
+	RegisterMigration(22, "metadata_add_audio_tracks", func(gormDB *gorm.DB) error {
+		var hasCol int64
+		gormDB.Raw("SELECT COUNT(*) FROM pragma_table_info('torrent_metadata') WHERE name='audio_tracks'").Scan(&hasCol)
+		if hasCol == 0 {
+			return gormDB.Exec("ALTER TABLE torrent_metadata ADD COLUMN audio_tracks integer DEFAULT 0").Error
+		}
+		return nil
+	})
 	RegisterMigration(20, "cluster_screenshot_cache", func(gormDB *gorm.DB) error {
 		return gormDB.Migrator().CreateTable(&model.ClusterScreenshotCache{})
 	})

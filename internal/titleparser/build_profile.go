@@ -16,5 +16,10 @@ func BuildTechProfile(title, mediaInfo string, domMedium, domResolution, domVide
 		MergeMediaInfoInto(&profile, &miTech)
 	}
 	MergeDOMInto(&profile, domMedium, domResolution, domVideoCodec, domAudioCodec)
+	// §59.76: 实现步骤 3 承诺的合并——ReleaseVersion(PROPER/REPACK/RERIP/DIRFIX/INTERNAL)
+	// 并入 EditionInfo（空时补，不覆盖既有 edition token；重组/展示统一单通道）
+	if profile.EditionInfo == "" && profile.ReleaseVersion != "" {
+		profile.EditionInfo = profile.ReleaseVersion
+	}
 	return profile
 }

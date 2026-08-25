@@ -2607,6 +2607,7 @@ fetched:
 				"audio_codec":     profile.AudioCodec,
 				"audio_channels":  profile.AudioChannels,
 				"audio_tech":      profile.AudioTechnology,
+				"audio_tracks":    profile.AudioTracks, // §59.76: v1.05 #16
 				"hdr":             profile.HDR,
 				"bit_depth":       profile.BitDepth,
 				"source_type":     profile.SourceType,
@@ -3556,6 +3557,7 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"audio_codec":     pickNonEmpty(meta.AudioCodec, profile.AudioCodec),
 		"audio_channels":  pickNonEmpty(meta.AudioChannels, profile.AudioChannels),
 		"audio_tech":      pickNonEmpty(meta.AudioTech, profile.AudioTechnology),
+		"audio_tracks":    pickNonZero(meta.AudioTracks, profile.AudioTracks), // §59.76
 		"hdr":             pickNonEmpty(meta.HDR, profile.HDR),
 		"bit_depth":       pickNonEmpty(meta.BitDepth, profile.BitDepth),
 		"source_type":     displayProfile.SourceType,
