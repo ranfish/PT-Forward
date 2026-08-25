@@ -207,3 +207,28 @@ func TestAdjustCommentaryTracks(t *testing.T) {
 		}
 	}
 }
+
+// §59.84: 媒介写法区分三缺口——3D 点分隔/HDDVDRip/DVD 原盘。
+func TestMediumThreeGaps(t *testing.T) {
+	cases := []struct {
+		title        string
+		wantST, wantSpec string
+	}{
+		// 1. 3D 点分隔: preferredBlurayToken 只认 "3D BLU"(空格)/"3DBLU"(无分隔), 点分隔 "3D.Blu-ray" 落入普通 BLU
+		{"Movie.3D.Blu-ray.1080p.AVC", "3D Blu-ray", ""},
+		{"Movie.2024.3D.BluRay.1080p.x264", "3D BluRay", ""},
+		// 2. HDDVDRip: extractMedium/splitMedium 双双无 HDDVD case(v1.05 压制类明列)
+		{"Movie.2024.1080p.HDDVDRip.x264", "HD DVD", "HDDVDRip"},
+		// 3. DVD 原盘: reDVDDiscToken 只认 DVD5/DVD9, 裸 "DVD" 不命中(v1.05 原盘类)
+		{"Movie.2024.DVD.Full", "DVD", ""},
+		// 既有行为回归锚
+		{"Movie.2024.UHD.BluRay.2160p.x265", "UHD BluRay", ""},
+		{"Movie.2024.DVDRip", "DVD", "DVDRip"},
+	}
+	for _, c := range cases {
+		p := BuildTechProfile(c.title, "", "", "", "", "")
+		if p.SourceType != c.wantST || p.Specification != c.wantSpec {
+			t.Errorf("%s: ST=%q Spec=%q, want ST=%q Spec=%q", c.title, p.SourceType, p.Specification, c.wantST, c.wantSpec)
+		}
+	}
+}

@@ -155,6 +155,9 @@ func splitMedium(medium string) (sourceType, specification string) {
 		} else {
 			sourceType = "BluRay"
 		}
+	case strings.Contains(upper, "HDDVDRIP"):
+		sourceType = "HD DVD"
+		specification = "HDDVDRip"
 	case strings.Contains(upper, "DVD"):
 		sourceType = "DVD"
 	}
