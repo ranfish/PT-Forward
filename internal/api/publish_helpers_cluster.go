@@ -76,6 +76,36 @@ func (h *PublishTorrentsHandler) hasCompleteMetadata(ctx context.Context, hash s
 	return n > 0
 }
 
+// propagateClusterReviewed §59.93: 审核状态簇同步——PUT reviewed 写行后把
+// 簇内全部行同步（同簇数据相同，审核一份数据=审核全簇）。仙履奇缘 54 副本实锤：
+// 编辑行 reviewed=1 其余 53 行=0，列表逐快照行展示时其他快照挂的兄弟行仍 pending。
+func (h *PublishTorrentsHandler) propagateClusterReviewed(ctx context.Context, clientID, savePath, name, selfHash string, reviewed bool) {
+	if h.db == nil || clientID == "" || savePath == "" || name == "" {
+		return
+	}
+	var siblingHashes []string
+	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = 0 AND hash != ?",
+			clientID, savePath, name, selfHash).
+		Pluck("hash", &siblingHashes)
+	if len(siblingHashes) == 0 {
+		return
+	}
+	res := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ?", siblingHashes).
+		Update("reviewed", reviewed)
+	if res.Error != nil {
+		h.logger.Error("cluster reviewed propagate failed", zap.Error(res.Error))
+		return
+	}
+	if res.RowsAffected > 0 {
+		h.logger.Info("cluster reviewed propagated",
+			zap.String("hash", selfHash[:min(10, len(selfHash))]),
+			zap.Bool("reviewed", reviewed),
+			zap.Int64("rows", res.RowsAffected))
+	}
+}
+
 // upsertClusterScreenshotCache §59.63: 截图链接缓存写穿（自动链成功点 + 手动捕获
 // 完成点共用）。ttlDays<=0 视为功能关闭。UPSERT——同簇双 leader 后写赢（第二个
 // 本就是缓存命中，链接一致）。

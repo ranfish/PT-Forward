@@ -3698,6 +3698,12 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	meta.Description = pickNonEmpty(req.Description, meta.Description)
 	missing := h.checkRequiredFields(meta)
 	updates["reviewed"] = len(missing) == 0
+	// §59.93: 审核状态簇同步（含取消）——簇键从快照查，PUT 落库完成后执行
+	var snapClient, snapPath, snapName string
+	h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
+		Where("hash = ?", infoHash).Select("client_id, save_path, name").
+		Row().Scan(&snapClient, &snapPath, &snapName)
+	defer h.propagateClusterReviewed(context.Background(), snapClient, snapPath, snapName, infoHash, len(missing) == 0)
 
 	h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
 		Where("id = ?", meta.ID).
