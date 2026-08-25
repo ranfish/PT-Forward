@@ -3746,8 +3746,6 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"tags":         updated.Tags,
 		"reviewed":     updated.Reviewed,
 		"missing_fields": missing,
-		"main_title":    profile.MainTitle,
-		"release_group":  profile.ReleaseGroup,
 
 		// §59.81: v1.05 全字段（发布预览参数区扩容——对齐 Tab1 资产）
 		"season_episode": profile.SeasonEpisode,
@@ -3767,6 +3765,13 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"region_code":    profile.RegionCode,
 		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(updated.Subtitle)),
 		"encode":         titleparser.IsEncode(profile),
+		// §59.90: 对齐 Tab1——剧名/制作组/类型(InferCategory)
+		"main_title":     profile.MainTitle,
+		"release_group":  profile.ReleaseGroup,
+		"category": func() string {
+			comps := titleparser.TechProfileToComponents(profile)
+			return titleparser.InferCategory(comps, updated.SourceCategory, "", "")
+		}(),
 
 		// §59.28 C（方案A ②④）：标准化重组标题 + 渲染后完整描述（预览）
 		"reassembled_title": reassembledTitle,

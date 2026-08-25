@@ -86,28 +86,27 @@
               <a-card size="small" style="margin-bottom: 12px">
                 <template #title><span style="font-size: 14px">② 技术规格</span></template>
               <a-descriptions :column="4" bordered size="small">
-                <!-- §59.87: 对齐 Tab1 分组——媒介组 -->
+                <!-- §59.90: 行集/顺序对齐 Tab1（标识组→媒介组→视频组→音频组→其他） -->
+                <a-descriptions-item label="中文名">{{ pv('chinese_prefix') }}</a-descriptions-item>
+                <a-descriptions-item label="剧名">{{ pv('main_title') }}</a-descriptions-item>
                 <a-descriptions-item label="季集">{{ pv('season_episode') }}</a-descriptions-item>
                 <a-descriptions-item label="年份">{{ pv('year') }}</a-descriptions-item>
+                <a-descriptions-item label="制作组">{{ pv('release_group') }}</a-descriptions-item>
+                <a-descriptions-item label="类型">{{ pvCategory }}</a-descriptions-item>
                 <a-descriptions-item label="媒介(站点)">{{ pvSiteMedium }}</a-descriptions-item>
                 <a-descriptions-item label="片源">{{ pv('source_type') }}</a-descriptions-item>
                 <a-descriptions-item label="规格">{{ pv('specification') }}</a-descriptions-item>
                 <a-descriptions-item label="分发方">{{ pv('source_platform') }}</a-descriptions-item>
-                <!-- 视频组 -->
                 <a-descriptions-item label="分辨率">{{ pv('resolution') }}</a-descriptions-item>
                 <a-descriptions-item label="视频编码">{{ pv('video_codec') }}</a-descriptions-item>
                 <a-descriptions-item label="HDR">{{ pv('hdr') }}</a-descriptions-item>
                 <a-descriptions-item label="bit">{{ pv('bit_depth') }}</a-descriptions-item>
-                <!-- 音频组 -->
                 <a-descriptions-item label="音频编码">{{ pv('audio_codec') }}</a-descriptions-item>
                 <a-descriptions-item label="声道">{{ pv('audio_channels') }}</a-descriptions-item>
-                <a-descriptions-item label="对象信息">{{ pv('audio_tech') }}</a-descriptions-item>
+                <a-descriptions-item label="音频技术">{{ pv('audio_tech') }}</a-descriptions-item>
                 <a-descriptions-item label="音轨数">{{ pv('audio_tracks') }}</a-descriptions-item>
-                <!-- 其他 -->
                 <a-descriptions-item label="版本">{{ pv('edition_info') }}</a-descriptions-item>
                 <a-descriptions-item label="地区码">{{ pv('region_code') }}</a-descriptions-item>
-                <a-descriptions-item label="Encode">{{ pv('encode') }}</a-descriptions-item>
-                <a-descriptions-item label="中文名">{{ pv('chinese_prefix') }}</a-descriptions-item>
               </a-descriptions>
               </a-card>
 
@@ -848,6 +847,12 @@ const pvSiteMedium = computed(() => {
   if (st.includes('DVD') && !st.includes('Rip')) return 'DVD'
   if (tc.encode) return 'Encode'
   return '—'
+})
+
+// §59.90: 类型行——与 Tab1 categoryLabel 同源（standard key → 中文）
+const pvCategory = computed(() => {
+  const c = String(previewFieldsData.value.category || '')
+  return c ? categoryLabel(c) : '—'
 })
 
 const pv = (key: string): string => {
