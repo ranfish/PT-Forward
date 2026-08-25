@@ -179,6 +179,10 @@ func extractMedium(title string) string {
 	if reBDRipToken.MatchString(title) {
 		parts = append(parts, "BDRip")
 	}
+	// §59.84: HDDVDRip（v1.05 压制类明列，extractMedium 曾无 case 双空）
+	if regexp.MustCompile(`(?i)\bHDDVDRIP\b`).MatchString(title) {
+		parts = append(parts, "HDDVDRip")
+	}
 	if raw := strings.TrimSpace(reTVRipToken.FindString(title)); raw != "" {
 		parts = append(parts, "TVRip")
 	}
@@ -187,6 +191,9 @@ func extractMedium(title string) string {
 	}
 	if raw := strings.TrimSpace(reDVDDiscToken.FindString(title)); raw != "" {
 		parts = append(parts, strings.ToUpper(raw))
+	} else if regexp.MustCompile(`(?i)\bDVD\b`).MatchString(title) && !strings.Contains(upper, "DVDRIP") {
+		// §59.84: 裸 DVD（原盘类）——reDVDDiscToken 只认 DVD5/9, "DVD.Full" 曾双空
+		parts = append(parts, "DVD")
 	}
 	if strings.Contains(upper, "WEB-DL") || strings.Contains(upper, "WEBDL") {
 		parts = append(parts, "WEB-DL")
@@ -210,7 +217,8 @@ func preferredBlurayToken(title string) string {
 	switch {
 	case strings.Contains(upper, "UHD BLU") || strings.Contains(upper, "UHDBLU"):
 		return "UHD " + suffix
-	case strings.Contains(upper, "3D BLU") || strings.Contains(upper, "3DBLU"):
+	// §59.84: 3D 分隔三形态（空格/点/无分隔）——点分隔 "3D.Blu-ray" 曾落入普通 BLU
+	case strings.Contains(upper, "3D BLU") || strings.Contains(upper, "3D.BLU") || strings.Contains(upper, "3DBLU"):
 		return "3D " + suffix
 	case strings.Contains(upper, "BLU"):
 		return suffix
