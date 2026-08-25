@@ -1908,15 +1908,28 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 		return
 	}
 
-	updates := map[string]interface{}{
-		"title":       req.Title,
-		"subtitle":    req.Subtitle,
-		"description": req.Description,
-		"screenshots": model.NormalizeScreenshotColumn(req.Screenshots), // §59.59 附二: 透传写点归一（原碰巧正确，靠前端 JSON.stringify）
-		"poster":      req.Poster,
-		"media_info":  req.MediaInfo, // §59.56 审计: 列名笔误同族第四处（mediainfo→media_info）
-		"tags":        req.Tags,
-		"reviewed":    true,
+	// §59.94: 空值不覆盖（§59.89 同款——旧编辑链无条件覆盖会清空未传字段）
+	updates := map[string]interface{}{"reviewed": true}
+	if req.Title != "" {
+		updates["title"] = req.Title
+	}
+	if req.Subtitle != "" {
+		updates["subtitle"] = req.Subtitle
+	}
+	if req.Description != "" {
+		updates["description"] = req.Description
+	}
+	if req.Screenshots != "" {
+		updates["screenshots"] = model.NormalizeScreenshotColumn(req.Screenshots) // §59.59 附二: 透传写点归一
+	}
+	if req.Poster != "" {
+		updates["poster"] = req.Poster
+	}
+	if req.MediaInfo != "" {
+		updates["media_info"] = req.MediaInfo // §59.56: 列名笔误同族第四处
+	}
+	if req.Tags != "" {
+		updates["tags"] = req.Tags
 	}
 
 	result := h.db.WithContext(r.Context()).
@@ -1931,6 +1944,8 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 		Error(w, http.StatusNotFound, 40400, "记录不存在")
 		return
 	}
+	// §59.94: 审核簇同步（公共方法）
+	h.syncClusterReviewedByIDs(context.Background(), []uint{uint(id)}, true)
 
 	Success(w, map[string]interface{}{"success": true, "id": id})
 }
@@ -1958,6 +1973,8 @@ func (h *PublishTorrentsHandler) handleBatchReview(w http.ResponseWriter, r *htt
 		Error(w, http.StatusInternalServerError, 50000, "db error")
 		return
 	}
+	// §59.94: 审核簇同步（公共方法——批量 ID 去重簇键后逐簇传播）
+	h.syncClusterReviewedByIDs(context.Background(), req.IDs, req.Reviewed)
 	Success(w, map[string]interface{}{"updated": result.RowsAffected})
 }
 
@@ -3698,12 +3715,8 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	meta.Description = pickNonEmpty(req.Description, meta.Description)
 	missing := h.checkRequiredFields(meta)
 	updates["reviewed"] = len(missing) == 0
-	// §59.93: 审核状态簇同步（含取消）——簇键从快照查，PUT 落库完成后执行
-	var snapClient, snapPath, snapName string
-	h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
-		Where("hash = ?", infoHash).Select("client_id, save_path, name").
-		Row().Scan(&snapClient, &snapPath, &snapName)
-	defer h.propagateClusterReviewed(context.Background(), snapClient, snapPath, snapName, infoHash, len(missing) == 0)
+	// §59.93/94: 审核状态簇同步（公共方法——含取消）
+	defer h.syncClusterReviewedByHashes(context.Background(), []string{infoHash}, len(missing) == 0)
 
 	h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
 		Where("id = ?", meta.ID).
