@@ -359,3 +359,27 @@ func TestPropagateClusterReviewed(t *testing.T) {
 		t.Errorf("取消也应同步: %d", n)
 	}
 }
+
+// §59.94: 簇共享公共方法——clusterKeyOf(info_hash→簇键) + syncClusterReviewedByIDs
+//（batchReview/saveSeedData 两写点统一接入）。
+func TestClusterKeyOfAndSyncByIDs(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	db.Create(&model.TorrentSnapshot{Hash: "kself0000000000000000000000000000000000", ClientID: "PT1", Name: "K", SavePath: "/k"})
+	db.Create(&model.TorrentSnapshot{Hash: "ksib00000000000000000000000000000000000", ClientID: "PT1", Name: "K", SavePath: "/k"})
+	db.Create(&model.TorrentMetadata{InfoHash: "kself0000000000000000000000000000000000", SiteName: "朋友", Title: "t", ID: 9001})
+	db.Create(&model.TorrentMetadata{InfoHash: "ksib00000000000000000000000000000000000", SiteName: "朋友", Title: "t", ID: 9002})
+
+	// 簇键解析（hash → client/path/name）
+	ck, ok := clusterKeyOf(db, "kself0000000000000000000000000000000000")
+	if !ok || ck.name != "K" || ck.savePath != "/k" || ck.clientID != "PT1" {
+		t.Fatalf("clusterKeyOf: %+v ok=%v", ck, ok)
+	}
+	// 按 metadata ID 批量同步 reviewed
+	h.syncClusterReviewedByIDs(context.Background(), []uint{9001}, true)
+	var n int64
+	db.Model(&model.TorrentMetadata{}).Where("info_hash = ? AND reviewed = ?", "ksib00000000000000000000000000000000000", true).Count(&n)
+	if n != 1 {
+		t.Errorf("按 ID 同步应覆盖兄弟行: %d", n)
+	}
+}

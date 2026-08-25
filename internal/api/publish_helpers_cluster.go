@@ -76,6 +76,55 @@ func (h *PublishTorrentsHandler) hasCompleteMetadata(ctx context.Context, hash s
 	return n > 0
 }
 
+// clusterKey §59.94: 簇键三元组（公共方法统一形态）。
+type clusterKey struct {
+	clientID string
+	savePath string
+	name     string
+}
+
+// clusterKeyOf §59.94: info_hash → 簇键（快照反查）。公共方法——PUT 保存/
+// 批量审核/旧编辑链统一接入，消除三处各自拼装。
+func clusterKeyOf(db *gorm.DB, infoHash string) (clusterKey, bool) {
+	if db == nil || infoHash == "" {
+		return clusterKey{}, false
+	}
+	var ck clusterKey
+	err := db.Model(&model.TorrentSnapshot{}).
+		Where("hash = ?", infoHash).
+		Select("client_id, save_path, name").
+		Row().Scan(&ck.clientID, &ck.savePath, &ck.name)
+	if err != nil || ck.name == "" {
+		return clusterKey{}, false
+	}
+	return ck, true
+}
+
+// syncClusterReviewedByIDs §59.94: 按 metadata ID 批量审核簇同步（batchReview/
+// saveSeedData 写点公共接入）——ID→hash→簇键→propagateClusterReviewed。
+func (h *PublishTorrentsHandler) syncClusterReviewedByIDs(ctx context.Context, ids []uint, reviewed bool) {
+	if h.db == nil || len(ids) == 0 {
+		return
+	}
+	var hashes []string
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("id IN ?", ids).Pluck("info_hash", &hashes)
+	h.syncClusterReviewedByHashes(ctx, hashes, reviewed)
+}
+
+// syncClusterReviewedByHashes §59.94: 按 info_hash 批量审核簇同步（去重簇键后逐簇）。
+func (h *PublishTorrentsHandler) syncClusterReviewedByHashes(ctx context.Context, hashes []string, reviewed bool) {
+	seen := map[clusterKey]bool{}
+	for _, ih := range hashes {
+		ck, ok := clusterKeyOf(h.db, ih)
+		if !ok || seen[ck] {
+			continue
+		}
+		seen[ck] = true
+		h.propagateClusterReviewed(ctx, ck.clientID, ck.savePath, ck.name, ih, reviewed)
+	}
+}
+
 // propagateClusterReviewed §59.93: 审核状态簇同步——PUT reviewed 写行后把
 // 簇内全部行同步（同簇数据相同，审核一份数据=审核全簇）。仙履奇缘 54 副本实锤：
 // 编辑行 reviewed=1 其余 53 行=0，列表逐快照行展示时其他快照挂的兄弟行仍 pending。
