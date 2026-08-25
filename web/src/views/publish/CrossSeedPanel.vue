@@ -806,16 +806,23 @@ const seedReviewed = ref(false)
 const siteMediumDisplay = computed(() => {
   const tc = form.value.titleComponents
   const spec = (tc.specification || '').toLowerCase()
-  const st = (tc.source_type || '').toLowerCase()
+  const st = tc.source_type || ''
+  // 规格优先（Remux/WEB/HDTV 族是独立媒介值）
   if (spec === 'remux') return 'Remux'
   if (spec === 'web-dl' || spec === 'webdl') return 'WEB-DL'
   if (spec === 'webrip') return 'WEBRip'
   if (spec === 'hdtv') return 'HDTV'
   if (spec === 'uhdtv') return 'UHDTV'
-  if (spec === 'bdrip') return 'Encode'
-  if (st.includes('uhd')) return 'UHD Blu-ray 原盘'
-  if (st.includes('blu')) return 'Blu-ray 原盘'
-  if (st.includes('dvd')) return 'DVD'
+  if (spec === 'bdrip' || spec === 'dvdrip') return 'Encode'
+  // §59.83: v1.05 片源写法区分——连字符=原盘媒介, 无连字符=压制(Encode 媒介)
+  // 威猛奇兵实锤: "UHD.BluRay"(压制) 曾被子串匹配误显"UHD Blu-ray 原盘"
+  if (st === 'UHD Blu-ray' || st === 'Blu-ray' || st === '3D Blu-ray') {
+    return st + ' 原盘'
+  }
+  if (st === 'UHD BluRay' || st === 'BluRay' || st === '3D BluRay') {
+    return 'Encode' // 压制写法 → 站点媒介 Encode
+  }
+  if (st.includes('DVD') && !st.includes('Rip')) return 'DVD'
   if (tc.encode) return 'Encode'
   return '—'
 })
