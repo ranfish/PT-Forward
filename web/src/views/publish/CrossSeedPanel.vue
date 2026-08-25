@@ -358,7 +358,7 @@
               </div>
               <a-textarea v-model:value="form.description" :rows="36" placeholder="BBCode 简介正文" style="font-family: monospace" />
               <!-- §59.20: maintenanceOnly 模式下外部链接只读展示 -->
-              <div v-if="maintenanceOnly && (form.doubanLink || form.imdbLink || form.tmdbLink)" style="margin-top: 12px">
+              <div v-if="form.doubanLink || form.imdbLink || form.tmdbLink" style="margin-top: 12px">
                 <span style="color: #999; font-size: 12px; margin-right: 12px">外部链接：</span>
                 <a v-if="form.doubanLink" :href="form.doubanLink" target="_blank" style="margin-right: 8px; font-size: 12px">豆瓣</a>
                 <a v-if="form.imdbLink" :href="form.imdbLink" target="_blank" style="margin-right: 8px; font-size: 12px">IMDb</a>
