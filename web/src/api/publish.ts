@@ -265,6 +265,7 @@ export interface SeedDetail {
   fetched_at: string
   fetch_source: string
   tags?: string[]
+  audio_tracks?: number
   // §59.75: 产地/类型（PTGen 源归一——keys=canonical 供发布映射, labels=展示）
   region?: { keys: string[]; labels: string[] }
   genre?: { keys: string[]; labels: string[] }

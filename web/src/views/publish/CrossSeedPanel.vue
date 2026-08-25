@@ -161,6 +161,7 @@
                     </a-tooltip>
                   </a-descriptions-item>
                   <a-descriptions-item label="版本">{{ form.titleComponents.edition_info || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="音轨数">{{ form.titleComponents.audio_tracks || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="地区码">{{ form.titleComponents.region_code || '—' }}</a-descriptions-item>
                 </a-descriptions>
                 <!-- §59.75: 产地/类型（PTGen 源归一只读展示——发布映射消费 canonical） -->

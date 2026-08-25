@@ -58,6 +58,11 @@ var editionPatterns = []editionPattern{
 	{regexp.MustCompile(`(?i)\bCollector'?s?[-_.\s]*Edition\b`), "Collector's Edition"},
 	{regexp.MustCompile(`(?i)\bCriterion[-_.\s]*Collection\b`), "Criterion Collection"},
 	{regexp.MustCompile(`(?i)\bCriterion\b`), "Criterion"},
+	// §59.76: v1.05 W.9 碟片发行商品牌（原盘类内容分发方）——CC 已由 Criterion 覆盖
+	{regexp.MustCompile(`(?i)\bMoC\b`), "MoC"},
+	{regexp.MustCompile(`(?i)\bWAC\b`), "WAC"},
+	{regexp.MustCompile(`(?i)\bMasters[-_.\s]*of[-_.\s]*Cinema\b`), "MoC"},
+	{regexp.MustCompile(`(?i)\bWarner[-_.\s]*Archive(?:[-_.\s]*Collection)?\b`), "WAC"},
 	// 特殊比例（优先级 4）
 	{regexp.MustCompile(`(?i)\bIMAX[-_.\s]*Enhanced\b`), "IMAX Enhanced"},
 	{regexp.MustCompile(`(?i)\bIMAX\b`), "IMAX"},

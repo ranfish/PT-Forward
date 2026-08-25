@@ -54,6 +54,7 @@ type TorrentMetadata struct {
 	AudioCodec    string `json:"audio_codec" gorm:"size:20;default:''"`    // DTS/TrueHD/AAC
 	AudioChannels string `json:"audio_channels" gorm:"size:20;default:''"`  // 5.1/7.1/2.0
 	AudioTech     string `json:"audio_tech" gorm:"size:20;default:''"`     // Atmos/Auro3D
+	AudioTracks   int    `json:"audio_tracks" gorm:"default:0"`             // §59.76: 音轨数（v1.05 #16，Encode 类强制）
 	HDR           string `json:"hdr" gorm:"size:30;default:''"`            // DV/HDR/HDR10+
 	BitDepth      string `json:"bit_depth" gorm:"size:10;default:''"`      // 8bit/10bit
 	SourceType    string `json:"source_type" gorm:"size:30;default:''"`    // UHD Blu-ray/BluRay

@@ -159,3 +159,27 @@ func TestMergeMediaInfoInto_NilSafe(t *testing.T) {
 	var nilP *TechProfile
 	MergeMediaInfoInto(nilP, &MediaInfoTech{Resolution: "2160p"}) // 不 panic
 }
+
+// §59.76: v1.05 资产四断点——REPACK 合并/MoC WAC pattern/音轨数/分发方展示(3b 前端)
+func TestEditionMergeReleaseVersion(t *testing.T) {
+	p := BuildTechProfile("Movie.2024.REPACK.1080p.BluRay.x264-GROUP", "", "", "", "", "")
+	if p.EditionInfo != "REPACK" {
+		t.Errorf("REPACK 应合并进 EditionInfo: %q", p.EditionInfo)
+	}
+	p2 := BuildTechProfile("Film.2020.IMAX.REPACK.2160p", "", "", "", "", "")
+	if p2.EditionInfo != "IMAX REPACK" && p2.EditionInfo != "IMAX" {
+		t.Errorf("已有 Edition 时不被覆盖: %q", p2.EditionInfo)
+	}
+}
+
+func TestEditionPublisherBrands(t *testing.T) {
+	for _, c := range []struct{ title, want string }{
+		{"Film.2020.MoC.2160p.Blu-ray", "MoC"},
+		{"Movie.2019.WAC.1080p.BluRay", "WAC"},
+	} {
+		p := BuildTechProfile(c.title, "", "", "", "", "")
+		if p.EditionInfo != c.want {
+			t.Errorf("%s: EditionInfo=%q want %q", c.title, p.EditionInfo, c.want)
+		}
+	}
+}
