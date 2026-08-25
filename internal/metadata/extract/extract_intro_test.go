@@ -370,3 +370,20 @@ Size: 21.6 GiB
 		t.Errorf("MI 碎片也应从 Body 剥离")
 	}
 }
+
+// §59.78 附: MI 碎片变体——音轨明细块（#1:5.1 Surround Remix 6 channels, DTS XLL@4... GiB (%)）。
+// mUHD 制作者的音轨摘要行形态: "#N:<名称> <X> channels, <编码>@<码率>, <体积> (<百分比>%)"。
+func TestMISectionQuote_AudioTrackDetail(t *testing.T) {
+	inner := "[b]#1:5.1 Surround Remix 6 channels, DTS XLL@4 195 kb/s, 3.80 GiB (18%)[/b]\n#2:Original Dolby Stereo SR Matrixed 2 channels, FLAC@577 kb/s, 535 MiB (2%)"
+	if !isMISectionQuote(inner) {
+		t.Errorf("音轨明细块应判 MI 碎片: %q", inner[:60])
+	}
+	// 真声明防御: 含 MI 词但结构不符的多行块不判
+	if isMISectionQuote("5.1音轨及镭射碟杜比立体声均保留；\n中文字幕来自 TLF字幕组") {
+		t.Error("真声明不应误判")
+	}
+	// 边界: #N 行 + 普通文本行混合 → 不判
+	if isMISectionQuote("#1:FLAC 2 channels, 577 kb/s\n普通说明文字") {
+		t.Error("混合块不应判 MI 碎片")
+	}
+}

@@ -188,7 +188,7 @@ func topLevelQuotes(quotes []quoteBlock) []quoteBlock {
 // mUHD 制作者把 MI 摘要拆成多个小 quote（[quote]General[/quote]、
 // [quote]Container: Matroska\nRuntime...[/quote]）——"短文本即声明"启发式
 // 对其失效（墓碑镇实锤混入 Statement）。整块每一行都匹配才判定。
-var miFragmentLineRe = regexp.MustCompile(`(?i)^(general|video(\s*\(\d+\))?|audio(\s*\(\d+\))?|subtitles?(\s*\(\d+\))?|text(\s*\(\d+\))?|chapters?|menu|image(?:\s*\(\d+\))?|(container|runtime|size|format|overall bit rate|width|height|bit rate|frame rate|writing library|codec id|duration)\s*:.*)$`)
+var miFragmentLineRe = regexp.MustCompile(`(?i)^(?:\[b\]|\[/b\])*(general|video(\s*\(\d+\))?|audio(\s*\(\d+\))?|subtitles?(\s*\(\d+\))?|text(\s*\(\d+\))?|chapters?|menu|image(?:\s*\(\d+\))?|(container|runtime|size|format|overall bit rate|width|height|bit rate|frame rate|writing library|codec id|duration)\s*:.*|#\d+\s*:.*(?:channels|kb/s|mb/s|gb|mib|gib).*)$`)
 
 // isMISectionQuote 判定 quote 块是否为 MI 碎片（索引段名或元数据字段块）。
 // 每行（剥空白）都必须匹配 MI 形态；混有任何非 MI 行即不是碎片。
