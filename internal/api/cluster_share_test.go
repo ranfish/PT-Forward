@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
@@ -245,5 +246,38 @@ func TestRefreshInferredTags_AfterPTGen(t *testing.T) {
 	}
 	if !has("chinese_subtitle") {
 		t.Errorf("既有标签不可丢: %v", tags)
+	}
+}
+
+// §59.75: t2 PTGen 源持久化——ptgen_source_json 落库（Region/Genre 结构化资产，
+// Tab1 产地/类型展示 + 未来发布映射消费）。接入遗漏修复：机制（列/Marshal）早已有，
+// 获取链 querier 只取 RawBBCode/PosterURL 把完整 result 丢了。
+func TestApplyPTGenSourcePersist(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	hash := "pgen00000000000000000000000000000000000"
+	db.Create(&model.TorrentMetadata{InfoHash: hash, SiteName: "朋友", Title: "t",
+		Poster: "https://img.keepfrds.com/x", FetchSource: "rss_detail"})
+
+	h.persistPTGenSource(context.Background(), hash, "朋友", &model.PTGenResult{
+		Region:       []string{"美国", "英国"},
+		Genre:        []string{"剧情", "动作", "科幻"},
+		ChineseTitle: "测试片",
+	})
+
+	var m model.TorrentMetadata
+	db.Where("info_hash = ?", hash).First(&m)
+	if m.PTGenSourceJSON == "" {
+		t.Fatal("ptgen_source_json 应落库")
+	}
+	src, err := metadata.UnmarshalPTGenSource(m.PTGenSourceJSON)
+	if err != nil || src == nil {
+		t.Fatalf("Unmarshal 失败: %v", err)
+	}
+	if len(src.Region) != 2 || src.Region[0] != "美国" {
+		t.Errorf("Region 应持久化: %v", src.Region)
+	}
+	if len(src.Genre) != 3 {
+		t.Errorf("Genre 应持久化: %v", src.Genre)
 	}
 }
