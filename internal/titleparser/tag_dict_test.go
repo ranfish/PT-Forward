@@ -56,8 +56,8 @@ func TestTagGroupsStructure(t *testing.T) {
 			}
 		}
 	}
-	if total != 49 {
-		t.Errorf("tag 词条 %d, want 49（+§59.73 特效字幕）", total)
+	if total != 56 {
+		t.Errorf("tag 词条 %d, want 56（+§59.85 A类缺口）", total)
 	}
 	// 关键词条锚定
 	for _, k := range []string{"dolby_vision", "chinese_subtitle", "chinese_audio", "complete", "10_bit", "hdr10_plus", "auro_3d"} {

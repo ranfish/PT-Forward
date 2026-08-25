@@ -1,24 +1,34 @@
 <template>
   <div class="tag-selector">
-    <!-- 已选标签 -->
+    <!-- 已选标签（只读展示；删除在弹窗内） -->
     <div v-if="modelValue.length" class="selected-tags">
       <a-tag
         v-for="tag in modelValue"
         :key="tag"
-        closable
-        :color="isStandardTag(tag) ? 'blue' : 'default'"
-        @close="removeTag(tag)"
+        :color="isRestrictedTag(tag) ? 'red' : isStandardTag(tag) ? 'blue' : 'default'"
       >
         {{ tagLabel(tag) }}
       </a-tag>
     </div>
     <div v-else class="empty-hint">未选择标签</div>
 
+    <!-- §59.85: 编辑标签按钮弹窗形态（折叠面板收进弹窗，Tab1 不再常驻展开） -->
+    <a-button size="small" style="margin-top: 8px" @click="modalOpen = true">
+      <EditOutlined /> 编辑标签
+    </a-button>
+    <a-modal
+      v-model:open="modalOpen"
+      title="编辑标签"
+      width="760px"
+      ok-text="确定"
+      cancel-text="取消"
+      :z-index="1100"
+    >
     <!-- 自定义标签输入 -->
     <a-input
       v-model:value="customInput"
       placeholder="输入自定义标签后回车（如 禁转/首发）"
-      style="margin-top: 8px"
+      style="margin-bottom: 8px"
       @press-enter="addCustomTag"
     >
       <template #suffix>
@@ -28,8 +38,21 @@
       </template>
     </a-input>
 
-    <!-- 38 个标准 media_tag 分组多选 -->
-    <a-collapse v-model:active-key="activeGroups" :bordered="false" ghost style="margin-top: 8px">
+    <!-- 已选标签（弹窗内可删除） -->
+    <div v-if="modelValue.length" class="selected-tags" style="margin-bottom: 8px">
+      <a-tag
+        v-for="tag in modelValue"
+        :key="tag"
+        closable
+        :color="isRestrictedTag(tag) ? 'red' : isStandardTag(tag) ? 'blue' : 'default'"
+        @close="removeTag(tag)"
+      >
+        {{ tagLabel(tag) }}
+      </a-tag>
+    </div>
+
+    <!-- 标准标签分组多选（dict 56 词条 9 分组） -->
+    <a-collapse v-model:active-key="activeGroups" :bordered="false" ghost>
       <a-collapse-panel
         v-for="group in tagGroups"
         :key="group.name"
@@ -50,12 +73,13 @@
         </div>
       </a-collapse-panel>
     </a-collapse>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { CheckCircleFilled } from '@ant-design/icons-vue'
+import { CheckCircleFilled, EditOutlined } from '@ant-design/icons-vue'
 import { TAG_GROUPS } from '@/generated/dict'
 
 // §59.35 P4: tag 分组数据源切换 generated/dict.ts（dict/tag.json 唯一真相源，
@@ -74,6 +98,11 @@ const emit = defineEmits<{
 
 const customInput = ref('')
 const activeGroups = ref<string[]>(['HDR/色彩'])  // 默认展开第一组
+const modalOpen = ref(false)
+// §59.85: 禁转类标签红色（easy-upload getTagType 借鉴）
+const isRestrictedTag = (t: string): boolean =>
+  t === '禁转' || t === 'tag.禁转' || t === '限转' || t === 'tag.限转' || t === 'no_transfer'
+
 
 function isStandardTag(tag: string): boolean {
   return allStandardKeys.value.includes(tag)

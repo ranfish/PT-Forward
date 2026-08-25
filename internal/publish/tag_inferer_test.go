@@ -193,3 +193,34 @@ func TestMergeTags(t *testing.T) {
 		}
 	}
 }
+
+// §59.85: A类缺口 9 词条——文案判据 + 4K/8K 数值判据。
+func TestInferGapTags(t *testing.T) {
+	cases := []struct {
+		name string
+		in   TagInput
+		wants []string
+	}{
+		{"原盘文案", TagInput{Title: "Movie.2024.BD原盘"}, []string{"original_disc"}},
+		{"3D token", TagInput{Title: "Movie.3D.BluRay.1080p"}, []string{"3d"}},
+		{"4K 数值", TagInput{Title: "M", MediaInfo: "General\nVideo\nWidth : 3 840 pixels\n"}, []string{"resolution_4k"}},
+		{"8K 数值", TagInput{Title: "M", MediaInfo: "General\nVideo\nWidth : 7 680 pixels\n"}, []string{"resolution_8k"}},
+		{"1080p 非4K", TagInput{Title: "M", MediaInfo: "General\nVideo\nWidth : 1 920 pixels\n"}, nil},
+		{"超分", TagInput{Subtitle: "AI放大"}, []string{"upscale"}},
+		{"补帧", TagInput{Subtitle: "补帧"}, []string{"frame_interp"}},
+		{"短剧副标题", TagInput{Title: "剧.2024", Subtitle: "短剧 全集"}, []string{"short_play"}},
+	}
+	for _, c := range cases {
+		got := NewMediaTagInferer().InferFull(c.in)
+		for _, w := range c.wants {
+			found := false
+			for _, g := range got { if g == w { found = true } }
+			if !found { t.Errorf("%s: 缺 %q got=%v", c.name, w, got) }
+		}
+		if c.wants == nil {
+			for _, g := range got {
+				if g == "resolution_4k" || g == "resolution_8k" { t.Errorf("%s: 不应命中 %q", c.name, g) }
+			}
+		}
+	}
+}
