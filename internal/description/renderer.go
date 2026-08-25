@@ -44,6 +44,14 @@ func (r *Renderer) Render(data *model.DescriptionData, config model.SiteDescConf
 	if data.PTGen != nil {
 		ptgenBody = FormatPTGen(data.PTGen, PTGenTemplateDouban)
 	}
+	// §59.88: 海报查重（统一在正文确定后）——doubaninfo PTGen format 头部自带
+	// 海报图（与 poster 列同源同 URL），正文已含则移除注入段，否则 rendered 内
+	// 海报双份（兵人实锤）。覆盖 PTGenBody 与 FormatPTGen 两个正文源。
+	if data.PosterURL != "" && strings.Contains(ptgenBody, data.PosterURL) {
+		if i := indexOfSection(sections, data.PosterURL); i >= 0 {
+			sections = append(sections[:i], sections[i+1:]...)
+		}
+	}
 	if ptgenBody != "" {
 		body := ptgenBody
 		if format == "markdown" {
@@ -88,6 +96,16 @@ func (r *Renderer) Render(data *model.DescriptionData, config model.SiteDescConf
 		result = BBCodeToHTML(result)
 	}
 	return result, nil
+}
+
+// indexOfSection §59.88: 找 sections 中含指定 URL 的海报段索引（无则 -1）。
+func indexOfSection(sections []string, posterURL string) int {
+	for i, s := range sections {
+		if strings.Contains(s, posterURL) && strings.Contains(s, "[img]") {
+			return i
+		}
+	}
+	return -1
 }
 
 func (r *Renderer) FormatMediaInfo(rawText string, format model.MediaInfoFormat) string {
