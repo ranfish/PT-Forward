@@ -66,7 +66,7 @@
         <div v-else-if="currentStep === 0" class="csp-step-content">
           <!-- §59.20 ⑨: maintenanceOnly 预览模式 -->
           <template v-if="maintenanceOnly && seedPreviewMode">
-            <div style="max-width: 1100px">
+            <div ref="previewScrollRef" style="max-width: 1100px" @scroll="onPreviewScroll">
               <a-typography-title :level="5">发布预览</a-typography-title>
 
               <!-- §59.86: ① 种子标识（卡片） -->
@@ -435,7 +435,9 @@
             <!-- §59.20 ⑨: 预览模式 → 返回编辑 + 确认完成 -->
             <template v-if="seedPreviewMode">
               <a-button @click="backToEdit">返回编辑</a-button>
-              <a-button type="primary" @click="confirmDone">确认完成</a-button>
+              <a-tooltip :title="previewScrolled ? '' : '请完整浏览预览内容（滚动到底）后确认'">
+                <a-button type="primary" :disabled="!previewScrolled" @click="confirmDone">确认完成</a-button>
+              </a-tooltip>
             </template>
             <!-- 编辑模式 → 预览按钮 -->
             <template v-else>
@@ -460,7 +462,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
 import { CheckCircleFilled, ReloadOutlined } from '@ant-design/icons-vue'
 import { manualForwardApi, publishDataApi, publishApi, publishTorrentsApi, seedConfigApi } from '@/api/publish'
@@ -826,6 +828,16 @@ const seedPreviewMode = ref(false)
 const previewRenderedDesc = ref('')
 // §59.81: 发布预览增强——全字段/标签着色/分段渲染/源码切换
 const previewFieldsData = ref<Record<string, unknown>>({})
+// §59.92: 预览完成门槛——滚动到底才可确认（30px 容差）
+const previewScrolled = ref(false)
+const previewScrollRef = ref<HTMLElement | null>(null)
+
+function onPreviewScroll(e: Event) {
+  const el = e.target as HTMLElement
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 30) {
+    previewScrolled.value = true
+  }
+}
 const previewShotPreview = ref('')
 const previewDescMode = ref<'rendered' | 'source'>('rendered')
 const previewStatement = ref('')
@@ -1187,6 +1199,20 @@ async function saveOnly() {
       }
     }
     seedPreviewMode.value = true
+    // §59.92: 完成门槛重置 + 内容不足滚动时直接放开
+    previewScrolled.value = false
+    nextTick(() => {
+      const el = previewScrollRef.value
+      let sc: HTMLElement | null = el
+      while (sc && sc !== document.body) {
+        const st = getComputedStyle(sc)
+        if (/(auto|scroll)/.test(st.overflowY)) break
+        sc = sc.parentElement
+      }
+      if (sc && sc.scrollHeight <= sc.clientHeight + 30) {
+        previewScrolled.value = true
+      }
+    })
   } catch (e: unknown) {
     message.error('保存失败: ' + (e as Error).message)
   } finally {
@@ -1203,6 +1229,7 @@ function confirmDone() {
 // §59.20 ⑨: 返回编辑
 function backToEdit() {
   seedPreviewMode.value = false
+  previewScrolled.value = false
 }
 
 async function loadPreview() {
