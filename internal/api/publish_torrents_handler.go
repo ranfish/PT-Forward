@@ -2597,6 +2597,8 @@ fetched:
 			// 种子配置页与 runAnalyze 走同一套三源合并管线（§59.26 设计）
 			domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(finalMeta.DetailSourceJSON)
 			profile := titleparser.BuildTechProfile(finalMeta.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
+			// §59.77: 评论音轨扣减（v1.05 不计入——副标题声明提取）
+			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, finalMeta.Subtitle)
 			components := titleparser.TechProfileToComponents(profile)
 			category := titleparser.InferCategory(components, finalMeta.SourceCategory, "", "")
 
