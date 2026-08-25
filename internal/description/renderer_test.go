@@ -50,8 +50,9 @@ func TestRenderer_BBCode(t *testing.T) {
 	if !strings.Contains(result, "[img]https://a.com/1.jpg[/img]") {
 		t.Error("missing screenshot 1")
 	}
-	if !strings.Contains(result, "转载自 site1") {
-		t.Error("missing source site")
+	// §59.87: 来源段已删——致谢由声明列承载(声明内含), rendered 不再重复渲染
+	if strings.Contains(result, "转载自") {
+		t.Error("来源段不应再渲染(§59.87)")
 	}
 }
 
@@ -248,5 +249,31 @@ func TestFormat(t *testing.T) {
 	r := NewRenderer("markdown")
 	if r.Format() != "markdown" {
 		t.Errorf("expected markdown, got %s", r.Format())
+	}
+}
+
+// §59.87: 渲染不再输出"来源/致谢"段——致谢已在 statement 列（§59.68 声明列含致谢），
+// rendered 内重复渲染致谢/来源致预览双份（用户实锤）。MI/BDInfo/截图保留（发布描述需要）。
+func TestRender_NoSourceNoThanksSections(t *testing.T) {
+	r := NewRenderer("")
+	out, err := r.Render(&model.DescriptionData{
+		Statement:     "[quote]声明内容[/quote]",
+		PosterURL:     "https://img.example.com/p.jpg",
+		PTGenBody:     "剧情简介",
+		MediaInfoText: "General\nFormat : Matroska",
+		SourceSite:    "朋友",
+		Title:         "Movie.2024-CMRG",
+	}, model.SiteDescConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "转载自 朋友") || strings.Contains(out, "来源") {
+		t.Errorf("不应渲染来源段: %q", out[:min(200, len(out))])
+	}
+	if strings.Contains(out, "致谢") || strings.Contains(out, "感谢原制作者") {
+		t.Errorf("不应渲染致谢段(声明列已有): %q", out[:min(200, len(out))])
+	}
+	if !strings.Contains(out, "声明内容") || !strings.Contains(out, "剧情简介") {
+		t.Errorf("声明/正文保留: %q", out[:min(200, len(out))])
 	}
 }

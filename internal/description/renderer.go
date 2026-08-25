@@ -70,19 +70,9 @@ func (r *Renderer) Render(data *model.DescriptionData, config model.SiteDescConf
 		}
 	}
 
-	if data.SourceSite != "" {
-		note := fmt.Sprintf("转载自 %s", data.SourceSite)
-		sections = append(sections, r.renderSection("来源", note, format))
-	}
-
-	// §59.20: 始终添加致谢（不只 TemplateOverride 时）
-	if data.SourceSite != "" {
-		group := util.ExtractGroupName(data.Title)
-		quote := GenerateThanksQuote(data.SourceSite, group, false, nil)
-		if quote != "" {
-			sections = append(sections, r.renderSection("致谢", quote, format))
-		}
-	}
+	// §59.87: 删除"来源/致谢"段渲染——致谢由声明列承载（§59.68 声明列末尾追加
+	// 官组致谢+禁转PTT），rendered 内再渲染即预览双份（用户实锤 a/d 项）。
+	// 发布描述的声明段（updated.Statement）已含致谢——单一来源。
 
 	if config.TemplateOverride != "" {
 		result := r.applyTemplate(config.TemplateOverride, data, format)

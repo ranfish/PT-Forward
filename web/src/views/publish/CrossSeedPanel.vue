@@ -72,30 +72,42 @@
               <!-- §59.86: ① 种子标识（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
                 <template #title><span style="font-size: 14px">① 种子标识</span></template>
-                <h3 style="margin: 0">{{ form.title || '—' }}</h3>
-                <div v-if="form.subtitle" style="color: #666; font-size: 14px">{{ form.subtitle }}</div>
+                <a-descriptions :column="1" size="small">
+                  <a-descriptions-item label="主标题">
+                    <span style="font-size: 15px; font-weight: 600">{{ form.title || '—' }}</span>
+                  </a-descriptions-item>
+                  <a-descriptions-item v-if="form.subtitle" label="副标题">
+                    <span style="color: #666">{{ form.subtitle }}</span>
+                  </a-descriptions-item>
+                </a-descriptions>
               </a-card>
 
               <!-- §59.86: ② 技术规格（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
                 <template #title><span style="font-size: 14px">② 技术规格</span></template>
               <a-descriptions :column="4" bordered size="small">
+                <!-- §59.87: 对齐 Tab1 分组——媒介组 -->
                 <a-descriptions-item label="季集">{{ pv('season_episode') }}</a-descriptions-item>
                 <a-descriptions-item label="年份">{{ pv('year') }}</a-descriptions-item>
+                <a-descriptions-item label="媒介(站点)">{{ pvSiteMedium }}</a-descriptions-item>
+                <a-descriptions-item label="片源">{{ pv('source_type') }}</a-descriptions-item>
+                <a-descriptions-item label="规格">{{ pv('specification') }}</a-descriptions-item>
+                <a-descriptions-item label="分发方">{{ pv('source_platform') }}</a-descriptions-item>
+                <!-- 视频组 -->
                 <a-descriptions-item label="分辨率">{{ pv('resolution') }}</a-descriptions-item>
+                <a-descriptions-item label="视频编码">{{ pv('video_codec') }}</a-descriptions-item>
                 <a-descriptions-item label="HDR">{{ pv('hdr') }}</a-descriptions-item>
                 <a-descriptions-item label="bit">{{ pv('bit_depth') }}</a-descriptions-item>
-                <a-descriptions-item label="视频编码">{{ pv('video_codec') }}</a-descriptions-item>
+                <!-- 音频组 -->
                 <a-descriptions-item label="音频编码">{{ pv('audio_codec') }}</a-descriptions-item>
                 <a-descriptions-item label="声道">{{ pv('audio_channels') }}</a-descriptions-item>
                 <a-descriptions-item label="对象信息">{{ pv('audio_tech') }}</a-descriptions-item>
                 <a-descriptions-item label="音轨数">{{ pv('audio_tracks') }}</a-descriptions-item>
-                <a-descriptions-item label="片源">{{ pv('source_type') }}</a-descriptions-item>
-                <a-descriptions-item label="规格">{{ pv('specification') }}</a-descriptions-item>
-                <a-descriptions-item label="分发方">{{ pv('source_platform') }}</a-descriptions-item>
+                <!-- 其他 -->
                 <a-descriptions-item label="版本">{{ pv('edition_info') }}</a-descriptions-item>
                 <a-descriptions-item label="地区码">{{ pv('region_code') }}</a-descriptions-item>
                 <a-descriptions-item label="Encode">{{ pv('encode') }}</a-descriptions-item>
+                <a-descriptions-item label="中文名">{{ pv('chinese_prefix') }}</a-descriptions-item>
               </a-descriptions>
               </a-card>
 
@@ -124,67 +136,21 @@
                 <div v-else style="color: #999">未选择标签</div>
               </a-card>
 
-              <!-- §59.86: ⑤ 媒体数据（卡片） -->
-              <a-card size="small" style="margin-bottom: 12px">
-                <template #title><span style="font-size: 14px">⑤ 媒体数据</span></template>
-                <!-- 海报 -->
-                <div v-if="form.poster" style="margin-bottom: 16px; text-align: center">
-                  <img :src="form.poster" style="max-height: 300px; border-radius: 4px" />
-                </div>
-
-                <!-- MediaInfo -->
-                <div v-if="form.mediaInfo" style="margin-bottom: 16px">
-                  <div style="font-weight: 600; margin-bottom: 4px">MediaInfo</div>
-                  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap">{{ form.mediaInfo }}</pre>
-                </div>
-
-                <!-- BDInfo -->
-                <div v-if="form.bdinfo" style="margin-bottom: 16px">
-                  <div style="font-weight: 600; margin-bottom: 4px">BDInfo</div>
-                  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 200px; overflow: auto; white-space: pre-wrap">{{ form.bdinfo }}</pre>
-                </div>
-
-                <!-- 截图（点击放大） -->
-                <div v-if="form.screenshots.length > 0">
-                  <div style="font-weight: 600; margin-bottom: 8px">截图</div>
-                  <div style="display: flex; flex-wrap: wrap; gap: 8px">
-                    <img
-                      v-for="(url, i) in form.screenshots" :key="i" :src="url"
-                      style="width: 200px; border-radius: 4px; cursor: zoom-in"
-                      @click="previewShotPreview = url"
-                    />
-                  </div>
-                </div>
-                <div v-if="!form.poster && !form.mediaInfo && !form.bdinfo && form.screenshots.length === 0" style="color: #999">
-                  暂无媒体数据
-                </div>
-              </a-card>
               <a-modal :open="!!previewShotPreview" :footer="null" width="900px" @cancel="previewShotPreview = ''">
                 <img v-if="previewShotPreview" :src="previewShotPreview" style="width: 100%" />
               </a-modal>
 
-              <!-- §59.86: ⑥ 发布简介（卡片·四段结构化 + 源码/渲染切换） -->
+              <!-- §59.87: ⑤ 发布简介（原⑥，⑤媒体数据已删——冗余；整块渲染=所见即所发） -->
               <a-card size="small" style="margin-bottom: 12px">
-                <template #title><span style="font-size: 14px">⑥ 发布简介（按发布描述组装顺序）</span></template>
+                <template #title><span style="font-size: 14px">⑤ 发布简介（最终发布内容）</span></template>
                 <template #extra>
                   <a-radio-group v-model:value="previewDescMode" size="small">
                     <a-radio-button value="rendered">渲染效果</a-radio-button>
                     <a-radio-button value="source">BBCode 源码</a-radio-button>
                   </a-radio-group>
                 </template>
-                <div v-if="previewRenderedDesc || previewStatement">
-                  <template v-if="previewDescMode === 'rendered'">
-                    <div v-if="previewStatement" style="padding: 12px; background: #fafafa; border-radius: 4px; margin-bottom: 8px">
-                      <div style="color: #999; font-size: 12px; margin-bottom: 4px">— 声明 —</div>
-                      <div style="line-height: 1.8" v-html="previewStatementHTML"></div>
-                    </div>
-                    <div v-if="form.poster" style="text-align: center; margin-bottom: 8px">
-                      <img :src="form.poster" style="max-height: 260px; border-radius: 4px" />
-                    </div>
-                    <div v-if="previewRenderedDesc" style="padding: 12px; background: #fafafa; border-radius: 4px; line-height: 1.8" v-html="previewRenderedDesc"></div>
-                  </template>
-                  <pre v-else style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 500px; overflow: auto; white-space: pre-wrap">{{ previewDescSource }}</pre>
-                </div>
+                <div v-if="previewDescMode === 'rendered' && previewRenderedDesc" style="padding: 12px; background: #fafafa; border-radius: 4px; line-height: 1.8" v-html="previewRenderedDesc"></div>
+                <pre v-else-if="previewDescMode === 'source' && previewDescSource" style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 500px; overflow: auto; white-space: pre-wrap">{{ previewDescSource }}</pre>
                 <div v-else style="color: #999">暂无简介数据</div>
               </a-card>
 
@@ -865,6 +831,24 @@ const previewShotPreview = ref('')
 const previewDescMode = ref<'rendered' | 'source'>('rendered')
 const previewStatement = ref('')
 const previewDescSource = ref('')
+
+// §59.87: ② 媒介(站点)合成——与 Tab1 siteMediumDisplay 同规则
+const pvSiteMedium = computed(() => {
+  const tc = previewFieldsData.value
+  const spec = String(tc.specification || '').toLowerCase()
+  const st = String(tc.source_type || '')
+  if (spec === 'remux') return 'Remux'
+  if (spec === 'web-dl' || spec === 'webdl') return 'WEB-DL'
+  if (spec === 'webrip') return 'WEBRip'
+  if (spec === 'hdtv') return 'HDTV'
+  if (spec === 'uhdtv') return 'UHDTV'
+  if (spec === 'bdrip' || spec === 'dvdrip') return 'Encode'
+  if (st === 'UHD Blu-ray' || st === 'Blu-ray' || st === '3D Blu-ray') return st + ' 原盘'
+  if (st === 'UHD BluRay' || st === 'BluRay' || st === '3D BluRay') return 'Encode'
+  if (st.includes('DVD') && !st.includes('Rip')) return 'DVD'
+  if (tc.encode) return 'Encode'
+  return '—'
+})
 
 const pv = (key: string): string => {
   const v = previewFieldsData.value[key]
