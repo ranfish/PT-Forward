@@ -337,3 +337,36 @@ func TestSplitIntroSections_MediaInfoQuoteNotStatement(t *testing.T) {
 		t.Error("quote 形态 MI 应被 MI 提取层捕获(发布需要)")
 	}
 }
+
+// §59.78: MI 碎片引用（mUHD 制作者把 MI 摘要拆成多个小 quote）不得入 Statement。
+// "短文本即声明"启发式对 [quote]General[/quote] 类 MI 段名碎片失效（墓碑镇实锤）。
+func TestSplitIntroSections_MIFragmentQuotes(t *testing.T) {
+	bb := `[quote]
+原盘来自Tombstone.1993
+[quote]Source 内层[/quote]
+[/quote]
+感谢素材提供者！
+[quote]General[/quote]
+[quote]Video (1)[/quote]
+[quote]Audio (2)[/quote]
+[quote]Subtitles (5)[/quote]
+[quote]Container: Matroska
+Runtime: 2 h 9 min
+Size: 21.6 GiB
+[/quote]
+[img]https://img.example.com/p.jpg[/img]
+正文`
+	d := (&PublicExtractor{}).splitIntroSections("", bb)
+	if strings.Contains(d.Statement, "General") || strings.Contains(d.Statement, "Video (1)") {
+		t.Errorf("MI 碎片不得入 Statement: %q", d.Statement[:min(200, len(d.Statement))])
+	}
+	if strings.Contains(d.Statement, "Container: Matroska") {
+		t.Errorf("MI 元数据块不得入 Statement")
+	}
+	if !strings.Contains(d.Statement, "原盘来自") {
+		t.Errorf("真声明保留: %q", d.Statement[:min(100, len(d.Statement))])
+	}
+	if strings.Contains(d.Body, "[quote]General[/quote]") {
+		t.Errorf("MI 碎片也应从 Body 剥离")
+	}
+}
