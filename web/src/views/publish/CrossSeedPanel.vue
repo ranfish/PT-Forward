@@ -373,7 +373,7 @@
                 <a-button :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">{{ seedIsLocal ? '重新获取 MediaInfo' : '从源站重新获取 MediaInfo' }}</a-button>
               </div>
               <!-- §59.36: 维护模式 MI 只读展示，重获走上方按钮（数据修复动作） -->
-              <a-textarea v-model:value="form.mediaInfo" :rows="20" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
+              <a-textarea v-model:value="form.mediaInfo" :rows="36" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
               <a-form-item v-if="form.bdinfo" label="BDInfo" style="margin-top: 12px">
                 <a-textarea v-model:value="form.bdinfo" :rows="10" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
               </a-form-item>
