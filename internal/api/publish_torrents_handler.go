@@ -3616,6 +3616,39 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 	Success(w, result)
 }
 
+// putSeedRequest §59.89: PUT /publish/seeds 请求体（提升命名——buildPutSeedUpdates 测试锚）。
+type putSeedRequest struct {
+	Poster       string   `json:"poster"`
+	Screenshots  []string `json:"screenshots"`
+	Description  string   `json:"description"`
+	Tags         []string `json:"tags"`
+	SiteName     string   `json:"siteName"`
+}
+
+// buildPutSeedUpdates §59.89: PUT 更新构造（空值不覆盖）——部分保存场景（只改
+// tags 不带 description）不得清空简介/海报/截图；v0.0.738 验证脚本 PUT {} 污染
+// 预览实锤的根因修复。清空语义: 显式传空串 poster=""/description="" 视为清空
+// 仍生效（需求方主动清空 vs 漏传的区分——JSON 里 nil 与 "" 无法区分，取保守:
+// 一律不覆盖空值；主动清空走"重新获取"链）。
+func buildPutSeedUpdates(req putSeedRequest, existingPoster, existingDesc, existingShots string) map[string]interface{} {
+	updates := map[string]interface{}{}
+	if req.Poster != "" {
+		updates["poster"] = req.Poster
+	}
+	if req.Description != "" {
+		updates["description"] = req.Description
+	}
+	if req.Screenshots != nil {
+		updates["screenshots"] = model.FormatScreenshotColumn(req.Screenshots)
+	}
+	if req.Tags != nil {
+		if data, err := json.Marshal(req.Tags); err == nil {
+			updates["tags"] = string(data)
+		}
+	}
+	return updates
+}
+
 // handlePutSeed §59.20: 保存种子配置（PUT /publish/seeds/:info_hash）。
 // 写入编辑字段（poster/screenshots/description）→ 9 字段校验 → Reviewed → 预览渲染。
 func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Request) {
@@ -3625,13 +3658,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	var req struct {
-		Poster       string   `json:"poster"`
-		Screenshots  []string `json:"screenshots"`
-		Description  string   `json:"description"`
-		Tags         []string `json:"tags"`      // §59.26: 标签编辑
-		SiteName     string   `json:"siteName"` // 可选，指定更新哪行
-	}
+	var req putSeedRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 		return
@@ -3657,24 +3684,18 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	if meta == nil {
 		meta = &metas[0]
 	}
+	existingShots := meta.Screenshots
 
 	// 写入编辑字段
-	updates := map[string]interface{}{
-		"poster":       req.Poster,
-		"screenshots":  model.FormatScreenshotColumn(req.Screenshots), // §59.59 附二: 写侧单点（原 Join("\n") 第五处残留）
-		"description":  req.Description,
-	}
-	// §59.26: 标签编辑（JSON 数组字符串）
-	if req.Tags != nil {
-		if data, err := json.Marshal(req.Tags); err == nil {
-			updates["tags"] = string(data)
-		}
-	}
+	updates := buildPutSeedUpdates(req, meta.Poster, meta.Description, meta.Screenshots)
 
-	// 9 字段校验 → Reviewed
-	meta.Poster = req.Poster
+	// 9 字段校验 → Reviewed（有效值合成——空请求不把已有值算成缺失）
+	meta.Poster = pickNonEmpty(req.Poster, meta.Poster)
 	meta.Screenshots = model.FormatScreenshotColumn(req.Screenshots)
-	meta.Description = req.Description
+	if req.Screenshots == nil {
+		meta.Screenshots = existingShots
+	}
+	meta.Description = pickNonEmpty(req.Description, meta.Description)
 	missing := h.checkRequiredFields(meta)
 	updates["reviewed"] = len(missing) == 0
 

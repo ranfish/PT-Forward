@@ -302,3 +302,27 @@ func TestAppendThanksNoLeadingBlank(t *testing.T) {
 		t.Errorf("非空 base 保持双换行分隔: %q", got[:40])
 	}
 }
+
+// §59.89: PUT 空值不覆盖——只改 tags 不带 description 时简介不得被清空
+//（v0.0.738 验证脚本 PUT {} 污染预览实锤的根因；前端部分保存场景同风险）。
+func TestPutSeedEmptyNotOverwrite(t *testing.T) {
+	// 直接测 updates 构造语义: buildPutSeedUpdates 纯函数化
+	u := buildPutSeedUpdates(putSeedRequest{Tags: []string{"high_bitrate"}}, "poster0", "desc0", "shots0")
+	if _, ok := u["description"]; ok {
+		t.Errorf("空 description 不应覆盖: %v", u)
+	}
+	if _, ok := u["poster"]; ok {
+		t.Errorf("空 poster 不应覆盖")
+	}
+	if _, ok := u["screenshots"]; ok {
+		t.Errorf("空 screenshots 不应覆盖")
+	}
+	if u["tags"] != `["high_bitrate"]` {
+		t.Errorf("tags 应写入: %v", u["tags"])
+	}
+	// 带值时正常写
+	u2 := buildPutSeedUpdates(putSeedRequest{Poster: "p", Description: "d", Screenshots: []string{"s1"}}, "", "", "")
+	if u2["poster"] != "p" || u2["description"] != "d" {
+		t.Errorf("非空应写入: %v", u2)
+	}
+}
