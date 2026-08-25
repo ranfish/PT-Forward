@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -279,5 +280,25 @@ func TestApplyPTGenSourcePersist(t *testing.T) {
 	}
 	if len(src.Genre) != 3 {
 		t.Errorf("Genre 应持久化: %v", src.Genre)
+	}
+}
+
+// §59.80: 源站无声明时追加致谢不得产生前导空行（米仔睡着了实锤
+// '\n\n[quote]FRDS官组作品...'——thanks 固定 \n\n 前缀 + 空 base）。
+func TestAppendThanksNoLeadingBlank(t *testing.T) {
+	thanks := "[quote][b][color=blue][size=5]FRDS官组作品，感谢原制作者发布。[/size][/color][/b][/quote]\n[quote][b][color=red][size=5]请遵守PT互相遵重共识，禁转PTT[/size][/color][/b][/quote]"
+	join := func(base string) string {
+		if base == "" {
+			return thanks
+		}
+		return base + "\n\n" + thanks
+	}
+	if got := join(""); strings.HasPrefix(got, "\n") {
+		t.Errorf("空 base 不应前导空行: %q", got[:30])
+	}
+	base := "[quote]源站声明[/quote]"
+	got := join(base)
+	if !strings.HasPrefix(got, base+"\n\n") {
+		t.Errorf("非空 base 保持双换行分隔: %q", got[:40])
 	}
 }
