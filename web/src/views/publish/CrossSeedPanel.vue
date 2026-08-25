@@ -198,23 +198,25 @@
                   <a-descriptions-item label="年份">{{ form.titleComponents.year || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="制作组">{{ form.titleComponents.release_group || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="类型">{{ categoryLabel(form.titleComponents.category) }}</a-descriptions-item>
-                  <a-descriptions-item label="分辨率">{{ form.titleComponents.resolution || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="视频编码">{{ form.titleComponents.video_codec || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="片源类型">{{ form.titleComponents.source_type || '—' }}</a-descriptions-item>
+                  <!-- §59.82: 分组重排——媒介→视频→音频 聚类; 站点媒介合成行 -->
+                  <a-descriptions-item label="媒介(站点)">{{ siteMediumDisplay }}</a-descriptions-item>
+                  <a-descriptions-item label="片源">{{ form.titleComponents.source_type || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="规格">{{ specDisplay }}</a-descriptions-item>
-                  <a-descriptions-item label="音频编码">{{ form.titleComponents.audio_codec || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="声道">{{ form.titleComponents.audio_channels || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="音频技术">{{ form.titleComponents.audio_technology || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="HDR">{{ form.titleComponents.hdr || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="bit">{{ form.titleComponents.bit_depth || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="分发方">
                     {{ form.titleComponents.source_platform || '—' }}
                     <a-tooltip v-if="PLATFORM_FULLNAMES[form.titleComponents.source_platform]" :title="PLATFORM_FULLNAMES[form.titleComponents.source_platform]">
                       <InfoCircleOutlined style="color: #999; margin-left: 4px" />
                     </a-tooltip>
                   </a-descriptions-item>
-                  <a-descriptions-item label="版本">{{ form.titleComponents.edition_info || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="分辨率">{{ form.titleComponents.resolution || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="视频编码">{{ form.titleComponents.video_codec || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="HDR">{{ form.titleComponents.hdr || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="bit">{{ form.titleComponents.bit_depth || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="音频编码">{{ form.titleComponents.audio_codec || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="声道">{{ form.titleComponents.audio_channels || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="音频技术">{{ form.titleComponents.audio_technology || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="音轨数">{{ form.titleComponents.audio_tracks || '—' }}</a-descriptions-item>
+                  <a-descriptions-item label="版本">{{ form.titleComponents.edition_info || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="地区码">{{ form.titleComponents.region_code || '—' }}</a-descriptions-item>
                 </a-descriptions>
                 <!-- §59.75: 产地/类型（PTGen 源归一只读展示——发布映射消费 canonical） -->
@@ -799,6 +801,25 @@ const seedRegionGenre = computed(() => ({
   genre: form.value.genre || [],
 }))
 const seedReviewed = ref(false)
+// §59.82: 站点媒介合成显示——v1.05 source_type×specification 二维 → 站点单选视角
+// （站点媒介下拉把两维压成一维枚举: remux/webdl/hdtv/uhd_bluray/bluray/encode）
+const siteMediumDisplay = computed(() => {
+  const tc = form.value.titleComponents
+  const spec = (tc.specification || '').toLowerCase()
+  const st = (tc.source_type || '').toLowerCase()
+  if (spec === 'remux') return 'Remux'
+  if (spec === 'web-dl' || spec === 'webdl') return 'WEB-DL'
+  if (spec === 'webrip') return 'WEBRip'
+  if (spec === 'hdtv') return 'HDTV'
+  if (spec === 'uhdtv') return 'UHDTV'
+  if (spec === 'bdrip') return 'Encode'
+  if (st.includes('uhd')) return 'UHD Blu-ray 原盘'
+  if (st.includes('blu')) return 'Blu-ray 原盘'
+  if (st.includes('dvd')) return 'DVD'
+  if (tc.encode) return 'Encode'
+  return '—'
+})
+
 // §59.34: Encode 派生标识（后端真相源；v1.05 Encode 规格为空，规格栏显示 Encode）
 const seedEncode = ref(false)
 const specDisplay = computed(() =>
