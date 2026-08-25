@@ -356,7 +356,7 @@
                 <!-- §59.45: 简介重获是数据源修复动作（与 Tab3/Tab5 同性质），维护模式放开 -->
                 <a-button :loading="refreshing === 'intro'" @click="doRefresh('intro')">重新获取简介（PTGen）</a-button>
               </div>
-              <a-textarea v-model:value="form.description" :rows="20" placeholder="BBCode 简介正文" style="font-family: monospace" />
+              <a-textarea v-model:value="form.description" :rows="36" placeholder="BBCode 简介正文" style="font-family: monospace" />
               <!-- §59.20: maintenanceOnly 模式下外部链接只读展示 -->
               <div v-if="maintenanceOnly && (form.doubanLink || form.imdbLink || form.tmdbLink)" style="margin-top: 12px">
                 <span style="color: #999; font-size: 12px; margin-right: 12px">外部链接：</span>
