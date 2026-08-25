@@ -326,3 +326,36 @@ func TestPutSeedEmptyNotOverwrite(t *testing.T) {
 		t.Errorf("非空应写入: %v", u2)
 	}
 }
+
+// §59.93: 审核状态簇同步——PUT reviewed 写行 + 簇内全部行（同簇数据相同，
+// 审核一份数据=审核全簇；仙履奇缘 54 副本实锤：编辑行 reviewed=1 其余 53 行=0，
+// 列表逐快照行展示时其他快照挂的兄弟行仍 pending）。
+func TestPropagateClusterReviewed(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	// 簇: self + 2 兄弟
+	db.Create(&model.TorrentSnapshot{Hash: "rself00000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentSnapshot{Hash: "rsib10000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentSnapshot{Hash: "rsib20000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentMetadata{InfoHash: "rself00000000000000000000000000000000000", SiteName: "朋友", Title: "t", FetchSource: "rss_detail"})
+	db.Create(&model.TorrentMetadata{InfoHash: "rsib10000000000000000000000000000000000", SiteName: "朋友", Title: "t", FetchSource: "cluster"})
+	db.Create(&model.TorrentMetadata{InfoHash: "rsib20000000000000000000000000000000000", SiteName: "朋友", Title: "t", FetchSource: "cluster"})
+
+	h.propagateClusterReviewed(context.Background(), "PT0", "/r", "R", "rself00000000000000000000000000000000000", true)
+
+	var n int64
+	db.Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ? AND reviewed = ?", []string{"rsib10000000000000000000000000000000000", "rsib20000000000000000000000000000000000"}, true).
+		Count(&n)
+	if n != 2 {
+		t.Errorf("簇内兄弟行应同步 reviewed: %d", n)
+	}
+	// 取消同步
+	h.propagateClusterReviewed(context.Background(), "PT0", "/r", "R", "rself00000000000000000000000000000000000", false)
+	db.Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ? AND reviewed = ?", []string{"rsib10000000000000000000000000000000000", "rsib20000000000000000000000000000000000"}, false).
+		Count(&n)
+	if n != 2 {
+		t.Errorf("取消也应同步: %d", n)
+	}
+}
