@@ -308,6 +308,33 @@
    "group": "版本类型"
   },
   {
+   "canonical": "original_disc",
+   "label": "原盘",
+   "group": "版本类型",
+   "standard_key": "tag.original_disc",
+   "variants": [
+    "原盘",
+    "原生原盘",
+    "原碟",
+    "BD原盘"
+   ],
+   "infer_pattern": "(原盘|原生原盘|原碟)",
+   "infer_scope": "title_raw",
+   "note": "§59.85 A类缺口(5+2站); 亦从 source_type 原盘类推导(代码层可后续)"
+  },
+  {
+   "canonical": "3d",
+   "label": "3D",
+   "group": "版本类型",
+   "standard_key": "tag.3d",
+   "variants": [
+    "3D"
+   ],
+   "infer_pattern": "((?:^|[\\. \\-])3D(?:[\\. \\-]|$))",
+   "infer_scope": "title_raw",
+   "note": "§59.85 A类缺口(2站); 标题 3D token(与 3D Blu-ray 片源联动)"
+  },
+  {
    "canonical": "special_edition",
    "label": "特别版",
    "aliases": "Special Edition",
@@ -446,6 +473,20 @@
    ]
   },
   {
+   "canonical": "short_play",
+   "label": "短剧",
+   "group": "剧集状态",
+   "standard_key": "tag.short_play",
+   "variants": [
+    "短剧"
+   ],
+   "infer_pattern": "(短剧)",
+   "infer_scope": "subtitle_raw",
+   "infer_pattern2": "(短剧)",
+   "infer_scope2": "desc_raw",
+   "note": "§59.85 A类缺口(4站); 副标题/简介关键词; zmpt/劳改所审核有短剧分类判定"
+  },
+  {
    "canonical": "big_pack",
    "label": "大包",
    "group": "规格",
@@ -454,6 +495,52 @@
    "variants": [
     "大包"
    ]
+  },
+  {
+   "canonical": "resolution_4k",
+   "label": "4K",
+   "group": "规格",
+   "standard_key": "tag.resolution_4k",
+   "variants": [
+    "4K"
+   ],
+   "note": "§59.85 A类缺口(4站); 数值判据(resolution 2160p)在 InferFull 代码层"
+  },
+  {
+   "canonical": "resolution_8k",
+   "label": "8K",
+   "group": "规格",
+   "standard_key": "tag.resolution_8k",
+   "variants": [
+    "8K"
+   ],
+   "note": "§59.85 A类缺口(2站); 数值判据(resolution 4320p)在代码层"
+  },
+  {
+   "canonical": "upscale",
+   "label": "超分",
+   "group": "规格",
+   "standard_key": "tag.upscale",
+   "variants": [
+    "超分",
+    "AI放大"
+   ],
+   "infer_pattern": "(超分|AI放大|upscale)",
+   "infer_scope": "title_raw",
+   "note": "§59.85 A类缺口(3站); 注意: 劳改所等站禁止超分——勾选前需 compliance 校验"
+  },
+  {
+   "canonical": "frame_interp",
+   "label": "补帧",
+   "group": "规格",
+   "standard_key": "tag.frame_interp",
+   "variants": [
+    "补帧",
+    "插帧"
+   ],
+   "infer_pattern": "(补帧|插帧|60FPS\\+|frameinterp)",
+   "infer_scope": "title_raw",
+   "note": "§59.85 A类缺口(3站); 与 high_frame_rate 区分: 补帧=后期处理声明; 注意部分站禁止"
   }
  ]
 }

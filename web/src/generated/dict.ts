@@ -522,6 +522,16 @@ export const TAG_GROUPS: TagGroup[] = [
           "key": "hybrid",
           "label": "Hybrid",
           "aliases": ""
+        },
+        {
+          "key": "original_disc",
+          "label": "原盘",
+          "aliases": ""
+        },
+        {
+          "key": "3d",
+          "label": "3D",
+          "aliases": ""
         }
       ]
     },
@@ -602,6 +612,26 @@ export const TAG_GROUPS: TagGroup[] = [
           "key": "big_pack",
           "label": "大包",
           "aliases": ""
+        },
+        {
+          "key": "resolution_4k",
+          "label": "4K",
+          "aliases": ""
+        },
+        {
+          "key": "resolution_8k",
+          "label": "8K",
+          "aliases": ""
+        },
+        {
+          "key": "upscale",
+          "label": "超分",
+          "aliases": ""
+        },
+        {
+          "key": "frame_interp",
+          "label": "补帧",
+          "aliases": ""
         }
       ]
     },
@@ -621,6 +651,11 @@ export const TAG_GROUPS: TagGroup[] = [
         {
           "key": "ongoing",
           "label": "连载",
+          "aliases": ""
+        },
+        {
+          "key": "short_play",
+          "label": "短剧",
           "aliases": ""
         }
       ]

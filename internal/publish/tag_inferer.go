@@ -82,6 +82,14 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	if in.Size > 1024*1024*1024*1024 && !has("big_pack") {
 		tags = append(tags, "big_pack")
 	}
+	// §59.85: 4K/8K 数值判据——MI Width（与 high_bitrate 同源解析）
+	if w := parseMIWidthPixels(in.MediaInfo); w > 0 {
+		if w >= 7680 && !has("resolution_8k") {
+			tags = append(tags, "resolution_8k")
+		} else if w >= 3840 && w < 7680 && !has("resolution_4k") {
+			tags = append(tags, "resolution_4k")
+		}
+	}
 	return ApplyTagRules(dedupTags(tags))
 }
 
