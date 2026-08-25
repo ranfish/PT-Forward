@@ -163,6 +163,15 @@
                   <a-descriptions-item label="版本">{{ form.titleComponents.edition_info || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="地区码">{{ form.titleComponents.region_code || '—' }}</a-descriptions-item>
                 </a-descriptions>
+                <!-- §59.75: 产地/类型（PTGen 源归一只读展示——发布映射消费 canonical） -->
+                <a-form-item v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length" label="产地 / 类型" style="max-width: 900px; margin-top: 16px">
+                  <span v-if="seedRegionGenre.region.length" style="margin-right: 16px">
+                    产地：<a-tag v-for="r in seedRegionGenre.region" :key="r" color="geekblue">{{ r }}</a-tag>
+                  </span>
+                  <span v-if="seedRegionGenre.genre.length">
+                    类型：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
+                  </span>
+                </a-form-item>
                 <!-- §59.26: 标签（可编辑，供发布使用） -->
                 <a-form-item label="标签" style="max-width: 900px; margin-top: 16px">
                   <TagSelector v-model="form.tags" />
@@ -483,6 +492,9 @@ const form = ref({
   anonymous: false,
   screenshotInDesc: false,
   titleComponents: {} as Record<string, string>,
+  // §59.75: 产地/类型（label 形态只读展示）
+  region: [] as string[],
+  genre: [] as string[],
 })
 
 // Preview
@@ -624,6 +636,8 @@ function resetPanel() {
     statement: '', poster: '', doubanLink: '', imdbLink: '', tmdbLink: '',
     tags: [], removedDeclarations: [], bdinfo: '', anonymous: false, screenshotInDesc: false,
     titleComponents: {},
+    region: [],
+    genre: [],
   }
 }
 
@@ -652,6 +666,8 @@ function fillFormFromPreset() {
     anonymous: false,
     screenshotInDesc: false,
     titleComponents: {},
+    region: [],
+    genre: [],
   }
   loading.value = false
   // §59.20: maintenanceOnly 模式从后端加载已存 metadata
@@ -703,6 +719,9 @@ async function loadSeedDetail(infoHash: string) {
       }
       // 状态
       seedMissingFields.value = d.missing_fields || []
+      // §59.75: 产地/类型（labels 只读展示）
+      form.value.region = d.region?.labels || []
+      form.value.genre = d.genre?.labels || []
       seedReviewed.value = d.reviewed || false
       seedEncode.value = d.encode ?? false
       seedIsLocal.value = (d as any).is_local ?? true
@@ -719,6 +738,11 @@ async function loadSeedDetail(infoHash: string) {
 
 // §59.20: 种子配置页状态
 const seedMissingFields = ref<string[]>([])
+// §59.75: 产地/类型展示（label 形态）
+const seedRegionGenre = computed(() => ({
+  region: form.value.region || [],
+  genre: form.value.genre || [],
+}))
 const seedReviewed = ref(false)
 // §59.34: Encode 派生标识（后端真相源；v1.05 Encode 规格为空，规格栏显示 Encode）
 const seedEncode = ref(false)

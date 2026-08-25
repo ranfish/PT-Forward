@@ -14,6 +14,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/coverage"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
+	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
@@ -3576,6 +3577,13 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"missing_fields": h.checkRequiredFields(meta),
 	}
 
+	// §59.75: 产地/类型（PTGen 源归一——region.us/genre.drama + label 双形态，
+	// 前端 Tab1 只读展示，发布映射消费 canonical）
+	if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+		result["region"] = normalizeDomainValues("region", src.Region)
+		result["genre"] = normalizeDomainValues("genre", src.Genre)
+	}
+
 	// §59.26: 返回 tags（DB JSON 数组字符串 → []string）
 	if meta.Tags != "" {
 		var tags []string
@@ -3812,6 +3820,60 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 	Success(w, map[string]interface{}{"message": "已清除"})
 }
 
+// normalizeDomainValues §59.75: 域值归一（PTGen 原词→canonical）+ label 映射。
+// 返回 {"keys": ["region.us"], "labels": ["美国"]} 双形态——Tab1 显示 label，
+// 发布映射消费 keys。miss（未收录国名/类型词）保留原文双形态。
+func normalizeDomainValues(domain string, raws []string) map[string][]string {
+	if len(raws) == 0 {
+		return nil
+	}
+	keys, labels := make([]string, 0, len(raws)), make([]string, 0, len(raws))
+	seen := map[string]bool{}
+	for _, r := range raws {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			continue
+		}
+		key := titleparser.LookupDictKey(domain, r)
+		if key == "" {
+			key = r // miss 保留原文
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		keys = append(keys, key)
+		if label := titleparser.ReverseLookup(key); label != "" {
+			labels = append(labels, label)
+		} else {
+			labels = append(labels, r)
+		}
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	return map[string][]string{"keys": keys, "labels": labels}
+}
+
+// persistPTGenSource §59.75: PTGen 源结构化持久化（ptgen_source_json）。
+// Region/Genre（产地/类型）此前只在 querier 闭包里被取走 RawBBCode/PosterURL 后
+// 丢弃——接入遗漏修复（列/Marshal/Unmarshal 机制 §56 时代已有）。
+// Tab1 产地/类型展示与未来发布站点映射消费此列。
+func (h *PublishTorrentsHandler) persistPTGenSource(ctx context.Context, infoHash, siteName string, r *model.PTGenResult) {
+	if r == nil {
+		return
+	}
+	data, err := json.Marshal(metadata.PTGenToSource(*r, time.Now()))
+	if err != nil {
+		return
+	}
+	if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+		Update("ptgen_source_json", string(data)).Error; err != nil {
+		h.logger.Warn("ptgen source persist failed", zap.Error(err))
+	}
+}
+
 // refreshInferredTags §59.70: t2 重推标签——PTGen 简介落库后评分行才存在
 //（t0 InferFull 时 Description 尚无 "◎豆瓣评分" 行），此处重跑推断并合并
 //（既有标签全保留——直采/用户标签优先，推断只补差）。
@@ -3878,6 +3940,7 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 	// 海报走 RunPosterFallback 语义不变；description 增量写（format 非空才覆盖）
 	ptgenDesc := ""
 	var queriers []publish.PTGenQuerier
+	var ptgenResult *model.PTGenResult
 	queriers = append(queriers, func(ctx context.Context, q string) (string, error) {
 		r, err := h.ptgen.AnalyzePTGen(ctx, q)
 		if err != nil || r == nil {
@@ -3885,6 +3948,7 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		}
 		if r.RawBBCode != "" {
 			ptgenDesc = r.RawBBCode
+			ptgenResult = r // §59.75: 捕获完整 result——产地/类型结构化落库
 		}
 		return r.PosterURL, nil
 	})
@@ -3900,6 +3964,8 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		h.logger.Info("ptgen description applied",
 			zap.String("hash", infoHash[:10]),
 			zap.Int("length", len(ptgenDesc)))
+		// §59.75: PTGen 源结构化持久化（region/genre 系统资产）
+		h.persistPTGenSource(ctx, infoHash, siteName, ptgenResult)
 		// §59.70: t2 重推标签——评分行此刻才进 Description（豆瓣评分≥8 → high_rating）
 		h.refreshInferredTags(ctx, infoHash, siteName)
 		// §59.61 附2: 简介终态同步回传簇（map miss 反查; 幂等可重复）

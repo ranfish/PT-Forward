@@ -1,0 +1,337 @@
+{
+ "tokens": [
+  {
+   "canonical": "genre.drama",
+   "standard_key": "genre.drama",
+   "display": "剧情",
+   "variants": [
+    "剧情",
+    "Drama"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.comedy",
+   "standard_key": "genre.comedy",
+   "display": "喜剧",
+   "variants": [
+    "喜剧",
+    "Comedy"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.action",
+   "standard_key": "genre.action",
+   "display": "动作",
+   "variants": [
+    "动作",
+    "Action"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.romance",
+   "standard_key": "genre.romance",
+   "display": "爱情",
+   "variants": [
+    "爱情",
+    "Romance"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.scifi",
+   "standard_key": "genre.scifi",
+   "display": "科幻",
+   "variants": [
+    "科幻",
+    "Sci-Fi",
+    "SciFi"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.suspense",
+   "standard_key": "genre.suspense",
+   "display": "悬疑",
+   "variants": [
+    "悬疑",
+    "Mystery",
+    "Suspense"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.thriller",
+   "standard_key": "genre.thriller",
+   "display": "惊悚",
+   "variants": [
+    "惊悚",
+    "Thriller"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.horror",
+   "standard_key": "genre.horror",
+   "display": "恐怖",
+   "variants": [
+    "恐怖",
+    "Horror"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.crime",
+   "standard_key": "genre.crime",
+   "display": "犯罪",
+   "variants": [
+    "Crime"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.animation",
+   "standard_key": "genre.animation",
+   "display": "动画",
+   "variants": [
+    "动画",
+    "Animation"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.fantasy",
+   "standard_key": "genre.fantasy",
+   "display": "奇幻",
+   "variants": [
+    "奇幻",
+    "Fantasy"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.adventure",
+   "standard_key": "genre.adventure",
+   "display": "冒险",
+   "variants": [
+    "冒险",
+    "Adventure"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.disaster",
+   "standard_key": "genre.disaster",
+   "display": "灾难",
+   "variants": [
+    "灾难",
+    "Disaster"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.war",
+   "standard_key": "genre.war",
+   "display": "战争",
+   "variants": [
+    "战争",
+    "War"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.biography",
+   "standard_key": "genre.biography",
+   "display": "传记",
+   "variants": [
+    "传记",
+    "Biography"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.history",
+   "standard_key": "genre.history",
+   "display": "历史",
+   "variants": [
+    "历史",
+    "History"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.sports",
+   "standard_key": "genre.sports",
+   "display": "运动",
+   "variants": [
+    "运动",
+    "Sports"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.music",
+   "standard_key": "genre.music",
+   "display": "音乐",
+   "variants": [
+    "音乐",
+    "Music"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.musical",
+   "standard_key": "genre.musical",
+   "display": "歌舞",
+   "variants": [
+    "歌舞",
+    "Musical"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.family",
+   "standard_key": "genre.family",
+   "display": "家庭",
+   "variants": [
+    "家庭",
+    "Family"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.children",
+   "standard_key": "genre.children",
+   "display": "儿童",
+   "variants": [
+    "儿童",
+    "Children"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.documentary",
+   "standard_key": "genre.documentary",
+   "display": "纪录",
+   "variants": [
+    "纪录",
+    "纪录片",
+    "Documentary"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.short",
+   "standard_key": "genre.short",
+   "display": "短片",
+   "variants": [
+    "短片",
+    "Short"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.reality",
+   "standard_key": "genre.reality",
+   "display": "真人秀",
+   "variants": [
+    "真人秀",
+    "Reality"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.talkshow",
+   "standard_key": "genre.talkshow",
+   "display": "脱口秀",
+   "variants": [
+    "脱口秀",
+    "Talk Show"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.western",
+   "standard_key": "genre.western",
+   "display": "西部",
+   "variants": [
+    "西部",
+    "Western"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.wuxia",
+   "standard_key": "genre.wuxia",
+   "display": "武侠",
+   "variants": [
+    "武侠",
+    "武侠/仙侠"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.costume",
+   "standard_key": "genre.costume",
+   "display": "古装",
+   "variants": [
+    "古装",
+    "Costume"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.erotic",
+   "standard_key": "genre.erotic",
+   "display": "情色",
+   "variants": [
+    "情色",
+    "Erotic"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  },
+  {
+   "canonical": "genre.other",
+   "standard_key": "genre.other",
+   "display": "其它",
+   "variants": [
+    "其它",
+    "其他",
+    "Other"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎类　型归一（豆瓣词表为准）"
+  }
+ ]
+}

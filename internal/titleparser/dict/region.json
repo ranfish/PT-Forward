@@ -1,0 +1,317 @@
+{
+ "tokens": [
+  {
+   "canonical": "region.cn",
+   "standard_key": "region.cn",
+   "display": "中国大陆",
+   "variants": [
+    "中国大陆",
+    "大陆",
+    "中国",
+    "内地",
+    "CN"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.hk",
+   "standard_key": "region.hk",
+   "display": "中国香港",
+   "variants": [
+    "中国香港",
+    "香港",
+    "HK"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.tw",
+   "standard_key": "region.tw",
+   "display": "中国台湾",
+   "variants": [
+    "中国台湾",
+    "台湾",
+    "TW"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.mo",
+   "standard_key": "region.mo",
+   "display": "中国澳门",
+   "variants": [
+    "中国澳门",
+    "澳门",
+    "MO"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.us",
+   "standard_key": "region.us",
+   "display": "美国",
+   "variants": [
+    "美国",
+    "USA",
+    "US"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.gb",
+   "standard_key": "region.gb",
+   "display": "英国",
+   "variants": [
+    "英国",
+    "UK",
+    "GB",
+    "英国/英国"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.jp",
+   "standard_key": "region.jp",
+   "display": "日本",
+   "variants": [
+    "日本",
+    "JPN",
+    "JP"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.kr",
+   "standard_key": "region.kr",
+   "display": "韩国",
+   "variants": [
+    "韩国",
+    "KOR",
+    "KR"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.in",
+   "standard_key": "region.in",
+   "display": "印度",
+   "variants": [
+    "印度",
+    "IND"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.th",
+   "standard_key": "region.th",
+   "display": "泰国",
+   "variants": [
+    "泰国",
+    "THA"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.ru",
+   "standard_key": "region.ru",
+   "display": "俄罗斯",
+   "variants": [
+    "俄罗斯",
+    "俄国",
+    "RU"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.de",
+   "standard_key": "region.de",
+   "display": "德国",
+   "variants": [
+    "德国",
+    "DE"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.fr",
+   "standard_key": "region.fr",
+   "display": "法国",
+   "variants": [
+    "法国",
+    "FR"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.it",
+   "standard_key": "region.it",
+   "display": "意大利",
+   "variants": [
+    "意大利",
+    "IT"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.es",
+   "standard_key": "region.es",
+   "display": "西班牙",
+   "variants": [
+    "西班牙",
+    "ES"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.ca",
+   "standard_key": "region.ca",
+   "display": "加拿大",
+   "variants": [
+    "加拿大",
+    "CA"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.au",
+   "standard_key": "region.au",
+   "display": "澳大利亚",
+   "variants": [
+    "澳大利亚",
+    "澳洲",
+    "AU"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.nz",
+   "standard_key": "region.nz",
+   "display": "新西兰",
+   "variants": [
+    "新西兰",
+    "NZ"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.sg",
+   "standard_key": "region.sg",
+   "display": "新加坡",
+   "variants": [
+    "新加坡",
+    "SG"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.my",
+   "standard_key": "region.my",
+   "display": "马来西亚",
+   "variants": [
+    "马来西亚",
+    "MY"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.se",
+   "standard_key": "region.se",
+   "display": "瑞典",
+   "variants": [
+    "瑞典",
+    "SE"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.dk",
+   "standard_key": "region.dk",
+   "display": "丹麦",
+   "variants": [
+    "丹麦",
+    "DK"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.br",
+   "standard_key": "region.br",
+   "display": "巴西",
+   "variants": [
+    "巴西",
+    "BR"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.vn",
+   "standard_key": "region.vn",
+   "display": "越南",
+   "variants": [
+    "越南",
+    "VN"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.ph",
+   "standard_key": "region.ph",
+   "display": "菲律宾",
+   "variants": [
+    "菲律宾",
+    "PH"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.id",
+   "standard_key": "region.id",
+   "display": "印度尼西亚",
+   "variants": [
+    "印度尼西亚",
+    "印尼",
+    "ID"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  },
+  {
+   "canonical": "region.other",
+   "standard_key": "region.other",
+   "display": "其他",
+   "variants": [
+    "其他",
+    "其它",
+    "Other",
+    "OT"
+   ],
+   "origin": "wiki",
+   "note": "§59.75 系统资产域——PTGen ◎产　地归一（国家层，站点粗区映射由发布适配层归并）"
+  }
+ ]
+}
