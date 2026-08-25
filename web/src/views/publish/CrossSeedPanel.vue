@@ -66,7 +66,7 @@
         <div v-else-if="currentStep === 0" class="csp-step-content">
           <!-- §59.20 ⑨: maintenanceOnly 预览模式 -->
           <template v-if="maintenanceOnly && seedPreviewMode">
-            <div ref="previewScrollRef" style="max-width: 1100px" @scroll="onPreviewScroll">
+            <div ref="previewScrollRef" style="max-width: 1100px">
               <a-typography-title :level="5">发布预览</a-typography-title>
 
               <!-- §59.86: ① 种子标识（卡片） -->
@@ -828,9 +828,12 @@ const seedPreviewMode = ref(false)
 const previewRenderedDesc = ref('')
 // §59.81: 发布预览增强——全字段/标签着色/分段渲染/源码切换
 const previewFieldsData = ref<Record<string, unknown>>({})
-// §59.92: 预览完成门槛——滚动到底才可确认（30px 容差）
+// §59.92: 预览完成门槛——滚动到底才可确认（30px 容差）。
+// 滚动发生在 drawer .ant-drawer-body（预览容器自身不滚动，scroll 不冒泡）
+// → 进入预览时对滚动祖先 addEventListener，离开时摘除。
 const previewScrolled = ref(false)
 const previewScrollRef = ref<HTMLElement | null>(null)
+let previewScrollHost: HTMLElement | null = null
 
 function onPreviewScroll(e: Event) {
   const el = e.target as HTMLElement
@@ -838,6 +841,37 @@ function onPreviewScroll(e: Event) {
     previewScrolled.value = true
   }
 }
+
+function findScrollHost(el: HTMLElement | null): HTMLElement | null {
+  let sc = el
+  while (sc && sc !== document.body) {
+    const st = getComputedStyle(sc)
+    if (/(auto|scroll)/.test(st.overflowY)) return sc
+    sc = sc.parentElement
+  }
+  return null
+}
+
+function attachPreviewScrollGate() {
+  nextTick(() => {
+    const host = findScrollHost(previewScrollRef.value)
+    if (host) {
+      host.addEventListener('scroll', onPreviewScroll, { passive: true })
+      previewScrollHost = host
+      if (host.scrollHeight <= host.clientHeight + 30) {
+        previewScrolled.value = true
+      }
+    } else {
+      previewScrolled.value = true
+    }
+  })
+}
+
+function detachPreviewScrollGate() {
+  previewScrollHost?.removeEventListener('scroll', onPreviewScroll)
+  previewScrollHost = null
+}
+
 const previewShotPreview = ref('')
 const previewDescMode = ref<'rendered' | 'source'>('rendered')
 const previewStatement = ref('')
@@ -1199,20 +1233,9 @@ async function saveOnly() {
       }
     }
     seedPreviewMode.value = true
-    // §59.92: 完成门槛重置 + 内容不足滚动时直接放开
+    // §59.92: 完成门槛——挂滚动监听 + 内容不足直接放开
     previewScrolled.value = false
-    nextTick(() => {
-      const el = previewScrollRef.value
-      let sc: HTMLElement | null = el
-      while (sc && sc !== document.body) {
-        const st = getComputedStyle(sc)
-        if (/(auto|scroll)/.test(st.overflowY)) break
-        sc = sc.parentElement
-      }
-      if (sc && sc.scrollHeight <= sc.clientHeight + 30) {
-        previewScrolled.value = true
-      }
-    })
+    attachPreviewScrollGate()
   } catch (e: unknown) {
     message.error('保存失败: ' + (e as Error).message)
   } finally {
@@ -1230,6 +1253,7 @@ function confirmDone() {
 function backToEdit() {
   seedPreviewMode.value = false
   previewScrolled.value = false
+  detachPreviewScrollGate()
 }
 
 async function loadPreview() {
@@ -1502,4 +1526,5 @@ function stopCandidatePoll() {
 // §59.51: 组件卸载清轮询
 onUnmounted(() => {
   if (capturePollTimer) { clearInterval(capturePollTimer); capturePollTimer = null }
+  detachPreviewScrollGate()
 })
