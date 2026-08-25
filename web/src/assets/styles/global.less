@@ -7,3 +7,21 @@ body {
 #app {
   min-height: 100vh;
 }
+
+/* §59.91: descriptions 表格边框加浓——默认 #f0f0f0 在部分显示器几乎不可见 */
+.ant-descriptions-bordered {
+  .ant-descriptions-item-label,
+  .ant-descriptions-item-content {
+    border-block-end: 1px solid #b7b7b7 !important;
+    border-inline-end: 1px solid #b7b7b7 !important;
+  }
+  .ant-descriptions-row:last-child {
+    .ant-descriptions-item-label,
+    .ant-descriptions-item-content {
+      border-block-end: 1px solid #b7b7b7 !important;
+    }
+  }
+  .ant-descriptions-view {
+    border: 1px solid #b7b7b7 !important;
+  }
+}
