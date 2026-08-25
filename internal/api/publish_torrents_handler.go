@@ -2649,11 +2649,16 @@ fetched:
 			if profile.ReleaseGroup != "" && profile.ReleaseGroup != "NOGROUP" {
 				thanksLine := description.GenerateThanksQuote(meta.SiteName, profile.ReleaseGroup, false, nil)
 				noTransferLine := "[quote][b][color=red][size=5]请遵守PT互相遵重共识，禁转PTT[/size][/color][/b][/quote]"
-				thanks := "\n\n[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + noTransferLine
+				thanks := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + noTransferLine
 
 				// 幂等：先剥离历史追加的致谢块（v0.0.607 修复重获累积）
 				base := stripAppendedThanks(finalMeta.Statement)
-				updates["statement"] = base + thanks
+				// §59.80: 空 base 不接 \n\n 前缀（米仔睡着了实锤前导空行）
+				if base == "" {
+					updates["statement"] = thanks
+				} else {
+					updates["statement"] = base + "\n\n" + thanks
+				}
 			}
 
 			// §59.26: 标签推断（对齐 auto_feed：副标题+标题+简介+MI 多源关键词匹配）
