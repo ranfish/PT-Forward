@@ -69,14 +69,17 @@
             <div style="max-width: 1100px">
               <a-typography-title :level="5">发布预览</a-typography-title>
 
-              <!-- 标题 + 副标题 -->
-              <div style="margin-bottom: 16px">
+              <!-- §59.86: ① 种子标识（卡片） -->
+              <a-card size="small" style="margin-bottom: 12px">
+                <template #title><span style="font-size: 14px">① 种子标识</span></template>
                 <h3 style="margin: 0">{{ form.title || '—' }}</h3>
                 <div v-if="form.subtitle" style="color: #666; font-size: 14px">{{ form.subtitle }}</div>
-              </div>
+              </a-card>
 
-              <!-- §59.81: v1.05 全字段参数区（4 列紧凑） -->
-              <a-descriptions :column="4" bordered size="small" style="margin-bottom: 12px">
+              <!-- §59.86: ② 技术规格（卡片） -->
+              <a-card size="small" style="margin-bottom: 12px">
+                <template #title><span style="font-size: 14px">② 技术规格</span></template>
+              <a-descriptions :column="4" bordered size="small">
                 <a-descriptions-item label="季集">{{ pv('season_episode') }}</a-descriptions-item>
                 <a-descriptions-item label="年份">{{ pv('year') }}</a-descriptions-item>
                 <a-descriptions-item label="分辨率">{{ pv('resolution') }}</a-descriptions-item>
@@ -94,86 +97,106 @@
                 <a-descriptions-item label="地区码">{{ pv('region_code') }}</a-descriptions-item>
                 <a-descriptions-item label="Encode">{{ pv('encode') }}</a-descriptions-item>
               </a-descriptions>
+              </a-card>
 
-              <!-- §59.81: 产地 / 类型 -->
-              <div v-if="pvRegion.length || pvGenre.length" style="margin-bottom: 12px">
-                <span v-if="pvRegion.length" style="margin-right: 16px">
-                  产地：<a-tag v-for="r in pvRegion" :key="r" color="geekblue">{{ r }}</a-tag>
-                </span>
-                <span v-if="pvGenre.length">
-                  类型：<a-tag v-for="g in pvGenre" :key="g" color="purple">{{ g }}</a-tag>
-                </span>
-              </div>
-
-              <!-- §59.81: 标签区（着色: 禁转类红 / 其余蓝） -->
-              <div v-if="previewTags.length" style="margin-bottom: 12px">
-                标签：
-                <a-tag v-for="t in previewTags" :key="t" :color="isRestrictedTag(t) ? 'red' : 'blue'">
-                  {{ tagDisplayName(t) }}
-                </a-tag>
-              </div>
-
-              <!-- 海报 -->
-              <div v-if="form.poster" style="margin-bottom: 16px; text-align: center">
-                <img :src="form.poster" style="max-height: 300px; border-radius: 4px" />
-              </div>
-
-              <!-- MediaInfo -->
-              <div v-if="form.mediaInfo" style="margin-bottom: 16px">
-                <div style="font-weight: 600; margin-bottom: 4px">MediaInfo</div>
-                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap">{{ form.mediaInfo }}</pre>
-              </div>
-
-              <!-- BDInfo -->
-              <div v-if="form.bdinfo" style="margin-bottom: 16px">
-                <div style="font-weight: 600; margin-bottom: 4px">BDInfo</div>
-                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 200px; overflow: auto; white-space: pre-wrap">{{ form.bdinfo }}</pre>
-              </div>
-
-              <!-- §59.81: 截图（点击放大） -->
-              <div v-if="form.screenshots.length > 0" style="margin-bottom: 16px">
-                <div style="font-weight: 600; margin-bottom: 8px">截图</div>
-                <div style="display: flex; flex-wrap: wrap; gap: 8px">
-                  <img
-                    v-for="(url, i) in form.screenshots" :key="i" :src="url"
-                    style="width: 200px; border-radius: 4px; cursor: zoom-in"
-                    @click="previewShotPreview = url"
-                  />
+              <!-- §59.86: ③ 内容属性（卡片） -->
+              <a-card size="small" style="margin-bottom: 12px">
+                <template #title><span style="font-size: 14px">③ 内容属性</span></template>
+                <div v-if="pvRegion.length || pvGenre.length">
+                  <span v-if="pvRegion.length" style="margin-right: 16px">
+                    产地：<a-tag v-for="r in pvRegion" :key="r" color="geekblue">{{ r }}</a-tag>
+                  </span>
+                  <span v-if="pvGenre.length">
+                    类型：<a-tag v-for="g in pvGenre" :key="g" color="purple">{{ g }}</a-tag>
+                  </span>
                 </div>
-              </div>
+                <div v-else style="color: #999">暂无产地 / 类型数据（需 PTGen 获取）</div>
+              </a-card>
+
+              <!-- §59.86: ④ 标签（卡片） -->
+              <a-card size="small" style="margin-bottom: 12px">
+                <template #title><span style="font-size: 14px">④ 标签</span></template>
+                <div v-if="previewTags.length">
+                  <a-tag v-for="t in previewTags" :key="t" :color="isRestrictedTag(t) ? 'red' : 'blue'">
+                    {{ tagDisplayName(t) }}
+                  </a-tag>
+                </div>
+                <div v-else style="color: #999">未选择标签</div>
+              </a-card>
+
+              <!-- §59.86: ⑤ 媒体数据（卡片） -->
+              <a-card size="small" style="margin-bottom: 12px">
+                <template #title><span style="font-size: 14px">⑤ 媒体数据</span></template>
+                <!-- 海报 -->
+                <div v-if="form.poster" style="margin-bottom: 16px; text-align: center">
+                  <img :src="form.poster" style="max-height: 300px; border-radius: 4px" />
+                </div>
+
+                <!-- MediaInfo -->
+                <div v-if="form.mediaInfo" style="margin-bottom: 16px">
+                  <div style="font-weight: 600; margin-bottom: 4px">MediaInfo</div>
+                  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap">{{ form.mediaInfo }}</pre>
+                </div>
+
+                <!-- BDInfo -->
+                <div v-if="form.bdinfo" style="margin-bottom: 16px">
+                  <div style="font-weight: 600; margin-bottom: 4px">BDInfo</div>
+                  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 200px; overflow: auto; white-space: pre-wrap">{{ form.bdinfo }}</pre>
+                </div>
+
+                <!-- 截图（点击放大） -->
+                <div v-if="form.screenshots.length > 0">
+                  <div style="font-weight: 600; margin-bottom: 8px">截图</div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                    <img
+                      v-for="(url, i) in form.screenshots" :key="i" :src="url"
+                      style="width: 200px; border-radius: 4px; cursor: zoom-in"
+                      @click="previewShotPreview = url"
+                    />
+                  </div>
+                </div>
+                <div v-if="!form.poster && !form.mediaInfo && !form.bdinfo && form.screenshots.length === 0" style="color: #999">
+                  暂无媒体数据
+                </div>
+              </a-card>
               <a-modal :open="!!previewShotPreview" :footer="null" width="900px" @cancel="previewShotPreview = ''">
                 <img v-if="previewShotPreview" :src="previewShotPreview" style="width: 100%" />
               </a-modal>
 
-              <!-- §59.81: 发布简介（四段结构化 + 源码/渲染切换） -->
-              <div v-if="previewRenderedDesc || previewStatement" style="margin-bottom: 16px">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
-                  <div style="font-weight: 600">发布简介（按发布描述组装顺序）</div>
+              <!-- §59.86: ⑥ 发布简介（卡片·四段结构化 + 源码/渲染切换） -->
+              <a-card size="small" style="margin-bottom: 12px">
+                <template #title><span style="font-size: 14px">⑥ 发布简介（按发布描述组装顺序）</span></template>
+                <template #extra>
                   <a-radio-group v-model:value="previewDescMode" size="small">
                     <a-radio-button value="rendered">渲染效果</a-radio-button>
                     <a-radio-button value="source">BBCode 源码</a-radio-button>
                   </a-radio-group>
-                </div>
-                <template v-if="previewDescMode === 'rendered'">
-                  <div v-if="previewStatement" style="padding: 12px; background: #fafafa; border-radius: 4px; margin-bottom: 8px">
-                    <div style="color: #999; font-size: 12px; margin-bottom: 4px">— 声明 —</div>
-                    <div style="line-height: 1.8" v-html="previewStatementHTML"></div>
-                  </div>
-                  <div v-if="form.poster" style="text-align: center; margin-bottom: 8px">
-                    <img :src="form.poster" style="max-height: 260px; border-radius: 4px" />
-                  </div>
-                  <div v-if="previewRenderedDesc" style="padding: 12px; background: #fafafa; border-radius: 4px; line-height: 1.8" v-html="previewRenderedDesc"></div>
                 </template>
-                <pre v-else style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 500px; overflow: auto; white-space: pre-wrap">{{ previewDescSource }}</pre>
-              </div>
+                <div v-if="previewRenderedDesc || previewStatement">
+                  <template v-if="previewDescMode === 'rendered'">
+                    <div v-if="previewStatement" style="padding: 12px; background: #fafafa; border-radius: 4px; margin-bottom: 8px">
+                      <div style="color: #999; font-size: 12px; margin-bottom: 4px">— 声明 —</div>
+                      <div style="line-height: 1.8" v-html="previewStatementHTML"></div>
+                    </div>
+                    <div v-if="form.poster" style="text-align: center; margin-bottom: 8px">
+                      <img :src="form.poster" style="max-height: 260px; border-radius: 4px" />
+                    </div>
+                    <div v-if="previewRenderedDesc" style="padding: 12px; background: #fafafa; border-radius: 4px; line-height: 1.8" v-html="previewRenderedDesc"></div>
+                  </template>
+                  <pre v-else style="background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 500px; overflow: auto; white-space: pre-wrap">{{ previewDescSource }}</pre>
+                </div>
+                <div v-else style="color: #999">暂无简介数据</div>
+              </a-card>
 
-              <!-- 校验状态 -->
+              <!-- §59.86: ⑦ 校验状态（卡片） -->
+              <a-card size="small">
+                <template #title><span style="font-size: 14px">⑦ 校验状态</span></template>
               <a-alert
                 :type="seedMissingFields.length === 0 ? 'success' : 'warning'"
                 show-icon
-                style="margin-top: 16px"
                 :message="seedMissingFields.length === 0 ? '✓ 9 必需字段齐全，已自动审核' : `⚠ 仍缺 ${seedMissingFields.length} 个字段：${seedMissingFields.join(', ')}`"
               />
+              </a-card>
             </div>
           </template>
 
