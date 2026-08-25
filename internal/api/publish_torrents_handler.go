@@ -3743,7 +3743,15 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"poster":       updated.Poster,
 		"description":  updated.Description,
 		"statement":    updated.Statement,
-		"tags":         updated.Tags,
+		"tags": func() interface{} {
+			var tags []string
+			if updated.Tags != "" {
+				if err := json.Unmarshal([]byte(updated.Tags), &tags); err != nil {
+					return []string{}
+				}
+			}
+			return tags
+		}(),
 		"reviewed":     updated.Reviewed,
 		"missing_fields": missing,
 

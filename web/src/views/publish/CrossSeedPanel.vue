@@ -868,7 +868,15 @@ const pvGenre = computed(() => {
   const g = previewFieldsData.value.genre as { labels?: string[] } | undefined
   return g?.labels || []
 })
-const previewTags = computed<string[]>(() => (previewFieldsData.value.tags as string[]) || [])
+const previewTags = computed<string[]>(() => {
+  const t = previewFieldsData.value.tags
+  if (Array.isArray(t)) return t as string[]
+  // 字符串形态（JSON）解析；畸形回退空
+  if (typeof t === 'string' && t.startsWith('[')) {
+    try { return JSON.parse(t) as string[] } catch { return [] }
+  }
+  return []
+})
 // §59.81: 禁转类标签红色（easy-upload getTagType 借鉴）
 const isRestrictedTag = (t: string): boolean =>
   t === '禁转' || t === 'tag.禁转' || t === '限转' || t === 'tag.限转' || t === 'no_transfer'
