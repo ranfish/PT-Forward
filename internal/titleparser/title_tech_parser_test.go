@@ -183,3 +183,27 @@ func TestEditionPublisherBrands(t *testing.T) {
 		}
 	}
 }
+
+// §59.77: 评论音轨从副标题提取扣减——v1.05 "评论音轨不计入音轨数"。
+// 243 实证形态: 评论音轨(单)/双评论音轨/三评论音轨/双评论音轨带字幕。
+func TestAdjustCommentaryTracks(t *testing.T) {
+	cases := []struct {
+		name     string
+		mi, want int
+		sub      string
+	}{
+		{"单条", 3, 2, "英语 评论音轨 简繁英字幕"},
+		{"双", 4, 2, "双评论音轨 带章节名"},
+		{"三", 5, 2, "英语 三评论音轨 简繁英双语字幕"},
+		{"带字幕变体", 3, 1, "双评论音轨带字幕"},
+		{"无评论轨", 3, 3, "英语 简繁英双语字幕"},
+		{"MI=1 防御(单轨不可能有评论轨)", 1, 1, "评论音轨"},
+		{"扣到负钳 0", 2, 0, "三评论音轨"},
+		{"MI=0 不动", 0, 0, "评论音轨"},
+	}
+	for _, c := range cases {
+		if got := AdjustCommentaryTracks(c.mi, c.sub); got != c.want {
+			t.Errorf("%s: AdjustCommentaryTracks(%d, %q) = %d, want %d", c.name, c.mi, c.sub, got, c.want)
+		}
+	}
+}

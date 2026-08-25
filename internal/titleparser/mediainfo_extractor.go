@@ -1,6 +1,7 @@
 package titleparser
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -309,6 +310,34 @@ func bitDepthFromMI(bitDepthStr string) string {
 // countAudioTracks 计算有效音轨数（排除兼容音轨）。
 //
 // 排除规则：Audio #1 是高清音轨（TrueHD / DTS-HD MA）+ Audio #2 是 AC-3/DDP → 后者为兼容音轨，不计入。
+// commentaryTrackRe §59.77: 副标题评论音轨声明（243 实证形态）。
+// 数量前缀中文数字词: 无前缀=1 / 双=2 / 三=3; "带字幕"等后缀天然兼容。
+var commentaryTrackRe = regexp.MustCompile(`(?i)(三|双)?评论音轨|commentary[- ]?track`)
+
+// AdjustCommentaryTracks §59.77: v1.05 "评论音轨不计入音轨数"——从副标题提取
+// 评论轨数并扣减。防御: MI<=1 不扣（单轨不可能有评论轨，副标题误标防御）；
+// 下限 0。
+func AdjustCommentaryTracks(miTracks int, subtitle string) int {
+	if miTracks <= 1 || subtitle == "" {
+		return miTracks
+	}
+	m := commentaryTrackRe.FindStringSubmatch(subtitle)
+	if m == nil {
+		return miTracks
+	}
+	n := 1
+	switch m[1] {
+	case "双":
+		n = 2
+	case "三":
+		n = 3
+	}
+	if miTracks-n < 0 {
+		return 0
+	}
+	return miTracks - n
+}
+
 func countAudioTracks(audioStreams []miStream) int {
 	total := len(audioStreams)
 	if total <= 1 {
