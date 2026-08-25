@@ -97,6 +97,13 @@ func (c *HTMLToBBCodeConverter) Convert(htmlStr string) (string, error) {
 		root = doc.Selection
 	}
 
+	// §59.79: div.mediainfo（站方 MI 独立字段渲染区）整块剔除——147 页实测其内
+	// td.mi_head/codemain/pre 被转成伪 quote（[quote]General[/quote]）混入声明
+	// 分类（墓碑镇实锤）。MI 提取层走 descrHTML（goquery 查询），不受本剔除影响。
+	// 147 页全量验证: MI 区后 fieldset 仅评论引用(28)/截图对比(37)两类，无官组声明
+	// ——剔除不误伤（声明采集边界不变）。
+	root.Find("div.mediainfo").Remove()
+
 	var b strings.Builder
 	root.Contents().Each(func(_ int, s *goquery.Selection) {
 		b.WriteString(c.convertNode(s, 0))

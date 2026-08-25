@@ -296,3 +296,24 @@ func TestHTMLToBBCode_TooLarge(t *testing.T) {
 		t.Error("expected error for >1MB HTML")
 	}
 }
+
+// §59.79: div.mediainfo（站方 MI 独立字段渲染区）整块剔除——147 页实测其内
+// td.mi_head/codemain/pre 被转成伪 quote（[quote]General[/quote]）混入声明分类。
+func TestConvert_SkipsMediaInfoDiv(t *testing.T) {
+	html := `<fieldset>真声明：感谢原制作者</fieldset>
+<div class='mediainfo'><a class="codetop"><span>MediaInfo: x.mkv</span></a><div class="codemain"><pre>
+General
+Complete name : x.mkv
+</pre></div><div class="codemain"><table><tr><td class='mi_head'>General</td><td class='mi_head'>Video (1)</td></tr></table></div></div>
+正文`
+	out, err := HTMLToBBCode(html)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "[quote]General[/quote]") || strings.Contains(out, "Complete name") {
+		t.Errorf("mediainfo 区应整块剔除: %q", out)
+	}
+	if !strings.Contains(out, "真声明") || !strings.Contains(out, "正文") {
+		t.Errorf("区外内容保留: %q", out)
+	}
+}
