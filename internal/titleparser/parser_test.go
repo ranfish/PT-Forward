@@ -302,3 +302,27 @@ func TestRegionCodeExtract(t *testing.T) {
 		t.Errorf("Main=%q RegionCode=%q, want 2046/ITA", c2.MainTitle, c2.RegionCode)
 	}
 }
+
+// §59.98: 季集边界锚——「季集或年份」最先出现者为右边界（无年份剧集也获结构边界）。
+func TestSeasonAnchor(t *testing.T) {
+	cases := []struct{ title, wantMain, wantYear, wantSE string }{
+		// 季集先于年份 → 锚=季集
+		{"Show.S01.2024.1080p.BluRay.x264-GROUP", "Show", "2024", "S01"},
+		{"Show.S01E03.2024.1080p.BluRay.x264-GROUP", "Show", "2024", "S01E03"},
+		// 无年份剧集 → 季集锚（fallback 逐词的 Saki 案例升级为结构边界）
+		{"Saki.S01-S03.BluRay.1080p.Hi10P.x264.FLAC.2.0-VCB-Studio", "Saki", "", "S01-S03"},
+		// 电影无季集 → 年份锚（既有）
+		{"Movie.Name.2024.1080p.BluRay.x264-GROUP", "Movie Name", "2024", ""},
+		// 双年份+季集
+		{"2046.2004.REPACK.2160p.UHD.Blu-ray.REMUX-CMiNEPHiLES", "2046", "2004", ""},
+		// Clannad +MOVIE 后缀: 季集锚, MOVIE 在右侧技术区
+		{"Clannad.S01-S02+MOVIE.REPACK.1080p.BluRay-GRP", "Clannad", "", "S01-S02"},
+	}
+	for _, c := range cases {
+		got := ParseTitle(c.title)
+		if got.MainTitle != c.wantMain || got.Year != c.wantYear || got.SeasonEpisode != c.wantSE {
+			t.Errorf("%q:\n  Main=%q want %q | Year=%q want %q | SE=%q want %q",
+				c.title, got.MainTitle, c.wantMain, got.Year, c.wantYear, got.SeasonEpisode, c.wantSE)
+		}
+	}
+}
