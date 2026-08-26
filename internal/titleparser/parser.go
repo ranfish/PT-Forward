@@ -50,11 +50,16 @@ func ParseTitle(title string) TitleComponents {
 	// §59.35: WEB 上下文在 token 消费开始前判定（platform 提取点位于 medium/audio
 	// 移除之后，彼时 WEB-DL/HDTV token 已被剥除，上下文会丢失）
 	webCtx := hasWebContext(title)
+	mainLocked := "" // §59.97: 年份锚定的主标题（空=未锁定，走逐词 fallback）
 
 	// 季集
 	c.SeasonEpisode, title = extractSeasonEpisodeAndRemove(title)
-	// 年份
-	c.Year, title = extractYearAndRemove(title)
+	// 年份（§59.97: 前置截断——主标题在技术 extractor 之前锁定，年份后未知
+	// token 结构性免疫；双年份取最后（2046.2004 → 2004，第一组是片名）
+	c.Year, title, mainLocked = extractYearAnchorMain(title)
+	if mainLocked != "" {
+		c.MainTitle = mainLocked
+	}
 	// 发布版本
 	c.ReleaseVersion = extractReleaseVersion(title)
 	title = removeToken(title, c.ReleaseVersion)
@@ -93,8 +98,17 @@ func ParseTitle(title string) TitleComponents {
 	c.ReleaseGroup = extractGroup(title)
 	title = removeGroupSuffix(title, c.ReleaseGroup)
 
-	// 剩余部分 = 主标题 + 无法识别
-	c.MainTitle, c.Unrecognized = extractMainAndUnrecognized(title)
+	// 剩余部分 = 主标题 + 无法识别（§59.97: 年份锚锁定主标题骨架；技术剥除后
+	// 残余的非技术词（地区码 HKG/片名续词）回填主标题——锚定不吞词）
+	if mainLocked != "" {
+		var tailMain string
+		tailMain, c.Unrecognized = extractMainAndUnrecognized(title)
+		if tailMain != "" {
+			c.MainTitle = c.MainTitle + " " + tailMain
+		}
+	} else {
+		c.MainTitle, c.Unrecognized = extractMainAndUnrecognized(title)
+	}
 
 	return c
 }
@@ -132,6 +146,55 @@ func extractSeasonEpisodeAndRemove(title string) (value, remaining string) {
 	remaining = strings.TrimSpace(reSeasonEpisode.ReplaceAllString(title, " "))
 	remaining = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " "))
 	return match, remaining
+}
+
+// techFollowRe §59.97: 年份 token 后随技术词（判定真年份锚——片名含年份数字
+// 但后无技术词的场景如 "Blade Runner 2049 Alone" 不截断）。
+var techFollowRe = regexp.MustCompile(`(?i)(1080|2160|720|480|4320|bluray|blu-?ray|uhd|web|hdvd|remux|x26[45]|h\.?26[45]|hevc|avc|xvid|dvd)`)
+
+// extractYearAnchorMain §59.97: 年份锚定主标题——返回 (year, remaining, mainLocked)。
+// 规则（用户定案）:
+//   - 全部独立年份 token；无 → ("", title, "")
+//   - 取最后一个"后随技术 token"的年份为真年份（2046.2004 → 2004）
+//   - 主标题 = 首个年份 token 之前的部分（保住以数字为片名的《2046》）
+//   - remaining = 真年份之后的标题（技术区，后续 extractor 消费）
+func extractYearAnchorMain(title string) (year, remaining, mainLocked string) {
+	matches := reYearToken.FindAllStringSubmatchIndex(title, -1)
+	if len(matches) == 0 {
+		return "", title, ""
+	}
+	type yTok struct{ val string; start, end int; hasTechAfter bool }
+	var toks []yTok
+	for _, m := range matches {
+		val := title[m[2]:m[3]]
+		after := title[m[3]:]
+		hasTech := techFollowRe.MatchString(after)
+		toks = append(toks, yTok{val, m[2], m[3], hasTech})
+	}
+	// 真年份 = 最后一个后随技术词的年份 token
+	anchor := -1
+	for i := len(toks) - 1; i >= 0; i-- {
+		if toks[i].hasTechAfter {
+			anchor = i
+			break
+		}
+	}
+	if anchor < 0 {
+		return "", title, "" // 无锚（片名含年份无技术词）→ 不截断
+	}
+	year = toks[anchor].val
+	// 主标题 = 首个年份 token 前（片名以数字开头时首个即片名一部分，保留）
+	mainLocked = strings.TrimSpace(title[:toks[0].start])
+	mainLocked = strings.NewReplacer(".", " ", "_", " ").Replace(mainLocked)
+	mainLocked = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(mainLocked, " "))
+	mainLocked = strings.Trim(mainLocked, "- ")
+	// remaining = 锚年份后（保留后续技术区；锚与首个 token 之间的年份词也归主标题已处理——
+	// 双年份场景中间内容(即无)忽略）
+	remaining = strings.TrimSpace(title[toks[anchor].end:])
+	if remaining == "" {
+		remaining = title
+	}
+	return year, remaining, mainLocked
 }
 
 func extractYearAndRemove(title string) (value, remaining string) {
@@ -357,7 +420,9 @@ func extractReleaseVersion(title string) string {
 func extractGroup(title string) string {
 	title = strings.TrimSpace(title)
 	idx := strings.LastIndex(title, "-")
-	if idx > 0 && idx < len(title)-1 {
+	// §59.97: idx>=0——前导连字符残留("-FRDS", token 剥除后)也是组段;
+	// 点分隔 ".-FRDS" 一直靠前导点占位侥幸通过, 空格分隔剥后 "-FRDS" 被拒(实锤)
+	if idx >= 0 && idx < len(title)-1 {
 		raw := strings.TrimSpace(title[idx+1:])
 		raw = stripFileExtension(raw)
 		upper := strings.ToUpper(raw)
@@ -432,9 +497,8 @@ func isLikelyTitleWord(s string) bool {
 	if len(s) <= 1 {
 		return false
 	}
-	if regexp.MustCompile(`^\d+$`).MatchString(s) {
-		return false
-	}
+	// §59.97: 纯数字词不剔（年份已由锚定层剥离——能到 fallback 的数字
+	// 都是片名成分: 2049/1917/2001/Se7en 型）
 	if regexp.MustCompile(`^\d{3,4}[pi]$`).MatchString(s) {
 		return false
 	}
