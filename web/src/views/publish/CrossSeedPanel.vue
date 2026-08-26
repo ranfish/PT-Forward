@@ -468,6 +468,7 @@ import { CheckCircleFilled, ReloadOutlined } from '@ant-design/icons-vue'
 import { manualForwardApi, publishDataApi, publishApi, publishTorrentsApi, seedConfigApi } from '@/api/publish'
 import type { SeedDetail } from '@/api/publish'
 import { parseBBCode } from '@/utils/bbcode'
+import { tagDisplayName as tagDisplayNameCommon } from '@/utils/tagDisplay'
 import { TAG_GROUPS } from '@/generated/dict'
 import { CATEGORY_LABELS, PLATFORM_FULLNAMES } from '@/generated/dict'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
@@ -939,14 +940,13 @@ const previewTags = computed<string[]>(() => {
 const isRestrictedTag = (t: string): boolean =>
   t === '禁转' || t === 'tag.禁转' || t === '限转' || t === 'tag.限转' || t === 'no_transfer'
 // 标签显示名（dict label 优先）
-const tagDisplayName = (t: string): string => {
-  for (const g of TAG_GROUPS) {
-    for (const tk of g.tags) {
-      if (tk.key === t) return tk.label
-    }
-  }
-  return t
-}
+// §59.110: 公共单点（utils/tagDisplay）——后端 tag_labels 权威优先
+const previewTagLabels = computed<string[] | null>(() => {
+  const tl = previewFieldsData.value.tag_labels
+  return Array.isArray(tl) ? tl : null
+})
+const tagDisplayName = (t: string): string =>
+  tagDisplayNameCommon(t, previewTags.value, previewTagLabels.value)
 const previewStatementHTML = computed(() => parseBBCode(previewStatement.value))
 
 // §59.20: 已过滤声明 Tab 预览

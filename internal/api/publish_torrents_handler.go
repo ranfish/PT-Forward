@@ -3495,6 +3495,17 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 			}
 			return tags
 		}(),
+		"tag_labels": func() []string {
+			// §59.110: 预览④与 Tab1 同源显示名（§59.106 双形态）
+			var tags []string
+			if updated.Tags != "" {
+				if err := json.Unmarshal([]byte(updated.Tags), &tags); err != nil {
+					return []string{}
+				}
+				return tagDisplayNames(tags)
+			}
+			return []string{}
+		}(),
 		"reviewed":     updated.Reviewed,
 		"missing_fields": missing,
 

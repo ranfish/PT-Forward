@@ -81,6 +81,7 @@
 import { ref, computed } from 'vue'
 import { CheckCircleFilled, EditOutlined } from '@ant-design/icons-vue'
 import { TAG_GROUPS } from '@/generated/dict'
+import { tagDisplayName as tagDisplayNameCommon } from '@/utils/tagDisplay'
 
 // §59.35 P4: tag 分组数据源切换 generated/dict.ts（dict/tag.json 唯一真相源，
 // 原前端 38 组硬编码副本删除）
@@ -111,17 +112,8 @@ function isStandardTag(tag: string): boolean {
 
 // §59.32: 已选区显示通用标签文字（label），自定义标签显示原文
 function tagLabel(tag: string): string {
-  // §59.106: 后端权威显示名优先（与 modelValue 索引对齐）——dict 词条缺失/旧 bundle 时不显示代码
-  const idx = props.modelValue.indexOf(tag)
-  if (props.displayLabels && idx >= 0 && idx < props.displayLabels.length && props.displayLabels[idx]) {
-    return props.displayLabels[idx]
-  }
-  for (const g of tagGroups) {
-    for (const t of g.tags) {
-      if (t.key === tag) return t.label
-    }
-  }
-  return tag
+  // §59.110: 公共单点（utils/tagDisplay）——后端权威优先/本地 dict/原文兜底
+  return tagDisplayNameCommon(tag, props.modelValue, props.displayLabels)
 }
 
 function toggleTag(key: string) {
