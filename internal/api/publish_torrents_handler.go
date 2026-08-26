@@ -782,142 +782,6 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 	})
 }
 
-func (h *PublishTorrentsHandler) queryPiecesHashSites(ctx context.Context, infoHash, piecesHash string) {
-	var sites []model.Site
-	h.db.WithContext(ctx).
-		Where("enabled = ? AND is_target = ?", true, true).
-		Find(&sites)
-
-	now := time.Now()
-	ttl := now.Add(24 * time.Hour)
-
-	for _, site := range sites {
-		adapter, err := h.siteProvider.GetAdapter(ctx, site.Domain)
-		if err != nil || adapter == nil {
-			continue
-		}
-		if !adapter.SupportsSearchByPiecesHash() {
-			continue
-		}
-		searcher, ok := adapter.(piecesHashSearcher)
-		if !ok {
-			continue
-		}
-		config, err := h.siteProvider.GetSiteConfig(ctx, site.Domain)
-		if err != nil || config == nil {
-			continue
-		}
-
-		result, err := searcher.SearchByPiecesHash(ctx, config, []string{piecesHash})
-		if err != nil {
-			h.logger.Debug("pieces_hash query failed", zap.String("site", site.Name), zap.Error(err))
-			continue
-		}
-
-		if tid, found := result[piecesHash]; found {
-			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
-				InfoHash:   infoHash,
-				SiteName:   site.Name,
-				Status:     model.CoverageConfirmedHas,
-				Source:     model.CoverageSourcePiecesHash,
-				Confidence: 1.0,
-				TorrentID:  strconv.Itoa(tid),
-				QueriedAt:  now,
-				ExpiresAt:  ttl,
-			})
-		} else {
-			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
-				InfoHash:   infoHash,
-				SiteName:   site.Name,
-				Status:     model.CoverageConfirmedNot,
-				Source:     model.CoverageSourcePiecesHash,
-				Confidence: 0.95,
-				QueriedAt:  now,
-				ExpiresAt:  ttl,
-			})
-		}
-	}
-}
-
-func (h *PublishTorrentsHandler) queryNameSizeSites(ctx context.Context, infoHash, name string, size int64) {
-	coveredSites, _ := h.coverage.GetCoveredSiteNames(ctx, infoHash)
-
-	var sites []model.Site
-	query := h.db.WithContext(ctx).
-		Where("enabled = ? AND is_target = ?", true, true)
-	if len(coveredSites) > 0 {
-		query = query.Where("name NOT IN ?", coveredSites)
-	}
-	if err := query.Find(&sites).Error; err != nil {
-		h.logger.Warn("query failed", zap.Error(err))
-	}
-
-	now := time.Now()
-	ttl := now.Add(24 * time.Hour)
-	keyword := extractSearchKeyword(name)
-	tolerance := size * 2 / 100
-
-	for _, site := range sites {
-		adapter, err := h.siteProvider.GetAdapter(ctx, site.Domain)
-		if err != nil || adapter == nil {
-			continue
-		}
-		config, err := h.siteProvider.GetSiteConfig(ctx, site.Domain)
-		if err != nil || config == nil {
-			continue
-		}
-
-		results, err := adapter.SearchTorrents(ctx, config, keyword, nil)
-		if err != nil {
-			h.logger.Debug("name_size search failed", zap.String("site", site.Name), zap.Error(err))
-			continue
-		}
-
-		matched := false
-		for _, result := range results {
-			diff := result.Size - size
-			if diff < 0 {
-				diff = -diff
-			}
-			if diff <= tolerance {
-				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
-					InfoHash:   infoHash,
-					SiteName:   site.Name,
-					Status:     model.CoverageProbablyHas,
-					Source:     model.CoverageSourceNameSize,
-					Confidence: 0.7,
-					TorrentID:  result.TorrentID,
-					QueriedAt:  now,
-					ExpiresAt:  ttl,
-				})
-				matched = true
-				break
-			}
-		}
-
-		if !matched {
-			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
-				InfoHash:   infoHash,
-				SiteName:   site.Name,
-				Status:     model.CoverageProbablyNot,
-				Source:     model.CoverageSourceNameSize,
-				Confidence: 0.7,
-				QueriedAt:  now,
-				ExpiresAt:  ttl,
-			})
-		}
-	}
-}
-
-func extractSearchKeyword(name string) string {
-	idx := strings.LastIndex(name, "-")
-	keyword := name
-	if idx > 10 {
-		keyword = name[:idx]
-	}
-	return strings.ReplaceAll(strings.ReplaceAll(keyword, ".", " "), "_", " ")
-}
-
 func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
 	h.logger.Info("scheduled coverage refresh started")
 	var clients []model.ClientConfig
@@ -997,112 +861,6 @@ func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
 	return nil
 }
 
-func (h *PublishTorrentsHandler) batchPiecesHashQuery(ctx context.Context, items []coverage.BatchItem, cfg model.ClientConfig) {
-	// 从 content_fingerprints 表批量读 pieces_hash（复用辅种指纹，不计算种子文件）
-	infoHashes := make([]string, 0, len(items))
-	for _, item := range items {
-		infoHashes = append(infoHashes, item.InfoHash)
-	}
-
-	var fps []model.ContentFingerprint
-	h.db.WithContext(ctx).Where("info_hash IN ?", infoHashes).Find(&fps)
-
-	hashToPieces := make(map[string]string, len(fps))
-	for _, fp := range fps {
-		if fp.PiecesHash != "" {
-			hashToPieces[fp.InfoHash] = fp.PiecesHash
-		}
-	}
-	if len(hashToPieces) == 0 {
-		h.logger.Info("bg L1 fresh: no pieces_hash from fingerprints", zap.Int("torrents", len(items)))
-		return
-	}
-
-	// 收集去重 pieces_hashes
-	allPieces := make([]string, 0, len(hashToPieces))
-	seen := make(map[string]bool)
-	for _, ph := range hashToPieces {
-		if !seen[ph] {
-			seen[ph] = true
-			allPieces = append(allPieces, ph)
-		}
-	}
-	h.logger.Info("bg L1 fresh: starting",
-		zap.Int("torrents", len(hashToPieces)),
-		zap.Int("unique_pieces", len(allPieces)))
-
-	// 获取全部目标站点
-	var sites []model.Site
-	if err := h.db.WithContext(ctx).Where("enabled = ? AND is_target = ?", true, true).Find(&sites).Error; err != nil {
-		h.logger.Warn("query failed", zap.Error(err))
-	}
-
-	now := time.Now()
-	ttl := now.Add(24 * time.Hour)
-
-	for _, site := range sites {
-		adapter, err := h.siteProvider.GetAdapter(ctx, site.Domain)
-		if err != nil || adapter == nil {
-			continue
-		}
-		if !adapter.SupportsSearchByPiecesHash() {
-			continue
-		}
-		searcher, ok := adapter.(piecesHashSearcher)
-		if !ok {
-			continue
-		}
-		config, err := h.siteProvider.GetSiteConfig(ctx, site.Domain)
-		if err != nil || config == nil {
-			continue
-		}
-
-		// 批量查询（100/batch，NexusPHP 限制）
-		for i := 0; i < len(allPieces); i += 100 {
-			end := i + 100
-			if end > len(allPieces) {
-				end = len(allPieces)
-			}
-			batch := allPieces[i:end]
-
-			result, err := searcher.SearchByPiecesHash(ctx, config, batch)
-			if err != nil {
-				h.logger.Debug("bg L1 fresh: site query failed",
-					zap.String("site", site.Name), zap.Error(err))
-				continue
-			}
-
-			// 将结果映射回 info_hash
-			for infoHash, ph := range hashToPieces {
-				if tid, found := result[ph]; found {
-					h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
-						InfoHash:   infoHash,
-						SiteName:   site.Name,
-						Status:     model.CoverageConfirmedHas,
-						Source:     model.CoverageSourcePiecesHash,
-						Confidence: 1.0,
-						TorrentID:  strconv.Itoa(tid),
-						QueriedAt:  now,
-						ExpiresAt:  ttl,
-					})
-				} else {
-					h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
-						InfoHash:   infoHash,
-						SiteName:   site.Name,
-						Status:     model.CoverageConfirmedNot,
-						Source:     model.CoverageSourcePiecesHash,
-						Confidence: 0.95,
-						QueriedAt:  now,
-						ExpiresAt:  ttl,
-					})
-				}
-			}
-		}
-	}
-
-	h.logger.Info("bg L1 fresh: done", zap.Int("sites_checked", len(sites)))
-}
-
 func (h *PublishTorrentsHandler) handleQueryStatus(w http.ResponseWriter, r *http.Request) {
 	clientIDStr := r.URL.Query().Get("client_id")
 	clientID, _ := strconv.ParseUint(clientIDStr, 10, 64)
@@ -1152,19 +910,6 @@ func (s *backgroundQueryState) getProgress() (querying bool, done, total int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.active) > 0, s.done, s.total
-}
-
-func extractTorrentDir(configJSON string) string {
-	if configJSON == "" {
-		return ""
-	}
-	var cfg struct {
-		TorrentDir string `json:"torrent_dir"`
-	}
-	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
-		return ""
-	}
-	return cfg.TorrentDir
 }
 
 type detectSourceRequest struct {
@@ -2741,19 +2486,6 @@ func domFieldsFromDetailSource(detailJSON string) (medium, resolution, videoCode
 		titleparser.ReverseLookup(ds.AudioCodec)
 }
 
-// dedupStringSlice 保序去重（§59.26 标签合并用）。
-func dedupStringSlice(in []string) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, s := range in {
-		if s != "" && !seen[s] {
-			seen[s] = true
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
 // thanksAppendMarker §59.28 致谢追加分隔标记：statement 中该标记之后的内容
 // 是我们追加的致谢块（重获时剥离，保证幂等）。
 const thanksAppendMarker = "FRDS官组作品"
@@ -3274,15 +3006,6 @@ func (h *PublishTorrentsHandler) handleSeedUniquePaths(w http.ResponseWriter, r 
 	Success(w, map[string]interface{}{"clients": clients})
 }
 
-// groupMetasByHash 按 info_hash 分组 metadata。
-func (h *PublishTorrentsHandler) groupMetasByHash(metas []model.TorrentMetadata) map[string][]model.TorrentMetadata {
-	result := make(map[string][]model.TorrentMetadata)
-	for _, m := range metas {
-		result[m.InfoHash] = append(result[m.InfoHash], m)
-	}
-	return result
-}
-
 // selectSourceMeta 从同一 hash 的多行 metadata 中选出源站行（制作组映射命中优先，否则 updated_at 最新）。
 func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata) *model.TorrentMetadata {
 	if len(metas) == 0 {
@@ -3308,39 +3031,6 @@ func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata)
 		}
 	}
 	return best
-}
-
-// classifySeedStatus §59.20: 种子 5 态分类。
-func (h *PublishTorrentsHandler) classifySeedStatus(ctx context.Context, name string, meta *model.TorrentMetadata) string {
-	// ① flags 检查（§59.28 A1：关键词集对齐 extract_flags.go 生产域，
-	// 与发布侧 checkFlagsFromMetadata 精确匹配口径一致）
-	if meta != nil && meta.Flags != "" {
-		var flags []string
-		if err := json.Unmarshal([]byte(meta.Flags), &flags); err == nil {
-			forbiddenSet := map[string]bool{
-				"禁转": true, "禁止转载": true, "谢绝转载": true, "严禁转载": true,
-				"谢绝搬运": true, "独占": true, "限时禁转": true, "限转": true,
-			}
-			for _, f := range flags {
-				if forbiddenSet[f] {
-					return "forbidden"
-				}
-			}
-		}
-	}
-
-	// ② compliance 检查
-	if h.complianceChecker != nil && meta != nil {
-		siteName := ""
-		if meta.SiteName != "" {
-			siteName = meta.SiteName
-		}
-		if r := h.complianceChecker.CheckWithSite(ctx, name, siteName); r != nil && !r.Passed {
-			return "system_forbidden"
-		}
-	}
-
-	return h.classifySeedStatusLite(ctx, name, meta)
 }
 
 // classifySeedStatusLite §59.29: 轻量状态标注（跳过 compliance 的 per-row DB 查询）。
