@@ -148,6 +148,33 @@
    ]
   },
   {
+   "canonical": "english_audio",
+   "label": "英语",
+   "group": "语言音轨",
+   "standard_key": "tag.english_audio",
+   "variants": [
+    "英语",
+    "英配"
+   ],
+   "infer_pattern": "(\\bEnglish\\b|英语|英配音轨)",
+   "infer_scope": "all_raw",
+   "note": "§59.105 语言族补缺(站点侧英语 2 站); '英字幕/英字'词形不命中(无歧义); MI Audio English 由 scope=all 扫 MI 文本"
+  },
+  {
+   "canonical": "bilingual_audio",
+   "label": "中英双语",
+   "group": "语言音轨",
+   "standard_key": "tag.bilingual_audio",
+   "variants": [
+    "中英双语",
+    "国英双语",
+    "多语"
+   ],
+   "infer_pattern": "((?:中|国)英双语|多语种)",
+   "infer_scope": "title_raw",
+   "note": "§59.105 补缺(2+1 站); 国英双语为朋友站惯用写法"
+  },
+  {
    "canonical": "japanese_audio",
    "label": "日语",
    "aliases": "原声",

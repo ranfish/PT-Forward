@@ -224,3 +224,25 @@ func TestInferGapTags(t *testing.T) {
 		}
 	}
 }
+
+// §59.105: 语言族补缺——english_audio/bilingual_audio。
+func TestInferLanguageGapTags(t *testing.T) {
+	cases := []struct {
+		name string
+		in   TagInput
+		want string
+	}{
+		{"副标题英语", TagInput{Subtitle: "英语 简繁字幕"}, "english_audio"},
+		{"国英双语", TagInput{Subtitle: "国英双语 简繁字幕"}, "bilingual_audio"},
+		{"中英双语", TagInput{Subtitle: "中英双语"}, "bilingual_audio"},
+		{"英语字幕不算音轨", TagInput{Subtitle: "简英字幕"}, ""},
+	}
+	for _, c := range cases {
+		got := NewMediaTagInferer().InferFull(c.in)
+		found := false
+		for _, g := range got { if g == c.want { found = true } }
+		if found != (c.want != "") {
+			t.Errorf("%s: %q found=%v", c.name, c.want, found)
+		}
+	}
+}

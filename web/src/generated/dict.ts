@@ -414,6 +414,16 @@ export const TAG_GROUPS: TagGroup[] = [
           "aliases": ""
         },
         {
+          "key": "english_audio",
+          "label": "英语",
+          "aliases": ""
+        },
+        {
+          "key": "bilingual_audio",
+          "label": "中英双语",
+          "aliases": ""
+        },
+        {
           "key": "japanese_audio",
           "label": "日语",
           "aliases": "原声"
