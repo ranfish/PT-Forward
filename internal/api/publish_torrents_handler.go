@@ -3285,9 +3285,10 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"audio_codec":     pickNonEmpty(meta.AudioCodec, profile.AudioCodec),
 		"audio_channels":  pickNonEmpty(meta.AudioChannels, profile.AudioChannels),
 		"audio_tech":      pickNonEmpty(meta.AudioTech, profile.AudioTechnology),
-		// §59.115: fallback 同 PUT 公式（AdjustCommentaryTracks 双源扣减）——
-		// §59.76 裸 profile 曾致 GET=4/PUT=2 分裂（伴我同行列 0 暴露）
-		"audio_tracks":    pickNonZero(meta.AudioTracks, titleparser.AdjustCommentaryTracks(profile.AudioTracks, meta.Subtitle, miForProfile)),
+		// §59.116: 展示层零计算回归——列值唯一真相（计算只在 t0 落库层，有完整
+		// titleparser 管道与段上下文）；fallback 只裸 profile 补位（列 0=异常诚实显示，
+		// 刷列治本）。§59.115 曾在 fallback 加扣减——展示层第二套计算是分裂之源。
+		"audio_tracks":    pickNonZero(meta.AudioTracks, profile.AudioTracks),
 		"hdr":             pickNonEmpty(meta.HDR, profile.HDR),
 		"bit_depth":       pickNonEmpty(meta.BitDepth, profile.BitDepth),
 		"source_type":     displayProfile.SourceType,
@@ -3523,7 +3524,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"audio_codec":    pickNonEmpty(updated.AudioCodec, profile.AudioCodec),
 		"audio_channels": pickNonEmpty(updated.AudioChannels, profile.AudioChannels),
 		"audio_tech":     pickNonEmpty(updated.AudioTech, profile.AudioTechnology),
-		"audio_tracks":   pickNonZero(updated.AudioTracks, titleparser.AdjustCommentaryTracks(profile.AudioTracks, updated.Subtitle, miForProfile)),
+		"audio_tracks":   pickNonZero(updated.AudioTracks, profile.AudioTracks), // §59.116: 展示层零计算（同 GET）
 		"source_type":    pickNonEmpty(updated.SourceType, profile.SourceType),
 		"specification":  pickNonEmpty(updated.Specification, profile.Specification),
 		"source_platform": pickNonEmpty(updated.SourcePlatform, profile.SourcePlatform),

@@ -311,9 +311,26 @@ func bitDepthFromMI(bitDepthStr string) string {
 // 数量前缀中文数字词: 无前缀=1 / 双=2 / 三=3; "带字幕"等后缀天然兼容。
 var commentaryTrackRe = regexp.MustCompile(`(?i)(三|双)?评论音轨`)
 
-// commentaryTitleRe §59.114: MI Title 行 Commentary（英文——v1.05 精神语言无关，
-// 绝地计划 #2/#3 "Commentary by film critics" 实锤）。
-var commentaryTitleRe = regexp.MustCompile(`(?im)^Title\s*:[^\n]*\bCommentary\b`)
+// commentaryTitleInAudio §59.114/§59.116: MI **Audio 段内** Title 行 Commentary 计数。
+// 按段切片（复用 parseMIStreams 语义）而非单 regex——Text(字幕轨)的 Commentary
+// 配套字幕不是评论音轨（天堂里的烦恼 2−2=0 误扣实锤）；RE2 无前瞻，切片是正解。
+func commentaryTitleInAudio(mediaInfo string) int {
+	if mediaInfo == "" {
+		return 0
+	}
+	n := 0
+	for _, s := range parseMIStreams(mediaInfo) {
+		if s.name != "audio" {
+			continue
+		}
+		if commentaryTitleLineRe.MatchString(s.fields["title"]) {
+			n++
+		}
+	}
+	return n
+}
+
+var commentaryTitleLineRe = regexp.MustCompile(`(?i)\bCommentary\b`)
 
 // AdjustCommentaryTracks §59.77/§59.114: v1.05 "评论音轨不计入音轨数"——扣减信号两源:
 // ① 副标题"评论音轨"声明（中文，数量前缀）② MI Title 行 Commentary（每行算 1）。
@@ -334,7 +351,7 @@ func AdjustCommentaryTracks(miTracks int, subtitle string, mediaInfo string) int
 			}
 		}
 	}
-	nMI := len(commentaryTitleRe.FindAllString(mediaInfo, -1))
+	nMI := commentaryTitleInAudio(mediaInfo)
 	n := nSub
 	if nMI > n {
 		n = nMI
