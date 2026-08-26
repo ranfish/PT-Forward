@@ -858,6 +858,10 @@ function attachPreviewScrollGate() {
     if (host) {
       host.addEventListener('scroll', onPreviewScroll, { passive: true })
       previewScrollHost = host
+      // §59.101: 键盘滚动支持——焦点必须落在滚动容器上（↑↓/Home/End 作用于
+      // 焦点元素所在滚动层; drawer 焦点陷阱下焦点不在滚动宿主→键盘滚不动实锤）
+      host.tabIndex = -1
+      host.focus({ preventScroll: true })
       if (host.scrollHeight <= host.clientHeight + 30) {
         previewScrolled.value = true
       }
