@@ -993,16 +993,6 @@
     },
     {
       "category": "media_tag",
-      "key": "dubbed",
-      "code": "media_tag.dubbed",
-      "aliases": [
-        "配音",
-        "Dub"
-      ],
-      "is_protected": false
-    },
-    {
-      "category": "media_tag",
       "key": "internal",
       "code": "media_tag.internal",
       "aliases": [
