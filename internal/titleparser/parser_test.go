@@ -289,3 +289,16 @@ func TestMainTitleYearAnchor(t *testing.T) {
 		}
 	}
 }
+
+// §59.97 附: 地区码 extractor——HKG 等进 RegionCode 不进主标题。
+func TestRegionCodeExtract(t *testing.T) {
+	c := ParseTitle("Movie 2020 1080p HKG BluRay x264-CMCT")
+	if c.MainTitle != "Movie" || c.RegionCode != "HKG" {
+		t.Errorf("Main=%q RegionCode=%q, want Movie/HKG", c.MainTitle, c.RegionCode)
+	}
+	// 点分隔 + 双年份
+	c2 := ParseTitle("2046.2004.2160p.ITA.UHD.Blu-ray.REMUX-CMiNEPHiLES")
+	if c2.MainTitle != "2046" || c2.RegionCode != "ITA" {
+		t.Errorf("Main=%q RegionCode=%q, want 2046/ITA", c2.MainTitle, c2.RegionCode)
+	}
+}

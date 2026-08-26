@@ -9,6 +9,7 @@ type TitleComponents struct {
 	SeriesStatus    string `json:"series_status"`     // 剧集状态 (Complete)
 	ReleaseVersion  string `json:"release_version"`   // 发布版本 (PROPER/REPACK)
 	Resolution      string `json:"resolution"`        // 分辨率 (1080p/2160p)
+	RegionCode      string `json:"region_code"`       // 地区码 (§59.97 附 ITA/USA/JPN/HKG——v1.05 #6)
 	FrameRate       string `json:"frame_rate"`        // 帧率 (24fps)
 	SourcePlatform  string `json:"source_platform"`   // 片源平台 (NF/AMZN/DSNP)
 	Medium          string `json:"medium"`            // 媒介 (BluRay/WEB-DL/Remux)
