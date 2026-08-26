@@ -91,6 +91,8 @@ func ParseTitle(title string) TitleComponents {
 	// §59.35: webCtx 来自解析起点（见函数开头），消费后标题已无 WEB token
 	c.SourcePlatform = extractSourcePlatformWithContext(title, webCtx)
 	title = removeToken(title, c.SourcePlatform)
+	// 地区码 §59.97（v1.05 #6——年份后技术区扫; platform 词表优先消歧 HKG）
+	c.RegionCode, title = extractRegionCodeAndRemove(title)
 	// 移除音轨数 token（2Audios/3Audios 等）
 	title = reAudioTracksCleanup.ReplaceAllString(title, " ")
 	title = strings.TrimSpace(title)
@@ -98,14 +100,11 @@ func ParseTitle(title string) TitleComponents {
 	c.ReleaseGroup = extractGroup(title)
 	title = removeGroupSuffix(title, c.ReleaseGroup)
 
-	// 剩余部分 = 主标题 + 无法识别（§59.97: 年份锚锁定主标题骨架；技术剥除后
-	// 残余的非技术词（地区码 HKG/片名续词）回填主标题——锚定不吞词）
+	// 剩余部分 = 无法识别（§59.97 定案: 年份右侧技术区残余不回填主标题——
+	// 边界左侧全是片名、右侧全是技术词，无词性猜测；HKG/ITA 走 RegionCode extractor）
 	if mainLocked != "" {
-		var tailMain string
-		tailMain, c.Unrecognized = extractMainAndUnrecognized(title)
-		if tailMain != "" {
-			c.MainTitle = c.MainTitle + " " + tailMain
-		}
+		c.MainTitle = mainLocked
+		_, c.Unrecognized = extractMainAndUnrecognized(title)
 	} else {
 		c.MainTitle, c.Unrecognized = extractMainAndUnrecognized(title)
 	}
@@ -184,7 +183,9 @@ func extractYearAnchorMain(title string) (year, remaining, mainLocked string) {
 	}
 	year = toks[anchor].val
 	// 主标题 = 首个年份 token 前（片名以数字开头时首个即片名一部分，保留）
-	mainLocked = strings.TrimSpace(title[:toks[0].start])
+	// §59.97 定案: 主标题 = 锚年份左侧全部（含首个年份 token 2046——片名数字;
+	// 边界左侧不猜词性, 全是片名成分）
+	mainLocked = strings.TrimSpace(title[:toks[anchor].start])
 	mainLocked = strings.NewReplacer(".", " ", "_", " ").Replace(mainLocked)
 	mainLocked = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(mainLocked, " "))
 	mainLocked = strings.Trim(mainLocked, "- ")
@@ -206,6 +207,31 @@ func extractYearAndRemove(title string) (value, remaining string) {
 	remaining = strings.TrimSpace(reRemove.ReplaceAllString(title, " "))
 	remaining = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " "))
 	return match[1], remaining
+}
+
+// regionCodeSet §59.97: v1.05 地区码词表（qingwapt W 章 + ISO 常见）。
+var regionCodeSet = map[string]bool{
+	"ITA": true, "USA": true, "JPN": true, "HKG": true, "TWN": true, "KOR": true,
+	"GBR": true, "UK": true, "FRA": true, "GER": true, "DEU": true, "CAN": true,
+	"AUS": true, "ESP": true, "NLD": true, "SWE": true, "NOR": true, "DEN": true,
+	"FIN": true, "RUS": true, "CHN": true, "IND": true, "THA": true, "BRA": true,
+	"MEX": true, "ARG": true, "NZL": true,
+}
+
+// extractRegionCodeAndRemove 年份后技术区的地区码提取（点/空格分隔均处理——
+// Fields 按空格, 点分隔需先归一）。返回 (code, remaining)。
+func extractRegionCodeAndRemove(title string) (string, string) {
+	normalized := strings.NewReplacer(".", " ", "_", " ").Replace(title)
+	for _, f := range strings.Fields(normalized) {
+		up := strings.ToUpper(f)
+		if len(up) == 3 && regionCodeSet[up] {
+			re := regexp.MustCompile(`(?i)(^|[\s.-])` + up + `([\s.-]|$)`)
+			remaining := re.ReplaceAllString(title, "$1")
+			remaining = strings.Trim(strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " ")), " .-")
+			return up, remaining
+		}
+	}
+	return "", title
 }
 
 func extractResolution(title string) string {

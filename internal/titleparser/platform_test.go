@@ -32,7 +32,7 @@ func TestPlatformRequiresWeb(t *testing.T) {
 		// legacy 词条保留
 		{"friday_legacy", "Drama 2021 1080p friDay WEB-DL H.264-CMCT", "friDay", "Drama"},
 		// 地区码兼容词条挂 requires=web——非 WEB 标题不再误剥词（"You Can Count on Me" 案例）
-		{"hkg_web_only", "Movie 2020 1080p HKG BluRay x264-CMCT", "", "Movie HKG"},
+		{"hkg_web_only", "Movie 2020 1080p HKG BluRay x264-CMCT", "", "Movie"},
 		{"hkg_webdl", "Movie 2020 1080p HKG WEB-DL H.264-CMCT", "HKG", "Movie"},
 	}
 	for _, c := range cases {
