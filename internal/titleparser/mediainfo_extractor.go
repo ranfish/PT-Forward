@@ -347,7 +347,13 @@ func countAudioTracks(audioStreams []miStream) int {
 	secondCodec, _ := audioFromMI(audioStreams[1].fields["format"], "")
 	hiRes := firstCodec == "TrueHD" || firstCodec == "DTS-HD MA"
 	compat := secondCodec == "DD" || secondCodec == "DDP"
+	// §59.113: Title 佐证——兼容轨（同内容降级副本）技术特征是 Title 空；
+	// Title 有内容标识（Mandarin (台配)/Cantonese 等语言内容）= 独立音轨不扣。
+	// 幽灵公主实锤: DTS-HD MA + 3 条 Title 标识轨被误扣 1（4→3）。
 	if hiRes && compat {
+		if t := strings.TrimSpace(audioStreams[1].fields["title"]); t != "" {
+			return total
+		}
 		return total - 1
 	}
 	return total
