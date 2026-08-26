@@ -59,7 +59,8 @@
    "aliases": "",
    "group": "HDR/色彩",
    "infer_pattern": "hlg",
-   "infer_scope": "all"
+   "infer_scope": "all",
+   "standard_key": "tag.hlg"
   },
   {
    "canonical": "10_bit",
@@ -94,7 +95,8 @@
    "aliases": "Auro-3D",
    "group": "音频编码",
    "infer_pattern": "auro[-. ]?3d",
-   "infer_scope": "all"
+   "infer_scope": "all",
+   "standard_key": "tag.auro_3d"
   },
   {
    "canonical": "dts_x",
@@ -102,19 +104,22 @@
    "aliases": "",
    "group": "音频编码",
    "infer_pattern": "dts:x",
-   "infer_scope": "all"
+   "infer_scope": "all",
+   "standard_key": "tag.dts_x"
   },
   {
    "canonical": "lossless",
    "label": "无损",
    "aliases": "",
-   "group": "音频编码"
+   "group": "音频编码",
+   "standard_key": "tag.lossless"
   },
   {
    "canonical": "lossy",
    "label": "有损",
    "aliases": "",
-   "group": "音频编码"
+   "group": "音频编码",
+   "standard_key": "tag.lossy"
   },
   {
    "canonical": "chinese_audio",
@@ -181,7 +186,8 @@
    "group": "语言音轨",
    "infer_pattern": "(日语|日配|(?s)Audio #?\\d+[^\\n]*(?:\\n[^\\n#]*){0,6}?Japanese)",
    "infer_scope": "all_raw",
-   "note": "§59.109 语言组判据补齐(原空 pattern 不可推导); MI Audio Japanese/副标题日语"
+   "note": "§59.109 语言组判据补齐(原空 pattern 不可推导); MI Audio Japanese/副标题日语",
+   "standard_key": "tag.japanese_audio"
   },
   {
    "canonical": "korean_audio",
@@ -190,13 +196,15 @@
    "group": "语言音轨",
    "infer_pattern": "(韩语|韩配|(?s)Audio #?\\d+[^\\n]*(?:\\n[^\\n#]*){0,6}?Korean)",
    "infer_scope": "all_raw",
-   "note": "§59.109 同构"
+   "note": "§59.109 同构",
+   "standard_key": "tag.korean_audio"
   },
   {
    "canonical": "original_audio",
    "label": "原声",
    "aliases": "",
-   "group": "语言音轨"
+   "group": "语言音轨",
+   "standard_key": "tag.original_audio"
   },
   {
    "canonical": "dubbed",
@@ -205,7 +213,8 @@
    "group": "语言音轨",
    "infer_pattern": "((?:国语?配音|国配|粤配|普通话配音)|(?m:^Title[^\\n]*(?:Mandarin|Cantonese|Dub))|(?:央视|上译|八一)[\\s(]*配音?)",
    "infer_scope": "all_raw",
-   "note": "§59.109 配音版判据——MI Title 注释 Mandarin(国配)/Cantonese/Dub + Audio 段括号注释(央视国配/台配/上译) + 副标题国配/粤配(148 簇实证 170+ 处); 国配同时证 chinese_audio 与 dubbed(双命中合理)"
+   "note": "§59.109 配音版判据——MI Title 注释 Mandarin(国配)/Cantonese/Dub + Audio 段括号注释(央视国配/台配/上译) + 副标题国配/粤配(148 簇实证 170+ 处); 国配同时证 chinese_audio 与 dubbed(双命中合理)",
+   "standard_key": "tag.dubbed"
   },
   {
    "canonical": "special_effects_subs",
@@ -257,25 +266,29 @@
    "canonical": "hardcoded_subs",
    "label": "硬字幕",
    "aliases": "硬字",
-   "group": "字幕"
+   "group": "字幕",
+   "standard_key": "tag.hardcoded_subs"
   },
   {
    "canonical": "encoded_subs",
    "label": "内嵌字幕",
    "aliases": "",
-   "group": "字幕"
+   "group": "字幕",
+   "standard_key": "tag.encoded_subs"
   },
   {
    "canonical": "external_subtitles",
    "label": "外挂字幕",
    "aliases": "",
-   "group": "字幕"
+   "group": "字幕",
+   "standard_key": "tag.external_subtitles"
   },
   {
    "canonical": "subtitles_include",
    "label": "含字幕",
    "aliases": "",
-   "group": "字幕"
+   "group": "字幕",
+   "standard_key": "tag.subtitles_include"
   },
   {
    "canonical": "diy",
@@ -293,7 +306,8 @@
    "canonical": "scene",
    "label": "Scene",
    "aliases": "Scene Release",
-   "group": "版本类型"
+   "group": "版本类型",
+   "standard_key": "tag.scene"
   },
   {
    "canonical": "remux",
@@ -311,37 +325,43 @@
    "canonical": "internal",
    "label": "Internal",
    "aliases": "iNTERNAL",
-   "group": "版本类型"
+   "group": "版本类型",
+   "standard_key": "tag.internal"
   },
   {
    "canonical": "exclusive",
    "label": "独占",
    "aliases": "专属",
-   "group": "版本类型"
+   "group": "版本类型",
+   "standard_key": "tag.exclusive"
   },
   {
    "canonical": "retail",
    "label": "Retail",
    "aliases": "",
-   "group": "版本类型"
+   "group": "版本类型",
+   "standard_key": "tag.retail"
   },
   {
    "canonical": "web_release",
    "label": "WEB Release",
    "aliases": "",
-   "group": "版本类型"
+   "group": "版本类型",
+   "standard_key": "tag.web_release"
   },
   {
    "canonical": "promotional",
    "label": "宣传版",
    "aliases": "Promo",
-   "group": "版本类型"
+   "group": "版本类型",
+   "standard_key": "tag.promotional"
   },
   {
    "canonical": "hybrid",
    "label": "Hybrid",
    "aliases": "",
-   "group": "版本类型"
+   "group": "版本类型",
+   "standard_key": "tag.hybrid"
   },
   {
    "canonical": "original_disc",
@@ -374,49 +394,57 @@
    "canonical": "special_edition",
    "label": "特别版",
    "aliases": "Special Edition",
-   "group": "特别版"
+   "group": "特别版",
+   "standard_key": "tag.special_edition"
   },
   {
    "canonical": "director_s_cut",
    "label": "导演剪辑",
    "aliases": "Director's Cut",
-   "group": "特别版"
+   "group": "特别版",
+   "standard_key": "tag.director_s_cut"
   },
   {
    "canonical": "anniversary_edition",
    "label": "纪念版",
    "aliases": "Anniversary",
-   "group": "特别版"
+   "group": "特别版",
+   "standard_key": "tag.anniversary_edition"
   },
   {
    "canonical": "criterion",
    "label": "Criterion",
    "aliases": "CC",
-   "group": "特别版"
+   "group": "特别版",
+   "standard_key": "tag.criterion"
   },
   {
    "canonical": "the_criterion_collection",
    "label": "CC 收藏",
    "aliases": "Criterion Collection",
-   "group": "特别版"
+   "group": "特别版",
+   "standard_key": "tag.the_criterion_collection"
   },
   {
    "canonical": "4k_remaster",
    "label": "4K Remaster",
    "aliases": "4K 重制",
-   "group": "特别版"
+   "group": "特别版",
+   "standard_key": "tag.4k_remaster"
   },
   {
    "canonical": "4k_restoration",
    "label": "4K Restoration",
    "aliases": "4K 修复",
-   "group": "特别版"
+   "group": "特别版",
+   "standard_key": "tag.4k_restoration"
   },
   {
    "canonical": "commentary",
    "label": "评论音轨",
    "aliases": "Commentary",
-   "group": "其他"
+   "group": "其他",
+   "standard_key": "tag.commentary"
   },
   {
    "canonical": "complete",
