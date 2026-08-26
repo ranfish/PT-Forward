@@ -3419,6 +3419,23 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// §59.104: description 展示兜底（与 GET §59.46 同款）——列空按 douban_url 查
+	// ptgen_cache（format BBCode）；非空不覆盖
+	descriptionOut := updated.Description
+	if descriptionOut == "" && updated.DoubanURL != "" {
+		var cached model.PTGenCache
+		if err := h.db.WithContext(r.Context()).
+			Where("query_key = ?", updated.DoubanURL).
+			Order("updated_at DESC").First(&cached).Error; err == nil {
+			var pr struct {
+				RawBBCode string `json:"raw_bbcode"`
+			}
+			if json.Unmarshal([]byte(cached.JSONData), &pr) == nil && pr.RawBBCode != "" {
+				descriptionOut = pr.RawBBCode
+			}
+		}
+	}
+
 	// §59.28 C（方案A ②）：ReassembleFromTechProfile 标准化重组标题（预览用，不落库——
 	// 发布时按目标站 title_format 重组，这里用 v1.05 默认模板展示标准化效果）
 	// §59.28 C（方案A ④）：Renderer.Render 生成完整描述（声明+致谢+海报+正文+截图）
@@ -3450,7 +3467,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"title":        updated.Title,
 		"subtitle":     updated.Subtitle,
 		"poster":       updated.Poster,
-		"description":  updated.Description,
+		"description":  descriptionOut, // §59.104: GET 同款兜底（列空按 douban_url 查 ptgen_cache——预览不漏缓存简介）
 		"statement":    updated.Statement,
 		"tags": func() interface{} {
 			var tags []string
