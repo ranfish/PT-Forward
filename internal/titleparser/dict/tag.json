@@ -126,7 +126,7 @@
    "label": "国语",
    "aliases": "普通话/国配",
    "group": "语言音轨",
-   "infer_pattern": "([^多]国.{0,3}语|国.{0,3}配|台.{0,3}语|台.{0,3}配|(Audio[^\\n]*Chinese)|(Audio[^\\n]*mandarin))",
+   "infer_pattern": "([^多]国.{0,3}语|国.{0,3}配|台.{0,3}语|台.{0,3}配|(Audio[^\\n]*Chinese)|(Audio[^\\n]*mandarin)|(?m)^Title\\s*:.*Mandarin)",
    "infer_scope": "all_raw",
    "infer_exclude": "国家",
    "infer_pattern2": "◎语.*?言　汉语普通话",
@@ -136,21 +136,23 @@
     "国语",
     "国语配音",
     "中配"
-   ]
+   ],
+   "note": "§59.113: MI Title Mandarin (台配/央视国配) 行直证追加"
   },
   {
    "canonical": "cantonese_audio",
    "label": "粤语",
    "aliases": "",
    "group": "语言音轨",
-   "infer_pattern": "(粤.{0,3}语|粤.{0,3}配|(Audio[^\\n]*cantonese))",
+   "infer_pattern": "(粤.{0,3}语|粤.{0,3}配|(?m)^(?:Title|Language)\\s*:.*Cantonese|[国台日英韩]粤|粤[国台日英韩])",
    "infer_scope": "all_raw",
    "infer_pattern2": "◎语.*?言　粤语",
    "infer_scope2": "desc_raw",
    "standard_key": "tag.cantonese_audio",
    "variants": [
     "粤语"
-   ]
+   ],
+   "note": "§59.113: MI Title/Language 行 Cantonese 跨行直证(幽灵公主实锤); 单字粤=枚举串形态(与国/台/日/英/韩相邻)"
   },
   {
    "canonical": "english_audio",
