@@ -27,8 +27,15 @@ export function parseBBCode(text: string): string {
   // [u]...[/u]
   html = html.replace(/\[u\]/gi, '<u>').replace(/\[\/u\]/gi, '</u>')
 
-  // [size=X]...[/size]
-  html = html.replace(/\[size=(\d+)\]/gi, (_, size) => `<span style="font-size:${size}px">`)
+  // [size=X]...[/size] — X 是字号档位(1-7, 站点默认 2), 非 px。
+  // §59.100: 原实现把档位当像素直译(size=5 → 5px 极小字)——预览声明比正文还小实锤。
+  // NexusPHP 档位→px 映射渲染。
+  html = html.replace(/\[size=(\d+)\]/gi, (_, size) => {
+    const step = Number(size)
+    const pxMap: Record<number, number> = { 1: 10, 2: 13, 3: 16, 4: 18, 5: 24, 6: 32, 7: 48 }
+    const px = pxMap[step] ?? Math.min(48, Math.max(10, step))
+    return `<span style="font-size:${px}px">`
+  })
   html = html.replace(/\[\/size\]/gi, '</span>')
 
   // [color=X]...[/color]
