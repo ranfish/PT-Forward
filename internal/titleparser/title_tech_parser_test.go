@@ -237,3 +237,20 @@ func TestMediumThreeGaps(t *testing.T) {
 		}
 	}
 }
+
+// §59.116: 评论扣减 MI 信号限定 Audio 段——Text(字幕轨)的 Commentary 配套字幕
+// 不是评论音轨（天堂里的烦恼 2-2=0 误扣实锤）。
+func TestAdjustCommentaryTracksTextNotCounted(t *testing.T) {
+	mi := `Audio #1
+Format : FLAC
+Title : English
+Audio #2
+Format : AAC LC
+Title : Commentary by Lubitsch biographer Scott Eyman
+Text #6
+Format : UTF-8
+Title : Commentary by Lubitsch biographer Scott Eyman`
+	if got := AdjustCommentaryTracks(2, "", mi); got != 1 {
+		t.Errorf("字幕 Commentary 不应扣: got %d want 1", got)
+	}
+}
