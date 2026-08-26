@@ -38,3 +38,19 @@ func TestFetchFromSiteNoFallback_FailsWithoutIYUU(t *testing.T) {
 		t.Fatalf("直取失败应报错且无兜底: meta=%v err=%v", meta, err)
 	}
 }
+
+// §59.99: 站点运营标记过滤——副标题/标题尾部 "[中性种子(NL)]"（朋友站零魔力
+// 标识, NBSP 前缀——与 §59.64 标题侧 [2X 50%] 同族）不属于内容, 转发无意义。
+func TestStripSiteOperationMarkers(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"【醉拳2】mUHD作品 4k 杜比视界版本\u00a0\u00a0\u00a0 [中性种子(NL)]", "【醉拳2】mUHD作品 4k 杜比视界版本"},
+		{"正常副标题", "正常副标题"},
+		{"【名】简介 简繁字幕 带章节名    [中性种子(NL)]", "【名】简介 简繁字幕 带章节名"},
+		{"标题 [中性种子(NL)]", "标题"},
+	}
+	for _, c := range cases {
+		if got := stripSiteOperationMarkers(c.in); got != c.want {
+			t.Errorf("strip(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
