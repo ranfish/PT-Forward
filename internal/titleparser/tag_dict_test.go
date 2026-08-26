@@ -40,7 +40,7 @@ func TestTagInferAnchors(t *testing.T) {
 func TestTagGroupsStructure(t *testing.T) {
 	groups := TagGroups()
 	if len(groups) != 9 {
-		t.Errorf("分组数 %d, want 58（+§59.105 语言族）", len(groups))
+		t.Errorf("分组数 %d, want 57（-dubbed §59.111）", len(groups))
 	}
 	total := 0
 	seen := map[string]bool{}
@@ -56,7 +56,7 @@ func TestTagGroupsStructure(t *testing.T) {
 			}
 		}
 	}
-	if total != 58 {
+	if total != 57 {
 		t.Errorf("tag 词条 %d, want 56（+§59.85 A类缺口）", total)
 	}
 	// 关键词条锚定
