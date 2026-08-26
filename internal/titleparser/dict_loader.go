@@ -95,6 +95,12 @@ func (t TokenDef) display() string {
 	if t.Display != "" {
 		return t.Display
 	}
+	// §59.106: tag 域词条用 Label（显示名）——reverse map（standard_key→显示名）
+	// 曾因只查 Display 导致 tag_labels 全返回 canonical（english_audio 显示代码复盘的
+	// 第二层根因）
+	if t.Label != "" {
+		return t.Label
+	}
 	return t.Canonical
 }
 
