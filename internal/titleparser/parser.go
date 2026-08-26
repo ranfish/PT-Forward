@@ -346,6 +346,11 @@ func extractReleaseVersion(title string) string {
 			return kw
 		}
 	}
+	// §59.96: REPACK2/REPACK3 变体——Contains 命中 REPACK 但返回须带数字
+	//（removeToken  边界对 REPACK2 需完整 token 才能剥除）
+	if m := regexp.MustCompile(`REPACK(\d+)`).FindStringSubmatch(upper); m != nil {
+		return m[0]
+	}
 	return ""
 }
 
@@ -419,6 +424,10 @@ func extractMainAndUnrecognized(remaining string) (mainTitle, unrecognized strin
 	return strings.Join(main, " "), strings.Join(unknown, " ")
 }
 
+// techWordRe §59.96: 技术词形态——黑名单词 + 数字后缀变体(REPACK2/PROPER2)
+// + Hi10P 类比特标记 + *FiX 修复标记。
+var techWordRe = regexp.MustCompile(`(?i)^(UHD|HDR|SDR|HLG|DV|DOVI|ATMOS|HYBRID|REMASTER(?:ED)?|MUHD|MHD|MSD|MNHD|REPACK\d*|PROPER\d*|RERIP|INTERNAL|HI\d+P|\w*FiX)$`)
+
 func isLikelyTitleWord(s string) bool {
 	if len(s) <= 1 {
 		return false
@@ -429,10 +438,7 @@ func isLikelyTitleWord(s string) bool {
 	if regexp.MustCompile(`^\d{3,4}[pi]$`).MatchString(s) {
 		return false
 	}
-	upper := strings.ToUpper(s)
-	switch upper {
-	case "UHD", "HDR", "SDR", "HLG", "DV", "DOVI", "ATMOS", "HYBRID", "REMASTER", "REMASTERED",
-		"MUHD", "MHD", "MSD":
+	if techWordRe.MatchString(s) {
 		return false
 	}
 	return true
@@ -490,11 +496,34 @@ func removeMediumTokens(title, medium string) string {
 	return title
 }
 
+// groupSegmentRe §59.96: 尾部组段形态——"-MNHD-FRDS"/"-VCB-Studio"（1-4 个短大写/小写词链）。
+var groupSegmentRe = regexp.MustCompile(`(?i)[-\s]+([A-Za-z][A-Za-z0-9@]{1,30}(?:[-][A-Za-z][A-Za-z0-9@]{1,30})*)\s*$`)
+
 func removeGroupSuffix(title, group string) string {
 	if group == "" {
 		return title
 	}
-	// 移除 -group 后缀
+	// §59.96: 组段整体剥除——尾部连字符词链 "-X(-Y)*" 以 group 结尾时整段移除
+	//（MNHD-FRDS: group=FRDS, MNHD 压制线前缀同段; VCB-Studio: group=Studio, VCB 前缀）。
+	// 先试整段(更准), 不中再精确后缀。
+	m := groupSegmentRe.FindStringSubmatch(title)
+	if m != nil {
+		seg := m[1]
+		segLower := strings.ToLower(seg)
+		groupLower := strings.ToLower(group)
+		if segLower == groupLower {
+			return strings.TrimSpace(title[:len(title)-len(m[0])])
+		}
+		if strings.HasSuffix(segLower, "-"+groupLower) {
+			// 段以 -group 结尾: 前缀词链是组名组成部分(VCB-Studio)或压制线标识(MNHD-FRDS)
+			// ——整段剥除。前缀须为短词(≤10)防误吞真标题词(如 "Part-2" 不在尾部场景)
+			prefix := segLower[:len(segLower)-len(groupLower)-1]
+			if len(prefix) <= 10 && !strings.ContainsAny(prefix, " ") {
+				return strings.TrimSpace(title[:len(title)-len(m[0])])
+			}
+		}
+	}
+	// 精确后缀 fallback
 	re := regexp.MustCompile(`(?i)[-.\s]+` + regexp.QuoteMeta(group) + `\s*$`)
 	return strings.TrimSpace(re.ReplaceAllString(title, ""))
 }

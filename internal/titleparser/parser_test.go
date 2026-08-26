@@ -248,3 +248,22 @@ func TestParseTitle_DDPChannelsMerged(t *testing.T) {
 		}
 	}
 }
+
+// §59.96: 主标题提取双优化——年份截断 + 组段整体剥除。
+func TestMainTitleYearBoundary(t *testing.T) {
+	cases := []struct{ title, wantMain, wantGroup string }{
+		// 年份后技术区噪声不进主标题(REPACK2/MNHD 结构性免疫)
+		{"时空奇旅.Arco.2025.BluRay.1080p.x265.10bit.DDP7.1.REPACK2.MNHD-FRDS", "Arco", "FRDS"},
+		{"赎梦.Peg.O'My.Heart.2024.BluRay.1080p.x265.10bit.DDP7.1.MNHD-FRDS", "Peg O'My Heart", "FRDS"},
+		// 无年份标题: fallback 逐词法(组段剥除后 MNHD 不残留)
+		{"Saki.S01-S03.BluRay.1080p.Hi10P.x264.FLAC.2.0-VCB-Studio", "Saki", "Studio"},
+		// 中文名前缀保留
+		{"电影名.Movie.2024.1080p.BluRay.x264-GROUP", "Movie", "GROUP"},
+	}
+	for _, c := range cases {
+		got := ParseTitle(c.title)
+		if got.MainTitle != c.wantMain || got.ReleaseGroup != c.wantGroup {
+			t.Errorf("%s:\n  Main=%q want %q | Group=%q want %q", c.title[:min(50, len(c.title))], got.MainTitle, c.wantMain, got.ReleaseGroup, c.wantGroup)
+		}
+	}
+}
