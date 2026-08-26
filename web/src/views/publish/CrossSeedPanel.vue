@@ -768,6 +768,7 @@ async function loadSeedDetail(infoHash: string) {
         region_code: d.region_code || '',
         category: d.category || '',
         form: d.form || '',
+        medium: d.medium || '', // §59.108: 编辑表单媒介输入框（曾恒空）
       }
       // 状态
       seedMissingFields.value = d.missing_fields || []
