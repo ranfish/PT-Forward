@@ -3266,6 +3266,20 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		// 14 DB 平铺字段（DB 为空 → profile fallback）
 		"category":        pickNonEmpty(meta.Category, inferredCategory),
 		"form":            meta.Form,
+		// §59.108: 编辑表单媒介输入框数据源（titleComponents.medium 曾恒空——
+		// GET 无 medium 键, source_type+specification 合成 TitleComponents.Medium 形态）
+		"medium": func() string {
+			m := pickNonEmpty(meta.SourceType, profile.SourceType)
+			s := pickNonEmpty(meta.Specification, profile.Specification)
+			switch {
+			case m != "" && s != "":
+				return m + " " + s
+			case m != "":
+				return m
+			default:
+				return s
+			}
+		}(),
 		"resolution":      pickNonEmpty(meta.Resolution, profile.Resolution),
 		"video_codec":     pickNonEmpty(meta.VideoCodec, profile.VideoCodec),
 		"audio_codec":     pickNonEmpty(meta.AudioCodec, profile.AudioCodec),
