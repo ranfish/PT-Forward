@@ -3285,7 +3285,9 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"audio_codec":     pickNonEmpty(meta.AudioCodec, profile.AudioCodec),
 		"audio_channels":  pickNonEmpty(meta.AudioChannels, profile.AudioChannels),
 		"audio_tech":      pickNonEmpty(meta.AudioTech, profile.AudioTechnology),
-		"audio_tracks":    pickNonZero(meta.AudioTracks, profile.AudioTracks), // §59.76
+		// §59.115: fallback 同 PUT 公式（AdjustCommentaryTracks 双源扣减）——
+		// §59.76 裸 profile 曾致 GET=4/PUT=2 分裂（伴我同行列 0 暴露）
+		"audio_tracks":    pickNonZero(meta.AudioTracks, titleparser.AdjustCommentaryTracks(profile.AudioTracks, meta.Subtitle, miForProfile)),
 		"hdr":             pickNonEmpty(meta.HDR, profile.HDR),
 		"bit_depth":       pickNonEmpty(meta.BitDepth, profile.BitDepth),
 		"source_type":     displayProfile.SourceType,
