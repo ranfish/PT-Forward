@@ -218,7 +218,7 @@
                 </a-form-item>
                 <!-- §59.26: 标签（可编辑，供发布使用） -->
                 <a-form-item label="标签" style="max-width: 900px; margin-top: 16px">
-                  <TagSelector v-model="form.tags" />
+                  <TagSelector v-model="form.tags" :display-labels="form.tagLabels" />
                 </a-form-item>
                 <div v-if="seedMissingFields.length > 0" style="margin-top: 12px; padding: 8px 12px; background: #fffbe6; border-radius: 4px; font-size: 13px">
                   <span style="color: #faad14">⚠ 缺失字段：</span>{{ seedMissingFields.join(', ') }}
@@ -295,7 +295,7 @@
                     </a-col>
                   </a-row>
                   <a-form-item label="标签">
-                    <TagSelector v-model="form.tags" />
+                    <TagSelector v-model="form.tags" :display-labels="form.tagLabels" />
                   </a-form-item>
                 </a-form>
               </template><!-- v-else (non-maintenanceOnly) -->
@@ -542,6 +542,8 @@ const form = ref({
   // §59.75: 产地/类型（label 形态只读展示）
   region: [] as string[],
   genre: [] as string[],
+  // §59.106: 标签显示名（后端 tag_labels; null=用 TagSelector 本地映射）
+  tagLabels: null as string[] | null,
 })
 
 // Preview
@@ -685,6 +687,7 @@ function resetPanel() {
     titleComponents: {},
     region: [],
     genre: [],
+    tagLabels: null,
   }
 }
 
@@ -715,6 +718,7 @@ function fillFormFromPreset() {
     titleComponents: {},
     region: [],
     genre: [],
+    tagLabels: null,
   }
   loading.value = false
   // §59.20: maintenanceOnly 模式从后端加载已存 metadata
@@ -775,6 +779,8 @@ async function loadSeedDetail(infoHash: string) {
       currentSourceSite.value = d.site_name || ''
       // §59.26: 标签（获取时推断，编辑时可修正）
       form.value.tags = d.tags || []
+      // §59.106: 显示名优先用后端 tag_labels（dict bundle 无关——新词条旧缓存页面不显示代码）
+      form.value.tagLabels = d.tag_labels || null
     }
   } catch (e: unknown) {
     loadError.value = (e as Error).message

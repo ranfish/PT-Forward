@@ -3300,11 +3300,14 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		result["genre"] = normalizeDomainValues("genre", src.Genre)
 	}
 
-	// §59.26: 返回 tags（DB JSON 数组字符串 → []string）
+	// §59.26: 返回 tags——双形态（§59.106: keys=canonical 供发布映射,
+	// labels=dict 显示名——前端已选区不依赖 bundle 内 dict 新旧, 新词条上线
+	// 旧缓存页面也不显示代码）
 	if meta.Tags != "" {
 		var tags []string
 		if err := json.Unmarshal([]byte(meta.Tags), &tags); err == nil && len(tags) > 0 {
 			result["tags"] = tags
+			result["tag_labels"] = tagDisplayNames(tags)
 		}
 	}
 	if result["tags"] == nil {
@@ -3615,6 +3618,19 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 	}
 	_ = result
 	Success(w, map[string]interface{}{"message": "已清除"})
+}
+
+// tagDisplayNames §59.106: tag canonical 键 → dict 显示名列表（miss 保留原文）。
+func tagDisplayNames(tags []string) []string {
+	out := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if l := titleparser.ReverseLookup("tag." + t); l != "" {
+			out = append(out, l)
+		} else {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // normalizeDomainValues §59.75: 域值归一（PTGen 原词→canonical）+ label 映射。

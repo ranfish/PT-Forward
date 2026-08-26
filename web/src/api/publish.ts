@@ -265,6 +265,7 @@ export interface SeedDetail {
   fetched_at: string
   fetch_source: string
   tags?: string[]
+  tag_labels?: string[] // §59.106: 后端权威显示名（与 tags 索引对齐）
   audio_tracks?: number
   // §59.75: 产地/类型（PTGen 源归一——keys=canonical 供发布映射, labels=展示）
   region?: { keys: string[]; labels: string[] }

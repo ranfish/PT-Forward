@@ -91,6 +91,7 @@ const allStandardKeys = computed(() => tagGroups.flatMap(g => g.tags.map(t => t.
 
 const props = defineProps<{
   modelValue: string[]
+  displayLabels?: string[] | null // §59.106: 后端权威显示名（索引对齐 modelValue; null=本地 dict 映射）
 }>()
 const emit = defineEmits<{
   'update:modelValue': [value: string[]]
@@ -110,6 +111,11 @@ function isStandardTag(tag: string): boolean {
 
 // §59.32: 已选区显示通用标签文字（label），自定义标签显示原文
 function tagLabel(tag: string): string {
+  // §59.106: 后端权威显示名优先（与 modelValue 索引对齐）——dict 词条缺失/旧 bundle 时不显示代码
+  const idx = props.modelValue.indexOf(tag)
+  if (props.displayLabels && idx >= 0 && idx < props.displayLabels.length && props.displayLabels[idx]) {
+    return props.displayLabels[idx]
+  }
   for (const g of tagGroups) {
     for (const t of g.tags) {
       if (t.key === tag) return t.label
