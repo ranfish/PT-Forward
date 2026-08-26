@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	reSeasonEpisode = regexp.MustCompile(`(?i)\bS\d{1,2}(?:E\d{1,3}(?:[-~]E?\d{1,3})?)?\b`)
+	// §59.98: 范围/复合形态——S01-S03(跨季)/S01E03-E05/S01+S02 组合
+	reSeasonEpisode = regexp.MustCompile(`(?i)\bS\d{1,2}(?:E\d{1,3}(?:[-~]E?\d{1,3})?)?(?:[-+]S\d{1,2}(?:E\d{1,3})?)*\b`)
 	reYearToken     = regexp.MustCompile(`[\s.(]((?:19|20)\d{2})([\s.)]|$)`)
 	reResolutionTok = regexp.MustCompile(`(?i)\b(4320p|8k|2160p|4k|1440p|1080p|1080i|720p|480p)\b`)
 	reBDRipToken    = regexp.MustCompile(`(?i)\bBD[-\s]?RIP\b`)
@@ -52,14 +53,9 @@ func ParseTitle(title string) TitleComponents {
 	webCtx := hasWebContext(title)
 	mainLocked := "" // §59.97: 年份锚定的主标题（空=未锁定，走逐词 fallback）
 
-	// 季集
-	c.SeasonEpisode, title = extractSeasonEpisodeAndRemove(title)
-	// 年份（§59.97: 前置截断——主标题在技术 extractor 之前锁定，年份后未知
-	// token 结构性免疫；双年份取最后（2046.2004 → 2004，第一组是片名）
-	c.Year, title, mainLocked = extractYearAnchorMain(title)
-	if mainLocked != "" {
-		c.MainTitle = mainLocked
-	}
+	// §59.98: 统一边界锚——「季集或年份」最先出现者为主标题右边界（v1.05 顺序
+	// 剧名→季集→年份; 无年份剧集由季集锚获结构边界, Saki 案例不再依赖逐词 fallback）
+	c.SeasonEpisode, c.Year, title, mainLocked = extractBoundaryAnchor(title)
 	// 发布版本
 	c.ReleaseVersion = extractReleaseVersion(title)
 	title = removeToken(title, c.ReleaseVersion)
@@ -145,6 +141,66 @@ func extractSeasonEpisodeAndRemove(title string) (value, remaining string) {
 	remaining = strings.TrimSpace(reSeasonEpisode.ReplaceAllString(title, " "))
 	remaining = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " "))
 	return match, remaining
+}
+
+// extractBoundaryAnchor §59.98: 统一边界锚。
+// 锚 = 第一个「季集 token」或「后随技术词的年份 token」（位置最先者）;
+// 双年份取最后技术跟随者（§59.97《2046》）。
+// 返回 (seasonEpisode, year, remaining, mainLocked)。
+func extractBoundaryAnchor(title string) (se, year, remaining, mainLocked string) {
+	// 季集 token 位置
+	seLoc := reSeasonEpisode.FindStringIndex(title)
+	// 年份锚（技术跟随）
+	var yearStart, yearEnd int
+	matches := reYearToken.FindAllStringSubmatchIndex(title, -1)
+	anchorVal := ""
+	for _, m := range matches {
+		if techFollowRe.MatchString(title[m[3]:]) {
+			yearStart, yearEnd, anchorVal = m[2], m[3], title[m[2]:m[3]]
+		}
+	}
+	takeMain := func(cut int) string {
+		m := strings.TrimSpace(title[:cut])
+		m = strings.NewReplacer(".", " ", "_", " ").Replace(m)
+		m = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(m, " "))
+		return strings.Trim(m, "- ")
+	}
+	// 季集锚无条件优先（§59.98: 季集 token 是比年份更强的边界——年份可倒序
+	// 2024.S01E03 / 可在片名 2046, 季集永远紧邻剧名右侧）。年份可在季集前后——
+	// 有技术跟随的年份即真年份, 两侧剥除防污染
+	if seLoc != nil {
+		se = title[seLoc[0]:seLoc[1]]
+		mainLocked = takeMain(seLoc[0])
+		remaining = strings.TrimSpace(title[seLoc[1]:])
+		if anchorVal != "" {
+			year = anchorVal
+			// 右侧: 从 remaining 剥
+			remaining = strings.Replace(remaining, anchorVal, "", 1)
+			remaining = strings.TrimSpace(regexp.MustCompile(`[\s.]+`).ReplaceAllString(remaining, " "))
+			// 左侧: mainLocked 里的年份词剔除（"Test Show 2024"→"Test Show"）
+			mmL := strings.NewReplacer(".", " ").Replace(mainLocked)
+			if strings.Contains(mmL, anchorVal) {
+				reY := regexp.MustCompile(`(?i)\b` + anchorVal + `\b`)
+				mainLocked = strings.TrimSpace(reY.ReplaceAllString(mmL, ""))
+			}
+		}
+		if remaining == "" {
+			remaining = title
+		}
+		return se, year, remaining, mainLocked
+	}
+	// 年份锚（§59.97 原逻辑）
+	if anchorVal != "" {
+		mainLocked = takeMain(yearStart)
+		remaining = strings.TrimSpace(title[yearEnd:])
+		if remaining == "" {
+			remaining = title
+		}
+		return "", anchorVal, remaining, mainLocked
+	}
+	// 无锚: 季集无/年份无技术跟随——季集仍可作弱锚（Saki 无年份场景已在上分支）
+	// 完全无锚走 fallback
+	return "", "", title, ""
 }
 
 // techFollowRe §59.97: 年份 token 后随技术词（判定真年份锚——片名含年份数字
