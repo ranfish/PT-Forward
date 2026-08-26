@@ -3464,24 +3464,24 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"reviewed":     updated.Reviewed,
 		"missing_fields": missing,
 
-		// §59.81: v1.05 全字段（发布预览参数区扩容——对齐 Tab1 资产）
-		"season_episode": profile.SeasonEpisode,
-		"year":           profile.Year,
-		"resolution":     profile.Resolution,
-		"hdr":            profile.HDR,
-		"bit_depth":      profile.BitDepth,
-		"video_codec":    profile.VideoCodec,
-		"audio_codec":    profile.AudioCodec,
-		"audio_channels": profile.AudioChannels,
-		"audio_tech":     profile.AudioTechnology,
-		// §59.102: 音轨数同源——列值优先（t0 已过评论扣减），列空才现算
-		//（现算也过 AdjustCommentaryTracks——预览/Tab1 两处曾分裂实锤: 列=1 预览=3）
+		// §59.103: v1.05 全字段——与 GET detail（Tab1 数据源）同款取值策略：
+		// 列值优先（pickNonEmpty/pickNonZero），列空才 profile 现算补。预览=引用
+		// Tab1 数据，不再独立计算（§59.102 音轨数分裂的结构性根除——两响应同源）。
+		"season_episode": profile.SeasonEpisode, // transient（不落列，两处同源现算）
+		"year":           profile.Year,          // transient
+		"resolution":     pickNonEmpty(updated.Resolution, profile.Resolution),
+		"hdr":            pickNonEmpty(updated.HDR, profile.HDR),
+		"bit_depth":      pickNonEmpty(updated.BitDepth, profile.BitDepth),
+		"video_codec":    pickNonEmpty(updated.VideoCodec, profile.VideoCodec),
+		"audio_codec":    pickNonEmpty(updated.AudioCodec, profile.AudioCodec),
+		"audio_channels": pickNonEmpty(updated.AudioChannels, profile.AudioChannels),
+		"audio_tech":     pickNonEmpty(updated.AudioTech, profile.AudioTechnology),
 		"audio_tracks":   pickNonZero(updated.AudioTracks, titleparser.AdjustCommentaryTracks(profile.AudioTracks, updated.Subtitle)),
-		"source_type":    profile.SourceType,
-		"specification":  profile.Specification,
-		"source_platform": profile.SourcePlatform,
+		"source_type":    pickNonEmpty(updated.SourceType, profile.SourceType),
+		"specification":  pickNonEmpty(updated.Specification, profile.Specification),
+		"source_platform": pickNonEmpty(updated.SourcePlatform, profile.SourcePlatform),
 		"edition_info":   pickNonEmpty(updated.EditionInfo, profile.EditionInfo),
-		"region_code":    profile.RegionCode,
+		"region_code":    pickNonEmpty(updated.RegionCode, profile.RegionCode),
 		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(updated.Subtitle)),
 		"encode":         titleparser.IsEncode(profile),
 		// §59.90: 对齐 Tab1——剧名/制作组/类型(InferCategory)
