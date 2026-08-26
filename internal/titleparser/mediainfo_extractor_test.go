@@ -3,8 +3,8 @@ package titleparser
 import "testing"
 
 
-// §59.113: 兼容轨排除加 Title 佐证——Title 有内容标识(台配/央视国配/Cantonese)
-// 是独立音轨非兼容副本（幽灵公主 4 轨被误扣 1 实锤）；兼容轨技术特征是 Title 空。
+// §59.114: 兼容轨排除整体删除（v1.05:199 权威——唯一扣减是评论轨）。
+// 兼容副本(TrueHD 内嵌 DD)也是正片音轨计入——极限审判 3 正片轨曾被误扣为 2。
 func TestCountAudioTracksTitleEvidence(t *testing.T) {
 	// 幽灵公主形态: DTS-HD MA + 3 条有 Title 标识的独立轨 = 4
 	miMononoke := `Audio #1
@@ -28,8 +28,9 @@ Title                                    : Cantonese`
 Format : TrueHD
 Audio #2
 Format : AC-3`
+	// §59.114: 兼容对(TrueHD+AC-3 无 Title)同样计入——v1.05 无兼容轨排除
 	tech2 := ExtractMediaInfo(miCompat)
-	if tech2.AudioTracks != 1 {
-		t.Errorf("无 Title 兼容轨仍应扣减: got %d want 1", tech2.AudioTracks)
+	if tech2.AudioTracks != 2 {
+		t.Errorf("兼容对也计入(v1.05 无兼容排除): got %d want 2", tech2.AudioTracks)
 	}
 }

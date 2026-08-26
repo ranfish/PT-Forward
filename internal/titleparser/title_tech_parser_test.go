@@ -191,19 +191,24 @@ func TestAdjustCommentaryTracks(t *testing.T) {
 		name     string
 		mi, want int
 		sub      string
+		miText   string
 	}{
-		{"单条", 3, 2, "英语 评论音轨 简繁英字幕"},
-		{"双", 4, 2, "双评论音轨 带章节名"},
-		{"三", 5, 2, "英语 三评论音轨 简繁英双语字幕"},
-		{"带字幕变体", 3, 1, "双评论音轨带字幕"},
-		{"无评论轨", 3, 3, "英语 简繁英双语字幕"},
-		{"MI=1 防御(单轨不可能有评论轨)", 1, 1, "评论音轨"},
-		{"扣到负钳 0", 2, 0, "三评论音轨"},
-		{"MI=0 不动", 0, 0, "评论音轨"},
+		{"单条", 3, 2, "英语 评论音轨 简繁英字幕", ""},
+		{"双", 4, 2, "双评论音轨 带章节名", ""},
+		{"三", 5, 2, "英语 三评论音轨 简繁英双语字幕", ""},
+		{"带字幕变体", 3, 1, "双评论音轨带字幕", ""},
+		{"无评论轨", 3, 3, "英语 简繁英双语字幕", ""},
+		{"MI=1 防御(单轨不可能有评论轨)", 1, 1, "评论音轨", ""},
+		{"扣到负钳 0", 2, 0, "三评论音轨", ""},
+		{"MI=0 不动", 0, 0, "评论音轨", ""},
+		// §59.114: MI Title 英文 Commentary 信号（绝地计划实锤——两行 Commentary 扣 2）
+		{"MI Commentary 单行", 3, 2, "", "Audio #1\nTitle : English\nAudio #2\nTitle : Commentary by film critics"},
+		{"MI Commentary 双行", 4, 2, "", "Audio #1\nTitle : English\nAudio #2\nTitle : Commentary by film critics\nAudio #3\nTitle : Commentary by production"},
+		{"两源取大不叠加", 3, 1, "双评论音轨", "Audio #1\nTitle : English\nAudio #2\nTitle : Commentary"},
 	}
 	for _, c := range cases {
-		if got := AdjustCommentaryTracks(c.mi, c.sub); got != c.want {
-			t.Errorf("%s: AdjustCommentaryTracks(%d, %q) = %d, want %d", c.name, c.mi, c.sub, got, c.want)
+		if got := AdjustCommentaryTracks(c.mi, c.sub, c.miText); got != c.want {
+			t.Errorf("%s: AdjustCommentaryTracks(%d, %q, mi) = %d, want %d", c.name, c.mi, c.sub, got, c.want)
 		}
 	}
 }

@@ -307,30 +307,40 @@ func bitDepthFromMI(bitDepthStr string) string {
 	return strconv.Itoa(n) + "bit"
 }
 
-// countAudioTracks 计算有效音轨数（排除兼容音轨）。
-//
-// 排除规则：Audio #1 是高清音轨（TrueHD / DTS-HD MA）+ Audio #2 是 AC-3/DDP → 后者为兼容音轨，不计入。
-// commentaryTrackRe §59.77: 副标题评论音轨声明（243 实证形态）。
+// commentaryTrackRe §59.77: 评论音轨声明（副标题中文形态）。
 // 数量前缀中文数字词: 无前缀=1 / 双=2 / 三=3; "带字幕"等后缀天然兼容。
-var commentaryTrackRe = regexp.MustCompile(`(?i)(三|双)?评论音轨|commentary[- ]?track`)
+var commentaryTrackRe = regexp.MustCompile(`(?i)(三|双)?评论音轨`)
 
-// AdjustCommentaryTracks §59.77: v1.05 "评论音轨不计入音轨数"——从副标题提取
-// 评论轨数并扣减。防御: MI<=1 不扣（单轨不可能有评论轨，副标题误标防御）；
-// 下限 0。
-func AdjustCommentaryTracks(miTracks int, subtitle string) int {
-	if miTracks <= 1 || subtitle == "" {
+// commentaryTitleRe §59.114: MI Title 行 Commentary（英文——v1.05 精神语言无关，
+// 绝地计划 #2/#3 "Commentary by film critics" 实锤）。
+var commentaryTitleRe = regexp.MustCompile(`(?im)^Title\s*:[^\n]*\bCommentary\b`)
+
+// AdjustCommentaryTracks §59.77/§59.114: v1.05 "评论音轨不计入音轨数"——扣减信号两源:
+// ① 副标题"评论音轨"声明（中文，数量前缀）② MI Title 行 Commentary（每行算 1）。
+// 防御: MI<=1 不扣（单轨不可能有评论轨，误标防御）；下限 0；两源取大值不叠加。
+func AdjustCommentaryTracks(miTracks int, subtitle string, mediaInfo string) int {
+	if miTracks <= 1 {
 		return miTracks
 	}
-	m := commentaryTrackRe.FindStringSubmatch(subtitle)
-	if m == nil {
-		return miTracks
+	nSub := 0
+	if subtitle != "" {
+		if m := commentaryTrackRe.FindStringSubmatch(subtitle); m != nil {
+			nSub = 1
+			switch m[1] {
+			case "双":
+				nSub = 2
+			case "三":
+				nSub = 3
+			}
+		}
 	}
-	n := 1
-	switch m[1] {
-	case "双":
-		n = 2
-	case "三":
-		n = 3
+	nMI := len(commentaryTitleRe.FindAllString(mediaInfo, -1))
+	n := nSub
+	if nMI > n {
+		n = nMI
+	}
+	if n == 0 {
+		return miTracks
 	}
 	if miTracks-n < 0 {
 		return 0
@@ -339,24 +349,11 @@ func AdjustCommentaryTracks(miTracks int, subtitle string) int {
 }
 
 func countAudioTracks(audioStreams []miStream) int {
-	total := len(audioStreams)
-	if total <= 1 {
-		return total
-	}
-	firstCodec, _ := audioFromMI(audioStreams[0].fields["format"], "")
-	secondCodec, _ := audioFromMI(audioStreams[1].fields["format"], "")
-	hiRes := firstCodec == "TrueHD" || firstCodec == "DTS-HD MA"
-	compat := secondCodec == "DD" || secondCodec == "DDP"
-	// §59.113: Title 佐证——兼容轨（同内容降级副本）技术特征是 Title 空；
-	// Title 有内容标识（Mandarin (台配)/Cantonese 等语言内容）= 独立音轨不扣。
-	// 幽灵公主实锤: DTS-HD MA + 3 条 Title 标识轨被误扣 1（4→3）。
-	if hiRes && compat {
-		if t := strings.TrimSpace(audioStreams[1].fields["title"]); t != "" {
-			return total
-		}
-		return total - 1
-	}
-	return total
+	// §59.114: v1.05 权威语义——音轨数 = Audio 段数（评论轨扣减在
+	// AdjustCommentaryTracks 声明制层）。兼容轨排除（TrueHD 内嵌 DD 副本扣 1）
+	// 是违反 v1.05 的多余启发式——兼容副本也是正片音轨应计入（极限审判实锤:
+	// 3 正片轨被误扣为 2；用户以 v1.05:199 原文纠偏）。
+	return len(audioStreams)
 }
 
 // parseMIInt 从 MediaInfo 字段值中提取数字。

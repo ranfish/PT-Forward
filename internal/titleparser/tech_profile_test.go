@@ -76,8 +76,8 @@ Channel layout                           : L R
 	assertEquals(t, "BitDepth", "8bit", r.BitDepth)
 	assertEquals(t, "AudioCodec", "DTS-HD MA", r.AudioCodec)
 	assertEquals(t, "AudioChannels", "5.1", r.AudioChannels)
-	// Audio #1=DTS-HD MA(高清) + Audio #2=AC-3(兼容) → 排除 1 → 3-1=2
-	assertEqualsInt(t, "AudioTracks", 2, r.AudioTracks)
+	// §59.114: 兼容排除删除——3 段全计入(v1.05 唯一扣减是评论轨)
+	assertEqualsInt(t, "AudioTracks", 3, r.AudioTracks)
 }
 
 func TestExtractMediaInfo_TrueHD_Atmos_Compat(t *testing.T) {
@@ -101,7 +101,7 @@ Channel layout                           : L R C LFE Ls Rs
 	assertEquals(t, "AudioCodec", "TrueHD", r.AudioCodec)
 	assertEquals(t, "AudioTechnology", "Atmos", r.AudioTechnology)
 	assertEquals(t, "AudioChannels", "7.1", r.AudioChannels)
-	assertEqualsInt(t, "AudioTracks", 1, r.AudioTracks) // TrueHD + AC-3 兼容 → 2-1=1
+	assertEqualsInt(t, "AudioTracks", 2, r.AudioTracks) // §59.114: 兼容副本也是正片轨计入(v1.05 无兼容排除)
 }
 
 func TestExtractMediaInfo_HDRVivid_V265(t *testing.T) {
