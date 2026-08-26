@@ -3474,7 +3474,9 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"audio_codec":    profile.AudioCodec,
 		"audio_channels": profile.AudioChannels,
 		"audio_tech":     profile.AudioTechnology,
-		"audio_tracks":   profile.AudioTracks,
+		// §59.102: 音轨数同源——列值优先（t0 已过评论扣减），列空才现算
+		//（现算也过 AdjustCommentaryTracks——预览/Tab1 两处曾分裂实锤: 列=1 预览=3）
+		"audio_tracks":   pickNonZero(updated.AudioTracks, titleparser.AdjustCommentaryTracks(profile.AudioTracks, updated.Subtitle)),
 		"source_type":    profile.SourceType,
 		"specification":  profile.Specification,
 		"source_platform": profile.SourcePlatform,
