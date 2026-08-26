@@ -758,6 +758,7 @@ async function loadSeedDetail(infoHash: string) {
         audio_codec: d.audio_codec || '',
         audio_channels: d.audio_channels || '',
         audio_technology: d.audio_tech || '',
+        audio_tracks: d.audio_tracks ? String(d.audio_tracks) : '', // §59.107: Tab1 组装漏映射（预览有 Tab1 无实锤）
         hdr: d.hdr || '',
         bit_depth: d.bit_depth || '',
         source_type: d.source_type || '',
