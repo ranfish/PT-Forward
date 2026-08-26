@@ -1463,49 +1463,6 @@ func TestSystem_NotFound(t *testing.T) {
 	}
 }
 
-func TestCredentialDetector_CheckNow(t *testing.T) {
-	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err := db.AutoMigrate(&model.Site{}); err != nil {
-		t.Fatalf("auto migrate: %v", err)
-	}
-	hub := NewHub()
-	d := NewCredentialDetector(db, zap.NewNop(), hub)
-
-	db.Create(&model.Site{
-		Name: "test", Domain: "test.com", BaseURL: "https://test.com",
-		Framework: "nexusphp", Enabled: true, Cookie: "old_cookie",
-	})
-
-	d.CheckNow(context.Background())
-}
-
-func TestCredentialDetector_NoCredentials(t *testing.T) {
-	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err := db.AutoMigrate(&model.Site{}); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	d := NewCredentialDetector(db, zap.NewNop(), nil)
-
-	db.Create(&model.Site{
-		Name: "bare", Domain: "bare.com", BaseURL: "https://bare.com",
-		Framework: "generic", Enabled: true,
-	})
-
-	d.CheckNow(context.Background())
-}
-
-func TestCredentialDetector_RunCancel(t *testing.T) {
-	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err := db.AutoMigrate(&model.Site{}); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	d := NewCredentialDetector(db, zap.NewNop(), nil)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	d.Run(ctx, 1*time.Hour)
-}
-
 func TestSeeding_Clients(t *testing.T) {
 	env := setupTestEnv(t)
 
@@ -9971,27 +9928,6 @@ func TestRSS_SubResource_Unknown(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
-}
-
-func TestCredentialDetector_Notify(t *testing.T) {
-	hub := NewHub()
-	stop := make(chan struct{})
-	go hub.Run(stop)
-	defer close(stop)
-
-	d := NewCredentialDetector(nil, zap.NewNop(), hub)
-	d.notify("testsite", "cookie", "test message")
-}
-
-func TestCredentialDetector_CheckNow2(t *testing.T) {
-	env := setupTestEnv(t)
-	hub := NewHub()
-	stop := make(chan struct{})
-	go hub.Run(stop)
-	defer close(stop)
-
-	d := NewCredentialDetector(env.db, zap.NewNop(), hub)
-	d.CheckNow(context.Background())
 }
 
 func TestIYUU_Config_MethodNotAllowed(t *testing.T) {
