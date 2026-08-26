@@ -257,9 +257,8 @@ func TestInferLangAudioCompletion(t *testing.T) {
 		{"副标题日语", TagInput{Subtitle: "日语 中字"}, "japanese_audio"},
 		{"MI Japanese", TagInput{MediaInfo: "Audio #1\nLanguage : Japanese"}, "japanese_audio"},
 		{"副标题韩语", TagInput{Subtitle: "韩语"}, "korean_audio"},
-		{"MI Title Mandarin 国配注释", TagInput{MediaInfo: "Audio #2\nTitle : Mandarin (央视国配)"}, "dubbed"},
-		{"副标题国配", TagInput{Subtitle: "国语 国配 简繁"}, "dubbed"},
-		{"MI Dub", TagInput{MediaInfo: "Audio #1\nTitle : English Dub"}, "dubbed"},
+		// §59.111: dubbed 已删（0 站消费+语言标签完全吸收: 国配/台配→国语、粤配→粤语）
+		{"MI Title Mandarin 国配注释→国语", TagInput{MediaInfo: "Audio #2\nTitle : Mandarin (央视国配)"}, "chinese_audio"},
 		{"英语字幕不算配音", TagInput{Subtitle: "英字"}, ""},
 	}
 	for _, c := range cases {

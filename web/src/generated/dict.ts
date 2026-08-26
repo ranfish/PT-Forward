@@ -437,11 +437,6 @@ export const TAG_GROUPS: TagGroup[] = [
           "key": "original_audio",
           "label": "原声",
           "aliases": ""
-        },
-        {
-          "key": "dubbed",
-          "label": "配音",
-          "aliases": "Dub"
         }
       ]
     },

@@ -207,16 +207,6 @@
    "standard_key": "tag.original_audio"
   },
   {
-   "canonical": "dubbed",
-   "label": "配音",
-   "aliases": "Dub",
-   "group": "语言音轨",
-   "infer_pattern": "((?:国语?配音|国配|粤配|普通话配音)|(?m:^Title[^\\n]*(?:Mandarin|Cantonese|Dub))|(?:央视|上译|八一)[\\s(]*配音?)",
-   "infer_scope": "all_raw",
-   "note": "§59.109 配音版判据——MI Title 注释 Mandarin(国配)/Cantonese/Dub + Audio 段括号注释(央视国配/台配/上译) + 副标题国配/粤配(148 簇实证 170+ 处); 国配同时证 chinese_audio 与 dubbed(双命中合理)",
-   "standard_key": "tag.dubbed"
-  },
-  {
    "canonical": "special_effects_subs",
    "label": "特效字幕",
    "group": "字幕",
