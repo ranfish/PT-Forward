@@ -267,3 +267,25 @@ func TestMainTitleYearBoundary(t *testing.T) {
 		}
 	}
 }
+
+// §59.97: 年份前置截断——主标题在技术 extractor 之前锁定。
+func TestMainTitleYearAnchor(t *testing.T) {
+	cases := []struct{ title, wantMain, wantYear string }{
+		// 双年份: 片名本身是年份数字(2046) → 取第二年份, 主标题含第一组
+		{"2046.2004.REPACK.2160p.UHD.Blu-ray.REMUX-CMiNEPHiLES", "2046", "2004"},
+		// 单年份标准形态
+		{"Movie.Name.2024.1080p.BluRay.x264-GROUP", "Movie Name", "2024"},
+		// 年份后未知 token 不进主标题
+		{"Arco.2025.BluRay.1080p.REPACK2.MNHD-FRDS", "Arco", "2025"},
+		// 片名含年份数字但后无技术 token → 不截断(整串是主标题候选)
+		{"Blade.Runner.2049.Alone", "Blade Runner 2049 Alone", ""},
+		// 无年份 fallback(逐词法+组段剥除)
+		{"Saki.S01-S03.BluRay.1080p.Hi10P.x264.FLAC.2.0-VCB-Studio", "Saki", ""},
+	}
+	for _, c := range cases {
+		got := ParseTitle(c.title)
+		if got.MainTitle != c.wantMain || got.Year != c.wantYear {
+			t.Errorf("%q:\n  Main=%q want %q | Year=%q want %q", c.title, got.MainTitle, c.wantMain, got.Year, c.wantYear)
+		}
+	}
+}
