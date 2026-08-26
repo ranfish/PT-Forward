@@ -2360,7 +2360,7 @@ fetched:
 			domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(finalMeta.DetailSourceJSON)
 			profile := titleparser.BuildTechProfile(finalMeta.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 			// §59.77: 评论音轨扣减（v1.05 不计入——副标题声明提取）
-			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, finalMeta.Subtitle)
+			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, finalMeta.Subtitle, miForProfile)
 			components := titleparser.TechProfileToComponents(profile)
 			category := titleparser.InferCategory(components, finalMeta.SourceCategory, "", "")
 
@@ -3521,7 +3521,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"audio_codec":    pickNonEmpty(updated.AudioCodec, profile.AudioCodec),
 		"audio_channels": pickNonEmpty(updated.AudioChannels, profile.AudioChannels),
 		"audio_tech":     pickNonEmpty(updated.AudioTech, profile.AudioTechnology),
-		"audio_tracks":   pickNonZero(updated.AudioTracks, titleparser.AdjustCommentaryTracks(profile.AudioTracks, updated.Subtitle)),
+		"audio_tracks":   pickNonZero(updated.AudioTracks, titleparser.AdjustCommentaryTracks(profile.AudioTracks, updated.Subtitle, miForProfile)),
 		"source_type":    pickNonEmpty(updated.SourceType, profile.SourceType),
 		"specification":  pickNonEmpty(updated.Specification, profile.Specification),
 		"source_platform": pickNonEmpty(updated.SourcePlatform, profile.SourcePlatform),
