@@ -49,7 +49,7 @@
 
 **支线插曲（v0.0.642-643）**：compliance 关键词层防误伤（§56.2x 修正）——"The Pornographers" 被 "Porn" 子串误标系统禁转；修复 = ASCII 关键词词边界匹配（compliance.MatchKeyword 单一入口，checker/reseed/pipeline 三套统一）+ 中文误报排除补实现（成人+教育/高考/大学/学院，设计稿落地）。已知边界：xXx 由 qui 层白名单覆盖、Adult Swim 待案例。
 
-**遗留**：发布页重构（含 tag_config 激活，§56.22，下一步主线）；批量截图并发限流（>20 路挤爆代理，§59.57 观察）；MarkStatus 跨订阅写（§59.17 违反，预存在）；runAnalyze 分级（读 DB 跳过重拉）；integration TestE2E_SeedingFullChain flaky（eng2.Start 竞态，§59.35 P3 记录）。
+**遗留**：发布页重构（含 tag_config 激活，§56.22，下一步主线）；MarkStatus 跨订阅写（§59.17 违反，预存在）；runAnalyze 分级（读 DB 跳过重拉）；integration TestE2E_SeedingFullChain flaky（eng2.Start 竞态，§59.35 P3 记录）。已完结：批量截图并发限流（§59.58 信号量 5 实施，观察期无新问题，2026-08-26 关闭）。
 
 ### ✅ 已完成（v0.0.228 → v0.0.547）
 
