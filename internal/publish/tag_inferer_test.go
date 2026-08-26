@@ -246,3 +246,28 @@ func TestInferLanguageGapTags(t *testing.T) {
 		}
 	}
 }
+
+// §59.109: 语言组判据补齐——日语/韩语/配音（原空 pattern）。
+func TestInferLangAudioCompletion(t *testing.T) {
+	cases := []struct {
+		name string
+		in   TagInput
+		want string
+	}{
+		{"副标题日语", TagInput{Subtitle: "日语 中字"}, "japanese_audio"},
+		{"MI Japanese", TagInput{MediaInfo: "Audio #1\nLanguage : Japanese"}, "japanese_audio"},
+		{"副标题韩语", TagInput{Subtitle: "韩语"}, "korean_audio"},
+		{"MI Title Mandarin 国配注释", TagInput{MediaInfo: "Audio #2\nTitle : Mandarin (央视国配)"}, "dubbed"},
+		{"副标题国配", TagInput{Subtitle: "国语 国配 简繁"}, "dubbed"},
+		{"MI Dub", TagInput{MediaInfo: "Audio #1\nTitle : English Dub"}, "dubbed"},
+		{"英语字幕不算配音", TagInput{Subtitle: "英字"}, ""},
+	}
+	for _, c := range cases {
+		got := NewMediaTagInferer().InferFull(c.in)
+		found := false
+		for _, g := range got { if g == c.want { found = true } }
+		if found != (c.want != "") {
+			t.Errorf("%s: want %q found=%v got=%v", c.name, c.want, found, got)
+		}
+	}
+}

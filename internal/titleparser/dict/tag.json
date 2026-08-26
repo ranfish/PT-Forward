@@ -178,13 +178,19 @@
    "canonical": "japanese_audio",
    "label": "日语",
    "aliases": "原声",
-   "group": "语言音轨"
+   "group": "语言音轨",
+   "infer_pattern": "(日语|日配|(?s)Audio #?\\d+[^\\n]*(?:\\n[^\\n#]*){0,6}?Japanese)",
+   "infer_scope": "all_raw",
+   "note": "§59.109 语言组判据补齐(原空 pattern 不可推导); MI Audio Japanese/副标题日语"
   },
   {
    "canonical": "korean_audio",
    "label": "韩语",
    "aliases": "",
-   "group": "语言音轨"
+   "group": "语言音轨",
+   "infer_pattern": "(韩语|韩配|(?s)Audio #?\\d+[^\\n]*(?:\\n[^\\n#]*){0,6}?Korean)",
+   "infer_scope": "all_raw",
+   "note": "§59.109 同构"
   },
   {
    "canonical": "original_audio",
@@ -196,7 +202,10 @@
    "canonical": "dubbed",
    "label": "配音",
    "aliases": "Dub",
-   "group": "语言音轨"
+   "group": "语言音轨",
+   "infer_pattern": "((?:国语?配音|国配|粤配|普通话配音)|(?m:^Title[^\\n]*(?:Mandarin|Cantonese|Dub))|(?:央视|上译|八一)[\\s(]*配音?)",
+   "infer_scope": "all_raw",
+   "note": "§59.109 配音版判据——MI Title 注释 Mandarin(国配)/Cantonese/Dub + Audio 段括号注释(央视国配/台配/上译) + 副标题国配/粤配(148 簇实证 170+ 处); 国配同时证 chinese_audio 与 dubbed(双命中合理)"
   },
   {
    "canonical": "special_effects_subs",
