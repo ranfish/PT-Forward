@@ -5,6 +5,7 @@
 package publish
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -48,11 +49,16 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 		NFO:         in.NFO,
 		Statement:   in.Statement,
 	})
-	// §59.69: 高码/高帧数值判据（regex 表达不了阈值比较，代码层判定）。
-	// 高码: MI Overall bit rate(General 段,用户定案) ≥15Mb/s@宽度≥4K / ≥9Mb/s@宽度<4K
-	// 高帧: MI Frame rate ≥60（59.940 NTSC 不算）
-	// 仅视频类种子（无 Video 段解析不到宽度/帧率，自然不命中）
-	hasHB, hasHF := inferNumericSpecTags(in.MediaInfo)
+	// §59.117: MI 层查询（MISections 统一信息源）——语言信号从 Audios 层
+	// Language/Title 字段直证（跨行 regex 补丁废除）; 数值判据层内化
+	//（General["overall bit rate"] / Videos[0]["width"/"frame rate"]）。
+	miSec := titleparser.ParseMISections(in.MediaInfo)
+	for _, lt := range inferLanguageFromMIAudios(miSec) {
+		if !containsStr(tags, lt) {
+			tags = append(tags, lt)
+		}
+	}
+	hasHB, hasHF := inferNumericSpecTagsSections(miSec)
 	// §59.70: 高分——豆瓣评分 ≥8.0（Description 源——PTGen 简介行，
 	// "◎豆瓣评分　8.2/10"；无评分/暂无评分不命中）
 	hasHR := parseDoubanRatingScore(in.Description) >= 8.0
@@ -91,6 +97,132 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 		}
 	}
 	return ApplyTagRules(dedupTags(tags))
+}
+
+// containsStr 小工具。
+func containsStr(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
+// inferLanguageFromMIAudios §59.117: MI Audios 层语言判据——Language 字段直证
+//（层内无跨行歧义; Title 行语义标识如"台配/央视国配"由文案层 pattern 承载）。
+func inferLanguageFromMIAudios(s titleparser.MISections) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(k string) {
+		if !seen[k] {
+			seen[k] = true
+			out = append(out, k)
+		}
+	}
+	for _, a := range s.Audios {
+		lang := strings.ToLower(a["language"])
+		title := strings.ToLower(a["title"])
+		// Language 字段直证 + Title 行语义标识（"Mandarin (台配)"/"Cantonese"——
+		// §59.113 案例库: 幽灵公主 Title: Cantonese 的直证通道）
+		switch {
+		case strings.Contains(lang, "cantonese") || strings.Contains(title, "cantonese"):
+			add("cantonese_audio")
+		case strings.Contains(lang, "chinese") || strings.Contains(lang, "mandarin") ||
+			strings.Contains(title, "mandarin"):
+			add("chinese_audio")
+		}
+		if strings.Contains(lang, "japanese") {
+			add("japanese_audio")
+		}
+		if strings.Contains(lang, "korean") {
+			add("korean_audio")
+		}
+		if strings.Contains(lang, "english") || strings.Contains(title, "english") {
+			add("english_audio")
+		}
+	}
+	return out
+}
+
+// inferNumericSpecTagsSections §59.117: 数值判据层内化。
+func inferNumericSpecTagsSections(s titleparser.MISections) (highBitrate, highFrameRate bool) {
+	if len(s.Videos) == 0 {
+		return false, false
+	}
+	rate := rateValueMbps(s.General["overall bit rate"])
+	width := parseMIIntStr(s.Videos[0]["width"])
+	fps := fpsValue(s.Videos[0]["frame rate"])
+	if rate > 0 && width > 0 {
+		if width >= 3840 {
+			highBitrate = rate >= 15
+		} else {
+			highBitrate = rate >= 9
+		}
+	}
+	if fps >= 60 {
+		highFrameRate = true
+	}
+	return highBitrate, highFrameRate
+}
+
+// rateValueMbps §59.117: 字段值（"15.2 Mb/s"/"9 500 kb/s"）→ Mb/s 归一。
+func rateValueMbps(v string) float64 {
+	v = strings.TrimSpace(v)
+	lower := strings.ToLower(v)
+	numEnd := 0
+	var numStr string
+	for i, c := range lower {
+		if (c >= '0' && c <= '9') || c == '.' || c == ' ' {
+			numEnd = i + 1
+		} else {
+			break
+		}
+	}
+	numStr = strings.ReplaceAll(v[:numEnd], " ", "")
+	var n float64
+	fmtSscanf(numStr, "%f", &n)
+	switch {
+	case strings.Contains(lower, "gb/s"):
+		return n * 1000
+	case strings.Contains(lower, "kb/s"):
+		return n / 1000
+	default:
+		return n
+	}
+}
+
+// fpsValue §59.117: 字段值（"60.000 FPS"/"23.976 FPS"）→ float。
+func fpsValue(v string) float64 {
+	numEnd := 0
+	for i, c := range v {
+		if (c >= '0' && c <= '9') || c == '.' {
+			numEnd = i + 1
+		} else {
+			break
+		}
+	}
+	var n float64
+	fmtSscanf(v[:numEnd], "%f", &n)
+	return n
+}
+
+func fmtSscanf(s string, format string, args ...interface{}) {
+	_, _ = fmt.Sscanf(s, format, args...)
+}
+
+func parseMIIntStr(s string) int {
+	var n int
+	digit := false
+	for _, c := range strings.ReplaceAll(s, " ", "") {
+		if c >= '0' && c <= '9' {
+			n = n*10 + int(c-'0')
+			digit = true
+		} else if digit {
+			break
+		}
+	}
+	return n
 }
 
 // inferNumericSpecTags §59.69: 从 MI 文本解析码率/宽度/帧率做阈值判定。

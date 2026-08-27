@@ -126,8 +126,8 @@
    "label": "国语",
    "aliases": "普通话/国配",
    "group": "语言音轨",
-   "infer_pattern": "([^多]国.{0,3}语|国.{0,3}配|台.{0,3}语|台.{0,3}配|(Audio[^\\n]*Chinese)|(Audio[^\\n]*mandarin)|(?m)^Title\\s*:.*Mandarin)",
-   "infer_scope": "all_raw",
+   "infer_pattern": "([^多]国.{0,3}语|国.{0,3}配|台.{0,3}语|台.{0,3}配)",
+   "infer_scope": "title_raw",
    "infer_exclude": "国家",
    "infer_pattern2": "◎语.*?言　汉语普通话",
    "infer_scope2": "desc_raw",
@@ -137,22 +137,22 @@
     "国语配音",
     "中配"
    ],
-   "note": "§59.113: MI Title Mandarin (台配/央视国配) 行直证追加"
+   "note": "§59.117: MI 信号移 InferFull 层查询(MISections.Audios language/title)——Mandarin/Chinese 跨行 regex 补丁废除"
   },
   {
    "canonical": "cantonese_audio",
    "label": "粤语",
    "aliases": "",
    "group": "语言音轨",
-   "infer_pattern": "(粤.{0,3}语|粤.{0,3}配|(?m)^(?:Title|Language)\\s*:.*Cantonese|[国台日英韩]粤|粤[国台日英韩])",
-   "infer_scope": "all_raw",
+   "infer_pattern": "(粤.{0,3}语|粤.{0,3}配|[国台日英韩]粤|粤[国台日英韩])",
+   "infer_scope": "title_raw",
    "infer_pattern2": "◎语.*?言　粤语",
    "infer_scope2": "desc_raw",
    "standard_key": "tag.cantonese_audio",
    "variants": [
     "粤语"
    ],
-   "note": "§59.113: MI Title/Language 行 Cantonese 跨行直证(幽灵公主实锤); 单字粤=枚举串形态(与国/台/日/英/韩相邻)"
+   "note": "§59.117: MI Cantonese 移层查询"
   },
   {
    "canonical": "english_audio",
@@ -163,9 +163,9 @@
     "英语",
     "英配"
    ],
-   "infer_pattern": "(\\bEnglish\\b|英语|英配音轨)",
-   "infer_scope": "all_raw",
-   "note": "§59.105 语言族补缺(站点侧英语 2 站); '英字幕/英字'词形不命中(无歧义); MI Audio English 由 scope=all 扫 MI 文本"
+   "infer_pattern": "英语|英配音轨",
+   "infer_scope": "title_raw",
+   "note": "§59.117: MI English 移层查询"
   },
   {
    "canonical": "bilingual_audio",
@@ -186,9 +186,9 @@
    "label": "日语",
    "aliases": "原声",
    "group": "语言音轨",
-   "infer_pattern": "(日语|日配|(?s)Audio #?\\d+[^\\n]*(?:\\n[^\\n#]*){0,6}?Japanese)",
-   "infer_scope": "all_raw",
-   "note": "§59.109 语言组判据补齐(原空 pattern 不可推导); MI Audio Japanese/副标题日语",
+   "infer_pattern": "(日语|日配)",
+   "infer_scope": "title_raw",
+   "note": "§59.117: MI Japanese 移层查询",
    "standard_key": "tag.japanese_audio"
   },
   {
@@ -196,9 +196,9 @@
    "label": "韩语",
    "aliases": "",
    "group": "语言音轨",
-   "infer_pattern": "(韩语|韩配|(?s)Audio #?\\d+[^\\n]*(?:\\n[^\\n#]*){0,6}?Korean)",
-   "infer_scope": "all_raw",
-   "note": "§59.109 同构",
+   "infer_pattern": "(韩语|韩配)",
+   "infer_scope": "title_raw",
+   "note": "§59.117: MI Korean 移层查询",
    "standard_key": "tag.korean_audio"
   },
   {

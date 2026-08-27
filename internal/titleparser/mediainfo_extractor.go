@@ -80,6 +80,74 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 //
 // 段标题是不含 ":" 的独立行（Video / Audio #1 / Audio #2 / General / Text / Menu）。
 // 只保留 video 和 audio 段（其他段忽略）。
+// MISections §59.117: MI 五层结构化（General/Video/Audio/Text/Menu）——
+// 统一信息源：所有 MI 信息采集从各自层进行，消灭全文 regex（跨行补丁式
+// 判据的根除——§59.109/113 语言判据、§59.116 评论字幕误扣的治本层）。
+type MISections struct {
+	General map[string]string
+	Videos  []map[string]string
+	Audios  []map[string]string
+	Texts   []map[string]string
+	Menus   []map[string]string
+}
+
+// ParseMISections 解析 MI 纯文本为五层结构。非标文本返回空结构（不 error——
+// 消费方 fallback 全文 regex）。字段 key 小写、首值优先（与 parseMIStreams 一致）。
+func ParseMISections(text string) MISections {
+	var s MISections
+	var cur *map[string]string
+	var curList *[]map[string]string
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if !strings.Contains(line, ":") {
+			upper := strings.ToUpper(line)
+			switch {
+			case strings.HasPrefix(upper, "GENERAL"):
+				s.General = map[string]string{}
+				cur, curList = &s.General, nil
+			case strings.HasPrefix(upper, "VIDEO"):
+				s.Videos = append(s.Videos, map[string]string{})
+				cur, curList = nil, &s.Videos
+			case strings.HasPrefix(upper, "AUDIO"):
+				s.Audios = append(s.Audios, map[string]string{})
+				cur, curList = nil, &s.Audios
+			case strings.HasPrefix(upper, "TEXT"):
+				s.Texts = append(s.Texts, map[string]string{})
+				cur, curList = nil, &s.Texts
+			case strings.HasPrefix(upper, "MENU"):
+				s.Menus = append(s.Menus, map[string]string{})
+				cur, curList = nil, &s.Menus
+			default:
+				cur, curList = nil, nil
+			}
+			continue
+		}
+		var target map[string]string
+		if cur != nil {
+			target = *cur
+		} else if curList != nil && len(*curList) > 0 {
+			target = (*curList)[len(*curList)-1]
+		}
+		if target == nil {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(parts[0]))
+		val := strings.TrimSpace(parts[1])
+		if _, exists := target[key]; !exists {
+			target[key] = val
+		}
+		// 回写（slice 元素是值——map 头本身共享, 无需回写; cur 指针同理）
+	}
+	return s
+}
+
 func parseMIStreams(text string) []miStream {
 	var streams []miStream
 	curIdx := -1
