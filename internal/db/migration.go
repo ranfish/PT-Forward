@@ -253,6 +253,40 @@ func init() {
 		return nil
 	})
 	// §59.63: 簇截图链接缓存表（观察期复用——清簇重取免重截重传）
+	// §59.123: 站点别名域名补齐随版本同步（§59.60 O3 曾只在 29 手工 UPDATE——
+	// 10 站 tracker_domains/alternative_domains 补实测别名; 243 实测 9/10 缺）
+	RegisterMigration(24, "site_alias_domains_sync", func(gormDB *gorm.DB) error {
+		type aliasRow struct {
+			Site string
+			Add  string // 追加到 alternative_domains（若主域未含）
+		}
+		aliases := []aliasRow{
+			{"不可说", "hdcmct.org"}, {"猫", "pterclub.com"}, {"青蛙", "qingwapt.org"},
+			{"憨憨", "hhanclub.top"}, {"13城", "13city.online"}, {"柠檬不甜", "lemonhd.club"},
+			{"HDVideo", "hdvideo.one"}, {"莫妮卡", "mua.xloli.cc"}, {"拾刻", "ptskit.org"},
+			{"萝莉", "azusa.wiki"},
+		}
+		for _, a := range aliases {
+			var site model.Site
+			if err := gormDB.Where("name = ?", a.Site).First(&site).Error; err != nil {
+				continue // 站未配置——跳过（不杜撰站点）
+			}
+			// 已含（主域或别名任一）则跳过——幂等
+			if strings.Contains(site.TrackerDomains, a.Add) || strings.Contains(site.AlternativeDomains, a.Add) {
+				continue
+			}
+			extra := site.AlternativeDomains
+			if extra != "" && !strings.HasSuffix(extra, ",") {
+				extra += ","
+			}
+			extra += a.Add
+			if err := gormDB.Model(&model.Site{}).Where("id = ?", site.ID).
+				Update("alternative_domains", extra).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	RegisterMigration(23, "seeding_cleanup_thresholds", func(gormDB *gorm.DB) error {
 		// §59.122: 评分清理阈值配置化（原硬编码 0.3/48h）
 		var hasCol int64
