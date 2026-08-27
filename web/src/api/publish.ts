@@ -243,6 +243,9 @@ export interface SeedListItem {
   fetched_at?: string
   fetched?: boolean
   status: string // forbidden / system_forbidden / no_mapping / reviewed / pending / incomplete / unfetched
+  // §59.131 ②: 簇口径增量字段（发布页一种多站）
+  copy_count?: number
+  sites?: string[]
 }
 
 export interface SeedDetail {
@@ -306,7 +309,7 @@ export const seedConfigApi = {
   purgeObserving(clientId: string, name: string) {
     return client.post<ApiResponse<{ message: string; deleted_snaps: number; deleted_metas: number }>>('/publish/seeds/observing/purge', { clientId, name })
   },
-  listSeeds(params: { client_id?: string; save_path?: string; status?: string; search?: string; page?: number; page_size?: number }) {
+  listSeeds(params: { client_id?: string; save_path?: string; status?: string; search?: string; ready?: string; page?: number; page_size?: number }) {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params })
   },
   uniquePaths() {

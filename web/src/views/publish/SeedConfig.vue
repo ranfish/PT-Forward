@@ -230,12 +230,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { PlusOutlined, ReloadOutlined, FilterOutlined, ClearOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
 import { formatBytes } from '@/utils/format'
 import { seedConfigApi, type SeedListItem } from '@/api/publish'
+
+const route = useRoute()
+const router = useRouter()
 
 // ==================== 筛选状态（§59.29：挂载即查，筛选弹层选路径） ====================
 
@@ -591,15 +595,52 @@ function onBatchFetchCompleted() {
 
 // ==================== 初始化 ====================
 
-onMounted(() => {
+// §59.131 ②: deep-link（发布页引导跳回）——/publish/seeds?client_id&save_path&name&focus=1
+// 自动应用筛选+定位+打开编辑（R3-1 定案）。处理后清 query 防刷新重复触发。
+let deeplinkSkipSearch = false
+
+onMounted(async () => {
   loadPersistedFilters()
   fetchClientPaths()
+  const q = route.query
+  if (q.client_id || q.save_path || q.name) {
+    if (q.client_id) {
+      filterClient.value = String(q.client_id)
+      tempClient.value = filterClient.value
+    }
+    if (q.save_path) {
+      filterPath.value = String(q.save_path)
+      tempPath.value = filterPath.value
+    }
+    if (q.name) {
+      deeplinkSkipSearch = true
+      searchText.value = String(q.name)
+    }
+    currentPage.value = 1
+    persistFilters()
+    await fetchList()
+    if (q.focus === '1') {
+      const row = tableData.value.find(it => it.name === String(q.name))
+      if (row) {
+        openEdit(row)
+      } else {
+        message.info('未定位到对应种子行，请手动查找')
+      }
+    }
+    router.replace({ query: {} })
+    return
+  }
   fetchList()
 })
 
 // 搜索防抖（输入停顿后自动查）
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(searchText, () => {
+  // deep-link 挂载期赋值不触发防抖查询（onMounted 已显式 fetchList）
+  if (deeplinkSkipSearch) {
+    deeplinkSkipSearch = false
+    return
+  }
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => onFilterChange(), 400)
 })
