@@ -947,7 +947,8 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 					Leechers:        ev.Leechers,
 				})
 				}
-				e.repo.MarkStatus(ctx, ev.SiteName, ev.TorrentID, "seen")
+				// §59.120: 订阅隔离打勾（sub 上下文——原跨订阅污染 B seen 行）
+				e.repo.MarkStatus(ctx, uintToString(sub.ID), ev.SiteName, ev.TorrentID, "seen")
 			}
 		} else if len(torrentEvents) > 0 && e.dispatcher != nil {
 			if err := e.dispatcher.Dispatch(ctx, "rss_new", torrentEvents); err != nil {
