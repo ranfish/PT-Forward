@@ -292,3 +292,31 @@ func TestListSeenBySubscription(t *testing.T) {
 		t.Error("subscription isolation broken")
 	}
 }
+
+// §59.120: MarkStatus 订阅隔离——A 订阅打勾不得污染 B 订阅的 seen 行
+//（§59.17 每订阅独立语义的漏改残留，§59.33 审计 #9）。
+func TestMarkStatusSubscriptionIsolation(t *testing.T) {
+	db := setupRepoTestDB(t)
+	r := NewRepository(db)
+	ctx := context.Background()
+	// 两订阅同站同 tid（Status 模型默认 'seen'——先置区分性初始值 pending）
+	db.Create(&model.RSSTorrentSeen{SiteName: "testsit", TorrentID: "501", SubscriptionID: "subA", Title: "t", Status: "pending"})
+	db.Create(&model.RSSTorrentSeen{SiteName: "testsit", TorrentID: "501", SubscriptionID: "subB", Title: "t", Status: "pending"})
+
+	r.MarkStatus(ctx, "subA", "testsit", "501", "seen")
+
+	var bStatus string
+	db.Model(&model.RSSTorrentSeen{}).
+		Where("site_name = ? AND torrent_id = ? AND subscription_id = ?", "testsit", "501", "subB").
+		Pluck("status", &bStatus)
+	if bStatus != "pending" {
+		t.Errorf("B 订阅被 A 污染: status=%q（应保持 pending）", bStatus)
+	}
+	var aStatus string
+	db.Model(&model.RSSTorrentSeen{}).
+		Where("site_name = ? AND torrent_id = ? AND subscription_id = ?", "testsit", "501", "subA").
+		Pluck("status", &aStatus)
+	if aStatus != "seen" {
+		t.Errorf("A 订阅应已 seen: %q", aStatus)
+	}
+}

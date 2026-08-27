@@ -113,10 +113,13 @@ func (r *Repository) CleanupOldSeen(ctx context.Context, retentionDays int) (int
 	return result.RowsAffected, result.Error
 }
 
-func (r *Repository) MarkStatus(ctx context.Context, siteName, torrentID, status string) {
+// MarkStatus §59.120: 订阅隔离——按 (site, tid, subscription_id) 精确更新。
+// §59.17 每订阅独立语义的漏改残留（§59.33 审计 #9）：原 WHERE 缺 subscription_id，
+// 订阅 A 打 seen 会污染同站同 tid 的订阅 B 的 seen 行 → B 永远静默丢种。
+func (r *Repository) MarkStatus(ctx context.Context, subscriptionID, siteName, torrentID, status string) {
 	r.db.WithContext(ctx).
 		Model(&model.RSSTorrentSeen{}).
-		Where("site_name = ? AND torrent_id = ?", siteName, torrentID).
+		Where("site_name = ? AND torrent_id = ? AND subscription_id = ?", siteName, torrentID, subscriptionID).
 		Update("status", status)
 }
 

@@ -507,7 +507,7 @@ func TestEngine_FetchOnce_HappyPath(t *testing.T) {
 	require.False(t, isSeen, "status=seen should not be considered seen yet")
 
 	// Simulate pushed status
-	eng.repo.MarkStatus(context.Background(), "testsit", "501", "pushed")
+	eng.repo.MarkStatus(context.Background(), "1", "testsit", "501", "pushed")
 	isSeen2, err := eng.repo.IsSeen(context.Background(), "testsit", "501", "1")
 	require.NoError(t, err)
 	require.True(t, isSeen2, "status=pushed should be considered seen")
