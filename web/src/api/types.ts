@@ -83,6 +83,8 @@ export interface SeedingClientConfig {
   active_time_windows: string
   ema_alpha: number
   cleanup_score_weights: string
+  cleanup_min_score: number // §59.122: 评分清理低分阈值(0=默认0.3)
+  cleanup_min_age_hours: number // §59.122: 种龄保护小时(0=默认48)
   archive_granularity: string
   reannounce_before: boolean
   reannounce_retries: number

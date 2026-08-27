@@ -235,6 +235,23 @@
                 </a-form-item>
               </a-col>
             </a-row>
+            <a-row :gutter="12">
+              <a-col :span="8">
+                <a-form-item label="低分阈值">
+                  <a-input-number v-model:value="configForm.cleanupMinScore" :min="0" :max="1" :step="0.05" style="width: 100%" placeholder="默认 0.3" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="种龄保护(小时)">
+                  <a-input-number v-model:value="configForm.cleanupMinAgeHours" :min="0" :max="720" :step="1" style="width: 100%" placeholder="默认 48" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="评分清理">
+                  <a-switch v-model:checked="scoreCleanupEnabled" checked-children="开" un-checked-children="关" disabled />
+                </a-form-item>
+              </a-col>
+            </a-row>
             <a-form-item label="清理评分权重(JSON)">
               <a-textarea v-model:value="configForm.cleanupScoreWeights" :rows="2" placeholder="JSON: seed_time, ratio, ..." />
             </a-form-item>
@@ -301,9 +318,11 @@ const deleteRuleMap = computed(() => {
 
 const configModalVisible = ref(false)
 const configSubmitting = ref(false)
+const scoreCleanupEnabled = computed(() => configForm.role !== 'download')
 const editingConfig = ref<SeedingClientConfig | null>(null)
 const configForm = reactive({
   clientId: '',
+  role: 'seeding' as string,
   enabled: true,
   autoDeleteCron: '*/30 * * * *',
   mainDataCron: '*/10 * * * *',
@@ -325,6 +344,8 @@ const configForm = reactive({
   activeTimeWindows: '',
   emaAlpha: 0.1,
   cleanupScoreWeights: '',
+  cleanupMinScore: 0,
+  cleanupMinAgeHours: 0,
   archiveGranularity: 'daily',
 })
 
@@ -401,6 +422,9 @@ function openConfigModal(record?: SeedingClientConfig) {
       spaceAlarmGb: record.space_alarm_gb ?? 10,
       minDiskSpacePercent: record.min_disk_space_percent ?? 0,
       scope: record.scope || 'managed',
+      role: record.role || 'seeding',
+      cleanupMinScore: record.cleanup_min_score ?? 0,
+      cleanupMinAgeHours: record.cleanup_min_age_hours ?? 0,
       preFilterEnabled: record.pre_filter_enabled ?? true,
       enhancementBatchSize: record.enhancement_batch_size ?? 20,
       enhancementCacheTtl: record.enhancement_cache_ttl ?? 600,
@@ -427,12 +451,15 @@ function openConfigModal(record?: SeedingClientConfig) {
       spaceAlarmGb: 10,
       minDiskSpacePercent: 0,
       scope: 'managed',
+      role: 'seeding' as string,
       preFilterEnabled: true,
       enhancementBatchSize: 20,
       enhancementCacheTtl: 600,
       activeTimeWindows: '',
       emaAlpha: 0.1,
       cleanupScoreWeights: '',
+      cleanupMinScore: 0,
+      cleanupMinAgeHours: 0,
       archiveGranularity: 'daily',
     })
   }

@@ -265,6 +265,8 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		ActiveTimeWindows        string  `json:"activeTimeWindows"`
 		EmaAlpha                 float64 `json:"emaAlpha"`
 		CleanupScoreWeights      string  `json:"cleanupScoreWeights"`
+		CleanupMinScore          float64 `json:"cleanupMinScore"`     // §59.122: 评分清理阈值(0=默认0.3)
+		CleanupMinAgeHours       float64 `json:"cleanupMinAgeHours"`  // §59.122: (0=默认48h)
 		ArchiveGranularity       string  `json:"archiveGranularity"`
 		RejectRuleIDs            string  `json:"rejectRuleIds"`
 		ReannounceBefore         bool    `json:"reannounceBefore"`
@@ -323,6 +325,8 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		ActiveTimeWindows:        req.ActiveTimeWindows,
 		EmaAlpha:                 req.EmaAlpha,
 		CleanupScoreWeights:      req.CleanupScoreWeights,
+		CleanupMinScore:          req.CleanupMinScore,
+		CleanupMinAgeHours:       req.CleanupMinAgeHours,
 		ArchiveGranularity:       req.ArchiveGranularity,
 		RejectRuleIDs:            req.RejectRuleIDs,
 		ReannounceBefore:         req.ReannounceBefore,
@@ -428,6 +432,12 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 	}
 	if v, ok := req["cleanupScoreWeights"]; ok {
 		updates["cleanup_score_weights"] = v
+	}
+	if v, ok := req["cleanupMinScore"]; ok {
+		updates["cleanup_min_score"] = v
+	}
+	if v, ok := req["cleanupMinAgeHours"]; ok {
+		updates["cleanup_min_age_hours"] = v
 	}
 	if v, ok := req["archiveGranularity"]; ok {
 		updates["archive_granularity"] = v

@@ -253,6 +253,20 @@ func init() {
 		return nil
 	})
 	// §59.63: 簇截图链接缓存表（观察期复用——清簇重取免重截重传）
+	RegisterMigration(23, "seeding_cleanup_thresholds", func(gormDB *gorm.DB) error {
+		// §59.122: 评分清理阈值配置化（原硬编码 0.3/48h）
+		var hasCol int64
+		gormDB.Raw("SELECT COUNT(*) FROM pragma_table_info('seeding_client_configs') WHERE name='cleanup_min_score'").Scan(&hasCol)
+		if hasCol == 0 {
+			if err := gormDB.Exec("ALTER TABLE seeding_client_configs ADD COLUMN cleanup_min_score real DEFAULT 0").Error; err != nil {
+				return err
+			}
+			if err := gormDB.Exec("ALTER TABLE seeding_client_configs ADD COLUMN cleanup_min_age_hours real DEFAULT 0").Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	RegisterMigration(22, "metadata_add_audio_tracks", func(gormDB *gorm.DB) error {
 		var hasCol int64
 		gormDB.Raw("SELECT COUNT(*) FROM pragma_table_info('torrent_metadata') WHERE name='audio_tracks'").Scan(&hasCol)
