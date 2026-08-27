@@ -19,7 +19,10 @@ import (
 
 func setupSeedingE2EDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	// §59.122: 每测试独立内存库（count>1/同包并行时 shared cache 撞 UNIQUE——
+	// "sites.domain" 污染即本例, 原 flaky 真因; unique named db 每次全新）
+	dbName := fmt.Sprintf("file:e2e_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{})
 	require.NoError(t, err, "open in-memory db")
 	err = db.AutoMigrate(
 		&model.SeedingTorrentRecord{},
@@ -179,14 +182,37 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 	}
 	require.NoError(t, eng.OnTorrents(ctx, events))
 
+	// §59.122: OnTorrents 同步建 record——轮询等落库（count=N 首跑偶发
+	// 0.02s 即挂 = 事件处理链内异步分支未完成, First 立即查空）
 	var rec model.SeedingTorrentRecord
-	require.NoError(t, db.Where("info_hash = ?", "e2e_hash_001").First(&rec).Error)
+	var recErr error
+	for i := 0; i < 50; i++ {
+		recErr = db.Where("info_hash = ?", "e2e_hash_001").First(&rec).Error
+		if recErr == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	require.NoError(t, recErr)
 	assert.Equal(t, "1001", rec.TorrentID)
 	assert.True(t, rec.IsFree)
 	assert.Equal(t, model.SeedingStatusPending, rec.Status)
 	t.Logf("Phase 1 PASS: record created id=%d torrent=%s isFree=%v status=%s", rec.ID, rec.TorrentID, rec.IsFree, rec.Status)
 
 	t.Log("=== Phase 2: Flush ===")
+	// §59.122: 推下载器经 consumeLoop 30s ticker 批处理（OnTorrents 只建 record;
+	// AddFromFile 由 scoreAndPush 调用）——ticker 无法加速, 改为 Drain 语义验证:
+	// 事件已在 pendingEvents 队列, 轮询 DB 等 record 由 pending 翻转（AddFromFile
+	// 完成的标志）。40s 上限覆盖一个完整 ticker 周期。
+	for i := 0; i < 400; i++ {
+		var st string
+		db.Model(&model.SeedingTorrentRecord{}).
+			Where("info_hash = ?", "e2e_hash_001").Pluck("status", &st)
+		if st != string(model.SeedingStatusPending) && st != "" {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	candidates, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID))
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(candidates), "Flush should return 1 candidate")
@@ -194,8 +220,18 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 	t.Logf("Phase 2 PASS: candidates=%d addCalls=%d", len(candidates), atomic.LoadInt64(&addCalls))
 
 	t.Log("=== Phase 3: Evaluate (young torrent, no deletion) ===")
-	evalResult, err := eng.Evaluate(ctx, "seeding-e2e-client", nil)
-	require.NoError(t, err)
+	// §59.122: OnTorrents 事件经 consumeLoop 异步建 record——Evaluate 前轮询等
+	// record 就绪（原立即评估偶发 evaluated=0 即此竞态）
+	var evalResult *seeding.EvaluateResult
+	var evalErr error
+	for i := 0; i < 20; i++ {
+		evalResult, evalErr = eng.Evaluate(ctx, "seeding-e2e-client", nil)
+		require.NoError(t, evalErr)
+		if evalResult.Evaluated > 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	assert.Equal(t, 1, evalResult.Evaluated, "should evaluate 1 record")
 	assert.Equal(t, 0, evalResult.Deleted, "young torrent should NOT be deleted")
 	t.Logf("Phase 3 PASS: evaluated=%d deleted=%d", evalResult.Evaluated, evalResult.Deleted)
@@ -224,8 +260,17 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 		}, nil
 	}
 
-	evalResult2, err := eng2.Evaluate(ctx, "seeding-e2e-client", nil)
-	require.NoError(t, err)
+	// §59.122: Start 异步初始化竞态修复——Evaluate 为空时轮询重试
+	//（refreshMaindataLoop 后台协程与立即 Evaluate 并发, cachedMaindata 可能未就绪）
+	var evalResult2 *seeding.EvaluateResult
+	for i := 0; i < 10; i++ {
+		evalResult2, evalErr = eng2.Evaluate(ctx, "seeding-e2e-client", nil)
+		require.NoError(t, evalErr)
+		if evalResult2.Evaluated > 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	assert.Equal(t, 1, evalResult2.Evaluated, "should evaluate 1 record")
 	assert.True(t, evalResult2.Deleted >= 1, "old non-free torrent with low score should be deleted")
 	assert.True(t, atomic.LoadInt64(&deleteCalls) > 0, "DeleteTorrent should be called")

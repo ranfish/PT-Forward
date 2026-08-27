@@ -2678,6 +2678,15 @@ func (e *Engine) applyConfig(cfg *model.SeedingClientConfig, defaultScore float6
 	minScore := defaultScore
 	minAgeHours := defaultAge
 	weights := defaultWeights
+	// §59.122: 阈值配置化——DB 列非零覆盖默认（零值=默认, 兼容存量）
+	if cfg != nil {
+		if cfg.CleanupMinScore > 0 {
+			minScore = cfg.CleanupMinScore
+		}
+		if cfg.CleanupMinAgeHours > 0 {
+			minAgeHours = cfg.CleanupMinAgeHours
+		}
+	}
 
 	if cfg.CleanupScoreWeights != "" {
 		var w model.CleanupScoreWeights

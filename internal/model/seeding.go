@@ -85,6 +85,10 @@ type SeedingClientConfig struct {
 	EmaAlpha float64 `json:"ema_alpha" gorm:"default:0.3"`
 
 	CleanupScoreWeights string `json:"cleanup_score_weights" gorm:"type:text"`
+	// §59.122: 评分清理阈值配置化（原硬编码 0.3/48h 无 DB 列——刷流用户调不了低分线）
+	// 零值 = 用引擎默认（0.3/48h）——兼容存量配置行
+	CleanupMinScore   float64 `json:"cleanup_min_score" gorm:"default:0"`
+	CleanupMinAgeHours float64 `json:"cleanup_min_age_hours" gorm:"default:0"`
 
 	ArchiveGranularity string `json:"archive_granularity" gorm:"size:20;default:'daily'"`
 
