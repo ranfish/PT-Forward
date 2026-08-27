@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -2720,6 +2721,8 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	savePath := r.URL.Query().Get("save_path")
 	statusFilter := r.URL.Query().Get("status")
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
+	// §59.131 ②: ready 过滤——发布页（一种多站）簇口径 data_ready 筛选（R3-3: 簇级=reviewed）
+	readyFilter := r.URL.Query().Get("ready")
 
 	// §59.38: 观察期视图——独立分支（hidden 组按 (client,name) 聚合，
 	// 不与活跃视图共用查询/状态机）
@@ -2837,6 +2840,33 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		}
 	}
 
+	// §59.131 ②: 簇副本数——发布页（一种多站）增量字段。
+	// 按 (client,path,name) 聚合活跃快照行数；不施加 search 过滤（簇成员数与
+	// 搜索无关，search 只决定哪些簇可见）。name='' 行不入此表，副本数退化 1。
+	type clusterCountRow struct {
+		ClientID string
+		SavePath string
+		Name     string
+		Cnt      int
+	}
+	var countRows []clusterCountRow
+	countQ := h.db.WithContext(r.Context()).
+		Table("torrent_snapshots").
+		Select("client_id, save_path, name, COUNT(*) AS cnt").
+		Where("is_hidden = ? AND name != ''", false)
+	if clientID != "" {
+		countQ = countQ.Where("client_id = ?", clientID)
+	}
+	if savePath != "" {
+		countQ = countQ.Where("save_path = ?", savePath)
+	}
+	countQ.Group("client_id, save_path, name").Find(&countRows)
+	copyCountByKey := make(map[string]int, len(countRows))
+	for _, cr := range countRows {
+		copyCountByKey[cr.ClientID+"|"+cr.SavePath+"|"+cr.Name] = cr.Cnt
+	}
+	clusterKey := func(c, p, n string) string { return c + "|" + p + "|" + n }
+
 	// 4. 组装结果（§59.29 性能：轻量状态标注全量执行——flags/映射/reviewed 纯内存或
 	// 带缓存查询；compliance（含 per-row DB 查询）延迟到分页后的当前页执行，
 	// 未筛选 system_forbidden 时默认降级为轻量判定，筛该态时对全量补跑）
@@ -2896,6 +2926,36 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		// 5 态标注（轻量：跳过 compliance）
 		status := h.classifySeedStatusLite(r.Context(), snap.Name, meta)
 		item["status"] = status
+
+		// §59.131 ②: 副本数 + 站点列表（簇内已有站点——发布页"已存在"标注数据源）
+		cc := copyCountByKey[clusterKey(snap.ClientID, snap.SavePath, snap.Name)]
+		if cc == 0 {
+			cc = 1
+		}
+		item["copy_count"] = cc
+		siteSet := make(map[string]bool)
+		for _, m := range metaByName[snap.Name] {
+			if m.SiteName != "" {
+				siteSet[m.SiteName] = true
+			}
+		}
+		sites := make([]string, 0, len(siteSet))
+		for s := range siteSet {
+			sites = append(sites, s)
+		}
+		sort.Strings(sites)
+		item["sites"] = sites
+
+		// §59.131 ②: ready 过滤（data_ready=reviewed 口径，R3-3）
+		if readyFilter != "" {
+			isReady := meta != nil && meta.Reviewed
+			if readyFilter == "true" && !isReady {
+				continue
+			}
+			if readyFilter == "false" && isReady {
+				continue
+			}
+		}
 
 		// §59.29: 后端过滤（状态 + 搜索），与分页解耦
 		if statusFilter != "" && statusFilter != "system_forbidden" {

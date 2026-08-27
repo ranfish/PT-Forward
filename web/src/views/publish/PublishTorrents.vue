@@ -2,69 +2,49 @@
   <div>
     <div class="page-toolbar">
       <a-select
-        v-model:value="selectedClientId"
-        style="width: 260px"
+        v-model:value="selectedClient"
+        style="width: 180px"
         :loading="clientsLoading"
-        placeholder="选择下载器"
-        @change="onClientChange"
+        placeholder="下载器（全部）"
+        allow-clear
+        @change="onFilterChange"
       >
-        <a-select-option v-for="c in clients" :key="c.id" :value="c.id">
-          {{ c.name }} ({{ c.type }})
+        <a-select-option v-for="c in clients" :key="c.client_id" :value="c.client_id">
+          {{ c.client_id }} ({{ totalPathsOf(c) }})
         </a-select-option>
       </a-select>
+      <a-select
+        v-model:value="selectedPath"
+        style="width: 220px; margin-left: 12px"
+        placeholder="保存路径（全部）"
+        allow-clear
+        :disabled="!selectedClient"
+        @change="onFilterChange"
+      >
+        <a-select-option v-for="p in pathOptions" :key="p.save_path" :value="p.save_path">
+          {{ p.save_path }} ({{ p.count }})
+        </a-select-option>
+      </a-select>
+      <a-radio-group
+        v-model:value="readyFilter"
+        button-style="solid"
+        size="small"
+        style="margin-left: 12px"
+        @change="onFilterChange"
+      >
+        <a-radio-button value="all">全部</a-radio-button>
+        <a-radio-button value="ready">可发布</a-radio-button>
+        <a-radio-button value="pending">待完善</a-radio-button>
+      </a-radio-group>
       <a-input-search
-        v-if="torrents.length"
         v-model:value="searchText"
-        placeholder="搜索种子名称..."
+        placeholder="搜索簇名称..."
         style="width: 260px; margin-left: 12px"
         allow-clear
+        @search="onFilterChange"
       />
-      <a-select
-        v-if="torrents.length"
-        v-model:value="typeFilter"
-        style="width: 130px; margin-left: 12px"
-        placeholder="类型筛选"
-        allow-clear
-      >
-        <a-select-option v-for="label, key in CATEGORY_LABELS" :key="key" :value="key">{{ label }}</a-select-option>
-      </a-select>
-      <a-select
-        v-if="torrents.length"
-        v-model:value="queryFilter"
-        style="width: 130px; margin-left: 12px"
-        placeholder="覆盖筛选"
-        allow-clear
-      >
-        <a-select-option value="queried">已查询</a-select-option>
-        <a-select-option value="unqueried">未查询</a-select-option>
-      </a-select>
-      <a-select
-        v-if="torrents.length"
-        v-model:value="stateFilter"
-        mode="multiple"
-        style="width: 160px; margin-left: 12px"
-        placeholder="状态筛选"
-        allow-clear
-        :max-tag-count="1"
-      >
-        <a-select-option value="uploading">上传中</a-select-option>
-        <a-select-option value="stalledUP">停滞做种</a-select-option>
-        <a-select-option value="pausedUP">暂停做种</a-select-option>
-        <a-select-option value="downloading">下载中</a-select-option>
-        <a-select-option value="pausedDL">暂停下载</a-select-option>
-        <a-select-option value="error">错误</a-select-option>
-      </a-select>
-      <a-select
-        v-if="torrents.length"
-        v-model:value="pathFilter"
-        style="width: 180px; margin-left: 12px"
-        placeholder="保存路径"
-        allow-clear
-      >
-        <a-select-option v-for="p in savePaths" :key="p" :value="p">{{ p }}</a-select-option>
-      </a-select>
-      <a-tag v-if="torrents.length" color="blue" style="margin-left: 8px">
-        {{ filteredTorrents.length }} / {{ torrents.length }}
+      <a-tag v-if="tableData.length" color="blue" style="margin-left: 8px">
+        共 {{ total }} 簇
       </a-tag>
       <a-button size="small" style="margin-left: auto" @click="groupMappingOpen = true">
         制作组映射
@@ -72,236 +52,70 @@
       <a-button size="small" @click="openDeclFilters">
         过滤规则
       </a-button>
-      <a-button
-        v-if="selectedHashes.length > 0"
-        size="small"
-        :loading="batchQuerying"
-        @click="batchQueryCoverage"
-      >
-        批量查询 ({{ selectedHashes.length }})
-      </a-button>
-      <a-button
-        v-if="selectedHashes.length > 0"
-        type="primary"
-        size="small"
-        :loading="batchPublishing"
-        @click="openBatchPublish"
-      >
-        批量发布 ({{ selectedHashes.length }})
-      </a-button>
-      <!-- 后台查询进度 -->
-      <div v-if="querying" class="query-progress">
-        <a-progress
-          :percent="queryProgress"
-          size="small"
-          status="active"
-          style="width: 200px"
-        />
-        <span class="progress-text">{{ queryDone }} / {{ queryTotal }}</span>
-      </div>
     </div>
+
+    <a-alert
+      type="info"
+      show-icon
+      style="margin-bottom: 12px"
+      message="一种多站：以簇为中心——选择一个种子簇，向多个目标站发布。数据不完整的簇请先到种子配置页完善（发布页零拉取）。"
+    />
 
     <a-table
       :columns="columns"
-      :data-source="pagedTorrents"
+      :data-source="tableData"
       :loading="loading"
       :pagination="{
         current: currentPage,
         pageSize: pageSize,
-        total: filteredTorrents.length,
+        total: total,
         showSizeChanger: true,
         pageSizeOptions: ['50', '100', '200'],
-        showTotal: (total: number) => `共 ${total} 个种子`,
+        showTotal: (t: number) => `共 ${t} 簇`,
         size: 'small',
       }"
-      row-key="info_hash"
+      row-key="hash"
       size="small"
-      :scroll="{ x: 1430 }"
+      :scroll="{ x: 1100 }"
       :sticky="{ offsetHeader: 48 }"
-      :row-class-name="(record: any) => record.metadata_reviewed ? 'row-reviewed' : 'row-unreviewed'"
-      :row-selection="{ selectedRowKeys: selectedHashes, onChange: (keys: string[]) => selectedHashes = keys }"
+      :row-class-name="(record: SeedListItem) => record.reviewed ? 'cluster-row-ready' : 'cluster-row-pending'"
       @change="onTableChange"
     >
-      <template #expandedRowRender="{ record }">
-        <div class="coverage-expand">
-          <template v-if="record.coverage?.sites?.length">
-            <div class="coverage-group">
-              <span class="coverage-label">🟢 做种中</span>
-              <a-tag v-for="s in coverageSitesOf(record, 'green')" :key="s.site_name" color="success" style="margin: 2px">{{ s.site_name }}</a-tag>
-              <span v-if="coverageSitesOf(record, 'green').length === 0" class="empty-hint">无</span>
-            </div>
-            <div class="coverage-group">
-              <span class="coverage-label">🟡 可辅种</span>
-              <a-tag v-for="s in coverageSitesOf(record, 'yellow')" :key="s.site_name" color="warning" style="margin: 2px">{{ s.site_name }}</a-tag>
-              <span v-if="coverageSitesOf(record, 'yellow').length === 0" class="empty-hint">无</span>
-            </div>
-            <div class="coverage-group">
-              <span class="coverage-label">⚪ 未发现</span>
-              <span v-if="(record.coverage?.target_count ?? 0) > 0" style="font-size: 12px; color: #999">{{ record.coverage?.target_count }} 站（可转载发布）</span>
-              <span v-else class="empty-hint">无</span>
-            </div>
-          </template>
-          <span v-else class="empty-hint">{{ record.queried ? '已查询，暂无已知覆盖数据' : '尚未查询覆盖' }}</span>
-        </div>
-      </template>
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'source_site'">
-          <template v-if="record.source_sites && record.source_sites.length">
-            <a-tag v-for="s in record.source_sites" :key="s" color="blue" size="small" style="margin: 1px">{{ s }}</a-tag>
-          </template>
-          <span v-else style="color: #999; font-size: 12px">未知</span>
+        <template v-if="column.key === 'name'">
+          <div class="cluster-name">{{ record.name }}</div>
+          <div v-if="record.title && record.title !== record.name" class="cluster-title">{{ record.title }}</div>
         </template>
         <template v-if="column.key === 'size'">
           {{ formatBytes(record.size) }}
         </template>
-        <template v-if="column.key === 'state'">
-          <a-tag :color="stateColor(record.state)" style="margin: 0">{{ translateQbState(record.state) }}</a-tag>
+        <template v-if="column.key === 'copies'">
+          <a-tag :color="(record.copy_count ?? 1) > 1 ? 'blue' : 'default'">{{ record.copy_count ?? 1 }} 副本</a-tag>
         </template>
-        <template v-if="column.key === 'progress'">
-          <a-progress :percent="Math.round(record.progress || 0)" :stroke-color="progressColor(record.progress || 0)" :show-info="false" />
-          <span style="font-size: 11px; color: #666">{{ Math.round(record.progress || 0) }}%</span>
+        <template v-if="column.key === 'sites'">
+          <template v-if="record.sites?.length">
+            <a-tag v-for="s in record.sites.slice(0, 4)" :key="s" size="small" style="margin: 1px">{{ s }}</a-tag>
+            <a-tag v-if="record.sites.length > 4" size="small" style="margin: 1px">+{{ record.sites.length - 4 }}</a-tag>
+          </template>
+          <span v-else style="color: #999; font-size: 12px">未知</span>
         </template>
-        <template v-if="column.key === 'uploaded'">
-          <span :style="{ color: record.uploaded > 0 ? '#52c41a' : '#999' }">{{ formatBytes(record.uploaded) }}</span>
+        <template v-if="column.key === 'status'">
+          <a-tag :color="statusColor(record.status)" style="margin: 0">{{ statusLabel(record.status) }}</a-tag>
         </template>
-        <template v-if="column.key === 'save_path'">
-          <a-tooltip :title="record.save_path">
-            <span style="font-size: 11px; color: #666">{{ record.save_path }}</span>
-          </a-tooltip>
-        </template>
-        <template v-if="column.key === 'coverage'">
-          <a-tooltip>
-            <template #title>
-              <div v-if="record.coverage?.sites?.length">
-                <div v-for="s in record.coverage.sites" :key="s.site_name" style="display: flex; align-items: center; gap: 4px; margin: 1px 0">
-                  <span>{{ coverageEmoji(s.status, s.source) }}</span>
-                  <a-tag :color="coverageColor(s.status, s.source)" size="small" style="margin: 0">
-                    {{ s.site_name }}
-                  </a-tag>
-                </div>
-              </div>
-              <div v-else-if="record.queried" style="color: #999">
-                已查询，暂无已知覆盖
-              </div>
-              <div v-else style="color: #999">尚未查询</div>
-              <div v-if="record.coverage?.sites?.length" style="margin-top: 4px; border-top: 1px solid #333; padding-top: 4px; font-size: 11px">
-                🟢 做种中 {{ coverageCount(record, 'green') }} · 🟡 可辅种 {{ coverageCount(record, 'yellow') }} · ⚪ 未发现 {{ record.coverage?.target_count ?? 0 }}
-              </div>
-            </template>
-            <div class="coverage-cell">
-              <span v-if="coverageCount(record, 'green') > 0" style="color: #52c41a; font-weight: 600">{{ coverageCount(record, 'green') }}</span>
-              <span v-if="coverageCount(record, 'green') > 0" style="color: #999">·</span>
-              <span v-if="coverageCount(record, 'yellow') > 0" style="color: #faad14; font-weight: 600">{{ coverageCount(record, 'yellow') }}</span>
-              <span v-if="coverageCount(record, 'yellow') > 0" style="color: #999">·</span>
-              <span style="color: #999">{{ record.coverage?.target_count ?? 0 }}</span>
-              <a-tag v-if="!record.queried" color="orange" size="small" class="unqueried-tag">未查</a-tag>
-            </div>
-          </a-tooltip>
-        </template>
-        <template v-if="column.key === 'target_count'">
-          <a-tag :color="(record.coverage?.target_count ?? 0) > 0 ? 'green' : 'default'">
-            {{ record.coverage?.target_count ?? 0 }} 站可转
-          </a-tag>
+        <template v-if="column.key === 'ready'">
+          <a-tag v-if="record.reviewed" color="success" style="margin: 0">✓ ready</a-tag>
+          <a-tag v-else color="warning" style="margin: 0">待完善</a-tag>
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-          <a-button
-              type="link"
-              size="small"
-              :loading="queryingHash === record.info_hash"
-              @click="queryCoverage(record)"
-            >
-              查询覆盖
-            </a-button>
-            <a-button
-              type="primary"
-              size="small"
-              :disabled="false"
-              @click="startForward(record)"
-            >
-              转种
-            </a-button>
+            <a-tooltip title="提交链路接线中（TagApplier 灰度，R3-5）">
+              <a-button type="primary" size="small" disabled>选站发布</a-button>
+            </a-tooltip>
+            <a-button size="small" @click="goRefine(record)">完善数据</a-button>
           </a-space>
         </template>
       </template>
     </a-table>
-
-    <CrossSeedPanel
-      v-model:open="crossSeedOpen"
-      :preset-torrent="presetTorrent"
-      @success="onWizardSuccess"
-    />
-
-    <a-modal
-      v-model:open="sourceSelectOpen"
-      title="选择转种源站"
-      width="520px"
-      :footer="null"
-    >
-      <div v-if="sourceDetectRecord" style="margin-bottom: 16px">
-        <span style="color: #666">种子：</span>
-        <span>{{ sourceDetectRecord.name }}</span>
-      </div>
-      <p style="color: #999; margin-bottom: 16px">
-        未自动识别制作组主站，请手动选择数据来源站点：
-      </p>
-      <a-radio-group v-model:value="selectedSourceSite" style="width: 100%">
-        <div
-          v-for="c in sourceCandidates"
-          :key="c.siteName"
-          style="display: flex; align-items: center; padding: 8px 0"
-        >
-          <a-radio :value="c.siteName" :disabled="!c.hasCookie">
-            {{ c.siteName }}
-          </a-radio>
-          <a-tag v-if="c.torrentId" color="blue" size="small" style="margin-left: 8px">
-            ID: {{ c.torrentId }}
-          </a-tag>
-          <a-tag v-if="!c.hasCookie" color="red" size="small" style="margin-left: 4px">
-            缺 cookie
-          </a-tag>
-        </div>
-      </a-radio-group>
-      <div style="text-align: right; margin-top: 16px">
-        <a-button style="margin-right: 8px" @click="sourceSelectOpen = false">取消</a-button>
-        <a-button type="primary" :disabled="!selectedSourceSite" @click="confirmSourceSite">
-          确定
-        </a-button>
-      </div>
-    </a-modal>
-
-    <a-modal
-      v-model:open="batchPublishOpen"
-      title="批量发布"
-      width="480px"
-      :confirm-loading="batchPublishing"
-      @ok="doBatchPublish"
-    >
-      <a-alert
-        type="info"
-        show-icon
-        :message="`将创建 ${selectedHashes.length} 个发布候选`"
-        description="系统将自动获取 MediaInfo/截图/简介并发布到目标站，无需逐个核对。"
-        style="margin-bottom: 16px"
-      />
-      <a-form layout="vertical">
-        <a-form-item label="源站">
-          <a-input v-model:value="batchForm.source_site" placeholder="源站名称" />
-        </a-form-item>
-        <a-form-item label="目标站">
-          <a-select v-model:value="batchForm.target_site" placeholder="选择目标站" show-search>
-            <a-select-option
-              v-for="site in batchTargetSites"
-              :key="site.name"
-              :value="site.name"
-              :label="site.name"
-            >
-              {{ site.name }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-      </a-form>
-    </a-modal>
 
     <a-modal
       v-model:open="declFilterOpen"
@@ -413,49 +227,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
+import { ref, computed, onMounted, watch, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { publishTorrentsApi, type PublishTorrentItem } from '@/api/publish'
-import { downloadersApi } from '@/api/downloaders'
+import { seedConfigApi, publishTorrentsApi, type SeedListItem } from '@/api/publish'
 import { formatBytes, maskDomain } from '@/utils/format'
-import { CATEGORY_LABELS } from '@/generated/dict'
-import { useEnumLabels } from '@/utils/enumLabels'
 
-const { translateQbState } = useEnumLabels()
+// §59.131 ②: 一种多站页——簇口径改造（R3-1 定案）。
+// 数据源 = /publish/seeds 簇端点（零拉取）；行 = (client,path,name) 簇。
+// 覆盖查询/转种向导/detect-source 现场调用全部移除（发布页纯消费层）。
 
-function stateColor(state: string): string {
-  const colors: Record<string, string> = {
-    uploading: 'success',
-    stalledUP: 'success',
-    forcedUP: 'success',
-    pausedUP: 'warning',
-    pausedDL: 'warning',
-    downloading: 'processing',
-    stalledDL: 'processing',
-    error: 'error',
-    missingFiles: 'error',
-  }
-  return colors[state] || 'default'
-}
+const router = useRouter()
 
-function progressColor(pct: number): string {
-  if (pct >= 100) return '#52c41a'
-  if (pct >= 80) return '#faad14'
-  return '#1677ff'
-}
-import CrossSeedPanel from './CrossSeedPanel.vue'
-
-const clients = ref<{ id: number; name: string; type: string }[]>([])
+const clients = ref<Array<{ client_id: string; paths: Array<{ save_path: string; count: number }> }>>([])
 const clientsLoading = ref(false)
 
-const STORAGE_KEY = 'publish_torrents_filters'
+const STORAGE_KEY = 'publish_clusters_filters'
 
 interface PersistedFilters {
-  client_id?: number
+  client?: string
+  path?: string
+  ready?: string
   search?: string
-  query_filter?: string
-  type_filter?: string
-  state_filter?: string[]
   page_size?: number
 }
 
@@ -469,11 +262,10 @@ function loadPersistedFilters(): PersistedFilters {
 
 function persistFilters() {
   const data: PersistedFilters = {
-    client_id: selectedClientId.value,
+    client: selectedClient.value || undefined,
+    path: selectedPath.value || undefined,
+    ready: readyFilter.value,
     search: searchText.value || undefined,
-    query_filter: queryFilter.value,
-    type_filter: typeFilter.value,
-    state_filter: stateFilter.value,
     page_size: pageSize.value,
   }
   try {
@@ -483,432 +275,127 @@ function persistFilters() {
 
 const persisted = loadPersistedFilters()
 
-const selectedClientId = ref<number | undefined>(persisted.client_id)
-const torrents = ref<PublishTorrentItem[]>([])
-const loading = ref(false)
+const selectedClient = ref<string | undefined>(persisted.client)
+const selectedPath = ref<string | undefined>(persisted.path)
+const readyFilter = ref(persisted.ready || 'all')
 const searchText = ref(persisted.search || '')
-const queryFilter = ref<string | undefined>(persisted.query_filter)
-const typeFilter = ref<string | undefined>(persisted.type_filter)
-const stateFilter = ref<string[]>(persisted.state_filter || [])
-const pathFilter = ref<string | undefined>(undefined)
-const savePaths = ref<string[]>([])
-const queryingHash = ref('')
-const selectedHashes = ref<string[]>([])
-let coverageAbortController: AbortController | null = null
 
-// 分页
+const tableData = ref<SeedListItem[]>([])
+const total = ref(0)
+const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(persisted.page_size || 50)
 
-// 后台查询状态
-const querying = ref(false)
-const queryDone = ref(0)
-const queryTotal = ref(0)
+watch([selectedClient, selectedPath, readyFilter, pageSize], persistFilters)
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
+const pathOptions = computed(() => {
+  const c = clients.value.find(c => c.client_id === selectedClient.value)
+  return c?.paths || []
+})
 
-watch([selectedClientId, searchText, queryFilter, typeFilter, stateFilter, pageSize], persistFilters)
-
-const crossSeedOpen = ref(false)
-const presetTorrent = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; state: string; source_site?: string; source_site_id?: number; torrent_id?: string } | null>(null)
+function totalPathsOf(c: { paths: Array<{ count: number }> }): number {
+  return c.paths.reduce((sum, p) => sum + p.count, 0)
+}
 
 const columns = [
-  { title: '种子名称', dataIndex: 'name', key: 'name', ellipsis: true },
-  { title: '做种站点', key: 'source_site', width: 160 },
+  { title: '簇名称', dataIndex: 'name', key: 'name', ellipsis: true },
   { title: '大小', key: 'size', width: 90 },
-  { title: '状态', key: 'state', width: 90 },
-  { title: '进度', key: 'progress', width: 110, align: 'center' as const },
-  { title: '上传量', key: 'uploaded', width: 90 },
-  { title: '保存路径', key: 'save_path', width: 150, ellipsis: true },
-  { title: '覆盖', key: 'coverage', width: 120, align: 'center' as const },
-  { title: '可转', key: 'target_count', width: 100 },
-  { title: '操作', key: 'actions', width: 180 },
+  { title: '副本', key: 'copies', width: 90, align: 'center' as const },
+  { title: '已有站点', key: 'sites', width: 220 },
+  { title: '数据状态', key: 'status', width: 110 },
+  { title: '发布就绪', key: 'ready', width: 100, align: 'center' as const },
+  { title: '操作', key: 'actions', width: 200 },
 ]
 
-const filteredTorrents = computed(() => {
-  let result = torrents.value
-  if (searchText.value) {
-    const q = searchText.value.toLowerCase()
-    result = result.filter(t => t.name.toLowerCase().includes(q))
-  }
-  if (queryFilter.value === 'queried') {
-    result = result.filter(t => t.queried)
-  } else if (queryFilter.value === 'unqueried') {
-    result = result.filter(t => !t.queried)
-  }
-  if (typeFilter.value) {
-    result = result.filter((t: any) => (t as any).standard_type === typeFilter.value)
-  }
-  if (stateFilter.value.length > 0) {
-    result = result.filter(t => stateFilter.value.includes(t.state))
-  }
-  if (pathFilter.value) {
-    result = result.filter(t => t.save_path === pathFilter.value)
-  }
-  return result
-})
-
-const pagedTorrents = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return filteredTorrents.value.slice(start, start + pageSize.value)
-})
-
-const queryProgress = computed(() => {
-  if (queryTotal.value === 0) return 0
-  return Math.round((queryDone.value / queryTotal.value) * 100)
-})
-
-function coverageColor(status: string, source?: string): string {
-  if (status === 'confirmed_has' || status === 'probably_has') {
-    if (source === 'tracker') return 'green'
-    return 'gold'
-  }
-  return 'default'
+const STATUS_META: Record<string, { label: string; color: string }> = {
+  forbidden: { label: '禁转', color: 'red' },
+  system_forbidden: { label: '系统禁转', color: 'red' },
+  no_mapping: { label: '无源站映射', color: 'volcano' },
+  reviewed: { label: '已审核', color: 'green' },
+  pending: { label: '待审核', color: 'blue' },
+  incomplete: { label: '配置不完整', color: 'orange' },
+  unfetched: { label: '未获取', color: 'default' },
 }
 
-function coverageEmoji(status: string, source?: string): string {
-  if (status === 'confirmed_has' || status === 'probably_has') {
-    if (source === 'tracker') return '🟢'
-    return '🟡'
-  }
-  return '⚪'
+function statusLabel(s: string): string {
+  return STATUS_META[s]?.label || s
 }
 
-function coverageCount(record: PublishTorrentItem, color: 'green' | 'yellow' | 'white'): number {
-  const sites = record.coverage?.sites
-  if (!sites?.length) return 0
-  return sites.filter((s: { status: string; source: string }) => {
-    const c = coverageColor(s.status, s.source)
-    if (color === 'green') return c === 'green'
-    if (color === 'yellow') return c === 'gold'
-    return c === 'default'
-  }).length
-}
-
-function coverageSitesOf(record: PublishTorrentItem, color: 'green' | 'yellow' | 'white') {
-  const sites = record.coverage?.sites
-  if (!sites?.length) return []
-  return sites.filter((s: { status: string; source: string }) => {
-    const c = coverageColor(s.status, s.source)
-    if (color === 'green') return c === 'green'
-    if (color === 'yellow') return c === 'gold'
-    return c === 'default'
-  })
-}
-
-function coverageSiteStatus(s: { status: string }): string {
-  return s.status === 'confirmed_not' ? 'cached_not' : s.status
+function statusColor(s: string): string {
+  return STATUS_META[s]?.color || 'default'
 }
 
 function onTableChange(pag: { current?: number; pageSize?: number }) {
   if (pag.current) currentPage.value = pag.current
   if (pag.pageSize) pageSize.value = pag.pageSize
+  fetchList()
 }
 
-function onClientChange() {
+function onFilterChange() {
   currentPage.value = 1
-  selectedHashes.value = []
-  if (coverageAbortController) {
-    coverageAbortController.abort()
-    coverageAbortController = null
-  }
-  fetchTorrents()
+  if (selectedClient.value === undefined) selectedPath.value = undefined
+  persistFilters()
+  fetchList()
 }
 
 async function fetchClients() {
   clientsLoading.value = true
   try {
-    const resp = await downloadersApi.listLight(1, 100)
-    const data = resp.data?.data
-    clients.value = (data?.items || data || []) as { id: number; name: string; type: string }[]
-    if (clients.value.length > 0) {
-      const exists = selectedClientId.value && clients.value.some(c => c.id === selectedClientId.value)
-      if (!exists) {
-        selectedClientId.value = clients.value[0].id
-      }
-      fetchTorrents()
-    }
+    const resp = await seedConfigApi.uniquePaths()
+    clients.value = resp.data?.data?.clients || []
   } catch { /* ignore */ } finally {
     clientsLoading.value = false
   }
 }
 
-async function fetchTorrents() {
-  if (!selectedClientId.value) return
+async function fetchList() {
   loading.value = true
   try {
-    const resp = await publishTorrentsApi.list(selectedClientId.value)
-    const data = resp.data?.data
-    torrents.value = data?.items || []
-    // 提取保存路径列表
-    const paths = new Set<string>()
-    for (const t of torrents.value) {
-      if (t.save_path) paths.add(t.save_path)
-    }
-    savePaths.value = [...paths].sort()
-    pathFilter.value = undefined
-    querying.value = data?.querying ?? false
-    queryDone.value = data?.query_progress?.done ?? 0
-    queryTotal.value = data?.query_progress?.total ?? 0
-
-    if (querying.value) {
-      startPolling()
-    } else {
-      stopPolling()
-    }
-  } catch (e: unknown) {
-    message.error((e as Error).message)
+    const resp = await seedConfigApi.listSeeds({
+      client_id: selectedClient.value || '',
+      save_path: selectedPath.value || '',
+      ready: readyFilter.value === 'all' ? '' : readyFilter.value,
+      search: searchText.value,
+      page: currentPage.value,
+      page_size: pageSize.value,
+    })
+    tableData.value = ((resp.data?.data?.items || []) as SeedListItem[]).map((it) => ({
+      ...it,
+      hash: it.hash || `${it.client_id}|${it.name}`,
+    }))
+    total.value = resp.data?.data?.total || 0
+  } catch {
+    message.error('加载簇列表失败')
+    tableData.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
 }
 
-async function pollQueryStatus() {
-  if (!selectedClientId.value) return
-  try {
-    const resp = await publishTorrentsApi.queryStatus(selectedClientId.value)
-    const data = resp.data?.data
-    querying.value = data?.querying ?? false
-    queryDone.value = data?.done ?? 0
-    queryTotal.value = data?.total ?? 0
-
-    if (querying.value) {
-      // 查询进行中，同时刷新种子数据（覆盖数据在逐步填充）
-      await refreshTorrentsSilent()
-    } else {
-      // 查询完成，最终刷新
-      stopPolling()
-      await refreshTorrentsSilent()
-    }
-  } catch { /* silent */ }
-}
-
-async function refreshTorrentsSilent() {
-  if (!selectedClientId.value) return
-  try {
-    const resp = await publishTorrentsApi.list(selectedClientId.value)
-    torrents.value = resp.data?.data?.items || []
-  } catch { /* silent */ }
-}
-
-function startPolling() {
-  if (pollTimer) return
-  pollTimer = setInterval(pollQueryStatus, 5000)
-}
-
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
-  }
-}
-
-watch(queryFilter, () => { currentPage.value = 1 })
-watch(typeFilter, () => { currentPage.value = 1 })
-
-async function queryCoverage(record: PublishTorrentItem) {
-  if (!selectedClientId.value) return
-  // 取消上一个正在进行的查询
-  if (coverageAbortController) {
-    coverageAbortController.abort()
-  }
-  coverageAbortController = new AbortController()
-  queryingHash.value = record.info_hash
-  try {
-    const resp = await publishTorrentsApi.queryCoverage({
-      clientId: selectedClientId.value,
-      infoHash: record.info_hash,
+// 引导跳回种子配置页（R3-1 deep-link：自动应用筛选+定位+打开编辑）
+function goRefine(record: SeedListItem) {
+  router.push({
+    path: '/publish/seeds',
+    query: {
+      client_id: record.client_id,
+      save_path: record.save_path,
       name: record.name,
-      size: record.size,
-    })
-    const result = resp.data?.data
-    if (result) {
-      record.coverage = {
-        has_count: result.has_count,
-        total_sites: result.total_sites,
-        target_count: result.target_count,
-        sites: result.sites,
-      }
-      record.queried = true
-      message.success(`覆盖查询完成：${result.has_count}/${result.total_sites}`)
-    }
-  } catch (e: unknown) {
-    if (e instanceof DOMException && e.name === 'AbortError') return
-    message.error((e as Error).message)
-  } finally {
-    if (queryingHash.value === record.info_hash) {
-      queryingHash.value = ''
-      coverageAbortController = null
-    }
-  }
+      focus: '1',
+    },
+  })
 }
 
-async function batchQueryCoverage() {
-  if (selectedHashes.value.length === 0 || !selectedClientId.value) return
-  batchQuerying.value = true
-  queryingHash.value = '批量查询中...'
-  try {
-    await publishTorrentsApi.batchQueryCoverage({
-      clientId: selectedClientId.value,
-      infoHashes: [...selectedHashes.value],
-    })
-    message.success(`批量查询完成: ${selectedHashes.value.length} 个种子`)
-    await fetchTorrents()
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  } finally {
-    batchQuerying.value = false
-    queryingHash.value = ''
-  }
-}
+// 搜索防抖（输入停顿后自动查）
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(searchText, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => onFilterChange(), 400)
+})
 
-function startForward(record: PublishTorrentItem) {
-  presetTorrent.value = {
-    info_hash: record.info_hash,
-    name: record.name,
-    size: record.size,
-    save_path: record.save_path,
-    client_id: selectedClientId.value!,
-    state: record.state,
-  }
-  // 检测源头站
-  detectAndOpen(record)
-}
-
-async function detectAndOpen(record: PublishTorrentItem) {
-  try {
-    const resp = await publishTorrentsApi.detectSource({
-      infoHash: record.info_hash,
-      name: record.name,
-    })
-    const result = resp.data?.data
-    if (result?.source_site) {
-      // 自动检测成功（或降级选中）
-      presetTorrent.value = {
-        ...presetTorrent.value!,
-        source_site: result.source_site,
-        source_site_id: result.source_site_id,
-        torrent_id: result.torrent_id,
-      }
-      if (!result.auto_detected && result.candidates?.length > 1) {
-        // 非自动判断 + 多候选 → 弹选择弹窗
-        sourceCandidates.value = result.candidates
-        sourceDetectRecord.value = record
-        sourceSelectOpen.value = true
-        return
-      }
-    }
-    // 直接打开 CrossSeedPanel
-    crossSeedOpen.value = true
-  } catch {
-    // 检测失败 → 直接打开 CrossSeedPanel（用默认源站）
-    crossSeedOpen.value = true
-  }
-}
-
-// 源站选择弹窗
-const sourceSelectOpen = ref(false)
-const sourceCandidates = ref<{ siteName: string; torrentId: string; hasCookie: boolean }[]>([])
-const sourceDetectRecord = ref<PublishTorrentItem | null>(null)
-const selectedSourceSite = ref<string>('')
-
-function confirmSourceSite() {
-  const cand = sourceCandidates.value.find(c => c.siteName === selectedSourceSite.value)
-  if (cand && presetTorrent.value) {
-    presetTorrent.value = {
-      ...presetTorrent.value,
-      source_site: cand.siteName,
-      torrent_id: cand.torrentId,
-    }
-  }
-  sourceSelectOpen.value = false
-  crossSeedOpen.value = true
-}
-
-function onWizardSuccess() {
-  fetchTorrents()
-}
-
-// --- 批量发布 ---
-const batchPublishOpen = ref(false)
-const batchPublishing = ref(false)
-const batchQuerying = ref(false)
-const batchTargetSites = ref<{ name: string }[]>([])
-const batchForm = reactive({ source_site: '', target_site: '' })
-
-async function openBatchPublish() {
-  batchForm.source_site = ''
-  batchForm.target_site = ''
-  // 自动检测源站（用第一个选中种子的制作组）
-  if (selectedHashes.value.length > 0 && torrents.value.length > 0) {
-    const firstHash = selectedHashes.value[0]
-    const torrent = torrents.value.find(t => t.info_hash === firstHash)
-    if (torrent) {
-      try {
-        const resp = await publishTorrentsApi.detectSource({
-          infoHash: torrent.info_hash,
-          name: torrent.name,
-        })
-        if (resp.data?.data?.source_site) {
-          batchForm.source_site = resp.data.data.source_site
-        }
-      } catch { /* ignore */ }
-    }
-  }
-  // 加载目标站列表
-  try {
-    // 用 sitesApi 获取目标站
-    const sitesResp = await import('@/api/sites').then(m => m.sitesApi.list(1, 200))
-    const data = sitesResp.data?.data
-    batchTargetSites.value = ((data?.items || data || []) as { name: string; is_target?: boolean }[])
-      .filter(s => s.is_target !== false)
-      .map(s => ({ name: s.name }))
-  } catch { /* ignore */ }
-  batchPublishOpen.value = true
-}
-
-async function doBatchPublish() {
-  if (!batchForm.source_site || !batchForm.target_site || !selectedClientId.value) {
-    message.warning('源站和目标站必填')
-    return
-  }
-  batchPublishing.value = true
-  try {
-    const items = selectedHashes.value.map(hash => {
-      const t = torrents.value.find(t => t.info_hash === hash)
-      return {
-        infoHash: hash,
-        name: t?.name || '',
-        size: t?.size || 0,
-        savePath: t?.save_path || '',
-      }
-    })
-    const resp = await publishTorrentsApi.batchPublish({
-      clientId: selectedClientId.value,
-      sourceSite: batchForm.source_site,
-      targetSite: batchForm.target_site,
-      items,
-    })
-    const result = resp.data?.data
-    if (result) {
-      message.success(`已创建 ${result.created} 个发布候选${result.failed > 0 ? `，${result.failed} 个失败` : ''}`)
-    }
-    batchPublishOpen.value = false
-    selectedHashes.value = []
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  } finally {
-    batchPublishing.value = false
-  }
-}
-
-onMounted(fetchClients)
-
-onUnmounted(() => {
-  stopPolling()
-  if (coverageAbortController) {
-    coverageAbortController.abort()
-  }
+onMounted(() => {
+  fetchClients()
+  fetchList()
 })
 
 // --- 映射管理 ---
@@ -929,7 +416,7 @@ const mappingPagination = reactive({
   pageSize: 20,
   showSizeChanger: true,
   pageSizeOptions: ['20', '50', '100'],
-  showTotal: (total: number) => `共 ${total} 条`,
+  showTotal: (t: number) => `共 ${t} 条`,
   size: 'small' as const,
 })
 
@@ -1047,65 +534,22 @@ async function saveDeclFilters() {
   background: #fff;
   padding: 8px 0;
 }
-.coverage-cell {
-  font-size: 16px;
-  font-weight: 600;
-  cursor: default;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.cluster-name {
+  font-size: 13px;
+  word-break: break-all;
 }
-.coverage-has {
-  color: #52c41a;
-}
-.coverage-sep {
-  color: #d9d9d9;
-}
-.coverage-total {
+.cluster-title {
+  font-size: 12px;
   color: #999;
-}
-.unqueried-tag {
-  margin-left: 4px;
-  transform: scale(0.85);
-}
-.query-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-.progress-text {
-  font-size: 12px;
-  color: #666;
-  white-space: nowrap;
-}
-.coverage-expand {
-  padding: 8px 0;
-}
-.coverage-group {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-  margin-bottom: 6px;
-}
-.coverage-label {
-  font-size: 12px;
-  color: #666;
-  min-width: 80px;
-  font-weight: 500;
-}
-.empty-hint {
-  font-size: 12px;
-  color: #bbb;
+  margin-top: 2px;
 }
 </style>
 
 <style>
-.row-reviewed {
+.cluster-row-ready {
   background-color: #f6ffed !important;
 }
-.row-unreviewed {
+.cluster-row-pending {
   background-color: #fffbe6 !important;
 }
 </style>
