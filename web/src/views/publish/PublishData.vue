@@ -13,7 +13,7 @@
             :filter-option="filterSiteOption"
             @change="onInjectFilterChange"
           >
-            <a-select-option v-for="s in targetSites" :key="s.name" :value="s.name">
+            <a-select-option v-for="s in targetSites" :key="s.name" :value="s.name" :label="s.name">
               {{ s.name }}
               <a-tag v-if="!s.hasCookie" color="red" size="small" style="margin-left: 4px">缺 cookie</a-tag>
             </a-select-option>
@@ -36,7 +36,7 @@
             <a-radio-button value="new">未存在</a-radio-button>
           </a-radio-group>
           <a-tag v-if="selectedTarget" :color="publishableCount > 0 ? 'green' : 'default'" style="margin-left: 8px">
-            {{ selectedTarget }}：可灌入 {{ publishableCount }} 簇
+            {{ selectedTarget }}：本页可灌入 {{ publishableCount }} 簇
           </a-tag>
           <a-tooltip title="提交链路接线中（TagApplier 灰度，R3-5）">
             <a-button
@@ -58,7 +58,7 @@
 
         <a-table
           :columns="injectColumns"
-          :data-source="injectRows"
+          :data-source="filteredInjectRows"
           :loading="injectLoading"
           :pagination="{
             current: injectPage,
@@ -279,11 +279,9 @@ const injectColumns = [
   { title: '操作', key: 'actions', width: 100 },
 ]
 
-function filterSiteOption(input: string, option: { children: () => unknown[] }): boolean {
-  const text = Array.isArray(option?.children?.())
-    ? String(option.children().join(''))
-    : String(option?.children?.() ?? '')
-  return text.toLowerCase().includes(input.toLowerCase())
+function filterSiteOption(input: string, option: { label?: string; value?: string }): boolean {
+  const label = option?.label || option?.value || ''
+  return String(label).toLowerCase().includes(input.toLowerCase())
 }
 
 function existsOnTarget(record: SeedListItem): boolean {
@@ -293,7 +291,13 @@ function existsOnTarget(record: SeedListItem): boolean {
 
 const publishableCount = computed(() => {
   if (!selectedTarget.value) return 0
-  return injectRows.value.filter(r => !existsOnTarget(r)).length
+  return filteredInjectRows.value.filter(r => !existsOnTarget(r)).length
+})
+
+// "未存在"视图：本地过滤当前页（服务端无 exists 口径，total 保持服务端值）
+const filteredInjectRows = computed(() => {
+  if (existFilter.value !== 'new' || !selectedTarget.value) return injectRows.value
+  return injectRows.value.filter(r => !existsOnTarget(r))
 })
 
 async function fetchTargetSites() {
@@ -321,9 +325,7 @@ async function fetchInjectList() {
       hash: it.hash || `${it.client_id}|${it.name}`,
     }))
     injectTotal.value = resp.data?.data?.total || 0
-    // 切筛选后勾选可能已不在列表，清空避免幽灵提交
-    selectedInjectHashes.value = selectedInjectHashes.value.filter(h =>
-      injectRows.value.some(r => r.hash === h))
+    // 跨页保留勾选（批量灌入跨页累积）；目标站变化时已存在语义变，onInjectFilterChange 显式清
   } catch {
     message.error('加载 ready 簇失败')
     injectRows.value = []
@@ -335,6 +337,8 @@ async function fetchInjectList() {
 
 function onInjectFilterChange() {
   injectPage.value = 1
+  // 筛选变化清勾选（目标站变化→已存在语义变；搜索变化→行集变）
+  selectedInjectHashes.value = []
   fetchInjectList()
 }
 
@@ -361,6 +365,11 @@ let injectSearchTimer: ReturnType<typeof setTimeout> | undefined
 watch(injectSearch, () => {
   if (injectSearchTimer) clearTimeout(injectSearchTimer)
   injectSearchTimer = setTimeout(() => onInjectFilterChange(), 400)
+})
+
+// 切回灌入 Tab 时刷新 ready 簇（维护保存后 reviewed 状态可能变化）
+watch(activeTab, (tab) => {
+  if (tab === 'inject') fetchInjectList()
 })
 
 // ==================== Tab 2: 数据管理（原功能保留） ====================
