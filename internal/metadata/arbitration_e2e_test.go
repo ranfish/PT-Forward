@@ -56,7 +56,7 @@ func newRealFetcher(t *testing.T) (*Fetcher, *gorm.DB) {
 	engine := extract.NewEngine(publicExtractor, nil)
 	factory := adapter.NewFactory(logger, engine)
 	provider := site.NewProvider(db, factory, logger)
-	return NewFetcher(db, logger, provider), db
+	return NewFetcher(db, logger, provider, nil), db
 }
 
 func TestArbitrationPathA_TrueHDMatch(t *testing.T) {

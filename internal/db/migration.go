@@ -256,6 +256,35 @@ func init() {
 	// §59.63: 簇截图链接缓存表（观察期复用——清簇重取免重截重传）
 	// §59.123: 站点别名域名补齐随版本同步（§59.60 O3 曾只在 29 手工 UPDATE——
 	// 10 站 tracker_domains/alternative_domains 补实测别名; 243 实测 9/10 缺）
+	// §59.137: 朋友站源截图存量清洗——详情图为"资源原图 vs 站点压制"对比图,
+	// 不可作发布截图。清簇缓存行 + 该簇全部 metadata 行 screenshots 列(簇共享同值),
+	// 下轮获取/发布前触发 mpv 重取(isLocal)或留空(远程)。
+	RegisterMigration(26, "friend_source_screenshots_purge", func(gormDB *gorm.DB) error {
+		type snapRow struct {
+			ClientID string
+			SavePath string
+			Name     string
+		}
+		// 朋友站源 hash → 快照簇键（快照行可能 hidden, 不筛 is_hidden——簇键全量）
+		var snaps []snapRow
+		if err := gormDB.Raw("SELECT DISTINCT s.client_id, s.save_path, s.name FROM torrent_snapshots s JOIN torrent_metadata m ON m.info_hash = s.hash WHERE m.site_name = ?", "朋友").Scan(&snaps).Error; err != nil {
+			return err
+		}
+		for _, sp := range snaps {
+			if sp.Name == "" {
+				continue
+		}
+			// 清簇截图缓存（观察期锚点作废, 强制走新策略）
+			if err := gormDB.Exec("DELETE FROM cluster_screenshot_cache WHERE client_id = ? AND save_path = ? AND name = ?", sp.ClientID, sp.SavePath, sp.Name).Error; err != nil {
+				return err
+			}
+			// 清簇内全部 metadata 行 screenshots（簇共享: 朋友行与同步副本一并清）
+			if err := gormDB.Exec("UPDATE torrent_metadata SET screenshots = '' WHERE info_hash IN (SELECT hash FROM torrent_snapshots WHERE client_id = ? AND save_path = ? AND name = ?)", sp.ClientID, sp.SavePath, sp.Name).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	// §59.136: 运营标记存量清洗——副标题尾部 "[50%]"/"[中性种子(NL)]" 等（采集层
 	// §59.99 词表漏百分比形态 + 混排 [禁转] 挡尾锚, 243 实测 32 行）。
 	// 用 metadata.StripSiteOperationMarkers 公共方法（与采集层同一实现, [禁转] 保留）。

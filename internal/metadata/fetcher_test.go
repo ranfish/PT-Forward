@@ -33,7 +33,7 @@ func TestFetchFromSiteNoFallback_FailsWithoutIYUU(t *testing.T) {
 		t.Skip("需要 DB")
 	}
 	// 构造: 无 siteProvider 站点 → fetchFromSite 报错 → 必须原样返回错误（nil meta）
-	f := NewFetcher(noFBDB(t), zap.NewNop(), nil)
+	f := NewFetcher(noFBDB(t), zap.NewNop(), nil, nil)
 	meta, err := f.FetchFromSiteNoFallback(context.Background(), "aaaa000000000000000000000000000000000000", "朋友", "2782026")
 	if err == nil || meta != nil {
 		t.Fatalf("直取失败应报错且无兜底: meta=%v err=%v", meta, err)
@@ -66,5 +66,13 @@ func TestStripSiteOperationMarkers(t *testing.T) {
 		if got := util.StripSiteOperationMarkers(c.in); got != c.want {
 			t.Errorf("strip(%q) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// §59.137: 源站截图不可信判定——settings nil（旧行为）/ 站点在/不在排除表
+func TestIsSourceScreenshotExcluded(t *testing.T) {
+	f := &Fetcher{}
+	if f.isSourceScreenshotExcluded(context.Background(), "朋友") {
+		t.Error("nil settingsRepo 应保持旧行为(false)")
 	}
 }

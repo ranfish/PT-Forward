@@ -455,7 +455,7 @@ func main() {
 	publishPipeline.SetComplianceChecker(complianceChecker)
 	publishPipeline.SetPusher(torrentPusher) // §56.30: 发布后自动加种
 	reseedEngine.SetComplianceChecker(complianceChecker)
-	metadataFetcher := metadata.NewFetcher(db, log, siteProvider)
+	metadataFetcher := metadata.NewFetcher(db, log, siteProvider, settingsRepo)
 	// §56.13 方案 B: Engine 已在前面注入到 adapter.Factory（line 244），
 	// fetcher 不再需要 SetEngine（adapter 内部已用 Engine 提取）。
 	publishPipeline.SetMetadataFetcher(metadataFetcher)
