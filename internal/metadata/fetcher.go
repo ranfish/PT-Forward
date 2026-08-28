@@ -9,6 +9,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/util"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/titleparser"
@@ -25,14 +26,36 @@ type Fetcher struct {
 	db           *gorm.DB
 	logger       *zap.Logger
 	siteProvider SiteAdapterProvider
+	settingsRepo *setting.Repository
 }
 
-func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvider) *Fetcher {
+func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvider, settingsRepo *setting.Repository) *Fetcher {
 	return &Fetcher{
 		db:           db,
 		logger:       logger.With(zap.String("component", "metadata")),
 		siteProvider: siteProvider,
+		settingsRepo: settingsRepo,
 	}
+}
+
+// isSourceScreenshotExcluded §59.137: 源站截图不可信判定——朋友站详情图为
+// "资源原图 vs 站点压制"对比图，非资源真实画面。特化站点采集层不落 screenshots 列
+//（写侧单点丢弃，任何失败路径都不可能流到发布），截图只走本地 mpv/远程留空。
+// settings 为 nil（测试构造）时返回 false 保持旧行为。
+func (f *Fetcher) isSourceScreenshotExcluded(ctx context.Context, siteName string) bool {
+	if f.settingsRepo == nil || siteName == "" {
+		return false
+	}
+	raw, err := f.settingsRepo.Get(ctx, setting.KeyScreenshotSourceExcludedSites)
+	if err != nil || raw == "" {
+		return false
+	}
+	for _, s := range strings.Split(raw, ",") {
+		if strings.TrimSpace(s) == siteName {
+			return true
+		}
+	}
+	return false
 }
 
 // SetEngine 已弃用（§56.13 方案 B：Engine 注入到 adapter.Factory，不再需要 fetcher 持有）。
@@ -463,7 +486,12 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 		}
 	}
 
-	if len(detail.Screenshots) > 0 {
+	// §59.137: 特化站点（源截图不可信）写侧丢弃——对比图从不入库
+	if excluded := f.isSourceScreenshotExcluded(context.Background(), siteName); excluded && len(detail.Screenshots) > 0 {
+		f.logger.Info("source screenshots excluded (site policy)",
+			zap.String("site", siteName),
+			zap.Int("dropped", len(detail.Screenshots)))
+	} else if len(detail.Screenshots) > 0 {
 		if data, err := json.Marshal(detail.Screenshots); err == nil {
 			meta.Screenshots = string(data)
 		}

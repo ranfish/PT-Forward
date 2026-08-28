@@ -29,6 +29,9 @@ const (
 	KeyScreenshotMinInterval = "screenshot_min_interval"
 	KeyScreenshotJPEGQuality = "screenshot_jpeg_quality"
 	KeyScreenshotCacheDays   = "screenshot_cache_days" // §59.63: 截图链接缓存观察期（天，<=0 关闭）
+	// §59.137: 源站截图不可信站点（逗号分隔）——朋友站详情图为"资源原图 vs 站点压制"
+	// 对比图，非资源真实画面；特化站点采集层不落 screenshots 列，只走本地 mpv
+	KeyScreenshotSourceExcludedSites = "screenshot_source_excluded_sites"
 
 	KeyDataCleanupTorrentEventDays   = "data_cleanup_torrent_event_days"
 	KeyDataCleanupPublishResultDays  = "data_cleanup_publish_result_days"
@@ -68,6 +71,7 @@ var DefaultSeeds = map[string]string{
 	KeyScreenshotMinInterval: "60",
 	KeyScreenshotJPEGQuality: "85",
 	KeyScreenshotCacheDays:   "30",
+	KeyScreenshotSourceExcludedSites: "朋友",
 
 	KeyDataCleanupTorrentEventDays:   "30",
 	KeyDataCleanupPublishResultDays:  "30",
