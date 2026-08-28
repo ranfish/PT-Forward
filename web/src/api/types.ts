@@ -689,33 +689,6 @@ export interface SettingsRestoreRequest {
   settings: Record<string, string>
 }
 
-export interface ManualForwardSubmitRequest {
-  clientId?: number
-  infoHash?: string
-  name?: string
-  savePath?: string
-  sourceSite?: string
-  sourceSiteId?: number
-  sourceTorrentId?: string
-  title?: string
-  subtitle?: string
-  description?: string
-  mediaInfo?: string
-  screenshots?: string | string[]
-  poster?: string
-  posterUrl?: string
-  statement?: string
-  doubanLink?: string
-  imdbLink?: string
-  tmdbLink?: string
-  tags?: string[]
-  titleComponents?: Record<string, string>
-  bdinfo?: string
-  targetSites?: string[]
-  anonymous?: boolean
-  screenshotInDesc?: boolean
-}
-
 export type CreateWithoutId<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt' | 'created_at' | 'updated_at'>
 export type UpdatePartial<T> = Partial<CreateWithoutId<T>>
 
@@ -748,29 +721,3 @@ export interface SchedulerTask {
   paused: boolean
 }
 
-// §56.24 字段预览（reverse mapping UI）
-export interface PreviewField {
-  category: string          // 元数据/简介/媒体/链接/标签/来源标注
-  standard_key: string      // 标准化键（如 title/subtitle/resolution）
-  label: string             // 显示名（如 "标题"/"分辨率"）
-  target_value: string      // 目标站字段值（reverse mapping 后）
-  source_value: string      // 原始值（mapping 前）
-  source: string            // 来源（ptgen/detail/local/user）
-  is_user_edited: boolean   // 是否用户编辑
-  required: boolean         // 是否必填
-  missing: boolean          // 是否缺失（必填但空）
-}
-
-export interface PreviewCompleteness {
-  total: number
-  filled: number
-  missing: number
-  percent: number
-}
-
-export interface PreviewResponse {
-  target_site: string
-  mode: string
-  fields: PreviewField[]
-  completeness: PreviewCompleteness
-}
