@@ -53,7 +53,7 @@
           type="info"
           show-icon
           style="margin-bottom: 12px"
-          message="一站多种：以站点为中心——选定目标站，批量将 ready 簇灌入发布。已存在该站的簇默认不可选。"
+          message="一站多种：以站点为中心——选定目标站，批量将 ready 簇灌入发布。已存在该站的簇默认不可选；源站禁转簇已隐藏。"
         />
 
         <a-table
@@ -323,6 +323,8 @@ async function fetchInjectList() {
   try {
     const resp = await seedConfigApi.listSeeds({
       ready: 'true',
+      // §59.143: 发布页隐藏源站禁转簇
+      exclude_forbidden: 'true',
       search: injectSearch.value,
       page: injectPage.value,
       page_size: injectPageSize.value,

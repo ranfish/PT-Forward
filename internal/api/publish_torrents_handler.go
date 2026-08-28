@@ -2724,6 +2724,9 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
 	// §59.131 ②: ready 过滤——发布页（一种多站）簇口径 data_ready 筛选（R3-3: 簇级=reviewed）
 	readyFilter := r.URL.Query().Get("ready")
+	// §59.143: 发布页排除源站禁转——forbidden（flags 内存判定零成本）直接隐藏；
+	// system_forbidden 精判在分页后（排除致页不齐）——保留红标, Eligibility 提交兜底
+	excludeForbidden := r.URL.Query().Get("exclude_forbidden") == "true"
 
 	// §59.38: 观察期视图——独立分支（hidden 组按 (client,name) 聚合，
 	// 不与活跃视图共用查询/状态机）
@@ -2967,6 +2970,11 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		}
 		sort.Strings(sites)
 		item["sites"] = sites
+
+		// §59.143: 发布页隐藏源站禁转簇（种子配置页不传此参数——数据维护视角可见）
+		if excludeForbidden && status == "forbidden" {
+			continue
+		}
 
 		// §59.131 ②: ready 过滤（data_ready=reviewed 口径，R3-3）
 		if readyFilter != "" {
