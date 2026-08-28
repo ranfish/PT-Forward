@@ -86,6 +86,10 @@
           <div class="cluster-name">{{ record.name }}</div>
           <div v-if="record.title && record.title !== record.name" class="cluster-title">{{ record.title }}</div>
         </template>
+        <template v-if="column.key === 'category'">
+          <a-tag v-if="record.category" color="blue" style="margin: 0">{{ CATEGORY_LABELS[record.category] || record.category }}</a-tag>
+          <span v-else style="color: #999; font-size: 12px">—</span>
+        </template>
         <template v-if="column.key === 'size'">
           {{ formatBytes(record.size) }}
         </template>
@@ -230,6 +234,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { seedConfigApi, publishTorrentsApi, type SeedListItem } from '@/api/publish'
 import { formatBytes, maskDomain } from '@/utils/format'
+import { CATEGORY_LABELS } from '@/generated/dict'
 
 // §59.131 ②: 一种多站页——簇口径改造（R3-1 定案）。
 // 数据源 = /publish/seeds 簇端点（零拉取）；行 = (client,path,name) 簇。
@@ -297,6 +302,7 @@ function totalPathsOf(c: { paths: Array<{ count: number }> }): number {
 
 const columns = [
   { title: '簇名称', dataIndex: 'name', key: 'name', ellipsis: true },
+  { title: '类型', key: 'category', width: 80 },
   { title: '大小', key: 'size', width: 90 },
   { title: '副本', key: 'copies', width: 90, align: 'center' as const },
   { title: '已有站点', key: 'sites', width: 220 },
