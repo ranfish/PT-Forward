@@ -6,8 +6,8 @@
     placement="right"
     :body-style="{ padding: '0' }"
     :header-style="{ display: 'none' }"
-    :mask-closable="!taskRunning"
-    :keyboard="!taskRunning"
+    :mask-closable="!loading"
+    :keyboard="!loading"
     destroy-on-close
     @close="handleClose"
   >
@@ -19,31 +19,7 @@
           <a-tag v-if="selectedTorrent" color="blue">{{ selectedTorrent.name }}</a-tag>
         </div>
         <div class="csp-header-right">
-          <!-- 源站切换 -->
-          <a-select
-            v-if="cachedSites.length > 0"
-            v-model:value="currentSourceSite"
-            size="small"
-            style="width: 200px"
-            placeholder="选择源站"
-            @change="onSourceSiteChange"
-          >
-            <a-select-option v-for="s in cachedSites" :key="s.siteName" :value="s.siteName">
-              {{ s.siteName }}
-              <CheckCircleFilled v-if="s.reviewed" style="color: #52c41a; margin-left: 4px" />
-            </a-select-option>
-          </a-select>
         </div>
-      </div>
-
-      <!-- ═══ Steps ═══ -->
-      <div v-if="!maintenanceOnly" class="csp-steps">
-        <a-steps :current="currentStep" size="small" style="padding: 8px 24px">
-          <a-step title="编辑详情" />
-          <a-step title="参数预览" />
-          <a-step title="选择站点" />
-          <a-step title="发布结果" />
-        </a-steps>
       </div>
 
       <!-- ═══ Body ═══ -->
@@ -62,10 +38,10 @@
           </template>
         </a-result>
 
-        <!-- Step 0: 编辑详情（5 Tab） -->
-        <div v-else-if="currentStep === 0" class="csp-step-content">
-          <!-- §59.20 ⑨: maintenanceOnly 预览模式 -->
-          <template v-if="maintenanceOnly && seedPreviewMode">
+        <!-- 编辑/预览 -->
+        <div v-else class="csp-step-content">
+          <!-- §59.20 ⑨: 预览模式 -->
+          <template v-if="seedPreviewMode">
             <div ref="previewScrollRef" style="max-width: 1100px">
               <a-typography-title :level="5">发布预览</a-typography-title>
 
@@ -167,17 +143,10 @@
 
           <!-- 编辑模式 -->
           <template v-else>
-          <a-alert
-            v-if="forbiddenFlag" type="error" show-icon style="margin-bottom: 16px"
-            :message="`⛔ 禁止转载：${forbiddenFlag}`" description="该种子被源站标记为禁止转载，无法继续发布。"
-          />
-
           <a-tabs v-model:active-key="activeTab">
             <!-- Tab 1: 种子详情 -->
             <a-tab-pane key="detail" tab="种子详情">
-              <!-- §59.20 maintenanceOnly 模式：18 TechProfile 字段只读展示 -->
-              <template v-if="maintenanceOnly">
-                <a-descriptions :column="3" bordered size="small" style="max-width: 900px">
+              <a-descriptions :column="3" bordered size="small" style="max-width: 900px">
                   <a-descriptions-item label="主标题" :span="3">{{ form.title || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="副标题" :span="3">{{ form.subtitle || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="中文名">{{ form.titleComponents.chinese_prefix || '—' }}</a-descriptions-item>
@@ -226,79 +195,6 @@
                 <div v-else-if="seedReviewed" style="margin-top: 12px; padding: 8px 12px; background: #f6ffed; border-radius: 4px; font-size: 13px; color: #52c41a">
                   ✓ 已审核（9 必需字段齐全）
                 </div>
-              </template>
-              <!-- 普通发布流程：可编辑表单 -->
-              <template v-else>
-                <a-form layout="vertical" style="max-width: 800px">
-                  <a-row :gutter="16">
-                    <a-col :span="12">
-                      <a-form-item label="主标题（英文）">
-                        <a-input v-model:value="form.title" placeholder="English.Title" />
-                      </a-form-item>
-                    </a-col>
-                    <a-col :span="12">
-                      <a-form-item label="中文副标题">
-                        <a-input v-model:value="form.subtitle" placeholder="中文名" />
-                        <div v-if="subtitleWarning" style="color: #faad14; font-size: 12px; margin-top: 4px">{{ subtitleWarning }}</div>
-                      </a-form-item>
-                    </a-col>
-                  </a-row>
-                  <div style="margin-bottom: 8px">
-                    <a-button size="small" :loading="reparsing" @click="reparseTitle">
-                      <template #icon><ReloadOutlined /></template>
-                      重新解析标题
-                    </a-button>
-                    <span v-if="reparseResult" style="margin-left: 8px; font-size: 12px" :style="{ color: reparseResult.includes('失败') ? '#cf1322' : '#52c41a' }">{{ reparseResult }}</span>
-                  </div>
-                  <a-row :gutter="16">
-                    <a-col :span="6">
-                      <a-form-item label="分辨率">
-                        <a-input v-model:value="form.titleComponents.resolution" placeholder="1080p" />
-                      </a-form-item>
-                    </a-col>
-                    <a-col :span="6">
-                      <a-form-item label="视频编码">
-                        <a-input v-model:value="form.titleComponents.video_codec" placeholder="x265" />
-                      </a-form-item>
-                    </a-col>
-                    <a-col :span="6">
-                      <a-form-item label="音频编码">
-                        <a-input v-model:value="form.titleComponents.audio_codec" placeholder="AC3" />
-                      </a-form-item>
-                    </a-col>
-                    <a-col :span="6">
-                      <a-form-item label="媒介">
-                        <a-input v-model:value="form.titleComponents.medium" placeholder="BluRay" />
-                      </a-form-item>
-                    </a-col>
-                  </a-row>
-                  <a-row :gutter="16">
-                    <a-col :span="6">
-                      <a-form-item label="制作组">
-                        <a-input v-model:value="form.titleComponents.release_group" placeholder="-GROUP" />
-                      </a-form-item>
-                    </a-col>
-                    <a-col :span="6">
-                      <a-form-item label="HDR">
-                        <a-input v-model:value="form.titleComponents.hdr" placeholder="HDR" />
-                      </a-form-item>
-                    </a-col>
-                    <a-col :span="6">
-                      <a-form-item label="年份/季集">
-                        <a-input v-model:value="form.titleComponents.year" placeholder="2024 / S01E01" />
-                      </a-form-item>
-                    </a-col>
-                    <a-col :span="6">
-                      <a-form-item label="版本信息">
-                        <a-input v-model:value="form.titleComponents.edition_info" placeholder="Remux" />
-                      </a-form-item>
-                    </a-col>
-                  </a-row>
-                  <a-form-item label="标签">
-                    <TagSelector v-model="form.tags" :display-labels="form.tagLabels" />
-                  </a-form-item>
-                </a-form>
-              </template><!-- v-else (non-maintenanceOnly) -->
             </a-tab-pane>
 
             <!-- Tab 2: 海报与声明 -->
@@ -312,14 +208,7 @@
                   <a-image v-if="form.poster" :src="form.poster" :width="120" style="margin-top: 8px" />
                 </a-form-item>
                 <a-form-item label="声明">
-                  <a-textarea v-model:value="form.statement" :auto-size="{ minRows: 3, maxRows: 25 }" placeholder="源站官组声明（只读）" :disabled="maintenanceOnly" />
-                </a-form-item>
-                <a-form-item v-if="!maintenanceOnly" label="豆瓣 / IMDb / TMDb">
-                  <a-row :gutter="8">
-                    <a-col :span="8"><a-input v-model:value="form.doubanLink" placeholder="豆瓣链接" /></a-col>
-                    <a-col :span="8"><a-input v-model:value="form.imdbLink" placeholder="IMDb 链接" /></a-col>
-                    <a-col :span="8"><a-input v-model:value="form.tmdbLink" placeholder="TMDb 链接" /></a-col>
-                  </a-row>
+                  <a-textarea v-model:value="form.statement" :auto-size="{ minRows: 3, maxRows: 25 }" placeholder="源站官组声明（只读）" disabled />
                 </a-form-item>
               </a-form>
             </a-tab-pane>
@@ -361,14 +250,14 @@
                 <a-button :loading="refreshing === 'mediainfo'" @click="doRefresh('mediainfo')">{{ seedIsLocal ? '重新获取 MediaInfo' : '从源站重新获取 MediaInfo' }}</a-button>
               </div>
               <!-- §59.36: 维护模式 MI 只读展示，重获走上方按钮（数据修复动作） -->
-              <a-textarea v-model:value="form.mediaInfo" :rows="36" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
+              <a-textarea v-model:value="form.mediaInfo" :rows="36" placeholder="MediaInfo 文本" style="font-family: monospace; font-size: 12px" disabled />
               <a-form-item v-if="form.bdinfo" label="BDInfo" style="margin-top: 12px">
-                <a-textarea v-model:value="form.bdinfo" :rows="10" style="font-family: monospace; font-size: 12px" :disabled="maintenanceOnly" />
+                <a-textarea v-model:value="form.bdinfo" :rows="10" style="font-family: monospace; font-size: 12px" disabled />
               </a-form-item>
             </a-tab-pane>
 
             <!-- §59.20 Tab 6: 已过滤声明（只读预览） -->
-            <a-tab-pane v-if="maintenanceOnly" key="filtered" tab="已过滤声明">
+            <a-tab-pane key="filtered" tab="已过滤声明">
               <a-alert
                 type="info" show-icon style="margin-bottom: 12px"
                 message="以下声明将在发布时被自动过滤。可在「发布规则 → 声明过滤规则」中管理过滤模式。"
@@ -385,74 +274,24 @@
           </template><!-- v-else (editing mode) -->
         </div>
 
-        <!-- Step 1: 参数预览 -->
-        <div v-else-if="currentStep === 1" class="csp-step-content">
-          <PublishFieldPreview
-            :target-site="previewTargetSite"
-            :mode="previewMode"
-            :fields="previewFields"
-            :completeness="previewCompleteness"
-            :loading="previewLoading"
-            error=""
-          />
-        </div>
-
-        <!-- Step 2: 选择站点 -->
-        <div v-else-if="currentStep === 2" class="csp-step-content">
-          <WizardStepSelectTargets
-            v-model="selectedTargets"
-            :site-list="siteList"
-            :targets-loading="targetsLoading"
-            :anonymous="form.anonymous"
-            :title-components="form.titleComponents"
-            :info-hash="selectedTorrent?.info_hash || ''"
-            :mode="analyzeResult?.last_merge_mode || 'ptgen_first'"
-            @update:anonymous="form.anonymous = $event"
-          />
-        </div>
-
-        <!-- Step 3: 发布结果 -->
-        <div v-else-if="currentStep === 3" class="csp-step-content">
-          <WizardStepResult
-            :submit-error="submitError"
-            :submitted-candidate-id="submittedCandidateId"
-            :candidate-status="candidateStatus"
-            :selected-targets="selectedTargets"
-            :result-records="resultRecords"
-            @back="handleClose"
-          />
-        </div>
       </div>
 
       <!-- ═══ Footer ═══ -->
       <div class="csp-footer">
-        <div class="csp-footer-left">
-          <a-button v-if="currentStep > 0 && !maintenanceOnly" @click="prevStep">上一步</a-button>
-        </div>
+        <div class="csp-footer-left"></div>
         <div class="csp-footer-right">
           <a-button @click="handleClose">取消</a-button>
-          <template v-if="maintenanceOnly">
-            <!-- §59.20 ⑨: 预览模式 → 返回编辑 + 确认完成 -->
-            <template v-if="seedPreviewMode">
-              <a-button @click="backToEdit">返回编辑</a-button>
-              <a-tooltip :title="previewScrolled ? '' : '请完整浏览预览内容（滚动到底）后确认'">
-                <a-button type="primary" :disabled="!previewScrolled" @click="confirmDone">确认完成</a-button>
-              </a-tooltip>
-            </template>
-            <!-- 编辑模式 → 预览按钮 -->
-            <template v-else>
-              <a-button type="primary" :loading="saving" :disabled="loading || !!loadError" @click="saveOnly">
-                预览
-              </a-button>
-            </template>
+          <!-- §59.20 ⑨: 预览模式 → 返回编辑 + 确认完成 -->
+          <template v-if="seedPreviewMode">
+            <a-button @click="backToEdit">返回编辑</a-button>
+            <a-tooltip :title="previewScrolled ? '' : '请完整浏览预览内容（滚动到底）后确认'">
+              <a-button type="primary" :disabled="!previewScrolled" @click="confirmDone">确认完成</a-button>
+            </a-tooltip>
           </template>
+          <!-- 编辑模式 → 预览按钮 -->
           <template v-else>
-            <a-button v-if="currentStep === 0" type="primary" :disabled="!canProceed" :loading="saving" @click="nextStep">
-              保存并预览
-            </a-button>
-            <a-button v-else-if="currentStep === 1" type="primary" @click="nextStep">下一步</a-button>
-            <a-button v-else-if="currentStep === 2" type="primary" :loading="submitting" :disabled="selectedTargets.length === 0" @click="doSubmit">
-              立即发布（{{ selectedTargets.length }} 站）
+            <a-button type="primary" :loading="saving" :disabled="loading || !!loadError" @click="saveOnly">
+              预览
             </a-button>
           </template>
         </div>
@@ -472,15 +311,11 @@ import { tagDisplayName as tagDisplayNameCommon } from '@/utils/tagDisplay'
 import { TAG_GROUPS } from '@/generated/dict'
 import { CATEGORY_LABELS, PLATFORM_FULLNAMES } from '@/generated/dict'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
-import type { ManualForwardSubmitRequest, PreviewField, PreviewCompleteness, PublishResultRecord } from '@/api/types'
 import TagSelector from './TagSelector.vue'
 import ScreenshotManager from './ScreenshotManager.vue'
 
 // §59.54: 截图管理器引用（转存前快照）
 const shotManagerRef = ref<InstanceType<typeof ScreenshotManager> | null>(null)
-import PublishFieldPreview from './PublishFieldPreview.vue'
-import WizardStepSelectTargets from './WizardStepSelectTargets.vue'
-import WizardStepResult from './WizardStepResult.vue'
 
 interface PresetTorrent {
   info_hash: string
@@ -496,7 +331,6 @@ interface PresetTorrent {
 const props = defineProps<{
   open: boolean
   presetTorrent?: PresetTorrent | null
-  maintenanceOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -505,22 +339,17 @@ const emit = defineEmits<{
 }>()
 
 // --- State ---
-const currentStep = ref(0)
 const activeTab = ref('detail')
 const loading = ref(false)
 const loadingText = ref('')
 const loadingProgress = ref(0)
 const loadError = ref('')
 const saving = ref(false)
-const submitting = ref(false)
-const reparsing = ref(false)
-const reparseResult = ref('')
 const refreshing = ref('')
 const bodyRef = ref<HTMLElement>()
 
 const selectedTorrent = ref<PresetTorrent | null>(null)
-const analyzeResult = ref<Record<string, any> | null>(null)
-const cachedSites = ref<Array<{ id: number; siteName: string; torrentId: string; reviewed: boolean; fetchedAt: string; title: string; subtitle: string }>>([])
+// 源站名（loadSeedDetail 回填；refresh/saveOnly 的 siteName 参数源）
 const currentSourceSite = ref<string>('')
 
 const form = ref({
@@ -547,138 +376,14 @@ const form = ref({
   tagLabels: null as string[] | null,
 })
 
-// Preview
-const previewTargetSite = ref('')
-const previewMode = ref('ptgen_first')
-const previewFields = ref<PreviewField[]>([])
-const previewCompleteness = ref<PreviewCompleteness | null>(null)
-const previewLoading = ref(false)
-
-// Target sites
-interface SiteItem { name: string; domain: string; blocked: boolean; blockReason: string }
-const siteList = ref<SiteItem[]>([])
-const selectedTargets = ref<string[]>([])
-const targetsLoading = ref(false)
-
-// Submit results
-interface CandidateStatus { status: string; total_count: number; done_count: number; fail_count: number }
-const submitError = ref('')
-const submittedCandidateId = ref(0)
-const candidateStatus = ref<CandidateStatus | null>(null)
-const resultRecords = ref<Record<string, PublishResultRecord>>({})
-let pollTimer: ReturnType<typeof setTimeout> | null = null
-let candidatePollTimer: ReturnType<typeof setInterval> | null = null
 
 // --- Computed ---
-const forbiddenFlag = computed(() => analyzeResult.value?.forbidden || '')
-const canProceed = computed(() => !!selectedTorrent.value && !forbiddenFlag.value)
 
-const subtitleWarning = computed(() => {
-  if (!form.value.subtitle) return ''
-  const sub = form.value.subtitle
-  const warnings: string[] = []
-  if (/[\uFF00-\uFFEF]/.test(sub)) warnings.push('含全角符号')
-  const firstChar = sub.charAt(0)
-  if (!/[\u4e00-\u9fff]/.test(firstChar)) warnings.push('未以中文开头')
-  if (/转自|转载自|来源[:：]/.test(sub)) warnings.push('包含转载来源')
-  return warnings.join('； ')
-})
-
-// --- Lifecycle ---
-watch(() => props.open, (val) => {
-  if (val) {
-    // §59.32: 恢复进行中任务（分析/发布）——不重置、不重新发起
-    const active = restoreActiveTask()
-    if (active) {
-      resetPanel()
-      if (props.presetTorrent) selectedTorrent.value = props.presetTorrent
-      if (active.candidateId) {
-        // 发布阶段恢复：直接进入结果步骤，续轮询
-        currentStep.value = 2
-        submittedCandidateId.value = active.candidateId
-        startCandidatePoll(active.candidateId)
-        return
-      }
-      if (active.taskId) {
-        // 分析阶段恢复：loading 视图 + 续轮询
-        loading.value = true
-        loadingProgress.value = 0
-        loadingText.value = '正在分析（已恢复）...'
-        pollAnalyze(active.taskId)
-        return
-      }
-    }
-    resetPanel()
-    if (props.presetTorrent) {
-      selectedTorrent.value = props.presetTorrent
-      if (props.maintenanceOnly) {
-        fillFormFromPreset()
-        loadDeclPatterns()
-      } else {
-        enterAnalyze()
-      }
-    }
-  }
-})
-
-watch(currentStep, () => {
-  if (bodyRef.value) bodyRef.value.scrollTop = 0
-})
-
-// §59.32: 后台任务运行态（分析 loading 或 发布轮询中）
-const taskRunning = computed(() => loading.value || !!candidatePollTimer)
-
-// §59.32: 任务恢复——sessionStorage 记录进行中任务（infoHash 匹配才恢复，防跨种子串台）
-const SS_TASK_KEY = 'csp-active-task'
-
-function saveActiveTask(infoHash: string, taskId?: number, candidateId?: number) {
-  try {
-    const prev = JSON.parse(sessionStorage.getItem(SS_TASK_KEY) || '{}')
-    sessionStorage.setItem(SS_TASK_KEY, JSON.stringify({
-      infoHash,
-      taskId: taskId ?? prev.taskId,
-      candidateId: candidateId ?? prev.candidateId,
-    }))
-  } catch { /* silent */ }
-}
-
-function clearActiveTask() {
-  try { sessionStorage.removeItem(SS_TASK_KEY) } catch { /* silent */ }
-}
-
-function restoreActiveTask(): { infoHash: string; taskId?: number; candidateId?: number } | null {
-  try {
-    const raw = sessionStorage.getItem(SS_TASK_KEY)
-    if (!raw) return null
-    const t = JSON.parse(raw)
-    if (!t?.infoHash) return null
-    if (!t.taskId && !t.candidateId) return null
-    // infoHash 匹配当前预设种子才恢复（跨种子不串台）
-    if (props.presetTorrent?.info_hash && t.infoHash !== props.presetTorrent.info_hash) {
-      sessionStorage.removeItem(SS_TASK_KEY)
-      return null
-    }
-    return t
-  } catch { return null }
-}
 
 function resetPanel() {
-  stopCandidatePoll()
-  currentStep.value = 0
   activeTab.value = 'detail'
   selectedTorrent.value = null
-  analyzeResult.value = null
-  cachedSites.value = []
   currentSourceSite.value = ''
-  siteList.value = []
-  selectedTargets.value = []
-  submittedCandidateId.value = 0
-  candidateStatus.value = null
-  resultRecords.value = {}
-  previewFields.value = []
-  previewCompleteness.value = null
-  previewLoading.value = false
-  submitError.value = ''
   seedPreviewMode.value = false
   previewRenderedDesc.value = ''
   form.value = {
@@ -693,11 +398,20 @@ function resetPanel() {
 }
 
 function handleClose() {
-  if (taskRunning.value) {
-    message.info('任务将在后台继续，重新打开此种子可恢复进度')
-  }
   emit('update:open', false)
 }
+
+// --- Lifecycle ---
+watch(() => props.open, (val) => {
+  if (val) {
+    resetPanel()
+    if (props.presetTorrent) {
+      selectedTorrent.value = props.presetTorrent
+      fillFormFromPreset()
+      loadDeclPatterns()
+    }
+  }
+})
 
 function fillFormFromPreset() {
   const t = props.presetTorrent
@@ -975,105 +689,6 @@ async function loadDeclPatterns() {
   } catch { /* silent */ }
 }
 
-// --- Analyze ---
-async function enterAnalyze() {
-  if (!selectedTorrent.value) return
-  loading.value = true
-  loadingText.value = '正在分析种子信息...'
-  loadingProgress.value = 0
-  loadError.value = ''
-
-  try {
-    // 先查缓存站点
-    const csResp = await publishDataApi.cachedSites(selectedTorrent.value.info_hash)
-    cachedSites.value = csResp.data?.data?.sites || []
-    if (cachedSites.value.length > 0 && !currentSourceSite.value) {
-      currentSourceSite.value = cachedSites.value[0].siteName
-    }
-
-    const t = selectedTorrent.value
-    const resp = await manualForwardApi.startAnalyze({
-      clientId: t.client_id,
-      infoHash: t.info_hash,
-      name: t.name,
-      savePath: t.save_path,
-      size: t.size,
-      sourceSite: t.source_site || currentSourceSite.value,
-      sourceTorrentId: t.source_site_id ? String(t.source_site_id) : undefined,
-    })
-    const taskId = (resp.data?.data as Record<string, unknown>)?.task_id as number
-    if (!taskId) {
-      loadError.value = '分析任务创建失败'
-      loading.value = false
-      return
-    }
-    if (props.presetTorrent?.info_hash) {
-      saveActiveTask(props.presetTorrent.info_hash, taskId)
-    }
-    pollAnalyze(taskId)
-  } catch (e: unknown) {
-    loadError.value = (e as Error).message
-    loading.value = false
-  }
-}
-
-function pollAnalyze(taskId: number) {
-  async function poll() {
-    try {
-      const resp = await manualForwardApi.pollAnalyze(taskId)
-      const task = resp.data?.data as Record<string, any> | undefined
-      if (!task) return
-      if (task.status === 'done' && task.result) {
-        const r = task.result as Record<string, any>
-        analyzeResult.value = r
-        fillForm(r)
-        loading.value = false
-        loadingProgress.value = 0
-        clearActiveTask()
-      } else if (task.status === 'failed') {
-        loadError.value = task.error || '分析失败'
-        loading.value = false
-        clearActiveTask()
-      } else {
-        loadingProgress.value = task.progress || 0
-        loadingText.value = task.progressText || '正在分析...'
-        pollTimer = setTimeout(poll, 2000)
-      }
-    } catch (e: unknown) {
-      loadError.value = (e as Error).message
-      loading.value = false
-    }
-  }
-  pollTimer = setTimeout(poll, 1500)
-}
-
-function fillForm(r: Record<string, any>) {
-  form.value.title = r.title || ''
-  form.value.subtitle = r.subtitle || ''
-  form.value.mediaInfo = r.media_info || ''
-  form.value.description = r.description || ''
-  form.value.screenshots = r.screenshots || []
-  form.value.poster = r.poster_url || r.poster || ''
-  form.value.statement = r.statement || ''
-  form.value.doubanLink = r.douban_link || ''
-  form.value.imdbLink = r.imdb_link || ''
-  form.value.tmdbLink = r.tmdb_link || ''
-  form.value.tags = r.tags || []
-  form.value.bdinfo = r.bdinfo || ''
-  form.value.titleComponents = r.title_components || {}
-  if (r.removed_declarations) {
-    form.value.removedDeclarations = r.removed_declarations
-  }
-}
-
-// --- Source site switch ---
-async function onSourceSiteChange() {
-  if (!selectedTorrent.value || !currentSourceSite.value) return
-  // Re-analyze with new source site
-  selectedTorrent.value.source_site = currentSourceSite.value
-  await enterAnalyze()
-}
-
 // --- Refresh ---
 // §59.51: 后台截图任务——启动 + 2s 轮询 + 会话一致性校验
 let capturePollTimer: ReturnType<typeof setInterval> | null = null
@@ -1167,47 +782,6 @@ async function doRefresh(type: string) {
   }
 }
 
-// --- Step navigation ---
-async function nextStep() {
-  if (currentStep.value === 0) {
-    // Save to DB before proceeding
-    await saveToDB()
-    // Load preview
-    await loadPreview()
-    currentStep.value = 1
-  } else if (currentStep.value === 1) {
-    await enterSelectSites()
-    currentStep.value = 2
-  }
-}
-
-function prevStep() {
-  if (currentStep.value > 0) currentStep.value--
-}
-
-async function saveToDB() {
-  if (!selectedTorrent.value) return
-  // 直接从 cachedSites 找到 metadata ID，避免脆弱的搜索
-  const site = cachedSites.value.find(s => s.siteName === (currentSourceSite.value || selectedTorrent.value?.source_site))
-  if (!site || !site.id) return
-  saving.value = true
-  try {
-    await publishDataApi.saveSeedData(site.id, {
-      title: form.value.title,
-      subtitle: form.value.subtitle,
-      description: form.value.description,
-      screenshots: JSON.stringify(form.value.screenshots),
-      poster: form.value.poster,
-      mediainfo: form.value.mediaInfo,
-      tags: JSON.stringify(form.value.tags),
-    })
-  } catch (e: unknown) {
-    // §59.56 审计: 静默吞错导致列名笔误长期不可见——保存失败必须提示
-    message.error('保存失败: ' + (e as Error).message)
-  } finally {
-    saving.value = false
-  }
-}
 
 // §59.20: maintenanceOnly 模式保存——调 PUT /publish/seeds/:info_hash → 保存+预览
 async function saveOnly() {
@@ -1268,77 +842,6 @@ function backToEdit() {
   detachPreviewScrollGate()
 }
 
-async function loadPreview() {
-  if (!selectedTorrent.value) return
-  previewLoading.value = true
-  try {
-    const resp = await manualForwardApi.previewFields({
-      infoHash: selectedTorrent.value.info_hash,
-      targetSite: '',
-      mode: analyzeResult.value?.last_merge_mode || 'ptgen_first',
-    })
-    const data = resp.data?.data as unknown as Record<string, unknown> | undefined
-    if (data) {
-      previewFields.value = (data.fields as PreviewField[]) || []
-      previewCompleteness.value = (data.completeness as PreviewCompleteness) || null
-      previewMode.value = (data.mode as string) || 'ptgen_first'
-    }
-  } catch { /* silent */ } finally {
-    previewLoading.value = false
-  }
-}
-
-// 覆盖缓存（遗漏 C：目标站三色排除）
-const coveredSites = ref<Set<string>>(new Set())
-
-async function enterSelectSites() {
-  selectedTargets.value = []
-  targetsLoading.value = true
-  try {
-    const blockedTargets = (analyzeResult.value?.blocked_targets as string[]) || []
-    const resp = await manualForwardApi.eligibleTargets({
-      sourceSite: analyzeResult.value?.source_site || '',
-      blockedTargets: blockedTargets,
-    })
-    const raw = (resp.data?.data || []) as unknown[]
-
-    // 查覆盖缓存（轻量级 DB 读，不触发慢查询）
-    const coveredNames = new Set<string>()
-    if (selectedTorrent.value?.info_hash) {
-      try {
-        const covResp = await publishDataApi.coverageCache(selectedTorrent.value.info_hash)
-        const covSites = covResp.data?.data?.sites || []
-        for (const s of covSites) coveredNames.add(s.siteName)
-      } catch { /* silent — 无覆盖数据则不过滤 */ }
-    }
-    coveredSites.value = coveredNames
-
-    // 过滤掉已覆盖站点（🟢做种中 + 🟡可辅种），保留 ⚪未发现 + 无覆盖数据
-    siteList.value = raw
-      .filter((item) => {
-        const obj = item as Record<string, unknown>
-        return !coveredNames.has(obj.name as string)
-      })
-      .map((item) => {
-        const obj = item as Record<string, unknown>
-        const blocked = !!obj.blocked
-        const name = obj.name as string
-        let blockReason = ''
-        if (blocked) {
-          blockReason = blockedTargets.includes(name) ? '互斥规则' : '缺少 cookie/passkey'
-        }
-        return { name, domain: (obj.domain as string) || '', blocked, blockReason }
-      })
-
-    if (coveredNames.size > 0) {
-      message.info(`已排除 ${coveredNames.size} 个已覆盖站点`)
-    }
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  } finally {
-    targetsLoading.value = false
-  }
-}
 
 // --- helpers ---
 // §59.35 P3: 分级 label——Layer 1 字典优先（generated/dict.ts，与后端同源），
@@ -1350,135 +853,16 @@ const extendedCategoryLabels: Record<string, string> = {
   'category.game': '游戏',
   'category.software': '软件',
 }
-function categoryLabelOf(v?: string): string {
+function categoryLabel(v?: string): string {
   if (!v) return '—'
   return CATEGORY_LABELS[v] || extendedCategoryLabels[v] || v
 }
-function categoryLabel(v?: string): string {
-  return categoryLabelOf(v)
-}
 
-// --- Submit ---
-async function reparseTitle() {
-  const title = form.value.title || selectedTorrent.value?.name || ''
-  if (!title) {
-    message.warning('请先输入标题')
-    return
-  }
-  reparsing.value = true
-  reparseResult.value = ''
-  try {
-    const resp = await manualForwardApi.parseTitle(title)
-    const data = resp.data?.data
-    if (data?.title_components) {
-      const tc = data.title_components
-      // 只更新有值的字段（不覆盖用户手动修改的空字段）
-      for (const [key, val] of Object.entries(tc)) {
-        if (val) form.value.titleComponents[key] = val
-      }
-      reparseResult.value = `解析成功：${data.category || ''} ${tc.resolution || ''} ${tc.medium || ''} ${tc.video_codec || ''}`.trim()
-    } else {
-      reparseResult.value = '解析完成（无额外信息）'
-    }
-  } catch (e: unknown) {
-    reparseResult.value = `解析失败: ${(e as Error).message}`
-  } finally {
-    reparsing.value = false
-  }
-}
-
-async function doSubmit() {
-  if (!selectedTorrent.value || selectedTargets.value.length === 0) return
-  submitting.value = true
-  try {
-    const t = selectedTorrent.value
-    const req: ManualForwardSubmitRequest = {
-      clientId: t.client_id,
-      infoHash: t.info_hash,
-      title: t.name,
-      sourceSite: analyzeResult.value?.source_site || t.source_site || '',
-      sourceSiteId: t.source_site_id || 0,
-      description: form.value.description,
-      mediaInfo: form.value.mediaInfo,
-      screenshots: form.value.screenshots,
-      targetSites: selectedTargets.value,
-      subtitle: form.value.subtitle,
-      statement: form.value.statement,
-      poster: form.value.poster,
-      doubanLink: form.value.doubanLink,
-      imdbLink: form.value.imdbLink,
-      tmdbLink: form.value.tmdbLink,
-      tags: form.value.tags,
-      bdinfo: form.value.bdinfo,
-      anonymous: form.value.anonymous,
-      screenshotInDesc: form.value.screenshotInDesc,
-      titleComponents: form.value.titleComponents,
-    }
-    const resp = await manualForwardApi.submit(req)
-    const candId = (resp.data?.data as unknown as Record<string, unknown>)?.candidate_id as number
-    if (candId) {
-      submittedCandidateId.value = candId
-      if (props.presetTorrent?.info_hash) {
-        saveActiveTask(props.presetTorrent.info_hash, undefined, candId)
-      }
-      currentStep.value = 3
-      startCandidatePoll(candId)
-    }
-  } catch (e: unknown) {
-    message.error(`发布失败: ${(e as Error).message}`)
-  } finally {
-    submitting.value = false
-  }
-}
-
-function startCandidatePoll(candidateId: number) {
-  candidatePollTimer = setInterval(async () => {
-    try {
-      const resp = await publishApi.getCandidate(candidateId)
-      const c = resp.data?.data
-      if (!c) return
-      const status = c.publish_status as string
-
-      // 每次轮询都拉 result records（增量进度）
-      await fetchResultRecords()
-
-      // 从 resultRecords 计算逐站进度
-      const records = Object.values(resultRecords.value)
-      const doneCount = records.filter(r => ['completed', 'skipped', 'exists', 'edited'].includes(r.status)).length
-      const failCount = records.filter(r => r.status === 'failed').length
-
-      candidateStatus.value = {
-        status,
-        total_count: selectedTargets.value.length,
-        done_count: doneCount,
-        fail_count: failCount,
-      }
-
-      if (status === 'done' || status === 'failed') {
-        stopCandidatePoll()
-        clearActiveTask()
-      }
-    } catch { /* silent */ }
-  }, 3000)
-}
-
-async function fetchResultRecords() {
-  if (!submittedCandidateId.value) return
-  try {
-    const resp = await publishApi.listResults({ page: 1, pageSize: 100, candidateId: submittedCandidateId.value })
-    const items = (resp.data?.data?.items || []) as PublishResultRecord[]
-    const map: Record<string, PublishResultRecord> = {}
-    for (const r of items) map[r.target_site] = r
-    resultRecords.value = map
-  } catch { /* silent */ }
-}
-
-function stopCandidatePoll() {
-  if (candidatePollTimer) {
-    clearInterval(candidatePollTimer)
-    candidatePollTimer = null
-  }
-}
+// §59.51: 组件卸载清轮询
+onUnmounted(() => {
+  if (capturePollTimer) { clearInterval(capturePollTimer); capturePollTimer = null }
+  detachPreviewScrollGate()
+})
 </script>
 
 <style scoped>
@@ -1534,9 +918,3 @@ function stopCandidatePoll() {
   gap: 8px;
 }
 </style>
-
-// §59.51: 组件卸载清轮询
-onUnmounted(() => {
-  if (capturePollTimer) { clearInterval(capturePollTimer); capturePollTimer = null }
-  detachPreviewScrollGate()
-})

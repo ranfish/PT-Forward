@@ -220,8 +220,7 @@
     <CrossSeedPanel
       v-model:open="panelOpen"
       :preset-torrent="panelPreset"
-      maintenance-only
-      @success="fetchData"
+            @success="fetchData"
     />
 
     <BatchFetchPanel

@@ -324,12 +324,6 @@
     </a-tabs>
 
 
-    <CrossSeedPanel
-      v-model:open="crossSeedOpen"
-      :preset-torrent="null"
-      @success="onWizardSuccess"
-    />
-
     <a-modal v-model:open="showCreateTaskModal" :title="t('publish.tasks')" :confirm-loading="createTaskSubmitting" width="520px" @ok="createTask">
       <a-form layout="vertical">
         <a-form-item :label="t('publish.sourceSiteId')">
@@ -365,7 +359,6 @@ import * as echarts from 'echarts'
 import { publishApi, publishDataApi } from '@/api/publish'
 import { sitesApi } from '@/api/sites'
 import { useEnumLabels } from '@/utils/enumLabels'
-import CrossSeedPanel from './CrossSeedPanel.vue'
 import type { PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from '@/api/types'
 import { formatTime, formatBytes } from '@/utils/format'
 
@@ -539,7 +532,6 @@ function recentStatusLabel(status: string): string {
   return map[status] || status
 }
 
-const crossSeedOpen = ref(false)
 const candidateSearch = ref('')
 const candidateStatus = ref<string | undefined>(undefined)
 const candidatesLoading = ref(false)
@@ -931,11 +923,6 @@ async function createTask() {
   } finally {
     createTaskSubmitting.value = false
   }
-}
-
-function onWizardSuccess() {
-  activeTab.value = 'candidates'
-  fetchCandidates()
 }
 
 onMounted(() => {
