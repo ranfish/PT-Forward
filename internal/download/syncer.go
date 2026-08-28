@@ -263,10 +263,9 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientID string, torrents []
 	now := time.Now()
 	seenHashes := make(map[string]bool, len(torrents))
 
-	if len(torrents) == 0 {
-		return
-	}
-
+	// §59.144: 空≠跳过——下载器清空（0 种子）恰恰意味着全部消失，必须走到
+	// 尾部 hidden 标记（原早退致 QB0 清空后残留快照永冻 is_hidden=0，
+	// 真人快打2 残留簇混入 ready 计数实锤）。UPSERT 循环对空列表天然无操作。
 	records := make([]model.TorrentSnapshot, 0, len(torrents))
 	for _, t := range torrents {
 		seenHashes[t.Hash] = true
