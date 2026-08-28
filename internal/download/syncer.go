@@ -213,7 +213,7 @@ func (s *Syncer) syncClient(ctx context.Context, c model.DownloaderClient) {
 
 	torrents, err := c.GetAllTorrents(ctx)
 	if err != nil {
-		s.logger.Debug("failed to get torrents from client",
+		s.logger.Warn("failed to get torrents from client",
 			zap.String("client", clientID),
 			zap.Error(err))
 		return

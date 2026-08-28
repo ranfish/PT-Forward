@@ -5,7 +5,7 @@
 // type 域：standard_key → 显示名（categoryLabel 数据源）
 export const CATEGORY_LABELS: Record<string, string> = {
   "category.movie": "电影",
-  "category.tv_series": "电视剧",
+  "category.tv_series": "剧集",
   "category.tv_shows": "综艺",
   "category.animation": "动漫",
   "category.documentary": "纪录片",
