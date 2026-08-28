@@ -58,7 +58,7 @@
       type="info"
       show-icon
       style="margin-bottom: 12px"
-      message="一种多站：以簇为中心——选择一个种子簇，向多个目标站发布。数据不完整的簇请先到种子配置页完善（发布页零拉取）。"
+      message="一种多站：以簇为中心——选择一个种子簇，向多个目标站发布。数据不完整的簇请先到种子配置页完善（发布页零拉取）；源站禁转簇已隐藏。"
     />
 
     <a-table
@@ -370,6 +370,8 @@ async function fetchList() {
       save_path: selectedPath.value || '',
       // §59.142: radio 值域映射——前端 ready/pending → 后端 true/false（原透传致过滤失效三态同数据）
       ready: readyFilter.value === 'all' ? '' : (readyFilter.value === 'ready' ? 'true' : 'false'),
+      // §59.143: 发布页隐藏源站禁转簇
+      exclude_forbidden: 'true',
       search: searchText.value,
       page: currentPage.value,
       page_size: pageSize.value,
