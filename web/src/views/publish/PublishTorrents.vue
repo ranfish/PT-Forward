@@ -301,10 +301,10 @@ function totalPathsOf(c: { paths: Array<{ count: number }> }): number {
 }
 
 const columns = [
-  { title: '簇名称', dataIndex: 'name', key: 'name', ellipsis: true },
-  { title: '类型', key: 'category', width: 80 },
-  { title: '大小', key: 'size', width: 90 },
-  { title: '副本', key: 'copies', width: 90, align: 'center' as const },
+  { title: '簇名称', dataIndex: 'name', key: 'name', ellipsis: true, sorter: (a: SeedListItem, b: SeedListItem) => a.name.localeCompare(b.name) },
+  { title: '类型', key: 'category', width: 80, sorter: (a: SeedListItem, b: SeedListItem) => (a.category || '').localeCompare(b.category || '') },
+  { title: '大小', key: 'size', width: 90, sorter: (a: SeedListItem, b: SeedListItem) => a.size - b.size },
+  { title: '副本', key: 'copies', width: 90, align: 'center' as const, sorter: (a: SeedListItem, b: SeedListItem) => (a.copy_count ?? 1) - (b.copy_count ?? 1) },
   { title: '已有站点', key: 'sites', width: 220 },
   { title: '数据状态', key: 'status', width: 110 },
   { title: '操作', key: 'actions', width: 200 },
