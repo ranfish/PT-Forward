@@ -1,113 +1,226 @@
 <template>
   <div style="padding: 24px">
-    <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center">
-      <a-space>
-        <h3 style="margin: 0">一站多种</h3>
-        <template v-if="selectedIds.length > 0">
-          <a-button size="small" type="primary" @click="batchReview(true)">
-            批量审核 ({{ selectedIds.length }})
-          </a-button>
-          <a-button size="small" @click="batchReview(false)">取消审核</a-button>
-          <a-popconfirm :title="`确定删除选中的 ${selectedIds.length} 条记录？`" @confirm="batchDelete">
-            <a-button size="small" danger>批量删除</a-button>
-          </a-popconfirm>
-        </template>
-      </a-space>
-      <a-space>
-        <a-radio-group v-model:value="reviewStatus" button-style="solid" size="small" @change="onFilterChange">
-          <a-radio-button value="all">全部</a-radio-button>
-          <a-radio-button value="reviewed">已审核</a-radio-button>
-          <a-radio-button value="unreviewed">待审核</a-radio-button>
-        </a-radio-group>
-        <a-button type="primary" @click="batchFetchOpen = true"><PlusOutlined /> 获取数据</a-button>
-        <a-input-search
-          v-model:value="searchQuery"
-          placeholder="搜索标题或副标题"
-          style="width: 300px"
-          allow-clear
-          @search="onFilterChange"
-        />
-        <a-select
-          v-model:value="sourceSiteFilter"
-          style="width: 200px"
-          placeholder="源站筛选"
-          allow-clear
-          @change="onFilterChange"
-        >
-          <a-select-option v-for="s in sourceSites" :key="s" :value="s">{{ s }}</a-select-option>
-        </a-select>
-        <a-button @click="fetchData"><ReloadOutlined /></a-button>
-      </a-space>
-    </div>
-
-    <a-table
-      :columns="columns"
-      :data-source="tableData"
-      :loading="loading"
-      :pagination="pagination"
-      row-key="id"
-      :scroll="{ x: 1380 }"
-      size="small"
-      :row-class-name="(record: SeedDataRow) => completenessPercent(record) < 50 ? 'row-incomplete' : ''"
-      :row-selection="{ selectedRowKeys: selectedIds, onChange: (keys: number[]) => selectedIds = keys }"
-      @change="onTableChange"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'title'">
-          <div>
-            <div v-if="record.subtitle" style="color: #666; font-size: 12px">{{ record.subtitle }}</div>
-            <div :class="{ 'cell-missing': !record.title }">{{ record.title || '(空)' }}</div>
-          </div>
-        </template>
-        <template v-else-if="column.key === 'site_name'">
-          <a-tag color="blue">{{ record.site_name }}</a-tag>
-          <CheckCircleFilled v-if="record.reviewed" style="color: #52c41a; margin-left: 4px" />
-        </template>
-        <template v-else-if="column.key === 'standard_type'">
-          <span v-if="record.standard_type">{{ record.standard_type }}</span>
-          <span v-else class="cell-missing">未设置</span>
-        </template>
-        <template v-else-if="column.key === 'tags'">
-          <template v-if="parseTags(record.tags).length">
-            <a-tag
-              v-for="t in parseTags(record.tags)"
-              :key="t"
-              :color="isForbiddenTag(t) ? 'red' : 'blue'"
-              style="margin: 1px; font-size: 11px"
-            >
-              {{ t }}
-            </a-tag>
-          </template>
-          <span v-else class="cell-missing">无</span>
-        </template>
-        <template v-else-if="column.key === 'completeness'">
-          <a-progress
-            type="circle"
-            :size="40"
-            :percent="completenessPercent(record)"
-            :stroke-color="completenessColor(record)"
+    <a-tabs v-model:active-key="activeTab">
+      <!-- ═══ Tab 1: 灌入发布（站中心，§59.133 ③） ═══ -->
+      <a-tab-pane key="inject" tab="灌入发布">
+        <div class="inject-toolbar">
+          <a-select
+            v-model:value="selectedTarget"
+            style="width: 220px"
+            :loading="targetSitesLoading"
+            placeholder="选择目标站"
+            show-search
+            :filter-option="filterSiteOption"
+            @change="onInjectFilterChange"
+          >
+            <a-select-option v-for="s in targetSites" :key="s.name" :value="s.name">
+              {{ s.name }}
+              <a-tag v-if="!s.hasCookie" color="red" size="small" style="margin-left: 4px">缺 cookie</a-tag>
+            </a-select-option>
+          </a-select>
+          <a-input-search
+            v-model:value="injectSearch"
+            placeholder="搜索簇名称..."
+            style="width: 260px; margin-left: 12px"
+            allow-clear
+            @search="onInjectFilterChange"
           />
-        </template>
-        <template v-else-if="column.key === 'flags'">
-          <a-tag v-if="record.flags" color="red">{{ record.flags }}</a-tag>
-        </template>
-        <template v-else-if="column.key === 'updated_at'">
-          {{ formatTime(record.updated_at) }}
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space size="small">
-          <a-space size="small">
-            <a-button size="small" type="link" @click="openReview(record)">核对</a-button>
-            <a-button size="small" type="link" @click="openMaintenance(record)">维护</a-button>
+          <a-radio-group
+            v-model:value="existFilter"
+            button-style="solid"
+            size="small"
+            style="margin-left: 12px"
+            @change="onInjectFilterChange"
+          >
+            <a-radio-button value="all">全部</a-radio-button>
+            <a-radio-button value="new">未存在</a-radio-button>
+          </a-radio-group>
+          <a-tag v-if="selectedTarget" :color="publishableCount > 0 ? 'green' : 'default'" style="margin-left: 8px">
+            {{ selectedTarget }}：可灌入 {{ publishableCount }} 簇
+          </a-tag>
+          <a-tooltip title="提交链路接线中（TagApplier 灰度，R3-5）">
+            <a-button
+              type="primary"
+              style="margin-left: auto"
+              :disabled="selectedInjectHashes.length === 0"
+            >
+              发布到 {{ selectedTarget || '目标站' }} ({{ selectedInjectHashes.length }})
+            </a-button>
+          </a-tooltip>
+        </div>
+
+        <a-alert
+          type="info"
+          show-icon
+          style="margin-bottom: 12px"
+          message="一站多种：以站点为中心——选定目标站，批量将 ready 簇灌入发布。已存在该站的簇默认不可选。"
+        />
+
+        <a-table
+          :columns="injectColumns"
+          :data-source="injectRows"
+          :loading="injectLoading"
+          :pagination="{
+            current: injectPage,
+            pageSize: injectPageSize,
+            total: injectTotal,
+            showSizeChanger: true,
+            pageSizeOptions: ['50', '100', '200'],
+            showTotal: (t: number) => `共 ${t} 簇`,
+            size: 'small',
+          }"
+          row-key="hash"
+          size="small"
+          :scroll="{ x: 1000 }"
+          :row-selection="{
+            selectedRowKeys: selectedInjectHashes,
+            onChange: (keys: string[]) => selectedInjectHashes = keys,
+            getCheckboxProps: (record: SeedListItem) => ({ disabled: !selectedTarget || existsOnTarget(record) }),
+          }"
+          @change="onInjectTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'name'">
+              <div class="cluster-name">{{ record.name }}</div>
+              <div v-if="record.title && record.title !== record.name" class="cluster-title">{{ record.title }}</div>
+            </template>
+            <template v-if="column.key === 'size'">
+              {{ formatBytes(record.size) }}
+            </template>
+            <template v-if="column.key === 'copies'">
+              <a-tag :color="(record.copy_count ?? 1) > 1 ? 'blue' : 'default'">{{ record.copy_count ?? 1 }} 副本</a-tag>
+            </template>
+            <template v-if="column.key === 'sites'">
+              <template v-if="record.sites?.length">
+                <a-tag v-for="s in record.sites.slice(0, 4)" :key="s" size="small" style="margin: 1px">{{ s }}</a-tag>
+                <a-tag v-if="record.sites.length > 4" size="small" style="margin: 1px">+{{ record.sites.length - 4 }}</a-tag>
+              </template>
+              <span v-else style="color: #999; font-size: 12px">未知</span>
+            </template>
+            <template v-if="column.key === 'exist'">
+              <template v-if="selectedTarget && existsOnTarget(record)">
+                <a-tag color="warning">已存在</a-tag>
+              </template>
+              <a-tag v-else-if="selectedTarget" color="success">可灌入</a-tag>
+              <span v-else style="color: #999; font-size: 12px">未选站</span>
+            </template>
+            <template v-if="column.key === 'actions'">
+              <a-button size="small" @click="goRefine(record)">完善数据</a-button>
+            </template>
+          </template>
+        </a-table>
+      </a-tab-pane>
+
+      <!-- ═══ Tab 2: 数据管理（行级 metadata，原功能保留） ═══ -->
+      <a-tab-pane key="manage" tab="数据管理">
+        <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center">
+          <a-space>
+            <template v-if="selectedIds.length > 0">
+              <a-button size="small" type="primary" @click="batchReview(true)">
+                批量审核 ({{ selectedIds.length }})
+              </a-button>
+              <a-button size="small" @click="batchReview(false)">取消审核</a-button>
+              <a-popconfirm :title="`确定删除选中的 ${selectedIds.length} 条记录？`" @confirm="batchDelete">
+                <a-button size="small" danger>批量删除</a-button>
+              </a-popconfirm>
+            </template>
           </a-space>
+          <a-space>
+            <a-radio-group v-model:value="reviewStatus" button-style="solid" size="small" @change="onFilterChange">
+              <a-radio-button value="all">全部</a-radio-button>
+              <a-radio-button value="reviewed">已审核</a-radio-button>
+              <a-radio-button value="unreviewed">待审核</a-radio-button>
+            </a-radio-group>
+            <a-button type="primary" @click="batchFetchOpen = true"><PlusOutlined /> 获取数据</a-button>
+            <a-input-search
+              v-model:value="searchQuery"
+              placeholder="搜索标题或副标题"
+              style="width: 300px"
+              allow-clear
+              @search="onFilterChange"
+            />
+            <a-select
+              v-model:value="sourceSiteFilter"
+              style="width: 200px"
+              placeholder="源站筛选"
+              allow-clear
+              @change="onFilterChange"
+            >
+              <a-select-option v-for="s in sourceSites" :key="s" :value="s">{{ s }}</a-select-option>
+            </a-select>
+            <a-button @click="fetchData"><ReloadOutlined /></a-button>
           </a-space>
-        </template>
-      </template>
-    </a-table>
+        </div>
+
+        <a-table
+          :columns="columns"
+          :data-source="tableData"
+          :loading="loading"
+          :pagination="pagination"
+          row-key="id"
+          :scroll="{ x: 1380 }"
+          size="small"
+          :row-class-name="(record: SeedDataRow) => completenessPercent(record) < 50 ? 'row-incomplete' : ''"
+          :row-selection="{ selectedRowKeys: selectedIds, onChange: (keys: number[]) => selectedIds = keys }"
+          @change="onTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'title'">
+              <div>
+                <div v-if="record.subtitle" style="color: #666; font-size: 12px">{{ record.subtitle }}</div>
+                <div :class="{ 'cell-missing': !record.title }">{{ record.title || '(空)' }}</div>
+              </div>
+            </template>
+            <template v-else-if="column.key === 'site_name'">
+              <a-tag color="blue">{{ record.site_name }}</a-tag>
+              <CheckCircleFilled v-if="record.reviewed" style="color: #52c41a; margin-left: 4px" />
+            </template>
+            <template v-else-if="column.key === 'standard_type'">
+              <span v-if="record.standard_type">{{ record.standard_type }}</span>
+              <span v-else class="cell-missing">未设置</span>
+            </template>
+            <template v-else-if="column.key === 'tags'">
+              <template v-if="parseTags(record.tags).length">
+                <a-tag
+                  v-for="t in parseTags(record.tags)"
+                  :key="t"
+                  :color="isForbiddenTag(t) ? 'red' : 'blue'"
+                  style="margin: 1px; font-size: 11px"
+                >
+                  {{ t }}
+                </a-tag>
+              </template>
+              <span v-else class="cell-missing">无</span>
+            </template>
+            <template v-else-if="column.key === 'completeness'">
+              <a-progress
+                type="circle"
+                :size="40"
+                :percent="completenessPercent(record)"
+                :stroke-color="completenessColor(record)"
+              />
+            </template>
+            <template v-else-if="column.key === 'flags'">
+              <a-tag v-if="record.flags" color="red">{{ record.flags }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'updated_at'">
+              {{ formatTime(record.updated_at) }}
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-space size="small">
+                <a-button size="small" type="link" @click="openReview(record)">核对</a-button>
+                <a-button size="small" type="link" @click="openMaintenance(record)">维护</a-button>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
+      </a-tab-pane>
+    </a-tabs>
 
     <CrossSeedPanel
       v-model:open="panelOpen"
       :preset-torrent="panelPreset"
+      maintenance-only
       @success="fetchData"
     />
 
@@ -126,18 +239,131 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ReloadOutlined, CheckCircleFilled, PlusOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
-import { publishDataApi } from '@/api/publish'
+import { publishDataApi, seedConfigApi, type SeedListItem } from '@/api/publish'
+import { sitesApi } from '@/api/sites'
+import type { Site } from '@/api/types'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
 import MetadataReviewModal from './MetadataReviewModal.vue'
-import { formatTime } from '@/utils/format'
+import { formatBytes, formatTime } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
+
+const activeTab = ref('inject')
+
+// ==================== Tab 1: 灌入发布（§59.133 ③ 站中心灌入） ====================
+
+const targetSites = ref<Site[]>([])
+const targetSitesLoading = ref(false)
+const selectedTarget = ref<string | undefined>(undefined)
+const injectSearch = ref('')
+const existFilter = ref<'all' | 'new'>('all')
+const injectRows = ref<SeedListItem[]>([])
+const injectTotal = ref(0)
+const injectLoading = ref(false)
+const injectPage = ref(1)
+const injectPageSize = ref(50)
+const selectedInjectHashes = ref<string[]>([])
+
+const injectColumns = [
+  { title: '簇名称', dataIndex: 'name', key: 'name', ellipsis: true },
+  { title: '大小', key: 'size', width: 90 },
+  { title: '副本', key: 'copies', width: 90, align: 'center' as const },
+  { title: '已有站点', key: 'sites', width: 220 },
+  { title: '目标站状态', key: 'exist', width: 110, align: 'center' as const },
+  { title: '操作', key: 'actions', width: 100 },
+]
+
+function filterSiteOption(input: string, option: { children: () => unknown[] }): boolean {
+  const text = Array.isArray(option?.children?.())
+    ? String(option.children().join(''))
+    : String(option?.children?.() ?? '')
+  return text.toLowerCase().includes(input.toLowerCase())
+}
+
+function existsOnTarget(record: SeedListItem): boolean {
+  if (!selectedTarget.value) return false
+  return (record.sites || []).includes(selectedTarget.value)
+}
+
+const publishableCount = computed(() => {
+  if (!selectedTarget.value) return 0
+  return injectRows.value.filter(r => !existsOnTarget(r)).length
+})
+
+async function fetchTargetSites() {
+  targetSitesLoading.value = true
+  try {
+    const resp = await sitesApi.list(1, 300, '', { is_target: 'true' })
+    const data = resp.data?.data
+    targetSites.value = ((data?.items || data || []) as Site[]).filter(s => s.enabled)
+  } catch { /* ignore */ } finally {
+    targetSitesLoading.value = false
+  }
+}
+
+async function fetchInjectList() {
+  injectLoading.value = true
+  try {
+    const resp = await seedConfigApi.listSeeds({
+      ready: 'true',
+      search: injectSearch.value,
+      page: injectPage.value,
+      page_size: injectPageSize.value,
+    })
+    injectRows.value = ((resp.data?.data?.items || []) as SeedListItem[]).map((it) => ({
+      ...it,
+      hash: it.hash || `${it.client_id}|${it.name}`,
+    }))
+    injectTotal.value = resp.data?.data?.total || 0
+    // 切筛选后勾选可能已不在列表，清空避免幽灵提交
+    selectedInjectHashes.value = selectedInjectHashes.value.filter(h =>
+      injectRows.value.some(r => r.hash === h))
+  } catch {
+    message.error('加载 ready 簇失败')
+    injectRows.value = []
+    injectTotal.value = 0
+  } finally {
+    injectLoading.value = false
+  }
+}
+
+function onInjectFilterChange() {
+  injectPage.value = 1
+  fetchInjectList()
+}
+
+function onInjectTableChange(pag: { current?: number; pageSize?: number }) {
+  if (pag.current) injectPage.value = pag.current
+  if (pag.pageSize) injectPageSize.value = pag.pageSize
+  fetchInjectList()
+}
+
+// 引导跳回种子配置页（同 ② deep-link）
+function goRefine(record: SeedListItem) {
+  router.push({
+    path: '/publish/seeds',
+    query: {
+      client_id: record.client_id,
+      save_path: record.save_path,
+      name: record.name,
+      focus: '1',
+    },
+  })
+}
+
+let injectSearchTimer: ReturnType<typeof setTimeout> | undefined
+watch(injectSearch, () => {
+  if (injectSearchTimer) clearTimeout(injectSearchTimer)
+  injectSearchTimer = setTimeout(() => onInjectFilterChange(), 400)
+})
+
+// ==================== Tab 2: 数据管理（原功能保留） ====================
 
 interface SeedDataRow {
   id: number
@@ -344,6 +570,7 @@ async function tryOpenFromDeepLink() {
   const infoHash = route.query.info_hash as string
   const siteName = route.query.site_name as string
   if (!infoHash) return
+  activeTab.value = 'manage'
   try {
     const resp = await publishDataApi.listSeedData({ search: infoHash, page_size: 100 })
     const items = resp.data?.data?.items as SeedDataRow[] | undefined
@@ -364,13 +591,22 @@ watch(panelOpen, (now, prev) => {
   if (prev && !now) onPanelClose()
 })
 
-onMounted(async () => {
-  await fetchData()
+onMounted(() => {
+  fetchTargetSites()
+  fetchInjectList()
+  fetchData()
   tryOpenFromDeepLink()
 })
 </script>
 
 <style scoped>
+.inject-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
 :deep(.row-incomplete) {
   background-color: #fff2f0;
 }
@@ -380,5 +616,14 @@ onMounted(async () => {
 .cell-missing {
   color: #cf1322;
   font-weight: 500;
+}
+.cluster-name {
+  font-size: 13px;
+  word-break: break-all;
+}
+.cluster-title {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
 }
 </style>
