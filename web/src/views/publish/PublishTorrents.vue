@@ -110,14 +110,24 @@
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-tooltip title="提交链路接线中（TagApplier 灰度，R3-5）">
-              <a-button type="primary" size="small" disabled>选站发布</a-button>
-            </a-tooltip>
-            <a-button size="small" @click="goRefine(record)">完善数据</a-button>
+            <template v-if="record.reviewed">
+              <a-tooltip title="提交链路接线中（TagApplier 灰度，R3-5）">
+                <a-button type="primary" size="small" disabled>选站发布</a-button>
+              </a-tooltip>
+              <a-button size="small" @click="previewSeed(record)">预览种子</a-button>
+            </template>
+            <a-button v-else size="small" @click="goRefine(record)">完善数据</a-button>
           </a-space>
         </template>
       </template>
     </a-table>
+
+    <CrossSeedPanel
+      v-model:open="previewPanelOpen"
+      :preset-torrent="previewPreset"
+      :initial-preview="previewDirect"
+      @success="onPreviewSaved"
+    />
 
     <a-modal
       v-model:open="declFilterOpen"
@@ -231,6 +241,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import CrossSeedPanel from './CrossSeedPanel.vue'
 import { message } from 'ant-design-vue'
 import { seedConfigApi, publishTorrentsApi, type SeedListItem } from '@/api/publish'
 import { formatBytes, maskDomain } from '@/utils/format'
@@ -374,6 +385,28 @@ async function fetchList() {
   } finally {
     loading.value = false
   }
+}
+
+// §59.141: 预览种子——ready 行直开 CrossSeedPanel 预览（幂等保存+滚动门槛全套）
+const previewPanelOpen = ref(false)
+const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string } | null>(null)
+const previewDirect = ref(false)
+
+function previewSeed(record: SeedListItem) {
+  previewPreset.value = {
+    info_hash: record.hash,
+    name: record.name,
+    size: record.size,
+    save_path: record.save_path,
+    client_id: Number(record.client_id) || 0,  // 非数字站名(PT0)→0, 维护链路仅 String 兜底传参
+    source_site: record.site_name,
+  }
+  previewDirect.value = true
+  previewPanelOpen.value = true
+}
+
+function onPreviewSaved() {
+  fetchList()
 }
 
 // 引导跳回种子配置页（R3-1 deep-link：自动应用筛选+定位+打开编辑）
