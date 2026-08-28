@@ -70,6 +70,15 @@ bash .github/skills/ptf-deploy/scripts/release-tag.sh v0.0.XXX
 - 镜像：`ghcr.io/ranfish/pt-forward:latest`（国外）/ `ranfish/pt-forward:latest`（国内）
 - 生产环境更新由**用户自行执行**：OTA（前端侧栏 → 检查更新 → 立即更新）或 `docker compose pull && docker compose up -d`
 
+## 部署到 243（开发验证环境，Docker）
+
+```bash
+bash .claude/skills/ptf-deploy/scripts/deploy-243.sh
+```
+
+- 前置：已 commit+push + 已跑 build-backend.sh（前端涉及另跑 build-frontend.sh）
+- 流程：gzip+ssh 管道传输 → docker cp + 原子 mv → restart → 版本核对 + 前端资产 hash 比对（不一致即报错退出）
+
 ## systemd OTA 兼容（勿改坏）
 
 `~/.config/systemd/user/pt-forward.service` 的 `[Service]` 段必须用 `Restart=always`（**不能**用 `on-failure`）：
