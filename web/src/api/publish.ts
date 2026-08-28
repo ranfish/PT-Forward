@@ -138,6 +138,7 @@ export interface SeedListItem {
   // §59.131 ②: 簇口径增量字段（发布页一种多站）
   copy_count?: number
   sites?: string[]
+  category?: string
 }
 
 export interface SeedDetail {
