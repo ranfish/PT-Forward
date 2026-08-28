@@ -368,7 +368,8 @@ async function fetchList() {
     const resp = await seedConfigApi.listSeeds({
       client_id: selectedClient.value || '',
       save_path: selectedPath.value || '',
-      ready: readyFilter.value === 'all' ? '' : readyFilter.value,
+      // §59.142: radio 值域映射——前端 ready/pending → 后端 true/false（原透传致过滤失效三态同数据）
+      ready: readyFilter.value === 'all' ? '' : (readyFilter.value === 'ready' ? 'true' : 'false'),
       search: searchText.value,
       page: currentPage.value,
       page_size: pageSize.value,
