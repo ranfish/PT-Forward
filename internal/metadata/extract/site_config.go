@@ -11,6 +11,8 @@
 package extract
 
 import (
+	"fmt"
+	"strconv"
 	"embed"
 	"encoding/json"
 	"strings"
@@ -30,6 +32,9 @@ type siteConfigEntry struct {
 	SiteName     string                       `json:"site_name"`
 	SourceKeys   map[string]string            `json:"source_keys"`
 	StandardKeys map[string]map[string]string `json:"standard_keys"`
+	// §59.146: 表单值映射（发布链 TagApplier 消费）——域→{standard_key→站表单值}
+	// 39 站 tag 域（tag.国语→yes/数字）、36 站 team 域。数值统一字符串化。
+	FormValueMappings map[string]map[string]interface{} `json:"form_value_mappings,omitempty"`
 	// v0.0.254: 站点特殊提取规则（替代 Go 代码的特殊提取器）
 	Extractors *siteExtractors `json:"extractors,omitempty"`
 }
@@ -212,6 +217,49 @@ func LookupSiteExtractors(domain, siteCode string) *siteExtractors {
 		}
 	}
 	return nil
+}
+
+// LookupFormValueMappings §59.146: 查站点表单值映射（域→{standard_key→站值字符串}）。
+// 数值统一 String 化（BTSchool span 数字值等）。站点无该域时返回 nil。
+func LookupFormValueMappings(domain, siteCode string) map[string]map[string]string {
+	loadConfig()
+	var cfg siteConfigEntry
+	var ok bool
+	if domain != "" {
+		cfg, ok = sitesByDomain[strings.ToLower(strings.TrimSpace(domain))]
+	}
+	if !ok && siteCode != "" {
+		cfg, ok = sitesByCode[strings.ToLower(strings.TrimSpace(siteCode))]
+	}
+	if !ok || len(cfg.FormValueMappings) == 0 {
+		return nil
+	}
+	out := make(map[string]map[string]string, len(cfg.FormValueMappings))
+	for domain, m := range cfg.FormValueMappings {
+		vals := make(map[string]string, len(m))
+		for k, v := range m {
+			switch tv := v.(type) {
+			case string:
+				vals[k] = tv
+			case float64:
+				if tv == float64(int64(tv)) {
+					vals[k] = strconv.FormatInt(int64(tv), 10)
+				} else {
+					vals[k] = strconv.FormatFloat(tv, 'f', -1, 64)
+				}
+			case bool:
+				if tv {
+					vals[k] = "yes"
+				} else {
+					vals[k] = "no"
+				}
+			default:
+				vals[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		out[domain] = vals
+	}
+	return out
 }
 
 // LookupStandardKey 把字段原始值映射到标准键（如 "电视剧 (TV Series)" → "category.tv_series"）。

@@ -453,7 +453,15 @@ func main() {
 	publishPipeline.SetDeclarationFilter(declFilter)
 	complianceChecker := compliance.NewChecker(db, log)
 	publishPipeline.SetComplianceChecker(complianceChecker)
-	publishPipeline.SetPusher(torrentPusher) // §56.30: 发布后自动加种
+	publishPipeline.SetPusher(torrentPusher)
+	// §59.146: TagApplier 灰度站点注入（发布时读 settings, 低频直查可接受）
+	publishPipeline.SetTagApplierSites(func() string {
+		v, err := settingsRepo.Get(ctx, setting.KeyTagApplierSites)
+		if err != nil {
+			return ""
+		}
+		return v
+	}) // §56.30: 发布后自动加种
 	reseedEngine.SetComplianceChecker(complianceChecker)
 	metadataFetcher := metadata.NewFetcher(db, log, siteProvider, settingsRepo)
 	// §56.13 方案 B: Engine 已在前面注入到 adapter.Factory（line 244），
