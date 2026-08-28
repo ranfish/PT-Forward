@@ -303,8 +303,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
-import { CheckCircleFilled, ReloadOutlined } from '@ant-design/icons-vue'
-import { manualForwardApi, publishDataApi, publishApi, publishTorrentsApi, seedConfigApi } from '@/api/publish'
+import { manualForwardApi, publishTorrentsApi, seedConfigApi } from '@/api/publish'
 import type { SeedDetail } from '@/api/publish'
 import { parseBBCode } from '@/utils/bbcode'
 import { tagDisplayName as tagDisplayNameCommon } from '@/utils/tagDisplay'
@@ -886,9 +885,6 @@ onUnmounted(() => {
 .csp-header-title {
   font-size: 16px;
   font-weight: 600;
-}
-.csp-steps {
-  border-bottom: 1px solid #f0f0f0;
 }
 .csp-body {
   flex: 1;
