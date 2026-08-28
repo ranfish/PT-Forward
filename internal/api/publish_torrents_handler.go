@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/coverage"
@@ -2765,14 +2766,29 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		sub = sub.Where("save_path = ?", savePath)
 	}
 	// §59.29: 搜索下推 SQL，20w+ 行时避免 Go 层全量过滤
-	// §59.138: 三域搜索——name/title/subtitle 任一命中（Yumi 纯英文簇的中文剧名在
-	// subtitle 域）。跨表一跳：metadata 命中 hash → 回快照 name 集合。
-	// 三查询点（sub/snapQuery/hashQ）必须同域——漏一处列表假阴性（§59.28 H1 同族）
-	searchMetaCond := "name LIKE ? OR name IN (SELECT s2.name FROM torrent_snapshots s2 JOIN torrent_metadata m ON m.info_hash = s2.hash WHERE m.title LIKE ? OR m.subtitle LIKE ?)"
-	searchArgs := []interface{}{"%" + search + "%", "%" + search + "%", "%" + search + "%"}
+	// §59.138: 三域搜索——CJK 词跨表扩 title/subtitle（Yumi 纯英文簇的中文剧名在
+	// subtitle 域）；拉丁词纯 name LIKE。回归审核定案：29 大库 FLAC 全表跨表子查询
+	// 69.8s 爆炸（大命中集 O(N×M)），CJK 门控消解（中文剧名命中集天然小）。
+	// snapQuery 不再重复 search 过滤——代表行组键=name，sub 已筛组（§59.29 双保险收敛）。
+	// sub/hashQ 两查询点必须同域——漏一处列表假阴性（§59.28 H1 同族）。
+	searchHasCJK := false
+	for _, r := range search {
+		if unicode.Is(unicode.Han, r) {
+			searchHasCJK = true
+			break
+		}
+	}
+	var searchConds []string
+	var searchArgs []interface{}
 	if search != "" {
-		snapQuery = snapQuery.Where("s.name LIKE ? OR s.name IN (SELECT s2.name FROM torrent_snapshots s2 JOIN torrent_metadata m ON m.info_hash = s2.hash WHERE m.title LIKE ? OR m.subtitle LIKE ?)", searchArgs...)
-		sub = sub.Where(searchMetaCond, searchArgs...)
+		if searchHasCJK {
+			searchConds = []string{"name LIKE ?", "OR name IN (SELECT s2.name FROM torrent_snapshots s2 JOIN torrent_metadata m ON m.info_hash = s2.hash WHERE m.title LIKE ? OR m.subtitle LIKE ?)"}
+			searchArgs = []interface{}{"%" + search + "%", "%" + search + "%", "%" + search + "%"}
+		} else {
+			searchConds = []string{"name LIKE ?"}
+			searchArgs = []interface{}{"%" + search + "%"}
+		}
+		sub = sub.Where(strings.Join(searchConds, " "), searchArgs...)
 	}
 	var rawSnapshots []model.TorrentSnapshot
 	if err := snapQuery.
@@ -2831,8 +2847,8 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			hashQ = hashQ.Where("save_path = ?", savePath)
 		}
 		if search != "" {
-			// §59.138: nameByHash 域同步三域（漏则命中簇 metadata 关联丢失, 状态标注假阴性）
-			hashQ = hashQ.Where(searchMetaCond, searchArgs...)
+			// §59.138: nameByHash 域同步搜索域（CJK 三域/拉丁 name——漏则假阴性）
+			hashQ = hashQ.Where(strings.Join(searchConds, " "), searchArgs...)
 		}
 		hashQ.Find(&hashNameRows)
 		for _, r := range hashNameRows {
