@@ -213,8 +213,7 @@
     <CrossSeedPanel
       v-model:open="editOpen"
       :preset-torrent="editPreset"
-      maintenance-only
-      @success="onEditSuccess"
+            @success="onEditSuccess"
     />
 
     <!-- Batch Fetch Panel -->

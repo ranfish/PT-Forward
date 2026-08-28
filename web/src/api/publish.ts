@@ -1,12 +1,9 @@
 import client from './client'
-import type { ApiResponse, ApiResponsePaginated, ListParams, ManualForwardSubmitRequest, PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from './types'
+import type { ApiResponse, ApiResponsePaginated, ListParams, PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from './types'
 
 export const publishApi = {
   listCandidates(params?: ListParams & { status?: string }) {
     return client.get<ApiResponsePaginated<PublishCandidate>>('/publish/candidates', { params })
-  },
-  getCandidate(id: number) {
-    return client.get<ApiResponse<PublishCandidate>>(`/publish/candidates/${id}`)
   },
   deleteCandidate(id: number) {
     return client.delete<ApiResponse<void>>(`/publish/candidates/${id}`)
@@ -56,21 +53,6 @@ export const publishApi = {
 }
 
 export const publishTorrentsApi = {
-  list(clientId?: number) {
-    return client.get<ApiResponse<{ items: PublishTorrentItem[]; total: number; total_sites: number; querying: boolean; query_progress: { done: number; total: number } }>>('/publish/torrents', { params: clientId ? { client_id: clientId } : {} })
-  },
-  queryCoverage(data: { clientId: number; infoHash: string; name?: string; size?: number }) {
-    return client.post<ApiResponse<CoverageResult>>('/publish/torrents/coverage', data)
-  },
-  batchQueryCoverage(data: { clientId: number; infoHashes: string[] }) {
-    return client.post<ApiResponse<{ queried: number }>>('/publish/torrents/batch-coverage', data)
-  },
-  queryStatus(clientId: number) {
-    return client.get<ApiResponse<{ querying: boolean; done: number; total: number }>>('/publish/torrents/query-status', { params: { client_id: clientId } })
-  },
-  detectSource(data: { infoHash: string; name: string }) {
-    return client.post<ApiResponse<SourceDetectResult>>('/publish/torrents/detect-source', data)
-  },
   listGroupMappings() {
     return client.get<ApiResponse<{ items: Array<Record<string, unknown> & { id: number }>; total: number }>>('/publish/torrents/group-mappings')
   },
@@ -86,96 +68,15 @@ export const publishTorrentsApi = {
   listGroupedSiteNames() {
     return client.get<ApiResponse<{ sites: string[] }>>('/publish/torrents/group-mappings/sites')
   },
-  batchPublish(data: { clientId: number; sourceSite: string; targetSite: string; items: { infoHash: string; name: string; size: number; savePath: string }[] }) {
-    return client.post<ApiResponse<{ created: number; failed: number; candidate_ids: number[]; target_site: string }>>('/publish/torrents/batch-publish', data)
-  },
   getDeclarationFilters() {
     return client.get<ApiResponse<{ patterns: string[]; is_default: boolean }>>('/publish/torrents/declaration-filters')
   },
   setDeclarationFilters(patterns: string[]) {
     return client.put<ApiResponse<{ patterns: string[]; message: string }>>('/publish/torrents/declaration-filters', { patterns })
   },
-  previewTitle(data: { targetSite: string; titleComponents: Record<string, string> }) {
-    return client.post<ApiResponse<{ title: string; target_site: string }>>('/publish/torrents/preview-title', data)
-  },
-  previewTitleBatch(data: { targetSites: string[]; titleComponents: Record<string, string> }) {
-    return client.post<ApiResponse<{ results: Record<string, string> }>>('/publish/torrents/preview-title-batch', data)
-  },
-}
-
-export interface SourceDetectResult {
-  source_site: string
-  source_site_id: number
-  group_name: string
-  torrent_id: string
-  auto_detected: boolean
-  candidates: { siteName: string; torrentId: string; hasCookie: boolean }[]
-}
-
-export interface PublishTorrentItem {
-  info_hash: string
-  name: string
-  size: number
-  save_path: string
-  state: string
-  uploaded: number
-  progress: number
-  ratio: number
-  queried: boolean
-  coverage: {
-    has_count: number
-    total_sites: number
-    target_count: number
-    sites: CoverageSite[]
-  }
-}
-
-export interface CoverageSite {
-  site_name: string
-  status: string
-  source: string
-  confidence: number
-  torrent_id: string
-  detail_url: string
-  queried_at: string
-}
-
-export interface CoverageResult {
-  info_hash: string
-  sites: CoverageSite[]
-  has_count: number
-  total_sites: number
-  target_count: number
 }
 
 export const manualForwardApi = {
-  seededTorrents(clientId?: number) {
-    return client.get<ApiResponse<unknown[]>>('/manual-forward/seeded-torrents', { params: clientId ? { client_id: clientId } : {} })
-  },
-  startAnalyze(data: { clientId: number; infoHash: string; name: string; savePath: string; size?: number; sourceSite?: string; sourceTorrentId?: string; metadataPriority?: string; fetchSource?: string }) {
-    return client.post<ApiResponse<{ task_id: number }>>('/manual-forward/start-analyze', data)
-  },
-  parseTitle(title: string) {
-    return client.post<ApiResponse<{ components: unknown; title_components: Record<string, string>; standardized: unknown; category: string }>>('/manual-forward/parse-title', { title })
-  },
-  pollAnalyze(taskId: number) {
-    return client.get<ApiResponse<{ status: string; result?: unknown }>>(`/manual-forward/analyze/${taskId}`)
-  },
-  eligibleTargets(data: { sourceSite: string; blockedTargets?: string[] }) {
-    return client.post<ApiResponse<string[]>>('/manual-forward/eligible-targets', data)
-  },
-  mergeFields(data: { infoHash: string; mode: string }) {
-    return client.post<ApiResponse<unknown>>('/manual-forward/merge', data)
-  },
-  previewFields(data: { infoHash: string; targetSite: string; mode?: string; userOverrides?: Record<string, string> }) {
-    return client.post<ApiResponse<unknown>>('/manual-forward/preview', data)
-  },
-  submit(data: ManualForwardSubmitRequest) {
-    return client.post<ApiResponse<void>>('/manual-forward/submit', data)
-  },
-  batchSubmit(items: ManualForwardSubmitRequest[]) {
-    return client.post<ApiResponse<{ succeeded: number; failed: number }>>('/manual-forward/batch-submit', { items })
-  },
   refresh(data: { type: string; name: string; savePath?: string; infoHash?: string; siteName?: string; screenshots?: string[] }) {
     return client.post<ApiResponse<Record<string, unknown>>>('/manual-forward/refresh', data)
   },
@@ -189,20 +90,11 @@ export const manualForwardApi = {
 }
 
 export const publishDataApi = {
-  cachedSites(infoHash: string) {
-    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ id: number; siteName: string; torrentId: string; reviewed: boolean; fetchedAt: string; title: string; subtitle: string }> }>>('/publish/cached-sites', { params: { info_hash: infoHash } })
-  },
   listSeedData(params?: { page?: number; page_size?: number; search?: string; source_site?: string; review_status?: 'all' | 'reviewed' | 'unreviewed' }) {
     return client.get<ApiResponse<{ items: unknown[]; total: number; page: number; page_size: number }>>('/publish/seed-data', { params })
   },
-  saveSeedData(id: number, data: { title?: string; subtitle?: string; description?: string; screenshots?: string; poster?: string; mediainfo?: string; tags?: string }) {
-    return client.put<ApiResponse<{ success: boolean; id: number }>>(`/publish/seed-data/${id}`, data)
-  },
   stats(days?: number) {
     return client.get<ApiResponse<{ stats: { todayPublish: number; todaySuccess: number; todayFailed: number; pendingCount: number; reviewedCount: number; totalMetadata: number; yesterdayPublish: number; yesterdaySuccess: number; unreviewedCount: number }; recent: unknown[]; trend: Array<{ day: string; success: number; failed: number }>; target_site_top: Array<{ site: string; count: number }>; status_distribution: Array<{ status: string; count: number }> }>>('/publish/stats', { params: days ? { days } : undefined })
-  },
-  coverageCache(infoHash: string) {
-    return client.get<ApiResponse<{ info_hash: string; sites: Array<{ siteName: string; status: string; source: string }> }>>('/publish/coverage-cache', { params: { info_hash: infoHash } })
   },
   batchReview(ids: number[], reviewed: boolean) {
     return client.post<ApiResponse<{ updated: number }>>('/publish/seed-data/batch-review', { ids, reviewed })
