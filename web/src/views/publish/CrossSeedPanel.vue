@@ -128,8 +128,8 @@
                   <a-descriptions-item label="主标题" :span="3">{{ form.title || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="副标题" :span="3">{{ form.subtitle || '—' }}</a-descriptions-item>
               </a-descriptions>
-              <!-- §59.135: 技术规格表——与预览②同一组件（展示同件） -->
-              <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="3" style="max-width: 900px" />
+              <!-- §59.135/§59.136: 技术规格表——与预览②同一组件同一 column（5行×4列 视觉同步） -->
+              <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" style="max-width: 900px; margin-top: 16px" />
                 <!-- §59.75: 产地/类型（PTGen 源归一只读展示——发布映射消费 canonical） -->
                 <a-form-item v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length" label="产地 / 类型" style="max-width: 900px; margin-top: 16px">
                   <span v-if="seedRegionGenre.region.length" style="margin-right: 16px">

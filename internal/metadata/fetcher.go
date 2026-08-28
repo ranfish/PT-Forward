@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/util"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
@@ -423,23 +423,14 @@ func (f *Fetcher) fetchWithIYUUFallback(ctx context.Context, infoHash, primarySi
 	return nil
 }
 
-// siteOpMarkerRe §59.99: 站点运营标记（副标题/标题尾部）——朋友站 "[中性种子(NL)]"
-// 零魔力标识（NBSP 前缀, 243 实测 254 行）。非内容数据, 转发引用无意义, 采集层剥除。
-var siteOpMarkerRe = regexp.MustCompile(`[\s\x{00a0}]*\[(?:中性种子|免费|Free|2X|促销)[^\]]*\]\s*$`)
-
-// stripSiteOperationMarkers 剥除标题/副标题尾部的站点运营标记（§59.64 副标题侧同族）。
-func stripSiteOperationMarkers(s string) string {
-	return strings.TrimSpace(siteOpMarkerRe.ReplaceAllString(strings.TrimSpace(s), ""))
-}
-
 func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *model.TorrentDetail, engineMeta extract.Meta) *model.TorrentMetadata {
 	now := time.Now()
 	meta := &model.TorrentMetadata{
 		InfoHash:          infoHash,
 		SiteName:          siteName,
 		TorrentID:         torrentID,
-		Title:             stripSiteOperationMarkers(detail.Title),
-		Subtitle:          stripSiteOperationMarkers(detail.Subtitle),
+		Title:             util.StripSiteOperationMarkers(detail.Title),
+		Subtitle:          util.StripSiteOperationMarkers(detail.Subtitle),
 		SourceCategory:    detail.Category,
 		SourceDescription: detail.Description,
 		Description:       detail.Description,

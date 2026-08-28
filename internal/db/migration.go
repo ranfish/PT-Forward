@@ -11,6 +11,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/titleparser"
+	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -255,6 +256,33 @@ func init() {
 	// §59.63: 簇截图链接缓存表（观察期复用——清簇重取免重截重传）
 	// §59.123: 站点别名域名补齐随版本同步（§59.60 O3 曾只在 29 手工 UPDATE——
 	// 10 站 tracker_domains/alternative_domains 补实测别名; 243 实测 9/10 缺）
+	// §59.136: 运营标记存量清洗——副标题尾部 "[50%]"/"[中性种子(NL)]" 等（采集层
+	// §59.99 词表漏百分比形态 + 混排 [禁转] 挡尾锚, 243 实测 32 行）。
+	// 用 metadata.StripSiteOperationMarkers 公共方法（与采集层同一实现, [禁转] 保留）。
+	RegisterMigration(25, "subtitle_op_markers_cleanup", func(gormDB *gorm.DB) error {
+		type subRow struct {
+			InfoHash string
+			Subtitle string
+		}
+		var rows []subRow
+		if err := gormDB.Table("torrent_metadata").
+			Select("info_hash, subtitle").
+			Where("subtitle LIKE ?", "%[%]").Find(&rows).Error; err != nil {
+			return err
+		}
+		for _, r := range rows {
+			cleaned := util.StripSiteOperationMarkers(r.Subtitle)
+			if cleaned == r.Subtitle {
+				continue
+			}
+			if err := gormDB.Table("torrent_metadata").
+				Where("info_hash = ?", r.InfoHash).
+				Update("subtitle", cleaned).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	RegisterMigration(24, "site_alias_domains_sync", func(gormDB *gorm.DB) error {
 		type aliasRow struct {
 			Site string

@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"github.com/ranfish/pt-forward/internal/util"
 	"context"
 	"testing"
 
@@ -39,17 +40,30 @@ func TestFetchFromSiteNoFallback_FailsWithoutIYUU(t *testing.T) {
 	}
 }
 
-// §59.99: 站点运营标记过滤——副标题/标题尾部 "[中性种子(NL)]"（朋友站零魔力
-// 标识, NBSP 前缀——与 §59.64 标题侧 [2X 50%] 同族）不属于内容, 转发无意义。
+// §59.99/§59.136: 站点运营标记过滤——副标题/标题尾部 "[中性种子(NL)]"（朋友站零魔力
+// 标识, NBSP 前缀——与 §59.64 标题侧 [2X 50%] 同族）、百分比/返利族 "[50%]" "[30%]" "[75%]"
+// 不属于内容, 转发无意义。混排 "[50%] [禁转]" 只剥运营标记, [禁转] 是合规判据保留。
 func TestStripSiteOperationMarkers(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"【醉拳2】mUHD作品 4k 杜比视界版本\u00a0\u00a0\u00a0 [中性种子(NL)]", "【醉拳2】mUHD作品 4k 杜比视界版本"},
 		{"正常副标题", "正常副标题"},
 		{"【名】简介 简繁字幕 带章节名    [中性种子(NL)]", "【名】简介 简繁字幕 带章节名"},
 		{"标题 [中性种子(NL)]", "标题"},
+		// §59.136: 百分比/返利族
+		{"危情24小时.Butterfly.On.A.Wheel.2007     [50%]", "危情24小时.Butterfly.On.A.Wheel.2007"},
+		{"副标题 [30%]", "副标题"},
+		{"副标题 [75%]", "副标题"},
+		{"副标题\u00a0\u00a0 [2X 50%]", "副标题"},
+		{"副标题 [Free 50%]", "副标题"},
+		// §59.136: 混排——运营标记剥除, [禁转] 保留
+		{"简繁双语特效四字幕\u00a0\u00a0\u00a0 [中性种子(NL)] [禁转]", "简繁双语特效四字幕 [禁转]"},
+		{"副标题 [50%] [禁转]", "副标题 [禁转]"},
+		{"副标题 [50%] [中性种子(NL)] [谢绝转载]", "副标题 [谢绝转载]"},
+		// [禁转] 单独存在: 不剥
+		{"副标题 [禁转]", "副标题 [禁转]"},
 	}
 	for _, c := range cases {
-		if got := stripSiteOperationMarkers(c.in); got != c.want {
+		if got := util.StripSiteOperationMarkers(c.in); got != c.want {
 			t.Errorf("strip(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
