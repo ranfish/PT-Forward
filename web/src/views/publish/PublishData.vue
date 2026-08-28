@@ -91,10 +91,12 @@
               <a-tag :color="(record.copy_count ?? 1) > 1 ? 'blue' : 'default'">{{ record.copy_count ?? 1 }} 副本</a-tag>
             </template>
             <template v-if="column.key === 'sites'">
-              <template v-if="record.sites?.length">
-                <a-tag v-for="s in record.sites.slice(0, 4)" :key="s" size="small" style="margin: 1px">{{ s }}</a-tag>
-                <a-tag v-if="record.sites.length > 4" size="small" style="margin: 1px">+{{ record.sites.length - 4 }}</a-tag>
-              </template>
+              <a-tooltip v-if="record.sites?.length" :title="record.sites.join('、')">
+                <span>
+                  <a-tag v-for="s in record.sites.slice(0, 4)" :key="s" size="small" style="margin: 1px">{{ s }}</a-tag>
+                  <a-tag v-if="record.sites.length > 4" size="small" style="margin: 1px">+{{ record.sites.length - 4 }}</a-tag>
+                </span>
+              </a-tooltip>
               <span v-else style="color: #999; font-size: 12px">未知</span>
             </template>
             <template v-if="column.key === 'exist'">

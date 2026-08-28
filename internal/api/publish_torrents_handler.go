@@ -2764,10 +2764,15 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		snapQuery = snapQuery.Where("s.save_path = ?", savePath)
 		sub = sub.Where("save_path = ?", savePath)
 	}
-	// §59.29: 搜索下推 SQL（name LIKE），20w+ 行时避免 Go 层全量过滤
+	// §59.29: 搜索下推 SQL，20w+ 行时避免 Go 层全量过滤
+	// §59.138: 三域搜索——name/title/subtitle 任一命中（Yumi 纯英文簇的中文剧名在
+	// subtitle 域）。跨表一跳：metadata 命中 hash → 回快照 name 集合。
+	// 三查询点（sub/snapQuery/hashQ）必须同域——漏一处列表假阴性（§59.28 H1 同族）
+	searchMetaCond := "name LIKE ? OR name IN (SELECT s2.name FROM torrent_snapshots s2 JOIN torrent_metadata m ON m.info_hash = s2.hash WHERE m.title LIKE ? OR m.subtitle LIKE ?)"
+	searchArgs := []interface{}{"%" + search + "%", "%" + search + "%", "%" + search + "%"}
 	if search != "" {
-		snapQuery = snapQuery.Where("s.name LIKE ?", "%"+search+"%")
-		sub = sub.Where("name LIKE ?", "%"+search+"%")
+		snapQuery = snapQuery.Where("s.name LIKE ? OR s.name IN (SELECT s2.name FROM torrent_snapshots s2 JOIN torrent_metadata m ON m.info_hash = s2.hash WHERE m.title LIKE ? OR m.subtitle LIKE ?)", searchArgs...)
+		sub = sub.Where(searchMetaCond, searchArgs...)
 	}
 	var rawSnapshots []model.TorrentSnapshot
 	if err := snapQuery.
@@ -2826,7 +2831,8 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			hashQ = hashQ.Where("save_path = ?", savePath)
 		}
 		if search != "" {
-			hashQ = hashQ.Where("name LIKE ?", "%"+search+"%")
+			// §59.138: nameByHash 域同步三域（漏则命中簇 metadata 关联丢失, 状态标注假阴性）
+			hashQ = hashQ.Where(searchMetaCond, searchArgs...)
 		}
 		hashQ.Find(&hashNameRows)
 		for _, r := range hashNameRows {
@@ -2970,8 +2976,14 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		}
 		if search != "" {
 			sLower := strings.ToLower(search)
+			// §59.138: Go 层双保险同步三域（name/title/subtitle）
+			subtitle := ""
+			if meta != nil {
+				subtitle = meta.Subtitle
+			}
 			if !strings.Contains(strings.ToLower(snap.Name), sLower) &&
-				!strings.Contains(strings.ToLower(item["title"].(string)), sLower) {
+				!strings.Contains(strings.ToLower(item["title"].(string)), sLower) &&
+				!strings.Contains(strings.ToLower(subtitle), sLower) {
 				continue
 			}
 		}
