@@ -87,7 +87,7 @@
           <div v-if="record.title && record.title !== record.name" class="cluster-title">{{ record.title }}</div>
         </template>
         <template v-if="column.key === 'category'">
-          <a-tag v-if="record.category" color="blue" style="margin: 0">{{ CATEGORY_LABELS[record.category] || record.category }}</a-tag>
+          <a-tag v-if="record.category" :color="categoryTagColor(record.category)" style="margin: 0">{{ CATEGORY_LABELS[record.category] || record.category }}</a-tag>
           <span v-else style="color: #999; font-size: 12px">—</span>
         </template>
         <template v-if="column.key === 'size'">
@@ -246,6 +246,7 @@ import { message } from 'ant-design-vue'
 import { seedConfigApi, publishTorrentsApi, type SeedListItem } from '@/api/publish'
 import { formatBytes, maskDomain } from '@/utils/format'
 import { CATEGORY_LABELS } from '@/generated/dict'
+import { categoryTagColor } from '@/utils/categoryDisplay'
 
 // §59.131 ②: 一种多站页——簇口径改造（R3-1 定案）。
 // 数据源 = /publish/seeds 簇端点（零拉取）；行 = (client,path,name) 簇。

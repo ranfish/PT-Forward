@@ -85,7 +85,7 @@
               <div v-if="record.title && record.title !== record.name" class="cluster-title">{{ record.title }}</div>
             </template>
             <template v-if="column.key === 'category'">
-              <a-tag v-if="record.category" color="blue" style="margin: 0">{{ CATEGORY_LABELS[record.category] || record.category }}</a-tag>
+              <a-tag v-if="record.category" :color="categoryTagColor(record.category)" style="margin: 0">{{ CATEGORY_LABELS[record.category] || record.category }}</a-tag>
               <span v-else style="color: #999; font-size: 12px">—</span>
             </template>
             <template v-if="column.key === 'size'">
@@ -256,6 +256,7 @@ import BatchFetchPanel from './BatchFetchPanel.vue'
 import MetadataReviewModal from './MetadataReviewModal.vue'
 import { formatBytes, formatTime } from '@/utils/format'
 import { CATEGORY_LABELS } from '@/generated/dict'
+import { categoryTagColor } from '@/utils/categoryDisplay'
 
 const route = useRoute()
 const router = useRouter()
