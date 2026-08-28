@@ -93,18 +93,16 @@
           <a-tag :color="(record.copy_count ?? 1) > 1 ? 'blue' : 'default'">{{ record.copy_count ?? 1 }} 副本</a-tag>
         </template>
         <template v-if="column.key === 'sites'">
-          <template v-if="record.sites?.length">
-            <a-tag v-for="s in record.sites.slice(0, 4)" :key="s" size="small" style="margin: 1px">{{ s }}</a-tag>
-            <a-tag v-if="record.sites.length > 4" size="small" style="margin: 1px">+{{ record.sites.length - 4 }}</a-tag>
-          </template>
+          <a-tooltip v-if="record.sites?.length" :title="record.sites.join('、')">
+            <span>
+              <a-tag v-for="s in record.sites.slice(0, 4)" :key="s" size="small" style="margin: 1px">{{ s }}</a-tag>
+              <a-tag v-if="record.sites.length > 4" size="small" style="margin: 1px">+{{ record.sites.length - 4 }}</a-tag>
+            </span>
+          </a-tooltip>
           <span v-else style="color: #999; font-size: 12px">未知</span>
         </template>
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)" style="margin: 0">{{ statusLabel(record.status) }}</a-tag>
-        </template>
-        <template v-if="column.key === 'ready'">
-          <a-tag v-if="record.reviewed" color="success" style="margin: 0">✓ ready</a-tag>
-          <a-tag v-else color="warning" style="margin: 0">待完善</a-tag>
         </template>
         <template v-if="column.key === 'actions'">
           <a-space>
@@ -303,7 +301,6 @@ const columns = [
   { title: '副本', key: 'copies', width: 90, align: 'center' as const },
   { title: '已有站点', key: 'sites', width: 220 },
   { title: '数据状态', key: 'status', width: 110 },
-  { title: '发布就绪', key: 'ready', width: 100, align: 'center' as const },
   { title: '操作', key: 'actions', width: 200 },
 ]
 
