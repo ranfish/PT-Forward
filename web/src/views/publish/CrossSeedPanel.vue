@@ -283,6 +283,8 @@ interface PresetTorrent {
 const props = defineProps<{
   open: boolean
   presetTorrent?: PresetTorrent | null
+  // §59.141: 直开预览——发布页"预览种子"按钮（加载完自动 saveOnly 进预览, 幂等）
+  initialPreview?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -450,6 +452,10 @@ async function loadSeedDetail(infoHash: string) {
       form.value.tags = d.tags || []
       // §59.106: 显示名优先用后端 tag_labels（dict bundle 无关——新词条旧缓存页面不显示代码）
       form.value.tagLabels = d.tag_labels || null
+      // §59.141: 直开预览——发布页"预览种子"入口（数据加载完幂等保存进预览）
+      if (props.initialPreview) {
+        await saveOnly()
+      }
     }
   } catch (e: unknown) {
     loadError.value = (e as Error).message
