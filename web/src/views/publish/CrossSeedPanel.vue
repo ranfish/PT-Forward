@@ -61,43 +61,21 @@
               <!-- §59.86: ② 技术规格（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
                 <template #title><span style="font-size: 14px">② 技术规格</span></template>
-              <a-descriptions :column="4" bordered size="small">
-                <!-- §59.90: 行集/顺序对齐 Tab1（标识组→媒介组→视频组→音频组→其他） -->
-                <a-descriptions-item label="中文名">{{ pv('chinese_prefix') }}</a-descriptions-item>
-                <a-descriptions-item label="剧名">{{ pv('main_title') }}</a-descriptions-item>
-                <a-descriptions-item label="季集">{{ pv('season_episode') }}</a-descriptions-item>
-                <a-descriptions-item label="年份">{{ pv('year') }}</a-descriptions-item>
-                <a-descriptions-item label="制作组">{{ pv('release_group') }}</a-descriptions-item>
-                <a-descriptions-item label="类型">{{ pvCategory }}</a-descriptions-item>
-                <a-descriptions-item label="媒介(站点)">{{ pvSiteMedium }}</a-descriptions-item>
-                <a-descriptions-item label="片源">{{ pv('source_type') }}</a-descriptions-item>
-                <a-descriptions-item label="规格">{{ pv('specification') }}</a-descriptions-item>
-                <a-descriptions-item label="分发方">{{ pv('source_platform') }}</a-descriptions-item>
-                <a-descriptions-item label="分辨率">{{ pv('resolution') }}</a-descriptions-item>
-                <a-descriptions-item label="视频编码">{{ pv('video_codec') }}</a-descriptions-item>
-                <a-descriptions-item label="HDR">{{ pv('hdr') }}</a-descriptions-item>
-                <a-descriptions-item label="bit">{{ pv('bit_depth') }}</a-descriptions-item>
-                <a-descriptions-item label="音频编码">{{ pv('audio_codec') }}</a-descriptions-item>
-                <a-descriptions-item label="声道">{{ pv('audio_channels') }}</a-descriptions-item>
-                <a-descriptions-item label="音频技术">{{ pv('audio_tech') }}</a-descriptions-item>
-                <a-descriptions-item label="音轨数">{{ pv('audio_tracks') }}</a-descriptions-item>
-                <a-descriptions-item label="版本">{{ pv('edition_info') }}</a-descriptions-item>
-                <a-descriptions-item label="地区码">{{ pv('region_code') }}</a-descriptions-item>
-              </a-descriptions>
+              <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" />
               </a-card>
 
               <!-- §59.86: ③ 内容属性（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
                 <template #title><span style="font-size: 14px">③ 内容属性</span></template>
-                <div v-if="pvRegion.length || pvGenre.length">
-                  <span v-if="pvRegion.length" style="margin-right: 16px">
-                    产地：<a-tag v-for="r in pvRegion" :key="r" color="geekblue">{{ r }}</a-tag>
-                  </span>
-                  <span v-if="pvGenre.length">
-                    类型：<a-tag v-for="g in pvGenre" :key="g" color="purple">{{ g }}</a-tag>
-                  </span>
-                </div>
-                <div v-else style="color: #999">暂无产地 / 类型数据（需 PTGen 获取）</div>
+                <div v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length">
+                    <span v-if="seedRegionGenre.region.length" style="margin-right: 16px">
+                      产地：<a-tag v-for="r in seedRegionGenre.region" :key="r" color="geekblue">{{ r }}</a-tag>
+                    </span>
+                    <span v-if="seedRegionGenre.genre.length">
+                      类型：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
+                    </span>
+                  </div>
+                  <div v-else style="color: #999">暂无产地 / 类型数据（需 PTGen 获取）</div>
               </a-card>
 
               <!-- §59.86: ④ 标签（卡片） -->
@@ -149,33 +127,9 @@
               <a-descriptions :column="3" bordered size="small" style="max-width: 900px">
                   <a-descriptions-item label="主标题" :span="3">{{ form.title || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="副标题" :span="3">{{ form.subtitle || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="中文名">{{ form.titleComponents.chinese_prefix || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="剧名">{{ form.titleComponents.main_title || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="季集">{{ form.titleComponents.season_episode || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="年份">{{ form.titleComponents.year || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="制作组">{{ form.titleComponents.release_group || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="类型">{{ categoryLabel(form.titleComponents.category) }}</a-descriptions-item>
-                  <!-- §59.82: 分组重排——媒介→视频→音频 聚类; 站点媒介合成行 -->
-                  <a-descriptions-item label="媒介(站点)">{{ siteMediumDisplay }}</a-descriptions-item>
-                  <a-descriptions-item label="片源">{{ form.titleComponents.source_type || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="规格">{{ specDisplay }}</a-descriptions-item>
-                  <a-descriptions-item label="分发方">
-                    {{ form.titleComponents.source_platform || '—' }}
-                    <a-tooltip v-if="PLATFORM_FULLNAMES[form.titleComponents.source_platform]" :title="PLATFORM_FULLNAMES[form.titleComponents.source_platform]">
-                      <InfoCircleOutlined style="color: #999; margin-left: 4px" />
-                    </a-tooltip>
-                  </a-descriptions-item>
-                  <a-descriptions-item label="分辨率">{{ form.titleComponents.resolution || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="视频编码">{{ form.titleComponents.video_codec || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="HDR">{{ form.titleComponents.hdr || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="bit">{{ form.titleComponents.bit_depth || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="音频编码">{{ form.titleComponents.audio_codec || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="声道">{{ form.titleComponents.audio_channels || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="音频技术">{{ form.titleComponents.audio_technology || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="音轨数">{{ form.titleComponents.audio_tracks || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="版本">{{ form.titleComponents.edition_info || '—' }}</a-descriptions-item>
-                  <a-descriptions-item label="地区码">{{ form.titleComponents.region_code || '—' }}</a-descriptions-item>
-                </a-descriptions>
+              </a-descriptions>
+              <!-- §59.135: 技术规格表——与预览②同一组件（展示同件） -->
+              <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="3" style="max-width: 900px" />
                 <!-- §59.75: 产地/类型（PTGen 源归一只读展示——发布映射消费 canonical） -->
                 <a-form-item v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length" label="产地 / 类型" style="max-width: 900px; margin-top: 16px">
                   <span v-if="seedRegionGenre.region.length" style="margin-right: 16px">
@@ -308,9 +262,8 @@ import type { SeedDetail } from '@/api/publish'
 import { parseBBCode } from '@/utils/bbcode'
 import { tagDisplayName as tagDisplayNameCommon } from '@/utils/tagDisplay'
 import { TAG_GROUPS } from '@/generated/dict'
-import { CATEGORY_LABELS, PLATFORM_FULLNAMES } from '@/generated/dict'
-import { InfoCircleOutlined } from '@ant-design/icons-vue'
 import TagSelector from './TagSelector.vue'
+import SeedTechDescriptions from './SeedTechDescriptions.vue'
 import ScreenshotManager from './ScreenshotManager.vue'
 
 // §59.54: 截图管理器引用（转存前快照）
@@ -513,37 +466,8 @@ const seedRegionGenre = computed(() => ({
   genre: form.value.genre || [],
 }))
 const seedReviewed = ref(false)
-// §59.82: 站点媒介合成显示——v1.05 source_type×specification 二维 → 站点单选视角
-// （站点媒介下拉把两维压成一维枚举: remux/webdl/hdtv/uhd_bluray/bluray/encode）
-const siteMediumDisplay = computed(() => {
-  const tc = form.value.titleComponents
-  const spec = (tc.specification || '').toLowerCase()
-  const st = tc.source_type || ''
-  // 规格优先（Remux/WEB/HDTV 族是独立媒介值）
-  if (spec === 'remux') return 'Remux'
-  if (spec === 'web-dl' || spec === 'webdl') return 'WEB-DL'
-  if (spec === 'webrip') return 'WEBRip'
-  if (spec === 'hdtv') return 'HDTV'
-  if (spec === 'uhdtv') return 'UHDTV'
-  if (spec === 'bdrip' || spec === 'dvdrip') return 'Encode'
-  // §59.83: v1.05 片源写法区分——连字符=原盘媒介, 无连字符=压制(Encode 媒介)
-  // 威猛奇兵实锤: "UHD.BluRay"(压制) 曾被子串匹配误显"UHD Blu-ray 原盘"
-  if (st === 'UHD Blu-ray' || st === 'Blu-ray' || st === '3D Blu-ray') {
-    return st + ' 原盘'
-  }
-  if (st === 'UHD BluRay' || st === 'BluRay' || st === '3D BluRay') {
-    return 'Encode' // 压制写法 → 站点媒介 Encode
-  }
-  if (st.includes('DVD') && !st.includes('Rip')) return 'DVD'
-  if (tc.encode) return 'Encode'
-  return '—'
-})
-
-// §59.34: Encode 派生标识（后端真相源；v1.05 Encode 规格为空，规格栏显示 Encode）
+// §59.34: Encode 派生标识（后端真相源；组件 SeedTechDescriptions 消费）
 const seedEncode = ref(false)
-const specDisplay = computed(() =>
-  form.value.titleComponents.specification || (seedEncode.value ? 'Encode' : '—')
-)
 const seedIsLocal = ref(true) // §59.21: 默认 true（向后兼容）
 // §59.20 ⑨: 预览模式（保存即预览）
 const seedPreviewMode = ref(false)
@@ -603,43 +527,6 @@ const previewDescMode = ref<'rendered' | 'source'>('rendered')
 const previewStatement = ref('')
 const previewDescSource = ref('')
 
-// §59.87: ② 媒介(站点)合成——与 Tab1 siteMediumDisplay 同规则
-const pvSiteMedium = computed(() => {
-  const tc = previewFieldsData.value
-  const spec = String(tc.specification || '').toLowerCase()
-  const st = String(tc.source_type || '')
-  if (spec === 'remux') return 'Remux'
-  if (spec === 'web-dl' || spec === 'webdl') return 'WEB-DL'
-  if (spec === 'webrip') return 'WEBRip'
-  if (spec === 'hdtv') return 'HDTV'
-  if (spec === 'uhdtv') return 'UHDTV'
-  if (spec === 'bdrip' || spec === 'dvdrip') return 'Encode'
-  if (st === 'UHD Blu-ray' || st === 'Blu-ray' || st === '3D Blu-ray') return st + ' 原盘'
-  if (st === 'UHD BluRay' || st === 'BluRay' || st === '3D BluRay') return 'Encode'
-  if (st.includes('DVD') && !st.includes('Rip')) return 'DVD'
-  if (tc.encode) return 'Encode'
-  return '—'
-})
-
-// §59.90: 类型行——与 Tab1 categoryLabel 同源（standard key → 中文）
-const pvCategory = computed(() => {
-  const c = String(previewFieldsData.value.category || '')
-  return c ? categoryLabel(c) : '—'
-})
-
-const pv = (key: string): string => {
-  const v = previewFieldsData.value[key]
-  if (v === undefined || v === null || v === '' || v === 0) return '—'
-  return String(v)
-}
-const pvRegion = computed(() => {
-  const r = previewFieldsData.value.region as { labels?: string[] } | undefined
-  return r?.labels || []
-})
-const pvGenre = computed(() => {
-  const g = previewFieldsData.value.genre as { labels?: string[] } | undefined
-  return g?.labels || []
-})
 const previewTags = computed<string[]>(() => {
   const t = previewFieldsData.value.tags
   if (Array.isArray(t)) return t as string[]
@@ -816,6 +703,34 @@ async function saveOnly() {
       if (result.reassembled_title) {
         form.value.title = result.reassembled_title
       }
+      // §59.135: PUT result 技术字段回填 form.titleComponents（与 GET 同源 §59.103）——
+      // Tab1 与预览②同读一份（预览只消费 Tab 数据）；顺带修保存后 Tab1 不刷新
+      const r = result as Record<string, any>
+      form.value.titleComponents = {
+        ...form.value.titleComponents,
+        main_title: r.main_title || '',
+        season_episode: r.season_episode || '',
+        year: r.year || '',
+        release_group: r.release_group || '',
+        chinese_prefix: r.chinese_prefix || '',
+        resolution: r.resolution || '',
+        video_codec: r.video_codec || '',
+        audio_codec: r.audio_codec || '',
+        audio_channels: r.audio_channels || '',
+        audio_technology: r.audio_tech || '',
+        audio_tracks: r.audio_tracks ? String(r.audio_tracks) : '',
+        hdr: r.hdr || '',
+        bit_depth: r.bit_depth || '',
+        source_type: r.source_type || '',
+        specification: r.specification || '',
+        source_platform: r.source_platform || '',
+        edition_info: r.edition_info || '',
+        region_code: r.region_code || '',
+        category: r.category || '',
+      }
+      seedEncode.value = r.encode ?? seedEncode.value
+      if (r.region?.labels) form.value.region = r.region.labels
+      if (r.genre?.labels) form.value.genre = r.genre.labels
     }
     seedPreviewMode.value = true
     // §59.92: 完成门槛——挂滚动监听 + 内容不足直接放开
@@ -842,20 +757,6 @@ function backToEdit() {
 }
 
 
-// --- helpers ---
-// §59.35 P3: 分级 label——Layer 1 字典优先（generated/dict.ts，与后端同源），
-// 扩展分类（adapter 源站直传的 category.mv/game/software 等）本地兜底
-const extendedCategoryLabels: Record<string, string> = {
-  'category.mv': 'MV',
-  'category.audiobook': '有声读物',
-  'category.ebook': '电子书',
-  'category.game': '游戏',
-  'category.software': '软件',
-}
-function categoryLabel(v?: string): string {
-  if (!v) return '—'
-  return CATEGORY_LABELS[v] || extendedCategoryLabels[v] || v
-}
 
 // §59.51: 组件卸载清轮询
 onUnmounted(() => {
