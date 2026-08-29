@@ -206,19 +206,7 @@ func TestAppError_Unwrap(t *testing.T) {
 	}
 }
 
-func TestPublishGroup_TableName(t *testing.T) {
-	var g PublishGroup
-	if g.TableName() != "publish_groups" {
-		t.Error("unexpected table name")
-	}
-}
 
-func TestPublishGroupMember_TableName(t *testing.T) {
-	var m PublishGroupMember
-	if m.TableName() != "publish_group_members" {
-		t.Error("unexpected table name")
-	}
-}
 
 func TestTorrentEvent_TableName(t *testing.T) {
 	var e TorrentEvent
@@ -258,8 +246,7 @@ func TestAutoMigrate(t *testing.T) {
 	}
 
 	tables := []string{
-		"users", "sites", "clients", "rss_subscriptions",
-		"publish_groups", "publish_group_members", "torrent_events",
+		"users", "sites", "clients", "rss_subscriptions", "torrent_events",
 		"seeding_torrent_records", "content_fingerprints",
 		"filter_rules", "delete_rules", "publish_tasks",
 		"publish_result_records", "publish_candidates",
