@@ -1,5 +1,5 @@
 import client from './client'
-import type { ApiResponse, ApiResponsePaginated, ListParams, PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from './types'
+import type { ApiResponse, ApiResponsePaginated, ListParams, PublishCandidate, PublishTask, PublishResultRecord } from './types'
 
 export const publishApi = {
   listCandidates(params?: ListParams & { status?: string }) {
@@ -7,12 +7,6 @@ export const publishApi = {
   },
   deleteCandidate(id: number) {
     return client.delete<ApiResponse<void>>(`/publish/candidates/${id}`)
-  },
-  listGroups() {
-    return client.get<ApiResponse<{ items: PublishGroup[]; total: number }>>('/publish/groups')
-  },
-  getGroup(id: number) {
-    return client.get<ApiResponse<PublishGroup>>(`/publish/groups/${id}`)
   },
   deleteGroup(id: number) {
     return client.delete<ApiResponse<void>>(`/publish/groups/${id}`)
