@@ -8,9 +8,6 @@ export const publishApi = {
   deleteCandidate(id: number) {
     return client.delete<ApiResponse<void>>(`/publish/candidates/${id}`)
   },
-  manualPublish(id: number) {
-    return client.post<ApiResponse<void>>(`/publish/candidates/${id}/publish`)
-  },
   listGroups() {
     return client.get<ApiResponse<{ items: PublishGroup[]; total: number }>>('/publish/groups')
   },

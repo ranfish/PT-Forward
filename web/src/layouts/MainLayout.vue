@@ -79,10 +79,6 @@
             <template #icon><VideoCameraOutlined /></template>
             <span>{{ t('nav.ptgen') }}</span>
           </a-menu-item>
-          <a-menu-item key="/tracker" @click="$router.push('/tracker')">
-            <template #icon><ClusterOutlined /></template>
-            <span>{{ t('nav.tracker') }}</span>
-          </a-menu-item>
           <a-menu-item key="/lifecycle" @click="$router.push('/lifecycle')">
             <template #icon><HeartOutlined /></template>
             <span>{{ t('nav.lifecycle') }}</span>

@@ -272,19 +272,6 @@ func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID ui
 		return
 	}
 
-	if w.pipeline == nil {
-		w.logger.Warn("pipeline not set, skipping publish",
-			zap.Uint("candidate_id", candidateID),
-		)
-		return
-	}
-
-	if _, err := w.pipeline.PublishCandidate(ctx, candidateID); err != nil {
-		w.logger.Error("publish candidate failed",
-			zap.Uint("candidate_id", candidateID),
-			zap.Error(err),
-		)
-	}
 }
 
 func (w *CompletionWatcher) transferToReseed(ctx context.Context, candidate *model.PublishCandidate, sourceClient model.DownloaderClient, torrent *model.TorrentInfo) (string, string, error) {

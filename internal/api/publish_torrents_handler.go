@@ -1365,12 +1365,23 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 	createdIDs := make([]uint, 0, len(req.Items))
 	failed := 0
 
+	// §59.147: 数字下载器 id → 客户端名转换（pusher 按名 Get, 原数字串必失败）
+	var clientName string
+	if req.ClientID > 0 {
+		var cl model.ClientConfig
+		if err := h.db.Select("name").Where("id = ?", req.ClientID).First(&cl).Error; err == nil {
+			clientName = cl.Name
+		}
+	}
+
 	for _, item := range req.Items {
 		candidate := &model.PublishCandidate{
-			SourceSite:        req.SourceSite,
-			InfoHash:          item.InfoHash,
-			TorrentName:       item.Name,
-			ClientID:          fmt.Sprintf("%d", req.ClientID),
+			SourceSite: req.SourceSite,
+			InfoHash:   item.InfoHash,
+			TorrentName: item.Name,
+			ClientID:   clientName,
+			// §59.147: 源资源路径落库——链 A 加种 SavePath 依赖（原丢弃致加种落默认路径不做种）
+			LocalSavePath:     item.SavePath,
 			TargetSites:       string(targetsJSON),
 			PublishStatus:     model.CandidatePending,
 			DownloadCompleted: true,

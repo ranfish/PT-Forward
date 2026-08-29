@@ -12,7 +12,6 @@ import (
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/rss"
 	"github.com/ranfish/pt-forward/internal/seeding"
@@ -306,87 +305,6 @@ func TestScenario_F4_SkipsNonFree(t *testing.T) {
 }
 
 // ── F5: 转载发布 全链路 ──────────────────────────────────────────
-
-func TestScenario_F5_PublishE2E(t *testing.T) {
-	db := setupDB(t)
-	ctx := context.Background()
-
-	sourceSite := &model.Site{
-		Name: "f5-source", Domain: "f5source.com",
-		BaseURL: "https://f5source.com", AuthType: "cookie",
-	}
-	require.NoError(t, db.Create(sourceSite).Error)
-
-	targetSite := &model.Site{
-		Name: "f5-target", Domain: "f5target.com",
-		BaseURL: "https://f5target.com", AuthType: "cookie",
-	}
-	require.NoError(t, db.Create(targetSite).Error)
-
-	clientID := seedClient(t, db, "dl-client", "download")
-	_ = clientID
-
-	candidate := &model.PublishCandidate{
-		SourceSite:      "f5-source",
-		SourceTorrentID: "src-001",
-		TorrentName:     "Clean Release 2024",
-		Size:            1024,
-		InfoHash:        "aa111bb222cc333dd444ee555ff666aa777bb88",
-		PublishStatus:   "pending",
-		TargetSites:     `["f5-target"]`,
-	}
-	require.NoError(t, db.Create(candidate).Error)
-
-	var uploadCalled int32
-	siteProvider := &mocks.SiteInfoProvider{
-		GetSiteInfoFn: func(ctx context.Context, siteName string) (*model.SiteInfo, error) {
-			return &model.SiteInfo{Name: siteName, Enabled: true}, nil
-		},
-		GetSiteConfigFn: func(ctx context.Context, domain string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{Domain: domain}, nil
-		},
-		GetAdapterFn: func(ctx context.Context, domain string) (model.SiteAdapter, error) {
-			return &mocks.SiteAdapter{
-				DownloadTorrentFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-					return []byte("d8:announce30:http://tracker.example.com/announcee"), nil
-				},
-				GetTorrentDetailFn: func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-					return &model.TorrentDetail{
-						Title: "Test Torrent", Category: "movie",
-						Source: "BluRay", Resolution: "2160p", Codec: "x264",
-						ReleaseGroup: "GROUP", Description: "test desc",
-					}, nil
-				},
-				SearchTorrentsFn: func(ctx context.Context, config *model.SiteConfig, query string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
-					return nil, nil
-				},
-				UploadTorrentFn: func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-					atomic.AddInt32(&uploadCalled, 1)
-					return &model.PublishResponse{
-						TorrentID: "pub-001",
-						DetailURL: "https://f5target.com/torrents/pub-001",
-					}, nil
-				},
-			}, nil
-		},
-	}
-
-	pipeline := publish.NewPipeline(db, nopLogger())
-	pipeline.SetSiteProvider(siteProvider)
-
-	result, err := pipeline.PublishCandidate(ctx, candidate.ID)
-	require.NoError(t, err)
-	require.NotNil(t, result)
-
-	var results []model.PublishResultRecord
-	db.Find(&results)
-	assert.True(t, len(results) > 0)
-
-	t.Logf("PASS F5: publish E2E candidate_id=%d upload_called=%v results=%d",
-		candidate.ID, atomic.LoadInt32(&uploadCalled) > 0, len(results))
-}
-
-// ── F7: 辅种引擎 SizeTitle 匹配 + 注入 ────────────────────────────
 
 func TestScenario_F7_SizeTitleMatchAndInject(t *testing.T) {
 	db := setupDB(t)
