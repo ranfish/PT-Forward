@@ -1061,13 +1061,6 @@ func registerSchedulerTasks(
 		return nil
 	})
 
-	register("publish_pending", "publish", "*/30 * * * *", func(ctx context.Context) error {
-		return publishPipeline.ProcessPending(ctx)
-	})
-
-	register("publish_groups", "publish", "*/60 * * * *", func(ctx context.Context) error {
-		return publishPipeline.ProcessPendingGroups(ctx)
-	})
 
 	register("publish_lifecycle", "publish", "*/30 * * * *", func(ctx context.Context) error {
 		_, err := lifecycleMgr.CheckOnce(ctx)

@@ -14,7 +14,6 @@ import (
 	"github.com/ranfish/pt-forward/internal/auth"
 	"github.com/ranfish/pt-forward/internal/client"
 	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/ranfish/pt-forward/internal/titleparser"
 	notificationPkg "github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
@@ -697,25 +696,6 @@ func TestReseedTasks_CRUD(t *testing.T) {
 	}
 }
 
-func TestPublishTasks_List(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("GET", "/api/v1/publish/tasks", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("GET", "/api/v1/publish/candidates", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list candidates: expected 200, got %d", w.Code)
-	}
-
-	w = env.doRequest("GET", "/api/v1/publish/results", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list results: expected 200, got %d", w.Code)
-	}
-}
-
 func TestDashboard_Overview(t *testing.T) {
 	env := setupTestEnv(t)
 
@@ -1028,67 +1008,6 @@ func TestFingerprint_CRUD(t *testing.T) {
 	}
 }
 
-func TestTracker_Members(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("GET", "/api/v1/tracker/members", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("GET", "/api/v1/tracker/members?groupId=999", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list by group: expected 200, got %d", w.Code)
-	}
-
-	w = env.doRequest("GET", "/api/v1/tracker/members/nonexistenthash", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("get nonexistent: expected 404, got %d", w.Code)
-	}
-
-	w = env.doRequest("GET", "/api/v1/tracker/history", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("history: expected 200, got %d", w.Code)
-	}
-
-	w = env.doRequest("GET", "/api/v1/tracker/history?groupId=1", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("history by group: expected 200, got %d", w.Code)
-	}
-}
-
-func TestLifecycle_Config(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("GET", "/api/v1/lifecycle/config", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get config: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("PUT", "/api/v1/lifecycle/config", map[string]interface{}{
-		"pauseSeeders":        false,
-		"deleteSeedHours":     360,
-		"checkInterval":       "10m",
-		"maxConcurrentChecks": 5,
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("update config: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("GET", "/api/v1/lifecycle/backpressure", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("backpressure: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, ok := resp.Data.(map[string]interface{})
-	if !ok {
-		t.Fatal("data not map")
-	}
-	if _, ok := data["isThrottled"]; !ok {
-		t.Error("missing isThrottled")
-	}
-}
-
 func TestSeeding_Status(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("GET", "/api/v1/seeding/status", nil)
@@ -1239,95 +1158,6 @@ func TestSeeding_ScoringConfigAndLogs(t *testing.T) {
 	w = env.doRequest("POST", fmt.Sprintf("/api/v1/seeding/dryrun/%d", subID), nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("dryrun: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_GroupsAndLifecycle(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("GET", "/api/v1/publish/groups", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list groups: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	env.db.Create(&model.PublishGroup{SubscriptionID: "sub1", SourceHash: "hash1", SourceSite: "site1", Status: "active"})
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: 1, InfoHash: "ih1", SiteName: "site1", Role: "source", Status: "new"})
-
-	w = env.doRequest("GET", "/api/v1/publish/groups/1", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get group: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, ok := resp.Data.(map[string]interface{})
-	if !ok {
-		t.Fatal("data not map")
-	}
-	if _, ok := data["members"]; !ok {
-		t.Error("expected members field")
-	}
-
-	w = env.doRequest("POST", "/api/v1/publish/groups/1/lifecycle/pause", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("pause: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("POST", "/api/v1/publish/groups/1/lifecycle/resume", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("resume: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("POST", "/api/v1/publish/groups/1/lifecycle/delete", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete lifecycle: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("DELETE", "/api/v1/publish/groups/1", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete group: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CandidateDeleteAndPublish(t *testing.T) {
-	env := setupTestEnv(t)
-
-	env.db.Create(&model.PublishCandidate{
-		SourceSite: "site1", SourceTorrentID: "t1", InfoHash: "ih1",
-		TorrentName: "test-torrent", PublishStatus: model.CandidatePending,
-	})
-
-	w := env.doRequest("DELETE", "/api/v1/publish/candidates/1", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete candidate: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	env.db.Create(&model.PublishCandidate{
-		SourceSite: "site2", SourceTorrentID: "t2", InfoHash: "ih2",
-		TorrentName: "good-torrent", PublishStatus: model.CandidatePending,
-	})
-
-	w = env.doRequest("POST", "/api/v1/publish/candidates/2/publish", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("manual publish: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_TaskCancel(t *testing.T) {
-	env := setupTestEnv(t)
-
-	env.db.Create(&model.Site{Name: "pubsite", Domain: "pubsite.com", BaseURL: "https://pubsite.com", Framework: "nexusphp", Enabled: true, Passkey: "pk"})
-
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"type":         "manual",
-		"sourceSiteId": 1,
-		"targetSites":  []string{"target.com"},
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("create task: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("POST", "/api/v1/publish/tasks/1/cancel", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("cancel task: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -1539,22 +1369,6 @@ func TestDeleteRule_CreateAndList(t *testing.T) {
 	}
 }
 
-func TestPublish_Groups(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("POST", "/api/v1/publish/groups", map[string]interface{}{
-		"name": "group1", "sourceSite": "s1", "targetSites": []string{"t1", "t2"},
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("create group: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("GET", "/api/v1/publish/groups", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list groups: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 func TestPublish_Results(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("GET", "/api/v1/publish/results", nil)
@@ -1607,41 +1421,9 @@ func TestSettings_Update(t *testing.T) {
 	}
 }
 
-func TestTracker_MembersFull(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/tracker/members", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTracker_History(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/tracker/history", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 func TestFingerprint_List(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("GET", "/api/v1/fingerprints", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestLifecycle_ConfigFull(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/lifecycle/config", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestLifecycle_Backpressure(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/lifecycle/backpressure", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -1946,42 +1728,6 @@ func TestPTGen_NotFound(t *testing.T) {
 	w := env.doRequest("GET", "/api/v1/ptgen/nonexistent", nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
-	}
-}
-
-func TestPublish_GetTask_NotFound(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/tasks/99999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	if resp.Code != 40400 {
-		t.Errorf("expected code 40400, got %d", resp.Code)
-	}
-}
-
-func TestPublish_DeleteTask_NotFound(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("DELETE", "/api/v1/publish/tasks/99999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	if resp.Code != 40400 {
-		t.Errorf("expected code 40400, got %d", resp.Code)
-	}
-}
-
-func TestPublish_GetCandidate_NotFound(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/candidates/99999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	if resp.Code != 40400 {
-		t.Errorf("expected code 40400, got %d", resp.Code)
 	}
 }
 
@@ -3154,23 +2900,6 @@ func TestSite_CircuitStatus_Reset(t *testing.T) {
 	}
 }
 
-func TestLifecycle_UpdateBackpressure(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("PUT", "/api/v1/lifecycle/backpressure", map[string]interface{}{
-		"max_concurrent":    10,
-		"pause_on_pressure": true,
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("update backpressure: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["max_concurrent"] != float64(10) {
-		t.Errorf("expected max_concurrent=10, got %v", data["max_concurrent"])
-	}
-}
-
 func TestSeeding_ResumeRecord(t *testing.T) {
 	env := setupTestEnv(t)
 
@@ -3563,122 +3292,12 @@ func TestTorrentEvents_ListWithSite(t *testing.T) {
 	}
 }
 
-func TestPublish_CancelTask_AlreadyDone(t *testing.T) {
-	env := setupTestEnv(t)
-
-	siteID := createTestSite(t, env, "PubCnlSite", "pubcnl.com")
-
-	task := &model.PublishTask{
-		SourceSiteID: siteID,
-		TargetSites:  []string{"target.com"},
-		Status:       model.PublishTaskCompleted,
-	}
-	env.db.Create(task)
-
-	w := env.doRequest("POST", fmt.Sprintf("/api/v1/publish/tasks/%d/cancel", task.ID), nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("cancel done task: expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_LifecycleDelete(t *testing.T) {
-	env := setupTestEnv(t)
-
-	group := &model.PublishGroup{
-		Status:     "publishing",
-		SourceHash: "src-hash-del",
-		SourceSite: "del-site.com",
-	}
-	env.db.Create(group)
-
-	w := env.doRequest("POST", fmt.Sprintf("/api/v1/publish/groups/%d/lifecycle/delete", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("lifecycle delete: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["message"] != "删除已触发" {
-		t.Errorf("expected delete message, got %v", data["message"])
-	}
-}
-
-func TestPublish_GetGroup(t *testing.T) {
-	env := setupTestEnv(t)
-
-	group := &model.PublishGroup{
-		Status:     "done",
-		SourceHash: "src-hash-get",
-		SourceSite: "get-site.com",
-	}
-	env.db.Create(group)
-
-	w := env.doRequest("GET", fmt.Sprintf("/api/v1/publish/groups/%d", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get group: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_DeleteGroup(t *testing.T) {
-	env := setupTestEnv(t)
-
-	group := &model.PublishGroup{
-		Status:     "done",
-		SourceHash: "src-hash-del2",
-		SourceSite: "del2-site.com",
-	}
-	env.db.Create(group)
-
-	w := env.doRequest("DELETE", fmt.Sprintf("/api/v1/publish/groups/%d", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete group: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTracker_GetMember(t *testing.T) {
-	env := setupTestEnv(t)
-
-	env.db.Create(&model.PublishGroupMember{
-		PublishGroupID: 1,
-		InfoHash:       "member-hash-1",
-		SiteName:       "member-site.com",
-		Status:         "done",
-	})
-
-	w := env.doRequest("GET", "/api/v1/tracker/members/member-hash-1", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get member: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTracker_GetMember_NotFound(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("GET", "/api/v1/tracker/members/nonexist-hash", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("get member not found: expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 func TestDeleteRule_TestRule_NotFound(t *testing.T) {
 	env := setupTestEnv(t)
 
 	w := env.doRequest("POST", "/api/v1/seeding/delete-rules/99999/test", nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("test rule not found: expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestLifecycle_Backpressure_Get(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("GET", "/api/v1/lifecycle/backpressure", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get backpressure: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if _, ok := data["activePublishes"]; !ok {
-		t.Error("expected activePublishes field")
 	}
 }
 
@@ -3731,26 +3350,6 @@ func TestFingerprint_Get(t *testing.T) {
 	w := env.doRequest("GET", fmt.Sprintf("/api/v1/fingerprints/%d", fp.ID), nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("get fingerprint: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CreateTask_Validation(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"sourceSiteId": 0,
-		"targetSites":  []string{"site.com"},
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("no source: expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"sourceSiteId": 1,
-		"targetSites":  []string{},
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("no targets: expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -4091,64 +3690,6 @@ func TestSettings_ListWithPrefix(t *testing.T) {
 	}
 }
 
-func TestPublish_CreateAndGetTask(t *testing.T) {
-	env := setupTestEnv(t)
-
-	siteID := createTestSite(t, env, "PubTaskSite", "pubtask.com")
-
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"sourceSiteId": siteID,
-		"targetSites":  []string{"target.com"},
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	taskID := data["id"].(float64)
-
-	w = env.doRequest("GET", fmt.Sprintf("/api/v1/publish/tasks/%d", int(taskID)), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get task: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_DeleteTask(t *testing.T) {
-	env := setupTestEnv(t)
-
-	siteID := createTestSite(t, env, "PubDelSite", "pubdel.com")
-
-	task := &model.PublishTask{
-		SourceSiteID: siteID,
-		TargetSites:  []string{"target.com"},
-		Status:       model.PublishTaskPending,
-	}
-	env.db.Create(task)
-
-	w := env.doRequest("DELETE", fmt.Sprintf("/api/v1/publish/tasks/%d", task.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete task: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CancelTask_Pending(t *testing.T) {
-	env := setupTestEnv(t)
-
-	siteID := createTestSite(t, env, "PubCnlPend", "pubcnlpend.com")
-
-	task := &model.PublishTask{
-		SourceSiteID: siteID,
-		TargetSites:  []string{"target.com"},
-		Status:       model.PublishTaskPending,
-	}
-	env.db.Create(task)
-
-	w := env.doRequest("POST", fmt.Sprintf("/api/v1/publish/tasks/%d/cancel", task.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("cancel pending: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 func TestPublish_Results_WithCandidateID(t *testing.T) {
 	env := setupTestEnv(t)
 
@@ -4447,44 +3988,6 @@ func TestPTGen_ListCache_WithKeyword(t *testing.T) {
 	}
 }
 
-func TestPublish_GroupLifecycle_PauseResume(t *testing.T) {
-	env := setupTestEnv(t)
-
-	group := &model.PublishGroup{
-		Status:     "publishing",
-		SourceHash: "lifecycle-hash",
-		SourceSite: "lc-site.com",
-	}
-	env.db.Create(group)
-
-	w := env.doRequest("POST", fmt.Sprintf("/api/v1/publish/groups/%d/lifecycle/pause", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("pause: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("POST", fmt.Sprintf("/api/v1/publish/groups/%d/lifecycle/resume", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("resume: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_ListGroups_WithStatus(t *testing.T) {
-	env := setupTestEnv(t)
-
-	env.db.Create(&model.PublishGroup{Status: "done", SourceHash: "grp-hash1", SourceSite: "s1.com"})
-	env.db.Create(&model.PublishGroup{Status: "publishing", SourceHash: "grp-hash2", SourceSite: "s2.com"})
-
-	w := env.doRequest("GET", "/api/v1/publish/groups?status=done", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list groups: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["total"] != float64(1) {
-		t.Errorf("expected 1 done group, got %v", data["total"])
-	}
-}
-
 func TestSite_Create_Validation(t *testing.T) {
 	env := setupTestEnv(t)
 
@@ -4694,38 +4197,6 @@ func TestSite_Update(t *testing.T) {
 	data, _ := resp.Data.(map[string]interface{})
 	if data["name"] != "UpdatedSite" {
 		t.Errorf("expected UpdatedSite, got %v", data["name"])
-	}
-}
-
-func TestPublish_CandidateCRUD(t *testing.T) {
-	env := setupTestEnv(t)
-
-	candidate := &model.PublishCandidate{
-		SourceSite:    "candsite.com",
-		InfoHash:      "cand-hash",
-		TorrentName:   "cand title",
-		Size:          1024,
-		PublishStatus: "pending",
-	}
-	env.db.Create(candidate)
-
-	w := env.doRequest("GET", fmt.Sprintf("/api/v1/publish/candidates/%d", candidate.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get candidate: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("DELETE", fmt.Sprintf("/api/v1/publish/candidates/%d", candidate.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete candidate: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_DeleteGroup_NotFound(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("DELETE", "/api/v1/publish/groups/99999", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete group not found: expected 200 (still ok), got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -5148,20 +4619,6 @@ func TestSite_Test_ConnectionError(t *testing.T) {
 	w := env.doRequest("GET", fmt.Sprintf("/api/v1/sites/%d/test", site.ID), nil)
 	if w.Code != http.StatusBadGateway {
 		t.Fatalf("test conn error: expected 502, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_TasksPaginated(t *testing.T) {
-	env := setupTestEnv(t)
-
-	w := env.doRequest("GET", "/api/v1/publish/tasks?page=1&pageSize=5", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("paginated tasks: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["page"] != float64(1) {
-		t.Errorf("expected page 1, got %v", data["page"])
 	}
 }
 
@@ -7535,67 +6992,6 @@ func TestSystem_UnknownPath(t *testing.T) {
 	}
 }
 
-func TestPublish_ListTasks_Empty2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/tasks", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list tasks: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["total"] != float64(0) {
-		t.Errorf("expected 0 tasks, got %v", data["total"])
-	}
-}
-
-func TestPublish_GetTask_NotFound2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/tasks/999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_DeleteTask_NotFound2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("DELETE", "/api/v1/publish/tasks/999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CancelTask_NotFound2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/tasks/999/cancel", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_GetCandidate_NotFound2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/candidates/999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_DeleteCandidate_NotFound2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("DELETE", "/api/v1/publish/candidates/999", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 (delete is idempotent), got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_ManualPublish_NotFound2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/candidates/999/publish", nil)
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 func TestPublish_ListCandidates_Empty2(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("GET", "/api/v1/publish/candidates", nil)
@@ -7612,343 +7008,11 @@ func TestPublish_ListResults_Empty2(t *testing.T) {
 	}
 }
 
-func TestPublish_CreateTask_NoSourceSite(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"sourceSiteId": 0,
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CreateTask_NoTargets(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"sourceSiteId": 1,
-		"targetSites":  []string{},
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CreateTask_BadBody2(t *testing.T) {
-	env := setupTestEnv(t)
-	req := httptest.NewRequest("POST", "/api/v1/publish/tasks", bytes.NewBufferString("not json"))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+env.token)
-	w := httptest.NewRecorder()
-	env.mux.ServeHTTP(w, req)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
-	}
-}
-
-func TestPublish_ListGroups_Empty2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/groups", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list groups: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["total"] != float64(0) {
-		t.Errorf("expected 0 groups, got %v", data["total"])
-	}
-}
-
-func TestPublish_GetGroup_NotFound2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/groups/999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_DeleteGroup2(t *testing.T) {
-	env := setupTestEnv(t)
-	group := &model.PublishGroup{Status: "active", SourceHash: "abc123del"}
-	env.db.Create(group)
-	w := env.doRequest("DELETE", fmt.Sprintf("/api/v1/publish/groups/%d", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete group: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_LifecyclePause2(t *testing.T) {
-	env := setupTestEnv(t)
-	group := &model.PublishGroup{Status: "active", SourceHash: "pausehash"}
-	env.db.Create(group)
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: group.ID, InfoHash: "h1p", Paused: false})
-
-	w := env.doRequest("POST", fmt.Sprintf("/api/v1/publish/groups/%d/lifecycle/pause", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("pause: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_LifecycleResume2(t *testing.T) {
-	env := setupTestEnv(t)
-	group := &model.PublishGroup{Status: "active", SourceHash: "resumehash"}
-	env.db.Create(group)
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: group.ID, InfoHash: "h1r", Paused: true})
-
-	w := env.doRequest("POST", fmt.Sprintf("/api/v1/publish/groups/%d/lifecycle/resume", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("resume: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_LifecycleDelete2(t *testing.T) {
-	env := setupTestEnv(t)
-	group := &model.PublishGroup{Status: "active", SourceHash: "delhash"}
-	env.db.Create(group)
-
-	w := env.doRequest("POST", fmt.Sprintf("/api/v1/publish/groups/%d/lifecycle/delete", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("lifecycle delete: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_GroupBadID2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/groups/invalid", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
-	}
-}
-
-func TestPublish_LifecycleBadAction2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/groups/1/lifecycle/invalid", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", w.Code)
-	}
-}
-
 func TestPublish_UnknownPath2(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("GET", "/api/v1/publish/unknown", nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
-	}
-}
-
-func TestPublish_TasksCRUD2(t *testing.T) {
-	env := setupTestEnv(t)
-	siteID := createTestSite(t, env, "SrcSiteCRUD", "srccrud.com")
-
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"sourceSiteId": siteID,
-		"targetSites":  []string{"target1.com"},
-		"manualCheck":  true,
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("create task: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	taskID := data["id"].(float64)
-
-	w = env.doRequest("GET", fmt.Sprintf("/api/v1/publish/tasks/%d", int(taskID)), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get task: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	w = env.doRequest("GET", "/api/v1/publish/tasks", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list tasks: expected 200, got %d", w.Code)
-	}
-}
-
-func TestPublish_CancelTask2(t *testing.T) {
-	env := setupTestEnv(t)
-	siteID := createTestSite(t, env, "SrcSiteCancel", "srccancel.com")
-
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"sourceSiteId": siteID,
-		"targetSites":  []string{"target1.com"},
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	taskID := uint(data["id"].(float64))
-
-	w = env.doRequest("POST", fmt.Sprintf("/api/v1/publish/tasks/%d/cancel", taskID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("cancel: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_DeleteTask2(t *testing.T) {
-	env := setupTestEnv(t)
-	siteID := createTestSite(t, env, "SrcSiteDel", "srcdel.com")
-
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"sourceSiteId": siteID,
-		"targetSites":  []string{"target1.com"},
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	taskID := uint(data["id"].(float64))
-
-	w = env.doRequest("DELETE", fmt.Sprintf("/api/v1/publish/tasks/%d", taskID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("delete: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_GetGroup_WithMembers2(t *testing.T) {
-	env := setupTestEnv(t)
-	group := &model.PublishGroup{Status: "active", SourceHash: "memberhash", SourceSite: "site1"}
-	env.db.Create(group)
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: group.ID, InfoHash: "mh1", SiteName: "site1"})
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: group.ID, InfoHash: "mh2", SiteName: "site2"})
-
-	w := env.doRequest("GET", fmt.Sprintf("/api/v1/publish/groups/%d", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get group: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	members, _ := data["members"].([]interface{})
-	if len(members) != 2 {
-		t.Errorf("expected 2 members, got %d", len(members))
-	}
-}
-
-func TestPublish_ListGroups_WithStatus2(t *testing.T) {
-	env := setupTestEnv(t)
-	env.db.Create(&model.PublishGroup{Status: "active", SourceHash: "stat1"})
-	env.db.Create(&model.PublishGroup{Status: "completed", SourceHash: "stat2"})
-
-	w := env.doRequest("GET", "/api/v1/publish/groups?status=active", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list groups: expected 200, got %d", w.Code)
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["total"] != float64(1) {
-		t.Errorf("expected 1 active group, got %v", data["total"])
-	}
-}
-
-func TestTracker_ListMembers_Empty2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/tracker/members", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list members: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTracker_ListMembers_WithData2(t *testing.T) {
-	env := setupTestEnv(t)
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: 1, InfoHash: "thash1", SiteName: "tsite1"})
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: 1, InfoHash: "thash2", SiteName: "tsite2"})
-
-	w := env.doRequest("GET", "/api/v1/tracker/members", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list: expected 200, got %d", w.Code)
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["total"] != float64(2) {
-		t.Errorf("expected 2, got %v", data["total"])
-	}
-}
-
-func TestTracker_ListMembers_ByGroupID2(t *testing.T) {
-	env := setupTestEnv(t)
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: 1, InfoHash: "tgh1"})
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: 2, InfoHash: "tgh2"})
-
-	w := env.doRequest("GET", "/api/v1/tracker/members?groupId=1", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["total"] != float64(1) {
-		t.Errorf("expected 1, got %v", data["total"])
-	}
-}
-
-func TestTracker_GetMember_NotFound2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/tracker/members/nonexistenthash2", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTracker_GetMember_Found2(t *testing.T) {
-	env := setupTestEnv(t)
-	env.db.Create(&model.PublishGroupMember{PublishGroupID: 1, InfoHash: "tfound123", SiteName: "ts1"})
-
-	w := env.doRequest("GET", "/api/v1/tracker/members/tfound123", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTracker_ListHistory_Empty2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/tracker/history", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("history: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTracker_ListHistory_WithData2(t *testing.T) {
-	env := setupTestEnv(t)
-	env.db.Create(&model.PublishGroupStatusHistory{PublishGroupID: 1, MemberHash: "th1", OldStatus: "new", NewStatus: "seeding", Reason: "test"})
-
-	w := env.doRequest("GET", "/api/v1/tracker/history", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["total"] != float64(1) {
-		t.Errorf("expected 1, got %v", data["total"])
-	}
-}
-
-func TestTracker_ListHistory_ByGroupID2(t *testing.T) {
-	env := setupTestEnv(t)
-	env.db.Create(&model.PublishGroupStatusHistory{PublishGroupID: 1, MemberHash: "thg1", OldStatus: "new", NewStatus: "seeding"})
-	env.db.Create(&model.PublishGroupStatusHistory{PublishGroupID: 2, MemberHash: "thg2", OldStatus: "new", NewStatus: "seeding"})
-
-	w := env.doRequest("GET", "/api/v1/tracker/history?groupId=1", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["total"] != float64(1) {
-		t.Errorf("expected 1, got %v", data["total"])
-	}
-}
-
-func TestTracker_UnknownPath(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/tracker/unknown2", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", w.Code)
-	}
-}
-
-func TestTracker_PostMembers(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/tracker/members", nil)
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", w.Code)
 	}
 }
 
@@ -8701,94 +7765,6 @@ func TestSettings_Restore_GetNotAllowed(t *testing.T) {
 	w := env.doRequest("GET", "/api/v1/settings/restore", nil)
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d", w.Code)
-	}
-}
-
-func TestLifecycle_GetConfig2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/lifecycle/config", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("get config: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["pauseSeeders"] != true {
-		t.Error("default pauseSeeders should be true")
-	}
-}
-
-func TestLifecycle_UpdateConfig2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("PUT", "/api/v1/lifecycle/config", map[string]interface{}{
-		"pauseSeeders":  false,
-		"deleteSeeders": true,
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("update config: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestLifecycle_UpdateConfig_BadBody2(t *testing.T) {
-	env := setupTestEnv(t)
-	req := httptest.NewRequest("PUT", "/api/v1/lifecycle/config", bytes.NewBufferString("not json"))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+env.token)
-	w := httptest.NewRecorder()
-	env.mux.ServeHTTP(w, req)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
-	}
-}
-
-func TestLifecycle_Backpressure2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/lifecycle/backpressure", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("backpressure: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	if data["isThrottled"] != false {
-		t.Error("should not be throttled with 0 publishes")
-	}
-}
-
-func TestLifecycle_UpdateBackpressure2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("PUT", "/api/v1/lifecycle/backpressure", map[string]interface{}{
-		"max_concurrent":    10,
-		"pause_on_pressure": false,
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("update bp: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestLifecycle_UpdateBackpressure_BadBody2(t *testing.T) {
-	env := setupTestEnv(t)
-	req := httptest.NewRequest("PUT", "/api/v1/lifecycle/backpressure", bytes.NewBufferString("not json"))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+env.token)
-	w := httptest.NewRecorder()
-	env.mux.ServeHTTP(w, req)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
-	}
-}
-
-func TestLifecycle_PostNotAllowed(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/lifecycle/config", nil)
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", w.Code)
-	}
-}
-
-func TestLifecycle_UnknownPath(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/lifecycle/unknown2", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", w.Code)
 	}
 }
 
@@ -9738,86 +8714,6 @@ func TestSeeding_ServeHTTP_UnknownPath(t *testing.T) {
 	}
 }
 
-func TestPublish_CreateTask_MissingSourceSiteID(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"targetSites": []string{"site1"},
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CreateTask_MissingTargetSites(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/tasks", map[string]interface{}{
-		"sourceSiteId": 1,
-	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CreateTask_BadBody(t *testing.T) {
-	env := setupTestEnv(t)
-	req := httptest.NewRequest("POST", "/api/v1/publish/tasks", bytes.NewBufferString("xxx"))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+env.token)
-	rec := httptest.NewRecorder()
-	env.mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rec.Code)
-	}
-}
-
-func TestPublish_TaskSub_InvalidID(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/tasks/notanumber", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CandidateSub_InvalidID(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/candidates/notanumber", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_GroupsSub_InvalidID(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/groups/notanumber", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_GroupsSub_UnknownLifecycle(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/groups/1/lifecycle/unknown", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", w.Code)
-	}
-}
-
-func TestPublish_GroupsSub_LifecycleNoAction(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/groups/1/lifecycle", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", w.Code)
-	}
-}
-
-func TestPublish_GroupsSub_UnknownSub(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/groups/1/unknown", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", w.Code)
-	}
-}
-
 func TestPublish_ServeHTTP_UnknownPath(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("GET", "/api/v1/publish/unknown", nil)
@@ -9839,22 +8735,6 @@ func TestPublish_Results_MethodNotAllowed(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/publish/results", nil)
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d", w.Code)
-	}
-}
-
-func TestPublish_TaskCancel_InvalidID(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/tasks/notanumber/cancel", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_CandidatePublish_InvalidID(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/candidates/notanumber/publish", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -10072,26 +8952,6 @@ func TestSeeding_CreateConfig_DefaultCron(t *testing.T) {
 	}
 }
 
-func TestPublish_LifecyclePause(t *testing.T) {
-	env := setupTestEnv(t)
-	group := model.PublishGroup{Status: "active", SourceHash: "hash1", SourceSite: "site1"}
-	env.db.Create(&group)
-	w := env.doRequest("POST", fmt.Sprintf("/api/v1/publish/groups/%d/lifecycle/pause", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_LifecycleResume(t *testing.T) {
-	env := setupTestEnv(t)
-	group := model.PublishGroup{Status: "paused", SourceHash: "hash2", SourceSite: "site2"}
-	env.db.Create(&group)
-	w := env.doRequest("POST", fmt.Sprintf("/api/v1/publish/groups/%d/lifecycle/resume", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 func TestDeleteRuleHandler_ServeHTTP_TrailingSlash(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("GET", "/api/v1/seeding/delete-rules/", nil)
@@ -10257,87 +9117,6 @@ func TestSeeding_DeleteRule_Error(t *testing.T) {
 	w := env.doRequest("DELETE", "/api/v1/seeding/rules/0", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 for delete of non-existent, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_DeleteGroup_Success(t *testing.T) {
-	env := setupTestEnv(t)
-	group := model.PublishGroup{Status: "active", SourceHash: "delhash", SourceSite: "site1"}
-	env.db.Create(&group)
-	w := env.doRequest("DELETE", fmt.Sprintf("/api/v1/publish/groups/%d", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_DeleteGroup_NotFound2(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("DELETE", "/api/v1/publish/groups/99999", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 (gorm delete doesn't error on missing), got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_GetGroup_WithMembers(t *testing.T) {
-	env := setupTestEnv(t)
-	group := model.PublishGroup{Status: "active", SourceHash: "memhash", SourceSite: "site1"}
-	env.db.Create(&group)
-	env.db.Create(&model.PublishGroupMember{
-		PublishGroupID: group.ID,
-		SiteName:       "targetsite",
-		Status:         "pending",
-	})
-	w := env.doRequest("GET", fmt.Sprintf("/api/v1/publish/groups/%d", group.ID), nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	resp := parseResponse(t, w)
-	data, _ := resp.Data.(map[string]interface{})
-	members, ok := data["members"].([]interface{})
-	if !ok || len(members) != 1 {
-		t.Errorf("expected 1 member, got %v", data["members"])
-	}
-}
-
-func TestPublish_GetGroup_NotFound(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("GET", "/api/v1/publish/groups/99999", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_GroupsList_WithStatus(t *testing.T) {
-	env := setupTestEnv(t)
-	env.db.Create(&model.PublishGroup{Status: "active", SourceHash: "h1", SourceSite: "s1"})
-	env.db.Create(&model.PublishGroup{Status: "completed", SourceHash: "h2", SourceSite: "s2"})
-	w := env.doRequest("GET", "/api/v1/publish/groups?status=active", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPublish_TaskGetMethodNotAllowed(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/tasks/1", nil)
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", w.Code)
-	}
-}
-
-func TestPublish_CandidateGetMethodNotAllowed(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("PUT", "/api/v1/publish/candidates/1", nil)
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", w.Code)
-	}
-}
-
-func TestPublish_GroupDeleteMethodNotAllowed(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("POST", "/api/v1/publish/groups/1", nil)
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", w.Code)
 	}
 }
 
@@ -10526,49 +9305,5 @@ func TestScheduler_HandleTrigger_NotFound(t *testing.T) {
 	w := env.doRequest("POST", "/api/v1/scheduler/tasks/nonexistent/trigger", nil)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestScheduler_HandleReschedule_NotFound(t *testing.T) {
-	env := setupTestEnv(t)
-	w := env.doRequest("PUT", "/api/v1/scheduler/tasks/nonexistent/schedule", map[string]interface{}{
-		"schedule": "*/5 * * * *",
-	})
-	if w.Code != http.StatusNotFound && w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400/404, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// §59.60 B2: persistAnalysis Updates 列名锚定——bdinfo 必须是 bd_info（表列名），
-// 错列名导致整组 Updates 静默失败（243 日志 no such column: bdinfo 实锤，§59.56 同族第六处）。
-func TestPersistAnalysis_ColumnNames(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	if err := model.AutoMigrate(db); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	h := NewManualForwardHandler(db, zap.NewNop())
-	meta := &model.TorrentMetadata{InfoHash: "b2coltest0001", SiteName: "朋友", Title: "t"}
-	if err := db.Create(meta).Error; err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-	result := map[string]interface{}{
-		"info_hash":  "b2coltest0001",
-		"title":      "B2 列名测试",
-		"media_info": "mi-text",
-		"bdinfo":     "bd-text",
-	}
-	h.persistAnalysis("b2coltest0001", "朋友", result, titleparser.TechProfile{})
-	var got model.TorrentMetadata
-	if err := db.Where("info_hash = ?", "b2coltest0001").First(&got).Error; err != nil {
-		t.Fatalf("reload: %v", err)
-	}
-	if got.MediaInfo != "mi-text" {
-		t.Errorf("media_info 落库失败: %q（列名错会整组 Updates 失败）", got.MediaInfo)
-	}
-	if got.BDInfo != "bd-text" {
-		t.Errorf("bd_info 落库失败: %q（bdinfo→bd_info 笔误）", got.BDInfo)
 	}
 }

@@ -48,7 +48,6 @@ type Router struct {
 	iyuuHandler          *IYUUHandler
 	cloudFPHandler       *CloudFPHandler
 	fingerprintHandler   *FingerprintHandler
-	trackerHandler       *TrackerHandler
 	lifecycleHandler     *LifecycleHandler
 	cookiecloudHandler   *CookieCloudHandler
 	ptgenHandler         *PTGenHandler
@@ -130,7 +129,6 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		iyuuHandler:          NewIYUUHandler(db, logger, iyuuSvc),
 		cloudFPHandler:       NewCloudFPHandler(db, logger),
 		fingerprintHandler:   NewFingerprintHandler(db, logger),
-		trackerHandler:       NewTrackerHandler(db, logger),
 		lifecycleHandler:     NewLifecycleHandler(db, logger),
 		cookiecloudHandler:   NewCookieCloudHandler(db, logger),
 		ptgenHandler:         NewPTGenHandler(db, logger),
@@ -152,11 +150,7 @@ func (rt *Router) Register(mux *http.ServeMux, corsOrigins []string, rateLimitEn
 
 func (rt *Router) Start(_ context.Context) {}
 
-func (rt *Router) Stop() {
-	if rt.manualForwardHandler != nil {
-		rt.manualForwardHandler.Close()
-	}
-}
+func (rt *Router) Stop() {}
 
 func (rt *Router) SetCloudFPBreakerFn(fn func() bool) {
 	if rt.cloudFPHandler != nil {
@@ -420,8 +414,6 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/publish/candidates/", publishHandler)
 	mux.Handle("/api/v1/publish/results", publishHandler)
 	mux.Handle("/api/v1/publish/results/", publishHandler)
-	mux.Handle("/api/v1/publish/groups", publishHandler)
-	mux.Handle("/api/v1/publish/groups/", publishHandler)
 
 	mfHandler := rt.chain(writeLimitMW, rt.manualForwardHandler.ServeHTTP)
 	mux.Handle("/api/v1/manual-forward/seeded-torrents", mfHandler)
@@ -543,11 +535,6 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/fingerprints", fingerprintHandler)
 	mux.Handle("/api/v1/fingerprints/", fingerprintHandler)
 
-	trackerHandler := rt.chain(rt.rateLimitMW, rt.trackerHandler.ServeHTTP)
-	mux.Handle("/api/v1/tracker/members", trackerHandler)
-	mux.Handle("/api/v1/tracker/members/", trackerHandler)
-	mux.Handle("/api/v1/tracker/history", trackerHandler)
-	mux.Handle("/api/v1/tracker/history/", trackerHandler)
 
 	lifecycleHandler := rt.chain(rt.rateLimitMW, rt.lifecycleHandler.ServeHTTP)
 	mux.Handle("/api/v1/lifecycle/config", lifecycleHandler)

@@ -12,13 +12,11 @@ import (
 	"unsafe"
 
 	"github.com/ranfish/pt-forward/internal/client"
-	"github.com/ranfish/pt-forward/internal/dispatcher"
 	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
-	"github.com/ranfish/pt-forward/internal/seeding"
 	"github.com/ranfish/pt-forward/internal/watcher"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -505,100 +503,6 @@ func TestScenario_F10_FailoverGroup(t *testing.T) {
 		atomic.LoadInt32(&primaryCalled), atomic.LoadInt32(&fallbackCalled), len(histories))
 }
 
-// F2+F3: Dispatcher 多角色并发路由
-func TestScenario_F2F3_DispatcherMultiRole(t *testing.T) {
-	db := setupDB(t)
-	ctx := context.Background()
-
-	seedSite(t, db, "source.com", "multi-site")
-
-	seedingClientID := seedClient(t, db, "seeding-cl", "seeding")
-	downloadClientID := seedClient(t, db, "download-cl", "download")
-	_ = downloadClientID
-
-	seedingSub := &model.RSSSubscription{
-		Name:     "seeding-sub",
-		SiteName: "multi-site",
-		URLs:     []string{"https://source.com/rss"},
-		Cron:     "*/15 * * * *",
-		ClientID: "seeding-cl",
-		Enabled:  true,
-	}
-	require.NoError(t, db.Create(seedingSub).Error)
-
-	downloadSub := &model.RSSSubscription{
-		Name:     "download-sub",
-		SiteName: "multi-site",
-		URLs:     []string{"https://source.com/rss"},
-		Cron:     "*/15 * * * *",
-		ClientID: "download-cl",
-		Enabled:  true,
-	}
-	require.NoError(t, db.Create(downloadSub).Error)
-
-	seedingEng := seeding.NewEngine(db, nopLogger())
-	publishPipeline := publish.NewPipeline(db, nopLogger())
-
-	mockSP := &mocks.SiteInfoProvider{
-		GetSiteInfoFn: func(ctx context.Context, sn string) (*model.SiteInfo, error) {
-			return &model.SiteInfo{Name: sn, BaseURL: "https://source.com"}, nil
-		},
-		GetSiteConfigFn: func(ctx context.Context, d string) (*model.SiteConfig, error) {
-			return &model.SiteConfig{}, nil
-		},
-		GetAdapterFn: func(ctx context.Context, d string) (model.SiteAdapter, error) {
-			return &mocks.SiteAdapter{}, nil
-		},
-	}
-	mockDL := &mocks.DownloaderProvider{
-		GetFn: func(cid string) (model.DownloaderClient, error) {
-			if cid == "seeding-cl" {
-				return &mocks.DownloaderClient{ID: seedingClientID, Name: "seeding-cl", Role: "seeding"}, nil
-			}
-			return &mocks.DownloaderClient{ID: downloadClientID, Name: "download-cl", Role: "download"}, nil
-		},
-	}
-	publishPipeline.SetSiteProvider(mockSP)
-	publishPipeline.SetClientProvider(mockDL)
-
-	td := dispatcher.NewTorrentDispatcher(db, nil, nopLogger())
-	td.RegisterHandler(dispatcher.RoleSeeding, seedingEng)
-	td.RegisterHandler(dispatcher.RoleDownload, publishPipeline)
-
-	events := []model.TorrentEvent{
-		{
-			SiteName: "multi-site", TorrentID: "multi-t-001",
-			Title: "Seeding.Stream.2024", Size: 10000000000,
-			InfoHash: "multi_hash_seeding_1",
-			SourceID: fmt.Sprintf("%d", seedingSub.ID),
-			Discount: model.DiscountFree,
-		},
-		{
-			SiteName: "multi-site", TorrentID: "multi-t-002",
-			Title: "Download.Stream.2024", Size: 20000000000,
-			InfoHash:        "multi_hash_download_1",
-			SourceID:        fmt.Sprintf("%d", downloadSub.ID),
-			MatchedRuleName: "accept-all",
-		},
-	}
-
-	require.NoError(t, td.OnTorrents(ctx, events))
-
-	assert.Equal(t, int64(1), countRecords(t, db, "seeding_torrent_records"))
-	assert.Equal(t, int64(1), countRecords(t, db, "publish_candidates"))
-
-	var seedRec model.SeedingTorrentRecord
-	require.NoError(t, db.Where("torrent_id = ?", "multi-t-001").First(&seedRec).Error)
-	assert.Equal(t, "multi_hash_seeding_1", seedRec.InfoHash)
-
-	var cand model.PublishCandidate
-	require.NoError(t, db.Where("source_torrent_id = ?", "multi-t-002").First(&cand).Error)
-	assert.Equal(t, "multi_hash_download_1", cand.InfoHash)
-
-	t.Logf("PASS F2+F3 multi-role: seeding_records=1 candidates=1")
-}
-
-// F10: 连续失败标记不健康
 func TestScenario_F10_ChannelMarkedUnhealthy(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()

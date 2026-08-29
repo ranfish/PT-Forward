@@ -124,16 +124,6 @@
           </a-select>
           <a-badge :count="candidateTotal" :number-style="{ backgroundColor: '#1890ff' }" :overflow-count="9999" />
           <div class="tab-toolbar-right">
-            <a-button
-              v-if="selectedCandidateIds.length > 0"
-              type="primary"
-              size="small"
-              :loading="batchRetrying"
-              @click="batchRetry"
-            >
-              <template #icon><ReloadOutlined /></template>
-              批量重试 ({{ selectedCandidateIds.length }})
-            </a-button>
           </div>
         </div>
 
@@ -188,42 +178,7 @@
             </template>
             <template v-if="column.key === 'actions'">
               <a-space>
-                <a-button
-                  type="link"
-                  size="small"
-                  :disabled="record.publish_status === 'done' || record.publish_status === 'publishing'"
-                  @click="manualPublish(record.id)"
-                >
-                  {{ t('publish.publishAction') }}
-                </a-button>
                 <a-popconfirm :title="t('publish.deleteConfirm')" @confirm="deleteCandidate(record.id)">
-                  <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
-                </a-popconfirm>
-              </a-space>
-            </template>
-          </template>
-        </a-table>
-      </a-tab-pane>
-
-      <a-tab-pane key="groups" :tab="t('publish.groups')">
-        <a-table
-          :columns="groupColumns"
-          :data-source="groups"
-          :loading="groupsLoading"
-          :pagination="false"
-          row-key="id"
-          size="small"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'status'">
-              <a-tag :color="record.status === 'active' ? 'green' : record.status === 'completed' ? 'default' : 'orange'">
-                {{ translatePublishStatus(record.status) }}
-              </a-tag>
-            </template>
-            <template v-if="column.key === 'actions'">
-              <a-space>
-                <a-button type="link" size="small" @click="$router.push(`/publish/groups/${record.id}`)">{{ t('common.detail') }}</a-button>
-                <a-popconfirm :title="t('publish.deleteConfirm')" @confirm="deleteGroup(record.id)">
                   <a-button type="link" danger size="small">{{ t('common.delete') }}</a-button>
                 </a-popconfirm>
               </a-space>
@@ -359,7 +314,7 @@ import * as echarts from 'echarts'
 import { publishApi, publishDataApi } from '@/api/publish'
 import { sitesApi } from '@/api/sites'
 import { useEnumLabels } from '@/utils/enumLabels'
-import type { PublishCandidate, PublishGroup, PublishTask, PublishResultRecord } from '@/api/types'
+import type { PublishCandidate, PublishTask, PublishResultRecord } from '@/api/types'
 import { formatTime, formatBytes } from '@/utils/format'
 
 const { t } = useI18n()
@@ -540,10 +495,7 @@ const candidatePage = ref(1)
 const candidateTotal = ref(0)
 const candidatePageSize = ref(20)
 const selectedCandidateIds = ref<number[]>([])
-const batchRetrying = ref(false)
 
-const groupsLoading = ref(false)
-const groups = ref<PublishGroup[]>([])
 
 const tasksLoading = ref(false)
 const tasks = ref<PublishTask[]>([])
@@ -748,50 +700,8 @@ async function fetchCandidates() {
   }
 }
 
-async function batchRetry() {
-  if (selectedCandidateIds.value.length === 0) return
-  batchRetrying.value = true
-  let ok = 0
-  let fail = 0
-  for (const id of selectedCandidateIds.value) {
-    try {
-      await publishApi.manualPublish(id)
-      ok++
-    } catch {
-      fail++
-    }
-  }
-  batchRetrying.value = false
-  selectedCandidateIds.value = []
-  if (fail === 0) {
-    message.success(`已重试 ${ok} 个候选`)
-  } else {
-    message.warning(`成功 ${ok}，失败 ${fail}`)
-  }
-  fetchCandidates()
-}
 
-async function fetchGroups() {
-  groupsLoading.value = true
-  try {
-    const resp = await publishApi.listGroups()
-    groups.value = resp.data.data?.items ?? []
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  } finally {
-    groupsLoading.value = false
-  }
-}
 
-async function manualPublish(id: number) {
-  try {
-    await publishApi.manualPublish(id)
-    message.success(t('publish.publishTriggered'))
-    fetchCandidates()
-  } catch (e: unknown) {
-    message.error((e as Error).message)
-  }
-}
 
 async function deleteCandidate(id: number) {
   try {
@@ -807,7 +717,6 @@ async function deleteGroup(id: number) {
   try {
     await publishApi.deleteGroup(id)
     message.success(t('common.deleted'))
-    fetchGroups()
   } catch (e: unknown) {
     message.error((e as Error).message)
   }
@@ -930,7 +839,6 @@ onMounted(() => {
   resumeRunningCandidates()
   fetchStats()
   fetchCandidates()
-  fetchGroups()
   fetchTasks()
   fetchResultsFiltered()
   fetchTaskSites()

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -109,11 +108,6 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if len(parts) == 2 && parts[1] == "publish" && r.Method == http.MethodPost {
-			h.handleManualPublish(w, r, uint(id))
-			return
-		}
-
 		switch r.Method {
 		case http.MethodGet:
 			h.handleGetCandidate(w, r, uint(id))
@@ -125,56 +119,6 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.Contains(trimmed, "/publish/groups") {
-		remaining := strings.TrimPrefix(trimmed, "/api/v1/publish/groups")
-		remaining = strings.TrimRight(remaining, "/")
-		remaining = strings.TrimPrefix(remaining, "/")
-
-		if remaining == "" {
-			h.handleListGroups(w, r)
-			return
-		}
-
-		parts := strings.SplitN(remaining, "/", 3)
-		groupID, err := strconv.ParseUint(parts[0], 10, 64)
-		if err != nil {
-			Error(w, http.StatusBadRequest, 40001, "无效的组 ID")
-			return
-		}
-
-		if len(parts) == 1 {
-			switch r.Method {
-			case http.MethodGet:
-				h.handleGetGroup(w, r, uint(groupID))
-			case http.MethodDelete:
-				h.handleDeleteGroup(w, r, uint(groupID))
-			default:
-				Error(w, http.StatusMethodNotAllowed, 40001, "方法不允许")
-			}
-			return
-		}
-
-		if len(parts) >= 2 && parts[1] == "lifecycle" {
-			if len(parts) == 3 {
-				switch parts[2] {
-				case "pause":
-					h.handleLifecyclePause(w, r, uint(groupID))
-				case "resume":
-					h.handleLifecycleResume(w, r, uint(groupID))
-				case "delete":
-					h.handleLifecycleDelete(w, r, uint(groupID))
-				default:
-					Error(w, http.StatusNotFound, 40400, "路径不存在")
-				}
-			} else {
-				Error(w, http.StatusNotFound, 40400, "路径不存在")
-			}
-			return
-		}
-
-		Error(w, http.StatusNotFound, 40400, "路径不存在")
-		return
-	}
 
 	Error(w, http.StatusNotFound, 40400, "接口不存在")
 }
@@ -417,83 +361,6 @@ func (h *PublishHandler) handleDeleteCandidate(w http.ResponseWriter, r *http.Re
 		"message": "发布候选已删除",
 		"id":      id,
 	})
-}
-
-func (h *PublishHandler) handleManualPublish(w http.ResponseWriter, r *http.Request, id uint) {
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-	defer cancel()
-	candidate, err := h.pipeline.PublishCandidate(ctx, id)
-	if err != nil {
-		if strings.Contains(err.Error(), "合规检查") {
-			Error(w, http.StatusBadRequest, 40001, err.Error())
-		} else {
-			Error(w, http.StatusInternalServerError, 50000, err.Error())
-		}
-		return
-	}
-	h.logger.Info("publish candidate manually triggered", zap.Uint("id", id))
-	Success(w, candidate)
-}
-
-func (h *PublishHandler) handleListGroups(w http.ResponseWriter, r *http.Request) {
-	q := h.db.Model(&model.PublishGroup{})
-	if status := r.URL.Query().Get("status"); status != "" {
-		q = q.Where("status = ?", status)
-	}
-
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
-		h.logger.Warn("query failed", zap.Error(err))
-	}
-
-	var groups []model.PublishGroup
-	if err := q.Session(&gorm.Session{}).Order("created_at DESC").Limit(100).Find(&groups).Error; err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询发布组失败")
-		return
-	}
-
-	Success(w, map[string]interface{}{
-		"items": groups,
-		"total": total,
-	})
-}
-
-func (h *PublishHandler) handleGetGroup(w http.ResponseWriter, r *http.Request, id uint) {
-	var group model.PublishGroup
-	if err := h.db.First(&group, id).Error; err != nil {
-		Error(w, http.StatusNotFound, 40400, "发布组不存在")
-		return
-	}
-
-	var members []model.PublishGroupMember
-	if err := h.db.Where("publish_group_id = ?", id).Find(&members).Error; err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "查询发布成员失败")
-		return
-	}
-
-	Success(w, map[string]interface{}{
-		"id":          group.ID,
-		"candidateId": group.CandidateID,
-		"status":      group.Status,
-		"sourceHash":  group.SourceHash,
-		"sourceSite":  group.SourceSite,
-		"createdAt":   group.CreatedAt,
-		"updatedAt":   group.UpdatedAt,
-		"members":     members,
-	})
-}
-
-func (h *PublishHandler) handleDeleteGroup(w http.ResponseWriter, r *http.Request, id uint) {
-	if err := h.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("publish_group_id = ?", id).Delete(&model.PublishGroupMember{}).Error; err != nil {
-			return err
-		}
-		return tx.Delete(&model.PublishGroup{}, id).Error
-	}); err != nil {
-		Error(w, http.StatusInternalServerError, 50000, "删除发布组失败")
-		return
-	}
-	Success(w, nil)
 }
 
 func (h *PublishHandler) handleLifecyclePause(w http.ResponseWriter, r *http.Request, id uint) {
