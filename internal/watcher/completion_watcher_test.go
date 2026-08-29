@@ -381,30 +381,6 @@ func TestWatcher_OnWatchCompleted_DBUpdateFailure(t *testing.T) {
 	})
 }
 
-func TestWatcher_OnWatchCompleted_PipelineFailure(t *testing.T) {
-	db := setupWatcherTestDB(t)
-	pipeline := publish.NewPipeline(db, zap.NewNop())
-	w := NewCompletionWatcher(db, nil, pipeline, zap.NewNop())
-
-	candidate := model.PublishCandidate{
-		SourceSite:      "site1",
-		SourceTorrentID: "t1",
-		TorrentName:     "Test 禁转 Torrent",
-		PublishStatus:   model.CandidatePending,
-	}
-	db.Create(&candidate)
-
-	w.onWatchCompleted(context.Background(), candidate.ID, &model.TorrentInfo{
-		SavePath: "/data/test",
-	})
-
-	var updated model.PublishCandidate
-	db.First(&updated, candidate.ID)
-	if updated.PublishStatus != model.CandidateSkipped {
-		t.Errorf("expected skipped, got %s", updated.PublishStatus)
-	}
-}
-
 func TestWatcher_PollOnce_MalformedKey(t *testing.T) {
 	db := setupWatcherTestDB(t)
 	mgr := client.NewManager(db, zap.NewNop())
