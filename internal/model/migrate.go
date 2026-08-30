@@ -34,6 +34,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&SeedingClientConfig{},
 		&SeedingClientState{},
 		&TorrentTraffic{},
+		&SiteTrafficFlow{},
 		&DownloaderSpeedSnapshot{},
 		&SiteTrafficDaily{},
 		&TrafficStatsHourly{},

@@ -1387,19 +1387,16 @@ func (h *SeedingHandler) handleStatsBySite(w http.ResponseWriter, r *http.Reques
 		SiteName string `json:"site_name"`
 		Uploaded int64  `json:"uploaded"`
 	}
+	// §59.152: 历史总量直读 current_uploaded 列（Vertex torrents 表模式——
+	// 每 UPSERT 最新值；final_uploaded 兜底删除种子；traffic 全表扫 fallback 移除）
 	var historyRows []historyRow
 	h.db.Raw(`SELECT site_name, SUM(uploaded) as uploaded
 		FROM (
 			SELECT str.site_name, str.info_hash,
-				CASE WHEN str.final_uploaded > 0 THEN str.final_uploaded
-					WHEN tt.uploaded > 0 THEN tt.uploaded
+				CASE WHEN str.current_uploaded > 0 THEN str.current_uploaded
+					WHEN str.final_uploaded > 0 THEN str.final_uploaded
 					ELSE 0 END as uploaded
 			FROM seeding_torrent_records str
-			LEFT JOIN (
-				SELECT info_hash, MAX(uploaded) as uploaded
-				FROM torrent_traffic
-				GROUP BY info_hash
-			) tt ON tt.info_hash = str.info_hash
 			WHERE str.status IN ('seeding','pending','paused_free_end','paused_rule')
 		) sub
 		GROUP BY site_name`).Scan(&historyRows)

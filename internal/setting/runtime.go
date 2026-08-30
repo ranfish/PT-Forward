@@ -87,7 +87,7 @@ var DefaultSeeds = map[string]string{
 	KeyDataCleanupPTGenCacheDays:     "90",
 	KeyDataCleanupSeedingArchiveDays: "90",
 	KeyDataCleanupAuditLogDays:       "90",
-	KeyTorrentTrafficRetentionDays:   "30",
+	KeyTorrentTrafficRetentionDays:   "1", // §59.152: 明细降为当日增量原料（Vertex 明细短保留模式）
 
 	KeySeedingDeleteRulesGlobal: "false",
 
