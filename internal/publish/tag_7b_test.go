@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"testing"
 
@@ -307,5 +308,142 @@ func TestTagConfigFromFlag(t *testing.T) {
 	p2.SetTagApplierSites(func() string { return "" })
 	if cfg4 := p2.tagConfigFromFlag("BTSchool", model.Site{Domain: "pt.btschool.club"}); cfg4 != nil {
 		t.Errorf("空 flag 应 nil")
+	}
+}
+
+// §59.151 附批次判据单测锚定（七轮推演实证语义——防未来改动破坏）
+// 案例索引：霹雳火=香港×原声 / 一个好人=English原声反例 / 迫降航班=Mandarin标记反证 /
+// 天空之城=副标题粤字 / 挽救计划=Text段中字补 / 醉拳2=中文Title
+func TestHasHKOriginalTrack(t *testing.T) {
+	mk := func(lang, title string) titleparser.MISections {
+		return titleparser.MISections{Audios: []map[string]string{{"language": lang, "title": title}}}
+	}
+	// 霹雳火正例：香港 + Chinese|原声
+	if !hasHKOriginalTrack(mk("Chinese", "原声"), "中国香港") {
+		t.Error("香港+Chinese原声 应判粤语(霹雳火)")
+	}
+	// 一个好人反例：English|原声（英语原声）
+	if hasHKOriginalTrack(mk("English", "原声"), "中国香港") {
+		t.Error("香港+English原声 不应判粤语(一个好人反例)")
+	}
+	// 非香港
+	if hasHKOriginalTrack(mk("Chinese", "原声"), "日本") {
+		t.Error("非香港 不应判")
+	}
+	// 香港但 Title 非精确"原声"
+	if hasHKOriginalTrack(mk("Chinese", "国语"), "中国香港") {
+		t.Error("香港+国语Title 非原声 不应判")
+	}
+}
+
+func TestHasMandarinTitledTrack(t *testing.T) {
+	sec := titleparser.MISections{Audios: []map[string]string{
+		{"title": "Mandarin (粤配)"}, // 迫降航班：粤配轨标记 Mandarin——反证生效
+	}}
+	if !hasMandarinTitledTrack(sec) {
+		t.Error("Mandarin Title 应为反证(迫降航班)")
+	}
+	sec2 := titleparser.MISections{Audios: []map[string]string{
+		{"language": "Chinese"}, {"title": "粤语"},
+	}}
+	if hasMandarinTitledTrack(sec2) {
+		t.Error("无 Mandarin/国语 标记不应反证")
+	}
+	sec3 := titleparser.MISections{Audios: []map[string]string{{"title": "上译国配"}}}
+	if !hasMandarinTitledTrack(sec3) {
+		t.Error("国配 Title 应反证")
+	}
+}
+
+func TestInferSubtitleFromMITexts(t *testing.T) {
+	sec := titleparser.MISections{Texts: []map[string]string{
+		{"language": "Chinese", "title": "CHS&ENG"}, // 挽救计划形态
+	}}
+	out := inferSubtitleFromMITexts(sec)
+	if !out["chinese_subtitle"] {
+		t.Error("Text Language=Chinese 应产中字(挽救计划)")
+	}
+	// Title-only 形态（无 Language 行——CHS/CHT 压制组标记）
+	sec2 := titleparser.MISections{Texts: []map[string]string{
+		{"title": "CHT"}, {"title": "eng"},
+	}}
+	out2 := inferSubtitleFromMITexts(sec2)
+	if !out2["chinese_subtitle"] || !out2["english_subtitle"] {
+		t.Error("Title-only CHS/CHT+eng 应产中字+英字(四通道防御)")
+	}
+	// Commentary 字幕轨排除
+	sec3 := titleparser.MISections{Texts: []map[string]string{
+		{"language": "English", "title": "Commentary subtitles"},
+	}}
+	out3 := inferSubtitleFromMITexts(sec3)
+	if out3["english_subtitle"] {
+		t.Error("Commentary 字幕轨应排除")
+	}
+}
+
+// InferFull 集成：粤语复合三场景（霹雳火/天空之城/迫降航班）
+func TestCantoneseCompositeScenarios(t *testing.T) {
+	inf := NewMediaTagInferer()
+	// 场景1 霹雳火：region 香港 + Chinese|原声 → cantonese
+	mi1 := "Audio #1\nLanguage : Chinese\nTitle : 原声\n"
+	tags1 := inf.InferFull(TagInput{MediaInfo: mi1, Title: "Thunderbolt", Region: "中国香港"})
+	found := false
+	for _, tg := range tags1 {
+		if tg == "cantonese_audio" { found = true }
+	}
+	if !found {
+		t.Errorf("霹雳火场景应产 cantonese, got %v", tags1)
+	}
+	// 场景2 迫降航班：副标题含粤 + MI Mandarin 标记 → 不产
+	mi2 := "Audio #1\nLanguage : Chinese\nTitle : Mandarin (粤配)\n"
+	tags2 := inf.InferFull(TagInput{MediaInfo: mi2, Title: "Flight", Subtitle: "国粤台英音轨", Region: "美国"})
+	found2 := false
+	for _, tg := range tags2 {
+		if tg == "cantonese_audio" { found2 = true }
+	}
+	if found2 {
+		t.Errorf("迫降航班场景(Mandarin反证)不应产 cantonese, got %v", tags2)
+	}
+	// 场景3 天空之城：副标题粤 + MI 无 Mandarin 标记 → 产
+	mi3 := "Audio #1\nLanguage : Japanese\nAudio #2\nLanguage : Chinese\n"
+	tags3 := inf.InferFull(TagInput{MediaInfo: mi3, Title: "Laputa", Subtitle: "国粤英日四语", Region: "日本"})
+	found3 := false
+	for _, tg := range tags3 {
+		if tg == "cantonese_audio" { found3 = true }
+	}
+	if !found3 {
+		t.Errorf("天空之城场景(副标题声明无反证)应产 cantonese, got %v", tags3)
+	}
+}
+
+// inferHDRTagsFromMI 直测（dvhe.08 双层/ST2086/空）
+func TestInferHDRTagsFromMI(t *testing.T) {
+	mkV := func(hdr string) titleparser.MISections {
+		return titleparser.MISections{Videos: []map[string]string{{"hdr format": hdr}}}
+	}
+	// dvhe.08 = DV+HDR10 双层
+	out := inferHDRTagsFromMI(mkV("Dolby Vision, Version 1.0, Profile 8.1, dvhe.08.06, BL+RPU, no metadata compression, HDR10"), nil)
+	if !containsStr(out, "dolby_vision") || !containsStr(out, "hdr10") {
+		t.Errorf("dvhe.08 应双产 dv+hdr10, got %v", out)
+	}
+	// ST2086 = HDR10
+	out2 := inferHDRTagsFromMI(mkV("SMPTE ST 2086, HDR10 compatible"), nil)
+	if !containsStr(out2, "hdr10") || containsStr(out2, "dolby_vision") {
+		t.Errorf("ST2086 应仅 hdr10, got %v", out2)
+	}
+	// 空 = 全不产
+	out3 := inferHDRTagsFromMI(mkV(""), nil)
+	if len(out3) != 0 {
+		t.Errorf("空 HDR format 应零产出, got %v", out3)
+	}
+	// 无 Video 段 = 剔除后返回（纯音频种子）
+	out4 := inferHDRTagsFromMI(titleparser.MISections{}, []string{"hdr10", "other"})
+	if containsStr(out4, "hdr10") || !containsStr(out4, "other") {
+		t.Errorf("无 Video 段应剔除 HDR 族保留其它, got %v", out4)
+	}
+	// ST2094 = HDR10+ 不叠 HDR10
+	out5 := inferHDRTagsFromMI(mkV("SMPTE ST 2094-40, HDR10+"), nil)
+	if !containsStr(out5, "hdr10_plus") || containsStr(out5, "hdr10") {
+		t.Errorf("HDR10+ 应仅 hdr10_plus, got %v", out5)
 	}
 }
