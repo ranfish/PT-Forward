@@ -232,7 +232,7 @@ func TestInferLanguageGapTags(t *testing.T) {
 		in   TagInput
 		want string
 	}{
-		{"副标题英语", TagInput{Subtitle: "英语 简繁字幕"}, "english_audio"},
+		{"副标题英语不产 audio(§59.151 MI 单点)", TagInput{Subtitle: "英语 简繁字幕"}, ""},
 		{"国英双语", TagInput{Subtitle: "国英双语 简繁字幕"}, "bilingual_audio"},
 		{"中英双语", TagInput{Subtitle: "中英双语"}, "bilingual_audio"},
 		{"英语字幕不算音轨", TagInput{Subtitle: "简英字幕"}, ""},

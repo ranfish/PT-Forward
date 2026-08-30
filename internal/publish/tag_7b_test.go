@@ -103,15 +103,20 @@ func TestMediaTagInferer_ChineseSubtitle(t *testing.T) {
 
 func TestMediaTagInferer_ChineseAudio(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("", "电影 国语 2024")
+	// §59.151: audio 语言族 MI 单点（MI Audio 段 Language/Title——标题声明废除）
+	tags := inferer.Infer("Audio #1\nLanguage : Chinese", "电影 2024")
 	if !containsTag(tags, "chinese_audio") {
 		t.Errorf("should infer chinese_audio, got %v", tags)
+	}
+	tags2 := inferer.Infer("", "电影 国语 2024")
+	if containsTag(tags2, "chinese_audio") {
+		t.Errorf("title-only chinese_audio should not infer (§59.151), got %v", tags2)
 	}
 }
 
 func TestMediaTagInferer_CantoneseAudio(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("", "电影 粤语 2024")
+	tags := inferer.Infer("Audio #1\nTitle : Cantonese", "电影 2024")
 	if !containsTag(tags, "cantonese_audio") {
 		t.Errorf("should infer cantonese_audio, got %v", tags)
 	}

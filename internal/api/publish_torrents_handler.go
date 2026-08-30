@@ -3406,6 +3406,10 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		Specification: pickNonEmpty(meta.Specification, profile.Specification),
 		VideoCodec:    pickNonEmpty(meta.VideoCodec, profile.VideoCodec),
 	}
+	// §59.151: MI 铁证传递（displayProfile 原列值构造丢 MIEncoded——
+	// WEB-DL 剧集 Encode 误判根因：IsEncode 走不进 MI 分支回落旧 spec 判定）
+	displayProfile.MIEncoded = profile.MIEncoded
+	displayProfile.MIHasVideo = profile.MIHasVideo
 
 	// §59.46: 展示优先级兜底——description 列为空（源站无简介形态）时按
 	// douban_url 查 ptgen_cache（format BBCode）；非空不覆盖（尊重源站/用户编辑）
