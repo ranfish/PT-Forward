@@ -24,6 +24,8 @@ type TechProfile struct {
 	Resolution      string `json:"resolution"`       // 5. 分辨率（4320p/2160p/1080p/720p/480p/1440p）
 	HDR             string `json:"hdr"`              // 10. HDR 类型（HDR10/HDR10+/DoVi/DoVi HDR/HDR Vivid/HLG）
 	BitDepth        string `json:"bit_depth"`        // 11. bit 信息（8bit/10bit）
+	MIEncoded       bool   `json:"-"`                // §59.151: MI Writing library 重编码铁证
+	MIHasVideo      bool   `json:"-"`                // §59.151: MI 存在 Video 层（判据可信前提）
 	VideoCodec      string `json:"video_codec"`      // 12. 视频编码（x264/x265/HEVC/AVC/AV1...）
 	AudioCodec      string `json:"audio_codec"`      // 13. 音频编码（DDP/DD/DTS/DTS-HD MA/TrueHD/FLAC/AAC...）
 	AudioChannels   string `json:"audio_channels"`   // 14. 声道数（2.0/5.1/7.1）
@@ -53,6 +55,17 @@ type TechProfile struct {
 //   - 片源为压制写法（BluRay/UHD BluRay/3D BluRay，无连字符）
 //   - 视频编码为压制族（x264/x265/Xvid）
 func IsEncode(p TechProfile) bool {
+	// §59.151: MI Writing library 铁证优先（Encoded=有编码器写入痕迹——
+	// WEB-DL 同 spec 双种子 MI 一编码一原生的实证；spec/标题循环依赖废除）
+	if p.MIEncoded {
+		return true
+	}
+	if p.MIHasVideo && !p.MIEncoded {
+		// MI 存在 Video 层且无编码痕迹 = 原生（原盘直流/未重编码 WEB-DL）
+		if p.Specification != "BDRip" && p.Specification != "DVDRip" && p.Specification != "TVRip" {
+			return false
+		}
+	}
 	switch p.Specification {
 	case "Remux", "WEB-DL", "WEBRip", "HDTV", "UHDTV", "BDRip", "DVDRip", "TVRip":
 		return false

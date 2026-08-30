@@ -10,10 +10,10 @@ func TestTagInferAnchors(t *testing.T) {
 		want []string // 含 ApplyTagRules 前的原始命中（顺序 = dict 序）
 	}{
 		{"空输入零命中", TagInferInput{Title: "Normal Movie"}, nil},
-		{"dv 带空格仅标题命中（旧 Contains 等价）", TagInferInput{Title: "Movie DV HDR", MediaInfo: "no dv here"}, []string{"dolby_vision"}},
-		{"dv 词中不命中", TagInferInput{Title: "Normal Movie", MediaInfo: "advance"}, nil},
-		{"dolby_vision 全文", TagInferInput{Title: "Movie", MediaInfo: "Dolby Vision Profile 5"}, []string{"dolby_vision"}},
-		{"hdr10_plus 优先", TagInferInput{Title: "Movie HDR10+", MediaInfo: ""}, []string{"hdr10_plus", "hdr10"}}, // 原始命中含两者，ApplyTagRules 覆盖后仅 hdr10_plus（publish 层测试护航）
+		// §59.151: HDR 族文本 regex 废除（幽灵 hdr10 根因——MI 尾段/标题字样误命中）——
+		// 判据移 tag_inferer.inferHDRTagsFromMI（MI Video 层 HDR format 含 Profile 语义）
+		{"HDR 族标题字样不命中(§59.151)", TagInferInput{Title: "Movie DV HDR HDR10+", MediaInfo: "no dv here"}, nil},
+		{"HDR 族 MI 文本字样不命中(§59.151)", TagInferInput{Title: "Movie", MediaInfo: "Video\nHDR format : Dolby Vision Profile 5"}, nil},
 		{"中字 MI Text 段", TagInferInput{Title: "Movie", MediaInfo: "Text #1: Chinese"}, []string{"chinese_subtitle"}},
 		{"国语排除国家", TagInferInput{Title: "中国国家地理纪录片"}, nil},
 		{"国语 PTGen 行", TagInferInput{Description: "◎语　言　汉语普通话"}, []string{"chinese_audio"}},

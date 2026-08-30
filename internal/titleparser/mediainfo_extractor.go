@@ -20,6 +20,7 @@ type MediaInfoTech struct {
 	AudioTracks     int    // 有效音轨数（排除兼容音轨）
 	HDR             string // HDR10/HDR10+/DoVi/DoVi HDR/DoVi HDR10+/HDR Vivid/HLG/PQ10
 	BitDepth        string // 8bit/10bit
+	Encoded         bool   // §59.151: Writing library 存在=重编码（IsEncode MI 驱动唯一判据）
 }
 
 // miStream MediaInfo 纯文本中的一个段（Video / Audio #N）。
@@ -51,6 +52,9 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 			result.VideoCodec = codecFromMI(s.fields["format"], s.fields["writing library"])
 			result.BitDepth = bitDepthFromMI(s.fields["bit depth"])
 			result.HDR = hdrFromMI(s.fields["hdr format"])
+			// §59.151: Writing library 存在 = 重编码铁证（x265 等编码器写入痕迹）——
+			// IsEncode MI 驱动的唯一判据（165/166 语料实证；spec/标题循环依赖废除）
+			result.Encoded = strings.TrimSpace(s.fields["writing library"]) != ""
 			break
 		}
 	}

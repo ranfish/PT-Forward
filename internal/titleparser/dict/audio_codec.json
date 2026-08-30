@@ -44,7 +44,7 @@
     },
     {
       "canonical": "DTS-ES",
-      "pattern": "\\bDTS[._\\- ]?ES(?:[._\\d]+)?\\b",
+      "pattern": "\\bDTS[._\\- ]?ES(?:[._\\d]+)?\\b|\\bDTS[._\\- ]?ES[._\\- ]?XLL\\b",
       "variants": []
     },
     {

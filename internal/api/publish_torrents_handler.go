@@ -228,6 +228,9 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleSetFetchPriority(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/audit-infohash") && r.Method == http.MethodPost:
 		h.handleAuditInfoHash(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/recompute-profiles") && r.Method == http.MethodPost:
+		h.handleRecomputeProfiles(w, r)
+
 	case strings.HasSuffix(path, "/publish/seeds/batch-fetch") && r.Method == http.MethodPost:
 		h.handleBatchFetch(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/batch-fetch-progress") && r.Method == http.MethodGet:
@@ -3073,6 +3076,77 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	Success(w, map[string]interface{}{
 		"items": items,
 		"total": total,
+	})
+}
+
+// handleRecomputeProfiles §59.151: 批量重推 MI 派生列+tags（存量自愈端点）。
+// 对全部有本地 MI 的 metadata 行：读 MI → BuildTechProfile → 更新 v1.05 技术列
+// + 重推 tags（MI 层判据版）。幂等——MI 是唯一真相，重推收敛同一值。
+func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var rows []model.TorrentMetadata
+	if err := h.db.WithContext(ctx).
+		Where("media_info != ''").Find(&rows).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50000, "查询失败: "+err.Error())
+		return
+	}
+	recomputed, skipped := 0, 0
+	for _, m := range rows {
+		mi := m.MediaInfo
+		if mi == "" {
+			mi = m.SourceMediaInfo
+		}
+		if mi == "" {
+			skipped++
+			continue
+		}
+		domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(m.DetailSourceJSON)
+		profile := titleparser.BuildTechProfile(m.Title, mi, domMedium, domRes, domVideo, domAudio)
+		profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, m.Subtitle, mi)
+		components := titleparser.TechProfileToComponents(profile)
+		category := titleparser.InferCategory(components, m.SourceCategory, "", "")
+		updates := map[string]interface{}{
+			"category":        category,
+			"resolution":      profile.Resolution,
+			"video_codec":     profile.VideoCodec,
+			"audio_codec":     profile.AudioCodec,
+			"audio_channels":  profile.AudioChannels,
+			"audio_tech":      profile.AudioTechnology,
+			"audio_tracks":    profile.AudioTracks,
+			"hdr":             profile.HDR,
+			"bit_depth":       profile.BitDepth,
+			"source_type":     profile.SourceType,
+			"specification":   profile.Specification,
+			"source_platform": profile.SourcePlatform,
+			"edition_info":    profile.EditionInfo,
+			"region_code":     profile.RegionCode,
+		}
+		// tags 重推（MI 层判据版——§59.151 HDR/语言族结构化）
+		inferer := publish.NewMediaTagInferer()
+		inferred := inferer.Infer(mi, m.Title)
+		if sub := m.Subtitle; sub != "" {
+			// 副标题语义补充（infer 全输入）
+			inferred = inferer.InferFull(publish.TagInput{
+				MediaInfo: mi, Title: m.Title, Subtitle: sub,
+				Description: m.Description, Statement: m.Statement,
+			})
+		}
+		if data, err := json.Marshal(inferred); err == nil {
+			updates["tags"] = string(data)
+		}
+		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash = ? AND site_name = ?", m.InfoHash, m.SiteName).
+			Updates(updates).Error; err != nil {
+			h.logger.Warn("recompute profile failed",
+				zap.String("hash", m.InfoHash[:10]), zap.Error(err))
+			skipped++
+			continue
+		}
+		recomputed++
+	}
+	Success(w, map[string]interface{}{
+		"recomputed": recomputed,
+		"skipped":    skipped,
 	})
 }
 
