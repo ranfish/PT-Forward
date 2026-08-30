@@ -447,3 +447,27 @@ func TestInferHDRTagsFromMI(t *testing.T) {
 		t.Errorf("HDR10+ 应仅 hdr10_plus, got %v", out5)
 	}
 }
+
+// §59.151 附7: 英语标签条件产出（lucky TAGS_MISSING_ENGLISH_AUDIO 实证）
+// Buried.Alive.1990（纯英语 FLAC/PGS-EN）探针：勾→100 / 不勾→WARN 扣分
+func TestLuckyEnglishAudioConditional(t *testing.T) {
+	inf := NewMediaTagInferer()
+	// 场景1 纯英语（Buried Alive 形态）：Audio English + Text English → lucky_english_audio
+	mi1 := "Audio #1\nFormat : FLAC\nLanguage : English\nText #1\nLanguage : English\n"
+	tags1 := inf.InferFull(TagInput{MediaInfo: mi1, Title: "Buried Alive 1990"})
+	if !containsStr(tags1, "lucky_english_audio") {
+		t.Errorf("纯英语种应产 lucky_english_audio, got %v", tags1)
+	}
+	// 场景2 英语音轨+中文字幕（爱情抓马形态）→ 不产
+	mi2 := mi1 + "Text #2\nLanguage : Chinese\n"
+	tags2 := inf.InferFull(TagInput{MediaInfo: mi2, Title: "The Drama 2026"})
+	if containsStr(tags2, "lucky_english_audio") {
+		t.Errorf("有中字不应产 lucky_english_audio, got %v", tags2)
+	}
+	// 场景3 国语音轨+英语音轨 → 不产
+	mi3 := "Audio #1\nFormat : TrueHD\nLanguage : English\nAudio #2\nLanguage : Chinese\nTitle : Mandarin\n"
+	tags3 := inf.InferFull(TagInput{MediaInfo: mi3, Title: "Movie"})
+	if containsStr(tags3, "lucky_english_audio") {
+		t.Errorf("有国语不应产 lucky_english_audio, got %v", tags3)
+	}
+}
