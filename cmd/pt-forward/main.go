@@ -1166,11 +1166,27 @@ func registerSchedulerTasks(
 		cutoff := time.Now().AddDate(0, 0, -retentionDays)
 		tc := db.Where("recorded_at < ?", cutoff).Delete(&model.TorrentTraffic{})
 		sc := db.Where("recorded_at < ?", cutoff).Delete(&model.DownloaderSpeedSnapshot{})
-		if tc.RowsAffected > 0 || sc.RowsAffected > 0 {
+		// §59.152: 聚合表 7 天保留（Vertex tracker_flow 模式）
+		sf := db.Where("recorded_at < ?", time.Now().AddDate(0, 0, -7)).Delete(&model.SiteTrafficFlow{})
+		if tc.RowsAffected > 0 || sc.RowsAffected > 0 || sf.RowsAffected > 0 {
 			log.Info("cleaned old traffic data",
 				zap.Int64("torrent_traffic", tc.RowsAffected),
 				zap.Int64("speed_snapshots", sc.RowsAffected),
+				zap.Int64("site_traffic_flows", sf.RowsAffected),
 				zap.Int("retention_days", retentionDays))
+		}
+		return nil
+	})
+
+	// §59.152: WAL 周期 checkpoint（观察项 4——243 实测 3 天涨 2.4GB 拖垮批量写，
+	// autocheckpoint 被长事务饿死 §59.33；每日 4 次 PASSIVE 主动落盘）
+	register("wal_checkpoint", "maintenance", "0 */6 * * *", func(ctx context.Context) error {
+		if sqlDB, err := db.DB(); err == nil {
+			if _, err := sqlDB.ExecContext(ctx, "PRAGMA wal_checkpoint(PASSIVE)"); err != nil {
+				log.Warn("wal checkpoint failed", zap.Error(err))
+			} else {
+				log.Info("wal checkpoint done")
+			}
 		}
 		return nil
 	})

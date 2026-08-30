@@ -2522,6 +2522,44 @@ func (e *Engine) collectTorrentTraffic(ctx context.Context, clientID string, md 
 	}
 
 	if len(trafficBatch) > 0 {
+		// §59.152 融合方案（Vertex 三层模式）：
+		// ① seeding_torrent_records UPSERT 最新累计（current_uploaded 列——历史总量零成本）
+		// ② site_traffic_flows 写时聚合（内存差值→站点增量，7 天保留——查询永不扫全量）
+		// ③ torrent_traffic 明细照写（当日增量原料，保留期 30→1 天由配置层改）
+		siteDeltas := map[string]*model.SiteTrafficFlow{}
+		for _, t := range trafficBatch {
+			sd, ok := siteDeltas[t.SiteName]
+			if !ok {
+				sd = &model.SiteTrafficFlow{SiteName: t.SiteName, RecordedAt: now}
+				siteDeltas[t.SiteName] = sd
+			}
+			// 与上次快照的差值（collect 前从 record 缓存查——rec.Uploaded 是上轮值）
+			for _, r := range records {
+				if r.InfoHash == t.InfoHash {
+					if t.Uploaded > r.CurrentUploaded {
+						sd.UploadDelta += t.Uploaded - r.CurrentUploaded
+					}
+					if t.Downloaded > r.CurrentDownloaded {
+						sd.DownloadDelta += t.Downloaded - r.CurrentDownloaded
+					}
+					break
+				}
+			}
+			// ① 单行 UPSERT 最新累计到 record
+			e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+				Where("info_hash = ?", t.InfoHash).
+				Updates(map[string]interface{}{
+					"current_uploaded":   t.Uploaded,
+					"current_downloaded": t.Downloaded,
+				})
+		}
+		// ② 站点增量落库
+		for _, sd := range siteDeltas {
+			if sd.UploadDelta > 0 || sd.DownloadDelta > 0 {
+				e.db.WithContext(ctx).Create(sd)
+			}
+		}
+
 		// §59.37: 分块写入——SQLite 单条 INSERT 变量上限 999（默认），2 万种子
 		// 单条批量写必然 too many SQL variables（243 实证每轮 2 次失败）。
 		// 每行 9 列 → chunk 100 行 = 900 变量，安全上限内。

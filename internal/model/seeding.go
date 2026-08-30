@@ -33,6 +33,11 @@ type SeedingTorrentRecord struct {
 
 	Unregistered    bool       `json:"unregistered" gorm:"default:false"`
 	UnregisteredAt  *time.Time `json:"unregistered_at"`
+
+	// §59.152: 最新累计上传/下载（Vertex torrents 表模式——每轮 UPSERT，
+	// 历史总量零成本直读列；traffic 明细表降为当日增量原料）
+	CurrentUploaded   int64 `json:"current_uploaded" gorm:"default:0"`
+	CurrentDownloaded int64 `json:"current_downloaded" gorm:"default:0"`
 	UnregisteredMsg string     `json:"unregistered_msg" gorm:"size:200"`
 	// §59.31: 命中关键词的 tracker 域名（诊断展示用，非规则条件键）
 	UnregisteredTracker string    `json:"unregistered_tracker" gorm:"size:200"`
@@ -328,3 +333,16 @@ type ScoringLog struct {
 }
 
 func (ScoringLog) TableName() string { return "scoring_logs" }
+
+// §59.152 — SiteTrafficFlow: 站点流量增量聚合（Vertex tracker_flow 模式——
+// 写时聚合：采集轮内内存算增量落库，查询永不扫全量明细；7 天保留）。
+type SiteTrafficFlow struct {
+	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	CreatedAt   time.Time `json:"created_at"`
+	SiteName    string    `json:"site_name" gorm:"size:100;index:idx_site_flow_time"`
+	UploadDelta int64     `json:"upload_delta"`
+	DownloadDelta int64   `json:"download_delta"`
+	RecordedAt  time.Time `json:"recorded_at" gorm:"index:idx_site_flow_time"`
+}
+
+func (SiteTrafficFlow) TableName() string { return "site_traffic_flows" }
