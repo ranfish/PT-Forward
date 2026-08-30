@@ -30,6 +30,8 @@ type TagInput struct {
 	NFO         string // NFO/BDInfo
 	Size        int64  // §59.72 B2: 种子体积（字节）——big_pack >1TB 判据（AGSV 审核硬规则）
 	Statement   string // §59.73: 引用/声明区（源站 quote 块）——特效字幕等发布者声明
+	// §59.151: PTGen 产地（labels 串，如 "中国香港"）——港片原声=粤语复合判据
+	Region string
 }
 
 // Infer 从多源文本推断 MediaTags。
@@ -56,6 +58,14 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	for _, lt := range inferLanguageFromMIAudios(miSec) {
 		if !containsStr(tags, lt) {
 			tags = append(tags, lt)
+		}
+	}
+	// §59.151: 粤语复合判据（用户经验）——PTGen 产地香港 + MI 原声轨（港片
+	// 原声=粤语，霹雳火案例）；副标题音轨清单声明"粤"（天空之城"国粤英日
+	// 四语"——发布者声明可靠）
+	if !containsStr(tags, "cantonese_audio") {
+		if hasHKOriginalTrack(miSec, in.Region) || strings.Contains(in.Subtitle, "粤") {
+			tags = append(tags, "cantonese_audio")
 		}
 	}
 	// §59.151: HDR 族 MI 层结构化判据（dict 文本 regex 已删——MI Video 层
@@ -416,4 +426,20 @@ func inferSubtitleFromMITexts(s titleparser.MISections) map[string]bool {
 		}
 	}
 	return out
+}
+
+
+// hasHKOriginalTrack §59.151: 产地香港 × MI 原声轨 → 粤语（港片原声判据）。
+// Region 为 PTGen 产地 labels（"中国香港"/"香港"形态）；原声轨=Audio Title
+// 精确为"原声"（港片压制组惯例标记）。
+func hasHKOriginalTrack(s titleparser.MISections, region string) bool {
+	if !strings.Contains(region, "香港") {
+		return false
+	}
+	for _, a := range s.Audios {
+		if strings.TrimSpace(a["title"]) == "原声" {
+			return true
+		}
+	}
+	return false
 }
