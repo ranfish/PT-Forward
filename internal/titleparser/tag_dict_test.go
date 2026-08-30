@@ -16,7 +16,7 @@ func TestTagInferAnchors(t *testing.T) {
 		{"HDR 族 MI 文本字样不命中(§59.151)", TagInferInput{Title: "Movie", MediaInfo: "Video\nHDR format : Dolby Vision Profile 5"}, nil},
 		{"中字 MI Text 段", TagInferInput{Title: "Movie", MediaInfo: "Text #1: Chinese"}, []string{"chinese_subtitle"}},
 		{"国语排除国家", TagInferInput{Title: "中国国家地理纪录片"}, nil},
-		{"国语 PTGen 行", TagInferInput{Description: "◎语　言　汉语普通话"}, []string{"chinese_audio"}},
+		{"国语 PTGen 行不产 audio(§59.151 MI 单点)", TagInferInput{Description: "◎语　言　汉语普通话"}, nil},
 		{"complete S01 无 E", TagInferInput{Title: "Show S01 Complete"}, []string{"complete"}},
 		{"complete 全N集副标题", TagInferInput{Title: "Show", Subtitle: "全12集"}, []string{"complete"}},
 		{"S01E01 不判 complete(分集命中)", TagInferInput{Title: "Show S01E01"}, []string{"episode_split"}},

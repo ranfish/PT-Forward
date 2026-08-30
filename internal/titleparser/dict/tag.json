@@ -119,10 +119,7 @@
       "label": "国语",
       "aliases": "普通话/国配",
       "group": "语言音轨",
-      "infer_pattern": "([^多]国.{0,3}语|国.{0,3}配|台.{0,3}语|台.{0,3}配)",
-      "infer_scope": "title_raw",
       "infer_exclude": "国家",
-      "infer_pattern2": "◎语.*?言　汉语普通话",
       "infer_scope2": "desc_raw",
       "standard_key": "tag.chinese_audio",
       "variants": [
@@ -137,9 +134,6 @@
       "label": "粤语",
       "aliases": "",
       "group": "语言音轨",
-      "infer_pattern": "(粤.{0,3}语|粤.{0,3}配|[国台日英韩]粤|粤[国台日英韩])",
-      "infer_scope": "title_raw",
-      "infer_pattern2": "◎语.*?言　粤语",
       "infer_scope2": "desc_raw",
       "standard_key": "tag.cantonese_audio",
       "variants": [
@@ -156,8 +150,6 @@
         "英语",
         "英配"
       ],
-      "infer_pattern": "英语|英配音轨",
-      "infer_scope": "title_raw",
       "note": "§59.117: MI English 移层查询"
     },
     {

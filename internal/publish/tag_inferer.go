@@ -57,15 +57,18 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 		if !containsStr(tags, lt) {
 			tags = append(tags, lt)
 		}
-		// §59.151: 中文音轨细分——泛中文补国语语义 tag（chinese_audio ⊃ 国语）
-		if lt == "chinese_audio" && !containsStr(tags, "guoyu_audio") {
-			tags = append(tags, "guoyu_audio")
-		}
 	}
 	// §59.151: HDR 族 MI 层结构化判据（dict 文本 regex 已删——MI Video 层
 	// HDR format 含 Profile 语义是唯一真相：dvhe.08/09=DV+HDR10 双层 /
 	// dvhe.05=仅DV / ST2086=HDR10 / ST2094=HDR10+ / Vivid / HLG / PQ10）
 	tags = inferHDRTagsFromMI(miSec, tags)
+	// §59.151: 字幕语言 MI Text 段补充（Language 行直证——副标题声明之外的
+	// 铁证通道；挽救计划案例：特效字幕声明 ≠ 中字 tag，MI Text 中文轨才是）
+	for st := range inferSubtitleFromMITexts(miSec) {
+		if !containsStr(tags, st) {
+			tags = append(tags, st)
+		}
+	}
 	hasHB, hasHF := inferNumericSpecTagsSections(miSec)
 	// §59.70: 高分——豆瓣评分 ≥8.0（Description 源——PTGen 简介行，
 	// "◎豆瓣评分　8.2/10"；无评分/暂无评分不命中）
@@ -148,6 +151,9 @@ func inferLanguageFromMIAudios(s titleparser.MISections) []string {
 			strings.Contains(title, "mandarin") || strings.Contains(title, "国语") ||
 			strings.Contains(title, "国配") || strings.Contains(title, "普通话"):
 			add("chinese_audio")
+		}
+		if strings.Contains(lang, "english") {
+			add("english_audio")
 		}
 		if strings.Contains(lang, "japanese") {
 			add("japanese_audio")
@@ -387,6 +393,27 @@ func inferHDRTagsFromMI(s titleparser.MISections, tags []string) []string {
 	}
 	if hasPQ10 {
 		out = append(out, "pq10")
+	}
+	return out
+}
+
+
+// inferSubtitleFromMITexts §59.151: MI Text 段字幕语言（Language 行直证）。
+// Commentary 排除同 §59.114 判据（评论字幕不承载内容语言）。
+func inferSubtitleFromMITexts(s titleparser.MISections) map[string]bool {
+	out := map[string]bool{}
+	for _, t := range s.Texts {
+		lang := strings.ToLower(t["language"])
+		title := strings.ToLower(t["title"])
+		if strings.Contains(title, "commentary") || strings.Contains(title, "评论") {
+			continue
+		}
+		if strings.Contains(lang, "chinese") {
+			out["chinese_subtitle"] = true
+		}
+		if strings.Contains(lang, "english") {
+			out["english_subtitle"] = true
+		}
 	}
 	return out
 }
