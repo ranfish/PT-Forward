@@ -60,11 +60,15 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 			tags = append(tags, lt)
 		}
 	}
-	// §59.151: 粤语复合判据（用户经验）——PTGen 产地香港 + MI 原声轨（港片
-	// 原声=粤语，霹雳火案例）；副标题音轨清单声明"粤"（天空之城"国粤英日
-	// 四语"——发布者声明可靠）
+	// §59.151: 粤语复合判据（用户经验 + 反例修正）：
+	// ① PTGen 产地香港 × MI 原声轨（Language=Chinese——港片粤语原声；一个好人
+	//    反例：English|原声=英语原声不判）
+	// ② 副标题"粤"字声明（天空之城"国粤英日四语"）——仅在 MI 无 Mandarin/
+	//    国语 Title 反证时生效（迫降航班反例：粤配轨 MI 标记 Mandarin，幸运按
+	//    MI Language 判无粤语→勾了=WRONGLY）
 	if !containsStr(tags, "cantonese_audio") {
-		if hasHKOriginalTrack(miSec, in.Region) || strings.Contains(in.Subtitle, "粤") {
+		if hasHKOriginalTrack(miSec, in.Region) ||
+			(strings.Contains(in.Subtitle, "粤") && !hasMandarinTitledTrack(miSec)) {
 			tags = append(tags, "cantonese_audio")
 		}
 	}
@@ -429,15 +433,27 @@ func inferSubtitleFromMITexts(s titleparser.MISections) map[string]bool {
 }
 
 
-// hasHKOriginalTrack §59.151: 产地香港 × MI 原声轨 → 粤语（港片原声判据）。
-// Region 为 PTGen 产地 labels（"中国香港"/"香港"形态）；原声轨=Audio Title
-// 精确为"原声"（港片压制组惯例标记）。
+// hasHKOriginalTrack §59.151: 产地香港 × MI 原声轨（Language=Chinese）→ 粤语。
+// 一个好人反例：English|原声=英语原声（成龙港片的英语轨标记）不判粤语。
 func hasHKOriginalTrack(s titleparser.MISections, region string) bool {
 	if !strings.Contains(region, "香港") {
 		return false
 	}
 	for _, a := range s.Audios {
-		if strings.TrimSpace(a["title"]) == "原声" {
+		if strings.TrimSpace(a["title"]) == "原声" &&
+			strings.Contains(strings.ToLower(a["language"]), "chinese") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasMandarinTitledTrack §59.151: MI Audio Title 含 Mandarin/国语标记（副标题
+// 粤字声明的反证——迫降航班粤配轨 MI 标记 Mandarin，幸运按 Language 判）。
+func hasMandarinTitledTrack(s titleparser.MISections) bool {
+	for _, a := range s.Audios {
+		t := strings.ToLower(a["title"])
+		if strings.Contains(t, "mandarin") || strings.Contains(t, "国语") || strings.Contains(t, "国配") {
 			return true
 		}
 	}
