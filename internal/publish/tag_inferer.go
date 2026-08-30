@@ -57,7 +57,15 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 		if !containsStr(tags, lt) {
 			tags = append(tags, lt)
 		}
+		// §59.151: 中文音轨细分——泛中文补国语语义 tag（chinese_audio ⊃ 国语）
+		if lt == "chinese_audio" && !containsStr(tags, "guoyu_audio") {
+			tags = append(tags, "guoyu_audio")
+		}
 	}
+	// §59.151: HDR 族 MI 层结构化判据（dict 文本 regex 已删——MI Video 层
+	// HDR format 含 Profile 语义是唯一真相：dvhe.08/09=DV+HDR10 双层 /
+	// dvhe.05=仅DV / ST2086=HDR10 / ST2094=HDR10+ / Vivid / HLG / PQ10）
+	tags = inferHDRTagsFromMI(miSec, tags)
 	hasHB, hasHF := inferNumericSpecTagsSections(miSec)
 	// §59.70: 高分——豆瓣评分 ≥8.0（Description 源——PTGen 简介行，
 	// "◎豆瓣评分　8.2/10"；无评分/暂无评分不命中）
@@ -123,13 +131,22 @@ func inferLanguageFromMIAudios(s titleparser.MISections) []string {
 	for _, a := range s.Audios {
 		lang := strings.ToLower(a["language"])
 		title := strings.ToLower(a["title"])
+		// §59.151: Commentary 轨排除（§59.114 同源判据——评论轨不承载内容语言）
+		if strings.Contains(title, "commentary") || strings.Contains(title, "评论") ||
+			strings.Contains(title, "解说") {
+			continue
+		}
 		// Language 字段直证 + Title 行语义标识（"Mandarin (台配)"/"Cantonese"——
 		// §59.113 案例库: 幽灵公主 Title: Cantonese 的直证通道）
+		// §59.151: 中文 Title 补齐（醉拳2 Title=['粤语','国语','英语'] 实证——
+		// 中英文 Title 双通道；'原声'/Title 空 → 泛中文（Lang=Chinese 兜底））
 		switch {
-		case strings.Contains(lang, "cantonese") || strings.Contains(title, "cantonese"):
+		case strings.Contains(lang, "cantonese") || strings.Contains(title, "cantonese") ||
+			strings.Contains(title, "粤语") || strings.Contains(title, "广东话"):
 			add("cantonese_audio")
 		case strings.Contains(lang, "chinese") || strings.Contains(lang, "mandarin") ||
-			strings.Contains(title, "mandarin"):
+			strings.Contains(title, "mandarin") || strings.Contains(title, "国语") ||
+			strings.Contains(title, "国配") || strings.Contains(title, "普通话"):
 			add("chinese_audio")
 		}
 		if strings.Contains(lang, "japanese") {
@@ -318,6 +335,58 @@ func dedupTags(tags []string) []string {
 			seen[t] = true
 			out = append(out, t)
 		}
+	}
+	return out
+}
+
+
+// inferHDRTagsFromMI §59.151: HDR 族标签 MI 层结构化产出（唯一真相源）。
+// 先剔除文本 regex 可能残留的 HDR 族（防双源冲突），再按 MI Video 层
+// HDR format 判据单点产出。MI 缺 Video 层/HDR 行时不产任何 HDR 族。
+func inferHDRTagsFromMI(s titleparser.MISections, tags []string) []string {
+	hdrFamily := map[string]bool{
+		"dolby_vision": true, "hdr10": true, "hdr10_plus": true,
+		"vivid_hdr": true, "hlg": true, "pq10": true,
+	}
+	out := tags[:0]
+	for _, t := range tags {
+		if !hdrFamily[t] {
+			out = append(out, t)
+		}
+	}
+	if len(s.Videos) == 0 {
+		return out
+	}
+	hdr := strings.ToLower(s.Videos[0]["hdr format"])
+	if hdr == "" {
+		return out
+	}
+	hasDoVi := strings.Contains(hdr, "dolby vision") || strings.Contains(hdr, "dovi") ||
+		strings.Contains(hdr, "dvhe") || strings.Contains(hdr, "dvha") || strings.Contains(hdr, "dvav")
+	hasHDR10Plus := strings.Contains(hdr, "hdr10+") || strings.Contains(hdr, "smpte st 2094")
+	hasHDR10 := strings.Contains(hdr, "hdr10") || strings.Contains(hdr, "smpte st 2086")
+	hasVivid := strings.Contains(hdr, "hdr vivid") || strings.Contains(hdr, "hdrvivid")
+	hasHLG := strings.Contains(hdr, "hlg")
+	hasPQ10 := strings.Contains(hdr, "pq10")
+	if hasDoVi {
+		out = append(out, "dolby_vision")
+	}
+	if hasHDR10Plus {
+		out = append(out, "hdr10_plus")
+	} else if hasDoVi && (strings.Contains(hdr, "dvhe.08") || strings.Contains(hdr, "dvhe.09")) {
+		// Profile 8/9 = DV+HDR10 双层（BL+RPU+EL——MI 尾段 HDR10 兼容层）
+		out = append(out, "hdr10")
+	} else if hasHDR10 && !hasDoVi {
+		out = append(out, "hdr10")
+	}
+	if hasVivid {
+		out = append(out, "vivid_hdr")
+	}
+	if hasHLG {
+		out = append(out, "hlg")
+	}
+	if hasPQ10 {
+		out = append(out, "pq10")
 	}
 	return out
 }

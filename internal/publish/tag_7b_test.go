@@ -60,15 +60,21 @@ func TestApplyTagRules_Dedup(t *testing.T) {
 
 func TestMediaTagInferer_HDR10(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("Video: HDR10", "电影 2024 HDR10")
+	// §59.151: HDR 族 MI 层结构化（Video 段 HDR format 唯一通道；文本字样废除）
+	tags := inferer.Infer("Video\nHDR format : SMPTE ST 2086, HDR10 compatible", "电影 2024")
 	if !containsTag(tags, "hdr10") {
 		t.Errorf("should infer hdr10, got %v", tags)
+	}
+	// 纯文本字样（旧 regex 通道）不再命中
+	tags2 := inferer.Infer("Video: HDR10", "电影 2024 HDR10")
+	if containsTag(tags2, "hdr10") {
+		t.Errorf("text-only hdr10 should not infer (§59.151), got %v", tags2)
 	}
 }
 
 func TestMediaTagInferer_HDR10Plus(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("HDR10+ stream", "电影.hdr10+")
+	tags := inferer.Infer("Video\nHDR format : SMPTE ST 2094-40, HDR10+", "电影.hdr10+")
 	if !containsTag(tags, "hdr10_plus") {
 		t.Errorf("should infer hdr10_plus, got %v", tags)
 	}
@@ -80,9 +86,10 @@ func TestMediaTagInferer_HDR10Plus(t *testing.T) {
 
 func TestMediaTagInferer_DolbyVision(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("Dolby Vision", "电影 DoVi")
-	if !containsTag(tags, "dolby_vision") {
-		t.Errorf("should infer dolby_vision, got %v", tags)
+	// dvhe.08 = DV+HDR10 双层（§59.151 Profile 语义——两 tag 同产）
+	tags := inferer.Infer("Video\nHDR format : Dolby Vision, Version 1.0, Profile 8.1, dvhe.08.06, BL+RPU, no metadata compression, HDR10", "电影")
+	if !containsTag(tags, "dolby_vision") || !containsTag(tags, "hdr10") {
+		t.Errorf("dvhe.08 should infer dv+hdr10 (dual layer), got %v", tags)
 	}
 }
 
