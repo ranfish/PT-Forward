@@ -422,10 +422,14 @@ func inferSubtitleFromMITexts(s titleparser.MISections) map[string]bool {
 		if strings.Contains(title, "commentary") || strings.Contains(title, "评论") {
 			continue
 		}
-		if strings.Contains(lang, "chinese") {
+		// §59.151: Language+Title 双通道（Title-only 形态防御——CHS/CHT/简/繁
+		// 无 Language 行的压制组标记；48/48 假纯英语料的 Text 实证）
+		cnSub := strings.Contains(lang, "chinese") || regexAny(title, []string{"chs", "cht", "简", "繁", "中文"})
+		enSub := strings.Contains(lang, "english") || strings.Contains(title, "eng")
+		if cnSub {
 			out["chinese_subtitle"] = true
 		}
-		if strings.Contains(lang, "english") {
+		if enSub {
 			out["english_subtitle"] = true
 		}
 	}
@@ -454,6 +458,17 @@ func hasMandarinTitledTrack(s titleparser.MISections) bool {
 	for _, a := range s.Audios {
 		t := strings.ToLower(a["title"])
 		if strings.Contains(t, "mandarin") || strings.Contains(t, "国语") || strings.Contains(t, "国配") {
+			return true
+		}
+	}
+	return false
+}
+
+
+// regexAny 子串命中任一（小写化后匹配——CHS/CHT 形态）。
+func regexAny(s string, subs []string) bool {
+	for _, sub := range subs {
+		if strings.Contains(s, sub) {
 			return true
 		}
 	}
