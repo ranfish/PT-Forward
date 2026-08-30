@@ -83,6 +83,13 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 			tags = append(tags, st)
 		}
 	}
+	// §59.151 附7: 英语标签条件产出（lucky TAGS_MISSING_ENGLISH_AUDIO 实证——
+	// 纯英语种无国语/粤语/中字时必须产 lucky_english_audio）。
+	// Buried.Alive.1990 探针：勾英语→100；不勾→TAGS_MISSING_ENGLISH_AUDIO 扣分
+	if containsStr(tags, "english_audio") && !containsStr(tags, "chinese_audio") &&
+		!containsStr(tags, "cantonese_audio") && !containsStr(tags, "chinese_subtitle") {
+		tags = append(tags, "lucky_english_audio")
+	}
 	hasHB, hasHF := inferNumericSpecTagsSections(miSec)
 	// §59.70: 高分——豆瓣评分 ≥8.0（Description 源——PTGen 简介行，
 	// "◎豆瓣评分　8.2/10"；无评分/暂无评分不命中）
