@@ -3129,6 +3129,7 @@ func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, 
 			inferred = inferer.InferFull(publish.TagInput{
 				MediaInfo: mi, Title: m.Title, Subtitle: sub,
 				Description: m.Description, Statement: m.Statement,
+				Region: regionLabelsOfMeta(m),
 			})
 		}
 		if data, err := json.Marshal(inferred); err == nil {
@@ -4197,4 +4198,13 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientID, infoHash, sit
 
 	// §59.63: 成功落库写穿缓存（final 非空才到达此处——same 早退/失败路径不写）
 	upsertClusterScreenshotCache(h.db, h.logger, h.screenshotCacheDays, clientID, savePath, name, final)
+}
+
+// regionLabelsOfMeta §59.151: metadata 行 → PTGen 产地 labels 串（复合判据输入）。
+func regionLabelsOfMeta(m model.TorrentMetadata) string {
+	src, err := metadata.UnmarshalPTGenSource(m.PTGenSourceJSON)
+	if err != nil || src == nil {
+		return ""
+	}
+	return strings.Join(src.Region, " ")
 }
