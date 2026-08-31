@@ -66,6 +66,104 @@
     },
     {
       "category": "type",
+      "key": "短剧",
+      "code": "category.short_drama",
+      "aliases": [
+        "Short Drama"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "MV",
+      "code": "category.mv",
+      "aliases": [
+        "Music Video",
+        "音乐视频"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "演唱会",
+      "code": "category.concert",
+      "aliases": [
+        "Concert",
+        "音乐会",
+        "Live"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "有声书",
+      "code": "category.audiobook",
+      "aliases": [
+        "Audiobook",
+        "有声读物"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "无损音乐",
+      "code": "category.lossless_music",
+      "aliases": [
+        "Lossless",
+        "无损"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "游戏",
+      "code": "category.game",
+      "aliases": [
+        "Game",
+        "Games"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "软件",
+      "code": "category.software",
+      "aliases": [
+        "Software",
+        "应用"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "电子书",
+      "code": "category.ebook",
+      "aliases": [
+        "Ebook",
+        "E-Book"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "学习",
+      "code": "category.education",
+      "aliases": [
+        "学习资料",
+        "Education"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "漫画",
+      "code": "category.comic",
+      "aliases": [
+        "Comic",
+        "Manga"
+      ]
+    },
+    {
+      "category": "type",
+      "key": "成人",
+      "code": "category.adult",
+      "aliases": [
+        "Adult"
+      ]
+    },
+    {
+      "category": "type",
       "key": "其他",
       "code": "category.other",
       "aliases": [
