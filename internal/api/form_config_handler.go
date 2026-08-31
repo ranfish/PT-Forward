@@ -51,7 +51,7 @@ func (h *FormConfigHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	Success(w, map[string]any{
 		"site_name": site.Name,
 		"config":    model.ParseFormConfig(site.PublishFormConfig),
 	})
@@ -81,7 +81,7 @@ func (h *FormConfigHandler) handleParse(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	merged, diffs := publish.MergeDraftWithCurrent(model.ParseFormConfig(site.PublishFormConfig), draft)
-	writeJSON(w, http.StatusOK, map[string]any{
+	Success(w, map[string]any{
 		"site_name": site.Name,
 		"draft":     draft,
 		"merged":    merged,
@@ -124,7 +124,7 @@ func (h *FormConfigHandler) handleApply(w http.ResponseWriter, r *http.Request) 
 		Detail: string(audit),
 		CreatedAt: time.Now(),
 	})
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	Success(w, map[string]any{"ok": true})
 }
 
 func (h *FormConfigHandler) loadSite(ctx context.Context, name string) (*model.Site, error) {
