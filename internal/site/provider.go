@@ -613,12 +613,19 @@ func defaultPublishConfig(framework string) model.SitePublishFullConfig {
 // 2. Global proxy from /settings (if use_global_proxy=true)
 // 3. Empty (direct connection)
 func (p *Provider) resolveProxy(ctx context.Context, site *model.Site) string {
+	return ResolveSiteProxy(p.db, ctx, site)
+}
+
+// ResolveSiteProxy §59.156: 站点代理解析公共单点——"尊重站点配置而非强制代理"：
+// site.proxy_url 优先 → use_global_proxy 读 settings httpProxy → 空=直连。
+// 站点维度 HTTP（adapter 上传/发布预检/后续站点 API）统一走此，禁止各处裸 client。
+func ResolveSiteProxy(db *gorm.DB, ctx context.Context, site *model.Site) string {
 	if site.ProxyURL != "" {
 		return site.ProxyURL
 	}
 	if site.UseGlobalProxy {
 		var val string
-		p.db.WithContext(ctx).Raw("SELECT value FROM system_settings WHERE key = 'httpProxy' LIMIT 1").Scan(&val)
+		db.WithContext(ctx).Raw("SELECT value FROM system_settings WHERE key = 'httpProxy' LIMIT 1").Scan(&val)
 		return val
 	}
 	return ""

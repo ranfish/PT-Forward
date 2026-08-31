@@ -26,7 +26,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/pusher"
-	"github.com/ranfish/pt-forward/internal/setting"
+	sitepkg "github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/util"
 )
@@ -70,16 +70,12 @@ type ExecuteResult struct {
 
 // PublishExecutor 新发布执行器。
 type PublishExecutor struct {
-	db        *gorm.DB
-	logger    *zap.Logger
-	pipe      *Pipeline
-	resolver  *ResourceResolver
-	inferer   *MediaTagInferer
-	globalProxyURL string // §59.156: UseGlobalProxy 站点的全局代理
+	db       *gorm.DB
+	logger   *zap.Logger
+	pipe     *Pipeline
+	resolver *ResourceResolver
+	inferer  *MediaTagInferer
 }
-
-// SetGlobalProxy 注入全局代理（main 读 settings——pre-audit 与 adapter 代理行为一致）。
-func (e *PublishExecutor) SetGlobalProxy(url string) { e.globalProxyURL = url }
 
 // NewPublishExecutor 创建执行器（pipe 提供复用组件：siteProvider/clientProvider/pusher/dedup/render）。
 func NewPublishExecutor(pipe *Pipeline) *PublishExecutor {
@@ -89,10 +85,6 @@ func NewPublishExecutor(pipe *Pipeline) *PublishExecutor {
 		pipe:     pipe,
 		resolver: NewResourceResolver(pipe.db),
 		inferer:  &MediaTagInferer{},
-	}
-	// §59.156: 全局代理 settings 自读（UseGlobalProxy 站点预检用——与 adapter 行为一致）
-	if v, err := setting.NewRepository(pipe.db).Get(context.Background(), "httpProxy"); err == nil {
-		ex.globalProxyURL = v
 	}
 	return ex
 }
@@ -513,12 +505,9 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("Cookie", siteConfig.Cookie)
-	// §59.156 回归审核：走站点代理配置（与 adapter 同基建——裸 client 在需代理的
-	// 环境（29 访问 luckpt.de）不可达；UseGlobalProxy 时 ProxyURL 为全局值由调用方注入）
-	proxyURL := site.ProxyURL
-	if site.UseGlobalProxy && e.globalProxyURL != "" {
-		proxyURL = e.globalProxyURL
-	}
+	// §59.156: 站点代理解析公共单点（site.ResolveSiteProxy——与 adapter 同源；
+	// "尊重站点配置而非强制代理"）
+	proxyURL := sitepkg.ResolveSiteProxy(e.db, ctx, site)
 	httpClient := httpclient.NewSiteHTTPClient(httpclient.SiteHTTPConfig{
 		ProxyURL:      proxyURL,
 		SkipSSLVerify: site.SkipSSLVerify,
