@@ -156,6 +156,18 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if cfg.TagConfig != nil && cfg.TagConfig.Mode != "" {
 		tagCfg.Mode = cfg.TagConfig.Mode
 	}
+	// Tags map 从 ValueMappings 构造（双形态键——standard_key + canonical）
+	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
+		if m.Auto != nil && !*m.Auto {
+			continue
+		}
+		for _, k := range m.StandardKeys {
+			tagCfg.Tags[k] = m.Value
+			if i := strings.Index(k, "."); i > 0 {
+				tagCfg.Tags[k[i+1:]] = m.Value
+			}
+		}
+	}
 	applier := NewTagApplier(tagCfg)
 	applied := []string{}
 	for _, t := range tags {
@@ -387,6 +399,11 @@ func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model
 		}
 		for _, k := range m.StandardKeys {
 			allowed[k] = m.Value
+			// canonical 双形态（Infer 产出无前缀 "dolby_vision"；standard_key
+			// 形态 "tag.dolby_vision"——两者同值）
+			if i := strings.Index(k, "."); i > 0 {
+				allowed[k[i+1:]] = m.Value
+			}
 		}
 	}
 	out := []string{}
