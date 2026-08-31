@@ -89,7 +89,7 @@ const merged = ref<PublishFormConfig | null>(null)
 onMounted(async () => {
   try {
     const res = await sitesApi.list()
-    sites.value = (res.data?.items ?? []).map((s: { name: string }) => s.name)
+    sites.value = (res.data?.data?.items ?? []).map((s: { name: string }) => s.name)
   } catch {
     sites.value = []
   }
@@ -99,7 +99,7 @@ async function loadCurrent() {
   diffs.value = null
   merged.value = null
   const res = await formConfigApi.get(siteName.value)
-  current.value = res.data?.config ?? null
+  current.value = res.data?.data?.config ?? null
 }
 
 function onFile(e: Event) {
@@ -114,8 +114,8 @@ async function doParse() {
   parsing.value = true
   try {
     const res = await formConfigApi.parse(siteName.value, html.value)
-    diffs.value = res.data?.diffs ?? []
-    merged.value = res.data?.merged ?? null
+    diffs.value = res.data?.data?.diffs ?? []
+    merged.value = res.data?.data?.merged ?? null
     html.value = '' // 即弃
   } finally {
     parsing.value = false
