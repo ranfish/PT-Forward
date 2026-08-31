@@ -30,6 +30,8 @@ func (h *FormConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasSuffix(path, "/publish/form-config/get") && r.Method == http.MethodGet:
 		h.handleGet(w, r)
+	case strings.HasSuffix(path, "/publish/form-config/targets") && r.Method == http.MethodGet:
+		h.handleTargets(w, r)
 	case strings.HasSuffix(path, "/publish/form-config/parse") && r.Method == http.MethodPost:
 		h.handleParse(w, r)
 	case strings.HasSuffix(path, "/publish/form-config/apply") && r.Method == http.MethodPost:
@@ -133,4 +135,28 @@ func (h *FormConfigHandler) loadSite(ctx context.Context, name string) (*model.S
 		return nil, err
 	}
 	return &site, nil
+}
+
+
+// handleTargets §59.156 切片 3.5: 可发布目标站列表（publish_form_config enabled 的站）。
+// 选站发布入口数据源——只回名字+预检能力，轻量。
+func (h *FormConfigHandler) handleTargets(w http.ResponseWriter, _ *http.Request) {
+	var sites []model.Site
+	if err := h.db.Find(&sites).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 500, err.Error())
+		return
+	}
+	type target struct {
+		Name        string `json:"name"`
+		HasPreAudit bool   `json:"has_pre_audit"`
+	}
+	out := make([]target, 0, 8)
+	for _, s := range sites {
+		cfg := model.ParseFormConfig(s.PublishFormConfig)
+		if cfg == nil || !cfg.Enabled {
+			continue
+		}
+		out = append(out, target{Name: s.Name, HasPreAudit: cfg.PreAuditURL != ""})
+	}
+	Success(w, out)
 }
