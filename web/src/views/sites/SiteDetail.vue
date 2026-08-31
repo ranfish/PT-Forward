@@ -284,6 +284,11 @@
           </a-form-item>
         </a-form>
       </a-card>
+
+      <!-- §59.157: 发布表单配置（仅源站=官组映射完备站可见——发布目标站语义） -->
+      <a-card v-if="site.isSource" title="发布配置">
+        <FormConfigPanel :site-name="site.name" />
+      </a-card>
     </a-spin>
   </div>
 </template>

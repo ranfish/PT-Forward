@@ -1,19 +1,9 @@
 <template>
-  <div class="form-config-page">
-    <div class="page-header">
-      <h2>发布配置中心</h2>
-      <p class="hint">HTML 上传半自动：粘贴发布页源码 → 解析草稿 → diff 确认 → 落库（唯一写入路径）</p>
-    </div>
+  <div class="form-config-panel">
+    <h3>发布表单配置</h3>
+    <p class="hint">HTML 上传半自动：粘贴发布页源码 → 解析草稿 → diff 确认 → 落库（唯一写入路径）</p>
 
-    <div class="toolbar">
-      <select v-model="siteName" class="site-select">
-        <option value="" disabled>选择站点</option>
-        <option v-for="s in sites" :key="s" :value="s">{{ s }}</option>
-      </select>
-      <button class="btn" :disabled="!siteName" @click="loadCurrent">查看当前配置</button>
-    </div>
-
-    <div v-if="siteName" class="grid">
+    <div class="grid">
       <!-- 左：HTML 上传 -->
       <div class="card">
         <h3>① 上传发布页 HTML</h3>
@@ -42,7 +32,7 @@
     </div>
 
     <!-- diff 三分类 -->
-    <div v-if="diffs" class="card diff-card">
+    <div v-if="diffs" class="card diff-card full">
       <h3>③ Diff 确认<span v-if="diffs.length" class="badge">{{ diffs.length }}</span></h3>
       <p class="hint">matched 已自动校准不显示；added=待标注（standard_keys 空）；changed=改版/语义错位信号</p>
       <table v-if="diffs.length" class="diff-table">
@@ -75,30 +65,23 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { sitesApi } from '@/api/sites'
 import { formConfigApi, type FormConfigDiffItem, type PublishFormConfig } from '@/api/formConfig'
 
-const siteName = ref('')
-const sites = ref<string[]>([])
+// §59.157: 站点详情页嵌入面板（仅 is_source 站渲染——官组映射完备=可发布目标站）
+const props = defineProps<{ siteName: string }>()
+
 const current = ref<PublishFormConfig | null>(null)
 const html = ref('')
 const parsing = ref(false)
 const diffs = ref<FormConfigDiffItem[] | null>(null)
 const merged = ref<PublishFormConfig | null>(null)
 
-onMounted(async () => {
-  try {
-    const res = await sitesApi.list(1, 200)
-    sites.value = (res.data?.data?.items ?? []).map((s: { name: string }) => s.name)
-  } catch {
-    sites.value = []
-  }
-})
+onMounted(() => loadCurrent())
 
 async function loadCurrent() {
   diffs.value = null
   merged.value = null
-  const res = await formConfigApi.get(siteName.value)
+  const res = await formConfigApi.get(props.siteName)
   current.value = res.data?.data?.config ?? null
 }
 
@@ -113,7 +96,7 @@ function onFile(e: Event) {
 async function doParse() {
   parsing.value = true
   try {
-    const res = await formConfigApi.parse(siteName.value, html.value)
+    const res = await formConfigApi.parse(props.siteName, html.value)
     diffs.value = res.data?.data?.diffs ?? []
     merged.value = res.data?.data?.merged ?? null
     html.value = '' // 即弃
@@ -124,7 +107,7 @@ async function doParse() {
 
 async function doApply() {
   if (!merged.value) return
-  await formConfigApi.apply(siteName.value, merged.value, 'HTML 上传 diff 确认')
+  await formConfigApi.apply(props.siteName, merged.value, 'HTML 上传 diff 确认')
   await loadCurrent()
   diffs.value = null
   merged.value = null
@@ -144,8 +127,8 @@ function kindLabel(k: string) {
 </script>
 
 <style scoped>
-.form-config-page { padding: 16px; max-width: 1200px; margin: 0 auto; }
-.page-header h2 { margin: 0 0 4px; }
+.form-config-panel { margin-top: 24px; }
+
 .hint { color: #888; font-size: 12px; margin: 4px 0 12px; }
 .toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
 .site-select { min-width: 200px; }
@@ -156,6 +139,7 @@ function kindLabel(k: string) {
 .kv { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; font-size: 13px; }
 .kv span { color: #888; min-width: 110px; }
 .kv small { color: #aaa; }
+.diff-card.full { grid-column: 1 / -1; }
 .diff-card table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .diff-card th, .diff-card td { border: 1px solid #eee; padding: 4px 8px; text-align: left; }
 .diff-card td small { color: #888; display: block; }

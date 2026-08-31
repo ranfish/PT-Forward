@@ -50,7 +50,6 @@
             <a-menu-item key="/publish/data" @click="$router.push('/publish/data')">一站多种</a-menu-item>
             <a-menu-item key="/publish/logs" @click="$router.push('/publish/logs')">发布日志</a-menu-item>
             <a-menu-item key="/publish/rules" @click="$router.push('/publish/rules')">发布规则</a-menu-item>
-            <a-menu-item key="/publish/form-config" @click="$router.push('/publish/form-config')">发布配置</a-menu-item>
           </a-sub-menu>
           <a-menu-item key="/reseed" @click="$router.push('/reseed')">
             <template #icon><CopyOutlined /></template>
