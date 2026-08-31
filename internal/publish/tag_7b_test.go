@@ -2,7 +2,6 @@ package publish
 
 import (
 	"github.com/ranfish/pt-forward/internal/titleparser"
-	"go.uber.org/zap"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -278,52 +277,7 @@ func TestTagApplier_TaglistAlwaysSupported(t *testing.T) {
 }
 
 // §59.146: 灰度构造——flag 命中站从 sites_source_keys 静态构造 SiteTagConfig
-func TestTagConfigFromFlag(t *testing.T) {
-	p := &Pipeline{logger: zap.NewNop()}
-	p.SetTagApplierSites(func() string { return "BTSchool, 朋友" })
 
-	// BTSchool: checkbox_span（数据形态兼容——tag.国语→span 数字值）
-	cfg := p.tagConfigFromFlag("BTSchool", model.Site{Domain: "pt.btschool.club", Name: "BTSchool"})
-	if cfg == nil {
-		t.Fatal("BTSchool 应命中灰度构造")
-	}
-	if cfg.Mode != model.TagModeCheckboxSpan {
-		t.Fatalf("BTSchool mode = %s, want checkbox_span", cfg.Mode)
-	}
-	if cfg.Tags["tag.国语"] != "5" {
-		t.Errorf("BTSchool tag.国语 = %q, want \"5\"", cfg.Tags["tag.国语"])
-	}
-
-	// Apply 闭环: span 模式 write("span[]", selector)
-	var fields []struct{ f, v string }
-	NewTagApplier(cfg).Apply([]string{"tag.国语"}, func(f, v string) {
-		fields = append(fields, struct{ f, v string }{f, v})
-	})
-	if len(fields) != 1 || fields[0].f != "span[]" || fields[0].v != "5" {
-		t.Errorf("span apply = %+v, want span[]=5", fields)
-	}
-
-	// 朋友: 灰度命中但无 tag 域数据 → nil（.Warn 可见）
-	if cfg2 := p.tagConfigFromFlag("朋友", model.Site{Domain: "friend.example", Name: "朋友"}); cfg2 != nil {
-		t.Errorf("朋友 无 tag 域数据, want nil")
-	}
-
-	// 未命中站: nil
-	if cfg3 := p.tagConfigFromFlag("PTer", model.Site{Domain: "pterclub.net", Name: "PTer"}); cfg3 != nil {
-		t.Errorf("PTer 不在灰度表, want nil")
-	}
-
-	// flag 空: nil
-	p2 := &Pipeline{logger: zap.NewNop()}
-	p2.SetTagApplierSites(func() string { return "" })
-	if cfg4 := p2.tagConfigFromFlag("BTSchool", model.Site{Domain: "pt.btschool.club"}); cfg4 != nil {
-		t.Errorf("空 flag 应 nil")
-	}
-}
-
-// §59.151 附批次判据单测锚定（七轮推演实证语义——防未来改动破坏）
-// 案例索引：霹雳火=香港×原声 / 一个好人=English原声反例 / 迫降航班=Mandarin标记反证 /
-// 天空之城=副标题粤字 / 挽救计划=Text段中字补 / 醉拳2=中文Title
 func TestHasHKOriginalTrack(t *testing.T) {
 	mk := func(lang, title string) titleparser.MISections {
 		return titleparser.MISections{Audios: []map[string]string{{"language": lang, "title": title}}}

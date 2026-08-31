@@ -118,7 +118,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		reseedHandler:        NewReseedHandler(reseedEngine, logger),
 		publishHandler:         NewPublishHandler(publishPipeline, logger, db),
 		manualForwardHandler:   manualForwardHandler,
-		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger),
+		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger, publishPipeline),
 		complianceHandler:      NewComplianceHandler(db, logger),		publishLimitHandler:   NewPublishLimitHandler(db, logger),
 		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),
 		metadataHandler:       NewMetadataHandler(db, logger),

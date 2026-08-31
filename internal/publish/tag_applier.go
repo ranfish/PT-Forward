@@ -48,9 +48,14 @@ func (a *TagApplier) Apply(tags []string, write TagApplyFunc) {
 				write(selector, "on")
 			}
 		case model.TagModeCheckboxSpan:
-			// BTSchool：selector 是 span[] 的 value
+			// BTSchool/幸运：selector 是 span[] 的 value；字段名参数化（§59.156
+			// SpanField——幸运 tags[4][]，空默认 span[] 旧配置零影响）
 			if selector, ok := a.config.Tags[tag]; ok {
-				write("span[]", selector)
+				field := a.config.SpanField
+				if field == "" {
+					field = "span[]"
+				}
+				write(field, selector)
 			}
 		case model.TagModeIndependentField:
 			// HDRoute：selector 是独立 input name

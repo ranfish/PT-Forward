@@ -7,7 +7,10 @@ import "encoding/json"
 // Tags: standard_key → selector/value（mode=taglist 时可为空）
 type SiteTagConfig struct {
 	Mode string            `json:"mode"` // taglist / checkbox_id / checkbox_span / independent_field
-	Tags map[string]string `json:"tags"` // standard_key → selector/value
+	Tags map[string]string `json:"tags"` // standard_key → selector/value（mode=taglist 时可为空）
+	// SpanField §59.156: checkbox_span 模式的数组字段名（幸运 tags[4][]——data-mode 后缀；
+	// 空默认 "span[]"，旧配置零影响）
+	SpanField string `json:"span_field,omitempty"`
 }
 
 // Tag 模式常量。
