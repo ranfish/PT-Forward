@@ -67,8 +67,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { formConfigApi, type FormConfigDiffItem, type PublishFormConfig } from '@/api/formConfig'
 
-// §59.157: 站点详情页嵌入面板（仅 is_source 站渲染——官组映射完备=可发布目标站）
-const props = defineProps<{ siteName: string }>()
+// §59.157: 站点详情页嵌入面板（仅 is_target 站渲染——发布语义=目标站）
+// siteName 可选：site.name 加载期可能 undefined（严格模式 vue-tsc -b）
+const props = defineProps<{ siteName?: string }>()
 
 const current = ref<PublishFormConfig | null>(null)
 const html = ref('')
@@ -76,11 +77,14 @@ const parsing = ref(false)
 const diffs = ref<FormConfigDiffItem[] | null>(null)
 const merged = ref<PublishFormConfig | null>(null)
 
-onMounted(() => loadCurrent())
+onMounted(() => {
+  if (props.siteName) loadCurrent()
+})
 
 async function loadCurrent() {
   diffs.value = null
   merged.value = null
+  if (!props.siteName) return
   const res = await formConfigApi.get(props.siteName)
   current.value = res.data?.data?.config ?? null
 }
