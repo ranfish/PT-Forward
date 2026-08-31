@@ -100,6 +100,7 @@ function onFile(e: Event) {
 async function doParse() {
   parsing.value = true
   try {
+    if (!props.siteName || !html.value) return
     const res = await formConfigApi.parse(props.siteName, html.value)
     diffs.value = res.data?.data?.diffs ?? []
     merged.value = res.data?.data?.merged ?? null
@@ -111,6 +112,7 @@ async function doParse() {
 
 async function doApply() {
   if (!merged.value) return
+  if (!props.siteName) return
   await formConfigApi.apply(props.siteName, merged.value, 'HTML 上传 diff 确认')
   await loadCurrent()
   diffs.value = null
