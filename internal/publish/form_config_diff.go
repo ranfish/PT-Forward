@@ -69,8 +69,9 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 		sel.Find("option").Each(func(_ int, opt *goquery.Selection) {
 			v, _ := opt.Attr("value")
 			label := strings.TrimSpace(opt.Text())
-			if v == "" || label == "" || v == "0" && (strings.Contains(label, "选择") || label == "") {
-				return // 占位项
+			if v == "" || label == "" || v == "0" {
+				return // 占位项（NP 家族 value=0 惯例——语言无关；§59.157 繁体「請選擇一項」漏过滤教训：
+				// 占位判定不得依赖文案子串，简/繁/英占位词各异）
 			}
 			opts = append(opts, model.FormValueMapping{Label: label, Value: v})
 		})
