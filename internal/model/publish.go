@@ -172,6 +172,9 @@ type PublishRequest struct {
 	TorrentData     []byte            `json:"-"`
 	FormFields      map[string]string `json:"form_fields"`
 	TagFields       map[string]string `json:"tag_fields"`
+	// §59.156: checkbox 数组标签（tags[4][] 同名字段多次重复——multipart 数组语义；
+	// map 无法承载重复键，NUL 拼接 adapter 不可拆）
+	TagArrayFields []TagKV           `json:"tag_array_fields,omitempty"`
 	TagConfig       string            `json:"tag_config,omitempty"` // §56.22: 站点 tag 配置 JSON（SiteTagConfig）
 	Title           string            `json:"title"`
 	Subtitle        string            `json:"subtitle"`
@@ -190,6 +193,12 @@ type PublishRequest struct {
 	ClientID        string            `json:"client_id"`
 	GroupID         uint              `json:"group_group_id"`
 	TargetSite      string            `json:"target_site"`
+}
+
+// TagKV 有序表单键值对（同名字段重复语义）。
+type TagKV struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // §33.1.10 — PublishResponse: 站点上传响应
