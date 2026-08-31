@@ -297,6 +297,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
+import FormConfigPanel from '@/views/publish/FormConfigPanel.vue'
 import { useI18n } from 'vue-i18n'
 import { sitesApi } from '@/api/sites'
 import { iyuuApi } from '@/api/iyuu'
