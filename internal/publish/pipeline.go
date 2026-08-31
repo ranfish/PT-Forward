@@ -17,7 +17,6 @@ import (
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/metadata"
-	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
 	"github.com/ranfish/pt-forward/internal/ptgen"
@@ -56,49 +55,7 @@ type Pipeline struct {
 	tagApplierSites func() string
 }
 
-// tagModeBySite §59.146: 灰度站点的 tag 表单模式表（b+a 首批）——
-// 未列站默认 taglist（NP 标准 tagList[]）。mode 以数据形态可判的为准：
-// checkbox_span: form_fields tags[]→span[] 且值数字（BTSchool 族, 数据直接兼容）。
-// checkbox_id: TagApplier 期望 standard_key→selector, 而 sites_source_keys PTer 族
-// 录的是 standard_key→值("yes")——selector 换名缺失, 数据形态错位,
-// 首发不做（逐站整理 standard_key→表单 checkbox 名后再入表）。
-// §59.130 附: 逐站适配持续演进——mode 错配的站从灰度表中移除即可。
-var tagModeBySite = map[string]string{
-	"BTSchool": model.TagModeCheckboxSpan,
-}
 
-// tagConfigFromFlag §59.146: 灰度命中站从 sites_source_keys 构造 SiteTagConfig。
-// 未命中/无 tag 域数据返回 nil。站点名匹配不区分大小写。
-func (p *Pipeline) tagConfigFromFlag(targetSite string, site model.Site) *model.SiteTagConfig {
-	if p.tagApplierSites == nil || targetSite == "" {
-		return nil
-	}
-	raw := p.tagApplierSites()
-	if raw == "" {
-		return nil
-	}
-	hit := false
-	for _, s := range strings.Split(raw, ",") {
-		if strings.EqualFold(strings.TrimSpace(s), targetSite) {
-			hit = true
-			break
-		}
-	}
-	if !hit {
-		return nil
-	}
-	fvm := extract.LookupFormValueMappings(site.Domain, site.Name)
-	if fvm == nil || len(fvm["tag"]) == 0 {
-		p.logger.Warn("tag applier site has no tag mappings",
-			zap.String("site", targetSite))
-		return nil
-	}
-	mode := tagModeBySite[targetSite]
-	if mode == "" {
-		mode = model.TagModeTaglist
-	}
-	return &model.SiteTagConfig{Mode: mode, Tags: fvm["tag"]}
-}
 
 func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
 	logger = logger.With(zap.String("component", "publish"))
@@ -114,11 +71,6 @@ func (p *Pipeline) SetSiteProvider(sp model.SiteInfoProvider) {
 	p.siteProvider = sp
 }
 
-// SetTagApplierSites §59.146: 注入灰度站点查询（返回 settings 逗号分隔串）。
-// nil 时 TagApplier 灰度关闭（site.TagConfig 列配置仍生效）。
-func (p *Pipeline) SetTagApplierSites(fn func() string) {
-	p.tagApplierSites = fn
-}
 
 func (p *Pipeline) SetClientProvider(cp model.DownloaderProvider) {
 	p.clientProvider = cp

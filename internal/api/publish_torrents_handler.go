@@ -38,6 +38,7 @@ type SiteProviderGetter interface {
 }
 
 type PublishTorrentsHandler struct {
+	executor *publish.PublishExecutor // §59.156 切片 2 新发布执行器（复用 pipeline 组件）
 	db             *gorm.DB
 	coverage       *coverage.Service
 	clientMgr      MFClientProvider
@@ -82,13 +83,14 @@ type batchFetchItem struct {
 	Error  string `json:"error,omitempty"`
 }
 
-func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger) *PublishTorrentsHandler {
+func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger, pipeline *publish.Pipeline) *PublishTorrentsHandler {
 	// §59.58: 容量 5——8 核实测每路 mpv ~6 核，5 路摊薄后单种子 ~145s < 4min ctx（60% 余量）。
 	// CPU 总量守恒：并发数不改变批量总时长，只消除无界并发导致的 ctx 超时作废功。
 	// §59.51 手动截图按钮不经过此信号量（独立单例，不与批量竞争）。
 	return &PublishTorrentsHandler{
 		db:               db,
 		logger:           logger,
+		executor:         publish.NewPublishExecutor(pipeline),
 		bgState:          backgroundQueryState{active: make(map[uint]bool)},
 		resourceResolver: publish.NewResourceResolver(db),
 		strategySem:      make(chan struct{}, 5),
@@ -230,6 +232,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleAuditInfoHash(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/recompute-profiles") && r.Method == http.MethodPost:
 		h.handleRecomputeProfiles(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/execute") && r.Method == http.MethodPost:
+		h.handleExecutePublish(w, r)
 
 	case strings.HasSuffix(path, "/publish/seeds/batch-fetch") && r.Method == http.MethodPost:
 		h.handleBatchFetch(w, r)
@@ -4207,4 +4211,33 @@ func regionLabelsOfMeta(m model.TorrentMetadata) string {
 		return ""
 	}
 	return strings.Join(src.Region, " ")
+}
+
+
+// handleExecutePublish §59.156 切片 2: 新发布执行器入口（DB 供给——切读 publish_form_config）。
+// body: {info_hash, target_site, anonymous, tag_overrides: [], dry_run}
+func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		InfoHash     string   `json:"info_hash"`
+		TargetSite   string   `json:"target_site"`
+		Anonymous    bool     `json:"anonymous"`
+		TagOverrides []string `json:"tag_overrides"`
+		DryRun       bool     `json:"dry_run"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InfoHash == "" || req.TargetSite == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "info_hash 与 target_site 必填"})
+		return
+	}
+	if h.executor == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "执行器未初始化"})
+		return
+	}
+	result := h.executor.Execute(r.Context(), publish.ExecuteInput{
+		InfoHash:     req.InfoHash,
+		TargetSite:   req.TargetSite,
+		Anonymous:    req.Anonymous,
+		TagOverrides: req.TagOverrides,
+		DryRun:       req.DryRun,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }

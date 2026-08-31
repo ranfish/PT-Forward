@@ -35,7 +35,6 @@ const (
 
 	// §59.146: TagApplier 灰度站点（逗号分隔，空=全关）。命中站发布链从
 	// sites_source_keys form_value_mappings.tag 静态构造 TagConfig 填 tag 表单
-	KeyTagApplierSites = "tag_applier_sites"
 
 	KeyDataCleanupTorrentEventDays   = "data_cleanup_torrent_event_days"
 	KeyDataCleanupPublishResultDays  = "data_cleanup_publish_result_days"
@@ -76,7 +75,6 @@ var DefaultSeeds = map[string]string{
 	KeyScreenshotJPEGQuality: "85",
 	KeyScreenshotCacheDays:   "30",
 	KeyScreenshotSourceExcludedSites: "朋友",
-	KeyTagApplierSites:              "", // §59.146: 空=全关, 逐站灰度
 
 	KeyDataCleanupTorrentEventDays:   "30",
 	KeyDataCleanupPublishResultDays:  "30",
