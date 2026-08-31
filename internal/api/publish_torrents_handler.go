@@ -4232,7 +4232,11 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "执行器未初始化"})
 		return
 	}
-	result := h.executor.Execute(r.Context(), publish.ExecuteInput{
+	// §59.156 回归审核：发布长流程（渲染+预检+上传+加种）脱离 HTTP 请求生命周期——
+	// §59.51 教训（243 实测上传 context canceled）；独立 Background+10min 上限
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	result := h.executor.Execute(ctx, publish.ExecuteInput{
 		InfoHash:     req.InfoHash,
 		TargetSite:   req.TargetSite,
 		Anonymous:    req.Anonymous,
