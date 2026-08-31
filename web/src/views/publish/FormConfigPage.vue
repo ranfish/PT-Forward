@@ -88,7 +88,7 @@ const merged = ref<PublishFormConfig | null>(null)
 
 onMounted(async () => {
   try {
-    const res = await sitesApi.list()
+    const res = await sitesApi.list(1, 500)
     sites.value = (res.data?.data?.items ?? []).map((s: { name: string }) => s.name)
   } catch {
     sites.value = []
