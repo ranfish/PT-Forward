@@ -49,3 +49,33 @@ export const formConfigApi = {
     })
   },
 }
+
+export interface ExecuteResult {
+  status: string
+  message: string
+  pre_audit?: { passed: boolean; totalScore: number; details?: Array<{ ruleType: string; errorCode: string; message: string; level: string }> } | null
+  form?: Record<string, string>
+  tags?: string[]
+  upload?: { torrent_id?: string; detail_url?: string } | null
+  target_torrent_url?: string
+}
+
+export interface PublishTarget {
+  name: string
+  has_pre_audit: boolean
+}
+
+export const executeApi = {
+  targets() {
+    return client.get<ApiResponse<PublishTarget[]>>('/publish/form-config/targets')
+  },
+  execute(infoHash: string, targetSite: string, opts?: { dryRun?: boolean; tagOverrides?: string[]; anonymous?: boolean }) {
+    return client.post<ApiResponse<ExecuteResult>>('/publish/seeds/execute', {
+      info_hash: infoHash,
+      target_site: targetSite,
+      dry_run: opts?.dryRun ?? true,
+      tag_overrides: opts?.tagOverrides ?? [],
+      anonymous: opts?.anonymous ?? false,
+    })
+  },
+}

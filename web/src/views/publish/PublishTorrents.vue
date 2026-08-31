@@ -111,9 +111,7 @@
         <template v-if="column.key === 'actions'">
           <a-space>
             <template v-if="record.reviewed">
-              <a-tooltip title="提交链路接线中（TagApplier 灰度，R3-5）">
-                <a-button type="primary" size="small" disabled>选站发布</a-button>
-              </a-tooltip>
+              <a-button type="primary" size="small" @click="openExecute(record)">选站发布</a-button>
               <a-button size="small" @click="previewSeed(record)">预览种子</a-button>
             </template>
             <a-button v-else size="small" @click="goRefine(record)">完善数据</a-button>
@@ -121,6 +119,13 @@
         </template>
       </template>
     </a-table>
+
+    <PublishExecuteModal
+      v-model:open="executeOpen"
+      :info-hash="executeHash"
+      :seed-name="executeName"
+      @done="fetchList"
+    />
 
     <CrossSeedPanel
       v-model:open="previewPanelOpen"
@@ -389,6 +394,18 @@ async function fetchList() {
   } finally {
     loading.value = false
   }
+}
+
+import PublishExecuteModal from './PublishExecuteModal.vue'
+
+// §59.156 切片 3.5: 选站发布最小闭环（DryRun 预检→确认提交）
+const executeOpen = ref(false)
+const executeHash = ref('')
+const executeName = ref('')
+function openExecute(record: { hash?: string; name?: string }) {
+  executeHash.value = record.hash || ''
+  executeName.value = record.name || ''
+  executeOpen.value = true
 }
 
 // §59.141: 预览种子——ready 行直开 CrossSeedPanel 预览（幂等保存+滚动门槛全套）
