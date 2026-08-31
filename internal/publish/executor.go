@@ -132,7 +132,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	jobs := []domainJob{
 		{model.FieldDomainType, e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)},
 		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", meta.Resolution))},
-		{model.FieldDomainCodec, e.lookupByStdKey(cfg, model.FieldDomainCodec, extract.LookupStandardKey("video", meta.VideoCodec))},
+		{model.FieldDomainCodec, e.lookupByStdKey(cfg, model.FieldDomainCodec, extract.LookupStandardKey("video_codec", meta.VideoCodec))},
 		{model.FieldDomainAudiocodec, e.audioMapping(cfg, meta)},
 		{model.FieldDomainMedium, e.mediumMapping(cfg, meta)},
 		{model.FieldDomainTeam, e.teamMapping(cfg, meta)},
@@ -324,12 +324,12 @@ func (e *PublishExecutor) lookupByStdKey(cfg *model.PublishFormConfig, domain, s
 // audioMapping 音频域（组合键优先：TrueHD+Atmos→"TrueHD Atmos"——§59.150 判据六）。
 func (e *PublishExecutor) audioMapping(cfg *model.PublishFormConfig, meta *model.TorrentMetadata) *model.FormValueMapping {
 	if meta.AudioCodec != "" && meta.AudioTech != "" {
-		combined := extract.LookupStandardKey("audio", meta.AudioCodec+" "+meta.AudioTech)
+		combined := extract.LookupStandardKey("audio_codec", meta.AudioCodec+" "+meta.AudioTech)
 		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, combined); m != nil {
 			return m
 		}
 	}
-	return e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, extract.LookupStandardKey("audio", meta.AudioCodec))
+	return e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, extract.LookupStandardKey("audio_codec", meta.AudioCodec))
 }
 
 // mediumMapping 媒介域（二维规则 §59.150：规格优先，Encode 判定 IsEncode 铁证 §59.151）。
