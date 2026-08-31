@@ -4225,11 +4225,11 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		DryRun       bool     `json:"dry_run"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InfoHash == "" || req.TargetSite == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "info_hash 与 target_site 必填"})
+		Error(w, http.StatusBadRequest, 40001, "info_hash 与 target_site 必填")
 		return
 	}
 	if h.executor == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "执行器未初始化"})
+		Error(w, http.StatusServiceUnavailable, 50301, "执行器未初始化")
 		return
 	}
 	// §59.156 回归审核：发布长流程（渲染+预检+上传+加种）脱离 HTTP 请求生命周期——

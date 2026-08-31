@@ -15,8 +15,14 @@
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="条件标签人工勾选（auto:false 站方选项——如英语/首发）">
-          <a-select v-model:value="tagOverrides" mode="multiple" style="width: 100%" placeholder="留空=纯自动推断" />
+        <a-form-item label="条件标签人工勾选（auto:false 站方选项——推断不自动勾，人工确认后进入）">
+          <a-select
+            v-model:value="tagOverrides"
+            mode="multiple"
+            style="width: 100%"
+            placeholder="留空=纯自动推断"
+            :options="conditionalTagOptions"
+          />
         </a-form-item>
       </a-form>
       <div class="actions">
@@ -68,12 +74,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { executeApi, type ExecuteResult, type PublishTarget } from '@/api/formConfig'
+import { executeApi, formConfigApi, type ExecuteResult, type PublishTarget } from '@/api/formConfig'
 
 const props = defineProps<{ open: boolean; infoHash: string; seedName?: string }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'done'): void }>()
 
 const targets = ref<PublishTarget[]>([])
+const conditionalTagOptions = ref<{ label: string; value: string }[]>([])
 const targetSite = ref('')
 const tagOverrides = ref<string[]>([])
 const loading = ref(false)
@@ -92,9 +99,25 @@ watch(
       } catch {
         targets.value = []
       }
+      conditionalTagOptions.value = []
     }
   },
 )
+
+watch(targetSite, async (site) => {
+  tagOverrides.value = []
+  if (!site) return
+  try {
+    const res = await formConfigApi.get(site)
+    const cfg = res.data?.data?.config
+    const tags = cfg?.value_mappings?.tags ?? []
+    conditionalTagOptions.value = tags
+      .filter((t) => t.auto === false && t.standard_keys?.length)
+      .map((t) => ({ label: `${t.label}（${t.standard_keys![0]}）`, value: t.standard_keys![0] }))
+  } catch {
+    conditionalTagOptions.value = []
+  }
+})
 
 async function runDryRun() {
   loading.value = true
