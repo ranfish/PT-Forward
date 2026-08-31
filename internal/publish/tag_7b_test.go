@@ -92,6 +92,16 @@ func TestMediaTagInferer_DolbyVision(t *testing.T) {
 	if !containsTag(tags, "dolby_vision") || !containsTag(tags, "hdr10") {
 		t.Errorf("dvhe.08 should infer dv+hdr10 (dual layer), got %v", tags)
 	}
+	// §59.154：dvhe.05/dvav.09 = 仅 DV（P5 无兼容层 IPTPQc2 / P9 8-bit AVC+SDR 兼容）
+	for _, hdr := range []string{
+		"Dolby Vision, Version 1.0, Profile 5, dvhe.05.06, BL+RPU", // SNYLV 2160p 实证
+		"Dolby Vision, Version 1.0, Profile 9, dvav.09.06, BL+RPU", // 理论构造（P9=AVC）
+	} {
+		tags2 := inferer.Infer("Video\nHDR format : "+hdr, "电影")
+		if !containsTag(tags2, "dolby_vision") || containsTag(tags2, "hdr10") {
+			t.Errorf("P5/P9 应仅 dv 不勾 hdr10（%s）, got %v", hdr, tags2)
+		}
+	}
 }
 
 func TestMediaTagInferer_ChineseSubtitle(t *testing.T) {
