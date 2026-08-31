@@ -180,27 +180,6 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		}
 	}
 
-	if in.DryRun {
-		res := &ExecuteResult{
-			Status: "dry_run_ok",
-			Form:   form,
-			Tags:   applied,
-		}
-		// §59.156 回归审核：DryRun 顺带跑官方预检（推数据拿判定零落站——
-		// 验证 cookie/代理/JSON 全链；未通过不阻断 dry_run 状态）
-		if cfg.PreAuditURL != "" {
-			if pa, errMsg := e.callPreAudit(ctx, &site, cfg, meta, form, jobs, applied); pa != nil {
-				res.PreAudit = pa
-				if !pa.Passed {
-					res.Message = "预检未通过（dry_run 不阻断）"
-				}
-			} else {
-				res.Message = "预检请求失败: " + errMsg
-			}
-		}
-		return res
-	}
-
 	// ⑥ 描述渲染（复用组件——PTGen 缓存兜底见 renderDescription 内部）
 	sourceDetail := &model.TorrentDetail{
 		Description: meta.Description,
@@ -218,14 +197,26 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 
 	// ⑦ pre-audit 官方预检（§59.150——passed 才提交）
+	var preAudit *PreAuditResult
 	if cfg.PreAuditURL != "" {
 		pa, errMsg := e.callPreAudit(ctx, &site, cfg, meta, form, jobs, applied)
 		if pa == nil {
 			return fail("pre_audit_failed", "预检请求失败: "+errMsg)
 		}
-		if !pa.Passed {
+		preAudit = pa
+		if !pa.Passed && !in.DryRun {
 			return &ExecuteResult{Status: "pre_audit_failed", Message: "预检未通过", PreAudit: pa}
 		}
+	}
+
+	// DryRun 检查点：组装+渲染+预检之后、上传之前（§59.156——完整表单形态验证，
+	// 预检未通过不阻断 dry_run：预检修正循环数据源）
+	if in.DryRun {
+		res := &ExecuteResult{Status: "dry_run_ok", Form: form, Tags: applied, PreAudit: preAudit}
+		if preAudit != nil && !preAudit.Passed {
+			res.Message = "预检未通过（dry_run 不阻断）"
+		}
+		return res
 	}
 
 	// ⑧ 上传（adapter UploadTorrent 复用）
