@@ -95,6 +95,10 @@ type Site struct {
 	// §56.22 决策 1: 站点 tag 配置（JSON 序列化 SiteTagConfig）
 	TagConfig string `json:"tag_config,omitempty" gorm:"type:text;default:''"`
 
+	// §59.147 站点发布配置中心: 发布表单完整配置（JSON 序列化 PublishFormConfig——
+	// enabled/form_fields/value_mappings/tag_config/pre_audit_url 一体文档）
+	PublishFormConfig string `json:"publish_form_config,omitempty" gorm:"type:text;default:''"`
+
 	// §56.23 决策 1: 已存在种子处理策略（per-site 覆盖全局默认）
 	ExistingStrategy string `json:"existing_strategy,omitempty" gorm:"size:20;default:''"`
 

@@ -11,6 +11,17 @@ export const CATEGORY_LABELS: Record<string, string> = {
   "category.documentary": "纪录片",
   "category.music": "音乐",
   "category.sports": "体育",
+  "category.short_drama": "短剧",
+  "category.mv": "MV",
+  "category.concert": "演唱会",
+  "category.audiobook": "有声书",
+  "category.lossless_music": "无损音乐",
+  "category.game": "游戏",
+  "category.software": "软件",
+  "category.ebook": "电子书",
+  "category.education": "学习",
+  "category.comic": "漫画",
+  "category.adult": "成人",
   "category.other": "其他",
 }
 

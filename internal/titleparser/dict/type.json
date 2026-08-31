@@ -42,7 +42,8 @@
       "standard_key": "category.documentary",
       "variants": [
         "纪录片",
-        "Documentary"
+        "Documentary",
+        "纪录"
       ]
     },
     {
@@ -59,6 +60,104 @@
       "variants": [
         "体育",
         "Sports"
+      ]
+    },
+    {
+      "canonical": "短剧",
+      "standard_key": "category.short_drama",
+      "variants": [
+        "短剧",
+        "Short Drama"
+      ]
+    },
+    {
+      "canonical": "MV",
+      "standard_key": "category.mv",
+      "variants": [
+        "MV",
+        "Music Video",
+        "音乐视频"
+      ]
+    },
+    {
+      "canonical": "演唱会",
+      "standard_key": "category.concert",
+      "variants": [
+        "演唱会",
+        "Concert",
+        "音乐会",
+        "Live"
+      ]
+    },
+    {
+      "canonical": "有声书",
+      "standard_key": "category.audiobook",
+      "variants": [
+        "有声书",
+        "Audiobook",
+        "有声读物"
+      ]
+    },
+    {
+      "canonical": "无损音乐",
+      "standard_key": "category.lossless_music",
+      "variants": [
+        "无损音乐",
+        "Lossless",
+        "无损"
+      ]
+    },
+    {
+      "canonical": "游戏",
+      "standard_key": "category.game",
+      "variants": [
+        "游戏",
+        "Game",
+        "Games"
+      ]
+    },
+    {
+      "canonical": "软件",
+      "standard_key": "category.software",
+      "variants": [
+        "软件",
+        "Software",
+        "应用"
+      ]
+    },
+    {
+      "canonical": "电子书",
+      "standard_key": "category.ebook",
+      "variants": [
+        "电子书",
+        "Ebook",
+        "E-Book"
+      ]
+    },
+    {
+      "canonical": "学习",
+      "standard_key": "category.education",
+      "variants": [
+        "学习",
+        "学习资料",
+        "Education"
+      ]
+    },
+    {
+      "canonical": "漫画",
+      "standard_key": "category.comic",
+      "variants": [
+        "漫画",
+        "Comic",
+        "Manga"
+      ]
+    },
+    {
+      "canonical": "成人",
+      "standard_key": "category.adult",
+      "variants": [
+        "成人",
+        "Adult"
       ]
     },
     {
