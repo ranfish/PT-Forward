@@ -321,14 +321,15 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID strin
 		hashes = append(hashes, r.InfoHash)
 	}
 
+	// §59.153: preload 改读 record.last_score 列（每轮 UPSERT 的最新值——
+	// 原 293 万行 scoring_logs 全表 MAX(id) GROUP BY 子查询实测 1.8s→毫秒级点查）
 	type latestRow struct {
 		InfoHash string
 		Score    float64
 		CycleID  string
 	}
 	var latestRows []latestRow
-	// §59.37: IN 子句分块——SQLite 变量上限 999，2 万 hashes 单查询 too many SQL
-	// variables（243 实证）。chunk 500 安全。
+	// §59.37: IN 子句分块——SQLite 变量上限 999。chunk 500 安全。
 	const chunk = 500
 	for i := 0; i < len(hashes); i += chunk {
 		end := i + chunk
@@ -336,16 +337,11 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID strin
 			end = len(hashes)
 		}
 		var rows []latestRow
-		if dbErr := re.db.WithContext(ctx).Model(&model.ScoringLog{}).
-			Select("info_hash, score, cycle_id").
-			Where("client_id = ? AND info_hash IN ? AND id IN (?)",
-				clientID, hashes[i:end],
-				re.db.WithContext(ctx).Model(&model.ScoringLog{}).
-					Select("MAX(id)").Where("client_id = ? AND info_hash IN ?", clientID, hashes[i:end]).
-					Group("info_hash"),
-			).
+		if dbErr := re.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Select("info_hash, last_score as score, last_cycle_id as cycle_id").
+			Where("info_hash IN ? AND last_score > 0", hashes[i:end]).
 			Find(&rows).Error; dbErr != nil {
-			re.logger.Warn("preload scoring cache: query latest scores failed", zap.Error(dbErr))
+			re.logger.Warn("preload scoring cache: query last_score failed", zap.Error(dbErr))
 			continue
 		}
 		latestRows = append(latestRows, rows...)

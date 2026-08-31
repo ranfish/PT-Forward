@@ -1178,6 +1178,19 @@ func registerSchedulerTasks(
 		return nil
 	})
 
+	// §59.153: VACUUM 30 天一次（删除后 SQLite 空闲页不归还 OS——243 实测 3400 万行
+	// 删除后文件仍 8.9GB 需手动 VACUUM 收缩至 1.5GB；定时化后不再需要手动干预）
+	register("db_vacuum", "maintenance", "0 5 1 * *", func(ctx context.Context) error {
+		if sqlDB, err := db.DB(); err == nil {
+			if _, err := sqlDB.ExecContext(ctx, "VACUUM"); err != nil {
+				log.Warn("db vacuum failed", zap.Error(err))
+			} else {
+				log.Info("db vacuum done")
+			}
+		}
+		return nil
+	})
+
 	// §59.152: WAL 周期 checkpoint（观察项 4——243 实测 3 天涨 2.4GB 拖垮批量写，
 	// autocheckpoint 被长事务饿死 §59.33；每日 4 次 PASSIVE 主动落盘）
 	register("wal_checkpoint", "maintenance", "0 */6 * * *", func(ctx context.Context) error {

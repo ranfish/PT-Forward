@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	scoringCutoffHours = 72 * time.Hour
+	scoringCutoffHours = 24 * time.Hour // §59.153: 72h→24h（消费方只要最新值+日志页近一天）
 	syncGracePeriod    = 15 * time.Minute
 	syncHardTimeout    = 2 * time.Hour
 	sqliteVarLimit     = 500
@@ -1621,6 +1621,13 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 		}).Error; dbErr != nil {
 			e.logger.Warn("create scoring log failed", zap.String("info_hash", rec.InfoHash), zap.Error(dbErr))
 		}
+		// §59.153: UPSERT 最新评分到 record——rule_evaluator preload 直读列
+		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("info_hash = ?", rec.InfoHash).
+			Updates(map[string]interface{}{
+				"last_score":    score,
+				"last_cycle_id": cycleID,
+			})
 	}
 
 	shouldCleanup = ShouldCleanup(*candidate, ec.minScore, ec.minAge)
