@@ -72,3 +72,4 @@ cmd/_tmp_decrypt/
 cmd/_tmp_test/
 cmd/_tmp_decrypt2/
 env-PT-Forward.md
+*.db.old*

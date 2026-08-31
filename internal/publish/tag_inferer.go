@@ -400,8 +400,10 @@ func inferHDRTagsFromMI(s titleparser.MISections, tags []string) []string {
 	}
 	if hasHDR10Plus {
 		out = append(out, "hdr10_plus")
-	} else if hasDoVi && (strings.Contains(hdr, "dvhe.08") || strings.Contains(hdr, "dvhe.09")) {
-		// Profile 8/9 = DV+HDR10 双层（BL+RPU+EL——MI 尾段 HDR10 兼容层）
+	} else if hasDoVi && strings.Contains(hdr, "dvhe.08") {
+		// Profile 8 = DV+HDR10 双层（BL+RPU——MI 尾段 HDR10 兼容层）。
+		// §59.154：P9 摘出双勾组——Dolby Profiles v1.5 官方表 P9=8-bit AVC+SDR 兼容
+		// （标志 dvav.09；不勾 hdr10，仅 DV），与 P8 语义不同。
 		out = append(out, "hdr10")
 	} else if hasHDR10 && !hasDoVi {
 		out = append(out, "hdr10")
