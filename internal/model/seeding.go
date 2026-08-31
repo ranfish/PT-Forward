@@ -38,6 +38,11 @@ type SeedingTorrentRecord struct {
 	// 历史总量零成本直读列；traffic 明细表降为当日增量原料）
 	CurrentUploaded   int64 `json:"current_uploaded" gorm:"default:0"`
 	CurrentDownloaded int64 `json:"current_downloaded" gorm:"default:0"`
+
+	// §59.153: 最新评分（每轮评分后 UPSERT——rule_evaluator preload 零查询直读列，
+	// 293 万行 MAX(id) GROUP BY 1.8s→毫秒）
+	LastScore     float64   `json:"last_score" gorm:"default:0"`
+	LastCycleID   string    `json:"last_cycle_id" gorm:"size:30;default:''"`
 	UnregisteredMsg string     `json:"unregistered_msg" gorm:"size:200"`
 	// §59.31: 命中关键词的 tracker 域名（诊断展示用，非规则条件键）
 	UnregisteredTracker string    `json:"unregistered_tracker" gorm:"size:200"`
