@@ -42,6 +42,7 @@ type Router struct {
 	publishHandler       *PublishHandler
 	manualForwardHandler *ManualForwardHandler
 	publishTorrentsHandler *PublishTorrentsHandler
+	formConfigHandler      *FormConfigHandler
 	complianceHandler    *ComplianceHandler
 	dashboardHandler     *DashboardHandler
 	systemHandler        *SystemHandler
@@ -119,6 +120,7 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		publishHandler:         NewPublishHandler(publishPipeline, logger, db),
 		manualForwardHandler:   manualForwardHandler,
 		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger, publishPipeline),
+		formConfigHandler:      NewFormConfigHandler(db),
 		complianceHandler:      NewComplianceHandler(db, logger),		publishLimitHandler:   NewPublishLimitHandler(db, logger),
 		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),
 		metadataHandler:       NewMetadataHandler(db, logger),
@@ -463,6 +465,8 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	mux.Handle("/api/v1/publish/fetch-priority", ptHandler)
 	mux.Handle("/api/v1/publish/seeds", ptHandler)
 	mux.Handle("/api/v1/publish/seeds/", ptHandler)
+	// §59.156 切片 3: 站点发布配置中心（HTML 上传半自动）
+	mux.Handle("/api/v1/publish/form-config/", rt.chain(rt.rateLimitMW, rt.formConfigHandler.ServeHTTP))
 
 	dashboardHandler := rt.chain(rt.rateLimitMW, rt.dashboardHandler.ServeHTTP)
 	mux.Handle("/api/v1/dashboard/overview", dashboardHandler)
