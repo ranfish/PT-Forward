@@ -190,6 +190,19 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	desc := e.pipe.renderDescription(ctx, meta.SiteName, in.TargetSite, meta.Title, sourceDetail)
 	if desc.Text != "" {
+		// §59.150 官方验证格式：截图 [img] 行前置（≤8 张，129 张异常案例教训
+		// §59.84）——站点无描述模板时 renderDescription 原文透传不含截图
+		if n := len(sourceDetail.Screenshots); n > 0 {
+			limit := n
+			if limit > 8 {
+				limit = 8
+			}
+			lines := make([]string, 0, limit)
+			for _, u := range sourceDetail.Screenshots[:limit] {
+				lines = append(lines, "[img]"+u+"[/img]")
+			}
+			desc.Text = strings.Join(lines, "\n") + "\n" + desc.Text
+		}
 		form[cfg.FormFields[model.FieldDomainDescription]] = desc.Text
 	}
 	if desc.Subtitle != "" && form[model.FieldDomainSmallDescr] == "" {
