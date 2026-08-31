@@ -17,6 +17,7 @@ const luckHTML = `
 <textarea name="technical_info"></textarea>
 <select name="type">
   <option value="0">请选择</option>
+  <option value="0">請選擇一項</option>
   <option value="401">电影</option>
   <option value="402">电视剧</option>
   <option value="413">短剧</option>
