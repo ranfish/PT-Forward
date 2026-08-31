@@ -16,8 +16,7 @@ import (
 
 // FormConfigHandler 配置中心端点。
 type FormConfigHandler struct {
-	db        *gorm.DB
-	publisher *publish.Pipeline
+	db *gorm.DB
 }
 
 // NewFormConfigHandler 创建 handler。
@@ -61,6 +60,8 @@ func (h *FormConfigHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 // handleParse POST {site_name, html} → {draft, merged, diffs}
 // HTML 即弃：内存解析，不落库不写日志（L2 敏感信息——表单含 auth/token）。
 func (h *FormConfigHandler) handleParse(w http.ResponseWriter, r *http.Request) {
+	// §59.157 回归审核：body 上限 5MB（真实发布页 ~50KB，100 倍余量——防误传打爆内存）
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 	var req struct {
 		SiteName string `json:"site_name"`
 		HTML     string `json:"html"`
