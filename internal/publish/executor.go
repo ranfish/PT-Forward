@@ -181,11 +181,24 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 
 	if in.DryRun {
-		return &ExecuteResult{
+		res := &ExecuteResult{
 			Status: "dry_run_ok",
 			Form:   form,
 			Tags:   applied,
 		}
+		// §59.156 回归审核：DryRun 顺带跑官方预检（推数据拿判定零落站——
+		// 验证 cookie/代理/JSON 全链；未通过不阻断 dry_run 状态）
+		if cfg.PreAuditURL != "" {
+			if pa, errMsg := e.callPreAudit(ctx, &site, cfg, meta, form, jobs, applied); pa != nil {
+				res.PreAudit = pa
+				if !pa.Passed {
+					res.Message = "预检未通过（dry_run 不阻断）"
+				}
+			} else {
+				res.Message = "预检请求失败: " + errMsg
+			}
+		}
+		return res
 	}
 
 	// ⑥ 描述渲染（复用组件——PTGen 缓存兜底见 renderDescription 内部）
@@ -233,23 +246,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		TargetSite:  in.TargetSite,
 		ClientID:    rv.ClientID,
 	}
-	// tags 写入表单（multipart 数组字段——TagApplier 回调）
-	{
-		var tagErr error
-		tagWrite := func(field, value string) {
-			if tagErr != nil {
-				return
-			}
-			existing, ok := pubReq.FormFields[field]
-			if ok && existing != "" {
-				pubReq.FormFields[field] = existing + "\x00" + value // 数组形态：NUL 分隔（adapter 写 multipart 时拆分）
-			} else {
-				pubReq.FormFields[field] = value
-			}
-		}
-		applier.Apply(tags, tagWrite)
-		_ = tagErr
-	}
+	// tags 写入表单（checkbox 数组=同名字段重复——§59.156 TagArrayFields 通道）
+	applier.Apply(tags, func(field, value string) {
+		pubReq.TagArrayFields = append(pubReq.TagArrayFields, model.TagKV{Key: field, Value: value})
+	})
 
 	adapter, aErr := e.pipe.siteProvider.GetAdapter(ctx, in.TargetSite)
 	if aErr != nil {

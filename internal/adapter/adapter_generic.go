@@ -573,6 +573,10 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	for k, v := range req.FormFields {
 		fw.writeField(k, v)
 	}
+	// §59.156: checkbox 数组标签——同名字段重复写（multipart 数组语义）
+	for _, kv := range req.TagArrayFields {
+		fw.writeField(kv.Key, kv.Value)
+	}
 
 	if err := fw.hasError(); err != nil {
 		return nil, fmt.Errorf("write form field: %w", err)
