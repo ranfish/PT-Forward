@@ -3,11 +3,9 @@
 /.pt-forward.new
 
 # Data
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
-data/cache/
+# §59.154: *.db* 通配——覆盖 .db/.db-wal/.db.old16g/.db.bak 等一切衍生形态
+# （v0.0.804 事故：*.db 不匹配 .db.old16g 后缀，16GB 备份被 add -A 带入）
+*.db*
 
 # Logs
 logs/

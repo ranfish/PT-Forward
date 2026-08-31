@@ -1,0 +1,24 @@
+#!/bin/bash
+# §59.154: pre-commit 硬拦截——防 .gitignore 覆盖不到的形态再犯
+# (a) 文件名含 .db（数据库族——历史上 16GB 备份曾被 add -A 带入）
+# (b) 暂存文件 >50MB（仓库最大合法文件 bin/pt-forward ~34MB）
+set -e
+LIST=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$LIST" ] && exit 0
+
+for f in $LIST; do
+    case "$f" in
+        Thumbs.db) continue ;;  # OS 垃圾文件已被 ignore，防御性放行
+    esac
+    if [[ "$f" == *.db* ]]; then
+        echo "✗ 拒绝提交数据库文件: $f"
+        echo "  如确需提交，请先在 .gitignore 增加精确例外（!path）并经人工确认"
+        exit 1
+    fi
+    size=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+    if [ "$size" -gt 52428800 ]; then
+        echo "✗ 拒绝提交大文件: $f ($(( size / 1048576 ))MB > 50MB)"
+        exit 1
+    fi
+done
+exit 0
