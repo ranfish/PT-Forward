@@ -4243,5 +4243,6 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		TagOverrides: req.TagOverrides,
 		DryRun:       req.DryRun,
 	})
-	writeJSON(w, http.StatusOK, map[string]any{"result": result})
+	// §59.158: Success 信封（与 form-config 同款教训——裸写致前端取值 undefined）
+	Success(w, map[string]any{"result": result})
 }

@@ -70,7 +70,7 @@ export const executeApi = {
     return client.get<ApiResponse<PublishTarget[]>>('/publish/form-config/targets')
   },
   execute(infoHash: string, targetSite: string, opts?: { dryRun?: boolean; tagOverrides?: string[]; anonymous?: boolean }) {
-    return client.post<ApiResponse<ExecuteResult>>('/publish/seeds/execute', {
+    return client.post<ApiResponse<{ result: ExecuteResult }>>('/publish/seeds/execute', {
       info_hash: infoHash,
       target_site: targetSite,
       dry_run: opts?.dryRun ?? true,
