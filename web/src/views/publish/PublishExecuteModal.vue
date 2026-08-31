@@ -103,7 +103,7 @@ async function runDryRun() {
       dryRun: true,
       tagOverrides: tagOverrides.value,
     })
-    result.value = res.data?.data ?? null
+    result.value = res.data?.data?.result ?? null
   } catch (e) {
     message.error(String(e))
   } finally {
@@ -118,7 +118,7 @@ async function runSubmit() {
       dryRun: false,
       tagOverrides: tagOverrides.value,
     })
-    result.value = res.data?.data ?? null
+    result.value = res.data?.data?.result ?? null
     if (result.value && ['uploaded', 'pushed'].includes(result.value.status)) {
       message.success(`发布成功：${result.value.target_torrent_url || result.value.status}`)
       emit('done')
