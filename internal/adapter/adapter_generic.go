@@ -28,7 +28,9 @@ var (
 	reGenericKdescr            = regexp.MustCompile(`(?s)<div[^>]*id=['"]kdescr['"][^>]*>([\s\S]*?)</div>`)
 	reGenericSeeders           = regexp.MustCompile(`(?i)(?:做种数|Seeders?|S[^<]*<[^>]*>)(\d+)`)
 	reGenericLeechers          = regexp.MustCompile(`(?i)(?:下载数|Leechers?|L[^<]*<[^>]*>)(\d+)`)
-	reGenericDetailID          = regexp.MustCompile(`(?:details|detail|torrent)\.php\?id=(\d+)`)
+	// §59.159 词边界修复：前置 [^a-zA-Z0-9_] 防 userdetails.php/user torrent 误命中
+	// （实战：四次发布 tid=10136 恒等于用户自身 ID——上传失败页的导航链接被误抓判"成功"）
+	reGenericDetailID          = regexp.MustCompile(`[^a-zA-Z0-9_](?:details|detail|torrent)\.php\?id=(\d+)`)
 	reGenericErrorClass        = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reGenericStripTags         = regexp.MustCompile(`<[^>]+>`)
 	reGenericBrowseRow         = regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
@@ -140,6 +142,11 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 	}
 	if len(data) == 0 {
 		return nil, &model.AppError{Code: 15001, Message: "种子数据为空"}
+	}
+	// §59.159: bencode 嗅探——错误页伪装（Content-Type 非 html 但 body 是页面文本，
+	// 如 text/plain 的 stderr 消息页）不当种子数据返回（pusher 加种 HTML 必失败且难排查）
+	if data[0] != 'd' && data[0] != 'l' && data[0] != 'i' {
+		return nil, &model.AppError{Code: 15002, Message: fmt.Sprintf("响应非 bencode 种子数据（首字节 %q）——疑似错误页", data[0])}
 	}
 	return data, nil
 }
