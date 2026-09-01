@@ -209,8 +209,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	desc := e.pipe.renderDescription(ctx, meta.SiteName, in.TargetSite, meta.Title, sourceDetail)
 	if desc.Text != "" {
-		// §59.150 官方验证格式：截图 [img] 行前置（≤8 张，129 张异常案例教训
-		// §59.84）——站点无描述模板时 renderDescription 原文透传不含截图
+		// §59.159 用户定案：截图 [img] 放简介**下方**（≤8 张 §59.84 上限；
+		// 无引号纯 URL——带引号坏格式致 LuckAudit 审核拒绝实战）
 		if n := len(sourceDetail.Screenshots); n > 0 {
 			limit := n
 			if limit > 8 {
@@ -220,7 +220,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			for _, u := range sourceDetail.Screenshots[:limit] {
 				lines = append(lines, "[img]"+u+"[/img]")
 			}
-			desc.Text = strings.Join(lines, "\n") + "\n" + desc.Text
+			desc.Text = desc.Text + "\n\n" + strings.Join(lines, "\n")
 		}
 		form[cfg.FormFields[model.FieldDomainDescription]] = desc.Text
 	}
@@ -569,14 +569,23 @@ type idNameWithMode struct {
 	Mode string `json:"mode,omitempty"`
 }
 
-// parseScreenshotsCol screenshots 列解析（§59.47 四消费点同款——逗号/换行分隔）。
+// parseScreenshotsCol screenshots 列解析（§59.47 四消费点同款）。
+// §59.159 修复：列存储形态为 JSON 数组（["url1","url2"]）——FieldsFunc 硬拆
+// 会保留引号 → [img]"url"[/img] 坏格式 → LuckAudit 审核拒绝（实战 86 分 1 错误）。
+// JSON 解析优先，剥引号兜底。
 func parseScreenshotsCol(s string) []string {
 	if s == "" {
 		return nil
 	}
+	var urls []string
+	if err := json.Unmarshal([]byte(s), &urls); err == nil {
+		return urls
+	}
+	// fallback：逗号/换行分隔 + 剥引号
 	parts := strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == '\n' || r == '\r' || r == ' ' })
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
+		p = strings.Trim(p, "\"")
 		if p != "" {
 			out = append(out, p)
 		}
