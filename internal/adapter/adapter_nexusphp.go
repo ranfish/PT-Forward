@@ -791,17 +791,16 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	if !strings.HasPrefix(baseURL, "http") {
 		baseURL = "https://" + baseURL
 	}
-	// §59.159: NP 默认上传处理端点是 takeupload.php（upload.php 是表单 GET 页——
-	// POST 它只会回显表单=实战静默失败之源；PTNexus 竞品同款硬编码佐证）
-	uploadPath := "/takeupload.php"
-	if config.Paths.Upload != "" {
+	// §59.159: NP 上传 POST 端点=TakeUpload（takeupload.php 处理页）；Upload
+	// （upload.php）是表单 GET 页——POST 只回显表单=实战静默失败之源。历史代码
+	// 误用 Upload 且 TakeUpload 误限音乐类。优先级：TakeUpload > 显式 Upload 配置
+	// > 默认 takeupload.php。
+	uploadPath := config.Paths.TakeUpload
+	if uploadPath == "" {
 		uploadPath = config.Paths.Upload
 	}
-
-	if cat, ok := req.FormFields["category"]; ok && config.Paths.TakeUpload != "" {
-		if isMusicCategory(cat) {
-			uploadPath = config.Paths.TakeUpload
-		}
+	if uploadPath == "" {
+		uploadPath = "/takeupload.php"
 	}
 
 	uploadURL := baseURL + uploadPath
