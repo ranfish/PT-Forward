@@ -45,6 +45,8 @@ type ExecuteInput struct {
 	PushOnly bool
 	// TorrentID PushOnly 模式的目标站种子 ID
 	TorrentID string
+	// BatchGroupID 批次分组（批量端点生成 UUID——发布日志页按批次分组）
+	BatchGroupID string
 	// PushClientID/PushSavePath 补推直给（记录回放——发布记录落库值；缺省回落
 	// ResolveResource 资源定位）
 	PushClientID string
@@ -68,7 +70,7 @@ type PreAuditResult struct {
 
 // ExecuteResult 执行结果（状态机：每个短路点一个 Status）。
 type ExecuteResult struct {
-	Status   string `json:"status"` // disabled/ ineligible/ duplicate/ pre_audit_failed/ uploaded/ pushed/ failed/ dry_run_ok
+	Status   string `json:"status"` // disabled/ ineligible/ duplicate/ existing/ uploaded/ uploaded_existing/ pushed/ pushed_existing/ failed/ dry_run_ok
 	Message  string `json:"message"`
 	PreAudit *PreAuditResult   `json:"pre_audit,omitempty"`
 	Form     map[string]string `json:"form,omitempty"` // 组装产物（DryRun 供人工核对）
@@ -273,50 +275,22 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		}
 	}
 
-	// ⑥ 描述渲染（复用组件——PTGen 缓存兜底见 renderDescription 内部）
-	sourceDetail := &model.TorrentDetail{
-		Description: meta.Description,
-		MediaInfo:   meta.MediaInfo,
-		BDInfo:      meta.BDInfo,
-		Screenshots: parseScreenshotsCol(meta.Screenshots),
-		PosterURL:   meta.Poster,
+	// ⑥ 描述组装——纯本地资产消费（§59.159 白名单：替代 renderDescription
+	// [queryPTGen 在线/rehostPoster 图床转存双违规]；零网络依赖）
+	if strings.TrimSpace(meta.Title) == "" || strings.TrimSpace(meta.Description) == "" {
+		return fail("ineligible", "资产不完备：name/简介为空（先完成获取-审核）")
 	}
-	desc := e.pipe.renderDescription(ctx, meta.SiteName, in.TargetSite, meta.Title, sourceDetail)
-	if desc.Text != "" {
-		// §59.159 用户定案（二轮修正）：引用=种子详情 Tab2 **声明的完整内容**
-		// （statement 列 BBCode 原文——源站声明块）置简介最上方；非致谢模板短句
-		if q := strings.TrimSpace(meta.Statement); q != "" {
-			desc.Text = "[quote]" + q + "[/quote]\n\n" + desc.Text
-		}
-		// §59.159 用户定案：截图 [img] 放简介**下方**（≤8 张 §59.84 上限；
-		// 无引号纯 URL——带引号坏格式致 LuckAudit 审核拒绝实战）
-		if n := len(sourceDetail.Screenshots); n > 0 {
-			limit := n
-			if limit > 8 {
-				limit = 8
-			}
-			lines := make([]string, 0, limit)
-			for _, u := range sourceDetail.Screenshots[:limit] {
-				lines = append(lines, "[img]"+u+"[/img]")
-			}
-			desc.Text = desc.Text + "\n\n" + strings.Join(lines, "\n")
-		}
-		form[cfg.FormFields[model.FieldDomainDescription]] = desc.Text
-	}
-	if desc.Subtitle != "" {
-		setForm(model.FieldDomainSmallDescr, desc.Subtitle)
-	}
+	form[cfg.FormFields[model.FieldDomainDescription]] = assembleDescription(meta)
 
-	// ⑦ pre-audit 官方预检（§59.150——passed 才提交）
+	// ⑦ pre-audit（§59.159 六轮定案：适配工具非发布门控——结果记录不阻断；
+	// 历史：§59.150"passed 才提交"为单站验证期设计，多站架构下门控语义不成立）
 	var preAudit *PreAuditResult
 	if cfg.PreAuditURL != "" {
-		pa, errMsg := e.callPreAudit(ctx, &site, cfg, meta, form, jobs, applied)
-		if pa == nil {
-			return fail("pre_audit_failed", "预检请求失败: "+errMsg)
-		}
-		preAudit = pa
-		if !pa.Passed && !in.DryRun {
-			return &ExecuteResult{Status: "pre_audit_failed", Message: "预检未通过", PreAudit: pa}
+		if pa, errMsg := e.callPreAudit(ctx, &site, cfg, meta, form, jobs, applied); pa != nil {
+			preAudit = pa
+		} else {
+			preAudit = &PreAuditResult{Passed: false, TotalScore: -1,
+				Details: []PreAuditDetail{{Level: "WARN", Message: "预检请求失败: " + errMsg}}}
 		}
 	}
 
@@ -343,7 +317,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		Description: form[cfg.FormFields[model.FieldDomainDescription]],
 		MediaInfo:   meta.MediaInfo,
 		BDInfo:      meta.BDInfo,
-		Screenshots: sourceDetail.Screenshots,
+		Screenshots: parseScreenshotsCol(meta.Screenshots),
 		IMDbLink:    meta.IMDbURL,
 		DoubanLink:  meta.DoubanURL,
 		Anonymous:   in.Anonymous,
@@ -388,6 +362,14 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// 加种照做=把站上已有种下回做种（辅种语义），Status 语义化区分新发/已有。
 	uploadedStatus := "uploaded"
 	if resp.IsExisting {
+		if resp.ExistingID == "" && resp.TorrentID == "" {
+			// §59.159 existing 终态：文本"已存在"（信文案不信页面 ID——无权威 ID
+			// 不推种；定位与推种走辅种业务）
+			return &ExecuteResult{
+				Status: "existing", Message: "站上已有同种（未定位站内 ID，未推种——辅种业务范畴）",
+				TargetTorrentURL: resp.DetailURL,
+			}
+		}
 		uploadedStatus = "uploaded_existing"
 		if resp.ExistingID != "" && resp.TorrentID == "" {
 			resp.TorrentID = resp.ExistingID
@@ -431,6 +413,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 
 	// ⑩ 结果落库（发布日志页消费）
 	now := time.Now()
+	paNote := ""
+	if preAudit != nil && !preAudit.Passed {
+		paNote = fmt.Sprintf("预检 %d 分未过（已继续提交——§59.159 非门控）", preAudit.TotalScore)
+	}
 	_ = e.pipe.CreateResult(ctx, &model.PublishResultRecord{
 		TargetSite:   in.TargetSite,
 		SourceSite:   meta.SiteName,
@@ -438,9 +424,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		SavePath:      rv.SavePath,
 		TorrentID:    resp.TorrentID,
 		Status:       model.PublishResultStatus(result.Status),
-		SkipReason:   result.Message,
+		SkipReason:   joinNotes(paNote, result.Message),
 		PublishURL:   result.TargetTorrentURL,
 		Trigger:      "manual",
+		BatchGroupID: in.BatchGroupID,
 		Title:        meta.Title,
 		DownloaderID: rv.ClientID,
 		Seeded:       result.Status == "pushed" || result.Status == "pushed_existing", // §59.159: 辅种加种同为加种
@@ -449,6 +436,18 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		CompletedAt:  &now,
 	})
 	return result
+}
+
+// joinNotes 多段备注拼接（预检摘要+结果消息）。
+func joinNotes(a, b string) string {
+	switch {
+	case a == "":
+		return b
+	case b == "":
+		return a
+	default:
+		return a + "；" + b
+	}
 }
 
 // domainJob 域装配任务（主流程与 pre-audit 共用）。

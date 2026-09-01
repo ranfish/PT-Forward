@@ -8,14 +8,19 @@
   >
     <div v-if="!result" class="step-select">
       <a-form layout="vertical">
-        <a-form-item label="目标站（已启用发布配置）">
-          <a-select v-model:value="targetSite" style="width: 260px" placeholder="选择站点">
+        <a-form-item label="目标站（已启用发布配置——多选并行发布）">
+          <a-select
+            v-model:value="selectedSites"
+            mode="multiple"
+            style="width: 100%"
+            placeholder="选择站点（单选可用预检——适配工具；多选直接提交）"
+          >
             <a-select-option v-for="t in targets" :key="t.name" :value="t.name">
               {{ t.name }}<a-tag v-if="t.has_pre_audit" color="blue" style="margin-left: 8px">官方预检</a-tag>
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="条件标签人工勾选（auto:false 站方选项——推断不自动勾，人工确认后进入）">
+        <a-form-item v-if="selectedSites.length === 1" label="条件标签人工勾选（auto:false——人工确认后进入）">
           <a-select
             v-model:value="tagOverrides"
             mode="multiple"
@@ -26,9 +31,31 @@
         </a-form-item>
       </a-form>
       <div class="actions">
-        <a-button :disabled="!targetSite || loading" type="primary" :loading="loading" @click="runDryRun">
-          预检（DryRun 不落站）
+        <a-button
+          v-if="selectedSites.length === 1"
+          :disabled="loading"
+          :loading="loading"
+          @click="runDryRun"
+        >
+          预检（DryRun 适配工具·不落站）
         </a-button>
+        <a-button :disabled="!selectedSites.length || loading" type="primary" :loading="loading" @click="runBatch">
+          发布（{{ selectedSites.length || 0 }} 站）
+        </a-button>
+      </div>
+    </div>
+
+    <div v-else-if="batchResults" class="step-result">
+      <h4>批次结果（{{ batchSummary }}）</h4>
+      <div v-for="r in batchResults" :key="r.site" class="batch-row">
+        <a-tag :color="batchRowColor(r.status)">{{ r.site }}</a-tag>
+        <span>{{ r.status }}</span>
+        <span v-if="r.message" class="muted">{{ r.message.slice(0, 80) }}</span>
+        <a v-if="r.url" :href="r.url" target="_blank" style="font-size: 12px">详情</a>
+      </div>
+      <div class="actions">
+        <a-button @click="reset">关闭</a-button>
+        <a-button type="primary" @click="$router.push('/publish/logs')">查看发布日志（按批次分组）</a-button>
       </div>
     </div>
 
@@ -74,6 +101,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import client from '@/api/client'
 import { executeApi, formConfigApi, type ExecuteResult, type PublishTarget } from '@/api/formConfig'
 
 const props = defineProps<{ open: boolean; infoHash: string; seedName?: string }>()
@@ -81,7 +109,8 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'done'): vo
 
 const targets = ref<PublishTarget[]>([])
 const conditionalTagOptions = ref<{ label: string; value: string }[]>([])
-const targetSite = ref('')
+const selectedSites = ref<string[]>([])
+const batchResults = ref<Array<{ site: string; status: string; message?: string; url?: string }> | null>(null)
 const tagOverrides = ref<string[]>([])
 const loading = ref(false)
 const result = ref<ExecuteResult | null>(null)
@@ -91,7 +120,8 @@ watch(
   async (v) => {
     if (v) {
       result.value = null
-      targetSite.value = ''
+      batchResults.value = null
+      selectedSites.value = []
       tagOverrides.value = []
       try {
         const res = await executeApi.targets()
@@ -103,6 +133,8 @@ watch(
     }
   },
 )
+
+const targetSite = computed(() => selectedSites.value[0] ?? '')
 
 watch(targetSite, async (site) => {
   tagOverrides.value = []
@@ -134,6 +166,35 @@ async function runDryRun() {
   }
 }
 
+async function runBatch() {
+  loading.value = true
+  try {
+    const res = await client.post('/publish/seeds/execute-batch', {
+      info_hash: props.infoHash,
+      target_sites: selectedSites.value,
+      tag_overrides: tagOverrides.value,
+    })
+    batchResults.value = res.data?.data?.results ?? []
+    emit('done')
+  } catch (e) {
+    message.error(String(e))
+  } finally {
+    loading.value = false
+  }
+}
+
+const batchSummary = computed(() => {
+  const rs = batchResults.value ?? []
+  const ok = rs.filter((r) => ['pushed', 'pushed_existing', 'existing'].includes(r.status)).length
+  return `${ok} 成功 / ${rs.length - ok} 未成`
+})
+
+function batchRowColor(s: string): string {
+  if (s === 'pushed' || s === 'pushed_existing') return 'green'
+  if (s === 'existing') return 'blue'
+  return 'red'
+}
+
 async function runSubmit() {
   loading.value = true
   try {
@@ -142,7 +203,7 @@ async function runSubmit() {
       tagOverrides: tagOverrides.value,
     })
     result.value = res.data?.data?.result ?? null
-    if (result.value && ['uploaded', 'pushed', 'uploaded_existing', 'pushed_existing'].includes(result.value.status)) {
+    if (result.value && ['uploaded', 'pushed', 'uploaded_existing', 'pushed_existing', 'existing'].includes(result.value.status)) {
       message.success(`发布成功：${result.value.target_torrent_url || result.value.status}`)
       emit('done')
     }
