@@ -47,6 +47,7 @@ const (
 	FieldDomainIMDBURL     = "imdb_url"
 	FieldDomainPTGen       = "pt_gen"   // §59.159: PT-Gen 链接（幸运必填——用户实战指认）
 	FieldDomainDoubanURL   = "dburl"    // §59.159: 豆瓣链接（PTNexus 同款）
+	FieldDomainUplver      = "uplver"   // §59.159: 匿名发布（checkbox value=yes——语义由 Anonymous 承载，域仅记录存在性）
 	FieldDomainDescription = "description"
 	FieldDomainTechInfo    = "technical_info"
 )

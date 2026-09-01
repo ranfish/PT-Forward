@@ -13,6 +13,9 @@ const luckHTML = `
 <input type="text" name="name" />
 <input type="text" name="small_descr" />
 <input type="text" name="url" />
+<input type="text" name="pt_gen" />
+<input type="text" name="dburl" />
+<input type="checkbox" name="uplver" value="yes" />
 <textarea name="descr"></textarea>
 <textarea name="technical_info"></textarea>
 <select name="type">
@@ -92,6 +95,12 @@ func TestParsePublishFormHTML(t *testing.T) {
 	// tags checkbox 4 项
 	if len(draft.ValueMappings[model.FieldDomainTags]) != 4 {
 		t.Errorf("tags 应 4 项, got %d", len(draft.ValueMappings[model.FieldDomainTags]))
+	}
+	// §59.159: pt_gen/dburl/uplver 存在性（migration 30 域与解析器对齐）
+	for _, domain := range []string{model.FieldDomainPTGen, model.FieldDomainDoubanURL, model.FieldDomainUplver} {
+		if draft.FormFields[domain] == "" {
+			t.Errorf("%s 域应被解析收录（防 HTML diff 误判整域消失）", domain)
+		}
 	}
 	// HTML 即弃（返回值无原文）
 	if strings.Contains(draft.Serialize(), "takeupload") {
