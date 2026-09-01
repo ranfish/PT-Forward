@@ -40,22 +40,31 @@
           预检（DryRun 适配工具·不落站）
         </a-button>
         <a-button :disabled="!selectedSites.length || loading" type="primary" :loading="loading" @click="runBatch">
-          发布（{{ selectedSites.length || 0 }} 站）
+          {{ loading ? '发布中…' : `发布（${selectedSites.length || 0} 站）` }}
         </a-button>
       </div>
     </div>
 
     <div v-else-if="batchResults" class="step-result">
-      <h4>批次结果（{{ batchSummary }}）</h4>
+      <a-alert :type="batchAlertType" show-icon style="margin-bottom: 12px">
+        <template #message>
+          <span style="font-size: 15px; font-weight: 600">
+            发布成功 {{ okCount }} 站<span v-if="existCount"> · 已存在 {{ existCount }} 站</span><span v-if="failCount"> · 失败 {{ failCount }} 站</span>
+          </span>
+        </template>
+        <template #description>
+          逐站明细（{{ batchResults.length }} 站）——失败原因见各行/发布日志
+        </template>
+      </a-alert>
       <div v-for="r in batchResults" :key="r.site" class="batch-row">
         <a-tag :color="batchRowColor(r.status)">{{ r.site }}</a-tag>
-        <span>{{ r.status }}</span>
+        <span>{{ batchRowLabel(r.status) }}</span>
         <span v-if="r.message" class="muted">{{ r.message.slice(0, 80) }}</span>
         <a v-if="r.url" :href="r.url" target="_blank" style="font-size: 12px">详情</a>
       </div>
       <div class="actions">
-        <a-button @click="reset">关闭</a-button>
-        <a-button type="primary" @click="$router.push('/publish/logs')">查看发布日志（按批次分组）</a-button>
+        <a-button @click="$router.push('/publish/logs')">查看发布日志</a-button>
+        <a-button type="primary" @click="emit('update:open', false)">完成</a-button>
       </div>
     </div>
 
@@ -183,11 +192,29 @@ async function runBatch() {
   }
 }
 
-const batchSummary = computed(() => {
+const okCount = computed(() => (batchResults.value ?? []).filter((r) => r.status === 'pushed' || r.status === 'pushed_existing').length)
+const existCount = computed(() => (batchResults.value ?? []).filter((r) => r.status === 'existing' || r.status === 'duplicate').length)
+const failCount = computed(() => {
   const rs = batchResults.value ?? []
-  const ok = rs.filter((r) => ['pushed', 'pushed_existing', 'existing'].includes(r.status)).length
-  return `${ok} 成功 / ${rs.length - ok} 未成`
+  return rs.length - okCount.value - existCount.value
 })
+const batchAlertType = computed(() => {
+  if (failCount.value > 0) return 'error'
+  if (okCount.value > 0) return 'success'
+  return 'warning'
+})
+
+function batchRowLabel(s: string): string {
+  const map: Record<string, string> = {
+    pushed: '发布成功·已推种',
+    pushed_existing: '站上已有·已推种',
+    existing: '站上已有（未定位 ID）',
+    duplicate: '站上已有同内容种',
+    uploaded: '已上传（推种未确认）',
+    failed: '失败',
+  }
+  return map[s] ?? s
+}
 
 function batchRowColor(s: string): string {
   if (s === 'pushed' || s === 'pushed_existing') return 'green'
