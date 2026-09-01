@@ -5,6 +5,12 @@ import "time"
 // §33.1.22 — TorrentDetail: 种子详情
 type TorrentDetail struct {
 	Title        string     `json:"title"`
+	// §59.162 keepfrds 禁转两态采集：列表页行原始文本（含 [禁转]/[ 限时禁转 ] 标记）
+	// 与详情页发布时间原文（"由 xx 发布于20时46分前"——相对时间，天档以上=超 24h 窗）
+	RawListRow  string     `json:"raw_list_row,omitempty"`
+	AddedAtText string     `json:"added_at_text,omitempty"`
+	// §59.162: 限时禁转让渡截止（判定收口 fetcher——buildMetadata 传递落库）
+	NoTransferUntil *time.Time `json:"no_transfer_until,omitempty"`
 	Subtitle     string     `json:"subtitle"`
 	Description  string     `json:"description"`
 	Category     string     `json:"category"`

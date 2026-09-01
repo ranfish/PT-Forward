@@ -291,8 +291,24 @@ func (f *Fetcher) fetchFromSite(ctx context.Context, infoHash, siteName, torrent
 	// §59.26 方案 A: keepfrds（朋友站）title/subtitle 互换
 	// 朋友站部分种子 title=中文格式化标题，subtitle=英文 v1.05 发种名。
 	// 副标题非空时无条件互换（PTNexus 同款逻辑）。
-	if strings.Contains(siteCfg.Domain, "keepfrds") && detail.Subtitle != "" {
-		detail.Title, detail.Subtitle = detail.Subtitle, detail.Title
+	if strings.Contains(siteCfg.Domain, "keepfrds") {
+		if detail.Subtitle != "" {
+			detail.Title, detail.Subtitle = detail.Subtitle, detail.Title
+		}
+		// §59.162 禁转两态判定收口（列表行标记+详情发布时间——用户站点经验：
+		// [禁转]=永久 / [ 限时禁转 ]=24h 窗到期自动放行）
+		if limited, permanent, until := ClassifyNoTransfer(detail.RawListRow, detail.AddedAtText, time.Now()); limited || permanent {
+			if permanent {
+				if !containsFlag(detail.Flags, "禁转") {
+					detail.Flags = append(detail.Flags, "禁转")
+				}
+			} else {
+				if !containsFlag(detail.Flags, "限时禁转") {
+					detail.Flags = append(detail.Flags, "限时禁转")
+				}
+				detail.NoTransferUntil = &until
+			}
+		}
 	}
 
 	// §56.13 方案 B: adapter 内部已用 Engine 提取（如 NexusPHPAdapter）。
@@ -458,6 +474,7 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 		SourceDescription: detail.Description,
 		Description:       detail.Description,
 		Statement:         detail.Statement,
+		NoTransferUntil:   detail.NoTransferUntil, // §59.162 限时禁转让渡截止
 		Poster:            detail.PosterURL,
 		IMDbURL:           detail.IMDbURL,
 		DoubanURL:         detail.DoubanURL,
@@ -574,4 +591,14 @@ func (f *Fetcher) GetMetadataByHash(ctx context.Context, infoHash string) (*mode
 		return nil, false
 	}
 	return &meta, true
+}
+
+
+func containsFlag(flags []string, f string) bool {
+	for _, x := range flags {
+		if x == f {
+			return true
+		}
+	}
+	return false
 }
