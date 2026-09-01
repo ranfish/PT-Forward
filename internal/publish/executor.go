@@ -124,6 +124,14 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if err != nil || len(torrentData) == 0 {
 		return fail("failed", fmt.Sprintf("本地导出种子失败: %v", err))
 	}
+	// §59.159 源头嗅探：导出数据必须是 bencode（实战排查——.torrent 无效时
+	// 站方静默回表单页，错误不可见）
+	if torrentData[0] != 'd' && torrentData[0] != 'l' && torrentData[0] != 'i' {
+		e.logger.Warn("exported torrent data is not bencode",
+			zap.String("client", rv.ClientID), zap.Int("len", len(torrentData)),
+			zap.Uint8("first_byte", torrentData[0]))
+		return fail("failed", fmt.Sprintf("导出数据非 bencode 种子（首字节 %q）——路径/内容异常", torrentData[0]))
+	}
 
 	// ④ 域值组装（DB 供给——value_mappings 反查）
 	form := map[string]string{}
