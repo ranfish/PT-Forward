@@ -174,17 +174,24 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 		result.Error = fmt.Errorf("download torrent: %w", err)
 		return result
 	}
-	// §59.159 加种一致性校验（下载后加种前）：目标站种子的 infohash 必与源种一致
-	// （转发种 info dict 不变）——不一致=下载到了无关种（实战 52394 UBits/53342 HDH
-	// 错加事故根治；此前"加种后 mismatch 宽容放行"是错种已进下载器才发觉）
-	if req.InfoHash != "" {
-		if fm, ferr := fingerprint.ComputeFromTorrent(torrentData); ferr == nil && fm != nil && fm.InfoHash != req.InfoHash {
-			result.Error = fmt.Errorf("下载种子与源种不一致（expected %s actual %s, torrent_id %s）——拒绝加种",
-				req.InfoHash[:12], fm.InfoHash[:12], req.TorrentID)
-			p.logger.Warn("push: torrent hash mismatch, rejected",
-				zap.String("expected", req.InfoHash), zap.String("actual", fm.InfoHash),
+	// §59.159 加种一致性校验（下载后加种前·二轮修正）：
+	// hash 校验废除——幸运等 NP 站转发时改写 .torrent（infohash 变，53342/52394/53508
+	// 三例实证），按 hash 拒必误拒；改 **name 一致性**（站方改种不改内容名）：
+	// name 不符=下载到无关种（52394 UBits 错加事故防线），hash 变化作 Info 记录
+	if fm, ferr := fingerprint.ComputeFromTorrent(torrentData); ferr == nil && fm != nil {
+		if req.Title != "" && fm.Name != req.Title {
+			result.Error = fmt.Errorf("下载种子名与源种不符（expected %q actual %q, torrent_id %s）——疑似无关种，拒绝加种",
+				req.Title, fm.Name, req.TorrentID)
+			p.logger.Warn("push: torrent name mismatch, rejected",
+				zap.String("expected", req.Title), zap.String("actual", fm.Name),
 				zap.String("torrent_id", req.TorrentID))
 			return result
+		}
+		if req.InfoHash != "" && fm.InfoHash != req.InfoHash {
+			p.logger.Info("push: infohash changed by site (torrent rewritten)",
+				zap.String("source", req.InfoHash), zap.String("actual", fm.InfoHash),
+				zap.String("torrent_id", req.TorrentID))
+			result.InfoHash = fm.InfoHash
 		}
 	}
 
