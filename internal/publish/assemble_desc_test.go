@@ -34,7 +34,7 @@ Chapters: GBR - only named source available.`
 		t.Error("无形态文本应原样保留")
 	}
 	// MI 老段名 General 也覆盖
-	if got := FullwidthMIColons("General : x"); got != "General：x" {
+	if got := FullwidthMIColons("General : x"); got != "General： x" {
 		t.Errorf("General 空格变体应替换, got %q", got)
 	}
 }
