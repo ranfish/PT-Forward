@@ -333,11 +333,22 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			Title:     meta.Title,
 			SavePath:  rv.SavePath,
 		}
-		if pr := e.pipe.pusher.Push(ctx, pushReq); pr != nil && pr.Success {
-			if uploadedStatus == "uploaded_existing" {
+		if pr := e.pipe.pusher.Push(ctx, pushReq); pr != nil {
+			switch {
+			case pr.Success:
+				if uploadedStatus == "uploaded_existing" {
+					result.Status = "pushed_existing"
+				} else {
+					result.Status = "pushed"
+				}
+			case pr.AlreadyExist:
+				// 下载器已有同种（人工先行导入/跨链重复）——辅种语义达成
 				result.Status = "pushed_existing"
-			} else {
-				result.Status = "pushed"
+				result.Message = "下载器已有该种子（已做种）"
+			default:
+				if pr.Error != nil {
+					result.Message = "加种失败: " + pr.Error.Error()
+				}
 			}
 		}
 	}
@@ -355,6 +366,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		Title:        meta.Title,
 		DownloaderID: rv.ClientID,
 		Seeded:       result.Status == "pushed" || result.Status == "pushed_existing", // §59.159: 辅种加种同为加种
+		SeedError:    func() string { if strings.Contains(result.Message, "加种失败") { return result.Message }; return "" }(),
 		SeededAt:     func() *time.Time { if result.Status == "pushed" { return &now }; return nil }(),
 		CompletedAt:  &now,
 	})
