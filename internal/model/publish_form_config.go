@@ -20,6 +20,10 @@ type PublishFormConfig struct {
 	// PreAuditURL 站方官方预审接口（§59.150：提交前预检——passed 才提交）
 	PreAuditURL string `json:"pre_audit_url,omitempty"`
 
+	// Anonymous 匿名发布站点默认（§59.159 用户定案：站点配置-发布配置勾选项——
+	// 勾选=该站发布默认匿名 uplver=yes；发布请求可显式覆盖）
+	Anonymous bool `json:"anonymous,omitempty"`
+
 	// FormFields 逻辑域 → 表单字段名（站方 HTML 真名，如幸运 medium_sel[4] data-mode 后缀）
 	FormFields map[string]string `json:"form_fields,omitempty"`
 
@@ -41,6 +45,8 @@ const (
 	FieldDomainTags        = "tags"
 	FieldDomainSmallDescr  = "small_descr"
 	FieldDomainIMDBURL     = "imdb_url"
+	FieldDomainPTGen       = "pt_gen"   // §59.159: PT-Gen 链接（幸运必填——用户实战指认）
+	FieldDomainDoubanURL   = "dburl"    // §59.159: 豆瓣链接（PTNexus 同款）
 	FieldDomainDescription = "description"
 	FieldDomainTechInfo    = "technical_info"
 )

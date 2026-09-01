@@ -13,6 +13,7 @@ export interface PublishFormConfig {
   enabled: boolean
   framework?: string
   pre_audit_url?: string
+  anonymous?: boolean
   form_fields?: Record<string, string>
   value_mappings?: Record<string, FormValueMapping[]>
   tag_config_legacy?: { mode?: string } | null
@@ -40,6 +41,12 @@ export const formConfigApi = {
     return client.post<
       ApiResponse<{ site_name: string; draft: PublishFormConfig; merged: PublishFormConfig; diffs: FormConfigDiffItem[] }>
     >('/publish/form-config/parse', { site_name: siteName, html })
+  },
+  setAnonymous(siteName: string, anonymous: boolean) {
+    return client.post<ApiResponse<{ ok: boolean }>>('/publish/form-config/set-anonymous', {
+      site_name: siteName,
+      anonymous,
+    })
   },
   apply(siteName: string, config: PublishFormConfig, note?: string) {
     return client.post<ApiResponse<{ ok: boolean }>>('/publish/form-config/apply', {

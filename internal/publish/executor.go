@@ -139,6 +139,14 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	form[model.FieldDomainDescription] = meta.Description // renderDescription 结果后续覆盖
 	form[model.FieldDomainTechInfo] = meta.MediaInfo
 	form[model.FieldDomainIMDBURL] = meta.IMDbURL
+	// §59.159: PT-Gen/豆瓣链接（用户实战指认——发布页面完整投递；PTNexus 同款
+	// pt_gen 值=豆瓣链接；FormFields 未配站点自然跳过）
+	if _, ok := cfg.FormFields[model.FieldDomainPTGen]; ok && meta.DoubanURL != "" {
+		form[model.FieldDomainPTGen] = meta.DoubanURL
+	}
+	if _, ok := cfg.FormFields[model.FieldDomainDoubanURL]; ok && meta.DoubanURL != "" {
+		form[model.FieldDomainDoubanURL] = meta.DoubanURL
+	}
 
 	jobs := []domainJob{
 		{model.FieldDomainType, e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)},
@@ -244,6 +252,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 
 	// ⑧ 上传（adapter UploadTorrent 复用）
+	// §59.159: 匿名发布取站点默认（form_config.Anonymous——站点配置勾选项）
+	if cfg.Anonymous {
+		in.Anonymous = true
+	}
 	pubReq := &model.PublishRequest{
 		TorrentData: torrentData,
 		FormFields:  form,

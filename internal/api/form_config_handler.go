@@ -3,6 +3,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"encoding/json"
 	"net/http"
@@ -36,6 +37,8 @@ func (h *FormConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleParse(w, r)
 	case strings.HasSuffix(path, "/publish/form-config/apply") && r.Method == http.MethodPost:
 		h.handleApply(w, r)
+	case strings.HasSuffix(path, "/publish/form-config/set-anonymous") && r.Method == http.MethodPost:
+		h.handleSetAnonymous(w, r)
 	default:
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})
 	}
@@ -159,4 +162,42 @@ func (h *FormConfigHandler) handleTargets(w http.ResponseWriter, _ *http.Request
 		out = append(out, target{Name: s.Name, HasPreAudit: cfg.PreAuditURL != ""})
 	}
 	Success(w, out)
+}
+
+
+// handleSetAnonymous §59.159: 匿名发布站点默认开关（即时保存+审计——独立小端点：
+// 非 HTML 来源配置项，不走 diff 确认流）。
+func (h *FormConfigHandler) handleSetAnonymous(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SiteName  string `json:"site_name"`
+		Anonymous bool   `json:"anonymous"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.SiteName == "" {
+		Error(w, http.StatusBadRequest, 40001, "site_name 必填")
+		return
+	}
+	site, err := h.loadSite(r.Context(), req.SiteName)
+	if err != nil {
+		Error(w, http.StatusNotFound, 40401, err.Error())
+		return
+	}
+	cfg := model.ParseFormConfig(site.PublishFormConfig)
+	if cfg == nil {
+		Error(w, http.StatusBadRequest, 40002, "站点未配置发布表单——先完成 HTML 接入")
+		return
+	}
+	cfg.Anonymous = req.Anonymous
+	if err := h.db.WithContext(r.Context()).Model(&model.Site{}).
+		Where("id = ?", site.ID).
+		Update("publish_form_config", cfg.Serialize()).Error; err != nil {
+		Error(w, http.StatusInternalServerError, 50001, err.Error())
+		return
+	}
+	h.db.WithContext(context.Background()).Create(&model.OperationAuditLog{
+		Actor: "user", Module: "publish", Action: "form_config_anonymous",
+		TargetType: "site", TargetID: site.Name,
+		Detail:    fmt.Sprintf(`{"anonymous":%v}`, req.Anonymous),
+		CreatedAt: time.Now(),
+	})
+	Success(w, map[string]any{"ok": true})
 }
