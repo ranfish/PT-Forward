@@ -791,7 +791,9 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	if !strings.HasPrefix(baseURL, "http") {
 		baseURL = "https://" + baseURL
 	}
-	uploadPath := "/upload.php"
+	// §59.159: NP 默认上传处理端点是 takeupload.php（upload.php 是表单 GET 页——
+	// POST 它只会回显表单=实战静默失败之源；PTNexus 竞品同款硬编码佐证）
+	uploadPath := "/takeupload.php"
 	if config.Paths.Upload != "" {
 		uploadPath = config.Paths.Upload
 	}
