@@ -22,6 +22,16 @@
           <div class="kv"><span>enabled</span><b>{{ current.enabled }}</b></div>
           <div class="kv"><span>framework</span><b>{{ current.framework || '—' }}</b></div>
           <div class="kv"><span>pre_audit_url</span><b>{{ current.pre_audit_url || '—' }}</b></div>
+          <div class="kv">
+            <span>匿名发布</span>
+            <a-switch
+              :checked="current.anonymous || false"
+              checked-children="匿名"
+              un-checked-children="实名"
+              @change="(v: boolean) => setAnonymous(v)"
+            />
+            <small>站点默认——勾选后该站发布默认匿名（uplver）</small>
+          </div>
           <div v-for="(field, domain) in current.form_fields" :key="domain" class="kv">
             <span>{{ domain }}</span><b>{{ field }}</b>
             <small v-if="current.value_mappings?.[domain]?.length">{{ current.value_mappings[domain].length }} 项</small>
@@ -95,6 +105,12 @@ function onFile(e: Event) {
   const reader = new FileReader()
   reader.onload = () => (html.value = String(reader.result ?? ''))
   reader.readAsText(f)
+}
+
+async function setAnonymous(v: boolean) {
+  if (!current.value || !props.siteName) return
+  await formConfigApi.setAnonymous(props.siteName, v)
+  current.value = { ...current.value, anonymous: v }
 }
 
 async function doParse() {

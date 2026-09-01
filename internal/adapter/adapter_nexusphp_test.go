@@ -905,7 +905,9 @@ func TestNexusPHPUpload_MusicRouting(t *testing.T) {
 		}
 	})
 
-	t.Run("non-music category uses default upload", func(t *testing.T) {
+	t.Run("non-music category uses TakeUpload too", func(t *testing.T) {
+		// §59.159 语义修正：TakeUpload 是 NP 的 POST 处理端点（全类别）——
+		// 旧断言（非音乐走 Upload=upload.php 表单页）正是实战静默失败之源
 		config := &model.SiteConfig{
 			Domain: srv.URL,
 			Cookie: "session=test",
@@ -922,8 +924,8 @@ func TestNexusPHPUpload_MusicRouting(t *testing.T) {
 			FormFields:  map[string]string{"category": "401"},
 		}
 		_, _ = a.UploadTorrent(context.Background(), config, req)
-		if uploadPath != "/upload.php" {
-			t.Errorf("expected /upload.php, got %s", uploadPath)
+		if uploadPath != "/upload_music.php" {
+			t.Errorf("expected TakeUpload (/upload_music.php), got %s", uploadPath)
 		}
 	})
 }

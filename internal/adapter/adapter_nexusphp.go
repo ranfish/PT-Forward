@@ -830,7 +830,7 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 		fw.writeField("url", req.IMDbLink)
 	}
 	if req.Anonymous {
-		fw.writeField("uplver", "1")
+		fw.writeField("uplver", "yes") // §59.159: 幸运 checkbox value=yes（NP 存在即勾，值对齐站方）
 	}
 
 	npFieldMap := map[string]string{
