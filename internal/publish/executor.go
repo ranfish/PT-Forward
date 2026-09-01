@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
-	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -213,10 +212,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	desc := e.pipe.renderDescription(ctx, meta.SiteName, in.TargetSite, meta.Title, sourceDetail)
 	if desc.Text != "" {
-		// §59.159 用户定案：引用 quote 置简介**最上方**（§59.20 渲染器致谢——
-		// 站点无模板透传时丢失，此处补投；制作组名提取复用公共单点）
-		if q := description.GenerateThanksQuote(meta.SiteName, util.ExtractGroupName(meta.Title), false, nil); q != "" {
-			desc.Text = q + "\n\n" + desc.Text
+		// §59.159 用户定案（二轮修正）：引用=种子详情 Tab2 **声明的完整内容**
+		// （statement 列 BBCode 原文——源站声明块）置简介最上方；非致谢模板短句
+		if q := strings.TrimSpace(meta.Statement); q != "" {
+			desc.Text = "[quote]" + q + "[/quote]\n\n" + desc.Text
 		}
 		// §59.159 用户定案：截图 [img] 放简介**下方**（≤8 张 §59.84 上限；
 		// 无引号纯 URL——带引号坏格式致 LuckAudit 审核拒绝实战）
@@ -330,7 +329,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			ClientID:  rv.ClientID,
 			SiteName:  in.TargetSite,
 			TorrentID: resp.TorrentID,
-			InfoHash:  "",
+			InfoHash:  in.InfoHash, // §59.159: 源种 infohash——下载一致性校验+已存在辅种快路径
 			Title:     meta.Title,
 			SavePath:  rv.SavePath,
 		}
