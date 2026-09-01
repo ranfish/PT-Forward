@@ -117,15 +117,23 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 	}
 
 	// 文本域存在性（名称记录——供 diff 检测改版）
+	// §59.159: pt_gen/dburl/uplver 必须收录——否则 HTML diff 误判"整域消失"，
+	// 确认落库即丢配置（migration 30 注册的域与解析器对齐）
 	for field, domain := range map[string]string{
-		"small_descr":     model.FieldDomainSmallDescr,
-		"url":             model.FieldDomainIMDBURL,
-		"descr":           model.FieldDomainDescription,
-		"technical_info":  model.FieldDomainTechInfo,
+		"small_descr":    model.FieldDomainSmallDescr,
+		"url":            model.FieldDomainIMDBURL,
+		"descr":          model.FieldDomainDescription,
+		"technical_info": model.FieldDomainTechInfo,
+		"pt_gen":         model.FieldDomainPTGen,
+		"dburl":          model.FieldDomainDoubanURL,
 	} {
 		if doc.Find("input[name='"+field+"'], textarea[name='"+field+"']").Length() > 0 {
 			draft.FormFields[domain] = field
 		}
+	}
+	// uplver（checkbox——存在性记录；语义由 form_config.Anonymous 承载）
+	if doc.Find("input[type='checkbox'][name='uplver']").Length() > 0 {
+		draft.FormFields[model.FieldDomainUplver] = "uplver"
 	}
 
 	if len(draft.FormFields) == 0 {
