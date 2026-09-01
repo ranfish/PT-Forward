@@ -50,7 +50,8 @@ var (
 	reNexusLeechersCount  = regexp.MustCompile(`(\d+)个下载者`)
 	reNexusSeedersID      = regexp.MustCompile(`id=['"]seeders['"][^>]*>(?:<[^>]*>)*(\d+)`)
 	reNexusLeechersID     = regexp.MustCompile(`id=['"]leechers['"][^>]*>(?:<[^>]*>)*(\d+)`)
-	reNexusDetailID       = regexp.MustCompile(`(?:details|detail)\.php\?id=(\d+)`)
+	// §59.159 词边界：防 userdetails.php 误命中（实战四次假成功真因——失败页用户导航链接）
+	reNexusDetailID       = regexp.MustCompile(`[^a-zA-Z0-9_](?:details|detail)\.php\?id=(\d+)`)
 	reNexusErrorClass     = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reNexusErrorP         = regexp.MustCompile(`<p[^>]*>([^<]*(?:失败|错误|error|fail|拒绝|duplicate|already)[^<]*)</p>`)
 	reNexusBrowseLink     = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?(?:plugin_)?details\.php\?id=(\d+)["'][^>]*><b>\s*&nbsp;([^<]+)</b>`)
@@ -888,7 +889,22 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
 
-	resp, err := a.doer.Client.Do(httpReq)
+	// §59.159: 重定向 existed=1 捕获（NP 重复上传 302 details.php?id=N&existed=1 形态；
+	// 幸运实测为 200 失败页形态——双形态兼容，transport 继承站点代理）
+	existingID := ""
+	redirectClient := &http.Client{
+		Timeout:   a.doer.Client.Timeout,
+		Transport: a.doer.Client.Transport,
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			if req.URL.Query().Get("existed") == "1" {
+				if id := req.URL.Query().Get("id"); id != "" {
+					existingID = id
+				}
+			}
+			return nil
+		},
+	}
+	resp, err := redirectClient.Do(httpReq)
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
@@ -905,8 +921,35 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 		return nil, classifySiteError(resp, "upload")
 	}
 
+	// §59.159: 已存在优先判定（302 existed / 200 stderr 文本——Generic 同款双形态）
+	if existingID != "" {
+		return &model.PublishResponse{
+			Success: true, IsExisting: true, ExistingID: existingID,
+			DetailURL: baseURL + "/details.php?id=" + existingID,
+			TargetSite: config.Domain,
+		}, nil
+	}
+	if strings.Contains(html, "已存在") || strings.Contains(strings.ToLower(html), "already exists") {
+		exID := ""
+		if m := reNexusDetailID.FindStringSubmatch(html); len(m) > 1 {
+			exID = m[1]
+		}
+		respObj := &model.PublishResponse{Success: true, IsExisting: true, ExistingID: exID, TargetSite: config.Domain}
+		if exID != "" {
+			respObj.DetailURL = baseURL + "/details.php?id=" + exID
+		}
+		return respObj, nil
+	}
+
 	if idMatch := reNexusDetailID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
+		// §59.159 诊断：成功判定 body 摘要（假成功系列排查）
+		plain := strings.Join(strings.Fields(strings.ReplaceAll(strings.ReplaceAll(html, "<", " <"), ">", "> ")), " ")
+		if len(plain) > 700 {
+			plain = plain[:700]
+		}
+		a.logger.Info("upload success-path body digest",
+			zap.String("site", config.Domain), zap.String("tid", torrentID), zap.String("body", plain))
 		detailURL := baseURL + "/details.php?id=" + torrentID
 		return &model.PublishResponse{
 			Success:    true,
