@@ -43,6 +43,9 @@ type TorrentMetadata struct {
 	LastMergeMode string `json:"last_merge_mode" gorm:"column:last_merge_mode;size:20;default:'ptgen_first'"`
 
 	// §59.20 源站声明 + BDInfo 持久化
+	// §59.162: 限时禁转让渡截止（keepfrds 24h 窗——added+24h+30m 余量；
+	// 零值=无窗口[永久禁转或可转]；now<until 拦截，过期自动放行）
+	NoTransferUntil *time.Time `json:"no_transfer_until,omitempty"`
 	Statement string `json:"statement" gorm:"type:text"` // §59.20: 源站官组声明（仅"获取数据"时写入）
 	BDInfo    string `json:"bdinfo" gorm:"type:text"`     // §59.20: 蓝光原盘 BDInfo（BDMV/M2TS）
 

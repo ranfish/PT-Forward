@@ -3230,11 +3230,17 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 		if err := json.Unmarshal([]byte(meta.Flags), &flags); err == nil {
 			forbiddenSet := map[string]bool{
 				"禁转": true, "禁止转载": true, "谢绝转载": true, "严禁转载": true,
-				"谢绝搬运": true, "独占": true, "限时禁转": true, "限转": true,
+				"谢绝搬运": true, "独占": true, "限转": true,
 			}
 			for _, f := range flags {
 				if forbiddenSet[f] {
 					return "forbidden"
+				}
+				// §59.162: 限时禁转两态——now<until 才拦（keepfrds 24h 窗到期自动放行）
+				if f == "限时禁转" {
+					if meta.NoTransferUntil == nil || meta.NoTransferUntil.After(time.Now()) {
+						return "forbidden"
+					}
 				}
 			}
 		}

@@ -192,11 +192,84 @@ func (a *NexusPHPAdapter) resolveSignedDownloadURL(ctx context.Context, config *
 	return match, nil
 }
 
+// GetTorrentDetail §59.162 外层：keepfrds 禁转增强 merge（内层原逻辑零改动）。
 func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
+	detail, err := a.getTorrentDetailInner(ctx, config, torrentID)
+	if err != nil || detail == nil {
+		return detail, err
+	}
+	if strings.Contains(config.Domain, "keepfrds") {
+		a.enrichKeepfrdsTransferFlags(ctx, config, torrentID, detail)
+	}
+	return detail, nil
+}
+
+// enrichKeepfrdsTransferFlags §59.162: keepfrds 禁转两态采集增强——
+// 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 列表页行原始
+// 文本（种子名后标记区 [禁转] 永久 / [ 限时禁转 ] 24h——用户站点经验权威）。
+// 非侵入：塞 detail 附加字段，两态判定收口在 fetcher（extract_flags 消费）。
+func (a *NexusPHPAdapter) enrichKeepfrdsTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail) {
+	html, err := a.fetchDetailsHTML(ctx, config, torrentID)
+	if err != nil {
+		return
+	}
+	if m := reKeepfrdsAddedAt.FindStringSubmatch(html); len(m) > 1 {
+		detail.AddedAtText = strings.TrimSpace(m[1])
+	}
+	if row := a.fetchKeepfrdsListRow(ctx, config, torrentID); row != "" {
+		detail.RawListRow = row
+	}
+}
+
+var reKeepfrdsAddedAt = regexp.MustCompile(`由[^<]{0,30}发布于([^<]{2,25})`)
+
+// fetchKeepfrdsListRow 抓列表页首页按 tid 定位的行原始文本（新种限时窗内必在
+// 首页——NP 默认时间倒序；老种[标记已消失]拿不到行=无标记语义，不误伤）。
+func (a *NexusPHPAdapter) fetchKeepfrdsListRow(ctx context.Context, config *model.SiteConfig, torrentID string) string {
+	base := config.Domain
+	if !strings.HasPrefix(base, "http") {
+		base = "https://" + base
+	}
+	u := strings.TrimRight(base, "/") + "/torrents.php?page=0"
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return ""
+	}
+	setCommonHeaders(req, config.Cookie)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer func() { drainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	body, err := readBody(resp)
+	if err != nil {
+		return ""
+	}
+	html := string(body)
+	// 定位 tid 行：details.php?id=<tid> 首现位置取行块（<tr> 边界粗切）
+	anchor := "details.php?id=" + torrentID
+	i := strings.Index(html, anchor)
+	if i < 0 {
+		return ""
+	}
+	start := strings.LastIndex(html[:i], "<tr")
+	end := strings.Index(html[i:], "</tr>")
+	if start < 0 || end < 0 {
+		return ""
+	}
+	return html[start : i+end+5]
+}
+
+func (a *NexusPHPAdapter) getTorrentDetailInner(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
 	html, err := a.fetchDetailsHTML(ctx, config, torrentID)
 	if err != nil {
 		return nil, err
 	}
+	// §59.162: keepfrds 发布时间提取收口在 enrichKeepfrdsTransferFlags（单点）
+
 
 	// §56.34 OpenCD 专用提取（音乐站 DOM 与标准 NexusPHP 差异大）
 	if isOpenCDDomain(config.Domain) {
@@ -2740,3 +2813,5 @@ func deriveSiteCode(domain string) string {
 	}
 	return strings.ToLower(parts[0])
 }
+
+
