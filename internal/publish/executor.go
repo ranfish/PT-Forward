@@ -326,7 +326,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		Trigger:      "manual",
 		Title:        meta.Title,
 		DownloaderID: rv.ClientID,
-		Seeded:       result.Status == "pushed",
+		Seeded:       result.Status == "pushed" || result.Status == "pushed_existing", // §59.159: 辅种加种同为加种
 		SeededAt:     func() *time.Time { if result.Status == "pushed" { return &now }; return nil }(),
 		CompletedAt:  &now,
 	})
