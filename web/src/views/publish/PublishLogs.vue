@@ -38,7 +38,7 @@
         </a-select>
         <a-range-picker v-model:value="dateRange" @change="onFilterChange" />
         <a-button @click="fetchData"><ReloadOutlined /></a-button>
-        <a-button @click="exportCSV" :disabled="tableData.length === 0"><DownloadOutlined /> CSV</a-button>
+        <a-button :disabled="tableData.length === 0" @click="exportCSV"><DownloadOutlined /> CSV</a-button>
         <a-switch
           v-model:checked="autoRefresh"
           checked-children="自动"
@@ -94,14 +94,26 @@
           {{ formatTime(record.created_at) }}
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-button
-            v-if="record.candidate_id"
-            size="small"
-            type="link"
-            @click="$router.push(`/publish/groups/${record.candidate_id}`)"
-          >
-            详情
-          </a-button>
+          <a-space>
+            <a-button
+              v-if="record.candidate_id"
+              size="small"
+              type="link"
+              @click="$router.push(`/publish/groups/${record.candidate_id}`)"
+            >
+              详情
+            </a-button>
+            <!-- §59.159: 补推（发布成功未推送的修复通道——push_only 直推站上种子） -->
+            <a-button
+              v-if="canRepush(record)"
+              size="small"
+              type="link"
+              :loading="repushing === record.id"
+              @click="repush(record)"
+            >
+              补推
+            </a-button>
+          </a-space>
           <a-popconfirm title="确定删除此记录？" @confirm="handleDelete(record)">
             <a-button size="small" type="link" danger>删除</a-button>
           </a-popconfirm>
@@ -133,6 +145,7 @@
 </template>
 
 <script setup lang="ts">
+import { executeApi } from '@/api/formConfig'
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
@@ -217,6 +230,39 @@ const columns = [
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollRefreshing = false
+
+const repushing = ref<number | null>(null)
+
+// 补推条件：有站上种子 ID + 未真正推送（uploaded/pushed_existing/failed）+ 源 hash 可定位资源
+function canRepush(r: { torrent_id?: string; status?: string; seeded?: boolean; downloader_id?: string; save_path?: string }): boolean {
+  if (!r.torrent_id || !r.downloader_id || !r.save_path) return false
+  if (r.seeded && r.status === 'pushed') return false
+  return ['uploaded', 'pushed_existing', 'failed'].includes(r.status ?? '')
+}
+
+async function repush(r: { id: number; torrent_id?: string; target_site?: string; source_info_hash?: string; downloader_id?: string; save_path?: string }) {
+  repushing.value = r.id
+  try {
+    const res = await executeApi.execute(r.source_info_hash ?? '', r.target_site ?? '', {
+      pushOnly: true,
+      torrentId: r.torrent_id ?? '',
+      dryRun: false,
+      pushClientId: r.downloader_id ?? '',
+      pushSavePath: r.save_path ?? '',
+    })
+    const result = res.data?.data?.result
+    if (result && ['pushed', 'pushed_existing'].includes(result.status)) {
+      message.success(`补推成功：${result.status}`)
+      await fetchData(true)
+    } else {
+      message.warning(`补推未成功：${result?.message || result?.status || '未知'}`)
+    }
+  } catch (e) {
+    message.error(String(e))
+  } finally {
+    repushing.value = null
+  }
+}
 
 async function fetchData(silent = false) {
   if (!silent) loading.value = true

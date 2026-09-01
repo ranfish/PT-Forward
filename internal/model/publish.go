@@ -132,6 +132,10 @@ type PublishResultRecord struct {
 
 	Status       PublishResultStatus `json:"status" gorm:"size:20"`
 	SkipReason   string              `json:"skip_reason" gorm:"size:200"`
+	// §59.159: 源种 hash（记录溯源）
+	SourceInfoHash string            `json:"source_info_hash" gorm:"size:40;index"`
+	// §59.159: 加种目标路径（发布时落库——补推纯记录回放，不依赖快照行存活）
+	SavePath       string            `json:"save_path" gorm:"size:500"`
 	PublishURL   string              `json:"publish_url" gorm:"size:500"`
 	ErrorMessage string              `json:"error_message" gorm:"size:500"`
 	CompletedAt  *time.Time          `json:"completed_at"`

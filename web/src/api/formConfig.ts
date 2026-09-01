@@ -76,13 +76,17 @@ export const executeApi = {
   targets() {
     return client.get<ApiResponse<PublishTarget[]>>('/publish/form-config/targets')
   },
-  execute(infoHash: string, targetSite: string, opts?: { dryRun?: boolean; tagOverrides?: string[]; anonymous?: boolean }) {
+  execute(infoHash: string, targetSite: string, opts?: { dryRun?: boolean; tagOverrides?: string[]; anonymous?: boolean; pushOnly?: boolean; torrentId?: string; pushClientId?: string; pushSavePath?: string }) {
     return client.post<ApiResponse<{ result: ExecuteResult }>>('/publish/seeds/execute', {
       info_hash: infoHash,
       target_site: targetSite,
       dry_run: opts?.dryRun ?? true,
       tag_overrides: opts?.tagOverrides ?? [],
       anonymous: opts?.anonymous ?? false,
+      push_only: opts?.pushOnly ?? false,
+      torrent_id: opts?.torrentId ?? '',
+      push_client_id: opts?.pushClientId ?? '',
+      push_save_path: opts?.pushSavePath ?? '',
     })
   },
 }
