@@ -81,9 +81,17 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 			TargetSite: site,
 		}
 	}
-	// ④ 成功文案
+	// ④ 成功文案（无详情 ID 的弱成功——诊断期 dump 摘要，防再次假成功）
 	if strings.Contains(html, "uploaded") || strings.Contains(html, "成功") ||
 		strings.Contains(html, "Upload succeeded") || strings.Contains(html, "succeeded") {
+		if logger != nil {
+			plain := strings.Join(strings.Fields(strings.ReplaceAll(strings.ReplaceAll(html, "<", " <"), ">", "> ")), " ")
+			if len(plain) > 700 {
+				plain = plain[:700]
+			}
+			logger.Info("upload weak-success body digest",
+				zap.String("site", site), zap.String("body", plain))
+		}
 		return &model.PublishResponse{Success: true, TargetSite: site}
 	}
 	return nil
