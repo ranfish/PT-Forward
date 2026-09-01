@@ -48,7 +48,7 @@
 | 编码 | `codec_sel[4]` | 是 | 7 项 |
 | 分辨率 | `standard_sel[4]` | 是 | 7 项 |
 | 制作组 | `team_sel[4]` | 否 | 13 项预置 |
-| 标签 | `tags[4][]` | 否 | checkbox 多选（禁转/首发/官方/DIY/国语/中字/HDR）。**"首发"(id=2) 转存种禁勾**——PT 圈语义：圈首次发布，站管/压制组官方专属，转载人员不允许使用（2026-09-02 用户权威定义） |
+| 标签 | `tags[4][]` | 否 | checkbox 多选（禁转/首发/官方/DIY/国语/中字/HDR）。**"首发"(id=2) 转存种禁勾**——PT 圈通用语义（非本站专属）：圈首次发布，站管/压制组官方专属，转载人员不允许使用（2026-09-02 用户权威定义） |
 | 匿名发布 | `uplver` | 否 | checkbox value=yes |
 | 提交 | `upload` | — | submit（"我已经阅读过规则/发布"按钮，无隐藏确认字段） |
 
@@ -148,7 +148,7 @@
 1. **form_config**：HTML 上传 diff 流（§59.157 FormConfigPanel）——`ParsePublishFormHTML` 直接解析本站表单（select 静态无 data-mode，解析器兼容性待验证）；ValueMappings 按**本档号段表**落库（不复制幸运 dict）
 2. **资产投递**：quote/descr 组装复用 assembleDescription（**MI 全角化防御对本站无谓但无害**——本站无 MI-in-descr 检测；MI 资产可附 descr 末尾，站规"尽可能包含"非强制）；url=IMDb ✓；无 pt_gen/technical_info 字段
 3. **cnname**：新字段——中文名拆分投递（meta 的中文标题→cnname，主标题→name）
-4. **tags[4][]**：数组形态（TagArrayFields 已支持 §59.159）；**首发(id=2) 禁勾**（用户定案：PT 圈首次发布官方专属标签，转载人员不允许使用）
+4. **tags[4][]**：数组形态（TagArrayFields 已支持 §59.159）；**首发(id=2) 禁勾**（PT 圈通用铁律，见 AGENTS.md）
 5. **pre-audit**：本站无 → executor 跳过（可选步骤设计兼容）
 6. **上传判定**：NP 标准 takeupload 成功=302 → details.php?id=N（redirect 权威 + upload_classify.go 公共单点已覆盖）
 7. **新种下载**：BuildNexusDownloadURL 标准 `download.php?id=N&passkey=`（243 实测确认 passkey 形态）
@@ -159,6 +159,6 @@
 - [ ] 非电影类（402-410）质量字段名是否仍为 `[4]` 后缀（upload.php 无 type 参数默认电影表单）
 - [ ] download.php passkey 下载链接实测
 - [ ] takeupload 302 成功页与失败页形态（信文案不信页面 ID——§59.160 原则）
-- [x] ~~首发标签转存种是否勾选~~ → **不勾**（用户 09-02 定案：首发=PT 圈首次发布官方专属，转载禁用）
+- [x] ~~首发标签转存种是否勾选~~ → **不勾**（用户 09-02 定案：首发=PT 圈通用官方专属语义，转载禁用——全站适用铁律）
 - [ ] descr 中 MI 文本是否触发人工审查（无自动检测，风险低）
 - [ ] 种子最小体积限制（幸运 1GB，本站规则仅见 100MB 下限——验证是否有上限/下限服务端校验）
