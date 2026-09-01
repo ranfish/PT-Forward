@@ -160,6 +160,26 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 				}
 			}
 		}
+		// §59.159 回归审核：补推成功回写原记录（同 tid 最新行 Status/Seeded——
+		// 否则按钮反复可点[幂等无害但状态不收敛]、发布日志页 seeded 恒 0）
+		if res.Status == "pushed" || res.Status == "pushed_existing" {
+			now := time.Now()
+			// GORM Updates 不支持 Order/Limit——子查询定位最新行主键再更新
+			var lastID int64
+			e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+				Where("torrent_id = ? AND target_site = ?", in.TorrentID, in.TargetSite).
+				Select("id").Order("id DESC").Limit(1).Scan(&lastID)
+			if lastID > 0 {
+				e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+					Where("id = ?", lastID).
+					Updates(map[string]interface{}{
+						"status":     "pushed",
+						"seeded":     true,
+						"seeded_at":  now,
+						"seed_error": "",
+					})
+			}
+		}
 		return res
 	}
 
