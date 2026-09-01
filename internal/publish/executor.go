@@ -22,6 +22,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/httpclient"
 	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -134,19 +135,22 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 
 	// ④ 域值组装（DB 供给——value_mappings 反查）
+	// §59.159 用户定案"发布=填满上传页所有内容"：表单键必须是**站方字段名**
+	// （FormFields 映射）——此前用域常量做键（imdb_url=…），站方 input name 是 url → 投递丢失
 	form := map[string]string{}
-	form[model.FieldDomainSmallDescr] = meta.Subtitle
-	form[model.FieldDomainDescription] = meta.Description // renderDescription 结果后续覆盖
-	form[model.FieldDomainTechInfo] = meta.MediaInfo
-	form[model.FieldDomainIMDBURL] = meta.IMDbURL
+	setForm := func(domain, value string) {
+		if field, ok := cfg.FormFields[domain]; ok && field != "" && value != "" {
+			form[field] = value
+		}
+	}
+	setForm(model.FieldDomainSmallDescr, meta.Subtitle)
+	setForm(model.FieldDomainDescription, meta.Description) // renderDescription 结果后续覆盖
+	setForm(model.FieldDomainTechInfo, meta.MediaInfo)
+	setForm(model.FieldDomainIMDBURL, meta.IMDbURL)
 	// §59.159: PT-Gen/豆瓣链接（用户实战指认——发布页面完整投递；PTNexus 同款
 	// pt_gen 值=豆瓣链接；FormFields 未配站点自然跳过）
-	if _, ok := cfg.FormFields[model.FieldDomainPTGen]; ok && meta.DoubanURL != "" {
-		form[model.FieldDomainPTGen] = meta.DoubanURL
-	}
-	if _, ok := cfg.FormFields[model.FieldDomainDoubanURL]; ok && meta.DoubanURL != "" {
-		form[model.FieldDomainDoubanURL] = meta.DoubanURL
-	}
+	setForm(model.FieldDomainPTGen, meta.DoubanURL)
+	setForm(model.FieldDomainDoubanURL, meta.DoubanURL)
 
 	jobs := []domainJob{
 		{model.FieldDomainType, e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)},
@@ -209,6 +213,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	desc := e.pipe.renderDescription(ctx, meta.SiteName, in.TargetSite, meta.Title, sourceDetail)
 	if desc.Text != "" {
+		// §59.159 用户定案：引用 quote 置简介**最上方**（§59.20 渲染器致谢——
+		// 站点无模板透传时丢失，此处补投；制作组名提取复用公共单点）
+		if q := description.GenerateThanksQuote(meta.SiteName, util.ExtractGroupName(meta.Title), false, nil); q != "" {
+			desc.Text = q + "\n\n" + desc.Text
+		}
 		// §59.159 用户定案：截图 [img] 放简介**下方**（≤8 张 §59.84 上限；
 		// 无引号纯 URL——带引号坏格式致 LuckAudit 审核拒绝实战）
 		if n := len(sourceDetail.Screenshots); n > 0 {
@@ -224,8 +233,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		}
 		form[cfg.FormFields[model.FieldDomainDescription]] = desc.Text
 	}
-	if desc.Subtitle != "" && form[model.FieldDomainSmallDescr] == "" {
-		form[model.FieldDomainSmallDescr] = desc.Subtitle
+	if desc.Subtitle != "" {
+		setForm(model.FieldDomainSmallDescr, desc.Subtitle)
 	}
 
 	// ⑦ pre-audit 官方预检（§59.150——passed 才提交）

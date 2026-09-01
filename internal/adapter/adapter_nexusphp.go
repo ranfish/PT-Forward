@@ -875,6 +875,13 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 		}
 	}
 
+	// §59.159 断头修复：TagArrayFields 写入（checkbox 数组标签 tags[4][N]）。
+	// 此前只有诊断日志无实际 writeField → tags 全丢 → LuckAudit
+	// "未选择任何标签/粤语/中字标签"审核拒绝三连（实战私信实证）
+	for _, kv := range req.TagArrayFields {
+		fw.writeField(kv.Key, kv.Value)
+	}
+
 	if err := fw.hasError(); err != nil {
 		return nil, fmt.Errorf("write form field: %w", err)
 	}
