@@ -68,40 +68,40 @@
       </div>
     </div>
 
-    <div v-else class="step-result">
+    <div v-else-if="result" class="step-result">
       <a-alert
         :type="alertType"
         :message="alertTitle"
-        :description="result.message || undefined"
+        :description="result?.message || undefined"
         show-icon
         style="margin-bottom: 12px"
       />
-      <template v-if="result.pre_audit">
+      <template v-if="result?.pre_audit">
         <h4>官方预检明细</h4>
         <div v-for="(d, i) in result.pre_audit.details || []" :key="i" class="pa-detail" :class="d.level?.toLowerCase()">
           <a-tag :color="d.level === 'ERROR' ? 'red' : d.level === 'WARNING' ? 'orange' : 'green'">{{ d.level }}</a-tag>
           <span class="code">{{ d.errorCode }}</span> {{ d.message }}
         </div>
-        <p v-if="!(result.pre_audit.details || []).length" class="muted">零明细（满分通过）</p>
+        <p v-if="!((result?.pre_audit?.details ?? []).length)" class="muted">零明细（满分通过）</p>
       </template>
-      <h4 style="margin-top: 12px">表单组装（{{ Object.keys(result.form || {}).length }} 域）</h4>
+      <h4 style="margin-top: 12px">表单组装（{{ Object.keys(result?.form || {}).length }} 域）</h4>
       <div class="form-grid">
-        <div v-for="(v, k) in result.form" :key="k" class="kv">
+        <div v-for="(v, k) in result?.form" :key="k" class="kv">
           <span>{{ k }}</span><b>{{ String(v).slice(0, 40) }}</b>
         </div>
       </div>
-      <p v-if="result.tags?.length" class="muted">tags: {{ result.tags.join(', ') }}</p>
+      <p v-if="result?.tags?.length" class="muted">tags: {{ result?.tags?.join(', ') }}</p>
       <div class="actions">
         <a-button @click="reset">返回重选</a-button>
         <a-button
-          v-if="result.status === 'dry_run_ok' && result.pre_audit?.passed"
+          v-if="result?.status === 'dry_run_ok' && result?.pre_audit?.passed"
           type="primary"
           :loading="loading"
           @click="runSubmit"
         >
           确认提交（上传+加种）
         </a-button>
-        <a-button v-else-if="result.status === 'dry_run_ok'" disabled>预检未通过——修正后重试</a-button>
+        <a-button v-else-if="result?.status === 'dry_run_ok'" disabled>预检未通过——修正后重试</a-button>
       </div>
     </div>
   </a-modal>
