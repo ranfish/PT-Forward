@@ -46,7 +46,7 @@ func TestGenericAdapter_UploadTorrent_ExistingRedirect(t *testing.T) {
 	}
 }
 
-// §59.159 四轮定案：已存在文本=失败（发布不重复发——辅种业务范畴）。
+// §59.159 六轮定案：已存在文本=Success+IsExisting+ID 空（信文案不信页面 ID）。
 func TestGenericAdapter_UploadTorrent_ExistingText(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`<html><body><p class="stderr">该种子已存在：<a href="details.php?id=777">查看</a></p></body></html>`))
@@ -64,10 +64,10 @@ func TestGenericAdapter_UploadTorrent_ExistingText(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp == nil || resp.Success {
-		t.Errorf("已存在文本应为失败形态（Success=false+ErrorMessage）, got %+v", resp)
+	if !resp.Success || !resp.IsExisting {
+		t.Errorf("已存在文本应为 Success+IsExisting, got %+v", resp)
 	}
-	if resp != nil && resp.ErrorMessage == "" {
-		t.Error("失败应携带 ErrorMessage")
+	if resp.ExistingID != "" {
+		t.Errorf("页面 ID 不可信应为空, got %q", resp.ExistingID)
 	}
 }

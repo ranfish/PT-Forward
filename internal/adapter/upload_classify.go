@@ -90,11 +90,12 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 		}
 	}
 	if strings.Contains(html, "已存在") || strings.Contains(strings.ToLower(html), "already exists") {
-		// 站上已有同种=发布业务终点（PT 站不允许重复发——辅种业务范畴）
+		// §59.159 existing 终态（六轮）：信站方文案（已存在是明确陈述），
+		// 不信页面 ID（推荐位风险）——IsExisting=true + ExistingID=""
 		return &model.PublishResponse{
-			Success:      false,
-			TargetSite:   site,
-			ErrorMessage: "站点提示种子已存在（发布不重复发——辅种业务范畴）",
+			Success:    true,
+			IsExisting: true,
+			TargetSite: site,
 		}
 	}
 	if logger != nil {

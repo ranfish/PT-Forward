@@ -234,6 +234,8 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleRecomputeProfiles(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/execute") && r.Method == http.MethodPost:
 		h.handleExecutePublish(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/execute-batch") && r.Method == http.MethodPost:
+		h.handleExecutePublishBatch(w, r)
 
 	case strings.HasSuffix(path, "/publish/seeds/batch-fetch") && r.Method == http.MethodPost:
 		h.handleBatchFetch(w, r)
@@ -4253,4 +4255,64 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 	})
 	// §59.158: Success 信封（与 form-config 同款教训——裸写致前端取值 undefined）
 	Success(w, map[string]any{"result": result})
+}
+
+
+// handleExecutePublishBatch §59.159: 一种多站批量发布——每站独立 execute 并行
+// （BatchGroupID 分组落库；网络白名单内并发安全——PTGen 等在线依赖已移除）。
+func (h *PublishTorrentsHandler) handleExecutePublishBatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		InfoHash     string   `json:"info_hash"`
+		TargetSites  []string `json:"target_sites"`
+		Anonymous    bool     `json:"anonymous"`
+		TagOverrides []string `json:"tag_overrides"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InfoHash == "" || len(req.TargetSites) == 0 {
+		Error(w, http.StatusBadRequest, 40001, "info_hash 与 target_sites 必填")
+		return
+	}
+	if h.executor == nil {
+		Error(w, http.StatusServiceUnavailable, 50301, "执行器未初始化")
+		return
+	}
+	batchID := fmt.Sprintf("%d", time.Now().UnixNano())
+	type siteResult struct {
+		Site    string                 `json:"site"`
+		Status  string                 `json:"status"`
+		Message string                 `json:"message"`
+		TorrentID string               `json:"torrent_id,omitempty"`
+		URL     string                 `json:"url,omitempty"`
+		PreAudit *publish.PreAuditResult `json:"pre_audit,omitempty"`
+	}
+	results := make([]siteResult, len(req.TargetSites))
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	for i, site := range req.TargetSites {
+		wg.Add(1)
+		go func(idx int, siteName string) {
+			defer wg.Done()
+			defer func() {
+				if rec := recover(); rec != nil {
+					results[idx] = siteResult{Site: siteName, Status: "failed", Message: fmt.Sprintf("panic: %v", rec)}
+				}
+			}()
+			res := h.executor.Execute(ctx, publish.ExecuteInput{
+				InfoHash:     req.InfoHash,
+				TargetSite:   siteName,
+				Anonymous:    req.Anonymous,
+				TagOverrides: req.TagOverrides,
+				BatchGroupID: batchID,
+			})
+			sr := siteResult{Site: siteName, Status: res.Status, Message: res.Message}
+			if res.Upload != nil {
+				sr.TorrentID = res.Upload.TorrentID
+			}
+			sr.URL = res.TargetTorrentURL
+			sr.PreAudit = res.PreAudit
+			results[idx] = sr
+		}(i, site)
+	}
+	wg.Wait()
+	Success(w, map[string]any{"batch_id": batchID, "results": results})
 }

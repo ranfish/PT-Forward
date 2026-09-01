@@ -405,12 +405,9 @@ func TestGenericAdapter_UploadTorrent_Duplicate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("duplicate should be success-with-existing (§59.159 语义变更), got err %v", err)
 	}
-	// §59.159 四轮定案：已存在文本=失败（发布不重复发——辅种业务范畴）
-	if result == nil || result.Success {
-		t.Errorf("已存在文本应为 Success=false 失败形态, got %+v", result)
-	}
-	if result != nil && result.ErrorMessage == "" {
-		t.Error("失败应携带明确 ErrorMessage")
+	// §59.159 六轮定案：Success+IsExisting+ID 空（信文案不信页面 ID）
+	if !result.Success || !result.IsExisting || result.ExistingID != "" {
+		t.Errorf("已存在文本应为 Success+IsExisting+空 ID, got %+v", result)
 	}
 	_ = appErrPlaceholder()
 }

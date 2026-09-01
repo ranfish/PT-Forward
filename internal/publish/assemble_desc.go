@@ -1,0 +1,52 @@
+// Package publish 发布描述组装——纯本地（§59.159 资产消费白名单）。
+//
+// 发布链网络动作白名单（三允许，其余禁止——AGENTS.md 铁律）：
+//   ① 目标站交互（pre-audit/dedup/上传/下载新种）——发布动作组成
+//   ② 下载器 RPC（导出/加种）——本地资源引用
+//   ③ 无了。PTGen/图床转存/豆瓣/一切外部 API 禁止——必须消费 torrent_metadata
+//      落库资产（历史违规两例：queryPTGen/rehostPoster——renderDescription
+//      采集时代组件的旧习惯，本函数即其发布专用替代）。
+//
+// 组装形态（§59.159 用户定案）：
+//   [quote]Tab2 声明完整 BBCode[/quote]  ← 置顶
+//   [img]海报[/img] + Tab4 简介            ← 落库资产直拼
+//   [img]截图 ×N[/img]（≤8 张，无引号）    ← 简介下方
+package publish
+
+import (
+	"strings"
+
+	"github.com/ranfish/pt-forward/internal/model"
+)
+
+// assembleDescription 发布描述纯本地组装（零网络依赖）。
+// meta 各资产来自种子配置页六 Tab（获取-审核阶段产物）。
+func assembleDescription(meta *model.TorrentMetadata) string {
+	var b strings.Builder
+	if q := strings.TrimSpace(meta.Statement); q != "" {
+		b.WriteString("[quote]")
+		b.WriteString(q)
+		b.WriteString("[/quote]\n\n")
+	}
+	if p := strings.TrimSpace(meta.Poster); p != "" {
+		b.WriteString("[img]")
+		b.WriteString(p)
+		b.WriteString("[/img]\n\n")
+	}
+	if d := strings.TrimSpace(meta.Description); d != "" {
+		b.WriteString(d)
+	}
+	shots := parseScreenshotsCol(meta.Screenshots)
+	if len(shots) > 8 { // §59.84 上限
+		shots = shots[:8]
+	}
+	if len(shots) > 0 {
+		lines := make([]string, 0, len(shots))
+		for _, u := range shots {
+			lines = append(lines, "[img]"+u+"[/img]")
+		}
+		b.WriteString("\n\n")
+		b.WriteString(strings.Join(lines, "\n"))
+	}
+	return b.String()
+}
