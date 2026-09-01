@@ -105,7 +105,8 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 	} else {
 		u = buildGenericURL(config, config.Paths.Detail, torrentID)
 		if u == "" {
-			u = buildGenericDownloadURL(config, torrentID)
+			// §59.159: NP 族公共单点（download_url.go——双副本收敛）
+			u = BuildNexusDownloadURL(baseURLOf(config), torrentID, config.Passkey)
 		}
 	}
 	if u == "" {
@@ -1547,4 +1548,12 @@ func (a *GenericAdapter) fetchTTGUserClass(ctx context.Context, config *model.Si
 		return strings.TrimSpace(m[1])
 	}
 	return ""
+}
+
+// baseURLOf BaseURL 优先回落 Domain（§59.159 下载 URL 公共单点配套）。
+func baseURLOf(config *model.SiteConfig) string {
+	if config.BaseURL != "" {
+		return config.BaseURL
+	}
+	return config.Domain
 }
