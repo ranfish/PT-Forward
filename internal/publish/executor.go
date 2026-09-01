@@ -40,6 +40,11 @@ type ExecuteInput struct {
 	TagOverrides []string
 	// DryRun 只组装+预检不上传不加种（预检修正循环 / 冒烟验证）
 	DryRun bool
+	// PushOnly §59.159: 跳过上传/dedup 直接推送指定 TorrentID（补推——发布成功
+	// 但推送环节失败/误跳过的修复通道，如 53511-53516 实战）
+	PushOnly bool
+	// TorrentID PushOnly 模式的目标站种子 ID
+	TorrentID string
 }
 
 // PreAuditDetail 预检明细（幸运官方结构 §59.150）。
@@ -110,6 +115,44 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	cfg := model.ParseFormConfig(site.PublishFormConfig)
 	if cfg == nil || !cfg.Enabled {
 		return fail("disabled", "目标站未启用发布配置")
+	}
+
+	// §59.159 PushOnly 补推通道：跳过上传/dedup——推指定 TorrentID（SavePath 取资源目录）
+	if in.PushOnly {
+		if in.TorrentID == "" {
+			return fail("failed", "PushOnly 需 TorrentID")
+		}
+		if e.pipe.pusher == nil {
+			return fail("failed", "pusher 未注入")
+		}
+		pushReq := &pusher.PushRequest{
+			ClientID:  rv.ClientID,
+			SiteName:  in.TargetSite,
+			TorrentID: in.TorrentID,
+			InfoHash:  in.InfoHash,
+			Title:     meta.Title,
+			SavePath:  rv.SavePath,
+		}
+		res := &ExecuteResult{Status: "uploaded"}
+		if pr := e.pipe.pusher.Push(ctx, pushReq); pr != nil {
+			switch {
+			case pr.Success:
+				res.Status = "pushed"
+				var s2 model.Site
+			if err := e.db.WithContext(ctx).Where("name = ?", in.TargetSite).First(&s2).Error; err == nil {
+				res.TargetTorrentURL = strings.TrimRight(s2.BaseURL, "/") + "/details.php?id=" + in.TorrentID
+			}
+			case pr.AlreadyExist:
+				res.Status = "pushed_existing"
+				res.Message = "下载器已有该种子（已做种）"
+			default:
+				if pr.Error != nil {
+					res.Status = "failed"
+					res.Message = "加种失败: " + pr.Error.Error()
+				}
+			}
+		}
+		return res
 	}
 
 	// ③ 源 .torrent 本地导出（零拉取）

@@ -4223,6 +4223,8 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		Anonymous    bool     `json:"anonymous"`
 		TagOverrides []string `json:"tag_overrides"`
 		DryRun       bool     `json:"dry_run"`
+		PushOnly     bool     `json:"push_only"`
+		TorrentID    string   `json:"torrent_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InfoHash == "" || req.TargetSite == "" {
 		Error(w, http.StatusBadRequest, 40001, "info_hash 与 target_site 必填")
@@ -4242,6 +4244,8 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		Anonymous:    req.Anonymous,
 		TagOverrides: req.TagOverrides,
 		DryRun:       req.DryRun,
+		PushOnly:     req.PushOnly,
+		TorrentID:    req.TorrentID,
 	})
 	// §59.158: Success 信封（与 form-config 同款教训——裸写致前端取值 undefined）
 	Success(w, map[string]any{"result": result})

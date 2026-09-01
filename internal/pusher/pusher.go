@@ -116,14 +116,10 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 		return result
 	}
 
-	if exists, err := dlClient.CheckExists(ctx, req.InfoHash); err == nil && exists {
-		result.AlreadyExist = true
-		result.SkipReason = "already exists in downloader"
-		p.logger.Debug("push: torrent already exists",
-			zap.String("client", req.ClientID),
-			zap.String("info_hash", req.InfoHash))
-		return result
-	}
+	// §59.159 五轮修正（用户实战：53511-53516 六种全部误判"已做种"未推送）：
+	// CheckExists(req.InfoHash) 查的是**源种 hash**——源种本来就在下载器（发布
+	// 起点即它导出）→ 必然命中 → 误跳过推送。改种站新种 hash ≠ 源 hash，源在
+	// 不代表新种在。快路径废除：无条件下载新种 + AddTorrent——下载器是去重
 
 	siteCfg, err := p.siteProvider.GetSiteConfig(ctx, req.SiteName)
 	if err != nil || siteCfg == nil {
