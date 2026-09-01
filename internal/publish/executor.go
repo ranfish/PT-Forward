@@ -329,7 +329,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			ClientID:  rv.ClientID,
 			SiteName:  in.TargetSite,
 			TorrentID: resp.TorrentID,
-			InfoHash:  in.InfoHash, // §59.159: 源种 infohash——下载一致性校验+已存在辅种快路径
+			InfoHash:  in.InfoHash, // §59.159: 源种 infohash——已存在辅种快路径
+			SkipNameCheck: resp.IDSource == "redirect", // 成功页 302 权威 id 免检
 			Title:     meta.Title,
 			SavePath:  rv.SavePath,
 		}

@@ -15,6 +15,7 @@ import (
 )
 
 type PushRequest struct {
+	SkipNameCheck bool // §59.159: 成功页 302 权威 id 免检（主防线=下载源正确）
 	ClientID      string
 	SiteName      string
 	TorrentID     string
@@ -174,12 +175,11 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 		result.Error = fmt.Errorf("download torrent: %w", err)
 		return result
 	}
-	// §59.159 加种一致性校验（下载后加种前·二轮修正）：
-	// hash 校验废除——幸运等 NP 站转发时改写 .torrent（infohash 变，53342/52394/53508
-	// 三例实证），按 hash 拒必误拒；改 **name 一致性**（站方改种不改内容名）：
-	// name 不符=下载到无关种（52394 UBits 错加事故防线），hash 变化作 Info 记录
+	// §59.159 加种校验·三轮定案（用户）：主防线=下载源正确（成功页 302 权威 id
+	// → download.php?id=N 必然正确——SkipNameCheck 免检）；name 校验仅对 body 来源
+	// id（文本提取有推荐位风险，52394 UBits 事故）兜底。hash 变作 Info 记录。
 	if fm, ferr := fingerprint.ComputeFromTorrent(torrentData); ferr == nil && fm != nil {
-		if req.Title != "" && fm.Name != req.Title {
+		if !req.SkipNameCheck && req.Title != "" && fm.Name != req.Title {
 			result.Error = fmt.Errorf("下载种子名与源种不符（expected %q actual %q, torrent_id %s）——疑似无关种，拒绝加种",
 				req.Title, fm.Name, req.TorrentID)
 			p.logger.Warn("push: torrent name mismatch, rejected",
