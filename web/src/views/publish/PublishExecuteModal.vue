@@ -142,7 +142,7 @@ async function runSubmit() {
       tagOverrides: tagOverrides.value,
     })
     result.value = res.data?.data?.result ?? null
-    if (result.value && ['uploaded', 'pushed'].includes(result.value.status)) {
+    if (result.value && ['uploaded', 'pushed', 'uploaded_existing', 'pushed_existing'].includes(result.value.status)) {
       message.success(`发布成功：${result.value.target_torrent_url || result.value.status}`)
       emit('done')
     }
@@ -161,6 +161,7 @@ const alertType = computed(() => {
   if (!result.value) return 'info'
   const s = result.value.status
   if (s === 'pushed' || s === 'uploaded') return 'success'
+  if (s === 'pushed_existing' || s === 'uploaded_existing') return 'info'
   if (s === 'dry_run_ok') return result.value.pre_audit?.passed ? 'success' : 'warning'
   return 'error'
 })

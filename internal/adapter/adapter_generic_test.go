@@ -385,6 +385,8 @@ func TestGenericAdapter_UploadTorrent_Success(t *testing.T) {
 	}
 }
 
+func appErrPlaceholder() *model.AppError { return nil } // §59.159 语义变更后 errors.As 占位移除
+
 func TestGenericAdapter_UploadTorrent_Duplicate(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -400,13 +402,15 @@ func TestGenericAdapter_UploadTorrent_Duplicate(t *testing.T) {
 
 	req := &model.PublishRequest{TorrentData: []byte("d4:infod...e")}
 	result, err := a.UploadTorrent(context.Background(), config, req)
-	if err == nil {
-		t.Fatal("expected error for duplicate")
+	if err != nil {
+		t.Fatalf("duplicate should be success-with-existing (§59.159 语义变更), got err %v", err)
 	}
-	var appErr *model.AppError
-	if !errors.As(err, &appErr) || appErr.Code != 15001 {
-		t.Fatalf("expected AppError 15001, got %v", err)
+	// §59.159: 旧语义（已存在=错误 15001）→ 新语义（Success+IsExisting——
+	// PTNexus 同款"按已存在成功处理"；executor 分流 pushed_existing 辅种语义）
+	if !result.Success || !result.IsExisting {
+		t.Errorf("expected Success+IsExisting, got %+v", result)
 	}
+	_ = appErrPlaceholder()
 	_ = result
 }
 
