@@ -305,6 +305,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return fail("failed", fmt.Sprintf("上传失败: %v", upErr))
 	}
 	if !resp.Success {
+		// §59.159 回归审核：优先消费 ErrorMessage（已存在等语义化失败信息——
+		// 旧代码拼 DetailURL[已存在形态为空]致"上传未成功: "空尾巴）
+		if resp.ErrorMessage != "" {
+			return fail("failed", resp.ErrorMessage)
+		}
 		return fail("failed", "上传未成功: "+resp.DetailURL)
 	}
 
