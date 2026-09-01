@@ -71,6 +71,7 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 			TorrentID:  finalRedirectID,
 			DetailURL:  detailBase + "/details.php?id=" + finalRedirectID,
 			TargetSite: site,
+			IDSource:   "redirect", // 成功页 302 权威——加种免检
 		}
 	}
 	// ② 已存在文本（旧版 NP stderr 200 页——PTNexus 竞品同款关键词族）
@@ -108,6 +109,7 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 			TorrentID:  m[1],
 			DetailURL:  detailBase + "/details.php?id=" + m[1],
 			TargetSite: site,
+			IDSource:   "body", // 文本提取——推荐位风险，加种 name 校验兜底
 		}
 	}
 	// ④ 成功文案（无详情 ID 的弱成功——诊断期 dump 摘要，防再次假成功）

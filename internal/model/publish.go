@@ -208,6 +208,10 @@ type PublishResponse struct {
 	DetailURL    string `json:"detail_url"`
 	IsExisting   bool   `json:"is_existing"`
 	ExistingID   string `json:"existing_id"`
+	// §59.159 IDSource: TorrentID 来源——"redirect"=成功页 302 最终 URL（权威，
+	// 加种免检）/"body"=响应文本提取（推荐位风险，name 校验兜底）。用户定案：
+	// 主防线是下载源正确（成功页下载必然正确），校验仅 body 来源兜底。
+	IDSource     string `json:"id_source,omitempty"`
 	ErrorMessage string `json:"error_message"`
 	TargetSite   string `json:"target_site"`
 	InfoHash     string `json:"info_hash"`
