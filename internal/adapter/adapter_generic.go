@@ -631,48 +631,9 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 		return nil, classifySiteError(resp, "upload")
 	}
 
-	// §59.159: 已存在优先判定（在通用成功之前——重复页 body 也含 details id）
-	if existingID != "" {
-		return &model.PublishResponse{
-			Success:    true,
-			IsExisting: true,
-			ExistingID: existingID,
-			DetailURL:  config.Domain + "/details.php?id=" + existingID,
-			TargetSite: config.Domain,
-		}, nil
-	}
-	if strings.Contains(html, "已存在") || strings.Contains(strings.ToLower(html), "already exists") {
-		// 旧版 NP stderr 200 页形态——文本提取已存在种链接（PTNexus 同款关键词族）
-		exID := ""
-		if m := reGenericDetailID.FindStringSubmatch(html); len(m) > 1 {
-			exID = m[1]
-		}
-		resp := &model.PublishResponse{Success: true, IsExisting: true, ExistingID: exID, TargetSite: config.Domain}
-		if exID != "" {
-			resp.DetailURL = config.Domain + "/details.php?id=" + exID
-		}
-		return resp, nil
-	}
-
-	if idMatch := reGenericDetailID.FindStringSubmatch(html); len(idMatch) > 1 {
-		torrentID := idMatch[1]
-		// §59.159 诊断：成功判定路径 dump body 摘要（tid 与预期不符排查——假成功系列）
-		plain := strings.Join(strings.Fields(strings.ReplaceAll(strings.ReplaceAll(html, "<", " <"), ">", "> ")), " ")
-		if len(plain) > 700 {
-			plain = plain[:700]
-		}
-		a.logger.Info("upload success-path body digest",
-			zap.String("site", config.Domain), zap.String("tid", torrentID), zap.String("body", plain))
-		return &model.PublishResponse{
-			Success:    true,
-			TorrentID:  torrentID,
-			DetailURL:  config.Domain + "/details.php?id=" + torrentID,
-			TargetSite: config.Domain,
-		}, nil
-	}
-
-	if strings.Contains(html, "成功") || strings.Contains(html, "succeeded") || strings.Contains(html, "uploaded") {
-		return &model.PublishResponse{Success: true, TargetSite: config.Domain}, nil
+	// §59.159: 公共判定单点（upload_classify.go——双副本教训后收敛）
+	if r := classifyUploadHTML(a.logger, config.Domain, config.Domain, html, existingID); r != nil {
+		return r, nil
 	}
 
 	errMsg := "上传失败: 未知响应"
