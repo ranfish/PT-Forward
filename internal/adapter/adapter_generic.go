@@ -656,6 +656,13 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 
 	if idMatch := reGenericDetailID.FindStringSubmatch(html); len(idMatch) > 1 {
 		torrentID := idMatch[1]
+		// §59.159 诊断：成功判定路径 dump body 摘要（tid 与预期不符排查——假成功系列）
+		plain := strings.Join(strings.Fields(strings.ReplaceAll(strings.ReplaceAll(html, "<", " <"), ">", "> ")), " ")
+		if len(plain) > 700 {
+			plain = plain[:700]
+		}
+		a.logger.Info("upload success-path body digest",
+			zap.String("site", config.Domain), zap.String("tid", torrentID), zap.String("body", plain))
 		return &model.PublishResponse{
 			Success:    true,
 			TorrentID:  torrentID,
