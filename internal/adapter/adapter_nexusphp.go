@@ -907,15 +907,17 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 
 	// §59.159: 重定向 existed=1 捕获（NP 重复上传 302 details.php?id=N&existed=1 形态；
 	// 幸运实测为 200 失败页形态——双形态兼容，transport 继承站点代理）
-	existingID := ""
+	existingID, finalID := "", ""
 	redirectClient := &http.Client{
 		Timeout:   a.doer.Client.Timeout,
 		Transport: a.doer.Client.Transport,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			if req.URL.Query().Get("existed") == "1" {
-				if id := req.URL.Query().Get("id"); id != "" {
-					existingID = id
-				}
+			id := req.URL.Query().Get("id")
+			if req.URL.Query().Get("existed") == "1" && id != "" {
+				existingID = id
+			}
+			if id != "" && strings.Contains(req.URL.Path, "details.php") {
+				finalID = id
 			}
 			return nil
 		},
@@ -938,7 +940,7 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	}
 
 	// §59.159: 公共判定单点（upload_classify.go——双副本教训后收敛）
-	if r := classifyUploadHTML(a.logger, config.Domain, baseURL, html, existingID); r != nil {
+	if r := classifyUploadHTML(a.logger, config.Domain, baseURL, html, existingID, finalID); r != nil {
 		return r, nil
 	}
 

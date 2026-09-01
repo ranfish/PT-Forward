@@ -602,15 +602,17 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	// §59.159: 重定向检查——NP 家族重复上传 302 → details.php?id=N&existed=1
 	// （PTNexus 实战佐证/织梦日志）。默认跟随会把落点详情页当成功页，
 	// 已存在种 ID 被误判为新发布——CheckRedirect 捕获 existed 参数（transport 继承代理配置）。
-	existingID := ""
+	existingID, finalID := "", ""
 	redirectClient := &http.Client{
 		Timeout:   a.doer.Client.Timeout,
 		Transport: a.doer.Client.Transport,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			if req.URL.Query().Get("existed") == "1" {
-				if id := req.URL.Query().Get("id"); id != "" {
-					existingID = id
-				}
+			id := req.URL.Query().Get("id")
+			if req.URL.Query().Get("existed") == "1" && id != "" {
+				existingID = id
+			}
+			if id != "" && strings.Contains(req.URL.Path, "details.php") {
+				finalID = id
 			}
 			return nil
 		},
@@ -632,7 +634,7 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	}
 
 	// §59.159: 公共判定单点（upload_classify.go——双副本教训后收敛）
-	if r := classifyUploadHTML(a.logger, config.Domain, config.Domain, html, existingID); r != nil {
+	if r := classifyUploadHTML(a.logger, config.Domain, config.Domain, html, existingID, finalID); r != nil {
 		return r, nil
 	}
 

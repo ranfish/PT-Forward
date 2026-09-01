@@ -26,33 +26,50 @@ var reUploadNewID = regexp.MustCompile(`[^a-zA-Z0-9_]details\.php\?id=(\d+)&uplo
 // uploadRedirectClient 构造捕获 existed=1 的重定向 HTTP 客户端
 // （NP 重复上传 302 → details.php?id=N&existed=1 形态；transport 继承站点代理配置）。
 // 返回值 existingIDPtr 在 Do 期间被填充。
-func uploadRedirectClient(base *http.Client) (client *http.Client, existingIDPtr *string) {
-	id := ""
+func uploadRedirectClient(base *http.Client) (client *http.Client, existingIDPtr, finalIDPtr *string) {
+	existingID := ""
+	finalID := ""
 	c := &http.Client{
 		Timeout:   base.Timeout,
 		Transport: base.Transport,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			if req.URL.Query().Get("existed") == "1" {
-				if v := req.URL.Query().Get("id"); v != "" {
-					id = v
-				}
+			id := req.URL.Query().Get("id")
+			if req.URL.Query().Get("existed") == "1" && id != "" {
+				existingID = id
+			}
+			// §59.159: 记录最后一跳的 details id——NP 上传成功 302 → 新种
+			// 详情页，最终 URL 的 id 才是权威新种 ID（body 链接是推荐位，实战
+			// 抓错两次：53342 HDH/52394 UBits 无关种）
+			if id != "" && strings.Contains(req.URL.Path, "details.php") {
+				finalID = id
 			}
 			return nil
 		},
 	}
-	return c, &id
+	return c, &existingID, &finalID
 }
 
 // classifyUploadHTML 上传响应 HTML 判定（公共单点）。
 // 判定序（§59.159）：existed 重定向 > 已存在文本（stderr 200 页——幸运实测形态）
 // > 详情 ID（词边界）> 成功文案 > 失败（返回 nil，errMsg 由调用方兜底）。
 // logger 非空时对详情 ID 命中路径打 body 摘要诊断（假成功排查期）。
-func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedirectID string) *model.PublishResponse {
+func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedirectID, finalRedirectID string) *model.PublishResponse {
 	// ① 重定向 existed（uploadRedirectClient 捕获）
 	if existingRedirectID != "" {
 		return &model.PublishResponse{
 			Success: true, IsExisting: true, ExistingID: existingRedirectID,
 			DetailURL: detailBase + "/details.php?id=" + existingRedirectID,
+			TargetSite: site,
+		}
+	}
+	// ①' 重定向最终 URL 的新种 id（NP 成功 302 → details.php?id=NEW——权威，
+	// body 链接不可信[推荐位]；仅当 body 也佐证成功形态时采用）
+	if finalRedirectID != "" && (strings.Contains(html, "成功") || strings.Contains(html, "uploaded") ||
+		strings.Contains(html, "已存在") || reUploadDetailID != nil) {
+		return &model.PublishResponse{
+			Success:    true,
+			TorrentID:  finalRedirectID,
+			DetailURL:  detailBase + "/details.php?id=" + finalRedirectID,
 			TargetSite: site,
 		}
 	}
