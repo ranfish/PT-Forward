@@ -45,6 +45,10 @@ type ExecuteInput struct {
 	PushOnly bool
 	// TorrentID PushOnly 模式的目标站种子 ID
 	TorrentID string
+	// PushClientID/PushSavePath 补推直给（记录回放——发布记录落库值；缺省回落
+	// ResolveResource 资源定位）
+	PushClientID string
+	PushSavePath string
 }
 
 // PreAuditDetail 预检明细（幸运官方结构 §59.150）。
@@ -125,13 +129,17 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		if e.pipe.pusher == nil {
 			return fail("failed", "pusher 未注入")
 		}
+		clientID, savePath := in.PushClientID, in.PushSavePath
+		if clientID == "" || savePath == "" {
+			clientID, savePath = rv.ClientID, rv.SavePath // 回落资源定位
+		}
 		pushReq := &pusher.PushRequest{
-			ClientID:  rv.ClientID,
+			ClientID:  clientID,
 			SiteName:  in.TargetSite,
-			TorrentID: in.TorrentID,
+			TorrentID: in.TorrentID, // pusher 内部 download.php?id=N 直下
 			InfoHash:  in.InfoHash,
 			Title:     meta.Title,
-			SavePath:  rv.SavePath,
+			SavePath:  savePath,
 		}
 		res := &ExecuteResult{Status: "uploaded"}
 		if pr := e.pipe.pusher.Push(ctx, pushReq); pr != nil {
@@ -406,6 +414,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	_ = e.pipe.CreateResult(ctx, &model.PublishResultRecord{
 		TargetSite:   in.TargetSite,
 		SourceSite:   meta.SiteName,
+		SourceInfoHash: in.InfoHash,
+		SavePath:      rv.SavePath,
 		TorrentID:    resp.TorrentID,
 		Status:       model.PublishResultStatus(result.Status),
 		SkipReason:   result.Message,
