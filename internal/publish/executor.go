@@ -342,7 +342,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 
 	// dedup（复用组件——pieces_hash 目标站查重）
 	if dup, dupMsg := e.pipe.dedupByPiecesHash(ctx, adapter, siteConfig, torrentData); dup {
-		return fail("duplicate", "目标站已存在同内容种子: "+dupMsg)
+		msg := "目标站已存在同内容种子: " + dupMsg
+		e.recordResult(ctx, in, meta, rv, "duplicate", msg, "", "")
+		return fail("duplicate", msg)
 	}
 
 	resp, upErr := adapter.UploadTorrent(ctx, siteConfig, pubReq)
@@ -365,8 +367,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		if resp.ExistingID == "" && resp.TorrentID == "" {
 			// §59.159 existing 终态：文本"已存在"（信文案不信页面 ID——无权威 ID
 			// 不推种；定位与推种走辅种业务）
+			msg2 := "站上已有同种（未定位站内 ID，未推种——辅种业务范畴）"
+			e.recordResult(ctx, in, meta, rv, "existing", msg2, "", "")
 			return &ExecuteResult{
-				Status: "existing", Message: "站上已有同种（未定位站内 ID，未推种——辅种业务范畴）",
+				Status: "existing", Message: msg2,
 				TargetTorrentURL: resp.DetailURL,
 			}
 		}
