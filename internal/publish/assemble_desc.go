@@ -14,19 +14,41 @@
 package publish
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/ranfish/pt-forward/internal/model"
 )
+
+// miLookalikeRe 幸运 MI 误判防御（§59.163 探针实证：description 含
+// `Video:`/`Audio:` 等段名+冒号**子串**即触发 DESCRIPTION_CONTAINS_MEDIAINFO——
+// 非行首匹配[探针 G]；源站制作注记[Source 对比/Notes]常含此形态）。
+var miLookalikeRe = regexp.MustCompile(`(?:General|Video|Audio|Text|Subtitles?|Chapters?|Menu)\s*:`)
+
+// StripMILookalikeLines 按行剥含 MI 段名冒号子串的行（quote 内容防御过滤——
+// 探针 E 验证：过滤后站方检测通过；Source # 列表行无冒号形态保留）。
+func StripMILookalikeLines(s string) string {
+	lines := strings.Split(s, "\n")
+	out := make([]string, 0, len(lines))
+	for _, l := range lines {
+		if miLookalikeRe.MatchString(l) {
+			continue
+		}
+		out = append(out, l)
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
+}
 
 // assembleDescription 发布描述纯本地组装（零网络依赖）。
 // meta 各资产来自种子配置页六 Tab（获取-审核阶段产物）。
 func assembleDescription(meta *model.TorrentMetadata) string {
 	var b strings.Builder
 	if q := strings.TrimSpace(meta.Statement); q != "" {
-		b.WriteString("[quote]")
-		b.WriteString(q)
-		b.WriteString("[/quote]\n\n")
+		if filtered := StripMILookalikeLines(q); filtered != "" {
+			b.WriteString("[quote]")
+			b.WriteString(filtered)
+			b.WriteString("[/quote]\n\n")
+		}
 	}
 	if p := strings.TrimSpace(meta.Poster); p != "" {
 		b.WriteString("[img]")
