@@ -280,9 +280,19 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return fail("failed", "上传未成功: "+resp.DetailURL)
 	}
 
+	// §59.159: 已存在分流（NP 302 existed=1 / stderr 文本——站上已有同种）。
+	// 加种照做=把站上已有种下回做种（辅种语义），Status 语义化区分新发/已有。
+	uploadedStatus := "uploaded"
+	if resp.IsExisting {
+		uploadedStatus = "uploaded_existing"
+		if resp.ExistingID != "" && resp.TorrentID == "" {
+			resp.TorrentID = resp.ExistingID
+		}
+	}
+
 	// ⑨ 加种（pusher 复用——SavePath 资源目录）
 	result := &ExecuteResult{
-		Status: "uploaded",
+		Status: uploadedStatus,
 		Upload: resp,
 		TargetTorrentURL: resp.DetailURL,
 	}
@@ -296,7 +306,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			SavePath:  rv.SavePath,
 		}
 		if pr := e.pipe.pusher.Push(ctx, pushReq); pr != nil && pr.Success {
-			result.Status = "pushed"
+			if uploadedStatus == "uploaded_existing" {
+				result.Status = "pushed_existing"
+			} else {
+				result.Status = "pushed"
+			}
 		}
 	}
 

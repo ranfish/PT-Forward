@@ -592,7 +592,23 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	setCommonHeaders(httpReq, config.Cookie)
 
-	resp, err := a.doer.Client.Do(httpReq)
+	// §59.159: 重定向检查——NP 家族重复上传 302 → details.php?id=N&existed=1
+	// （PTNexus 实战佐证/织梦日志）。默认跟随会把落点详情页当成功页，
+	// 已存在种 ID 被误判为新发布——CheckRedirect 捕获 existed 参数（transport 继承代理配置）。
+	existingID := ""
+	redirectClient := &http.Client{
+		Timeout:   a.doer.Client.Timeout,
+		Transport: a.doer.Client.Transport,
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			if req.URL.Query().Get("existed") == "1" {
+				if id := req.URL.Query().Get("id"); id != "" {
+					existingID = id
+				}
+			}
+			return nil
+		},
+	}
+	resp, err := redirectClient.Do(httpReq)
 	if err != nil {
 		return nil, uploadError("上传请求失败", err)
 	}
@@ -606,6 +622,29 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, classifySiteError(resp, "upload")
+	}
+
+	// §59.159: 已存在优先判定（在通用成功之前——重复页 body 也含 details id）
+	if existingID != "" {
+		return &model.PublishResponse{
+			Success:    true,
+			IsExisting: true,
+			ExistingID: existingID,
+			DetailURL:  config.Domain + "/details.php?id=" + existingID,
+			TargetSite: config.Domain,
+		}, nil
+	}
+	if strings.Contains(html, "已存在") || strings.Contains(strings.ToLower(html), "already exists") {
+		// 旧版 NP stderr 200 页形态——文本提取已存在种链接（PTNexus 同款关键词族）
+		exID := ""
+		if m := reGenericDetailID.FindStringSubmatch(html); len(m) > 1 {
+			exID = m[1]
+		}
+		resp := &model.PublishResponse{Success: true, IsExisting: true, ExistingID: exID, TargetSite: config.Domain}
+		if exID != "" {
+			resp.DetailURL = config.Domain + "/details.php?id=" + exID
+		}
+		return resp, nil
 	}
 
 	if idMatch := reGenericDetailID.FindStringSubmatch(html); len(idMatch) > 1 {
