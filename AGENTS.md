@@ -53,6 +53,7 @@
 3. R3-5/R3-6 遗留：TagApplier 灰度已随 §59.156 退役；team 域词条建设待做
 
 **活跃观察项（未闭环）**：
+- ~~阮玲玉 no_transfer_until 过后放行验证~~（§59.162 两态首例已闭环 09-02：重采 flags 消失+消费侧 until 过期放行双路 ✓）
 - 53534/53535 等 9 个新种 LuckAudit 过审情况（用户读站内信驱动）
 - 错加的无关种清理：UBits The.Drama（52394）/ZmWeb 200 Million（10136）在 243 下载器
 - build-backend go test 偶发"首跑 FAIL 重跑过"（两次，未定位）
