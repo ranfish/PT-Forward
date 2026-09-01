@@ -6,7 +6,7 @@
     width="760px"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
-    <div v-if="!result" class="step-select">
+    <div v-else-if="!result" class="step-select">
       <a-form layout="vertical">
         <a-form-item label="目标站（已启用发布配置——多选并行发布）">
           <a-select
@@ -45,7 +45,7 @@
       </div>
     </div>
 
-    <div v-else-if="batchResults" class="step-result">
+    <div v-if="batchResults" class="step-result">
       <a-alert :type="batchAlertType" show-icon style="margin-bottom: 12px">
         <template #message>
           <span style="font-size: 15px; font-weight: 600">
