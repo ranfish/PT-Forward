@@ -19,6 +19,10 @@ import (
 // 链接误命中：实战失败页被误抓判"成功"，tid 恒为用户自身 UID）。
 var reUploadDetailID = regexp.MustCompile(`[^a-zA-Z0-9_](?:details|detail|torrent)\.php\?id=(\d+)`)
 
+// reUploadNewID NP 上传成功页新种链接（details.php?id=N&uploaded=1——权威形态；
+// 实战：普通形态首个命中是推荐位种子 53342 而非新种 53505）
+var reUploadNewID = regexp.MustCompile(`[^a-zA-Z0-9_]details\.php\?id=(\d+)&uploaded=1`)
+
 // uploadRedirectClient 构造捕获 existed=1 的重定向 HTTP 客户端
 // （NP 重复上传 302 → details.php?id=N&existed=1 形态；transport 继承站点代理配置）。
 // 返回值 existingIDPtr 在 Do 期间被填充。
@@ -64,8 +68,16 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 		}
 		return resp
 	}
+	// ③ 新种 ID 优先（uploaded=1 权威链接）——无则回落通用形态
+	newID := ""
+	if m := reUploadNewID.FindStringSubmatch(html); len(m) > 1 {
+		newID = m[1]
+	}
 	// ③ 详情 ID（词边界）——带诊断摘要
 	if m := reUploadDetailID.FindStringSubmatch(html); len(m) > 1 {
+		if newID != "" {
+			m = []string{"", newID}
+		}
 		if logger != nil {
 			plain := strings.Join(strings.Fields(strings.ReplaceAll(strings.ReplaceAll(html, "<", " <"), ">", "> ")), " ")
 			if len(plain) > 700 {
@@ -95,4 +107,16 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 		return &model.PublishResponse{Success: true, TargetSite: site}
 	}
 	return nil
+}
+
+// firstNPairs 前 n 个键值对（诊断用）。
+func firstNPairs(kvs []model.TagKV, n int) [][2]string {
+	if len(kvs) < n {
+		n = len(kvs)
+	}
+	out := make([][2]string, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, [2]string{kvs[i].Key, kvs[i].Value})
+	}
+	return out
 }

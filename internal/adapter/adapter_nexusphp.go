@@ -882,6 +882,14 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	if err := writer.Close(); err != nil {
 		return nil, networkError("关闭 multipart writer 失败", err)
 	}
+	// §59.159 诊断：multipart 字段清单（tags 投递实证——LuckAudit"未选择任何标签"排查）
+	if a.logger != nil {
+		a.logger.Info("upload multipart fields",
+			zap.String("site", config.Domain),
+			zap.Int("form_fields", len(req.FormFields)),
+			zap.Int("tag_array_fields", len(req.TagArrayFields)),
+			zap.String("tag_sample", fmt.Sprintf("%v", firstNPairs(req.TagArrayFields, 6))))
+	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
 	if err != nil {
