@@ -46,7 +46,7 @@ func TestGenericAdapter_UploadTorrent_ExistingRedirect(t *testing.T) {
 	}
 }
 
-// 旧版 stderr 200 页形态：文本"该种子已存在"含详情链接。
+// §59.159 四轮定案：已存在文本=失败（发布不重复发——辅种业务范畴）。
 func TestGenericAdapter_UploadTorrent_ExistingText(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`<html><body><p class="stderr">该种子已存在：<a href="details.php?id=777">查看</a></p></body></html>`))
@@ -64,7 +64,10 @@ func TestGenericAdapter_UploadTorrent_ExistingText(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !resp.IsExisting || resp.ExistingID != "777" {
-		t.Errorf("文本形态应识别已存在+ID 777, got %+v", resp)
+	if resp == nil || resp.Success {
+		t.Errorf("已存在文本应为失败形态（Success=false+ErrorMessage）, got %+v", resp)
+	}
+	if resp != nil && resp.ErrorMessage == "" {
+		t.Error("失败应携带 ErrorMessage")
 	}
 }

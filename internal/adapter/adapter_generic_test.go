@@ -362,7 +362,7 @@ func TestGenericAdapter_UploadTorrent_Success(t *testing.T) {
 			t.Error("missing Content-Type for multipart")
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`<html>上传成功 <a href="details.php?id=456">查看</a></html>`))
+		_, _ = w.Write([]byte(`<html>上传成功 <a href="details.php?id=456&uploaded=1">查看</a></html>`))
 	}))
 	defer srv.Close()
 
@@ -405,13 +405,14 @@ func TestGenericAdapter_UploadTorrent_Duplicate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("duplicate should be success-with-existing (§59.159 语义变更), got err %v", err)
 	}
-	// §59.159: 旧语义（已存在=错误 15001）→ 新语义（Success+IsExisting——
-	// PTNexus 同款"按已存在成功处理"；executor 分流 pushed_existing 辅种语义）
-	if !result.Success || !result.IsExisting {
-		t.Errorf("expected Success+IsExisting, got %+v", result)
+	// §59.159 四轮定案：已存在文本=失败（发布不重复发——辅种业务范畴）
+	if result == nil || result.Success {
+		t.Errorf("已存在文本应为 Success=false 失败形态, got %+v", result)
+	}
+	if result != nil && result.ErrorMessage == "" {
+		t.Error("失败应携带明确 ErrorMessage")
 	}
 	_ = appErrPlaceholder()
-	_ = result
 }
 
 func TestGenericAdapter_DownloadTorrent_NotFound(t *testing.T) {
@@ -647,7 +648,7 @@ func TestGenericAdapter_UploadTorrent_EmptyData(t *testing.T) {
 func TestGenericAdapter_UploadTorrent_WithFields(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`<html>上传成功</html>`))
+		_, _ = w.Write([]byte(`<html>上传成功 <a href="details.php?id=457&uploaded=1">查看</a></html>`))
 	}))
 	defer srv.Close()
 
@@ -675,7 +676,7 @@ func TestGenericAdapter_UploadTorrent_WithFields(t *testing.T) {
 func TestGenericAdapter_UploadTTG(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`<html>成功 <a href="/t/789/">查看</a></html>`))
+		_, _ = w.Write([]byte(`<html>成功 <a href="details.php?id=789&uploaded=1">查看</a></html>`))
 	}))
 	defer srv.Close()
 
@@ -702,7 +703,7 @@ func TestGenericAdapter_UploadTTG(t *testing.T) {
 func TestGenericAdapter_UploadYemaPT(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`<html>上传成功 <a href="details.php?id=555">查看</a></html>`))
+		_, _ = w.Write([]byte(`<html>上传成功 <a href="details.php?id=555&uploaded=1">查看</a></html>`))
 	}))
 	defer srv.Close()
 

@@ -15,7 +15,6 @@ import (
 )
 
 type PushRequest struct {
-	SkipNameCheck bool // §59.159: 成功页 302 权威 id 免检（主防线=下载源正确）
 	ClientID      string
 	SiteName      string
 	TorrentID     string
@@ -175,18 +174,10 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 		result.Error = fmt.Errorf("download torrent: %w", err)
 		return result
 	}
-	// §59.159 加种校验·三轮定案（用户）：主防线=下载源正确（成功页 302 权威 id
-	// → download.php?id=N 必然正确——SkipNameCheck 免检）；name 校验仅对 body 来源
-	// id（文本提取有推荐位风险，52394 UBits 事故）兜底。hash 变作 Info 记录。
+	// §59.159 四轮定案（用户）：加种 id 唯一来源=发布成功页 302 权威——下载源
+	// 正确即无需校验（body fallback 已删，52394 误推源头不存在了）。
+	// 仅记录站方改写导致的 hash 变化（NP 转发改种常态——三例实证）
 	if fm, ferr := fingerprint.ComputeFromTorrent(torrentData); ferr == nil && fm != nil {
-		if !req.SkipNameCheck && req.Title != "" && fm.Name != req.Title {
-			result.Error = fmt.Errorf("下载种子名与源种不符（expected %q actual %q, torrent_id %s）——疑似无关种，拒绝加种",
-				req.Title, fm.Name, req.TorrentID)
-			p.logger.Warn("push: torrent name mismatch, rejected",
-				zap.String("expected", req.Title), zap.String("actual", fm.Name),
-				zap.String("torrent_id", req.TorrentID))
-			return result
-		}
 		if req.InfoHash != "" && fm.InfoHash != req.InfoHash {
 			p.logger.Info("push: infohash changed by site (torrent rewritten)",
 				zap.String("source", req.InfoHash), zap.String("actual", fm.InfoHash),

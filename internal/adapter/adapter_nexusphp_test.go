@@ -347,7 +347,7 @@ func TestNexusPHP_UploadTorrent_Success(t *testing.T) {
 		if r.Header.Get("Cookie") != "sid=test" {
 			t.Error("missing cookie")
 		}
-		_, _ = w.Write([]byte(`<html>上传成功 <a href="details.php?id=789">查看</a></html>`))
+		_, _ = w.Write([]byte(`<html>上传成功 <a href="details.php?id=789&uploaded=1">查看</a></html>`))
 	}))
 	defer srv.Close()
 
@@ -1793,7 +1793,7 @@ func TestNexusPHP_UploadTorrent_UnknownResponse(t *testing.T) {
 
 func TestNexusPHP_UploadTorrent_SuccessKeyword(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><body>Upload succeeded</body></html>`))
+		_, _ = w.Write([]byte(`<html><body>Upload succeeded <a href="details.php?id=790&uploaded=1">link</a></body></html>`))
 	}))
 	defer srv.Close()
 
