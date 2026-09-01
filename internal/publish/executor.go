@@ -411,31 +411,54 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		}
 	}
 
-	// ⑩ 结果落库（发布日志页消费）
+	// ⑩ 结果落库（发布日志页消费——recordResultFull 统一单点）
+	seeded := result.Status == "pushed" || result.Status == "pushed_existing"
+	e.recordResultFull(ctx, in, meta, rv, result.Status,
+		joinNotes(paNoteOf(preAudit), result.Message),
+		resp.TorrentID, result.TargetTorrentURL, seeded)
+	return result
+}
+
+// paNoteOf 预检摘要（未过时——§59.160 非门控但记录）。
+func paNoteOf(pa *PreAuditResult) string {
+	if pa != nil && !pa.Passed {
+		return fmt.Sprintf("预检 %d 分未过（已继续提交——非门控）", pa.TotalScore)
+	}
+	return ""
+}
+
+// recordResult 短路终态落库（duplicate/existing——§59.160 回归审核补：发布历史完整性）。
+func (e *PublishExecutor) recordResult(ctx context.Context, in ExecuteInput, meta *model.TorrentMetadata,
+	rv *ResourceView, status, msg, torrentID, url string) {
+	e.recordResultFull(ctx, in, meta, rv, status, msg, torrentID, url, false)
+}
+
+// recordResultFull 统一落库单点。
+func (e *PublishExecutor) recordResultFull(ctx context.Context, in ExecuteInput, meta *model.TorrentMetadata,
+	rv *ResourceView, status, note, torrentID, url string, seeded bool) {
 	now := time.Now()
-	paNote := ""
-	if preAudit != nil && !preAudit.Passed {
-		paNote = fmt.Sprintf("预检 %d 分未过（已继续提交——§59.159 非门控）", preAudit.TotalScore)
+	seedErr := ""
+	if strings.Contains(note, "加种失败") {
+		seedErr = note
 	}
 	_ = e.pipe.CreateResult(ctx, &model.PublishResultRecord{
-		TargetSite:   in.TargetSite,
-		SourceSite:   meta.SiteName,
+		TargetSite:     in.TargetSite,
+		SourceSite:     meta.SiteName,
 		SourceInfoHash: in.InfoHash,
-		SavePath:      rv.SavePath,
-		TorrentID:    resp.TorrentID,
-		Status:       model.PublishResultStatus(result.Status),
-		SkipReason:   joinNotes(paNote, result.Message),
-		PublishURL:   result.TargetTorrentURL,
-		Trigger:      "manual",
-		BatchGroupID: in.BatchGroupID,
-		Title:        meta.Title,
-		DownloaderID: rv.ClientID,
-		Seeded:       result.Status == "pushed" || result.Status == "pushed_existing", // §59.159: 辅种加种同为加种
-		SeedError:    func() string { if strings.Contains(result.Message, "加种失败") { return result.Message }; return "" }(),
-		SeededAt:     func() *time.Time { if result.Status == "pushed" { return &now }; return nil }(),
-		CompletedAt:  &now,
+		SavePath:       rv.SavePath,
+		TorrentID:      torrentID,
+		Status:         model.PublishResultStatus(status),
+		SkipReason:     note,
+		PublishURL:     url,
+		Trigger:        "manual",
+		BatchGroupID:   in.BatchGroupID,
+		Title:          meta.Title,
+		DownloaderID:   rv.ClientID,
+		Seeded:         seeded,
+		SeedError:      seedErr,
+		SeededAt:       func() *time.Time { if seeded { return &now }; return nil }(),
+		CompletedAt:    &now,
 	})
-	return result
 }
 
 // joinNotes 多段备注拼接（预检摘要+结果消息）。
