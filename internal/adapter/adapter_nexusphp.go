@@ -109,7 +109,8 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 	} else if config.DownloadURLTemplate != "" {
 		u = buildTemplateURL(config, config.DownloadURLTemplate, torrentID)
 	} else {
-		u = buildURL(config.Domain, "/download.php", torrentID, config.Passkey)
+		// §59.159: NP 族公共单点（download_url.go——双副本收敛）
+		u = BuildNexusDownloadURL(baseURLOf(config), torrentID, config.Passkey)
 	}
 
 	method := "GET"
