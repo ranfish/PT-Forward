@@ -74,68 +74,36 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 			IDSource:   "redirect", // 成功页 302 权威——加种免检
 		}
 	}
-	// ② 已存在文本（旧版 NP stderr 200 页——PTNexus 竞品同款关键词族）
-	if strings.Contains(html, "已存在") || strings.Contains(strings.ToLower(html), "already exists") {
-		exID := ""
-		if m := reUploadDetailID.FindStringSubmatch(html); len(m) > 1 {
-			exID = m[1]
-		}
-		resp := &model.PublishResponse{Success: true, IsExisting: true, ExistingID: exID, TargetSite: site}
-		if exID != "" {
-			resp.DetailURL = detailBase + "/details.php?id=" + exID
-		}
-		return resp
-	}
-	// ③ 新种 ID 优先（uploaded=1 权威链接）——无则回落通用形态
-	newID := ""
+	// §59.159 四轮定案（用户）：发布二元化——**仅接受发布成功页的种子**：
+	//   成功页形态① 302 最终 URL（finalRedirectID，IDSource=redirect）
+	//   成功页形态② 200 成功页内 uploaded=1 权威链接（NP 成功页标志参数——
+	//              推荐位链接不带此参数，天然区分）
+	// 其余（通用 body 链接/成功文案）一律失败——其它页面的种子是辅种业务
+	// 的工作，发布不抓取（53342/52394 推荐位误推根治）。
 	if m := reUploadNewID.FindStringSubmatch(html); len(m) > 1 {
-		newID = m[1]
-	}
-	// ③ 详情 ID（词边界）——带诊断摘要
-	if m := reUploadDetailID.FindStringSubmatch(html); len(m) > 1 {
-		if newID != "" {
-			m = []string{"", newID}
-		}
-		if logger != nil {
-			plain := strings.Join(strings.Fields(strings.ReplaceAll(strings.ReplaceAll(html, "<", " <"), ">", "> ")), " ")
-			if len(plain) > 700 {
-				plain = plain[:700]
-			}
-			logger.Info("upload success-path body digest",
-				zap.String("site", site), zap.String("tid", m[1]), zap.String("body", plain))
-		}
 		return &model.PublishResponse{
 			Success:    true,
 			TorrentID:  m[1],
 			DetailURL:  detailBase + "/details.php?id=" + m[1],
 			TargetSite: site,
-			IDSource:   "body", // 文本提取——推荐位风险，加种 name 校验兜底
+			IDSource:   "success_page", // 成功页 uploaded=1 权威链接
 		}
 	}
-	// ④ 成功文案（无详情 ID 的弱成功——诊断期 dump 摘要，防再次假成功）
-	if strings.Contains(html, "uploaded") || strings.Contains(html, "成功") ||
-		strings.Contains(html, "Upload succeeded") || strings.Contains(html, "succeeded") {
-		if logger != nil {
-			plain := strings.Join(strings.Fields(strings.ReplaceAll(strings.ReplaceAll(html, "<", " <"), ">", "> ")), " ")
-			if len(plain) > 700 {
-				plain = plain[:700]
-			}
-			logger.Info("upload weak-success body digest",
-				zap.String("site", site), zap.String("body", plain))
+	if strings.Contains(html, "已存在") || strings.Contains(strings.ToLower(html), "already exists") {
+		// 站上已有同种=发布业务终点（PT 站不允许重复发——辅种业务范畴）
+		return &model.PublishResponse{
+			Success:      false,
+			TargetSite:   site,
+			ErrorMessage: "站点提示种子已存在（发布不重复发——辅种业务范畴）",
 		}
-		return &model.PublishResponse{Success: true, TargetSite: site}
+	}
+	if logger != nil {
+		plain := strings.Join(strings.Fields(strings.ReplaceAll(strings.ReplaceAll(html, "<", " <"), ">", "> ")), " ")
+		if len(plain) > 700 {
+			plain = plain[:700]
+		}
+		logger.Warn("upload rejected: no success-page seed link",
+			zap.String("site", site), zap.String("body", plain))
 	}
 	return nil
-}
-
-// firstNPairs 前 n 个键值对（诊断用）。
-func firstNPairs(kvs []model.TagKV, n int) [][2]string {
-	if len(kvs) < n {
-		n = len(kvs)
-	}
-	out := make([][2]string, 0, n)
-	for i := 0; i < n; i++ {
-		out = append(out, [2]string{kvs[i].Key, kvs[i].Value})
-	}
-	return out
 }

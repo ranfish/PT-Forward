@@ -895,7 +895,7 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 			zap.String("site", config.Domain),
 			zap.Int("form_fields", len(req.FormFields)),
 			zap.Int("tag_array_fields", len(req.TagArrayFields)),
-			zap.String("tag_sample", fmt.Sprintf("%v", firstNPairs(req.TagArrayFields, 6))))
+			zap.Any("tag_sample", req.TagArrayFields[:min(6, len(req.TagArrayFields))]))
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, &buf)
