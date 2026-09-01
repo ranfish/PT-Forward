@@ -32,12 +32,24 @@ description: 'PT-Forward 编译部署流程：先提交后部署铁律、部署�
 | 服务 | `systemctl --user restart pt-forward`（用户级 systemd，端口 8765） |
 | 版本号 | ldflags 必含 `-X main.version=$(git describe --tags --always --dirty)`，源码默认值 `"dev"` |
 
+## 部署链单入口（Agent 调用铁律）
+
+Agent 部署一律调 deploy-all.sh（**禁止**手工串联三脚本 + `| tail` 截断输出——调用侧管道吞退出码已四次事故[§59.157/159/163×2]）：
+
+```bash
+bash .claude/skills/ptf-deploy/scripts/deploy-all.sh              # 全链：前端→后端→243
+bash .claude/skills/ptf-deploy/scripts/deploy-all.sh --backend-only   # 后端→243（纯后端改动）
+bash .claude/skills/ptf-deploy/scripts/deploy-all.sh --frontend-only  # 仅前端（不部署，后续走全链）
+```
+
+判定：最后一行 `✅✅ 部署链全完成` = 真成功；失败即断链绝无此行。前端改动 hash 变化验证仍保留（index-*.js 前后对比）。
+
 ## 后端验证与部署（纯后端改动）
 
 一条命令完成（vet → test → build → restart）：
 
 ```bash
-bash .github/skills/ptf-deploy/scripts/build-backend.sh
+bash .claude/skills/ptf-deploy/scripts/build-backend.sh
 ```
 
 等价手动步骤：
@@ -51,7 +63,7 @@ bash .github/skills/ptf-deploy/scripts/build-backend.sh
 前端是 Go embed（`frontend/spa.go` 用 `//go:embed all:dist`），修改前端后必须重新构建并重新编译 Go 二进制才能生效：
 
 ```bash
-bash .github/skills/ptf-deploy/scripts/build-frontend.sh
+bash .claude/skills/ptf-deploy/scripts/build-frontend.sh
 ```
 
 等价手动步骤：
@@ -63,7 +75,7 @@ bash .github/skills/ptf-deploy/scripts/build-frontend.sh
 ## 打 tag 发布
 
 ```bash
-bash .github/skills/ptf-deploy/scripts/release-tag.sh v0.0.XXX
+bash .claude/skills/ptf-deploy/scripts/release-tag.sh v0.0.XXX
 ```
 
 - push tag 触发 CI：`docker-publish.yml`（GHCR + Docker Hub 镜像）、`release.yml`（GitHub Release 二进制，OTA 用）
