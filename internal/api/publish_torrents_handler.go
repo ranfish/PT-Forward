@@ -4530,6 +4530,7 @@ func (h *PublishTorrentsHandler) handleSiteBatchProgress(w http.ResponseWriter, 
 				actives = append(actives, t)
 			}
 		}
+		sort.Slice(actives, func(i, j int) bool { return actives[i].StartedAt.Before(actives[j].StartedAt) })
 		if len(actives) == 0 {
 			Success(w, nil)
 			return

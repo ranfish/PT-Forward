@@ -420,10 +420,6 @@ const injectColumns = [
   { title: '操作', key: 'actions', width: 100 },
 ]
 
-function existsOnTarget(record: SeedListItem): boolean {
-  if (!selectedTarget.value) return false
-  return (record.sites || []).includes(selectedTarget.value)
-}
 
 // 行集直通（已存在预判在行级 exist 列与勾选禁用表达——§59.166 重构）
 const filteredInjectRows = computed(() => injectRows.value)
@@ -478,18 +474,6 @@ function onInjectTableChange(pag: { current?: number; pageSize?: number }) {
   fetchInjectList()
 }
 
-// 引导跳回种子配置页（同 ② deep-link）
-function goRefine(record: SeedListItem) {
-  router.push({
-    path: '/publish/seeds',
-    query: {
-      client_id: record.client_id,
-      save_path: record.save_path,
-      name: record.name,
-      focus: '1',
-    },
-  })
-}
 
 let injectSearchTimer: ReturnType<typeof setTimeout> | undefined
 watch(injectSearch, () => {
