@@ -426,34 +426,41 @@ type piecesHashSearcher interface {
 }
 
 func (p *Pipeline) dedupByPiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, torrentData []byte) (bool, string) {
+	dup, msg, _ := p.dedupByPiecesHashFull(ctx, adapter, config, torrentData)
+	return dup, msg
+}
+
+// dedupByPiecesHashFull §59.166: 增强——返回站上 tid（此前 API matches 的 tid 被
+// 丢弃；拦截记录消费展示"站上已有种"直达链接）。
+func (p *Pipeline) dedupByPiecesHashFull(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, torrentData []byte) (bool, string, int) {
 	if len(torrentData) == 0 {
-		return false, ""
+		return false, "", 0
 	}
 
 	meta, err := fingerprint.ComputeFromTorrent(torrentData)
 	if err != nil || meta == nil || meta.PiecesHash == "" {
-		return false, ""
+		return false, "", 0
 	}
 
 	if !adapter.SupportsSearchByPiecesHash() {
-		return false, ""
+		return false, "", 0
 	}
 
 	searcher, ok := adapter.(piecesHashSearcher)
 	if !ok {
-		return false, ""
+		return false, "", 0
 	}
 
 	matches, err := searcher.SearchByPiecesHash(ctx, config, []string{meta.PiecesHash})
 	if err != nil || len(matches) == 0 {
-		return false, ""
+		return false, "", 0
 	}
 
 	if torrentID, found := matches[meta.PiecesHash]; found && torrentID > 0 {
-		return true, meta.PiecesHash
+		return true, meta.PiecesHash, torrentID
 	}
 
-	return false, ""
+	return false, "", 0
 }
 
 type descResult struct {
