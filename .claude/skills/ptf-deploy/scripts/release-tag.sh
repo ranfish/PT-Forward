@@ -30,5 +30,15 @@ fi
 git tag "$TAG"
 git push origin "$TAG"
 echo "✅ 已推送 $TAG"
+
+# §59.166 回归审核机制化：AGENTS.md 版本行自动同步（历史五次滞后同型——
+# v0.0.631/642/670/830/835；脚本化根治，不靠记忆）
+if [ -f AGENTS.md ] && grep -q '^\*\*版本\*\*' AGENTS.md; then
+  if sed -i "s/^\*\*版本\*\*：v[0-9.]\+（已发布[^）]*）。/**版本**：${TAG}（已发布——release-tag 脚本自动同步）。/" AGENTS.md 2>/dev/null && git diff --quiet AGENTS.md; then
+    : # 无变化（已是本版本）
+  else
+    git add AGENTS.md && git commit -m "chore: AGENTS.md 版本行同步 ${TAG}（release-tag 自动）" && git push origin main || true
+  fi
+fi
 echo "   CI 将自动：docker-publish.yml → GHCR + Docker Hub 镜像；release.yml → GitHub Release 二进制（OTA）"
 echo "   提醒：生产环境由用户自行更新（OTA 或 docker compose pull && docker compose up -d）"
