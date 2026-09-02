@@ -4404,9 +4404,14 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 	// 同站互斥（运行中任务存在→拒）
 	taskID := fmt.Sprintf("%d", time.Now().UnixNano())
 	h.siteBatch.mu.Lock()
-	if _, running := h.siteBatch.active[req.TargetSite]; running {
+	if runID, running := h.siteBatch.active[req.TargetSite]; running {
+		msg := "该站已有批量任务运行中，请等待完成"
+		// §59.166 互斥提示带进度（用户定案 A 方案——信息透明）
+		if t := h.siteBatch.tasks[runID]; t != nil {
+			msg = fmt.Sprintf("该站已有批量任务运行中（%d/%d），请等待完成", t.Done, t.Total)
+		}
 		h.siteBatch.mu.Unlock()
-		Error(w, http.StatusConflict, 40901, "该站已有批量任务运行中，请等待完成")
+		Error(w, http.StatusConflict, 40901, msg)
 		return
 	}
 	task := &siteBatchTask{
