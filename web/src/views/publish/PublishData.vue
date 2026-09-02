@@ -3,49 +3,78 @@
     <a-tabs v-model:active-key="activeTab">
       <!-- ═══ Tab 1: 批量发布（站中心，§59.133 ③ / §59.166 一站多种接线） ═══ -->
       <a-tab-pane key="inject" tab="批量发布">
-        <div class="inject-toolbar">
+        <div class="batch-toolbar">
           <a-select
-            v-model:value="selectedTarget"
-            style="width: 220px"
-            :loading="targetSitesLoading"
-            placeholder="选择目标站"
-            show-search
-            :filter-option="filterSiteOption"
-            @change="onInjectFilterChange"
+            v-model:value="selectedClient"
+            style="width: 170px"
+            :loading="clientsLoading"
+            placeholder="下载器（全部）"
+            allow-clear
+            @change="onClientChange"
           >
-            <a-select-option v-for="s in targetSites" :key="s.name" :value="s.name" :label="s.name">
-              {{ s.name }}
-              <a-tag v-if="!s.hasCookie" color="red" size="small" style="margin-left: 4px">缺 cookie</a-tag>
+            <a-select-option v-for="c in clients" :key="c.client_id" :value="c.client_id">
+              {{ c.client_id }}（{{ c.paths.length }} 路径）
             </a-select-option>
           </a-select>
+          <a-select
+            v-model:value="selectedPath"
+            style="width: 230px; margin-left: 10px"
+            placeholder="保存路径（全部）"
+            allow-clear
+            :disabled="!selectedClient"
+            @change="onBatchFilterChange"
+          >
+            <a-select-option v-for="p in pathOptions" :key="p.save_path" :value="p.save_path">
+              {{ p.save_path }}（{{ p.count }}）
+            </a-select-option>
+          </a-select>
+          <a-radio-group
+            v-model:value="readyFilter"
+            button-style="solid"
+            size="small"
+            style="margin-left: 10px"
+            @change="onBatchFilterChange"
+          >
+            <a-radio-button value="ready">可发布</a-radio-button>
+            <a-radio-button value="all">全部</a-radio-button>
+            <a-radio-button value="pending">待完善</a-radio-button>
+          </a-radio-group>
           <a-input-search
             v-model:value="injectSearch"
             placeholder="搜索簇名称..."
-            style="width: 260px; margin-left: 12px"
+            style="width: 230px; margin-left: 10px"
             allow-clear
-            @search="onInjectFilterChange"
+            @search="onBatchFilterChange"
           />
-          <a-radio-group
-            v-model:value="existFilter"
-            button-style="solid"
-            size="small"
-            style="margin-left: 12px"
-            @change="onInjectFilterChange"
-          >
-            <a-radio-button value="all">全部</a-radio-button>
-            <a-radio-button value="new">未存在</a-radio-button>
-          </a-radio-group>
-          <a-tag v-if="selectedTarget" :color="publishableCount > 0 ? 'green' : 'default'" style="margin-left: 8px">
-            {{ selectedTarget }}：本页可发布 {{ publishableCount }} 簇
-          </a-tag>
+          <a-tag v-if="injectTotal" color="blue" style="margin-left: 8px">共 {{ injectTotal }} 簇</a-tag>
+          <span v-if="selectedInjectHashes.length" style="margin-left: 8px; color: #1677ff">
+            已选 {{ selectedInjectHashes.length }} 簇
+          </span>
+        </div>
+
+        <!-- 目标站平铺单选 + 一键发布（§59.166 镜像一种多站点选交互）-->
+        <div class="target-row">
+          <span class="target-label">目标站</span>
+          <div class="site-tiles">
+            <div
+              v-for="t in targetSites"
+              :key="t.name"
+              class="site-tile"
+              :class="{ active: selectedTarget === t.name }"
+              @click="onTargetPick(t.name)"
+            >
+              <span class="tile-name">{{ t.name }}</span>
+              <a-tag v-if="t.has_pre_audit" color="blue" class="tile-tag">官方预检</a-tag>
+            </div>
+          </div>
           <a-button
             type="primary"
             style="margin-left: auto"
-            :disabled="selectedInjectHashes.length === 0 || !selectedTarget || batchTask !== null && !batchTask.finished"
+            :disabled="!selectedInjectHashes.length || !selectedTarget || (batchTask !== null && !batchTask.finished)"
             :loading="batchSubmitting"
             @click="submitBatch"
           >
-            {{ batchTask && !batchTask.finished ? '发布中…' : `发布到 ${selectedTarget || '目标站'} (${selectedInjectHashes.length})` }}
+            {{ batchTask && !batchTask.finished ? '发布中…' : `发布到 ${selectedTarget || '目标站'}（${selectedInjectHashes.length}）` }}
           </a-button>
         </div>
 
@@ -53,7 +82,7 @@
           type="info"
           show-icon
           style="margin-bottom: 12px"
-          message="一站多种：以站点为中心——选定目标站，批量将 ready 簇串行发布（站点配置间隔）。已存在该站的簇默认不可选；源站禁转簇已隐藏。"
+          message="一站多种：勾选多个种子簇 → 点亮一个目标站 → 一键串行发布（站点配置间隔）。已存在目标站的簇默认不可选；源站禁转簇已隐藏。"
         />
 
         <a-table
@@ -67,15 +96,16 @@
             showSizeChanger: true,
             pageSizeOptions: ['50', '100', '200'],
             showTotal: (t: number) => `共 ${t} 簇`,
-            size: 'small',
           }"
           row-key="hash"
           size="small"
-          :scroll="{ x: 1000 }"
+          :scroll="{ x: 1100 }"
           :row-selection="{
             selectedRowKeys: selectedInjectHashes,
-            onChange: (keys: string[]) => selectedInjectHashes = keys,
-            getCheckboxProps: (record: SeedListItem) => ({ disabled: !selectedTarget || existsOnTarget(record) }),
+            onChange: onSelectionChange,
+            getCheckboxProps: (record: SeedListItem) => ({
+              disabled: !selectedTarget || existsOnTarget(record) || !isValidHash(record.hash),
+            }),
           }"
           @change="onInjectTableChange"
         >
@@ -85,19 +115,18 @@
               <div v-if="record.title && record.title !== record.name" class="cluster-title">{{ record.title }}</div>
             </template>
             <template v-if="column.key === 'category'">
-              <a-tag v-if="record.category" :color="categoryTagColor(record.category)" style="margin: 0">{{ CATEGORY_LABELS[record.category] || record.category }}</a-tag>
+              <a-tag v-if="record.category" :color="categoryTagColor(record.category)" style="margin: 0">
+                {{ CATEGORY_LABELS[record.category] || record.category }}
+              </a-tag>
               <span v-else style="color: #999; font-size: 12px">—</span>
             </template>
             <template v-if="column.key === 'size'">
               {{ formatBytes(record.size) }}
             </template>
-            <template v-if="column.key === 'copies'">
-              <a-tag :color="(record.copy_count ?? 1) > 1 ? 'blue' : 'default'">{{ record.copy_count ?? 1 }} 副本</a-tag>
-            </template>
             <template v-if="column.key === 'sites'">
               <a-tooltip v-if="record.sites?.length" :title="record.sites.join('、')">
                 <span>
-                  <a-tag v-for="s in record.sites.slice(0, 4)" :key="s" size="small" style="margin: 1px">{{ s }}</a-tag>
+                  <a-tag v-for="st in record.sites.slice(0, 4)" :key="st" size="small" style="margin: 1px">{{ st }}</a-tag>
                   <a-tag v-if="record.sites.length > 4" size="small" style="margin: 1px">+{{ record.sites.length - 4 }}</a-tag>
                 </span>
               </a-tooltip>
@@ -107,6 +136,7 @@
               <template v-if="selectedTarget && existsOnTarget(record)">
                 <a-tag color="warning">已存在</a-tag>
               </template>
+              <a-tag v-else-if="selectedTarget && !isValidHash(record.hash)" color="default">无有效 hash</a-tag>
               <a-tag v-else-if="selectedTarget" color="success">可发布</a-tag>
               <span v-else style="color: #999; font-size: 12px">未选站</span>
             </template>
@@ -295,14 +325,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { ReloadOutlined, CheckCircleFilled, PlusOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { publishDataApi, seedConfigApi, type SeedListItem } from '@/api/publish'
-import { sitesApi } from '@/api/sites'
-import type { Site } from '@/api/types'
+import { CATEGORY_LABELS } from '@/generated/dict'
+import { categoryTagColor } from '@/utils/categoryDisplay'
+import { formatBytes } from '@/utils/format'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
 import MetadataReviewModal from './MetadataReviewModal.vue'
-import { formatBytes, formatTime } from '@/utils/format'
-import { CATEGORY_LABELS } from '@/generated/dict'
-import { categoryTagColor } from '@/utils/categoryDisplay'
+import { formatTime } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -311,17 +340,59 @@ const activeTab = ref('inject')
 
 // ==================== Tab 1: 批量发布（§59.133 ③ 站中心 / §59.166 一站多种） ====================
 
-const targetSites = ref<Site[]>([])
-const targetSitesLoading = ref(false)
+const targetSites = ref<Array<{ name: string; has_pre_audit: boolean }>>([])
 const selectedTarget = ref<string | undefined>(undefined)
+const clients = ref<Array<{ client_id: string; paths: Array<{ save_path: string; count: number }> }>>([])
+const clientsLoading = ref(false)
+const selectedClient = ref<string | undefined>(undefined)
+const selectedPath = ref<string | undefined>(undefined)
+const readyFilter = ref<'ready' | 'all' | 'pending'>('ready') // §59.166 用户定案：默认只显示配置好的种子
 const injectSearch = ref('')
-const existFilter = ref<'all' | 'new'>('all')
 const injectRows = ref<SeedListItem[]>([])
 const injectTotal = ref(0)
 const injectLoading = ref(false)
 const injectPage = ref(1)
 const injectPageSize = ref(50)
 const selectedInjectHashes = ref<string[]>([])
+
+const pathOptions = computed(() => {
+  const c = clients.value.find(x => x.client_id === selectedClient.value)
+  return c ? c.paths : []
+})
+
+// 簇 hash 有效性（观察期造键 `${client}|${name}` 非真 infohash——不可执行发布）
+function isValidHash(h: string | undefined): boolean {
+  return !!h && h.length === 40 && !h.includes('|')
+}
+
+async function fetchClients() {
+  clientsLoading.value = true
+  try {
+    const resp = await seedConfigApi.uniquePaths()
+    clients.value = resp.data?.data?.clients || []
+  } catch { /* ignore */ } finally {
+    clientsLoading.value = false
+  }
+}
+
+function onClientChange() {
+  selectedPath.value = undefined
+  injectPage.value = 1
+  fetchInjectList()
+}
+
+function onBatchFilterChange() {
+  injectPage.value = 1
+  fetchInjectList()
+}
+
+function onTargetPick(name: string) {
+  selectedTarget.value = selectedTarget.value === name ? undefined : name
+}
+
+function onSelectionChange(keys: (string | number)[]) {
+  selectedInjectHashes.value = keys.map(String)
+}
 
 // ═══ §59.166 一站多种：批量任务（提交+轮询+断线恢复）═══
 const batchTask = ref<SiteBatchTask | null>(null)
@@ -358,9 +429,17 @@ function statusColor(st: string): string {
 
 async function submitBatch() {
   if (!selectedTarget.value || !selectedInjectHashes.value.length) return
+  const valid = selectedInjectHashes.value.filter(isValidHash)
+  if (!valid.length) {
+    message.warning('所选簇均无有效 infoHash（观察期簇需先完善数据）')
+    return
+  }
+  if (valid.length < selectedInjectHashes.value.length) {
+    message.info(`已剔除 ${selectedInjectHashes.value.length - valid.length} 个无有效 hash 的簇`)
+  }
   batchSubmitting.value = true
   try {
-    const res = await executeApi.executeSiteBatch([...selectedInjectHashes.value], selectedTarget.value)
+    const res = await executeApi.executeSiteBatch(valid, selectedTarget.value)
     const tid = res.data?.data?.task_id
     if (tid) {
       batchTask.value = { task_id: tid, target_site: selectedTarget.value, total: res.data?.data?.total || selectedInjectHashes.value.length, done: 0, results: [], finished: false, started_at: new Date().toISOString() }
@@ -419,43 +498,29 @@ const injectColumns = [
   { title: '操作', key: 'actions', width: 100 },
 ]
 
-function filterSiteOption(input: string, option: { label?: string; value?: string }): boolean {
-  const label = option?.label || option?.value || ''
-  return String(label).toLowerCase().includes(input.toLowerCase())
-}
-
 function existsOnTarget(record: SeedListItem): boolean {
   if (!selectedTarget.value) return false
   return (record.sites || []).includes(selectedTarget.value)
 }
 
-const publishableCount = computed(() => {
-  if (!selectedTarget.value) return 0
-  return filteredInjectRows.value.filter(r => !existsOnTarget(r)).length
-})
-
-// "未存在"视图：本地过滤当前页（服务端无 exists 口径，total 保持服务端值）
-const filteredInjectRows = computed(() => {
-  if (existFilter.value !== 'new' || !selectedTarget.value) return injectRows.value
-  return injectRows.value.filter(r => !existsOnTarget(r))
-})
+// 行集直通（已存在预判在行级 exist 列与勾选禁用表达——§59.166 重构）
+const filteredInjectRows = computed(() => injectRows.value)
 
 async function fetchTargetSites() {
-  targetSitesLoading.value = true
+  // §59.166: form-config targets（已启用发布配置——与 execute-site-batch 后端校验同口径）
   try {
-    const resp = await sitesApi.list(1, 300, '', { is_target: 'true' })
-    const data = resp.data?.data
-    targetSites.value = ((data?.items || data || []) as Site[]).filter(s => s.enabled)
-  } catch { /* ignore */ } finally {
-    targetSitesLoading.value = false
-  }
+    const resp = await executeApi.targets()
+    targetSites.value = (resp.data?.data || []) as Array<{ name: string; has_pre_audit: boolean }>
+  } catch { /* ignore */ }
 }
 
 async function fetchInjectList() {
   injectLoading.value = true
   try {
     const resp = await seedConfigApi.listSeeds({
-      ready: 'true',
+      client_id: selectedClient.value || '',
+      save_path: selectedPath.value || '',
+      ready: readyFilter.value === 'ready' ? 'true' : (readyFilter.value === 'pending' ? 'false' : ''),
       // §59.143: 发布页隐藏源站禁转簇
       exclude_forbidden: 'true',
       search: injectSearch.value,
