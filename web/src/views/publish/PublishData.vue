@@ -388,6 +388,8 @@ function onBatchFilterChange() {
 
 function onTargetPick(name: string) {
   selectedTarget.value = selectedTarget.value === name ? undefined : name
+  // 回归审核补：换站清勾选——已存在语义随目标站变化（旧站中心逻辑，重构时丢失）
+  selectedInjectHashes.value = []
 }
 
 function onSelectionChange(keys: (string | number)[]) {
