@@ -124,25 +124,43 @@
         <!-- §59.166 选站弹窗（平铺单选 + 右下发布——一种多站 Modal 同构）-->
         <a-modal
           v-model:open="pickerOpen"
-          title="选择发布站"
+          :title="batchTask ? (batchTask.finished ? '批量发布完成' : '批量发布中') : '选择发布站'"
           width="620px"
           :footer="null"
+          :mask-closable="!batchTask || batchTask.finished"
         >
-          <SiteTiles v-model="pickerValue" :sites="tileSites" />
-          <div style="margin-top: 20px; text-align: right">
-            <a-button style="margin-right: 10px" @click="pickerOpen = false">关闭</a-button>
-            <a-button
-              type="primary"
-              :disabled="!pickerValue || !selectedInjectHashes.length || (batchTask !== null && !batchTask.finished && batchTask.target_site === pickerValue)"
-              :loading="batchSubmitting"
-              @click="submitBatch"
-            >
-              发布到 {{ pickerValue || '目标站' }}（{{ selectedInjectHashes.length }} 种）
-            </a-button>
-          </div>
-          <p style="margin-top: 8px; color: #999; font-size: 12px">
-            点选站点即时生效；已覆盖目标站的簇不阻塞——发布时自动跳过并记录日志。
-          </p>
+          <!-- 态 1：选站（batchTask 空）-->
+          <template v-if="!batchTask">
+            <SiteTiles v-model="pickerValue" :sites="tileSites" />
+            <div style="margin-top: 20px; text-align: right">
+              <a-button style="margin-right: 10px" @click="pickerOpen = false">关闭</a-button>
+              <a-button
+                type="primary"
+                :disabled="!pickerValue || !selectedInjectHashes.length || pickerSiteBusy"
+                :loading="batchSubmitting"
+                @click="submitBatch"
+              >
+                发布到 {{ pickerValue || '目标站' }}（{{ selectedInjectHashes.length }} 种）
+              </a-button>
+            </div>
+            <p style="margin-top: 8px; color: #999; font-size: 12px">
+              点选站点即时生效；已覆盖目标站的簇不阻塞——发布时自动跳过并记录日志。
+            </p>
+          </template>
+          <!-- 态 2：进度（公共组件——与一种多站共用）-->
+          <PublishProgressPanel
+            v-else-if="!batchTask.finished"
+            :progress="{ done: batchTask.done, total: batchTask.total, currentTitle: batchTask.current_title }"
+            :results="batchTask.results"
+            row-mode="seed"
+          />
+          <!-- 态 3：完成汇总 -->
+          <PublishProgressPanel
+            v-else
+            :results="batchTask.results"
+            row-mode="seed"
+            @done="batchTask = null"
+          />
         </a-modal>
 
         <CrossSeedPanel
@@ -151,51 +169,6 @@
           :initial-preview="previewDirect"
           @success="fetchInjectList"
         />
-
-        <!-- §59.166 一站多种：批量任务进度/结果 -->
-        <div v-if="batchTask" class="batch-panel">
-          <template v-if="batchTask && !batchTask.finished">
-            <a-progress
-              :percent="batchPercent"
-              :format="() => `${batchTask?.done ?? 0}/${batchTask?.total ?? 0}`"
-              status="active"
-            />
-            <p class="batch-current">
-              正在发布 {{ batchTask.done + 1 }}/{{ batchTask.total }}
-              <span v-if="batchTask.current_title">：{{ batchTask.current_title }}</span>
-              <a-spin size="small" style="margin-left: 8px" />
-            </p>
-          </template>
-          <template v-else>
-            <a-alert :type="batchAlertType" show-icon style="margin-bottom: 12px">
-              <template #message>
-                批量发布完成：发布成功 {{ successCount }} 站次 · 已存在 {{ dupCount }} · 失败 {{ failCount }}
-                <span v-if="batchTask.error" style="color: #cf1322">（{{ batchTask.error }}）</span>
-              </template>
-            </a-alert>
-            <a-table
-              v-if="batchTask.results.length"
-              :columns="batchResultColumns"
-              :data-source="batchTask.results"
-              :pagination="false"
-              size="small"
-              row-key="info_hash"
-            >
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'status'">
-                  <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
-                </template>
-                <template v-else-if="column.key === 'url'">
-                  <a v-if="record.url" :href="record.url" target="_blank">查看种子</a>
-                  <span v-else style="color: #999">—</span>
-                </template>
-                <template v-else-if="column.key === 'message'">
-                  <span :style="record.status === 'failed' ? 'color: #cf1322' : ''">{{ record.message || '—' }}</span>
-                </template>
-              </template>
-            </a-table>
-          </template>
-        </div>
       </div>
     </div>
   </div>
@@ -205,15 +178,14 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { executeApi, type SiteBatchTask } from '@/api/formConfig'
 import SiteTiles from './SiteTiles.vue'
+import PublishProgressPanel from './PublishProgressPanel.vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
-import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { seedConfigApi, type SeedListItem } from '@/api/publish'
 import { CATEGORY_LABELS } from '@/generated/dict'
 import { categoryTagColor } from '@/utils/categoryDisplay'
 import { formatBytes } from '@/utils/format'
 
-const router = useRouter()
 
 // ==================== Tab 1: 批量发布（§59.133 ③ 站中心 / §59.166 一站多种） ====================
 
@@ -286,6 +258,11 @@ const pickerOpen = ref(false)
 const pickerValue = ref('')
 watch(pickerValue, (v) => { selectedTarget.value = v || undefined })
 
+const pickerSiteBusy = computed(() => {
+  const t = batchTask.value
+  return t !== null && !t.finished && t.target_site === pickerValue.value
+})
+
 const tileSites = computed(() => targetSites.value.map(t => ({ name: t.name, hasPreAudit: t.has_pre_audit })))
 
 function onSelectionChange(keys: (string | number)[]) {
@@ -297,28 +274,6 @@ const batchTask = ref<SiteBatchTask | null>(null)
 const batchSubmitting = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
-const batchPercent = computed(() => {
-  const t = batchTask.value
-  if (!t) return 0
-  return Math.round((t.done / Math.max(t.total, 1)) * 100)
-})
-const successCount = computed(() => (batchTask.value?.results || []).filter(r => ['pushed', 'pushed_existing'].includes(r.status)).length)
-const dupCount = computed(() => (batchTask.value?.results || []).filter(r => ['duplicate', 'existing'].includes(r.status)).length)
-const failCount = computed(() => (batchTask.value?.results || []).filter(r => r.status === 'failed').length)
-const batchAlertType = computed(() => (failCount.value > 0 ? 'warning' : 'success'))
-const batchResultColumns = [
-  { title: '种子', key: 'title', ellipsis: true },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '说明', key: 'message', ellipsis: true },
-  { title: '链接', key: 'url', width: 100 },
-]
-
-function statusText(st: string): string {
-  const m: Record<string, string> = {
-    pushed: '发布成功', pushed_existing: '已推种', duplicate: '站上已有', existing: '站上已有', failed: '失败',
-  }
-  return m[st] || st
-}
 // §59.166 数据状态列（一种多站同款）
 const STATUS_META: Record<string, { label: string; color: string }> = {
   forbidden: { label: '禁转', color: 'red' },
@@ -334,9 +289,7 @@ function statusLabel(st: string): string {
 }
 
 function statusColor(st: string): string {
-  if (['pushed', 'pushed_existing'].includes(st)) return 'success'
-  if (['duplicate', 'existing'].includes(st)) return 'warning'
-  return 'error'
+  return STATUS_META[st]?.color || 'default'
 }
 
 async function submitBatch() {
@@ -356,8 +309,7 @@ async function submitBatch() {
     if (tid) {
       batchTask.value = { task_id: tid, target_site: selectedTarget.value, total: res.data?.data?.total || selectedInjectHashes.value.length, done: 0, results: [], finished: false, started_at: new Date().toISOString() }
       selectedInjectHashes.value = []
-      pickerOpen.value = false
-      // §59.166 用户定案：发布消费选择——站选一并清空（每次发布重新选站）
+      // §59.166 弹窗进度态：发布后弹窗不关（进度→汇总→[完成]手动关闭）
       selectedTarget.value = undefined
       pickerValue.value = ''
       schedulePoll(tid)
@@ -401,6 +353,7 @@ async function resumeActiveBatch() {
     const t = Array.isArray(list) ? list[0] : list
     if (t && !t.finished) {
       batchTask.value = t
+      pickerOpen.value = true // 断线恢复：自动开弹窗（进度态在眼前）
       schedulePoll(t.task_id)
     }
   } catch { /* 无任务 */ }

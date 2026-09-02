@@ -37,26 +37,7 @@
     </div>
 
     <div v-if="batchResults" class="step-result">
-      <a-alert :type="batchAlertType" show-icon style="margin-bottom: 12px">
-        <template #message>
-          <span style="font-size: 15px; font-weight: 600">
-            发布成功 {{ okCount }} 站<span v-if="existCount"> · 已存在 {{ existCount }} 站</span><span v-if="failCount"> · 失败 {{ failCount }} 站</span>
-          </span>
-        </template>
-        <template #description>
-          逐站明细（{{ batchResults.length }} 站）——失败原因见各行/发布日志
-        </template>
-      </a-alert>
-      <div v-for="r in batchResults" :key="r.site" class="batch-row">
-        <a-tag :color="batchRowColor(r.status)">{{ r.site }}</a-tag>
-        <span>{{ batchRowLabel(r.status) }}</span>
-        <span v-if="r.message" class="muted">{{ r.message.slice(0, 80) }}</span>
-        <a v-if="r.url" :href="r.url" target="_blank" style="font-size: 12px">详情</a>
-      </div>
-      <div class="actions">
-        <a-button @click="$router.push('/publish/logs')">查看发布日志</a-button>
-        <a-button type="primary" @click="emit('update:open', false)">完成</a-button>
-      </div>
+      <PublishProgressPanel :results="batchResults" row-mode="site" @done="emit('update:open', false)" />
     </div>
 
     <div v-else-if="result" class="step-result">
@@ -100,6 +81,7 @@
 
 <script setup lang="ts">
 import SiteTiles from './SiteTiles.vue'
+import PublishProgressPanel from './PublishProgressPanel.vue'
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import client from '@/api/client'
@@ -193,29 +175,8 @@ const failCount = computed(() => {
   const rs = batchResults.value ?? []
   return rs.length - okCount.value - existCount.value
 })
-const batchAlertType = computed(() => {
-  if (failCount.value > 0) return 'error'
-  if (okCount.value > 0) return 'success'
-  return 'warning'
-})
 
-function batchRowLabel(s: string): string {
-  const map: Record<string, string> = {
-    pushed: '发布成功·已推种',
-    pushed_existing: '站上已有·已推种',
-    existing: '站上已有（未定位 ID）',
-    duplicate: '站上已有同内容种',
-    uploaded: '已上传（推种未确认）',
-    failed: '失败',
-  }
-  return map[s] ?? s
-}
 
-function batchRowColor(s: string): string {
-  if (s === 'pushed' || s === 'pushed_existing') return 'green'
-  if (s === 'existing') return 'blue'
-  return 'red'
-}
 
 async function runSubmit() {
   loading.value = true
