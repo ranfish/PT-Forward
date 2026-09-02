@@ -53,7 +53,7 @@
 3. R3-5/R3-6 遗留：TagApplier 灰度已随 §59.156 退役；team 域词条建设待做
 
 **活跃观察项（未闭环）**：
-- build-backend go test 偶发"首跑 FAIL 重跑过"（两次，未定位——下次出现留现场）
+- build-backend go test 偶发"首跑 FAIL 重跑过"（三次：seeding/TestFlush_PushOne_TorrentExists 09-02 最新——时序敏感待定位）
 
 **已销观察项**：LuckAudit 过审率（09-02 收官——除 Suspiria MI 误判外全部正常过审，幸运专线 §59.155-163 实战验证完成）；阮玲玉两态放行（09-02 双路闭环 ✓）；243 错加无关种（用户已删）；keepfrds 列表页容量假设（朋友站日发种个位数，消解）
 
