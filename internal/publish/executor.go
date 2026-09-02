@@ -177,6 +177,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		// §59.159 回归审核：补推成功回写原记录（同 tid 最新行 Status/Seeded——
 		// 否则按钮反复可点[幂等无害但状态不收敛]、发布日志页 seeded 恒 0）
 		if res.Status == "pushed" || res.Status == "pushed_existing" {
+			e.logger.Info("repush 回写执行", zap.String("tid", in.TorrentID), zap.String("site", in.TargetSite))
 			now := time.Now()
 			// §59.166 实战修复：原 Scan(&lastID) 标量目标 GORM 不支持（静默不填
 			// 恒 0 → 回写永不执行——"补推成功但日志不收敛"4 例实锤；§59.56 同型
@@ -187,6 +188,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 				Order("id DESC").Limit(1).Pluck("id", &ids).Error; err != nil {
 				e.logger.Warn("repush 回写定位失败", zap.Error(err))
 			}
+			e.logger.Info("repush 回写定位", zap.Int64s("ids", ids))
 			if len(ids) > 0 {
 				if err := e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
 					Where("id = ?", ids[0]).
