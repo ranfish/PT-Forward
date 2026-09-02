@@ -117,7 +117,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.164: 落库版 fail（上传失败等终态此前不落库——修道院首例实战暴露：
 	// 发布日志页看不到失败记录，用户误读为旧记录）。meta 就绪后的失败全部走此路径。
 	failRec := func(status, msg string) *ExecuteResult {
-		e.recordResultFull(ctx, in, meta, rv, status, msg, "", "", false)
+		// DryRun 不落库（适配工具语义——失败记录污染发布日志；§59.164 回归审核补）
+		if !in.DryRun {
+			e.recordResultFull(ctx, in, meta, rv, status, msg, "", "", false)
+		}
 		return fail(status, msg)
 	}
 
