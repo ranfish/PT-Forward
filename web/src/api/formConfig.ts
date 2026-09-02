@@ -102,6 +102,10 @@ export const executeApi = {
   siteBatchActive(site: string) {
     return client.get<ApiResponse<SiteBatchTask | null>>(`/publish/seeds/site-batch-progress?site=${encodeURIComponent(site)}&active=1`)
   },
+  // §59.166: 不带 site → 全部活跃任务（选站不持久化下刷新恢复的无锚查询）
+  siteBatchActiveAll() {
+    return client.get<ApiResponse<SiteBatchTask[] | null>>('/publish/seeds/site-batch-progress?active=1')
+  },
   execute(infoHash: string, targetSite: string, opts?: { dryRun?: boolean; tagOverrides?: string[]; anonymous?: boolean; pushOnly?: boolean; torrentId?: string; pushClientId?: string; pushSavePath?: string }) {
     return client.post<ApiResponse<{ result: ExecuteResult }>>('/publish/seeds/execute', {
       info_hash: infoHash,

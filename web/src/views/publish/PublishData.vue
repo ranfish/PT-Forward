@@ -50,31 +50,8 @@
           <span v-if="selectedInjectHashes.length" style="margin-left: 8px; color: #1677ff">
             已选 {{ selectedInjectHashes.length }} 簇
           </span>
-        </div>
-
-        <!-- 目标站平铺单选 + 一键发布（§59.166 镜像一种多站点选交互）-->
-        <div class="target-row">
-          <span class="target-label">目标站</span>
-          <div class="site-tiles">
-            <div
-              v-for="t in targetSites"
-              :key="t.name"
-              class="site-tile"
-              :class="{ active: selectedTarget === t.name }"
-              @click="onTargetPick(t.name)"
-            >
-              <span class="tile-name">{{ t.name }}</span>
-              <a-tag v-if="t.has_pre_audit" color="blue" class="tile-tag">官方预检</a-tag>
-            </div>
-          </div>
-          <a-button
-            type="primary"
-            style="margin-left: auto"
-            :disabled="!selectedInjectHashes.length || !selectedTarget || (batchTask !== null && !batchTask.finished)"
-            :loading="batchSubmitting"
-            @click="submitBatch"
-          >
-            {{ batchTask && !batchTask.finished ? '发布中…' : `发布到 ${selectedTarget || '目标站'}（${selectedInjectHashes.length}）` }}
+          <a-button style="margin-left: 10px" @click="pickerOpen = true">
+            {{ selectedTarget ? `目标站：${selectedTarget} ▾` : '选择发布站' }}
           </a-button>
         </div>
 
@@ -82,7 +59,7 @@
           type="info"
           show-icon
           style="margin-bottom: 12px"
-          message="一站多种：勾选多个种子簇 → 点亮一个目标站 → 一键串行发布（站点配置间隔）。已存在目标站的簇默认不可选；源站禁转簇已隐藏。"
+          message="一站多种：勾选多个种子簇 → 选择发布站 → 串行发布（站点配置间隔）。已覆盖目标站的簇不阻塞——发布时自动跳过并记录日志；源站禁转簇已隐藏。"
         />
 
         <a-table
@@ -104,14 +81,17 @@
             selectedRowKeys: selectedInjectHashes,
             onChange: onSelectionChange,
             getCheckboxProps: (record: SeedListItem) => ({
-              disabled: !selectedTarget || existsOnTarget(record) || !isValidHash(record.hash),
+              disabled: !isValidHash(record.hash),
             }),
           }"
           @change="onInjectTableChange"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'name'">
-              <div class="cluster-name">{{ record.name }}</div>
+              <div class="cluster-name">
+                {{ record.name }}
+                <a-tag v-if="!isValidHash(record.hash)" color="default" style="margin-left: 4px">观察期</a-tag>
+              </div>
               <div v-if="record.title && record.title !== record.name" class="cluster-title">{{ record.title }}</div>
             </template>
             <template v-if="column.key === 'category'">
@@ -132,19 +112,45 @@
               </a-tooltip>
               <span v-else style="color: #999; font-size: 12px">未知</span>
             </template>
-            <template v-if="column.key === 'exist'">
-              <template v-if="selectedTarget && existsOnTarget(record)">
-                <a-tag color="warning">已存在</a-tag>
-              </template>
-              <a-tag v-else-if="selectedTarget && !isValidHash(record.hash)" color="default">无有效 hash</a-tag>
-              <a-tag v-else-if="selectedTarget" color="success">可发布</a-tag>
-              <span v-else style="color: #999; font-size: 12px">未选站</span>
+            <template v-if="column.key === 'status'">
+              <a-tag :color="statusColor(record.status)" style="margin: 0">{{ statusLabel(record.status) }}</a-tag>
             </template>
             <template v-if="column.key === 'actions'">
-              <a-button size="small" @click="goRefine(record)">完善数据</a-button>
+              <a-button size="small" @click="previewSeed(record)">预览种子</a-button>
             </template>
           </template>
         </a-table>
+
+        <!-- §59.166 选站弹窗（平铺单选 + 右下发布——一种多站 Modal 同构）-->
+        <a-modal
+          v-model:open="pickerOpen"
+          title="选择发布站"
+          width="620px"
+          :footer="null"
+        >
+          <SiteTiles v-model="pickerValue" :sites="tileSites" />
+          <div style="margin-top: 20px; text-align: right">
+            <a-button style="margin-right: 10px" @click="pickerOpen = false">关闭</a-button>
+            <a-button
+              type="primary"
+              :disabled="!pickerValue || !selectedInjectHashes.length || (batchTask !== null && !batchTask.finished && batchTask.target_site === pickerValue)"
+              :loading="batchSubmitting"
+              @click="submitBatch"
+            >
+              发布到 {{ pickerValue || '目标站' }}（{{ selectedInjectHashes.length }} 种）
+            </a-button>
+          </div>
+          <p style="margin-top: 8px; color: #999; font-size: 12px">
+            点选站点即时生效；已覆盖目标站的簇不阻塞——发布时自动跳过并记录日志。
+          </p>
+        </a-modal>
+
+        <CrossSeedPanel
+          v-model:open="previewPanelOpen"
+          :preset-torrent="previewPreset"
+          :initial-preview="previewDirect"
+          @success="fetchInjectList"
+        />
 
         <!-- §59.166 一站多种：批量任务进度/结果 -->
         <div v-if="batchTask" class="batch-panel">
@@ -198,6 +204,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { executeApi, type SiteBatchTask } from '@/api/formConfig'
+import SiteTiles from './SiteTiles.vue'
+import CrossSeedPanel from './CrossSeedPanel.vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { seedConfigApi, type SeedListItem } from '@/api/publish'
@@ -255,11 +263,30 @@ function onBatchFilterChange() {
   fetchInjectList()
 }
 
-function onTargetPick(name: string) {
-  selectedTarget.value = selectedTarget.value === name ? undefined : name
-  // 回归审核补：换站清勾选——已存在语义随目标站变化（旧站中心逻辑，重构时丢失）
-  selectedInjectHashes.value = []
+// §59.166 预览种子（CrossSeedPanel——一种多站同款；pending 簇经此返回编辑）
+const previewPanelOpen = ref(false)
+const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string } | null>(null)
+const previewDirect = ref(false)
+
+function previewSeed(record: SeedListItem) {
+  previewPreset.value = {
+    info_hash: record.hash,
+    name: record.name,
+    size: record.size,
+    save_path: record.save_path,
+    client_id: Number(record.client_id) || 0,
+    source_site: record.site_name,
+  }
+  previewDirect.value = true
+  previewPanelOpen.value = true
 }
+
+// §59.166 选站弹窗状态（pickerValue 即时同步 selectedTarget——工具栏按钮显示）
+const pickerOpen = ref(false)
+const pickerValue = ref('')
+watch(pickerValue, (v) => { selectedTarget.value = v || undefined })
+
+const tileSites = computed(() => targetSites.value.map(t => ({ name: t.name, hasPreAudit: t.has_pre_audit })))
 
 function onSelectionChange(keys: (string | number)[]) {
   selectedInjectHashes.value = keys.map(String)
@@ -292,6 +319,20 @@ function statusText(st: string): string {
   }
   return m[st] || st
 }
+// §59.166 数据状态列（一种多站同款）
+const STATUS_META: Record<string, { label: string; color: string }> = {
+  forbidden: { label: '禁转', color: 'red' },
+  system_forbidden: { label: '系统禁转', color: 'red' },
+  no_mapping: { label: '无源站映射', color: 'volcano' },
+  reviewed: { label: '已审核', color: 'green' },
+  pending: { label: '待审核', color: 'blue' },
+  incomplete: { label: '配置不完整', color: 'orange' },
+  unfetched: { label: '未获取', color: 'default' },
+}
+function statusLabel(st: string): string {
+  return STATUS_META[st]?.label || st
+}
+
 function statusColor(st: string): string {
   if (['pushed', 'pushed_existing'].includes(st)) return 'success'
   if (['duplicate', 'existing'].includes(st)) return 'warning'
@@ -315,7 +356,17 @@ async function submitBatch() {
     if (tid) {
       batchTask.value = { task_id: tid, target_site: selectedTarget.value, total: res.data?.data?.total || selectedInjectHashes.value.length, done: 0, results: [], finished: false, started_at: new Date().toISOString() }
       selectedInjectHashes.value = []
+      pickerOpen.value = false
+      // §59.166 用户定案：发布消费选择——站选一并清空（每次发布重新选站）
+      selectedTarget.value = undefined
+      pickerValue.value = ''
       schedulePoll(tid)
+    }
+  } catch (err) {
+    // §59.166 回归审核补：40901 人话提示（同站互斥——可能来自其它标签页提交）
+    const status = (err as { response?: { status?: number } })?.response?.status
+    if (status === 409) {
+      message.warning('该站已有批量任务运行中，请等待完成')
     }
   } finally {
     batchSubmitting.value = false
@@ -342,12 +393,12 @@ function schedulePoll(taskId: string) {
   }, 2000)
 }
 
-// 挂载恢复：目标站有运行中任务则接回进度（断线无伤）
+// 挂载恢复：全部活跃任务无锚查询（选站不持久化——刷新后站名已丢，§59.166 回归审核修正）
 async function resumeActiveBatch() {
-  if (!selectedTarget.value) return
   try {
-    const res = await executeApi.siteBatchActive(selectedTarget.value)
-    const t = res.data?.data
+    const res = await executeApi.siteBatchActiveAll()
+    const list = res.data?.data as SiteBatchTask[] | SiteBatchTask | null | undefined
+    const t = Array.isArray(list) ? list[0] : list
     if (t && !t.finished) {
       batchTask.value = t
       schedulePoll(t.task_id)
@@ -365,7 +416,7 @@ const injectColumns = [
   { title: '大小', key: 'size', width: 90, sorter: (a: SeedListItem, b: SeedListItem) => a.size - b.size },
   { title: '副本', key: 'copies', width: 90, align: 'center' as const, sorter: (a: SeedListItem, b: SeedListItem) => (a.copy_count ?? 1) - (b.copy_count ?? 1) },
   { title: '已有站点', key: 'sites', width: 220 },
-  { title: '目标站状态', key: 'exist', width: 110, align: 'center' as const },
+  { title: '数据状态', key: 'status', width: 90, align: 'center' as const },
   { title: '操作', key: 'actions', width: 100 },
 ]
 
@@ -410,6 +461,7 @@ async function fetchInjectList() {
     injectTotal.value = 0
   } finally {
     injectLoading.value = false
+    persistFilters()
   }
 }
 
@@ -450,7 +502,34 @@ watch(selectedTarget, () => {
   if (!batchTask.value || batchTask.value.finished) resumeActiveBatch()
 })
 
+// §59.166 记忆：下载器/路径/ready/搜索/页大小（一种多站同款机制，独立 key）
+const FILTERS_KEY = 'publish_data_filters'
+function persistFilters() {
+  try {
+    localStorage.setItem(FILTERS_KEY, JSON.stringify({
+      client: selectedClient.value || undefined,
+      path: selectedPath.value || undefined,
+      ready: readyFilter.value,
+      search: injectSearch.value || undefined,
+      page_size: injectPageSize.value,
+    }))
+  } catch { /* silent */ }
+}
+function restoreFilters() {
+  try {
+    const raw = localStorage.getItem(FILTERS_KEY)
+    if (!raw) return
+    const f = JSON.parse(raw) as { client?: string; path?: string; ready?: 'ready' | 'all' | 'pending'; search?: string; page_size?: number }
+    if (f.client) selectedClient.value = f.client
+    if (f.path) selectedPath.value = f.path
+    if (f.ready) readyFilter.value = f.ready
+    if (f.search) injectSearch.value = f.search
+    if (f.page_size) injectPageSize.value = f.page_size
+  } catch { /* silent */ }
+}
+
 onMounted(() => {
+  restoreFilters()
   fetchClients()
   fetchTargetSites()
   fetchInjectList()
