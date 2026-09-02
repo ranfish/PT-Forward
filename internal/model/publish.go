@@ -132,6 +132,9 @@ type PublishResultRecord struct {
 
 	Status       PublishResultStatus `json:"status" gorm:"size:20"`
 	SkipReason   string              `json:"skip_reason" gorm:"size:200"`
+	// §59.166 dedup 本地记忆（站方 pieces-hash API 瞬时空返回实战打穿——18:49 批
+	// 4 种重传；发布成功/拦截均落，dedup 先查本地零依赖站方）
+	PiecesHash string `json:"pieces_hash" gorm:"size:40;index"`
 	// §59.159: 源种 hash（记录溯源）
 	SourceInfoHash string            `json:"source_info_hash" gorm:"size:40;index"`
 	// §59.159: 加种目标路径（发布时落库——补推纯记录回放，不依赖快照行存活）

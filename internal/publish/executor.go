@@ -30,6 +30,7 @@ import (
 	sitepkg "github.com/ranfish/pt-forward/internal/site"
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"github.com/ranfish/pt-forward/internal/util"
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 )
 
 // ExecuteInput 执行入参（API 层构造）。
@@ -358,10 +359,39 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		return failRec("failed", fmt.Sprintf("获取站点配置失败: %v", scErr))
 	}
 
-	// dedup（复用组件——pieces_hash 目标站查重）
-	if dup, dupMsg := e.pipe.dedupByPiecesHash(ctx, adapter, siteConfig, torrentData); dup {
-		// failRec 统一落库（§59.164 双落库回归修复——此前 recordResult+failRec 各落一次）
-		return failRec("duplicate", "目标站已存在同内容种子: "+dupMsg)
+	// dedup 双路（§59.166 本地记忆优先——修道院 18:49 批实战：站方 pieces-hash API
+	// 密集查询间歇空返回致 4 种重传（站方复用 tid 无损但应防御）；本地零依赖零延迟，
+	// 站方 API 作本地未命中补充。一种多站/一站多种发布链公共生效。
+	piecesHash := fingerprintPiecesHash(torrentData)
+	if piecesHash != "" {
+		// ① 本地记忆（同站同 pieces_hash 已有终态记录→拦；tid 有值则复用展示）
+		var rec model.PublishResultRecord
+		if err := e.db.WithContext(ctx).
+			Where("target_site = ? AND pieces_hash = ? AND status IN ?", in.TargetSite, piecesHash,
+				[]string{"pushed", "pushed_existing", "duplicate"}).
+			Order("id DESC").First(&rec).Error; err == nil {
+			// 本地记忆 tid 补充：站方 API 查一次取真实 tid（失败不阻塞——记忆拦截已成立）
+			tidShown := rec.TorrentID
+			if tidShown == "" {
+				if _, mHash, mTID := e.pipe.dedupByPiecesHashFull(ctx, adapter, siteConfig, torrentData); mTID > 0 {
+					_ = mHash
+					tidShown = fmt.Sprintf("%d", mTID)
+				}
+			}
+			msg := "本地记忆命中（站上已有同内容种）: " + piecesHash
+			e.recordResult(ctx, in, meta, rv, "duplicate", msg, tidShown, detailURLOf(siteConfig, tidShown), piecesHash)
+			return fail("duplicate", msg)
+		}
+	}
+	// ② 站方 pieces-hash API（拦截记录带站上 tid——此前 API 返回的 tid 被丢弃）
+	if dup, dupMsg, mTID := e.pipe.dedupByPiecesHashFull(ctx, adapter, siteConfig, torrentData); dup {
+		msg := "目标站已存在同内容种子: " + dupMsg
+		tidShown := ""
+		if mTID > 0 {
+			tidShown = fmt.Sprintf("%d", mTID)
+		}
+		e.recordResult(ctx, in, meta, rv, "duplicate", msg, tidShown, detailURLOf(siteConfig, tidShown), piecesHash)
+		return fail("duplicate", msg)
 	}
 
 	resp, upErr := adapter.UploadTorrent(ctx, siteConfig, pubReq)
@@ -436,7 +466,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	seeded := result.Status == "pushed" || result.Status == "pushed_existing"
 	e.recordResultFull(ctx, in, meta, rv, result.Status,
 		joinNotes(paNoteOf(preAudit), result.Message),
-		resp.TorrentID, result.TargetTorrentURL, seeded)
+		resp.TorrentID, result.TargetTorrentURL, seeded, piecesHash)
 	return result
 }
 
@@ -450,19 +480,29 @@ func paNoteOf(pa *PreAuditResult) string {
 
 // recordResult 短路终态落库（duplicate/existing——§59.160 回归审核补：发布历史完整性）。
 func (e *PublishExecutor) recordResult(ctx context.Context, in ExecuteInput, meta *model.TorrentMetadata,
-	rv *ResourceView, status, msg, torrentID, url string) {
+	rv *ResourceView, status, msg, torrentID, url string, piecesHash ...string) {
+	if len(piecesHash) > 0 {
+		e.recordResultFull(ctx, in, meta, rv, status, msg, torrentID, url, false, piecesHash[0])
+		return
+	}
 	e.recordResultFull(ctx, in, meta, rv, status, msg, torrentID, url, false)
 }
 
-// recordResultFull 统一落库单点。
+// recordResultFull 统一落库单点（piecesHash §59.166 dedup 本地记忆——一种多站/
+// 一站多种发布链公共生效：成功/拦截均落，下次发布 dedup 先查本地零依赖站方 API）。
 func (e *PublishExecutor) recordResultFull(ctx context.Context, in ExecuteInput, meta *model.TorrentMetadata,
-	rv *ResourceView, status, note, torrentID, url string, seeded bool) {
+	rv *ResourceView, status, note, torrentID, url string, seeded bool, piecesHash ...string) {
 	now := time.Now()
 	seedErr := ""
 	if strings.Contains(note, "加种失败") {
 		seedErr = note
 	}
+	ph := ""
+	if len(piecesHash) > 0 {
+		ph = piecesHash[0]
+	}
 	_ = e.pipe.CreateResult(ctx, &model.PublishResultRecord{
+		PiecesHash:     ph,
 		TargetSite:     in.TargetSite,
 		SourceSite:     meta.SiteName,
 		SourceInfoHash: in.InfoHash,
@@ -747,4 +787,23 @@ func chineseTitleOf(title string) string {
 		}
 	}
 	return best
+}
+
+// fingerprintPiecesHash 种子数据 pieces hash（dedup 本地记忆键——空数据/解析失败返回空）。
+func fingerprintPiecesHash(torrentData []byte) string {
+	if len(torrentData) == 0 {
+		return ""
+	}
+	if m, err := fingerprint.ComputeFromTorrent(torrentData); err == nil && m != nil {
+		return m.PiecesHash
+	}
+	return ""
+}
+
+// detailURLOf 站内种详情 URL（拦截记录直达链接——tid 空返回空）。
+func detailURLOf(cfg *model.SiteConfig, tid string) string {
+	if tid == "" {
+		return ""
+	}
+	return strings.TrimRight(cfg.Domain, "/") + "/details.php?id=" + tid
 }
