@@ -121,6 +121,7 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 	// 确认落库即丢配置（migration 30 注册的域与解析器对齐）
 	for field, domain := range map[string]string{
 		"small_descr":    model.FieldDomainSmallDescr,
+		"cnname":         model.FieldDomainCNName, // §59.164: 修道院独立中文名字段
 		"url":            model.FieldDomainIMDBURL,
 		"descr":          model.FieldDomainDescription,
 		"technical_info": model.FieldDomainTechInfo,

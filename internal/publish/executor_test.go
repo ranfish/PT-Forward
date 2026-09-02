@@ -146,3 +146,20 @@ func TestTagApplierSpanFieldParam(t *testing.T) {
 		t.Errorf("旧配置应回落 span[], got %v", written2)
 	}
 }
+
+// §59.164: 修道院 cnname 中文段提取
+func TestChineseTitleOf(t *testing.T) {
+	cases := map[string]string{
+		"阴风阵阵.Suspiria.2018.UHD.BluRay.2160p":            "阴风阵阵",
+		"Five Easy Pieces 1970 UHD BluRay":                   "",
+		"阮玲玉 Center Stage 1991 1080p":                      "阮玲玉",
+		"七武士 七人の侍 Seven Samurai 1954":                    "七武士 七人", // 假名不在 Han——段被の切开取最长
+		"The.Matrix.1999":                                    "",
+		"花木兰 Mulan 2020 4K":                                 "花木兰",
+	}
+	for in, want := range cases {
+		if got := chineseTitleOf(in); got != want {
+			t.Errorf("chineseTitleOf(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

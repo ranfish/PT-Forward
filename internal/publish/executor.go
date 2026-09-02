@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -216,6 +217,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		}
 	}
 	setForm(model.FieldDomainSmallDescr, meta.Subtitle)
+	// §59.164: 修道院 cnname 独立中文名（FormFields 未配站点自然跳过）
+	setForm(model.FieldDomainCNName, chineseTitleOf(meta.Title))
 	setForm(model.FieldDomainDescription, meta.Description) // renderDescription 结果后续覆盖
 	setForm(model.FieldDomainTechInfo, meta.MediaInfo)
 	setForm(model.FieldDomainIMDBURL, meta.IMDbURL)
@@ -254,6 +257,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// Tags map 从 ValueMappings 构造（双形态键——standard_key + canonical）
 	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
 		if m.Auto != nil && !*m.Auto {
+			continue
+		}
+		// §59.164 转存发布禁勾"首发"（PT 圈通用铁律：圈首次发布=站管/压制组
+		// 官方专属，转载人员不允许使用——用户 2026-09-02 权威定义，全站适用）
+		if m.Label == "首发" {
 			continue
 		}
 		for _, k := range m.StandardKeys {
@@ -715,4 +723,19 @@ func parseScreenshotsCol(s string) []string {
 		}
 	}
 	return out
+}
+
+// chineseTitleOf 提取标题中文段（§59.164 修道院 cnname——"阴风阵阵.Suspiria.2018"→"阴风阵阵"）。
+// 取最长连续中文段（含·间隔与内部空格）；无中文返回空（字段不投递）。
+var chineseTitleRe = regexp.MustCompile(`\p{Han}+(?:[\s·・]\p{Han}+)*`)
+
+func chineseTitleOf(title string) string {
+	best := ""
+	for _, seg := range chineseTitleRe.FindAllString(title, -1) {
+		seg = strings.TrimSpace(seg)
+		if len([]rune(seg)) > len([]rune(best)) {
+			best = seg
+		}
+	}
+	return best
 }
