@@ -4513,11 +4513,28 @@ func (h *PublishTorrentsHandler) handleSiteBatchProgress(w http.ResponseWriter, 
 
 	if q.Get("active") == "1" {
 		siteName := q.Get("site")
-		if id, ok := h.siteBatch.active[siteName]; ok {
-			Success(w, h.siteBatch.tasks[id])
+		if siteName != "" {
+			// 指定站查询（原口径）
+			if id, ok := h.siteBatch.active[siteName]; ok {
+				Success(w, h.siteBatch.tasks[id])
+				return
+			}
+			Success(w, nil) // 无运行中任务
 			return
 		}
-		Success(w, nil) // 无运行中任务
+		// §59.166 终稿回归审核补：不带 site → 全部活跃任务（选站不持久化的
+		// 前提下，页面刷新后恢复进度需要无锚查询——active map 直接列出）
+		actives := make([]*siteBatchTask, 0, len(h.siteBatch.active))
+		for _, id := range h.siteBatch.active {
+			if t, ok := h.siteBatch.tasks[id]; ok {
+				actives = append(actives, t)
+			}
+		}
+		if len(actives) == 0 {
+			Success(w, nil)
+			return
+		}
+		Success(w, actives)
 		return
 	}
 	id := q.Get("task_id")

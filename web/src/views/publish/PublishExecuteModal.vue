@@ -9,19 +9,7 @@
     <div v-if="!batchResults && !result" class="step-select">
       <a-form layout="vertical">
         <a-form-item label="目标站（点选点亮——多选并行发布）">
-          <div class="site-tiles">
-            <div
-              v-for="t in targets"
-              :key="t.name"
-              class="site-tile"
-              :class="{ active: selectedSites.includes(t.name) }"
-              @click="toggleSite(t.name)"
-            >
-              <span class="tile-name">{{ t.name }}</span>
-              <a-tag v-if="t.has_pre_audit" color="blue" class="tile-tag">官方预检</a-tag>
-            </div>
-          </div>
-          <div v-if="!targets.length" class="tile-empty">暂无已启用发布配置的目标站</div>
+          <SiteTiles v-model="selectedSites" :sites="tileSites" multiple />
         </a-form-item>
         <a-form-item v-if="selectedSites.length === 1" label="条件标签人工勾选（auto:false——人工确认后进入）">
           <a-select
@@ -111,6 +99,7 @@
 </template>
 
 <script setup lang="ts">
+import SiteTiles from './SiteTiles.vue'
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import client from '@/api/client'
@@ -123,12 +112,8 @@ const targets = ref<PublishTarget[]>([])
 const conditionalTagOptions = ref<{ label: string; value: string }[]>([])
 const selectedSites = ref<string[]>([])
 
-// §59.164: 站点平铺点选（点亮=选中——用户交互定案）
-function toggleSite(name: string) {
-  const i = selectedSites.value.indexOf(name)
-  if (i >= 0) selectedSites.value.splice(i, 1)
-  else selectedSites.value.push(name)
-}
+// §59.166: SiteTiles 公共组件（has_pre_audit→hasPreAudit 适配）
+const tileSites = computed(() => targets.value.map(t => ({ name: t.name, hasPreAudit: t.has_pre_audit })))
 const batchResults = ref<Array<{ site: string; status: string; message?: string; url?: string }> | null>(null)
 const tagOverrides = ref<string[]>([])
 const loading = ref(false)
@@ -275,40 +260,6 @@ const alertTitle = computed(() => {
 </script>
 
 <style scoped>
-/* §59.164: 站点平铺点选——点亮交互 */
-.site-tiles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.site-tile {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border: 1.5px solid #d9d9d9;
-  border-radius: 8px;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.15s ease;
-  background: #fafafa;
-}
-.site-tile:hover {
-  border-color: #1677ff;
-}
-.site-tile.active {
-  border-color: #1677ff;
-  background: #e6f4ff;
-  color: #1677ff;
-  font-weight: 600;
-}
-.tile-empty {
-  color: #999;
-  padding: 12px 0;
-}
-.tile-tag {
-  margin: 0;
-}
 .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: 12px; }
 .kv span { color: #888; margin-right: 8px; }
