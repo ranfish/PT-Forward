@@ -129,6 +129,16 @@
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
+  "dstudio.me": {
+    "domain": "dstudio.me",
+    "name_cn": "深度",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "dstudio.me",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": "全站官种，只能做源站"
+  },
   "dubhe.site": {
     "domain": "dubhe.site",
     "name_cn": "天枢",
@@ -424,7 +434,7 @@
     "cookiecloud_domain": "pt.cdy.skin",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "blocked",
-    "special_notes": "传道院 - HTTP 403 / 直连超时"
+    "special_notes": "站点已关站（2026-09-02），禁止新增接入"
   },
   "pt.eastgame.org": {
     "domain": "pt.eastgame.org",
@@ -867,6 +877,16 @@
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
+  "www.musopia.vip": {
+    "domain": "www.musopia.vip",
+    "name_cn": "音乐乌托邦",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "www.musopia.vip",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
+    "verification_status": "verified",
+    "special_notes": ""
+  },
   "www.okpt.net": {
     "domain": "www.okpt.net",
     "name_cn": "OKPT",
@@ -946,6 +966,15 @@
     "verification_status": "verified",
     "special_notes": "CookieCloud 域名 yemapt.org；上传走 /api/torrent/add JSON API"
   },
+  "xdypt.vip": {
+    "domain": "xdypt.vip",
+    "name_cn": "修道院",
+    "framework": "nexusphp",
+    "auth_type": "cookie",
+    "cookiecloud_domain": "xdypt.vip",
+    "download_url_template": "download.php?id={id}&passkey={passkey}",
+    "verification_status": "verified"
+  },
   "xingtan.one": {
     "domain": "xingtan.one",
     "name_cn": "杏坛",
@@ -1008,25 +1037,5 @@
     "cookiecloud_domain": "zrpt.cc",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
-  },
-  "www.musopia.vip": {
-    "domain": "www.musopia.vip",
-    "name_cn": "音乐乌托邦",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
-    "cookiecloud_domain": "www.musopia.vip",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified",
-    "special_notes": ""
-  },
-  "dstudio.me": {
-    "domain": "dstudio.me",
-    "name_cn": "深度",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
-    "cookiecloud_domain": "dstudio.me",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified",
-    "special_notes": "全站官种，只能做源站"
   }
 }
