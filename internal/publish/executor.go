@@ -114,23 +114,30 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	meta := rv.Meta
 
+	// §59.164: 落库版 fail（上传失败等终态此前不落库——修道院首例实战暴露：
+	// 发布日志页看不到失败记录，用户误读为旧记录）。meta 就绪后的失败全部走此路径。
+	failRec := func(status, msg string) *ExecuteResult {
+		e.recordResultFull(ctx, in, meta, rv, status, msg, "", "", false)
+		return fail(status, msg)
+	}
+
 	// ② 目标站配置（C1 处方开关）
 	var site model.Site
 	if err := e.db.WithContext(ctx).Where("name = ?", in.TargetSite).First(&site).Error; err != nil {
-		return fail("disabled", "目标站不存在")
+		return failRec("disabled", "目标站不存在")
 	}
 	cfg := model.ParseFormConfig(site.PublishFormConfig)
 	if cfg == nil || !cfg.Enabled {
-		return fail("disabled", "目标站未启用发布配置")
+		return failRec("disabled", "目标站未启用发布配置")
 	}
 
 	// §59.159 PushOnly 补推通道：跳过上传/dedup——推指定 TorrentID（SavePath 取资源目录）
 	if in.PushOnly {
 		if in.TorrentID == "" {
-			return fail("failed", "PushOnly 需 TorrentID")
+			return failRec("failed", "PushOnly 需 TorrentID")
 		}
 		if e.pipe.pusher == nil {
-			return fail("failed", "pusher 未注入")
+			return failRec("failed", "pusher 未注入")
 		}
 		clientID, savePath := in.PushClientID, in.PushSavePath
 		if clientID == "" || savePath == "" {
@@ -188,15 +195,15 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 
 	// ③ 源 .torrent 本地导出（零拉取）
 	if e.pipe.clientProvider == nil {
-		return fail("failed", "clientProvider 未注入")
+		return failRec("failed", "clientProvider 未注入")
 	}
 	client, err := e.pipe.clientProvider.Get(rv.ClientID)
 	if err != nil {
-		return fail("failed", fmt.Sprintf("获取下载器 %s 失败: %v", rv.ClientID, err))
+		return failRec("failed", fmt.Sprintf("获取下载器 %s 失败: %v", rv.ClientID, err))
 	}
 	torrentData, err := client.ExportTorrent(ctx, in.InfoHash)
 	if err != nil || len(torrentData) == 0 {
-		return fail("failed", fmt.Sprintf("本地导出种子失败: %v", err))
+		return failRec("failed", fmt.Sprintf("本地导出种子失败: %v", err))
 	}
 	// §59.159 源头嗅探：导出数据必须是 bencode（实战排查——.torrent 无效时
 	// 站方静默回表单页，错误不可见）
@@ -204,7 +211,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		e.logger.Warn("exported torrent data is not bencode",
 			zap.String("client", rv.ClientID), zap.Int("len", len(torrentData)),
 			zap.Uint8("first_byte", torrentData[0]))
-		return fail("failed", fmt.Sprintf("导出数据非 bencode 种子（首字节 %q）——路径/内容异常", torrentData[0]))
+		return failRec("failed", fmt.Sprintf("导出数据非 bencode 种子（首字节 %q）——路径/内容异常", torrentData[0]))
 	}
 
 	// ④ 域值组装（DB 供给——value_mappings 反查）
@@ -286,7 +293,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// ⑥ 描述组装——纯本地资产消费（§59.159 白名单：替代 renderDescription
 	// [queryPTGen 在线/rehostPoster 图床转存双违规]；零网络依赖）
 	if strings.TrimSpace(meta.Title) == "" || strings.TrimSpace(meta.Description) == "" {
-		return fail("ineligible", "资产不完备：name/简介为空（先完成获取-审核）")
+		return failRec("ineligible", "资产不完备：name/简介为空（先完成获取-审核）")
 	}
 	form[cfg.FormFields[model.FieldDomainDescription]] = assembleDescription(meta)
 
@@ -341,31 +348,31 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 
 	adapter, aErr := e.pipe.siteProvider.GetAdapter(ctx, in.TargetSite)
 	if aErr != nil {
-		return fail("failed", fmt.Sprintf("获取站点适配器失败: %v", aErr))
+		return failRec("failed", fmt.Sprintf("获取站点适配器失败: %v", aErr))
 	}
 	siteConfig, scErr := e.pipe.siteProvider.GetSiteConfig(ctx, in.TargetSite)
 	if scErr != nil {
-		return fail("failed", fmt.Sprintf("获取站点配置失败: %v", scErr))
+		return failRec("failed", fmt.Sprintf("获取站点配置失败: %v", scErr))
 	}
 
 	// dedup（复用组件——pieces_hash 目标站查重）
 	if dup, dupMsg := e.pipe.dedupByPiecesHash(ctx, adapter, siteConfig, torrentData); dup {
 		msg := "目标站已存在同内容种子: " + dupMsg
 		e.recordResult(ctx, in, meta, rv, "duplicate", msg, "", "")
-		return fail("duplicate", msg)
+		return failRec("duplicate", msg)
 	}
 
 	resp, upErr := adapter.UploadTorrent(ctx, siteConfig, pubReq)
 	if upErr != nil {
-		return fail("failed", fmt.Sprintf("上传失败: %v", upErr))
+		return failRec("failed", fmt.Sprintf("上传失败: %v", upErr))
 	}
 	if !resp.Success {
 		// §59.159 回归审核：优先消费 ErrorMessage（已存在等语义化失败信息——
 		// 旧代码拼 DetailURL[已存在形态为空]致"上传未成功: "空尾巴）
 		if resp.ErrorMessage != "" {
-			return fail("failed", resp.ErrorMessage)
+			return failRec("failed", resp.ErrorMessage)
 		}
-		return fail("failed", "上传未成功: "+resp.DetailURL)
+		return failRec("failed", "上传未成功: "+resp.DetailURL)
 	}
 
 	// §59.159: 已存在分流（NP 302 existed=1 / stderr 文本——站上已有同种）。

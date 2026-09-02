@@ -15,6 +15,7 @@
 package publish
 
 import (
+	"github.com/ranfish/pt-forward/internal/metadata/extract"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -73,7 +74,17 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 				return // 占位项（NP 家族 value=0 惯例——语言无关；§59.157 繁体「請選擇一項」漏过滤教训：
 				// 占位判定不得依赖文案子串，简/繁/英占位词各异）
 			}
-			opts = append(opts, model.FormValueMapping{Label: label, Value: v})
+			m := model.FormValueMapping{Label: label, Value: v}
+			// §59.164: 词条补 StandardKeys（label→standard key 宽松反查）——
+			// parse 产物缺此键则 executor lookupByStdKey 反查全空 → 五域全丢
+			// → 站方"类型必填"拒绝（修道院首例实战暴露——幸运靠 migration 27
+			// 手工映射掩盖了此缺口）
+			if cat, ok := domainToCategory[domain]; ok {
+				if sk := extract.LookupStandardKeyLoose(cat, label); sk != "" {
+					m.StandardKeys = []string{sk}
+				}
+			}
+			opts = append(opts, m)
 		})
 		if len(opts) == 0 {
 			return
@@ -98,7 +109,11 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 		if label == "" {
 			label = v
 		}
-		tags = append(tags, model.FormValueMapping{Label: label, Value: v})
+		tm := model.FormValueMapping{Label: label, Value: v}
+		if sk := extract.LookupStandardKeyLoose("tag", label); sk != "" {
+			tm.StandardKeys = []string{sk}
+		}
+		tags = append(tags, tm)
 	})
 	if len(tags) > 0 {
 		// 字段名取实际 name（tags[4][] 本身即数组形态——原样保留）
@@ -268,4 +283,16 @@ func indexByLabel(vals []model.FormValueMapping) map[string]model.FormValueMappi
 		m[v.Label] = v
 	}
 	return m
+}
+
+// domainToCategory §59.164: FormFields 域 → standard_keys 词表 category
+// （parse 词条补 StandardKeys 用）。
+var domainToCategory = map[string]string{
+	model.FieldDomainType:       "type",
+	model.FieldDomainMedium:     "medium",
+	model.FieldDomainCodec:      "video_codec",
+	model.FieldDomainAudiocodec: "audio_codec",
+	model.FieldDomainStandard:   "resolution",
+	model.FieldDomainTeam:       "team",
+	model.FieldDomainTags:       "tag",
 }

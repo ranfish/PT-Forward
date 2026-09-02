@@ -100,6 +100,7 @@ var (
 	sitesByDomain  map[string]siteConfigEntry // key = domain（小写）
 	sitesByCode    map[string]siteConfigEntry // key = site_code（小写，fallback）
 	standardKeys   map[string]map[string]string
+	standardKeyEntries map[string][]standardKeyEntry
 
 	defaultSourceKeys = map[string]string{
 		"type":        "类型",
@@ -148,6 +149,21 @@ func loadConfig() {
 		// 加载全局 standard_keys
 		standardKeys = map[string]map[string]string{}
 		_ = json.Unmarshal(extendedStandardKeysJSON, &standardKeys)
+		// §59.164: entries 索引（LookupStandardKeyLoose 的 aliases 匹配——
+		// json 到 map 的加载丢 aliases，重建结构化索引）
+		standardKeyEntries = map[string][]standardKeyEntry{}
+		var raw []struct {
+			Category string   `json:"category"`
+			Key      string   `json:"key"`
+			Code     string   `json:"code"`
+			Aliases  []string `json:"aliases"`
+		}
+		if err := json.Unmarshal(extendedStandardKeysJSON, &raw); err == nil {
+			for _, e := range raw {
+				standardKeyEntries[e.Category] = append(standardKeyEntries[e.Category],
+					standardKeyEntry{Key: e.Key, Code: e.Code, Aliases: e.Aliases})
+			}
+		}
 	})
 }
 
@@ -297,4 +313,46 @@ func LookupStandardKey(category, raw string) string {
 		}
 	}
 	return bestStd
+}
+
+// standardKeyEntry §59.164: 词条结构化（key/code/aliases——Loose 匹配用）
+type standardKeyEntry struct {
+	Key     string
+	Code    string
+	Aliases []string
+}
+
+// LookupStandardKeyLoose 宽松标准键匹配（§59.164 form_config parse 词条补
+// StandardKeys 专用——站方 label 形态各异："4K/2160i/2160P"/"电影（Movies）"）。
+// LookupStandardKey 基础上追加：①大小写不敏感包含 ②aliases 匹配。
+func LookupStandardKeyLoose(category, raw string) string {
+	if std := LookupStandardKey(category, raw); std != "" {
+		return std
+	}
+	rawLower := strings.ToLower(strings.TrimSpace(raw))
+	if rawLower == "" {
+		return ""
+	}
+	loadConfig()
+	bestLen, best := 0, ""
+	for k, v := range standardKeys[category] {
+		if v == "" {
+			continue
+		}
+		if len(k) > bestLen && strings.Contains(rawLower, strings.ToLower(k)) {
+			bestLen, best = len(k), v
+		}
+	}
+	if best != "" {
+		return best
+	}
+	bestALen, bestA := 0, ""
+	for _, e := range standardKeyEntries[category] {
+		for _, a := range e.Aliases {
+			if len(a) > bestALen && strings.Contains(rawLower, strings.ToLower(a)) {
+				bestALen, bestA = len(a), e.Code
+			}
+		}
+	}
+	return bestA
 }
