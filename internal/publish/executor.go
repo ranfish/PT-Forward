@@ -178,20 +178,26 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		// 否则按钮反复可点[幂等无害但状态不收敛]、发布日志页 seeded 恒 0）
 		if res.Status == "pushed" || res.Status == "pushed_existing" {
 			now := time.Now()
-			// GORM Updates 不支持 Order/Limit——子查询定位最新行主键再更新
-			var lastID int64
-			e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+			// §59.166 实战修复：原 Scan(&lastID) 标量目标 GORM 不支持（静默不填
+			// 恒 0 → 回写永不执行——"补推成功但日志不收敛"4 例实锤；§59.56 同型
+			// 代码存在≠生效）。改 Pluck+Error 检查。
+			var ids []int64
+			if err := e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
 				Where("torrent_id = ? AND target_site = ?", in.TorrentID, in.TargetSite).
-				Select("id").Order("id DESC").Limit(1).Scan(&lastID)
-			if lastID > 0 {
-				e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
-					Where("id = ?", lastID).
+				Order("id DESC").Limit(1).Pluck("id", &ids).Error; err != nil {
+				e.logger.Warn("repush 回写定位失败", zap.Error(err))
+			}
+			if len(ids) > 0 {
+				if err := e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+					Where("id = ?", ids[0]).
 					Updates(map[string]interface{}{
 						"status":     "pushed",
 						"seeded":     true,
 						"seeded_at":  now,
 						"seed_error": "",
-					})
+					}).Error; err != nil {
+					e.logger.Warn("repush 回写失败", zap.Error(err), zap.Int64("record_id", ids[0]))
+				}
 			}
 		}
 		return res
