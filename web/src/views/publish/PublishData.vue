@@ -457,7 +457,7 @@ function persistFilters() {
     localStorage.setItem(FILTERS_KEY, JSON.stringify({
       client: selectedClient.value || undefined,
       path: selectedPath.value || undefined,
-      ready: readyFilter.value,
+      // ready 不持久化（§59.166：站视角三态离站无意义——恢复恒 all）
       search: injectSearch.value || undefined,
       page_size: injectPageSize.value,
     }))
@@ -470,7 +470,9 @@ function restoreFilters() {
     const f = JSON.parse(raw) as { client?: string; path?: string; ready?: 'all' | 'publishable' | 'published'; search?: string; page_size?: number }
     if (f.client) selectedClient.value = f.client
     if (f.path) selectedPath.value = f.path
-    if (f.ready) readyFilter.value = f.ready
+    // §59.166 回归审核：站不持久化——publishable/published 恢复后无站=禁用 radio
+    // 矛盾选中态（定案④从恢复路径复现）——非 all 一律回退
+    if (f.ready && f.ready === 'all') readyFilter.value = 'all'
     if (f.search) injectSearch.value = f.search
     if (f.page_size) injectPageSize.value = f.page_size
   } catch { /* silent */ }
