@@ -4447,11 +4447,25 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 			task.CurrentTitle = curTitle
 			h.siteBatch.mu.Unlock()
 
-			res := h.executor.Execute(ctx, publish.ExecuteInput{
-				InfoHash:     hash,
-				TargetSite:   req.TargetSite,
-				BatchGroupID: batchGroupID, // 匿名走站点级 form_config.Anonymous（§59.166 单源）
-			})
+			// §59.166 回归审核补：per-seed recover——executor panic 若穿透会把任务
+			// goroutine 炸掉（finishSiteBatch 永不调用 → 同站互斥永久锁死直到重启）。
+			// recover 后按单种失败继续（批量语义）。
+			res := func() *publish.ExecuteResult {
+				defer func() {
+					if rec := recover(); rec != nil {
+						h.logger.Error("site-batch executor panic",
+							zap.String("site", req.TargetSite), zap.Any("panic", rec))
+					}
+				}()
+				return h.executor.Execute(ctx, publish.ExecuteInput{
+					InfoHash:     hash,
+					TargetSite:   req.TargetSite,
+					BatchGroupID: batchGroupID, // 匿名走站点级 form_config.Anonymous（§59.166 单源）
+				})
+			}()
+			if res == nil {
+				res = &publish.ExecuteResult{Status: "failed", Message: "执行器 panic（已隔离，继续后续种子）"}
+			}
 			sr := siteBatchResult{InfoHash: hash, Title: curTitle, Status: res.Status, Message: res.Message}
 			if res.Upload != nil {
 				sr.TorrentID = res.Upload.TorrentID
