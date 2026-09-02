@@ -1,8 +1,8 @@
 <template>
   <div style="padding: 24px">
     <a-tabs v-model:active-key="activeTab">
-      <!-- ═══ Tab 1: 灌入发布（站中心，§59.133 ③） ═══ -->
-      <a-tab-pane key="inject" tab="灌入发布">
+      <!-- ═══ Tab 1: 批量发布（站中心，§59.133 ③ / §59.166 一站多种接线） ═══ -->
+      <a-tab-pane key="inject" tab="批量发布">
         <div class="inject-toolbar">
           <a-select
             v-model:value="selectedTarget"
@@ -36,24 +36,24 @@
             <a-radio-button value="new">未存在</a-radio-button>
           </a-radio-group>
           <a-tag v-if="selectedTarget" :color="publishableCount > 0 ? 'green' : 'default'" style="margin-left: 8px">
-            {{ selectedTarget }}：本页可灌入 {{ publishableCount }} 簇
+            {{ selectedTarget }}：本页可发布 {{ publishableCount }} 簇
           </a-tag>
-          <a-tooltip title="提交链路接线中（TagApplier 灰度，R3-5）">
-            <a-button
-              type="primary"
-              style="margin-left: auto"
-              :disabled="selectedInjectHashes.length === 0"
-            >
-              发布到 {{ selectedTarget || '目标站' }} ({{ selectedInjectHashes.length }})
-            </a-button>
-          </a-tooltip>
+          <a-button
+            type="primary"
+            style="margin-left: auto"
+            :disabled="selectedInjectHashes.length === 0 || !selectedTarget || batchTask !== null && !batchTask.finished"
+            :loading="batchSubmitting"
+            @click="submitBatch"
+          >
+            {{ batchTask && !batchTask.finished ? '发布中…' : `发布到 ${selectedTarget || '目标站'} (${selectedInjectHashes.length})` }}
+          </a-button>
         </div>
 
         <a-alert
           type="info"
           show-icon
           style="margin-bottom: 12px"
-          message="一站多种：以站点为中心——选定目标站，批量将 ready 簇灌入发布。已存在该站的簇默认不可选；源站禁转簇已隐藏。"
+          message="一站多种：以站点为中心——选定目标站，批量将 ready 簇串行发布（站点配置间隔）。已存在该站的簇默认不可选；源站禁转簇已隐藏。"
         />
 
         <a-table
@@ -107,7 +107,7 @@
               <template v-if="selectedTarget && existsOnTarget(record)">
                 <a-tag color="warning">已存在</a-tag>
               </template>
-              <a-tag v-else-if="selectedTarget" color="success">可灌入</a-tag>
+              <a-tag v-else-if="selectedTarget" color="success">可发布</a-tag>
               <span v-else style="color: #999; font-size: 12px">未选站</span>
             </template>
             <template v-if="column.key === 'actions'">
@@ -115,6 +115,51 @@
             </template>
           </template>
         </a-table>
+
+        <!-- §59.166 一站多种：批量任务进度/结果 -->
+        <div v-if="batchTask" class="batch-panel">
+          <template v-if="batchTask && !batchTask.finished">
+            <a-progress
+              :percent="batchPercent"
+              :format="() => `${batchTask?.done ?? 0}/${batchTask?.total ?? 0}`"
+              status="active"
+            />
+            <p class="batch-current">
+              正在发布 {{ batchTask.done + 1 }}/{{ batchTask.total }}
+              <span v-if="batchTask.current_title">：{{ batchTask.current_title }}</span>
+              <a-spin size="small" style="margin-left: 8px" />
+            </p>
+          </template>
+          <template v-else>
+            <a-alert :type="batchAlertType" show-icon style="margin-bottom: 12px">
+              <template #message>
+                批量发布完成：发布成功 {{ successCount }} 站次 · 已存在 {{ dupCount }} · 失败 {{ failCount }}
+                <span v-if="batchTask.error" style="color: #cf1322">（{{ batchTask.error }}）</span>
+              </template>
+            </a-alert>
+            <a-table
+              v-if="batchTask.results.length"
+              :columns="batchResultColumns"
+              :data-source="batchTask.results"
+              :pagination="false"
+              size="small"
+              row-key="info_hash"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
+                </template>
+                <template v-else-if="column.key === 'url'">
+                  <a v-if="record.url" :href="record.url" target="_blank">查看种子</a>
+                  <span v-else style="color: #999">—</span>
+                </template>
+                <template v-else-if="column.key === 'message'">
+                  <span :style="record.status === 'failed' ? 'color: #cf1322' : ''">{{ record.message || '—' }}</span>
+                </template>
+              </template>
+            </a-table>
+          </template>
+        </div>
       </a-tab-pane>
 
       <!-- ═══ Tab 2: 数据管理（行级 metadata，原功能保留） ═══ -->
@@ -226,7 +271,7 @@
     <CrossSeedPanel
       v-model:open="panelOpen"
       :preset-torrent="panelPreset"
-            @success="fetchData"
+      @success="fetchData"
     />
 
     <BatchFetchPanel
@@ -244,7 +289,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { executeApi, type SiteBatchTask } from '@/api/formConfig'
 import { useRoute, useRouter } from 'vue-router'
 import { ReloadOutlined, CheckCircleFilled, PlusOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
@@ -263,7 +309,7 @@ const router = useRouter()
 
 const activeTab = ref('inject')
 
-// ==================== Tab 1: 灌入发布（§59.133 ③ 站中心灌入） ====================
+// ==================== Tab 1: 批量发布（§59.133 ③ 站中心 / §59.166 一站多种） ====================
 
 const targetSites = ref<Site[]>([])
 const targetSitesLoading = ref(false)
@@ -276,6 +322,92 @@ const injectLoading = ref(false)
 const injectPage = ref(1)
 const injectPageSize = ref(50)
 const selectedInjectHashes = ref<string[]>([])
+
+// ═══ §59.166 一站多种：批量任务（提交+轮询+断线恢复）═══
+const batchTask = ref<SiteBatchTask | null>(null)
+const batchSubmitting = ref(false)
+let pollTimer: ReturnType<typeof setTimeout> | undefined
+
+const batchPercent = computed(() => {
+  const t = batchTask.value
+  if (!t) return 0
+  return Math.round((t.done / Math.max(t.total, 1)) * 100)
+})
+const successCount = computed(() => (batchTask.value?.results || []).filter(r => ['pushed', 'pushed_existing'].includes(r.status)).length)
+const dupCount = computed(() => (batchTask.value?.results || []).filter(r => ['duplicate', 'existing'].includes(r.status)).length)
+const failCount = computed(() => (batchTask.value?.results || []).filter(r => r.status === 'failed').length)
+const batchAlertType = computed(() => (failCount.value > 0 ? 'warning' : 'success'))
+const batchResultColumns = [
+  { title: '种子', key: 'title', ellipsis: true },
+  { title: '状态', key: 'status', width: 100 },
+  { title: '说明', key: 'message', ellipsis: true },
+  { title: '链接', key: 'url', width: 100 },
+]
+
+function statusText(st: string): string {
+  const m: Record<string, string> = {
+    pushed: '发布成功', pushed_existing: '已推种', duplicate: '站上已有', existing: '站上已有', failed: '失败',
+  }
+  return m[st] || st
+}
+function statusColor(st: string): string {
+  if (['pushed', 'pushed_existing'].includes(st)) return 'success'
+  if (['duplicate', 'existing'].includes(st)) return 'warning'
+  return 'error'
+}
+
+async function submitBatch() {
+  if (!selectedTarget.value || !selectedInjectHashes.value.length) return
+  batchSubmitting.value = true
+  try {
+    const res = await executeApi.executeSiteBatch([...selectedInjectHashes.value], selectedTarget.value)
+    const tid = res.data?.data?.task_id
+    if (tid) {
+      batchTask.value = { task_id: tid, target_site: selectedTarget.value, total: res.data?.data?.total || selectedInjectHashes.value.length, done: 0, results: [], finished: false, started_at: new Date().toISOString() }
+      selectedInjectHashes.value = []
+      schedulePoll(tid)
+    }
+  } finally {
+    batchSubmitting.value = false
+  }
+}
+
+function schedulePoll(taskId: string) {
+  if (pollTimer) clearTimeout(pollTimer)
+  pollTimer = setTimeout(async () => {
+    try {
+      const res = await executeApi.siteBatchProgress(taskId)
+      const t = res.data?.data
+      if (t) batchTask.value = t
+      if (t && !t.finished) schedulePoll(taskId)
+    } catch (err) {
+      // 404=任务过期（30 分钟 TTL）→ 终止轮询并标记完成；其他错误（网络抖动）继续
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 404) {
+        if (batchTask.value) batchTask.value = { ...batchTask.value, finished: true, error: '任务进度已过期（结果见发布日志）' }
+      } else {
+        schedulePoll(taskId)
+      }
+    }
+  }, 2000)
+}
+
+// 挂载恢复：目标站有运行中任务则接回进度（断线无伤）
+async function resumeActiveBatch() {
+  if (!selectedTarget.value) return
+  try {
+    const res = await executeApi.siteBatchActive(selectedTarget.value)
+    const t = res.data?.data
+    if (t && !t.finished) {
+      batchTask.value = t
+      schedulePoll(t.task_id)
+    }
+  } catch { /* 无任务 */ }
+}
+
+onUnmounted(() => {
+  if (pollTimer) clearTimeout(pollTimer)
+})
 
 const injectColumns = [
   { title: '簇名称', dataIndex: 'name', key: 'name', ellipsis: true, sorter: (a: SeedListItem, b: SeedListItem) => a.name.localeCompare(b.name) },
@@ -335,7 +467,7 @@ async function fetchInjectList() {
       hash: it.hash || `${it.client_id}|${it.name}`,
     }))
     injectTotal.value = resp.data?.data?.total || 0
-    // 跨页保留勾选（批量灌入跨页累积）；目标站变化时已存在语义变，onInjectFilterChange 显式清
+    // 跨页保留勾选（批量发布跨页累积）；目标站变化时已存在语义变，onInjectFilterChange 显式清
   } catch {
     message.error('加载 ready 簇失败')
     injectRows.value = []
@@ -377,7 +509,12 @@ watch(injectSearch, () => {
   injectSearchTimer = setTimeout(() => onInjectFilterChange(), 400)
 })
 
-// 切回灌入 Tab 时刷新 ready 簇（维护保存后 reviewed 状态可能变化）
+// 换目标站：恢复该站运行中任务（§59.166 断线无伤）
+watch(selectedTarget, () => {
+  if (!batchTask.value || batchTask.value.finished) resumeActiveBatch()
+})
+
+// 切回批量 Tab 时刷新 ready 簇（维护保存后 reviewed 状态可能变化）
 watch(activeTab, (tab) => {
   if (tab === 'inject') fetchInjectList()
 })
@@ -615,10 +752,22 @@ onMounted(() => {
   fetchInjectList()
   fetchData()
   tryOpenFromDeepLink()
+  resumeActiveBatch()
 })
 </script>
 
 <style scoped>
+.batch-panel {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.batch-current {
+  margin: 8px 0 0;
+  color: #555;
+}
 .inject-toolbar {
   display: flex;
   align-items: center;

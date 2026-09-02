@@ -32,6 +32,19 @@
             />
             <small>站点默认——勾选后该站发布默认匿名（uplver）</small>
           </div>
+          <div class="kv">
+            <span>发布间隔</span>
+            <a-input-number
+              v-model:value="intervalSeconds"
+              :min="1"
+              :max="60"
+              size="small"
+              style="width: 76px"
+              :disabled="intervalSaving"
+              @change="saveInterval"
+            />
+            <small>秒——一站多种批量发布种间间隔（连续上传节奏拟人）</small>
+          </div>
           <div v-for="(field, domain) in current.form_fields" :key="domain" class="kv">
             <span>{{ domain }}</span><b>{{ field }}</b>
             <small v-if="current.value_mappings?.[domain]?.length">{{ current.value_mappings[domain].length }} 项</small>
@@ -75,6 +88,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { sitesApi } from '@/api/sites'
 import { formConfigApi, type FormConfigDiffItem, type PublishFormConfig } from '@/api/formConfig'
 
 // §59.157: 站点详情页嵌入面板（仅 is_target 站渲染——发布语义=目标站）
@@ -88,7 +102,10 @@ const diffs = ref<FormConfigDiffItem[] | null>(null)
 const merged = ref<PublishFormConfig | null>(null)
 
 onMounted(() => {
-  if (props.siteName) loadCurrent()
+  if (props.siteName) {
+    loadCurrent()
+    loadInterval()
+  }
 })
 
 async function loadCurrent() {
@@ -105,6 +122,32 @@ function onFile(e: Event) {
   const reader = new FileReader()
   reader.onload = () => (html.value = String(reader.result ?? ''))
   reader.readAsText(f)
+}
+
+// §59.166 一站多种：发布间隔（sites.publish_interval_seconds——滚轮 1-60 默认 1）
+const intervalSeconds = ref(1)
+const intervalSaving = ref(false)
+let siteId: number | null = null
+
+async function loadInterval() {
+  try {
+    const res = await sitesApi.list(1, 200)
+    const s = (res.data?.data?.items || []).find((x: { name?: string }) => x.name === props.siteName)
+    if (s) {
+      siteId = (s as { id: number }).id
+      intervalSeconds.value = (s as { publish_interval_seconds?: number }).publish_interval_seconds || 1
+    }
+  } catch { /* 站点列表加载失败保持默认 */ }
+}
+
+async function saveInterval() {
+  if (siteId == null || intervalSaving.value) return
+  intervalSaving.value = true
+  try {
+    await sitesApi.update(siteId, { publishIntervalSeconds: intervalSeconds.value } as never)
+  } finally {
+    intervalSaving.value = false
+  }
 }
 
 async function setAnonymous(v: boolean) {

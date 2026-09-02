@@ -56,6 +56,7 @@ type PublishTorrentsHandler struct {
 	logger         *zap.Logger
 	bgState        backgroundQueryState
 	batchFetch     batchFetchState
+	siteBatch      siteBatchState // §59.166 一站多种批量任务
 	strategySem    chan struct{} // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
 	posterClusterCtx map[string]posterClusterContext // §59.61 附: infoHash → 簇上下文（异步修复回传用）
 }
@@ -83,6 +84,36 @@ type batchFetchItem struct {
 	Error  string `json:"error,omitempty"`
 }
 
+// ═══ §59.166 一站多种批量发布任务（N 种×1 站——串行+间隔，轮询进度）═══
+
+type siteBatchState struct {
+	mu     sync.Mutex
+	tasks  map[string]*siteBatchTask // taskID → task（含已完成待 TTL 清理）
+	active map[string]string         // targetSite → 运行中 taskID（同站互斥）
+}
+
+type siteBatchTask struct {
+	ID           string            `json:"task_id"`
+	TargetSite   string            `json:"target_site"`
+	Total        int               `json:"total"`
+	Done         int               `json:"done"`
+	CurrentTitle string            `json:"current_title,omitempty"`
+	Results      []siteBatchResult `json:"results"`
+	Finished     bool              `json:"finished"`
+	Error        string            `json:"error,omitempty"`
+	StartedAt    time.Time         `json:"started_at"`
+	FinishedAt   time.Time         `json:"finished_at,omitempty"`
+}
+
+type siteBatchResult struct {
+	InfoHash  string `json:"info_hash"`
+	Title     string `json:"title"`
+	Status    string `json:"status"`
+	Message   string `json:"message,omitempty"`
+	TorrentID string `json:"torrent_id,omitempty"`
+	URL       string `json:"url,omitempty"`
+}
+
 func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger, pipeline *publish.Pipeline) *PublishTorrentsHandler {
 	// §59.58: 容量 5——8 核实测每路 mpv ~6 核，5 路摊薄后单种子 ~145s < 4min ctx（60% 余量）。
 	// CPU 总量守恒：并发数不改变批量总时长，只消除无界并发导致的 ctx 超时作废功。
@@ -92,6 +123,7 @@ func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger, pipeline *publis
 		logger:           logger,
 		executor:         publish.NewPublishExecutor(pipeline),
 		bgState:          backgroundQueryState{active: make(map[uint]bool)},
+		siteBatch:        siteBatchState{tasks: map[string]*siteBatchTask{}, active: map[string]string{}},
 		resourceResolver: publish.NewResourceResolver(db),
 		strategySem:      make(chan struct{}, 5),
 		screenshotCacheDays: 30, // §59.63: 观察期默认 30 天（SetScreenshotCacheDays 由 settings 覆盖）
@@ -236,6 +268,11 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleExecutePublish(w, r)
 	case strings.HasSuffix(path, "/publish/seeds/execute-batch") && r.Method == http.MethodPost:
 		h.handleExecutePublishBatch(w, r)
+
+	case strings.HasSuffix(path, "/publish/seeds/execute-site-batch") && r.Method == http.MethodPost:
+		h.handleExecuteSiteBatch(w, r)
+	case strings.HasSuffix(path, "/publish/seeds/site-batch-progress") && r.Method == http.MethodGet:
+		h.handleSiteBatchProgress(w, r)
 
 	case strings.HasSuffix(path, "/publish/seeds/batch-fetch") && r.Method == http.MethodPost:
 		h.handleBatchFetch(w, r)
@@ -4321,4 +4358,158 @@ func (h *PublishTorrentsHandler) handleExecutePublishBatch(w http.ResponseWriter
 	}
 	wg.Wait()
 	Success(w, map[string]any{"batch_id": batchID, "results": results})
+}
+
+// handleExecuteSiteBatch §59.166 一站多种批量发布（N 种×1 站）：
+// 串行+种间间隔（sites.publish_interval_seconds，clamp 1-60）——NP 站连续上传
+// 反作弊风险，节奏拟人（用户定案）；单种失败不中断批次；统一 BatchGroupID。
+// 任务化：立即返回 taskId，进度走 site-batch-progress 轮询（断线无伤）。
+func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		InfoHashes []string `json:"infoHashes"`
+		TargetSite string   `json:"targetSite"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.InfoHashes) == 0 || req.TargetSite == "" {
+		Error(w, http.StatusBadRequest, 40001, "infoHashes 与 targetSite 必填")
+		return
+	}
+	if len(req.InfoHashes) > 100 {
+		Error(w, http.StatusBadRequest, 40002, "单批最多 100 个种子（流控防护）")
+		return
+	}
+	if h.executor == nil {
+		Error(w, http.StatusServiceUnavailable, 50301, "执行器未初始化")
+		return
+	}
+
+	// 目标站校验：存在 + 发布配置启用
+	var site model.Site
+	if err := h.db.WithContext(r.Context()).Where("name = ?", req.TargetSite).First(&site).Error; err != nil {
+		Error(w, http.StatusBadRequest, 40003, "目标站不存在: "+req.TargetSite)
+		return
+	}
+	cfg := model.ParseFormConfig(site.PublishFormConfig)
+	if cfg == nil || !cfg.Enabled {
+		Error(w, http.StatusBadRequest, 40004, "目标站未启用发布配置: "+req.TargetSite)
+		return
+	}
+	interval := site.PublishIntervalSeconds
+	if interval < 1 {
+		interval = 1
+	}
+	if interval > 60 {
+		interval = 60
+	}
+
+	// 同站互斥（运行中任务存在→拒）
+	taskID := fmt.Sprintf("%d", time.Now().UnixNano())
+	h.siteBatch.mu.Lock()
+	if _, running := h.siteBatch.active[req.TargetSite]; running {
+		h.siteBatch.mu.Unlock()
+		Error(w, http.StatusConflict, 40901, "该站已有批量任务运行中，请等待完成")
+		return
+	}
+	task := &siteBatchTask{
+		ID: taskID, TargetSite: req.TargetSite, Total: len(req.InfoHashes),
+		Results: make([]siteBatchResult, 0, len(req.InfoHashes)),
+		StartedAt: time.Now(),
+	}
+	h.siteBatch.tasks[taskID] = task
+	h.siteBatch.active[req.TargetSite] = taskID
+	h.siteBatch.mu.Unlock()
+
+	// §59.51 长任务铁律：脱离 HTTP 生命周期；动态超时 total×(60s+间隔) 封顶 24h
+	budget := time.Duration(len(req.InfoHashes)) * (60*time.Second + time.Duration(interval)*time.Second)
+	if budget > 24*time.Hour {
+		budget = 24 * time.Hour
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), budget)
+		defer cancel()
+		batchGroupID := taskID
+		for i, hash := range req.InfoHashes {
+			if i > 0 {
+				select {
+				case <-ctx.Done():
+					h.finishSiteBatch(task, "任务超时中断（已完成 "+fmt.Sprint(task.Done)+"/"+fmt.Sprint(task.Total)+"）")
+					return
+				case <-time.After(time.Duration(interval) * time.Second):
+				}
+			}
+			// 当前种标题（进度显示——DB 快查，失败留空）
+			curTitle := ""
+			var m model.TorrentMetadata
+			if err := h.db.WithContext(ctx).Select("title").
+				Where("info_hash = ?", hash).First(&m).Error; err == nil {
+				curTitle = m.Title
+			}
+			h.siteBatch.mu.Lock()
+			task.CurrentTitle = curTitle
+			h.siteBatch.mu.Unlock()
+
+			res := h.executor.Execute(ctx, publish.ExecuteInput{
+				InfoHash:     hash,
+				TargetSite:   req.TargetSite,
+				BatchGroupID: batchGroupID, // 匿名走站点级 form_config.Anonymous（§59.166 单源）
+			})
+			sr := siteBatchResult{InfoHash: hash, Title: curTitle, Status: res.Status, Message: res.Message}
+			if res.Upload != nil {
+				sr.TorrentID = res.Upload.TorrentID
+			}
+			sr.URL = res.TargetTorrentURL
+			h.siteBatch.mu.Lock()
+			task.Results = append(task.Results, sr)
+			task.Done++
+			task.CurrentTitle = ""
+			h.siteBatch.mu.Unlock()
+		}
+		h.finishSiteBatch(task, "")
+	}()
+
+	Success(w, map[string]any{"task_id": taskID, "total": len(req.InfoHashes), "interval_seconds": interval})
+}
+
+// finishSiteBatch 收尾（解锁同站互斥+终态时间戳）。
+func (h *PublishTorrentsHandler) finishSiteBatch(task *siteBatchTask, errMsg string) {
+	h.siteBatch.mu.Lock()
+	defer h.siteBatch.mu.Unlock()
+	task.Finished = true
+	task.Error = errMsg
+	task.FinishedAt = time.Now()
+	if h.siteBatch.active[task.TargetSite] == task.ID {
+		delete(h.siteBatch.active, task.TargetSite)
+	}
+}
+
+// handleSiteBatchProgress §59.166 批量任务进度轮询：
+// ?task_id= 指定任务；?site=X&active=1 查该站运行中任务（页面挂载恢复——断线无伤）。
+// 惰性 TTL 清理：完成任务 30 分钟后移除（发布日志有全量，内存态只保近期）。
+func (h *PublishTorrentsHandler) handleSiteBatchProgress(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	h.siteBatch.mu.Lock()
+	defer h.siteBatch.mu.Unlock()
+
+	// TTL 清理（30 分钟）
+	now := time.Now()
+	for id, t := range h.siteBatch.tasks {
+		if t.Finished && now.Sub(t.FinishedAt) > 30*time.Minute {
+			delete(h.siteBatch.tasks, id)
+		}
+	}
+
+	if q.Get("active") == "1" {
+		siteName := q.Get("site")
+		if id, ok := h.siteBatch.active[siteName]; ok {
+			Success(w, h.siteBatch.tasks[id])
+			return
+		}
+		Success(w, nil) // 无运行中任务
+		return
+	}
+	id := q.Get("task_id")
+	if t, ok := h.siteBatch.tasks[id]; ok {
+		Success(w, t)
+		return
+	}
+	Error(w, http.StatusNotFound, 40401, "任务不存在或已过期（30 分钟 TTL）")
 }

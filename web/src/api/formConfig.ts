@@ -72,9 +72,35 @@ export interface PublishTarget {
   has_pre_audit: boolean
 }
 
+export interface SiteBatchTask {
+  task_id: string
+  target_site: string
+  total: number
+  done: number
+  current_title?: string
+  results: Array<{ info_hash: string; title: string; status: string; message?: string; torrent_id?: string; url?: string }>
+  finished: boolean
+  error?: string
+  started_at: string
+  finished_at?: string
+}
+
 export const executeApi = {
   targets() {
     return client.get<ApiResponse<PublishTarget[]>>('/publish/form-config/targets')
+  },
+  // §59.166 一站多种：N 种×1 站批量（任务化+轮询）
+  executeSiteBatch(infoHashes: string[], targetSite: string) {
+    return client.post<ApiResponse<{ task_id: string; total: number; interval_seconds: number }>>('/publish/seeds/execute-site-batch', {
+      infoHashes,
+      targetSite,
+    })
+  },
+  siteBatchProgress(taskId: string) {
+    return client.get<ApiResponse<SiteBatchTask | null>>(`/publish/seeds/site-batch-progress?task_id=${encodeURIComponent(taskId)}`)
+  },
+  siteBatchActive(site: string) {
+    return client.get<ApiResponse<SiteBatchTask | null>>(`/publish/seeds/site-batch-progress?site=${encodeURIComponent(site)}&active=1`)
   },
   execute(infoHash: string, targetSite: string, opts?: { dryRun?: boolean; tagOverrides?: string[]; anonymous?: boolean; pushOnly?: boolean; torrentId?: string; pushClientId?: string; pushSavePath?: string }) {
     return client.post<ApiResponse<{ result: ExecuteResult }>>('/publish/seeds/execute', {
