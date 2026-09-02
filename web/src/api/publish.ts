@@ -193,7 +193,7 @@ export const seedConfigApi = {
   purgeObserving(clientId: string, name: string) {
     return client.post<ApiResponse<{ message: string; deleted_snaps: number; deleted_metas: number }>>('/publish/seeds/observing/purge', { clientId, name })
   },
-  listSeeds(params: { client_id?: string; save_path?: string; status?: string; search?: string; ready?: string; exclude_forbidden?: string; page?: number; page_size?: number }) {
+  listSeeds(params: { client_id?: string; save_path?: string; status?: string; search?: string; ready?: string; publish_state?: string; target_site?: string; exclude_forbidden?: string; page?: number; page_size?: number }) {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params })
   },
   uniquePaths() {

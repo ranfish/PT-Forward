@@ -35,9 +35,9 @@
             style="margin-left: 10px"
             @change="onBatchFilterChange"
           >
-            <a-radio-button value="ready">可发布</a-radio-button>
             <a-radio-button value="all">全部</a-radio-button>
-            <a-radio-button value="pending">待完善</a-radio-button>
+            <a-radio-button value="publishable" :disabled="!selectedTarget">可发布</a-radio-button>
+            <a-radio-button value="published" :disabled="!selectedTarget">已发布</a-radio-button>
           </a-radio-group>
           <a-input-search
             v-model:value="injectSearch"
@@ -47,8 +47,8 @@
             @search="onBatchFilterChange"
           />
           <a-tag v-if="injectTotal" color="blue" style="margin-left: 8px">共 {{ injectTotal }} 簇</a-tag>
-          <span v-if="selectedInjectHashes.length" style="margin-left: 8px; color: #1677ff">
-            已选 {{ selectedInjectHashes.length }} 簇
+          <span v-if="selectedInjectHashes.length" :style="{ marginLeft: '8px', color: selectedInjectHashes.length > 100 ? '#cf1322' : '#1677ff' }">
+            已选 {{ selectedInjectHashes.length }} 簇<span v-if="selectedInjectHashes.length > 100">（超单批上限 100——请分批）</span>
           </span>
           <a-button style="margin-left: 10px" @click="pickerOpen = true">
             {{ selectedTarget ? `目标站：${selectedTarget} ▾` : '选择发布站' }}
@@ -71,7 +71,7 @@
             pageSize: injectPageSize,
             total: injectTotal,
             showSizeChanger: true,
-            pageSizeOptions: ['50', '100', '200'],
+            pageSizeOptions: ['50', '100'],
             showTotal: (t: number) => `共 ${t} 簇`,
           }"
           row-key="hash"
@@ -136,7 +136,7 @@
               <a-button style="margin-right: 10px" @click="pickerOpen = false">关闭</a-button>
               <a-button
                 type="primary"
-                :disabled="!pickerValue || !selectedInjectHashes.length || pickerSiteBusy"
+                :disabled="!pickerValue || !selectedInjectHashes.length || selectedInjectHashes.length > 100 || pickerSiteBusy"
                 :loading="batchSubmitting"
                 @click="submitBatch"
               >
@@ -195,7 +195,7 @@ const clients = ref<Array<{ client_id: string; paths: Array<{ save_path: string;
 const clientsLoading = ref(false)
 const selectedClient = ref<string | undefined>(undefined)
 const selectedPath = ref<string | undefined>(undefined)
-const readyFilter = ref<'ready' | 'all' | 'pending'>('ready') // §59.166 用户定案：默认只显示配置好的种子
+const readyFilter = ref<'all' | 'publishable' | 'published'>('all') // §59.166 三态（未选站默认全部）
 const injectSearch = ref('')
 const injectRows = ref<SeedListItem[]>([])
 const injectTotal = ref(0)
@@ -396,7 +396,10 @@ async function fetchInjectList() {
     const resp = await seedConfigApi.listSeeds({
       client_id: selectedClient.value || '',
       save_path: selectedPath.value || '',
-      ready: readyFilter.value === 'ready' ? 'true' : (readyFilter.value === 'pending' ? 'false' : ''),
+      // §59.166 三态：publishable/published 走 target_site+publish_state（后端
+      // publishable 自含 reviewed）；all 不带
+      publish_state: (readyFilter.value === 'publishable' || readyFilter.value === 'published') ? readyFilter.value : '',
+      target_site: readyFilter.value === 'all' ? '' : (selectedTarget.value || ''),
       // §59.143: 发布页隐藏源站禁转簇
       exclude_forbidden: 'true',
       search: injectSearch.value,
@@ -439,8 +442,11 @@ watch(injectSearch, () => {
   injectSearchTimer = setTimeout(() => onInjectFilterChange(), 400)
 })
 
-// 换目标站：恢复该站运行中任务（§59.166 断线无伤）
-watch(selectedTarget, () => {
+// 换目标站联动（§59.166 用户定案）：选站→切"可发布"；清站→回"全部"
+// （发布消费清站后筛选自动复位——可发布/已发布在未选站时无意义）
+watch(selectedTarget, (v) => {
+  if (v) readyFilter.value = 'publishable'
+  else if (readyFilter.value !== 'all') readyFilter.value = 'all'
   if (!batchTask.value || batchTask.value.finished) resumeActiveBatch()
 })
 
@@ -461,7 +467,7 @@ function restoreFilters() {
   try {
     const raw = localStorage.getItem(FILTERS_KEY)
     if (!raw) return
-    const f = JSON.parse(raw) as { client?: string; path?: string; ready?: 'ready' | 'all' | 'pending'; search?: string; page_size?: number }
+    const f = JSON.parse(raw) as { client?: string; path?: string; ready?: 'all' | 'publishable' | 'published'; search?: string; page_size?: number }
     if (f.client) selectedClient.value = f.client
     if (f.path) selectedPath.value = f.path
     if (f.ready) readyFilter.value = f.ready

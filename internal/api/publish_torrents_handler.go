@@ -2613,6 +2613,9 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 	if pageSize == 0 {
 		pageSize = 50
 	}
+	if pageSize > 100 {
+		pageSize = 100 // §59.166 单批发布上限 100 对齐（localStorage 脏值防线）
+	}
 
 	// 观察组 = (client, name) 聚合：全变体 hidden（组内无活跃行）且 name 非空
 	type obsRow struct {
@@ -2785,6 +2788,42 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// system_forbidden 精判在分页后（排除致页不齐）——保留红标, Eligibility 提交兜底
 	excludeForbidden := r.URL.Query().Get("exclude_forbidden") == "true"
 
+	// §59.166 一站多种：目标站发布维度筛选（publish_state=publishable/published
+	// + target_site）。口径（用户定案）：已发布=四终态（pushed/pushed_existing/
+	// duplicate/existing）有记录；可发布=已审核（reviewed 蕴含资产完备——种配审核
+	// 流程权威保证）AND 无四终态记录（failed 算未发布可重试）；关联键=簇成员 hash
+	// 集合反查簇键（宁漏勿错——早期空 source_info_hash 记录匹配不上→落可发布，
+	// dedup 兜底）。
+	publishState := r.URL.Query().Get("publish_state")
+	publishTargetSite := r.URL.Query().Get("target_site")
+	var publishedClusters map[string]bool
+	if (publishState == "publishable" || publishState == "published") && publishTargetSite != "" {
+		var pubHashes []string
+		h.db.WithContext(r.Context()).
+			Table("publish_result_records").
+			Where("target_site = ? AND source_info_hash != '' AND status IN ?",
+				publishTargetSite, []string{"pushed", "pushed_existing", "duplicate", "existing"}).
+			Distinct("source_info_hash").
+			Pluck("source_info_hash", &pubHashes)
+		publishedClusters = make(map[string]bool)
+		if len(pubHashes) > 0 {
+			type ckRow struct {
+				ClientID string
+				SavePath string
+				Name     string
+			}
+			var cks []ckRow
+			h.db.WithContext(r.Context()).
+				Table("torrent_snapshots").
+				Select("DISTINCT client_id, save_path, name").
+				Where("hash IN ? AND is_hidden = 0 AND name != ''", pubHashes).
+				Find(&cks)
+			for _, c := range cks {
+				publishedClusters[c.ClientID+"|"+c.SavePath+"|"+c.Name] = true
+			}
+		}
+	}
+
 	// §59.38: 观察期视图——独立分支（hidden 组按 (client,name) 聚合，
 	// 不与活跃视图共用查询/状态机）
 	if statusFilter == "observing" {
@@ -2799,6 +2838,9 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
 	if pageSize == 0 {
 		pageSize = 50
+	}
+	if pageSize > 100 {
+		pageSize = 100 // §59.166 单批发布上限 100 对齐（localStorage 脏值防线）
 	}
 
 	// 1. 查 snapshots——§59.26: 先去重再分页；§59.29: SQL 层分组去重（20w+ 行时
@@ -3041,6 +3083,20 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			}
 			if readyFilter == "false" && isReady {
 				continue
+			}
+		}
+
+		// §59.166 一站多种：发布维度过滤（publishable 自含 reviewed——三态筛选
+		// 无独立 ready 选项；published=历史事实回溯）
+		if (publishState == "publishable" || publishState == "published") && publishTargetSite != "" {
+			isPub := publishedClusters[snap.ClientID+"|"+snap.SavePath+"|"+snap.Name]
+			if publishState == "published" && !isPub {
+				continue
+			}
+			if publishState == "publishable" {
+				if isPub || meta == nil || !meta.Reviewed {
+					continue
+				}
 			}
 		}
 
