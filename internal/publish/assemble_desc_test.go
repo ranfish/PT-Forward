@@ -3,6 +3,8 @@ package publish
 import (
 	"strings"
 	"testing"
+
+	"github.com/ranfish/pt-forward/internal/model"
 )
 
 
@@ -36,5 +38,23 @@ Chapters: GBR - only named source available.`
 	// MI 老段名 General 也覆盖
 	if got := FullwidthMIColons("General : x"); got != "General： x" {
 		t.Errorf("General 空格变体应替换, got %q", got)
+	}
+}
+
+// §59.166: 海报双份回归修复——发布组装不插入 Tab2 海报（简介自带）
+func TestAssembleNoPosterDuplication(t *testing.T) {
+	meta := &model.TorrentMetadata{
+		Statement:   "感谢 FRDS 组",
+		Poster:      "https://img.example.com/poster.jpg",
+		Description: "[img]https://img.example.com/poster.jpg[/img]\n剧情简介正文",
+	}
+	out := assembleDescription(meta)
+	// Tab2 海报不注入（简介自带——双份防御）
+	n := strings.Count(out, "poster.jpg")
+	if n != 1 {
+		t.Errorf("海报应恰好 1 次（简介自带），got %d 次", n)
+	}
+	if !strings.Contains(out, "剧情简介正文") {
+		t.Error("简介正文应保留")
 	}
 }

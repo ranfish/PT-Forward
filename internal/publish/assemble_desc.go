@@ -9,7 +9,7 @@
 //
 // 组装形态（§59.159 用户定案）：
 //   [quote]Tab2 声明完整 BBCode[/quote]  ← 置顶
-//   [img]海报[/img] + Tab4 简介            ← 落库资产直拼
+//   Tab4 简介（自带海报——§59.166 不再插 Tab2 海报防双份）
 //   [img]截图 ×N[/img]（≤8 张，无引号）    ← 简介下方
 package publish
 
@@ -34,6 +34,9 @@ func FullwidthMIColons(s string) string {
 }
 
 // assembleDescription 发布描述纯本地组装（零网络依赖）。
+// §59.166 海报双份回归修复：Tab4 简介（rendered PTGen 产物）头部自带海报
+// （§59.88 同型：doubaninfo format 头部图）——不再插入 Tab2 海报（用户定案）；
+// 新建本函数时未继承 §59.88 防御致双份回归。
 // meta 各资产来自种子配置页六 Tab（获取-审核阶段产物）。
 func assembleDescription(meta *model.TorrentMetadata) string {
 	var b strings.Builder
@@ -41,11 +44,6 @@ func assembleDescription(meta *model.TorrentMetadata) string {
 		b.WriteString("[quote]")
 		b.WriteString(FullwidthMIColons(q))
 		b.WriteString("[/quote]\n\n")
-	}
-	if p := strings.TrimSpace(meta.Poster); p != "" {
-		b.WriteString("[img]")
-		b.WriteString(p)
-		b.WriteString("[/img]\n\n")
 	}
 	if d := strings.TrimSpace(meta.Description); d != "" {
 		b.WriteString(d)
