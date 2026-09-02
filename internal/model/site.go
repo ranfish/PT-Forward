@@ -73,6 +73,8 @@ type Site struct {
 	UseGlobalProxy  bool   `json:"use_global_proxy" gorm:"default:false"`
 	SkipSSLVerify   bool   `json:"skip_ssl_verify" gorm:"default:false"`
 	MaxConcurrent   int    `json:"max_concurrent" gorm:"default:2"`
+	// §59.166: 一站多种批量发布种间间隔（秒，站点级——FormConfigPanel 滚轮 1-60，默认 1）
+	PublishIntervalSeconds int `json:"publish_interval_seconds" gorm:"default:1"`
 
 	SupportsPiecesHashAPI bool   `json:"supports_pieces_hash_api" gorm:"default:false"`
 	APIDomain             string `json:"api_domain,omitempty" gorm:"size:255;default:''"`

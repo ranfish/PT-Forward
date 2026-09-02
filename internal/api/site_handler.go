@@ -176,6 +176,7 @@ type updateSiteRequest struct {
 	CookieCloudDomain  *string `json:"cookieCloudDomain,omitempty"`
 	AlternativeDomains *string `json:"alternativeDomains,omitempty"`
 	Enabled            *bool   `json:"enabled,omitempty"`
+	PublishIntervalSeconds *int `json:"publishIntervalSeconds,omitempty"` // §59.166 一站多种批量发布种间间隔（1-60 秒）
 
 	SupportsPiecesHashAPI *bool `json:"supportsPiecesHashApi,omitempty"`
 
@@ -623,7 +624,7 @@ var siteImportFields = []string{
 	"is_source", "is_target", "target_types", "participate_auto_publish",
 	"hr_strategy", "override_rss_url", "override_save_path",
 	"assume_free",
-	"proxy_url", "use_global_proxy", "skip_ssl_verify", "max_concurrent",
+	"proxy_url", "use_global_proxy", "skip_ssl_verify", "max_concurrent", "publish_interval_seconds",
 	"reseed_limit_count", "reseed_limit_interval", "iyuu_limit_count", "iyuu_limit_interval",
 	"alternative_domains", "tracker_domains", "supports_pieces_hash_api", "api_domain",
 }
@@ -1015,6 +1016,17 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Enabled != nil {
 		s.Enabled = *req.Enabled
+	}
+	// §59.166: clamp 1-60（防脏数据）
+	if req.PublishIntervalSeconds != nil {
+		v := *req.PublishIntervalSeconds
+		if v < 1 {
+			v = 1
+		}
+		if v > 60 {
+			v = 60
+		}
+		s.PublishIntervalSeconds = v
 	}
 	if req.IsSource != nil {
 		s.IsSource = *req.IsSource
