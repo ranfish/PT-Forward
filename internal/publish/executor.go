@@ -299,7 +299,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if strings.TrimSpace(meta.Title) == "" || strings.TrimSpace(meta.Description) == "" {
 		return failRec("ineligible", "资产不完备：name/简介为空（先完成获取-审核）")
 	}
-	form[cfg.FormFields[model.FieldDomainDescription]] = assembleDescription(meta)
+	form[cfg.FormFields[model.FieldDomainDescription]] = assembleDescription(meta, cfg)
 
 	// ⑦ pre-audit（§59.159 六轮定案：适配工具非发布门控——结果记录不阻断；
 	// 历史：§59.150"passed 才提交"为单站验证期设计，多站架构下门控语义不成立）
