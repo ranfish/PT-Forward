@@ -360,9 +360,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 
 	// dedup（复用组件——pieces_hash 目标站查重）
 	if dup, dupMsg := e.pipe.dedupByPiecesHash(ctx, adapter, siteConfig, torrentData); dup {
-		msg := "目标站已存在同内容种子: " + dupMsg
-		e.recordResult(ctx, in, meta, rv, "duplicate", msg, "", "")
-		return failRec("duplicate", msg)
+		// failRec 统一落库（§59.164 双落库回归修复——此前 recordResult+failRec 各落一次）
+		return failRec("duplicate", "目标站已存在同内容种子: "+dupMsg)
 	}
 
 	resp, upErr := adapter.UploadTorrent(ctx, siteConfig, pubReq)
