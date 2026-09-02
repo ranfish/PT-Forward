@@ -1411,5 +1411,31 @@
     "2024": "year.2024",
     "2025": "year.2025",
     "Earlier/更早": "year.earlier"
+  },
+  "tag": {
+    "禁转": "tag.restricted",
+    "严禁转载": "tag.restricted",
+    "禁止转载": "tag.restricted",
+    "谢绝转载": "tag.restricted",
+    "谢绝搬运": "tag.restricted",
+    "限时禁转": "tag.restricted",
+    "独占": "tag.exclusive",
+    "分集": "tag.episodes",
+    "国语": "tag.chinese_audio",
+    "普通话": "tag.chinese_audio",
+    "国配": "tag.chinese_audio",
+    "粤语": "tag.cantonese_audio",
+    "粤": "tag.cantonese_audio",
+    "中字": "tag.chinese_subtitle",
+    "简繁": "tag.chinese_subtitle",
+    "繁简": "tag.chinese_subtitle",
+    "繁体": "tag.chinese_subtitle",
+    "简体": "tag.chinese_subtitle",
+    "中英": "tag.chinese_subtitle",
+    "中文": "tag.chinese_subtitle",
+    "DIY": "tag.diy",
+    "官方": "tag.official",
+    "官组": "tag.official",
+    "完结": "tag.complete"
   }
 }
