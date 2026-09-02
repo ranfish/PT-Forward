@@ -316,9 +316,14 @@ async function submitBatch() {
     }
   } catch (err) {
     // §59.166 回归审核补：40901 人话提示（同站互斥——可能来自其它标签页提交）
-    const status = (err as { response?: { status?: number } })?.response?.status
+    const e2 = err as { response?: { status?: number; data?: { message?: string } }; message?: string }
+    const status = e2?.response?.status
     if (status === 409) {
       message.warning('该站已有批量任务运行中，请等待完成')
+    } else {
+      // §59.166 实战回归：非 409 静默吞错=「点击发布没反应」——必须人话报错
+      const detail = e2?.response?.data?.message || e2?.message || '请求失败'
+      message.error('发布失败: ' + detail)
     }
   } finally {
     batchSubmitting.value = false
