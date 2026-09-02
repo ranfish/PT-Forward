@@ -10,6 +10,7 @@
 // 组装形态（§59.159 用户定案）：
 //   [quote]Tab2 声明完整 BBCode[/quote]  ← 置顶
 //   Tab4 简介（自带海报——§59.166 不再插 Tab2 海报防双份）
+//   [quote]MediaInfo[/quote]（无 techinfo 域站——修道院规范）
 //   [img]截图 ×N[/img]（≤8 张，无引号）    ← 简介下方
 package publish
 
@@ -37,8 +38,12 @@ func FullwidthMIColons(s string) string {
 // §59.166 海报双份回归修复：Tab4 简介（rendered PTGen 产物）头部自带海报
 // （§59.88 同型：doubaninfo format 头部图）——不再插入 Tab2 海报（用户定案）；
 // 新建本函数时未继承 §59.88 防御致双份回归。
+// §59.166 修道院发布规范（用户权威定义）：无 technical_info 表单域的站，
+// MI 以引用格式插入简介（顺序：声明→简介→MI→截图）；有域的站（幸运）MI 走
+// 表单字段——descr 绝不混入 MI 原文（幸运审核检测简介 MI 文本，§59.163）。
+// 数据驱动：按 form_config.FormFields 有无 techinfo 域自动分支，新站零配置。
 // meta 各资产来自种子配置页六 Tab（获取-审核阶段产物）。
-func assembleDescription(meta *model.TorrentMetadata) string {
+func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConfig) string {
 	var b strings.Builder
 	if q := strings.TrimSpace(meta.Statement); q != "" {
 		b.WriteString("[quote]")
@@ -47,6 +52,15 @@ func assembleDescription(meta *model.TorrentMetadata) string {
 	}
 	if d := strings.TrimSpace(meta.Description); d != "" {
 		b.WriteString(d)
+	}
+	// §59.166 修道院规范：无 techinfo 表单域 → MI 引用格式入简介（半角原文——
+	// 无自动审核站，标准形态；全角化只服务幸运声明 quote）
+	if cfg == nil || cfg.FormFields[model.FieldDomainTechInfo] == "" {
+		if mi := strings.TrimSpace(meta.MediaInfo); mi != "" {
+			b.WriteString("\n\n[quote]")
+			b.WriteString(mi)
+			b.WriteString("[/quote]")
+		}
 	}
 	shots := parseScreenshotsCol(meta.Screenshots)
 	if len(shots) > 8 { // §59.84 上限
