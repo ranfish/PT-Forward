@@ -171,3 +171,29 @@ func TestMergeDraftWithCurrent(t *testing.T) {
 		}
 	}
 }
+
+// §59.164: parse 词条补 StandardKeys（label 宽松反查——修道院实战暴露）
+func TestParseStandardKeysEnrich(t *testing.T) {
+	html := `<form>
+	<select name="type"><option value="0">请选择</option><option value="401">电影（Movies）</option></select>
+	<select name="standard_sel[4]"><option value="8">4K/2160i/2160P</option><option value="6">1080i/1080P</option></select>
+	<select name="team_sel[4]"><option value="25">FRDS</option></select>
+	<select name="medium_sel[4]"><option value="7">Encode</option></select>
+	</form>`
+	draft := ParsePublishFormHTML(html)
+	lookup := func(domain, wantCode string) {
+		t.Helper()
+		for _, m := range draft.ValueMappings[domain] {
+			for _, k := range m.StandardKeys {
+				if k == wantCode {
+					return
+				}
+			}
+		}
+		t.Errorf("%s 词条未补到 StandardKeys %q（含 %v）", domain, wantCode, draft.ValueMappings[domain])
+	}
+	lookup("type", "category.movie")
+	lookup("standard", "resolution.r2160p") // 大小写不敏感（4K/2160i/2160P）
+	lookup("team", "team.frds")
+	lookup("medium", "medium.encode")
+}
