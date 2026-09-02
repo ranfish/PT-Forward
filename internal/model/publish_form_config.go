@@ -48,6 +48,7 @@ const (
 	FieldDomainPTGen       = "pt_gen"   // §59.159: PT-Gen 链接（幸运必填——用户实战指认）
 	FieldDomainDoubanURL   = "dburl"    // §59.159: 豆瓣链接（PTNexus 同款）
 	FieldDomainUplver      = "uplver"   // §59.159: 匿名发布（checkbox value=yes——语义由 Anonymous 承载，域仅记录存在性）
+	FieldDomainCNName      = "cnname"  // §59.164: 中文名独立字段（修道院——幸运并入 name）
 	FieldDomainDescription = "description"
 	FieldDomainTechInfo    = "technical_info"
 )
