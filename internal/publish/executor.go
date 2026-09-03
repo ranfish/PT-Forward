@@ -731,7 +731,7 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 		PageURL       string   `json:"page_url,omitempty"`
 	}
 	body := auditBody{
-		Name:          meta.Title,
+		Name:          e.preAuditTitle(meta),
 		SmallDescr:    form[model.FieldDomainSmallDescr],
 		IMDBURL:       meta.IMDbURL,
 		Description:   form[cfg.FormFields[model.FieldDomainDescription]],
@@ -869,4 +869,15 @@ func detailURLOf(cfg *model.SiteConfig, tid string) string {
 		return ""
 	}
 	return strings.TrimRight(cfg.Domain, "/") + "/details.php?id=" + tid
+}
+
+// preAuditTitle §59.166 B2 补：预检 name 与上传标题同源（tp 重组 MI 纠错终态
+// ——Arco 案预检层旧标题与表单 DDP 对照错位残留）。
+func (e *PublishExecutor) preAuditTitle(meta *model.TorrentMetadata) string {
+	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
+	tp := titleparser.BuildTechProfile(meta.Title, meta.MediaInfo, domMedium, domRes, domVideo, domAudio)
+	if rt := titleparser.ReassembleFromTechProfile(tp, titleparser.V105TitleFormat()); strings.TrimSpace(rt) != "" {
+		return rt
+	}
+	return meta.Title
 }
