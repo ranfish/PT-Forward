@@ -52,7 +52,7 @@
 4. 发布配置 diff 维度补 StandardKeys 对比（低优先）
 4. R3-5/R3-6 遗留：team 域词条建设待做
 5. 憨憨源站适配收尾观察（§59.167 RSS 去重修复后采集验证运行中（不绑下载器——用户授权适配期专用）+禁转标签实弹验证）
-6. 支线：站点支持 OTA 同步（§59.167 migration 33 传道院下线+修道院骨架含 form_config——OTA 实例更新验证待用户执行）
+6. 支线：OTA 更新验证待用户执行（§59.167 三合一：migration 33 站点同步+migration 4 无限重启修复+Docker 日志治理（默认 error 级/密码直打印））
 
 **活跃观察项（未闭环）**：
 - build-backend go test 偶发"首跑 FAIL 重跑过"（三次：seeding/TestFlush_PushOne_TorrentExists 09-02 最新——时序敏感待定位）
