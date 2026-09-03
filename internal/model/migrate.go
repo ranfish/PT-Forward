@@ -22,6 +22,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&PublishCandidate{},
 		&PublishResultRecord{},
 		&PublishTask{},
+		&PublishGroupMember{}, // §59.167 PT31 新装缺表（模型在用三处——AutoMigrate 清单遗漏）
 		&PublishExclusion{},
 		&SiteFieldMapping{},
 		&SiteConfigOverride{},
