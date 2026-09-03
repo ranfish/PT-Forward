@@ -23,6 +23,14 @@ type DownloaderChecker interface {
 }
 
 func (s *SeedingConfirmation) CheckOnce(ctx context.Context, checker DownloaderChecker) error {
+	// §59.167 新装场景（PT31 实战）：表缺失静默跳过（周期任务噪音——AutoMigrate
+	// 清单与老模型演进差异；表在则正常查）
+	var tbl int64
+	s.db.WithContext(ctx).Raw(
+		"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='publish_group_members'").Scan(&tbl)
+	if tbl == 0 {
+		return nil
+	}
 	var members []model.PublishGroupMember
 	err := s.db.WithContext(ctx).
 		Where("status IN ?", []model.MemberStatus{
