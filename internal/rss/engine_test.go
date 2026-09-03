@@ -500,11 +500,11 @@ func TestEngine_FetchOnce_HappyPath(t *testing.T) {
 	require.Equal(t, int64(4700000000), dispatched[0].Size)
 	require.Equal(t, "testsit", dispatched[0].SiteName)
 
-	// After fetchOnce, status is "seen" (not yet "pushed"), so IsSeen should be false
-	// (IsSeen only returns true for status="pushed" or "blocked")
+	// §59.167 修复后：fetchOnce 已 MarkSeen（status="seen"）→ IsSeen 存在性判定为 true
+	//（原白名单语义与写入恒 seen 断裂——每轮重复分发实证）
 	isSeen, err := eng.repo.IsSeen(context.Background(), "testsit", "501", "1")
 	require.NoError(t, err)
-	require.False(t, isSeen, "status=seen should not be considered seen yet")
+	require.True(t, isSeen, "status=seen 应视为已见过（§59.167 存在性判定）")
 
 	// Simulate pushed status
 	eng.repo.MarkStatus(context.Background(), "1", "testsit", "501", "pushed")
@@ -828,7 +828,7 @@ func TestEngine_FetchOnce_NoDispatcher(t *testing.T) {
 
 	isSeen, err := eng.repo.IsSeen(context.Background(), "testsit", "401", "1")
 	require.NoError(t, err)
-	require.False(t, isSeen, "status=seen should not be IsSeen=true until pushed")
+	require.True(t, isSeen, "status=seen 应视为已见过（§59.167 存在性判定）")
 }
 
 func TestEngine_FetchOnce_FreeTorrent(t *testing.T) {
