@@ -1,5 +1,7 @@
 package titleparser
 
+import "encoding/json"
+
 // BuildTechProfile 三源分层合并 → TechProfile（§56.34 决策 4 的公共入口）。
 //
 // 统一供 runAnalyze（手动转发 ⑫）和 fetchSingleTorrent（种子配置页）调用，
@@ -22,4 +24,26 @@ func BuildTechProfile(title, mediaInfo string, domMedium, domResolution, domVide
 		profile.EditionInfo = profile.ReleaseVersion
 	}
 	return profile
+}
+
+// DOMFieldsFromDetailSource §59.166 A 层公共提升（原 api 包私有 domFieldsFromDetailSource
+// 三处重复——发布链 executor 同源消费需要；detail 提取器存 standard key 经
+// ReverseLookup 归一，未映射 key 空=跳过保留 title 值）。
+func DOMFieldsFromDetailSource(detailJSON string) (medium, resolution, videoCodec, audioCodec string) {
+	if detailJSON == "" {
+		return
+	}
+	var ds struct {
+		Medium     string `json:"medium"`
+		Resolution string `json:"resolution"`
+		VideoCodec string `json:"video_codec"`
+		AudioCodec string `json:"audio_codec"`
+	}
+	if json.Unmarshal([]byte(detailJSON), &ds) != nil {
+		return
+	}
+	return ReverseLookup(ds.Medium),
+		ReverseLookup(ds.Resolution),
+		ReverseLookup(ds.VideoCodec),
+		ReverseLookup(ds.AudioCodec)
 }
