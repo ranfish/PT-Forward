@@ -3,7 +3,8 @@ ARG TARGETPLATFORM
 FROM node:24-alpine AS frontend
 # §59.167 容器日志默认 error 级（仅错误+首次密码直打印——info 级刷屏用户定案治理；
 # 需要详细日志：docker run -e PTF_LOG_LEVEL=info）
-ENV PTF_LOG_LEVEL=error
+ENV PTF_LOG_LEVEL=error \
+    PTF_DATABASE_LOGLEVEL=error
 
 WORKDIR /build/web
 COPY web/package.json web/package-lock.json ./
@@ -15,7 +16,8 @@ FROM golang:1.25-bookworm AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends git gcc libc6-dev && rm -rf /var/lib/apt/lists/*
 # §59.167 容器日志默认 error 级（仅错误+首次密码直打印——info 级刷屏用户定案治理；
 # 需要详细日志：docker run -e PTF_LOG_LEVEL=info）
-ENV PTF_LOG_LEVEL=error
+ENV PTF_LOG_LEVEL=error \
+    PTF_DATABASE_LOGLEVEL=error
 
 WORKDIR /build
 COPY go.mod go.sum ./
@@ -50,7 +52,8 @@ RUN chmod 755 /usr/local/bin/pt-forward /usr/local/bin/mpv
 
 # §59.167 容器日志默认 error 级（仅错误+首次密码直打印——info 级刷屏用户定案治理；
 # 需要详细日志：docker run -e PTF_LOG_LEVEL=info）
-ENV PTF_LOG_LEVEL=error
+ENV PTF_LOG_LEVEL=error \
+    PTF_DATABASE_LOGLEVEL=error
 
 WORKDIR /
 EXPOSE 8765
