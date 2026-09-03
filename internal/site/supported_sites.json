@@ -276,8 +276,8 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "hhanclub.net",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "verified",
-    "special_notes": "仅源站，全站官种"
+    "special_notes": "全站官种仅源站（docs/32/hhanclub.md）；checkbox 筛选 RSS（cat[]/processing[]/medium[]…）；无限时禁转——标签明示禁转；黑名单 FGT/Hao4K/Mp4Ba/RARBG；H&R 20天72h",
+    "verification_status": "verified"
   },
   "kufei.org": {
     "domain": "kufei.org",
