@@ -249,6 +249,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// 1080 归一)/天空之城(audio)/Arco(MI 纠错 DDP)。type/team 域保持原源。
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
 	tp := titleparser.BuildTechProfile(meta.Title, meta.MediaInfo, domMedium, domRes, domVideo, domAudio)
+	// §59.166 B2：发布标题重组同源——ReassembleFromTechProfile(tp) 为权威（MI 纠错
+	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）；空/异常回 meta.Title。
+	publishTitle := meta.Title
+	if rt := titleparser.ReassembleFromTechProfile(tp, titleparser.V105TitleFormat()); strings.TrimSpace(rt) != "" {
+		publishTitle = rt
+	}
 	jobs := []domainJob{
 		{model.FieldDomainType, e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)},
 		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", tp.Resolution))},
@@ -342,7 +348,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	pubReq := &model.PublishRequest{
 		TorrentData: torrentData,
 		FormFields:  form,
-		Title:       meta.Title,
+		Title:       publishTitle,
 		Subtitle:    form[model.FieldDomainSmallDescr],
 		Description: form[cfg.FormFields[model.FieldDomainDescription]],
 		MediaInfo:   meta.MediaInfo,
@@ -568,6 +574,12 @@ func (e *PublishExecutor) lookupByStdKey(cfg *model.PublishFormConfig, domain, s
 
 // audioMappingOf §59.166 A 层：TechProfile 源音频映射（组合键优先 §59.150 判据六）。
 func (e *PublishExecutor) audioMappingOf(cfg *model.PublishFormConfig, audioCodec, audioTech string) *model.FormValueMapping {
+	// §59.166 B1：canonical→词条 standard_key 直取优先（"DD" 词表 exact 失明修复）
+	if sk := titleparser.AudioStandardKey(audioCodec); sk != "" {
+		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, sk); m != nil {
+			return m
+		}
+	}
 	if audioCodec != "" && audioTech != "" {
 		combined := extract.LookupStandardKey("audio_codec", audioCodec+" "+audioTech)
 		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, combined); m != nil {
