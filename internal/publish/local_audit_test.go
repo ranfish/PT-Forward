@@ -113,3 +113,13 @@ func codes(f []LocalAuditFinding) []string {
 	}
 	return out
 }
+
+// §59.166 回归审核：禁发组词边界负例（Altitude 含 alt 不命中——青蛙/藏宝阁同款边界语义）
+func TestBannedGroupWordBoundary(t *testing.T) {
+	if g := containsBannedGroup("Movie.2026.Altitude.1080p-GROUP"); g != "" {
+		t.Errorf("Altitude 不应误命中 alt, got %s", g)
+	}
+	if g := containsBannedGroup("Movie 2026 1080p BluRay x265-XiaoMi"); g == "" {
+		t.Error("XiaoMi（大小写不敏感）应命中")
+	}
+}
