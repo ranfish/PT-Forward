@@ -986,8 +986,7 @@ func initEncryption(cfg *config.Config, configPath string, db *gorm.DB, log *zap
 	if err := crypto.MigratePlaintext(db, enc, log); err != nil {
 		log.Warn("plaintext migration warning", zap.Error(err))
 	}
-	// §59.167 直 stdout：加密初始化是关键启动信息（用户点名保留——error 级下 Info 被滤）
-	fmt.Println("credential encryption initialized")
+	log.Info("credential encryption initialized")
 	return nil
 }
 
