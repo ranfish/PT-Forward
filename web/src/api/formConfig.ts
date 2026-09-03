@@ -57,9 +57,16 @@ export const formConfigApi = {
   },
 }
 
+export interface LocalAuditFinding {
+  code: string
+  message: string
+  source: string
+}
+
 export interface ExecuteResult {
   status: string
   message: string
+  local_audit?: LocalAuditFinding[]
   pre_audit?: { passed: boolean; totalScore: number; details?: Array<{ ruleType: string; errorCode: string; message: string; level: string }> } | null
   form?: Record<string, string>
   tags?: string[]

@@ -63,6 +63,15 @@
         </div>
       </div>
       <p v-if="result?.tags?.length" class="muted">tags: {{ result?.tags?.join(', ') }}</p>
+
+      <!-- §59.166 LocalAudit 内部规范提示（advisory——与幸运预检并列的信息源） -->
+      <template v-if="result?.local_audit?.length">
+        <h4>内部规范提示（不阻塞）</h4>
+        <div v-for="(la, i) in result.local_audit" :key="i" class="pa-detail warn">
+          <a-tag color="orange">WARN</a-tag>
+          <span class="code">{{ la.code }}</span> {{ la.message }}
+        </div>
+      </template>
       <div class="actions">
         <a-button @click="reset">返回重选</a-button>
         <a-button
