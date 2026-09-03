@@ -615,6 +615,7 @@ type siteExportImport struct {
 	TrackerDomains        string `json:"tracker_domains"`
 	SupportsPiecesHashAPI bool   `json:"supports_pieces_hash_api"`
 	APIDomain             string `json:"api_domain"`
+	PublishFormConfig string `json:"publish_form_config,omitempty"`
 }
 
 var siteImportFields = []string{
@@ -625,7 +626,7 @@ var siteImportFields = []string{
 	"hr_strategy", "override_rss_url", "override_save_path",
 	"assume_free",
 	"proxy_url", "use_global_proxy", "skip_ssl_verify", "max_concurrent", "publish_interval_seconds",
-	"reseed_limit_count", "reseed_limit_interval", "iyuu_limit_count", "iyuu_limit_interval",
+	"reseed_limit_count", "reseed_limit_interval", "iyuu_limit_count", "iyuu_limit_interval", "publish_form_config",
 	"alternative_domains", "tracker_domains", "supports_pieces_hash_api", "api_domain",
 }
 
@@ -679,7 +680,9 @@ func (h *SiteHandler) handleExport(w http.ResponseWriter, r *http.Request) {
 			TrackerDomains:         s.TrackerDomains,
 			SupportsPiecesHashAPI:  s.SupportsPiecesHashAPI,
 			APIDomain:              s.APIDomain,
-		})
+		
+		PublishFormConfig: s.PublishFormConfig,
+	})
 	}
 	w.Header().Set("Content-Disposition", `attachment; filename="pt-forward-sites-export.json"`)
 	Success(w, map[string]interface{}{
