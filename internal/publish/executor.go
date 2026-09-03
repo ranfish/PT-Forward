@@ -78,6 +78,7 @@ type ExecuteResult struct {
 	Form     map[string]string `json:"form,omitempty"` // 组装产物（DryRun 供人工核对）
 	Tags     []string          `json:"tags,omitempty"`
 	Upload   *model.PublishResponse `json:"upload,omitempty"`
+	LocalAudit []LocalAuditFinding  `json:"local_audit,omitempty"` // §59.166 内部规范提示（advisory）
 	TargetTorrentURL string     `json:"target_torrent_url,omitempty"`
 }
 
@@ -330,10 +331,23 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		}
 	}
 
+	// §59.166 LocalAudit 内部重组审核规范（advisory 全 WARN 不阻塞——规则未实战
+	// 验证前不拦发布，用户定案；提示走 DryRun/成功 message/logs 三出口）
+	localFindings := RunLocalAudit(localAuditInput{
+		TargetSite:   in.TargetSite,
+		TP:           tp,
+		Form:         form,
+		Cfg:          cfg,
+		AppliedTags:  applied,
+		TagOverrides: in.TagOverrides,
+		Meta:         meta,
+		PublishTitle: publishTitle,
+	})
+
 	// DryRun 检查点：组装+渲染+预检之后、上传之前（§59.156——完整表单形态验证，
 	// 预检未通过不阻断 dry_run：预检修正循环数据源）
 	if in.DryRun {
-		res := &ExecuteResult{Status: "dry_run_ok", Form: form, Tags: applied, PreAudit: preAudit}
+		res := &ExecuteResult{Status: "dry_run_ok", Form: form, Tags: applied, PreAudit: preAudit, LocalAudit: localFindings}
 		if preAudit != nil && !preAudit.Passed {
 			res.Message = "预检未通过（dry_run 不阻断）"
 		}
@@ -481,9 +495,16 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 
 	// ⑩ 结果落库（发布日志页消费——recordResultFull 统一单点）
 	seeded := result.Status == "pushed" || result.Status == "pushed_existing"
-	e.recordResultFull(ctx, in, meta, rv, result.Status,
+	// §59.166 LocalAudit 出口：成功态 message 后缀（failed 态不拼防混淆站方错误——
+	// 回归审核定案③）；findings JSON 进 logs 列（实战回流分析对照站方结果）
+	if len(localFindings) > 0 {
+		result.Message = strings.TrimSpace(strings.TrimSuffix(result.Message, "；") +
+			"；" + FormatLocalAudit(localFindings))
+	}
+	e.recordResultFullWithLogs(ctx, in, meta, rv, result.Status,
 		joinNotes(paNoteOf(preAudit), result.Message),
-		resp.TorrentID, result.TargetTorrentURL, seeded, piecesHash)
+		resp.TorrentID, result.TargetTorrentURL, seeded, piecesHash,
+		SerializeLocalAudit(localFindings))
 	return result
 }
 
@@ -507,6 +528,35 @@ func (e *PublishExecutor) recordResult(ctx context.Context, in ExecuteInput, met
 
 // recordResultFull 统一落库单点（piecesHash §59.166 dedup 本地记忆——一种多站/
 // 一站多种发布链公共生效：成功/拦截均落，下次发布 dedup 先查本地零依赖站方 API）。
+func (e *PublishExecutor) recordResultFullWithLogs(ctx context.Context, in ExecuteInput, meta *model.TorrentMetadata,
+	rv *ResourceView, status, note, torrentID, url string, seeded bool, piecesHash string, logs string) {
+	now := time.Now()
+	seedErr := ""
+	if strings.Contains(note, "加种失败") {
+		seedErr = note
+	}
+	_ = e.pipe.CreateResult(ctx, &model.PublishResultRecord{
+		PiecesHash:     piecesHash,
+		TargetSite:     in.TargetSite,
+		SourceSite:     meta.SiteName,
+		SourceInfoHash: in.InfoHash,
+		SavePath:       rv.SavePath,
+		TorrentID:      torrentID,
+		Status:         model.PublishResultStatus(status),
+		SkipReason:     note,
+		PublishURL:     url,
+		Logs:           logs,
+		Trigger:        "manual",
+		BatchGroupID:   in.BatchGroupID,
+		Title:          meta.Title,
+		DownloaderID:   rv.ClientID,
+		Seeded:         seeded,
+		SeedError:      seedErr,
+		SeededAt:       func() *time.Time { if seeded { return &now }; return nil }(),
+		CompletedAt:    &now,
+	})
+}
+
 func (e *PublishExecutor) recordResultFull(ctx context.Context, in ExecuteInput, meta *model.TorrentMetadata,
 	rv *ResourceView, status, note, torrentID, url string, seeded bool, piecesHash ...string) {
 	now := time.Now()
