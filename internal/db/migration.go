@@ -75,6 +75,13 @@ func init() {
 		// 硬编码旧列名 main_data_cron → 列不存在炸。§59.123 只修了测试没修本体。
 		// 兼容：检测目标表列名选 INSERT 变体（源表 download_client_configs 仍
 		// 是 main_data_cron——model 未改名，SELECT 侧恒旧名）。
+		// §59.167 新装场景（PT31 实战）：AutoMigrate 不再建废弃模型 download_client_configs
+		// → SELECT 源表不存在炸启动。无源表=无数据可迁，直接成功。
+		var srcTable int64
+		gormDB.Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='download_client_configs'`).Scan(&srcTable)
+		if srcTable == 0 {
+			return nil
+		}
 		var hasOldCol int64
 		gormDB.Raw(`SELECT COUNT(*) FROM pragma_table_info('seeding_client_configs') WHERE name = 'main_data_cron'`).Scan(&hasOldCol)
 		cronCol := "maindata_cron" // 新库（AutoMigrate 新 model）形态
