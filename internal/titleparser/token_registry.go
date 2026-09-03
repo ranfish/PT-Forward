@@ -36,6 +36,15 @@ func lookupToken(registry []TokenDef, s string) string {
 	return ""
 }
 
+func lookupTokenDef(registry []TokenDef, s string) *TokenDef {
+	for i := range registry {
+		if registry[i].matchesWithRequires(s, false) {
+			return &registry[i]
+		}
+	}
+	return nil
+}
+
 // lookupTokenWebContext 同 lookupToken，但 requires=web 的词条按 webContext 启用。
 // webContext = 标题已证实为 WEB 类资源（含 WEB/HDTV/UHDTV token）。
 func lookupTokenWebContext(registry []TokenDef, s string, webContext bool) string {
@@ -75,4 +84,15 @@ func removeAllTokenPatterns(registry []TokenDef, s string, webContext bool) stri
 		}
 	}
 	return s
+}
+
+// AudioStandardKey §59.166 B1：音频名 → standard_key 直取（绕过 extended 词表
+// exact 匹配——"DD" 两字母 canonical 在词表失明实证：无 exact 键+太短无法包含
+// 匹配→LookupStandardKey 空→表单 audio 丢；词条 pattern 自带 sk 权威）。
+func AudioStandardKey(name string) string {
+	def := lookupTokenDef(audioCodecRegistry, name)
+	if def != nil {
+		return def.StandardKey
+	}
+	return ""
 }
