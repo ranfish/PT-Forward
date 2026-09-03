@@ -12,8 +12,8 @@ import (
 // ═══ §59.166 LocalAudit 内部重组审核规范（advisory——仅提示不阻塞）═══
 //
 // 用户定案：站点适配阶段规则未经验证，发布后才知道规则是否正确——全 WARN 不拦。
-// 规则源：幸运探针实证 + v1.05 规范（后续各站种审脚本分析持续内化——
-// Source 标注实证来源站，同 Code 多站命中=共性规则，单站=站特例）。
+// 规则源：幸运探针实证 + v1.05 规范 + 9 站种审脚本共性抽取（docs/38——
+// Source 标注来源，同规则多站命中=共性，单站=站特例按 SiteOnly 过滤）。
 //
 // 校验分工（回归审核定案）：判据引擎产 tags（自动有据）、executor 硬拦行为
 // 铁律（首发禁勾等）——LocalAudit 只做校验类（映射缺口/纠错透明/override 有据）。
@@ -58,7 +58,17 @@ type localAuditRule struct {
 	Check    func(in localAuditInput) string
 }
 
-// localAuditRules 初始规则集（已实证内置——用户定案）。
+// §59.166 R11 禁发组共性黑名单（AGSV/CS/春日/劳改所/青蛙五站名单交集——
+// docs/38 共性矩阵；FRDS/BeiTai/GodDramas/VCB-Studio 为劳改所/春日站特例，
+// 转存主业站合法不进共性——特例站接入时按 SiteOnly 追加）。
+var bannedGroupsCommon = []string{
+	"FGT", "hao4k", "mp4ba", "rarbg", "gpthd", "seeweb", "dreamhd", "blacktv",
+	"xiaomi", "huawei", "momohd", "momoweb", "ddhdtv", "tagweb", "sonyhd", "minihd",
+	"bitstv", "nukehd", "zerotv", "hottv", "enttv", "gamehd", "smy", "seehd",
+	"verypsp", "dwr", "xlmv", "xjctv", "ctrlhd",
+}
+
+// localAuditRules 规则集（初始=幸运实证五规则 + 9 站共性七规则——docs/38 矩阵）。
 var localAuditRules = []localAuditRule{
 	{
 		Code:   "LOCAL_MEDIUM_UNMAPPED",
@@ -66,7 +76,7 @@ var localAuditRules = []localAuditRule{
 		Check: func(in localAuditInput) string {
 			f := in.Cfg.FormFields[model.FieldDomainMedium]
 			if f == "" {
-				return "" // 站点无该域（如词表形态差异）非违例
+				return "" // 站点无该域非违例
 			}
 			if _, ok := in.Form[f]; !ok {
 				return "媒介域未选择（站点词表可能缺词条）——建议核对站点发布配置的媒介映射"
@@ -106,7 +116,7 @@ var localAuditRules = []localAuditRule{
 					}
 				}
 				if !hasAudioTrace {
-					return "" // 标题/MI 均无音频痕迹（无配音信息）不提示
+					return "" // 标题/MI 均无音频痕迹不提示
 				}
 				return fmt.Sprintf("音频域未选择——标题/MI 有音频信息（%s）但未映射到站点词表，建议核对音频词条", in.TP.AudioCodec)
 			}
@@ -127,7 +137,6 @@ var localAuditRules = []localAuditRule{
 		Code:   "LOCAL_TAG_OVERRIDE_NO_EVIDENCE",
 		Source: "common",
 		Check: func(in localAuditInput) string {
-			// 人工 overrides 有据校验（自动产出由判据引擎保证——本规则只看 overrides）
 			for _, o := range in.TagOverrides {
 				if strings.Contains(o, "cantonese") {
 					hasEvidence := strings.Contains(in.Meta.Subtitle, "粤") ||
@@ -140,6 +149,144 @@ var localAuditRules = []localAuditRule{
 			return ""
 		},
 	},
+	{
+		Code:   "LOCAL_TITLE_NON_ASCII",
+		Source: "common",
+		Check: func(in localAuditInput) string {
+			// 9/9 站共性（docs/38 C1）：主标题禁中文/全角——tp 重组应保证纯 ASCII
+			if hasFullWidthOrChinese(in.PublishTitle) {
+				return "发布标题含中文/全角字符（9 站共性禁令）——请核对标题重组（中文名应走 cnname/副标题）"
+			}
+			return ""
+		},
+	},
+	{
+		Code:   "LOCAL_SUBTITLE_EMPTY",
+		Source: "common",
+		Check: func(in localAuditInput) string {
+			if strings.TrimSpace(in.Meta.Subtitle) == "" {
+				return "副标题为空（9 站共性必填）——建议补齐副标题再发布"
+			}
+			return ""
+		},
+	},
+	{
+		Code:   "LOCAL_MEDIAINFO_EMPTY",
+		Source: "common",
+		Check: func(in localAuditInput) string {
+			if strings.TrimSpace(in.Meta.MediaInfo) == "" {
+				return "MediaInfo 为空（9 站共性必填，形态各异）——建议先在种子配置页完成 MI 获取"
+			}
+			return ""
+		},
+	},
+	{
+		Code:   "LOCAL_IMAGES_INSUFFICIENT",
+		Source: "common",
+		Check: func(in localAuditInput) string {
+			// 宽松阈值 2（AGSV≥2/春日≥3/青蛙藏宝阁≥1——docs/38 C5）
+			shots := parseScreenshotsCol(in.Meta.Screenshots)
+			if len(shots) < 2 {
+				return fmt.Sprintf("截图不足（%d 张 < 2，6 站共性 ≥1-3）——建议补齐截图", len(shots))
+			}
+			return ""
+		},
+	},
+	{
+		Code:   "LOCAL_IMDB_EMPTY",
+		Source: "common",
+		Check: func(in localAuditInput) string {
+			if strings.TrimSpace(in.Meta.IMDbURL) == "" {
+				return "IMDb 链接为空（7 站共性必填）——建议补齐 IMDb 链接"
+			}
+			return ""
+		},
+	},
+	{
+		Code:   "LOCAL_BANNED_GROUP",
+		Source: "common",
+		Check: func(in localAuditInput) string {
+			if g := containsBannedGroup(in.PublishTitle); g != "" {
+				return "标题含多站禁发组 " + g + "（AGSV/CS/春日/劳改所/青蛙名单交集）——目标站可能禁发该组，发布前请确认"
+			}
+			return ""
+		},
+	},
+	{
+		Code:   "LOCAL_TITLE_WORD_FORM",
+		Source: "common",
+		Check: func(in localAuditInput) string {
+			// 词形规范防御（青蛙/织梦词形+多站归一——docs/38 §三）
+			t := " " + in.PublishTitle + " "
+			var bad []string
+			if strings.Contains(t, " 4K ") {
+				bad = append(bad, "4K→2160p")
+			}
+			for _, p := range []string{" 1080P ", " 720P ", " 2160P ", " 480P ", " 4320P "} {
+				if strings.Contains(t, p) {
+					bad = append(bad, strings.TrimSpace(p)+"→小写p")
+					break
+				}
+			}
+			if strings.Contains(t, " AC3 ") {
+				bad = append(bad, "AC3→DD")
+			}
+			if strings.Contains(t, " HDR10 ") {
+				bad = append(bad, "HDR10→HDR")
+			}
+			for _, w := range []string{" HQ ", " EDR ", " SDR "} {
+				if strings.Contains(t, w) {
+					bad = append(bad, strings.TrimSpace(w)+"应删除")
+				}
+			}
+			if len(bad) > 0 {
+				return "标题词形违规（" + strings.Join(bad, "；") + "）——请核对标题重组"
+			}
+			return ""
+		},
+	},
+}
+
+// containsBannedGroup 词边界匹配（青蛙/藏宝阁同款——防 "alt" 伪命中 "Altitude"）。
+func containsBannedGroup(title string) string {
+	u := strings.ToUpper(title)
+	for _, g := range bannedGroupsCommon {
+		gu := strings.ToUpper(g)
+		idx := strings.Index(u, gu)
+		for idx >= 0 {
+			before := byte(' ')
+			if idx > 0 {
+				before = u[idx-1]
+			}
+			after := byte(' ')
+			if idx+len(gu) < len(u) {
+				after = u[idx+len(gu)]
+			}
+			if !isAlnum(before) && !isAlnum(after) {
+				return g
+			}
+			next := strings.Index(u[idx+1:], gu)
+			if next < 0 {
+				break
+			}
+			idx = next + idx + 1
+		}
+	}
+	return ""
+}
+
+func isAlnum(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+}
+
+// hasFullWidthOrChinese 全角字符或中文检测（9 站共性 C1——同款 [\u4e00-\u9fa5\uFF01-\uFF60]）。
+func hasFullWidthOrChinese(s string) bool {
+	for _, r := range s {
+		if (r >= 0x4e00 && r <= 0x9fa5) || (r >= 0xFF01 && r <= 0xFF60) {
+			return true
+		}
+	}
+	return false
 }
 
 // FormatLocalAudit 提示格式化（成功态 message 后缀）。
