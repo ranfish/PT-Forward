@@ -30,6 +30,18 @@ func Load(configPath string, logger *zap.Logger) (*Config, error) {
 		return nil, configError(ErrConfigLoad, "unmarshal config", err)
 	}
 
+	// §59.167 viper AutomaticEnv 对嵌套 key（log.level → PTF_LOG_LEVEL）在
+	// Unmarshal 时不生效（PT31 实战：Dockerfile ENV PTF_LOG_LEVEL=error 无效
+	// ——info 全量输出）。显式 BindEnv 后重读。
+	_ = v.BindEnv("log.level", "PTF_LOG_LEVEL")
+	_ = v.BindEnv("database.log_level", "PTF_DATABASE_LOGLEVEL")
+	if lv := v.GetString("log.level"); lv != "" {
+		cfg.Log.Level = lv
+	}
+	if dl := v.GetString("database.log_level"); dl != "" {
+		cfg.Database.LogLevel = dl
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return nil, configError(ErrConfigValidate, "validate config", err)
 	}
