@@ -3201,7 +3201,7 @@ func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, 
 		}
 		// tags 重推（MI 层判据版——§59.151 HDR/语言族结构化）
 		inferer := publish.NewMediaTagInferer()
-		inferred := inferer.Infer(mi, m.Title)
+		inferred := inferer.Infer(mi, m.Title, m.Subtitle)
 		if sub := m.Subtitle; sub != "" {
 			// 副标题语义补充（infer 全输入）
 			inferred = inferer.InferFull(publish.TagInput{

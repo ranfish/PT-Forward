@@ -36,8 +36,10 @@ type TagInput struct {
 
 // Infer 从多源文本推断 MediaTags。
 // 返回推断出的标准键列表（如 hdr10/dolby_vision/chinese_subtitle）。
-func (i *MediaTagInferer) Infer(mediaInfoText, title string) []string {
-	return i.InferFull(TagInput{MediaInfo: mediaInfoText, Title: title})
+func (i *MediaTagInferer) Infer(mediaInfoText, title, subtitle string) []string {
+	// §59.166 修3：副标题通道接通（天空之城"国粤英日四语"站方审核实证——原 Infer
+	// 二参形态丢 Subtitle，粤语 ②a 判据的副标题条件永远为空）
+	return i.InferFull(TagInput{MediaInfo: mediaInfoText, Title: title, Subtitle: subtitle})
 }
 
 // InferFull 从完整输入推断 MediaTags（§59.35 P4：规则查 dict/tag.json）。

@@ -48,7 +48,7 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 	// Video 段（取第一个）
 	for _, s := range streams {
 		if s.name == "video" {
-			result.Resolution = resolutionFromWidth(s.fields["width"])
+			result.Resolution = resolutionFromHeightOrWidth(s.fields["height"], s.fields["width"])
 			result.VideoCodec = codecFromMI(s.fields["format"], s.fields["writing library"])
 			result.BitDepth = bitDepthFromMI(s.fields["bit depth"])
 			result.HDR = hdrFromMI(s.fields["hdr format"])
@@ -188,6 +188,28 @@ func parseMIStreams(text string) []miStream {
 		}
 	}
 	return streams
+}
+
+// resolutionFromHeightOrWidth §59.166 宽幅修正（地道战/天堂里的烦恼站方审核实证）：
+// 高度有效（>=400）优先按高度——1.37:1 等特殊画幅铺满 1080p 容器（高 1080 宽
+// 1432-1480）应判 1080p 而非 1440p；高度缺失/异常回退宽度（Height 63% 历史顾虑
+// 针对的是异常高度值——档位下限 400 过滤脏值）。
+func resolutionFromHeightOrWidth(heightStr, widthStr string) string {
+	// 形态学（测试实证 x264_DTSXLL 案）：宽幅裁高（h800×w1920=1080p 容器 2.35:1）
+	// 应按宽度；特殊高画幅（h1080×w1432）应按高度。规则=高度≥1000（满高）用
+	// 高度档，否则回退宽度档（高度档只保留 4320p/2160p/1080p——720p 及以下
+	// 高度语义弱，统一宽度）。
+	if h := parseMIInt(heightStr); h >= 1000 {
+		switch {
+		case h >= 4200:
+			return "4320p"
+		case h >= 2000:
+			return "2160p"
+		default:
+			return "1080p"
+		}
+	}
+	return resolutionFromWidth(widthStr)
 }
 
 // resolutionFromWidth 按 Width 推断分辨率（Height 63% 非标准，不可靠）。

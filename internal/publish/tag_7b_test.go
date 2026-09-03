@@ -61,12 +61,12 @@ func TestApplyTagRules_Dedup(t *testing.T) {
 func TestMediaTagInferer_HDR10(t *testing.T) {
 	inferer := NewMediaTagInferer()
 	// §59.151: HDR 族 MI 层结构化（Video 段 HDR format 唯一通道；文本字样废除）
-	tags := inferer.Infer("Video\nHDR format : SMPTE ST 2086, HDR10 compatible", "电影 2024")
+	tags := inferer.Infer("Video\nHDR format : SMPTE ST 2086, HDR10 compatible", "电影 2024", "")
 	if !containsTag(tags, "hdr10") {
 		t.Errorf("should infer hdr10, got %v", tags)
 	}
 	// 纯文本字样（旧 regex 通道）不再命中
-	tags2 := inferer.Infer("Video: HDR10", "电影 2024 HDR10")
+	tags2 := inferer.Infer("Video: HDR10", "电影 2024 HDR10", "")
 	if containsTag(tags2, "hdr10") {
 		t.Errorf("text-only hdr10 should not infer (§59.151), got %v", tags2)
 	}
@@ -74,7 +74,7 @@ func TestMediaTagInferer_HDR10(t *testing.T) {
 
 func TestMediaTagInferer_HDR10Plus(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("Video\nHDR format : SMPTE ST 2094-40, HDR10+", "电影.hdr10+")
+	tags := inferer.Infer("Video\nHDR format : SMPTE ST 2094-40, HDR10+", "电影.hdr10+", "")
 	if !containsTag(tags, "hdr10_plus") {
 		t.Errorf("should infer hdr10_plus, got %v", tags)
 	}
@@ -87,7 +87,7 @@ func TestMediaTagInferer_HDR10Plus(t *testing.T) {
 func TestMediaTagInferer_DolbyVision(t *testing.T) {
 	inferer := NewMediaTagInferer()
 	// dvhe.08 = DV+HDR10 双层（§59.151 Profile 语义——两 tag 同产）
-	tags := inferer.Infer("Video\nHDR format : Dolby Vision, Version 1.0, Profile 8.1, dvhe.08.06, BL+RPU, no metadata compression, HDR10", "电影")
+	tags := inferer.Infer("Video\nHDR format : Dolby Vision, Version 1.0, Profile 8.1, dvhe.08.06, BL+RPU, no metadata compression, HDR10", "电影", "")
 	if !containsTag(tags, "dolby_vision") || !containsTag(tags, "hdr10") {
 		t.Errorf("dvhe.08 should infer dv+hdr10 (dual layer), got %v", tags)
 	}
@@ -96,7 +96,7 @@ func TestMediaTagInferer_DolbyVision(t *testing.T) {
 		"Dolby Vision, Version 1.0, Profile 5, dvhe.05.06, BL+RPU", // SNYLV 2160p 实证
 		"Dolby Vision, Version 1.0, Profile 9, dvav.09.06, BL+RPU", // 理论构造（P9=AVC）
 	} {
-		tags2 := inferer.Infer("Video\nHDR format : "+hdr, "电影")
+		tags2 := inferer.Infer("Video\nHDR format : "+hdr, "电影", "")
 		if !containsTag(tags2, "dolby_vision") || containsTag(tags2, "hdr10") {
 			t.Errorf("P5/P9 应仅 dv 不勾 hdr10（%s）, got %v", hdr, tags2)
 		}
@@ -105,7 +105,7 @@ func TestMediaTagInferer_DolbyVision(t *testing.T) {
 
 func TestMediaTagInferer_ChineseSubtitle(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("", "电影 中字 2024")
+	tags := inferer.Infer("", "电影 中字 2024", "")
 	if !containsTag(tags, "chinese_subtitle") {
 		t.Errorf("should infer chinese_subtitle, got %v", tags)
 	}
@@ -114,11 +114,11 @@ func TestMediaTagInferer_ChineseSubtitle(t *testing.T) {
 func TestMediaTagInferer_ChineseAudio(t *testing.T) {
 	inferer := NewMediaTagInferer()
 	// §59.151: audio 语言族 MI 单点（MI Audio 段 Language/Title——标题声明废除）
-	tags := inferer.Infer("Audio #1\nLanguage : Chinese", "电影 2024")
+	tags := inferer.Infer("Audio #1\nLanguage : Chinese", "电影 2024", "")
 	if !containsTag(tags, "chinese_audio") {
 		t.Errorf("should infer chinese_audio, got %v", tags)
 	}
-	tags2 := inferer.Infer("", "电影 国语 2024")
+	tags2 := inferer.Infer("", "电影 国语 2024", "")
 	if containsTag(tags2, "chinese_audio") {
 		t.Errorf("title-only chinese_audio should not infer (§59.151), got %v", tags2)
 	}
@@ -126,7 +126,7 @@ func TestMediaTagInferer_ChineseAudio(t *testing.T) {
 
 func TestMediaTagInferer_CantoneseAudio(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("Audio #1\nTitle : Cantonese", "电影 2024")
+	tags := inferer.Infer("Audio #1\nTitle : Cantonese", "电影 2024", "")
 	if !containsTag(tags, "cantonese_audio") {
 		t.Errorf("should infer cantonese_audio, got %v", tags)
 	}
@@ -134,7 +134,7 @@ func TestMediaTagInferer_CantoneseAudio(t *testing.T) {
 
 func TestMediaTagInferer_Atmos(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("Dolby Atmos", "电影 atmos")
+	tags := inferer.Infer("Dolby Atmos", "电影 atmos", "")
 	if !containsTag(tags, "dolby_atmos") {
 		t.Errorf("should infer dolby_atmos, got %v", tags)
 	}
@@ -142,7 +142,7 @@ func TestMediaTagInferer_Atmos(t *testing.T) {
 
 func TestMediaTagInferer_Remux(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("", "电影 2024 Remux")
+	tags := inferer.Infer("", "电影 2024 Remux", "")
 	if !containsTag(tags, "remux") {
 		t.Errorf("should infer remux, got %v", tags)
 	}
@@ -150,7 +150,7 @@ func TestMediaTagInferer_Remux(t *testing.T) {
 
 func TestMediaTagInferer_10Bit(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("Bit depth: 10 bit", "电影 10bit")
+	tags := inferer.Infer("Bit depth: 10 bit", "电影 10bit", "")
 	if !containsTag(tags, "10_bit") {
 		t.Errorf("should infer 10_bit, got %v", tags)
 	}
@@ -158,7 +158,7 @@ func TestMediaTagInferer_10Bit(t *testing.T) {
 
 func TestMediaTagInferer_Empty(t *testing.T) {
 	inferer := NewMediaTagInferer()
-	tags := inferer.Infer("", "普通电影")
+	tags := inferer.Infer("", "普通电影", "")
 	if len(tags) != 0 {
 		t.Errorf("empty: should infer nothing, got %v", tags)
 	}

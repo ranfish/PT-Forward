@@ -605,7 +605,14 @@ func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp title
 		stdKey = "medium.encode"
 	}
 	if stdKey == "" {
-		stdKey = extract.LookupStandardKey("medium", tp.SourceType)
+		// §59.166 回归补：IsEncode 铁证（老 mediumMapping 原有——tp 同源化时丢失
+		// 致 BluRay 1080p x265 压制误判 Blu-ray 原碟；titleparser.IsEncode 含
+		// MI Writing library 铁证+碟源+编码族二维 §59.151）
+		if titleparser.IsEncode(tp) {
+			stdKey = "medium.encode"
+		} else {
+			stdKey = extract.LookupStandardKey("medium", tp.SourceType)
+		}
 	}
 	return e.lookupByStdKey(cfg, model.FieldDomainMedium, stdKey)
 }
@@ -656,7 +663,7 @@ func (e *PublishExecutor) teamMapping(cfg *model.PublishFormConfig, meta *model.
 // assembleTags 标签装配：判据引擎推断 → form_config 值映射 → auto:false 过滤 + 人工 overrides。
 func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model.TorrentMetadata, overrides []string) []string {
 	// 判据引擎（§59.151 MI 唯一真相）
-	inferred := e.inferer.Infer(meta.MediaInfo, meta.Title)
+	inferred := e.inferer.Infer(meta.MediaInfo, meta.Title, meta.Subtitle)
 	// 站方 tags 域 standard_key → value 映射 + auto:false 排除
 	allowed := map[string]string{}
 	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
