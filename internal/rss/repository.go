@@ -81,11 +81,15 @@ func (r *Repository) MarkSeen(ctx context.Context, seen *model.RSSTorrentSeen) e
 }
 
 func (r *Repository) IsSeen(ctx context.Context, siteName, torrentID, subscriptionID string) (bool, error) {
+	// §59.167 修复：原白名单 status IN (pushed,blocked) 与写入侧断裂——全项目
+	// MarkSeen/MarkStatus 恒写 "seen"（pushed/blocked 从未被写过）→ 所有订阅
+	// 所有种子每轮判"新种"重复分发（憨憨未绑下载器暴露：dispatched 恒 50；
+	// 朋友被下载器同 hash 幂等掩盖）。放宽为存在性判定（见过即去重）——重试
+	// 语义由 ClearSeen 手动通道承载（§59.33 清 seen 重走完整过滤链）。
 	var count int64
 	err := r.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
-		Where("site_name = ? AND torrent_id = ? AND subscription_id = ? AND status IN ?",
-			siteName, torrentID, subscriptionID,
-			[]string{"pushed", "blocked"}).
+		Where("site_name = ? AND torrent_id = ? AND subscription_id = ?",
+			siteName, torrentID, subscriptionID).
 		Count(&count).Error
 	return count > 0, err
 }

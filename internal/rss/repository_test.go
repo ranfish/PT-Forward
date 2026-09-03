@@ -158,7 +158,8 @@ func TestRepository_MarkSeen_AndIsSeen(t *testing.T) {
 		t.Error("should not be seen")
 	}
 
-	// status="seen" should NOT be considered seen (waiting for push)
+	// §59.167 修复：status="seen" 视为已见过（原断言"waiting for push 不算 seen"
+	// 的白名单语义与写入侧恒 "seen" 断裂——全订阅每轮重复分发实证；重试走 ClearSeen）
 	seenWaiting := &model.RSSTorrentSeen{
 		SiteName:       "example",
 		TorrentID:      "43",
@@ -170,24 +171,23 @@ func TestRepository_MarkSeen_AndIsSeen(t *testing.T) {
 		t.Fatal(err)
 	}
 	isSeen3, _ := repo.IsSeen(ctx, "example", "43", "1")
-	if isSeen3 {
-		t.Error("status=seen should not be considered seen (waiting for push)")
+	if !isSeen3 {
+		t.Error("status=seen 应视为已见过（§59.167 存在性判定）")
 	}
 
-	// status="blocked" should be considered seen (compliance blocked)
-	blockedSeen := &model.RSSTorrentSeen{
-		SiteName:       "example",
-		TorrentID:      "44",
-		SubscriptionID: "1",
-		Title:          "Blocked",
-		Status:         "blocked",
+	// §59.167 语义更新：存在性判定（见过即去重）——status="seen" 也算 seen
+	seenStatusSeen := &model.RSSTorrentSeen{
+		SiteName:       "siteA",
+		TorrentID:      "tid-seen-status",
+		SubscriptionID: "9",
+		InfoHash:       "aaaa000000000000000000000000000000000000",
+		Status:         "seen",
 	}
-	if err := repo.MarkSeen(ctx, blockedSeen); err != nil {
+	if err := repo.MarkSeen(ctx, seenStatusSeen); err != nil {
 		t.Fatal(err)
 	}
-	isSeen4, _ := repo.IsSeen(ctx, "example", "44", "1")
-	if !isSeen4 {
-		t.Error("status=blocked should be considered seen")
+	if ok, _ := repo.IsSeen(ctx, "siteA", "tid-seen-status", "9"); !ok {
+		t.Error("status=seen 应视为已见过（§59.167 修复——恒 seen 写入与白名单断裂）")
 	}
 }
 
