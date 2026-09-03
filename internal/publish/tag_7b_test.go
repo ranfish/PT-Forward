@@ -435,3 +435,18 @@ func TestLuckyEnglishAudioConditional(t *testing.T) {
 		t.Errorf("有国语不应产 lucky_english_audio, got %v", tags3)
 	}
 }
+
+// §59.166 英雄本色2 场景：Mandarin 纯标记（国语轨并存）+ 副标题"国粤"声明 → 产粤语
+// （原 Mandarin Title 即反证误伤多语并存——站方审核实证；陷阱仅"粤配"形态）。
+func TestCantoneseMultiTrackCoexist(t *testing.T) {
+	mi := "Audio #1\nLanguage : Chinese\nTitle : Mandarin\nAudio #2\nLanguage : Chinese\nAudio #3\nLanguage : English\n"
+	inf := NewMediaTagInferer()
+	tags := inf.InferFull(TagInput{MediaInfo: mi, Title: "A Better Tomorrow II", Subtitle: "英雄本色2 国粤英三语 简繁英字幕"})
+	found := false
+	for _, tg := range tags {
+		if tg == "cantonese_audio" { found = true }
+	}
+	if !found {
+		t.Errorf("多语并存场景（Mandarin 纯标记+国粤声明）应产 cantonese, got %v", tags)
+	}
+}

@@ -68,7 +68,7 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	//    MI Language 判无粤语→勾了=WRONGLY）
 	if !containsStr(tags, "cantonese_audio") {
 		if hasHKOriginalTrack(miSec, in.Region) ||
-			(strings.Contains(in.Subtitle, "粤") && !hasMandarinTitledTrack(miSec)) {
+			(strings.Contains(in.Subtitle, "粤") && !hasCantoneseDubbedTrapTrack(miSec)) {
 			tags = append(tags, "cantonese_audio")
 		}
 	}
@@ -467,6 +467,21 @@ func hasMandarinTitledTrack(s titleparser.MISections) bool {
 	for _, a := range s.Audios {
 		t := strings.ToLower(a["title"])
 		if strings.Contains(t, "mandarin") || strings.Contains(t, "国语") || strings.Contains(t, "国配") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasCantoneseDubbedTrapTrack §59.166 反证收窄（英雄本色2 站方审核实证）：
+// 原 Mandarin Title 即反证误伤多语并存（"Title: Mandarin"=国语轨与粤语轨并存
+// 是正常形态）；真陷阱仅"声明粤实为国配"的轨道——Title 同时含 Mandarin 系
+// **与粤字**（迫降形态 "Mandarin (粤配)"）。
+func hasCantoneseDubbedTrapTrack(s titleparser.MISections) bool {
+	for _, a := range s.Audios {
+		t := strings.ToLower(a["title"])
+		mandarin := strings.Contains(t, "mandarin") || strings.Contains(t, "国语") || strings.Contains(t, "国配")
+		if mandarin && strings.Contains(t, "粤") {
 			return true
 		}
 	}

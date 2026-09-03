@@ -243,12 +243,18 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	setForm(model.FieldDomainPTGen, meta.DoubanURL)
 	setForm(model.FieldDomainDoubanURL, meta.DoubanURL)
 
+	// §59.166 A 层同源化：表单四域（standard/codec/audiocodec/medium）改消费
+	// BuildTechProfile（标题+MI+DOM 三源合并——种配页重组器同款，MI 纠错终态），
+	// 替代 meta 原始列。五案根治：From S04(WEBRip 媒介跟标题)/宽幅 2K(高度
+	// 1080 归一)/天空之城(audio)/Arco(MI 纠错 DDP)。type/team 域保持原源。
+	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
+	tp := titleparser.BuildTechProfile(meta.Title, meta.MediaInfo, domMedium, domRes, domVideo, domAudio)
 	jobs := []domainJob{
 		{model.FieldDomainType, e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)},
-		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", meta.Resolution))},
-		{model.FieldDomainCodec, e.lookupByStdKey(cfg, model.FieldDomainCodec, extract.LookupStandardKey("video_codec", meta.VideoCodec))},
-		{model.FieldDomainAudiocodec, e.audioMapping(cfg, meta)},
-		{model.FieldDomainMedium, e.mediumMapping(cfg, meta)},
+		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", tp.Resolution))},
+		{model.FieldDomainCodec, e.lookupByStdKey(cfg, model.FieldDomainCodec, extract.LookupStandardKey("video_codec", tp.VideoCodec))},
+		{model.FieldDomainAudiocodec, e.audioMappingOf(cfg, tp.AudioCodec, tp.AudioTechnology)},
+		{model.FieldDomainMedium, e.mediumMappingOf(cfg, tp)},
 		{model.FieldDomainTeam, e.teamMapping(cfg, meta)},
 	}
 	for _, j := range jobs {
@@ -560,6 +566,17 @@ func (e *PublishExecutor) lookupByStdKey(cfg *model.PublishFormConfig, domain, s
 	return nil
 }
 
+// audioMappingOf §59.166 A 层：TechProfile 源音频映射（组合键优先 §59.150 判据六）。
+func (e *PublishExecutor) audioMappingOf(cfg *model.PublishFormConfig, audioCodec, audioTech string) *model.FormValueMapping {
+	if audioCodec != "" && audioTech != "" {
+		combined := extract.LookupStandardKey("audio_codec", audioCodec+" "+audioTech)
+		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, combined); m != nil {
+			return m
+		}
+	}
+	return e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, extract.LookupStandardKey("audio_codec", audioCodec))
+}
+
 // audioMapping 音频域（组合键优先：TrueHD+Atmos→"TrueHD Atmos"——§59.150 判据六）。
 func (e *PublishExecutor) audioMapping(cfg *model.PublishFormConfig, meta *model.TorrentMetadata) *model.FormValueMapping {
 	if meta.AudioCodec != "" && meta.AudioTech != "" {
@@ -569,6 +586,28 @@ func (e *PublishExecutor) audioMapping(cfg *model.PublishFormConfig, meta *model
 		}
 	}
 	return e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, extract.LookupStandardKey("audio_codec", meta.AudioCodec))
+}
+
+// mediumMappingOf §59.166 A 层：TechProfile 源媒介映射（标题纠错终态——
+// WEBRip/WEB-DL/Encode 规格优先 §59.150 二维规则）。
+func (e *PublishExecutor) mediumMappingOf(cfg *model.PublishFormConfig, tp titleparser.TechProfile) *model.FormValueMapping {
+	stdKey := ""
+	switch strings.ToLower(tp.Specification) {
+	case "remux":
+		stdKey = "medium.remux"
+	case "web-dl", "webdl":
+		stdKey = "medium.webdl"
+	case "hdtv":
+		stdKey = "medium.hdtv"
+	case "bdrip", "dvdrip", "tvrip", "encode", "webrip":
+		// WEBRip=Encode（§59.166 From S04 案站方 TYPE_MISMATCH 对照——源站 WEB-DL
+		// 标错、MI 痕迹证 WEBRip，重组已归 WEBRip，媒介跟 Encode 而非 WEB-DL）
+		stdKey = "medium.encode"
+	}
+	if stdKey == "" {
+		stdKey = extract.LookupStandardKey("medium", tp.SourceType)
+	}
+	return e.lookupByStdKey(cfg, model.FieldDomainMedium, stdKey)
 }
 
 // mediumMapping 媒介域（二维规则 §59.150：规格优先，Encode 判定 IsEncode 铁证 §59.151）。

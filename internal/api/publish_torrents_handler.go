@@ -2416,7 +2416,7 @@ fetched:
 			}
 			// §59.28 D1: DOM 源接入（DetailSourceJSON 的 medium/codec/resolution），
 			// 种子配置页与 runAnalyze 走同一套三源合并管线（§59.26 设计）
-			domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(finalMeta.DetailSourceJSON)
+			domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(finalMeta.DetailSourceJSON)
 			profile := titleparser.BuildTechProfile(finalMeta.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 			// §59.77: 评论音轨扣减（v1.05 不计入——副标题声明提取）
 			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, finalMeta.Subtitle, miForProfile)
@@ -2522,28 +2522,6 @@ fetched:
 	return nil
 }
 
-// domFieldsFromDetailSource §59.28 D1：从 DetailSourceJSON 解析 DOM 源四字段
-// （medium/resolution/video_codec/audio_codec），供 BuildTechProfile 三源合并。
-func domFieldsFromDetailSource(detailJSON string) (medium, resolution, videoCodec, audioCodec string) {
-	if detailJSON == "" {
-		return
-	}
-	var ds struct {
-		Medium     string `json:"medium"`
-		Resolution string `json:"resolution"`
-		VideoCodec string `json:"video_codec"`
-		AudioCodec string `json:"audio_codec"`
-	}
-	if json.Unmarshal([]byte(detailJSON), &ds) != nil {
-		return
-	}
-	// §59.34 审计: detail 提取器存 standard key（medium.webdl/UNK*），
-	// ReverseLookup 归一化；未映射 key → 空（MergeDOMInto 跳过，保留 title 值）
-	return titleparser.ReverseLookup(ds.Medium),
-		titleparser.ReverseLookup(ds.Resolution),
-		titleparser.ReverseLookup(ds.VideoCodec),
-		titleparser.ReverseLookup(ds.AudioCodec)
-}
 
 // thanksAppendMarker §59.28 致谢追加分隔标记：statement 中该标记之后的内容
 // 是我们追加的致谢块（重获时剥离，保证幂等）。
@@ -3200,7 +3178,7 @@ func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, 
 			skipped++
 			continue
 		}
-		domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(m.DetailSourceJSON)
+		domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(m.DetailSourceJSON)
 		profile := titleparser.BuildTechProfile(m.Title, mi, domMedium, domRes, domVideo, domAudio)
 		profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, m.Subtitle, mi)
 		components := titleparser.TechProfileToComponents(profile)
@@ -3502,7 +3480,7 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		miForProfile = meta.SourceMediaInfo
 	}
 	// §59.28 D1: DOM 源接入（与 fetchSingleTorrent 同一套三源合并）
-	domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(meta.DetailSourceJSON)
+	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
 	profile := titleparser.BuildTechProfile(meta.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 	components := titleparser.TechProfileToComponents(profile)
 	inferredCategory := titleparser.InferCategory(components, meta.SourceCategory, "", "")
@@ -3755,7 +3733,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	if miForProfile == "" {
 		miForProfile = updated.SourceMediaInfo
 	}
-	domMedium, domRes, domVideo, domAudio := domFieldsFromDetailSource(updated.DetailSourceJSON)
+	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(updated.DetailSourceJSON)
 	profile := titleparser.BuildTechProfile(updated.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 	reassembledTitle := titleparser.ReassembleFromTechProfile(profile, titleparser.V105TitleFormat())
 
