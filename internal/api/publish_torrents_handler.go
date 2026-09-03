@@ -4482,6 +4482,8 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 
 	// §59.51 长任务铁律：脱离 HTTP 生命周期；动态超时 total×(60s+间隔) 封顶 24h
 	budget := time.Duration(len(req.InfoHashes)) * (60*time.Second + time.Duration(interval)*time.Second)
+	// §59.166 熔断重试余量：最坏 5 轮 × 35s 冷却/种
+	budget += 30 * time.Minute
 	if budget > 24*time.Hour {
 		budget = 24 * time.Hour
 	}
@@ -4512,7 +4514,7 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 			// §59.166 回归审核补：per-seed recover——executor panic 若穿透会把任务
 			// goroutine 炸掉（finishSiteBatch 永不调用 → 同站互斥永久锁死直到重启）。
 			// recover 后按单种失败继续（批量语义）。
-			res := func() *publish.ExecuteResult {
+			execOnce := func() *publish.ExecuteResult {
 				defer func() {
 					if rec := recover(); rec != nil {
 						h.logger.Error("site-batch executor panic",
@@ -4524,9 +4526,40 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 					TargetSite:   req.TargetSite,
 					BatchGroupID: batchGroupID, // 匿名走站点级 form_config.Anonymous（§59.166 单源）
 				})
-			}()
+			}
+			// §59.166 韧性终案（用户确认）：熔断感知重试——circuit open=请求未发出
+			// （熔断器发送前拒绝），重试零重复上传风险；冷却等待后重试（最多 5 轮），
+			// 仍熔断则记 failed 继续。超时类错误绝不自动重试（请求可能已达站方，
+			// 重试有重复上传风险——§59.159 上传判定二元化边界）。
+			const circuitCooldown = 35 * time.Second
+			const maxCircuitRetries = 5
+			res := execOnce()
 			if res == nil {
 				res = &publish.ExecuteResult{Status: "failed", Message: "执行器 panic（已隔离，继续后续种子）"}
+			}
+			for attempt := 1; attempt <= maxCircuitRetries; attempt++ {
+				if res == nil || res.Status != "failed" || !strings.Contains(res.Message, "circuit open") {
+					break
+				}
+				h.siteBatch.mu.Lock()
+				task.CurrentTitle = curTitle + fmt.Sprintf("（熔断冷却 %d/%d）", attempt, maxCircuitRetries)
+				h.siteBatch.mu.Unlock()
+				select {
+				case <-ctx.Done():
+					h.finishSiteBatch(task, "任务超时中断（已完成 "+fmt.Sprint(task.Done)+"/"+fmt.Sprint(task.Total)+"）")
+					return
+				case <-time.After(circuitCooldown):
+				}
+				h.logger.Info("site-batch 熔断重试",
+					zap.String("site", req.TargetSite), zap.Int("attempt", attempt),
+					zap.String("hash", hash))
+				res = execOnce()
+				if res == nil {
+					res = &publish.ExecuteResult{Status: "failed", Message: "执行器 panic（已隔离，继续后续种子）"}
+				}
+			}
+			if res != nil && res.Status == "failed" && strings.Contains(res.Message, "circuit open") {
+				res.Message = "站点熔断持续打开（已等待 5 轮冷却）: " + res.Message
 			}
 			sr := siteBatchResult{InfoHash: hash, Title: curTitle, Status: res.Status, Message: res.Message}
 			if res.Upload != nil {
