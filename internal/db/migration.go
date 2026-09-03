@@ -70,9 +70,20 @@ func init() {
 		) WHERE LENGTH(source_torrent_id) >= 40`).Error
 	})
 	RegisterMigration(4, "merge_download_client_configs_into_seeding", func(gormDB *gorm.DB) error {
-		return gormDB.Exec(`INSERT INTO seeding_client_configs (
+		// §59.167 OTA 实例无限重启修复：老库按序 4→8（列改名）无恙；OTA 实例
+		// 首次全量跑——AutoMigrate 先按新 model 建表（仅 maindata_cron），本迁移
+		// 硬编码旧列名 main_data_cron → 列不存在炸。§59.123 只修了测试没修本体。
+		// 兼容：检测目标表列名选 INSERT 变体（源表 download_client_configs 仍
+		// 是 main_data_cron——model 未改名，SELECT 侧恒旧名）。
+		var hasOldCol int64
+		gormDB.Raw(`SELECT COUNT(*) FROM pragma_table_info('seeding_client_configs') WHERE name = 'main_data_cron'`).Scan(&hasOldCol)
+		cronCol := "maindata_cron" // 新库（AutoMigrate 新 model）形态
+		if hasOldCol > 0 {
+			cronCol = "main_data_cron" // 老库（migration 8 改名前）形态
+		}
+		ins := `INSERT INTO seeding_client_configs (
 			client_id, created_at, updated_at, enabled, delete_rule_ids,
-			auto_delete_cron, main_data_cron,
+			auto_delete_cron, ` + cronCol + `,
 			disk_protect_enabled, min_disk_space_gb,
 			space_alarm_enabled, space_alarm_gb, min_disk_space_percent,
 			max_active_uploads, max_active_downloads, max_active_seeding,
@@ -91,7 +102,8 @@ func init() {
 			super_seeding_default, scope, 'download',
 			reannounce_before, reannounce_retries, reannounce_interval_ms, reannounce_wait_ms
 		FROM download_client_configs
-		WHERE client_id NOT IN (SELECT client_id FROM seeding_client_configs)`).Error
+		WHERE client_id NOT IN (SELECT client_id FROM seeding_client_configs)`
+		return gormDB.Exec(ins).Error
 	})
 	RegisterMigration(5, "rss_torrent_seen_unique_add_subscription_id", func(gormDB *gorm.DB) error {
 		return gormDB.Transaction(func(tx *gorm.DB) error {

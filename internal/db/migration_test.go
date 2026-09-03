@@ -1,6 +1,7 @@
 package db
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -47,5 +48,39 @@ func TestMigration24_SiteAliasDomains(t *testing.T) {
 	gormDB.Where("name = ?", "猫").First(&s)
 	if s.AlternativeDomains != first {
 		t.Errorf("非幂等: %q -> %q", first, s.AlternativeDomains)
+	}
+}
+
+// §59.167 OTA 场景回归：AutoMigrate 新结构库（maindata_cron 形态）+ 源表有数据
+// → RunMigrations 全量（含 migration 4 列名自适应）应通过且数据迁移成功。
+// 实战背景：OTA 实例首次全量跑炸 "no column named main_data_cron"（无限重启）。
+func TestMigrations_FullRun_OnAutoMigratedDB(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "ota_scenario.db")
+	gormDB, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 模拟 OTA 实例：AutoMigrate 按新 model 建表
+	if err := gormDB.AutoMigrate(&model.SeedingClientConfig{}, &model.DownloadClientConfig{}); err != nil {
+		t.Fatal(err)
+	}
+	// 源表种子数据
+	gormDB.Create(&model.DownloadClientConfig{
+		ClientID: "TR0", Enabled: true,
+		MainDataCron: "*/15 * * * *",
+	})
+	// 聚焦 migration 4 本体（全量跑有其它迁移的前置表依赖——此处验证列名自适应）
+	for _, m := range registeredMigrations {
+		if m.Version == 4 {
+			if err := m.Up(gormDB); err != nil {
+				t.Fatalf("migration 4 失败（OTA 场景/新库形态）: %v", err)
+			}
+		}
+	}
+	// migration 4 数据应已迁入
+	var cnt int64
+	gormDB.Table("seeding_client_configs").Where("client_id = ?", "TR0").Count(&cnt)
+	if cnt != 1 {
+		t.Errorf("migration 4 数据未迁入（OTA 场景）: cnt=%d", cnt)
 	}
 }
