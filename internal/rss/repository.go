@@ -111,7 +111,9 @@ func (r *Repository) CleanupOldSeen(ctx context.Context, retentionDays int) (int
 	cutoff := time.Now().AddDate(0, 0, -retentionDays)
 	result := r.db.WithContext(ctx).
 		Where("status IN ? AND updated_at < ?",
-			[]string{"pushed", "expired", "skipped_rule"},
+			// §59.167 回归审核补 "seen"：IsSeen 存在性判定后 seen 是常态态
+			// （全量停留）——不清理则无限增长；30 天安全（老种早滑出 RSS 窗口不重现）
+			[]string{"pushed", "expired", "skipped_rule", "seen"},
 			cutoff,
 		).Delete(&model.RSSTorrentSeen{})
 	return result.RowsAffected, result.Error
