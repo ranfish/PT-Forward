@@ -70,6 +70,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	stdlog "log"
 )
 
 var version = "dev"
@@ -858,7 +859,18 @@ func initDB(cfg *config.Config, log *zap.Logger, ctx context.Context) (*gorm.DB,
 	}
 
 	gormCfg := &gorm.Config{
-		Logger: logger.Default.LogMode(logLevel),
+		// §59.167 PT31 实战：Default logger 把 ErrRecordNotFound 也按 Error 染色
+		// 打印（site_config_overrides/migration 幂等查空/首次 admin 流——全是正常
+		// 业务噪音刷屏）。定制 logger 忽略 RecordNotFound——真 SQL 错误仍打。
+		Logger: logger.New(
+			stdlog.New(os.Stdout, "\r\n", stdlog.LstdFlags),
+			logger.Config{
+				SlowThreshold:             200 * time.Millisecond,
+				LogLevel:                  logLevel,
+				IgnoreRecordNotFoundError: true,
+				Colorful:                  true,
+			},
+		),
 	}
 
 	var db *gorm.DB
