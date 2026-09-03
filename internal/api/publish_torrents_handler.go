@@ -2789,8 +2789,9 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	excludeForbidden := r.URL.Query().Get("exclude_forbidden") == "true"
 
 	// §59.166 一站多种：目标站发布维度筛选（publish_state=publishable/published
-	// + target_site）。口径（用户定案）：已发布=四终态（pushed/pushed_existing/
-	// duplicate/existing）有记录；可发布=已审核（reviewed 蕴含资产完备——种配审核
+	// + target_site）。口径（用户定案）：已发布=终态有记录（pushed/pushed_existing/
+	// uploaded/duplicate/existing——uploaded=上传成功站上已有，§59.166 补入：
+	// 漏种簇不再留在"可发布"防整体重传）；可发布=已审核（reviewed 蕴含资产完备——种配审核
 	// 流程权威保证）AND 无四终态记录（failed 算未发布可重试）；关联键=簇成员 hash
 	// 集合反查簇键（宁漏勿错——早期空 source_info_hash 记录匹配不上→落可发布，
 	// dedup 兜底）。
@@ -2802,7 +2803,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		h.db.WithContext(r.Context()).
 			Table("publish_result_records").
 			Where("target_site = ? AND source_info_hash != '' AND status IN ?",
-				publishTargetSite, []string{"pushed", "pushed_existing", "duplicate", "existing"}).
+				publishTargetSite, []string{"pushed", "pushed_existing", "uploaded", "duplicate", "existing"}).
 			Distinct("source_info_hash").
 			Pluck("source_info_hash", &pubHashes)
 		publishedClusters = make(map[string]bool)

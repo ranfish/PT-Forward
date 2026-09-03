@@ -177,29 +177,26 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		// §59.159 回归审核：补推成功回写原记录（同 tid 最新行 Status/Seeded——
 		// 否则按钮反复可点[幂等无害但状态不收敛]、发布日志页 seeded 恒 0）
 		if res.Status == "pushed" || res.Status == "pushed_existing" {
-			e.logger.Info("repush 回写执行", zap.String("tid", in.TorrentID), zap.String("site", in.TargetSite))
+			// §59.166 实战修复（探针实证两段错位）：
+			// ①原 Scan(&lastID) 标量 GORM 不支持恒 0 → 回写永不执行
+			// ②改 Pluck 后取"最新行"——同 tid 多行（漏种 uploaded 行 + 二轮复发
+			//   pushed 行）时永远命中新行，漏种行留痕不收敛
+			// 终案：按条件批量收敛**所有 status=uploaded 的同 tid 行**（幂等——
+			// 已 pushed 行不动），回写条数入日志。
 			now := time.Now()
-			// §59.166 实战修复：原 Scan(&lastID) 标量目标 GORM 不支持（静默不填
-			// 恒 0 → 回写永不执行——"补推成功但日志不收敛"4 例实锤；§59.56 同型
-			// 代码存在≠生效）。改 Pluck+Error 检查。
-			var ids []int64
-			if err := e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
-				Where("torrent_id = ? AND target_site = ?", in.TorrentID, in.TargetSite).
-				Order("id DESC").Limit(1).Pluck("id", &ids).Error; err != nil {
-				e.logger.Warn("repush 回写定位失败", zap.Error(err))
-			}
-			e.logger.Info("repush 回写定位", zap.Int64s("ids", ids))
-			if len(ids) > 0 {
-				if err := e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
-					Where("id = ?", ids[0]).
-					Updates(map[string]interface{}{
-						"status":     "pushed",
-						"seeded":     true,
-						"seeded_at":  now,
-						"seed_error": "",
-					}).Error; err != nil {
-					e.logger.Warn("repush 回写失败", zap.Error(err), zap.Int64("record_id", ids[0]))
-				}
+			res2 := e.db.WithContext(ctx).Model(&model.PublishResultRecord{}).
+				Where("torrent_id = ? AND target_site = ? AND status = ?",
+					in.TorrentID, in.TargetSite, "uploaded").
+				Updates(map[string]interface{}{
+					"status":     "pushed",
+					"seeded":     true,
+					"seeded_at":  now,
+					"seed_error": "",
+				})
+			if res2.Error != nil {
+				e.logger.Warn("repush 回写失败", zap.Error(res2.Error))
+			} else if res2.RowsAffected > 0 {
+				e.logger.Info("repush 回写收敛", zap.String("tid", in.TorrentID), zap.Int64("rows", res2.RowsAffected))
 			}
 		}
 		return res
@@ -376,7 +373,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		var rec model.PublishResultRecord
 		if err := e.db.WithContext(ctx).
 			Where("target_site = ? AND pieces_hash = ? AND status IN ?", in.TargetSite, piecesHash,
-				[]string{"pushed", "pushed_existing", "duplicate"}).
+				[]string{"pushed", "pushed_existing", "uploaded", "duplicate"}).
 			Order("id DESC").First(&rec).Error; err == nil {
 			// 本地记忆 tid 补充：站方 API 查一次取真实 tid（失败不阻塞——记忆拦截已成立）
 			tidShown := rec.TorrentID
