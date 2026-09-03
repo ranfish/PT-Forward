@@ -201,8 +201,32 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 	if strings.Contains(config.Domain, "keepfrds") {
 		a.enrichKeepfrdsTransferFlags(ctx, config, torrentID, detail)
 	}
+	// §59.167 憨憨：标签明示禁转（无限时态——用户权威；详情页 Tailwind 徽章）
+	if strings.Contains(config.Domain, "hhanclub") {
+		a.enrichHhanTransferFlags(ctx, config, torrentID, detail)
+	}
 	return detail, nil
 }
+
+// enrichHhanTransferFlags §59.167: 憨憨禁转标签采集——详情页徽章直提
+// （形态实证 tid=173490：style="background: #990000">禁转<——色码+文本双校验
+// 防正文误命中；首发 #009900/转载 #FF6633 徽章不消费——禁转才是拦发布语义）。
+func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail) {
+	html, err := a.fetchDetailsHTML(ctx, config, torrentID)
+	if err != nil {
+		return
+	}
+	if reHhanNoTransferBadge.MatchString(html) {
+		for _, f := range detail.Flags {
+			if f == "禁转" {
+				return
+			}
+		}
+		detail.Flags = append(detail.Flags, "禁转")
+	}
+}
+
+var reHhanNoTransferBadge = regexp.MustCompile(`background:\s*#990000[^>]*>\s*禁转\s*<`)
 
 // enrichKeepfrdsTransferFlags §59.162: keepfrds 禁转两态采集增强——
 // 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 列表页行原始

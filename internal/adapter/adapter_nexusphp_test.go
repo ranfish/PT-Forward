@@ -1938,3 +1938,19 @@ func TestFmtES(t *testing.T) {
 		t.Errorf("got %q, want %q", got, "hello world 42")
 	}
 }
+
+// §59.167 憨憨禁转徽章（tid=173490 实证形态——色码+文本双校验）
+func TestHhanNoTransferBadge(t *testing.T) {
+	badge := `class="font-small text-light" style="background: #990000">禁转<`
+	if !reHhanNoTransferBadge.MatchString(badge) {
+		t.Error("憨憨禁转徽章应命中")
+	}
+	// 负例：正文提及禁转但非徽章（无 #990000 色码）
+	if reHhanNoTransferBadge.MatchString("本资源禁止转载，禁转 PTT") {
+		t.Error("正文禁转文本不应误命中（需色码双校验）")
+	}
+	// 负例：首发徽章（#009900）不命中
+	if reHhanNoTransferBadge.MatchString(`style="background: #009900">首发<`) {
+		t.Error("首发徽章不应命中")
+	}
+}
