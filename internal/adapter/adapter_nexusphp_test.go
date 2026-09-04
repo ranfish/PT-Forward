@@ -1941,13 +1941,18 @@ func TestFmtES(t *testing.T) {
 
 // §59.167 憨憨禁转徽章（tid=173490 实证形态——色码+文本双校验）
 func TestHhanNoTransferBadge(t *testing.T) {
-	badge := `class="font-small text-light" style="background: #990000">禁转<`
+	// §59.167 实弹纠偏（tid=211544 误判）：种子标签形态=background-color（连字符）
+	badge := `style="background-color:#990000;color:#ffffff;">禁转<`
 	if !reHhanNoTransferBadge.MatchString(badge) {
-		t.Error("憨憨禁转徽章应命中")
+		t.Error("憨憨种子标签（真禁转）应命中")
 	}
-	// 负例：正文提及禁转但非徽章（无 #990000 色码）
+	// 负例 1：筛选器形态（background 冒号后空格——详情页固定含，原正则误判源）
+	if reHhanNoTransferBadge.MatchString(`style="background: #990000">禁转<`) {
+		t.Error("筛选器禁转选项不应命中（tid=211544 误判实证）")
+	}
+	// 负例 2：正文提及禁转但非标签
 	if reHhanNoTransferBadge.MatchString("本资源禁止转载，禁转 PTT") {
-		t.Error("正文禁转文本不应误命中（需色码双校验）")
+		t.Error("正文禁转文本不应误命中")
 	}
 	// 负例：首发徽章（#009900）不命中
 	if reHhanNoTransferBadge.MatchString(`style="background: #009900">首发<`) {
