@@ -1203,3 +1203,152 @@ CMCTA(group=8) 豁免分辨率/地区/豆瓣链接必选检查
 
 *分析时间：2026-04-19（Wiki+upload.php 更新：2026-04-22）*
 *数据来源：upload.php (Playwright) + Wiki (https://wiki.hdcmct.org/zh/Rule/上传规则) + rules.php (Playwright) + SpringSunday-Torrent-Assistant.js v1.1.67 (2727行/135KB)*
+
+---
+
+## 种审脚本规则（实抓分析 2026-09-03）
+
+> 来源：用户提供站方种审脚本全文分析（SpringSunday-Torrent-Assistant v1.1.73 油猴 JS，/tmp/0 归档）。与 docs/38 共性矩阵的站特例部分。
+> **种审双层架构**：①硬规则层（assistant-tooltips 红底，error=true 阻断）——发布者自检与审核共通；②种审模式层（editor-tooltips，勾选"种审模式"才启用，脚本自注"检测较为激进，误报率较高，需配合人工判断"）——Dupe 参考/允许发布版本策略/禁发/中性/可替代。标题/下拉/MI 三方 ID 常量：cat 501-509、type 1-11、encode 1-5、audio 1-13、resolution 1-5、area 1-9、group 1/3/6/8/9。
+
+### 错误级（阻断通过，硬规则层）
+
+| 判定条件 | 错误消息 |
+|---------|---------|
+| 主标题含空格（春日主标题以 `.` 分隔） | 主标题包含空格 |
+| 主标题含全角符号（U+FF00-FFEF） | 请将主标题中的全角符号更换为半角符号 |
+| 主标题含中文/中文字符 | 主标题包含中文或中文字符 |
+| 组名命中禁发名单第一批（区分大小写）：`-`/`@` + CTRLHD/SmY/FZHD | 主标题包含禁发小组，请检查 |
+| 组名命中禁发名单第二批（不区分大小写，45 组）：FGT/ZAX/Ubits/UBWEB/NSBC/BATWEB/GPTHD/DreamHD/BlackTV/CatWEB/Xiaomi/Huawei/MOMOWEB/DDHDTV/SeeWeb/TagWeb/SonyHD/MiniHD/BitsTV/ALT/NukeHD/ZeroTV/HotTV/EntTV/GameHD/SeeHD/VeryPSP/DWR/XLMV/XJCTV/Mp4Ba/GodDramas/FRDS/BeiTai/Ying/VCB-Studio/toothless/YTS.MX/BMDru/ParkHD/Xunlei/BestWEB/TBMaxUB/13city/HiveWeb | 主标题包含禁发小组，请检查 |
+| 组名命中不受信名单：Eleph/HDH/HDS(非HDTV)/HDHome/HDSky/HDSWEB/HDHWEB/Dream(非DreamRu)/DYZ-Movie；或 Dream 结尾 + BDRip/WEBRip/TVRip/DVDRip | 主标题包含不受信小组，请检查 |
+| 副标题为空 | 副标题为空 |
+| 副标题含【】 | 副标题包含【】，请修改为 [] |
+| 未选择分类/格式/主视频编码/主音频编码/地区（分辨率与地区 CMCTA 豁免） | 未选择分类/格式/主视频编码/主音频编码/分辨率/地区 |
+| 标题检测格式 vs 选择格式不一致（标题词法：.minibd/.remux/.bdrip/.bluray+x26x/.webrip/.web-dl/.tvrip/.hdtv/.dvdrip/.dvd） | 标题检测格式为 X，选择格式为 Y |
+| 标题检测视频编码 vs 选择不一致（x265/h265/hevc→H.265；x264/h264/avc→H.264 等） | 标题检测视频编码为 X，选择视频编码为 Y |
+| 视频编码选 Other（CMCTA 豁免） | 视频编码选择为 other，请人工检查 |
+| 标题检测音频编码 vs 选择不一致（dts-hd/dts-x→DTS-HD；ddp/dd+/e-ac-3→E-AC-3；ac3/dd2/dd5→AC-3 等） | 标题检测音频编码为 X，选择音频编码为 Y |
+| 音频编码选 Other | 音频编码选择为 other，请人工检查 |
+| 标题检测分辨率 vs 选择不一致（.2160p/.uhd(无1080p)/.4k.→2160p，remastered 不计 2160p） | 标题检测分辨率为 X，选择分辨率为 Y |
+| 海报为 tu.totheglory.im 防盗链图床 | 海报使用防盗链图床，请更换或留空 |
+| MediaInfo 原文含"论坛/公众号/微信" | 请检查「MediaInfo」内信息是否含有广告，请确认资源来源是否可信 |
+| 无 MediaInfo 解析栏 | 无「MediaInfo」信息，请检查 |
+| 解析后媒体信息文本 <50 字符（原盘/DVD 提示用 BDInfo，其余提示用 MediaInfo） | 媒体信息格式错误，请使用「BDInfo/Mediainfo」重新获取完整的英文信息 |
+| 格式为 Blu-ray 但媒体信息栏顶为 MediaInfo | Blu-ray 媒体信息请使用 BDInfo |
+| BDRip/Remux/WEB-DL/WEBRip/TVRip/DVDRip 且解析栏==原文栏 | 媒体信息未解析 |
+| 无豆瓣且无 IMDb 链接（CMCTA 豁免） | 未检测到豆瓣或 IMDb 链接 |
+| 有 IMDb 无豆瓣 | 未优先使用豆瓣链接 |
+| 做种者 0 | 请先做种，再等待审核 |
+| 非原盘（type≠1）选「原生」标签 | 非原盘请勿选择「原生」标签 |
+| 标题含 complete 或副标题含"X集全/全N集/合集"但未选「合集」 | 未选择「合集」标签 |
+| 有中文字幕（MI 内封中文轨或外挂 chs/cht）未选「中字」 | 未选择「中字」标签 |
+| MI 含 Dolby Vision（排除 Encoding 行）vs「DoVi」标签双向不符 | 未选择「DoVi」标签 / 选择「DoVi」标签，未识别到「DoVi」 |
+| MI 含 HDR10+ vs「HDR10+」标签双向不符 | 未选择「HDR10+」标签 / 选择「HDR10+」标签，未识别到「HDR10+」 |
+| MI 含 HDR10（无 +）vs「HDR10」标签双向不符 | 未选择「HDR10」标签 / 选择「HDR10」标签，未识别到「HDR10」 |
+| 同时选「HDR10」与「HDR10+」 | 请勿同时选择「HDR10」与「HDR10+」标签 |
+| MI 含 HLG vs「HLG」标签双向不符 | 未选择「HLG」标签 / 选择「HLG」标签，未识别到「HLG」 |
+| MI 含 HDR Vivid vs「菁彩 HDR」标签双向不符 | 未选择「菁彩 HDR」标签 / 选择「菁彩 HDR」标签，未识别到「菁彩 HDR」 |
+| 「活动」标签但无「中字」或非 WEB-DL | 选择「活动」标签，未识别到「中字」/「WEB-DL」 |
+| 附加信息含 ◎（应只剩致谢、制作信息） | 请移除附加信息中除致谢、制作信息以外的内容 |
+| 标题检测 CMCT/CMCTA/CMCTV 但未选制作组 | 未选择制作组 CMCT(x) |
+| PNG 截图 <3 张（isWhiteList 豁免，见下）；或 PNG+JPG 合计 <3 张 | PNG 格式的图片未满 3 张 / 图片未满 3 张 |
+| 截图非白名单图床（见下）；Pixhost 非 `img*.pixhost.cc|to/images/` 直链格式 | 请使用规则白名单内的图床 / Pixhost 图床链接格式错误，请使用正确的图片直链 |
+| 无截图容器 | 无图片信息 |
+| 豆瓣分类（◎类别+◎类型推断 501-505）vs 选择分类不一致 | 豆瓣检测分类为 X，选择分类为 Y |
+| 豆瓣地区（◎产地映射，多值）vs 选择地区不一致 | 豆瓣检测地区为 X，选择地区为 Y |
+| 豆瓣动画类别 vs「动画」标签双向不符 | 豆瓣检测「动画」类别，未选择「动画」标签 / 选择「动画」标签，豆瓣未识别到「动画」类别 |
+
+### 警告级（提示不阻断）
+
+| 判定条件 | 警告消息 |
+|---------|---------|
+| WEB-DL 且分辨率 720p/SD | 禁发：低于 1080p 分辨率的 WEB-DL 资源（仅提示，未置 error） |
+
+### 种审模式层（editor 参考，激进检测不阻断）
+
+**格式/编码比对**：BDInfo/MediaInfo 检测格式/视频编码/音频编码 vs 下拉不一致（MI 音频优先取 Default=Yes 轨）。
+
+**Dupe 平台优先级（WEB-DL）**：
+- 二次元：CR = B-Global 2160p > B-Global 1080p > AMZN > Other
+- 2160p 高优先级源：DSNP/Disney+/MAX/AMZN(Amazon)；次高：Paramount+/PMTP/iTunes/HBO.Max/HMax/.iT.
+- 1080P 高优先级源：DSNP/Disney+/MAX/AMZN/Amazon/CR；次高：Netflix/NF/HBO.Max/HMax
+- 低优先级源：Mytvs/MyVideo/Hami/Mytvsuper
+- 单独槽位：`.ma.`+WEB-DL=Movies Anywhere；`.nf.`+WEB-DL+2160p=Netflix 2160P
+
+**Dupe 参考（优质资源，必需保留附加信息否则不允许发布）**：
+- 优质字幕小组：Nest/n!ck/lancertony/vandoge、-Breeze@Sunny
+- 优质小组：Pter/CiNEPHiLES/FraMeSToR/BLURANiUM/ZQ/ZoroSenpai/hallowed/MainFrame
+- DIY 原盘（DIY- 前缀或副标题 DIY）、REMUX 类（type=4）必需保留附加信息
+- 外挂字幕优先级低于内置字幕；合集资源须选取第一集（S01E01）的媒体信息
+- DV Profile：dvhe.05=P5（不含 HDR10 数据）；dvhe.07/08=P7 or P8（含 HDR10 数据）
+- 52pt + 原盘：疑似 Remux，检查是否真「原生」
+- BHDStudio 原盘：可替代（质量较差的视频）
+
+**禁发（editor 层提示）**：
+- DV P7 压制（dvhe.07 + BDRip/WEBRip）：兼容性过低
+- 剧集形式 TV/OVA 番剧的原盘（含合集），仅允许剧场版/电影原盘
+- 音乐类（cat=508）：除官组驻站外禁止发布；演唱会可发且分类为 MV
+
+**允许发布的版本策略（Encode，type=BDRip/WEBRip/TVRip/DVDRip）**：
+- 2160P 只接受 x265 编码版本
+- 1080P SDR 只接受 x264 编码版本（非动漫）
+- 1080P SDR 仅日本二维动画接受 x265（动漫但非日本地区不接受）
+- 禁止：1080P 带 HDR 的 Encode（豁免：UHD 原盘制作的日本二次元动漫且非外挂中字）
+- 禁止：x264 10bit（标题 `.x264.`+`.10bit.`，或 MI 10 bits+x264 库）：硬件兼容性较差
+- 不允许：低于 720P 的 BDRip
+
+**可替代（Trumpable）**：
+- 音频臃肿：DTS-HD/TrueHD/DTS:X/LPCM 轨 + 1080p 及以下 + Encode
+- 使用 PCM 音轨的 Encode
+- 主标题含 PAD/iPAD
+
+**中性（无需处理）**：
+- 国产豆瓣低分（<4 分、非原盘、需排除一个月内未出分新片）
+- 单集（剧集/纪录/综艺 + HDTV/WEB-DL）无需审核；疑似单集但带合集标签需检查
+- 除电影外无「中字」的 WEB/Remux/动漫 Encode/Blu-Ray 剧集资源
+- 时长 <10 分钟疑似短剧
+
+**标题/媒体信息词形与元数据检查（editor 层）**：
+- 标题未检测到年份（1880-2030）/音频编码/分辨率/视频编码
+- MI 含网址；MI 中文开头（概览/概要）；MI 空格字符过少（双空格 <30 处）；BDInfo 带多行空格；Size: 0；0 kbps
+- `.BDMV/.BDISO/.BDBOX.`→Blu-ray、`.DVDISO.`→DVD；`.2in1.` 检查 BDinfo 齐全；DTS-HDMA 连写检查标点；`..` 检查标点
+- 标题含 HDR 但 MI 无 ST 2086/ST 2094/HDR Vivid/Transfer characteristics HLG|PQ（MediaInfo 源）
+- 标题/副标题含 Criterion/CC/CC标准收藏版/CC版 而 type 为原盘/Remux/BDRip：检查「CC」标签
+- 副标题开头非中文译名（1-8 字中文）提示检查
+- 副标题含"X版原盘"但无「原生」标签且副标题无 DIY
+- 港版原盘区号 `.HK.` 应使用 HKG；不接受发行地中国大陆的蓝光原盘 DIY（`.CHN.`+副标题 DIY）
+- 标题含 `.DV.` 但 MI 未检测到杜比视界（非原盘）
+- MI 含 `SUBtitleS:` 检查 BDInfo；Original height 需人工判断
+- Progressive 扫描 vs 1080i 分辨率矛盾；Video:1080i vs 1080p 标题
+- DVDRip 非 SD 分辨率：检查是否超分辨率
+- 「国配」标签三问：MI 无普通话配音禁用；豆瓣原始语言含普通话禁用；外语/粤语片含普通话配音需使用
+- 附加信息含网址（白名单 blu-ray.com/ptpimg.me/slow.pics 外）
+- 「应求」标签需悬赏链接且候选区先来后到
+- MediaInfo 未找到文件名信息；BDInfo 未找到 Disc Title/Label
+- 豆瓣未检测到年份；豆瓣与标题年份不匹配；豆瓣信息未检测到语言
+
+**图片质量检查（editor 层，Range 请求实测）**：
+- PNG 位深 <24 报错（读 PNG 头 IHDR 通道×位深）
+- 截图分辨率 vs MI 分辨率（2160p: 高 2120-2160/宽 3800-3840；1080p/i: 高 1040-1080/宽 1880-1920；720p: 高 680-720/宽 1280；AMZN 宽度可按 MI 宽高比换算）
+- Blu-ray 原盘截图须按 16:9 标准（3840×2160/1920×1080）；DVD 截图人工确认
+- HDR/2160p 截图体积须 ≥1800KB；1080p 截图 ≥1000KB
+- 活动标签检查豆瓣/IMDb 评分
+
+### 豁免/特殊逻辑
+
+- **PNG 3 张白名单 isWhiteList**：（大陆 + 组名 PterWEB/CatEDU/CMCTV/HHWEB/OurBits）或（HDTV/WEB-DL + 2160p + HDR10/HDR10+/菁彩 HDR/DoVi）→ 豁免 PNG≥3（仍须总数≥3）。
+- **CMCTA（group=8）豁免**：分辨率/地区未选、视频编码 Other、无豆瓣 IMDb 链接。
+- **「禁转」标题**：exclusive 标记（脚本识别供转载限制判断）。
+- **remastered 特例**：`.uhd.` + remastered 不按 2160p 计（重制版年份词干扰规避）。
+- **标题词法识别用小写全文**（title_lowercase）；音频识别兼容 dd2/dd5/dd.2/dd.5 写法。
+- **BDInfo 识别**：DISC INFO/BDInfo/Disc Label/Disc Title 特征；MiniBD 标题覆盖 type=2。
+- **审核快捷回复模板**（脚本内置 15 条驳回话术：主标题/海报/截图规格/截图有效信息/中字截图/制作信息/附加信息 NFO/MediaInfo/BDInfo 多合一/标签等）与 8 条标签释义（原生/特效/已取代/合集/中字/国配/CC/自购）。
+
+### 标题词形规范
+
+- 主标题以 `.` 分隔、禁空格、禁中文/全角。
+- `.4k.`→2160p；`.uhd.`（无 1080p）→2160p；`.minibd/.remux/.bdrip/.bluray/.blu-ray/.webrip/.web-dl/.webdl/.web./.tvrip/.hdtv/.dvdrip/.dvd` 小写词法识别。
+- BDMV/BDISO/BDBOX 应写 Blu-ray；DVDISO 应写 DVD（editor 提示）。
+- DTS-HD MA 须带空格分隔（DTS-HDMA 连写报标点）。
+- 港版原盘区号用 HKG（非 HK）。
+- 编码词法：x265/h265/h.265/hevc 同组；x264/h264/h.264/avc 同组。

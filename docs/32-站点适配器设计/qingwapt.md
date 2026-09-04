@@ -2011,3 +2011,177 @@ Saki S01-S03 BluRay 1080p / 720p Hi10P x264 FLAC 2.0-VCB-Studio
 | 推荐客户端 | qBittorrent 或 Transmission（不推荐最新版） |
 
 > **对 PT-Forward 的影响**：青蛙站对盒子无限制，PT-Forward 转发行为不受盒子规则约束。但需注意 Transmission 版本限制——如果 PT-Forward 使用 Transmission 做种，版本必须在 4.0.5 以上或使用 qBittorrent。
+
+---
+
+## 种审脚本规则（实抓分析 2026-09-03）
+
+> 来源：用户提供站方种审脚本全文分析（qingwa-torrent-assistant v1.1.1）。与 docs/38 共性矩阵的站特例部分；与 W.1 标题命名规范互为印证（脚本为可执行判定的实抓口径）。
+> 脚本形态：error（红色面板阻断）/ warning（黄色面板提示）两级；音乐(408)/其他(409) 分类有清空重判逻辑（见豁免）。
+
+### 错误级（阻断通过）
+
+**A. 标题词形硬规则（本站最强项）**
+
+| # | 判定条件 | 错误消息 |
+|---|---------|---------|
+| A1 | 主标题含中文/全角字符（`[\u4e00-\u9fa5\uff01-\uff60]`） | 主标题包含中文或中文字符 |
+| A2 | 媒介≠UHD Blu-ray(1)/Blu-ray(8) 且标题含 Complete | 主标题: Complete 需删除 |
+| A3 | 标题出现 `年份 Sxx` 顺序（年份后才有季号） | 标题：季集应在年份前 |
+| A4 | 标题含 `\sHDR10\s` | 标题：HDR10 需要改为 HDR |
+| A5 | 勾「HDR10+」标签但标题无 HDR10+ 词 | 标题：HDR类型 缺少/错误 |
+| A6 | 勾「HDR」标签（未勾 HDR10+）但标题无 HLG/HDR/HDR10+ 词 | 标题：HDR类型 缺少/错误 |
+| A7 | 媒介=WEB-DL(7) 且标题含 HEVC/H265 | 标题：WEB 资源, HEVC 或 H265 应改为 H.265 |
+| A8 | 媒介=WEB-DL(7) 且标题含 AVC/H264 | 标题：WEB 资源, AVC 或 H264 应改为 H.264 |
+| A9 | 媒介=HDTV(4) 且标题含 HEVC/H.265 | 标题：HDTV 资源, HEVC 或 H.265 应改为 H265 |
+| A10 | 媒介=HDTV(4) 且标题含 AVC/H.264 | 标题：HDTV 资源, AVC 或 H.264 应改为 H264 |
+| A11 | 标题含 `(480|720|1080|2160|4320)P`（大写 P） | 标题：分辨率 P 应改为 p |
+| A12 | 标题 `atmos…truehd` 顺序（Atmos 在 TrueHD 前） | 标题：Atmos 应置于 声道 之后 |
+| A13 | 编码词出现在片源词后（`(编码词).*(bluray|blu-ray|web-dl|remux)`） | 标题：片源类型与规格应置于视频编码前面 |
+| A14 | 标题无分辨率词（媒介=DVD/Remux 时可由 NTSC/PAL 制式词替代） | 标题中缺少分辨率 / 标题中缺少分辨率或制式 |
+| A15 | 标题无来源/媒介词 | 标题中缺少来源或媒介 |
+| A16 | 分辨率词位置在来源/媒介词之后 | 将标题中的分辨率置于来源/媒介前 |
+| A17 | 标题无视频编码词 | 标题中缺少视频编码 |
+| A18 | 标题无音频编码词 | 标题中缺少音频编码 |
+| A19 | 标题含 AC3 | AC3改为 DD |
+| A20 | 标题含 HQ | 删除标题中的 HQ |
+| A21 | 标题含 FPS（`\s\d{2,3}FPS\s`） | 删除标题中的 FPS |
+| A22 | 标题含 EDR | 删除标题中的 EDR |
+| A23 | 标题含 SDR | 删除标题中的 SDR |
+| A24 | 标题含 4K | 4K 改为 2160p |
+| A25 | 标题有音频编码词但无 `X.Y` 声道数 | 标题中未正确标示声道数 |
+| A26 | 视频编码词位置在音频编码词后 | 将标题中的视频编码置于音频编码前面 |
+| A27 | HDR 类型词位置在视频编码词后（或音频词后） | 将标题中的HDR类型置于视频编码前面 |
+| A28 | 标题含 10bit | 删除标题中的10bit |
+| A29 | 媒介∈{UHD Blu-ray(1), Blu-ray(8), MiniBD(11)} 且标题含 BluRay/Blu-Ray/BDMV/BLURAY | 标题中X应为Blu-ray |
+| A30 | 媒介=Encode(10) 且标题含 BDRip/Blu-ray/Blu-Ray/BLURAY | 标题中X应为BluRay |
+
+**B. 媒介↔MediaInfo 栏形态**
+
+| # | 判定条件 | 错误消息 |
+|---|---------|---------|
+| B1 | BD 系媒介（1/8/11）但 MI 栏为 MediaInfo 格式（非 BDInfo） | Mediainfo栏应填写BDinfo |
+| B2 | 非 BD 媒介但 MI 栏为 BDInfo 格式 | Mediainfo栏应填写mediainfo |
+| B3 | BD 系（BDInfo）DIY 判定成立但未勾「DIY」标签 | 未选择DIY标签 |
+| B4 | BD 系 DIY 判定成立但勾了「原生原盘」标签 | 不应选择原生原盘标签 |
+| B5 | BD 系未勾「原生原盘」且未勾「DIY」 | Blu-ray 类型，未选择 原生 或 DIY 标签 |
+| B6 | 「原生原盘」与「DIY」同时勾选 | 原生 或 DIY 标签只能使用一个 |
+
+**C. 分类/剧集形态**
+
+| # | 判定条件 | 错误消息 |
+|---|---------|---------|
+| C1 | 分类=电影(401) 但标题含 `S**E**` | 经脚本检查标题包含 S**E**，但选择了电影类别，请再次确认 |
+| C2 | 分类=剧集(402) 但标题不含 `S**E**` | 选择了剧集类别，但是经脚本检查标题未包含 S**E**，请再次确认 |
+| C3 | 标题含单独季号 `Sxx`（无 E）未勾「完结」标签 | 完结剧集请添加完结标签 |
+| C4 | 标题含 `SxxExx` 未勾「分集」标签 | 未完结剧集请添加分集标签，如果无法勾选，请前往站点首页公告处查看并申请分集标签权限或举报删除 |
+| C5 | 标题为单季/分集形态（ES=0 或 1）但勾了「合集」标签 | 不应选择合集标签 |
+
+**D. 信息完整性**
+
+| # | 判定条件 | 错误消息 |
+|---|---------|---------|
+| D1 | 副标题为空 | 副标题为空 |
+| D2 | 未选择分类/媒介/主视频编码/主音频编码/分辨率 | 未选择分类 / 未选择媒介 / 未选择主视频编码 / 未选择主音频编码 / 未选择分辨率 |
+| D3 | 标题检测媒介/视频编码/音频编码/分辨率与所选不一致 | 标题检测媒介为X，选择媒介为Y（四维度同构） |
+| D4 | MediaInfo 栏为空 | Mediainfo栏为空 |
+| D5 | MediaInfo 栏既非 MediaInfo 格式也非 BDInfo 格式 | Mediainfo栏填写不正确 |
+| D6 | MediaInfo 含 BBCode（`[/b]` `[/color]` 等） | MediaInfo中含有bbcode |
+| D7 | 简介文本含 MediaInfo 特征（Complete name+Movie name/General+Video、DISC INFO 等） | 简介中包含Mediainfo |
+| D8 | 简介图片数 <1（含海报位） | 缺少海报或截图 |
+
+**E. 标签↔MediaInfo 联动（双向）**
+
+| # | 判定条件 | 错误消息 |
+|---|---------|---------|
+| E1 | MI Audio Language 中文/国语未勾「国语」标签 | 未选择国语标签 |
+| E2 | MI 粤语音轨未勾「粤语」标签 | 未选择粤语标签 |
+| E3 | MI Text Language Chinese 未勾「中字」标签 | 未选择中字标签 |
+| E4 | 标题含 vcb-studio 未勾「VCB-Studio」标签 | VCB资源未选择VCB-Studio标签 |
+| E5/E6 | MI 识别 HDR（HDR Vivid/BT.2020/SMPTE ST 2086/HDR10+）↔「HDR」标签双向 | 未选择 HDR 标签 / 选择 HDR 标签，未识别到 HDR |
+| E7/E8 | MI SMPTE ST 2094/HDR10+ ↔「HDR10+」标签双向 | 未选择 HDR10+ 标签 / 选择 HDR10+ 标签，未识别到 HDR10+ |
+| E9/E10 | MI dvhe./Dolby Vision ↔「杜比视界」标签双向 | 未选择杜比视界标签 / 选择 杜比视界 标签，未识别到 杜比视界 |
+| E11 | MI 含 HLG 未勾「HDR」标签 | HLG 需要添加 HDR 标签 |
+| E12 | 媒介=Remux(9) 未勾「Remux」标签 | 未选择Remux标签 |
+
+**F. 组/官种**
+
+| # | 判定条件 | 错误消息 |
+|---|---------|---------|
+| F1 | 标题 `-`/`@` 后缀命中禁发组（名单见下） | 主标题包含禁发小组，请检查 |
+| F2 | 官种未选制作组 | 未选择制作组 |
+| F3 | 非官种勾「官方」标签 | 非官种不可选择官方标签 |
+| F4 | 官种未勾「官方」标签 | 官种未选择官方标签 |
+| F5 | FROGE 压制组官种 MI 含 x264/x265 但标题无对应词 | 压制组-主标题中编码应为 x264 / x265 |
+
+**G. 音乐类专用**（cat=408 清空重判后追加）
+
+| # | 判定条件 | 错误消息 |
+|---|---------|---------|
+| G1 | 音乐(408) 标题无 kHz | 主标题缺少采样频率 |
+| G2 | 音乐(408) 标题无 bit | 主标题缺少比特率 |
+
+**禁发组名单（F1，`(-|@)` 前缀匹配）**：
+`FGT, NSBC, BATWEB, GPTHD, DreamHD, BlackTV, CatWEB, Xiaomi, Huawei, MOMOWEB, DDHDTV, SeeWeb, TagWeb, SonyHD, MiniHD, BitsTV, ALT, LelveTV, NukeHD, ZeroTV, HotTV, EntTV, GameHD, SmY, SeeHD, ParkHD, VeryPSP, DWR, XLMV, XJCTV, Mp4Ba, Huluwa` + `CTRLHD`（独立判定，共 33 组）。
+注意：VCB-Studio 在本站**不禁发**（有专属标签联动 E4）——与劳改所站特例相反。
+
+### 警告级（提示不阻断）
+
+| # | 判定条件 | 警告消息 |
+|---|---------|---------|
+| W1 | 分辨率=SD/Other（或标题分辨率 SD）且非官种/非 GodDramas | 请检查是否有更高清的资源 |
+| W2 | DVD 来源但分辨率 720p | 请检查该DVD来源的资源分辨率有否错标 |
+| W3 | 简介无 IMDb/豆瓣链接（认可 imdb.com/douban.com/themoviedb.org/bgm.tv）且非 GodDramas | 简介中未检测到IMDb或豆瓣链接 |
+| W4 | 简介图片加载 30 秒超时 | 页面图片加载30秒超时 |
+| W5 | 简介图片渲染高度 ≤24px（异常小图/挂图） | 异常图片：URL 列表 |
+
+### 豁免/特殊逻辑
+
+- **音乐(408)/其他(409) 清空重判**：先清空此前全部 error+warning 再重新判定——其他(409) 类全免（不输出任何错误）；音乐(408) 仅查 G1/G2（kHz/bit）。
+- **officialMusicSeed（标题含 frogmus，预留）**：清空全部错误，仅保留「未选择制作组」检查。
+- **官种识别**：标题含 `frog`/`froge`/`frogweb`/`Loong@QingWa`；制作组下拉：FROG(6)/FROGE(7)/FROGWeb(8)/GodDramas(9)/Other(5)——F5 仅对 FROGE(7) 压制组生效。
+- **GodDramas 驻站短剧组**（变量预留但已参与判定）：豁免 W1 高清检查与 W3 链接检查。
+- **VCB-Studio 特殊地位**：不禁发、有专属标签（标题 vcb-studio ↔ 标签 VCB-Studio 双向联动）。
+- **DVD/Remux 缺分辨率豁免**：标题含 NTSC/PAL 制式词可替代分辨率词（A14）。
+- **WAVVE 防误命中**：音频词检测前把标题中 `WAVVE` 替换为 `WAAAE`（防流媒体名误判 WAV）。
+- **DIY 识别**：标题 `(-|@)(BHYS|sGnb|SPM|HDSky|HDHome|DIY)` 后缀，或副标题含 `DIY`。
+- **MI 判定源**：dvhe./Dolby Vision→DV；HDR Vivid/BT.2020/SMPTE ST 2086→HDR；SMPTE ST 2094/HDR10+ 文本→HDR10+（并连带 HDR）。
+- **音频语言推断**：MI Audio Language=Chinese 时按副标题分流——含「粤」→粤语，否则国语；副标题含 国语/国配/国粤→国语；Mandarin→国语；Cantonese→粤语。
+- **标题预处理**：判定前剥离站方标记（禁转/(已审|冻结|待定)/[免费|50%|2X免费|30%|2X 50%]/(限时N…)/[2X]/[推荐|热门|经典|已审]/剩余时间*/(禁止)，与藏宝阁同款正则）。
+- **分辨率归一**：720i→720p；480p/480i/360p/360i→SD。
+- **区号词（CAN/ITA/USA/JPN/HKG/TWN/EUR 等）**：脚本仅提取位置未参与判定（预留）。
+
+### 标题词形规范（本站独有最全集）
+
+**改写/删除硬规则**：
+- `HDR10 → HDR`（A4）；`4K → 2160p`（A24）；分辨率小写 `p`（A11）；`AC3 → DD`（A19）
+- 删除词：`10bit`（A28）、`HQ`（A20）、`FPS`（A21）、`EDR`（A22）、`SDR`（A23）、`Complete`（A2，BD 原盘媒介外）
+- 声道数必标：音频编码词后必须带 `X.Y` 形式声道数（A25）
+
+**媒介分形编码词（同名编码按媒介写不同词形）**：
+
+| 媒介 | H.265 系词形 | H.264 系词形 |
+|------|-------------|-------------|
+| WEB-DL | H.265 | H.264 |
+| HDTV | H265 | H264 |
+| Encode（FROGE 压制官种，按 MI Writing library） | x265 | x264 |
+
+**BD 词形分层**：原盘系（UHD Blu-ray/Blu-ray/MiniBD/Remux）用 `Blu-ray`（**有连字符**，A29）；Encode 用 `BluRay`（**无连字符**，A30）。
+
+**词序规范（六条位置判定）**：
+1. 季集在年份前（A3）
+2. 分辨率在来源/媒介前（A16）
+3. 片源在视频编码前（A13）
+4. 视频编码在音频编码前（A26）
+5. HDR 类型在视频编码前（A27）
+6. Atmos 在声道后（A12，即 TrueHD Atmos 顺序）
+
+**标题识别词表（一致性比对用，按 if-else 顺序优先）**：
+
+| 维度 | 识别词表 |
+|------|---------|
+| 媒介 | web-dl/webdl→WEB-DL(7)；remux→Remux(9)；hdtv→HDTV(4)；minibd→MiniBD(11)；blu-ray/bluray **且无编码词**→Encode(10)；webrip/dvdrip/bdrip/x265/x264→Encode(10)；uhd blu-ray/uhd bluray→UHD Blu-ray(1)；blu-ray/bluray（带编码词）→Blu-ray(8)；` DVD`→DVD(2)；cd→CD(3)；track→Track(5)。注意：BD 标题**应带编码词**（HEVC/AVC 等）才会识别为原盘——无编码词的 blu-ray 反而被判 Encode |
+| 视频编码 | 264/avc→H.264/AVC；265/hevc→H.265/HEVC；vc/vc-1→VC-1；mpeg2/mpeg-2→MPEG-2；av1/av-1→AV1；mpeg4/mpeg-4→MPEG-4；vp9/vp-9→VP9 |
+| 音频 | FLAC→FLAC；LPCM→LPCM；DDP/DD+/E-AC3→DDP/E-AC3；DD/AC3→DD/AC3；hra→DTS-HD HRA；truehd+atmos→TrueHD Atmos；dts-hd→DTS-HD MA；dts:x/dts-x/dtsx→DTS:X；truehd→TrueHD；DTS→DTS；AAC/USAC→AAC；ape→APE；wav→WAV；mp3→MP3；m4a→M4A；OPUS→OPUS；AV3A→AV3A |
+| 分辨率 | 1080p→1080p；1080i→1080i；720p/720i→720p；` SD `→SD；8k/4320p/4320i→8K；4k/2160p/2160i/uhd→4K |
+| 完结/分集 | complete→完结；`s\d+e\d+`/`ep\d+`→分集；单独 `Sxx`（无 E）或多季 `Sxx-`→完结/合集形态 |

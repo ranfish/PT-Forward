@@ -1220,3 +1220,70 @@ ALT, BATWEB, DBD-Raws, XunLei, ZeroTV, LelveTV, Quark, mp4, mkv
 
 *数据来源: upload.php HTML (2026-04-22), Wiki uploadrule (2025-11-05 更新), Wiki howtoupload (2025-10-11 更新), CS-Torrent-Assistant-New v1.5.11 (1615行/73KB)*
 *文档更新: 2026-04-22*
+
+---
+
+## 种审脚本规则（实抓分析 2026-09-03）
+
+> 来源：用户提供站方种审脚本全文分析（CS-Torrent-Assistant-New v1.5.11，/tmp/0 归档）。与 docs/38 共性矩阵的站特例部分；共性规则（C1-C12）标注于判定条件内。
+> 脚本改自 AGSV 版（经 SpringSunday），存在多处 **AGSV 残留 ID/死代码**（标注于表内及"豁免/特殊逻辑"，提取规则须甄别——docs/38 §五）。
+
+### 错误级（阻断通过）
+
+| 判定条件 | 错误消息 |
+|---------|---------|
+| 简介图片 src 命中禁用图床黑名单：rains3.com / img.m-team.cc / totheglory.im/details / i.miji.bid / duan.red（**CS 特有**） | 请检查海报或者截图是否加载正常 |
+| 主标题含非 ASCII 中文字符（共性 C1；豁免：￡/™/罗马数字Ⅰ及Ⅱ-Ⅹ/白自在/至尊宝；无分类豁免） | 主标题包含中文或中文字符 |
+| 副标题为空（共性 C3） | 副标题为空 |
+| 详情页无"标签"栏（一个标签都没选，**CS 特有**） | 标签为空 |
+| 标签"儿童"与简介类别 XOR 不一致（**CS 特有**：解析简介"类 别:"或"Keywords:"行按"/"分词；儿童词集=儿童/animated/child/kids；标签有∨简介有仅其一即报） | 标签与简介类别不一致(儿童) |
+| 标签"喜剧"与简介类别 XOR 不一致（**CS 特有**：喜剧词集=喜剧/搞笑/comedy/funny） | 标签与简介类别不一致(喜剧) |
+| 副标题含"动画"但分类≠405 Anime | 类型未选择Anime(动漫) |
+| 分类/媒介/主视频编码/主音频编码/分辨率任一下拉未选（共性 C2） | 未选择分类／未选择媒介／未选择主视频编码／未选择主音频编码／未选择分辨率 |
+| 标题解析出的媒介/编码/音频/分辨率与下拉不一致（共性 C2；分辨率含 2K/1440p 档——CS 独有） | 标题检测媒介为X，选择媒介为Y（视频编码/音频编码/分辨率同构共 4 条） |
+| 标题含 complete + 未选"完结"标签 + cat∈{402, 403, 404} | 完结剧集请添加完结标签 |
+| 官种（标题含 csweb 或 cspt）MediaInfo 短格式=完整格式（未解析） | 媒体信息未解析 |
+| MediaInfo 含 BBCode 结束标签 | MediaInfo中含有bbcode |
+| 官种未选制作组 | 未选择制作组 |
+| 标题命中未信任组黑名单（共性 C7 + **CS 新增 Quark/mp4/mkv**——mp4/mkv 为容器词，标题带即触发，误伤面大，docs/38 §五） | 检测为疑似未信任制作组发布的资源 |
+| GodDramas 种 + 简介含"禁止转载" + 未选禁转标签（AGSV 残留） | 未选择禁转标签 |
+| GodDramas 种 + cat≠419 Playlet（AGSV 残留） | 未选择短剧类型 |
+| GodDramas 种 + 未选驻站标签（AGSV 残留） | 未选择驻站标签 |
+| 非官种选了"官方/官种"标签／官种未选（双向；识别词含"官方"或"官种"） | 非官种不可选择官方标签／官种未选择官方标签 |
+| 标题含 S01E01 分集形态或副标题含"第N集" + 未选分集标签 | 未选择分集标签 |
+| 标题含 hares（AGSV 残留：方舟标签检测已注释 isTagArcProj 恒 false → 含 hares 标题恒报） | 方舟计划种子未选择方舟标签 |
+| hares 种未选 Hares 制作组／非 hares 种选 Hares（AGSV 残留死代码：CS 制作组实为 WiKi/MySiLU/HDS/CHD/rain/rainweb/Tangweb，category 解析绑 AGSV 组名永为空 → 含 hares 标题恒报） | 制作组未选择Hares／制作组选择错误 |
+| 简介含 MediaInfo 文本（共性 C12，官种 NFO 多形态白名单同 AGSV） | 简介中包含Mediainfo |
+| 简介无"片名"或"译名"字段（**CS 生效**——AGSV 版此规则已注释） | 未填写影片简介 |
+| 简介内图片总数<2（共性 C5） | 缺少海报或截图 |
+| MediaInfo 栏为空（共性 C4） | Mediainfo栏为空 |
+| Music(411) 主标题缺 kHz／缺 bit | 主标题缺少采样频率／主标题缺少比特率 |
+| 官种 x264/x265 词形（**死代码**：绑 category===6=AGSVPT 残留 ID，CS 无此组） | 主标题中编码应为 x264／x265 |
+
+**未信任组黑名单（CS 版，标题小写子串匹配）**：AGSV 27 词（见 agsv.md 同章节）+ `Quark`, `mp4`, `mkv`
+
+### 警告级（提示不阻断）
+
+| 判定条件 | 警告消息 |
+|---------|---------|
+| 分辨率=4K（**残留 bug**：判 `resolution===8`，AGSV 的 8=Other/原意 480p 档，CS 的 8=4K → 全部 4K 种误报，docs/38 §五） | 请检查是否有更高清的资源 |
+| 简介含 MediaInfo 参数图片（pterclub 模板图/文件名含 Mediainfo.png） | 请删除多余的影片参数/媒体信息图片 |
+| MI 字幕轨含 Chinese 未选"中字"标签（共性 C8） | 未选择中字标签 |
+| 体积>1T 未选"大包"标签 | 未选择大包标签 |
+| 页面图片加载超过 30 秒（CS 激活；AGSV 版已注释） | 页面图片加载30秒超时 |
+| 图片实际加载失败（渲染高度≤24px，CS 激活） | 图片加载失败：\<图片链接\> |
+
+### 豁免/特殊逻辑
+
+- **IMDb/豆瓣/TMDB 链接检查已注释**（共性 C6 停用——CS 不强制简介链接）
+- **英字标签警告已注释**（AGSV 有）；**冰种标签规则已注释**（CS 无冰种体系）
+- 官种音乐清空逻辑（agsvmus）残留但 CS 无此组——死代码
+- **分类整体豁免**：cat∈{406 MV, 408 Audio, 411 Music, 412 Software, 413 Game, 415 E-Book, 418 Picture} → 清空全部错误+警告；Music(411) 的 kHz/bit 在清空之后重加，仍生效
+- **官种识别**：标题含 `csweb` 或 `cspt`（official_tags 配置）
+- **残留 bug 清单**（docs/38 §五，提取规则须甄别）：①4K 分辨率警告全误报（AGSV 残留 ID 8）②未信任组含 mp4/mkv 容器词（标题带即拒）③官种 x264/x265 绑 AGSVPT=6 死码 ④媒介检测 AV1 分支判大写 `includes("AV1")`（title 已 toLowerCase → 永不命中，AV1 标题走 264/265→Encode 分支）
+
+### 标题词形规范
+
+- CS 无词形硬规则；Music(411) 需含 `kHz`+`bit`
+- **媒介标题检测分支**：web-dl|webdl|webrip|web-rip→WEB-DL；remux→Remux；blu-ray|bluray 且无 uhd/264/265→Blu-ray；hdtv→HDTV；encode|264|265→Encode；uhd→UHD Blu-ray；dvd/cd/track→对应；兜底 Other
+- **分辨率独有 2K/1440p 档**（1440p/1440i，ID=11）

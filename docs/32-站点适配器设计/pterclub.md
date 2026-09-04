@@ -1378,3 +1378,111 @@ U2: [机动战士高达0080：口袋里的战争][Mobile Suit Gundam 0080 War In
 
 *数据来源: upload.php (92140字节) + Wiki上传规则 (12281字节) + Wiki DUPE规则 (11334字节) + Wiki盒子规则 + 种子检查脚本 PTerClub Torrent Checker v1.0.22 (2245行/141KB) + 论坛规则 (112756字节)*
 *文档更新: 2026-04-22 — 补充官方 Wiki 上传规则完整采集 + 种子检查脚本深度复查补充 11 项遗漏 + Wiki盒子及独立主机特别说明（W.12）*
+
+---
+
+## 种审脚本规则（实抓分析 2026-09-03）
+
+> 来源：用户提供站方种审脚本全文分析（PTerClub Torrent Checker v1.0.22 油猴 JS，/tmp/0 归档）。与 docs/38 共性矩阵的站特例部分。
+> 脚本架构：详情页抓取 TORRENT_INFO 六块（titleinfo/tableinfo/descrinfo/mediainfo/bdinfo/results）→ 主标题按模板占位符逐段提取重组（`##Logo## ##Name## ##Year## ##Season## ##Chapters## ##Date## ##REMUX## ##Resolution## ##Source## ##Vcodec## ##BitDepth## ##FPS## ##HDR## ##DoVi## ##Acodec## ##Channels## ##Atmos## ##Group##`，docs/38 记为 16 段模板，实际占位 18 段）→ 与 MediaInfo/BDInfo/简介逐词重组比对 → error 数组汇总判定。
+
+### 错误级（阻断通过）
+
+| 判定条件 | 错误消息 |
+|---------|---------|
+| 副标题含单集模式（`第?N集/N话/N期` 或 `N-M集`） | 不审核单集（直接终止返回） |
+| 页面存在"猫站帮帮组徽章" | 有 Helper 意见（终止，以帮帮组意见为准） |
+| 主标题无来源词（Blu-ray/WEB-DL/WEBRip/HDTV/U?HDTV/DVDRip/DVD+PAL|NTSC；音乐类 `bit.*khz` 标题豁免） | 主标题缺少来源 |
+| 无视频编码（质量非 DVD） | 主标题缺少视频编码 |
+| 无分辨率（非 DVD 来源） | 主标题缺少分辨率 |
+| 重组后片名为空 | 如有：主标题不符合命名规范（片名） |
+| 电影类无年份 | 如有：标题缺少年份 |
+| 年份/季数/播出日期全无 | 如有：主标题不符合命名规范（季数） |
+| 标题去除组名后含 BDRip/BDMV/非 ASCII 字符（中文） | 如有：主标题不符合命名规范（其他） |
+| 重组标题含 `.` | 如有：标题中有多余的点需要删除 |
+| 标题含 `2.05.1` | 如有：音频通道错误 |
+| TrueHD + 通道非 7.1 + 标 Atmos | 如有：音频对象错误 |
+| 组名含空格 | 如有：标题中有扩展名等需要删除 |
+| 重组标题含 `(...)` | 如有：标题中有多余括号需要删除 |
+| 标题含连续空格 `\s{2,}` | 主标题含连续多个空格 |
+| 标题含 REPACK | REPACK / FIX / 有更好的版本 |
+| 标题含日期 YYYYMMDD | 播出日期需要人工确认 |
+| MediaInfo/BDInfo/解析 NFO 全无 | 缺少 MediaInfo 或 BDInfo |
+| 标题分辨率 vs MI 分辨率不一致（MI 宽高差值法：差>4096-1248→4320；>1920-672 或横屏高 2160→2160；>1280-480 或高 1080→1080；>1024-520/宽 1260-1280/高 720→720；高 481-576→576；高 351-480→480；隔行扫描加 i） | 红色标题//判断：分辨率 |
+| 标题视频编码 vs MI 不一致（H.264/H264、H.265/H265 互认同价；MPEG-2 特判） | 红色标题//判断：视频编码 |
+| MI 视频编码无法识别（非 AVC/HEVC/VC-1/AV1/VP9/AVS 系/x264/x265/XviD） | MediaInfo 视频编码为 X |
+| 单音轨：音频编码不一致（EAC3/DD+→DDP、AC-3→DD 归一后比对） | 红色主标题//编码 |
+| 单音轨：通道不一致 | 红色主标题//通道 |
+| BDInfo 路径：分辨率/视频编码/音频编码/通道不一致 | 红色主标题//判断：分辨率/视频编码/音频编码 |
+| 标题年份 vs 简介年份（首映/上映日期/年代/年份行）差 >1 | 红色主标题//判断：标题年份（电视剧/综艺豁免） |
+| 标题季数 vs 副标题"第N季"推断不一致 | 红色主标题//判断：标题季数 |
+| 标题集数 vs 副标题集数不一致 | 红色主标题//判断：标题集数 |
+| 标题媒介：质量 WEB-DL 但来源词非 WEB-DL；或质量-媒介组合矩阵不匹配（如质量 DVD 但来源 Blu-ray） | 红色主标题//判断：标题媒介 |
+| 标题含 DV 但 MI/BDInfo 无 Dolby Vision | 缺少 DV 信息 |
+| 标题 HDR 与 MI/BDInfo HDR 不一致 | 红色主标题//判断：HDR |
+| 类型推断（简介类型行：纪录片/动画/综艺(真人秀/脱口秀)/演唱会→舞台演出/有集数或短剧→电视剧/默认电影）vs 表格类型 | 必有 1：类型选择错误，类型应为 X（未判断时：类型未判断） |
+| 质量推断（MI/BDInfo→Encode/REMUX/WEB-DL/HDTV/DVD/UHD/BD）vs 表格质量 | 必有 2：质量选择错误，应为 X（未判断时：质量未判断） |
+| 表格地区 vs 简介产地不一致（大陆/香港/台湾/欧美 70+ 国列表/日本/韩国/印度/其它 20+ 国列表） | 必有 3：地区不一致，应为 X（产地缺失时：地区未判断） |
+| MI 无粤语但标签有"粤语" | 没有 粤语 |
+| 简介产地香港且无国语/粤语标签 | 缺少 粤语 标签（缺语言标签） |
+| MI 有粤语但无"粤语"标签 | 缺少 粤语 标签 |
+| MI 无国语但标签有"国语"（仅非大陆产计 error） | 没有 国语 |
+| MI 有国语、或产地大陆/台湾，但无"国语"标签 | 缺少 国语 标签 |
+| 产地大陆/香港/台湾且国语粤语标签均无 | 缺少语言标签 |
+| 无字幕轨且无中字/英字标签 | 检查是否有字幕 |
+| 产地中文区/MI 中字轨/外挂中字，但无"中字"标签 | 缺少 中字 标签 |
+| 原盘（BD/UHD）：MI 无中字且无外挂中字但标签有"中字"；非原盘同类情形降为提示 | 没有 中字（非原盘：检查是否有硬中字字幕） |
+| MI 无英字轨且无外挂英字但标签有"英字" | 检查是否有硬英字字幕 |
+| 副标题含 DIY（BDInfo 路径）但无"DIY原盘"标签 / 反之 | 缺少 DIY 标签 / 非 DIY 原盘 |
+| IMDb 空（非中文产区且豆瓣也空才计 error） | IMDb 链接为空 |
+| 表格 IMDb 与简介 IMDb 不一致 | IMDb 链接不一致 |
+| 豆瓣空（IMDb 也空且组非 GodDramas 才计 error） | 豆瓣链接为空 |
+| 表格豆瓣与简介豆瓣不一致 | 豆瓣链接不一致 |
+| 简介首图（#kdescr 首个 img）为 gifyu 图床 | 第一张图片不能是 gifyu 图床 |
+| 简介图片命中图床黑名单（见下） | 黑名单内的图床 |
+| 文件数 vs 集数不符（非 BD/UHD/DVD 质量、非 GodDramas：区间集 files=chapter2-chapter1+1；全集 files=简介集数；单集 files=1） | 错误的文件数量 |
+| 多余文件（白名单组豁免见下） | 包含多余文件 (.xxx) |
+| BDInfo 视频码率为 0 | BDInfo 码率为 0 |
+| 其他版本列表存在同容量+同制作组+同 3D 格式种子 | 重复的种子！ |
+
+文件列表白名单/黑名单（按质量分支）：
+- BD/UHD：BDMV 目录（stream/clipinf/playlist/backup）外出现非 `.clpi/.mpls/.m2ts` 文件、或任何 `.pad` 文件 → 多余文件
+- DVD：只允许 `.vob/.iso/.ifo/.bup`
+- 其它（Encode/REMUX/WEB 等）：只允许 `.mkv/.mp4/.vob/.m2ts/.ts/.avi/.mov/.nfo/.md5`
+
+### 警告级（提示不阻断）
+
+| 判定条件 | 警告/提示消息 |
+|---------|---------|
+| 无 MediaInfo 但识别到制作组解析 NFO（FRDS/TLF/BMDru/NGB/HDCTV/QHstudIo 等特征） | 如有：通过 XX 的解析 Info 进行分析 |
+| MI 缺字段致分辨率/视频编码/年份无法判断 | 橙色标注对应段（不进 error） |
+| MediaInfo/BDInfo 折叠栏内含图片 | Info 中含有图片（红字提示，不进 error） |
+| 制作组命中合作组名单（AdBlue/AREY/BdC/BMDru/CatEDU/c0kE/Dave/doraemon/iFT/JKCT/KMX/Lislander/MZABI/nLiBRA/RO/Telesto/XPcl/ZTR/GodDramas） | 合作组 |
+| 非当前季（非 S01）但其他版本列表出现 S01 种子 | 此种不为第一季但其他列表出现第一季！（标黄） |
+| 其他版本列表同容量但不同组（非 CatEDU） | 可能重复（标黄，不进 error） |
+
+### 豁免/特殊逻辑
+
+- **单集不审核**：副标题命中单集/区间集模式直接 return "不审核单集"。
+- **Helper 徽章优先**：存在"猫站帮帮组徽章"直接 return "有 Helper 意见"。
+- **多余文件白名单组**：FRDS/CMCT/EPiC/WiKi/TTG/QHstudIo/DBTV/CHD/HDH/PbK/MTeam/HDChina/Dream/TLF/BMDru/PuTao/GodDramas/OPS——仅当多余文件**全部**为 `.jpg/.png/.txt/.ass` 时豁免 error。
+- **TLF + MiniSD**：分辨率不一致豁免。
+- **CatEDU**：类型选择错误豁免、同容量"可能重复"豁免。
+- **GodDramas**：豆瓣链接为空豁免、文件数量校验豁免。
+- **大陆产"没有国语"**：页面红字但不计 error（国产国语由标签覆盖面推定）。
+- **电视剧/综艺**：标题年份与简介年份不一致豁免（连载跨年）。
+- **音乐类标题**（`.*bit.*khz`）：跳过来源/编码/分辨率检查，提示模板"歌手 - 歌曲名 发行年份 - 格式 位深 频率 - 制作组"。
+- **台标提取**：标题开头 CCTV-4K/CCTV-8K/CHC/CWJDTV；Jade（须粤语标签）。
+- **质量判定特例**：标题 Blu-ray + x264/x265/AV1（Writing library）→ Encode；组名 FRDS/beAst/WScode/Dream/WiKi/CMCT/ANK-Raws/TLF/HDH/HDS + Blu-ray → Encode；FRDS + WEB-DL → Encode；MiniBD → Encode；BDInfo 2160p→UHD、1080p→BD。
+- **季数推断**：副标题"第 1~25 季"（支持中文数字）映射 S01-S25，匹配不到默认 S01。
+- **图床黑名单**（jpg/png/gif 直链正则）：imgur.com、loli.net、ibb.co、ax1x.com、picgd.com、p.sda1.dev、gifyu.com、i.duan.red（图床关闭）、z4a.net（图床关闭）、helloimg.com、chdbits.co、ubitspho.top、ik.jcwsr.top、stonestudio2015.com、img.m-team.cc、cmct.xyz。
+- **外挂字幕识别**：字幕行香港/中国旗标→外挂中字、uk 旗标→外挂英字。
+
+### 标题词形规范
+
+- 模板：`[台标]片名 [年份|Sxx|Exx-Eyy|YYYYMMDD] [REMUX] 分辨率 媒介 视频编码 [10bit] [xxFPS] [HDR|HDR10|HDR10+|HDR Vivid|HLG] [DV|DoVi|Dolby Vision] 音频编码 通道 [Atmos] - 制作组`（段间单空格，" - "接组名）。
+- 分辨率归一：`4K`→按 2160p 识别、`8K`→4320p（识别层归一）；480i/576i/1080i 隔行词形合法。
+- 音频归一：EAC3/DD+→DDP、AC-3→DD（比对层归一）。
+- 视频编码归一：H.264/H264、H.265/H265 视为等价。
+- HDR 归一：HDR10 比对时按 HDR 处理、HDR10P→HDR10+。
+- 禁：主标题中文/全角字符、BDRip/BDMV 字样、多余点、多余括号、连续空格（≥2）、组名内空格、`2.05.1` 通道写法。

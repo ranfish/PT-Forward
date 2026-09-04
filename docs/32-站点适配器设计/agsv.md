@@ -1186,3 +1186,68 @@ H&R = Hit and Run，即下载完资源后在规定时间内没有完成最少做
 *文档维护：PT-Forward 开发团队*
 *最后更新：2026-04-23*
 *数据来源：upload.php + 飞书 Wiki（通用发种规范 v1.3 + 上传规则 + H&R规则 + 盒子规则）+ Agsv-Torrent-Assistant.js v1.4.7*
+
+---
+
+## 种审脚本规则（实抓分析 2026-09-03）
+
+> 来源：用户提供站方种审脚本全文分析（Agsv-Torrent-Assistant v1.4.7，/tmp/0 归档）。与 docs/38 共性矩阵的站特例部分；共性规则（C1-C12）标注于判定条件内，全文见 docs/38-站点种审脚本规则分析.md。
+> 错误级=红色横幅阻断一键通过；警告级=黄色提示不阻断。官种/组别判定均为标题小写子串匹配。
+
+### 错误级（阻断通过）
+
+| 判定条件 | 错误消息 |
+|---------|---------|
+| 主标题含非 ASCII 中文字符（共性 C1；豁免：￡/™/罗马数字Ⅰ及Ⅱ-Ⅹ/白自在/至尊宝；cat=415 E-Book 整类豁免） | 主标题包含中文或中文字符 |
+| 副标题为空（共性 C3） | 副标题为空 |
+| 副标题含"动画"但分类≠405 Anime | 类型未选择Anime(动漫) |
+| 分类/媒介/主视频编码/主音频编码/分辨率任一下拉未选（共性 C2 五下拉必填） | 未选择分类／未选择媒介／未选择主视频编码／未选择主音频编码／未选择分辨率 |
+| 标题解析出的媒介/编码/音频/分辨率与下拉不一致（共性 C2；标题检测不出对应值则跳过比对） | 标题检测媒介为X，选择媒介为Y（视频编码/音频编码/分辨率同构共 4 条） |
+| 标题含 complete + 未选"完结"标签 + cat∈{402 剧集, 403 综艺, 404 纪录} | 完结剧集请添加完结标签 |
+| 简介无 imdb.com/douban.com/themoviedb.org 链接（共性 C6；cat=419 短剧豁免） | 简介中未检测到IMDb或豆瓣链接 |
+| 官种（标题含 agsv）MediaInfo 短格式=完整格式（未解析） | 媒体信息未解析 |
+| MediaInfo 含 BBCode 结束标签（[/b][/color][/i][/u][/img]，且短格式=完整格式时） | MediaInfo中含有bbcode |
+| 官种未选制作组 | 未选择制作组 |
+| 标题命中未信任组黑名单（共性 C7，子串匹配，名单见下） | 检测为疑似未信任制作组发布的资源 |
+| GodDramas 种 + 简介含"禁止转载" + 未选禁转标签 | 未选择禁转标签 |
+| GodDramas 种 + cat≠419 | 未选择短剧类型 |
+| GodDramas 种 + 未选驻站标签 | 未选择驻站标签 |
+| 非官种选了"官方"标签／官种未选"官方"标签（双向） | 非官种不可选择官方标签／官种未选择官方标签 |
+| 官种或 GodDramas 种未选"冰种"标签（**AGSV 特有标签体系**） | 未选择冰种标签 |
+| 标题含 S01E01 分集形态或副标题含"第N集" + 未选分集标签 | 未选择分集标签 |
+| "方舟"标签与方舟种双向不一致（**AGSV 特有**；方舟种=Hares/RL/BeiTai 三组官种，判定见下） | 非方舟计划种子不可选择方舟标签／方舟计划种子未选择方舟标签 |
+| -hares 种未选 Hares 制作组／-rl 种未选 RL 制作组／beitai 种未选 BeiTai 制作组（**AGSV 方舟三组**） | 制作组未选择Hares／制作组未选择RL／制作组未选择BeiTai |
+| 非 -hares 种选了 Hares 制作组 | 制作组选择错误 |
+| 简介含 MediaInfo 文本（共性 C12——官种 NFO 多形态白名单识别，识别集见"豁免/特殊逻辑"） | 简介中包含Mediainfo |
+| 简介内图片总数<2（共性 C5，AGSV 阈值 2；仅统计 #kdescr 内 img） | 缺少海报或截图 |
+| MediaInfo 栏为空（共性 C4） | Mediainfo栏为空 |
+| AGSVPT 官种（制作组=6）MI 含 x264/x265 而主标题缺对应词（**AGSV 特有词形**） | 主标题中编码应为 x264／主标题中编码应为 x265 |
+| Music(411) 主标题缺 kHz 采样频率／缺 bit 比特率（**AGSV 特有**） | 主标题缺少采样频率／主标题缺少比特率 |
+
+**未信任组黑名单（27 词去重，标题小写子串匹配）**：fgt, hao4k, mp4ba, rarbg, gpthd, seeweb, dreamhd, blacktv, xiaomi, huawei, momohd, ddhdtv, nukehd, tagweb, sonyhd, minihd, bitstv, -alt, batweb, dbd-raws, xunlei, zerotv, lelvetv
+
+### 警告级（提示不阻断）
+
+| 判定条件 | 警告消息 |
+|---------|---------|
+| 分辨率=480p 或 Other（含标题检测 480p）且非官种/GodDramas 种 | 请检查是否有更高清的资源 |
+| 简介含 MediaInfo 参数图片（pterclub 模板图 URL 或文件名含 Mediainfo.png） | 请删除多余的影片参数/媒体信息图片 |
+| MI 字幕轨含 Chinese 未选"中字"标签（共性 C8） | 未选择中字标签 |
+| MI 字幕轨含 English 未选"英字"标签 | 未选择英字标签 |
+| 体积>1T（基本信息含 TB）未选"大包"标签 | 未选择大包标签 |
+
+### 豁免/特殊逻辑
+
+- **官种音乐**（标题含 agsvmus）：清空此前全部错误，仅保留"未选择制作组"检查
+- **分类整体豁免**：cat∈{406 MV, 408 Audio, 411 Music, 412 Software, 413 Game, 415 E-Book, 418 Picture} → 清空全部错误+警告；Music(411) 的 kHz/bit 检查在清空**之后**重加，仍生效
+- **官种/组别识别词**（标题小写子串）：`agsv`=官种／`goddramas`=驻站短剧组／`agsvmus`=音乐官种／`-hares`／`-rl`∨`r²`∨`-vandoge@R²`（红叶）／`beitai`；方舟种 = hares∨rl∨beitai
+- **MediaInfo 官种 NFO 形态白名单**（isBriefContainsInfo 识别集，命中即报"简介中包含Mediainfo"）：general+video+audio／概览+视频+音频／disc info／disc size／.release.info／general information／nfo信息（杜比官种）／release date+source（FRDS）／release.name∨release.size／文件名(文件名称)+体积（CMCT/HDCTV）／source type∨video bitrate（HDChina）
+- **停用规则**（源码已注释，不生效）：未填写影片简介、未选择国语标签、PNG 图片<3 张、<1T 无需大包、主标题含空格、图片加载失败检测
+- 残留重复代码：RL 制作组与方舟两条规则在文件后部重复判定一次（无行为差异）
+
+### 标题词形规范
+
+- **官种编码词形**：AGSVPT 官种 MI 编码为 x264/x265 时，主标题必须写小写 x 形态的 `x264`/`x265`（非 H.264/H.265/AVC/HEVC）
+- **Music(411) 标题**：必须含 `kHz`（采样频率）与 `bit`（比特率）字样
+- **媒介标题检测分支**：web-dl|webdl→WEB-DL；remux→Remux；blu-ray|bluray 且无编码词（HEVC/AVC/VC-1/MPEG-2/4）→Encode；webrip|web-rip|dvdrip|bdrip→Encode；hdtv→HDTV；含 uhd→UHD Blu-ray；其余 blu-ray→Blu-ray
+- AGSV 无 4K→2160p、AC3→DD 等词形硬规则（比青蛙/织梦宽松）
