@@ -119,7 +119,17 @@ func V105TitleFormat() TitleFormat {
 func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) string {
 	switch field {
 	case "title":
+		// §59.168 V1.05 #80: EnglishTitle 主路径（◎译名权威）→ MainTitle 兜底
+		if p.EnglishTitle != "" {
+			return p.EnglishTitle
+		}
 		return p.MainTitle
+	case "chinese_title":
+		// §59.168 chinese_prefixed 范式 ChineseTitle（◎片名权威）→ ChinesePrefix 兜底
+		if p.ChineseTitle != "" {
+			return p.ChineseTitle
+		}
+		return p.ChinesePrefix
 	case "year":
 		return p.Year
 	case "season":

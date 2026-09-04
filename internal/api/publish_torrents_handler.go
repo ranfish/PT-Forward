@@ -3735,6 +3735,26 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	}
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(updated.DetailSourceJSON)
 	profile := titleparser.BuildTechProfile(updated.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
+	
+	// §59.168 PTGen 资产提取 + 副标题组装（获取时落库）
+	ptgenMeta := metadata.SetPTGenFields(&profile, updated.Description)
+	if updated.Subtitle == "" || !containsChineseSubtitle(updated.Subtitle) {
+		if assembled := metadata.AssembleSubtitle(updated.Subtitle, &profile, ptgenMeta); assembled != "" {
+			updates["subtitle"] = assembled
+		}
+	}
+	if profile.ChineseTitle != "" {
+		updates["chinese_title"] = profile.ChineseTitle
+	}
+	if profile.EnglishTitle != "" {
+		updates["english_title"] = profile.EnglishTitle
+	}
+	if profile.Genre != "" {
+		updates["genre"] = profile.Genre
+	}
+	if ptgenMeta != "" {
+		updates["ptgen_meta"] = ptgenMeta
+	}
 	reassembledTitle := titleparser.ReassembleFromTechProfile(profile, titleparser.V105TitleFormat())
 
 	renderer := description.NewRenderer("")
@@ -4617,4 +4637,14 @@ func (h *PublishTorrentsHandler) handleSiteBatchProgress(w http.ResponseWriter, 
 		return
 	}
 	Error(w, http.StatusNotFound, 40401, "任务不存在或已过期（30 分钟 TTL）")
+}
+
+// containsChineseSubtitle §59.168: 含中文字符判定（副标题 Step 2a 条件）。
+func containsChineseSubtitle(s string) bool {
+	for _, r := range s {
+		if r >= 0x4e00 && r <= 0x9fa5 {
+			return true
+		}
+	}
+	return false
 }
