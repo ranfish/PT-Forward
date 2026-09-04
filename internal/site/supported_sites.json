@@ -426,16 +426,6 @@
     "download_url_template": "download.php?id={id}&passkey={passkey}",
     "verification_status": "verified"
   },
-  "pt.cdy.skin": {
-    "domain": "pt.cdy.skin",
-    "name_cn": "传道院",
-    "framework": "nexusphp",
-    "auth_type": "cookie",
-    "cookiecloud_domain": "pt.cdy.skin",
-    "download_url_template": "download.php?id={id}&passkey={passkey}",
-    "verification_status": "blocked",
-    "special_notes": "站点已关站（2026-09-02），禁止新增接入"
-  },
   "pt.eastgame.org": {
     "domain": "pt.eastgame.org",
     "name_cn": "TLF",
