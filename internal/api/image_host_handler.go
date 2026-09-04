@@ -81,6 +81,15 @@ func (h *ImageHostHandler) handlePut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// §59.167 PT31 实战修复：AGSVPT 首配链断裂——原顺序 default 先校验
+	// mgr.SetDefault("agsvpt") 必失败（host 仅启动时按已有凭证注册；首配时
+	// 凭证还没存→未注册→400 早退，邮箱密码也存不上）。修正：凭证先落库+
+	// 运行时注册（不存在的 agsvpt 动态 Register），再设默认。
+	if req.AGSVPTEmail != "" && req.AGSVPTPassword != "" {
+		if _, err := h.mgr.GetHost("agsvpt"); err != nil {
+			h.mgr.Register(imagehost.NewAGSVPTHost(req.AGSVPTEmail, req.AGSVPTPassword, h.logger))
+		}
+	}
 	if req.Default != "" {
 		if err := h.settings.Set(ctx, setting.KeyImageHostDefault, req.Default); err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "保存默认图床失败")
