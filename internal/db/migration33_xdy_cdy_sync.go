@@ -24,7 +24,9 @@ func syncXdyAndCdySites(gormDB *gorm.DB) error {
 		site := model.Site{
 			Name: "修道院", Domain: "xdypt.vip", BaseURL: "https://xdypt.vip",
 			Framework: "nexusphp", AuthType: "cookie",
-			Enabled: true, IsTarget: true,
+			// §59.167 用户定案：骨架不默认启用（新装实例无凭证的站不该出现在
+			// "我的站点"——骨架落"未启用"列表，用户配置凭证后自行启用）
+			Enabled: false, IsTarget: true,
 			CookieCloudSync: true, CookieCloudDomain: "xdypt.vip",
 			HRStrategy: "protect", DownloadMode: "template",
 			DownloadURLTemplate: "download.php?id={id}&passkey={passkey}",
