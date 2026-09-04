@@ -23,6 +23,14 @@ func AutoMigrate(db *gorm.DB) error {
 		&PublishResultRecord{},
 		&PublishTask{},
 		&PublishGroupMember{}, // §59.167 PT31 新装缺表（模型在用三处——AutoMigrate 清单遗漏）
+		// §59.167 系统性补齐（model 包 vs 清单全量 diff——活模型 5 个；废弃模型
+		// DownloadClientConfig/IYUUCandidate/PublishGroupStatusHistory/ReseedDecision/
+		// ReseedSource 不建（migration 4 已做源表存在检测兼容））
+		&PublishGroup{},
+		&PublishGroupStatusHistory{},
+		&ClusterScreenshotCache{},
+		&ReseedExecutionResult{},
+		&SeedingScoringConfig{},
 		&PublishExclusion{},
 		&SiteFieldMapping{},
 		&SiteConfigOverride{},
