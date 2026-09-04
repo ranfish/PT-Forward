@@ -643,3 +643,97 @@
 *文档创建：2026-04-19*
 *最后更新：2026-04-22*
 *数据来源：upload.php (70490字节) + Wiki发布规则 (3488字节) + Wiki HR规则 (551字节) + 论坛#67 (2441字节) + ptlgs-Torrent-Assistant.js v1.1.43 (830行/37KB)*
+
+---
+
+## 种审脚本规则（实抓分析 2026-09-03）
+
+> 来源：用户提供站方种审脚本全文分析（ptlgs-Torrent-Assistant v1.1.43）。与 docs/38 共性矩阵的站特例部分；本文是「校验规则（普通用户/种审员模式）」章节之外的全量规则清单（错误/editor 逐条）。
+> 脚本形态：双层——普通检查（红色 `#assistant-tooltips`，置 error）+ editor 激进层（灰色 `#editor-tooltips`，**不置 error**，标注"较为激进，需配合人工判断"；仅测试版脚本/手动开启 isEditor 时显示）。
+
+### 错误级（阻断通过）
+
+| # | 判定条件 | 错误消息 |
+|---|---------|---------|
+| E1 | 主标题含中文/全角字符（`[\u4e00-\u9fa5\uff01-\uff60]`） | 主标题包含中文或中文字符 |
+| E2 | 标题组名后缀命中禁发组（`-组名` 形式，35 组名单见下） | 主标题包含禁发小组，请检查 |
+| E3 | 副标题为空 | 副标题为空 |
+| E4 | 未选择分类 | 未选择分类 |
+| E5 | 未选择格式（媒介） | 未选择格式 |
+| E6 | 标题检测格式与所选格式不一致 | 标题检测格式为X，选择格式为Y |
+| E7 | 未选择主视频编码 | 未选择主视频编码 |
+| E8 | 标题检测视频编码与所选不一致 | 标题检测视频编码为X，选择视频编码为Y |
+| E9 | 视频编码=other 且制作组≠8 | 视频编码选择为 other，请人工检查（注：encode=99 与组 8 均不在本站枚举内，疑为跨站残留死分支） |
+| E10 | 未选择主音频编码 | 未选择主音频编码 |
+| E11 | 标题检测音频编码与所选不一致 | 标题检测音频编码为X，选择音频编码为Y |
+| E12 | 音频编码=other | 音频编码选择为 other，请人工检查（同上疑残留） |
+| E13 | 未选择分辨率 | 未选择分辨率 |
+| E14 | 标题检测分辨率与所选不一致 | 标题检测分辨率为X，选择分辨率为Y |
+| E15 | 海报图床为 tu.totheglory.im（TTG 防盗链） | 海报使用防盗链图床，请更换或留空 |
+| E16 | 媒介=DVD(type 1) 且媒体信息栏为 MediaInfo 格式（codetop='MediaInfo'） | Blu-ray 媒体信息请使用 BDInfo（消息原文如此，判据为 DVD 媒介） |
+| E17 | 媒介不在合法枚举且短栏内容=原始栏内容 | 媒体信息未解析 |
+| E18 | 识别到中文字幕（四路检测，见文末）未选「中字」标签 | 未选择「中字」标签 |
+| E19 | MI 含 Dolby Vision（非 Encoding 行）未选「DoVi」标签；或反向误选 | 未选择「DoVi」标签 / 选择「DoVi」标签，未识别到「DoVi」 |
+| E20 | MI 含 HDR format（非 HDR format+、非 Encoding 行）未选「HDR」标签；或反向误选 | 未选择「HDR」标签 / 选择「HDR」标签，未识别到「HDR」 |
+| E21 | MI 含 HLG 未选「HLG」标签；或反向误选 | 未选择「HLG」标签 / 选择「HLG」标签，未识别到「HLG」 |
+| E22 | 其它信息区（#kother/#kdescr）含 `<img>` 或 `◎` 且无制作组 | 请移除其它信息中除致谢、制作信息以外的内容。 |
+| E23 | MediaInfo 文本 <30 字符 | 媒体信息格式错误，请使用「BDInfo」（媒介 DVD/HDTV 时）或「Mediainfo」重新获取完整的英文信息 |
+| E24 | 标题含 DYZ-WEB/DYZ-Movie/DYZ-TV/beAst/ZmWeb 未选对应制作组 | 未选择制作组X |
+| E25 | 截图区图片 <1 张 | 截图未满 1 张 |
+| E26 | 截图图床不在白名单（9 个，见下） | 请使用规则白名单内的图床 |
+| E27 | 豆瓣分类反查与所选分类不一致（仅比对 401-408，见豁免） | 豆瓣检测分类为X，选择分类为Y |
+| E28 | 选「动画」标签但豆瓣类别不含动画 | 选择「动画」标签，豆瓣未识别到「动画」类别 |
+
+**禁发组名单（35 组，标题 `-` 后缀形式匹配）**：
+`FGT, NSBC, BATWEB, GPTHD, DreamHD, BlackTV, CatWEB, Xiaomi, Huawei, MOMOWEB, DDHDTV, SeeWeb, TagWeb, SonyHD, MiniHD, BitsTV, CTRLHD, ALT, NukeHD, ZeroTV, HotTV, EntTV, GameHD, SmY, SeeHD, VeryPSP, DWR, XLMV, XJCTV, Mp4Ba, GodDramas, FRDS, BeiTai, Ying, VCB-Studio`
+
+> ⚠️ **站特例（重要）**：`FRDS`、`BeiTai`、`GodDramas`、`VCB-Studio` 在本站为**禁发组**（docs/38 §二明确不进共性名单——FRDS/BeiTai 在转存业务中是他站合法组，接入本站种审时必须按 SiteOnly 附加此名单）。
+
+**图床白名单（9 个）**：`files.ptlgs.org, cmct.xyz, static.ssdforum.org, static.hdcmct.org, gifyu.com, imgbox.com, pixhost.to, ptpimg.me, ssdforum.org`
+
+### 警告级（editor 激进层——提示不阻断，"需配合人工判断"）
+
+| # | 判定条件 | 提示消息 |
+|---|---------|---------|
+| V1 | 选「合集」标签但主副标题无合集字符（complete/集全/全集/合集等） | 主副标题未识别到「合集」相关字符，请检查 |
+| V2 | MI 以 概览/概要 开头 | 检测到「中文Mediainfo」，请重新扫描 |
+| V3 | 标题含 `.hdr.`/`.hdr10.` 或 MI 含 BT.2020，且 MI 无 ST 2086/ST 2094/HDR Vivid/HLG transfer（且栏为 MediaInfo） | 主标题检测到HDR，未识别到「HDR」相关元数据，请重新扫描 Mediainfo |
+| V4 | 标题 `.Criterion.`/`.CC.` 或副标题 CC标准收藏版/CC收藏版/CC版/CC(非CCTV)，未选「CC」标签 | 主副标题识别到「CC」相关字符，请检查是否有「CC」标签 |
+| V5 | 副标题含「版原盘」未选「原生」标签 | 副标题识别到「原盘」相关字符，请检查是否有「原生」标签 |
+| V6 | MI 含 `SUBtitleS:` | 识别到「SUBtitleS:」相关字符，请检查BDInfo |
+| V7 | MI 连续双空格段 <30 处（媒介≠DVD） | 识别到「mediainfo」空格字符过少，请检查排版是否正确 |
+| V8 | MI HDR format 为 dvhe.05 | DUPE参考：Dolby Vision P5（不含 HDR10 数据） |
+| V9 | MI HDR format 为 dvhe.08 或 dvhe.07 | DUPE参考：Dolby Vision P7 or P8（含 HDR10 数据） |
+| V10 | 选「中字」标签但未识别到中文字幕 | 选择「中字」标签，未识别到中文字幕，请检查 |
+| V11 | 媒介=WEBRiP(type 7) 且其它信息含 (FLUX/HHWEB/HHCLUB)字幕/DIY | 添加字幕后修改原视频后缀的「WEB-DL」资源，此类资源应保留原组名后缀 |
+| V12 | MI 含 Progressive 且分辨率=720p(3) | 扫描方式为 Progressive，分辨率为 1080i（消息原文如此，判据为 720p，疑词形漂移） |
+| V13 | 音频臃肿可替代：MI 无损音轨（DTS-HD/TrueHD/DTS:X/LPCM/PCM）且分辨率低（1080i/720p/SD/Other）且媒介=Remux | 可替代：音频臃肿（注：判据 type∈{6,8,9,10} 中仅 8=Remux 在本站枚举内，实际仅 Remux 生效） |
+| V14 | 无中文字幕且未选「原生」标签 | 可替代：无中字或硬字幕 |
+| V15 | 标题 x264+10bit，或 MI Bit depth 10 bits + Writing library x264 | 可替代：x264 10bit 硬件兼容性较差 |
+
+> V8/V9/V13/V14/V15 即 docs/38 所称 **editor 激进模式（Dupe P5/P7/P8/音频臃肿可替代）**——用于种审判断站内已有种与新种的替代关系，非发布阻断规则。
+
+### 豁免/特殊逻辑
+
+- **editor 层全部不置 error**：激进检测仅提示；普通层（E1-E28）才是阻断规则。
+- **豆瓣分类反查范围**：豆瓣类型=电视剧 → 真人秀→综艺(403)/纪录片→纪录(404)/其他→剧集(402)；豆瓣类型≠电视剧 → 纪录片→404/其余→**其他(409)**。仅 douban_cat∈[401,408] 且≠所选分类时报 E27——**409（含全部电影）不比对**（电影误选分类脚本不报，见前文「豆瓣分类判定：电影无映射」）。
+- **分辨率识别 remastered 豁免**：标题含 `remastered` 时跳过 2160p/uhd/4k 判定（防 Remastered 版误判 4K）。
+- **标题「禁转」标记**：检测后仅记录（exclusive），未参与任何放行/阻断——本站脚本对禁转种无审核豁免。
+- **制作组下拉体系**：DYZ-WEB(17)/DYZ-Movie(15)/DYZ-TV(14)/beAst(9)/ZmWeb(11)/Other(13)；标题含组名必须选对应制作组（E24）——**DYZ 系组必选制作组**为站特例。
+- **分类体系**：电影401/剧集402/综艺403/纪录片404/动漫405/音乐406/体育407/其他409/游戏410（无 408）。
+- **中文字幕四路检测**：字幕区简体中文旗标 / 字幕链接含 chs|cht / MI `字幕…Chinese` / MI `字幕…Mandarin` / MI `Subtitle: Chinese`（详见前文「中文字幕检测细节」）。
+- **中文音轨检测**：非 DVD 看 MI `音频:…chinese`；DVD(type 1) 看 `Audio: Chinese`。
+- **检测顺序**：媒介→编码→音频→分辨率→豆瓣反查；标题词全部要求 `[.| ]` 分隔边界（防词内误命中）。
+
+### 标题词形规范
+
+本站**无词形改写硬规则**（无 4K→2160p/大小写强制），靠「标题识别词表 ↔ 下拉一致比对」约束。识别词表（均要求 `[.| ]` 前导分隔，按 if-else 顺序优先）：
+
+| 维度 | 标题识别词表 |
+|------|-------------|
+| 媒介 | `.remux`→Remux；`.bdrip` 或 `bluray/blu-ray`+`x26[45]`→BDRip；`bluray/blu-ray`→Blu-ray；`.webrip` 或 `web.`+`x26[45]`→WEBRiP；`web-dl/webdl/web.`→WEB-DL；`.tvrip`→TVRip；`hdtv`→HDTV；`.dvdrip` 或 `dvd`+`x26[45]`→DVDRiP；`dvd`→DVD |
+| 视频编码 | x265/h265/h.265/hevc→H.265/HEVC；x264/h264/h.264/avc→H.264/AVC；vc-1/vc1→VC-1；mpeg2/mpeg-2→MPEG-2 |
+| 音频 | dts-hd/dtshd/dts-x/dts:x→DTS-HD；truehd→TrueHD；lpcm/pcm→LPCM；dts→DTS；ac3/ac-3/ddp/dd+/dd2/dd5/dd.2/dd.5→AC-3；aac→AAC；flac→FLAC |
+| 分辨率 | 2160p、uhd（无 1080p）、`4k[.| ]`→2160p（remastered 时跳过）；1080p；1080i；720p；其余→Other |
+| 完结 | `complete`→完结标识 |
+| 制作组 | dyz-web→DYZ-WEB；dyz-movie→DYZ-Movie；dyz-tv→DYZ-TV；beast→beAst；zmweb→ZmWeb |
