@@ -1941,21 +1941,17 @@ func TestFmtES(t *testing.T) {
 
 // §59.167 憨憨禁转徽章（tid=173490 实证形态——色码+文本双校验）
 func TestHhanNoTransferBadge(t *testing.T) {
-	// §59.167 终案（class 结构特征）：种子标签 class 含 font-bold（小徽章语义）
-	badge := `class="justify-center items-center rounded-md text-[12px] h-[18px] mr-2 px-[5px] font-bold" style="background-color:#990000;color:#ffffff;">禁转<`
-	if !reHhanNoTransferBadge.MatchString(badge) {
-		t.Error("憨憨种子标签（真禁转/font-bold 徽章）应命中")
+	// §59.167 区块法终案（双正例实证 tid=173490 真禁转/tid=211544 非禁转）
+	// 真禁转：标签字段区块（官方+禁转）→基本信息
+	has := `<div class="font-bold leading-6">标签</div><div class="font-light leading-6 flex flex-wrap"><a href="/torrents.php?tag_id3=1"><span style="background-color:#0000ff;">官方</span></a><a href="/torrents.php?tag_id1=1"><span style="background-color:#990000;">禁转</span></a></div><div class="font-bold leading-6">基本信息</div>`
+	m := reHhanTagSection.FindStringSubmatch(has)
+	if m == nil || !strings.Contains(m[1], "禁转") {
+		t.Error("真禁转（标签区块含禁转）应命中")
 	}
-	// 负例 1：筛选器形态（font-small 选项——详情页固定含，tid=211544 误判实证）
-	if reHhanNoTransferBadge.MatchString(`class="font-small text-light text-center text-[#FFFFFF] rounded-[5px] px-[10px] h-[24px] flex" style="background: #990000">禁转<`) {
-		t.Error("筛选器禁转选项不应命中（font-small 非 font-bold）")
-	}
-	// 负例 2：正文提及禁转但非标签
-	if reHhanNoTransferBadge.MatchString("本资源禁止转载，禁转 PTT") {
-		t.Error("正文禁转文本不应误命中")
-	}
-	// 负例：首发徽章（#009900）不命中
-	if reHhanNoTransferBadge.MatchString(`style="background: #009900">首发<`) {
-		t.Error("首发徽章不应命中")
+	// 非禁转：标签区块（官方/国语/中字——无禁转）
+	no := `<div class="font-bold leading-6">标签</div><div class="font-light"><a href="/torrents.php?tag_id3=1"><span>官方</span></a><a href="/torrents.php?tag_id5=1"><span>国语</span></a><a href="/torrents.php?tag_id6=1"><span>中字</span></a></div><div class="font-bold leading-6">基本信息</div>`
+	m2 := reHhanTagSection.FindStringSubmatch(no)
+	if m2 != nil && strings.Contains(m2[1], "禁转") {
+		t.Error("非禁转（标签区块无禁转）不应命中——顶部筛选器的禁转选项不在区块内")
 	}
 }
