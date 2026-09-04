@@ -95,9 +95,12 @@ func (h *ImageHostHandler) handlePut(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusInternalServerError, 50000, "保存默认图床失败")
 			return
 		}
+		// §59.167 终案（用户定案"没配 agsvpt 保存不该报错"）：default 是期望值
+		// 落库——mgr 未注册（如 agsvpt 凭证还没配）不阻断保存，Warn 提示；
+		// 凭证配好/重启后启动加载自然生效。
 		if err := h.mgr.SetDefault(req.Default); err != nil {
-			Error(w, http.StatusBadRequest, 40001, err.Error())
-			return
+			h.logger.Warn("default image host not yet registered (will apply after credentials/restart)",
+				zap.String("host", req.Default), zap.Error(err))
 		}
 	}
 
