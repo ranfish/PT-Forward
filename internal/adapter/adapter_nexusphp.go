@@ -208,9 +208,13 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 	return detail, nil
 }
 
-// enrichHhanTransferFlags §59.167: 憨憨禁转标签采集——详情页徽章直提
-// （形态实证 tid=173490：style="background: #990000">禁转<——色码+文本双校验
-// 防正文误命中；首发 #009900/转载 #FF6633 徽章不消费——禁转才是拦发布语义）。
+// enrichHhanTransferFlags §59.167: 憨憨禁转标签采集——详情页种子自身标签直提。
+// 判据演进（双正例对照实证 tid=173490 真禁转 vs tid=211544 非禁转）：
+//   ①纯文本（否）：筛选器固定含"禁转"选项（torrents.php?tag_id1=1 的 checkbox
+//     label）→ 全量误判；②CSS 写法差异（弃）：background-color vs background
+//     是样式巧合，改主题即断；③终案（class 结构特征）：种子标签 class 含
+//     font-bold（text-[12px] h-[18px] 小徽章），筛选器为 font-small h-[24px]
+//     ——结构语义稳定（用户定案）。首发/转载标签不消费——禁转才是拦发布语义。
 func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail) {
 	html, err := a.fetchDetailsHTML(ctx, config, torrentID)
 	if err != nil {
@@ -226,7 +230,7 @@ func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *m
 	}
 }
 
-var reHhanNoTransferBadge = regexp.MustCompile(`background-color:\s*#990000[^>]*>\s*禁转\s*<`)
+var reHhanNoTransferBadge = regexp.MustCompile(`class="[^"]*font-bold[^"]*"[^>]*>\s*禁转\s*<`)
 
 // enrichKeepfrdsTransferFlags §59.162: keepfrds 禁转两态采集增强——
 // 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 列表页行原始
