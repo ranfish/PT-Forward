@@ -84,3 +84,32 @@ func TestMigrations_FullRun_OnAutoMigratedDB(t *testing.T) {
 		t.Errorf("migration 4 数据未迁入（OTA 场景）: cnt=%d", cnt)
 	}
 }
+
+// TestNewInstallFullMigrations §59.167 新装全链回归（PT31 三次循环重启教训终
+// 结者）：AutoMigrate 全清单建表 → RunMigrations 全量（1→最新）→ 断言全过。
+// 之前的 TestMigrations_FullRun_OnAutoMigratedDB 因"前置表依赖"绕过全量——
+// 那个绕过让 migration 20 撞表逃过测试直到 PT31 人肉发现（v0.0.859 教训：
+// 宣称系统性必须配全链实证）。
+func TestNewInstallFullMigrations(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "new_install.db")
+	gormDB, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// ① 新装第一步：AutoMigrate 全清单
+	if err := model.AutoMigrate(gormDB); err != nil {
+		t.Fatalf("AutoMigrate 失败: %v", err)
+	}
+	// ② 新装第二步：全部 data migration 按序号跑
+	for _, m := range registeredMigrations {
+		if err := m.Up(gormDB); err != nil {
+			t.Fatalf("migration %d (%s) 新装失败: %v", m.Version, m.Name, err)
+		}
+	}
+	// ③ 关键表抽查（全链后应存在）
+	for _, tbl := range []string{"publish_groups", "publish_group_members", "cluster_screenshot_cache", "seeding_client_configs", "sites"} {
+		if !gormDB.Migrator().HasTable(tbl) {
+			t.Errorf("新装全链后缺表: %s", tbl)
+		}
+	}
+}
