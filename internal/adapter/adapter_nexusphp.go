@@ -226,7 +226,7 @@ func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *m
 	}
 }
 
-var reHhanNoTransferBadge = regexp.MustCompile(`background:\s*#990000[^>]*>\s*禁转\s*<`)
+var reHhanNoTransferBadge = regexp.MustCompile(`background-color:\s*#990000[^>]*>\s*禁转\s*<`)
 
 // enrichKeepfrdsTransferFlags §59.162: keepfrds 禁转两态采集增强——
 // 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 列表页行原始
