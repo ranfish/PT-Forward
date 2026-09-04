@@ -386,6 +386,11 @@ func init() {
 		return nil
 	})
 	RegisterMigration(20, "cluster_screenshot_cache", func(gormDB *gorm.DB) error {
+		// §59.167 新装兼容：该模型已入 AutoMigrate 清单（系统性补齐）——新装
+		// AutoMigrate 先建表，裸 CreateTable 撞已存在炸启动（PT31 循环重启实证）。
+		if gormDB.Migrator().HasTable(&model.ClusterScreenshotCache{}) {
+			return nil
+		}
 		return gormDB.Migrator().CreateTable(&model.ClusterScreenshotCache{})
 	})
 	// §59.44: 存量尾斜杠路径归一——TR 上报的历史脏数据（"PT6/SSD/" vs "PT6/SSD"）
