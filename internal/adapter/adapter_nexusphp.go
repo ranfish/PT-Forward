@@ -208,19 +208,22 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 	return detail, nil
 }
 
-// enrichHhanTransferFlags §59.167: 憨憨禁转标签采集——详情页种子自身标签直提。
+// enrichHhanTransferFlags §59.167: 憨憨禁转标签采集——详情页"标签"字段区块直提。
 // 判据演进（双正例对照实证 tid=173490 真禁转 vs tid=211544 非禁转）：
-//   ①纯文本（否）：筛选器固定含"禁转"选项（torrents.php?tag_id1=1 的 checkbox
-//     label）→ 全量误判；②CSS 写法差异（弃）：background-color vs background
-//     是样式巧合，改主题即断；③终案（class 结构特征）：种子标签 class 含
-//     font-bold（text-[12px] h-[18px] 小徽章），筛选器为 font-small h-[24px]
-//     ——结构语义稳定（用户定案）。首发/转载标签不消费——禁转才是拦发布语义。
+//   ①纯文本（否）：顶部筛选器固定含"禁转"选项（checkbox+label 内包 a 链接，
+//     tag_id1=1 形态两区同现）→ 全量误判；②CSS 写法差异（弃）：样式巧合；
+//   ③class font-bold（次优）：表现层语义；④终案（字段区块定位）：详情页字段
+//     区块顺序固定"标题→副标题→标签→基本信息"——提取 >标签</div> 至
+//     >基本信息</div> 之间内容（该区块只含种子自身标签链接），区块内判
+//     "禁转"字符。字段区块名是页面数据结构语义（样式无关——用户结构化分析定案）。
+// 首发/转载标签不消费——禁转才是拦发布语义。
 func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *model.SiteConfig, torrentID string, detail *model.TorrentDetail) {
 	html, err := a.fetchDetailsHTML(ctx, config, torrentID)
 	if err != nil {
 		return
 	}
-	if reHhanNoTransferBadge.MatchString(html) {
+	tagSec := reHhanTagSection.FindStringSubmatch(html)
+	if tagSec != nil && strings.Contains(tagSec[1], "禁转") {
 		for _, f := range detail.Flags {
 			if f == "禁转" {
 				return
@@ -230,7 +233,9 @@ func (a *NexusPHPAdapter) enrichHhanTransferFlags(ctx context.Context, config *m
 	}
 }
 
-var reHhanNoTransferBadge = regexp.MustCompile(`class="[^"]*font-bold[^"]*"[^>]*>\s*禁转\s*<`)
+// reHhanTagSection 详情页"标签"字段区块（标题→副标题→标签→基本信息——区块
+// 内容只含种子自身标签，筛选器在页面顶部 top-search 区不会混入）。
+var reHhanTagSection = regexp.MustCompile(`(?s)>标签</div>(.*?)>基本信息</div>`)
 
 // enrichKeepfrdsTransferFlags §59.162: keepfrds 禁转两态采集增强——
 // 详情页"发布于"时间原文（相对时间——天档以上=超 24h 窗）+ 列表页行原始
