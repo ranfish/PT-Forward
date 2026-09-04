@@ -2,8 +2,8 @@
   <!-- §59.135: 技术规格表公共组件——Tab1 与预览②引用同一份（展示同件，§59.116 定案落地）。
        主/副标题由调用方自行展示（Tab1 span=3 行 / 预览①种子标识卡片）。 -->
   <a-descriptions :column="column" bordered size="small">
-    <a-descriptions-item label="中文名">{{ tc.chinese_prefix || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="剧名">{{ tc.main_title || '—' }}</a-descriptions-item>
+    <a-descriptions-item label="中文名">{{ tc.chinese_title || tc.chinese_prefix || '—' }}</a-descriptions-item>
+    <a-descriptions-item label="译名">{{ tc.english_title || tc.main_title || '—' }}</a-descriptions-item>
     <a-descriptions-item label="季集">{{ tc.season_episode || '—' }}</a-descriptions-item>
     <a-descriptions-item label="年份">{{ tc.year || '—' }}</a-descriptions-item>
     <a-descriptions-item label="制作组">{{ tc.release_group || '—' }}</a-descriptions-item>

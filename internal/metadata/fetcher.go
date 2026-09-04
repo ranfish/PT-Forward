@@ -15,6 +15,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/titleparser"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"regexp"
 )
 
 type SiteAdapterProvider interface {
@@ -597,6 +598,193 @@ func (f *Fetcher) GetMetadataByHash(ctx context.Context, infoHash string) (*mode
 func containsFlag(flags []string, f string) bool {
 	for _, x := range flags {
 		if x == f {
+			return true
+		}
+	}
+	return false
+}
+
+// SetPTGenFields §59.168: PTGen ◎行提取器——从 description（豆瓣 BBCode）提取
+// 数据资产填入 TechProfile + 返回 ptgen_meta JSON。获取链组装完 TechProfile 后调用。
+// 提取项：◎片名→ChineseTitle / ◎译名首段英文→EnglishTitle / ◎类别→Genre(JSON) /
+// ◎导演/编剧/主演/产地/语言/上映日期/片长/评分→ptgen_meta（副标题组装原料）。
+func SetPTGenFields(tp *titleparser.TechProfile, description string) string {
+	if tp == nil || strings.TrimSpace(description) == "" {
+		return ""
+	}
+	if v := extractPTGenLine(description, "◎片　　名"); v != "" {
+		tp.ChineseTitle = v
+	}
+	if v := extractPTGenEnglishTitle(description); v != "" {
+		tp.EnglishTitle = v
+	}
+	if v := extractPTGenGenre(description); v != "" {
+		tp.Genre = v
+	}
+	return extractPTGenMetaJSON(description)
+}
+
+// extractPTGenLine 提取◎行值（全角空格对齐形态"◎片　　名 值"）。
+func extractPTGenLine(desc, prefix string) string {
+	re := regexp.MustCompile(regexp.QuoteMeta(prefix) + `\s+(.+)`)
+	m := re.FindStringSubmatch(desc)
+	if len(m) > 1 {
+		return strings.TrimSpace(m[1])
+	}
+	return ""
+}
+
+// extractPTGenEnglishTitle ◎译名首段英文（含冒号复合——§59.168 用户定案）。
+// "Greenland 2: Migration / 末世绿洲2…" → "Greenland 2: Migration"
+var rePTGenEnglishTitle = regexp.MustCompile(`◎译　　名\s+([A-Za-z0-9][A-Za-z0-9\s\.\-']*(?::\s+[A-Za-z0-9][A-Za-z0-9\s\.\-']*)*)`)
+
+func extractPTGenEnglishTitle(desc string) string {
+	m := rePTGenEnglishTitle.FindStringSubmatch(desc)
+	if len(m) > 1 {
+		return strings.TrimSpace(m[1])
+	}
+	return ""
+}
+
+// extractPTGenGenre ◎类别→JSON 数组（"惊悚 / 恐怖" → '["惊悚","恐怖"]'——§59.168 用户定案原子词平等）。
+func extractPTGenGenre(desc string) string {
+	raw := extractPTGenLine(desc, "◎类　　别")
+	if raw == "" {
+		return ""
+	}
+	parts := strings.Split(raw, "/")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	b, _ := json.Marshal(out)
+	return string(b)
+}
+
+// extractPTGenMetaJSON 补充资产 JSON（§31.10.27 变量 #5-#11——副标题组装原料）。
+func extractPTGenMetaJSON(desc string) string {
+	meta := map[string]interface{}{}
+	if v := extractPTGenLine(desc, "◎产　　地"); v != "" {
+		meta["country"] = v
+	}
+	if v := extractPTGenLine(desc, "◎语　　言"); v != "" {
+		meta["language"] = v
+	}
+	if v := extractPTGenLine(desc, "◎上映日期"); v != "" {
+		meta["release_date"] = v
+	}
+	if v := extractPTGenLine(desc, "◎片　　长"); v != "" {
+		meta["duration"] = v
+	}
+	if v := extractPTGenLine(desc, "◎IMDb评分"); v != "" {
+		meta["imdb_rating"] = v
+	}
+	if v := extractPTGenLine(desc, "◎豆瓣评分"); v != "" {
+		meta["douban_rating"] = v
+	}
+	if v := extractPTGenLine(desc, "◎导　　演"); v != "" {
+		meta["director"] = splitBySlash(v)
+	}
+	if v := extractPTGenLine(desc, "◎编　　剧"); v != "" {
+		meta["writer"] = splitBySlash(v)
+	}
+	if v := extractPTGenLine(desc, "◎主　　演"); v != "" {
+		meta["actor"] = extractActors(v)
+	}
+	if v := extractPTGenLine(desc, "◎简　　介"); v != "" {
+		meta["introduction"] = v
+	}
+	if len(meta) == 0 {
+		return ""
+	}
+	b, _ := json.Marshal(meta)
+	return string(b)
+}
+
+// splitBySlash 按 / 拆分+Trim。
+func splitBySlash(s string) []string {
+	parts := strings.Split(s, "/")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// extractActors 主演行拆分（"演员名 英文名 (饰 角色)" 取演员名——首个空格前）。
+func extractActors(raw string) []string {
+	parts := splitBySlash(raw)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		// 取首个空格或 tab 前的名字
+		idx := strings.IndexAny(p, " \t")
+		if idx > 0 {
+			out = append(out, p[:idx])
+		} else if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// AssembleSubtitle §59.168 副标题组装（source_fallback Step 2a/2b + C 格式）。
+// 站方副标题非空且含中文→直接返回；空/纯英文→组装兜底（C 格式完整）。
+// 获取链调用（获取时落库——非发布时）。
+func AssembleSubtitle(sourceSubtitle string, tp *titleparser.TechProfile, ptgenMetaJSON string) string {
+	// Step 2a: 站方副标题非空且含中文
+	if sourceSubtitle != "" && containsChinese(sourceSubtitle) {
+		return sourceSubtitle
+	}
+	// Step 2b: 组装兜底（C 格式）
+	if tp == nil || tp.ChineseTitle == "" {
+		return sourceSubtitle // 无中文名资产，无法组装
+	}
+	var b strings.Builder
+	b.WriteString(tp.ChineseTitle)
+	if tp.Resolution != "" {
+		b.WriteString(" | " + tp.Resolution)
+	}
+	if tp.Genre != "" {
+		var genres []string
+		if json.Unmarshal([]byte(tp.Genre), &genres) == nil && len(genres) > 0 {
+			b.WriteString(" | 类型: " + strings.Join(genres, "/"))
+		}
+	}
+	// 导演/主演从 ptgenMetaJSON
+	var meta map[string]interface{}
+	if json.Unmarshal([]byte(ptgenMetaJSON), &meta) == nil {
+		if dir, ok := meta["director"].([]interface{}); ok && len(dir) > 0 {
+			if s, ok := dir[0].(string); ok {
+				b.WriteString(" | 导演: " + s)
+			}
+		}
+		if acts, ok := meta["actor"].([]interface{}); ok && len(acts) > 0 {
+			names := make([]string, 0, 3)
+			for i := 0; i < len(acts) && i < 3; i++ {
+				if s, ok := acts[i].(string); ok {
+					names = append(names, s)
+				}
+			}
+			if len(names) > 0 {
+				b.WriteString(" | 主演: " + strings.Join(names, "/"))
+			}
+		}
+	}
+	return b.String()
+}
+
+// containsChinese 含中文字符判定。
+func containsChinese(s string) bool {
+	for _, r := range s {
+		if r >= 0x4e00 && r <= 0x9fa5 {
 			return true
 		}
 	}
