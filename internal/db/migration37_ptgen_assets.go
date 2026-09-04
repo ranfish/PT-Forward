@@ -58,7 +58,7 @@ func addPTGenAssets(gormDB *gorm.DB) error {
 
 // migration 内嵌提取函数（不依赖 metadata 包——migration 独立性）
 func extractPTGenValue(desc, prefix string) string {
-	m := regexp.MustCompile(regexp.QuoteMeta(prefix) + `\s+(.+)`).FindStringSubmatch(desc)
+	m := regexp.MustCompile(regexp.QuoteMeta(prefix) + `[\s　]+(.+)`).FindStringSubmatch(desc)
 	if len(m) > 1 {
 		return strings.TrimSpace(m[1])
 	}

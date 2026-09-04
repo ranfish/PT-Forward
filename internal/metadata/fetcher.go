@@ -626,7 +626,7 @@ func SetPTGenFields(tp *titleparser.TechProfile, description string) string {
 
 // extractPTGenLine 提取◎行值（全角空格对齐形态"◎片　　名 值"）。
 func extractPTGenLine(desc, prefix string) string {
-	re := regexp.MustCompile(regexp.QuoteMeta(prefix) + `\s+(.+)`)
+	re := regexp.MustCompile(regexp.QuoteMeta(prefix) + `[\s　]+(.+)`)
 	m := re.FindStringSubmatch(desc)
 	if len(m) > 1 {
 		return strings.TrimSpace(m[1])
