@@ -2520,6 +2520,10 @@ fetched:
 	// （携带终态）+ 终态回传（幂等）
 	h.finalizeClusterPropagation(ctx, &posterFallbackWg, clientID, savePath, name, hash, meta.SiteName)
 
+	// §59.168 PTGen 资产提取——fetchSingleTorrent 内部末尾（所有处理+DB 更新完成后）
+	// 单条/batch/手动转发 全路径统一触发（此前仅 handleFetchSingleSeed 接——batch 路径漏）
+	h.extractPTGenAssets(ctx, hash, clientID)
+
 	return nil
 }
 
@@ -3884,11 +3888,10 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 
 	fetchErr := h.fetchSingleTorrent(r.Context(), clientID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal)
 
-	// §59.168 PTGen 资产后置提取——即使 fetch 报错也尝试（适配器可能已存
-	// metadata+description 含◎行，仅后续步骤限流——提取不依赖网络）
-	h.extractPTGenAssets(r.Context(), infoHash, clientID)
-
 	if fetchErr != nil {
+		// §59.168 fetch 报错仍尝试提取（适配器可能已存数据——提取在 fetchSingleTorrent
+		// 内部末尾已触发，此处兜底覆盖"fetch 内中途 panic 跳过提取"的边界）
+		h.extractPTGenAssets(r.Context(), infoHash, clientID)
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", fetchErr))
 		return
 	}
