@@ -4691,13 +4691,20 @@ func (h *PublishTorrentsHandler) extractPTGenAssets(ctx context.Context, infoHas
 			newSub = assembled
 		}
 	}
+	// §59.168 同 info_hash 全记录更新——簇传播复制的副本（hasCompleteMetadata
+	// 跳过路径）也需要 PTGen 列（batch-fetch 27 簇首 ✓ 795 副本 ✗ 实证）
 	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-		Where("id = ?", m.ID).
+		Where("info_hash = ?", infoHash).
 		Updates(map[string]interface{}{
 			"chinese_title": profile.ChineseTitle,
 			"english_title": profile.EnglishTitle,
 			"genre":         profile.Genre,
 			"ptgen_meta":    ptgenMeta,
-			"subtitle":      newSub,
 		})
+	// 副标题仅更新当前记录（簇副本可能有不同站方副标题）
+	if newSub != m.Subtitle {
+		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("id = ?", m.ID).
+			Update("subtitle", newSub)
+	}
 }
