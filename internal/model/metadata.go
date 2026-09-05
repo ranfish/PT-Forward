@@ -65,12 +65,6 @@ type TorrentMetadata struct {
 	SourcePlatform string `json:"source_platform" gorm:"size:30;default:''"` // NF/AMZN/DSNP
 	EditionInfo   string `json:"edition_info" gorm:"size:30;default:''"`   // REPACK/REMUX
 	RegionCode    string `json:"region_code" gorm:"size:10;default:''"`    // USA/JPN/ITA
-
-	// §59.168 PTGen 数据资产（获取时从 description◎行提取——Tab1/cnname/副标题组装共用）
-	ChineseTitle string `json:"chinese_title" gorm:"size:200"`
-	EnglishTitle string `json:"english_title" gorm:"size:500"`
-	Genre        string `json:"genre" gorm:"size:200"`     // JSON 数组 '["惊悚","恐怖"]'
-	PtgenMeta    string `json:"ptgen_meta" gorm:"type:text"` // 补充资产 JSON
 }
 
 func (TorrentMetadata) TableName() string { return "torrent_metadata" }

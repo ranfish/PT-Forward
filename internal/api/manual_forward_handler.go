@@ -491,13 +491,11 @@ func (h *ManualForwardHandler) handleScreenshotCaptureProgress(w http.ResponseWr
 	})
 }
 
-func pickNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
+func pickNonEmpty(a, b string) string {
+	if a != "" {
+		return a
 	}
-	return ""
+	return b
 }
 
 func pickNonZero(a, b int) int {

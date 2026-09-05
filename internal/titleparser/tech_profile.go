@@ -20,11 +20,6 @@ type TechProfile struct {
 	ReleaseGroup   string `json:"release_group"`   // 17. 制作组
 	ChinesePrefix  string `json:"chinese_prefix"`  // 18. 中文名前缀 [中文名]
 
-	// === PTGen 数据资产字段（权威源：description◎行提取，§59.168）===
-	ChineseTitle string `json:"chinese_title"` // ◎片名（中文名资产——Tab1/cnname/副标题共用）
-	EnglishTitle string `json:"english_title"` // ◎译名首段英文（含冒号复合——主标题组装主路径 V1.05 #80）
-	Genre        string `json:"genre"`         // ◎类别（JSON 数组 '["惊悚","恐怖"]'）
-
 	// === 技术参数字段（权威源：MediaInfo，8 字段）===
 	Resolution      string `json:"resolution"`       // 5. 分辨率（4320p/2160p/1080p/720p/480p/1440p）
 	HDR             string `json:"hdr"`              // 10. HDR 类型（HDR10/HDR10+/DoVi/DoVi HDR/HDR Vivid/HLG）

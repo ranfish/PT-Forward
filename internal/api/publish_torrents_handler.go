@@ -2512,17 +2512,11 @@ fetched:
 			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 				Updates(updates)
-
 		}
 	}
 
-	// §59.168 PTGen 资产提取——必须在簇传播之前（传播是整行复制，PTGen 空
-	// 则副本也空——HH 路径 790 副本 cn=0% 实证：此前提取在传播后→副本拿到
-	// 空 PTGen 后无人再修）。先提取→再传播→副本继承 PTGen ✓
-	h.extractPTGenAssets(ctx, hash, clientID)
-
 	// §59.61 第 4 步 + 附5: 簇终局传播——等海报 fallback 终局后 INSERT 缺行
-	// （携带终态，含已提取的 PTGen 四列）+ 终态回传（幂等）
+	// （携带终态）+ 终态回传（幂等）
 	h.finalizeClusterPropagation(ctx, &posterFallbackWg, clientID, savePath, name, hash, meta.SiteName)
 
 	return nil
@@ -3581,9 +3575,6 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"year":           profile.Year,
 		"release_group":  profile.ReleaseGroup,
 		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle)),
-		// §59.168 PTGen 资产（DB 列——handleGetSeed 此前未返回此字段致 Tab1 恒空）
-		"chinese_title": pickNonEmpty(meta.ChineseTitle, profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle)),
-		"english_title": pickNonEmpty(meta.EnglishTitle, profile.MainTitle),
 
 		// 状态
 		"missing_fields": h.checkRequiredFields(meta),
@@ -3744,26 +3735,6 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	}
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(updated.DetailSourceJSON)
 	profile := titleparser.BuildTechProfile(updated.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
-	
-	// §59.168 PTGen 资产提取 + 副标题组装（获取时落库）
-	ptgenMeta := metadata.SetPTGenFields(&profile, updated.Description)
-	if updated.Subtitle == "" || !containsChineseSubtitle(updated.Subtitle) {
-		if assembled := metadata.AssembleSubtitle(updated.Subtitle, &profile, ptgenMeta); assembled != "" {
-			updates["subtitle"] = assembled
-		}
-	}
-	if profile.ChineseTitle != "" {
-		updates["chinese_title"] = profile.ChineseTitle
-	}
-	if profile.EnglishTitle != "" {
-		updates["english_title"] = profile.EnglishTitle
-	}
-	if profile.Genre != "" {
-		updates["genre"] = profile.Genre
-	}
-	if ptgenMeta != "" {
-		updates["ptgen_meta"] = ptgenMeta
-	}
 	reassembledTitle := titleparser.ReassembleFromTechProfile(profile, titleparser.V105TitleFormat())
 
 	renderer := description.NewRenderer("")
@@ -3830,8 +3801,6 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"edition_info":   pickNonEmpty(updated.EditionInfo, profile.EditionInfo),
 		"region_code":    pickNonEmpty(updated.RegionCode, profile.RegionCode),
 		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(updated.Subtitle)),
-		"chinese_title": pickNonEmpty(updated.ChineseTitle, profile.ChinesePrefix, extractChineseFromSubtitle(updated.Subtitle)),
-		"english_title": pickNonEmpty(updated.EnglishTitle, profile.MainTitle),
 		"encode":         titleparser.IsEncode(profile),
 		// §59.90: 对齐 Tab1——剧名/制作组/类型(InferCategory)
 		"main_title":     profile.MainTitle,
@@ -3892,13 +3861,8 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 		return
 	}
 
-	fetchErr := h.fetchSingleTorrent(r.Context(), clientID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal)
-
-	if fetchErr != nil {
-		// §59.168 fetch 报错仍尝试提取（适配器可能已存数据——提取在 fetchSingleTorrent
-		// 内部末尾已触发，此处兜底覆盖"fetch 内中途 panic 跳过提取"的边界）
-		h.extractPTGenAssets(r.Context(), infoHash, clientID)
-		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", fetchErr))
+	if err := h.fetchSingleTorrent(r.Context(), clientID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal); err != nil {
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", err))
 		return
 	}
 
@@ -4653,64 +4617,4 @@ func (h *PublishTorrentsHandler) handleSiteBatchProgress(w http.ResponseWriter, 
 		return
 	}
 	Error(w, http.StatusNotFound, 40401, "任务不存在或已过期（30 分钟 TTL）")
-}
-
-// containsChineseSubtitle §59.168: 含中文字符判定（副标题 Step 2a 条件）。
-func containsChineseSubtitle(s string) bool {
-	for _, r := range s {
-		if r >= 0x4e00 && r <= 0x9fa5 {
-			return true
-		}
-	}
-	return false
-}
-
-// safeSubstring 安全截取（不越界）。
-func safeSubstring(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
-	}
-	return s
-}
-
-// extractPTGenAssets §59.168 后置 PTGen 资产提取——fetch 全管线完成后从 DB
-// 终态 description（已含◎行——渲染管线产物）提取四列+副标题组装。
-// 根因：fetch 中间态 description 不含◎（渲染未完成）→内联提取恒空（实战定位）。
-func (h *PublishTorrentsHandler) extractPTGenAssets(ctx context.Context, infoHash, clientID string) {
-	var m model.TorrentMetadata
-	if err := h.db.WithContext(ctx).Where("info_hash = ?", infoHash).
-		Order("id DESC").First(&m).Error; err != nil {
-		return
-	}
-	if m.Description == "" || !strings.Contains(m.Description, "\u25CE") {
-		return // 无◎行——非 PTGen 简介
-	}
-	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(m.DetailSourceJSON)
-	profile := titleparser.BuildTechProfile(m.Title, m.MediaInfo, domMedium, domRes, domVideo, domAudio)
-	ptgenMeta := metadata.SetPTGenFields(&profile, m.Description)
-	if profile.ChineseTitle == "" && profile.EnglishTitle == "" && profile.Genre == "" && ptgenMeta == "" {
-		return
-	}
-	newSub := m.Subtitle
-	if newSub == "" || !containsChineseSubtitle(newSub) {
-		if assembled := metadata.AssembleSubtitle(newSub, &profile, ptgenMeta); assembled != "" {
-			newSub = assembled
-		}
-	}
-	// §59.168 同 info_hash 全记录更新——簇传播复制的副本（hasCompleteMetadata
-	// 跳过路径）也需要 PTGen 列（batch-fetch 27 簇首 ✓ 795 副本 ✗ 实证）
-	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-		Where("info_hash = ?", infoHash).
-		Updates(map[string]interface{}{
-			"chinese_title": profile.ChineseTitle,
-			"english_title": profile.EnglishTitle,
-			"genre":         profile.Genre,
-			"ptgen_meta":    ptgenMeta,
-		})
-	// 副标题仅更新当前记录（簇副本可能有不同站方副标题）
-	if newSub != m.Subtitle {
-		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-			Where("id = ?", m.ID).
-			Update("subtitle", newSub)
-	}
 }
