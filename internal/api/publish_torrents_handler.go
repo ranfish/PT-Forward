@@ -2421,25 +2421,20 @@ fetched:
 			// §59.77: 评论音轨扣减（v1.05 不计入——副标题声明提取）
 			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, finalMeta.Subtitle, miForProfile)
 			// §59.168 PTGen 资产提取（获取链接线——initial fetch 也走此路径）
-			ptgenMeta := metadata.SetPTGenFields(&profile, finalMeta.Description)
-			// §59.168 调试——定位新列不落库根因
-			safeSub := func(s string, n int) string { if len(s) > n { return s[:n] }; return s }
-			descHead := ""
-			if len(finalMeta.Description) > 100 { descHead = finalMeta.Description[:100] } else { descHead = finalMeta.Description }
-			// ◎行上下文（定位原始格式差异）
-			if idx := strings.Index(finalMeta.Description, "◎"); idx >= 0 {
-				end := idx + 60
-				if end > len(finalMeta.Description) { end = len(finalMeta.Description) }
-				descHead = fmt.Sprintf("pos=%d ctx=%q", idx, finalMeta.Description[idx:end])
+			// §59.168 根因修复：原始 PTGen 响应不含◎字符（HTML 实体/其它编码）——
+			// 清理后才含◎。SetPTGenFields 必须用清理后 description。
+			cleanedDesc := finalMeta.Description
+			if h.declFilter != nil && cleanedDesc != "" {
+				patterns := h.declFilter.GetPatterns(ctx)
+				fr := h.declFilter.Filter(cleanedDesc, patterns)
+				cleanedDesc = fr.CleanedText
 			}
-			h.logger.Info("PTGen extract debug",
+			ptgenMeta := metadata.SetPTGenFields(&profile, cleanedDesc)
+			h.logger.Info("PTGen extract",
 				zap.String("hash", meta.InfoHash[:10]),
-				zap.Int("desc_len", len(finalMeta.Description)),
-				zap.String("cn", safeSub(profile.ChineseTitle, 20)),
-				zap.String("en", safeSub(profile.EnglishTitle, 30)),
-				zap.String("genre", safeSub(profile.Genre, 30)),
-				zap.String("desc_head", descHead),
-				zap.String("site", meta.SiteName))
+				zap.Int("cleaned_len", len(cleanedDesc)),
+				zap.String("cn", safeSubstring(profile.ChineseTitle, 20)),
+				zap.String("en", safeSubstring(profile.EnglishTitle, 30)))
 			// §59.168 副标题组装（站方优先/组装兜底——source_fallback Step 2a/2b）
 			if finalMeta.Subtitle == "" || !containsChineseSubtitle(finalMeta.Subtitle) {
 				if assembled := metadata.AssembleSubtitle(finalMeta.Subtitle, &profile, ptgenMeta); assembled != "" {
@@ -2476,10 +2471,8 @@ fetched:
 				updates["subtitle"] = finalMeta.Subtitle
 			}
 
-			if h.declFilter != nil && finalMeta.Description != "" {
-				patterns := h.declFilter.GetPatterns(ctx)
-				fr := h.declFilter.Filter(finalMeta.Description, patterns)
-				updates["description"] = fr.CleanedText
+			if cleanedDesc != finalMeta.Description {
+				updates["description"] = cleanedDesc
 			}
 
 			// §59.27: flags 以本次 detail 为准（detail_source_json.flags 是新提取值，
@@ -4692,4 +4685,12 @@ func containsChineseSubtitle(s string) bool {
 		}
 	}
 	return false
+}
+
+// safeSubstring 安全截取（不越界）。
+func safeSubstring(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
 }
