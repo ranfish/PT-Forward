@@ -158,6 +158,10 @@ export interface SeedDetail {
   // §59.75: 产地/类型（PTGen 源归一——keys=canonical 供发布映射, labels=展示）
   region?: { keys: string[]; labels: string[] }
   genre?: { keys: string[]; labels: string[] }
+  // §59.168 PTGen 数据资产（获取时从 description◎行提取）
+  chinese_title?: string
+  english_title?: string
+  ptgen_genre?: string // JSON 数组 '["惊悚","恐怖"]'（与上方 genre 对象区分）
   // 14 DB 平铺字段
   category: string
   form: string
