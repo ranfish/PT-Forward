@@ -3882,13 +3882,16 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 		return
 	}
 
-	if err := h.fetchSingleTorrent(r.Context(), clientID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal); err != nil {
-		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", err))
+	fetchErr := h.fetchSingleTorrent(r.Context(), clientID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal)
+
+	// §59.168 PTGen 资产后置提取——即使 fetch 报错也尝试（适配器可能已存
+	// metadata+description 含◎行，仅后续步骤限流——提取不依赖网络）
+	h.extractPTGenAssets(r.Context(), infoHash, clientID)
+
+	if fetchErr != nil {
+		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", fetchErr))
 		return
 	}
-
-	// §59.168 PTGen 资产后置提取——fetch 全管线完成后 DB description 已含◎行
-	h.extractPTGenAssets(r.Context(), infoHash, clientID)
 
 	// §59.26: 获取（含重新获取）后 reviewed=false，必须重新走预览审核
 	// §59.44: 资源视图圈 hash——获取可能落在资源键内其他 hash（tid 反查），全组重置
