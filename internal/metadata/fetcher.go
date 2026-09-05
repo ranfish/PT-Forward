@@ -634,14 +634,25 @@ func extractPTGenLine(desc, prefix string) string {
 	return ""
 }
 
-// extractPTGenEnglishTitle ◎译名首段英文（含冒号复合——§59.168 用户定案）。
-// "Greenland 2: Migration / 末世绿洲2…" → "Greenland 2: Migration"
-var rePTGenEnglishTitle = regexp.MustCompile(`◎译　　名[\s　]+([A-Za-z0-9][A-Za-z0-9\s\.\-']*(?::\s+[A-Za-z0-9][A-Za-z0-9\s\.\-']*)*)`)
+// rePTGenEnglishSeg 单段英文匹配（含冒号复合）
+var rePTGenEnglishSeg = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9\s\.\-']*(?::\s+[A-Za-z0-9][A-Za-z0-9\s\.\-']*)*)`)
 
+// extractPTGenEnglishTitle ◎译名第一个英文段（含冒号复合——§59.168 用户定案演进：
+// 首段→全段扫描。实证：Made in Korea 泰米尔语首段/英文第 2 段——75 条全部可提取）。
+// "末世绿洲2 / Greenland 2: Migration / …" → "Greenland 2: Migration"
 func extractPTGenEnglishTitle(desc string) string {
-	m := rePTGenEnglishTitle.FindStringSubmatch(desc)
-	if len(m) > 1 {
-		return strings.TrimSpace(m[1])
+	m := regexp.MustCompile(`◎译　　名[\s　]+(.+?)(?:\n|$)`).FindStringSubmatch(desc)
+	if len(m) < 2 {
+		return ""
+	}
+	for _, seg := range strings.Split(m[1], "/") {
+		seg = strings.TrimSpace(seg)
+		if seg == "" {
+			continue
+		}
+		if em := rePTGenEnglishSeg.FindStringSubmatch(seg); len(em) > 1 && strings.TrimSpace(em[1]) != "" {
+			return strings.TrimSpace(em[1])
+		}
 	}
 	return ""
 }
