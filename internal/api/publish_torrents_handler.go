@@ -3580,6 +3580,9 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"year":           profile.Year,
 		"release_group":  profile.ReleaseGroup,
 		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle)),
+		// §59.168 PTGen 资产（DB 列——handleGetSeed 此前未返回此字段致 Tab1 恒空）
+		"chinese_title": pickNonEmpty(meta.ChineseTitle, profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle)),
+		"english_title": pickNonEmpty(meta.EnglishTitle, profile.MainTitle),
 
 		// 状态
 		"missing_fields": h.checkRequiredFields(meta),
@@ -3826,6 +3829,8 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 		"edition_info":   pickNonEmpty(updated.EditionInfo, profile.EditionInfo),
 		"region_code":    pickNonEmpty(updated.RegionCode, profile.RegionCode),
 		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(updated.Subtitle)),
+		"chinese_title": pickNonEmpty(updated.ChineseTitle, profile.ChinesePrefix, extractChineseFromSubtitle(updated.Subtitle)),
+		"english_title": pickNonEmpty(updated.EnglishTitle, profile.MainTitle),
 		"encode":         titleparser.IsEncode(profile),
 		// §59.90: 对齐 Tab1——剧名/制作组/类型(InferCategory)
 		"main_title":     profile.MainTitle,
