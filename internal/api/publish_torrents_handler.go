@@ -2426,6 +2426,12 @@ fetched:
 			safeSub := func(s string, n int) string { if len(s) > n { return s[:n] }; return s }
 			descHead := ""
 			if len(finalMeta.Description) > 100 { descHead = finalMeta.Description[:100] } else { descHead = finalMeta.Description }
+			// ◎行上下文（定位原始格式差异）
+			if idx := strings.Index(finalMeta.Description, "◎"); idx >= 0 {
+				end := idx + 60
+				if end > len(finalMeta.Description) { end = len(finalMeta.Description) }
+				descHead = fmt.Sprintf("pos=%d ctx=%q", idx, finalMeta.Description[idx:end])
+			}
 			h.logger.Info("PTGen extract debug",
 				zap.String("hash", meta.InfoHash[:10]),
 				zap.Int("desc_len", len(finalMeta.Description)),
