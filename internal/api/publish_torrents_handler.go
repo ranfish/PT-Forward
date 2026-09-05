@@ -2423,12 +2423,16 @@ fetched:
 			// §59.168 PTGen 资产提取（获取链接线——initial fetch 也走此路径）
 			ptgenMeta := metadata.SetPTGenFields(&profile, finalMeta.Description)
 			// §59.168 调试——定位新列不落库根因
+			safeSub := func(s string, n int) string { if len(s) > n { return s[:n] }; return s }
+			descHead := ""
+			if len(finalMeta.Description) > 100 { descHead = finalMeta.Description[:100] } else { descHead = finalMeta.Description }
 			h.logger.Info("PTGen extract debug",
 				zap.String("hash", meta.InfoHash[:10]),
 				zap.Int("desc_len", len(finalMeta.Description)),
-				zap.String("cn", profile.ChineseTitle[:20]),
-				zap.String("en", profile.EnglishTitle[:30]),
-				zap.String("genre", profile.Genre[:30]),
+				zap.String("cn", safeSub(profile.ChineseTitle, 20)),
+				zap.String("en", safeSub(profile.EnglishTitle, 30)),
+				zap.String("genre", safeSub(profile.Genre, 30)),
+				zap.String("desc_head", descHead),
 				zap.String("site", meta.SiteName))
 			// §59.168 副标题组装（站方优先/组装兜底——source_fallback Step 2a/2b）
 			if finalMeta.Subtitle == "" || !containsChineseSubtitle(finalMeta.Subtitle) {
