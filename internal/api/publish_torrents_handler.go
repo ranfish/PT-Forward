@@ -2420,6 +2420,15 @@ fetched:
 			profile := titleparser.BuildTechProfile(finalMeta.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 			// §59.77: 评论音轨扣减（v1.05 不计入——副标题声明提取）
 			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, finalMeta.Subtitle, miForProfile)
+			// §59.168 PTGen 资产提取（获取链接线——initial fetch 也走此路径）
+			ptgenMeta := metadata.SetPTGenFields(&profile, finalMeta.Description)
+			// §59.168 副标题组装（站方优先/组装兜底——source_fallback Step 2a/2b）
+			if finalMeta.Subtitle == "" || !containsChineseSubtitle(finalMeta.Subtitle) {
+				if assembled := metadata.AssembleSubtitle(finalMeta.Subtitle, &profile, ptgenMeta); assembled != "" {
+					updates_sub := assembled
+					finalMeta.Subtitle = updates_sub
+				}
+			}
 			components := titleparser.TechProfileToComponents(profile)
 			category := titleparser.InferCategory(components, finalMeta.SourceCategory, "", "")
 
@@ -2438,6 +2447,15 @@ fetched:
 				"source_platform": profile.SourcePlatform,
 				"edition_info":    profile.EditionInfo,
 				"region_code":     profile.RegionCode,
+				// §59.168 PTGen 资产落库
+				"chinese_title":   profile.ChineseTitle,
+				"english_title":   profile.EnglishTitle,
+				"genre":           profile.Genre,
+				"ptgen_meta":      ptgenMeta,
+			}
+			// §59.168 副标题（组装后覆盖——空才覆盖不破坏站方值）
+			if finalMeta.Subtitle != "" {
+				updates["subtitle"] = finalMeta.Subtitle
 			}
 
 			if h.declFilter != nil && finalMeta.Description != "" {
