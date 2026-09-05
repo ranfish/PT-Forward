@@ -4694,10 +4694,4 @@ func (h *PublishTorrentsHandler) extractPTGenAssets(ctx context.Context, infoHas
 			"ptgen_meta":    ptgenMeta,
 			"subtitle":      newSub,
 		})
-	if h.logger != nil {
-		h.logger.Info("PTGen assets extracted",
-			zap.String("hash", infoHash[:10]),
-			zap.String("cn", profile.ChineseTitle),
-			zap.String("en", profile.EnglishTitle))
-	}
 }
