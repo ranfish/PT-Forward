@@ -2516,13 +2516,14 @@ fetched:
 		}
 	}
 
-	// §59.61 第 4 步 + 附5: 簇终局传播——等海报 fallback 终局后 INSERT 缺行
-	// （携带终态）+ 终态回传（幂等）
-	h.finalizeClusterPropagation(ctx, &posterFallbackWg, clientID, savePath, name, hash, meta.SiteName)
-
-	// §59.168 PTGen 资产提取——fetchSingleTorrent 内部末尾（所有处理+DB 更新完成后）
-	// 单条/batch/手动转发 全路径统一触发（此前仅 handleFetchSingleSeed 接——batch 路径漏）
+	// §59.168 PTGen 资产提取——必须在簇传播之前（传播是整行复制，PTGen 空
+	// 则副本也空——HH 路径 790 副本 cn=0% 实证：此前提取在传播后→副本拿到
+	// 空 PTGen 后无人再修）。先提取→再传播→副本继承 PTGen ✓
 	h.extractPTGenAssets(ctx, hash, clientID)
+
+	// §59.61 第 4 步 + 附5: 簇终局传播——等海报 fallback 终局后 INSERT 缺行
+	// （携带终态，含已提取的 PTGen 四列）+ 终态回传（幂等）
+	h.finalizeClusterPropagation(ctx, &posterFallbackWg, clientID, savePath, name, hash, meta.SiteName)
 
 	return nil
 }
