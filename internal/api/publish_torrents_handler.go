@@ -2530,6 +2530,15 @@ fetched:
 			h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 				Updates(updates)
+
+			// §59.168 直接 SQL 确保新列写入（GORM Updates map 实证未写入——
+			// 可能被 callback/列映射拦截；直接 Exec 绕过）
+			if profile.ChineseTitle != "" || profile.EnglishTitle != "" || profile.Genre != "" || ptgenMeta != "" {
+				h.db.WithContext(ctx).Exec(
+					"UPDATE torrent_metadata SET chinese_title=?, english_title=?, genre=?, ptgen_meta=? WHERE info_hash=? AND site_name=?",
+					profile.ChineseTitle, profile.EnglishTitle, profile.Genre, ptgenMeta,
+					meta.InfoHash, meta.SiteName)
+			}
 		}
 	}
 
