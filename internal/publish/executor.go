@@ -235,7 +235,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	setForm(model.FieldDomainSmallDescr, meta.Subtitle)
 	// §59.164: 修道院 cnname 独立中文名（FormFields 未配站点自然跳过）
-	setForm(model.FieldDomainCNName, firstNonEmpty(meta.ChineseTitle, chineseTitleOf(meta.Title)))
+	setForm(model.FieldDomainCNName, chineseTitleOf(meta.Title))
 	setForm(model.FieldDomainDescription, meta.Description) // renderDescription 结果后续覆盖
 	setForm(model.FieldDomainTechInfo, meta.MediaInfo)
 	setForm(model.FieldDomainIMDBURL, meta.IMDbURL)
@@ -930,14 +930,4 @@ func (e *PublishExecutor) preAuditTitle(meta *model.TorrentMetadata) string {
 		return rt
 	}
 	return meta.Title
-}
-
-// firstNonEmpty §59.168: 首个非空串。
-func firstNonEmpty(ss ...string) string {
-	for _, s := range ss {
-		if s != "" {
-			return s
-		}
-	}
-	return ""
 }
