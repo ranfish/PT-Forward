@@ -3887,6 +3887,9 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 		return
 	}
 
+	// §59.168 PTGen 资产后置提取——fetch 全管线完成后 DB description 已含◎行
+	h.extractPTGenAssets(r.Context(), infoHash, clientID)
+
 	// §59.26: 获取（含重新获取）后 reviewed=false，必须重新走预览审核
 	// §59.44: 资源视图圈 hash——获取可能落在资源键内其他 hash（tid 反查），全组重置
 	resetHashes := []string{infoHash}
@@ -4656,4 +4659,45 @@ func safeSubstring(s string, n int) string {
 		return s[:n]
 	}
 	return s
+}
+
+// extractPTGenAssets §59.168 后置 PTGen 资产提取——fetch 全管线完成后从 DB
+// 终态 description（已含◎行——渲染管线产物）提取四列+副标题组装。
+// 根因：fetch 中间态 description 不含◎（渲染未完成）→内联提取恒空（实战定位）。
+func (h *PublishTorrentsHandler) extractPTGenAssets(ctx context.Context, infoHash, clientID string) {
+	var m model.TorrentMetadata
+	if err := h.db.WithContext(ctx).Where("info_hash = ?", infoHash).
+		Order("id DESC").First(&m).Error; err != nil {
+		return
+	}
+	if m.Description == "" || !strings.Contains(m.Description, "\u25CE") {
+		return // 无◎行——非 PTGen 简介
+	}
+	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(m.DetailSourceJSON)
+	profile := titleparser.BuildTechProfile(m.Title, m.MediaInfo, domMedium, domRes, domVideo, domAudio)
+	ptgenMeta := metadata.SetPTGenFields(&profile, m.Description)
+	if profile.ChineseTitle == "" && profile.EnglishTitle == "" && profile.Genre == "" && ptgenMeta == "" {
+		return
+	}
+	newSub := m.Subtitle
+	if newSub == "" || !containsChineseSubtitle(newSub) {
+		if assembled := metadata.AssembleSubtitle(newSub, &profile, ptgenMeta); assembled != "" {
+			newSub = assembled
+		}
+	}
+	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("id = ?", m.ID).
+		Updates(map[string]interface{}{
+			"chinese_title": profile.ChineseTitle,
+			"english_title": profile.EnglishTitle,
+			"genre":         profile.Genre,
+			"ptgen_meta":    ptgenMeta,
+			"subtitle":      newSub,
+		})
+	if h.logger != nil {
+		h.logger.Info("PTGen assets extracted",
+			zap.String("hash", infoHash[:10]),
+			zap.String("cn", profile.ChineseTitle),
+			zap.String("en", profile.EnglishTitle))
+	}
 }
