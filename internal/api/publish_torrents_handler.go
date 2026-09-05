@@ -2420,28 +2420,6 @@ fetched:
 			profile := titleparser.BuildTechProfile(finalMeta.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 			// §59.77: 评论音轨扣减（v1.05 不计入——副标题声明提取）
 			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, finalMeta.Subtitle, miForProfile)
-			// §59.168 PTGen 资产提取（获取链接线——initial fetch 也走此路径）
-			// §59.168 根因修复：原始 PTGen 响应不含◎字符（HTML 实体/其它编码）——
-			// 清理后才含◎。SetPTGenFields 必须用清理后 description。
-			cleanedDesc := finalMeta.Description
-			if h.declFilter != nil && cleanedDesc != "" {
-				patterns := h.declFilter.GetPatterns(ctx)
-				fr := h.declFilter.Filter(cleanedDesc, patterns)
-				cleanedDesc = fr.CleanedText
-			}
-			ptgenMeta := metadata.SetPTGenFields(&profile, cleanedDesc)
-			h.logger.Info("PTGen extract",
-				zap.String("hash", meta.InfoHash[:10]),
-				zap.Int("cleaned_len", len(cleanedDesc)),
-				zap.String("cn", safeSubstring(profile.ChineseTitle, 20)),
-				zap.String("en", safeSubstring(profile.EnglishTitle, 30)))
-			// §59.168 副标题组装（站方优先/组装兜底——source_fallback Step 2a/2b）
-			if finalMeta.Subtitle == "" || !containsChineseSubtitle(finalMeta.Subtitle) {
-				if assembled := metadata.AssembleSubtitle(finalMeta.Subtitle, &profile, ptgenMeta); assembled != "" {
-					updates_sub := assembled
-					finalMeta.Subtitle = updates_sub
-				}
-			}
 			components := titleparser.TechProfileToComponents(profile)
 			category := titleparser.InferCategory(components, finalMeta.SourceCategory, "", "")
 
@@ -2460,19 +2438,12 @@ fetched:
 				"source_platform": profile.SourcePlatform,
 				"edition_info":    profile.EditionInfo,
 				"region_code":     profile.RegionCode,
-				// §59.168 PTGen 资产落库
-				"chinese_title":   profile.ChineseTitle,
-				"english_title":   profile.EnglishTitle,
-				"genre":           profile.Genre,
-				"ptgen_meta":      ptgenMeta,
-			}
-			// §59.168 副标题（组装后覆盖——空才覆盖不破坏站方值）
-			if finalMeta.Subtitle != "" {
-				updates["subtitle"] = finalMeta.Subtitle
 			}
 
-			if cleanedDesc != finalMeta.Description {
-				updates["description"] = cleanedDesc
+			if h.declFilter != nil && finalMeta.Description != "" {
+				patterns := h.declFilter.GetPatterns(ctx)
+				fr := h.declFilter.Filter(finalMeta.Description, patterns)
+				updates["description"] = fr.CleanedText
 			}
 
 			// §59.27: flags 以本次 detail 为准（detail_source_json.flags 是新提取值，
@@ -2542,14 +2513,6 @@ fetched:
 				Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 				Updates(updates)
 
-			// §59.168 直接 SQL 确保新列写入（GORM Updates map 实证未写入——
-			// 可能被 callback/列映射拦截；直接 Exec 绕过）
-			if profile.ChineseTitle != "" || profile.EnglishTitle != "" || profile.Genre != "" || ptgenMeta != "" {
-				h.db.WithContext(ctx).Exec(
-					"UPDATE torrent_metadata SET chinese_title=?, english_title=?, genre=?, ptgen_meta=? WHERE info_hash=? AND site_name=?",
-					profile.ChineseTitle, profile.EnglishTitle, profile.Genre, ptgenMeta,
-					meta.InfoHash, meta.SiteName)
-			}
 		}
 	}
 
