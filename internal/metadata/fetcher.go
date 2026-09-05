@@ -636,7 +636,7 @@ func extractPTGenLine(desc, prefix string) string {
 
 // extractPTGenEnglishTitle ◎译名首段英文（含冒号复合——§59.168 用户定案）。
 // "Greenland 2: Migration / 末世绿洲2…" → "Greenland 2: Migration"
-var rePTGenEnglishTitle = regexp.MustCompile(`◎译　　名\s+([A-Za-z0-9][A-Za-z0-9\s\.\-']*(?::\s+[A-Za-z0-9][A-Za-z0-9\s\.\-']*)*)`)
+var rePTGenEnglishTitle = regexp.MustCompile(`◎译　　名[\s　]+([A-Za-z0-9][A-Za-z0-9\s\.\-']*(?::\s+[A-Za-z0-9][A-Za-z0-9\s\.\-']*)*)`)
 
 func extractPTGenEnglishTitle(desc string) string {
 	m := rePTGenEnglishTitle.FindStringSubmatch(desc)
