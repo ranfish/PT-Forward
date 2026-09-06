@@ -274,7 +274,7 @@ interface PresetTorrent {
   name: string
   size: number
   save_path: string
-  client_id: number
+  client_id: string // §59.170 BUG-1: 下载器名是字符串（"PT0"）——原 number 类型逼出 Number() NaN→0 转换链
   state?: string
   source_site?: string
   source_site_id?: number

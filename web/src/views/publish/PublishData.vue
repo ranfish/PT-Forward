@@ -237,7 +237,7 @@ function onBatchFilterChange() {
 
 // §59.166 预览种子（CrossSeedPanel——一种多站同款；pending 簇经此返回编辑）
 const previewPanelOpen = ref(false)
-const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string } | null>(null)
+const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: string; source_site?: string } | null>(null)
 const previewDirect = ref(false)
 
 function previewSeed(record: SeedListItem) {
@@ -246,10 +246,14 @@ function previewSeed(record: SeedListItem) {
     name: record.name,
     size: record.size,
     save_path: record.save_path,
-    client_id: Number(record.client_id) || 0,
+    // §59.170 BUG-1: client_id 原样传字符串（"PT0"）——原 Number() NaN→0→'' 致截图 400
+    client_id: record.client_id,
     source_site: record.site_name,
   }
-  previewDirect.value = true
+  // §59.170 F2: 直开预览（含自动保存）仅 reviewed 行——非 reviewed 开编辑模式
+  // （§59.166 自述"pending 簇经此返回编辑"本意；无门禁时空表单自动 PUT 会
+  // 连坐簇 reviewed——46 行实锤）
+  previewDirect.value = !!record.reviewed
   previewPanelOpen.value = true
 }
 
