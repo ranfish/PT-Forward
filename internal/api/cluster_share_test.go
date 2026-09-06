@@ -502,6 +502,10 @@ func TestPropagateClusterMediainfoDB(t *testing.T) {
 	if sib2.MediaInfo != "MI-LOCAL" {
 		t.Errorf("cluster 副本应被覆盖: %q", sib2.MediaInfo)
 	}
+	// §59.171 附: 标签随货走——media_info_source 一并写
+	if sib1.MediaInfoSource != "local" || sib2.MediaInfoSource != "local" {
+		t.Errorf("传播应带 MI 出处标签: %q/%q", sib1.MediaInfoSource, sib2.MediaInfoSource)
+	}
 	if rssRow.MediaInfo != "MI-SRC" {
 		t.Errorf("非簇行不应被写: %q", rssRow.MediaInfo)
 	}

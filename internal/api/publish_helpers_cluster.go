@@ -317,9 +317,14 @@ func propagateClusterMediainfoDB(db *gorm.DB, logger *zap.Logger, ctx context.Co
 	if len(siblingHashes) == 0 {
 		return
 	}
+	// §59.171 附: 标签随货走——media_info_source 一并写（PT31 Bohemian 实证
+	// 副本行有 MI 无出处标签；纯诊断字段无行为依赖，挂账后用户要求即修）
 	res := db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 		Where("info_hash IN ? AND (media_info = '' OR fetch_source = 'cluster')", siblingHashes).
-		Update("media_info", mi)
+		Updates(map[string]interface{}{
+			"media_info":        mi,
+			"media_info_source": "local",
+		})
 	if res.Error != nil {
 		logger.Warn("cluster mediainfo propagate failed", zap.Error(res.Error))
 		return
