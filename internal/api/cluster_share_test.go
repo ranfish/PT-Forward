@@ -450,3 +450,93 @@ func TestPutSeedEmptyScreenshotsNotOverwrite(t *testing.T) {
 		t.Errorf("空表单 PUT 应沿用库中截图（校验诚实），实际: %q", meta.Screenshots)
 	}
 }
+
+// §59.171 A: 同名多行确定性排序——权威行（非 cluster）优先于更新的 cluster 副本
+//（PT31 抽签实锤的反向验证：无序时 info_hash 索引序可让 cluster 空行当选）。
+func TestSortMetasAuthoritative(t *testing.T) {
+	metas := []model.TorrentMetadata{
+		{ID: 3, FetchSource: "cluster", MediaInfo: "", UpdatedAt: time.Now()},
+		{ID: 1, FetchSource: "rss_detail", MediaInfo: "MI-FULL", UpdatedAt: time.Now().Add(-time.Hour)},
+		{ID: 2, FetchSource: "cluster", MediaInfo: "", UpdatedAt: time.Now()},
+	}
+	model.SortMetasAuthoritative(metas)
+	if metas[0].ID != 1 || metas[0].FetchSource != "rss_detail" {
+		t.Errorf("权威行应排首: %+v", metas[0])
+	}
+	// 两个 cluster 行：updated_at 相同 → id 升序
+	if metas[1].ID > metas[2].ID {
+		t.Errorf("同级行应 id 升序: %d, %d", metas[1].ID, metas[2].ID)
+	}
+	// selectSourceMeta 端到端：无制作组映射时 best=排序后首行（权威行）
+	h := &PublishTorrentsHandler{db: nil, logger: zap.NewNop()}
+	picked := h.selectSourceMeta(metas)
+	if picked == nil || picked.ID != 1 {
+		t.Errorf("selectSourceMeta 应选权威行: %+v", picked)
+	}
+}
+
+// §59.171 B: MI 簇传播——空副本/cluster 副本补齐，rss_detail 独立行不动。
+func TestPropagateClusterMediainfoDB(t *testing.T) {
+	db := clusterTestDB(t)
+	logger := zap.NewNop()
+	db.Create(&model.TorrentSnapshot{Hash: "mself11000000000000000000000000000000000", ClientID: "PT0", Name: "W", SavePath: "/w"})
+	db.Create(&model.TorrentSnapshot{Hash: "msib110000000000000000000000000000000000", ClientID: "PT0", Name: "W", SavePath: "/w"})
+	db.Create(&model.TorrentSnapshot{Hash: "msib120000000000000000000000000000000000", ClientID: "PT0", Name: "W", SavePath: "/w"})
+	db.Create(&model.TorrentMetadata{InfoHash: "mself11000000000000000000000000000000000", SiteName: "朋友", Title: "t", MediaInfo: "MI-LOCAL"})
+	db.Create(&model.TorrentMetadata{InfoHash: "msib110000000000000000000000000000000000", SiteName: "朋友", Title: "t", MediaInfo: ""})
+	db.Create(&model.TorrentMetadata{InfoHash: "msib120000000000000000000000000000000000", SiteName: "朋友", Title: "t", MediaInfo: "MI-OLD", FetchSource: "cluster"})
+	// 独立获取行（不同簇键外的 rss 行——用其它名字簇的行模拟不动语义）
+	db.Create(&model.TorrentMetadata{InfoHash: "mrss110000000000000000000000000000000000", SiteName: "朋友", Title: "t", MediaInfo: "MI-SRC", FetchSource: "rss_detail"})
+	db.Create(&model.TorrentSnapshot{Hash: "mrss110000000000000000000000000000000000", ClientID: "PT0", Name: "OTHER", SavePath: "/w"})
+
+	propagateClusterMediainfoDB(db, logger, context.Background(), "PT0", "/w", "W",
+		"mself11000000000000000000000000000000000", "MI-LOCAL")
+
+	var sib1, sib2, rssRow model.TorrentMetadata
+	db.Where("info_hash = ?", "msib110000000000000000000000000000000000").First(&sib1)
+	db.Where("info_hash = ?", "msib120000000000000000000000000000000000").First(&sib2)
+	db.Where("info_hash = ?", "mrss110000000000000000000000000000000000").First(&rssRow)
+	if sib1.MediaInfo != "MI-LOCAL" {
+		t.Errorf("空副本应补 MI: %q", sib1.MediaInfo)
+	}
+	if sib2.MediaInfo != "MI-LOCAL" {
+		t.Errorf("cluster 副本应被覆盖: %q", sib2.MediaInfo)
+	}
+	if rssRow.MediaInfo != "MI-SRC" {
+		t.Errorf("非簇行不应被写: %q", rssRow.MediaInfo)
+	}
+	// nil/空守卫
+	propagateClusterMediainfoDB(nil, logger, context.Background(), "PT0", "/w", "W", "mself11000000000000000000000000000000000", "MI")
+	propagateClusterMediainfoDB(db, nil, context.Background(), "PT0", "/w", "W", "mself11000000000000000000000000000000000", "MI")
+	propagateClusterMediainfoDB(db, logger, context.Background(), "PT0", "/w", "W", "mself11000000000000000000000000000000000", "")
+}
+
+// §59.171 D: MI 九字段校验口径——仅源站 MI（SourceMediaInfo）不再判缺。
+func TestCheckRequiredFieldsMediainfoFallback(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	// 完整字段 + 仅 SourceMediaInfo（本地列空）
+	meta := &model.TorrentMetadata{
+		Title: "t", Poster: "p", Screenshots: `["1","2","3"]`, Description: "d",
+		MediaInfo: "", SourceMediaInfo: "MI-FROM-SOURCE-SITE",
+		Resolution: "1080p", VideoCodec: "h265",
+	}
+	missing := h.checkRequiredFields(meta)
+	for _, m := range missing {
+		if m == "mediainfo" {
+			t.Errorf("仅源站 MI 不应判缺（本地优先+源站兜底设计口径）: %v", missing)
+		}
+	}
+	// 双列皆空才判缺
+	meta.SourceMediaInfo = ""
+	missing2 := h.checkRequiredFields(meta)
+	found := false
+	for _, m := range missing2 {
+		if m == "mediainfo" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("双列皆空应判缺: %v", missing2)
+	}
+}

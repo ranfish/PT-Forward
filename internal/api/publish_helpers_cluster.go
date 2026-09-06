@@ -300,6 +300,37 @@ func propagateClusterScreenshotsDB(db *gorm.DB, logger *zap.Logger, ctx context.
 	}
 }
 
+// propagateClusterMediainfoDB §59.171: MI 簇传播（与截图 §59.169 同语义）——
+// 本地 MI 落库后补簇内空 MI 行。PT31 DouBan 合集实锤：63 副本 mi=0 而源行
+// mi=14741（fetch 传播跳过已有行 + MI 无二波机制），列表抽签 63/64 中空行
+// → "重获成功却恒红叉"。覆盖条件与截图同：空行 + cluster 行；rss_detail
+// 独立获取行不动（尊重显式数据）。
+func propagateClusterMediainfoDB(db *gorm.DB, logger *zap.Logger, ctx context.Context, clientID, savePath, name, selfHash, mi string) {
+	if db == nil || logger == nil || clientID == "" || savePath == "" || name == "" || mi == "" {
+		return
+	}
+	var siblingHashes []string
+	db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+		Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = 0 AND hash != ?",
+			clientID, savePath, name, selfHash).
+		Pluck("hash", &siblingHashes)
+	if len(siblingHashes) == 0 {
+		return
+	}
+	res := db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash IN ? AND (media_info = '' OR fetch_source = 'cluster')", siblingHashes).
+		Update("media_info", mi)
+	if res.Error != nil {
+		logger.Warn("cluster mediainfo propagate failed", zap.Error(res.Error))
+		return
+	}
+	if res.RowsAffected > 0 {
+		logger.Info("cluster mediainfo propagated",
+			zap.String("hash", selfHash[:min(10, len(selfHash))]),
+			zap.Int64("rows", res.RowsAffected))
+	}
+}
+
 // propagateClusterPosters §59.61 附（传播竞态修复）：异步修复（PTGen 海报/简介）
 // 完成后把首副本终态回传簇行——仅覆盖 fetch_source='cluster' 的传播行
 // （独立获取行 rss_detail 不动，尊重显式数据）。243 墓碑镇 57 副本裂图根因：

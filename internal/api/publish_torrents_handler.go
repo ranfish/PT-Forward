@@ -2400,6 +2400,10 @@ fetched:
 			h.logger.Error("local mediainfo persist failed",
 				zap.String("hash", meta.InfoHash[:10]),
 				zap.Error(err))
+		} else {
+			// §59.171 B: 本地 MI 落库后簇传播——fetch 行复制只给无行兄弟建行
+			// （haveSet 跳过已有行），重获场景副本恒空（PT31 63 副本实锤）
+			propagateClusterMediainfoDB(h.db, h.logger, ctx, clientID, savePath, name, meta.InfoHash, localMI)
 		}
 	}
 
@@ -2999,7 +3003,10 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			item["flags"] = meta.Flags
 			item["source_category"] = meta.SourceCategory
 			item["fetch_source"] = meta.FetchSource
-			item["has_mediainfo"] = meta.MediaInfo != ""
+			// §59.171 D: MI 口径对齐设计（本地优先+源站兜底）——双列任一非空即"有 MI"。
+			// 原只查 media_info（本地列）："仅源站 MI"行 Tab5 能显示（消费侧兜底生效）、
+			// 列表却报红叉——口径自相矛盾。
+			item["has_mediainfo"] = meta.MediaInfo != "" || meta.SourceMediaInfo != ""
 			item["has_description"] = meta.Description != ""
 			item["has_screenshots"] = meta.Screenshots != ""
 			item["fetched_at"] = meta.FetchedAt
@@ -3271,14 +3278,15 @@ func (h *PublishTorrentsHandler) selectSourceMeta(metas []model.TorrentMetadata)
 	if len(metas) == 0 {
 		return nil
 	}
+	// §59.171: 确定性排序——排序即选择（权威行=非 cluster 传播副本优先 → 新者优先
+	// → 小 id 优先）。消除无序查询抽签（PT31 MI 红叉实锤：item hash 挂着有 MI 的
+	// 源行，却选中 cluster 空行）。原 best=updated_at 全量扫描已被废弃：传播会
+	// bump 副本 updated_at（reviewed/截图二波），"最新"常是副本行——权威优先级
+	// 必须高于新旧。
+	model.SortMetasAuthoritative(metas)
 	ctx := context.Background()
-	var best *model.TorrentMetadata
-	for i := range metas {
-		if best == nil || metas[i].UpdatedAt.After(best.UpdatedAt) {
-			best = &metas[i]
-		}
-	}
-	// 尝试找制作组映射命中行
+	best := &metas[0]
+	// 尝试找制作组映射命中行（排序后首个命中=权威最新的匹配行）
 	if h.sourceDetector != nil {
 		for i := range metas {
 			group := publish.ExtractGroupName(metas[i].Title)
@@ -3414,7 +3422,10 @@ func (h *PublishTorrentsHandler) checkRequiredFields(meta *model.TorrentMetadata
 	if meta.Description == "" {
 		missing = append(missing, "description")
 	}
-	if meta.MediaInfo == "" {
+	// §59.171 D: MI 校验口径对齐设计（本地优先+源站兜底）——双列任一非空即通过。
+	// 原只查 MediaInfo："仅源站 MI"行九字段校验永缺 → reviewed 上不去（与列表
+	// 红叉同族误判）。
+	if meta.MediaInfo == "" && meta.SourceMediaInfo == "" {
 		missing = append(missing, "mediainfo")
 	}
 	if meta.Resolution == "" {
