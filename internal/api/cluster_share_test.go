@@ -383,3 +383,41 @@ func TestClusterKeyOfAndSyncByIDs(t *testing.T) {
 		t.Errorf("按 ID 同步应覆盖兄弟行: %d", n)
 	}
 }
+
+// §59.169: 手动截图路径簇传播——propagateClusterScreenshotsDB 包级函数
+// （海王2 45 副本死循环实锤：手动捕获只写单行，种子中心逐行展示下缺截图循环）。
+func TestPropagateClusterScreenshotsDB_ManualCapturePath(t *testing.T) {
+	db := clusterTestDB(t)
+	logger := zap.NewNop()
+	// 簇：1 源行 + 2 空副本 + 1 已有完整截图的独立获取行（rss_detail——不应被覆盖）
+	db.Create(&model.TorrentSnapshot{Hash: "mself000000000000000000000000000000000000", ClientID: "PT0", Name: "M", SavePath: "/m"})
+	db.Create(&model.TorrentSnapshot{Hash: "msib1000000000000000000000000000000000000", ClientID: "PT0", Name: "M", SavePath: "/m"})
+	db.Create(&model.TorrentSnapshot{Hash: "msib2000000000000000000000000000000000000", ClientID: "PT0", Name: "M", SavePath: "/m"})
+	db.Create(&model.TorrentMetadata{InfoHash: "mself000000000000000000000000000000000000", SiteName: "憨憨", Title: "t", Screenshots: `["https://a/9.jpg"]`})
+	db.Create(&model.TorrentMetadata{InfoHash: "msib1000000000000000000000000000000000000", SiteName: "憨憨", Title: "t", Screenshots: ""})
+	db.Create(&model.TorrentMetadata{InfoHash: "msib2000000000000000000000000000000000000", SiteName: "憨憨", Title: "t", Screenshots: "", FetchSource: "cluster"})
+	db.Create(&model.TorrentMetadata{InfoHash: "mrss0000000000000000000000000000000000000", SiteName: "憨憨", Title: "t", Screenshots: `["https://a/old.jpg"]`, FetchSource: "rss_detail"})
+
+	// 手动捕获路径：同簇键调用包级函数
+	propagateClusterScreenshotsDB(db, logger, context.Background(), "PT0", "/m", "M",
+		"mself000000000000000000000000000000000000", `["https://a/9.jpg"]`)
+
+	var sib1, sib2, rssRow model.TorrentMetadata
+	db.Where("info_hash = ?", "msib1000000000000000000000000000000000000").First(&sib1)
+	db.Where("info_hash = ?", "msib2000000000000000000000000000000000000").First(&sib2)
+	db.Where("info_hash = ?", "mrss0000000000000000000000000000000000000").First(&rssRow)
+	if sib1.Screenshots != `["https://a/9.jpg"]` {
+		t.Errorf("空副本应被补齐: %q", sib1.Screenshots)
+	}
+	if sib2.Screenshots != `["https://a/9.jpg"]` {
+		t.Errorf("cluster 副本应被补齐: %q", sib2.Screenshots)
+	}
+	if rssRow.Screenshots != `["https://a/old.jpg"]` {
+		t.Errorf("独立获取行(rss_detail)不应被覆盖: %q", rssRow.Screenshots)
+	}
+
+	// nil 守卫：db/logger 空、空 JSON、空簇键不 panic
+	propagateClusterScreenshotsDB(nil, logger, context.Background(), "PT0", "/m", "M", "mself000000000000000000000000000000000000", `[]`)
+	propagateClusterScreenshotsDB(db, nil, context.Background(), "PT0", "/m", "M", "mself000000000000000000000000000000000000", "")
+	propagateClusterScreenshotsDB(db, logger, context.Background(), "", "/m", "M", "mself000000000000000000000000000000000000", `["https://a/9.jpg"]`)
+}

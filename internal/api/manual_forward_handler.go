@@ -471,7 +471,13 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 			if req.SiteName != "" {
 				q = q.Where("site_name = ?", req.SiteName)
 			}
-			q.Update("screenshots", string(data))
+			if err := q.Update("screenshots", string(data)).Error; err != nil {
+				h.logger.Warn("screenshot capture persist failed",
+					zap.String("hash", req.InfoHash[:min(10, len(req.InfoHash))]), zap.Error(err))
+			}
+			// §59.169: 手动截图簇传播——与策略路径（screenshot cache hit 分支）对齐，
+			// 补簇内空截图行。海王2 45 副本死循环根因：手动只写单行。
+			propagateClusterScreenshotsDB(h.db, h.logger, ctx, req.ClientID, req.SavePath, req.Name, req.InfoHash, string(data))
 		}
 	}()
 
