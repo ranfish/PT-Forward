@@ -265,11 +265,19 @@ func (h *PublishTorrentsHandler) propagateClusterMetadata(ctx context.Context, c
 // propagateClusterScreenshots 截图策略完成后：补簇内空截图行
 // （策略是分钟级异步任务，元数据传播时截图未就绪——此为二次传播）。
 func (h *PublishTorrentsHandler) propagateClusterScreenshots(ctx context.Context, clientID, savePath, name, selfHash, screenshotsJSON string) {
-	if h.db == nil || clientID == "" || savePath == "" || name == "" || screenshotsJSON == "" || screenshotsJSON == "[]" {
+	propagateClusterScreenshotsDB(h.db, h.logger, ctx, clientID, savePath, name, selfHash, screenshotsJSON)
+}
+
+// propagateClusterScreenshotsDB 簇截图二次传播（包级——ManualForwardHandler
+// 手动捕获路径共用）。§59.169: 手动截图与策略路径对齐——落库后补簇内空截图行
+// （海王2 45 副本实锤：手动修复只写单行，种子中心逐行展示下形成"截图成功→
+// 列表仍缺截图→重截"死循环；§59.93 审核簇同步的同型第四写点）。
+func propagateClusterScreenshotsDB(db *gorm.DB, logger *zap.Logger, ctx context.Context, clientID, savePath, name, selfHash, screenshotsJSON string) {
+	if db == nil || logger == nil || clientID == "" || savePath == "" || name == "" || screenshotsJSON == "" || screenshotsJSON == "[]" {
 		return
 	}
 	var siblingHashes []string
-	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
+	db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
 		Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = 0 AND hash != ?",
 			clientID, savePath, name, selfHash).
 		Pluck("hash", &siblingHashes)
@@ -278,11 +286,15 @@ func (h *PublishTorrentsHandler) propagateClusterScreenshots(ctx context.Context
 	}
 	// §59.61 附: 覆盖条件含 cluster 行——站内 2 张部分截图须被策略终态（5 张）覆盖
 	// （原仅补空行——243 墓碑镇实锤：簇行残留部分截图不回传）
-	res := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+	res := db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 		Where("info_hash IN ? AND (screenshots = '' OR screenshots = '[]' OR fetch_source = 'cluster')", siblingHashes).
 		Update("screenshots", screenshotsJSON)
+	if res.Error != nil {
+		logger.Warn("cluster screenshots propagate failed", zap.Error(res.Error))
+		return
+	}
 	if res.RowsAffected > 0 {
-		h.logger.Info("cluster screenshots propagated",
+		logger.Info("cluster screenshots propagated",
 			zap.String("hash", selfHash[:min(10, len(selfHash))]),
 			zap.Int64("rows", res.RowsAffected))
 	}
