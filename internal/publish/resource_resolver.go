@@ -98,13 +98,9 @@ func selectSourceMetaRow(metas []model.TorrentMetadata) *model.TorrentMetadata {
 	if len(metas) == 0 {
 		return nil
 	}
-	best := &metas[0]
-	for i := range metas {
-		if metas[i].UpdatedAt.After(best.UpdatedAt) {
-			best = &metas[i]
-		}
-	}
-	// 制作组映射命中行优先（需 detector；此处用启发：GroupSuffixInTitle 时选有 torrent_id 的行——
-	// 完整语义由调用方（handler 持 sourceDetector）覆核，此处保底最新行）
-	return best
+	// §59.171: 确定性排序（与 handler selectSourceMeta 同款）——排序即选择：
+	// 权威行（非 cluster）优先 → 新者优先 → 小 id 优先。原 updated_at 全量扫描
+	// 已废弃（传播 bump 副本时间戳，"最新"常是副本行）。
+	model.SortMetasAuthoritative(metas)
+	return &metas[0]
 }

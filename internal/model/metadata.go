@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"sort"
+	"time"
+)
 
 // §48.2 — TorrentMetadata: 源种元数据（抓取-存储-映射体系）
 // §56.8 扩展：加 4 个 JSON 列（三源原始 + 合并结果）+ LastMergeMode
@@ -68,3 +71,23 @@ type TorrentMetadata struct {
 }
 
 func (TorrentMetadata) TableName() string { return "torrent_metadata" }
+
+// SortMetasAuthoritative §59.171: 同名多行确定性排序——权威行（非 cluster 传播
+// 副本）优先 → updated_at 新 → id 小。消除无序查询的"抽签"（PT31 MI 红叉实锤：
+// 列表 item 的 hash 挂着 mi=14741 的源行，selectSourceMeta 却选中 cluster 空行
+// ——SELECT 无 ORDER BY 时 SQLite 走 info_hash 索引序，"第一行"由哈希字母序决定）。
+// fetch_source 是判别字段：传播会复制 torrent_id，"有 tid"不可判别（243 实证
+// 46 行同 tid）；cluster=传播副本，非 cluster（rss_detail/analyze/空）=直获权威。
+func SortMetasAuthoritative(metas []TorrentMetadata) {
+	sort.SliceStable(metas, func(i, j int) bool {
+		aAuth := metas[i].FetchSource != "cluster"
+		bAuth := metas[j].FetchSource != "cluster"
+		if aAuth != bAuth {
+			return aAuth
+		}
+		if !metas[i].UpdatedAt.Equal(metas[j].UpdatedAt) {
+			return metas[i].UpdatedAt.After(metas[j].UpdatedAt)
+		}
+		return metas[i].ID < metas[j].ID
+	})
+}

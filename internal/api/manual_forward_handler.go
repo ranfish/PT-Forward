@@ -234,6 +234,25 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		}
 		if mi, ok := artifacts["media_info"]; ok {
 			result["mediainfo"] = mi
+			// §59.171 C: 本地 MI 持久化源行 + 簇传播——原实现只返回表单，
+			// 而 PUT 请求体无 mediainfo 字段，手动获取的 MI 无落库通道
+			// （PT31 实锤：Tab5 获取"成功"仅表单内存，DB 恒空）。与手动截图
+			// §59.169 行为对齐。
+			if miStr, isStr := mi.(string); isStr && miStr != "" && req.InfoHash != "" && h.db != nil {
+				q := h.db.Model(&model.TorrentMetadata{}).Where("info_hash = ?", req.InfoHash)
+				if req.SiteName != "" {
+					q = q.Where("site_name = ?", req.SiteName)
+				}
+				if err := q.Updates(map[string]interface{}{
+					"media_info":        miStr,
+					"media_info_source": "local",
+				}).Error; err != nil {
+					h.logger.Warn("refresh mediainfo persist failed",
+						zap.String("hash", req.InfoHash[:min(10, len(req.InfoHash))]), zap.Error(err))
+				} else {
+					propagateClusterMediainfoDB(h.db, h.logger, ctx, req.ClientID, req.SavePath, req.Name, req.InfoHash, miStr)
+				}
+			}
 		}
 		// §59.20: 同时扫描 BDInfo（如有蓝光结构）
 		if h.bdinfoScanner != nil && req.SavePath != "" {
