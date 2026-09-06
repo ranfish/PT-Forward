@@ -421,3 +421,32 @@ func TestPropagateClusterScreenshotsDB_ManualCapturePath(t *testing.T) {
 	propagateClusterScreenshotsDB(db, nil, context.Background(), "PT0", "/m", "M", "mself000000000000000000000000000000000000", "")
 	propagateClusterScreenshotsDB(db, logger, context.Background(), "", "/m", "M", "mself000000000000000000000000000000000000", `["https://a/9.jpg"]`)
 }
+
+// §59.170: 空 screenshots（[] 与 nil 同义）不覆盖不降级——直开预览自动保存
+// 空表单的三连击防线（行覆写/reviewed 合成降级/簇连坐）前两层在此验证。
+func TestPutSeedEmptyScreenshotsNotOverwrite(t *testing.T) {
+	// ① 写入层：空数组不覆盖（nil 同义）
+	u := buildPutSeedUpdates(putSeedRequest{Screenshots: []string{}}, "poster0", "desc0", `["https://a/1.jpg"]`)
+	if _, ok := u["screenshots"]; ok {
+		t.Errorf("空 screenshots 数组不应覆盖: %v", u)
+	}
+	// 非空正常写
+	u2 := buildPutSeedUpdates(putSeedRequest{Screenshots: []string{"s1"}}, "", "", "")
+	if u2["screenshots"] != `["s1"]` {
+		t.Errorf("非空 screenshots 应写入: %v", u2["screenshots"])
+	}
+
+	// ② 审核合成层：空数组沿用库中已有截图 → 9 字段校验不误判缺截图
+	// 直接复刻 handlePutSeed 的合成语义（纯逻辑段，不 mock HTTP）：
+	meta := model.TorrentMetadata{Screenshots: `["https://a/1.jpg"]`}
+	req := putSeedRequest{Screenshots: []string{}}
+	existingShots := meta.Screenshots
+	if len(req.Screenshots) > 0 {
+		meta.Screenshots = model.FormatScreenshotColumn(req.Screenshots)
+	} else {
+		meta.Screenshots = existingShots
+	}
+	if len(model.ParseScreenshotColumn(meta.Screenshots)) != 1 {
+		t.Errorf("空表单 PUT 应沿用库中截图（校验诚实），实际: %q", meta.Screenshots)
+	}
+}

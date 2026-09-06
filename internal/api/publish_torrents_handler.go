@@ -3627,6 +3627,9 @@ type putSeedRequest struct {
 // 预览实锤的根因修复。清空语义: 显式传空串 poster=""/description="" 视为清空
 // 仍生效（需求方主动清空 vs 漏传的区分——JSON 里 nil 与 "" 无法区分，取保守:
 // 一律不覆盖空值；主动清空走"重新获取"链）。
+// §59.170: screenshots 空数组同 policy——[] 与 nil 一律不覆盖（直开预览自动
+// 保存空表单实锤：[] 覆盖 + reviewed 合成降级 + 簇连坐三连击；空值清除无合法
+// 消费者，主动清空走"重新获取"链）。
 func buildPutSeedUpdates(req putSeedRequest, existingPoster, existingDesc, existingShots string) map[string]interface{} {
 	updates := map[string]interface{}{}
 	if req.Poster != "" {
@@ -3635,7 +3638,7 @@ func buildPutSeedUpdates(req putSeedRequest, existingPoster, existingDesc, exist
 	if req.Description != "" {
 		updates["description"] = req.Description
 	}
-	if req.Screenshots != nil {
+	if len(req.Screenshots) > 0 {
 		updates["screenshots"] = model.FormatScreenshotColumn(req.Screenshots)
 	}
 	if req.Tags != nil {
@@ -3688,8 +3691,12 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 
 	// 9 字段校验 → Reviewed（有效值合成——空请求不把已有值算成缺失）
 	meta.Poster = pickNonEmpty(req.Poster, meta.Poster)
-	meta.Screenshots = model.FormatScreenshotColumn(req.Screenshots)
-	if req.Screenshots == nil {
+	// §59.170: 空 screenshots（nil 与 [] 同义）沿用库中已有——校验才诚实。
+	// 原 guard 只挡 nil：空表单自动保存（直开预览）合成出"缺截图"→ reviewed
+	// 降级 → 簇传播连坐（46 行实锤）。与 buildPutSeedUpdates 空值不覆盖同语义。
+	if len(req.Screenshots) > 0 {
+		meta.Screenshots = model.FormatScreenshotColumn(req.Screenshots)
+	} else {
 		meta.Screenshots = existingShots
 	}
 	meta.Description = pickNonEmpty(req.Description, meta.Description)

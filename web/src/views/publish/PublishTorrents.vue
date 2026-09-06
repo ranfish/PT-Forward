@@ -410,7 +410,7 @@ function openExecute(record: { hash?: string; name?: string }) {
 
 // §59.141: 预览种子——ready 行直开 CrossSeedPanel 预览（幂等保存+滚动门槛全套）
 const previewPanelOpen = ref(false)
-const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string } | null>(null)
+const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: string; source_site?: string } | null>(null)
 const previewDirect = ref(false)
 
 function previewSeed(record: SeedListItem) {
@@ -419,7 +419,9 @@ function previewSeed(record: SeedListItem) {
     name: record.name,
     size: record.size,
     save_path: record.save_path,
-    client_id: Number(record.client_id) || 0,  // 非数字站名(PT0)→0, 维护链路仅 String 兜底传参
+    // §59.170 BUG-1: client_id 原样传字符串（"PT0"）——原 Number() 转换 NaN→0→''
+    // 致面板"重新获取截图/MediaInfo" 400 必填（维护链路 String 兜底只救了维护）
+    client_id: record.client_id,
     source_site: record.site_name,
   }
   previewDirect.value = true
