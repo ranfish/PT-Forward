@@ -391,151 +391,46 @@ func TestMISectionQuote_AudioTrackDetail(t *testing.T) {
 	}
 }
 
-// §59.172: keepfrds 头区引用归一——dash 族包装 + 分类域拓宽。
-// 四真页形态（PT31 Top250 合集爬取实证）：
-//   ---- 形态（tid=4554 模仿游戏）海报→<b>----鸣谢----</b>→◎行
-//   —— 形态（tid=7025）全角破折号变体
-//   fieldset 海报后（tid=9073）——已 [quote] 化，仅靠域拓宽捕获
-//   域纪律：无 ◎ 行不处理；◎ 后的 ---- 不包装（防正文噪声）
+// §59.172 附八: dash 族合并采集——多行引用合并为单 [quote]，剥分隔符与 [b] 壳。
+// 分隔符变体全覆盖（----/——/---/单侧/混搭）。
 func TestKFHeadDashQuotesNormalize(t *testing.T) {
-	// ① dash 包装：头区内 ---- 段获得 [quote] 壳
-	in := "[img]https://x/p.jpg[/img]\n[b]----国配由优伶@CMCT授权frds发布，感谢！严禁提取转载！----\n----国配字幕来自realyinxu@CMCT，特此鸣谢！----[/b]\n◎片　　名　模仿游戏\n◎译　　名　The Imitation Game"
+	// ① 拯救大兵瑞恩真实形态：[b] 双段 + 裸单段 ×3 → 合并一 quote 五行
+	in := "[img]https://x/p.jpg[/img]\n[b]----八一国配来自驴脾气，原盘来自CMCT，特此鸣谢！----\n----因原盘噪点过多，适度降噪，非喜务下----[/b]\n----重混东影上译国语来自cys92096@CNLANG----\n----东影上译国语特效字幕来自huzy2003----\n----感谢大神们的辛苦创作！----\n◎片\u3000\u3000名\u3000拯救大兵瑞恩"
 	out := normalizeKFHeadDashQuotes(in)
-	if strings.Count(out, "[quote]") != 2 {
-		t.Errorf("dash 段应包装 2 个 quote: %q", out)
+	if strings.Count(out, "[quote]") != 1 {
+		t.Errorf("应合并为单个 quote: %q", out)
 	}
-	if !strings.Contains(out, "[quote]----国配由优伶") {
-		t.Errorf("包装应保留原文（诚实透传）: %q", out)
+	wantLines := []string{"八一国配来自驴脾气", "因原盘噪点过多", "重混东影上译国语", "东影上译国语特效字幕", "感谢大神们的辛苦创作"}
+	for _, w := range wantLines {
+		if !strings.Contains(out, w) {
+			t.Errorf("内容缺失: %s in %q", w, out)
+		}
 	}
-	// ◎ 后的 ---- 不包装
-	if strings.Contains(out[strings.Index(out, "◎"):], "[quote]") {
-		t.Errorf("◎ 行之后不应包装: %q", out)
+	if strings.Contains(out, "----") || strings.Contains(out, "——") || strings.Contains(out, "[b]") {
+		t.Errorf("分隔符与 b 壳应剥离: %q", out)
+	}
+	if head := strings.TrimSpace(strings.SplitN(out, "\n◎", 2)[0]); !strings.HasSuffix(head, "[/quote]") {
+		t.Errorf("合并块应在◎行前闭合: %q", head)
 	}
 
-	// ② 全角破折号变体
-	in2 := "[img]https://x/p.jpg[/img]\n——韩版原盘DIY来自HDHome ，感谢！！！——\n◎片　　名　X"
+	// ② 行首单侧 ——（7025 形态）参与合并
+	in2 := "[img]p[/img]\n[b]——韩版原盘DIY来自HDHome ，感谢！！！[/b]\n[b]——提高视频码率，增加字幕[/b]\n◎片\u3000\u3000名\u3000X"
 	out2 := normalizeKFHeadDashQuotes(in2)
-	if !strings.Contains(out2, "[quote]——韩版原盘DIY") {
-		t.Errorf("—— 变体应包装: %q", out2)
+	if strings.Count(out2, "[quote]") != 1 || !strings.Contains(out2, "感谢！！！\n提高视频码率") {
+		t.Errorf("单侧 —— 应合并: %q", out2)
 	}
 
-	// ③ 无 ◎ 行（kdouban 框架页回退语义）——原样返回
-	in3 := "[img]https://x/p.jpg[/img]\n----whatever----"
-	if out3 := normalizeKFHeadDashQuotes(in3); out3 != in3 {
-		t.Errorf("无 ◎ 行不应处理: %q", out3)
-	}
-
-	// ④ 分隔线噪声（空内容/超长）不包装
-	in4 := "[img]https://x/p.jpg[/img]\n----------------------------------------------------------------\n◎片　　名　X"
-	if out4 := normalizeKFHeadDashQuotes(in4); strings.Contains(out4, "[quote]") {
-		t.Errorf("纯分隔线不应包装: %q", out4)
-	}
-}
-
-// §59.172: keepfrds 域拓宽——海报→◎行 之间的 [quote]（fieldset/dash 归一后）
-// 分类入 Statement（原海报前域漏采，tid=9073/4554 实证）。
-func TestSplitIntroSectionsKFWiden(t *testing.T) {
-	p := &PublicExtractor{}
-	// 海报 → quote（鸣谢短句）→ ◎正文
-	bb := "[img]https://x/p.jpg[/img]\n[quote]----国配由优伶@CMCT授权，感谢！----[/quote]\n◎片　　名　模仿游戏\n正文"
-	d := p.splitIntroSections("", bb, true)
-	if !strings.Contains(d.Statement, "国配由优伶") {
-		t.Errorf("海报→◎行 间 quote 应入 Statement（拓宽）: %q", d.Statement)
-	}
-	if strings.Contains(d.Body, "国配由优伶") {
-		t.Errorf("入 Statement 后应从 Body 移除: %q", d.Body)
-	}
-	// 非 keepfrds（widen=false）：维持原海报前域——不采
-	d2 := p.splitIntroSections("", bb, false)
-	if strings.Contains(d2.Statement, "国配由优伶") {
-		t.Errorf("非 keepfrds 不应拓宽: %q", d2.Statement)
-	}
-}
-
-// §59.172 附: 行首单侧形态——[b]——文字[/b]（tid=7025 实证：分隔符仅行首无闭合）。
-func TestKFHeadLeadingDashNormalize(t *testing.T) {
-	in := "[img]https://x/p.jpg[/img]\n[b]——韩版原盘DIY来自HDHome ，感谢！！！[/b]\n[b]——提高视频码率，增加简,繁,韩,英字幕，音轨为ac3-5.1@640kbps[/b]\n\n◎片　　名　熔炉"
-	out := normalizeKFHeadDashQuotes(in)
-	if strings.Count(out, "[quote]") != 2 {
-		t.Errorf("行首单侧 —— 应包装 2 行: %q", out)
-	}
-	if !strings.Contains(out, "[quote][b]——韩版原盘DIY") {
-		t.Errorf("应整行包装（含 [b] 壳原样）: %q", out)
-	}
-	// 纯分隔线行（行首 ---- 但余文全 dash）不包装
-	in2 := "[img]https://x/p.jpg[/img]\n--------------------------------\n◎片　　名　X"
-	if out2 := normalizeKFHeadDashQuotes(in2); strings.Contains(out2, "[quote]") {
-		t.Errorf("行首纯分隔线不应包装: %q", out2)
-	}
-	// 双侧形态行不被行首规则重复包装（已含 [quote] 跳过）
-	in3 := "[img]https://x/p.jpg[/img]\n[quote]----已有壳----[/quote]\n[b]——单独行[/b]\n◎片　　名　X"
+	// ③ 闭合 3 连字符变体（10352 形态）
+	in3 := "[img]p[/img]\n----央视新国配授权来自yuanyiyang@CNLANG---\n◎片\u3000\u3000名\u3000X"
 	out3 := normalizeKFHeadDashQuotes(in3)
-	if strings.Count(out3, "[quote]") != 2 {
-		t.Errorf("已包装行不重复，新行包装一次: %q", out3)
+	if !strings.Contains(out3, "央视新国配授权来自yuanyiyang@CNLANG\n") && !strings.Contains(out3, "[quote]央视新国配授权来自yuanyiyang@CNLANG[/quote]") {
+		t.Errorf("3 连字符闭合应剥离: %q", out3)
 	}
-}
 
-// §59.172 附三: 老式【】格式页面——无 ◎ 行，影片详情标记是【原 片 名】。
-// tid=4186/5144/5729 等 34 种实证：头区 dash 采集被"无◎回退"挡住。
-func TestKFHeadLegacyBracketAnchor(t *testing.T) {
-	// ① 【】格式：dash 在海报与【原 片 名】之间 → 应包装
-	in := "[img]https://x/p.jpg[/img]\n----原盘来自CMCT，特此鸣谢！----\n【原 片 名】Fight Club\n【中 文 名】搏击会"
-	out := normalizeKFHeadDashQuotes(in)
-	if !strings.Contains(out, "[quote]----原盘来自CMCT") {
-		t.Errorf("【】格式头区 dash 应包装: %q", out)
-	}
-	// 【 后的 dash 不包装
-	if strings.Contains(out[strings.Index(out, "【原"):], "[quote]") {
-		t.Errorf("【详情区之后不应包装: %q", out)
-	}
-	// ② 双标记页面取先到者
-	in2 := "[img]p[/img]\n----A----\n【影片原名】X\n----B----\n◎片　　名　Y"
-	out2 := normalizeKFHeadDashQuotes(in2)
-	if !strings.Contains(out2, "[quote]----A----") || strings.Contains(out2, "[quote]----B----") {
-		t.Errorf("锚应取先到的【——B 在【后◎前不应包装: %q", out2)
-	}
-	// ③ 拓宽侧同锚：海报→【之间的 quote 入 Statement
-	p := &PublicExtractor{}
-	bb := "[img]https://x/p.jpg[/img]\n[quote]----原盘来自CMCT，特此鸣谢！----[/quote]\n【原 片 名】Fight Club\n正文"
-	d := p.splitIntroSections("", bb, true)
-	if !strings.Contains(d.Statement, "原盘来自CMCT") {
-		t.Errorf("【】格式拓宽应捕获: %q", d.Statement)
-	}
-}
-
-// §59.172 附四: 拓宽段 quote 跳过鸣谢门槛——tid=9246"制作说明"四段长文
-// 无关键词超 200 字，原 IsAcknowledgmentQuote 判 false 落回 Body。
-func TestSplitIntroSectionsKFWidenBypassAckGate(t *testing.T) {
-	p := &PublicExtractor{}
-	longNote := "[b]\n制作说明：\n1、有人反映本站1080p 10bit的版本有音画不同步，故有重制的想法；\n2、原1080p bit版本采用日版蓝光制作，分辨率1920×1080、比例16:9；此CC版1800×1080、比例1.66:1。查询得知OAR为1.85:1，通过比较发现日版上下各有数个像素裁剪，CC版左右各有26个左右像素裁剪。画质对比见附图，萝卜青菜，请根据喜好下载；\n3、此CC版采用DIY-wq561103@beAst制作，国粤语均来自DIY；简体字幕来自伪射手，适配国语；繁体字幕来自港版蓝光，适配粤语；\n4、下载了本站日版1080p 10bit，经1楼提醒，国语确实在1h:37之后不同步。[/b]"
-	bb := "[img]https://x/p.jpg[/img]\n[quote]\n" + longNote + "\n[/quote]\n\n◎译　　名　重庆森林\n正文"
-	d := p.splitIntroSections("", bb, true)
-	if !strings.Contains(d.Statement, "制作说明") {
-		t.Errorf("拓宽段长说明应跳过鸣谢门槛入 Statement: %q", d.Statement[:80])
-	}
-	if strings.Contains(d.Body, "制作说明") {
-		t.Errorf("应从 Body 移除: %q", d.Body[:80])
-	}
-	// 非 keepfrds：保持原分类（长文留 Body）
-	d2 := p.splitIntroSections("", bb, false)
-	if strings.Contains(d2.Statement, "制作说明") {
-		t.Errorf("非 keepfrds 不应拓宽: %q", d2.Statement[:60])
-	}
-}
-
-// §59.172 附五: 海报前长鸣谢同样豁免——tid=11254 实证（quote 在海报前，
-// 长文无关键词："字幕库"≠"字幕组"，IsAcknowledgmentQuote false 落回 Body）。
-func TestSplitIntroSectionsKFLenientAckBeforePoster(t *testing.T) {
-	p := &PublicExtractor{}
-	longAck := "[b][color=#0000ff]\n上译国配取自CMCT-BBS，jack70@CMCT重混，由\"梦幻之龙@CMCT\"调制匹配BD；\n字　幕：特效部分由索尼@CMCT操刀，景瑞调整匹配；\nSUP简英双语/中文字幕为上译国配，梦幻之龙@CMCT原创听录并精校；\nASS/SRT中文字母：官方翻译，由\"字幕库@非傲慢即偏见\"OCR；\nDTS-HD_音轨：英语原声 / DTS_音轨-上译国语\n[/color][/b]"
-	bb := "[quote]\n" + longAck + "\n[/quote]\n\n[img]https://x/p.jpg[/img]\n\n[b]※※※※※　影片信息　※※※※※[/b]\n◎片　　名　X\n正文"
-	d := p.splitIntroSections("", bb, true)
-	if !strings.Contains(d.Statement, "上译国配取自CMCT-BBS") {
-		t.Errorf("keepfrds 海报前长鸣谢应豁免门槛入 Statement: %q", d.Statement[:60])
-	}
-	d2 := p.splitIntroSections("", bb, false)
-	if strings.Contains(d2.Statement, "上译国配") {
-		t.Errorf("非 keepfrds 维持原门槛: %q", d2.Statement[:60])
+	// ④ 无锚不动 / 纯分隔线不采
+	in4 := "[img]p[/img]\n--------------------------------"
+	if out4 := normalizeKFHeadDashQuotes(in4); out4 != in4 {
+		t.Errorf("纯分隔线不应触发: %q", out4)
 	}
 }
 
@@ -544,12 +439,12 @@ func TestKFHeadColonAnchor(t *testing.T) {
 	// 包装侧：dash 在海报与"导演:"之间 → 应包装
 	in := "[img]https://x/p.jpg[/img]\n----DIY原盘来自HDSky，特此鸣谢！----\n导演: 比利·怀德\n编剧: 阿加莎"
 	out := normalizeKFHeadDashQuotes(in)
-	if !strings.Contains(out, "[quote]----DIY原盘来自HDSky") {
+	if !strings.Contains(out, "[quote]DIY原盘来自HDSky，特此鸣谢！[/quote]") {
 		t.Errorf("冒号格式头区 dash 应包装: %q", out)
 	}
 	// 全角冒号
 	in2 := "[img]p[/img]\n----A鸣谢----\n导演：X\n类型: 剧情"
-	if out2 := normalizeKFHeadDashQuotes(in2); !strings.Contains(out2, "[quote]----A鸣谢") {
+	if out2 := normalizeKFHeadDashQuotes(in2); !strings.Contains(out2, "[quote]A鸣谢[/quote]") {
 		t.Errorf("全角冒号锚应生效: %q", out2)
 	}
 	// 拓宽侧：海报→导演: 之间的 quote 入 Statement

@@ -314,6 +314,18 @@ func kfHeadAnchor(bbcode string) int {
 // 两种形态（§59.172 附，tid=7025 实证补充）：
 //  ① 双侧分隔：----文字---- / ——文字——（kfHeadDashQuoteRe）
 //  ② 行首单侧：[b]——文字[/b]——分隔符只在行首（7025 全角破折号变体实为单侧）
+// normalizeKFHeadDashQuotes §59.172 附八: keepfrds 头区 dash 族引用归一——
+// 合并采集（用户定案：多行引用内容包裹为同一个引用块，剥离源站 ----/—— 引用
+// 符号——[quote] 本身承载引用语义，分隔符是源站的无 BBCode 化排版痕迹）。
+// 域纪律：仅头区（首个影片详情标记前）；无标记不动（kdouban 框架页回退）。
+// 已有 [quote] 区（fieldset 产物）遮蔽保护——fieldset 块独立保留不参与合并。
+// normalizeKFHeadDashQuotes §59.172 附八: keepfrds 头区 dash 族引用归一——
+// 合并采集（用户定案：多行引用合并为同一个引用块，剥离源站分隔符——
+// [quote] 本身承载引用语义，----/—— 是源站无 BBCode 化的排版痕迹）。
+// 分隔符变体全覆盖（附八：任意 dash 族字符混搭、任意数量、单侧/双侧）：
+// ----…---- / ——…—— / ----…--- / ——… / ──…── 等——逐行判行首分隔符即入选。
+// 域纪律：仅头区（首个影片详情标记前）；无标记不动（kdouban 框架页回退）。
+// 已有 [quote] 区（fieldset 产物）遮蔽保护——fieldset 块独立保留不参与合并。
 func normalizeKFHeadDashQuotes(bbcode string) string {
 	headEnd := kfHeadAnchor(bbcode)
 	if headEnd < 0 {
@@ -321,8 +333,6 @@ func normalizeKFHeadDashQuotes(bbcode string) string {
 	}
 	head, rest := bbcode[:headEnd], bbcode[headEnd:]
 
-	// 遮蔽已有 [quote] 区（fieldset 转换产物——内部 dash 段不再包装，防双层），
-	// 处理后还原。占位符用不可见控制字符，不与内容冲突。
 	placeholders := make([]string, 0, 4)
 	maskQuote := func(s string) string {
 		return reQuoteSpan.ReplaceAllStringFunc(s, func(m string) string {
@@ -336,38 +346,64 @@ func normalizeKFHeadDashQuotes(bbcode string) string {
 		}
 		return s
 	}
-
 	head = maskQuote(head)
-	head = kfHeadDashQuoteRe.ReplaceAllStringFunc(head, func(m string) string {
-		return "[quote]" + m + "[/quote]"
-	})
 
-	// 行首单侧形态：逐行扫（跳过已包装行；剥离前导 [b] 探测；余文非纯分隔符才包）
-	lines := strings.Split(head, "\n")
-	for i, ln := range lines {
+	// 逐行统一收集：行首有 dash 族分隔符 + 剥壳后非空 → 引用行
+	type seg struct{ start, end int; text string }
+	var segs []seg
+	lineBase := 0
+	for _, ln := range strings.Split(head, "\n") {
+		lineBase += len(ln) + 1
 		t := strings.TrimSpace(ln)
-		if t == "" || strings.Contains(t, "[quote]") {
+		if t == "" || strings.Contains(t, "[quote]") || strings.Contains(t, "\x00KFQ") {
 			continue
 		}
 		probe := t
 		if strings.HasPrefix(probe, "[b]") {
 			probe = probe[len("[b]"):]
 		}
-		lead := ""
-		if strings.HasPrefix(probe, "——") {
-			lead = "——"
-		} else if strings.HasPrefix(probe, "----") {
-			lead = "----"
+		probe = strings.TrimSuffix(probe, "[/b]")
+		inner := strings.TrimLeft(probe, "-—─ \t")
+		if inner == probe {
+			continue // 行首无分隔符——非引用行
 		}
-		if lead == "" {
-			continue
-		}
-		if strings.TrimLeft(probe[len(lead):], "-— \t") == "" {
+		inner = strings.TrimRight(inner, "-—─ \t")
+		inner = strings.ReplaceAll(inner, "[b]", "")
+		inner = strings.ReplaceAll(inner, "[/b]", "")
+		inner = strings.TrimSpace(inner)
+		if inner == "" {
 			continue // 纯分隔线
 		}
-		lines[i] = ln[:strings.Index(ln, t)] + "[quote]" + t + "[/quote]"
+		lineStart := lineBase - len(ln) - 1 + strings.Index(ln, t)
+		segs = append(segs, seg{lineStart, lineStart + len(t), inner})
 	}
-	return unmaskQuote(strings.Join(lines, "\n")) + rest
+	if len(segs) == 0 {
+		return unmaskQuote(head) + rest
+	}
+
+	// 重建：删除全部引用行，首段原位插入合并 [quote]
+	insertAt := segs[0].start
+	var b strings.Builder
+	pos := 0
+	for _, sg := range segs {
+		if sg.start > pos {
+			b.WriteString(head[pos:sg.start])
+		}
+		pos = sg.end
+	}
+	b.WriteString(head[pos:])
+	texts := make([]string, 0, len(segs))
+	for _, sg := range segs {
+		texts = append(texts, sg.text)
+	}
+	merged := "[quote]" + strings.Join(texts, "\n") + "[/quote]"
+	out := b.String()
+	out = out[:insertAt] + merged + out[insertAt:]
+	out = regexp.MustCompile(`(?s)\[b\]\s*\[/b\]`).ReplaceAllString(out, "")
+	for strings.Contains(out, "\n\n\n") {
+		out = strings.ReplaceAll(out, "\n\n\n", "\n\n")
+	}
+	return unmaskQuote(out) + rest
 }
 
 // reQuoteSpan 已有 [quote] 块整体匹配（遮蔽用——栈式配对简化为非贪婪跨块）。
