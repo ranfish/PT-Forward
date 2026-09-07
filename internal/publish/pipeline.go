@@ -248,6 +248,15 @@ func (p *Pipeline) AnalyzePTGen(ctx context.Context, name string) (*model.PTGenR
 	return p.ptgen.Query(ctx, name)
 }
 
+// AnalyzePTGenForce §59.173: 强制刷新 PTGen——绕缓存直连 API+写穿。
+// 手动重获按钮语义（"点了重获就要新的"）；批量获取等自动化路径仍走缓存版。
+func (p *Pipeline) AnalyzePTGenForce(ctx context.Context, name string) (*model.PTGenResult, error) {
+	if p.ptgen == nil {
+		return nil, nil
+	}
+	return p.ptgen.QueryForce(ctx, name)
+}
+
 // ptgenToMap 把 PTGenResult 字段填入 map（AnalyzeTorrent wrapper 向后兼容用）。
 // 字段映射保持与 v0.0.278 之前的 AnalyzeTorrent 一致。
 func ptgenToMap(r *model.PTGenResult, result map[string]interface{}) {
