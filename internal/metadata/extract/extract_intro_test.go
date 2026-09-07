@@ -471,3 +471,31 @@ func TestKFHeadLeadingDashNormalize(t *testing.T) {
 		t.Errorf("已包装行不重复，新行包装一次: %q", out3)
 	}
 }
+
+// §59.172 附三: 老式【】格式页面——无 ◎ 行，影片详情标记是【原 片 名】。
+// tid=4186/5144/5729 等 34 种实证：头区 dash 采集被"无◎回退"挡住。
+func TestKFHeadLegacyBracketAnchor(t *testing.T) {
+	// ① 【】格式：dash 在海报与【原 片 名】之间 → 应包装
+	in := "[img]https://x/p.jpg[/img]\n----原盘来自CMCT，特此鸣谢！----\n【原 片 名】Fight Club\n【中 文 名】搏击会"
+	out := normalizeKFHeadDashQuotes(in)
+	if !strings.Contains(out, "[quote]----原盘来自CMCT") {
+		t.Errorf("【】格式头区 dash 应包装: %q", out)
+	}
+	// 【 后的 dash 不包装
+	if strings.Contains(out[strings.Index(out, "【原"):], "[quote]") {
+		t.Errorf("【详情区之后不应包装: %q", out)
+	}
+	// ② 双标记页面取先到者
+	in2 := "[img]p[/img]\n----A----\n【影片原名】X\n----B----\n◎片　　名　Y"
+	out2 := normalizeKFHeadDashQuotes(in2)
+	if !strings.Contains(out2, "[quote]----A----") || strings.Contains(out2, "[quote]----B----") {
+		t.Errorf("锚应取先到的【——B 在【后◎前不应包装: %q", out2)
+	}
+	// ③ 拓宽侧同锚：海报→【之间的 quote 入 Statement
+	p := &PublicExtractor{}
+	bb := "[img]https://x/p.jpg[/img]\n[quote]----原盘来自CMCT，特此鸣谢！----[/quote]\n【原 片 名】Fight Club\n正文"
+	d := p.splitIntroSections("", bb, true)
+	if !strings.Contains(d.Statement, "原盘来自CMCT") {
+		t.Errorf("【】格式拓宽应捕获: %q", d.Statement)
+	}
+}
