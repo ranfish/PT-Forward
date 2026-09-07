@@ -535,3 +535,25 @@ func TestSplitIntroSectionsKFLenientAckBeforePoster(t *testing.T) {
 		t.Errorf("非 keepfrds 维持原门槛: %q", d2.Statement[:60])
 	}
 }
+
+// §59.172 附六: 冒号格式锚——"导演:/导演："（豆瓣老模板第三形态，tid=5979 实证）。
+func TestKFHeadColonAnchor(t *testing.T) {
+	// 包装侧：dash 在海报与"导演:"之间 → 应包装
+	in := "[img]https://x/p.jpg[/img]\n----DIY原盘来自HDSky，特此鸣谢！----\n导演: 比利·怀德\n编剧: 阿加莎"
+	out := normalizeKFHeadDashQuotes(in)
+	if !strings.Contains(out, "[quote]----DIY原盘来自HDSky") {
+		t.Errorf("冒号格式头区 dash 应包装: %q", out)
+	}
+	// 全角冒号
+	in2 := "[img]p[/img]\n----A鸣谢----\n导演：X\n类型: 剧情"
+	if out2 := normalizeKFHeadDashQuotes(in2); !strings.Contains(out2, "[quote]----A鸣谢") {
+		t.Errorf("全角冒号锚应生效: %q", out2)
+	}
+	// 拓宽侧：海报→导演: 之间的 quote 入 Statement
+	p := &PublicExtractor{}
+	bb := "[img]https://x/p.jpg[/img]\n[quote]----DIY原盘来自HDSky，特此鸣谢！----[/quote]\n导演: 比利·怀德\n正文"
+	d := p.splitIntroSections("", bb, true)
+	if !strings.Contains(d.Statement, "DIY原盘来自HDSky") {
+		t.Errorf("冒号锚拓宽应捕获: %q", d.Statement[:60])
+	}
+}
