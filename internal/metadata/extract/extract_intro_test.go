@@ -448,3 +448,26 @@ func TestSplitIntroSectionsKFWiden(t *testing.T) {
 		t.Errorf("非 keepfrds 不应拓宽: %q", d2.Statement)
 	}
 }
+
+// §59.172 附: 行首单侧形态——[b]——文字[/b]（tid=7025 实证：分隔符仅行首无闭合）。
+func TestKFHeadLeadingDashNormalize(t *testing.T) {
+	in := "[img]https://x/p.jpg[/img]\n[b]——韩版原盘DIY来自HDHome ，感谢！！！[/b]\n[b]——提高视频码率，增加简,繁,韩,英字幕，音轨为ac3-5.1@640kbps[/b]\n\n◎片　　名　熔炉"
+	out := normalizeKFHeadDashQuotes(in)
+	if strings.Count(out, "[quote]") != 2 {
+		t.Errorf("行首单侧 —— 应包装 2 行: %q", out)
+	}
+	if !strings.Contains(out, "[quote][b]——韩版原盘DIY") {
+		t.Errorf("应整行包装（含 [b] 壳原样）: %q", out)
+	}
+	// 纯分隔线行（行首 ---- 但余文全 dash）不包装
+	in2 := "[img]https://x/p.jpg[/img]\n--------------------------------\n◎片　　名　X"
+	if out2 := normalizeKFHeadDashQuotes(in2); strings.Contains(out2, "[quote]") {
+		t.Errorf("行首纯分隔线不应包装: %q", out2)
+	}
+	// 双侧形态行不被行首规则重复包装（已含 [quote] 跳过）
+	in3 := "[img]https://x/p.jpg[/img]\n[quote]----已有壳----[/quote]\n[b]——单独行[/b]\n◎片　　名　X"
+	out3 := normalizeKFHeadDashQuotes(in3)
+	if strings.Count(out3, "[quote]") != 2 {
+		t.Errorf("已包装行不重复，新行包装一次: %q", out3)
+	}
+}
