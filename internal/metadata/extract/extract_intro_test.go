@@ -194,7 +194,7 @@ func TestSplitIntroSections_Statement(t *testing.T) {
 正文内容`
 
 	p := NewPublicExtractor("test", "测试")
-	intro := p.splitIntroSections(descrHTML, descrBBCode)
+	intro := p.splitIntroSections(descrHTML, descrBBCode, false)
 
 	if intro.Poster != "https://example.com/poster.jpg" {
 		t.Errorf("Poster mismatch: %q", intro.Poster)
@@ -219,7 +219,7 @@ func TestSplitIntroSections_ARDTUStripped(t *testing.T) {
 正文`
 
 	p := NewPublicExtractor("test", "测试")
-	intro := p.splitIntroSections(descrHTML, descrBBCode)
+	intro := p.splitIntroSections(descrHTML, descrBBCode, false)
 
 	if len(intro.RemovedARDTUDeclarations) == 0 {
 		t.Error("should have ARDTU declarations removed")
@@ -234,7 +234,7 @@ func TestSplitIntroSections_NoPoster(t *testing.T) {
 	descrBBCode := `无图片的简介`
 
 	p := NewPublicExtractor("test", "测试")
-	intro := p.splitIntroSections(descrHTML, descrBBCode)
+	intro := p.splitIntroSections(descrHTML, descrBBCode, false)
 
 	if intro.Poster != "" {
 		t.Errorf("expected empty poster, got %q", intro.Poster)
@@ -251,7 +251,7 @@ func TestSplitIntroSections_LogoFiltered(t *testing.T) {
 <img src="https://example.com/shot1.jpg"/>
 </div>`
 	p := NewPublicExtractor("test", "测试")
-	intro := p.splitIntroSections(descrHTML, "")
+	intro := p.splitIntroSections(descrHTML, "", false)
 
 	// logo 应被过滤，poster.jpg 成为首图
 	if strings.Contains(intro.Poster, "logo") {
@@ -295,7 +295,7 @@ func TestSplitIntroSections_MultipleQuotesAllCollected(t *testing.T) {
 [quote]第二个声明：仅供学习交流[/quote]
 [img]https://img.example.com/poster.jpg[/img]
 正文与截图`
-	d := (&PublicExtractor{}).splitIntroSections("", bb)
+	d := (&PublicExtractor{}).splitIntroSections("", bb, false)
 	if !strings.Contains(d.Statement, "第一个声明") || !strings.Contains(d.Statement, "第二个声明") {
 		t.Errorf("多个声明应全部依次采集: %q", d.Statement)
 	}
@@ -311,7 +311,7 @@ func TestSplitIntroSections_NestedQuoteNoDuplicate(t *testing.T) {
 外层尾[/quote]
 [img]https://img.example.com/p.jpg[/img]
 正文`
-	d := (&PublicExtractor{}).splitIntroSections("", bb)
+	d := (&PublicExtractor{}).splitIntroSections("", bb, false)
 	n := strings.Count(d.Statement, "内层引用：感谢字幕组")
 	if n != 1 {
 		t.Errorf("嵌套内容应仅随外层原样出现一次(实得 %d 次): %q", n, d.Statement)
@@ -328,7 +328,7 @@ func TestSplitIntroSections_MediaInfoQuoteNotStatement(t *testing.T) {
 [img]https://img.example.com/p.jpg[/img]
 正文描述
 [quote]` + mi + `[/quote]`
-	d := (&PublicExtractor{}).splitIntroSections("", bb)
+	d := (&PublicExtractor{}).splitIntroSections("", bb, false)
 	if strings.Contains(d.Statement, "Unique ID") {
 		t.Errorf("MI quote 不得归入声明: %q", d.Statement)
 	}
@@ -356,7 +356,7 @@ Size: 21.6 GiB
 [/quote]
 [img]https://img.example.com/p.jpg[/img]
 正文`
-	d := (&PublicExtractor{}).splitIntroSections("", bb)
+	d := (&PublicExtractor{}).splitIntroSections("", bb, false)
 	if strings.Contains(d.Statement, "General") || strings.Contains(d.Statement, "Video (1)") {
 		t.Errorf("MI 碎片不得入 Statement: %q", d.Statement[:min(200, len(d.Statement))])
 	}
@@ -385,5 +385,66 @@ func TestMISectionQuote_AudioTrackDetail(t *testing.T) {
 	// 边界: #N 行 + 普通文本行混合 → 不判
 	if isMISectionQuote("#1:FLAC 2 channels, 577 kb/s\n普通说明文字") {
 		t.Error("混合块不应判 MI 碎片")
+	}
+}
+
+// §59.172: keepfrds 头区引用归一——dash 族包装 + 分类域拓宽。
+// 四真页形态（PT31 Top250 合集爬取实证）：
+//   ---- 形态（tid=4554 模仿游戏）海报→<b>----鸣谢----</b>→◎行
+//   —— 形态（tid=7025）全角破折号变体
+//   fieldset 海报后（tid=9073）——已 [quote] 化，仅靠域拓宽捕获
+//   域纪律：无 ◎ 行不处理；◎ 后的 ---- 不包装（防正文噪声）
+func TestKFHeadDashQuotesNormalize(t *testing.T) {
+	// ① dash 包装：头区内 ---- 段获得 [quote] 壳
+	in := "[img]https://x/p.jpg[/img]\n[b]----国配由优伶@CMCT授权frds发布，感谢！严禁提取转载！----\n----国配字幕来自realyinxu@CMCT，特此鸣谢！----[/b]\n◎片　　名　模仿游戏\n◎译　　名　The Imitation Game"
+	out := normalizeKFHeadDashQuotes(in)
+	if strings.Count(out, "[quote]") != 2 {
+		t.Errorf("dash 段应包装 2 个 quote: %q", out)
+	}
+	if !strings.Contains(out, "[quote]----国配由优伶") {
+		t.Errorf("包装应保留原文（诚实透传）: %q", out)
+	}
+	// ◎ 后的 ---- 不包装
+	if strings.Contains(out[strings.Index(out, "◎"):], "[quote]") {
+		t.Errorf("◎ 行之后不应包装: %q", out)
+	}
+
+	// ② 全角破折号变体
+	in2 := "[img]https://x/p.jpg[/img]\n——韩版原盘DIY来自HDHome ，感谢！！！——\n◎片　　名　X"
+	out2 := normalizeKFHeadDashQuotes(in2)
+	if !strings.Contains(out2, "[quote]——韩版原盘DIY") {
+		t.Errorf("—— 变体应包装: %q", out2)
+	}
+
+	// ③ 无 ◎ 行（kdouban 框架页回退语义）——原样返回
+	in3 := "[img]https://x/p.jpg[/img]\n----whatever----"
+	if out3 := normalizeKFHeadDashQuotes(in3); out3 != in3 {
+		t.Errorf("无 ◎ 行不应处理: %q", out3)
+	}
+
+	// ④ 分隔线噪声（空内容/超长）不包装
+	in4 := "[img]https://x/p.jpg[/img]\n----------------------------------------------------------------\n◎片　　名　X"
+	if out4 := normalizeKFHeadDashQuotes(in4); strings.Contains(out4, "[quote]") {
+		t.Errorf("纯分隔线不应包装: %q", out4)
+	}
+}
+
+// §59.172: keepfrds 域拓宽——海报→◎行 之间的 [quote]（fieldset/dash 归一后）
+// 分类入 Statement（原海报前域漏采，tid=9073/4554 实证）。
+func TestSplitIntroSectionsKFWiden(t *testing.T) {
+	p := &PublicExtractor{}
+	// 海报 → quote（鸣谢短句）→ ◎正文
+	bb := "[img]https://x/p.jpg[/img]\n[quote]----国配由优伶@CMCT授权，感谢！----[/quote]\n◎片　　名　模仿游戏\n正文"
+	d := p.splitIntroSections("", bb, true)
+	if !strings.Contains(d.Statement, "国配由优伶") {
+		t.Errorf("海报→◎行 间 quote 应入 Statement（拓宽）: %q", d.Statement)
+	}
+	if strings.Contains(d.Body, "国配由优伶") {
+		t.Errorf("入 Statement 后应从 Body 移除: %q", d.Body)
+	}
+	// 非 keepfrds（widen=false）：维持原海报前域——不采
+	d2 := p.splitIntroSections("", bb, false)
+	if strings.Contains(d2.Statement, "国配由优伶") {
+		t.Errorf("非 keepfrds 不应拓宽: %q", d2.Statement)
 	}
 }

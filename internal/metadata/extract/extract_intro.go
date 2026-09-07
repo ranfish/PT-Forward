@@ -57,8 +57,9 @@ type quoteBlock struct {
 
 // splitIntroSections 简介分段主入口。
 // 输入：描述容器 HTML（提取图片用） + BBCode（提取 quote 用）
+// + widenKF keepfrds 头区拓宽开关（§59.172）
 // 输出：IntroData{Statement, Poster, Body, Screenshots, RemovedARDTUDeclarations}
-func (p *PublicExtractor) splitIntroSections(descrHTML, descrBBCode string) IntroData {
+func (p *PublicExtractor) splitIntroSections(descrHTML, descrBBCode string, widenKF bool) IntroData {
 	intro := IntroData{}
 
 	// 1. 抽取所有图片 URL + 归一化 + 去重 + 黑白名单过滤（§56.12）
@@ -86,6 +87,14 @@ func (p *PublicExtractor) splitIntroSections(descrHTML, descrBBCode string) Intr
 	}
 	if posterIdx < 0 {
 		posterIdx = findMediaInfoPosition(descrBBCode)
+	}
+	// §59.172: keepfrds 头区拓宽——早期种子的引用/鸣谢块（fieldset 与 dash 归一
+	// 后的 [quote]）大量落在【海报→◎正文】之间（tid=9073/4554 实证），原"海报前"
+	// 分类域全部漏采。锚拓宽到首个 ◎ 行；无 ◎（kdouban 框架页）自然回退海报前。
+	if widenKF {
+		if ki := strings.Index(descrBBCode, "◎"); ki > posterIdx {
+			posterIdx = ki
+		}
 	}
 	beforePoster, _ := splitQuotesByPosition(quotes, posterIdx)
 
@@ -285,4 +294,24 @@ func compactBlankLines(s string) string {
 		s = strings.ReplaceAll(s, "\n\n\n", "\n\n")
 	}
 	return s
+}
+
+// kfHeadDashQuoteRe §59.172: dash 族引用段——----…---- / ——…——（全角破折号变体，
+// tid=7025 实证 18 例）。内容限单行内（引用是行内短句，跨行的是正文/分隔线）。
+// 内容首字符排除分隔符本身——纯分隔线（全 dash）无内容不匹配（单测实证）。
+var kfHeadDashQuoteRe = regexp.MustCompile(`(-{4,}[ \t]*[^\s\n\[\]{}-][^\n\[\]{}]{2,180}?-{4,}|—{2,}[ \t]*[^\s\n\[\]{}—-][^\n\[\]{}]{2,180}?—{2,})`)
+
+// normalizeKFHeadDashQuotes §59.172: keepfrds 头区 dash 族引用归一——包装 [quote]
+// 使分类器可见。域纪律：仅首个 ◎ 行之前的头区；无 ◎ 不动（kdouban 框架页回退）。
+// 诚实透传语义：内容原样（含 ---- 分隔符本身）不增不删。
+func normalizeKFHeadDashQuotes(bbcode string) string {
+	headEnd := strings.Index(bbcode, "◎")
+	if headEnd < 0 {
+		return bbcode
+	}
+	head, rest := bbcode[:headEnd], bbcode[headEnd:]
+	wrapped := kfHeadDashQuoteRe.ReplaceAllStringFunc(head, func(m string) string {
+		return "[quote]" + m + "[/quote]"
+	})
+	return wrapped + rest
 }
