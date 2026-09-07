@@ -66,29 +66,42 @@ func (p *Provider) SetAPIKey(key string) {
 	p.apiKey = strings.TrimSpace(key)
 }
 
+// Query §59.173: 缓存优先查询（30 天 TTL 内命中不外呼 API）。
 func (p *Provider) Query(ctx context.Context, query string) (*model.PTGenResult, error) {
+	return p.query(ctx, query, false)
+}
+
+// QueryForce §59.173: 强制刷新——绕缓存直连 API，结果写穿缓存（TTL 重计）。
+// "点了重获就要新的"按钮语义；失败不回退缓存（错误直达用户，旧数据仍在库）。
+func (p *Provider) QueryForce(ctx context.Context, query string) (*model.PTGenResult, error) {
+	return p.query(ctx, query, true)
+}
+
+func (p *Provider) query(ctx context.Context, query string, force bool) (*model.PTGenResult, error) {
 	if query == "" {
 		return nil, &model.AppError{Code: 40001, Message: "query is empty"}
 	}
 
-	cached, err := p.getCache(ctx, query)
-	if err == nil && cached != nil {
-		result := &model.PTGenResult{
-			ChineseTitle: cached.ChineseTitle,
-			PosterURL:    cached.PosterURL,
-			DoubanURL:    cached.DoubanURL,
-			IMDBURL:      cached.IMDbURL,
-			RawBBCode:    cached.BBCode,
-			Source:       cached.Source,
-			Cached:       true,
-		}
-		if cached.JSONData != "" {
-			if jsonErr := json.Unmarshal([]byte(cached.JSONData), result); jsonErr != nil {
-				return nil, fmt.Errorf("parse cached ptgen data: %w", jsonErr)
+	if !force {
+		cached, err := p.getCache(ctx, query)
+		if err == nil && cached != nil {
+			result := &model.PTGenResult{
+				ChineseTitle: cached.ChineseTitle,
+				PosterURL:    cached.PosterURL,
+				DoubanURL:    cached.DoubanURL,
+				IMDBURL:      cached.IMDbURL,
+				RawBBCode:    cached.BBCode,
+				Source:       cached.Source,
+				Cached:       true,
 			}
-			result.Cached = true
+			if cached.JSONData != "" {
+				if jsonErr := json.Unmarshal([]byte(cached.JSONData), result); jsonErr != nil {
+					return nil, fmt.Errorf("parse cached ptgen data: %w", jsonErr)
+				}
+				result.Cached = true
+			}
+			return result, nil
 		}
-		return result, nil
 	}
 
 	result, err := p.queryRemote(ctx, query)

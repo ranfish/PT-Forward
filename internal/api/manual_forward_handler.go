@@ -57,6 +57,7 @@ type MetadataFetcherProvider interface {
 type PublishPipeline interface {
 	AnalyzeTorrent(ctx context.Context, name, savePath string) (map[string]interface{}, error)
 	AnalyzePTGen(ctx context.Context, name string) (*model.PTGenResult, error)
+	AnalyzePTGenForce(ctx context.Context, name string) (*model.PTGenResult, error) // §59.173
 	AnalyzeLocalArtifacts(ctx context.Context, name, savePath string) (map[string]interface{}, error)
 	CaptureScreenshots(ctx context.Context, name, savePath string, sourceScreenshots []string) []string
 }
@@ -180,7 +181,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		// 现配 endpoint（doubaninfo/cspt）只接受资源 URL，种子名必然失败
 		//（用户报"重新获取海报报 无法解析资源URL"根因）；与 applyPosterFallback 同款语义。
 		query := h.resolvePTGenQuery(ctx, req.InfoHash, req.SiteName, req.Name)
-		ptgen, err := h.pipeline.AnalyzePTGen(ctx, query)
+		// §59.173: 手动重获强制刷新——绕缓存直连（点了重获就要新的）
+		ptgen, err := h.pipeline.AnalyzePTGenForce(ctx, query)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("PTGen 失败: %v", err))
 			return

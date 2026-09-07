@@ -237,3 +237,31 @@ func TestQueryDoubanInfoFormatFallback(t *testing.T) {
 		t.Error("bbcode 应优先于 format")
 	}
 }
+
+// §59.173: QueryForce 绕缓存直连——缓存命中时 Query 返回 Cached=true，
+// QueryForce 必须绕过缓存重查（无远程 endpoint 时报错而非吃缓存）。
+func TestProviderQueryForceBypassesCache(t *testing.T) {
+	db := setupPTGenDB(t)
+	p := NewProvider(db, zap.NewNop())
+	q := "https://movie.douban.com/subject/force_test/"
+	// 种缓存：30 天内新鲜
+	if err := db.Create(&model.PTGenCache{
+		QueryKey: q, ChineseTitle: "缓存标题", BBCode: "[b]cache[/b]",
+		JSONData: `{"chinese_title":"缓存标题"}`, UpdatedAt: time.Now(),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	// Query：命中缓存
+	r1, err := p.Query(context.Background(), q)
+	if err != nil || r1 == nil || !r1.Cached || r1.ChineseTitle != "缓存标题" {
+		t.Fatalf("Query 应命中缓存: %+v err=%v", r1, err)
+	}
+	// QueryForce：无 endpoint 配置 → 必须报错（证明绕过了缓存直达远端）
+	r2, err := p.QueryForce(context.Background(), q)
+	if err == nil {
+		t.Fatalf("QueryForce 应绕缓存（无 endpoint 必然失败）却成功: %+v", r2)
+	}
+	if r2 != nil && r2.Cached {
+		t.Fatal("QueryForce 不得返回缓存结果")
+	}
+}
