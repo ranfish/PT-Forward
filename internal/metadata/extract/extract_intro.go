@@ -93,7 +93,6 @@ func (p *PublicExtractor) splitIntroSections(descrHTML, descrBBCode string, wide
 	// 后的 [quote]）大量落在【海报→影片详情】之间（tid=9073/4554 实证），原"海报前"
 	// 分类域全部漏采。锚拓宽到首个影片详情标记（◎/【 双形态，附三）；无标记
 	// （kdouban 框架页）自然回退海报前。
-	origIdx := posterIdx
 	if widenKF {
 		if ki := kfHeadAnchor(descrBBCode); ki > posterIdx {
 			posterIdx = ki
@@ -102,29 +101,12 @@ func (p *PublicExtractor) splitIntroSections(descrHTML, descrBBCode string, wide
 	beforePoster, _ := splitQuotesByPosition(quotes, posterIdx)
 
 	// 5. 分类首图前的 quote 块
-	statements, ardtuFulls, stmtFulls := classifyBeforePosterQuotes(beforePoster)
-	// §59.172 附四: 拓宽段（origIdx→anchorIdx，仅 keepfrds 存在）的 quote 跳过
-	// IsAcknowledgmentQuote 鸣谢门槛（<200字/关键词——为通用站声明短句设计，
-	// 误伤 keepfrds 头区长说明：tid=9246"制作说明"四段无关键词超长实证）。
-	// 位置即信号：海报→详情标记之间 = 发布者引用/说明约定区。MI/ARDTU 垃圾滤保留。
-	if widenKF && posterIdx > origIdx {
-		widened, _ := splitQuotesByPosition(quotes, posterIdx)
-		for _, q := range widened {
-			if q.Start <= origIdx {
-				continue // 拓宽段之外的（海报前）已走原分类
-			}
-			text := strings.TrimSpace(q.Inner)
-			if text == "" {
-				continue
-			}
-			if isMISectionQuote(q.Inner) || IsToolSignatureQuote(text) || IsTechParamsQuote(text) {
-				ardtuFulls = append(ardtuFulls, q.Full)
-				continue
-			}
-			statements = append(statements, q.Full)
-			stmtFulls = append(stmtFulls, q.Full)
-		}
-	}
+	// §59.172 附五: keepfrds 头区（含海报前+拓宽段）quote 豁免鸣谢门槛——
+	// IsAcknowledgmentQuote 的 <200字/关键词规则为通用站声明短句设计，
+	// keepfrds 头区 quote 位置即信号（发布者引用/说明约定区）：
+	// tid=9246 制作说明四段 / tid=11254 海报前长鸣谢（"字幕库"≠"字幕组"）双实证。
+	// MI/ARDTU 垃圾滤保留。
+	statements, ardtuFulls, stmtFulls := classifyBeforePosterQuotes(beforePoster, widenKF)
 	intro.Statement = strings.Join(statements, "\n\n")
 	intro.RemovedARDTUDeclarations = ardtuFulls
 
@@ -277,7 +259,7 @@ func splitQuotesByPosition(quotes []quoteBlock, posterIdx int) (before, after []
 
 // classifyBeforePosterQuotes 分类首图前的 quote 块。
 // 顺序很重要：By ARDTU 前缀优先（能保留正文），其次工具签名/技术参数（剥离），最后官组声明（保留）。
-func classifyBeforePosterQuotes(quotes []quoteBlock) (statements, ardtuFulls, stmtFulls []string) {
+func classifyBeforePosterQuotes(quotes []quoteBlock, lenientAck bool) (statements, ardtuFulls, stmtFulls []string) {
 	for _, q := range quotes {
 		text := strings.TrimSpace(q.Inner)
 		if text == "" {
@@ -303,7 +285,8 @@ func classifyBeforePosterQuotes(quotes []quoteBlock) (statements, ardtuFulls, st
 			continue
 		}
 		// 3. 官组声明 → 归 Statement（完整 BBCode），整块从 Body 移除
-		if IsAcknowledgmentQuote(text) {
+		// §59.172 附五: lenientAck（keepfrds 头区）豁免鸣谢门槛——位置即信号
+		if lenientAck || IsAcknowledgmentQuote(text) {
 			statements = append(statements, q.Full)
 			stmtFulls = append(stmtFulls, q.Full)
 			continue
