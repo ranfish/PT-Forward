@@ -519,3 +519,19 @@ func TestSplitIntroSectionsKFWidenBypassAckGate(t *testing.T) {
 		t.Errorf("非 keepfrds 不应拓宽: %q", d2.Statement[:60])
 	}
 }
+
+// §59.172 附五: 海报前长鸣谢同样豁免——tid=11254 实证（quote 在海报前，
+// 长文无关键词："字幕库"≠"字幕组"，IsAcknowledgmentQuote false 落回 Body）。
+func TestSplitIntroSectionsKFLenientAckBeforePoster(t *testing.T) {
+	p := &PublicExtractor{}
+	longAck := "[b][color=#0000ff]\n上译国配取自CMCT-BBS，jack70@CMCT重混，由\"梦幻之龙@CMCT\"调制匹配BD；\n字　幕：特效部分由索尼@CMCT操刀，景瑞调整匹配；\nSUP简英双语/中文字幕为上译国配，梦幻之龙@CMCT原创听录并精校；\nASS/SRT中文字母：官方翻译，由\"字幕库@非傲慢即偏见\"OCR；\nDTS-HD_音轨：英语原声 / DTS_音轨-上译国语\n[/color][/b]"
+	bb := "[quote]\n" + longAck + "\n[/quote]\n\n[img]https://x/p.jpg[/img]\n\n[b]※※※※※　影片信息　※※※※※[/b]\n◎片　　名　X\n正文"
+	d := p.splitIntroSections("", bb, true)
+	if !strings.Contains(d.Statement, "上译国配取自CMCT-BBS") {
+		t.Errorf("keepfrds 海报前长鸣谢应豁免门槛入 Statement: %q", d.Statement[:60])
+	}
+	d2 := p.splitIntroSections("", bb, false)
+	if strings.Contains(d2.Statement, "上译国配") {
+		t.Errorf("非 keepfrds 维持原门槛: %q", d2.Statement[:60])
+	}
+}
