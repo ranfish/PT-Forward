@@ -50,6 +50,12 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 
 	seed := SeedData{}
 
+	// §59.172 前置：域名/siteCode 解析（原阶段 5 内的声明上移——头区归一需要）
+	domain := input.Domain
+	if domain == "" {
+		domain = p.domain
+	}
+
 	// 阶段 1: 标题/副标题
 	seed.Title = p.extractTitle(doc, input.FallbackTitle)
 	seed.Subtitle = p.extractSubtitle(doc, input.PageHTML)
@@ -66,8 +72,19 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	// §59.26: 剥离 NexusPHP [quote] 渲染头 "引用"（HTML→BBCode 逆转换伪影）
 	descrBBCode = stripNexusPHPQuoteHeaders(descrBBCode)
 
+	// §59.172: 朋友站头区引用归一——dash 族（----/——）包装 [quote]。
+	// 早期种子（Top250 合集 171/227 实证）的引用/鸣谢块是 <b>----文字----</b>
+	// 纯文本形态（非 fieldset quote），转换后无 [quote] 壳，分类器不可见。
+	// 域纪律：仅头区（首个 ◎ 行前）处理；无 ◎ 行（kdouban 框架页）不动——
+	//  越界即噪声（tid=4037/4669 页面统计面板文本混入的反面教材）。
+	// 站点域硬隔离：憨憨 ---- 是章节头装饰（28/300 实证），误采即污染——仅 keepfrds。
+	isKeepfrds := strings.Contains(domain, "keepfrds")
+	if isKeepfrds {
+		descrBBCode = normalizeKFHeadDashQuotes(descrBBCode)
+	}
+
 	// 阶段 3: 简介分段
-	seed.Intro = p.splitIntroSections(descrHTML, descrBBCode)
+	seed.Intro = p.splitIntroSections(descrHTML, descrBBCode, isKeepfrds)
 
 	// 阶段 4: MediaInfo/BDInfo（2b.5 stub）
 	seed.MediaInfo, seed.BDInfo = p.extractMediaInfo(descrHTML, descrBBCode)
@@ -75,10 +92,7 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	// 阶段 5: 基本信息表格行
 	// v0.0.253: 优先用 input.Domain（PublicExtractor 是单例，多 goroutine 并发时
 	// 不能改实例字段；用参数传递保证并发安全；domain 比 siteCode 更唯一）
-	domain := input.Domain
-	if domain == "" {
-		domain = p.domain
-	}
+	// §59.172: domain 声明已上移至 Extract 头部（头区归一复用）
 	siteCode := input.SiteCode
 	if siteCode == "" {
 		siteCode = p.siteCode
