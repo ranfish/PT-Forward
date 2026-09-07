@@ -17,43 +17,25 @@ import (
 // quoteBlockRe 提取 BBCode [quote] 块（含位置信息）。
 var quoteBlockRe = regexp.MustCompile(`(?is)\[quote(?:=[^\]]*)?\](.*?)\[/quote\]`)
 
-// stripQuoteLayoutImages §59.66: quote 引用内容剥离站内相对路径布局图（方案 A）。
-// NexusPHP 站点用 1px 透明图（trans.gif 等）做行首对齐——转发到目标站解析为
-// 小黑点/占位符，无信息量。仅剥: ①无 scheme 的站内相对路径 [img] ②已知布局图
-// 文件名（任何域）。绝对 URL 内容图保留（真截图在 screenshots 字段单独管理，
-// quote 内 http 图可能是源信息的一部分）。
+// stripQuoteLayoutImages §59.66→§59.172 附七: quote 引用内容剥离全部 [img] 图。
+// §59.66 原方案 A 只剥相对路径布局图（trans.gif 类）、保留绝对 URL——
+// §59.172 附七升级（用户定案）：诚实引用不包括图片，发布站点的引用是干净文本
+// （引用渲染在海报上方，站规禁止上方有图）；真截图由 screenshots 字段独立管理
+// （ExtractImages 在 quote 剥离前已全量提取，图不丢失）。
+// Body 移除用 OrigFull（原文）不受剥图影响。
 var quoteImgRe = regexp.MustCompile(`(?is)\[img\](.*?)\[/img\]`)
 
 func stripQuoteLayoutImages(bbcode string) string {
-	return quoteImgRe.ReplaceAllStringFunc(bbcode, func(m string) string {
-		sub := quoteImgRe.FindStringSubmatch(m)
-		if len(sub) < 2 {
-			return m
-		}
-		u := strings.TrimSpace(sub[1])
-		if u == "" {
-			return ""
-		}
-		// 站内相对路径: 无 scheme（不以 http:// https:// 开头）
-		if !strings.HasPrefix(strings.ToLower(u), "http://") && !strings.HasPrefix(strings.ToLower(u), "https://") {
-			return ""
-		}
-		// 已知布局图文件名（绝对 URL 形态的站点道具）
-		for _, prop := range []string{"trans.gif", "cattrans.gif", "spacer.gif", "pixel.gif"} {
-			if strings.HasSuffix(strings.ToLower(u), "/"+prop) || strings.EqualFold(u[strings.LastIndex(u, "/")+1:], prop) {
-				return ""
-			}
-		}
-		return m
-	})
+	return quoteImgRe.ReplaceAllString(bbcode, "")
 }
 
 // quoteBlock BBCode 中的 quote 块（含位置信息）。
 type quoteBlock struct {
 	Start int    // 在 BBCode 中的起始位置（含 [quote] 标签）
 	End   int    // 结束位置（含 [/quote] 标签）
-	Full  string // 完整 [quote]...[/quote] 文本
-	Inner string // quote 内部文本
+	Full  string // 完整 [quote]...[/quote] 文本（剥图后——声明区消费）
+	OrigFull string // 原始未剥图文本（Body 移除消费——ReplaceAll 需与原文精确匹配）
+	Inner string // quote 内部文本（剥图后——分类判定消费）
 }
 
 // splitIntroSections 简介分段主入口。
@@ -171,6 +153,7 @@ func extractQuoteBlocks(bbcode string) []quoteBlock {
 				Start: openTag.pos,
 				End:   tok.end,
 				Full:  bbcode[openTag.pos:tok.end],
+				OrigFull: bbcode[openTag.pos:tok.end],
 				Inner: bbcode[openTag.end:tok.pos],
 			})
 		}
@@ -267,7 +250,7 @@ func classifyBeforePosterQuotes(quotes []quoteBlock, lenientAck bool) (statement
 		}
 		// 0. §59.78 MI 碎片引用（mUHD 摘要形态）→ 整块剥离（不入 Statement 也不留 Body）
 		if isMISectionQuote(q.Inner) {
-			ardtuFulls = append(ardtuFulls, q.Full)
+			ardtuFulls = append(ardtuFulls, q.OrigFull)
 			continue
 		}
 		// 1. By ARDTU@... 前缀 → 剥离前缀归 Statement，整块从 Body 移除
@@ -276,19 +259,21 @@ func classifyBeforePosterQuotes(quotes []quoteBlock, lenientAck bool) (statement
 			if stripped != "" {
 				statements = append(statements, stripped)
 			}
-			ardtuFulls = append(ardtuFulls, q.Full)
+			ardtuFulls = append(ardtuFulls, q.OrigFull)
 			continue
 		}
 		// 2. ARDTU 工具签名 / 技术参数块 → 整块移除
 		if IsToolSignatureQuote(text) || IsTechParamsQuote(text) {
-			ardtuFulls = append(ardtuFulls, q.Full)
+			ardtuFulls = append(ardtuFulls, q.OrigFull)
 			continue
 		}
 		// 3. 官组声明 → 归 Statement（完整 BBCode），整块从 Body 移除
 		// §59.172 附五: lenientAck（keepfrds 头区）豁免鸣谢门槛——位置即信号
+		// §59.172 附七: statement 用剥图 Full（引用=干净文本）；
+		// stmtFulls 用 OrigFull（Body ReplaceAll 需原文精确匹配——§59.66 失配教训）
 		if lenientAck || IsAcknowledgmentQuote(text) {
 			statements = append(statements, q.Full)
-			stmtFulls = append(stmtFulls, q.Full)
+			stmtFulls = append(stmtFulls, q.OrigFull)
 			continue
 		}
 		// 4. 其他 → 保留在 Body 中（不丢内容）
