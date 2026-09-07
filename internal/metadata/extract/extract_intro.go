@@ -90,10 +90,11 @@ func (p *PublicExtractor) splitIntroSections(descrHTML, descrBBCode string, wide
 		posterIdx = findMediaInfoPosition(descrBBCode)
 	}
 	// §59.172: keepfrds 头区拓宽——早期种子的引用/鸣谢块（fieldset 与 dash 归一
-	// 后的 [quote]）大量落在【海报→◎正文】之间（tid=9073/4554 实证），原"海报前"
-	// 分类域全部漏采。锚拓宽到首个 ◎ 行；无 ◎（kdouban 框架页）自然回退海报前。
+	// 后的 [quote]）大量落在【海报→影片详情】之间（tid=9073/4554 实证），原"海报前"
+	// 分类域全部漏采。锚拓宽到首个影片详情标记（◎/【 双形态，附三）；无标记
+	// （kdouban 框架页）自然回退海报前。
 	if widenKF {
-		if ki := strings.Index(descrBBCode, "◎"); ki > posterIdx {
+		if ki := kfHeadAnchor(descrBBCode); ki > posterIdx {
 			posterIdx = ki
 		}
 	}
@@ -302,14 +303,25 @@ func compactBlankLines(s string) string {
 // 内容首字符排除分隔符本身——纯分隔线（全 dash）无内容不匹配（单测实证）。
 var kfHeadDashQuoteRe = regexp.MustCompile(`(-{4,}[ \t]*[^\s\n\[\]{}-][^\n\[\]{}]{2,180}?-{4,}|—{2,}[ \t]*[^\s\n\[\]{}—-][^\n\[\]{}]{2,180}?—{2,})`)
 
+// kfHeadAnchor §59.172 附三: 头区锚——首个影片详情标记位置（两种形态取先到者）：
+// ◎（PTGen 格式）或 【（老式【原 片 名】格式——tid=4186/5144/5729 等 34 种实证，
+// 无 ◎ 行导致回退语义挡住 dash 采集）。均无返回 -1（kdouban 框架页回退不动）。
+func kfHeadAnchor(bbcode string) int {
+	anchor := strings.Index(bbcode, "◎")
+	if k := strings.Index(bbcode, "【"); k >= 0 && (anchor < 0 || k < anchor) {
+		anchor = k
+	}
+	return anchor
+}
+
 // normalizeKFHeadDashQuotes §59.172: keepfrds 头区 dash 族引用归一——包装 [quote]
-// 使分类器可见。域纪律：仅首个 ◎ 行之前的头区；无 ◎ 不动（kdouban 框架页回退）。
+// 使分类器可见。域纪律：仅头区（首个影片详情标记前）；无标记不动（回退）。
 // 诚实透传语义：内容原样（含 ---- 分隔符本身）不增不删。
 // 两种形态（§59.172 附，tid=7025 实证补充）：
 //  ① 双侧分隔：----文字---- / ——文字——（kfHeadDashQuoteRe）
 //  ② 行首单侧：[b]——文字[/b]——分隔符只在行首（7025 全角破折号变体实为单侧）
 func normalizeKFHeadDashQuotes(bbcode string) string {
-	headEnd := strings.Index(bbcode, "◎")
+	headEnd := kfHeadAnchor(bbcode)
 	if headEnd < 0 {
 		return bbcode
 	}
