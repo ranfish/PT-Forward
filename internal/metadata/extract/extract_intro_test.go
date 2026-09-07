@@ -266,7 +266,8 @@ func TestSplitIntroSections_LogoFiltered(t *testing.T) {
 	}
 }
 
-// §59.66: quote 引用内容剥离站内相对路径布局图（trans.gif 类）——保留绝对 URL 内容图。
+// §59.66→§59.172 附七: quote 引用内容剥离全部 [img]（引用=干净文本——
+// 绝对 URL 内容图也剥；真截图由 screenshots 字段独立管理）。
 func TestStripQuoteLayoutImages(t *testing.T) {
 	cases := []struct{ in, want string }{
 		// 站内相对路径（NexusPHP 布局 hack）——剥
@@ -274,8 +275,10 @@ func TestStripQuoteLayoutImages(t *testing.T) {
 		{"[img]pic/trans.gif[/img]文本", "文本"},
 		// 已知布局图文件名（绝对 URL 形态的站点道具）——剥
 		{"[img]https://pt.keepfrds.com/static/pic/trans.gif[/img][url=https://x.com]链接[/url]", "[url=https://x.com]链接[/url]"},
-		// 绝对 URL 内容图——保留（方案 A）
-		{"前[img]https://img.example.com/a.jpg[/img]后", "前[img]https://img.example.com/a.jpg[/img]后"},
+		// 绝对 URL 内容图——剥（§59.172 附七：诚实引用不包括图片）
+		{"前[img]https://img.example.com/a.jpg[/img]后", "前后"},
+		// 表情图（相对路径 smilie）——剥
+		{"文本A [img]/static/pic/smilies/9.gif[/img] 文本B", "文本A  文本B"},
 		// 文本/格式/链接不动
 		{"[b]加粗[/b] [i]斜体[/i] [url=https://b.com]链接[/url]", "[b]加粗[/b] [i]斜体[/i] [url=https://b.com]链接[/url]"},
 		// 多个布局图混排
@@ -555,5 +558,27 @@ func TestKFHeadColonAnchor(t *testing.T) {
 	d := p.splitIntroSections("", bb, true)
 	if !strings.Contains(d.Statement, "DIY原盘来自HDSky") {
 		t.Errorf("冒号锚拓宽应捕获: %q", d.Statement[:60])
+	}
+}
+
+// §59.172 附七: 引用=干净文本——绝对 URL 图入声明区前剥离（不入库）；
+// Body 移除用 OrigFull（原文）——9290 正文残留副本 bug（§59.66 失配）同修。
+func TestQuoteCleanTextAndBodyRemoval(t *testing.T) {
+	p := &PublicExtractor{}
+	// quote 含绝对 URL 图 + 表情图 + 文本格式
+	bb := "[img]https://x/poster.jpg[/img]\n[quote][b]DIY说明文字 [img]https://img.example.com/real.jpg[/img] 表情[img]/static/pic/smilies/9.gif[/img] 完[/b][/quote]\n◎片　　名　X\n正文"
+	d := p.splitIntroSections("", bb, true)
+	if strings.Contains(d.Statement, "[img]") {
+		t.Errorf("Statement 应无任何图片: %q", d.Statement)
+	}
+	if !strings.Contains(d.Statement, "DIY说明文字") || !strings.Contains(d.Statement, "完") {
+		t.Errorf("文本与格式应保留: %q", d.Statement)
+	}
+	if strings.Contains(d.Body, "DIY说明文字") {
+		t.Errorf("Body 移除应生效（OrigFull 原文匹配）: %q", d.Body[:80])
+	}
+	// 图片本身不丢失：截图管道独立提取（validImages 全量）
+	if !strings.Contains(bb, "img.example.com/real.jpg") {
+		t.Error("sanity")
 	}
 }
