@@ -8,6 +8,7 @@
 package extract
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -304,14 +305,64 @@ var kfHeadDashQuoteRe = regexp.MustCompile(`(-{4,}[ \t]*[^\s\n\[\]{}-][^\n\[\]{}
 // normalizeKFHeadDashQuotes §59.172: keepfrds 头区 dash 族引用归一——包装 [quote]
 // 使分类器可见。域纪律：仅首个 ◎ 行之前的头区；无 ◎ 不动（kdouban 框架页回退）。
 // 诚实透传语义：内容原样（含 ---- 分隔符本身）不增不删。
+// 两种形态（§59.172 附，tid=7025 实证补充）：
+//  ① 双侧分隔：----文字---- / ——文字——（kfHeadDashQuoteRe）
+//  ② 行首单侧：[b]——文字[/b]——分隔符只在行首（7025 全角破折号变体实为单侧）
 func normalizeKFHeadDashQuotes(bbcode string) string {
 	headEnd := strings.Index(bbcode, "◎")
 	if headEnd < 0 {
 		return bbcode
 	}
 	head, rest := bbcode[:headEnd], bbcode[headEnd:]
-	wrapped := kfHeadDashQuoteRe.ReplaceAllStringFunc(head, func(m string) string {
+
+	// 遮蔽已有 [quote] 区（fieldset 转换产物——内部 dash 段不再包装，防双层），
+	// 处理后还原。占位符用不可见控制字符，不与内容冲突。
+	placeholders := make([]string, 0, 4)
+	maskQuote := func(s string) string {
+		return reQuoteSpan.ReplaceAllStringFunc(s, func(m string) string {
+			placeholders = append(placeholders, m)
+			return fmt.Sprintf("\x00KFQ%d\x00", len(placeholders)-1)
+		})
+	}
+	unmaskQuote := func(s string) string {
+		for i, p := range placeholders {
+			s = strings.ReplaceAll(s, fmt.Sprintf("\x00KFQ%d\x00", i), p)
+		}
+		return s
+	}
+
+	head = maskQuote(head)
+	head = kfHeadDashQuoteRe.ReplaceAllStringFunc(head, func(m string) string {
 		return "[quote]" + m + "[/quote]"
 	})
-	return wrapped + rest
+
+	// 行首单侧形态：逐行扫（跳过已包装行；剥离前导 [b] 探测；余文非纯分隔符才包）
+	lines := strings.Split(head, "\n")
+	for i, ln := range lines {
+		t := strings.TrimSpace(ln)
+		if t == "" || strings.Contains(t, "[quote]") {
+			continue
+		}
+		probe := t
+		if strings.HasPrefix(probe, "[b]") {
+			probe = probe[len("[b]"):]
+		}
+		lead := ""
+		if strings.HasPrefix(probe, "——") {
+			lead = "——"
+		} else if strings.HasPrefix(probe, "----") {
+			lead = "----"
+		}
+		if lead == "" {
+			continue
+		}
+		if strings.TrimLeft(probe[len(lead):], "-— \t") == "" {
+			continue // 纯分隔线
+		}
+		lines[i] = ln[:strings.Index(ln, t)] + "[quote]" + t + "[/quote]"
+	}
+	return unmaskQuote(strings.Join(lines, "\n")) + rest
 }
+
+// reQuoteSpan 已有 [quote] 块整体匹配（遮蔽用——栈式配对简化为非贪婪跨块）。
+var reQuoteSpan = regexp.MustCompile(`(?s)\[quote[^\]]*\].*?\[/quote\]`)
