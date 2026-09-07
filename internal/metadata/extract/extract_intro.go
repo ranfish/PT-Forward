@@ -309,13 +309,16 @@ func compactBlankLines(s string) string {
 // 内容首字符排除分隔符本身——纯分隔线（全 dash）无内容不匹配（单测实证）。
 var kfHeadDashQuoteRe = regexp.MustCompile(`(-{4,}[ \t]*[^\s\n\[\]{}-][^\n\[\]{}]{2,180}?-{4,}|—{2,}[ \t]*[^\s\n\[\]{}—-][^\n\[\]{}]{2,180}?—{2,})`)
 
-// kfHeadAnchor §59.172 附三: 头区锚——首个影片详情标记位置（两种形态取先到者）：
-// ◎（PTGen 格式）或 【（老式【原 片 名】格式——tid=4186/5144/5729 等 34 种实证，
-// 无 ◎ 行导致回退语义挡住 dash 采集）。均无返回 -1（kdouban 框架页回退不动）。
+
+// kfHeadAnchor §59.172 附三/附六: 头区锚——首个影片详情标记位置（三形态取先到）：
+// ◎（PTGen 格式）/ 【（老式【原 片 名】格式，tid=4186 等 34 种）/
+// 导演[：:]（冒号格式豆瓣老模板，tid=5979 实证）。均无返回 -1（kdouban 框架页回退不动）。
 func kfHeadAnchor(bbcode string) int {
 	anchor := strings.Index(bbcode, "◎")
-	if k := strings.Index(bbcode, "【"); k >= 0 && (anchor < 0 || k < anchor) {
-		anchor = k
+	for _, marker := range []string{"【", "导演:", "导演："} {
+		if k := strings.Index(bbcode, marker); k >= 0 && (anchor < 0 || k < anchor) {
+			anchor = k
+		}
 	}
 	return anchor
 }
