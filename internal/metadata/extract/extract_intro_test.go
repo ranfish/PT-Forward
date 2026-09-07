@@ -499,3 +499,23 @@ func TestKFHeadLegacyBracketAnchor(t *testing.T) {
 		t.Errorf("【】格式拓宽应捕获: %q", d.Statement)
 	}
 }
+
+// §59.172 附四: 拓宽段 quote 跳过鸣谢门槛——tid=9246"制作说明"四段长文
+// 无关键词超 200 字，原 IsAcknowledgmentQuote 判 false 落回 Body。
+func TestSplitIntroSectionsKFWidenBypassAckGate(t *testing.T) {
+	p := &PublicExtractor{}
+	longNote := "[b]\n制作说明：\n1、有人反映本站1080p 10bit的版本有音画不同步，故有重制的想法；\n2、原1080p bit版本采用日版蓝光制作，分辨率1920×1080、比例16:9；此CC版1800×1080、比例1.66:1。查询得知OAR为1.85:1，通过比较发现日版上下各有数个像素裁剪，CC版左右各有26个左右像素裁剪。画质对比见附图，萝卜青菜，请根据喜好下载；\n3、此CC版采用DIY-wq561103@beAst制作，国粤语均来自DIY；简体字幕来自伪射手，适配国语；繁体字幕来自港版蓝光，适配粤语；\n4、下载了本站日版1080p 10bit，经1楼提醒，国语确实在1h:37之后不同步。[/b]"
+	bb := "[img]https://x/p.jpg[/img]\n[quote]\n" + longNote + "\n[/quote]\n\n◎译　　名　重庆森林\n正文"
+	d := p.splitIntroSections("", bb, true)
+	if !strings.Contains(d.Statement, "制作说明") {
+		t.Errorf("拓宽段长说明应跳过鸣谢门槛入 Statement: %q", d.Statement[:80])
+	}
+	if strings.Contains(d.Body, "制作说明") {
+		t.Errorf("应从 Body 移除: %q", d.Body[:80])
+	}
+	// 非 keepfrds：保持原分类（长文留 Body）
+	d2 := p.splitIntroSections("", bb, false)
+	if strings.Contains(d2.Statement, "制作说明") {
+		t.Errorf("非 keepfrds 不应拓宽: %q", d2.Statement[:60])
+	}
+}
