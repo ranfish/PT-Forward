@@ -174,7 +174,7 @@ SDR 资源不填此项。从 MediaInfo 的 Video - HDR Format 字段判断。
 | DTS-HD HR | DTS-HD High Resolution |
 | DTS:X | DTS:X（标题中不需要额外标注） |
 | TrueHD | Dolby TrueHD |
-| Atmos | Dolby Atmos（基于对象的，写在声道数前） |
+| Atmos | Dolby Atmos（基于对象的，属"对象信息"字段——写在声道数后；§59.175 原文实证勘误：原文常见错误明列"在声道数左侧写了Atmos"） |
 | FLAC | FLAC |
 | LPCM | LPCM |
 | AAC | AAC（2.0 时可省略声道数） |
@@ -186,7 +186,7 @@ SDR 资源不填此项。从 MediaInfo 的 Video - HDR Format 字段判断。
 - DD 和 DDP 搞混：Dolby Digital Plus = DDP = DD+ = E-AC3；Dolby Digital = DD = AC3
 - 标题中不应写作 AC3/E-AC3，应写作 DD/DDP
 - AAC/MP2/MP3 且声道为 2.0 时可省略声道数
-- Atmos 写在声道数之后（如 `TrueHD Atmos 7.1`）
+- Atmos 写在声道数之后（如 `TrueHD 7.1 Atmos`；§59.175 勘误：原文"常见错误：在声道数左侧写了Atmos"——本行旧示例方向反了）
 - DTS:X 不需额外标注
 - 评论音轨不计入音轨数
 

@@ -106,6 +106,9 @@ func V105TitleFormat() TitleFormat {
 			"source_type", "specification",
 			"hdr", "bit_depth",
 			"video_codec",
+			// §59.175 定案（原文实证）：Atmos 属"对象信息"字段，位于声道数【后】
+			// （qingwapt v1.05 原文常见错误明列"在声道数左侧写了Atmos"——
+			// "TrueHD Atmos 7.1" 是错误形态；正确 = TrueHD 7.1 Atmos）
 			"audio_codec", "audio_channels", "audio_technology", "audio_tracks",
 			"group",
 		},

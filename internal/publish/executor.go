@@ -622,17 +622,23 @@ func (e *PublishExecutor) lookupByStdKey(cfg *model.PublishFormConfig, domain, s
 	return nil
 }
 
-// audioMappingOf §59.166 A 层：TechProfile 源音频映射（组合键优先 §59.150 判据六）。
+// audioMappingOf §59.166 A 层：TechProfile 源音频映射。
+// §59.175 顺序定案：表单组合键【最优先】——§59.150 判据六（TrueHD+Atmos→
+// 站点表单选项 "TrueHD Atmos"）。B1 直取曾置于组合键之前把组合键短路
+// （→裸 audio.truehd → 幸运 LuckAudit AUDIO_MISMATCH 十连拒实证：
+// "标题显示为TrueHD Atmos，但选择了TrueHD"）。组合键未命中自然落 B1
+// （DD 场景行为不变）。注：表单选项的组合词条与标题形态无关——标题
+// 规范（v1.05）Atmos 属对象信息在声道数后（TrueHD 7.1 Atmos），不变。
 func (e *PublishExecutor) audioMappingOf(cfg *model.PublishFormConfig, audioCodec, audioTech string) *model.FormValueMapping {
-	// §59.166 B1：canonical→词条 standard_key 直取优先（"DD" 词表 exact 失明修复）
-	if sk := titleparser.AudioStandardKey(audioCodec); sk != "" {
-		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, sk); m != nil {
-			return m
-		}
-	}
 	if audioCodec != "" && audioTech != "" {
 		combined := extract.LookupStandardKey("audio_codec", audioCodec+" "+audioTech)
 		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, combined); m != nil {
+			return m
+		}
+	}
+	// §59.166 B1：canonical→词条 standard_key 直取（"DD" 词表 exact 失明修复）
+	if sk := titleparser.AudioStandardKey(audioCodec); sk != "" {
+		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, sk); m != nil {
 			return m
 		}
 	}
