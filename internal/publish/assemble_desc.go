@@ -46,6 +46,10 @@ func FullwidthMIColons(s string) string {
 func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConfig) string {
 	var b strings.Builder
 	if q := strings.TrimSpace(meta.Statement); q != "" {
+		// §59.178: 剥外层 [quote] 壳后 Trim 换行——NP 站 HTML fieldset/legend
+		// 后的换行被 BBCode 转换保留（[quote]⏎正文⏎[/quote]），渲染后引用块
+		// 内首行前出现空行。剥壳 → Trim → 重包单层，消除双 quote 嵌套与空行。
+		q = trimQuoteWrapper(q)
 		b.WriteString("[quote]")
 		b.WriteString(FullwidthMIColons(q))
 		b.WriteString("[/quote]\n\n")
@@ -75,4 +79,18 @@ func assembleDescription(meta *model.TorrentMetadata, cfg *model.PublishFormConf
 		b.WriteString(strings.Join(lines, "\n"))
 	}
 	return b.String()
+}
+
+
+// trimQuoteWrapper §59.178: 剥外层 [quote] 壳 + Trim 换行。
+// Statement 列可能存带壳格式（附八合并产物/fetch 管线 q.Full 原文切片），
+// assembleDescription 再包一层 → 嵌套。剥壳后 Trim 确保干净文本。
+func trimQuoteWrapper(q string) string {
+	q = strings.TrimSpace(q)
+	// 剥外层 [quote]...[/quote]（如有）
+	if strings.HasPrefix(q, "[quote]") && strings.HasSuffix(q, "[/quote]") {
+		inner := q[len("[quote]") : len(q)-len("[/quote]")]
+		q = strings.TrimSpace(inner)
+	}
+	return q
 }
