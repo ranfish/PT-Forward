@@ -193,3 +193,57 @@ func TestAudioMappingOfCombinedFirst(t *testing.T) {
 		t.Errorf("DD 直取应选 3: %+v", m3)
 	}
 }
+
+// §59.177: adjustTagsForSite 四场景——新推断正确/存量幸运自愈/藏宝阁覆写/用户手动保护。
+func TestAdjustTagsForSite(t *testing.T) {
+	title := "Masters of Horror S01-S02 2005-2006 1080p Blu-ray x265 DTS"
+	subtitle := "【恐怖大师】全两季 全剧终 | 中英字幕"
+
+	// ① 新推断正确（词典改后 S01-S02 不再触发 collection）——tags 已正确
+	tags1 := []string{"10_bit", "chinese_subtitle", "complete"}
+	out1 := adjustTagsForSite(tags1, "幸运", title, subtitle)
+	if contains(out1, "collection") || !contains(out1, "complete") {
+		t.Errorf("幸运通用：应保留 complete 无 collection: %v", out1)
+	}
+
+	// ② 存量数据发布幸运——旧 tags 含 collection（词典旧规则产物）→ 自愈移除+补 complete
+	tags2 := []string{"10_bit", "chinese_subtitle", "collection"}
+	out2 := adjustTagsForSite(tags2, "幸运", title, subtitle)
+	if contains(out2, "collection") {
+		t.Errorf("幸运存量自愈：应移除 collection: %v", out2)
+	}
+	if !contains(out2, "complete") {
+		t.Errorf("幸运存量自愈：副标题全剧终应补 complete: %v", out2)
+	}
+
+	// ③ 藏宝阁覆写——跨季=合集（去完结加合集）
+	tags3 := []string{"10_bit", "chinese_subtitle", "complete"}
+	out3 := adjustTagsForSite(tags3, "藏宝阁", title, subtitle)
+	if !contains(out3, "collection") || contains(out3, "complete") {
+		t.Errorf("藏宝阁覆写：应加 collection 去 complete: %v", out3)
+	}
+
+	// ④ 用户手动保护——副标题含"合集"字样（真多作品合集）→ 调整层不动
+	tags4 := []string{"10_bit", "collection"}
+	subtitle4 := "【杜比全家桶合集】Top250 精选"
+	out4 := adjustTagsForSite(tags4, "幸运", title, subtitle4)
+	if !contains(out4, "collection") {
+		t.Errorf("用户手动保护：真多作品合集不应被移除: %v", out4)
+	}
+
+	// ⑤ 非跨季标题 → 不调整
+	tags5 := []string{"collection"}
+	out5 := adjustTagsForSite(tags5, "幸运", "Oppenheimer 2023 1080p", "奥本海默")
+	if !contains(out5, "collection") {
+		t.Errorf("非跨季标题不应触发调整: %v", out5)
+	}
+}
+
+func contains(tags []string, target string) bool {
+	for _, t := range tags {
+		if t == target {
+			return true
+		}
+	}
+	return false
+}
