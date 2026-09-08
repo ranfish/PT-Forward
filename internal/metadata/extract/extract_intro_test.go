@@ -477,3 +477,31 @@ func TestQuoteCleanTextAndBodyRemoval(t *testing.T) {
 		t.Error("sanity")
 	}
 }
+
+// §59.172 附八补: dash-only fieldset 溶解——[quote] 块内容全为 dash 行时拆壳
+// 参与合并（拯救大兵瑞恩实锤）；非 dash fieldset（音轨说明）保持独立。
+func TestKFHeadDashOnlyFieldsetDissolve(t *testing.T) {
+	// fieldset 内 [b] 双 dash 行 + 裸 3 行 → 全部五行合并一块
+	in := "[img]p[/img]\n[quote]\n[b]----八一国配来自驴脾气，特此鸣谢！----\n----因原盘噪点过多，适度降噪----[/b]\n[/quote]\n----重混东影上译国语来自cys92096----\n----感谢大神们的辛苦创作！----\n◎片\\u3000\\u3000名\\u3000X"
+	out := normalizeKFHeadDashQuotes(in)
+	if strings.Count(out, "[quote]") != 1 {
+		t.Errorf("dash-only fieldset 应溶解参与合并为单块: %q", out)
+	}
+	for _, w := range []string{"八一国配", "适度降噪", "重混东影", "感谢大神"} {
+		if !strings.Contains(out, w) {
+			t.Errorf("内容缺失 %s: %q", w, out)
+		}
+	}
+	if strings.Contains(out, "----") {
+		t.Errorf("分隔符应全剥: %q", out)
+	}
+	// 非 dash fieldset 独立保留
+	in2 := "[img]p[/img]\n[quote]英语(DTS-5.1)/国语(AC3-5.1)音轨说明[/quote]\n----A鸣谢----\n◎片\\u3000\\u3000名\\u3000X"
+	out2 := normalizeKFHeadDashQuotes(in2)
+	if strings.Count(out2, "[quote]") != 2 {
+		t.Errorf("非 dash fieldset 应独立（2 块）: %q", out2)
+	}
+	if !strings.Contains(out2, "音轨说明") || !strings.Contains(out2, "A鸣谢") {
+		t.Errorf("两类内容都应保留: %q", out2)
+	}
+}

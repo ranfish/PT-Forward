@@ -346,6 +346,36 @@ func normalizeKFHeadDashQuotes(bbcode string) string {
 		}
 		return s
 	}
+	// 附八补：dash-only fieldset 溶解——[quote] 块内容全部是 dash 行时，
+	// 拆壳放出内容行参与合并（拯救大兵瑞恩实锤：fieldset 内是 [b]----A----
+
+	// ----B----[/b]，语义是引用文本而非音轨说明）；非 dash-only 的 fieldset
+	// （11895 音轨/字幕轨语义）保持遮蔽独立。
+	head = reQuoteSpan.ReplaceAllStringFunc(head, func(m string) string {
+		inner := reQuoteInner.FindStringSubmatch(m)
+		if inner == nil {
+			return m
+		}
+		content := strings.ReplaceAll(inner[1], "[b]", "")
+		content = strings.ReplaceAll(content, "[/b]", "")
+		allDash := false
+		for _, ln := range strings.Split(content, "\n") {
+			t := strings.TrimSpace(ln)
+			if t == "" {
+				continue
+			}
+			if strings.TrimLeft(t, "-—─ \t") == t {
+				allDash = false
+				break
+			}
+			allDash = true
+		}
+		if !allDash {
+			return m
+		}
+		return inner[1] // 拆壳放出——后续行收集接管
+	})
+
 	head = maskQuote(head)
 
 	// 逐行统一收集：行首有 dash 族分隔符 + 剥壳后非空 → 引用行
@@ -408,3 +438,6 @@ func normalizeKFHeadDashQuotes(bbcode string) string {
 
 // reQuoteSpan 已有 [quote] 块整体匹配（遮蔽用——栈式配对简化为非贪婪跨块）。
 var reQuoteSpan = regexp.MustCompile(`(?s)\[quote[^\]]*\].*?\[/quote\]`)
+
+// reQuoteInner quote 块内层提取（附八补 dash-only 溶解用）。
+var reQuoteInner = regexp.MustCompile(`(?s)^\[quote[^\]]*\](.*)\[/quote\]$`)
