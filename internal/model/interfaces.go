@@ -5,6 +5,21 @@ import (
 	"strings"
 )
 
+// PublishPreflightResult §59.176: 发布前置检查结果。
+// Allowed=false 时 Reason 为站方拒绝文案原文（引导用户打开发布页查看）。
+type PublishPreflightResult struct {
+	Allowed bool
+	Reason  string
+}
+
+// PublishPreflighter §59.176: 发布前置检查能力接口（可选实现——
+// NP 族默认实现，其它框架按需覆写；消费方 type-assert 判定）。
+// 语义：GET 发布表单页（NP: upload.php）——表单存在=允许；
+// 登录墙/无表单+文案=不可发布（文案即原因）。
+type PublishPreflighter interface {
+	PreflightPublish(ctx context.Context, config *SiteConfig) (*PublishPreflightResult, error)
+}
+
 type SiteAdapter interface {
 	Framework() string
 	ParseRSS(ctx context.Context, feedURL string, config *SiteConfig) ([]*RSSTorrentEvent, error)

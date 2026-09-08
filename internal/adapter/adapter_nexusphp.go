@@ -2848,3 +2848,91 @@ func deriveSiteCode(domain string) string {
 }
 
 
+
+// preflightUploadFormRe §59.176: 发布表单存在性信号——文件选择控件/takeupload
+// 提交端点/常见文件字段名（hdfans 实证：有权限页必含表单；帮助文本含
+// "权限/不允许"字样是噪音——表单存在性是唯一权威信号，不扫关键词）。
+var preflightUploadFormRe = regexp.MustCompile(`(?i)<input[^>]+type=["']?file|takeupload\.php|name=["']?(tfile|file_upload|torrent)`)
+
+// preflightLoginRe §59.176: 登录墙信号（NP 登录表单端点）。
+var preflightLoginRe = regexp.MustCompile(`(?i)takelogin\.php`)
+
+// PreflightPublish §59.176: NP 族发布前置检查。
+// GET 发布表单页（upload.php）：表单在=允许；登录墙=凭证失效；
+// 无表单=站点拒绝发布（提取正文文案——幸运"被拒种子数:10 达到上限"实测形态，
+// 52movie 无权限"你没有发布种子的权限"标准形态——短文案页无表单噪音）。
+func (a *NexusPHPAdapter) PreflightPublish(ctx context.Context, config *model.SiteConfig) (*model.PublishPreflightResult, error) {
+	baseURL := config.Domain
+	if !strings.HasPrefix(baseURL, "http") {
+		baseURL = "https://" + baseURL
+	}
+	// 表单 GET 页路径：显式 Upload 配置（非 takeupload）优先，否则标准 /upload.php
+	path := "/upload.php"
+	if config.Paths.Upload != "" && !strings.Contains(config.Paths.Upload, "takeupload") {
+		path = config.Paths.Upload
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+path, nil)
+	if err != nil {
+		return nil, networkError("构造请求失败", err)
+	}
+	setCommonHeaders(req, config.Cookie)
+	resp, err := a.doer.Client.Do(req)
+	if err != nil {
+		return nil, networkError("请求发布页失败", err)
+	}
+	defer func() { drainBody(resp) }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
+	}
+	bodyBytes, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	body := string(bodyBytes)
+
+	if preflightLoginRe.MatchString(body) {
+		return &model.PublishPreflightResult{
+			Allowed: false,
+			Reason:  "站点登录态失效（发布页返回登录表单）——请检查站点凭证/CookieCloud 同步",
+		}, nil
+	}
+	if preflightUploadFormRe.MatchString(body) {
+		return &model.PublishPreflightResult{Allowed: true}, nil
+	}
+
+	// 无表单：提取正文文案（短拒绝页——去标签取正文，裁剪导航残留）
+	text := stripTagsForPreflight(body)
+	return &model.PublishPreflightResult{
+		Allowed: false,
+		Reason:  "站点不允许发布：" + text,
+	}, nil
+}
+
+// stripTagsForPreflight §59.176: 拒绝文案提取——去脚本样式标签、压缩空白、
+// 截取核心段（拒绝页正文短；从首个中文/冒号句起截，跳过站点导航头部）。
+func stripTagsForPreflight(body string) string {
+	text := regexp.MustCompile(`(?s)<script.*?</script>`).ReplaceAllString(body, " ")
+	text = regexp.MustCompile(`(?s)<style.*?</style>`).ReplaceAllString(text, " ")
+	text = regexp.MustCompile(`<[^>]+>`).ReplaceAllString(text, " ")
+	text = htmllib.UnescapeString(text)
+	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+	text = strings.TrimSpace(text)
+	// 跳过导航残留：从"对不起/抱歉/您/你/当前/发布"等文案起点的最近处截取
+	best := -1
+	for _, kw := range []string{"对不起", "抱歉", "你没有", "您没有", "当前", "不允许", "禁止"} {
+		if i := strings.Index(text, kw); i >= 0 && (best < 0 || i < best) {
+			best = i
+		}
+	}
+	if best > 0 {
+		text = text[best:]
+	}
+	if len(text) > 160 {
+		text = text[:160] + "…"
+	}
+	if text == "" {
+		text = "（发布页无表单且未提取到文案——请登录站点查看）"
+	}
+	return text
+}

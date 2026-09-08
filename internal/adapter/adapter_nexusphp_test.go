@@ -1955,3 +1955,44 @@ func TestHhanNoTransferBadge(t *testing.T) {
 		t.Error("非禁转（标签区块无禁转）不应命中——顶部筛选器的禁转选项不在区块内")
 	}
 }
+
+// §59.176: PreflightPublish 三态——表单存在=允许；无表单+文案=拒绝+原因提取；
+// 登录墙=凭证失效。
+func TestPreflightPublishStates(t *testing.T) {
+	mkSrv := func(body string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(body))
+		}))
+	}
+	a := NewNexusPHPAdapter(NewHTTPDoer(), zap.NewNop())
+
+	// 表单页（帮助文本含"权限/不允许"噪音）→ 允许（表单存在性是唯一权威信号）
+	s1 := mkSrv(`帮助文本含 权限 不允许 噪音<form action="takeupload.php"><input type="file" name="tfile"></form>`)
+	defer s1.Close()
+	r1, err := a.PreflightPublish(context.Background(), &model.SiteConfig{Domain: s1.URL})
+	if err != nil || r1 == nil || !r1.Allowed {
+		t.Errorf("表单页应允许: %+v err=%v", r1, err)
+	}
+
+	// 拒绝页（幸运十连拒原文形态）→ 不允许 + 文案从"对不起"起提取（跳过导航头）
+	s2 := mkSrv(`导航头 对不起 当前审核被拒绝的种子数：10 达到上限，不允许发布。 页脚`)
+	defer s2.Close()
+	r2, _ := a.PreflightPublish(context.Background(), &model.SiteConfig{Domain: s2.URL})
+	if r2 == nil || r2.Allowed {
+		t.Fatalf("拒绝页应不允许: %+v", r2)
+	}
+	if !strings.Contains(r2.Reason, "对不起") || !strings.Contains(r2.Reason, "10 达到上限") {
+		t.Errorf("应提取站方原文: %q", r2.Reason)
+	}
+	if strings.Contains(r2.Reason, "导航头") {
+		t.Errorf("应跳过导航残留: %q", r2.Reason)
+	}
+
+	// 登录墙 → 凭证失效提示
+	s3 := mkSrv(`<form action="takelogin.php">login</form>`)
+	defer s3.Close()
+	r3, _ := a.PreflightPublish(context.Background(), &model.SiteConfig{Domain: s3.URL})
+	if r3 == nil || r3.Allowed || !strings.Contains(r3.Reason, "登录态失效") {
+		t.Errorf("登录墙应提示凭证失效: %+v", r3)
+	}
+}

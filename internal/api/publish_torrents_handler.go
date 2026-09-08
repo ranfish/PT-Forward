@@ -53,6 +53,8 @@ type PublishTorrentsHandler struct {
 	screenshotCacheDays int // §59.63: 截图链接缓存观察期（天，<=0 关闭）
 	ptgen              PTGenAnalyzer
 	resourceResolver   *publish.ResourceResolver
+	preflightCache     map[string]preflightEntry // §59.176: 站点发布前置检查缓存（5 分钟）
+	preflightMu        sync.Mutex
 	logger         *zap.Logger
 	bgState        backgroundQueryState
 	batchFetch     batchFetchState
@@ -4356,6 +4358,61 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 
 // handleExecutePublishBatch §59.159: 一种多站批量发布——每站独立 execute 并行
 // （BatchGroupID 分组落库；网络白名单内并发安全——PTGen 等在线依赖已移除）。
+
+
+// preflightEntry §59.176: 前置检查缓存项。
+type preflightEntry struct {
+	result  *model.PublishPreflightResult
+	expires time.Time
+}
+
+// preflightSite §59.176: 站点发布前置检查（公共方法——消费点：
+// 一种多站/一站多种/单发三个入口）。5 分钟缓存（串行发布同站只拉一次；
+// 禁发状态分钟级不会翻转）。未实现 Preflighter 的 adapter 返回 nil（放行——
+// 不阻塞未适配站）。
+func (h *PublishTorrentsHandler) preflightSite(ctx context.Context, siteName string) *model.PublishPreflightResult {
+	if h.siteProvider == nil {
+		return nil
+	}
+	h.preflightMu.Lock()
+	if h.preflightCache == nil {
+		h.preflightCache = make(map[string]preflightEntry)
+	}
+	if e, ok := h.preflightCache[siteName]; ok && time.Now().Before(e.expires) {
+		h.preflightMu.Unlock()
+		return e.result
+	}
+	h.preflightMu.Unlock()
+
+	adapter, err := h.siteProvider.GetAdapter(ctx, siteName)
+	if err != nil {
+		return nil
+	}
+	pf, ok := adapter.(model.PublishPreflighter)
+	if !ok {
+		return nil
+	}
+	cfg, err := h.siteProvider.GetSiteConfig(ctx, siteName)
+	if err != nil || cfg == nil {
+		return nil
+	}
+	result, err := pf.PreflightPublish(ctx, cfg)
+	if err != nil {
+		h.logger.Warn("preflight publish failed（放行）",
+			zap.String("site", siteName), zap.Error(err))
+		return nil // 检查失败不阻塞发布（fail-open——上传链自会暴露问题）
+	}
+	h.preflightMu.Lock()
+	h.preflightCache[siteName] = preflightEntry{result: result, expires: time.Now().Add(5 * time.Minute)}
+	h.preflightMu.Unlock()
+	return result
+}
+
+// preflightBlockMessage §59.176: 统一引导文案。
+func preflightBlockMessage(reason string) string {
+	return reason + "——请登录站点打开发布页查看处理（如修改被拒种子后权限自动恢复/检查用户组权限/重新登录）"
+}
+
 func (h *PublishTorrentsHandler) handleExecutePublishBatch(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		InfoHash     string   `json:"info_hash"`
@@ -4393,6 +4450,14 @@ func (h *PublishTorrentsHandler) handleExecutePublishBatch(w http.ResponseWriter
 					results[idx] = siteResult{Site: siteName, Status: "failed", Message: fmt.Sprintf("panic: %v", rec)}
 				}
 			}()
+			// §59.176: 站点发布前置检查——不可发布仅跳过该站（隔离语义：
+			// 不阻塞可发布站），提示+日志
+			if pf := h.preflightSite(ctx, siteName); pf != nil && !pf.Allowed {
+				h.logger.Warn("preflight blocked site",
+					zap.String("site", siteName), zap.String("reason", pf.Reason))
+				results[idx] = siteResult{Site: siteName, Status: "preflight_blocked", Message: preflightBlockMessage(pf.Reason)}
+				return
+			}
 			res := h.executor.Execute(ctx, publish.ExecuteInput{
 				InfoHash:     req.InfoHash,
 				TargetSite:   siteName,
@@ -4444,6 +4509,13 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 	cfg := model.ParseFormConfig(site.PublishFormConfig)
 	if cfg == nil || !cfg.Enabled {
 		Error(w, http.StatusBadRequest, 40004, "目标站未启用发布配置: "+req.TargetSite)
+		return
+	}
+	// §59.176: 批首发布前置检查——不可发布整批快速失败（92 次无效上传教训）
+	if pf := h.preflightSite(r.Context(), req.TargetSite); pf != nil && !pf.Allowed {
+		h.logger.Warn("site-batch preflight blocked",
+			zap.String("site", req.TargetSite), zap.String("reason", pf.Reason))
+		Error(w, http.StatusBadRequest, 40005, preflightBlockMessage(pf.Reason))
 		return
 	}
 	interval := site.PublishIntervalSeconds
