@@ -515,12 +515,14 @@ func extractGroup(title string) string {
 		}
 	}
 
-	// ￡ 分隔符（SSD 特有格式 ￡CMCT发布者，取连续英文 = 组名）
+	// ￡ 分隔符（SSD 特有格式 ￡CMCT发布者，取连续英文+@子组标记 = 完整组名）
+	// §59.179: 保留 @ 子组标记——"￡cXcY@FRDS" 取完整 "cXcY@FRDS" 而非截断到 "cXcY"
+	// （修道院 tid=2111 实证：Forrest Gump DTS￡cXcY@FRDS 重组后丢 @FRDS）
 	if pIdx := strings.LastIndex(title, "￡"); pIdx >= 0 {
 		rest := title[pIdx+len("￡"):]
 		var b strings.Builder
 		for _, r := range rest {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '@' || (r >= '0' && r <= '9') {
 				b.WriteRune(r)
 			} else {
 				break

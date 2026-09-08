@@ -326,3 +326,19 @@ func TestSeasonAnchor(t *testing.T) {
 		}
 	}
 }
+
+// §59.179: ￡ 分隔组名保留 @ 子组标记——"￡cXcY@FRDS" → "cXcY@FRDS"（非截断到 "cXcY"）。
+func TestExtractGroupPoundWithSubgroup(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"Forrest Gump 1994 1080p DTS￡cXcY@FRDS", "cXcY@FRDS"},
+		{"Movie 2024 DTS￡CMCT", "CMCT"},
+		{"Show DTS￡Yumi@FRDS", "Yumi@FRDS"},
+		{"Plain 2024 1080p-GROUP", "GROUP"},
+		{"NoGroup Marker", ""},
+	}
+	for _, c := range cases {
+		if got := extractGroup(c.in); got != c.want {
+			t.Errorf("extractGroup(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
