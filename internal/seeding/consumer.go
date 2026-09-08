@@ -143,6 +143,26 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 					zap.Int64("min_bytes", minBytes),
 					zap.Float64("min_gb", clientCfg.MinDiskSpaceGB),
 					zap.Float64("emergency_buffer", clientCfg.EmergencyBuffer))
+				// §59.174: 拦截 ≠ 终态——候选标 blocked（可重试态），
+				// 空间恢复后 rss 引擎 retryBlocked 通道自动重推。
+				// 仅升级 seen→blocked，不动 pushed/expired 终态（防倒退）。
+				marked := int64(0)
+				for _, c := range candidates {
+					if c.Event == nil || c.Event.SubscriptionID == "" {
+						continue
+					}
+					res := e.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
+						Where("subscription_id = ? AND site_name = ? AND torrent_id = ? AND status = ?",
+							c.Event.SubscriptionID, c.Event.SiteName, c.Event.TorrentID, "seen").
+						Update("status", "blocked")
+					if res.Error == nil {
+						marked += res.RowsAffected
+					}
+				}
+				e.logger.Info("scoreAndPush: disk blocked candidates marked",
+					zap.String("client_id", clientID),
+					zap.Int("candidates", len(candidates)),
+					zap.Int64("marked", marked))
 				return
 			}
 		}

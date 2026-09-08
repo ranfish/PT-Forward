@@ -257,6 +257,96 @@ type DryRunItem struct {
 	MatchedRule string `json:"matched_rule,omitempty"`
 }
 
+// blockedRetryMaxAge §59.174: blocked 超龄终态——磁盘长期不恢复则放弃（防无限停靠）。
+const blockedRetryMaxAge = 7 * 24 * time.Hour
+
+// retryBlocked §59.174: 磁盘守卫 blocked 重推（用户定案）。
+// 语义：磁盘守卫拦截 ≠ 终态——blocked 条目在空间恢复后自动重推；
+// 重推遵守磁盘守卫（consumer 二次校验+不满足再标 blocked）与抓取选项
+// （免费/HR 以【当前 feed】为准——滚出窗口或免费过期 = expired 终态，
+// 不能确认免费就不推——"只接受免费种子"订阅条件不因重推放宽）。
+// 抗风暴保持：IsSeen 存在性判定不变——feed 通道一次性，重试由本通道独占。
+func (e *Engine) retryBlocked(ctx context.Context, sub *model.RSSSubscription, events []*model.RSSTorrentEvent) {
+	if sub.ClientID == "" || e.eventBus == nil {
+		return
+	}
+	rows, err := e.repo.ListBlocked(ctx, uintToString(sub.ID))
+	if err != nil || len(rows) == 0 {
+		return
+	}
+	// 引擎侧磁盘预检（空间仍紧张则本轮跳过，避免空转 republish；consumer 守卫仍二次校验）
+	if e.clientProvider != nil {
+		if dl, derr := e.clientProvider.Get(sub.ClientID); derr == nil && dl != nil {
+			if md, merr := dl.GetMainData(ctx); merr == nil && md != nil && md.FreeSpace < 10*1024*1024*1024 {
+				return
+			}
+		}
+	}
+	idx := make(map[string]*model.RSSTorrentEvent, len(events))
+	for i := range events {
+		idx[events[i].TorrentID] = events[i]
+	}
+	subID := uintToString(sub.ID)
+	republished := 0
+	for i := range rows {
+		row := &rows[i]
+		if time.Since(row.UpdatedAt) > blockedRetryMaxAge {
+			e.repo.MarkStatus(ctx, subID, row.SiteName, row.TorrentID, "expired")
+			e.logger.Info("blocked retry: over-age expired",
+				zap.String("torrent", row.TorrentID))
+			continue
+		}
+		ev := idx[row.TorrentID]
+		if ev == nil {
+			// 滚出 feed 窗口——免费态无法确认（"只接受免费"不放宽）
+			e.repo.MarkStatus(ctx, subID, row.SiteName, row.TorrentID, "expired")
+			e.logger.Info("blocked retry: out of feed window, expired",
+				zap.String("torrent", row.TorrentID))
+			continue
+		}
+		isFree := ev.DiscountLevel == model.DiscountFree || ev.DiscountLevel == model.Discount2xFree ||
+			ev.DiscountLevel == model.DiscountAssumeFree || ev.IsFree
+		if !isFree {
+			e.repo.MarkStatus(ctx, subID, row.SiteName, row.TorrentID, "expired")
+			e.logger.Info("blocked retry: free expired",
+				zap.String("torrent", row.TorrentID))
+			continue
+		}
+		// 重推：留 blocked 态——成功由 consumer 标 pushed（§55.5 P1 回写链），
+		// 磁盘再次不足由 consumer 重标 blocked（幂等循环）
+		discount := model.DiscountNone
+		if ev.DiscountLevel != "" {
+			discount = ev.DiscountLevel
+		} else if ev.IsFree {
+			discount = model.DiscountFree
+		}
+		e.eventBus.Publish(&pusher.PushedEvent{
+			ClientID:       sub.ClientID,
+			SiteName:       ev.SiteName,
+			TorrentID:      ev.TorrentID,
+			InfoHash:       ev.InfoHash,
+			Title:          ev.Title,
+			Size:           ev.Size,
+			Discount:       discount,
+			HasHR:          ev.HasHR,
+			IsFree:         true,
+			FreeEndAt:      ev.FreeEndAt,
+			SubscriptionID: subID,
+			AutoTransfer:   sub.AutoTransfer,
+			TransferClientIDs: sub.TransferClientIDs,
+			PushedAt:       time.Now(),
+			Seeders:        ev.Seeders,
+			Leechers:       ev.Leechers,
+		})
+		republished++
+	}
+	if republished > 0 {
+		e.logger.Info("blocked retry: republished",
+			zap.String("subscription", sub.Name),
+			zap.Int("count", republished))
+	}
+}
+
 func (e *Engine) DryRun(ctx context.Context, sub *model.RSSSubscription) (*DryRunResult, error) {
 	var site model.Site
 	if err := e.db.WithContext(ctx).Where("name = ? OR domain = ?", sub.SiteName, sub.SiteName).First(&site).Error; err != nil {
@@ -957,6 +1047,9 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 					zap.Error(err))
 			}
 		}
+
+		// §59.174: 磁盘守卫 blocked 重推——空间恢复后按当前 feed 重校验免费态再推
+		e.retryBlocked(ctx, sub, events)
 
 		if newCount > 0 {
 			e.logger.Info("rss fetch completed",

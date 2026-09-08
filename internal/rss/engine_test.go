@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/filter"
+	"github.com/ranfish/pt-forward/internal/pusher"
 	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/stretchr/testify/require"
@@ -1325,3 +1327,61 @@ func TestEngine_FetchOnce_AcceptRejectRules(t *testing.T) {
 	require.Equal(t, "Ubuntu 24.04 LTS", dispatched[0].Title)
 	require.Equal(t, "801", dispatched[0].TorrentID)
 }
+
+// §59.174: retryBlocked——免费重校验三态（窗口滚出/免费过期→expired；
+// 仍免费→republish 留 blocked；超龄→expired）。
+func TestRetryBlockedStates(t *testing.T) {
+	db := setupEngineDB(t)
+	repo := NewRepository(db)
+	eng := NewEngine(db, zap.NewNop())
+	ctx := context.Background()
+	sub := &model.RSSSubscription{ID: 1, Name: "T", SiteName: "朋友", ClientID: "QB0", Enabled: true}
+	// 三条 blocked：200 窗口内免费 / 201 窗口内不免费 / 202 窗口外
+	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "朋友", TorrentID: "200", SubscriptionID: "1", Status: "seen"})
+	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "朋友", TorrentID: "201", SubscriptionID: "1", Status: "seen"})
+	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "朋友", TorrentID: "202", SubscriptionID: "1", Status: "seen"})
+	repo.MarkStatus(ctx, "1", "朋友", "200", "blocked")
+	repo.MarkStatus(ctx, "1", "朋友", "201", "blocked")
+	repo.MarkStatus(ctx, "1", "朋友", "202", "blocked")
+
+	var mu sync.Mutex
+	var published []*pusher.PushedEvent
+	bus := pusher.NewEventBus(zap.NewNop(), 16)
+	bus.Register(&testRetryConsumer{fn: func(ev *pusher.PushedEvent) {
+		mu.Lock()
+		defer mu.Unlock()
+		published = append(published, ev)
+	}})
+	eng.SetEventBus(bus)
+	defer bus.Close()
+
+	events := []*model.RSSTorrentEvent{
+		{SiteName: "朋友", TorrentID: "200", InfoHash: strings.Repeat("a", 40), Title: "free-one", DownloadURL: "https://x/dl/200", IsFree: true},
+		{SiteName: "朋友", TorrentID: "201", InfoHash: strings.Repeat("b", 40), Title: "not-free", IsFree: false},
+	}
+	eng.retryBlocked(ctx, sub, events)
+
+	if len(published) != 1 || published[0].TorrentID != "200" {
+		t.Errorf("仅免费项应重推: %+v", published)
+	}
+	var s200, s201, s202 string
+	db.Raw("SELECT status FROM rss_torrent_seen WHERE torrent_id='200'").Scan(&s200)
+	db.Raw("SELECT status FROM rss_torrent_seen WHERE torrent_id='201'").Scan(&s202)
+	db.Raw("SELECT status FROM rss_torrent_seen WHERE torrent_id='201'").Scan(&s201)
+	if s201 != "expired" {
+		t.Errorf("不免费应 expired: %s", s201)
+	}
+	db.Raw("SELECT status FROM rss_torrent_seen WHERE torrent_id='202'").Scan(&s202)
+	if s202 != "expired" {
+		t.Errorf("窗口外应 expired: %s", s202)
+	}
+	if s200 != "blocked" {
+		t.Errorf("重推项应留 blocked（成功才由下游标 pushed）: %s", s200)
+	}
+}
+
+// testRetryConsumer §59.174 测试用最小 Consumer。
+type testRetryConsumer struct{ fn func(*pusher.PushedEvent) }
+
+func (c *testRetryConsumer) ID() string                                { return "test-retry" }
+func (c *testRetryConsumer) OnPushed(ctx context.Context, ev *pusher.PushedEvent) { c.fn(ev) }
