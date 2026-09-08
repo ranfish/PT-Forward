@@ -320,3 +320,21 @@ func TestMarkStatusSubscriptionIsolation(t *testing.T) {
 		t.Errorf("A 订阅应已 seen: %q", aStatus)
 	}
 }
+
+// §59.174: ListBlocked——blocked 态可重试查询（FIFO 最老优先）。
+func TestRepositoryListBlocked(t *testing.T) {
+	db := setupRepoTestDB(t)
+	repo := NewRepository(db)
+	ctx := context.Background()
+	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "朋友", TorrentID: "100", SubscriptionID: "1", Status: "seen", Title: "A"})
+	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "朋友", TorrentID: "101", SubscriptionID: "1", Status: "seen", Title: "B"})
+	repo.MarkStatus(ctx, "1", "朋友", "100", "blocked")
+	repo.MarkStatus(ctx, "1", "朋友", "101", "pushed")
+	rows, err := repo.ListBlocked(ctx, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].TorrentID != "100" {
+		t.Errorf("应只列出 blocked 行: %+v", rows)
+	}
+}

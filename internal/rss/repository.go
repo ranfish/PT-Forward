@@ -113,10 +113,22 @@ func (r *Repository) CleanupOldSeen(ctx context.Context, retentionDays int) (int
 		Where("status IN ? AND updated_at < ?",
 			// §59.167 回归审核补 "seen"：IsSeen 存在性判定后 seen 是常态态
 			// （全量停留）——不清理则无限增长；30 天安全（老种早滑出 RSS 窗口不重现）
-			[]string{"pushed", "expired", "skipped_rule", "seen"},
+			// §59.174 补 "blocked"（超龄终态化由 retryBlocked 7 天兜底，此处物理清理兜底）
+			[]string{"pushed", "expired", "skipped_rule", "seen", "blocked"},
 			cutoff,
 		).Delete(&model.RSSTorrentSeen{})
 	return result.RowsAffected, result.Error
+}
+
+// ListBlocked §59.174: 磁盘守卫拦截的可重试条目（blocked 态——空间恢复后重推）。
+// FIFO（最老优先）——先拦截的先重推。
+func (r *Repository) ListBlocked(ctx context.Context, subscriptionID string) ([]model.RSSTorrentSeen, error) {
+	var rows []model.RSSTorrentSeen
+	err := r.db.WithContext(ctx).
+		Where("subscription_id = ? AND status = ?", subscriptionID, "blocked").
+		Order("updated_at ASC").
+		Find(&rows).Error
+	return rows, err
 }
 
 // MarkStatus §59.120: 订阅隔离——按 (site, tid, subscription_id) 精确更新。
