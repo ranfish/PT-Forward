@@ -90,7 +90,7 @@ func TestInferEpisodeSplitCollectionComplete(t *testing.T) {
 		{"EP01 分集", "Show.EP01.1080p", "", true, false, false},
 		{"第1集 分集", "剧.第1集", "", true, false, false},
 		{"E13-E21 范围分集", "Show.E13-E21.1080p", "", true, false, false},
-		{"S01-S02 合集", "Show.S01-S02.1080p", "", false, true, false},
+		{"S01-S02 通用=非合集可完结(§59.177 幸运语义)", "Show.S01-S02.1080p", "", false, false, true},
 		{"副标题合集", "Show.S01", "第1-2季合集", false, true, false},
 		{"副标题集全", "Show.S01", "全集", false, false, true},
 		{"已完结", "Show.2024", "已完结", false, false, true},
@@ -120,7 +120,7 @@ func TestInferOngoingAndBigPack(t *testing.T) {
 	}{
 		{"分集→连载", "Show.S01E05.1080p", 0, true, false, false},
 		{"完结抑制连载", "Show.S01.1080p", 0, false, false, true},
-		{"合集抑制连载", "Show.S01-S02.1080p", 0, false, false, false},
+		{"S01-S02 不触发合集(§59.177)非连载", "Show.S01-S02.1080p", 0, false, false, true},
 		{"1TB+1B 大包", "Movie.2024.2160p", tb + 1, false, true, false},
 		{"恰 1TB 不算(>1T 字面)", "Movie.2024.2160p", tb, false, false, false},
 		{"999G 不算", "Movie.2024.2160p", tb - 5*1024*1024*1024, false, false, false},

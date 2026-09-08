@@ -273,8 +273,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		}
 	}
 
-	// ⑤ tags（判据引擎 → form_config 反查 → auto:false 过滤 + 人工 overrides）
-	tags := e.assembleTags(cfg, meta, in.TagOverrides)
+	// ⑤ tags（判据引擎 → 站点调整层 → form_config 反查 → auto:false 过滤 + 人工 overrides）
+	tags := adjustTagsForSite(e.assembleTags(cfg, meta, in.TagOverrides),
+		in.TargetSite, meta.Title, meta.Subtitle)
 	tagCfg := &model.SiteTagConfig{
 		Mode:     model.TagModeTaglist,
 		Tags:     map[string]string{},
@@ -936,4 +937,68 @@ func (e *PublishExecutor) preAuditTitle(meta *model.TorrentMetadata) string {
 		return rt
 	}
 	return meta.Title
+}
+
+// crossSeasonTagRe §59.177: 跨季标题形态（S01-S02 / 第N-M季）。
+var crossSeasonTagRe = regexp.MustCompile(`(?i)(?:[.\s]S\d{1,2}-S?\d{1,2}\b|第\d+-\d+季)`)
+
+// multiWorkCollectionRe §59.177: 多作品合集信号（副标题）。
+var multiWorkCollectionRe = regexp.MustCompile(`(合集|集全|期全)`)
+
+// completeSignalRe §59.177: 完结信号（副标题）。
+var completeSignalRe = regexp.MustCompile(`(全集|全季|已完结|完结|全\d+集|全剧终)`)
+
+// crossSeasonCollectionSites §59.177: 覆写组——跨季=合集（Session Pack 语义）。
+// 藏宝阁: 多季合集规范（S01-SXX 专门命名规范）; ubits: 整季包/跨季包。
+// 新站实测冲突时加条目（两层架构——通用=幸运，差异按站扩展）。
+var crossSeasonCollectionSites = map[string]bool{
+	"藏宝阁": true,
+	"ubits": true,
+}
+
+// adjustTagsForSite §59.177: 发布时标签按目标站调整（两层架构的站点扩展层）。
+// 通用规则=幸运语义：合集=多部不同作品的集合；S01-S02=单作品系列→完结。
+// 覆写组（藏宝阁/ubits）：S01-S02=多季合集→合集（去完结）。
+// 用户意图保护：副标题含"合集/集全/期全"（真多作品合集）时调整层不动。
+func adjustTagsForSite(tags []string, siteName, title, subtitle string) []string {
+	if !crossSeasonTagRe.MatchString(title + " " + subtitle) {
+		return tags
+	}
+	// 用户意图保护——真多作品合集不调整
+	if multiWorkCollectionRe.MatchString(subtitle) {
+		return tags
+	}
+
+	has := func(t string) bool {
+		for _, x := range tags {
+			if x == t {
+				return true
+			}
+		}
+		return false
+	}
+	remove := func(t string) []string {
+		out := make([]string, 0, len(tags))
+		for _, x := range tags {
+			if x != t {
+				out = append(out, x)
+			}
+		}
+		return out
+	}
+
+	if crossSeasonCollectionSites[siteName] {
+		// 覆写组：跨季=合集（去完结，加合集）
+		adjusted := remove("complete")
+		if !has("collection") {
+			adjusted = append(adjusted, "collection")
+		}
+		return adjusted
+	}
+	// 通用（幸运语义）：跨季=单作品系列（去合集，加完结）
+	adjusted := remove("collection")
+	if !has("complete") && completeSignalRe.MatchString(subtitle) {
+		adjusted = append(adjusted, "complete")
+	}
+	return adjusted
 }
