@@ -91,3 +91,24 @@ func TestAssembleMIIinDescForNoTechInfoSite(t *testing.T) {
 		t.Error("有 techinfo 域的站 MI 不应入简介（幸运审核检测）")
 	}
 }
+
+// §59.178: 引用块首行前空行修复——剥外层 [quote] 壳 + Trim 换行。
+func TestTrimQuoteWrapper(t *testing.T) {
+	cases := []struct{ in, want string }{
+		// 带壳 + 内部首行前有 \n（NP 站 fieldset/legend 换行保留产物）
+		{"[quote]\nRemux来自源站\n[/quote]", "Remux来自源站"},
+		// 带壳 + 内部尾行后有 \n
+		{"[quote]正文\n[/quote]", "正文"},
+		// 无壳纯文本（已 Trim）
+		{"直接文本", "直接文本"},
+		// 双层嵌套（Statement 内含子 quote）
+		{"[quote]\n外层\n[quote]内层[/quote]\n[/quote]", "外层\n[quote]内层[/quote]"},
+		// 空白壳
+		{"[quote]\n[/quote]", ""},
+	}
+	for _, c := range cases {
+		if got := trimQuoteWrapper(c.in); got != c.want {
+			t.Errorf("trimQuoteWrapper(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
