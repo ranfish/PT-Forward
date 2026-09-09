@@ -274,7 +274,8 @@
     {
       "canonical": "DIY",
       "full_name": "DIY Network",
-      "pattern": "\\bDIY\\b"
+      "pattern": "\\bDIY\\b",
+      "requires": "web"
     },
     {
       "canonical": "DOCC",
