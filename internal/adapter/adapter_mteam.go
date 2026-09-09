@@ -155,7 +155,7 @@ func (a *MTeamAdapter) DownloadTorrent(ctx context.Context, config *model.SiteCo
 	if domain == "" {
 		domain = config.Domain
 	}
-	httpclient.GlobalDownloadLimiter.Acquire(domain)
+	httpclient.GlobalDownloadLimiter.AcquireWithLimit(domain, config.DownloadHourlyLimit)
 
 	if config.APIKey != "" {
 		return a.downloadViaAPI(ctx, config, torrentID)

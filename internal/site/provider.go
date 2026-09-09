@@ -466,6 +466,7 @@ func siteToConfig(s *model.Site) *model.SiteConfig {
 		SkipSSLVerify: s.SkipSSLVerify,
 		HRStrategy:    s.HRStrategy,
 
+		DownloadHourlyLimit:   s.DownloadHourlyLimit,
 		DownloadURLTemplate:   s.DownloadURLTemplate,
 		DetailsURLTemplate:    s.DetailsURLTemplate,
 		DownloadMode:          s.DownloadMode,

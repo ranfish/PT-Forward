@@ -286,6 +286,7 @@ export interface Site {
   proxyUrl?: string
   skipSslVerify: boolean
   maxConcurrent: number
+  downloadHourlyLimit: number
   uploadBytes: string
   downloadBytes: string
   seedingPoints: number

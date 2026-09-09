@@ -73,6 +73,9 @@ type Site struct {
 	UseGlobalProxy  bool   `json:"use_global_proxy" gorm:"default:false"`
 	SkipSSLVerify   bool   `json:"skip_ssl_verify" gorm:"default:false"`
 	MaxConcurrent   int    `json:"max_concurrent" gorm:"default:2"`
+	// §59.183: 站点级 .torrent 下载限流（次/小时，0=全局默认 95）——孤儿恢复/辅种批量下载
+	// 受此限制；优堡等实测无此严限制的站点可在 站点管理-详情-网络 调高。
+	DownloadHourlyLimit int `json:"download_hourly_limit" gorm:"default:0"`
 	// §59.166: 一站多种批量发布种间间隔（秒，站点级——FormConfigPanel 滚轮 1-60，默认 1）
 	PublishIntervalSeconds int `json:"publish_interval_seconds" gorm:"default:1"`
 
@@ -346,6 +349,8 @@ type SiteConfig struct {
 	ProxyURL      string `json:"proxy_url,omitempty"`
 	SkipSSLVerify bool   `json:"skip_ssl_verify"`
 
+	// §59.183: 站点级 .torrent 下载限流（次/小时，0=全局默认 95）
+	DownloadHourlyLimit int    `json:"download_hourly_limit,omitempty"`
 	DownloadMode        string `json:"download_mode,omitempty"`
 	DownloadURLTemplate string `json:"download_url_template,omitempty"`
 	DetailsURLTemplate  string `json:"details_url_template,omitempty"`
