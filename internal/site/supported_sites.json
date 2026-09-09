@@ -963,6 +963,7 @@
     "auth_type": "cookie",
     "cookiecloud_domain": "xdypt.vip",
     "download_url_template": "download.php?id={id}&passkey={passkey}",
+    "supports_pieces_hash_api": true,
     "verification_status": "verified"
   },
   "xingtan.one": {
