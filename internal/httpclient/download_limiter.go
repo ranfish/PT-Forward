@@ -30,11 +30,12 @@ func NewDownloadRateLimiter(minInterval time.Duration, hourlyLimit int) *Downloa
 var GlobalDownloadLimiter = NewDownloadRateLimiter(2*time.Second, 95)
 
 func (l *DownloadRateLimiter) Acquire(domain string) error {
-	return l.AcquireWithLimit(domain, 0)
+	// 无参路径=全局默认（构造值，GlobalDownloadLimiter 为 95）；0=不限是 AcquireWithLimit 的显式语义
+	return l.AcquireWithLimit(domain, l.hourlyLimit)
 }
 
-// AcquireWithLimit §52.4.3/§59.183: hourlyLimit<=0 用全局默认；
-// 站点级覆盖（sites.download_hourly_limit，站点管理-详情-网络可配）。
+// AcquireWithLimit §52.4.3/§59.183: hourlyLimit<=0 不限（仍有 minInterval 兜底，
+// ≈2s/次）；站点级值来自 sites.download_hourly_limit（站点管理-详情-网络，默认 95）。
 func (l *DownloadRateLimiter) AcquireWithLimit(domain string, hourlyLimit int) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -51,10 +52,7 @@ func (l *DownloadRateLimiter) AcquireWithLimit(domain string, hourlyLimit int) e
 		entry.windowStart = now
 	}
 
-	if hourlyLimit <= 0 {
-		hourlyLimit = l.hourlyLimit
-	}
-	if entry.count >= hourlyLimit {
+	if hourlyLimit > 0 && entry.count >= hourlyLimit {
 		return fmt.Errorf("download quota exceeded for %s: %d/%d per hour", domain, entry.count, hourlyLimit)
 	}
 

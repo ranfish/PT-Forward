@@ -281,7 +281,7 @@
     "maxConcurrent": "Max Concurrent Requests",
     "maxConcurrentHint": "Max simultaneous HTTP requests to this site (default 2). Higher values speed up RSS refresh and HR detection but may trigger rate limiting.",
     "downloadHourlyLimit": "Torrent DL Limit/Hour",
-    "downloadHourlyLimitHint": "Max .torrent downloads per site per hour, 0=global default 95. Applies to orphan recovery & reseed batch downloads; raise if the site has no such strict limit.",
+    "downloadHourlyLimitHint": "Max .torrent downloads per site per hour, 0=unlimited (min-interval ~2s still applies), default 95. Applies to orphan recovery & reseed batch downloads.",
     "parseStrategy": "Parse Strategy",
     "hashStrategy": "Hash Strategy",
     "sizeStrategy": "Size Strategy",
