@@ -284,7 +284,7 @@
     "maxConcurrent": "最大并发连接数",
     "maxConcurrentHint": "同一站点同时进行的 HTTP 请求数上限，默认 2。增大可加快 RSS 刷新和 HR 检测速度，但可能触发站点限流。",
     "downloadHourlyLimit": "种子下载限流/时",
-    "downloadHourlyLimitHint": "每站点 .torrent 文件下载次数/小时上限，0=全局默认 95。孤儿恢复/辅种批量下载受此限制；站点实测无此严限制时可调高。",
+    "downloadHourlyLimitHint": "每站点 .torrent 文件下载次数/小时上限，0=不限（仍有约 2 秒/次的节奏兜底），默认 95。孤儿恢复/辅种批量下载受此限制。",
     "parseStrategy": "解析策略",
     "hashStrategy": "Hash 策略",
     "sizeStrategy": "Size 策略",

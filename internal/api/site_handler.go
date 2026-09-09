@@ -934,11 +934,16 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		ProxyURL:      req.ProxyURL,
 		SkipSSLVerify: req.SkipSSLVerify,
 		MaxConcurrent: req.MaxConcurrent,
-		DownloadHourlyLimit: req.DownloadHourlyLimit,
 
 		HRStrategy: req.HRStrategy,
 
 		SupportsPiecesHashAPI: supportsPiecesHashAPI,
+	}
+
+	// §59.183: 创建未指定(0)落默认 95——0=不限是详情页显式语义；
+	// 不能依赖 DB 列默认（migration 38 旧版库存量列默认 0）。
+	if s.DownloadHourlyLimit == 0 {
+		s.DownloadHourlyLimit = 95
 	}
 
 	if err := h.repo.Create(r.Context(), &s); err != nil {
