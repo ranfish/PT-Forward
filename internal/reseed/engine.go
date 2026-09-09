@@ -2995,7 +2995,21 @@ func techProfileConflictFields(src titleparser.TechProfile, candidateTitle strin
 }
 
 // techProfileVersionDefined 规则 B：候选有版本定义 Token（EditionInfo/RegionCode/SourcePlatform）而源无。
+// stripBracketsForVersionCheck §59.181: 剥离站点标签括号内容（半角[]与全角【】）。
+// 副标题匹配路径加固：优堡 "[热门]【DIY 原盘 00884】正义的慈悲"（tid=109323 实证）
+// 中的 【DIY 原盘 00884】 是站点分类标签，与资源元数据无关；其中的 "DIY" 在
+// 英文主标题路径被 splitMedium 消费为 "Blu-ray DIY"，但中文副标题路径无
+// Blu-ray 上下文，"DIY" 绕过媒介消费误入 platform 词典 → SourcePlatform="DIY"
+// → techProfileVersionDefined 误判版本差异 → fuzzy 被阻断 → size_miss。
+// 剥离括号内容消除噪音，保留两条匹配路径各自的正确行为。
+var reBracketContent = regexp.MustCompile(`\[[^\]]*\]|【[^】]*】`)
+
+func stripBracketsForVersionCheck(s string) string {
+	return reBracketContent.ReplaceAllString(s, "")
+}
+
 func techProfileVersionDefined(src titleparser.TechProfile, candidateTitle string) bool {
+	candidateTitle = stripBracketsForVersionCheck(candidateTitle)
 	cand := titleparser.ParseTitleTech(candidateTitle)
 	if cand.EditionInfo != "" && src.EditionInfo == "" {
 		return true
