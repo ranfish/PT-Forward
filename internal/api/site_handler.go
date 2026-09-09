@@ -107,6 +107,8 @@ type createSiteRequest struct {
 	UseGlobalProxy  bool   `json:"useGlobalProxy"`
 	SkipSSLVerify   bool   `json:"skipSslVerify"`
 	MaxConcurrent   int    `json:"maxConcurrent,omitempty"`
+	// §59.183: 站点级 .torrent 下载限流（次/小时，0=全局默认 95）
+	DownloadHourlyLimit int `json:"downloadHourlyLimit,omitempty"`
 
 	HRStrategy string `json:"hrStrategy,omitempty"`
 }
@@ -187,6 +189,8 @@ type updateSiteRequest struct {
 	UseGlobalProxy *bool   `json:"useGlobalProxy,omitempty"`
 	SkipSSLVerify  *bool   `json:"skipSslVerify,omitempty"`
 	MaxConcurrent *int    `json:"maxConcurrent,omitempty"`
+	// §59.183: 站点级 .torrent 下载限流（次/小时，0=全局默认 95）
+	DownloadHourlyLimit *int `json:"downloadHourlyLimit,omitempty"`
 
 	HRStrategy          *string `json:"hrStrategy,omitempty"`
 	TargetTypes         *string `json:"targetTypes,omitempty"`
@@ -253,6 +257,7 @@ type siteResponse struct {
 	UseGlobalProxy       bool   `json:"useGlobalProxy"`
 	SkipSSLVerify        bool   `json:"skipSslVerify"`
 	MaxConcurrent        int    `json:"maxConcurrent"`
+	DownloadHourlyLimit  int    `json:"downloadHourlyLimit"`
 
 	HRStrategy           string `json:"hrStrategy,omitempty"`
 	TargetTypes          string `json:"targetTypes,omitempty"`
@@ -374,6 +379,7 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		UseGlobalProxy:  s.UseGlobalProxy,
 		SkipSSLVerify:   s.SkipSSLVerify,
 		MaxConcurrent:   s.MaxConcurrent,
+		DownloadHourlyLimit: s.DownloadHourlyLimit,
 
 		HRStrategy:           s.HRStrategy,
 		TargetTypes:          s.TargetTypes,
@@ -605,6 +611,8 @@ type siteExportImport struct {
 	UseGlobalProxy bool   `json:"use_global_proxy"`
 	SkipSSLVerify  bool   `json:"skip_ssl_verify"`
 	MaxConcurrent  int    `json:"max_concurrent"`
+	// §59.183: 站点级 .torrent 下载限流
+	DownloadHourlyLimit int `json:"download_hourly_limit"`
 
 	ReseedLimitCount    int `json:"reseed_limit_count"`
 	ReseedLimitInterval int `json:"reseed_limit_interval"`
@@ -625,7 +633,7 @@ var siteImportFields = []string{
 	"is_source", "is_target", "target_types", "participate_auto_publish",
 	"hr_strategy", "override_rss_url", "override_save_path",
 	"assume_free",
-	"proxy_url", "use_global_proxy", "skip_ssl_verify", "max_concurrent", "publish_interval_seconds",
+	"proxy_url", "use_global_proxy", "skip_ssl_verify", "max_concurrent", "publish_interval_seconds", "download_hourly_limit",
 	"reseed_limit_count", "reseed_limit_interval", "iyuu_limit_count", "iyuu_limit_interval", "publish_form_config",
 	"alternative_domains", "tracker_domains", "supports_pieces_hash_api", "api_domain",
 }
@@ -672,6 +680,7 @@ func (h *SiteHandler) handleExport(w http.ResponseWriter, r *http.Request) {
 			UseGlobalProxy:         s.UseGlobalProxy,
 			SkipSSLVerify:          s.SkipSSLVerify,
 			MaxConcurrent:          s.MaxConcurrent,
+			DownloadHourlyLimit:    s.DownloadHourlyLimit,
 			ReseedLimitCount:       s.ReseedLimitCount,
 			ReseedLimitInterval:    s.ReseedLimitInterval,
 			IYUULimitCount:         s.IYUULimitCount,
@@ -925,6 +934,7 @@ func (h *SiteHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		ProxyURL:      req.ProxyURL,
 		SkipSSLVerify: req.SkipSSLVerify,
 		MaxConcurrent: req.MaxConcurrent,
+		DownloadHourlyLimit: req.DownloadHourlyLimit,
 
 		HRStrategy: req.HRStrategy,
 
@@ -1135,6 +1145,9 @@ func (h *SiteHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.MaxConcurrent != nil {
 		s.MaxConcurrent = *req.MaxConcurrent
+	}
+	if req.DownloadHourlyLimit != nil {
+		s.DownloadHourlyLimit = *req.DownloadHourlyLimit
 	}
 	if req.HRStrategy != nil {
 		s.HRStrategy = *req.HRStrategy

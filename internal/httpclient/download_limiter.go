@@ -30,6 +30,12 @@ func NewDownloadRateLimiter(minInterval time.Duration, hourlyLimit int) *Downloa
 var GlobalDownloadLimiter = NewDownloadRateLimiter(2*time.Second, 95)
 
 func (l *DownloadRateLimiter) Acquire(domain string) error {
+	return l.AcquireWithLimit(domain, 0)
+}
+
+// AcquireWithLimit §52.4.3/§59.183: hourlyLimit<=0 用全局默认；
+// 站点级覆盖（sites.download_hourly_limit，站点管理-详情-网络可配）。
+func (l *DownloadRateLimiter) AcquireWithLimit(domain string, hourlyLimit int) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -45,8 +51,11 @@ func (l *DownloadRateLimiter) Acquire(domain string) error {
 		entry.windowStart = now
 	}
 
-	if entry.count >= l.hourlyLimit {
-		return fmt.Errorf("download quota exceeded for %s: %d/%d per hour", domain, entry.count, l.hourlyLimit)
+	if hourlyLimit <= 0 {
+		hourlyLimit = l.hourlyLimit
+	}
+	if entry.count >= hourlyLimit {
+		return fmt.Errorf("download quota exceeded for %s: %d/%d per hour", domain, entry.count, hourlyLimit)
 	}
 
 	if !entry.lastDownload.IsZero() {

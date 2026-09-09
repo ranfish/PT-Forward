@@ -168,6 +168,12 @@
                 <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('site.maxConcurrentHint') }}</div>
               </a-form-item>
             </a-col>
+            <a-col :span="8">
+              <a-form-item :label="t('site.downloadHourlyLimit')">
+                <a-input-number v-model:value="settingsForm.downloadHourlyLimit" :min="0" :max="100000" style="width: 100%" />
+                <div style="font-size: 11px; color: #999; margin-top: 2px">{{ t('site.downloadHourlyLimitHint') }}</div>
+              </a-form-item>
+            </a-col>
           </a-row>
 
           <div class="section-title">{{ t('site.hrStrategy') }}</div>
@@ -338,6 +344,7 @@ const settingsForm = reactive({
   proxyUrl: '',
   skipSslVerify: false,
   maxConcurrent: 2,
+  downloadHourlyLimit: 0,
   hrStrategy: '',
   targetTypes: [] as string[],
   reseedLimitCount: 0,
@@ -485,6 +492,7 @@ async function fetchSite() {
       proxyUrl: site.value.proxyUrl || '',
       skipSslVerify: site.value.skipSslVerify || false,
       maxConcurrent: site.value.maxConcurrent || 2,
+      downloadHourlyLimit: site.value.downloadHourlyLimit || 0,
       hrStrategy: site.value.hrStrategy || '',
       targetTypes: parseTargetTypes(site.value.targetTypes, site.value.isTarget),
       reseedLimitCount: site.value.reseedLimitCount || 0,
@@ -538,6 +546,7 @@ async function updateSettings() {
       proxyUrl: settingsForm.proxyUrl,
       skipSslVerify: settingsForm.skipSslVerify,
       maxConcurrent: settingsForm.maxConcurrent,
+      downloadHourlyLimit: settingsForm.downloadHourlyLimit,
       hrStrategy: settingsForm.hrStrategy,
       name: settingsForm.name,
       baseUrl: settingsForm.baseUrl,

@@ -95,7 +95,7 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 	if domain == "" {
 		domain = config.Domain
 	}
-	if err := httpclient.GlobalDownloadLimiter.Acquire(domain); err != nil {
+	if err := httpclient.GlobalDownloadLimiter.AcquireWithLimit(domain, config.DownloadHourlyLimit); err != nil {
 		return nil, downloadError("下载限流: "+err.Error(), nil)
 	}
 
