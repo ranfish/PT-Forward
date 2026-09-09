@@ -340,6 +340,15 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 					stats.FailedSites = append(stats.FailedSites, SiteFailure{Site: sourceSite, Reason: searchErr.Error()})
 				} else {
 					stats.Searched++
+					// §59.181 调试：打印每条结果的 size（定位 size_miss 根因）
+					for _, rr := range results {
+						r.logger.Debug("orphan L2 priority: result detail",
+							zap.String("site", sourceSite),
+							zap.String("tid", rr.TorrentID),
+							zap.Int64("size", rr.Size),
+							zap.String("title", rr.Title[:min(60, len(rr.Title))]),
+							zap.Int64("orphan_size", orphan.Size))
+					}
 					r.logger.Info("orphan L2 priority: search results",
 						zap.String("site", sourceSite),
 						zap.Int("result_count", len(results)),
