@@ -2906,13 +2906,6 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 			stats.SizeMiss++
 			continue
 		}
-		// §59.181 调试：逐结果状态（定位 fuzzy 匹配失败根因）
-		if srcProfile != nil {
-			verBlocked := techProfileVersionDefined(*srcProfile, r.Title)
-			sizeOK := CompareSizeDisplay(sourceSize, r.Size)
-			fmt.Printf("[verify-debug] tid=%s size=%d srcSize=%d exact=%v verBlocked=%v sizeOK=%v conflict=%v title=%q\n",
-				r.TorrentID, r.Size, sourceSize, r.Size == sourceSize, verBlocked, sizeOK, techProfileConflict(*srcProfile, r.Title), r.Title[:min(80, len(r.Title))])
-		}
 		// 精确匹配（字节相同）优先返回
 		if r.Size == sourceSize {
 			return &L2MatchResult{
