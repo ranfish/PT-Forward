@@ -1636,8 +1636,10 @@ func looksLikeSceneName(s string) bool {
 }
 
 // hasGroupSuffix §59.26: 检查标题末尾是否有制作组后缀模式（-XXXXX 至少 2 个字母数字）
+// §59.182: 字符类加 @——@ 子组署名（-DIY@UBits / -cXcY@FRDS，§59.179 同族）不含 @ 时
+// 完整英文标题被误判"无后缀"→ §59.26 补全用 </a> 后中文副标题覆盖英文主标题。
 func hasGroupSuffix(s string) bool {
-	return regexp.MustCompile(`-[A-Za-z0-9]{2,}$`).MatchString(strings.TrimSpace(s))
+	return regexp.MustCompile(`-[A-Za-z0-9@]{2,}$`).MatchString(strings.TrimSpace(s))
 }
 
 func parseSizeStr(s string) int64 {
