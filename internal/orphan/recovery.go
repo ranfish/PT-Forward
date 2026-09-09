@@ -346,7 +346,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 							zap.String("site", sourceSite),
 							zap.String("tid", rr.TorrentID),
 							zap.Int64("size", rr.Size),
-							zap.String("title", rr.Title[:min(60, len(rr.Title))]),
+							zap.String("title", rr.Title[:min(200, len(rr.Title))]),
 							zap.Int64("orphan_size", orphan.Size))
 					}
 					r.logger.Info("orphan L2 priority: search results",
