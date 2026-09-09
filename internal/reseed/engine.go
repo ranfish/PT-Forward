@@ -2553,14 +2553,10 @@ func ExtractSearchKeyword(title string) string {
 	raw = strings.Join(strings.Fields(raw), " ")
 	raw = stripApostrophes(raw)
 
-	// stripChinesePrefix 剥离了 CJK 片名时，raw 缺少电影名称。
-	// 用 chineseTitleFallback（基于原始标题）补回片名。
-	strippedCJK := len(rest) < len(title)
-	if strippedCJK {
-		if fb := chineseTitleFallback(title); fb != "" && fb != raw {
-			return appendMediaAfterResolution(stripApostrophes(fb), title)
-		}
-	}
+	// §59.180: 删除 strippedCJK 回退——剥离成功=英文标题可用，不需要"补回"中文。
+	// chineseTitleFallback 只在 KeywordHasNoTitle（英文确实无有效标题）时触发。
+	// 原 strippedCJK 条件会用含中文前缀的结果覆盖正确的英文搜索词
+	// （孤儿恢复三失败实证：不设限通缉Running.On.Empty... → 搜索词被污染）。
 	if KeywordHasNoTitle(raw) {
 		if fb := chineseTitleFallback(title); fb != "" && fb != raw {
 			return appendMediaAfterResolution(stripApostrophes(fb), title)
