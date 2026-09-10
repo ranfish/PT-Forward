@@ -66,6 +66,11 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 		case form == "unknown" && hasVideoFiles:
 			// S01 无 Complete 无 Exx + 有视频文件：直接走文件级（用文件名 SxxExx 搜索）
 			siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
+			if siteName == "" {
+				// §59.187 ②: 文件级未命中回退目录级——form 误判安全网
+			 //（关键词含集粒度 token + 单集尺寸基准双错形态，目录级总尺寸可救）
+				siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
+			}
 		default:
 			// 全集/电影/音乐：走目录级搜索
 			siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
@@ -435,6 +440,24 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 				}
 				r.logger.Debug("orphan L2 priority: no match",
 					zap.String("site", sourceSite))
+
+				// §59.187 ③: 混合词归一化降级轮——主词含 CJK+ASCII 粘连词且未命中
+				// → 词内拆分+短英文剔除变体重搜（"神秘友友IF 2024"站方分隔形态
+				//   粘连 token 零结果案；用户实测归一化词一页命中）
+				if nk := reseed.NormalizeMixedKeyword(searchKeyword); nk != "" {
+					r.logger.Debug("orphan L2 priority: mixed keyword normalization retry",
+						zap.String("site", sourceSite),
+						zap.String("normalized", nk))
+					if retry, rErr := r.searchWithBackoff(ctx, adapter, config, nk); rErr == nil && len(retry) > 0 {
+						if m3, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m3 != nil {
+							r.logger.Info("orphan L2 match (priority, mixed-normalized)",
+								zap.String("orphan", orphan.Name),
+								zap.String("site", sourceSite),
+								zap.String("torrent_id", m3.TorrentID))
+							return sourceSite, m3.TorrentID, "l2:priority-mix:"+sourceSite
+						}
+					}
+				}
 
 				// §59.184 B 补线（priority 站）：B1 形态（主词无 CJK 且源标题有 CJK）
 				// → 前导中文段补一轮 area=0（中文标题站索引中文名）
