@@ -57,15 +57,15 @@ type TokenDef struct {
 // re 返回编译缓存的正则。CaseSensitive 词条不加 (?i)（iP/iT/Baha 等 wiki 明确写法，
 // 大小写敏感避免 "IT"/"IP" 等普通词误命中）。
 func (t TokenDef) re() *regexp.Regexp {
-	if re, ok := tokenReC2[t.Pattern]; ok {
-		return re
+	if re, ok := tokenReC2.Load(t.Pattern); ok {
+		return re.(*regexp.Regexp)
 	}
 	pattern := t.Pattern
 	if !t.CaseSensitive {
 		pattern = `(?i)` + pattern
 	}
 	re := regexp.MustCompile(pattern)
-	tokenReC2[t.Pattern] = re
+	tokenReC2.Store(t.Pattern, re)
 	return re
 }
 
@@ -114,10 +114,14 @@ type dictState struct {
 }
 
 var (
-	dictOnce  sync.Once
-	dict      *dictState
-	dictErr   error
-	tokenReC2 = map[string]*regexp.Regexp{} // pattern → compiled（t.re() 用）
+	dictOnce sync.Once
+	dict     *dictState
+	dictErr  error
+	// tokenReC2 §59.186: pattern→compiled 懒缓存。sync.Map——无锁 map 版曾在
+	// 冷启动双 goroutine 并发首写时 fatal: concurrent map read and map write
+	// （PT30 OTA 后立即批量恢复实证，进程崩溃不可恢复）。读多+每键写一次，
+	// sync.Map 最适。
+	tokenReC2 sync.Map
 )
 
 // loadDict 加载 + 校验分域字典。校验失败 fail-fast（错误暴露给 ensureDict 调用方）。
@@ -424,15 +428,15 @@ func chineseAudHit(t TokenDef, all string) bool {
 	return strings.Contains(strings.ToLower(m), t.InferExclude)
 }
 
-// compileInferRe 推断正则缓存编译。
-var inferReCache = map[string]*regexp.Regexp{}
+// compileInferRe 推断正则缓存编译。§59.186: sync.Map——同 tokenReC2 并发首写地雷。
+var inferReCache sync.Map
 
 func compileInferRe(pattern string) *regexp.Regexp {
-	if re, ok := inferReCache[pattern]; ok {
-		return re
+	if re, ok := inferReCache.Load(pattern); ok {
+		return re.(*regexp.Regexp)
 	}
 	re := regexp.MustCompile(`(?i)` + pattern)
-	inferReCache[pattern] = re
+	inferReCache.Store(pattern, re)
 	return re
 }
 
