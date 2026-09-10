@@ -85,16 +85,15 @@ func (l *siteLimiter) getCount(siteName string) int {
 }
 
 type l2Stats struct {
-	mu            sync.Mutex
-	searched      map[string]int
-	noKeyword     int
-	noGroup       int
-	searchFailed  int
-	searchEmpty   int
-	groupMismatch int
-	sizeMismatch  int
-	matched       int
-	siteResults   map[string]string
+	mu           sync.Mutex
+	searched     map[string]int
+	noKeyword    int
+	refuted      int // §59.184 三态反驳聚合（组名/续集/tech/版本/size）
+	neutral      int // 中性（不可验证，不再拒绝）
+	searchFailed int
+	searchEmpty  int
+	matched      int
+	siteResults  map[string]string
 }
 
 func newL2Stats() *l2Stats {
@@ -117,11 +116,10 @@ func (s *l2Stats) log(e *Engine) {
 	e.logger.Info("L2 search verification stats",
 		zap.Int("searched", len(s.searched)),
 		zap.Int("noKeyword", s.noKeyword),
-		zap.Int("noGroup", s.noGroup),
+		zap.Int("refuted", s.refuted),
+		zap.Int("neutral", s.neutral),
 		zap.Int("searchFailed", s.searchFailed),
 		zap.Int("searchEmpty", s.searchEmpty),
-		zap.Int("groupMismatch", s.groupMismatch),
-		zap.Int("sizeMismatch", s.sizeMismatch),
 		zap.Int("matched", s.matched))
 	sites := make([]string, 0, len(s.siteResults))
 	for site := range s.siteResults {
@@ -2357,14 +2355,10 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		return nil
 	}
 
-	if !isMusic && groupName == "" {
-		if l2s != nil {
-			l2s.mu.Lock()
-			l2s.noGroup++
-			l2s.mu.Unlock()
-		}
-		return nil
-	}
+	// §59.184 D1: 无组名早退删除——早期种/纯中文种（场景2）靠 标题/tech/size
+	// 三门验证兜底；孤儿（getSitePriority 组名空→全站照搜）与元数据获取本就无此门，
+	// 辅种为唯一异类，三业务对齐。残余敞口（同碟 REMUX 变体误匹配）由注入侧
+	// pieces-hash 终审兜底。
 
 	if isMusic {
 		e.logger.Debug("music torrent L2 search",
@@ -2426,16 +2420,22 @@ func (e *Engine) matchLayer2SearchVerify(ctx context.Context, adapter model.Site
 		zap.String("groupName", groupName),
 		zap.Bool("music", isMusic),
 		zap.Int("results", len(results)),
-		zap.Int("noTorrentID", filterStats.EmptyID),
-		zap.Int("groupMismatch", filterStats.GroupMiss),
-		zap.Int("titleMismatch", filterStats.TitleMiss),
-		zap.Int("sizeMismatch", filterStats.SizeMiss))
+		zap.Int("emptyId", filterStats.EmptyID),
+		zap.Int("groupRefute", filterStats.GroupRefute),
+		zap.Int("groupNeutral", filterStats.GroupNeutral),
+		zap.Int("sequelRefute", filterStats.SequelRefute),
+		zap.Int("titleNeutral", filterStats.TitleNeutral),
+		zap.Int("sizeInvalid", filterStats.SizeInvalid),
+		zap.Int("techRefute", filterStats.TechRefute),
+		zap.Int("versionRefute", filterStats.VersionRefute),
+		zap.Int("sizeRefute", filterStats.SizeRefute))
 	if l2s != nil {
-		reason := fmt.Sprintf("未匹配(group=%d,size=%d)", filterStats.GroupMiss, filterStats.SizeMiss)
+		refuted := filterStats.GroupRefute + filterStats.SequelRefute + filterStats.TechRefute + filterStats.VersionRefute + filterStats.SizeRefute
+		reason := fmt.Sprintf("未匹配(refute=%d,neutral=%d)", refuted, filterStats.GroupNeutral+filterStats.TitleNeutral)
 		l2s.record(siteName, reason)
 		l2s.mu.Lock()
-		l2s.groupMismatch += filterStats.GroupMiss
-		l2s.sizeMismatch += filterStats.SizeMiss
+		l2s.refuted += refuted
+		l2s.neutral += filterStats.GroupNeutral + filterStats.TitleNeutral
 		l2s.mu.Unlock()
 	}
 
@@ -2850,21 +2850,29 @@ type L2MatchResult struct {
 	Size      int64
 }
 
+// MatchFilterStats §59.184 三态化：反驳按原因拆分、不可验证计中性
+// （原 GroupMiss/SizeMiss/TitleMiss 杂烩计数消融——§59.182 排查被误导教训）。
 type MatchFilterStats struct {
-	EmptyID   int
-	GroupMiss int
-	SizeMiss  int
-	TitleMiss int
+	EmptyID       int
+	GroupRefute   int // 组名反驳：显式异组名后缀（同碟 REMUX 体积不可分，组名唯一判别器）
+	GroupNeutral  int // 组名中性：无显式组名后缀（中文标题/音乐/截断）
+	SequelRefute  int // 标题反驳：续集号不同
+	TitleNeutral  int // 标题中性：无命中（原 TitleMiss 拒绝 → 三态改中性）
+	SizeInvalid   int // size<=0 运营性拒绝（非身份判断）
+	TechRefute    int // 规则 A：字段双方有值且不等价
+	VersionRefute int // 规则 B：候选有版本 Token 源无（G2 修复后含无括号 REPACK）
+	SizeRefute    int // 超显示等价窗
 }
 
 func VerifyMatchWithStats(results []*model.SeedingSearchResult, groupName string, sourceSize int64) (*L2MatchResult, *MatchFilterStats) {
 	return VerifyMatchWithStatsAndSource(results, groupName, sourceSize, "")
 }
 
-// VerifyMatchWithStatsAndSource 在 VerifyMatchWithStats 基础上增加 TechProfile 比较。
-// sourceTitle 非空时，对候选标题解析 TechProfile，按规则 A/B 过滤：
-//   - 规则 A：双方都有值且不同 → 拒绝（VideoCodec/AudioCodec/HDR/Specification/RegionCode）
-//   - 规则 B：候选有版本定义 Token 而源无 → 降为精确匹配（EditionInfo/RegionCode/SourcePlatform）
+// VerifyMatchWithStatsAndSource §59.184 三态门主链。
+// 每门三态：确认（正向证据）/ 中性（语言形态无法验证→不杀）/ 反驳（身份矛盾→一票否决）。
+// 裁决：任一反驳→拒；≥1 确认且 0 反驳→放行；全中性→拒。
+// 排序（G3）：精确字节短路保留；通过者按 确认门数降序 → |diff| 升序。
+// sourceTitle 非空时按规则 A（字段不等价→反驳）/ B（候选版本 Token 源无→禁等价匹配）过滤。
 func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupName string, sourceSize int64, sourceTitle string) (*L2MatchResult, *MatchFilterStats) {
 	var srcProfile *titleparser.TechProfile
 	if sourceTitle != "" {
@@ -2873,8 +2881,9 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 	}
 
 	stats := &MatchFilterStats{}
-	var fuzzyMatch *L2MatchResult
-	var fuzzyBestDiff int64
+	var best *L2MatchResult
+	var bestConfirms int
+	var bestDiff int64
 
 	meaningfulWords := extractMeaningfulTitleWords(sourceTitle, groupName)
 	sourceCJK := extractCJKSubstrings(sourceTitle)
@@ -2884,29 +2893,51 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 			stats.EmptyID++
 			continue
 		}
-		if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
-			// §59.26: 站点 CSS 截断的标题（含 .. 且含分辨率词）可能截掉制作组后缀，
-			// 跳过组名过滤，交给 size + title 关键词验证兜底。
-			// 无分辨率词的截断标题（如 "Movie.1999.."）仍然严格拒绝。
-			if !(strings.Contains(r.Title, "..") && hasResolutionToken(r.Title)) {
-				stats.GroupMiss++
+		confirms := 0
+
+		// 门2 组名（三态）：确认（含预期组名）优先于反驳短路——
+		// 中文副标题内嵌组名（如 "UBits官方DIY"）无后缀形态由 contains 命中。
+		if groupName != "" {
+			if strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
+				confirms++
+			} else if cg := ExtractGroupName(r.Title); cg != "" && !strings.EqualFold(cg, groupName) {
+				stats.GroupRefute++
 				continue
+			} else {
+				stats.GroupNeutral++
 			}
 		}
-		if sourceTitle != "" && !titleKeywordRelevant(meaningfulWords, sourceCJK, sourceTitle, r.Title) {
-			stats.TitleMiss++
-			continue
+
+		// 门3 标题（三态）：续集号反驳保持；无命中中性（原 TitleMiss 消融）。
+		if sourceTitle != "" {
+			switch titleKeywordState(meaningfulWords, sourceCJK, sourceTitle, r.Title) {
+			case titleStateRefute:
+				stats.SequelRefute++
+				continue
+			case titleStateConfirm:
+				confirms++
+			default:
+				stats.TitleNeutral++
+			}
 		}
+
+		// 门4 size>0：运营性必填（size 恒有比较能力，无中性态）。
 		if r.Size <= 0 {
-			stats.SizeMiss++
+			stats.SizeInvalid++
 			continue
 		}
-		// TechProfile 比较：规则 A 双方有值且不同 → 跳过
+
+		// 门5 tech 规则 A：双方有值且不等价 → 反驳（等价组豁免保持）。
 		if srcProfile != nil && techProfileConflict(*srcProfile, r.Title) {
-			stats.SizeMiss++
+			stats.TechRefute++
 			continue
 		}
-		// 精确匹配（字节相同）优先返回
+		// tech 确认：≥1 字段双方有值且等价。
+		if srcProfile != nil && techProfileConfirm(*srcProfile, r.Title) {
+			confirms++
+		}
+
+		// 门6 精确字节短路（优先于版本 Token——保持既有语义：字节相同即同一 torrent）。
 		if r.Size == sourceSize {
 			return &L2MatchResult{
 				TorrentID: r.TorrentID,
@@ -2914,33 +2945,132 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 				Size:      r.Size,
 			}, stats
 		}
-		// TechProfile 比较：规则 B 候选有版本 Token 源无 → 不允许容差匹配
-		allowFuzzy := true
+
+		// 门7 版本 Token（规则 B）：候选有版本定义源无 → 仅允许精确匹配。
 		if srcProfile != nil && techProfileVersionDefined(*srcProfile, r.Title) {
-			allowFuzzy = false
+			stats.VersionRefute++
+			continue
 		}
-		// 容差匹配：保存差值最小的结果
-		if allowFuzzy && CompareSizeDisplay(sourceSize, r.Size) {
-			diff := r.Size - sourceSize
-			if diff < 0 {
-				diff = -diff
+
+		// 门8 size 显示等价（v3）：超窗=内容级反驳。
+		if !CompareSizeDisplay(sourceSize, r.Size) {
+			stats.SizeRefute++
+			continue
+		}
+		confirms++ // size 等价确认
+
+		// 全中性零证据 → 拒（size 门恒有结论，此为防御性条款）。
+		if confirms == 0 {
+			continue
+		}
+
+		diff := r.Size - sourceSize
+		if diff < 0 {
+			diff = -diff
+		}
+		if best == nil || confirms > bestConfirms || (confirms == bestConfirms && diff < bestDiff) {
+			best = &L2MatchResult{
+				TorrentID: r.TorrentID,
+				Title:     r.Title,
+				Size:      r.Size,
 			}
-			if fuzzyMatch == nil || diff < fuzzyBestDiff {
-				fuzzyMatch = &L2MatchResult{
-					TorrentID: r.TorrentID,
-					Title:     r.Title,
-					Size:      r.Size,
-				}
-				fuzzyBestDiff = diff
-			}
-		} else {
-			stats.SizeMiss++
+			bestConfirms = confirms
+			bestDiff = diff
 		}
 	}
-	if fuzzyMatch != nil {
-		return fuzzyMatch, stats
+	if best != nil {
+		return best, stats
 	}
 	return nil, stats
+}
+
+// titleKeywordState §59.184: 标题门三态化（原 titleKeywordRelevant 的三态重构；
+// 后者保留供 loose 轮/AudioConflictCandidates 等未三态化消费方使用）。
+type titleState int
+
+const (
+	titleStateNeutral titleState = iota
+	titleStateConfirm
+	titleStateRefute
+)
+
+func titleKeywordState(meaningfulWords []string, sourceCJK []string, sourceTitle, candidateTitle string) titleState {
+	// 续集号比较（硬反驳）：双方都有续集号且不同 → 拒绝
+	sourceSequel := extractSequelNumber(sourceTitle)
+	candidateSequel := extractSequelNumber(candidateTitle)
+	if sourceSequel > 0 && candidateSequel > 0 && sourceSequel != candidateSequel {
+		return titleStateRefute
+	}
+
+	if candidateTitle == "" {
+		return titleStateNeutral
+	}
+	if len(meaningfulWords) == 0 && len(sourceCJK) == 0 {
+		return titleStateNeutral
+	}
+	candLower := strings.ToLower(candidateTitle)
+	if len(meaningfulWords) > 0 {
+		for _, w := range meaningfulWords {
+			if strings.Contains(candLower, w) {
+				return titleStateConfirm
+			}
+		}
+		// §59.184: 英文词在纯中文候选中零命中=无法验证（中性），原 return false 拒绝消融
+		return titleStateNeutral
+	}
+	candCJK := extractCJKSubstrings(candidateTitle)
+	if len(sourceCJK) > 0 && len(candCJK) > 0 {
+		for _, s := range sourceCJK {
+			if strings.Contains(candidateTitle, s) {
+				return titleStateConfirm
+			}
+		}
+		return titleStateNeutral
+	}
+	return titleStateNeutral // 原 true 技术性放行 → 显式中性
+}
+
+// techProfileConfirm §59.184: tech 门确认态——≥1 字段双方有值且等价
+// （等价判定与 techProfileConflictFields 同口径：EqualFold + spec/codec 等价组）。
+func techProfileConfirm(src titleparser.TechProfile, candidateTitle string) bool {
+	cand := titleparser.ParseTitleTech(candidateTitle)
+	fields := []struct{ name, s, c string }{
+		{"Resolution", src.Resolution, cand.Resolution},
+		{"VideoCodec", src.VideoCodec, cand.VideoCodec},
+		{"AudioCodec", src.AudioCodec, cand.AudioCodec},
+		{"HDR", src.HDR, cand.HDR},
+		{"Specification", src.Specification, cand.Specification},
+		{"RegionCode", src.RegionCode, cand.RegionCode},
+	}
+	for _, f := range fields {
+		if f.s == "" || f.c == "" {
+			continue
+		}
+		if strings.EqualFold(f.s, f.c) {
+			return true
+		}
+		if f.name == "Resolution" && resolutionEquivalent(f.s, f.c) {
+			return true
+		}
+		if f.name == "Specification" && specEquivalent(f.s, f.c) {
+			return true
+		}
+		if f.name == "VideoCodec" && codecEquivalent(f.s, f.c) {
+			return true
+		}
+	}
+	return false
+}
+
+// resolutionEquivalent §59.184: 分辨率显示变体同义（4K≡2160p/8K≡4320p/2K≡1440p）。
+// 经词典 variants 映射到同一 standard_key 判等——中文副标题 "4K UHD 原盘"（§59.181
+// 同族路径）与英文 "2160p" 由提取器返回原始 token，比较侧规范化兜底。
+func resolutionEquivalent(a, b string) bool {
+	if strings.EqualFold(a, b) {
+		return true
+	}
+	ka := titleparser.LookupDictKey("resolution", a)
+	return ka != "" && ka == titleparser.LookupDictKey("resolution", b)
 }
 
 // techProfileConflict 规则 A：源标题和候选标题都有某 Token 且值不同 → 冲突。
@@ -2980,6 +3110,10 @@ func techProfileConflictFields(src titleparser.TechProfile, candidateTitle strin
 			continue
 		}
 		if f.s != "" && f.c != "" && !strings.EqualFold(f.s, f.c) {
+			// §59.184: Resolution 显示变体等价豁免（4K ≡ 2160p）
+			if f.name == "Resolution" && resolutionEquivalent(f.s, f.c) {
+				continue
+			}
 			// §59.30: Specification 等价组豁免（WEB-DL ≈ WEBRip 站点标注差异）
 			if f.name == "Specification" && specEquivalent(f.s, f.c) {
 				continue
@@ -3032,21 +3166,11 @@ func VerifyMatchWithTruncationCheck(results []*model.SeedingSearchResult, groupN
 	return VerifyMatchWithTruncationCheckAndSource(results, groupName, sourceSize, "")
 }
 
+// VerifyMatchWithTruncationCheckAndSource §59.184 消融：三态化后组名不可见=中性
+// （CSS 截断/中文标题自然放行），空组名重跑与截断豁免条款冗余，收敛为直接委托。
+// 保留签名兼容既有调用方（orphan/reseed/metadata）。
 func VerifyMatchWithTruncationCheckAndSource(results []*model.SeedingSearchResult, groupName string, sourceSize int64, sourceTitle string) (*L2MatchResult, *MatchFilterStats) {
-	match, stats := VerifyMatchWithStatsAndSource(results, groupName, sourceSize, sourceTitle)
-	if match == nil && groupName != "" {
-		needFallback := false
-		for _, r := range results {
-			if strings.HasSuffix(strings.TrimSpace(r.Title), "..") {
-				needFallback = true
-				break
-			}
-		}
-		if needFallback {
-			return VerifyMatchWithStatsAndSource(results, "", sourceSize, sourceTitle)
-		}
-	}
-	return match, stats
+	return VerifyMatchWithStatsAndSource(results, groupName, sourceSize, sourceTitle)
 }
 
 // AudioConflictCandidates §59.36 修订: 从候选中提取"仅因音频 token 冲突被拒"的
@@ -3176,6 +3300,20 @@ func SearchAndVerifyMatchWithResults(ctx context.Context, adapter model.SiteAdap
 			allResults = append(allResults, retry...)
 			if m, _ := VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m != nil {
 				return m, nil, nil
+			}
+		}
+	}
+
+	// §59.184 B 链内补线：B1 形态（keyword 无 CJK 且 sourceTitle 有 CJK——提取期
+	// 剥过中文前缀的签名）→ 从 sourceTitle 提取前导中文段补一轮 area=0（中文标题
+	// 站索引中文名）。英线命中短路则本线永不触发；与 area=1 正交。
+	if match == nil && !hasCJKWord(keyword) && hasCJKWord(sourceTitle) {
+		if cnKW := leadingCJKSegment(sourceTitle); cnKW != "" && cnKW != keyword {
+			if retry, rErr := adapter.SearchTorrents(ctx, config, cnKW, nil); rErr == nil && len(retry) > 0 {
+				allResults = append(allResults, retry...)
+				if m, _ := VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m != nil {
+					return m, nil, nil
+				}
 			}
 		}
 	}
@@ -3357,6 +3495,45 @@ func hasCJKWord(s string) bool {
 	}
 	return false
 }
+
+// leadingCJKSegment §59.184 B 补线：提取标题的前导 CJK 段（B1 中文前缀）。
+// 跳过 [【】] 括号组；允许段内分隔符（点/空格/·/冒号）延续；遇 ASCII 即止；
+// 尾部分隔符剥净。"冰冻星球.BBC.Frozen..." → "冰冻星球"；"忍者神龟：变种时代.BluRay..." → "忍者神龟：变种时代"。
+func leadingCJKSegment(title string) string {
+	var b []rune
+	inBracket := false
+	started := false
+	stop := func() string {
+		return strings.TrimRight(strings.TrimSpace(string(b)), ". ·：:，!")
+	}
+	for _, r := range title {
+		switch {
+		case r == '[' || r == '【':
+			if started {
+				return stop()
+			}
+			inBracket = true
+		case inBracket && (r == ']' || r == '】'):
+			inBracket = false
+		case inBracket:
+			// 跳过括号内容
+		case (r >= 0x4E00 && r <= 0x9FFF) || (r >= 0x3400 && r <= 0x4DBF):
+			b = append(b, r)
+			started = true
+		case started && (r == '.' || r == ' ' || r == '·' || r == '：' || r == ':' || r == '，' || r == '!'):
+			b = append(b, r)
+		default:
+			return stop()
+		}
+	}
+	return stop()
+}
+
+// HasCJKWord §59.184: hasCJKWord 导出形态——孤儿恢复 B 补线跨包消费。
+func HasCJKWord(s string) bool { return hasCJKWord(s) }
+
+// LeadingCJKSegment §59.184: leadingCJKSegment 导出形态——孤儿恢复 B 补线跨包消费。
+func LeadingCJKSegment(title string) string { return leadingCJKSegment(title) }
 
 // stripCJKWords 剥离关键词中的 CJK 词，保留 ASCII 部分。
 func stripCJKWords(s string) string {
@@ -3970,6 +4147,19 @@ func hasCJKChar(s string) bool {
 	return false
 }
 
+// CompareSizeDisplay §59.184 v3: 显示舍入等价 + 1MB 绝对地板（替代 2% 容差）。
+//
+// 语义：站方显示值 = true_bytes 按其显示档（1024 基两位小数）舍入的结果，
+// parseSizeStr 反解析出的 resultBytes 是舍入近似值；孤儿/本地震磁盘字节为真值。
+// 同一种子两侧差的数学边界 = ½ 显示单位，按候选解析值量级重建显示档：
+//
+//	≥1TiB → ±0.005×1024⁴（±5.37GB）；≥1GiB → ±0.005×1024³（±5.37MB）；MB 档 → ±5KB
+//
+// 1MB 地板兜 2% 的真实成因（v0.0.484 考古勘误）：跨站种子文件集微差
+// （站方 NFO ~52KB，647.31 vs 647.26 MiB 案）——附属文件场景不存在，此为真因。
+// Just Mercy 实数锚：109323 差 5.09MB（窗内）/ 108076 差 5.38MB（窗外）。
+// 假设：站方显示 1024 基与 parseSizeStr 同基；若个别站 1000 基会全量失配
+// （偏差 7.4%，2% 时代同样失配）——非新增风险，全量失配时第一诊断项=查显示基。
 func CompareSizeDisplay(sourceBytes, resultBytes int64) bool {
 	if sourceBytes <= 0 || resultBytes <= 0 {
 		return false
@@ -3978,9 +4168,23 @@ func CompareSizeDisplay(sourceBytes, resultBytes int64) bool {
 	if diff < 0 {
 		diff = -diff
 	}
-	// 2% 容差：音乐目录含封面/CUE/LOG 等附属文件，总体积略大于纯种子体积。
-	// 视频不同 encode 也可能有微小体积差异。下载器自动校验兜底误匹配。
-	return float64(diff)/float64(resultBytes) <= 0.02
+	window := sizeDisplayWindow(resultBytes)
+	if floor := int64(1024 * 1024); window < floor {
+		window = floor
+	}
+	return diff <= window
+}
+
+// sizeDisplayWindow 按候选解析值量级重建站方显示档的舍入半窗（1024 基）。
+func sizeDisplayWindow(parsedBytes int64) int64 {
+	switch {
+	case parsedBytes >= 1024*1024*1024*1024:
+		return 1024 * 1024 * 1024 * 1024 / 200
+	case parsedBytes >= 1024 * 1024 * 1024:
+		return 1024 * 1024 * 1024 / 200
+	default:
+		return 1024 * 1024 / 200
+	}
 }
 
 func (e *Engine) CreateTask(ctx context.Context, task *model.ReseedTask) error {
@@ -5255,9 +5459,18 @@ func romanToValue(s string) int {
 //  2. 英文标题中独立的罗马数字词（II~IX，排除歧义的 I）：
 //     The Bride with White Hair II → 2, Rocky IV → 4
 //     仅扫描年份（1900~2099）之前出现的词，避免误匹配技术元数据。
+var reSeasonMarker = regexp.MustCompile(`(?i)\bS(\d{1,2})(?:E\d{1,3})?\b`)
+
 func extractSequelNumber(title string) int {
 	if title == "" {
 		return 0
+	}
+
+	// 策略 0（§59.184）：季标记 S01/S02E03——季号是强身份信号，不同季=不同内容
+	if m := reSeasonMarker.FindStringSubmatch(title); len(m) > 1 {
+		if n, err := strconv.Atoi(m[1]); err == nil && n >= 1 && n <= 99 {
+			return n
+		}
 	}
 
 	// 策略 1：CJK 后紧跟的 ASCII 段

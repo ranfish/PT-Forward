@@ -2895,8 +2895,17 @@ func TestVerifyMatch(t *testing.T) {
 			wantID:    "t1",
 		},
 		{
-			name:    "group not in title, strict skip",
+			// §59.184 三态：点分隔无组名后缀=组名不可见=中性；size 精确短路放行
+			name:    "group invisible (dot form), exact size matches via neutral",
 			results: makeResults(struct{ id, title string; size int64 }{"t1", "Movie.1999.OTHER", sourceSize}),
+			groupName: "GROUP",
+			sourceSz:  sourceSize,
+			wantID:    "t1",
+		},
+		{
+			// §59.184 三态：显式异组名后缀（dash 形态）→ 组名反驳
+			name:    "explicit different group suffix refuted",
+			results: makeResults(struct{ id, title string; size int64 }{"t1b", "Movie.1999-OTHER", sourceSize}),
 			groupName: "GROUP",
 			sourceSz:  sourceSize,
 			wantID:    "",
@@ -2926,11 +2935,12 @@ func TestVerifyMatch(t *testing.T) {
 			wantID:    "t4",
 		},
 		{
-			name:    "truncated title strict, no match",
+			// §59.184 三态：CSS 截断=组名不可见=中性（原 strict 拒绝消融）；size 精确短路
+			name:    "truncated title neutral, exact size matches",
 			results: makeResults(struct{ id, title string; size int64 }{"t5", "Movie.1999..", sourceSize}),
 			groupName: "GROUP",
 			sourceSz:  sourceSize,
-			wantID:    "",
+			wantID:    "t5",
 		},
 		{
 			name:    "truncated title relaxed via empty group",
