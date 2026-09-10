@@ -2915,7 +2915,9 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 		if groupName != "" {
 			if strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
 				confirms++
-			} else if cg := ExtractGroupName(r.Title); cg != "" && !strings.EqualFold(cg, groupName) {
+			} else if cg := ExtractGroupName(r.Title); cg != "" && !strings.EqualFold(cg, groupName) && !sameGroupFamily(cg, groupName) {
+				// §59.187 ①: 同族拼写变体豁免（UBits/UBbits 同映射优堡官方）——
+				// 豁免不计确认（保守），靠标题/tech/size 确认通过
 				stats.GroupRefute++
 				continue
 			} else {
@@ -3104,6 +3106,21 @@ func sourceTypeEquivalent(a, b string) bool {
 	}
 	na, nb := norm(a), norm(b)
 	return na != "" && na == nb
+}
+
+// GroupFamilyResolver §59.187 ①: 组名→官方映射站点域（同站=同族拼写变体）。
+// 启动时由 main 注入（release_group_mappings 查询闭包）；nil 时退化为纯字符串比较。
+// 背景：UBbits/UBits 同族变体（v0.0.473 映射层已认，验证层未接线——
+// 回到未来II tid=109991 误杀案：映射表只在 priority 选站被查询，组名反驳是原串比较）。
+var GroupFamilyResolver func(group string) string
+
+// sameGroupFamily: 两拼写均官方映射到同一站点 = 同族 → 组名反驳豁免。
+func sameGroupFamily(a, b string) bool {
+	if GroupFamilyResolver == nil {
+		return false
+	}
+	fa, fb := GroupFamilyResolver(a), GroupFamilyResolver(b)
+	return fa != "" && fa == fb
 }
 
 // techProfileConflict 规则 A：源标题和候选标题都有某 Token 且值不同 → 冲突。
@@ -3568,6 +3585,64 @@ func leadingCJKSegment(title string) string {
 		}
 	}
 	return stop()
+}
+
+// NormalizeMixedKeyword §59.187 ③: 混合词归一化——词内 CJK|ASCII 边界拆分，
+// 剔除 ≤2 字符 ASCII 词（噪音源：IF 在英文标题 ubiquitous，用户实测多页噪音）。
+// "神秘友友IF 2024 1080P" → "神秘友友 2024 1080P"（用户实测一页命中的精准词）。
+// 粘连词在站方同粘连形态时本就命中（回到黑暗Back 案），故作降级轮变体而非替换。
+// 无混合词或归一化后无变化返回 ""（调用方跳过该轮）。
+func NormalizeMixedKeyword(keyword string) string {
+	words := strings.Fields(keyword)
+	changed := false
+	var out []string
+	hasCJKAnchor := false
+	for _, w := range words {
+		hasCJK, hasASCII := false, false
+		for _, r := range w {
+			if (r >= 0x4E00 && r <= 0x9FFF) || (r >= 0x3400 && r <= 0x4DBF) {
+				hasCJK = true
+			} else if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+				hasASCII = true
+			}
+		}
+		switch {
+		case hasCJK && hasASCII:
+			// 词内边界拆分：CJK 段与 ASCII 段
+			var cjkPart, asciiPart []rune
+			for _, r := range w {
+				if (r >= 0x4E00 && r <= 0x9FFF) || (r >= 0x3400 && r <= 0x4DBF) {
+					cjkPart = append(cjkPart, r)
+				} else {
+					asciiPart = append(asciiPart, r)
+				}
+			}
+			if len(cjkPart) > 0 {
+				out = append(out, string(cjkPart))
+				hasCJKAnchor = true
+			}
+			if len(asciiPart) > 2 { // ≤2 字符 ASCII 剔除（IF/3D 噪音）
+				out = append(out, string(asciiPart))
+			}
+			changed = true
+		case !hasCJK && len([]rune(w)) <= 2 && !hasCJKAnchor:
+			// 中文锚出现前的纯短英文词——剔除（防裸英文噪音起始，如 "IF 2024"）
+			changed = true
+		default:
+			out = append(out, w)
+			if hasCJK {
+				hasCJKAnchor = true
+			}
+		}
+	}
+	if !changed {
+		return ""
+	}
+	normalized := strings.Join(out, " ")
+	if normalized == keyword || !hasCJKAnchor {
+		return ""
+	}
+	return normalized
 }
 
 // HasCJKWord §59.184: hasCJKWord 导出形态——孤儿恢复 B 补线跨包消费。

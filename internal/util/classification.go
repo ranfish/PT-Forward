@@ -33,6 +33,8 @@ var (
 	// S01 / S01E03 / S01E01-E12 / S01 E03 / S01 E01-E03
 	// 捕获组：season, firstEpisode(可空), lastEpisode(可空)
 	reSxxExx = regexp.MustCompile(`(?i)(?:^|[\s._\-])S(\d{1,2})(?:\s*E(\d{1,3})(?:\s*[-~]\s*E?(\d{1,3}))?)?`)
+	// §59.187 ②: EP 范围签名——EP01-E06 / E01-E12 / EP01-06
+	reEPRange = regexp.MustCompile(`(?i)\bE?P?(\d{1,2})\s*-\s*E?P?(\d{1,3})\b`)
 
 	// 文件名中的单集模式 S01E03（用于文件树分析）
 	reFileEpisode = regexp.MustCompile(`(?i)S\d{1,2}E(\d{1,3})`)
@@ -99,6 +101,11 @@ func classifyFromTitle(title string, result *TorrentType) {
 	upper := strings.ToUpper(title)
 	hasComplete := strings.Contains(upper, "COMPLETE")
 
+	// §59.187 ②: EP 范围签名（"S01.EP01-E06" 分段形态——reSxxExx 仅捕获 S01，
+	// 无 COMPLETE 词 → 误判 unknown → 文件级搜索单集尺寸误杀季包种子。
+	// 范围起始集=1 → season_pack，否则 partial_pack；Obi-Wan tid=67993 案实证）
+	epRange := reEPRange.FindStringSubmatch(title)
+
 	match := reSxxExx.FindStringSubmatch(title)
 	if match != nil {
 		result.Category = "tv_series"
@@ -120,6 +127,14 @@ func classifyFromTitle(title string, result *TorrentType) {
 			// 仅季号 S01
 			if hasComplete {
 				result.Form = "season_pack"
+			} else if epRange != nil {
+				// §59.187 ②: EP 范围替代 COMPLETE 词判定季完整性
+				startEp, _ := strconv.Atoi(epRange[1])
+				if startEp == 1 {
+					result.Form = "season_pack"
+				} else {
+					result.Form = "partial_pack"
+				}
 			} else {
 				result.Form = "unknown"
 			}
