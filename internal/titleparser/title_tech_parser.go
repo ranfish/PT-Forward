@@ -19,6 +19,13 @@ func ParseTitleTech(title string) TechProfile {
 	p := TechProfileFromTitle(tc)
 
 	p.EditionInfo = extractEditionInfo(title)
+	// §59.76 步骤 3 / §59.184 G2: ReleaseVersion 并入 EditionInfo（空时补，
+	// 不覆盖既有 edition token）。单点合并——BuildTechProfile 同款逻辑变幂等；
+	// 验证路径 techProfileVersionDefined 规则 B 对无括号 REPACK 由此生效
+	// （§59.181 挂账兑现：此前仅重组流合并，验证流 EditionInfo 恒空）。
+	if p.EditionInfo == "" && p.ReleaseVersion != "" {
+		p.EditionInfo = p.ReleaseVersion
+	}
 	p.SourceType, p.Specification = splitMedium(tc.Medium)
 	p.AudioChannels = extractAudioChannelsFromTitle(title)
 	p.AudioTechnology = extractAudioTechnologyFromTitle(title)

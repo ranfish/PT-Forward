@@ -367,8 +367,14 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 							zap.String("site", sourceSite),
 							zap.Int("results", len(results)),
 							zap.Int("empty_id", filterStats.EmptyID),
-							zap.Int("group_miss", filterStats.GroupMiss),
-							zap.Int("size_miss", filterStats.SizeMiss),
+							zap.Int("group_refute", filterStats.GroupRefute),
+							zap.Int("group_neutral", filterStats.GroupNeutral),
+							zap.Int("sequel_refute", filterStats.SequelRefute),
+							zap.Int("title_neutral", filterStats.TitleNeutral),
+							zap.Int("size_invalid", filterStats.SizeInvalid),
+							zap.Int("tech_refute", filterStats.TechRefute),
+							zap.Int("version_refute", filterStats.VersionRefute),
+							zap.Int("size_refute", filterStats.SizeRefute),
 							zap.String("first_title", firstTitle),
 							zap.String("expected_group", groupName))
 					}
@@ -384,6 +390,26 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 					}
 					r.logger.Debug("orphan L2 priority: no match",
 						zap.String("site", sourceSite))
+
+					// §59.184 B 补线（priority 站）：B1 形态（主词无 CJK 且源标题有 CJK）
+					// → 前导中文段补一轮 area=0（中文标题站索引中文名）
+					if !reseed.HasCJKWord(searchKeyword) && reseed.HasCJKWord(sourceTitle) {
+						if cnKW := reseed.LeadingCJKSegment(sourceTitle); cnKW != "" && cnKW != searchKeyword {
+							r.logger.Debug("orphan L2 priority: chinese supplement search",
+								zap.String("site", sourceSite),
+								zap.String("keyword", cnKW))
+							if retry, rErr := adapter.SearchTorrents(searchCtx, config, cnKW, nil); rErr == nil && len(retry) > 0 {
+								if m2, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m2 != nil {
+									cancel()
+									r.logger.Info("orphan L2 match (priority, chinese line)",
+										zap.String("orphan", orphan.Name),
+										zap.String("site", sourceSite),
+										zap.String("torrent_id", m2.TorrentID))
+									return sourceSite, m2.TorrentID, "l2:priority-cn:" + sourceSite
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -478,6 +504,31 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 
 			match, filterStats := reseed.VerifyMatchWithTruncationCheckAndSource(results2, groupName, sourceSize, sourceTitle)
 			if match == nil {
+				// §59.184 B 补线（全站轮）：B1 形态 → 前导中文段补一轮 area=0
+				if !reseed.HasCJKWord(searchKeyword) && reseed.HasCJKWord(sourceTitle) {
+					if cnKW := reseed.LeadingCJKSegment(sourceTitle); cnKW != "" && cnKW != searchKeyword {
+						cnCtx, cnCancel := context.WithTimeout(searchCtx, 20*time.Second)
+						if retry, rErr := adapter.SearchTorrents(cnCtx, config, cnKW, nil); rErr == nil && len(retry) > 0 {
+							match, _ = reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle)
+						}
+						cnCancel()
+						if match != nil {
+							r.logger.Info("orphan L2 match (chinese line)",
+								zap.String("orphan", orphan.Name),
+								zap.String("site", site),
+								zap.String("torrent_id", match.TorrentID),
+								zap.String("matched_title", match.Title),
+								zap.Int64("orphan_size", orphan.Size),
+								zap.Int64("matched_size", match.Size))
+							select {
+							case resultCh <- matchResult{site, match.TorrentID, "l2:search-cn:" + site}:
+							case <-searchCtx.Done():
+							}
+							return
+						}
+					}
+				}
+
 				firstTitle := ""
 				if len(results2) > 0 {
 					t := results2[0].Title
@@ -488,8 +539,14 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 					zap.String("site", site),
 					zap.Int("results", len(results2)),
 					zap.Int("empty_id", filterStats.EmptyID),
-					zap.Int("group_miss", filterStats.GroupMiss),
-					zap.Int("size_miss", filterStats.SizeMiss),
+					zap.Int("group_refute", filterStats.GroupRefute),
+					zap.Int("group_neutral", filterStats.GroupNeutral),
+					zap.Int("sequel_refute", filterStats.SequelRefute),
+					zap.Int("title_neutral", filterStats.TitleNeutral),
+					zap.Int("size_invalid", filterStats.SizeInvalid),
+					zap.Int("tech_refute", filterStats.TechRefute),
+					zap.Int("version_refute", filterStats.VersionRefute),
+					zap.Int("size_refute", filterStats.SizeRefute),
 					zap.String("first_title", firstTitle),
 					zap.String("expected_group", groupName))
 				return
