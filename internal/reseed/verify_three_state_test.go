@@ -241,3 +241,28 @@ func TestStripEpisodeNumberPrefix(t *testing.T) {
 		t.Errorf("无前缀误剥: %q", got)
 	}
 }
+
+// §59.185: SourceType 血统反驳——BluRay vs DVD 拒；书写变体等价不误杀。
+func TestSourceTypeRefute(t *testing.T) {
+	const size = int64(3430444459)
+	// 旋律时光实证：BluRay 源 × DVDrip 候选（同尺寸）——此前零反驳放行
+	src := "旋律时光.Melody.Time.1948.BluRay.1080p.upscale.x265.10bit.MNHD-FRDS"
+	cand := &model.SeedingSearchResult{TorrentID: "9322",
+		Title: "Melody Time 1948 DVDrip 1080p upscale x265 10bit MNHD-FRDS", Size: size}
+	m, stats := VerifyMatchWithStatsAndSource([]*model.SeedingSearchResult{cand}, "FRDS", size, src)
+	if m != nil {
+		t.Fatalf("BluRay×DVDrip 应血统反驳, got match")
+	}
+	if stats.TechRefute == 0 {
+		t.Errorf("expect techRefute, got %+v", stats)
+	}
+
+	// 书写变体等价：UHD Blu-ray 源 × UHD BluRay 候选——不误杀
+	src2 := "Just.Mercy.2019.2160p.UHD.Blu-ray.DoVi.HEVC.TrueHD.7.1-DIY@UBits"
+	cand2 := &model.SeedingSearchResult{TorrentID: "t2",
+		Title: "Just Mercy 2019 2160p UHD BluRay DoVi HEVC TrueHD 7.1-DIY@UBits", Size: size}
+	m2, _ := VerifyMatchWithStatsAndSource([]*model.SeedingSearchResult{cand2}, "UBits", size, src2)
+	if m2 == nil {
+		t.Fatalf("UHD Blu-ray ≡ UHD BluRay 变体等价应放行")
+	}
+}

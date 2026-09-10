@@ -3056,6 +3056,7 @@ func techProfileConfirm(src titleparser.TechProfile, candidateTitle string) bool
 		{"HDR", src.HDR, cand.HDR},
 		{"Specification", src.Specification, cand.Specification},
 		{"RegionCode", src.RegionCode, cand.RegionCode},
+		{"SourceType", src.SourceType, cand.SourceType},
 	}
 	for _, f := range fields {
 		if f.s == "" || f.c == "" {
@@ -3065,6 +3066,9 @@ func techProfileConfirm(src titleparser.TechProfile, candidateTitle string) bool
 			return true
 		}
 		if f.name == "Resolution" && resolutionEquivalent(f.s, f.c) {
+			return true
+		}
+		if f.name == "SourceType" && sourceTypeEquivalent(f.s, f.c) {
 			return true
 		}
 		if f.name == "Specification" && specEquivalent(f.s, f.c) {
@@ -3086,6 +3090,20 @@ func resolutionEquivalent(a, b string) bool {
 	}
 	ka := titleparser.LookupDictKey("resolution", a)
 	return ka != "" && ka == titleparser.LookupDictKey("resolution", b)
+}
+
+// sourceTypeEquivalent §59.185: 源类型等价——剥连字符/空格后大小写不敏感比较。
+// 同血统书写变体归一（"UHD Blu-ray" ≡ "UHD BluRay"、"Blu-ray" ≡ "BluRay"——
+// Just Mercy 案实证两形态并存）。血统不同（BluRay vs DVD）不等价 → 反驳。
+func sourceTypeEquivalent(a, b string) bool {
+	norm := func(s string) string {
+		s = strings.ToLower(s)
+		s = strings.ReplaceAll(s, "-", "")
+		s = strings.ReplaceAll(s, " ", "")
+		return s
+	}
+	na, nb := norm(a), norm(b)
+	return na != "" && na == nb
 }
 
 // techProfileConflict 规则 A：源标题和候选标题都有某 Token 且值不同 → 冲突。
@@ -3119,6 +3137,9 @@ func techProfileConflictFields(src titleparser.TechProfile, candidateTitle strin
 		{"HDR", src.HDR, cand.HDR},
 		{"Specification", src.Specification, cand.Specification},
 		{"RegionCode", src.RegionCode, cand.RegionCode},
+		// §59.185: SourceType 补入——源类型不同=不同血统（用户定案；
+		// 旋律时光 BluRay 孤儿误配 DVDrip 种实证：ST 不在字段表零反驳放行）
+		{"SourceType", src.SourceType, cand.SourceType},
 	}
 	for _, f := range fields {
 		if f.name == "AudioCodec" && skipAudio {
@@ -3127,6 +3148,10 @@ func techProfileConflictFields(src titleparser.TechProfile, candidateTitle strin
 		if f.s != "" && f.c != "" && !strings.EqualFold(f.s, f.c) {
 			// §59.184: Resolution 显示变体等价豁免（4K ≡ 2160p）
 			if f.name == "Resolution" && resolutionEquivalent(f.s, f.c) {
+				continue
+			}
+			// §59.185: SourceType 书写变体等价豁免（UHD Blu-ray ≡ UHD BluRay）
+			if f.name == "SourceType" && sourceTypeEquivalent(f.s, f.c) {
 				continue
 			}
 			// §59.30: Specification 等价组豁免（WEB-DL ≈ WEBRip 站点标注差异）
