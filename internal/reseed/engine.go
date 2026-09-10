@@ -2517,6 +2517,10 @@ func ExtractSearchKeyword(title string) string {
 	if title == "" {
 		return ""
 	}
+	// §59.184 附四: 剥合集数字序号前缀——剥后即标准 B1 形态（中文前缀+英文主体），
+	// 英文链/KeywordHasNoTitle/中文线（leadingCJKSegment 同步剥）三点一线恢复。
+	title = stripEpisodeNumberPrefix(title)
+
 	rest := stripChinesePrefix(title)
 	if rest == "" {
 		// stripChinesePrefix 失败（如 三国.全95集.2010...，分隔符后是中文）
@@ -2563,6 +2567,17 @@ func ExtractSearchKeyword(title string) string {
 		}
 	}
 	return appendMediaAfterResolution(raw, title)
+}
+
+// reEpisodeNumPrefix 合集数字序号前缀（可重复，如 "12." / "12.2."）。
+var reEpisodeNumPrefix = regexp.MustCompile(`^(\d{1,3}[.])+`)
+
+// stripEpisodeNumberPrefix §59.184 附四: 剥合集数字序号前缀。
+// 关键词被序号污染（"12 仙履奇缘 Cinderella…"）会触发 KeywordHasNoTitle
+// 误杀（首词数字 → 判"无标题"→ 整个 L2 跳过——迪士尼动画收集 8 孤儿实证）。
+// 限 1-3 位数字+点分隔（"2019.片名" 年份开头 4 位形态不受影响）。
+func stripEpisodeNumberPrefix(title string) string {
+	return reEpisodeNumPrefix.ReplaceAllString(title, "")
 }
 
 // stripApostrophes 剥离直撇号和弯撇号，防止 NexusPHP SQL LIKE 注入式失败。
@@ -3500,6 +3515,7 @@ func hasCJKWord(s string) bool {
 // 跳过 [【】] 括号组；允许段内分隔符（点/空格/·/冒号）延续；遇 ASCII 即止；
 // 尾部分隔符剥净。"冰冻星球.BBC.Frozen..." → "冰冻星球"；"忍者神龟：变种时代.BluRay..." → "忍者神龟：变种时代"。
 func leadingCJKSegment(title string) string {
+	title = stripEpisodeNumberPrefix(title) // §59.184 附四: 序号前缀不遮蔽 B1 判定
 	var b []rune
 	inBracket := false
 	started := false
