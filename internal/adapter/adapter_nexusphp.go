@@ -1852,7 +1852,7 @@ func (a *NexusPHPAdapter) FetchUserStats(ctx context.Context, config *model.Site
 	if err == nil && stats != nil {
 		if stats.SeedingCount > 0 && stats.SeedingSize > 0 {
 			a.scrapePasskey(ctx, config, stats)
-			if config.DownloadMode == "cuhash" {
+			if cuhashEnabled(config) {
 				a.scrapeCuhash(ctx, config, stats)
 			}
 			return stats, nil
@@ -1878,7 +1878,7 @@ func (a *NexusPHPAdapter) FetchUserStats(ctx context.Context, config *model.Site
 			}
 		}
 		a.scrapePasskey(ctx, config, stats)
-		if config.DownloadMode == "cuhash" {
+		if cuhashEnabled(config) {
 			a.scrapeCuhash(ctx, config, stats)
 		}
 		return stats, nil
@@ -1886,7 +1886,7 @@ func (a *NexusPHPAdapter) FetchUserStats(ctx context.Context, config *model.Site
 	stats, err = a.fetchUserStatsHTML(ctx, config)
 	if err == nil && stats != nil {
 		a.scrapePasskey(ctx, config, stats)
-		if config.DownloadMode == "cuhash" {
+		if cuhashEnabled(config) {
 			a.scrapeCuhash(ctx, config, stats)
 		}
 	}
@@ -1980,30 +1980,46 @@ func (a *NexusPHPAdapter) scrapePasskey(ctx context.Context, config *model.SiteC
 	}
 }
 
-func (a *NexusPHPAdapter) scrapeCuhash(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
+// cuhashEnabled §59.185 ②: cuhash 依赖判定——mode 显式声明或下载模板含 cuhash=
+// （如城市 hdcity "download?id={id}&cuhash={passkey}"）。此前仅判 mode，
+// 城市实际 mode=template → 统计同步的 cuhash 抓取链路整条空转（下载必败根因）。
+func cuhashEnabled(config *model.SiteConfig) bool {
+	return config.DownloadMode == "cuhash" || strings.Contains(config.DownloadURLTemplate, "cuhash=")
+}
+
+// ScrapeCuhash §59.185 ②: 公开形态——首页任意下载链接提取当前 32hex cuhash
+// （无则空串）。供下载失败懒刷新（CuhashScraper 可选接口）。
+func (a *NexusPHPAdapter) ScrapeCuhash(ctx context.Context, config *model.SiteConfig) string {
 	if config.Cookie == "" {
-		return
+		return ""
 	}
 	pageURL := config.Domain + "/index.php"
 	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
 	if err != nil {
-		return
+		return ""
 	}
 	setCommonHeaders(req, config.Cookie)
 	resp, err := a.doer.Client.Do(req)
 	if err != nil {
-		return
+		return ""
 	}
 	defer httpclient.DrainBody(resp)
 	if resp.StatusCode != http.StatusOK {
-		return
+		return ""
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
 	if err != nil {
-		return
+		return ""
 	}
 	if m := reCuhashFromLink.FindStringSubmatch(string(body)); len(m) > 1 {
-		stats.Passkey = m[1]
+		return m[1]
+	}
+	return ""
+}
+
+func (a *NexusPHPAdapter) scrapeCuhash(ctx context.Context, config *model.SiteConfig, stats *model.UserStatsResult) {
+	if cu := a.ScrapeCuhash(ctx, config); cu != "" {
+		stats.Passkey = cu
 	}
 }
 
