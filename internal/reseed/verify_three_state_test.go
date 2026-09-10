@@ -211,3 +211,33 @@ func TestLeadingCJKSegment(t *testing.T) {
 		}
 	}
 }
+
+// §59.184 附四: 合集数字序号前缀剥除——关键词污染/误杀/中文线三点。
+func TestStripEpisodeNumberPrefix(t *testing.T) {
+	cases := []struct{ in, wantKw, wantCN string }{
+		// 原始名 → 期望关键词不含序号 + 中文段可提取（B 补线）
+		{"12.仙履奇缘.Cinderella.1950.BluRay.1080p.x265.10bit.4Audios.MNHD-FRDS", "Cinderella 1950 1080p", "仙履奇缘"}, // 英文优先：中文归 B 补线
+		{"12.2.仙履奇缘2.Cinderella.2.2002.1080p.Bluray.x265.10bit.4Audios.MNHD-FRDS", "Cinderella 2 2002 1080p BluRay", "仙履奇缘"},
+		{"11.伊老师与小蟾蜍大历险.The.Adventures.of.Ichabod.and.Mr.Toad.1949.BluRay.1080p.x265.10bit.MNHD-FRDS", "The Adventures of Ichabod and Mr Toad 1949 1080p", "伊老师与小蟾蜍大历险"},
+	}
+	for _, c := range cases {
+		kw := ExtractSearchKeyword(c.in)
+		if kw != c.wantKw {
+			t.Errorf("keyword(%q)=%q want %q", c.in, kw, c.wantKw)
+		}
+		if KeywordHasNoTitle(kw) {
+			t.Errorf("keyword(%q) 不应误判无标题", c.in)
+		}
+		if cn := leadingCJKSegment(c.in); cn != c.wantCN {
+			t.Errorf("leadingCJKSegment(%q)=%q want %q", c.in, cn, c.wantCN)
+		}
+	}
+	// 年份开头（4 位）不剥
+	if got := stripEpisodeNumberPrefix("2019.冰冻星球.BBC.Frozen.Planet.S02"); got != "2019.冰冻星球.BBC.Frozen.Planet.S02" {
+		t.Errorf("年份前缀误剥: %q", got)
+	}
+	// 无前缀不变
+	if got := stripEpisodeNumberPrefix("冰冻星球.BBC.Frozen"); got != "冰冻星球.BBC.Frozen" {
+		t.Errorf("无前缀误剥: %q", got)
+	}
+}
