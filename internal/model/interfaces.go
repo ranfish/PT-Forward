@@ -20,6 +20,13 @@ type PublishPreflighter interface {
 	PreflightPublish(ctx context.Context, config *SiteConfig) (*PublishPreflightResult, error)
 }
 
+// CuhashScraper §59.185 ②: 可选能力——cuhash 模板站（如城市 hdcity）从首页
+// 任意下载链接提取当前 cuhash（轮换值，非静态凭证）。适配器可选实现，
+// 消费方以接口断言探测（无此能力的站不受影响）。
+type CuhashScraper interface {
+	ScrapeCuhash(ctx context.Context, config *SiteConfig) string
+}
+
 type SiteAdapter interface {
 	Framework() string
 	ParseRSS(ctx context.Context, feedURL string, config *SiteConfig) ([]*RSSTorrentEvent, error)
