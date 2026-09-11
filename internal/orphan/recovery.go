@@ -97,7 +97,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 			}
 		}
 
-		if err := r.downloadWithFallback(ctx, orphan, siteName, torrentID, targetClientID, injectSize, injectName); err != nil {
+		if err := r.downloadWithFallback(ctx, orphan, siteName, torrentID, targetClientID, injectSize, injectName, stats); err != nil {
 			// §59.185 ①: 失败必落日志——此前仅写 result.Message 返回，全日志零痕迹（城市
 			// cuhash 案实证排查黑洞）
 			r.logger.Error("orphan recovery failed",
@@ -352,6 +352,11 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 		sourceTitle = orphan.Name
 	}
 
+	if stats == nil {
+		// §59.189: nil-stats 防御——retrySearchExcling 等兜底路径可传 nil
+		//（08:48 PT30 panic 实证：stats.TotalSites 空指针解引用崩溃重启）
+		stats = &SearchStats{}
+	}
 	sites := r.getSitePriority(ctx, groupName, sourceSize)
 	if len(sites) == 0 {
 		return "", "", ""
@@ -797,7 +802,7 @@ func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, cli
 // 层2 cuhash 模板站懒刷新 + 原站重试一次（cuhash 轮换窗口未知，6h 定时同步有缺口；
 //     刷新即变化则回写 DB 后重试——保源站偏好，keepfrds 429 类失败不直接跳站）
 // 层3 次优站递补：排除已败站重搜（优先站/中文线链路复用），最多递补 2 站
-func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, primarySite, primaryTid, targetClientID string, sourceSize int64, sourceName string) error {
+func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, primarySite, primaryTid, targetClientID string, sourceSize int64, sourceName string, stats *SearchStats) error {
 	excluded := map[string]bool{}
 	var lastErr error
 
@@ -805,7 +810,7 @@ func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, prim
 		site, tid := primarySite, primaryTid
 		if attempt > 0 {
 			// 层3: 次优站递补——排除已败站重搜取新胜者
-			s2, t2 := r.retrySearchExcluding(ctx, orphan, excluded)
+			s2, t2 := r.retrySearchExcluding(ctx, orphan, excluded, stats)
 			if s2 == "" {
 				break
 			}
@@ -852,7 +857,7 @@ func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, prim
 }
 
 // retrySearchExcluding §59.185 ③: 次优站递补搜索（排除已败站，2 分钟窗口）
-func (r *Recovery) retrySearchExcluding(ctx context.Context, orphan *Entry, exclude map[string]bool) (string, string) {
+func (r *Recovery) retrySearchExcluding(ctx context.Context, orphan *Entry, exclude map[string]bool, stats *SearchStats) (string, string) {
 	searchKeyword := reseed.ExtractSearchKeyword(orphan.Name)
 	if searchKeyword == "" {
 		searchKeyword = orphan.Name
@@ -860,7 +865,7 @@ func (r *Recovery) retrySearchExcluding(ctx context.Context, orphan *Entry, excl
 	groupName := reseed.ExtractGroupName(orphan.Name)
 	retryCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	site, tid, _ := r.tryL2SearchCore(retryCtx, orphan, nil, searchKeyword, groupName, orphan.Size, orphan.Name, exclude)
+	site, tid, _ := r.tryL2SearchCore(retryCtx, orphan, stats, searchKeyword, groupName, orphan.Size, orphan.Name, exclude)
 	return site, tid
 }
 
