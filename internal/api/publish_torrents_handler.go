@@ -2370,8 +2370,11 @@ fetched:
 
 	// §59.42: 海报可信图源白名单替换（异步；§59.61 附5: 尾部 finalize 会等其终局
 	// 再传播——INSERT 与回传 UPDATE 的竞态已由 WaitGroup 消除）
+	// §59.195: 门条件 Poster!="" 移除——站点详情无海报时（流控降级内容/解析差异），
+	// PTGen 简介增量写与海报兜底恰是最需要的场景（原门导致 Tab2/Tab4 双空——
+	// 侠女案：手动重获正常而获取无 PTGen 信息的根因）。空海报路径六支回归验证安全。
 	var posterFallbackWg sync.WaitGroup
-	if meta != nil && meta.Poster != "" {
+	if meta != nil {
 		posterFallbackWg.Add(1)
 		go func() {
 			defer posterFallbackWg.Done()
