@@ -464,6 +464,23 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 					}
 				}
 
+				// §59.194: 中文关键词净化降级轮——版式词残留/词内版式后缀/中点
+				// （午夜凶铃 4K修复版/宝贝计划加长版/安娜·卡列尼娜 六案）
+				if pk := reseed.PurifyChineseKeyword(searchKeyword); pk != "" {
+					r.logger.Debug("orphan L2 priority: chinese purification retry",
+						zap.String("site", sourceSite),
+						zap.String("purified", pk))
+					if retry, rErr := r.searchWithBackoff(ctx, adapter, config, pk); rErr == nil && len(retry) > 0 {
+						if m4, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m4 != nil {
+							r.logger.Info("orphan L2 match (priority, chinese-purified)",
+								zap.String("orphan", orphan.Name),
+								zap.String("site", sourceSite),
+								zap.String("torrent_id", m4.TorrentID))
+							return sourceSite, m4.TorrentID, "l2:priority-purify:"+sourceSite
+						}
+					}
+				}
+
 				// §59.184 B 补线（priority 站）：B1 形态（主词无 CJK 且源标题有 CJK）
 				// → 前导中文段补一轮 area=0（中文标题站索引中文名）
 				if !reseed.HasCJKWord(searchKeyword) && reseed.HasCJKWord(sourceTitle) {

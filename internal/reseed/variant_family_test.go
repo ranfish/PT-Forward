@@ -245,3 +245,20 @@ func TestQueenUHDSourceType(t *testing.T) {
 		t.Errorf("媒介连字符后的真组名应保留: %q", g)
 	}
 }
+
+// §59.194: 中文关键词净化——六案变体形态。
+func TestPurifyChineseKeyword(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"午夜凶铃 4K修复版 1998", "午夜凶铃 1998"},               // 版式词 token 剥离（tid=270313 案）
+		{"宝贝计划加长版 2006", "宝贝计划 2006"},                  // 词内版式后缀（tid=5824 案）
+		{"安娜·卡列尼娜 1997 720P", "安娜卡列尼娜 1997 720P"}, // 中点消解（tid=46343 案）
+		{"卡萨布兰卡 1942 1080p", ""},                    // 无装饰 → 跳过
+		{"修复版 1998", ""},                              // 剥空防护
+		{"Cinderella 1950 1080p", ""},                     // 无 CJK → 跳过
+	}
+	for _, c := range cases {
+		if got := PurifyChineseKeyword(c.in); got != c.want {
+			t.Errorf("PurifyChineseKeyword(%q)=%q want %q", c.in, got, c.want)
+		}
+	}
+}
