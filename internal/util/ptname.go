@@ -50,12 +50,24 @@ func ExtractGroupName(title string) string {
 	// §59.193: 词内连字符（媒介/音频复合词 Blu-ray/WEB-DL/DTS-HD）非组分隔——
 	// "…Live Aid 4K Blu-ray" 曾误提取组名 "ray"（Queen 案）。取连字符前词段
 	// （至空格/点），为已知媒介片段时该连字符不构成分隔。
+	// §59.196 修订: 需双侧证据——前段为媒介/音频片段 AND 后段为已知复合续段
+	// （ray/dl/hd/ma/x 等）。仅前段命中曾误杀 "DTS-CMCT" 形态（DTS 片段为
+	// DTS-HD 而设，后随组名时实为音频+组分隔——永安镇故事集案：组名提取
+	// 失败→恢复链源站优先阶段整段跳过→未能从不可说恢复）。
 	if lastDash > 0 {
 		fragStart := strings.LastIndexAny(clean[:lastDash], " ._")
 		frag := strings.ToLower(clean[fragStart+1 : lastDash])
+		afterTok := clean[lastDash+1:]
+		if sp := strings.IndexAny(afterTok, " ._"); sp >= 0 {
+			afterTok = afterTok[:sp]
+		}
+		afterLower := strings.ToLower(afterTok)
 		switch frag {
 		case "blu", "web", "dts", "dts-hd", "true", "hd":
-			lastDash = -1
+			switch afterLower {
+			case "ray", "dl", "rip", "hd", "ma", "x", "hra", "dvd":
+				lastDash = -1
+			}
 		}
 	}
 	if lastDash > 0 && lastDash < len(clean)-1 {
