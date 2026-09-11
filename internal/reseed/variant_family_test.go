@@ -238,6 +238,16 @@ func TestQueenUHDSourceType(t *testing.T) {
 		t.Error("Blu-ray ≢ WEB")
 	}
 	// 词内连字符组名
+	// §59.196: 双侧证据——DTS 前段 + 组名后段 = 音频+组分隔（永安镇故事集案）
+	if g := ExtractGroupName("[永安镇故事集].Ripples.of.Life.2021.CHN.BluRay.1080p.x264.DTS-CMCT"); g != "CMCT" {
+		t.Errorf("DTS-CMCT = %q, want CMCT", g)
+	}
+	if g := ExtractGroupName("Movie.2020.BluRay.x264.DTS-HD"); g != "" {
+		t.Errorf("DTS-HD tail = %q, want empty", g)
+	}
+	if g := ExtractGroupName("Show.2020.DTS-HD MA.1080p-GRP"); g != "GRP" {
+		t.Errorf("DTS-HD MA mid + -GRP tail = %q, want GRP", g)
+	}
 	if g := ExtractGroupName("Queen Rock Montreal and Live Aid 4K Blu-ray"); g != "" {
 		t.Errorf("Blu-ray 连字符不应提取组名: %q", g)
 	}
