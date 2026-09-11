@@ -2563,10 +2563,11 @@ func ExtractSearchKeyword(title string) string {
 	// （孤儿恢复三失败实证：不设限通缉Running.On.Empty... → 搜索词被污染）。
 	if KeywordHasNoTitle(raw) {
 		if fb := chineseTitleFallback(title); fb != "" && fb != raw {
-			return appendMediaAfterResolution(stripApostrophes(fb), title)
+			return stripVersionTokens(appendMediaAfterResolution(stripApostrophes(fb), title))
 		}
 	}
-	return appendMediaAfterResolution(raw, title)
+	// §59.188: 终段剥版本词（两个返回点统一）
+	return stripVersionTokens(appendMediaAfterResolution(raw, title))
 }
 
 // reEpisodeNumPrefix 合集数字序号前缀（可重复，如 "12." / "12.2."）。
@@ -2578,6 +2579,25 @@ var reEpisodeNumPrefix = regexp.MustCompile(`^(\d{1,3}[.])+`)
 // 限 1-3 位数字+点分隔（"2019.片名" 年份开头 4 位形态不受影响）。
 func stripEpisodeNumberPrefix(title string) string {
 	return reEpisodeNumPrefix.ReplaceAllString(title, "")
+}
+
+// reVersionToken 版本词（与 extractReleaseVersion 同表：PROPER/REPACKn/RERIP/DIRFIX/INTERNAL）。
+var reVersionToken = regexp.MustCompile(`(?i)^(?:PROPER|REPACK\d*|RERIP|DIRFIX|INTERNAL)$`)
+
+// stripVersionTokens §59.188: 搜索关键词剥版本词。
+// 版本词非内容身份——站方标题带不带不可控（加勒比 tid=105267 案实证：
+// 发布名含 PROPER 站方标题无 → NexusPHP AND 0 结果）；版本不对称由验证层
+// 规则 B 管辖（§59.76/G2），搜索层剥除纯增益召回（PROPER/非PROPER 版都搜得）。
+func stripVersionTokens(keyword string) string {
+	words := strings.Fields(keyword)
+	out := make([]string, 0, len(words))
+	for _, w := range words {
+		if reVersionToken.MatchString(w) {
+			continue
+		}
+		out = append(out, w)
+	}
+	return strings.Join(out, " ")
 }
 
 // stripApostrophes 剥离直撇号和弯撇号，防止 NexusPHP SQL LIKE 注入式失败。
