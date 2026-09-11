@@ -25,13 +25,16 @@ func TestStripBracketsVersionCheck(t *testing.T) {
 	}
 	fmt.Printf("  ② 英文主标题路径 → blocked=false ✓\n")
 
-	// ③ Director's Cut 版本差异仍被拦截（无括号）
+	// ③ §59.191 b: EditionInfo（营销版式词）移出版本反驳——Director's Cut
+	// 差异不再拦截（本地命名省略版式词为常态，物理身份交给 size 指纹；
+	// 侠女/宾虚/卡萨布兰卡 反向案三连实证）。REPACK 类反驳由
+	// TestVersionRefuteEditionOnlyOut 锚定。
 	src3 := titleparser.ParseTitleTech("Movie.2024.1080p.BluRay.x264")
 	blocked3 := techProfileVersionDefined(src3, "Movie.2024.Director's.Cut.1080p.BluRay.x264")
-	if !blocked3 {
-		t.Errorf("Director's Cut 版本差异应被拦截: blocked=%v", blocked3)
+	if blocked3 {
+		t.Errorf("Director's Cut 版式词差异不应拦截（§59.191 b）: blocked=%v", blocked3)
 	}
-	fmt.Printf("  ③ 无括号 Director's Cut 版本差异 → blocked=true ✓\n")
+	fmt.Printf("  ③ 无括号 Director's Cut 版式差异 → blocked=false（§59.191 b）✓\n")
 
 	// ④ platform 词典 web 限制（DIY 非 web 语境不匹配）
 	p := titleparser.ParseTitleTech("Movie.2024.1080p.BluRay.DIY.DTS")

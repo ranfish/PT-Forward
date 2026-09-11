@@ -3205,7 +3205,7 @@ func techProfileConflictFields(src titleparser.TechProfile, candidateTitle strin
 	return false
 }
 
-// techProfileVersionDefined 规则 B：候选有版本定义 Token（EditionInfo/RegionCode/SourcePlatform）而源无。
+// techProfileVersionDefined 规则 B：候选有版本定义 Token（ReleaseVersion/RegionCode/SourcePlatform）而源无。
 // stripBracketsForVersionCheck §59.181: 剥离站点标签括号内容（半角[]与全角【】）。
 // 副标题匹配路径加固：优堡 "[热门]【DIY 原盘 00884】正义的慈悲"（tid=109323 实证）
 // 中的 【DIY 原盘 00884】 是站点分类标签，与资源元数据无关；其中的 "DIY" 在
@@ -3222,7 +3222,11 @@ func stripBracketsForVersionCheck(s string) string {
 func techProfileVersionDefined(src titleparser.TechProfile, candidateTitle string) bool {
 	candidateTitle = stripBracketsForVersionCheck(candidateTitle)
 	cand := titleparser.ParseTitleTech(candidateTitle)
-	if cand.EditionInfo != "" && src.EditionInfo == "" {
+	// §59.191 b: EditionInfo（营销版式词 Remaster/Ultimate Cut/Anniversary…）
+	// 移出反驳——本地中文命名常省略版式词、站方名常更全（侠女/宾虚/卡萨布兰卡
+	// 反向案三连实证系统性误杀）；物理身份交给 size 显示等价指纹。
+	// ReleaseVersion（REPACK/PROPER 重发布标记）保留——重新打包≠同发布。
+	if cand.ReleaseVersion != "" && src.ReleaseVersion == "" {
 		return true
 	}
 	if cand.RegionCode != "" && src.RegionCode == "" {
@@ -3809,7 +3813,7 @@ func isResolutionWord(w string) bool {
 // reTitlelessSpecToken 无标题价值的 token：纯数字 / 分辨率规格（4K/2K/8K/3D/1080p…）/
 // 中文版式词及其混合形态（"4K修复版"/"2K修复版"/"修复版"）。§59.190 ②:
 // 浪人.4K修复版 / 爱情万岁.2K修复版 案——英文主体仅剩年份+规格时关键词无片名。
-var reTitlelessSpecToken = regexp.MustCompile(`(?i)^(?:\d{1,4}k)?(?:修复版?|修復版?|重制版?|重製版?|数字修复|數字修復)?$`)
+var reTitlelessSpecToken = regexp.MustCompile(`(?i)^(?:\d{1,4}k)?(?:(?:终极|導演|导演)?剪辑版?|終極剪輯版?|加长版?|加長版?|修复版?|修復版?|重制版?|重製版?|完整版?|未删[减节]版?|数字修复|數字修復)?$`)
 
 // keywordAllTitleless 关键词全部由规格/版式/数字 token 构成 = 无片名
 //（触发 chineseTitleFallback 补中文片名）。
