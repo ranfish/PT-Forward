@@ -133,3 +133,61 @@ func TestKeywordAllTitleless(t *testing.T) {
 		t.Errorf("浪人关键词丢片名: %q", kw)
 	}
 }
+
+// §59.191 b: EditionInfo 移出版本反驳（反向案三连免疫）；ReleaseVersion 保留。
+func TestVersionRefuteEditionOnlyOut(t *testing.T) {
+	const size = int64(19928648253) // 守望者正主实尺
+	// 反向案形态：源无版式词 × 候选 Ultimate Cut（守望者 tid 实证）
+	src := "守望者.2009.GBR.终极剪辑版.1080p.中英字幕￡CMCT蒙太奇"
+	cand := &model.SeedingSearchResult{TorrentID: "w1",
+		Title: "Watchmen.2009.GBR.The.Ultimate.Cut.BluRay.1080p.x264.DTS-CMCT", Size: size}
+	m, stats := VerifyMatchWithTruncationCheckAndSource([]*model.SeedingSearchResult{cand}, "CMCT", size, src)
+	if m == nil {
+		t.Fatalf("Ultimate Cut 版式词应放行: %+v", stats)
+	}
+
+	// 宾虚反向案：源无版式词 × 候选 Collector's Edition
+	src2 := "宾虚.国英双语.1959.中英字幕￡CMCT暮雨潇潇"
+	cand2 := &model.SeedingSearchResult{TorrentID: "w2",
+		Title: "Ben-Hur.1959.Ultimate.Collector's.Edition.BluRay.1080p.x264.DTS.4Audios-CMCT", Size: size}
+	m2, _ := VerifyMatchWithTruncationCheckAndSource([]*model.SeedingSearchResult{cand2}, "CMCT", size, src2)
+	if m2 == nil {
+		t.Fatalf("Collector's Edition 版式词应放行")
+	}
+
+	// 卡萨布兰卡反向案：70th Anniversary
+	src3 := "卡萨布兰卡.1942.1080p.国英双语.中英字幕￡CMCT风潇潇"
+	cand3 := &model.SeedingSearchResult{TorrentID: "w3",
+		Title: "Casablanca.1942.70th.Anniversary.BluRay.1080p.x264.DTS.6Audios-CMCT", Size: size}
+	m3, stats3 := VerifyMatchWithTruncationCheckAndSource([]*model.SeedingSearchResult{cand3}, "CMCT", size, src3)
+	if m3 == nil {
+		t.Fatalf("Anniversary 版式词应放行: %+v", stats3)
+	}
+
+	// REPACK 重发布标记仍反驳（b 方案保留项）
+	src4 := "Movie.2019.1080p.BluRay.x264-GRP"
+	cand4 := &model.SeedingSearchResult{TorrentID: "w4",
+		Title: "Movie 2019 1080p BluRay REPACK x264-GRP", Size: size + 2*1024*1024} // 窗内非精确——避免门6短路
+	m4, stats4 := VerifyMatchWithTruncationCheckAndSource([]*model.SeedingSearchResult{cand4}, "GRP", size, src4)
+	if m4 != nil || stats4.VersionRefute != 1 {
+		t.Fatalf("REPACK 应仍反驳: m=%v stats=%+v", m4, stats4)
+	}
+}
+
+// §59.191: titleless 词表扩展——守望者/月光光 关键词丢片名。
+func TestKeywordTitlelessExtended(t *testing.T) {
+	for _, kw := range []string{"2009 终极剪辑版 1080p", "2021 加长版 720p"} {
+		if !KeywordHasNoTitle(kw) {
+			t.Errorf("%q 应判无标题", kw)
+		}
+	}
+	// 端到端：守望者/月光光 关键词带片名
+	for name, want := range map[string]string{
+		"守望者.2009.GBR.终极剪辑版.1080p.中英字幕￡CMCT蒙太奇": "守望者",
+		"月光光心慌慌：杀戮.2021.加长版.720p.中英字幕￡CMCT梦回":  "月光光",
+	} {
+		if kw := ExtractSearchKeyword(name); !strings.Contains(kw, want) {
+			t.Errorf("%s 关键词丢片名: %q", want, kw)
+		}
+	}
+}
