@@ -3128,6 +3128,13 @@ func sourceTypeEquivalent(a, b string) bool {
 		s = strings.ToLower(s)
 		s = strings.ReplaceAll(s, "-", "")
 		s = strings.ReplaceAll(s, " ", "")
+		// §59.193: UHD 前缀消解——源 "4K Blu-ray"（4K 被 Res 消费，ST 剩 "Blu-ray"）
+		// vs 候选 "2160p UHD Blu-ray"（UHD 归 ST）——同为 UHD 蓝光仅归属路径不同
+		//（Queen tid=3020 tech_refute 误杀实证）。分辨率差异由 Resolution 门独立把关，
+		// 此处消解前缀安全。
+		if t := strings.TrimPrefix(s, "uhd"); t != "" {
+			s = t
+		}
 		return s
 	}
 	na, nb := norm(a), norm(b)
