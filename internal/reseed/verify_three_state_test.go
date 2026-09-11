@@ -218,7 +218,7 @@ func TestStripEpisodeNumberPrefix(t *testing.T) {
 		// 原始名 → 期望关键词不含序号 + 中文段可提取（B 补线）
 		{"12.仙履奇缘.Cinderella.1950.BluRay.1080p.x265.10bit.4Audios.MNHD-FRDS", "Cinderella 1950 1080p", "仙履奇缘"}, // 英文优先：中文归 B 补线
 		{"12.2.仙履奇缘2.Cinderella.2.2002.1080p.Bluray.x265.10bit.4Audios.MNHD-FRDS", "Cinderella 2 2002 1080p BluRay", "仙履奇缘"},
-		{"11.伊老师与小蟾蜍大历险.The.Adventures.of.Ichabod.and.Mr.Toad.1949.BluRay.1080p.x265.10bit.MNHD-FRDS", "The Adventures of Ichabod and Mr Toad 1949 1080p", "伊老师与小蟾蜍大历险"},
+		{"11.伊老师与小蟾蜍大历险.The.Adventures.of.Ichabod.and.Mr.Toad.1949.BluRay.1080p.x265.10bit.MNHD-FRDS", "The Adventures of Ichabod Mr Toad 1949 1080p", "伊老师与小蟾蜍大历险"}, // and 剥离（§59.192 A）
 	}
 	for _, c := range cases {
 		kw := ExtractSearchKeyword(c.in)
