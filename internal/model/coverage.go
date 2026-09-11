@@ -10,6 +10,7 @@ const (
 	CoverageUnknown         = "unknown"
 
 	CoverageSourceTracker    = "tracker"
+	CoverageSourceDownload   = "download" // §59.196: 恢复链下载成功——原发页确定性证据（高于 tracker 存在性）
 	CoverageSourcePiecesHash = "pieces_hash"
 	CoverageSourceIYUU       = "iyuu"
 	CoverageSourceNameSize   = "name_size"

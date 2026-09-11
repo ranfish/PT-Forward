@@ -3387,13 +3387,22 @@ func SearchAndVerifyMatchWithResults(ctx context.Context, adapter model.SiteAdap
 			if retryKW == "" || retryKW == keyword {
 				continue
 			}
-			retry, rErr := adapter.SearchTorrents(ctx, config, retryKW, nil)
-			if rErr != nil {
-				continue
+			// §59.196: 纯 CJK 重试词（站标题索引英文、中文副标题不在标题索引的
+			// 形态——springsunday 侠女案）追加 area=1 简介搜索一轮：简介含中文
+			// 片名可命中，严格验证（size+组名确认）把关。
+			opts := []*model.SearchOptions{nil}
+			if hasCJKWord(retryKW) && stripASCIIWords(retryKW) == retryKW {
+				opts = append(opts, &model.SearchOptions{SearchArea: "1"})
 			}
-			allResults = append(allResults, retry...)
-			if m, _ := VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m != nil {
-				return m, nil, nil
+			for _, opt := range opts {
+				retry, rErr := adapter.SearchTorrents(ctx, config, retryKW, opt)
+				if rErr != nil {
+					continue
+				}
+				allResults = append(allResults, retry...)
+				if m, _ := VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m != nil {
+					return m, nil, nil
+				}
 			}
 		}
 	}
@@ -3461,6 +3470,12 @@ func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config
 			short = stripCJKWords(keyword)
 		}
 	}
+	// §59.196: 短词标题锚守卫——短词剥完仅剩技术词（无 CJK 且无 ≥4 字母词，
+	// 如 "1970 1080p"）时中止该轮：光技术词 AND 搜索返回同年同规格任意种子
+	// （侠女 1970×Valerie 1970 错挂形态），技术词不构成资源身份。
+	if short != "" && short != keyword && !keywordHasTitleAnchor(short) {
+		short = ""
+	}
 	if short != "" && short != keyword {
 		orderedKWs = append(orderedKWs, short)
 	}
@@ -3492,6 +3507,26 @@ func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config
 		}
 	}
 	return nil
+}
+
+// keywordHasTitleAnchor §59.196: 关键词是否含标题锚（CJK 词或 ≥4 字母的
+// token）。年份/分辨率 token 的字母数 <4 不构成锚；媒介词已在短词剥离链剥除。
+func keywordHasTitleAnchor(kw string) bool {
+	if hasCJKWord(kw) {
+		return true
+	}
+	for _, tok := range strings.Fields(strings.ToLower(kw)) {
+		letters := 0
+		for _, r := range tok {
+			if unicode.IsLetter(r) {
+				letters++
+			}
+		}
+		if letters >= 4 {
+			return true
+		}
+	}
+	return false
 }
 
 // stripYearToken 剥离关键词中的年份 token。
@@ -3530,6 +3565,14 @@ func stripMediumTokensLoose(kw string) string {
 func loosePick(results []*model.SeedingSearchResult, groupName, sourceTitle string) *L2MatchResult {
 		for _, r := range results {
 			if r.TorrentID == "" {
+				continue
+			}
+			// §59.196: 双盲拒绝——源标题含 CJK×候选无 CJK×源无 meaningful 英文词
+			// （纯中文名种子）：titleKeywordRelevant 尾部盲放行（return true）曾致
+			// 同年同组不同电影错挂（侠女×Valerie 案）。loose 宁漏勿错——正确路径
+			// 是主轮（纯 CJK area=1 补线 + size/组名确认）或 ①coverage_tid 直达。
+			if hasCJKWord(sourceTitle) && !hasCJKWord(r.Title) &&
+				len(extractMeaningfulTitleWords(sourceTitle, groupName)) == 0 {
 				continue
 			}
 			// 组名（CSS 截断标题放宽，与主路径一致；

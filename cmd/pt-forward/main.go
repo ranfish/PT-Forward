@@ -497,6 +497,7 @@ func main() {
 
 	orphanScanner := orphan.NewScanner(clientManager, db, log)
 	orphanRecovery := orphan.NewRecovery(db, siteProvider, clientManager, log)
+	orphanRecovery.SetCoverageService(coverageSvc) // §59.196: 恢复链 tid 回写
 	router.SetupOrphan(orphanScanner, orphanRecovery, db)
 	router.SetupDebug(siteProvider)
 	if err := router.StartCoverageRefresh(taskRegistry); err != nil {
