@@ -191,3 +191,27 @@ func TestKeywordTitlelessExtended(t *testing.T) {
 		}
 	}
 }
+
+// §59.192: and/& 词形 + 下划线分隔——Queen 与 BOHEMIAN 案。
+func TestConnectorAndUnderscore(t *testing.T) {
+	// Queen：站方标题 "Queen.Rock.Montreal.&.Live.Aid"——关键词 and 剥离后可命中
+	kw := ExtractSearchKeyword("Queen Rock Montreal and Live Aid 4K Blu-ray")
+	if strings.Contains(kw, "and") {
+		t.Errorf("and 应剥离: %q", kw)
+	}
+	for _, must := range []string{"Queen", "Rock", "Montreal", "Live", "Aid"} {
+		if !strings.Contains(kw, must) {
+			t.Errorf("%q 缺 %q", kw, must)
+		}
+	}
+	// BOHEMIAN：下划线名拆词
+	kw2 := ExtractSearchKeyword("BOHEMIAN_RHAPSODY_2018.1080p.BluRay.x264-CMCT")
+	if !strings.Contains(kw2, "BOHEMIAN") || !strings.Contains(kw2, "RHAPSODY") || strings.Contains(kw2, "_") {
+		t.Errorf("下划线应拆词: %q", kw2)
+	}
+	// "Beauty and the Beast" 类标题含 and 也安全（余词仍全命中）
+	kw3 := ExtractSearchKeyword("Beauty.and.the.Beast.2017.1080p.BluRay.x264-GRP")
+	if strings.Contains(kw3, "and") || !strings.Contains(kw3, "Beauty") || !strings.Contains(kw3, "Beast") {
+		t.Errorf("and 剥离不应伤及标题词: %q", kw3)
+	}
+}

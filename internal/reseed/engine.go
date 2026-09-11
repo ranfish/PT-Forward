@@ -2547,6 +2547,7 @@ func ExtractSearchKeyword(title string) string {
 		return ""
 	}
 	raw = strings.ReplaceAll(raw, ".", " ")
+	raw = strings.ReplaceAll(raw, "_", " ") // §59.192 B: 下划线分隔名（BOHEMIAN_RHAPSODY）站方点分隔 AND 失配
 	raw = stripBrandColonPrefix(raw)
 	// 去掉介质/来源词和地区码
 	for _, term := range mediumAndRegionTerms {
@@ -2593,6 +2594,11 @@ func stripVersionTokens(keyword string) string {
 	out := make([]string, 0, len(words))
 	for _, w := range words {
 		if reVersionToken.MatchString(w) {
+			continue
+		}
+		// §59.192 A: "and" 连接词——站方标题惯用 "&"（Queen.Rock.Montreal.&.Live.Aid
+		// tid=410220 案），词形不对称 AND 必空；剥离后余词仍全含于标题，无损召回
+		if strings.EqualFold(w, "and") {
 			continue
 		}
 		out = append(out, w)
