@@ -76,6 +76,10 @@ var editionPatterns = []editionPattern{
 	{regexp.MustCompile(`(?i)\bOpen[-_.\s]*Matte\b`), "Open Matte"},
 	// Hybrid（优先级 5）
 	{regexp.MustCompile(`(?i)\bHybrid\b`), "Hybrid"},
+	// §59.190 ①: 中文版式词——中英同词异形（本地"2K修复版" vs 站方"2K.REMASTERED"
+	// 同一版本，爱情万岁 tid=328261 三连误杀实证）归一英文 canonical，
+	// 规则 B"候选有源无"不再误触发（双侧均有值即不反驳）
+	{regexp.MustCompile(`修复版|修復版|重制版|重製版|数字修复|數字修復`), "Remastered"},
 	// MiniBD（优先级 9）
 	{regexp.MustCompile(`(?i)\bMiniBD\b`), "MiniBD"},
 	// CC = Criterion Collection 缩写，PT 标题中出现在年份后片源前（如 1972.CC.BluRay）

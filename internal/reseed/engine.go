@@ -3791,8 +3791,45 @@ func KeywordStartsWithYear(keyword string) bool {
 //
 // 以年份开头但后续含 CJK 字符或非规格英文词时不视为"无标题"
 // （片名本身以年份开头，如 "2001太空漫游"、"2001 A Space Odyssey"）。
+// isResolutionWord: 分辨率/规格词判定（含 2K/8K/3D 等词典外延）。
+func isResolutionWord(w string) bool {
+	lw := strings.ToLower(w)
+	for _, r := range resolutionKeywords {
+		if lw == r {
+			return true
+		}
+	}
+	switch lw {
+	case "2k", "8k", "3d", "sdr", "hdr", "uhd", "hd":
+		return true
+	}
+	return false
+}
+
+// reTitlelessSpecToken 无标题价值的 token：纯数字 / 分辨率规格（4K/2K/8K/3D/1080p…）/
+// 中文版式词及其混合形态（"4K修复版"/"2K修复版"/"修复版"）。§59.190 ②:
+// 浪人.4K修复版 / 爱情万岁.2K修复版 案——英文主体仅剩年份+规格时关键词无片名。
+var reTitlelessSpecToken = regexp.MustCompile(`(?i)^(?:\d{1,4}k)?(?:修复版?|修復版?|重制版?|重製版?|数字修复|數字修復)?$`)
+
+// keywordAllTitleless 关键词全部由规格/版式/数字 token 构成 = 无片名
+//（触发 chineseTitleFallback 补中文片名）。
+func keywordAllTitleless(keyword string) bool {
+	for _, w := range strings.Fields(keyword) {
+		if !reTitlelessSpecToken.MatchString(w) && !isResolutionWord(w) {
+			if _, err := strconv.Atoi(w); err != nil {
+				return false // 存在非规格词 → 有标题
+			}
+		}
+	}
+	return true
+}
+
 func KeywordHasNoTitle(keyword string) bool {
 	if keyword == "" {
+		return true
+	}
+	// §59.190 ②: 全规格词形态（"4K修复版 1998 1080p"）= 无片名
+	if keywordAllTitleless(keyword) {
 		return true
 	}
 	if KeywordStartsWithYear(keyword) {

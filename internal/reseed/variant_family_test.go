@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/titleparser"
 )
 
 // §59.187 ①: 组名同族豁免——UBbits/UBits 同映射变体不反驳。
@@ -90,5 +91,45 @@ func TestStripVersionTokens(t *testing.T) {
 	// 无版本词不变
 	if got := stripVersionTokens("Cinderella 1950 1080p"); got != "Cinderella 1950 1080p" {
 		t.Errorf("无版本词误剥: %q", got)
+	}
+}
+
+// §59.190 ①: 中文版式词归一——爱情万岁 tid=328261 三连误杀复现与修复断言。
+func TestChineseRemasterEdition(t *testing.T) {
+	const size = int64(11263515487)
+	src := "爱情万岁.1994.USA.2K修复版.1080p.国语.简繁中字￡CMCT蒙太奇"
+	cand := &model.SeedingSearchResult{TorrentID: "328261",
+		Title: "Vive.L'Amour.1994.USA.2K.REMASTERED.BluRay.1080p.x264.FLAC-CMCT",
+		Size:  11263551733} // 差 36KB < 1MB 地板
+	m, stats := VerifyMatchWithTruncationCheckAndSource([]*model.SeedingSearchResult{cand}, "CMCT", size, src)
+	if m == nil {
+		t.Fatalf("2K修复版≡REMASTERED 应放行: stats=%+v", stats)
+	}
+	if stats.VersionRefute != 0 {
+		t.Errorf("版本反驳不应触发: %+v", stats)
+	}
+	// EditionInfo 归一断言
+	p := titleparser.ParseTitleTech(src)
+	if p.EditionInfo != "Remastered" {
+		t.Errorf("中文修复版 EditionInfo=%q want Remastered", p.EditionInfo)
+	}
+}
+
+// §59.190 ②: 全规格词关键词判无标题 → 中文兜底触发。
+func TestKeywordAllTitleless(t *testing.T) {
+	for _, kw := range []string{"4K修复版 1998 1080p", "1994 2K修复版 1080p", "1080p", "2K"} {
+		if !KeywordHasNoTitle(kw) {
+			t.Errorf("%q 应判无标题", kw)
+		}
+	}
+	for _, kw := range []string{"侠女 1970 1080p", "Cinderella 1950 1080p", "2001太空漫游 1080p"} {
+		if KeywordHasNoTitle(kw) {
+			t.Errorf("%q 应判有标题", kw)
+		}
+	}
+	// 端到端：浪人关键词应含片名（经中文兜底）
+	kw := ExtractSearchKeyword("浪人.4K修复版.1998.1080p.国英双语.中英字幕￡CMCT旧梦")
+	if !strings.Contains(kw, "浪人") {
+		t.Errorf("浪人关键词丢片名: %q", kw)
 	}
 }
