@@ -164,8 +164,20 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
+		start := time.Now()
 		result := h.recovery.Recover(ctx, target, req.ClientID)
 		h.recoverStore.Store(taskID, result)
+		// §59.196 附二: 恢复任务终态必落日志——结果仅存内存 recoverStore
+		// （前端轮询消费），轮询丢失/浏览器后台节流时 UI 误标"未恢复"而
+		// 服务端零痕迹（SSD5 批 50/50 全成功被报 5 未恢复案）。终态以日志
+		// 为准，与 §59.185"失败必落日志"同族闭环。
+		h.logger.Info("orphan recover task finished",
+			zap.Int64("task_id", taskID),
+			zap.String("orphan", target.Name),
+			zap.Bool("found", result.Found),
+			zap.Int("recovered_count", result.RecoveredCount),
+			zap.String("message", result.Message),
+			zap.Duration("elapsed", time.Since(start)))
 		// 延迟清理任务结果（前端有 100×3s=300s 轮询窗口）
 		time.AfterFunc(10*time.Minute, func() { h.recoverStore.Delete(taskID) })
 		if result.Found {
