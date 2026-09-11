@@ -291,7 +291,38 @@ func extractRegionCodeAndRemove(title string) (string, string) {
 }
 
 func extractResolution(title string) string {
-	return strings.TrimSpace(reResolutionTok.FindString(title))
+	// §59.196: 显式像素形态优先——"4K.REMASTER...1080p" 形态中裸 4K 是版式/片源
+	// 描述（4K 修复版源），真实编码分辨率是其后的 1080p；首匹配取 4K 曾致
+	// Resolution 假冲突（侠女 tid=288084 主轮误拒）。仅含 4K/8K 时维持原值。
+	all := reResolutionTok.FindAllString(title, -1)
+	for _, tok := range all {
+		if isPixelFormResolution(tok) {
+			return strings.TrimSpace(tok)
+		}
+	}
+	if len(all) > 0 {
+		return strings.TrimSpace(all[0])
+	}
+	return ""
+}
+
+// isPixelFormResolution §59.196: 是否显式像素形态（4320p/2160p/1440p/1080p/
+// 1080i/720p/480p）——区别于 4K/8K 营销词形。
+func isPixelFormResolution(tok string) bool {
+	t := strings.ToLower(strings.TrimSpace(tok))
+	if len(t) < 3 {
+		return false
+	}
+	suffix := t[len(t)-1:]
+	if suffix != "p" && suffix != "i" {
+		return false
+	}
+	for _, r := range t[:len(t)-1] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func extractMedium(title string) string {

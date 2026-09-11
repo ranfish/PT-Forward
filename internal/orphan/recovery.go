@@ -11,6 +11,7 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/reseed"
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/util"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -21,6 +22,12 @@ type Recovery struct {
 	siteProvider   model.SiteInfoProvider
 	clientProvider model.DownloaderProvider
 	logger         *zap.Logger
+	coverageSrv    CoverageWriter // §59.196: tid 回写（可空——测试/降级场景）
+}
+
+// CoverageWriter §59.196: 恢复链所需的 coverage 写接口（coverage.Service 实现）。
+type CoverageWriter interface {
+	UpsertCoverage(ctx context.Context, record *model.SiteCoverageCache) error
 }
 
 func NewRecovery(db *gorm.DB, sp model.SiteInfoProvider, cp model.DownloaderProvider, logger *zap.Logger) *Recovery {
@@ -31,6 +38,9 @@ func NewRecovery(db *gorm.DB, sp model.SiteInfoProvider, cp model.DownloaderProv
 		logger:         logger.With(zap.String("component", "orphan-recovery")),
 	}
 }
+
+// SetCoverageService §59.196: 注入 coverage 写服务（main 装配）。
+func (r *Recovery) SetCoverageService(c CoverageWriter) { r.coverageSrv = c }
 
 func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID string) *RecoverResult {
 	result := &RecoverResult{Orphan: orphan}
@@ -979,7 +989,45 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		zap.String("site", siteName),
 		zap.String("save_path", savePath))
 
+	// §59.196: tid 回写——下载成功即源站原发页确定性证据（高于 tracker 存在性）。
+	// 同簇后续 fetch 走 ①组映射+coverage_tid 直达详情页，绕开搜索反查
+	// （侠女案：tid 丢失→loose 搜索错挂 Valerie）。失败仅记日志不影响恢复结果。
+	r.writeDownloadCoverage(ctx, torrentData, siteName, torrentID)
+
 	return nil
+}
+
+// writeDownloadCoverage §59.196: 从种子数据取 info_hash 回写 coverage。
+func (r *Recovery) writeDownloadCoverage(ctx context.Context, torrentData []byte, siteName, torrentID string) {
+	if r.coverageSrv == nil || torrentID == "" {
+		return
+	}
+	fp, err := fingerprint.ComputeFromTorrent(torrentData)
+	if err != nil || fp.InfoHash == "" {
+		return
+	}
+	now := time.Now()
+	rec := &model.SiteCoverageCache{
+		InfoHash:   fp.InfoHash,
+		SiteName:   siteName,
+		Status:     model.CoverageConfirmedHas,
+		Source:     model.CoverageSourceDownload,
+		Confidence: 0.99,
+		TorrentID:  torrentID,
+		QueriedAt:  now,
+		ExpiresAt:  now.Add(30 * 24 * time.Hour),
+	}
+	if err := r.coverageSrv.UpsertCoverage(ctx, rec); err != nil {
+		r.logger.Warn("orphan coverage writeback failed",
+			zap.String("hash", fp.InfoHash[:10]),
+			zap.String("site", siteName),
+			zap.Error(err))
+		return
+	}
+	r.logger.Info("orphan coverage writeback",
+		zap.String("hash", fp.InfoHash[:10]),
+		zap.String("site", siteName),
+		zap.String("tid", torrentID))
 }
 
 func waitForRecheck(ctx context.Context, dlClient model.DownloaderClient, infoHash string, timeout time.Duration) error {
