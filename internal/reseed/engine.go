@@ -3682,6 +3682,74 @@ func NormalizeMixedKeyword(keyword string) string {
 	return normalized
 }
 
+// editionSuffixes 中文版式词后缀（长在前优先修剪）。§59.194。
+var editionSuffixes = []string{"终极剪辑版", "导演剪辑版", "数字修复版", "未删减版", "未删节版", "修复版", "重制版", "加长版", "完整版", "剪辑版", "修复", "重制"}
+
+var reEditionWordOnly = regexp.MustCompile(`^(?:终极剪辑版|导演剪辑版|数字修复版|未删减版|未删节版|修复版|重制版|加长版|完整版|剪辑版|修复|重制)$`)
+
+// PurifyChineseKeyword §59.194: 中文关键词净化降级变体。
+// 站方副标题桥要求精确子串，而中文关键词常带装饰元素（六案实证：
+// 午夜凶铃 tid=270313/宝贝计划 tid=5824/安娜·卡列尼娜 tid=46343 等）：
+// ① 版式词 token 剥离——站方副标题纯片名（REMASTERED 在英文标题，
+//   中文 4K修复版 词 AND 必失配）
+// ② CJK 词尾版式后缀修剪——"宝贝计划加长版"（词内粘连）→"宝贝计划"
+// ③ 中点消解——"安娜·卡列尼娜"→"安娜卡列尼娜"（副标题无点形态）
+// 无 CJK / 无变化 / 剥空 均返回 ""（调用方跳过该轮）。
+func PurifyChineseKeyword(keyword string) string {
+	if !hasCJKWord(keyword) {
+		return ""
+	}
+	var out []string
+	changed := false
+	for _, w := range strings.Fields(keyword) {
+		if !hasCJKWord(w) {
+			out = append(out, w)
+			continue
+		}
+		if reEditionWordOnly.MatchString(w) { // 整词版式词 → 剥
+			changed = true
+			continue
+		}
+		nw := strings.NewReplacer("·", "", "・", "", "•", "").Replace(w)
+		trimmed := false
+		for _, suf := range editionSuffixes {
+			if strings.HasSuffix(nw, suf) {
+				nw = strings.TrimSuffix(nw, suf)
+				changed = true
+				trimmed = true
+				break
+			}
+		}
+		if nw != w {
+			changed = true
+		}
+		// 版式词剥净后剩纯规格（4K修复版→4K）、单字残片或空 → 整词丢弃
+		if nw == "" || (hasCJKWord(w) && (!hasCJKWord(nw) || (trimmed && cjkRunes(nw) < 2))) {
+			continue
+		}
+		out = append(out, nw)
+	}
+	if !changed {
+		return ""
+	}
+	res := strings.Join(out, " ")
+	if res == keyword || res == "" || !hasCJKWord(res) {
+		return ""
+	}
+	return res
+}
+
+// cjkRunes: 字符串中 CJK 字数
+func cjkRunes(s string) int {
+	n := 0
+	for _, r := range s {
+		if (r >= 0x4E00 && r <= 0x9FFF) || (r >= 0x3400 && r <= 0x4DBF) {
+			n++
+		}
+	}
+	return n
+}
+
 // HasCJKWord §59.184: hasCJKWord 导出形态——孤儿恢复 B 补线跨包消费。
 func HasCJKWord(s string) bool { return hasCJKWord(s) }
 
