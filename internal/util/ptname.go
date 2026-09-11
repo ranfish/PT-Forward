@@ -47,6 +47,17 @@ func ExtractGroupName(title string) string {
 
 	// 尝试 "-" 分隔符
 	lastDash := strings.LastIndex(clean, "-")
+	// §59.193: 词内连字符（媒介/音频复合词 Blu-ray/WEB-DL/DTS-HD）非组分隔——
+	// "…Live Aid 4K Blu-ray" 曾误提取组名 "ray"（Queen 案）。取连字符前词段
+	// （至空格/点），为已知媒介片段时该连字符不构成分隔。
+	if lastDash > 0 {
+		fragStart := strings.LastIndexAny(clean[:lastDash], " ._")
+		frag := strings.ToLower(clean[fragStart+1 : lastDash])
+		switch frag {
+		case "blu", "web", "dts", "dts-hd", "true", "hd":
+			lastDash = -1
+		}
+	}
 	if lastDash > 0 && lastDash < len(clean)-1 {
 		group := strings.TrimSpace(clean[lastDash+1:])
 		if atIdx := strings.LastIndex(group, "@"); atIdx >= 0 && atIdx < len(group)-1 {

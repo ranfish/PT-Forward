@@ -215,3 +215,33 @@ func TestConnectorAndUnderscore(t *testing.T) {
 		t.Errorf("and 剥离不应伤及标题词: %q", kw3)
 	}
 }
+
+// §59.193: UHD 前缀消解 + 词内连字符组名误提取——Queen tid=3020 案。
+func TestQueenUHDSourceType(t *testing.T) {
+	const size = int64(192832840245)
+	src := "Queen Rock Montreal and Live Aid 4K Blu-ray"
+	cand := &model.SeedingSearchResult{TorrentID: "3020",
+		Title: "Queen Rock Montreal & Live Aid 1981 2160p UHD Blu-ray HDR10 HEVC TrueHD 7.1 Atmos-CMCT",
+		Size:  192833294172} // 差 443KB
+	m, stats := VerifyMatchWithTruncationCheckAndSource([]*model.SeedingSearchResult{cand}, "", size, src)
+	if m == nil {
+		t.Fatalf("4K Blu-ray ≡ UHD Blu-ray(2160p) 应放行: %+v", stats)
+	}
+	// UHD 前缀消解单元
+	if !sourceTypeEquivalent("Blu-ray", "UHD Blu-ray") {
+		t.Error("Blu-ray ≡ UHD Blu-ray 应等价")
+	}
+	if sourceTypeEquivalent("UHDTV", "HDTV") {
+		t.Error("UHDTV ≢ HDTV")
+	}
+	if sourceTypeEquivalent("Blu-ray", "WEB") {
+		t.Error("Blu-ray ≢ WEB")
+	}
+	// 词内连字符组名
+	if g := ExtractGroupName("Queen Rock Montreal and Live Aid 4K Blu-ray"); g != "" {
+		t.Errorf("Blu-ray 连字符不应提取组名: %q", g)
+	}
+	if g := ExtractGroupName("Movie.Blu-ray.x264-GRP"); g != "GRP" {
+		t.Errorf("媒介连字符后的真组名应保留: %q", g)
+	}
+}
