@@ -107,7 +107,8 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 			}
 		}
 
-		if err := r.downloadWithFallback(ctx, orphan, siteName, torrentID, targetClientID, injectSize, injectName, stats); err != nil {
+		actualSite, err := r.downloadWithFallback(ctx, orphan, siteName, torrentID, targetClientID, injectSize, injectName, stats)
+		if err != nil {
 			// §59.185 ①: 失败必落日志——此前仅写 result.Message 返回，全日志零痕迹（城市
 			// cuhash 案实证排查黑洞）
 			r.logger.Error("orphan recovery failed",
@@ -127,11 +128,15 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 			result.RecoveredCount += additional
 		}
 
+		finalSite := siteName
+		if actualSite != "" {
+			finalSite = actualSite
+		}
 		if result.RecoveredCount > 1 {
 			result.Message = fmt.Sprintf("recovered %d episodes from %s (method=%s, includes same-site expansion)",
-				result.RecoveredCount, siteName, method)
+				result.RecoveredCount, finalSite, method)
 		} else {
-			result.Message = fmt.Sprintf("recovered from %s (method=%s)", siteName, method)
+			result.Message = fmt.Sprintf("recovered from %s (method=%s)", finalSite, method)
 		}
 		return result
 	}
@@ -857,6 +862,16 @@ func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, cli
 				zap.String("orphan", orphan.Name),
 				zap.String("hash", infoHash),
 				zap.Error(recheckErr))
+			// §59.203: recheck 未完成=注入了错误种子（piece hash 全不匹配，
+			// 克拉之膝/活着案：错版滞留下载器 0% 且恢复被标成功）。判失败交
+			// 三层兜底（次优站递补），并移除错误种子（保留数据文件）。
+			if delErr := client.DeleteTorrent(ctx, infoHash, false); delErr != nil {
+				r.logger.Warn("orphan wrong-torrent cleanup failed",
+					zap.String("orphan", orphan.Name),
+					zap.String("hash", infoHash),
+					zap.Error(delErr))
+			}
+			return fmt.Errorf("recheck incomplete (wrong torrent injected): %w", recheckErr)
 		} else {
 			if resumeErr := client.ResumeTorrent(ctx, infoHash); resumeErr != nil {
 				r.logger.Warn("orphan resume failed",
@@ -874,7 +889,9 @@ func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, cli
 // 层2 cuhash 模板站懒刷新 + 原站重试一次（cuhash 轮换窗口未知，6h 定时同步有缺口；
 //     刷新即变化则回写 DB 后重试——保源站偏好，keepfrds 429 类失败不直接跳站）
 // 层3 次优站递补：排除已败站重搜（优先站/中文线链路复用），最多递补 2 站
-func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, primarySite, primaryTid, targetClientID string, sourceSize int64, sourceName string, stats *SearchStats) error {
+// downloadWithFallback 返回实际下载成功的站点（§59.203：次优站递补成功时
+// 主匹配站点≠实际站点——绝望的牛仔案结果消息误报主站）。
+func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, primarySite, primaryTid, targetClientID string, sourceSize int64, sourceName string, stats *SearchStats) (string, error) {
 	excluded := map[string]bool{}
 	var lastErr error
 
@@ -897,7 +914,7 @@ func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, prim
 
 		err := r.downloadAndAdd(ctx, orphan, site, tid, "", targetClientID, sourceSize, sourceName)
 		if err == nil {
-			return nil
+			return site, nil
 		}
 		lastErr = fmt.Errorf("site=%s tid=%s: %w", site, tid, err)
 		r.logger.Warn("orphan recovery: download attempt failed",
@@ -912,7 +929,7 @@ func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, prim
 				r.logger.Info("orphan recovery: succeeded after cuhash refresh",
 					zap.String("orphan", orphan.Name),
 					zap.String("site", site))
-				return nil
+				return site, nil
 			} else {
 				r.logger.Warn("orphan recovery: retry after cuhash refresh still failed",
 					zap.String("orphan", orphan.Name),
@@ -925,7 +942,7 @@ func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, prim
 	if lastErr == nil {
 		lastErr = fmt.Errorf("no downloadable candidate site")
 	}
-	return lastErr
+	return "", lastErr
 }
 
 // retrySearchExcluding §59.185 ③: 次优站递补搜索（排除已败站，2 分钟窗口）

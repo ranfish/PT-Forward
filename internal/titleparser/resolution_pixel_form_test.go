@@ -39,3 +39,20 @@ func TestResolutionEdition4KPhrase(t *testing.T) {
 		}
 	}
 }
+
+// §59.203: 版本词在年份前形态——边界锚吞掉 REPACK 致规则 B 失明（活着案）。
+func TestReleaseVersionBeforeYear(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"To.Live.REPACK.JPN.1994.BluRay.720p.x264.FLAC-CMCT", "REPACK"},
+		{"To.Live.REPACK.1994.BluRay.720p.x264.FLAC-CMCT", "REPACK"},
+		{"Movie.2020.REPACK.1080p.BluRay.x264-CMCT", "REPACK"}, // 年份后（回归）
+		{"Movie.2020.REPACK2.1080p-CMCT", "REPACK"}, // Contains 先命中（§59.96 顺序缺陷历史行为）
+		{"Movie.2020.PROPER.JPN.1994.BluRay-CMCT", "PROPER"},
+		{"Movie.2020.1080p.BluRay.x264-CMCT", ""},
+	}
+	for _, c := range cases {
+		if got := ParseTitleTech(c.in).ReleaseVersion; got != c.want {
+			t.Errorf("ReleaseVersion(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

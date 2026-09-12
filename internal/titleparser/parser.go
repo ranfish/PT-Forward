@@ -55,9 +55,13 @@ func ParseTitle(title string) TitleComponents {
 
 	// §59.98: 统一边界锚——「季集或年份」最先出现者为主标题右边界（v1.05 顺序
 	// 剧名→季集→年份; 无年份剧集由季集锚获结构边界, Saki 案例不再依赖逐词 fallback）
+	preBoundary := title
 	c.SeasonEpisode, c.Year, title, mainLocked = extractBoundaryAnchor(title)
 	// 发布版本
-	c.ReleaseVersion = extractReleaseVersion(title)
+	// §59.203: 版本词在年份前形态（To.Live.REPACK.1994...）——边界锚把年份前
+	// 内容锁入主标题并从工作标题剥除，REPACK 对 extractReleaseVersion 不可见
+	//（活着 tid=295484 错配注入案：规则 B 版本反驳未触发）。改用锚前全文提取。
+	c.ReleaseVersion = extractReleaseVersion(preBoundary)
 	title = removeToken(title, c.ReleaseVersion)
 	// 剧集状态
 	c.SeriesStatus = extractSeriesStatus(title)
