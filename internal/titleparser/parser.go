@@ -290,6 +290,12 @@ func extractRegionCodeAndRemove(title string) (string, string) {
 	return "", title
 }
 
+// reEdition4K §59.190 挂账兑现/§59.197 附: "4K修复版"/"4K.REMASTER" 版式短语
+// ——4K 是修复源描述（4K 扫描母版修复），非编码分辨率。此语境下无像素形态
+// token 时 Resolution 置空（编码分辨率未标），交 size 仲裁版本（午夜凶铃案：
+// Res="4K"×候选 1080p 假冲突六站候选全灭）。裸 "4K"（无版式语境）维持原值。
+var reEdition4K = regexp.MustCompile(`(?i)(?:4k|8k)[-_\.\s]*(?:修复版?|修復版?|重制版?|重製版?|数字修复|數字修復|remaster(?:ed)?)`)
+
 func extractResolution(title string) string {
 	// §59.196: 显式像素形态优先——"4K.REMASTER...1080p" 形态中裸 4K 是版式/片源
 	// 描述（4K 修复版源），真实编码分辨率是其后的 1080p；首匹配取 4K 曾致
@@ -301,7 +307,12 @@ func extractResolution(title string) string {
 		}
 	}
 	if len(all) > 0 {
-		return strings.TrimSpace(all[0])
+		pick := strings.TrimSpace(all[0])
+		lt := strings.ToLower(pick)
+		if (lt == "4k" || lt == "8k") && reEdition4K.MatchString(title) {
+			return ""
+		}
+		return pick
 	}
 	return ""
 }
