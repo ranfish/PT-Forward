@@ -3085,6 +3085,9 @@ func techProfileConfirm(src titleparser.TechProfile, candidateTitle string) bool
 		{"Specification", src.Specification, cand.Specification},
 		{"RegionCode", src.RegionCode, cand.RegionCode},
 		{"SourceType", src.SourceType, cand.SourceType},
+		// §59.197: 3D 封装补入——HSBS×HOU 不同封装=不同种（300勇士案：
+		// 站内两版同体积同组，双显异值才反驳；省略/"3D"泛词为空值放行）
+		{"Stereo3D", src.Stereo3D, cand.Stereo3D},
 	}
 	for _, f := range fields {
 		if f.s == "" || f.c == "" {
@@ -3190,6 +3193,9 @@ func techProfileConflictFields(src titleparser.TechProfile, candidateTitle strin
 		// §59.185: SourceType 补入——源类型不同=不同血统（用户定案；
 		// 旋律时光 BluRay 孤儿误配 DVDrip 种实证：ST 不在字段表零反驳放行）
 		{"SourceType", src.SourceType, cand.SourceType},
+		// §59.197: 3D 封装补入——HSBS×HOU 不同封装=不同种（300勇士案：
+		// 站内两版同体积同组，双显异值才反驳；省略/"3D"泛词为空值放行）
+		{"Stereo3D", src.Stereo3D, cand.Stereo3D},
 	}
 	for _, f := range fields {
 		if f.name == "AudioCodec" && skipAudio {
