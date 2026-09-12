@@ -239,6 +239,17 @@ func TestQueenUHDSourceType(t *testing.T) {
 	}
 	// 词内连字符组名
 	// §59.196: 双侧证据——DTS 前段 + 组名后段 = 音频+组分隔（永安镇故事集案）
+	// §59.200: E+数字合集序号前缀剥除（007 合集 E09=金枪人案——纯数字形态
+	// §59.184 附四已覆盖，E 形态补齐）
+	if kw := ExtractSearchKeyword("E09.The.Man.With.The.Golden.Gun.1974.720p.BluRay.x264.DTS-WiKi"); kw != "The Man With The Golden Gun 1974 720p BluRay" {
+		t.Errorf("E-prefix keyword = %q", kw)
+	}
+	if kw := ExtractSearchKeyword("12.仙履奇缘.Cinderella.2015.1080p"); kw != "Cinderella 2015 1080p" {
+		t.Errorf("numeric prefix keyword = %q", kw)
+	}
+	if kw := ExtractSearchKeyword("2019.片名.Movie.1080p"); kw == "片名 Movie 1080p" {
+		t.Errorf("4-digit year prefix must not be stripped, got %q", kw)
+	}
 	if g := ExtractGroupName("[永安镇故事集].Ripples.of.Life.2021.CHN.BluRay.1080p.x264.DTS-CMCT"); g != "CMCT" {
 		t.Errorf("DTS-CMCT = %q, want CMCT", g)
 	}

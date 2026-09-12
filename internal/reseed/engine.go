@@ -2571,8 +2571,11 @@ func ExtractSearchKeyword(title string) string {
 	return stripVersionTokens(appendMediaAfterResolution(raw, title))
 }
 
-// reEpisodeNumPrefix 合集数字序号前缀（可重复，如 "12." / "12.2."）。
-var reEpisodeNumPrefix = regexp.MustCompile(`^(\d{1,3}[.])+`)
+// reEpisodeNumPrefix 合集序号前缀（可重复，如 "12." / "12.2." / "E09."）。
+// §59.200: E+数字形态（电影合集单文件命名——007 合集 E09=金枪人案）：
+// 站方独立资源标题无集号词 → AND 0 结果。纯数字（迪士尼收集案）与 E 形态
+// 统一剥除；4 位年份开头（"2019."）不受影响（1-3 位限制）。
+var reEpisodeNumPrefix = regexp.MustCompile(`^((?:\d{1,3}|(?i:E\d{1,3}))[.])+`)
 
 // stripEpisodeNumberPrefix §59.184 附四: 剥合集数字序号前缀。
 // 关键词被序号污染（"12 仙履奇缘 Cinderella…"）会触发 KeywordHasNoTitle
