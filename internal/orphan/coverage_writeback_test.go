@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/reseed"
 	"go.uber.org/zap"
 )
 
@@ -74,4 +75,21 @@ func TestWriteDownloadCoverage_Defensive(t *testing.T) {
 func TestWriteDownloadCoverage_NilService(t *testing.T) {
 	r := NewRecovery(nil, nil, nil, zap.NewNop())
 	r.writeDownloadCoverage(context.Background(), minimalTorrent, "不可说", "288084")
+}
+
+// StripYearToken §59.198: 年份剥离（站方年份笔误家族降级轮的词法基础）。
+func TestStripYearToken(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"拾芳 2019 1080p", "拾芳 1080p"},
+		{"巴士底日 2016", "巴士底日"},
+		{"生死格斗 2006", "生死格斗"},
+		{"Movie 1994 720p", "Movie 720p"},
+		{"Movie 720p", "Movie 720p"},
+		{"2001太空漫游 1968", "2001太空漫游"}, // CJK 词内 2001 不剥（非独立 token）
+	}
+	for _, c := range cases {
+		if got := reseed.StripYearToken(c.in); got != c.want {
+			t.Errorf("StripYearToken(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
 }

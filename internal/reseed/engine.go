@@ -3470,7 +3470,7 @@ func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config
 	if kw2 := stripResolutionTokens(keyword); kw2 != "" && kw2 != keyword {
 		orderedKWs = append(orderedKWs, kw2)
 	}
-	short := stripYearToken(stripCJKWords(stripResolutionTokens(stripMediumTokensLoose(keyword))))
+	short := StripYearToken(stripCJKWords(stripResolutionTokens(stripMediumTokensLoose(keyword))))
 	if short == "" || short == keyword {
 		if hasCJKWord(keyword) {
 			short = stripCJKWords(keyword)
@@ -3535,8 +3535,9 @@ func keywordHasTitleAnchor(kw string) bool {
 	return false
 }
 
-// stripYearToken 剥离关键词中的年份 token。
-func stripYearToken(kw string) string {
+// StripYearToken 剥离关键词中的年份 token（19xx/20xx 四位词）。
+// §59.198 导出：恢复链 Phase-1 年份剥离降级轮复用（站方年份笔误家族）。
+func StripYearToken(kw string) string {
 	out := kw
 	for _, f := range strings.Fields(kw) {
 		if len(f) == 4 && (strings.HasPrefix(f, "19") || strings.HasPrefix(f, "20")) {

@@ -509,6 +509,26 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 						}
 					}
 				}
+
+				// §59.198: 年份剥离降级轮——站方年份笔误家族（浪潮/三个老
+				// 抢手/巴士底日/拾芳 四案：站方主标题年份写错，关键词带年份
+				// AND 语义 0 结果）。剥 19xx/20xx token 重试——"拾芳 1080p"
+				// 实证返回 2018 题 CMCT 原版 tid=278834。排最末兜底：年份是
+				// 有效收窄词，仅前轮全空时触发。
+				if yk := reseed.StripYearToken(searchKeyword); yk != "" && yk != searchKeyword {
+					r.logger.Debug("orphan L2 priority: yearless retry",
+						zap.String("site", sourceSite),
+						zap.String("keyword", yk))
+					if retry, rErr := r.searchWithBackoff(ctx, adapter, config, yk); rErr == nil && len(retry) > 0 {
+						if m5, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m5 != nil {
+							r.logger.Info("orphan L2 match (priority, yearless)",
+								zap.String("orphan", orphan.Name),
+								zap.String("site", sourceSite),
+								zap.String("torrent_id", m5.TorrentID))
+							return sourceSite, m5.TorrentID, "l2:priority-yearless:"+sourceSite
+						}
+					}
+				}
 			}
 		}
 		r.logger.Info("orphan L2: source site miss, searching all sites",
