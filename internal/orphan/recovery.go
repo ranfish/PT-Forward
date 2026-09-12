@@ -194,7 +194,13 @@ func (r *Recovery) expandSameSite(ctx context.Context, orphan *Entry, classifica
 // isRateLimitErr §59.185 A: 我方域限流器排队超时/冻结连坐类错误
 // （"domain rate limit acquire failed"——请求未出进程，重试零站方压力）。
 func isRateLimitErr(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "domain rate limit")
+	if err == nil {
+		return false
+	}
+	// §59.199: 异常页（并发限流 503 重试耗尽后的轻量错误页）同按限流类
+	// 退避重试——错误≠未命中。
+	return strings.Contains(err.Error(), "domain rate limit") ||
+		strings.Contains(err.Error(), "search page anomaly")
 }
 
 // searchWithBackoff §59.185 A: priority 搜索遇限流类错误退避重试一次

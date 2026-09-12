@@ -1135,6 +1135,24 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 
 		parsed := parseNexusPHPBrowse(string(body), config)
 
+		// §59.199: 异常页检测——0 行且页面无空结果标记（真空页 NexusPHP 标准主题
+		// 必含"没有种子/搜索结果"——springsunday 实测）＝页面异常形态：站点并发
+		// 限流 503（24 并发实测 17×503）被 retry 中间件耗尽后返回的轻量错误页/
+		// 降级页。此前静默当"确认无结果"——Phase-2 恒 0 行且零日志（生死格斗案：
+		// PT30 批次窗口 spring 搜索全盲）。按站点错误上报，交上层退避重试。
+		if len(parsed) == 0 &&
+			!strings.Contains(string(body), "没有种子") && !strings.Contains(string(body), "没有符合") &&
+			!strings.Contains(string(body), "搜索结果") && !strings.Contains(string(body), "Nothing") {
+			if a.logger != nil {
+				a.logger.Debug("nexusphp search: anomaly page (0 rows, no empty marker)",
+					zap.String("domain", config.Domain),
+					zap.Int("status", resp.StatusCode),
+					zap.Int("body_bytes", len(body)))
+			}
+			lastErr = httpError(fmtES("search page anomaly on %s (status=%d, bytes=%d, no empty marker)", bp, resp.StatusCode, len(body)), nil)
+			continue
+		}
+
 		// §59.30: 间歇性 session 失效防护——请求带 search 参数但返回页无搜索结果
 		// 标记（NexusPHP 对失效 session 忽略参数返回默认列表），重试一次。
 		if len(parsed) > 0 && !strings.Contains(string(body), "搜索结果") && !strings.Contains(string(body), "没有种子") && !strings.Contains(string(body), "Nothing") {

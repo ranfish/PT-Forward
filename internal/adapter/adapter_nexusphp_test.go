@@ -439,7 +439,9 @@ func TestNexusPHP_SearchTorrents_WithCategory(t *testing.T) {
 		if cat != "123" {
 			t.Errorf("expected cat=123, got %s", cat)
 		}
-		_, _ = w.Write([]byte(`<html></html>`))
+		// §59.199: 空页须含空结果标记（真实 NexusPHP 空页契约），
+		// 否则按异常页上报（并发限流轻量页检测）
+		_, _ = w.Write([]byte(`<html>没有种子</html>`))
 	}))
 	defer srv.Close()
 
