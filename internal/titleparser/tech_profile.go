@@ -18,6 +18,7 @@ type TechProfile struct {
 	RegionCode     string `json:"region_code"`     // 6. 地区码（ITA/USA/JPN，仅原盘类）
 	SourcePlatform string `json:"source_platform"` // 7. 内容分发方（NF/AMZN/DSNP）
 	ReleaseGroup   string `json:"release_group"`   // 17. 制作组
+	Stereo3D       string `json:"stereo_3d"`       // 19. 3D 封装（HSBS/HOU/SBS/OU——§59.197 仅标题解析；双显异值=不同封装形态）
 	ChinesePrefix  string `json:"chinese_prefix"`  // 18. 中文名前缀 [中文名]
 
 	// === 技术参数字段（权威源：MediaInfo，8 字段）===

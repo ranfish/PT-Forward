@@ -30,8 +30,35 @@ func ParseTitleTech(title string) TechProfile {
 	p.AudioChannels = extractAudioChannelsFromTitle(title)
 	p.AudioTechnology = extractAudioTechnologyFromTitle(title)
 	p.AudioTracks = extractAudioTracksFromTitle(title)
+	p.Stereo3D = extractStereo3D(title)
 
 	return p
+}
+
+// extractStereo3D §59.197: 3D 封装词提取（仅显式形态参与反驳——"3D" 泛词
+// 与省略形态返回空值不参与）。族归一：HSBS/H-SBS/Half-SBS→HSBS；
+// HOU/H-OU/Half-OU→HOU；裸 SBS/OU 独立值（半幅/全幅不同封装）。
+// 300勇士案：站内同资源 HSBS/HOU 两版同体积同组——无此字段则验证链全盲、
+// 结果顺序定生死（HOU 在前即错配注入，piece hash 不匹配 recheck 失败）。
+var reStereo3D = regexp.MustCompile(`(?i)\b(?:half[-_.\s]?|h[-_.\s]?)?(sbs|ou)\b`)
+
+func extractStereo3D(title string) string {
+	for _, m := range reStereo3D.FindAllStringSubmatch(title, -1) {
+		full := strings.ToLower(m[0])
+		switch strings.ToUpper(m[1]) {
+		case "SBS":
+			if strings.Contains(full, "half") || strings.Contains(full, "h") {
+				return "HSBS"
+			}
+			return "SBS"
+		case "OU":
+			if strings.Contains(full, "half") || strings.Contains(full, "h") {
+				return "HOU"
+			}
+			return "OU"
+		}
+	}
+	return ""
 }
 
 // editionPattern 版本信息匹配规则。
