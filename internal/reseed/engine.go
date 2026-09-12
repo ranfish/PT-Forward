@@ -2555,6 +2555,7 @@ func ExtractSearchKeyword(title string) string {
 	}
 	// 去掉中文集数描述（全16集、16集等）
 	raw = chineseEpisodeCountRe.ReplaceAllString(raw, " ")
+	raw = reYearRangeToken.ReplaceAllString(raw, " ") // §59.204 F2: 年份区间
 	raw = strings.Join(strings.Fields(raw), " ")
 	raw = stripApostrophes(raw)
 
@@ -2692,6 +2693,7 @@ func chineseTitleFallback(title string) string {
 		fb = strings.ReplaceAll(fb, term, " ")
 	}
 	fb = chineseEpisodeCountRe.ReplaceAllString(fb, " ")
+	fb = reYearRangeToken.ReplaceAllString(fb, " ") // §59.204 F2: 年份区间
 	fb = strings.Join(strings.Fields(fb), " ")
 	return fb
 }
@@ -2725,7 +2727,14 @@ func stripBrandColonPrefix(s string) string {
 
 var seasonPattern = regexp.MustCompile(`(?i)^S\d{1,2}(?:E\d{1,3})?`)
 
-var chineseEpisodeCountRe = regexp.MustCompile(`全?\d+集全?`)
+// §59.204 F1: 集数标记支持中文数字（全五集/全四十集）——原仅阿拉伯数字，
+// BBC王朝案"全五集"残留致站方 AND 0 结果（用户实证 "BBC 王朝 2018 720p" 命中）。
+var chineseEpisodeCountRe = regexp.MustCompile(`全?[0-9零一二三四五六七八九十百千]+集全?`)
+
+// reYearRangeToken §59.204 F2: 年份区间 token（合集多部年份跨度 2002-2007）——
+// 站方标题/副标题通常不含区间写法，AND 阻断词（色即是空案实证：
+// "色即是空 合集"=3 行 vs "色即是空 合集 2002-2007"=0 行）。
+var reYearRangeToken = regexp.MustCompile(`\b(?:19|20)\d{2}[-.](?:19|20)\d{2}\b`)
 
 var mediumAndRegionTerms = []string{
 	// 介质/来源词（变体问题：Blu-ray/Bluray、Web-DL/WebDL）
@@ -3963,11 +3972,48 @@ var reTitlelessSpecToken = regexp.MustCompile(`(?i)^(?:\d{1,4}k)?(?:(?:终极|�
 
 // keywordAllTitleless 关键词全部由规格/版式/数字 token 构成 = 无片名
 //（触发 chineseTitleFallback 补中文片名）。
+// isRomanNumeralToken §59.204 F3: 纯罗马数字 token（I/II/III…X）——合集部数
+// 编号非标题（色即是空I.II合集：英文主体仅剩 "II合集"，II 是编号）。
+func isRomanNumeralToken(w string) bool {
+	switch strings.ToUpper(w) {
+	case "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X":
+		return true
+	}
+	return false
+}
+
+// isCollectionMarkerToken §59.204 F3: 合集结构词（合集/全集）——标记非标题。
+// 粘着形态（"II合集"＝罗马编号+合集一体，色即是空案）同判：剥去合集/全集
+// 后缀，余部为空或罗马数字/数字＝纯结构标记。
+func isCollectionMarkerToken(w string) bool {
+	switch w {
+	case "合集", "全集":
+		return true
+	}
+	if strings.HasSuffix(w, "合集") || strings.HasSuffix(w, "全集") {
+		head := w[:len(w)-len("合集")]
+		if head == "" {
+			return true
+		}
+		if _, err := strconv.Atoi(head); err == nil {
+			return true
+		}
+		if isRomanNumeralToken(head) {
+			return true
+		}
+	}
+	return false
+}
+
 func keywordAllTitleless(keyword string) bool {
 	// §59.201: 数字 token 紧邻年份（19xx/20xx）= 数字片名（65.2023/300.2006
 	// 家族）——视为有标题（"65" 即站方标题词，AND 可命中）。
 	words := strings.Fields(keyword)
 	for i, w := range words {
+		// §59.204 F3: 罗马数字编号/合集结构词不构成标题
+		if isRomanNumeralToken(w) || isCollectionMarkerToken(w) {
+			continue
+		}
 		if !reTitlelessSpecToken.MatchString(w) && !isResolutionWord(w) {
 			if _, err := strconv.Atoi(w); err != nil {
 				return false // 存在非规格词 → 有标题
