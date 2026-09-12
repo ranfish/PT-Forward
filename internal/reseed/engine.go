@@ -2582,8 +2582,20 @@ var reEpisodeNumPrefix = regexp.MustCompile(`^((?:\d{1,3}|(?i:E\d{1,3}))[.])+`)
 // 误杀（首词数字 → 判"无标题"→ 整个 L2 跳过——迪士尼动画收集 8 孤儿实证）。
 // 限 1-3 位数字+点分隔（"2019.片名" 年份开头 4 位形态不受影响）。
 func stripEpisodeNumberPrefix(title string) string {
-	return reEpisodeNumPrefix.ReplaceAllString(title, "")
+	loc := reEpisodeNumPrefix.FindStringIndex(title)
+	if loc == nil {
+		return title
+	}
+	// §59.201: 2-3 位序号后紧跟年份 = 数字本身是片名（65.2023/300.2006——
+	// 数字命名电影家族；1 位序号年份形态结局同跳过，不区分）。
+	if reYearTokenFollows.MatchString(title[loc[1]:]) {
+		return title
+	}
+	return title[:loc[0]] + title[loc[1]:]
 }
+
+// reYearTokenFollows §59.201: 行首年份 token（数字片名判别的配套锚）。
+var reYearTokenFollows = regexp.MustCompile(`^(?:19|20)\d{2}[.]`)
 
 // reVersionToken 版本词（与 extractReleaseVersion 同表：PROPER/REPACKn/RERIP/DIRFIX/INTERNAL）。
 var reVersionToken = regexp.MustCompile(`(?i)^(?:PROPER|REPACK\d*|RERIP|DIRFIX|INTERNAL)$`)
@@ -3952,15 +3964,26 @@ var reTitlelessSpecToken = regexp.MustCompile(`(?i)^(?:\d{1,4}k)?(?:(?:终极|�
 // keywordAllTitleless 关键词全部由规格/版式/数字 token 构成 = 无片名
 //（触发 chineseTitleFallback 补中文片名）。
 func keywordAllTitleless(keyword string) bool {
-	for _, w := range strings.Fields(keyword) {
+	// §59.201: 数字 token 紧邻年份（19xx/20xx）= 数字片名（65.2023/300.2006
+	// 家族）——视为有标题（"65" 即站方标题词，AND 可命中）。
+	words := strings.Fields(keyword)
+	for i, w := range words {
 		if !reTitlelessSpecToken.MatchString(w) && !isResolutionWord(w) {
 			if _, err := strconv.Atoi(w); err != nil {
 				return false // 存在非规格词 → 有标题
 			}
 		}
+		if i+1 < len(words) && len(w) >= 2 && len(w) <= 3 {
+			if _, err := strconv.Atoi(w); err == nil && reYearWord.MatchString(words[i+1]) {
+				return false // 2-3 位数字+年份相邻 = 数字片名（1 位=序号污染，§59.190 用例保持）
+			}
+		}
 	}
 	return true
 }
+
+// reYearWord §59.201: 独立年份词（19xx/20xx）。
+var reYearWord = regexp.MustCompile(`^(?:19|20)\d{2}$`)
 
 func KeywordHasNoTitle(keyword string) bool {
 	if keyword == "" {
@@ -3976,6 +3999,11 @@ func KeywordHasNoTitle(keyword string) bool {
 	fields := strings.Fields(keyword)
 	if len(fields) > 0 && len(fields[0]) <= 3 {
 		if _, err := strconv.Atoi(fields[0]); err == nil {
+			// §59.201: 2-3 位数字+年份相邻 = 数字片名（65 2023/300 2006），
+			// 非序号污染；1 位数字保持序号语义（"2 2016"用例）
+			if len(fields[0]) >= 2 && len(fields) > 1 && reYearWord.MatchString(fields[1]) {
+				return false
+			}
 			return true
 		}
 	}
