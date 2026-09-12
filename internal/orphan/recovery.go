@@ -535,6 +535,25 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 						}
 					}
 				}
+
+				// §59.202: 原始全名兜底轮——站方搜索丢弃短数字词形态（优堡实证：
+				// "65 2023 2160p WEB-DL" 返回 40 行无一含 65、tid=42 被埋——数字
+				// 片名词被站方忽略+版本词已剥（§59.188）后关键词失去唯一区分度）。
+				// 全名（含版本词/全部技术词）窄化实证首行命中。仅关键词被变换过时触发。
+				if searchKeyword != sourceTitle {
+					r.logger.Debug("orphan L2 priority: raw name retry",
+						zap.String("site", sourceSite),
+						zap.String("raw", sourceTitle))
+					if retry, rErr := r.searchWithBackoff(ctx, adapter, config, sourceTitle); rErr == nil && len(retry) > 0 {
+						if m6, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m6 != nil {
+							r.logger.Info("orphan L2 match (priority, raw name)",
+								zap.String("orphan", orphan.Name),
+								zap.String("site", sourceSite),
+								zap.String("torrent_id", m6.TorrentID))
+							return sourceSite, m6.TorrentID, "l2:priority-rawname:"+sourceSite
+						}
+					}
+				}
 			}
 		}
 		r.logger.Info("orphan L2: source site miss, searching all sites",
