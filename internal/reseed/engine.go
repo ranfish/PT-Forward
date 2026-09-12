@@ -5846,8 +5846,19 @@ func romanToValue(s string) int {
 //     仅扫描年份（1900~2099）之前出现的词，避免误匹配技术元数据。
 var reSeasonMarker = regexp.MustCompile(`(?i)\bS(\d{1,2})(?:E\d{1,3})?\b`)
 
+// reSequelPair §59.205: 相邻罗马续集号对（I.II / II.III）——多部合集形态。
+// 仅罗马对（数字对假阳性高：音频声道 "2.0 2Audios"/年份区间同形，无实证案例）。
+var reSequelPair = regexp.MustCompile(`(?i)(?:^|[^0-9a-z])[ivx]{1,4}[._ -]+[ivx]{1,4}(?:$|[^0-9a-z])`)
+
 func extractSequelNumber(title string) int {
 	if title == "" {
+		return 0
+	}
+
+	// §59.205: 多部合集（I.II 合集）——续集号非单一判别值，返回 0 不参与
+	// 反驳。色即是空I.II合集案：源 CJK 路取 I=1 × 候选英文路取 II=2，
+	// 双正序列误杀（家园/南洋正确候选 sequel_refute 出局）。
+	if reSequelPair.MatchString(title) {
 		return 0
 	}
 
