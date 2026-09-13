@@ -2572,6 +2572,9 @@ func ExtractSearchKeyword(title string) string {
 	raw = reYearRangeToken.ReplaceAllString(raw, " ") // §59.204 F2: 年份区间
 	// §59.218: CJK 注记噪声词（音轨/碟媒）token 剥离
 	raw = stripAnnotNoiseTokens(raw)
+	// §59.220: 规格词拼写变体归一——minbd→minibd（收藏转发名少 i 形态，
+	// Inception 案：官站 MiniBD1080P 词形 AND 全灭走次优站包子）
+	raw = normalizeSpecVariants(raw)
 	raw = strings.Join(strings.Fields(raw), " ")
 	raw = stripApostrophes(raw)
 
@@ -3878,6 +3881,22 @@ func NormalizeMixedKeyword(keyword string) string {
 var editionSuffixes = []string{"十周年纪念版", "周年纪念版", "终极剪辑版", "导演剪辑版", "数字修复版", "未删减版", "未删节版", "修复版", "重制版", "加长版", "完整版", "剪辑版", "十周年", "纪念版", "蓝光版", "蓝光碟", "修复", "重制"}
 
 var reEditionWordOnly = regexp.MustCompile(`^(?:终极剪辑版|导演剪辑版|数字修复版|未删减版|未删节版|修复版|重制版|加长版|完整版|剪辑版|修复|重制|蓝光版|蓝光碟)$`)
+
+// normalizeSpecVariants §59.220: 规格词拼写变体归一（token 前缀替换，
+// 有界词表）。minbd→MiniBD——收藏转发名少 i vs 官站 MiniBD 词形
+//（Inception/True Grit 案：AND 全灭，包子/大青虫同源转发名恰命中）。
+func normalizeSpecVariants(kw string) string {
+	words := strings.Fields(kw)
+	out := make([]string, 0, len(words))
+	for _, w := range words {
+		lw := strings.ToLower(w)
+		if strings.HasPrefix(lw, "minbd") {
+			w = "MiniBD" + w[len("minbd"):]
+		}
+		out = append(out, w)
+	}
+	return strings.Join(out, " ")
+}
 
 // stripAnnotNoiseTokens §59.218: 按词剥离 CJK 注记噪声（音轨/碟媒）。
 func stripAnnotNoiseTokens(kw string) string {

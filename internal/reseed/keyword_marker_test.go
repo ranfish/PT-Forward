@@ -83,3 +83,11 @@ func TestAnnotNoiseAndEditionPeel(t *testing.T) {
 		t.Errorf("角斗士 purify = %q, want 角斗士 2000（两连后缀循环剥净）", pk)
 	}
 }
+
+// §59.220 规格词拼写变体归一——Inception MINBD 案。
+func TestSpecVariantNormalize(t *testing.T) {
+	kw := ExtractSearchKeyword("Inception.2010.BluRay.x264.DTS.MINBD1080P-CMCT")
+	if !strings.Contains(kw, "MiniBD1080P") {
+		t.Errorf("MINBD 应归一 MiniBD: %q", kw)
+	}
+}

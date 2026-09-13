@@ -17,3 +17,16 @@ func TestOfficialGroupKey(t *testing.T) {
 		}
 	}
 }
+
+func TestFuzzyGroupPrefixKey(t *testing.T) {
+	keys := []string{"CMCT", "CMCTA", "CMCTV", "UBits", "FRDS"}
+	if got := FuzzyGroupPrefixKey("CMCTf", keys); got != "CMCT" {
+		t.Errorf("CMCTf → %q, want CMCT", got)
+	}
+	if got := FuzzyGroupPrefixKey("CMCT", keys); got != "" {
+		t.Errorf("精确键自身不回退: %q", got)
+	}
+	if got := FuzzyGroupPrefixKey("XX", keys); got != "" {
+		t.Errorf("无前缀关系: %q", got)
+	}
+}
