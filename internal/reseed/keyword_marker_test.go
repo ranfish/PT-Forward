@@ -67,3 +67,19 @@ func TestStripCJKParenNote(t *testing.T) {
 		t.Errorf("根(国英) 形态不应产生空关键词")
 	}
 }
+
+// §59.218 注记噪声词+版式后缀循环剥净——勇敢的心/死亡诗社/角斗士三案。
+func TestAnnotNoiseAndEditionPeel(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"勇敢的心.国英双语.1995.中英字幕￡CMCT暮雨潇潇", "勇敢的心 1995"},
+		{"死亡诗社.蓝光版.1989.中英字幕￡CMCT暮雨潇潇", "死亡诗社 1989"},
+	}
+	for _, c := range cases {
+		if got := ExtractSearchKeyword(c.in); got != c.want {
+			t.Errorf("kw(%q) = %q, want %q", c.in[:12], got, c.want)
+		}
+	}
+	if pk := PurifyChineseKeyword(ExtractSearchKeyword("角斗士十周年加长版.国英双语.2000.720p￡CMCT九洲客")); pk != "角斗士 2000" {
+		t.Errorf("角斗士 purify = %q, want 角斗士 2000（两连后缀循环剥净）", pk)
+	}
+}
