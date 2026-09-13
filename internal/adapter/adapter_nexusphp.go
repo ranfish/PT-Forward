@@ -1107,8 +1107,13 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 	for _, bp := range browsePaths {
 		searchURL := u + bp + "?" + searchParam + "=" + url.QueryEscape(keyword) + "&search_area=" + areaParam + "&search_mode=0&incldead=1" + catParam
 
-		if strings.Contains(config.Domain, "audiences") {
-			a.logger.Info("nexusphp search debug", zap.String("url", searchURL), zap.String("bp", bp))
+		// §59.213: 全站搜索调试（debug 级）——audiences-only 时代产物 universal 化：
+		// PT30 容器 vs 同容器探针结果分叉案（密阳 7 行 vs 0 行，同栈同 cookie
+		// 同网络）需要请求级可观测收口。
+		if a.logger != nil {
+			a.logger.Debug("nexusphp search req",
+				zap.String("domain", config.Domain),
+				zap.String("url", searchURL))
 		}
 
 		req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
@@ -1141,6 +1146,14 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 		}
 
 		parsed := parseNexusPHPBrowse(string(body), config)
+		if a.logger != nil {
+			a.logger.Debug("nexusphp search resp",
+				zap.String("domain", config.Domain),
+				zap.String("bp", bp),
+				zap.Int("status", resp.StatusCode),
+				zap.Int("body_bytes", len(body)),
+				zap.Int("parsed", len(parsed)))
+		}
 
 		// §59.199: 异常页检测——0 行且页面无空结果标记（真空页 NexusPHP 标准主题
 		// 必含"没有种子/搜索结果"——springsunday 实测）且无结果表格结构签名
