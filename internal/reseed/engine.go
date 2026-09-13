@@ -5620,6 +5620,15 @@ func (e *Engine) QueryBatchCoverage(ctx context.Context, infoHashes []string, cl
 	hashToPieces := make(map[string]string, len(infoHashes))
 	var missing []string
 	for _, ih := range infoHashes {
+		// §59.210: 任务 ctx 过期短路——此前无检查，ctx 死后每哈希
+		// GetByInfoHash 瞬时失败 × 万级 GORM 刷屏（PT31 12:05 一分钟
+		// 1.28 万条 context deadline exceeded 实证）
+		if ctx.Err() != nil {
+			e.logger.Warn("pieces hash batch aborted: context expired",
+				zap.Int("collected", len(hashToPieces)),
+				zap.Int("remaining", len(infoHashes)-len(hashToPieces)-len(missing)))
+			return result
+		}
 		fp, err := e.fpRepo.GetByInfoHash(ctx, ih)
 		if err == nil && fp != nil && fp.PiecesHash != "" {
 			hashToPieces[ih] = fp.PiecesHash
