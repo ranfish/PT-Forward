@@ -2570,6 +2570,8 @@ func ExtractSearchKeyword(title string) string {
 	// 去掉中文集数描述（全16集、16集等）
 	raw = chineseEpisodeCountRe.ReplaceAllString(raw, " ")
 	raw = reYearRangeToken.ReplaceAllString(raw, " ") // §59.204 F2: 年份区间
+	// §59.218: CJK 注记噪声词（音轨/碟媒）token 剥离
+	raw = stripAnnotNoiseTokens(raw)
 	raw = strings.Join(strings.Fields(raw), " ")
 	raw = stripApostrophes(raw)
 
@@ -3871,9 +3873,30 @@ func NormalizeMixedKeyword(keyword string) string {
 }
 
 // editionSuffixes 中文版式词后缀（长在前优先修剪）。§59.194。
-var editionSuffixes = []string{"终极剪辑版", "导演剪辑版", "数字修复版", "未删减版", "未删节版", "修复版", "重制版", "加长版", "完整版", "剪辑版", "修复", "重制"}
+// §59.218: +十周年/周年纪念版/纪念版/蓝光版/蓝光碟（角斗士十周年加长版/
+// 死亡诗社蓝光版案）；后缀修剪改循环剥净（角斗士案两连后缀实证）。
+var editionSuffixes = []string{"十周年纪念版", "周年纪念版", "终极剪辑版", "导演剪辑版", "数字修复版", "未删减版", "未删节版", "修复版", "重制版", "加长版", "完整版", "剪辑版", "十周年", "纪念版", "蓝光版", "蓝光碟", "修复", "重制"}
 
-var reEditionWordOnly = regexp.MustCompile(`^(?:终极剪辑版|导演剪辑版|数字修复版|未删减版|未删节版|修复版|重制版|加长版|完整版|剪辑版|修复|重制)$`)
+var reEditionWordOnly = regexp.MustCompile(`^(?:终极剪辑版|导演剪辑版|数字修复版|未删减版|未删节版|修复版|重制版|加长版|完整版|剪辑版|修复|重制|蓝光版|蓝光碟)$`)
+
+// stripAnnotNoiseTokens §59.218: 按词剥离 CJK 注记噪声（音轨/碟媒）。
+func stripAnnotNoiseTokens(kw string) string {
+	words := strings.Fields(kw)
+	out := make([]string, 0, len(words))
+	for _, w := range words {
+		if reAnnotNoiseToken.MatchString(w) {
+			continue
+		}
+		out = append(out, w)
+	}
+	return strings.Join(out, " ")
+}
+
+// reAnnotNoiseToken §59.218: 主路径 CJK 注记噪声词——音轨注记（国英双语/
+// 国粤双语/国粤日三语 等）与碟媒注记（蓝光版）。站方副标题不保证携带，
+// AND 阻断词（勇敢的心案：kw 残"国英双语"致 0 行；探针"勇敢的心 1995"
+// 18 行含 tid=4260 同版本）。
+var reAnnotNoiseToken = regexp.MustCompile(`^(?:国英|国粤|国日|国粤日|粤英|英日|中日)?[双三]语$|^蓝光[版碟]?$`)
 
 // PurifyChineseKeyword §59.194: 中文关键词净化降级变体。
 // 站方副标题桥要求精确子串，而中文关键词常带装饰元素（六案实证：
@@ -3900,11 +3923,18 @@ func PurifyChineseKeyword(keyword string) string {
 		}
 		nw := strings.NewReplacer("·", "", "・", "", "•", "").Replace(w)
 		trimmed := false
-		for _, suf := range editionSuffixes {
-			if strings.HasSuffix(nw, suf) {
-				nw = strings.TrimSuffix(nw, suf)
-				changed = true
-				trimmed = true
+		for { // §59.218: 循环剥净——角斗士十周年加长版两连后缀实证
+			peeled := false
+			for _, suf := range editionSuffixes {
+				if strings.HasSuffix(nw, suf) {
+					nw = strings.TrimSuffix(nw, suf)
+					changed = true
+					trimmed = true
+					peeled = true
+					break
+				}
+			}
+			if !peeled {
 				break
 			}
 		}
