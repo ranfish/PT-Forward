@@ -547,6 +547,23 @@ func extractReleaseVersion(title string) string {
 
 func extractGroup(title string) string {
 	title = strings.TrimSpace(title)
+	// §59.211 补: ￡ 标记优先于 dash——dash 在 S01-S02/Blu-ray 多连字符名下
+	// 产垃圾段（"克兰弗德S01-S02...Blu-ray...￡cXcY@FRDS" 曾提取
+	// "2009. . . . ￡cXcY@FRDS"）；￡ 是无歧义组署名锚（SSD 族惯例）。
+	if pIdx := strings.LastIndex(title, "￡"); pIdx >= 0 {
+		rest := title[pIdx+len("￡"):]
+		var b strings.Builder
+		for _, r := range rest {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '@' || (r >= '0' && r <= '9') {
+				b.WriteRune(r)
+			} else {
+				break
+			}
+		}
+		if b.Len() >= 2 {
+			return b.String()
+		}
+	}
 	idx := strings.LastIndex(title, "-")
 	// §59.97: idx>=0——前导连字符残留("-FRDS", token 剥除后)也是组段;
 	// 点分隔 ".-FRDS" 一直靠前导点占位侥幸通过, 空格分隔剥后 "-FRDS" 被拒(实锤)

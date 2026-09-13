@@ -86,9 +86,16 @@ func ExtractGroupName(title string) string {
 	// 尝试 "￡" 分隔符（SSD 特有格式）
 	if pIdx := strings.LastIndex(clean, "￡"); pIdx >= 0 && pIdx < len(clean)-len("￡") {
 		rest := clean[pIdx+len("￡"):]
+		// §59.211 终案（用户方案 B）: @ 后段=官方组——与 dash 规则语义统一
+		//（"-JK@UBits"→"UBits" §59.184 附二先例）。"￡cXcY@FRDS"→"FRDS"
+		//（子组前缀无判别价值：同官方组不同子组=同族；完整署名由 titleparser
+		// 保留供 Tab1 展示/重组）。此前遇 @ 截断取 "cXcY" 致映射永久 miss。
+		if at := strings.LastIndex(rest, "@"); at >= 0 && at < len(rest)-1 {
+			rest = rest[at+1:]
+		}
 		var b strings.Builder
 		for _, r := range rest {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
 				b.WriteRune(r)
 			} else {
 				break

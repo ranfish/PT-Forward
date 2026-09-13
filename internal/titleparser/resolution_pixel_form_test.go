@@ -56,3 +56,18 @@ func TestReleaseVersionBeforeYear(t *testing.T) {
 		}
 	}
 }
+
+// §59.211 补: ￡ 标记优先于 dash（多连字符名 dash 产垃圾段）。
+func TestExtractGroupPoundPriority(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"克兰弗德S01-S02.Cranford.2007-2009.1080p.Blu-ray.x265.AC3￡cXcY@FRDS", "cXcY@FRDS"},
+		{"Forrest.Gump.DTS￡cXcY@FRDS", "cXcY@FRDS"},
+		{"Movie.2020.BluRay.x264-CMCT", "CMCT"},
+		{"Movie.2020.Blu-ray.x264-GRP", "GRP"},
+	}
+	for _, c := range cases {
+		if got := ParseTitle(c.in).ReleaseGroup; got != c.want {
+			t.Errorf("ParseTitle(%q).ReleaseGroup = %q, want %q", c.in[:30], got, c.want)
+		}
+	}
+}
