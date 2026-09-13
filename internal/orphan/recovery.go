@@ -474,8 +474,14 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 					r.logger.Debug("orphan L2 priority: mixed keyword normalization retry",
 						zap.String("site", sourceSite),
 						zap.String("normalized", nk))
-					if retry, rErr := r.searchWithBackoff(ctx, adapter, config, nk); rErr == nil && len(retry) > 0 {
-						if m3, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m3 != nil {
+					retryMix, mixErr := r.searchWithBackoff(ctx, adapter, config, nk)
+					if mixErr == nil {
+						r.logger.Debug("orphan L2 priority: mixed round rc",
+							zap.String("site", sourceSite),
+							zap.Int("rows", len(retryMix)))
+					}
+					if mixErr == nil && len(retryMix) > 0 {
+						if m3, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retryMix, groupName, sourceSize, sourceTitle); m3 != nil {
 							r.logger.Info("orphan L2 match (priority, mixed-normalized)",
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
@@ -491,8 +497,14 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 					r.logger.Debug("orphan L2 priority: chinese purification retry",
 						zap.String("site", sourceSite),
 						zap.String("purified", pk))
-					if retry, rErr := r.searchWithBackoff(ctx, adapter, config, pk); rErr == nil && len(retry) > 0 {
-						if m4, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m4 != nil {
+					retryPur, purErr := r.searchWithBackoff(ctx, adapter, config, pk)
+					if purErr == nil {
+						r.logger.Debug("orphan L2 priority: purify round rc",
+							zap.String("site", sourceSite),
+							zap.Int("rows", len(retryPur)))
+					}
+					if purErr == nil && len(retryPur) > 0 {
+						if m4, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retryPur, groupName, sourceSize, sourceTitle); m4 != nil {
 							r.logger.Info("orphan L2 match (priority, chinese-purified)",
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
@@ -509,8 +521,14 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 						r.logger.Debug("orphan L2 priority: chinese supplement search",
 							zap.String("site", sourceSite),
 							zap.String("keyword", cnKW))
-						if retry, rErr := r.searchWithBackoff(ctx, adapter, config, cnKW); rErr == nil && len(retry) > 0 {
-							if m2, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m2 != nil {
+						retryCN, cnErr := r.searchWithBackoff(ctx, adapter, config, cnKW)
+						if cnErr == nil {
+							r.logger.Debug("orphan L2 priority: chinese round rc",
+								zap.String("site", sourceSite),
+								zap.Int("rows", len(retryCN)))
+						}
+						if cnErr == nil && len(retryCN) > 0 {
+							if m2, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retryCN, groupName, sourceSize, sourceTitle); m2 != nil {
 								r.logger.Info("orphan L2 match (priority, chinese line)",
 									zap.String("orphan", orphan.Name),
 									zap.String("site", sourceSite),
@@ -530,8 +548,14 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 					r.logger.Debug("orphan L2 priority: yearless retry",
 						zap.String("site", sourceSite),
 						zap.String("keyword", yk))
-					if retry, rErr := r.searchWithBackoff(ctx, adapter, config, yk); rErr == nil && len(retry) > 0 {
-						if m5, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m5 != nil {
+					retryY, yErr := r.searchWithBackoff(ctx, adapter, config, yk)
+					if yErr == nil {
+						r.logger.Debug("orphan L2 priority: yearless round rc",
+							zap.String("site", sourceSite),
+							zap.Int("rows", len(retryY)))
+					}
+					if yErr == nil && len(retryY) > 0 {
+						if m5, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retryY, groupName, sourceSize, sourceTitle); m5 != nil {
 							r.logger.Info("orphan L2 match (priority, yearless)",
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
@@ -549,8 +573,14 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 					r.logger.Debug("orphan L2 priority: raw name retry",
 						zap.String("site", sourceSite),
 						zap.String("raw", sourceTitle))
-					if retry, rErr := r.searchWithBackoff(ctx, adapter, config, sourceTitle); rErr == nil && len(retry) > 0 {
-						if m6, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retry, groupName, sourceSize, sourceTitle); m6 != nil {
+					retryRaw, rawErr := r.searchWithBackoff(ctx, adapter, config, sourceTitle)
+					if rawErr == nil {
+						r.logger.Debug("orphan L2 priority: rawname round rc",
+							zap.String("site", sourceSite),
+							zap.Int("rows", len(retryRaw)))
+					}
+					if rawErr == nil && len(retryRaw) > 0 {
+						if m6, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retryRaw, groupName, sourceSize, sourceTitle); m6 != nil {
 							r.logger.Info("orphan L2 match (priority, raw name)",
 								zap.String("orphan", orphan.Name),
 								zap.String("site", sourceSite),
