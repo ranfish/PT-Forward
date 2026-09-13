@@ -304,6 +304,19 @@ func (e *Engine) retryBlocked(ctx context.Context, sub *model.RSSSubscription, e
 				zap.String("torrent", row.TorrentID))
 			continue
 		}
+		// §59.212: blocked 项在预分发循环被 seen 门 continue，detectHRAndDiscount
+		// 从未运行——原始 RSS 零值致系统性误判 "free expired"（243 四种 3 分钟
+		// expired 实证：blocked 状态机生产端到端从未成功）。此处补跑检测
+		//（含缓存复用）；检测不可得（API 空返回家族）= 无法确认 → 保持
+		// blocked 下轮再试，不判 expired。provider 缺失（测试/降级形态）用
+		// ev 既有值（原语义）。
+		if e.siteProvider != nil && ev.TorrentID != "" {
+			if !e.detectHRAndDiscount(ctx, ev, row.SiteName) {
+				e.logger.Warn("blocked retry: discount detect unavailable, keep blocked",
+					zap.String("torrent", row.TorrentID))
+				continue
+			}
+		}
 		isFree := ev.DiscountLevel == model.DiscountFree || ev.DiscountLevel == model.Discount2xFree ||
 			ev.DiscountLevel == model.DiscountAssumeFree || ev.IsFree
 		if !isFree {
@@ -1146,9 +1159,12 @@ func uintToString(n uint) string {
 
 const perTorrentDetectTimeout = 8 * time.Second
 
-func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorrentEvent, siteName string) {
+// detectHRAndDiscount 逐种站点检测 HR/折扣/SL（写回 event + 缓存）。
+// §59.212: 返回 detected——false=检测不可得（适配器/配置/接口失败，
+// event 保持零值），true=检测完成（含确认无折扣）。
+func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorrentEvent, siteName string) bool {
 	if e.siteProvider == nil || event.TorrentID == "" {
-		return
+		return false
 	}
 
 	cacheKey := siteName + ":" + event.TorrentID
@@ -1162,7 +1178,7 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 			event.FreeEndAt = entry.freeEndAt
 			event.Seeders = entry.seeders
 			event.Leechers = entry.leechers
-			return
+			return true
 		}
 		e.detectCache.Delete(cacheKey)
 	}
@@ -1173,13 +1189,13 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 	adapter, err := e.siteProvider.GetAdapter(detectCtx, siteName)
 	if err != nil {
 		e.logger.Warn("failed to get adapter, skipping HR/discount check", zap.String("site", siteName), zap.Error(err))
-		return
+		return false
 	}
 
 	config, err := e.siteProvider.GetSiteConfig(detectCtx, siteName)
 	if err != nil {
 		e.logger.Warn("failed to get site config, skipping HR/discount check", zap.String("site", siteName), zap.Error(err))
-		return
+		return false
 	}
 
 	// §55.19 根本修复：优先尝试 CombinedHRDiscountSLDetector（顺便提取 SL，避免评分重复抓详情页）
@@ -1187,7 +1203,7 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 		hrResult, discResult, slResult, err := slDetector.DetectHRDiscountAndSL(detectCtx, config, event.TorrentID)
 		if err != nil {
 			e.logger.Debug("combined SL detect failed", zap.String("site", siteName), zap.String("torrent", event.TorrentID), zap.Error(err))
-			return
+			return false
 		}
 		if hrResult != nil {
 			event.HasHR = hrResult.HasHR
@@ -1221,14 +1237,14 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 			leechers:      event.Leechers,
 			cachedAt:      time.Now(),
 		})
-		return
+		return true
 	}
 
 	if combined, ok := adapter.(model.CombinedHRDiscountDetector); ok {
 		hrResult, discResult, err := combined.DetectHRAndDiscount(detectCtx, config, event.TorrentID)
 		if err != nil {
 			e.logger.Debug("combined detect failed", zap.String("site", siteName), zap.String("torrent", event.TorrentID), zap.Error(err))
-			return
+			return false
 		}
 		if hrResult != nil {
 			event.HasHR = hrResult.HasHR
@@ -1258,7 +1274,7 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 			leechers:      event.Leechers,
 			cachedAt:      time.Now(),
 		})
-		return
+		return true
 	}
 
 	type hrOut struct {
@@ -1297,6 +1313,7 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 	}
 
 	disc := <-discCh
+	detected := disc.err == nil
 	if disc.err == nil && disc.result != nil && disc.result.Level != model.DiscountNone {
 		event.DiscountLevel = disc.result.Level
 		event.IsFree = disc.result.Level == model.DiscountFree ||
@@ -1317,6 +1334,7 @@ func (e *Engine) detectHRAndDiscount(ctx context.Context, event *model.RSSTorren
 		leechers:      event.Leechers,
 		cachedAt:      time.Now(),
 	})
+	return detected
 }
 
 func (e *Engine) ExpireDiskBudget() {
