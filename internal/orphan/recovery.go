@@ -852,6 +852,19 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 			Where("LOWER(group_name) = LOWER(?) AND site_name IN ?", lookupG, enabledSites).
 			Order("is_official DESC").
 			Pluck("site_name", &sourceSites)
+		if len(sourceSites) == 0 {
+			// §59.220: 组名前缀回退（CMCTf→CMCT 生死格斗案重议）
+			var fkeys []string
+			r.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+				Where("site_name IN ?", enabledSites).
+				Pluck("group_name", &fkeys)
+			if fk := util.FuzzyGroupPrefixKey(lookupG, fkeys); fk != "" {
+				r.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+					Where("LOWER(group_name) = LOWER(?) AND site_name IN ?", fk, enabledSites).
+					Order("is_official DESC").
+					Pluck("site_name", &sourceSites)
+			}
+		}
 		for _, site := range sourceSites {
 			if !seen[site] {
 				priority = append(priority, site)

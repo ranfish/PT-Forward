@@ -13,3 +13,20 @@ func OfficialGroupKey(group string) string {
 	}
 	return group
 }
+
+// FuzzyGroupPrefixKey §59.220: 组名前缀回退——missed 组名以某已知键为前缀
+// （CMCTf ⊃ CMCT）时返回最长键（发布者署名粘连字母/子组后缀形态）。
+// 多候选取最长（最具体）；无前缀关系返回空。区别于编辑距离：CMCTA/CMCTV
+// 与 CMCTf 同距 1 但非前缀，天然消歧。
+func FuzzyGroupPrefixKey(missed string, keys []string) string {
+	best := ""
+	for _, k := range keys {
+		if k == "" || len(k) >= len(missed) {
+			continue
+		}
+		if strings.HasPrefix(missed, k) && len(k) > len(best) {
+			best = k
+		}
+	}
+	return best
+}
