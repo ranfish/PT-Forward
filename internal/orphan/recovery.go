@@ -796,9 +796,20 @@ func (r *Recovery) getSitePriority(ctx context.Context, groupName string, orphan
 
 	// 官组映射优先（OpenCD→皇后），确保主音乐站排第一
 	if r.db != nil {
+		lookupG := groupName
+		if util.OfficialGroupKey(groupName) != groupName {
+			var probe []string
+			r.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+				Where("LOWER(group_name) = LOWER(?) AND site_name IN ?", groupName, enabledSites).
+				Order("is_official DESC").
+				Pluck("site_name", &probe)
+			if len(probe) == 0 {
+				lookupG = util.OfficialGroupKey(groupName) // §59.211: @子组署名官方键回退
+			}
+		}
 		var sourceSites []string
 		r.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
-			Where("LOWER(group_name) = LOWER(?) AND site_name IN ?", groupName, enabledSites).
+			Where("LOWER(group_name) = LOWER(?) AND site_name IN ?", lookupG, enabledSites).
 			Order("is_official DESC").
 			Pluck("site_name", &sourceSites)
 		for _, site := range sourceSites {

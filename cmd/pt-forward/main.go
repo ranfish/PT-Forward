@@ -239,10 +239,21 @@ func main() {
 		// §59.187 ①: 组名同族 resolver 注入——验证层组名反驳经 release_group_mappings
 		// 判同族豁免（UBbits/UBits 同映射优堡官方等拼写变体；仅反驳路径触发，罕见路径）
 		reseed.GroupFamilyResolver = func(group string) string {
+			lookup := group
+			if util.OfficialGroupKey(group) != group {
+				var probe []string
+				db.WithContext(context.Background()).
+					Model(&model.ReleaseGroupMapping{}).
+					Where("LOWER(group_name) = LOWER(?) AND is_official = ?", group, true).
+					Limit(1).Pluck("domain", &probe)
+				if len(probe) == 0 {
+					lookup = util.OfficialGroupKey(group) // §59.211: @子组署名官方键回退
+				}
+			}
 			var domains []string
 			db.WithContext(context.Background()).
 				Model(&model.ReleaseGroupMapping{}).
-				Where("LOWER(group_name) = LOWER(?) AND is_official = ?", group, true).
+				Where("LOWER(group_name) = LOWER(?) AND is_official = ?", lookup, true).
 				Limit(1).Pluck("domain", &domains)
 			if len(domains) == 0 {
 				return ""
