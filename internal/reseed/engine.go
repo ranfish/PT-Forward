@@ -3595,6 +3595,17 @@ func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config
 	return nil
 }
 
+// ColonSubSegment §59.215: 全角冒号副题段提取——CJK 标题「主题：副题」
+// 形态的副题段关键词（柯南剧场版16案：站方副标题只含副题"第11位前锋"，
+// 主关键词整段 AND 全灭）。返回空=无冒号或副题段为空。
+func ColonSubSegment(kw string) string {
+	at := strings.Index(kw, "：")
+	if at < 0 || at == len(kw)-len("：") {
+		return ""
+	}
+	return strings.TrimSpace(kw[at+len("："):])
+}
+
 // keywordHasTitleAnchor §59.196: 关键词是否含标题锚（CJK 词或 ≥4 字母的
 // token）。年份/分辨率 token 的字母数 <4 不构成锚；媒介词已在短词剥离链剥除。
 func keywordHasTitleAnchor(kw string) bool {
