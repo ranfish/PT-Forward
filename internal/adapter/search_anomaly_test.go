@@ -29,6 +29,11 @@ func TestSearchAnomalyPageDetected(t *testing.T) {
 			body:    "<html><body>没有种子。请用准确的关键字重试。</body></html>",
 			wantErr: "",
 		},
+		{
+			name:    "真空页(无标记但有表格结构——人人形态 §59.209)",
+			body:    `<html><body><div class="page-torrents page-torrent-list"><table><tr><td>head</td></tr></table></div></body></html>`,
+			wantErr: "",
+		},
 	}
 	for _, c := range cases {
 		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
