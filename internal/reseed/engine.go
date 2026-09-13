@@ -3286,6 +3286,29 @@ func techProfileVersionDefined(src titleparser.TechProfile, candidateTitle strin
 	if cand.SourcePlatform != "" && src.SourcePlatform == "" {
 		return true
 	}
+	// §59.207: 碟片发行商品牌（§59.76 W.9 血统类）回归规则 B——品牌词=
+	// 不同碟源血统（Criterion/MoC/WAC 物理母盘不同），区别于营销版式词
+	//（§59.191 b 保持移出：Remaster/Anniversary 是同碟宣传包装）。
+	// 克拉之膝案：站内 CC/FLAC 版 tid=309436 与 DTS 版 tid=73609 同 size
+	//（10GiB 占位值）同组并存、本地名无音频 token——品牌是唯一判别器，
+	// 结果顺序错选 CC 版注入 recheck 0% 实证。
+	if isBrandEdition(cand.EditionInfo) && !isBrandEdition(src.EditionInfo) {
+		return true
+	}
+	return false
+}
+
+// isBrandEdition §59.207: 碟片发行商品牌 EditionInfo 判定（血统类）。
+func isBrandEdition(ed string) bool {
+	if ed == "" {
+		return false
+	}
+	lower := strings.ToLower(ed)
+	for _, b := range []string{"criterion", "moc", "wac", "warner archive"} {
+		if strings.Contains(lower, b) {
+			return true
+		}
+	}
 	return false
 }
 
