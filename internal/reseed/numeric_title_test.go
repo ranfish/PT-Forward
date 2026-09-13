@@ -29,7 +29,7 @@ func TestNumericMovieTitle(t *testing.T) {
 	if kw := ExtractSearchKeyword("12.仙履奇缘.Cinderella.2015.1080p"); kw != "Cinderella 2015 1080p" {
 		t.Errorf("collection index strip regressed: %q", kw)
 	}
-	if kw := ExtractSearchKeyword("E09.The.Man.With.The.Golden.Gun.1974.720p.BluRay.x264.DTS-WiKi"); kw != "The Man With The Golden Gun 1974 720p BluRay" {
+	if kw := ExtractSearchKeyword("E09.The.Man.With.The.Golden.Gun.1974.720p.BluRay.x264.DTS-WiKi"); kw != "The Man With The Golden Gun 1974" { // §59.206 超限剥规格词
 		t.Errorf("E-prefix strip regressed: %q", kw)
 	}
 }

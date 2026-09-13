@@ -2538,6 +2538,14 @@ func ExtractSearchKeyword(title string) string {
 		rest = title // 回退原始标题，保留中文剧名
 	}
 
+	// §59.206: 字母+数字粘连拆分（Aliens2→Aliens 2 / MiniBD1080P→MiniBD 1080P）。
+	// 双收益：①粘连 token 词级匹配失效（站方词级引擎不吃词内子串——Aliens2
+	// 形态实测 0 行 vs Aliens 2 形态 8 行含目标 tid=4343；单字符数字被站方
+	// 忽略）②拆出的分辨率词恢复 truncateToResolution 截断点（粘连形态致
+	// 截断失明、7 词全量残留撞站方词数上限）。字母段 ≥3 防技术词误拆
+	//（x264/H265/AC3/S01E01 等形态免疫）。
+	rest = reAlphaDigitGlue.ReplaceAllString(rest, "$1 $2")
+
 	raw := truncateToResolution(rest)
 	if raw == "" {
 		raw = truncateToYear(rest)
@@ -2565,11 +2573,11 @@ func ExtractSearchKeyword(title string) string {
 	// （孤儿恢复三失败实证：不设限通缉Running.On.Empty... → 搜索词被污染）。
 	if KeywordHasNoTitle(raw) {
 		if fb := chineseTitleFallback(title); fb != "" && fb != raw {
-			return stripVersionTokens(appendMediaAfterResolution(stripApostrophes(fb), title))
+			return limitKeywordTerms(stripVersionTokens(appendMediaAfterResolution(stripApostrophes(fb), title)))
 		}
 	}
 	// §59.188: 终段剥版本词（两个返回点统一）
-	return stripVersionTokens(appendMediaAfterResolution(raw, title))
+	return limitKeywordTerms(stripVersionTokens(appendMediaAfterResolution(raw, title)))
 }
 
 // reEpisodeNumPrefix 合集序号前缀（可重复，如 "12." / "12.2." / "E09."）。
@@ -5845,6 +5853,57 @@ func romanToValue(s string) int {
 //     The Bride with White Hair II → 2, Rocky IV → 4
 //     仅扫描年份（1900~2099）之前出现的词，避免误匹配技术元数据。
 var reSeasonMarker = regexp.MustCompile(`(?i)\bS(\d{1,2})(?:E\d{1,3})?\b`)
+
+// limitKeywordTerms §59.206: 站方搜索词数上限感知——springsunday 实测 5 词
+// 以上 AND 0 结果（Aliens 案 6/7/9 词全灭 vs ≤5 词全中）。超 5 词时剥规格词
+//（编码/音频/媒介/分辨率——验证层自有 TechProfile 比对，搜索层规格词仅是
+// 收窄，剥除只放宽召回）。≤5 词零变化（既有行为免疫）。
+func limitKeywordTerms(kw string) string {
+	words := strings.Fields(kw)
+	if len(words) <= 5 {
+		return kw
+	}
+	out := make([]string, 0, len(words))
+	for _, w := range words {
+		if isKeywordSpecWord(w) {
+			continue
+		}
+		out = append(out, w)
+	}
+	return strings.Join(out, " ")
+}
+
+// isKeywordSpecWord §59.206: 关键词规格词判定（编码/音频/媒介/分辨率）。
+func isKeywordSpecWord(w string) bool {
+	lw := strings.ToLower(w)
+	switch lw {
+	case "x264", "x265", "h264", "h265", "h266", "avc", "hevc", "av1", "vc1", "xvid", "divx",
+		"dts", "ac3", "aac", "flac", "truehd", "ddp", "dd", "lpcm", "atmos", "ddp5",
+		"minibd", "remux", "web-dl", "webdl", "webrip", "hdtv", "blu-ray", "bluray", "bdrip", "hdrip",
+		"10bit", "8bit", "sdr", "hdr", "hdr10", "dovi", "dv", "hdr10+":
+		return true
+	}
+	// 数字后缀音频词（DD5/DDP5.1/DTS-HD 等）
+	if reAudioNumToken.MatchString(lw) {
+		return true
+	}
+	// 粘连规格+分辨率 token（MiniBD1080P）
+	for _, p := range []string{"minibd", "remux", "webdl", "web", "hdtv", "bluray", "blu-ray", "bdrip", "hdrip", "webrip"} {
+		if strings.HasPrefix(lw, p) && isResolutionWord(strings.TrimPrefix(lw, p)) {
+			return true
+		}
+	}
+	return isResolutionWord(lw)
+}
+
+// reAudioNumToken §59.206: 数字后缀音频词（dd5/ddp5.1/dts-hd 等）。
+var reAudioNumToken = regexp.MustCompile(`^(?:dd|ddp|ac|aac|dts|truehd|lpcm|atmos)[-\d.]*$`)
+
+// reAlphaDigitGlue §59.206: 字母段(≥3)+纯数字尾粘连。仅拆数字后无字母的
+// 形态（Aliens2/Aliens3）；分辨率后缀粘连（MiniBD1080P——数字后跟 P，
+// 无 \b 边界）不拆——拆出独立 "1080P" 词实测反致 0 结果（用户实测+
+// 探针双证）。x264/H265/S01 短字母段免疫。
+var reAlphaDigitGlue = regexp.MustCompile(`([A-Za-z]{3,})(\d{1,4})\b`)
 
 // reSequelPair §59.205: 相邻罗马续集号对（I.II / II.III）——多部合集形态。
 // 仅罗马对（数字对假阳性高：音频声道 "2.0 2Audios"/年份区间同形，无实证案例）。

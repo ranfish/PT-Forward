@@ -69,7 +69,7 @@ func TestNormalizeMixedKeyword(t *testing.T) {
 func TestStripVersionTokens(t *testing.T) {
 	// 加勒比实证形态：PROPER 在年份与分辨率之间
 	kw := ExtractSearchKeyword("Pirates.of.the.Caribbean.Dead.Man's.Chest.2006.PROPER.2160p.UHD.Blu-ray.HDR10.HEVC.Atmos.TrueHD.7.1-DIY@UBits")
-	for _, must := range []string{"Pirates", "Chest", "2006", "2160p", "UHD"} {
+	for _, must := range []string{"Pirates", "Chest", "2006"} { // §59.206: 超限剥规格词，2160p/UHD 不再残留（AND 子集=超集召回）
 		if !strings.Contains(kw, must) {
 			t.Errorf("keyword %q 缺 %q", kw, must)
 		}
@@ -241,7 +241,7 @@ func TestQueenUHDSourceType(t *testing.T) {
 	// §59.196: 双侧证据——DTS 前段 + 组名后段 = 音频+组分隔（永安镇故事集案）
 	// §59.200: E+数字合集序号前缀剥除（007 合集 E09=金枪人案——纯数字形态
 	// §59.184 附四已覆盖，E 形态补齐）
-	if kw := ExtractSearchKeyword("E09.The.Man.With.The.Golden.Gun.1974.720p.BluRay.x264.DTS-WiKi"); kw != "The Man With The Golden Gun 1974 720p BluRay" {
+	if kw := ExtractSearchKeyword("E09.The.Man.With.The.Golden.Gun.1974.720p.BluRay.x264.DTS-WiKi"); kw != "The Man With The Golden Gun 1974" { // §59.206 超限剥规格词（AND 子集=超集召回）
 		t.Errorf("E-prefix keyword = %q", kw)
 	}
 	if kw := ExtractSearchKeyword("12.仙履奇缘.Cinderella.2015.1080p"); kw != "Cinderella 2015 1080p" {
