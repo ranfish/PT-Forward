@@ -37,3 +37,17 @@ func TestKeywordStructuralMarkers(t *testing.T) {
 		}
 	}
 }
+
+// §59.215 全角冒号副题段——柯南剧场版16 案。
+func TestColonSubSegment(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"名侦探柯南剧场版16：第11位前锋 2012", "第11位前锋 2012"},
+		{"无冒号 标题 2020", ""},
+		{"主题：", ""},
+	}
+	for _, c := range cases {
+		if got := ColonSubSegment(c.in); got != c.want {
+			t.Errorf("ColonSubSegment(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

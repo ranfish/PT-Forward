@@ -565,6 +565,32 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 					}
 				}
 
+				// §59.215: 全角冒号副题段降级轮——CJK 标题「主题：副题」形态
+				//（柯南剧场版16案：站方副标题只含"第11位前锋"，主关键词整段
+				// AND 全灭；副题段"第11位前锋 2012"探针双中 tid=11541=本地
+				// 720p 3.22GB 同版本）。排在 yearless 后：主关键词含全角冒号
+				// 且副题段非空时触发。
+				if ck := reseed.ColonSubSegment(searchKeyword); ck != "" && ck != searchKeyword {
+					r.logger.Debug("orphan L2 priority: colon sub-segment retry",
+						zap.String("site", sourceSite),
+						zap.String("keyword", ck))
+					retryC, cErr := r.searchWithBackoff(ctx, adapter, config, ck)
+					if cErr == nil {
+						r.logger.Debug("orphan L2 priority: colon round rc",
+							zap.String("site", sourceSite),
+							zap.Int("rows", len(retryC)))
+					}
+					if cErr == nil && len(retryC) > 0 {
+						if mc, _ := reseed.VerifyMatchWithTruncationCheckAndSource(retryC, groupName, sourceSize, sourceTitle); mc != nil {
+							r.logger.Info("orphan L2 match (priority, colon sub-segment)",
+								zap.String("orphan", orphan.Name),
+								zap.String("site", sourceSite),
+								zap.String("torrent_id", mc.TorrentID))
+							return sourceSite, mc.TorrentID, "l2:priority-colon:"+sourceSite
+						}
+					}
+				}
+
 				// §59.202: 原始全名兜底轮——站方搜索丢弃短数字词形态（优堡实证：
 				// "65 2023 2160p WEB-DL" 返回 40 行无一含 65、tid=42 被埋——数字
 				// 片名词被站方忽略+版本词已剥（§59.188）后关键词失去唯一区分度）。
