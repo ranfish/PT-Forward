@@ -136,9 +136,22 @@ func (d *SourceSiteDetector) LookupGroup(ctx context.Context, groupName string) 
 	}
 	d.mu.RUnlock()
 
+	// §59.211: @子组署名形态（cXcY@FRDS——§59.179 保留完整署名）——官方组是
+	// @ 后段（FRDS→朋友）。全名 miss 时回退官方组键再查（克兰弗德/恐怖大师/
+	// 根 三种无源站映射案：映射键 FRDS 与完整署名失配）。
+	lookupName := groupName
+	if util.OfficialGroupKey(groupName) != groupName {
+		var sub model.ReleaseGroupMapping
+		if err := d.db.WithContext(ctx).
+			Where("LOWER(group_name) = LOWER(?)", groupName).
+			First(&sub).Error; err != nil {
+			lookupName = util.OfficialGroupKey(groupName)
+		}
+	}
+
 	var mapping model.ReleaseGroupMapping
 	if err := d.db.WithContext(ctx).
-		Where("LOWER(group_name) = LOWER(?)", groupName).
+		Where("LOWER(group_name) = LOWER(?)", lookupName).
 		First(&mapping).Error; err != nil {
 		// §59.29: 缓存 miss 结果——大列表（2w+ 行）循环中未映射组名
 		// 会反复触发 DB 查询（不同 title 同组名），miss 缓存消除重复查询
