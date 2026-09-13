@@ -1,6 +1,7 @@
 package reseed
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -49,5 +50,20 @@ func TestColonSubSegment(t *testing.T) {
 		if got := ColonSubSegment(c.in); got != c.want {
 			t.Errorf("ColonSubSegment(%q) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// §59.217 CJK 后挂括号注记剥离——雅尼案。
+func TestStripCJKParenNote(t *testing.T) {
+	kw := ExtractSearchKeyword("雅尼雅典卫城音乐会(25周年纪念版).1993.720p.中英字幕￡CMCT小鱼")
+	if !strings.HasPrefix(kw, "雅尼雅典卫城音乐会 ") {
+		t.Errorf("雅尼 keyword = %q, want 前缀 雅尼雅典卫城音乐会", kw)
+	}
+	// 回归：方括号标题/年份括号/根(国英) 形态
+	if kw := ExtractSearchKeyword("[杀人回忆].Memories.of.Murder.2003.BluRay.720p.x264.AC3-CMCT.mkv"); !strings.Contains(kw, "Memories of Murder") {
+		t.Errorf("方括号标题形态回归: %q", kw)
+	}
+	if kw := ExtractSearchKeyword("根(国英)S01.Roots.1977.1080p.Blu-ray.x265.DTS￡cXcY@FRDS"); kw == "" {
+		t.Errorf("根(国英) 形态不应产生空关键词")
 	}
 }
