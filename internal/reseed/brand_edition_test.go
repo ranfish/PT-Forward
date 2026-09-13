@@ -40,3 +40,21 @@ func TestBrandEditionRefute(t *testing.T) {
 		t.Fatal("marketing edition (REMASTER) must stay un-refuted")
 	}
 }
+
+// §59.214 品牌反驳相对化——密阳案回归：唯一候选即 CC 版（中文名不写 CC
+// 是命名习惯），无兄弟时品牌词不构成判别器，放行。
+func TestBrandEditionRelativeMiyang(t *testing.T) {
+	src := "密阳.2007.简体中字￡CMCT暮雨潇潇"
+	const local = int64(4079791986) // 真实本地（与站方差 42KB——不走门6 短路）
+	rows := []*model.SeedingSearchResult{
+		{TorrentID: "424501", Title: "Secret.Sunshine.2007.JPN.4K.REMASTERED.BluRay.1080p.x264.DTS-CMCT", Size: 13314398617},
+		{TorrentID: "422927", Title: "Milyang.2007.REMASTERED.1080p.JPN.Blu-ray.AVC.DTS-HD.MA.5.1-Anonymous", Size: 44710609551},
+		{TorrentID: "411889", Title: "Secret.Sunshine.2007.1080p.BluRay.DD+5.1.x265.10bit-PTer", Size: 15214921646},
+		{TorrentID: "70698", Title: "Secret.Sunshine.2007.CC.BluRay.1080p.AVC.DTS-HD.MA.5.1-blucook@CHDBits", Size: 45193793372},
+		{TorrentID: "2670", Title: "Secret.Sunshine.2007.CC.BluRay.720p.x264.AC3-CMCT", Size: 4080218931},
+	}
+	m, _ := VerifyMatchWithTruncationCheckAndSource(rows, "CMCT", local, src)
+	if m == nil || m.TorrentID != "2670" {
+		t.Fatalf("密阳唯一正确候选（CC 版）应放行, got %+v", m)
+	}
+}

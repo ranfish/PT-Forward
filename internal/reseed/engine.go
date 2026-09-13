@@ -2953,6 +2953,24 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 		srcProfile = &p
 	}
 
+	// §59.214: 品牌兄弟预扫描——同组（标题含组名或中性）+ size 窗内 +
+	// 无品牌词的候选存在 = 品牌构成判别器。
+	hasPlainBrandSibling := false
+	if srcProfile != nil && !isBrandEdition(srcProfile.EditionInfo) {
+		for _, r := range results {
+			if r.Size <= 0 || !CompareSizeDisplay(sourceSize, r.Size) {
+				continue
+			}
+			if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
+				continue
+			}
+			if p := titleparser.ParseTitleTech(r.Title); !isBrandEdition(p.EditionInfo) {
+				hasPlainBrandSibling = true
+				break
+			}
+		}
+	}
+
 	stats := &MatchFilterStats{}
 	var best *L2MatchResult
 	var bestConfirms int
@@ -3022,9 +3040,21 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 		}
 
 		// 门7 版本 Token（规则 B）：候选有版本定义源无 → 仅允许精确匹配。
-		if srcProfile != nil && techProfileVersionDefined(*srcProfile, r.Title) {
-			stats.VersionRefute++
-			continue
+		// §59.214: 品牌血统反驳相对化——仅当同组同 size 窗非品牌兄弟存在
+		//（集合级预扫描 hasPlainBrandSibling）时反驳品牌候选（克拉之膝双版
+		// 消歧保持）；无兄弟时品牌词不构成判别器（密阳案：唯一候选即 CC 版，
+		// 中文名不写 CC 是命名习惯——绝对反驳假杀实证）。
+		if srcProfile != nil {
+			brandRefute := false
+			if hasPlainBrandSibling && !isBrandEdition(srcProfile.EditionInfo) {
+				if p := titleparser.ParseTitleTech(r.Title); isBrandEdition(p.EditionInfo) {
+					brandRefute = true
+				}
+			}
+			if brandRefute || techProfileVersionDefined(*srcProfile, r.Title) {
+				stats.VersionRefute++
+				continue
+			}
 		}
 
 		// 门8 size 显示等价（v3）：超窗=内容级反驳。
@@ -3286,15 +3316,10 @@ func techProfileVersionDefined(src titleparser.TechProfile, candidateTitle strin
 	if cand.SourcePlatform != "" && src.SourcePlatform == "" {
 		return true
 	}
-	// §59.207: 碟片发行商品牌（§59.76 W.9 血统类）回归规则 B——品牌词=
-	// 不同碟源血统（Criterion/MoC/WAC 物理母盘不同），区别于营销版式词
-	//（§59.191 b 保持移出：Remaster/Anniversary 是同碟宣传包装）。
-	// 克拉之膝案：站内 CC/FLAC 版 tid=309436 与 DTS 版 tid=73609 同 size
-	//（10GiB 占位值）同组并存、本地名无音频 token——品牌是唯一判别器，
-	// 结果顺序错选 CC 版注入 recheck 0% 实证。
-	if isBrandEdition(cand.EditionInfo) && !isBrandEdition(src.EditionInfo) {
-		return true
-	}
+	// §59.214: 品牌反驳移出本函数相对化——绝对反驳在密阳案假杀唯一正确
+	// 候选（tid=2670 CC 版即本地版本，中文名不写 CC 是命名习惯；本地
+	// size 差 42KB 未走门6 短路实证）。品牌词仅在候选集内存在同组同窗
+	// 非品牌兄弟时才构成判别器（克拉之膝双版消歧），由调用方集合级判定。
 	return false
 }
 
