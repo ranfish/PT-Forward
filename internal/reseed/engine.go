@@ -2521,6 +2521,12 @@ func ExtractSearchKeyword(title string) string {
 	// 英文链/KeywordHasNoTitle/中文线（leadingCJKSegment 同步剥）三点一线恢复。
 	title = stripEpisodeNumberPrefix(title)
 
+	// §59.217: CJK 后挂括号注记剥离——"雅尼雅典卫城音乐会(25周年纪念版).1993"
+	//（雅尼案：注记被当中文前缀整段剥离，keyword 残"25周年纪念版) 1993 720p"
+	// 带残括号且丢片名）。仅剥【前邻 CJK + 内容含 CJK】的半角/全角括号组；
+	// 方括号标题形态（[杀人回忆].Memories…）与年份括号不受影响。
+	title = stripCJKParenNote(title)
+
 	rest := stripChinesePrefix(title)
 	if rest == "" {
 		// stripChinesePrefix 失败（如 三国.全95集.2010...，分隔符后是中文）
@@ -3593,6 +3599,47 @@ func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config
 		}
 	}
 	return nil
+}
+
+// stripCJKParenNote §59.217: CJK 后挂括号注记剥离（半角/全角括号，
+// 前邻 CJK 且内容含 CJK 才剥）。"雅尼雅典卫城音乐会(25周年纪念版)" →
+// "雅尼雅典卫城音乐会"；"[杀人回忆].Memories"（方括号）/"Movie.(2019)"
+//（内容无 CJK）不受影响。
+func stripCJKParenNote(s string) string {
+	runes := []rune(s)
+	var b strings.Builder
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if r == '(' || r == '（' {
+			closer := ')' 
+			if r == '（' {
+				closer = '）'
+			}
+			// 前邻 CJK 才考虑剥离
+			if b.Len() > 0 {
+				prev := []rune(b.String())
+				p := prev[len(prev)-1]
+				if p >= 0x4E00 && p <= 0x9FFF {
+					// 找闭括号，内容含 CJK 则整组剥除
+					for j := i + 1; j < len(runes); j++ {
+						if runes[j] == closer {
+							content := string(runes[i+1 : j])
+							for _, c := range content {
+								if c >= 0x4E00 && c <= 0x9FFF {
+									i = j // 跳过整组
+									goto next
+								}
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+		b.WriteRune(r)
+	next:
+	}
+	return b.String()
 }
 
 // ColonSubSegment §59.215: 全角冒号副题段提取——CJK 标题「主题：副题」
