@@ -256,6 +256,20 @@ func main() {
 				Where("LOWER(group_name) = LOWER(?) AND is_official = ?", lookup, true).
 				Limit(1).Pluck("domain", &domains)
 			if len(domains) == 0 {
+				// §59.220: 组名前缀回退（CMCTf→CMCT）——验证层组门家族豁免
+				var fkeys []string
+				db.WithContext(context.Background()).
+					Model(&model.ReleaseGroupMapping{}).
+					Where("is_official = ?", true).
+					Pluck("group_name", &fkeys)
+				if fk := util.FuzzyGroupPrefixKey(lookup, fkeys); fk != "" {
+					db.WithContext(context.Background()).
+						Model(&model.ReleaseGroupMapping{}).
+						Where("LOWER(group_name) = LOWER(?) AND is_official = ?", fk, true).
+						Limit(1).Pluck("domain", &domains)
+				}
+			}
+			if len(domains) == 0 {
 				return ""
 			}
 			return domains[0]
