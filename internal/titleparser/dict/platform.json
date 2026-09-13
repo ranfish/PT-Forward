@@ -1279,11 +1279,6 @@
       "canonical": "MY5",
       "full_name": "Channel 5",
       "pattern": "\\bMY5\\b"
-    },
-    {
-      "canonical": "BFI",
-      "full_name": "BFI Player",
-      "pattern": "\\bBFI\\b"
     }
   ]
 }

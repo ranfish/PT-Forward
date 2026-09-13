@@ -94,6 +94,10 @@ var editionPatterns = []editionPattern{
 	{regexp.MustCompile(`(?i)\bCriterion\b`), "Criterion"},
 	// §59.76: v1.05 W.9 碟片发行商品牌（原盘类内容分发方）——CC 已由 Criterion 覆盖
 	{regexp.MustCompile(`(?i)\bMoC\b`), "MoC"},
+	// §59.219: BFI（British Film Institute 碟标——霸王别姬案：曾误入
+	// platform.json 流媒体槽致候选 SourcePlatform=BFI × 源"BFI修复版"粘连
+	// 提取失败 → 单侧 platform 反驳假杀）
+	{regexp.MustCompile(`(?i)(?:^|[.\s\-_])BFI(?:[.\s\-_]|$)`), "BFI"},
 	{regexp.MustCompile(`(?i)\bWAC\b`), "WAC"},
 	{regexp.MustCompile(`(?i)\bMasters[-_.\s]*of[-_.\s]*Cinema\b`), "MoC"},
 	{regexp.MustCompile(`(?i)\bWarner[-_.\s]*Archive(?:[-_.\s]*Collection)?\b`), "WAC"},

@@ -214,10 +214,24 @@ func isRateLimitErr(err error) bool {
 func (r *Recovery) searchWithBackoff(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, keyword string) ([]*model.SeedingSearchResult, error) {
 	var results []*model.SeedingSearchResult
 	var err error
+	emptyRetried := false // §59.219: 空页单次免费重试
 	for attempt := 0; ; attempt++ {
 		attemptCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		results, err = adapter.SearchTorrents(attemptCtx, config, keyword, nil)
 		cancel()
+		// §59.219: 空页重试——批期并发限流形态（springsunday 实证：并发期对
+		// 部分请求返回【带空标记的真空页】，合法空页绕过异常检测；同刻死亡
+		// 诗社命中/勇敢的心空页、容器内顺序探针 6/6 恒 18 行实证=并发窗口性）。
+		// 0 行延迟后免费重试一次（throttle 窗口随并发请求完成释放）。
+		if err == nil && len(results) == 0 && ctx.Err() == nil && !emptyRetried {
+			emptyRetried = true
+			select {
+			case <-time.After(1500 * time.Millisecond):
+			case <-ctx.Done():
+				return results, err
+			}
+			continue
+		}
 		if err == nil || !isRateLimitErr(err) || attempt >= 1 || ctx.Err() != nil {
 			return results, err
 		}
