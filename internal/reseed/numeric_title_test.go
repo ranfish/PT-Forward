@@ -33,3 +33,16 @@ func TestNumericMovieTitle(t *testing.T) {
 		t.Errorf("E-prefix strip regressed: %q", kw)
 	}
 }
+
+// §59.216: 行首短数字守卫越权修复——"0 0兆赫 2019"（0.0MHz 点变空格形态）
+// 其余 token 含标题成分（0兆赫）时不判无标题（官站 tid=281254 3.23GB
+// 同版本，"0 0兆赫 2019" 形态实测 6 行命中）。
+func TestNumericUnitTitleMHz(t *testing.T) {
+	if KeywordHasNoTitle("0 0兆赫 2019") {
+		t.Error("\"0 0兆赫 2019\" must be titled (0兆赫 混合 token)")
+	}
+	// 回归：序号污染形态保持无标题判定
+	if !KeywordHasNoTitle("2 2016 1080p") {
+		t.Error("\"2 2016 1080p\" must stay titleless")
+	}
+}

@@ -4117,6 +4117,12 @@ func KeywordHasNoTitle(keyword string) bool {
 			if len(fields[0]) >= 2 && len(fields) > 1 && reYearWord.MatchString(fields[1]) {
 				return false
 			}
+			// §59.216: 其余 token 含标题成分时不判无标题——行首短数字是
+			// 序号/单位形态（"0 0兆赫 2019"案：0.0MHz 片名点变空格，"0兆赫"
+			// 混合 token 是标题，守卫曾越权秒拒 0 站搜索）
+			if len(fields) > 1 && !keywordAllTitleless(strings.Join(fields[1:], " ")) {
+				return false
+			}
 			return true
 		}
 	}
