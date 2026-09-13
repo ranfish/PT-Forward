@@ -59,6 +59,7 @@
 
 **活跃观察项（未闭环）**：
 - §59.203 挂账：站方列表 size 虚标（海豹 tid=23036 3G/7.26G）防御仅靠注入校验兜底
+- §59.208 降级链不对称观察（fetch 无 yearless/rawname｜recovery 无 area=1）——按需生长纪律：零案例不预实施；第 3 次跨链不对称实证触发轮次库抽取重构
 - build-backend go test 偶发"首跑 FAIL 重跑过"（三次：seeding/TestFlush_PushOne_TorrentExists 09-02 最新——时序敏感待定位）
 
 **已销观察项**：LuckAudit 过审率（09-02 收官——除 Suspiria MI 误判外全部正常过审，幸运专线 §59.155-163 实战验证完成）；阮玲玉两态放行（09-02 双路闭环 ✓）；243 错加无关种（用户已删）；keepfrds 列表页容量假设（朋友站日发种个位数，消解）
