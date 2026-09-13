@@ -1061,6 +1061,13 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 	return nil, &model.AppError{Code: 15001, Message: errMsg}
 }
 
+// reTorrentTableSig §59.209: 结果页结构签名（任意元素 class 含 torrents——
+// 含 table 主题与 div 主题如 人人 class="page-torrents page-torrent-list"）。
+// 有签名=真实搜索结果页（真空也合法）；无标记无签名=异常轻量页。
+// 判别实证：spring 16 并发 503 页 0 字节无签名（保持 anomaly）×
+// 人人真空页 78k 带签名（真实空）。
+var reTorrentTableSig = regexp.MustCompile(`(?i)class="[^"]*torrents`)
+
 func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.SiteConfig, keyword string, opts *model.SearchOptions) ([]*model.SeedingSearchResult, error) {
 	u := config.Domain
 	if !strings.HasPrefix(u, "http") {
@@ -1136,13 +1143,17 @@ func (a *NexusPHPAdapter) SearchTorrents(ctx context.Context, config *model.Site
 		parsed := parseNexusPHPBrowse(string(body), config)
 
 		// §59.199: 异常页检测——0 行且页面无空结果标记（真空页 NexusPHP 标准主题
-		// 必含"没有种子/搜索结果"——springsunday 实测）＝页面异常形态：站点并发
-		// 限流 503（24 并发实测 17×503）被 retry 中间件耗尽后返回的轻量错误页/
-		// 降级页。此前静默当"确认无结果"——Phase-2 恒 0 行且零日志（生死格斗案：
-		// PT30 批次窗口 spring 搜索全盲）。按站点错误上报，交上层退避重试。
+		// 必含"没有种子/搜索结果"——springsunday 实测）且无结果表格结构签名
+		// （§59.209: 部分站点真空页无文本标记但有完整 torrents 表格——人人
+		// audiences.me 实测 78k 真空页零标记，纯标记判据误报 anomaly）＝页面
+		// 异常形态：站点并发限流 503（24 并发实测 17×503）被 retry 中间件耗尽
+		// 后返回的轻量错误页/降级页。此前静默当"确认无结果"——Phase-2 恒 0 行
+		// 且零日志（生死格斗案：PT30 批次窗口 spring 搜索全盲）。按站点错误
+		// 上报，交上层退避重试。
 		if len(parsed) == 0 &&
 			!strings.Contains(string(body), "没有种子") && !strings.Contains(string(body), "没有符合") &&
-			!strings.Contains(string(body), "搜索结果") && !strings.Contains(string(body), "Nothing") {
+			!strings.Contains(string(body), "搜索结果") && !strings.Contains(string(body), "Nothing") &&
+			!reTorrentTableSig.MatchString(string(body)) {
 			if a.logger != nil {
 				a.logger.Debug("nexusphp search: anomaly page (0 rows, no empty marker)",
 					zap.String("domain", config.Domain),
