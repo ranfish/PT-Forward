@@ -115,6 +115,11 @@ func hasVideoReleaseMarkers(title string) bool {
 	return reSeasonEp.MatchString(title)
 }
 
+// HasMusicReleaseMarkers §59.225: 导出给孤儿恢复链 JAV 判定使用。
+func HasMusicReleaseMarkers(title string) bool {
+	return hasMusicReleaseMarkers(title)
+}
+
 func hasMusicReleaseMarkers(title string) bool {
 	lower := strings.ToLower(title)
 	for _, token := range musicReleaseTokens {

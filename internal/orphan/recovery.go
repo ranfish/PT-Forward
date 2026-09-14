@@ -2,6 +2,7 @@ package orphan
 
 import (
 	"context"
+	"regexp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/reseed"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/util"
@@ -23,6 +25,100 @@ type Recovery struct {
 	clientProvider model.DownloaderProvider
 	logger         *zap.Logger
 	coverageSrv    CoverageWriter // §59.196: tid 回写（可空——测试/降级场景）
+}
+
+// reJAVOrphan §59.225: 孤儿恢复链的 JAV 番号提取正则（放宽边界——
+// compliance 的 reJAV 用 \b 导致 "3dsvr-1912"（前导数字）和
+// "SVVRT-079_4K"（后缀下划线规格词）不命中）。
+var reJAVOrphan = regexp.MustCompile(`(?i)(?:^|[^A-Za-z0-9])([A-Za-z]{2,8}-\d{2,5})(?:[^A-Za-z0-9]|$)`)
+
+// extractJAVKeyword §59.225: 从孤儿名提取 JAV 番号作为搜索关键词。
+// 双条件：① compliance.DetectAdult 判定成人（排除 RIAJ 音乐/电影番号）
+// ② 放宽边界正则提取番号段（兼容前导数字/后缀规格词形态）。
+// "MDVR-400.8K" → "MDVR-400"，"SVVRT-079_4K" → "SVVRT-079"。
+func extractJAVKeyword(name string) (string, bool) {
+	// §59.225: 无边界正则提取番号段——兼容前导数字（3dsvr-1912）和
+	// 后缀规格词（SVVRT-079_4K / MDVR-400.8K）
+	re := regexp.MustCompile(`(?i)[A-Za-z0-9]{2,8}-\d{2,5}`)
+	m := re.FindString(name)
+	if m == "" {
+		return "", false
+	}
+	// 番号段清理：确保至少含一个字母（排除纯数字如 "2020-1080"）
+	hasLetter := false
+	for _, c := range m {
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			hasLetter = true
+			break
+		}
+	}
+	if !hasLetter {
+		return "", false
+	}
+	// 剥前导数字：番号前的数字是系列编号前缀（如 "3dsvr" 的 3）——保留
+	// （馒头标题就是 "3DSVR-1912" 带前导数字）
+
+	// RIAJ 音乐排除
+	remaining := strings.Replace(name, m, "", 1)
+	if compliance.HasMusicReleaseMarkers(remaining) {
+		return "", false
+	}
+	// 完整电影发布标记排除
+	if hasFullMovieMarkers(remaining) {
+		return "", false
+	}
+	return strings.ToUpper(m), true
+}
+
+// hasFullMovieMetadata §59.225: 余文含完整电影发布标记组合
+// （分辨率+媒介+编码——排除 "MDVR-400.8K" 中的孤立规格词）。
+func hasFullMovieMarkers(remaining string) bool {
+	lower := strings.ToLower(remaining)
+	hasRes := false
+	hasCodec := false
+	for _, r := range []string{"1080p", "720p", "2160p", "480p"} {
+		if strings.Contains(lower, r) {
+			hasRes = true
+			break
+		}
+	}
+	for _, c := range []string{"x264", "x265", "h264", "h265", "hevc", "avc"} {
+		if strings.Contains(lower, c) {
+			hasCodec = true
+			break
+		}
+	}
+	return hasRes && hasCodec
+}
+
+// searchMTeamAdult §59.225: JAV 番号专用馒头搜索（adult 模式优先）。
+// 返回 (siteName, torrentID)；空 = 未命中。
+func (r *Recovery) searchMTeamAdult(ctx context.Context, keyword string, sourceSize int64, sourceTitle string) (string, string) {
+	if r.siteProvider == nil {
+		return "", ""
+	}
+	const siteName = "馒头"
+	config, err := r.siteProvider.GetSiteConfig(ctx, siteName)
+	if err != nil || config == nil {
+		return "", ""
+	}
+	adapter, err := r.siteProvider.GetAdapter(ctx, siteName)
+	if err != nil || adapter == nil {
+		return "", ""
+	}
+	results, err := r.searchWithBackoff(ctx, adapter, config, keyword)
+	if err != nil || len(results) == 0 {
+		return "", ""
+	}
+	r.logger.Info("orphan L2: JAV mteam search results",
+		zap.String("keyword", keyword),
+		zap.Int("rows", len(results)))
+	// 验证：组名空（番号形态无组概念），标题中性放行（番号即标题）
+	m, _ := reseed.VerifyMatchWithTruncationCheckAndSource(results, "", sourceSize, sourceTitle)
+	if m != nil {
+		return siteName, m.TorrentID
+	}
+	return "", ""
 }
 
 // CoverageWriter §59.196: 恢复链所需的 coverage 写接口（coverage.Service 实现）。
@@ -350,6 +446,20 @@ func (r *Recovery) tryFileLevelL2Search(ctx context.Context, orphan *Entry, stat
 }
 
 func (r *Recovery) tryL2Search(ctx context.Context, orphan *Entry, stats *SearchStats) (siteName, torrentID, method string) {
+	// §59.225: JAV 番号专用路径——DetectAdult 命中番号模式时，番号即
+	// 搜索关键词（馒头标题=纯番号不带规格词），优先馒头 adult 搜索，
+	// 未中走全站兜底。零管线侵入（不动 ExtractSearchKeyword）。
+	if keyword, ok := extractJAVKeyword(orphan.Name); ok {
+		r.logger.Info("orphan L2: JAV series detected",
+			zap.String("orphan", orphan.Name),
+			zap.String("keyword", keyword))
+		if site, tid := r.searchMTeamAdult(ctx, keyword, orphan.Size, orphan.Name); tid != "" {
+			return site, tid, "l2:jav:mteam"
+		}
+		// 未中 → 继续走常规管线（全站兜底）
+		return r.tryL2SearchCore(ctx, orphan, stats, keyword, "", orphan.Size, orphan.Name, nil)
+	}
+
 	if orphan.IsDir && reseed.DetectMusicFromDir(orphan.Path) {
 		musicKeyword := reseed.ExtractMusicKeyword(orphan.Name)
 		r.logger.Info("orphan L2: music detected",
