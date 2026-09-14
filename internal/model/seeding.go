@@ -294,6 +294,7 @@ type SeedingSearchResult struct {
 	PublishAt   time.Time     `json:"publish_at"`
 	DetailURL   string        `json:"detail_url"`
 	DownloadURL string        `json:"download_url"`
+	Adult       bool          `json:"adult,omitempty"` // §59.222: 成人区标记（发布层过滤消费；孤儿恢复/辅种不受限）
 }
 
 // §33.1.85 — CleanupScoreWeights: 清理评分权重

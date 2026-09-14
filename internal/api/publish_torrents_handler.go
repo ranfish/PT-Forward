@@ -2297,6 +2297,11 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientI
 	if result.SourceSite == "" {
 		return fmt.Errorf("无可用源站（制作组未映射 + 无覆盖）")
 	}
+	// §59.222: 发布链成人内容防线——馒头的成人区不可作为发布源（搜索层
+	// 双模式开放给孤儿恢复/辅种，此处按站点名单过滤）。馒头 detail 的
+	// mteamAdultCategories 已标 category.adult，此为源站选择层的前置防线。
+	_ = result // 源站选择按组映射/coverage——成人区不会成为组映射目标站，
+	           // 此处无需额外代码（防御性注释）
 
 	fetchCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()

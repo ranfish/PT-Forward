@@ -85,63 +85,83 @@ func (a *MTeamAdapter) SearchTorrents(ctx context.Context, config *model.SiteCon
 	return a.GenericAdapter.SearchTorrents(ctx, config, keyword, opts)
 }
 
+// searchViaAPI §59.222: 双模式搜索（normal + adult）——成人区不再被搜索层
+// 一刀切（3dsvr 六连案：mode:"normal" 硬编码致全站 97 站 0 结果）。
+// 成人内容限制移至发布业务层（SelectFetchSite/publishing 过滤），
+// 孤儿恢复/辅种不受限。adult 结果带 Adult 标记供下游消费。
 func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfig, keyword string) ([]*model.SeedingSearchResult, error) {
 	u := resolveBaseURL(config) + "/api/torrent/search"
-	payload, _ := json.Marshal(map[string]interface{}{
-		"keyword":    keyword,
-		"mode":       "normal",
-		"pageNumber": 1,
-		"pageSize":   20,
-	})
 
-	req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(payload))
-	if err != nil {
-		return nil, searchError("构造搜索请求失败", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	a.setAPIHeaders(req, config.APIKey)
-
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return nil, searchError("搜索请求失败", err)
-	}
-	defer func() { drainBody(resp) }()
-
-	body, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-
-	var result struct {
-		Code json.Number `json:"code"`
-		Data struct {
-			Data []struct {
-				ID     string  `json:"id"`
-				Name   string  `json:"name"`
-				Size   flexInt `json:"size"`
-				Status struct {
-					Seeders  flexInt `json:"seeders"`
-					Leechers flexInt `json:"leechers"`
-					Discount string  `json:"discount"`
-				} `json:"status"`
-			} `json:"data"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, parseError("解析搜索结果失败", err)
-	}
-
-	var results []*model.SeedingSearchResult
-	for _, item := range result.Data.Data {
-		results = append(results, &model.SeedingSearchResult{
-			TorrentID: item.ID,
-			Title:     item.Name,
-			Size:      int64(item.Size),
-			Seeders:   int(item.Status.Seeders),
-			Leechers:  int(item.Status.Leechers),
+	var all []*model.SeedingSearchResult
+	for _, mode := range []string{"normal", "adult"} {
+		payload, _ := json.Marshal(map[string]interface{}{
+			"keyword":    keyword,
+			"mode":       mode,
+			"pageNumber": 1,
+			"pageSize":   20,
 		})
+
+		req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(payload))
+		if err != nil {
+			return nil, searchError("构造搜索请求失败", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		a.setAPIHeaders(req, config.APIKey)
+
+		resp, err := a.doer.Client.Do(req)
+		if err != nil {
+			if mode == "normal" {
+				return nil, searchError("搜索请求失败", err)
+			}
+			continue // adult 轮失败不阻断——降级 normal-only
+		}
+
+		body, readErr := readBody(resp)
+		drainBody(resp)
+		if readErr != nil && mode == "normal" {
+			return nil, readErr
+		}
+		if readErr != nil {
+			continue
+		}
+
+		var result struct {
+			Code json.Number `json:"code"`
+			Data struct {
+				Data []struct {
+					ID     string  `json:"id"`
+					Name   string  `json:"name"`
+					Size   flexInt `json:"size"`
+					Status struct {
+						Seeders  flexInt `json:"seeders"`
+						Leechers flexInt `json:"leechers"`
+						Discount string  `json:"discount"`
+					} `json:"status"`
+				} `json:"data"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			if mode == "normal" {
+				return nil, parseError("解析搜索结果失败", err)
+			}
+			continue
+		}
+
+		for _, item := range result.Data.Data {
+			r := &model.SeedingSearchResult{
+				TorrentID: item.ID,
+				Title:     item.Name,
+				Size:      int64(item.Size),
+				Seeders:   int(item.Status.Seeders),
+				Leechers: int(item.Status.Leechers),
+			}
+			if mode == "adult" {
+				r.Adult = true
+			}
+			all = append(all, r)
+		}
 	}
-	return results, nil
+	return all, nil
 }
 
 func (a *MTeamAdapter) setAPIHeaders(req *http.Request, apiKey string) {
