@@ -147,6 +147,21 @@ func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfi
 			continue
 		}
 
+		// §59.223: API 业务错误码（code!=0 如 key 无效/限流）——不静默
+		if result.Code.String() != "0" && a.logger != nil {
+			a.logger.Warn("mteam search API error",
+				zap.String("mode", mode),
+				zap.String("keyword", keyword),
+				zap.String("code", result.Code.String()))
+		}
+		if a.logger != nil {
+			a.logger.Debug("mteam search resp",
+				zap.String("mode", mode),
+				zap.String("keyword", keyword),
+				zap.Int("body_bytes", len(body)),
+				zap.Int("parsed", len(result.Data.Data)))
+		}
+
 		for _, item := range result.Data.Data {
 			r := &model.SeedingSearchResult{
 				TorrentID: item.ID,
