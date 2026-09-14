@@ -147,18 +147,27 @@ func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfi
 			continue
 		}
 
-		// §59.223: API 业务错误码（code!=0 如 key 无效/限流）——不静默
-		if result.Code.String() != "0" && a.logger != nil {
-			// 尝试提取 message 字段（55 字节小响应解析）
+		// §59.224: API 业务错误码（code≠0）——返回错误进入退避重试链
+		// （savr 六连案：并发批量期 code=4 瞬时限流，单独重试即恢复——
+		//  此前返回空结果=合法空页，§59.219 空页重试偶尔能兜住但不可靠）。
+		// message 提取供日志+错误消息。
+		if result.Code.String() != "0" {
 			var errBody struct {
 				Message string `json:"message"`
 			}
 			_ = json.Unmarshal(body, &errBody)
-			a.logger.Warn("mteam search API error",
-				zap.String("mode", mode),
-				zap.String("keyword", keyword),
-				zap.String("code", result.Code.String()),
-				zap.String("message", errBody.Message))
+			if a.logger != nil {
+				a.logger.Warn("mteam search API error",
+					zap.String("mode", mode),
+					zap.String("keyword", keyword),
+					zap.String("code", result.Code.String()),
+					zap.String("message", errBody.Message))
+			}
+			if mode == "normal" {
+				return nil, &model.AppError{Code: 15002, Message: fmt.Sprintf("MTeam API error code=%s: %s", result.Code.String(), errBody.Message)}
+			}
+			// adult 轮 code≠0：记日志不阻断（降级 normal-only 结果）
+			continue
 		}
 		if a.logger != nil {
 			a.logger.Debug("mteam search resp",

@@ -204,8 +204,10 @@ func isRateLimitErr(err error) bool {
 	}
 	// §59.199: 异常页（并发限流 503 重试耗尽后的轻量错误页）同按限流类
 	// 退避重试——错误≠未命中。
+	// §59.224: MTeam API 业务错误码（code=4 并发限流等）同族
 	return strings.Contains(err.Error(), "domain rate limit") ||
-		strings.Contains(err.Error(), "search page anomaly")
+		strings.Contains(err.Error(), "search page anomaly") ||
+		strings.Contains(err.Error(), "MTeam API error")
 }
 
 // searchWithBackoff §59.185 A: priority 搜索遇限流类错误退避重试一次
