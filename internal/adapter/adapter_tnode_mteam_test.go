@@ -800,11 +800,21 @@ func TestMTeamAdapter_SearchTorrents_API(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results, got %d", len(results))
+	// §59.222: dual-mode (normal+adult) — same mock server returns for both
+	if len(results) != 4 {
+		t.Fatalf("expected 4 results (dual-mode), got %d", len(results))
 	}
 	if results[0].TorrentID != "123" {
 		t.Errorf("expected torrent ID 123, got %s", results[0].TorrentID)
+	}
+	if results[0].Adult {
+		t.Error("first result (normal mode) should not have Adult flag")
+	}
+	if results[2].TorrentID != "123" {
+		t.Errorf("expected torrent ID 123 for adult mode, got %s", results[2].TorrentID)
+	}
+	if !results[2].Adult {
+		t.Error("third result (adult mode) should have Adult flag")
 	}
 	if results[0].Title != "Test Torrent" {
 		t.Errorf("unexpected title: %s", results[0].Title)
