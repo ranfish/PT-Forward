@@ -149,10 +149,16 @@ func (a *MTeamAdapter) searchViaAPI(ctx context.Context, config *model.SiteConfi
 
 		// §59.223: API 业务错误码（code!=0 如 key 无效/限流）——不静默
 		if result.Code.String() != "0" && a.logger != nil {
+			// 尝试提取 message 字段（55 字节小响应解析）
+			var errBody struct {
+				Message string `json:"message"`
+			}
+			_ = json.Unmarshal(body, &errBody)
 			a.logger.Warn("mteam search API error",
 				zap.String("mode", mode),
 				zap.String("keyword", keyword),
-				zap.String("code", result.Code.String()))
+				zap.String("code", result.Code.String()),
+				zap.String("message", errBody.Message))
 		}
 		if a.logger != nil {
 			a.logger.Debug("mteam search resp",
