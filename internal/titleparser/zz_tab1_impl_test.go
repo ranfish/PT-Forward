@@ -77,7 +77,11 @@ func TestCNEpisode(t *testing.T) {
 		t.Errorf("SeasonEpisode = %q, want E01-E24", tc.SeasonEpisode)
 	}
 	tc2 := ParseTitle("BBC王朝全集.全五集.2018.720p-GROUP")
-	if tc2.SeasonEpisode == "" {
-		t.Errorf("全五集 应解析出 E01-E05")
+	if tc2.SeasonEpisode != "E01-E05" {
+		t.Errorf("全五集: SeasonEpisode = %q, want E01-E05", tc2.SeasonEpisode)
+	}
+	tc3 := ParseTitle("剧名.全十二集.2020.1080p-GROUP")
+	if tc3.SeasonEpisode != "E01-E12" {
+		t.Errorf("全十二集: SeasonEpisode = %q, want E01-E12", tc3.SeasonEpisode)
 	}
 }
