@@ -15,9 +15,11 @@ func TestMergeDOMIntoGarbageMediumDefense(t *testing.T) {
 		// 垃圾 DOM medium：不覆盖 title 值
 		{"unk_key", "Movie 2160p UHD BluRay x265 GRP", "UNK0", "UHD BluRay", ""},
 		{"encode_word", "Movie 1080p BluRay x264 GRP", "Encode", "BluRay", ""},
-		// 有效 DOM medium：覆盖 title 值（DOM > title，完整覆盖含清除）
-		{"webdl_key_normalized", "Movie 1080p BluRay x264 GRP", "WEB-DL", "", "WEB-DL"},
-		{"remux", "Movie 1080p BluRay x264 GRP", "Remux", "", "Remux"},
+		// §59.226 附五 对调后：标题主值 + DOM fallback——标题已有 ST/Spec
+		// 时 DOM 不覆盖（DOM 下拉脏数据实证 §59.166）；标题无值时 DOM 填充。
+		{"webdl_no_overwrite", "Movie 1080p BluRay x264 GRP", "WEB-DL", "BluRay", ""},
+		{"remux_no_overwrite", "Movie 1080p BluRay x264 GRP", "Remux", "BluRay", ""},
+		{"dom_fills_empty_title", "Movie 2023 1080p x264 GRP", "WEB-DL", "WEB", "WEB-DL"},
 		// 空 DOM medium：跳过
 		{"empty", "Movie 2160p UHD BluRay x265 GRP", "", "UHD BluRay", ""},
 	}

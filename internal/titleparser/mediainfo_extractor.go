@@ -14,6 +14,7 @@ import (
 type MediaInfoTech struct {
 	Resolution      string // 2160p/1080p/720p/480p/1440p/4320p
 	VideoCodec      string // x264/x265/HEVC/AVC/AV1/VP9/MPEG-2/VC-1/AVS+/AVS2
+	FrameRate       string // §59.226 附二十一: MI 原值（"23.976"——展示层判非默认）
 	AudioCodec      string // DDP/DD/DTS/DTS-HD MA/DTS-HD HR/DTS-ES/TrueHD/FLAC/AAC/LPCM/Opus/AV3A/xHE-AAC/ALAC
 	AudioChannels   string // 2.0/5.1/7.1
 	AudioTechnology string // Atmos
@@ -50,6 +51,9 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 		if s.name == "video" {
 			result.Resolution = resolutionFromHeightOrWidth(s.fields["height"], s.fields["width"])
 			result.VideoCodec = codecFromMI(s.fields["format"], s.fields["writing library"])
+			// §59.226 附二十一: MI Frame rate 字段（"23.976 FPS"→"23.976"——
+			// 数字原值保留，展示/重组层判非默认帧率才显示）
+			result.FrameRate = frameRateFromMI(s.fields["frame rate"])
 			result.BitDepth = bitDepthFromMI(s.fields["bit depth"])
 			result.HDR = hdrFromMI(s.fields["hdr format"])
 			// §59.151: Writing library 存在 = 重编码铁证（x265 等编码器写入痕迹）——
@@ -393,6 +397,21 @@ func hdrFromMI(hdrFormat string) string {
 }
 
 // bitDepthFromMI 从 Bit depth 字段提取色深。
+// frameRateFromMI §59.226 附二十一: MI "Frame rate" 字段提取数字原值。
+// "23.976 FPS"/"60.000 FPS" → "23.976"/"60.000"（原值保留——23.976 vs 24.000
+// 是细分母源信号；非默认判定在展示/重组层）。
+func frameRateFromMI(frameRateStr string) string {
+	v := strings.TrimSpace(frameRateStr)
+	if v == "" {
+		return ""
+	}
+	// 取第一个数字段（"23.976 FPS"→"23.976"；有的 MI 是 "23.976" 纯数字）
+	if m := regexp.MustCompile(`^([0-9]+(?:\.[0-9]+)?)`).FindStringSubmatch(v); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
 func bitDepthFromMI(bitDepthStr string) string {
 	n := parseMIInt(bitDepthStr)
 	if n <= 0 {
@@ -505,6 +524,18 @@ var audioSpecRank = map[string]int{
 }
 
 // audioSpecRankOf 获取音轨的规格分数（含 Atmos 加分）。
+// filterCommentaryStreams §59.226 附十六: 排除 Title 行含 Commentary 的
+// 音频段（评论轨——导演解说非内容音轨；V1.05 声道标主音轨最高规格）。
+func filterCommentaryStreams(streams []miStream) []miStream {
+	var main []miStream
+	for _, s := range streams {
+		if !commentaryTitleLineRe.MatchString(s.fields["title"]) {
+			main = append(main, s)
+		}
+	}
+	return main
+}
+
 func audioSpecRankOf(stream miStream) int {
 	codec, tech := audioFromMI(stream.fields["format"], stream.fields["commercial name"])
 	rank := audioSpecRank[codec]
@@ -519,7 +550,17 @@ func audioSpecRankOf(stream miStream) int {
 // 多音轨种子中，标题只标最高规格音轨。例如：
 //   - Audio #1 = DDP 5.1, Audio #2 = TrueHD Atmos 7.1 → 选 TrueHD Atmos（规格更高）
 //   - Audio #1 = DTS-HD MA, Audio #2 = AC-3 → 选 DTS-HD MA（规格更高）
+//
+// §59.226 附十六: 评论轨排除——Audio 段 Title 含 Commentary 的轨道
+// 从候选排除（评论轨恰为最高规格时声道/编码取错；§59.116
+// commentaryTitleLineRe 判据同源）。边缘防御：全部是评论轨
+// （纯解说种）→ 不排除（保持最高规格不饿死）。
 func selectBestAudioStream(streams []miStream) miStream {
+	main := filterCommentaryStreams(streams)
+	if len(main) == 0 {
+		main = streams // 全评论轨：保持原集合（不饿死）
+	}
+	streams = main
 	if len(streams) <= 1 {
 		if len(streams) == 1 {
 			return streams[0]

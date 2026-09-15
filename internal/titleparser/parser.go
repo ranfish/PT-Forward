@@ -1,6 +1,7 @@
 package titleparser
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -18,7 +19,9 @@ var (
 	reAudioDTSHDMA  = regexp.MustCompile(`(?i)\bDTS[-._\s]?HD[-._\s]*MA\b`)
 	reAudioCodecDD  = regexp.MustCompile(`(?i)\bDD\b`)
 	reChinesePrefix = regexp.MustCompile(`^\s*\[([^\]]+)\]\s*`)
-	reBitDepth      = regexp.MustCompile(`(?i)\b(8|10|12|16|24)\s*BIT\b`)
+// §59.226 附十四: 视频位深合法域仅 8|10|12（16/24 是音频位深——FLAC 24BIT
+// 音乐标题曾污染视频位深字段）；捕获数字归一 "Nbit"（"10 BIT"→"10bit"）。
+reBitDepth      = regexp.MustCompile(`(?i)\b(8|10|12)[._\-\s]?BIT\b`)
 	reFrameRate     = regexp.MustCompile(`(?i)\b(\d{2,3}(?:\.\d+)?)\s*FPS\b`)
 	reVideoCodecToken = regexp.MustCompile(`(?i)\b(AV1|VP[89]|AVS2|X265|H\.?265|HEVC|X264|H\.?264|AVC|VC-?1|MPEG-?2)\b`)
 	reAudioCodecToken = regexp.MustCompile(`(?i)\b(TrueHD|True[-.\s]*HD|DTS[-.\s]*HD[-.\s]*(?:MA|HR)|DTS:X|DTS|E[-]?AC[-]?3|DDPA|DDP|DD\+|AC[-]?3|DD|FLAC|ALAC|AAC|APE|WAV|OPUS|MP3|LPCM|PCM)\d*(?:\.\d+)?`)
@@ -137,10 +140,85 @@ func extractChinesePrefix(title string) (prefix, remaining string) {
 	return "", title
 }
 
+// reCNEpisodeRange §59.226 附三: 中文集数范围——"第01-24集"/"第1~12集"。
+// 结构词"第…集"自锚定（电影标题不出现此形态——无歧义，不开 PTGen 门）。
+var reCNEpisodeRange = regexp.MustCompile(`第\s*(\d{1,4})\s*[-~－至]\s*(\d{1,4})\s*集`)
+
+// reCNEpisodeCount §59.226 附三: 中文全集数——"全24集"/"全五集"（中文数字
+// §59.204 F1 同族词表：零一二三四五六七八九十百千）。
+var reCNEpisodeCount = regexp.MustCompile(`全\s*([0-9]{1,4}|[零一二三四五六七八九十百千])\s*集`)
+
+// cnNumToInt §59.226 附三: 中文数字→阿拉伯（一~十/百内简单组合）。
+func cnNumToInt(cn string) int {
+	if n := len(cn); n == 1 {
+		singles := map[rune]int{'零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
+			'五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+		if v, ok := singles[rune(cn[0])]; ok {
+			return v
+		}
+		if cn == "十" {
+			return 10
+		}
+	} else if n >= 2 {
+		// 十位组合：十五/二十/二十五
+		tenIdx := strings.Index(cn, "十")
+		if tenIdx >= 0 {
+			head, tail := 1, 0
+			singles := map[rune]int{'一': 1, '二': 2, '三': 3, '四': 4,
+				'五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+			if tenIdx > 0 {
+				if v, ok := singles[rune(cn[0])]; ok {
+					head = v
+				}
+			}
+			if tenIdx+len("十") < len(cn) {
+				if v, ok := singles[rune(cn[tenIdx+len("十")])]; ok {
+					tail = v
+				}
+			}
+			return head*10 + tail
+		}
+	}
+	return 0
+}
+
+// extractCNEpisodeAndRemove 中文集数提取归一（E01-E24 形态）。
+// §59.226 附三: "第01-24集"→"E01-E24"；"全24集"→"E01-E24"（起点补 01）。
+// 无匹配返回空。调用点在 reSeasonEpisode 未命中时兜底（S/E 形态优先）。
+func extractCNEpisodeAndRemove(title string) (value, remaining string) {
+	if m := reCNEpisodeRange.FindStringSubmatch(title); m != nil {
+		start, end := padE(m[1]), padE(m[2])
+		remaining := strings.TrimSpace(reCNEpisodeRange.ReplaceAllString(title, " "))
+		return "E" + start + "-E" + end, remaining
+	}
+	if m := reCNEpisodeCount.FindStringSubmatch(title); m != nil {
+		num := m[1]
+		if !regexp.MustCompile(`^[0-9]+$`).MatchString(num) {
+			num = fmt.Sprint(cnNumToInt(num))
+			if num == "0" {
+				num = "1"
+			}
+		}
+		remaining := strings.TrimSpace(reCNEpisodeCount.ReplaceAllString(title, " "))
+		return "E01-E" + padE(num), remaining
+	}
+	return "", title
+}
+
+// padE 集数补零到 2 位（"1"→"01"；"124"→"124"）。
+func padE(num string) string {
+	for len(num) < 2 {
+		num = "0" + num
+	}
+	return num
+}
+
 func extractSeasonEpisodeAndRemove(title string) (value, remaining string) {
 	match := reSeasonEpisode.FindString(title)
 	if match == "" {
-		return "", title
+		// §59.226 附三: S/E 形态未命中 → 中文集数兜底（第N集/全N集——
+		// 结构词自锚定）
+		return extractCNEpisodeAndRemove(title)
 	}
 	remaining = strings.TrimSpace(reSeasonEpisode.ReplaceAllString(title, " "))
 	remaining = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " "))
@@ -154,6 +232,15 @@ func extractSeasonEpisodeAndRemove(title string) (value, remaining string) {
 func extractBoundaryAnchor(title string) (se, year, remaining, mainLocked string) {
 	// 季集 token 位置
 	seLoc := reSeasonEpisode.FindStringIndex(title)
+	// §59.226 附三: 中文集数形态（"第01-24集"/"全五集"）同季集锚——
+	// 结构词自锚定，锚在年份前也不锁进主标题（"大江大河.第01-24集.2024"）
+	if seLoc == nil {
+		if cnLoc := reCNEpisodeRange.FindStringIndex(title); cnLoc != nil {
+			seLoc = cnLoc
+		} else if cnLoc2 := reCNEpisodeCount.FindStringIndex(title); cnLoc2 != nil {
+			seLoc = cnLoc2
+		}
+	}
 	// 年份锚（技术跟随）
 	var yearStart, yearEnd int
 	matches := reYearToken.FindAllStringSubmatchIndex(title, -1)
@@ -174,6 +261,19 @@ func extractBoundaryAnchor(title string) (se, year, remaining, mainLocked string
 	// 有技术跟随的年份即真年份, 两侧剥除防污染
 	if seLoc != nil {
 		se = title[seLoc[0]:seLoc[1]]
+		// §59.226 附三: 中文集数锚归一（"第01-24集"→"E01-E24"）
+		if m := reCNEpisodeRange.FindStringSubmatch(se); m != nil {
+			se = "E" + padE(m[1]) + "-E" + padE(m[2])
+		} else if m2 := reCNEpisodeCount.FindStringSubmatch(se); m2 != nil {
+			num := m2[1]
+			if !regexp.MustCompile(`^[0-9]+$`).MatchString(num) {
+				num = fmt.Sprint(cnNumToInt(num)) // 中文数字转阿拉伯
+				if num == "0" {
+					num = "1"
+				}
+			}
+			se = "E01-E" + padE(num)
+		}
 		mainLocked = takeMain(seLoc[0])
 		remaining = strings.TrimSpace(title[seLoc[1]:])
 		if anchorVal != "" {
@@ -357,7 +457,7 @@ func extractMedium(title string) string {
 	}
 
 	if blurayToken != "" {
-		if regexp.MustCompile(`(?i)\bDIY\b`).MatchString(title) {
+		if hasMediaDIY(title) {
 			parts = append(parts, blurayToken+" DIY")
 		} else {
 			parts = append(parts, blurayToken)
@@ -450,7 +550,9 @@ func extractHDRFormat(title string) string {
 		return "DoVi HDR10+"
 	}
 	if hasDoVi && hasHDR10 {
-		return "DoVi HDR10"
+		// §59.226 附十三: "DoVi HDR10" 是词表外冗余形态（DoVi 组合 HDR10 即
+		// "DoVi HDR"——"10" 冗余；对齐 MI 侧 hdrFromMI/词表/§59.151）
+		return "DoVi HDR"
 	}
 	if hasDoVi && hasHDR {
 		return "DoVi HDR"
@@ -489,7 +591,11 @@ func extractAudio(title string) string {
 }
 
 func extractBitDepth(title string) string {
-	return strings.TrimSpace(reBitDepth.FindString(title))
+	m := reBitDepth.FindStringSubmatch(title)
+	if m == nil {
+		return ""
+	}
+	return m[1] + "bit"
 }
 
 func extractFrameRate(title string) string {
@@ -545,8 +651,42 @@ func extractReleaseVersion(title string) string {
 	return ""
 }
 
+// reAtGroupTail §59.226 附八 补: 尾部 @ 组名段（"DIY@CMCT"/"@CMCT"/"SHB931@UBWEB"）。
+var reAtGroupTail = regexp.MustCompile(`(?i)(?:^|[\s.])([A-Za-z0-9_]*@[A-Za-z0-9_]+)$`)
+
+// reDIYWord §59.226 附八: 媒介位 DIY 词（Go regexp 无负向前瞻——
+// 后继字符检查实现：DIY 后紧跟 @ = 组名署名形态 "-DIY@CMCT" 非媒介词）。
+var reDIYWord = regexp.MustCompile(`(?i)\bDIY\b`)
+
+// hasMediaDIY 标题是否存在媒介位 DIY（至少一个 DIY 后不跟 @）。
+func hasMediaDIY(title string) bool {
+	for _, loc := range reDIYWord.FindAllStringIndex(title, -1) {
+		end := loc[1]
+		if end >= len(title) || title[end] != '@' {
+			return true
+		}
+	}
+	return false
+}
+
 func extractGroup(title string) string {
 	title = strings.TrimSpace(title)
+	// §59.226 附八 补: 无 dash 的 @ 组名段——前置剥除链（音频/分辨率 token
+	// 剥除后的清理）可能清掉 dash 残留，输入裸 "DIY@CMCT"/"@CMCT" 形态
+	// （Batman 插桩实证）。@ 是无歧义组署名锚。
+	if strings.Contains(title, "@") {
+		if m := reAtGroupTail.FindStringSubmatch(title); m != nil {
+			seg := m[1]
+			upper := strings.ToUpper(seg)
+			if strings.HasPrefix(upper, "DIY@") && len(seg) > len("DIY@")+1 {
+				return seg[len("DIY@"):] // DIY@ 伪复合剥离
+			}
+			if strings.HasPrefix(seg, "@") && len(seg) > 1 {
+				return seg[1:] // 裸 @ 残留（DIY 被前置链剥除）
+			}
+			return seg // 真复合整段（SHB931@UBits）
+		}
+	}
 	// §59.211 补: ￡ 标记优先于 dash——dash 在 S01-S02/Blu-ray 多连字符名下
 	// 产垃圾段（"克兰弗德S01-S02...Blu-ray...￡cXcY@FRDS" 曾提取
 	// "2009. . . . ￡cXcY@FRDS"）；￡ 是无歧义组署名锚（SSD 族惯例）。
@@ -574,6 +714,11 @@ func extractGroup(title string) string {
 		if upper == "NOGROUP" || upper == "N/A" || upper == "NONE" || upper == "UNKNOWN" {
 			// 继续尝试 ￡ 分隔符
 		} else if len(raw) >= 2 && len(raw) <= 30 {
+			// §59.226 附八: DIY@ 伪复合剥离——DIY 是通用标记非组员名
+			// （区别于 SHB931@UBits 真复合整段保留），剥离后仅返回纯组名
+			if strings.HasPrefix(upper, "DIY@") && len(raw) > len("DIY@")+1 {
+				return raw[len("DIY@"):]
+			}
 			return raw
 		}
 	}
@@ -724,6 +869,14 @@ func removeGroupSuffix(title, group string) string {
 		groupLower := strings.ToLower(group)
 		if segLower == groupLower {
 			return strings.TrimSpace(title[:len(title)-len(m[0])])
+		}
+		if strings.HasSuffix(segLower, "@"+groupLower) {
+			// §59.226 附八: DIY@ 伪复合剥离后的整段剥除（group=CMCT 时
+			// 尾部 "-DIY@CMCT" 段整段移除——防主标题残留污染）
+			prefix := segLower[:len(segLower)-len(groupLower)-1]
+			if len(prefix) <= 10 && !strings.ContainsAny(prefix, " ") {
+				return strings.TrimSpace(title[:len(title)-len(m[0])])
+			}
 		}
 		if strings.HasSuffix(segLower, "-"+groupLower) {
 			// 段以 -group 结尾: 前缀词链是组名组成部分(VCB-Studio)或压制线标识(MNHD-FRDS)

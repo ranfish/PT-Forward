@@ -1279,6 +1279,47 @@
       "canonical": "MY5",
       "full_name": "Channel 5",
       "pattern": "\\bMY5\\b"
+    },
+    {
+      "canonical": "ZEE5",
+      "full_name": "ZEE5",
+      "pattern": "\\bZEE5\\b"
+    },
+    {
+      "canonical": "SNYLIV",
+      "full_name": "SonyLIV",
+      "pattern": "\\bSNY[-_.]?LIV\\b"
+    },
+    {
+      "canonical": "JHS",
+      "full_name": "JioHotstar",
+      "pattern": "\\bJHS\\b"
+    },
+    {
+      "canonical": "SNXT",
+      "full_name": "Sun NXT",
+      "pattern": "\\bSN[-_.]?XT\\b"
+    },
+    {
+      "canonical": "HOTSTAR",
+      "full_name": "JioHotstar (ex-Hotstar)",
+      "pattern": "\\bHOTSTAR\\b"
+    },
+    {
+      "canonical": "VOOT",
+      "full_name": "Voot (ex-Viu)",
+      "pattern": "\\bVOOT\\b"
+    },
+    {
+      "canonical": "AHA",
+      "full_name": "aha (Telugu/Tamil)",
+      "pattern": "\\bAHA\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "JIOT",
+      "full_name": "JioHotstar",
+      "pattern": "\\bJIO[-_.]?T\\b"
     }
   ]
 }

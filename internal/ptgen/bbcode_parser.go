@@ -56,6 +56,10 @@ var fieldMappers = map[string]fieldMapper{
 	"IMDB评分": mapIMDbRating,
 	"豆瓣评分": mapDoubanRating,
 	"片长":    mapDuration,
+	// §59.226: ◎季数/◎集数映射（曾无映射被丢弃——InferCategory ④级
+	// ptgenEpisodes 输入激活+裸数字季号消歧门）
+	"季数": mapSeason,
+	"集数": mapEpisodes,
 	"导演":    mapDirector,
 	"编剧":    mapWriter,
 	"主演":    mapCast,
@@ -178,6 +182,17 @@ func mapForeignTitle(r *model.PTGenResult, v string) {
 
 func mapYear(r *model.PTGenResult, v string) {
 	r.Year = v
+}
+
+// mapSeason §59.226: ◎季　　数 → PTGenResult.Season（纯数字形态——"3"）。
+func mapSeason(r *model.PTGenResult, v string) {
+	r.Season = strings.TrimSpace(v)
+}
+
+// mapEpisodes §59.226: ◎集　　数 → PTGenResult.Episodes（激活僵尸字段——
+// InferCategory 判剧信号 "episodes 非空非0非1 → tv_series"）。
+func mapEpisodes(r *model.PTGenResult, v string) {
+	r.Episodes = strings.TrimSpace(v)
 }
 
 func mapRegion(r *model.PTGenResult, v string) {

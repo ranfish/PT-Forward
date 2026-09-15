@@ -1,5 +1,7 @@
 package titleparser
 
+import "strings"
+
 // TechProfile 种子技术特征统一模型（§56.34，18 字段 + 过渡字段）。
 //
 // 作为标题解析 / MediaInfo / DOM 三源技术特征的单一事实来源（SSOT），
@@ -23,7 +25,8 @@ type TechProfile struct {
 
 	// === 技术参数字段（权威源：MediaInfo，8 字段）===
 	Resolution      string `json:"resolution"`       // 5. 分辨率（4320p/2160p/1080p/720p/480p/1440p）
-	HDR             string `json:"hdr"`              // 10. HDR 类型（HDR10/HDR10+/DoVi/DoVi HDR/HDR Vivid/HLG）
+	HDR             string `json:"hdr"`
+	FrameRate       string `json:"frame_rate"` // §59.226 附二十一: 帧率（MI 原值优先/标题 60fps 兜底）              // 10. HDR 类型（HDR10/HDR10+/DoVi/DoVi HDR/HDR Vivid/HLG）
 	BitDepth        string `json:"bit_depth"`        // 11. bit 信息（8bit/10bit）
 	MIEncoded       bool   `json:"-"`                // §59.151: MI Writing library 重编码铁证
 	MIHasVideo      bool   `json:"-"`                // §59.151: MI 存在 Video 层（判据可信前提）
@@ -48,6 +51,54 @@ type TechProfile struct {
 	ChineseAlbum  string `json:"chinese_album,omitempty"`  // 中文专辑名
 	SampleRate    string `json:"sample_rate,omitempty"`    // 采样率（如 "96.0"）
 	AudioBitDepth string `json:"audio_bit_depth,omitempty"` // 位深（如 "24"）
+}
+
+// MediumCanonicalOf §59.226 附四: 媒介 canonical 纯函数单点——
+// spec/st/IsEncode → canonical 值（Remux/WEB-DL/WEBRip/HDTV/UHDTV/
+// Encode/DVD/原盘族）。发布映射（lookupByStdKey 站点适配）与前端
+// 展示统一消费同一判定（前端 siteMediumDisplay 规则副本废除）。
+//
+// 优先级：①spec 显式（Remux/WEB-DL/WEBRip/HDTV/UHDTV/BDRip/DVDRip→Encode）
+// ②ST 原盘连字符族 ③ST 压制写法（无连字符 BluRay）→Encode ④UHD Remux
+// 联动（§59.226 附八: 2160p ∧ Remux → "UHD Remux"——站点词表独立项）
+// ⑤DVD 非 Rip ⑥IsEncode 兜底 ⑦空。
+func MediumCanonicalOf(p TechProfile) string {
+	spec := p.Specification
+	st := p.SourceType
+	switch spec {
+	case "Remux":
+		// §59.226 附八: UHD Remux canonical 区分（分辨率联动）
+		if strings.EqualFold(p.Resolution, "2160p") || p.Resolution == "4K" {
+			return "UHD Remux"
+		}
+		return "Remux"
+	case "WEB-DL":
+		return "WEB-DL"
+	case "WEBRip":
+		// §59.166 From S04 案定案: WEBRip 媒介跟 Encode
+		return "Encode"
+	case "HDTV":
+		return "HDTV"
+	case "UHDTV":
+		return "UHDTV"
+	case "BDRip", "DVDRip", "TVRip", "HDDVDRip":
+		return "Encode"
+	}
+	switch st {
+	case "UHD Blu-ray", "Blu-ray", "3D Blu-ray":
+		return st + " 原盘"
+	case "UHD BluRay", "BluRay", "3D BluRay":
+		return "Encode"
+	case "HD DVD":
+		return "DVD"
+	}
+	if strings.Contains(st, "DVD") && !strings.Contains(st, "Rip") {
+		return "DVD"
+	}
+	if IsEncode(p) {
+		return "Encode"
+	}
+	return ""
 }
 
 // IsEncode 判定 Encode（压制）资源（v1.05：Encode 规格为空，由片源写法/编码族区分）。

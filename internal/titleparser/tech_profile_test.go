@@ -274,11 +274,18 @@ func TestMergeTechProfile_PartialMediaInfo(t *testing.T) {
 func TestMergeDOMInto_MediumOverride(t *testing.T) {
 	p := ParseTitleTech("Movie 2024 1080p Blu-ray x264 DTS")
 	assertEquals(t, "SourceType(标题)", "Blu-ray", p.SourceType)
-	// DOM 覆盖媒介（DOM > 标题）
+	// §59.226 附五 对调：标题主值 + DOM fallback——标题已有 ST 时 DOM 不覆盖
 	MergeDOMInto(&p, "WEB-DL", "", "", "")
-	assertEquals(t, "SourceType(DOM)", "", p.SourceType)
-	assertEquals(t, "Specification(DOM)", "WEB-DL", p.Specification)
-	assertEquals(t, "Medium(DOM)", "WEB-DL", p.Medium)
+	assertEquals(t, "SourceType(标题保持)", "Blu-ray", p.SourceType)
+	assertEquals(t, "Specification(标题保持)", "", p.Specification)
+	assertEquals(t, "Medium(标题保持)", "Blu-ray", p.Medium)
+
+	// 标题无媒介值时 DOM fallback 填充
+	p2 := ParseTitleTech("Movie 2024 1080p x264 DTS")
+	MergeDOMInto(&p2, "WEB-DL", "", "", "")
+	assertEquals(t, "SourceType(DOM 填充)", "WEB", p2.SourceType) // §59.226 附六: ST 扩展
+	assertEquals(t, "Specification(DOM 填充)", "WEB-DL", p2.Specification)
+	assertEquals(t, "Medium(DOM 填充)", "WEB-DL", p2.Medium)
 }
 
 func TestMergeDOMInto_TechFallback(t *testing.T) {

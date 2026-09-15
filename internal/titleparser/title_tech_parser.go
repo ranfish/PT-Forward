@@ -27,10 +27,18 @@ func ParseTitleTech(title string) TechProfile {
 		p.EditionInfo = p.ReleaseVersion
 	}
 	p.SourceType, p.Specification = splitMedium(tc.Medium)
+	// §59.226 附九: ST 反哺派生——流媒体平台词非空 ∧ ST 空 → ST="WEB"
+	// （"Movie.1080p.NF.DDP5.1" 平台词直接当源形态——平台词本身证明 WEB
+	// 语境）。电视台族（BBC/HBO 等）不派生（内容可 HDTV 直录可流媒体
+	// 不确定——SPEC 有词走 splitMedium 既有规则）。
+	if p.SourceType == "" && isStreamingPlatform(tc.SourcePlatform) {
+		p.SourceType = "WEB"
+	}
 	p.AudioChannels = extractAudioChannelsFromTitle(title)
 	p.AudioTechnology = extractAudioTechnologyFromTitle(title)
 	p.AudioTracks = extractAudioTracksFromTitle(title)
 	p.Stereo3D = extractStereo3D(title)
+	p.FrameRate = tc.FrameRate // §59.226 附二十一: 标题 60fps 形态兜底（MI 合并时覆盖）
 
 	return p
 }
@@ -41,6 +49,22 @@ func ParseTitleTech(title string) TechProfile {
 // 300勇士案：站内同资源 HSBS/HOU 两版同体积同组——无此字段则验证链全盲、
 // 结果顺序定生死（HOU 在前即错配注入，piece hash 不匹配 recheck 失败）。
 var reStereo3D = regexp.MustCompile(`(?i)\b(?:half[-_.\s]?|h[-_.\s]?)?(sbs|ou)\b`)
+
+// streamingPlatformSet §59.226 附九: 流媒体平台 canonical 集（电视台族
+// BBC/HBO/AMC 等不在内——HDTV 广播语义）。platform.json 的 requires="web"
+// 词条即流媒体族——此处列高频 canonical（词表 223 条全量判定在 dict 层，
+// 这里是 ST 反哺的高频快集）。
+var streamingPlatformSet = map[string]bool{
+	"NF": true, "AMZN": true, "HMAX": true, "Hulu": true, "DSNP": true,
+	"ATVP": true, "iP": true, "Peacock": true, "PMTP": true, "STAN": true,
+	"ZEE5": true, "SNYLIV": true, "JHS": true, "SNXT": true, "HOTSTAR": true,
+	"VOOT": true, "AHA": true, "JIOT": true,
+}
+
+// isStreamingPlatform 流媒体平台判定（ST 反哺门）。
+func isStreamingPlatform(platform string) bool {
+	return platform != "" && streamingPlatformSet[platform]
+}
 
 func extractStereo3D(title string) string {
 	for _, m := range reStereo3D.FindAllStringSubmatch(title, -1) {
@@ -105,6 +129,8 @@ var editionPatterns = []editionPattern{
 	{regexp.MustCompile(`(?i)\bIMAX[-_.\s]*Enhanced\b`), "IMAX Enhanced"},
 	{regexp.MustCompile(`(?i)\bIMAX\b`), "IMAX"},
 	{regexp.MustCompile(`(?i)\bOpen[-_.\s]*Matte\b`), "Open Matte"},
+	// §59.226 附十九: MAR（Modified Aspect Ratio——v1.05 特殊比例第三词）
+	{regexp.MustCompile(`(?i)(?:^|[.\s\-_])MAR(?:[.\s\-_]|$)`), "MAR"},
 	// Hybrid（优先级 5）
 	{regexp.MustCompile(`(?i)\bHybrid\b`), "Hybrid"},
 	// §59.190 ①: 中文版式词——中英同词异形（本地"2K修复版" vs 站方"2K.REMASTERED"
@@ -167,14 +193,21 @@ func splitMedium(medium string) (sourceType, specification string) {
 	switch {
 	case strings.Contains(upper, "WEB-DL") || strings.Contains(upper, "WEBDL"):
 		specification = "WEB-DL"
+		// §59.226 附六 B-lite: ST 语义扩展——WEB-DL/WEBRip 落规格但片源
+		// 恒空的不对称归属修正；流媒体平台词本身就是 WEB 语境证据
+		// （"Movie.1080p.NF.DDP5.1" 无 WEB-DL 词形态的 ST 反哺同族）
+		sourceType = "WEB"
 	case strings.Contains(upper, "WEBRIP"):
 		specification = "WEBRip"
+		sourceType = "WEB" // §59.226 附六
 	case strings.Contains(upper, "REMUX"):
 		specification = "Remux"
 	case strings.Contains(upper, "UHDTV"):
 		specification = "UHDTV"
+		sourceType = "UHDTV" // §59.226 附六: 源=规格合一（SPEC 保留——canonical 判定链吃 spec）
 	case strings.Contains(upper, "HDTV"):
 		specification = "HDTV"
+		sourceType = "HDTV" // §59.226 附六: 同上——ST/SPEC 同词冗余为必要代价
 	case strings.Contains(upper, "BDRIP"):
 		specification = "BDRip"
 	case strings.Contains(upper, "DVDRIP"):

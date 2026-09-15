@@ -42,14 +42,15 @@ func TestSplitMedium(t *testing.T) {
 		srcType  string
 		spec     string
 	}{
-		{"WEB-DL", "", "WEB-DL"},
-		{"WEBRip", "", "WEBRip"},
+		{"WEB-DL", "WEB", "WEB-DL"}, // §59.226 附六
+		{"WEBRip", "WEB", "WEBRip"}, // §59.226 附六
+		{"HDTV", "HDTV", "HDTV"},     // §59.226 附六
+		{"UHDTV", "UHDTV", "UHDTV"},  // §59.226 附六
 		{"Blu-ray", "Blu-ray", ""},
 		{"UHD Blu-ray", "UHD Blu-ray", ""},
 		{"UHD Blu-ray Remux", "UHD Blu-ray", "Remux"},
 		{"Blu-ray Remux", "Blu-ray", "Remux"},
-		{"HDTV", "", "HDTV"},
-		{"UHDTV", "", "UHDTV"},
+
 		{"3D Blu-ray", "3D Blu-ray", ""},
 		{"DVD", "DVD", ""},
 		{"DVDRip", "DVD", "DVDRip"},

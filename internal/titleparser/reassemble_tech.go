@@ -132,6 +132,11 @@ func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) s
 	case "resolution":
 		return normalizeResolution(p.Resolution, tf.ResolutionCase)
 	case "region_code":
+		// §59.226 附二十: 媒介门——V1.05 "地区码（仅原盘类）"。
+		// 非原盘/Remux 类不写（存储保留提取值供验证层比对）。
+		if !isDiscMedia(p) {
+			return ""
+		}
 		return p.RegionCode
 	case "platform":
 		return p.SourcePlatform
@@ -343,10 +348,27 @@ func normalizeHDR(hdr string, hdr10ToHDR bool) string {
 	if hdr10ToHDR && hdr == "HDR10" {
 		return "HDR"
 	}
+	// §59.226 附十三: SDR 不写出（V1.05 "SDR 资源不填此项"——不写即 SDR）
+	if hdr == "SDR" {
+		return ""
+	}
 	return hdr
 }
 
 // normalizeMedium 媒介归一化（预留扩展点）。
+// isDiscMedia §59.226 附二十: 原盘族媒介判定（地区码媒介门——
+// V1.05 仅原盘类标地区码）。原盘连字符族 + Remux（原盘无损重封装）。
+func isDiscMedia(p TechProfile) bool {
+	if p.Specification == "Remux" {
+		return true
+	}
+	switch p.SourceType {
+	case "UHD Blu-ray", "Blu-ray", "3D Blu-ray", "HD DVD", "DVD":
+		return true
+	}
+	return false
+}
+
 func normalizeMedium(medium string) string {
 	return medium
 }
