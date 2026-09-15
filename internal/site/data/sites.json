@@ -15626,7 +15626,8 @@
       "groups": [
         "CMCT",
         "CMCTA",
-        "CMCTV"
+        "CMCTV",
+        "cqkyjj2"
       ],
       "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"forbidden\": [\"BDMV\", \"BDISO\", \"BDBOX\", \"DVDISO\", \"MKV\", \"MP4\"]}",
       "tracker_domains": [
@@ -16113,13 +16114,13 @@
         "music_tags": null
       },
       "supports_pieces_hash_api": true,
- "groups": [
-  "UBits",
-  "UBWEB",
-  "UBTV",
-  "UBbits",
-  "SHB931"
- ],
+      "groups": [
+        "UBits",
+        "UBWEB",
+        "UBTV",
+        "UBbits",
+        "SHB931"
+      ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
         "t.ubits.club"
