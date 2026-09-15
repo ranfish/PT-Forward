@@ -422,10 +422,6 @@ async function loadSeedDetail(infoHash: string) {
         year: d.year || '',
         release_group: d.release_group || '',
         chinese_prefix: d.chinese_prefix || '',
-        chinese_title: d.chinese_title || '',
-        english_title: d.english_title || '',
-        frame_rate: d.frame_rate || '',
-        medium_canonical: d.medium_canonical || '',
         // §59.226: PTGen 资产 + 新字段（#1/#2/#21/#7 canonical）
         chinese_title: d.chinese_title || '',
         english_title: d.english_title || '',
