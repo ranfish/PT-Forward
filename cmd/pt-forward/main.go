@@ -1201,9 +1201,11 @@ func registerSchedulerTasks(
 	})
 
 	register("traffic_data_cleanup", "maintenance", "0 3 * * *", func(ctx context.Context) error {
+		// §59.229: 守卫 d>=7 曾把 §59.152 定案的默认 "1" 静默拒绝——实际永远
+		// 30 天保留，fnos 环境 1.018 亿行/23G 实证（fnos DB 治理案）。放宽 d>=1。
 		retentionDays := 30
 		if v, err := settingsRepo.Get(ctx, setting.KeyTorrentTrafficRetentionDays); err == nil && v != "" {
-			if d, pErr := strconv.Atoi(v); pErr == nil && d >= 7 {
+			if d, pErr := strconv.Atoi(v); pErr == nil && d >= 1 {
 				retentionDays = d
 			}
 		}
