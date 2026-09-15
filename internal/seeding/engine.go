@@ -2,6 +2,7 @@ package seeding
 
 import (
 	"context"
+	"regexp"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -551,6 +552,7 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 		e.checkUnregisteredTorrents(ctx, clientID, dlClient, torrentMap)
 		e.logOrphanTorrents(ctx, clientID, torrentMap)
 		e.syncUnmanagedTorrents(ctx, clientID, torrentMap)
+		e.reconcileStaleRecords(ctx, clientID, torrentMap)
 		e.checkAutoTransfer(ctx, clientID, torrentMap, dlClient)
 	}
 }
@@ -690,6 +692,100 @@ func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrent
 	}
 }
 
+// reconcileStaleRecords §59.227 场景1: record 状态机与下载器实际状态对账。
+//
+// 失联形态（249 生产案）：record ∈ {archived, pausedFreeEnd, pausedRule,
+// deleted, deleting} 但 qb 实际做种中——评估白名单不含这些状态 → 永不
+// 评估（妻本善良 191.7h 未删案）。对账铁律：下载器事实是唯一真相。
+//
+// 防抖（§59.227 ①用户定案）：状态持续 >10 分钟才对账——躲开 pause/
+// delete 生效延迟窗（免费结束暂停的 record 在 qb 状态更新延迟内仍显示
+// UP，误重激活会击穿免费结束保护）。
+//
+// 语义铁律（§59.227 ④用户定案）：刷流删除规则优先级 > 用户手动 resume
+// （托管语义——手动恢复的种子被对账纠正回 seeding 后由规则处置）。
+func (e *Engine) reconcileStaleRecords(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
+	// 只对有启用的 seeding 配置的下载器对账（与 logOrphanTorrents 同门）
+	var configCount int64
+	if err := e.db.WithContext(ctx).Model(&model.SeedingClientConfig{}).
+		Where("client_id = ? AND enabled = ?", clientID, true).Count(&configCount).Error; err != nil || configCount == 0 {
+		return
+	}
+
+	staleStatuses := []string{
+		string(model.SeedingStatusArchived),
+		string(model.SeedingStatusPausedFreeEnd),
+		string(model.SeedingStatusPausedRule),
+		string(model.SeedingStatusDeleted),
+		string(model.SeedingStatusDeleting),
+	}
+	var staleRecords []model.SeedingTorrentRecord
+	if err := e.db.WithContext(ctx).
+		Where("client_id = ? AND status IN ?", clientID, staleStatuses).
+		Find(&staleRecords).Error; err != nil {
+		return
+	}
+
+	cutoff := time.Now().Add(-10 * time.Minute)
+	reconciled := 0
+	for i := range staleRecords {
+		rec := &staleRecords[i]
+		ti, ok := torrentMap[strings.ToLower(rec.InfoHash)]
+		if !ok || ti == nil {
+			continue
+		}
+		// 真做种中判定：uploading/stalledUP/forcedUP（pausedUP 已暂停不算——
+		// 与"qb 实际 UP 做种"语义对齐）
+		if ti.State != "uploading" && ti.State != "stalledUP" && ti.State != "forcedUP" {
+			continue
+		}
+		// 防抖：状态写入未满 10 分钟不碰（pause/delete 生效延迟窗）
+		if rec.UpdatedAt.After(cutoff) {
+			continue
+		}
+		if err := e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("id = ?", rec.ID).
+			Updates(map[string]interface{}{
+				"status":         model.SeedingStatusSeeding,
+				"last_action_by": "reconcile",
+				"updated_at":     time.Now(),
+			}).Error; err != nil {
+			e.logger.Warn("reconcile: failed to reactivate record",
+				zap.Uint("id", rec.ID),
+				zap.String("info_hash", rec.InfoHash),
+				zap.Error(err))
+			continue
+		}
+		e.mu.Lock()
+		if r, ok := e.recordMap[recordKey(clientID, rec.InfoHash)]; ok {
+			r.Status = model.SeedingStatusSeeding
+			r.LastActionBy = "reconcile"
+		} else {
+			e.recordMap[recordKey(clientID, rec.InfoHash)] = rec
+		}
+		e.mu.Unlock()
+		reconciled++
+		e.logger.Info("reconcile: stale record reactivated (downloader is seeding)",
+			zap.String("client_id", clientID),
+			zap.String("info_hash", rec.InfoHash),
+			zap.String("prev_status", string(rec.Status)),
+			zap.String("prev_last_action_by", rec.LastActionBy),
+			zap.String("downloader_state", ti.State))
+	}
+}
+
+// reDetailPageURL §59.227 ③: 站点详情页 URL（.torrent 元数据 comment 字段
+// 自带——ubits.club/details.php?id=345299 实证）。取 id 参数作 torrent_id。
+var reDetailPageURL = regexp.MustCompile(`(?i)https?://[^/\s]+/details\.php\?id=(\d+)`)
+
+// extractTorrentIDFromComment 从种子 comment 提取详情页 tid（空=无详情页 URL）。
+func extractTorrentIDFromComment(comment string) string {
+	if m := reDetailPageURL.FindStringSubmatch(comment); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
 // syncUnmanagedTorrents: when client config scope=all, auto-register torrents
 // that exist in the downloader but not in seeding_torrent_records.
 func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
@@ -716,11 +812,15 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 		if ti.State == "error" || ti.Removed {
 			continue
 		}
-		key := recordKey(clientID, hash)
-		e.mu.RLock()
-		_, exists := e.recordMap[key]
-		e.mu.RUnlock()
-		if exists {
+		// §59.227: DB 为真相源——内存 recordMap 幽灵（写内存成功/DB 写失败的
+		// 残留 key）不再短路导入；以 DB count 为准（Ashes 永久孤儿案根因之一）。
+		// DB count 用 LOWER 归一（对齐 logOrphanTorrents 写法——RSS 事件 hash
+		// 大写 vs qb 小写形态不一致时旧查询漏判）。
+		var count int64
+		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
+			Where("client_id = ? AND LOWER(info_hash) = ?", clientID, strings.ToLower(hash)).
+			Count(&count)
+		if count > 0 {
 			continue
 		}
 
@@ -730,20 +830,16 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 			siteName = "unknown"
 		}
 
-		// Check DB to avoid duplicates (race condition safety)
-		var count int64
-		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-			Where("client_id = ? AND info_hash = ?", clientID, hash).
-			Count(&count)
-		if count > 0 {
-			continue
-		}
+		// §59.227 ③: comment 详情页 URL 直达——.torrent 元数据自带站方
+		// 详情页 URL（qb comment 字段），解析回填 torrent_id（比 tracker
+		// 域名推断多拿到 tid，站方重查/追溯直达）。
+		torrentID := extractTorrentIDFromComment(ti.Comment)
 
 		newRecords = append(newRecords, &model.SeedingTorrentRecord{
 			ClientID:    clientID,
 			InfoHash:    hash,
 			SiteName:    siteName,
-			TorrentID:   "",
+			TorrentID:   torrentID,
 			Status:      model.SeedingStatusSeeding,
 			Source:      "imported",
 			TorrentSize: ti.TotalSize,
