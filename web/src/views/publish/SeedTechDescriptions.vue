@@ -1,35 +1,70 @@
 <template>
-  <!-- §59.135: 技术规格表公共组件——Tab1 与预览②引用同一份（展示同件，§59.116 定案落地）。
-       主/副标题由调用方自行展示（Tab1 span=3 行 / 预览①种子标识卡片）。 -->
-  <a-descriptions :column="column" bordered size="small">
-    <a-descriptions-item label="中文名">{{ tc.chinese_prefix || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="剧名">{{ tc.main_title || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="季集">{{ tc.season_episode || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="年份">{{ tc.year || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="制作组">{{ tc.release_group || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="类型">{{ categoryLabel(tc.category) }}</a-descriptions-item>
-    <!-- §59.82: 站点媒介合成——v1.05 source_type×specification 二维 → 站点单选视角 -->
-    <a-descriptions-item label="媒介(站点)">{{ siteMediumDisplay }}</a-descriptions-item>
-    <a-descriptions-item label="片源">{{ tc.source_type || '—' }}</a-descriptions-item>
-    <!-- §59.34: v1.05 Encode 规格为空——规格栏 Encode 派生兜底（后端真相源） -->
-    <a-descriptions-item label="规格">{{ specDisplay }}</a-descriptions-item>
-    <a-descriptions-item label="分发方">
-      {{ tc.source_platform || '—' }}
-      <a-tooltip v-if="PLATFORM_FULLNAMES[tc.source_platform]" :title="PLATFORM_FULLNAMES[tc.source_platform]">
-        <InfoCircleOutlined style="color: #999; margin-left: 4px" />
-      </a-tooltip>
-    </a-descriptions-item>
-    <a-descriptions-item label="分辨率">{{ tc.resolution || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="视频编码">{{ tc.video_codec || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="HDR">{{ tc.hdr || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="bit">{{ tc.bit_depth || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="音频编码">{{ tc.audio_codec || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="声道">{{ tc.audio_channels || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="音频技术">{{ tc.audio_technology || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="音轨数">{{ tc.audio_tracks || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="版本">{{ tc.edition_info || '—' }}</a-descriptions-item>
-    <a-descriptions-item label="地区码">{{ tc.region_code || '—' }}</a-descriptions-item>
-  </a-descriptions>
+  <!-- §59.226 附二十一: 三分区表格——作品信息(PTGen 优先族)/发布规格(标题原样族)/
+       技术参数(MI 铁证族)。分区表头三色视觉区分（审核者一眼分区）。
+       主/副标题由调用方自行展示（Tab1 ①种子标识卡片 / 预览①种子标识）。 -->
+  <div class="std-sections">
+    <!-- 分区一：作品信息（蓝） -->
+    <a-descriptions
+      :column="4" bordered size="small" :title="undefined"
+      class="std-zone std-zone-work" layout="horizontal"
+    >
+      <template #title>
+        <div class="zone-header zone-work">作品信息</div>
+      </template>
+      <a-descriptions-item label="片名" :span="2">{{ tc.chinese_title || tc.chinese_prefix || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="类别" :span="2">
+        <template v-if="genreList.length">
+          <a-tag v-for="g in genreList" :key="g" color="purple">{{ g }}</a-tag>
+        </template>
+        <template v-else>—</template>
+      </a-descriptions-item>
+      <a-descriptions-item label="译名" :span="4">{{ tc.english_title || tc.main_title || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="类型">{{ categoryLabel(tc.category) }}</a-descriptions-item>
+      <a-descriptions-item label="年份">{{ tc.year || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="季集">{{ tc.season_episode || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="产地">
+        <template v-if="regionList.length">
+          <a-tag v-for="r in regionList" :key="r" color="geekblue">{{ r }}</a-tag>
+        </template>
+        <template v-else>—</template>
+      </a-descriptions-item>
+    </a-descriptions>
+
+    <!-- 分区二：发布规格（绿） -->
+    <a-descriptions :column="4" bordered size="small" class="std-zone">
+      <template #title>
+        <div class="zone-header zone-spec">发布规格</div>
+      </template>
+      <a-descriptions-item label="制作组">{{ tc.release_group || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="片源">{{ tc.source_type || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="分辨率">{{ resolutionDisplay }}</a-descriptions-item>
+      <a-descriptions-item label="规格">{{ tc.specification || (encode ? 'Encode' : '—') }}</a-descriptions-item>
+      <a-descriptions-item label="媒介">{{ mediumDisplay }}</a-descriptions-item>
+      <a-descriptions-item label="分发方">
+        {{ tc.source_platform || '—' }}
+        <a-tooltip v-if="PLATFORM_FULLNAMES[tc.source_platform]" :title="PLATFORM_FULLNAMES[tc.source_platform]">
+          <InfoCircleOutlined style="color: #999; margin-left: 4px" />
+        </a-tooltip>
+      </a-descriptions-item>
+      <a-descriptions-item label="版本">{{ tc.edition_info || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="地区码">{{ tc.region_code || '—' }}</a-descriptions-item>
+    </a-descriptions>
+
+    <!-- 分区三：技术参数（橙） -->
+    <a-descriptions :column="4" bordered size="small" class="std-zone">
+      <template #title>
+        <div class="zone-header zone-tech">技术参数</div>
+      </template>
+      <a-descriptions-item label="视频编码">{{ videoCodecDisplay }}</a-descriptions-item>
+      <a-descriptions-item label="HDR">{{ tc.hdr === 'SDR' ? 'SDR' : (tc.hdr || '—') }}</a-descriptions-item>
+      <a-descriptions-item label="bit">{{ tc.bit_depth || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="帧率">{{ tc.frame_rate || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="音频编码">{{ tc.audio_codec || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="声道">{{ tc.audio_channels || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="音频技术">{{ tc.audio_technology || '—' }}</a-descriptions-item>
+      <a-descriptions-item label="音轨数">{{ tc.audio_tracks || '—' }}</a-descriptions-item>
+    </a-descriptions>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -41,49 +76,67 @@ const props = withDefaults(defineProps<{
   tc: Record<string, string>
   encode?: boolean
   column?: number
+  genre?: string[]   // §59.226 #6④: 类别（◎类别原子词——分区一）
+  region?: string[]  // §59.226: 产地（◎产地——分区一）
 }>(), {
   encode: false,
-  column: 3,
+  column: 4,
+  genre: () => [],
+  region: () => [],
 })
 
-// §59.87: 站点媒介合成（§59.83 v1.05 片源写法区分——连字符=原盘媒介, 无连字符=压制）
-const siteMediumDisplay = computed(() => {
-  const tc = props.tc
-  const spec = (tc.specification || '').toLowerCase()
-  const st = tc.source_type || ''
-  if (spec === 'remux') return 'Remux'
-  if (spec === 'web-dl' || spec === 'webdl') return 'WEB-DL'
-  if (spec === 'webrip') return 'WEBRip'
-  if (spec === 'hdtv') return 'HDTV'
-  if (spec === 'uhdtv') return 'UHDTV'
-  if (spec === 'bdrip' || spec === 'dvdrip') return 'Encode'
-  if (st === 'UHD Blu-ray' || st === 'Blu-ray' || st === '3D Blu-ray') {
-    return st + ' 原盘'
-  }
-  if (st === 'UHD BluRay' || st === 'BluRay' || st === '3D BluRay') {
-    return 'Encode'
-  }
-  if (st.includes('DVD') && !st.includes('Rip')) return 'DVD'
-  if (props.encode) return 'Encode'
-  return '—'
+const genreList = computed(() => props.genre || [])
+const regionList = computed(() => props.region || [])
+
+// §59.226 附十一: 4K/8K 展示层归一（渲染层转换——存储保 4K 供验证层等价语义）
+const resolutionDisplay = computed(() => {
+  const r = (props.tc.resolution || '').toUpperCase()
+  if (r === '4K') return '2160p'
+  if (r === '8K') return '4320p'
+  return props.tc.resolution || '—'
 })
 
-// §59.34: Encode 派生兜底——规格空且 encode=true → 显示 Encode
-const specDisplay = computed(() =>
-  props.tc.specification || (props.encode ? 'Encode' : '—')
-)
+// §59.226 附四: 媒介 canonical 单点——后端 medium_canonical 出值（前端
+// siteMediumDisplay 规则副本废除——§59.166 漂移四处教训）
+const mediumDisplay = computed(() => props.tc.medium_canonical || '—')
 
-// §59.35 P3: 分级 label——Layer 1 字典优先（generated/dict.ts，与后端同源），
-// 扩展分类（adapter 源站直传的 category.mv/game/software 等）本地兜底
-const extendedCategoryLabels: Record<string, string> = {
-  'category.mv': 'MV',
-  'category.audiobook': '有声读物',
-  'category.ebook': '电子书',
-  'category.game': '游戏',
-  'category.software': '软件',
-}
-function categoryLabel(v?: string): string {
-  if (!v) return '—'
-  return CATEGORY_LABELS[v] || extendedCategoryLabels[v] || v
-}
+// §59.226 附十二: 视频编码形态按媒介+铁证（后端已按 V1.05 形态出值——
+// 前端纯展示；空值 encode 布尔兜底展示旧值兼容）
+const videoCodecDisplay = computed(() => props.tc.video_codec || '—')
+
+const categoryLabel = (key: string) => CATEGORY_LABELS[key] || key || '—'
 </script>
+
+<style scoped>
+.std-sections :deep(.ant-descriptions) {
+  margin-bottom: 8px;
+}
+/* §59.226 附二十一: 三分区表头颜色视觉区分 */
+.std-sections :deep(.ant-descriptions-header) {
+  margin-bottom: 4px;
+}
+.zone-header {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 3px;
+  display: inline-block;
+  color: #fff;
+}
+/* 作品信息（蓝）——PTGen 优先族 */
+.zone-work {
+  background: #1677ff;
+}
+/* 发布规格（绿）——标题原样族 */
+.zone-spec {
+  background: #389e0d;
+}
+/* 技术参数（橙）——MI 铁证族 */
+.zone-tech {
+  background: #d46b08;
+}
+.std-sections :deep(.ant-descriptions-item-label) {
+  width: 88px;
+  min-width: 88px;
+}
+</style>

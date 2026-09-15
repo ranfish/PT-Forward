@@ -34,6 +34,12 @@ type TorrentMetadata struct {
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 
+	// §59.226 #1/#2/#6④: PTGen 资产列（DB 列 migration 37 已在——§59.168 回滚
+	// 删了 model 字段保留列；补回供 Tab1/发布适配消费）
+	ChineseTitle string `json:"chinese_title" gorm:"size:200"`
+	EnglishTitle string `json:"english_title" gorm:"size:500"`
+	Genre        string `json:"genre" gorm:"size:200"` // JSON 数组 ["惊悚","恐怖"]
+
 	// §56.8 三源 JSON 列（详情页/PTGen/本地产物原始结果）
 	DetailSourceJSON string `json:"detail_source_json" gorm:"column:detail_source_json;type:TEXT"`
 	PTGenSourceJSON  string `json:"ptgen_source_json"  gorm:"column:ptgen_source_json;type:TEXT"`

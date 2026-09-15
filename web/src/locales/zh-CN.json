@@ -1109,7 +1109,7 @@
     "doubanRating": "豆瓣评分",
     "imdbRating": "IMDb评分",
     "director": "导演",
-    "genre": "类型",
+    "genre": "类别",
     "introduction": "简介",
     "fromCache": "来自缓存",
     "queryCache": "查询缓存",

@@ -3029,12 +3029,21 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		item["hdr"] = meta.HDR
 		item["source_type"] = meta.SourceType
 		item["specification"] = meta.Specification
-		// §59.34: Encode 派生（v1.05 Encode 规格为空，由片源写法/编码族区分）
-		item["encode"] = titleparser.IsEncode(titleparser.TechProfile{
+		// §59.226 附七: Encode 派生单点化——列表页此前手工构造 mini profile
+		// （只填 3 字段）MI 铁证输入恒 false（MIEncoded/MIHasVideo 零值）——
+		// 与详情页（完整 profile 含 MI）同种子判定可能打架。改为：MI 本地列
+		// 存在时解析出铁证输入，与详情页同源。
+		encProfile := titleparser.TechProfile{
 			SourceType:    meta.SourceType,
 			Specification: meta.Specification,
 			VideoCodec:    meta.VideoCodec,
-		})
+		}
+		if meta.MediaInfo != "" {
+			miTech := titleparser.ExtractMediaInfo(meta.MediaInfo)
+			encProfile.MIEncoded = miTech.Encoded
+			encProfile.MIHasVideo = miTech.Encoded || miTech.Resolution != "" || miTech.VideoCodec != ""
+		}
+		item["encode"] = titleparser.IsEncode(encProfile)
 		item["category"] = meta.Category
 		item["form"] = meta.Form
 		} else {
@@ -3468,6 +3477,35 @@ func extractSeedHash(r *http.Request) string {
 
 // handleGetSeed §59.20: 读取单个种子 metadata（GET /publish/seeds/:info_hash）。
 // 返回 DB 14 平铺字段 + ParseTitleTech 解析 5 字段 = 完整 18 TechProfile + 编辑字段。
+// effectiveSpecification §59.226 附七: 生效规格——SPEC 非空返回 SPEC；
+// SPEC 空时 IsEncode 铁证派生 "Encode"（Encode 派生单点化：后端出值，
+// 前端 specDisplay 拼接逻辑删除）。
+// nonDefaultFrameRate §59.226 附二十一: 非默认帧率判定——默认帧率
+// （23.976/24/25/29.970——电影母源标准）返回空（标题生态从不标默认）；
+// 非默认（60/120/50 高帧率）返回整数形态（"60.000"→"60fps"）。
+func nonDefaultFrameRate(fps string) string {
+	if fps == "" {
+		return ""
+	}
+	switch fps {
+	case "23.976", "24", "24.000", "25", "25.000", "29.970", "29.97":
+		return ""
+	}
+	// 去尾零："60.000"→"60"
+	trimmed := strings.TrimRight(strings.TrimRight(fps, "0"), ".")
+	return trimmed + "fps"
+}
+
+func effectiveSpecification(p titleparser.TechProfile) string {
+	if p.Specification != "" {
+		return p.Specification
+	}
+	if titleparser.IsEncode(p) {
+		return "Encode"
+	}
+	return ""
+}
+
 func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Request) {
 	infoHash := extractSeedHash(r)
 	if infoHash == "" || infoHash == "seeds" {
@@ -3583,7 +3621,9 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"hdr":             pickNonEmpty(meta.HDR, profile.HDR),
 		"bit_depth":       pickNonEmpty(meta.BitDepth, profile.BitDepth),
 		"source_type":     displayProfile.SourceType,
-		"specification":   displayProfile.Specification,
+		// §59.226 附七: 生效规格（effective specification）——SPEC 空 →
+		// IsEncode 派生 "Encode"（后端单点出值，前端规格栏纯展示）
+		"specification":   effectiveSpecification(displayProfile),
 		// §59.34: Encode 派生标识（前端规格展示用，不参与重组）
 		"encode":          titleparser.IsEncode(displayProfile),
 		"source_platform": pickNonEmpty(meta.SourcePlatform, profile.SourcePlatform),
@@ -3596,6 +3636,15 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"year":           profile.Year,
 		"release_group":  profile.ReleaseGroup,
 		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle)),
+
+		// §59.226 #1/#2: PTGen 资产列（◎片名/◎译名——主路径，fallback 标题侧）
+		"chinese_title": pickNonEmpty(meta.ChineseTitle, pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle))),
+		"english_title": pickNonEmpty(meta.EnglishTitle, profile.MainTitle),
+		// §59.226 附二十一 #21: 帧率（MI 原值/标题兜底——非默认帧率才显示，
+		// 默认 23.976/24/25/29.970 展示空——标题不标默认）
+		"frame_rate": nonDefaultFrameRate(profile.FrameRate),
+		// §59.226 附四: 媒介 canonical 单点（后端出值——前端 siteMediumDisplay 副本废除）
+		"medium_canonical": titleparser.MediumCanonicalOf(displayProfile),
 
 		// 状态
 		"missing_fields": h.checkRequiredFields(meta),

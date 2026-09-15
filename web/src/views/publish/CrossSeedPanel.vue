@@ -61,7 +61,7 @@
               <!-- §59.86: ② 技术规格（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
                 <template #title><span style="font-size: 14px">② 技术规格</span></template>
-              <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" />
+              <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" />
               </a-card>
 
               <!-- §59.86: ③ 内容属性（卡片） -->
@@ -72,10 +72,10 @@
                       产地：<a-tag v-for="r in seedRegionGenre.region" :key="r" color="geekblue">{{ r }}</a-tag>
                     </span>
                     <span v-if="seedRegionGenre.genre.length">
-                      类型：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
+                      类别：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
                     </span>
                   </div>
-                  <div v-else style="color: #999">暂无产地 / 类型数据（需 PTGen 获取）</div>
+                  <div v-else style="color: #999">暂无产地 / 类别数据（需 PTGen 获取）</div>
               </a-card>
 
               <!-- §59.86: ④ 标签（卡片） -->
@@ -129,14 +129,14 @@
                   <a-descriptions-item label="副标题" :span="3">{{ form.subtitle || '—' }}</a-descriptions-item>
               </a-descriptions>
               <!-- §59.135/§59.136: 技术规格表——与预览②同一组件同一 column（5行×4列 视觉同步） -->
-              <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" style="max-width: 900px; margin-top: 16px" />
+              <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" style="max-width: 900px; margin-top: 16px" />
                 <!-- §59.75: 产地/类型（PTGen 源归一只读展示——发布映射消费 canonical） -->
-                <a-form-item v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length" label="产地 / 类型" style="max-width: 900px; margin-top: 16px">
+                <a-form-item v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length" label="产地 / 类别" style="max-width: 900px; margin-top: 16px">
                   <span v-if="seedRegionGenre.region.length" style="margin-right: 16px">
                     产地：<a-tag v-for="r in seedRegionGenre.region" :key="r" color="geekblue">{{ r }}</a-tag>
                   </span>
                   <span v-if="seedRegionGenre.genre.length">
-                    类型：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
+                    类别：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
                   </span>
                 </a-form-item>
                 <!-- §59.26: 标签（可编辑，供发布使用） -->
@@ -422,6 +422,15 @@ async function loadSeedDetail(infoHash: string) {
         year: d.year || '',
         release_group: d.release_group || '',
         chinese_prefix: d.chinese_prefix || '',
+        chinese_title: d.chinese_title || '',
+        english_title: d.english_title || '',
+        frame_rate: d.frame_rate || '',
+        medium_canonical: d.medium_canonical || '',
+        // §59.226: PTGen 资产 + 新字段（#1/#2/#21/#7 canonical）
+        chinese_title: d.chinese_title || '',
+        english_title: d.english_title || '',
+        frame_rate: d.frame_rate || '',
+        medium_canonical: d.medium_canonical || '',
         resolution: d.resolution || '',
         video_codec: d.video_codec || '',
         audio_codec: d.audio_codec || '',

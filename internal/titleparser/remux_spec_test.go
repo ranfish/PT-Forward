@@ -10,7 +10,7 @@ func TestVerifyRemux(t *testing.T) {
 	cases := []struct{ title, wantSrc, wantSpec, wantRelVer string }{
 		{"Movie 2160p UHD BluRay Remux DTS GRP", "UHD BluRay", "Remux", ""},
 		{"Movie 1080p BluRay Remux GRP", "BluRay", "Remux", ""},
-		{"Movie 1080p WEB-DL x264 GRP", "", "WEB-DL", ""},
+		{"Movie 1080p WEB-DL x264 GRP", "WEB", "WEB-DL", ""}, // §59.226 附六: ST 扩展
 		{"Movie 1080p BluRay x264 PROPER GRP", "BluRay", "", "PROPER"},
 		{"Movie 1080p BluRay x264 REPACK GRP", "BluRay", "", "REPACK"},
 		{"Movie 2160p UHD BluRay x265 GRP", "UHD BluRay", "", ""},

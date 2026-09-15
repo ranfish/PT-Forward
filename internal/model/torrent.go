@@ -116,6 +116,7 @@ type PTGenResult struct {
 	Genre        []string     `json:"genre"`
 	Language     []string     `json:"language"`
 	Episodes     string       `json:"episodes"`
+	Season       string       `json:"season"` // §59.226: ◎季数（裸数字季号消歧门）
 	Duration     string       `json:"duration"`
 	Playdate     string       `json:"playdate"` // §56.16 决策 9: ◎上映日期
 	Director     []string     `json:"director"`
