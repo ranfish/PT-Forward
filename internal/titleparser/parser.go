@@ -146,40 +146,44 @@ var reCNEpisodeRange = regexp.MustCompile(`第\s*(\d{1,4})\s*[-~－至]\s*(\d{1,
 
 // reCNEpisodeCount §59.226 附三: 中文全集数——"全24集"/"全五集"（中文数字
 // §59.204 F1 同族词表：零一二三四五六七八九十百千）。
-var reCNEpisodeCount = regexp.MustCompile(`全\s*([0-9]{1,4}|[零一二三四五六七八九十百千])\s*集`)
+var reCNEpisodeCount = regexp.MustCompile(`全\s*([0-9]{1,4}|[零一二三四五六七八九十百千]{1,4})\s*集`)
 
-// cnNumToInt §59.226 附三: 中文数字→阿拉伯（一~十/百内简单组合）。
+// cnNumToInt §59.226 附三: 中文数字→阿拉伯（一~九十九——UTF-8 rune 处理）。
 func cnNumToInt(cn string) int {
-	if n := len(cn); n == 1 {
+	runes := []rune(cn)
+	if len(runes) == 1 {
 		singles := map[rune]int{'零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
-			'五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
-		if v, ok := singles[rune(cn[0])]; ok {
+			'五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10}
+		if v, ok := singles[runes[0]]; ok {
 			return v
 		}
-		if cn == "十" {
-			return 10
-		}
-	} else if n >= 2 {
-		// 十位组合：十五/二十/二十五
-		tenIdx := strings.Index(cn, "十")
-		if tenIdx >= 0 {
-			head, tail := 1, 0
-			singles := map[rune]int{'一': 1, '二': 2, '三': 3, '四': 4,
-				'五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
-			if tenIdx > 0 {
-				if v, ok := singles[rune(cn[0])]; ok {
-					head = v
-				}
-			}
-			if tenIdx+len("十") < len(cn) {
-				if v, ok := singles[rune(cn[tenIdx+len("十")])]; ok {
-					tail = v
-				}
-			}
-			return head*10 + tail
+		return 0
+	}
+	// 十位组合：十五(15)/二十(20)/二十五(25)
+	singles := map[rune]int{'一': 1, '二': 2, '三': 3, '四': 4,
+		'五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+	tenIdx := -1
+	for i, r := range runes {
+		if r == '十' {
+			tenIdx = i
+			break
 		}
 	}
-	return 0
+	if tenIdx < 0 {
+		return 0
+	}
+	head, tail := 1, 0
+	if tenIdx > 0 {
+		if v, ok := singles[runes[tenIdx-1]]; ok {
+			head = v
+		}
+	}
+	if tenIdx+1 < len(runes) {
+		if v, ok := singles[runes[tenIdx+1]]; ok {
+			tail = v
+		}
+	}
+	return head*10 + tail
 }
 
 // extractCNEpisodeAndRemove 中文集数提取归一（E01-E24 形态）。
