@@ -77,7 +77,7 @@
       :row-selection="{
         selectedRowKeys: selectedHashes,
         onChange: onSelectChange,
-        getCheckboxProps: (record: SeedListItem) => ({ disabled: record.status === 'unfetched' }),
+        getCheckboxProps: (record: SeedListItem) => ({ disabled: record.status === 'unfetched' || record.status === 'no_mapping' }), // §59.230: no_mapping=未获取族（无映射提醒态，无数据）
       }"
       @change="onTableChange"
     >
@@ -150,10 +150,10 @@
               :loading="fetchingSet.has(record.hash)"
               @click="fetchSingle(record)"
             >
-              {{ record.status === 'unfetched' ? '获取' : '重获' }}
+              {{ record.status === 'unfetched' || record.status === 'no_mapping' ? '获取' : '重获' }}
             </a-button>
             <a-button
-              v-if="record.status !== 'unfetched'"
+              v-if="record.status !== 'unfetched' && record.status !== 'no_mapping'"
               size="small"
               type="link"
               danger
