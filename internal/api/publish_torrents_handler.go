@@ -204,6 +204,8 @@ type ScreenshotStrategyRunner interface {
 // PTGenAnalyzer PTGen 查询接口（§59.42 海报 fallback 链用）
 type PTGenAnalyzer interface {
 	AnalyzePTGen(ctx context.Context, name string) (*model.PTGenResult, error)
+	// §59.236 ①: 主链 Force 通道（单条重获绕缓存——§59.173 语义）
+	AnalyzePTGenForce(ctx context.Context, name string) (*model.PTGenResult, error)
 }
 
 func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -2279,7 +2281,10 @@ func (h *PublishTorrentsHandler) clusterCtxFor(ctx context.Context, hash string)
 	return c, true
 }
 
-func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientID, hash, name string, size int64, savePath string, isLocal bool) error {
+func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientID, hash, name string, size int64, savePath string, isLocal bool, forcePTGen ...bool) error {
+	// §59.236 ①: forcePTGen 变参——单条重获 true（Force 绕缓存 §59.173）/
+	// 批量 false（普通缓存——流控友好 §59.236 决策点①）
+	force := len(forcePTGen) > 0 && forcePTGen[0]
 	// §59.61 附: 注册簇上下文（applyPosterFallback 异步回传用；固定小容量防泄漏——批量串行覆盖）
 	if h.posterClusterCtx == nil {
 		h.posterClusterCtx = make(map[string]posterClusterContext, 256)
@@ -2409,10 +2414,12 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientI
 	}
 fetched:
 
-	// §59.235 P2: PTGen 资产后置提取（§59.168 终案重建——batch 断链
-	// 遗留修复：862 行含◎行 description 而四列全空实证）。汇合点
-	// 调用（直达/搜索/簇/IYUU 全路径统一）。
-	h.extractPTGenAssets(ctx, meta)
+	// §59.236 ①: 主链必经 PTGen——豆瓣链接 → PTGen 端点查询 →
+	// ptgen_source_json（唯一账本，落代表行）+ desc=RawBBCode。
+	// 失败全空（incomplete 状态机承接——用户自查端点；站方原文
+	// 不保存 §59.236 定案）。取代 §59.235 P2 的 extractPTGenAssets
+	// 双时序补丁（架构性取代——kdouban/NexusPHP 分叉根除）。
+	h.runMainlinePTGen(ctx, meta, force)
 
 	// §59.42: 海报可信图源白名单替换（异步；§59.61 附5: 尾部 finalize 会等其终局
 	// 再传播——INSERT 与回传 UPDATE 的竞态已由 WaitGroup 消除）
@@ -2476,7 +2483,14 @@ fetched:
 			// §59.77: 评论音轨扣减（v1.05 不计入——副标题声明提取）
 			profile.AudioTracks = titleparser.AdjustCommentaryTracks(profile.AudioTracks, finalMeta.Subtitle, miForProfile)
 			components := titleparser.TechProfileToComponents(profile)
-			category := titleparser.InferCategory(components, finalMeta.SourceCategory, "", "")
+			// §59.236 ④: InferCategory 的 PTGen 输入（五级链③④级信号）从
+			// 主链唯一账本读（runMainlinePTGen 已先行落库——此处终态 JSON）
+			ptgGenre, ptgEpi := "", ""
+			if src, pErr := metadata.UnmarshalPTGenSource(finalMeta.PTGenSourceJSON); pErr == nil && src != nil {
+				ptgGenre = strings.Join(src.Genre, " ")
+				ptgEpi = src.Episodes
+			}
+			category := titleparser.InferCategory(components, finalMeta.SourceCategory, ptgGenre, ptgEpi)
 
 			updates := map[string]interface{}{
 				"category":        category,
@@ -3535,106 +3549,57 @@ func extractSeedHash(r *http.Request) string {
 
 // handleGetSeed §59.20: 读取单个种子 metadata（GET /publish/seeds/:info_hash）。
 // 返回 DB 14 平铺字段 + ParseTitleTech 解析 5 字段 = 完整 18 TechProfile + 编辑字段。
-// rePTGenLine §59.235 P2: ◎行提取（终态 description——全角空格字符类
-// §59.168 教训：\s 不匹配 U+3000）。◎片　　名　值 形态。
-var (
-	rePTGenCNTitle = regexp.MustCompile(`◎片[\s　]*名[\s　]*([^\n]+)`)
-	rePTGenENTitle = regexp.MustCompile(`◎译[\s　]*名[\s　]*([^\n]+)`)
-	rePTGenGenre   = regexp.MustCompile(`◎类[\s　]*别[\s　]*([^\n]+)`)
-)
-
-// extractPTGenAssets §59.235 P2 重建（§59.168 终案——batch 断链遗留）：
-// fetch 汇合后从终态 description 提取 ◎片名/◎译名/◎类别 落库。
-// ◎是渲染管线产物（③定案：提取时序=渲染终态之后）——此处已是终态。
-func (h *PublishTorrentsHandler) extractPTGenAssets(ctx context.Context, meta *model.TorrentMetadata) {
-	if meta == nil || meta.Description == "" {
+// runMainlinePTGen §59.236 ①: 主链必经 PTGen 查询——豆瓣链接 → 端点查询 →
+// ptgen_source_json（唯一账本）+ desc=RawBBCode。失败全空（incomplete 承接）。
+// 站方原文不保存（desc=我们的 RawBBCode 或空——§59.236 定案）。
+// force=true 绕缓存（单条重获 §59.173）/false 普通缓存（批量——§59.236 决策点①）。
+func (h *PublishTorrentsHandler) runMainlinePTGen(ctx context.Context, meta *model.TorrentMetadata, force bool) {
+	if meta == nil || h.ptgen == nil {
 		return
 	}
-	updates := map[string]interface{}{}
-	if m := rePTGenCNTitle.FindStringSubmatch(meta.Description); m != nil {
-		if v := strings.TrimSpace(m[1]); v != "" {
-			updates["chinese_title"] = v
-		}
-	}
-	if m := rePTGenENTitle.FindStringSubmatch(meta.Description); m != nil {
-		// ◎译名第一个英文段（含冒号复合——§59.168 段扫描终案：全段扫描
-		// 第一个 ^[A-Za-z0-9] 段；多语言译名首段非英文时继续扫描）
-		val := strings.TrimSpace(m[1])
-		for _, seg := range strings.FieldsFunc(val, func(r rune) bool { return r == '/' || r == '　' || r == ' ' }) {
-			if len(seg) > 0 && (seg[0] >= 'A' && seg[0] <= 'Z' || seg[0] >= 'a' && seg[0] <= 'z' || seg[0] >= '0' && seg[0] <= '9') {
-				updates["english_title"] = seg
-				break
-			}
-		}
-	}
-	if m := rePTGenGenre.FindStringSubmatch(meta.Description); m != nil {
-		// ◎类别原子词平等（§59.168 ③）——JSON 数组落库（§59.168 ⑤）
-		val := strings.TrimSpace(m[1])
-		var arr []string
-		for _, seg := range strings.FieldsFunc(val, func(r rune) bool { return r == '/' || r == '　' }) {
-			if seg = strings.TrimSpace(seg); seg != "" {
-				arr = append(arr, seg)
-			}
-		}
-		if len(arr) > 0 {
-			if b, err := json.Marshal(arr); err == nil {
-				updates["genre"] = string(b)
-			}
-		}
-	}
-	if len(updates) == 0 {
+	// 豆瓣链接（detail.DoubanURL——FetchAndStore 提取的站方链接）
+	if meta.DoubanURL == "" {
+		h.logger.Info("mainline ptgen: no douban url, skip",
+			zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
+			zap.String("site", meta.SiteName))
 		return
 	}
-	if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-		Where("info_hash = ?", meta.InfoHash).Updates(updates).Error; err != nil {
-		h.logger.Warn("extractPTGenAssets: update failed", zap.String("hash", meta.InfoHash), zap.Error(err))
+	var (
+		result *model.PTGenResult
+		err    error
+	)
+	if force {
+		result, err = h.ptgen.AnalyzePTGenForce(ctx, meta.DoubanURL)
+	} else {
+		result, err = h.ptgen.AnalyzePTGen(ctx, meta.DoubanURL)
+	}
+	if err != nil || result == nil || result.RawBBCode == "" {
+		h.logger.Warn("mainline ptgen: query failed",
+			zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
+			zap.String("douban", meta.DoubanURL),
+			zap.Bool("force", force),
+			zap.Error(err))
+		return // 全空——incomplete 状态机承接（§59.236 遗漏①定案）
+	}
+	// 唯一账本落库：ptgen_source_json + desc=RawBBCode（我们的——站方原文不保存）
+	raw, mErr := json.Marshal(result)
+	if mErr != nil {
+		h.logger.Warn("mainline ptgen: marshal failed", zap.Error(mErr))
 		return
 	}
-	// 回填内存 meta（同请求后续消费）
-	if v, ok := updates["chinese_title"]; ok {
-		meta.ChineseTitle, _ = v.(string)
-	}
-	if v, ok := updates["english_title"]; ok {
-		meta.EnglishTitle, _ = v.(string)
-	}
-	// §59.235 P2 附: 簇传播（§59.168 教训第三项——PTGen 列传播）：
-	// (clientID, savePath, name) 同簇副本行同步（覆盖条件=空行——尊重
-	// 显式数据；截图/MI 传播同语义）。写源行本身幂等（WHERE 空守卫）。
-	h.propagateClusterPTGen(ctx, meta)
-}
-
-// propagateClusterPTGen §59.235 P2 附: PTGen 资产列簇传播（截图/MI 同款语义）。
-func (h *PublishTorrentsHandler) propagateClusterPTGen(ctx context.Context, meta *model.TorrentMetadata) {
-	if meta == nil || h.db == nil {
+	if uErr := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
+		Updates(map[string]interface{}{
+			"ptgen_source_json": string(raw),
+			"description":       result.RawBBCode,
+		}).Error; uErr != nil {
+		h.logger.Warn("mainline ptgen: persist failed", zap.Error(uErr))
 		return
 	}
-	var siblingHashes []string
-	h.db.WithContext(ctx).
-		Table("torrent_snapshots").
-		Select("hash").
-		Where("name = (SELECT name FROM torrent_snapshots WHERE hash = ? LIMIT 1)", meta.InfoHash).
-		Find(&siblingHashes)
-	if len(siblingHashes) == 0 {
-		return
-	}
-	sets := map[string]string{}
-	if meta.ChineseTitle != "" {
-		sets["chinese_title"] = meta.ChineseTitle
-	}
-	if meta.EnglishTitle != "" {
-		sets["english_title"] = meta.EnglishTitle
-	}
-	if meta.Genre != "" {
-		sets["genre"] = meta.Genre
-	}
-	for col, val := range sets {
-		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-			Where("info_hash IN ? AND ("+col+" = '' OR "+col+" IS NULL)", siblingHashes).
-			Update(col, val).Error; err != nil {
-			h.logger.Warn("propagateClusterPTGen: update failed",
-				zap.String("col", col), zap.Error(err))
-		}
-	}
+	h.logger.Info("mainline ptgen: applied",
+		zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
+		zap.String("site", meta.SiteName),
+		zap.Int("desc_len", len(result.RawBBCode)))
 }
 
 // canonicalGroupName §59.234 ①: 组名规范化到映射词条名——搜索附加词用
@@ -3817,13 +3782,29 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		// 5 标题解析字段（chinese_prefix fallback 到副标题【中文名】）
 		"main_title":     profile.MainTitle,
 		"season_episode": profile.SeasonEpisode,
-		"year":           profile.Year,
+		"year": func() string {
+			if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil && src.Year != "" {
+				return src.Year // §59.236 ④: ◎年代优先（#4 定案实施）
+			}
+			return profile.Year
+		}(),
 		"release_group":  profile.ReleaseGroup,
 		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle)),
 
-		// §59.226 #1/#2: PTGen 资产列（◎片名/◎译名——主路径，fallback 标题侧）
-		"chinese_title": pickNonEmpty(meta.ChineseTitle, pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle))),
-		"english_title": pickNonEmpty(meta.EnglishTitle, profile.MainTitle),
+		// §59.236 ④: PTGen 族键改 ptgen_source_json 唯一账本直读
+		// （三列冻结——§59.236 定案；fallback 标题侧保留供 PTGen 缺失显示）
+		"chinese_title": func() string {
+			if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil && src.ChineseTitle != "" {
+				return src.ChineseTitle
+			}
+			return pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle))
+		}(),
+		"english_title": func() string {
+			if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil && src.ForeignTitle != "" {
+				return src.ForeignTitle // 完整串（§59.236 冲突②定案——切段废止）
+			}
+			return profile.MainTitle
+		}(),
 		// §59.226 附二十一 #21: 帧率（MI 原值/标题兜底——非默认帧率才显示，
 		// 默认 23.976/24/25/29.970 展示空——标题不标默认）
 		"frame_rate": nonDefaultFrameRate(profile.FrameRate),
@@ -4122,7 +4103,7 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 		return
 	}
 
-	if err := h.fetchSingleTorrent(r.Context(), clientID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal); err != nil {
+	if err := h.fetchSingleTorrent(r.Context(), clientID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal, true); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", err))
 		return
 	}
@@ -4336,16 +4317,8 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		h.logger.Info("ptgen description applied",
 			zap.String("hash", infoHash[:10]),
 			zap.Int("length", len(ptgenDesc)))
-		// §59.235 P2 终修: NexusPHP 链的◎desc 由本异步增量写产生（kdouban
-		// 站在 FetchAndStore 内同步渲染故 fetched: 处可提取；NexusPHP 站
-		// fetched: 时 desc=站方原文无◎——提取恒空，fnos 不可说 59 行实证）。
-		// 增量写完成=desc 终态——此处提取+簇传播才是正确时序点。
-		var m2 model.TorrentMetadata
-		if err := h.db.WithContext(ctx).
-			Where("info_hash = ? AND site_name = ?", infoHash, siteName).
-			First(&m2).Error; err == nil {
-			h.extractPTGenAssets(ctx, &m2)
-		}
+		// §59.236: 本链（海报兜底副产物）desc 增量写保留——主链
+		// runMainlinePTGen 已落唯一账本（走缓存幂等重复——决策点②保留现状）。
 		// §59.75: PTGen 源结构化持久化（region/genre 系统资产）
 		h.persistPTGenSource(ctx, infoHash, siteName, ptgenResult)
 		// §59.70: t2 重推标签——评分行此刻才进 Description（豆瓣评分≥8 → high_rating）

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"strings"
+	"context"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -52,25 +54,41 @@ func TestClassifySeedStatusNoMappingRefactor(t *testing.T) {
 	}
 }
 
-// §59.235 P2: PTGen 资产后置提取（◎行→四列——§59.168 断链重建）
-func TestExtractPTGenAssets(t *testing.T) {
-	db, _ := gorm.Open(sqlite.Open("file:ptgen_assets_test.db?mode=memory&cache=shared"), &gorm.Config{})
+// §59.236 ①: 主链 PTGen——唯一账本落库（ptgen_source_json+desc）
+func TestRunMainlinePTGen_NoDoubanURL(t *testing.T) {
+	h := &PublishTorrentsHandler{logger: zap.NewNop()}
+	meta := &model.TorrentMetadata{InfoHash: "H1", SiteName: "s", DoubanURL: ""}
+	// 无豆瓣链接：跳过（不报错不写库——incomplete 由状态机承接）
+	h.runMainlinePTGen(nil, meta, false)
+}
+
+// §59.236 ①: 主链 PTGen 成功路径——唯一账本+desc 落库
+func TestRunMainlinePTGen_Success(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open("file:mlptgen_t.db?mode=memory&cache=shared"), &gorm.Config{})
 	db.AutoMigrate(&model.TorrentMetadata{})
-	meta := &model.TorrentMetadata{InfoHash: "H1", Description: "[img]x[/img]\n\n◎片　　名　刘老庄八十二壮士\n◎译　　名　82 Warriors / Il disprezzo\n◎类　　别　历史/战争\n◎年　　代　2013"}
-	db.Create(meta)
+	db.Create(&model.TorrentMetadata{InfoHash: "H2", SiteName: "zmpt", DoubanURL: "https://movie.douban.com/subject/123/"})
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	h.extractPTGenAssets(nil, meta)
+	// mock 注入（PTGenAnalyzer 接口）
+	h.ptgen = fakeAnalyzer{res: &model.PTGenResult{
+		ChineseTitle: "火车梦", ForeignTitle: "Train Dreams / 铁路梦影(港)",
+		Year: "2025", RawBBCode: "◎片　　名　火车梦",
+	}}
+	h.runMainlinePTGen(nil, &model.TorrentMetadata{InfoHash: "H2", SiteName: "zmpt", DoubanURL: "https://movie.douban.com/subject/123/"}, false)
 	var got model.TorrentMetadata
-	db.Where("info_hash = ?", "H1").First(&got)
-	if got.ChineseTitle != "刘老庄八十二壮士" {
-		t.Errorf("chinese_title = %q", got.ChineseTitle)
+	db.Where("info_hash = ?", "H2").First(&got)
+	if got.Description != "◎片　　名　火车梦" {
+		t.Errorf("desc = %q, want RawBBCode", got.Description)
 	}
-	if got.EnglishTitle != "82" || len(got.EnglishTitle) < 2 {
-		if got.EnglishTitle != "82 Warriors" {
-			t.Errorf("english_title = %q, want 82 Warriors", got.EnglishTitle)
-		}
+	if !strings.Contains(got.PTGenSourceJSON, "火车梦") {
+		t.Errorf("ptgen_source_json 未落: %q", got.PTGenSourceJSON[:min(40, len(got.PTGenSourceJSON))])
 	}
-	if got.Genre != `["历史","战争"]` {
-		t.Errorf("genre = %q", got.Genre)
-	}
+}
+
+type fakeAnalyzer struct{ res *model.PTGenResult }
+
+func (f fakeAnalyzer) AnalyzePTGen(ctx context.Context, name string) (*model.PTGenResult, error) {
+	return f.res, nil
+}
+func (f fakeAnalyzer) AnalyzePTGenForce(ctx context.Context, name string) (*model.PTGenResult, error) {
+	return f.res, nil
 }

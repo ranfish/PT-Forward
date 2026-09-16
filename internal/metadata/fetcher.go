@@ -483,7 +483,9 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 		Subtitle:          util.StripSiteOperationMarkers(detail.Subtitle),
 		SourceCategory:    detail.Category,
 		SourceDescription: detail.Description,
-		Description:       detail.Description,
+		// §59.236 ③: desc 站方原文不保存——Description 只由主链
+		// runMainlinePTGen 写 RawBBCode（我们的查询结果或空）
+		Description: "",
 		Statement:         detail.Statement,
 		NoTransferUntil:   detail.NoTransferUntil, // §59.162 限时禁转让渡截止
 		Poster:            detail.PosterURL,
