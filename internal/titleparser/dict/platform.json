@@ -474,7 +474,7 @@
     {
       "canonical": "iT",
       "full_name": "iTunes",
-      "pattern": "(?:^|[^A-Za-z])iT(?:$|[^A-Za-z])",
+      "pattern": "(?:^|[^A-Za-z])iT(?:$|[^A-Za-z])|(?:^|[^A-Za-z])iTunes(?:$|[^A-Za-z])",
       "case_sensitive": true,
       "requires": "web"
     },
@@ -1325,6 +1325,17 @@
       "canonical": "CCTV",
       "full_name": "中国中央电视台 (CCTV)",
       "pattern": "(?i)\\bCCTV\\s?[0-9]{0,2}\\b|\\bCCTV\\s?(?:电影|电视剧|音乐|戏曲|少儿|新闻|财经|体育|综合|国防|世界地理|纪录|中文国际|英语新闻)频道?\\b"
+    },
+    {
+      "canonical": "YK",
+      "full_name": "YouKu 优酷",
+      "pattern": "\\bYK\\b",
+      "requires": "web"
+    },
+    {
+      "canonical": "Giloo",
+      "full_name": "Giloo 纪录片平台",
+      "pattern": "\\bGiloo\\b"
     }
   ]
 }
