@@ -2374,7 +2374,9 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientI
 		// 0 结果即终败，而簇内 hdcmct.org/details.php?id=579801 完美凭证
 		// 躺着没用）。对齐直达分支降级链：搜索失败→簇 comment 逐个直达
 		// （D3 校验内建）→ IYUU 兜底。
-		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI)
+		// §59.234 ①: 组映射确定源站——搜索词附加组名（suffix 变参——
+		// 提取管道后追加；直接附加 name 会被提取层剥组名尾段）
+		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI, h.canonicalGroupName(ctx, result.GroupName))
 		if err == nil {
 			goto fetched
 		}
@@ -3528,6 +3530,29 @@ func extractSeedHash(r *http.Request) string {
 
 // handleGetSeed §59.20: 读取单个种子 metadata（GET /publish/seeds/:info_hash）。
 // 返回 DB 14 平铺字段 + ParseTitleTech 解析 5 字段 = 完整 18 TechProfile + 编辑字段。
+// canonicalGroupName §59.234 ①: 组名规范化到映射词条名——搜索附加词用
+// 站方标题标准写法（CMCTf 笔误提取→CMCT 词条）。miss 返回原词。
+func (h *PublishTorrentsHandler) canonicalGroupName(ctx context.Context, group string) string {
+	if group == "" || h.db == nil {
+		return group
+	}
+	var exact []string
+	h.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).
+		Where("LOWER(group_name) = LOWER(?)", group).Limit(1).Pluck("group_name", &exact)
+	if len(exact) > 0 {
+		return exact[0]
+	}
+	// 前缀回退（CMCTf→CMCT——词表标准键）
+	var all []string
+	h.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Pluck("group_name", &all)
+	if fk := util.FuzzyGroupPrefixKey(group, all); fk != "" {
+		return fk
+	}
+	return group
+}
+
+
+
 // syncGroupLexicon §59.233: mappings CRUD 后重建组名词表（识别+展示双层——
 // RefreshCache 只刷 LookupGroup 缓存，lexicon 不联动则新词条不生效）。
 func (h *PublishTorrentsHandler) syncGroupLexicon(ctx context.Context) {
