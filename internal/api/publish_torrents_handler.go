@@ -2366,7 +2366,38 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientI
 				zap.String("site", meta.SiteName))
 		}
 	} else {
+		// §59.231: ①b 组映射_搜索模式（tid 空）——此前搜索失败直接短路，
+		// 簇 comment/IYUU 兜底全没走到（刘老庄案：CMCTV→不可说站内搜索
+		// 0 结果即终败，而簇内 hdcmct.org/details.php?id=579801 完美凭证
+		// 躺着没用）。对齐直达分支降级链：搜索失败→簇 comment 逐个直达
+		// （D3 校验内建）→ IYUU 兜底。
 		meta, err = h.metadataFetcher.FetchAndStoreBySearch(fetchCtx, hash, result.SourceSite, name, size, localMI)
+		if err == nil {
+			goto fetched
+		}
+		h.logger.Info("mapped-site search failed, trying cluster comments",
+			zap.String("hash", hash[:min(10, len(hash))]),
+			zap.String("site", result.SourceSite),
+			zap.Error(err))
+		for _, tgt := range clusterTargets {
+			if tgt.TorrentID == "" || tgt.SiteName == result.SourceSite {
+				continue
+			}
+			meta, err = h.metadataFetcher.FetchAndStoreDirect(fetchCtx, hash, tgt.SiteName, tgt.TorrentID, name)
+			if err == nil {
+				h.logger.Info("cluster comment direct hit (after mapped-site search)",
+					zap.String("hash", hash[:min(10, len(hash))]),
+					zap.String("site", tgt.SiteName),
+					zap.String("tid", tgt.TorrentID))
+				break
+			}
+		}
+		if err != nil {
+			h.logger.Info("cluster comments exhausted, IYUU fallback (mapped-site search path)",
+				zap.String("hash", hash[:min(10, len(hash))]),
+				zap.Error(err))
+			meta, err = h.metadataFetcher.FetchAndStoreIYUU(fetchCtx, hash, result.SourceSite)
+		}
 	}
 	if err != nil {
 		return err
