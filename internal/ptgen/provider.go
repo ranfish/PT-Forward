@@ -101,6 +101,10 @@ func (p *Provider) query(ctx context.Context, query string, force bool) (*model.
 				}
 				result.Cached = true
 			}
+			// §59.237 附: 缓存路径同样 enrich——旧缓存 JSONData 无 translated_titles
+			// 键（v0.0.974 前落盘），TranslatedTitles 丢失致译名恒空（fnos 5/862）。
+			// RawBBCode 缓存有——enrich 无条件补提（免疫 JSONData 覆盖）。
+			enrichFromBBCode(result)
 			return result, nil
 		}
 	}
