@@ -3800,8 +3800,10 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 			return pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(meta.Subtitle))
 		}(),
 		"english_title": func() string {
-			if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil && src.ForeignTitle != "" {
-				return src.ForeignTitle // 完整串（§59.236 冲突②定案——切段废止）
+			// §59.237: 读 TranslatedTitles（◎译名行完整串——唯一真源）；
+			// ForeignTitle 是端点陷阱字段（恒=chinese_title——fnos 片名=译名故障根因）
+			if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil && src.TranslatedTitles != "" {
+				return src.TranslatedTitles
 			}
 			return profile.MainTitle
 		}(),

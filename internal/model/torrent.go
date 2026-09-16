@@ -110,7 +110,13 @@ type SearchOptions struct {
 // §56.16 决策 9: 加 Playdate 字段（◎上映日期）
 type PTGenResult struct {
 	ChineseTitle string       `json:"chinese_title"`
-	ForeignTitle string       `json:"foreign_title"`
+	// ForeignTitle §59.237 弃用：端点（doubaninfo）foreign_title 实测恒=chinese_title
+	// （148 行历史实证+fnos 三样本）——语义陷阱字段（名承诺 foreign 实为中文别名）。
+	// 保留仅对接端点字段名，禁止一切消费——译名真数据用 TranslatedTitles。
+	ForeignTitle string `json:"foreign_title"`
+	// TranslatedTitles §59.237: ◎译名行完整内容（多语言串——豆瓣又名 aka 同源，
+	// 从 bbcode 提取——端点结构化字段无此数据）。
+	TranslatedTitles string `json:"translated_titles"`
 	Year         string       `json:"year"`
 	Region       []string     `json:"region"`
 	Genre        []string     `json:"genre"`

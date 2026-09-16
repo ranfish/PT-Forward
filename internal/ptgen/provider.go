@@ -1,6 +1,7 @@
 package ptgen
 
 import (
+	"regexp"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -125,17 +126,25 @@ func (p *Provider) SupportsNameSearch() bool {
 	return true
 }
 
+// reTranslatedNamesLine §59.237: ◎译名行完整内容（[\s　] 全角空格字符类——
+// §59.168 U+3000 教训）。
+var reTranslatedNamesLine = regexp.MustCompile(`◎译[\s　]*名[\s　　]*([^\n]+)`)
+
 // enrichFromBBCode §56.16: 用 ParseBBCodeFormat 从 RawBBCode 补充 PTGenResult 空字段。
 func enrichFromBBCode(result *model.PTGenResult) {
 	parsed := ParseBBCodeFormat(result.RawBBCode)
 	if parsed == nil {
 		return
 	}
+	// §59.237: TranslatedTitles 独立行提取——◎译名行完整内容是唯一真源。
+	// 不复用 parsed.ForeignTitle：bbcode_parser 的 字段映射是 kdouban
+	// 反置语义（片名→Foreign/译名→Chinese——朋友站卡片惯例），doubaninfo
+	// PTGen 是正置（片名=中文）——同一解析器两种端点语义，独立正则免疫。
+	if m := reTranslatedNamesLine.FindStringSubmatch(result.RawBBCode); m != nil {
+		result.TranslatedTitles = strings.TrimSpace(m[1])
+	}
 	if result.ChineseTitle == "" {
 		result.ChineseTitle = parsed.ChineseTitle
-	}
-	if result.ForeignTitle == "" {
-		result.ForeignTitle = parsed.ForeignTitle
 	}
 	if result.Year == "" {
 		result.Year = parsed.Year
