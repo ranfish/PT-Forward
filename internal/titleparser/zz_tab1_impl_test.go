@@ -121,3 +121,13 @@ func TestExtractGroupLexiconLayer(t *testing.T) {
 		}
 	}
 }
+
+// §59.235 P1: composeMedium 源=规格合一去重（HDTV 不再 "HDTV HDTV"）
+func TestComposeMediumDedup(t *testing.T) {
+	if got := composeMedium(TechProfile{SourceType: "HDTV", Specification: "HDTV"}); got != "HDTV" {
+		t.Errorf("合一形态: got %q, want HDTV", got)
+	}
+	if got := composeMedium(TechProfile{SourceType: "UHD Blu-ray", Specification: "Remux"}); got != "UHD Blu-ray Remux" {
+		t.Errorf("组合形态: got %q", got)
+	}
+}
