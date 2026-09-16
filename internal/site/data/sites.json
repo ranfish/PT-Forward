@@ -3180,7 +3180,9 @@
         "Audies",
         "ADAudio",
         "ADeBook",
-        "ADMusic"
+        "ADMusic",
+        "xiaopie@CHDWEB",
+        "BiVerse@ADWeb"
       ],
       "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -14134,7 +14136,8 @@
         "CHDTV",
         "CHDWEB",
         "SGNB",
-        "CHDHKTV"
+        "CHDHKTV",
+        "xiaopie@CHDWEB"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -15627,7 +15630,18 @@
         "CMCT",
         "CMCTA",
         "CMCTV",
-        "cqkyjj2"
+        "cqkyjj2",
+        "hyb9373@CMCT",
+        "EPiC@CMCT",
+        "QSD@CMCT",
+        "TMD@CMCT",
+        "Pure@CMCT",
+        "cqkyjj2@CMCT",
+        "BBQ@CMCT",
+        "JK@CMCT",
+        "DAKEAI@CMCT",
+        "SUB@CMCT",
+        "TEMP@CMCTV"
       ],
       "title_format": "{\"separator\": \".\", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"group\"], \"strip_chinese\": true, \"forbidden\": [\"BDMV\", \"BDISO\", \"BDBOX\", \"DVDISO\", \"MKV\", \"MP4\"]}",
       "tracker_domains": [
@@ -16119,7 +16133,12 @@
         "UBWEB",
         "UBTV",
         "UBbits",
-        "SHB931"
+        "SHB931",
+        "SHB931@UBWEB",
+        "LK@UBits",
+        "Chei@UBits",
+        "DSeiei@UBits",
+        "Philia@UBits"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
@@ -27672,7 +27691,9 @@
       },
       "supports_pieces_hash_api": true,
       "groups": [
-        "FRDS"
+        "FRDS",
+        "Yumi@FRDS",
+        "cXcY@FRDS"
       ],
       "title_format": "{\"separator\": \" \", \"order\": [\"title\", \"season\", \"year\", \"edition_info\", \"resolution\", \"platform\", \"medium\", \"hdr\", \"bit_depth\", \"video_codec\", \"audio_codec\", \"audio_channels\", \"audio_technology\", \"audio_tracks\", \"group\"], \"strip_chinese\": true}",
       "tracker_domains": [
