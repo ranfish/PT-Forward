@@ -3597,6 +3597,44 @@ func (h *PublishTorrentsHandler) extractPTGenAssets(ctx context.Context, meta *m
 	if v, ok := updates["english_title"]; ok {
 		meta.EnglishTitle, _ = v.(string)
 	}
+	// §59.235 P2 附: 簇传播（§59.168 教训第三项——PTGen 列传播）：
+	// (clientID, savePath, name) 同簇副本行同步（覆盖条件=空行——尊重
+	// 显式数据；截图/MI 传播同语义）。写源行本身幂等（WHERE 空守卫）。
+	h.propagateClusterPTGen(ctx, meta)
+}
+
+// propagateClusterPTGen §59.235 P2 附: PTGen 资产列簇传播（截图/MI 同款语义）。
+func (h *PublishTorrentsHandler) propagateClusterPTGen(ctx context.Context, meta *model.TorrentMetadata) {
+	if meta == nil || h.db == nil {
+		return
+	}
+	var siblingHashes []string
+	h.db.WithContext(ctx).
+		Table("torrent_snapshots").
+		Select("hash").
+		Where("name = (SELECT name FROM torrent_snapshots WHERE hash = ? LIMIT 1)", meta.InfoHash).
+		Find(&siblingHashes)
+	if len(siblingHashes) == 0 {
+		return
+	}
+	sets := map[string]string{}
+	if meta.ChineseTitle != "" {
+		sets["chinese_title"] = meta.ChineseTitle
+	}
+	if meta.EnglishTitle != "" {
+		sets["english_title"] = meta.EnglishTitle
+	}
+	if meta.Genre != "" {
+		sets["genre"] = meta.Genre
+	}
+	for col, val := range sets {
+		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash IN ? AND ("+col+" = '' OR "+col+" IS NULL)", siblingHashes).
+			Update(col, val).Error; err != nil {
+			h.logger.Warn("propagateClusterPTGen: update failed",
+				zap.String("col", col), zap.Error(err))
+		}
+	}
 }
 
 // canonicalGroupName §59.234 ①: 组名规范化到映射词条名——搜索附加词用
@@ -3751,18 +3789,10 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"form":            meta.Form,
 		// §59.108: 编辑表单媒介输入框数据源（titleComponents.medium 曾恒空——
 		// GET 无 medium 键, source_type+specification 合成 TitleComponents.Medium 形态）
-		"medium": func() string {
-			m := pickNonEmpty(meta.SourceType, profile.SourceType)
-			s := pickNonEmpty(meta.Specification, profile.Specification)
-			switch {
-			case m != "" && s != "":
-				return m + " " + s
-			case m != "":
-				return m
-			default:
-				return s
-			}
-		}(),
+		// §59.235 P1 附: 公共单点（ComposeMedium——双实现漏修教训）
+		"medium": titleparser.ComposeMedium(
+			pickNonEmpty(meta.SourceType, profile.SourceType),
+			pickNonEmpty(meta.Specification, profile.Specification)),
 		"resolution":      pickNonEmpty(meta.Resolution, profile.Resolution),
 		"video_codec":     pickNonEmpty(meta.VideoCodec, profile.VideoCodec),
 		"audio_codec":     pickNonEmpty(meta.AudioCodec, profile.AudioCodec),
