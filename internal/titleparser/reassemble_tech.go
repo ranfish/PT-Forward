@@ -174,6 +174,14 @@ func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) s
 	}
 }
 
+// ComposeMedium §59.235 P1 附: 媒介组合值公共单点（源=规格合一去重——
+// v0.0.967 修 composeMedium 漏了 API 内联副本的教训：拼接双实现漏修）。
+// API 层（handleGetSeed "medium" 键）与重组层（本文件）统一消费。
+func ComposeMedium(sourceType, specification string) string {
+	p := TechProfile{SourceType: sourceType, Specification: specification}
+	return composeMedium(p)
+}
+
 // composeMedium 从 SourceType + Specification 拼接媒介组合值。
 // 当 SourceType + Specification 均为空时 fallback 到过渡字段 Medium（兼容旧数据）。
 func composeMedium(p TechProfile) string {
