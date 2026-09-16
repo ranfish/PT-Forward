@@ -2513,6 +2513,12 @@ var mediaTypeKeywords = []string{
 	"UHD", "DVDRip",
 }
 
+// reChannelWord §59.234 ②: 频道词（制作频道=分发方语义——同 BBC 之于
+// BBC 剧）。CCTVx（x=数字或文字，含"电影频道"中文形态）。刘老庄案：
+// "[刘老庄八十二壮士].CCTV6.82.Warriors..." 的 CCTV6 站剧名区——被字母
+// 数字拆词拆成 CCTV+6 后独立 "6" 污染关键词（AND 必失配）。
+var reChannelWord = regexp.MustCompile(`(?i)\bCCTV\s?[0-9]{0,2}\b|\bCCTV\s?(?:电影|电视剧|音乐|戏曲|少儿|新闻|财经|体育|综合|国防|世界地理|纪录|中文国际|英语新闻)频道?\b`)
+
 func ExtractSearchKeyword(title string) string {
 	if title == "" {
 		return ""
@@ -2520,6 +2526,10 @@ func ExtractSearchKeyword(title string) string {
 	// §59.184 附四: 剥合集数字序号前缀——剥后即标准 B1 形态（中文前缀+英文主体），
 	// 英文链/KeywordHasNoTitle/中文线（leadingCJKSegment 同步剥）三点一线恢复。
 	title = stripEpisodeNumberPrefix(title)
+
+	// §59.234 ②: 频道词剥离（CCTV 族——剧名区频道词非片名组成部分，
+	// 站方标题搜核心片名即可召回；独立 "6" 尾巴是 AND 污染源）
+	title = strings.TrimSpace(reChannelWord.ReplaceAllString(title, " "))
 
 	// §59.217: CJK 后挂括号注记剥离——"雅尼雅典卫城音乐会(25周年纪念版).1993"
 	//（雅尼案：注记被当中文前缀整段剥离，keyword 残"25周年纪念版) 1993 720p"

@@ -162,6 +162,13 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 	if len(sourceLocalMI) > 0 {
 		localMI = sourceLocalMI[0]
 	}
+	// §59.234 ①: 可选第二变参=关键词组名后缀——提取管道后追加
+	// （直接附加到 torrentName 会被提取层剥除组名尾段——实测 kw 不变）。
+	// 组映射确定源站场景：站方标题必含组名（强区分词精确锚定官组版）。
+	keywordGroupSuffix := ""
+	if len(sourceLocalMI) > 1 {
+		keywordGroupSuffix = sourceLocalMI[1]
+	}
 	if infoHash == "" || siteName == "" || torrentName == "" {
 		return nil, fmt.Errorf("info_hash, site_name, torrent_name are required")
 	}
@@ -182,6 +189,10 @@ func (f *Fetcher) FetchAndStoreBySearch(ctx context.Context, infoHash, siteName,
 	groupName := reseed.ExtractGroupName(torrentName)
 	if keyword == "" {
 		return nil, fmt.Errorf("cannot extract search keyword from title: %s", torrentName)
+	}
+	// §59.234 ①: 组名后缀追加（已含不重复）
+	if keywordGroupSuffix != "" && !strings.Contains(strings.ToUpper(keyword), strings.ToUpper(keywordGroupSuffix)) {
+		keyword = keyword + " " + keywordGroupSuffix
 	}
 
 	match, allResults, err := reseed.SearchAndVerifyMatchWithResults(ctx, adapter, config, keyword, groupName, size, torrentName)
