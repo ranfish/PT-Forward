@@ -181,7 +181,10 @@ func composeMedium(p TechProfile) string {
 	if p.SourceType != "" {
 		parts = append(parts, p.SourceType)
 	}
-	if p.Specification != "" {
+	// §59.235 P1: 源=规格合一去重——ST 扩展（§59.233）后 HDTV/UHDTV
+	// 双填（ST==SPEC）拼接成 "HDTV HDTV"（刘老庄案——codecStyle 媒介
+	// 上下文参数与 API medium 键污染）。同值只出一个。
+	if p.Specification != "" && !strings.EqualFold(p.Specification, p.SourceType) {
 		parts = append(parts, p.Specification)
 	}
 	composed := strings.Join(parts, " ")
