@@ -4336,6 +4336,16 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		h.logger.Info("ptgen description applied",
 			zap.String("hash", infoHash[:10]),
 			zap.Int("length", len(ptgenDesc)))
+		// §59.235 P2 终修: NexusPHP 链的◎desc 由本异步增量写产生（kdouban
+		// 站在 FetchAndStore 内同步渲染故 fetched: 处可提取；NexusPHP 站
+		// fetched: 时 desc=站方原文无◎——提取恒空，fnos 不可说 59 行实证）。
+		// 增量写完成=desc 终态——此处提取+簇传播才是正确时序点。
+		var m2 model.TorrentMetadata
+		if err := h.db.WithContext(ctx).
+			Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+			First(&m2).Error; err == nil {
+			h.extractPTGenAssets(ctx, &m2)
+		}
 		// §59.75: PTGen 源结构化持久化（region/genre 系统资产）
 		h.persistPTGenSource(ctx, infoHash, siteName, ptgenResult)
 		// §59.70: t2 重推标签——评分行此刻才进 Description（豆瓣评分≥8 → high_rating）
