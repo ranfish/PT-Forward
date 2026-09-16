@@ -131,3 +131,21 @@ func TestComposeMediumDedup(t *testing.T) {
 		t.Errorf("组合形态: got %q", got)
 	}
 }
+
+// §59.235 P3: BDAV 容器门——原盘 AVC 流的 x264 制作管线痕迹不判 Encode
+func TestIsEncodeBDAVContainerGate(t *testing.T) {
+	// BDAV 原盘：x264 Writing library 存在但容器=原盘铁证——不判 Encode
+	// （直接测 ExtractMediaInfo 层的 Encoded 产出——双态样本）
+	bdavMI := "General\nFormat           : BDAV\nMenu ID          : 1 (0x1)\n\nVideo\nFormat           : AVC\nWriting library  : x264 core 148\nWidth            : 1920 pixels\n"
+	if mi := ExtractMediaInfo(bdavMI); mi.Encoded {
+		t.Errorf("BDAV 容器门失效：原盘 x264 制作管线被误判 Encode")
+	}
+	if mi := ExtractMediaInfo(bdavMI); mi.VideoCodec != "AVC" {
+		t.Errorf("BDAV 样本 VideoCodec 应解析出 AVC，got %q（样本构造校验）", mi.VideoCodec)
+	}
+	// MKV 压制（§59.151 语料语义不变）
+	mkvMI := "General\nFormat           : Matroska\n\nVideo\nFormat           : HEVC\nWriting library  : x265\nWidth            : 1920 pixels\n"
+	if mi := ExtractMediaInfo(mkvMI); !mi.Encoded {
+		t.Errorf("MKV x265 铁证应判 Encode")
+	}
+}
