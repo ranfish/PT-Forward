@@ -45,12 +45,20 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 	}
 
 	streams := parseMIStreams(text)
-
-	// Video 段（取第一个）
+	// §59.235 P3: General 层容器 Format（BDAV 门用——Video 段的 format 是
+	// 编码格式 AVC/HEVC 非容器）
+	sections := ParseMISections(text)
+	containerFormat := sections.General["format"]
 	for _, s := range streams {
 		if s.name == "video" {
 			result.Resolution = resolutionFromHeightOrWidth(s.fields["height"], s.fields["width"])
-			result.VideoCodec = codecFromMI(s.fields["format"], s.fields["writing library"])
+			// §59.235 P3: BDAV 语境 Format 优先（AVC 规范名——V1.05 原盘写法；
+			// Writing library 的 x264 是制作管线痕迹，非民间压制标识）
+			if strings.EqualFold(strings.TrimSpace(containerFormat), "BDAV") {
+				result.VideoCodec = codecFromMI(s.fields["format"], "")
+			} else {
+				result.VideoCodec = codecFromMI(s.fields["format"], s.fields["writing library"])
+			}
 			// §59.226 附二十一: MI Frame rate 字段（"23.976 FPS"→"23.976"——
 			// 数字原值保留，展示/重组层判非默认帧率才显示）
 			result.FrameRate = frameRateFromMI(s.fields["frame rate"])
@@ -58,7 +66,14 @@ func ExtractMediaInfo(text string) MediaInfoTech {
 			result.HDR = hdrFromMI(s.fields["hdr format"])
 			// §59.151: Writing library 存在 = 重编码铁证（x265 等编码器写入痕迹）——
 			// IsEncode MI 驱动的唯一判据（165/166 语料实证；spec/标题循环依赖废除）
-			result.Encoded = strings.TrimSpace(s.fields["writing library"]) != ""
+			// §59.235 P3: BDAV 容器门——专业蓝光制作管线合法使用 x264（授权压制
+			// 输出 AVC 流装 BDAV——小厂/修复版蓝光常见）。Format=BDAV + Menu ID =
+			// 原盘结构铁证（压制种=MKV/MP4 容器；Remux 亦 MKV）——容器形态优先于
+			// 编码器痕迹，此语境 x264=制作管线非民间重编码（PERFUME OF THE LADY
+			// IN BLACK 1974 案：BDAV+AVC High@L4.1+x264 core148+DTS-HD MA 双无损
+			// 音轨+原盘体积目录——站方 Blu-ray 连字符标注与文件事实一致）。
+			result.Encoded = strings.TrimSpace(s.fields["writing library"]) != "" &&
+				!strings.EqualFold(strings.TrimSpace(containerFormat), "BDAV")
 			break
 		}
 	}
