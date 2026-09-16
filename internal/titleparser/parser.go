@@ -391,7 +391,11 @@ func extractRegionCodeAndRemove(title string) (string, string) {
 		if len(up) == 3 && regionCodeSet[up] {
 			re := regexp.MustCompile(`(?i)(^|[\s.-])` + up + `([\s.-]|$)`)
 			remaining := re.ReplaceAllString(title, "$1")
-			remaining = strings.Trim(strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " ")), " .-")
+			remaining = regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " ")
+			// §59.232: 左侧清理不消耗 "-"——dash 是组名锚（Ilo.Ilo 案：剥 TWN 后
+			// 首部 "-CMCT" 的 dash 被 Trim(" .-") 吃掉 → extractGroup 无锚失明 →
+			// release_group 缺失）。dash 左位=组名锚保留；右位=残留垃圾清理。
+			remaining = strings.TrimRight(strings.TrimLeft(strings.TrimSpace(remaining), " ."), " .-")
 			return up, remaining
 		}
 	}

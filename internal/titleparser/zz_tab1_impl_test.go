@@ -85,3 +85,17 @@ func TestCNEpisode(t *testing.T) {
 		t.Errorf("全十二集: SeasonEpisode = %q, want E01-E12", tc3.SeasonEpisode)
 	}
 }
+
+// §59.232: region 剥除的 dash 锚保护——Ilo.Ilo 案（TWN 剥除后首部 "-CMCT"）
+func TestRegionStripDashAnchor(t *testing.T) {
+	cases := []struct{ title, want string }{
+		{"Ilo.Ilo.2013.TWN.BluRay.1080p.x264.DDP.5.1-CMCT", "CMCT"},
+		{"Ilo.Ilo.2013.TWN.BluRay.1080p.x264.DDP.5.1-CMCT  (已审)", "CMCT"},
+		{"Movie.2023.USA.BluRay.1080p.x264-GROUP", "GROUP"},
+	}
+	for _, c := range cases {
+		if got := ParseTitle(c.title).ReleaseGroup; got != c.want {
+			t.Errorf("group(%q) = %q, want %q", c.title, got, c.want)
+		}
+	}
+}
