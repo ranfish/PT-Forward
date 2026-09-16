@@ -1,6 +1,8 @@
 package util
 
 import (
+	"regexp"
+	"sync/atomic"
 	"strings"
 )
 
@@ -13,6 +15,63 @@ import (
 //
 // 所有分支统一剥离尾部中文（发布者名），自动忽略 NOGROUP/N/A/NONE/UNKNOWN，
 // 自动去除文件扩展名。
+// groupLexicon §59.233: 组名映射资产扫描注册表（ExtractGroupName v2 第一层）。
+// 词条源=release_group_mappings（sites.json groups seed + UI 词条）——
+// 启动加载注入 + RefreshCache 联动重建（handleCreateGroupMapping 挂钩）。
+// atomic.Pointer 编译缓存（§59.186 懒编译并发首写 fatal 教训——重建全量替换）。
+var groupLexicon atomic.Pointer[regexp.Regexp]
+
+// SetGroupLexicon §59.233: 注入组名词表（重建 alternation 编译正则——
+// 词长降序防短词先中；(?i) 扫描返回标题原词）。
+func SetGroupLexicon(words []string) {
+	filtered := make([]string, 0, len(words))
+	for _, w := range words {
+		w = strings.TrimSpace(w)
+		if len(w) >= 2 {
+			filtered = append(filtered, regexp.QuoteMeta(w))
+		}
+	}
+	if len(filtered) == 0 {
+		groupLexicon.Store(nil)
+		return
+	}
+	// 词长降序（长词优先防子串抢占）
+	for i := 0; i < len(filtered); i++ {
+		for j := i + 1; j < len(filtered); j++ {
+			if len(filtered[j]) > len(filtered[i]) {
+				filtered[i], filtered[j] = filtered[j], filtered[i]
+			}
+		}
+	}
+	re, err := regexp.Compile(`(?i)(?:^|[\s._\-￡])(` + strings.Join(filtered, "|") + `)\b`)
+	if err != nil {
+		return
+	}
+	groupLexicon.Store(re)
+}
+
+// reTailSuffix §59.233: 尾部约束——命中词右侧仅剩分隔/空白/括号尾缀
+// （"(已审)"/"[Free]" 类；V1.05 组名仅出现在尾部——非尾部排除，§59.233 ②定案）。
+var reTailSuffix = regexp.MustCompile(`^[\s._\-]*(\([^)]*\)|\[[^\]]*\])?[\s._\-]*$`)
+
+// matchGroupLexicon §59.233: 资产扫描——尾部约束内命中返回标题原词。
+func matchGroupLexicon(clean string) string {
+	re := groupLexicon.Load()
+	if re == nil {
+		return ""
+	}
+	for _, loc := range re.FindAllStringSubmatchIndex(clean, -1) {
+		if loc[2] < 0 || loc[3] < 0 {
+			continue
+		}
+		tail := clean[loc[3]:]
+		if reTailSuffix.MatchString(tail) {
+			return clean[loc[2]:loc[3]] // 标题原词（§59.233 ③定案）
+		}
+	}
+	return ""
+}
+
 func ExtractGroupName(title string) string {
 	title = strings.TrimSpace(title)
 	if title == "" {
@@ -43,6 +102,15 @@ func ExtractGroupName(title string) string {
 			break
 		}
 		clean = strings.TrimRight(trimmed[:open], " ")
+	}
+
+	// §59.233 第一层：映射资产扫描（尾部约束内命中返回标题原词）。
+	// @ 形态标题跳过（既有 @ 后段=官方组规则优先——§59.211；@ 是最强
+	// 无歧义锚不依赖词表，DIY@ 通用前缀由后段规则天然剥离）。
+	if !strings.Contains(clean, "@") {
+		if g := matchGroupLexicon(clean); g != "" {
+			return g
+		}
 	}
 
 	// 尝试 "-" 分隔符

@@ -236,6 +236,18 @@ func main() {
 		}
 		log.Info("domain rate limiter initialized from site configs", zap.Int("sites", len(allSites)))
 
+		// §59.233: 组名映射资产词表注入（ExtractGroupName v2 资产扫描层——
+		// util 识别层 + titleparser 展示层双注册；词表=release_group_mappings 全词条）。
+		loadAndSyncGroupLexicon := func() {
+			var words []string
+			db.WithContext(context.Background()).
+				Model(&model.ReleaseGroupMapping{}).
+				Pluck("group_name", &words)
+			util.SetGroupLexicon(words)
+			titleparser.SetGroupLexicon(words)
+		}
+		loadAndSyncGroupLexicon()
+
 		// §59.187 ①: 组名同族 resolver 注入——验证层组名反驳经 release_group_mappings
 		// 判同族豁免（UBbits/UBits 同映射优堡官方等拼写变体；仅反驳路径触发，罕见路径）
 		reseed.GroupFamilyResolver = func(group string) string {

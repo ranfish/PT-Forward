@@ -1268,6 +1268,7 @@ func (h *PublishTorrentsHandler) handleCreateGroupMapping(w http.ResponseWriter,
 	}
 	if h.sourceDetector != nil {
 		h.sourceDetector.RefreshCache(r.Context())
+		h.syncGroupLexicon(r.Context())
 	}
 	Success(w, mapping)
 }
@@ -1302,6 +1303,7 @@ func (h *PublishTorrentsHandler) handleUpdateGroupMapping(w http.ResponseWriter,
 	}
 	if h.sourceDetector != nil {
 		h.sourceDetector.RefreshCache(r.Context())
+		h.syncGroupLexicon(r.Context())
 	}
 	Success(w, map[string]interface{}{"message": "已更新"})
 }
@@ -1331,6 +1333,7 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 
 	if h.sourceDetector != nil {
 		h.sourceDetector.RefreshCache(r.Context())
+		h.syncGroupLexicon(r.Context())
 	}
 
 	// 删除后如果该站已无任何映射，自动关闭 is_source
@@ -3525,6 +3528,15 @@ func extractSeedHash(r *http.Request) string {
 
 // handleGetSeed §59.20: 读取单个种子 metadata（GET /publish/seeds/:info_hash）。
 // 返回 DB 14 平铺字段 + ParseTitleTech 解析 5 字段 = 完整 18 TechProfile + 编辑字段。
+// syncGroupLexicon §59.233: mappings CRUD 后重建组名词表（识别+展示双层——
+// RefreshCache 只刷 LookupGroup 缓存，lexicon 不联动则新词条不生效）。
+func (h *PublishTorrentsHandler) syncGroupLexicon(ctx context.Context) {
+	var words []string
+	h.db.WithContext(ctx).Model(&model.ReleaseGroupMapping{}).Pluck("group_name", &words)
+	util.SetGroupLexicon(words)
+	titleparser.SetGroupLexicon(words)
+}
+
 // effectiveSpecification §59.226 附七: 生效规格——SPEC 非空返回 SPEC；
 // SPEC 空时 IsEncode 铁证派生 "Encode"（Encode 派生单点化：后端出值，
 // 前端 specDisplay 拼接逻辑删除）。

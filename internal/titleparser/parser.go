@@ -1,6 +1,7 @@
 package titleparser
 
 import (
+	"sync/atomic"
 	"fmt"
 	"regexp"
 	"strings"
@@ -659,6 +660,57 @@ func extractReleaseVersion(title string) string {
 	return ""
 }
 
+// groupLexicon §59.233: 组名映射资产扫描注册表（展示层 extractGroup 第一层）。
+// util 同款语义；main 启动注入 + RefreshCache 联动重建。
+var groupLexicon atomic.Pointer[regexp.Regexp]
+
+// SetGroupLexicon §59.233: 注入组名词表（alternation 编译缓存——词长降序）。
+func SetGroupLexicon(words []string) {
+	filtered := make([]string, 0, len(words))
+	for _, w := range words {
+		w = strings.TrimSpace(w)
+		if len(w) >= 2 {
+			filtered = append(filtered, regexp.QuoteMeta(w))
+		}
+	}
+	if len(filtered) == 0 {
+		groupLexicon.Store(nil)
+		return
+	}
+	for i := 0; i < len(filtered); i++ {
+		for j := i + 1; j < len(filtered); j++ {
+			if len(filtered[j]) > len(filtered[i]) {
+				filtered[i], filtered[j] = filtered[j], filtered[i]
+			}
+		}
+	}
+	re, err := regexp.Compile(`(?i)(?:^|[\s._\-￡])(` + strings.Join(filtered, "|") + `)\b`)
+	if err != nil {
+		return
+	}
+	groupLexicon.Store(re)
+}
+
+// reGroupTailSuffix §59.233: 尾部约束（同 util.reTailSuffix）。
+var reGroupTailSuffix = regexp.MustCompile(`^[\s._\-]*(\([^)]*\)|\[[^\]]*\])?[\s._\-]*$`)
+
+// matchGroupLexicon §59.233: 资产扫描（尾部约束内命中返回标题原词）。
+func matchGroupLexicon(clean string) string {
+	re := groupLexicon.Load()
+	if re == nil {
+		return ""
+	}
+	for _, loc := range re.FindAllStringSubmatchIndex(clean, -1) {
+		if loc[2] < 0 || loc[3] < 0 {
+			continue
+		}
+		if reGroupTailSuffix.MatchString(clean[loc[3]:]) {
+			return clean[loc[2]:loc[3]]
+		}
+	}
+	return ""
+}
+
 // reAtGroupTail §59.226 附八 补: 尾部 @ 组名段（"DIY@CMCT"/"@CMCT"/"SHB931@UBWEB"）。
 var reAtGroupTail = regexp.MustCompile(`(?i)(?:^|[\s.])([A-Za-z0-9_]*@[A-Za-z0-9_]+)$`)
 
@@ -712,6 +764,11 @@ func extractGroup(title string) string {
 			return b.String()
 		}
 	}
+	// §59.233 第一层：映射资产扫描（非 @ 标题——@ 形态已由上方锚处理）。
+	if g := matchGroupLexicon(title); g != "" {
+		return g
+	}
+
 	idx := strings.LastIndex(title, "-")
 	// §59.97: idx>=0——前导连字符残留("-FRDS", token 剥除后)也是组段;
 	// 点分隔 ".-FRDS" 一直靠前导点占位侥幸通过, 空格分隔剥后 "-FRDS" 被拒(实锤)

@@ -99,3 +99,25 @@ func TestRegionStripDashAnchor(t *testing.T) {
 		}
 	}
 }
+
+// §59.233: 展示层 extractGroup v2（@ 锚原样优先+资产扫描+锚兜底）
+func TestExtractGroupLexiconLayer(t *testing.T) {
+	SetGroupLexicon([]string{"CMCT", "UBits", "UBWEB"})
+	defer SetGroupLexicon(nil)
+
+	cases := []struct{ title, want string }{
+		// @ 真复合：整段原样（第 0 层——不依赖词表）
+		{"Movie.2023.1080p-SHB931@UBWEB", "SHB931@UBWEB"},
+		// @ 伪复合：DIY@ 剥离
+		{"Movie.2023.1080p.x264.DDP.5.1-DIY@CMCT", "CMCT"},
+		// 资产扫描：dash 被吃裸词（§59.232 场景——词表兜住）
+		{"CMCT", "CMCT"},
+		// 尾部约束：非尾部命中排除
+		{"CMCT.Movie.2023.1080p-RealGRP", "RealGRP"},
+	}
+	for _, c := range cases {
+		if got := ParseTitle(c.title).ReleaseGroup; got != c.want {
+			t.Errorf("group(%q) = %q, want %q", c.title, got, c.want)
+		}
+	}
+}
