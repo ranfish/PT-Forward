@@ -2409,6 +2409,11 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientI
 	}
 fetched:
 
+	// §59.235 P2: PTGen 资产后置提取（§59.168 终案重建——batch 断链
+	// 遗留修复：862 行含◎行 description 而四列全空实证）。汇合点
+	// 调用（直达/搜索/簇/IYUU 全路径统一）。
+	h.extractPTGenAssets(ctx, meta)
+
 	// §59.42: 海报可信图源白名单替换（异步；§59.61 附5: 尾部 finalize 会等其终局
 	// 再传播——INSERT 与回传 UPDATE 的竞态已由 WaitGroup 消除）
 	// §59.195: 门条件 Poster!="" 移除——站点详情无海报时（流控降级内容/解析差异），
@@ -3530,6 +3535,70 @@ func extractSeedHash(r *http.Request) string {
 
 // handleGetSeed §59.20: 读取单个种子 metadata（GET /publish/seeds/:info_hash）。
 // 返回 DB 14 平铺字段 + ParseTitleTech 解析 5 字段 = 完整 18 TechProfile + 编辑字段。
+// rePTGenLine §59.235 P2: ◎行提取（终态 description——全角空格字符类
+// §59.168 教训：\s 不匹配 U+3000）。◎片　　名　值 形态。
+var (
+	rePTGenCNTitle = regexp.MustCompile(`◎片[\s　]*名[\s　]*([^\n]+)`)
+	rePTGenENTitle = regexp.MustCompile(`◎译[\s　]*名[\s　]*([^\n]+)`)
+	rePTGenGenre   = regexp.MustCompile(`◎类[\s　]*别[\s　]*([^\n]+)`)
+)
+
+// extractPTGenAssets §59.235 P2 重建（§59.168 终案——batch 断链遗留）：
+// fetch 汇合后从终态 description 提取 ◎片名/◎译名/◎类别 落库。
+// ◎是渲染管线产物（③定案：提取时序=渲染终态之后）——此处已是终态。
+func (h *PublishTorrentsHandler) extractPTGenAssets(ctx context.Context, meta *model.TorrentMetadata) {
+	if meta == nil || meta.Description == "" {
+		return
+	}
+	updates := map[string]interface{}{}
+	if m := rePTGenCNTitle.FindStringSubmatch(meta.Description); m != nil {
+		if v := strings.TrimSpace(m[1]); v != "" {
+			updates["chinese_title"] = v
+		}
+	}
+	if m := rePTGenENTitle.FindStringSubmatch(meta.Description); m != nil {
+		// ◎译名第一个英文段（含冒号复合——§59.168 段扫描终案：全段扫描
+		// 第一个 ^[A-Za-z0-9] 段；多语言译名首段非英文时继续扫描）
+		val := strings.TrimSpace(m[1])
+		for _, seg := range strings.FieldsFunc(val, func(r rune) bool { return r == '/' || r == '　' || r == ' ' }) {
+			if len(seg) > 0 && (seg[0] >= 'A' && seg[0] <= 'Z' || seg[0] >= 'a' && seg[0] <= 'z' || seg[0] >= '0' && seg[0] <= '9') {
+				updates["english_title"] = seg
+				break
+			}
+		}
+	}
+	if m := rePTGenGenre.FindStringSubmatch(meta.Description); m != nil {
+		// ◎类别原子词平等（§59.168 ③）——JSON 数组落库（§59.168 ⑤）
+		val := strings.TrimSpace(m[1])
+		var arr []string
+		for _, seg := range strings.FieldsFunc(val, func(r rune) bool { return r == '/' || r == '　' }) {
+			if seg = strings.TrimSpace(seg); seg != "" {
+				arr = append(arr, seg)
+			}
+		}
+		if len(arr) > 0 {
+			if b, err := json.Marshal(arr); err == nil {
+				updates["genre"] = string(b)
+			}
+		}
+	}
+	if len(updates) == 0 {
+		return
+	}
+	if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+		Where("info_hash = ?", meta.InfoHash).Updates(updates).Error; err != nil {
+		h.logger.Warn("extractPTGenAssets: update failed", zap.String("hash", meta.InfoHash), zap.Error(err))
+		return
+	}
+	// 回填内存 meta（同请求后续消费）
+	if v, ok := updates["chinese_title"]; ok {
+		meta.ChineseTitle, _ = v.(string)
+	}
+	if v, ok := updates["english_title"]; ok {
+		meta.EnglishTitle, _ = v.(string)
+	}
+}
+
 // canonicalGroupName §59.234 ①: 组名规范化到映射词条名——搜索附加词用
 // 站方标题标准写法（CMCTf 笔误提取→CMCT 词条）。miss 返回原词。
 func (h *PublishTorrentsHandler) canonicalGroupName(ctx context.Context, group string) string {

@@ -51,3 +51,26 @@ func TestClassifySeedStatusNoMappingRefactor(t *testing.T) {
 		}
 	}
 }
+
+// §59.235 P2: PTGen 资产后置提取（◎行→四列——§59.168 断链重建）
+func TestExtractPTGenAssets(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open("file:ptgen_assets_test.db?mode=memory&cache=shared"), &gorm.Config{})
+	db.AutoMigrate(&model.TorrentMetadata{})
+	meta := &model.TorrentMetadata{InfoHash: "H1", Description: "[img]x[/img]\n\n◎片　　名　刘老庄八十二壮士\n◎译　　名　82 Warriors / Il disprezzo\n◎类　　别　历史/战争\n◎年　　代　2013"}
+	db.Create(meta)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	h.extractPTGenAssets(nil, meta)
+	var got model.TorrentMetadata
+	db.Where("info_hash = ?", "H1").First(&got)
+	if got.ChineseTitle != "刘老庄八十二壮士" {
+		t.Errorf("chinese_title = %q", got.ChineseTitle)
+	}
+	if got.EnglishTitle != "82" || len(got.EnglishTitle) < 2 {
+		if got.EnglishTitle != "82 Warriors" {
+			t.Errorf("english_title = %q, want 82 Warriors", got.EnglishTitle)
+		}
+	}
+	if got.Genre != `["历史","战争"]` {
+		t.Errorf("genre = %q", got.Genre)
+	}
+}
