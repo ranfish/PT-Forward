@@ -92,3 +92,4 @@ func (f fakeAnalyzer) AnalyzePTGen(ctx context.Context, name string) (*model.PTG
 func (f fakeAnalyzer) AnalyzePTGenForce(ctx context.Context, name string) (*model.PTGenResult, error) {
 	return f.res, nil
 }
+

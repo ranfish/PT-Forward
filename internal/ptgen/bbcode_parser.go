@@ -176,6 +176,9 @@ func mapAKA(r *model.PTGenResult, v string) {
 	r.AKA = append(r.AKA, splitBySlash(v)...)
 }
 
+// mapForeignTitle §59.237 注: 此处填的是【◎译名行完整内容】（真译名——多语言串）——
+// 字段名 ForeignTitle 是历史命名陷阱（端点同名字段恒=中文，本解析值才是真源——
+// 消费走 TranslatedTitles 转发）。
 func mapForeignTitle(r *model.PTGenResult, v string) {
 	r.ForeignTitle = v
 }
