@@ -99,18 +99,9 @@ func (p *PublicExtractor) Extract(input Input) (SeedData, error) {
 	}
 	p.fillBasicInfoFieldsWithCode(doc, &seed, domain, siteCode)
 
-	// §59.45: 朋友站 kdouban 框——站方渲染的"豆瓣信息"折叠框才是简介权威源
-	//（发布者约定 descr 只放声明+MI+截图，body 从 descr 取会 93% MI 污染）。
-	// 判定：descr-body 含 ◎（发布者自贴完整简介）保留；MI 污染形态 → kdouban 替换。
-	if strings.Contains(domain, "keepfrds") {
-		// §59.46: 空_body 也回退——纯声明形态（descr 全是 Source 声明无简介正文，
-		// 黑暗侵袭 tid=2782261 实证）是朋友站发布者另一类常见写法
-		if seed.Intro.Body == "" || IsMIPollutedIntro(seed.Intro.Body) {
-			if kd := ExtractKDouban(doc); kd.Body != "" {
-				seed.Intro.Body = kd.Body
-			}
-		}
-	}
+	// §59.236 ②: kdouban 逆向重建删除——站方中转数据不作信息源（唯一信息源
+	// =主链自查询 PTGen §59.236 定案）；kdouban 卡片的豆瓣链接由
+	// extractExternalLinks 页面正则独立提取（仅保留链接提取）。
 
 	// 阶段 6: 标签 + InfoHash + Size + URL + Flags
 	seed.Tags = p.extractTags(doc)
