@@ -3345,19 +3345,36 @@ func (h *PublishTorrentsHandler) classifySeedStatusLite(ctx context.Context, nam
 		}
 	}
 
-	// ③ 制作组映射检查
+	// ③ 制作组映射检查 §59.230: 仅对未获取种子有意义（无映射=获取通道提醒——
+	// 已获取种子该状态双重过时：a)簇 comment/coverage 兜底已获取成功 b)站方标题
+	// 可能带组名（PERFUME 案：tr 裸名无组名判 no_mapping，获取后织梦标题
+	// 实为 -CMCT 官组种有映射——本地裸名误判被站方标题纠正）。
+	// 已获取种子用站方标题（meta.Title）重判映射——站方标题是权威
+	// （发布/审核消费的就是它）。
 	if h.sourceDetector != nil {
-		group := publish.ExtractGroupName(name)
-		if group == "" {
-			return "no_mapping"
-		}
-		site := h.sourceDetector.LookupGroup(ctx, group)
-		if site == "" {
-			return "no_mapping"
+		if meta == nil {
+			group := publish.ExtractGroupName(name)
+			if group == "" {
+				return "no_mapping"
+			}
+			site := h.sourceDetector.LookupGroup(ctx, group)
+			if site == "" {
+				return "no_mapping"
+			}
+		} else if meta.Title != "" {
+			group := publish.ExtractGroupName(meta.Title)
+			if group != "" {
+				site := h.sourceDetector.LookupGroup(ctx, group)
+				if site == "" {
+					// 站方标题有组名但无映射——真无映射（比裸名可信）
+					return "no_mapping"
+				}
+			}
+			// 站方标题无组名（电影等）或有映射——均按获取后状态流展示
 		}
 	}
 
-	// 无 metadata → 未获取
+	// 无 metadata → 未获取（映射检查已前置处理 no_mapping）
 	if meta == nil {
 		return "unfetched"
 	}
