@@ -47,7 +47,7 @@
 
               <!-- §59.86: ① 种子标识→种子标题（§59.243 与 Tab1 文案一致） -->
               <a-card size="small" style="margin-bottom: 12px">
-                <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #13c2c2">种子标题</div></template>
+                <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #13c2c2">① 种子标题</div></template>
                 <a-descriptions :column="1" size="small">
                   <a-descriptions-item label="主标题">
                     <span style="font-size: 15px; font-weight: 600">{{ form.title || '—' }}</span>
@@ -60,7 +60,7 @@
 
               <!-- §59.86: ② 技术规格（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
-                <template #title><span style="font-size: 14px">② 技术规格</span></template>
+                <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #1d39c4">② 技术规格</div></template>
               <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" />
               </a-card>
 
@@ -97,7 +97,7 @@
 
               <!-- §59.86: ⑦→⑤ 校验状态（§59.241 序号顺移） -->
               <a-card size="small">
-                <template #title><span style="font-size: 14px">⑤ 校验状态</span></template>
+                <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #d4b106">⑤ 校验状态</div></template>
               <a-alert
                 :type="seedMissingFields.length === 0 ? 'success' : 'warning'"
                 show-icon
