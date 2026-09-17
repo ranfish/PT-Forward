@@ -3,6 +3,30 @@
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-left">
+        <!-- §59.240: 下载器/路径下拉直选（PublishData 同款——弹窗筛选交互升级） -->
+        <a-select
+          v-model:value="filterClient"
+          style="width: 150px"
+          placeholder="下载器（全部）"
+          allow-clear
+          @change="onClientPicked"
+        >
+          <a-select-option v-for="c in clientSelectOptions" :key="c.value" :value="c.value">
+            {{ c.label }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filterPath"
+          style="width: 240px; margin-left: 10px"
+          placeholder="保存路径（全部）"
+          allow-clear
+          :disabled="!filterClient"
+          @change="onFilterChange"
+        >
+          <a-select-option v-for="p in pathSelectOptions" :key="p.value" :value="p.value">
+            {{ p.label }}
+          </a-select-option>
+        </a-select>
         <a-input-search
           v-model:value="searchText"
           placeholder="搜索标题/种子名..."
@@ -41,10 +65,7 @@
             <ClearOutlined /> {{ statusFilter === 'observing' ? '批量清理' : '批量清除' }}{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
           </a-button>
         </a-popconfirm>
-        <a-button @click="filterVisible = true">
-          <FilterOutlined /> 筛选
-        </a-button>
-        <a-button
+<a-button
           v-if="filterClient && filterPath"
           type="primary"
           :loading="batchFetchActive"
@@ -175,41 +196,7 @@
       </template>
     </a-table>
 
-    <!-- Filter Modal（二级筛选页） -->
-    <a-modal
-      v-model:open="filterVisible"
-      title="筛选选项"
-      ok-text="确认"
-      cancel-text="取消"
-      :width="520"
-      @ok="applyFilters"
-    >
-      <a-form layout="vertical">
-        <a-form-item label="下载器">
-          <a-select
-            v-model:value="tempClient"
-            placeholder="全部下载器"
-            allow-clear
-            style="width: 100%"
-            :options="clientSelectOptions"
-            @change="tempPath = undefined"
-          />
-        </a-form-item>
-        <a-form-item label="保存路径">
-          <a-select
-            v-model:value="tempPath"
-            placeholder="全部路径"
-            allow-clear
-            style="width: 100%"
-            :disabled="!tempClient"
-            :options="pathSelectOptions"
-          />
-          <div v-if="!tempClient" style="color: #999; font-size: 12px">选择下载器后可筛选具体路径</div>
-        </a-form-item>
-      </a-form>
-    </a-modal>
-
-    <!-- Edit Panel -->
+<!-- Edit Panel -->
     <CrossSeedPanel
       v-model:open="editOpen"
       :preset-torrent="editPreset"
@@ -230,7 +217,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { PlusOutlined, ReloadOutlined, FilterOutlined, ClearOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, ClearOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
@@ -256,9 +243,6 @@ const statusFilter = ref('all')
 const searchText = ref('')
 
 // 弹层临时状态
-const filterVisible = ref(false)
-const tempClient = ref<string | undefined>(undefined)
-const tempPath = ref<string | undefined>(undefined)
 
 // 持久化 key
 const LS_KEY = 'seed-config-filters'
@@ -271,8 +255,6 @@ function loadPersistedFilters() {
     filterClient.value = saved.client || undefined
     filterPath.value = saved.path || undefined
     statusFilter.value = saved.status || 'all'
-    tempClient.value = filterClient.value
-    tempPath.value = filterPath.value
   } catch { /* silent */ }
 }
 
@@ -291,9 +273,16 @@ const clientSelectOptions = computed(() =>
 )
 
 const pathSelectOptions = computed(() => {
-  const entry = clientPathTree.value.find(c => c.client_id === tempClient.value)
+  // §59.240: 绑 filterClient（下拉直选——tempClient 随弹窗废弃）
+  const entry = clientPathTree.value.find(c => c.client_id === filterClient.value)
   return (entry?.paths || []).map(p => ({ value: p.save_path, label: `${p.save_path} (${p.count})` }))
 })
+
+// §59.240: 下载器切换——路径联动清空+筛选
+function onClientPicked() {
+  filterPath.value = undefined
+  onFilterChange()
+}
 
 const hasActiveFilters = computed(() => !!filterClient.value || !!filterPath.value)
 
@@ -317,21 +306,10 @@ async function fetchClientPaths() {
   }
 }
 
-function applyFilters() {
-  filterClient.value = tempClient.value || undefined
-  filterPath.value = tempPath.value || undefined
-  // 切筛选重置到第一页
-  currentPage.value = 1
-  persistFilters()
-  filterVisible.value = false
-  fetchList()
-}
 
 function clearFilters() {
   filterClient.value = undefined
   filterPath.value = undefined
-  tempClient.value = undefined
-  tempPath.value = undefined
   currentPage.value = 1
   persistFilters()
   fetchList()
@@ -605,11 +583,9 @@ onMounted(async () => {
   if (q.client_id || q.save_path || q.name) {
     if (q.client_id) {
       filterClient.value = String(q.client_id)
-      tempClient.value = filterClient.value
     }
     if (q.save_path) {
       filterPath.value = String(q.save_path)
-      tempPath.value = filterPath.value
     }
     if (q.name) {
       deeplinkSkipSearch = true
