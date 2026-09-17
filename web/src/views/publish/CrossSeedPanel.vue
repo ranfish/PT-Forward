@@ -64,19 +64,7 @@
               <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" />
               </a-card>
 
-              <!-- §59.86: ③ 内容属性（卡片） -->
-              <a-card size="small" style="margin-bottom: 12px">
-                <template #title><span style="font-size: 14px">③ 内容属性</span></template>
-                <div v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length">
-                    <span v-if="seedRegionGenre.region.length" style="margin-right: 16px">
-                      产地：<a-tag v-for="r in seedRegionGenre.region" :key="r" color="geekblue">{{ r }}</a-tag>
-                    </span>
-                    <span v-if="seedRegionGenre.genre.length">
-                      类别：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
-                    </span>
-                  </div>
-                  <div v-else style="color: #999">暂无产地 / 类别数据（需 PTGen 获取）</div>
-              </a-card>
+              <!-- §59.238: ③ 内容属性卡片删除——类别/产地已入②技术规格表分区一（冗余） -->
 
               <!-- §59.86: ④ 标签（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
@@ -130,19 +118,14 @@
               </a-descriptions>
               <!-- §59.135/§59.136: 技术规格表——与预览②同一组件同一 column（5行×4列 视觉同步） -->
               <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" style="max-width: 900px; margin-top: 16px" />
-                <!-- §59.75: 产地/类型（PTGen 源归一只读展示——发布映射消费 canonical） -->
-                <a-form-item v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length" label="产地 / 类别" style="max-width: 900px; margin-top: 16px">
-                  <span v-if="seedRegionGenre.region.length" style="margin-right: 16px">
-                    产地：<a-tag v-for="r in seedRegionGenre.region" :key="r" color="geekblue">{{ r }}</a-tag>
-                  </span>
-                  <span v-if="seedRegionGenre.genre.length">
-                    类别：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
-                  </span>
-                </a-form-item>
-                <!-- §59.26: 标签（可编辑，供发布使用） -->
-                <a-form-item label="标签" style="max-width: 900px; margin-top: 16px">
-                  <TagSelector v-model="form.tags" :display-labels="form.tagLabels" />
-                </a-form-item>
+                <!-- §59.238 ①: "产地/类别"行删除——数据已入分区一（§59.228 三分区）冗余 -->
+                <!-- §59.238 ②: 标签行表格化（卡片+表格——页面统一化） -->
+                <a-card size="small" style="max-width: 900px; margin-top: 16px">
+                  <template #title><span style="font-size: 14px">标签</span></template>
+                  <div style="padding: 4px 0">
+                    <TagSelector v-model="form.tags" :display-labels="form.tagLabels" />
+                  </div>
+                </a-card>
                 <div v-if="seedMissingFields.length > 0" style="margin-top: 12px; padding: 8px 12px; background: #fffbe6; border-radius: 4px; font-size: 13px">
                   <span style="color: #faad14">⚠ 缺失字段：</span>{{ seedMissingFields.join(', ') }}
                 </div>
