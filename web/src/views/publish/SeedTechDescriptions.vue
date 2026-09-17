@@ -3,6 +3,12 @@
        技术参数(MI 铁证族)。分区表头三色视觉区分（审核者一眼分区）。
        主/副标题由调用方自行展示（Tab1 ①种子标识卡片 / 预览①种子标识）。 -->
   <div class="std-sections">
+    <!-- §59.245: 外层卡片+统一表头"技术规格"（深空蓝 #1d39c4——外深内浅，
+         与预览②卡片结构统一；三分区表头保持蓝/绿/橙内层色） -->
+    <a-card size="small" class="tech-spec-card">
+      <template #title>
+        <div class="zone-header zone-techspec">技术规格</div>
+      </template>
     <!-- 分区一：作品信息（蓝） -->
     <a-descriptions
       :column="4" bordered size="small" :title="undefined"
@@ -64,6 +70,7 @@
       <a-descriptions-item label="音频技术">{{ tc.audio_technology || '—' }}</a-descriptions-item>
       <a-descriptions-item label="音轨数">{{ tc.audio_tracks || '—' }}</a-descriptions-item>
     </a-descriptions>
+    </a-card>
   </div>
 </template>
 
@@ -134,6 +141,13 @@ const categoryLabel = (key: string) => CATEGORY_LABELS[key] || key || '—'
 /* 技术参数（橙）——MI 铁证族 */
 .zone-tech {
   background: #d46b08;
+}
+/* §59.245: 外层"技术规格"表头（深空蓝——外深内浅层次） */
+.zone-techspec {
+  background: #1d39c4;
+}
+.tech-spec-card :deep(.ant-card-body) {
+  padding: 8px;
 }
 .std-sections :deep(.ant-descriptions-item-label) {
   width: 88px;
