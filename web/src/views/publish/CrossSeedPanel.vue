@@ -64,7 +64,19 @@
               <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" />
               </a-card>
 
-              <!-- §59.238: ③ 内容属性卡片删除——类别/产地已入②技术规格表分区一（冗余） -->
+              <!-- §59.86: ③ 内容属性（卡片） -->
+              <a-card size="small" style="margin-bottom: 12px">
+                <template #title><span style="font-size: 14px">③ 内容属性</span></template>
+                <div v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length">
+                    <span v-if="seedRegionGenre.region.length" style="margin-right: 16px">
+                      产地：<a-tag v-for="r in seedRegionGenre.region" :key="r" color="geekblue">{{ r }}</a-tag>
+                    </span>
+                    <span v-if="seedRegionGenre.genre.length">
+                      类别：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
+                    </span>
+                  </div>
+                  <div v-else style="color: #999">暂无产地 / 类别数据（需 PTGen 获取）</div>
+              </a-card>
 
               <!-- §59.86: ④ 标签（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
