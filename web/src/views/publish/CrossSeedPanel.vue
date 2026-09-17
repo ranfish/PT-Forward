@@ -751,8 +751,25 @@ async function saveOnly() {
   }
 }
 
-// §59.20 ⑨: 确认完成——数据已在预览时存好，直接关闭
-function confirmDone() {
+// §59.20 ⑨ →§59.247: 确认完成=唯一审核通道——PUT 带 reviewed=true
+// （后端 9 字段门槛：缺字段拒绝审核；数据已在预览时存好）
+async function confirmDone() {
+  const hash = selectedTorrent.value?.info_hash
+  if (hash) {
+    try {
+      await seedConfigApi.putSeed(hash, {
+        poster: form.value.poster,
+        screenshots: form.value.screenshots,
+        description: form.value.description,
+        tags: form.value.tags,
+        siteName: currentSourceSite.value || undefined,
+        reviewed: true,
+      })
+    } catch (e: unknown) {
+      message.error('审核失败: ' + (e as Error).message)
+      return
+    }
+  }
   emit('success')
   emit('update:open', false)
 }

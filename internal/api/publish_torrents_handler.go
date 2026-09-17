@@ -3857,6 +3857,7 @@ type putSeedRequest struct {
 	Description  string   `json:"description"`
 	Tags         []string `json:"tags"`
 	SiteName     string   `json:"siteName"`
+	Reviewed     bool     `json:"reviewed"` // §59.247: 显式审核通道（确认完成——带 9 字段门槛）
 }
 
 // buildPutSeedUpdates §59.89: PUT 更新构造（空值不覆盖）——部分保存场景（只改
@@ -3938,9 +3939,18 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	}
 	meta.Description = pickNonEmpty(req.Description, meta.Description)
 	missing := h.checkRequiredFields(meta)
-	updates["reviewed"] = len(missing) == 0
-	// §59.93/94: 审核状态簇同步（公共方法——含取消）
-	defer h.syncClusterReviewedByHashes(context.Background(), []string{infoHash}, len(missing) == 0)
+	// §59.247: PUT 默认不碰 reviewed（保存≠审核——浏览预览/取消退出不
+	// 误审）；req.Reviewed=true 为显式审核通道（确认完成调用——带 9 字段
+	// 门槛：缺字段拒绝审核）。§59.20 自动审核在 §59.141 自动保存后语义错位。
+	if req.Reviewed {
+		if len(missing) > 0 {
+			Error(w, http.StatusBadRequest, 40001, fmt.Sprintf("审核失败：仍缺 %d 个字段: %s", len(missing), strings.Join(missing, ", ")))
+			return
+		}
+		updates["reviewed"] = true
+		// §59.93/94: 审核状态簇同步（显式审核触发）
+		defer h.syncClusterReviewedByHashes(context.Background(), []string{infoHash}, true)
+	}
 
 	h.db.WithContext(r.Context()).Model(&model.TorrentMetadata{}).
 		Where("id = ?", meta.ID).
