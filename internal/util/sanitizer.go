@@ -57,7 +57,7 @@ func (s *SanitizerCore) Check(entry zapcore.Entry, ce *zapcore.CheckedEntry) *za
 // 朋友站 "[中性种子(NL)]"（零魔力, NBSP 前缀）、百分比/返利族 "[50%]" "[30%]" "[75%]" "[2X 50%]"、
 // 免费/促销族。非内容数据, 转发引用无意义, 采集层剥除。
 // 混排保留组: 尾部 [禁转] 族（合规判据, extractFlags 消费）不剥——"[50%] [禁转]" 只剥 [50%]。
-var siteOpMarkerTailRe = regexp.MustCompile(`([\s\x{00a0}]*\[(?:中性种子|免费|Free|2X|促销|\d+(?:[Xx×]\s*\d+)?\s*%)[^\]]*\])+(\s*\[(?:禁转|谢绝转载|严禁转载|禁止转载)[^\]]*\])?\s*$`)
+var siteOpMarkerTailRe = regexp.MustCompile(`(?i)([\s\x{00a0}]*\[(?:中性种子|免费|free|2x|促销|普通|hot|经典|限免|密封|seeding|leeching|\d+(?:[Xx×]\s*\d+)?\s*%)[^\]]*\])+(\s*\[(?:禁转|谢绝转载|严禁转载|禁止转载)[^\]]*\])?\s*$`)
 
 // StripSiteOperationMarkers 剥除标题/副标题尾部的站点运营标记（§59.64 副标题侧同族）。
 // §59.136 提升公共方法至 util（metadata 采集层与 db migration 清存量同一实现——
@@ -65,7 +65,7 @@ var siteOpMarkerTailRe = regexp.MustCompile(`([\s\x{00a0}]*\[(?:中性种子|免
 // siteStateTailRe §59.248 族二: 圆括号站方状态标注（标题尾部）——织梦系
 // "(已审)" 等（fnos 378 行实证）。判据：括号内首字 ∈ {已,待,未}（审核
 // 状态语义锚）——内容性括号（"(港)" 地区译名标注）不剥。
-var siteStateTailRe = regexp.MustCompile(`([\s\x{00a0}]*\((?:已|待|未)[^)]*\))+\s*$`)
+var siteStateTailRe = regexp.MustCompile(`(?i)([\s\x{00a0}]*\((?:已|待|未|中性种子|免费|free|2x|促销|普通|hot|经典|限免|密封|seeding|leeching|\d+(?:[Xx×]\s*\d+)?\s*%)[^)]*\))+\s*$`)
 
 // StripSiteOperationMarkers 剥除标题/副标题尾部一切【与标题无关的站方标注】
 // （§59.248 泛化为标题净化公共方法）——两族词表：族一方括号运营标记
