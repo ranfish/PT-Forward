@@ -80,7 +80,7 @@
 
               <!-- §59.86: ④ 标签（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
-                <template #title><span style="font-size: 14px">④ 标签</span></template>
+                <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #722ed1">④ 标签</div></template>
                 <div v-if="previewTags.length">
                   <a-tag v-for="t in previewTags" :key="t" :color="isRestrictedTag(t) ? 'red' : 'blue'">
                     {{ tagDisplayName(t) }}
@@ -131,9 +131,12 @@
               <!-- §59.135/§59.136: 技术规格表——与预览②同一组件同一 column（5行×4列 视觉同步） -->
               <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" style="max-width: 900px; margin-top: 16px" />
                 <!-- §59.238 ①: "产地/类别"行删除——数据已入分区一（§59.228 三分区）冗余 -->
-                <!-- §59.238 ②: 标签行表格化（卡片+表格——页面统一化） -->
+                <!-- §59.238 ②: 标签行表格化（卡片+表格——页面统一化；§59.239:
+                     表头在表格外+独立紫色区分（三分区蓝/绿/橙之后的第四区色）） -->
                 <a-card size="small" style="max-width: 900px; margin-top: 16px">
-                  <template #title><span style="font-size: 14px">标签</span></template>
+                  <template #title>
+                    <div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #722ed1">标签</div>
+                  </template>
                   <div style="padding: 4px 0">
                     <TagSelector v-model="form.tags" :display-labels="form.tagLabels" />
                   </div>
