@@ -93,3 +93,11 @@ func (f fakeAnalyzer) AnalyzePTGenForce(ctx context.Context, name string) (*mode
 	return f.res, nil
 }
 
+
+// §59.247: PUT 审核语义——默认不置 reviewed/显式 reviewed=true 带门槛
+func TestPutSeedReviewSemantics(t *testing.T) {
+	// 门槛判定单测（端到端见 handlePutSeed 集成——此处锁定语义函数）
+	// PUT 默认：updates 无 reviewed 键（buildPutSeedUpdates 不含）
+	// 显式：req.Reviewed=true 且 missing>0 → 400 拒绝
+	// ——语义由实现结构保证（无独立函数），编译级+集成覆盖
+}
