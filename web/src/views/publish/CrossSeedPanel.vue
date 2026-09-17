@@ -112,24 +112,29 @@
           <a-tabs v-model:active-key="activeTab">
             <!-- Tab 1: 种子详情 -->
             <a-tab-pane key="detail" tab="种子详情">
-              <!-- §59.243: 种子标题卡片+表头外置（青色——与预览①同语义同色一致） -->
+              <!-- §59.243+§59.246: 种子标题卡（①——两区序号镜像统一） -->
               <a-card size="small" style="max-width: 900px">
                 <template #title>
-                  <div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #13c2c2">种子标题</div>
+                  <div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #13c2c2">① 种子标题</div>
                 </template>
                 <a-descriptions :column="3" bordered size="small">
                   <a-descriptions-item label="主标题" :span="3">{{ form.title || '—' }}</a-descriptions-item>
                   <a-descriptions-item label="副标题" :span="3">{{ form.subtitle || '—' }}</a-descriptions-item>
                 </a-descriptions>
               </a-card>
-              <!-- §59.135/§59.136: 技术规格表——与预览②同一组件同一 column（5行×4列 视觉同步） -->
-              <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" style="max-width: 900px; margin-top: 16px" />
+              <!-- §59.246: 技术规格卡（②与预览统一——组件裸三分区+调用方包装，两区序号镜像） -->
+              <a-card size="small" style="max-width: 900px; margin-top: 16px">
+                <template #title>
+                  <div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #1d39c4">② 技术规格</div>
+                </template>
+                <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" />
+              </a-card>
                 <!-- §59.238 ①: "产地/类别"行删除——数据已入分区一（§59.228 三分区）冗余 -->
                 <!-- §59.238 ②: 标签行表格化（卡片+表格——页面统一化；§59.239:
                      表头在表格外+独立紫色区分（三分区蓝/绿/橙之后的第四区色）） -->
                 <a-card size="small" style="max-width: 900px; margin-top: 16px">
                   <template #title>
-                    <div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #722ed1">标签</div>
+                    <div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #722ed1">③ 标签</div>
                   </template>
                   <div style="padding: 4px 0">
                     <TagSelector v-model="form.tags" :display-labels="form.tagLabels" />
