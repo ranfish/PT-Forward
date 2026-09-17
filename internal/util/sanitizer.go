@@ -62,10 +62,22 @@ var siteOpMarkerTailRe = regexp.MustCompile(`([\s\x{00a0}]*\[(?:中性种子|免
 // StripSiteOperationMarkers 剥除标题/副标题尾部的站点运营标记（§59.64 副标题侧同族）。
 // §59.136 提升公共方法至 util（metadata 采集层与 db migration 清存量同一实现——
 // metadata→reseed→db 依赖环, 不能放 metadata）。迭代处理多标记混排。
+// siteStateTailRe §59.248 族二: 圆括号站方状态标注（标题尾部）——织梦系
+// "(已审)" 等（fnos 378 行实证）。判据：括号内首字 ∈ {已,待,未}（审核
+// 状态语义锚）——内容性括号（"(港)" 地区译名标注）不剥。
+var siteStateTailRe = regexp.MustCompile(`([\s\x{00a0}]*\((?:已|待|未)[^)]*\))+\s*$`)
+
+// StripSiteOperationMarkers 剥除标题/副标题尾部一切【与标题无关的站方标注】
+// （§59.248 泛化为标题净化公共方法）——两族词表：族一方括号运营标记
+// （§59.99/§59.136）+族二圆括号站方状态（已审/已复核/待审）。迭代处理
+// 多标记混排+跨族混排。存量清除重获自愈（无需 migration）。
 func StripSiteOperationMarkers(s string) string {
 	s = strings.TrimSpace(s)
 	for {
+		// 族一（运营标记——禁转保留组 $2）
 		ns := strings.TrimSpace(siteOpMarkerTailRe.ReplaceAllString(s, "$2"))
+		// 族二（站方状态——无保留组直接剥）
+		ns = strings.TrimSpace(siteStateTailRe.ReplaceAllString(ns, ""))
 		if ns == s {
 			return ns
 		}
