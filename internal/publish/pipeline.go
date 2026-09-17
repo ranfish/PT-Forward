@@ -1280,6 +1280,9 @@ func (p *Pipeline) CaptureScreenshots(ctx context.Context, name, savePath string
 	if entryPath, _ := findTorrentEntry(savePath, name); entryPath != "" {
 		torrentDir = entryPath
 	}
+	// §59.250 认知对齐: Tab3 重新获取 = 无视缓存 + 硬编码 local_upload
+	// （用户定案：本意=对现有截图不满意强制重新截图——不走配置策略；
+	//   零缓存查询语义不变）
 	artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", sourceScreenshots, "local_upload")
 	if err != nil || artifact == nil {
 		p.logger.Warn("capture screenshots failed", zap.Error(err))
@@ -1303,7 +1306,14 @@ func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath s
 		// §59.53 第6点: 远程只转存（白名单逐张判定），无图留空——不截图
 		return p.artifactGenerator.ProcessScreenshotsRemote(sourceScreenshots)
 	}
-	artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", sourceScreenshots, "auto")
+	// §59.250: 策略参数化——读注入值（imageHostStrategy——用户四策略配置；
+	// 空值默认 auto 兼容）。此前硬编码 "auto" 致"始终本地截图"等配置在
+	// 采集链（批量/单条获取）不生效。
+	strategy := p.imageHostStrategy
+	if strategy == "" {
+		strategy = "auto"
+	}
+	artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", sourceScreenshots, strategy)
 	if err != nil || artifact == nil {
 		return sourceScreenshots
 	}
