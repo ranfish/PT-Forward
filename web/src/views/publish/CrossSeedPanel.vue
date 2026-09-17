@@ -47,7 +47,7 @@
 
               <!-- §59.86: ① 种子标识（卡片） -->
               <a-card size="small" style="margin-bottom: 12px">
-                <template #title><span style="font-size: 14px">① 种子标识</span></template>
+                <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #13c2c2">① 种子标识</div></template>
                 <a-descriptions :column="1" size="small">
                   <a-descriptions-item label="主标题">
                     <span style="font-size: 15px; font-weight: 600">{{ form.title || '—' }}</span>
@@ -64,23 +64,11 @@
               <SeedTechDescriptions :tc="form.titleComponents" :encode="seedEncode" :column="4" :genre="seedRegionGenre.genre" :region="seedRegionGenre.region" />
               </a-card>
 
-              <!-- §59.86: ③ 内容属性（卡片） -->
-              <a-card size="small" style="margin-bottom: 12px">
-                <template #title><span style="font-size: 14px">③ 内容属性</span></template>
-                <div v-if="seedRegionGenre.region.length || seedRegionGenre.genre.length">
-                    <span v-if="seedRegionGenre.region.length" style="margin-right: 16px">
-                      产地：<a-tag v-for="r in seedRegionGenre.region" :key="r" color="geekblue">{{ r }}</a-tag>
-                    </span>
-                    <span v-if="seedRegionGenre.genre.length">
-                      类别：<a-tag v-for="g in seedRegionGenre.genre" :key="g" color="purple">{{ g }}</a-tag>
-                    </span>
-                  </div>
-                  <div v-else style="color: #999">暂无产地 / 类别数据（需 PTGen 获取）</div>
-              </a-card>
+              <!-- §59.241: ③ 内容属性卡片删除——类别/产地已入②技术规格表分区一 -->
 
-              <!-- §59.86: ④ 标签（卡片） -->
+              <!-- §59.86: 标签（卡片）§59.241 序号③ -->
               <a-card size="small" style="margin-bottom: 12px">
-                <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #722ed1">④ 标签</div></template>
+                <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #722ed1">③ 标签</div></template>
                 <div v-if="previewTags.length">
                   <a-tag v-for="t in previewTags" :key="t" :color="isRestrictedTag(t) ? 'red' : 'blue'">
                     {{ tagDisplayName(t) }}
@@ -93,9 +81,9 @@
                 <img v-if="previewShotPreview" :src="previewShotPreview" style="width: 100%" />
               </a-modal>
 
-              <!-- §59.87: ⑤ 发布简介（原⑥，⑤媒体数据已删——冗余；整块渲染=所见即所发） -->
+              <!-- §59.87: 发布简介（原⑥→⑤→§59.241 序号④+品红；整块渲染=所见即所发） -->
               <a-card size="small" style="margin-bottom: 12px">
-                <template #title><span style="font-size: 14px">⑤ 发布简介（最终发布内容）</span></template>
+                <template #title><div style="font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 3px; display: inline-block; color: #fff; background: #eb2f96">④ 发布简介（最终发布内容）</div></template>
                 <template #extra>
                   <a-radio-group v-model:value="previewDescMode" size="small">
                     <a-radio-button value="rendered">渲染效果</a-radio-button>
@@ -107,9 +95,9 @@
                 <div v-else style="color: #999">暂无简介数据</div>
               </a-card>
 
-              <!-- §59.86: ⑦ 校验状态（卡片） -->
+              <!-- §59.86: ⑦→⑤ 校验状态（§59.241 序号顺移） -->
               <a-card size="small">
-                <template #title><span style="font-size: 14px">⑦ 校验状态</span></template>
+                <template #title><span style="font-size: 14px">⑤ 校验状态</span></template>
               <a-alert
                 :type="seedMissingFields.length === 0 ? 'success' : 'warning'"
                 show-icon
