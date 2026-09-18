@@ -289,7 +289,7 @@ async function fetchPublishTargets() {
   try {
     const resp = await downloadersApi.listPublishTargets()
     const all = resp.data.data || []
-    publishTargets.value = all.filter((item: ClientPublishTarget) => item.client_id === id)
+    publishTargets.value = all.filter((item: ClientPublishTarget) => item.client_uid === id)
   } catch (e: unknown) {
     message.error((e as Error).message)
   } finally {

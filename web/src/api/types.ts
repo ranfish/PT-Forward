@@ -196,7 +196,7 @@ export interface ClientConfig {
 
 export interface ClientPublishTarget {
   id: number
-  client_id: number
+  client_uid: number
   site_name: string
   category_mapping: string
   source_mapping: string
