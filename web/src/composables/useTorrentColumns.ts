@@ -15,7 +15,7 @@ export type TorrentColumnKey =
   | 'torrent_size'
   | 'latest_upload'
   | 'info_hash'
-  | 'client_id'
+  | 'client_uid'
   | 'source'
   | 'status'
   | 'flushed_at'
@@ -128,11 +128,12 @@ export function useTorrentColumns(options: TorrentColumnOptions = {}) {
       customRender: ({ text }: { text: string }) =>
         h('span', { style: 'cursor:pointer;font-family:monospace;font-size:12px', onClick: () => copyHash(text) }, text),
     },
-    client_id: {
+    client_uid: {
       title: t('seeding.client'),
-      dataIndex: 'client_id',
-      key: 'client_id',
+      dataIndex: 'client_uid',
+      key: 'client_uid',
       width: 60,
+      customRender: ({ text }: { text: number }) => `#${text}`,
     },
     source: {
       title: t('seeding.source'),
@@ -190,7 +191,7 @@ export function useTorrentColumns(options: TorrentColumnOptions = {}) {
     'torrent_size',
     'latest_upload',
     'info_hash',
-    'client_id',
+    'client_uid',
     'source',
     'status',
     'flushed_at',
