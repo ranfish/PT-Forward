@@ -22,12 +22,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func injectMockClient(t *testing.T, mgr *client.Manager, name string, dl model.DownloaderClient) {
+func injectMockClient(t *testing.T, mgr *client.Manager, id uint, dl model.DownloaderClient) {
 	t.Helper()
 	v := reflect.ValueOf(mgr).Elem()
 	f := v.FieldByName("clients")
-	clients := *(*map[string]model.DownloaderClient)(unsafe.Pointer(f.UnsafeAddr()))
-	clients[name] = dl
+	clients := *(*map[uint]model.DownloaderClient)(unsafe.Pointer(f.UnsafeAddr()))
+	clients[id] = dl
 }
 
 // F6: 下载完成监控 → 发布 pipeline 完整链路
@@ -37,7 +37,7 @@ func TestScenario_F6_CompletionWatcherToPublish(t *testing.T) {
 
 	seedSite(t, db, "source.com", "source-site")
 	seedSite(t, db, "target.com", "target-site")
-	sourceClientID := seedClient(t, db, "dl-client", "download")
+	sourceClientID := seedClient(t, db, "source-client", "download")
 
 	uploadCalled := false
 	mockSiteProvider := &mocks.SiteInfoProvider{
@@ -67,7 +67,7 @@ func TestScenario_F6_CompletionWatcherToPublish(t *testing.T) {
 	}
 
 	mockDL := &mocks.DownloaderClient{
-		ID: sourceClientID, Name: "dl-client", Role: "download",
+		ID: sourceClientID, Name: "source-client", Role: "download",
 		GetTorrentByHashFn: func(ctx context.Context, hash string) (*model.TorrentInfo, error) {
 			return &model.TorrentInfo{
 				Hash:       hash,
@@ -78,7 +78,7 @@ func TestScenario_F6_CompletionWatcherToPublish(t *testing.T) {
 	}
 
 	clientMgr := client.NewManager(db, nopLogger())
-	injectMockClient(t, clientMgr, "dl-client", mockDL)
+	injectMockClient(t, clientMgr, sourceClientID, mockDL)
 
 	pipeline := publish.NewPipeline(db, nopLogger())
 	pipeline.SetSiteProvider(mockSiteProvider)
@@ -91,7 +91,7 @@ func TestScenario_F6_CompletionWatcherToPublish(t *testing.T) {
 		InfoHash:        "f6hash1234567890",
 		TorrentName:     "F6.Test.Release.2024",
 		Size:            5000000000,
-		ClientID:        "dl-client",
+		ClientUID:        1,
 		TargetSites:     "target-site",
 		PublishStatus:   model.CandidatePending,
 		Role:            model.RoleDownload,
@@ -102,7 +102,7 @@ func TestScenario_F6_CompletionWatcherToPublish(t *testing.T) {
 	require.NoError(t, db.First(&saved).Error)
 	assert.Equal(t, model.CandidatePending, saved.PublishStatus)
 
-	assert.True(t, w.IsWatching("dl-client", "f6hash1234567890"))
+	assert.True(t, w.IsWatching(1, "f6hash1234567890"))
 	assert.Equal(t, 1, w.ActiveWatchCount())
 
 	w.SetPollInterval(50 * time.Millisecond)
@@ -173,7 +173,7 @@ func TestScenario_F6_TransferToReseed(t *testing.T) {
 
 	sourceMockDL := &mocks.DownloaderClient{
 		ID: sourceClientID, Name: "source-client", Role: "source",
-		TransferTargetID: "reseed-client",
+		TransferTargetUID: reseedClientID,
 		GetTorrentByHashFn: func(ctx context.Context, hash string) (*model.TorrentInfo, error) {
 			return &model.TorrentInfo{
 				Hash:       hash,
@@ -200,8 +200,8 @@ func TestScenario_F6_TransferToReseed(t *testing.T) {
 	}
 
 	clientMgr := client.NewManager(db, nopLogger())
-	injectMockClient(t, clientMgr, "source-client", sourceMockDL)
-	injectMockClient(t, clientMgr, "reseed-client", reseedMockDL)
+	injectMockClient(t, clientMgr, sourceClientID, sourceMockDL)
+	injectMockClient(t, clientMgr, reseedClientID, reseedMockDL)
 
 	pipeline := publish.NewPipeline(db, nopLogger())
 	pipeline.SetSiteProvider(mockSiteProvider)
@@ -214,7 +214,7 @@ func TestScenario_F6_TransferToReseed(t *testing.T) {
 		InfoHash:        "transfer_hash_1234",
 		TorrentName:     "Transfer.Test.2024",
 		Size:            3000000000,
-		ClientID:        "source-client",
+		ClientUID:        1,
 		TargetSites:     "target-site",
 		PublishStatus:   model.CandidatePending,
 		Role:            model.RoleSource,
@@ -248,17 +248,17 @@ func TestScenario_F6_WatchOrphanDetection(t *testing.T) {
 	ctx := context.Background()
 
 	seedSite(t, db, "source.com", "source-site")
-	clientID := seedClient(t, db, "orphan-client", "download")
+	clientUID := seedClient(t, db, "orphan-client", "download")
 
 	mockDL := &mocks.DownloaderClient{
-		ID: clientID, Name: "orphan-client", Role: "download",
+		ID: clientUID, Name: "orphan-client", Role: "download",
 		GetTorrentByHashFn: func(ctx context.Context, hash string) (*model.TorrentInfo, error) {
 			return nil, nil
 		},
 	}
 
 	clientMgr := client.NewManager(db, nopLogger())
-	injectMockClient(t, clientMgr, "orphan-client", mockDL)
+	injectMockClient(t, clientMgr, 1, mockDL)
 
 	pipeline := publish.NewPipeline(db, nopLogger())
 
@@ -271,7 +271,7 @@ func TestScenario_F6_WatchOrphanDetection(t *testing.T) {
 		InfoHash:        "orphan_hash_1234",
 		TorrentName:     "Orphan.Test.2024",
 		Size:            1000000000,
-		ClientID:        "orphan-client",
+		ClientUID:        1,
 		TargetSites:     "target-site",
 		PublishStatus:   model.CandidatePending,
 		Role:            model.RoleDownload,
@@ -301,14 +301,14 @@ func TestScenario_F8_ManualForward(t *testing.T) {
 	ctx := context.Background()
 
 	seedSite(t, db, "source.com", "source-site")
-	clientID := seedClient(t, db, "manual-client", "download")
+	clientUID := seedClient(t, db, "manual-client", "download")
 
 	mockDL := &mocks.DownloaderClient{
-		ID: clientID, Name: "manual-client", Role: "download",
+		ID: clientUID, Name: "manual-client", Role: "download",
 	}
 
 	clientMgr := client.NewManager(db, nopLogger())
-	injectMockClient(t, clientMgr, "manual-client", mockDL)
+	injectMockClient(t, clientMgr, 1, mockDL)
 
 	pipeline := publish.NewPipeline(db, nopLogger())
 	w := watcher.NewCompletionWatcher(db, clientMgr, pipeline, nopLogger())
@@ -319,7 +319,7 @@ func TestScenario_F8_ManualForward(t *testing.T) {
 		InfoHash:        "manualhash123456",
 		TorrentName:     "Manual.Forward.2024",
 		Size:            8000000000,
-		ClientID:        "manual-client",
+		ClientUID:        1,
 		TargetSites:     "target-site",
 		PublishStatus:   model.CandidatePending,
 		Role:            model.RoleDownload,
@@ -327,7 +327,7 @@ func TestScenario_F8_ManualForward(t *testing.T) {
 	require.NoError(t, w.SubmitCandidate(ctx, candidate))
 
 	assert.Equal(t, int64(1), countRecords(t, db, "publish_candidates"))
-	assert.True(t, w.IsWatching("manual-client", "manualhash123456"))
+	assert.True(t, w.IsWatching(1, "manualhash123456"))
 
 	dupCandidate := model.PublishCandidate{
 		SourceSite:      "source-site",
@@ -335,7 +335,7 @@ func TestScenario_F8_ManualForward(t *testing.T) {
 		InfoHash:        "manualhash123456",
 		TorrentName:     "Manual.Forward.2024",
 		Size:            8000000000,
-		ClientID:        "manual-client",
+		ClientUID:        1,
 		TargetSites:     "target-site",
 		PublishStatus:   model.CandidatePending,
 	}
@@ -351,7 +351,7 @@ func TestScenario_F8_ManualForward(t *testing.T) {
 	assert.Error(t, err)
 
 	t.Logf("PASS F8: manual forward submitted, watching=%v duplicates_handled=1 empty_rejected=%v",
-		w.IsWatching("manual-client", "manualhash123456"), err != nil)
+		w.IsWatching(1, "manualhash123456"), err != nil)
 }
 
 // F10: 通知流程 — 正常发送 + 历史记录
@@ -778,7 +778,7 @@ func TestScenario_F11_IYUUTriggersReseed(t *testing.T) {
 	seedRec := &model.SeedingTorrentRecord{
 		TorrentID: "iyuu-t-001",
 		SiteName:  "source-site",
-		ClientID:  fmt.Sprintf("%d", sourceClientID),
+		ClientUID:  sourceClientID,
 		InfoHash:  "iyuu_hash_source",
 		Status:    "seeding",
 		IsFree:    true,
@@ -819,7 +819,7 @@ func TestScenario_F11_IYUUTriggersReseed(t *testing.T) {
 		},
 	}
 	mockDL := &mocks.DownloaderProvider{
-		GetFn: func(cid string) (model.DownloaderClient, error) {
+		GetFn: func(cid uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				ID: targetClientID, Name: "target-cl", Role: "download",
 				AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {

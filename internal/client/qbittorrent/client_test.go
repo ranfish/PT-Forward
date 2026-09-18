@@ -1057,12 +1057,12 @@ func TestNewQBClient(t *testing.T) {
 	}
 }
 
-func TestQBClient_GetTransferTargetID(t *testing.T) {
+func TestQBClient_GetTransferTargetUID(t *testing.T) {
 	mock := &qbMock{version: "4.6.3"}
 	c := newTestQBClient(t, mock.handler())
-	c.cfg.TransferTargetID = "target-123"
-	if c.GetTransferTargetID() != "target-123" {
-		t.Errorf("expected target-123, got %s", c.GetTransferTargetID())
+	c.cfg.TransferTargetUID = 123
+	if c.GetTransferTargetUID() != 123 {
+		t.Errorf("expected 123, got %d", c.GetTransferTargetUID())
 	}
 }
 

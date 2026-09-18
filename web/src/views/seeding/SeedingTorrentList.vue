@@ -96,7 +96,7 @@ function handlePause(recordId: number) {
 }
 
 const { columns } = useTorrentColumns({
-  show: ['title', 'site_name', 'torrent_id', 'discount', 'is_free', 'has_hr', 'torrent_size', 'info_hash', 'client_id', 'source', 'status', 'flushed_at', 'updated_at', 'actions'],
+  show: ['title', 'site_name', 'torrent_id', 'discount', 'is_free', 'has_hr', 'torrent_size', 'info_hash', 'client_uid', 'source', 'status', 'flushed_at', 'updated_at', 'actions'],
   statusRender: (record) => h(Badge, {
     status: record.status === 'seeding' ? 'success' : record.status === 'downloading' ? 'processing' : 'warning',
     text: translateSeedingStatus(record.status as string),
@@ -108,10 +108,10 @@ const { columns } = useTorrentColumns({
   ]),
 })
 
-const downloaderOptions = ref<{label: string, value: string}[]>([])
+const downloaderOptions = ref<{label: string, value: number}[]>([])
 const filters = reactive({
   search: '',
-  clientId: undefined as string | undefined,
+  clientId: undefined as number | undefined,
   site: undefined as string | undefined,
   status: undefined as string | undefined,
 })
@@ -129,8 +129,8 @@ async function fetchDownloaders() {
     const resp = await downloadersApi.listLight(1, 100, 'seeding')
     const items = resp.data.data?.items || resp.data.data || []
     downloaderOptions.value = items.map((d: { name?: string; id?: number }) => ({
-      label: String(d.name || d.id),
-      value: String(d.name || d.id),
+      label: d.name || `#${d.id}`,
+      value: Number(d.id),
     }))
   } catch {}
 }

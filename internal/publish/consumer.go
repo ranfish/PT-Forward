@@ -33,7 +33,7 @@ func (p *Pipeline) OnPushed(ctx context.Context, event *pusher.PushedEvent) {
 		HasHR:           event.HasHR,
 		PublishStatus:   model.CandidatePending,
 		Role:            role,
-		ClientID:        event.ClientID,
+		ClientUID: event.ClientUID,
 	}
 
 	if err := p.CreateCandidate(ctx, candidate); err != nil {
@@ -45,7 +45,7 @@ func (p *Pipeline) OnPushed(ctx context.Context, event *pusher.PushedEvent) {
 	}
 
 	p.logger.Debug("OnPushed: publish candidate created",
-		zap.String("client_id", event.ClientID),
+		zap.Uint("client_id", event.ClientUID),
 		zap.String("info_hash", event.InfoHash),
 		zap.String("role", event.Role))
 }

@@ -16,7 +16,7 @@ type exprEnv struct {
 	HasHR         bool    `expr:"hasHR"`
 	HRSeedTimeH   int     `expr:"hrSeedTimeH"`
 	Discount      string  `expr:"discount"`
-	ClientID      string  `expr:"clientID"`
+	ClientUID     uint   `expr:"clientUID"`
 	TorrentID     string  `expr:"torrentID"`
 	FreeLevel     string  `expr:"freeLevel"`
 	Source        string  `expr:"source"`
@@ -63,7 +63,7 @@ func buildExprEnv(rc *RuleContext) *exprEnv {
 		HasHR:        rc.Record.HasHR,
 		HRSeedTimeH:  rc.Record.HRSeedTimeH,
 		Discount:     string(rc.Record.Discount),
-		ClientID:     rc.Record.ClientID,
+		ClientUID:     rc.Record.ClientUID,
 		TorrentID:    rc.Record.TorrentID,
 		FreeLevel:    rc.Record.FreeLevel,
 		Source:       rc.Record.Source,

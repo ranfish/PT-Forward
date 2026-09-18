@@ -132,7 +132,7 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		Path     string `json:"path"`
-		ClientID string `json:"client_id"`
+		ClientUID uint `json:"client_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -165,7 +165,7 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 		start := time.Now()
-		result := h.recovery.Recover(ctx, target, req.ClientID)
+		result := h.recovery.Recover(ctx, target, req.ClientUID)
 		h.recoverStore.Store(taskID, result)
 		// §59.196 附二: 恢复任务终态必落日志——结果仅存内存 recoverStore
 		// （前端轮询消费），轮询丢失/浏览器后台节流时 UI 误标"未恢复"而
@@ -358,7 +358,7 @@ func (h *OrphanHandler) handleListScanConfigs(w http.ResponseWriter, r *http.Req
 
 func (h *OrphanHandler) handleAddScanConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientID string `json:"client_id"`
+		ClientUID uint `json:"client_id"`
 		ScanPath string `json:"scan_path"`
 		Enabled  bool   `json:"enabled"`
 	}
@@ -366,17 +366,17 @@ func (h *OrphanHandler) handleAddScanConfig(w http.ResponseWriter, r *http.Reque
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 		return
 	}
-	if req.ClientID == "" || req.ScanPath == "" {
+	if req.ClientUID == 0 || req.ScanPath == "" {
 		Error(w, http.StatusBadRequest, 40001, "client_id 和 scan_path 必填")
 		return
 	}
 
 	cfg := model.OrphanScanConfig{
-		ClientID: req.ClientID,
+		ClientUID: req.ClientUID,
 		ScanPath: req.ScanPath,
 		Enabled:  req.Enabled,
 	}
-	if err := h.db.Where("client_id = ? AND scan_path = ?", req.ClientID, req.ScanPath).
+	if err := h.db.Where("client_uid = ? AND scan_path = ?", req.ClientUID, req.ScanPath).
 		FirstOrCreate(&cfg).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50001, "保存失败")
 		return

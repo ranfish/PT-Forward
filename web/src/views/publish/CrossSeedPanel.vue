@@ -271,7 +271,7 @@ interface PresetTorrent {
   name: string
   size: number
   save_path: string
-  client_id: string // §59.170 BUG-1: 下载器名是字符串（"PT0"）——原 number 类型逼出 Number() NaN→0 转换链
+  client_id: number // §59.251: 恒定 ID（数字）
   state?: string
   source_site?: string
   source_site_id?: number
@@ -398,7 +398,7 @@ async function loadSeedDetail(infoHash: string) {
   loading.value = true
   loadError.value = ''
   try {
-    const resp = await seedConfigApi.getSeed(infoHash, String(props.presetTorrent?.client_id || ''))
+    const resp = await seedConfigApi.getSeed(infoHash, props.presetTorrent?.client_id || 0)
     const d: SeedDetail | undefined = resp.data?.data
     if (d) {
       form.value.title = d.title || form.value.title
@@ -595,7 +595,7 @@ async function startScreenshotCaptureTask() {
     await manualForwardApi.startScreenshotCapture({
       name: taskName,
       savePath: selectedTorrent.value.save_path || '',
-      clientId: String(selectedTorrent.value.client_id || ''),
+      clientId: selectedTorrent.value.client_id,
       infoHash: selectedTorrent.value.info_hash,
       siteName: currentSourceSite.value || selectedTorrent.value.source_site || '',
     })
@@ -637,13 +637,13 @@ async function doRefresh(type: string) {
   }
   refreshing.value = type
   try {
-    const payload: { type: string; name: string; savePath?: string; infoHash?: string; siteName?: string; screenshots?: string[]; clientId?: string } = {
+    const payload: { type: string; name: string; savePath?: string; infoHash?: string; siteName?: string; screenshots?: string[]; clientId?: number } = {
       type,
       name: selectedTorrent.value.name,
       savePath: selectedTorrent.value.save_path,
       infoHash: selectedTorrent.value.info_hash,
       siteName: currentSourceSite.value || selectedTorrent.value.source_site || '',
-      clientId: String(selectedTorrent.value.client_id || ''),
+      clientId: selectedTorrent.value.client_id,
     }
     if (type === 'rehost_screenshots') {
       payload.screenshots = form.value.screenshots

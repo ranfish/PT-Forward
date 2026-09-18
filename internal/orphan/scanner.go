@@ -52,23 +52,23 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 
 	// 只查询配置的下载器（不遍历全部下载器）
 	allSavePaths := make(map[string]bool)
-	clientByPath := make(map[string]map[string][]string) // clientID → savePath → torrent names
-	queriedClients := make(map[string]bool)
+	clientByPath := make(map[uint]map[string][]string) // clientUID → savePath → torrent names
+	queriedClients := make(map[uint]bool)
 	for _, cfg := range s.scanConfigs {
-		queriedClients[cfg.ClientID] = true
+		queriedClients[cfg.ClientUID] = true
 	}
-	for clientID := range queriedClients {
+	for clientUID := range queriedClients {
 		if ctx.Err() != nil {
 			break
 		}
-		client, err := s.provider.Get(clientID)
+		client, err := s.provider.Get(clientUID)
 		if err != nil {
 			continue
 		}
 		md, err := client.GetMainData(ctx)
 		if err != nil || md == nil {
 			s.logger.Debug("orphan scan: get maindata failed",
-				zap.String("client", clientID), zap.Error(err))
+				zap.Uint("client", clientUID), zap.Error(err))
 			continue
 		}
 		byPath := make(map[string][]string)
@@ -80,7 +80,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			allSavePaths[sp] = true
 			byPath[sp] = append(byPath[sp], t.Name)
 		}
-		clientByPath[clientID] = byPath
+		clientByPath[clientUID] = byPath
 	}
 
 	// 第二遍：只扫描配置的路径，用配置 client 的种子构建 claimed
@@ -88,11 +88,11 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 	for _, cfg := range s.scanConfigs {
 		sp := filepath.Clean(cfg.ScanPath)
 
-		byPath, ok := clientByPath[cfg.ClientID]
+		byPath, ok := clientByPath[cfg.ClientUID]
 		if !ok {
 			s.logger.Warn("orphan scan: configured client unreachable, skipping path",
 				zap.String("path", sp),
-				zap.String("client", cfg.ClientID))
+				zap.Uint("client", cfg.ClientUID))
 			continue
 		}
 
@@ -102,12 +102,12 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			claimedNames[name] = true
 		}
 
-		orphans := s.scanDirectory(sp, claimedNames, []string{cfg.ClientID}, allSavePaths)
+		orphans := s.scanDirectory(sp, claimedNames, []uint{cfg.ClientUID}, allSavePaths)
 		allOrphans = append(allOrphans, orphans...)
 
 		s.logger.Debug("orphan scan: configured path scanned",
 			zap.String("path", sp),
-			zap.String("client", cfg.ClientID),
+			zap.Uint("client", cfg.ClientUID),
 			zap.Int("claimed", len(claimedNames)),
 			zap.Int("orphans", len(orphans)))
 	}
@@ -180,7 +180,7 @@ func stripChineseBracketPrefix(s string) string {
 	return s
 }
 
-func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, clientIDs []string, allSavePaths map[string]bool) []Entry {
+func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, clientUIDs []uint, allSavePaths map[string]bool) []Entry {
 	entries, err := os.ReadDir(savePath)
 	if err != nil {
 		s.logger.Debug("orphan scan: cannot read directory",
@@ -223,7 +223,7 @@ func (s *Scanner) scanDirectory(savePath string, claimed map[string]bool, client
 			Name:       name,
 			Size:       size,
 			IsDir:      entry.IsDir(),
-			ClientIDs:  clientIDs,
+			ClientUIDs:  clientUIDs,
 			SavePath:   savePath,
 			DetectedAt: now,
 		})

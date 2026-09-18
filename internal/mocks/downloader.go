@@ -9,7 +9,7 @@ import (
 type DownloaderClient struct {
 	Name           string
 	Role           string
-	TransferTargetID string
+	TransferTargetUID uint
 	ID             uint
 	FreeSpaceVal   int64
 
@@ -41,7 +41,7 @@ type DownloaderClient struct {
 
 func (m *DownloaderClient) GetName() string                           { return m.Name }
 func (m *DownloaderClient) GetRole() string                           { return m.Role }
-func (m *DownloaderClient) GetTransferTargetID() string                 { return m.TransferTargetID }
+func (m *DownloaderClient) GetTransferTargetUID() uint                 { return m.TransferTargetUID }
 func (m *DownloaderClient) GetID() uint                               { return m.ID }
 func (m *DownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
 func (m *DownloaderClient) GetTorrentDir() string                      { return "" }
@@ -228,13 +228,13 @@ func (m *DownloaderClient) GetTrackers(ctx context.Context, hash string) ([]stri
 
 type DownloaderProvider struct {
 	Client        model.DownloaderClient
-	GetFn         func(clientID string) (model.DownloaderClient, error)
-	ListClientsFn func() []string
+	GetFn         func(clientUID uint) (model.DownloaderClient, error)
+	ListClientsFn func() []uint
 }
 
-func (p *DownloaderProvider) Get(clientID string) (model.DownloaderClient, error) {
+func (p *DownloaderProvider) Get(clientUID uint) (model.DownloaderClient, error) {
 	if p.GetFn != nil {
-		return p.GetFn(clientID)
+		return p.GetFn(clientUID)
 	}
 	if p.Client != nil {
 		return p.Client, nil
@@ -242,7 +242,7 @@ func (p *DownloaderProvider) Get(clientID string) (model.DownloaderClient, error
 	return nil, nil
 }
 
-func (p *DownloaderProvider) ListClients() []string {
+func (p *DownloaderProvider) ListClients() []uint {
 	if p.ListClientsFn != nil {
 		return p.ListClientsFn()
 	}

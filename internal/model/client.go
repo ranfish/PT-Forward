@@ -19,7 +19,7 @@ type ClientConfig struct {
 	IsDefault      bool           `json:"is_default" gorm:"default:false"`
 	Role           string         `json:"role" gorm:"size:20;default:'seeding'"`
 	IsLocal        bool           `json:"is_local" gorm:"default:false"` // §59.21: 媒体文件是否在本机可访问（本地发布 vs 转种上盒）
-	TransferTargetID string       `json:"transfer_target_id,omitempty" gorm:"column:reseed_target_id;size:50"`
+	TransferTargetUID uint         `json:"transfer_target_uid,omitempty" gorm:"column:reseed_target_uid"` // §59.251: 目标下载器恒定 ID（名字废弃）
 	LastPingAt     *time.Time     `json:"last_ping_at"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
@@ -44,7 +44,7 @@ func (ClientPathMapping) TableName() string { return "client_path_mappings" }
 // §33.1.43 — ClientPublishTarget: 客户端发布目标配置
 type ClientPublishTarget struct {
 	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ClientID        uint      `json:"client_id" gorm:"not null;uniqueIndex:idx_client_site"`
+	ClientUID       uint      `json:"client_uid" gorm:"not null;uniqueIndex:idx_client_site"`
 	SiteName        string    `json:"site_name" gorm:"size:100;not null;uniqueIndex:idx_client_site"`
 	CategoryMapping string    `json:"category_mapping" gorm:"type:text"`
 	SourceMapping   string    `json:"source_mapping" gorm:"type:text"`

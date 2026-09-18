@@ -87,7 +87,7 @@ type SiteInfoProvider interface {
 type CompletionWatcher interface {
 	Start(ctx context.Context) error
 	Stop()
-	Watch(ctx context.Context, clientName, infoHash string, candidateID uint) error
+	Watch(ctx context.Context, clientUID uint, infoHash string, candidateID uint) error
 	SubmitCandidate(ctx context.Context, candidate PublishCandidate) error
 }
 
@@ -108,7 +108,7 @@ type GlobalTransferStats struct {
 type DownloaderClient interface {
 	GetName() string
 	GetRole() string
-	GetTransferTargetID() string
+	GetTransferTargetUID() uint
 	GetID() uint
 	GetSharedPaths() []SharedPathMapping
 	GetTorrentDir() string
@@ -171,8 +171,8 @@ func (t TrackerMessage) TrackerDomain() string {
 }
 
 type DownloaderProvider interface {
-	Get(clientID string) (DownloaderClient, error)
-	ListClients() []string
+	Get(clientUID uint) (DownloaderClient, error)
+	ListClients() []uint
 }
 
 type AuthRepository interface {

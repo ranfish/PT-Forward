@@ -2,6 +2,7 @@ package seeding
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -39,7 +40,7 @@ func (m *FreeEndMonitor) Schedule(record *model.SeedingTorrentRecord) {
 		return
 	}
 
-	key := record.ClientID + "|" + record.InfoHash
+	key := fmt.Sprintf("%d|%s", record.ClientUID, record.InfoHash)
 	delay := time.Until(*record.FreeEndAt)
 
 	if delay <= 0 {
@@ -59,15 +60,15 @@ func (m *FreeEndMonitor) Schedule(record *model.SeedingTorrentRecord) {
 	m.mu.Unlock()
 
 	m.logger.Debug("free end monitor: scheduled",
-		zap.String("client", record.ClientID),
+		zap.Uint("client_uid", record.ClientUID),
 		zap.String("info_hash", record.InfoHash),
 		zap.Time("free_end_at", *record.FreeEndAt),
 		zap.Duration("delay", delay),
 	)
 }
 
-func (m *FreeEndMonitor) Cancel(clientID, infoHash string) {
-	key := clientID + "|" + infoHash
+func (m *FreeEndMonitor) Cancel(clientUID uint, infoHash string) {
+	key := fmt.Sprintf("%d|%s", clientUID, infoHash)
 	m.mu.Lock()
 	if t, ok := m.timers[key]; ok {
 		t.Stop()
@@ -89,17 +90,17 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 	defer func() {
 		if r := recover(); r != nil {
 			m.logger.Error("free end monitor: panic in handleFreeEnded",
-				zap.String("client", record.ClientID),
+				zap.Uint("client_uid", record.ClientUID),
 				zap.String("info_hash", record.InfoHash),
 				zap.Any("recover", r),
 			)
 			m.mu.Lock()
-			delete(m.timers, record.ClientID+"|"+record.InfoHash)
+			delete(m.timers, fmt.Sprintf("%d|%s", record.ClientUID, record.InfoHash))
 			m.mu.Unlock()
 		}
 	}()
 
-	key := record.ClientID + "|" + record.InfoHash
+	key := fmt.Sprintf("%d|%s", record.ClientUID, record.InfoHash)
 	m.mu.Lock()
 	delete(m.timers, key)
 	m.mu.Unlock()
@@ -108,7 +109,7 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 	defer cancel()
 
 	var current model.SeedingTorrentRecord
-	if err := m.db.WithContext(ctx).Where("client_id = ? AND info_hash = ?", record.ClientID, record.InfoHash).First(&current).Error; err != nil {
+	if err := m.db.WithContext(ctx).Where("client_uid = ? AND info_hash = ?", record.ClientUID, record.InfoHash).First(&current).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return
 		}
@@ -124,7 +125,7 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 
 	isDownloading := false
 	if m.client != nil {
-		dlClient, err := m.client.Get(record.ClientID)
+		dlClient, err := m.client.Get(record.ClientUID)
 		if err == nil {
 			ti, err := dlClient.GetTorrentByHash(ctx, record.InfoHash)
 			if err != nil {
@@ -142,9 +143,9 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 
 	if isDownloading {
 		if m.engine != nil {
-			if err := m.engine.PauseForFreeEnd(ctx, record.ClientID, record.InfoHash); err != nil {
+			if err := m.engine.PauseForFreeEnd(ctx, record.ClientUID, record.InfoHash); err != nil {
 				m.logger.Error("free end monitor: pause failed",
-					zap.String("client", record.ClientID),
+					zap.Uint("client_uid", record.ClientUID),
 					zap.String("info_hash", record.InfoHash),
 					zap.Error(err),
 				)
@@ -153,7 +154,7 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 		}
 
 		if m.client != nil {
-			dlClient, err := m.client.Get(record.ClientID)
+			dlClient, err := m.client.Get(record.ClientUID)
 			if err == nil {
 				if err := dlClient.PauseTorrent(ctx, record.InfoHash); err != nil {
 					m.logger.Warn("free end monitor: downloader pause failed", zap.Error(err))
@@ -162,15 +163,15 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 		}
 
 		m.logger.Info("free end monitor: torrent download free period expired, paused",
-			zap.String("client", record.ClientID),
+			zap.Uint("client_uid", record.ClientUID),
 			zap.String("info_hash", record.InfoHash),
 			zap.String("site", record.SiteName),
 		)
 	} else {
 		if m.engine != nil {
-			if err := m.engine.MarkFreeExpired(ctx, record.ClientID, record.InfoHash); err != nil {
+			if err := m.engine.MarkFreeExpired(ctx, record.ClientUID, record.InfoHash); err != nil {
 				m.logger.Error("free end monitor: mark free expired failed",
-					zap.String("client", record.ClientID),
+					zap.Uint("client_uid", record.ClientUID),
 					zap.String("info_hash", record.InfoHash),
 					zap.Error(err),
 				)
@@ -179,7 +180,7 @@ func (m *FreeEndMonitor) handleFreeEnded(record *model.SeedingTorrentRecord) {
 		}
 
 		m.logger.Info("free end monitor: torrent completed, free period expired, continuing seed",
-			zap.String("client", record.ClientID),
+			zap.Uint("client_uid", record.ClientUID),
 			zap.String("info_hash", record.InfoHash),
 			zap.String("site", record.SiteName),
 		)

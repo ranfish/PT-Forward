@@ -138,7 +138,7 @@ func NewRecovery(db *gorm.DB, sp model.SiteInfoProvider, cp model.DownloaderProv
 // SetCoverageService §59.196: 注入 coverage 写服务（main 装配）。
 func (r *Recovery) SetCoverageService(c CoverageWriter) { r.coverageSrv = c }
 
-func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID string) *RecoverResult {
+func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientUID uint) *RecoverResult {
 	result := &RecoverResult{Orphan: orphan}
 	stats := &SearchStats{}
 
@@ -203,7 +203,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 			}
 		}
 
-		actualSite, err := r.downloadWithFallback(ctx, orphan, siteName, torrentID, targetClientID, injectSize, injectName, stats)
+		actualSite, err := r.downloadWithFallback(ctx, orphan, siteName, torrentID, targetClientUID, injectSize, injectName, stats)
 		if err != nil {
 			// §59.185 ①: 失败必落日志——此前仅写 result.Message 返回，全日志零痕迹（城市
 			// cuhash 案实证排查黑洞）
@@ -220,7 +220,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 
 		// 同站扩展：在命中的站点搜索其他集
 		if classification != nil && len(classification.VideoFiles) > 1 {
-			additional := r.expandSameSite(ctx, orphan, classification, siteName, targetClientID)
+			additional := r.expandSameSite(ctx, orphan, classification, siteName, targetClientUID)
 			result.RecoveredCount += additional
 		}
 
@@ -244,7 +244,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientID st
 
 // expandSameSite 在主恢复命中的站点上，搜索并恢复其他视频文件（同站扩展）。
 // classification.VideoFiles[0] 已被主恢复恢复，从 [1] 开始。
-func (r *Recovery) expandSameSite(ctx context.Context, orphan *Entry, classification *util.DirClassification, siteName, targetClientID string) int {
+func (r *Recovery) expandSameSite(ctx context.Context, orphan *Entry, classification *util.DirClassification, siteName string, targetClientUID uint) int {
 	if len(classification.VideoFiles) <= 1 {
 		return 0
 	}
@@ -272,7 +272,7 @@ func (r *Recovery) expandSameSite(ctx context.Context, orphan *Entry, classifica
 			continue
 		}
 
-		err := r.downloadAndAdd(ctx, orphan, siteName, tid, "", targetClientID, vf.Size, fileBase)
+		err := r.downloadAndAdd(ctx, orphan, siteName, tid, "", targetClientUID, vf.Size, fileBase)
 		if err != nil {
 			r.logger.Warn("orphan same-site expansion failed",
 				zap.String("file", vf.Name),
@@ -1041,8 +1041,8 @@ func (r *Recovery) getCategoryAndTags(siteName string) (string, []string) {
 	return category, tags
 }
 
-func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, clientID string, torrentData []byte, savePath, category string, tags []string) error {
-	client, err := r.clientProvider.Get(clientID)
+func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, clientUID uint, torrentData []byte, savePath, category string, tags []string) error {
+	client, err := r.clientProvider.Get(clientUID)
 	if err != nil {
 		return fmt.Errorf("get downloader client: %w", err)
 	}
@@ -1097,7 +1097,7 @@ func (r *Recovery) addTorrentWithRecheck(ctx context.Context, orphan *Entry, cli
 // 层3 次优站递补：排除已败站重搜（优先站/中文线链路复用），最多递补 2 站
 // downloadWithFallback 返回实际下载成功的站点（§59.203：次优站递补成功时
 // 主匹配站点≠实际站点——绝望的牛仔案结果消息误报主站）。
-func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, primarySite, primaryTid, targetClientID string, sourceSize int64, sourceName string, stats *SearchStats) (string, error) {
+func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, primarySite, primaryTid string, targetClientUID uint, sourceSize int64, sourceName string, stats *SearchStats) (string, error) {
 	excluded := map[string]bool{}
 	var lastErr error
 
@@ -1118,7 +1118,7 @@ func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, prim
 		}
 		excluded[site] = true
 
-		err := r.downloadAndAdd(ctx, orphan, site, tid, "", targetClientID, sourceSize, sourceName)
+		err := r.downloadAndAdd(ctx, orphan, site, tid, "", targetClientUID, sourceSize, sourceName)
 		if err == nil {
 			return site, nil
 		}
@@ -1131,7 +1131,7 @@ func (r *Recovery) downloadWithFallback(ctx context.Context, orphan *Entry, prim
 
 		// 层2: cuhash 懒刷新 + 原站重试
 		if r.tryCuhashRefresh(ctx, site) {
-			if err2 := r.downloadAndAdd(ctx, orphan, site, tid, "", targetClientID, sourceSize, sourceName); err2 == nil {
+			if err2 := r.downloadAndAdd(ctx, orphan, site, tid, "", targetClientUID, sourceSize, sourceName); err2 == nil {
 				r.logger.Info("orphan recovery: succeeded after cuhash refresh",
 					zap.String("orphan", orphan.Name),
 					zap.String("site", site))
@@ -1203,7 +1203,7 @@ func (r *Recovery) tryCuhashRefresh(ctx context.Context, siteName string) bool {
 	return true
 }
 
-func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string, savePathOverride string, targetClientID string, sourceSize int64, sourceName string) error {
+func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, torrentID string, savePathOverride string, targetClientUID uint, sourceSize int64, sourceName string) error {
 	if sourceSize <= 0 {
 		sourceSize = orphan.Size
 	}
@@ -1233,9 +1233,9 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 		return fmt.Errorf("注入校验失败: %w", err)
 	}
 
-	clientID := targetClientID
-	if clientID == "" && len(orphan.ClientIDs) > 0 {
-		clientID = orphan.ClientIDs[0]
+	clientUID := targetClientUID
+	if clientUID == 0 && len(orphan.ClientUIDs) > 0 {
+		clientUID = orphan.ClientUIDs[0]
 	}
 
 	savePath := savePathOverride
@@ -1248,7 +1248,7 @@ func (r *Recovery) downloadAndAdd(ctx context.Context, orphan *Entry, siteName, 
 
 	category, tags := r.getCategoryAndTags(siteName)
 
-	if err := r.addTorrentWithRecheck(ctx, orphan, clientID, torrentData, savePath, category, tags); err != nil {
+	if err := r.addTorrentWithRecheck(ctx, orphan, clientUID, torrentData, savePath, category, tags); err != nil {
 		return err
 	}
 

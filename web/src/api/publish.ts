@@ -72,7 +72,7 @@ export const manualForwardApi = {
     return client.post<ApiResponse<Record<string, unknown>>>('/manual-forward/refresh', data)
   },
   // §59.51: 后台截图任务（is_local=true 专用，长任务轮询）
-  startScreenshotCapture(data: { name: string; savePath: string; clientId: string; infoHash?: string; siteName?: string }) {
+  startScreenshotCapture(data: { name: string; savePath: string; clientId: number; infoHash?: string; siteName?: string }) {
     return client.post<ApiResponse<{ started: boolean }>>('/manual-forward/screenshot-capture', data)
   },
   screenshotCaptureProgress() {
@@ -106,7 +106,7 @@ export interface SeedListItem {
   hash: string
   name: string
   size: number
-  client_id: string
+  client_id: number
   save_path: string
   // §59.38 观察期行（组聚合，hash 为造键 client|name）
   variants?: number
@@ -195,29 +195,29 @@ export const seedConfigApi = {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params: { ...params, status: 'observing' } })
   },
   // §59.38: 观察期立即清理
-  purgeObserving(clientId: string, name: string) {
+  purgeObserving(clientId: number, name: string) {
     return client.post<ApiResponse<{ message: string; deleted_snaps: number; deleted_metas: number }>>('/publish/seeds/observing/purge', { clientId, name })
   },
   listSeeds(params: { client_id?: string; save_path?: string; status?: string; search?: string; ready?: string; publish_state?: string; target_site?: string; exclude_forbidden?: string; page?: number; page_size?: number }) {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params })
   },
   uniquePaths() {
-    return client.get<ApiResponse<{ clients: Array<{ client_id: string; paths: Array<{ save_path: string; count: number }> }> }>>('/publish/seeds/unique-paths')
+    return client.get<ApiResponse<{ clients: Array<{ client_id: number; name: string; paths: Array<{ save_path: string; count: number }> }> }>>('/publish/seeds/unique-paths')
   },
-  getSeed(infoHash: string, clientId?: string) {
+  getSeed(infoHash: string, clientId?: number) {
     return client.get<ApiResponse<SeedDetail>>(`/publish/seeds/${infoHash}`, { params: clientId ? { client_id: clientId } : undefined })
   },
   putSeed(infoHash: string, data: { poster?: string; screenshots?: string[]; description?: string; tags?: string[]; siteName?: string; reviewed?: boolean }) {
     return client.put<ApiResponse<{ reviewed: boolean; missing_fields: string[]; reassembled_title?: string; rendered_description?: string; render_error?: string }>>(`/publish/seeds/${infoHash}`, data)
   },
-  batchFetch(items: Array<{ hash: string; name: string; size: number; savePath: string }>, clientId: string) {
+  batchFetch(items: Array<{ hash: string; name: string; size: number; savePath: string }>, clientId: number) {
     return client.post<ApiResponse<{ message: string; total: number }>>('/publish/seeds/batch-fetch', { items, clientId })
   },
   batchFetchProgress() {
     return client.get<ApiResponse<{ active: boolean; total: number; done: number; failed: number; items: Array<{ hash: string; name: string; status: string; error?: string }> }>>('/publish/seeds/batch-fetch-progress')
   },
-  snapshotUnconfigured(clientId: string, savePath: string) {
-    return client.get<ApiResponse<{ items: Array<{ hash: string; name: string; size: number; clientId: string; savePath: string }>; total: number }>>('/downloads/snapshot-unconfigured', { params: { client_id: clientId, save_path: savePath } })
+  snapshotUnconfigured(clientId: number, savePath: string) {
+    return client.get<ApiResponse<{ items: Array<{ hash: string; name: string; size: number; clientId: number; savePath: string }>; total: number }>>('/downloads/snapshot-unconfigured', { params: { client_id: clientId, save_path: savePath } })
   },
   getFetchPriority() {
     return client.get<ApiResponse<{ priority: string[] }>>('/publish/fetch-priority')
@@ -225,7 +225,7 @@ export const seedConfigApi = {
   setFetchPriority(priority: string[]) {
     return client.put<ApiResponse<{ priority: string[] }>>('/publish/fetch-priority', { priority })
   },
-  fetchSingleSeed(infoHash: string, clientId: string) {
+  fetchSingleSeed(infoHash: string, clientId: number) {
     return client.post<ApiResponse<{ message: string }>>(`/publish/seeds/${infoHash}/fetch`, {}, { params: { client_id: clientId } })
   },
   deleteSeed(infoHash: string) {

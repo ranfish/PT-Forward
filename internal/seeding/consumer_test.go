@@ -35,8 +35,8 @@ func TestCreateRecordFromPush_MarksRSSTorrentSeenPushed(t *testing.T) {
 	}
 
 	// 调用 createRecordFromPush（模拟推送成功路径）
-	e.createRecordFromPush(context.Background(), "c1", &pusher.PushedEvent{
-		ClientID:       "c1",
+	e.createRecordFromPush(context.Background(), 1, &pusher.PushedEvent{
+		ClientUID:       1,
 		SiteName:       "site1",
 		TorrentID:      "t100",
 		SubscriptionID: "1",
@@ -55,7 +55,7 @@ func TestCreateRecordFromPush_MarksRSSTorrentSeenPushed(t *testing.T) {
 
 	// 验证 seeding record 也已创建
 	var rec model.SeedingTorrentRecord
-	if err := db.Where("client_id = ? AND info_hash = ?", "c1", "hash100").First(&rec).Error; err != nil {
+	if err := db.Where("client_uid = ? AND info_hash = ?", 1, "hash100").First(&rec).Error; err != nil {
 		t.Fatalf("query record: %v", err)
 	}
 	if rec.Status != model.SeedingStatusSeeding {
@@ -81,7 +81,7 @@ func TestLoadScoringConfig_ReadsEmbeddedScoringConfig(t *testing.T) {
 		Name:     "test-scoring-sub",
 		Enabled:  true,
 		SiteName: "site1",
-		ClientID: "c1",
+		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:       true,
 			HalfLifeHours: 3.5,
@@ -121,22 +121,22 @@ func setupConfigTestDB(t *testing.T) *gorm.DB {
 func TestLoadActiveClientConfig(t *testing.T) {
 	t.Run("seeding config hit", func(t *testing.T) {
 		db := setupConfigTestDB(t)
-		db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, Role: "seeding", MaxActiveSeeding: 7, MinDiskSpaceGB: 20})
+		db.Create(&model.SeedingClientConfig{ClientUID: 1, Enabled: true, Role: "seeding", MaxActiveSeeding: 7, MinDiskSpaceGB: 20})
 		e := NewEngine(db, zap.NewNop())
-		cfg, ok := e.LoadActiveClientConfig(context.Background(), "c1")
+		cfg, ok := e.LoadActiveClientConfig(context.Background(), 1)
 		if !ok {
 			t.Fatal("expected ok=true for seeding config")
 		}
-		if cfg.ClientID != "c1" || cfg.MaxActiveSeeding != 7 || cfg.MinDiskSpaceGB != 20 {
-			t.Errorf("unexpected seeding cfg: client=%s max=%d min=%v",
-				cfg.ClientID, cfg.MaxActiveSeeding, cfg.MinDiskSpaceGB)
+		if cfg.ClientUID != 1 || cfg.MaxActiveSeeding != 7 || cfg.MinDiskSpaceGB != 20 {
+			t.Errorf("unexpected seeding cfg: client=%d max=%d min=%v",
+				cfg.ClientUID, cfg.MaxActiveSeeding, cfg.MinDiskSpaceGB)
 		}
 	})
 
 	t.Run("download role config hit", func(t *testing.T) {
 		db := setupConfigTestDB(t)
 		db.Create(&model.SeedingClientConfig{
-			ClientID:           "qb-dl",
+			ClientUID:           1,
 			Enabled:            true,
 			Role:               "download",
 			MaxActiveSeeding:   5,
@@ -144,7 +144,7 @@ func TestLoadActiveClientConfig(t *testing.T) {
 			DiskProtectEnabled: true,
 		})
 		e := NewEngine(db, zap.NewNop())
-		cfg, ok := e.LoadActiveClientConfig(context.Background(), "qb-dl")
+		cfg, ok := e.LoadActiveClientConfig(context.Background(), 1)
 		if !ok {
 			t.Fatal("expected ok=true for download role config")
 		}
@@ -160,7 +160,7 @@ func TestLoadActiveClientConfig(t *testing.T) {
 	t.Run("neither config found", func(t *testing.T) {
 		db := setupConfigTestDB(t)
 		e := NewEngine(db, zap.NewNop())
-		_, ok := e.LoadActiveClientConfig(context.Background(), "ghost")
+		_, ok := e.LoadActiveClientConfig(context.Background(), 2)
 		if ok {
 			t.Fatal("expected ok=false when no config exists")
 		}
@@ -169,10 +169,10 @@ func TestLoadActiveClientConfig(t *testing.T) {
 	t.Run("disabled config skipped", func(t *testing.T) {
 		db := setupConfigTestDB(t)
 		// 用 map 创建绕过 gorm default:true tag 对 bool 零值的覆盖
-		db.Model(&model.SeedingClientConfig{}).Create(map[string]interface{}{"client_id": "c2", "enabled": false})
-		db.Model(&model.DownloadClientConfig{}).Create(map[string]interface{}{"client_id": "c2", "enabled": false})
+		db.Model(&model.SeedingClientConfig{}).Create(map[string]interface{}{"client_uid": 2, "enabled": false})
+		db.Model(&model.DownloadClientConfig{}).Create(map[string]interface{}{"client_uid": 2, "enabled": false})
 		e := NewEngine(db, zap.NewNop())
-		_, ok := e.LoadActiveClientConfig(context.Background(), "c2")
+		_, ok := e.LoadActiveClientConfig(context.Background(), 2)
 		if ok {
 			t.Fatal("expected ok=false for disabled configs")
 		}

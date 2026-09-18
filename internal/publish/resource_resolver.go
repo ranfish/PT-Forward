@@ -15,7 +15,7 @@ import (
 
 // ResourceView 一个资源的完整数据视图。
 type ResourceView struct {
-	ClientID string   // 资源键：下载器
+	ClientUID uint    // §59.251: 资源键：下载器恒定 ID
 	SavePath string   // 资源键：目录（Clean 形态）
 	Name     string   // 资源键：下载器种子名
 	Hashes   []string // 该资源键下全部活跃（hidden=0）hash
@@ -59,14 +59,14 @@ func (rr *ResourceResolver) ResolveResource(ctx context.Context, infoHash string
 		First(&snap).Error
 	if err == nil && snap.Name != "" {
 		rv := &ResourceView{
-			ClientID: snap.ClientID,
+			ClientUID: snap.ClientUID,
 			SavePath: snap.SavePath,
 			Name:     snap.Name,
 		}
 		// 圈资源键下全部活跃 hash
 		rr.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
-			Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = ?",
-				snap.ClientID, snap.SavePath, snap.Name, false).
+			Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = ?",
+				snap.ClientUID, snap.SavePath, snap.Name, false).
 			Pluck("hash", &rv.Hashes)
 		if len(rv.Hashes) > 0 {
 			rr.db.WithContext(ctx).

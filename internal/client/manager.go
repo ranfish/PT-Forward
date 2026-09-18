@@ -17,14 +17,14 @@ type Manager struct {
 	db      *gorm.DB
 	logger  *zap.Logger
 	mu      sync.RWMutex
-	clients map[string]model.DownloaderClient
+	clients map[uint]model.DownloaderClient // §59.251: 键=恒定 DB ID（名字仅显示）
 }
 
 func NewManager(db *gorm.DB, logger *zap.Logger) *Manager {
 	return &Manager{
 		db:      db,
 		logger:  logger,
-		clients: make(map[string]model.DownloaderClient),
+		clients: make(map[uint]model.DownloaderClient),
 	}
 }
 
@@ -39,9 +39,9 @@ func (m *Manager) LoadClients(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	activeIDs := make(map[string]bool)
+	activeIDs := make(map[uint]bool)
 	for _, cfg := range configs {
-		activeIDs[cfg.Name] = true
+		activeIDs[cfg.ID] = true
 
 		paths := m.loadPaths(cfg.ID)
 		client, err := m.createClient(&cfg, paths)
@@ -61,54 +61,55 @@ func (m *Manager) LoadClients(ctx context.Context) error {
 				zap.Error(err),
 			)
 			cancel()
-			delete(m.clients, cfg.Name)
+			delete(m.clients, cfg.ID)
 			continue
 		}
 		cancel()
 
-		m.clients[cfg.Name] = client
+		m.clients[cfg.ID] = client
 		m.logger.Info("client connected", zap.String("name", cfg.Name), zap.String("type", cfg.Type))
 	}
 
-	for name := range m.clients {
-		if !activeIDs[name] {
-			if old, ok := m.clients[name]; ok {
+	for id := range m.clients {
+		if !activeIDs[id] {
+			if old, ok := m.clients[id]; ok {
 				old.Close()
 			}
-			delete(m.clients, name)
+			delete(m.clients, id)
 		}
 	}
 
 	return nil
 }
 
-func (m *Manager) Get(clientID string) (model.DownloaderClient, error) {
+// Get §59.251: 按恒定 DB ID 获取（名字键废弃）
+func (m *Manager) Get(clientUID uint) (model.DownloaderClient, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	c, ok := m.clients[clientID]
+	c, ok := m.clients[clientUID]
 	if !ok {
-		return nil, clientError(ErrClientConnection, fmt.Sprintf("client %q not found or not connected", clientID), nil)
+		return nil, clientError(ErrClientConnection, fmt.Sprintf("client %d not found or not connected", clientUID), nil)
 	}
 	return c, nil
 }
 
-func (m *Manager) IsConnected(name string) bool {
+func (m *Manager) IsConnected(id uint) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	_, ok := m.clients[name]
+	_, ok := m.clients[id]
 	return ok
 }
 
-func (m *Manager) ListClients() []string {
+func (m *Manager) ListClients() []uint {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	names := make([]string, 0, len(m.clients))
-	for name := range m.clients {
-		names = append(names, name)
+	ids := make([]uint, 0, len(m.clients))
+	for id := range m.clients {
+		ids = append(ids, id)
 	}
-	return names
+	return ids
 }
 
 func (m *Manager) GetByDBID(ctx context.Context, id uint) (model.DownloaderClient, *model.ClientConfig, error) {
@@ -119,7 +120,7 @@ func (m *Manager) GetByDBID(ctx context.Context, id uint) (model.DownloaderClien
 		return nil, nil, clientError(ErrClientConnection, "client config not found", err)
 	}
 
-	client, err := m.Get(cfg.Name)
+	client, err := m.Get(cfg.ID)
 	if err != nil {
 		return nil, &cfg, err
 	}
@@ -131,14 +132,14 @@ func (m *Manager) Reload(ctx context.Context) error {
 }
 
 // ReloadClient 重连单个客户端（编辑下载器时用，避免全量 Reload 阻塞其他客户端）
-func (m *Manager) ReloadClient(ctx context.Context, name string) error {
+func (m *Manager) ReloadClient(ctx context.Context, id uint) error {
 	var cfg model.ClientConfig
-	if err := m.db.WithContext(ctx).Where("name = ? AND enabled = ?", name, true).First(&cfg).Error; err != nil {
+	if err := m.db.WithContext(ctx).Where("id = ? AND enabled = ?", id, true).First(&cfg).Error; err != nil {
 		// 客户端被禁用或删除 → 从池中移除
 		m.mu.Lock()
-		if old, ok := m.clients[name]; ok {
+		if old, ok := m.clients[id]; ok {
 			old.Close()
-			delete(m.clients, name)
+			delete(m.clients, id)
 		}
 		m.mu.Unlock()
 		return nil
@@ -147,25 +148,25 @@ func (m *Manager) ReloadClient(ctx context.Context, name string) error {
 	paths := m.loadPaths(cfg.ID)
 	client, err := m.createClient(&cfg, paths)
 	if err != nil {
-		m.logger.Warn("reloadClient: failed to create client", zap.String("name", name), zap.Error(err))
+		m.logger.Warn("reloadClient: failed to create client", zap.Uint("id", id), zap.String("name", cfg.Name), zap.Error(err))
 		return err
 	}
 
 	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	if connected, err := m.connectClient(connectCtx, client); !connected {
-		m.logger.Warn("reloadClient: connect failed", zap.String("name", name), zap.Error(err))
+		m.logger.Warn("reloadClient: connect failed", zap.Uint("id", id), zap.String("name", cfg.Name), zap.Error(err))
 		return err
 	}
 
 	m.mu.Lock()
-	if old, ok := m.clients[name]; ok {
+	if old, ok := m.clients[id]; ok {
 		old.Close()
 	}
-	m.clients[name] = client
+	m.clients[id] = client
 	m.mu.Unlock()
 
-	m.logger.Info("client reloaded", zap.String("name", name), zap.String("type", cfg.Type))
+	m.logger.Info("client reloaded", zap.Uint("id", id), zap.String("name", cfg.Name), zap.String("type", cfg.Type))
 	return nil
 }
 
@@ -227,48 +228,48 @@ func (m *Manager) HealthCheck(ctx context.Context) {
 		return
 	}
 
-	activeNames := make(map[string]bool, len(configs))
+	activeIDs := make(map[uint]bool, len(configs))
 
 	for i := range configs {
 		if ctx.Err() != nil {
 			return
 		}
 		cfg := &configs[i]
-		activeNames[cfg.Name] = true
+		activeIDs[cfg.ID] = true
 
 		m.mu.RLock()
-		existing, isConnected := m.clients[cfg.Name]
+		existing, isConnected := m.clients[cfg.ID]
 		m.mu.RUnlock()
 
 		if isConnected {
-			m.healthCheckConnected(ctx, cfg.Name, existing)
+			m.healthCheckConnected(ctx, cfg.ID, existing)
 		} else {
 			m.tryReconnect(ctx, cfg)
 		}
 	}
 
 	m.mu.Lock()
-	for name := range m.clients {
-		if !activeNames[name] {
-			delete(m.clients, name)
-			m.logger.Info("client removed (disabled or deleted)", zap.String("name", name))
+	for id := range m.clients {
+		if !activeIDs[id] {
+			delete(m.clients, id)
+			m.logger.Info("client removed (disabled or deleted)", zap.Uint("id", id))
 		}
 	}
 	m.mu.Unlock()
 }
 
-func (m *Manager) healthCheckConnected(ctx context.Context, name string, c model.DownloaderClient) {
+func (m *Manager) healthCheckConnected(ctx context.Context, id uint, c model.DownloaderClient) {
 	if checker, ok := c.(ipBannedChecker); ok && checker.IsIPBanned() {
-		m.logger.Warn("client IP banned, attempting reconnect", zap.String("clientID", name))
+		m.logger.Warn("client IP banned, attempting reconnect", zap.Uint("client_uid", id))
 		if connector, ok := c.(connecter); ok {
 			connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			if err := connector.Connect(connectCtx); err != nil {
 				m.logger.Warn("client reconnect failed, IP still banned",
-					zap.String("clientID", name), zap.Error(err))
+					zap.Uint("client_uid", id), zap.Error(err))
 				cancel()
 				return
 			}
-			m.logger.Info("client reconnect succeeded after IP ban", zap.String("clientID", name))
+			m.logger.Info("client reconnect succeeded after IP ban", zap.Uint("client_uid", id))
 			cancel()
 		}
 		return
@@ -276,17 +277,17 @@ func (m *Manager) healthCheckConnected(ctx context.Context, name string, c model
 
 	if _, err := c.GetMainData(ctx); err != nil {
 		m.logger.Warn("client ping failed, attempting reconnect",
-			zap.String("clientID", name), zap.Error(err))
+			zap.Uint("client_uid", id), zap.Error(err))
 		if connector, ok := c.(connecter); ok {
 			connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			if err := connector.Connect(connectCtx); err != nil {
 				m.logger.Warn("client reconnect failed, removing from pool",
-					zap.String("clientID", name), zap.Error(err))
+					zap.Uint("client_uid", id), zap.Error(err))
 				m.mu.Lock()
-				delete(m.clients, name)
+				delete(m.clients, id)
 				m.mu.Unlock()
 			} else {
-				m.logger.Info("client reconnected successfully", zap.String("clientID", name))
+				m.logger.Info("client reconnected successfully", zap.Uint("client_uid", id))
 			}
 			cancel()
 		}
@@ -312,7 +313,7 @@ func (m *Manager) tryReconnect(ctx context.Context, cfg *model.ClientConfig) {
 	cancel()
 
 	m.mu.Lock()
-	m.clients[cfg.Name] = client
+	m.clients[cfg.ID] = client
 	m.mu.Unlock()
 
 	m.logger.Info("client connected (recovered by health check)",

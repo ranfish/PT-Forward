@@ -24,7 +24,7 @@ type freeWaitEntry struct {
 	InfoHash       string
 	Title          string
 	Size           int64
-	ClientID       string
+	ClientUID      uint
 	SubscriptionID string
 	HasHR          bool
 	HRSeedTimeH    int
@@ -63,7 +63,7 @@ func (m *FreeWaitMonitor) RecoverOnStartup(ctx context.Context) {
 			InfoHash:        dbEntry.InfoHash,
 			Title:           dbEntry.Title,
 			Size:            dbEntry.Size,
-			ClientID:        dbEntry.ClientID,
+			ClientUID:        dbEntry.ClientUID,
 			SubscriptionID:  dbEntry.SubscriptionID,
 			HasHR:           dbEntry.HasHR,
 			HRSeedTimeH:     dbEntry.HRSeedTimeH,
@@ -83,7 +83,7 @@ func (m *FreeWaitMonitor) RecoverOnStartup(ctx context.Context) {
 	}
 }
 
-func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size int64, checkBefore *time.Time, clientID, subscriptionID string, hasHR bool, hrSeedTimeH int, recheckSec, minRemainMin int) {
+func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size int64, checkBefore *time.Time, clientUID uint, subscriptionID string, hasHR bool, hrSeedTimeH int, recheckSec, minRemainMin int) {
 	if torrentID == "" {
 		return
 	}
@@ -107,7 +107,7 @@ func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size 
 		InfoHash:        infoHash,
 		Title:           title,
 		Size:            size,
-		ClientID:        clientID,
+		ClientUID:        clientUID,
 		SubscriptionID:  subscriptionID,
 		HasHR:           hasHR,
 		HRSeedTimeH:     hrSeedTimeH,
@@ -126,7 +126,7 @@ func (m *FreeWaitMonitor) Add(siteName, torrentID, infoHash, title string, size 
 		InfoHash:       infoHash,
 		Title:          title,
 		Size:           size,
-		ClientID:       clientID,
+		ClientUID:       clientUID,
 		SubscriptionID: subscriptionID,
 		HasHR:          hasHR,
 		HRSeedTimeH:    hrSeedTimeH,
@@ -272,7 +272,7 @@ type FreeWaitEntryInfo struct {
 	TorrentID      string    `json:"torrentID"`
 	Title          string    `json:"title"`
 	Size           int64     `json:"size"`
-	ClientID       string    `json:"clientId"`
+	ClientUID      uint      `json:"clientUid"`
 	SubscriptionID string    `json:"subscriptionID"`
 	AddedAt        time.Time `json:"addedAt"`
 	CheckBefore    *time.Time `json:"checkBefore,omitempty"`
@@ -292,7 +292,7 @@ func (m *FreeWaitMonitor) ListPending() []FreeWaitEntryInfo {
 			TorrentID:      e.TorrentID,
 			Title:          e.Title,
 			Size:           e.Size,
-			ClientID:       e.ClientID,
+			ClientUID:       e.ClientUID,
 			SubscriptionID: e.SubscriptionID,
 			AddedAt:        e.AddedAt,
 			CheckBefore:    e.CheckBefore,

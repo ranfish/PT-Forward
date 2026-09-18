@@ -19,7 +19,9 @@
         <a-tabs v-model:active-key="activeTab">
           <a-tab-pane key="matches" :tab="t('reseed.matchResults')">
             <div style="margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
-              <a-input v-model:value="filter.clientId" placeholder="客户端" style="width: 150px" allow-clear @press-enter="onFilterSearch" />
+              <a-select v-model:value="filter.clientId" placeholder="客户端" style="width: 150px" allow-clear show-search @change="onFilterSearch">
+                <a-select-option v-for="(name, id) in downloaderMap" :key="id" :value="Number(id)">{{ name }}</a-select-option>
+              </a-select>
               <a-input v-model:value="filter.site" placeholder="站点" style="width: 150px" allow-clear @press-enter="onFilterSearch" />
               <a-input v-model:value="filter.torrentId" placeholder="种子ID" style="width: 130px" allow-clear @press-enter="onFilterSearch" />
               <a-select v-model:value="filter.status" placeholder="状态" style="width: 120px" allow-clear>
@@ -267,7 +269,7 @@ interface ReseedMatchItem {
   fail_reason: string
   directory?: string
   created_at: string
-  client_id: string
+  client_uid: number
 }
 
 const loading = ref(false)
@@ -279,7 +281,7 @@ const matchesPage = ref(1)
 const matchesPageSize = ref(20)
 const activeTab = ref('matches')
 
-const filter = reactive({ clientId: '', site: '', torrentId: '', status: '' })
+const filter = reactive({ clientId: undefined as number | undefined, site: '', torrentId: '', status: '' })
 const matchesOrder = reactive({ field: '', order: '' })
 const selectedMatchKeys = ref<number[]>([])
 
@@ -330,7 +332,7 @@ const iyuuColumns = [
 
 const matchColumns = [
   { title: t('reseed.sourceInfoHash'), dataIndex: 'source_info_hash', key: 'source_info_hash', ellipsis: true, sorter: true },
-  { title: '客户端', dataIndex: 'client_id', key: 'client_id', width: 100, sorter: true },
+  { title: '客户端', dataIndex: 'client_uid', key: 'client_uid', width: 100, sorter: true, customRender: ({ text }: { text: number }) => downloaderMap.value[String(text)] || `#${text}` },
   { title: t('reseed.targetSite'), dataIndex: 'target_site', key: 'target_site', width: 120, sorter: true },
   { title: '种子ID', dataIndex: 'target_torrent_id', key: 'target_torrent_id', width: 110, sorter: true },
   { title: '资源文件夹', dataIndex: 'directory', key: 'directory', ellipsis: true, sorter: true },
@@ -366,7 +368,7 @@ async function fetchMatches() {
     const resp = await reseedApi.getMatches(taskId, {
       page: matchesPage.value,
       pageSize: matchesPageSize.value,
-      clientId: filter.clientId || undefined,
+      clientId: filter.clientId ?? undefined,
       site: filter.site || undefined,
       torrentId: filter.torrentId || undefined,
       status: filter.status || undefined,
@@ -415,7 +417,7 @@ function onFilterSearch() {
 }
 
 function onFilterReset() {
-  filter.clientId = ''
+  filter.clientId = undefined
   filter.site = ''
   filter.torrentId = ''
   filter.status = ''

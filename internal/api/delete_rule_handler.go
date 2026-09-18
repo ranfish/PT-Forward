@@ -292,14 +292,14 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 
 	type torrentWithClient struct {
 		ti       *model.TorrentInfo
-		clientID string
+		clientUID uint // §59.251: range 变量遮蔽修复占位
 	}
 	var torrentEntries []torrentWithClient
 	if h.clientMgr != nil {
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
-		for _, clientName := range h.clientMgr.ListClients() {
-			dl, err := h.clientMgr.Get(clientName)
+		for _, clientUID := range h.clientMgr.ListClients() {
+			dl, err := h.clientMgr.Get(clientUID)
 			if err != nil {
 				continue
 			}
@@ -308,7 +308,7 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 				continue
 			}
 			for _, t := range ts {
-				torrentEntries = append(torrentEntries, torrentWithClient{ti: t, clientID: clientName})
+				torrentEntries = append(torrentEntries, torrentWithClient{ti: t, clientUID: clientUID})
 			}
 		}
 	}
@@ -334,7 +334,7 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 		rec, hasRec := recordMap[strings.ToLower(ti.Hash)]
 		if !hasRec {
 			rec = &model.SeedingTorrentRecord{
-				ClientID: entry.clientID,
+				ClientUID: entry.clientUID,
 				InfoHash: ti.Hash,
 				Status:   model.SeedingStatusSeeding,
 				Source:   "sync",
@@ -392,7 +392,7 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 				title = c.ti.Name
 			}
 			matched = append(matched, map[string]interface{}{
-				"clientID":  c.rec.ClientID,
+				"clientUID":  c.rec.ClientUID,
 				"infoHash":  c.rec.InfoHash,
 				"siteName":  c.rec.SiteName,
 				"torrentID": c.rec.TorrentID,
@@ -467,7 +467,7 @@ func (h *DeleteRuleHandler) handleTestRuleDryrun(w http.ResponseWriter, r *http.
 				Discount:  model.DiscountNone,
 				IsFree:    false,
 				HasHR:     false,
-				ClientID:  "test",
+				ClientUID: 1,
 				TorrentID: "test",
 			},
 			Torrent: &model.TorrentInfo{

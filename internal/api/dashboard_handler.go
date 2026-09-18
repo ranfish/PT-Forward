@@ -27,7 +27,7 @@ type clientOnlineChecker interface {
 }
 
 type torrentCounter interface {
-	GetRealTorrentCounts() map[string]*seeding.RealTorrentCounts
+	GetRealTorrentCounts() map[uint]*seeding.RealTorrentCounts
 }
 
 func NewDashboardHandler(db *gorm.DB, logger *zap.Logger, version string, checker clientOnlineChecker) *DashboardHandler {
@@ -672,7 +672,12 @@ func (h *DashboardHandler) handleTaskAction(w http.ResponseWriter, r *http.Reque
 
 func (h *DashboardHandler) handleTrafficHourly(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	clientID := r.URL.Query().Get("client_id")
+	clientUID := 0
+	if v := r.URL.Query().Get("client_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			clientUID = int(n)
+		}
+	}
 	days := 7
 	if d := r.URL.Query().Get("days"); d != "" {
 		if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= 90 {
@@ -684,8 +689,8 @@ func (h *DashboardHandler) handleTrafficHourly(w http.ResponseWriter, r *http.Re
 	query := h.db.WithContext(ctx).Model(&model.TrafficStatsHourly{}).
 		Where("hour >= ?", cutoff).
 		Order("hour ASC")
-	if clientID != "" {
-		query = query.Where("client_id = ?", clientID)
+	if clientUID != 0 {
+		query = query.Where("client_uid = ?", clientUID)
 	}
 
 	var records []model.TrafficStatsHourly

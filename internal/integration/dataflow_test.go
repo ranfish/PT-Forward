@@ -44,7 +44,7 @@ func TestScenario_F1_FetchParseDispatch(t *testing.T) {
 	sub := &model.RSSSubscription{
 		Name: "f1-sub", SiteName: "source-site",
 		URLs: []string{"https://source.com/rss"}, Enabled: true,
-		ClientID: "seeding-client",
+		ClientUID: 1,
 	}
 	require.NoError(t, db.Create(sub).Error)
 
@@ -97,7 +97,7 @@ func TestScenario_F1_MultipleItems(t *testing.T) {
 	sub := &model.RSSSubscription{
 		Name: "f1-multi", SiteName: "multi-site",
 		URLs: []string{"https://multi.com/rss"}, Enabled: true,
-		ClientID: "seeding-client",
+		ClientUID: 1,
 	}
 	require.NoError(t, db.Create(sub).Error)
 
@@ -155,7 +155,7 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 	sub := &model.RSSSubscription{
 		Name: "f4-sub", SiteName: "f4-site",
 		URLs: []string{"https://f4.com/rss"}, Enabled: true,
-		ClientID: "seeding-client",
+		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			MaxCandidates:    10,
 			MinScore:         -1,
@@ -168,7 +168,7 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 	subID := fmt.Sprintf("%d", sub.ID)
 
 	record := &model.SeedingTorrentRecord{
-		ClientID:       "seeding-client",
+		ClientUID:       1,
 		TorrentID:      "free-001",
 		InfoHash:       "aa111bb222cc333dd444ee555ff666aa777bb88",
 		SiteName:       "f4-site",
@@ -196,7 +196,7 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 	}
 
 	mockDLProvider := &mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return mockDLClient, nil
 		},
 	}
@@ -228,13 +228,13 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 	defer eng.Stop(ctx)
 
 	var dbRecords []model.SeedingTorrentRecord
-	db.Where("client_id = ? AND status = ? AND source = ?", "seeding-client", model.SeedingStatusSeeding, "rss").Find(&dbRecords)
+	db.Where("client_uid = ? AND status = ? AND source = ?", 1, model.SeedingStatusSeeding, "rss").Find(&dbRecords)
 	t.Logf("F4 debug: db_records=%d discount=%s isFree=%v", len(dbRecords), dbRecords[0].Discount, dbRecords[0].IsFree)
 
 	var dbSub model.RSSSubscription
 	require.NoError(t, db.First(&dbSub).Error)
 	t.Logf("F4 debug: sub.ID=%d Enabled=%v ClientID=%q ScoringCfg.MaxCandidates=%d ScoringCfg.MaxActiveSeeding=%d",
-		dbSub.ID, dbSub.Enabled, dbSub.ClientID, dbSub.ScoringConfig.MaxCandidates, dbSub.ScoringConfig.MaxActiveSeeding)
+		dbSub.ID, dbSub.Enabled, dbSub.ClientUID, dbSub.ScoringConfig.MaxCandidates, dbSub.ScoringConfig.MaxActiveSeeding)
 
 	results, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID))
 	require.NoError(t, err)
@@ -260,7 +260,7 @@ func TestScenario_F4_SkipsNonFree(t *testing.T) {
 	sub := &model.RSSSubscription{
 		Name: "f4skip-sub", SiteName: "f4skip-site",
 		URLs: []string{"https://f4skip.com/rss"}, Enabled: true,
-		ClientID: "seeding-client",
+		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			MaxCandidates:    10,
 			MinScore:         0,
@@ -271,7 +271,7 @@ func TestScenario_F4_SkipsNonFree(t *testing.T) {
 	require.NoError(t, db.Create(sub).Error)
 
 	nonFreeRecord := &model.SeedingTorrentRecord{
-		ClientID:  "seeding-client",
+		ClientUID:  1,
 		TorrentID: "nonfree-001",
 		InfoHash:  "bb111bb222cc333dd444ee555ff666aa777bb99",
 		SiteName:  "f4skip-site",
@@ -289,7 +289,7 @@ func TestScenario_F4_SkipsNonFree(t *testing.T) {
 	}
 
 	mockDLProvider := &mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return mockDLClient, nil
 		},
 	}
@@ -326,7 +326,7 @@ func TestScenario_F7_SizeTitleMatchAndInject(t *testing.T) {
 	require.NoError(t, db.Create(reseedClient).Error)
 
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "reseed-client",
+		ClientUID:  1,
 		TorrentID: "src-001",
 		InfoHash:  "aa111bb222cc333dd444ee555ff666aa777bb88",
 		SiteName:  "f7-source",
@@ -381,7 +381,7 @@ func TestScenario_F7_SizeTitleMatchAndInject(t *testing.T) {
 	}
 
 	mockDLProvider := &mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {
 					atomic.AddInt32(&addFromFileCalled, 1)
@@ -453,7 +453,7 @@ func TestScenario_F7_NoMatchFound(t *testing.T) {
 	require.NoError(t, db.Create(nomatchClient).Error)
 
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "reseed-client-nm",
+		ClientUID:  1,
 		TorrentID: "src-nm-001",
 		InfoHash:  "cc111bb222cc333dd444ee555ff666aa777bb00",
 		SiteName:  "f7nomatch-src",
@@ -492,7 +492,7 @@ func TestScenario_F7_NoMatchFound(t *testing.T) {
 	}
 
 	mockDLProvider := &mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
 					return []*model.TorrentInfo{

@@ -32,7 +32,7 @@
             <a-divider>{{ t('subscription.downloaderSettings') }}</a-divider>
             <a-form-item :label="t('downloader.title')" name="clientId">
               <a-select v-model:value="configForm.clientId" :placeholder="t('subscription.selectDownloader')" :loading="downloadersLoading" allow-clear>
-                <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">
+                <a-select-option v-for="d in downloaders" :key="d.id" :value="d.id">
                   {{ d.name }}（{{ d.type }}）
                 </a-select-option>
               </a-select>
@@ -127,7 +127,7 @@
               <a-col :span="12">
                 <a-form-item :label="t('subscription.reseedClients')">
                   <a-select v-model:value="configForm.transferClientIds" mode="multiple" :placeholder="t('subscription.selectReseedClients')" :loading="downloadersLoading" style="width: 100%">
-                    <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">{{ d.name }}（{{ d.type }}）</a-select-option>
+                    <a-select-option v-for="d in downloaders" :key="d.id" :value="d.id">{{ d.name }}（{{ d.type }}）</a-select-option>
                   </a-select>
                 </a-form-item>
               </a-col>
@@ -267,7 +267,7 @@
                   <a-col :span="12">
                     <a-form-item :label="t('subscription.candidateClients')">
                       <a-select v-model:value="configForm.candidateClients" mode="multiple" :placeholder="t('subscription.selectCandidateClients')" :loading="downloadersLoading" style="width: 100%">
-                        <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">
+                        <a-select-option v-for="d in downloaders" :key="d.id" :value="d.id">
                           {{ d.name }}（{{ d.type }}）
                         </a-select-option>
                       </a-select>
@@ -500,7 +500,7 @@ const configForm = reactive({
   name: '',
   urls: '',
   cron: '',
-  clientId: '',
+  clientId: undefined as number | undefined,
   savePath: '',
   category: '',
   addPaused: false,
@@ -515,7 +515,7 @@ const configForm = reactive({
   autoTransfer: false,
   notifyId: '',
   publishTargets: [] as string[],
-  transferClientIds: [] as string[],
+  transferClientIds: [] as number[],
   lifecyclePauseSeeders: 0,
   lifecycleDeleteSeeders: 0,
   lifecycleDeleteSeedHours: 0,
@@ -536,7 +536,7 @@ const configForm = reactive({
   feasibilitySafety: 0.8,
   diskBudgetEnabled: false,
   diskBudgetMinGB: 10,
-  candidateClients: [] as string[],
+  candidateClients: [] as number[],
   clientSelection: 'fixed',
   diskGuardEnabled: true,
   diskGuardThreshold: 1,
@@ -603,7 +603,7 @@ async function fetchSubscription() {
       name: subscription.value.name || '',
       urls: Array.isArray(subscription.value.urls) ? subscription.value.urls.join('\n') : (subscription.value.urls || ''),
       cron: subscription.value.cron || '',
-      clientId: subscription.value.clientId || '',
+      clientId: subscription.value.clientId || undefined,
       savePath: subscription.value.savePath || '',
       category: subscription.value.category || '',
       addPaused: subscription.value.addPaused || false,

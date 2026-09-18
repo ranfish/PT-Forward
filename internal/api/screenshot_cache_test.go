@@ -32,14 +32,14 @@ func TestScreenshotCache_HitSkipsStrategy(t *testing.T) {
 
 	cached := []string{"https://pixhost/C1.jpg", "https://pixhost/C2.jpg", "https://pixhost/C3.jpg"}
 	data, _ := json.Marshal(cached)
-	db.Create(&model.ClusterScreenshotCache{ClientID: "PT0", SavePath: "/p", Name: "N", Screenshots: string(data), UpdatedAt: time.Now()})
+	db.Create(&model.ClusterScreenshotCache{ClientUID: 1, SavePath: "/p", Name: "N", Screenshots: string(data), UpdatedAt: time.Now()})
 
-	db.Create(&model.TorrentSnapshot{Hash: "cself00000000000000000000000000000000", ClientID: "PT0", Name: "N", SavePath: "/p"})
-	db.Create(&model.TorrentSnapshot{Hash: "csib000000000000000000000000000000000", ClientID: "PT0", Name: "N", SavePath: "/p"})
+	db.Create(&model.TorrentSnapshot{Hash: "cself00000000000000000000000000000000", ClientUID: 1, Name: "N", SavePath: "/p"})
+	db.Create(&model.TorrentSnapshot{Hash: "csib000000000000000000000000000000000", ClientUID: 1, Name: "N", SavePath: "/p"})
 	db.Create(&model.TorrentMetadata{InfoHash: "cself00000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: "", FetchSource: "rss_detail"})
 	db.Create(&model.TorrentMetadata{InfoHash: "csib000000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: "", FetchSource: "cluster"})
 
-	h.applyScreenshotStrategy("PT0", "cself00000000000000000000000000000000", "朋友", "N", "/p", true)
+	h.applyScreenshotStrategy(1, "cself00000000000000000000000000000000", "朋友", "N", "/p", true)
 
 	if mock.called != 0 {
 		t.Errorf("缓存命中不应调用策略: called=%d", mock.called)
@@ -64,19 +64,19 @@ func TestScreenshotCache_ExpiredMissRunsStrategy(t *testing.T) {
 	mock := &mockShotStrategy{result: []string{"https://pixhost/a.jpg", "https://pixhost/b.jpg", "https://pixhost/c.jpg"}}
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop(), screenshotCacheDays: 30, shotStrategy: mock}
 
-	db.Create(&model.ClusterScreenshotCache{ClientID: "PT0", SavePath: "/p", Name: "N",
+	db.Create(&model.ClusterScreenshotCache{ClientUID: 1, SavePath: "/p", Name: "N",
 		Screenshots: `["https://pixhost/OLD.jpg"]`, UpdatedAt: time.Now().AddDate(0, 0, -31)})
 
-	db.Create(&model.TorrentSnapshot{Hash: "dself00000000000000000000000000000000", ClientID: "PT0", Name: "N", SavePath: "/p"})
+	db.Create(&model.TorrentSnapshot{Hash: "dself00000000000000000000000000000000", ClientUID: 1, Name: "N", SavePath: "/p"})
 	db.Create(&model.TorrentMetadata{InfoHash: "dself00000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: "", FetchSource: "rss_detail"})
 
-	h.applyScreenshotStrategy("PT0", "dself00000000000000000000000000000000", "朋友", "N", "/p", true)
+	h.applyScreenshotStrategy(1, "dself00000000000000000000000000000000", "朋友", "N", "/p", true)
 
 	if mock.called != 1 {
 		t.Fatalf("过期应走策略: called=%d", mock.called)
 	}
 	var row model.ClusterScreenshotCache
-	db.Where("client_id = ? AND save_path = ? AND name = ?", "PT0", "/p", "N").First(&row)
+	db.Where("client_uid = ? AND save_path = ? AND name = ?", 1, "/p", "N").First(&row)
 	if len(model.ParseScreenshotColumn(row.Screenshots)) != 3 {
 		t.Errorf("缓存应刷新为策略终态: %q", row.Screenshots)
 	}
@@ -96,10 +96,10 @@ func TestScreenshotCache_SameExitNoWrite(t *testing.T) {
 	mock := &mockShotStrategy{result: nil}
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop(), screenshotCacheDays: 30, shotStrategy: mock}
 
-	db.Create(&model.TorrentSnapshot{Hash: "eself00000000000000000000000000000000", ClientID: "PT0", Name: "N", SavePath: "/p"})
+	db.Create(&model.TorrentSnapshot{Hash: "eself00000000000000000000000000000000", ClientUID: 1, Name: "N", SavePath: "/p"})
 	db.Create(&model.TorrentMetadata{InfoHash: "eself00000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: "", FetchSource: "rss_detail"})
 
-	h.applyScreenshotStrategy("PT0", "eself00000000000000000000000000000000", "朋友", "N", "/p", true)
+	h.applyScreenshotStrategy(1, "eself00000000000000000000000000000000", "朋友", "N", "/p", true)
 
 	var n int64
 	db.Model(&model.ClusterScreenshotCache{}).Count(&n)

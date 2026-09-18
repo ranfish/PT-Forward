@@ -3,6 +3,7 @@ package watcher
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -58,14 +59,14 @@ func (w *CompletionWatcher) Stop() {
 	w.logger.Info("completion watcher stopped")
 }
 
-func (w *CompletionWatcher) Watch(_ context.Context, clientName, infoHash string, candidateID uint) error {
-	if clientName == "" || infoHash == "" {
+func (w *CompletionWatcher) Watch(_ context.Context, clientUID uint, infoHash string, candidateID uint) error {
+	if clientUID == 0 || infoHash == "" {
 		return &model.AppError{Code: 40001, Message: "client_name and info_hash are required"}
 	}
-	key := clientName + "|" + infoHash
+	key := fmt.Sprintf("%d|%s", clientUID, infoHash)
 	w.watchStore.Store(key, watchEntry{candidateID: candidateID, submittedAt: time.Now()})
 	w.logger.Debug("watch registered",
-		zap.String("client", clientName),
+		zap.Uint("client_uid", clientUID),
 		zap.String("info_hash", infoHash),
 		zap.Uint("candidate_id", candidateID),
 	)
@@ -103,8 +104,8 @@ func (w *CompletionWatcher) SubmitCandidate(ctx context.Context, candidate model
 		return &model.AppError{Code: 50001, Message: "创建发布候选失败", Cause: err}
 	}
 
-	if candidate.ClientID != "" && candidate.InfoHash != "" {
-		if err := w.Watch(ctx, candidate.ClientID, candidate.InfoHash, candidate.ID); err != nil {
+	if candidate.ClientUID != 0 && candidate.InfoHash != "" {
+		if err := w.Watch(ctx, candidate.ClientUID, candidate.InfoHash, candidate.ID); err != nil {
 			w.logger.Warn("failed to register watch for candidate",
 				zap.Uint("candidate_id", candidate.ID),
 				zap.Error(err),
@@ -168,12 +169,13 @@ func (w *CompletionWatcher) pollOnce(ctx context.Context) {
 			w.watchStore.Delete(key)
 			return true
 		}
-		clientName, infoHash := parts[0], parts[1]
+		uidNum, _ := strconv.ParseUint(parts[0], 10, 64)
+		clientUID, infoHash := uint(uidNum), parts[1]
 
-		dl, err := w.clientMgr.Get(clientName)
+		dl, err := w.clientMgr.Get(clientUID)
 		if err != nil {
 			w.logger.Debug("watch: downloader not available",
-				zap.String("client", clientName),
+				zap.Uint("client_uid", clientUID),
 				zap.Error(err),
 			)
 			return true
@@ -182,7 +184,7 @@ func (w *CompletionWatcher) pollOnce(ctx context.Context) {
 		torrent, err := dl.GetTorrentByHash(ctx, infoHash)
 		if err != nil {
 			w.logger.Debug("watch: get torrent failed",
-				zap.String("client", clientName),
+				zap.Uint("client_uid", clientUID),
 				zap.String("info_hash", infoHash),
 				zap.Error(err),
 			)
@@ -191,7 +193,7 @@ func (w *CompletionWatcher) pollOnce(ctx context.Context) {
 
 		if torrent == nil {
 			w.logger.Warn("watch: torrent not found in downloader (orphan)",
-				zap.String("client", clientName),
+				zap.Uint("client_uid", clientUID),
 				zap.String("info_hash", infoHash),
 			)
 			w.watchStore.Delete(key)
@@ -215,12 +217,12 @@ func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID ui
 		return
 	}
 
-	if candidate.Role == model.RoleSource && candidate.ClientID != "" {
-		sourceClient, err := w.clientMgr.Get(candidate.ClientID)
+	if candidate.Role == model.RoleSource && candidate.ClientUID != 0 {
+		sourceClient, err := w.clientMgr.Get(candidate.ClientUID)
 		if err != nil {
 			w.logger.Error("failed to get source client for transfer", zap.Error(err))
-		} else if sourceClient.GetTransferTargetID() != "" {
-			reseedClientName, reseedHash, err := w.transferToReseed(ctx, &candidate, sourceClient, torrent)
+		} else if sourceClient.GetTransferTargetUID() != 0 {
+			reseedClientUID, reseedHash, err := w.transferToReseed(ctx, &candidate, sourceClient, torrent)
 			if err != nil {
 				w.logger.Error("transfer to reseed failed, continuing with source client",
 					zap.Uint("candidate_id", candidateID),
@@ -229,12 +231,12 @@ func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID ui
 			} else {
 				w.logger.Info("transfer to reseed completed",
 					zap.Uint("candidate_id", candidateID),
-					zap.String("transfer_client", reseedClientName),
+					zap.Uint("transfer_client_uid", reseedClientUID),
 					zap.String("reseed_hash", reseedHash),
 				)
-				candidate.ClientID = reseedClientName
+				candidate.ClientUID = reseedClientUID
 				candidate.InfoHash = reseedHash
-				candidate.SourceClientID = sourceClient.GetName()
+				candidate.SourceClientUID = sourceClient.GetID()
 			}
 		}
 	}
@@ -252,14 +254,14 @@ func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID ui
 		"publish_status":     model.CandidateCompleted,
 		"updated_at":         now,
 	}
-	if candidate.ClientID != "" {
-		updates["client_id"] = candidate.ClientID
+	if candidate.ClientUID != 0 {
+		updates["client_uid"] = candidate.ClientUID
 	}
 	if candidate.InfoHash != "" {
 		updates["info_hash"] = candidate.InfoHash
 	}
-	if candidate.SourceClientID != "" {
-		updates["source_client_id"] = candidate.SourceClientID
+	if candidate.SourceClientUID != 0 {
+		updates["source_client_uid"] = candidate.SourceClientUID
 	}
 
 	if err := w.db.WithContext(ctx).Model(&model.PublishCandidate{}).
@@ -274,15 +276,15 @@ func (w *CompletionWatcher) onWatchCompleted(ctx context.Context, candidateID ui
 
 }
 
-func (w *CompletionWatcher) transferToReseed(ctx context.Context, candidate *model.PublishCandidate, sourceClient model.DownloaderClient, torrent *model.TorrentInfo) (string, string, error) {
-	reseedClient, err := w.clientMgr.Get(sourceClient.GetTransferTargetID())
+func (w *CompletionWatcher) transferToReseed(ctx context.Context, candidate *model.PublishCandidate, sourceClient model.DownloaderClient, torrent *model.TorrentInfo) (uint, string, error) {
+	reseedClient, err := w.clientMgr.Get(sourceClient.GetTransferTargetUID())
 	if err != nil {
-		return "", "", fmt.Errorf("get reseed client %s: %w", sourceClient.GetTransferTargetID(), err)
+		return 0, "", fmt.Errorf("get reseed client %d: %w", sourceClient.GetTransferTargetUID(), err)
 	}
 
 	torrentData, err := sourceClient.ExportTorrent(ctx, candidate.InfoHash)
 	if err != nil {
-		return "", "", fmt.Errorf("export torrent from source: %w", err)
+		return 0, "", fmt.Errorf("export torrent from source: %w", err)
 	}
 
 	reseedPath := client.MapPath(torrent.SavePath, sourceClient.GetSharedPaths())
@@ -301,7 +303,7 @@ func (w *CompletionWatcher) transferToReseed(ctx context.Context, candidate *mod
 
 	addResult, err := reseedClient.AddFromFile(ctx, torrentData, opts)
 	if err != nil {
-		return "", "", fmt.Errorf("add torrent to reseed client: %w", err)
+		return 0, "", fmt.Errorf("add torrent to reseed client: %w", err)
 	}
 
 	if err := sourceClient.DeleteTorrent(ctx, candidate.InfoHash, false); err != nil {
@@ -312,7 +314,7 @@ func (w *CompletionWatcher) transferToReseed(ctx context.Context, candidate *mod
 		)
 	}
 
-	return reseedClient.GetName(), addResult.InfoHash, nil
+	return sourceClient.GetTransferTargetUID(), addResult.InfoHash, nil
 }
 
 func (w *CompletionWatcher) markCandidateOrphan(ctx context.Context, candidateID uint) {
@@ -343,8 +345,8 @@ func (w *CompletionWatcher) recoverPendingWatches(ctx context.Context) {
 
 	recovered := 0
 	for _, c := range candidates {
-		if c.ClientID != "" && c.InfoHash != "" {
-			key := c.ClientID + "|" + c.InfoHash
+		if c.ClientUID != 0 && c.InfoHash != "" {
+			key := fmt.Sprintf("%d|%s", c.ClientUID, c.InfoHash)
 			w.watchStore.Store(key, watchEntry{candidateID: c.ID, submittedAt: time.Now()})
 			recovered++
 		}
@@ -364,8 +366,8 @@ func (w *CompletionWatcher) ActiveWatchCount() int {
 	return count
 }
 
-func (w *CompletionWatcher) IsWatching(clientName, infoHash string) bool {
-	key := clientName + "|" + infoHash
+func (w *CompletionWatcher) IsWatching(clientUID uint, infoHash string) bool {
+	key := fmt.Sprintf("%d|%s", clientUID, infoHash)
 	_, ok := w.watchStore.Load(key)
 	return ok
 }

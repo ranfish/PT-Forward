@@ -303,7 +303,16 @@ const configsLoading = ref(false)
 const status = ref<SeedingStatusData>({})
 const torrents = ref<SeedingTorrentRecord[]>([])
 const configs = ref<SeedingClientConfig[]>([])
-const downloaderOptions = ref<{label: string, value: string}[]>([])
+const downloaderOptions = ref<{label: string, value: number}[]>([])
+
+const uidNameMap = computed(() => {
+  const m = new Map<number, string>()
+  for (const o of downloaderOptions.value) m.set(o.value, o.label)
+  return m
+})
+function uidLabel(uid: number): string {
+  return uidNameMap.value.get(uid) || `#${uid}`
+}
 const deleteRuleOptions = ref<{label: string, value: number}[]>([])
 const deleteRulesGlobal = ref(false)
 
@@ -321,7 +330,7 @@ const configSubmitting = ref(false)
 const scoreCleanupEnabled = computed(() => configForm.role !== 'download')
 const editingConfig = ref<SeedingClientConfig | null>(null)
 const configForm = reactive({
-  clientId: '',
+  clientId: undefined as number | undefined,
   role: 'seeding' as string,
   enabled: true,
   autoDeleteCron: '*/30 * * * *',
@@ -350,7 +359,7 @@ const configForm = reactive({
 })
 
 const { columns } = useTorrentColumns({
-  show: ['title', 'site_name', 'torrent_id', 'discount', 'is_free', 'has_hr', 'info_hash', 'client_id', 'source', 'status', 'flushed_at', 'actions'],
+  show: ['title', 'site_name', 'torrent_id', 'discount', 'is_free', 'has_hr', 'info_hash', 'client_uid', 'source', 'status', 'flushed_at', 'actions'],
   statusRender: (record) => h(Badge, {
     status: record.status === 'seeding' ? 'success' : 'warning',
     text: translateSeedingStatus(record.status as string),
@@ -363,7 +372,7 @@ const { columns } = useTorrentColumns({
 })
 
 const configColumns = [
-  { title: t('seeding.downloaderId'), dataIndex: 'client_id', key: 'client_id', width: 120 },
+  { title: t('seeding.downloaderId'), dataIndex: 'client_uid', key: 'client_uid', width: 120, customRender: ({ text }: { text: number }) => uidLabel(text) },
   { title: t('seeding.autoDeleteCronShort'), dataIndex: 'auto_delete_cron', key: 'auto_delete_cron', width: 120 },
   { title: t('seeding.mainDataCronShort'), dataIndex: 'maindata_cron', key: 'maindata_cron', width: 100 },
   { title: t('seeding.diskProtectShort'), key: 'disk_protect_enabled', width: 100 },
@@ -406,7 +415,7 @@ function openConfigModal(record?: SeedingClientConfig) {
   editingConfig.value = record || null
   if (record) {
     Object.assign(configForm, {
-      clientId: record.client_id || '',
+      clientId: record.client_uid || undefined,
       enabled: record.enabled || false,
       autoDeleteCron: record.auto_delete_cron || '*/30 * * * *',
       mainDataCron: record.maindata_cron || '*/10 * * * *',
@@ -435,7 +444,7 @@ function openConfigModal(record?: SeedingClientConfig) {
     })
   } else {
     Object.assign(configForm, {
-      clientId: '',
+      clientId: undefined as number | undefined,
       enabled: true,
       autoDeleteCron: '*/30 * * * *',
       mainDataCron: '*/10 * * * *',
@@ -539,8 +548,8 @@ async function fetchDownloaders() {
     downloaderOptions.value = items
       .filter((d: ClientConfig) => d.role === 'seeding')
       .map((d: ClientConfig) => ({
-        label: d.name || String(d.id),
-        value: d.name || String(d.id),
+        label: d.name || `#${d.id}`,
+        value: d.id,
       }))
   } catch {
   }

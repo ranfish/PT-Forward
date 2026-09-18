@@ -15,7 +15,7 @@ import (
 )
 
 type PushRequest struct {
-	ClientID      string
+	ClientUID     uint
 	SiteName      string
 	TorrentID     string
 	InfoHash      string
@@ -42,7 +42,7 @@ type PushResult struct {
 }
 
 type PushedEvent struct {
-	ClientID        string
+	ClientUID       uint
 	SiteName        string
 	TorrentID       string
 	InfoHash        string
@@ -55,7 +55,7 @@ type PushedEvent struct {
 	FreeEndAt       *time.Time
 	SubscriptionID   string
 	AutoTransfer     bool
-	TransferClientIDs []string
+	TransferClientUIDs []uint
 	PushedAt         time.Time
 	// §55.19 根本修复：携带 detect 阶段提取的 SL，评分时直接用，避免二次抓详情页。
 	Seeders  int
@@ -68,7 +68,7 @@ type SiteProvider interface {
 }
 
 type ClientProvider interface {
-	Get(clientID string) (model.DownloaderClient, error)
+	Get(clientUID uint) (model.DownloaderClient, error)
 }
 
 type Pusher struct {
@@ -110,7 +110,7 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 		return result
 	}
 
-	dlClient, err := p.clientProvider.Get(req.ClientID)
+	dlClient, err := p.clientProvider.Get(req.ClientUID)
 	if err != nil {
 		result.Error = fmt.Errorf("get downloader client: %w", err)
 		return result
@@ -217,7 +217,7 @@ func (p *Pusher) Push(ctx context.Context, req *PushRequest) *PushResult {
 
 	result.Success = true
 	p.logger.Debug("push: torrent pushed successfully",
-		zap.String("client_id", req.ClientID),
+		zap.Uint("client_uid", req.ClientUID),
 		zap.String("info_hash", result.InfoHash),
 		zap.String("site", req.SiteName),
 		zap.String("torrent_id", req.TorrentID))
@@ -241,14 +241,9 @@ func (p *Pusher) PushBatch(ctx context.Context, reqs []*PushRequest) []*PushResu
 }
 
 func (p *Pusher) GetClientRole(ctx context.Context, clientID string) string {
-	var cfg model.ClientConfig
-	idNum, idErr := parseUint(clientID)
-	if idErr == nil {
-		if err := p.db.WithContext(ctx).Where("name = ? OR id = ?", clientID, idNum).First(&cfg).Error; err == nil {
-			return cfg.Role
-		}
-	} else {
-		if err := p.db.WithContext(ctx).Where("name = ?", clientID).First(&cfg).Error; err == nil {
+	if idNum, idErr := parseUint(clientID); idErr == nil {
+		var cfg model.ClientConfig
+		if err := p.db.WithContext(ctx).Where("id = ?", idNum).First(&cfg).Error; err == nil {
 			return cfg.Role
 		}
 	}

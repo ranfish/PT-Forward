@@ -134,7 +134,7 @@ import { formatBytes } from '@/utils/format'
 
 const props = defineProps<{
   open: boolean
-  clientId?: string
+  clientId?: number
   savePath?: string
 }>()
 const emit = defineEmits<{
@@ -146,7 +146,7 @@ interface UnconfiguredTorrent {
   hash: string
   name: string
   size: number
-  clientId: string
+  clientId: number
   savePath: string
 }
 
@@ -246,7 +246,7 @@ async function startBatchFetch() {
     .map(t => ({ hash: t.hash, name: t.name, size: t.size, savePath: t.savePath }))
 
   try {
-    await seedConfigApi.batchFetch(items, props.clientId || '')
+    await seedConfigApi.batchFetch(items, props.clientId || 0)
     fetching.value = true
     fetchDone.value = false
     progress.value = { active: true, total: items.length, done: 0, failed: 0, items: [] }

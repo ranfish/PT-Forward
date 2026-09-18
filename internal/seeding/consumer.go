@@ -23,11 +23,11 @@ func (e *Engine) SetPusher(p *pusher.Pusher) {
 	e.pusher = p
 }
 
-// LoadActiveClientConfig 按 clientID 加载启用的客户端配置。
+// LoadActiveClientConfig 按 clientUID 加载启用的客户端配置。
 // 合并后统一查 seeding_client_configs（含 Role=download 的原 download_client_configs 数据）。
-func (e *Engine) LoadActiveClientConfig(ctx context.Context, clientID string) (model.SeedingClientConfig, bool) {
+func (e *Engine) LoadActiveClientConfig(ctx context.Context, clientUID uint) (model.SeedingClientConfig, bool) {
 	var cfg model.SeedingClientConfig
-	if err := e.db.WithContext(ctx).Where("client_id = ? AND enabled = ?", clientID, true).First(&cfg).Error; err == nil {
+	if err := e.db.WithContext(ctx).Where("client_uid = ? AND enabled = ?", clientUID, true).First(&cfg).Error; err == nil {
 		if cfg.Role == "" {
 			cfg.Role = "seeding"
 		}
@@ -42,7 +42,7 @@ func (e *Engine) OnPushed(ctx context.Context, event *pusher.PushedEvent) {
 	}
 
 	// 统一查 seeding_client_configs（合并后含 Role=download 的配置）
-	if _, ok := e.LoadActiveClientConfig(ctx, event.ClientID); !ok {
+	if _, ok := e.LoadActiveClientConfig(ctx, event.ClientUID); !ok {
 		return
 	}
 
@@ -50,7 +50,7 @@ func (e *Engine) OnPushed(ctx context.Context, event *pusher.PushedEvent) {
 	case e.pendingEvents <- event:
 	default:
 		e.logger.Warn("pending events channel full, dropping event",
-			zap.String("client_id", event.ClientID),
+			zap.Uint("client_uid", event.ClientUID),
 			zap.String("info_hash", event.InfoHash))
 	}
 }
@@ -81,12 +81,12 @@ func (e *Engine) consumeLoop(ctx context.Context) {
 
 func (e *Engine) scoreAndPush(ctx context.Context, events []*pusher.PushedEvent) {
 	type groupKey struct {
-		clientID       string
+		clientUID       uint
 		subscriptionID string
 	}
 	groups := make(map[groupKey][]*pendingCandidate)
 	for _, ev := range events {
-		key := groupKey{clientID: ev.ClientID, subscriptionID: ev.SubscriptionID}
+		key := groupKey{clientUID: ev.ClientUID, subscriptionID: ev.SubscriptionID}
 		groups[key] = append(groups[key], &pendingCandidate{
 			Event:     ev,
 			CreatedAt: ev.PushedAt,
@@ -94,23 +94,23 @@ func (e *Engine) scoreAndPush(ctx context.Context, events []*pusher.PushedEvent)
 	}
 
 	for key, candidates := range groups {
-		e.scoreAndPushForClient(ctx, key.clientID, key.subscriptionID, candidates)
+		e.scoreAndPushForClient(ctx, key.clientUID, key.subscriptionID, candidates)
 	}
 }
 
-func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscriptionID string, candidates []*pendingCandidate) {
-	clientCfg, ok := e.LoadActiveClientConfig(ctx, clientID)
+func (e *Engine) scoreAndPushForClient(ctx context.Context, clientUID uint, subscriptionID string, candidates []*pendingCandidate) {
+	clientCfg, ok := e.LoadActiveClientConfig(ctx, clientUID)
 	if !ok {
 		return
 	}
 
 	if !IsWithinActiveWindow(clientCfg.ActiveTimeWindows) {
 		e.logger.Debug("scoreAndPush: outside active time windows",
-			zap.String("client_id", clientID))
+			zap.Uint("client_uid", clientUID))
 		return
 	}
 
-	activeCount := e.GetActiveCount(clientID)
+	activeCount := e.GetActiveCount(clientUID)
 	maxActive := 100
 	if clientCfg.MaxActiveSeeding != 0 {
 		maxActive = clientCfg.MaxActiveSeeding
@@ -121,14 +121,14 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 	remaining := maxActive - activeCount
 	if remaining <= 0 {
 		e.logger.Info("scoreAndPush: max active reached, skipping",
-			zap.String("client_id", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.Int("active", activeCount),
 			zap.Int("max", maxActive))
 		return
 	}
 
 	if clientCfg.DiskProtectEnabled && e.clientProvider != nil {
-		dlClient, err := e.clientProvider.Get(clientID)
+		dlClient, err := e.clientProvider.Get(clientUID)
 		if err == nil && dlClient != nil {
 			freeSpace, _ := dlClient.GetFreeSpace(ctx)
 			totalSpace := int64(0)
@@ -138,7 +138,7 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 			minBytes := calcDiskMinBytes(&clientCfg, totalSpace)
 			if minBytes > 0 && freeSpace >= 0 && freeSpace < minBytes {
 				e.logger.Warn("scoreAndPush: disk space insufficient, pausing push",
-					zap.String("client_id", clientID),
+					zap.Uint("client_uid", clientUID),
 					zap.Int64("free_space", freeSpace),
 					zap.Int64("min_bytes", minBytes),
 					zap.Float64("min_gb", clientCfg.MinDiskSpaceGB),
@@ -160,7 +160,7 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 					}
 				}
 				e.logger.Info("scoreAndPush: disk blocked candidates marked",
-					zap.String("client_id", clientID),
+					zap.Uint("client_uid", clientUID),
 					zap.Int("candidates", len(candidates)),
 					zap.Int64("marked", marked))
 				return
@@ -171,7 +171,7 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 	// §55.14 阶段3：按下载器 role 决定是否评分（role≠seeding 顺序推送，不挑种子）
 	var roleClient model.ClientConfig
 	isSeedingRole := true
-	if err := e.db.WithContext(ctx).Where("name = ?", clientID).First(&roleClient).Error; err == nil {
+	if err := e.db.WithContext(ctx).Where("name = ?", clientUID).First(&roleClient).Error; err == nil {
 		isSeedingRole = roleClient.Role == "seeding"
 	}
 
@@ -210,7 +210,7 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 			continue
 		}
 
-		key := recordKey(clientID, c.Event.InfoHash)
+		key := recordKey(clientUID, c.Event.InfoHash)
 		e.mu.RLock()
 		_, exists := e.recordMap[key]
 		e.mu.RUnlock()
@@ -218,7 +218,7 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 			continue
 		}
 
-		req := e.buildPushRequest(ctx, clientID, c.Event)
+		req := e.buildPushRequest(ctx, clientUID, c.Event)
 		if req == nil {
 			continue
 		}
@@ -227,7 +227,7 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 		if !result.Success {
 			if result.Error != nil {
 				e.logger.Warn("scoreAndPush: push failed",
-					zap.String("client_id", clientID),
+					zap.Uint("client_uid", clientUID),
 					zap.String("info_hash", c.Event.InfoHash),
 					zap.Float64("score", c.Score),
 					zap.Error(result.Error))
@@ -235,12 +235,12 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientID, subscripti
 			continue
 		}
 
-		e.createRecordFromPush(ctx, clientID, c.Event, result.InfoHash)
+		e.createRecordFromPush(ctx, clientUID, c.Event, result.InfoHash)
 		pushed++
 	}
 
 	e.logger.Info("scoreAndPush: batch complete",
-		zap.String("client_id", clientID),
+		zap.Uint("client_uid", clientUID),
 		zap.Int("candidates", len(candidates)),
 		zap.Int("pushed", pushed),
 		zap.Int("remaining_capacity", remaining-pushed))
@@ -357,9 +357,9 @@ func (e *Engine) parseSiteWeights(jsonStr string) map[string]float64 {
 	return weights
 }
 
-func (e *Engine) buildPushRequest(ctx context.Context, clientID string, event *pusher.PushedEvent) *pusher.PushRequest {
+func (e *Engine) buildPushRequest(ctx context.Context, clientUID uint, event *pusher.PushedEvent) *pusher.PushRequest {
 	req := &pusher.PushRequest{
-		ClientID:    clientID,
+		ClientUID:   clientUID,
 		SiteName:    event.SiteName,
 		TorrentID:   event.TorrentID,
 		InfoHash:    event.InfoHash,
@@ -401,13 +401,13 @@ func (e *Engine) buildPushRequest(ctx context.Context, clientID string, event *p
 	return req
 }
 
-func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, event *pusher.PushedEvent, actualHash string) {
+func (e *Engine) createRecordFromPush(ctx context.Context, clientUID uint, event *pusher.PushedEvent, actualHash string) {
 	infoHash := actualHash
 	if infoHash == "" {
 		infoHash = event.InfoHash
 	}
 
-	key := recordKey(clientID, infoHash)
+	key := recordKey(clientUID, infoHash)
 	e.mu.RLock()
 	_, exists := e.recordMap[key]
 	e.mu.RUnlock()
@@ -418,12 +418,12 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 	// §55.14 阶段2：查下载器 role 存入 record（consumeLoop 据此决定是否评分）
 	var dlClient model.ClientConfig
 	clientRole := ""
-	if err := e.db.WithContext(ctx).Where("name = ?", clientID).First(&dlClient).Error; err == nil {
+	if err := e.db.WithContext(ctx).Where("name = ?", clientUID).First(&dlClient).Error; err == nil {
 		clientRole = dlClient.Role
 	}
 
 	record := &model.SeedingTorrentRecord{
-		ClientID:          clientID,
+		ClientUID:         clientUID,
 		SiteName:          event.SiteName,
 		TorrentID:         event.TorrentID,
 		InfoHash:          infoHash,
@@ -435,7 +435,7 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 		TorrentSize:       event.Size,
 		SubscriptionID:    event.SubscriptionID,
 		AutoTransfer:      event.AutoTransfer,
-		TransferClientIDs: event.TransferClientIDs,
+		TransferClientUIDs: event.TransferClientUIDs,
 		Role:              clientRole,
 	}
 	if event.Discount != "" {
@@ -446,7 +446,7 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 	record.FlushedAt = &now
 
 	result := e.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "client_id"}, {Name: "info_hash"}},
+		Columns:   []clause.Column{{Name: "client_uid"}, {Name: "info_hash"}},
 		DoNothing: true,
 	}).Create(record)
 	if result.Error != nil {
@@ -459,7 +459,7 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 	if result.RowsAffected == 0 {
 		var loaded model.SeedingTorrentRecord
 		if err := e.db.WithContext(ctx).
-			Where("client_id = ? AND info_hash = ?", clientID, infoHash).
+			Where("client_uid = ? AND info_hash = ?", clientUID, infoHash).
 			First(&loaded).Error; err != nil {
 			return
 		}
@@ -487,7 +487,7 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientID string, even
 	}
 
 	e.logger.Debug("createRecordFromPush: record created",
-		zap.String("client_id", clientID),
+		zap.Uint("client_uid", clientUID),
 		zap.String("info_hash", infoHash))
 
 	// §55.5 P1 修复：推送成功后回写 rss_torrent_seen.status="pushed"，避免下轮 RSS 重复投递。

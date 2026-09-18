@@ -435,19 +435,19 @@ func TestDownloaders_CRUD(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	clientID := data["id"].(float64)
+	clientUID := data["id"].(float64)
 
 	w = env.doRequest("GET", "/api/v1/downloaders", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("list: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	w = env.doRequest("GET", fmt.Sprintf("/api/v1/downloaders/%d", int(clientID)), nil)
+	w = env.doRequest("GET", fmt.Sprintf("/api/v1/downloaders/%d", int(clientUID)), nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("get: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	w = env.doRequest("DELETE", fmt.Sprintf("/api/v1/downloaders/%d", int(clientID)), nil)
+	w = env.doRequest("DELETE", fmt.Sprintf("/api/v1/downloaders/%d", int(clientUID)), nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("delete: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -499,7 +499,7 @@ func TestRSS_CRUD(t *testing.T) {
 		"urls":      []string{"https://rss-site.com/rss"},
 		"cron":      "*/10 * * * *",
 		"enabled":   true,
-		"client_id": "",
+		"client_id": 0,
 	}
 	w := env.doRequest("POST", "/api/v1/rss/subscriptions", createBody)
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
@@ -579,7 +579,7 @@ func TestSeedingConfigs_CRUD(t *testing.T) {
 	env := setupTestEnv(t)
 
 	w := env.doRequest("POST", "/api/v1/seeding/configs", map[string]interface{}{
-		"clientId":       "seeding-client-1",
+		"clientId":       1,
 		"enabled":        true,
 		"minDiskSpaceGB": 30,
 	})
@@ -1166,7 +1166,7 @@ func TestReseed_RetryAndNegativeCache(t *testing.T) {
 
 	env.db.Create(&model.ReseedTask{Name: "reseed1", Enabled: true, Status: "idle"})
 	env.db.Create(&model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 0.9, Status: model.MatchStatusFailed, FailReason: "test failure",
 	})
@@ -1297,7 +1297,7 @@ func TestSeeding_Clients(t *testing.T) {
 	env := setupTestEnv(t)
 
 	w := env.doRequest("POST", "/api/v1/seeding/configs", map[string]interface{}{
-		"clientId":       "seeding-client-1",
+		"clientId":       1,
 		"enabled":        true,
 		"minDiskSpaceGB": 30,
 	})
@@ -2511,9 +2511,9 @@ func TestDownloader_Update_HappyPath(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	clientID := data["id"].(float64)
+	clientUID := data["id"].(float64)
 
-	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/downloaders/%d", int(clientID)), map[string]interface{}{
+	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/downloaders/%d", int(clientUID)), map[string]interface{}{
 		"name": "UpdatedName", "url": "http://localhost:9090", "role": "download", "enabled": false,
 	})
 	if w.Code != http.StatusOK {
@@ -2551,9 +2551,9 @@ func TestDownloader_Update_WithPathMappings(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	clientID := data["id"].(float64)
+	clientUID := data["id"].(float64)
 
-	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/downloaders/%d", int(clientID)), map[string]interface{}{
+	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/downloaders/%d", int(clientUID)), map[string]interface{}{
 		"pathMappings": []map[string]string{
 			{"sourcePath": "/data/tv", "reseedPath": "/mnt/tv"},
 			{"sourcePath": "/data/anime", "reseedPath": "/mnt/anime"},
@@ -2597,9 +2597,9 @@ func TestDownloader_Update_InvalidJSON(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	clientID := data["id"].(float64)
+	clientUID := data["id"].(float64)
 
-	req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/downloaders/%d", int(clientID)), bytes.NewReader([]byte("not json")))
+	req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/downloaders/%d", int(clientUID)), bytes.NewReader([]byte("not json")))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+env.token)
 	w2 := httptest.NewRecorder()
@@ -2904,7 +2904,7 @@ func TestSeeding_ResumeRecord(t *testing.T) {
 	env := setupTestEnv(t)
 
 	rec := &model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "abc123",
 		SiteName:  "s1",
 		TorrentID: "t1",
@@ -2922,7 +2922,7 @@ func TestSeeding_PauseRecord(t *testing.T) {
 	env := setupTestEnv(t)
 
 	rec := &model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "def456",
 		SiteName:  "s1",
 		TorrentID: "t2",
@@ -3770,7 +3770,7 @@ func TestSeeding_ConfigsCRUD_Full(t *testing.T) {
 	env := setupTestEnv(t)
 
 	w := env.doRequest("POST", "/api/v1/seeding/configs", map[string]interface{}{
-		"clientId":       "seeding-client-1",
+		"clientId":       1,
 		"enabled":        true,
 		"autoDeleteCron": "0 */6 * * *",
 		"mainDataCron":   "*/30 * * * *",
@@ -4234,7 +4234,7 @@ func TestSeeding_ConfigCreateDuplicate(t *testing.T) {
 	env := setupTestEnv(t)
 
 	w := env.doRequest("POST", "/api/v1/seeding/configs", map[string]interface{}{
-		"clientId": "dup-config-client",
+		"clientId": 7,
 		"enabled":  true,
 	})
 	if w.Code != http.StatusOK {
@@ -4242,7 +4242,7 @@ func TestSeeding_ConfigCreateDuplicate(t *testing.T) {
 	}
 
 	w = env.doRequest("POST", "/api/v1/seeding/configs", map[string]interface{}{
-		"clientId": "dup-config-client",
+		"clientId": 7,
 		"enabled":  true,
 	})
 	if w.Code != http.StatusConflict {
@@ -4344,7 +4344,7 @@ func TestSeeding_Torrents_ResumeFromTorrents(t *testing.T) {
 	env := setupTestEnv(t)
 
 	rec := &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "tor-resume-hash",
+		ClientUID: 1, InfoHash: "tor-resume-hash",
 		SiteName: "s1", TorrentID: "t1", Status: model.SeedingStatusPausedFreeEnd,
 	}
 	env.db.Create(rec)
@@ -5387,7 +5387,7 @@ func TestSeeding_ListConfigs_Empty(t *testing.T) {
 func TestSeeding_CreateConfig_Success(t *testing.T) {
 	env := setupTestEnv(t)
 	body := map[string]interface{}{
-		"clientId":       "client-1",
+		"clientId":       1,
 		"enabled":        true,
 		"autoDeleteCron": "*/15 * * * *",
 		"mainDataCron":   "*/5 * * * *",
@@ -5398,8 +5398,8 @@ func TestSeeding_CreateConfig_Success(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	if data["client_id"] != "client-1" {
-		t.Errorf("expected client_id=client-1, got %v", data["client_id"])
+	if data["client_uid"] != float64(1) {
+		t.Errorf("expected client_uid=1, got %v", data["client_uid"])
 	}
 	if data["min_disk_space_gb"] != 50.0 {
 		t.Errorf("expected default min_disk_space_gb=50, got %v", data["min_disk_space_gb"])
@@ -5408,7 +5408,7 @@ func TestSeeding_CreateConfig_Success(t *testing.T) {
 
 func TestSeeding_CreateConfig_Duplicate(t *testing.T) {
 	env := setupTestEnv(t)
-	body := map[string]interface{}{"clientId": "dup-client", "enabled": true}
+	body := map[string]interface{}{"clientId": 8, "enabled": true}
 	w1 := env.doRequest("POST", "/api/v1/seeding/configs", body)
 	if w1.Code != http.StatusOK {
 		t.Fatalf("first create: expected 200, got %d", w1.Code)
@@ -5429,9 +5429,9 @@ func TestSeeding_CreateConfig_MissingClientID(t *testing.T) {
 
 func TestSeeding_GetConfig_Success(t *testing.T) {
 	env := setupTestEnv(t)
-	env.db.Create(&model.SeedingClientConfig{ClientID: "gc-1", Enabled: true})
+	env.db.Create(&model.SeedingClientConfig{ClientUID: 1, Enabled: true})
 	var cfg model.SeedingClientConfig
-	env.db.Where("client_id = ?", "gc-1").First(&cfg)
+	env.db.Where("client_uid = ?", 1).First(&cfg)
 
 	w := env.doRequest("GET", fmt.Sprintf("/api/v1/seeding/configs/%d", cfg.ID), nil)
 	if w.Code != http.StatusOK {
@@ -5439,8 +5439,8 @@ func TestSeeding_GetConfig_Success(t *testing.T) {
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	if data["client_id"] != "gc-1" {
-		t.Errorf("expected client_id=gc-1, got %v", data["client_id"])
+	if data["client_uid"] != float64(1) {
+		t.Errorf("expected client_uid=1, got %v", data["client_uid"])
 	}
 }
 
@@ -5454,9 +5454,9 @@ func TestSeeding_GetConfig_NotFound(t *testing.T) {
 
 func TestSeeding_DeleteConfig_Success(t *testing.T) {
 	env := setupTestEnv(t)
-	env.db.Create(&model.SeedingClientConfig{ClientID: "del-1", Enabled: true})
+	env.db.Create(&model.SeedingClientConfig{ClientUID: 2, Enabled: true})
 	var cfg model.SeedingClientConfig
-	env.db.Where("client_id = ?", "del-1").First(&cfg)
+	env.db.Where("client_uid = ?", 2).First(&cfg)
 
 	w := env.doRequest("DELETE", fmt.Sprintf("/api/v1/seeding/configs/%d", cfg.ID), nil)
 	if w.Code != http.StatusOK {
@@ -5488,11 +5488,11 @@ func TestSeeding_Stats_Empty(t *testing.T) {
 func TestSeeding_Stats_WithRecords(t *testing.T) {
 	env := setupTestEnv(t)
 	env.db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "hash1", SiteName: "site1", TorrentID: "t1",
+		ClientUID: 1, InfoHash: "hash1", SiteName: "site1", TorrentID: "t1",
 		Status: model.SeedingStatusSeeding,
 	})
 	env.db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "hash2", SiteName: "site1", TorrentID: "t2",
+		ClientUID: 1, InfoHash: "hash2", SiteName: "site1", TorrentID: "t2",
 		Status: model.SeedingStatusPausedFreeEnd,
 	})
 	w := env.doRequest("GET", "/api/v1/seeding/stats", nil)
@@ -5512,7 +5512,7 @@ func TestSeeding_Stats_WithRecords(t *testing.T) {
 func TestSeeding_EngineStatus(t *testing.T) {
 	env := setupTestEnv(t)
 	env.db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "s1", TorrentID: "t1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "s1", TorrentID: "t1",
 		Status: model.SeedingStatusSeeding,
 	})
 	w := env.doRequest("GET", "/api/v1/seeding/status", nil)
@@ -5532,8 +5532,8 @@ func TestSeeding_EngineStatus(t *testing.T) {
 
 func TestSeeding_ListClients(t *testing.T) {
 	env := setupTestEnv(t)
-	env.db.Create(&model.SeedingClientConfig{ClientID: "lc-1", Enabled: true})
-	env.db.Create(&model.SeedingClientConfig{ClientID: "lc-2", Enabled: false})
+	env.db.Create(&model.SeedingClientConfig{ClientUID: 3, Enabled: true})
+	env.db.Create(&model.SeedingClientConfig{ClientUID: 4, Enabled: false})
 	w := env.doRequest("GET", "/api/v1/seeding/clients", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -5624,11 +5624,11 @@ func TestSeeding_DeleteRule_InvalidID(t *testing.T) {
 func TestSeeding_ResumeRecord_V2(t *testing.T) {
 	env := setupTestEnv(t)
 	env.db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "rh1", SiteName: "s1", TorrentID: "t1",
+		ClientUID: 1, InfoHash: "rh1", SiteName: "s1", TorrentID: "t1",
 		Status: model.SeedingStatusPausedFreeEnd,
 	})
 	var rec model.SeedingTorrentRecord
-	env.db.Where("client_id = ?", "c1").First(&rec)
+	env.db.Where("client_uid = ?", 1).First(&rec)
 
 	w := env.doRequest("POST", fmt.Sprintf("/api/v1/seeding/records/%d/resume", rec.ID), nil)
 	if w.Code != http.StatusOK {
@@ -5639,11 +5639,11 @@ func TestSeeding_ResumeRecord_V2(t *testing.T) {
 func TestSeeding_PauseRecord_V2(t *testing.T) {
 	env := setupTestEnv(t)
 	env.db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "ph1", SiteName: "s1", TorrentID: "t1",
+		ClientUID: 1, InfoHash: "ph1", SiteName: "s1", TorrentID: "t1",
 		Status: model.SeedingStatusSeeding,
 	})
 	var rec model.SeedingTorrentRecord
-	env.db.Where("client_id = ?", "c1").First(&rec)
+	env.db.Where("client_uid = ?", 1).First(&rec)
 
 	w := env.doRequest("POST", fmt.Sprintf("/api/v1/seeding/records/%d/pause", rec.ID), nil)
 	if w.Code != http.StatusOK {
@@ -5662,18 +5662,18 @@ func TestSeeding_ResumeRecord_InvalidID_V2(t *testing.T) {
 func TestSeeding_TriggerClient(t *testing.T) {
 	env := setupTestEnv(t)
 	env.db.Create(&model.SeedingTorrentRecord{
-		ClientID: "tc-1", InfoHash: "th1", SiteName: "s1", TorrentID: "t1",
+		ClientUID: 1, InfoHash: "th1", SiteName: "s1", TorrentID: "t1",
 		Status: model.SeedingStatusSeeding,
 	})
 
-	w := env.doRequest("POST", "/api/v1/seeding/clients/tc-1/trigger", nil)
+	w := env.doRequest("POST", "/api/v1/seeding/clients/1/trigger", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
-	if data["clientId"] != "tc-1" {
-		t.Errorf("expected clientId=tc-1, got %v", data["clientId"])
+	if data["clientId"] != float64(1) {
+		t.Errorf("expected clientId=1, got %v", data["clientId"])
 	}
 }
 
@@ -5687,9 +5687,9 @@ func TestSeeding_ScoringLogs_V2(t *testing.T) {
 
 func TestSeeding_StatsBySite_V2(t *testing.T) {
 	env := setupTestEnv(t)
-	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "siteA", TorrentID: "t1", Status: model.SeedingStatusSeeding})
-	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "siteA", TorrentID: "t2", Status: model.SeedingStatusSeeding})
-	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h3", SiteName: "siteB", TorrentID: "t3", Status: model.SeedingStatusSeeding})
+	env.db.Create(&model.SeedingTorrentRecord{ClientUID: 19, InfoHash: "h1", SiteName: "siteA", TorrentID: "t1", Status: model.SeedingStatusSeeding})
+	env.db.Create(&model.SeedingTorrentRecord{ClientUID: 19, InfoHash: "h2", SiteName: "siteA", TorrentID: "t2", Status: model.SeedingStatusSeeding})
+	env.db.Create(&model.SeedingTorrentRecord{ClientUID: 19, InfoHash: "h3", SiteName: "siteB", TorrentID: "t3", Status: model.SeedingStatusSeeding})
 
 	w := env.doRequest("GET", "/api/v1/seeding/stats/by-site", nil)
 	if w.Code != http.StatusOK {
@@ -5705,9 +5705,9 @@ func TestSeeding_StatsBySite_V2(t *testing.T) {
 
 func TestSeeding_StatsTorrents_V2(t *testing.T) {
 	env := setupTestEnv(t)
-	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s1", TorrentID: "t1", Status: model.SeedingStatusSeeding})
-	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s1", TorrentID: "t2", Status: model.SeedingStatusPausedFreeEnd})
-	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h3", SiteName: "s1", TorrentID: "t3", Status: model.SeedingStatusDeleted})
+	env.db.Create(&model.SeedingTorrentRecord{ClientUID: 19, InfoHash: "h1", SiteName: "s1", TorrentID: "t1", Status: model.SeedingStatusSeeding})
+	env.db.Create(&model.SeedingTorrentRecord{ClientUID: 19, InfoHash: "h2", SiteName: "s1", TorrentID: "t2", Status: model.SeedingStatusPausedFreeEnd})
+	env.db.Create(&model.SeedingTorrentRecord{ClientUID: 19, InfoHash: "h3", SiteName: "s1", TorrentID: "t3", Status: model.SeedingStatusDeleted})
 
 	w := env.doRequest("GET", "/api/v1/seeding/stats/torrents", nil)
 	if w.Code != http.StatusOK {
@@ -5850,7 +5850,7 @@ func TestSeeding_ListTorrents_Pagination(t *testing.T) {
 	env.db.Create(&model.ClientConfig{Name: "c1", Type: "qbittorrent", Role: "seeding"})
 	for i := 0; i < 5; i++ {
 		env.db.Create(&model.SeedingTorrentRecord{
-			ClientID: "c1", InfoHash: fmt.Sprintf("pag%d", i), SiteName: "s1",
+			ClientUID: 1, InfoHash: fmt.Sprintf("pag%d", i), SiteName: "s1",
 			TorrentID: fmt.Sprintf("t%d", i), Status: model.SeedingStatusSeeding,
 		})
 	}
@@ -5871,8 +5871,8 @@ func TestSeeding_ListTorrents_Pagination(t *testing.T) {
 
 func TestSeeding_StatsOverview_V2(t *testing.T) {
 	env := setupTestEnv(t)
-	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "o1", SiteName: "s1", TorrentID: "t1", Status: model.SeedingStatusSeeding})
-	env.db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "o2", SiteName: "s1", TorrentID: "t2", Status: model.SeedingStatusPausedRule})
+	env.db.Create(&model.SeedingTorrentRecord{ClientUID: 19, InfoHash: "o1", SiteName: "s1", TorrentID: "t1", Status: model.SeedingStatusSeeding})
+	env.db.Create(&model.SeedingTorrentRecord{ClientUID: 19, InfoHash: "o2", SiteName: "s1", TorrentID: "t2", Status: model.SeedingStatusPausedRule})
 
 	w := env.doRequest("GET", "/api/v1/seeding/stats/overview", nil)
 	if w.Code != http.StatusOK {
@@ -5941,9 +5941,9 @@ func TestSeeding_ScoringConfigByID_WithSub(t *testing.T) {
 
 func TestSeeding_UpdateConfig_Success(t *testing.T) {
 	env := setupTestEnv(t)
-	env.db.Create(&model.SeedingClientConfig{ClientID: "uc-1", Enabled: true})
+	env.db.Create(&model.SeedingClientConfig{ClientUID: 5, Enabled: true})
 	var cfg model.SeedingClientConfig
-	env.db.Where("client_id = ?", "uc-1").First(&cfg)
+	env.db.Where("client_uid = ?", 5).First(&cfg)
 
 	body := map[string]interface{}{"enabled": false, "minDiskSpaceGB": 100.0}
 	w := env.doRequest("PUT", fmt.Sprintf("/api/v1/seeding/configs/%d", cfg.ID), body)
@@ -5992,7 +5992,7 @@ func TestSeeding_Records_WithPath_NotFound(t *testing.T) {
 func TestSeeding_Torrents_ResumeViaTorrentPath(t *testing.T) {
 	env := setupTestEnv(t)
 	env.db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "trh1", SiteName: "s1", TorrentID: "t1",
+		ClientUID: 1, InfoHash: "trh1", SiteName: "s1", TorrentID: "t1",
 		Status: model.SeedingStatusPausedFreeEnd,
 	})
 	var rec model.SeedingTorrentRecord
@@ -8236,7 +8236,7 @@ func TestCookieCloud_UpdateConfig_BadJSON(t *testing.T) {
 func TestSeeding_CreateConfig_DuplicateClient(t *testing.T) {
 	env := setupTestEnv(t)
 	body := map[string]interface{}{
-		"clientId": "dup-seed-client", "enabled": true,
+		"clientId": 9, "enabled": true,
 	}
 	w := env.doRequest("POST", "/api/v1/seeding/configs", body)
 	if w.Code != http.StatusOK {
@@ -8289,7 +8289,7 @@ func TestSeeding_UpdateConfig_NotFound2(t *testing.T) {
 func TestSeeding_UpdateConfig_BadBody(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("POST", "/api/v1/seeding/configs", map[string]interface{}{
-		"clientId": "update-badbody", "enabled": true,
+		"clientId": 10, "enabled": true,
 	})
 	resp := parseResponse(t, w)
 	data, _ := resp.Data.(map[string]interface{})
@@ -8933,7 +8933,7 @@ func TestMaskToken(t *testing.T) {
 func TestSeeding_CreateConfig_DefaultCron(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("POST", "/api/v1/seeding/configs", map[string]interface{}{
-		"clientId": "default-cron-client",
+		"clientId": 11,
 		"enabled":  true,
 	})
 	if w.Code != http.StatusOK {
@@ -9056,7 +9056,7 @@ func TestDeleteRuleHandler_TopLevel_MethodNotAllowed(t *testing.T) {
 func TestDeleteRuleHandler_TestRule_WithRecords(t *testing.T) {
 	env := setupTestEnv(t)
 	env.db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "test-client",
+		ClientUID:  1,
 		InfoHash:  "abc123",
 		SiteName:  "testsite",
 		TorrentID: "t1",
@@ -9202,7 +9202,7 @@ func TestRSS_Update_ManyFields(t *testing.T) {
 		"urls":            []string{"https://rssupsite.com/rss2"},
 		"siteName":        "RSSUpSite",
 		"cron":            "*/15 * * * *",
-		"clientId":        "client1",
+		"clientId":        1,
 		"savePath":        "/data",
 		"category":        "cat1",
 		"addPaused":       true,
@@ -9217,7 +9217,7 @@ func TestRSS_Update_ManyFields(t *testing.T) {
 		"publishEnabled":  true,
 		"publishTargets":  []string{"site1"},
 		"autoReseed":      true,
-		"reseedClientIds": []string{"c1"},
+		"transferClientIds": []uint{1},
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())

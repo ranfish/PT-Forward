@@ -114,7 +114,7 @@
 
         <template v-else-if="column.key === 'client'">
           <div class="client-cell">
-            <div>{{ record.client_id }}</div>
+            <div>{{ uidName(record.client_id) }}</div>
             <div class="client-path" :title="record.save_path">{{ shortPath(record.save_path) }}</div>
           </div>
         </template>
@@ -230,14 +230,15 @@ const router = useRouter()
 // ==================== 筛选状态（§59.29：挂载即查，筛选弹层选路径） ====================
 
 interface ClientPathEntry {
-  client_id: string
+  client_id: number
+  name: string
   paths: Array<{ save_path: string; count: number }>
 }
 
 const clientPathTree = ref<ClientPathEntry[]>([])
 
 // 生效的筛选（传给 API）
-const filterClient = ref<string | undefined>(undefined)
+const filterClient = ref<number | undefined>(undefined)
 const filterPath = ref<string | undefined>(undefined)
 const statusFilter = ref('all')
 const searchText = ref('')
@@ -268,8 +269,17 @@ function persistFilters() {
   } catch { /* silent */ }
 }
 
+const uidNameMap = computed(() => {
+  const m = new Map<number, string>()
+  for (const c of clientPathTree.value) m.set(c.client_id, c.name || `#${c.client_id}`)
+  return m
+})
+function uidName(uid: number): string {
+  return uidNameMap.value.get(uid) || `#${uid}`
+}
+
 const clientSelectOptions = computed(() =>
-  clientPathTree.value.map(c => ({ value: c.client_id, label: c.client_id }))
+  clientPathTree.value.map(c => ({ value: c.client_id, label: c.name || `#${c.client_id}` }))
 )
 
 const pathSelectOptions = computed(() => {
@@ -334,7 +344,7 @@ async function fetchList() {
   loading.value = true
   try {
     const params = {
-      client_id: filterClient.value || '',
+      client_id: filterClient.value ?? '',
       save_path: filterPath.value || '',
       status: statusFilter.value === 'all' ? '' : (statusFilter.value === 'issues' ? 'issues' : statusFilter.value),
       search: searchText.value,
@@ -507,7 +517,7 @@ async function batchPurgeObserving() {
     for (const key of selectedHashes.value) {
       const sep = key.indexOf('|')
       if (sep <= 0) { fail++; continue }
-      const clientId = key.slice(0, sep)
+      const clientId = Number(key.slice(0, sep))
       const name = key.slice(sep + 1)
       try {
         await seedConfigApi.purgeObserving(clientId, name)
@@ -582,7 +592,7 @@ onMounted(async () => {
   const q = route.query
   if (q.client_id || q.save_path || q.name) {
     if (q.client_id) {
-      filterClient.value = String(q.client_id)
+      filterClient.value = Number(q.client_id)
     }
     if (q.save_path) {
       filterPath.value = String(q.save_path)

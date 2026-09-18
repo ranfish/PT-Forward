@@ -26,18 +26,18 @@ func setupReconcileDB(t *testing.T) *gorm.DB {
 // §59.227 场景1: record archived × qb stalledUP × 超 10min → 重激活 seeding
 func TestReconcileStaleRecords_Reactivate(t *testing.T) {
 	db := setupReconcileDB(t)
-	db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, Scope: "all"})
+	db.Create(&model.SeedingClientConfig{ClientUID: 1, Enabled: true, Scope: "all"})
 	old := time.Now().Add(-time.Hour)
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "ABC123", Status: model.SeedingStatusArchived,
+		ClientUID: 1, InfoHash: "ABC123", Status: model.SeedingStatusArchived,
 		LastActionBy: "rule:慢车", UpdatedAt: old, CreatedAt: old,
 	})
 	e := NewEngine(db, zap.NewNop())
 	tm := map[string]*model.TorrentInfo{"abc123": {State: "stalledUP", Name: "x"}}
-	e.reconcileStaleRecords(t.Context(), "c1", tm)
+	e.reconcileStaleRecords(t.Context(), 1, tm)
 
 	var rec model.SeedingTorrentRecord
-	db.Where("client_id = ? AND info_hash = ?", "c1", "ABC123").First(&rec)
+	db.Where("client_uid = ? AND info_hash = ?", 1, "ABC123").First(&rec)
 	if rec.Status != model.SeedingStatusSeeding {
 		t.Errorf("status = %q, want seeding", rec.Status)
 	}
@@ -49,14 +49,14 @@ func TestReconcileStaleRecords_Reactivate(t *testing.T) {
 // §59.227 ①防抖: 状态写入未满 10 分钟不对账（pause 生效延迟窗保护）
 func TestReconcileStaleRecords_Debounce(t *testing.T) {
 	db := setupReconcileDB(t)
-	db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, Scope: "all"})
+	db.Create(&model.SeedingClientConfig{ClientUID: 1, Enabled: true, Scope: "all"})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "ABC123", Status: model.SeedingStatusPausedFreeEnd,
+		ClientUID: 1, InfoHash: "ABC123", Status: model.SeedingStatusPausedFreeEnd,
 		UpdatedAt: time.Now().Add(-2 * time.Minute), // <10min
 	})
 	e := NewEngine(db, zap.NewNop())
 	tm := map[string]*model.TorrentInfo{"abc123": {State: "stalledUP"}}
-	e.reconcileStaleRecords(t.Context(), "c1", tm)
+	e.reconcileStaleRecords(t.Context(), 1, tm)
 
 	var rec model.SeedingTorrentRecord
 	db.Where("info_hash = ?", "ABC123").First(&rec)
@@ -68,14 +68,14 @@ func TestReconcileStaleRecords_Debounce(t *testing.T) {
 // §59.227: pausedUP（已暂停）不对账——只有真做种态（uploading/stalledUP/forcedUP）触发
 func TestReconcileStaleRecords_PausedUpState(t *testing.T) {
 	db := setupReconcileDB(t)
-	db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, Scope: "all"})
+	db.Create(&model.SeedingClientConfig{ClientUID: 1, Enabled: true, Scope: "all"})
 	old := time.Now().Add(-time.Hour)
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "ABC123", Status: model.SeedingStatusPausedRule, UpdatedAt: old,
+		ClientUID: 1, InfoHash: "ABC123", Status: model.SeedingStatusPausedRule, UpdatedAt: old,
 	})
 	e := NewEngine(db, zap.NewNop())
 	tm := map[string]*model.TorrentInfo{"abc123": {State: "pausedUP"}}
-	e.reconcileStaleRecords(t.Context(), "c1", tm)
+	e.reconcileStaleRecords(t.Context(), 1, tm)
 
 	var rec model.SeedingTorrentRecord
 	db.Where("info_hash = ?", "ABC123").First(&rec)
@@ -87,13 +87,13 @@ func TestReconcileStaleRecords_PausedUpState(t *testing.T) {
 // §59.227 ②: deleted/deleting 失联形态纳入对账
 func TestReconcileStaleRecords_DeletedAndDeleting(t *testing.T) {
 	db := setupReconcileDB(t)
-	db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, Scope: "all"})
+	db.Create(&model.SeedingClientConfig{ClientUID: 1, Enabled: true, Scope: "all"})
 	old := time.Now().Add(-time.Hour)
-	db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "D1", Status: model.SeedingStatusDeleted, UpdatedAt: old})
-	db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "D2", Status: model.SeedingStatusDeleting, UpdatedAt: old})
+	db.Create(&model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "D1", Status: model.SeedingStatusDeleted, UpdatedAt: old})
+	db.Create(&model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "D2", Status: model.SeedingStatusDeleting, UpdatedAt: old})
 	e := NewEngine(db, zap.NewNop())
 	tm := map[string]*model.TorrentInfo{"d1": {State: "stalledUP"}, "d2": {State: "uploading"}}
-	e.reconcileStaleRecords(t.Context(), "c1", tm)
+	e.reconcileStaleRecords(t.Context(), 1, tm)
 
 	var n int64
 	db.Model(&model.SeedingTorrentRecord{}).Where("status = ?", model.SeedingStatusSeeding).Count(&n)
@@ -120,21 +120,21 @@ func TestExtractTorrentIDFromComment(t *testing.T) {
 // §59.227 2b: recordMap 幽灵不短路导入——DB count 为真相源（LOWER 归一）
 func TestSyncUnmanaged_GhostRecordMap(t *testing.T) {
 	db := setupReconcileDB(t)
-	db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, Scope: "all"})
+	db.Create(&model.SeedingClientConfig{ClientUID: 1, Enabled: true, Scope: "all"})
 	e := NewEngine(db, zap.NewNop())
 	// 内存幽灵：recordMap 有 key 但 DB 无 record
 	e.mu.Lock()
-	e.recordMap[recordKey("c1", "ghost1")] = &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "ghost1"}
+	e.recordMap[recordKey(1, "ghost1")] = &model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "ghost1"}
 	e.mu.Unlock()
 
 	// ghost1 在 qb 但 DB 无 record → 应导入（旧逻辑被幽灵 continue）
 	// 大写 hash 变体：DB 有大写 record → LOWER 归一后不重复导入
-	db.Create(&model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "UPPERHASH", Status: model.SeedingStatusSeeding})
+	db.Create(&model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "UPPERHASH", Status: model.SeedingStatusSeeding})
 	tm := map[string]*model.TorrentInfo{
 		"ghost1":    {State: "stalledUP", Name: "g", TrackerURL: "https://t.hhanclub.net/announce.php?passkey=x"},
 		"upperhash": {State: "stalledUP", Name: "u", TrackerURL: "https://t.hhanclub.net/announce.php?passkey=x"},
 	}
-	e.syncUnmanagedTorrents(t.Context(), "c1", tm)
+	e.syncUnmanagedTorrents(t.Context(), 1, tm)
 
 	var n int64
 	db.Model(&model.SeedingTorrentRecord{}).Where("info_hash = ?", "ghost1").Count(&n)
@@ -150,13 +150,13 @@ func TestSyncUnmanaged_GhostRecordMap(t *testing.T) {
 // §59.227: comment 回填 tid
 func TestSyncUnmanaged_CommentTorrentID(t *testing.T) {
 	db := setupReconcileDB(t)
-	db.Create(&model.SeedingClientConfig{ClientID: "c1", Enabled: true, Scope: "all"})
+	db.Create(&model.SeedingClientConfig{ClientUID: 1, Enabled: true, Scope: "all"})
 	e := NewEngine(db, zap.NewNop())
 	tm := map[string]*model.TorrentInfo{
 		"cmt1": {State: "stalledUP", Name: "c", TrackerURL: "https://t.hhanclub.net/announce.php?passkey=x",
 			Comment: "https://hhanclub.net/details.php?id=210878"},
 	}
-	e.syncUnmanagedTorrents(t.Context(), "c1", tm)
+	e.syncUnmanagedTorrents(t.Context(), 1, tm)
 	var rec model.SeedingTorrentRecord
 	db.Where("info_hash = ?", "cmt1").First(&rec)
 	if rec.TorrentID != "210878" {

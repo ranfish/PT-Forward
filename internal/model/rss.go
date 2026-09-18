@@ -99,7 +99,7 @@ type RSSSubscription struct {
 	RejectRuleIDs []uint          `json:"reject_rule_ids" gorm:"type:json;serializer:json"`
 	Conditions    []RuleCondition `json:"conditions" gorm:"type:text;serializer:json"`
 
-	ClientID  string `json:"client_id" gorm:"size:50;index"`
+	ClientUID uint   `json:"client_uid" gorm:"index"`
 	SavePath  string `json:"save_path" gorm:"size:500"`
 	Category  string `json:"category" gorm:"size:100"`
 	AddPaused bool   `json:"add_paused" gorm:"default:false"`
@@ -121,7 +121,7 @@ type RSSSubscription struct {
 	ReplaceStr     string `json:"replace_str" gorm:"size:256"`
 
 	AutoTransfer      bool     `json:"auto_transfer" gorm:"column:auto_transfer;default:false"`
-	TransferClientIDs []string `json:"transfer_client_ids" gorm:"column:transfer_client_ids;type:json;serializer:json"`
+	TransferClientUIDs []uint `json:"transfer_client_uids" gorm:"column:transfer_client_uids;type:json;serializer:json"`
 
 	PublishEnabled bool     `json:"publish_enabled" gorm:"default:false"`
 	PublishTargets []string `json:"publish_targets" gorm:"type:json;serializer:json"`
@@ -150,7 +150,7 @@ type RSSSubscription struct {
 	DiskBudgetEnabled bool    `json:"disk_budget_enabled" gorm:"default:false"`
 	DiskBudgetMinGB   float64 `json:"disk_budget_min_gb" gorm:"default:10"`
 
-	CandidateClients []string            `json:"candidate_clients" gorm:"type:json;serializer:json"`
+	CandidateClients  []uint            `json:"candidate_clients" gorm:"type:json;serializer:json"`
 	ClientSelection  ClientSelectionMode `json:"client_selection" gorm:"size:20;default:'fixed'"`
 
 	ScoringConfig SeedingScoringConfig `json:"scoring_config" gorm:"embedded"`
@@ -196,7 +196,7 @@ type PendingScoringEntry struct {
 // v2: reserved — 待实现时激活
 type ScoredCandidate struct {
 	SubscriptionID    string        `json:"subscription_id"`
-	ClientID          string        `json:"client_id"`
+	ClientUID          uint             `json:"client_uid"`
 	Event             *TorrentEvent `json:"event"`
 	Seeders           int           `json:"seeders"`
 	Leechers          int           `json:"leechers"`

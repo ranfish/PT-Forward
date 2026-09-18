@@ -26,12 +26,12 @@ type ClientHandler struct {
 }
 
 type ClientManager interface {
-	Get(clientID string) (model.DownloaderClient, error)
+	Get(clientUID uint) (model.DownloaderClient, error)
 	Reload(ctx context.Context) error
-	ReloadClient(ctx context.Context, name string) error
+	ReloadClient(ctx context.Context, id uint) error
 	ConnectedCount() int
-	ListClients() []string
-	IsConnected(name string) bool
+	ListClients() []uint
+	IsConnected(id uint) bool
 }
 
 func NewClientHandler(db *gorm.DB, logger *zap.Logger, clientMgr ClientManager) *ClientHandler {
@@ -46,7 +46,7 @@ type createDownloaderRequest struct {
 	Password       string               `json:"password"`
 	Role           string               `json:"role"`
 	IsLocal        *bool                `json:"isLocal"` // §59.21: 指针类型区分"未传"和"false"
-	TransferTargetID string               `json:"transferTargetId"`
+	TransferTargetUID uint               `json:"transferTargetUid"`
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
 	TorrentDir     string               `json:"torrentDir"`
@@ -66,7 +66,7 @@ type downloaderResponse struct {
 	Username       string               `json:"username"`
 	Role           string               `json:"role"`
 	IsLocal        bool                 `json:"isLocal"`
-	TransferTargetID string               `json:"transferTargetId,omitempty"`
+	TransferTargetUID uint               `json:"transferTargetUid,omitempty"`
 	Enabled        bool                 `json:"enabled"`
 	IsDefault      bool                 `json:"isDefault"`
 	TorrentDir     string               `json:"torrentDir,omitempty"`
@@ -89,7 +89,7 @@ func (h *ClientHandler) toResponse(c *model.ClientConfig, mappings []model.Clien
 		Username:       c.Username,
 		Role:           c.Role,
 		IsLocal:        c.IsLocal,
-		TransferTargetID: c.TransferTargetID,
+		TransferTargetUID: c.TransferTargetUID,
 		Enabled:        c.Enabled,
 		IsDefault:      c.IsDefault,
 		CreatedAt:      c.CreatedAt,
@@ -155,15 +155,15 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 			if !clients[i].Enabled || h.clientMgr == nil {
 				continue
 			}
-			items[i].Connected = h.clientMgr.IsConnected(clients[i].Name)
+			items[i].Connected = h.clientMgr.IsConnected(clients[i].ID)
 			if !items[i].Connected {
 				continue
 			}
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				name := clients[idx].Name
-				dlClient, err := h.clientMgr.Get(name)
+				cid := clients[idx].ID
+				dlClient, err := h.clientMgr.Get(cid)
 				if err != nil {
 					return
 				}
@@ -183,7 +183,7 @@ func (h *ClientHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	} else {
 		for i := range items {
 			if clients[i].Enabled && h.clientMgr != nil {
-				items[i].Connected = h.clientMgr.IsConnected(clients[i].Name)
+				items[i].Connected = h.clientMgr.IsConnected(clients[i].ID)
 			}
 		}
 	}
@@ -251,7 +251,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, 40001, "type 必须为 qbittorrent 或 transmission")
 		return
 	}
-	if req.TransferTargetID != "" && req.Type != "qbittorrent" {
+	if req.TransferTargetUID != 0 && req.Type != "qbittorrent" {
 		Error(w, http.StatusBadRequest, 40001, "配置转移目标的下载器必须是 qbittorrent 类型（transmission 的种子导出依赖本地文件，跨机不可达）")
 		return
 	}
@@ -283,7 +283,7 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		IsDefault:      req.IsDefault,
 		Role:           req.Role,
 		IsLocal:        req.IsLocal != nil && *req.IsLocal,
-		TransferTargetID: req.TransferTargetID,
+		TransferTargetUID: req.TransferTargetUID,
 	}
 	if req.TorrentDir != "" {
 		cfgBytes, _ := json.Marshal(map[string]string{"torrent_dir": req.TorrentDir})
@@ -388,14 +388,14 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		client.Role = req.Role
 	}
-	client.TransferTargetID = req.TransferTargetID
+	client.TransferTargetUID = req.TransferTargetUID
 	client.Enabled = req.Enabled
 	client.IsDefault = req.IsDefault
 	if req.IsLocal != nil {
 		client.IsLocal = *req.IsLocal
 	}
 
-	if client.TransferTargetID != "" && client.Type != "qbittorrent" {
+	if client.TransferTargetUID != 0 && client.Type != "qbittorrent" {
 		Error(w, http.StatusBadRequest, 40001, "配置转移目标的下载器必须是 qbittorrent 类型（transmission 的种子导出依赖本地文件，跨机不可达）")
 		return
 	}
@@ -430,7 +430,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 			"password":         client.Password,
 			"role":             client.Role,
 			"is_local":         client.IsLocal,
-			"reseed_target_id": client.TransferTargetID,
+			"reseed_target_uid": client.TransferTargetUID,
 			"enabled":          client.Enabled,
 			"is_default":       client.IsDefault,
 			"config":           configJSON,
@@ -464,7 +464,7 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	auditLog(r, "client", "update", "client", fmt.Sprintf("%d", id), client.Name, "success")
 
 	if h.clientMgr != nil {
-		_ = h.clientMgr.ReloadClient(context.Background(), client.Name)
+		_ = h.clientMgr.ReloadClient(context.Background(), client.ID)
 	}
 
 	var mappings []model.ClientPathMapping
@@ -649,7 +649,7 @@ func (h *ClientHandler) buildClient(ctx context.Context, id uint) (model.Downloa
 	}
 
 	if h.clientMgr != nil {
-		if pooled, err := h.clientMgr.Get(cfg.Name); err == nil {
+		if pooled, err := h.clientMgr.Get(cfg.ID); err == nil {
 			return pooled, nil
 		}
 	}
@@ -905,7 +905,7 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		target := model.ClientPublishTarget{
-			ClientID:        req.ClientID,
+			ClientUID: req.ClientID,
 			SiteName:        req.SiteName,
 			CategoryMapping: req.CategoryMapping,
 			SourceMapping:   req.SourceMapping,

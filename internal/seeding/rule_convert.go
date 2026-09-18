@@ -15,7 +15,7 @@ func toRuleContext(rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, freeS
 		HasHR:             rec.HasHR,
 		HRSeedTimeH:       rec.HRSeedTimeH,
 		Discount:          string(rec.Discount),
-		ClientID:          rec.ClientID,
+		ClientUID:          rec.ClientUID,
 		TorrentID:         rec.TorrentID,
 		FreeLevel:         rec.FreeLevel,
 		Source:            rec.Source,

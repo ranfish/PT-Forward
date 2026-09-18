@@ -55,7 +55,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 		Name:     "e2e-sub",
 		Enabled:  true,
 		SiteName: "testsite",
-		ClientID: "seeding-e2e-client",
+		ClientUID: 1,
 		URLs:     []string{"https://testsite.cc/rss"},
 		Cron:     "*/5 * * * *",
 		ScoringConfig: model.SeedingScoringConfig{
@@ -71,7 +71,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 	db.Model(sub).Update("min_score", 0.0)
 
 	seedCfg := &model.SeedingClientConfig{
-		ClientID: "seeding-e2e-client",
+		ClientUID: 1,
 		Enabled:  true,
 	}
 	require.NoError(t, db.Create(seedCfg).Error)
@@ -121,14 +121,14 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 	}
 
 	mockDLProvider := &mocks.DownloaderProvider{
-		GetFn: func(cid string) (model.DownloaderClient, error) {
-			if cid == "seeding-e2e-client" {
+		GetFn: func(cid uint) (model.DownloaderClient, error) {
+			if cid == 1 {
 				return mockClient, nil
 			}
-			return nil, fmt.Errorf("not found: %s", cid)
+			return nil, fmt.Errorf("not found: %d", cid)
 		},
-		ListClientsFn: func() []string {
-			return []string{"seeding-e2e-client"}
+		ListClientsFn: func() []uint {
+			return []uint{1}
 		},
 	}
 
@@ -177,7 +177,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 			Size:      47000000000,
 			InfoHash:  "e2e_hash_001",
 			Discount:  model.DiscountFree,
-			Metadata:  map[string]any{"client_name": "seeding-e2e-client"},
+			Metadata:  map[string]any{"client_uid": 1},
 		},
 	}
 	require.NoError(t, eng.OnTorrents(ctx, events))
@@ -225,7 +225,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 	var evalResult *seeding.EvaluateResult
 	var evalErr error
 	for i := 0; i < 20; i++ {
-		evalResult, evalErr = eng.Evaluate(ctx, "seeding-e2e-client", nil)
+		evalResult, evalErr = eng.Evaluate(ctx, 1, nil)
 		require.NoError(t, evalErr)
 		if evalResult.Evaluated > 0 {
 			break
@@ -264,7 +264,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 	//（refreshMaindataLoop 后台协程与立即 Evaluate 并发, cachedMaindata 可能未就绪）
 	var evalResult2 *seeding.EvaluateResult
 	for i := 0; i < 10; i++ {
-		evalResult2, evalErr = eng2.Evaluate(ctx, "seeding-e2e-client", nil)
+		evalResult2, evalErr = eng2.Evaluate(ctx, 1, nil)
 		require.NoError(t, evalErr)
 		if evalResult2.Evaluated > 0 {
 			break

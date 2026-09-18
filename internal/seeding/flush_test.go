@@ -26,7 +26,7 @@ type flushMockClient struct {
 
 func (m *flushMockClient) GetName() string                           { return "c1" }
 func (m *flushMockClient) GetRole() string                           { return "seeding" }
-func (m *flushMockClient) GetTransferTargetID() string                 { return "" }
+func (m *flushMockClient) GetTransferTargetUID() uint                 { return 0 }
 func (m *flushMockClient) GetID() uint                               { return 1 }
 func (m *flushMockClient) GetSharedPaths() []model.SharedPathMapping { return nil }
 func (m *flushMockClient) GetTorrentDir() string                      { return "" }
@@ -95,18 +95,18 @@ func (m *flushMockClient) GetTrackers(_ context.Context, _ string) ([]string, er
 }
 
 type flushMockProvider struct {
-	clients map[string]model.DownloaderClient
-	list    []string
+	clients   map[uint]model.DownloaderClient
+	list     []uint
 }
 
-func (p *flushMockProvider) Get(id string) (model.DownloaderClient, error) {
+func (p *flushMockProvider) Get(id uint) (model.DownloaderClient, error) {
 	c, ok := p.clients[id]
 	if !ok {
-		return nil, fmt.Errorf("not found: %s", id)
+		return nil, fmt.Errorf("not found: %d", id)
 	}
 	return c, nil
 }
-func (p *flushMockProvider) ListClients() []string { return p.list }
+func (p *flushMockProvider) ListClients() []uint { return p.list }
 
 func newMockSiteProvider() *mocks.SiteInfoProvider {
 	return &mocks.SiteInfoProvider{
@@ -147,7 +147,7 @@ func seedSubscription(t *testing.T, db *gorm.DB, scoringEnabled bool, include2xU
 		Name:     "test-sub",
 		Enabled:  true,
 		SiteName: "site1",
-		ClientID: "c1",
+		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          scoringEnabled,
 			MaxCandidates:    50,
@@ -243,8 +243,8 @@ func TestFlush_NoClient(t *testing.T) {
 	_ = e.Start(ctx)
 
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{},
-		list:    []string{},
+		clients: map[uint]model.DownloaderClient{},
+		list:    []uint{},
 	})
 
 	candidates, err := e.Flush(ctx, fmt.Sprintf("%d", subID))
@@ -268,8 +268,8 @@ func TestFlush_NoRecords(t *testing.T) {
 		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	candidates, err := e.Flush(ctx, fmt.Sprintf("%d", subID))
@@ -291,7 +291,7 @@ func TestFlush_MaxActiveReached(t *testing.T) {
 		Name:     "test-sub",
 		Enabled:  true,
 		SiteName: "site1",
-		ClientID: "c1",
+		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          true,
 			MaxActiveSeeding: 0,
@@ -304,8 +304,8 @@ func TestFlush_MaxActiveReached(t *testing.T) {
 		maindata: &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	candidates, err := e.Flush(ctx, fmt.Sprintf("%d", sub.ID))
@@ -327,7 +327,7 @@ func TestFlush_PushOne_HRProtect(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:       "c1",
+		ClientUID:       1,
 		InfoHash:       "hash1",
 		SiteName:       "site1",
 		TorrentID:      "42",
@@ -346,15 +346,15 @@ func TestFlush_PushOne_HRProtect(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "hash0"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 	e.SetSiteProvider(newMockSiteProvider())
 
 	e.mu.Lock()
-	e.recordMap[recordKey("c1", "hash1")] = &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "hash1", Status: model.SeedingStatusSeeding,
+	e.recordMap[recordKey(1, "hash1")] = &model.SeedingTorrentRecord{
+		ClientUID: 1, InfoHash: "hash1", Status: model.SeedingStatusSeeding,
 		SubscriptionID: fmt.Sprintf("%d", subID),
 	}
 	e.mu.Unlock()
@@ -384,7 +384,7 @@ func TestFlush_PushOne_TorrentExists(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:       "c1",
+		ClientUID:       1,
 		InfoHash:       "hash_exists",
 		SiteName:       "site1",
 		TorrentID:      "43",
@@ -402,14 +402,14 @@ func TestFlush_PushOne_TorrentExists(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "hash_exists"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
 	e.mu.Lock()
-	e.recordMap[recordKey("c1", "hash_exists")] = &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "hash_exists", Status: model.SeedingStatusSeeding,
+	e.recordMap[recordKey(1, "hash_exists")] = &model.SeedingTorrentRecord{
+		ClientUID: 1, InfoHash: "hash_exists", Status: model.SeedingStatusSeeding,
 		SubscriptionID: fmt.Sprintf("%d", subID),
 	}
 	e.mu.Unlock()
@@ -433,17 +433,17 @@ func TestFlush_CollectsOnlyFree(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1", TorrentID: "1",
 		Discount: model.DiscountFree, Status: model.SeedingStatusSeeding,
 		Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h2", SiteName: "site1", TorrentID: "2",
+		ClientUID: 1, InfoHash: "h2", SiteName: "site1", TorrentID: "2",
 		Discount: model.DiscountNone, Status: model.SeedingStatusSeeding,
 		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h3", SiteName: "site1", TorrentID: "3",
+		ClientUID: 1, InfoHash: "h3", SiteName: "site1", TorrentID: "3",
 		Discount: model.Discount2xFree, Status: model.SeedingStatusSeeding,
 		Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
 	})
@@ -453,15 +453,15 @@ func TestFlush_CollectsOnlyFree(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "h1"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
 	for _, hash := range []string{"h1", "h2", "h3"} {
 		e.mu.Lock()
-		e.recordMap[recordKey("c1", hash)] = &model.SeedingTorrentRecord{
-			ClientID: "c1", InfoHash: hash, Status: model.SeedingStatusSeeding,
+		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
+			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", subID),
 		}
 		e.mu.Unlock()
@@ -473,7 +473,7 @@ func TestFlush_CollectsOnlyFree(t *testing.T) {
 	}
 	if len(candidates) != 2 {
 		var allRecords []model.SeedingTorrentRecord
-		db.Where("client_id = ? AND status = ?", "c1", model.SeedingStatusSeeding).Find(&allRecords)
+		db.Where("client_uid = ? AND status = ?", 1, model.SeedingStatusSeeding).Find(&allRecords)
 		for _, r := range allRecords {
 			t.Logf("record: hash=%s discount=%s isFree=%v source=%q", r.InfoHash, r.Discount, r.IsFree, r.Source)
 		}
@@ -491,12 +491,12 @@ func TestFlush_Include2xUp(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1", TorrentID: "1",
 		Discount: model.Discount2xUp, Status: model.SeedingStatusSeeding,
 		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h2", SiteName: "site1", TorrentID: "2",
+		ClientUID: 1, InfoHash: "h2", SiteName: "site1", TorrentID: "2",
 		Discount: model.DiscountNone, Status: model.SeedingStatusSeeding,
 		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
 	})
@@ -506,15 +506,15 @@ func TestFlush_Include2xUp(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "h1"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
 	for _, hash := range []string{"h1", "h2"} {
 		e.mu.Lock()
-		e.recordMap[recordKey("c1", hash)] = &model.SeedingTorrentRecord{
-			ClientID: "c1", InfoHash: hash, Status: model.SeedingStatusSeeding,
+		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
+			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusSeeding,
 		}
 		e.mu.Unlock()
 	}
@@ -545,12 +545,12 @@ func TestFlush_AssumeFreeSite(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "二师兄", TorrentID: "1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "二师兄", TorrentID: "1",
 		Discount: model.DiscountNone, Status: model.SeedingStatusPending,
 		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h2", SiteName: "二师兄", TorrentID: "2",
+		ClientUID: 1, InfoHash: "h2", SiteName: "二师兄", TorrentID: "2",
 		Discount: model.DiscountNone, Status: model.SeedingStatusPending,
 		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
 	})
@@ -560,15 +560,15 @@ func TestFlush_AssumeFreeSite(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "h1"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
 	for _, hash := range []string{"h1", "h2"} {
 		e.mu.Lock()
-		e.recordMap[recordKey("c1", hash)] = &model.SeedingTorrentRecord{
-			ClientID: "c1", InfoHash: hash, Status: model.SeedingStatusPending,
+		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
+			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusPending,
 			SubscriptionID: fmt.Sprintf("%d", subID),
 		}
 		e.mu.Unlock()
@@ -613,7 +613,7 @@ func TestFlush_AssumeFreeNotSet(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "二师兄", TorrentID: "1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "二师兄", TorrentID: "1",
 		Discount: model.DiscountNone, Status: model.SeedingStatusPending,
 		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
 	})
@@ -623,14 +623,14 @@ func TestFlush_AssumeFreeNotSet(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "h1"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
 	e.mu.Lock()
-	e.recordMap[recordKey("c1", "h1")] = &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", Status: model.SeedingStatusPending,
+	e.recordMap[recordKey(1, "h1")] = &model.SeedingTorrentRecord{
+		ClientUID: 1, InfoHash: "h1", Status: model.SeedingStatusPending,
 		SubscriptionID: fmt.Sprintf("%d", subID),
 	}
 	e.mu.Unlock()
@@ -661,7 +661,7 @@ func TestFlush_AssumeFreeSkipsDetectDiscount(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "二师兄", TorrentID: "1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "二师兄", TorrentID: "1",
 		Discount: model.DiscountNone, Status: model.SeedingStatusPending,
 		Source: "rss", IsFree: false, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now,
 	})
@@ -671,8 +671,8 @@ func TestFlush_AssumeFreeSkipsDetectDiscount(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "h1"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	detectDiscountCalled := 0
@@ -698,8 +698,8 @@ func TestFlush_AssumeFreeSkipsDetectDiscount(t *testing.T) {
 	e.SetSiteProvider(mockProvider)
 
 	e.mu.Lock()
-	e.recordMap[recordKey("c1", "h1")] = &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", Status: model.SeedingStatusPending,
+	e.recordMap[recordKey(1, "h1")] = &model.SeedingTorrentRecord{
+		ClientUID: 1, InfoHash: "h1", Status: model.SeedingStatusPending,
 		SubscriptionID: fmt.Sprintf("%d", subID),
 	}
 	e.mu.Unlock()
@@ -723,7 +723,7 @@ func TestFlush_BatchLimit(t *testing.T) {
 	_ = e.Start(ctx)
 
 	sub := &model.RSSSubscription{
-		Name: "test-sub", Enabled: true, SiteName: "site1", ClientID: "c1",
+		Name: "test-sub", Enabled: true, SiteName: "site1", ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled: true, MaxCandidates: 50, MaxActiveSeeding: 100,
 			BatchLimit: 2, MinScore: 0.0, HalfLifeHours: 2.0,
@@ -736,14 +736,14 @@ func TestFlush_BatchLimit(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		hash := fmt.Sprintf("hash%d", i)
 		db.Create(&model.SeedingTorrentRecord{
-			ClientID: "c1", InfoHash: hash, SiteName: "site1",
+			ClientUID: 1, InfoHash: hash, SiteName: "site1",
 			TorrentID: fmt.Sprintf("%d", i), Discount: model.DiscountFree,
 			Status: model.SeedingStatusSeeding, Source: "rss",
 			IsFree: true, CreatedAt: now,
 		})
 		e.mu.Lock()
-		e.recordMap[recordKey("c1", hash)] = &model.SeedingTorrentRecord{
-			ClientID: "c1", InfoHash: hash, Status: model.SeedingStatusSeeding,
+		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
+			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusSeeding,
 		}
 		e.mu.Unlock()
 	}
@@ -753,8 +753,8 @@ func TestFlush_BatchLimit(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "hash0"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
@@ -780,12 +780,12 @@ func TestFlush_Sorting(t *testing.T) {
 	newTime := now.Add(-1 * time.Hour)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "old_hash", SiteName: "site1", TorrentID: "1",
+		ClientUID: 1, InfoHash: "old_hash", SiteName: "site1", TorrentID: "1",
 		Discount: model.DiscountFree, Status: model.SeedingStatusSeeding,
 		Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: oldTime,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "new_hash", SiteName: "site1", TorrentID: "2",
+		ClientUID: 1, InfoHash: "new_hash", SiteName: "site1", TorrentID: "2",
 		Discount: model.Discount2xFree, Status: model.SeedingStatusSeeding,
 		Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: newTime,
 	})
@@ -795,15 +795,15 @@ func TestFlush_Sorting(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "new_hash"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
 	for _, h := range []string{"old_hash", "new_hash"} {
 		e.mu.Lock()
-		e.recordMap[recordKey("c1", h)] = &model.SeedingTorrentRecord{
-			ClientID: "c1", InfoHash: h, Status: model.SeedingStatusSeeding,
+		e.recordMap[recordKey(1, h)] = &model.SeedingTorrentRecord{
+			ClientUID: 1, InfoHash: h, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", subID),
 		}
 		e.mu.Unlock()
@@ -830,14 +830,14 @@ func TestFlush_ContextCancelled(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		hash := fmt.Sprintf("hash%d", i)
 		db.Create(&model.SeedingTorrentRecord{
-			ClientID: "c1", InfoHash: hash, SiteName: "site1",
+			ClientUID: 1, InfoHash: hash, SiteName: "site1",
 			TorrentID: fmt.Sprintf("%d", i), Discount: model.DiscountFree,
 			Status: model.SeedingStatusSeeding, Source: "rss",
 			IsFree: true, CreatedAt: now,
 		})
 		e.mu.Lock()
-		e.recordMap[recordKey("c1", hash)] = &model.SeedingTorrentRecord{
-			ClientID: "c1", InfoHash: hash, Status: model.SeedingStatusSeeding,
+		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
+			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusSeeding,
 		}
 		e.mu.Unlock()
 	}
@@ -847,8 +847,8 @@ func TestFlush_ContextCancelled(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "hash0"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	cancel()
@@ -870,14 +870,14 @@ func TestFlush_ScoreWithBatchSLData(t *testing.T) {
 
 	now := time.Now()
 	records := []model.SeedingTorrentRecord{
-		{ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "10", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now},
-		{ClientID: "c1", InfoHash: "h2", SiteName: "site1", TorrentID: "20", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now},
+		{ClientUID: 1, InfoHash: "h1", SiteName: "site1", TorrentID: "10", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now},
+		{ClientUID: 1, InfoHash: "h2", SiteName: "site1", TorrentID: "20", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", subID), CreatedAt: now},
 	}
 	for i := range records {
 		db.Create(&records[i])
 		e.mu.Lock()
-		e.recordMap[recordKey(records[i].ClientID, records[i].InfoHash)] = &model.SeedingTorrentRecord{
-			ClientID: records[i].ClientID, InfoHash: records[i].InfoHash, Status: model.SeedingStatusSeeding,
+		e.recordMap[recordKey(records[i].ClientUID, records[i].InfoHash)] = &model.SeedingTorrentRecord{
+			ClientUID: records[i].ClientUID, InfoHash: records[i].InfoHash, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", subID),
 		}
 		e.mu.Unlock()
@@ -892,8 +892,8 @@ func TestFlush_ScoreWithBatchSLData(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	batchSL := map[string]*model.SLData{
@@ -962,7 +962,7 @@ func TestFlush_ConfirmTopN_Rescores(t *testing.T) {
 		Name:     "test-sub-sl",
 		Enabled:  true,
 		SiteName: "site1",
-		ClientID: "c1",
+		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          true,
 			MaxCandidates:    50,
@@ -985,15 +985,15 @@ func TestFlush_ConfirmTopN_Rescores(t *testing.T) {
 
 	now := time.Now()
 	records := []model.SeedingTorrentRecord{
-		{ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "10", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", sub.ID), CreatedAt: now},
-		{ClientID: "c1", InfoHash: "h2", SiteName: "site1", TorrentID: "20", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", sub.ID), CreatedAt: now},
-		{ClientID: "c1", InfoHash: "h3", SiteName: "site1", TorrentID: "30", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", sub.ID), CreatedAt: now},
+		{ClientUID: 1, InfoHash: "h1", SiteName: "site1", TorrentID: "10", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", sub.ID), CreatedAt: now},
+		{ClientUID: 1, InfoHash: "h2", SiteName: "site1", TorrentID: "20", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", sub.ID), CreatedAt: now},
+		{ClientUID: 1, InfoHash: "h3", SiteName: "site1", TorrentID: "30", Discount: model.DiscountFree, Status: model.SeedingStatusSeeding, Source: "rss", IsFree: true, SubscriptionID: fmt.Sprintf("%d", sub.ID), CreatedAt: now},
 	}
 	for i := range records {
 		db.Create(&records[i])
 		e.mu.Lock()
-		e.recordMap[recordKey(records[i].ClientID, records[i].InfoHash)] = &model.SeedingTorrentRecord{
-			ClientID: records[i].ClientID, InfoHash: records[i].InfoHash, Status: model.SeedingStatusSeeding,
+		e.recordMap[recordKey(records[i].ClientUID, records[i].InfoHash)] = &model.SeedingTorrentRecord{
+			ClientUID: records[i].ClientUID, InfoHash: records[i].InfoHash, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", sub.ID),
 		}
 		e.mu.Unlock()
@@ -1008,8 +1008,8 @@ func TestFlush_ConfirmTopN_Rescores(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	batchSL := map[string]*model.SLData{
@@ -1082,14 +1082,14 @@ func TestFlush_DiskProtectBlocks(t *testing.T) {
 	subID := seedSubscription(t, db, true, true)
 
 	db.Create(&model.SeedingClientConfig{
-		ClientID:           "c1",
+		ClientUID:           1,
 		Enabled:            true,
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     50,
 	})
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:       "c1",
+		ClientUID:       1,
 		InfoHash:       "hash_dp",
 		SiteName:       "site1",
 		TorrentID:      "100",
@@ -1106,8 +1106,8 @@ func TestFlush_DiskProtectBlocks(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "hash_dp"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
@@ -1135,14 +1135,14 @@ func TestFlush_DiskProtectAllowsWhenSpaceOK(t *testing.T) {
 	subID := seedSubscription(t, db, true, true)
 
 	db.Create(&model.SeedingClientConfig{
-		ClientID:           "c1",
+		ClientUID:           1,
 		Enabled:            true,
 		DiskProtectEnabled: true,
 		MinDiskSpaceGB:     10,
 	})
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:       "c1",
+		ClientUID:       1,
 		InfoHash:       "hash_ok",
 		SiteName:       "site1",
 		TorrentID:      "200",
@@ -1159,8 +1159,8 @@ func TestFlush_DiskProtectAllowsWhenSpaceOK(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "hash_ok"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
@@ -1183,7 +1183,7 @@ func TestFlush_DiskRecoverBypassMaxActive(t *testing.T) {
 		Name:     "test-sub",
 		Enabled:  true,
 		SiteName: "site1",
-		ClientID: "c1",
+		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          true,
 			MaxActiveSeeding: 2,
@@ -1196,16 +1196,16 @@ func TestFlush_DiskRecoverBypassMaxActive(t *testing.T) {
 	db.Create(&model.Site{Name: "site1", Domain: "site1.com"})
 
 	e.mu.Lock()
-	e.recordMap[recordKey("c1", "existing1")] = &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "existing1", Status: model.SeedingStatusSeeding,
+	e.recordMap[recordKey(1, "existing1")] = &model.SeedingTorrentRecord{
+		ClientUID: 1, InfoHash: "existing1", Status: model.SeedingStatusSeeding,
 	}
-	e.recordMap[recordKey("c1", "existing2")] = &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "existing2", Status: model.SeedingStatusSeeding,
+	e.recordMap[recordKey(1, "existing2")] = &model.SeedingTorrentRecord{
+		ClientUID: 1, InfoHash: "existing2", Status: model.SeedingStatusSeeding,
 	}
 	e.mu.Unlock()
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:       "c1",
+		ClientUID:       1,
 		InfoHash:       "dr_hash",
 		SiteName:       "site1",
 		TorrentID:      "500",
@@ -1219,8 +1219,8 @@ func TestFlush_DiskRecoverBypassMaxActive(t *testing.T) {
 	})
 
 	e.mu.Lock()
-	e.recordMap[recordKey("c1", "dr_hash")] = &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "dr_hash", Status: model.SeedingStatusPending,
+	e.recordMap[recordKey(1, "dr_hash")] = &model.SeedingTorrentRecord{
+		ClientUID: 1, InfoHash: "dr_hash", Status: model.SeedingStatusPending,
 	}
 	e.mu.Unlock()
 
@@ -1230,8 +1230,8 @@ func TestFlush_DiskRecoverBypassMaxActive(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "dr_hash"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 
@@ -1263,7 +1263,7 @@ func TestFlush_DiskRecoverMaxActiveNoRecoverCandidates(t *testing.T) {
 		Name:     "test-sub",
 		Enabled:  true,
 		SiteName: "site1",
-		ClientID: "c1",
+		ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{
 			Enabled:          true,
 			MaxActiveSeeding: 1,
@@ -1276,13 +1276,13 @@ func TestFlush_DiskRecoverMaxActiveNoRecoverCandidates(t *testing.T) {
 	db.Create(&model.Site{Name: "site1", Domain: "site1.com"})
 
 	e.mu.Lock()
-	e.recordMap[recordKey("c1", "existing1")] = &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "existing1", Status: model.SeedingStatusSeeding,
+	e.recordMap[recordKey(1, "existing1")] = &model.SeedingTorrentRecord{
+		ClientUID: 1, InfoHash: "existing1", Status: model.SeedingStatusSeeding,
 	}
 	e.mu.Unlock()
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:       "c1",
+		ClientUID:       1,
 		InfoHash:       "normal_hash",
 		SiteName:       "site1",
 		TorrentID:      "600",
@@ -1295,8 +1295,8 @@ func TestFlush_DiskRecoverMaxActiveNoRecoverCandidates(t *testing.T) {
 	})
 
 	e.mu.Lock()
-	e.recordMap[recordKey("c1", "normal_hash")] = &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "normal_hash", Status: model.SeedingStatusPending,
+	e.recordMap[recordKey(1, "normal_hash")] = &model.SeedingTorrentRecord{
+		ClientUID: 1, InfoHash: "normal_hash", Status: model.SeedingStatusPending,
 	}
 	e.mu.Unlock()
 
@@ -1305,8 +1305,8 @@ func TestFlush_DiskRecoverMaxActiveNoRecoverCandidates(t *testing.T) {
 		addResult: &model.AddResult{InfoHash: "normal_hash"},
 	}
 	e.SetClientProvider(&flushMockProvider{
-		clients: map[string]model.DownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]model.DownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 	e.SetSiteProvider(newMockSiteProvider())
 

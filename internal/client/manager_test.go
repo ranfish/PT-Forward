@@ -50,7 +50,7 @@ func TestManager_Get_NotFound(t *testing.T) {
 	db := setupManagerDB(t)
 	m := NewManager(db, zap.NewNop())
 
-	_, err := m.Get("nonexistent")
+	_, err := m.Get(99999)
 	if err == nil {
 		t.Error("expected error for nonexistent client")
 	}
@@ -204,7 +204,7 @@ func TestManager_LoadClients_RemovesStale(t *testing.T) {
 	})
 
 	m.mu.Lock()
-	m.clients["stale-qb"] = &stubClient{name: "stale-qb"}
+	m.clients[999] = &stubClient{id: 999}
 	m.mu.Unlock()
 	if m.ConnectedCount() != 1 {
 		t.Fatalf("expected 1 (injected), got %d", m.ConnectedCount())
@@ -223,15 +223,15 @@ func TestManager_IsConnected(t *testing.T) {
 	db := setupManagerDB(t)
 	m := NewManager(db, zap.NewNop())
 
-	if m.IsConnected("nope") {
+	if m.IsConnected(777) {
 		t.Error("expected false for nonexistent client")
 	}
 
 	m.mu.Lock()
-	m.clients["injected"] = &stubClient{name: "injected"}
+	m.clients[888] = &stubClient{name: "injected", id: 888}
 	m.mu.Unlock()
 
-	if !m.IsConnected("injected") {
+	if !m.IsConnected(888) {
 		t.Error("expected true for injected client")
 	}
 }
@@ -281,13 +281,13 @@ func TestManager_HealthCheck_ReconnectsDisconnectedClient(t *testing.T) {
 	if err := m.LoadClients(context.Background()); err != nil {
 		t.Fatalf("LoadClients: %v", err)
 	}
-	if m.IsConnected("disc-qb") {
+	if m.IsConnected(555) {
 		t.Fatal("expected client to be disconnected (unreachable)")
 	}
 
 	m.HealthCheck(context.Background())
 
-	if m.IsConnected("disc-qb") {
+	if m.IsConnected(555) {
 		t.Error("expected client to still be disconnected (still unreachable)")
 	}
 }
@@ -297,16 +297,16 @@ func TestManager_HealthCheck_RemovesDisabledClient(t *testing.T) {
 	m := NewManager(db, zap.NewNop())
 
 	m.mu.Lock()
-	m.clients["should-remove"] = &stubClient{name: "should-remove"}
+	m.clients[172] = &stubClient{name: "should-remove"}
 	m.mu.Unlock()
 
-	if !m.IsConnected("should-remove") {
+	if !m.IsConnected(172) {
 		t.Fatal("expected client to be connected before health check")
 	}
 
 	m.HealthCheck(context.Background())
 
-	if m.IsConnected("should-remove") {
+	if m.IsConnected(172) {
 		t.Error("expected client to be removed (not in DB)")
 	}
 }
@@ -337,11 +337,12 @@ func TestManager_CreateClient_Transmission(t *testing.T) {
 
 type stubClient struct {
 	name string
+	id   uint
 }
 
 func (s *stubClient) GetName() string                           { return s.name }
 func (s *stubClient) GetRole() string                           { return "download" }
-func (s *stubClient) GetTransferTargetID() string                 { return "" }
+func (s *stubClient) GetTransferTargetUID() uint                 { return 0 }
 func (s *stubClient) GetID() uint                               { return 0 }
 func (s *stubClient) GetSharedPaths() []model.SharedPathMapping { return nil }
 func (s *stubClient) GetTorrentDir() string                      { return "" }

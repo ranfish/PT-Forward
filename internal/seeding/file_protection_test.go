@@ -88,7 +88,7 @@ func TestFindRelatedByTagOrPath_Depth1(t *testing.T) {
 	others := []*model.TorrentInfo{
 		torrent,
 		{Hash: "b1", Tags: []string{"REPOST_chain"}},
-		{Hash: "c1", Tags: []string{"REPOST_c1"}},
+		{Hash: "h1", Tags: []string{"REPOST_c1"}},
 	}
 	result := FindRelatedByTagOrPath(torrent, others, 1)
 	if len(result) != 1 {
@@ -103,7 +103,7 @@ func TestFindRelatedByTagOrPath_Depth2(t *testing.T) {
 	others := []*model.TorrentInfo{
 		torrent,
 		{Hash: "b1", Tags: []string{"REPOST_chain", "REPOST_c1"}},
-		{Hash: "c1", Tags: []string{"REPOST_c1"}},
+		{Hash: "h1", Tags: []string{"REPOST_c1"}},
 	}
 	result := FindRelatedByTagOrPath(torrent, others, 2)
 	if len(result) != 2 {

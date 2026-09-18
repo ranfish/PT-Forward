@@ -430,7 +430,12 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	clientID := r.URL.Query().Get("clientId")
+	clientUID := uint(0)
+	if v := r.URL.Query().Get("client_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			clientUID = uint(n)
+		}
+	}
 	site := r.URL.Query().Get("site")
 	torrentID := r.URL.Query().Get("torrentId")
 	status := r.URL.Query().Get("status")
@@ -448,8 +453,8 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 
 	query := h.engine.DB().Model(&model.ReseedMatch{}).Where("task_id = ? OR task_id = 0", taskID)
 
-	if clientID != "" {
-		query = query.Where("client_id = ?", clientID)
+	if clientUID != 0 {
+		query = query.Where("client_uid = ?", clientUID)
 	}
 	if site != "" {
 		query = query.Where("target_site = ? OR source_site = ?", site, site)
@@ -477,7 +482,7 @@ func (h *ReseedHandler) handleListMatches(w http.ResponseWriter, r *http.Request
 
 	allowedOrders := map[string]bool{
 		"created_at": true, "status": true, "target_site": true, "source_site": true,
-		"client_id": true, "confidence": true, "source_torrent_id": true,
+		"client_uid": true, "confidence": true, "source_torrent_id": true,
 		"target_torrent_id": true, "directory": true,
 	}
 	orderClause := "created_at DESC"

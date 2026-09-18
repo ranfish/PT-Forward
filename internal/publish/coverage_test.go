@@ -192,7 +192,7 @@ func TestLifecycleManager_RemoveHRTag_NoClientProvider(t *testing.T) {
 	m := NewLifecycleManager(db, zap.NewNop())
 
 	mem := &model.PublishGroupMember{
-		ClientID: "client-1",
+		ClientUID: 1,
 		InfoHash: "abc123",
 		HRSite:   "site-a",
 	}
@@ -206,7 +206,7 @@ func TestLifecycleManager_RemoveHRTag_EmptySite(t *testing.T) {
 	m.SetClientProvider(&mockLifecycleProvider{client: mockDL})
 
 	mem := &model.PublishGroupMember{
-		ClientID: "client-1",
+		ClientUID: 1,
 		InfoHash: "abc123",
 		HRSite:   "",
 		SiteName: "",
@@ -225,7 +225,7 @@ func TestLifecycleManager_RemoveHRTag_UsesSiteName(t *testing.T) {
 	m.SetClientProvider(&mockLifecycleProvider{client: mockDL})
 
 	mem := &model.PublishGroupMember{
-		ClientID: "client-1",
+		ClientUID: 1,
 		InfoHash: "abc123",
 		HRSite:   "",
 		SiteName: "fallback-site",
@@ -249,7 +249,7 @@ func TestLifecycleManager_PauseMember_WithClient(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "site-a",
-		ClientID:       "test-client",
+		ClientUID:       2,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        60,
 	}
@@ -286,7 +286,7 @@ func TestLifecycleManager_PauseMember_PauseFails(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "site-a",
-		ClientID:       "test-client",
+		ClientUID:       2,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        60,
 	}
@@ -317,7 +317,7 @@ func TestLifecycleManager_DeleteGroup_WithClientProvider(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "site-a",
-		ClientID:       "test-client",
+		ClientUID:       0,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        200,
 	}
@@ -325,7 +325,7 @@ func TestLifecycleManager_DeleteGroup_WithClientProvider(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "def456",
 		SiteName:       "site-b",
-		ClientID:       "",
+		ClientUID:       1,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        200,
 	}
@@ -356,7 +356,7 @@ func TestLifecycleManager_DeleteGroup_DeleteFails(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "site-a",
-		ClientID:       "test-client",
+		ClientUID:       2,
 		Status:         model.MemberStatusSeedingConfirmed,
 		Seeders:        200,
 	}
@@ -500,7 +500,7 @@ func TestSeedingConfirmation_ConfirmMember_NoClientID(t *testing.T) {
 
 	confirmed, err := sc.confirmMember(context.Background(), &mockDownloaderChecker{}, model.PublishGroupMember{
 		InfoHash: "abc123",
-		ClientID: "",
+		ClientUID: 0,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -516,7 +516,7 @@ func TestSeedingConfirmation_ConfirmMember_ClientConfigNotFound(t *testing.T) {
 
 	confirmed, err := sc.confirmMember(context.Background(), &mockDownloaderChecker{}, model.PublishGroupMember{
 		InfoHash: "abc123",
-		ClientID: "nonexistent",
+		ClientUID: 1,
 	})
 	if err == nil {
 		t.Error("expected error for non-existent client config")
@@ -539,7 +539,7 @@ func TestSeedingConfirmation_ConfirmMember_CheckerError(t *testing.T) {
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
 		InfoHash: "abc123",
-		ClientID: "client-1",
+		ClientUID: 1,
 	})
 	if err == nil {
 		t.Error("expected error from checker")
@@ -562,7 +562,7 @@ func TestSeedingConfirmation_ConfirmMember_NilInfo(t *testing.T) {
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
 		InfoHash: "abc123",
-		ClientID: "client-1",
+		ClientUID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -588,7 +588,7 @@ func TestSeedingConfirmation_ConfirmMember_StalledUP(t *testing.T) {
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
 		InfoHash: "abc123",
-		ClientID: "client-1",
+		ClientUID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -614,7 +614,7 @@ func TestSeedingConfirmation_ConfirmMember_ForcedUP(t *testing.T) {
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
 		InfoHash: "abc123",
-		ClientID: "client-1",
+		ClientUID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -641,7 +641,7 @@ func TestSeedingConfirmation_ConfirmMember_IsFinished(t *testing.T) {
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
 		InfoHash: "abc123",
-		ClientID: "client-1",
+		ClientUID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -662,7 +662,7 @@ func TestSeedingConfirmation_CheckOnce_CancelledContext(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientID:       "client-1",
+		ClientUID:       1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}
@@ -694,7 +694,7 @@ func TestSeedingConfirmation_CheckOnce_ConfirmFails(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientID:       "client-1",
+		ClientUID:       1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}
@@ -730,7 +730,7 @@ func TestSeedingConfirmation_CheckOnce_WithLogger(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientID:       "client-1",
+		ClientUID:       1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}
@@ -770,7 +770,7 @@ func TestSeedingConfirmation_ConfirmMember_InjectedStatus(t *testing.T) {
 
 	confirmed, err := sc.confirmMember(context.Background(), checker, model.PublishGroupMember{
 		InfoHash: "abc123",
-		ClientID: "client-1",
+		ClientUID: 1,
 		Status:   model.MemberStatusInjected,
 	})
 	if err != nil {
@@ -876,7 +876,7 @@ type mockCompletionWatcher struct {
 
 func (m *mockCompletionWatcher) Start(ctx context.Context) error { return nil }
 func (m *mockCompletionWatcher) Stop()                           {}
-func (m *mockCompletionWatcher) Watch(ctx context.Context, clientName, infoHash string, candidateID uint) error {
+func (m *mockCompletionWatcher) Watch(ctx context.Context, clientUID uint, infoHash string, candidateID uint) error {
 	return nil
 }
 func (m *mockCompletionWatcher) SubmitCandidate(ctx context.Context, candidate model.PublishCandidate) error {

@@ -38,7 +38,7 @@ type Context struct {
 	AddedAt     time.Time
 
 	SiteName       string
-	ClientID       string
+	ClientUID      uint
 	TorrentID      string
 	Status         string
 	Discount       string
@@ -81,7 +81,7 @@ func (c *Context) fieldValue(key string) (string, bool) {
 	case "discount":
 		return c.Discount, true
 	case "client_id":
-		return c.ClientID, true
+		return fmt.Sprintf("%d", c.ClientUID), true
 	case "torrent_id":
 		return c.TorrentID, true
 	case "free_level":
@@ -342,7 +342,7 @@ type ExprEnv struct {
 	HasHR         bool    `expr:"hasHR"`
 	HRSeedTimeH   int     `expr:"hrSeedTimeH"`
 	Discount      string  `expr:"discount"`
-	ClientID      string  `expr:"clientID"`
+	ClientUID     uint   `expr:"clientUID"`
 	Name          string  `expr:"name"`
 	Size          int64   `expr:"size"`
 	TotalSize     int64   `expr:"totalSize"`
@@ -383,7 +383,7 @@ func buildExprEnv(c *Context) *ExprEnv {
 		HasHR:         c.HasHR,
 		HRSeedTimeH:   c.HRSeedTimeH,
 		Discount:      c.Discount,
-		ClientID:      c.ClientID,
+		ClientUID:     c.ClientUID,
 		Name:          c.Name,
 		Size:          c.TotalSize,
 		TotalSize:     c.TotalSize,
@@ -472,7 +472,7 @@ func ValidateExpr(exprStr string) error {
 	return err
 }
 
-func ContextFromTorrentInfo(ti *model.TorrentInfo, siteName, clientID string, now time.Time) *Context {
+func ContextFromTorrentInfo(ti *model.TorrentInfo, siteName string, clientUID uint, now time.Time) *Context {
 	return &Context{
 		InfoHash:      ti.Hash,
 		Name:          ti.Name,
@@ -496,7 +496,7 @@ func ContextFromTorrentInfo(ti *model.TorrentInfo, siteName, clientID string, no
 		IsPaused:      ti.IsPaused,
 		AddedAt:       ti.AddedAt,
 		SiteName:      siteName,
-		ClientID:      clientID,
+		ClientUID:     clientUID,
 		Now:           now,
 	}
 }

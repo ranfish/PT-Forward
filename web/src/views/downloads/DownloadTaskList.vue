@@ -7,7 +7,7 @@
             v-model:value="filterClient" style="width: 180px" allow-clear
             :placeholder="t('downloads.filterClient')" @change="fetchData"
           >
-            <a-select-option v-for="c in clientOptions" :key="c" :value="c">{{ c }}</a-select-option>
+            <a-select-option v-for="c in clientOptions" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
           </a-select>
           <a-select
             v-model:value="filterStatus" style="width: 140px" allow-clear
@@ -26,7 +26,7 @@
     <div v-if="spaceStats.length > 0" style="margin-bottom: 16px">
       <a-row :gutter="12">
         <a-col v-for="s in spaceStats" :key="s.clientId" :span="Math.max(6, Math.floor(24 / spaceStats.length))">
-          <a-card size="small" :title="s.clientId">
+          <a-card size="small" :title="s.name || `#${s.clientId}`">
             <a-statistic title="实际可用" :value="formatBytes(s.effectiveFree)" :value-style="{ color: s.effectiveFree < 50 * 1024 * 1024 * 1024 ? '#ff4d4f' : '#52c41a', fontSize: '16px' }" />
             <div style="font-size: 12px; color: #999; margin-top: 8px">
               <div>剩余 {{ formatBytes(s.freeSpace) }}</div>
@@ -175,7 +175,7 @@
       <a-form layout="vertical">
         <a-form-item label="目标下载器" required>
           <a-select v-model:value="addForm.client_id" :placeholder="t('downloads.selectClient')">
-            <a-select-option v-for="c in clientOptions" :key="c" :value="c">{{ c }}</a-select-option>
+            <a-select-option v-for="c in clientOptions" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-tabs v-model:active-key="addMode">
@@ -201,8 +201,8 @@
     <a-modal v-model:open="configModalVisible" :title="t('downloads.configTitle')" :confirm-loading="configSubmitting" width="600px" @ok="handleConfigSubmit">
       <a-form layout="vertical">
         <a-form-item label="下载器" required>
-          <a-select v-model:value="configForm.client_id" :disabled="!!editingConfig" :placeholder="t('downloads.selectClient')">
-            <a-select-option v-for="c in clientOptions" :key="c" :value="c">{{ c }}</a-select-option>
+          <a-select v-model:value="configForm.client_uid" :disabled="!!editingConfig" :placeholder="t('downloads.selectClient')">
+            <a-select-option v-for="c in clientOptions" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="删种规则">
@@ -272,11 +272,11 @@ const loading = ref(false)
 const page = ref(1)
 const size = ref(20)
 const total = ref(0)
-const filterClient = ref<string>('')
+const filterClient = ref<number | undefined>(undefined)
 const filterStatus = ref<string>('')
 const selectedRowKeys = ref<number[]>([])
 const deleteMode = ref(true)
-const allClients = ref<string[]>([])
+const allClients = ref<{ id: number; name: string }[]>([])
 const spaceStats = ref<SpaceStat[]>([])
 const configs = ref<DownloadClientConfig[]>([])
 const configsLoading = ref(false)
@@ -286,7 +286,7 @@ const configModalVisible = ref(false)
 const configSubmitting = ref(false)
 const editingConfig = ref<DownloadClientConfig | null>(null)
 const configForm = reactive({
-  client_id: '',
+  client_uid: undefined as number | undefined,
   enabled: true,
   deleteRuleIds: [] as number[],
   auto_delete_cron: '*/30 * * * *',
@@ -297,7 +297,7 @@ const configForm = reactive({
 })
 
 const configColumns = computed(() => [
-  { title: '下载器', dataIndex: 'client_id', key: 'client_id', width: 120 },
+  { title: '下载器', dataIndex: 'client_uid', key: 'client_uid', width: 120, customRender: ({ text }: { text: number }) => clientName(text) },
   { title: '启用', key: 'enabled', width: 70 },
   { title: '删种规则', key: 'delete_rule_ids' },
   { title: '范围', dataIndex: 'scope', key: 'scope', width: 180, customRender: ({ text }: { text: string }) => (text === 'all' ? '全部种子' : '仅 PT-Forward 推送') },
@@ -308,7 +308,7 @@ const showAddModal = ref(false)
 const adding = ref(false)
 const addMode = ref<'file' | 'url'>('file')
 const addForm = reactive({
-  client_id: '',
+  client_id: undefined as number | undefined,
   url: '',
   category: '',
   paused: false,
@@ -318,10 +318,18 @@ const addForm = reactive({
 const hasSelected = computed(() => selectedRowKeys.value.length > 0)
 
 const clientOptions = computed(() => allClients.value)
+const clientNameMap = computed(() => {
+  const m = new Map<number, string>()
+  for (const c of allClients.value) m.set(c.id, c.name)
+  return m
+})
+function clientName(uid: number): string {
+  return clientNameMap.value.get(uid) || `#${uid}`
+}
 
 const columns = computed(() => [
   { title: t('downloads.torrentName'), dataIndex: 'torrent_name', key: 'torrent_name', ellipsis: true },
-  { title: t('downloads.client'), dataIndex: 'client_id', key: 'client_id', width: 100 },
+  { title: t('downloads.client'), dataIndex: 'client_uid', key: 'client_uid', width: 100, customRender: ({ text }: { text: number }) => clientName(text) },
   { title: t('common.status'), key: 'status', width: 90 },
   { title: t('downloads.progress'), key: 'progress', width: 120 },
   { title: t('downloads.speed'), key: 'speed', width: 100 },
@@ -389,7 +397,7 @@ async function fetchData() {
     const resp = await downloadsApi.list({
       page: page.value,
       size: size.value,
-      client_id: filterClient.value || undefined,
+      client_id: filterClient.value ?? undefined,
       status: filterStatus.value || undefined,
     })
     const data = resp.data.data
@@ -480,7 +488,7 @@ async function handleAdd() {
     if (addMode.value === 'file' && addForm.file) {
       const formData = new FormData()
       formData.append('torrent', addForm.file)
-      formData.append('client_id', addForm.client_id)
+      formData.append('client_id', String(addForm.client_id))
       if (addForm.category) formData.append('category', addForm.category)
       if (addForm.paused) formData.append('paused', 'true')
       const { default: client } = await import('@/api/client')
@@ -490,7 +498,7 @@ async function handleAdd() {
     }
     message.success(t('common.operationSuccess'))
     showAddModal.value = false
-    addForm.client_id = ''
+    addForm.client_id = undefined
     addForm.url = ''
     addForm.category = ''
     addForm.paused = false
@@ -507,7 +515,7 @@ function openConfigModal(record?: DownloadClientConfig) {
   editingConfig.value = record || null
   if (record) {
     Object.assign(configForm, {
-      client_id: record.client_id,
+      client_uid: record.client_uid,
       enabled: record.enabled,
       deleteRuleIds: record.delete_rule_ids ? record.delete_rule_ids.split(',').filter(Boolean).map(Number) : [],
       auto_delete_cron: record.auto_delete_cron || '*/30 * * * *',
@@ -518,7 +526,7 @@ function openConfigModal(record?: DownloadClientConfig) {
     })
   } else {
     Object.assign(configForm, {
-      client_id: '', enabled: true, deleteRuleIds: [],
+      client_uid: undefined, enabled: true, deleteRuleIds: [],
       auto_delete_cron: '*/30 * * * *', maindata_cron: '*/20 * * * *',
       disk_protect_enabled: true, min_disk_space_gb: 50, scope: 'managed',
     })
@@ -527,14 +535,14 @@ function openConfigModal(record?: DownloadClientConfig) {
 }
 
 async function handleConfigSubmit() {
-  if (!configForm.client_id) {
+  if (!configForm.client_uid) {
     message.warning(t('downloads.selectClient'))
     return
   }
   configSubmitting.value = true
   try {
     const payload = {
-      client_id: configForm.client_id,
+      client_uid: configForm.client_uid,
       enabled: configForm.enabled,
       delete_rule_ids: configForm.deleteRuleIds.join(','),
       auto_delete_cron: configForm.auto_delete_cron,
@@ -601,7 +609,7 @@ async function fetchSpaceStats() {
 onMounted(async () => {
   try {
     const resp = await downloadersApi.listLight(1, 200)
-    allClients.value = (resp.data.data?.items || []).filter((c: any) => c.role && c.role !== 'seeding').map((c: { name: string }) => c.name).sort()
+    allClients.value = (resp.data.data?.items || []).filter((c: any) => c.role && c.role !== 'seeding').map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })).sort((a, b) => a.name.localeCompare(b.name))
   } catch {
     // ignore
   }

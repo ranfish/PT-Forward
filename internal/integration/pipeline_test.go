@@ -42,14 +42,14 @@ func TestE2E_RSSToSeedingRecord(t *testing.T) {
 	}
 	require.NoError(t, db.Create(site).Error)
 
-	clientID := seedClient(t, db, "seeding-client", "seeding")
+	clientUID := seedClient(t, db, "seeding-client", "seeding")
 
 	sub := &model.RSSSubscription{
 		Name:     "test-sub",
 		SiteName: "source-site",
 		URLs:     []string{"https://source.com/rss"},
 		Cron:     "*/15 * * * *",
-		ClientID: "seeding-client",
+		ClientUID: 1,
 		Enabled:  true,
 	}
 	require.NoError(t, db.Create(sub).Error)
@@ -69,9 +69,9 @@ func TestE2E_RSSToSeedingRecord(t *testing.T) {
 		},
 	}
 	mockDLProvider := &mocks.DownloaderProvider{
-		GetFn: func(cid string) (model.DownloaderClient, error) {
+		GetFn: func(cid uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
-				ID: clientID, Name: "seeding-client", Role: "seeding",
+				ID: clientUID, Name: "seeding-client", Role: "seeding",
 			}, nil
 		},
 	}
@@ -152,7 +152,7 @@ func TestE2E_ReseedMatchAndInject(t *testing.T) {
 	seedRec := &model.SeedingTorrentRecord{
 		TorrentID: "torrent-001",
 		SiteName:  "source-site",
-		ClientID:  fmt.Sprintf("%d", sourceClientID),
+		ClientUID:  sourceClientID,
 		InfoHash:  "abc123def456",
 		Status:    "seeding",
 		IsFree:    true,
@@ -196,7 +196,7 @@ func TestE2E_ReseedMatchAndInject(t *testing.T) {
 		},
 	}
 	mockDLProvider := &mocks.DownloaderProvider{
-		GetFn: func(cid string) (model.DownloaderClient, error) {
+		GetFn: func(cid uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				ID: targetClientID, Name: "target-client", Role: "download",
 				AddFromFileFn: func(ctx context.Context, data []byte, opts model.AddTorrentOptions) (*model.AddResult, error) {

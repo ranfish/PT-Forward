@@ -52,12 +52,12 @@
       <a-card size="small" :title="t('orphan.scanConfigTitle')">
         <div v-if="scanConfigs.length > 0" style="margin-bottom: 12px">
           <a-tag v-for="cfg in scanConfigs" :key="cfg.id" closable @close="deleteScanConfig(cfg.id)" style="margin-bottom: 4px">
-            {{ cfg.client_id }}: {{ cfg.scan_path }}
+            {{ cfg.client_uid }}: {{ cfg.scan_path }}
           </a-tag>
         </div>
         <a-space>
           <a-select v-model:value="newConfigClient" style="width: 130px" :placeholder="t('orphan.selectClient')">
-            <a-select-option v-for="c in availableClients" :key="c" :value="c">{{ c }}</a-select-option>
+            <a-select-option v-for="c in availableClients" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
           </a-select>
           <a-input v-model:value="newConfigPath" style="width: 300px" placeholder="/PT1/SSD" />
           <a-button size="small" type="primary" :disabled="!newConfigClient || !newConfigPath" @click="addScanConfig">
@@ -94,7 +94,7 @@
               v-model:value="record._selectedClient"
               size="small"
               style="width: 110px"
-              :options="(record.client_ids || []).map((c: string) => ({ label: c, value: c }))"
+              :options="(record.client_uids || []).map((c: number) => ({ label: `#${c}`, value: c }))"
             />
           </template>
           <template v-if="column.key === 'status'">
@@ -201,11 +201,11 @@ interface OrphanEntry {
   name: string
   size: number
   is_dir: boolean
-  client_ids: string[]
+  client_uids: number[]
   save_path: string
   detected_at: string
   _status?: string
-  _selectedClient?: string
+  _selectedClient?: number
   _elapsed?: number
 }
 
@@ -237,10 +237,10 @@ const batchStats = ref({ total: 0, found: 0, notFound: 0, error: 0 })
 const recoverCategory = ref('orphan-recover')
 const recoverTags = ref('orphan-recover')
 const pageSize = ref(50)
-const scanConfigs = ref<{id: number; client_id: string; scan_path: string; enabled: boolean}[]>([])
-const newConfigClient = ref('')
+const scanConfigs = ref<{id: number; client_uid: number; scan_path: string; enabled: boolean}[]>([])
+const newConfigClient = ref<number | undefined>(undefined)
 const newConfigPath = ref('')
-const availableClients = ref<string[]>([])
+const availableClients = ref<{ id: number; name: string }[]>([])
 
 const pagination = {
   pageSize: pageSize.value,
@@ -276,7 +276,7 @@ async function fetchOrphans() {
     })
     const data = await resp.json()
     if (data.code === 0) {
-      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_ids?.[0] }))
+      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_uids?.[0] }))
       if (data.data.scanned_at) {
         scannedAt.value = new Date(data.data.scanned_at)
       }
@@ -326,7 +326,7 @@ async function scan() {
     })
     const data = await resp.json()
     if (data.code === 0) {
-      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_ids?.[0] }))
+      orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_uids?.[0] }))
       scannedAt.value = new Date(data.data.scanned_at)
       message.success(`${data.data.count} ${t('orphan.itemsFound')}`)
     } else {
@@ -361,8 +361,8 @@ async function loadAvailableClients() {
     if (Array.isArray(clients)) {
       availableClients.value = clients
         .filter((c: { enabled?: boolean; connected?: boolean }) => c.enabled !== false)
-        .map((c: { name?: string }) => c.name || '')
-        .filter(Boolean)
+        .map((c: { id?: number; name?: string }) => ({ id: Number(c.id), name: c.name || `#${c.id}` }))
+        .filter((c: { id: number }) => !!c.id)
     }
   } catch { /* ignore */ }
 }
@@ -399,7 +399,7 @@ async function deleteScanConfig(id: number) {
 
 async function recoverOrphan(
   path: string,
-  clientID?: string,
+  clientID?: number,
   onProgress?: (elapsedSec: number) => void
 ): Promise<{ found: boolean; site: string; message: string }> {
   const startTime = Date.now()

@@ -41,9 +41,9 @@ func setupEngineWithMockClient(t *testing.T, db *gorm.DB, torrents []*model.Torr
 	t.Helper()
 	e := NewEngine(db, zap.NewNop())
 	e.SetClientProvider(&mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
-				Name: clientID,
+				Name: fmt.Sprintf("client-%d", clientUID),
 				GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
 					return torrents, nil
 				},
@@ -88,7 +88,7 @@ func TestEngine_UpdateTask(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	task := &model.ReseedTask{Name: "up-task", Enabled: true, ClientIDs: "c1"}
+	task := &model.ReseedTask{Name: "up-task", Enabled: true, ClientIDs: "1"}
 	if err := e.CreateTask(context.Background(), task); err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestEngine_DeleteTask(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	task := &model.ReseedTask{Name: "del-task", Enabled: true, ClientIDs: "c1"}
+	task := &model.ReseedTask{Name: "del-task", Enabled: true, ClientIDs: "1"}
 	if err := e.CreateTask(context.Background(), task); err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -131,13 +131,13 @@ func TestEngine_RunTaskWithRecords(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	task := &model.ReseedTask{Name: "run-task", Enabled: true, ClientIDs: "c1"}
+	task := &model.ReseedTask{Name: "run-task", Enabled: true, ClientIDs: "1"}
 	if err := e.CreateTask(context.Background(), task); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
 	e.SetClientProvider(&mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				Name: "c1",
 				GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
@@ -172,7 +172,7 @@ func TestEngine_MatchRetry(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 	db.Create(&model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 0.9, Status: model.MatchStatusFailed, FailReason: "test",
 	})
@@ -290,7 +290,7 @@ func TestEngine_RetryMatch_NonFailedRejected(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	db.Create(&model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 0.9, Status: model.MatchStatusMatched,
 	})
@@ -353,10 +353,10 @@ func TestEngine_ListTasks(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "b-task", Enabled: true, ClientIDs: "c1"}); err != nil {
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "b-task", Enabled: true, ClientIDs: "1"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "a-task", Enabled: true, ClientIDs: "c1"}); err != nil {
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "a-task", Enabled: true, ClientIDs: "1"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
@@ -377,7 +377,7 @@ func TestEngine_FindMatchByID(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	db.Create(&model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	})
@@ -431,7 +431,7 @@ func TestEngine_RunTask_SourceSiteFilter(t *testing.T) {
 	})
 
 	task := &model.ReseedTask{
-		Name: "filtered", Enabled: true, ClientIDs: "c1",
+		Name: "filtered", Enabled: true, ClientIDs: "1",
 		SourceSiteIDs: "site1",
 	}
 	if err := e.CreateTask(context.Background(), task); err != nil {
@@ -483,10 +483,10 @@ func TestEngine_StartStop(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "auto1", Enabled: true, ClientIDs: "c1"}); err != nil {
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "auto1", Enabled: true, ClientIDs: "1"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "disabled", Enabled: false, ClientIDs: "c1"}); err != nil {
+	if err := e.CreateTask(context.Background(), &model.ReseedTask{Name: "disabled", Enabled: false, ClientIDs: "1"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
@@ -503,7 +503,7 @@ func TestEngine_SaveAndFindMatch(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	match := &model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	}
@@ -581,7 +581,7 @@ func TestEngine_RunTask_Canceled(t *testing.T) {
 		"site1.com": "site1",
 	})
 
-	task := &model.ReseedTask{Name: "cancel-test", Enabled: true, ClientIDs: "c1"}
+	task := &model.ReseedTask{Name: "cancel-test", Enabled: true, ClientIDs: "1"}
 	if err := e.CreateTask(context.Background(), task); err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -897,13 +897,13 @@ func TestEngine_RunTask_DuplicateExists(t *testing.T) {
 		},
 	})
 
-	task := &model.ReseedTask{Name: "dup-task", Enabled: true, ClientIDs: "c1", TargetSiteIDs: "site2", MatchMethods: "size_title"}
+	task := &model.ReseedTask{Name: "dup-task", Enabled: true, ClientIDs: "1", TargetSiteIDs: "site2", MatchMethods: "size_title"}
 	if err := e.CreateTask(context.Background(), task); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
 	db.Create(&model.ReseedMatch{
-		ClientID: "c1", SourceSite: "site1", SourceTorrentID: "ih_dup", SourceInfoHash: "ih_dup",
+		ClientUID: 1, SourceSite: "site1", SourceTorrentID: "ih_dup", SourceInfoHash: "ih_dup",
 		TargetSite: "site2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	})
@@ -1059,7 +1059,7 @@ func makePreloadedSites(targetSite string, config *model.SiteConfig, adapter mod
 func TestEngine_injectMatch_NoProvider(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
-	match := &model.ReseedMatch{ClientID: "c1", SourceSite: "s1", TargetSite: "s2"}
+	match := &model.ReseedMatch{ClientUID: 1, SourceSite: "s1", TargetSite: "s2"}
 	task := &model.ReseedTask{}
 	err := e.injectMatch(context.Background(), match, task, nil)
 	if err == nil {
@@ -1072,7 +1072,7 @@ func TestEngine_injectMatch_FailSiteInfo(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	match := &model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	}
@@ -1141,7 +1141,7 @@ func TestEngine_injectMatch_Success(t *testing.T) {
 		},
 	}
 	cp := &mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return client, nil
 		},
 	}
@@ -1149,7 +1149,7 @@ func TestEngine_injectMatch_Success(t *testing.T) {
 	e.SetClientProvider(cp)
 
 	match := &model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "target_site", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	}
@@ -1206,7 +1206,7 @@ func TestEngine_injectMatch_AlreadyExists(t *testing.T) {
 		},
 	}
 	cp := &mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return client, nil
 		},
 	}
@@ -1214,7 +1214,7 @@ func TestEngine_injectMatch_AlreadyExists(t *testing.T) {
 	e.SetClientProvider(cp)
 
 	match := &model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "target_site", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	}
@@ -1519,12 +1519,12 @@ func TestEngine_ListByClientID(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t1", Enabled: true, ClientIDs: "c1"})
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t2", Enabled: true, ClientIDs: "c1,c2"})
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t3", Enabled: true, ClientIDs: "c2,c3"})
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t4", Enabled: true, ClientIDs: "c3"})
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t1", Enabled: true, ClientIDs: "1"})
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t2", Enabled: true, ClientIDs: "1,2"})
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t3", Enabled: true, ClientIDs: "2,3"})
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "t4", Enabled: true, ClientIDs: "3"})
 
-	tasks, err := e.ListByClientID(context.Background(), "c1")
+	tasks, err := e.ListByClientID(context.Background(), "1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1532,7 +1532,7 @@ func TestEngine_ListByClientID(t *testing.T) {
 		t.Errorf("expected 2 tasks for c1, got %d", len(tasks))
 	}
 
-	tasks, err = e.ListByClientID(context.Background(), "c2")
+	tasks, err = e.ListByClientID(context.Background(), "2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1540,7 +1540,7 @@ func TestEngine_ListByClientID(t *testing.T) {
 		t.Errorf("expected 2 tasks for c2, got %d", len(tasks))
 	}
 
-	tasks, err = e.ListByClientID(context.Background(), "c3")
+	tasks, err = e.ListByClientID(context.Background(), "3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1548,7 +1548,7 @@ func TestEngine_ListByClientID(t *testing.T) {
 		t.Errorf("expected 2 tasks for c3, got %d", len(tasks))
 	}
 
-	tasks, err = e.ListByClientID(context.Background(), "c99")
+	tasks, err = e.ListByClientID(context.Background(), "99")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1562,12 +1562,12 @@ func TestEngine_ListEnabled(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 	ctx := context.Background()
 
-	e.CreateTask(ctx, &model.ReseedTask{Name: "idle1", Enabled: true, ClientIDs: "c1"})
-	e.CreateTask(ctx, &model.ReseedTask{Name: "running1", Enabled: true, ClientIDs: "c1"})
-	task3 := &model.ReseedTask{Name: "completed1", Enabled: true, ClientIDs: "c1"}
+	e.CreateTask(ctx, &model.ReseedTask{Name: "idle1", Enabled: true, ClientIDs: "1"})
+	e.CreateTask(ctx, &model.ReseedTask{Name: "running1", Enabled: true, ClientIDs: "1"})
+	task3 := &model.ReseedTask{Name: "completed1", Enabled: true, ClientIDs: "1"}
 	e.CreateTask(ctx, task3)
 	e.db.Model(task3).Update("status", model.ReseedTaskCompleted)
-	e.CreateTask(ctx, &model.ReseedTask{Name: "disabled1", Enabled: false, ClientIDs: "c1"})
+	e.CreateTask(ctx, &model.ReseedTask{Name: "disabled1", Enabled: false, ClientIDs: "1"})
 
 	tasks, err := e.ListEnabled(ctx)
 	if err != nil {
@@ -1583,10 +1583,10 @@ func TestEngine_BatchSaveMatches(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	matches := []*model.ReseedMatch{
-		{ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		{ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 			TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 			Confidence: 1.0, Status: model.MatchStatusMatched},
-		{ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t3", SourceInfoHash: "ih3",
+		{ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t3", SourceInfoHash: "ih3",
 			TargetSite: "s2", TargetTorrentID: "t4", MatchMethod: "size_title",
 			Confidence: 0.85, Status: model.MatchStatusMatched},
 	}
@@ -1606,7 +1606,7 @@ func TestEngine_UpdateMatchStatus(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	db.Create(&model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "s2", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	})
@@ -1629,7 +1629,7 @@ func TestEngine_CancelTask_Existing(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "cancel-exist", Enabled: true, ClientIDs: "c1"})
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "cancel-exist", Enabled: true, ClientIDs: "1"})
 	ctx := context.Background()
 	e.Start(ctx)
 
@@ -1648,7 +1648,7 @@ func TestEngine_Start_ReplaceExisting(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	e.CreateTask(context.Background(), &model.ReseedTask{Name: "replace", Enabled: true, ClientIDs: "c1"})
+	e.CreateTask(context.Background(), &model.ReseedTask{Name: "replace", Enabled: true, ClientIDs: "1"})
 	ctx := context.Background()
 	e.Start(ctx)
 
@@ -1674,7 +1674,7 @@ func TestEngine_RunTask_BlockedTitle(t *testing.T) {
 		Title: "Some.Title.禁转.2023", TotalSize: 1073741824,
 	})
 
-	task := &model.ReseedTask{Name: "blocked-test", Enabled: true, ClientIDs: "c1"}
+	task := &model.ReseedTask{Name: "blocked-test", Enabled: true, ClientIDs: "1"}
 	e.CreateTask(context.Background(), task)
 
 	result, err := e.RunTask(context.Background(), task)
@@ -1735,7 +1735,7 @@ func TestEngine_RunTask_WithProviders(t *testing.T) {
 		},
 	}
 	cp := &mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return dlClient, nil
 		},
 	}
@@ -1747,7 +1747,7 @@ func TestEngine_RunTask_WithProviders(t *testing.T) {
 	e.SetTrackerResolver(resolver)
 
 	task := &model.ReseedTask{
-		Name: "full-run", Enabled: true, ClientIDs: "c1",
+		Name: "full-run", Enabled: true, ClientIDs: "1",
 		TargetSiteIDs: "target_site", ReseedCategory: "cross-seed",
 		InjectionIntervalS: 0,
 	}
@@ -1792,17 +1792,17 @@ func TestEngine_RunTask_MaxInjectionsLimit(t *testing.T) {
 	})
 
 	task := &model.ReseedTask{
-		Name: "max-inj", Enabled: true, ClientIDs: "c1",
+		Name: "max-inj", Enabled: true, ClientIDs: "1",
 		TargetSiteIDs: "target_site", MaxInjectionsPerRun: 1,
 	}
 	e.CreateTask(context.Background(), task)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "ih1", SiteName: "site1",
+		ClientUID: 1, InfoHash: "ih1", SiteName: "site1",
 		TorrentID: "t1", Status: model.SeedingStatusSeeding,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "ih2", SiteName: "site1",
+		ClientUID: 1, InfoHash: "ih2", SiteName: "site1",
 		TorrentID: "t2", Status: model.SeedingStatusSeeding,
 	})
 
@@ -1819,7 +1819,7 @@ func TestEngine_RunTask_NoRecords(t *testing.T) {
 	db := setupReseedDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	task := &model.ReseedTask{Name: "no-recs", Enabled: true, ClientIDs: "c1"}
+	task := &model.ReseedTask{Name: "no-recs", Enabled: true, ClientIDs: "1"}
 	e.CreateTask(context.Background(), task)
 
 	result, err := e.RunTask(context.Background(), task)
@@ -1836,13 +1836,13 @@ func TestEngine_RunTask_DefaultSizeTolerance(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	task := &model.ReseedTask{
-		Name: "default-tol", Enabled: true, ClientIDs: "c1",
+		Name: "default-tol", Enabled: true, ClientIDs: "1",
 		SizeTolerancePercent: 0,
 	}
 	e.CreateTask(context.Background(), task)
 
 	e.SetClientProvider(&mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				Name: "c1",
 				GetAllTorrentsFn: func(ctx context.Context) ([]*model.TorrentInfo, error) {
@@ -2055,13 +2055,13 @@ func TestEngine_injectMatch_DownloadError(t *testing.T) {
 	}
 	e.SetSiteProvider(sp)
 	e.SetClientProvider(&mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{}, nil
 		},
 	})
 
 	match := &model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "tgt", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	}
@@ -2098,13 +2098,13 @@ func TestEngine_injectMatch_EmptyTorrentData(t *testing.T) {
 	}
 	e.SetSiteProvider(sp)
 	e.SetClientProvider(&mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{}, nil
 		},
 	})
 
 	match := &model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "tgt", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	}
@@ -2146,13 +2146,13 @@ func TestEngine_injectMatch_AddFromFileError(t *testing.T) {
 	}
 	e.SetSiteProvider(sp)
 	e.SetClientProvider(&mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return dlClient, nil
 		},
 	})
 
 	match := &model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "tgt", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	}
@@ -2194,13 +2194,13 @@ func TestEngine_injectMatch_GetClientError(t *testing.T) {
 	}
 	e.SetSiteProvider(sp)
 	e.SetClientProvider(&mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return nil, fmt.Errorf("client not found")
 		},
 	})
 
 	match := &model.ReseedMatch{
-		ClientID: "c1", SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
+		ClientUID: 1, SourceSite: "s1", SourceTorrentID: "t1", SourceInfoHash: "ih1",
 		TargetSite: "tgt", TargetTorrentID: "t2", MatchMethod: "pieces_hash",
 		Confidence: 1.0, Status: model.MatchStatusMatched,
 	}

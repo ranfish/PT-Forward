@@ -26,7 +26,7 @@ type mockDownloaderChecker struct {
 	err    error
 }
 
-func (m *mockDownloaderChecker) GetTorrentInfo(ctx context.Context, clientID uint, infoHash string) (*model.TorrentInfo, error) {
+func (m *mockDownloaderChecker) GetTorrentInfo(ctx context.Context, clientUID uint, infoHash string) (*model.TorrentInfo, error) {
 	return m.result, m.err
 }
 
@@ -50,7 +50,7 @@ func TestSeedingConfirmation_ConfirmUploaded(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientID:       "client-1",
+		ClientUID:       1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}
@@ -87,7 +87,7 @@ func TestSeedingConfirmation_NotYetSeeding(t *testing.T) {
 		PublishGroupID: group.ID,
 		InfoHash:       "abc123",
 		SiteName:       "target",
-		ClientID:       "client-1",
+		ClientUID:       1,
 		Status:         model.MemberStatusUploaded,
 		UpdatedAt:      now,
 	}

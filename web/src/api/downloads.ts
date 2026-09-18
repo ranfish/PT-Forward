@@ -9,7 +9,7 @@ export interface DownloadTask {
   updated_at: string
   source: string
   subscription_id?: number
-  client_id: string
+  client_uid: number
   info_hash: string
   torrent_name: string
   save_path: string
@@ -25,7 +25,7 @@ export interface DownloadTask {
   num_peers: number
   error_message: string
   transfer_status: string
-  transfer_client_id: string
+  transfer_client_uid: number
   transfer_hash: string
   transferred_at?: string
   deleted_at?: string
@@ -41,7 +41,7 @@ export interface DownloadTaskListResponse {
 }
 
 export const downloadsApi = {
-  list(params?: { page?: number; size?: number; client_id?: string; status?: string }) {
+  list(params?: { page?: number; size?: number; client_id?: number; status?: string }) {
     const query = new URLSearchParams()
     if (params?.page) query.set('page', String(params.page))
     if (params?.size) query.set('size', String(params.size))
@@ -67,7 +67,7 @@ export const downloadsApi = {
     })
   },
 
-  addByUrl(clientId: string, url: string, category?: string, paused?: boolean) {
+  addByUrl(clientId: number, url: string, category?: string, paused?: boolean) {
     return client.post<ApiResponse<DownloadTask>>('/downloads', {
       clientId,
       url,
@@ -102,7 +102,8 @@ export const downloadsApi = {
 }
 
 export interface SpaceStat {
-  clientId: string
+  clientId: number
+  name: string
   freeSpace: number
   totalSpace: number
   pendingBytes: number

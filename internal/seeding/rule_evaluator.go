@@ -71,7 +71,7 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 	case "discount":
 		return string(rec.Discount), true
 	case "client_id":
-		return rec.ClientID, true
+		return fmt.Sprintf("%d", rec.ClientUID), true
 	case "torrent_id":
 		return rec.TorrentID, true
 	case "free_level":
@@ -202,7 +202,7 @@ func (rc *RuleContext) fieldValue(key string) (string, bool) {
 	return "", false
 }
 
-func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo, freeSpace int64, totalSpace int64) ([]RuleMatch, error) {
+func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientUID uint, torrentMap map[string]*model.TorrentInfo, freeSpace int64, totalSpace int64) ([]RuleMatch, error) {
 	var rules []model.DeleteRule
 	if err := re.db.WithContext(ctx).
 		Where("enabled = ?", true).
@@ -217,7 +217,7 @@ func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, tor
 
 	var records []model.SeedingTorrentRecord
 	if err := re.db.WithContext(ctx).
-		Where("client_id = ? AND status = ?", clientID, model.SeedingStatusSeeding).
+		Where("client_uid = ? AND status = ?", clientUID, model.SeedingStatusSeeding).
 		Find(&records).Error; err != nil {
 		return nil, seedingError(ErrSeedingDB, "query seeding records", err)
 	}
@@ -228,13 +228,13 @@ func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, tor
 
 	var globalUpSpeed, globalDownSpeed float64
 	var state model.SeedingClientState
-	if err := re.db.WithContext(ctx).Where("client_id = ?", clientID).First(&state).Error; err == nil {
+	if err := re.db.WithContext(ctx).Where("client_uid = ?", clientUID).First(&state).Error; err == nil {
 		globalUpSpeed = state.AvgUploadSpeed
 		globalDownSpeed = state.AvgDownloadSpeed
 	}
 
 	now := time.Now()
-	cache := re.preloadScoringCache(ctx, clientID, records)
+	cache := re.preloadScoringCache(ctx, clientUID, records)
 	var matches []RuleMatch
 	for _, rule := range rules {
 		matched := re.matchRuleWithCache(ctx, rule, records, torrentMap, freeSpace, totalSpace, now, globalUpSpeed, globalDownSpeed, cache)
@@ -254,8 +254,8 @@ func (re *RuleEvaluator) EvaluateRules(ctx context.Context, clientID string, tor
 	return matches, nil
 }
 
-func (re *RuleEvaluator) EvaluateRulesSimple(ctx context.Context, clientID string) ([]RuleMatch, error) {
-	return re.EvaluateRules(ctx, clientID, nil, -1, 0)
+func (re *RuleEvaluator) EvaluateRulesSimple(ctx context.Context, clientUID uint) ([]RuleMatch, error) {
+	return re.EvaluateRules(ctx, clientUID, nil, -1, 0)
 }
 
 func (re *RuleEvaluator) MatchRules(ctx context.Context, rules []model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, totalSpace int64) []RuleMatch {
@@ -263,22 +263,22 @@ func (re *RuleEvaluator) MatchRules(ctx context.Context, rules []model.DeleteRul
 		return nil
 	}
 
-	var clientID string
+	var clientUID uint
 	if len(records) > 0 {
-		clientID = records[0].ClientID
+		clientUID = records[0].ClientUID
 	}
 
 	var globalUpSpeed, globalDownSpeed float64
 	var state model.SeedingClientState
 	if re.db != nil {
-		if err := re.db.WithContext(ctx).Where("client_id = ?", clientID).First(&state).Error; err == nil {
+		if err := re.db.WithContext(ctx).Where("client_uid = ?", clientUID).First(&state).Error; err == nil {
 			globalUpSpeed = state.AvgUploadSpeed
 			globalDownSpeed = state.AvgDownloadSpeed
 		}
 	}
 
 	now := time.Now()
-	cache := re.preloadScoringCache(ctx, clientID, records)
+	cache := re.preloadScoringCache(ctx, clientUID, records)
 	var matches []RuleMatch
 	for _, rule := range rules {
 		matched := re.matchRuleWithCache(ctx, rule, records, torrentMap, freeSpace, totalSpace, now, globalUpSpeed, globalDownSpeed, cache)
@@ -305,7 +305,7 @@ type scoringCache struct {
 	lowScoreCount map[string]int
 }
 
-func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID string, records []model.SeedingTorrentRecord) *scoringCache {
+func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientUID uint, records []model.SeedingTorrentRecord) *scoringCache {
 	cache := &scoringCache{
 		latestScore:   make(map[string]float64, len(records)),
 		rankInCycle:   make(map[string]int, len(records)),
@@ -406,8 +406,8 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientID strin
 	var lowRows []lowRow
 	if dbErr := re.db.WithContext(ctx).Model(&model.ScoringLog{}).
 		Select("info_hash, COUNT(*) as count").
-		Where("client_id = ? AND info_hash IN ? AND score < ? AND created_at > ?",
-			clientID, hashes, 5.0, cutoff).
+		Where("client_uid = ? AND info_hash IN ? AND score < ? AND created_at > ?",
+			clientUID, hashes, 5.0, cutoff).
 		Group("info_hash").
 		Find(&lowRows).Error; dbErr != nil {
 		re.logger.Warn("preload scoring cache: query low score counts failed", zap.Error(dbErr))

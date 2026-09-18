@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -29,13 +30,13 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func createSubscription(t *testing.T, db *gorm.DB, id uint, clientName string) {
+func createSubscription(t *testing.T, db *gorm.DB, id uint, clientUID uint) {
 	t.Helper()
 	sub := &model.RSSSubscription{
-		Name:     "sub-" + clientName,
+		Name:     fmt.Sprintf("sub-%d", clientUID),
 		Enabled:  true,
 		SiteName: "testsite",
-		ClientID: clientName,
+		ClientUID: clientUID,
 		URLs:     []string{"http://example.com/rss"},
 	}
 	sub.ID = id
@@ -44,7 +45,7 @@ func createSubscription(t *testing.T, db *gorm.DB, id uint, clientName string) {
 	}
 }
 
-func createClientConfig(t *testing.T, db *gorm.DB, name, role string) {
+func createClientConfig(t *testing.T, db *gorm.DB, name, role string) *model.ClientConfig {
 	t.Helper()
 	cfg := &model.ClientConfig{
 		Name:    name,
@@ -56,6 +57,7 @@ func createClientConfig(t *testing.T, db *gorm.DB, name, role string) {
 	if err := db.Create(cfg).Error; err != nil {
 		t.Fatalf("create client config: %v", err)
 	}
+	return cfg
 }
 
 func newTestDispatcher(t *testing.T, db *gorm.DB) *TorrentDispatcher {
@@ -74,10 +76,10 @@ func TestDispatcher_EmptyEvents(t *testing.T) {
 
 func TestDispatcher_RoutesByRole(t *testing.T) {
 	db := setupTestDB(t)
-	createSubscription(t, db, 1, "qb-seed")
-	createSubscription(t, db, 2, "qb-dl")
-	createClientConfig(t, db, "qb-seed", "seeding")
-	createClientConfig(t, db, "qb-dl", "download")
+	seed := createClientConfig(t, db, "qb-seed", "seeding")
+	dl := createClientConfig(t, db, "qb-dl", "download")
+	createSubscription(t, db, 1, seed.ID)
+	createSubscription(t, db, 2, dl.ID)
 
 	d := newTestDispatcher(t, db)
 
@@ -119,8 +121,8 @@ func TestDispatcher_RoutesByRole(t *testing.T) {
 	if seedingEvents[0].TorrentID != "100" {
 		t.Errorf("expected torrent 100, got %s", seedingEvents[0].TorrentID)
 	}
-	if GetClientName(&seedingEvents[0]) != "qb-seed" {
-		t.Errorf("expected client qb-seed, got %s", GetClientName(&seedingEvents[0]))
+	if GetClientUID(&seedingEvents[0]) != seed.ID {
+		t.Errorf("expected client %d, got %d", seed.ID, GetClientUID(&seedingEvents[0]))
 	}
 	if GetClientRole(&seedingEvents[0]) != "seeding" {
 		t.Errorf("expected role seeding, got %s", GetClientRole(&seedingEvents[0]))
@@ -134,8 +136,8 @@ func TestDispatcher_RoutesByRole(t *testing.T) {
 	if downloadEvents[0].TorrentID != "200" {
 		t.Errorf("expected torrent 200, got %s", downloadEvents[0].TorrentID)
 	}
-	if GetClientName(&downloadEvents[0]) != "qb-dl" {
-		t.Errorf("expected client qb-dl, got %s", GetClientName(&downloadEvents[0]))
+	if GetClientUID(&downloadEvents[0]) != dl.ID {
+		t.Errorf("expected client %d, got %d", dl.ID, GetClientUID(&downloadEvents[0]))
 	}
 	downloadMu.Unlock()
 }
@@ -190,8 +192,7 @@ func TestDispatcher_SkipsMissingSubscription(t *testing.T) {
 
 func TestDispatcher_SkipsMissingClient(t *testing.T) {
 	db := setupTestDB(t)
-	createSubscription(t, db, 1, "nonexistent-client")
-
+	createSubscription(t, db, 1, 4)
 	d := newTestDispatcher(t, db)
 
 	var called bool
@@ -220,7 +221,7 @@ func TestDispatcher_SkipsDisabledSubscription(t *testing.T) {
 		Name:     "disabled-sub",
 		Enabled:  true,
 		SiteName: "testsite",
-		ClientID: "qb-seed",
+		ClientUID: 1,
 		URLs:     []string{"http://example.com/rss"},
 	}
 	sub.ID = 1
@@ -252,7 +253,6 @@ func TestDispatcher_SkipsDisabledSubscription(t *testing.T) {
 
 func TestDispatcher_SkipsDisabledClient(t *testing.T) {
 	db := setupTestDB(t)
-	createSubscription(t, db, 1, "qb-off")
 	cfg := &model.ClientConfig{
 		Name:    "qb-off",
 		Type:    "qbittorrent",
@@ -262,6 +262,7 @@ func TestDispatcher_SkipsDisabledClient(t *testing.T) {
 	}
 	db.Create(cfg)
 	db.Model(cfg).Update("enabled", false)
+	createSubscription(t, db, 1, cfg.ID)
 
 	d := newTestDispatcher(t, db)
 
@@ -287,7 +288,7 @@ func TestDispatcher_SkipsDisabledClient(t *testing.T) {
 
 func TestDispatcher_NoHandlerForRole(t *testing.T) {
 	db := setupTestDB(t)
-	createSubscription(t, db, 1, "qb-src")
+	createSubscription(t, db, 1, 4)
 	createClientConfig(t, db, "qb-src", "source")
 
 	d := newTestDispatcher(t, db)
@@ -303,8 +304,8 @@ func TestDispatcher_NoHandlerForRole(t *testing.T) {
 
 func TestDispatcher_HandlerError(t *testing.T) {
 	db := setupTestDB(t)
-	createSubscription(t, db, 1, "qb-seed")
-	createClientConfig(t, db, "qb-seed", "seeding")
+	seed := createClientConfig(t, db, "qb-seed", "seeding")
+	createSubscription(t, db, 1, seed.ID)
 
 	d := newTestDispatcher(t, db)
 
@@ -325,8 +326,8 @@ func TestDispatcher_HandlerError(t *testing.T) {
 
 func TestDispatcher_SourceRoleRoutesToSourceHandler(t *testing.T) {
 	db := setupTestDB(t)
-	createSubscription(t, db, 1, "qb-source")
-	createClientConfig(t, db, "qb-source", "source")
+	src := createClientConfig(t, db, "qb-source", "source")
+	createSubscription(t, db, 1, src.ID)
 
 	d := newTestDispatcher(t, db)
 
@@ -361,8 +362,8 @@ func TestDispatcher_SourceRoleRoutesToSourceHandler(t *testing.T) {
 
 func TestDispatcher_MetadataEnrichment(t *testing.T) {
 	db := setupTestDB(t)
-	createSubscription(t, db, 42, "qb-test")
-	createClientConfig(t, db, "qb-test", "download")
+	dl := createClientConfig(t, db, "qb-test", "download")
+	createSubscription(t, db, 42, dl.ID)
 
 	d := newTestDispatcher(t, db)
 
@@ -385,8 +386,8 @@ func TestDispatcher_MetadataEnrichment(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected event")
 	}
-	if GetClientName(got) != "qb-test" {
-		t.Errorf("expected client_name=qb-test, got %s", GetClientName(got))
+	if GetClientUID(got) != dl.ID {
+		t.Errorf("expected client %d, got %d", dl.ID, GetClientUID(got))
 	}
 	if GetClientRole(got) != "download" {
 		t.Errorf("expected client_role=download, got %s", GetClientRole(got))
@@ -398,8 +399,8 @@ func TestDispatcher_MetadataEnrichment(t *testing.T) {
 
 func TestDispatcher_MultipleRolesSameSubscription(t *testing.T) {
 	db := setupTestDB(t)
-	createSubscription(t, db, 1, "qb-mix")
-	createClientConfig(t, db, "qb-mix", "seeding")
+	mix := createClientConfig(t, db, "qb-mix", "seeding")
+	createSubscription(t, db, 1, mix.ID)
 
 	d := newTestDispatcher(t, db)
 
@@ -427,8 +428,8 @@ func TestDispatcher_MultipleRolesSameSubscription(t *testing.T) {
 
 func TestGetClientName_Fallback(t *testing.T) {
 	ev := &model.TorrentEvent{SourceID: "fallback-id"}
-	if got := GetClientName(ev); got != "fallback-id" {
-		t.Errorf("expected fallback-id, got %s", got)
+	if got := GetClientUID(ev); got != 0 {
+		t.Errorf("expected 0 for unresolvable source, got %d", got)
 	}
 }
 
@@ -469,7 +470,7 @@ func TestDispatcher_SoftDeletedSubscription(t *testing.T) {
 		Name:     "deleted-sub",
 		Enabled:  true,
 		SiteName: "testsite",
-		ClientID: "qb-seed",
+		ClientUID: 1,
 		URLs:     []string{"http://example.com/rss"},
 	}
 	sub.ID = 1
@@ -506,9 +507,9 @@ func TestDispatcher_ClientSelectorIntegration(t *testing.T) {
 		Name:             "selector-sub",
 		Enabled:          true,
 		SiteName:         "testsite",
-		ClientID:         "qb-default",
+		ClientUID:         1,
 		URLs:             []string{"http://example.com/rss"},
-		CandidateClients: []string{"qb-default", "qb-bigspace"},
+		CandidateClients: []uint{1, 2},
 		ClientSelection:  model.SelectionMostSpace,
 	}
 	sub.ID = 1
@@ -519,17 +520,17 @@ func TestDispatcher_ClientSelectorIntegration(t *testing.T) {
 	createClientConfig(t, db, "qb-default", "seeding")
 	createClientConfig(t, db, "qb-bigspace", "seeding")
 
-	selectorClients := map[string]model.DownloaderClient{
-		"qb-default": &mocks.DownloaderClient{Name: "qb-default", GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
+	selectorClients := map[uint]model.DownloaderClient{
+		1: &mocks.DownloaderClient{Name: "qb-default", GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
 			return &model.Maindata{FreeSpace: 1 * 1024 * 1024 * 1024}, nil
 		}},
-		"qb-bigspace": &mocks.DownloaderClient{Name: "qb-bigspace", GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
+		2: &mocks.DownloaderClient{Name: "qb-bigspace", GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
 			return &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024}, nil
 		}},
 	}
 	provider := &mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
-			return selectorClients[clientID], nil
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
+			return selectorClients[clientUID], nil
 		},
 	}
 
@@ -560,9 +561,9 @@ func TestDispatcher_ClientSelectorIntegration(t *testing.T) {
 	if len(gotEvents) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(gotEvents))
 	}
-	selectedClient := GetClientName(&gotEvents[0])
-	if selectedClient != "qb-bigspace" {
-		t.Errorf("most_space should select qb-bigspace (100GB), got %s", selectedClient)
+	selectedClient := GetClientUID(&gotEvents[0])
+	if selectedClient != 2 {
+		t.Errorf("most_space should select qb-bigspace (100GB), got %d", selectedClient)
 	}
 }
 
@@ -573,7 +574,7 @@ func TestDispatcher_ClientSelectorFixedFallback(t *testing.T) {
 		Name:            "fixed-sub",
 		Enabled:         true,
 		SiteName:        "testsite",
-		ClientID:        "qb-default",
+		ClientUID:        1,
 		URLs:            []string{"http://example.com/rss"},
 		ClientSelection: model.SelectionFixed,
 	}
@@ -611,8 +612,8 @@ func TestDispatcher_ClientSelectorFixedFallback(t *testing.T) {
 	if len(gotEvents) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(gotEvents))
 	}
-	if GetClientName(&gotEvents[0]) != "qb-default" {
-		t.Errorf("fixed mode should use sub.ClientID, got %s", GetClientName(&gotEvents[0]))
+	if GetClientUID(&gotEvents[0]) != 1 {
+		t.Errorf("fixed mode should use sub.ClientUID, got %d", GetClientUID(&gotEvents[0]))
 	}
 }
 
@@ -623,9 +624,9 @@ func TestDispatcher_ClientSelectorAllUnhealthy(t *testing.T) {
 		Name:             "unhealthy-sub",
 		Enabled:          true,
 		SiteName:         "testsite",
-		ClientID:         "qb-default",
+		ClientUID:         1,
 		URLs:             []string{"http://example.com/rss"},
-		CandidateClients: []string{"qb-default", "qb-dead"},
+		CandidateClients: []uint{1, 3},
 		ClientSelection:  model.SelectionMostSpace,
 	}
 	sub.ID = 1
@@ -636,7 +637,7 @@ func TestDispatcher_ClientSelectorAllUnhealthy(t *testing.T) {
 	createClientConfig(t, db, "qb-default", "seeding")
 
 	provider := &mocks.DownloaderProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return nil, &model.AppError{Code: 50000, Message: "unhealthy"}
 		},
 	}
@@ -668,8 +669,8 @@ func TestDispatcher_ClientSelectorAllUnhealthy(t *testing.T) {
 	if len(gotEvents) != 1 {
 		t.Fatalf("expected 1 event (fallback to fixed), got %d", len(gotEvents))
 	}
-	if GetClientName(&gotEvents[0]) != "qb-default" {
-		t.Errorf("all unhealthy should fallback to sub.ClientID, got %s", GetClientName(&gotEvents[0]))
+	if GetClientUID(&gotEvents[0]) != 1 {
+		t.Errorf("all unhealthy should fallback to sub.ClientUID, got %d", GetClientUID(&gotEvents[0]))
 	}
 }
 

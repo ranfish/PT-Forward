@@ -909,23 +909,23 @@ func TestEngine_FetchOnce_MixedSeenAndNew(t *testing.T) {
 }
 
 type mockClientProvider struct {
-	GetFn func(clientID string) (model.DownloaderClient, error)
+	GetFn func(clientUID uint) (model.DownloaderClient, error)
 }
 
-func (m *mockClientProvider) Get(clientID string) (model.DownloaderClient, error) {
+func (m *mockClientProvider) Get(clientUID uint) (model.DownloaderClient, error) {
 	if m.GetFn != nil {
-		return m.GetFn(clientID)
+		return m.GetFn(clientUID)
 	}
 	return nil, nil
 }
 
-func (m *mockClientProvider) ListClients() []string {
+func (m *mockClientProvider) ListClients() []uint {
 	return nil
 }
 
 func TestEngine_CheckDiskBudget_NilProvider(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
-	sub := &model.RSSSubscription{ClientID: "client1"}
+	sub := &model.RSSSubscription{ClientUID: 1}
 	err := eng.checkDiskBudget(context.Background(), sub, 1000)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "下载器提供者未注入")
@@ -934,7 +934,7 @@ func TestEngine_CheckDiskBudget_NilProvider(t *testing.T) {
 func TestEngine_CheckDiskBudget_SufficientSpace(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
 	eng.SetClientProvider(&mockClientProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
 					return &model.Maindata{FreeSpace: 100 * 1024 * 1024 * 1024}, nil
@@ -943,7 +943,7 @@ func TestEngine_CheckDiskBudget_SufficientSpace(t *testing.T) {
 		},
 	})
 
-	sub := &model.RSSSubscription{ClientID: "client1", DiskBudgetMinGB: 10}
+	sub := &model.RSSSubscription{ClientUID: 1, DiskBudgetMinGB: 10}
 	err := eng.checkDiskBudget(context.Background(), sub, 1024*1024*1024)
 	require.NoError(t, err)
 }
@@ -951,7 +951,7 @@ func TestEngine_CheckDiskBudget_SufficientSpace(t *testing.T) {
 func TestEngine_CheckDiskBudget_InsufficientSpace(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
 	eng.SetClientProvider(&mockClientProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
 					return &model.Maindata{FreeSpace: 5 * 1024 * 1024 * 1024}, nil
@@ -960,7 +960,7 @@ func TestEngine_CheckDiskBudget_InsufficientSpace(t *testing.T) {
 		},
 	})
 
-	sub := &model.RSSSubscription{ClientID: "client1", DiskBudgetMinGB: 10}
+	sub := &model.RSSSubscription{ClientUID: 1, DiskBudgetMinGB: 10}
 	err := eng.checkDiskBudget(context.Background(), sub, 4*1024*1024*1024)
 	require.Error(t, err)
 }
@@ -968,12 +968,12 @@ func TestEngine_CheckDiskBudget_InsufficientSpace(t *testing.T) {
 func TestEngine_CheckDiskBudget_GetClientError(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
 	eng.SetClientProvider(&mockClientProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return nil, fmt.Errorf("client not found")
 		},
 	})
 
-	sub := &model.RSSSubscription{ClientID: "client1"}
+	sub := &model.RSSSubscription{ClientUID: 1}
 	err := eng.checkDiskBudget(context.Background(), sub, 1000)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "获取下载器失败")
@@ -981,7 +981,7 @@ func TestEngine_CheckDiskBudget_GetClientError(t *testing.T) {
 
 func TestEngine_CheckDiskGuard_Disabled(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
-	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: false, DiskGuardThreshold: 1073741824}
+	sub := &model.RSSSubscription{ClientUID: 1, DiskGuardEnabled: false, DiskGuardThreshold: 1073741824}
 	err := eng.checkDiskGuard(context.Background(), sub)
 	require.NoError(t, err)
 }
@@ -989,7 +989,7 @@ func TestEngine_CheckDiskGuard_Disabled(t *testing.T) {
 func TestEngine_CheckDiskGuard_SufficientSpace(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
 	eng.SetClientProvider(&mockClientProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
 					return &model.Maindata{FreeSpace: 50 * 1024 * 1024 * 1024}, nil
@@ -998,7 +998,7 @@ func TestEngine_CheckDiskGuard_SufficientSpace(t *testing.T) {
 		},
 	})
 
-	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
+	sub := &model.RSSSubscription{ClientUID: 1, DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
 	err := eng.checkDiskGuard(context.Background(), sub)
 	require.NoError(t, err)
 }
@@ -1006,7 +1006,7 @@ func TestEngine_CheckDiskGuard_SufficientSpace(t *testing.T) {
 func TestEngine_CheckDiskGuard_InsufficientSpace(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
 	eng.SetClientProvider(&mockClientProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
 					return &model.Maindata{FreeSpace: 500 * 1024 * 1024}, nil
@@ -1015,7 +1015,7 @@ func TestEngine_CheckDiskGuard_InsufficientSpace(t *testing.T) {
 		},
 	})
 
-	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
+	sub := &model.RSSSubscription{ClientUID: 1, DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
 	err := eng.checkDiskGuard(context.Background(), sub)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "磁盘守卫拦截")
@@ -1024,12 +1024,12 @@ func TestEngine_CheckDiskGuard_InsufficientSpace(t *testing.T) {
 func TestEngine_CheckDiskGuard_GetClientError(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
 	eng.SetClientProvider(&mockClientProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return nil, fmt.Errorf("client not found")
 		},
 	})
 
-	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
+	sub := &model.RSSSubscription{ClientUID: 1, DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
 	err := eng.checkDiskGuard(context.Background(), sub)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "磁盘守卫：获取下载器失败")
@@ -1037,7 +1037,7 @@ func TestEngine_CheckDiskGuard_GetClientError(t *testing.T) {
 
 func TestEngine_CheckDiskGuard_NilProvider(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
-	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
+	sub := &model.RSSSubscription{ClientUID: 1, DiskGuardEnabled: true, DiskGuardThreshold: 1073741824}
 	err := eng.checkDiskGuard(context.Background(), sub)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "下载器提供者未注入")
@@ -1046,7 +1046,7 @@ func TestEngine_CheckDiskGuard_NilProvider(t *testing.T) {
 func TestEngine_CheckDiskGuard_ZeroThreshold(t *testing.T) {
 	eng, _ := newEngineWithDB(t)
 	eng.SetClientProvider(&mockClientProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
 					return &model.Maindata{FreeSpace: 0}, nil
@@ -1055,7 +1055,7 @@ func TestEngine_CheckDiskGuard_ZeroThreshold(t *testing.T) {
 		},
 	})
 
-	sub := &model.RSSSubscription{ClientID: "client1", DiskGuardEnabled: true, DiskGuardThreshold: 0}
+	sub := &model.RSSSubscription{ClientUID: 1, DiskGuardEnabled: true, DiskGuardThreshold: 0}
 	err := eng.checkDiskGuard(context.Background(), sub)
 	require.NoError(t, err)
 }
@@ -1088,7 +1088,7 @@ func TestEngine_FetchOnce_DiskBudgetSkip(t *testing.T) {
 	}
 	eng.SetSiteProvider(provider)
 	eng.SetClientProvider(&mockClientProvider{
-		GetFn: func(clientID string) (model.DownloaderClient, error) {
+		GetFn: func(clientUID uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{
 				GetMainDataFn: func(ctx context.Context) (*model.Maindata, error) {
 					return &model.Maindata{FreeSpace: 1 * 1024 * 1024 * 1024}, nil
@@ -1100,7 +1100,7 @@ func TestEngine_FetchOnce_DiskBudgetSkip(t *testing.T) {
 	srv := serveRssWithItems(t, rssItem("Big Torrent", "https://testsit.com/download.php?id=601", "601",
 		"fff000aaa111bbb222ccc333ddd444eee555fff0", "5000000000"))
 	sub := makeSub(db, t, "disk-sub", "testsit", []string{srv.URL})
-	sub.ClientID = "client1"
+	sub.ClientUID = 1
 	sub.DiskBudgetEnabled = true
 	sub.DiskBudgetMinGB = 10
 	require.NoError(t, db.Save(sub).Error)
@@ -1335,7 +1335,7 @@ func TestRetryBlockedStates(t *testing.T) {
 	repo := NewRepository(db)
 	eng := NewEngine(db, zap.NewNop())
 	ctx := context.Background()
-	sub := &model.RSSSubscription{ID: 1, Name: "T", SiteName: "朋友", ClientID: "QB0", Enabled: true}
+	sub := &model.RSSSubscription{ID: 1, Name: "T", SiteName: "朋友", ClientUID: 1, Enabled: true}
 	// 三条 blocked：200 窗口内免费 / 201 窗口内不免费 / 202 窗口外
 	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "朋友", TorrentID: "200", SubscriptionID: "1", Status: "seen"})
 	repo.MarkSeen(ctx, &model.RSSTorrentSeen{SiteName: "朋友", TorrentID: "201", SubscriptionID: "1", Status: "seen"})

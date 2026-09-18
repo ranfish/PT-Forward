@@ -66,7 +66,7 @@ func TestMigrations_FullRun_OnAutoMigratedDB(t *testing.T) {
 	}
 	// 源表种子数据
 	gormDB.Create(&model.DownloadClientConfig{
-		ClientID: "TR0", Enabled: true,
+		ClientUID: 1, Enabled: true,
 		MainDataCron: "*/15 * * * *",
 	})
 	// 聚焦 migration 4 本体（全量跑有其它迁移的前置表依赖——此处验证列名自适应）
@@ -79,7 +79,7 @@ func TestMigrations_FullRun_OnAutoMigratedDB(t *testing.T) {
 	}
 	// migration 4 数据应已迁入
 	var cnt int64
-	gormDB.Table("seeding_client_configs").Where("client_id = ?", "TR0").Count(&cnt)
+	gormDB.Table("seeding_client_configs").Where("client_uid = ?", 1).Count(&cnt)
 	if cnt != 1 {
 		t.Errorf("migration 4 数据未迁入（OTA 场景）: cnt=%d", cnt)
 	}

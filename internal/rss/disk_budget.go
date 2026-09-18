@@ -10,7 +10,7 @@ import (
 
 type DiskBudgetTicket struct {
 	ID        string
-	ClientID  string
+	ClientUID uint
 	Size      int64
 	CreatedAt time.Time
 	ExpiresAt time.Time
@@ -29,13 +29,13 @@ func NewDiskBudgetManager(logger *zap.Logger) *DiskBudgetManager {
 	}
 }
 
-func (m *DiskBudgetManager) Reserve(clientID string, size int64, freeSpace int64, ttl time.Duration) (*DiskBudgetTicket, error) {
+func (m *DiskBudgetManager) Reserve(clientUID uint, size int64, freeSpace int64, ttl time.Duration) (*DiskBudgetTicket, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var reserved int64
 	for _, t := range m.tickets {
-		if t.ClientID == clientID && time.Now().Before(t.ExpiresAt) {
+		if t.ClientUID == clientUID && time.Now().Before(t.ExpiresAt) {
 			reserved += t.Size
 		}
 	}
@@ -47,7 +47,7 @@ func (m *DiskBudgetManager) Reserve(clientID string, size int64, freeSpace int64
 
 	ticket := &DiskBudgetTicket{
 		ID:        fmt.Sprintf("ticket-%d", time.Now().UnixNano()),
-		ClientID:  clientID,
+		ClientUID: clientUID,
 		Size:      size,
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(ttl),
@@ -56,7 +56,7 @@ func (m *DiskBudgetManager) Reserve(clientID string, size int64, freeSpace int64
 
 	m.logger.Debug("disk budget reserved",
 		zap.String("ticket", ticket.ID),
-		zap.String("client", clientID),
+		zap.Uint("client_uid", clientUID),
 		zap.Int64("size", size),
 		zap.Int64("reserved", reserved+size),
 		zap.Int64("freeSpace", freeSpace),
@@ -77,7 +77,7 @@ func (m *DiskBudgetManager) Release(ticket *DiskBudgetTicket) {
 		delete(m.tickets, ticket.ID)
 		m.logger.Debug("disk budget released",
 			zap.String("ticket", ticket.ID),
-			zap.String("client", ticket.ClientID),
+			zap.Uint("client_uid", ticket.ClientUID),
 			zap.Int64("size", ticket.Size),
 		)
 	}
@@ -111,14 +111,14 @@ func (m *DiskBudgetManager) Expire() {
 	}
 }
 
-func (m *DiskBudgetManager) ReservedBytes(clientID string) int64 {
+func (m *DiskBudgetManager) ReservedBytes(clientUID uint) int64 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var total int64
 	now := time.Now()
 	for _, t := range m.tickets {
-		if t.ClientID == clientID && now.Before(t.ExpiresAt) {
+		if t.ClientUID == clientUID && now.Before(t.ExpiresAt) {
 			total += t.Size
 		}
 	}
