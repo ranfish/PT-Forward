@@ -37,7 +37,7 @@ func (a *TrafficAggregator) AggregateHourly(ctx context.Context) error {
 	}
 
 	type clientKey struct {
-		ClientID string
+		ClientUID uint
 	}
 	type clientAgg struct {
 		uploadSum    float64
@@ -50,7 +50,7 @@ func (a *TrafficAggregator) AggregateHourly(ctx context.Context) error {
 
 	aggs := make(map[clientKey]*clientAgg)
 	for _, s := range snapshots {
-		key := clientKey{ClientID: s.ClientID}
+		key := clientKey{ClientUID: s.ClientUID}
 		agg, ok := aggs[key]
 		if !ok {
 			agg = &clientAgg{}
@@ -77,7 +77,7 @@ func (a *TrafficAggregator) AggregateHourly(ctx context.Context) error {
 		avgActive := agg.activeSum / agg.sampleCount
 
 		record := model.TrafficStatsHourly{
-			ClientID:          key.ClientID,
+			ClientUID:          key.ClientUID,
 			Hour:              prevHour,
 			UploadedDelta:     int64(avgUp * 3600),
 			DownloadedDelta:   int64(avgDown * 3600),
@@ -90,11 +90,11 @@ func (a *TrafficAggregator) AggregateHourly(ctx context.Context) error {
 		}
 
 		if err := a.db.WithContext(ctx).
-			Where("client_id = ? AND hour = ?", record.ClientID, record.Hour).
+			Where("client_uid = ? AND hour = ?", record.ClientUID, record.Hour).
 			Assign(record).
 			FirstOrCreate(&record).Error; err != nil {
 			a.logger.Warn("traffic hourly upsert failed",
-				zap.String("client_id", record.ClientID),
+				zap.Uint("client_uid", record.ClientUID),
 				zap.Time("hour", record.Hour),
 				zap.Error(err))
 		}

@@ -4,7 +4,7 @@
       <template #extra>
         <a-space>
           <a-select v-model:value="filters.client_id" style="width: 140px" allow-clear placeholder="客户端" @change="fetchData">
-            <a-select-option v-for="c in clients" :key="c.client_id" :value="c.client_id">{{ c.client_id }}</a-select-option>
+            <a-select-option v-for="c in clients" :key="c.client_uid" :value="c.client_uid">#{{ c.client_uid }}</a-select-option>
           </a-select>
           <a-select v-model:value="filters.site_name" style="width: 120px" allow-clear placeholder="站点" @change="fetchData">
             <a-select-option v-for="s in sites" :key="s" :value="s">{{ s }}</a-select-option>
@@ -69,7 +69,7 @@ const clients = ref<any[]>([])
 const sites = ref<string[]>([])
 
 const filters = reactive({
-  client_id: undefined as string | undefined,
+  client_id: undefined as number | undefined,
   site_name: undefined as string | undefined,
   search: '',
 })
@@ -104,8 +104,13 @@ async function fetchData() {
     records.value = data.data?.items || []
     total.value = data.data?.total || 0
     const siteSet = new Set<string>()
-    records.value.forEach((r: any) => { if (r.site_name) siteSet.add(r.site_name) })
+    const clientSet = new Set<number>()
+    records.value.forEach((r: any) => {
+      if (r.site_name) siteSet.add(r.site_name)
+      if (r.client_uid) clientSet.add(r.client_uid)
+    })
     sites.value = [...siteSet].sort()
+    clients.value = [...clientSet].sort((a, b) => a - b).map((uid) => ({ client_uid: uid }))
   } catch {
     message.error('加载历史失败')
   } finally {

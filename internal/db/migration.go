@@ -89,7 +89,7 @@ func init() {
 			cronCol = "main_data_cron" // 老库（migration 8 改名前）形态
 		}
 		ins := `INSERT INTO seeding_client_configs (
-			client_id, created_at, updated_at, enabled, delete_rule_ids,
+			client_uid, created_at, updated_at, enabled, delete_rule_ids,
 			auto_delete_cron, ` + cronCol + `,
 			disk_protect_enabled, min_disk_space_gb,
 			space_alarm_enabled, space_alarm_gb, min_disk_space_percent,
@@ -98,7 +98,7 @@ func init() {
 			reannounce_before, reannounce_retries, reannounce_interval_ms, reannounce_wait_ms
 		)
 		SELECT
-			client_id, created_at, updated_at, enabled, delete_rule_ids,
+			client_uid, created_at, updated_at, enabled, delete_rule_ids,
 			auto_delete_cron, main_data_cron,
 			disk_protect_enabled, min_disk_space_gb,
 			space_alarm_enabled, space_alarm_gb, min_disk_space_percent,
@@ -109,7 +109,7 @@ func init() {
 			super_seeding_default, scope, 'download',
 			reannounce_before, reannounce_retries, reannounce_interval_ms, reannounce_wait_ms
 		FROM download_client_configs
-		WHERE client_id NOT IN (SELECT client_id FROM seeding_client_configs)`
+		WHERE client_uid NOT IN (SELECT client_uid FROM seeding_client_configs)`
 		return gormDB.Exec(ins).Error
 	})
 	RegisterMigration(5, "rss_torrent_seen_unique_add_subscription_id", func(gormDB *gorm.DB) error {
@@ -266,7 +266,7 @@ func init() {
 		var hasIdx int64
 		gormDB.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_snapshots_cluster'").Scan(&hasIdx)
 		if hasIdx == 0 {
-			if err := gormDB.Exec("CREATE INDEX idx_snapshots_cluster ON torrent_snapshots(client_id, save_path, name)").Error; err != nil {
+			if err := gormDB.Exec("CREATE INDEX idx_snapshots_cluster ON torrent_snapshots(client_uid, save_path, name)").Error; err != nil {
 				return err
 			}
 		}
@@ -280,13 +280,13 @@ func init() {
 	// 下轮获取/发布前触发 mpv 重取(isLocal)或留空(远程)。
 	RegisterMigration(26, "friend_source_screenshots_purge", func(gormDB *gorm.DB) error {
 		type snapRow struct {
-			ClientID string
-			SavePath string
-			Name     string
+			ClientUID uint
+			SavePath  string
+			Name      string
 		}
 		// 朋友站源 hash → 快照簇键（快照行可能 hidden, 不筛 is_hidden——簇键全量）
 		var snaps []snapRow
-		if err := gormDB.Raw("SELECT DISTINCT s.client_id, s.save_path, s.name FROM torrent_snapshots s JOIN torrent_metadata m ON m.info_hash = s.hash WHERE m.site_name = ?", "朋友").Scan(&snaps).Error; err != nil {
+		if err := gormDB.Raw("SELECT DISTINCT s.client_uid, s.save_path, s.name FROM torrent_snapshots s JOIN torrent_metadata m ON m.info_hash = s.hash WHERE m.site_name = ?", "朋友").Scan(&snaps).Error; err != nil {
 			return err
 		}
 		for _, sp := range snaps {
@@ -294,11 +294,11 @@ func init() {
 				continue
 		}
 			// 清簇截图缓存（观察期锚点作废, 强制走新策略）
-			if err := gormDB.Exec("DELETE FROM cluster_screenshot_cache WHERE client_id = ? AND save_path = ? AND name = ?", sp.ClientID, sp.SavePath, sp.Name).Error; err != nil {
+			if err := gormDB.Exec("DELETE FROM cluster_screenshot_cache WHERE client_uid = ? AND save_path = ? AND name = ?", sp.ClientUID, sp.SavePath, sp.Name).Error; err != nil {
 				return err
 			}
 			// 清簇内全部 metadata 行 screenshots（簇共享: 朋友行与同步副本一并清）
-			if err := gormDB.Exec("UPDATE torrent_metadata SET screenshots = '' WHERE info_hash IN (SELECT hash FROM torrent_snapshots WHERE client_id = ? AND save_path = ? AND name = ?)", sp.ClientID, sp.SavePath, sp.Name).Error; err != nil {
+			if err := gormDB.Exec("UPDATE torrent_metadata SET screenshots = '' WHERE info_hash IN (SELECT hash FROM torrent_snapshots WHERE client_uid = ? AND save_path = ? AND name = ?)", sp.ClientUID, sp.SavePath, sp.Name).Error; err != nil {
 				return err
 			}
 		}

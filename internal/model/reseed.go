@@ -91,7 +91,7 @@ type ReseedMatch struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
-	ClientID        string `json:"client_id" gorm:"size:50;not null;uniqueIndex:idx_reseed_match_pair"`
+	ClientUID       uint   `json:"client_uid" gorm:"not null;uniqueIndex:idx_reseed_match_pair"`
 	SourceSite      string `json:"source_site" gorm:"size:50;not null;uniqueIndex:idx_reseed_match_pair"`
 	SourceTorrentID string `json:"source_torrent_id" gorm:"size:50;not null;uniqueIndex:idx_reseed_match_pair"`
 	SourceInfoHash  string `json:"source_info_hash" gorm:"size:40;not null;index"`

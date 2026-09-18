@@ -167,7 +167,8 @@ func (h *SeedingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		remaining := extractLastSegment(trimmed, "/api/v1/seeding/clients/")
 		parts := strings.SplitN(remaining, "/", 2)
 		if len(parts) == 2 && parts[1] == "trigger" && r.Method == http.MethodPost {
-			h.handleTriggerClient(w, r, parts[0])
+			uidNum, _ := strconv.ParseUint(parts[0], 10, 64)
+			h.handleTriggerClient(w, r, uint(uidNum))
 			return
 		}
 		Error(w, http.StatusNotFound, 40400, "路径不存在")
@@ -243,7 +244,7 @@ func (h *SeedingHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request,
 
 func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientID                 string  `json:"clientId"`
+		ClientUID uint  `json:"clientId"`
 		Enabled                  bool    `json:"enabled"`
 		DeleteRuleIDs            string  `json:"deleteRuleIds"`
 		AutoDeleteCron           string  `json:"autoDeleteCron"`
@@ -279,13 +280,13 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 		return
 	}
-	if req.ClientID == "" {
+	if req.ClientUID == 0 {
 		Error(w, http.StatusBadRequest, 40001, "clientId 为必填项")
 		return
 	}
 	// §55.14 role 校验：/seeding 只接 role=seeding
 	var seedClient model.ClientConfig
-	if h.db.Where("name = ?", req.ClientID).First(&seedClient).Error == nil {
+	if h.db.Where("id = ?", req.ClientUID).First(&seedClient).Error == nil {
 		if seedClient.Role != "seeding" {
 			Error(w, http.StatusBadRequest, 40001, "刷流管理只接受刷流专用(role=seeding)下载器，普通下载器请到下载管理添加")
 			return
@@ -293,7 +294,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	var count int64
-	if err := h.db.Model(&model.SeedingClientConfig{}).Where("client_id = ?", req.ClientID).Count(&count).Error; err != nil {
+	if err := h.db.Model(&model.SeedingClientConfig{}).Where("client_uid = ?", req.ClientUID).Count(&count).Error; err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
 		return
 	}
@@ -303,7 +304,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	config := model.SeedingClientConfig{
-		ClientID:                 req.ClientID,
+		ClientUID: req.ClientUID,
 		Enabled:                  req.Enabled,
 		DeleteRuleIDs:            req.DeleteRuleIDs,
 		AutoDeleteCron:           req.AutoDeleteCron,
@@ -349,7 +350,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		Error(w, http.StatusInternalServerError, 50000, "创建刷流配置失败")
 		return
 	}
-	auditLog(r, "seeding", "create", "config", fmt.Sprintf("%d", config.ID), config.ClientID, "success")
+	auditLog(r, "seeding", "create", "config", fmt.Sprintf("%d", config.ID), fmt.Sprintf("client_uid=%d", config.ClientUID), "success")
 	Success(w, config)
 }
 
@@ -470,7 +471,7 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 		Error(w, http.StatusInternalServerError, 50000, "查询刷流配置失败")
 		return
 	}
-	auditLog(r, "seeding", "update", "config", fmt.Sprintf("%d", id), config.ClientID, "success")
+	auditLog(r, "seeding", "update", "config", fmt.Sprintf("%d", id), fmt.Sprintf("client_uid=%d", config.ClientUID), "success")
 	Success(w, config)
 }
 
@@ -485,7 +486,12 @@ func (h *SeedingHandler) handleDeleteConfig(w http.ResponseWriter, r *http.Reque
 
 func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	clientID := query.Get("client_id")
+	clientUID := uint(0)
+	if v := query.Get("clientUid"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			clientUID = uint(n)
+		}
+	}
 	siteName := query.Get("site")
 	status := query.Get("status")
 	search := query.Get("search")
@@ -498,8 +504,8 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 		size = 50
 	}
 
-	if h.engine != nil && clientID != "" {
-		records, err := h.engine.ListByClient(r.Context(), clientID)
+	if h.engine != nil && clientUID != 0 {
+		records, err := h.engine.ListByClient(r.Context(), clientUID)
 		if err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "查询刷流记录失败")
 			return
@@ -555,8 +561,8 @@ func (h *SeedingHandler) handleListRecords(w http.ResponseWriter, r *http.Reques
 
 	q := h.db.Model(&model.SeedingTorrentRecord{}).
 		Where("status IN ?", []string{"seeding", "paused_free_end", "paused_rule"})
-	if clientID != "" {
-		q = q.Where("client_id = ?", clientID)
+	if clientUID != 0 {
+		q = q.Where("client_uid = ?", clientUID)
 	}
 	if siteName != "" {
 		q = q.Where("site_name = ?", siteName)
@@ -778,7 +784,7 @@ func (h *SeedingHandler) handleEngineStatus(w http.ResponseWriter, _ *http.Reque
 
 	var total int64
 	if err := h.db.Model(&model.SeedingTorrentRecord{}).
-		Where("client_id IN (SELECT name FROM clients WHERE role = 'seeding')").
+		Where("client_uid IN (SELECT id FROM clients WHERE role = 'seeding')").
 		Count(&total).Error; err != nil {
 		h.logger.Warn("engine status: query total count failed", zap.Error(err))
 	}
@@ -809,11 +815,13 @@ func (h *SeedingHandler) handleListTorrents(w http.ResponseWriter, r *http.Reque
 	q := h.db.Model(&model.SeedingTorrentRecord{}).
 		Where("status IN ?", []string{"seeding", "paused_free_end", "paused_rule"})
 
-	if clientID := r.URL.Query().Get("clientId"); clientID != "" {
-		q = q.Where("client_id = ?", clientID)
+	if v := r.URL.Query().Get("client_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			q = q.Where("client_uid = ?", uint(n))
+		}
 	} else {
 		// §56.40: 默认只返回 role=seeding 下载器的种子（聚焦刷流业务）
-		q = q.Where("client_id IN (SELECT name FROM clients WHERE role = 'seeding')")
+		q = q.Where("client_uid IN (SELECT id FROM clients WHERE role = 'seeding')")
 	}
 
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
@@ -1084,7 +1092,7 @@ func (h *SeedingHandler) handleScoringLogs(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func (h *SeedingHandler) handleTriggerClient(w http.ResponseWriter, r *http.Request, clientID string) {
+func (h *SeedingHandler) handleTriggerClient(w http.ResponseWriter, r *http.Request, clientUID uint) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
@@ -1095,37 +1103,37 @@ func (h *SeedingHandler) handleTriggerClient(w http.ResponseWriter, r *http.Requ
 
 	// §55.15：统一配置加载入口（查 seeding_client_configs 或 download_client_configs），
 	// 避免仅查单表导致 role≠seeding 下载器手动触发评估时被误报 "no enabled config"。
-	cfg, ok := h.engine.LoadActiveClientConfig(ctx, clientID)
+	cfg, ok := h.engine.LoadActiveClientConfig(ctx, clientUID)
 	if !ok {
-		count := h.engine.GetActiveCount(clientID)
-		h.logger.Warn("seeding trigger: no enabled config, returning count only", zap.String("clientId", clientID))
+		count := h.engine.GetActiveCount(clientUID)
+		h.logger.Warn("seeding trigger: no enabled config, returning count only", zap.Uint("clientUid", clientUID))
 		Success(w, map[string]interface{}{
 			"processedCount": count,
-			"clientId":       clientID,
+			"clientId":       clientUID,
 			"evaluated":      false,
 			"reason":         "no enabled config",
 		})
 		return
 	}
 
-	result, err := h.engine.Evaluate(ctx, clientID, &cfg)
+	result, err := h.engine.Evaluate(ctx, clientUID, &cfg)
 	if err != nil {
-		h.logger.Error("seeding evaluate failed", zap.String("clientId", clientID), zap.Error(err))
+		h.logger.Error("seeding evaluate failed", zap.Uint("clientUid", clientUID), zap.Error(err))
 		Error(w, http.StatusInternalServerError, 50000, "评估执行失败: "+err.Error())
 		return
 	}
 
 	h.logger.Info("seeding client evaluated",
-		zap.String("clientId", clientID),
+		zap.Uint("clientUid", clientUID),
 		zap.Int("evaluated", result.Evaluated),
 		zap.Int("paused", result.Paused),
 		zap.Int("deleted", result.Deleted),
 		zap.Int("limited", result.Limited),
 		zap.Int("errors", result.Errors),
 	)
-	auditLog(r, "seeding", "trigger", "client", clientID, fmt.Sprintf("evaluated=%d,paused=%d,deleted=%d", result.Evaluated, result.Paused, result.Deleted), "success")
+	auditLog(r, "seeding", "trigger", "client", fmt.Sprintf("%d", clientUID), fmt.Sprintf("evaluated=%d,paused=%d,deleted=%d", result.Evaluated, result.Paused, result.Deleted), "success")
 	Success(w, map[string]interface{}{
-		"clientId":       clientID,
+		"clientId":       clientUID,
 		"evaluated":      true,
 		"processedCount": result.Evaluated,
 		"pausedCount":    result.Paused,
@@ -1229,11 +1237,11 @@ func (h *SeedingHandler) handleStatsSubroute(w http.ResponseWriter, r *http.Requ
 			Error(w, http.StatusNotFound, 40400, "路径不存在")
 		}
 	case strings.HasPrefix(remaining, "downloader/"):
-		clientID := strings.TrimPrefix(remaining, "downloader/")
-		clientID = strings.TrimRight(clientID, "/")
-		if strings.HasSuffix(clientID, "/speed-trend") {
-			id := strings.TrimSuffix(clientID, "/speed-trend")
-			h.handleDownloaderSpeedTrend(w, r, id)
+		clientIDPath := strings.TrimRight(strings.TrimPrefix(remaining, "downloader/"), "/")
+		if strings.HasSuffix(clientIDPath, "/speed-trend") {
+			idStr := strings.TrimSuffix(clientIDPath, "/speed-trend")
+			idNum, _ := strconv.ParseUint(idStr, 10, 64)
+			h.handleDownloaderSpeedTrend(w, r, uint(idNum))
 		} else {
 			Error(w, http.StatusNotFound, 40400, "路径不存在")
 		}
@@ -1579,7 +1587,7 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-func (h *SeedingHandler) handleDownloaderSpeedTrend(w http.ResponseWriter, r *http.Request, clientID string) {
+func (h *SeedingHandler) handleDownloaderSpeedTrend(w http.ResponseWriter, r *http.Request, clientUID uint) {
 	hours := 24
 	if v := r.URL.Query().Get("range"); v == "7d" {
 		hours = 168
@@ -1597,10 +1605,10 @@ func (h *SeedingHandler) handleDownloaderSpeedTrend(w http.ResponseWriter, r *ht
 	rangeEnd := now.Truncate(time.Hour).Add(time.Hour)
 
 	var snapshots []model.DownloaderSpeedSnapshot
-	if err := h.db.Where("client_id = ? AND recorded_at >= ? AND recorded_at < ?", clientID, rangeStart, rangeEnd).
+	if err := h.db.Where("client_uid = ? AND recorded_at >= ? AND recorded_at < ?", clientUID, rangeStart, rangeEnd).
 		Order("recorded_at ASC").Find(&snapshots).Error; err != nil {
 		h.logger.Warn("query speed snapshots failed",
-			zap.String("clientID", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.Error(err))
 	}
 
@@ -1629,7 +1637,7 @@ func (h *SeedingHandler) handleDownloaderSpeedTrend(w http.ResponseWriter, r *ht
 	}
 
 	Success(w, map[string]interface{}{
-		"clientId": clientID,
+		"clientId": clientUID,
 		"points":   points,
 	})
 }
@@ -1648,9 +1656,9 @@ func (h *SeedingHandler) handleDryrunAll(w http.ResponseWriter, r *http.Request)
 
 	totalEvaluated := 0
 	for _, cfg := range configs {
-		count, evalErr := h.engine.DryRunEvaluate(ctx, cfg.ClientID, cfg)
+		count, evalErr := h.engine.DryRunEvaluate(ctx, cfg.ClientUID, cfg)
 		if evalErr != nil {
-			h.logger.Warn("dryrun evaluate failed", zap.String("clientId", cfg.ClientID), zap.Error(evalErr))
+			h.logger.Warn("dryrun evaluate failed", zap.Uint("client_uid", cfg.ClientUID), zap.Error(evalErr))
 			continue
 		}
 		totalEvaluated += count
@@ -1678,7 +1686,7 @@ func (h *SeedingHandler) handleDryrunBySub(w http.ResponseWriter, r *http.Reques
 
 	totalEvaluated := 0
 	for _, cfg := range configs {
-		count, err := h.engine.DryRunEvaluate(ctx, cfg.ClientID, cfg)
+		count, err := h.engine.DryRunEvaluate(ctx, cfg.ClientUID, cfg)
 		if err != nil {
 			continue
 		}
@@ -1704,8 +1712,10 @@ func (h *SeedingHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 	q := h.db.Model(&model.SeedingTorrentRecord{}).
 		Where("status = ?", "deleted")
 
-	if clientID := r.URL.Query().Get("client_id"); clientID != "" {
-		q = q.Where("client_id = ?", clientID)
+	if v := r.URL.Query().Get("client_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			q = q.Where("client_uid = ?", uint(n))
+		}
 	}
 	if siteName := r.URL.Query().Get("site_name"); siteName != "" {
 		q = q.Where("site_name = ?", siteName)

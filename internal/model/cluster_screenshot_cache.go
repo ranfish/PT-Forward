@@ -10,7 +10,7 @@ import "time"
 // 缓存语义 = 簇最新已知好链接）。观察期过期 = miss（惰性判定，无后台扫描）。
 type ClusterScreenshotCache struct {
 	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ClientID    string    `json:"client_id" gorm:"size:50;not null;uniqueIndex:idx_shot_cache_cluster"`
+	ClientUID   uint      `json:"client_uid" gorm:"not null;uniqueIndex:idx_shot_cache_cluster"`
 	SavePath    string    `json:"save_path" gorm:"size:500;not null;uniqueIndex:idx_shot_cache_cluster"`
 	Name        string    `json:"name" gorm:"size:500;not null;uniqueIndex:idx_shot_cache_cluster"`
 	Screenshots string    `json:"screenshots" gorm:"type:text;not null"` // JSON 数组

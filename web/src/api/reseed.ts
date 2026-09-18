@@ -73,11 +73,11 @@ export const reseedApi = {
   cancelTask(id: number) {
     return client.post<ApiResponse<void>>(`/reseed/tasks/${id}/cancel`)
   },
-  getMatches(taskId: number, opts?: { page?: number; pageSize?: number; clientId?: string; site?: string; torrentId?: string; status?: string; orderField?: string; order?: string }) {
+  getMatches(taskId: number, opts?: { page?: number; pageSize?: number; clientId?: number; site?: string; torrentId?: string; status?: string; orderField?: string; order?: string }) {
     const params: Record<string, string | number> = {}
     if (opts?.page) params.page = opts.page
     if (opts?.pageSize) params.pageSize = opts.pageSize
-    if (opts?.clientId) params.clientId = opts.clientId
+    if (opts?.clientId) params.client_id = opts.clientId
     if (opts?.site) params.site = opts.site
     if (opts?.torrentId) params.torrentId = opts.torrentId
     if (opts?.status) params.status = opts.status

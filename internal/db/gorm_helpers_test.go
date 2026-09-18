@@ -59,7 +59,7 @@ func TestForceCreate_FloatZero(t *testing.T) {
 	db := setupTestDB(t)
 
 	config := &model.SeedingClientConfig{
-		ClientID: "test-client", Enabled: false,
+		ClientUID: 1, Enabled: false,
 		MinDiskSpaceGB: 0, EmergencyBuffer: 0, EmaAlpha: 0,
 		SpaceAlarmGB: 0, MinDiskSpacePercent: 0,
 	}

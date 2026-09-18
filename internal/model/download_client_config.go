@@ -7,7 +7,7 @@ type DownloadClientConfig struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
-	ClientID      string `json:"client_id" gorm:"uniqueIndex;size:50;not null"`
+	ClientUID     uint   `json:"client_uid" gorm:"uniqueIndex;not null"`
 	Enabled       bool   `json:"enabled" gorm:"default:true"`
 	DeleteRuleIDs string `json:"delete_rule_ids" gorm:"type:text"`
 

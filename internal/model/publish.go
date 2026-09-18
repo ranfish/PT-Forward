@@ -13,8 +13,8 @@ type PublishCandidate struct {
 	InfoHash        string    `json:"info_hash" gorm:"index;size:40"`
 	TorrentName     string    `json:"torrent_name" gorm:"size:500"`
 	Size            int64     `json:"size"`
-	ClientID        string    `json:"client_id" gorm:"size:50"`
-	SourceClientID  string    `json:"source_client_id" gorm:"size:50"`
+	ClientUID       uint       `json:"client_uid"`
+	SourceClientUID uint       `json:"source_client_uid"`
 
 	LocalSavePath string `json:"local_save_path" gorm:"size:500"`
 	LocalFilePath string `json:"local_file_path" gorm:"size:500"`
@@ -67,7 +67,7 @@ type PublishGroupMember struct {
 	SiteName  string `json:"site_name" gorm:"uniqueIndex:idx_group_site;size:100"`
 	TorrentID string `json:"torrent_id" gorm:"size:50"`
 	Role      string `json:"role" gorm:"size:20"`
-	ClientID  string `json:"client_id" gorm:"size:50"`
+	ClientUID uint  `json:"client_uid"`
 	Size      int64  `json:"size" gorm:"default:0"`
 	SavePath  string `json:"save_path" gorm:"size:500"`
 
@@ -147,7 +147,7 @@ type PublishResultRecord struct {
 	BatchGroupID string `json:"batch_group_id" gorm:"size:36;index"` // 批量发布 UUID
 	Title        string `json:"title" gorm:"size:500"`
 	Subtitle     string `json:"subtitle" gorm:"size:500"`
-	DownloaderID string `json:"downloader_id" gorm:"size:50"`
+	DownloaderID uint   `json:"downloader_id"`
 	CostMS       int64  `json:"cost_ms" gorm:"default:0"`
 	Logs         string `json:"logs" gorm:"type:text"`
 
@@ -197,7 +197,7 @@ type PublishRequest struct {
 	SourceSite      string            `json:"source_site"`
 	SourceInfoHash  string            `json:"source_info_hash"`
 	SourceTorrentID string            `json:"source_torrent_id"`
-	ClientID        string            `json:"client_id"`
+	ClientUID       uint             `json:"client_uid"`
 	GroupID         uint              `json:"group_group_id"`
 	TargetSite      string            `json:"target_site"`
 }

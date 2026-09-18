@@ -23,18 +23,18 @@ func NewClientSelector(cp model.DownloaderProvider, logger *zap.Logger) *ClientS
 	}
 }
 
-func (s *ClientSelector) Select(ctx context.Context, sub *model.RSSSubscription) (string, error) {
+func (s *ClientSelector) Select(ctx context.Context, sub *model.RSSSubscription) (uint, error) {
 	if len(sub.CandidateClients) == 0 || sub.ClientSelection == model.SelectionFixed || sub.ClientSelection == "" {
-		return sub.ClientID, nil
+		return sub.ClientUID, nil
 	}
 
 	candidates := s.filterHealthy(ctx, sub.CandidateClients)
 	if len(candidates) == 0 {
 		s.logger.Warn("client selector: all candidates unhealthy, falling back to fixed",
 			zap.String("subscription", sub.Name),
-			zap.Strings("candidates", sub.CandidateClients),
+			zap.Uints("candidates", sub.CandidateClients),
 		)
-		return sub.ClientID, nil
+		return sub.ClientUID, nil
 	}
 
 	if len(candidates) == 1 {
@@ -55,11 +55,11 @@ func (s *ClientSelector) Select(ctx context.Context, sub *model.RSSSubscription)
 	}
 }
 
-func (s *ClientSelector) filterHealthy(ctx context.Context, candidates []string) []string {
+func (s *ClientSelector) filterHealthy(ctx context.Context, candidates []uint) []uint {
 	if s.clientProvider == nil {
 		return candidates
 	}
-	var healthy []string
+	var healthy []uint
 	for _, c := range candidates {
 		if _, err := s.clientProvider.Get(c); err == nil {
 			healthy = append(healthy, c)
@@ -68,8 +68,8 @@ func (s *ClientSelector) filterHealthy(ctx context.Context, candidates []string)
 	return healthy
 }
 
-func (s *ClientSelector) selectMostSpace(ctx context.Context, candidates []string) (string, error) {
-	var bestClient string
+func (s *ClientSelector) selectMostSpace(ctx context.Context, candidates []uint) (uint, error) {
+	var bestClient uint
 	var bestSpace int64 = -1
 
 	for _, c := range candidates {
@@ -87,14 +87,14 @@ func (s *ClientSelector) selectMostSpace(ctx context.Context, candidates []strin
 		}
 	}
 
-	if bestClient == "" {
+	if bestClient == 0 {
 		return candidates[0], nil
 	}
 	return bestClient, nil
 }
 
-func (s *ClientSelector) selectLeastUpload(ctx context.Context, candidates []string) (string, error) {
-	var bestClient string
+func (s *ClientSelector) selectLeastUpload(ctx context.Context, candidates []uint) (uint, error) {
+	var bestClient uint
 	var bestSpeed int64 = -1
 
 	for _, c := range candidates {
@@ -113,15 +113,15 @@ func (s *ClientSelector) selectLeastUpload(ctx context.Context, candidates []str
 		}
 	}
 
-	if bestClient == "" {
+	if bestClient == 0 {
 		return candidates[0], nil
 	}
 	return bestClient, nil
 }
 
-func (s *ClientSelector) selectBestFit(ctx context.Context, candidates []string) (string, error) {
+func (s *ClientSelector) selectBestFit(ctx context.Context, candidates []uint) (uint, error) {
 	type candidateScore struct {
-		name        string
+		name        uint
 		uploadSpeed int64
 		freeSpace   int64
 	}
@@ -153,7 +153,7 @@ func (s *ClientSelector) selectBestFit(ctx context.Context, candidates []string)
 		return candidates[0], nil
 	}
 
-	var bestClient string
+	var bestClient uint
 	var bestScore float64 = -1
 	for _, sc := range scores {
 		var uploadNorm, spaceNorm float64
@@ -174,13 +174,13 @@ func (s *ClientSelector) selectBestFit(ctx context.Context, candidates []string)
 		}
 	}
 
-	if bestClient == "" {
+	if bestClient == 0 {
 		return candidates[0], nil
 	}
 	return bestClient, nil
 }
 
-func (s *ClientSelector) selectRoundRobin(subName string, candidates []string) string {
+func (s *ClientSelector) selectRoundRobin(subName string, candidates []uint) uint {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

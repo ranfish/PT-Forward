@@ -34,7 +34,7 @@ export const seedingApi = {
   deleteConfig(id: number) {
     return client.delete<ApiResponse<void>>(`/seeding/configs/${id}`)
   },
-  listRecords(page = 1, size = 20, filters?: { search?: string; clientId?: string; site?: string; status?: string }) {
+  listRecords(page = 1, size = 20, filters?: { search?: string; clientId?: number; site?: string; status?: string }) {
     const params: Record<string, string | number> = { page, size }
     if (filters) {
       if (filters.search) params.search = filters.search
@@ -80,7 +80,7 @@ export const seedingApi = {
   listScoringLogs(params?: ListParams) {
     return client.get<ApiResponsePaginated<ScoringLog>>('/seeding/scoring-logs', { params })
   },
-  getHistory(params?: ListParams & { site_name?: string; action_by?: string; client_id?: string }) {
+  getHistory(params?: ListParams & { site_name?: string; action_by?: string; client_id?: number }) {
     return client.get<ApiResponsePaginated<SeedingTorrentRecord>>('/seeding/history', { params })
   },
   getUnregisteredKeywords() {
@@ -92,7 +92,7 @@ export const seedingApi = {
 }
 
 export const seedingClientsApi = {
-  trigger(clientId: string) {
+  trigger(clientId: number) {
     return client.post<ApiResponse<void>>(`/seeding/clients/${clientId}/trigger`)
   },
 }
@@ -110,8 +110,8 @@ export const seedingStatsApi = {
   siteTrend(site: string, range = '7d') {
     return client.get<ApiResponse<{ site: string; trends: SeedingSiteTrendPoint[] }>>(`/seeding/stats/by-site/${encodeURIComponent(site)}/trend`, { params: { range } })
   },
-  downloaderSpeedTrend(id: string, range = '24h') {
-    return client.get<ApiResponse<{ clientId: string; points: SeedingSpeedTrendPoint[] }>>(`/seeding/stats/downloader/${id}/speed-trend`, { params: { range } })
+  downloaderSpeedTrend(id: number, range = '24h') {
+    return client.get<ApiResponse<{ clientId: number; points: SeedingSpeedTrendPoint[] }>>(`/seeding/stats/downloader/${id}/speed-trend`, { params: { range } })
   },
 }
 

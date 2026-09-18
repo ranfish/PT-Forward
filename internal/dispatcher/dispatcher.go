@@ -137,14 +137,14 @@ func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.T
 			continue
 		}
 
-		selectedClient := sub.ClientID
+		selectedClient := sub.ClientUID
 		if d.clientSelector != nil {
 			if chosen, err := d.clientSelector.Select(ctx, sub); err == nil {
 				selectedClient = chosen
 			} else {
 				d.logger.Warn("client selector failed, using fixed client",
 					zap.String("subscription", sub.Name),
-					zap.String("fixed_client", sub.ClientID),
+					zap.Uint("fixed_client_uid", sub.ClientUID),
 					zap.Error(err),
 				)
 			}
@@ -153,7 +153,7 @@ func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.T
 		clientCfg, err := d.getClientConfig(ctx, selectedClient)
 		if err != nil {
 			d.logger.Debug("client config not found, skipping event",
-				zap.String("client_id", selectedClient),
+				zap.Uint("client_uid", selectedClient),
 				zap.String("site", ev.SiteName),
 				zap.Error(err),
 			)
@@ -165,7 +165,7 @@ func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.T
 		if ev.Metadata == nil {
 			ev.Metadata = make(map[string]any)
 		}
-		ev.Metadata["client_name"] = selectedClient
+		ev.Metadata["client_uid"] = selectedClient
 		ev.Metadata["client_role"] = string(role)
 		ev.Metadata["subscription_id"] = ev.SourceID
 
@@ -175,16 +175,9 @@ func (d *TorrentDispatcher) enrichAndRoute(ctx context.Context, events []model.T
 	return result, nil
 }
 
-func (d *TorrentDispatcher) getClientConfig(ctx context.Context, clientID string) (*model.ClientConfig, error) {
+func (d *TorrentDispatcher) getClientConfig(ctx context.Context, clientUID uint) (*model.ClientConfig, error) {
 	var cfg model.ClientConfig
-	q := d.db.WithContext(ctx).Where("enabled = ?", true)
-
-	idNum, idErr := strconv.ParseUint(clientID, 10, 64)
-	if idErr == nil {
-		q = q.Where("name = ? OR id = ?", clientID, uint(idNum))
-	} else {
-		q = q.Where("name = ?", clientID)
-	}
+	q := d.db.WithContext(ctx).Where("enabled = ? AND id = ?", true, clientUID)
 
 	if err := q.First(&cfg).Error; err != nil {
 		return nil, err
@@ -192,13 +185,22 @@ func (d *TorrentDispatcher) getClientConfig(ctx context.Context, clientID string
 	return &cfg, nil
 }
 
-func GetClientName(ev *model.TorrentEvent) string {
+func GetClientUID(ev *model.TorrentEvent) uint {
 	if ev.Metadata != nil {
-		if name, ok := ev.Metadata["client_name"].(string); ok {
-			return name
+		switch id := ev.Metadata["client_uid"].(type) {
+		case uint:
+			return id
+		case uint64:
+			return uint(id)
+		case int:
+			return uint(id)
+		case int64:
+			return uint(id)
+		case float64: // JSON 反序列化形态
+			return uint(id)
 		}
 	}
-	return ev.SourceID
+	return 0
 }
 
 func GetClientRole(ev *model.TorrentEvent) string {

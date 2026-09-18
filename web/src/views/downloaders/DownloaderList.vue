@@ -115,7 +115,7 @@
           <a-col :span="12">
             <a-form-item :label="t('downloader.transferTargetId')">
               <a-select
-                v-model:value="form.transferTargetId"
+                v-model:value="form.transferTargetUid"
                 :placeholder="form.type !== 'qbittorrent' ? '仅 qBittorrent 支持主辅分离转移' : t('downloader.transferTargetIdPlaceholder')"
                 :disabled="form.type !== 'qbittorrent'"
                 allow-clear
@@ -123,7 +123,7 @@
                 <a-select-option
                   v-for="c in (pagination.data.value as ClientConfig[]).filter(d => d.role === 'reseed' && d.name !== form.name)"
                   :key="c.id"
-                  :value="c.name"
+                  :value="c.id"
                 >
                   {{ c.name }}
                 </a-select-option>
@@ -182,15 +182,15 @@ const form = reactive({
   role: 'download',
   enabled: true,
   isDefault: false,
-  transferTargetId: '',
+  transferTargetUid: undefined as number | undefined,
   torrentDir: '',
   isLocal: null as boolean | null,
   pathMappings: [] as { sourcePath: string; reseedPath: string }[],
 })
 
 watch(() => form.type, (val) => {
-  if (val !== 'qbittorrent' && form.transferTargetId) {
-    form.transferTargetId = ''
+  if (val !== 'qbittorrent' && form.transferTargetUid) {
+    form.transferTargetUid = undefined
   }
 })
 
@@ -212,9 +212,9 @@ const pagination = usePagination((page, size) => downloadersApi.list(page, size)
 function openModal(record?: ClientConfig) {
   editingRecord.value = record || null
   if (record) {
-    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true, isDefault: record.isDefault || false, transferTargetId: record.transferTargetId || '', torrentDir: record.torrentDir || '', isLocal: record.isLocal ?? null, pathMappings: (record.pathMappings || []).map((p: { sourcePath: string; reseedPath: string }) => ({ sourcePath: p.sourcePath || '', reseedPath: p.reseedPath || '' })) })
+    Object.assign(form, { name: record.name, type: record.type, url: record.url, username: record.username || '', password: '', role: record.role || 'download', enabled: record.enabled ?? true, isDefault: record.isDefault || false, transferTargetUid: record.transferTargetUid || undefined, torrentDir: record.torrentDir || '', isLocal: record.isLocal ?? null, pathMappings: (record.pathMappings || []).map((p: { sourcePath: string; reseedPath: string }) => ({ sourcePath: p.sourcePath || '', reseedPath: p.reseedPath || '' })) })
   } else {
-    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '', role: 'download', enabled: true, isDefault: false, transferTargetId: '', torrentDir: '', isLocal: null, pathMappings: [] })
+    Object.assign(form, { name: '', type: 'qbittorrent', url: '', username: '', password: '', role: 'download', enabled: true, isDefault: false, transferTargetUid: undefined, torrentDir: '', isLocal: null, pathMappings: [] })
   }
   modalVisible.value = true
 }

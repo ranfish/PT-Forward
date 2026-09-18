@@ -173,7 +173,7 @@ type sourceTorrent struct {
 	InfoHash  string
 	TorrentID string
 	SiteName  string
-	ClientID  string
+	ClientUID uint
 	Name      string
 	SavePath  string
 }
@@ -935,27 +935,27 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 	existing := e.preloadFingerprints(ctx, infoHashes)
 
 	type missingEntry struct {
-		src        sourceTorrent
-		clientName string
+		src       sourceTorrent
+		clientUID uint
 	}
 
-	clientCache := make(map[string]model.DownloaderClient)
+	clientCache := make(map[uint]model.DownloaderClient)
 	var missing []missingEntry
 
 	for _, src := range sources {
 		if existing.get(src.InfoHash, src.SiteName) != nil {
 			continue
 		}
-		dlClient, ok := clientCache[src.ClientID]
+		dlClient, ok := clientCache[src.ClientUID]
 		if !ok {
 			var err error
-			dlClient, err = e.clientProvider.Get(src.ClientID)
+			dlClient, err = e.clientProvider.Get(src.ClientUID)
 			if err != nil {
 				continue
 			}
-			clientCache[src.ClientID] = dlClient
+			clientCache[src.ClientUID] = dlClient
 		}
-		missing = append(missing, missingEntry{src: src, clientName: src.ClientID})
+		missing = append(missing, missingEntry{src: src, clientUID: src.ClientUID})
 	}
 
 	if len(missing) == 0 {
@@ -971,14 +971,14 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 		if ctx.Err() != nil {
 			break
 		}
-		dlClient := clientCache[m.clientName]
+		dlClient := clientCache[m.clientUID]
 		torrentDir := dlClient.GetTorrentDir()
 		torrentData, err := clientpkg.ReadTorrentFile(torrentDir, m.src.InfoHash)
 		if err != nil {
 			if computed == 0 {
 				e.logger.Warn("read torrent file failed (first error)",
 					zap.String("hash", m.src.InfoHash),
-					zap.String("client", m.clientName),
+					zap.Uint("client_uid", m.clientUID),
 					zap.String("torrent_dir", torrentDir),
 					zap.Error(err))
 			}
@@ -1246,8 +1246,8 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		}
 	}()
 
-	clientNames := e.resolveClientIDsToNames(ctx, task.ClientIDs)
-	if len(clientNames) == 0 {
+	clientUIDs := e.resolveClientIDsToUIDs(ctx, task.ClientIDs)
+	if len(clientUIDs) == 0 {
 		return result, nil
 	}
 
@@ -1255,7 +1255,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 		return result, nil
 	}
 
-	e.retryFailedForTask(ctx, task, clientNames)
+	e.retryFailedForTask(ctx, task, clientUIDs)
 
 	// 预加载 seeding_torrent_records 的 InfoHash→TorrentID 映射（关联源站数字种子ID）
 	var seedRecords []model.SeedingTorrentRecord
@@ -1273,15 +1273,15 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 	clientHashes := make(map[string]bool)
 	seenSourceNames := make(map[string]bool)
 	nameSites := make(map[string]map[string]bool)
-	for _, clientName := range clientNames {
-		dlClient, err := e.clientProvider.Get(clientName)
+	for _, clientUID := range clientUIDs {
+		dlClient, err := e.clientProvider.Get(clientUID)
 		if err != nil {
-			e.logger.Warn("failed to get downloader", zap.String("client", clientName), zap.Error(err))
+			e.logger.Warn("failed to get downloader", zap.Uint("client_uid", clientUID), zap.Error(err))
 			continue
 		}
 		allTorrents, err := dlClient.GetAllTorrents(ctx)
 		if err != nil {
-			e.logger.Warn("failed to get all torrents", zap.String("client", clientName), zap.Error(err))
+			e.logger.Warn("failed to get all torrents", zap.Uint("client_uid", clientUID), zap.Error(err))
 			continue
 		}
 		for _, t := range allTorrents {
@@ -1310,7 +1310,7 @@ func (e *Engine) RunTask(ctx context.Context, task *model.ReseedTask) (result *m
 				InfoHash:  t.Hash,
 				TorrentID: seedTorrentIDs[t.Hash],
 				SiteName:  siteName,
-				ClientID:  clientName,
+				ClientUID:  clientUID,
 				Name:      t.Name,
 				SavePath:  t.SavePath,
 			})
@@ -1722,7 +1722,7 @@ func (e *Engine) runSeedFeatureScan(
 
 		match := &model.ReseedMatch{
 			TaskID:          task.ID,
-			ClientID:        sr.src.ClientID,
+			ClientUID:        sr.src.ClientUID,
 			SourceSite:      sr.src.SiteName,
 			SourceTorrentID: sr.src.TorrentID,
 			SourceInfoHash:  sr.src.InfoHash,
@@ -1770,7 +1770,7 @@ func (e *Engine) runSeedFeatureScan(
 
 				match := &model.ReseedMatch{
 					TaskID:          task.ID,
-					ClientID:        src.ClientID,
+					ClientUID:        src.ClientUID,
 					SourceSite:      src.SiteName,
 					SourceTorrentID: src.TorrentID,
 					SourceInfoHash:  src.InfoHash,
@@ -1927,7 +1927,7 @@ func (e *Engine) runLegacyScan(
 
 			match := &model.ReseedMatch{
 				TaskID:          task.ID,
-				ClientID:        src.ClientID,
+				ClientUID:        src.ClientUID,
 				SourceSite:      src.SiteName,
 				SourceTorrentID: src.TorrentID,
 				SourceInfoHash:  src.InfoHash,
@@ -2165,7 +2165,7 @@ func (e *Engine) lazyComputeBencodeHash(ctx context.Context, src sourceTorrent, 
 	if e.clientProvider == nil {
 		return ""
 	}
-	dlClient, err := e.clientProvider.Get(src.ClientID)
+	dlClient, err := e.clientProvider.Get(src.ClientUID)
 	if err != nil {
 		return ""
 	}
@@ -4803,7 +4803,7 @@ func (e *Engine) ListEnabled(ctx context.Context) ([]model.ReseedTask, error) {
 func (e *Engine) BatchSaveMatches(ctx context.Context, matches []*model.ReseedMatch) error {
 	return e.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{
-			{Name: "client_id"},
+			{Name: "client_uid"},
 			{Name: "source_site"},
 			{Name: "source_torrent_id"},
 			{Name: "target_site"},
@@ -4816,7 +4816,7 @@ func (e *Engine) BatchSaveMatches(ctx context.Context, matches []*model.ReseedMa
 	}).Create(matches).Error
 }
 
-func (e *Engine) retryFailedForTask(ctx context.Context, task *model.ReseedTask, clientNames []string) {
+func (e *Engine) retryFailedForTask(ctx context.Context, task *model.ReseedTask, clientUIDs []uint) {
 	maxRetries := task.MaxRetries
 	if maxRetries <= 0 {
 		maxRetries = 3
@@ -4829,7 +4829,7 @@ func (e *Engine) retryFailedForTask(ctx context.Context, task *model.ReseedTask,
 	var matches []model.ReseedMatch
 	err := e.db.WithContext(ctx).
 		Where("status = ? AND retry_count < ?", model.MatchStatusFailed, maxRetries).
-		Where("client_id IN ?", clientNames).
+		Where("client_uid IN ?", clientUIDs).
 		Where("next_retry_at IS NULL OR next_retry_at <= ?", time.Now()).
 		Order("next_retry_at ASC").
 		Limit(50).
@@ -4901,7 +4901,7 @@ func (e *Engine) UpdateMatchStatus(ctx context.Context, id uint, status string, 
 func (e *Engine) SaveMatch(ctx context.Context, match *model.ReseedMatch) error {
 	return e.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{
-			{Name: "client_id"},
+			{Name: "client_uid"},
 			{Name: "source_site"},
 			{Name: "source_torrent_id"},
 			{Name: "target_site"},
@@ -5030,14 +5030,14 @@ func (e *Engine) FlushNegativeCache(ctx context.Context) (int64, error) {
 	return result.RowsAffected, result.Error
 }
 
-func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.SeedingTorrentRecord, reseedClientIDs []string) {
+func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.SeedingTorrentRecord, reseedClientIDs []uint) {
 	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Minute)
 	defer cancel()
 
 	e.logger.Info("auto reseed triggered",
 		zap.String("site", record.SiteName),
 		zap.String("info_hash", record.InfoHash),
-		zap.Strings("reseed_client_ids", reseedClientIDs))
+		zap.Uints("reseed_client_uids", reseedClientIDs))
 
 	if e.siteProvider == nil {
 		e.logger.Warn("auto reseed: siteProvider not available")
@@ -5081,7 +5081,7 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 	src := sourceTorrent{
 		InfoHash: record.InfoHash,
 		SiteName: record.SiteName,
-		ClientID: record.ClientID,
+		ClientUID: record.ClientUID,
 	}
 	candidates := e.findCandidates(ctx, src, ps, fpc, task.SizeTolerancePercent, task, negCache, nil, nil, nil, nil, nil)
 	if len(candidates) == 0 {
@@ -5100,7 +5100,7 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 		}
 		for _, clientID := range reseedClientIDs {
 			match := &model.ReseedMatch{
-				ClientID:        clientID,
+				ClientUID:        clientID,
 				SourceSite:      record.SiteName,
 				SourceTorrentID: record.TorrentID,
 				SourceInfoHash:  record.InfoHash,
@@ -5134,7 +5134,7 @@ func (e *Engine) OnTorrentSeeding(parentCtx context.Context, record model.Seedin
 			e.logger.Info("auto reseed: injected",
 				zap.String("source_hash", record.InfoHash),
 				zap.String("target_site", c.TargetSite),
-				zap.String("client_id", clientID))
+				zap.Uint("client_uid", clientID))
 		}
 	}
 }
@@ -5164,28 +5164,13 @@ func (e *Engine) ValidateClientRoles(ctx context.Context, clientIDs string) erro
 	return nil
 }
 
-func (e *Engine) resolveClientIDsToNames(ctx context.Context, ids string) []string {
+// resolveClientIDsToUIDs §59.251: 直接返回 UID（名字解析层废除——ID 即标识）
+func (e *Engine) resolveClientIDsToUIDs(ctx context.Context, ids string) []uint {
 	parts := ParseClientIDs(ids)
 	if len(parts) == 0 {
 		return nil
 	}
-	uintIDs := partsToUint(parts)
-	if len(uintIDs) == 0 {
-		return parts
-	}
-	var clients []model.ClientConfig
-	if err := e.db.WithContext(ctx).Select("id, name").Where("id IN ?", uintIDs).Find(&clients).Error; err != nil {
-		e.logger.Warn("resolve client IDs to names failed", zap.Error(err))
-		return parts
-	}
-	if len(clients) == 0 {
-		return parts
-	}
-	names := make([]string, 0, len(clients))
-	for _, c := range clients {
-		names = append(names, c.Name)
-	}
-	return names
+	return partsToUint(parts)
 }
 
 func (e *Engine) resolveSiteIDsToNames(ctx context.Context, ids string) []string {
@@ -5339,7 +5324,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 		return e.failMatch(ctx, match, fmt.Sprintf("下载目标种子失败: %v", err))
 	}
 
-	dlClient, err := e.clientProvider.Get(match.ClientID)
+	dlClient, err := e.clientProvider.Get(match.ClientUID)
 	if err != nil {
 		return e.failMatch(ctx, match, fmt.Sprintf("获取下载器客户端失败: %v", err))
 	}
@@ -5416,7 +5401,7 @@ func (e *Engine) injectMatch(ctx context.Context, match *model.ReseedMatch, task
 
 	now := time.Now()
 	audit.Log("system", "reseed", "inject", "torrent", match.SourceInfoHash,
-		fmt.Sprintf("辅种注入 client=%s %s→%s", match.ClientID, match.SourceSite, match.TargetSite), "success")
+		fmt.Sprintf("辅种注入 client=%d %s→%s", match.ClientUID, match.SourceSite, match.TargetSite), "success")
 	return e.db.WithContext(ctx).Model(match).Updates(map[string]interface{}{
 		"status":           model.MatchStatusInjected,
 		"target_info_hash": infoHash,

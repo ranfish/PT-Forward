@@ -138,10 +138,15 @@ func (h *DownloadHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	if size <= 0 || size > 200 {
 		size = 20
 	}
-	clientID := r.URL.Query().Get("client_id")
+	clientUID := uint(0)
+	if v := r.URL.Query().Get("client_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			clientUID = uint(n)
+		}
+	}
 	status := r.URL.Query().Get("status")
 
-	tasks, total, err := h.repo.List(r.Context(), page, size, clientID, status)
+	tasks, total, err := h.repo.List(r.Context(), page, size, clientUID, status)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "查询失败")
 		return
@@ -283,7 +288,7 @@ func (h *DownloadHandler) handleBulkAction(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *DownloadHandler) doPause(ctx context.Context, task *model.DownloadTask) error {
-	c, err := h.clientMgr.Get(task.ClientID)
+	c, err := h.clientMgr.Get(task.ClientUID)
 	if err != nil {
 		return err
 	}
@@ -291,7 +296,7 @@ func (h *DownloadHandler) doPause(ctx context.Context, task *model.DownloadTask)
 }
 
 func (h *DownloadHandler) doResume(ctx context.Context, task *model.DownloadTask) error {
-	c, err := h.clientMgr.Get(task.ClientID)
+	c, err := h.clientMgr.Get(task.ClientUID)
 	if err != nil {
 		return err
 	}
@@ -299,7 +304,7 @@ func (h *DownloadHandler) doResume(ctx context.Context, task *model.DownloadTask
 }
 
 func (h *DownloadHandler) doRecheck(ctx context.Context, task *model.DownloadTask) error {
-	c, err := h.clientMgr.Get(task.ClientID)
+	c, err := h.clientMgr.Get(task.ClientUID)
 	if err != nil {
 		return err
 	}
@@ -307,7 +312,7 @@ func (h *DownloadHandler) doRecheck(ctx context.Context, task *model.DownloadTas
 }
 
 type addTaskRequest struct {
-	ClientID string `json:"clientId"`
+	ClientUID uint `json:"clientId"`
 	URL      string `json:"url"`
 	Category string `json:"category"`
 	Paused   bool   `json:"paused"`
@@ -315,7 +320,8 @@ type addTaskRequest struct {
 
 func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 	var torrentData []byte
-	var clientID, category string
+	var clientUID uint
+	var category string
 	var paused bool
 
 	contentType := r.Header.Get("Content-Type")
@@ -335,7 +341,11 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusBadRequest, 40001, "读取文件失败")
 			return
 		}
-		clientID = r.FormValue("client_id")
+		if v := r.FormValue("client_id"); v != "" {
+			if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+				clientUID = uint(n)
+			}
+		}
 		category = r.FormValue("category")
 		paused = r.FormValue("paused") == "true"
 	} else {
@@ -344,7 +354,7 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 			return
 		}
-		clientID = req.ClientID
+		clientUID = req.ClientUID
 		category = req.Category
 		paused = req.Paused
 		if req.URL != "" {
@@ -367,7 +377,7 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if clientID == "" {
+	if clientUID == 0 {
 		Error(w, http.StatusBadRequest, 40001, "client_id 为必填项")
 		return
 	}
@@ -376,7 +386,7 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := h.clientMgr.Get(clientID)
+	c, err := h.clientMgr.Get(clientUID)
 	if err != nil {
 		Error(w, http.StatusBadRequest, 40001, "下载器不可用: "+err.Error())
 		return
@@ -394,7 +404,7 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 
 	task := &model.DownloadTask{
 		Source:      model.DownloadSourceManual,
-		ClientID:    clientID,
+		ClientUID: clientUID,
 		InfoHash:    result.InfoHash,
 		TorrentName: result.Name,
 		Category:    category,
@@ -421,14 +431,14 @@ func (h *DownloadHandler) handleRetryTransfer(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	h.repo.UpdateTransfer(r.Context(), id, model.TransferStatusPending, "", "")
+	h.repo.UpdateTransfer(r.Context(), id, model.TransferStatusPending, 0, "")
 	Success(w, map[string]interface{}{"id": id, "transfer_status": model.TransferStatusPending})
 }
 
 var _ = fmt.Sprintf
 
 type spaceStat struct {
-	ClientID        string `json:"clientId"`
+	ClientUID uint `json:"clientId"`
 	FreeSpace       int64  `json:"freeSpace"`
 	TotalSpace      int64  `json:"totalSpace"`
 	PendingBytes    int64  `json:"pendingBytes"`
@@ -483,7 +493,7 @@ func (h *DownloadHandler) handleSpaceStats(w http.ResponseWriter, r *http.Reques
 		}
 
 		stats = append(stats, spaceStat{
-			ClientID:         name,
+			ClientUID: name,
 			FreeSpace:        freeSpace,
 			TotalSpace:       totalSpace,
 			PendingBytes:     pending,
@@ -502,29 +512,37 @@ func (h *DownloadHandler) handleSnapshotPaths(w http.ResponseWriter, r *http.Req
 		Count    int64  `json:"count"`
 	}
 	type clientPaths struct {
-		ClientID string      `json:"clientId"`
+		ClientUID uint      `json:"clientId"`
+		Name     string    `json:"name"`
 		Paths    []pathEntry `json:"paths"`
 	}
 
 	var snapshots []model.TorrentSnapshot
 	h.db.WithContext(r.Context()).
-		Select("client_id, save_path, COUNT(*) as size").
+		Select("client_uid, save_path, COUNT(*) as size").
 		Where("is_hidden = ? AND save_path != ?", false, "").
-		Group("client_id, save_path").
-		Order("client_id, save_path").
+		Group("client_uid, save_path").
+		Order("client_uid, save_path").
 		Find(&snapshots)
 
-	clientMap := make(map[string][]pathEntry)
+	clientMap := make(map[uint][]pathEntry)
 	for _, s := range snapshots {
-		clientMap[s.ClientID] = append(clientMap[s.ClientID], pathEntry{
+		clientMap[s.ClientUID] = append(clientMap[s.ClientUID], pathEntry{
 			Path:  s.SavePath,
 			Count: s.Size,
 		})
 	}
 
+	var clients []model.ClientConfig
+	h.db.WithContext(r.Context()).Select("id, name").Find(&clients)
+	clientNames := make(map[uint]string, len(clients))
+	for _, c := range clients {
+		clientNames[c.ID] = c.Name
+	}
+
 	result := make([]clientPaths, 0, len(clientMap))
 	for cid, paths := range clientMap {
-		result = append(result, clientPaths{ClientID: cid, Paths: paths})
+		result = append(result, clientPaths{ClientUID: cid, Name: clientNames[cid], Paths: paths})
 	}
 
 	Success(w, result)
@@ -532,9 +550,14 @@ func (h *DownloadHandler) handleSnapshotPaths(w http.ResponseWriter, r *http.Req
 
 // handleSnapshotUnconfigured §59.20: 查找快照中有但 torrent_metadata 中无记录的种子（"获取数据"目标）。
 func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *http.Request) {
-	clientID := r.URL.Query().Get("client_id")
+	clientUID := uint(0)
+	if v := r.URL.Query().Get("client_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			clientUID = uint(n)
+		}
+	}
 	savePath := r.URL.Query().Get("save_path")
-	if clientID == "" || savePath == "" {
+	if clientUID == 0 || savePath == "" {
 		Error(w, http.StatusBadRequest, 40001, "client_id 和 save_path 为必填")
 		return
 	}
@@ -543,7 +566,7 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 		Hash     string `json:"hash"`
 		Name     string `json:"name"`
 		Size     int64  `json:"size"`
-		ClientID string `json:"clientId"`
+		ClientUID uint `json:"clientId"`
 		SavePath string `json:"savePath"`
 	}
 
@@ -553,12 +576,12 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 	var rawItems []unconfiguredItem
 	h.db.WithContext(r.Context()).
 		Table("torrent_snapshots AS s").
-		Select("s.hash, s.name, s.size, s.client_id, s.save_path").
-		Where("s.client_id = ? AND s.save_path = ? AND s.is_hidden = ?", clientID, savePath, false).
+		Select("s.hash, s.name, s.size, s.client_uid, s.save_path").
+		Where("s.client_uid = ? AND s.save_path = ? AND s.is_hidden = ?", clientUID, savePath, false).
 		Where("s.name NOT IN (?)",
 			h.db.Table("torrent_snapshots AS s2").
 				Joins("INNER JOIN torrent_metadata m ON s2.hash = m.info_hash").
-				Where("s2.client_id = ? AND s2.save_path = ? AND s2.is_hidden = 0 AND s2.name != ''", clientID, savePath).
+				Where("s2.client_uid = ? AND s2.save_path = ? AND s2.is_hidden = 0 AND s2.name != ''", clientUID, savePath).
 				Select("DISTINCT s2.name")).
 		Order("s.updated_at DESC").
 		Find(&rawItems)
@@ -582,7 +605,7 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 	switch {
 	case rest == "" && r.Method == http.MethodGet:
 		var configs []model.SeedingClientConfig
-		if err := h.db.WithContext(r.Context()).Where("role = ?", "download").Order("client_id ASC").Find(&configs).Error; err != nil {
+		if err := h.db.WithContext(r.Context()).Where("role = ?", "download").Order("client_uid ASC").Find(&configs).Error; err != nil {
 			h.logger.Warn("query failed", zap.Error(err))
 		}
 
@@ -593,13 +616,13 @@ func (h *DownloadHandler) handleConfigs(w http.ResponseWriter, r *http.Request, 
 			Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 			return
 		}
-		if req.ClientID == "" {
+		if req.ClientUID == 0 {
 			Error(w, http.StatusBadRequest, 40001, "client_id 为必填项")
 			return
 		}
 		// role 校验：/downloads 只接 role≠seeding 的下载器
 		var dlClient model.ClientConfig
-		if h.db.WithContext(r.Context()).Where("name = ?", req.ClientID).First(&dlClient).Error == nil {
+		if h.db.WithContext(r.Context()).Where("id = ?", req.ClientUID).First(&dlClient).Error == nil {
 			if dlClient.Role == "seeding" {
 				Error(w, http.StatusBadRequest, 40001, "刷流专用(role=seeding)下载器不能添加到下载管理，请到刷流管理添加")
 				return

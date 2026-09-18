@@ -181,11 +181,11 @@ func (m *LifecycleManager) getEffectiveConfig(ctx context.Context, subscriptionI
 }
 
 func (m *LifecycleManager) pauseMember(ctx context.Context, mem *model.PublishGroupMember, result *LifecycleCheckResult) {
-	if m.clientProvider != nil && mem.ClientID != "" && mem.InfoHash != "" {
-		if dl, err := m.clientProvider.Get(mem.ClientID); err == nil {
+	if m.clientProvider != nil && mem.ClientUID != 0 && mem.InfoHash != "" {
+		if dl, err := m.clientProvider.Get(mem.ClientUID); err == nil {
 			if err := dl.PauseTorrent(ctx, mem.InfoHash); err != nil {
 				m.logger.Warn("lifecycle: pause torrent failed",
-					zap.String("clientID", mem.ClientID),
+					zap.Uint("clientID", mem.ClientUID),
 					zap.String("infoHash", mem.InfoHash),
 					zap.Error(err),
 				)
@@ -216,16 +216,16 @@ func (m *LifecycleManager) deleteGroup(ctx context.Context, group *model.Publish
 	if m.clientProvider != nil {
 		for i := range members {
 			mem := &members[i]
-			if mem.ClientID == "" || mem.InfoHash == "" {
+			if mem.ClientUID == 0 || mem.InfoHash == "" {
 				continue
 			}
-			if dl, err := m.clientProvider.Get(mem.ClientID); err == nil {
+			if dl, err := m.clientProvider.Get(mem.ClientUID); err == nil {
 				if mem.HRProtected && !mem.HRReleased {
 					m.removeHRTag(ctx, mem)
 				}
 				if err := dl.DeleteTorrent(ctx, mem.InfoHash, true); err != nil {
 					m.logger.Warn("lifecycle: delete torrent failed",
-						zap.String("clientID", mem.ClientID),
+						zap.Uint("clientID", mem.ClientUID),
 						zap.String("infoHash", mem.InfoHash),
 						zap.Error(err),
 					)
@@ -361,7 +361,7 @@ func parseIntSetting(s string) int {
 }
 
 func (m *LifecycleManager) removeHRTag(ctx context.Context, mem *model.PublishGroupMember) {
-	if m.clientProvider == nil || mem.ClientID == "" || mem.InfoHash == "" {
+	if m.clientProvider == nil || mem.ClientUID == 0 || mem.InfoHash == "" {
 		return
 	}
 	site := mem.HRSite
@@ -372,10 +372,10 @@ func (m *LifecycleManager) removeHRTag(ctx context.Context, mem *model.PublishGr
 		return
 	}
 	hrTag := fmt.Sprintf("PROTECTED_HR_%s", site)
-	if dl, err := m.clientProvider.Get(mem.ClientID); err == nil {
+	if dl, err := m.clientProvider.Get(mem.ClientUID); err == nil {
 		if err := dl.RemoveTorrentTags(ctx, mem.InfoHash, []string{hrTag}); err != nil {
 			m.logger.Warn("lifecycle: failed to remove HR protect tag",
-				zap.String("clientID", mem.ClientID),
+				zap.Uint("clientID", mem.ClientUID),
 				zap.String("infoHash", mem.InfoHash),
 				zap.Error(err),
 			)

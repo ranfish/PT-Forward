@@ -65,7 +65,7 @@ type PublishTorrentsHandler struct {
 
 type backgroundQueryState struct {
 	mu          sync.Mutex
-	active      map[uint]bool // clientID → querying
+	active      map[uint]bool // clientUID → querying
 	total       int
 	done        int
 }
@@ -150,15 +150,15 @@ func (h *PublishTorrentsHandler) StartObservingCleanup() {
 func (h *PublishTorrentsHandler) runObservingCleanup(ctx context.Context) {
 	cutoff := time.Now().Add(-observingGracePeriod)
 	type obsGroup struct {
-		ClientID string
+		ClientUID uint
 		Name     string
 	}
 	var groups []obsGroup
 	h.db.WithContext(ctx).
 		Table("torrent_snapshots").
-		Select("client_id, name").
+		Select("client_uid, name").
 		Where("name != '' AND last_seen < ?", cutoff).
-		Group("client_id, name").
+		Group("client_uid, name").
 		Having("SUM(CASE WHEN is_hidden = 0 THEN 1 ELSE 0 END) = 0 AND SUM(CASE WHEN is_hidden = 1 THEN 1 ELSE 0 END) > 0").
 		Find(&groups)
 	if len(groups) == 0 {
@@ -166,7 +166,7 @@ func (h *PublishTorrentsHandler) runObservingCleanup(ctx context.Context) {
 	}
 	var totalSnaps, totalMetas int64
 	for _, g := range groups {
-		res := h.purgeObservingResource(ctx, g.ClientID, g.Name)
+		res := h.purgeObservingResource(ctx, g.ClientUID, g.Name)
 		totalSnaps += res.snapRows
 		totalMetas += res.metaRows
 	}
@@ -321,19 +321,19 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 		clientIDStr = fmt.Sprintf("%d", clients[0].ID)
 	}
 
-	clientID, err := strconv.ParseUint(clientIDStr, 10, 64)
+	clientUID, err := strconv.ParseUint(clientIDStr, 10, 64)
 	if err != nil {
 		Error(w, http.StatusBadRequest, 40001, "无效的 client_id")
 		return
 	}
 
 	var cfg model.ClientConfig
-	if err := h.db.First(&cfg, clientID).Error; err != nil {
+	if err := h.db.First(&cfg, clientUID).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "下载器不存在")
 		return
 	}
 
-	client, err := h.clientMgr.Get(cfg.Name)
+	client, err := h.clientMgr.Get(cfg.ID)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("连接下载器失败: %v", err))
 		return
@@ -472,7 +472,7 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 	items = h.dedupTorrentItems(r.Context(), items)
 
 	// 如果有未查询的种子，触发后台批量查询
-	querying := h.bgState.isQuerying(uint(clientID))
+	querying := h.bgState.isQuerying(uint(clientUID))
 	if !querying && h.coverage != nil {
 		unqueried := 0
 		for _, t := range torrents {
@@ -481,7 +481,7 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 			}
 		}
 		if unqueried > 0 {
-			go h.startBackgroundQuery(uint(clientID), cfg, torrents)
+			go h.startBackgroundQuery(uint(clientUID), cfg, torrents)
 			querying = true
 		}
 	}
@@ -500,14 +500,14 @@ func (h *PublishTorrentsHandler) handleListTorrents(w http.ResponseWriter, r *ht
 	})
 }
 
-func (h *PublishTorrentsHandler) startBackgroundQuery(clientID uint, cfg model.ClientConfig, torrents []*model.TorrentInfo) {
-	h.bgState.start(clientID, len(torrents))
-	defer h.bgState.stop(clientID)
+func (h *PublishTorrentsHandler) startBackgroundQuery(clientUID uint, cfg model.ClientConfig, torrents []*model.TorrentInfo) {
+	h.bgState.start(clientUID, len(torrents))
+	defer h.bgState.stop(clientUID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	client, err := h.clientMgr.Get(cfg.Name)
+	client, err := h.clientMgr.Get(cfg.ID)
 	if err != nil {
 		h.logger.Error("bg query: client connect failed", zap.Error(err))
 		return
@@ -613,7 +613,7 @@ func (h *PublishTorrentsHandler) bgTrackerCoverage(ctx context.Context, hashes [
 }
 
 type coverageQueryRequest struct {
-	ClientID  uint   `json:"clientId"`
+	ClientUID uint   `json:"clientUid"`
 	InfoHash  string `json:"infoHash"`
 	Name      string `json:"name"`
 	Size      int64  `json:"size"`
@@ -630,18 +630,18 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 		return
 	}
-	if req.InfoHash == "" || req.ClientID == 0 {
+	if req.InfoHash == "" || req.ClientUID == 0 {
 		Error(w, http.StatusBadRequest, 40001, "info_hash 和 client_id 必填")
 		return
 	}
 
 	var cfg model.ClientConfig
-	if err := h.db.First(&cfg, req.ClientID).Error; err != nil {
+	if err := h.db.First(&cfg, req.ClientUID).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "下载器不存在")
 		return
 	}
 
-	client, err := h.clientMgr.Get(cfg.Name)
+	client, err := h.clientMgr.Get(cfg.ID)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("连接下载器失败: %v", err))
 		return
@@ -726,24 +726,24 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 		return
 	}
 	var req struct {
-		ClientID  uint     `json:"clientId"`
+		ClientUID  uint     `json:"clientId"`
 		InfoHashes []string `json:"infoHashes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
 		return
 	}
-	if req.ClientID == 0 || len(req.InfoHashes) == 0 {
+	if req.ClientUID == 0 || len(req.InfoHashes) == 0 {
 		Error(w, http.StatusBadRequest, 40001, "client_id 和 info_hashes 必填")
 		return
 	}
 
 	var cfg model.ClientConfig
-	if err := h.db.First(&cfg, req.ClientID).Error; err != nil {
+	if err := h.db.First(&cfg, req.ClientUID).Error; err != nil {
 		Error(w, http.StatusNotFound, 40400, "下载器不存在")
 		return
 	}
-	client, err := h.clientMgr.Get(cfg.Name)
+	client, err := h.clientMgr.Get(cfg.ID)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("连接下载器失败: %v", err))
 		return
@@ -845,7 +845,7 @@ func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
 	ttl := now.Add(24 * time.Hour)
 
 	for _, cfg := range clients {
-		client, err := h.clientMgr.Get(cfg.Name)
+		client, err := h.clientMgr.Get(cfg.ID)
 		if err != nil {
 			h.logger.Warn("coverage refresh: client failed", zap.String("name", cfg.Name), zap.Error(err))
 			continue
@@ -915,9 +915,9 @@ func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
 
 func (h *PublishTorrentsHandler) handleQueryStatus(w http.ResponseWriter, r *http.Request) {
 	clientIDStr := r.URL.Query().Get("client_id")
-	clientID, _ := strconv.ParseUint(clientIDStr, 10, 64)
+	clientUID, _ := strconv.ParseUint(clientIDStr, 10, 64)
 
-	querying := h.bgState.isQuerying(uint(clientID))
+	querying := h.bgState.isQuerying(uint(clientUID))
 	_, done, total := h.bgState.getProgress()
 	Success(w, map[string]interface{}{
 		"querying": querying,
@@ -926,24 +926,24 @@ func (h *PublishTorrentsHandler) handleQueryStatus(w http.ResponseWriter, r *htt
 	})
 }
 
-func (s *backgroundQueryState) start(clientID uint, total int) {
+func (s *backgroundQueryState) start(clientUID uint, total int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.active[clientID] = true
+	s.active[clientUID] = true
 	s.total = total
 	s.done = 0
 }
 
-func (s *backgroundQueryState) stop(clientID uint) {
+func (s *backgroundQueryState) stop(clientUID uint) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.active, clientID)
+	delete(s.active, clientUID)
 }
 
-func (s *backgroundQueryState) isQuerying(clientID uint) bool {
+func (s *backgroundQueryState) isQuerying(clientUID uint) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.active[clientID]
+	return s.active[clientUID]
 }
 
 func (s *backgroundQueryState) incDone() {
@@ -1358,7 +1358,7 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 }
 
 type batchPublishRequest struct {
-	ClientID   uint   `json:"clientId"`
+	ClientUID  uint   `json:"clientUid"`
 	SourceSite string `json:"sourceSite"`
 	TargetSite string `json:"targetSite"`
 	Items      []struct {
@@ -1419,12 +1419,9 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 	failed := 0
 
 	// §59.147: 数字下载器 id → 客户端名转换（pusher 按名 Get, 原数字串必失败）
-	var clientName string
-	if req.ClientID > 0 {
-		var cl model.ClientConfig
-		if err := h.db.Select("name").Where("id = ?", req.ClientID).First(&cl).Error; err == nil {
-			clientName = cl.Name
-		}
+	var clientUID uint
+	if req.ClientUID > 0 {
+		clientUID = req.ClientUID
 	}
 
 	for _, item := range req.Items {
@@ -1432,7 +1429,7 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 			SourceSite: req.SourceSite,
 			InfoHash:   item.InfoHash,
 			TorrentName: item.Name,
-			ClientID:   clientName,
+			ClientUID: clientUID,
 			// §59.147: 源资源路径落库——链 A 加种 SavePath 依赖（原丢弃致加种落默认路径不做种）
 			LocalSavePath:     item.SavePath,
 			TargetSites:       string(targetsJSON),
@@ -2159,7 +2156,7 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 	}
 
 	var req struct {
-		ClientID string `json:"clientId"`
+		ClientUID uint `json:"clientId"`
 		Items    []struct {
 			Hash     string `json:"hash"`
 			Name     string `json:"name"`
@@ -2192,12 +2189,12 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 	}
 	h.batchFetch.mu.Unlock()
 
-	go h.runBatchFetch(req.ClientID, req.Items)
+	go h.runBatchFetch(req.ClientUID, req.Items)
 
 	Success(w, map[string]interface{}{"message": "已开始", "total": len(req.Items)})
 }
 
-func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
+func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 	Hash     string `json:"hash"`
 	Name     string `json:"name"`
 	Size     int64  `json:"size"`
@@ -2214,9 +2211,9 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
 	ctx := context.Background()
 	// §59.21: 查下载器 is_local
 	isLocal := false
-	if clientID != "" {
+	if clientUID != 0 {
 		var client model.ClientConfig
-		if err := h.db.WithContext(ctx).Where("name = ?", clientID).First(&client).Error; err == nil {
+		if err := h.db.WithContext(ctx).Where("name = ?", clientUID).First(&client).Error; err == nil {
 			isLocal = client.IsLocal
 		}
 	}
@@ -2238,7 +2235,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
 			continue
 		}
 
-		err := h.fetchSingleTorrent(ctx, clientID, item.Hash, item.Name, item.Size, item.SavePath, isLocal)
+		err := h.fetchSingleTorrent(ctx, clientUID, item.Hash, item.Name, item.Size, item.SavePath, isLocal)
 
 		h.batchFetch.mu.Lock()
 		h.batchFetch.done++
@@ -2256,7 +2253,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientID string, items []struct {
 }
 
 type posterClusterContext struct {
-	clientID string
+	clientUID uint
 	savePath string
 	name     string
 }
@@ -2273,7 +2270,7 @@ func (h *PublishTorrentsHandler) clusterCtxFor(ctx context.Context, hash string)
 	if err := h.db.WithContext(ctx).Where("hash = ? AND is_hidden = 0", hash).First(&snap).Error; err != nil {
 		return posterClusterContext{}, false
 	}
-	c := posterClusterContext{clientID: snap.ClientID, savePath: snap.SavePath, name: snap.Name}
+	c := posterClusterContext{clientUID: snap.ClientUID, savePath: snap.SavePath, name: snap.Name}
 	if h.posterClusterCtx == nil {
 		h.posterClusterCtx = make(map[string]posterClusterContext, 256)
 	}
@@ -2281,7 +2278,7 @@ func (h *PublishTorrentsHandler) clusterCtxFor(ctx context.Context, hash string)
 	return c, true
 }
 
-func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientID, hash, name string, size int64, savePath string, isLocal bool, forcePTGen ...bool) error {
+func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientUID uint, hash, name string, size int64, savePath string, isLocal bool, forcePTGen ...bool) error {
 	// §59.236 ①: forcePTGen 变参——单条重获 true（Force 绕缓存 §59.173）/
 	// 批量 false（普通缓存——流控友好 §59.236 决策点①）
 	force := len(forcePTGen) > 0 && forcePTGen[0]
@@ -2289,7 +2286,7 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientI
 	if h.posterClusterCtx == nil {
 		h.posterClusterCtx = make(map[string]posterClusterContext, 256)
 	}
-	h.posterClusterCtx[hash] = posterClusterContext{clientID: clientID, savePath: savePath, name: name}
+	h.posterClusterCtx[hash] = posterClusterContext{clientUID: clientUID, savePath: savePath, name: name}
 	var coverageSites []model.SiteCoverageCache
 	if h.coverage != nil {
 		cs, err := h.coverage.GetCachedCoverage(ctx, hash)
@@ -2299,7 +2296,7 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientI
 	}
 
 	// §59.61: 簇 comment 直达候选——(client_id, save_path, name) 群聚合（管道 b 快照表）
-	clusterTargets := h.buildClusterTargets(ctx, clientID, savePath, name, hash)
+	clusterTargets := h.buildClusterTargets(ctx, clientUID, savePath, name, hash)
 
 	result := h.sourceDetector.SelectFetchSite(ctx, name, coverageSites, clusterTargets)
 	if result.SourceSite == "" {
@@ -2439,7 +2436,7 @@ fetched:
 	// strategy 不可用（远程/无 savePath）时探活独立异步执行。
 	if meta != nil {
 		if h.shotStrategy != nil && savePath != "" {
-			go h.applyScreenshotStrategy(clientID, meta.InfoHash, meta.SiteName, name, savePath, isLocal)
+			go h.applyScreenshotStrategy(clientUID, meta.InfoHash, meta.SiteName, name, savePath, isLocal)
 		} else if meta.Screenshots != "" && meta.Screenshots != "[]" {
 			go h.purgeDeadScreenshots(meta.InfoHash, meta.SiteName)
 		}
@@ -2461,7 +2458,7 @@ fetched:
 		} else {
 			// §59.171 B: 本地 MI 落库后簇传播——fetch 行复制只给无行兄弟建行
 			// （haveSet 跳过已有行），重获场景副本恒空（PT31 63 副本实锤）
-			propagateClusterMediainfoDB(h.db, h.logger, ctx, clientID, savePath, name, meta.InfoHash, localMI)
+			propagateClusterMediainfoDB(h.db, h.logger, ctx, clientUID, savePath, name, meta.InfoHash, localMI)
 		}
 	}
 
@@ -2586,7 +2583,7 @@ fetched:
 
 	// §59.61 第 4 步 + 附5: 簇终局传播——等海报 fallback 终局后 INSERT 缺行
 	// （携带终态）+ 终态回传（幂等）
-	h.finalizeClusterPropagation(ctx, &posterFallbackWg, clientID, savePath, name, hash, meta.SiteName)
+	h.finalizeClusterPropagation(ctx, &posterFallbackWg, clientUID, savePath, name, hash, meta.SiteName)
 
 	return nil
 }
@@ -2651,7 +2648,7 @@ const observingGracePeriod = 7 * 24 * time.Hour
 // handleListObserving §59.38: 观察期视图——辅种组（client+name）全部变体 hidden 的资源。
 // 行内容：name + 变体数 + 消失时间（max last_seen）+ 清理倒计时 + 下载器/路径。
 // 资源实体语义（用户定案）：辅种 = 同下载器同资源不同站点；跨下载器为独立副本互不影响。
-func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *http.Request, clientID, savePath, search string) {
+func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *http.Request, clientUID uint, savePath, search string) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page == 0 {
 		page = 1
@@ -2666,7 +2663,7 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 
 	// 观察组 = (client, name) 聚合：全变体 hidden（组内无活跃行）且 name 非空
 	type obsRow struct {
-		ClientID string
+		ClientUID uint
 		Name     string
 		Variants int64
 		LastSeen string // MAX() 聚合返回 string（driver 层），解析用
@@ -2675,20 +2672,20 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 	}
 	q := h.db.WithContext(r.Context()).
 		Table("torrent_snapshots").
-		Select(`client_id, name, COUNT(*) AS variants, MAX(last_seen) AS last_seen,
-			(SELECT save_path FROM torrent_snapshots s2 WHERE s2.client_id = torrent_snapshots.client_id AND s2.name = torrent_snapshots.name ORDER BY last_seen DESC LIMIT 1) AS save_path,
+		Select(`client_uid, name, COUNT(*) AS variants, MAX(last_seen) AS last_seen,
+			(SELECT save_path FROM torrent_snapshots s2 WHERE s2.client_uid = torrent_snapshots.client_uid AND s2.name = torrent_snapshots.name ORDER BY last_seen DESC LIMIT 1) AS save_path,
 			MAX(size) AS size`).
 		// §59.38 审计修正: WHERE 不限 hidden——HAVING 活跃检测需全组行进聚合域
 		//（原 is_hidden=1 使 SUM(active) 恒 0，组内仍有活跃行的资源被误列观察期）
 		Where("name != ''").
-		Group("client_id, name").
+		Group("client_uid, name").
 		Having("SUM(CASE WHEN is_hidden = 0 THEN 1 ELSE 0 END) = 0 AND SUM(CASE WHEN is_hidden = 1 THEN 1 ELSE 0 END) > 0")
-	if clientID != "" {
-		q = q.Where("client_id = ?", clientID)
+	if clientUID != 0 {
+		q = q.Where("client_uid = ?", clientUID)
 	}
 	if savePath != "" {
 		// §59.38 审计修正: 按 (client_id, name) 组过滤——原 IN client 放大返回该下载器全部组
-		q = q.Where("client_id || '|' || name IN (SELECT client_id || '|' || name FROM torrent_snapshots WHERE save_path = ?)", savePath)
+		q = q.Where("client_uid || '|' || name IN (SELECT client_uid || '|' || name FROM torrent_snapshots WHERE save_path = ?)", savePath)
 	}
 	if search != "" {
 		q = q.Where("name LIKE ?", "%"+search+"%")
@@ -2715,7 +2712,7 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 			}
 		}
 		items = append(items, map[string]interface{}{
-			"client_id":       row.ClientID,
+			"client_id":       row.ClientUID,
 			"name":            row.Name,
 			"variants":        row.Variants,
 			"last_seen":       row.LastSeen,
@@ -2746,14 +2743,14 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 //   ② metadata 仅当 info_hash 不被任何其他下载器活跃/观察期快照引用才删
 func (h *PublishTorrentsHandler) handlePurgeObserving(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientID string `json:"clientId"`
+		ClientUID uint `json:"clientId"`
 		Name     string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ClientID == "" || req.Name == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ClientUID == 0 || req.Name == "" {
 		Error(w, http.StatusBadRequest, 40001, "clientId 和 name 必填")
 		return
 	}
-	deleted := h.purgeObservingResource(r.Context(), req.ClientID, req.Name)
+	deleted := h.purgeObservingResource(r.Context(), req.ClientUID, req.Name)
 	Success(w, map[string]interface{}{
 		"message":        "已清理",
 		"deleted_snaps":  deleted.snapRows,
@@ -2768,10 +2765,10 @@ type purgeResult struct {
 
 // purgeObservingResource 两级清理（立即清理与定时任务共用）。
 // 安全前置：仅当该组确无活跃行才执行（活跃=误判，拒绝清理）。
-func (h *PublishTorrentsHandler) purgeObservingResource(ctx context.Context, clientID, name string) purgeResult {
+func (h *PublishTorrentsHandler) purgeObservingResource(ctx context.Context, clientUID uint, name string) purgeResult {
 	var active int64
 	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
-		Where("client_id = ? AND name = ? AND is_hidden = ?", clientID, name, false).
+		Where("client_uid = ? AND name = ? AND is_hidden = ?", clientUID, name, false).
 		Count(&active)
 	if active > 0 {
 		return purgeResult{}
@@ -2780,7 +2777,7 @@ func (h *PublishTorrentsHandler) purgeObservingResource(ctx context.Context, cli
 	// ① 该组全部 hash
 	var hashes []string
 	h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
-		Where("client_id = ? AND name = ?", clientID, name).
+		Where("client_uid = ? AND name = ?", clientUID, name).
 		Pluck("hash", &hashes)
 	if len(hashes) == 0 {
 		return purgeResult{}
@@ -2790,7 +2787,7 @@ func (h *PublishTorrentsHandler) purgeObservingResource(ctx context.Context, cli
 	var referenced []string
 	h.db.WithContext(ctx).
 		Table("torrent_snapshots").
-		Where("hash IN ? AND is_hidden = ? AND (client_id != ? OR name != ?)", hashes, false, clientID, name).
+		Where("hash IN ? AND is_hidden = ? AND (client_uid != ? OR name != ?)", hashes, false, clientUID, name).
 		Distinct("hash").
 		Pluck("hash", &referenced)
 	refSet := make(map[string]bool, len(referenced))
@@ -2812,11 +2809,11 @@ func (h *PublishTorrentsHandler) purgeObservingResource(ctx context.Context, cli
 		res.metaRows = d.RowsAffected
 	}
 	// 删该组快照行
-	d := h.db.WithContext(ctx).Where("client_id = ? AND name = ?", clientID, name).
+	d := h.db.WithContext(ctx).Where("client_uid = ? AND name = ?", clientUID, name).
 		Delete(&model.TorrentSnapshot{})
 	res.snapRows = d.RowsAffected
 	h.logger.Info("observing resource purged",
-		zap.String("client", clientID),
+		zap.Uint("client", clientUID),
 		zap.String("name", name[:min(len(name), 50)]),
 		zap.Int64("snaps", res.snapRows),
 		zap.Int64("metas", res.metaRows))
@@ -2825,7 +2822,12 @@ func (h *PublishTorrentsHandler) purgeObservingResource(ctx context.Context, cli
 
 
 func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.Request) {
-	clientID := r.URL.Query().Get("client_id")
+	clientUID := uint(0)
+	if v := r.URL.Query().Get("client_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			clientUID = uint(n)
+		}
+	}
 	savePath := r.URL.Query().Get("save_path")
 	statusFilter := r.URL.Query().Get("status")
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
@@ -2856,18 +2858,18 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		publishedClusters = make(map[string]bool)
 		if len(pubHashes) > 0 {
 			type ckRow struct {
-				ClientID string
+				ClientUID uint
 				SavePath string
 				Name     string
 			}
 			var cks []ckRow
 			h.db.WithContext(r.Context()).
 				Table("torrent_snapshots").
-				Select("DISTINCT client_id, save_path, name").
+				Select("DISTINCT client_uid, save_path, name").
 				Where("hash IN ? AND is_hidden = 0 AND name != ''", pubHashes).
 				Find(&cks)
 			for _, c := range cks {
-				publishedClusters[c.ClientID+"|"+c.SavePath+"|"+c.Name] = true
+				publishedClusters[fmt.Sprintf("%d|%s|%s", c.ClientUID, c.SavePath, c.Name)] = true
 			}
 		}
 	}
@@ -2875,7 +2877,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// §59.38: 观察期视图——独立分支（hidden 组按 (client,name) 聚合，
 	// 不与活跃视图共用查询/状态机）
 	if statusFilter == "observing" {
-		h.handleListObserving(w, r, clientID, savePath, search)
+		h.handleListObserving(w, r, clientUID, savePath, search)
 		return
 	}
 
@@ -2906,10 +2908,10 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		Table("torrent_snapshots").
 		Select("MAX(id) AS id").
 		Where("is_hidden = ?", false).
-		Group("client_id, save_path, CASE WHEN name = '' THEN hash ELSE name END")
-	if clientID != "" {
-		snapQuery = snapQuery.Where("s.client_id = ?", clientID)
-		sub = sub.Where("client_id = ?", clientID)
+		Group("client_uid, save_path, CASE WHEN name = '' THEN hash ELSE name END")
+	if clientUID != 0 {
+		snapQuery = snapQuery.Where("s.client_uid = ?", clientUID)
+		sub = sub.Where("client_uid = ?", clientUID)
 	}
 	if savePath != "" {
 		snapQuery = snapQuery.Where("s.save_path = ?", savePath)
@@ -2953,7 +2955,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// §59.29: 全部视图下 key 为 client+path+name（不同下载器/路径的同名资源是不同实体）
 	snapshots := util.DedupByKey(rawSnapshots, func(s model.TorrentSnapshot) string {
 		if s.Name != "" {
-			return s.ClientID + "|" + s.SavePath + "|" + s.Name
+			return fmt.Sprintf("%d|%s", s.ClientUID, s.SavePath) + "|" + s.Name
 		}
 		return s.Hash
 	})
@@ -2990,8 +2992,8 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			Table("torrent_snapshots").
 			Select("hash, name").
 			Where("is_hidden = ? AND name != ''", false)
-		if clientID != "" {
-			hashQ = hashQ.Where("client_id = ?", clientID)
+		if clientUID != 0 {
+			hashQ = hashQ.Where("client_uid = ?", clientUID)
 		}
 		if savePath != "" {
 			hashQ = hashQ.Where("save_path = ?", savePath)
@@ -3016,7 +3018,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// 按 (client,path,name) 聚合活跃快照行数；不施加 search 过滤（簇成员数与
 	// 搜索无关，search 只决定哪些簇可见）。name='' 行不入此表，副本数退化 1。
 	type clusterCountRow struct {
-		ClientID string
+		ClientUID uint
 		SavePath string
 		Name     string
 		Cnt      int
@@ -3024,20 +3026,19 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	var countRows []clusterCountRow
 	countQ := h.db.WithContext(r.Context()).
 		Table("torrent_snapshots").
-		Select("client_id, save_path, name, COUNT(*) AS cnt").
+		Select("client_uid, save_path, name, COUNT(*) AS cnt").
 		Where("is_hidden = ? AND name != ''", false)
-	if clientID != "" {
-		countQ = countQ.Where("client_id = ?", clientID)
+	if clientUID != 0 {
+		countQ = countQ.Where("client_uid = ?", clientUID)
 	}
 	if savePath != "" {
 		countQ = countQ.Where("save_path = ?", savePath)
 	}
-	countQ.Group("client_id, save_path, name").Find(&countRows)
+	countQ.Group("client_uid, save_path, name").Find(&countRows)
 	copyCountByKey := make(map[string]int, len(countRows))
 	for _, cr := range countRows {
-		copyCountByKey[cr.ClientID+"|"+cr.SavePath+"|"+cr.Name] = cr.Cnt
+		copyCountByKey[fmt.Sprintf("%d|%s|%s", cr.ClientUID, cr.SavePath, cr.Name)] = cr.Cnt
 	}
-	clusterKey := func(c, p, n string) string { return c + "|" + p + "|" + n }
 
 	// 4. 组装结果（§59.29 性能：轻量状态标注全量执行——flags/映射/reviewed 纯内存或
 	// 带缓存查询；compliance（含 per-row DB 查询）延迟到分页后的当前页执行，
@@ -3049,7 +3050,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			"hash":      snap.Hash,
 			"name":      snap.Name,
 			"size":      snap.Size,
-			"client_id": snap.ClientID,
+			"client_id": snap.ClientUID,
 			"save_path": snap.SavePath,
 		}
 
@@ -3112,7 +3113,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		item["status"] = status
 
 		// §59.131 ②: 副本数 + 站点列表（簇内已有站点——发布页"已存在"标注数据源）
-		cc := copyCountByKey[clusterKey(snap.ClientID, snap.SavePath, snap.Name)]
+		cc := copyCountByKey[fmt.Sprintf("%d|%s|%s", snap.ClientUID, snap.SavePath, snap.Name)]
 		if cc == 0 {
 			cc = 1
 		}
@@ -3149,7 +3150,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		// §59.166 一站多种：发布维度过滤（publishable 自含 reviewed——三态筛选
 		// 无独立 ready 选项；published=历史事实回溯）
 		if (publishState == "publishable" || publishState == "published") && publishTargetSite != "" {
-			isPub := publishedClusters[snap.ClientID+"|"+snap.SavePath+"|"+snap.Name]
+			isPub := publishedClusters[fmt.Sprintf("%d|%s|%s", snap.ClientUID, snap.SavePath, snap.Name)]
 			if publishState == "published" && !isPub {
 				continue
 			}
@@ -3313,28 +3314,36 @@ func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, 
 // handleSeedUniquePaths §59.29: 返回有快照的 下载器→路径 树（筛选弹层数据源）。
 func (h *PublishTorrentsHandler) handleSeedUniquePaths(w http.ResponseWriter, r *http.Request) {
 	type pathRow struct {
-		ClientID string
+		ClientUID uint
 		SavePath string
 		Count    int64
 	}
 	var rows []pathRow
 	h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
-		Select("client_id, save_path, COUNT(*) as count").
+		Select("client_uid, save_path, COUNT(*) as count").
 		Where("is_hidden = ?", false).
-		Group("client_id, save_path").
-		Order("client_id, save_path").
+		Group("client_uid, save_path").
+		Order("client_uid, save_path").
 		Find(&rows)
 
+	var allClients []model.ClientConfig
+	h.db.WithContext(r.Context()).Select("id, name").Find(&allClients)
+	clientNames := make(map[uint]string, len(allClients))
+	for _, c := range allClients {
+		clientNames[c.ID] = c.Name
+	}
+
 	clients := make([]map[string]interface{}, 0, len(rows))
-	byClient := map[string]*map[string]interface{}{}
+	byClient := map[uint]*map[string]interface{}{}
 	for _, row := range rows {
-		c, ok := byClient[row.ClientID]
+		c, ok := byClient[row.ClientUID]
 		if !ok {
 			entry := map[string]interface{}{
-				"client_id": row.ClientID,
+				"client_id": row.ClientUID,
+				"name":      clientNames[row.ClientUID],
 				"paths":     make([]map[string]interface{}, 0, 4),
 			}
-			byClient[row.ClientID] = &entry
+			byClient[row.ClientUID] = &entry
 			clients = append(clients, entry)
 			c = &entry
 		}
@@ -3839,10 +3848,15 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 	}
 
 	// §59.21: 返回 is_local（从 client_id 查询）
-	clientID := r.URL.Query().Get("client_id")
-	if clientID != "" {
+	clientUID := uint(0)
+	if v := r.URL.Query().Get("client_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			clientUID = uint(n)
+		}
+	}
+	if clientUID != 0 {
 		var client model.ClientConfig
-		if err := h.db.WithContext(r.Context()).Where("name = ?", clientID).First(&client).Error; err == nil {
+		if err := h.db.WithContext(r.Context()).Where("name = ?", clientUID).First(&client).Error; err == nil {
 			result["is_local"] = client.IsLocal
 		}
 	}
@@ -4091,21 +4105,26 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 		Error(w, http.StatusBadRequest, 40001, "缺少 info_hash")
 		return
 	}
-	clientID := r.URL.Query().Get("client_id")
-	if clientID == "" {
+	clientUID := uint(0)
+	if v := r.URL.Query().Get("client_id"); v != "" {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+			clientUID = uint(n)
+		}
+	}
+	if clientUID == 0 {
 		Error(w, http.StatusBadRequest, 40001, "client_id 为必填")
 		return
 	}
 
 	var snap model.TorrentSnapshot
-	if err := h.db.WithContext(r.Context()).Where("hash = ? AND client_id = ?", infoHash, clientID).First(&snap).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).Where("hash = ? AND client_uid = ?", infoHash, clientUID).First(&snap).Error; err != nil {
 		Error(w, http.StatusNotFound, 40401, "快照中未找到该种子")
 		return
 	}
 
 	isLocal := false
 	var client model.ClientConfig
-	if h.db.WithContext(r.Context()).Where("name = ?", clientID).First(&client).Error == nil {
+	if h.db.WithContext(r.Context()).Where("name = ?", clientUID).First(&client).Error == nil {
 		isLocal = client.IsLocal
 	}
 
@@ -4115,7 +4134,7 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 		return
 	}
 
-	if err := h.fetchSingleTorrent(r.Context(), clientID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal, true); err != nil {
+	if err := h.fetchSingleTorrent(r.Context(), clientUID, infoHash, snap.Name, snap.Size, snap.SavePath, isLocal, true); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("获取失败: %v", err))
 		return
 	}
@@ -4337,7 +4356,7 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		h.refreshInferredTags(ctx, infoHash, siteName)
 		// §59.61 附2: 简介终态同步回传簇（map miss 反查; 幂等可重复）
 		if c, ok := h.clusterCtxFor(ctx, infoHash); ok {
-			h.propagateClusterPosters(ctx, c.clientID, c.savePath, c.name, infoHash)
+			h.propagateClusterPosters(ctx, c.clientUID, c.savePath, c.name, infoHash)
 		}
 	}
 
@@ -4369,7 +4388,7 @@ func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePos
 		})
 	// §59.61 附2: PTGen 终态回传簇（map miss 反查 snapshots——4005 批次实锤修复）
 	if c, ok := h.clusterCtxFor(ctx, infoHash); ok {
-		h.propagateClusterPosters(ctx, c.clientID, c.savePath, c.name, infoHash)
+		h.propagateClusterPosters(ctx, c.clientUID, c.savePath, c.name, infoHash)
 	}
 	h.logger.Info("poster fallback applied",
 		zap.String("hash", infoHash[:10]),
@@ -4451,7 +4470,7 @@ func (h *PublishTorrentsHandler) purgeDeadScreenshots(infoHash, siteName string)
 // 本函数可能读到 purge 前的死链列表，rehost 失败保源后 final==source → same 早退
 // → 永不触发 mpv 补图（243 实测 8 组 ptpimg.me 全死链复现）。探活先行，本函数
 // 读到的必为活链集，再走策略（白名单/转存/差额补足/无图全量）→ 落库。
-func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientID, infoHash, siteName, name, savePath string, isLocal bool) {
+func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHash, siteName, name, savePath string, isLocal bool) {
 	// §59.58: 并发额度闸门——批量链 N 路 fire-and-forget 无界并发挤爆 CPU/代理（243 实测
 	// >20 路时 mpv 摊薄 15 倍 → 撞 4min ctx → 差额补足作废）。排队在闸门外等，不烧 ctx 预算
 	// （ctx 在获得额度后才创建）。CPU 总量守恒：总时长不变，换来每单稳定完成。
@@ -4469,12 +4488,12 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientID, infoHash, sit
 	// mpv/上传全链（Q3 缓存优先：本批源站截图不消费）。锚点=最近一次成功写穿，
 	// 手动捕获结果也刷新锚点（Q4）。过期=miss 走既有策略（Q2=A：源站充足仍转存
 	// 源站，不足才 mpv——与 §59.53 语义一致）。
-	if cached, ok := h.lookupScreenshotCache(clientID, savePath, name); ok {
+	if cached, ok := h.lookupScreenshotCache(clientUID, savePath, name); ok {
 		data, _ := json.Marshal(cached)
 		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 			Where("info_hash = ? AND site_name = ?", infoHash, siteName).
 			Update("screenshots", string(data)).Error; err == nil {
-			h.propagateClusterScreenshots(ctx, clientID, savePath, name, infoHash, string(data))
+			h.propagateClusterScreenshots(ctx, clientUID, savePath, name, infoHash, string(data))
 			h.logger.Info("screenshot cache hit",
 				zap.String("hash", infoHash[:min(10, len(infoHash))]),
 				zap.Int("shots", len(cached)))
@@ -4529,7 +4548,7 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientID, infoHash, sit
 		return
 	}
 	// §59.61 第 4 步: 截图二次传播（策略异步完成后补簇内空行——元数据传播时未就绪）
-	h.propagateClusterScreenshots(ctx, clientID, savePath, name, infoHash, string(data))
+	h.propagateClusterScreenshots(ctx, clientUID, savePath, name, infoHash, string(data))
 	h.logger.Info("screenshot strategy applied",
 		zap.String("hash", infoHash[:10]),
 		zap.Bool("local", isLocal),
@@ -4537,7 +4556,7 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientID, infoHash, sit
 		zap.Int("final", len(final)))
 
 	// §59.63: 成功落库写穿缓存（final 非空才到达此处——same 早退/失败路径不写）
-	upsertClusterScreenshotCache(h.db, h.logger, h.screenshotCacheDays, clientID, savePath, name, final)
+	upsertClusterScreenshotCache(h.db, h.logger, h.screenshotCacheDays, clientUID, savePath, name, final)
 }
 
 // regionLabelsOfMeta §59.151: metadata 行 → PTGen 产地 labels 串（复合判据输入）。
@@ -4561,7 +4580,7 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		DryRun       bool     `json:"dry_run"`
 		PushOnly     bool     `json:"push_only"`
 		TorrentID    string   `json:"torrent_id"`
-		PushClientID string   `json:"push_client_id"`
+		PushClientID uint    `json:"push_client_uid"`
 		PushSavePath string   `json:"push_save_path"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InfoHash == "" || req.TargetSite == "" {

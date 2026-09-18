@@ -21,7 +21,7 @@ func TestMigration19_SnapshotComment(t *testing.T) {
 	}
 	_ = zap.NewNop()
 	// comment 列可写可读
-	row := model.TorrentSnapshot{Hash: "aabb", ClientID: "PT0", Name: "n", SavePath: "/x", Comment: "https://pt.keepfrds.com/details.php?id=1"}
+	row := model.TorrentSnapshot{Hash: "aabb", ClientUID: 1, Name: "n", SavePath: "/x", Comment: "https://pt.keepfrds.com/details.php?id=1"}
 	if err := gormDB.Create(&row).Error; err != nil {
 		t.Fatalf("comment 列缺失或不可写: %v", err)
 	}

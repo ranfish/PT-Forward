@@ -13,7 +13,7 @@
             @change="onClientChange"
           >
             <a-select-option v-for="c in clients" :key="c.client_id" :value="c.client_id">
-              {{ c.client_id }}（{{ c.paths.length }} 路径）
+              {{ c.name || `#${c.client_id}` }}（{{ c.paths.length }} 路径）
             </a-select-option>
           </a-select>
           <a-select
@@ -191,7 +191,7 @@ import { formatBytes } from '@/utils/format'
 
 const targetSites = ref<Array<{ name: string; has_pre_audit: boolean }>>([])
 const selectedTarget = ref<string | undefined>(undefined)
-const clients = ref<Array<{ client_id: string; paths: Array<{ save_path: string; count: number }> }>>([])
+const clients = ref<Array<{ client_id: number; name: string; paths: Array<{ save_path: string; count: number }> }>>([])
 const clientsLoading = ref(false)
 const selectedClient = ref<string | undefined>(undefined)
 const selectedPath = ref<string | undefined>(undefined)
@@ -237,7 +237,7 @@ function onBatchFilterChange() {
 
 // §59.166 预览种子（CrossSeedPanel——一种多站同款；pending 簇经此返回编辑）
 const previewPanelOpen = ref(false)
-const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: string; source_site?: string } | null>(null)
+const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string } | null>(null)
 const previewDirect = ref(false)
 
 function previewSeed(record: SeedListItem) {
@@ -398,7 +398,7 @@ async function fetchInjectList() {
   injectLoading.value = true
   try {
     const resp = await seedConfigApi.listSeeds({
-      client_id: selectedClient.value || '',
+      client_id: selectedClient.value ?? '',
       save_path: selectedPath.value || '',
       // §59.166 三态：publishable/published 走 target_site+publish_state（后端
       // publishable 自含 reviewed）；all 不带

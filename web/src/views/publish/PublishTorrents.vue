@@ -10,7 +10,7 @@
         @change="onFilterChange"
       >
         <a-select-option v-for="c in clients" :key="c.client_id" :value="c.client_id">
-          {{ c.client_id }} ({{ totalPathsOf(c) }})
+          {{ c.name || `#${c.client_id}` }} ({{ totalPathsOf(c) }})
         </a-select-option>
       </a-select>
       <a-select
@@ -259,7 +259,7 @@ import { categoryTagColor } from '@/utils/categoryDisplay'
 
 const router = useRouter()
 
-const clients = ref<Array<{ client_id: string; paths: Array<{ save_path: string; count: number }> }>>([])
+const clients = ref<Array<{ client_id: number; name: string; paths: Array<{ save_path: string; count: number }> }>>([])
 const clientsLoading = ref(false)
 
 const STORAGE_KEY = 'publish_clusters_filters'
@@ -295,7 +295,7 @@ function persistFilters() {
 
 const persisted = loadPersistedFilters()
 
-const selectedClient = ref<string | undefined>(persisted.client)
+const selectedClient = ref<number | undefined>(persisted.client ? Number(persisted.client) : undefined)
 const selectedPath = ref<string | undefined>(persisted.path)
 const readyFilter = ref(persisted.ready || 'all')
 const searchText = ref(persisted.search || '')
@@ -372,7 +372,7 @@ async function fetchList() {
   loading.value = true
   try {
     const resp = await seedConfigApi.listSeeds({
-      client_id: selectedClient.value || '',
+      client_id: selectedClient.value ?? '',
       save_path: selectedPath.value || '',
       // §59.142: radio 值域映射——前端 ready/pending → 后端 true/false（原透传致过滤失效三态同数据）
       ready: readyFilter.value === 'all' ? '' : (readyFilter.value === 'ready' ? 'true' : 'false'),
@@ -410,7 +410,7 @@ function openExecute(record: { hash?: string; name?: string }) {
 
 // §59.141: 预览种子——ready 行直开 CrossSeedPanel 预览（幂等保存+滚动门槛全套）
 const previewPanelOpen = ref(false)
-const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: string; source_site?: string } | null>(null)
+const previewPreset = ref<{ info_hash: string; name: string; size: number; save_path: string; client_id: number; source_site?: string } | null>(null)
 const previewDirect = ref(false)
 
 function previewSeed(record: SeedListItem) {

@@ -2,7 +2,7 @@ import client from './client'
 import type { ApiResponse } from './types'
 
 export interface TrafficHourlyPoint {
-  client_id: string
+  client_uid: number
   hour: string
   uploaded_delta: number
   downloaded_delta: number
@@ -15,8 +15,8 @@ export interface TrafficHourlyPoint {
 }
 
 export const statsApi = {
-  getTrafficHourly(clientId?: string, days = 7) {
-    const params: Record<string, string> = { days: String(days) }
+  getTrafficHourly(clientId?: number, days = 7) {
+    const params: Record<string, string | number> = { days }
     if (clientId) params.client_id = clientId
     return client.get<ApiResponse<TrafficHourlyPoint[]>>('/stats/traffic/hourly', { params })
   },

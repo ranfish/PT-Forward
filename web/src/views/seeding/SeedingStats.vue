@@ -288,7 +288,7 @@ function formatSpeed(bytesPerSec: number) {
 
 async function fetchSpeedTrend() {
   if (!configs.value?.length) return
-  const clientId = configs.value[0]?.client_id as string
+  const clientId = configs.value[0]?.client_uid as number
   if (!clientId) return
   try {
     const resp = await seedingStatsApi.downloaderSpeedTrend(clientId, speedRange.value)

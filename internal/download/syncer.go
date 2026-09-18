@@ -24,7 +24,7 @@ type Syncer struct {
 	fitTimer    *rule.FitTimer
 	runtimeCfg  *setting.RuntimeConfig
 	logger      *zap.Logger
-	schedules   map[string]*clientSchedule
+	schedules   map[uint]*clientSchedule // §59.251: 键=client UID
 }
 
 type clientSchedule struct {
@@ -42,7 +42,7 @@ func NewSyncer(db *gorm.DB, clientMgr *client.Manager, runtimeCfg *setting.Runti
 		fitTimer:   rule.NewFitTimer(),
 		runtimeCfg: runtimeCfg,
 		logger:     logger,
-		schedules:  make(map[string]*clientSchedule),
+		schedules:  make(map[uint]*clientSchedule),
 	}
 }
 
@@ -67,10 +67,10 @@ func (s *Syncer) Run(ctx context.Context) {
 
 func (s *Syncer) runOnce(ctx context.Context) {
 	now := time.Now()
-	clientNames := s.clientMgr.ListClients()
+	clientUIDs := s.clientMgr.ListClients()
 
-	for _, name := range clientNames {
-		c, err := s.clientMgr.Get(name)
+	for _, clientUID := range clientUIDs {
+		c, err := s.clientMgr.Get(clientUID)
 		if err != nil {
 			continue
 		}
@@ -78,14 +78,14 @@ func (s *Syncer) runOnce(ctx context.Context) {
 			continue
 		}
 
-		sched := s.schedules[name]
+		sched := s.schedules[clientUID]
 		if sched == nil {
 			sched = &clientSchedule{}
-			s.schedules[name] = sched
+			s.schedules[clientUID] = sched
 		}
 
 		var cfg model.SeedingClientConfig
-		hasCfg := s.db.WithContext(ctx).Where("client_id = ? AND role = ?", name, "download").First(&cfg).Error == nil
+		hasCfg := s.db.WithContext(ctx).Where("client_uid = ? AND role = ?", clientUID, "download").First(&cfg).Error == nil
 
 		syncInterval := 20 * time.Second
 		evalInterval := 30 * time.Second
@@ -111,7 +111,7 @@ func (s *Syncer) runOnce(ctx context.Context) {
 		}
 
 		if sched.lastTransfer.IsZero() || now.Sub(sched.lastTransfer) >= transferInterval {
-			s.processClientTransfers(ctx, name)
+			s.processClientTransfers(ctx, clientUID)
 			sched.lastTransfer = now
 		}
 	}
@@ -194,9 +194,9 @@ func (s *Syncer) restoreFitTimer(ctx context.Context) {
 }
 
 func (s *Syncer) sync(ctx context.Context) {
-	clientNames := s.clientMgr.ListClients()
-	for _, name := range clientNames {
-		c, err := s.clientMgr.Get(name)
+	clientUIDs := s.clientMgr.ListClients()
+	for _, clientUID := range clientUIDs {
+		c, err := s.clientMgr.Get(clientUID)
 		if err != nil {
 			continue
 		}
@@ -209,48 +209,48 @@ func (s *Syncer) sync(ctx context.Context) {
 }
 
 func (s *Syncer) syncClient(ctx context.Context, c model.DownloaderClient) {
-	clientID := c.GetName()
+	clientUID := c.GetID()
 
 	torrents, err := c.GetAllTorrents(ctx)
 	if err != nil {
 		s.logger.Warn("failed to get torrents from client",
-			zap.String("client", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.Error(err))
 		return
 	}
 
 	// 同步种子快照（含 save_path，用于种子配置页路径选择）
-	s.syncSnapshots(ctx, clientID, torrents)
+	s.syncSnapshots(ctx, clientUID, torrents)
 
 	torrentMap := make(map[string]*model.TorrentInfo, len(torrents))
 	for _, t := range torrents {
 		torrentMap[t.Hash] = t
 	}
 
-	existingHashes, err := s.repo.FindExistingHashes(ctx, clientID)
+	existingHashes, err := s.repo.FindExistingHashes(ctx, clientUID)
 	if err != nil {
 		s.logger.Debug("failed to get existing hashes",
-			zap.String("client", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.Error(err))
 		return
 	}
 
 	for hash, ti := range torrentMap {
 		if existingHashes[hash] {
-			s.updateTaskProgress(ctx, clientID, ti)
+			s.updateTaskProgress(ctx, clientUID, ti)
 		} else {
-			s.importTask(ctx, clientID, ti)
+			s.importTask(ctx, clientUID, ti)
 		}
 	}
 
 	for hash := range existingHashes {
 		if _, ok := torrentMap[hash]; !ok {
-			task, err := s.repo.FindByClientAndHash(ctx, clientID, hash)
+			task, err := s.repo.FindByClientAndHash(ctx, clientUID, hash)
 			if err == nil && task != nil && task.Status != model.DownloadStatusDeleted {
 				s.repo.MarkDeleted(ctx, task.ID, "external")
 				s.logger.Info("task auto-deleted (torrent removed externally)",
 					zap.Uint("id", task.ID),
-					zap.String("client", clientID),
+					zap.Uint("client_uid", clientUID),
 					zap.String("hash", hash))
 			}
 		}
@@ -259,7 +259,7 @@ func (s *Syncer) syncClient(ctx context.Context, c model.DownloaderClient) {
 
 // syncSnapshots 将下载器全量种子同步到 torrent_snapshots 表（含 save_path）。
 // UPSERT by (hash, client_id)，消失的种子标记 is_hidden=true。
-func (s *Syncer) syncSnapshots(ctx context.Context, clientID string, torrents []*model.TorrentInfo) {
+func (s *Syncer) syncSnapshots(ctx context.Context, clientUID uint, torrents []*model.TorrentInfo) {
 	now := time.Now()
 	seenHashes := make(map[string]bool, len(torrents))
 
@@ -273,7 +273,7 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientID string, torrents []
 		// 字符串差异会劈裂三元组资源键，Clean 统一形态
 		records = append(records, model.TorrentSnapshot{
 			Hash:     t.Hash,
-			ClientID: clientID,
+			ClientUID: clientUID,
 			Name:     t.Name,
 			SavePath: filepath.Clean(t.SavePath),
 			Size:     t.TotalSize,
@@ -289,7 +289,7 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientID string, torrents []
 	for i := range records {
 		s.db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "hash"}, {Name: "client_id"},
+				{Name: "hash"}, {Name: "client_uid"},
 			},
 			DoUpdates: clause.AssignmentColumns([]string{
 				"name", "save_path", "size", "state", "progress", "uploaded",
@@ -299,12 +299,12 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientID string, torrents []
 	}
 
 	s.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
-		Where("client_id = ? AND last_seen < ? AND is_hidden = ?", clientID, now, false).
+		Where("client_uid = ? AND last_seen < ? AND is_hidden = ?", clientUID, now, false).
 		Update("is_hidden", true)
 }
 
-func (s *Syncer) updateTaskProgress(ctx context.Context, clientID string, ti *model.TorrentInfo) {
-	task, err := s.repo.FindByClientAndHash(ctx, clientID, ti.Hash)
+func (s *Syncer) updateTaskProgress(ctx context.Context, clientUID uint, ti *model.TorrentInfo) {
+	task, err := s.repo.FindByClientAndHash(ctx, clientUID, ti.Hash)
 	if err != nil || task == nil {
 		return
 	}
@@ -348,19 +348,19 @@ func (s *Syncer) updateTaskProgress(ctx context.Context, clientID string, ti *mo
 		updates["completed_at"] = time.Now()
 		s.logger.Info("download completed",
 			zap.Uint("id", task.ID),
-			zap.String("client", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.String("name", ti.Name))
 	}
 
 	s.repo.UpdateProgress(ctx, task.ID, updates)
 }
 
-func (s *Syncer) importTask(ctx context.Context, clientID string, ti *model.TorrentInfo) {
+func (s *Syncer) importTask(ctx context.Context, clientUID uint, ti *model.TorrentInfo) {
 	// §55.14 阶段4：RSS 推送的种子已由 seedingEngine 管（seeding_torrent_records），
 	// 跳过导入避免双轨（record + download_task 重叠）
 	var recordCount int64
 	s.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-		Where("client_id = ? AND info_hash = ? AND status NOT IN ?", clientID, ti.Hash,
+		Where("client_uid = ? AND info_hash = ? AND status NOT IN ?", clientUID, ti.Hash,
 			[]string{string(model.SeedingStatusDeleted), string(model.SeedingStatusArchived)}).
 		Count(&recordCount)
 	if recordCount > 0 {
@@ -369,7 +369,7 @@ func (s *Syncer) importTask(ctx context.Context, clientID string, ti *model.Torr
 
 	task := &model.DownloadTask{
 		Source:       "import",
-		ClientID:     clientID,
+		ClientUID:    clientUID,
 		InfoHash:     ti.Hash,
 		TorrentName:  ti.Name,
 		SavePath:     ti.SavePath,
@@ -393,7 +393,7 @@ func (s *Syncer) importTask(ctx context.Context, clientID string, ti *model.Torr
 
 	if err := s.repo.Create(ctx, task); err != nil {
 		s.logger.Debug("failed to import task",
-			zap.String("client", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.String("hash", ti.Hash),
 			zap.Error(err))
 		return
@@ -401,17 +401,17 @@ func (s *Syncer) importTask(ctx context.Context, clientID string, ti *model.Torr
 
 	s.logger.Info("task auto-imported",
 		zap.Uint("id", task.ID),
-		zap.String("client", clientID),
+		zap.Uint("client_uid", clientUID),
 		zap.String("name", ti.Name))
 }
 
-func (s *Syncer) processClientTransfers(ctx context.Context, clientName string) {
+func (s *Syncer) processClientTransfers(ctx context.Context, clientUID uint) {
 	var tasks []model.DownloadTask
 	query := s.db.WithContext(ctx).
-		Where("status = ? AND transfer_status != ? AND client_id = ?",
+		Where("status = ? AND transfer_status != ? AND client_uid = ?",
 			model.DownloadStatusCompleted,
 			model.TransferStatusTransferred,
-			clientName)
+			clientUID)
 
 	if cooldown := s.runtimeCfg.GetInt(ctx, setting.KeyTransferCooldownSeconds); cooldown > 0 {
 		cutoff := time.Now().Add(-time.Duration(cooldown) * time.Second).UTC().Format("2006-01-02 15:04:05")
@@ -426,7 +426,7 @@ func (s *Syncer) processClientTransfers(ctx context.Context, clientName string) 
 
 	// §55.16 修复 §55.14 副作用：role≠seeding 的 RSS 种子走 seeding record（不进 download_task），
 	// 补一条 record 转移源，让下载器级 transferTargetId 对这类种子也生效
-	s.processRecordTransfers(ctx, clientName)
+	s.processRecordTransfers(ctx, clientUID)
 }
 
 // processRecordTransfers 处理 role≠seeding 的 seeding record 的下载器级转移（§55.16 修复 §55.14 副作用）。
@@ -435,29 +435,29 @@ func (s *Syncer) processClientTransfers(ctx context.Context, clientName string) 
 // 此函数补这条链路：对 role≠seeding AND auto_transfer=false（订阅没配转移，由下载器级兜底）
 // AND 下载器配了 transferTargetId 的 record，完成后转移到 transferTargetId。
 // auto_transfer=true 的由订阅级 transferRecord 处理（§55.11 协调，互斥不重复）。
-func (s *Syncer) processRecordTransfers(ctx context.Context, clientName string) {
-	sourceClient, err := s.clientMgr.Get(clientName)
+func (s *Syncer) processRecordTransfers(ctx context.Context, clientUID uint) {
+	sourceClient, err := s.clientMgr.Get(clientUID)
 	if err != nil || sourceClient == nil {
 		return
 	}
 	if sourceClient.GetRole() == "seeding" {
 		return // 下载器级转移是 /downloads 体系职责，不碰刷流
 	}
-	targetID := sourceClient.GetTransferTargetID()
-	if targetID == "" {
+	targetUID := sourceClient.GetTransferTargetUID()
+	if targetUID == 0 {
 		return // 下载器没配转移目标
 	}
-	targetClient, err := s.clientMgr.Get(targetID)
+	targetClient, err := s.clientMgr.Get(targetUID)
 	if err != nil || targetClient == nil {
 		s.logger.Warn("record transfer: target client unavailable",
-			zap.String("source", clientName), zap.String("target", targetID), zap.Error(err))
+			zap.Uint("source", clientUID), zap.Uint("target", targetUID), zap.Error(err))
 		return
 	}
 
 	var records []model.SeedingTorrentRecord
 	s.db.WithContext(ctx).
-		Where("client_id = ? AND role != ? AND status = ? AND auto_transfer = ?",
-			clientName, "seeding", model.SeedingStatusSeeding, false).
+		Where("client_uid = ? AND role != ? AND status = ? AND auto_transfer = ?",
+			clientUID, "seeding", model.SeedingStatusSeeding, false).
 		Find(&records)
 
 	for i := range records {
@@ -481,7 +481,7 @@ func (s *Syncer) processRecordTransfers(ctx context.Context, clientName string) 
 		result, transferErr := client.TransferTorrent(ctx, sourceClient, targetClient, rec.InfoHash)
 		if transferErr != nil {
 			s.logger.Warn("record transfer: failed",
-				zap.String("source", clientName), zap.String("target", targetID),
+				zap.Uint("source", clientUID), zap.Uint("target", targetUID),
 				zap.String("hash", rec.InfoHash), zap.Error(transferErr))
 			s.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
 				Where("id = ?", rec.ID).Update("status", model.SeedingStatusSeeding)
@@ -497,7 +497,7 @@ func (s *Syncer) processRecordTransfers(ctx context.Context, clientName string) 
 			Where("id = ?", rec.ID).Update("status", model.SeedingStatusDeleted)
 
 		s.logger.Info("record transfer: completed",
-			zap.String("source", clientName), zap.String("target", targetID),
+			zap.Uint("source", clientUID), zap.Uint("target", targetUID),
 			zap.String("hash", rec.InfoHash),
 			zap.Bool("duplicate", result.IsDuplicate))
 	}
@@ -507,8 +507,8 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 	// §55.11 协调：订阅级转移优先。若该种子被 seeding record 标记 AutoTransfer，由 transferRecord 处理，syncer 跳过。
 	var seedingManaged int64
 	s.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-		Where("client_id = ? AND info_hash = ? AND auto_transfer = ? AND status IN ?",
-			task.ClientID, task.InfoHash, true,
+		Where("client_uid = ? AND info_hash = ? AND auto_transfer = ? AND status IN ?",
+			task.ClientUID, task.InfoHash, true,
 			[]string{string(model.SeedingStatusSeeding), string(model.SeedingStatusTransferring)}).
 		Count(&seedingManaged)
 	if seedingManaged > 0 {
@@ -517,68 +517,68 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 		return
 	}
 
-	sourceClient, err := s.clientMgr.Get(task.ClientID)
+	sourceClient, err := s.clientMgr.Get(task.ClientUID)
 	if err != nil {
 		s.logger.Warn("transfer: source client unavailable",
-			zap.Uint("id", task.ID), zap.String("client", task.ClientID), zap.Error(err))
+			zap.Uint("id", task.ID), zap.Uint("client_uid", task.ClientUID), zap.Error(err))
 		return
 	}
 
-	targetID := sourceClient.GetTransferTargetID()
-	if targetID == "" {
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, "", "")
+	targetUID := sourceClient.GetTransferTargetUID()
+	if targetUID == 0 {
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, 0, "")
 		return
 	}
 
-	targetClient, err := s.clientMgr.Get(targetID)
+	targetClient, err := s.clientMgr.Get(targetUID)
 	if err != nil {
 		s.logger.Warn("transfer: target client unavailable",
-			zap.Uint("id", task.ID), zap.String("target", targetID), zap.Error(err))
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetID, "")
+			zap.Uint("id", task.ID), zap.Uint("target", targetUID), zap.Error(err))
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetUID, "")
 		return
 	}
 
 	if task.TransferStatus != model.TransferStatusPartial {
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetID, "")
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetUID, "")
 
 		result, err := client.TransferTorrent(ctx, sourceClient, targetClient, task.InfoHash)
 		if err != nil {
 			s.logger.Error("transfer: failed",
-				zap.Uint("id", task.ID), zap.String("target", targetID), zap.Error(err))
-			s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetID, "")
+				zap.Uint("id", task.ID), zap.Uint("target", targetUID), zap.Error(err))
+			s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetUID, "")
 			return
 		}
 
 		if result.IsDuplicate {
 			s.logger.Info("transfer: target already has torrent (skip add)",
 				zap.Uint("id", task.ID),
-				zap.String("target", targetID),
+				zap.Uint("target", targetUID),
 				zap.String("hash", result.InfoHash))
 		} else {
 			s.logger.Info("transfer: added to target",
 				zap.Uint("id", task.ID),
-				zap.String("target", targetID),
+				zap.Uint("target", targetUID),
 				zap.String("new_hash", result.InfoHash))
 		}
 
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetID, result.InfoHash)
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetUID, result.InfoHash)
 		task.TransferHash = result.InfoHash
 	}
 
 	if err := sourceClient.DeleteTorrent(ctx, task.InfoHash, false); err != nil {
 		s.logger.Warn("transfer: delete from source failed (partial)",
 			zap.Uint("id", task.ID), zap.Error(err))
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusPartial, targetID, task.TransferHash)
+		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusPartial, targetUID, task.TransferHash)
 		return
 	}
 
-	s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, targetID, task.TransferHash)
-	s.repo.UpdateClientAndHash(ctx, task.ID, targetID, task.TransferHash)
+	s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, targetUID, task.TransferHash)
+	s.repo.UpdateClientAndHash(ctx, task.ID, targetUID, task.TransferHash)
 
 	s.logger.Info("transfer: completed",
 		zap.Uint("id", task.ID),
-		zap.String("source", task.ClientID),
-		zap.String("target", targetID))
+		zap.Uint("source_uid", task.ClientUID),
+		zap.Uint("target", targetUID))
 }
 
 func (s *Syncer) evaluateClientRules(ctx context.Context, c model.DownloaderClient, cfg *model.SeedingClientConfig) {
@@ -607,7 +607,7 @@ func (s *Syncer) evaluateClientRules(ctx context.Context, c model.DownloaderClie
 
 	var contexts []*rule.Context
 	for _, ti := range torrents {
-		contexts = append(contexts, rule.ContextFromTorrentInfo(ti, "", name, now))
+		contexts = append(contexts, rule.ContextFromTorrentInfo(ti, "", 0, now))
 	}
 
 	activeHashes := make(map[string]bool)
@@ -642,7 +642,7 @@ func (s *Syncer) evaluateClientRules(ctx context.Context, c model.DownloaderClie
 				s.fitTimer.MarkMatched(r.ID, hash, now)
 				nowCopy := now
 				s.db.WithContext(ctx).Model(&model.DownloadTask{}).
-					Where("client_id = ? AND info_hash = ?", name, hash).
+					Where("client_uid = ? AND info_hash = ?", name, hash).
 					Update("first_matched_at", &nowCopy)
 				continue
 			}
@@ -672,7 +672,7 @@ func (s *Syncer) evaluateClientRules(ctx context.Context, c model.DownloaderClie
 				action = model.DeleteActionSiteOnly
 			}
 			s.db.WithContext(ctx).Model(&model.DownloadTask{}).
-				Where("client_id = ? AND info_hash = ?", name, hash).
+				Where("client_uid = ? AND info_hash = ?", name, hash).
 				Updates(map[string]interface{}{
 					"status":           model.DownloadStatusDeleted,
 					"deleted_at":       &now,
@@ -686,7 +686,7 @@ func (s *Syncer) evaluateClientRules(ctx context.Context, c model.DownloaderClie
 	for hash := range activeHashes {
 		if _, matched := matchedSet[hash]; !matched {
 			s.db.WithContext(ctx).Model(&model.DownloadTask{}).
-				Where("client_id = ? AND info_hash = ?", name, hash).
+				Where("client_uid = ? AND info_hash = ?", name, hash).
 				Update("first_matched_at", nil)
 		}
 	}

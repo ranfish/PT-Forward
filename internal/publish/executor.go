@@ -51,7 +51,7 @@ type ExecuteInput struct {
 	BatchGroupID string
 	// PushClientID/PushSavePath 补推直给（记录回放——发布记录落库值；缺省回落
 	// ResolveResource 资源定位）
-	PushClientID string
+	PushClientID uint
 	PushSavePath string
 }
 
@@ -144,12 +144,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		if e.pipe.pusher == nil {
 			return failRec("failed", "pusher 未注入")
 		}
-		clientID, savePath := in.PushClientID, in.PushSavePath
-		if clientID == "" || savePath == "" {
-			clientID, savePath = rv.ClientID, rv.SavePath // 回落资源定位
+		clientUID, savePath := in.PushClientID, in.PushSavePath
+		if clientUID == 0 || savePath == "" {
+			clientUID, savePath = rv.ClientUID, rv.SavePath // 回落资源定位
 		}
 		pushReq := &pusher.PushRequest{
-			ClientID:  clientID,
+			ClientUID: clientUID,
 			SiteName:  in.TargetSite,
 			TorrentID: in.TorrentID, // pusher 内部 download.php?id=N 直下
 			InfoHash:  in.InfoHash,
@@ -207,9 +207,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if e.pipe.clientProvider == nil {
 		return failRec("failed", "clientProvider 未注入")
 	}
-	client, err := e.pipe.clientProvider.Get(rv.ClientID)
+	client, err := e.pipe.clientProvider.Get(rv.ClientUID)
 	if err != nil {
-		return failRec("failed", fmt.Sprintf("获取下载器 %s 失败: %v", rv.ClientID, err))
+		return failRec("failed", fmt.Sprintf("获取下载器 %d 失败: %v", rv.ClientUID, err))
 	}
 	torrentData, err := client.ExportTorrent(ctx, in.InfoHash)
 	if err != nil || len(torrentData) == 0 {
@@ -219,7 +219,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// 站方静默回表单页，错误不可见）
 	if torrentData[0] != 'd' && torrentData[0] != 'l' && torrentData[0] != 'i' {
 		e.logger.Warn("exported torrent data is not bencode",
-			zap.String("client", rv.ClientID), zap.Int("len", len(torrentData)),
+			zap.Uint("client", rv.ClientUID), zap.Int("len", len(torrentData)),
 			zap.Uint8("first_byte", torrentData[0]))
 		return failRec("failed", fmt.Sprintf("导出数据非 bencode 种子（首字节 %q）——路径/内容异常", torrentData[0]))
 	}
@@ -375,7 +375,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		SourceSite:  meta.SiteName,
 		SourceInfoHash: in.InfoHash,
 		TargetSite:  in.TargetSite,
-		ClientID:    rv.ClientID,
+		ClientUID: rv.ClientUID,
 	}
 	// tags 写入表单（checkbox 数组=同名字段重复——§59.156 TagArrayFields 通道）
 	applier.Apply(tags, func(field, value string) {
@@ -467,7 +467,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	if e.pipe.pusher != nil {
 		pushReq := &pusher.PushRequest{
-			ClientID:  rv.ClientID,
+			ClientUID: rv.ClientUID,
 			SiteName:  in.TargetSite,
 			TorrentID: resp.TorrentID,
 			InfoHash:  in.InfoHash, // §59.159: 源种 infohash——已存在辅种快路径
@@ -550,7 +550,7 @@ func (e *PublishExecutor) recordResultFullWithLogs(ctx context.Context, in Execu
 		Trigger:        "manual",
 		BatchGroupID:   in.BatchGroupID,
 		Title:          meta.Title,
-		DownloaderID:   rv.ClientID,
+		DownloaderID:   rv.ClientUID,
 		Seeded:         seeded,
 		SeedError:      seedErr,
 		SeededAt:       func() *time.Time { if seeded { return &now }; return nil }(),
@@ -582,7 +582,7 @@ func (e *PublishExecutor) recordResultFull(ctx context.Context, in ExecuteInput,
 		Trigger:        "manual",
 		BatchGroupID:   in.BatchGroupID,
 		Title:          meta.Title,
-		DownloaderID:   rv.ClientID,
+		DownloaderID:   rv.ClientUID,
 		Seeded:         seeded,
 		SeedError:      seedErr,
 		SeededAt:       func() *time.Time { if seeded { return &now }; return nil }(),

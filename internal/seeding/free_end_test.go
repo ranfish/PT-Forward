@@ -30,12 +30,12 @@ func TestFreeEndMonitor_Schedule_PausedWhenDownloading(t *testing.T) {
 		},
 	}
 	engine.freeEndMonitor.client = &mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"test-client": dlClient},
+		clients: map[uint]*mockDownloaderClient{1: dlClient},
 	}
 
 	freeEnd := time.Now().Add(-10 * time.Second)
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "test-client",
+		ClientUID:  1,
 		InfoHash:  "abc123",
 		SiteName:  "test-site",
 		TorrentID: "12345",
@@ -64,12 +64,12 @@ func TestFreeEndMonitor_Schedule_KeepsSeedingWhenComplete(t *testing.T) {
 		},
 	}
 	engine.freeEndMonitor.client = &mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"test-client": dlClient},
+		clients: map[uint]*mockDownloaderClient{1: dlClient},
 	}
 
 	freeEnd := time.Now().Add(-10 * time.Second)
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "test-client",
+		ClientUID:  1,
 		InfoHash:  "abc123",
 		SiteName:  "test-site",
 		TorrentID: "12345",
@@ -98,7 +98,7 @@ func TestFreeEndMonitor_Cancel(t *testing.T) {
 
 	freeEnd := time.Now().Add(10 * time.Second)
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "test-client",
+		ClientUID:  2,
 		InfoHash:  "abc123",
 		SiteName:  "test-site",
 		TorrentID: "12345",
@@ -113,7 +113,7 @@ func TestFreeEndMonitor_Cancel(t *testing.T) {
 		t.Fatalf("expected 1 timer")
 	}
 
-	mon.Cancel("test-client", "abc123")
+	mon.Cancel(2, "abc123")
 	if mon.ActiveTimerCount() != 0 {
 		t.Errorf("expected 0 timers after cancel, got %d", mon.ActiveTimerCount())
 	}
@@ -124,7 +124,7 @@ func TestFreeEndMonitor_SkipNonFree(t *testing.T) {
 	mon := NewFreeEndMonitor(db, nil, zap.NewNop())
 
 	record := &model.SeedingTorrentRecord{
-		ClientID: "test-client",
+		ClientUID: 2,
 		InfoHash: "abc123",
 		IsFree:   false,
 		Status:   model.SeedingStatusSeeding,
@@ -141,7 +141,7 @@ func TestFreeEndMonitor_SkipNoFreeEndAt(t *testing.T) {
 	mon := NewFreeEndMonitor(db, nil, zap.NewNop())
 
 	record := &model.SeedingTorrentRecord{
-		ClientID: "test-client",
+		ClientUID: 2,
 		InfoHash: "abc123",
 		IsFree:   true,
 		Status:   model.SeedingStatusSeeding,
@@ -160,7 +160,7 @@ func TestFreeEndMonitor_StopAll(t *testing.T) {
 	freeEnd := time.Now().Add(1 * time.Hour)
 	for i := 0; i < 3; i++ {
 		record := &model.SeedingTorrentRecord{
-			ClientID:  "test-client",
+			ClientUID:  2,
 			InfoHash:  string(rune('a' + i)),
 			IsFree:    true,
 			FreeEndAt: &freeEnd,
@@ -191,7 +191,7 @@ func TestFreeEndMonitor_RecoverOnStartup_Downloading(t *testing.T) {
 	future := time.Now().Add(1 * time.Hour)
 
 	expired := &model.SeedingTorrentRecord{
-		ClientID:  "client1",
+		ClientUID:  1,
 		InfoHash:  "expired",
 		IsFree:    true,
 		FreeEndAt: &past,
@@ -200,7 +200,7 @@ func TestFreeEndMonitor_RecoverOnStartup_Downloading(t *testing.T) {
 	db.Create(expired)
 
 	upcoming := &model.SeedingTorrentRecord{
-		ClientID:  "client1",
+		ClientUID:  1,
 		InfoHash:  "upcoming",
 		IsFree:    true,
 		FreeEndAt: &future,
@@ -210,7 +210,7 @@ func TestFreeEndMonitor_RecoverOnStartup_Downloading(t *testing.T) {
 
 	engine := NewEngine(db, zap.NewNop())
 	engine.freeEndMonitor.client = &mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"client1": dlClient},
+		clients: map[uint]*mockDownloaderClient{1: dlClient},
 	}
 	mon := engine.freeEndMonitor
 
@@ -238,7 +238,7 @@ func TestFreeEndMonitor_RecoverOnStartup_Completed(t *testing.T) {
 	past := time.Now().Add(-1 * time.Hour)
 
 	expired := &model.SeedingTorrentRecord{
-		ClientID:  "client1",
+		ClientUID:  1,
 		InfoHash:  "expired",
 		IsFree:    true,
 		FreeEndAt: &past,
@@ -248,7 +248,7 @@ func TestFreeEndMonitor_RecoverOnStartup_Completed(t *testing.T) {
 
 	engine := NewEngine(db, zap.NewNop())
 	engine.freeEndMonitor.client = &mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"client1": dlClient},
+		clients: map[uint]*mockDownloaderClient{1: dlClient},
 	}
 	mon := engine.freeEndMonitor
 
@@ -272,7 +272,7 @@ func TestFreeEndMonitor_AlreadyPaused(t *testing.T) {
 
 	past := time.Now().Add(-1 * time.Hour)
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "client1",
+		ClientUID:  3,
 		InfoHash:  "already_paused",
 		IsFree:    true,
 		FreeEndAt: &past,
@@ -296,7 +296,7 @@ func TestFreeEndMonitor_NoDownloader_PausedAsDefault(t *testing.T) {
 
 	freeEnd := time.Now().Add(-10 * time.Second)
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "test-client",
+		ClientUID:  2,
 		InfoHash:  "abc123",
 		SiteName:  "test-site",
 		TorrentID: "12345",

@@ -133,7 +133,7 @@ func (e *Engine) siteHRStrategy(ctx context.Context, siteName string) string {
 }
 
 func (e *Engine) checkDiskGuard(ctx context.Context, sub *model.RSSSubscription) error {
-	if !sub.DiskGuardEnabled || sub.ClientID == "" {
+	if !sub.DiskGuardEnabled || sub.ClientUID == 0 {
 		return nil
 	}
 
@@ -146,7 +146,7 @@ func (e *Engine) checkDiskGuard(ctx context.Context, sub *model.RSSSubscription)
 		return rssError(ErrRSSDisk, "磁盘守卫：下载器提供者未注入，拒绝放行（fail-closed）", nil)
 	}
 
-	dlClient, err := e.clientProvider.Get(sub.ClientID)
+	dlClient, err := e.clientProvider.Get(sub.ClientUID)
 	if err != nil {
 		return rssError(ErrRSSDisk, "磁盘守卫：获取下载器失败", err)
 	}
@@ -168,7 +168,7 @@ func (e *Engine) checkDiskBudget(ctx context.Context, sub *model.RSSSubscription
 		return rssError(ErrRSSDisk, "磁盘预算检查：下载器提供者未注入，拒绝放行（fail-closed）", nil)
 	}
 
-	dlClient, err := e.clientProvider.Get(sub.ClientID)
+	dlClient, err := e.clientProvider.Get(sub.ClientUID)
 	if err != nil {
 		return rssError(ErrRSSDisk, "磁盘预算检查：获取下载器失败", err)
 	}
@@ -181,13 +181,13 @@ func (e *Engine) checkDiskBudget(ctx context.Context, sub *model.RSSSubscription
 	freeSpace := md.FreeSpace
 	minGB := sub.DiskBudgetMinGB
 	minBytes := int64(minGB * 1024 * 1024 * 1024)
-	effectiveFree := freeSpace - minBytes - e.diskBudget.ReservedBytes(sub.ClientID)
+	effectiveFree := freeSpace - minBytes - e.diskBudget.ReservedBytes(sub.ClientUID)
 
 	if effectiveFree < size {
 		return rssError(ErrRSSDisk, fmt.Sprintf("磁盘预算不足: 可用 %d 字节, 需要 %d 字节 (保留 %.1fGB)", effectiveFree, size, minGB), nil)
 	}
 
-	ticket, err := e.diskBudget.Reserve(sub.ClientID, size, effectiveFree, 10*time.Minute)
+	ticket, err := e.diskBudget.Reserve(sub.ClientUID, size, effectiveFree, 10*time.Minute)
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ const blockedRetryMaxAge = 7 * 24 * time.Hour
 // 不能确认免费就不推——"只接受免费种子"订阅条件不因重推放宽）。
 // 抗风暴保持：IsSeen 存在性判定不变——feed 通道一次性，重试由本通道独占。
 func (e *Engine) retryBlocked(ctx context.Context, sub *model.RSSSubscription, events []*model.RSSTorrentEvent) {
-	if sub.ClientID == "" || e.eventBus == nil {
+	if sub.ClientUID == 0 || e.eventBus == nil {
 		return
 	}
 	rows, err := e.repo.ListBlocked(ctx, uintToString(sub.ID))
@@ -276,7 +276,7 @@ func (e *Engine) retryBlocked(ctx context.Context, sub *model.RSSSubscription, e
 	}
 	// 引擎侧磁盘预检（空间仍紧张则本轮跳过，避免空转 republish；consumer 守卫仍二次校验）
 	if e.clientProvider != nil {
-		if dl, derr := e.clientProvider.Get(sub.ClientID); derr == nil && dl != nil {
+		if dl, derr := e.clientProvider.Get(sub.ClientUID); derr == nil && dl != nil {
 			if md, merr := dl.GetMainData(ctx); merr == nil && md != nil && md.FreeSpace < 10*1024*1024*1024 {
 				return
 			}
@@ -334,7 +334,7 @@ func (e *Engine) retryBlocked(ctx context.Context, sub *model.RSSSubscription, e
 			discount = model.DiscountFree
 		}
 		e.eventBus.Publish(&pusher.PushedEvent{
-			ClientID:       sub.ClientID,
+			ClientUID:      sub.ClientUID,
 			SiteName:       ev.SiteName,
 			TorrentID:      ev.TorrentID,
 			InfoHash:       ev.InfoHash,
@@ -346,7 +346,7 @@ func (e *Engine) retryBlocked(ctx context.Context, sub *model.RSSSubscription, e
 			FreeEndAt:      ev.FreeEndAt,
 			SubscriptionID: subID,
 			AutoTransfer:   sub.AutoTransfer,
-			TransferClientIDs: sub.TransferClientIDs,
+			TransferClientUIDs: sub.TransferClientUIDs,
 			PushedAt:       time.Now(),
 			Seeders:        ev.Seeders,
 			Leechers:       ev.Leechers,
@@ -763,7 +763,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				continue
 			}
 
-			if sub.DiskGuardEnabled && sub.ClientID != "" && e.clientProvider != nil {
+			if sub.DiskGuardEnabled && sub.ClientUID != 0 && e.clientProvider != nil {
 				if err := e.checkDiskGuard(ctx, sub); err != nil {
 					e.logger.Warn("torrent skipped by disk guard",
 						zap.String("torrent", event.TorrentID),
@@ -774,7 +774,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				}
 			}
 
-			if sub.DiskBudgetEnabled && sub.ClientID != "" && e.clientProvider != nil {
+			if sub.DiskBudgetEnabled && sub.ClientUID != 0 && e.clientProvider != nil {
 				if err := e.checkDiskBudget(ctx, sub, event.Size); err != nil {
 					e.logger.Warn("torrent skipped by disk budget",
 						zap.String("torrent", event.TorrentID),
@@ -1026,13 +1026,13 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 				zap.String("matchedRule", derefStr(event.MatchedRule)))
 		}
 
-		if sub.Enabled && sub.ClientID != "" {
+		if sub.Enabled && sub.ClientUID != 0 {
 			for i := range torrentEvents {
 				ev := &torrentEvents[i]
 				isFree := ev.Discount == model.DiscountFree || ev.Discount == model.Discount2xFree || ev.Discount == model.DiscountAssumeFree
 				if e.eventBus != nil {
 					e.eventBus.Publish(&pusher.PushedEvent{
-						ClientID:        sub.ClientID,
+						ClientUID:        sub.ClientUID,
 						SiteName:        ev.SiteName,
 						TorrentID:       ev.TorrentID,
 						InfoHash:        ev.InfoHash,
@@ -1044,7 +1044,7 @@ func (e *Engine) fetchOnce(ctx context.Context, sub *model.RSSSubscription) {
 						FreeEndAt:       ev.FreeEndAt,
 					SubscriptionID:  uintToString(sub.ID),
 					AutoTransfer:    sub.AutoTransfer,
-					TransferClientIDs: sub.TransferClientIDs,
+					TransferClientUIDs: sub.TransferClientUIDs,
 					PushedAt:        time.Now(),
 					Seeders:         ev.Seeders,
 					Leechers:        ev.Leechers,

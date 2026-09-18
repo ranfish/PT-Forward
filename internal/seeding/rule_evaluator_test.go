@@ -32,7 +32,7 @@ func TestRuleEvaluator_EvaluateRules_NoRules(t *testing.T) {
 	db := setupRuleEvalTestDB(t)
 	re := NewRuleEvaluator(db, zap.NewNop())
 
-	matches, err := re.EvaluateRulesSimple(context.Background(), "c1")
+	matches, err := re.EvaluateRulesSimple(context.Background(), 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestRuleEvaluator_EvaluateRules_NoRecords(t *testing.T) {
 	})
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRulesSimple(ctx, "c1")
+	matches, err := re.EvaluateRulesSimple(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestRuleEvaluator_EvaluateRules_DeleteNum(t *testing.T) {
 	})
 	for i := 0; i < 3; i++ {
 		db.Create(&model.SeedingTorrentRecord{
-			ClientID:  "c1",
+			ClientUID:  1,
 			InfoHash:  fmt.Sprintf("h%d", i),
 			SiteName:  "site1",
 			TorrentID: fmt.Sprintf("%d", i),
@@ -87,7 +87,7 @@ func TestRuleEvaluator_EvaluateRules_DeleteNum(t *testing.T) {
 	}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRulesSimple(ctx, "c1")
+	matches, err := re.EvaluateRulesSimple(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestRuleEvaluator_EvaluateRules_PriorityOrder(t *testing.T) {
 		DeleteNum:  0,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "h1",
 		SiteName:  "site1",
 		TorrentID: "1",
@@ -126,7 +126,7 @@ func TestRuleEvaluator_EvaluateRules_PriorityOrder(t *testing.T) {
 	})
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRulesSimple(ctx, "c1")
+	matches, err := re.EvaluateRulesSimple(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestRuleEvaluator_EvaluateRules_EmptyConditions(t *testing.T) {
 		DeleteNum: 0,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "h1",
 		SiteName:  "site1",
 		TorrentID: "1",
@@ -157,7 +157,7 @@ func TestRuleEvaluator_EvaluateRules_EmptyConditions(t *testing.T) {
 	})
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRulesSimple(ctx, "c1")
+	matches, err := re.EvaluateRulesSimple(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestEvalCondition_NumericOperators(t *testing.T) {
 		NumComplete: 42,
 	}
 	rec := model.SeedingTorrentRecord{
-		ClientID:    "c1",
+		ClientUID:    1,
 		InfoHash:    "abc",
 		SiteName:    "site1",
 		TorrentID:   "1",
@@ -416,7 +416,7 @@ func TestExprEngine_RatioAndTime(t *testing.T) {
 	})
 
 	rec := model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1",
 		Status: model.SeedingStatusSeeding, Discount: model.DiscountNone,
 	}
 	rec.CreatedAt = time.Now().Add(-8 * 24 * time.Hour)
@@ -429,7 +429,7 @@ func TestExprEngine_RatioAndTime(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
+	matches, err := re.EvaluateRules(ctx, 1, torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +451,7 @@ func TestExprEngine_FreeSpaceCheck(t *testing.T) {
 	})
 
 	rec := model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1",
 		Status: model.SeedingStatusSeeding, Discount: model.DiscountNone,
 	}
 	db.Create(&rec)
@@ -462,7 +462,7 @@ func TestExprEngine_FreeSpaceCheck(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, 10*1024*1024*1024, 0)
+	matches, err := re.EvaluateRules(ctx, 1, torrentMap, 10*1024*1024*1024, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -482,7 +482,7 @@ func TestExprEngine_SiteAndFreeAndHR(t *testing.T) {
 
 	freeEnd := time.Now().Add(1 * time.Hour)
 	rec := model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "mteam",
+		ClientUID: 1, InfoHash: "h1", SiteName: "mteam",
 		Status: model.SeedingStatusSeeding, Discount: model.DiscountFree,
 		IsFree: true, HasHR: true, HRSeedTimeH: 72, FreeEndAt: &freeEnd,
 	}
@@ -492,7 +492,7 @@ func TestExprEngine_SiteAndFreeAndHR(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
+	matches, err := re.EvaluateRules(ctx, 1, torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,7 +511,7 @@ func TestExprEngine_NoMatch(t *testing.T) {
 	})
 
 	rec := model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1",
 		Status: model.SeedingStatusSeeding, Discount: model.DiscountNone,
 	}
 	db.Create(&rec)
@@ -520,7 +520,7 @@ func TestExprEngine_NoMatch(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
+	matches, err := re.EvaluateRules(ctx, 1, torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +553,7 @@ func TestExprEngine_StateInList(t *testing.T) {
 	})
 
 	rec := model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1",
 		Status: model.SeedingStatusSeeding, Discount: model.DiscountNone,
 	}
 	db.Create(&rec)
@@ -562,7 +562,7 @@ func TestExprEngine_StateInList(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
+	matches, err := re.EvaluateRules(ctx, 1, torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +581,7 @@ func TestExprEngine_NightProtection(t *testing.T) {
 	})
 
 	rec := model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1",
 		Status: model.SeedingStatusSeeding, Discount: model.DiscountNone,
 	}
 	db.Create(&rec)
@@ -590,7 +590,7 @@ func TestExprEngine_NightProtection(t *testing.T) {
 	torrentMap := map[string]*model.TorrentInfo{"h1": ti}
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRules(ctx, "c1", torrentMap, -1, 0)
+	matches, err := re.EvaluateRules(ctx, 1, torrentMap, -1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -714,20 +714,20 @@ func TestRuleEvaluator_EvaluateRules_OrLogic(t *testing.T) {
 	}
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1",
 		TorrentID: "1", Status: model.SeedingStatusSeeding,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h2", SiteName: "site2",
+		ClientUID: 1, InfoHash: "h2", SiteName: "site2",
 		TorrentID: "2", Status: model.SeedingStatusSeeding,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h3", SiteName: "site3",
+		ClientUID: 1, InfoHash: "h3", SiteName: "site3",
 		TorrentID: "3", Status: model.SeedingStatusSeeding,
 	})
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRulesSimple(ctx, "c1")
+	matches, err := re.EvaluateRulesSimple(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -755,16 +755,16 @@ func TestRuleEvaluator_EvaluateRules_AndVsOr(t *testing.T) {
 		t.Fatalf("create rule: %v", err)
 	}
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1",
 		TorrentID: "1", Status: model.SeedingStatusSeeding, IsFree: true,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h2", SiteName: "site1",
+		ClientUID: 1, InfoHash: "h2", SiteName: "site1",
 		TorrentID: "2", Status: model.SeedingStatusSeeding, IsFree: false,
 	})
 
 	re := NewRuleEvaluator(db, zap.NewNop())
-	matches, err := re.EvaluateRulesSimple(ctx, "c1")
+	matches, err := re.EvaluateRulesSimple(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -32,7 +32,7 @@ const (
 	sqliteVarLimit     = 500
 )
 
-func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
+func (e *Engine) syncStaleRecords(ctx context.Context, clientUID uint, torrentMap map[string]*model.TorrentInfo) {
 	hashSet := make(map[string]bool, len(torrentMap))
 	lowerMap := make(map[string]*model.TorrentInfo, len(torrentMap))
 	for hash, ti := range torrentMap {
@@ -46,7 +46,7 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 	var staleHashes []string
 	now := time.Now()
 	for key, rec := range e.recordMap {
-		if rec.ClientID != clientID {
+		if rec.ClientUID != clientUID {
 			continue
 		}
 		if rec.Status == model.SeedingStatusDeleted {
@@ -68,7 +68,7 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 				continue
 			}
 			e.logger.Debug("syncStale: marking record as deleted (torrent gone from downloader)",
-				zap.String("client_id", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.String("info_hash", rec.InfoHash),
 				zap.String("site_name", rec.SiteName),
 				zap.String("prev_status", string(rec.Status)),
@@ -86,7 +86,7 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 
 	if len(staleHashes) > 0 {
 		e.logger.Info("synced stale seeding records",
-			zap.String("client_id", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.Int("stale_count", len(staleHashes)))
 		for i := 0; i < len(staleHashes); i += sqliteVarLimit {
 			end := i + sqliteVarLimit
@@ -94,7 +94,7 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 				end = len(staleHashes)
 			}
 			e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-				Where("client_id = ? AND info_hash IN ?", clientID, staleHashes[i:end]).
+				Where("client_uid = ? AND info_hash IN ?", clientUID, staleHashes[i:end]).
 				Updates(map[string]interface{}{
 					"status":     model.SeedingStatusDeleted,
 					"updated_at": time.Now(),
@@ -118,9 +118,9 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 		}
 		var partial []model.SeedingTorrentRecord
 		if dbErr := e.db.WithContext(ctx).
-			Where("client_id = ? AND LOWER(info_hash) IN ? AND status = ?", clientID, orphanHashes[i:end], model.SeedingStatusDeleted).
+			Where("client_uid = ? AND LOWER(info_hash) IN ? AND status = ?", clientUID, orphanHashes[i:end], model.SeedingStatusDeleted).
 			Find(&partial).Error; dbErr != nil {
-			e.logger.Warn("syncStale: query orphan records failed", zap.String("client_id", clientID), zap.Error(dbErr))
+			e.logger.Warn("syncStale: query orphan records failed", zap.Uint("client_uid", clientUID), zap.Error(dbErr))
 			return
 		}
 		existingRecords = append(existingRecords, partial...)
@@ -142,7 +142,7 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 			if ti := lowerMap[lowerHash]; ti != nil {
 				if deadStates[ti.State] && ti.Progress == 0 {
 					e.logger.Debug("syncStale: skipping recovery of dead-state torrent",
-						zap.String("client_id", clientID),
+						zap.Uint("client_uid", clientUID),
 						zap.String("info_hash", rec.InfoHash),
 						zap.String("qb_state", ti.State),
 						zap.Float64("progress", ti.Progress))
@@ -153,7 +153,7 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 		}
 		if len(recoverHashes) > 0 {
 			e.logger.Info("recovering orphan torrents: deleted records still present in downloader",
-				zap.String("client_id", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.Int("count", len(recoverHashes)),
 				zap.Strings("info_hashes", recoverHashes))
 			for i := 0; i < len(recoverHashes); i += sqliteVarLimit {
@@ -162,7 +162,7 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 					end = len(recoverHashes)
 				}
 				e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-					Where("client_id = ? AND info_hash IN ?", clientID, recoverHashes[i:end]).
+					Where("client_uid = ? AND info_hash IN ?", clientUID, recoverHashes[i:end]).
 					Updates(map[string]interface{}{
 						"status":         model.SeedingStatusSeeding,
 						"last_action_by": "",
@@ -172,11 +172,11 @@ func (e *Engine) syncStaleRecords(ctx context.Context, clientID string, torrentM
 
 			e.mu.Lock()
 			for _, hash := range recoverHashes {
-				key := recordKey(clientID, hash)
+				key := recordKey(clientUID, hash)
 				if _, exists := e.recordMap[key]; !exists {
 					var rec model.SeedingTorrentRecord
 					if err := e.db.WithContext(ctx).
-						Where("client_id = ? AND info_hash = ?", clientID, hash).
+						Where("client_uid = ? AND info_hash = ?", clientUID, hash).
 						First(&rec).Error; err == nil {
 						e.recordMap[key] = &rec
 					}
@@ -197,9 +197,9 @@ type Engine struct {
 	wsBroadcaster     event.WSBroadcaster
 	mu                sync.RWMutex
 	recordMap         map[string]*model.SeedingTorrentRecord
-	emaStates         map[string]*emaState
+	emaStates     map[uint]*emaState
 	maindataMu        sync.RWMutex
-	maindataCache     map[string]*maindataEntry
+	maindataCache     map[uint]*maindataEntry // §59.251: 键=client UID
 	fitTimer          *FitTimer
 	freeWaitMonitor   *FreeWaitMonitor
 	refreshCancel     context.CancelFunc
@@ -214,11 +214,11 @@ type Engine struct {
 	//     小客户端每 tick 重置，饿死大客户端的扫描段）
 	//   patrolCooldowns: 怀疑池冷却（遗漏 A）
 	patrolMu        sync.Mutex
-	patrolCursors   map[string]int
+	patrolCursors   map[uint]int
 	patrolCooldowns map[string]*patrolCooldownEntry
 
 	spaceAlarmMu   sync.Mutex
-	spaceAlarmLast map[string]time.Time
+	spaceAlarmLast    map[uint]time.Time
 
 	discountCache   map[string]*discountCacheEntry
 	discountCacheMu sync.Mutex
@@ -252,12 +252,12 @@ func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 		db:              db,
 		logger:          logger,
 		recordMap:       make(map[string]*model.SeedingTorrentRecord),
-		emaStates:       make(map[string]*emaState),
-		maindataCache:   make(map[string]*maindataEntry),
+		emaStates:       make(map[uint]*emaState),
+		maindataCache:   make(map[uint]*maindataEntry),
 		fitTimer:          NewFitTimer(),
 		freeWaitMonitor:  NewFreeWaitMonitor(db, logger),
 		pendingEvents:    make(chan *pusher.PushedEvent, 1000),
-		spaceAlarmLast:   make(map[string]time.Time),
+		spaceAlarmLast:   make(map[uint]time.Time),
 		discountCache:    make(map[string]*discountCacheEntry),
 	}
 	e.freeEndMonitor = NewFreeEndMonitor(db, nil, logger)
@@ -268,10 +268,10 @@ func NewEngine(db *gorm.DB, logger *zap.Logger) *Engine {
 
 // GetCachedTorrents 返回某个下载器在 maindataCache 中的全部种子（全部状态）。
 // 如果该下载器不在缓存中（未配置/engine 未启动/首次同步未完成），返回 nil。
-func (e *Engine) GetCachedTorrents(clientName string) []*model.TorrentInfo {
+func (e *Engine) GetCachedTorrents(clientUID uint) []*model.TorrentInfo {
 	e.maindataMu.RLock()
 	defer e.maindataMu.RUnlock()
-	entry, ok := e.maindataCache[clientName]
+	entry, ok := e.maindataCache[clientUID]
 	if !ok || entry == nil || len(entry.TorrentMap) == 0 {
 		return nil
 	}
@@ -304,8 +304,8 @@ func (e *Engine) GetGlobalTransferStats(ctx context.Context) *model.GlobalTransf
 	if e.getClientProvider() == nil {
 		return result
 	}
-	for _, clientID := range e.getClientProvider().ListClients() {
-		client, err := e.getClientProvider().Get(clientID)
+	for _, clientUID := range e.getClientProvider().ListClients() {
+		client, err := e.getClientProvider().Get(clientUID)
 		if err != nil {
 			continue
 		}
@@ -327,8 +327,8 @@ func (e *Engine) GetTodayTransferDelta(ctx context.Context) *model.GlobalTransfe
 	if e.getClientProvider() == nil {
 		return result
 	}
-	for _, clientID := range e.getClientProvider().ListClients() {
-		client, err := e.getClientProvider().Get(clientID)
+	for _, clientUID := range e.getClientProvider().ListClients() {
+		client, err := e.getClientProvider().Get(clientUID)
 		if err != nil {
 			continue
 		}
@@ -337,7 +337,7 @@ func (e *Engine) GetTodayTransferDelta(ctx context.Context) *model.GlobalTransfe
 			continue
 		}
 		var dbState model.SeedingClientState
-		if err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&dbState).Error; err != nil {
+		if err := e.db.WithContext(ctx).Where("client_uid = ?", clientUID).First(&dbState).Error; err != nil {
 			continue
 		}
 		result.AllTimeUpload += currentStats.AllTimeUpload - dbState.DayStartUpload
@@ -354,8 +354,8 @@ func (e *Engine) SetWSBroadcaster(b event.WSBroadcaster) {
 	e.wsBroadcaster = b
 }
 
-func recordKey(clientID, infoHash string) string {
-	return clientID + ":" + infoHash
+func recordKey(clientUID uint, infoHash string) string {
+	return fmt.Sprintf("%d:%s", clientUID, infoHash)
 }
 
 func (e *Engine) Start(ctx context.Context) error {
@@ -372,7 +372,7 @@ func (e *Engine) Start(ctx context.Context) error {
 		if records[i].Status == model.SeedingStatusTransferring {
 			records[i].Status = model.SeedingStatusSeeding
 		}
-		key := recordKey(records[i].ClientID, records[i].InfoHash)
+		key := recordKey(records[i].ClientUID, records[i].InfoHash)
 		e.recordMap[key] = &records[i]
 	}
 	e.mu.Unlock()
@@ -422,7 +422,7 @@ func (e *Engine) Start(ctx context.Context) error {
 	if err := e.db.WithContext(ctx).Where("enabled = ?", true).Find(&configs).Error; err != nil {
 		e.logger.Warn("failed to load seeding configs, continuing without", zap.Error(err))
 	}
-	clientRuleIDs := make(map[string]map[uint]bool)
+	clientRuleIDs := make(map[uint]map[uint]bool)
 	for _, cfg := range configs {
 		ids := splitRuleIDs(cfg.DeleteRuleIDs)
 		ruleSet := make(map[uint]bool, len(ids))
@@ -431,7 +431,7 @@ func (e *Engine) Start(ctx context.Context) error {
 				ruleSet[uint(id)] = true
 			}
 		}
-		clientRuleIDs[cfg.ClientID] = ruleSet
+		clientRuleIDs[cfg.ClientUID] = ruleSet
 	}
 
 	for i := range records {
@@ -439,7 +439,7 @@ func (e *Engine) Start(ctx context.Context) error {
 			continue
 		}
 		t := *records[i].FirstMatchedAt
-		ruleSet := clientRuleIDs[records[i].ClientID]
+		ruleSet := clientRuleIDs[records[i].ClientUID]
 		for ruleID := range ruleSet {
 			if _, ok := ruleMap[ruleID]; ok {
 				e.fitTimer.MarkMatched(ruleID, records[i].InfoHash, t)
@@ -499,27 +499,27 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 	}
 
 	clients := e.getClientProvider().ListClients()
-	for _, clientID := range clients {
+	for _, clientUID := range clients {
 		if ctx.Err() != nil {
 			return
 		}
 
-		dlClient, err := e.getClientProvider().Get(clientID)
+		dlClient, err := e.getClientProvider().Get(clientUID)
 		if err != nil {
 			continue
 		}
 
 		e.maindataMu.RLock()
-		prev := e.maindataCache[clientID]
+		prev := e.maindataCache[clientUID]
 		e.maindataMu.RUnlock()
 
-		torrentMap, freeSpace, totalDiskSpace, newRid, wasFull := e.syncMaindata(ctx, clientID, dlClient, prev)
+		torrentMap, freeSpace, totalDiskSpace, newRid, wasFull := e.syncMaindata(ctx, clientUID, dlClient, prev)
 
 		if torrentMap == nil {
 			continue
 		}
 
-		e.checkSpaceAlarm(ctx, clientID, freeSpace)
+		e.checkSpaceAlarm(ctx, clientUID, freeSpace)
 
 		cyclesSinceFull := 0
 		if prev != nil && !wasFull {
@@ -544,20 +544,20 @@ func (e *Engine) refreshMaindataOnce(ctx context.Context) {
 		}
 
 		e.maindataMu.Lock()
-		e.maindataCache[clientID] = entry
+		e.maindataCache[clientUID] = entry
 		e.maindataMu.Unlock()
 
-		e.updateEMA(ctx, clientID, entry.Maindata, torrentMap)
-		e.syncStaleRecords(ctx, clientID, torrentMap)
-		e.checkUnregisteredTorrents(ctx, clientID, dlClient, torrentMap)
-		e.logOrphanTorrents(ctx, clientID, torrentMap)
-		e.syncUnmanagedTorrents(ctx, clientID, torrentMap)
-		e.reconcileStaleRecords(ctx, clientID, torrentMap)
-		e.checkAutoTransfer(ctx, clientID, torrentMap, dlClient)
+		e.updateEMA(ctx, clientUID, entry.Maindata, torrentMap)
+		e.syncStaleRecords(ctx, clientUID, torrentMap)
+		e.checkUnregisteredTorrents(ctx, clientUID, dlClient, torrentMap)
+		e.logOrphanTorrents(ctx, clientUID, torrentMap)
+		e.syncUnmanagedTorrents(ctx, clientUID, torrentMap)
+		e.reconcileStaleRecords(ctx, clientUID, torrentMap)
+		e.checkAutoTransfer(ctx, clientUID, torrentMap, dlClient)
 	}
 }
 
-func (e *Engine) syncMaindata(ctx context.Context, clientID string, dlClient model.DownloaderClient, prev *maindataEntry) (torrentMap map[string]*model.TorrentInfo, freeSpace, totalDiskSpace int64, newRid int, wasFull bool) {
+func (e *Engine) syncMaindata(ctx context.Context, clientUID uint, dlClient model.DownloaderClient, prev *maindataEntry) (torrentMap map[string]*model.TorrentInfo, freeSpace, totalDiskSpace int64, newRid int, wasFull bool) {
 	forceFull := prev == nil || prev.Rid == 0 || len(prev.TorrentMap) == 0 || prev.CyclesSinceFull >= forceFullSyncInterval
 
 	if forceFull {
@@ -565,7 +565,7 @@ func (e *Engine) syncMaindata(ctx context.Context, clientID string, dlClient mod
 		if err != nil || md == nil {
 			if err != nil {
 				e.logger.Warn("refresh maindata (full) failed",
-					zap.String("client", clientID),
+					zap.Uint("client_uid", clientUID),
 					zap.Error(err))
 			}
 			return nil, 0, 0, 0, false
@@ -582,14 +582,14 @@ func (e *Engine) syncMaindata(ctx context.Context, clientID string, dlClient mod
 	if err != nil || md == nil {
 		if err != nil {
 			e.logger.Debug("incremental maindata failed, falling back to full",
-				zap.String("client", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.Error(err))
 		}
 		mdFull, fullErr := dlClient.GetMainData(ctx)
 		if fullErr != nil || mdFull == nil {
 			if fullErr != nil {
 				e.logger.Warn("refresh maindata (fallback full) failed",
-					zap.String("client", clientID),
+					zap.Uint("client_uid", clientUID),
 					zap.Error(fullErr))
 			}
 			return nil, 0, 0, 0, false
@@ -615,7 +615,7 @@ func (e *Engine) syncMaindata(ctx context.Context, clientID string, dlClient mod
 		totalDiskSpace = prev.TotalDiskSpace
 		newRid = rid
 		e.logger.Debug("maindata full_update received, rebuilt map",
-			zap.String("client", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.Int("torrents", len(torrentMap)))
 		return torrentMap, freeSpace, totalDiskSpace, newRid, true
 	}
@@ -649,10 +649,10 @@ func (e *Engine) syncMaindata(ctx context.Context, clientID string, dlClient mod
 // tracking record at all (not even deleted). This runs only for clients that
 // have seeding configs (i.e., actively managed by the seeding engine) to avoid
 // noise from non-seeding clients with many torrents. It only logs, never creates records.
-func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
+func (e *Engine) logOrphanTorrents(ctx context.Context, clientUID uint, torrentMap map[string]*model.TorrentInfo) {
 	var configCount int64
 	if err := e.db.WithContext(ctx).Model(&model.SeedingClientConfig{}).
-		Where("client_id = ? AND enabled = ?", clientID, true).Count(&configCount).Error; err != nil {
+		Where("client_uid = ? AND enabled = ?", clientUID, true).Count(&configCount).Error; err != nil {
 		return
 	}
 	if configCount == 0 {
@@ -668,7 +668,7 @@ func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrent
 
 		var count int64
 		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-			Where("client_id = ? AND LOWER(info_hash) = ?", clientID, lowerHash).
+			Where("client_uid = ? AND LOWER(info_hash) = ?", clientUID, lowerHash).
 			Count(&count)
 		if count == 0 {
 			shortHash := lowerHash
@@ -685,7 +685,7 @@ func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrent
 			logOrphans = append(logOrphans[:20], fmt.Sprintf("... and %d more", len(orphans)-20))
 		}
 		e.logger.Warn("orphan torrents detected: in downloader but not tracked",
-			zap.String("client_id", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.Int("count", len(orphans)),
 			zap.Int("total_in_downloader", len(torrentMap)),
 			zap.Strings("orphans", logOrphans))
@@ -704,11 +704,11 @@ func (e *Engine) logOrphanTorrents(ctx context.Context, clientID string, torrent
 //
 // 语义铁律（§59.227 ④用户定案）：刷流删除规则优先级 > 用户手动 resume
 // （托管语义——手动恢复的种子被对账纠正回 seeding 后由规则处置）。
-func (e *Engine) reconcileStaleRecords(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
+func (e *Engine) reconcileStaleRecords(ctx context.Context, clientUID uint, torrentMap map[string]*model.TorrentInfo) {
 	// 只对有启用的 seeding 配置的下载器对账（与 logOrphanTorrents 同门）
 	var configCount int64
 	if err := e.db.WithContext(ctx).Model(&model.SeedingClientConfig{}).
-		Where("client_id = ? AND enabled = ?", clientID, true).Count(&configCount).Error; err != nil || configCount == 0 {
+		Where("client_uid = ? AND enabled = ?", clientUID, true).Count(&configCount).Error; err != nil || configCount == 0 {
 		return
 	}
 
@@ -721,7 +721,7 @@ func (e *Engine) reconcileStaleRecords(ctx context.Context, clientID string, tor
 	}
 	var staleRecords []model.SeedingTorrentRecord
 	if err := e.db.WithContext(ctx).
-		Where("client_id = ? AND status IN ?", clientID, staleStatuses).
+		Where("client_uid = ? AND status IN ?", clientUID, staleStatuses).
 		Find(&staleRecords).Error; err != nil {
 		return
 	}
@@ -757,16 +757,16 @@ func (e *Engine) reconcileStaleRecords(ctx context.Context, clientID string, tor
 			continue
 		}
 		e.mu.Lock()
-		if r, ok := e.recordMap[recordKey(clientID, rec.InfoHash)]; ok {
+		if r, ok := e.recordMap[recordKey(clientUID, rec.InfoHash)]; ok {
 			r.Status = model.SeedingStatusSeeding
 			r.LastActionBy = "reconcile"
 		} else {
-			e.recordMap[recordKey(clientID, rec.InfoHash)] = rec
+			e.recordMap[recordKey(clientUID, rec.InfoHash)] = rec
 		}
 		e.mu.Unlock()
 		reconciled++
 		e.logger.Info("reconcile: stale record reactivated (downloader is seeding)",
-			zap.String("client_id", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.String("info_hash", rec.InfoHash),
 			zap.String("prev_status", string(rec.Status)),
 			zap.String("prev_last_action_by", rec.LastActionBy),
@@ -788,14 +788,14 @@ func extractTorrentIDFromComment(comment string) string {
 
 // syncUnmanagedTorrents: when client config scope=all, auto-register torrents
 // that exist in the downloader but not in seeding_torrent_records.
-func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo) {
+func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientUID uint, torrentMap map[string]*model.TorrentInfo) {
 	cfg, err := e.ListConfigs(ctx)
 	if err != nil {
 		return
 	}
 	var clientCfg *model.SeedingClientConfig
 	for _, c := range cfg {
-		if c.ClientID == clientID && c.Enabled {
+		if c.ClientUID == clientUID && c.Enabled {
 			clientCfg = c
 			break
 		}
@@ -818,7 +818,7 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 		// 大写 vs qb 小写形态不一致时旧查询漏判）。
 		var count int64
 		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-			Where("client_id = ? AND LOWER(info_hash) = ?", clientID, strings.ToLower(hash)).
+			Where("client_uid = ? AND LOWER(info_hash) = ?", clientUID, strings.ToLower(hash)).
 			Count(&count)
 		if count > 0 {
 			continue
@@ -836,7 +836,7 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 		torrentID := extractTorrentIDFromComment(ti.Comment)
 
 		newRecords = append(newRecords, &model.SeedingTorrentRecord{
-			ClientID:    clientID,
+			ClientUID:    clientUID,
 			InfoHash:    hash,
 			SiteName:    siteName,
 			TorrentID:   torrentID,
@@ -858,7 +858,7 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 		if err := e.db.WithContext(ctx).Create(rec).Error; err != nil {
 			continue // Skip duplicates (unique constraint)
 		}
-		key := recordKey(rec.ClientID, rec.InfoHash)
+		key := recordKey(rec.ClientUID, rec.InfoHash)
 		e.mu.Lock()
 		e.recordMap[key] = rec
 		e.mu.Unlock()
@@ -867,7 +867,7 @@ func (e *Engine) syncUnmanagedTorrents(ctx context.Context, clientID string, tor
 
 	if inserted > 0 {
 		e.logger.Info("scope=all: imported unmanaged torrents",
-			zap.String("client_id", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.Int("imported", inserted),
 			zap.Int("total_in_downloader", len(torrentMap)),
 		)
@@ -885,10 +885,10 @@ func defaultHRSeedTimeH(ctx context.Context, provider model.SiteInfoProvider, si
 	return cfg.HR.SeedTimeH()
 }
 
-func (e *Engine) getCachedMaindata(clientID string) *maindataEntry {
+func (e *Engine) getCachedMaindata(clientUID uint) *maindataEntry {
 	e.maindataMu.RLock()
 	defer e.maindataMu.RUnlock()
-	return e.maindataCache[clientID]
+	return e.maindataCache[clientUID]
 }
 
 func (e *Engine) FreeWaitQueue() []FreeWaitEntryInfo {
@@ -909,7 +909,7 @@ func (e *Engine) FreeWaitCheckOnce(ctx context.Context) int {
 	checker := &siteDiscountChecker{provider: e.siteProvider}
 	return e.freeWaitMonitor.CheckOnce(ctx, checker, func(ctx context.Context, entry *freeWaitEntry) error {
 		record := &model.SeedingTorrentRecord{
-			ClientID:       entry.ClientID,
+			ClientUID:       entry.ClientUID,
 			InfoHash:       entry.InfoHash,
 			SiteName:       entry.SiteName,
 			TorrentID:      entry.TorrentID,
@@ -925,7 +925,7 @@ func (e *Engine) FreeWaitCheckOnce(ctx context.Context) int {
 			return err
 		}
 
-		if entry.ClientID != "" && entry.SubscriptionID != "" {
+		if entry.ClientUID != 0 && entry.SubscriptionID != "" {
 			e.pushFreeWaitTorrent(ctx, entry)
 		}
 
@@ -937,10 +937,10 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 	if e.getClientProvider() == nil {
 		return
 	}
-	dlClient, err := e.getClientProvider().Get(entry.ClientID)
+	dlClient, err := e.getClientProvider().Get(entry.ClientUID)
 	if err != nil {
 		e.logger.Warn("free wait push: client not available",
-			zap.String("client_id", entry.ClientID),
+			zap.Uint("client_uid", entry.ClientUID),
 			zap.Error(err))
 		return
 	}
@@ -951,13 +951,13 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 			zap.String("info_hash", entry.InfoHash))
 		now := time.Now()
 		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-			Where("client_id = ? AND info_hash = ? AND status = ?", entry.ClientID, entry.InfoHash, model.SeedingStatusPending).
+			Where("client_uid = ? AND info_hash = ? AND status = ?", entry.ClientUID, entry.InfoHash, model.SeedingStatusPending).
 			Updates(map[string]interface{}{
 				"status":     model.SeedingStatusSeeding,
 				"flushed_at": now,
 			})
 		e.mu.Lock()
-		key := recordKey(entry.ClientID, entry.InfoHash)
+		key := recordKey(entry.ClientUID, entry.InfoHash)
 		if r, ok := e.recordMap[key]; ok && r.Status == model.SeedingStatusPending {
 			r.Status = model.SeedingStatusSeeding
 			r.FlushedAt = &now
@@ -1009,28 +1009,28 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 	now := time.Now()
 
 	e.logger.Info("free wait push: pushed to downloader",
-		zap.String("client_id", entry.ClientID),
+		zap.Uint("client_uid", entry.ClientUID),
 		zap.String("site", entry.SiteName),
 		zap.String("torrent_id", entry.TorrentID),
 		zap.String("info_hash", entry.InfoHash))
 
 	if addResult != nil && addResult.InfoHash != "" && addResult.InfoHash != entry.InfoHash {
 		e.mu.Lock()
-		altKey := recordKey(entry.ClientID, addResult.InfoHash)
+		altKey := recordKey(entry.ClientUID, addResult.InfoHash)
 		if _, ok := e.recordMap[altKey]; !ok {
-			oldKey := recordKey(entry.ClientID, entry.InfoHash)
+			oldKey := recordKey(entry.ClientUID, entry.InfoHash)
 			delete(e.recordMap, oldKey)
 			e.mu.Unlock()
 
 			e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-				Where("client_id = ? AND info_hash = ?", entry.ClientID, entry.InfoHash).
+				Where("client_uid = ? AND info_hash = ?", entry.ClientUID, entry.InfoHash).
 				Updates(map[string]interface{}{
 					"status":     model.SeedingStatusDeleted,
 					"updated_at": now,
 				})
 
 			newRecord := &model.SeedingTorrentRecord{
-				ClientID:       entry.ClientID,
+				ClientUID:       entry.ClientUID,
 				SiteName:       entry.SiteName,
 				TorrentID:      entry.TorrentID,
 				InfoHash:       addResult.InfoHash,
@@ -1072,13 +1072,13 @@ func (e *Engine) pushFreeWaitTorrent(ctx context.Context, entry *freeWaitEntry) 
 		}
 	} else {
 		e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-			Where("client_id = ? AND info_hash = ?", entry.ClientID, entry.InfoHash).
+			Where("client_uid = ? AND info_hash = ?", entry.ClientUID, entry.InfoHash).
 			Updates(map[string]interface{}{
 				"status":     model.SeedingStatusSeeding,
 				"flushed_at": now,
 			})
 		e.mu.Lock()
-		key := recordKey(entry.ClientID, entry.InfoHash)
+		key := recordKey(entry.ClientUID, entry.InfoHash)
 		if r, ok := e.recordMap[key]; ok {
 			r.Status = model.SeedingStatusSeeding
 			r.FlushedAt = &now
@@ -1108,11 +1108,11 @@ func (c *siteDiscountChecker) CheckDiscount(ctx context.Context, siteName, torre
 }
 
 func (e *Engine) AddSeedingRecord(ctx context.Context, record *model.SeedingTorrentRecord) error {
-	if record.ClientID == "" || record.InfoHash == "" {
+	if record.ClientUID == 0 || record.InfoHash == "" {
 		return &model.AppError{Code: 40001, Message: "client_id and info_hash are required"}
 	}
 
-	key := recordKey(record.ClientID, record.InfoHash)
+	key := recordKey(record.ClientUID, record.InfoHash)
 
 	e.mu.Lock()
 	if _, exists := e.recordMap[key]; exists {
@@ -1134,55 +1134,55 @@ func (e *Engine) AddSeedingRecord(ctx context.Context, record *model.SeedingTorr
 	return nil
 }
 
-func (e *Engine) RemoveSeedingRecord(ctx context.Context, clientID, infoHash string) error {
+func (e *Engine) RemoveSeedingRecord(ctx context.Context, clientUID uint, infoHash string) error {
 	e.logger.Info("RemoveSeedingRecord: manually removing seeding record",
-		zap.String("client_id", clientID),
+		zap.Uint("client_uid", clientUID),
 		zap.String("info_hash", infoHash))
 	if err := e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-		Where("client_id = ? AND info_hash = ?", clientID, infoHash).
+		Where("client_uid = ? AND info_hash = ?", clientUID, infoHash).
 		Update("status", model.SeedingStatusDeleted).Error; err != nil {
 		return err
 	}
 
 	e.mu.Lock()
-	delete(e.recordMap, recordKey(clientID, infoHash))
+	delete(e.recordMap, recordKey(clientUID, infoHash))
 	e.mu.Unlock()
 
 	if e.freeEndMonitor != nil {
-		e.freeEndMonitor.Cancel(clientID, infoHash)
+		e.freeEndMonitor.Cancel(clientUID, infoHash)
 	}
 
 	return nil
 }
 
-func (e *Engine) GetActiveCount(clientID string) int {
+func (e *Engine) GetActiveCount(clientUID uint) int {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	count := 0
 	for _, r := range e.recordMap {
-		if r.ClientID == clientID && r.Status == model.SeedingStatusSeeding {
+		if r.ClientUID == clientUID && r.Status == model.SeedingStatusSeeding {
 			count++
 		}
 	}
 	return count
 }
 
-func (e *Engine) GetRecord(clientID, infoHash string) (*model.SeedingTorrentRecord, bool) {
+func (e *Engine) GetRecord(clientUID uint, infoHash string) (*model.SeedingTorrentRecord, bool) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	r, ok := e.recordMap[recordKey(clientID, infoHash)]
+	r, ok := e.recordMap[recordKey(clientUID, infoHash)]
 	if !ok {
 		return nil, false
 	}
 	return r, true
 }
 
-func (e *Engine) ListByClient(ctx context.Context, clientID string) ([]model.SeedingTorrentRecord, error) {
+func (e *Engine) ListByClient(ctx context.Context, clientUID uint) ([]model.SeedingTorrentRecord, error) {
 	var records []model.SeedingTorrentRecord
 	err := e.db.WithContext(ctx).
-		Where("client_id = ? AND status IN ?", clientID,
+		Where("client_uid = ? AND status IN ?", clientUID,
 			[]string{string(model.SeedingStatusPending), string(model.SeedingStatusSeeding), "paused_free_end", "paused_rule", "delete_failed"}).
 		Find(&records).Error
 	return records, err
@@ -1194,7 +1194,7 @@ func (e *Engine) saveFinalTraffic(ctx context.Context, rec *model.SeedingTorrent
 	}
 
 	traffic := &model.TorrentTraffic{
-		ClientID:      rec.ClientID,
+		ClientUID:      rec.ClientUID,
 		InfoHash:      rec.InfoHash,
 		SiteName:      rec.SiteName,
 		Uploaded:      ti.Uploaded,
@@ -1243,8 +1243,8 @@ func (e *Engine) UpdateStatus(ctx context.Context, id uint, status model.Seeding
 	return nil
 }
 
-func (e *Engine) PauseForFreeEnd(ctx context.Context, clientID, infoHash string) error {
-	key := recordKey(clientID, infoHash)
+func (e *Engine) PauseForFreeEnd(ctx context.Context, clientUID uint, infoHash string) error {
+	key := recordKey(clientUID, infoHash)
 	e.mu.Lock()
 	if r, ok := e.recordMap[key]; ok {
 		r.Status = model.SeedingStatusPausedFreeEnd
@@ -1253,7 +1253,7 @@ func (e *Engine) PauseForFreeEnd(ctx context.Context, clientID, infoHash string)
 	e.mu.Unlock()
 
 	return e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-		Where("client_id = ? AND info_hash = ?", clientID, infoHash).
+		Where("client_uid = ? AND info_hash = ?", clientUID, infoHash).
 		Updates(map[string]interface{}{
 			"status":         model.SeedingStatusPausedFreeEnd,
 			"is_free":        false,
@@ -1261,9 +1261,9 @@ func (e *Engine) PauseForFreeEnd(ctx context.Context, clientID, infoHash string)
 		}).Error
 }
 
-func (e *Engine) MarkFreeExpired(ctx context.Context, clientID, infoHash string) error {
+func (e *Engine) MarkFreeExpired(ctx context.Context, clientUID uint, infoHash string) error {
 	return e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-		Where("client_id = ? AND info_hash = ?", clientID, infoHash).
+		Where("client_uid = ? AND info_hash = ?", clientUID, infoHash).
 		Updates(map[string]interface{}{
 			"is_free":        false,
 			"last_action_by": "free_end_keeper",
@@ -1333,7 +1333,7 @@ func (e *Engine) OnTorrents(ctx context.Context, events []model.TorrentEvent) er
 			continue
 		}
 
-		clientID := dispatcher.GetClientName(ev)
+		clientUID := dispatcher.GetClientUID(ev)
 
 		isQualified := ev.Discount == model.DiscountFree || ev.Discount == model.Discount2xFree
 
@@ -1350,7 +1350,7 @@ func (e *Engine) OnTorrents(ctx context.Context, events []model.TorrentEvent) er
 						deadline := time.Now().Add(time.Duration(sub.FreeWaitMaxWaitSec) * time.Second)
 						checkBefore = &deadline
 					}
-					e.freeWaitMonitor.Add(ev.SiteName, ev.TorrentID, ev.InfoHash, ev.Title, ev.Size, checkBefore, clientID, ev.SourceID, ev.HasHR, ev.HRSeedTimeH, sub.FreeWaitRecheckSec, sub.FreeWaitMinRemain)
+					e.freeWaitMonitor.Add(ev.SiteName, ev.TorrentID, ev.InfoHash, ev.Title, ev.Size, checkBefore, clientUID, ev.SourceID, ev.HasHR, ev.HRSeedTimeH, sub.FreeWaitRecheckSec, sub.FreeWaitMinRemain)
 					continue
 				}
 			}
@@ -1361,7 +1361,7 @@ func (e *Engine) OnTorrents(ctx context.Context, events []model.TorrentEvent) er
 		}
 
 		record := &model.SeedingTorrentRecord{
-			ClientID:       clientID,
+			ClientUID:       clientUID,
 			InfoHash:       ev.InfoHash,
 			SiteName:       ev.SiteName,
 			TorrentID:      ev.TorrentID,
@@ -1398,13 +1398,13 @@ func (e *Engine) CleanupStale(ctx context.Context) (int64, error) {
 	}
 
 	type staleKey struct {
-		ClientID string
-		InfoHash string
+		ClientUID uint
+		InfoHash  string
 	}
 	var stalePairs []staleKey
 	if dbErr := e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
 		Where("status IN ? AND updated_at < ?", staleStatuses, cutoff).
-		Select("client_id, info_hash").
+		Select("client_uid, info_hash").
 		Find(&stalePairs).Error; dbErr != nil {
 		return 0, dbErr
 	}
@@ -1418,7 +1418,7 @@ func (e *Engine) CleanupStale(ctx context.Context) (int64, error) {
 
 	e.mu.Lock()
 	for _, p := range stalePairs {
-		delete(e.recordMap, recordKey(p.ClientID, p.InfoHash))
+		delete(e.recordMap, recordKey(p.ClientUID, p.InfoHash))
 	}
 	e.mu.Unlock()
 
@@ -1438,9 +1438,9 @@ func (e *Engine) CleanupStale(ctx context.Context) (int64, error) {
 			r.IsFree = false
 		}
 	}
-	activeClients := make(map[string]bool, len(e.recordMap))
+	activeClients := make(map[uint]bool, len(e.recordMap))
 	for _, r := range e.recordMap {
-		activeClients[r.ClientID] = true
+		activeClients[r.ClientUID] = true
 	}
 	for cid := range e.emaStates {
 		if !activeClients[cid] {
@@ -1499,7 +1499,7 @@ type EvaluateResult struct {
 }
 
 type evaluateContext struct {
-	clientID     string
+	clientUID     uint
 	client       model.DownloaderClient
 	records      []model.SeedingTorrentRecord
 	torrents     []*model.TorrentInfo
@@ -1514,17 +1514,17 @@ type evaluateContext struct {
 	deleteRules []model.DeleteRule
 }
 
-func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cfg *model.SeedingClientConfig) (*evaluateContext, error) {
+func (e *Engine) prepareEvaluateContext(ctx context.Context, clientUID uint, cfg *model.SeedingClientConfig) (*evaluateContext, error) {
 	if e.getClientProvider() == nil {
 		return nil, &model.AppError{Code: 50001, Message: "client provider not configured"}
 	}
 
-	dlClient, err := e.getClientProvider().Get(clientID)
+	dlClient, err := e.getClientProvider().Get(clientUID)
 	if err != nil {
 		return nil, &model.AppError{Code: 50001, Message: "failed to get downloader", Cause: err}
 	}
 
-	records, err := e.ListByClient(ctx, clientID)
+	records, err := e.ListByClient(ctx, clientUID)
 	if err != nil {
 		return nil, &model.AppError{Code: 50001, Message: "查询做种记录失败", Cause: err}
 	}
@@ -1556,7 +1556,7 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 	var maindata *model.Maindata
 	freeSpace := int64(-1)
 	totalSpace := int64(0)
-	if cached := e.getCachedMaindata(clientID); cached != nil {
+	if cached := e.getCachedMaindata(clientUID); cached != nil {
 		maindata = cached.Maindata
 		freeSpace = cached.FreeSpace
 		totalSpace = cached.TotalDiskSpace
@@ -1567,7 +1567,7 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 			freeSpace = md.FreeSpace
 			totalSpace = md.TotalDiskSpace
 		}
-		e.updateEMA(ctx, clientID, md, torrentMap)
+		e.updateEMA(ctx, clientUID, md, torrentMap)
 	}
 
 	var deleteRules []model.DeleteRule
@@ -1581,7 +1581,7 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 			Where("enabled = ?", true).
 			Order("priority DESC").
 			Find(&deleteRules).Error; dbErr != nil {
-			e.logger.Warn("load delete rules (global) failed", zap.String("client_id", clientID), zap.Error(dbErr))
+			e.logger.Warn("load delete rules (global) failed", zap.Uint("client_uid", clientUID), zap.Error(dbErr))
 		}
 	} else if cfg != nil && cfg.DeleteRuleIDs != "" {
 		ruleIDs := splitRuleIDs(cfg.DeleteRuleIDs)
@@ -1589,12 +1589,12 @@ func (e *Engine) prepareEvaluateContext(ctx context.Context, clientID string, cf
 			Where("id IN (?) AND enabled = ?", ruleIDs, true).
 			Order("priority DESC").
 			Find(&deleteRules).Error; dbErr != nil {
-			e.logger.Warn("load delete rules failed", zap.String("client_id", clientID), zap.Error(dbErr))
+			e.logger.Warn("load delete rules failed", zap.Uint("client_uid", clientUID), zap.Error(dbErr))
 		}
 	}
 
 	return &evaluateContext{
-		clientID:     clientID,
+		clientUID:     clientUID,
 		client:       dlClient,
 		records:      records,
 		torrents:     torrents,
@@ -1651,7 +1651,7 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 		if rec.FlushedAt != nil && time.Since(*rec.FlushedAt) < 30*time.Minute {
 			e.logger.Debug("seeding record: torrent not in downloader but within flush grace period",
 				zap.String("info_hash", rec.InfoHash),
-				zap.String("client_id", rec.ClientID),
+				zap.Uint("client_uid", rec.ClientUID),
 				zap.Time("flushed_at", *rec.FlushedAt))
 			return nil, evaluated, false
 		}
@@ -1659,11 +1659,11 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 			e.logger.Warn("update record status to deleted", zap.Uint("id", rec.ID), zap.Error(err))
 		}
 		e.mu.Lock()
-		delete(e.recordMap, recordKey(rec.ClientID, rec.InfoHash))
+		delete(e.recordMap, recordKey(rec.ClientUID, rec.InfoHash))
 		e.mu.Unlock()
 		e.logger.Debug("seeding record cleaned: torrent not in downloader",
 			zap.String("info_hash", rec.InfoHash),
-			zap.String("client_id", rec.ClientID))
+			zap.Uint("client_uid", rec.ClientUID))
 		return nil, evaluated, false
 	}
 
@@ -1703,7 +1703,7 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 	if score < 5.0 {
 		if dbErr := e.db.WithContext(ctx).Create(&model.ScoringLog{
 			CycleID:     cycleID,
-			ClientID:    ec.clientID,
+			ClientUID:    ec.clientUID,
 			InfoHash:    rec.InfoHash,
 			SiteName:    rec.SiteName,
 			TorrentID:   rec.TorrentID,
@@ -1730,10 +1730,10 @@ func (e *Engine) evaluateRecord(ctx context.Context, rec *model.SeedingTorrentRe
 	return candidate, evaluated, shouldCleanup
 }
 
-func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) {
+func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientUID uint) {
 	var paused []model.SeedingTorrentRecord
 	if err := e.db.WithContext(ctx).
-		Where("client_id = ? AND status = ? AND last_action_by = ?", clientID, model.SeedingStatusPausedRule, "disk_protect").
+		Where("client_uid = ? AND status = ? AND last_action_by = ?", clientUID, model.SeedingStatusPausedRule, "disk_protect").
 		Find(&paused).Error; err != nil || len(paused) == 0 {
 		return
 	}
@@ -1756,7 +1756,7 @@ func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) 
 						zap.Uint("id", rec.ID), zap.Error(err))
 				}
 				e.mu.Lock()
-				delete(e.recordMap, recordKey(clientID, rec.InfoHash))
+				delete(e.recordMap, recordKey(clientUID, rec.InfoHash))
 				e.mu.Unlock()
 				continue
 			}
@@ -1776,7 +1776,7 @@ func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) 
 			continue
 		}
 		e.mu.Lock()
-		key := recordKey(clientID, rec.InfoHash)
+		key := recordKey(clientUID, rec.InfoHash)
 		if r, ok := e.recordMap[key]; ok {
 			r.Status = model.SeedingStatusPending
 			r.LastActionBy = "disk_recover"
@@ -1785,7 +1785,7 @@ func (e *Engine) recoverDiskProtectPaused(ctx context.Context, clientID string) 
 		e.mu.Unlock()
 		e.logger.Info("disk_protect recovery: torrent re-enters pending queue",
 			zap.String("info_hash", rec.InfoHash),
-			zap.String("client_id", clientID))
+			zap.Uint("client_uid", clientUID))
 	}
 }
 
@@ -1814,7 +1814,7 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 	isDeleteFiles := true
 
 	e.logger.Debug("executeCleanup: starting delete",
-		zap.String("client_id", rec.ClientID),
+		zap.Uint("client_uid", rec.ClientUID),
 		zap.String("info_hash", rec.InfoHash),
 		zap.String("site_name", rec.SiteName),
 		zap.String("torrent_id", rec.TorrentID),
@@ -1838,7 +1838,7 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 	}
 
 	e.logger.Info("executeCleanup: torrent deleted successfully",
-		zap.String("client_id", rec.ClientID),
+		zap.Uint("client_uid", rec.ClientUID),
 		zap.String("info_hash", rec.InfoHash),
 		zap.String("site_name", rec.SiteName),
 		zap.String("reason", rec.LastActionBy))
@@ -1847,16 +1847,16 @@ func (e *Engine) executeCleanup(ctx context.Context, rec *model.SeedingTorrentRe
 		e.logger.Error("failed to update delete status", zap.Uint("id", rec.ID), zap.Error(err))
 	}
 	audit.Log("system", "seeding", "delete", "torrent", rec.InfoHash,
-		fmt.Sprintf("自动删种 client=%s site=%s reason=%s", rec.ClientID, rec.SiteName, rec.LastActionBy), "success")
+		fmt.Sprintf("自动删种 client=%d site=%s reason=%s", rec.ClientUID, rec.SiteName, rec.LastActionBy), "success")
 	result.Deleted++
 }
 
-func (e *Engine) markRelatedDeleted(ctx context.Context, relatedHashes []string, clientID, actionBy string) {
+func (e *Engine) markRelatedDeleted(ctx context.Context, relatedHashes []string, clientUID uint, actionBy string) {
 	if len(relatedHashes) == 0 {
 		return
 	}
 	e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-		Where("client_id = ? AND info_hash IN ? AND status = ?", clientID, relatedHashes, model.SeedingStatusSeeding).
+		Where("client_uid = ? AND info_hash IN ? AND status = ?", clientUID, relatedHashes, model.SeedingStatusSeeding).
 		Updates(map[string]interface{}{
 			"status":         model.SeedingStatusDeleting,
 			"last_action_by": actionBy,
@@ -1865,7 +1865,7 @@ func (e *Engine) markRelatedDeleted(ctx context.Context, relatedHashes []string,
 
 	e.mu.Lock()
 	for _, hash := range relatedHashes {
-		key := recordKey(clientID, hash)
+		key := recordKey(clientUID, hash)
 		if r, ok := e.recordMap[key]; ok {
 			r.Status = model.SeedingStatusDeleting
 		}
@@ -1905,7 +1905,7 @@ func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateCo
 		}
 	}
 	if len(plan.CompanionHashes) > 0 {
-		e.markRelatedDeleted(ctx, plan.CompanionHashes, ec.clientID, "companion_cascade")
+		e.markRelatedDeleted(ctx, plan.CompanionHashes, ec.clientUID, "companion_cascade")
 	}
 
 	err := ec.client.DeleteTorrent(ctx, plan.MainHash, plan.DeleteData)
@@ -1970,32 +1970,32 @@ func (e *Engine) reannounceBeforeDelete(ctx context.Context, client model.Downlo
 	return false
 }
 
-func (e *Engine) Evaluate(ctx context.Context, clientID string, cfg *model.SeedingClientConfig) (*EvaluateResult, error) {
-	return e.evaluate(ctx, clientID, cfg, false)
+func (e *Engine) Evaluate(ctx context.Context, clientUID uint, cfg *model.SeedingClientConfig) (*EvaluateResult, error) {
+	return e.evaluate(ctx, clientUID, cfg, false)
 }
 
-func (e *Engine) DryRunEvaluate(ctx context.Context, clientID string, cfg *model.SeedingClientConfig) (int, error) {
-	result, err := e.evaluate(ctx, clientID, cfg, true)
+func (e *Engine) DryRunEvaluate(ctx context.Context, clientUID uint, cfg *model.SeedingClientConfig) (int, error) {
+	result, err := e.evaluate(ctx, clientUID, cfg, true)
 	if err != nil {
 		return 0, err
 	}
 	return result.Evaluated, nil
 }
 
-func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.SeedingClientConfig, dryRun bool) (*EvaluateResult, error) {
-	ec, err := e.prepareEvaluateContext(ctx, clientID, cfg)
+func (e *Engine) evaluate(ctx context.Context, clientUID uint, cfg *model.SeedingClientConfig, dryRun bool) (*EvaluateResult, error) {
+	ec, err := e.prepareEvaluateContext(ctx, clientUID, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(ec.records) == 0 {
 		e.logger.Debug("evaluate: no records to evaluate",
-			zap.String("client_id", clientID))
+			zap.Uint("client_uid", clientUID))
 		return &EvaluateResult{}, nil
 	}
 
 	e.logger.Debug("evaluate: starting cycle",
-		zap.String("client_id", clientID),
+		zap.Uint("client_uid", clientUID),
 		zap.Int("records", len(ec.records)),
 		zap.Int("torrents_in_downloader", len(ec.torrentMap)),
 		zap.Bool("dry_run", dryRun))
@@ -2006,7 +2006,7 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 	if !dryRun && ec.cfg != nil && ec.cfg.DiskProtectEnabled && ec.cfg.MinDiskSpaceGB > 0 && ec.freeSpace >= 0 {
 		minBytes := int64(ec.cfg.MinDiskSpaceGB * 1024 * 1024 * 1024)
 		if ec.freeSpace >= minBytes {
-			e.recoverDiskProtectPaused(ctx, ec.clientID)
+			e.recoverDiskProtectPaused(ctx, ec.clientUID)
 		} else {
 			e.logger.Warn("disk_protect: insufficient disk space, flush will pause pushing new torrents",
 				zap.Int64("freeSpace", ec.freeSpace),
@@ -2037,7 +2037,7 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 				e.logger.Info("pending timeout cleanup",
 					zap.Uint("id", rec.ID),
 					zap.String("info_hash", rec.InfoHash),
-					zap.String("client_id", rec.ClientID),
+					zap.Uint("client_uid", rec.ClientUID),
 					zap.Time("created_at", rec.CreatedAt),
 				)
 				ti := ec.torrentMap[rec.InfoHash]
@@ -2053,7 +2053,7 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 							e.logger.Warn("pending cleanup: companion delete failed", zap.String("hash", compHash), zap.Error(err))
 						}
 					}
-					e.markRelatedDeleted(ctx, companions, ec.clientID, "pending_companion_cascade")
+					e.markRelatedDeleted(ctx, companions, ec.clientUID, "pending_companion_cascade")
 				}
 			}
 				if err := e.db.WithContext(ctx).Model(rec).Updates(map[string]interface{}{
@@ -2063,7 +2063,7 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 					e.logger.Warn("pending timeout cleanup: failed to update status", zap.Uint("id", rec.ID), zap.Error(err))
 				}
 				e.mu.Lock()
-				delete(e.recordMap, recordKey(rec.ClientID, rec.InfoHash))
+				delete(e.recordMap, recordKey(rec.ClientUID, rec.InfoHash))
 				e.mu.Unlock()
 				result.Deleted++
 			}
@@ -2096,7 +2096,7 @@ func (e *Engine) evaluate(ctx context.Context, clientID string, cfg *model.Seedi
 
 	if e.wsBroadcaster != nil && result.Deleted > 0 {
 		e.wsBroadcaster.BroadcastWS("seeding.cleanup", map[string]interface{}{
-			"client_id": clientID,
+			"client_id": clientUID,
 			"deleted":   result.Deleted,
 			"errors":    result.Errors,
 		})
@@ -2227,7 +2227,7 @@ func (e *Engine) executeRuleAction(ctx context.Context, rec *model.SeedingTorren
 func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorrentRecord, ti *model.TorrentInfo, ec *evaluateContext, rule *model.DeleteRule, result *EvaluateResult) {
 
 	e.logger.Debug("executeRuleDelete: starting rule delete",
-		zap.String("client_id", rec.ClientID),
+		zap.Uint("client_uid", rec.ClientUID),
 		zap.String("info_hash", rec.InfoHash),
 		zap.String("site_name", rec.SiteName),
 		zap.String("rule_alias", rule.Alias),
@@ -2252,7 +2252,7 @@ func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorren
 		return
 	}
 	e.logger.Info("executeRuleDelete: torrent deleted by rule",
-		zap.String("client_id", rec.ClientID),
+		zap.Uint("client_uid", rec.ClientUID),
 		zap.String("info_hash", rec.InfoHash),
 		zap.String("site_name", rec.SiteName),
 		zap.String("rule_alias", rule.Alias))
@@ -2261,7 +2261,7 @@ func (e *Engine) executeRuleDelete(ctx context.Context, rec *model.SeedingTorren
 			"info_hash":  rec.InfoHash,
 			"site_name":  rec.SiteName,
 			"rule_alias": rule.Alias,
-			"client_id":  rec.ClientID,
+			"client_id":  rec.ClientUID,
 		})
 	}
 	if err := e.UpdateStatus(ctx, rec.ID, model.SeedingStatusDeleting, "rule:"+rule.Alias); err != nil {
@@ -2398,18 +2398,18 @@ func (e *Engine) DeleteConfig(ctx context.Context, id uint) error {
 
 // Deprecated: Add is legacy code. Seeding Engine now receives events via EventBus
 // (OnPushed → pendingEvents → consumeLoop → Pusher.Push → createRecordFromPush).
-func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentEvent) error {
+func (e *Engine) Add(ctx context.Context, clientUID uint, event *model.TorrentEvent) error {
 	var cfg model.SeedingClientConfig
-	if err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&cfg).Error; err == nil {
+	if err := e.db.WithContext(ctx).Where("client_uid = ?", clientUID).First(&cfg).Error; err == nil {
 		if !IsWithinActiveWindow(cfg.ActiveTimeWindows) {
 			e.logger.Debug("outside active time windows, skipping add",
-				zap.String("client_id", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.String("windows", cfg.ActiveTimeWindows))
 			return nil
 		}
 	}
 
-	key := recordKey(clientID, event.InfoHash)
+	key := recordKey(clientUID, event.InfoHash)
 
 	e.mu.RLock()
 	_, exists := e.recordMap[key]
@@ -2419,7 +2419,7 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 	}
 
 	record := &model.SeedingTorrentRecord{
-		ClientID:       clientID,
+		ClientUID:       clientUID,
 		SiteName:       event.SiteName,
 		TorrentID:      event.TorrentID,
 		InfoHash:       event.InfoHash,
@@ -2442,7 +2442,7 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 	}
 
 	result := e.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "client_id"}, {Name: "info_hash"}},
+		Columns:   []clause.Column{{Name: "client_uid"}, {Name: "info_hash"}},
 		DoNothing: true,
 	}).Create(record)
 	if result.Error != nil {
@@ -2452,13 +2452,13 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 	if result.RowsAffected == 0 {
 		var loaded model.SeedingTorrentRecord
 		if err := e.db.WithContext(ctx).
-			Where("client_id = ? AND info_hash = ?", clientID, event.InfoHash).
+			Where("client_uid = ? AND info_hash = ?", clientUID, event.InfoHash).
 			First(&loaded).Error; err != nil {
 			return err
 		}
 		if loaded.Status == model.SeedingStatusDeleted {
 			e.logger.Info("Add: restoring deleted seeding record",
-				zap.String("client_id", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.String("info_hash", event.InfoHash),
 				zap.String("site_name", event.SiteName),
 				zap.String("torrent_id", event.TorrentID),
@@ -2497,14 +2497,14 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 			record = &loaded
 		} else {
 			e.logger.Debug("Add: record already exists, skipping",
-				zap.String("client_id", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.String("info_hash", event.InfoHash),
 				zap.String("status", string(loaded.Status)))
 			record = &loaded
 		}
 	} else {
 		e.logger.Debug("Add: created new seeding record",
-			zap.String("client_id", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.String("info_hash", event.InfoHash),
 			zap.String("site_name", event.SiteName),
 			zap.String("torrent_id", event.TorrentID))
@@ -2520,17 +2520,17 @@ func (e *Engine) Add(ctx context.Context, clientID string, event *model.TorrentE
 	return nil
 }
 
-func (e *Engine) Clear(ctx context.Context, clientID string) error {
+func (e *Engine) Clear(ctx context.Context, clientUID uint) error {
 	e.mu.Lock()
 	for key, r := range e.recordMap {
-		if r.ClientID == clientID && r.Source == "rss" {
+		if r.ClientUID == clientUID && r.Source == "rss" {
 			delete(e.recordMap, key)
 		}
 	}
 	e.mu.Unlock()
 
 	return e.db.WithContext(ctx).Model(&model.SeedingTorrentRecord{}).
-		Where("client_id = ? AND source = ? AND status != ?", clientID, "rss", model.SeedingStatusDeleted).
+		Where("client_uid = ? AND source = ? AND status != ?", clientUID, "rss", model.SeedingStatusDeleted).
 		Updates(map[string]interface{}{
 			"status":         model.SeedingStatusDeleted,
 			"last_action_by": "clear",
@@ -2546,24 +2546,24 @@ func (e *Engine) CollectTrafficStats(ctx context.Context) error {
 	clients := e.getClientProvider().ListClients()
 	now := time.Now()
 
-	for _, clientID := range clients {
+	for _, clientUID := range clients {
 		var md *model.Maindata
 
-		if cached := e.getCachedMaindata(clientID); cached != nil {
+		if cached := e.getCachedMaindata(clientUID); cached != nil {
 			md = cached.Maindata
 		}
 
 		if md == nil {
-			dlClient, err := e.getClientProvider().Get(clientID)
+			dlClient, err := e.getClientProvider().Get(clientUID)
 			if err != nil {
-				e.logger.Debug("failed to get downloader, skipping", zap.String("clientID", clientID), zap.Error(err))
+				e.logger.Debug("failed to get downloader, skipping", zap.Uint("client_uid", clientUID), zap.Error(err))
 				continue
 			}
 
 			var fetchErr error
 			md, fetchErr = dlClient.GetMainData(ctx)
 			if fetchErr != nil || md == nil {
-				e.logger.Debug("failed to get downloader data, skipping", zap.String("clientID", clientID), zap.Error(fetchErr))
+				e.logger.Debug("failed to get downloader data, skipping", zap.Uint("client_uid", clientUID), zap.Error(fetchErr))
 				continue
 			}
 		}
@@ -2575,7 +2575,7 @@ func (e *Engine) CollectTrafficStats(ctx context.Context) error {
 		}
 
 		snapshot := &model.DownloaderSpeedSnapshot{
-			ClientID:       clientID,
+			ClientUID:       clientUID,
 			UploadSpeed:    totalUpload,
 			DownloadSpeed:  totalDownload,
 			FreeSpaceBytes: md.FreeSpace,
@@ -2583,21 +2583,21 @@ func (e *Engine) CollectTrafficStats(ctx context.Context) error {
 			RecordedAt:     now,
 		}
 		if err := e.db.WithContext(ctx).Create(snapshot).Error; err != nil {
-			e.logger.Warn("failed to write downloader speed snapshot", zap.String("clientID", clientID), zap.Error(err))
+			e.logger.Warn("failed to write downloader speed snapshot", zap.Uint("client_uid", clientUID), zap.Error(err))
 		}
 
-		e.collectSiteTrafficDaily(ctx, clientID, md, now)
+		e.collectSiteTrafficDaily(ctx, clientUID, md, now)
 
-		e.collectTorrentTraffic(ctx, clientID, md, now)
+		e.collectTorrentTraffic(ctx, clientUID, md, now)
 	}
 
 	return nil
 }
 
-func (e *Engine) collectTorrentTraffic(ctx context.Context, clientID string, md *model.Maindata, now time.Time) {
+func (e *Engine) collectTorrentTraffic(ctx context.Context, clientUID uint, md *model.Maindata, now time.Time) {
 	var records []model.SeedingTorrentRecord
 	e.db.WithContext(ctx).
-		Where("client_id = ? AND status IN ?", clientID,
+		Where("client_uid = ? AND status IN ?", clientUID,
 			[]string{string(model.SeedingStatusPending), string(model.SeedingStatusSeeding), "paused_free_end", "paused_rule"}).
 		Find(&records)
 
@@ -2612,7 +2612,7 @@ func (e *Engine) collectTorrentTraffic(ctx context.Context, clientID string, md 
 			continue
 		}
 		trafficBatch = append(trafficBatch, &model.TorrentTraffic{
-			ClientID:      clientID,
+			ClientUID:      clientUID,
 			InfoHash:      rec.InfoHash,
 			SiteName:      rec.SiteName,
 			Uploaded:      ti.Uploaded,
@@ -2677,7 +2677,7 @@ func (e *Engine) collectTorrentTraffic(ctx context.Context, clientID string, md 
 				failed++
 				if failed == 1 { // 首次失败记录，后续不刷屏
 					e.logger.Warn("batch write torrent_traffic chunk failed",
-						zap.String("clientID", clientID),
+						zap.Uint("client_uid", clientUID),
 						zap.Int("chunk_index", i/chunk),
 						zap.Error(err))
 				}
@@ -2687,7 +2687,7 @@ func (e *Engine) collectTorrentTraffic(ctx context.Context, clientID string, md 
 		}
 		if failed > 0 {
 			e.logger.Warn("batch write torrent_traffic partial failure",
-				zap.String("clientID", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.Int("written", written),
 				zap.Int("failed_chunks", failed))
 		}
@@ -2699,12 +2699,12 @@ func (e *Engine) collectTorrentTraffic(ctx context.Context, clientID string, md 
 // current SUM of ti.Uploaded for active torrents. The stats API no longer uses this field
 // for "today's upload" display (uses torrent_traffic max-min instead).
 // site_traffic_daily is retained for site-level trend charts only.
-func (e *Engine) collectSiteTrafficDaily(ctx context.Context, clientID string, md *model.Maindata, now time.Time) {
+func (e *Engine) collectSiteTrafficDaily(ctx context.Context, clientUID uint, md *model.Maindata, now time.Time) {
 	today := now.Truncate(24 * time.Hour)
 
 	var records []model.SeedingTorrentRecord
 	e.db.WithContext(ctx).
-		Where("client_id = ? AND status IN ?", clientID,
+		Where("client_uid = ? AND status IN ?", clientUID,
 			[]string{string(model.SeedingStatusPending), string(model.SeedingStatusSeeding), "paused_free_end", "paused_rule"}).
 		Find(&records)
 
@@ -2772,12 +2772,12 @@ type RealTorrentCounts struct {
 	TotalSize   int64 `json:"totalSize"`
 }
 
-func (e *Engine) GetRealTorrentCounts() map[string]*RealTorrentCounts {
+func (e *Engine) GetRealTorrentCounts() map[uint]*RealTorrentCounts {
 	e.maindataMu.RLock()
 	defer e.maindataMu.RUnlock()
 
-	result := make(map[string]*RealTorrentCounts)
-	for clientID, entry := range e.maindataCache {
+	result := make(map[uint]*RealTorrentCounts)
+	for clientUID, entry := range e.maindataCache {
 		counts := &RealTorrentCounts{}
 		for _, ti := range entry.Maindata.Torrents {
 			if ti.Removed {
@@ -2798,7 +2798,7 @@ func (e *Engine) GetRealTorrentCounts() map[string]*RealTorrentCounts {
 				counts.Paused++
 			}
 		}
-		result[clientID] = counts
+		result[clientUID] = counts
 	}
 	return result
 }
@@ -2850,7 +2850,7 @@ func (e *Engine) applyConfig(cfg *model.SeedingClientConfig, defaultScore float6
 	return minScore, minAgeHours, weights
 }
 
-func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model.Maindata, torrentMap map[string]*model.TorrentInfo) {
+func (e *Engine) updateEMA(ctx context.Context, clientUID uint, maindata *model.Maindata, torrentMap map[string]*model.TorrentInfo) {
 	var totalUp, totalDown int64
 	for _, ti := range torrentMap {
 		totalUp += ti.UploadSpeed
@@ -2859,15 +2859,15 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 
 	alpha := emaAlpha
 	var clientCfg model.SeedingClientConfig
-	if err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&clientCfg).Error; err == nil && clientCfg.EmaAlpha > 0 {
+	if err := e.db.WithContext(ctx).Where("client_uid = ?", clientUID).First(&clientCfg).Error; err == nil && clientCfg.EmaAlpha > 0 {
 		alpha = clientCfg.EmaAlpha
 	}
 
 	e.mu.Lock()
-	state, ok := e.emaStates[clientID]
+	state, ok := e.emaStates[clientUID]
 	if !ok {
 		state = &emaState{}
-		e.emaStates[clientID] = state
+		e.emaStates[clientUID] = state
 	}
 
 	newUp := float64(totalUp)
@@ -2885,11 +2885,11 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 	e.mu.Unlock()
 
 	var dbState model.SeedingClientState
-	err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&dbState).Error
+	err := e.db.WithContext(ctx).Where("client_uid = ?", clientUID).First(&dbState).Error
 
 	var globalStats *model.GlobalTransferStats
 	if e.getClientProvider() != nil {
-		if client, cErr := e.getClientProvider().Get(clientID); cErr == nil {
+		if client, cErr := e.getClientProvider().Get(clientUID); cErr == nil {
 			if gs, gsErr := client.GetGlobalTransferStats(ctx); gsErr == nil {
 				globalStats = gs
 			}
@@ -2898,7 +2898,7 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 
 	if err != nil {
 		dbState = model.SeedingClientState{
-			ClientID:         clientID,
+			ClientUID:         clientUID,
 			AvgUploadSpeed:   snapshotUp,
 			AvgDownloadSpeed: snapshotDown,
 			Initialized:      true,
@@ -2909,7 +2909,7 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 		}
 		if err := e.db.WithContext(ctx).Create(&dbState).Error; err != nil {
 			e.logger.Warn("create seeding client state failed",
-				zap.String("client_id", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.Error(err))
 		}
 	} else {
@@ -2931,18 +2931,18 @@ func (e *Engine) updateEMA(ctx context.Context, clientID string, maindata *model
 		}
 		if err := e.db.WithContext(ctx).Model(&dbState).Updates(updates).Error; err != nil {
 			e.logger.Warn("update seeding client state failed",
-				zap.String("client_id", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.Error(err))
 		}
 	}
 }
 
 // checkSpaceAlarm §33.1.79 空间告警：剩余空间 < 阈值时发 WS 事件 + 日志（5 分钟节流）。
-func (e *Engine) checkSpaceAlarm(ctx context.Context, clientID string, freeSpace int64) {
+func (e *Engine) checkSpaceAlarm(ctx context.Context, clientUID uint, freeSpace int64) {
 	if freeSpace < 0 {
 		return
 	}
-	cfg, ok := e.LoadActiveClientConfig(ctx, clientID)
+	cfg, ok := e.LoadActiveClientConfig(ctx, clientUID)
 	if !ok || !cfg.SpaceAlarmEnabled || cfg.SpaceAlarmGB <= 0 {
 		return
 	}
@@ -2952,11 +2952,11 @@ func (e *Engine) checkSpaceAlarm(ctx context.Context, clientID string, freeSpace
 	}
 
 	e.spaceAlarmMu.Lock()
-	if last, ok := e.spaceAlarmLast[clientID]; ok && time.Since(last) < 5*time.Minute {
+	if last, ok := e.spaceAlarmLast[clientUID]; ok && time.Since(last) < 5*time.Minute {
 		e.spaceAlarmMu.Unlock()
 		return
 	}
-	e.spaceAlarmLast[clientID] = time.Now()
+	e.spaceAlarmLast[clientUID] = time.Now()
 	e.spaceAlarmMu.Unlock()
 
 	level := "warning"
@@ -2965,14 +2965,14 @@ func (e *Engine) checkSpaceAlarm(ctx context.Context, clientID string, freeSpace
 	}
 
 	e.logger.Warn("disk space alarm triggered",
-		zap.String("client_id", clientID),
+		zap.Uint("client_uid", clientUID),
 		zap.Int64("freeSpace", freeSpace),
 		zap.Float64("thresholdGB", cfg.SpaceAlarmGB),
 		zap.String("level", level))
 
 	if e.wsBroadcaster != nil {
 		e.wsBroadcaster.BroadcastWS("system.disk.warning", map[string]interface{}{
-			"client_id":  clientID,
+			"client_id":  clientUID,
 			"freeSpace":  freeSpace,
 			"level":      level,
 			"threshold":  threshold,
@@ -3109,7 +3109,7 @@ func (e *Engine) refreshDiscountStatus(ctx context.Context, records []model.Seed
 			}
 
 			e.mu.Lock()
-			key := recordKey(rec.ClientID, rec.InfoHash)
+			key := recordKey(rec.ClientUID, rec.InfoHash)
 			if r, ok := e.recordMap[key]; ok {
 				r.IsFree = false
 				r.Discount = newDiscount
@@ -3163,7 +3163,7 @@ func (e *Engine) getUnregisteredKeywords() []string {
 //
 // 标记单向：已标记种子跳过后续扫描（检测职责完成，移交规则）；
 // 闭环出口=规则删种 → syncStaleRecords 回收 → 扫描池收缩。
-func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string, dlClient model.DownloaderClient, torrentMap map[string]*model.TorrentInfo) {
+func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientUID uint, dlClient model.DownloaderClient, torrentMap map[string]*model.TorrentInfo) {
 	if !e.unregisteredChecking.CompareAndSwap(false, true) {
 		return
 	}
@@ -3178,7 +3178,7 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 	e.mu.RLock()
 	var candidates []*model.SeedingTorrentRecord
 	for _, rec := range e.recordMap {
-		if rec.ClientID == clientID && !rec.Unregistered &&
+		if rec.ClientUID == clientUID && !rec.Unregistered &&
 			(rec.Status == model.SeedingStatusSeeding || rec.Status == model.SeedingStatusPausedFreeEnd || rec.Status == model.SeedingStatusPausedRule) {
 			candidates = append(candidates, rec)
 		}
@@ -3189,11 +3189,11 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 		return
 	}
 
-	framework := e.clientFramework(clientID)
+	framework := e.clientFramework(clientUID)
 	switch framework {
 	case "transmission":
 		// TR 档：torrentMap 自带全部消息，全量匹配（零额外请求）
-		e.patrolMatchFromTorrentMap(ctx, clientID, candidates, torrentMap, keywords)
+		e.patrolMatchFromTorrentMap(ctx, clientUID, candidates, torrentMap, keywords)
 	case "qbittorrent":
 		// qb 档（§59.31 审计修复 #1/#2）：5.2+ 信号字段只做调度加速，
 		// 不改变覆盖语义——每个 tick 同时跑两路：
@@ -3215,19 +3215,19 @@ func (e *Engine) checkUnregisteredTorrents(ctx context.Context, clientID string,
 			}
 		}
 		if len(suspects) > 0 {
-			e.patrolConfirmBatch(ctx, clientID, dlClient, suspects, keywords)
+			e.patrolConfirmBatch(ctx, clientUID, dlClient, suspects, keywords)
 		}
 		if len(rest) > 0 {
-			e.patrolFullScanBatch(ctx, clientID, dlClient, rest, keywords)
+			e.patrolFullScanBatch(ctx, clientUID, dlClient, rest, keywords)
 		}
 	default:
 		// 未知框架：全量轮询兜底
-		e.patrolFullScanBatch(ctx, clientID, dlClient, candidates, keywords)
+		e.patrolFullScanBatch(ctx, clientUID, dlClient, candidates, keywords)
 	}
 }
 
 // patrolMatchFromTorrentMap TR 档：torrentMap 全量消息关键词匹配（零额外请求）。
-func (e *Engine) patrolMatchFromTorrentMap(ctx context.Context, clientID string, candidates []*model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, keywords []string) {
+func (e *Engine) patrolMatchFromTorrentMap(ctx context.Context, clientUID uint, candidates []*model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, keywords []string) {
 	for _, rec := range candidates {
 		if ctx.Err() != nil {
 			return
@@ -3254,7 +3254,7 @@ func (e *Engine) patrolMatchFromTorrentMap(ctx context.Context, clientID string,
 // 单 tick 上限（审计 #3）：站点故障爆发首 tick 冷却表为空，若不限量会全池
 // 串行打完并阻塞 refreshMaindataLoop——限 50/tick，溢出留待下 tick（此时
 // 已有冷却记录，不重复）。
-func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClient trackerMsgGetter, suspects []*model.SeedingTorrentRecord, keywords []string) {
+func (e *Engine) patrolConfirmBatch(ctx context.Context, clientUID uint, dlClient trackerMsgGetter, suspects []*model.SeedingTorrentRecord, keywords []string) {
 	now := time.Now()
 	cooldown := e.patrolCooldownDuration()
 	batchSize := e.patrolBatchSize() // §59.31 三审 NEW-F：外提，防循环内逐候选 SQL（#7 模式）
@@ -3266,7 +3266,7 @@ func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClie
 		if checked >= batchSize {
 			return
 		}
-		if e.inUnregCooldown(clientID, rec.InfoHash, now, cooldown) {
+		if e.inUnregCooldown(clientUID, rec.InfoHash, now, cooldown) {
 			continue
 		}
 		// §59.31 二审 NEW-2：尝试即计数（含失败）——错误风暴（CSRF 过期/客户端
@@ -3289,14 +3289,14 @@ func (e *Engine) patrolConfirmBatch(ctx context.Context, clientID string, dlClie
 			}
 		}
 		if !matched {
-			e.setUnregCooldown(clientID, rec.InfoHash, now)
+			e.setUnregCooldown(clientUID, rec.InfoHash, now)
 		}
 	}
 }
 
 // patrolFullScanBatch 全量兜底轮询（批 N，per-client 周期指针循环）。
 // qb <5.2 主路径；qb 5.2+ 的无信号候选兜底（审计 #1）。
-func (e *Engine) patrolFullScanBatch(ctx context.Context, clientID string, dlClient trackerMsgGetter, candidates []*model.SeedingTorrentRecord, keywords []string) {
+func (e *Engine) patrolFullScanBatch(ctx context.Context, clientUID uint, dlClient trackerMsgGetter, candidates []*model.SeedingTorrentRecord, keywords []string) {
 	// §59.31 二审 A：按 InfoHash 排序使游标为确定性轮转（recordMap 迭代序随机，
 	// 不排序时游标是对随机排列的滑窗采样，最坏覆盖延迟 ~2× 标称周期）
 	sorted := make([]*model.SeedingTorrentRecord, len(candidates))
@@ -3307,9 +3307,9 @@ func (e *Engine) patrolFullScanBatch(ctx context.Context, clientID string, dlCli
 	batchSize := e.patrolBatchSize()
 	e.patrolMu.Lock()
 	if e.patrolCursors == nil {
-		e.patrolCursors = make(map[string]int)
+		e.patrolCursors = make(map[uint]int)
 	}
-	cursor := e.patrolCursors[clientID]
+	cursor := e.patrolCursors[clientUID]
 	if cursor >= len(candidates) {
 		cursor = 0
 	}
@@ -3317,7 +3317,7 @@ func (e *Engine) patrolFullScanBatch(ctx context.Context, clientID string, dlCli
 	if end > len(candidates) {
 		end = len(candidates)
 	}
-	e.patrolCursors[clientID] = end
+	e.patrolCursors[clientUID] = end
 	e.patrolMu.Unlock()
 	batch := candidates[cursor:end]
 
@@ -3345,7 +3345,7 @@ func (e *Engine) patrolFullScanBatch(ctx context.Context, clientID string, dlCli
 // markUnregistered §59.31: 标记幽灵种子（纯标记，无副作用——不暂停不删除）。
 func (e *Engine) markUnregistered(ctx context.Context, rec *model.SeedingTorrentRecord, msg, trackerDomain string) {
 	e.logger.Info("unregistered torrent detected",
-		zap.String("client_id", rec.ClientID),
+		zap.Uint("client_uid", rec.ClientUID),
 		zap.String("site", rec.SiteName),
 		zap.String("torrent_id", rec.TorrentID),
 		zap.String("info_hash", rec.InfoHash),
@@ -3398,23 +3398,23 @@ type patrolCooldownEntry struct {
 	lastChecked time.Time
 }
 
-func (e *Engine) inUnregCooldown(clientID, hash string, now time.Time, cooldown time.Duration) bool {
+func (e *Engine) inUnregCooldown(clientUID uint, hash string, now time.Time, cooldown time.Duration) bool {
 	e.patrolMu.Lock()
 	defer e.patrolMu.Unlock()
-	key := clientID + "|" + hash
+	key := fmt.Sprintf("%d|%s", clientUID, hash)
 	if entry, ok := e.patrolCooldowns[key]; ok {
 		return now.Sub(entry.lastChecked) < cooldown
 	}
 	return false
 }
 
-func (e *Engine) setUnregCooldown(clientID, hash string, now time.Time) {
+func (e *Engine) setUnregCooldown(clientUID uint, hash string, now time.Time) {
 	e.patrolMu.Lock()
 	defer e.patrolMu.Unlock()
 	if e.patrolCooldowns == nil {
 		e.patrolCooldowns = make(map[string]*patrolCooldownEntry)
 	}
-	e.patrolCooldowns[clientID+"|"+hash] = &patrolCooldownEntry{lastChecked: now}
+	e.patrolCooldowns[fmt.Sprintf("%d|%s", clientUID, hash)] = &patrolCooldownEntry{lastChecked: now}
 }
 
 // patrolCooldownDuration 冷却时长（默认 30 分钟；全局可配 patrol.recheck_cooldown_min）。
@@ -3444,9 +3444,9 @@ func (e *Engine) patrolBatchSize() int {
 
 // clientFramework 查下载器框架（clients.type：qbittorrent/transmission）。
 // 每客户端每 tick 一次点查，结果语义稳定。
-func (e *Engine) clientFramework(clientID string) string {
+func (e *Engine) clientFramework(clientUID uint) string {
 	var t string
-	if err := e.db.Raw("SELECT type FROM clients WHERE name = ? AND deleted_at IS NULL LIMIT 1", clientID).Row().Scan(&t); err != nil {
+	if err := e.db.Raw("SELECT type FROM clients WHERE name = ? AND deleted_at IS NULL LIMIT 1", clientUID).Row().Scan(&t); err != nil {
 		return ""
 	}
 	return t
@@ -3454,7 +3454,7 @@ func (e *Engine) clientFramework(clientID string) string {
 
 // checkAutoTransfer 检测下载完成的 record，触发自动转移（§55.11 方案B）。
 // 在 refreshMaindataOnce 里调用，复用已有的 torrentMap（10s 轮询），零额外网络成本。
-func (e *Engine) checkAutoTransfer(ctx context.Context, clientID string, torrentMap map[string]*model.TorrentInfo, dlClient model.DownloaderClient) {
+func (e *Engine) checkAutoTransfer(ctx context.Context, clientUID uint, torrentMap map[string]*model.TorrentInfo, dlClient model.DownloaderClient) {
 	if dlClient == nil {
 		return
 	}
@@ -3463,7 +3463,7 @@ func (e *Engine) checkAutoTransfer(ctx context.Context, clientID string, torrent
 	e.mu.RLock()
 	var pending []string
 	for key, rec := range e.recordMap {
-		if rec.ClientID != clientID || !rec.AutoTransfer || rec.Status != model.SeedingStatusSeeding || len(rec.TransferClientIDs) == 0 {
+		if rec.ClientUID != clientUID || !rec.AutoTransfer || rec.Status != model.SeedingStatusSeeding || len(rec.TransferClientUIDs) == 0 {
 			continue
 		}
 		ti, ok := torrentMap[strings.ToLower(rec.InfoHash)]
@@ -3503,26 +3503,26 @@ func (e *Engine) transferRecord(ctx context.Context, rec model.SeedingTorrentRec
 		e.revertTransferring(ctx, key, rec.ID)
 		return
 	}
-	sourceClient, err := e.clientProvider.Get(rec.ClientID)
+	sourceClient, err := e.clientProvider.Get(rec.ClientUID)
 	if err != nil {
-		e.logger.Warn("auto transfer: get source client failed", zap.String("client", rec.ClientID), zap.Error(err))
+		e.logger.Warn("auto transfer: get source client failed", zap.Uint("client_uid", rec.ClientUID), zap.Error(err))
 		e.revertTransferring(ctx, key, rec.ID)
 		return
 	}
 
 	successCount := 0
-	for _, targetID := range rec.TransferClientIDs {
+	for _, targetID := range rec.TransferClientUIDs {
 		targetClient, err := e.clientProvider.Get(targetID)
 		if err != nil {
-			e.logger.Warn("auto transfer: get target client failed", zap.String("target", targetID), zap.Error(err))
+			e.logger.Warn("auto transfer: get target client failed", zap.Uint("target_uid", targetID), zap.Error(err))
 			continue
 		}
 		if _, err := client.TransferTorrent(ctx, sourceClient, targetClient, rec.InfoHash); err != nil {
-			e.logger.Warn("auto transfer: transfer to target failed", zap.String("target", targetID), zap.String("hash", rec.InfoHash), zap.Error(err))
+			e.logger.Warn("auto transfer: transfer to target failed", zap.Uint("target_uid", targetID), zap.String("hash", rec.InfoHash), zap.Error(err))
 			continue
 		}
 		successCount++
-		e.logger.Info("auto transfer: added to target", zap.String("target", targetID), zap.String("hash", rec.InfoHash))
+		e.logger.Info("auto transfer: added to target", zap.Uint("target_uid", targetID), zap.String("hash", rec.InfoHash))
 	}
 
 	if successCount == 0 {
@@ -3544,7 +3544,7 @@ func (e *Engine) transferRecord(ctx context.Context, rec model.SeedingTorrentRec
 
 	e.logger.Info("auto transfer: completed",
 		zap.String("hash", rec.InfoHash),
-		zap.String("source", rec.ClientID),
+		zap.Uint("source", rec.ClientUID),
 		zap.Int("targets", successCount))
 }
 

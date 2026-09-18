@@ -38,10 +38,10 @@ func TestWatcher_WatchRegisters(t *testing.T) {
 	db := setupWatcherTestDB(t)
 	w := NewCompletionWatcher(db, nil, nil, zap.NewNop())
 
-	if err := w.Watch(context.Background(), "client1", "hash1", 1); err != nil {
+	if err := w.Watch(context.Background(), 1, "hash1", 1); err != nil {
 		t.Fatal(err)
 	}
-	if !w.IsWatching("client1", "hash1") {
+	if !w.IsWatching(1, "hash1") {
 		t.Error("should be watching")
 	}
 	if w.ActiveWatchCount() != 1 {
@@ -53,10 +53,10 @@ func TestWatcher_WatchValidation(t *testing.T) {
 	db := setupWatcherTestDB(t)
 	w := NewCompletionWatcher(db, nil, nil, zap.NewNop())
 
-	if err := w.Watch(context.Background(), "", "hash1", 1); err == nil {
+	if err := w.Watch(context.Background(), 0, "hash1", 1); err == nil {
 		t.Error("expected error for empty client_name")
 	}
-	if err := w.Watch(context.Background(), "client1", "", 1); err == nil {
+	if err := w.Watch(context.Background(), 1, "", 1); err == nil {
 		t.Error("expected error for empty info_hash")
 	}
 }
@@ -69,7 +69,7 @@ func TestWatcher_SubmitCandidate(t *testing.T) {
 		SourceSite:      "site1",
 		SourceTorrentID: "torrent1",
 		InfoHash:        "abc123",
-		ClientID:        "client1",
+		ClientUID:        1,
 		TorrentName:     "Test Torrent",
 		PublishStatus:   model.CandidatePending,
 		Role:            model.RoleDownload,
@@ -79,7 +79,7 @@ func TestWatcher_SubmitCandidate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !w.IsWatching("client1", "abc123") {
+	if !w.IsWatching(1, "abc123") {
 		t.Error("should be watching after submit")
 	}
 
@@ -144,12 +144,12 @@ func TestWatcher_PollDetectsCompletion(t *testing.T) {
 		SourceSite:      "site1",
 		SourceTorrentID: "t1",
 		InfoHash:        "hash1",
-		ClientID:        "client1",
+		ClientUID:        1,
 		PublishStatus:   model.CandidatePending,
 	}
 	db.Create(&candidate)
 
-	if err := w.Watch(context.Background(), "client1", "hash1", candidate.ID); err != nil {
+	if err := w.Watch(context.Background(), 1, "hash1", candidate.ID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,7 +174,7 @@ func TestWatcher_PollOrphanDetection(t *testing.T) {
 		SourceSite:      "site1",
 		SourceTorrentID: "t1",
 		InfoHash:        "hash1",
-		ClientID:        "client1",
+		ClientUID:        1,
 		PublishStatus:   model.CandidatePending,
 	}
 	db.Create(&candidate)
@@ -194,17 +194,17 @@ func TestWatcher_RecoverPendingWatches(t *testing.T) {
 
 	c1 := model.PublishCandidate{
 		SourceSite: "s1", SourceTorrentID: "t1",
-		InfoHash: "h1", ClientID: "c1",
+		InfoHash: "h1", ClientUID: 1,
 		PublishStatus: model.CandidatePending,
 	}
 	c2 := model.PublishCandidate{
 		SourceSite: "s2", SourceTorrentID: "t2",
-		InfoHash: "h2", ClientID: "c2",
+		InfoHash: "h2", ClientUID: 2,
 		PublishStatus: model.CandidateDownloading,
 	}
 	c3 := model.PublishCandidate{
 		SourceSite: "s3", SourceTorrentID: "t3",
-		InfoHash: "h3", ClientID: "c3",
+		InfoHash: "h3", ClientUID: 1,
 		PublishStatus: model.CandidateDone,
 	}
 	db.Create(&c1)
@@ -213,13 +213,13 @@ func TestWatcher_RecoverPendingWatches(t *testing.T) {
 
 	w.recoverPendingWatches(context.Background())
 
-	if !w.IsWatching("c1", "h1") {
+	if !w.IsWatching(1, "h1") {
 		t.Error("should recover pending candidate")
 	}
-	if !w.IsWatching("c2", "h2") {
+	if !w.IsWatching(2, "h2") {
 		t.Error("should recover downloading candidate")
 	}
-	if w.IsWatching("c3", "h3") {
+	if w.IsWatching(3, "h3") {
 		t.Error("should not recover done candidate")
 	}
 }
@@ -267,7 +267,7 @@ func TestWatcher_MultipleWatches(t *testing.T) {
 	w := NewCompletionWatcher(db, nil, nil, zap.NewNop())
 
 	for i := 0; i < 10; i++ {
-		if err := w.Watch(context.Background(), "client", "hash", uint(i)); err != nil {
+		if err := w.Watch(context.Background(), 1, "hash", uint(i)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -277,7 +277,7 @@ func TestWatcher_MultipleWatches(t *testing.T) {
 	}
 
 	for i := 0; i < 5; i++ {
-		if err := w.Watch(context.Background(), "client", "hash"+string(rune('a'+i)), uint(i)); err != nil {
+		if err := w.Watch(context.Background(), 1, "hash"+string(rune('a'+i)), uint(i)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -293,12 +293,12 @@ func TestFmtCandidate(t *testing.T) {
 	}
 }
 
-func injectMockClient(t *testing.T, mgr *client.Manager, name string, dl model.DownloaderClient) {
+func injectMockClient(t *testing.T, mgr *client.Manager, id uint, dl model.DownloaderClient) {
 	t.Helper()
 	v := reflect.ValueOf(mgr).Elem()
 	f := v.FieldByName("clients")
-	clients := *(*map[string]model.DownloaderClient)(unsafe.Pointer(f.UnsafeAddr()))
-	clients[name] = dl
+	clients := *(*map[uint]model.DownloaderClient)(unsafe.Pointer(f.UnsafeAddr()))
+	clients[id] = dl
 }
 
 func TestWatcher_OnWatchCompleted_HappyPath(t *testing.T) {
@@ -426,7 +426,7 @@ func TestWatcher_PollOnce_GetTorrentByHashError(t *testing.T) {
 			return nil, errors.New("connection refused")
 		},
 	}
-	injectMockClient(t, mgr, "client1", mockDL)
+	injectMockClient(t, mgr, 1, mockDL)
 
 	candidate := model.PublishCandidate{
 		SourceSite:      "site1",
@@ -435,11 +435,11 @@ func TestWatcher_PollOnce_GetTorrentByHashError(t *testing.T) {
 	}
 	db.Create(&candidate)
 
-	w.watchStore.Store("client1|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
+	w.watchStore.Store("1|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
 
 	w.pollOnce(context.Background())
 
-	if _, ok := w.watchStore.Load("client1|hash1"); !ok {
+	if _, ok := w.watchStore.Load("1|hash1"); !ok {
 		t.Error("watch should not be removed on GetTorrentByHash error")
 	}
 
@@ -456,7 +456,7 @@ func TestWatcher_PollOnce_TorrentNotFound(t *testing.T) {
 	w := NewCompletionWatcher(db, mgr, nil, zap.NewNop())
 
 	mockDL := &mocks.DownloaderClient{}
-	injectMockClient(t, mgr, "client1", mockDL)
+	injectMockClient(t, mgr, 1, mockDL)
 
 	candidate := model.PublishCandidate{
 		SourceSite:      "site1",
@@ -465,11 +465,11 @@ func TestWatcher_PollOnce_TorrentNotFound(t *testing.T) {
 	}
 	db.Create(&candidate)
 
-	w.watchStore.Store("client1|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
+	w.watchStore.Store("1|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
 
 	w.pollOnce(context.Background())
 
-	if _, ok := w.watchStore.Load("client1|hash1"); ok {
+	if _, ok := w.watchStore.Load("1|hash1"); ok {
 		t.Error("watch should be removed for orphan")
 	}
 
@@ -498,7 +498,7 @@ func TestWatcher_PollOnce_DetectsCompletion(t *testing.T) {
 			}, nil
 		},
 	}
-	injectMockClient(t, mgr, "client1", mockDL)
+	injectMockClient(t, mgr, 1, mockDL)
 
 	candidate := model.PublishCandidate{
 		SourceSite:      "site1",
@@ -508,11 +508,11 @@ func TestWatcher_PollOnce_DetectsCompletion(t *testing.T) {
 	}
 	db.Create(&candidate)
 
-	w.watchStore.Store("client1|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
+	w.watchStore.Store("1|hash1", watchEntry{candidateID: candidate.ID, submittedAt: time.Now()})
 
 	w.pollOnce(context.Background())
 
-	if _, ok := w.watchStore.Load("client1|hash1"); ok {
+	if _, ok := w.watchStore.Load("1|hash1"); ok {
 		t.Error("watch should be removed after completion")
 	}
 

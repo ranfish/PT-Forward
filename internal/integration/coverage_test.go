@@ -22,7 +22,7 @@ func TestE2E_OnTorrents_NoMatchedRule(t *testing.T) {
 	sub := &model.RSSSubscription{
 		Name: "sub-unmatched", SiteName: "source-site",
 		URLs: []string{"https://source.com/rss"}, Cron: "*/15 * * * *",
-		ClientID: "seeding-client", Enabled: true,
+		ClientUID: 1, Enabled: true,
 	}
 	require.NoError(t, db.Create(sub).Error)
 
@@ -110,7 +110,7 @@ func TestE2E_DuplicateSeedingRecord(t *testing.T) {
 	sub := &model.RSSSubscription{
 		Name: "dup-sub", SiteName: "dup-source-site",
 		URLs: []string{"https://dup-source.com/rss"}, Cron: "*/15 * * * *",
-		ClientID: "dup-seeding-client", Enabled: true,
+		ClientUID: 1, Enabled: true,
 	}
 	require.NoError(t, db.Create(sub).Error)
 
@@ -129,7 +129,7 @@ func TestE2E_DuplicateSeedingRecord(t *testing.T) {
 		},
 	}
 	mockDL := &mocks.DownloaderProvider{
-		GetFn: func(cid string) (model.DownloaderClient, error) {
+		GetFn: func(cid uint) (model.DownloaderClient, error) {
 			return &mocks.DownloaderClient{ID: 1, Name: "dup-seeding-client", Role: "seeding"}, nil
 		},
 	}

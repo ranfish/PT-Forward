@@ -50,7 +50,7 @@ func createTestMember(t *testing.T, db *gorm.DB, groupID uint, role string, seed
 		PublishGroupID: groupID,
 		Role:           role,
 		SiteName:       siteName,
-		ClientID:       "test-client",
+		ClientUID:       2,
 		InfoHash:       "abc123",
 		Status:         status,
 		Seeders:        seeders,
@@ -192,7 +192,7 @@ func TestLifecycleManager_SubscriptionOverride(t *testing.T) {
 		Name:                  "test-sub",
 		Enabled:               true,
 		SiteName:              "testsite",
-		ClientID:              "test-client",
+		ClientUID:              2,
 		URLs:                  []string{"http://example.com/rss"},
 		LifecyclePauseSeeders: 20,
 	}
@@ -294,10 +294,10 @@ type mockLifecycleProvider struct {
 	client *lifecycleMockDLClient
 }
 
-func (m *mockLifecycleProvider) Get(clientID string) (model.DownloaderClient, error) {
+func (m *mockLifecycleProvider) Get(clientUID uint) (model.DownloaderClient, error) {
 	return m.client, nil
 }
-func (m *mockLifecycleProvider) ListClients() []string { return nil }
+func (m *mockLifecycleProvider) ListClients() []uint { return nil }
 
 func TestLifecycleManager_HRReleased_RemovesTag(t *testing.T) {
 	db := setupLifecycleDB(t)

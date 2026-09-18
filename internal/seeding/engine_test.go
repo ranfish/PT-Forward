@@ -89,7 +89,7 @@ func (m *mockDownloaderClient) GetMainDataIncremental(_ context.Context, _ int) 
 }
 func (m *mockDownloaderClient) GetName() string                           { return "mock" }
 func (m *mockDownloaderClient) GetRole() string                           { return "" }
-func (m *mockDownloaderClient) GetTransferTargetID() string                 { return "" }
+func (m *mockDownloaderClient) GetTransferTargetUID() uint                 { return 0 }
 func (m *mockDownloaderClient) GetID() uint                               { return 0 }
 func (m *mockDownloaderClient) GetSharedPaths() []model.SharedPathMapping { return nil }
 func (m *mockDownloaderClient) GetTorrentDir() string                      { return "" }
@@ -105,18 +105,18 @@ func (m *mockDownloaderClient) GetTrackers(_ context.Context, _ string) ([]strin
 }
 
 type mockDownloaderProvider struct {
-	clients map[string]*mockDownloaderClient
-	list    []string
+	clients     map[uint]*mockDownloaderClient
+	list     []uint
 }
 
-func (p *mockDownloaderProvider) Get(id string) (model.DownloaderClient, error) {
+func (p *mockDownloaderProvider) Get(id uint) (model.DownloaderClient, error) {
 	c, ok := p.clients[id]
 	if !ok {
-		return nil, fmt.Errorf("not found: %s", id)
+		return nil, fmt.Errorf("not found: %d", id)
 	}
 	return c, nil
 }
-func (p *mockDownloaderProvider) ListClients() []string { return p.list }
+func (p *mockDownloaderProvider) ListClients() []uint { return p.list }
 
 func setupEngineTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -149,7 +149,7 @@ func TestEngine_AddAndRemoveRecord(t *testing.T) {
 	}
 
 	record := &model.SeedingTorrentRecord{
-		ClientID:  "client-1",
+		ClientUID:  1,
 		InfoHash:  "abc123",
 		SiteName:  "site1",
 		TorrentID: "42",
@@ -159,11 +159,11 @@ func TestEngine_AddAndRemoveRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if e.GetActiveCount("client-1") != 1 {
-		t.Errorf("expected 1, got %d", e.GetActiveCount("client-1"))
+	if e.GetActiveCount(1) != 1 {
+		t.Errorf("expected 1, got %d", e.GetActiveCount(1))
 	}
 
-	got, ok := e.GetRecord("client-1", "abc123")
+	got, ok := e.GetRecord(1, "abc123")
 	if !ok {
 		t.Fatal("record should exist")
 	}
@@ -171,11 +171,11 @@ func TestEngine_AddAndRemoveRecord(t *testing.T) {
 		t.Errorf("expected 42, got %s", got.TorrentID)
 	}
 
-	if err := e.RemoveSeedingRecord(context.Background(), "client-1", "abc123"); err != nil {
+	if err := e.RemoveSeedingRecord(context.Background(), 1, "abc123"); err != nil {
 		t.Fatal(err)
 	}
 
-	if e.GetActiveCount("client-1") != 0 {
+	if e.GetActiveCount(1) != 0 {
 		t.Error("should be 0 after removal")
 	}
 }
@@ -187,8 +187,8 @@ func TestEngine_DuplicateRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r1 := &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}
-	r2 := &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "2"}
+	r1 := &model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "h1", SiteName: "s", TorrentID: "1"}
+	r2 := &model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "h1", SiteName: "s", TorrentID: "2"}
 
 	if err := e.AddSeedingRecord(context.Background(), r1); err != nil {
 		t.Fatal(err)
@@ -202,7 +202,7 @@ func TestEngine_MissingFields(t *testing.T) {
 	db := setupEngineTestDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	r := &model.SeedingTorrentRecord{ClientID: "", InfoHash: "h1"}
+	r := &model.SeedingTorrentRecord{ClientUID: 0, InfoHash: "h1"}
 	if err := e.AddSeedingRecord(context.Background(), r); err == nil {
 		t.Error("expected error for empty client_id")
 	}
@@ -215,17 +215,17 @@ func TestEngine_ListByClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "h2", SiteName: "s", TorrentID: "2"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientUID: 2, InfoHash: "h3", SiteName: "s", TorrentID: "3"}); err != nil {
 		t.Fatal(err)
 	}
 
-	records, err := e.ListByClient(context.Background(), "c1")
+	records, err := e.ListByClient(context.Background(), 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,14 +257,14 @@ func TestEngine_StartWithRecords(t *testing.T) {
 	ctx := context.Background()
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "hash1",
 		SiteName:  "site1",
 		TorrentID: "100",
 		Status:    model.SeedingStatusSeeding,
 	})
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c2",
+		ClientUID:  2,
 		InfoHash:  "hash2",
 		SiteName:  "site2",
 		TorrentID: "200",
@@ -279,11 +279,11 @@ func TestEngine_StartWithRecords(t *testing.T) {
 	if e.TotalActiveCount() != 1 {
 		t.Errorf("expected 1 active, got %d", e.TotalActiveCount())
 	}
-	_, ok := e.GetRecord("c1", "hash1")
+	_, ok := e.GetRecord(1, "hash1")
 	if !ok {
 		t.Error("c1:hash1 should exist in recordMap")
 	}
-	_, ok = e.GetRecord("c2", "hash2")
+	_, ok = e.GetRecord(2, "hash2")
 	if !ok {
 		t.Error("c2:hash2 should exist in recordMap")
 	}
@@ -296,13 +296,13 @@ func TestEngine_TotalActiveCount(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1", Status: model.SeedingStatusSeeding}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "h1", SiteName: "s", TorrentID: "1", Status: model.SeedingStatusSeeding}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h2", SiteName: "s", TorrentID: "2", Status: model.SeedingStatusSeeding}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "h2", SiteName: "s", TorrentID: "2", Status: model.SeedingStatusSeeding}); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c2", InfoHash: "h3", SiteName: "s", TorrentID: "3", Status: model.SeedingStatusSeeding}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientUID: 2, InfoHash: "h3", SiteName: "s", TorrentID: "3", Status: model.SeedingStatusSeeding}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -318,15 +318,15 @@ func TestEngine_PauseForFreeEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientID: "c1", InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
+	if err := e.AddSeedingRecord(context.Background(), &model.SeedingTorrentRecord{ClientUID: 1, InfoHash: "h1", SiteName: "s", TorrentID: "1"}); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := e.PauseForFreeEnd(context.Background(), "c1", "h1"); err != nil {
+	if err := e.PauseForFreeEnd(context.Background(), 1, "h1"); err != nil {
 		t.Fatal(err)
 	}
 
-	rec, ok := e.GetRecord("c1", "h1")
+	rec, ok := e.GetRecord(1, "h1")
 	if !ok {
 		t.Fatal("record should exist")
 	}
@@ -340,7 +340,7 @@ func TestEngine_CleanupStale_DeletesOld(t *testing.T) {
 	ctx := context.Background()
 
 	rec := &model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "h1",
 		SiteName:  "s",
 		TorrentID: "1",
@@ -350,7 +350,7 @@ func TestEngine_CleanupStale_DeletesOld(t *testing.T) {
 	db.Model(rec).Update("updated_at", time.Now().AddDate(0, 0, -31))
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c2",
+		ClientUID:  1,
 		InfoHash:  "h2",
 		SiteName:  "s",
 		TorrentID: "2",
@@ -383,7 +383,7 @@ func TestEngine_CleanupStale_PausesFreeExpired(t *testing.T) {
 
 	past := time.Now().Add(-1 * time.Hour)
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "h1",
 		SiteName:  "s",
 		TorrentID: "1",
@@ -413,11 +413,12 @@ func TestEngine_OnTorrents(t *testing.T) {
 
 	events := []model.TorrentEvent{
 		{
-			SourceID:  "client-1",
+			SourceID:  "1",
 			SiteName:  "site1",
 			TorrentID: "42",
 			InfoHash:  "abc123",
 			Discount:  model.DiscountFree,
+			Metadata:  map[string]any{"client_uid": 1},
 		},
 	}
 
@@ -425,7 +426,7 @@ func TestEngine_OnTorrents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rec, ok := e.GetRecord("client-1", "abc123")
+	rec, ok := e.GetRecord(1, "abc123")
 	if !ok {
 		t.Fatal("record should exist")
 	}
@@ -504,7 +505,7 @@ func TestEngine_OnTorrents_Include2xUp(t *testing.T) {
 	_ = e.Start(context.Background())
 
 	sub := &model.RSSSubscription{
-		Name: "test-sub", Enabled: true, SiteName: "site1", ClientID: "c1",
+		Name: "test-sub", Enabled: true, SiteName: "site1", ClientUID: 1,
 		ScoringConfig: model.SeedingScoringConfig{Enabled: true, Include2xUp: true},
 	}
 	db.Create(sub)
@@ -516,7 +517,7 @@ func TestEngine_OnTorrents_Include2xUp(t *testing.T) {
 			TorrentID: "42",
 			InfoHash:  "hash_2xup",
 			Discount:  model.Discount2xUp,
-			Metadata:  map[string]any{"client_name": "c1"},
+			Metadata:  map[string]any{"client_uid": 1},
 		},
 	}
 
@@ -530,7 +531,7 @@ func TestEngine_OnTorrents_Include2xUp(t *testing.T) {
 		t.Errorf("expected 1 record for 2xUp with Include2xUp=true, got %d", count)
 	}
 
-	rec, ok := e.GetRecord("c1", "hash_2xup")
+	rec, ok := e.GetRecord(1, "hash_2xup")
 	if !ok {
 		t.Fatal("expected record in recordMap")
 	}
@@ -545,7 +546,7 @@ func TestEngine_OnTorrents_FreeWait(t *testing.T) {
 	_ = e.Start(context.Background())
 
 	sub := &model.RSSSubscription{
-		Name: "test-sub", Enabled: true, SiteName: "site1", ClientID: "c1",
+		Name: "test-sub", Enabled: true, SiteName: "site1", ClientUID: 1,
 		ScoringConfig:      model.SeedingScoringConfig{Enabled: true},
 		FreeWaitEnabled:    true,
 		FreeWaitMaxWaitSec: 3600,
@@ -559,7 +560,7 @@ func TestEngine_OnTorrents_FreeWait(t *testing.T) {
 			TorrentID: "42",
 			InfoHash:  "hash_none",
 			Discount:  model.DiscountNone,
-			Metadata:  map[string]any{"client_name": "c1"},
+			Metadata:  map[string]any{"client_uid": 1},
 		},
 	}
 
@@ -589,7 +590,7 @@ func TestEngine_Evaluate_NoProvider(t *testing.T) {
 	db := setupEngineTestDB(t)
 	e := NewEngine(db, zap.NewNop())
 
-	result, err := e.Evaluate(context.Background(), "c1", nil)
+	result, err := e.Evaluate(context.Background(), 1, nil)
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -603,10 +604,10 @@ func TestEngine_ListConfigs(t *testing.T) {
 	ctx := context.Background()
 
 	db.Create(&model.SeedingClientConfig{
-		ClientID: "c1",
+		ClientUID: 1,
 		Enabled:  true,
 	})
-	db.Exec("INSERT INTO seeding_client_configs (client_id, enabled, created_at, updated_at) VALUES (?, false, datetime('now'), datetime('now'))", "c2")
+	db.Exec("INSERT INTO seeding_client_configs (client_uid, enabled, created_at, updated_at) VALUES (?, false, datetime('now'), datetime('now'))", 2)
 
 	e := NewEngine(db, zap.NewNop())
 	configs, err := e.ListConfigs(ctx)
@@ -616,8 +617,8 @@ func TestEngine_ListConfigs(t *testing.T) {
 	if len(configs) != 1 {
 		t.Fatalf("expected 1, got %d", len(configs))
 	}
-	if configs[0].ClientID != "c1" {
-		t.Errorf("expected c1, got %s", configs[0].ClientID)
+	if configs[0].ClientUID != 1 {
+		t.Errorf("expected c1, got %d", configs[0].ClientUID)
 	}
 }
 
@@ -641,7 +642,7 @@ func TestEngine_GetConfigByID(t *testing.T) {
 	ctx := context.Background()
 
 	e := NewEngine(db, zap.NewNop())
-	cfg := &model.SeedingClientConfig{ClientID: "c1", Enabled: true}
+	cfg := &model.SeedingClientConfig{ClientUID: 1, Enabled: true}
 	if err := e.CreateConfig(ctx, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -650,8 +651,8 @@ func TestEngine_GetConfigByID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ClientID != "c1" {
-		t.Errorf("expected c1, got %s", got.ClientID)
+	if got.ClientUID != 1 {
+		t.Errorf("expected c1, got %d", got.ClientUID)
 	}
 }
 
@@ -660,7 +661,7 @@ func TestEngine_UpdateConfig(t *testing.T) {
 	ctx := context.Background()
 
 	e := NewEngine(db, zap.NewNop())
-	cfg := &model.SeedingClientConfig{ClientID: "c1", Enabled: true}
+	cfg := &model.SeedingClientConfig{ClientUID: 1, Enabled: true}
 	if err := e.CreateConfig(ctx, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -681,7 +682,7 @@ func TestEngine_DeleteConfig(t *testing.T) {
 	ctx := context.Background()
 
 	e := NewEngine(db, zap.NewNop())
-	cfg := &model.SeedingClientConfig{ClientID: "c1", Enabled: true}
+	cfg := &model.SeedingClientConfig{ClientUID: 1, Enabled: true}
 	if err := e.CreateConfig(ctx, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -705,7 +706,7 @@ func TestEngine_UpdateStatus(t *testing.T) {
 	}
 
 	rec := &model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "hash1", SiteName: "s1", TorrentID: "1",
+		ClientUID: 1, InfoHash: "hash1", SiteName: "s1", TorrentID: "1",
 		Status: model.SeedingStatusSeeding,
 	}
 	if err := e.AddSeedingRecord(ctx, rec); err != nil {
@@ -733,7 +734,7 @@ func TestEngine_FlushAndClear(t *testing.T) {
 		t.Fatalf("flush with no data should not error: %v", err)
 	}
 
-	if err := e.Clear(ctx, "c1"); err != nil {
+	if err := e.Clear(ctx, 1); err != nil {
 		t.Fatalf("clear with no data should not error: %v", err)
 	}
 }
@@ -752,7 +753,7 @@ func TestEngine_Add(t *testing.T) {
 		HRSeedTimeH: 0,
 	}
 
-	if err := e.Add(ctx, "client-1", event); err != nil {
+	if err := e.Add(ctx, 1, event); err != nil {
 		t.Fatal(err)
 	}
 
@@ -830,12 +831,12 @@ func TestEngine_CollectTrafficStats(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "h1",
 		SiteName:  "site1",
 		TorrentID: "1",
@@ -847,7 +848,7 @@ func TestEngine_CollectTrafficStats(t *testing.T) {
 	}
 
 	var snap model.DownloaderSpeedSnapshot
-	db.Where("client_id = ?", "c1").First(&snap)
+	db.Where("client_uid = ?", 1).First(&snap)
 	if snap.UploadSpeed != 3000 {
 		t.Errorf("expected 3000, got %d", snap.UploadSpeed)
 	}
@@ -868,8 +869,8 @@ func TestEngine_CollectTrafficStats_ClientError(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{},
+		list:    []uint{1},
 	})
 
 	if err := e.CollectTrafficStats(ctx); err != nil {
@@ -884,8 +885,8 @@ func TestEngine_CollectTrafficStats_GetMainDataError(t *testing.T) {
 
 	mc := &mockDownloaderClient{err: fmt.Errorf("connection refused")}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	if err := e.CollectTrafficStats(ctx); err != nil {
@@ -902,7 +903,7 @@ func TestEngine_CollectSiteTrafficDaily_Update(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "h1",
 		SiteName:  "site1",
 		TorrentID: "1",
@@ -921,7 +922,7 @@ func TestEngine_CollectSiteTrafficDaily_Update(t *testing.T) {
 			"h1": {Uploaded: 2048000},
 		},
 	}
-	e.collectSiteTrafficDaily(ctx, "c1", md, now)
+	e.collectSiteTrafficDaily(ctx, 1, md, now)
 
 	var traffic model.SiteTrafficDaily
 	db.Where("site_name = ? AND date = ?", "site1", today).First(&traffic)
@@ -943,9 +944,9 @@ func TestEngine_UpdateEMA_Initialize(t *testing.T) {
 	}
 	md := &model.Maindata{Torrents: map[string]model.TorrentInfo{"h1": {UploadSpeed: 2000}}}
 
-	e.updateEMA(ctx, "c1", md, torrentMap)
+	e.updateEMA(ctx, 1, md, torrentMap)
 
-	state, ok := e.emaStates["c1"]
+	state, ok := e.emaStates[1]
 	if !ok {
 		t.Fatal("ema state should exist")
 	}
@@ -954,7 +955,7 @@ func TestEngine_UpdateEMA_Initialize(t *testing.T) {
 	}
 
 	var dbState model.SeedingClientState
-	db.Where("client_id = ?", "c1").First(&dbState)
+	db.Where("client_uid = ?", 1).First(&dbState)
 	if !dbState.Initialized {
 		t.Error("should be initialized")
 	}
@@ -965,16 +966,16 @@ func TestEngine_UpdateEMA_Exponential(t *testing.T) {
 	ctx := context.Background()
 	e := NewEngine(db, zap.NewNop())
 
-	e.emaStates["c1"] = &emaState{UploadSpeed: 1000, DownloadSpeed: 500}
+	e.emaStates[1] = &emaState{UploadSpeed: 1000, DownloadSpeed: 500}
 
 	torrentMap := map[string]*model.TorrentInfo{
 		"h1": {UploadSpeed: 2000, DownloadSpeed: 1000},
 	}
 	md := &model.Maindata{}
 
-	e.updateEMA(ctx, "c1", md, torrentMap)
+	e.updateEMA(ctx, 1, md, torrentMap)
 
-	state := e.emaStates["c1"]
+	state := e.emaStates[1]
 	expected := 0.3*2000 + 0.7*1000
 	if state.UploadSpeed != expected {
 		t.Errorf("expected %v, got %v", expected, state.UploadSpeed)
@@ -986,7 +987,7 @@ func TestEngine_UpdateEMA_UpdateExisting(t *testing.T) {
 	ctx := context.Background()
 
 	db.Create(&model.SeedingClientState{
-		ClientID: "c1", AvgUploadSpeed: 500, AvgDownloadSpeed: 200, Initialized: true,
+		ClientUID: 1, AvgUploadSpeed: 500, AvgDownloadSpeed: 200, Initialized: true,
 	})
 
 	e := NewEngine(db, zap.NewNop())
@@ -996,10 +997,10 @@ func TestEngine_UpdateEMA_UpdateExisting(t *testing.T) {
 	}
 	md := &model.Maindata{}
 
-	e.updateEMA(ctx, "c1", md, torrentMap)
+	e.updateEMA(ctx, 1, md, torrentMap)
 
 	var dbState model.SeedingClientState
-	db.Where("client_id = ?", "c1").First(&dbState)
+	db.Where("client_uid = ?", 1).First(&dbState)
 	if dbState.AvgUploadSpeed == 500 {
 		t.Error("upload speed should have been updated")
 	}
@@ -1022,11 +1023,11 @@ func TestEngine_Evaluate_NoRecords(t *testing.T) {
 
 	mc := &mockDownloaderClient{}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
-	result, err := e.Evaluate(ctx, "c1", nil)
+	result, err := e.Evaluate(ctx, 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1042,7 +1043,7 @@ func TestEngine_Evaluate_NoMatchingTorrent(t *testing.T) {
 	_ = e.Start(ctx)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "hash1", SiteName: "s1", TorrentID: "1",
+		ClientUID: 1, InfoHash: "hash1", SiteName: "s1", TorrentID: "1",
 		Status: model.SeedingStatusSeeding,
 	})
 
@@ -1052,11 +1053,11 @@ func TestEngine_Evaluate_NoMatchingTorrent(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
-	result, err := e.Evaluate(ctx, "c1", nil)
+	result, err := e.Evaluate(ctx, 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1074,11 +1075,10 @@ func TestEngine_Evaluate_ClientNotFound(t *testing.T) {
 	e := NewEngine(db, zap.NewNop())
 
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{},
-		list:    []string{},
-	})
+		clients: map[uint]*mockDownloaderClient{},
+		list:    []uint{},	})
 
-	_, err := e.Evaluate(ctx, "missing", nil)
+	_, err := e.Evaluate(ctx, 999, nil)
 	if err == nil {
 		t.Error("expected error for missing client")
 	}
@@ -1091,17 +1091,17 @@ func TestEngine_Evaluate_GetSeedsError(t *testing.T) {
 	_ = e.Start(ctx)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "hash1", SiteName: "s1", TorrentID: "1",
+		ClientUID: 1, InfoHash: "hash1", SiteName: "s1", TorrentID: "1",
 		Status: model.SeedingStatusSeeding,
 	})
 
 	mc := &mockDownloaderClient{seedErr: fmt.Errorf("connection refused")}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
-	_, err := e.Evaluate(ctx, "c1", nil)
+	_, err := e.Evaluate(ctx, 1, nil)
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -1114,7 +1114,7 @@ func TestEngine_Evaluate_DiskProtection(t *testing.T) {
 	_ = e.Start(ctx)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "hash1",
 		SiteName:  "s1",
 		TorrentID: "1",
@@ -1129,8 +1129,8 @@ func TestEngine_Evaluate_DiskProtection(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	cfg := &model.SeedingClientConfig{
@@ -1138,7 +1138,7 @@ func TestEngine_Evaluate_DiskProtection(t *testing.T) {
 		MinDiskSpaceGB:     10,
  Role: "seeding",
 	}
-	result, err := e.Evaluate(ctx, "c1", cfg)
+	result, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1160,7 +1160,7 @@ func TestEngine_Evaluate_DiskProtectRecovery(t *testing.T) {
 
 	now := time.Now()
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:     "c1",
+		ClientUID:     1,
 		InfoHash:     "hash1",
 		SiteName:     "s1",
 		TorrentID:    "1",
@@ -1175,8 +1175,8 @@ func TestEngine_Evaluate_DiskProtectRecovery(t *testing.T) {
 		seeds:    []*model.TorrentInfo{},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	cfg := &model.SeedingClientConfig{
@@ -1184,7 +1184,7 @@ func TestEngine_Evaluate_DiskProtectRecovery(t *testing.T) {
 		MinDiskSpaceGB:     10,
  Role: "seeding",
 	}
-	_, err := e.Evaluate(ctx, "c1", cfg)
+	_, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1209,7 +1209,7 @@ func TestEngine_Evaluate_DiskProtectNoRecoveryWhenFull(t *testing.T) {
 	_ = e.Start(ctx)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:     "c1",
+		ClientUID:     1,
 		InfoHash:     "hash1",
 		SiteName:     "s1",
 		TorrentID:    "1",
@@ -1223,8 +1223,8 @@ func TestEngine_Evaluate_DiskProtectNoRecoveryWhenFull(t *testing.T) {
 		seeds:    []*model.TorrentInfo{},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	cfg := &model.SeedingClientConfig{
@@ -1232,7 +1232,7 @@ func TestEngine_Evaluate_DiskProtectNoRecoveryWhenFull(t *testing.T) {
 		MinDiskSpaceGB:     10,
  Role: "seeding",
 	}
-	_, err := e.Evaluate(ctx, "c1", cfg)
+	_, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1251,7 +1251,7 @@ func TestEngine_Evaluate_PausedDiskProtect_InQB_TooYoung(t *testing.T) {
 	_ = e.Start(ctx)
 
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:     "c1",
+		ClientUID:     1,
 		InfoHash:     "hash1",
 		SiteName:     "s1",
 		TorrentID:    "1",
@@ -1268,8 +1268,8 @@ func TestEngine_Evaluate_PausedDiskProtect_InQB_TooYoung(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	cfg := &model.SeedingClientConfig{
@@ -1277,7 +1277,7 @@ func TestEngine_Evaluate_PausedDiskProtect_InQB_TooYoung(t *testing.T) {
 		MinDiskSpaceGB:     10,
  Role: "seeding",
 	}
-	_, err := e.Evaluate(ctx, "c1", cfg)
+	_, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1297,7 +1297,7 @@ func TestEngine_Evaluate_DeleteTorrent(t *testing.T) {
 
 	past := time.Now().Add(-200 * time.Hour)
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID:  "c1",
+		ClientUID:  1,
 		InfoHash:  "hash1",
 		SiteName:  "s1",
 		TorrentID: "1",
@@ -1314,11 +1314,11 @@ func TestEngine_Evaluate_DeleteTorrent(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
-	result, err := e.Evaluate(ctx, "c1", nil)
+	result, err := e.Evaluate(ctx, 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1347,14 +1347,14 @@ func TestEngine_RefreshMaindataCache(t *testing.T) {
 	_ = origGetMainData
 	mc.err = nil
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	_ = callCount
 	e.refreshMaindataOnce(ctx)
 
-	cached := e.getCachedMaindata("c1")
+	cached := e.getCachedMaindata(1)
 	if cached == nil {
 		t.Fatal("expected cached maindata for c1")
 	}
@@ -1375,7 +1375,7 @@ func TestEngine_RefreshMaindata_NoProvider(t *testing.T) {
 
 	e.refreshMaindataOnce(ctx)
 
-	cached := e.getCachedMaindata("c1")
+	cached := e.getCachedMaindata(1)
 	if cached != nil {
 		t.Error("expected nil cache when no provider set")
 	}
@@ -1393,13 +1393,13 @@ func TestEngine_RefreshMaindata_ClientError(t *testing.T) {
 		err:      fmt.Errorf("connection refused"),
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	e.refreshMaindataOnce(ctx)
 
-	cached := e.getCachedMaindata("c1")
+	cached := e.getCachedMaindata(1)
 	if cached != nil {
 		t.Error("expected nil cache when client returns error")
 	}
@@ -1417,8 +1417,8 @@ func TestEngine_EvaluateUsesCachedMaindata(t *testing.T) {
 		seeds: []*model.TorrentInfo{},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	if err := e.Start(ctx); err != nil {
@@ -1428,12 +1428,12 @@ func TestEngine_EvaluateUsesCachedMaindata(t *testing.T) {
 
 	e.refreshMaindataOnce(ctx)
 
-	_, err := e.Evaluate(ctx, "c1", nil)
+	_, err := e.Evaluate(ctx, 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cached := e.getCachedMaindata("c1")
+	cached := e.getCachedMaindata(1)
 	if cached == nil {
 		t.Fatal("expected cached maindata to exist after evaluate")
 	}
@@ -1448,7 +1448,7 @@ func TestEngine_Reannounce_AbortsDelete(t *testing.T) {
 
 	past := time.Now().Add(-200 * time.Hour)
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1", TorrentID: "1",
 		Status: model.SeedingStatusSeeding, IsFree: false, HasHR: false, CreatedAt: past,
 	})
 
@@ -1462,14 +1462,14 @@ func TestEngine_Reannounce_AbortsDelete(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	e.refreshMaindataOnce(ctx)
 
 	cfg := &model.SeedingClientConfig{
-		ClientID:             "c1",
+		ClientUID:             1,
 		Enabled:              true,
 		ReannounceBefore:     true,
 		ReannounceRetries:    2,
@@ -1478,7 +1478,7 @@ func TestEngine_Reannounce_AbortsDelete(t *testing.T) {
  Role: "seeding",
 	}
 
-	result, err := e.Evaluate(ctx, "c1", cfg)
+	result, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1499,7 +1499,7 @@ func TestEngine_Reannounce_Disabled(t *testing.T) {
 
 	past := time.Now().Add(-200 * time.Hour)
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1", TorrentID: "1",
 		Status: model.SeedingStatusSeeding, IsFree: false, HasHR: false, CreatedAt: past,
 	})
 
@@ -1510,20 +1510,20 @@ func TestEngine_Reannounce_Disabled(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	e.refreshMaindataOnce(ctx)
 
 	cfg := &model.SeedingClientConfig{
-		ClientID:         "c1",
+		ClientUID:         1,
 		Enabled:          true,
 		ReannounceBefore: false,
  Role: "seeding",
 	}
 
-	result, err := e.Evaluate(ctx, "c1", cfg)
+	result, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1544,7 +1544,7 @@ func TestEngine_Reannounce_AllRetriesFail(t *testing.T) {
 
 	past := time.Now().Add(-200 * time.Hour)
 	db.Create(&model.SeedingTorrentRecord{
-		ClientID: "c1", InfoHash: "h1", SiteName: "site1", TorrentID: "1",
+		ClientUID: 1, InfoHash: "h1", SiteName: "site1", TorrentID: "1",
 		Status: model.SeedingStatusSeeding, IsFree: false, HasHR: false, CreatedAt: past,
 	})
 
@@ -1558,14 +1558,14 @@ func TestEngine_Reannounce_AllRetriesFail(t *testing.T) {
 		},
 	}
 	e.SetClientProvider(&mockDownloaderProvider{
-		clients: map[string]*mockDownloaderClient{"c1": mc},
-		list:    []string{"c1"},
+		clients: map[uint]*mockDownloaderClient{1: mc},
+		list:    []uint{1},
 	})
 
 	e.refreshMaindataOnce(ctx)
 
 	cfg := &model.SeedingClientConfig{
-		ClientID:             "c1",
+		ClientUID:             1,
 		Enabled:              true,
 		ReannounceBefore:     true,
 		ReannounceRetries:    2,
@@ -1574,7 +1574,7 @@ func TestEngine_Reannounce_AllRetriesFail(t *testing.T) {
  Role: "seeding",
 	}
 
-	result, err := e.Evaluate(ctx, "c1", cfg)
+	result, err := e.Evaluate(ctx, 1, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

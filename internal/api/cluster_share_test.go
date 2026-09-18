@@ -34,14 +34,14 @@ func TestPropagateClusterMetadata(t *testing.T) {
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
 	// 簇: self + 2 siblings（快照）
 	for _, hh := range []string{"selfhash0000000000000000000000000000000000000", "sib10000000000000000000000000000000000000", "sib20000000000000000000000000000000000000"} {
-		db.Create(&model.TorrentSnapshot{Hash: hh, ClientID: "PT0", Name: "Arco.2025", SavePath: "/x"})
+		db.Create(&model.TorrentSnapshot{Hash: hh, ClientUID: 1, Name: "Arco.2025", SavePath: "/x"})
 	}
 	// self 完整 metadata
 	db.Create(&model.TorrentMetadata{InfoHash: "selfhash0000000000000000000000000000000000000", SiteName: "朋友", TorrentID: "123", Title: "Arco", Description: "d", Poster: "p", MediaInfo: "mi", MediaInfoSource: "local"})
 	// sibling1 已有自己的行（不覆盖）；sibling2 无行（应复制）
 	db.Create(&model.TorrentMetadata{InfoHash: "sib10000000000000000000000000000000000000", SiteName: "财神", Title: "existing"})
 
-	h.propagateClusterMetadata(context.Background(), "PT0", "/x", "Arco.2025",
+	h.propagateClusterMetadata(context.Background(), 1, "/x", "Arco.2025",
 		"selfhash0000000000000000000000000000000000000", "朋友")
 
 	var cpy model.TorrentMetadata
@@ -80,14 +80,14 @@ func TestHasCompleteMetadata(t *testing.T) {
 func TestPropagateClusterScreenshots(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	db.Create(&model.TorrentSnapshot{Hash: "shotself0000000000000000000000000000000000", ClientID: "PT0", Name: "N", SavePath: "/s"})
-	db.Create(&model.TorrentSnapshot{Hash: "shotsib00000000000000000000000000000000000", ClientID: "PT0", Name: "N", SavePath: "/s"})
+	db.Create(&model.TorrentSnapshot{Hash: "shotself0000000000000000000000000000000000", ClientUID: 1, Name: "N", SavePath: "/s"})
+	db.Create(&model.TorrentSnapshot{Hash: "shotsib00000000000000000000000000000000000", ClientUID: 1, Name: "N", SavePath: "/s"})
 	db.Create(&model.TorrentMetadata{InfoHash: "shotself0000000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: `["https://a/1.jpg"]`})
 	db.Create(&model.TorrentMetadata{InfoHash: "shotsib00000000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: ""})
 	// 已有截图的第三方行（不同簇）不应被写
 	db.Create(&model.TorrentMetadata{InfoHash: "other0000000000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: ""})
 
-	h.propagateClusterScreenshots(context.Background(), "PT0", "/s", "N",
+	h.propagateClusterScreenshots(context.Background(), 1, "/s", "N",
 		"shotself0000000000000000000000000000000000", `["https://a/1.jpg"]`)
 
 	var sib model.TorrentMetadata
@@ -108,12 +108,12 @@ func TestPropagateClusterScreenshots_OverwritePartialClusterRows(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
 	// 簇行带 2 张部分截图（fetch_source=cluster）——必须被覆盖（非仅空行）
-	db.Create(&model.TorrentSnapshot{Hash: "pself000000000000000000000000000000000000", ClientID: "PT0", Name: "P", SavePath: "/p"})
-	db.Create(&model.TorrentSnapshot{Hash: "psib0000000000000000000000000000000000000", ClientID: "PT0", Name: "P", SavePath: "/p"})
+	db.Create(&model.TorrentSnapshot{Hash: "pself000000000000000000000000000000000000", ClientUID: 1, Name: "P", SavePath: "/p"})
+	db.Create(&model.TorrentSnapshot{Hash: "psib0000000000000000000000000000000000000", ClientUID: 1, Name: "P", SavePath: "/p"})
 	db.Create(&model.TorrentMetadata{InfoHash: "pself000000000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: `["https://a/5.jpg"]`})
 	db.Create(&model.TorrentMetadata{InfoHash: "psib0000000000000000000000000000000000000", SiteName: "朋友", Title: "t", Screenshots: `["https://a/1.jpg","https://a/2.jpg"]`, FetchSource: "cluster"})
 
-	h.propagateClusterScreenshots(context.Background(), "PT0", "/p", "P",
+	h.propagateClusterScreenshots(context.Background(), 1, "/p", "P",
 		"pself000000000000000000000000000000000000", `["https://a/5.jpg"]`)
 
 	var sib model.TorrentMetadata
@@ -127,8 +127,8 @@ func TestPropagateClusterScreenshots_OverwritePartialClusterRows(t *testing.T) {
 func TestPropagateClusterPosters(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	db.Create(&model.TorrentSnapshot{Hash: "qself000000000000000000000000000000000000", ClientID: "PT0", Name: "Q", SavePath: "/q"})
-	db.Create(&model.TorrentSnapshot{Hash: "qsib0000000000000000000000000000000000000", ClientID: "PT0", Name: "Q", SavePath: "/q"})
+	db.Create(&model.TorrentSnapshot{Hash: "qself000000000000000000000000000000000000", ClientUID: 1, Name: "Q", SavePath: "/q"})
+	db.Create(&model.TorrentSnapshot{Hash: "qsib0000000000000000000000000000000000000", ClientUID: 1, Name: "Q", SavePath: "/q"})
 	// 首副本已被 PTGen 修复
 	db.Create(&model.TorrentMetadata{InfoHash: "qself000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
 		Poster: "https://doubaninfo.com/dbposter/x.jpg", Description: "PTGen简介", FetchSource: "rss_detail"})
@@ -136,11 +136,11 @@ func TestPropagateClusterPosters(t *testing.T) {
 	db.Create(&model.TorrentMetadata{InfoHash: "qsib0000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
 		Poster: "https://img.keepfrds.com/dead", Description: "[url=javascript:void(0)] MediaInfo: x.", FetchSource: "cluster"})
 	// 同簇但有独立数据的行（rss_detail）——不可被覆盖
-	db.Create(&model.TorrentSnapshot{Hash: "qown0000000000000000000000000000000000000", ClientID: "PT0", Name: "Q", SavePath: "/q"})
+	db.Create(&model.TorrentSnapshot{Hash: "qown0000000000000000000000000000000000000", ClientUID: 1, Name: "Q", SavePath: "/q"})
 	db.Create(&model.TorrentMetadata{InfoHash: "qown0000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
 		Poster: "own", Description: "own-desc", FetchSource: "rss_detail"})
 
-	h.propagateClusterPosters(context.Background(), "PT0", "/q", "Q", "qself000000000000000000000000000000000000")
+	h.propagateClusterPosters(context.Background(), 1, "/q", "Q", "qself000000000000000000000000000000000000")
 
 	var sib model.TorrentMetadata
 	db.Where("info_hash = ?", "qsib0000000000000000000000000000000000000").First(&sib)
@@ -159,15 +159,15 @@ func TestPropagateClusterPosters(t *testing.T) {
 func TestPropagateClusterPosters_NoMemoryMap(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	db.Create(&model.TorrentSnapshot{Hash: "rself000000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
-	db.Create(&model.TorrentSnapshot{Hash: "rsib0000000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentSnapshot{Hash: "rself000000000000000000000000000000000000", ClientUID: 1, Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentSnapshot{Hash: "rsib0000000000000000000000000000000000000", ClientUID: 1, Name: "R", SavePath: "/r"})
 	db.Create(&model.TorrentMetadata{InfoHash: "rself000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
 		Poster: "https://doubaninfo.com/dbposter/y.jpg", Description: "d2", FetchSource: "rss_detail"})
 	db.Create(&model.TorrentMetadata{InfoHash: "rsib0000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
 		Poster: "https://img.keepfrds.com/dead2", FetchSource: "cluster"})
 
 	// 不注册 posterClusterCtx（模拟 map 被清空/进程重启后）——直接调用也必须回传成功
-	h.propagateClusterPosters(context.Background(), "PT0", "/r", "R", "rself000000000000000000000000000000000000")
+	h.propagateClusterPosters(context.Background(), 1, "/r", "R", "rself000000000000000000000000000000000000")
 	var sib model.TorrentMetadata
 	db.Where("info_hash = ?", "rsib0000000000000000000000000000000000000").First(&sib)
 	if sib.Poster != "https://doubaninfo.com/dbposter/y.jpg" {
@@ -179,10 +179,10 @@ func TestPropagateClusterPosters_NoMemoryMap(t *testing.T) {
 func TestClusterCtxFor_FallbackToSnapshots(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	db.Create(&model.TorrentSnapshot{Hash: "ctxhash00000000000000000000000000000000", ClientID: "PT7", Name: "Ctx", SavePath: "/ctx"})
+	db.Create(&model.TorrentSnapshot{Hash: "ctxhash00000000000000000000000000000000", ClientUID: 1, Name: "Ctx", SavePath: "/ctx"})
 	// map 为空（未注册）
 	c, ok := h.clusterCtxFor(context.Background(), "ctxhash00000000000000000000000000000000")
-	if !ok || c.clientID != "PT7" || c.name != "Ctx" || c.savePath != "/ctx" {
+	if !ok || c.clientUID != 1 || c.name != "Ctx" || c.savePath != "/ctx" {
 		t.Errorf("反查失败: %+v ok=%v", c, ok)
 	}
 	// 未知 hash
@@ -197,8 +197,8 @@ func TestClusterCtxFor_FallbackToSnapshots(t *testing.T) {
 func TestFinalizeClusterPropagation_WaitsForFallback(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	db.Create(&model.TorrentSnapshot{Hash: "fself00000000000000000000000000000000000", ClientID: "PT0", Name: "F", SavePath: "/f"})
-	db.Create(&model.TorrentSnapshot{Hash: "fsib000000000000000000000000000000000000", ClientID: "PT0", Name: "F", SavePath: "/f"})
+	db.Create(&model.TorrentSnapshot{Hash: "fself00000000000000000000000000000000000", ClientUID: 1, Name: "F", SavePath: "/f"})
+	db.Create(&model.TorrentSnapshot{Hash: "fsib000000000000000000000000000000000000", ClientUID: 1, Name: "F", SavePath: "/f"})
 	// 首副本初始为站点态（fallback 尚未完成）
 	db.Create(&model.TorrentMetadata{InfoHash: "fself00000000000000000000000000000000000", SiteName: "朋友", Title: "t",
 		Poster: "https://img.keepfrds.com/site", Description: "site-desc", FetchSource: "rss_detail"})
@@ -214,7 +214,7 @@ func TestFinalizeClusterPropagation_WaitsForFallback(t *testing.T) {
 			Update("poster", "https://doubaninfo.com/dbposter/f.jpg")
 	}()
 
-	h.finalizeClusterPropagation(context.Background(), &wg, "PT0", "/f", "F",
+	h.finalizeClusterPropagation(context.Background(), &wg, 1, "/f", "F",
 		"fself00000000000000000000000000000000000", "朋友")
 
 	var sib model.TorrentMetadata
@@ -334,14 +334,14 @@ func TestPropagateClusterReviewed(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
 	// 簇: self + 2 兄弟
-	db.Create(&model.TorrentSnapshot{Hash: "rself00000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
-	db.Create(&model.TorrentSnapshot{Hash: "rsib10000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
-	db.Create(&model.TorrentSnapshot{Hash: "rsib20000000000000000000000000000000000", ClientID: "PT0", Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentSnapshot{Hash: "rself00000000000000000000000000000000000", ClientUID: 1, Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentSnapshot{Hash: "rsib10000000000000000000000000000000000", ClientUID: 1, Name: "R", SavePath: "/r"})
+	db.Create(&model.TorrentSnapshot{Hash: "rsib20000000000000000000000000000000000", ClientUID: 1, Name: "R", SavePath: "/r"})
 	db.Create(&model.TorrentMetadata{InfoHash: "rself00000000000000000000000000000000000", SiteName: "朋友", Title: "t", FetchSource: "rss_detail"})
 	db.Create(&model.TorrentMetadata{InfoHash: "rsib10000000000000000000000000000000000", SiteName: "朋友", Title: "t", FetchSource: "cluster"})
 	db.Create(&model.TorrentMetadata{InfoHash: "rsib20000000000000000000000000000000000", SiteName: "朋友", Title: "t", FetchSource: "cluster"})
 
-	h.propagateClusterReviewed(context.Background(), "PT0", "/r", "R", "rself00000000000000000000000000000000000", true)
+	h.propagateClusterReviewed(context.Background(), 1, "/r", "R", "rself00000000000000000000000000000000000", true)
 
 	var n int64
 	db.Model(&model.TorrentMetadata{}).
@@ -351,7 +351,7 @@ func TestPropagateClusterReviewed(t *testing.T) {
 		t.Errorf("簇内兄弟行应同步 reviewed: %d", n)
 	}
 	// 取消同步
-	h.propagateClusterReviewed(context.Background(), "PT0", "/r", "R", "rself00000000000000000000000000000000000", false)
+	h.propagateClusterReviewed(context.Background(), 1, "/r", "R", "rself00000000000000000000000000000000000", false)
 	db.Model(&model.TorrentMetadata{}).
 		Where("info_hash IN ? AND reviewed = ?", []string{"rsib10000000000000000000000000000000000", "rsib20000000000000000000000000000000000"}, false).
 		Count(&n)
@@ -365,14 +365,14 @@ func TestPropagateClusterReviewed(t *testing.T) {
 func TestClusterKeyOfAndSyncByIDs(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	db.Create(&model.TorrentSnapshot{Hash: "kself0000000000000000000000000000000000", ClientID: "PT1", Name: "K", SavePath: "/k"})
-	db.Create(&model.TorrentSnapshot{Hash: "ksib00000000000000000000000000000000000", ClientID: "PT1", Name: "K", SavePath: "/k"})
+	db.Create(&model.TorrentSnapshot{Hash: "kself0000000000000000000000000000000000", ClientUID: 1, Name: "K", SavePath: "/k"})
+	db.Create(&model.TorrentSnapshot{Hash: "ksib00000000000000000000000000000000000", ClientUID: 1, Name: "K", SavePath: "/k"})
 	db.Create(&model.TorrentMetadata{InfoHash: "kself0000000000000000000000000000000000", SiteName: "朋友", Title: "t", ID: 9001})
 	db.Create(&model.TorrentMetadata{InfoHash: "ksib00000000000000000000000000000000000", SiteName: "朋友", Title: "t", ID: 9002})
 
 	// 簇键解析（hash → client/path/name）
 	ck, ok := clusterKeyOf(db, "kself0000000000000000000000000000000000")
-	if !ok || ck.name != "K" || ck.savePath != "/k" || ck.clientID != "PT1" {
+	if !ok || ck.name != "K" || ck.savePath != "/k" || ck.clientUID != 1 {
 		t.Fatalf("clusterKeyOf: %+v ok=%v", ck, ok)
 	}
 	// 按 metadata ID 批量同步 reviewed
@@ -390,16 +390,16 @@ func TestPropagateClusterScreenshotsDB_ManualCapturePath(t *testing.T) {
 	db := clusterTestDB(t)
 	logger := zap.NewNop()
 	// 簇：1 源行 + 2 空副本 + 1 已有完整截图的独立获取行（rss_detail——不应被覆盖）
-	db.Create(&model.TorrentSnapshot{Hash: "mself000000000000000000000000000000000000", ClientID: "PT0", Name: "M", SavePath: "/m"})
-	db.Create(&model.TorrentSnapshot{Hash: "msib1000000000000000000000000000000000000", ClientID: "PT0", Name: "M", SavePath: "/m"})
-	db.Create(&model.TorrentSnapshot{Hash: "msib2000000000000000000000000000000000000", ClientID: "PT0", Name: "M", SavePath: "/m"})
+	db.Create(&model.TorrentSnapshot{Hash: "mself000000000000000000000000000000000000", ClientUID: 1, Name: "M", SavePath: "/m"})
+	db.Create(&model.TorrentSnapshot{Hash: "msib1000000000000000000000000000000000000", ClientUID: 1, Name: "M", SavePath: "/m"})
+	db.Create(&model.TorrentSnapshot{Hash: "msib2000000000000000000000000000000000000", ClientUID: 1, Name: "M", SavePath: "/m"})
 	db.Create(&model.TorrentMetadata{InfoHash: "mself000000000000000000000000000000000000", SiteName: "憨憨", Title: "t", Screenshots: `["https://a/9.jpg"]`})
 	db.Create(&model.TorrentMetadata{InfoHash: "msib1000000000000000000000000000000000000", SiteName: "憨憨", Title: "t", Screenshots: ""})
 	db.Create(&model.TorrentMetadata{InfoHash: "msib2000000000000000000000000000000000000", SiteName: "憨憨", Title: "t", Screenshots: "", FetchSource: "cluster"})
 	db.Create(&model.TorrentMetadata{InfoHash: "mrss0000000000000000000000000000000000000", SiteName: "憨憨", Title: "t", Screenshots: `["https://a/old.jpg"]`, FetchSource: "rss_detail"})
 
 	// 手动捕获路径：同簇键调用包级函数
-	propagateClusterScreenshotsDB(db, logger, context.Background(), "PT0", "/m", "M",
+	propagateClusterScreenshotsDB(db, logger, context.Background(), 1, "/m", "M",
 		"mself000000000000000000000000000000000000", `["https://a/9.jpg"]`)
 
 	var sib1, sib2, rssRow model.TorrentMetadata
@@ -417,9 +417,9 @@ func TestPropagateClusterScreenshotsDB_ManualCapturePath(t *testing.T) {
 	}
 
 	// nil 守卫：db/logger 空、空 JSON、空簇键不 panic
-	propagateClusterScreenshotsDB(nil, logger, context.Background(), "PT0", "/m", "M", "mself000000000000000000000000000000000000", `[]`)
-	propagateClusterScreenshotsDB(db, nil, context.Background(), "PT0", "/m", "M", "mself000000000000000000000000000000000000", "")
-	propagateClusterScreenshotsDB(db, logger, context.Background(), "", "/m", "M", "mself000000000000000000000000000000000000", `["https://a/9.jpg"]`)
+	propagateClusterScreenshotsDB(nil, logger, context.Background(), 1, "/m", "M", "mself000000000000000000000000000000000000", `[]`)
+	propagateClusterScreenshotsDB(db, nil, context.Background(), 1, "/m", "M", "mself000000000000000000000000000000000000", "")
+	propagateClusterScreenshotsDB(db, logger, context.Background(), 1, "/m", "M", "mself000000000000000000000000000000000000", `["https://a/9.jpg"]`)
 }
 
 // §59.170: 空 screenshots（[] 与 nil 同义）不覆盖不降级——直开预览自动保存
@@ -479,17 +479,17 @@ func TestSortMetasAuthoritative(t *testing.T) {
 func TestPropagateClusterMediainfoDB(t *testing.T) {
 	db := clusterTestDB(t)
 	logger := zap.NewNop()
-	db.Create(&model.TorrentSnapshot{Hash: "mself11000000000000000000000000000000000", ClientID: "PT0", Name: "W", SavePath: "/w"})
-	db.Create(&model.TorrentSnapshot{Hash: "msib110000000000000000000000000000000000", ClientID: "PT0", Name: "W", SavePath: "/w"})
-	db.Create(&model.TorrentSnapshot{Hash: "msib120000000000000000000000000000000000", ClientID: "PT0", Name: "W", SavePath: "/w"})
+	db.Create(&model.TorrentSnapshot{Hash: "mself11000000000000000000000000000000000", ClientUID: 1, Name: "W", SavePath: "/w"})
+	db.Create(&model.TorrentSnapshot{Hash: "msib110000000000000000000000000000000000", ClientUID: 1, Name: "W", SavePath: "/w"})
+	db.Create(&model.TorrentSnapshot{Hash: "msib120000000000000000000000000000000000", ClientUID: 1, Name: "W", SavePath: "/w"})
 	db.Create(&model.TorrentMetadata{InfoHash: "mself11000000000000000000000000000000000", SiteName: "朋友", Title: "t", MediaInfo: "MI-LOCAL"})
 	db.Create(&model.TorrentMetadata{InfoHash: "msib110000000000000000000000000000000000", SiteName: "朋友", Title: "t", MediaInfo: ""})
 	db.Create(&model.TorrentMetadata{InfoHash: "msib120000000000000000000000000000000000", SiteName: "朋友", Title: "t", MediaInfo: "MI-OLD", FetchSource: "cluster"})
 	// 独立获取行（不同簇键外的 rss 行——用其它名字簇的行模拟不动语义）
 	db.Create(&model.TorrentMetadata{InfoHash: "mrss110000000000000000000000000000000000", SiteName: "朋友", Title: "t", MediaInfo: "MI-SRC", FetchSource: "rss_detail"})
-	db.Create(&model.TorrentSnapshot{Hash: "mrss110000000000000000000000000000000000", ClientID: "PT0", Name: "OTHER", SavePath: "/w"})
+	db.Create(&model.TorrentSnapshot{Hash: "mrss110000000000000000000000000000000000", ClientUID: 1, Name: "OTHER", SavePath: "/w"})
 
-	propagateClusterMediainfoDB(db, logger, context.Background(), "PT0", "/w", "W",
+	propagateClusterMediainfoDB(db, logger, context.Background(), 1, "/w", "W",
 		"mself11000000000000000000000000000000000", "MI-LOCAL")
 
 	var sib1, sib2, rssRow model.TorrentMetadata
@@ -510,9 +510,9 @@ func TestPropagateClusterMediainfoDB(t *testing.T) {
 		t.Errorf("非簇行不应被写: %q", rssRow.MediaInfo)
 	}
 	// nil/空守卫
-	propagateClusterMediainfoDB(nil, logger, context.Background(), "PT0", "/w", "W", "mself11000000000000000000000000000000000", "MI")
-	propagateClusterMediainfoDB(db, nil, context.Background(), "PT0", "/w", "W", "mself11000000000000000000000000000000000", "MI")
-	propagateClusterMediainfoDB(db, logger, context.Background(), "PT0", "/w", "W", "mself11000000000000000000000000000000000", "")
+	propagateClusterMediainfoDB(nil, logger, context.Background(), 1, "/w", "W", "mself11000000000000000000000000000000000", "MI")
+	propagateClusterMediainfoDB(db, nil, context.Background(), 1, "/w", "W", "mself11000000000000000000000000000000000", "MI")
+	propagateClusterMediainfoDB(db, logger, context.Background(), 1, "/w", "W", "mself11000000000000000000000000000000000", "")
 }
 
 // §59.171 D: MI 九字段校验口径——仅源站 MI（SourceMediaInfo）不再判缺。

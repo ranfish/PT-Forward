@@ -46,7 +46,7 @@ func (b *EventBus) Publish(event *PushedEvent) {
 	case b.eventCh <- event:
 	default:
 		b.logger.Warn("event bus buffer full, dropping push event",
-			zap.String("client_id", event.ClientID),
+			zap.Uint("client_uid", event.ClientUID),
 			zap.String("info_hash", event.InfoHash))
 	}
 }

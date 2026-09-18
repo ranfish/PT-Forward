@@ -18,15 +18,15 @@ type ClusterMember struct {
 
 // GetClusterComments 读簇内全部副本及其 comment（三入口统一：batch-fetch / manual-forward / refresh）。
 // 依赖 migration 19 的复合索引 idx_snapshots_cluster。
-func GetClusterComments(ctx context.Context, db *gorm.DB, clientID, savePath, name string) []ClusterMember {
-	if clientID == "" || savePath == "" || name == "" {
+func GetClusterComments(ctx context.Context, db *gorm.DB, clientUID uint, savePath, name string) []ClusterMember {
+	if clientUID == 0 || savePath == "" || name == "" {
 		return nil
 	}
 	var rows []ClusterMember
 	db.WithContext(ctx).
 		Model(&model.TorrentSnapshot{}).
 		Select("hash, COALESCE(comment, '') as comment").
-		Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = 0", clientID, savePath, name).
+		Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = 0", clientUID, savePath, name).
 		Scan(&rows)
 	return rows
 }

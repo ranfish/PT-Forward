@@ -68,7 +68,7 @@
         <a-divider>{{ t('subscription.downloaderSettings') }}</a-divider>
         <a-form-item :label="t('downloader.title')" name="clientId">
           <a-select v-model:value="form.clientId" :placeholder="t('subscription.selectDownloader')" :loading="downloadersLoading" allow-clear>
-            <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">
+            <a-select-option v-for="d in downloaders" :key="d.id" :value="d.id">
               {{ d.name }}（{{ d.type }}）
             </a-select-option>
           </a-select>
@@ -150,8 +150,8 @@
           <a-input v-model:value="form.notifyId" :placeholder="t('subscription.notifyChannelPlaceholder')" />
         </a-form-item>
         <a-form-item v-if="form.autoReseed" :label="t('subscription.reseedClientIds')">
-          <a-select v-model:value="form.reseedClientIds" mode="multiple" :placeholder="t('subscription.reseedClientIdsPlaceholder')" :loading="downloadersLoading">
-            <a-select-option v-for="d in downloaders" :key="d.name" :value="d.name">{{ d.name }}</a-select-option>
+          <a-select v-model:value="form.transferClientIds" mode="multiple" :placeholder="t('subscription.reseedClientIdsPlaceholder')" :loading="downloadersLoading">
+            <a-select-option v-for="d in downloaders" :key="d.id" :value="d.id">{{ d.name }}</a-select-option>
           </a-select>
         </a-form-item>
       </a-form>
@@ -177,7 +177,7 @@ interface SubscriptionItem {
   urls: string[]
   cron: string
   enabled: boolean
-  clientId: string
+  clientId: number | undefined
   savePath: string
   category: string
   addPaused: boolean
@@ -228,7 +228,7 @@ const editingRecord = ref<SubscriptionItem | null>(null)
 
 const sites = ref<{ name: string }[]>([])
 const sitesLoading = ref(false)
-const downloaders = ref<{ name: string; type: string }[]>([])
+const downloaders = ref<{ id: number; name: string; type: string }[]>([])
 const downloadersLoading = ref(false)
 
 const form = reactive({
@@ -236,7 +236,7 @@ const form = reactive({
   siteName: '',
   urls: '',
   cron: '*/15 * * * *',
-  clientId: '',
+  clientId: undefined as number | undefined,
   savePath: '',
   category: '',
   addPaused: false,
@@ -251,7 +251,7 @@ const form = reactive({
   autoReseed: false,
   notifyId: '',
   publishTargets: [] as string[],
-  reseedClientIds: [] as string[],
+  transferClientIds: [] as number[],
   enabled: true,
 })
 
@@ -299,7 +299,7 @@ function openModal(record?: SubscriptionItem) {
     Object.assign(form, {
       name: record.name, siteName: record.siteName,
       urls: (record.urls || []).join('\n'), cron: record.cron || '*/15 * * * *',
-      clientId: record.clientId || '',
+      clientId: record.clientId || undefined,
       savePath: record.savePath || '',
       category: record.category || '',
       addPaused: record.addPaused || false,
@@ -314,17 +314,17 @@ function openModal(record?: SubscriptionItem) {
       autoReseed: record.autoReseed || false,
       notifyId: record.notifyId || '',
       publishTargets: record.publishTargets || [],
-      reseedClientIds: record.reseedClientIds || [],
+      transferClientIds: record.transferClientIds || [],
       enabled: record.enabled ?? true,
     })
   } else {
     Object.assign(form, {
       name: '', siteName: '', urls: '', cron: '*/15 * * * *',
-      clientId: '', savePath: '', category: '', addPaused: false, autoTmm: false,
+      clientId: undefined, savePath: '', category: '', addPaused: false, autoTmm: false,
       tags: [], scrapeFree: false, scrapeHr: false,
       uploadLimitKb: 0, downloadLimitKb: 0,
       publishEnabled: false, pushNotify: false, autoReseed: false,
-      notifyId: '', publishTargets: [], reseedClientIds: [], enabled: true,
+      notifyId: '', publishTargets: [], transferClientIds: [], enabled: true,
     })
   }
   modalVisible.value = true

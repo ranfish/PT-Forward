@@ -24,7 +24,7 @@ export interface ListParams {
 }
 
 export interface SeedingConfigRequest {
-  clientId?: string
+  clientId?: number
   enabled?: boolean
   deleteRuleIds?: string
   rejectRuleIds?: string
@@ -57,7 +57,7 @@ export interface SeedingConfigRequest {
 
 export interface SeedingClientConfig {
   id: number
-  client_id: string
+  client_uid: number
   created_at: string
   updated_at: string
   enabled: boolean
@@ -98,7 +98,7 @@ export interface SeedingTorrentRecord {
   id: number
   created_at: string
   updated_at: string
-  client_id: string
+  client_uid: number
   info_hash: string
   site_name: string
   torrent_id: string
@@ -154,7 +154,7 @@ export interface SeedingScoringConfig {
 export interface ScoringLog {
   id: number
   cycle_id: string
-  client_id: string
+  client_uid: number
   info_hash: string
   site_name: string
   torrent_id: string
@@ -180,7 +180,7 @@ export interface ClientConfig {
   username: string
   role: string
   isLocal?: boolean | null // §59.21
-  transferTargetId?: string
+  transferTargetUid?: number
   enabled: boolean
   isDefault: boolean
   torrentDir?: string
@@ -355,7 +355,7 @@ export interface RSSSubscription {
   urls: string[]
   siteName: string
   cron: string
-  clientId?: string
+  clientId?: number
   savePath?: string
   category?: string
   addPaused: boolean
@@ -370,7 +370,7 @@ export interface RSSSubscription {
   publishEnabled: boolean
   publishTargets?: string[]
   autoTransfer: boolean
-  transferClientIds?: string[]
+  transferClientIds?: number[]
   skipSameSize: boolean
   skipSameSizeWindowMin: number
   skipSameSizeStrict: boolean
@@ -389,7 +389,7 @@ export interface RSSSubscription {
   feasibilitySafety: number
   diskBudgetEnabled: boolean
   diskBudgetMinGB: number
-  candidateClients?: string[]
+  candidateClients?: number[]
   clientSelection: string
   diskGuardEnabled: boolean
   diskGuardThreshold: number
@@ -448,8 +448,8 @@ export interface PublishCandidate {
   info_hash: string
   torrent_name: string
   size: number
-  client_id: string
-  source_client_id: string
+  client_uid: number
+  source_client_uid: number
   local_save_path: string
   local_file_path: string
   target_sites: string
@@ -561,7 +561,7 @@ export interface ReseedMatch {
   id: number
   created_at: string
   updated_at: string
-  client_id: string
+  client_uid: number
   source_site: string
   source_torrent_id: string
   source_info_hash: string

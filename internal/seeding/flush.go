@@ -36,7 +36,7 @@ type flushContext struct {
 	subscriptionID   string
 	sub              *model.RSSSubscription
 	scoringCfg       model.SeedingScoringConfig
-	clientID         string
+	clientUID         uint
 	client           model.DownloaderClient
 	records          []model.SeedingTorrentRecord
 	freeSpace        int64
@@ -60,8 +60,8 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 		return nil, nil
 	}
 
-	clientID := sub.ClientID
-	if clientID == "" {
+	clientUID := sub.ClientUID
+	if clientUID == 0 {
 		return nil, nil
 	}
 
@@ -69,32 +69,32 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 		return nil, nil
 	}
 
-	dlClient, err := e.clientProvider.Get(clientID)
+	dlClient, err := e.clientProvider.Get(clientUID)
 	if err != nil {
 		e.logger.Warn("flush: client not available",
-			zap.String("client_id", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.Error(err))
 		return nil, nil
 	}
 
 	var cfg model.SeedingClientConfig
 	hasConfig := true
-	if err := e.db.WithContext(ctx).Where("client_id = ?", clientID).First(&cfg).Error; err != nil {
+	if err := e.db.WithContext(ctx).Where("client_uid = ?", clientUID).First(&cfg).Error; err != nil {
 		hasConfig = false
 	}
 
 	if hasConfig && !IsWithinActiveWindow(cfg.ActiveTimeWindows) {
 		e.logger.Debug("flush: outside active time windows",
-			zap.String("client_id", clientID))
+			zap.Uint("client_uid", clientUID))
 		return nil, nil
 	}
 
 	var records []model.SeedingTorrentRecord
 	if dbErr := e.db.WithContext(ctx).
-		Where("client_id = ? AND status IN ? AND source IN ? AND subscription_id = ?", clientID, []model.SeedingTorrentStatus{model.SeedingStatusPending, model.SeedingStatusSeeding}, []string{"rss", "free_wait"}, subscriptionID).
+		Where("client_uid = ? AND status IN ? AND source IN ? AND subscription_id = ?", clientUID, []model.SeedingTorrentStatus{model.SeedingStatusPending, model.SeedingStatusSeeding}, []string{"rss", "free_wait"}, subscriptionID).
 		Find(&records).Error; dbErr != nil {
 		e.logger.Warn("flush: load records failed",
-			zap.String("client_id", clientID),
+			zap.Uint("client_uid", clientUID),
 			zap.String("subscription_id", subscriptionID),
 			zap.Error(dbErr))
 		return nil, nil
@@ -111,7 +111,7 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 		minBytes := calcDiskMinBytes(&cfg, totalSpace)
 		if minBytes > 0 && freeSpace < minBytes {
 			e.logger.Warn("flush: disk protect active, skipping push",
-				zap.String("client_id", clientID),
+				zap.Uint("client_uid", clientUID),
 				zap.Int64("freeSpace", freeSpace),
 				zap.Int64("minBytes", minBytes),
 				zap.Float64("minGB", cfg.MinDiskSpaceGB),
@@ -156,7 +156,7 @@ func (e *Engine) buildFlushContext(ctx context.Context, subscriptionID string) (
 		subscriptionID:  subscriptionID,
 		sub:             &sub,
 		scoringCfg:      scoringCfg,
-		clientID:        clientID,
+		clientUID:        clientUID,
 		client:          dlClient,
 		records:         records,
 		freeSpace:       freeSpace,
@@ -424,7 +424,7 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 		return []*model.SeedingCandidate{}, nil
 	}
 
-	activeCount := e.GetActiveCount(fc.clientID)
+	activeCount := e.GetActiveCount(fc.clientUID)
 	maxActive := fc.scoringCfg.MaxActiveSeeding
 	if fc.clientCfg != nil && fc.clientCfg.MaxActiveSeeding != 0 {
 		maxActive = fc.clientCfg.MaxActiveSeeding
@@ -441,7 +441,7 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 	}
 	if remaining <= 0 {
 		e.logger.Info("flush: max active seeding reached, checking disk_recover only",
-			zap.String("client_id", fc.clientID),
+			zap.Uint("client_id", fc.clientUID),
 			zap.Int("active", activeCount),
 			zap.Int("max", maxActive))
 
@@ -471,7 +471,7 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 			results = append(results, candidate)
 			if pushed {
 				e.logger.Info("flush: disk_recover pushed despite maxActiveSeeding",
-					zap.String("client_id", fc.clientID),
+					zap.Uint("client_id", fc.clientUID),
 					zap.String("info_hash", c.InfoHash))
 			}
 		}
@@ -558,7 +558,7 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 					effectiveFree := md.FreeSpace - inflightBytes
 					if effectiveFree < minBytes {
 						e.logger.Warn("flush: disk protect triggered during batch, stopping",
-							zap.String("client_id", fc.clientID),
+							zap.Uint("client_id", fc.clientUID),
 							zap.Int64("freeSpace", md.FreeSpace),
 							zap.Int64("inflightBytes", inflightBytes),
 							zap.Int64("batchPendingBytes", batchPendingBytes),
@@ -570,7 +570,7 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 					torrentSize := c.Record.TorrentSize
 					if torrentSize > 0 && effectiveFree-torrentSize < minBytes {
 						e.logger.Info("flush: disk budget insufficient for torrent, skipping",
-							zap.String("client_id", fc.clientID),
+							zap.Uint("client_id", fc.clientUID),
 							zap.Int64("freeSpace", md.FreeSpace),
 							zap.Int64("inflightBytes", inflightBytes),
 							zap.Int64("effectiveFree", effectiveFree),
@@ -588,7 +588,7 @@ func (e *Engine) Flush(ctx context.Context, subscriptionID string) ([]*model.See
 		if pushed {
 			batchPendingBytes += c.Record.TorrentSize
 			e.logger.Info("flush: pushed seeding torrent",
-				zap.String("client_id", fc.clientID),
+				zap.Uint("client_id", fc.clientUID),
 				zap.String("site", c.SiteName),
 				zap.String("torrent_id", c.TorrentID),
 				zap.String("info_hash", c.InfoHash),
@@ -603,7 +603,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 	rec := c.Record
 	candidate := &model.SeedingCandidate{
 		SubscriptionID: fc.subscriptionID,
-		ClientID:       fc.clientID,
+		ClientUID:       fc.clientUID,
 		CollectedAt:    time.Now(),
 	}
 
@@ -699,7 +699,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 			rec.Status = model.SeedingStatusSeeding
 			rec.FlushedAt = &now
 			e.mu.Lock()
-			key := recordKey(rec.ClientID, rec.InfoHash)
+			key := recordKey(rec.ClientUID, rec.InfoHash)
 			if r, ok := e.recordMap[key]; ok {
 				r.Status = model.SeedingStatusSeeding
 				r.LastActionBy = "disk_recover_restored"
@@ -767,7 +767,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 	addResult, err := fc.client.AddFromFile(ctx, torrentData, opts)
 	if err != nil {
 		e.logger.Warn("flush: add from file failed",
-			zap.String("client_id", fc.clientID),
+			zap.Uint("client_id", fc.clientUID),
 			zap.String("torrent_id", rec.TorrentID),
 			zap.String("site_name", rec.SiteName),
 			zap.String("info_hash", rec.InfoHash),
@@ -776,7 +776,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 	}
 
 	e.logger.Debug("flush: torrent pushed to downloader",
-		zap.String("client_id", fc.clientID),
+		zap.Uint("client_id", fc.clientUID),
 		zap.String("torrent_id", rec.TorrentID),
 		zap.String("site_name", rec.SiteName),
 		zap.String("expected_hash", rec.InfoHash),
@@ -788,7 +788,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 		}()))
 
 	e.mu.Lock()
-	key := recordKey(fc.clientID, rec.InfoHash)
+	key := recordKey(fc.clientUID, rec.InfoHash)
 	if _, ok := e.recordMap[key]; ok {
 		e.mu.Unlock()
 		if addResult != nil && addResult.InfoHash != "" && addResult.InfoHash != rec.InfoHash {
@@ -810,20 +810,20 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 					zap.String("torrent_id", rec.TorrentID),
 					zap.Error(dbErr))
 			}
-			realKey := recordKey(fc.clientID, addResult.InfoHash)
+			realKey := recordKey(fc.clientUID, addResult.InfoHash)
 			rec.InfoHash = addResult.InfoHash
 			e.mu.Lock()
 			e.recordMap[realKey] = rec
 			e.mu.Unlock()
 		}
 	} else if addResult != nil && addResult.InfoHash != "" && addResult.InfoHash != rec.InfoHash {
-		altKey := recordKey(fc.clientID, addResult.InfoHash)
+		altKey := recordKey(fc.clientUID, addResult.InfoHash)
 		if _, altOk := e.recordMap[altKey]; altOk {
 			e.mu.Unlock()
 		} else {
 			e.mu.Unlock()
 			newRecord := &model.SeedingTorrentRecord{
-				ClientID:       fc.clientID,
+				ClientUID:       fc.clientUID,
 				SiteName:       rec.SiteName,
 				TorrentID:      rec.TorrentID,
 				InfoHash:       addResult.InfoHash,
@@ -877,7 +877,7 @@ func (e *Engine) pushOne(ctx context.Context, fc *flushContext, c *flushCandidat
 			zap.Error(dbErr))
 	} else {
 		e.logger.Debug("flush: record updated to seeding",
-			zap.String("client_id", fc.clientID),
+			zap.Uint("client_id", fc.clientUID),
 			zap.String("info_hash", rec.InfoHash),
 			zap.String("site_name", rec.SiteName),
 			zap.String("torrent_id", rec.TorrentID))

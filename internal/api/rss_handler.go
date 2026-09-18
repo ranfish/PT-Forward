@@ -34,7 +34,7 @@ type createRSSRequest struct {
 	SiteName string   `json:"siteName"`
 	Cron     string   `json:"cron,omitempty"`
 
-	ClientID  string `json:"clientId,omitempty"`
+	ClientUID uint `json:"clientId,omitempty"`
 	SavePath  string `json:"savePath,omitempty"`
 	Category  string `json:"category,omitempty"`
 	AddPaused bool   `json:"addPaused"`
@@ -55,7 +55,7 @@ type createRSSRequest struct {
 	PublishTargets []string `json:"publishTargets,omitempty"`
 
 	AutoTransfer      bool     `json:"autoTransfer"`
-	TransferClientIDs []string `json:"transferClientIds,omitempty"`
+	TransferClientUIDs []uint `json:"transferClientIds,omitempty"`
 
 	SkipSameSize          bool `json:"skipSameSize"`
 	SkipSameSizeWindowMin int  `json:"skipSameSizeWindowMin"`
@@ -79,7 +79,7 @@ type createRSSRequest struct {
 	DiskBudgetEnabled bool    `json:"diskBudgetEnabled"`
 	DiskBudgetMinGB   float64 `json:"diskBudgetMinGB"`
 
-	CandidateClients []string                  `json:"candidateClients,omitempty"`
+	CandidateClients []uint                  `json:"candidateClients,omitempty"`
 	ClientSelection  model.ClientSelectionMode `json:"clientSelection,omitempty"`
 
 	DiskGuardEnabled   bool    `json:"diskGuardEnabled"`
@@ -99,7 +99,7 @@ type updateRSSRequest struct {
 	SiteName *string   `json:"siteName,omitempty"`
 	Cron     *string   `json:"cron,omitempty"`
 
-	ClientID  *string `json:"clientId,omitempty"`
+	ClientUID *uint   `json:"clientId,omitempty"`
 	SavePath  *string `json:"savePath,omitempty"`
 	Category  *string `json:"category,omitempty"`
 	AddPaused *bool   `json:"addPaused,omitempty"`
@@ -120,7 +120,7 @@ type updateRSSRequest struct {
 	PublishTargets *[]string `json:"publishTargets,omitempty"`
 
 	AutoTransfer      *bool     `json:"autoTransfer,omitempty"`
-	TransferClientIDs *[]string `json:"transferClientIds,omitempty"`
+	TransferClientUIDs *[]uint `json:"transferClientIds,omitempty"`
 
 	SkipSameSize          *bool `json:"skipSameSize,omitempty"`
 	SkipSameSizeWindowMin *int  `json:"skipSameSizeWindowMin,omitempty"`
@@ -144,7 +144,7 @@ type updateRSSRequest struct {
 	DiskBudgetEnabled *bool    `json:"diskBudgetEnabled,omitempty"`
 	DiskBudgetMinGB   *float64 `json:"diskBudgetMinGB,omitempty"`
 
-	CandidateClients *[]string                  `json:"candidateClients,omitempty"`
+	CandidateClients *[]uint                  `json:"candidateClients,omitempty"`
 	ClientSelection  *model.ClientSelectionMode `json:"clientSelection,omitempty"`
 
 	DiskGuardEnabled   *bool    `json:"diskGuardEnabled,omitempty"`
@@ -166,7 +166,7 @@ type rssResponse struct {
 	SiteName string   `json:"siteName"`
 	Cron     string   `json:"cron"`
 
-	ClientID  string `json:"clientId,omitempty"`
+	ClientUID uint `json:"clientId,omitempty"`
 	SavePath  string `json:"savePath,omitempty"`
 	Category  string `json:"category,omitempty"`
 	AddPaused bool   `json:"addPaused"`
@@ -187,7 +187,7 @@ type rssResponse struct {
 	PublishTargets []string `json:"publishTargets,omitempty"`
 
 	AutoTransfer      bool     `json:"autoTransfer"`
-	TransferClientIDs []string `json:"transferClientIds,omitempty"`
+	TransferClientUIDs []uint `json:"transferClientIds,omitempty"`
 
 	SkipSameSize    bool `json:"skipSameSize"`
 	AddCountPerHour int  `json:"addCountPerHour"`
@@ -212,7 +212,7 @@ type rssResponse struct {
 	DiskBudgetEnabled bool    `json:"diskBudgetEnabled"`
 	DiskBudgetMinGB   float64 `json:"diskBudgetMinGB"`
 
-	CandidateClients []string                  `json:"candidateClients"`
+	CandidateClients []uint                  `json:"candidateClients"`
 	ClientSelection  model.ClientSelectionMode `json:"clientSelection"`
 
 	DiskGuardEnabled   bool       `json:"diskGuardEnabled"`
@@ -248,7 +248,7 @@ func (h *RSSHandler) toResponse(s *model.RSSSubscription) rssResponse {
 		SiteName: s.SiteName,
 		Cron:     s.Cron,
 
-		ClientID:  s.ClientID,
+		ClientUID: s.ClientUID,
 		SavePath:  s.SavePath,
 		Category:  s.Category,
 		AddPaused: s.AddPaused,
@@ -269,7 +269,7 @@ func (h *RSSHandler) toResponse(s *model.RSSSubscription) rssResponse {
 		PublishTargets: s.PublishTargets,
 
 		AutoTransfer:      s.AutoTransfer,
-		TransferClientIDs: s.TransferClientIDs,
+		TransferClientUIDs: s.TransferClientUIDs,
 
 		SkipSameSize:    s.SkipSameSize,
 		AddCountPerHour: s.AddCountPerHour,
@@ -480,7 +480,7 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		SiteName: req.SiteName,
 		Cron:     cron,
 
-		ClientID:  req.ClientID,
+		ClientUID: req.ClientUID,
 		SavePath:  req.SavePath,
 		Category:  req.Category,
 		AddPaused: req.AddPaused,
@@ -501,7 +501,7 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		PublishTargets: req.PublishTargets,
 
 		AutoTransfer:      req.AutoTransfer,
-		TransferClientIDs: req.TransferClientIDs,
+		TransferClientUIDs: req.TransferClientUIDs,
 
 		SkipSameSize:          req.SkipSameSize,
 		SkipSameSizeWindowMin: req.SkipSameSizeWindowMin,
@@ -632,8 +632,8 @@ func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.Cron != nil {
 		sub.Cron = *req.Cron
 	}
-	if req.ClientID != nil {
-		sub.ClientID = *req.ClientID
+	if req.ClientUID != nil {
+		sub.ClientUID = *req.ClientUID
 	}
 	if req.SavePath != nil {
 		sub.SavePath = *req.SavePath
@@ -677,8 +677,8 @@ func (h *RSSHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.AutoTransfer != nil {
 		sub.AutoTransfer = *req.AutoTransfer
 	}
-	if req.TransferClientIDs != nil {
-		sub.TransferClientIDs = *req.TransferClientIDs
+	if req.TransferClientUIDs != nil {
+		sub.TransferClientUIDs = *req.TransferClientUIDs
 	}
 	if req.SkipSameSize != nil {
 		sub.SkipSameSize = *req.SkipSameSize

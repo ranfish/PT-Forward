@@ -1144,14 +1144,14 @@ func registerSchedulerTasks(
 			return err
 		}
 		for _, cfg := range configs {
-			result, evalErr := seedingEngine.Evaluate(ctx, cfg.ClientID, cfg)
+			result, evalErr := seedingEngine.Evaluate(ctx, cfg.ClientUID, cfg)
 			if evalErr != nil {
-				log.Warn("seeding auto-delete evaluate failed", zap.String("clientId", cfg.ClientID), zap.Error(evalErr))
+				log.Warn("seeding auto-delete evaluate failed", zap.Uint("client_uid", cfg.ClientUID), zap.Error(evalErr))
 				continue
 			}
 			if result.Paused > 0 || result.Deleted > 0 {
 				log.Info("seeding auto-delete",
-					zap.String("clientId", cfg.ClientID),
+					zap.Uint("client_uid", cfg.ClientUID),
 					zap.Int("evaluated", result.Evaluated),
 					zap.Int("paused", result.Paused),
 					zap.Int("deleted", result.Deleted),

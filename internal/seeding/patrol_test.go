@@ -56,18 +56,18 @@ func TestPatrolCooldown(t *testing.T) {
 	e := NewEngine(setupEngineTestDB(t), zap.NewNop())
 	now := time.Now()
 
-	if e.inUnregCooldown("PT0", "hash1", now, 30*time.Minute) {
+	if e.inUnregCooldown(1, "hash1", now, 30*time.Minute) {
 		t.Error("no entry → not in cooldown")
 	}
-	e.setUnregCooldown("PT0", "hash1", now)
+	e.setUnregCooldown(1, "hash1", now)
 
-	if !e.inUnregCooldown("PT0", "hash1", now.Add(10*time.Minute), 30*time.Minute) {
+	if !e.inUnregCooldown(1, "hash1", now.Add(10*time.Minute), 30*time.Minute) {
 		t.Error("within window → in cooldown")
 	}
-	if e.inUnregCooldown("PT0", "hash1", now.Add(31*time.Minute), 30*time.Minute) {
+	if e.inUnregCooldown(1, "hash1", now.Add(31*time.Minute), 30*time.Minute) {
 		t.Error("past window → expired")
 	}
-	if e.inUnregCooldown("PT1", "hash1", now, 30*time.Minute) {
+	if e.inUnregCooldown(2, "hash1", now, 30*time.Minute) {
 		t.Error("different client → separate")
 	}
 }
@@ -82,14 +82,14 @@ func TestMarkUnregistered(t *testing.T) {
 	defer e.Stop(context.Background())
 
 	rec := &model.SeedingTorrentRecord{
-		ClientID: "PT0", InfoHash: "aa", SiteName: "朋友",
+		ClientUID: 1, InfoHash: "aa", SiteName: "朋友",
 		Status: model.SeedingStatusSeeding,
 	}
 	if err := db.Create(rec).Error; err != nil {
 		t.Fatal(err)
 	}
 	e.mu.Lock()
-	e.recordMap[recordKey("PT0", "aa")] = rec
+	e.recordMap[recordKey(1, "aa")] = rec
 	e.mu.Unlock()
 
 	e.markUnregistered(context.Background(), rec, "torrent not found", "pt.keepfrds.com")
@@ -141,14 +141,14 @@ func TestPatrolDispatch(t *testing.T) {
 	// 构造 3 个候选：hash-a 有信号，hash-b/c 无信号
 	for _, h := range []string{"hash-a", "hash-b", "hash-c"} {
 		rec := &model.SeedingTorrentRecord{
-			ClientID: "QB1", InfoHash: h, SiteName: "测试",
+			ClientUID: 1, InfoHash: h, SiteName: "测试",
 			Status: model.SeedingStatusSeeding,
 		}
 		if err := db.Create(rec).Error; err != nil {
 			t.Fatal(err)
 		}
 		e.mu.Lock()
-		e.recordMap[recordKey("QB1", h)] = rec
+		e.recordMap[recordKey(1, h)] = rec
 		e.mu.Unlock()
 	}
 
@@ -163,24 +163,24 @@ func TestPatrolDispatch(t *testing.T) {
 	// 直接调 checkUnregisteredTorrents 的 qbittorrent 分支（框架查 DB clients 表，
 	// 单测 DB 无该表行 → clientFramework 返回 ""，走 default 兜底=全量。
 	// 因此这里直接测两个 batch 函数 + 分区逻辑的等价组合）
-	e.patrolConfirmBatch(context.Background(), "QB1", mock, []*model.SeedingTorrentRecord{
-		e.recordMap[recordKey("QB1", "hash-a")],
+	e.patrolConfirmBatch(context.Background(), 1, mock, []*model.SeedingTorrentRecord{
+		e.recordMap[recordKey(1, "hash-a")],
 	}, []string{"torrent not found"})
-	e.patrolFullScanBatch(context.Background(), "QB1", mock, []*model.SeedingTorrentRecord{
-		e.recordMap[recordKey("QB1", "hash-b")],
-		e.recordMap[recordKey("QB1", "hash-c")],
+	e.patrolFullScanBatch(context.Background(), 1, mock, []*model.SeedingTorrentRecord{
+		e.recordMap[recordKey(1, "hash-b")],
+		e.recordMap[recordKey(1, "hash-c")],
 	}, []string{"torrent not found"})
 
 	// hash-a 应被标记（池扫命中）
-	a := e.recordMap[recordKey("QB1", "hash-a")]
+	a := e.recordMap[recordKey(1, "hash-a")]
 	if !a.Unregistered || a.UnregisteredMsg != "torrent not found" {
 		t.Errorf("hash-a should be marked via suspect pool, got %+v", a.UnregisteredMsg)
 	}
 	// b/c 未命中（msg 为空）
-	if e.recordMap[recordKey("QB1", "hash-b")].Unregistered {
+	if e.recordMap[recordKey(1, "hash-b")].Unregistered {
 		t.Error("hash-b should not be marked")
 	}
-	if e.recordMap[recordKey("QB1", "hash-c")].Unregistered {
+	if e.recordMap[recordKey(1, "hash-c")].Unregistered {
 		t.Error("hash-c should not be marked")
 	}
 }
@@ -200,7 +200,7 @@ func TestPatrolCapAttempts(t *testing.T) {
 	for i := 0; i < 60; i++ {
 		h := fmt.Sprintf("err-%02d", i)
 		rec := &model.SeedingTorrentRecord{
-			ClientID: "QB1", InfoHash: h, SiteName: "测试",
+			ClientUID: 1, InfoHash: h, SiteName: "测试",
 			Status: model.SeedingStatusSeeding,
 		}
 		if err := db.Create(rec).Error; err != nil {
@@ -210,7 +210,7 @@ func TestPatrolCapAttempts(t *testing.T) {
 		mock.errSet[h] = true
 	}
 
-	e.patrolConfirmBatch(context.Background(), "QB1", mock, suspects, []string{"torrent not found"})
+	e.patrolConfirmBatch(context.Background(), 1, mock, suspects, []string{"torrent not found"})
 
 	if len(mock.calls) > e.patrolBatchSize() {
 		t.Errorf("error storm: %d attempts exceed cap %d", len(mock.calls), e.patrolBatchSize())
@@ -233,7 +233,7 @@ func TestPatrolCursorRoundRobin(t *testing.T) {
 	for i := 6; i >= 0; i-- {
 		h := fmt.Sprintf("h%d", i)
 		rec := &model.SeedingTorrentRecord{
-			ClientID: "QB2", InfoHash: h, SiteName: "测试",
+			ClientUID: 1, InfoHash: h, SiteName: "测试",
 			Status: model.SeedingStatusSeeding,
 		}
 		if err := db.Create(rec).Error; err != nil {
@@ -244,12 +244,12 @@ func TestPatrolCursorRoundRobin(t *testing.T) {
 	}
 
 	// batchSize=50 > 7 → 一 tick 全扫完，游标=7；下一 tick wrap 到 0 重扫
-	e.patrolFullScanBatch(context.Background(), "QB2", mock, records, []string{"kw"})
+	e.patrolFullScanBatch(context.Background(), 2, mock, records, []string{"kw"})
 	if len(mock.calls) != 7 {
 		t.Fatalf("first pass: %d calls, want 7", len(mock.calls))
 	}
 	mock.calls = nil
-	e.patrolFullScanBatch(context.Background(), "QB2", mock, records, []string{"kw"})
+	e.patrolFullScanBatch(context.Background(), 2, mock, records, []string{"kw"})
 	if len(mock.calls) != 7 {
 		t.Fatalf("after wrap: %d calls, want 7 (cursor wrapped)", len(mock.calls))
 	}

@@ -26,13 +26,13 @@ func (r *Repository) GetByID(ctx context.Context, id uint) (*model.DownloadTask,
 	return &task, err
 }
 
-func (r *Repository) List(ctx context.Context, page, size int, clientID, status string) ([]model.DownloadTask, int64, error) {
+func (r *Repository) List(ctx context.Context, page, size int, clientUID uint, status string) ([]model.DownloadTask, int64, error) {
 	var tasks []model.DownloadTask
 	var total int64
 
 	q := r.db.WithContext(ctx).Model(&model.DownloadTask{}).Where("status != ?", model.DownloadStatusDeleted)
-	if clientID != "" {
-		q = q.Where("client_id = ?", clientID)
+	if clientUID != 0 {
+		q = q.Where("client_uid = ?", clientUID)
 	}
 	if status != "" {
 		q = q.Where("status = ?", status)
@@ -57,18 +57,18 @@ func (r *Repository) ListActive(ctx context.Context) ([]model.DownloadTask, erro
 	return tasks, err
 }
 
-func (r *Repository) FindByClientAndHash(ctx context.Context, clientID, infoHash string) (*model.DownloadTask, error) {
+func (r *Repository) FindByClientAndHash(ctx context.Context, clientUID uint, infoHash string) (*model.DownloadTask, error) {
 	var task model.DownloadTask
 	err := r.db.WithContext(ctx).
-		Where("client_id = ? AND info_hash = ? AND status != ?", clientID, infoHash, model.DownloadStatusDeleted).
+		Where("client_uid = ? AND info_hash = ? AND status != ?", clientUID, infoHash, model.DownloadStatusDeleted).
 		First(&task).Error
 	return &task, err
 }
 
-func (r *Repository) FindExistingHashes(ctx context.Context, clientID string) (map[string]bool, error) {
+func (r *Repository) FindExistingHashes(ctx context.Context, clientUID uint) (map[string]bool, error) {
 	var hashes []string
 	err := r.db.WithContext(ctx).Model(&model.DownloadTask{}).
-		Where("client_id = ? AND status != ?", clientID, model.DownloadStatusDeleted).
+		Where("client_uid = ? AND status != ?", clientUID, model.DownloadStatusDeleted).
 		Pluck("info_hash", &hashes).Error
 	if err != nil {
 		return nil, err
@@ -98,10 +98,10 @@ func (r *Repository) UpdateProgress(ctx context.Context, id uint, updates map[st
 		Updates(updates).Error
 }
 
-func (r *Repository) UpdateTransfer(ctx context.Context, id uint, transferStatus, transferClientID, transferHash string) error {
+func (r *Repository) UpdateTransfer(ctx context.Context, id uint, transferStatus string, transferClientUID uint, transferHash string) error {
 	updates := map[string]interface{}{
 		"transfer_status":    transferStatus,
-		"transfer_client_id": transferClientID,
+		"transfer_client_uid": transferClientUID,
 		"updated_at":         time.Now(),
 	}
 	if transferHash != "" {
@@ -129,11 +129,11 @@ func (r *Repository) MarkDeleted(ctx context.Context, id uint, action string) er
 		}).Error
 }
 
-func (r *Repository) UpdateClientAndHash(ctx context.Context, id uint, clientID, infoHash string) error {
+func (r *Repository) UpdateClientAndHash(ctx context.Context, id uint, clientUID uint, infoHash string) error {
 	return r.db.WithContext(ctx).Model(&model.DownloadTask{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
-			"client_id":  clientID,
+			"client_id":  clientUID,
 			"info_hash":  infoHash,
 			"updated_at": time.Now(),
 		}).Error

@@ -143,7 +143,7 @@
       <template #extra>
         <a-select v-model:value="trafficClientId" style="width: 160px" @change="fetchTraffic">
           <a-select-option value="">全部</a-select-option>
-          <a-select-option v-for="c in trafficClients" :key="c" :value="c">{{ c }}</a-select-option>
+          <a-select-option v-for="c in trafficClients" :key="c" :value="c">#{{ c }}</a-select-option>
         </a-select>
         <a-radio-group v-model:value="trafficDays" size="small" style="margin-left: 8px" @change="fetchTraffic">
           <a-radio-button :value="1">24h</a-radio-button>
@@ -279,9 +279,9 @@ let chartInstance: echarts.ECharts | null = null
 let trafficChart: echarts.ECharts | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 const wsStore = useWebSocketStore()
-const trafficClientId = ref('')
+const trafficClientId = ref<number | undefined>(undefined)
 const trafficDays = ref(7)
-const trafficClients = ref<string[]>([])
+const trafficClients = ref<number[]>([])
 const trafficChartRef = ref<HTMLElement>()
 
 const activityColumns = [
@@ -437,11 +437,11 @@ async function fetchTraffic() {
   try {
     const { data } = await statsApi.getTrafficHourly(trafficClientId.value || undefined, trafficDays.value)
     const items: TrafficHourlyPoint[] = (data.data as any)?.items || []
-    const clientSet = new Set<string>()
+    const clientSet = new Set<number>()
     for (const item of items) {
-      if (item.client_id) clientSet.add(item.client_id)
+      if (item.client_uid) clientSet.add(item.client_uid)
     }
-    trafficClients.value = [...clientSet].sort()
+    trafficClients.value = [...clientSet].sort((a, b) => a - b)
     await nextTick()
     initTrafficChart(items)
   } catch {

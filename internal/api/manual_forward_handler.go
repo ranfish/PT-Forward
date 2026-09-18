@@ -37,7 +37,7 @@ type ManualForwardHandler struct {
 
 // SeedingCacheProvider 从 seeding engine 读取已缓存的种子列表（避免直连下载器）。
 type SeedingCacheProvider interface {
-	GetCachedTorrents(clientName string) []*model.TorrentInfo
+	GetCachedTorrents(clientUID uint) []*model.TorrentInfo
 }
 
 // CoverageServiceProvider §56.33 决策 C1：源站识别用 coverage 历史数据查 tid。
@@ -68,7 +68,7 @@ type SiteManager interface {
 }
 
 type MFClientProvider interface {
-	Get(clientID string) (model.DownloaderClient, error)
+	Get(clientUID uint) (model.DownloaderClient, error)
 }
 
 func NewManualForwardHandler(db *gorm.DB, logger *zap.Logger) *ManualForwardHandler {
@@ -121,8 +121,8 @@ func (h *ManualForwardHandler) refreshFromSource(ctx context.Context, infoHash, 
 		Where("hash = ? AND is_hidden = ?", infoHash, false).
 		First(&row).Error; err == nil && row.Name != "" {
 		h.db.WithContext(ctx).Model(&model.TorrentSnapshot{}).
-			Where("client_id = ? AND save_path = ? AND name = ? AND is_hidden = ?",
-				row.ClientID, row.SavePath, row.Name, false).
+			Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = ?",
+				row.ClientUID, row.SavePath, row.Name, false).
 			Pluck("hash", &hashes)
 	}
 	candidates := []string{infoHash}
@@ -152,7 +152,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		InfoHash    string   `json:"infoHash"`
 		SiteName    string   `json:"siteName"`
 		Screenshots []string `json:"screenshots"`
-		ClientID    string   `json:"clientId"` // §59.21: 查 is_local
+		ClientUID uint   `json:"clientId"` // §59.21: 查 is_local
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -168,9 +168,9 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 
 	// §59.21: 查下载器 is_local
 	isLocal := true // 默认 true（向后兼容：无 client_id 时走本地路径）
-	if req.ClientID != "" {
+	if req.ClientUID != 0 {
 		var client model.ClientConfig
-		if err := h.db.WithContext(ctx).Where("name = ?", req.ClientID).First(&client).Error; err == nil {
+		if err := h.db.WithContext(ctx).Where("id = ?", req.ClientUID).First(&client).Error; err == nil {
 			isLocal = client.IsLocal
 		}
 	}
@@ -252,7 +252,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 					h.logger.Warn("refresh mediainfo persist failed",
 						zap.String("hash", req.InfoHash[:min(10, len(req.InfoHash))]), zap.Error(err))
 				} else {
-					propagateClusterMediainfoDB(h.db, h.logger, ctx, req.ClientID, req.SavePath, req.Name, req.InfoHash, miStr)
+					propagateClusterMediainfoDB(h.db, h.logger, ctx, req.ClientUID, req.SavePath, req.Name, req.InfoHash, miStr)
 				}
 			}
 		}
@@ -422,18 +422,18 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 	var req struct {
 		Name     string `json:"name"`
 		SavePath string `json:"savePath"`
-		ClientID string `json:"clientId"`
+		ClientUID uint `json:"clientId"`
 		InfoHash string `json:"infoHash"`
 		SiteName string `json:"siteName"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.SavePath == "" || req.ClientID == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.SavePath == "" || req.ClientUID == 0 {
 		Error(w, http.StatusBadRequest, 40001, "name/savePath/clientId 必填")
 		return
 	}
 
 	// §59.51 遗漏2: is_local 守卫——本端点只服务本地下载器
 	var client model.ClientConfig
-	if err := h.db.WithContext(r.Context()).Where("name = ?", req.ClientID).First(&client).Error; err != nil || !client.IsLocal {
+	if err := h.db.WithContext(r.Context()).Where("id = ?", req.ClientUID).First(&client).Error; err != nil || !client.IsLocal {
 		Error(w, http.StatusBadRequest, 40001, "该下载器非本地（is_local=false 请走源站重获）")
 		return
 	}
@@ -479,7 +479,7 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 			h.capture.status = "done"
 			// §59.63 Q4: 手动捕获行为不变（每次全新截传），结果写穿缓存——
 			// 缓存语义 = 簇最新已知好链接，供下轮批量直接复用
-			upsertClusterScreenshotCache(h.db, h.logger, h.screenshotCacheDays, req.ClientID, req.SavePath, req.Name, shots)
+			upsertClusterScreenshotCache(h.db, h.logger, h.screenshotCacheDays, req.ClientUID, req.SavePath, req.Name, shots)
 		} else {
 			h.capture.status = "failed"
 			h.capture.error = "mpv 截图失败（本地无可用视频文件或上传全失败）"
@@ -498,7 +498,7 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 			}
 			// §59.169: 手动截图簇传播——与策略路径（screenshot cache hit 分支）对齐，
 			// 补簇内空截图行。海王2 45 副本死循环根因：手动只写单行。
-			propagateClusterScreenshotsDB(h.db, h.logger, ctx, req.ClientID, req.SavePath, req.Name, req.InfoHash, string(data))
+			propagateClusterScreenshotsDB(h.db, h.logger, ctx, req.ClientUID, req.SavePath, req.Name, req.InfoHash, string(data))
 		}
 	}()
 

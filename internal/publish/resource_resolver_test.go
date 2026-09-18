@@ -28,9 +28,9 @@ func TestResolveResourceCrossHash(t *testing.T) {
 	name := "黑暗侵袭.The.Descent.2005.Unrated.UHD.BluRay.2160p.x265.mUHD-FRDS"
 	path := "/home/pt/pt1/FRDS"
 	// 15 变体：挂载行 722b + 保留行 ea86 + 其他
-	db.Create(&model.TorrentSnapshot{Hash: "h_keep", ClientID: "PT0", SavePath: path, Name: name, IsHidden: false})
-	db.Create(&model.TorrentSnapshot{Hash: "h_meta", ClientID: "PT0", SavePath: path, Name: name, IsHidden: false})
-	db.Create(&model.TorrentSnapshot{Hash: "h_other", ClientID: "PT0", SavePath: path, Name: name, IsHidden: false})
+	db.Create(&model.TorrentSnapshot{Hash: "h_keep", ClientUID: 1, SavePath: path, Name: name, IsHidden: false})
+	db.Create(&model.TorrentSnapshot{Hash: "h_meta", ClientUID: 1, SavePath: path, Name: name, IsHidden: false})
+	db.Create(&model.TorrentSnapshot{Hash: "h_other", ClientUID: 1, SavePath: path, Name: name, IsHidden: false})
 	db.Create(&model.TorrentMetadata{InfoHash: "h_meta", SiteName: "朋友", Title: "The Descent 2005", TorrentID: "123"})
 
 	// 用保留行 hash（无 metadata）解析 → 应找到 h_meta 的数据
@@ -55,8 +55,8 @@ func TestResolveResourceCrossDir(t *testing.T) {
 	rr := NewResourceResolver(db)
 	name := "少年吔，安啦！.1992.TWN.1080p"
 	// PT5 副本挂 meta；PT7 副本无
-	db.Create(&model.TorrentSnapshot{Hash: "pt5_h", ClientID: "fnOS", SavePath: "/PT5/SSD", Name: name, IsHidden: false})
-	db.Create(&model.TorrentSnapshot{Hash: "pt7_h", ClientID: "fnOS", SavePath: "/PT7/SSD", Name: name, IsHidden: false})
+	db.Create(&model.TorrentSnapshot{Hash: "pt5_h", ClientUID: 1, SavePath: "/PT5/SSD", Name: name, IsHidden: false})
+	db.Create(&model.TorrentSnapshot{Hash: "pt7_h", ClientUID: 1, SavePath: "/PT7/SSD", Name: name, IsHidden: false})
 	db.Create(&model.TorrentMetadata{InfoHash: "pt5_h", SiteName: "朋友", Title: "x"})
 
 	rv5 := rr.ResolveResource(nil, "pt5_h")
@@ -73,8 +73,8 @@ func TestResolveResourceCrossDir(t *testing.T) {
 func TestResolveResourceEpisodes(t *testing.T) {
 	db := setupResolverDB(t)
 	rr := NewResourceResolver(db)
-	db.Create(&model.TorrentSnapshot{Hash: "ep2", ClientID: "PT7", SavePath: "/PT/temp", Name: "Iron.Wok.Jan.2026.S01E02.1080p-AnoZu", IsHidden: false})
-	db.Create(&model.TorrentSnapshot{Hash: "ep3", ClientID: "PT7", SavePath: "/PT/temp", Name: "Iron.Wok.Jan.2026.S01E03.1080p-AnoZu", IsHidden: false})
+	db.Create(&model.TorrentSnapshot{Hash: "ep2", ClientUID: 1, SavePath: "/PT/temp", Name: "Iron.Wok.Jan.2026.S01E02.1080p-AnoZu", IsHidden: false})
+	db.Create(&model.TorrentSnapshot{Hash: "ep3", ClientUID: 1, SavePath: "/PT/temp", Name: "Iron.Wok.Jan.2026.S01E03.1080p-AnoZu", IsHidden: false})
 	db.Create(&model.TorrentMetadata{InfoHash: "ep2", SiteName: "CR", Title: "E02"})
 
 	rv3 := rr.ResolveResource(nil, "ep3")
@@ -88,7 +88,7 @@ func TestResolveResourceHiddenFallback(t *testing.T) {
 	db := setupResolverDB(t)
 	rr := NewResourceResolver(db)
 	name := "Movie.2024-GROUP"
-	db.Create(&model.TorrentSnapshot{Hash: "h1", ClientID: "PT0", SavePath: "/p", Name: name, IsHidden: false})
+	db.Create(&model.TorrentSnapshot{Hash: "h1", ClientUID: 1, SavePath: "/p", Name: name, IsHidden: false})
 	db.Create(&model.TorrentMetadata{InfoHash: "h1", SiteName: "朋友", Title: "M"})
 	// 模拟删种：hidden
 	db.Model(&model.TorrentSnapshot{}).Where("hash = ?", "h1").Update("is_hidden", true)

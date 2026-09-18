@@ -94,12 +94,12 @@ func (s *SeedingConfirmation) confirmMember(ctx context.Context, checker Downloa
 		return false, nil
 	}
 
-	if member.ClientID == "" {
+	if member.ClientUID == 0 {
 		return false, nil
 	}
 
 	var clientConfig model.ClientConfig
-	if err := s.db.WithContext(ctx).Where("name = ?", member.ClientID).First(&clientConfig).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("id = ?", member.ClientUID).First(&clientConfig).Error; err != nil {
 		return false, err
 	}
 
