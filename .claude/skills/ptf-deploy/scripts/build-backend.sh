@@ -13,25 +13,32 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
-echo "==> [1/5] go vet（不用 ./...，cmd/verify-pieces-hash 有已知冲突）"
+echo "==> [1/6] go vet（不用 ./...，cmd/verify-pieces-hash 有已知冲突）"
 "$GO" vet ./internal/... ./cmd/pt-forward/
 
-echo "==> [2/5] dict 漂移检查（改 dict/*.json 后必跑 gen-dict 并提交）"
+echo "==> [2/6] dict 漂移检查（改 dict/*.json 后必跑 gen-dict 并提交）"
 "$GO" run ./cmd/gen-dict >/dev/null
 if [ -n "$(git status --porcelain web/src/generated/dict.ts)" ]; then
   echo "❌ dict.ts 与 dict/*.json 不同步——请提交 gen-dict 生成的 web/src/generated/dict.ts（CI drift check 必红）" >&2
   exit 1
 fi
 
-echo "==> [3/5] go test"
+echo "==> [3/6] 原生 SQL 列引用静态验证（sqlcheck——no such column 地雷拦截）"
+CGO_ENABLED=1 "$GO" run ./cmd/sqlcheck internal | grep -q "suspects=0" || {
+  echo "❌ sqlcheck 发现列引用地雷——修复后再部署" >&2
+  CGO_ENABLED=1 "$GO" run ./cmd/sqlcheck internal | grep -v "^tables=" >&2
+  exit 1
+}
+
+echo "==> [4/6] go test"
 "$GO" test ./internal/... -count=1 -timeout 600s
 
-echo "==> [4/5] go build（CGO_ENABLED=1 + 版本号 ldflags）"
+echo "==> [5/6] go build（CGO_ENABLED=1 + 版本号 ldflags）"
 CGO_ENABLED=1 "$GO" build \
   -ldflags "-s -w -X main.version=$(git describe --tags --always --dirty)" \
   -o pt-forward ./cmd/pt-forward/
 
-echo "==> [5/5] 重启服务"
+echo "==> [6/6] 重启服务"
 systemctl --user restart pt-forward
 sleep 2
 systemctl --user is-active pt-forward
