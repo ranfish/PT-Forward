@@ -1486,15 +1486,13 @@ func (h *SeedingHandler) handleStatsTorrents(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	orderClause := "final_uploaded DESC"
+	var orderClause string
 	switch sortBy {
 	case "size":
 		orderClause = "torrent_size DESC"
-	case "uploaded":
-		orderClause = "final_uploaded DESC"
 	case "time":
 		orderClause = "flushed_at DESC"
-	default:
+	default: // uploaded 及默认
 		orderClause = "final_uploaded DESC"
 	}
 

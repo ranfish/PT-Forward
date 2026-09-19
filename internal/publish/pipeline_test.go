@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ranfish/pt-forward/internal/mocks"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/notification"
 	"go.uber.org/zap"
@@ -431,37 +430,8 @@ func TestPipeline_ListResults_Empty(t *testing.T) {
 	}
 }
 
-type mockPublishSiteProvider struct {
-	*mocks.SiteInfoProvider
-}
 
-type mockPublishAdapter struct {
-	*mocks.SiteAdapter
-}
 
-func newMockPublishAdapter() *mockPublishAdapter {
-	a := &mocks.SiteAdapter{}
-	a.DownloadTorrentFn = func(ctx context.Context, config *model.SiteConfig, torrentID string) ([]byte, error) {
-		return []byte("d8:announce27:http://tracker.example.com4:infod6:lengthi13e4:name8:test.txt12:piece lengthi262144e6:pieces20:00000000000000000000ee"), nil
-	}
-	a.GetTorrentDetailFn = func(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
-		return &model.TorrentDetail{
-			Title:       "Test Movie 2024 1080p BluRay",
-			Description: "[b]Test Description[/b]",
-			Category:    "movies",
-			Source:      "blu-ray",
-			Resolution:  "1080p",
-			Codec:       "x264",
-			IMDbID:      "tt1234567",
-			MediaInfo:   "mediainfo text",
-			Screenshots: []string{"https://img.example.com/1.jpg"},
-		}, nil
-	}
-	a.UploadTorrentFn = func(ctx context.Context, config *model.SiteConfig, req *model.PublishRequest) (*model.PublishResponse, error) {
-		return &model.PublishResponse{TorrentID: "new-torrent-123", DetailURL: "https://target.com/torrents/123"}, nil
-	}
-	return &mockPublishAdapter{SiteAdapter: a}
-}
 
 func TestPipeline_SetSiteProvider(t *testing.T) {
 	db := setupPipelineTestDBWithGroups(t)

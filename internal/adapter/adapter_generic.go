@@ -97,7 +97,9 @@ func (a *GenericAdapter) DownloadTorrent(ctx context.Context, config *model.Site
 	if domain == "" {
 		domain = config.Domain
 	}
-	httpclient.GlobalDownloadLimiter.AcquireWithLimit(domain, config.DownloadHourlyLimit)
+	if err := httpclient.GlobalDownloadLimiter.AcquireWithLimit(domain, config.DownloadHourlyLimit); err != nil {
+		return nil, downloadError("下载限流: "+err.Error(), nil)
+	}
 
 	var u string
 	if config.DownloadURLTemplate != "" {

@@ -25,13 +25,7 @@ func (p *PublicExtractor) extractInfoHash(htmlStr string, doc *goquery.Document)
 	if hash := findHashInRows(doc); hash != "" {
 		return hash
 	}
-	// 主路径 2: [data-hash] 属性
-	if hash, _ := doc.Attr("data-hash"); len(hash) == 40 {
-		// doc 根节点无 data-hash，应该搜元素
-	}
-	doc.Find(`[data-hash]`).Each(func(_ int, s *goquery.Selection) {
-		// 在 Each 中无法返回，提前用 First
-	})
+	// 主路径 2: [data-hash] 属性（First 命中即取）
 	if v, ok := doc.Find(`[data-hash]`).First().Attr("data-hash"); ok && len(v) == 40 {
 		return v
 	}

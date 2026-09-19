@@ -549,12 +549,14 @@ func (h *PublishTorrentsHandler) startBackgroundQuery(clientUID uint, cfg model.
 				if hit.Source == "pieces_hash" {
 					source = model.CoverageSourcePiecesHash
 				}
-				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
 					InfoHash: infoHash, SiteName: hit.SiteName,
 					Status: model.CoverageConfirmedHas, Source: source,
 					Confidence: 1.0, TorrentID: hit.TorrentID,
 					QueriedAt: now, ExpiresAt: ttl,
-				})
+				}); cerr != nil {
+					h.logger.Warn("UpsertCoverage failed", zap.String("site", hit.SiteName), zap.Error(cerr))
+				}
 			}
 		}
 	}
@@ -602,11 +604,13 @@ func (h *PublishTorrentsHandler) bgTrackerCoverage(ctx context.Context, hashes [
 				Where("info_hash = ? AND site_name = ?", t.Hash, sn).
 				Update("source", model.CoverageSourceTracker)
 			if result.RowsAffected == 0 {
-				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
 					InfoHash: t.Hash, SiteName: sn,
 					Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
 					Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
-				})
+				}); cerr != nil {
+					h.logger.Warn("UpsertCoverage failed", zap.String("site", sn), zap.Error(cerr))
+				}
 			}
 		}
 	}
@@ -3690,8 +3694,7 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 	if meta == nil {
 		meta = rv.Meta
 	}
-	// 后续更新定位用资源视图的元数据行 hash（数据在谁名下就更新谁）
-	infoHash = meta.InfoHash
+	// 后续更新定位用资源视图的元数据行 hash（数据在谁名下就更新谁）——meta.InfoHash 即权威
 
 	// §59.47: screenshots 列统一解析（JSON 数组优先/换行回退）——
 	// 原 strings.Split("\n") 对 JSON 格式列拆出整个 JSON 串当 URL（1 张损坏图）

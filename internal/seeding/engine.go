@@ -1916,9 +1916,6 @@ func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateCo
 	return err
 }
 
-func (e *Engine) removeFromSnapshot(ec *evaluateContext, hashes []string) {
-	companion.RemoveFromSnapshot(&ec.torrents, ec.torrentMap, hashes)
-}
 
 func (e *Engine) reannounceBeforeDelete(ctx context.Context, client model.DownloaderClient, infoHash string, cfg *model.SeedingClientConfig) bool {
 	if cfg == nil || !cfg.ReannounceBefore {

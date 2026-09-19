@@ -185,9 +185,13 @@ func (s *Service) QueryBatchCoverage(ctx context.Context, items []BatchItem) err
 	for _, item := range items {
 		results := s.buildCoverageForItem(ctx, item, fpByHash, matchByHash, iyuuMap, negByHash, pubByHash, now, ttl)
 		for _, r := range results {
-			s.upsertCoverage(ctx, &r)
+			if err := s.upsertCoverage(ctx, &r); err != nil {
+				s.logger.Warn("upsertCoverage failed", zap.String("hash", r.InfoHash), zap.Error(err))
+			}
 		}
-		s.upsertQueryState(ctx, item.InfoHash, now, ttl)
+		if err := s.upsertQueryState(ctx, item.InfoHash, now, ttl); err != nil {
+			s.logger.Warn("upsertQueryState failed", zap.String("hash", item.InfoHash), zap.Error(err))
+		}
 	}
 
 	s.logger.Info("batch coverage query done",
@@ -375,7 +379,9 @@ func (s *Service) upsertQueryState(ctx context.Context, infoHash string, queried
 
 // MarkQueried 标记查询完成（供外部调用）。
 func (s *Service) MarkQueried(ctx context.Context, infoHash string, queriedAt, expiresAt time.Time) {
-	s.upsertQueryState(ctx, infoHash, queriedAt, expiresAt)
+	if err := s.upsertQueryState(ctx, infoHash, queriedAt, expiresAt); err != nil {
+		s.logger.Warn("MarkQueried upsert failed", zap.String("hash", infoHash), zap.Error(err))
+	}
 }
 
 // QueryCoverage 单种子查询（保留兼容）

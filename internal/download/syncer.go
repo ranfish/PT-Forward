@@ -193,20 +193,6 @@ func (s *Syncer) restoreFitTimer(ctx context.Context) {
 	}
 }
 
-func (s *Syncer) sync(ctx context.Context) {
-	clientUIDs := s.clientMgr.ListClients()
-	for _, clientUID := range clientUIDs {
-		c, err := s.clientMgr.Get(clientUID)
-		if err != nil {
-			continue
-		}
-		role := c.GetRole()
-		if role == "seeding" {
-			continue
-		}
-		s.syncClient(ctx, c)
-	}
-}
 
 func (s *Syncer) syncClient(ctx context.Context, c model.DownloaderClient) {
 	clientUID := c.GetID()
@@ -247,7 +233,9 @@ func (s *Syncer) syncClient(ctx context.Context, c model.DownloaderClient) {
 		if _, ok := torrentMap[hash]; !ok {
 			task, err := s.repo.FindByClientAndHash(ctx, clientUID, hash)
 			if err == nil && task != nil && task.Status != model.DownloadStatusDeleted {
-				s.repo.MarkDeleted(ctx, task.ID, "external")
+				if err := s.repo.MarkDeleted(ctx, task.ID, "external"); err != nil {
+					s.logger.Warn("MarkDeleted failed", zap.Uint("id", task.ID), zap.Error(err))
+				}
 				s.logger.Info("task auto-deleted (torrent removed externally)",
 					zap.Uint("id", task.ID),
 					zap.Uint("client_uid", clientUID),
@@ -352,7 +340,9 @@ func (s *Syncer) updateTaskProgress(ctx context.Context, clientUID uint, ti *mod
 			zap.String("name", ti.Name))
 	}
 
-	s.repo.UpdateProgress(ctx, task.ID, updates)
+	if err := s.repo.UpdateProgress(ctx, task.ID, updates); err != nil {
+		s.logger.Warn("UpdateProgress failed", zap.Uint("id", task.ID), zap.Error(err))
+	}
 }
 
 func (s *Syncer) importTask(ctx context.Context, clientUID uint, ti *model.TorrentInfo) {
@@ -526,7 +516,9 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 
 	targetUID := sourceClient.GetTransferTargetUID()
 	if targetUID == 0 {
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, 0, "")
+		if err := s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, 0, ""); err != nil {
+			s.logger.Warn("UpdateTransfer failed", zap.Uint("id", task.ID), zap.Error(err))
+		}
 		return
 	}
 
@@ -534,7 +526,9 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 	if err != nil {
 		s.logger.Warn("transfer: target client unavailable",
 			zap.Uint("id", task.ID), zap.Uint("target", targetUID), zap.Error(err))
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetUID, "")
+		if uerr := s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetUID, ""); uerr != nil {
+			s.logger.Warn("UpdateTransfer failed", zap.Uint("id", task.ID), zap.Error(uerr))
+		}
 		return
 	}
 
@@ -572,8 +566,12 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 		return
 	}
 
-	s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, targetUID, task.TransferHash)
-	s.repo.UpdateClientAndHash(ctx, task.ID, targetUID, task.TransferHash)
+	if err := s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferred, targetUID, task.TransferHash); err != nil {
+		s.logger.Warn("UpdateTransfer failed", zap.Uint("id", task.ID), zap.Error(err))
+	}
+	if err := s.repo.UpdateClientAndHash(ctx, task.ID, targetUID, task.TransferHash); err != nil {
+		s.logger.Warn("UpdateClientAndHash failed", zap.Uint("id", task.ID), zap.Error(err))
+	}
 
 	s.logger.Info("transfer: completed",
 		zap.Uint("id", task.ID),

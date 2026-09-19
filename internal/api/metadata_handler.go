@@ -71,13 +71,13 @@ func (h *MetadataHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	for _, rec := range records {
 		item := metaItem{TorrentMetadata: rec}
 		if rec.Tags != "" {
-			json.Unmarshal([]byte(rec.Tags), &item.TagsList)
+			_ = json.Unmarshal([]byte(rec.Tags), &item.TagsList) // 非法 JSON → 空列表回退（列本可含非 JSON 旧值）
 		}
 		if rec.Flags != "" {
-			json.Unmarshal([]byte(rec.Flags), &item.FlagsList)
+			_ = json.Unmarshal([]byte(rec.Flags), &item.FlagsList) // 非法 JSON → 空列表回退（列本可含非 JSON 旧值）
 		}
 		if rec.Screenshots != "" {
-			json.Unmarshal([]byte(rec.Screenshots), &item.ScreenshotsList)
+			_ = json.Unmarshal([]byte(rec.Screenshots), &item.ScreenshotsList) // 非法 JSON → 空列表回退（列本可含非 JSON 旧值）
 		}
 		items = append(items, item)
 	}

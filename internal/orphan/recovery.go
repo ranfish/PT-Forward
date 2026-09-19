@@ -27,11 +27,6 @@ type Recovery struct {
 	coverageSrv    CoverageWriter // §59.196: tid 回写（可空——测试/降级场景）
 }
 
-// reJAVOrphan §59.225: 孤儿恢复链的 JAV 番号提取正则（放宽边界——
-// compliance 的 reJAV 用 \b 导致 "3dsvr-1912"（前导数字）和
-// "SVVRT-079_4K"（后缀下划线规格词）不命中）。
-var reJAVOrphan = regexp.MustCompile(`(?i)(?:^|[^A-Za-z0-9])([A-Za-z]{2,8}-\d{2,5})(?:[^A-Za-z0-9]|$)`)
-
 // extractJAVKeyword §59.225: 从孤儿名提取 JAV 番号作为搜索关键词。
 // 双条件：① compliance.DetectAdult 判定成人（排除 RIAJ 音乐/电影番号）
 // ② 放宽边界正则提取番号段（兼容前导数字/后缀规格词形态）。

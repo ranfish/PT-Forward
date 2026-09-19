@@ -64,12 +64,21 @@ func main() {
 		bad++
 		fmt.Printf(format, args...)
 	}
-	knownFP := map[string]bool{
-		"internal/api/download_handler.go:585": true,
-		"internal/api/reseed_handler.go:469":   true,
+	// 已知假阳性指纹（内容键不随行号漂移）：
+	// download_handler: 子查询实参（torrent_snapshots AS s2）片段缝合进外层——真实 SQL 合法
+	// reseed_handler: 变量持有 builder（query := Model(ReseedMatch) 后续 query.Where）+ 子查询
+	//   Model(TorrentMetadata) 被 analyzeStmt 直捕——source_info_hash 属外层 reseed_matches
+	knownFP := func(c chain) bool {
+		if c.file == "internal/api/download_handler.go" && c.table == "torrent_snapshots AS s" {
+			return true
+		}
+		if c.file == "internal/api/reseed_handler.go" && strings.Contains(strings.Join(whereFrags(c), " "), "source_info_hash IN") {
+			return true
+		}
+		return false
 	}
 	for _, c := range chains {
-		if knownFP[c.file+":"+fmt.Sprint(c.line)] {
+		if knownFP(c) {
 			continue
 		}
 		full := synth(c, false)
@@ -117,6 +126,16 @@ func mustTables(db *gorm.DB) []string {
 // isConditionalMigration 迁移包 Exec 是条件 SQL（pragma 检查旧列后才执行）——跳过
 func isConditionalMigration(file string) bool {
 	return strings.Contains(file, "internal/db/migration") || strings.Contains(file, "internal/model/migrate.go")
+}
+
+func whereFrags(c chain) []string {
+	var out []string
+	for _, f := range c.frags {
+		if f.kind == "where" {
+			out = append(out, f.sql)
+		}
+	}
+	return out
 }
 
 func tryExplain(db *gorm.DB, q string) error {

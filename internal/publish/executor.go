@@ -647,15 +647,6 @@ func (e *PublishExecutor) audioMappingOf(cfg *model.PublishFormConfig, audioCode
 }
 
 // audioMapping 音频域（组合键优先：TrueHD+Atmos→"TrueHD Atmos"——§59.150 判据六）。
-func (e *PublishExecutor) audioMapping(cfg *model.PublishFormConfig, meta *model.TorrentMetadata) *model.FormValueMapping {
-	if meta.AudioCodec != "" && meta.AudioTech != "" {
-		combined := extract.LookupStandardKey("audio_codec", meta.AudioCodec+" "+meta.AudioTech)
-		if m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, combined); m != nil {
-			return m
-		}
-	}
-	return e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, extract.LookupStandardKey("audio_codec", meta.AudioCodec))
-}
 
 // mediumMappingOf §59.166 A 层：TechProfile 源媒介映射（标题纠错终态——
 // WEBRip/WEB-DL/Encode 规格优先 §59.150 二维规则）。
