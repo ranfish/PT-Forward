@@ -5,8 +5,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func AutoMigrate(db *gorm.DB) error {
-	if err := db.AutoMigrate(
+func AllModels() []any {
+	return []any{
 		&User{},
 		&Site{},
 		&ClientConfig{},
@@ -22,10 +22,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&PublishCandidate{},
 		&PublishResultRecord{},
 		&PublishTask{},
-		&PublishGroupMember{}, // §59.167 PT31 新装缺表（模型在用三处——AutoMigrate 清单遗漏）
-		// §59.167 系统性补齐（model 包 vs 清单全量 diff——活模型 5 个；废弃模型
-		// DownloadClientConfig/IYUUCandidate/PublishGroupStatusHistory/ReseedDecision/
-		// ReseedSource 不建（migration 4 已做源表存在检测兼容））
+		&PublishGroupMember{},
 		&PublishGroup{},
 		&PublishGroupStatusHistory{},
 		&ClusterScreenshotCache{},
@@ -76,8 +73,14 @@ func AutoMigrate(db *gorm.DB) error {
 		&TitleRule{},
 		&ComplianceRule{},
 		&setting.Setting{},
-	); err != nil {
-		return err
+	}
+}
+
+func AutoMigrate(db *gorm.DB) error {
+	for _, m := range AllModels() {
+		if err := db.AutoMigrate(m); err != nil {
+			return err
+		}
 	}
 	migrateAutoTransferColumns(db)
 	return nil
