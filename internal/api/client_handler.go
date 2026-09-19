@@ -500,6 +500,25 @@ func (h *ClientHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		if err := tx.Where("source_client_id = ? OR reseed_client_id = ?", client.ID, client.ID).Delete(&model.ClientPathMapping{}).Error; err != nil {
 			return err
 		}
+		// §59.251 架构不变式②：删除=删 ID=级联删全部数据（数据跟 ID 走）。
+		// 保留面：rss_subscriptions（用户资产）/publish_result_records（发布历史审计）——
+		// 悬空引用由列表层容忍，用户重新指派。
+		cascade := []interface{}{
+			&model.TorrentSnapshot{}, &model.ClusterScreenshotCache{},
+			&model.SeedingTorrentRecord{}, &model.SeedingClientState{}, &model.SeedingClientConfig{},
+			&model.FreeWaitEntry{}, &model.DownloadTask{}, &model.ClientPublishTarget{},
+			&model.TorrentTraffic{}, &model.DownloaderSpeedSnapshot{}, &model.TrafficStatsHourly{},
+			&model.PublishGroupMember{}, &model.ReseedMatch{}, &model.ScoringLog{}, &model.OrphanScanConfig{},
+		}
+		for _, m := range cascade {
+			if err := tx.Unscoped().Where("client_uid = ?", client.ID).Delete(m).Error; err != nil {
+				return err
+			}
+		}
+		// 候选行双角色引用（client_uid 主/源）任一命中即级联
+		if err := tx.Unscoped().Where("client_uid = ? OR source_client_uid = ?", client.ID, client.ID).Delete(&model.PublishCandidate{}).Error; err != nil {
+			return err
+		}
 		return tx.Unscoped().Delete(&client).Error
 	}); err != nil {
 		Error(w, http.StatusInternalServerError, 50000, "删除下载器失败")
