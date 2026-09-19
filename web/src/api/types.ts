@@ -578,7 +578,6 @@ export interface ReseedMatch {
   retry_count: number
   next_retry_at: string | null
   directory?: string
-  source_detail_url?: string
 	target_detail_url?: string
 }
 

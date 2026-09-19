@@ -131,6 +131,7 @@ func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 		"isVip":            cfg.IsVIP,
 		"version":          cfg.Version,
 		"requestTimeoutMs": cfg.RequestTimeoutSec * 1000,
+		"syncIntervalHours": cfg.SyncIntervalHours,
 	})
 }
 
