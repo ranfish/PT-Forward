@@ -2642,7 +2642,7 @@ func TestPublishTargets_CreateAndGet(t *testing.T) {
 	dlID := dlData["id"].(float64)
 
 	w = env.doRequest("POST", "/api/v1/downloaders/publish-targets", map[string]interface{}{
-		"client_id": dlID, "site_name": "crtsite.com",
+		"client_uid": dlID, "site_name": "crtsite.com",
 		"category_mapping": "movies", "auto_publish": true, "notify_on_publish": true, "enabled": true,
 	})
 	if w.Code != http.StatusOK {
@@ -2655,7 +2655,7 @@ func TestPublishTargets_CreateAndGet(t *testing.T) {
 	}
 
 	w = env.doRequest("POST", "/api/v1/downloaders/publish-targets", map[string]interface{}{
-		"client_id": dlID, "site_name": "crtsite.com",
+		"client_uid": dlID, "site_name": "crtsite.com",
 	})
 	if w.Code != http.StatusConflict {
 		t.Fatalf("duplicate: expected 409, got %d: %s", w.Code, w.Body.String())
@@ -2691,7 +2691,7 @@ func TestPublishTargets_Update(t *testing.T) {
 	dlID := dlData["id"].(float64)
 
 	w = env.doRequest("POST", "/api/v1/downloaders/publish-targets", map[string]interface{}{
-		"client_id": dlID, "site_name": "updtsite.com",
+		"client_uid": dlID, "site_name": "updtsite.com",
 		"auto_publish": true, "enabled": true,
 	})
 	if w.Code != http.StatusOK {
@@ -2736,7 +2736,7 @@ func TestPublishTargets_Delete(t *testing.T) {
 	dlID := dlData["id"].(float64)
 
 	w = env.doRequest("POST", "/api/v1/downloaders/publish-targets", map[string]interface{}{
-		"client_id": dlID, "site_name": "delsite.com", "enabled": true,
+		"client_uid": dlID, "site_name": "delsite.com", "enabled": true,
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d: %s", w.Code, w.Body.String())

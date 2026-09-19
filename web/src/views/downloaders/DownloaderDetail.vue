@@ -372,7 +372,7 @@ async function handleTargetSubmit() {
       })
     } else {
       await downloadersApi.createPublishTarget({
-        client_id: id,
+        client_uid: id,
         site_name: targetForm.value.site_name,
         category_mapping: targetForm.value.category_mapping,
         source_mapping: targetForm.value.source_mapping,
