@@ -499,7 +499,7 @@ func TestRSS_CRUD(t *testing.T) {
 		"urls":      []string{"https://rss-site.com/rss"},
 		"cron":      "*/10 * * * *",
 		"enabled":   true,
-		"client_id": 0,
+		"clientId": 0,
 	}
 	w := env.doRequest("POST", "/api/v1/rss/subscriptions", createBody)
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
