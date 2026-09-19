@@ -438,7 +438,8 @@ func (h *DownloadHandler) handleRetryTransfer(w http.ResponseWriter, r *http.Req
 var _ = fmt.Sprintf
 
 type spaceStat struct {
-	ClientUID uint `json:"clientId"`
+	ClientUID uint   `json:"clientId"`
+	Name      string `json:"name"`
 	FreeSpace       int64  `json:"freeSpace"`
 	TotalSpace      int64  `json:"totalSpace"`
 	PendingBytes    int64  `json:"pendingBytes"`
@@ -448,11 +449,17 @@ type spaceStat struct {
 }
 
 func (h *DownloadHandler) handleSpaceStats(w http.ResponseWriter, r *http.Request) {
-	clientNames := h.clientMgr.ListClients()
-	var stats []spaceStat
+	loadedUIDs := h.clientMgr.ListClients()
+	var dbClients []model.ClientConfig
+	h.db.WithContext(r.Context()).Select("id, name").Find(&dbClients)
+	dbNames := make(map[uint]string, len(dbClients))
+	for _, c := range dbClients {
+		dbNames[c.ID] = c.Name
+	}
+	stats := make([]spaceStat, 0, len(loadedUIDs))
 
-	for _, name := range clientNames {
-		c, err := h.clientMgr.Get(name)
+	for _, uid := range loadedUIDs {
+		c, err := h.clientMgr.Get(uid)
 		if err != nil {
 			continue
 		}
@@ -493,7 +500,8 @@ func (h *DownloadHandler) handleSpaceStats(w http.ResponseWriter, r *http.Reques
 		}
 
 		stats = append(stats, spaceStat{
-			ClientUID: name,
+			ClientUID: uid,
+			Name:      dbNames[uid],
 			FreeSpace:        freeSpace,
 			TotalSpace:       totalSpace,
 			PendingBytes:     pending,

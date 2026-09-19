@@ -4580,7 +4580,7 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		DryRun       bool     `json:"dry_run"`
 		PushOnly     bool     `json:"push_only"`
 		TorrentID    string   `json:"torrent_id"`
-		PushClientID uint    `json:"push_client_uid"`
+		PushClientID uint    `json:"push_client_id"`
 		PushSavePath string   `json:"push_save_path"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InfoHash == "" || req.TargetSite == "" {

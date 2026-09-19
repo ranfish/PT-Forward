@@ -472,7 +472,7 @@ function restoreFilters() {
     const raw = localStorage.getItem(FILTERS_KEY)
     if (!raw) return
     const f = JSON.parse(raw) as { client?: string; path?: string; ready?: 'all' | 'publishable' | 'published'; search?: string; page_size?: number }
-    if (f.client) selectedClient.value = f.client
+    if (f.client) selectedClient.value = Number(f.client) || undefined
     if (f.path) selectedPath.value = f.path
     // §59.166 回归审核：站不持久化——publishable/published 恢复后无站=禁用 radio
     // 矛盾选中态（定案④从恢复路径复现）——非 all 一律回退

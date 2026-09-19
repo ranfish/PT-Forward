@@ -515,7 +515,7 @@ export interface PublishResultRecord {
   batch_group_id?: string
   title?: string
   subtitle?: string
-  downloader_id?: string
+  downloader_id?: number
   cost_ms?: number
   logs?: string
   // v0.0.255 §56.30 加种状态（auto reseed 后端已实现）

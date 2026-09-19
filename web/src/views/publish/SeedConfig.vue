@@ -253,7 +253,7 @@ function loadPersistedFilters() {
     const raw = localStorage.getItem(LS_KEY)
     if (!raw) return
     const saved = JSON.parse(raw)
-    filterClient.value = saved.client || undefined
+    filterClient.value = saved.client ? Number(saved.client) || undefined : undefined
     filterPath.value = saved.path || undefined
     statusFilter.value = saved.status || 'all'
   } catch { /* silent */ }
