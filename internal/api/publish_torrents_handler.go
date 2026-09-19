@@ -613,7 +613,7 @@ func (h *PublishTorrentsHandler) bgTrackerCoverage(ctx context.Context, hashes [
 }
 
 type coverageQueryRequest struct {
-	ClientUID uint   `json:"clientUid"`
+	ClientUID uint   `json:"clientId"`
 	InfoHash  string `json:"infoHash"`
 	Name      string `json:"name"`
 	Size      int64  `json:"size"`
@@ -1358,7 +1358,7 @@ func (h *PublishTorrentsHandler) handleDeleteGroupMapping(w http.ResponseWriter,
 }
 
 type batchPublishRequest struct {
-	ClientUID  uint   `json:"clientUid"`
+	ClientUID  uint   `json:"clientId"`
 	SourceSite string `json:"sourceSite"`
 	TargetSite string `json:"targetSite"`
 	Items      []struct {

@@ -133,7 +133,7 @@ func (r *Repository) UpdateClientAndHash(ctx context.Context, id uint, clientUID
 	return r.db.WithContext(ctx).Model(&model.DownloadTask{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
-			"client_id":  clientUID,
+			"client_uid": clientUID,
 			"info_hash":  infoHash,
 			"updated_at": time.Now(),
 		}).Error
