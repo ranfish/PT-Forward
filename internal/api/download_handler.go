@@ -431,7 +431,11 @@ func (h *DownloadHandler) handleRetryTransfer(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	h.repo.UpdateTransfer(r.Context(), id, model.TransferStatusPending, 0, "")
+	if err := h.repo.UpdateTransfer(r.Context(), id, model.TransferStatusPending, 0, ""); err != nil {
+		h.logger.Warn("retry-transfer: UpdateTransfer failed", zap.Uint("id", id), zap.Error(err))
+		Error(w, http.StatusInternalServerError, 50000, "重置转移状态失败")
+		return
+	}
 	Success(w, map[string]interface{}{"id": id, "transfer_status": model.TransferStatusPending})
 }
 

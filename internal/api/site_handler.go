@@ -2572,7 +2572,7 @@ func buildBrowseURLForTest(config *model.SiteConfig, framework string) string {
 }
 
 func extractTorrentIDFromHTML(html, framework, domain string) string {
-	patterns := []*regexp.Regexp{}
+	var patterns []*regexp.Regexp
 	switch {
 	case domain == "totheglory.im":
 		patterns = []*regexp.Regexp{

@@ -8,11 +8,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/compliance"
-	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/imagehost"
@@ -48,11 +46,9 @@ type Pipeline struct {
 	imageHostStrategy string
 	imageHostMgr      *imagehost.Manager
 	pusher            *pusher.Pusher // §56.30: 发布后自动加种
-	memberMu          sync.Map
 	wsBroadcaster     event.WSBroadcaster
 	bdinfoScanner     *BDInfoScanner
 	// §59.146: TagApplier 灰度站点查询（nil=关闭；返回 settings 逗号分隔串）
-	tagApplierSites func() string
 }
 
 
@@ -127,16 +123,6 @@ func (p *Pipeline) SetPusher(pusher *pusher.Pusher) {
 }
 
 // isDetailFirst §56.18: 从 publish_settings 读取海报优先级 toggle。
-func (p *Pipeline) isDetailFirst() bool {
-	if p.db == nil {
-		return false
-	}
-	var setting model.PublishSetting
-	if err := p.db.Where("key = ?", "metadata_priority").First(&setting).Error; err == nil {
-		return setting.Value == "detail_first"
-	}
-	return false
-}
 
 // loadTitleRules §56.19: 从 DB 加载目标站的标题校验规则。
 func (p *Pipeline) loadTitleRules(siteCode string) []model.TitleRule {
@@ -150,14 +136,6 @@ func (p *Pipeline) loadTitleRules(siteCode string) []model.TitleRule {
 }
 
 // getExistingStrategy §56.23: 从 DB 读取目标站的已存在种子策略。
-func (p *Pipeline) getExistingStrategy(siteName string) model.ExistingStrategy {
-	if p.db == nil {
-		return model.ExistingSkip
-	}
-	var site model.Site
-	p.db.Where("name = ? OR domain = ?", siteName, siteName).First(&site)
-	return model.ParseExistingStrategy(site.ExistingStrategy)
-}
 
 func (p *Pipeline) SetCompletionWatcher(w model.CompletionWatcher) {
 	p.completionWatcher = w
@@ -434,10 +412,6 @@ type piecesHashSearcher interface {
 	SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error)
 }
 
-func (p *Pipeline) dedupByPiecesHash(ctx context.Context, adapter model.SiteAdapter, config *model.SiteConfig, torrentData []byte) (bool, string) {
-	dup, msg, _ := p.dedupByPiecesHashFull(ctx, adapter, config, torrentData)
-	return dup, msg
-}
 
 // dedupByPiecesHashFull §59.166: 增强——返回站上 tid（此前 API matches 的 tid 被
 // 丢弃；拦截记录消费展示"站上已有种"直达链接）。
@@ -472,344 +446,20 @@ func (p *Pipeline) dedupByPiecesHashFull(ctx context.Context, adapter model.Site
 	return false, "", 0
 }
 
-type descResult struct {
-	Text       string
-	Subtitle   string // §56.20: 副标题（PTGen 渲染）
-	IMDbLink   string
-	DoubanLink string
-	TMDBID     string
-}
 
-func (p *Pipeline) renderDescription(ctx context.Context, sourceSite, targetSite, title string, sourceDetail *model.TorrentDetail) descResult {
-	descriptionText := ""
-	if sourceDetail != nil {
-		descriptionText = sourceDetail.Description
-	}
 
-	descData := &model.DescriptionData{
-		SourceSite: sourceSite,
-		Title:      title, // §59.20: 渲染器提取制作组名生成致谢
-	}
-	if sourceDetail != nil {
-		descData.MediaInfoText = sourceDetail.MediaInfo
-		descData.Screenshots = sourceDetail.Screenshots
-		if sourceDetail.BDInfo != "" {
-			FillBDInfo(descData, sourceDetail.BDInfo)
-		}
-	}
-
-	var result descResult
-	ptgenResult, ptgenErr := p.queryPTGen(ctx, title)
-	// PTGen 字段处理（独立于海报选择）
-	if ptgenErr == nil && ptgenResult != nil {
-		if ptgenResult.RawBBCode != "" {
-			descData.PTGenBody = ptgenResult.RawBBCode
-		}
-		descData.PTGen = ptgenResult // §56.16: 结构化 PTGen
-		result.IMDbLink = ptgenResult.IMDBURL
-		result.DoubanLink = ptgenResult.DoubanURL
-		if ptgenResult.TMDbURL != "" {
-			result.TMDBID = extractTMDBID(ptgenResult.TMDbURL)
-		}
-	}
-
-	// §56.18: 海报选择（toggle 支持 ptgen_first/detail_first）
-	ptgenPoster := ""
-	if ptgenResult != nil {
-		ptgenPoster = ptgenResult.PosterURL
-	}
-	detailPoster := ""
-	if sourceDetail != nil {
-		detailPoster = sourceDetail.PosterURL
-	}
-	if p.isDetailFirst() && detailPoster != "" {
-		descData.PosterURL = p.rehostPoster(ctx, detailPoster)
-	} else if ptgenPoster != "" {
-		descData.PosterURL = ptgenPoster
-	} else if detailPoster != "" {
-		descData.PosterURL = p.rehostPoster(ctx, detailPoster)
-	}
-
-	// §56.20: 副标题渲染（PTGen 外文名 + 年份）
-	if ptgenResult != nil && (ptgenResult.ForeignTitle != "" || ptgenResult.ChineseTitle != "") {
-		result.Subtitle = description.RenderSubtitle("", description.SubtitleData{
-			PTGenForeignTitle: ptgenResult.ForeignTitle,
-			PTGenChineseTitle: ptgenResult.ChineseTitle,
-			PTGenYear:         ptgenResult.Year,
-		})
-	}
-
-	if descriptionText == "" && descData.PTGenBody != "" {
-		descriptionText = descData.PTGenBody
-	}
-
-	var descConfig model.SiteDescConfig
-	siteInfo, siteInfoErr := p.siteProvider.GetSiteInfo(ctx, targetSite)
-	if siteInfoErr == nil && siteInfo != nil {
-		siteConfig, cfgErr := p.siteProvider.GetSiteConfig(ctx, targetSite)
-		if cfgErr == nil && siteConfig != nil {
-			descConfig = siteConfig.Publish.Description
-		}
-	}
-
-	// §56.28: 音乐站用独立描述模板（Gazelle 框架）
-	if fw := p.getTargetFramework(ctx, targetSite); fw == "gazelle" {
-		albumData := &description.MusicAlbumData{
-			Title:       title,
-			Year:        "",
-			PosterURL:   descData.PosterURL,
-			Description: descriptionText,
-		}
-		if ptgenResult != nil {
-			albumData.Year = ptgenResult.Year
-		}
-		if musicDesc := description.FormatMusicDescription(albumData); musicDesc != "" {
-			descriptionText = musicDesc
-		}
-	} else if descConfig.Format != "" || descConfig.TemplateOverride != "" {
-		renderer := description.NewRenderer(descConfig.Format)
-		if rendered, err := renderer.Render(descData, descConfig); err == nil && rendered != "" {
-			descriptionText = rendered
-		}
-	}
-
-	// §59.20: 感谢引言由渲染器 Render() 始终添加，不再手动 prepend（避免重复）
-
-	result.Text = descriptionText
-	return result
-}
-
-func populateFormFields(fields map[string]string, detail *model.TorrentDetail) {
-	if detail == nil {
-		return
-	}
-	if detail.Category != "" {
-		fields["category"] = detail.Category
-	}
-	if detail.Source != "" {
-		fields["source"] = detail.Source
-	}
-	if detail.Resolution != "" {
-		fields["resolution"] = detail.Resolution
-	}
-	if detail.Codec != "" {
-		fields["codec"] = detail.Codec
-	}
-	if detail.AudioCodec != "" {
-		fields["audioCodec"] = detail.AudioCodec
-	}
-	if detail.Processing != "" {
-		fields["processing"] = detail.Processing
-	}
-	if detail.ReleaseGroup != "" {
-		fields["team"] = detail.ReleaseGroup
-	}
-	if detail.Region != "" {
-		fields["region"] = detail.Region
-	}
-	if detail.IMDbID != "" {
-		fields["imdb"] = detail.IMDbID
-	}
-}
 
 // applyUserOverrides 将手动转发时用户编辑的字段覆盖到 PublishRequest
 // UserOverrides 是 JSON 字符串，包含 subtitle/statement/poster/douban_link/imdb_link/tmdb_link/tags/media_info/screenshots/description/bdinfo
-func applyUserOverrides(pubReq *model.PublishRequest, overridesJSON string) {
-	if overridesJSON == "" {
-		return
-	}
-	var overrides map[string]interface{}
-	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
-		return
-	}
-
-	// 仅在用户提供了非空值时覆盖（不覆盖空值）
-	if v, ok := overrides["subtitle"].(string); ok && v != "" {
-		pubReq.Subtitle = v
-	}
-	if v, ok := overrides["description"].(string); ok && v != "" {
-		pubReq.Description = v
-	}
-	if v, ok := overrides["media_info"].(string); ok && v != "" {
-		pubReq.MediaInfo = v
-	}
-	if v, ok := overrides["bdinfo"].(string); ok && v != "" {
-		pubReq.BDInfo = v
-	}
-	if v, ok := overrides["douban_link"].(string); ok && v != "" {
-		pubReq.DoubanLink = v
-	}
-	if v, ok := overrides["imdb_link"].(string); ok && v != "" {
-		pubReq.IMDbLink = v
-	}
-	if v, ok := overrides["tmdb_link"].(string); ok && v != "" {
-		if pubReq.ExtraFields == nil {
-			pubReq.ExtraFields = make(map[string]string)
-		}
-		pubReq.ExtraFields["tmdb_id"] = extractTMDBID(v)
-	}
-	// screenshots 是 []interface{}
-	if screenshots, ok := overrides["screenshots"].([]interface{}); ok && len(screenshots) > 0 {
-		var urls []string
-		for _, s := range screenshots {
-			if str, ok := s.(string); ok && str != "" {
-				urls = append(urls, str)
-			}
-		}
-		if len(urls) > 0 {
-			pubReq.Screenshots = urls
-		}
-	}
-	// tags 是 []interface{}
-	if tags, ok := overrides["tags"].([]interface{}); ok && len(tags) > 0 {
-		if pubReq.TagFields == nil {
-			pubReq.TagFields = make(map[string]string)
-		}
-		for _, tag := range tags {
-			if str, ok := tag.(string); ok && str != "" {
-				pubReq.TagFields[str] = "1"
-			}
-		}
-	}
-	// §56.29: 匿名发布字段
-	if v, ok := overrides["anonymous"].(bool); ok {
-		pubReq.Anonymous = v
-	}
-}
 
 // overridesString 从 UserOverrides JSON 中提取字符串值
-func overridesString(overridesJSON, key string) (string, bool) {
-	if overridesJSON == "" {
-		return "", false
-	}
-	var overrides map[string]interface{}
-	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
-		return "", false
-	}
-	if v, ok := overrides[key].(string); ok {
-		return v, true
-	}
-	return "", false
-}
 
 // overridesBool 从 UserOverrides JSON 中提取布尔值（§56.27）
-func overridesBool(overridesJSON, key string) (bool, bool) {
-	if overridesJSON == "" {
-		return false, false
-	}
-	var overrides map[string]interface{}
-	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
-		return false, false
-	}
-	if v, ok := overrides[key].(bool); ok {
-		return v, true
-	}
-	return false, false
-}
 
 // applyTitleComponents 用用户编辑的标题组件覆盖表单字段
 // 走标准化路径：原始值 → 标准键 → 规范显示名 → 表单字段
-func applyTitleComponents(pubReq *model.PublishRequest, overridesJSON string) {
-	if overridesJSON == "" {
-		return
-	}
-	var overrides map[string]interface{}
-	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
-		return
-	}
-	tcRaw, ok := overrides["title_components"]
-	if !ok || tcRaw == nil {
-		return
-	}
-	tc, ok := tcRaw.(map[string]interface{})
-	if !ok {
-		return
-	}
 
-	// 构建 TitleComponents 并标准化
-	components := titleparser.TitleComponents{
-		Resolution:   getStringFromMap(tc, "resolution"),
-		VideoCodec:   getStringFromMap(tc, "video_codec"),
-		AudioCodec:   getStringFromMap(tc, "audio_codec"),
-		Medium:       getStringFromMap(tc, "medium"),
-		ReleaseGroup: getStringFromMap(tc, "release_group"),
-	}
-	profile := titleparser.TechProfileFromTitle(components)
-	stdParams, _ := titleparser.StandardizeTechProfile(profile)
 
-	// 用标准键逆向映射为规范显示名，再填入表单
-	// 如果逆向映射失败（不在标准映射表中），回退到原始值
-	if components.Resolution != "" {
-		display := titleparser.ReverseLookup(stdParams.Resolution)
-		if display == "" {
-			display = components.Resolution
-		}
-		pubReq.FormFields["resolution"] = display
-	}
-	if components.VideoCodec != "" {
-		display := titleparser.ReverseLookup(stdParams.VideoCodec)
-		if display == "" {
-			display = components.VideoCodec
-		}
-		pubReq.FormFields["codec"] = display
-	}
-	if components.AudioCodec != "" {
-		display := titleparser.ReverseLookup(stdParams.AudioCodec)
-		if display == "" {
-			display = components.AudioCodec
-		}
-		pubReq.FormFields["audioCodec"] = display
-	}
-	if components.Medium != "" {
-		display := titleparser.ReverseLookup(stdParams.Medium)
-		if display == "" {
-			display = components.Medium
-		}
-		pubReq.FormFields["source"] = display
-	}
-	if components.ReleaseGroup != "" {
-		pubReq.FormFields["team"] = components.ReleaseGroup
-	}
-}
-
-func getStringFromMap(m map[string]interface{}, key string) string {
-	if v, ok := m[key].(string); ok {
-		return v
-	}
-	return ""
-}
-
-func extractTechProfile(userOverrides, title string) titleparser.TechProfile {
-	if userOverrides != "" {
-		var ov struct {
-			TechProfile     *titleparser.TechProfile `json:"tech_profile"`
-			TitleComponents map[string]string        `json:"title_components"`
-		}
-		if err := json.Unmarshal([]byte(userOverrides), &ov); err == nil {
-			if ov.TechProfile != nil {
-				return *ov.TechProfile
-			}
-			if len(ov.TitleComponents) > 0 {
-				return titleparser.TechProfileFromTitle(titleparser.TitleComponents{
-					MainTitle:      ov.TitleComponents["main_title"],
-					SeasonEpisode:  ov.TitleComponents["season_episode"],
-					Year:           ov.TitleComponents["year"],
-					Resolution:     ov.TitleComponents["resolution"],
-					Medium:         ov.TitleComponents["medium"],
-					VideoCodec:     ov.TitleComponents["video_codec"],
-					AudioCodec:     ov.TitleComponents["audio_codec"],
-					HDRFormat:      ov.TitleComponents["hdr_format"],
-					SourcePlatform: ov.TitleComponents["source_platform"],
-					BitDepth:       ov.TitleComponents["bit_depth"],
-					ReleaseVersion: ov.TitleComponents["release_version"],
-					ReleaseGroup:   ov.TitleComponents["release_group"],
-					ChinesePrefix:  ov.TitleComponents["chinese_prefix"],
-				})
-			}
-		}
-	}
-	return titleparser.ParseTitleTech(title)
-}
 
 func (p *Pipeline) ListAllCandidates(ctx context.Context, page, pageSize int, status, search string) ([]model.PublishCandidate, int64, error) {
 	var total int64
@@ -1138,23 +788,6 @@ func (p *Pipeline) OnTorrents(ctx context.Context, events []model.TorrentEvent) 
 	return nil
 }
 
-func (p *Pipeline) queryPTGen(ctx context.Context, title string) (*model.PTGenResult, error) {
-	if p.ptgen == nil {
-		return nil, nil
-	}
-	if title == "" {
-		return nil, nil
-	}
-	result, err := p.ptgen.Query(ctx, title)
-	if err != nil {
-		p.logger.Debug("ptgen query skipped",
-			zap.String("title", title),
-			zap.Error(err),
-		)
-		return nil, err
-	}
-	return result, nil
-}
 
 func extractTMDBID(tmdbURL string) string {
 	m := reTMDBID.FindStringSubmatch(tmdbURL)
@@ -1236,35 +869,7 @@ func (p *Pipeline) mapFieldValues(ctx context.Context, targetSite string, fields
 	}
 }
 
-func (p *Pipeline) getTargetFramework(ctx context.Context, targetSite string) string {
-	if p.siteProvider == nil {
-		return ""
-	}
-	if siteInfo, err := p.siteProvider.GetSiteInfo(ctx, targetSite); err == nil && siteInfo != nil {
-		return string(siteInfo.Framework)
-	}
-	return ""
-}
 
-func (p *Pipeline) rehostPoster(ctx context.Context, sourceURL string) string {
-	if sourceURL == "" {
-		return ""
-	}
-	if p.imageHostMgr == nil || p.imageHostMgr.DefaultHost() == nil {
-		return sourceURL
-	}
-	result, err := p.imageHostMgr.Rehost(ctx, sourceURL)
-	if err != nil || result == nil || result.URL == "" {
-		p.logger.Debug("poster rehost failed, using source URL",
-			zap.String("source_url", sourceURL),
-			zap.Error(err))
-		return sourceURL
-	}
-	p.logger.Debug("poster rehosted",
-		zap.String("source_url", sourceURL),
-		zap.String("rehosted_url", result.URL))
-	return result.URL
-}
 
 // CaptureScreenshots §59.50: 本地 mpv 截图（Tab3 "重新获取截图（mpv）" 专用）。
 //

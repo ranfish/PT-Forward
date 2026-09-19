@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/fingerprint"
@@ -76,7 +75,6 @@ type Pusher struct {
 	logger        *zap.Logger
 	siteProvider  SiteProvider
 	clientProvider ClientProvider
-	mu            sync.Mutex
 }
 
 func NewPusher(db *gorm.DB, logger *zap.Logger) *Pusher {

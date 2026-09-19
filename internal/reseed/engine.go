@@ -73,16 +73,6 @@ func (l *siteLimiter) checkAndIncr(siteName string, maxCount int) bool {
 	return true
 }
 
-func (l *siteLimiter) getCount(siteName string) int {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	today := time.Now().Format("2006-01-02")
-	entry := l.counts[siteName]
-	if entry == nil || entry.date != today {
-		return 0
-	}
-	return entry.count
-}
 
 type l2Stats struct {
 	mu           sync.Mutex
@@ -301,7 +291,9 @@ func (e *Engine) processPendingInjections(ctx context.Context) {
 
 		var task model.ReseedTask
 		if err := e.db.WithContext(ctx).First(&task, m.TaskID).Error; err != nil {
-			e.failMatch(ctx, m, fmt.Sprintf("任务不存在: %v", err))
+			if ferr := e.failMatch(ctx, m, fmt.Sprintf("任务不存在: %v", err)); ferr != nil {
+				e.logger.Warn("failMatch 落库失败", zap.Uint("match_id", m.ID), zap.Error(ferr))
+			}
 			continue
 		}
 
@@ -946,14 +938,12 @@ func (e *Engine) computeMissingFingerprints(ctx context.Context, sources []sourc
 		if existing.get(src.InfoHash, src.SiteName) != nil {
 			continue
 		}
-		dlClient, ok := clientCache[src.ClientUID]
-		if !ok {
-			var err error
-			dlClient, err = e.clientProvider.Get(src.ClientUID)
+		if _, ok := clientCache[src.ClientUID]; !ok {
+			dl, err := e.clientProvider.Get(src.ClientUID)
 			if err != nil {
 				continue
 			}
-			clientCache[src.ClientUID] = dlClient
+			clientCache[src.ClientUID] = dl
 		}
 		missing = append(missing, missingEntry{src: src, clientUID: src.ClientUID})
 	}
@@ -2182,7 +2172,9 @@ func (e *Engine) lazyComputeBencodeHash(ctx context.Context, src sourceTorrent, 
 	}
 	// 回写 DB 和内存
 	if e.fpRepo != nil {
-		e.fpRepo.UpdateField(ctx, fp.InfoHash, fp.SiteName, "pieces_hash_bencode", meta.PiecesHashBencode)
+		if err := e.fpRepo.UpdateField(ctx, fp.InfoHash, fp.SiteName, "pieces_hash_bencode", meta.PiecesHashBencode); err != nil {
+			e.logger.Warn("pieces_hash_bencode 回写失败", zap.String("hash", src.InfoHash), zap.Error(err))
+		}
 	}
 	fp.PiecesHashBencode = meta.PiecesHashBencode
 	e.logger.Info("lazyComputeBencodeHash: computed and saved",
@@ -5197,12 +5189,6 @@ func (e *Engine) resolveSiteIDsToNames(ctx context.Context, ids string) []string
 	return names
 }
 
-func truncHash(h string) string {
-	if len(h) > 16 {
-		return h[:16]
-	}
-	return h
-}
 
 func partsToUint(parts []string) []uint {
 	result := make([]uint, 0, len(parts))

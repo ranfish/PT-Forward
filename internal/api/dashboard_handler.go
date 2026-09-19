@@ -447,9 +447,12 @@ func (h *DashboardHandler) handleSystemDashboard(w http.ResponseWriter, r *http.
 		Where("enabled = ?", true).Count(&rssEnabled)
 
 	var lastRSSFetch time.Time
-	h.db.WithContext(ctx).Model(&model.RSSFetchLog{}).
+	if err := h.db.WithContext(ctx).Model(&model.RSSFetchLog{}).
 		Order("created_at DESC").Limit(1).
-		Select("created_at").Row().Scan(&lastRSSFetch)
+		Select("created_at").Row().Scan(&lastRSSFetch); err != nil {
+		// 空表/零行 → 零值即可；其余错误仅影响一张卡片，不致败整个仪表盘
+		lastRSSFetch = time.Time{}
+	}
 
 	// 下载卡片
 	var dlDownloading, dlCompleted, dlError, dlTransferPending int64

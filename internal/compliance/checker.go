@@ -369,12 +369,12 @@ func (c *Checker) lookupSourceCategory(ctx context.Context, title, siteName stri
 	}
 	var sourceCat string
 	if siteName != "" {
-		c.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
+		_ = c.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
 			Where("site_name = ? AND title = ?", siteName, title).
 			Select("source_category").Limit(1).Row().Scan(&sourceCat)
 	}
 	if sourceCat == "" {
-		c.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
+		_ = c.db.WithContext(ctx).Model(&model.RSSTorrentSeen{}).
 			Where("title = ?", title).
 			Select("source_category").Limit(1).Row().Scan(&sourceCat)
 	}
