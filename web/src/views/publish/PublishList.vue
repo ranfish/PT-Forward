@@ -145,7 +145,7 @@
                   <span style="font-family: monospace; font-size: 12px">{{ record.info_hash || '-' }}</span>
                 </a-descriptions-item>
                 <a-descriptions-item label="源种子ID">{{ record.source_torrent_id || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="下载器">{{ record.client_id || '-' }}</a-descriptions-item>
+                <a-descriptions-item label="下载器">{{ record.client_uid || '-' }}</a-descriptions-item>
                 <a-descriptions-item label="保存路径" :span="3">
                   <span style="font-family: monospace; font-size: 12px">{{ record.local_save_path || '-' }}</span>
                 </a-descriptions-item>
