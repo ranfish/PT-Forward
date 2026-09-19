@@ -344,7 +344,7 @@ async function fetchList() {
   loading.value = true
   try {
     const params = {
-      client_id: filterClient.value ?? '',
+      client_id: filterClient.value,
       save_path: filterPath.value || '',
       status: statusFilter.value === 'all' ? '' : (statusFilter.value === 'issues' ? 'issues' : statusFilter.value),
       search: searchText.value,

@@ -887,7 +887,7 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 
 	case http.MethodPost:
 		var req struct {
-			ClientID        uint   `json:"client_id"`
+			ClientUID       uint   `json:"client_uid"`
 			SiteName        string `json:"site_name"`
 			CategoryMapping string `json:"category_mapping"`
 			SourceMapping   string `json:"source_mapping"`
@@ -900,12 +900,12 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			Error(w, http.StatusBadRequest, 40001, "invalid request body")
 			return
 		}
-		if req.ClientID == 0 || req.SiteName == "" {
+		if req.ClientUID == 0 || req.SiteName == "" {
 			Error(w, http.StatusBadRequest, 40001, "client_id and site_name are required")
 			return
 		}
 		target := model.ClientPublishTarget{
-			ClientUID: req.ClientID,
+			ClientUID: req.ClientUID,
 			SiteName:        req.SiteName,
 			CategoryMapping: req.CategoryMapping,
 			SourceMapping:   req.SourceMapping,

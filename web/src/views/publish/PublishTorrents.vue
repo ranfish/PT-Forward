@@ -265,7 +265,7 @@ const clientsLoading = ref(false)
 const STORAGE_KEY = 'publish_clusters_filters'
 
 interface PersistedFilters {
-  client?: string
+  client?: number
   path?: string
   ready?: string
   search?: string
@@ -282,7 +282,7 @@ function loadPersistedFilters(): PersistedFilters {
 
 function persistFilters() {
   const data: PersistedFilters = {
-    client: selectedClient.value || undefined,
+    client: selectedClient.value ?? undefined,
     path: selectedPath.value || undefined,
     ready: readyFilter.value,
     search: searchText.value || undefined,
@@ -372,7 +372,7 @@ async function fetchList() {
   loading.value = true
   try {
     const resp = await seedConfigApi.listSeeds({
-      client_id: selectedClient.value ?? '',
+      client_id: selectedClient.value ?? undefined,
       save_path: selectedPath.value || '',
       // §59.142: radio 值域映射——前端 ready/pending → 后端 true/false（原透传致过滤失效三态同数据）
       ready: readyFilter.value === 'all' ? '' : (readyFilter.value === 'ready' ? 'true' : 'false'),

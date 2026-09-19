@@ -193,7 +193,7 @@ const targetSites = ref<Array<{ name: string; has_pre_audit: boolean }>>([])
 const selectedTarget = ref<string | undefined>(undefined)
 const clients = ref<Array<{ client_id: number; name: string; paths: Array<{ save_path: string; count: number }> }>>([])
 const clientsLoading = ref(false)
-const selectedClient = ref<string | undefined>(undefined)
+const selectedClient = ref<number | undefined>(undefined)
 const selectedPath = ref<string | undefined>(undefined)
 const readyFilter = ref<'all' | 'publishable' | 'published'>('all') // §59.166 三态（未选站默认全部）
 const injectSearch = ref('')
@@ -398,7 +398,7 @@ async function fetchInjectList() {
   injectLoading.value = true
   try {
     const resp = await seedConfigApi.listSeeds({
-      client_id: selectedClient.value ?? '',
+      client_id: selectedClient.value ?? undefined,
       save_path: selectedPath.value || '',
       // §59.166 三态：publishable/published 走 target_site+publish_state（后端
       // publishable 自含 reviewed）；all 不带
@@ -459,7 +459,7 @@ const FILTERS_KEY = 'publish_data_filters'
 function persistFilters() {
   try {
     localStorage.setItem(FILTERS_KEY, JSON.stringify({
-      client: selectedClient.value || undefined,
+      client: selectedClient.value ?? undefined,
       path: selectedPath.value || undefined,
       // ready 不持久化（§59.166：站视角三态离站无意义——恢复恒 all）
       search: injectSearch.value || undefined,
@@ -471,7 +471,7 @@ function restoreFilters() {
   try {
     const raw = localStorage.getItem(FILTERS_KEY)
     if (!raw) return
-    const f = JSON.parse(raw) as { client?: string; path?: string; ready?: 'all' | 'publishable' | 'published'; search?: string; page_size?: number }
+    const f = JSON.parse(raw) as { client?: number; path?: string; ready?: 'all' | 'publishable' | 'published'; search?: string; page_size?: number }
     if (f.client) selectedClient.value = Number(f.client) || undefined
     if (f.path) selectedPath.value = f.path
     // §59.166 回归审核：站不持久化——publishable/published 恢复后无站=禁用 radio

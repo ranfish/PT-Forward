@@ -45,7 +45,7 @@ export const downloadsApi = {
     const query = new URLSearchParams()
     if (params?.page) query.set('page', String(params.page))
     if (params?.size) query.set('size', String(params.size))
-    if (params?.client_id) query.set('client_id', params.client_id)
+    if (params?.client_id) query.set('client_id', String(params.client_id))
     if (params?.status) query.set('status', params.status)
     const qs = query.toString()
     return client.get<ApiResponse<DownloadTaskListResponse>>(`/downloads${qs ? '?' + qs : ''}`)

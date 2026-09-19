@@ -191,14 +191,14 @@ export interface SeedDetail {
 
 export const seedConfigApi = {
   // §59.38: 观察期列表（返回结构同 listSeeds：items/total；行字段 client_id/name/variants/last_seen/save_path/size/cleanup_in_days）
-  listObserving(params: { client_id?: string; save_path?: string; search?: string; page?: number; page_size?: number }) {
+  listObserving(params: { client_id?: number; save_path?: string; search?: string; page?: number; page_size?: number }) {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params: { ...params, status: 'observing' } })
   },
   // §59.38: 观察期立即清理
   purgeObserving(clientId: number, name: string) {
     return client.post<ApiResponse<{ message: string; deleted_snaps: number; deleted_metas: number }>>('/publish/seeds/observing/purge', { clientId, name })
   },
-  listSeeds(params: { client_id?: string; save_path?: string; status?: string; search?: string; ready?: string; publish_state?: string; target_site?: string; exclude_forbidden?: string; page?: number; page_size?: number }) {
+  listSeeds(params: { client_id?: number; save_path?: string; status?: string; search?: string; ready?: string; publish_state?: string; target_site?: string; exclude_forbidden?: string; page?: number; page_size?: number }) {
     return client.get<ApiResponse<{ items: SeedListItem[]; total: number }>>('/publish/seeds', { params })
   },
   uniquePaths() {
