@@ -13,18 +13,25 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
-echo "==> [1/4] go vet（不用 ./...，cmd/verify-pieces-hash 有已知冲突）"
+echo "==> [1/5] go vet（不用 ./...，cmd/verify-pieces-hash 有已知冲突）"
 "$GO" vet ./internal/... ./cmd/pt-forward/
 
-echo "==> [2/4] go test"
+echo "==> [2/5] dict 漂移检查（改 dict/*.json 后必跑 gen-dict 并提交）"
+"$GO" run ./cmd/gen-dict >/dev/null
+if [ -n "$(git status --porcelain web/src/generated/dict.ts)" ]; then
+  echo "❌ dict.ts 与 dict/*.json 不同步——请提交 gen-dict 生成的 web/src/generated/dict.ts（CI drift check 必红）" >&2
+  exit 1
+fi
+
+echo "==> [3/5] go test"
 "$GO" test ./internal/... -count=1 -timeout 600s
 
-echo "==> [3/4] go build（CGO_ENABLED=1 + 版本号 ldflags）"
+echo "==> [4/5] go build（CGO_ENABLED=1 + 版本号 ldflags）"
 CGO_ENABLED=1 "$GO" build \
   -ldflags "-s -w -X main.version=$(git describe --tags --always --dirty)" \
   -o pt-forward ./cmd/pt-forward/
 
-echo "==> [4/4] 重启服务"
+echo "==> [5/5] 重启服务"
 systemctl --user restart pt-forward
 sleep 2
 systemctl --user is-active pt-forward

@@ -14,10 +14,19 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
-echo "==> [1/5] vue-tsc + eslint"
+echo "==> [1/5] vue-tsc + eslint（-b build 模式——裸 --noEmit 会静默跳过 solution references）"
 cd web
 ./node_modules/.bin/vue-tsc -b --noEmit
 npx eslint src/
+
+echo "==> [1b/5] dict 漂移检查（改 dict/*.json 后必跑 gen-dict 并提交）"
+cd ..
+"$GO" run ./cmd/gen-dict >/dev/null
+if [ -n "$(git status --porcelain web/src/generated/dict.ts)" ]; then
+  echo "❌ dict.ts 与 dict/*.json 不同步——请提交 gen-dict 生成的 web/src/generated/dict.ts（CI drift check 必红）" >&2
+  exit 1
+fi
+cd web
 
 echo "==> [2/5] vite build（清 vite 缓存）"
 rm -rf node_modules/.vite
