@@ -259,7 +259,6 @@ interface ReseedMatchItem {
   id: number
   source_info_hash: string
   source_torrent_id: string
-  source_detail_url?: string
   target_detail_url?: string
   target_site: string
   target_info_hash: string
