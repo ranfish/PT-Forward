@@ -23,6 +23,7 @@ package model
 
 import (
 	"encoding/json"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -70,11 +71,91 @@ func uidNewCol(old string) string {
 }
 
 func migrateLegacyClientUID(db *gorm.DB) {
+	migrateLegacyUIDNotNull(db) // 必须最先：解除旧列 NOT NULL（表同构重建）——否则新代码 INSERT 被旧列拦截
 	for _, t := range legacyUIDTables {
 		migrateLegacyTable(db, t)
 	}
 	migrateLegacyRssArrays(db)
 	migrateLegacyReseedTasks(db)
+	migrateLegacyUIDIndexes(db) // 必须在回填/去重后：DROP 旧列组索引，gorm AutoMigrate 重建正确列组
+}
+
+// migrateLegacyUIDNotNull 第〇步：旧 client_id 列 NOT NULL 解除。
+// 旧列自带 NOT NULL 约束（新代码 INSERT 不写旧列 → 全部拦截，243 第四层实证：
+// 快照 upsert rows:0）。SQLite 不支持 ALTER 改约束——同构表重建：原 DDL 仅去掉
+// client_id 列的 NOT NULL，列序不变，INSERT SELECT * 同构拷贝（零列映射风险）。
+// DROP TABLE 连带删全部索引，gorm AutoMigrate 按新模型重建（半迁移态已建的新列组
+// 索引同删同建，幂等）。torrent_events 的自引用外键不受影响（本层不触该表）。
+func migrateLegacyUIDNotNull(db *gorm.DB) {
+	tables := []string{
+		"torrent_snapshots", "seeding_torrent_records", "seeding_client_configs", "seeding_client_states",
+		"reseed_matches", "free_wait_entries", "download_tasks", "orphan_scan_configs",
+		"cluster_screenshot_cache", "client_publish_targets", "scoring_logs",
+	}
+	for _, t := range tables {
+		if !legacyTableExists(db, t) || !legacyHasColumn(db, t, "client_id") {
+			continue
+		}
+		if !legacyColumnNotNull(db, t, "client_id") {
+			continue // 已解除（幂等）
+		}
+		var ddl string
+		if err := db.Raw("SELECT sql FROM sqlite_master WHERE type='table' AND name = ?", t).Scan(&ddl).Error; err != nil || ddl == "" {
+			continue
+		}
+		// 去掉 client_id 列定义中的 NOT NULL（保留 DEFAULT 等其余约束）
+		re := regexp.MustCompile("(`client_id`[^,)]*?)\\s+NOT NULL")
+		newDDL := re.ReplaceAllString(ddl, "$1")
+		if newDDL == ddl {
+			continue
+		}
+		tmp := t + "__uidmig"
+		if err := db.Exec("DROP TABLE IF EXISTS " + tmp).Error; err != nil {
+			continue
+		}
+		if err := db.Exec(strings.Replace(newDDL, "CREATE TABLE `"+t+"`", "CREATE TABLE `"+tmp+"`", 1)).Error; err != nil {
+			db.Logger.Error(db.Statement.Context, "legacy uid migrate: recreate table failed: %v table=%s", err, t)
+			continue
+		}
+		if err := db.Exec("INSERT INTO " + tmp + " SELECT * FROM " + t).Error; err != nil {
+			db.Logger.Error(db.Statement.Context, "legacy uid migrate: copy rows failed: %v table=%s", err, t)
+			db.Exec("DROP TABLE IF EXISTS " + tmp)
+			continue
+		}
+		if err := db.Exec("DROP TABLE " + t).Error; err != nil {
+			continue
+		}
+		if err := db.Exec("ALTER TABLE " + tmp + " RENAME TO " + t).Error; err != nil {
+			db.Logger.Error(db.Statement.Context, "legacy uid migrate: rename failed: %v table=%s", err, t)
+			continue
+		}
+	}
+}
+
+func legacyColumnNotNull(db *gorm.DB, table, col string) bool {
+	var n int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ? AND \"notnull\" = 1", table, col).Scan(&n)
+	return n > 0
+}
+
+// migrateLegacyUIDIndexes 第五步：旧列组索引替换。
+// 旧库唯一/普通索引列组用旧列名（如 idx_snapshot_hash_client ON (hash, client_id)），而 gorm
+// AutoMigrate 见同名索引存在即跳过——导致 (hash, client_uid) 索引缺失，upsert
+// ON CONFLICT (hash, client_uid) 全静默失败（243 第三层实证）。DROP 后 gorm 按新
+// 模型重建（数据已回填+去重，唯一索引重建安全）。client_path_mappings 的
+// source_client_id/reseed_client_id 列名未变——排除。
+func migrateLegacyUIDIndexes(db *gorm.DB) {
+	type idxRow struct {
+		Name string
+		Tbl  string
+	}
+	var idxs []idxRow
+	db.Raw("SELECT name, tbl_name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL AND (sql LIKE '%client_id%' OR sql LIKE '%client_id %') AND sql NOT LIKE '%client_uid%' AND tbl_name != 'client_path_mappings'").Scan(&idxs)
+	for _, ix := range idxs {
+		if err := db.Exec("DROP INDEX IF EXISTS " + ix.Name).Error; err != nil {
+			db.Logger.Error(db.Statement.Context, "legacy uid migrate: drop old index failed: %v idx=%s", err, ix.Name)
+		}
+	}
 }
 
 func migrateLegacyTable(db *gorm.DB, t legacyUIDTable) {
