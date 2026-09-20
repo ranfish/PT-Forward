@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -75,15 +76,62 @@ func (f *Fetcher) FetchAndStoreDirect(ctx context.Context, infoHash, siteName, t
 	// D3=C 轻校验：标题相关性（不校验 size/分辨率——元数据版本不敏感）
 	if meta != nil && meta.Title != "" && sourceName != "" {
 		if !reseed.TitleRelevant(sourceName, meta.Title) {
-			f.logger.Warn("direct fetch title mismatch (D3 reject)",
-				zap.String("site", siteName),
-				zap.String("torrent_id", torrentID),
-				zap.String("source", sourceName[:min(len(sourceName), 50)]),
-				zap.String("detail", meta.Title[:min(len(meta.Title), 50)]))
-			return nil, fmt.Errorf("直达标题不相关（D3 拒绝, tid=%s）", torrentID)
+			// §59.252 A：hash 终审——站方标题字段可噪声（重命名/译名/标错），
+			// .torrent 的 infohash 是数学权威（木星案 USA/CEE 实证）。下载比对：
+			// 相等=铁证放行（fetch_source=hash_verified）；不等/失败=维持 D3 拒绝。
+			if tm := f.hashVerifyDirect(ctx, siteName, torrentID, infoHash); tm != nil {
+				f.logger.Info("direct fetch hash-verified (D3 override)",
+					zap.String("site", siteName),
+					zap.String("torrent_id", torrentID),
+					zap.String("raw_name", tm.Name[:min(len(tm.Name), 60)]))
+				meta.FetchSource = "hash_verified"
+				meta.TorrentRawName = tm.Name // §59.252 C：原始名落库
+			} else {
+				f.logger.Warn("direct fetch title mismatch (D3 reject)",
+					zap.String("site", siteName),
+					zap.String("torrent_id", torrentID),
+					zap.String("source", sourceName[:min(len(sourceName), 50)]),
+					zap.String("detail", meta.Title[:min(len(meta.Title), 50)]))
+				return nil, fmt.Errorf("直达标题不相关（D3 拒绝, tid=%s）", torrentID)
+			}
 		}
 	}
 	return meta, nil
+}
+
+// hashVerifyDirect §59.252 A：下载 tid 的 .torrent 解析 infohash 终审。
+// 下载失败/解析失败/hash 不等 → nil（调用方维持 D3 拒绝）。
+func (f *Fetcher) hashVerifyDirect(ctx context.Context, siteName, torrentID, wantHash string) *fingerprint.TorrentMeta {
+	if f.siteProvider == nil || torrentID == "" || wantHash == "" {
+		return nil
+	}
+	adapter, err := f.siteProvider.GetAdapter(ctx, siteName)
+	if err != nil {
+		return nil
+	}
+	config, err := f.siteProvider.GetSiteConfig(ctx, siteName)
+	if err != nil || config == nil {
+		return nil
+	}
+	dlCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+	data, err := adapter.DownloadTorrent(dlCtx, config, torrentID)
+	if err != nil || len(data) == 0 {
+		f.logger.Debug("hash verify: download torrent failed",
+			zap.String("site", siteName), zap.String("torrent_id", torrentID), zap.Error(err))
+		return nil
+	}
+	tm, err := fingerprint.ComputeFromTorrent(data)
+	if err != nil {
+		return nil
+	}
+	if !strings.EqualFold(tm.InfoHash, wantHash) {
+		f.logger.Info("hash verify: mismatch",
+			zap.String("site", siteName), zap.String("torrent_id", torrentID),
+			zap.String("want", wantHash), zap.String("got", tm.InfoHash))
+		return nil
+	}
+	return tm
 }
 
 // FetchFromSiteNoFallback §59.65: 单站直取（fetch_source=rss_detail），失败报错

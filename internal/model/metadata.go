@@ -13,6 +13,7 @@ type TorrentMetadata struct {
 	SiteName          string    `json:"site_name" gorm:"uniqueIndex:idx_hash_site;size:100"`
 	TorrentID         string    `json:"torrent_id" gorm:"size:50"`
 	Title             string    `json:"title" gorm:"size:500"`
+	TorrentRawName    string    `json:"torrent_raw_name" gorm:"size:500"` // §59.252 C：.torrent 原始名（数学锚点——站方标题噪声免疫）
 	Subtitle          string    `json:"subtitle" gorm:"size:500"`
 	SourceCategory    string    `json:"source_category" gorm:"size:100"`
 	StandardType      string    `json:"standard_type" gorm:"size:50"`
