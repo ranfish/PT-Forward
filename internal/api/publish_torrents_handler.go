@@ -2227,7 +2227,7 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 	isLocal := false
 	if clientUID != 0 {
 		var client model.ClientConfig
-		if err := h.db.WithContext(ctx).Where("name = ?", clientUID).First(&client).Error; err == nil {
+		if err := h.db.WithContext(ctx).Where("id = ?", clientUID).First(&client).Error; err == nil {
 			isLocal = client.IsLocal
 		}
 	}
@@ -3868,7 +3868,7 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 	}
 	if clientUID != 0 {
 		var client model.ClientConfig
-		if err := h.db.WithContext(r.Context()).Where("name = ?", clientUID).First(&client).Error; err == nil {
+		if err := h.db.WithContext(r.Context()).Where("id = ?", clientUID).First(&client).Error; err == nil {
 			result["is_local"] = client.IsLocal
 		}
 	}
@@ -4136,7 +4136,7 @@ func (h *PublishTorrentsHandler) handleFetchSingleSeed(w http.ResponseWriter, r 
 
 	isLocal := false
 	var client model.ClientConfig
-	if h.db.WithContext(r.Context()).Where("name = ?", clientUID).First(&client).Error == nil {
+	if h.db.WithContext(r.Context()).Where("id = ?", clientUID).First(&client).Error == nil {
 		isLocal = client.IsLocal
 	}
 

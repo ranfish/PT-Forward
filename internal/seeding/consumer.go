@@ -171,7 +171,7 @@ func (e *Engine) scoreAndPushForClient(ctx context.Context, clientUID uint, subs
 	// §55.14 阶段3：按下载器 role 决定是否评分（role≠seeding 顺序推送，不挑种子）
 	var roleClient model.ClientConfig
 	isSeedingRole := true
-	if err := e.db.WithContext(ctx).Where("name = ?", clientUID).First(&roleClient).Error; err == nil {
+	if err := e.db.WithContext(ctx).Where("id = ?", clientUID).First(&roleClient).Error; err == nil {
 		isSeedingRole = roleClient.Role == "seeding"
 	}
 
@@ -418,7 +418,7 @@ func (e *Engine) createRecordFromPush(ctx context.Context, clientUID uint, event
 	// §55.14 阶段2：查下载器 role 存入 record（consumeLoop 据此决定是否评分）
 	var dlClient model.ClientConfig
 	clientRole := ""
-	if err := e.db.WithContext(ctx).Where("name = ?", clientUID).First(&dlClient).Error; err == nil {
+	if err := e.db.WithContext(ctx).Where("id = ?", clientUID).First(&dlClient).Error; err == nil {
 		clientRole = dlClient.Role
 	}
 
