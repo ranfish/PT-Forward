@@ -103,9 +103,18 @@ func migrateLegacyUIDNotNull(db *gorm.DB) {
 		if err := db.Raw("SELECT sql FROM sqlite_master WHERE type='table' AND name = ?", t).Scan(&ddl).Error; err != nil || ddl == "" {
 			continue
 		}
-		// 去掉 client_id 列定义中的 NOT NULL（保留 DEFAULT 等其余约束）
-		re := regexp.MustCompile("(`client_id`[^,)]*?)\\s+NOT NULL")
-		newDDL := re.ReplaceAllString(ddl, "$1")
+		// 去掉 client_id 列定义中的 NOT NULL（保留 DEFAULT 等其余约束）——
+		// 三种引号形态逐试（反引号/双引号/裸名——243 双引号实证）
+		var newDDL string
+		for _, re := range []*regexp.Regexp{
+			regexp.MustCompile("(`client_id`[^,)]*?)\\s+NOT\\s+NULL"),
+			regexp.MustCompile("(\"client_id\"[^,)]*?)\\s+NOT\\s+NULL"),
+			regexp.MustCompile("(?i)(client_id\\s+[^,)]*?)\\s+NOT\\s+NULL"),
+		} {
+			if newDDL = re.ReplaceAllString(ddl, "$1"); newDDL != ddl {
+				break
+			}
+		}
 		if newDDL == ddl {
 			continue
 		}
@@ -113,7 +122,13 @@ func migrateLegacyUIDNotNull(db *gorm.DB) {
 		if err := db.Exec("DROP TABLE IF EXISTS " + tmp).Error; err != nil {
 			continue
 		}
-		if err := db.Exec(strings.Replace(newDDL, "CREATE TABLE `"+t+"`", "CREATE TABLE `"+tmp+"`", 1)).Error; err != nil {
+		// 表名替换兼容三种引号形态（老版 gorm 双引号/反引号/裸名——243 实证差异）
+		nameRe := regexp.MustCompile("(?i)CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?[`\"?]?" + regexp.QuoteMeta(t) + "[`\"?]?")
+		if !nameRe.MatchString(newDDL) {
+			db.Logger.Error(db.Statement.Context, "legacy uid migrate: table name not found in DDL table=%s", t)
+			continue
+		}
+		if err := db.Exec(nameRe.ReplaceAllString(newDDL, "CREATE TABLE `"+tmp+"`")).Error; err != nil {
 			db.Logger.Error(db.Statement.Context, "legacy uid migrate: recreate table failed: %v table=%s", err, t)
 			continue
 		}
@@ -202,15 +217,27 @@ func migrateLegacyRssArrays(db *gorm.DB) {
 	if !legacyTableExists(db, "rss_subscriptions") || !legacyHasColumn(db, "rss_subscriptions", "client_id") {
 		return
 	}
+	// 列版本差异（243 实证）：旧 auto_reseed 列族仅更老库存在——逐列探测拼 SELECT
+	reseedCol := "''"
+	if legacyHasColumn(db, "rss_subscriptions", "reseed_client_ids") {
+		reseedCol = "COALESCE(reseed_client_ids,'')"
+	}
+	transferCol := "''"
+	if legacyHasColumn(db, "rss_subscriptions", "transfer_client_ids") {
+		transferCol = "COALESCE(transfer_client_ids,'')"
+	}
+	candCol := "''"
+	if legacyHasColumn(db, "rss_subscriptions", "candidate_clients") {
+		candCol = "COALESCE(candidate_clients,'')"
+	}
 	type row struct {
-		ID                      uint
-		ClientID                string
-		ReseedClientIDs         string // 旧 auto_reseed 列族（json 名字数组）
-		TransferClientIDs       string
-		CandidateClients        string
+		ID                uint
+		ClientID          string
+		TransferClientIDs string
+		CandidateClients  string
 	}
 	var rows []row
-	if err := db.Raw("SELECT id, COALESCE(client_id,''), COALESCE(reseed_client_ids,''), COALESCE(transfer_client_ids,''), COALESCE(candidate_clients,'') FROM rss_subscriptions WHERE client_uid = 0 OR (reseed_client_ids IS NOT NULL AND reseed_client_ids != '') OR (candidate_clients IS NOT NULL AND candidate_clients != '')").Scan(&rows).Error; err != nil {
+	if err := db.Raw("SELECT id, COALESCE(client_id,''), " + transferCol + ", " + candCol + " FROM rss_subscriptions WHERE client_uid = 0 OR (" + reseedCol + " != '') OR (" + candCol + " != '')").Scan(&rows).Error; err != nil {
 		return
 	}
 	if len(rows) == 0 {
