@@ -125,7 +125,8 @@ func mustTables(db *gorm.DB) []string {
 
 // isConditionalMigration 迁移包 Exec 是条件 SQL（pragma 检查旧列后才执行）——跳过
 func isConditionalMigration(file string) bool {
-	return strings.Contains(file, "internal/db/migration") || strings.Contains(file, "internal/model/migrate.go")
+	// migrate_uid.go：全部 Raw/Exec 在 legacyHasColumn/legacyTableExists 守卫后（运行时安全）
+	return strings.Contains(file, "internal/db/migration") || strings.Contains(file, "internal/model/migrate.go") || strings.Contains(file, "internal/model/migrate_uid.go")
 }
 
 func whereFrags(c chain) []string {
