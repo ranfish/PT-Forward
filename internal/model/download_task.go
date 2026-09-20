@@ -32,7 +32,7 @@ type DownloadTask struct {
 	Source         string `json:"source" gorm:"size:20;not null;default:'rss'"`
 	SubscriptionID *uint  `json:"subscription_id" gorm:"index"`
 
-	ClientUID uint `json:"client_uid" gorm:"index;not null"`
+	ClientUID uint `json:"client_uid" gorm:"index;not null;default:0"`
 
 	InfoHash    string `json:"info_hash" gorm:"size:40;index"`
 	TorrentName string `json:"torrent_name" gorm:"type:text"`

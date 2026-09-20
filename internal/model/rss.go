@@ -252,7 +252,7 @@ func (RSSFetchLog) TableName() string { return "rss_fetch_logs" }
 type RSSSubscriptionRule struct {
 	ID             uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	SubscriptionID string    `json:"subscription_id" gorm:"size:100;not null;uniqueIndex:idx_sub_rule,composite:subscription_id;index"`
-	RuleID         uint      `json:"rule_id" gorm:"not null;uniqueIndex:idx_sub_rule,composite:rule_id"`
+	RuleID         uint      `json:"rule_id" gorm:"not null;default:0;uniqueIndex:idx_sub_rule,composite:rule_id"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
