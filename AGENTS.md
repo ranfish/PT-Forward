@@ -69,6 +69,7 @@
 - **新站骨架永不默认启用（全站通用铁律）**：migration/seed 默认增加的支持站点一律 `enabled=false`（落"未启用"列表）——只有用户自行添加认证凭证并启用的站点才进入"我的站点"（2026-09-04 用户定案；migration 33 修道院 Enabled=true 反例教训）
 - **转存发布禁勾"首发"标签（全站通用铁律）**：首发=PT 圈首次发布，站管/压制组官方专属，转载人员不允许使用（2026-09-02 用户权威定义）
 - **站点代理解析公共单点**：`site.ResolveSiteProxy(db,ctx,site)` + `httpclient.NewSiteHTTPClient` 组合，禁止裸 client（§59.156）
+- **clients 表查询铁律（§59.251/v0.0.995 教训）**：按 UID 查下载器必须 `Where("id = ?", uid)`（uint 列）；`Where("name = ?", ...)` 仅限真名字场景——**uint 变量查 name 列=恒 miss 静默错**（isLocal/role 五处漏网实证，mock 测试不掩盖 DB 查询语义）。clients.id 带 AUTOINCREMENT 永不复用；悬空引用（rss 订阅/转移目标）由消费方失败处理容忍（§59.251 保留面定案）
 
 **历史详情**：§55-§59.161 全过程见 `docs/31-模块设计决策记录.md`（grep "§59.X" 定位章节）。
 
