@@ -514,6 +514,7 @@ export interface PublishResultRecord {
   trigger?: string
   batch_group_id?: string
   title?: string
+  torrent_raw_name?: string
   subtitle?: string
   downloader_id?: number
   cost_ms?: number
