@@ -992,9 +992,11 @@ func TestFlush_ConfirmTopN_Rescores(t *testing.T) {
 	for i := range records {
 		db.Create(&records[i])
 		e.mu.Lock()
+		// CreatedAt 必填：syncStaleRecords 保护窗用内存态 CreatedAt 判新旧（零值=巨差→
+		// 竞态清记录致 Flush 0 候选——CI 单核实证）。生产链 OnTorrents 回填，此处模拟真实形态。
 		e.recordMap[recordKey(records[i].ClientUID, records[i].InfoHash)] = &model.SeedingTorrentRecord{
 			ClientUID: records[i].ClientUID, InfoHash: records[i].InfoHash, Status: model.SeedingStatusSeeding,
-			SubscriptionID: fmt.Sprintf("%d", sub.ID),
+			SubscriptionID: fmt.Sprintf("%d", sub.ID), CreatedAt: now,
 		}
 		e.mu.Unlock()
 	}
