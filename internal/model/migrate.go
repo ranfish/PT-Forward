@@ -77,6 +77,7 @@ func AllModels() []any {
 }
 
 func AutoMigrate(db *gorm.DB) error {
+	migrateLegacyClientUID(db) // §59.251/v0.0.992 旧库升级兼容层（幂等；新库空跑）
 	for _, m := range AllModels() {
 		if err := db.AutoMigrate(m); err != nil {
 			return err
