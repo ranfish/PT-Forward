@@ -1361,7 +1361,18 @@ func TestRetryBlockedStates(t *testing.T) {
 	}
 	eng.retryBlocked(ctx, sub, events)
 
-	if len(published) != 1 || published[0].TorrentID != "200" {
+	// EventBus 异步分发（Publish 投 channel/dispatch goroutine 消费）——断言前轮询
+	// 等待消费完成（CI 慢机竞争窗实证：#1930 零重推假 FAIL；§59.122 同款模式）
+	deadline := time.Now().Add(2 * time.Second)
+	mu.Lock()
+	for len(published) == 0 && time.Now().Before(deadline) {
+		mu.Unlock()
+		time.Sleep(5 * time.Millisecond)
+		mu.Lock()
+	}
+	got := len(published)
+	mu.Unlock()
+	if got != 1 || published[0].TorrentID != "200" {
 		t.Errorf("仅免费项应重推: %+v", published)
 	}
 	var s200, s201, s202 string
