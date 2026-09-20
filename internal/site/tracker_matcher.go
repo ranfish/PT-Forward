@@ -66,11 +66,30 @@ func (m *TrackerMatcher) buildIndex(sites []model.Site) {
 				}
 			}
 		}
-		// 兜底：用 Domain + BaseURL 构建索引（核心域名启发式匹配）
+		// 兜底：用 Domain + BaseURL + AlternativeDomains 构建索引（核心域名启发式匹配）
+		// §59.251 木星案：老域名（hdcmct.org→春天等十域资产）只在 alternative_domains 列，
+		// 不入索引则簇 comment 直达解析断链（v0.0.996 前漏采）
 		candidates := []string{s.Domain}
 		if s.BaseURL != "" {
 			if u, err := url.Parse(s.BaseURL); err == nil && u.Hostname() != "" {
 				candidates = append(candidates, u.Hostname())
+			}
+		}
+		if s.AlternativeDomains != "" {
+			for _, part := range strings.Split(s.AlternativeDomains, ",") {
+				part = strings.TrimSpace(part)
+				if part == "" {
+					continue
+				}
+				// JSON 数组形态与裸串双兼容（hdcmct.org / ["a.com","b.com"]）
+				for _, seg := range strings.FieldsFunc(part, func(r rune) bool {
+					return r == ',' || r == '"' || r == '[' || r == ']'
+				}) {
+					seg = strings.TrimSpace(seg)
+					if seg != "" && !strings.Contains(seg, " ") {
+						candidates = append(candidates, seg)
+					}
+				}
 			}
 		}
 		for _, host := range candidates {
