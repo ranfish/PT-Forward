@@ -115,9 +115,10 @@ func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 
 	if len(configs) == 0 {
 		Success(w, map[string]interface{}{
-			"token":   "",
-			"enabled": false,
-			"baseUrl": "https://2025.iyuu.cn",
+			"token":             "",
+			"enabled":           false,
+			"baseUrl":           "https://2025.iyuu.cn",
+			"syncIntervalHours": 24,
 		})
 		return
 	}
