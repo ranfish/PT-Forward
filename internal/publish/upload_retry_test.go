@@ -11,7 +11,6 @@ type fakeUploader struct {
 	calls    int
 	failN    int // 前 N 次失败
 	failAll  bool
-	lastData []byte
 }
 
 func (f *fakeUploader) upload(ctx context.Context, data []byte, name string) (string, error) {

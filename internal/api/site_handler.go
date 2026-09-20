@@ -431,16 +431,6 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 	return resp
 }
 
-var validFrameworks = map[string]bool{
-	string(model.FrameworkNexusPHP):  true,
-	string(model.FrameworkUnit3D):    true,
-	string(model.FrameworkGazelle):   true,
-	string(model.FrameworkMTeam):     true,
-	string(model.FrameworkTNode):     true,
-	string(model.FrameworkLuminance): true,
-	string(model.FrameworkRousi):     true,
-	string(model.FrameworkGeneric):   true,
-}
 
 func (h *SiteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handleRouteByPath(w, r)
@@ -2413,7 +2403,7 @@ func (h *SiteHandler) handleDownloadTest(w http.ResponseWriter, r *http.Request,
 	var req struct {
 		TorrentID string `json:"torrentId"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req) // 空/坏 body → 空 torrentID 走 400
 
 	torrentID := req.TorrentID
 	var candidateIDs []string

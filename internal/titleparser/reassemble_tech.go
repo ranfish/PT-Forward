@@ -255,12 +255,6 @@ func formatBitDepthForTitle(p TechProfile) string {
 	return ""
 }
 
-// formatAudioTracksStr 音轨数 → 标题字符串（0/1 省略，≥2 输出 XAudios）。
-// §56.35: 被 audioCountWord 替代（支持 audio_count_suffix 站点覆盖），保留向后兼容。
-func formatAudioTracksStr(n int) string {
-	return audioCountWord(n, "")
-}
-
 // codecStyle 按媒介上下文转换视频编码写法（§56.35 阶段 1，v1.05 :150-160）。
 //
 // 原盘/Remux → AVC / HEVC

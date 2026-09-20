@@ -158,7 +158,7 @@ func uploadWithRetry(parent context.Context,
 	for i := 0; i < attempts; i++ {
 		if i > 0 {
 			// 退避: 2s, 8s（parent 取消则提前退出）
-			backoff := time.Duration(1<<uint(2*i-1)) * time.Second // i=1:2s, i=2:8s
+			backoff := time.Duration(1<<uint(2*i-1)) * time.Second //nolint:gosec // i 上界 2（重试轮数） // i=1:2s, i=2:8s
 			select {
 			case <-parent.Done():
 				return "", parent.Err()
@@ -208,7 +208,7 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 			_ = os.RemoveAll(tmpDir)
 		}
 		// §59.61 附3 层3: 不足 Min 且有失败张——tmpDir 保留给二次补传（defer 兜底清理）
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 	}
 	if len(uploaded) == 0 {
 		g.logger.Warn("screenshot upload all failed", zap.Int("captured", len(localShots)))
@@ -244,7 +244,7 @@ func (g *PublishArtifactGenerator) uploadShotsWithRetry(ctx context.Context, loc
 	var uploaded []string
 	var failedPaths []string
 	for i, shotPath := range localShots {
-		data, readErr := os.ReadFile(shotPath)
+		data, readErr := os.ReadFile(shotPath) //nolint:gosec // 截图临时目录内部路径
 		if readErr != nil {
 			g.logger.Warn("screenshot read failed", zap.String("path", shotPath), zap.Error(readErr))
 			continue
@@ -270,7 +270,7 @@ func (g *PublishArtifactGenerator) uploadShotsWithRetry(ctx context.Context, loc
 		}
 		var still []string
 		for _, shotPath := range failedPaths {
-			data, readErr := os.ReadFile(shotPath)
+			data, readErr := os.ReadFile(shotPath) //nolint:gosec // 截图临时目录内部路径
 			if readErr != nil {
 				continue
 			}

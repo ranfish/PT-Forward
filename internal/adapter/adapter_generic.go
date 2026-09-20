@@ -30,7 +30,6 @@ var (
 	reGenericLeechers          = regexp.MustCompile(`(?i)(?:下载数|Leechers?|L[^<]*<[^>]*>)(\d+)`)
 	// §59.159 词边界修复：前置 [^a-zA-Z0-9_] 防 userdetails.php/user torrent 误命中
 	// （实战：四次发布 tid=10136 恒等于用户自身 ID——上传失败页的导航链接被误抓判"成功"）
-	reGenericDetailID          = regexp.MustCompile(`[^a-zA-Z0-9_](?:details|detail|torrent)\.php\?id=(\d+)`)
 	reGenericErrorClass        = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reGenericStripTags         = regexp.MustCompile(`<[^>]+>`)
 	reGenericBrowseRow         = regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
@@ -730,20 +729,6 @@ func buildGenericURL(config *model.SiteConfig, pathTpl, torrentID string) string
 		u = base + "/" + strings.TrimLeft(u, "/")
 	}
 	return u
-}
-
-func buildGenericDownloadURL(config *model.SiteConfig, torrentID string) string {
-	base := config.BaseURL
-	if base == "" {
-		base = config.Domain
-	}
-	if !strings.HasPrefix(base, "http") {
-		base = "https://" + base
-	}
-	if config.Passkey != "" {
-		return base + "/download.php?id=" + url.QueryEscape(torrentID) + "&passkey=" + url.QueryEscape(config.Passkey)
-	}
-	return base + "/download.php?id=" + url.QueryEscape(torrentID)
 }
 
 func stripTags(s string) string {

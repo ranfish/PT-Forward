@@ -533,13 +533,17 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 	}
 
 	if task.TransferStatus != model.TransferStatusPartial {
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetUID, "")
+		if err := s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetUID, ""); err != nil {
+			s.logger.Warn("UpdateTransfer failed", zap.Uint("id", task.ID), zap.Error(err))
+		}
 
 		result, err := client.TransferTorrent(ctx, sourceClient, targetClient, task.InfoHash)
 		if err != nil {
 			s.logger.Error("transfer: failed",
 				zap.Uint("id", task.ID), zap.Uint("target", targetUID), zap.Error(err))
-			s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetUID, "")
+			if uerr := s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusFailed, targetUID, ""); uerr != nil {
+				s.logger.Warn("UpdateTransfer failed", zap.Uint("id", task.ID), zap.Error(uerr))
+			}
 			return
 		}
 
@@ -555,14 +559,18 @@ func (s *Syncer) processTransfer(ctx context.Context, task *model.DownloadTask) 
 				zap.String("new_hash", result.InfoHash))
 		}
 
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetUID, result.InfoHash)
+		if err := s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusTransferring, targetUID, result.InfoHash); err != nil {
+			s.logger.Warn("UpdateTransfer failed", zap.Uint("id", task.ID), zap.Error(err))
+		}
 		task.TransferHash = result.InfoHash
 	}
 
 	if err := sourceClient.DeleteTorrent(ctx, task.InfoHash, false); err != nil {
 		s.logger.Warn("transfer: delete from source failed (partial)",
 			zap.Uint("id", task.ID), zap.Error(err))
-		s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusPartial, targetUID, task.TransferHash)
+		if uerr := s.repo.UpdateTransfer(ctx, task.ID, model.TransferStatusPartial, targetUID, task.TransferHash); uerr != nil {
+			s.logger.Warn("UpdateTransfer failed", zap.Uint("id", task.ID), zap.Error(uerr))
+		}
 		return
 	}
 

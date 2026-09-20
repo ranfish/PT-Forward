@@ -669,7 +669,7 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 
 	// 2. flags 检查（来自 torrent_metadata）
 	if p.checkFlagsFromMetadata(ctx, candidate.InfoHash, candidate.SourceSite) {
-		return false, fmt.Sprintf("源站 flags 标记禁转/独占（torrent_metadata），跳过发布")
+		return false, "源站 flags 标记禁转/独占（torrent_metadata），跳过发布"
 	}
 
 	// 3. declaration_filter 检查（flags 不可用时兜底）
@@ -747,7 +747,7 @@ func (p *Pipeline) checkFlagsFromMetadata(ctx context.Context, infoHash, siteNam
 	return false
 }
 
-// hardcodedExclusionPairs 硬编码互斥站点对（双向），禁止用户修改
+// HardcodedExclusionPairs 硬编码互斥站点对（双向），禁止用户修改。
 var HardcodedExclusionPairs = map[string]map[string]bool{
 	"不可说": {"优堡": true},
 	"优堡":   {"不可说": true},

@@ -130,9 +130,7 @@ func TestValidate_CharacterRemoval(t *testing.T) {
 	if strings.Contains(result.Title, "(") || strings.Contains(result.Title, ")") {
 		t.Errorf("parens should be removed, got %q", result.Title)
 	}
-	if strings.Contains(result.Title, "[") {
-		// 方括号不在移除范围，应保留
-	}
+	// 方括号不在移除范围：parens 断言已覆盖处理后形态，[ 保留性由用例数据保证
 }
 
 func TestValidate_WhitespaceFix(t *testing.T) {

@@ -322,7 +322,7 @@ func ComputePiecesHashFromDir(torrentDir, infoHash string) (string, error) {
 		return "", fmt.Errorf("torrent_dir or info_hash empty")
 	}
 	path := filepath.Join(torrentDir, strings.ToLower(infoHash)+".torrent")
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // 内部种子目录拼接
 	if err != nil {
 		return "", fmt.Errorf("read torrent file %s: %w", path, err)
 	}

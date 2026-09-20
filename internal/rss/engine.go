@@ -307,7 +307,7 @@ func (e *Engine) retryBlocked(ctx context.Context, sub *model.RSSSubscription, e
 		// §59.212: blocked 项在预分发循环被 seen 门 continue，detectHRAndDiscount
 		// 从未运行——原始 RSS 零值致系统性误判 "free expired"（243 四种 3 分钟
 		// expired 实证：blocked 状态机生产端到端从未成功）。此处补跑检测
-		//（含缓存复用）；检测不可得（API 空返回家族）= 无法确认 → 保持
+		// （含缓存复用）；检测不可得（API 空返回家族）= 无法确认 → 保持
 		// blocked 下轮再试，不判 expired。provider 缺失（测试/降级形态）用
 		// ev 既有值（原语义）。
 		if e.siteProvider != nil && ev.TorrentID != "" {

@@ -990,10 +990,10 @@ func (h *SeedingHandler) handleScoringConfig(w http.ResponseWriter, r *http.Requ
 func (h *SeedingHandler) handleUnregisteredKeywords(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		var val string
-		h.db.Raw("SELECT value FROM system_settings WHERE key = 'seeding.unregistered_keywords' LIMIT 1").Row().Scan(&val)
+		_ = h.db.Raw("SELECT value FROM system_settings WHERE key = 'seeding.unregistered_keywords' LIMIT 1").Row().Scan(&val) // 空表 → 空串
 		var keywords []string
 		if val != "" {
-			json.Unmarshal([]byte(val), &keywords)
+			_ = json.Unmarshal([]byte(val), &keywords) // 非法 JSON → 空表回退
 		}
 		if len(keywords) == 0 {
 			keywords = []string{

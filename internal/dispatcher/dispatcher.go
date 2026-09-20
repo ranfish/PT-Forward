@@ -193,9 +193,9 @@ func GetClientUID(ev *model.TorrentEvent) uint {
 		case uint64:
 			return uint(id)
 		case int:
-			return uint(id)
+			return uint(id) //nolint:gosec // 类型 switch 已收窄（uint64 分支在前）
 		case int64:
-			return uint(id)
+			return uint(id) //nolint:gosec // 同上
 		case float64: // JSON 反序列化形态
 			return uint(id)
 		}

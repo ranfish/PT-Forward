@@ -55,7 +55,7 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 	})
 	// §59.117: MI 层查询（MISections 统一信息源）——语言信号从 Audios 层
 	// Language/Title 字段直证（跨行 regex 补丁废除）; 数值判据层内化
-	//（General["overall bit rate"] / Videos[0]["width"/"frame rate"]）。
+	// （General["overall bit rate"] / Videos[0]["width"/"frame rate"]）。
 	miSec := titleparser.ParseMISections(in.MediaInfo)
 	for _, lt := range inferLanguageFromMIAudios(miSec) {
 		if !containsStr(tags, lt) {
@@ -114,7 +114,7 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 		tags = append(tags, "high_rating")
 	}
 	// §59.72 B2: 组合判据——连载 = 分集 && 非完结 && 非合集
-	//（ubits: 连载=分集资源; 词条 regex 表达不了依赖，代码层）
+	// （ubits: 连载=分集资源; 词条 regex 表达不了依赖，代码层）
 	if has("episode_split") && !has("complete") && !has("collection") && !has("ongoing") {
 		tags = append(tags, "ongoing")
 	}
@@ -144,7 +144,7 @@ func containsStr(list []string, s string) bool {
 }
 
 // inferLanguageFromMIAudios §59.117: MI Audios 层语言判据——Language 字段直证
-//（层内无跨行歧义; Title 行语义标识如"台配/央视国配"由文案层 pattern 承载）。
+// （层内无跨行歧义; Title 行语义标识如"台配/央视国配"由文案层 pattern 承载）。
 func inferLanguageFromMIAudios(s titleparser.MISections) []string {
 	var out []string
 	seen := map[string]bool{}
@@ -271,51 +271,9 @@ func parseMIIntStr(s string) int {
 	return n
 }
 
-// inferNumericSpecTags §59.69: 从 MI 文本解析码率/宽度/帧率做阈值判定。
-// MI 数字含千分位空格（"3 840"），单位 Mb/s 或 kb/s。
-func inferNumericSpecTags(mi string) (highBitrate, highFrameRate bool) {
-	rate := parseMIOverallBitrateMbps(mi)
-	width := parseMIWidthPixels(mi)
-	fps := parseMIFrameRate(mi)
-
-	if rate > 0 && width > 0 {
-		if width >= 3840 { // ≥4K（2160p/4320p，DCI 4096 同覆盖）
-			highBitrate = rate >= 15
-		} else { // <4K（1080p 及以下）
-			highBitrate = rate >= 9
-		}
-	}
-	if fps >= 60 { // 59.940 NTSC 不算（用户定案：字面 ≥60）
-		highFrameRate = true
-	}
-	return highBitrate, highFrameRate
-}
-
 var (
-	miOverallBitrateRe = regexp.MustCompile(`(?i)Overall bit rate\s*:\s*([\d\s.,]+)\s*(Mb/s|kb/s|Gb/s)`)
 	miWidthRe          = regexp.MustCompile(`(?im)^\s*Width\s*:\s*([\d\s]+)\s*pixels`)
-	miFpsRe            = regexp.MustCompile(`(?im)^\s*Frame rate\s*:\s*([\d.]+)\s*FPS`)
 )
-
-// parseMIOverallBitrateMbps 解析 General 段 Overall bit rate，归一 Mb/s。
-func parseMIOverallBitrateMbps(mi string) float64 {
-	m := miOverallBitrateRe.FindStringSubmatch(mi)
-	if m == nil {
-		return 0
-	}
-	num, _ := strconv.ParseFloat(strings.ReplaceAll(strings.ReplaceAll(m[1], " ", ""), ",", ""), 64)
-	if num == 0 {
-		return 0
-	}
-	switch strings.ToLower(m[2]) {
-	case "gb/s":
-		return num * 1000
-	case "kb/s":
-		return num / 1000
-	default:
-		return num
-	}
-}
 
 // parseMIWidthPixels 解析 Video 段 Width（像素，含千分位空格）。
 func parseMIWidthPixels(mi string) int {
@@ -342,17 +300,6 @@ func parseDoubanRatingScore(desc string) float64 {
 		return 0
 	}
 	return v
-}
-
-// parseMIFrameRate 解析 Video 段 Frame rate（取最大值——多段 MI 场景保守）。
-func parseMIFrameRate(mi string) float64 {
-	var max float64
-	for _, m := range miFpsRe.FindAllStringSubmatch(mi, -1) {
-		if v, err := strconv.ParseFloat(m[1], 64); err == nil && v > max {
-			max = v
-		}
-	}
-	return max
 }
 
 // dedupTags 保序去重。

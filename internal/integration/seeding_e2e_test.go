@@ -180,7 +180,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 			Metadata:  map[string]any{"client_uid": 1},
 		},
 	}
-	require.NoError(t, eng.OnTorrents(ctx, events))
+	require.NoError(t, eng.OnTorrents(ctx, events)) //nolint:staticcheck // 同上
 
 	// §59.122: OnTorrents 同步建 record——轮询等落库（count=N 首跑偶发
 	// 0.02s 即挂 = 事件处理链内异步分支未完成, First 立即查空）
@@ -213,7 +213,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	candidates, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID))
+	candidates, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID)) //nolint:staticcheck // 同上
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(candidates), "Flush should return 1 candidate")
 	assert.True(t, atomic.LoadInt64(&addCalls) > 0, "AddFromFile should be called at least once")
@@ -261,7 +261,7 @@ func TestE2E_SeedingFullChain(t *testing.T) {
 	}
 
 	// §59.122: Start 异步初始化竞态修复——Evaluate 为空时轮询重试
-	//（refreshMaindataLoop 后台协程与立即 Evaluate 并发, cachedMaindata 可能未就绪）
+	// （refreshMaindataLoop 后台协程与立即 Evaluate 并发, cachedMaindata 可能未就绪）
 	var evalResult2 *seeding.EvaluateResult
 	for i := 0; i < 10; i++ {
 		evalResult2, evalErr = eng2.Evaluate(ctx, 1, nil)

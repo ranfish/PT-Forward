@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -34,7 +35,7 @@ func TestResolveResourceCrossHash(t *testing.T) {
 	db.Create(&model.TorrentMetadata{InfoHash: "h_meta", SiteName: "朋友", Title: "The Descent 2005", TorrentID: "123"})
 
 	// 用保留行 hash（无 metadata）解析 → 应找到 h_meta 的数据
-	rv := rr.ResolveResource(nil, "h_keep")
+	rv := rr.ResolveResource(context.TODO(), "h_keep")
 	if rv == nil || rv.Meta == nil {
 		t.Fatalf("保留行解析应命中挂载行数据: %+v", rv)
 	}
@@ -59,8 +60,8 @@ func TestResolveResourceCrossDir(t *testing.T) {
 	db.Create(&model.TorrentSnapshot{Hash: "pt7_h", ClientUID: 1, SavePath: "/PT7/SSD", Name: name, IsHidden: false})
 	db.Create(&model.TorrentMetadata{InfoHash: "pt5_h", SiteName: "朋友", Title: "x"})
 
-	rv5 := rr.ResolveResource(nil, "pt5_h")
-	rv7 := rr.ResolveResource(nil, "pt7_h")
+	rv5 := rr.ResolveResource(context.TODO(), "pt5_h")
+	rv7 := rr.ResolveResource(context.TODO(), "pt7_h")
 	if rv5 == nil || rv5.Meta == nil {
 		t.Fatal("PT5 应有数据")
 	}
@@ -77,7 +78,7 @@ func TestResolveResourceEpisodes(t *testing.T) {
 	db.Create(&model.TorrentSnapshot{Hash: "ep3", ClientUID: 1, SavePath: "/PT/temp", Name: "Iron.Wok.Jan.2026.S01E03.1080p-AnoZu", IsHidden: false})
 	db.Create(&model.TorrentMetadata{InfoHash: "ep2", SiteName: "CR", Title: "E02"})
 
-	rv3 := rr.ResolveResource(nil, "ep3")
+	rv3 := rr.ResolveResource(context.TODO(), "ep3")
 	if rv3 == nil || rv3.Meta != nil {
 		t.Fatalf("E03 不应拿到 E02 的数据: %+v", rv3)
 	}
@@ -93,7 +94,7 @@ func TestResolveResourceHiddenFallback(t *testing.T) {
 	// 模拟删种：hidden
 	db.Model(&model.TorrentSnapshot{}).Where("hash = ?", "h1").Update("is_hidden", true)
 
-	rv := rr.ResolveResource(nil, "h1")
+	rv := rr.ResolveResource(context.TODO(), "h1")
 	if rv == nil || rv.Meta == nil {
 		t.Fatalf("hidden 后应兜底命中数据: %+v", rv)
 	}
@@ -106,7 +107,7 @@ func TestResolveResourceHiddenFallback(t *testing.T) {
 func TestResolveResourceNil(t *testing.T) {
 	db := setupResolverDB(t)
 	rr := NewResourceResolver(db)
-	if rv := rr.ResolveResource(nil, "nonexistent"); rv != nil {
+	if rv := rr.ResolveResource(context.TODO(), "nonexistent"); rv != nil {
 		t.Errorf("应返回 nil, got %+v", rv)
 	}
 	_ = zap.NewNop()

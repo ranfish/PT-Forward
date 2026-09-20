@@ -114,7 +114,7 @@ func (h *CloudFPHandler) handleTest(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadGateway, 50201, fmt.Sprintf("连接失败: %v", err))
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusUnauthorized {
 		Error(w, http.StatusBadGateway, 50201, "API Token 无效")
 		return

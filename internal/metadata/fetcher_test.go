@@ -26,7 +26,7 @@ func noFBDB(t *testing.T) *gorm.DB {
 }
 
 // §59.65: FetchFromSiteNoFallback 直取——失败必须报错，不得内部 IYUU 兜底
-//（老 FetchAndStore 内嵌 fetchWithIYUUFallback，藏在 FetchAndStoreDirect 委托里
+// （老 FetchAndStore 内嵌 fetchWithIYUUFallback，藏在 FetchAndStoreDirect 委托里
 // 抢跑 §59.61 降级链——The.Boys 实锤: 朋友抖动 → 克隆 iyuu_cache 覆盖源站语义）。
 func TestFetchFromSiteNoFallback_FailsWithoutIYUU(t *testing.T) {
 	if testing.Short() {

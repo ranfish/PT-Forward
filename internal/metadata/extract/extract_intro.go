@@ -15,7 +15,6 @@ import (
 )
 
 // quoteBlockRe 提取 BBCode [quote] 块（含位置信息）。
-var quoteBlockRe = regexp.MustCompile(`(?is)\[quote(?:=[^\]]*)?\](.*?)\[/quote\]`)
 
 // stripQuoteLayoutImages §59.66→§59.172 附七: quote 引用内容剥离全部 [img] 图。
 // §59.66 原方案 A 只剥相对路径布局图（trans.gif 类）、保留绝对 URL——
@@ -292,7 +291,6 @@ func compactBlankLines(s string) string {
 // kfHeadDashQuoteRe §59.172: dash 族引用段——----…---- / ——…——（全角破折号变体，
 // tid=7025 实证 18 例）。内容限单行内（引用是行内短句，跨行的是正文/分隔线）。
 // 内容首字符排除分隔符本身——纯分隔线（全 dash）无内容不匹配（单测实证）。
-var kfHeadDashQuoteRe = regexp.MustCompile(`(-{4,}[ \t]*[^\s\n\[\]{}-][^\n\[\]{}]{2,180}?-{4,}|—{2,}[ \t]*[^\s\n\[\]{}—-][^\n\[\]{}]{2,180}?—{2,})`)
 
 
 // kfHeadAnchor §59.172 附三/附六: 头区锚——首个影片详情标记位置（三形态取先到）：

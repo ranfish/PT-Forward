@@ -356,6 +356,7 @@ func TestFlush_PushOne_HRProtect(t *testing.T) {
 	e.recordMap[recordKey(1, "hash1")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "hash1", Status: model.SeedingStatusSeeding,
 		SubscriptionID: fmt.Sprintf("%d", subID),
+		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -411,6 +412,7 @@ func TestFlush_PushOne_TorrentExists(t *testing.T) {
 	e.recordMap[recordKey(1, "hash_exists")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "hash_exists", Status: model.SeedingStatusSeeding,
 		SubscriptionID: fmt.Sprintf("%d", subID),
+		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -463,6 +465,7 @@ func TestFlush_CollectsOnlyFree(t *testing.T) {
 		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
 			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", subID),
+			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -515,6 +518,7 @@ func TestFlush_Include2xUp(t *testing.T) {
 		e.mu.Lock()
 		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
 			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusSeeding,
+			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -570,6 +574,7 @@ func TestFlush_AssumeFreeSite(t *testing.T) {
 		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
 			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusPending,
 			SubscriptionID: fmt.Sprintf("%d", subID),
+			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -632,6 +637,7 @@ func TestFlush_AssumeFreeNotSet(t *testing.T) {
 	e.recordMap[recordKey(1, "h1")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "h1", Status: model.SeedingStatusPending,
 		SubscriptionID: fmt.Sprintf("%d", subID),
+		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -701,6 +707,7 @@ func TestFlush_AssumeFreeSkipsDetectDiscount(t *testing.T) {
 	e.recordMap[recordKey(1, "h1")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "h1", Status: model.SeedingStatusPending,
 		SubscriptionID: fmt.Sprintf("%d", subID),
+		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -744,6 +751,7 @@ func TestFlush_BatchLimit(t *testing.T) {
 		e.mu.Lock()
 		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
 			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusSeeding,
+			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -805,6 +813,7 @@ func TestFlush_Sorting(t *testing.T) {
 		e.recordMap[recordKey(1, h)] = &model.SeedingTorrentRecord{
 			ClientUID: 1, InfoHash: h, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", subID),
+			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -838,6 +847,7 @@ func TestFlush_ContextCancelled(t *testing.T) {
 		e.mu.Lock()
 		e.recordMap[recordKey(1, hash)] = &model.SeedingTorrentRecord{
 			ClientUID: 1, InfoHash: hash, Status: model.SeedingStatusSeeding,
+			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -879,6 +889,7 @@ func TestFlush_ScoreWithBatchSLData(t *testing.T) {
 		e.recordMap[recordKey(records[i].ClientUID, records[i].InfoHash)] = &model.SeedingTorrentRecord{
 			ClientUID: records[i].ClientUID, InfoHash: records[i].InfoHash, Status: model.SeedingStatusSeeding,
 			SubscriptionID: fmt.Sprintf("%d", subID),
+			CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 		}
 		e.mu.Unlock()
 	}
@@ -1200,9 +1211,11 @@ func TestFlush_DiskRecoverBypassMaxActive(t *testing.T) {
 	e.mu.Lock()
 	e.recordMap[recordKey(1, "existing1")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "existing1", Status: model.SeedingStatusSeeding,
+		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.recordMap[recordKey(1, "existing2")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "existing2", Status: model.SeedingStatusSeeding,
+		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -1223,6 +1236,7 @@ func TestFlush_DiskRecoverBypassMaxActive(t *testing.T) {
 	e.mu.Lock()
 	e.recordMap[recordKey(1, "dr_hash")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "dr_hash", Status: model.SeedingStatusPending,
+		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -1280,6 +1294,7 @@ func TestFlush_DiskRecoverMaxActiveNoRecoverCandidates(t *testing.T) {
 	e.mu.Lock()
 	e.recordMap[recordKey(1, "existing1")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "existing1", Status: model.SeedingStatusSeeding,
+		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 
@@ -1299,6 +1314,7 @@ func TestFlush_DiskRecoverMaxActiveNoRecoverCandidates(t *testing.T) {
 	e.mu.Lock()
 	e.recordMap[recordKey(1, "normal_hash")] = &model.SeedingTorrentRecord{
 		ClientUID: 1, InfoHash: "normal_hash", Status: model.SeedingStatusPending,
+		CreatedAt: time.Now(), // syncStale 保护窗用内存态——零值=竞态清除（flush 族 flake 根因）
 	}
 	e.mu.Unlock()
 

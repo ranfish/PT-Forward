@@ -304,7 +304,7 @@ func TestAppendThanksNoLeadingBlank(t *testing.T) {
 }
 
 // §59.89: PUT 空值不覆盖——只改 tags 不带 description 时简介不得被清空
-//（v0.0.738 验证脚本 PUT {} 污染预览实锤的根因；前端部分保存场景同风险）。
+// （v0.0.738 验证脚本 PUT {} 污染预览实锤的根因；前端部分保存场景同风险）。
 func TestPutSeedEmptyNotOverwrite(t *testing.T) {
 	// 直接测 updates 构造语义: buildPutSeedUpdates 纯函数化
 	u := buildPutSeedUpdates(putSeedRequest{Tags: []string{"high_bitrate"}}, "poster0", "desc0", "shots0")
@@ -361,7 +361,7 @@ func TestPropagateClusterReviewed(t *testing.T) {
 }
 
 // §59.94: 簇共享公共方法——clusterKeyOf(info_hash→簇键) + syncClusterReviewedByIDs
-//（batchReview/saveSeedData 两写点统一接入）。
+// （batchReview/saveSeedData 两写点统一接入）。
 func TestClusterKeyOfAndSyncByIDs(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
@@ -452,7 +452,7 @@ func TestPutSeedEmptyScreenshotsNotOverwrite(t *testing.T) {
 }
 
 // §59.171 A: 同名多行确定性排序——权威行（非 cluster）优先于更新的 cluster 副本
-//（PT31 抽签实锤的反向验证：无序时 info_hash 索引序可让 cluster 空行当选）。
+// （PT31 抽签实锤的反向验证：无序时 info_hash 索引序可让 cluster 空行当选）。
 func TestSortMetasAuthoritative(t *testing.T) {
 	metas := []model.TorrentMetadata{
 		{ID: 3, FetchSource: "cluster", MediaInfo: "", UpdatedAt: time.Now()},

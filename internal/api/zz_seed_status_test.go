@@ -47,7 +47,7 @@ func TestClassifySeedStatusNoMappingRefactor(t *testing.T) {
 			&model.TorrentMetadata{Title: "Movie 2020 1080p-UNKNOWNGRP", SiteName: "站"}, "no_mapping"},
 	}
 	for _, c := range cases {
-		got := h.classifySeedStatusLite(nil, c.snapName, c.meta)
+		got := h.classifySeedStatusLite(context.TODO(), c.snapName, c.meta)
 		if got != c.want {
 			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
 		}
@@ -59,7 +59,7 @@ func TestRunMainlinePTGen_NoDoubanURL(t *testing.T) {
 	h := &PublishTorrentsHandler{logger: zap.NewNop()}
 	meta := &model.TorrentMetadata{InfoHash: "H1", SiteName: "s", DoubanURL: ""}
 	// 无豆瓣链接：跳过（不报错不写库——incomplete 由状态机承接）
-	h.runMainlinePTGen(nil, meta, false)
+	h.runMainlinePTGen(context.TODO(), meta, false)
 }
 
 // §59.236 ①: 主链 PTGen 成功路径——唯一账本+desc 落库
@@ -73,7 +73,7 @@ func TestRunMainlinePTGen_Success(t *testing.T) {
 		ChineseTitle: "火车梦", ForeignTitle: "Train Dreams / 铁路梦影(港)",
 		Year: "2025", RawBBCode: "◎片　　名　火车梦",
 	}}
-	h.runMainlinePTGen(nil, &model.TorrentMetadata{InfoHash: "H2", SiteName: "zmpt", DoubanURL: "https://movie.douban.com/subject/123/"}, false)
+	h.runMainlinePTGen(context.TODO(), &model.TorrentMetadata{InfoHash: "H2", SiteName: "zmpt", DoubanURL: "https://movie.douban.com/subject/123/"}, false)
 	var got model.TorrentMetadata
 	db.Where("info_hash = ?", "H2").First(&got)
 	if got.Description != "◎片　　名　火车梦" {

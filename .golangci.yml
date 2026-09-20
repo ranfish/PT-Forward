@@ -17,6 +17,10 @@ linters:
         - fmt.Sscanf
     gosec:
       excludes: []
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - singleCaseSwitch
     staticcheck:
       checks:
         - all

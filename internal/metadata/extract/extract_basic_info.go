@@ -24,23 +24,6 @@ var defaultBasicInfoLabels = map[string][]string{
 	"subtitle": {"副标题", "副標題", "subtitle"},
 }
 
-// fillBasicInfoFields 从详情页基本信息表填充结构化字段。
-// 支持 5 种 HTML 模式（按精准度优先级）：
-//  1. td.rowhead + td.rowfollow（NexusPHP 种子信息表标准，PTer/HDSky 等用此模式）
-//     - 子模式 a: rowfollow 纯文本（PTer "大小：18.53 GB 类型: 电视剧"）
-//     - 子模式 b: <span title="字段名">值</span>（SSD/Audiences）
-//     - 子模式 c: <b>字段名:</b>值 聚合 inline（HDSky/HDFans/CarPT/HDArea/HDTime 等 11 站）
-//  2. dt/dd 模式（HTML5 description list）
-//  3. th/td 模式（table header + cell）
-//  4. td/td 相邻模式（普通表格，限定不在 colhead 表内避免文件列表表头误匹配）
-//
-// v0.0.238: 按 site_code 加载 PTNexus 移植的 source_key 配置（覆盖默认 label）。
-// v0.0.253: 改用 domain 主键（解决 site_code 冲突）。
-// 字段值经 LookupStandardKey 映射到标准键（如 "电视剧 (TV Series)" → "category.tv_series"）。
-func (p *PublicExtractor) fillBasicInfoFields(doc *goquery.Document, seed *SeedData) {
-	p.fillBasicInfoFieldsWithCode(doc, seed, p.domain, p.siteCode)
-}
-
 // fillBasicInfoFieldsWithCode 显式传入 domain + siteCode 的版本（并发安全）。
 func (p *PublicExtractor) fillBasicInfoFieldsWithCode(doc *goquery.Document, seed *SeedData, domain, siteCode string) {
 	// 每个字段的候选 labels：site-specific source_key 优先 + default 变体

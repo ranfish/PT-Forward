@@ -40,7 +40,7 @@ func NewFetcher(db *gorm.DB, logger *zap.Logger, siteProvider SiteAdapterProvide
 
 // isSourceScreenshotExcluded §59.137: 源站截图不可信判定——朋友站详情图为
 // "资源原图 vs 站点压制"对比图，非资源真实画面。特化站点采集层不落 screenshots 列
-//（写侧单点丢弃，任何失败路径都不可能流到发布），截图只走本地 mpv/远程留空。
+// （写侧单点丢弃，任何失败路径都不可能流到发布），截图只走本地 mpv/远程留空。
 // settings 为 nil（测试构造）时返回 false 保持旧行为。
 func (f *Fetcher) isSourceScreenshotExcluded(ctx context.Context, siteName string) bool {
 	if f.settingsRepo == nil || siteName == "" {
@@ -103,7 +103,7 @@ func (f *Fetcher) FetchFromSiteNoFallback(ctx context.Context, infoHash, siteNam
 }
 
 // FetchAndStoreIYUU §59.65: IYUU coverage 兜底公开化——降级链最后一环
-//（老 FetchAndStore 内嵌私有版抢跑问题已摘除直达链；本方法供调用方显式编排）。
+// （老 FetchAndStore 内嵌私有版抢跑问题已摘除直达链；本方法供调用方显式编排）。
 func (f *Fetcher) FetchAndStoreIYUU(ctx context.Context, infoHash, excludeSite string) (*model.TorrentMetadata, error) {
 	meta := f.fetchWithIYUUFallback(ctx, infoHash, excludeSite)
 	if meta == nil {
@@ -500,7 +500,7 @@ func (f *Fetcher) buildMetadata(infoHash, siteName, torrentID string, detail *mo
 
 	if len(detail.Tags) > 0 {
 		// §59.73: 直采标签归一——DOM 显示名("特效"/"国语")→canonical，与推断产物
-		//（InferFull 标准键）统一形态；miss 保留原文（自定义标签）。原样落库会与
+		// （InferFull 标准键）统一形态；miss 保留原文（自定义标签）。原样落库会与
 		// 推断键混存（"特效"+"special_effects_subs" 双份同语义）。
 		for i, t := range detail.Tags {
 			detail.Tags[i] = titleparser.NormalizeTagDisplay(t)

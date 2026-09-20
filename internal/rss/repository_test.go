@@ -294,7 +294,7 @@ func TestListSeenBySubscription(t *testing.T) {
 }
 
 // §59.120: MarkStatus 订阅隔离——A 订阅打勾不得污染 B 订阅的 seen 行
-//（§59.17 每订阅独立语义的漏改残留，§59.33 审计 #9）。
+// （§59.17 每订阅独立语义的漏改残留，§59.33 审计 #9）。
 func TestMarkStatusSubscriptionIsolation(t *testing.T) {
 	db := setupRepoTestDB(t)
 	r := NewRepository(db)

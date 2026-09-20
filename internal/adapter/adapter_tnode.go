@@ -598,29 +598,6 @@ func (a *TNodeAdapter) FetchUserStats(ctx context.Context, config *model.SiteCon
 	return stats, nil
 }
 
-func (a *TNodeAdapter) fetchTNodeSeedInfo(ctx context.Context, config *model.SiteConfig, baseURL string, csrfToken string) ([]byte, error) {
-	seedURL := baseURL + "/api/userTorrent/fetchSeedTorrentInfo"
-	req, err := http.NewRequestWithContext(ctx, "POST", seedURL, strings.NewReader("{}"))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	setCommonHeaders(req, config.Cookie)
-	if csrfToken != "" {
-		req.Header.Set("x-csrf-token", csrfToken)
-	}
-
-	resp, err := a.doer.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { drainBody(resp) }()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-	return readBody(resp)
-}
-
 func (a *TNodeAdapter) VerifyExists(ctx context.Context, config *model.SiteConfig, torrentID string) (bool, error) {
 	results, err := a.SearchTorrents(ctx, config, torrentID, nil)
 	if err != nil {

@@ -54,7 +54,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleGet(w, r)
 	default:
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":"not found"}`))
+		_, _ = w.Write([]byte(`{"error":"not found"}`))
 	}
 }
 
@@ -64,17 +64,17 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		gzReader, err := gzip.NewReader(r.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"action":"error","error":"gzip decode failed"}`))
+			_, _ = w.Write([]byte(`{"action":"error","error":"gzip decode failed"}`))
 			return
 		}
-		defer gzReader.Close()
+		defer func() { _ = gzReader.Close() }()
 		body = gzReader
 	}
 
 	data, err := io.ReadAll(io.LimitReader(body, 50*1024*1024))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"action":"error","error":"read body failed"}`))
+		_, _ = w.Write([]byte(`{"action":"error","error":"read body failed"}`))
 		return
 	}
 
@@ -85,12 +85,12 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.Unmarshal(data, &req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"action":"error","error":"invalid json"}`))
+		_, _ = w.Write([]byte(`{"action":"error","error":"invalid json"}`))
 		return
 	}
 	if req.Encrypted == "" || req.UUID == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"action":"error","error":"missing encrypted or uuid"}`))
+		_, _ = w.Write([]byte(`{"action":"error","error":"missing encrypted or uuid"}`))
 		return
 	}
 
@@ -107,7 +107,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	s.scheduleDebouncedSync()
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"action":"done"}`))
+	_, _ = w.Write([]byte(`{"action":"done"}`))
 }
 
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
@@ -115,14 +115,14 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	uuid := parts[len(parts)-1]
 	if uuid == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"missing uuid"}`))
+		_, _ = w.Write([]byte(`{"error":"missing uuid"}`))
 		return
 	}
 
 	val, ok := s.store.Load(uuid)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":"not found"}`))
+		_, _ = w.Write([]byte(`{"error":"not found"}`))
 		return
 	}
 
@@ -132,7 +132,7 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 		"crypto_type": "legacy",
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) scheduleDebouncedSync() {

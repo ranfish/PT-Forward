@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const snapshotRetentionDays = 7
 
 type TrafficAggregator struct {
 	db     *gorm.DB

@@ -213,7 +213,7 @@ func (s *Service) doRequest(ctx context.Context, method, path string, body []byt
 		}
 
 		respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		if err != nil {
 			return nil, fmt.Errorf("read response: %w", err)

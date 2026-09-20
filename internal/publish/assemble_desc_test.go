@@ -74,7 +74,7 @@ func TestAssembleMIIinDescForNoTechInfoSite(t *testing.T) {
 	iDesc := strings.Index(out, "剧情简介")
 	iMI := strings.Index(out, "Complete name : test.mkv")
 	iShot := strings.Index(out, "s1.jpg")
-	if !(iDecl < iDesc && iDesc < iMI && iMI < iShot) {
+	if iDecl >= iDesc || iDesc >= iMI || iMI >= iShot {
 		t.Errorf("顺序错误: decl=%d desc=%d mi=%d shot=%d", iDecl, iDesc, iMI, iShot)
 	}
 	// MI 在引用块内（半角原文）
