@@ -91,7 +91,7 @@ type ReseedMatch struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
-	ClientUID       uint   `json:"client_uid" gorm:"not null;uniqueIndex:idx_reseed_match_pair"`
+	ClientUID       uint   `json:"client_uid" gorm:"not null;default:0;uniqueIndex:idx_reseed_match_pair"`
 	SourceSite      string `json:"source_site" gorm:"size:50;not null;uniqueIndex:idx_reseed_match_pair"`
 	SourceTorrentID string `json:"source_torrent_id" gorm:"size:50;not null;uniqueIndex:idx_reseed_match_pair"`
 	SourceInfoHash  string `json:"source_info_hash" gorm:"size:40;not null;index"`
@@ -227,7 +227,7 @@ func (ReseedIYUULog) TableName() string { return "reseed_iyuu_logs" }
 type ReseedFeatureLog struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	CreatedAt time.Time `json:"created_at"`
-	TaskID    uint      `json:"task_id" gorm:"index;not null"`
+	TaskID    uint      `json:"task_id" gorm:"index;not null;default:0"`
 	Site      string    `json:"site" gorm:"size:50"`
 	Queried   int       `json:"queried"`
 	Matched   int       `json:"matched"`

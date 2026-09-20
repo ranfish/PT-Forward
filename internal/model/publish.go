@@ -59,7 +59,7 @@ func (PublishGroup) TableName() string { return "publish_groups" }
 // §33.1.53 — PublishGroupMember: 发布组成员
 type PublishGroupMember struct {
 	ID             uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	PublishGroupID uint      `json:"publish_group_id" gorm:"uniqueIndex:idx_group_site;not null"`
+	PublishGroupID uint      `json:"publish_group_id" gorm:"uniqueIndex:idx_group_site;not null;default:0"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 
@@ -101,7 +101,7 @@ func (PublishGroupMember) TableName() string { return "publish_group_members" }
 // §33.1.54 — PublishGroupStatusHistory: 发布组状态变更历史
 type PublishGroupStatusHistory struct {
 	ID             uint         `json:"id" gorm:"primaryKey;autoIncrement"`
-	PublishGroupID uint         `json:"publish_group_id" gorm:"index;not null"`
+	PublishGroupID uint         `json:"publish_group_id" gorm:"index;not null;default:0"`
 	MemberHash     string       `json:"member_hash" gorm:"index;size:40"`
 	OldStatus      MemberStatus `json:"old_status" gorm:"size:20"`
 	NewStatus      MemberStatus `json:"new_status" gorm:"size:20"`
@@ -163,7 +163,7 @@ func (PublishResultRecord) TableName() string { return "publish_result_records" 
 type PublishTask struct {
 	ID           uint              `json:"id" gorm:"primaryKey;autoIncrement"`
 	Type         PublishTaskType   `json:"type" gorm:"size:20;default:'manual'"`
-	SourceSiteID uint              `json:"source_site_id" gorm:"not null;index"`
+	SourceSiteID uint              `json:"source_site_id" gorm:"not null;default:0;index"`
 	TargetSites  []string          `json:"target_sites" gorm:"type:json;serializer:json"`
 	ManualCheck  bool              `json:"manual_check" gorm:"default:true"`
 	CheckedAt    *time.Time        `json:"checked_at" gorm:"default:null"`

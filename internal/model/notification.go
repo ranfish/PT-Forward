@@ -32,7 +32,7 @@ func (NotificationChannel) TableName() string { return "notification_channels" }
 // §33.1.50 — NotificationHistory: 通知投递记录
 type NotificationHistory struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ChannelID uint      `json:"channel_id" gorm:"not null;index"`
+	ChannelID uint      `json:"channel_id" gorm:"not null;default:0;index"`
 	Event     string    `json:"event" gorm:"size:64;not null"`
 	Level     string    `json:"level" gorm:"size:16;not null"`
 	Title     string    `json:"title" gorm:"size:256"`

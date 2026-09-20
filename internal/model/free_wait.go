@@ -11,7 +11,7 @@ type FreeWaitEntry struct {
 	InfoHash       string `gorm:"size:40"`
 	Title          string `gorm:"size:500"`
 	Size           int64
-	ClientUID      uint    `gorm:"not null"`
+	ClientUID      uint    `gorm:"not null;default:0"`
 	SubscriptionID string `gorm:"size:50;not null"`
 	HasHR          bool
 	HRSeedTimeH    int

@@ -31,8 +31,8 @@ func (ClientConfig) TableName() string { return "clients" }
 // §33.1.42 — ClientPathMapping: 客户端路径映射
 type ClientPathMapping struct {
 	ID             uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	SourceClientID uint      `json:"source_client_id" gorm:"not null;index:idx_path_mapping,composite:source_client_id"`
-	ReseedClientID uint      `json:"reseed_client_id" gorm:"not null;index:idx_path_mapping,composite:reseed_client_id"`
+	SourceClientID uint      `json:"source_client_id" gorm:"not null;default:0;index:idx_path_mapping,composite:source_client_id"`
+	ReseedClientID uint      `json:"reseed_client_id" gorm:"not null;default:0;index:idx_path_mapping,composite:reseed_client_id"`
 	SourcePath     string    `json:"source_path" gorm:"size:512;not null;index:idx_path_mapping,composite:source_path"`
 	ReseedPath     string    `json:"reseed_path" gorm:"size:512;not null"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -44,7 +44,7 @@ func (ClientPathMapping) TableName() string { return "client_path_mappings" }
 // §33.1.43 — ClientPublishTarget: 客户端发布目标配置
 type ClientPublishTarget struct {
 	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ClientUID       uint      `json:"client_uid" gorm:"not null;uniqueIndex:idx_client_site"`
+	ClientUID       uint      `json:"client_uid" gorm:"not null;default:0;uniqueIndex:idx_client_site"`
 	SiteName        string    `json:"site_name" gorm:"size:100;not null;uniqueIndex:idx_client_site"`
 	CategoryMapping string    `json:"category_mapping" gorm:"type:text"`
 	SourceMapping   string    `json:"source_mapping" gorm:"type:text"`

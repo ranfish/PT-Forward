@@ -8,7 +8,7 @@ type SeedingTorrentRecord struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
-	ClientUID uint `json:"client_uid" gorm:"not null;uniqueIndex:idx_client_hash"`
+	ClientUID uint `json:"client_uid" gorm:"not null;default:0;uniqueIndex:idx_client_hash"`
 	InfoHash  string `json:"info_hash" gorm:"size:40;not null;uniqueIndex:idx_client_hash"`
 	SiteName  string `json:"site_name" gorm:"size:50;not null;index"`
 	TorrentID string `json:"torrent_id" gorm:"size:50;not null"`
@@ -60,7 +60,7 @@ func (SeedingTorrentRecord) TableName() string { return "seeding_torrent_records
 // §33.1.6 — SeedingClientConfig: 刷流下载器配置（34 字段）
 type SeedingClientConfig struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ClientUID uint    `json:"client_uid" gorm:"uniqueIndex;not null"`
+	ClientUID uint    `json:"client_uid" gorm:"uniqueIndex;not null;default:0"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Enabled   bool      `json:"enabled" gorm:"default:true"`
@@ -119,7 +119,7 @@ func (SeedingClientConfig) TableName() string { return "seeding_client_configs" 
 // §33.1.84 — SeedingClientState: 刷流下载器持久化状态
 type SeedingClientState struct {
 	ID               uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	ClientUID        uint          `gorm:"uniqueIndex;not null" json:"client_uid"`
+	ClientUID        uint          `gorm:"uniqueIndex;not null;default:0" json:"client_uid"`
 	UpdatedAt        time.Time `json:"updated_at"`
 	AvgUploadSpeed   float64   `json:"avg_upload_speed"`
 	AvgDownloadSpeed float64   `json:"avg_download_speed"`
@@ -319,7 +319,7 @@ type CleanupScoreWeights struct {
 type ScoringLog struct {
 	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	CycleID     string    `json:"cycle_id" gorm:"size:30;index;not null"`
-	ClientUID   uint     `json:"client_uid" gorm:"index;not null"`
+	ClientUID   uint     `json:"client_uid" gorm:"index;not null;default:0"`
 	InfoHash    string    `json:"info_hash" gorm:"size:40;index;not null"`
 	SiteName    string    `json:"site_name" gorm:"size:100"`
 	TorrentID   string    `json:"torrent_id" gorm:"size:50"`
