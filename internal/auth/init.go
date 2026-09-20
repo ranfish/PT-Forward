@@ -38,7 +38,7 @@ func EnsureAdminUser(ctx context.Context, repo model.AuthRepository, logger *zap
 	}
 
 	// §59.167 直 stdout（不走 zap）——首次随机密码必须在任何日志级别下可见
-	//（Docker 默认 PTF_LOG_LEVEL=error 时 Info 被滤——用户唯一必看信息）
+	// （Docker 默认 PTF_LOG_LEVEL=error 时 Info 被滤——用户唯一必看信息）
 	fmt.Println("============================")
 	fmt.Println("初始管理员账号已创建")
 	fmt.Println("username: admin")

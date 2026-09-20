@@ -1307,6 +1307,7 @@ func (e *Engine) TotalActiveCount() int {
 // OnTorrents is a legacy dispatcher handler. Seeding Engine now receives events
 // via EventBus (OnPushed → pendingEvents → consumeLoop). This method is kept
 // for backward compatibility with subscriptions that have no ClientID.
+//
 // Deprecated: Use pusher.EventBus + OnPushed instead.
 func (e *Engine) OnTorrents(ctx context.Context, events []model.TorrentEvent) error {
 	subIDs := make([]string, 0)
@@ -1910,7 +1911,7 @@ func (e *Engine) deleteTorrentWithCompanions(ctx context.Context, ec *evaluateCo
 
 	err := ec.client.DeleteTorrent(ctx, plan.MainHash, plan.DeleteData)
 	if err == nil {
-		allDeleted := append(plan.CompanionHashes, plan.MainHash)
+		allDeleted := append(append([]string{}, plan.CompanionHashes...), plan.MainHash)
 		companion.RemoveFromSnapshot(&ec.torrents, ec.torrentMap, allDeleted)
 	}
 	return err

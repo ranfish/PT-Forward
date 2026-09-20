@@ -17,15 +17,11 @@ var (
 	reDVDRipToken   = regexp.MustCompile(`(?i)\bDVD[-\s]?RIP\b`)
 	reDVDDiscToken  = regexp.MustCompile(`(?i)\bDVD(?:5|9)\b`)
 	reHDRTitleToken = regexp.MustCompile(`(?i)Dolby Vision|DoVi|HDR10\+|HDRVivid|HDR10|HLG|HDR|SDR|EDR|DV|Vivid`)
-	reAudioDTSHDMA  = regexp.MustCompile(`(?i)\bDTS[-._\s]?HD[-._\s]*MA\b`)
-	reAudioCodecDD  = regexp.MustCompile(`(?i)\bDD\b`)
 	reChinesePrefix = regexp.MustCompile(`^\s*\[([^\]]+)\]\s*`)
 // §59.226 附十四: 视频位深合法域仅 8|10|12（16/24 是音频位深——FLAC 24BIT
 // 音乐标题曾污染视频位深字段）；捕获数字归一 "Nbit"（"10 BIT"→"10bit"）。
 reBitDepth      = regexp.MustCompile(`(?i)\b(8|10|12)[._\-\s]?BIT\b`)
 	reFrameRate     = regexp.MustCompile(`(?i)\b(\d{2,3}(?:\.\d+)?)\s*FPS\b`)
-	reVideoCodecToken = regexp.MustCompile(`(?i)\b(AV1|VP[89]|AVS2|X265|H\.?265|HEVC|X264|H\.?264|AVC|VC-?1|MPEG-?2)\b`)
-	reAudioCodecToken = regexp.MustCompile(`(?i)\b(TrueHD|True[-.\s]*HD|DTS[-.\s]*HD[-.\s]*(?:MA|HR)|DTS:X|DTS|E[-]?AC[-]?3|DDPA|DDP|DD\+|AC[-]?3|DD|FLAC|ALAC|AAC|APE|WAV|OPUS|MP3|LPCM|PCM)\d*(?:\.\d+)?`)
 	reAudioTracksCleanup = regexp.MustCompile(`(?i)\b\d+\s*Audios?\b`)
 	reSiteTagSuffix = regexp.MustCompile(`(?:\s*(?:\[[^\]]*\]|\([^)]*\)))+\s*$`)
 	reHDRToken = regexp.MustCompile(`(?i)\b(Dolby[-\s]?Vision|DoVi|DV|HDR[-\s]?Vivid|HDRVivid|HDR10[-\s]?Plus|HDR10\+|HDR10|PQ10|HLG|HDR|SDR)\b`)
@@ -64,7 +60,7 @@ func ParseTitle(title string) TitleComponents {
 	// 发布版本
 	// §59.203: 版本词在年份前形态（To.Live.REPACK.1994...）——边界锚把年份前
 	// 内容锁入主标题并从工作标题剥除，REPACK 对 extractReleaseVersion 不可见
-	//（活着 tid=295484 错配注入案：规则 B 版本反驳未触发）。改用锚前全文提取。
+	// （活着 tid=295484 错配注入案：规则 B 版本反驳未触发）。改用锚前全文提取。
 	c.ReleaseVersion = extractReleaseVersion(preBoundary)
 	title = removeToken(title, c.ReleaseVersion)
 	// 剧集状态
@@ -187,47 +183,12 @@ func cnNumToInt(cn string) int {
 	return head*10 + tail
 }
 
-// extractCNEpisodeAndRemove 中文集数提取归一（E01-E24 形态）。
-// §59.226 附三: "第01-24集"→"E01-E24"；"全24集"→"E01-E24"（起点补 01）。
-// 无匹配返回空。调用点在 reSeasonEpisode 未命中时兜底（S/E 形态优先）。
-func extractCNEpisodeAndRemove(title string) (value, remaining string) {
-	if m := reCNEpisodeRange.FindStringSubmatch(title); m != nil {
-		start, end := padE(m[1]), padE(m[2])
-		remaining := strings.TrimSpace(reCNEpisodeRange.ReplaceAllString(title, " "))
-		return "E" + start + "-E" + end, remaining
-	}
-	if m := reCNEpisodeCount.FindStringSubmatch(title); m != nil {
-		num := m[1]
-		if !regexp.MustCompile(`^[0-9]+$`).MatchString(num) {
-			num = fmt.Sprint(cnNumToInt(num))
-			if num == "0" {
-				num = "1"
-			}
-		}
-		remaining := strings.TrimSpace(reCNEpisodeCount.ReplaceAllString(title, " "))
-		return "E01-E" + padE(num), remaining
-	}
-	return "", title
-}
-
 // padE 集数补零到 2 位（"1"→"01"；"124"→"124"）。
 func padE(num string) string {
 	for len(num) < 2 {
 		num = "0" + num
 	}
 	return num
-}
-
-func extractSeasonEpisodeAndRemove(title string) (value, remaining string) {
-	match := reSeasonEpisode.FindString(title)
-	if match == "" {
-		// §59.226 附三: S/E 形态未命中 → 中文集数兜底（第N集/全N集——
-		// 结构词自锚定）
-		return extractCNEpisodeAndRemove(title)
-	}
-	remaining = strings.TrimSpace(reSeasonEpisode.ReplaceAllString(title, " "))
-	remaining = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " "))
-	return match, remaining
 }
 
 // extractBoundaryAnchor §59.98: 统一边界锚。
@@ -315,64 +276,6 @@ func extractBoundaryAnchor(title string) (se, year, remaining, mainLocked string
 // techFollowRe §59.97: 年份 token 后随技术词（判定真年份锚——片名含年份数字
 // 但后无技术词的场景如 "Blade Runner 2049 Alone" 不截断）。
 var techFollowRe = regexp.MustCompile(`(?i)(1080|2160|720|480|4320|bluray|blu-?ray|uhd|web|hdvd|remux|x26[45]|h\.?26[45]|hevc|avc|xvid|dvd)`)
-
-// extractYearAnchorMain §59.97: 年份锚定主标题——返回 (year, remaining, mainLocked)。
-// 规则（用户定案）:
-//   - 全部独立年份 token；无 → ("", title, "")
-//   - 取最后一个"后随技术 token"的年份为真年份（2046.2004 → 2004）
-//   - 主标题 = 首个年份 token 之前的部分（保住以数字为片名的《2046》）
-//   - remaining = 真年份之后的标题（技术区，后续 extractor 消费）
-func extractYearAnchorMain(title string) (year, remaining, mainLocked string) {
-	matches := reYearToken.FindAllStringSubmatchIndex(title, -1)
-	if len(matches) == 0 {
-		return "", title, ""
-	}
-	type yTok struct{ val string; start, end int; hasTechAfter bool }
-	var toks []yTok
-	for _, m := range matches {
-		val := title[m[2]:m[3]]
-		after := title[m[3]:]
-		hasTech := techFollowRe.MatchString(after)
-		toks = append(toks, yTok{val, m[2], m[3], hasTech})
-	}
-	// 真年份 = 最后一个后随技术词的年份 token
-	anchor := -1
-	for i := len(toks) - 1; i >= 0; i-- {
-		if toks[i].hasTechAfter {
-			anchor = i
-			break
-		}
-	}
-	if anchor < 0 {
-		return "", title, "" // 无锚（片名含年份无技术词）→ 不截断
-	}
-	year = toks[anchor].val
-	// 主标题 = 首个年份 token 前（片名以数字开头时首个即片名一部分，保留）
-	// §59.97 定案: 主标题 = 锚年份左侧全部（含首个年份 token 2046——片名数字;
-	// 边界左侧不猜词性, 全是片名成分）
-	mainLocked = strings.TrimSpace(title[:toks[anchor].start])
-	mainLocked = strings.NewReplacer(".", " ", "_", " ").Replace(mainLocked)
-	mainLocked = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(mainLocked, " "))
-	mainLocked = strings.Trim(mainLocked, "- ")
-	// remaining = 锚年份后（保留后续技术区；锚与首个 token 之间的年份词也归主标题已处理——
-	// 双年份场景中间内容(即无)忽略）
-	remaining = strings.TrimSpace(title[toks[anchor].end:])
-	if remaining == "" {
-		remaining = title
-	}
-	return year, remaining, mainLocked
-}
-
-func extractYearAndRemove(title string) (value, remaining string) {
-	match := reYearToken.FindStringSubmatch(title)
-	if match == nil {
-		return "", title
-	}
-	reRemove := regexp.MustCompile(`[\s.(]` + regexp.QuoteMeta(match[1]) + `([\s.)]|$)`)
-	remaining = strings.TrimSpace(reRemove.ReplaceAllString(title, " "))
-	remaining = strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " "))
-	return match[1], remaining
-}
 
 // regionCodeSet §59.97: v1.05 地区码词表（qingwapt W 章 + ISO 常见）。
 var regionCodeSet = map[string]bool{
@@ -620,15 +523,6 @@ func hasWebContext(title string) bool {
 	return reWebContext.MatchString(title)
 }
 
-// extractSourcePlatform 从标题提取流媒体厂商缩写（§59.35：platform 字典域）。
-//
-// 词条顺序即优先级（canonical 长度降序，加载器排序）；
-// 2 字符缩写挂 requires=web——仅 WEB 上下文启用，误命中方向从
-// "剥词污染主标题" 变为 "不提取"（空值无损）。
-func extractSourcePlatform(title string) string {
-	return extractSourcePlatformWithContext(title, hasWebContext(title))
-}
-
 // extractSourcePlatformWithContext 显式传入 webContext（ParseTitle 用原始标题判定，
 // 避免前置 token 剥除导致上下文丢失）。
 func extractSourcePlatformWithContext(title string, webContext bool) string {
@@ -653,7 +547,7 @@ func extractReleaseVersion(title string) string {
 		}
 	}
 	// §59.96: REPACK2/REPACK3 变体——Contains 命中 REPACK 但返回须带数字
-	//（removeToken  边界对 REPACK2 需完整 token 才能剥除）
+	// （removeToken  边界对 REPACK2 需完整 token 才能剥除）
 	if m := regexp.MustCompile(`REPACK(\d+)`).FindStringSubmatch(upper); m != nil {
 		return m[0]
 	}
@@ -925,7 +819,7 @@ func removeGroupSuffix(title, group string) string {
 		return title
 	}
 	// §59.96: 组段整体剥除——尾部连字符词链 "-X(-Y)*" 以 group 结尾时整段移除
-	//（MNHD-FRDS: group=FRDS, MNHD 压制线前缀同段; VCB-Studio: group=Studio, VCB 前缀）。
+	// （MNHD-FRDS: group=FRDS, MNHD 压制线前缀同段; VCB-Studio: group=Studio, VCB 前缀）。
 	// 先试整段(更准), 不中再精确后缀。
 	m := groupSegmentRe.FindStringSubmatch(title)
 	if m != nil {

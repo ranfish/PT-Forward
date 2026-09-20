@@ -533,7 +533,7 @@ func (a *YemaptAdapter) SearchByPiecesHash(ctx context.Context, config *model.Si
 			return nil, fmt.Errorf("pieces_hash 请求失败: %w", err)
 		}
 		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		var result_struct struct {
 			Success      bool              `json:"success"`
@@ -553,7 +553,7 @@ func (a *YemaptAdapter) SearchByPiecesHash(ctx context.Context, config *model.Si
 			case float64:
 				id = int(n)
 			case string:
-				fmt.Sscanf(n, "%d", &id)
+				fmt.Sscanf(n, "%d", &id) //nolint:gosec // 解析失败 → id 零值走 400
 			}
 			if id > 0 {
 				result[hash] = id

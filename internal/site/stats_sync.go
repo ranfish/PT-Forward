@@ -204,7 +204,7 @@ func (s *StatsSyncService) syncSingleSite(ctx context.Context, site *model.Site)
 
 	var alts []string
 	if site.AlternativeDomains != "" {
-		json.Unmarshal([]byte(site.AlternativeDomains), &alts)
+		_ = json.Unmarshal([]byte(site.AlternativeDomains), &alts) // 非法 JSON → 空列表回退
 		config.AlternativeDomains = alts
 	}
 

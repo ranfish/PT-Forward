@@ -419,16 +419,6 @@ func (re *RuleEvaluator) preloadScoringCache(ctx context.Context, clientUID uint
 	return cache
 }
 
-func (re *RuleEvaluator) fillScoringContext(_ context.Context, rc *RuleContext, cache *scoringCache) {
-	if cache == nil {
-		return
-	}
-	rc.ScoringScore = cache.latestScore[rc.Record.InfoHash]
-	rc.ScoringRank = cache.rankInCycle[rc.Record.InfoHash]
-	rc.ScoringTotalInCycle = cache.totalInCycle[rc.Record.InfoHash]
-	rc.LowScoreCount = cache.lowScoreCount[rc.Record.InfoHash]
-}
-
 func (re *RuleEvaluator) matchRuleWithCache(ctx context.Context, r model.DeleteRule, records []model.SeedingTorrentRecord, torrentMap map[string]*model.TorrentInfo, freeSpace int64, totalSpace int64, now time.Time, globalUpSpeed, globalDownSpeed float64, cache *scoringCache) []model.SeedingTorrentRecord {
 	if r.Conditions == "" && r.Expr == "" {
 		return nil

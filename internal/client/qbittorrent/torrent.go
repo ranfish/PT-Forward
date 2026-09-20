@@ -555,7 +555,7 @@ func (c *QBClient) GetGlobalTransferStats(ctx context.Context) (*model.GlobalTra
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("transfer info returned %d", resp.StatusCode)
 	}
@@ -580,7 +580,7 @@ func (c *QBClient) GetTrackerMessagesAll(ctx context.Context, hash string) ([]mo
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("trackers API returned %d", resp.StatusCode)
 	}
@@ -609,7 +609,7 @@ func (c *QBClient) GetTrackers(ctx context.Context, hash string) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("trackers API returned %d", resp.StatusCode)
 	}

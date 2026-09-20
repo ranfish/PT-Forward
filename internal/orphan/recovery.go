@@ -169,7 +169,7 @@ func (r *Recovery) Recover(ctx context.Context, orphan *Entry, targetClientUID u
 			siteName, torrentID, method = r.tryFileLevelL2Search(ctx, orphan, stats)
 			if siteName == "" {
 				// §59.187 ②: 文件级未命中回退目录级——form 误判安全网
-			 //（关键词含集粒度 token + 单集尺寸基准双错形态，目录级总尺寸可救）
+			 // （关键词含集粒度 token + 单集尺寸基准双错形态，目录级总尺寸可救）
 				siteName, torrentID, method = r.tryL2Search(ctx, orphan, stats)
 			}
 		default:
@@ -496,7 +496,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 
 	if stats == nil {
 		// §59.189: nil-stats 防御——retrySearchExcling 等兜底路径可传 nil
-		//（08:48 PT30 panic 实证：stats.TotalSites 空指针解引用崩溃重启）
+		// （08:48 PT30 panic 实证：stats.TotalSites 空指针解引用崩溃重启）
 		stats = &SearchStats{}
 	}
 	sites := r.getSitePriority(ctx, groupName, sourceSize)
@@ -687,7 +687,7 @@ func (r *Recovery) tryL2SearchCore(ctx context.Context, orphan *Entry, stats *Se
 				}
 
 				// §59.215: 全角冒号副题段降级轮——CJK 标题「主题：副题」形态
-				//（柯南剧场版16案：站方副标题只含"第11位前锋"，主关键词整段
+				// （柯南剧场版16案：站方副标题只含"第11位前锋"，主关键词整段
 				// AND 全灭；副题段"第11位前锋 2012"探针双中 tid=11541=本地
 				// 720p 3.22GB 同版本）。排在 yearless 后：主关键词含全角冒号
 				// 且副题段非空时触发。

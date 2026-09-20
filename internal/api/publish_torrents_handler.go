@@ -28,10 +28,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type piecesHashSearcher interface {
-	SearchByPiecesHash(ctx context.Context, config *model.SiteConfig, piecesHashes []string) (map[string]int, error)
-}
-
 type SiteProviderGetter interface {
 	GetAdapter(ctx context.Context, domain string) (model.SiteAdapter, error)
 	GetSiteConfig(ctx context.Context, domain string) (*model.SiteConfig, error)
@@ -665,7 +661,7 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 			if hit.Source == "pieces_hash" {
 				source = model.CoverageSourcePiecesHash
 			}
-			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+			if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
 				InfoHash:   req.InfoHash,
 				SiteName:   hit.SiteName,
 				Status:     model.CoverageConfirmedHas,
@@ -674,7 +670,9 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 				TorrentID:  hit.TorrentID,
 				QueriedAt:  now,
 				ExpiresAt:  ttl,
-			})
+			}); cerr != nil {
+				h.logger.Warn("UpsertCoverage failed", zap.String("site", hit.SiteName), zap.Error(cerr))
+			}
 		}
 	}
 
@@ -684,7 +682,7 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 		tm := site.NewTrackerMatcher(h.db)
 		trackerSites := tm.MatchAll(trackers)
 		for _, sn := range trackerSites {
-			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+			if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
 				InfoHash:   req.InfoHash,
 				SiteName:   sn,
 				Status:     model.CoverageConfirmedHas,
@@ -692,7 +690,9 @@ func (h *PublishTorrentsHandler) handleQueryCoverage(w http.ResponseWriter, r *h
 				Confidence: 1.0,
 				QueriedAt:  now,
 				ExpiresAt:  ttl,
-			})
+			}); cerr != nil {
+				h.logger.Warn("UpsertCoverage failed", zap.String("site", sn), zap.Error(cerr))
+			}
 		}
 	}
 
@@ -767,12 +767,14 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 			if hit.Source == "pieces_hash" {
 				source = model.CoverageSourcePiecesHash
 			}
-			h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+			if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
 				InfoHash: infoHash, SiteName: hit.SiteName,
 				Status: model.CoverageConfirmedHas, Source: source,
 				Confidence: 1.0, TorrentID: hit.TorrentID,
 				QueriedAt: now, ExpiresAt: ttl,
-			})
+			}); cerr != nil {
+				h.logger.Warn("UpsertCoverage failed", zap.String("site", hit.SiteName), zap.Error(cerr))
+			}
 		}
 	}
 
@@ -804,11 +806,13 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 					Where("info_hash = ? AND site_name = ?", t.Hash, sn).
 					Update("source", model.CoverageSourceTracker)
 				if result.RowsAffected == 0 {
-					h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+					if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
 						InfoHash: t.Hash, SiteName: sn,
 						Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
 						Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
-					})
+					}); cerr != nil {
+						h.logger.Warn("UpsertCoverage failed", zap.String("site", sn), zap.Error(cerr))
+					}
 				}
 			}
 		}
@@ -821,11 +825,13 @@ func (h *PublishTorrentsHandler) handleBatchQueryCoverage(w http.ResponseWriter,
 			}
 			trackerSites := tm.MatchAll(trackers)
 			for _, sn := range trackerSites {
-				h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
+				if cerr := h.coverage.UpsertCoverage(ctx, &model.SiteCoverageCache{
 					InfoHash: infoHash, SiteName: sn,
 					Status: model.CoverageConfirmedHas, Source: model.CoverageSourceTracker,
 					Confidence: 1.0, QueriedAt: now, ExpiresAt: ttl,
-				})
+				}); cerr != nil {
+					h.logger.Warn("UpsertCoverage failed", zap.String("site", sn), zap.Error(cerr))
+				}
 			}
 		}
 	}
@@ -897,12 +903,14 @@ func (h *PublishTorrentsHandler) ScheduledRefresh(ctx context.Context) error {
 					if hit.Source == "pieces_hash" {
 						source = model.CoverageSourcePiecesHash
 					}
-					h.coverage.UpsertCoverage(batchCtx, &model.SiteCoverageCache{
+					if cerr := h.coverage.UpsertCoverage(batchCtx, &model.SiteCoverageCache{
 						InfoHash: infoHash, SiteName: hit.SiteName,
 						Status: model.CoverageConfirmedHas, Source: source,
 						Confidence: 1.0, TorrentID: hit.TorrentID,
 						QueriedAt: now, ExpiresAt: ttl,
-					})
+					}); cerr != nil {
+						h.logger.Warn("UpsertCoverage failed", zap.String("site", hit.SiteName), zap.Error(cerr))
+					}
 				}
 			}
 		}
@@ -1452,7 +1460,9 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 
 		// 回写覆盖缓存（该种子已在目标站发布）
 		if h.coverage != nil {
-			h.coverage.UpdateFromPublishResult(r.Context(), item.InfoHash, req.TargetSite)
+			if cerr := h.coverage.UpdateFromPublishResult(r.Context(), item.InfoHash, req.TargetSite); cerr != nil {
+				h.logger.Warn("UpdateFromPublishResult failed", zap.String("hash", item.InfoHash), zap.Error(cerr))
+			}
 		}
 	}
 
@@ -1889,7 +1899,7 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 		Group("DATE(created_at), status").
 		Order("day").
 		Rows()
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	dayMap := make(map[string]*dayStat)
 	for i := 0; i < days; i++ {
@@ -2600,7 +2610,6 @@ const thanksAppendMarker = "FRDS官组作品"
 // stripAppendedThanks 剥离历史追加的致谢块（§59.28 幂等修复）。
 // 追加格式固定为 "\n\n[quote]...官组作品...[/quote]\n[quote]...禁转PTT...[/quote]"，
 // 识别第二个 quote 块（禁转PTT）定位追加起点。
-var noTransferQuoteRe = regexp.MustCompile(`(?s)\s*\[quote\]\[b\]\[color=red\]\[size=5\]请遵守PT互相遵重共识，禁转PTT\[/size\]\[/color\]\[/b\]\[/quote\]`)
 
 func stripAppendedThanks(statement string) string {
 	if !strings.Contains(statement, thanksAppendMarker) {
@@ -2680,7 +2689,7 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 			(SELECT save_path FROM torrent_snapshots s2 WHERE s2.client_uid = torrent_snapshots.client_uid AND s2.name = torrent_snapshots.name ORDER BY last_seen DESC LIMIT 1) AS save_path,
 			MAX(size) AS size`).
 		// §59.38 审计修正: WHERE 不限 hidden——HAVING 活跃检测需全组行进聚合域
-		//（原 is_hidden=1 使 SUM(active) 恒 0，组内仍有活跃行的资源被误列观察期）
+		// （原 is_hidden=1 使 SUM(active) 恒 0，组内仍有活跃行的资源被误列观察期）
 		Where("name != ''").
 		Group("client_uid, name").
 		Having("SUM(CASE WHEN is_hidden = 0 THEN 1 ELSE 0 END) = 0 AND SUM(CASE WHEN is_hidden = 1 THEN 1 ELSE 0 END) > 0")
@@ -4168,12 +4177,12 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 
 	// 查该 hash 的 name → 同名全部 hash
 	var name string
-	h.db.WithContext(r.Context()).
+	_ = h.db.WithContext(r.Context()). //nolint:gosec // Row().Scan 容错——无行 → 空名走 sibling 分支
 		Table("torrent_snapshots").
 		Select("name").
 		Where("hash = ? AND name != ''", infoHash).
 		Limit(1).
-		Row().Scan(&name)
+		Row().Scan(&name) //nolint:errcheck // 同上 //nolint:errcheck,gosec // 无行/扫描失败 → 空名（资源级清除走 sibling 分支）
 
 	result := h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash).Delete(&model.TorrentMetadata{})
 	if name != "" {
@@ -4262,8 +4271,8 @@ func (h *PublishTorrentsHandler) persistPTGenSource(ctx context.Context, infoHas
 }
 
 // refreshInferredTags §59.70: t2 重推标签——PTGen 简介落库后评分行才存在
-//（t0 InferFull 时 Description 尚无 "◎豆瓣评分" 行），此处重跑推断并合并
-//（既有标签全保留——直采/用户标签优先，推断只补差）。
+// （t0 InferFull 时 Description 尚无 "◎豆瓣评分" 行），此处重跑推断并合并
+// （既有标签全保留——直采/用户标签优先，推断只补差）。
 func (h *PublishTorrentsHandler) refreshInferredTags(ctx context.Context, infoHash, siteName string) {
 	var m model.TorrentMetadata
 	if err := h.db.WithContext(ctx).

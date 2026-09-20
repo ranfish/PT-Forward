@@ -84,12 +84,8 @@ func (a *NexusPHPAdapter) GetEditForm(ctx context.Context, config *model.SiteCon
 		}
 		// input 取 value
 		if v, ok := s.Attr("value"); ok && v != "" {
-			// 跳过空名/敏感字段
-			if name == "auth" || strings.HasPrefix(name, "_") {
-				form.Fields[name] = v // 保留 auth 等隐藏字段
-			} else {
-				form.Fields[name] = v
-			}
+			// auth 等隐藏字段与普通字段同样保留（历史分支同体已合并）
+			form.Fields[name] = v
 		}
 	})
 

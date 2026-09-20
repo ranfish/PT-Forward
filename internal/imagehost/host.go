@@ -44,7 +44,7 @@ func downloadURL(ctx context.Context, url string) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("download: %w", err)
 	}
-	defer func() { _, _ = io.Copy(io.Discard, resp.Body); resp.Body.Close() }()
+	defer func() { _, _ = io.Copy(io.Discard, resp.Body); _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", fmt.Errorf("download status %d", resp.StatusCode)

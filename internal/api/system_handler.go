@@ -212,23 +212,23 @@ func (h *SystemHandler) handleListLogs(w http.ResponseWriter, r *http.Request) {
 		path := matches[i]
 		var scanner *bufio.Scanner
 		if strings.HasSuffix(path, ".gz") {
-			gf, err := os.Open(path)
+			gf, err := os.Open(path) //nolint:gosec // 日志目录内部文件
 			if err != nil {
 				continue
 			}
 			gz, err := gzip.NewReader(gf)
 			if err != nil {
-				gf.Close()
+				_ = gf.Close()
 				continue
 			}
-			defer gz.Close()
+			defer func() { _ = gz.Close() }()
 			scanner = bufio.NewScanner(gz)
 		} else {
-			f, err := os.Open(path)
+			f, err := os.Open(path) //nolint:gosec // 日志目录内部文件
 			if err != nil {
 				continue
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 			scanner = bufio.NewScanner(f)
 		}
 		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)

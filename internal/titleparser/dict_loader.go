@@ -371,7 +371,7 @@ func TagInferMatches(in TagInferInput) []string {
 			continue
 		}
 		if tagMatchOne(t.InferPattern, t.InferScope, all, title, in, false) &&
-			!(t.InferPatternNeg != "" && tagMatchOne(t.InferPatternNeg, t.InferScope, all, title, in, true)) &&
+			(t.InferPatternNeg == "" || !tagMatchOne(t.InferPatternNeg, t.InferScope, all, title, in, true)) &&
 			!tagExcluded(t, all) {
 			hits = append(hits, t.Canonical)
 			continue

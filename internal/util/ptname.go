@@ -90,7 +90,7 @@ func ExtractGroupName(title string) string {
 	// "…10bit-Yumi@FRDS\u00a0\u00a0\u00a0 [2X 50%]"（NBSP 分隔，243 The.Boys 实锤）。
 	// NBSP(U+00A0) ≥128 会被 isValidGroupName 判非 ASCII 连坐整个候选（→ 空组名，
 	// 编辑器报"缺失字段：release_group"）；普通空格变体则产出脏组名"BHD [Free]"
-	//（release_group_mappings 必失配）。归一 NBSP + 循环剥离尾部 [..] 标记后提取。
+	// （release_group_mappings 必失配）。归一 NBSP + 循环剥离尾部 [..] 标记后提取。
 	clean = strings.ReplaceAll(clean, "\u00a0", " ")
 	for {
 		trimmed := strings.TrimRight(clean, " ")
@@ -155,8 +155,8 @@ func ExtractGroupName(title string) string {
 	if pIdx := strings.LastIndex(clean, "￡"); pIdx >= 0 && pIdx < len(clean)-len("￡") {
 		rest := clean[pIdx+len("￡"):]
 		// §59.211 终案（用户方案 B）: @ 后段=官方组——与 dash 规则语义统一
-		//（"-JK@UBits"→"UBits" §59.184 附二先例）。"￡cXcY@FRDS"→"FRDS"
-		//（子组前缀无判别价值：同官方组不同子组=同族；完整署名由 titleparser
+		// （"-JK@UBits"→"UBits" §59.184 附二先例）。"￡cXcY@FRDS"→"FRDS"
+		// （子组前缀无判别价值：同官方组不同子组=同族；完整署名由 titleparser
 		// 保留供 Tab1 展示/重组）。此前遇 @ 截断取 "cXcY" 致映射永久 miss。
 		if at := strings.LastIndex(rest, "@"); at >= 0 && at < len(rest)-1 {
 			rest = rest[at+1:]

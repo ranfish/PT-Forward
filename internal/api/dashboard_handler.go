@@ -548,7 +548,7 @@ func (h *DashboardHandler) handleSystemDashboard(w http.ResponseWriter, r *http.
 func (h *DashboardHandler) handleSeedingMonitor(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var byStatus map[string]int64 = map[string]int64{}
+	byStatus := map[string]int64{}
 	var statuses = []string{"pending", "seeding", "paused_free_end", "paused_rule", "deleting", "delete_failed"}
 	for _, s := range statuses {
 		var c int64
@@ -577,7 +577,7 @@ func (h *DashboardHandler) handleSeedingMonitor(w http.ResponseWriter, r *http.R
 func (h *DashboardHandler) handleReseedMonitor(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var byStatus map[string]int64 = map[string]int64{}
+	byStatus := map[string]int64{}
 	var statuses = []string{"pending", "injecting", "injected", "failed", "skipped"}
 	for _, s := range statuses {
 		var c int64
@@ -600,7 +600,7 @@ func (h *DashboardHandler) handleReseedMonitor(w http.ResponseWriter, r *http.Re
 func (h *DashboardHandler) handlePublishMonitor(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var byStatus map[string]int64 = map[string]int64{}
+	byStatus := map[string]int64{}
 	var statuses = []string{"pending", "downloading", "completed", "publishing", "done", "error"}
 	for _, s := range statuses {
 		var c int64
@@ -677,7 +677,7 @@ func (h *DashboardHandler) handleTrafficHourly(w http.ResponseWriter, r *http.Re
 	ctx := r.Context()
 	clientUID := 0
 	if v := r.URL.Query().Get("client_id"); v != "" {
-		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+		if n, err := strconv.ParseUint(v, 10, 32); err == nil { // 32 位上限约束转换域
 			clientUID = int(n)
 		}
 	}

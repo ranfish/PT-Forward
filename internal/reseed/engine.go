@@ -361,8 +361,6 @@ func (e *Engine) SyncTaskSchedule(ctx context.Context, task *model.ReseedTask) {
 		})
 		return nil
 	}
-	if err := e.scheduler.Unregister(name); err == nil {
-	}
 	schedule := task.Schedule
 	if schedule == "" {
 		schedule = "0 */6 * * *"
@@ -671,7 +669,7 @@ func (e *Engine) preflightCheck(ctx context.Context, ps *preloadedSites, concurr
 				if err != nil {
 					return 0, err
 				}
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				return resp.StatusCode, nil
 			}
 
@@ -2524,7 +2522,7 @@ func ExtractSearchKeyword(title string) string {
 	title = strings.TrimSpace(reChannelWord.ReplaceAllString(title, " "))
 
 	// §59.217: CJK 后挂括号注记剥离——"雅尼雅典卫城音乐会(25周年纪念版).1993"
-	//（雅尼案：注记被当中文前缀整段剥离，keyword 残"25周年纪念版) 1993 720p"
+	// （雅尼案：注记被当中文前缀整段剥离，keyword 残"25周年纪念版) 1993 720p"
 	// 带残括号且丢片名）。仅剥【前邻 CJK + 内容含 CJK】的半角/全角括号组；
 	// 方括号标题形态（[杀人回忆].Memories…）与年份括号不受影响。
 	title = stripCJKParenNote(title)
@@ -2551,7 +2549,7 @@ func ExtractSearchKeyword(title string) string {
 	// 形态实测 0 行 vs Aliens 2 形态 8 行含目标 tid=4343；单字符数字被站方
 	// 忽略）②拆出的分辨率词恢复 truncateToResolution 截断点（粘连形态致
 	// 截断失明、7 词全量残留撞站方词数上限）。字母段 ≥3 防技术词误拆
-	//（x264/H265/AC3/S01E01 等形态免疫）。
+	// （x264/H265/AC3/S01E01 等形态免疫）。
 	rest = reAlphaDigitGlue.ReplaceAllString(rest, "$1 $2")
 
 	raw := truncateToResolution(rest)
@@ -3054,7 +3052,7 @@ func VerifyMatchWithStatsAndSource(results []*model.SeedingSearchResult, groupNa
 
 		// 门7 版本 Token（规则 B）：候选有版本定义源无 → 仅允许精确匹配。
 		// §59.214: 品牌血统反驳相对化——仅当同组同 size 窗非品牌兄弟存在
-		//（集合级预扫描 hasPlainBrandSibling）时反驳品牌候选（克拉之膝双版
+		// （集合级预扫描 hasPlainBrandSibling）时反驳品牌候选（克拉之膝双版
 		// 消歧保持）；无兄弟时品牌词不构成判别器（密阳案：唯一候选即 CC 版，
 		// 中文名不写 CC 是命名习惯——绝对反驳假杀实证）。
 		if srcProfile != nil {
@@ -3208,7 +3206,7 @@ func sourceTypeEquivalent(a, b string) bool {
 		s = strings.ReplaceAll(s, " ", "")
 		// §59.193: UHD 前缀消解——源 "4K Blu-ray"（4K 被 Res 消费，ST 剩 "Blu-ray"）
 		// vs 候选 "2160p UHD Blu-ray"（UHD 归 ST）——同为 UHD 蓝光仅归属路径不同
-		//（Queen tid=3020 tech_refute 误杀实证）。分辨率差异由 Resolution 门独立把关，
+		// （Queen tid=3020 tech_refute 误杀实证）。分辨率差异由 Resolution 门独立把关，
 		// 此处消解前缀安全。
 		if t := strings.TrimPrefix(s, "uhd"); t != "" {
 			s = t
@@ -3251,10 +3249,10 @@ func techProfileConflict(src titleparser.TechProfile, candidateTitle string) boo
 }
 
 // techProfileConflictFields 字段级冲突检查。skipAudio 豁免 AudioCodec 冲突
-//（§59.36 元数据获取宽松场景：站点文件名/标题音轨标注不一致是站点数据瑕疵，
+// （§59.36 元数据获取宽松场景：站点文件名/标题音轨标注不一致是站点数据瑕疵，
 // 非不同资源信号；视频编码/分辨率/HDR/规格仍严格——错那些的元数据才致命）。
 // §59.59 修复: 字段清单补 Resolution——原清单缺失致 1080p vs 2160p 不判冲突
-//（时空奇旅案：本地 2160p UHD 错配 1080p REPACK2 元数据，仲裁候选与 loose 轮
+// （时空奇旅案：本地 2160p UHD 错配 1080p REPACK2 元数据，仲裁候选与 loose 轮
 // 双路径漏放行。分辨率是版本身份强信号，任何标注差异都不等价，无需豁免组）。
 func techProfileConflictFields(src titleparser.TechProfile, candidateTitle string, skipAudio bool) bool {
 	cand := titleparser.ParseTitleTech(candidateTitle)
@@ -3383,7 +3381,7 @@ func AudioConflictCandidates(results []*model.SeedingSearchResult, groupName str
 			continue
 		}
 		if groupName != "" && !strings.Contains(strings.ToLower(r.Title), strings.ToLower(groupName)) {
-			if !(strings.Contains(r.Title, "..") && hasResolutionToken(r.Title)) {
+			if !strings.Contains(r.Title, "..") || !hasResolutionToken(r.Title) {
 				continue
 			}
 		}
@@ -3611,7 +3609,7 @@ func SearchAndVerifyLoose(ctx context.Context, adapter model.SiteAdapter, config
 // stripCJKParenNote §59.217: CJK 后挂括号注记剥离（半角/全角括号，
 // 前邻 CJK 且内容含 CJK 才剥）。"雅尼雅典卫城音乐会(25周年纪念版)" →
 // "雅尼雅典卫城音乐会"；"[杀人回忆].Memories"（方括号）/"Movie.(2019)"
-//（内容无 CJK）不受影响。
+// （内容无 CJK）不受影响。
 func stripCJKParenNote(s string) string {
 	runes := []rune(s)
 	var b strings.Builder
@@ -3886,7 +3884,7 @@ var reEditionWordOnly = regexp.MustCompile(`^(?:终极剪辑版|导演剪辑版|
 
 // normalizeSpecVariants §59.220: 规格词拼写变体归一（token 前缀替换，
 // 有界词表）。minbd→MiniBD——收藏转发名少 i vs 官站 MiniBD 词形
-//（Inception/True Grit 案：AND 全灭，包子/大青虫同源转发名恰命中）。
+// （Inception/True Grit 案：AND 全灭，包子/大青虫同源转发名恰命中）。
 func normalizeSpecVariants(kw string) string {
 	words := strings.Fields(kw)
 	out := make([]string, 0, len(words))
@@ -4136,7 +4134,7 @@ func isResolutionWord(w string) bool {
 var reTitlelessSpecToken = regexp.MustCompile(`(?i)^(?:\d{1,4}k)?(?:(?:终极|導演|导演)?剪辑版?|終極剪輯版?|加长版?|加長版?|修复版?|修復版?|重制版?|重製版?|完整版?|未删[减节]版?|数字修复|數字修復)?$`)
 
 // keywordAllTitleless 关键词全部由规格/版式/数字 token 构成 = 无片名
-//（触发 chineseTitleFallback 补中文片名）。
+// （触发 chineseTitleFallback 补中文片名）。
 // isRomanNumeralToken §59.204 F3: 纯罗马数字 token（I/II/III…X）——合集部数
 // 编号非标题（色即是空I.II合集：英文主体仅剩 "II合集"，II 是编号）。
 func isRomanNumeralToken(w string) bool {
@@ -4405,11 +4403,11 @@ func musicStripAllBrackets(s string) string {
 			if i < 0 {
 				break
 			}
-			j := strings.Index(s[i:], pair[1])
+			j := strings.Index(s[i:], pair[1]) //nolint:gosec // i 来自 Index ≥0 严格小于 len(s)
 			if j < 0 {
 				break
 			}
-			s = s[:i] + " " + s[i+j+len(pair[1]):]
+			s = s[:i] + " " + s[i+j+len(pair[1]):] //nolint:gosec // i,j 来自 Index ≥0 有界
 		}
 	}
 	return strings.TrimSpace(s)
@@ -4674,7 +4672,7 @@ func musicNormalize(s string) string {
 			continue
 		}
 		if r >= '\uFF01' && r <= '\uFF5E' {
-			r = r - '\uFEE0'
+			r -= '\uFEE0'
 		} else if r == '\u3000' {
 			r = ' '
 		}
@@ -6007,7 +6005,7 @@ var reSeasonMarker = regexp.MustCompile(`(?i)\bS(\d{1,2})(?:E\d{1,3})?\b`)
 
 // limitKeywordTerms §59.206: 站方搜索词数上限感知——springsunday 实测 5 词
 // 以上 AND 0 结果（Aliens 案 6/7/9 词全灭 vs ≤5 词全中）。超 5 词时剥规格词
-//（编码/音频/媒介/分辨率——验证层自有 TechProfile 比对，搜索层规格词仅是
+// （编码/音频/媒介/分辨率——验证层自有 TechProfile 比对，搜索层规格词仅是
 // 收窄，剥除只放宽召回）。≤5 词零变化（既有行为免疫）。
 func limitKeywordTerms(kw string) string {
 	words := strings.Fields(kw)
@@ -6083,11 +6081,11 @@ func extractSequelNumber(title string) int {
 	runes := []rune(title)
 	for i := 1; i < len(runes); i++ {
 		prev := runes[i-1]
-		if !((prev >= 0x4E00 && prev <= 0x9FFF) || (prev >= 0x3400 && prev <= 0x4DBF)) {
+		if (prev < 0x4E00 || prev > 0x9FFF) && (prev < 0x3400 || prev > 0x4DBF) {
 			continue
 		}
 		r := runes[i]
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
 			continue
 		}
 		var seg []rune
@@ -6124,7 +6122,7 @@ func extractSequelNumber(title string) int {
 	// 策略 2：英文标题中独立的罗马数字词（II~IX），扫描到年份停止
 	lower := strings.ToLower(title)
 	words := strings.FieldsFunc(lower, func(r rune) bool {
-		return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'))
+		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
 	})
 	for _, w := range words {
 		if n, err := strconv.Atoi(w); err == nil && n >= 1900 && n <= 2099 {

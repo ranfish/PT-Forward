@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
-	"github.com/ranfish/pt-forward/internal/notification"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -595,23 +594,3 @@ func TestPipeline_Update(t *testing.T) {
 	}
 }
 
-func setupPipelineDBWithNotify(t *testing.T) (*Pipeline, *gorm.DB) {
-	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	if err := db.AutoMigrate(
-		&model.PublishGroup{},
-		&model.PublishGroupMember{},
-		&model.PublishGroupStatusHistory{},
-		&model.NotificationChannel{},
-		&model.NotificationHistory{},
-	); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	p := NewPipeline(db, zap.NewNop())
-	ns := notification.NewService(db, zap.NewNop())
-	p.SetNotifyService(ns)
-	return p, db
-}

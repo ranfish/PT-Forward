@@ -236,7 +236,7 @@ func TestScenario_F4_FlushPushToDownloader(t *testing.T) {
 	t.Logf("F4 debug: sub.ID=%d Enabled=%v ClientID=%q ScoringCfg.MaxCandidates=%d ScoringCfg.MaxActiveSeeding=%d",
 		dbSub.ID, dbSub.Enabled, dbSub.ClientUID, dbSub.ScoringConfig.MaxCandidates, dbSub.ScoringConfig.MaxActiveSeeding)
 
-	results, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID))
+	results, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID)) //nolint:staticcheck // 集成测试锁定 legacy 通道
 	require.NoError(t, err)
 	t.Logf("F4 debug: results=%d addFromFile=%d", len(results), atomic.LoadInt32(&addFromFileCalled))
 	require.NotEmpty(t, results, "Flush should return at least one result")
@@ -297,7 +297,7 @@ func TestScenario_F4_SkipsNonFree(t *testing.T) {
 	eng := seeding.NewEngine(db, nopLogger())
 	eng.SetClientProvider(mockDLProvider)
 
-	results, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID))
+	results, err := eng.Flush(ctx, fmt.Sprintf("%d", sub.ID)) //nolint:staticcheck // 集成测试锁定 legacy 通道
 	require.NoError(t, err)
 	assert.Len(t, results, 0)
 

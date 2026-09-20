@@ -85,7 +85,7 @@ func (h *SSELogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rc := http.NewResponseController(w)
-	rc.SetWriteDeadline(time.Time{})
+	_ = rc.SetWriteDeadline(time.Time{})
 
 	levelFilter := strings.ToLower(r.URL.Query().Get("level"))
 

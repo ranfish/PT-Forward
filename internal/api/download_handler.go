@@ -335,7 +335,7 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusBadRequest, 40001, "请上传 .torrent 文件")
 			return
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		torrentData, err = io.ReadAll(file)
 		if err != nil {
 			Error(w, http.StatusBadRequest, 40001, "读取文件失败")
@@ -364,7 +364,7 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 				Error(w, http.StatusBadRequest, 40001, "下载 .torrent 失败: "+err.Error())
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode != 200 {
 				Error(w, http.StatusBadRequest, 40001, fmt.Sprintf("下载 .torrent 失败: HTTP %d", resp.StatusCode))
 				return

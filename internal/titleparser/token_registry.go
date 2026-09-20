@@ -76,7 +76,7 @@ func VideoTitleForm(canonical string) string { return titleFormOfToken(videoCode
 
 // removeAllTokenPatterns 从 registry 合成移除正则（替代手写 remove*Tokens）。
 // 返回移除所有变体后的字符串。requires=web 词条仅在 webContext 时移除
-//（否则不提取也不剥词——2 字符缩写误命中不得污染主标题）。
+// （否则不提取也不剥词——2 字符缩写误命中不得污染主标题）。
 func removeAllTokenPatterns(registry []TokenDef, s string, webContext bool) string {
 	for _, t := range registry {
 		if t.matchesWithRequires(s, webContext) {

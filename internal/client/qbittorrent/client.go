@@ -340,7 +340,10 @@ func findBencodeEnd(data []byte, pos int) (int, error) {
 		}
 		return cur + 1, nil
 	default:
-		if data[pos] >= '0' && data[pos] <= '9' {
+		if pos >= len(data) {
+			return 0, qbError(ErrQBParse, "unexpected end of data", nil)
+		}
+		if data[pos] >= '0' && data[pos] <= '9' { //nolint:gosec // 上方 pos>=len 守卫已 return
 			colon := bytes.IndexByte(data[pos:], ':')
 			if colon == -1 {
 				return 0, qbError(ErrQBParse, "invalid string", nil)
@@ -355,7 +358,7 @@ func findBencodeEnd(data []byte, pos int) (int, error) {
 			}
 			return strEnd, nil
 		}
-		return 0, qbError(ErrQBParse, fmt.Sprintf("unexpected char %c at pos %d", data[pos], pos), nil)
+		return 0, qbError(ErrQBParse, fmt.Sprintf("unexpected char %c at pos %d", data[pos], pos), nil) //nolint:gosec // 上方守卫已界
 	}
 }
 

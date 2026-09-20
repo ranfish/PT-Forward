@@ -78,7 +78,7 @@ func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request
 		})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		h.logger.Warn("check update: github api status", zap.Int("status", resp.StatusCode))
@@ -151,11 +151,11 @@ func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	var release githubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		Error(w, http.StatusInternalServerError, 50002, "解析 Release 失败")
 		return
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	assetName := fmt.Sprintf("pt-forward-linux-%s", runtime.GOARCH)
 	var downloadURL string
@@ -214,21 +214,21 @@ func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
 	if err != nil {
 		return fmt.Errorf("download: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("download HTTP %d", resp.StatusCode)
 	}
 
-	tmpFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	tmpFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o700) //nolint:gosec // 可执行文件需 owner x 位
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 
 	written, err := io.Copy(tmpFile, resp.Body)
-	tmpFile.Close()
+	_ = tmpFile.Close()
 	if err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("write temp file: %w", err)
 	}
 
@@ -237,51 +237,50 @@ func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
 	// SHA256 校验（强制）
 	expectedHash, err := h.downloadSHA256(downloadURL + ".sha256")
 	if err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("download SHA256 checksum: %w", err)
 	}
 	actualHash, err := computeFileSHA256(tmpPath)
 	if err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("compute SHA256: %w", err)
 	}
 	if actualHash != expectedHash {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("SHA256 mismatch: expected %s, got %s", expectedHash, actualHash)
 	}
 	h.logger.Info("OTA: SHA256 verified", zap.String("hash", actualHash[:16]+"..."))
 
 	// Verify the downloaded file is executable
-	if err := os.Chmod(tmpPath, 0755); err != nil {
-		os.Remove(tmpPath)
+	if err := os.Chmod(tmpPath, 0o700); err != nil { //nolint:gosec // OTA 二进制需 owner 执行位
 		return fmt.Errorf("chmod: %w", err)
 	}
 
 	// Quick sanity check: run --version
-	cmd := exec.CommandContext(context.Background(), tmpPath, "--version")
+	cmd := exec.CommandContext(context.Background(), tmpPath, "--version") //nolint:gosec // OTA 机制本体：执行的是已校验的下载二进制
 	versionOutput, err := cmd.CombinedOutput()
 	if err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("verify binary: %w (output: %s)", err, string(versionOutput))
 	}
 	h.logger.Info("OTA: binary verified", zap.String("version_output", strings.TrimSpace(string(versionOutput))))
 
 	// Backup current binary
 	backupPath := exePath + ".bak"
-	os.Remove(backupPath)
+	_ = os.Remove(backupPath)
 	if err := os.Rename(exePath, backupPath); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("backup current binary: %w", err)
 	}
 
 	// Atomic replace
 	if err := os.Rename(tmpPath, exePath); err != nil {
 		// Rollback
-		os.Rename(backupPath, exePath)
+		_ = os.Rename(backupPath, exePath) // 回滚失败：备份路径残留，人工介入
 		return fmt.Errorf("replace binary: %w", err)
 	}
 
-	os.Remove(backupPath)
+	_ = os.Remove(backupPath)
 	return nil
 }
 
@@ -295,7 +294,7 @@ func (h *SystemHandler) downloadSHA256(url string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("download checksum: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("checksum download HTTP %d", resp.StatusCode)
@@ -320,11 +319,11 @@ func (h *SystemHandler) downloadSHA256(url string) (string, error) {
 }
 
 func computeFileSHA256(path string) (string, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // OTA 校验目标路径
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {

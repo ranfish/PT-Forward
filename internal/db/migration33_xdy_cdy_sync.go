@@ -39,7 +39,7 @@ func syncXdyAndCdySites(gormDB *gorm.DB) error {
 		}
 		// §59.167 真根因修复：GORM 零值陷阱——Site.Enabled 列 default:true，
 		// Create 显式 false（bool 零值）被 INSERT 省略走列默认 → 落库 true
-		//（v0.0.856 修复从未生效——PT31 删卷重建实测 enabled=1 实证）。
+		// （v0.0.856 修复从未生效——PT31 删卷重建实测 enabled=1 实证）。
 		// SQL 直写强制未启用（绕过 GORM 零值语义）。
 		if err := gormDB.Exec("UPDATE sites SET enabled = 0 WHERE domain = 'xdypt.vip'").Error; err != nil {
 			return err

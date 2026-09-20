@@ -503,7 +503,7 @@ func TestEngine_FetchOnce_HappyPath(t *testing.T) {
 	require.Equal(t, "testsit", dispatched[0].SiteName)
 
 	// §59.167 修复后：fetchOnce 已 MarkSeen（status="seen"）→ IsSeen 存在性判定为 true
-	//（原白名单语义与写入恒 seen 断裂——每轮重复分发实证）
+	// （原白名单语义与写入恒 seen 断裂——每轮重复分发实证）
 	isSeen, err := eng.repo.IsSeen(context.Background(), "testsit", "501", "1")
 	require.NoError(t, err)
 	require.True(t, isSeen, "status=seen 应视为已见过（§59.167 存在性判定）")

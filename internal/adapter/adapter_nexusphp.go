@@ -51,7 +51,6 @@ var (
 	reNexusSeedersID      = regexp.MustCompile(`id=['"]seeders['"][^>]*>(?:<[^>]*>)*(\d+)`)
 	reNexusLeechersID     = regexp.MustCompile(`id=['"]leechers['"][^>]*>(?:<[^>]*>)*(\d+)`)
 	// §59.159 词边界：防 userdetails.php 误命中（实战四次假成功真因——失败页用户导航链接）
-	reNexusDetailID       = regexp.MustCompile(`[^a-zA-Z0-9_](?:details|detail)\.php\?id=(\d+)`)
 	reNexusErrorClass     = regexp.MustCompile(`class="error"[^>]*>([^<]+)`)
 	reNexusErrorP         = regexp.MustCompile(`<p[^>]*>([^<]*(?:失败|错误|error|fail|拒绝|duplicate|already)[^<]*)</p>`)
 	reNexusBrowseLink     = regexp.MustCompile(`(?s)href=["'](?:[^"']*/)?(?:plugin_)?details\.php\?id=(\d+)["'][^>]*><b>\s*&nbsp;([^<]+)</b>`)
@@ -152,7 +151,6 @@ func (a *NexusPHPAdapter) DownloadTorrent(ctx context.Context, config *model.Sit
 	return data, nil
 }
 
-var reSignedDownloadURL = regexp.MustCompile(`download\.php\?id=` + regexp.QuoteMeta("{id}") + `&t=\d+&sign=[a-f0-9]+`)
 
 func (a *NexusPHPAdapter) resolveSignedDownloadURL(ctx context.Context, config *model.SiteConfig, torrentID string) (string, error) {
 	detailURL := buildDetailsURL(config.Domain, torrentID, config.DetailsURLTemplate)
@@ -1604,8 +1602,6 @@ func parseNexusPHPBrowse(html string, config *model.SiteConfig) []*model.Seeding
 		if isImageOnly {
 			imgResults = append(imgResults, result)
 		} else {
-			if torrentID == "582" && strings.Contains(config.Domain, "tey") {
-			}
 			textResults = append(textResults, result)
 		}
 
@@ -1671,7 +1667,7 @@ func looksLikeSceneName(s string) bool {
 		return false
 	}
 	first := rune(s[0])
-	if !(first >= 'A' && first <= 'Z') {
+	if first < 'A' || first > 'Z' {
 		return false
 	}
 	return regexp.MustCompile(`\b(19|20)\d{2}\b`).MatchString(s)
