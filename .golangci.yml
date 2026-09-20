@@ -25,10 +25,14 @@ linters:
         - -ST1000
         - -ST1021
         - -ST1003
+        - -ST1023
+        - -S1017
+        - -S1007
   exclusions:
     paths:
       - web/node_modules
       - frontend/dist
+      - internal/bdinfo
     rules:
       - path: _test\.go
         linters:

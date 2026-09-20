@@ -62,9 +62,10 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2  # --new-from-rev=HEAD~1 需要父提交
 
       - uses: actions/setup-go@v5
         with:
@@ -74,10 +75,12 @@ jobs:
         run: mkdir -p frontend/dist && echo '<html></html>' > frontend/dist/index.html
 
       - name: Install golangci-lint
-        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.5
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.6.2
 
-      - name: Lint
-        run: $(go env GOPATH)/bin/golangci-lint run --timeout 5m ./internal/...
+      # §59.251 审核五轮定案：增量严检（--new-from-rev）——存量 108 条挂账清理轮逐步消化；
+      # v1.64.5 时代 continue-on-error + 版本失配双重掩盖=lint 从未真跑（教训落盘 docs/31）
+      - name: Lint（新增代码全量严检）
+        run: $(go env GOPATH)/bin/golangci-lint run --timeout 5m --new-from-rev=HEAD~1 ./internal/...
 
   build:
     runs-on: ubuntu-latest
