@@ -97,7 +97,6 @@ func migrateLegacyTable(db *gorm.DB, t legacyUIDTable) {
 				db.Logger.Error(db.Statement.Context, "legacy uid migrate: add column failed: %v table=%s col=%s", err, t.table, newCol)
 				continue
 			}
-			hasNew = true
 		}
 		if !hasOld {
 			continue // 新库（gorm 已建新列）或已迁移完
