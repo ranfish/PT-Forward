@@ -1,7 +1,6 @@
 package metadata
 
 import (
-	"os"
 	"context"
 	"testing"
 
@@ -19,10 +18,16 @@ func TestHashVerify_ThreeStates(t *testing.T) {
 	_ = db.AutoMigrate(&model.TorrentMetadata{}, &model.Site{})
 	repo := setting.NewRepository(db)
 
-	// 真实 .torrent 资产（transmission 测试集）
-	torrentData, err := os.ReadFile("../../examples/transmission/tests/libtransmission/assets/too-few-pieces.torrent")
+	// 代码内构造合法 .torrent（BuildSingleFileTorrent bencode 自洽——CI 无 examples/
+	// 目录，手写字节串 announce 长度差 1 即解析错乱 §59.252 教训）
+	pieces := make([]byte, 200)
+	for i := range pieces {
+		pieces[i] = byte(i)
+	}
+	torrentData, err := fingerprint.BuildSingleFileTorrent(
+		"http://tracker.example.com/announce", "Big.Movie.2025", 10737418240, 4194304, pieces)
 	if err != nil {
-		t.Fatalf("读测试资产失败: %v", err)
+		t.Fatalf("构造 .torrent 失败: %v", err)
 	}
 	tm, err := fingerprint.ComputeFromTorrent(torrentData)
 	if err != nil {
