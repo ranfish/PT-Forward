@@ -67,10 +67,47 @@ var siteOpMarkerTailRe = regexp.MustCompile(`(?i)([\s\x{00a0}]*\[(?:中性种子
 // 状态语义锚）——内容性括号（"(港)" 地区译名标注）不剥。
 var siteStateTailRe = regexp.MustCompile(`(?i)([\s\x{00a0}]*\((?:已|待|未|中性种子|免费|free|2x|促销|普通|hot|经典|限免|密封|seeding|leeching|\d+(?:[Xx×]\s*\d+)?\s*%)[^)]*\))+\s*$`)
 
+// siteTimeTailRe §59.248 族三: 裸文本时间尾段——NexusPHP 免费倒计时标注
+// （"[免费] 剩余时间：1天5时" 复合尾段的裸文本半段，fnos 5 行残留实证）。
+// 判据：前缀词强锚（剩余时间/优惠剩余/免费剩余）+时间量词串（数字/天时分秒/冒号）。
+// 前缀词锚保证不误伤片名（片名不以该三词+冒号+纯时间量构成尾段）。
+var siteTimeTailRe = regexp.MustCompile(`(?i)([\s\x{00a0}]*(?:剩余时间|优惠剩余|免费剩余)[：:\s]*[0-9０-９天日时小分秒:：/]+[\s\x{00a0}]*)+$`)
+
+var tailAnnotSegRe = regexp.MustCompile(`(?:[\s\x{00a0}]*(?:[\[（(【][^\]\)）】]*[\]\)）】]|(?:剩余时间|优惠剩余|免费剩余)[：:\s]*[0-9０-９天日时小分秒:：/]+))+$`)
+
+
+// stripGroupAnnotatedTail §59.248 族四: 组名锚尾段剥除（用户定案——官组名后
+// 站方标注内容均应剥除）。两遍法：①剥尾部纯标注段（形态判据——任意括号段/
+// 时间尾，不查词表=新造词免疫）得 clean2；②clean2 尾部恰为组名（ExtractGroupName
+// 严格三层识别+HasSuffix 验证）→ 标题净化为 clean2（组名即本体终点）。
+// clean2 尾非组名（组名后跟内容：官方版本/续作名等）→ 不剥（内容保护）。
+func stripGroupAnnotatedTail(title string) string {
+	removed := tailAnnotSegRe.FindString(title)
+	if removed == "" {
+		return title
+	}
+	// §59.136 定案冲突消解：禁转标记保留（站方禁转须净化后可见）——
+	// 尾段含禁转词族则族四整体不动（落回族一词表：剥促销保禁转）
+	if reNoTransferRe.MatchString(removed) {
+		return title
+	}
+	clean2 := strings.TrimSpace(strings.TrimSuffix(title, removed))
+	if clean2 == "" {
+		return title
+	}
+	if g := ExtractGroupName(clean2); g != "" && strings.HasSuffix(clean2, g) {
+		return clean2
+	}
+	return title
+}
+
+// reNoTransferRe 禁转词族（与族一保留组同源）
+var reNoTransferRe = regexp.MustCompile(`(?i)禁转|谢绝转载|严禁转载|禁止转载`)
+
 // StripSiteOperationMarkers 剥除标题/副标题尾部一切【与标题无关的站方标注】
-// （§59.248 泛化为标题净化公共方法）——两族词表：族一方括号运营标记
-// （§59.99/§59.136）+族二圆括号站方状态（已审/已复核/待审）。迭代处理
-// 多标记混排+跨族混排。存量清除重获自愈（无需 migration）。
+// （§59.248 泛化为标题净化公共方法）——四族：族一方括号运营标记（§59.99/§59.136
+// 词表）+族二圆括号站方状态（词表）+族三裸文本时间尾段+族四组名锚尾段剥除
+// （形态免疫收官）。迭代处理多标记/跨族混排。存量清除重获自愈（无需 migration）。
 func StripSiteOperationMarkers(s string) string {
 	s = strings.TrimSpace(s)
 	for {
@@ -78,6 +115,10 @@ func StripSiteOperationMarkers(s string) string {
 		ns := strings.TrimSpace(siteOpMarkerTailRe.ReplaceAllString(s, "$2"))
 		// 族二（站方状态——无保留组直接剥）
 		ns = strings.TrimSpace(siteStateTailRe.ReplaceAllString(ns, ""))
+		// 族三（裸文本时间尾段）
+		ns = strings.TrimSpace(siteTimeTailRe.ReplaceAllString(ns, ""))
+		// 族四（组名锚——纯标注序列整体剥）
+		ns = strings.TrimSpace(stripGroupAnnotatedTail(ns))
 		if ns == s {
 			return ns
 		}
