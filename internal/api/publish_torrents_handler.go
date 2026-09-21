@@ -4016,6 +4016,9 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(updated.DetailSourceJSON)
 	profile := titleparser.BuildTechProfile(updated.Title, miForProfile, domMedium, domRes, domVideo, domAudio)
 	reassembledTitle := titleparser.ReassembleFromTechProfile(profile, titleparser.V105TitleFormat())
+	// §59.254 项4 D：预览展示且警示不拒（预览本身即发布前检查工具）——
+	// 重组空=数据不完整（发布链将拒发），此处展示原形态+警示标记
+	titleIncomplete := strings.TrimSpace(reassembledTitle) == ""
 
 	renderer := description.NewRenderer("")
 	screenshots := model.ParseScreenshotColumn(updated.Screenshots) // §59.47
@@ -4092,6 +4095,7 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 
 		// §59.28 C（方案A ②④）：标准化重组标题 + 渲染后完整描述（预览）
 		"reassembled_title": reassembledTitle,
+		"title_incomplete":  titleIncomplete,
 		"rendered_description": renderedDesc,
 	}
 	// §59.81: 产地/类型 + 分段渲染素材（简介四段结构化展示）

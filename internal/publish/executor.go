@@ -256,10 +256,17 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// ——输入按端点感知链准备：aka 启发式（零请求）→ &imdb 二连（仅兜底触发）
 	e.mergePTGenSource(ctx, &tp, meta)
 	// §59.166 B2：发布标题重组同源——ReassembleFromTechProfile(tp) 为权威（MI 纠错
-	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）；空/异常回 meta.Title。
-	publishTitle := meta.Title
+	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）。
+	// §59.254 项4 D 终案：重组空=四层全灭（三源+PTGen 兜底后仍缺损）——拒发+精准引导
+	// （预览链展示且警示不拒——预览本身即发布前检查工具）。
+	publishTitle := ""
 	if rt := titleparser.ReassembleFromTechProfile(tp, titleparser.V105TitleFormat()); strings.TrimSpace(rt) != "" {
 		publishTitle = rt
+	} else {
+		if !tp.MIHasVideo {
+			return fail("failed", "标题重组失败：MI 缺失或视频不可读——检查下载器文件可访问性后重新获取数据")
+		}
+		return fail("failed", "标题重组失败：标题不可解析且 PTGen 无英文名——重新获取数据后再发布")
 	}
 	jobs := []domainJob{
 		{model.FieldDomainType, e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)},
@@ -783,8 +790,13 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 		ExportTime    string   `json:"export_time,omitempty"`
 		PageURL       string   `json:"page_url,omitempty"`
 	}
+	auditName, auditOK := e.preAuditTitle(meta)
+	if !auditOK {
+		// §59.254 项4：预检同拒（DryRun 正是发现问题的工具）
+		return nil, "标题重组失败：数据不完整——重新获取数据后再预检"
+	}
 	body := auditBody{
-		Name:          e.preAuditTitle(meta),
+		Name:          auditName,
 		SmallDescr:    form[model.FieldDomainSmallDescr],
 		IMDBURL:       meta.IMDbURL,
 		Description:   form[cfg.FormFields[model.FieldDomainDescription]],
@@ -926,13 +938,14 @@ func detailURLOf(cfg *model.SiteConfig, tid string) string {
 
 // preAuditTitle §59.166 B2 补：预检 name 与上传标题同源（tp 重组 MI 纠错终态
 // ——Arco 案预检层旧标题与表单 DDP 对照错位残留）。
-func (e *PublishExecutor) preAuditTitle(meta *model.TorrentMetadata) string {
+// §59.254 项4：重组空返回 ok=false（DryRun 同拒——预检正是发现问题的工具）。
+func (e *PublishExecutor) preAuditTitle(meta *model.TorrentMetadata) (string, bool) {
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
 	tp := titleparser.BuildTechProfile(meta.Title, meta.MediaInfo, domMedium, domRes, domVideo, domAudio)
 	if rt := titleparser.ReassembleFromTechProfile(tp, titleparser.V105TitleFormat()); strings.TrimSpace(rt) != "" {
-		return rt
+		return rt, true
 	}
-	return meta.Title
+	return "", false
 }
 
 // crossSeasonTagRe §59.177: 跨季标题形态（S01-S02 / 第N-M季）。

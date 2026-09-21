@@ -708,6 +708,9 @@ async function saveOnly() {
       previewFieldsData.value = { ...result } as Record<string, unknown>
       previewStatement.value = (result as { statement?: string }).statement || form.value.statement
       // §59.28 C（方案A ②）: 标准化重组标题回填预览
+      if (result.title_incomplete) {
+        message.warning('标题数据不完整（重组失败）：发布将被拒——请重新获取数据或检查视频文件可读性')
+      }
       if (result.reassembled_title) {
         form.value.title = result.reassembled_title
       }
