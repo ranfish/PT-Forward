@@ -2549,7 +2549,7 @@ fetched:
 			// 第二段禁转PTT 是用户指定的固定引言（v0.0.597）。
 			if profile.ReleaseGroup != "" && profile.ReleaseGroup != "NOGROUP" {
 				thanksLine := description.GenerateThanksQuote(meta.SiteName, profile.ReleaseGroup, false, nil)
-				noTransferLine := "[quote][b][color=red][size=5]请遵守PT互相遵重共识，禁转PTT[/size][/color][/b][/quote]"
+				noTransferLine := "[quote][b][color=red][size=5]互珍互重，禁转PTT[/size][/color][/b][/quote]"
 				thanks := "[quote][b][color=blue][size=5]" + thanksLine + "[/size][/color][/b][/quote]\n" + noTransferLine
 
 				// 幂等：先剥离历史追加的致谢块（v0.0.607 修复重获累积）

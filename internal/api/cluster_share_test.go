@@ -286,7 +286,7 @@ func TestApplyPTGenSourcePersist(t *testing.T) {
 // §59.80: 源站无声明时追加致谢不得产生前导空行（米仔睡着了实锤
 // '\n\n[quote]FRDS官组作品...'——thanks 固定 \n\n 前缀 + 空 base）。
 func TestAppendThanksNoLeadingBlank(t *testing.T) {
-	thanks := "[quote][b][color=blue][size=5]FRDS官组作品，感谢原制作者发布。[/size][/color][/b][/quote]\n[quote][b][color=red][size=5]请遵守PT互相遵重共识，禁转PTT[/size][/color][/b][/quote]"
+	thanks := "[quote][b][color=blue][size=5]FRDS官组作品，感谢原制作者发布。[/size][/color][/b][/quote]\n[quote][b][color=red][size=5]互珍互重，禁转PTT[/size][/color][/b][/quote]"
 	join := func(base string) string {
 		if base == "" {
 			return thanks
