@@ -10,6 +10,8 @@
 package publish
 
 import (
+	"github.com/ranfish/pt-forward/internal/metadata"
+	"github.com/ranfish/pt-forward/internal/ptgen"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -250,6 +252,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// 1080 归一)/天空之城(audio)/Arco(MI 纠错 DDP)。type/team 域保持原源。
 	domMedium, domRes, domVideo, domAudio := titleparser.DOMFieldsFromDetailSource(meta.DetailSourceJSON)
 	tp := titleparser.BuildTechProfile(meta.Title, meta.MediaInfo, domMedium, domRes, domVideo, domAudio)
+	// §59.254 项1: PTGen 第四源合并（year 校正+main_title 兜底+mismatch 可观测）
+	// ——输入按端点感知链准备：aka 启发式（零请求）→ &imdb 二连（仅兜底触发）
+	e.mergePTGenSource(ctx, &tp, meta)
 	// §59.166 B2：发布标题重组同源——ReassembleFromTechProfile(tp) 为权威（MI 纠错
 	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）；空/异常回 meta.Title。
 	publishTitle := meta.Title
@@ -992,4 +997,49 @@ func adjustTagsForSite(tags []string, siteName, title, subtitle string) []string
 		adjusted = append(adjusted, "complete")
 	}
 	return adjusted
+}
+
+// mergePTGenSource §59.254 项1: 第四源准备与合并（executor 侧）。
+// 端点感知链：PTGenSourceJSON 内 aka 启发式（零请求）→ NeedsIMDbFallback
+// 触发时 &imdb 二连（e.pipe.ptgen 独享豆影）→ MergePTGenInto。
+// EnglishName 同时回写 meta.EnglishTitle（二连触发时权威值覆盖）。
+func (e *PublishExecutor) mergePTGenSource(ctx context.Context, tp *titleparser.TechProfile, meta *model.TorrentMetadata) {
+	if meta == nil {
+		return
+	}
+	src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON)
+	if err != nil || src == nil {
+		return // 无 PTGen 数据（增强层缺失回退三源现状）
+	}
+	englishName := ptgen.ExtractEnglishName(&src.PTGenResult, src.Source)
+	if ptgen.NeedsIMDbFallback(tp.MainTitle, englishName) && e.pipe != nil && e.pipe.ptgen != nil && meta.DoubanURL != "" {
+		if en, _ := e.pipe.ptgen.QueryIMDbForEnglish(ctx, meta.DoubanURL); en != "" {
+			englishName = en
+			// 权威值覆盖落库（EnglishTitle 资产）
+			if err := e.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+				Where("info_hash = ?", meta.InfoHash).
+				Update("english_title", en).Error; err != nil {
+				e.logger.Warn("english_title persist failed", zap.Error(err))
+			}
+		}
+	}
+	// 常规 EnglishTitle 尽力落库（aka 启发式——未触发二连时）
+	if englishName != "" && meta.EnglishTitle == "" {
+		_ = e.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+			Where("info_hash = ?", meta.InfoHash).
+			Update("english_title", englishName).Error
+	}
+	titleparser.MergePTGenInto(tp, titleparser.PTGenMergeInput{
+		EnglishName: englishName,
+		Year:        src.Year,
+	}, func(msg string, kv ...any) {
+		// 可观测日志（info 级——year_corrected/main_title_backfilled/title_mismatch）
+		fields := []zap.Field{zap.String("info_hash", meta.InfoHash)}
+		for i := 0; i+1 < len(kv); i += 2 {
+			if k, ok := kv[i].(string); ok {
+				fields = append(fields, zap.Any(k, kv[i+1]))
+			}
+		}
+		e.logger.Info(msg, fields...)
+	})
 }

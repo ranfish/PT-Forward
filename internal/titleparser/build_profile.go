@@ -11,6 +11,9 @@ import "encoding/json"
 //   - 技术参数 8 字段：MediaInfo > 标题
 //   - 标题特有 8 字段：标题（唯一源）
 //   - 媒介/分类 2 字段：DOM > 标题
+//   - §59.254 项1 第四源：PTGen（year 校正/main_title 兜底/mismatch 可观测）
+//     ——MergePTGenInto 由调用方按端点感知链准备输入后显式调用（发布链接线；
+//     本入口签名不变，避免 26 处调用点波及）
 func BuildTechProfile(title, mediaInfo string, domMedium, domResolution, domVideoCodec, domAudioCodec string) TechProfile {
 	profile := ParseTitleTech(title)
 	if mediaInfo != "" {
