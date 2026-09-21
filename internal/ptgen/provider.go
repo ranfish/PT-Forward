@@ -67,6 +67,9 @@ func (p *Provider) SetAPIKey(key string) {
 	p.apiKey = strings.TrimSpace(key)
 }
 
+// SetHTTPClientForTest 测试注入自定义 http.Client（代理等）
+func (p *Provider) SetHTTPClientForTest(c *http.Client) { p.client = c }
+
 // Query §59.173: 缓存优先查询（30 天 TTL 内命中不外呼 API）。
 func (p *Provider) Query(ctx context.Context, query string) (*model.PTGenResult, error) {
 	return p.query(ctx, query, false)
