@@ -107,6 +107,12 @@ func (h *SettingsHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// restartRequiredKeys §59.255: 启动快照注入类 Key（改完需重启——前端提示）
+var restartRequiredKeys = map[string]bool{
+	setting.KeyPTGenEndpoints:              true,
+	setting.KeyTorrentTrafficRetentionDays: true,
+}
+
 func (h *SettingsHandler) handleGet(w http.ResponseWriter, r *http.Request, key string) {
 	if isSensitiveSettingKey(key) {
 		Error(w, http.StatusForbidden, 16003, "该设置项禁止读取")
@@ -120,7 +126,8 @@ func (h *SettingsHandler) handleGet(w http.ResponseWriter, r *http.Request, key 
 	}
 
 	Success(w, map[string]interface{}{
-		"key":   key,
+		"key":              key,
+		"restart_required": restartRequiredKeys[key],
 		"value": value,
 	})
 }
@@ -148,6 +155,7 @@ func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key 
 	auditLog(r, "settings", "update", "setting", key, "", "success")
 	// §56.36: 立即刷新 RuntimeConfig 缓存，使限流等配置热更新
 	setting.InvalidateAll()
+
 	if h.configBus != nil {
 		h.configBus.Publish(rss.ConfigChangedEvent{
 			ChangedKeys: []string{key},
@@ -155,7 +163,8 @@ func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key 
 		})
 	}
 	Success(w, map[string]interface{}{
-		"key":   key,
+		"key":              key,
+		"restart_required": restartRequiredKeys[key],
 		"value": req.Value,
 	})
 }

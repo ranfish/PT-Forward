@@ -225,9 +225,14 @@ async function savePtgen() {
       .filter(p => p.url.trim())
       .map(p => `${p.url.trim()}|${p.key.trim()}`)
       .join('#')
-    await settingsApi.update('ptgen_endpoints', { value: epStr })
+    const { data: rd } = await settingsApi.update('ptgen_endpoints', { value: epStr })
     await settingsApi.update('ptgen_api_key', { value: '' })
-    message.success('PTGen 配置保存成功')
+    // §59.255: 端点为启动快照注入——提示需重启生效
+    if (rd.data?.restart_required) {
+      message.warning('PTGen 配置已保存，需重启服务后生效')
+    } else {
+      message.success('PTGen 配置保存成功')
+    }
   } catch {
     message.error('保存失败')
   } finally {
