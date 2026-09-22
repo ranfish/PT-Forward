@@ -41,8 +41,16 @@ func (e *Engine) OnPushed(ctx context.Context, event *pusher.PushedEvent) {
 		return
 	}
 
-	// 统一查 seeding_client_configs（合并后含 Role=download 的配置）
+	// 统一查 seeding_client_configs（合并后含 Role=download 的配置）。
+	// §59.256 b：准入拒绝不再静默——Warn 日志（243/243 排查实证：漏建下载/刷流
+	// 配置时零痕迹，error 级日志下完全不可见，用户无从得知为何不推）。
 	if _, ok := e.LoadActiveClientConfig(ctx, event.ClientUID); !ok {
+		e.logger.Warn("event dropped: downloader has no active download/seeding config",
+			zap.Uint("client_uid", event.ClientUID),
+			zap.String("site", event.SiteName),
+			zap.String("torrent_id", event.TorrentID),
+			zap.String("hint", "到下载管理/刷流管理为该下载器创建并启用配置"),
+		)
 		return
 	}
 
