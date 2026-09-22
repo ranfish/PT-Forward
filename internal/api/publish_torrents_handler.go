@@ -2607,25 +2607,49 @@ fetched:
 // 是我们追加的致谢块（重获时剥离，保证幂等）。
 const thanksAppendMarker = "FRDS官组作品"
 
-// stripAppendedThanks 剥离历史追加的致谢块（§59.28 幂等修复）。
-// 追加格式固定为 "\n\n[quote]...官组作品...[/quote]\n[quote]...禁转PTT...[/quote]"，
-// 识别第二个 quote 块（禁转PTT）定位追加起点。
+// thanksNoTransferTail §59.260: 追加块固定尾引言（用户定案不变文案）——
+// 任意组名/中英模板的结构锚（幂等剥离通用判据）。
+const thanksNoTransferTail = "[quote][b][color=red][size=5]互珍互重，禁转PTT[/size][/color][/b][/quote]"
 
+// stripAppendedThanks 剥离历史追加的致谢块（§59.28 幂等 + §59.260 通用化）。
+// 追加格式固定双 quote 结尾：
+//   [quote][b][color=blue][size=5]{组名}官组作品...[/quote]\n[quote][b][color=red][size=5]互珍互重，禁转PTT...[/quote]
+// §59.260：以固定尾引言 thanksNoTransferTail 为锚（任意组名/中英模板通用），
+// 从最后一个尾引言回溯相邻前一 [quote] 起点整块剥离；旧 FRDS 标记兜底兼容。
 func stripAppendedThanks(statement string) string {
-	if !strings.Contains(statement, thanksAppendMarker) {
-		return statement
+	// 循环剥离（累积多轮的历史数据一次清净）：每轮以最后一个尾引言为锚，
+	// 向前找配对的致谢前缀 quote（固定蓝色[size=5]形态）——中间可能隔着其它
+	// quote（多轮累积时上一对的尾引言），必须匹配致谢自身特征而非任意 quote。
+	for {
+		idx := strings.LastIndex(statement, thanksNoTransferTail)
+		if idx < 0 {
+			break
+		}
+		head := statement[:idx]
+		// 配对致谢 = head 中最后一个蓝色 size=5 quote（追加块固定形态）
+		prevStart := strings.LastIndex(head, "[quote][b][color=blue][size=5]")
+		if prevStart < 0 {
+			// 无配对致谢（异常形态）——仅剥尾引言自身
+			tailStart := strings.LastIndex(head, "[quote]")
+			if tailStart < 0 {
+				statement = strings.TrimSpace(head)
+				continue
+			}
+			statement = strings.TrimSpace(head[:tailStart])
+			continue
+		}
+		statement = strings.TrimSpace(head[:prevStart])
 	}
-	// 从最后一个 "官组作品" quote 块的起始 [quote] 剥离到末尾
-	idx := strings.LastIndex(statement, thanksAppendMarker)
-	if idx < 0 {
-		return statement
+	// 旧 FRDS 标记兜底（历史数据兼容——同循环）
+	for strings.Contains(statement, thanksAppendMarker) {
+		idx := strings.LastIndex(statement, thanksAppendMarker)
+		start := strings.LastIndex(statement[:idx], "[quote]")
+		if start < 0 {
+			break
+		}
+		statement = strings.TrimSpace(statement[:start])
 	}
-	// 回溯到包裹它的 [quote] 起点
-	start := strings.LastIndex(statement[:idx], "[quote]")
-	if start < 0 {
-		return statement
-	}
-	return strings.TrimSpace(statement[:start])
+	return statement
 }
 
 // extractChineseFromSubtitle 从副标题提取【中文名】（§59.26 朋友站格式）。
