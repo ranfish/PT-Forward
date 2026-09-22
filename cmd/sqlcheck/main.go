@@ -262,27 +262,41 @@ func scan(root string) ([]chain, []frag) {
 		if perr != nil {
 			return nil
 		}
-		var stmts []ast.Stmt
 		for _, d := range f.Decls {
-			if fn, ok := d.(*ast.FuncDecl); ok && fn.Body != nil {
-				collectStmts(fn.Body, &stmts)
+			fn, ok := d.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
 			}
-		}
-		for _, stmt := range stmts {
-			if c := analyzeStmt(stmt, tableOf); c != nil {
-				c.file, c.line = path, fset.Position(stmt.Pos()).Line
-				chains = append(chains, *c)
-			}
-			ast.Inspect(stmt, func(m ast.Node) bool {
-				if ce, ok := m.(*ast.CallExpr); ok {
-					if se, ok := ce.Fun.(*ast.SelectorExpr); ok && (se.Sel.Name == "Exec" || se.Sel.Name == "Raw") && len(ce.Args) > 0 {
-						if lit := stringLitOrFormat(ce.Args[0]); lit != "" {
-							standalone = append(standalone, frag{file: path, line: fset.Position(ce.Pos()).Line, kind: se.Sel.Name, sql: normalize(lit)})
+			var stmts []ast.Stmt
+			collectStmts(fn.Body, &stmts)
+			for _, stmt := range stmts {
+				if c := analyzeStmt(stmt, tableOf); c != nil {
+					c.file, c.line = path, fset.Position(stmt.Pos()).Line
+					chains = append(chains, *c)
+				}
+				// Exec/Raw 独立收集（语句子树内，含嵌套块）
+				ast.Inspect(stmt, func(m ast.Node) bool {
+					if ce, ok := m.(*ast.CallExpr); ok {
+						if se, ok := ce.Fun.(*ast.SelectorExpr); ok && (se.Sel.Name == "Exec" || se.Sel.Name == "Raw") && len(ce.Args) > 0 {
+							if lit := stringLitOrFormat(ce.Args[0]); lit != "" {
+								standalone = append(standalone, frag{file: path, line: fset.Position(ce.Pos()).Line, kind: se.Sel.Name, sql: normalize(lit)})
+							}
 						}
 					}
+					return true
+				})
+			}
+			// §59.259 函数级兜底：updates["key"]=v 逐键赋值散布多语句
+			// （handleUpdateConfig 形态——字面量 map 提取不覆盖）——函数内
+			// 全部键 × 全部 Model 表名全组合验证
+			// 多 Model 表的函数无法确定 updates 键归属（propagateClusterPosters
+			// 双表实证——宁漏勿错），仅单表函数兜底
+			if fnKeys := fnDynamicKeys(stmts); len(fnKeys) > 0 {
+				if tbs := fnModelTables(fn, stmts, tableOf); len(tbs) == 1 {
+					chains = append(chains, chain{file: path, line: fset.Position(fn.Pos()).Line, table: tbs[0],
+						frags: []frag{{kind: "setkeys", sql: strings.Join(fnKeys, ", ")}}})
 				}
-				return true
-			})
+			}
 		}
 		return nil
 	})
@@ -344,10 +358,78 @@ func structTableNames() map[string]string {
 	return m
 }
 
-// analyzeStmt 叶子语句内找链头（Model/Table）与片段
+// analyzeStmt 叶子语句内找链头（Model/Table）与片段。
+// §59.259 盲区补齐：动态构建的 updates["col"]=v 逐键赋值（seeding_handler
+// handleUpdateConfig 形态——字面量 map 提取不覆盖）——语句内索引赋值键
+// 并入 setkeys，配合函数级兜底（collectFnDynamicUpdates）。
+// fnDynamicKeys 函数内全部 updates["key"]/update["key"] 字符串键（去重保序）
+func fnDynamicKeys(stmts []ast.Stmt) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, stmt := range stmts {
+		ast.Inspect(stmt, func(n ast.Node) bool {
+			if as, ok := n.(*ast.AssignStmt); ok {
+				for _, lhs := range as.Lhs {
+					if ix, ok := lhs.(*ast.IndexExpr); ok {
+						if id, ok := ix.X.(*ast.Ident); ok && (id.Name == "updates" || id.Name == "update") {
+							if lit, ok := ix.Index.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+								k := normalize(unquote(lit.Value))
+								if !seen[k] {
+									seen[k] = true
+									out = append(out, k)
+								}
+							}
+						}
+					}
+				}
+			}
+			return true
+		})
+	}
+	return out
+}
+
+// fnModelTables 函数内全部 Model(&X{}) 表名（去重）——含 Ident 变量引用反查
+func fnModelTables(fn *ast.FuncDecl, stmts []ast.Stmt, tableOf map[string]string) []string {
+	varTypes := varModelTypes(fn)
+	seen := map[string]bool{}
+	var out []string
+	for _, stmt := range stmts {
+		ast.Inspect(stmt, func(n ast.Node) bool {
+			if ce, ok := n.(*ast.CallExpr); ok {
+				if se, ok := ce.Fun.(*ast.SelectorExpr); ok && se.Sel.Name == "Model" && len(ce.Args) == 1 {
+					if t := modelNameEx(ce.Args[0], varTypes); t != "" {
+						if tb, ok := tableOf[t]; ok && !seen[tb] {
+							seen[tb] = true
+							out = append(out, tb)
+						}
+					}
+				}
+			}
+			return true
+		})
+	}
+	return out
+}
+
 func analyzeStmt(stmt ast.Stmt, tableOf map[string]string) *chain {
 	var table string
 	var frags []frag
+
+	ast.Inspect(stmt, func(n ast.Node) bool {
+		if as, ok := n.(*ast.AssignStmt); ok {
+			for _, lhs := range as.Lhs {
+				if ix, ok := lhs.(*ast.IndexExpr); ok {
+					if id, ok := ix.X.(*ast.Ident); ok && (id.Name == "updates" || id.Name == "update" || id.Name == "data") {
+						if lit, ok := ix.Index.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+							frags = append(frags, frag{kind: "setkeys", sql: normalize(unquote(lit.Value))})
+						}
+					}
+				}
+			}
+		}
+		return true
+	})
 
 	ast.Inspect(stmt, func(n ast.Node) bool {
 		ce, ok := n.(*ast.CallExpr)
@@ -470,6 +552,44 @@ func modelName(ex ast.Expr) string {
 		return id.Name
 	}
 	return ""
+}
+
+// modelNameEx §59.259：modelName 扩展——Ident 变量经 varModelTypes 反查类型
+func modelNameEx(ex ast.Expr, varTypes map[string]string) string {
+	if u, ok := ex.(*ast.UnaryExpr); ok && u.Op.String() == "&" {
+		if id, ok := u.X.(*ast.Ident); ok {
+			if t, ok := varTypes[id.Name]; ok {
+				return t
+			}
+		}
+	}
+	return modelName(ex)
+}
+
+// varModelTypes §59.259：函数内 var x model.X{} / var x model.X 声明收集——
+// Model(&x)（Ident 变量引用）的类型反查（handleUpdateConfig First(&config) 形态）
+func varModelTypes(fn *ast.FuncDecl) map[string]string {
+	out := map[string]string{}
+	if fn.Body == nil {
+		return out
+	}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		gd, ok := n.(*ast.GenDecl)
+		if !ok || gd.Tok != token.VAR {
+			return true
+		}
+		for _, spec := range gd.Specs {
+			vs, ok := spec.(*ast.ValueSpec)
+			if !ok || len(vs.Names) == 0 || vs.Type == nil {
+				continue
+			}
+			if se, ok := vs.Type.(*ast.SelectorExpr); ok {
+				out[vs.Names[0].Name] = se.Sel.Name
+			}
+		}
+		return true
+	})
+	return out
 }
 
 // stringLitOrFormat 取常量字符串；fmt.Sprintf 取 format 串（动词替换 1）
