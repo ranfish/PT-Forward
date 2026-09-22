@@ -141,6 +141,12 @@ func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) s
 	case "platform":
 		return p.SourcePlatform
 	case "source_type":
+		// §59.257: v1.05 WEB类省略片源类型（qingwapt.md "WEB类：省略此项"）——
+		// §59.226 附六 ST="WEB" 是 medium/canonical 层语义（识别 WEB 语境），
+		// 标题输出层与规格 WEB-DL/WEBRip 同现即重复（"WEB WEB-DL" 243 实证）
+		if p.SourceType == "WEB" && (p.Specification == "WEB-DL" || p.Specification == "WEBRip") {
+			return ""
+		}
 		return p.SourceType
 	case "specification":
 		return p.Specification
