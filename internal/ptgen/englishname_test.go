@@ -103,3 +103,19 @@ func TestSplitTitleSegments(t *testing.T) {
 		t.Errorf("斜杠拆分: %v", segs)
 	}
 }
+
+// §59.258 项4: 全角/Unicode 变体标点 → 半角归一（英文名标点保留定案）
+func TestNormalizeEnglishName_FullWidth(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"Mission： Impossible", "Mission: Impossible"},
+		{"Mission: Impossible – Dead Reckoning", "Mission: Impossible - Dead Reckoning"},
+		{"Movie（2019）", "Movie(2019)"},
+		{"Film　Title", "Film Title"},
+		{"A，B", "A,B"},
+	}
+	for _, c := range cases {
+		if got := NormalizeEnglishName(c.in); got != c.want {
+			t.Errorf("NormalizeEnglishName(%q)=%q want %q", c.in, got, c.want)
+		}
+	}
+}
