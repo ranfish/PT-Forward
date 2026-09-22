@@ -41,7 +41,7 @@
         <a-space wrap>
           <a-tag v-for="(status, name) in config.health" :key="name"
             :color="status === 'ok' ? 'green' : 'red'">
-            {{ name }}: {{ status === 'ok' ? '正常' : status }}
+            {{ name }}: {{ status === 'ok' ? '正常' : '访问失败（检查网络或代理）' }}
           </a-tag>
         </a-space>
         <div style="margin-top: 16px">
@@ -130,8 +130,12 @@ async function loadConfig() {
       const items = (sd.data?.items as unknown as Record<string, string>) || {}
       useProxy.value = items['image_host_use_proxy'] === 'true'
     } catch { /* defaults to false */ }
-  } catch {
-    message.error('加载图床配置失败')
+  } catch (e: unknown) {
+    // §59.254 附：超时/网络类失败给出可操作指引（代理配错是主因——PT30 实证）
+    const isNetwork = e instanceof Error && /timeout|network|fetch/i.test(e.message)
+    message.error(isNetwork
+      ? '图床访问失败，请检查网络或代理配置'
+      : `加载图床配置失败${e instanceof Error ? `：${e.message}` : ''}`)
   } finally {
     loading.value = false
   }
