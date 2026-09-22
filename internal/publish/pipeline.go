@@ -154,6 +154,13 @@ func (p *Pipeline) SetNotifyService(ns *notification.Service) {
 	p.notifyService = ns
 }
 
+// SetArtifactRuntimeConfig §59.255: 透传给 artifactGenerator（截图五参数运行时化）
+func (p *Pipeline) SetArtifactRuntimeConfig(rc *setting.RuntimeConfig) {
+	if p.artifactGenerator != nil {
+		p.artifactGenerator.SetRuntimeConfig(rc)
+	}
+}
+
 func (p *Pipeline) SetScreenshotConfig(cfg screenshot.Config) {
 	p.screenshotConfig = &cfg
 	p.artifactGenerator = NewPublishArtifactGenerator(&cfg, p.logger)

@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"sync"
 	"context"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/imagehost"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/screenshot"
 	"go.uber.org/zap"
 )
@@ -21,18 +23,84 @@ type PublishArtifactGenerator struct {
 	mediaInfoAnalyzer *MediaInfoAnalyzer
 	imageHostMgr      *imagehost.Manager // §56.17 决策 2: 统一图床管理
 	logger            *zap.Logger
+	// §59.255: 截图引擎参数运行时动态读（改配置即生效免重启——MpvPath/Count/
+	// MinInterval/Quality/Enabled 全五项；RuntimeConfig TTL 30s+PUT 立即失效）
+	runtimeCfg    *setting.RuntimeConfig
+	startupConfig *screenshot.Config // settings 未注入时回落（测试形态）
+	engineMu      sync.RWMutex
+	engineSig     string // 参数指纹（变更才重建 engine）
 }
 
 func NewPublishArtifactGenerator(cfg *screenshot.Config, logger *zap.Logger) *PublishArtifactGenerator {
-	g := &PublishArtifactGenerator{logger: logger}
-	// v0.0.255: MpvPath 为空时不创建 screenshotEngine（screenshot_enabled=false 场景）
-	// 但 MediaInfoAnalyzer/SubtitleDetector 始终创建（不依赖 screenshot 开关）
-	if cfg != nil && cfg.MpvPath != "" {
-		g.screenshotEngine = NewScreenshotEngine(cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, logger)
-	}
+	g := &PublishArtifactGenerator{logger: logger, startupConfig: cfg}
+	g.rebuildEngine(cfg)
 	g.subtitleDetector = NewSubtitleDetector(logger)
 	g.mediaInfoAnalyzer = NewMediaInfoAnalyzer(logger)
 	return g
+}
+
+// SetRuntimeConfig §59.255: 注入 RuntimeConfig——截图五参数运行时化
+func (g *PublishArtifactGenerator) SetRuntimeConfig(rc *setting.RuntimeConfig) {
+	g.runtimeCfg = rc
+}
+
+func (g *PublishArtifactGenerator) currentScreenshotConfig() *screenshot.Config {
+	if g.runtimeCfg == nil {
+		return g.startupConfig
+	}
+	ctx := context.Background()
+	cfg := &screenshot.Config{}
+	if !g.runtimeCfg.GetBool(ctx, setting.KeyScreenshotEnabled) {
+		return cfg // Enabled=false → MpvPath 空 → 不建引擎（MediaInfo 仍提取）
+	}
+	cfg.MpvPath = g.runtimeCfg.GetString(ctx, setting.KeyScreenshotMpvPath)
+	cfg.Count = g.runtimeCfg.GetInt(ctx, setting.KeyScreenshotCount)
+	cfg.MinInterval = g.runtimeCfg.GetInt(ctx, setting.KeyScreenshotMinInterval)
+	cfg.JPEGQuality = g.runtimeCfg.GetInt(ctx, setting.KeyScreenshotJPEGQuality)
+	if cfg.MpvPath == "" {
+		cfg.MpvPath = "mpv"
+	}
+	if cfg.Count == 0 {
+		cfg.Count = 6
+	}
+	return cfg
+}
+
+// screenshotEngineNow 参数指纹变更时重建（幂等）
+func (g *PublishArtifactGenerator) screenshotEngineNow() *ScreenshotEngine {
+	cfg := g.currentScreenshotConfig()
+	sig := fmt.Sprintf("%s|%d|%d|%d", cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality)
+	g.engineMu.RLock()
+	if g.engineSig == sig {
+		e := g.screenshotEngine
+		g.engineMu.RUnlock()
+		return e
+	}
+	g.engineMu.RUnlock()
+	g.engineMu.Lock()
+	defer g.engineMu.Unlock()
+	if g.engineSig == sig {
+		return g.screenshotEngine
+	}
+	var engine *ScreenshotEngine
+	if cfg.MpvPath != "" {
+		engine = NewScreenshotEngine(cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, g.logger)
+	}
+	g.screenshotEngine = engine
+	g.engineSig = sig
+	return engine
+}
+
+func (g *PublishArtifactGenerator) rebuildEngine(cfg *screenshot.Config) {
+	g.engineMu.Lock()
+	defer g.engineMu.Unlock()
+	if cfg != nil && cfg.MpvPath != "" {
+		g.screenshotEngine = NewScreenshotEngine(cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality, g.logger)
+		g.engineSig = fmt.Sprintf("%s|%d|%d|%d", cfg.MpvPath, cfg.Count, cfg.MinInterval, cfg.JPEGQuality)
+	} else {
+		g.screenshotEngine = nil
+		g.engineSig = ""
+	}
 }
 
 // SetImageHostManager §56.17 决策 2: 注入统一图床管理器。
@@ -177,7 +245,8 @@ func uploadWithRetry(parent context.Context,
 }
 
 func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, videoPath string) []string {
-	if g.screenshotEngine == nil || !g.screenshotEngine.Available() {
+	engineProbe := g.screenshotEngineNow()
+	if engineProbe == nil || !engineProbe.Available() {
 		return nil
 	}
 	subtitleSID := 0
@@ -186,7 +255,7 @@ func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, 
 			subtitleSID = sid
 		}
 	}
-	localShots, tmpDir, err := g.screenshotEngine.Capture(ctx, videoPath, subtitleSID)
+	localShots, tmpDir, err := engineProbe.Capture(ctx, videoPath, subtitleSID)
 	if err != nil || len(localShots) == 0 {
 		if tmpDir != "" {
 			_ = os.RemoveAll(tmpDir)

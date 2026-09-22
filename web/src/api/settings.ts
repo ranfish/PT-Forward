@@ -8,7 +8,7 @@ export const settingsApi = {
     return client.get<ApiResponse<Record<string, string>>>('/settings', { params })
   },
   update(key: string, data: { value: string }) {
-    return client.put<ApiResponse<void>>(`/settings/${key}`, data)
+    return client.put<ApiResponse<{ key: string; restart_required?: boolean; value?: string }>>(`/settings/${key}`, data)
   },
   remove(key: string) {
     return client.delete<ApiResponse<void>>(`/settings/${key}`)
