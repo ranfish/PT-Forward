@@ -103,7 +103,7 @@ func V105TitleFormat() TitleFormat {
 		Order: []string{
 			"title", "season", "year", "edition_info",
 			"resolution", "region_code", "platform",
-			"source_type", "specification",
+			"source_type", "specification", "stereo_3d",
 			"hdr", "bit_depth",
 			"video_codec",
 			// §59.175 定案（原文实证）：Atmos 属"对象信息"字段，位于声道数【后】
@@ -150,6 +150,10 @@ func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) s
 		return p.SourceType
 	case "specification":
 		return p.Specification
+	case "stereo_3d":
+		// §59.258: v1.05 规格值域含 HOU/HSBS（qingwapt.md 规格列表）——
+		// Stereo3D 提取已有（§59.197 反驳链），重组输出层此前缺失（243 加勒比海盗4 案）
+		return p.Stereo3D
 	case "medium":
 		return normalizeMedium(composeMedium(p))
 	case "hdr":
@@ -157,9 +161,18 @@ func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) s
 	case "bit_depth":
 		return formatBitDepthForTitle(p)
 	case "video_codec":
-		return codecStyle(VideoTitleForm(p.VideoCodec), composeMedium(p))
+		vc := p.VideoCodec
+		if tf.Separator == "." {
+			vc = VideoTitleForm(vc)
+		}
+		return codecStyle(vc, composeMedium(p))
 	case "audio_codec":
-		return normalizeAudio(AudioTitleForm(p.AudioCodec))
+		// §59.258: title_form 是点分隔资产形态（§59.27 P3）——空格分隔模式
+		// 用 canonical（"DTS-HD MA"），点模式才套 TitleForm（"DTS-HD.MA"）
+		if tf.Separator == "." {
+			return normalizeAudio(AudioTitleForm(p.AudioCodec))
+		}
+		return normalizeAudio(p.AudioCodec)
 	case "audio_full":
 		return composeAudio(p)
 	case "audio_channels":

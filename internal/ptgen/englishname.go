@@ -83,7 +83,9 @@ func IsLatinSegment(seg string) bool {
 	return hasLetter
 }
 
-// NormalizeEnglishName 归一化段（NBSP→空格+罗马数字→ASCII）后 TrimSpace
+// NormalizeEnglishName 归一化段：NBSP→空格 + 罗马数字→ASCII + 全角→半角标点。
+// §59.258 项4 用户定案：英文名标点及短横杠保留，统一归一为半角
+// （：→: －/–/—→- （）→() 全角空格→空格——PTGen 数据全角/en-dash 形态实证）。
 func NormalizeEnglishName(seg string) string {
 	seg = strings.ReplaceAll(seg, "\u00a0", " ")
 	var b strings.Builder
@@ -92,9 +94,26 @@ func NormalizeEnglishName(seg string) string {
 			b.WriteString(repl)
 			continue
 		}
+		if half, ok := fullWidthToHalf[r]; ok {
+			b.WriteRune(half)
+			continue
+		}
 		b.WriteRune(r)
 	}
 	return strings.TrimSpace(b.String())
+}
+
+// fullWidthToHalf 全角/Unicode 变体 → 半角标点（英文名保留标点定案）
+var fullWidthToHalf = map[rune]rune{
+	'：': ':',
+	'－': '-', '–': '-', '—': '-',
+	'（': '(', '）': ')',
+	'　': ' ',
+	'，': ',',
+	'；': ';',
+	'！': '!', '？': '?',
+	'．': '.',
+	'“': '"', '”': '"', '‘': '\'', '\'': '\'',
 }
 
 // ExtractEnglishFromSegments 用户规则：首段英文段→无则首段拉丁段。
