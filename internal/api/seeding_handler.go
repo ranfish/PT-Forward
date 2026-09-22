@@ -354,6 +354,21 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	Success(w, config)
 }
 
+// normalizeRuleIDs 规则 ID 列表归一：JSON 数组（[1,2]）→ 逗号串（"1,2"）——
+// 数组直写 TEXT 列会 500/产生 "1.0" float 形态脏数据；字符串原样。
+func normalizeRuleIDs(v interface{}) interface{} {
+	if arr, ok := v.([]interface{}); ok {
+		parts := make([]string, 0, len(arr))
+		for _, item := range arr {
+			if f, ok := item.(float64); ok {
+				parts = append(parts, fmt.Sprintf("%d", int(f)))
+			}
+		}
+		return strings.Join(parts, ",")
+	}
+	return v
+}
+
 func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request, id uint) {
 	var config model.SeedingClientConfig
 	if err := h.db.First(&config, id).Error; err != nil {
@@ -372,13 +387,13 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 		updates["enabled"] = v
 	}
 	if v, ok := req["deleteRuleIds"]; ok {
-		updates["delete_rule_ids"] = v
+		updates["delete_rule_ids"] = normalizeRuleIDs(v)
 	}
 	if v, ok := req["autoDeleteCron"]; ok {
 		updates["auto_delete_cron"] = v
 	}
 	if v, ok := req["mainDataCron"]; ok {
-		updates["main_data_cron"] = v
+		updates["maindata_cron"] = v
 	}
 	if v, ok := req["diskProtectEnabled"]; ok {
 		updates["disk_protect_enabled"] = v
@@ -444,7 +459,7 @@ func (h *SeedingHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Reque
 		updates["archive_granularity"] = v
 	}
 	if v, ok := req["rejectRuleIds"]; ok {
-		updates["reject_rule_ids"] = v
+		updates["reject_rule_ids"] = normalizeRuleIDs(v)
 	}
 	if v, ok := req["reannounceBefore"]; ok {
 		updates["reannounce_before"] = v
