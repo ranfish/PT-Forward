@@ -215,9 +215,18 @@ func parseMIStreams(text string) []miStream {
 // 针对的是异常高度值——档位下限 400 过滤脏值）。
 func resolutionFromHeightOrWidth(heightStr, widthStr string) string {
 	// 形态学（测试实证 x264_DTSXLL 案）：宽幅裁高（h800×w1920=1080p 容器 2.35:1）
-	// 应按宽度；特殊高画幅（h1080×w1432）应按高度。规则=高度≥1000（满高）用
-	// 高度档，否则回退宽度档（高度档只保留 4320p/2160p/1080p——720p 及以下
-	// 高度语义弱，统一宽度）。
+	// 应按宽度；特殊高画幅（h1080×w1432）应按高度。
+	// §59.261 宽度优先判 4K/8K：2.39:1 变形宽银幕 4K 只裁高不裁宽（3840×1604，
+	// Harry Potter mUHD/Samaritan 案）——高度落 1000-1999 区间被误判 1080p；
+	// 8K scope（7680×3200）同族误判 2160p。宽度是容器恒定量，先判宽度高档。
+	if w := parseMIInt(widthStr); w >= 2800 {
+		if w >= 7600 {
+			return "4320p"
+		}
+		return "2160p"
+	}
+	// 高度≥1000（满高）用高度档（高度档只保留 4320p/2160p/1080p——720p 及以下
+	// 高度语义弱，统一宽度），否则回退宽度档。
 	if h := parseMIInt(heightStr); h >= 1000 {
 		switch {
 		case h >= 4200:
