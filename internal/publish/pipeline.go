@@ -13,6 +13,7 @@ import (
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/event"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
+	"github.com/ranfish/pt-forward/internal/setting"
 	"github.com/ranfish/pt-forward/internal/imagehost"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/model"
@@ -44,6 +45,9 @@ type Pipeline struct {
 	complianceChecker *compliance.Checker
 	metadataFetcher   *metadata.Fetcher
 	imageHostStrategy string
+	// §59.254 附: settings 引用——截图策略运行时动态读（改配置即生效，
+	// 免重启。此前启动快照注入——用户改 local_upload 后不生效 PT30 实证）
+	settingsRepo *setting.Repository
 	imageHostMgr      *imagehost.Manager
 	pusher            *pusher.Pusher // §56.30: 发布后自动加种
 	wsBroadcaster     event.WSBroadcaster
@@ -100,6 +104,11 @@ func (p *Pipeline) SetImageHostStrategy(strategy string) {
 	if strategy != "" {
 		p.imageHostStrategy = strategy
 	}
+}
+
+// SetSettingsRepository §59.254 附: 注入 settings 仓库（运行时动态读策略）
+func (p *Pipeline) SetSettingsRepository(repo *setting.Repository) {
+	p.settingsRepo = repo
 }
 
 func (p *Pipeline) SetWSBroadcaster(b event.WSBroadcaster) {
@@ -911,10 +920,18 @@ func (p *Pipeline) ApplyScreenshotStrategy(ctx context.Context, name, savePath s
 		// §59.53 第6点: 远程只转存（白名单逐张判定），无图留空——不截图
 		return p.artifactGenerator.ProcessScreenshotsRemote(sourceScreenshots)
 	}
-	// §59.250: 策略参数化——读注入值（imageHostStrategy——用户四策略配置；
-	// 空值默认 auto 兼容）。此前硬编码 "auto" 致"始终本地截图"等配置在
-	// 采集链（批量/单条获取）不生效。
-	strategy := p.imageHostStrategy
+	// §59.250: 策略参数化；§59.254 附升级：**运行时动态读** settings
+	// （改配置即生效免重启——启动快照注入 PT30 不生效实证）。DB 读毫秒级
+	// 每获取一次可接受；settingsRepo 缺失（测试形态）回落启动注入值。
+	strategy := ""
+	if p.settingsRepo != nil {
+		if v, err := p.settingsRepo.Get(ctx, setting.KeyImageHostStrategy); err == nil && v != "" {
+			strategy = v
+		}
+	}
+	if strategy == "" {
+		strategy = p.imageHostStrategy // 回落：启动快照（settings 未注入时）
+	}
 	if strategy == "" {
 		strategy = "auto"
 	}
