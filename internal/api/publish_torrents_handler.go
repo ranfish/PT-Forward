@@ -2520,10 +2520,23 @@ fetched:
 				"region_code":     profile.RegionCode,
 			}
 
-			if h.declFilter != nil && finalMeta.Description != "" {
+			// §59.265 附: statement 列同步过滤——站点固定资源声明在声明列（Tab2
+			// 海报与声明），此前只滤 description 列导致批量/单种重获均不剥（243
+			// 四种子案）。先滤后接致谢（thanks-append 基线用净化后值）；
+			// NOGROUP 分支也落库（否则原始声明残留）。
+			if h.declFilter != nil {
 				patterns := h.declFilter.GetPatterns(ctx)
-				fr := h.declFilter.Filter(finalMeta.Description, patterns)
-				updates["description"] = fr.CleanedText
+				if finalMeta.Description != "" {
+					fr := h.declFilter.Filter(finalMeta.Description, patterns)
+					updates["description"] = fr.CleanedText
+				}
+				if finalMeta.Statement != "" {
+					fs := h.declFilter.Filter(finalMeta.Statement, patterns)
+					finalMeta.Statement = fs.CleanedText
+					if profile.ReleaseGroup == "" || profile.ReleaseGroup == "NOGROUP" {
+						updates["statement"] = finalMeta.Statement
+					}
+				}
 			}
 
 			// §59.27: flags 以本次 detail 为准（detail_source_json.flags 是新提取值，
