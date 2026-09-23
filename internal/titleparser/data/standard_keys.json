@@ -274,7 +274,8 @@
       "aliases": [
         "X264",
         "x.264"
-      ]
+      ],
+      "fold_to": "video.h264"
     },
     {
       "category": "video_codec",
@@ -292,7 +293,8 @@
       "aliases": [
         "X265",
         "x.265"
-      ]
+      ],
+      "fold_to": "video.h265"
     },
     {
       "category": "video_codec",

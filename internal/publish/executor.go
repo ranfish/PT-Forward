@@ -645,14 +645,10 @@ func (e *PublishExecutor) codecMappingOf(cfg *model.PublishFormConfig, videoCode
 	if m := e.lookupByStdKey(cfg, model.FieldDomainCodec, stdKey); m != nil {
 		return m
 	}
-	switch stdKey {
-	case "video.x264":
-		stdKey = "video.h264"
-	case "video.x265":
-		stdKey = "video.h265"
-	}
-	if m := e.lookupByStdKey(cfg, model.FieldDomainCodec, stdKey); m != nil {
-		return m
+	if folded := titleparser.FoldStandardKey("video_codec", stdKey); folded != stdKey {
+		if m := e.lookupByStdKey(cfg, model.FieldDomainCodec, folded); m != nil {
+			return m
+		}
 	}
 	return e.lookupByStdKey(cfg, model.FieldDomainCodec, "video.other")
 }
