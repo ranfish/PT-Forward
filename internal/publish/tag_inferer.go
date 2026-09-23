@@ -322,7 +322,7 @@ func dedupTags(tags []string) []string {
 func inferHDRTagsFromMI(s titleparser.MISections, tags []string) []string {
 	hdrFamily := map[string]bool{
 		"dolby_vision": true, "hdr10": true, "hdr10_plus": true,
-		"vivid_hdr": true, "hlg": true, "pq10": true,
+		"hdr_vivid": true, "vivid_hdr": true, "hlg": true, "pq10": true,
 	}
 	out := tags[:0]
 	for _, t := range tags {
@@ -358,7 +358,9 @@ func inferHDRTagsFromMI(s titleparser.MISections, tags []string) []string {
 		out = append(out, "hdr10")
 	}
 	if hasVivid {
-		out = append(out, "vivid_hdr")
+		// §59.267: 产出 dict canonical 键 hdr_vivid（vivid_hdr 旧形态无 dict 条目，
+		// Tab1 ③标签显示原文代码——243 莫离 HDR.Vivid 案）
+		out = append(out, "hdr_vivid")
 	}
 	if hasHLG {
 		out = append(out, "hlg")
