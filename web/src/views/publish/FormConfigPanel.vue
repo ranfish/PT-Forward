@@ -88,6 +88,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import { sitesApi } from '@/api/sites'
 import { formConfigApi, type FormConfigDiffItem, type PublishFormConfig } from '@/api/formConfig'
 
@@ -164,6 +165,10 @@ async function doParse() {
     diffs.value = res.data?.data?.diffs ?? []
     merged.value = res.data?.data?.merged ?? null
     html.value = '' // 即弃
+  } catch (e: any) {
+    // §59.270: 解析失败必须可见（此前无 catch——422/5xx/超时全部静默吞掉，
+    // "没反应+原文框不清空"形态；常见 422=粘贴的非发布表单页/登录页源码）
+    message.error('解析失败：' + (e?.response?.data?.error || e?.response?.data?.message || e?.message || '未知错误'))
   } finally {
     parsing.value = false
   }
@@ -172,10 +177,14 @@ async function doParse() {
 async function doApply() {
   if (!merged.value) return
   if (!props.siteName) return
-  await formConfigApi.apply(props.siteName, merged.value, 'HTML 上传 diff 确认')
-  await loadCurrent()
-  diffs.value = null
-  merged.value = null
+  try {
+    await formConfigApi.apply(props.siteName, merged.value, 'HTML 上传 diff 确认')
+    await loadCurrent()
+    diffs.value = null
+    merged.value = null
+  } catch (e: any) {
+    message.error('落库失败：' + (e?.response?.data?.error || e?.response?.data?.message || e?.message || '未知错误'))
+  }
 }
 
 const mergedSummary = computed(() => {
