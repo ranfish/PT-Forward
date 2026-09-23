@@ -175,6 +175,16 @@ func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 		return nil, httpError(fmtES("HTTP %d", resp.StatusCode), nil)
 	}
 
+	// §59.263: 凭证拦截页检测——302 自动跟随后终点为 take2fa/login（NexusPHP
+	// 二验/登录重定向，hddolby take2fa.php 实证），返回 200 但内容为验证页。
+	// 不识别则空解析"静默成功"，选站降级链永不触发（243 南部档案 DV 案）。
+	if resp.Request != nil && resp.Request.URL != nil {
+		finalPath := strings.ToLower(resp.Request.URL.Path)
+		if strings.Contains(finalPath, "take2fa") || strings.Contains(finalPath, "login") {
+			return nil, authError(fmtES("站点要求二次验证或登录（凭证被拦截，请更新 cookie）: %s", resp.Request.URL.Path), nil)
+		}
+	}
+
 	body, err := readBody(resp)
 	if err != nil {
 		return nil, err
@@ -238,6 +248,12 @@ func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 	}
 
 	detail.Tags = extractTags(html)
+
+	// §59.263: 空解析守卫（防御纵深）——三类核心字段全空说明页面不是详情页
+	// （未知形态拦截页/结构变化），显式报错而非静默成功，保住调用方降级链。
+	if detail.Title == "" && detail.Description == "" && detail.InfoHash == "" {
+		return nil, parseError("详情页解析为空（拦截页或页面结构变化）", nil)
+	}
 
 	detail.Category = NormalizeCategory(detail.Category)
 
