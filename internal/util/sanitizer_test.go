@@ -93,3 +93,19 @@ func containsSubstr(s, substr string) bool {
 	}
 	return false
 }
+
+// §59.262: 时间量词字符集补"月"——PT地带 50% 促销 51 天倒计时形态"1月21天"
+// （NexusPHP >30 天促销渲染为 N月M天），QHstudIo 243 案族三失配致标题尾巴残留。
+func TestStripSiteOperationMarkers_MonthTimeTail(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"The First Jasmine 2026 S01E17-E18 1080p WEB-DL HEVC AAC-QHstudIo    [50%] 剩余时间：1月21天",
+			"The First Jasmine 2026 S01E17-E18 1080p WEB-DL HEVC AAC-QHstudIo"},
+		{"Some Title 2020 1080p BluRay x264-GRP 剩余时间：2月", "Some Title 2020 1080p BluRay x264-GRP"},
+		{"Some Title 2020 1080p BluRay x264-GRP [免费] 剩余时间：10天5时", "Some Title 2020 1080p BluRay x264-GRP"},
+	}
+	for _, tc := range cases {
+		if got := StripSiteOperationMarkers(tc.in); got != tc.want {
+			t.Errorf("in=%q got=%q want=%q", tc.in, got, tc.want)
+		}
+	}
+}
