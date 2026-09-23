@@ -27,6 +27,11 @@ var defaultDeclarationPatterns = []string{
 	"By CSAUTO",
 	"By FWAUTO",
 	".Release.Info",
+	// §59.265: 站点固定资源声明整块剥除（quote 块短锚——按内容子串整块删）。
+	// 包子 BaoziPT（头行"BaoziPT · 资源声明"精确锚）；农场头行存在空格变体
+	// （"自由农场␣␣-␣资源声明"双空格实证）——用站名锚免疫排版漂移。
+	"BaoziPT · 资源声明",
+	"自由农场",
 }
 
 var quoteBlockRe = regexp.MustCompile(`(?s)\[quote\](.*?)\[/quote\]`)
