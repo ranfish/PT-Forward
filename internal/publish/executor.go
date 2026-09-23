@@ -271,7 +271,7 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	jobs := []domainJob{
 		{model.FieldDomainType, e.lookupByStdKey(cfg, model.FieldDomainType, meta.Category)},
 		{model.FieldDomainStandard, e.lookupByStdKey(cfg, model.FieldDomainStandard, extract.LookupStandardKey("resolution", tp.Resolution))},
-		{model.FieldDomainCodec, e.lookupByStdKey(cfg, model.FieldDomainCodec, extract.LookupStandardKey("video_codec", tp.VideoCodec))},
+		{model.FieldDomainCodec, e.codecMappingOf(cfg, tp.VideoCodec)},
 		{model.FieldDomainAudiocodec, e.audioMappingOf(cfg, tp.AudioCodec, tp.AudioTechnology)},
 		{model.FieldDomainMedium, e.mediumMappingOf(cfg, tp)},
 		{model.FieldDomainTeam, e.teamMapping(cfg, meta)},
@@ -633,6 +633,28 @@ func (e *PublishExecutor) lookupByStdKey(cfg *model.PublishFormConfig, domain, s
 		}
 	}
 	return nil
+}
+
+// codecMappingOf §59.268: 视频编码域映射——miss 折叠兜底。
+// 编码器实现归标准（x264→H.264 / x265→H.265——站方表单普遍只有标准名选项；
+// 修道院 224/288 未选案实证：x264×216+x265×6+AV1×2，BluRay/WEB-DL x264 通杀）。
+// 无对应标准的新编码（AV1/VVC/AVS2）→ Other 兜底（站方无 Other 选项时维持
+// nil 不强填）。
+func (e *PublishExecutor) codecMappingOf(cfg *model.PublishFormConfig, videoCodec string) *model.FormValueMapping {
+	stdKey := extract.LookupStandardKey("video_codec", videoCodec)
+	if m := e.lookupByStdKey(cfg, model.FieldDomainCodec, stdKey); m != nil {
+		return m
+	}
+	switch stdKey {
+	case "video.x264":
+		stdKey = "video.h264"
+	case "video.x265":
+		stdKey = "video.h265"
+	}
+	if m := e.lookupByStdKey(cfg, model.FieldDomainCodec, stdKey); m != nil {
+		return m
+	}
+	return e.lookupByStdKey(cfg, model.FieldDomainCodec, "video.other")
 }
 
 // audioMappingOf §59.166 A 层：TechProfile 源音频映射。
