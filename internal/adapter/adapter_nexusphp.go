@@ -196,6 +196,10 @@ func (a *NexusPHPAdapter) GetTorrentDetail(ctx context.Context, config *model.Si
 	if err != nil || detail == nil {
 		return detail, err
 	}
+	// §59.266: 解析真空双守卫（公共化三防线——Engine/legacy/OpenCD 全路径收口）
+	if err := CheckDetailVacuum(detail); err != nil {
+		return nil, err
+	}
 	if strings.Contains(config.Domain, "keepfrds") {
 		a.enrichKeepfrdsTransferFlags(ctx, config, torrentID, detail)
 	}
@@ -340,6 +344,12 @@ func (a *NexusPHPAdapter) fetchDetailsHTML(ctx context.Context, config *model.Si
 
 	if resp.StatusCode != http.StatusOK {
 		return "", httpError(fmtES("HTTP %d", resp.StatusCode), nil)
+	}
+
+	// §59.266: 凭证拦截重定向检测（公共化三防线——不可杜 take2fa/异地登录案
+	// 修复落错适配器教训：守卫必须在真实服务的适配器层生效）
+	if err := CheckCredentialRedirect(resp); err != nil {
+		return "", err
 	}
 
 	body, err := readBody(resp)
