@@ -1,6 +1,10 @@
 package publish
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/ranfish/pt-forward/internal/titleparser"
+)
 
 
 // §59.69: 高码/高帧推导（用户五判据定案）
@@ -267,6 +271,33 @@ func TestInferLangAudioCompletion(t *testing.T) {
 		for _, g := range got { if g == c.want { found = true } }
 		if found != (c.want != "") {
 			t.Errorf("%s: want %q found=%v got=%v", c.name, c.want, found, got)
+		}
+	}
+}
+
+// §59.267: HDR Vivid 产出 dict canonical 键 hdr_vivid（vivid_hdr 无 dict 条目显示代码案）
+func TestInferHDRTagsFromMI_VividCanonical(t *testing.T) {
+	s := titleparser.MISections{Videos: []map[string]string{
+		{"hdr format": "HDR Vivid, SMPTE ST 2086, HDR10 compatible"},
+	}}
+	got := inferHDRTagsFromMI(s, nil)
+	found := false
+	for _, tag := range got {
+		if tag == "hdr_vivid" {
+			found = true
+		}
+		if tag == "vivid_hdr" {
+			t.Error("不应再产出旧键 vivid_hdr（dict 无条目——Tab1 显示代码根因）")
+		}
+	}
+	if !found {
+		t.Errorf("应产出 canonical 键 hdr_vivid，实际: %v", got)
+	}
+	// 旧形态输入（文本源残留 vivid_hdr）应被族过滤剔除，产出 canonical
+	got2 := inferHDRTagsFromMI(s, []string{"vivid_hdr"})
+	for _, tag := range got2 {
+		if tag == "vivid_hdr" {
+			t.Error("旧键输入应被 hdrFamily 过滤剔除")
 		}
 	}
 }
