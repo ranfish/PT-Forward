@@ -62,3 +62,22 @@ func contains(s, sub string) bool { return len(s) >= len(sub) && (func() bool {
 	}
 	return false
 })() }
+
+// §59.264: 结构真空守卫——异地登录提醒页（200 直出、<title> 有值、无结构字段）
+func TestGetTorrentDetail_InterstitialTitleOnly(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("<html><head><title>异地登录提醒！</title></head><body>您的账号在异地登录</body></html>"))
+	}))
+	defer srv.Close()
+
+	a := newGenericFor2FA(t)
+	cfg := &model.SiteConfig{Domain: srv.URL, Cookie: "c=1",
+		SiteDefault: model.SiteDefault{Paths: model.SitePathsConfig{Detail: "details.php?id={id}"}}}
+	_, err := a.GetTorrentDetail(context.Background(), cfg, "1")
+	if err == nil {
+		t.Fatal("title-only 拦截页应报 authError，实际 nil（垃圾行落库根因）")
+	}
+	if !strings.Contains(err.Error(), "凭证拦截") {
+		t.Errorf("错误应指向凭证拦截: %v", err)
+	}
+}
