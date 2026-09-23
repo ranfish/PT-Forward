@@ -129,6 +129,15 @@ func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 		draft.FormFields[model.FieldDomainTags] = fieldName
 		draft.ValueMappings[model.FieldDomainTags] = tags
 		seenDomains[model.FieldDomainTags] = true
+		// §59.269: 标签控件形态 → 提交模式（上传页表单结构事实派生——导入即
+		// 完整配置。tags[4][]/span[] 数组形态=checkbox_span；修道院案根因：
+		// 导入不产 TagConfig → executor 默认 taglist → 字段名硬编码 tagList
+		// → 标签全丢）
+		mode := model.TagModeTaglist
+		if strings.Contains(fieldName, "[") {
+			mode = model.TagModeCheckboxSpan
+		}
+		draft.TagConfig = &model.SiteTagConfig{Mode: mode, Tags: map[string]string{}}
 	}
 
 	// 文本域存在性（名称记录——供 diff 检测改版）

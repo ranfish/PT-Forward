@@ -295,6 +295,15 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	if cfg.TagConfig != nil && cfg.TagConfig.Mode != "" {
 		tagCfg.Mode = cfg.TagConfig.Mode
+	} else if fieldName := cfg.FormFields[model.FieldDomainTags]; strings.Contains(fieldName, "[") {
+		// §59.269 兜底: TagConfig 缺失但字段名是数组形态（tags[4][]）→ 推断
+		// checkbox_span（推断源=显式 FormFields 数据派生；空配置现状=默认
+		// taglist → 字段名硬编码 tagList → 标签全丢，兜底严格更好）
+		tagCfg.Mode = model.TagModeCheckboxSpan
+		if e.logger != nil {
+			e.logger.Info("tag config missing, inferred checkbox_span from field name",
+				zap.String("field", fieldName))
+		}
 	}
 	// Tags map 从 ValueMappings 构造（双形态键——standard_key + canonical）
 	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {

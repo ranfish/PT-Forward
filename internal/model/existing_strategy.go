@@ -18,6 +18,10 @@ type EditRequest struct {
 	Referer    string            `json:"-"`  // Referer URL
 	BaseURL    string            `json:"-"`  // §56.23: 目标站 base URL
 	APIKey     string            `json:"-"`  // §56.23: API 站认证 key
+
+	// ArrayFields §59.269: 同名多值字段回放（checkbox 数组——缺失即清空勾选，
+	// 编辑工具必须原样携带 GetEditForm 采集值）
+	ArrayFields []TagKV `json:"array_fields,omitempty"`
 }
 
 // ParseExistingStrategy 解析策略字符串，无效值返回默认 skip。

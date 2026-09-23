@@ -89,6 +89,20 @@ func (a *NexusPHPAdapter) GetEditForm(ctx context.Context, config *model.SiteCon
 		}
 	})
 
+	// §59.269: checkbox:checked / radio:checked 采集 → ArrayFields（同名多值——
+	// tags[4][] 等 checkbox 数组缺失提交=清空勾选，必须原样回放）
+	doc.Find("input[type='checkbox']:checked, input[type='radio']:checked").Each(func(_ int, s *goquery.Selection) {
+		name, ok := s.Attr("name")
+		if !ok || name == "" {
+			return
+		}
+		v, _ := s.Attr("value")
+		if v == "" {
+			v = "on"
+		}
+		form.ArrayFields = append(form.ArrayFields, model.TagKV{Key: name, Value: v})
+	})
+
 	// small_descr（副标题）
 	if s := doc.Find("input[name='small_descr']").First(); s.Length() > 0 {
 		if v, ok := s.Attr("value"); ok {
@@ -115,6 +129,10 @@ func (a *NexusPHPAdapter) SubmitEdit(ctx context.Context, req *model.EditRequest
 	form.Set("id", req.TorrentID)
 	for k, v := range req.FormFields {
 		form.Set(k, v)
+	}
+	// §59.269: 同名多值字段回放（Add 非 Set——checkbox 数组重复键语义）
+	for _, kv := range req.ArrayFields {
+		form.Add(kv.Key, kv.Value)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", takeEditURL, strings.NewReader(form.Encode()))

@@ -229,6 +229,10 @@ type EditForm struct {
 	Fields       map[string]string `json:"fields"`
 	Category     string            `json:"category,omitempty"`      // §56.23: 现有分类
 	ExistingDesc string            `json:"existing_desc,omitempty"` // §56.23: 现有描述（与 Description 同义，冗余但清晰）
+
+	// ArrayFields §59.269: 同名多值字段（checkbox 数组 tags[4][] 等——
+	// map 无法承载重复键）。GetEditForm 采集已勾选项，SubmitEdit 原样回放。
+	ArrayFields []TagKV `json:"array_fields,omitempty"`
 }
 
 type PublishDedupResult struct {
