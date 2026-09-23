@@ -255,6 +255,15 @@ func (a *GenericAdapter) GetTorrentDetail(ctx context.Context, config *model.Sit
 		return nil, parseError("详情页解析为空（拦截页或页面结构变化）", nil)
 	}
 
+	// §59.264: 结构真空守卫——title 解析有值但结构字段全空（desc/infohash/
+	// category/subtitle）。凭证拦截页族变体（hddolby 异地登录提醒页：200 直出
+	// 无重定向、<title> 有值）绕过 URL 检测与空解析守卫；真详情页必有结构
+	// 字段至少其一。泛化判据不追站点措辞，未来新变体同层覆盖。
+	if detail.Title != "" && detail.Description == "" && detail.InfoHash == "" &&
+		detail.Category == "" && detail.Subtitle == "" {
+		return nil, authError(fmtES("页面无详情结构（疑似凭证拦截/提醒页）: %s", detail.Title), nil)
+	}
+
 	detail.Category = NormalizeCategory(detail.Category)
 
 	// 从结构化字段提取禁转标记（标题/副标题/标签）
