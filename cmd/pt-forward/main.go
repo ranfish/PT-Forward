@@ -103,6 +103,14 @@ func main() {
 	log = reconfigureLogger(cfg.Log, logBroadcaster)
 	defer func() { _ = log.Sync() }()
 
+	// §59.279: pprof 诊断基建（config debug.pprof 开关——容器内 localhost:6060；
+	// docker exec <容器> curl localhost:6060/debug/pprof/goroutine?debug=1 即得全协程栈）
+	if cfg.Debug.Pprof {
+		go func() {
+			_ = http.ListenAndServe("localhost:6060", nil)
+		}()
+	}
+
 	db, err := initDB(cfg, log, context.Background())
 	if err != nil {
 		log.Error("failed to init database", zap.Error(err))

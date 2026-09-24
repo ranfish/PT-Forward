@@ -13,6 +13,14 @@ type Config struct {
 	Log      model.LogConfig      `yaml:"log" mapstructure:"log"`
 	Security model.SecurityConfig `yaml:"security" mapstructure:"security"`
 	Memory   model.MemoryConfig   `yaml:"memory" mapstructure:"memory"`
+	Debug    DebugConfig          `yaml:"debug" mapstructure:"debug"`
+}
+
+// DebugConfig §59.279: 诊断基建开关（默认全关——生产按需开启）。
+type DebugConfig struct {
+	// Pprof: 容器内 localhost:6060 /debug/pprof（协程栈/dump——pt29 批量获取
+	// 卡死案的盲诊代价：无 pprof 只能 wchan/strace 侧写。docker exec curl 即用）
+	Pprof bool `yaml:"pprof" mapstructure:"pprof"`
 }
 
 func (c *Config) Validate() error {
