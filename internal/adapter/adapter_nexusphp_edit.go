@@ -143,27 +143,29 @@ func (a *NexusPHPAdapter) SubmitEdit(ctx context.Context, req *model.EditRequest
 	httpReq.Header.Set("Referer", req.Referer)
 	setCommonHeaders(httpReq, req.Cookie)
 
-	resp, err := a.doer.Client.Do(httpReq)
+	// §59.271: 禁止自动跟随重定向——成功判定必须看首响应（302=成功）。
+	// 此前跟随到 details 页（200）后在正文 grep "失败/error/权限"，而站点
+	// slogan/简介声明常含这些词 → 编辑已生效却误报失败（修道院 1898 案：
+	// 报错但 codec 实际已落库）。
+	noRedirect := *a.doer.Client
+	noRedirect.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := noRedirect.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("submit edit: %w", err)
 	}
 	defer func() { drainBody(resp) }()
 
-	// 302/301 重定向 = 成功
+	// 302/301 重定向 = 成功（NexusPHP takeedit 标准行为）
 	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
 		return nil
 	}
 
-	// 200 = 可能有错误信息
+	// 200 = 真·错误页（站方 stderr 模板——含真实原因如"有项目没有填写"）
 	if resp.StatusCode == http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		bodyStr := string(body)
-		// 检查常见错误
-		if strings.Contains(bodyStr, "失败") || strings.Contains(bodyStr, "error") || strings.Contains(bodyStr, "权限") {
-			return fmt.Errorf("edit failed: %s", extractErrorMessage(bodyStr))
-		}
-		// 有些站点 200 也是成功（无重定向）
-		return nil
+		return fmt.Errorf("edit failed: %s", extractErrorMessage(string(body)))
 	}
 
 	return fmt.Errorf("unexpected status %d from takeedit", resp.StatusCode)

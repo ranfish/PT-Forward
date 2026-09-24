@@ -155,6 +155,10 @@ func main() {
 				Referer:    *baseURL + "/edit.php?id=" + tid,
 				ArrayFields: form.ArrayFields,
 			}
+			// §59.271: descr 必须回填——GetEditForm 存 form.Description 不入
+			// Fields，缺省提交="有项目没有填写"被拒（修道院实锤）；text/hidden/
+			// radio 均经 Fields/ArrayFields 原样回放
+			req.FormFields["descr"] = form.Description
 			req.FormFields["codec_sel[4]"] = target
 			// tags 数组：保留现有 + 追加目标（去重）
 			seen := map[string]bool{}
