@@ -51,6 +51,14 @@ func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
 			if tf.Separator == "." {
 				val = strings.ReplaceAll(val, " ", ".")
 			}
+			// §59.274: 相邻槽终态去重护栏——相邻两槽输出完全相等（EqualFold）
+			// 时折叠。v1.05 语法中相邻同 token 永不合法（跨槽重复族三次复发：
+			// WEB×WEB-DL §59.257 / platform×medium §59.273 / ST×SPEC §59.273
+			// 附——逐对修不可持续，终态护栏兜未知组合）。组名除外（group 走
+				// 连接符分支不经此）。
+			if len(parts) > 0 && strings.EqualFold(parts[len(parts)-1], val) {
+				continue
+			}
 			parts = append(parts, val)
 		}
 	}
@@ -152,6 +160,13 @@ func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) s
 		// §59.226 附六 ST="WEB" 是 medium/canonical 层语义（识别 WEB 语境），
 		// 标题输出层与规格 WEB-DL/WEBRip 同现即重复（"WEB WEB-DL" 243 实证）
 		if p.SourceType == "WEB" && (p.Specification == "WEB-DL" || p.Specification == "WEBRip") {
+			return ""
+		}
+		// §59.273 附: ST==SPEC 同值去重（V105TitleFormat 17 字段序含 source_type
+		// 与 specification 双独立槽——ST=HDTV×SPEC=HDTV 双发 "HDTV HDTV"；
+		// BTV Vortex/EBCTV Mr.Vampire 案。specification 槽为规格语义权威，
+		// source_type 槽让位）
+		if p.Specification != "" && strings.EqualFold(p.SourceType, p.Specification) {
 			return ""
 		}
 		return p.SourceType

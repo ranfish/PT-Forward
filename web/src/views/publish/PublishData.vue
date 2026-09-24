@@ -80,8 +80,10 @@
           :row-selection="{
             selectedRowKeys: selectedInjectHashes,
             onChange: onSelectionChange,
+            // §59.274: 未审核行禁选（观察期同列）——审核门前置到选种层，
+            // 已审核才可进批次（用户定案：选不上优于发布时报错）
             getCheckboxProps: (record: SeedListItem) => ({
-              disabled: !isValidHash(record.hash),
+              disabled: !isValidHash(record.hash) || !record.reviewed,
             }),
           }"
           @change="onInjectTableChange"
@@ -91,6 +93,7 @@
               <div class="cluster-name">
                 {{ record.name }}
                 <a-tag v-if="!isValidHash(record.hash)" color="default" style="margin-left: 4px">观察期</a-tag>
+                <a-tag v-if="!record.reviewed" color="red" style="margin-left: 4px">未审核</a-tag>
               </div>
               <div v-if="record.title && record.title !== record.name" class="cluster-title">{{ record.title }}</div>
             </template>
