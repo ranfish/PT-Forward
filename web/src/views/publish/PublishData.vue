@@ -53,6 +53,17 @@
           <a-button style="margin-left: 10px" @click="pickerOpen = true">
             {{ selectedTarget ? `目标站：${selectedTarget} ▾` : '选择发布站' }}
           </a-button>
+          <!-- §59.276: 页面级发布按钮——选站后筛可发布选种直接发布（保留站选择，
+               省去重开弹窗；弹窗发布按钮保留双入口） -->
+          <a-button
+            type="primary"
+            style="margin-left: 8px"
+            :disabled="!selectedTarget || !selectedInjectHashes.length || selectedInjectHashes.length > 100 || pickerSiteBusy"
+            :loading="batchSubmitting"
+            @click="submitBatch(true)"
+          >
+            发布{{ selectedTarget ? `到 ${selectedTarget}` : '' }}（{{ selectedInjectHashes.length }} 簇）
+          </a-button>
         </div>
 
         <a-alert
@@ -299,7 +310,7 @@ function statusColor(st: string): string {
   return STATUS_META[st]?.color || 'default'
 }
 
-async function submitBatch() {
+async function submitBatch(keepTarget = false) {
   if (!selectedTarget.value || !selectedInjectHashes.value.length) return
   const valid = selectedInjectHashes.value.filter(isValidHash)
   if (!valid.length) {
@@ -317,8 +328,14 @@ async function submitBatch() {
       batchTask.value = { task_id: tid, target_site: selectedTarget.value, total: res.data?.data?.total || selectedInjectHashes.value.length, done: 0, results: [], finished: false, started_at: new Date().toISOString() }
       selectedInjectHashes.value = []
       // §59.166 弹窗进度态：发布后弹窗不关（进度→汇总→[完成]手动关闭）
-      selectedTarget.value = undefined
-      pickerValue.value = ''
+      // §59.276: keepTarget（页面级发布按钮）保留站选择——连续批次免重选站；
+      // 弹窗发布维持原清站行为
+      if (!keepTarget) {
+        selectedTarget.value = undefined
+        pickerValue.value = ''
+      } else {
+        pickerOpen.value = true // 进度态复用弹窗展示
+      }
       schedulePoll(tid)
     }
   } catch (err) {
@@ -447,6 +464,12 @@ let injectSearchTimer: ReturnType<typeof setTimeout> | undefined
 watch(injectSearch, () => {
   if (injectSearchTimer) clearTimeout(injectSearchTimer)
   injectSearchTimer = setTimeout(() => onInjectFilterChange(), 400)
+})
+
+// §59.276: 批量完成自动刷新列表——已发种即时出清"可发布"（此前须手动
+// 切"已发布"再切回"可发布"刷新——三步舞根因）
+watch(() => batchTask.value?.finished, (fin) => {
+  if (fin) fetchInjectList()
 })
 
 // 换目标站联动（§59.166 用户定案）：选站→切"可发布"；清站→回"全部"
