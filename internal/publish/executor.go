@@ -292,6 +292,11 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// 副标题带硬字幕/中英字幕说明时仍须选中字；The Furious/I Know Who You
 	// Are 八案。站点特化——统一方法待其它站适配时再议，用户定案）
 	tags = luckptChineseSubtitleHeuristic(in.TargetSite, meta, tags)
+	// §59.278: HDR 标签标题对齐——组装标题的 HDR token（tp.HDR 标题/DOM 源）
+	// 与标签勾选一致（幸运种审判据"标题包含 HDR10→勾 HDR10 标签"）。MI 缺
+	// HDR 行时推断器（§59.151 MI 唯一真相）不产 HDR 族标签——标题/DOM 源
+	// 证据补位；站方无对应标签选项时 applier 自然丢弃（跨站安全）。
+	tags = syncHDRTagFromProfile(tp.HDR, tags)
 	tagCfg := &model.SiteTagConfig{
 		Mode:     model.TagModeTaglist,
 		Tags:     map[string]string{},
@@ -671,10 +676,10 @@ func (e *PublishExecutor) lookupByStdKey(cfg *model.PublishFormConfig, domain, s
 	return nil
 }
 
-// luckptChineseSubtitleHeuristic §59.273: 幸运中字启发式补标。
-// 判据（站方种审行为反推——用户定案）：产地 ∈ {中国大陆, 中国香港, 中国台湾}
-// 且副标题含 硬字幕/中英字幕 → 补 chinese_subtitle（MI 无中文字幕轨也补——
-// 硬字幕内嵌不体现为字幕轨）。
+// luckptChineseSubtitleHeuristic §59.273→§59.278 终版: 幸运中字启发式补标。
+// 判据（用户定案演进）：§59.273 华语区产地门 → §59.278 硬字幕无条件化 →
+// 终版产地忽略——副标题含 中字/中英字幕/硬字幕 任一即补 chinese_subtitle
+// （MI 无中文字幕轨也补——硬字幕内嵌不体现为字幕轨）；"无中字"否定式剥除。
 func luckptChineseSubtitleHeuristic(siteName string, meta *model.TorrentMetadata, tags []string) []string {
 	if siteName != "幸运" || meta == nil {
 		return tags
@@ -684,18 +689,53 @@ func luckptChineseSubtitleHeuristic(siteName string, meta *model.TorrentMetadata
 			return tags
 		}
 	}
-	subtitle := meta.Subtitle
-	if !strings.Contains(subtitle, "硬字幕") && !strings.Contains(subtitle, "中英字幕") {
+	// §59.278 终版（用户定案：产地忽略）——副标题含 中字/中英字幕/硬字幕/
+	// 特效字幕/特效中字/简繁/简中/繁中/简体/繁体 任一即推断中字（PT 语境
+	// 发布者声明的特效字幕默认中文——§59.151 保守假设零案例支撑被推翻；
+	// 简繁族=中文字形变体描述。裸"特效"不命中——§59.73 防误判保持）。
+	// "无中字"先剥除（§59.277 Deep Water 案语义：否定式声明不得误配 中字 子串）。
+	sub := strings.ReplaceAll(meta.Subtitle, "无中字", "")
+	for _, kw := range []string{"中字", "中英字幕", "硬字幕", "特效字幕", "特效中字", "简繁", "简中", "繁中", "简体", "繁体"} {
+		if strings.Contains(sub, kw) {
+			return append(tags, "chinese_subtitle")
+		}
+	}
+	return tags
+}
+
+// syncHDRTagFromProfile §59.278: HDR 标签与组装标题 HDR token 对齐。
+// tp.HDR（标题/DOM 源——重组 hdr 槽数据源）非空而 MI 推断未产 HDR 族标签时
+// 补位（十三猎杀案：标题 HDR10 重组输出含 HDR10，MI 无 HDR 行标签缺失——
+// 幸运种审判据"标题包含 HDR10→勾 HDR10"）。已有 HDR 族标签（MI 铁证优先）
+// 不覆盖；站方无对应选项时 applier 自然丢弃（跨站安全）。
+func syncHDRTagFromProfile(hdr string, tags []string) []string {
+	if hdr == "" || hdr == "SDR" {
 		return tags
 	}
-	region := ""
-	if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
-		region = strings.Join(src.Region, " ")
+	hdrFamily := map[string]bool{
+		"hdr10": true, "hdr10_plus": true, "hdr_vivid": true, "hlg": true, "dolby_vision": true,
 	}
-	if !strings.Contains(region, "中国大陆") && !strings.Contains(region, "中国香港") && !strings.Contains(region, "中国台湾") {
+	for _, t := range tags {
+		if hdrFamily[t] {
+			return tags
+		}
+	}
+	var key string
+	switch {
+	case strings.Contains(hdr, "Vivid"):
+		key = "hdr_vivid"
+	case strings.Contains(hdr, "DoVi") || strings.Contains(hdr, "DV"):
+		key = "dolby_vision"
+	case strings.Contains(hdr, "HDR10+"):
+		key = "hdr10_plus"
+	case strings.Contains(hdr, "HDR"):
+		key = "hdr10"
+	case strings.Contains(hdr, "HLG"):
+		key = "hlg"
+	default:
 		return tags
 	}
-	return append(tags, "chinese_subtitle")
+	return append(tags, key)
 }
 
 // luckptEnglishTagValue §59.277: 幸运英语标签站规——无国语/粤语/中字且英语

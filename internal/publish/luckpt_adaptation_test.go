@@ -57,28 +57,25 @@ func luckptMeta(subtitle, ptgenRegion string) *model.TorrentMetadata {
 }
 
 func TestLuckptChineseSubtitleHeuristic(t *testing.T) {
-	// 产地华语区 + 硬字幕 → 补
-	tags := luckptChineseSubtitleHeuristic("幸运", luckptMeta("国语硬字幕 内嵌中字", "中国香港"), nil)
-	if len(tags) != 1 || tags[0] != "chinese_subtitle" {
-		t.Errorf("[硬字幕+香港] got %v", tags)
+	// §59.278 终版：产地忽略——三关键词任一即补
+	for _, sub := range []string{"国语硬字幕 内嵌中字", "中英字幕", "硬字幕", "内嵌中字", "中字"} {
+		tags := luckptChineseSubtitleHeuristic("幸运", luckptMeta(sub, "美国"), nil)
+		if len(tags) != 1 || tags[0] != "chinese_subtitle" {
+			t.Errorf("[%s+美国] got %v", sub, tags)
+		}
 	}
-	// 中英字幕 + 大陆 → 补
-	tags = luckptChineseSubtitleHeuristic("幸运", luckptMeta("中英字幕", "中国大陆"), nil)
-	if len(tags) != 1 || tags[0] != "chinese_subtitle" {
-		t.Errorf("[中英字幕+大陆] got %v", tags)
-	}
-	// 非华语区不补
-	tags = luckptChineseSubtitleHeuristic("幸运", luckptMeta("硬字幕", "美国"), nil)
+	// 无中字否定式不误配（§59.277 Deep Water 案）
+	tags := luckptChineseSubtitleHeuristic("幸运", luckptMeta("[英语/无中字]", "美国"), nil)
 	if len(tags) != 0 {
-		t.Errorf("[美国] got %v", tags)
+		t.Errorf("[无中字] got %v", tags)
 	}
-	// 华语区但无字幕说明不补
+	// 无关键词不补
 	tags = luckptChineseSubtitleHeuristic("幸运", luckptMeta("4K HDR", "中国大陆"), nil)
 	if len(tags) != 0 {
 		t.Errorf("[无说明] got %v", tags)
 	}
 	// 已有中字不重复
-	tags = luckptChineseSubtitleHeuristic("幸运", luckptMeta("硬字幕", "中国大陆"), []string{"chinese_subtitle"})
+	tags = luckptChineseSubtitleHeuristic("幸运", luckptMeta("硬字幕", "美国"), []string{"chinese_subtitle"})
 	if len(tags) != 1 {
 		t.Errorf("[已有] got %v", tags)
 	}
@@ -139,5 +136,34 @@ func TestLuckptEnglishTagValue(t *testing.T) {
 	cfgNoEn.ValueMappings[model.FieldDomainTags] = cfgNoEn.ValueMappings[model.FieldDomainTags][:3]
 	if v := luckptEnglishTagValue(cfgNoEn, "幸运", meta, nil); v != "" {
 		t.Errorf("[无英语选项] got %q", v)
+	}
+}
+
+// §59.278: 硬字幕无条件中字 + HDR 标签标题对齐
+
+func TestSyncHDRTagFromProfile(t *testing.T) {
+	// 十三猎杀案形态：HDR10 无 MI 标签 → 补 hdr10
+	if got := syncHDRTagFromProfile("HDR10", nil); len(got) != 1 || got[0] != "hdr10" {
+		t.Errorf("[HDR10] got %v", got)
+	}
+	if got := syncHDRTagFromProfile("HDR Vivid", nil); len(got) != 1 || got[0] != "hdr_vivid" {
+		t.Errorf("[Vivid] got %v", got)
+	}
+	if got := syncHDRTagFromProfile("DoVi HDR", nil); len(got) != 1 || got[0] != "dolby_vision" {
+		t.Errorf("[DoVi] got %v", got)
+	}
+	if got := syncHDRTagFromProfile("HDR10+", nil); len(got) != 1 || got[0] != "hdr10_plus" {
+		t.Errorf("[HDR10+] got %v", got)
+	}
+	// MI 铁证优先不覆盖
+	if got := syncHDRTagFromProfile("HDR10", []string{"hdr_vivid"}); len(got) != 1 {
+		t.Errorf("[已有族] got %v", got)
+	}
+	// 空/SDR 不动
+	if got := syncHDRTagFromProfile("SDR", nil); len(got) != 0 {
+		t.Errorf("[SDR] got %v", got)
+	}
+	if got := syncHDRTagFromProfile("", nil); len(got) != 0 {
+		t.Errorf("[空] got %v", got)
 	}
 }

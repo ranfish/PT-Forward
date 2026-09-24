@@ -2331,7 +2331,12 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	// 音频 token 冲突时作为 MI 仲裁的源侧证据（真测量）。失败不阻断（降级②盲放行）。
 	var localMI string
 	if isLocal && savePath != "" && h.seedPipeline != nil {
-		artifacts, artErr := h.seedPipeline.AnalyzeLocalArtifacts(ctx, name, savePath)
+		// §59.279: 本地 MI 分析限时 90s——ctx（批量=Background）无 deadline 时
+		// 大文件/慢挂载分析可无限挂起（pt29 批量获取卡死案 item[0] 现场特征）；
+		// 超时失败不阻断（§59.36 降级②盲放行语义保持）
+		analyzeCtx, analyzeCancel := context.WithTimeout(ctx, 90*time.Second)
+		artifacts, artErr := h.seedPipeline.AnalyzeLocalArtifacts(analyzeCtx, name, savePath)
+		analyzeCancel()
 		if artErr != nil {
 			h.logger.Warn("batch-fetch: pre-fetch local mediainfo failed", zap.String("hash", hash), zap.Error(artErr))
 		} else if mi, ok := artifacts["media_info"]; ok {
