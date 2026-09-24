@@ -337,6 +337,23 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			}
 		}
 	}
+	// §59.277: 幸运英语标签站规注入——TAGS_MISSING_ENGLISH_AUDIO 判据（无
+	// 国语/粤语/中字且英语音轨→必须选英语）。§59.151 附7 的 lucky_english_audio
+	// 通道被"英语选项 auto:false × 无 standard_keys"双卡断（allowed/tagCfg.Tags
+	// 均按 StandardKeys 构建，英语选项零键恒 miss）——站规强制属 auto:false
+	// 例外路径，Label 直配注入 applied。
+	if v := luckptEnglishTagValue(cfg, in.TargetSite, meta, tags); v != "" {
+		dup := false
+		for _, a := range applied {
+			if a == v {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			applied = append(applied, v)
+		}
+	}
 
 	// ⑥ 描述组装——纯本地资产消费（§59.159 白名单：替代 renderDescription
 	// [queryPTGen 在线/rehostPoster 图床转存双违规]；零网络依赖）
@@ -679,6 +696,45 @@ func luckptChineseSubtitleHeuristic(siteName string, meta *model.TorrentMetadata
 		return tags
 	}
 	return append(tags, "chinese_subtitle")
+}
+
+// luckptEnglishTagValue §59.277: 幸运英语标签站规——无国语/粤语/中字且英语
+// 音轨（english_audio/lucky_english_audio 推断 或 副标题"英语/无中字"声明）
+// → 返回英语选项 value（Label 直配——auto:false 无 standard_keys 例外路径）。
+// Deep Water 2022 AMZN WEB-DL 种审案（MI 无中文字幕 + 副标题[英语/无中字]）。
+func luckptEnglishTagValue(cfg *model.PublishFormConfig, siteName string, meta *model.TorrentMetadata, tags []string) string {
+	if siteName != "幸运" || cfg == nil {
+		return ""
+	}
+	for _, t := range tags {
+		if t == "chinese_audio" || t == "cantonese_audio" || t == "chinese_subtitle" {
+			return "" // 已有华语区标签——站规不要求英语
+		}
+	}
+	hasEnglish := false
+	for _, t := range tags {
+		if t == "english_audio" || t == "lucky_english_audio" {
+			hasEnglish = true
+			break
+		}
+	}
+	// 副标题声明兜底：MI 无 Language 行时 english_audio 可能未推断，
+	// "英语/无中字"声明是站方判据源
+	if !hasEnglish && meta != nil {
+		sub := meta.Subtitle
+		if strings.Contains(sub, "英语") || strings.Contains(sub, "无中字") {
+			hasEnglish = true
+		}
+	}
+	if !hasEnglish {
+		return ""
+	}
+	for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
+		if m.Label == "英语" {
+			return m.Value
+		}
+	}
+	return ""
 }
 
 // lookupOtherOption §59.273: 域内 Other 选项兜底（Label 判定——站方 Other
