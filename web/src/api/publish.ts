@@ -87,9 +87,6 @@ export const publishDataApi = {
   stats(days?: number) {
     return client.get<ApiResponse<{ stats: { todayPublish: number; todaySuccess: number; todayFailed: number; pendingCount: number; reviewedCount: number; totalMetadata: number; yesterdayPublish: number; yesterdaySuccess: number; unreviewedCount: number }; recent: unknown[]; trend: Array<{ day: string; success: number; failed: number }>; target_site_top: Array<{ site: string; count: number }>; status_distribution: Array<{ status: string; count: number }> }>>('/publish/stats', { params: days ? { days } : undefined })
   },
-  batchReview(ids: number[], reviewed: boolean) {
-    return client.post<ApiResponse<{ updated: number }>>('/publish/seed-data/batch-review', { ids, reviewed })
-  },
   batchDelete(ids: number[]) {
     return client.post<ApiResponse<{ deleted: number }>>('/publish/seed-data/batch-delete', { ids })
   },
