@@ -139,6 +139,13 @@ func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) s
 		}
 		return p.RegionCode
 	case "platform":
+		// §59.273: platform 槽与媒介槽同值去重（"HDTV HDTV" CCTV6 湾区晚会案
+		// ——§59.235 P1 只修 medium 内部 ST==SPEC，platform×medium 跨槽同值
+		// 重复未覆盖；同型参照 §59.257 WEB 省略）
+		if p.SourcePlatform != "" &&
+			(strings.EqualFold(p.SourcePlatform, p.SourceType) || strings.EqualFold(p.SourcePlatform, p.Specification)) {
+			return ""
+		}
 		return p.SourcePlatform
 	case "source_type":
 		// §59.257: v1.05 WEB类省略片源类型（qingwapt.md "WEB类：省略此项"）——

@@ -288,6 +288,10 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// ⑤ tags（判据引擎 → 站点调整层 → form_config 反查 → auto:false 过滤 + 人工 overrides）
 	tags := adjustTagsForSite(e.assembleTags(cfg, meta, in.TagOverrides),
 		in.TargetSite, meta.Title, meta.Subtitle)
+	// §59.273: 幸运中字启发（站方种审判据——MI 无中文字幕但产地为华语区且
+	// 副标题带硬字幕/中英字幕说明时仍须选中字；The Furious/I Know Who You
+	// Are 八案。站点特化——统一方法待其它站适配时再议，用户定案）
+	tags = luckptChineseSubtitleHeuristic(in.TargetSite, meta, tags)
 	tagCfg := &model.SiteTagConfig{
 		Mode:     model.TagModeTaglist,
 		Tags:     map[string]string{},
@@ -377,6 +381,12 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 
 	// ⑧ 上传（adapter UploadTorrent 复用）
+	// §59.273: 审核门——未审核种子禁止直接发布（一种多站/一站多种/单发全
+	// 路径收口在 executor 单点；DryRun 预览不受限。249 案：清除→重获后
+	// reviewed 重置为 false，页面显示未审核但发布无门可拦）
+	if !meta.Reviewed {
+		return failRec("unreviewed", "种子未审核（reviewed=false）——请先在种子配置页完成预览审核")
+	}
 	// §59.159: 匿名发布取站点默认（form_config.Anonymous——站点配置勾选项）
 	if cfg.Anonymous {
 		in.Anonymous = true
@@ -644,6 +654,46 @@ func (e *PublishExecutor) lookupByStdKey(cfg *model.PublishFormConfig, domain, s
 	return nil
 }
 
+// luckptChineseSubtitleHeuristic §59.273: 幸运中字启发式补标。
+// 判据（站方种审行为反推——用户定案）：产地 ∈ {中国大陆, 中国香港, 中国台湾}
+// 且副标题含 硬字幕/中英字幕 → 补 chinese_subtitle（MI 无中文字幕轨也补——
+// 硬字幕内嵌不体现为字幕轨）。
+func luckptChineseSubtitleHeuristic(siteName string, meta *model.TorrentMetadata, tags []string) []string {
+	if siteName != "幸运" || meta == nil {
+		return tags
+	}
+	for _, t := range tags {
+		if t == "chinese_subtitle" {
+			return tags
+		}
+	}
+	subtitle := meta.Subtitle
+	if !strings.Contains(subtitle, "硬字幕") && !strings.Contains(subtitle, "中英字幕") {
+		return tags
+	}
+	region := ""
+	if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+		region = strings.Join(src.Region, " ")
+	}
+	if !strings.Contains(region, "中国大陆") && !strings.Contains(region, "中国香港") && !strings.Contains(region, "中国台湾") {
+		return tags
+	}
+	return append(tags, "chinese_subtitle")
+}
+
+// lookupOtherOption §59.273: 域内 Other 选项兜底（Label 判定——站方 Other
+// 普遍无 standard_key，键查必落空；幸运 audio/codec/team 三域 Other 全无键
+// 实证，修道院 codec Other 有键属例外。Label 兼容 Other/其它/其他。
+func (e *PublishExecutor) lookupOtherOption(cfg *model.PublishFormConfig, domain string) *model.FormValueMapping {
+	for i, m := range cfg.ValueMappings[domain] {
+		switch strings.ToLower(m.Label) {
+		case "other", "其它", "其他":
+			return &cfg.ValueMappings[domain][i]
+		}
+	}
+	return nil
+}
+
 // codecMappingOf §59.268: 视频编码域映射——miss 折叠兜底。
 // 编码器实现归标准（x264→H.264 / x265→H.265——站方表单普遍只有标准名选项；
 // 修道院 224/288 未选案实证：x264×216+x265×6+AV1×2，BluRay/WEB-DL x264 通杀）。
@@ -659,7 +709,9 @@ func (e *PublishExecutor) codecMappingOf(cfg *model.PublishFormConfig, videoCode
 			return m
 		}
 	}
-	return e.lookupByStdKey(cfg, model.FieldDomainCodec, "video.other")
+	// §59.273: Other 兜底改 Label 判定（幸运 codec Other 无 standard_key——
+	// 键查在无键站落空，Opus 类未选音频案同族）
+	return e.lookupOtherOption(cfg, model.FieldDomainCodec)
 }
 
 // audioMappingOf §59.166 A 层：TechProfile 源音频映射。
@@ -682,7 +734,13 @@ func (e *PublishExecutor) audioMappingOf(cfg *model.PublishFormConfig, audioCode
 			return m
 		}
 	}
-	return e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, extract.LookupStandardKey("audio_codec", audioCodec))
+	m := e.lookupByStdKey(cfg, model.FieldDomainAudiocodec, extract.LookupStandardKey("audio_codec", audioCodec))
+	if m != nil {
+		return m
+	}
+	// §59.273: 音频域 Other 兜底（Opus/ALAC/DSD 等站方无选项——幸运种审
+	// "未选择音频" Robot Dreams AV1 Opus 案）
+	return e.lookupOtherOption(cfg, model.FieldDomainAudiocodec)
 }
 
 // audioMapping 音频域（组合键优先：TrueHD+Atmos→"TrueHD Atmos"——§59.150 判据六）。
@@ -756,7 +814,9 @@ func (e *PublishExecutor) teamMapping(cfg *model.PublishFormConfig, meta *model.
 			return &cfg.ValueMappings[model.FieldDomainTeam][i]
 		}
 	}
-	return nil
+	// §59.273: 制作组域 Other 兜底（组名存在但站方无选项——统一"无可选项
+	// 均选 Other"用户定案；组名空仍 nil 不强填）
+	return e.lookupOtherOption(cfg, model.FieldDomainTeam)
 }
 
 // assembleTags 标签装配：判据引擎推断 → form_config 值映射 → auto:false 过滤 + 人工 overrides。
