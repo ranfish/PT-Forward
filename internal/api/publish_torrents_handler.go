@@ -1773,6 +1773,8 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 }
 
 // handleBatchReview §56.40: 批量审核（标记 reviewed）。
+// §59.275 定位: 运维内部接口——仅后端/curl 调用（簇级批审/数据修复用），
+// 不开放前端 UI（前端 TS api 函数已删——用户定案 2026-09-24）。
 func (h *PublishTorrentsHandler) handleBatchReview(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IDs      []uint `json:"ids"`
