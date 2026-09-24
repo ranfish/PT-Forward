@@ -88,3 +88,56 @@ func TestLuckptChineseSubtitleHeuristic(t *testing.T) {
 		t.Errorf("[非幸运] got %v", tags)
 	}
 }
+
+// §59.277: 幸运英语标签站规（Deep Water 种审案）
+func luckptTagCfg() *model.PublishFormConfig {
+	return &model.PublishFormConfig{
+		ValueMappings: map[string][]model.FormValueMapping{
+			model.FieldDomainTags: {
+				{Label: "中字", Value: "6", StandardKeys: []string{"tag.chinese_subtitle"}},
+				{Label: "国语", Value: "5", StandardKeys: []string{"tag.chinese_audio"}},
+				{Label: "粤语", Value: "14", StandardKeys: []string{"tag.cantonese_audio"}},
+				{Label: "英语", Value: "22", Auto: boolPtr(false)},
+			},
+		},
+	}
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+func TestLuckptEnglishTagValue(t *testing.T) {
+	cfg := luckptTagCfg()
+	meta := &model.TorrentMetadata{Subtitle: "[英语/无中字] 2160p AMZN"}
+	// ① Deep Water 案：无中文标签 + 副标题英语/无中字 → 22
+	if v := luckptEnglishTagValue(cfg, "幸运", meta, nil); v != "22" {
+		t.Errorf("[Deep Water] got %q want 22", v)
+	}
+	// ② english_audio 推断路径（无副标题声明）
+	meta2 := &model.TorrentMetadata{}
+	if v := luckptEnglishTagValue(cfg, "幸运", meta2, []string{"english_audio"}); v != "22" {
+		t.Errorf("[english_audio] got %q", v)
+	}
+	// ③ lucky_english_audio 路径（§59.151 附7 产出键）
+	if v := luckptEnglishTagValue(cfg, "幸运", meta2, []string{"lucky_english_audio"}); v != "22" {
+		t.Errorf("[lucky_english_audio] got %q", v)
+	}
+	// ④ 有中字（§59.273 启发补的也算）→ 不要求英语
+	if v := luckptEnglishTagValue(cfg, "幸运", meta, []string{"chinese_subtitle"}); v != "" {
+		t.Errorf("[有中字] got %q", v)
+	}
+	// ⑤ 无英语证据 → 不注入
+	meta3 := &model.TorrentMetadata{Subtitle: "4K HDR"}
+	if v := luckptEnglishTagValue(cfg, "幸运", meta3, nil); v != "" {
+		t.Errorf("[无证据] got %q", v)
+	}
+	// ⑥ 非幸运站不动
+	if v := luckptEnglishTagValue(cfg, "修道院", meta, nil); v != "" {
+		t.Errorf("[非幸运] got %q", v)
+	}
+	// ⑦ 站表无英语选项 → 空
+	cfgNoEn := luckptTagCfg()
+	cfgNoEn.ValueMappings[model.FieldDomainTags] = cfgNoEn.ValueMappings[model.FieldDomainTags][:3]
+	if v := luckptEnglishTagValue(cfgNoEn, "幸运", meta, nil); v != "" {
+		t.Errorf("[无英语选项] got %q", v)
+	}
+}
