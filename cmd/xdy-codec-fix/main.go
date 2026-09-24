@@ -47,6 +47,7 @@ func main() {
 		tagsMap    = flag.String("tags-map", "", "tid→推断标签 JSON 文件（可选）")
 		formConfig = flag.String("form-config", "", "站点 form_config JSON（tags 值映射源，可选）")
 		apply      = flag.Bool("apply", false, "真提交（缺省 dry-run）")
+		tagOnly    = flag.Bool("tag-only", false, "纯标签补齐模式（无 codec token 的种子也补 tags——后期跨环境元数据补齐批量用）")
 		sleep      = flag.Duration("sleep", 1500*time.Millisecond, "请求间隔")
 	)
 	flag.Parse()
@@ -86,6 +87,10 @@ func main() {
 							tagValue[k[i+1:]] = m.Value
 						}
 					}
+					// §59.272: 存量旧键别名（§59.267 前 metadata.tags 用 vivid_hdr）
+					if m.Label == "HDR" {
+						tagValue["vivid_hdr"] = m.Value
+					}
 				}
 			}
 		}
@@ -114,12 +119,6 @@ func main() {
 		}
 
 		m := reToken.FindStringSubmatch(form.Title)
-		if m == nil {
-			stat["skip_no_token"]++
-			continue // 非编码器名 token——无需修复
-		}
-		target := codecTarget[m[1]]
-
 		// tags 目标值（现有勾选 ∪ 推断映射——只加不减）
 		tagWant := map[string]bool{}
 		for _, kv := range form.ArrayFields {
@@ -132,70 +131,102 @@ func main() {
 				tagWant[v] = true
 			}
 		}
-
-		curCodec := form.Fields["codec_sel[4]"]
 		curTagCount := 0
 		for _, kv := range form.ArrayFields {
 			if kv.Key == "tags[4][]" {
 				curTagCount++
 			}
 		}
+
+		if m == nil {
+			// 非编码器名 token：纯标签模式下有可补标签才动，否则跳过
+			if *tagOnly && len(tagWant) > curTagCount {
+				if !*apply {
+					stat["plan"]++
+					fmt.Printf("[%3d] tid=%-6s %s | tag-only | tags %d→%d | %s\n",
+						i+1, tid, "DRY", curTagCount, len(tagWant), trunc(form.Title, 44))
+					time.Sleep(*sleep)
+					continue
+				}
+				if err := submitEdit(nexus, cfg, cookie, *baseURL, tid, form, form.Fields["codec_sel[4]"], tagWant); err != nil {
+					stat["edit_err"]++
+					fmt.Printf("[%3d] tid=%-6s ✗ tag-only | tags %d→%d | %s | err=%v\n",
+						i+1, tid, curTagCount, len(tagWant), trunc(form.Title, 40), err)
+				} else {
+					stat["fixed"]++
+					fmt.Printf("[%3d] tid=%-6s %s | tag-only | tags %d→%d | %s\n",
+						i+1, tid, "OK ", curTagCount, len(tagWant), trunc(form.Title, 44))
+				}
+				time.Sleep(*sleep)
+				continue
+			}
+			stat["skip_no_token"]++
+			continue
+		}
+		target := codecTarget[m[1]]
+
+		curCodec := form.Fields["codec_sel[4]"]
 		if curCodec == target && len(tagWant) == curTagCount {
 			stat["skip_ok"]++
 			continue // 已正确（幂等）
 		}
 
-		action := "DRY"
-		if *apply {
-			req := &model.EditRequest{
-				TorrentID:  tid,
-				FormFields: form.Fields,
-				Cookie:     cookie,
-				BaseURL:    *baseURL,
-				Referer:    *baseURL + "/edit.php?id=" + tid,
-				ArrayFields: form.ArrayFields,
-			}
-			// §59.271: descr 必须回填——GetEditForm 存 form.Description 不入
-			// Fields，缺省提交="有项目没有填写"被拒（修道院实锤）；text/hidden/
-			// radio 均经 Fields/ArrayFields 原样回放
-			req.FormFields["descr"] = form.Description
-			req.FormFields["codec_sel[4]"] = target
-			// tags 数组：保留现有 + 追加目标（去重）
-			seen := map[string]bool{}
-			arr := []model.TagKV{}
-			for _, kv := range form.ArrayFields {
-				if kv.Key == "tags[4][]" && seen[kv.Value] {
-					continue
-				}
-				seen[kv.Value] = true
-				arr = append(arr, kv)
-			}
-			for v := range tagWant {
-				if !seen[v] {
-					arr = append(arr, model.TagKV{Key: "tags[4][]", Value: v})
-				}
-			}
-			req.ArrayFields = arr
-			ctx2, cancel2 := context.WithTimeout(context.Background(), 60*time.Second)
-			err := nexus.SubmitEdit(ctx2, req)
-			cancel2()
-			if err != nil {
-				stat["edit_err"]++
-				fmt.Printf("[%3d] tid=%-6s ✗ %s | %s | codec %s→%s tags %d→%d | err=%v\n",
-					i+1, tid, m[1], trunc(form.Title, 40), curCodec, target, curTagCount, len(tagWant), err)
-				time.Sleep(*sleep)
-				continue
-			}
-			action = "OK "
-			stat["fixed"]++
-		} else {
+		if !*apply {
 			stat["plan"]++
+			fmt.Printf("[%3d] tid=%-6s %s | %s | codec %q→%s | tags %d→%d | %s\n",
+				i+1, tid, "DRY", m[1], curCodec, target, curTagCount, len(tagWant), trunc(form.Title, 44))
+			time.Sleep(*sleep)
+			continue
 		}
-		fmt.Printf("[%3d] tid=%-6s %s | %s | codec %q→%s | tags %d→%d | %s\n",
-			i+1, tid, action, m[1], curCodec, target, curTagCount, len(tagWant), trunc(form.Title, 44))
+		if err := submitEdit(nexus, cfg, cookie, *baseURL, tid, form, target, tagWant); err != nil {
+			stat["edit_err"]++
+			fmt.Printf("[%3d] tid=%-6s ✗ %s | %s | codec %s→%s tags %d→%d | err=%v\n",
+				i+1, tid, m[1], trunc(form.Title, 40), curCodec, target, curTagCount, len(tagWant), err)
+		} else {
+			stat["fixed"]++
+			fmt.Printf("[%3d] tid=%-6s %s | %s | codec %q→%s | tags %d→%d | %s\n",
+				i+1, tid, "OK ", m[1], curCodec, target, curTagCount, len(tagWant), trunc(form.Title, 44))
+		}
 		time.Sleep(*sleep)
 	}
 	fmt.Printf("\n汇总: %+v\n", stat)
+}
+
+// submitEdit 组装并提交编辑（codec 路径与 tag-only 路径共用）。
+// §59.271: descr 必须回填（GetEditForm 存 form.Description 不入 Fields——
+// 缺省提交被"有项目没有填写"拒）；tags 只加不减（现有勾选 ∪ 目标）。
+func submitEdit(nexus *adapter.NexusPHPAdapter, cfg *model.SiteConfig, cookie, baseURL, tid string,
+	form *model.EditForm, codecTargetValue string, tagWant map[string]bool) error {
+	req := &model.EditRequest{
+		TorrentID:   tid,
+		FormFields:  form.Fields,
+		Cookie:      cookie,
+		BaseURL:     baseURL,
+		Referer:     baseURL + "/edit.php?id=" + tid,
+		ArrayFields: form.ArrayFields,
+	}
+	req.FormFields["descr"] = form.Description
+	if codecTargetValue != "" {
+		req.FormFields["codec_sel[4]"] = codecTargetValue
+	}
+	seen := map[string]bool{}
+	arr := []model.TagKV{}
+	for _, kv := range form.ArrayFields {
+		if kv.Key == "tags[4][]" && seen[kv.Value] {
+			continue
+		}
+		seen[kv.Value] = true
+		arr = append(arr, kv)
+	}
+	for v := range tagWant {
+		if !seen[v] {
+			arr = append(arr, model.TagKV{Key: "tags[4][]", Value: v})
+		}
+	}
+	req.ArrayFields = arr
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	return nexus.SubmitEdit(ctx, req)
 }
 
 func readTIDs(path string) ([]string, error) {
