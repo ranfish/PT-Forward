@@ -109,3 +109,46 @@ func TestStripSiteOperationMarkers_MonthTimeTail(t *testing.T) {
 		}
 	}
 }
+
+// §59.283: 时间量词补"钟"——"分钟"词尾（UBWEB 系脏尾 "-UBWEB    [免费]
+// 剩余时间：2时28分钟 (通过)" 243 PT0 4011 行实证：charset 有分无钟击穿族三/族四）
+func TestStripSiteOperationMarkers_ZhongTail(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"BRAT 2025 1080P AMZN WEB-DL H.264 DDP2.0 5Audio-SHB931@UBWEB    [免费] 剩余时间：2时28分钟 (通过)",
+			"BRAT 2025 1080P AMZN WEB-DL H.264 DDP2.0 5Audio-SHB931@UBWEB"},
+		{"96 2018 HINDI 1080P AMZN WEB-DL H265 DDP5.1-SHB931@UBWEB    [免费] 剩余时间：21时52分钟 (通过)",
+			"96 2018 HINDI 1080P AMZN WEB-DL H265 DDP5.1-SHB931@UBWEB"},
+		{"Some.Title.2020.1080p.x264-GRP 剩余时间：3分钟", "Some.Title.2020.1080p.x264-GRP"},
+	}
+	for _, tc := range cases {
+		if got := StripSiteOperationMarkers(tc.in); got != tc.want {
+			t.Errorf("in=%q got=%q want=%q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// §59.284 族五: 锚后全剥兜底——形态判据反转（标题词视角），新造标注词免疫
+func TestStripSiteOperationMarkers_AnchorFallback(t *testing.T) {
+	cases := []struct{ in, want string }{
+		// 新造量词（未来变体免疫——钟/月之后的任何词）
+		{"Movie.Name.2020.1080p.x264-GRP    [免费] 剩余时间：2兆13秒", "Movie.Name.2020.1080p.x264-GRP"},
+		// 禁转括号可剥（flags 通道单责——§59.136 折中由 §59.284 模型取代）
+		{"Movie.Name.2020.1080p.x264-GRP [禁转]", "Movie.Name.2020.1080p.x264-GRP"},
+		// UBWEB 实案形态
+		{"BRAT 2025 1080P AMZN WEB-DL H.264 DDP2.0 5Audio-SHB931@UBWEB    [免费] 剩余时间：2时28分钟 (通过)",
+			"BRAT 2025 1080P AMZN WEB-DL H.264 DDP2.0 5Audio-SHB931@UBWEB"},
+		// 保险丝：锚后含括号外标题词（3+ 字母）不剥
+		{"Movie.Name.2020.1080p.x264-GRP.Extended.Cut", "Movie.Name.2020.1080p.x264-GRP.Extended.Cut"},
+		// 纯数字尾（续集 "-2"）不锚——无字母 token 跳过
+		{"Wendy.Williams.The.Movie-2.2011.1080p", "Wendy.Williams.The.Movie-2.2011.1080p"},
+		// NOGROUP 锚
+		{"Some.Show.S01.2020.1080p.WEB-DL.x264-NOGROUP [促销]", "Some.Show.S01.2020.1080p.WEB-DL.x264-NOGROUP"},
+		// 组名即末尾——原样
+		{"Clean.Title.2020.1080p.x264-GRP", "Clean.Title.2020.1080p.x264-GRP"},
+	}
+	for _, tc := range cases {
+		if got := StripSiteOperationMarkers(tc.in); got != tc.want {
+			t.Errorf("in=%q\n got=%q\nwant=%q", tc.in, got, tc.want)
+		}
+	}
+}
