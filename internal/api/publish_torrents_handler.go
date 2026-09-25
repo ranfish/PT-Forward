@@ -2681,6 +2681,32 @@ func extractChineseFromSubtitle(subtitle string) string {
 	return ""
 }
 
+// BusyTaskDesc §59.281: 运行中长任务描述（""=空闲）——OTA 退出门控消费。
+func (h *PublishTorrentsHandler) BusyTaskDesc() string {
+	h.batchFetch.mu.Lock()
+	if h.batchFetch.active {
+		n := fmt.Sprintf("%d/%d", h.batchFetch.done, h.batchFetch.total)
+		h.batchFetch.mu.Unlock()
+		return "批量获取 " + n
+	}
+	h.batchFetch.mu.Unlock()
+	h.siteBatch.mu.Lock()
+	if len(h.siteBatch.active) > 0 {
+		sites := make([]string, 0, len(h.siteBatch.active))
+		for site, tid := range h.siteBatch.active {
+			if t, ok := h.siteBatch.tasks[tid]; ok {
+				sites = append(sites, fmt.Sprintf("%s %d/%d", site, t.Done, t.Total))
+			} else {
+				sites = append(sites, site)
+			}
+		}
+		h.siteBatch.mu.Unlock()
+		return "站点批量发布 " + strings.Join(sites, ",")
+	}
+	h.siteBatch.mu.Unlock()
+	return ""
+}
+
 // handleBatchFetchProgress §59.20: 查询批量获取进度。
 func (h *PublishTorrentsHandler) handleBatchFetchProgress(w http.ResponseWriter, r *http.Request) {
 	h.batchFetch.mu.Lock()

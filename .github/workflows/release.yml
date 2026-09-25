@@ -12,6 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # §59.281: 完整历史——git describe 取真 tag（浅克隆致版本号回退短 SHA bdc1f7b 外观案）
 
       - uses: actions/setup-go@v5
         with:

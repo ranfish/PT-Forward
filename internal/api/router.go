@@ -143,6 +143,15 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		logger:               logger,
 	}
 	rt.publishTorrentsHandler.SetReseedEngine(reseedEngine)
+	// §59.281: OTA 任务门控接线——批量获取/发布活跃态（os.Exit 前防腰斩）
+	sysHandler.SetBusyChecker(func() string {
+		if b := rt.publishTorrentsHandler; b != nil {
+			if desc := b.BusyTaskDesc(); desc != "" {
+				return desc
+			}
+		}
+		return ""
+	})
 	return rt
 }
 
