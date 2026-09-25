@@ -3699,12 +3699,20 @@ func (h *PublishTorrentsHandler) runMainlinePTGen(ctx context.Context, meta *mod
 		h.logger.Warn("mainline ptgen: marshal failed", zap.Error(mErr))
 		return
 	}
+	updates := map[string]interface{}{
+		"ptgen_source_json": string(raw),
+		"description":       result.RawBBCode,
+	}
+	// §59.285 附: 海报同源回填——PTGen 结果自带 PosterURL（Diesel 案：
+	// imdb 键查询成功 desc 落库但 poster 列空——Tab4 账本有图 Tab2 字段
+	// 空，incomplete 不消）。仅 Poster 列空时回填（站点海报优先的 fallback
+	// 语义，§59.55 同型增量写）
+	if meta.Poster == "" && result.PosterURL != "" {
+		updates["poster"] = result.PosterURL
+	}
 	if uErr := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 		Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
-		Updates(map[string]interface{}{
-			"ptgen_source_json": string(raw),
-			"description":       result.RawBBCode,
-		}).Error; uErr != nil {
+		Updates(updates).Error; uErr != nil {
 		h.logger.Warn("mainline ptgen: persist failed", zap.Error(uErr))
 		return
 	}
