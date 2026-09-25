@@ -26,11 +26,19 @@ type SystemHandler struct {
 	clientMgr     *client.Manager
 	logger        *zap.Logger
 	seedingEngine torrentCounter
+
+	// busyChecker §59.281: OTA 退出前任务门控——返回运行中长任务描述（""=空闲）。
+	// main 接线（批量获取/发布活跃态），防 os.Exit 腰斩在跑批次（pt29 部署
+	// 重启杀批量获取同型事故的 OTA 版）。
+	busyChecker func() string
 }
 
 func NewSystemHandler(version string, db *gorm.DB, clientMgr *client.Manager, logger *zap.Logger) *SystemHandler {
 	return &SystemHandler{version: version, db: db, clientMgr: clientMgr, logger: logger}
 }
+
+// SetBusyChecker §59.281: OTA 任务门控注入。
+func (h *SystemHandler) SetBusyChecker(fn func() string) { h.busyChecker = fn }
 
 func (h *SystemHandler) SetSeedingEngine(engine torrentCounter) {
 	h.seedingEngine = engine

@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/setting"
@@ -194,8 +195,26 @@ func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		h.logger.Info("OTA update complete, exiting for restart",
 			zap.String("old_version", h.version),
 			zap.String("new_version", release.TagName))
-		// Graceful exit — systemd/Docker will restart
-		time.Sleep(500 * time.Millisecond)
+		// §59.281: 重启三加固——
+		// ①任务门控：批量获取/发布在跑时等待（30s 轮询，最长 10 分钟），
+		//   防腰斩（os.Exit 无视一切在途工作）
+		// ②优雅停机：向自身发 SIGTERM 复用主程序停机路径（13 组件 Stop +
+		//   http Shutdown + DB 收尾）——裸 os.Exit 绕过全部清理
+		// ③.bbak 保留见 downloadAndReplace（下次 OTA 覆盖前不删——新二进制
+		//   环境性起不来时可人工回滚，fnos 孤儿端口案教训）
+		for i := 0; i < 20; i++ {
+			if h.busyChecker == nil || h.busyChecker() == "" {
+				break
+			}
+			busy := h.busyChecker()
+			h.logger.Info("OTA restart deferred: task active", zap.String("task", busy),
+				zap.Int("wait_round", i+1))
+			time.Sleep(30 * time.Second)
+		}
+		p, _ := os.FindProcess(os.Getpid())
+		_ = p.Signal(syscall.SIGTERM)
+		// 兜底：SIGTERM 处理器异常未退出时 90s 后强退（Restart=always 语义保障）
+		time.Sleep(90 * time.Second)
 		os.Exit(0)
 	}()
 }
@@ -288,7 +307,9 @@ func (h *SystemHandler) downloadAndReplace(downloadURL string) error {
 		return fmt.Errorf("replace binary: %w", err)
 	}
 
-	_ = os.Remove(backupPath)
+	// §59.281: .bak 保留至下次 OTA（顶部 os.Remove(backupPath) 滚动覆盖）——
+	// 新二进制环境性起不来（端口被占等）时人工可回滚
+	h.logger.Info("OTA: old binary backed up", zap.String("bak", backupPath))
 	return nil
 }
 
