@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -205,10 +204,8 @@ func (h *PublishTorrentsHandler) lookupScreenshotCache(clientUID uint, savePath,
 // src 只读一次）与异步 applyPosterFallback 的回传 UPDATE 并发——循环尾段 INSERT 的行
 // 携带过期站点态落地，"已有行不覆盖"语义保证无人再修。修复: 等 fallback 终局后
 // INSERT（携带终态），再显式回传一次（幂等兜底，覆盖既有传播行）。
-func (h *PublishTorrentsHandler) finalizeClusterPropagation(ctx context.Context, fallbackWg *sync.WaitGroup, clientUID uint, savePath, name, hash, siteName string) {
-	if fallbackWg != nil {
-		fallbackWg.Wait()
-	}
+// §59.286: fallbackWg 参数移除（②海报链下线——唯一等待者）
+func (h *PublishTorrentsHandler) finalizeClusterPropagation(ctx context.Context, clientUID uint, savePath, name, hash, siteName string) {
 	h.propagateClusterMetadata(ctx, clientUID, savePath, name, hash, siteName)
 	h.propagateClusterPosters(ctx, clientUID, savePath, name, hash)
 }

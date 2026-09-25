@@ -180,11 +180,21 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		// §59.42 延伸: PTGen query 优先级——DB douban_url > imdb_url > 种子名。
 		// 现配 endpoint（doubaninfo/cspt）只接受资源 URL，种子名必然失败
 		// （用户报"重新获取海报报 无法解析资源URL"根因）；与 applyPosterFallback 同款语义。
-		query := h.resolvePTGenQuery(ctx, req.InfoHash, req.SiteName, req.Name)
-		// §59.173: 手动重获强制刷新——绕缓存直连（点了重获就要新的）
-		ptgen, err := h.pipeline.AnalyzePTGenForce(ctx, query)
-		if err != nil {
-			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("PTGen 失败: %v", err))
+		// §59.286 终版: 三级顺序链（douban→imdb→name，失败落下一级，成功短路
+		// ——与主链同构）+ Force 绕缓存（§59.173 手动重获语义）
+		keys := h.resolvePTGenQueryKeys(ctx, req.InfoHash, req.SiteName, req.Name)
+		var ptgen *model.PTGenResult
+		var lastErr error
+		for _, k := range keys {
+			r, err := h.pipeline.AnalyzePTGenForce(ctx, k)
+			if err == nil && r != nil && (r.RawBBCode != "" || r.PosterURL != "") {
+				ptgen = r
+				break
+			}
+			lastErr = err
+		}
+		if ptgen == nil {
+			Error(w, http.StatusInternalServerError, 50000, fmt.Sprintf("PTGen 失败（三级链全败）: %v", lastErr))
 			return
 		}
 		if ptgen != nil {
@@ -381,7 +391,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 	Success(w, result)
 }
 
-func (h *ManualForwardHandler) resolvePTGenQuery(ctx context.Context, infoHash, siteName, fallbackName string) string {
+func (h *ManualForwardHandler) resolvePTGenQueryKeys(ctx context.Context, infoHash, siteName, fallbackName string) []string {
+	var keys []string
 	if infoHash != "" {
 		var m model.TorrentMetadata
 		q := h.db.WithContext(ctx).
@@ -392,14 +403,17 @@ func (h *ManualForwardHandler) resolvePTGenQuery(ctx context.Context, infoHash, 
 		}
 		if err := q.First(&m).Error; err == nil {
 			if m.DoubanURL != "" {
-				return m.DoubanURL
+				keys = append(keys, m.DoubanURL)
 			}
 			if m.IMDbURL != "" {
-				return m.IMDbURL
+				keys = append(keys, m.IMDbURL)
 			}
 		}
 	}
-	return fallbackName
+	if fallbackName != "" {
+		keys = append(keys, fallbackName)
+	}
+	return keys
 }
 
 // screenshotCaptureState §59.51: 后台截图任务全局单例状态（内存态，batch-fetch 同款）。
