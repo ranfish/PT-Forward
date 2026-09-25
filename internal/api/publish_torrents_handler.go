@@ -3629,6 +3629,20 @@ func (h *PublishTorrentsHandler) checkRequiredFields(meta *model.TorrentMetadata
 	return missing
 }
 
+// mainlineQueryKey §59.285: 主链 PTGen 查询键三级选择（DoubanURL→IMDbURL→Title）。
+func mainlineQueryKey(douban, imdb, title string) (string, string) {
+	if douban != "" {
+		return douban, "douban"
+	}
+	if imdb != "" {
+		return imdb, "imdb"
+	}
+	if title != "" {
+		return title, "title"
+	}
+	return "", ""
+}
+
 // extractSeedHash 从 URL 路径 /api/v1/publish/seeds/:info_hash 提取 info_hash。
 func extractSeedHash(r *http.Request) string {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -3649,9 +3663,14 @@ func (h *PublishTorrentsHandler) runMainlinePTGen(ctx context.Context, meta *mod
 	if meta == nil || h.ptgen == nil {
 		return
 	}
-	// 豆瓣链接（detail.DoubanURL——FetchAndStore 提取的站方链接）
-	if meta.DoubanURL == "" {
-		h.logger.Info("mainline ptgen: no douban url, skip",
+	// §59.285: 查询键三级化——DoubanURL → IMDbURL → meta.Title。
+	// 原豆瓣单源门（DoubanURL=="" skip）漏掉无豆瓣页作品（印度/小语种——
+	// Diesel 2025 HIN+TAM+TEL 案：批量获取 incomplete 而 Tab4 海报链
+	// name 反查成功）。Provider.Query 通用透传（端点能力 douban/imdb/name
+	// 通吃）；缓存键随查询键（天然语义）。
+	query, queryKind := mainlineQueryKey(meta.DoubanURL, meta.IMDbURL, meta.Title)
+	if query == "" {
+		h.logger.Info("mainline ptgen: no query key, skip",
 			zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
 			zap.String("site", meta.SiteName))
 		return
@@ -3661,14 +3680,15 @@ func (h *PublishTorrentsHandler) runMainlinePTGen(ctx context.Context, meta *mod
 		err    error
 	)
 	if force {
-		result, err = h.ptgen.AnalyzePTGenForce(ctx, meta.DoubanURL)
+		result, err = h.ptgen.AnalyzePTGenForce(ctx, query)
 	} else {
-		result, err = h.ptgen.AnalyzePTGen(ctx, meta.DoubanURL)
+		result, err = h.ptgen.AnalyzePTGen(ctx, query)
 	}
 	if err != nil || result == nil || result.RawBBCode == "" {
 		h.logger.Warn("mainline ptgen: query failed",
 			zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
-			zap.String("douban", meta.DoubanURL),
+			zap.String("query_kind", queryKind),
+			zap.String("query", query),
 			zap.Bool("force", force),
 			zap.Error(err))
 		return // 全空——incomplete 状态机承接（§59.236 遗漏①定案）
