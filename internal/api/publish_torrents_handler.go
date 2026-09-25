@@ -56,7 +56,6 @@ type PublishTorrentsHandler struct {
 	batchFetch     batchFetchState
 	siteBatch      siteBatchState // §59.166 一站多种批量任务
 	strategySem    chan struct{} // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
-	posterClusterCtx map[string]posterClusterContext // §59.61 附: infoHash → 簇上下文（异步修复回传用）
 }
 
 type backgroundQueryState struct {
@@ -2268,41 +2267,12 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 	}
 }
 
-type posterClusterContext struct {
-	clientUID uint
-	savePath string
-	name     string
-}
 
-// clusterCtxFor §59.61 附2: 簇上下文获取——map 加速, miss 从 snapshots 反查
-// （4005 批次实锤: map 容量清空丢尾部上下文 → PTGen 修复不回传。反查为权威来源）。
-func (h *PublishTorrentsHandler) clusterCtxFor(ctx context.Context, hash string) (posterClusterContext, bool) {
-	if h.posterClusterCtx != nil {
-		if c, ok := h.posterClusterCtx[hash]; ok {
-			return c, true
-		}
-	}
-	var snap model.TorrentSnapshot
-	if err := h.db.WithContext(ctx).Where("hash = ? AND is_hidden = 0", hash).First(&snap).Error; err != nil {
-		return posterClusterContext{}, false
-	}
-	c := posterClusterContext{clientUID: snap.ClientUID, savePath: snap.SavePath, name: snap.Name}
-	if h.posterClusterCtx == nil {
-		h.posterClusterCtx = make(map[string]posterClusterContext, 256)
-	}
-	h.posterClusterCtx[hash] = c
-	return c, true
-}
 
 func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientUID uint, hash, name string, size int64, savePath string, isLocal bool, forcePTGen ...bool) error {
 	// §59.236 ①: forcePTGen 变参——单条重获 true（Force 绕缓存 §59.173）/
 	// 批量 false（普通缓存——流控友好 §59.236 决策点①）
 	force := len(forcePTGen) > 0 && forcePTGen[0]
-	// §59.61 附: 注册簇上下文（applyPosterFallback 异步回传用；固定小容量防泄漏——批量串行覆盖）
-	if h.posterClusterCtx == nil {
-		h.posterClusterCtx = make(map[string]posterClusterContext, 256)
-	}
-	h.posterClusterCtx[hash] = posterClusterContext{clientUID: clientUID, savePath: savePath, name: name}
 	var coverageSites []model.SiteCoverageCache
 	if h.coverage != nil {
 		cs, err := h.coverage.GetCachedCoverage(ctx, hash)
@@ -2437,20 +2407,11 @@ fetched:
 	// 失败全空（incomplete 状态机承接——用户自查端点；站方原文
 	// 不保存 §59.236 定案）。取代 §59.235 P2 的 extractPTGenAssets
 	// 双时序补丁（架构性取代——kdouban/NexusPHP 分叉根除）。
-	h.runMainlinePTGen(ctx, meta, force)
-
-	// §59.42: 海报可信图源白名单替换（异步；§59.61 附5: 尾部 finalize 会等其终局
-	// 再传播——INSERT 与回传 UPDATE 的竞态已由 WaitGroup 消除）
-	// §59.195: 门条件 Poster!="" 移除——站点详情无海报时（流控降级内容/解析差异），
-	// PTGen 简介增量写与海报兜底恰是最需要的场景（原门导致 Tab2/Tab4 双空——
-	// 侠女案：手动重获正常而获取无 PTGen 信息的根因）。空海报路径六支回归验证安全。
-	var posterFallbackWg sync.WaitGroup
-	if meta != nil {
-		posterFallbackWg.Add(1)
-		go func() {
-			defer posterFallbackWg.Done()
-			h.applyPosterFallback(meta.InfoHash, meta.SiteName, meta.Poster, name)
-		}()
+	// §59.286 终版: 主链 PTGen 单点单责——三级顺序链成功时同步吸收②副产物
+	// 中的标签重推（②海报链全线下线；海报簇传播由尾部 finalizeClusterPropagation
+	// 统一执行——幂等可重复；ptgen_source_json canonical 包装已并入主链 persist）
+	if h.runMainlinePTGen(ctx, meta, force) {
+		h.refreshInferredTags(ctx, meta.InfoHash, meta.SiteName)
 	}
 	// §59.49+§59.57: 截图探活与策略——strategy 可用时探活内联进其前序（串行消除竞态：
 	// 原双 goroutine 并发，strategy 读到 purge 前死链 → rehost 失败保源 → same 早退 → 永不捕获）；
@@ -2617,7 +2578,7 @@ fetched:
 
 	// §59.61 第 4 步 + 附5: 簇终局传播——等海报 fallback 终局后 INSERT 缺行
 	// （携带终态）+ 终态回传（幂等）
-	h.finalizeClusterPropagation(ctx, &posterFallbackWg, clientUID, savePath, name, hash, meta.SiteName)
+	h.finalizeClusterPropagation(ctx, clientUID, savePath, name, hash, meta.SiteName)
 
 	return nil
 }
@@ -3629,18 +3590,16 @@ func (h *PublishTorrentsHandler) checkRequiredFields(meta *model.TorrentMetadata
 	return missing
 }
 
-// mainlineQueryKey §59.285: 主链 PTGen 查询键三级选择（DoubanURL→IMDbURL→Title）。
-func mainlineQueryKey(douban, imdb, title string) (string, string) {
-	if douban != "" {
-		return douban, "douban"
+// mainlineQueryKeys §59.285→§59.286: 主链 PTGen 三级查询键列表
+// （DoubanURL→IMDbURL→Title，空键跳过——顺序链逐级尝试成功即短路）。
+func mainlineQueryKeys(douban, imdb, title string) []string {
+	var keys []string
+	for _, k := range []string{douban, imdb, title} {
+		if k != "" {
+			keys = append(keys, k)
+		}
 	}
-	if imdb != "" {
-		return imdb, "imdb"
-	}
-	if title != "" {
-		return title, "title"
-	}
-	return "", ""
+	return keys
 }
 
 // extractSeedHash 从 URL 路径 /api/v1/publish/seeds/:info_hash 提取 info_hash。
@@ -3659,67 +3618,72 @@ func extractSeedHash(r *http.Request) string {
 // ptgen_source_json（唯一账本）+ desc=RawBBCode。失败全空（incomplete 承接）。
 // 站方原文不保存（desc=我们的 RawBBCode 或空——§59.236 定案）。
 // force=true 绕缓存（单条重获 §59.173）/false 普通缓存（批量——§59.236 决策点①）。
-func (h *PublishTorrentsHandler) runMainlinePTGen(ctx context.Context, meta *model.TorrentMetadata, force bool) {
+func (h *PublishTorrentsHandler) runMainlinePTGen(ctx context.Context, meta *model.TorrentMetadata, force bool) bool {
 	if meta == nil || h.ptgen == nil {
-		return
+		return false
 	}
-	// §59.285: 查询键三级化——DoubanURL → IMDbURL → meta.Title。
-	// 原豆瓣单源门（DoubanURL=="" skip）漏掉无豆瓣页作品（印度/小语种——
-	// Diesel 2025 HIN+TAM+TEL 案：批量获取 incomplete 而 Tab4 海报链
-	// name 反查成功）。Provider.Query 通用透传（端点能力 douban/imdb/name
-	// 通吃）；缓存键随查询键（天然语义）。
-	query, queryKind := mainlineQueryKey(meta.DoubanURL, meta.IMDbURL, meta.Title)
-	if query == "" {
+	// §59.286 终版: 三级顺序链——douban →（失败）→ imdb →（失败）→ title；
+	// 空键跳过；成功（RawBBCode 非空）即短路；写穿缓存（Provider 天然）。
+	// 原 mainlineQueryKey 单键选取在键失效（豆瓣页删除/API 抖动）时整链失败。
+	keys := mainlineQueryKeys(meta.DoubanURL, meta.IMDbURL, meta.Title)
+	if len(keys) == 0 {
 		h.logger.Info("mainline ptgen: no query key, skip",
 			zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
 			zap.String("site", meta.SiteName))
-		return
+		return false
 	}
-	var (
-		result *model.PTGenResult
-		err    error
-	)
-	if force {
-		result, err = h.ptgen.AnalyzePTGenForce(ctx, query)
-	} else {
-		result, err = h.ptgen.AnalyzePTGen(ctx, query)
-	}
-	if err != nil || result == nil || result.RawBBCode == "" {
-		h.logger.Warn("mainline ptgen: query failed",
-			zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
-			zap.String("query_kind", queryKind),
-			zap.String("query", query),
+	var result *model.PTGenResult
+	for _, k := range keys {
+		var (
+			r   *model.PTGenResult
+			err error
+		)
+		if force {
+			r, err = h.ptgen.AnalyzePTGenForce(ctx, k)
+		} else {
+			r, err = h.ptgen.AnalyzePTGen(ctx, k)
+		}
+		if err == nil && r != nil && r.RawBBCode != "" {
+			result = r
+			break // 短路
+		}
+		h.logger.Info("mainline ptgen: level failed, trying next",
+			zap.String("query", k[:min(50, len(k))]),
 			zap.Bool("force", force),
 			zap.Error(err))
-		return // 全空——incomplete 状态机承接（§59.236 遗漏①定案）
 	}
-	// 唯一账本落库：ptgen_source_json + desc=RawBBCode（我们的——站方原文不保存）
-	raw, mErr := json.Marshal(result)
+	if result == nil {
+		h.logger.Warn("mainline ptgen: all levels failed",
+			zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
+			zap.Int("levels", len(keys)))
+		return false // 全空——incomplete 状态机承接（§59.236 遗漏①定案）
+	}
+	// 唯一账本（§59.286: canonical 包装——PTGenToSource 含 fetched_at，
+	// 原 bare json.Marshal 与②路径同列两种编码分裂）+ desc + poster
+	// 无条件同源覆盖（PTGen 成功即权威——空/野图源/任意均覆盖，与 desc
+	// 同页同源；PosterURL 空不覆盖）
+	raw, mErr := json.Marshal(metadata.PTGenToSource(*result, time.Now()))
 	if mErr != nil {
 		h.logger.Warn("mainline ptgen: marshal failed", zap.Error(mErr))
-		return
+		return false
 	}
 	updates := map[string]interface{}{
 		"ptgen_source_json": string(raw),
 		"description":       result.RawBBCode,
 	}
-	// §59.285 附: 海报同源回填——PTGen 结果自带 PosterURL（Diesel 案：
-	// imdb 键查询成功 desc 落库但 poster 列空——Tab4 账本有图 Tab2 字段
-	// 空，incomplete 不消）。仅 Poster 列空时回填（站点海报优先的 fallback
-	// 语义，§59.55 同型增量写）
-	if meta.Poster == "" && result.PosterURL != "" {
+	if result.PosterURL != "" {
 		updates["poster"] = result.PosterURL
 	}
 	if uErr := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
 		Where("info_hash = ? AND site_name = ?", meta.InfoHash, meta.SiteName).
 		Updates(updates).Error; uErr != nil {
 		h.logger.Warn("mainline ptgen: persist failed", zap.Error(uErr))
-		return
+		return false
 	}
 	h.logger.Info("mainline ptgen: applied",
 		zap.String("hash", meta.InfoHash[:min(10, len(meta.InfoHash))]),
-		zap.String("site", meta.SiteName),
-		zap.Int("desc_len", len(result.RawBBCode)))
+		zap.String("site", meta.SiteName))
+	return true
 }
 
 // canonicalGroupName §59.234 ①: 组名规范化到映射词条名——搜索附加词用
@@ -4415,100 +4379,6 @@ func (h *PublishTorrentsHandler) refreshInferredTags(ctx context.Context, infoHa
 	h.logger.Info("inferred tags refreshed",
 		zap.String("hash", infoHash[:min(10, len(infoHash))]),
 		zap.Int("tags_total", len(existing)))
-}
-
-// applyPosterFallback §59.42: 海报替换链落库（goroutine 内执行）。
-// 优先用已落库的 douban_url 作 query（精确），无则种子名；两级 PTGen + HEAD 探活。
-func (h *PublishTorrentsHandler) applyPosterFallback(infoHash, siteName, sitePoster, name string) {
-	if h.ptgen == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	query := name
-	var m model.TorrentMetadata
-	if err := h.db.WithContext(ctx).
-		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
-		First(&m).Error; err == nil && m.DoubanURL != "" {
-		query = m.DoubanURL
-	}
-
-	// §59.55: 双字段消费——querier 捕获完整 PTGenResult（PosterURL + RawBBCode），
-	// 海报走 RunPosterFallback 语义不变；description 增量写（format 非空才覆盖）
-	ptgenDesc := ""
-	var queriers []publish.PTGenQuerier
-	var ptgenResult *model.PTGenResult
-	queriers = append(queriers, func(ctx context.Context, q string) (string, error) {
-		r, err := h.ptgen.AnalyzePTGen(ctx, q)
-		if err != nil || r == nil {
-			return "", err
-		}
-		if r.RawBBCode != "" {
-			ptgenDesc = r.RawBBCode
-			ptgenResult = r // §59.75: 捕获完整 result——产地/类型结构化落库
-		}
-		return r.PosterURL, nil
-	})
-	res := publish.RunPosterFallback(ctx, sitePoster, query, queriers)
-
-	// §59.55: description 增量写——PTGen format 非空即覆盖（PTGen 为准落库），
-	// 失败/空不动（kdouban/descr 回退保留）。与海报分支结果无关（PTGen 可能
-	// 成功返回了 format 但 PosterURL 恰为空/非白名单直信）。
-	if ptgenDesc != "" {
-		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-			Where("info_hash = ? AND site_name = ?", infoHash, siteName).
-			Update("description", ptgenDesc)
-		h.logger.Info("ptgen description applied",
-			zap.String("hash", infoHash[:10]),
-			zap.Int("length", len(ptgenDesc)))
-		// §59.236: 本链（海报兜底副产物）desc 增量写保留——主链
-		// runMainlinePTGen 已落唯一账本（走缓存幂等重复——决策点②保留现状）。
-		// §59.75: PTGen 源结构化持久化（region/genre 系统资产）
-		h.persistPTGenSource(ctx, infoHash, siteName, ptgenResult)
-		// §59.70: t2 重推标签——评分行此刻才进 Description（豆瓣评分≥8 → high_rating）
-		h.refreshInferredTags(ctx, infoHash, siteName)
-		// §59.61 附2: 简介终态同步回传簇（map miss 反查; 幂等可重复）
-		if c, ok := h.clusterCtxFor(ctx, infoHash); ok {
-			h.propagateClusterPosters(ctx, c.clientUID, c.savePath, c.name, infoHash)
-		}
-	}
-
-	if res.Source == "site" {
-		return // 可信原图，无需更新（description 已在上面处理）
-	}
-	// §59.49: ptgen_dead（两级 PTGen 全失败且原站 URL 不可信）时探活原 URL——
-	// 死链清空（poster=""，字段列诚实显红叉）；活链保留（下次重取再试 PTGen 替换）。
-	// 原 URL 进日志可追溯。
-	if res.Source == "ptgen_dead" {
-		if publish.CheckPosterAlive(ctx, sitePoster) {
-			h.logger.Info("poster fallback: ptgen dead but site URL alive, keeping",
-				zap.String("hash", infoHash[:10]),
-				zap.String("poster", sitePoster[:min(60, len(sitePoster))]))
-			return
-		}
-		h.logger.Warn("poster fallback: dead link purged",
-			zap.String("hash", infoHash[:10]),
-			zap.String("dead_url", sitePoster[:min(80, len(sitePoster))]))
-		h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-			Where("info_hash = ? AND site_name = ?", infoHash, siteName).
-			Update("poster", "")
-		return
-	}
-	h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-		Where("info_hash = ? AND site_name = ?", infoHash, siteName).
-		Updates(map[string]interface{}{
-			"poster": res.Poster,
-		})
-	// §59.61 附2: PTGen 终态回传簇（map miss 反查 snapshots——4005 批次实锤修复）
-	if c, ok := h.clusterCtxFor(ctx, infoHash); ok {
-		h.propagateClusterPosters(ctx, c.clientUID, c.savePath, c.name, infoHash)
-	}
-	h.logger.Info("poster fallback applied",
-		zap.String("hash", infoHash[:10]),
-		zap.String("source", res.Source),
-		zap.String("original", res.Original[:min(60, len(res.Original))]),
-		zap.String("final", res.Poster[:min(60, len(res.Poster))]))
 }
 
 // purgeDeadScreenshots §59.49: 截图获取时探活——HEAD（含 1 次重试）逐张检查，

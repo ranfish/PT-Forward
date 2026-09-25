@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -175,21 +174,6 @@ func TestPropagateClusterPosters_NoMemoryMap(t *testing.T) {
 	}
 }
 
-// §59.61 附2: clusterCtxFor 反查——map 空/丢失时从 snapshots 恢复上下文
-func TestClusterCtxFor_FallbackToSnapshots(t *testing.T) {
-	db := clusterTestDB(t)
-	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
-	db.Create(&model.TorrentSnapshot{Hash: "ctxhash00000000000000000000000000000000", ClientUID: 1, Name: "Ctx", SavePath: "/ctx"})
-	// map 为空（未注册）
-	c, ok := h.clusterCtxFor(context.Background(), "ctxhash00000000000000000000000000000000")
-	if !ok || c.clientUID != 1 || c.name != "Ctx" || c.savePath != "/ctx" {
-		t.Errorf("反查失败: %+v ok=%v", c, ok)
-	}
-	// 未知 hash
-	if _, ok := h.clusterCtxFor(context.Background(), "nonexist000000000000000000000000000000"); ok {
-		t.Error("未知 hash 应返回 false")
-	}
-}
 
 // §59.61 附5: 尾部终局传播——fetchSingleTorrent 的 INSERT 循环与异步 applyPosterFallback
 // 的回传 UPDATE 并发竞态（疯狂动物城2 BluRay 27/54 行残留站点态实锤）。修复:
@@ -203,18 +187,12 @@ func TestFinalizeClusterPropagation_WaitsForFallback(t *testing.T) {
 	db.Create(&model.TorrentMetadata{InfoHash: "fself00000000000000000000000000000000000", SiteName: "朋友", Title: "t",
 		Poster: "https://img.keepfrds.com/site", Description: "site-desc", FetchSource: "rss_detail"})
 
-	// 模拟异步 fallback: 50ms 后把首副本修复为 PTGen 终态
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		time.Sleep(50 * time.Millisecond)
-		db.Model(&model.TorrentMetadata{}).
-			Where("info_hash = ?", "fself00000000000000000000000000000000000").
-			Update("poster", "https://doubaninfo.com/dbposter/f.jpg")
-	}()
+	// §59.286: ②下线——主链同步写 PTGen 终态后由 finalize 直接传播（wg 等待语义随②废弃）
+	db.Model(&model.TorrentMetadata{}).
+		Where("info_hash = ?", "fself00000000000000000000000000000000000").
+		Update("poster", "https://doubaninfo.com/dbposter/f.jpg")
 
-	h.finalizeClusterPropagation(context.Background(), &wg, 1, "/f", "F",
+	h.finalizeClusterPropagation(context.Background(), 1, "/f", "F",
 		"fself00000000000000000000000000000000000", "朋友")
 
 	var sib model.TorrentMetadata
