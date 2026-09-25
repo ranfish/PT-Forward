@@ -1230,6 +1230,8 @@
     "importBackup": "Import Backup",
     "backupRestored": "Backup restored",
     "httpProxyPlaceholder": "e.g. http://127.0.0.1:7890",
+    "otaUseProxy": "OTA Update via Proxy",
+    "otaUseProxyHint": "When enabled, OTA check & download force through the HTTP proxy above (default off = direct)",
     "socksProxyPlaceholder": "e.g. socks5://127.0.0.1:7891",
     "cookiecloudUrlPlaceholder": "CookieCloud server URL",
     "cookiecloudUuidPlaceholder": "User UUID",

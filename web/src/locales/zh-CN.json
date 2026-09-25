@@ -1233,6 +1233,8 @@
     "importBackup": "导入备份",
     "backupRestored": "备份已恢复",
     "httpProxyPlaceholder": "例如: http://127.0.0.1:7890",
+    "otaUseProxy": "OTA 更新启用代理",
+    "otaUseProxyHint": "开启后 OTA 检查更新与下载强制走上方 HTTP 代理（默认关闭=直连）",
     "socksProxyPlaceholder": "例如: socks5://127.0.0.1:7891",
     "cookiecloudUrlPlaceholder": "CookieCloud 服务器地址",
     "cookiecloudUuidPlaceholder": "用户 UUID",

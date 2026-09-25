@@ -5,6 +5,10 @@
         <a-form-item :label="t('settings.httpProxy')">
           <a-input v-model:value="form.httpProxy" :placeholder="t('settings.httpProxyPlaceholder')" />
         </a-form-item>
+        <a-form-item :label="t('settings.otaUseProxy')">
+          <a-switch v-model:checked="form.otaUseProxy" />
+          <span style="margin-left: 8px; color: #999; font-size: 12px">{{ t('settings.otaUseProxyHint') }}</span>
+        </a-form-item>
         <a-form-item :label="t('settings.socksProxy')">
           <a-input v-model:value="form.socksProxy" :placeholder="t('settings.socksProxyPlaceholder')" />
         </a-form-item>
@@ -193,6 +197,7 @@ const restoring = ref(false)
 
 const form = reactive({
   httpProxy: '',
+  otaUseProxy: false,
   socksProxy: '',
   cookieCloudUrl: '',
   cookieCloudUuid: '',
@@ -238,6 +243,7 @@ async function fetchSettings() {
     }
     Object.assign(form, {
       httpProxy: data.httpProxy || '',
+      otaUseProxy: data.otaUseProxy === 'true',
       socksProxy: data.socksProxy || '',
       cookieCloudUrl: data.cookieCloudUrl || '',
       cookieCloudUuid: data.cookieCloudUuid || '',
@@ -276,6 +282,7 @@ async function saveSettings() {
   try {
     const entries: [string, string][] = [
       ['httpProxy', form.httpProxy],
+      ['otaUseProxy', String(form.otaUseProxy)],
       ['socksProxy', form.socksProxy],
       ['cookieCloudUrl', form.cookieCloudUrl],
       ['cookieCloudUuid', form.cookieCloudUuid],

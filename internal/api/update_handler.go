@@ -31,13 +31,29 @@ func (h *SystemHandler) getProxyFromSettings() string {
 	return val
 }
 
+// otaProxyEnabled §59.280: OTA 更新启用代理开关（settings otaUseProxy，
+// 默认 false）。ON=httpProxy 已配置时 OTA 检查+下载强制走代理——直连在部分
+// 网络（fnos 案）对 GitHub 是挂起不报错，"直连优先失败回退"永不触发；
+// OFF=维持直连优先回退行为。
+func (h *SystemHandler) otaProxyEnabled() bool {
+	repo := setting.NewRepository(h.db)
+	val, err := repo.Get(context.Background(), "otaUseProxy")
+	if err != nil {
+		return false
+	}
+	return val == "true"
+}
+
 func (h *SystemHandler) newHTTPClientWithProxy(timeout time.Duration) *http.Client {
-	proxyStr := h.getProxyFromSettings()
 	tr := &http.Transport{}
-	if proxyStr != "" {
-		if u, err := url.Parse(proxyStr); err == nil {
-			tr.Proxy = http.ProxyURL(u)
-			h.logger.Info("OTA: using proxy", zap.String("proxy", proxyStr))
+	// §59.280: otaUseProxy 总开关——OFF 时 OTA 全直连（httpProxy 是站点采集
+	// 等全局代理配置，OTA 不隐性搭车）；ON 且已配置才走代理
+	if h.otaProxyEnabled() {
+		if proxyStr := h.getProxyFromSettings(); proxyStr != "" {
+			if u, err := url.Parse(proxyStr); err == nil {
+				tr.Proxy = http.ProxyURL(u)
+				h.logger.Info("OTA: using proxy", zap.String("proxy", proxyStr))
+			}
 		}
 	}
 	return &http.Client{Timeout: timeout, Transport: tr}
@@ -61,14 +77,10 @@ func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request
 	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	// GitHub API: try direct first (api.github.com is usually accessible),
-	// fall back to proxy if direct fails.
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		h.logger.Warn("check update: direct failed, trying proxy", zap.Error(err))
-		proxyClient := h.newHTTPClientWithProxy(15 * time.Second)
-		resp, err = proxyClient.Do(req)
-	}
+	// §59.280: otaUseProxy 开关——ON=强制代理（直连挂起不报错的网络下
+	// "直连优先失败回退"永不回退——fnos 案）；OFF=纯直连（隐性代理回退
+	// 由显式开关取代）
+	resp, err := h.newHTTPClientWithProxy(15 * time.Second).Do(req)
 	if err != nil {
 		h.logger.Warn("check update: github api failed", zap.Error(err))
 		Success(w, map[string]interface{}{
@@ -138,12 +150,8 @@ func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	req, _ := http.NewRequestWithContext(ctx, "GET", githubAPI, nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	// GitHub API: try direct first, proxy fallback
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		proxyClient := h.newHTTPClientWithProxy(10 * time.Second)
-		resp, err = proxyClient.Do(req)
-	}
+	// §59.280: 同 check——开关统一走 newHTTPClientWithProxy
+	resp, err := h.newHTTPClientWithProxy(10 * time.Second).Do(req)
 	if err != nil {
 		Error(w, http.StatusServiceUnavailable, 50001, "无法连接 GitHub API")
 		return
