@@ -94,11 +94,22 @@ func (h *SystemHandler) handleCheckUpdate(w http.ResponseWriter, r *http.Request
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
-		h.logger.Warn("check update: github api status", zap.Int("status", resp.StatusCode))
+		// §59.282: 报错携带状态码+响应体摘要（403 限流/5xx 等自明——
+		// fnos 代理出口 IP 被限流案 30 秒定位，不再"非 200"盲猜）
+		bodySnip := ""
+		if b, rErr := io.ReadAll(io.LimitReader(resp.Body, 256)); rErr == nil {
+			bodySnip = strings.TrimSpace(string(b))
+		}
+		detail := fmt.Sprintf("GitHub API HTTP %d", resp.StatusCode)
+		if bodySnip != "" {
+			detail += ": " + bodySnip
+		}
+		h.logger.Warn("check update: github api status",
+			zap.Int("status", resp.StatusCode), zap.String("body", bodySnip))
 		Success(w, map[string]interface{}{
 			"has_update":      false,
 			"current_version": h.version,
-			"error":           "GitHub API 返回非 200",
+			"error":           detail,
 		})
 		return
 	}
@@ -155,6 +166,21 @@ func (h *SystemHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.newHTTPClientWithProxy(10 * time.Second).Do(req)
 	if err != nil {
 		Error(w, http.StatusServiceUnavailable, 50001, "无法连接 GitHub API")
+		return
+	}
+	// §59.282: 非 200 显式报错（含状态码+摘要）——原缺检查：403 限流体会被
+	// decode 成空 release 误报"未找到适配的二进制文件"
+	if resp.StatusCode != 200 {
+		bodySnip := ""
+		if b, rErr := io.ReadAll(io.LimitReader(resp.Body, 256)); rErr == nil {
+			bodySnip = strings.TrimSpace(string(b))
+		}
+		_ = resp.Body.Close()
+		detail := fmt.Sprintf("GitHub API HTTP %d", resp.StatusCode)
+		if bodySnip != "" {
+			detail += ": " + bodySnip
+		}
+		Error(w, http.StatusServiceUnavailable, 50001, detail)
 		return
 	}
 
