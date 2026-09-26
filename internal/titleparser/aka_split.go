@@ -65,7 +65,7 @@ var akaCommonWords = map[string]bool{
 	"death": true, "kill": true, "love": true, "war": true, "blood": true, "black": true,
 	"white": true, "red": true, "blue": true, "dark": true, "stranger": true, "hunt": true,
 	"piano": true, "factory": true, "princess": true, "hope": true, "risk": true, "moon": true,
-	"tiger": true, "deer": true, "warrior": true, "fantasy": true, "king": true,
+	"tiger": true, "deer": true, "audition": true, "warrior": true, "fantasy": true, "king": true,
 }
 
 // akaSegmentScore 段计分：常见词 +1/词；全小写字母词段（拼音形态）强扣分
