@@ -162,3 +162,9 @@
 - [x] ~~首发标签转存种是否勾选~~ → **不勾**（用户 09-02 定案：首发=PT 圈通用官方专属语义，转载禁用——全站适用铁律）
 - [ ] descr 中 MI 文本是否触发人工审查（无自动检测，风险低）
 - [ ] 种子最小体积限制（幸运 1GB，本站规则仅见 100MB 下限——验证是否有上限/下限服务端校验）
+
+## §59.289 教训记录（2026-09-26）
+
+- **type 映射单复数错位**：本文档上表的站方事实（404=纪录片（Documentaries））无误；错在翻译层——migration 33 手写基线把该条目的 standard_key 写成 `category.documentaries`（复数），而 dict L3 语义集 canonical 是 `category.documentary`（单数）→ 纪录片种子 type 字段恒不发 → 站方 "Invalid integer format or integer overflow" → 错误页形态（h1+p）未被提取 →"上传失败: 未知响应"（Untold Shooting Guards 三连案）。
+- **修复**：mapping 40 幂等双键（单数在前）+ 基线常量同步 + ExtractUploadError h1+p 提取 + executor type fail-fast。同类错位全库比对仅此一处（dict×站点映射 diff 实证）。
+- **规则**：见 README 映射命名铁律。
