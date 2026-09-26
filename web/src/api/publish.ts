@@ -225,6 +225,10 @@ export const seedConfigApi = {
   fetchSingleSeed(infoHash: string, clientId: number) {
     return client.post<ApiResponse<{ message: string }>>(`/publish/seeds/${infoHash}/fetch`, {}, { params: { client_id: clientId } })
   },
+  // §59.288: UI 批量审核（hash 形态——列表行天然主键；后端解析+簇同步）
+  batchReviewByHashes(infoHashes: string[], reviewed = true) {
+    return client.post<ApiResponse<{ updated: number }>>('/publish/seed-data/batch-review', { info_hashes: infoHashes, reviewed })
+  },
   deleteSeed(infoHash: string) {
     return client.delete<ApiResponse<{ message: string }>>(`/publish/seeds/${infoHash}`)
   },
