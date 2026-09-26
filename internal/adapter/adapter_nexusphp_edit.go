@@ -158,7 +158,13 @@ func (a *NexusPHPAdapter) SubmitEdit(ctx context.Context, req *model.EditRequest
 	defer func() { drainBody(resp) }()
 
 	// 302/301 重定向 = 成功（NexusPHP takeedit 标准行为）
+	// §59.290 附: Location 校验——重定向到 login/take2fa 是凭证被拒
+	// （幸运 IP 会话保护案：11 条 302→login.php 被误判 OK 的假成功实锤）
 	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
+		if loc := resp.Header.Get("Location"); strings.Contains(strings.ToLower(loc), "login") ||
+			strings.Contains(strings.ToLower(loc), "take2fa") {
+			return fmt.Errorf("edit failed: 凭证被拒（重定向 %s——cookie 失效/异地会话保护）", loc)
+		}
 		return nil
 	}
 
