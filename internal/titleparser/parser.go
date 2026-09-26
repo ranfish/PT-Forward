@@ -103,10 +103,14 @@ func ParseTitle(title string) TitleComponents {
 	// 剩余部分 = 无法识别（§59.97 定案: 年份右侧技术区残余不回填主标题——
 	// 边界左侧全是片名、右侧全是技术词，无词性猜测；HKG/ITA 走 RegionCode extractor）
 	if mainLocked != "" {
-		c.MainTitle = mainLocked
+		c.MainTitle = SplitAKATitle(mainLocked) // §59.290: AKA 双名切分（锁定名同切）
 		_, c.Unrecognized = extractMainAndUnrecognized(title)
 	} else {
 		c.MainTitle, c.Unrecognized = extractMainAndUnrecognized(title)
+		// §59.290: 站方 "原名 AKA 英文名" 命名风格切分——v1.05 主标题单名
+		// （243 "Chi l'ha vista morire? AKA Who Saw Her Die?" 案）；切分在
+		// year/组名/技术词提取之后（各 token 已独立摘出，主标题段内切分零影响）
+		c.MainTitle = SplitAKATitle(c.MainTitle)
 	}
 
 	return c
