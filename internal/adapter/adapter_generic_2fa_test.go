@@ -81,3 +81,22 @@ func TestGetTorrentDetail_InterstitialTitleOnly(t *testing.T) {
 		t.Errorf("错误应指向凭证拦截: %v", err)
 	}
 }
+
+// §59.289: 上传失败页 h1+p 组合提取（修道院 Invalid integer 案——原双正则全 miss）
+func TestExtractUploadError_H1P(t *testing.T) {
+	html := `<table><tr><td><h1>上传失败！</h1>
+<p>Invalid integer format or integer overflow: </p></td></tr></table>`
+	got := ExtractUploadError(html)
+	if !strings.Contains(got, "上传失败") || !strings.Contains(got, "Invalid integer") {
+		t.Errorf("h1+p 组合未提取: %q", got)
+	}
+	// 关键词 p（原路径回归）
+	html2 := `<p>上传失败: 种子已存在</p>`
+	if got2 := ExtractUploadError(html2); !strings.Contains(got2, "已存在") {
+		t.Errorf("p 关键词路径回归失败: %q", got2)
+	}
+	// 无错误页
+	if got3 := ExtractUploadError("<html><body>normal page</body></html>"); got3 != "" {
+		t.Errorf("正常页应空: %q", got3)
+	}
+}

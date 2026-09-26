@@ -284,6 +284,16 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 			form[field] = j.match.Value
 		}
 	}
+	// §59.289 fail-fast: 站方表单要求 type（FormFields 有域）但映射不出
+	// （元数据 category 无对应选项）——注定失败的上传不发出去，本地精准
+	// 拒发（修道院纪录片单复数错位案：type 不发→站方 Invalid integer
+	// →未知响应三连）。缺省站（FormFields 无 type 域）不受影响。
+	if tf, ok := cfg.FormFields[model.FieldDomainType]; ok && tf != "" {
+		if _, filled := form[tf]; !filled {
+			return failRec("failed", fmt.Sprintf(
+				"类型映射缺失：站点表单要求 type（%s），元数据 category=%q 无对应选项——检查站点发布表单配置 type 域映射", tf, meta.Category))
+		}
+	}
 
 	// ⑤ tags（判据引擎 → 站点调整层 → form_config 反查 → auto:false 过滤 + 人工 overrides）
 	tags := adjustTagsForSite(e.assembleTags(cfg, meta, in.TagOverrides),

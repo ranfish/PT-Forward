@@ -1059,11 +1059,16 @@ func (a *NexusPHPAdapter) UploadTorrent(ctx context.Context, config *model.SiteC
 		return r, nil
 	}
 
-	errMsg := "上传失败: 未知响应"
-	if m := reNexusErrorClass.FindStringSubmatch(html); len(m) > 1 {
-		errMsg = strings.TrimSpace(m[1])
-	} else if m := reNexusErrorP.FindStringSubmatch(html); len(m) > 1 {
-		errMsg = strings.TrimSpace(m[1])
+	// §59.289: 错误提取单点（h1+p 组合增强）+ 未知响应可观测化（响应体
+	// 片段入日志——"未知响应"不再吞真凶）
+	errMsg := ExtractUploadError(html)
+	if errMsg == "" {
+		errMsg = "上传失败: 未知响应"
+		if a.logger != nil {
+			a.logger.Error("upload unknown response body",
+				zap.String("site", config.Domain),
+				zap.String("html_head", html[:min(300, len(html))]))
+		}
 	}
 
 	return nil, &model.AppError{Code: 15001, Message: errMsg}
