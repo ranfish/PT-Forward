@@ -2,6 +2,10 @@
 
 > 本目录包含各个 PT 站点的特异化适配器设计文档，每个站点独立一个文档，便于维护和扩展。
 
+## 映射命名铁律（2026-09-26 §59.289 教训定案）
+
+**站点表单映射（form_config value_mappings）的 standard_key 必须对齐 `internal/titleparser/dict/<域>.json` 的 canonical 键（L3 语义集=命名权威）**——禁止手写变体（如单复数混用：dict `category.documentary`（单数）× 修道院基线手写 `category.documentaries`（复数）→ type 字段恒不发 → 站方 Invalid integer → "未知响应"三连案）。HTML 导入自动生成的映射（LookupStandardKeyLoose 走 extended_standard_keys）与手写基线（migration）都可能产生错位——**新建映射后必须与 dict canonical 全集比对一遍**（对照脚本形态见 §59.289 办案过程：dict 键 × 站点映射键 diff）。
+
 ## 目录
 
 | 站点 | 文档 | 状态 |
