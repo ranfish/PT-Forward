@@ -201,7 +201,7 @@ func (h *PublishTorrentsHandler) lookupScreenshotCache(clientUID uint, savePath,
 
 // finalizeClusterPropagation §59.61 附5: fetch 尾部终局传播。竞态实锤（疯狂动物城2
 // BluRay 27/54 行残留站点态）: propagateClusterMetadata 的 INSERT 循环（54 行/178ms，
-// src 只读一次）与异步 applyPosterFallback 的回传 UPDATE 并发——循环尾段 INSERT 的行
+// src 只读一次）（§59.286 后主链同步写——历史②异步竞态已随下线消解）循环尾段 INSERT 的行
 // 携带过期站点态落地，"已有行不覆盖"语义保证无人再修。修复: 等 fallback 终局后
 // INSERT（携带终态），再显式回传一次（幂等兜底，覆盖既有传播行）。
 // §59.286: fallbackWg 参数移除（②海报链下线——唯一等待者）
