@@ -1772,24 +1772,39 @@ func (h *PublishTorrentsHandler) handleSaveSeedData(w http.ResponseWriter, r *ht
 }
 
 // handleBatchReview §56.40: 批量审核（标记 reviewed）。
-// §59.275 定位: 运维内部接口——仅后端/curl 调用（簇级批审/数据修复用），
-// 不开放前端 UI（前端 TS api 函数已删——用户定案 2026-09-24）。
+// §59.275→§59.288 定位演进: ids 形态=运维内部（簇级批审/数据修复）；
+// info_hashes 形态=前端 UI 批量审核（列表行天然主键是 hash——与批量清除同
+// 钥匙形态；服务端解析 hash→ids 走原路径，簇同步 §59.94 对两形态统一生效）。
 func (h *PublishTorrentsHandler) handleBatchReview(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IDs      []uint `json:"ids"`
-		Reviewed bool   `json:"reviewed"`
+		IDs        []uint   `json:"ids"`
+		InfoHashes []string `json:"info_hashes"`
+		Reviewed   bool     `json:"reviewed"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "invalid body")
 		return
 	}
-	if len(req.IDs) == 0 {
+	ids := req.IDs
+	if len(req.InfoHashes) > 0 {
+		// §59.288: hash→id 解析（簇代表 hash 与全部同 hash 行均审——簇同步再扩散兄弟 hash）
+		var resolved []uint
+		if err := h.db.WithContext(r.Context()).
+			Model(&model.TorrentMetadata{}).
+			Where("info_hash IN ?", req.InfoHashes).
+			Pluck("id", &resolved).Error; err != nil {
+			Error(w, http.StatusInternalServerError, 50000, "db error")
+			return
+		}
+		ids = append(ids, resolved...)
+	}
+	if len(ids) == 0 {
 		Error(w, http.StatusBadRequest, 40001, "ids required")
 		return
 	}
 	result := h.db.WithContext(r.Context()).
 		Model(&model.TorrentMetadata{}).
-		Where("id IN ?", req.IDs).
+		Where("id IN ?", ids).
 		Update("reviewed", req.Reviewed)
 	if result.Error != nil {
 		h.logger.Warn("batch review failed", zap.Error(result.Error))
@@ -1797,7 +1812,7 @@ func (h *PublishTorrentsHandler) handleBatchReview(w http.ResponseWriter, r *htt
 		return
 	}
 	// §59.94: 审核簇同步（公共方法——批量 ID 去重簇键后逐簇传播）
-	h.syncClusterReviewedByIDs(context.Background(), req.IDs, req.Reviewed)
+	h.syncClusterReviewedByIDs(context.Background(), ids, req.Reviewed)
 	Success(w, map[string]interface{}{"updated": result.RowsAffected})
 }
 

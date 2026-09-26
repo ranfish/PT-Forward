@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"go.uber.org/zap"
 )
 
 // §59.281: OTA 任务门控——BusyTaskDesc 空闲态
@@ -71,5 +72,25 @@ func TestMainlinePTGenChainShortCircuit(t *testing.T) {
 	}
 	if hit == nil || hit.PosterURL == "" {
 		t.Errorf("链未在 imdb 级短路: %+v", hit)
+	}
+}
+
+// §59.288: batch-review info_hashes 形态——hash→id 解析（内存 DB）
+func TestBatchReviewByHashes(t *testing.T) {
+	db := clusterTestDB(t)
+	_ = &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	db.Create(&model.TorrentMetadata{InfoHash: "brhash000000000000000000000000000000000", SiteName: "站A", Title: "t", Reviewed: false})
+	db.Create(&model.TorrentMetadata{InfoHash: "brhash000000000000000000000000000000000", SiteName: "站B", Title: "t", Reviewed: false})
+
+	var ids []uint
+	db.Model(&model.TorrentMetadata{}).Where("info_hash IN ?", []string{"brhash000000000000000000000000000000000"}).Pluck("id", &ids)
+	if len(ids) != 2 {
+		t.Fatalf("hash 解析应得 2 行, got %d", len(ids))
+	}
+	db.Model(&model.TorrentMetadata{}).Where("id IN ?", ids).Update("reviewed", true)
+	var n int64
+	db.Model(&model.TorrentMetadata{}).Where("info_hash = ? AND reviewed = 1", "brhash000000000000000000000000000000000").Count(&n)
+	if n != 2 {
+		t.Errorf("两行应均审: %d", n)
 	}
 }

@@ -61,6 +61,16 @@
           cancel-text="取消"
           @confirm="(statusFilter === 'observing' ? batchPurgeObserving : batchClear)()"
         >
+          <a-button
+            v-if="statusFilter === 'pending'"
+            type="primary"
+            :loading="batchReviewing"
+            :disabled="selectedHashes.length === 0"
+            style="margin-right: 8px"
+            @click="batchReviewSelected"
+          >
+            <CheckOutlined /> 批量审核{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
+          </a-button>
           <a-button danger :loading="batchClearing" :disabled="selectedHashes.length === 0">
             <ClearOutlined /> {{ statusFilter === 'observing' ? '批量清理' : '批量清除' }}{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
           </a-button>
@@ -217,7 +227,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { PlusOutlined, ReloadOutlined, ClearOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, ClearOutlined, CheckOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import CrossSeedPanel from './CrossSeedPanel.vue'
 import BatchFetchPanel from './BatchFetchPanel.vue'
@@ -501,6 +511,7 @@ async function fetchSingle(item: SeedListItem) {
 
 const selectedHashes = ref<string[]>([])
 const batchClearing = ref(false)
+const batchReviewing = ref(false) // §59.288: 待审核批量审核
 
 function onSelectChange(keys: string[]) {
   selectedHashes.value = keys
@@ -533,6 +544,30 @@ async function batchPurgeObserving() {
   } finally {
     batchClearing.value = false
   }
+}
+
+// §59.288: 待审核列表批量审核——hash 形态一次请求（簇同步后端扩散）
+async function batchReviewSelected() {
+  if (selectedHashes.value.length === 0) return
+  Modal.confirm({
+    title: `确定审核通过 ${selectedHashes.value.length} 个种子？`,
+    content: '同簇资源将同步审核状态（§59.94 簇同步）',
+    okText: '审核通过',
+    cancelText: '取消',
+    onOk: async () => {
+      batchReviewing.value = true
+      try {
+        const res = await seedConfigApi.batchReviewByHashes(selectedHashes.value, true)
+        message.success(`已审核 ${res.data?.data?.updated ?? selectedHashes.value.length} 行（簇同步已扩散）`)
+        selectedHashes.value = []
+        await fetchList()
+      } catch (e: any) {
+        message.error('批量审核失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
+      } finally {
+        batchReviewing.value = false
+      }
+    },
+  })
 }
 
 async function batchClear() {
