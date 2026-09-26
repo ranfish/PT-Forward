@@ -71,7 +71,10 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 	}
 
 	var candidates []SubtitleCandidate
-	textCodecs := map[string]bool{"ass": true, "subrip": true, "srt": true, "ssa": true}
+	// §59.291: webvtt（NF/AMZN WEB-DL MKV 内嵌标配——UNABOMBER 中文简繁
+	// 双轨全 WEBVTT 实证）+ mov_text（MP4 内嵌）补入——原白名单致 Detect
+	// 全滤 → sid=0 → --sid=no 裸图
+	textCodecs := map[string]bool{"ass": true, "subrip": true, "srt": true, "ssa": true, "webvtt": true, "mov_text": true}
 	graphicCodecs := map[string]bool{
 		"hdmv_pgs_subtitle": true, "pgssub": true,
 		"dvd_subtitle": true, "dvdsub": true,
@@ -93,7 +96,20 @@ func (d *SubtitleDetector) Detect(ctx context.Context, videoPath string) ([]Subt
 		_, isText := textCodecs[codec]
 		_, isGraphic := graphicCodecs[codec]
 		if !isText && !isGraphic {
-			continue
+			// §59.291 附: codec unknown 兜底——MKV 内嵌 WEBVTT 的 CodecID
+			// （W_WEBVTT）ffprobe 报 codec_name 缺省（UNABOMBER 实证：三轨
+			// chi/中文简繁全 unknown 被白名单滤掉 → sid=0 裸图）。判据反转：
+			// 有语言/标题标记的字幕流（-select_streams s 已保证是字幕流）
+			// 按文本候选兜底——mpv 渲染兼容 webvtt
+			if codec == "" || codec == "unknown" {
+				if lang != "" || title != "" {
+					isText = true
+				} else {
+					continue
+				}
+			} else {
+				continue
+			}
 		}
 
 		score := 0
@@ -133,7 +149,9 @@ func (d *SubtitleDetector) SelectBestChinese(candidates []SubtitleCandidate) (in
 			if bestASS == nil || c.Score > bestASS.Score {
 				bestASS = c
 			}
-		case c.Codec == "subrip" && c.Score > 0:
+		case c.IsText && c.Score > 0:
+			// §59.291: 文本轨统一 SRT 槽（subrip/webvtt/mov_text/未知 codec
+			// 兜底候选——纯文本渲染同质，ass 优先级不变）
 			if bestSRT == nil || c.Score > bestSRT.Score {
 				bestSRT = c
 			}
