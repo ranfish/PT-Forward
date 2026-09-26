@@ -81,3 +81,24 @@ func classifyUploadHTML(logger *zap.Logger, site, detailBase, html, existingRedi
 	}
 	return nil
 }
+// reUploadFailH1P §59.289: 上传失败页 h1+p 组合——站方 stderr 模板
+// <h1>上传失败！</h1><p>Invalid integer format...</p> 中 p 内容不含
+// 失败/error 关键词（"Invalid integer" 全 miss）→ 原 reNexusErrorP 漏提
+// → "未知响应"（修道院 type 缺失三连案真凶被吞）。
+var reUploadFailH1P = regexp.MustCompile(`(?is)<h1[^>]*>([^<]*(?:失败|错误|无效)[^<]*)</h1>\s*(?:<br\s*/?>)?\s*<p[^>]*>([^<]{1,300})</p>`)
+
+// ExtractUploadError §59.289: 上传响应错误文案提取单点（generic/nexusphp
+// 双适配器共享——§59.263 双副本教训）。三级：class 属性 → p 关键词 → h1+p
+// 组合。全 miss 返回空（调用方落"未知响应"+日志响应体片段）。
+func ExtractUploadError(html string) string {
+	if m := reNexusErrorClass.FindStringSubmatch(html); len(m) > 1 {
+		return strings.TrimSpace(m[1])
+	}
+	if m := reNexusErrorP.FindStringSubmatch(html); len(m) > 1 {
+		return strings.TrimSpace(m[1])
+	}
+	if m := reUploadFailH1P.FindStringSubmatch(html); len(m) > 2 {
+		return strings.TrimSpace(m[1]) + ": " + strings.TrimSpace(m[2])
+	}
+	return ""
+}

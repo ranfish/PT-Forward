@@ -653,6 +653,13 @@ func (a *GenericAdapter) uploadGeneric(ctx context.Context, config *model.SiteCo
 	errMsg := "上传失败: 未知响应"
 	if m := reGenericErrorClass.FindStringSubmatch(html); len(m) > 1 {
 		errMsg = strings.TrimSpace(m[1])
+	} else if e := ExtractUploadError(html); e != "" {
+		// §59.289: h1+p 组合增强（与 nexusphp 单点共享）
+		errMsg = e
+	} else if a.logger != nil {
+		a.logger.Error("upload unknown response body",
+			zap.String("site", config.Domain),
+			zap.String("html_head", html[:min(300, len(html))]))
 	}
 
 	return nil, &model.AppError{Code: 15001, Message: errMsg}
