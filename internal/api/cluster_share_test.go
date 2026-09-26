@@ -154,7 +154,7 @@ func TestPropagateClusterPosters(t *testing.T) {
 }
 
 // §59.61 附2: propagateClusterPosters 不依赖内存 map——从 snapshots 反查簇上下文。
-// 4005 批次实锤: posterClusterCtx 容量清空把尾部 3 部上下文丢掉 → PTGen 修复不回传。
+// §59.61 附2（②已下线）：propagateClusterPosters 直接调用（snapshots 反查上下文）。
 func TestPropagateClusterPosters_NoMemoryMap(t *testing.T) {
 	db := clusterTestDB(t)
 	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
@@ -165,7 +165,7 @@ func TestPropagateClusterPosters_NoMemoryMap(t *testing.T) {
 	db.Create(&model.TorrentMetadata{InfoHash: "rsib0000000000000000000000000000000000000", SiteName: "朋友", Title: "t",
 		Poster: "https://img.keepfrds.com/dead2", FetchSource: "cluster"})
 
-	// 不注册 posterClusterCtx（模拟 map 被清空/进程重启后）——直接调用也必须回传成功
+	// 直接调用（snapshots 反查——§59.286 后唯一上下文源）
 	h.propagateClusterPosters(context.Background(), 1, "/r", "R", "rself000000000000000000000000000000000000")
 	var sib model.TorrentMetadata
 	db.Where("info_hash = ?", "rsib0000000000000000000000000000000000000").First(&sib)

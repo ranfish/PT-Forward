@@ -179,7 +179,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 	case "poster", "intro":
 		// §59.42 延伸: PTGen query 优先级——DB douban_url > imdb_url > 种子名。
 		// 现配 endpoint（doubaninfo/cspt）只接受资源 URL，种子名必然失败
-		// （用户报"重新获取海报报 无法解析资源URL"根因）；与 applyPosterFallback 同款语义。
+		// （用户报"重新获取海报报 无法解析资源URL"根因）；§59.286 三级顺序链。
 		// §59.286 终版: 三级顺序链（douban→imdb→name，失败落下一级，成功短路
 		// ——与主链同构）+ Force 绕缓存（§59.173 手动重获语义）
 		keys := h.resolvePTGenQueryKeys(ctx, req.InfoHash, req.SiteName, req.Name)
