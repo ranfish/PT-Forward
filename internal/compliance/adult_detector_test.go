@@ -112,3 +112,25 @@ func TestBenignXXX(t *testing.T) {
 		}
 	}
 }
+
+// §59.292: XXX 关键词 xXx 电影豁免——关键词通道词边界命中而 DetectAdult 有豁免的双通道不一致
+func TestXXXKeywordBenignE2E(t *testing.T) {
+	c := &Checker{}
+	// xXx 2002 电影（词边界 ^XXX 命中 + 年份豁免）→ 放行
+	if r := c.checkFull(nil, "xXx.2002.JPN.Blu-ray.x264.DTS.2Audios.MiniBD1080P-CMCT", "", ScopeShare); r != nil && !r.Passed {
+		t.Errorf("xXx 2002 应豁免: %+v", r)
+	}
+	// 副标题通道（限制级特工台译名）
+	if r := c.checkFull(nil, "xXx.2002.JPN.Blu-ray.x264.DTS.2Audios.MiniBD1080P-CMCT",
+		"极限特工/限制级特工(台) [日版修复版]", ScopeShare); r != nil && !r.Passed {
+		t.Errorf("xXx 2002 带台译副标题应豁免: %+v", r)
+	}
+	// 真 XXX 成人（无年份豁免形态）→ 仍拦
+	if r := c.checkFull(nil, "XXX.Amateurs.2020.1080p.WEB-DL.x264-GRP", "", ScopeShare); r == nil || r.Passed {
+		t.Errorf("真 XXX 应拦: %+v", r)
+	}
+	// xXx 2017 续作豁免
+	if r := c.checkFull(nil, "xXx.Return.of.Xander.Cage.2017.1080p.BluRay.x264-GRP", "", ScopeShare); r != nil && !r.Passed {
+		t.Errorf("xXx 2017 应豁免: %+v", r)
+	}
+}
