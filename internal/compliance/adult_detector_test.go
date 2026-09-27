@@ -153,3 +153,33 @@ func TestAdultExemptedSingleGuard(t *testing.T) {
 		t.Errorf("真 XXX 应拦: %+v", r)
 	}
 }
+
+// §59.295: isBenignXXX 前提词边界化——中文前缀形态（pt29 二连案）
+func TestXXXChinesePrefix(t *testing.T) {
+	c := &Checker{}
+	cases := []struct{ name, sub string }{
+		{"[极限特工1].xXx.2002.JPN.Blu-ray.1080p.AVC.TrueHD.5.1-CMCT", ""},                    // 案 1
+		{"[极限特工2].xXx.State.of.the.Union.2005.Blu-ray.1080p.AVC.TrueHD5.1-CMCT", ""},       // 案 2（点分片名）
+		{"[极限特工3].xXx.Return.of.Xander.Cage.2017.2160p.BluRay.x264-GRP", ""},               // 续作点分
+		{"xXx.2002.JPN.Blu-ray.x264.DTS.2Audios.MiniBD1080P-CMCT", ""},                        // 无前缀回归
+		{"xXx State of the Union 2005 1080p BluRay x264-GRP", ""},                             // 空格形态
+	}
+	for _, tc := range cases {
+		if r := c.checkFull(nil, tc.name, tc.sub, ScopeShare); r != nil && !r.Passed {
+			t.Errorf("[%s] 豁免失效: %+v", tc.name[:30], r)
+		}
+	}
+	// 真 XXX 成人（xxx 独立词 + 无豁免特征）仍拦
+	for _, bad := range []string{
+		"XXX.Amateurs.2020.1080p.WEB-DL.x264-GRP",
+		"[标签].xxx.2019.1080p.WEB-DL.x264-GRP", // xxx 有年份 2019 不在白名单
+	} {
+		if r := c.checkFull(nil, bad, "", ScopeShare); r == nil || r.Passed {
+			t.Errorf("[%s] 应拦: %+v", bad[:25], r)
+		}
+	}
+	// 词中 xxx 不豁免也不误判（xxxvideo 之类无词边界 → kw 也不命中 → 豁免前提 miss 但不影响判定）
+	if r := c.checkFull(nil, "Maxxx.2020.1080p.x264-GRP", "", ScopeShare); r != nil && !r.Passed {
+		t.Errorf("[词中] 误拦: %+v", r)
+	}
+}
