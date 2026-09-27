@@ -14,6 +14,7 @@ import (
 type ClusterMember struct {
 	Hash    string
 	Comment string
+	TrackerDomain string // §59.296: 下载来源站首域（纯数字/相对路径方言站点上下文）
 }
 
 // GetClusterComments 读簇内全部副本及其 comment（三入口统一：batch-fetch / manual-forward / refresh）。
@@ -25,7 +26,7 @@ func GetClusterComments(ctx context.Context, db *gorm.DB, clientUID uint, savePa
 	var rows []ClusterMember
 	db.WithContext(ctx).
 		Model(&model.TorrentSnapshot{}).
-		Select("hash, COALESCE(comment, '') as comment").
+		Select("hash, COALESCE(comment, '') as comment, COALESCE(tracker_domain, '') as tracker_domain").
 		Where("client_uid = ? AND save_path = ? AND name = ? AND is_hidden = 0", clientUID, savePath, name).
 		Scan(&rows)
 	return rows
@@ -41,7 +42,12 @@ func BuildClusterTargets(members []ClusterMember, hostResolver func(string) stri
 		if m.Comment == "" {
 			continue
 		}
-		host := trackerHostByHash[m.Hash]
+		// §59.296: 全簇副本 tracker 域——快照列直读（馒头纯数字方言
+		// 上下文），外部 map 仅作缺列兜底（新装/未同步窗口）
+		host := m.TrackerDomain
+		if host == "" {
+			host = trackerHostByHash[m.Hash]
+		}
 		for _, tgt := range comment.Resolve(m.Comment, hostResolver, host) {
 			key := tgt.SiteName + ":" + tgt.TorrentID
 			if !seen[key] {

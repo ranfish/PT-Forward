@@ -1,6 +1,8 @@
 package download
 
 import (
+	"net/url"
+	"strings"
 	"path/filepath"
 	"context"
 	"fmt"
@@ -271,6 +273,7 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientUID uint, torrents []*
 			IsHidden: false,
 			LastSeen: now,
 			Comment:  t.Comment, // §59.61: 簇直达判据凭证
+			TrackerDomain: firstTrackerHost(t.TrackerURL, t.TrackerURLs), // §59.296: 下载来源站首域
 		})
 	}
 
@@ -282,6 +285,7 @@ func (s *Syncer) syncSnapshots(ctx context.Context, clientUID uint, torrents []*
 			DoUpdates: clause.AssignmentColumns([]string{
 				"name", "save_path", "size", "state", "progress", "uploaded",
 				"is_hidden", "last_seen", "updated_at", "comment", // §59.61
+				"tracker_domain", // §59.296
 			}),
 		}).Create(&records[i])
 	}
@@ -742,3 +746,31 @@ func parseUint(s string) (uint, error) {
 }
 
 var errInvalidNumber = fmt.Errorf("invalid number")
+
+// firstTrackerHost §59.296: tracker URL → 下载来源站首域 host。
+// 主 tracker 优先（qb 仅主域；TR 全量取首），均无返回空。
+func firstTrackerHost(main string, all []string) string {
+	for _, u := range append([]string{main}, all...) {
+		if u == "" {
+			continue
+		}
+		if host := trackerHostOf(u); host != "" {
+			return host
+		}
+	}
+	return ""
+}
+
+func trackerHostOf(u string) string {
+	u = strings.TrimSpace(u)
+	if u == "" {
+		return ""
+	}
+	if !strings.Contains(u, "://") {
+		u = "http://" + u
+	}
+	if p, err := url.Parse(u); err == nil && p.Hostname() != "" {
+		return strings.ToLower(p.Hostname())
+	}
+	return ""
+}

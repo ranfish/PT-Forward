@@ -10,6 +10,9 @@ type TorrentSnapshot struct {
 	ClientUID  uint     `json:"client_uid" gorm:"not null;default:0;uniqueIndex:idx_snapshot_hash_client,composite:client_uid;index:idx_snapshots_cluster,composite:client_path_name"`
 	Name       string    `json:"name" gorm:"size:500;index:idx_snapshots_cluster,composite:client_path_name"`
 	Comment    string    `json:"comment" gorm:"type:text"` // §59.61: 种子 comment——簇直达判据凭证（TR/qb syncer 同步）
+	// §59.296: 下载来源站域名（tracker 首域 host）——簇副本归属判定
+	// （馒头纯数字 comment 方言的站点上下文；comment 直达/选站 ①a 消费）。syncer 同步写入。
+	TrackerDomain string    `json:"tracker_domain" gorm:"size:120;default:''"`
 	SavePath   string    `json:"save_path" gorm:"size:500;index;index:idx_snapshots_cluster,composite:client_path_name"`
 	Size       int64     `json:"size"`
 	State      string    `json:"state" gorm:"size:50"`
