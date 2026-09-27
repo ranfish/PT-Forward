@@ -51,7 +51,7 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 		for _, siteName := range priority {
 			if c, ok := siteMap[siteName]; ok {
 				var site model.Site
-				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
 					result.SourceSite = site.Name
 					result.SourceSiteID = site.ID
 					result.TorrentID = c.TorrentID
@@ -70,7 +70,7 @@ func (d *SourceSiteDetector) Detect(ctx context.Context, title, infoHash string,
 		if siteName != "" {
 			var site model.Site
 			// §59.20: Step 2 加 cookie 检查——源站无 cookie 时降级到 Step 3
-			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
 				result.SourceSite = site.Name
 				result.SourceSiteID = site.ID
 				result.AutoDetected = true
@@ -272,7 +272,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 					continue
 				}
 				var site2 model.Site
-				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site2).Error; err == nil {
+				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site2).Error; err == nil {
 					result.SourceSite = site2.Name
 					result.SourceSiteID = site2.ID
 					result.TorrentID = ct.TorrentID
@@ -284,7 +284,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 			// 优先：coverage 命中 + cookie → 有 tid 可直接获取
 			if c, ok := siteMap[siteName]; ok {
 				var site model.Site
-				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
 					result.SourceSite = site.Name
 					result.SourceSiteID = site.ID
 					result.TorrentID = c.TorrentID
@@ -296,7 +296,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 			}
 			// §59.25: 无 coverage 时也允许选站（batch-fetch 场景），用搜索方式获取
 			var site model.Site
-			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+			if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
 				result.SourceSite = site.Name
 				result.SourceSiteID = site.ID
 				result.AutoDetected = true
@@ -313,7 +313,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 			continue
 		}
 		var site2 model.Site
-		if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", ct.SiteName, true).First(&site2).Error; err == nil {
+		if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", ct.SiteName, true).First(&site2).Error; err == nil {
 			result.SourceSite = site2.Name
 			result.SourceSiteID = site2.ID
 			result.TorrentID = ct.TorrentID
@@ -328,7 +328,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 		for _, siteName := range priority {
 			if c, ok := siteMap[siteName]; ok {
 				var site model.Site
-				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+				if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
 					result.SourceSite = site.Name
 					result.SourceSiteID = site.ID
 					result.TorrentID = c.TorrentID
@@ -344,7 +344,7 @@ func (d *SourceSiteDetector) SelectFetchSite(ctx context.Context, title string, 
 	// §59.59 Q3b 定案保持现状）
 	for siteName, c := range siteMap {
 		var site model.Site
-		if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND cookie != ''", siteName, true).First(&site).Error; err == nil {
+		if err := d.db.WithContext(ctx).Where("name = ? AND enabled = ? AND (cookie != '' OR api_key != '')", siteName, true).First(&site).Error; err == nil {
 			result.SourceSite = site.Name
 			result.SourceSiteID = site.ID
 			result.TorrentID = c.TorrentID
