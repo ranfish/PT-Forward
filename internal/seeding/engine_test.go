@@ -803,6 +803,14 @@ func setupEngineTestDBAll(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
+	// §59.293: 测试库连接池串行化——cache=shared 内存库下引擎后台 goroutine
+	// （Start 起的采集循环）与测试主线程并发写同库，CI 慢环境撞 SQLITE_LOCKED
+	// （表锁非忙锁——DSN busy_timeout 不救）→ UPDATE 静默失败 → 断言飘移
+	// （DiskProtectNoRecoveryWhenFull CI flake 实证：update 到 deleted 报
+	// database table is locked）。单连接消除并发面。
+	if sqlDB, dbErr := db.DB(); dbErr == nil {
+		sqlDB.SetMaxOpenConns(1)
+	}
 	if err := db.AutoMigrate(
 		&model.SeedingTorrentRecord{},
 		&model.SeedingClientConfig{},
