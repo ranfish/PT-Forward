@@ -67,13 +67,18 @@ func detectRIAJMediaType(title string) string {
 
 // isBenignXXX 排除主流 xXx 电影系列（2002/2005/2017）。
 func isBenignXXX(titleLower, subtitleLower string) bool {
-	if !strings.HasPrefix(titleLower, "xxx") && !strings.HasPrefix(subtitleLower, "xxx") {
+	// §59.295: 前提从 HasPrefix 放宽为词边界出现——CMCT 系发布名带
+	// "[中文片名]." 前缀（"[极限特工1].xXx.2002..."）串首非 xxx，原前提
+	// 直接 false 豁免失效（pt29 系统禁转二连案）
+	if !hasXXXToken(titleLower) && !hasXXXToken(subtitleLower) {
 		return false
 	}
 	benignKeywords := []string{
 		"xander cage",
 		"state of the union",
+		"state.of.the.union",
 		"return of xander cage",
+		"return.of.xander.cage",
 	}
 	for _, kw := range benignKeywords {
 		if strings.Contains(titleLower, kw) || strings.Contains(subtitleLower, kw) {
@@ -83,6 +88,14 @@ func isBenignXXX(titleLower, subtitleLower string) bool {
 	// xXx 电影年份
 	reXXXYear := regexp.MustCompile(`xxx.*\b(2002|2005|2017)\b`)
 	return reXXXYear.MatchString(titleLower) || reXXXYear.MatchString(subtitleLower)
+}
+
+// hasXXXToken §59.295: xxx 作为独立词（词边界）出现在文本任意位置——
+// 分隔形态覆盖 空格/点/中括号/行首行尾。
+var reXXXToken = regexp.MustCompile(`(?:^|[^a-z0-9])xxx(?:[^a-z0-9]|$)`)
+
+func hasXXXToken(lower string) bool {
+	return reXXXToken.MatchString(lower)
 }
 
 // videoReleaseTokens 合法视频/音频发布中常见的 token。
