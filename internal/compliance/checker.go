@@ -155,16 +155,18 @@ func (c *Checker) checkFull(ctx context.Context, title, subtitle string, scope C
 	titleLower := strings.ToLower(title)
 	subtitleLower := strings.ToLower(subtitle)
 
+	// §59.294: 成人豁免单点守卫——A1 关键词循环与 A2 DetectAdult 结构化正则
+	// 共用前置（原豁免散在两处（isBenignXXX 在 A2 内、§59.292 补进 A1）——
+	// 改一漏一结构性风险（xXx 电影案实证）；上提单点后任何成人判据命中前
+	// 先过豁免）
+	if adultExempted(titleLower, subtitleLower) {
+		goto forbiddenCheck
+	}
+
 	for _, kw := range adult {
 		if matchKeyword(kw, title, titleLower) || matchKeyword(kw, subtitle, subtitleLower) {
 			// §56.2x: 中文误报排除（成人教育/高考/大学/学院）
 			if isChineseFalsePositive(title, kw) || isChineseFalsePositive(subtitle, kw) {
-				continue
-			}
-			// §59.292: XXX 关键词 xXx 电影系列豁免——词边界 (?i) 使 "xXx.2002..."
-			// 首词命中 ^ 边界（pt29 系统禁转误判案）；isBenignXXX 与 DetectAdult
-			// 同源复用（xxx+年份 2002/2005/2017/Xander Cage 片名白名单）
-			if strings.EqualFold(kw, "XXX") && isBenignXXX(titleLower, subtitleLower) {
 				continue
 			}
 			return &Result{Passed: false, Reason: kw, Category: "adult"}
@@ -175,6 +177,8 @@ func (c *Checker) checkFull(ctx context.Context, title, subtitle string, scope C
 	if matched, reason := DetectAdult(title, subtitle); matched {
 		return &Result{Passed: false, Reason: reason, Category: "adult"}
 	}
+
+forbiddenCheck:
 
 	for _, kw := range forbidden {
 		if matchKeyword(kw, title, titleLower) || matchKeyword(kw, subtitle, subtitleLower) {
@@ -398,4 +402,16 @@ func extractReleaseGroup(title string) string {
 		group = group[:dotIdx]
 	}
 	return strings.TrimSpace(group)
+}
+
+// adultExempted §59.294: 成人内容豁免单点守卫（A1 关键词 + A2 结构化正则
+// 共用前置）。当前豁免面：xXx 电影系列（isBenignXXX——2002/2005/2017 年份
+// + Xander Cage 片名白名单）。新增豁免（未来误判案）只加此处。
+func adultExempted(titleLower, subtitleLower string) bool {
+	if strings.Contains(titleLower, "xxx") || strings.Contains(subtitleLower, "xxx") {
+		if isBenignXXX(titleLower, subtitleLower) {
+			return true
+		}
+	}
+	return false
 }

@@ -134,3 +134,22 @@ func TestXXXKeywordBenignE2E(t *testing.T) {
 		t.Errorf("xXx 2017 应豁免: %+v", r)
 	}
 }
+
+// §59.294: 豁免单点守卫——A1/A2 共用前置（xXx 全形态穿透两通道）
+func TestAdultExemptedSingleGuard(t *testing.T) {
+	c := &Checker{}
+	cases := []struct{ title, sub string }{
+		{"xXx.2002.JPN.Blu-ray.x264.DTS.2Audios.MiniBD1080P-CMCT", ""},               // A1 词边界形态
+		{"xXx Return of Xander Cage 2017 1080p BluRay x264-GRP", ""},                // A2 片名白名单
+		{"Some.Show.2020", "xXx 2002 极限特工"},                                       // 副标题通道
+	}
+	for _, tc := range cases {
+		if r := c.checkFull(nil, tc.title, tc.sub, ScopeShare); r != nil && !r.Passed {
+			t.Errorf("[%s|%s] 豁免失效: %+v", tc.title[:20], tc.sub[:12], r)
+		}
+	}
+	// 真 XXX 不豁免
+	if r := c.checkFull(nil, "XXX.Amateurs.2020.1080p.WEB-DL.x264-GRP", "", ScopeShare); r == nil || r.Passed {
+		t.Errorf("真 XXX 应拦: %+v", r)
+	}
+}

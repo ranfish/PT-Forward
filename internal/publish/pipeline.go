@@ -64,6 +64,9 @@ func NewPipeline(db *gorm.DB, logger *zap.Logger) *Pipeline {
 		logger:    logger,
 		ptgen:     ptgen.NewProvider(db, logger),
 		limitGuard: NewPublishLimitGuard(db, logger),
+		// §59.294: 内建默认 compliance checker（单通道化后 nil 即缺陷——
+		// 构造即装配；main.go 显式 Set 仍可覆写同款实例）
+		complianceChecker: compliance.NewChecker(db, logger),
 	}
 }
 
@@ -592,35 +595,7 @@ func (p *Pipeline) ListResultsFiltered(ctx context.Context, page, pageSize int, 
 	return results, total, nil
 }
 
-func containsAnyKeyword(text string, keywords []string) (string, bool) {
-	// §56.2x: MatchKeyword 防误伤（ASCII 词边界）——与 compliance.Checker 行为一致
-	for _, kw := range keywords {
-		if compliance.MatchKeyword(kw, text) {
-			return kw, true
-		}
-	}
-	return "", false
-}
 
-func (p *Pipeline) checkForbiddenContent(texts []string) (bool, string) {
-	for _, text := range texts {
-		if text == "" {
-			continue
-		}
-		if kw, found := containsAnyKeyword(text, compliance.AdultKeywords); found {
-			return false, fmt.Sprintf("内容包含成人/色情关键词: %s (§30.5 规则 1)", kw)
-		}
-		if kw, found := containsAnyKeyword(text, compliance.ForbiddenTransferKeywords); found {
-			return false, fmt.Sprintf("标题/副标题包含禁止转载关键词: %s (§30.5 规则 2)", kw)
-		}
-		for _, grp := range compliance.ForbiddenGroups {
-			if compliance.MatchKeyword(grp, text) {
-				return false, fmt.Sprintf("禁止转载小组资源: %s (§30.5 规则 3)", grp)
-			}
-		}
-	}
-	return true, ""
-}
 
 func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model.PublishCandidate, targetSite string) (bool, string) {
 	// §59.20: 第 0 层——源站映射检查（制作组不在 release_group_mappings 中 → 不可发布）
@@ -641,14 +616,15 @@ func (p *Pipeline) CheckPublishEligibility(ctx context.Context, candidate *model
 		}
 	}
 
-	// 1. 合规检查（compliance.Checker 优先，含成人/禁转/小组/用户关键词/站点黑名单）
-	if p.complianceChecker != nil {
-		result := p.complianceChecker.CheckWithSite(ctx, candidate.TorrentName, candidate.SourceSite)
-		if !result.Passed {
-			return false, fmt.Sprintf("compliance_blocked:%s — %s", result.Category, result.Reason)
-		}
-	} else if eligible, reason := p.checkForbiddenContent([]string{candidate.TorrentName}); !eligible {
-		return false, reason
+	// 1. 合规检查（compliance.Checker 单通道——§59.294 影子通道删除：原 nil 降级
+	// 路径 checkForbiddenContent 与 Checker 双轨豁免分家（§59.292 xXx 案改一漏一
+	// 实证）；装配点 main.go 无条件注入，nil 只可能是测试构造缺位——fail loud
+	// 而非静默走影子逻辑）
+	if p.complianceChecker == nil {
+		return false, "compliance checker 未装配（装配点 main.go——初始化缺陷）"
+	}
+	if result := p.complianceChecker.CheckWithSite(ctx, candidate.TorrentName, candidate.SourceSite); !result.Passed {
+		return false, fmt.Sprintf("compliance_blocked:%s — %s", result.Category, result.Reason)
 	}
 
 	if candidate.HasHR {
