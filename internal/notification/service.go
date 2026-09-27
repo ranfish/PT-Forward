@@ -22,6 +22,10 @@ type Service struct {
 	db     *gorm.DB
 	logger *zap.Logger
 	client *http.Client
+
+	// §59.292 附: 时钟注入（测试时区 flake 修复——CI UTC 03:2x 命中
+	// 03:00-04:00 窗口而本地 CST 不中的双环境飘移；nil=time.Now）
+	nowFn func() time.Time
 }
 
 func NewService(db *gorm.DB, logger *zap.Logger) *Service {
@@ -410,7 +414,11 @@ func (s *Service) inQuietHours(ch *model.NotificationChannel) bool {
 	if ch.QuietHoursStart == "" || ch.QuietHoursEnd == "" {
 		return false
 	}
-	now := time.Now().Format("15:04")
+	nowFn := s.nowFn
+	if nowFn == nil {
+		nowFn = time.Now
+	}
+	now := nowFn().Format("15:04")
 	if ch.QuietHoursStart <= ch.QuietHoursEnd {
 		return now >= ch.QuietHoursStart && now <= ch.QuietHoursEnd
 	}

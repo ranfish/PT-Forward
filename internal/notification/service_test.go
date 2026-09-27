@@ -817,7 +817,9 @@ func TestService_InQuietHours_Active(t *testing.T) {
 }
 
 func TestService_InQuietHours_NotActive(t *testing.T) {
-	svc := &Service{}
+	// §59.292 附: 固定时钟——CI(UTC) 03:2x 会命中 03:00-04:00 窗口而本地(CST)
+	// 不中的时区 flake（注入 12:00 全时区安全）
+	svc := &Service{nowFn: func() time.Time { return time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC) }}
 	ch := &model.NotificationChannel{
 		QuietHoursStart: "03:00",
 		QuietHoursEnd:   "04:00",
