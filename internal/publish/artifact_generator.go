@@ -120,7 +120,11 @@ func (g *PublishArtifactGenerator) Generate(ctx context.Context, torrentDir stri
 	return g.GenerateWithStrategy(ctx, torrentDir, sourceMediaInfo, sourceScreenshots, "auto")
 }
 
-func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, torrentDir string, sourceMediaInfo string, sourceScreenshots []string, strategy string) (*ArtifactResult, error) {
+func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, torrentDir string, sourceMediaInfo string, sourceScreenshots []string, strategy string, forcedSid ...int) (*ArtifactResult, error) {
+	forcedSubSid := 0
+	if len(forcedSid) > 0 {
+		forcedSubSid = forcedSid[0]
+	}
 	result := &ArtifactResult{}
 
 	// 如果 torrentDir 是文件路径（非目录），直接分析该文件（精确匹配模式）
@@ -165,7 +169,7 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 	case "source_rehost":
 		result.ScreenshotURLs = g.rehostScreenshots(ctx, sourceScreenshots)
 	case "local_upload":
-		result.ScreenshotURLs = g.captureLocalScreenshots(ctx, videoPath)
+		result.ScreenshotURLs = g.captureLocalScreenshots(ctx, videoPath, forcedSubSid)
 		if len(result.ScreenshotURLs) == 0 {
 			result.ScreenshotURLs = sourceScreenshots
 		}
@@ -189,7 +193,7 @@ func (g *PublishArtifactGenerator) GenerateWithStrategy(ctx context.Context, tor
 			need := MinScreenshots - len(result.ScreenshotURLs)
 			var localShots []string
 			if len(result.ScreenshotURLs) == 0 {
-				localShots = g.captureLocalScreenshots(ctx, videoPath) // 全量（按 Count）
+				localShots = g.captureLocalScreenshots(ctx, videoPath, forcedSubSid) // 全量（按 Count）
 			} else {
 				localShots = g.captureLocalScreenshotsCount(ctx, videoPath, need) // 差额
 			}
@@ -244,13 +248,15 @@ func uploadWithRetry(parent context.Context,
 	return "", lastErr
 }
 
-func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, videoPath string) []string {
+func (g *PublishArtifactGenerator) captureLocalScreenshots(ctx context.Context, videoPath string, forcedSid ...int) []string {
 	engineProbe := g.screenshotEngineNow()
 	if engineProbe == nil || !engineProbe.Available() {
 		return nil
 	}
 	subtitleSID := 0
-	if g.subtitleDetector.Available() {
+	if len(forcedSid) > 0 && forcedSid[0] > 0 {
+		subtitleSID = forcedSid[0] // §59.298 C: 人工指定轨（tab3 下拉）——跳过自动选择
+	} else if g.subtitleDetector.Available() {
 		if sid, err := g.subtitleDetector.FindSubtitleStreamID(ctx, videoPath); err == nil && sid > 0 {
 			subtitleSID = sid
 		}

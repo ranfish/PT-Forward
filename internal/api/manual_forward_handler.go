@@ -59,7 +59,7 @@ type PublishPipeline interface {
 	AnalyzePTGen(ctx context.Context, name string) (*model.PTGenResult, error)
 	AnalyzePTGenForce(ctx context.Context, name string) (*model.PTGenResult, error) // §59.173
 	AnalyzeLocalArtifacts(ctx context.Context, name, savePath string) (map[string]interface{}, error)
-	CaptureScreenshots(ctx context.Context, name, savePath string, sourceScreenshots []string) []string
+	CaptureScreenshots(ctx context.Context, name, savePath string, sourceScreenshots []string, forcedSid ...int) []string
 }
 
 type SiteManager interface {
@@ -439,6 +439,8 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 		ClientUID uint `json:"clientId"`
 		InfoHash string `json:"infoHash"`
 		SiteName string `json:"siteName"`
+		// §59.298 C: 指定字幕轨（人工纠偏——tab3 轨下拉；0/缺省=自动选择）
+		SubtitleSid int `json:"subtitleSid"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.SavePath == "" || req.ClientUID == 0 {
 		Error(w, http.StatusBadRequest, 40001, "name/savePath/clientId 必填")
@@ -483,7 +485,7 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 
-		shots := h.pipeline.CaptureScreenshots(ctx, req.Name, req.SavePath, nil)
+		shots := h.pipeline.CaptureScreenshots(ctx, req.Name, req.SavePath, nil, req.SubtitleSid)
 
 		h.capture.mu.Lock()
 		defer h.capture.mu.Unlock()

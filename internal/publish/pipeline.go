@@ -869,7 +869,7 @@ func (p *Pipeline) mapFieldValues(ctx context.Context, targetSite string, fields
 // 本方法走 local_upload 策略——mpv 截图 + 字幕检测 + HDR tone-mapping + 图床上传，
 // 失败回源站截图（调用方传 sourceScreenshots 作 fallback）。
 // 返回截图 URL 列表（本地截图全失败且无源站值时为空列表）。
-func (p *Pipeline) CaptureScreenshots(ctx context.Context, name, savePath string, sourceScreenshots []string) []string {
+func (p *Pipeline) CaptureScreenshots(ctx context.Context, name, savePath string, sourceScreenshots []string, forcedSid ...int) []string {
 	if p.artifactGenerator == nil || savePath == "" {
 		return sourceScreenshots
 	}
@@ -880,7 +880,7 @@ func (p *Pipeline) CaptureScreenshots(ctx context.Context, name, savePath string
 	// §59.250 认知对齐: Tab3 重新获取 = 无视缓存 + 硬编码 local_upload
 	// （用户定案：本意=对现有截图不满意强制重新截图——不走配置策略；
 	//   零缓存查询语义不变）
-	artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", sourceScreenshots, "local_upload")
+	artifact, err := p.artifactGenerator.GenerateWithStrategy(ctx, torrentDir, "", sourceScreenshots, "local_upload", forcedSid...)
 	if err != nil || artifact == nil {
 		p.logger.Warn("capture screenshots failed", zap.Error(err))
 		return sourceScreenshots

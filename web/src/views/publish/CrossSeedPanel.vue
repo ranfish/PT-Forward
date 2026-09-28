@@ -168,6 +168,11 @@
             <a-tab-pane key="screenshots" tab="视频截图">
               <div style="margin-bottom: 12px; display: flex; gap: 8px">
                 <a-button :loading="refreshing === 'screenshots'" @click="doRefresh('screenshots')">{{ seedIsLocal ? '重新获取截图' : '从源站重新获取截图' }}</a-button>
+                <!-- §59.298 C: 字幕轨人工纠偏（MI Text 轨数>0 时显示——无标记 PGS 蓝光盘自动选轨可能非中文） -->
+                <a-select v-if="seedIsLocal && subtitleTrackCount > 0" v-model:value="selectedSubtitleSid" size="small" style="width: 120px; margin-left: 8px" @change="doRefresh('screenshots')">
+                  <a-select-option :value="0">自动选轨</a-select-option>
+                  <a-select-option v-for="n in subtitleTrackCount" :key="n" :value="n">字幕轨 {{ n }}</a-select-option>
+                </a-select>
                 <a-button :loading="refreshing === 'rehost_screenshots'" :disabled="form.screenshots.length === 0" @click="doRefresh('rehost_screenshots')">一键转存到图床</a-button>
               </div>
               <ScreenshotManager
@@ -587,6 +592,14 @@ async function loadDeclPatterns() {
 // §59.51: 后台截图任务——启动 + 2s 轮询 + 会话一致性校验
 let capturePollTimer: ReturnType<typeof setInterval> | null = null
 
+// §59.298 C: 字幕轨人工纠偏——MI Text 轨计数（无标记 PGS 蓝光盘自动选轨可能非中文）
+const subtitleTrackCount = computed(() => {
+  const mi: string = form.value.mediaInfo || ''
+  const matches = mi.match(/^Text #\d+/gm)
+  return matches ? matches.length : 0
+})
+const selectedSubtitleSid = ref(0) // 0=自动
+
 async function startScreenshotCaptureTask() {
   if (!selectedTorrent.value) return
   refreshing.value = 'screenshots'
@@ -598,6 +611,7 @@ async function startScreenshotCaptureTask() {
       clientId: selectedTorrent.value.client_id,
       infoHash: selectedTorrent.value.info_hash,
       siteName: currentSourceSite.value || selectedTorrent.value.source_site || '',
+      subtitleSid: selectedSubtitleSid.value || undefined,
     })
     message.info('截图中…（约 1-2 分钟）')
     capturePollTimer = setInterval(async () => {

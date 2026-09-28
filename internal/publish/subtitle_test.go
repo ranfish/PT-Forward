@@ -63,3 +63,35 @@ func TestSelectBestChinese_UnknownCodec(t *testing.T) {
 		t.Errorf("空集应 0")
 	}
 }
+
+// §59.298: 无标记 PGS 兜底——蓝光原盘结构性缺失（Under Current 双 PGS 无 language/title）
+func TestSelectBestChinese_UnmarkedPGS(t *testing.T) {
+	d := &SubtitleDetector{}
+	// 双 PGS 全无标记（Under Current 实测形态）
+	candidates := []SubtitleCandidate{
+		{StreamIndex: 3, Codec: "hdmv_pgs_subtitle", Language: "", Title: "", IsText: false, Score: 0},
+		{StreamIndex: 4, Codec: "hdmv_pgs_subtitle", Language: "", Title: "", IsText: false, Score: 0},
+	}
+	idx, codec := d.SelectBestChinese(candidates)
+	if idx != 3 || codec != "hdmv_pgs_subtitle" {
+		t.Errorf("无标记 PGS 应选首轨(idx=3): got %d %q", idx, codec)
+	}
+	// 有中文标记仍优先（评分路径不回归）
+	c2 := []SubtitleCandidate{
+		{StreamIndex: 3, Codec: "hdmv_pgs_subtitle", Language: "", Title: "", IsText: false, Score: 0},
+		{StreamIndex: 4, Codec: "hdmv_pgs_subtitle", Language: "chi", Title: "中文", IsText: false, Score: 12},
+	}
+	idx2, _ := d.SelectBestChinese(c2)
+	if idx2 != 4 {
+		t.Errorf("有标记轨应优先: got %d", idx2)
+	}
+	// 纯文本轨与 PGS 混合：文本零分 PGS 零分——文本槽优先语义（bestSRT 仍要求分>0 → 落 PGS 兜底）
+	c3 := []SubtitleCandidate{
+		{StreamIndex: 2, Codec: "subrip", Language: "eng", Title: "English", IsText: true, Score: 0},
+		{StreamIndex: 3, Codec: "hdmv_pgs_subtitle", Language: "", Title: "", IsText: false, Score: 0},
+	}
+	idx3, codec3 := d.SelectBestChinese(c3)
+	if idx3 != 3 || codec3 != "hdmv_pgs_subtitle" {
+		t.Errorf("混合零分应落 PGS 兜底: got %d %q", idx3, codec3)
+	}
+}
