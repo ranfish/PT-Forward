@@ -131,8 +131,8 @@ func (h *OrphanHandler) handleRecover(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Path     string `json:"path"`
-		ClientUID uint `json:"client_id"`
+		Path      string `json:"path"`
+		ClientUID uint   `json:"client_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -358,9 +358,9 @@ func (h *OrphanHandler) handleListScanConfigs(w http.ResponseWriter, r *http.Req
 
 func (h *OrphanHandler) handleAddScanConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientUID uint `json:"client_id"`
-		ScanPath string `json:"scan_path"`
-		Enabled  bool   `json:"enabled"`
+		ClientUID uint   `json:"client_id"`
+		ScanPath  string `json:"scan_path"`
+		Enabled   bool   `json:"enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -373,8 +373,8 @@ func (h *OrphanHandler) handleAddScanConfig(w http.ResponseWriter, r *http.Reque
 
 	cfg := model.OrphanScanConfig{
 		ClientUID: req.ClientUID,
-		ScanPath: req.ScanPath,
-		Enabled:  req.Enabled,
+		ScanPath:  req.ScanPath,
+		Enabled:   req.Enabled,
 	}
 	if err := h.db.Where("client_uid = ? AND scan_path = ?", req.ClientUID, req.ScanPath).
 		FirstOrCreate(&cfg).Error; err != nil {

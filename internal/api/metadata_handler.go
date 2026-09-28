@@ -238,17 +238,17 @@ func (h *MetadataHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if result.RowsAffected == 0 {
 		meta := &model.TorrentMetadata{
-			InfoHash:      req.InfoHash,
-			SiteName:      req.SiteName,
-			Title:         req.Title,
-			Subtitle:      req.Subtitle,
-			StandardType:  req.StandardType,
-			Tags:          req.Tags,
-			Description:   req.Description,
-			Screenshots:   req.Screenshots,
-			Reviewed:      true,
-			FetchSource:   "manual",
-			FetchedAt:     time.Now(),
+			InfoHash:     req.InfoHash,
+			SiteName:     req.SiteName,
+			Title:        req.Title,
+			Subtitle:     req.Subtitle,
+			StandardType: req.StandardType,
+			Tags:         req.Tags,
+			Description:  req.Description,
+			Screenshots:  req.Screenshots,
+			Reviewed:     true,
+			FetchSource:  "manual",
+			FetchedAt:    time.Now(),
 		}
 		if err := h.db.WithContext(r.Context()).Create(meta).Error; err != nil {
 			Error(w, http.StatusInternalServerError, 50000, "创建失败")

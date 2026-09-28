@@ -1,8 +1,8 @@
 package api
 
 import (
-	"strings"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
@@ -29,10 +29,10 @@ func TestClassifySeedStatusNoMappingRefactor(t *testing.T) {
 	h.SetSourceDetector(publish.NewSourceSiteDetector(db, zap.NewNop()))
 
 	cases := []struct {
-		name    string
+		name     string
 		snapName string
-		meta    *model.TorrentMetadata
-		want    string
+		meta     *model.TorrentMetadata
+		want     string
 	}{
 		// PERFUME 案 ①：tr 裸名未获取 → no_mapping（获取通道提醒）
 		{"裸名未获取", "PERFUME OF THE LADY IN BLACK", nil, "no_mapping"},
@@ -92,7 +92,6 @@ func (f fakeAnalyzer) AnalyzePTGen(ctx context.Context, name string) (*model.PTG
 func (f fakeAnalyzer) AnalyzePTGenForce(ctx context.Context, name string) (*model.PTGenResult, error) {
 	return f.res, nil
 }
-
 
 // §59.247: PUT 审核语义——默认不置 reviewed/显式 reviewed=true 带门槛
 func TestPutSeedReviewSemantics(t *testing.T) {

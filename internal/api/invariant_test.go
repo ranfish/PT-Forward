@@ -49,22 +49,22 @@ func cascadeTables(env *testEnv, uid uint) map[string]int64 {
 		return n
 	}
 	return map[string]int64{
-		"torrent_snapshots":       count(&model.TorrentSnapshot{}, "client_uid"),
-		"cluster_screenshot":      count(&model.ClusterScreenshotCache{}, "client_uid"),
-		"seeding_records":         count(&model.SeedingTorrentRecord{}, "client_uid"),
-		"seeding_states":          count(&model.SeedingClientState{}, "client_uid"),
-		"seeding_configs":         count(&model.SeedingClientConfig{}, "client_uid"),
-		"free_wait":               count(&model.FreeWaitEntry{}, "client_uid"),
-		"download_tasks":          count(&model.DownloadTask{}, "client_uid"),
-		"publish_targets":         count(&model.ClientPublishTarget{}, "client_uid"),
-		"torrent_traffic":         count(&model.TorrentTraffic{}, "client_uid"),
-		"speed_snapshots":         count(&model.DownloaderSpeedSnapshot{}, "client_uid"),
-		"traffic_hourly":          count(&model.TrafficStatsHourly{}, "client_uid"),
-		"publish_candidates":      count(&model.PublishCandidate{}, "client_uid"),
-		"publish_group_members":   count(&model.PublishGroupMember{}, "client_uid"),
-		"reseed_matches":          count(&model.ReseedMatch{}, "client_uid"),
-		"scoring_logs":            count(&model.ScoringLog{}, "client_uid"),
-		"orphan_scan_configs":     count(&model.OrphanScanConfig{}, "client_uid"),
+		"torrent_snapshots":     count(&model.TorrentSnapshot{}, "client_uid"),
+		"cluster_screenshot":    count(&model.ClusterScreenshotCache{}, "client_uid"),
+		"seeding_records":       count(&model.SeedingTorrentRecord{}, "client_uid"),
+		"seeding_states":        count(&model.SeedingClientState{}, "client_uid"),
+		"seeding_configs":       count(&model.SeedingClientConfig{}, "client_uid"),
+		"free_wait":             count(&model.FreeWaitEntry{}, "client_uid"),
+		"download_tasks":        count(&model.DownloadTask{}, "client_uid"),
+		"publish_targets":       count(&model.ClientPublishTarget{}, "client_uid"),
+		"torrent_traffic":       count(&model.TorrentTraffic{}, "client_uid"),
+		"speed_snapshots":       count(&model.DownloaderSpeedSnapshot{}, "client_uid"),
+		"traffic_hourly":        count(&model.TrafficStatsHourly{}, "client_uid"),
+		"publish_candidates":    count(&model.PublishCandidate{}, "client_uid"),
+		"publish_group_members": count(&model.PublishGroupMember{}, "client_uid"),
+		"reseed_matches":        count(&model.ReseedMatch{}, "client_uid"),
+		"scoring_logs":          count(&model.ScoringLog{}, "client_uid"),
+		"orphan_scan_configs":   count(&model.OrphanScanConfig{}, "client_uid"),
 	}
 }
 

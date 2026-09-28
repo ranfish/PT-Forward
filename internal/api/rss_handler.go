@@ -34,7 +34,7 @@ type createRSSRequest struct {
 	SiteName string   `json:"siteName"`
 	Cron     string   `json:"cron,omitempty"`
 
-	ClientUID uint `json:"clientId,omitempty"`
+	ClientUID uint   `json:"clientId,omitempty"`
 	SavePath  string `json:"savePath,omitempty"`
 	Category  string `json:"category,omitempty"`
 	AddPaused bool   `json:"addPaused"`
@@ -54,7 +54,7 @@ type createRSSRequest struct {
 	PublishEnabled bool     `json:"publishEnabled"`
 	PublishTargets []string `json:"publishTargets,omitempty"`
 
-	AutoTransfer      bool     `json:"autoTransfer"`
+	AutoTransfer       bool   `json:"autoTransfer"`
 	TransferClientUIDs []uint `json:"transferClientIds,omitempty"`
 
 	SkipSameSize          bool `json:"skipSameSize"`
@@ -79,7 +79,7 @@ type createRSSRequest struct {
 	DiskBudgetEnabled bool    `json:"diskBudgetEnabled"`
 	DiskBudgetMinGB   float64 `json:"diskBudgetMinGB"`
 
-	CandidateClients []uint                  `json:"candidateClients,omitempty"`
+	CandidateClients []uint                    `json:"candidateClients,omitempty"`
 	ClientSelection  model.ClientSelectionMode `json:"clientSelection,omitempty"`
 
 	DiskGuardEnabled   bool    `json:"diskGuardEnabled"`
@@ -119,7 +119,7 @@ type updateRSSRequest struct {
 	PublishEnabled *bool     `json:"publishEnabled,omitempty"`
 	PublishTargets *[]string `json:"publishTargets,omitempty"`
 
-	AutoTransfer      *bool     `json:"autoTransfer,omitempty"`
+	AutoTransfer       *bool   `json:"autoTransfer,omitempty"`
 	TransferClientUIDs *[]uint `json:"transferClientIds,omitempty"`
 
 	SkipSameSize          *bool `json:"skipSameSize,omitempty"`
@@ -144,7 +144,7 @@ type updateRSSRequest struct {
 	DiskBudgetEnabled *bool    `json:"diskBudgetEnabled,omitempty"`
 	DiskBudgetMinGB   *float64 `json:"diskBudgetMinGB,omitempty"`
 
-	CandidateClients *[]uint                  `json:"candidateClients,omitempty"`
+	CandidateClients *[]uint                    `json:"candidateClients,omitempty"`
 	ClientSelection  *model.ClientSelectionMode `json:"clientSelection,omitempty"`
 
 	DiskGuardEnabled   *bool    `json:"diskGuardEnabled,omitempty"`
@@ -166,7 +166,7 @@ type rssResponse struct {
 	SiteName string   `json:"siteName"`
 	Cron     string   `json:"cron"`
 
-	ClientUID uint `json:"clientId,omitempty"`
+	ClientUID uint   `json:"clientId,omitempty"`
 	SavePath  string `json:"savePath,omitempty"`
 	Category  string `json:"category,omitempty"`
 	AddPaused bool   `json:"addPaused"`
@@ -186,7 +186,7 @@ type rssResponse struct {
 	PublishEnabled bool     `json:"publishEnabled"`
 	PublishTargets []string `json:"publishTargets,omitempty"`
 
-	AutoTransfer      bool     `json:"autoTransfer"`
+	AutoTransfer       bool   `json:"autoTransfer"`
 	TransferClientUIDs []uint `json:"transferClientIds,omitempty"`
 
 	SkipSameSize    bool `json:"skipSameSize"`
@@ -212,7 +212,7 @@ type rssResponse struct {
 	DiskBudgetEnabled bool    `json:"diskBudgetEnabled"`
 	DiskBudgetMinGB   float64 `json:"diskBudgetMinGB"`
 
-	CandidateClients []uint                  `json:"candidateClients"`
+	CandidateClients []uint                    `json:"candidateClients"`
 	ClientSelection  model.ClientSelectionMode `json:"clientSelection"`
 
 	DiskGuardEnabled   bool       `json:"diskGuardEnabled"`
@@ -268,7 +268,7 @@ func (h *RSSHandler) toResponse(s *model.RSSSubscription) rssResponse {
 		PublishEnabled: s.PublishEnabled,
 		PublishTargets: s.PublishTargets,
 
-		AutoTransfer:      s.AutoTransfer,
+		AutoTransfer:       s.AutoTransfer,
 		TransferClientUIDs: s.TransferClientUIDs,
 
 		SkipSameSize:    s.SkipSameSize,
@@ -500,7 +500,7 @@ func (h *RSSHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		PublishEnabled: req.PublishEnabled,
 		PublishTargets: req.PublishTargets,
 
-		AutoTransfer:      req.AutoTransfer,
+		AutoTransfer:       req.AutoTransfer,
 		TransferClientUIDs: req.TransferClientUIDs,
 
 		SkipSameSize:          req.SkipSameSize,

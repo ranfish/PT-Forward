@@ -28,51 +28,51 @@ import (
 )
 
 type Router struct {
-	authHandler          *AuthHandler
-	clientHandler        *ClientHandler
-	siteHandler          *SiteHandler
-	rssHandler           *RSSHandler
-	filterHandler        *FilterHandler
-	notifyHandler        *NotifyHandler
-	cookiecloudServer     http.Handler
-	settingsHandler      *SettingsHandler
-	seedingHandler       *SeedingHandler
-	deleteRuleHandler    *DeleteRuleHandler
-	reseedHandler        *ReseedHandler
-	publishHandler       *PublishHandler
-	manualForwardHandler *ManualForwardHandler
+	authHandler            *AuthHandler
+	clientHandler          *ClientHandler
+	siteHandler            *SiteHandler
+	rssHandler             *RSSHandler
+	filterHandler          *FilterHandler
+	notifyHandler          *NotifyHandler
+	cookiecloudServer      http.Handler
+	settingsHandler        *SettingsHandler
+	seedingHandler         *SeedingHandler
+	deleteRuleHandler      *DeleteRuleHandler
+	reseedHandler          *ReseedHandler
+	publishHandler         *PublishHandler
+	manualForwardHandler   *ManualForwardHandler
 	publishTorrentsHandler *PublishTorrentsHandler
 	formConfigHandler      *FormConfigHandler
-	complianceHandler    *ComplianceHandler
-	dashboardHandler     *DashboardHandler
-	systemHandler        *SystemHandler
-	iyuuHandler          *IYUUHandler
-	cloudFPHandler       *CloudFPHandler
-	fingerprintHandler   *FingerprintHandler
-	lifecycleHandler     *LifecycleHandler
-	cookiecloudHandler   *CookieCloudHandler
-	ptgenHandler         *PTGenHandler
-	schedulerHandler     *SchedulerHandler
-	supportedSitesHandler *SupportedSitesHandler
-	downloadHandler       *DownloadHandler
-	publishLimitHandler   *PublishLimitHandler
-	imageHostHandler      *ImageHostHandler
-	metadataHandler       *MetadataHandler
-	sseLogHandler         *SSELogHandler
-	orphanHandler         *OrphanHandler
-	debugSiteProvider     *site.Provider
-	logBroadcaster        *LogBroadcaster
-	wsHandler            *WSHandler
-	hub                  *Hub
-	authManager          *auth.AuthManager
-	logger               *zap.Logger
-	corsMW               func(http.Handler) http.Handler
-	recoveryMW           func(http.Handler) http.Handler
-	secMW                func(http.Handler) http.Handler
-	authMW               func(http.Handler) http.Handler
-	rateLimitMW          func(http.Handler) http.Handler
-	publicRateLimitMW    func(http.Handler) http.Handler
-	rateLimitCfg         middleware.RateLimitConfigFunc
+	complianceHandler      *ComplianceHandler
+	dashboardHandler       *DashboardHandler
+	systemHandler          *SystemHandler
+	iyuuHandler            *IYUUHandler
+	cloudFPHandler         *CloudFPHandler
+	fingerprintHandler     *FingerprintHandler
+	lifecycleHandler       *LifecycleHandler
+	cookiecloudHandler     *CookieCloudHandler
+	ptgenHandler           *PTGenHandler
+	schedulerHandler       *SchedulerHandler
+	supportedSitesHandler  *SupportedSitesHandler
+	downloadHandler        *DownloadHandler
+	publishLimitHandler    *PublishLimitHandler
+	imageHostHandler       *ImageHostHandler
+	metadataHandler        *MetadataHandler
+	sseLogHandler          *SSELogHandler
+	orphanHandler          *OrphanHandler
+	debugSiteProvider      *site.Provider
+	logBroadcaster         *LogBroadcaster
+	wsHandler              *WSHandler
+	hub                    *Hub
+	authManager            *auth.AuthManager
+	logger                 *zap.Logger
+	corsMW                 func(http.Handler) http.Handler
+	recoveryMW             func(http.Handler) http.Handler
+	secMW                  func(http.Handler) http.Handler
+	authMW                 func(http.Handler) http.Handler
+	rateLimitMW            func(http.Handler) http.Handler
+	publicRateLimitMW      func(http.Handler) http.Handler
+	rateLimitCfg           middleware.RateLimitConfigFunc
 }
 
 func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine, notifyService *notification.Service, reseedEngine *reseed.Engine, publishPipeline *publish.Pipeline, seedingEngine *seeding.Engine, clientMgr *client.Manager, taskRegistry *scheduler.Registry, iyuuSvc IYUUQueryService, appVersion string, hub *Hub, imageHostMgr *imagehost.Manager, logBroadcaster *LogBroadcaster, logger *zap.Logger) *Router {
@@ -107,40 +107,40 @@ func NewRouter(authManager *auth.AuthManager, db *gorm.DB, rssEngine *rss.Engine
 		manualForwardHandler.SetSeedingCache(seedingEngine)
 	}
 	rt := &Router{
-		authHandler:          NewAuthHandler(authManager),
-		clientHandler:        NewClientHandler(db, logger, clientMgrIface),
-		siteHandler:          siteHandler,
-		rssHandler:           NewRSSHandler(rssRepo, rssEngine, db, logger),
-		filterHandler:        NewFilterHandler(filterRepo, filterEng, db, logger),
-		notifyHandler:        NewNotifyHandler(notifyRepo, notifyService, logger),
-		settingsHandler:      NewSettingsHandler(settingsRepo, logger),
-		seedingHandler:       NewSeedingHandler(db, logger, seedingEngine),
-		deleteRuleHandler:    NewDeleteRuleHandler(db, logger, clientMgrIface),
-		reseedHandler:        NewReseedHandler(reseedEngine, logger),
+		authHandler:            NewAuthHandler(authManager),
+		clientHandler:          NewClientHandler(db, logger, clientMgrIface),
+		siteHandler:            siteHandler,
+		rssHandler:             NewRSSHandler(rssRepo, rssEngine, db, logger),
+		filterHandler:          NewFilterHandler(filterRepo, filterEng, db, logger),
+		notifyHandler:          NewNotifyHandler(notifyRepo, notifyService, logger),
+		settingsHandler:        NewSettingsHandler(settingsRepo, logger),
+		seedingHandler:         NewSeedingHandler(db, logger, seedingEngine),
+		deleteRuleHandler:      NewDeleteRuleHandler(db, logger, clientMgrIface),
+		reseedHandler:          NewReseedHandler(reseedEngine, logger),
 		publishHandler:         NewPublishHandler(publishPipeline, logger, db),
 		manualForwardHandler:   manualForwardHandler,
 		publishTorrentsHandler: NewPublishTorrentsHandler(db, logger, publishPipeline),
 		formConfigHandler:      NewFormConfigHandler(db),
-		complianceHandler:      NewComplianceHandler(db, logger),		publishLimitHandler:   NewPublishLimitHandler(db, logger),
+		complianceHandler:      NewComplianceHandler(db, logger), publishLimitHandler: NewPublishLimitHandler(db, logger),
 		imageHostHandler:      NewImageHostHandler(imageHostMgr, settingsRepo, logger),
 		metadataHandler:       NewMetadataHandler(db, logger),
 		logBroadcaster:        logBroadcaster,
 		sseLogHandler:         NewSSELogHandler(logBroadcaster, logger),
-		dashboardHandler:     dashHandler,
-		systemHandler:        sysHandler,
-		iyuuHandler:          NewIYUUHandler(db, logger, iyuuSvc),
-		cloudFPHandler:       NewCloudFPHandler(db, logger),
-		fingerprintHandler:   NewFingerprintHandler(db, logger),
-		lifecycleHandler:     NewLifecycleHandler(db, logger),
-		cookiecloudHandler:   NewCookieCloudHandler(db, logger),
-		ptgenHandler:         NewPTGenHandler(db, logger),
-		schedulerHandler:     NewSchedulerHandler(taskRegistry, db, logger),
+		dashboardHandler:      dashHandler,
+		systemHandler:         sysHandler,
+		iyuuHandler:           NewIYUUHandler(db, logger, iyuuSvc),
+		cloudFPHandler:        NewCloudFPHandler(db, logger),
+		fingerprintHandler:    NewFingerprintHandler(db, logger),
+		lifecycleHandler:      NewLifecycleHandler(db, logger),
+		cookiecloudHandler:    NewCookieCloudHandler(db, logger),
+		ptgenHandler:          NewPTGenHandler(db, logger),
+		schedulerHandler:      NewSchedulerHandler(taskRegistry, db, logger),
 		supportedSitesHandler: NewSupportedSitesHandler(logger),
 		downloadHandler:       NewDownloadHandler(db, clientMgr, logger),
-		wsHandler:            NewWSHandler(hub, authManager, nil),
-		hub:                  hub,
-		authManager:          authManager,
-		logger:               logger,
+		wsHandler:             NewWSHandler(hub, authManager, nil),
+		hub:                   hub,
+		authManager:           authManager,
+		logger:                logger,
 	}
 	rt.publishTorrentsHandler.SetReseedEngine(reseedEngine)
 	// §59.281: OTA 任务门控接线——批量获取/发布活跃态（os.Exit 前防腰斩）
@@ -174,7 +174,6 @@ func (rt *Router) SetCloudFPBreakerFn(fn func() bool) {
 func (rt *Router) SetRateLimitConfig(cfg middleware.RateLimitConfigFunc) {
 	rt.rateLimitCfg = cfg
 }
-
 
 // SetupManualForward 注入手动转发向导所需的依赖
 func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *site.Provider, clientMgr *client.Manager, declFilter *publish.DeclarationFilter, bdinfoScanner *publish.BDInfoScanner, metadataFetcher *metadata.Fetcher, coverageSvc *coverage.Service, sourceDetector *publish.SourceSiteDetector, complianceChecker *compliance.Checker, imageHostMgr *imagehost.Manager) {
@@ -211,10 +210,10 @@ func (rt *Router) SetupManualForward(pipeline *publish.Pipeline, siteProvider *s
 	}
 	if pipeline != nil {
 		rt.publishTorrentsHandler.SetSeedPipeline(pipeline)
-	// §59.53: 采集链截图策略
-	rt.publishTorrentsHandler.SetScreenshotStrategyRunner(pipeline)
-	// §59.42: PTGen 海报 fallback 链
-	rt.publishTorrentsHandler.SetPTGenAnalyzer(pipeline)
+		// §59.53: 采集链截图策略
+		rt.publishTorrentsHandler.SetScreenshotStrategyRunner(pipeline)
+		// §59.42: PTGen 海报 fallback 链
+		rt.publishTorrentsHandler.SetPTGenAnalyzer(pipeline)
 	}
 }
 
@@ -547,7 +546,6 @@ func (rt *Router) RegisterWithEndpointLimits(mux *http.ServeMux, corsOrigins []s
 	fingerprintHandler := rt.chain(rt.rateLimitMW, rt.fingerprintHandler.ServeHTTP)
 	mux.Handle("/api/v1/fingerprints", fingerprintHandler)
 	mux.Handle("/api/v1/fingerprints/", fingerprintHandler)
-
 
 	lifecycleHandler := rt.chain(rt.rateLimitMW, rt.lifecycleHandler.ServeHTTP)
 	mux.Handle("/api/v1/lifecycle/config", lifecycleHandler)

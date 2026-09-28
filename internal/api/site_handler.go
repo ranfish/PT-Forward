@@ -103,10 +103,10 @@ type createSiteRequest struct {
 	OverrideRSSURL   string `json:"overrideRssUrl,omitempty"`
 	OverrideSavePath string `json:"overrideSavePath,omitempty"`
 
-	ProxyURL        string `json:"proxyUrl,omitempty"`
-	UseGlobalProxy  bool   `json:"useGlobalProxy"`
-	SkipSSLVerify   bool   `json:"skipSslVerify"`
-	MaxConcurrent   int    `json:"maxConcurrent,omitempty"`
+	ProxyURL       string `json:"proxyUrl,omitempty"`
+	UseGlobalProxy bool   `json:"useGlobalProxy"`
+	SkipSSLVerify  bool   `json:"skipSslVerify"`
+	MaxConcurrent  int    `json:"maxConcurrent,omitempty"`
 	// §59.183: 站点级 .torrent 下载限流（次/小时，0=全局默认 95）
 	DownloadHourlyLimit int `json:"downloadHourlyLimit,omitempty"`
 
@@ -174,11 +174,11 @@ type updateSiteRequest struct {
 	ParticipateAutoPublish *bool `json:"participateAutoPublish,omitempty"`
 	AssumeFree             *bool `json:"assumeFree,omitempty"`
 
-	CookieCloudSync    *bool   `json:"cookieCloudSync,omitempty"`
-	CookieCloudDomain  *string `json:"cookieCloudDomain,omitempty"`
-	AlternativeDomains *string `json:"alternativeDomains,omitempty"`
-	Enabled            *bool   `json:"enabled,omitempty"`
-	PublishIntervalSeconds *int `json:"publishIntervalSeconds,omitempty"` // §59.166 一站多种批量发布种间间隔（1-60 秒）
+	CookieCloudSync        *bool   `json:"cookieCloudSync,omitempty"`
+	CookieCloudDomain      *string `json:"cookieCloudDomain,omitempty"`
+	AlternativeDomains     *string `json:"alternativeDomains,omitempty"`
+	Enabled                *bool   `json:"enabled,omitempty"`
+	PublishIntervalSeconds *int    `json:"publishIntervalSeconds,omitempty"` // §59.166 一站多种批量发布种间间隔（1-60 秒）
 
 	SupportsPiecesHashAPI *bool `json:"supportsPiecesHashApi,omitempty"`
 
@@ -188,7 +188,7 @@ type updateSiteRequest struct {
 	ProxyURL       *string `json:"proxyUrl,omitempty"`
 	UseGlobalProxy *bool   `json:"useGlobalProxy,omitempty"`
 	SkipSSLVerify  *bool   `json:"skipSslVerify,omitempty"`
-	MaxConcurrent *int    `json:"maxConcurrent,omitempty"`
+	MaxConcurrent  *int    `json:"maxConcurrent,omitempty"`
 	// §59.183: 站点级 .torrent 下载限流（次/小时，0=全局默认 95）
 	DownloadHourlyLimit *int `json:"downloadHourlyLimit,omitempty"`
 
@@ -253,18 +253,18 @@ type siteResponse struct {
 	OverrideRSSURL   string `json:"overrideRssUrl,omitempty"`
 	OverrideSavePath string `json:"overrideSavePath,omitempty"`
 
-	ProxyURL             string `json:"proxyUrl,omitempty"`
-	UseGlobalProxy       bool   `json:"useGlobalProxy"`
-	SkipSSLVerify        bool   `json:"skipSslVerify"`
-	MaxConcurrent        int    `json:"maxConcurrent"`
-	DownloadHourlyLimit  int    `json:"downloadHourlyLimit"`
+	ProxyURL            string `json:"proxyUrl,omitempty"`
+	UseGlobalProxy      bool   `json:"useGlobalProxy"`
+	SkipSSLVerify       bool   `json:"skipSslVerify"`
+	MaxConcurrent       int    `json:"maxConcurrent"`
+	DownloadHourlyLimit int    `json:"downloadHourlyLimit"`
 
-	HRStrategy           string `json:"hrStrategy,omitempty"`
-	TargetTypes          string `json:"targetTypes,omitempty"`
-	ReseedLimitCount     int    `json:"reseedLimitCount"`
-	ReseedLimitInterval  int    `json:"reseedLimitInterval"`
-	IYUULimitCount       int    `json:"iyuuLimitCount"`
-	IYUULimitInterval    int    `json:"iyuuLimitInterval"`
+	HRStrategy          string `json:"hrStrategy,omitempty"`
+	TargetTypes         string `json:"targetTypes,omitempty"`
+	ReseedLimitCount    int    `json:"reseedLimitCount"`
+	ReseedLimitInterval int    `json:"reseedLimitInterval"`
+	IYUULimitCount      int    `json:"iyuuLimitCount"`
+	IYUULimitInterval   int    `json:"iyuuLimitInterval"`
 
 	HasPasskey     bool   `json:"hasPasskey"`
 	PasskeyMasked  string `json:"passkeyMasked,omitempty"`
@@ -375,18 +375,18 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 		OverrideRSSURL:   s.OverrideRSSURL,
 		OverrideSavePath: s.OverrideSavePath,
 
-		ProxyURL:        s.ProxyURL,
-		UseGlobalProxy:  s.UseGlobalProxy,
-		SkipSSLVerify:   s.SkipSSLVerify,
-		MaxConcurrent:   s.MaxConcurrent,
+		ProxyURL:            s.ProxyURL,
+		UseGlobalProxy:      s.UseGlobalProxy,
+		SkipSSLVerify:       s.SkipSSLVerify,
+		MaxConcurrent:       s.MaxConcurrent,
 		DownloadHourlyLimit: s.DownloadHourlyLimit,
 
-		HRStrategy:           s.HRStrategy,
-		TargetTypes:          s.TargetTypes,
-		ReseedLimitCount:     s.ReseedLimitCount,
-		ReseedLimitInterval:  s.ReseedLimitInterval,
-		IYUULimitCount:       s.IYUULimitCount,
-		IYUULimitInterval:    s.IYUULimitInterval,
+		HRStrategy:          s.HRStrategy,
+		TargetTypes:         s.TargetTypes,
+		ReseedLimitCount:    s.ReseedLimitCount,
+		ReseedLimitInterval: s.ReseedLimitInterval,
+		IYUULimitCount:      s.IYUULimitCount,
+		IYUULimitInterval:   s.IYUULimitInterval,
 
 		HasPasskey:     s.Passkey != "",
 		PasskeyMasked:  maskPasskey(s.Passkey),
@@ -430,7 +430,6 @@ func (h *SiteHandler) toResponse(s *model.Site) siteResponse {
 
 	return resp
 }
-
 
 func (h *SiteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handleRouteByPath(w, r)
@@ -613,7 +612,7 @@ type siteExportImport struct {
 	TrackerDomains        string `json:"tracker_domains"`
 	SupportsPiecesHashAPI bool   `json:"supports_pieces_hash_api"`
 	APIDomain             string `json:"api_domain"`
-	PublishFormConfig string `json:"publish_form_config,omitempty"`
+	PublishFormConfig     string `json:"publish_form_config,omitempty"`
 }
 
 var siteImportFields = []string{
@@ -679,9 +678,9 @@ func (h *SiteHandler) handleExport(w http.ResponseWriter, r *http.Request) {
 			TrackerDomains:         s.TrackerDomains,
 			SupportsPiecesHashAPI:  s.SupportsPiecesHashAPI,
 			APIDomain:              s.APIDomain,
-		
-		PublishFormConfig: s.PublishFormConfig,
-	})
+
+			PublishFormConfig: s.PublishFormConfig,
+		})
 	}
 	w.Header().Set("Content-Disposition", `attachment; filename="pt-forward-sites-export.json"`)
 	Success(w, map[string]interface{}{
@@ -2125,10 +2124,10 @@ func (h *SiteHandler) handleExclusions(w http.ResponseWriter, r *http.Request) {
 		result := make([]map[string]interface{}, 0, len(exclusions)+8)
 		for _, e := range exclusions {
 			result = append(result, map[string]interface{}{
-				"id":          e.ID,
-				"target_site": e.TargetSite,
-				"source_site": e.SourceSite,
-				"created_at":  e.CreatedAt,
+				"id":           e.ID,
+				"target_site":  e.TargetSite,
+				"source_site":  e.SourceSite,
+				"created_at":   e.CreatedAt,
 				"is_hardcoded": false,
 			})
 			dbPairs[e.SourceSite+"→"+e.TargetSite] = true

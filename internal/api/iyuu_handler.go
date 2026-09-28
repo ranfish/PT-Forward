@@ -125,13 +125,13 @@ func (h *IYUUHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 
 	cfg := configs[0]
 	Success(w, map[string]interface{}{
-		"id":               cfg.ID,
-		"token":            maskToken(cfg.Token),
-		"enabled":          cfg.Enabled,
-		"baseUrl":          cfg.BaseURL,
-		"isVip":            cfg.IsVIP,
-		"version":          cfg.Version,
-		"requestTimeoutMs": cfg.RequestTimeoutSec * 1000,
+		"id":                cfg.ID,
+		"token":             maskToken(cfg.Token),
+		"enabled":           cfg.Enabled,
+		"baseUrl":           cfg.BaseURL,
+		"isVip":             cfg.IsVIP,
+		"version":           cfg.Version,
+		"requestTimeoutMs":  cfg.RequestTimeoutSec * 1000,
 		"syncIntervalHours": cfg.SyncIntervalHours,
 	})
 }

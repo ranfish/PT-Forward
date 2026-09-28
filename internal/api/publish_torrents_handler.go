@@ -15,9 +15,9 @@ import (
 
 	"github.com/ranfish/pt-forward/internal/compliance"
 	"github.com/ranfish/pt-forward/internal/coverage"
+	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/fingerprint"
 	"github.com/ranfish/pt-forward/internal/metadata"
-	"github.com/ranfish/pt-forward/internal/description"
 	"github.com/ranfish/pt-forward/internal/model"
 	"github.com/ranfish/pt-forward/internal/publish"
 	"github.com/ranfish/pt-forward/internal/reseed"
@@ -34,35 +34,35 @@ type SiteProviderGetter interface {
 }
 
 type PublishTorrentsHandler struct {
-	executor *publish.PublishExecutor // §59.156 切片 2 新发布执行器（复用 pipeline 组件）
-	db             *gorm.DB
-	coverage       *coverage.Service
-	clientMgr      MFClientProvider
-	siteProvider   SiteProviderGetter
-	sourceDetector *publish.SourceSiteDetector
-	declFilter     *publish.DeclarationFilter
-	reseedEngine   *reseed.Engine
-	metadataFetcher MetadataFetcherProvider
-	complianceChecker *compliance.Checker
-	seedPipeline       SeedArtifactAnalyzer
-	shotStrategy       ScreenshotStrategyRunner
+	executor            *publish.PublishExecutor // §59.156 切片 2 新发布执行器（复用 pipeline 组件）
+	db                  *gorm.DB
+	coverage            *coverage.Service
+	clientMgr           MFClientProvider
+	siteProvider        SiteProviderGetter
+	sourceDetector      *publish.SourceSiteDetector
+	declFilter          *publish.DeclarationFilter
+	reseedEngine        *reseed.Engine
+	metadataFetcher     MetadataFetcherProvider
+	complianceChecker   *compliance.Checker
+	seedPipeline        SeedArtifactAnalyzer
+	shotStrategy        ScreenshotStrategyRunner
 	screenshotCacheDays int // §59.63: 截图链接缓存观察期（天，<=0 关闭）
-	ptgen              PTGenAnalyzer
-	resourceResolver   *publish.ResourceResolver
-	preflightCache     map[string]preflightEntry // §59.176: 站点发布前置检查缓存（5 分钟）
-	preflightMu        sync.Mutex
-	logger         *zap.Logger
-	bgState        backgroundQueryState
-	batchFetch     batchFetchState
-	siteBatch      siteBatchState // §59.166 一站多种批量任务
-	strategySem    chan struct{} // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
+	ptgen               PTGenAnalyzer
+	resourceResolver    *publish.ResourceResolver
+	preflightCache      map[string]preflightEntry // §59.176: 站点发布前置检查缓存（5 分钟）
+	preflightMu         sync.Mutex
+	logger              *zap.Logger
+	bgState             backgroundQueryState
+	batchFetch          batchFetchState
+	siteBatch           siteBatchState // §59.166 一站多种批量任务
+	strategySem         chan struct{}  // §59.58: 截图策略并发额度（批量链挤爆 CPU/代理实测定案）
 }
 
 type backgroundQueryState struct {
-	mu          sync.Mutex
-	active      map[uint]bool // clientUID → querying
-	total       int
-	done        int
+	mu     sync.Mutex
+	active map[uint]bool // clientUID → querying
+	total  int
+	done   int
 }
 
 type batchFetchState struct {
@@ -116,13 +116,13 @@ func NewPublishTorrentsHandler(db *gorm.DB, logger *zap.Logger, pipeline *publis
 	// CPU 总量守恒：并发数不改变批量总时长，只消除无界并发导致的 ctx 超时作废功。
 	// §59.51 手动截图按钮不经过此信号量（独立单例，不与批量竞争）。
 	return &PublishTorrentsHandler{
-		db:               db,
-		logger:           logger,
-		executor:         publish.NewPublishExecutor(pipeline),
-		bgState:          backgroundQueryState{active: make(map[uint]bool)},
-		siteBatch:        siteBatchState{tasks: map[string]*siteBatchTask{}, active: map[string]string{}},
-		resourceResolver: publish.NewResourceResolver(db),
-		strategySem:      make(chan struct{}, 5),
+		db:                  db,
+		logger:              logger,
+		executor:            publish.NewPublishExecutor(pipeline),
+		bgState:             backgroundQueryState{active: make(map[uint]bool)},
+		siteBatch:           siteBatchState{tasks: map[string]*siteBatchTask{}, active: map[string]string{}},
+		resourceResolver:    publish.NewResourceResolver(db),
+		strategySem:         make(chan struct{}, 5),
 		screenshotCacheDays: 30, // §59.63: 观察期默认 30 天（SetScreenshotCacheDays 由 settings 覆盖）
 	}
 }
@@ -146,7 +146,7 @@ func (h *PublishTorrentsHandler) runObservingCleanup(ctx context.Context) {
 	cutoff := time.Now().Add(-observingGracePeriod)
 	type obsGroup struct {
 		ClientUID uint
-		Name     string
+		Name      string
 	}
 	var groups []obsGroup
 	h.db.WithContext(ctx).
@@ -172,19 +172,23 @@ func (h *PublishTorrentsHandler) runObservingCleanup(ctx context.Context) {
 }
 
 func (h *PublishTorrentsHandler) SetCoverageService(s *coverage.Service) { h.coverage = s }
-func (h *PublishTorrentsHandler) SetReseedEngine(e *reseed.Engine)     { h.reseedEngine = e }
-func (h *PublishTorrentsHandler) SetClientProvider(c MFClientProvider)  { h.clientMgr = c }
-func (h *PublishTorrentsHandler) SetSiteProvider(s SiteProviderGetter)  { h.siteProvider = s }
-func (h *PublishTorrentsHandler) SetSourceDetector(d *publish.SourceSiteDetector) { h.sourceDetector = d }
+func (h *PublishTorrentsHandler) SetReseedEngine(e *reseed.Engine)       { h.reseedEngine = e }
+func (h *PublishTorrentsHandler) SetClientProvider(c MFClientProvider)   { h.clientMgr = c }
+func (h *PublishTorrentsHandler) SetSiteProvider(s SiteProviderGetter)   { h.siteProvider = s }
+func (h *PublishTorrentsHandler) SetSourceDetector(d *publish.SourceSiteDetector) {
+	h.sourceDetector = d
+}
 func (h *PublishTorrentsHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
 func (h *PublishTorrentsHandler) SetMetadataFetcher(f MetadataFetcherProvider)      { h.metadataFetcher = f }
 func (h *PublishTorrentsHandler) SetComplianceChecker(c *compliance.Checker)        { h.complianceChecker = c }
-func (h *PublishTorrentsHandler) SetSeedPipeline(p SeedArtifactAnalyzer)             { h.seedPipeline = p }
-func (h *PublishTorrentsHandler) SetScreenshotStrategyRunner(p ScreenshotStrategyRunner) { h.shotStrategy = p }
+func (h *PublishTorrentsHandler) SetSeedPipeline(p SeedArtifactAnalyzer)            { h.seedPipeline = p }
+func (h *PublishTorrentsHandler) SetScreenshotStrategyRunner(p ScreenshotStrategyRunner) {
+	h.shotStrategy = p
+}
 
 // SetScreenshotCacheDays §59.63: 截图链接缓存观察期（天）。<=0 关闭。
-func (h *PublishTorrentsHandler) SetScreenshotCacheDays(days int) { h.screenshotCacheDays = days }
-func (h *PublishTorrentsHandler) SetPTGenAnalyzer(p PTGenAnalyzer)                    { h.ptgen = p }
+func (h *PublishTorrentsHandler) SetScreenshotCacheDays(days int)  { h.screenshotCacheDays = days }
+func (h *PublishTorrentsHandler) SetPTGenAnalyzer(p PTGenAnalyzer) { h.ptgen = p }
 
 // §59.21: 本地产物分析接口（只跑 mediainfo，不跑截图）
 type SeedArtifactAnalyzer interface {
@@ -1239,7 +1243,7 @@ func (h *PublishTorrentsHandler) handlePreviewTitleBatch(w http.ResponseWriter, 
 		var tf titleparser.TitleFormat
 		if site.TitleFormat != "" {
 			if err := json.Unmarshal([]byte(site.TitleFormat), &tf); err != nil {
-			 tf = titleparser.DefaultTitleFormat()
+				tf = titleparser.DefaultTitleFormat()
 			}
 		} else {
 			tf = titleparser.DefaultTitleFormat()
@@ -1437,10 +1441,10 @@ func (h *PublishTorrentsHandler) handleBatchPublish(w http.ResponseWriter, r *ht
 
 	for _, item := range req.Items {
 		candidate := &model.PublishCandidate{
-			SourceSite: req.SourceSite,
-			InfoHash:   item.InfoHash,
+			SourceSite:  req.SourceSite,
+			InfoHash:    item.InfoHash,
 			TorrentName: item.Name,
-			ClientUID: clientUID,
+			ClientUID:   clientUID,
 			// §59.147: 源资源路径落库——链 A 加种 SavePath 依赖（原丢弃致加种落默认路径不做种）
 			LocalSavePath:     item.SavePath,
 			TargetSites:       string(targetsJSON),
@@ -1846,12 +1850,12 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	var stats struct {
-		TodayPublish   int64 `json:"todayPublish"`
-		TodaySuccess   int64 `json:"todaySuccess"`
-		TodayFailed    int64 `json:"todayFailed"`
-		PendingCount   int64 `json:"pendingCount"`
-		ReviewedCount  int64 `json:"reviewedCount"`
-		TotalMetadata  int64 `json:"totalMetadata"`
+		TodayPublish     int64 `json:"todayPublish"`
+		TodaySuccess     int64 `json:"todaySuccess"`
+		TodayFailed      int64 `json:"todayFailed"`
+		PendingCount     int64 `json:"pendingCount"`
+		ReviewedCount    int64 `json:"reviewedCount"`
+		TotalMetadata    int64 `json:"totalMetadata"`
 		YesterdayPublish int64 `json:"yesterdayPublish"`
 		YesterdaySuccess int64 `json:"yesterdaySuccess"`
 		UnreviewedCount  int64 `json:"unreviewedCount"`
@@ -1971,10 +1975,10 @@ func (h *PublishTorrentsHandler) handleStats(w http.ResponseWriter, r *http.Requ
 		Find(&statusDist)
 
 	Success(w, map[string]interface{}{
-		"stats":             stats,
-		"recent":            recent,
-		"trend":             trend,
-		"target_site_top":   targetSiteTop,
+		"stats":               stats,
+		"recent":              recent,
+		"trend":               trend,
+		"target_site_top":     targetSiteTop,
 		"status_distribution": statusDist,
 	})
 }
@@ -2004,10 +2008,10 @@ func (h *PublishTorrentsHandler) handleCoverageCache(w http.ResponseWriter, r *h
 	for _, c := range cached {
 		if c.Status == model.CoverageConfirmedHas || c.Status == model.CoverageProbablyHas {
 			sites = append(sites, siteStatus{
-			SiteName: c.SiteName,
-			Status:   c.Status,
-			Source:   c.Source,
-		})
+				SiteName: c.SiteName,
+				Status:   c.Status,
+				Source:   c.Source,
+			})
 		}
 	}
 
@@ -2187,7 +2191,7 @@ func (h *PublishTorrentsHandler) handleBatchFetch(w http.ResponseWriter, r *http
 
 	var req struct {
 		ClientUID uint `json:"clientId"`
-		Items    []struct {
+		Items     []struct {
 			Hash     string `json:"hash"`
 			Name     string `json:"name"`
 			Size     int64  `json:"size"`
@@ -2282,8 +2286,6 @@ func (h *PublishTorrentsHandler) runBatchFetch(clientUID uint, items []struct {
 	}
 }
 
-
-
 func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientUID uint, hash, name string, size int64, savePath string, isLocal bool, forcePTGen ...bool) error {
 	// §59.236 ①: forcePTGen 变参——单条重获 true（Force 绕缓存 §59.173）/
 	// 批量 false（普通缓存——流控友好 §59.236 决策点①）
@@ -2307,7 +2309,7 @@ func (h *PublishTorrentsHandler) fetchSingleTorrent(ctx context.Context, clientU
 	// 双模式开放给孤儿恢复/辅种，此处按站点名单过滤）。馒头 detail 的
 	// mteamAdultCategories 已标 category.adult，此为源站选择层的前置防线。
 	_ = result // 源站选择按组映射/coverage——成人区不会成为组映射目标站，
-	           // 此处无需额外代码（防御性注释）
+	// 此处无需额外代码（防御性注释）
 
 	fetchCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -2433,7 +2435,9 @@ fetched:
 	// strategy 不可用（远程/无 savePath）时探活独立异步执行。
 	if meta != nil {
 		if h.shotStrategy != nil && savePath != "" {
-			go h.applyScreenshotStrategy(clientUID, meta.InfoHash, meta.SiteName, name, savePath, isLocal)
+			// §59.299: force（单种重获）跳过簇缓存读——每次全新截传+写穿（Q4 语义
+			// 对齐手动捕获链）；批量 force=false 维持 Q3 缓存优先
+			go h.applyScreenshotStrategy(clientUID, meta.InfoHash, meta.SiteName, name, savePath, isLocal, force)
 		} else if meta.Screenshots != "" && meta.Screenshots != "[]" {
 			go h.purgeDeadScreenshots(meta.InfoHash, meta.SiteName)
 		}
@@ -2598,7 +2602,6 @@ fetched:
 	return nil
 }
 
-
 // thanksAppendMarker §59.28 致谢追加分隔标记：statement 中该标记之后的内容
 // 是我们追加的致谢块（重获时剥离，保证幂等）。
 const thanksAppendMarker = "FRDS官组作品"
@@ -2609,7 +2612,9 @@ const thanksNoTransferTail = "[quote][b][color=red][size=5]互珍互重，禁转
 
 // stripAppendedThanks 剥离历史追加的致谢块（§59.28 幂等 + §59.260 通用化）。
 // 追加格式固定双 quote 结尾：
-//   [quote][b][color=blue][size=5]{组名}官组作品...[/quote]\n[quote][b][color=red][size=5]互珍互重，禁转PTT...[/quote]
+//
+//	[quote][b][color=blue][size=5]{组名}官组作品...[/quote]\n[quote][b][color=red][size=5]互珍互重，禁转PTT...[/quote]
+//
 // §59.260：以固定尾引言 thanksNoTransferTail 为锚（任意组名/中英模板通用），
 // 从最后一个尾引言回溯相邻前一 [quote] 起点整块剥离；旧 FRDS 标记兜底兼容。
 func stripAppendedThanks(statement string) string {
@@ -2723,11 +2728,11 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 	// 观察组 = (client, name) 聚合：全变体 hidden（组内无活跃行）且 name 非空
 	type obsRow struct {
 		ClientUID uint
-		Name     string
-		Variants int64
-		LastSeen string // MAX() 聚合返回 string（driver 层），解析用
-		SavePath string
-		Size     int64
+		Name      string
+		Variants  int64
+		LastSeen  string // MAX() 聚合返回 string（driver 层），解析用
+		SavePath  string
+		Size      int64
 	}
 	q := h.db.WithContext(r.Context()).
 		Table("torrent_snapshots").
@@ -2798,12 +2803,13 @@ func (h *PublishTorrentsHandler) handleListObserving(w http.ResponseWriter, r *h
 
 // handlePurgeObserving §59.38: 立即清理——观察期资源主动确认不等 7 天。
 // 两级判定（防跨下载器 metadata 误删）：
-//   ① 删该 (client, name) 的全部 hidden 快照行
-//   ② metadata 仅当 info_hash 不被任何其他下载器活跃/观察期快照引用才删
+//
+//	① 删该 (client, name) 的全部 hidden 快照行
+//	② metadata 仅当 info_hash 不被任何其他下载器活跃/观察期快照引用才删
 func (h *PublishTorrentsHandler) handlePurgeObserving(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientUID uint `json:"clientId"`
-		Name     string `json:"name"`
+		ClientUID uint   `json:"clientId"`
+		Name      string `json:"name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ClientUID == 0 || req.Name == "" {
 		Error(w, http.StatusBadRequest, 40001, "clientId 和 name 必填")
@@ -2811,15 +2817,15 @@ func (h *PublishTorrentsHandler) handlePurgeObserving(w http.ResponseWriter, r *
 	}
 	deleted := h.purgeObservingResource(r.Context(), req.ClientUID, req.Name)
 	Success(w, map[string]interface{}{
-		"message":        "已清理",
-		"deleted_snaps":  deleted.snapRows,
-		"deleted_metas":  deleted.metaRows,
+		"message":       "已清理",
+		"deleted_snaps": deleted.snapRows,
+		"deleted_metas": deleted.metaRows,
 	})
 }
 
 type purgeResult struct {
-	snapRows  int64
-	metaRows  int64
+	snapRows int64
+	metaRows int64
 }
 
 // purgeObservingResource 两级清理（立即清理与定时任务共用）。
@@ -2879,7 +2885,6 @@ func (h *PublishTorrentsHandler) purgeObservingResource(ctx context.Context, cli
 	return res
 }
 
-
 func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.Request) {
 	clientUID := uint(0)
 	if v := r.URL.Query().Get("client_id"); v != "" {
@@ -2918,8 +2923,8 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		if len(pubHashes) > 0 {
 			type ckRow struct {
 				ClientUID uint
-				SavePath string
-				Name     string
+				SavePath  string
+				Name      string
 			}
 			var cks []ckRow
 			h.db.WithContext(r.Context()).
@@ -3078,9 +3083,9 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// 搜索无关，search 只决定哪些簇可见）。name='' 行不入此表，副本数退化 1。
 	type clusterCountRow struct {
 		ClientUID uint
-		SavePath string
-		Name     string
-		Cnt      int
+		SavePath  string
+		Name      string
+		Cnt       int
 	}
 	var countRows []clusterCountRow
 	countQ := h.db.WithContext(r.Context()).
@@ -3135,32 +3140,32 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			item["has_description"] = meta.Description != ""
 			item["has_screenshots"] = meta.Screenshots != ""
 			item["fetched_at"] = meta.FetchedAt
-		// 技术参数（列表展示用）
-		item["resolution"] = meta.Resolution
-		item["video_codec"] = meta.VideoCodec
-		item["audio_codec"] = meta.AudioCodec
-		item["audio_channels"] = meta.AudioChannels
-		item["audio_tech"] = meta.AudioTech
-		item["hdr"] = meta.HDR
-		item["source_type"] = meta.SourceType
-		item["specification"] = meta.Specification
-		// §59.226 附七: Encode 派生单点化——列表页此前手工构造 mini profile
-		// （只填 3 字段）MI 铁证输入恒 false（MIEncoded/MIHasVideo 零值）——
-		// 与详情页（完整 profile 含 MI）同种子判定可能打架。改为：MI 本地列
-		// 存在时解析出铁证输入，与详情页同源。
-		encProfile := titleparser.TechProfile{
-			SourceType:    meta.SourceType,
-			Specification: meta.Specification,
-			VideoCodec:    meta.VideoCodec,
-		}
-		if meta.MediaInfo != "" {
-			miTech := titleparser.ExtractMediaInfo(meta.MediaInfo)
-			encProfile.MIEncoded = miTech.Encoded
-			encProfile.MIHasVideo = miTech.Encoded || miTech.Resolution != "" || miTech.VideoCodec != ""
-		}
-		item["encode"] = titleparser.IsEncode(encProfile)
-		item["category"] = meta.Category
-		item["form"] = meta.Form
+			// 技术参数（列表展示用）
+			item["resolution"] = meta.Resolution
+			item["video_codec"] = meta.VideoCodec
+			item["audio_codec"] = meta.AudioCodec
+			item["audio_channels"] = meta.AudioChannels
+			item["audio_tech"] = meta.AudioTech
+			item["hdr"] = meta.HDR
+			item["source_type"] = meta.SourceType
+			item["specification"] = meta.Specification
+			// §59.226 附七: Encode 派生单点化——列表页此前手工构造 mini profile
+			// （只填 3 字段）MI 铁证输入恒 false（MIEncoded/MIHasVideo 零值）——
+			// 与详情页（完整 profile 含 MI）同种子判定可能打架。改为：MI 本地列
+			// 存在时解析出铁证输入，与详情页同源。
+			encProfile := titleparser.TechProfile{
+				SourceType:    meta.SourceType,
+				Specification: meta.Specification,
+				VideoCodec:    meta.VideoCodec,
+			}
+			if meta.MediaInfo != "" {
+				miTech := titleparser.ExtractMediaInfo(meta.MediaInfo)
+				encProfile.MIEncoded = miTech.Encoded
+				encProfile.MIHasVideo = miTech.Encoded || miTech.Resolution != "" || miTech.VideoCodec != ""
+			}
+			item["encode"] = titleparser.IsEncode(encProfile)
+			item["category"] = meta.Category
+			item["form"] = meta.Form
 		} else {
 			item["reviewed"] = false
 			item["fetched"] = false
@@ -3374,8 +3379,8 @@ func (h *PublishTorrentsHandler) handleRecomputeProfiles(w http.ResponseWriter, 
 func (h *PublishTorrentsHandler) handleSeedUniquePaths(w http.ResponseWriter, r *http.Request) {
 	type pathRow struct {
 		ClientUID uint
-		SavePath string
-		Count    int64
+		SavePath  string
+		Count     int64
 	}
 	var rows []pathRow
 	h.db.WithContext(r.Context()).Model(&model.TorrentSnapshot{}).
@@ -3556,11 +3561,11 @@ func (h *PublishTorrentsHandler) handleAuditInfoHash(w http.ResponseWriter, r *h
 	}
 	noSrc, _ := fingerprint.ComputeNoSourceHash(data)
 	Success(w, map[string]interface{}{
-		"site":              req.Site,
-		"torrent_id":        req.TorrentID,
-		"info_hash":         meta.InfoHash,
-		"expect_hash":       req.ExpectHash,
-		"match":             strings.EqualFold(meta.InfoHash, req.ExpectHash),
+		"site":                req.Site,
+		"torrent_id":          req.TorrentID,
+		"info_hash":           meta.InfoHash,
+		"expect_hash":         req.ExpectHash,
+		"match":               strings.EqualFold(meta.InfoHash, req.ExpectHash),
 		"info_hash_no_source": noSrc,
 	})
 }
@@ -3722,8 +3727,6 @@ func (h *PublishTorrentsHandler) canonicalGroupName(ctx context.Context, group s
 	return group
 }
 
-
-
 // syncGroupLexicon §59.233: mappings CRUD 后重建组名词表（识别+展示双层——
 // RefreshCache 只刷 LookupGroup 缓存，lexicon 不联动则新词条不生效）。
 func (h *PublishTorrentsHandler) syncGroupLexicon(ctx context.Context) {
@@ -3848,29 +3851,29 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 		"fetch_source":    meta.FetchSource,
 
 		// 14 DB 平铺字段（DB 为空 → profile fallback）
-		"category":        pickNonEmpty(meta.Category, inferredCategory),
-		"form":            meta.Form,
+		"category": pickNonEmpty(meta.Category, inferredCategory),
+		"form":     meta.Form,
 		// §59.108: 编辑表单媒介输入框数据源（titleComponents.medium 曾恒空——
 		// GET 无 medium 键, source_type+specification 合成 TitleComponents.Medium 形态）
 		// §59.235 P1 附: 公共单点（ComposeMedium——双实现漏修教训）
 		"medium": titleparser.ComposeMedium(
 			pickNonEmpty(meta.SourceType, profile.SourceType),
 			pickNonEmpty(meta.Specification, profile.Specification)),
-		"resolution":      pickNonEmpty(meta.Resolution, profile.Resolution),
-		"video_codec":     pickNonEmpty(meta.VideoCodec, profile.VideoCodec),
-		"audio_codec":     pickNonEmpty(meta.AudioCodec, profile.AudioCodec),
-		"audio_channels":  pickNonEmpty(meta.AudioChannels, profile.AudioChannels),
-		"audio_tech":      pickNonEmpty(meta.AudioTech, profile.AudioTechnology),
+		"resolution":     pickNonEmpty(meta.Resolution, profile.Resolution),
+		"video_codec":    pickNonEmpty(meta.VideoCodec, profile.VideoCodec),
+		"audio_codec":    pickNonEmpty(meta.AudioCodec, profile.AudioCodec),
+		"audio_channels": pickNonEmpty(meta.AudioChannels, profile.AudioChannels),
+		"audio_tech":     pickNonEmpty(meta.AudioTech, profile.AudioTechnology),
 		// §59.116: 展示层零计算回归——列值唯一真相（计算只在 t0 落库层，有完整
 		// titleparser 管道与段上下文）；fallback 只裸 profile 补位（列 0=异常诚实显示，
 		// 刷列治本）。§59.115 曾在 fallback 加扣减——展示层第二套计算是分裂之源。
-		"audio_tracks":    pickNonZero(meta.AudioTracks, profile.AudioTracks),
-		"hdr":             pickNonEmpty(meta.HDR, profile.HDR),
-		"bit_depth":       pickNonEmpty(meta.BitDepth, profile.BitDepth),
-		"source_type":     displayProfile.SourceType,
+		"audio_tracks": pickNonZero(meta.AudioTracks, profile.AudioTracks),
+		"hdr":          pickNonEmpty(meta.HDR, profile.HDR),
+		"bit_depth":    pickNonEmpty(meta.BitDepth, profile.BitDepth),
+		"source_type":  displayProfile.SourceType,
 		// §59.226 附七: 生效规格（effective specification）——SPEC 空 →
 		// IsEncode 派生 "Encode"（后端单点出值，前端规格栏纯展示）
-		"specification":   effectiveSpecification(displayProfile),
+		"specification": effectiveSpecification(displayProfile),
 		// §59.34: Encode 派生标识（前端规格展示用，不参与重组）
 		"encode":          titleparser.IsEncode(displayProfile),
 		"source_platform": pickNonEmpty(meta.SourcePlatform, profile.SourcePlatform),
@@ -3955,12 +3958,12 @@ func (h *PublishTorrentsHandler) handleGetSeed(w http.ResponseWriter, r *http.Re
 
 // putSeedRequest §59.89: PUT /publish/seeds 请求体（提升命名——buildPutSeedUpdates 测试锚）。
 type putSeedRequest struct {
-	Poster       string   `json:"poster"`
-	Screenshots  []string `json:"screenshots"`
-	Description  string   `json:"description"`
-	Tags         []string `json:"tags"`
-	SiteName     string   `json:"siteName"`
-	Reviewed     bool     `json:"reviewed"` // §59.247: 显式审核通道（确认完成——带 9 字段门槛）
+	Poster      string   `json:"poster"`
+	Screenshots []string `json:"screenshots"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+	SiteName    string   `json:"siteName"`
+	Reviewed    bool     `json:"reviewed"` // §59.247: 显式审核通道（确认完成——带 9 字段门槛）
 }
 
 // buildPutSeedUpdates §59.89: PUT 更新构造（空值不覆盖）——部分保存场景（只改
@@ -4100,25 +4103,25 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 	renderer := description.NewRenderer("")
 	screenshots := model.ParseScreenshotColumn(updated.Screenshots) // §59.47
 	descData := &model.DescriptionData{
-		Statement:      updated.Statement,
-		PosterURL:      updated.Poster,
-		PTGenBody:      updated.Description,
-		MediaInfoText:  miForProfile,
-		BDInfoText:     updated.BDInfo,
-		Screenshots:    screenshots,
-		SourceSite:     updated.SiteName,
-		Title:          updated.Title,
+		Statement:     updated.Statement,
+		PosterURL:     updated.Poster,
+		PTGenBody:     updated.Description,
+		MediaInfoText: miForProfile,
+		BDInfoText:    updated.BDInfo,
+		Screenshots:   screenshots,
+		SourceSite:    updated.SiteName,
+		Title:         updated.Title,
 	}
 	renderedDesc, renderErr := renderer.Render(descData, model.SiteDescConfig{})
 
 	result := map[string]interface{}{
-		"info_hash":    updated.InfoHash,
-		"site_name":    updated.SiteName,
-		"title":        updated.Title,
-		"subtitle":     updated.Subtitle,
-		"poster":       updated.Poster,
-		"description":  descriptionOut, // §59.104: GET 同款兜底（列空按 douban_url 查 ptgen_cache——预览不漏缓存简介）
-		"statement":    updated.Statement,
+		"info_hash":   updated.InfoHash,
+		"site_name":   updated.SiteName,
+		"title":       updated.Title,
+		"subtitle":    updated.Subtitle,
+		"poster":      updated.Poster,
+		"description": descriptionOut, // §59.104: GET 同款兜底（列空按 douban_url 查 ptgen_cache——预览不漏缓存简介）
+		"statement":   updated.Statement,
 		"tags": func() interface{} {
 			var tags []string
 			if updated.Tags != "" {
@@ -4139,40 +4142,40 @@ func (h *PublishTorrentsHandler) handlePutSeed(w http.ResponseWriter, r *http.Re
 			}
 			return []string{}
 		}(),
-		"reviewed":     updated.Reviewed,
+		"reviewed":       updated.Reviewed,
 		"missing_fields": missing,
 
 		// §59.103: v1.05 全字段——与 GET detail（Tab1 数据源）同款取值策略：
 		// 列值优先（pickNonEmpty/pickNonZero），列空才 profile 现算补。预览=引用
 		// Tab1 数据，不再独立计算（§59.102 音轨数分裂的结构性根除——两响应同源）。
-		"season_episode": profile.SeasonEpisode, // transient（不落列，两处同源现算）
-		"year":           profile.Year,          // transient
-		"resolution":     pickNonEmpty(updated.Resolution, profile.Resolution),
-		"hdr":            pickNonEmpty(updated.HDR, profile.HDR),
-		"bit_depth":      pickNonEmpty(updated.BitDepth, profile.BitDepth),
-		"video_codec":    pickNonEmpty(updated.VideoCodec, profile.VideoCodec),
-		"audio_codec":    pickNonEmpty(updated.AudioCodec, profile.AudioCodec),
-		"audio_channels": pickNonEmpty(updated.AudioChannels, profile.AudioChannels),
-		"audio_tech":     pickNonEmpty(updated.AudioTech, profile.AudioTechnology),
-		"audio_tracks":   pickNonZero(updated.AudioTracks, profile.AudioTracks), // §59.116: 展示层零计算（同 GET）
-		"source_type":    pickNonEmpty(updated.SourceType, profile.SourceType),
-		"specification":  pickNonEmpty(updated.Specification, profile.Specification),
+		"season_episode":  profile.SeasonEpisode, // transient（不落列，两处同源现算）
+		"year":            profile.Year,          // transient
+		"resolution":      pickNonEmpty(updated.Resolution, profile.Resolution),
+		"hdr":             pickNonEmpty(updated.HDR, profile.HDR),
+		"bit_depth":       pickNonEmpty(updated.BitDepth, profile.BitDepth),
+		"video_codec":     pickNonEmpty(updated.VideoCodec, profile.VideoCodec),
+		"audio_codec":     pickNonEmpty(updated.AudioCodec, profile.AudioCodec),
+		"audio_channels":  pickNonEmpty(updated.AudioChannels, profile.AudioChannels),
+		"audio_tech":      pickNonEmpty(updated.AudioTech, profile.AudioTechnology),
+		"audio_tracks":    pickNonZero(updated.AudioTracks, profile.AudioTracks), // §59.116: 展示层零计算（同 GET）
+		"source_type":     pickNonEmpty(updated.SourceType, profile.SourceType),
+		"specification":   pickNonEmpty(updated.Specification, profile.Specification),
 		"source_platform": pickNonEmpty(updated.SourcePlatform, profile.SourcePlatform),
-		"edition_info":   pickNonEmpty(updated.EditionInfo, profile.EditionInfo),
-		"region_code":    pickNonEmpty(updated.RegionCode, profile.RegionCode),
-		"chinese_prefix": pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(updated.Subtitle)),
-		"encode":         titleparser.IsEncode(profile),
+		"edition_info":    pickNonEmpty(updated.EditionInfo, profile.EditionInfo),
+		"region_code":     pickNonEmpty(updated.RegionCode, profile.RegionCode),
+		"chinese_prefix":  pickNonEmpty(profile.ChinesePrefix, extractChineseFromSubtitle(updated.Subtitle)),
+		"encode":          titleparser.IsEncode(profile),
 		// §59.90: 对齐 Tab1——剧名/制作组/类型(InferCategory)
-		"main_title":     profile.MainTitle,
-		"release_group":  profile.ReleaseGroup,
+		"main_title":    profile.MainTitle,
+		"release_group": profile.ReleaseGroup,
 		"category": func() string {
 			comps := titleparser.TechProfileToComponents(profile)
 			return titleparser.InferCategory(comps, updated.SourceCategory, "", "")
 		}(),
 
 		// §59.28 C（方案A ②④）：标准化重组标题 + 渲染后完整描述（预览）
-		"reassembled_title": reassembledTitle,
-		"title_incomplete":  titleIncomplete,
+		"reassembled_title":    reassembledTitle,
+		"title_incomplete":     titleIncomplete,
 		"rendered_description": renderedDesc,
 	}
 	// §59.81: 产地/类型 + 分段渲染素材（简介四段结构化展示）
@@ -4259,11 +4262,11 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 	// 查该 hash 的 name → 同名全部 hash
 	var name string
 	_ = h.db.WithContext(r.Context()). //nolint:gosec // Row().Scan 容错——无行 → 空名走 sibling 分支
-		Table("torrent_snapshots").
-		Select("name").
-		Where("hash = ? AND name != ''", infoHash).
-		Limit(1).
-		Row().Scan(&name) //nolint:errcheck // 同上 //nolint:errcheck,gosec // 无行/扫描失败 → 空名（资源级清除走 sibling 分支）
+						Table("torrent_snapshots").
+						Select("name").
+						Where("hash = ? AND name != ''", infoHash).
+						Limit(1).
+						Row().Scan(&name) //nolint:errcheck // 同上 //nolint:errcheck,gosec // 无行/扫描失败 → 空名（资源级清除走 sibling 分支）
 
 	result := h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash).Delete(&model.TorrentMetadata{})
 	if name != "" {
@@ -4469,7 +4472,8 @@ func (h *PublishTorrentsHandler) purgeDeadScreenshots(infoHash, siteName string)
 // 本函数可能读到 purge 前的死链列表，rehost 失败保源后 final==source → same 早退
 // → 永不触发 mpv 补图（243 实测 8 组 ptpimg.me 全死链复现）。探活先行，本函数
 // 读到的必为活链集，再走策略（白名单/转存/差额补足/无图全量）→ 落库。
-func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHash, siteName, name, savePath string, isLocal bool) {
+func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHash, siteName, name, savePath string, isLocal bool, skipCache ...bool) {
+	noCache := len(skipCache) > 0 && skipCache[0]
 	// §59.58: 并发额度闸门——批量链 N 路 fire-and-forget 无界并发挤爆 CPU/代理（243 实测
 	// >20 路时 mpv 摊薄 15 倍 → 撞 4min ctx → 差额补足作废）。排队在闸门外等，不烧 ctx 预算
 	// （ctx 在获得额度后才创建）。CPU 总量守恒：总时长不变，换来每单稳定完成。
@@ -4487,17 +4491,23 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	// mpv/上传全链（Q3 缓存优先：本批源站截图不消费）。锚点=最近一次成功写穿，
 	// 手动捕获结果也刷新锚点（Q4）。过期=miss 走既有策略（Q2=A：源站充足仍转存
 	// 源站，不足才 mpv——与 §59.53 语义一致）。
-	if cached, ok := h.lookupScreenshotCache(clientUID, savePath, name); ok {
-		data, _ := json.Marshal(cached)
-		if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
-			Where("info_hash = ? AND site_name = ?", infoHash, siteName).
-			Update("screenshots", string(data)).Error; err == nil {
-			h.propagateClusterScreenshots(ctx, clientUID, savePath, name, infoHash, string(data))
-			h.logger.Info("screenshot cache hit",
-				zap.String("hash", infoHash[:min(10, len(infoHash))]),
-				zap.Int("shots", len(cached)))
+	if !noCache {
+		if cached, ok := h.lookupScreenshotCache(clientUID, savePath, name); ok {
+			data, _ := json.Marshal(cached)
+			if err := h.db.WithContext(ctx).Model(&model.TorrentMetadata{}).
+				Where("info_hash = ? AND site_name = ?", infoHash, siteName).
+				Update("screenshots", string(data)).Error; err == nil {
+				h.propagateClusterScreenshots(ctx, clientUID, savePath, name, infoHash, string(data))
+				h.logger.Info("screenshot cache hit",
+					zap.String("hash", infoHash[:min(10, len(infoHash))]),
+					zap.Int("shots", len(cached)))
+			}
+			return
 		}
-		return
+	}
+	if noCache {
+		h.logger.Info("screenshot cache skipped (single re-fetch)",
+			zap.String("hash", infoHash[:min(10, len(infoHash))]))
 	}
 
 	// §59.57: 探活内联前序（自带 90s 独立 ctx，读自身快照；HEAD 秒级不占策略预算）
@@ -4567,7 +4577,6 @@ func regionLabelsOfMeta(m model.TorrentMetadata) string {
 	return strings.Join(src.Region, " ")
 }
 
-
 // handleExecutePublish §59.156 切片 2: 新发布执行器入口（DB 供给——切读 publish_form_config）。
 // body: {info_hash, target_site, anonymous, tag_overrides: [], dry_run}
 func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *http.Request) {
@@ -4579,7 +4588,7 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		DryRun       bool     `json:"dry_run"`
 		PushOnly     bool     `json:"push_only"`
 		TorrentID    string   `json:"torrent_id"`
-		PushClientID uint    `json:"push_client_id"`
+		PushClientID uint     `json:"push_client_id"`
 		PushSavePath string   `json:"push_save_path"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InfoHash == "" || req.TargetSite == "" {
@@ -4609,10 +4618,8 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 	Success(w, map[string]any{"result": result})
 }
 
-
 // handleExecutePublishBatch §59.159: 一种多站批量发布——每站独立 execute 并行
 // （BatchGroupID 分组落库；网络白名单内并发安全——PTGen 等在线依赖已移除）。
-
 
 // preflightEntry §59.176: 前置检查缓存项。
 type preflightEntry struct {
@@ -4684,12 +4691,12 @@ func (h *PublishTorrentsHandler) handleExecutePublishBatch(w http.ResponseWriter
 	}
 	batchID := fmt.Sprintf("%d", time.Now().UnixNano())
 	type siteResult struct {
-		Site    string                 `json:"site"`
-		Status  string                 `json:"status"`
-		Message string                 `json:"message"`
-		TorrentID string               `json:"torrent_id,omitempty"`
-		URL     string                 `json:"url,omitempty"`
-		PreAudit *publish.PreAuditResult `json:"pre_audit,omitempty"`
+		Site      string                  `json:"site"`
+		Status    string                  `json:"status"`
+		Message   string                  `json:"message"`
+		TorrentID string                  `json:"torrent_id,omitempty"`
+		URL       string                  `json:"url,omitempty"`
+		PreAudit  *publish.PreAuditResult `json:"pre_audit,omitempty"`
 	}
 	results := make([]siteResult, len(req.TargetSites))
 	var wg sync.WaitGroup
@@ -4795,7 +4802,7 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 	}
 	task := &siteBatchTask{
 		ID: taskID, TargetSite: req.TargetSite, Total: len(req.InfoHashes),
-		Results: make([]siteBatchResult, 0, len(req.InfoHashes)),
+		Results:   make([]siteBatchResult, 0, len(req.InfoHashes)),
 		StartedAt: time.Now(),
 	}
 	h.siteBatch.tasks[taskID] = task

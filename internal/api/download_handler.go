@@ -222,9 +222,9 @@ func splitPath(path string) []string {
 }
 
 type bulkActionRequest struct {
-	IDs    []uint `json:"ids"`
-	Action string `json:"action"` // pause|resume|recheck|delete
-	DeleteCompanions *bool `json:"deleteCompanions,omitempty"`
+	IDs              []uint `json:"ids"`
+	Action           string `json:"action"` // pause|resume|recheck|delete
+	DeleteCompanions *bool  `json:"deleteCompanions,omitempty"`
 }
 
 func (h *DownloadHandler) handleBulkAction(w http.ResponseWriter, r *http.Request) {
@@ -312,10 +312,10 @@ func (h *DownloadHandler) doRecheck(ctx context.Context, task *model.DownloadTas
 }
 
 type addTaskRequest struct {
-	ClientUID uint `json:"clientId"`
-	URL      string `json:"url"`
-	Category string `json:"category"`
-	Paused   bool   `json:"paused"`
+	ClientUID uint   `json:"clientId"`
+	URL       string `json:"url"`
+	Category  string `json:"category"`
+	Paused    bool   `json:"paused"`
 }
 
 func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
@@ -404,7 +404,7 @@ func (h *DownloadHandler) handleAdd(w http.ResponseWriter, r *http.Request) {
 
 	task := &model.DownloadTask{
 		Source:      model.DownloadSourceManual,
-		ClientUID: clientUID,
+		ClientUID:   clientUID,
 		InfoHash:    result.InfoHash,
 		TorrentName: result.Name,
 		Category:    category,
@@ -442,14 +442,14 @@ func (h *DownloadHandler) handleRetryTransfer(w http.ResponseWriter, r *http.Req
 var _ = fmt.Sprintf
 
 type spaceStat struct {
-	ClientUID uint   `json:"clientId"`
-	Name      string `json:"name"`
-	FreeSpace       int64  `json:"freeSpace"`
-	TotalSpace      int64  `json:"totalSpace"`
-	PendingBytes    int64  `json:"pendingBytes"`
-	EffectiveFree   int64  `json:"effectiveFree"`
-	TorrentCount    int    `json:"torrentCount"`
-	DownloadingCount int   `json:"downloadingCount"`
+	ClientUID        uint   `json:"clientId"`
+	Name             string `json:"name"`
+	FreeSpace        int64  `json:"freeSpace"`
+	TotalSpace       int64  `json:"totalSpace"`
+	PendingBytes     int64  `json:"pendingBytes"`
+	EffectiveFree    int64  `json:"effectiveFree"`
+	TorrentCount     int    `json:"torrentCount"`
+	DownloadingCount int    `json:"downloadingCount"`
 }
 
 func (h *DownloadHandler) handleSpaceStats(w http.ResponseWriter, r *http.Request) {
@@ -504,8 +504,8 @@ func (h *DownloadHandler) handleSpaceStats(w http.ResponseWriter, r *http.Reques
 		}
 
 		stats = append(stats, spaceStat{
-			ClientUID: uid,
-			Name:      dbNames[uid],
+			ClientUID:        uid,
+			Name:             dbNames[uid],
 			FreeSpace:        freeSpace,
 			TotalSpace:       totalSpace,
 			PendingBytes:     pending,
@@ -520,13 +520,13 @@ func (h *DownloadHandler) handleSpaceStats(w http.ResponseWriter, r *http.Reques
 
 func (h *DownloadHandler) handleSnapshotPaths(w http.ResponseWriter, r *http.Request) {
 	type pathEntry struct {
-		Path     string `json:"path"`
-		Count    int64  `json:"count"`
+		Path  string `json:"path"`
+		Count int64  `json:"count"`
 	}
 	type clientPaths struct {
-		ClientUID uint      `json:"clientId"`
-		Name     string    `json:"name"`
-		Paths    []pathEntry `json:"paths"`
+		ClientUID uint        `json:"clientId"`
+		Name      string      `json:"name"`
+		Paths     []pathEntry `json:"paths"`
 	}
 
 	var snapshots []model.TorrentSnapshot
@@ -575,11 +575,11 @@ func (h *DownloadHandler) handleSnapshotUnconfigured(w http.ResponseWriter, r *h
 	}
 
 	type unconfiguredItem struct {
-		Hash     string `json:"hash"`
-		Name     string `json:"name"`
-		Size     int64  `json:"size"`
-		ClientUID uint `json:"clientId"`
-		SavePath string `json:"savePath"`
+		Hash      string `json:"hash"`
+		Name      string `json:"name"`
+		Size      int64  `json:"size"`
+		ClientUID uint   `json:"clientId"`
+		SavePath  string `json:"savePath"`
 	}
 
 	// §59.29: 资源级（name）判定"未配置"——同 name 的所有 hash 变体中

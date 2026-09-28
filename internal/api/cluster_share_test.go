@@ -174,7 +174,6 @@ func TestPropagateClusterPosters_NoMemoryMap(t *testing.T) {
 	}
 }
 
-
 // §59.61 附5: 尾部终局传播——fetchSingleTorrent 的 INSERT 循环与异步 applyPosterFallback
 // 的回传 UPDATE 并发竞态（疯狂动物城2 BluRay 27/54 行残留站点态实锤）。修复:
 // finalizeClusterPropagation 等 fallback 终局后 INSERT + 终态回传。
@@ -219,7 +218,14 @@ func TestRefreshInferredTags_AfterPTGen(t *testing.T) {
 	db.Where("info_hash = ?", hash).First(&m)
 	var tags []string
 	_ = json.Unmarshal([]byte(m.Tags), &tags)
-	has := func(k string) bool { for _, x := range tags { if x == k { return true } }; return false }
+	has := func(k string) bool {
+		for _, x := range tags {
+			if x == k {
+				return true
+			}
+		}
+		return false
+	}
 	if !has("high_rating") {
 		t.Errorf("t2 重推应补 high_rating: %v", tags)
 	}
