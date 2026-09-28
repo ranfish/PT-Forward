@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -56,6 +57,11 @@ func (e *ScreenshotEngine) Available() bool {
 type videoInfo struct {
 	duration float64
 	isHDR    bool
+	// dualHEVC: m2ts 内含两个 HEVC 视频流（DoVi Profile 7 BL+EL 结构）。
+	// RPU 挂在 EL 流上，需 vf dovi_reshape 做 CPU reshaping/重标记；
+	// 且 seek 落点首帧常为参考缺失的 concealment 帧，需 IDR 精确起点+前向取帧。
+	dualHEVC bool
+	fps      float64
 }
 
 func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtitleStreamID int) ([]string, string, error) {
@@ -86,7 +92,7 @@ func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtit
 	var paths []string
 	for i, ts := range points {
 		outPath := filepath.Join(tmpDir, fmt.Sprintf("shot_%03d.jpg", i))
-		capErr := e.captureFrameMPV(ctx, videoPath, ts, subtitleStreamID, info.isHDR, outPath)
+		capErr := e.captureFrameMPVEx(ctx, videoPath, ts, subtitleStreamID, info.isHDR, info.dualHEVC, info.fps, outPath)
 		if capErr != nil {
 			e.logger.Warn("screenshot capture failed",
 				zap.Float64("timestamp", ts),
@@ -111,8 +117,8 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 
 	cmd := exec.CommandContext(ctx, probePath, //nolint:gosec // intentional subprocess
 		"-v", "error",
-		"-select_streams", "v:0",
-		"-show_entries", "stream=color_transfer,color_primaries:format=duration",
+		"-select_streams", "v",
+		"-show_entries", "stream=codec_name,avg_frame_rate,color_transfer,color_primaries:format=duration",
 		"-of", "json",
 		videoPath,
 	)
@@ -123,6 +129,8 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 
 	var result struct {
 		Streams []struct {
+			CodecName      string `json:"codec_name"`
+			AvgFrameRate   string `json:"avg_frame_rate"`
 			ColorTransfer  string `json:"color_transfer"`
 			ColorPrimaries string `json:"color_primaries"`
 		} `json:"streams"`
@@ -160,7 +168,46 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 		isHDR = trc == "smpte2084" || trc == "arib-std-b67" || trc == "pq" || trc == "hlg"
 	}
 
-	return &videoInfo{duration: d, isHDR: isHDR}, nil
+	hevcCount := 0
+	for _, st := range result.Streams {
+		if st.CodecName == "hevc" {
+			hevcCount++
+		}
+	}
+	fps := 0.0
+	if len(result.Streams) > 0 {
+		fps = parseFraction(result.Streams[0].AvgFrameRate)
+	}
+	if fps <= 0 {
+		fps = 23.976
+	}
+
+	return &videoInfo{
+		duration: d,
+		isHDR:    isHDR,
+		dualHEVC: hevcCount >= 2,
+		fps:      fps,
+	}, nil
+}
+
+func parseFraction(s string) float64 {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "0/0" {
+		return 0
+	}
+	parts := strings.SplitN(s, "/", 2)
+	num, err1 := strconv.ParseFloat(parts[0], 64)
+	if err1 != nil {
+		return 0
+	}
+	if len(parts) == 2 {
+		den, err2 := strconv.ParseFloat(parts[1], 64)
+		if err2 != nil || den == 0 {
+			return 0
+		}
+		return num / den
+	}
+	return num
 }
 
 func (e *ScreenshotEngine) generateTimePoints(duration float64) []float64 {
@@ -197,13 +244,46 @@ func (e *ScreenshotEngine) generateTimePoints(duration float64) []float64 {
 }
 
 func (e *ScreenshotEngine) captureFrameMPV(ctx context.Context, videoPath string, timestamp float64, subtitleStreamID int, isHDR bool, outPath string) error {
+	return e.captureFrameMPVEx(ctx, videoPath, timestamp, subtitleStreamID, isHDR, false, 0, outPath)
+}
+
+// captureFrameMPVEx: dualHEVC 时走 DoVi P7 专用路径（vf dovi_reshape + IDR 精确起点前向取帧）。
+func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath string, timestamp float64, subtitleStreamID int, isHDR, dualHEVC bool, fps float64, outPath string) error {
 	outDir := filepath.Dir(outPath)
+
+	start := timestamp
+	frames := 1
+	useDoviVF := false
+
+	if dualHEVC {
+		idr, err := e.findIDRBefore(ctx, videoPath, timestamp)
+		if err == nil && idr > 0 && timestamp > idr {
+			offset := (timestamp - idr) * fps
+			n := int(math.Ceil(offset)) + 2 // +2 跳过 open-GOP 前导 B 帧（参考缺失 concealment）
+			if n < 3 {
+				n = 3
+			}
+			if n > 240 {
+				n = 240
+			}
+			start = idr
+			frames = n
+			useDoviVF = true
+		} else {
+			// 找不到关键帧信息则退回 dovi vf + 保守取第 4 帧
+			frames = 4
+			useDoviVF = true
+			e.logger.Warn("screenshot dovi: no IDR found before target, fallback frames=4",
+				zap.Float64("timestamp", timestamp))
+		}
+	}
+
 	args := []string{
 		"--vo=image",
 		"--ao=null",
 		"--no-audio",
-		"--start=" + strconv.FormatFloat(timestamp, 'f', 3, 64),
-		"--frames=1",
+		"--start=" + strconv.FormatFloat(start, 'f', 6, 64),
+		"--frames=" + strconv.Itoa(frames),
 		"--no-terminal",
 		"--no-config",
 		"--vo-image-format=jpg",
@@ -211,9 +291,16 @@ func (e *ScreenshotEngine) captureFrameMPV(ctx context.Context, videoPath string
 		"--vo-image-outdir=" + outDir,
 	}
 
+	vfParts := []string{}
+	if useDoviVF {
+		vfParts = append(vfParts, fmt.Sprintf("dovi_reshape=el-source='%s'", videoPath))
+	}
 	// HDR: add mobius tone-mapping via lavfi filter (requires zimg for color conversion)
-	if isHDR {
-		args = append(args, "--vf=lavfi=[tonemap=mobius]")
+	if isHDR && !useDoviVF {
+		vfParts = append(vfParts, "lavfi=[tonemap=mobius]")
+	}
+	if len(vfParts) > 0 {
+		args = append(args, "--vf="+strings.Join(vfParts, ","))
 	}
 
 	if subtitleStreamID > 0 {
@@ -234,15 +321,75 @@ func (e *ScreenshotEngine) captureFrameMPV(ctx context.Context, videoPath string
 		return fmt.Errorf("mpv exited: %w, output: %s", err, string(output))
 	}
 
-	mpvOutput := filepath.Join(outDir, "00000001.jpg")
-	if _, statErr := os.Stat(mpvOutput); statErr == nil {
-		if mpvOutput != outPath {
-			if renameErr := os.Rename(mpvOutput, outPath); renameErr != nil {
-				return fmt.Errorf("rename output: %w", renameErr)
-			}
-		}
-		return nil
+	// 取编号最大的输出帧（frames>1 时最后一帧为目标帧）
+	entries, listErr := os.ReadDir(outDir)
+	if listErr != nil {
+		return fmt.Errorf("read output dir: %w", listErr)
 	}
+	best := ""
+	bestNum := -1
+	for _, ent := range entries {
+		name := ent.Name()
+		if !strings.HasSuffix(name, ".jpg") {
+			continue
+		}
+		base := strings.TrimSuffix(name, ".jpg")
+		num, convErr := strconv.Atoi(base)
+		if convErr != nil {
+			continue
+		}
+		if num > bestNum {
+			bestNum = num
+			best = filepath.Join(outDir, name)
+		}
+	}
+	if best == "" {
+		return fmt.Errorf("mpv output file not found in %s", outDir)
+	}
+	// 清理多余帧，仅保留目标帧
+	for _, ent := range entries {
+		if filepath.Join(outDir, ent.Name()) != best && strings.HasSuffix(ent.Name(), ".jpg") {
+			_ = os.Remove(filepath.Join(outDir, ent.Name()))
+		}
+	}
+	if best != outPath {
+		if renameErr := os.Rename(best, outPath); renameErr != nil {
+			return fmt.Errorf("rename output: %w", renameErr)
+		}
+	}
+	return nil
+}
 
-	return fmt.Errorf("mpv output file not found: %s", mpvOutput)
+// findIDRBefore: 目标时间点之前最近的关键帧 pts_time（秒）。
+func (e *ScreenshotEngine) findIDRBefore(ctx context.Context, videoPath string, t float64) (float64, error) {
+	windowStart := t - 5
+	if windowStart < 0 {
+		windowStart = 0
+	}
+	cmd := exec.CommandContext(ctx, e.ffprobePath, //nolint:gosec // intentional subprocess
+		"-v", "error",
+		"-read_intervals", fmt.Sprintf("%f%%%f", windowStart, t+0.5),
+		"-skip_frame", "nokey",
+		"-select_streams", "v:0",
+		"-show_entries", "frame=pts_time",
+		"-of", "csv=p=0",
+		videoPath,
+	)
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe idr: %w", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		line = strings.TrimSuffix(line, ",")
+		if line == "" {
+			continue
+		}
+		pt, parseErr := strconv.ParseFloat(line, 64)
+		if parseErr == nil && pt > 0 && pt <= t {
+			return pt, nil
+		}
+	}
+	return 0, fmt.Errorf("no keyframe found before %f", t)
 }
