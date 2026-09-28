@@ -1,0 +1,36 @@
+diff --git a/filters/user_filters.c b/filters/user_filters.c
+index 68c7016371..2b696321b2 100644
+--- a/filters/user_filters.c
++++ b/filters/user_filters.c
+@@ -82,6 +82,7 @@ const struct m_obj_list af_obj_list = {
+ 
+ const struct mp_user_filter_entry *vf_list[] = {
+     &vf_format,
++    &vf_dovi_reshape,
+     &vf_lavfi,
+     &vf_lavfi_bridge,
+     &vf_sub,
+diff --git a/filters/user_filters.h b/filters/user_filters.h
+index 639ffe7ddf..fb055452a6 100644
+--- a/filters/user_filters.h
++++ b/filters/user_filters.h
+@@ -30,6 +30,7 @@ extern const struct mp_user_filter_entry af_drop;
+ extern const struct mp_user_filter_entry vf_lavfi;
+ extern const struct mp_user_filter_entry vf_lavfi_bridge;
+ extern const struct mp_user_filter_entry vf_sub;
++extern const struct mp_user_filter_entry vf_dovi_reshape;
+ extern const struct mp_user_filter_entry vf_vapoursynth;
+ extern const struct mp_user_filter_entry vf_format;
+ extern const struct mp_user_filter_entry vf_vdpaupp;
+diff --git a/meson.build b/meson.build
+index fb10be5078..9e925864d7 100644
+--- a/meson.build
++++ b/meson.build
+@@ -212,6 +212,7 @@ sources = files(
+     'video/filter/refqueue.c',
+     'video/filter/vf_format.c',
+     'video/filter/vf_sub.c',
++    'video/filter/vf_dovi_reshape.c',
+     'video/fmt-conversion.c',
+     'video/hwdec.c',
+     'video/image_loader.c',
