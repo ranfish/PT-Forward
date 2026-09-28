@@ -244,7 +244,7 @@ func (h *SeedingHandler) handleGetConfig(w http.ResponseWriter, _ *http.Request,
 
 func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ClientUID uint  `json:"clientId"`
+		ClientUID                uint    `json:"clientId"`
 		Enabled                  bool    `json:"enabled"`
 		DeleteRuleIDs            string  `json:"deleteRuleIds"`
 		AutoDeleteCron           string  `json:"autoDeleteCron"`
@@ -266,8 +266,8 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 		ActiveTimeWindows        string  `json:"activeTimeWindows"`
 		EmaAlpha                 float64 `json:"emaAlpha"`
 		CleanupScoreWeights      string  `json:"cleanupScoreWeights"`
-		CleanupMinScore          float64 `json:"cleanupMinScore"`     // §59.122: 评分清理阈值(0=默认0.3)
-		CleanupMinAgeHours       float64 `json:"cleanupMinAgeHours"`  // §59.122: (0=默认48h)
+		CleanupMinScore          float64 `json:"cleanupMinScore"`    // §59.122: 评分清理阈值(0=默认0.3)
+		CleanupMinAgeHours       float64 `json:"cleanupMinAgeHours"` // §59.122: (0=默认48h)
 		ArchiveGranularity       string  `json:"archiveGranularity"`
 		RejectRuleIDs            string  `json:"rejectRuleIds"`
 		ReannounceBefore         bool    `json:"reannounceBefore"`
@@ -304,7 +304,7 @@ func (h *SeedingHandler) handleCreateConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	config := model.SeedingClientConfig{
-		ClientUID: req.ClientUID,
+		ClientUID:                req.ClientUID,
 		Enabled:                  req.Enabled,
 		DeleteRuleIDs:            req.DeleteRuleIDs,
 		AutoDeleteCron:           req.AutoDeleteCron,
@@ -1806,11 +1806,11 @@ func (h *SeedingHandler) handleListHistory(w http.ResponseWriter, r *http.Reques
 
 	type historyItem struct {
 		model.SeedingTorrentRecord
-		Title     string `json:"title"`
-		DetailURL string `json:"detail_url"`
-		Uploaded  int64  `json:"uploaded"`
-		Downloaded int64 `json:"downloaded"`
-		Ratio     float64 `json:"ratio"`
+		Title      string  `json:"title"`
+		DetailURL  string  `json:"detail_url"`
+		Uploaded   int64   `json:"uploaded"`
+		Downloaded int64   `json:"downloaded"`
+		Ratio      float64 `json:"ratio"`
 	}
 	items := make([]historyItem, len(records))
 	for i := range records {

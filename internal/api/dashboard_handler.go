@@ -512,10 +512,10 @@ func (h *DashboardHandler) handleSystemDashboard(w http.ResponseWriter, r *http.
 
 	Success(w, map[string]interface{}{
 		"seeding": map[string]interface{}{
-			"active":          seedingActive,
-			"deleted_today":   seedingDeletedToday,
-			"rss_enabled":     rssEnabled,
-			"last_rss_fetch":  lastRSSFetch,
+			"active":         seedingActive,
+			"deleted_today":  seedingDeletedToday,
+			"rss_enabled":    rssEnabled,
+			"last_rss_fetch": lastRSSFetch,
 		},
 		"download": map[string]interface{}{
 			"downloading":      dlDownloading,
@@ -530,17 +530,17 @@ func (h *DashboardHandler) handleSystemDashboard(w http.ResponseWriter, r *http.
 			"injected_today":    reseedInjectedToday,
 		},
 		"publish": map[string]interface{}{
-			"publishing":   publishPublishing,
-			"pending":      publishPending,
-			"done_total":   publishDone,
-			"done_today":   publishToday,
+			"publishing": publishPublishing,
+			"pending":    publishPending,
+			"done_total": publishDone,
+			"done_today": publishToday,
 		},
 		"system": map[string]interface{}{
-			"uptime":      time.Since(startTime).Seconds(),
-			"version":     h.version,
-			"goroutines":  runtime.NumGoroutine(),
-			"memory_mb":   memStats.Alloc / 1024 / 1024,
-			"clients":     onlineCount,
+			"uptime":     time.Since(startTime).Seconds(),
+			"version":    h.version,
+			"goroutines": runtime.NumGoroutine(),
+			"memory_mb":  memStats.Alloc / 1024 / 1024,
+			"clients":    onlineCount,
 		},
 	})
 }
@@ -568,8 +568,8 @@ func (h *DashboardHandler) handleSeedingMonitor(w http.ResponseWriter, r *http.R
 		Where("status = ? AND updated_at >= ?", "deleted", today).Count(&deletedToday)
 
 	Success(w, map[string]interface{}{
-		"by_status":     byStatus,
-		"deleted_today": deletedToday,
+		"by_status":      byStatus,
+		"deleted_today":  deletedToday,
 		"recent_fetches": rssLogs,
 	})
 }
@@ -616,7 +616,7 @@ func (h *DashboardHandler) handlePublishMonitor(w http.ResponseWriter, r *http.R
 	}
 
 	Success(w, map[string]interface{}{
-		"by_status":     byStatus,
+		"by_status":      byStatus,
 		"recent_results": resultsToday,
 	})
 }

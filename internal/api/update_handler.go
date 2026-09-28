@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,8 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"crypto/sha256"
-	"encoding/hex"
 	"runtime"
 	"strings"
 	"syscall"

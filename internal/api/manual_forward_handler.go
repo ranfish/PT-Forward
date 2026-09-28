@@ -1,12 +1,12 @@
 package api
 
 import (
-	"sync"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ranfish/pt-forward/internal/compliance"
@@ -18,20 +18,20 @@ import (
 )
 
 type ManualForwardHandler struct {
-	db            *gorm.DB
-	logger        *zap.Logger
-	pipeline      PublishPipeline
-	capture       screenshotCaptureState // §59.51 后台截图任务（全局单例）
-	siteMgr       SiteManager
-	clientMgr     MFClientProvider
-	seedingCache  SeedingCacheProvider
-	declFilter    *publish.DeclarationFilter
-	bdinfoScanner *publish.BDInfoScanner
-	metadataFetcher MetadataFetcherProvider
-	coverage        CoverageServiceProvider
-	sourceDetector  *publish.SourceSiteDetector
-	complianceChecker *compliance.Checker
-	imageHostMgr    *imagehost.Manager
+	db                  *gorm.DB
+	logger              *zap.Logger
+	pipeline            PublishPipeline
+	capture             screenshotCaptureState // §59.51 后台截图任务（全局单例）
+	siteMgr             SiteManager
+	clientMgr           MFClientProvider
+	seedingCache        SeedingCacheProvider
+	declFilter          *publish.DeclarationFilter
+	bdinfoScanner       *publish.BDInfoScanner
+	metadataFetcher     MetadataFetcherProvider
+	coverage            CoverageServiceProvider
+	sourceDetector      *publish.SourceSiteDetector
+	complianceChecker   *compliance.Checker
+	imageHostMgr        *imagehost.Manager
 	screenshotCacheDays int // §59.63: 手动捕获结果写穿缓存（观察期与自动链同配）
 }
 
@@ -50,8 +50,8 @@ type MetadataFetcherProvider interface {
 	FetchAndStore(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)
 	FetchAndStoreBySearch(ctx context.Context, infoHash, siteName, torrentName string, size int64, sourceLocalMI ...string) (*model.TorrentMetadata, error)
 	FetchAndStoreDirect(ctx context.Context, infoHash, siteName, torrentID, sourceName string) (*model.TorrentMetadata, error) // §59.61 D3
-	FetchFromSiteNoFallback(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)        // §59.65 直取
-	FetchAndStoreIYUU(ctx context.Context, infoHash, excludeSite string) (*model.TorrentMetadata, error)                      // §59.65 IYUU 末位兜底
+	FetchFromSiteNoFallback(ctx context.Context, infoHash, siteName, torrentID string) (*model.TorrentMetadata, error)         // §59.65 直取
+	FetchAndStoreIYUU(ctx context.Context, infoHash, excludeSite string) (*model.TorrentMetadata, error)                       // §59.65 IYUU 末位兜底
 }
 
 type PublishPipeline interface {
@@ -82,17 +82,17 @@ func NewManualForwardHandler(db *gorm.DB, logger *zap.Logger) *ManualForwardHand
 // SetScreenshotCacheDays §59.63: 手动捕获写穿缓存的观察期（天）。
 func (h *ManualForwardHandler) SetScreenshotCacheDays(days int) { h.screenshotCacheDays = days }
 
-func (h *ManualForwardHandler) SetPipeline(p PublishPipeline)        { h.pipeline = p }
-func (h *ManualForwardHandler) SetSiteManager(s SiteManager)         { h.siteMgr = s }
-func (h *ManualForwardHandler) SetClientProvider(c MFClientProvider) { h.clientMgr = c }
-func (h *ManualForwardHandler) SetSeedingCache(s SeedingCacheProvider) { h.seedingCache = s }
+func (h *ManualForwardHandler) SetPipeline(p PublishPipeline)                     { h.pipeline = p }
+func (h *ManualForwardHandler) SetSiteManager(s SiteManager)                      { h.siteMgr = s }
+func (h *ManualForwardHandler) SetClientProvider(c MFClientProvider)              { h.clientMgr = c }
+func (h *ManualForwardHandler) SetSeedingCache(s SeedingCacheProvider)            { h.seedingCache = s }
 func (h *ManualForwardHandler) SetDeclarationFilter(f *publish.DeclarationFilter) { h.declFilter = f }
-func (h *ManualForwardHandler) SetBDInfoScanner(s *publish.BDInfoScanner) { h.bdinfoScanner = s }
-func (h *ManualForwardHandler) SetMetadataFetcher(f MetadataFetcherProvider) { h.metadataFetcher = f }
-func (h *ManualForwardHandler) SetCoverageService(c CoverageServiceProvider) { h.coverage = c }
-func (h *ManualForwardHandler) SetSourceDetector(d *publish.SourceSiteDetector) { h.sourceDetector = d }
-func (h *ManualForwardHandler) SetComplianceChecker(c *compliance.Checker)    { h.complianceChecker = c }
-func (h *ManualForwardHandler) SetImageHostManager(m *imagehost.Manager)     { h.imageHostMgr = m }
+func (h *ManualForwardHandler) SetBDInfoScanner(s *publish.BDInfoScanner)         { h.bdinfoScanner = s }
+func (h *ManualForwardHandler) SetMetadataFetcher(f MetadataFetcherProvider)      { h.metadataFetcher = f }
+func (h *ManualForwardHandler) SetCoverageService(c CoverageServiceProvider)      { h.coverage = c }
+func (h *ManualForwardHandler) SetSourceDetector(d *publish.SourceSiteDetector)   { h.sourceDetector = d }
+func (h *ManualForwardHandler) SetComplianceChecker(c *compliance.Checker)        { h.complianceChecker = c }
+func (h *ManualForwardHandler) SetImageHostManager(m *imagehost.Manager)          { h.imageHostMgr = m }
 
 func (h *ManualForwardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.URL.Path, "/")
@@ -152,7 +152,7 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 		InfoHash    string   `json:"infoHash"`
 		SiteName    string   `json:"siteName"`
 		Screenshots []string `json:"screenshots"`
-		ClientUID uint   `json:"clientId"` // §59.21: 查 is_local
+		ClientUID   uint     `json:"clientId"` // §59.21: 查 is_local
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Error(w, http.StatusBadRequest, 40001, "请求格式错误")
@@ -204,8 +204,8 @@ func (h *ManualForwardHandler) handleRefresh(w http.ResponseWriter, r *http.Requ
 				result["imdb_link"] = ptgen.IMDBURL
 				result["tmdb_link"] = ptgen.TMDbURL
 			} else {
-			result["description"] = ptgen.RawBBCode
-			// §59.20: 不再返回 subtitle——副标题来自源站，PTGen 不覆盖
+				result["description"] = ptgen.RawBBCode
+				// §59.20: 不再返回 subtitle——副标题来自源站，PTGen 不覆盖
 			}
 		}
 
@@ -418,12 +418,12 @@ func (h *ManualForwardHandler) resolvePTGenQueryKeys(ctx context.Context, infoHa
 
 // screenshotCaptureState §59.51: 后台截图任务全局单例状态（内存态，batch-fetch 同款）。
 type screenshotCaptureState struct {
-	mu         sync.Mutex
-	active     bool
-	status     string // running / done / failed
-	name       string // 发起时的种子名（前端会话一致性校验）
+	mu          sync.Mutex
+	active      bool
+	status      string // running / done / failed
+	name        string // 发起时的种子名（前端会话一致性校验）
 	screenshots []string
-	error      string
+	error       string
 }
 
 // handleScreenshotCaptureStart §59.51: 启动后台 mpv 截图任务。
@@ -434,11 +434,11 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 		return
 	}
 	var req struct {
-		Name     string `json:"name"`
-		SavePath string `json:"savePath"`
-		ClientUID uint `json:"clientId"`
-		InfoHash string `json:"infoHash"`
-		SiteName string `json:"siteName"`
+		Name      string `json:"name"`
+		SavePath  string `json:"savePath"`
+		ClientUID uint   `json:"clientId"`
+		InfoHash  string `json:"infoHash"`
+		SiteName  string `json:"siteName"`
 		// §59.298 C: 指定字幕轨（人工纠偏——tab3 轨下拉；0/缺省=自动选择）
 		SubtitleSid int `json:"subtitleSid"`
 	}

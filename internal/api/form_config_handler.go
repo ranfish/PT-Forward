@@ -3,10 +3,10 @@ package api
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -97,9 +97,9 @@ func (h *FormConfigHandler) handleParse(w http.ResponseWriter, r *http.Request) 
 // handleApply POST {site_name, config, note} → 落库 + 审计（diff 确认是唯一写入路径）。
 func (h *FormConfigHandler) handleApply(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		SiteName string                `json:"site_name"`
+		SiteName string                   `json:"site_name"`
 		Config   *model.PublishFormConfig `json:"config"`
-		Note     string                `json:"note"`
+		Note     string                   `json:"note"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.SiteName == "" || req.Config == nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "site_name 与 config 必填"})
@@ -120,13 +120,13 @@ func (h *FormConfigHandler) handleApply(w http.ResponseWriter, r *http.Request) 
 	// L4 配置审计：变更写 operation_audit_logs（回滚=重上传 HTML 重 diff，不做版本管理）
 	audit, _ := json.Marshal(map[string]any{
 		"site": site.Name, "note": req.Note,
-		"domains": len(req.Config.FormFields),
+		"domains":  len(req.Config.FormFields),
 		"prev_len": len(prev), "new_len": len(req.Config.Serialize()),
 	})
 	h.db.WithContext(context.Background()).Create(&model.OperationAuditLog{
 		Actor: "user", Module: "publish", Action: "form_config_apply",
 		TargetType: "site", TargetID: site.Name,
-		Detail: string(audit),
+		Detail:    string(audit),
 		CreatedAt: time.Now(),
 	})
 	Success(w, map[string]any{"ok": true})
@@ -139,7 +139,6 @@ func (h *FormConfigHandler) loadSite(ctx context.Context, name string) (*model.S
 	}
 	return &site, nil
 }
-
 
 // handleTargets §59.156 切片 3.5: 可发布目标站列表（publish_form_config enabled 的站）。
 // 选站发布入口数据源——只回名字+预检能力，轻量。
@@ -163,7 +162,6 @@ func (h *FormConfigHandler) handleTargets(w http.ResponseWriter, _ *http.Request
 	}
 	Success(w, out)
 }
-
 
 // handleSetAnonymous §59.159: 匿名发布站点默认开关（即时保存+审计——独立小端点：
 // 非 HTML 来源配置项，不走 diff 确认流）。

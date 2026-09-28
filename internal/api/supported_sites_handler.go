@@ -11,8 +11,9 @@ import (
 // SupportedSitesHandler 暴露系统白名单站点（go:embed seed）给前端。
 //
 // 路由：
-//   GET /api/v1/supported-sites            列表（可选过滤 framework/status/search）
-//   GET /api/v1/supported-sites/{domain}   单个站点详情
+//
+//	GET /api/v1/supported-sites            列表（可选过滤 framework/status/search）
+//	GET /api/v1/supported-sites/{domain}   单个站点详情
 type SupportedSitesHandler struct {
 	logger *zap.Logger
 }

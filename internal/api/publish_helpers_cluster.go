@@ -78,8 +78,8 @@ func (h *PublishTorrentsHandler) hasCompleteMetadata(ctx context.Context, hash s
 // clusterKey §59.94: 簇键三元组（公共方法统一形态）。
 type clusterKey struct {
 	clientUID uint
-	savePath string
-	name     string
+	savePath  string
+	name      string
 }
 
 // clusterKeyOf §59.94: info_hash → 簇键（快照反查）。公共方法——PUT 保存/

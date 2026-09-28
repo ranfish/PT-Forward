@@ -128,7 +128,7 @@ func (h *SettingsHandler) handleGet(w http.ResponseWriter, r *http.Request, key 
 	Success(w, map[string]interface{}{
 		"key":              key,
 		"restart_required": restartRequiredKeys[key],
-		"value": value,
+		"value":            value,
 	})
 }
 
@@ -165,7 +165,7 @@ func (h *SettingsHandler) handleSet(w http.ResponseWriter, r *http.Request, key 
 	Success(w, map[string]interface{}{
 		"key":              key,
 		"restart_required": restartRequiredKeys[key],
-		"value": req.Value,
+		"value":            req.Value,
 	})
 }
 

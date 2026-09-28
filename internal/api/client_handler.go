@@ -39,18 +39,18 @@ func NewClientHandler(db *gorm.DB, logger *zap.Logger, clientMgr ClientManager) 
 }
 
 type createDownloaderRequest struct {
-	Name           string               `json:"name"`
-	Type           string               `json:"type"`
-	URL            string               `json:"url"`
-	Username       string               `json:"username"`
-	Password       string               `json:"password"`
-	Role           string               `json:"role"`
-	IsLocal        *bool                `json:"isLocal"` // §59.21: 指针类型区分"未传"和"false"
-	TransferTargetUID uint               `json:"transferTargetUid"`
-	Enabled        bool                 `json:"enabled"`
-	IsDefault      bool                 `json:"isDefault"`
-	TorrentDir     string               `json:"torrentDir"`
-	PathMappings   []pathMappingRequest `json:"pathMappings"`
+	Name              string               `json:"name"`
+	Type              string               `json:"type"`
+	URL               string               `json:"url"`
+	Username          string               `json:"username"`
+	Password          string               `json:"password"`
+	Role              string               `json:"role"`
+	IsLocal           *bool                `json:"isLocal"` // §59.21: 指针类型区分"未传"和"false"
+	TransferTargetUID uint                 `json:"transferTargetUid"`
+	Enabled           bool                 `json:"enabled"`
+	IsDefault         bool                 `json:"isDefault"`
+	TorrentDir        string               `json:"torrentDir"`
+	PathMappings      []pathMappingRequest `json:"pathMappings"`
 }
 
 type pathMappingRequest struct {
@@ -59,41 +59,41 @@ type pathMappingRequest struct {
 }
 
 type downloaderResponse struct {
-	ID             uint                 `json:"id"`
-	Name           string               `json:"name"`
-	Type           string               `json:"type"`
-	URL            string               `json:"url"`
-	Username       string               `json:"username"`
-	Role           string               `json:"role"`
-	IsLocal        bool                 `json:"isLocal"`
-	TransferTargetUID uint               `json:"transferTargetUid,omitempty"`
-	Enabled        bool                 `json:"enabled"`
-	IsDefault      bool                 `json:"isDefault"`
-	TorrentDir     string               `json:"torrentDir,omitempty"`
-	PathMappings   []pathMappingRequest `json:"pathMappings"`
-	DownloadSpeed  int64                `json:"downloadSpeed"`
-	UploadSpeed    int64                `json:"uploadSpeed"`
-	FreeSpace      int64                `json:"freeSpace"`
-	TotalDiskSpace int64                `json:"totalDiskSpace"`
-	Connected      bool                 `json:"connected"`
-	CreatedAt      time.Time            `json:"createdAt"`
-	UpdatedAt      time.Time            `json:"updatedAt"`
+	ID                uint                 `json:"id"`
+	Name              string               `json:"name"`
+	Type              string               `json:"type"`
+	URL               string               `json:"url"`
+	Username          string               `json:"username"`
+	Role              string               `json:"role"`
+	IsLocal           bool                 `json:"isLocal"`
+	TransferTargetUID uint                 `json:"transferTargetUid,omitempty"`
+	Enabled           bool                 `json:"enabled"`
+	IsDefault         bool                 `json:"isDefault"`
+	TorrentDir        string               `json:"torrentDir,omitempty"`
+	PathMappings      []pathMappingRequest `json:"pathMappings"`
+	DownloadSpeed     int64                `json:"downloadSpeed"`
+	UploadSpeed       int64                `json:"uploadSpeed"`
+	FreeSpace         int64                `json:"freeSpace"`
+	TotalDiskSpace    int64                `json:"totalDiskSpace"`
+	Connected         bool                 `json:"connected"`
+	CreatedAt         time.Time            `json:"createdAt"`
+	UpdatedAt         time.Time            `json:"updatedAt"`
 }
 
 func (h *ClientHandler) toResponse(c *model.ClientConfig, mappings []model.ClientPathMapping) downloaderResponse {
 	resp := downloaderResponse{
-		ID:             c.ID,
-		Name:           c.Name,
-		Type:           c.Type,
-		URL:            c.URL,
-		Username:       c.Username,
-		Role:           c.Role,
-		IsLocal:        c.IsLocal,
+		ID:                c.ID,
+		Name:              c.Name,
+		Type:              c.Type,
+		URL:               c.URL,
+		Username:          c.Username,
+		Role:              c.Role,
+		IsLocal:           c.IsLocal,
 		TransferTargetUID: c.TransferTargetUID,
-		Enabled:        c.Enabled,
-		IsDefault:      c.IsDefault,
-		CreatedAt:      c.CreatedAt,
-		UpdatedAt:      c.UpdatedAt,
+		Enabled:           c.Enabled,
+		IsDefault:         c.IsDefault,
+		CreatedAt:         c.CreatedAt,
+		UpdatedAt:         c.UpdatedAt,
 	}
 	if c.Config != "" {
 		var cfg struct {
@@ -274,15 +274,15 @@ func (h *ClientHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := model.ClientConfig{
-		Name:           req.Name,
-		Type:           req.Type,
-		URL:            req.URL,
-		Username:       req.Username,
-		Password:       req.Password,
-		Enabled:        req.Enabled,
-		IsDefault:      req.IsDefault,
-		Role:           req.Role,
-		IsLocal:        req.IsLocal != nil && *req.IsLocal,
+		Name:              req.Name,
+		Type:              req.Type,
+		URL:               req.URL,
+		Username:          req.Username,
+		Password:          req.Password,
+		Enabled:           req.Enabled,
+		IsDefault:         req.IsDefault,
+		Role:              req.Role,
+		IsLocal:           req.IsLocal != nil && *req.IsLocal,
 		TransferTargetUID: req.TransferTargetUID,
 	}
 	if req.TorrentDir != "" {
@@ -423,17 +423,17 @@ func (h *ClientHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if err := tx.Model(&client).Updates(map[string]interface{}{
-			"name":             client.Name,
-			"type":             client.Type,
-			"url":              client.URL,
-			"username":         client.Username,
-			"password":         client.Password,
-			"role":             client.Role,
-			"is_local":         client.IsLocal,
+			"name":              client.Name,
+			"type":              client.Type,
+			"url":               client.URL,
+			"username":          client.Username,
+			"password":          client.Password,
+			"role":              client.Role,
+			"is_local":          client.IsLocal,
 			"reseed_target_uid": client.TransferTargetUID,
-			"enabled":          client.Enabled,
-			"is_default":       client.IsDefault,
-			"config":           configJSON,
+			"enabled":           client.Enabled,
+			"is_default":        client.IsDefault,
+			"config":            configJSON,
 		}).Error; err != nil {
 			return err
 		}
@@ -924,7 +924,7 @@ func (h *ClientHandler) handlePublishTargets(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		target := model.ClientPublishTarget{
-			ClientUID: req.ClientUID,
+			ClientUID:       req.ClientUID,
 			SiteName:        req.SiteName,
 			CategoryMapping: req.CategoryMapping,
 			SourceMapping:   req.SourceMapping,

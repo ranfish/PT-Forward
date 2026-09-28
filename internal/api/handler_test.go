@@ -494,11 +494,11 @@ func TestRSS_CRUD(t *testing.T) {
 	env.db.Create(&model.Site{Name: "RSSSite", Domain: "rss-site.com", BaseURL: "https://rss-site.com", Framework: "nexusphp", AuthType: "cookie", Enabled: true})
 
 	createBody := map[string]interface{}{
-		"name":      "TestRSS",
-		"siteName":  "RSSSite",
-		"urls":      []string{"https://rss-site.com/rss"},
-		"cron":      "*/10 * * * *",
-		"enabled":   true,
+		"name":     "TestRSS",
+		"siteName": "RSSSite",
+		"urls":     []string{"https://rss-site.com/rss"},
+		"cron":     "*/10 * * * *",
+		"enabled":  true,
 		"clientId": 0,
 	}
 	w := env.doRequest("POST", "/api/v1/rss/subscriptions", createBody)
@@ -2904,7 +2904,7 @@ func TestSeeding_ResumeRecord(t *testing.T) {
 	env := setupTestEnv(t)
 
 	rec := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "abc123",
 		SiteName:  "s1",
 		TorrentID: "t1",
@@ -2922,7 +2922,7 @@ func TestSeeding_PauseRecord(t *testing.T) {
 	env := setupTestEnv(t)
 
 	rec := &model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "def456",
 		SiteName:  "s1",
 		TorrentID: "t2",
@@ -6639,9 +6639,9 @@ func TestSiteV2_ToResponseHasCredentials(t *testing.T) {
 	env := setupTestEnv(t)
 	// 用白名单内 domain（步骤 3）；framework/authType 由 seed 强制覆盖（gazelle→cookie）
 	w := env.doRequest("POST", "/api/v1/sites", map[string]interface{}{
-		"domain": "dicmusic.com",
+		"domain":  "dicmusic.com",
 		"passkey": "pk",
-		"apiKey": "ak", "authKey": "authk", "authHash": "authh",
+		"apiKey":  "ak", "authKey": "authk", "authHash": "authh",
 		"rssKey": "rssk", "bearerToken": "bt", "enabled": true,
 	})
 	if w.Code != http.StatusOK {
@@ -6809,11 +6809,11 @@ func TestSiteV2_CreateWithAllOptionalFields(t *testing.T) {
 		"hashStrategy": "guid", "sizeStrategy": "enclosure", "idStrategy": "query_param",
 		"hashXmlTagName": "infoHash", "sizeXmlTagName": "contentLength", "hashUrlParamName": "hash",
 		"sizeDescRegex": `(\d+)\s*GB`, "sizeTitleRegex": `(\d+)\s*MB`, "sizeBaseUnit": 1024,
-		"downloadMode": "template",
+		"downloadMode":        "template",
 		"downloadPagePattern": "/details.php", "requiresSideLoading": true,
 		"isSource": true, "isTarget": true, "participateAutoPublish": true,
 		"cookieCloudSync": true,
-		"enabled": true, "alternativeDomains": "alt.longpt.org",
+		"enabled":         true, "alternativeDomains": "alt.longpt.org",
 		"overrideRssUrl": "https://rss.longpt.org", "overrideSavePath": "/data/full",
 		"proxyUrl": "socks5://proxy:1080", "skipSslVerify": true,
 	})
@@ -7281,8 +7281,8 @@ func TestReseed_Create_BadBody2(t *testing.T) {
 func TestReseed_CRUD2(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("POST", "/api/v1/reseed/tasks", map[string]interface{}{
-		"name":    "reseed-crud2",
-		"enabled": true,
+		"name":      "reseed-crud2",
+		"enabled":   true,
 		"clientIds": "1",
 	})
 	if w.Code != http.StatusOK {
@@ -7337,8 +7337,8 @@ func TestReseed_Trigger_NotFound2(t *testing.T) {
 func TestReseed_Cancel2(t *testing.T) {
 	env := setupTestEnv(t)
 	w := env.doRequest("POST", "/api/v1/reseed/tasks", map[string]interface{}{
-		"name":    "cancel-task-2",
-		"enabled": true,
+		"name":      "cancel-task-2",
+		"enabled":   true,
 		"clientIds": "1",
 	})
 	if w.Code != http.StatusOK {
@@ -9056,7 +9056,7 @@ func TestDeleteRuleHandler_TopLevel_MethodNotAllowed(t *testing.T) {
 func TestDeleteRuleHandler_TestRule_WithRecords(t *testing.T) {
 	env := setupTestEnv(t)
 	env.db.Create(&model.SeedingTorrentRecord{
-		ClientUID:  1,
+		ClientUID: 1,
 		InfoHash:  "abc123",
 		SiteName:  "testsite",
 		TorrentID: "t1",
@@ -9197,26 +9197,26 @@ func TestRSS_Update_ManyFields(t *testing.T) {
 	id := int(data["id"].(float64))
 
 	w = env.doRequest("PUT", fmt.Sprintf("/api/v1/rss/subscriptions/%d", id), map[string]interface{}{
-		"name":            "UpSubRenamed",
-		"enabled":         false,
-		"urls":            []string{"https://rssupsite.com/rss2"},
-		"siteName":        "RSSUpSite",
-		"cron":            "*/15 * * * *",
-		"clientId":        1,
-		"savePath":        "/data",
-		"category":        "cat1",
-		"addPaused":       true,
-		"autoTmm":         true,
-		"uploadLimitKb":   1000,
-		"downloadLimitKb": 2000,
-		"tags":            []string{"tag1"},
-		"scrapeFree":      true,
-		"scrapeHr":        true,
-		"pushNotify":      true,
-		"notifyId":        "ch1",
-		"publishEnabled":  true,
-		"publishTargets":  []string{"site1"},
-		"autoReseed":      true,
+		"name":              "UpSubRenamed",
+		"enabled":           false,
+		"urls":              []string{"https://rssupsite.com/rss2"},
+		"siteName":          "RSSUpSite",
+		"cron":              "*/15 * * * *",
+		"clientId":          1,
+		"savePath":          "/data",
+		"category":          "cat1",
+		"addPaused":         true,
+		"autoTmm":           true,
+		"uploadLimitKb":     1000,
+		"downloadLimitKb":   2000,
+		"tags":              []string{"tag1"},
+		"scrapeFree":        true,
+		"scrapeHr":          true,
+		"pushNotify":        true,
+		"notifyId":          "ch1",
+		"publishEnabled":    true,
+		"publishTargets":    []string{"site1"},
+		"autoReseed":        true,
 		"transferClientIds": []uint{1},
 	})
 	if w.Code != http.StatusOK {

@@ -12,9 +12,9 @@ import (
 )
 
 type ImageHostHandler struct {
-	mgr       *imagehost.Manager
-	settings  *setting.Repository
-	logger    *zap.Logger
+	mgr      *imagehost.Manager
+	settings *setting.Repository
+	logger   *zap.Logger
 }
 
 func NewImageHostHandler(mgr *imagehost.Manager, settings *setting.Repository, logger *zap.Logger) *ImageHostHandler {
@@ -38,8 +38,8 @@ func (h *ImageHostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *ImageHostHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	result := map[string]interface{}{
-		"hosts":   h.mgr.ListHosts(),
-		"default": "",
+		"hosts":    h.mgr.ListHosts(),
+		"default":  "",
 		"strategy": "auto",
 	}
 
@@ -71,9 +71,9 @@ func (h *ImageHostHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 func (h *ImageHostHandler) handlePut(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req struct {
-		Default   string `json:"default"`
-		Strategy  string `json:"strategy"`
-		AGSVPTEmail string `json:"agsvpt_email"`
+		Default        string `json:"default"`
+		Strategy       string `json:"strategy"`
+		AGSVPTEmail    string `json:"agsvpt_email"`
 		AGSVPTPassword string `json:"agsvpt_password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

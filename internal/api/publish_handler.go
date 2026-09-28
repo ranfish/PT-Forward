@@ -118,7 +118,6 @@ func (h *PublishHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	Error(w, http.StatusNotFound, 40400, "接口不存在")
 }
 
@@ -361,4 +360,3 @@ func (h *PublishHandler) handleDeleteCandidate(w http.ResponseWriter, r *http.Re
 		"id":      id,
 	})
 }
-

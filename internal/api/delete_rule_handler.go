@@ -291,7 +291,7 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 	}
 
 	type torrentWithClient struct {
-		ti       *model.TorrentInfo
+		ti        *model.TorrentInfo
 		clientUID uint // §59.251: range 变量遮蔽修复占位
 	}
 	var torrentEntries []torrentWithClient
@@ -335,9 +335,9 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 		if !hasRec {
 			rec = &model.SeedingTorrentRecord{
 				ClientUID: entry.clientUID,
-				InfoHash: ti.Hash,
-				Status:   model.SeedingStatusSeeding,
-				Source:   "sync",
+				InfoHash:  ti.Hash,
+				Status:    model.SeedingStatusSeeding,
+				Source:    "sync",
 			}
 		}
 		candidates = append(candidates, struct {
@@ -392,7 +392,7 @@ func (h *DeleteRuleHandler) handleTestRule(w http.ResponseWriter, r *http.Reques
 				title = c.ti.Name
 			}
 			matched = append(matched, map[string]interface{}{
-				"clientUID":  c.rec.ClientUID,
+				"clientUID": c.rec.ClientUID,
 				"infoHash":  c.rec.InfoHash,
 				"siteName":  c.rec.SiteName,
 				"torrentID": c.rec.TorrentID,
