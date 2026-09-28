@@ -436,10 +436,10 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 		Tags:         d.Tags,
 	}
 	if d.Imdb != "" {
-		detail.IMDbURL = "https://www.imdb.com/title/" + d.Imdb + "/"
+		detail.IMDbURL = buildIMDbURL(d.Imdb) // §59.297 双形态
 	}
 	if d.Douban != "" {
-		detail.DoubanURL = "https://movie.douban.com/subject/" + d.Douban + "/"
+		detail.DoubanURL = buildDoubanURL(d.Douban) // §59.297 双形态
 	}
 	if d.Description != "" {
 		detail.Screenshots = extractScreenshotsFromBBCode(d.Description)
@@ -1505,4 +1505,20 @@ func (a *MTeamAdapter) fetchUserStatsHTML(ctx context.Context, config *model.Sit
 		result.DownloadBytes = parseSizeString(cleanText(m[1]))
 	}
 	return result, nil
+}
+
+// buildIMDbURL §59.297: API 字段双形态——纯 ID 拼接 / 完整 URL 直用（防双拼）。
+func buildIMDbURL(v string) string {
+	if strings.HasPrefix(v, "http") {
+		return v
+	}
+	return "https://www.imdb.com/title/" + v + "/"
+}
+
+// buildDoubanURL §59.297: 同族（Under Current 案 douban 双拼实证——API 返回完整 URL）。
+func buildDoubanURL(v string) string {
+	if strings.HasPrefix(v, "http") {
+		return v
+	}
+	return "https://movie.douban.com/subject/" + v + "/"
 }
