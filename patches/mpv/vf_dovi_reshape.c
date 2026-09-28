@@ -97,6 +97,7 @@ struct el_state {
 
 struct dovi_opts {
     char *el_source;
+    double until;      // 只 reshape pts >= until 的帧（前导帧直通省时；<0 = 全部）
 };
 
 struct priv {
@@ -724,6 +725,11 @@ static void vf_dovi_process(struct mp_filter *f)
     {
         struct mp_image *mpi = frame.data;
 
+        // until 裁剪：目标帧之前的前导帧直通（跳过昂贵的 reshape）
+        if (p->opts && p->opts->until >= 0 && mpi->pts >= 0 &&
+            mpi->pts < p->opts->until - 0.001)
+            goto passthrough;
+
         if (mpi->params.repr.sys != PL_COLOR_SYSTEM_DOLBYVISION || !mpi->params.repr.dovi) {
             // Dual-stream Profile 7: metadata rides the EL track.
             if (p->opts && p->opts->el_source && !p->el_failed) {
@@ -807,6 +813,7 @@ static const struct mp_filter_info filter_dovi_reshape = {
 #define OPT_BASE_STRUCT struct dovi_opts
 static const m_option_t dovi_opts_list[] = {
     {"el-source", OPT_STRING(el_source)},
+    {"until", OPT_DOUBLE(until), OPTDEF_DOUBLE(-1.0)},
     {0}
 };
 

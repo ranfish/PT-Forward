@@ -481,8 +481,9 @@ func (h *ManualForwardHandler) handleScreenshotCaptureStart(w http.ResponseWrite
 				h.capture.mu.Unlock()
 			}
 		}()
-		// §59.51: 脱离 HTTP 请求生命周期（§59.50 审计根因）——Background + 5min
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		// §59.51: 脱离 HTTP 请求生命周期（§59.50 审计根因）——Background + 15min
+		// （§59.300: DoVi 双流路径每点 IDR 前向解码+reshape 耗时数分钟，5min 不够）
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
 
 		shots := h.pipeline.CaptureScreenshots(ctx, req.Name, req.SavePath, nil, req.SubtitleSid)
