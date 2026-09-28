@@ -169,9 +169,21 @@ func (d *SubtitleDetector) SelectBestChinese(candidates []SubtitleCandidate) (in
 		return bestSRT.StreamIndex, bestSRT.Codec
 	case bestPGS != nil:
 		return bestPGS.StreamIndex, bestPGS.Codec
-	default:
-		return 0, ""
 	}
+	// §59.298: 无标记 PGS 双兜底——蓝光原盘结构性缺失（m2ts 容器不存 language/
+	// title/disposition，Under Current 2026 双 PGS 全 0 分实证）
+	//   A. 副标题中字特征词（简/繁/中字/双语字幕）+ 原盘轨序约定（首 PGS 常中字）→ 首个 PGS
+	//   B. 纯兜底：唯一/首个 PGS 轨（宁英文不裸图）——比无字幕好（人工纠偏见 C 层 tab3）
+	var pgs []*SubtitleCandidate
+	for i := range candidates {
+		if !candidates[i].IsText {
+			pgs = append(pgs, &candidates[i])
+		}
+	}
+	if len(pgs) > 0 {
+		return pgs[0].StreamIndex, pgs[0].Codec
+	}
+	return 0, ""
 }
 
 func (d *SubtitleDetector) FindSubtitleStreamID(ctx context.Context, videoPath string) (int, error) {

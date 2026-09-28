@@ -72,7 +72,7 @@ export const manualForwardApi = {
     return client.post<ApiResponse<Record<string, unknown>>>('/manual-forward/refresh', data)
   },
   // §59.51: 后台截图任务（is_local=true 专用，长任务轮询）
-  startScreenshotCapture(data: { name: string; savePath: string; clientId: number; infoHash?: string; siteName?: string }) {
+  startScreenshotCapture(data: { name: string; savePath: string; clientId: number; infoHash?: string; siteName?: string; subtitleSid?: number }) {
     return client.post<ApiResponse<{ started: boolean }>>('/manual-forward/screenshot-capture', data)
   },
   screenshotCaptureProgress() {
