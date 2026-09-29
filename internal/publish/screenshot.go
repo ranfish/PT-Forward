@@ -347,11 +347,20 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 	if best == "" {
 		return fmt.Errorf("mpv output file not found in %s", outDir)
 	}
-	// 清理多余帧，仅保留目标帧
+	// 清理本次 mpv 运行产生的多余数字编号帧（0000000N.jpg）。
+	// 回归审核教训（§59.300 附二）：不得删除目录内其它文件——多时间点共用同一
+	// tmpDir，前序迭代已重命名的 shot_00X.jpg 曾被误删，导致上传仅 1 张、
+	// 低于 MinScreenshots 判"上传全失败"（普通盘/DoVi 盘同根）。
 	for _, ent := range entries {
-		if filepath.Join(outDir, ent.Name()) != best && strings.HasSuffix(ent.Name(), ".jpg") {
-			_ = os.Remove(filepath.Join(outDir, ent.Name()))
+		name := ent.Name()
+		if filepath.Join(outDir, name) == best || !strings.HasSuffix(name, ".jpg") {
+			continue
 		}
+		base := strings.TrimSuffix(name, ".jpg")
+		if _, convErr := strconv.Atoi(base); convErr != nil {
+			continue // 非数字编号命名（如 shot_000.jpg）不动
+		}
+		_ = os.Remove(filepath.Join(outDir, name))
 	}
 	if best != outPath {
 		if renameErr := os.Rename(best, outPath); renameErr != nil {
