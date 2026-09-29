@@ -25,6 +25,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/buffer.h>
+#include <libavutil/common.h>
 #include <libavutil/dovi_meta.h>
 #include <libavutil/frame.h>
 #include <libavutil/opt.h>
@@ -160,25 +161,18 @@ static void build_pq_luts(struct priv *p)
     }
 }
 
-// FFmpeg vf_tonemap mobius（j=0.3）
-static double mobius(double in, double j, double peak)
-{
-    double a, b;
-    if (in <= j)
-        return in;
-    a = -j * peak / (j - 1.0);
-    b = (j * j - j * peak) / (j * j - 2.0 * j + peak + 1.0);
-    return (b * b + 2.0 * b * j + j * j) / (b - a) * (in - a);
-}
+#define TM_KNEE 0.40f   // 高亮软膝起点（线性域；中调恒等=用户已验收观感）
+#define TM_RANGE 0.52f  // 膝上指数滚降尺度（渐近 ~0.92 防>200nit 全白）
 
 static void build_tonemap_luts(struct priv *p, float peak)
 {
-    if (peak < 1.0f)
-        peak = 1.0f;
+    (void)peak; // §59.300 附六：mobius 全局映射弃用——中调直通+仅高亮软膝
     for (int i = 0; i <= PQ_LUT_N; i++) {
         float x = (float)i / PQ_LUT_N; // 线性域 0..1 = 0..10000 nits
-        float tm = (float)mobius((double)x, 0.3, (double)peak);
-        tm = MPCLAMP(tm, 0.0f, 1.0f);
+        float tm = x <= TM_KNEE
+                     ? x
+                     : TM_KNEE + TM_RANGE * (1.0f - expf(-(x - TM_KNEE) / TM_RANGE));
+        tm = MPCLAMP(tm, 0.0f, 0.92f);
         p->tm_lut[i] = tm;
         // bt709 OETF
         float v = tm >= 0.018f ? 1.099f * powf(tm, 0.45f) - 0.099f : 4.5f * tm;
@@ -297,10 +291,16 @@ static inline void reshape_pixel(struct priv *p, const float in[3], float out[3]
         rgb[i] = p->mat_out[i][0] * lin[0] + p->mat_out[i][1] * lin[1] +
                  p->mat_out[i][2] * lin[2];
 
-    // §59.300 附五：mobius tone map（线性域 0..1=10000nit）+ bt709 OETF 直出 SDR
-    for (int i = 0; i < 3; i++) {
-        float tm = lut_lookup(p->tm_lut, MPCLAMP(rgb[i], 0.0f, 1.0f));
-        out[i] = lut_lookup(p->g709_lut, MPCLAMP(tm, 0.0f, 1.0f));
+    // §59.300 附五：mobius tone map（线性域 0..1=10000nit）+ bt709 OETF 直出 SDR。
+    // FFmpeg 同款：按最大通道算缩放因子乘全通道（防逐通道 tone map 色偏）
+    float mx = MPMAX(MPMAX(rgb[0], rgb[1]), rgb[2]);
+    if (mx > 0.0f) {
+        float tm = lut_lookup(p->tm_lut, MPCLAMP(mx, 0.0f, 1.0f));
+        float scale = tm / mx;
+        for (int i = 0; i < 3; i++)
+            out[i] = lut_lookup(p->g709_lut, MPCLAMP(rgb[i] * scale, 0.0f, 1.0f));
+    } else {
+        out[0] = out[1] = out[2] = 0.0f;
     }
 }
 
