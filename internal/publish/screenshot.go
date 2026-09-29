@@ -293,8 +293,9 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 
 	vfParts := []string{}
 	if useDoviVF {
-		// until=目标时间戳：前导帧直通（跳过昂贵 reshape），仅目标帧做 DoVi 处理
-		vfParts = append(vfParts, fmt.Sprintf("dovi_reshape=el-source='%s':until=%f", videoPath, timestamp))
+		// until=目标时间戳：前导帧直通（跳过昂贵 reshape），仅目标帧做 DoVi 处理。
+		// 路径裸传（argv 内空格安全；勿加引号——mpv 子选项解析不认单引号，exit 1）
+		vfParts = append(vfParts, fmt.Sprintf("dovi_reshape=el-source=%s:until=%f", videoPath, timestamp))
 	}
 	// HDR: add mobius tone-mapping via lavfi filter (requires zimg for color conversion)
 	if isHDR && !useDoviVF {
