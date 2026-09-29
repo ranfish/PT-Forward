@@ -254,25 +254,30 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 	start := timestamp
 	frames := 1
 	useDoviVF := false
+	untilTs := -1.0
 
 	if dualHEVC {
 		idr, err := e.findIDRBefore(ctx, videoPath, timestamp)
 		if err == nil && idr > 0 && timestamp > idr {
 			offset := (timestamp - idr) * fps
-			n := int(math.Ceil(offset)) + 2 // +2 跳过 open-GOP 前导 B 帧（参考缺失 concealment）
+			// +2 跳过 open-GOP 前导 B 帧；+fps*1.2 抵御 mpv seek 落点漂移
+			// （落点早于 IDR 时帧数预算不足 → 末帧 pts < until → 直通 → 白花，§59.300 附五）
+			n := int(math.Ceil(offset)) + 2 + int(math.Ceil(fps*1.2))
 			if n < 3 {
 				n = 3
 			}
-			if n > 240 {
-				n = 240
+			if n > 360 {
+				n = 360
 			}
 			start = idr
 			frames = n
 			useDoviVF = true
+			untilTs = timestamp - 0.3
 		} else {
 			// 找不到关键帧信息则退回 dovi vf + 保守取第 4 帧
 			frames = 4
 			useDoviVF = true
+			untilTs = timestamp - 0.3
 			e.logger.Warn("screenshot dovi: no IDR found before target, fallback frames=4",
 				zap.Float64("timestamp", timestamp))
 		}
@@ -293,9 +298,9 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 
 	vfParts := []string{}
 	if useDoviVF {
-		// until=目标时间戳：前导帧直通（跳过昂贵 reshape），仅目标帧做 DoVi 处理。
+		// until=目标时间戳-0.3：前导帧直通（跳过昂贵 reshape），末帧群做 DoVi 处理。
 		// 路径裸传（argv 内空格安全；勿加引号——mpv 子选项解析不认单引号，exit 1）
-		vfParts = append(vfParts, fmt.Sprintf("dovi_reshape=el-source=%s:until=%f", videoPath, timestamp))
+		vfParts = append(vfParts, fmt.Sprintf("dovi_reshape=el-source=%s:until=%f", videoPath, untilTs))
 	}
 	// HDR: add mobius tone-mapping via lavfi filter (requires zimg for color conversion)
 	if isHDR && !useDoviVF {

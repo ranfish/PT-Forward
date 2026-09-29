@@ -60,10 +60,12 @@ static const float DOVI_LMS2RGB[3][3] = {
     { 0.01736321f, -0.04725154f,  1.03004253f},
 };
 
-// BT.2020 RGB -> YCbCr (limited range, quantized to 10-bit on output)
-#define BT2020_KG 0.6780f
-#define BT2020_KR 0.2627f
-#define BT2020_KB 0.0593f
+// §59.300 附五：vf 直出 SDR——PQ 线性光经 mobius tone map（与引擎原 lavfi
+// tonemap=mobius npl=100 同款观感）后 bt709 编码，摆脱 mpv zimg 对 PQ 无 tone map
+// 的硬裁剪（亮场景白花根因）。
+#define BT709_KR 0.2126f
+#define BT709_KG 0.7152f
+#define BT709_KB 0.0722f
 
 #define PQ_LUT_N 8192
 
@@ -83,6 +85,7 @@ struct dovi_curve {
 struct el_meta_entry {
     double pts;                       // seconds
     struct pl_dovi_metadata meta;
+    float tm_peak;                    // mobius peak = source_max_nits / 100
 };
 
 struct el_state {
@@ -118,10 +121,13 @@ struct priv {
     float mat_nonlin_c[3];   // folded: -mat * offset * levels_scale
     float mat_out[3][3];     // LMS2RGB * dovi->linear
     struct dovi_curve curves[3];
+    float cur_peak;          // 当前 tonemap LUT 的 peak（0=未建）
 
     // PQ transfer LUTs (built once)
     float eotf_lut[PQ_LUT_N + 1]; // PQ signal -> linear
     float oetf_lut[PQ_LUT_N + 1]; // linear -> PQ signal
+    float tm_lut[PQ_LUT_N + 1];   // linear(0..1=10000nit) -> tonemapped(0..1)
+    float g709_lut[PQ_LUT_N + 1]; // tonemapped linear -> bt709 signal
 };
 
 // ---------------------------------------------------------------------------
@@ -131,6 +137,11 @@ static float pq_eotf(float x)
     float v = powf(x, 1.0f / PQ_M2);
     v = fmaxf(v - PQ_C1, 0.0f) / (PQ_C2 - PQ_C3 * v);
     return powf(v, 1.0f / PQ_M1);
+}
+
+static float pq_eotff(float x)
+{
+    return pq_eotf(x);
 }
 
 static float pq_oetf(float x)
@@ -146,6 +157,32 @@ static void build_pq_luts(struct priv *p)
         float x = (float)i / PQ_LUT_N;
         p->eotf_lut[i] = pq_eotf(x);
         p->oetf_lut[i] = pq_oetf(x);
+    }
+}
+
+// FFmpeg vf_tonemap mobius（j=0.3）
+static double mobius(double in, double j, double peak)
+{
+    double a, b;
+    if (in <= j)
+        return in;
+    a = -j * peak / (j - 1.0);
+    b = (j * j - j * peak) / (j * j - 2.0 * j + peak + 1.0);
+    return (b * b + 2.0 * b * j + j * j) / (b - a) * (in - a);
+}
+
+static void build_tonemap_luts(struct priv *p, float peak)
+{
+    if (peak < 1.0f)
+        peak = 1.0f;
+    for (int i = 0; i <= PQ_LUT_N; i++) {
+        float x = (float)i / PQ_LUT_N; // 线性域 0..1 = 0..10000 nits
+        float tm = (float)mobius((double)x, 0.3, (double)peak);
+        tm = MPCLAMP(tm, 0.0f, 1.0f);
+        p->tm_lut[i] = tm;
+        // bt709 OETF
+        float v = tm >= 0.018f ? 1.099f * powf(tm, 0.45f) - 0.099f : 4.5f * tm;
+        p->g709_lut[i] = MPCLAMP(v, 0.0f, 1.0f);
     }
 }
 
@@ -250,7 +287,7 @@ static inline void reshape_pixel(struct priv *p, const float in[3], float out[3]
         lms[i] = p->mat_nonlin[i][0] * vdr[0] + p->mat_nonlin[i][1] * vdr[1] +
                  p->mat_nonlin[i][2] * vdr[2] + p->mat_nonlin_c[i];
 
-    // PQ EOTF -> linear LMS -> matrix -> PQ OETF
+    // PQ EOTF -> linear LMS -> matrix -> linear RGB
     float lin[3] = { lut_lookup(p->eotf_lut, MPCLAMP(lms[0], 0.0f, 1.0f)),
                      lut_lookup(p->eotf_lut, MPCLAMP(lms[1], 0.0f, 1.0f)),
                      lut_lookup(p->eotf_lut, MPCLAMP(lms[2], 0.0f, 1.0f)) };
@@ -260,20 +297,25 @@ static inline void reshape_pixel(struct priv *p, const float in[3], float out[3]
         rgb[i] = p->mat_out[i][0] * lin[0] + p->mat_out[i][1] * lin[1] +
                  p->mat_out[i][2] * lin[2];
 
-    for (int i = 0; i < 3; i++)
-        out[i] = lut_lookup(p->oetf_lut, MPCLAMP(rgb[i], 0.0f, 1.0f));
+    // §59.300 附五：mobius tone map（线性域 0..1=10000nit）+ bt709 OETF 直出 SDR
+    for (int i = 0; i < 3; i++) {
+        float tm = lut_lookup(p->tm_lut, MPCLAMP(rgb[i], 0.0f, 1.0f));
+        out[i] = lut_lookup(p->g709_lut, MPCLAMP(tm, 0.0f, 1.0f));
+    }
 }
 
 // ---------------------------------------------------------------------------
 
 static bool prepare(struct priv *p, const struct pl_dovi_metadata *dovi,
-                    const struct pl_bit_encoding *frame_bits)
+                    const struct pl_bit_encoding *frame_bits, float tm_peak)
 {
     if (!dovi)
         return false;
 
-    if (p->prepared && p->meta_key == dovi)
+    if (p->prepared && p->meta_key == dovi && p->cur_peak == tm_peak)
         return true;
+    p->cur_peak = tm_peak;
+    build_tonemap_luts(p, tm_peak);
 
     // Signal normalization, matching pl_color_repr_normalize (limited) with
     // the texture sample divisor: sample * 2^(tex-col) / (2^tex - 1).
@@ -391,8 +433,8 @@ static bool reshape_frame(struct priv *p, struct mp_image *mpi,
     const int dys = dmpi->stride[0] / 2, dcs = dmpi->stride[1] / 2;
 
     const float ss = p->sig_scale;
-    const float cb_gain = 0.5f / (1.0f - BT2020_KB);
-    const float cr_gain = 0.5f / (1.0f - BT2020_KR);
+    const float cb_gain = 0.5f / (1.0f - BT709_KB);
+    const float cr_gain = 0.5f / (1.0f - BT709_KR);
 
     void *ta = talloc_new(p);
     int *xi0, *yj0;
@@ -432,8 +474,8 @@ static bool reshape_frame(struct priv *p, struct mp_image *mpi,
             float o[3];
             reshape_pixel(p, in, o);
 
-            // PQ RGB -> BT.2020 limited YCbCr (10-bit)
-            float ylin = BT2020_KR * o[0] + BT2020_KG * o[1] + BT2020_KB * o[2];
+            // SDR RGB -> BT.709 limited YCbCr (10-bit)
+            float ylin = BT709_KR * o[0] + BT709_KG * o[1] + BT709_KB * o[2];
             float cb = (o[2] - ylin) * cb_gain + 0.5f;
             float cr = (o[0] - ylin) * cr_gain + 0.5f;
 
@@ -446,6 +488,8 @@ static bool reshape_frame(struct priv *p, struct mp_image *mpi,
     }
 
     // Average the 2x2 block contributions and quantize chroma.
+    // cb/cr 为 0.5 中心值：量化 = 512 + (v-0.5)*448（§59.300 附四：双重中心偏置
+    // 会全帧 +224 → 品红屏）
     for (int cy = 0; cy < ch; cy++) {
         int ry = MPMIN(2, h - cy * 2);
         for (int cx = 0; cx < cw; cx++) {
@@ -453,8 +497,8 @@ static bool reshape_frame(struct priv *p, struct mp_image *mpi,
             int n = ry * rx;
             const float *a = &acc[(cy * cw + cx) * 2];
             float cb = a[0] / n, cr = a[1] / n;
-            dcb[cy * dcs + cx] = MPCLAMP(lrintf(512.0f + cb * 448.0f), 0, 1023);
-            dcr[cy * dcs + cx] = MPCLAMP(lrintf(512.0f + cr * 448.0f), 0, 1023);
+            dcb[cy * dcs + cx] = MPCLAMP(lrintf(512.0f + (cb - 0.5f) * 896.0f), 0, 1023);
+            dcr[cy * dcs + cx] = MPCLAMP(lrintf(512.0f + (cr - 0.5f) * 896.0f), 0, 1023);
         }
     }
 
@@ -554,6 +598,18 @@ static void el_push_meta(struct el_state *el, double pts,
     }
     e->pts = pts;
 
+    // L1 元数据：source_max_pq → tone map peak（nits/100；缺省 1000nit=10）
+    e->tm_peak = 10.0f;
+    {
+        // AVDOVIColorMetadata 的 L1 藏在 color 里（dovi_meta.h source_min/max_pq）
+        const AVDOVIColorMetadata *cm = av_dovi_get_color(meta);
+        if (cm->source_max_pq > 0) {
+            float max_nits = pq_eotff((float)cm->source_max_pq / 4095.0f) * 10000.0f;
+            if (max_nits >= 100.0f)
+                e->tm_peak = max_nits / 100.0f;
+        }
+    }
+
     // Own AVDOVIMetadata -> pl_dovi_metadata mapping. libplacebo <v7.364
     // refuses FEL (disable_residual_flag=0) metadata inside
     // pl_map_avdovi_metadata and silently leaves the output zeroed; Profile 7
@@ -610,7 +666,7 @@ static double frame_pts_secs(AVCodecContext *dec, AVFrame *frame,
 }
 
 // Decode EL packets until we have metadata covering target pts.
-static const struct pl_dovi_metadata *el_lookup(struct priv *p, double target)
+static const struct el_meta_entry *el_lookup_entry(struct priv *p, double target)
 {
     struct el_state *el = &p->el;
     if (!el->fmt || !el->dec)
@@ -631,7 +687,7 @@ static const struct pl_dovi_metadata *el_lookup(struct priv *p, double target)
     AVPacket *pkt = av_packet_alloc();
     AVFrame *frame = av_frame_alloc();
     AVStream *st = el->fmt->streams[el->stream_idx];
-    const struct pl_dovi_metadata *result = NULL;
+    const struct el_meta_entry *result = NULL;
 
     if (!pkt || !frame) {
         if (pkt)
@@ -694,9 +750,9 @@ done:
         }
     }
     if (best >= 0) {
-        result = &el->ring[best].meta;
-        MP_VERBOSE(p, "DoVi EL metadata: target %.3f -> pts %.3f (ring %d/%d)\n",
-                   target, el->ring[best].pts, best, el->ring_len);
+        result = &el->ring[best];
+        MP_VERBOSE(p, "DoVi EL metadata: target %.3f -> pts %.3f peak=%.1f (ring %d/%d)\n",
+                   target, el->ring[best].pts, el->ring[best].tm_peak, best, el->ring_len);
     }
     av_frame_free(&frame);
     av_packet_free(&pkt);
@@ -737,17 +793,17 @@ static void vf_dovi_process(struct mp_filter *f)
                     p->el_failed = true;
                     goto passthrough;
                 }
-                const struct pl_dovi_metadata *ext = el_lookup(p, mpi->pts);
-                if (!ext)
+                const struct el_meta_entry *ent = el_lookup_entry(p, mpi->pts);
+                if (!ent)
                     goto passthrough;
-                if (!prepare(p, ext, &mpi->params.repr.bits))
+                if (!prepare(p, &ent->meta, &mpi->params.repr.bits, ent->tm_peak))
                     goto passthrough;
             } else {
                 goto passthrough; // plain HDR10/SDR
             }
         } else {
             // Single-track P5/P8: metadata attached by the decoder.
-            if (!prepare(p, mpi->params.repr.dovi, &mpi->params.repr.bits))
+            if (!prepare(p, mpi->params.repr.dovi, &mpi->params.repr.bits, 10.0f))
                 goto passthrough;
         }
 
@@ -776,12 +832,12 @@ static void vf_dovi_process(struct mp_filter *f)
             goto passthrough;
         }
 
-        // Relabel as HDR10 PQ bt.2020; drop residual DoVi attachments.
-        dmpi->params.repr.sys = PL_COLOR_SYSTEM_BT_2020_NC;
+        // §59.300 附五：直出 SDR bt.709（vf 内已完成 mobius tone map）
+        dmpi->params.repr.sys = PL_COLOR_SYSTEM_BT_709;
         dmpi->params.repr.levels = PL_COLOR_LEVELS_LIMITED;
         dmpi->params.repr.dovi = NULL;
-        dmpi->params.color.primaries = PL_COLOR_PRIM_BT_2020;
-        dmpi->params.color.transfer = PL_COLOR_TRC_PQ;
+        dmpi->params.color.primaries = PL_COLOR_PRIM_BT_709;
+        dmpi->params.color.transfer = PL_COLOR_TRC_BT_1886;
 
         dmpi->pts = mpi->pts;
         dmpi->dovi = NULL;
