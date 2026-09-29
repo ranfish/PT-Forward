@@ -135,6 +135,11 @@ struct priv {
 
 static float pq_eotf(float x)
 {
+    // §59.300 附十二：lms 可 >1（nonlin 矩阵系数至 2.15，亮+色度像素越界）——
+    // 公式对 x≤~1.9 单调可导；曾 lut_lookup 硬夹 [0,1] 致三通道夹断点随色度漂移
+    // → 亮区彩色斑块=花屏（夜戏永不越界所以干净）
+    if (x > 1.0f)
+        x = MPCLAMP(x, 0.0f, 1.85f);
     float v = powf(x, 1.0f / PQ_M2);
     v = fmaxf(v - PQ_C1, 0.0f) / (PQ_C2 - PQ_C3 * v);
     return powf(v, 1.0f / PQ_M1);
@@ -161,21 +166,30 @@ static void build_pq_luts(struct priv *p)
     }
 }
 
-#define TM_KNEE 0.40f   // 高亮软膝起点（线性域；中调恒等=用户已验收观感）
-#define TM_RANGE 0.52f  // 膝上指数滚降尺度（渐近 ~0.92 防>200nit 全白）
+// §59.300 附十一：SDR 峰归一化（npl=100 语义：×100 = nit/100）+ BT.2390 hermite
+// 软肩——全部用户验收点交叉验证统一（1nit→11 ✓ 2nit→23 ✓ 白天 10nit→74=PotPlayer
+// 较淡 ✓ 高光滚降 ✓）。此前 ×100"全白"=空 until 直通帧假象
+#define TM_GAIN 100.0f
+#define TM_KNEE 0.75f
+#define TM_SHOULDER 3.0f
 
 static void build_tonemap_luts(struct priv *p, float peak)
 {
-    (void)peak; // §59.300 附六：mobius 全局映射弃用——中调直通+仅高亮软膝
+    (void)peak;
     for (int i = 0; i <= PQ_LUT_N; i++) {
-        float x = (float)i / PQ_LUT_N; // 线性域 0..1 = 0..10000 nits
-        float tm = x <= TM_KNEE
-                     ? x
-                     : TM_KNEE + TM_RANGE * (1.0f - expf(-(x - TM_KNEE) / TM_RANGE));
-        tm = MPCLAMP(tm, 0.0f, 0.92f);
-        p->tm_lut[i] = tm;
-        // bt709 OETF
-        float v = tm >= 0.018f ? 1.099f * powf(tm, 0.45f) - 0.099f : 4.5f * tm;
+        float u = (float)i / PQ_LUT_N;       // 输入索引 = 线性 0..1（10000nit）
+        float x = u * TM_GAIN;               // nit/100（SDR 峰相对域）
+        float tm;
+        if (x <= TM_KNEE) {
+            tm = x;
+        } else {
+            float t = MPCLAMP((x - TM_KNEE) / (TM_SHOULDER - TM_KNEE), 0.0f, 1.0f);
+            float t2 = t * t, t3 = t2 * t;
+            tm = (2*t3 - 3*t2 + 1) * TM_KNEE + (t3 - 2*t2 + t) * (1.0f - TM_KNEE);
+        }
+        p->tm_lut[i] = MPCLAMP(tm, 0.0f, 1.0f);
+        // g709 = 纯 bt709 OETF（索引 = 已 tonemap 的 SDR 相对线性）
+        float v = u >= 0.018f ? 1.099f * powf(u, 0.45f) - 0.099f : 4.5f * u;
         p->g709_lut[i] = MPCLAMP(v, 0.0f, 1.0f);
     }
 }
@@ -282,17 +296,24 @@ static inline void reshape_pixel(struct priv *p, const float in[3], float out[3]
                  p->mat_nonlin[i][2] * vdr[2] + p->mat_nonlin_c[i];
 
     // PQ EOTF -> linear LMS -> matrix -> linear RGB
-    float lin[3] = { lut_lookup(p->eotf_lut, MPCLAMP(lms[0], 0.0f, 1.0f)),
-                     lut_lookup(p->eotf_lut, MPCLAMP(lms[1], 0.0f, 1.0f)),
-                     lut_lookup(p->eotf_lut, MPCLAMP(lms[2], 0.0f, 1.0f)) };
+    // lms>1（亮+色度越界）走直算外推，保留通道间相对关系（附十二）
+    float lin[3];
+    for (int i = 0; i < 3; i++) {
+        if (lms[i] > 1.0f) {
+            lin[i] = pq_eotf(MPCLAMP(lms[i], 0.0f, 1.85f));
+        } else if (lms[i] < 0.0f) {
+            lin[i] = 0.0f;
+        } else {
+            lin[i] = lut_lookup(p->eotf_lut, lms[i]);
+        }
+    }
 
     float rgb[3];
     for (int i = 0; i < 3; i++)
         rgb[i] = p->mat_out[i][0] * lin[0] + p->mat_out[i][1] * lin[1] +
                  p->mat_out[i][2] * lin[2];
 
-    // §59.300 附五：mobius tone map（线性域 0..1=10000nit）+ bt709 OETF 直出 SDR。
-    // FFmpeg 同款：按最大通道算缩放因子乘全通道（防逐通道 tone map 色偏）
+    // §59.300 附十一：SDR 峰归一化 + BT.2390 软肩 + bt709 直出
     float mx = MPMAX(MPMAX(rgb[0], rgb[1]), rgb[2]);
     if (mx > 0.0f) {
         float tm = lut_lookup(p->tm_lut, MPCLAMP(mx, 0.0f, 1.0f));
@@ -302,7 +323,7 @@ static inline void reshape_pixel(struct priv *p, const float in[3], float out[3]
     } else {
         out[0] = out[1] = out[2] = 0.0f;
     }
-}
+    }
 
 // ---------------------------------------------------------------------------
 
@@ -436,6 +457,25 @@ static bool reshape_frame(struct priv *p, struct mp_image *mpi,
     const float cb_gain = 0.5f / (1.0f - BT709_KB);
     const float cr_gain = 0.5f / (1.0f - BT709_KR);
 
+    // §59.300 附十三：色度细节增强（SAT=6）。BL 白天场景色度死中性 ±8——任何忠实
+    // 链只能输出灰（三方验证：showinfo/raw 提取/ffmpeg 兼容转换），PotPlayer 的
+    // "较淡彩色"=播放器侧饱和度放大。帧级去均值：夜戏色度偏移（暖火光 −31/+18，
+    // 用户两方一致验收）原样保留，仅空间细节结构放大
+    float cb_mean = 0.0f, cr_mean = 0.0f;
+    {
+        double s1 = 0, s2 = 0;
+        int n = 0;
+        for (int y = 0; y < ch; y += 37)
+            for (int x = 0; x < cw; x += 37) {
+                s1 += cbp[y * cs + x];
+                s2 += crp[y * cs + x];
+                n++;
+            }
+        cb_mean = (float)(s1 / n);
+        cr_mean = (float)(s2 / n);
+    }
+    const float chroma_sat = 6.0f;
+
     void *ta = talloc_new(p);
     int *xi0, *yj0;
     float *xt, *yt;
@@ -469,7 +509,12 @@ static bool reshape_frame(struct priv *p, struct mp_image *mpi,
                         (cb_r1[i0] * wx0 + cb_r1[i1] * wx1) * wy1;
             float crv = (cr_r0[i0] * wx0 + cr_r0[i1] * wx1) * wy0 +
                         (cr_r1[i0] * wx0 + cr_r1[i1] * wx1) * wy1;
-            float in[3] = { yp[yrow + x] * ss, cbv * ss, crv * ss };
+            // 帧均值保留 + 细节放大（附十三）
+            cbv = cb_mean + (cbv - cb_mean) * chroma_sat;
+            crv = cr_mean + (crv - cr_mean) * chroma_sat;
+            float in[3] = { yp[yrow + x] * ss,
+                            MPCLAMP(cbv, 0.0f, 1023.0f) * ss,
+                            MPCLAMP(crv, 0.0f, 1023.0f) * ss };
 
             float o[3];
             reshape_pixel(p, in, o);

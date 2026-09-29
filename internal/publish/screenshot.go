@@ -253,8 +253,6 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 
 	start := timestamp
 	frames := 1
-	useDoviVF := false
-	untilTs := -1.0
 
 	if dualHEVC {
 		idr, err := e.findIDRBefore(ctx, videoPath, timestamp)
@@ -271,13 +269,9 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 			}
 			start = idr
 			frames = n
-			useDoviVF = true
-			untilTs = timestamp - 0.3
 		} else {
 			// 找不到关键帧信息则退回 dovi vf + 保守取第 4 帧
 			frames = 4
-			useDoviVF = true
-			untilTs = timestamp - 0.3
 			e.logger.Warn("screenshot dovi: no IDR found before target, fallback frames=4",
 				zap.Float64("timestamp", timestamp))
 		}
@@ -297,13 +291,12 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 	}
 
 	vfParts := []string{}
-	if useDoviVF {
-		// until=目标时间戳-0.3：前导帧直通（跳过昂贵 reshape），末帧群做 DoVi 处理。
-		// 路径裸传（argv 内空格安全；勿加引号——mpv 子选项解析不认单引号，exit 1）
-		vfParts = append(vfParts, fmt.Sprintf("dovi_reshape=el-source=%s:until=%f", videoPath, untilTs))
-	}
-	// HDR: add mobius tone-mapping via lavfi filter (requires zimg for color conversion)
-	if isHDR && !useDoviVF {
+	// §59.300 附十四：恒等 RPU 双流盘（P7-FEL 兼容类）禁用 dovi_reshape——其 nonlin
+	// 矩阵（系数至 2.15）把 BL 色度噪声放大成亮度噪点=花屏（直通 std 27.7 vs
+	// reshape std 64 实测）；lavfi tonemap=mobius 本身正确处理 PQ（无白化）。
+	// dualHEVC 仅保留 IDR 精确捕获+帧数余量（concealment 修复）。
+	// vf 留给真 P5/P8（帧自带元数据）场景，引擎不再为双流盘挂载。
+	if isHDR {
 		vfParts = append(vfParts, "lavfi=[tonemap=mobius]")
 	}
 	if len(vfParts) > 0 {
