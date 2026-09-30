@@ -55,27 +55,27 @@
         <a-button :loading="loading" @click="fetchList">
           <ReloadOutlined /> 刷新
         </a-button>
+        <a-button
+          v-if="statusFilter === 'pending'"
+          type="primary"
+          :loading="batchReviewing"
+          :disabled="selectedHashes.length === 0"
+          style="margin-right: 8px"
+          @click="batchReviewSelected"
+        >
+          <CheckOutlined /> 批量审核{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
+        </a-button>
         <a-popconfirm
           :title="statusFilter === 'observing' ? `确定清理 ${selectedHashes.length} 个观察期资源？（快照+元数据，发布记录保留）` : `确定清除 ${selectedHashes.length} 个种子的已获取数据？`"
           :ok-text="statusFilter === 'observing' ? '清理' : '清除'"
           cancel-text="取消"
           @confirm="(statusFilter === 'observing' ? batchPurgeObserving : batchClear)()"
         >
-          <a-button
-            v-if="statusFilter === 'pending'"
-            type="primary"
-            :loading="batchReviewing"
-            :disabled="selectedHashes.length === 0"
-            style="margin-right: 8px"
-            @click="batchReviewSelected"
-          >
-            <CheckOutlined /> 批量审核{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
-          </a-button>
           <a-button danger :loading="batchClearing" :disabled="selectedHashes.length === 0">
             <ClearOutlined /> {{ statusFilter === 'observing' ? '批量清理' : '批量清除' }}{{ selectedHashes.length > 0 ? `（${selectedHashes.length}）` : '' }}
           </a-button>
         </a-popconfirm>
-<a-button
+        <a-button
           v-if="filterClient && filterPath"
           type="primary"
           :loading="batchFetchActive"
