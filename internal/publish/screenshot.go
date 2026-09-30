@@ -124,7 +124,9 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 	cmd := exec.CommandContext(ctx, probePath, //nolint:gosec // intentional subprocess
 		"-v", "error",
 		"-select_streams", "v",
-		"-show_entries", "stream=codec_name,avg_frame_rate,color_transfer,color_primaries:format=duration",
+		// §59.300 附十六：side_data_list（DOVI configuration record/dv_profile）在
+		// entries 过滤下输出空对象（该 ffprobe 版本行为）——stream 段全量拿
+		"-show_entries", "stream:format=duration",
 		"-of", "json",
 		videoPath,
 	)
@@ -139,10 +141,10 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 			AvgFrameRate   string `json:"avg_frame_rate"`
 			ColorTransfer  string `json:"color_transfer"`
 			ColorPrimaries string `json:"color_primaries"`
-			SideDataList   []struct {
+			SideDataList []struct {
 				SideDataType string `json:"side_data_type"`
 				DVProfile    int    `json:"dv_profile"`
-			} `json:"side_data_list"`
+			} `json:"side_data_list,omitempty"`
 		} `json:"streams"`
 		Format struct {
 			Duration string `json:"duration"`
