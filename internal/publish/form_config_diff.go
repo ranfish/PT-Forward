@@ -21,6 +21,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"html"
 )
 
 // htmlDomainRules 字段名 → 逻辑域识别规则（NexusPHP 家族实测形态——§59.149）。
@@ -39,10 +40,41 @@ var htmlDomainRules = []struct {
 
 // ParsePublishFormHTML 解析发布页 HTML → 配置草稿。
 // 返回 nil = HTML 无可识别表单结构。
+// unwrapViewSourceSave 兼容浏览器"查看源代码"标签页整体另存的包装页（Chrome/Edge
+// view-source Ctrl+S 形态：真源码被 HTML 转义包裹在 td.line-content 单元格 +
+// 行号 gutter 的查看器框架内——修道院 422 案实测形态）。识别签名→提取单元格
+// 文本→反转义还原真源码；非该形态原样返回。
+func unwrapViewSourceSave(src string) string {
+	if !strings.Contains(src, "line-content") ||
+		!strings.Contains(src, "&lt;") {
+		return src
+	}
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(src))
+	if err != nil {
+		return src
+	}
+	var lines []string
+	doc.Find("td.line-content").Each(func(_ int, td *goquery.Selection) {
+		lines = append(lines, td.Text())
+	})
+	if len(lines) == 0 {
+		return src
+	}
+	joined := strings.Join(lines, "\n")
+	// 双重保险：还原后必须出现真实标签才算成功（防误判把正常页面拆坏）
+	if unescaped := html.UnescapeString(joined); strings.Contains(unescaped, "<select") ||
+		strings.Contains(unescaped, "<input") || strings.Contains(unescaped, "<form") {
+		return unescaped
+	}
+	return src
+}
+
 func ParsePublishFormHTML(html string) *model.PublishFormConfig {
 	if strings.TrimSpace(html) == "" {
 		return nil
 	}
+	html = unwrapViewSourceSave(html)
+
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return nil
