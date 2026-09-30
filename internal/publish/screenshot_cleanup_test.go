@@ -45,13 +45,13 @@ exit 0
 	dir := t.TempDir()
 	p1 := filepath.Join(dir, "shot_000.jpg")
 	p2 := filepath.Join(dir, "shot_001.jpg")
-	if err := eng.captureFrameMPVEx(ctx, "dummy.mkv", 10.0, 0, false, false, 0, p1); err != nil {
+	if err := eng.captureFrameMPVEx(ctx, "dummy.mkv", 10.0, 0, false, false, 24.0, 0, p1); err != nil {
 		t.Fatalf("iter1: %v", err)
 	}
 	if _, err := os.Stat(p1); err != nil {
 		t.Fatalf("iter1 output missing: %v", err)
 	}
-	if err := eng.captureFrameMPVEx(ctx, "dummy.mkv", 40.0, 0, false, false, 0, p2); err != nil {
+	if err := eng.captureFrameMPVEx(ctx, "dummy.mkv", 40.0, 0, false, false, 24.0, 0, p2); err != nil {
 		t.Fatalf("iter2: %v", err)
 	}
 	if _, err := os.Stat(p2); err != nil {
