@@ -130,7 +130,7 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 		"-select_streams", "v",
 		// §59.300 附十六：side_data_list（DOVI configuration record/dv_profile）在
 		// entries 过滤下输出空对象（该 ffprobe 版本行为）——stream 段全量拿
-		"-show_entries", "stream:format=duration",
+		"-show_entries", "stream:format=duration,format_name",
 		"-of", "json",
 		videoPath,
 	)
