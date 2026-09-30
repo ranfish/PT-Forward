@@ -551,14 +551,13 @@ async function batchReviewSelected() {
   if (selectedHashes.value.length === 0) return
   Modal.confirm({
     title: `确定审核通过 ${selectedHashes.value.length} 个种子？`,
-    content: '同簇资源将同步审核状态（§59.94 簇同步）',
     okText: '审核通过',
     cancelText: '取消',
     onOk: async () => {
       batchReviewing.value = true
       try {
         const res = await seedConfigApi.batchReviewByHashes(selectedHashes.value, true)
-        message.success(`已审核 ${res.data?.data?.updated ?? selectedHashes.value.length} 行（簇同步已扩散）`)
+        message.success(`已审核 ${res.data?.data?.updated ?? selectedHashes.value.length} 行`)
         selectedHashes.value = []
         await fetchList()
       } catch (e: any) {
