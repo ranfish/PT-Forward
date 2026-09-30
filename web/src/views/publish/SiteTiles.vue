@@ -8,7 +8,6 @@
       @click="pick(t.name)"
     >
       <span class="tile-name">{{ t.name }}</span>
-      <a-tag v-if="t.hasPreAudit" color="blue" class="tile-tag">官方预检</a-tag>
     </div>
   </div>
   <div v-if="!sites.length" class="tile-empty">暂无已启用发布配置的目标站</div>
@@ -79,8 +78,5 @@ function pick(name: string) {
 .tile-empty {
   color: #999;
   padding: 12px 0;
-}
-.tile-tag {
-  margin: 0;
 }
 </style>
