@@ -313,16 +313,11 @@ static inline void reshape_pixel(struct priv *p, const float in[3], float out[3]
         rgb[i] = p->mat_out[i][0] * lin[0] + p->mat_out[i][1] * lin[1] +
                  p->mat_out[i][2] * lin[2];
 
-    // §59.300 附十一：SDR 峰归一化 + BT.2390 软肩 + bt709 直出
-    float mx = MPMAX(MPMAX(rgb[0], rgb[1]), rgb[2]);
-    if (mx > 0.0f) {
-        float tm = lut_lookup(p->tm_lut, MPCLAMP(mx, 0.0f, 1.0f));
-        float scale = tm / mx;
-        for (int i = 0; i < 3; i++)
-            out[i] = lut_lookup(p->g709_lut, MPCLAMP(rgb[i] * scale, 0.0f, 1.0f));
-    } else {
-        out[0] = out[1] = out[2] = 0.0f;
-    }
+    // §59.300 附十七：纯 PQ OETF 直出（P5 正确形态=libplacebo/mpv 同构：reshape→PQ，
+    // 显示层转换交 lavfi——附十一内部 tonemap+附十三 chroma_sat 与 lavfi 叠加=
+    // 双重色调映射+过饱和，G 通道压 0 实证）
+    for (int i = 0; i < 3; i++)
+        out[i] = lut_lookup(p->oetf_lut, MPCLAMP(rgb[i], 0.0f, 1.0f));
     }
 
 // ---------------------------------------------------------------------------
@@ -454,27 +449,9 @@ static bool reshape_frame(struct priv *p, struct mp_image *mpi,
     const int dys = dmpi->stride[0] / 2, dcs = dmpi->stride[1] / 2;
 
     const float ss = p->sig_scale;
-    const float cb_gain = 0.5f / (1.0f - BT709_KB);
-    const float cr_gain = 0.5f / (1.0f - BT709_KR);
+    const float cb_gain = 0.5f / (1.0f - 0.0593f);
+    const float cr_gain = 0.5f / (1.0f - 0.2627f);
 
-    // §59.300 附十三：色度细节增强（SAT=6）。BL 白天场景色度死中性 ±8——任何忠实
-    // 链只能输出灰（三方验证：showinfo/raw 提取/ffmpeg 兼容转换），PotPlayer 的
-    // "较淡彩色"=播放器侧饱和度放大。帧级去均值：夜戏色度偏移（暖火光 −31/+18，
-    // 用户两方一致验收）原样保留，仅空间细节结构放大
-    float cb_mean = 0.0f, cr_mean = 0.0f;
-    {
-        double s1 = 0, s2 = 0;
-        int n = 0;
-        for (int y = 0; y < ch; y += 37)
-            for (int x = 0; x < cw; x += 37) {
-                s1 += cbp[y * cs + x];
-                s2 += crp[y * cs + x];
-                n++;
-            }
-        cb_mean = (float)(s1 / n);
-        cr_mean = (float)(s2 / n);
-    }
-    const float chroma_sat = 6.0f;
 
     void *ta = talloc_new(p);
     int *xi0, *yj0;
@@ -509,18 +486,13 @@ static bool reshape_frame(struct priv *p, struct mp_image *mpi,
                         (cb_r1[i0] * wx0 + cb_r1[i1] * wx1) * wy1;
             float crv = (cr_r0[i0] * wx0 + cr_r0[i1] * wx1) * wy0 +
                         (cr_r1[i0] * wx0 + cr_r1[i1] * wx1) * wy1;
-            // 帧均值保留 + 细节放大（附十三）
-            cbv = cb_mean + (cbv - cb_mean) * chroma_sat;
-            crv = cr_mean + (crv - cr_mean) * chroma_sat;
-            float in[3] = { yp[yrow + x] * ss,
-                            MPCLAMP(cbv, 0.0f, 1023.0f) * ss,
-                            MPCLAMP(crv, 0.0f, 1023.0f) * ss };
+            float in[3] = { yp[yrow + x] * ss, cbv * ss, crv * ss };
 
             float o[3];
             reshape_pixel(p, in, o);
 
-            // SDR RGB -> BT.709 limited YCbCr (10-bit)
-            float ylin = BT709_KR * o[0] + BT709_KG * o[1] + BT709_KB * o[2];
+            // PQ RGB -> BT.2020 limited YCbCr (10-bit)
+            float ylin = 0.2627f * o[0] + 0.6780f * o[1] + 0.0593f * o[2];
             float cb = (o[2] - ylin) * cb_gain + 0.5f;
             float cr = (o[0] - ylin) * cr_gain + 0.5f;
 
@@ -877,12 +849,12 @@ static void vf_dovi_process(struct mp_filter *f)
             goto passthrough;
         }
 
-        // §59.300 附五：直出 SDR bt.709（vf 内已完成 mobius tone map）
-        dmpi->params.repr.sys = PL_COLOR_SYSTEM_BT_709;
+        // Relabel HDR10 PQ bt.2020（显示层转换交 lavfi——16 盘验证链）
+        dmpi->params.repr.sys = PL_COLOR_SYSTEM_BT_2020_NC;
         dmpi->params.repr.levels = PL_COLOR_LEVELS_LIMITED;
         dmpi->params.repr.dovi = NULL;
-        dmpi->params.color.primaries = PL_COLOR_PRIM_BT_709;
-        dmpi->params.color.transfer = PL_COLOR_TRC_BT_1886;
+        dmpi->params.color.primaries = PL_COLOR_PRIM_BT_2020;
+        dmpi->params.color.transfer = PL_COLOR_TRC_PQ;
 
         dmpi->pts = mpi->pts;
         dmpi->dovi = NULL;
