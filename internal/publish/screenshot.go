@@ -29,6 +29,9 @@ func NewScreenshotEngine(mpvPath string, count int, minInterval int, quality int
 	if mpvPath == "" {
 		mpvPath = "mpv"
 	}
+	if logger == nil {
+		logger = zap.NewNop() // 测试构造容错（§59.300 附十五 hr-seek 兜底路径打日志）
+	}
 	if count <= 0 {
 		count = 5
 	}
@@ -62,6 +65,9 @@ type videoInfo struct {
 	// 且 seek 落点首帧常为参考缺失的 concealment 帧，需 IDR 精确起点+前向取帧。
 	dualHEVC bool
 	fps      float64
+	// doviProfile: 容器 DOVI configuration record 的 dv_profile（0=无）。
+	// P5=IPT 原生需 dovi_reshape 反变换；P7/P8=BL 兼容 HDR10 直通即可（§59.300 附十四）
+	doviProfile int
 }
 
 func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtitleStreamID int) ([]string, string, error) {
@@ -92,7 +98,7 @@ func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtit
 	var paths []string
 	for i, ts := range points {
 		outPath := filepath.Join(tmpDir, fmt.Sprintf("shot_%03d.jpg", i))
-		capErr := e.captureFrameMPVEx(ctx, videoPath, ts, subtitleStreamID, info.isHDR, info.dualHEVC, info.fps, outPath)
+		capErr := e.captureFrameMPVEx(ctx, videoPath, ts, subtitleStreamID, info.isHDR, info.dualHEVC, info.fps, info.doviProfile, outPath)
 		if capErr != nil {
 			e.logger.Warn("screenshot capture failed",
 				zap.Float64("timestamp", ts),
@@ -133,6 +139,10 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 			AvgFrameRate   string `json:"avg_frame_rate"`
 			ColorTransfer  string `json:"color_transfer"`
 			ColorPrimaries string `json:"color_primaries"`
+			SideDataList   []struct {
+				SideDataType string `json:"side_data_type"`
+				DVProfile    int    `json:"dv_profile"`
+			} `json:"side_data_list"`
 		} `json:"streams"`
 		Format struct {
 			Duration string `json:"duration"`
@@ -182,11 +192,22 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 		fps = 23.976
 	}
 
+	doviProfile := 0
+	if len(result.Streams) > 0 {
+		for _, sd := range result.Streams[0].SideDataList {
+			if strings.Contains(strings.ToLower(sd.SideDataType), "dovi") {
+				doviProfile = sd.DVProfile
+				break
+			}
+		}
+	}
+
 	return &videoInfo{
-		duration: d,
-		isHDR:    isHDR,
-		dualHEVC: hevcCount >= 2,
-		fps:      fps,
+		duration:    d,
+		isHDR:       isHDR,
+		dualHEVC:    hevcCount >= 2,
+		fps:         fps,
+		doviProfile: doviProfile,
 	}, nil
 }
 
@@ -244,22 +265,24 @@ func (e *ScreenshotEngine) generateTimePoints(duration float64) []float64 {
 }
 
 func (e *ScreenshotEngine) captureFrameMPV(ctx context.Context, videoPath string, timestamp float64, subtitleStreamID int, isHDR bool, outPath string) error {
-	return e.captureFrameMPVEx(ctx, videoPath, timestamp, subtitleStreamID, isHDR, false, 0, outPath)
+	return e.captureFrameMPVEx(ctx, videoPath, timestamp, subtitleStreamID, isHDR, false, 23.976, 0, outPath)
 }
 
 // captureFrameMPVEx: dualHEVC 时走 DoVi P7 专用路径（vf dovi_reshape + IDR 精确起点前向取帧）。
-func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath string, timestamp float64, subtitleStreamID int, isHDR, dualHEVC bool, fps float64, outPath string) error {
+func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath string, timestamp float64, subtitleStreamID int, isHDR, dualHEVC bool, fps float64, doviProfile int, outPath string) error {
 	outDir := filepath.Dir(outPath)
 
 	start := timestamp
 	frames := 1
+	hrSeek := false
 
-	if dualHEVC {
+	// §59.300 附十五：IDR 精确捕获全量化（16 盘全量验证：plain seek 首帧=concealment，
+	// Cold Storage 4/5 灰花实证）；找不到关键帧 → hr-seek 兜底（mpv 内部从关键帧
+	// 前向解码，取 120 帧末帧必过 concealment 区——cs120 实证）
+	{
 		idr, err := e.findIDRBefore(ctx, videoPath, timestamp)
 		if err == nil && idr > 0 && timestamp > idr {
 			offset := (timestamp - idr) * fps
-			// +2 跳过 open-GOP 前导 B 帧；+fps*1.2 抵御 mpv seek 落点漂移
-			// （落点早于 IDR 时帧数预算不足 → 末帧 pts < until → 直通 → 白花，§59.300 附五）
 			n := int(math.Ceil(offset)) + 2 + int(math.Ceil(fps*1.2))
 			if n < 3 {
 				n = 3
@@ -270,33 +293,43 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 			start = idr
 			frames = n
 		} else {
-			// 找不到关键帧信息则退回 dovi vf + 保守取第 4 帧
-			frames = 4
-			e.logger.Warn("screenshot dovi: no IDR found before target, fallback frames=4",
+			start = timestamp
+			frames = 120
+			hrSeek = true
+			e.logger.Warn("screenshot: no IDR found before target, hr-seek fallback frames=120",
 				zap.Float64("timestamp", timestamp))
 		}
 	}
+	_ = dualHEVC
 
 	args := []string{
 		"--vo=image",
 		"--ao=null",
 		"--no-audio",
-		"--start=" + strconv.FormatFloat(start, 'f', 6, 64),
-		"--frames=" + strconv.Itoa(frames),
+	}
+	if hrSeek {
+		args = append(args, "--hr-seek=yes")
+	}
+	args = append(args,
+		"--start="+strconv.FormatFloat(start, 'f', 6, 64),
+		"--frames="+strconv.Itoa(frames),
 		"--no-terminal",
 		"--no-config",
 		"--vo-image-format=jpg",
-		"--vo-image-jpeg-quality=" + strconv.Itoa(e.quality),
-		"--vo-image-outdir=" + outDir,
-	}
+		"--vo-image-jpeg-quality="+strconv.Itoa(e.quality),
+		"--vo-image-outdir="+outDir,
+	)
 
 	vfParts := []string{}
-	// §59.300 附十四：恒等 RPU 双流盘（P7-FEL 兼容类）禁用 dovi_reshape——其 nonlin
-	// 矩阵（系数至 2.15）把 BL 色度噪声放大成亮度噪点=花屏（直通 std 27.7 vs
-	// reshape std 64 实测）；lavfi tonemap=mobius 本身正确处理 PQ（无白化）。
-	// dualHEVC 仅保留 IDR 精确捕获+帧数余量（concealment 修复）。
-	// vf 留给真 P5/P8（帧自带元数据）场景，引擎不再为双流盘挂载。
-	if isHDR {
+	// §59.300 附十四/附十五：
+	// - P5（IPT 原生）：必须 dovi_reshape 反变换（帧自带 RPU 元数据路径）+ lavfi
+	//   tonemap=PQ→SDR（iTunes WEB 紫→暖色自然实测）
+	// - P7/P8 兼容盘：BL 即 HDR10，直通+lavfi（16 盘全量验证；reshape 会放大
+	//   色度噪声成花屏）
+	if doviProfile == 5 {
+		vfParts = append(vfParts, "dovi_reshape")
+		vfParts = append(vfParts, "lavfi=[tonemap=mobius]")
+	} else if isHDR {
 		vfParts = append(vfParts, "lavfi=[tonemap=mobius]")
 	}
 	if len(vfParts) > 0 {
