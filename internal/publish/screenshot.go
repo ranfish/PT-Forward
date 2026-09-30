@@ -68,6 +68,10 @@ type videoInfo struct {
 	// doviProfile: 容器 DOVI configuration record 的 dv_profile（0=无）。
 	// P5=IPT 原生需 dovi_reshape 反变换；P7/P8=BL 兼容 HDR10 直通即可（§59.300 附十四）
 	doviProfile int
+	// isMpegTS: m2ts/ts 无索引容器——mpv 落点不确定+open-GOP concealment，
+	// 必须 IDR 精确慢链；mkv/mp4 精确 seek，frames=1 快链（发布链 4min 预算兼容，
+	// §59.300 附十八回归审计）
+	isMpegTS bool
 }
 
 func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtitleStreamID int) ([]string, string, error) {
@@ -98,7 +102,7 @@ func (e *ScreenshotEngine) Capture(ctx context.Context, videoPath string, subtit
 	var paths []string
 	for i, ts := range points {
 		outPath := filepath.Join(tmpDir, fmt.Sprintf("shot_%03d.jpg", i))
-		capErr := e.captureFrameMPVEx(ctx, videoPath, ts, subtitleStreamID, info.isHDR, info.dualHEVC, info.fps, info.doviProfile, outPath)
+		capErr := e.captureFrameMPVEx(ctx, videoPath, ts, subtitleStreamID, info.isHDR, info.isMpegTS, info.fps, info.doviProfile, outPath)
 		if capErr != nil {
 			e.logger.Warn("screenshot capture failed",
 				zap.Float64("timestamp", ts),
@@ -147,7 +151,8 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 			} `json:"side_data_list,omitempty"`
 		} `json:"streams"`
 		Format struct {
-			Duration string `json:"duration"`
+			Duration   string `json:"duration"`
+			FormatName string `json:"format_name"`
 		} `json:"format"`
 	}
 	if err := json.Unmarshal(output, &result); err != nil {
@@ -204,12 +209,14 @@ func (e *ScreenshotEngine) probeVideo(ctx context.Context, videoPath string) (*v
 		}
 	}
 
+	// §59.300 附十八：容器感知——mpv 对带索引容器（mkv/mp4/webm）默认 hr-seek
 	return &videoInfo{
 		duration:    d,
 		isHDR:       isHDR,
 		dualHEVC:    hevcCount >= 2,
 		fps:         fps,
 		doviProfile: doviProfile,
+		isMpegTS:    strings.Contains(strings.ToLower(result.Format.FormatName), "mpegts"),
 	}, nil
 }
 
@@ -271,17 +278,18 @@ func (e *ScreenshotEngine) captureFrameMPV(ctx context.Context, videoPath string
 }
 
 // captureFrameMPVEx: dualHEVC 时走 DoVi P7 专用路径（vf dovi_reshape + IDR 精确起点前向取帧）。
-func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath string, timestamp float64, subtitleStreamID int, isHDR, dualHEVC bool, fps float64, doviProfile int, outPath string) error {
+func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath string, timestamp float64, subtitleStreamID int, isHDR, isMpegTS bool, fps float64, doviProfile int, outPath string) error {
 	outDir := filepath.Dir(outPath)
 
 	start := timestamp
 	frames := 1
 	hrSeek := false
 
-	// §59.300 附十五：IDR 精确捕获全量化（16 盘全量验证：plain seek 首帧=concealment，
-	// Cold Storage 4/5 灰花实证）；找不到关键帧 → hr-seek 兜底（mpv 内部从关键帧
-	// 前向解码，取 120 帧末帧必过 concealment 区——cs120 实证）
-	{
+	// §59.300 附十五/附十八：IDR 精确慢链仅 mpegts（无索引容器 open-GOP concealment，
+	// Cold Storage/原始灰花投诉全为 m2ts）；mkv/mp4 精确 seek 保留 frames=1 快链
+	//（发布链截图策略 4min 预算兼容——全量化曾致其必然超时）。m2ts 找不到关键帧 →
+	// hr-seek 兜底（mpv 内部关键帧前向解码，取 120 帧末帧，cs120 实证）
+	if isMpegTS {
 		idr, err := e.findIDRBefore(ctx, videoPath, timestamp)
 		if err == nil && idr > 0 && timestamp > idr {
 			offset := (timestamp - idr) * fps
@@ -302,7 +310,6 @@ func (e *ScreenshotEngine) captureFrameMPVEx(ctx context.Context, videoPath stri
 				zap.Float64("timestamp", timestamp))
 		}
 	}
-	_ = dualHEVC
 
 	args := []string{
 		"--vo=image",

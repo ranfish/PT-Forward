@@ -4484,7 +4484,7 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	sem <- struct{}{}
 	defer func() { <-sem }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute) // §59.300 附十八：m2ts IDR 慢链 5 点 2-5min 预算
 	defer cancel()
 
 	// §59.63: 截图链接缓存（观察期）——簇键命中且未过期直接复用，跳过探活/转存/
@@ -4513,7 +4513,7 @@ func (h *PublishTorrentsHandler) applyScreenshotStrategy(clientUID uint, infoHas
 	// §59.57: 探活内联前序（自带 90s 独立 ctx，读自身快照；HEAD 秒级不占策略预算）
 	h.purgeDeadScreenshots(infoHash, siteName)
 
-	strategyCtx, scancel := context.WithTimeout(ctx, 4*time.Minute)
+	strategyCtx, scancel := context.WithTimeout(ctx, 10*time.Minute) // §59.300 附十八
 	defer scancel()
 
 	var meta model.TorrentMetadata
