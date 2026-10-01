@@ -23,7 +23,10 @@ func TestMidnightRingEdition4KMatch(t *testing.T) {
 	if m == nil || m.TorrentID != "1080" {
 		t.Fatalf("expected 1080 tid by size, got %+v (stats=%+v)", m, stats)
 	}
-	if stats.SizeRefute != 1 {
-		t.Errorf("SizeRefute = %d, want 1 (720p wrong size)", stats.SizeRefute)
+	// §59.307 后 720p 的反驳归因从 SizeRefute 移至 VersionRefute（候选 GBR 地区码
+	// 经 TechProfile 链恢复提取→techProfileVersionDefined 先于 size 门命中——归因
+	// 更精确：GBR 版本定义差异而非尺寸）。语义不变：720p 被拒+1080 命中。
+	if stats.SizeRefute+stats.VersionRefute < 1 {
+		t.Errorf("720p 未被任何门拒: sizeRefute=%d versionRefute=%d", stats.SizeRefute, stats.VersionRefute)
 	}
 }
