@@ -26,6 +26,7 @@ func ParseTitleTech(title string) TechProfile {
 	if p.EditionInfo == "" && p.ReleaseVersion != "" {
 		p.EditionInfo = p.ReleaseVersion
 	}
+	p.RegionCode = tc.RegionCode // §59.307: TechProfileFromTitle 曾漏拷（ParseTitle 提取链有效值直传）
 	p.SourceType, p.Specification = splitMedium(tc.Medium)
 	// §59.226 附九: ST 反哺派生——流媒体平台词非空 ∧ ST 空 → ST="WEB"
 	// （"Movie.1080p.NF.DDP5.1" 平台词直接当源形态——平台词本身证明 WEB
