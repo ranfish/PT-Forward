@@ -346,10 +346,13 @@ func inferHDRTagsFromMI(s titleparser.MISections, tags []string) []string {
 	}
 	if hasHDR10Plus {
 		out = append(out, "hdr10_plus")
-	} else if hasDoVi && strings.Contains(hdr, "dvhe.08") {
-		// Profile 8 = DV+HDR10 双层（BL+RPU——MI 尾段 HDR10 兼容层）。
+	} else if hasDoVi && (strings.Contains(hdr, "dvhe.08") || strings.Contains(hdr, "dvhe.07")) {
+		// Profile 7/8 = DV+HDR10 双层（BL 兼容层 HDR10——MI 尾段
+		// "SMPTE ST 2086, Version HDR10, HDR10 compatible" 明示）。
 		// §59.154：P9 摘出双勾组——Dolby Profiles v1.5 官方表 P9=8-bit AVC+SDR 兼容
-		// （标志 dvav.09；不勾 hdr10，仅 DV），与 P8 语义不同。
+		// （标志 dvav.09；不勾 hdr10，仅 DV），与 P7/P8 语义不同。
+		// §59.306：P7 补线——UHD 原盘 Remux（dvhe.07.06 BL+EL+RPU）BL 同为 HDR10
+		// 兼容，曾仅 P8 特例致中南海保镖 P7 Remux 未勾 HDR10（幸运种审拒绝）。
 		out = append(out, "hdr10")
 	} else if hasHDR10 && !hasDoVi {
 		out = append(out, "hdr10")
