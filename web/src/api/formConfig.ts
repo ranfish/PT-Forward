@@ -113,17 +113,20 @@ export const executeApi = {
   siteBatchActiveAll() {
     return client.get<ApiResponse<SiteBatchTask[] | null>>('/publish/seeds/site-batch-progress?active=1')
   },
-  execute(infoHash: string, targetSite: string, opts?: { dryRun?: boolean; tagOverrides?: string[]; anonymous?: boolean; pushOnly?: boolean; torrentId?: string; pushClientId?: string; pushSavePath?: string }) {
-    return client.post<ApiResponse<{ result: ExecuteResult }>>('/publish/seeds/execute', {
+  execute(infoHash: string, targetSite: string, opts?: { dryRun?: boolean; tagOverrides?: string[]; anonymous?: boolean; pushOnly?: boolean; torrentId?: string; pushClientId?: string | number; pushSavePath?: string }) {
+    // 空可选字段不发送：push_client_id 后端为 uint，空串会致 JSON 解码失败
+    // （曾被"必填"文案掩盖——DryRun 400 案）
+    const body: Record<string, unknown> = {
       info_hash: infoHash,
       target_site: targetSite,
       dry_run: opts?.dryRun ?? true,
       tag_overrides: opts?.tagOverrides ?? [],
       anonymous: opts?.anonymous ?? false,
       push_only: opts?.pushOnly ?? false,
-      torrent_id: opts?.torrentId ?? '',
-      push_client_id: opts?.pushClientId ?? '',
-      push_save_path: opts?.pushSavePath ?? '',
-    })
+    }
+    if (opts?.torrentId) body.torrent_id = opts.torrentId
+    if (opts?.pushClientId !== undefined && opts.pushClientId !== '') body.push_client_id = opts.pushClientId
+    if (opts?.pushSavePath) body.push_save_path = opts.pushSavePath
+    return client.post<ApiResponse<{ result: ExecuteResult }>>('/publish/seeds/execute', body)
   },
 }

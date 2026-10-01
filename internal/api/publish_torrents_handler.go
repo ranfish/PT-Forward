@@ -4591,7 +4591,12 @@ func (h *PublishTorrentsHandler) handleExecutePublish(w http.ResponseWriter, r *
 		PushClientID uint     `json:"push_client_id"`
 		PushSavePath string   `json:"push_save_path"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InfoHash == "" || req.TargetSite == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// DryRun 400 案教训：解码失败曾被"必填"文案掩盖（push_client_id 空串入 uint）
+		Error(w, http.StatusBadRequest, 40002, "请求体解码失败: "+err.Error())
+		return
+	}
+	if req.InfoHash == "" || req.TargetSite == "" {
 		Error(w, http.StatusBadRequest, 40001, "info_hash 与 target_site 必填")
 		return
 	}
