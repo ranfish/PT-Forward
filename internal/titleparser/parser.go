@@ -1,6 +1,9 @@
 package titleparser
 
 import (
+	"embed"
+	"encoding/json"
+	"sync"
 	"sync/atomic"
 	"fmt"
 	"regexp"
@@ -98,6 +101,7 @@ func ParseTitle(title string) TitleComponents {
 	title = strings.TrimSpace(title)
 	// 制作组
 	c.ReleaseGroup = extractGroup(title)
+	c.ReleaseGroupFull = extractGroupFull(title, c.ReleaseGroup)
 	title = removeGroupSuffix(title, c.ReleaseGroup)
 
 	// 剩余部分 = 无法识别（§59.97 定案: 年份右侧技术区残余不回填主标题——
@@ -625,6 +629,58 @@ func hasMediaDIY(title string) bool {
 		}
 	}
 	return false
+}
+
+// groupQualifierList §59.303 组名源限定前缀词表（group_qualifier.json，
+// 朋友站观察——MNHD=BD 源/mUHD=UHD 源，数据化可扩展）。
+//go:embed group_qualifier.json
+var groupQualifierFS embed.FS
+
+var (
+	groupQualifiersOnce sync.Once
+	groupQualifiers     []string
+)
+
+func groupQualifierList() []string {
+	groupQualifiersOnce.Do(func() {
+		data, err := groupQualifierFS.ReadFile("group_qualifier.json")
+		if err != nil {
+			return
+		}
+		var lex struct {
+			Qualifiers []struct {
+				Token string `json:"token"`
+			} `json:"qualifiers"`
+		}
+		if json.Unmarshal(data, &lex) == nil {
+			for _, q := range lex.Qualifiers {
+				if q.Token != "" {
+					groupQualifiers = append(groupQualifiers, q.Token)
+				}
+			}
+		}
+	})
+	return groupQualifiers
+}
+
+// extractGroupFull §59.303 组名源限定全段——标题尾部 qualifier 分隔符 纯组名
+// 命中时返回**原标题原样片段**（大小写忠实：mUHD-FRDS 保持小写 m）；无限定
+// 前缀时与纯组名相等（@FRDS 成员署名 extractGroup @ 锚本返全段，两值一致）。
+func extractGroupFull(title, group string) string {
+	if group == "" {
+		return group
+	}
+	escapedGroup := regexp.QuoteMeta(group)
+	for _, q := range groupQualifierList() {
+		re, err := regexp.Compile(`(?i)\b` + regexp.QuoteMeta(q) + `[-_.]` + escapedGroup + `\b`)
+		if err != nil {
+			continue
+		}
+		if m := re.FindString(title); m != "" {
+			return m // 原样片段（大小写忠实）
+		}
+	}
+	return group
 }
 
 func extractGroup(title string) string {

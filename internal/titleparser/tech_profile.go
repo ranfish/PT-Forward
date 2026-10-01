@@ -20,6 +20,10 @@ type TechProfile struct {
 	RegionCode     string `json:"region_code"`     // 6. 地区码（ITA/USA/JPN，仅原盘类）
 	SourcePlatform string `json:"source_platform"` // 7. 内容分发方（NF/AMZN/DSNP）
 	ReleaseGroup   string `json:"release_group"`   // 17. 制作组
+	// §59.303 组名源限定全段（如 MNHD-FRDS/mUHD-FRDS）——仅重组标题消费（忠实
+	// 原意：限定词=压制源标记非组名）；Tab1/簇识别/映射等下游一律读 ReleaseGroup
+	// （纯组名）。@FRDS 成员署名两值相等（extractGroup @ 锚本返全段）
+	ReleaseGroupFull string `json:"release_group_full,omitempty"`
 	Stereo3D       string `json:"stereo_3d"`       // 19. 3D 封装（HSBS/HOU/SBS/OU——§59.197 仅标题解析；双显异值=不同封装形态）
 	ChinesePrefix  string `json:"chinese_prefix"`  // 18. 中文名前缀 [中文名]
 
@@ -152,6 +156,7 @@ func TechProfileFromTitle(c TitleComponents) TechProfile {
 		BitDepth:        c.BitDepth,
 		AudioCodec:      c.AudioCodec,
 		ReleaseGroup:    c.ReleaseGroup,
+		ReleaseGroupFull: c.ReleaseGroupFull,
 		ChinesePrefix:   c.ChinesePrefix,
 		Medium:          c.Medium,
 	}
@@ -175,6 +180,7 @@ func TechProfileToComponents(p TechProfile) TitleComponents {
 		BitDepth:       p.BitDepth,
 		AudioCodec:     p.AudioCodec,
 		ReleaseGroup:   p.ReleaseGroup,
+		ReleaseGroupFull: p.ReleaseGroupFull,
 		ChinesePrefix:  p.ChinesePrefix,
 	}
 }

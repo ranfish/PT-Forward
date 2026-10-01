@@ -48,7 +48,21 @@ func ParseTitleTech(title string) TechProfile {
 // HOU/H-OU/Half-OU→HOU；裸 SBS/OU 独立值（半幅/全幅不同封装）。
 // 300勇士案：站内同资源 HSBS/HOU 两版同体积同组——无此字段则验证链全盲、
 // 结果顺序定生死（HOU 在前即错配注入，piece hash 不匹配 recheck 失败）。
+//
+// §59.303 位置约束：v1.05 规范 stereo_3d 槽位于 source_type/specification
+// 之后（技术段）。主标题区的词（拼音名 "Zhan Hou Wang" 的 Hou 经 h-前缀
+// 零分隔分支误命中→HOU→"BluRay HOU x265" 重组污染，丁丁战猴王案）不得
+// 提取。techZoneStart 定位首个技术 token（年份/分辨率/媒介/规格/平台），
+// 仅在其后扫描；无技术 token → 不提取（3D 无技术词不现实）。
 var reStereo3D = regexp.MustCompile(`(?i)\b(?:half[-_.\s]?|h[-_.\s]?)?(sbs|ou)\b`)
+
+// reTechZoneStart 技术段起点探测（年份/分辨率/媒介/规格/平台词首现位置）。
+var reTechZoneStart = regexp.MustCompile(`(?i)\b(?:` +
+	`(?:19|20)\d{2}\b` + // 年份
+	`|(?:4320|2160|1440|1080|720|576|480)p` + // 分辨率
+	`|uhd\.?blu.?ray|bluray|blu-?ray|web-?dl|webrip|hdtv|dvdrip|dvd|hddvd` + // 媒介/规格
+	`|remux|x264|x265|h264|h265|hevc|avc|av1|xvid` + // 规格/编码
+	`)`)
 
 // streamingPlatformSet §59.226 附九: 流媒体平台 canonical 集（电视台族
 // BBC/HBO/AMC 等不在内——HDTV 广播语义）。platform.json 的 requires="web"
@@ -67,7 +81,13 @@ func isStreamingPlatform(platform string) bool {
 }
 
 func extractStereo3D(title string) string {
-	for _, m := range reStereo3D.FindAllStringSubmatch(title, -1) {
+	// §59.303 技术段约束：仅技术 token 之后扫描（主标题区不提取）
+	loc := reTechZoneStart.FindStringIndex(title)
+	if loc == nil {
+		return ""
+	}
+	zone := title[loc[0]:]
+	for _, m := range reStereo3D.FindAllStringSubmatch(zone, -1) {
 		full := strings.ToLower(m[0])
 		switch strings.ToUpper(m[1]) {
 		case "SBS":
