@@ -18,6 +18,7 @@ type TitleComponents struct {
 	BitDepth        string `json:"bit_depth"`         // 色深 (8bit/10bit)
 	AudioCodec      string `json:"audio_codec"`       // 音频编码 (DTS-HD MA/TrueHD)
 	ReleaseGroup    string `json:"release_group"`     // 制作组 (CMCT/PTer)
+	ReleaseGroupFull string `json:"release_group_full,omitempty"` // §59.303 源限定全段（MNHD-FRDS——仅重组消费）
 	Unrecognized    string `json:"unrecognized"`      // 无法识别的部分
 	ChinesePrefix   string `json:"chinese_prefix"`    // [中文名] 前缀
 }

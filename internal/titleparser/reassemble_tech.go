@@ -207,6 +207,10 @@ func getFieldValueFromTechProfile(p TechProfile, field string, tf TitleFormat) s
 	case "audio_tracks":
 		return audioCountWord(p.AudioTracks, tf.AudioCountSuffix)
 	case "group":
+		// §59.303 源限定全段优先（忠实原意：MNHD-FRDS/mUHD-FRDS 标题直出）
+		if p.ReleaseGroupFull != "" {
+			return p.ReleaseGroupFull
+		}
 		return p.ReleaseGroup
 	case "release_version":
 		return p.ReleaseVersion

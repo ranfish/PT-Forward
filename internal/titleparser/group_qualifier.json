@@ -1,0 +1,17 @@
+{
+ "_meta": {
+  "note": "§59.303 组名源限定前缀词表——重组标题忠实保留全段（MNHD=BD 源/mUHD=UHD 源），Tab1 制作组取纯组名。朋友站观察（用户实证），可扩展"
+ },
+ "qualifiers": [
+  {
+   "token": "MNHD",
+   "meaning": "压制源 Blu-ray",
+   "origin": "朋友站"
+  },
+  {
+   "token": "mUHD",
+   "meaning": "压制源 UHD Blu-ray",
+   "origin": "朋友站"
+  }
+ ]
+}
