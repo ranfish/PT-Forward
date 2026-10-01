@@ -10,6 +10,7 @@
 package publish
 
 import (
+	"strconv"
 	"github.com/ranfish/pt-forward/internal/metadata"
 	"github.com/ranfish/pt-forward/internal/ptgen"
 	"bytes"
@@ -255,7 +256,18 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// §59.254 项1: PTGen 第四源合并（year 校正+main_title 兜底+mismatch 可观测）
 	// ——输入按端点感知链准备：aka 启发式（零请求）→ &imdb 二连（仅兜底触发）
 	e.mergePTGenSource(ctx, &tp, meta)
-	// §59.166 B2：发布标题重组同源——ReassembleFromTechProfile(tp) 为权威（MI 纠错
+	// §59.308 完结季包季集归一（A tags complete 主通道 + B PTGen episodes 加强）——
+	// 海的开始案：源站 RSS "S01E01-S01E10" 区间形态被幸运种审抓尾判单集
+	// （TAGS_COMPLETE_NO_SERIES_ALLOWED 90 分拒）；v1.05 单季合集权威=S01
+	tagsComplete := strings.Contains(meta.Tags, "\"complete\"")
+	ptgenEps := 0
+	if src, err := metadata.UnmarshalPTGenSource(meta.PTGenSourceJSON); err == nil && src != nil {
+		if v, perr := strconv.Atoi(strings.TrimSpace(src.Episodes)); perr == nil {
+			ptgenEps = v
+		}
+	}
+	tp.SeasonEpisode = titleparser.NormalizeSeasonPack(tp.SeasonEpisode, tagsComplete, ptgenEps)
+	// §59.166 B2：发布标题重组同源——ReassembleFromTechProfile(tp) 为权威（MI 纭错
 	// 终态，Arco 案 DTS-HD MA→DDP 发布时自动纠对存量错标题）。
 	// §59.254 项4 D 终案：重组空=四层全灭（三源+PTGen 兜底后仍缺损）——拒发+精准引导
 	// （预览链展示且警示不拒——预览本身即发布前检查工具）。

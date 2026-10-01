@@ -15,6 +15,34 @@ import (
 //   - "bit_depth" 字段按 v1.05 规则（仅 AVC 系 10bit 输出 Hi10P）
 //
 // 不支持 site hook（hook 绑定 TitleComponents，如需 hook 继续用 Reassemble）。
+// NormalizeSeasonPack §59.308: 完结季包季集归一——源站 RSS 常用全季区间形态
+// "S01E01-S01E10"（v1.05 分集区间形态），幸运种审正则抓尾 token 判"单集 E10"→
+// TAGS_COMPLETE_NO_SERIES_ALLOWED（海的开始案 90 分拒）。v1.05 权威：单季合集=S01。
+// 通道 A（tags 含 complete——副标题"全N集"/源站 tag 提取，完结声明权威在标签域）
+// 或通道 B（ptgenEpisodes>0 且区间 E01 起、末集=总集数——PTGen 数据加强）命中时，
+// E01 起始的集区间归一为纯季号。真分集包（非 E01 起）不动。
+func NormalizeSeasonPack(se string, tagsComplete bool, ptgenEpisodes int) string {
+	if se == "" {
+		return se
+	}
+	// 匹配 SxxEyy(-SxxEyy | -Eyy) 形态且起始 E01
+	m := reSeasonRangeStartE01.FindStringSubmatch(se)
+	if m == nil {
+		return se
+	}
+	if !tagsComplete && !(ptgenEpisodes > 0 && sameAtoi(m[2], ptgenEpisodes)) {
+		return se
+	}
+	return m[1] // 纯季号 S01
+}
+
+var reSeasonRangeStartE01 = regexp.MustCompile(`^(S\d+)E01(?:-S?\d*E?(\d+))$`)
+
+func sameAtoi(s string, n int) bool {
+	v, err := strconv.Atoi(s)
+	return err == nil && v == n
+}
+
 func ReassembleFromTechProfile(p TechProfile, tf TitleFormat) string {
 	if tf.SkipReassemble {
 		return ""
