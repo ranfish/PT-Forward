@@ -85,13 +85,10 @@ func (i *MediaTagInferer) InferFull(in TagInput) []string {
 			tags = append(tags, st)
 		}
 	}
-	// §59.151 附7: 英语标签条件产出（lucky TAGS_MISSING_ENGLISH_AUDIO 实证——
-	// 纯英语种无国语/粤语/中字时必须产 lucky_english_audio）。
-	// Buried.Alive.1990 探针：勾英语→100；不勾→TAGS_MISSING_ENGLISH_AUDIO 扣分
-	if containsStr(tags, "english_audio") && !containsStr(tags, "chinese_audio") &&
-		!containsStr(tags, "cantonese_audio") && !containsStr(tags, "chinese_subtitle") {
-		tags = append(tags, "lucky_english_audio")
-	}
+	// §59.151 附7（§59.304 修订）: 原此处追加内部标记 lucky_english_audio——被追加
+	// 的前提即 english_audio 已在 tags（纯冗余），且落库+Tab1 展示污染（无 dict 词条
+	// 显示代码、与"英语"重复显示——Life.Unexpected 案用户报）。站规判定单点收敛到
+	// executor.luckptEnglishTagValue（预检/DryRun/上传三链同源），本处不再产标记。
 	hasHB, hasHF := inferNumericSpecTagsSections(miSec)
 	// §59.70: 高分——豆瓣评分 ≥8.0（Description 源——PTGen 简介行，
 	// "◎豆瓣评分　8.2/10"；无评分/暂无评分不命中）

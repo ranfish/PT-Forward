@@ -416,11 +416,17 @@ func TestInferHDRTagsFromMI(t *testing.T) {
 // Buried.Alive.1990（纯英语 FLAC/PGS-EN）探针：勾→100 / 不勾→WARN 扣分
 func TestLuckyEnglishAudioConditional(t *testing.T) {
 	inf := NewMediaTagInferer()
-	// 场景1 纯英语（Buried Alive 形态）：Audio English + Text English → lucky_english_audio
+	// 场景1 纯英语（Buried Alive 形态）：Audio English + Text English → english_audio
+	// §59.304 修订：inferer 不再产 lucky_english_audio 内部标记（落库+Tab1 展示污染，
+	// Life.Unexpected 案）——站规判定单点收敛 executor.luckptEnglishTagValue，
+	// 此处断言条件前提（english_audio 存在且无华语区标签）
 	mi1 := "Audio #1\nFormat : FLAC\nLanguage : English\nText #1\nLanguage : English\n"
 	tags1 := inf.InferFull(TagInput{MediaInfo: mi1, Title: "Buried Alive 1990"})
-	if !containsStr(tags1, "lucky_english_audio") {
-		t.Errorf("纯英语种应产 lucky_english_audio, got %v", tags1)
+	if !containsStr(tags1, "english_audio") {
+		t.Errorf("纯英语种应产 english_audio, got %v", tags1)
+	}
+	if containsStr(tags1, "chinese_audio") || containsStr(tags1, "cantonese_audio") || containsStr(tags1, "chinese_subtitle") {
+		t.Errorf("纯英语种不应有华语区标签, got %v", tags1)
 	}
 	// 场景2 英语音轨+中文字幕（爱情抓马形态）→ 不产
 	mi2 := mi1 + "Text #2\nLanguage : Chinese\n"

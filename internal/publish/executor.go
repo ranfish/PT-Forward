@@ -444,6 +444,22 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	applier.Apply(tags, func(field, value string) {
 		pubReq.TagArrayFields = append(pubReq.TagArrayFields, model.TagKV{Key: field, Value: value})
 	})
+	// §59.304 上传链补线：站规注入的英语标签（auto:false 不在 tagCfg.Tags——构建
+	// 时被跳过，applier.Apply 永不投递）与预检/DryRun 的 applied 数组分叉——
+	// DryRun 100 分但实投缺标签→站方审核脚本 TAGS_MISSING_ENGLISH_AUDIO
+	// （Life.Unexpected 案：英语音轨无华语区标签，站规必选英语）。同源直投。
+	if v := luckptEnglishTagValue(cfg, in.TargetSite, meta, tags); v != "" {
+		dup := false
+		for _, kv := range pubReq.TagArrayFields {
+			if kv.Value == v {
+				dup = true
+				break
+			}
+		}
+		if field := cfg.FormFields[model.FieldDomainTags]; !dup && field != "" {
+			pubReq.TagArrayFields = append(pubReq.TagArrayFields, model.TagKV{Key: field, Value: v})
+		}
+	}
 
 	adapter, aErr := e.pipe.siteProvider.GetAdapter(ctx, in.TargetSite)
 	if aErr != nil {
