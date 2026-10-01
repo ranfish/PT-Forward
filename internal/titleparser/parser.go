@@ -107,6 +107,12 @@ func ParseTitle(title string) TitleComponents {
 	// 剩余部分 = 无法识别（§59.97 定案: 年份右侧技术区残余不回填主标题——
 	// 边界左侧全是片名、右侧全是技术词，无词性猜测；HKG/ITA 走 RegionCode extractor）
 	if mainLocked != "" {
+		// §59.305: 年份锚锁定段尾版式词剥除——"Wicked.City.4K.REMASTERED.1987"
+		// 形态中 4K REMASTERED 是 edition_info（v1.05 槽序 year 前），曾直通
+		// 主标题→重组 "Main 4K REMASTERED ... 4K Remaster" 相邻槽重复（妖兽都市
+		// 案幸运拒绝）。editionPatterns 全表扫（中文版式词同剥——副标题声明路径
+		// 已归一 EditionInfo，双通道收敛）。
+		mainLocked = stripTrailingEditionTokens(mainLocked)
 		c.MainTitle = SplitAKATitle(mainLocked) // §59.290: AKA 双名切分（锁定名同切）
 		_, c.Unrecognized = extractMainAndUnrecognized(title)
 	} else {
@@ -203,6 +209,33 @@ func padE(num string) string {
 // 锚 = 第一个「季集 token」或「后随技术词的年份 token」（位置最先者）;
 // 双年份取最后技术跟随者（§59.97《2046》）。
 // 返回 (seasonEpisode, year, remaining, mainLocked)。
+// stripTrailingEditionTokens §59.305: 锚定主标题段尾版式词剥除——editionPatterns
+// 全表扫描命中即从段中移除（"Wicked City 4K REMASTERED"→"Wicked City"；版式语义
+// 由 EditionInfo 通道承载，主标题槽不承载版式词——v1.05 槽序权威）。
+func stripTrailingEditionTokens(main string) string {
+	work := main
+	stripRe := func(re *regexp.Regexp) {
+		for {
+			loc := re.FindStringIndex(work)
+			if loc == nil {
+				break
+			}
+			work = strings.TrimSpace(work[:loc[0]] + " " + work[loc[1]:])
+		}
+	}
+	for _, p := range editionPatterns {
+		stripRe(p.re)
+	}
+	// §59.305 附: 发布版本词族（REPACK/PROPER/RERIP——走 ReleaseVersion 通道，
+	// 不在 editionPatterns；To.Live.REPACK 案 Main 残留+Edition 槽双现同型）
+	stripRe(regexp.MustCompile(`(?i)\b(?:REPACK\d*|PROPER\d*|RERIP)\b`))
+	work = strings.Join(strings.Fields(work), " ")
+	if work == "" {
+		return main
+	}
+	return work
+}
+
 func extractBoundaryAnchor(title string) (se, year, remaining, mainLocked string) {
 	// 季集 token 位置
 	seLoc := reSeasonEpisode.FindStringIndex(title)
