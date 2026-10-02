@@ -118,7 +118,10 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		Logic                string `json:"logic"`
 		Conditions           string `json:"conditions"`
 		Action               string `json:"action"`
-		DeleteNum            int    `json:"delete_num"`
+		// §59.313: 指针形态区分"未填"与"显式 0"——0=不限是合法语义（引擎
+		// rule_evaluator DeleteNum>0 才截断；前端提示"0=不限"）。曾用 int 零值
+		// 强改 1（创建假 1/编辑正常的不对称根因——update 走 map presence）
+		DeleteNum            *int   `json:"delete_num"`
 		Expr                 string `json:"expr"`
 		FitTime              int    `json:"fit_time"`
 		LimitSpeedBytes      int64  `json:"limit_speed_bytes"`
@@ -152,7 +155,6 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 		Logic:                req.Logic,
 		Conditions:           req.Conditions,
 		Action:               req.Action,
-		DeleteNum:            req.DeleteNum,
 		Expr:                 req.Expr,
 		FitTime:              req.FitTime,
 		LimitSpeedBytes:      req.LimitSpeedBytes,
@@ -171,8 +173,10 @@ func (h *DeleteRuleHandler) handleCreate(w http.ResponseWriter, r *http.Request)
 	if rule.Action == "" {
 		rule.Action = "delete"
 	}
-	if rule.DeleteNum == 0 {
-		rule.DeleteNum = 1
+	if req.DeleteNum != nil {
+		rule.DeleteNum = *req.DeleteNum
+	} else {
+		rule.DeleteNum = 1 // 未填默认 1（gorm default tag 仅 DDL 层，ForceCreate 零值直插不走 tag）
 	}
 
 	if err := dbimpl.ForceCreate(h.db, &rule); err != nil {
