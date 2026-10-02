@@ -96,21 +96,24 @@ func (h *OrphanHandler) handleScan(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 
-	orphans, err := h.scanner.Scan(ctx)
+	res, err := h.scanner.ScanWithSkip(ctx)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, 50001, "扫描失败: "+err.Error())
 		return
 	}
+	orphans := res.Orphans
 
 	h.mu.Lock()
 	h.lastResults = orphans
+	h.lastSkipped = res.SkippedPaths
 	h.scannedAt = time.Now()
 	h.mu.Unlock()
 
 	Success(w, map[string]interface{}{
-		"orphans":    orphans,
-		"count":      len(orphans),
-		"scanned_at": h.scannedAt,
+		"orphans":       orphans,
+		"count":         len(orphans),
+		"scanned_at":    h.scannedAt,
+		"skipped_paths": res.SkippedPaths, // §59.314 客户端不可达跳过的路径（UI 警示）
 	})
 }
 
