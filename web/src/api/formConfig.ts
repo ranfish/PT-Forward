@@ -70,6 +70,7 @@ export interface ExecuteResult {
   pre_audit?: { passed: boolean; totalScore: number; details?: Array<{ ruleType: string; errorCode: string; message: string; level: string }> } | null
   form?: Record<string, string>
   form_labels?: Record<string, string> // §59.310: 字段名→"域名 · 值label" 可读化
+  tag_assets?: string[] // §59.311: 标签资产（canonical 键——Tab1 ③ 同源）
   tags?: string[]
   upload?: { torrent_id?: string; detail_url?: string } | null
   target_torrent_url?: string

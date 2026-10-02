@@ -28,7 +28,7 @@
           :loading="loading"
           @click="runDryRun"
         >
-          预检（DryRun 适配工具·不落站）
+          预检（不落站·仅组装校验）
         </a-button>
         <a-button :disabled="!selectedSites.length || loading" type="primary" :loading="loading" @click="runBatch">
           {{ loading ? '发布中…' : `发布（${selectedSites.length || 0} 站）` }}
@@ -62,7 +62,8 @@
           <span>{{ result?.form_labels?.[k] || k }}</span><b>{{ valueLabel(k, String(v)) }}</b>
         </div>
       </div>
-      <p v-if="result?.tags?.length" class="muted">tags: {{ result?.tags?.join(', ') }}</p>
+      <p v-if="result?.tag_assets?.length" class="muted">标签资产：{{ result.tag_assets.join('、') }}</p>
+      <p v-if="result?.tags?.length" class="muted">标签投递：{{ result.tags.join('、') }}</p>
 
       <!-- §59.166 LocalAudit 内部规范提示（advisory——与幸运预检并列的信息源） -->
       <template v-if="result?.local_audit?.length">
@@ -234,7 +235,10 @@ const alertTitle = computed(() => {
   const pa = result.value.pre_audit
   if (s === 'pushed') return '已发布+已加种'
   if (s === 'uploaded') return '已上传（加种未确认）'
-  if (s === 'dry_run_ok') return `DryRun 预检${pa?.passed ? '通过' : '未通过'}（${pa?.totalScore ?? 0} 分）`
+  if (s === 'dry_run_ok') {
+    if (!pa) return '预检完成（该站无官方预检接口，仅本地组装校验）'
+    return `预检${pa.passed ? '通过' : '未通过'}${pa.totalScore > 0 ? `（${pa.totalScore} 分）` : ''}`
+  }
   return `失败：${s}`
 })
 </script>
