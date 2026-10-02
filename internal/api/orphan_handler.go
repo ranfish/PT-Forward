@@ -27,6 +27,7 @@ type OrphanHandler struct {
 
 	mu           sync.RWMutex
 	lastResults  []orphan.Entry
+	lastSkipped  []string
 	scannedAt    time.Time
 	recoverStore sync.Map
 	recoverSeq   atomic.Int64
@@ -118,9 +119,10 @@ func (h *OrphanHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	defer h.mu.RUnlock()
 
 	Success(w, map[string]interface{}{
-		"orphans":    h.lastResults,
-		"count":      len(h.lastResults),
-		"scanned_at": h.scannedAt,
+		"orphans":       h.lastResults,
+		"count":         len(h.lastResults),
+		"scanned_at":    h.scannedAt,
+		"skipped_paths": h.lastSkipped, // §59.314
 	})
 }
 
