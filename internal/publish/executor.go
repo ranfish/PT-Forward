@@ -380,11 +380,31 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	}
 	form[cfg.FormFields[model.FieldDomainDescription]] = assembleDescription(meta, cfg)
 
+	// §59.309: TagArrayFields 前置构建（上传 tags 真相源——预检与 pubReq 同一产物，
+	// 按构造同源。原预检消费 applied 表示层（值反查 label miss 静默丢）+上传独立
+	// applier.Apply=双链分叉三案病根：§59.304 英语注入、§59.308 标题、本次审计）
+	var tagArrayFields []model.TagKV
+	applier.Apply(tags, func(field, value string) {
+		tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: value})
+	})
+	if v := luckptEnglishTagValue(cfg, in.TargetSite, meta, tags); v != "" {
+		dup := false
+		for _, kv := range tagArrayFields {
+			if kv.Value == v {
+				dup = true
+				break
+			}
+		}
+		if field := cfg.FormFields[model.FieldDomainTags]; !dup && field != "" {
+			tagArrayFields = append(tagArrayFields, model.TagKV{Key: field, Value: v})
+		}
+	}
+
 	// ⑦ pre-audit（§59.159 六轮定案：适配工具非发布门控——结果记录不阻断；
 	// 历史：§59.150"passed 才提交"为单站验证期设计，多站架构下门控语义不成立）
 	var preAudit *PreAuditResult
 	if cfg.PreAuditURL != "" {
-		if pa, errMsg := e.callPreAudit(ctx, &site, cfg, meta, form, jobs, applied); pa != nil {
+		if pa, errMsg := e.callPreAudit(ctx, &site, cfg, meta, form, jobs, tagArrayFields, publishTitle); pa != nil {
 			preAudit = pa
 		} else {
 			preAudit = &PreAuditResult{Passed: false, TotalScore: -1,
@@ -443,26 +463,9 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 		TargetSite:  in.TargetSite,
 		ClientUID: rv.ClientUID,
 	}
-	// tags 写入表单（checkbox 数组=同名字段重复——§59.156 TagArrayFields 通道）
-	applier.Apply(tags, func(field, value string) {
-		pubReq.TagArrayFields = append(pubReq.TagArrayFields, model.TagKV{Key: field, Value: value})
-	})
-	// §59.304 上传链补线：站规注入的英语标签（auto:false 不在 tagCfg.Tags——构建
-	// 时被跳过，applier.Apply 永不投递）与预检/DryRun 的 applied 数组分叉——
-	// DryRun 100 分但实投缺标签→站方审核脚本 TAGS_MISSING_ENGLISH_AUDIO
-	// （Life.Unexpected 案：英语音轨无华语区标签，站规必选英语）。同源直投。
-	if v := luckptEnglishTagValue(cfg, in.TargetSite, meta, tags); v != "" {
-		dup := false
-		for _, kv := range pubReq.TagArrayFields {
-			if kv.Value == v {
-				dup = true
-				break
-			}
-		}
-		if field := cfg.FormFields[model.FieldDomainTags]; !dup && field != "" {
-			pubReq.TagArrayFields = append(pubReq.TagArrayFields, model.TagKV{Key: field, Value: v})
-		}
-	}
+	// §59.309: tags 复用前置构建的 TagArrayFields（预检与上传同一产物——
+	// checkbox 数组=同名字段重复 §59.156 通道；§59.304 站规注入已在构建段）
+	pubReq.TagArrayFields = tagArrayFields
 
 	adapter, aErr := e.pipe.siteProvider.GetAdapter(ctx, in.TargetSite)
 	if aErr != nil {
@@ -983,7 +986,8 @@ func (e *PublishExecutor) assembleTags(cfg *model.PublishFormConfig, meta *model
 
 // callPreAudit 幸运官方预检（§59.150 请求结构——dryrun_luck.py 实调验证 166/166）。
 func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cfg *model.PublishFormConfig,
-	meta *model.TorrentMetadata, form map[string]string, jobs []domainJob, appliedTagValues []string) (*PreAuditResult, string) {
+	meta *model.TorrentMetadata, form map[string]string, jobs []domainJob, tagArrayFields []model.TagKV,
+	auditName string) (*PreAuditResult, string) {
 
 	type idName struct {
 		ID   string `json:"id"`
@@ -1002,10 +1006,14 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 		ExportTime    string   `json:"export_time,omitempty"`
 		PageURL       string   `json:"page_url,omitempty"`
 	}
-	auditName, auditOK := e.preAuditTitle(meta)
-	if !auditOK {
-		// §59.254 项4：预检同拒（DryRun 正是发现问题的工具）
-		return nil, "标题重组失败：数据不完整——重新获取数据后再预检"
+	// §59.309: 预检 name 消费主管线产物（publishTitle 直传——按构造同源）；
+	// 空串=主管线重组失败的兜底场景（真实路径已在上游 fail，此处防御降级）
+	if auditName == "" {
+		fallback, ok := e.preAuditTitle(meta)
+		if !ok {
+			return nil, "标题重组失败：数据不完整——重新获取数据后再预检"
+		}
+		auditName = fallback
 	}
 	body := auditBody{
 		Name:          auditName,
@@ -1035,13 +1043,17 @@ func (e *PublishExecutor) callPreAudit(ctx context.Context, site *model.Site, cf
 		body.Type = &idNameWithMode{ID: t.ID, Name: t.Name, Mode: mode}
 		delete(body.Quality, model.FieldDomainType)
 	}
-	// tags：值反查 label
-	for _, v := range appliedTagValues {
+	// §59.309: tags 消费上传真相源 TagArrayFields（同一产物按构造同源）；
+	// label 反查 miss 不丢（label=value 兜底——原 applied 表示层静默丢的分叉防）
+	for _, kv := range tagArrayFields {
+		name := kv.Value
 		for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
-			if m.Value == v {
-				body.Tags = append(body.Tags, idName{ID: m.Value, Name: m.Label})
+			if m.Value == kv.Value {
+				name = m.Label
+				break
 			}
 		}
+		body.Tags = append(body.Tags, idName{ID: kv.Value, Name: name})
 	}
 
 	if site.UserID > 0 || site.Username != "" {
