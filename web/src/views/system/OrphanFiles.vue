@@ -328,7 +328,13 @@ async function scan() {
     if (data.code === 0) {
       orphans.value = (data.data.orphans || []).map((o: OrphanEntry) => ({ ...o, _selectedClient: o.client_uids?.[0] }))
       scannedAt.value = new Date(data.data.scanned_at)
-      message.success(`${data.data.count} ${t('orphan.itemsFound')}`)
+      // §59.314: 跳过路径警示——客户端不可达时曾静默 count:0 误导"无孤儿"
+      const skipped: string[] = data.data.skipped_paths || []
+      if (skipped.length > 0) {
+        message.warning(`扫描完成：${data.data.count} ${t('orphan.itemsFound')}，但 ${skipped.length} 条路径因下载器不可达被跳过`)
+      } else {
+        message.success(`${data.data.count} ${t('orphan.itemsFound')}`)
+      }
     } else {
       message.error(data.message || 'Scan failed')
     }

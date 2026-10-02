@@ -39,15 +39,36 @@ func (s *Scanner) loadScanConfigs() {
 	s.db.Where("enabled = ?", true).Find(&s.scanConfigs)
 }
 
+// ScanResult §59.314: Orphans + SkippedPaths（客户端不可达被跳过的路径清单——
+// 可观测化：曾静默 count:0 致用户误判"无孤儿"实为全路径跳过，28 案 14 路径
+// 因 tr 18k 种 RPC 超时全 skip）。
+type ScanResult struct {
+	Orphans      []Entry
+	SkippedPaths []string
+}
+
 func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
+	res, err := s.scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return res.Orphans, nil
+}
+
+// ScanWithSkip §59.314: 完整形态（孤儿 + 跳过路径）——handler 消费。
+func (s *Scanner) ScanWithSkip(ctx context.Context) (*ScanResult, error) {
+	return s.scan(ctx)
+}
+
+func (s *Scanner) scan(ctx context.Context) (*ScanResult, error) {
 	if s.provider == nil {
-		return nil, nil
+		return &ScanResult{}, nil
 	}
 
 	s.loadScanConfigs()
 
 	if len(s.scanConfigs) == 0 {
-		return nil, nil
+		return &ScanResult{}, nil
 	}
 
 	// 只查询配置的下载器（不遍历全部下载器）
@@ -85,6 +106,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 
 	// 第二遍：只扫描配置的路径，用配置 client 的种子构建 claimed
 	var allOrphans []Entry
+	var skippedPaths []string
 	for _, cfg := range s.scanConfigs {
 		sp := filepath.Clean(cfg.ScanPath)
 
@@ -93,6 +115,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			s.logger.Warn("orphan scan: configured client unreachable, skipping path",
 				zap.String("path", sp),
 				zap.Uint("client", cfg.ClientUID))
+			skippedPaths = append(skippedPaths, sp)
 			continue
 		}
 
@@ -102,8 +125,10 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 			claimedNames[name] = true
 		}
 
+		before := len(allOrphans)
 		orphans := s.scanDirectory(sp, claimedNames, []uint{cfg.ClientUID}, allSavePaths)
 		allOrphans = append(allOrphans, orphans...)
+		_ = before
 
 		s.logger.Debug("orphan scan: configured path scanned",
 			zap.String("path", sp),
@@ -114,9 +139,10 @@ func (s *Scanner) Scan(ctx context.Context) ([]Entry, error) {
 
 	s.logger.Info("orphan scan completed",
 		zap.Int("orphans", len(allOrphans)),
-		zap.Int("configured_paths", len(s.scanConfigs)))
+		zap.Int("configured_paths", len(s.scanConfigs)),
+		zap.Int("skipped_paths", len(skippedPaths)))
 
-	return allOrphans, nil
+	return &ScanResult{Orphans: allOrphans, SkippedPaths: skippedPaths}, nil
 }
 
 var skipSuffixes = []string{".!qb", ".parts", ".tmp"}
