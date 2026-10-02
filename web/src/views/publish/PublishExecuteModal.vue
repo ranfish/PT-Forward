@@ -62,7 +62,6 @@
           <span>{{ result?.form_labels?.[k] || k }}</span><b>{{ valueLabel(k, String(v)) }}</b>
         </div>
       </div>
-      <p v-if="result?.tag_assets?.length" class="muted">标签资产：{{ result.tag_assets.join('、') }}</p>
       <p v-if="result?.tags?.length" class="muted">标签投递：{{ result.tags.map((v, i) => result?.tags_labels?.[i] || v).join('、') }}</p>
 
       <!-- §59.166 LocalAudit 内部规范提示（advisory——与幸运预检并列的信息源） -->
