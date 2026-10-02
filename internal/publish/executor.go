@@ -82,6 +82,9 @@ type ExecuteResult struct {
 	// §59.310: 字段名→友好展示（"域名 · 值label"）——audiocodec_sel[4]=12 →
 	// "音频编码 · DTS"（form 键是站方字段名+值是站方枚举值，用户不可读）
 	FormLabels map[string]string `json:"form_labels,omitempty"`
+	// §59.311: 标签资产（canonical 键——Tab1 ③ 同源 meta.Tags；区别于 tags 字段
+	// 的站方枚举值形态。用户语义定案：弹窗=系统计算资产+按站投递双通道展示）
+	TagAssets []string `json:"tag_assets,omitempty"`
 	Tags     []string          `json:"tags,omitempty"`
 	Upload   *model.PublishResponse `json:"upload,omitempty"`
 	LocalAudit []LocalAuditFinding  `json:"local_audit,omitempty"` // §59.166 内部规范提示（advisory）
@@ -432,7 +435,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// 预检未通过不阻断 dry_run：预检修正循环数据源）
 	if in.DryRun {
 		res := &ExecuteResult{Status: "dry_run_ok", Form: form, Tags: applied, PreAudit: preAudit, LocalAudit: localFindings,
-			FormLabels: buildFormLabels(cfg, form)}
+			FormLabels: buildFormLabels(cfg, form),
+			TagAssets: parseTagsAssets(meta.Tags)}
 		if preAudit != nil && !preAudit.Passed {
 			res.Message = "预检未通过（dry_run 不阻断）"
 		}
@@ -1175,6 +1179,18 @@ func (e *PublishExecutor) preAuditTitle(meta *model.TorrentMetadata) (string, bo
 		return rt, true
 	}
 	return "", false
+}
+
+// parseTagsAssets §59.311: meta.Tags JSON 数组 → canonical 键列表（Tab1 ③ 同源）。
+func parseTagsAssets(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var arr []string
+	if err := json.Unmarshal([]byte(raw), &arr); err != nil {
+		return nil
+	}
+	return arr
 }
 
 // buildFormLabels §59.310: DryRun 表单组装可读化——字段名（站方 input name）反查
