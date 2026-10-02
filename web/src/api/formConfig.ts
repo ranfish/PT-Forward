@@ -71,6 +71,7 @@ export interface ExecuteResult {
   form?: Record<string, string>
   form_labels?: Record<string, string> // §59.310: 字段名→"域名 · 值label" 可读化
   tag_assets?: string[] // §59.311: 标签资产（canonical 键——Tab1 ③ 同源）
+  tags_labels?: string[] // §59.312: 标签投递 label（与 tags 索引对齐）
   tags?: string[]
   upload?: { torrent_id?: string; detail_url?: string } | null
   target_torrent_url?: string

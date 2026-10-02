@@ -63,14 +63,14 @@
         </div>
       </div>
       <p v-if="result?.tag_assets?.length" class="muted">标签资产：{{ result.tag_assets.join('、') }}</p>
-      <p v-if="result?.tags?.length" class="muted">标签投递：{{ result.tags.join('、') }}</p>
+      <p v-if="result?.tags?.length" class="muted">标签投递：{{ result.tags.map((v, i) => result?.tags_labels?.[i] || v).join('、') }}</p>
 
       <!-- §59.166 LocalAudit 内部规范提示（advisory——与幸运预检并列的信息源） -->
       <template v-if="result?.local_audit?.length">
         <h4>内部规范提示（不阻塞）</h4>
         <div v-for="(la, i) in result.local_audit" :key="i" class="pa-detail warn">
           <a-tag color="orange">WARN</a-tag>
-          <span class="code">{{ la.code }}</span> {{ la.message }}
+          <span class="code">{{ auditCodeName(la.code) }}</span> {{ la.message }}
         </div>
       </template>
       <div class="actions">
@@ -110,6 +110,23 @@ const batchResults = ref<Array<{ site: string; status: string; message?: string;
 const tagOverrides = ref<string[]>([])
 const loading = ref(false)
 const result = ref<ExecuteResult | null>(null)
+
+// §59.312: 内部规范 code → 中文短名（人工预检可读；原 code 悬浮 title 保留）
+const AUDIT_CODE_NAMES: Record<string, string> = {
+  LOCAL_MEDIUM_UNMAPPED: '媒介未映射',
+  LOCAL_STANDARD_UNMAPPED: '规格未映射',
+  LOCAL_AUDIO_UNMAPPED: '音频未映射',
+  LOCAL_TITLE_REASSEMBLED: '标题重组',
+  LOCAL_TAG_OVERRIDE_NO_EVIDENCE: '标签改判无据',
+  LOCAL_TITLE_NON_ASCII: '标题含中文',
+  LOCAL_SUBTITLE_EMPTY: '副标题为空',
+  LOCAL_MEDIAINFO_EMPTY: 'MI 为空',
+  LOCAL_IMAGES_INSUFFICIENT: '图量不足',
+  LOCAL_IMDB_EMPTY: 'IMDb 为空',
+  LOCAL_BANNED_GROUP: '禁发布组',
+  LOCAL_TITLE_WORD_FORM: '标题词形',
+}
+const auditCodeName = (code: string): string => AUDIT_CODE_NAMES[code] || code
 
 // §59.310: 表单值可读化——下拉域显示站方 label（form_labels 尾段），文本域原值
 const valueLabel = (field: string, value: string): string => {
