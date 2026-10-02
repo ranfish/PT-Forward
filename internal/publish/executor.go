@@ -85,6 +85,9 @@ type ExecuteResult struct {
 	// §59.311: 标签资产（canonical 键——Tab1 ③ 同源 meta.Tags；区别于 tags 字段
 	// 的站方枚举值形态。用户语义定案：弹窗=系统计算资产+按站投递双通道展示）
 	TagAssets []string `json:"tag_assets,omitempty"`
+	// §59.312: 标签投递可读化——tags 枚举值 → 站方 label（与 tags 索引对齐；
+	// 投递 6/10 → 完结/英语——预检人工查看语义）
+	TagsLabels []string `json:"tags_labels,omitempty"`
 	Tags     []string          `json:"tags,omitempty"`
 	Upload   *model.PublishResponse `json:"upload,omitempty"`
 	LocalAudit []LocalAuditFinding  `json:"local_audit,omitempty"` // §59.166 内部规范提示（advisory）
@@ -436,7 +439,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	if in.DryRun {
 		res := &ExecuteResult{Status: "dry_run_ok", Form: form, Tags: applied, PreAudit: preAudit, LocalAudit: localFindings,
 			FormLabels: buildFormLabels(cfg, form),
-			TagAssets: parseTagsAssets(meta.Tags)}
+			TagAssets: parseTagsAssets(meta.Tags),
+			TagsLabels: buildTagsLabels(cfg, applied)}
 		if preAudit != nil && !preAudit.Passed {
 			res.Message = "预检未通过（dry_run 不阻断）"
 		}
@@ -1191,6 +1195,26 @@ func parseTagsAssets(raw string) []string {
 		return nil
 	}
 	return arr
+}
+
+// buildTagsLabels §59.312: 标签投递值→站方 label（ValueMappings 反查；
+// miss 兜底原值——与 tags 索引对齐）。
+func buildTagsLabels(cfg *model.PublishFormConfig, applied []string) []string {
+	if cfg == nil || len(applied) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(applied))
+	for _, v := range applied {
+		label := v
+		for _, m := range cfg.ValueMappings[model.FieldDomainTags] {
+			if m.Value == v {
+				label = m.Label
+				break
+			}
+		}
+		out = append(out, label)
+	}
+	return out
 }
 
 // buildFormLabels §59.310: DryRun 表单组装可读化——字段名（站方 input name）反查
