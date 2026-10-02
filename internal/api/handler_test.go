@@ -9307,3 +9307,53 @@ func TestScheduler_HandleTrigger_NotFound(t *testing.T) {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// §59.313 创建规则 delete_num 显式 0 不得强改 1（0=不限——曾 int 零值假 1，
+// 用户 29 实证：创建填 0 落库变 1/编辑正常——update 走 map presence 的不对称）
+func TestDeleteRuleCreate_ExplicitZeroDeleteNum(t *testing.T) {
+	env := setupTestEnv(t)
+
+	getNum := func(id int) int {
+		w := env.doRequest("GET", "/api/v1/seeding/delete-rules/"+fmt.Sprint(id), nil)
+		var resp struct {
+			Data struct {
+				DeleteNum int `json:"delete_num"`
+			} `json:"data"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		return resp.Data.DeleteNum
+	}
+
+	// 显式 0 → 落库 0
+	w := env.doRequest("POST", "/api/v1/seeding/delete-rules", map[string]any{
+		"alias": "t-zero", "enabled": false, "type": "normal", "logic": "and",
+		"conditions": "", "action": "delete", "delete_num": 0,
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("create0: %d %s", w.Code, w.Body.String())
+	}
+	var r0 struct {
+		Data struct {
+			ID int `json:"id"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &r0)
+	if got := getNum(r0.Data.ID); got != 0 {
+		t.Errorf("显式 0 被强改: delete_num=%d want 0", got)
+	}
+
+	// 未填 → 默认 1
+	w = env.doRequest("POST", "/api/v1/seeding/delete-rules", map[string]any{
+		"alias": "t-def", "enabled": false, "type": "normal", "logic": "and",
+		"conditions": "", "action": "delete",
+	})
+	var r1 struct {
+		Data struct {
+			ID int `json:"id"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &r1)
+	if got := getNum(r1.Data.ID); got != 1 {
+		t.Errorf("未填未保默认 1: delete_num=%d", got)
+	}
+}
