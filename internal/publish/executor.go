@@ -79,6 +79,9 @@ type ExecuteResult struct {
 	Message  string `json:"message"`
 	PreAudit *PreAuditResult   `json:"pre_audit,omitempty"`
 	Form     map[string]string `json:"form,omitempty"` // 组装产物（DryRun 供人工核对）
+	// §59.310: 字段名→友好展示（"域名 · 值label"）——audiocodec_sel[4]=12 →
+	// "音频编码 · DTS"（form 键是站方字段名+值是站方枚举值，用户不可读）
+	FormLabels map[string]string `json:"form_labels,omitempty"`
 	Tags     []string          `json:"tags,omitempty"`
 	Upload   *model.PublishResponse `json:"upload,omitempty"`
 	LocalAudit []LocalAuditFinding  `json:"local_audit,omitempty"` // §59.166 内部规范提示（advisory）
@@ -428,7 +431,8 @@ func (e *PublishExecutor) Execute(ctx context.Context, in ExecuteInput) *Execute
 	// DryRun 检查点：组装+渲染+预检之后、上传之前（§59.156——完整表单形态验证，
 	// 预检未通过不阻断 dry_run：预检修正循环数据源）
 	if in.DryRun {
-		res := &ExecuteResult{Status: "dry_run_ok", Form: form, Tags: applied, PreAudit: preAudit, LocalAudit: localFindings}
+		res := &ExecuteResult{Status: "dry_run_ok", Form: form, Tags: applied, PreAudit: preAudit, LocalAudit: localFindings,
+			FormLabels: buildFormLabels(cfg, form)}
 		if preAudit != nil && !preAudit.Passed {
 			res.Message = "预检未通过（dry_run 不阻断）"
 		}
@@ -1171,6 +1175,59 @@ func (e *PublishExecutor) preAuditTitle(meta *model.TorrentMetadata) (string, bo
 		return rt, true
 	}
 	return "", false
+}
+
+// buildFormLabels §59.310: DryRun 表单组装可读化——字段名（站方 input name）反查
+// 域中文名 + 值（站方枚举 value）反查 label（ValueMappings 全域扫）。
+// "audiocodec_sel[4]"="12" → "音频编码 · DTS"；文本域（无枚举）只带域名。
+func buildFormLabels(cfg *model.PublishFormConfig, form map[string]string) map[string]string {
+	if cfg == nil || len(form) == 0 {
+		return nil
+	}
+	// 域中文名（domain → 中文）
+	domainNames := map[string]string{
+		model.FieldDomainType: "类型", model.FieldDomainStandard: "规格",
+		model.FieldDomainCodec: "编码", model.FieldDomainAudiocodec: "音频编码",
+		model.FieldDomainTeam: "制作组", model.FieldDomainMedium: "媒介",
+		model.FieldDomainSmallDescr: "副标题", model.FieldDomainDescription: "简介",
+		model.FieldDomainTechInfo: "技术信息", model.FieldDomainIMDBURL: "IMDb",
+		model.FieldDomainPTGen: "豆瓣链接", model.FieldDomainDoubanURL: "豆瓣链接",
+		model.FieldDomainCNName: "中文名", model.FieldDomainUplver: "匿名发布",
+	}
+	// 字段名 → 域名（FormFields 反查）
+	fieldToDomain := map[string]string{}
+	for domain, field := range cfg.FormFields {
+		if field != "" {
+			fieldToDomain[field] = domain
+		}
+	}
+	out := make(map[string]string, len(form))
+	for field, value := range form {
+		domain, ok := fieldToDomain[field]
+		if !ok {
+			continue // 站方特有字段无域名（如 url_[r]）——保留原键展示
+		}
+		dn := domainNames[domain]
+		if dn == "" {
+			dn = domain
+		}
+		// 值 → label（下拉域）
+		if ms, ok := cfg.ValueMappings[domain]; ok {
+			for _, m := range ms {
+				if m.Value == value {
+					out[field] = dn + " · " + m.Label
+					break
+				}
+			}
+		}
+		if out[field] == "" {
+			out[field] = dn
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // normalizeSeasonPackOf §59.308: 完结季包季集归一单点——A 通道（meta.Tags 含
