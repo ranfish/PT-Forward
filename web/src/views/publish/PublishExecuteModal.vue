@@ -58,8 +58,8 @@
       </template>
       <h4 style="margin-top: 12px">表单组装（{{ Object.keys(result?.form || {}).length }} 域）</h4>
       <div class="form-grid">
-        <div v-for="(v, k) in result?.form" :key="k" class="kv">
-          <span>{{ k }}</span><b>{{ String(v).slice(0, 40) }}</b>
+        <div v-for="(v, k) in result?.form" :key="k" class="kv" :title="`${k} = ${String(v).slice(0, 80)}`">
+          <span>{{ result?.form_labels?.[k] || k }}</span><b>{{ valueLabel(k, String(v)) }}</b>
         </div>
       </div>
       <p v-if="result?.tags?.length" class="muted">tags: {{ result?.tags?.join(', ') }}</p>
@@ -109,6 +109,16 @@ const batchResults = ref<Array<{ site: string; status: string; message?: string;
 const tagOverrides = ref<string[]>([])
 const loading = ref(false)
 const result = ref<ExecuteResult | null>(null)
+
+// §59.310: 表单值可读化——下拉域显示站方 label（form_labels 尾段），文本域原值
+const valueLabel = (field: string, value: string): string => {
+  const fl = result.value?.form_labels?.[field]
+  if (fl) {
+    const idx = fl.indexOf(' · ')
+    if (idx >= 0) return fl.slice(idx + 3)
+  }
+  return value.length > 40 ? value.slice(0, 40) : value
+}
 
 watch(
   () => props.open,

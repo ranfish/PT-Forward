@@ -69,6 +69,7 @@ export interface ExecuteResult {
   local_audit?: LocalAuditFinding[]
   pre_audit?: { passed: boolean; totalScore: number; details?: Array<{ ruleType: string; errorCode: string; message: string; level: string }> } | null
   form?: Record<string, string>
+  form_labels?: Record<string, string> // §59.310: 字段名→"域名 · 值label" 可读化
   tags?: string[]
   upload?: { torrent_id?: string; detail_url?: string } | null
   target_torrent_url?: string
