@@ -75,10 +75,6 @@
             <template #icon><CloudSyncOutlined /></template>
             <span>{{ t('nav.cookiecloud') }}</span>
           </a-menu-item>
-          <a-menu-item key="/ptgen" @click="$router.push('/ptgen')">
-            <template #icon><VideoCameraOutlined /></template>
-            <span>{{ t('nav.ptgen') }}</span>
-          </a-menu-item>
           <a-menu-item key="/lifecycle" @click="$router.push('/lifecycle')">
             <template #icon><HeartOutlined /></template>
             <span>{{ t('nav.lifecycle') }}</span>
