@@ -3005,14 +3005,27 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	// §59.316 附 C: 域收紧 name → 紧键 (client,path,name)——与 §59.44 资源视图
 	// 权威口径统一；同名跨下载器/跨路径簇不再互相借数据（假 ready 消除）。
 	// 同簇内跨站 hash 三元组一致不受影响（H1/§59.38 语义保持）。
-	clusterTriples := make([][]interface{}, 0, len(snapshots))
+	// 回归审核修复: 行值 IN 用【值列表展开】在 2.4w 簇规模下 3 占位符/元组
+	// 超 mattn SQLITE_MAX_VARIABLE_NUMBER(32766)——"too many SQL variables"
+	// 且错误被吞=全表静默 unfetched（29 实证 rows:0）。改保留行 ID 子查询
+	// （参数量=len(snapshots)，与旧 name IN 同量级同上限）。
+	snapIDs := make([]uint, 0, len(snapshots))
 	for _, s := range snapshots {
-		clusterTriples = append(clusterTriples, []interface{}{s.ClientUID, s.SavePath, s.Name})
+		snapIDs = append(snapIDs, s.ID)
 	}
+	keySub := h.db.WithContext(r.Context()).
+		Table("torrent_snapshots").
+		Select("client_uid, save_path, name").
+		Where("id IN ?", snapIDs)
 	var metas []model.TorrentMetadata
-	h.db.WithContext(r.Context()).
-		Where("info_hash IN (SELECT hash FROM torrent_snapshots WHERE (client_uid, save_path, name) IN ? AND is_hidden = 0)", clusterTriples).
-		Find(&metas)
+	if err := h.db.WithContext(r.Context()).
+		Where("info_hash IN (SELECT hash FROM torrent_snapshots WHERE (client_uid, save_path, name) IN (?) AND is_hidden = 0)", keySub).
+		Find(&metas).Error; err != nil {
+		if h.logger != nil {
+			h.logger.Error("listSeeds metas join failed", zap.Error(err))
+		}
+		metas = nil
+	}
 
 	// 3. 按紧键三元组关联 metadata（§59.29: 同簇所有 hash 的 metadata 行，
 	// 解决去重保留行与 metadata 行 hash 不一致时丢数据 §59.28 H1）
