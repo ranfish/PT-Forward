@@ -3000,31 +3000,37 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 	}
 
 	// 2. 收集 hash → 查 metadata（§59.29 性能：2.2w hash 的 IN 查询过慢，
-	// 改为子查询 JOIN——同名资源的所有站点 hash 的 metadata 一并取出，
+	// 改为子查询 JOIN——同簇资源的所有站点 hash 的 metadata 一并取出，
 	// 解决去重保留行 hash 与 metadata 行 hash 不一致时丢数据的问题（§59.28 H1））
-	nameList := make([]string, len(snapshots))
-	for i, s := range snapshots {
-		nameList[i] = s.Name
+	// §59.316 附 C: 域收紧 name → 紧键 (client,path,name)——与 §59.44 资源视图
+	// 权威口径统一；同名跨下载器/跨路径簇不再互相借数据（假 ready 消除）。
+	// 同簇内跨站 hash 三元组一致不受影响（H1/§59.38 语义保持）。
+	clusterTriples := make([][]interface{}, 0, len(snapshots))
+	for _, s := range snapshots {
+		clusterTriples = append(clusterTriples, []interface{}{s.ClientUID, s.SavePath, s.Name})
 	}
 	var metas []model.TorrentMetadata
 	h.db.WithContext(r.Context()).
-		Where("info_hash IN (SELECT hash FROM torrent_snapshots WHERE name IN ? AND is_hidden = 0)", nameList).
+		Where("info_hash IN (SELECT hash FROM torrent_snapshots WHERE (client_uid, save_path, name) IN ? AND is_hidden = 0)", clusterTriples).
 		Find(&metas)
 
-	// 3. 按 name 关联 metadata（§59.29: name → 同名所有 hash 的 metadata 行，
+	// 3. 按紧键三元组关联 metadata（§59.29: 同簇所有 hash 的 metadata 行，
 	// 解决去重保留行与 metadata 行 hash 不一致时丢数据 §59.28 H1）
-	// §59.38 修复: nameByHash 域放宽到 (client,path) 全部活跃行（原 rawSnapshots
+	// §59.38 修复: tripleByHash 域放宽到 (client,path) 全部活跃行（原 rawSnapshots
 	// 是分组去重保留行——同资源多变体场景 metadata 挂在非保留行上时映射丢失，
 	// 列表假阴性标 unfetched。H1 只放宽了 metas 查询没放宽映射域，半修）
-	nameByHash := make(map[string]string, len(rawSnapshots)*2)
+	// §59.316 附 C: 键值 name → triple key（与 copyCountByKey 同格式）
+	tripleByHash := make(map[string]string, len(rawSnapshots)*2)
 	{
-		var hashNameRows []struct {
-			Hash string
-			Name string
+		var hashKeyRows []struct {
+			Hash      string
+			ClientUID uint
+			SavePath  string
+			Name      string
 		}
 		hashQ := h.db.WithContext(r.Context()).
 			Table("torrent_snapshots").
-			Select("hash, name").
+			Select("hash, client_uid, save_path, name").
 			Where("is_hidden = ? AND name != ''", false)
 		if clientUID != 0 {
 			hashQ = hashQ.Where("client_uid = ?", clientUID)
@@ -3033,18 +3039,18 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			hashQ = hashQ.Where("save_path = ?", savePath)
 		}
 		if search != "" {
-			// §59.138: nameByHash 域同步搜索域（CJK 三域/拉丁 name——漏则假阴性）
+			// §59.138: tripleByHash 域同步搜索域（CJK 三域/拉丁 name——漏则假阴性）
 			hashQ = hashQ.Where(strings.Join(searchConds, " "), searchArgs...)
 		}
-		hashQ.Find(&hashNameRows)
-		for _, r := range hashNameRows {
-			nameByHash[r.Hash] = r.Name
+		hashQ.Find(&hashKeyRows)
+		for _, r := range hashKeyRows {
+			tripleByHash[r.Hash] = fmt.Sprintf("%d|%s|%s", r.ClientUID, r.SavePath, r.Name)
 		}
 	}
-	metaByName := make(map[string][]model.TorrentMetadata, len(snapshots))
+	metaByCluster := make(map[string][]model.TorrentMetadata, len(snapshots))
 	for _, m := range metas {
-		if name, ok := nameByHash[m.InfoHash]; ok {
-			metaByName[name] = append(metaByName[name], m)
+		if key, ok := tripleByHash[m.InfoHash]; ok {
+			metaByCluster[key] = append(metaByCluster[key], m)
 		}
 	}
 
@@ -3088,9 +3094,12 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 			"save_path": snap.SavePath,
 		}
 
-		// 查找源站行 metadata（按 name 关联，含同名兄弟 hash 的行）
+		// §59.316 附 C: 紧键三元组（map 键与 metas 子查询同口径）
+		clusterKey := fmt.Sprintf("%d|%s|%s", snap.ClientUID, snap.SavePath, snap.Name)
+
+		// 查找源站行 metadata（按紧键关联，含同簇兄弟 hash 的行）
 		var meta *model.TorrentMetadata
-		if metas, ok := metaByName[snap.Name]; ok && len(metas) > 0 {
+		if metas, ok := metaByCluster[clusterKey]; ok && len(metas) > 0 {
 			meta = h.selectSourceMeta(metas)
 		}
 
@@ -3153,7 +3162,7 @@ func (h *PublishTorrentsHandler) handleListSeeds(w http.ResponseWriter, r *http.
 		}
 		item["copy_count"] = cc
 		siteSet := make(map[string]bool)
-		for _, m := range metaByName[snap.Name] {
+		for _, m := range metaByCluster[clusterKey] {
 			if m.SiteName != "" {
 				siteSet[m.SiteName] = true
 			}
@@ -4229,23 +4238,32 @@ func (h *PublishTorrentsHandler) handleDeleteSeed(w http.ResponseWriter, r *http
 		return
 	}
 
-	// 查该 hash 的 name → 同名全部 hash
-	var name string
-	_ = h.db.WithContext(r.Context()). //nolint:gosec // Row().Scan 容错——无行 → 空名走 sibling 分支
+	// 查该 hash 的紧键三元组 → 同簇（(client,path,name) 一致）全部 hash
+	var ck struct {
+		ClientUID uint
+		SavePath  string
+		Name      string
+	}
+	hasCluster := true
+	if err := h.db.WithContext(r.Context()). //nolint:gosec // Row().Scan 容错——无行 → 走直删分支
 						Table("torrent_snapshots").
-						Select("name").
-						Where("hash = ? AND name != ''", infoHash).
-						Limit(1).
-						Row().Scan(&name) //nolint:errcheck // 同上 //nolint:errcheck,gosec // 无行/扫描失败 → 空名（资源级清除走 sibling 分支）
+		Select("client_uid, save_path, name").
+		Where("hash = ? AND name != ''", infoHash).
+		Limit(1).
+		Row().Scan(&ck.ClientUID, &ck.SavePath, &ck.Name); err != nil { //nolint:errcheck // 同上
+		hasCluster = false
+	}
 
 	result := h.db.WithContext(r.Context()).Where("info_hash = ?", infoHash).Delete(&model.TorrentMetadata{})
-	if name != "" {
-		// 资源级：删同名全部 hash 的 metadata（含代表 hash 自身，幂等）
+	if hasCluster {
+		// 资源级（§59.26 语义保持）：删同簇全部 hash 的 metadata（含代表 hash 自身，幂等）。
+		// §59.316 附 D: 域收紧 name → 紧键 (client,path,name)——同名跨下载器/跨路径
+		// 簇不再被连坐清除（数据跟随紧键资源，与 §59.44 权威口径统一）
 		var siblingHashes []string
 		h.db.WithContext(r.Context()).
 			Table("torrent_snapshots").
 			Select("hash").
-			Where("name = ?", name).
+			Where("client_uid = ? AND save_path = ? AND name = ?", ck.ClientUID, ck.SavePath, ck.Name).
 			Find(&siblingHashes)
 		if len(siblingHashes) > 0 {
 			result = h.db.WithContext(r.Context()).
