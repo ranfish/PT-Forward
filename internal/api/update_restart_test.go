@@ -166,3 +166,66 @@ func TestSiteBatchCurTitleClusterResolution(t *testing.T) {
 		t.Errorf("回退直查应命中, got %q", got)
 	}
 }
+
+// §59.316 附 C: 列表紧键域——同名跨下载器簇不互相借数据（B 簇无元数据 →
+// unfetched，不再借 A 簇 meta 显示假 ready）；同簇兄弟 hash 正常命中（H1 保持）。
+func TestListSeedsTightClusterScope(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop(),
+		resourceResolver: publish.NewResourceResolver(db)}
+	Zeros := func(n int) string { return strings.Repeat("0", n) }
+	// 簇 A（client 1 /v）：代表 hash 仅快照，元数据挂兄弟 hash（漂移簇）
+	db.Create(&model.TorrentSnapshot{Hash: "a" + "rep" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023"})
+	db.Create(&model.TorrentSnapshot{Hash: "a" + "sib" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023"})
+	db.Create(&model.TorrentMetadata{InfoHash: "a" + "sib" + Zeros(36), SiteName: "A", Title: "T", Poster: "p", Description: "d", Screenshots: `["u"]`, Tags: `["x"]`, MediaInfo: "mi", DoubanURL: "https://d", Reviewed: true})
+	// 簇 B（client 2 /w）：同名、无任何元数据
+	db.Create(&model.TorrentSnapshot{Hash: "b" + "rep" + Zeros(36), ClientUID: 2, SavePath: "/w", Name: "shared.name.2023"})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/publish/seeds?page=1&page_size=50", nil)
+	rec := httptest.NewRecorder()
+	h.handleListSeeds(rec, req)
+	var resp struct {
+		Data struct {
+			Items []map[string]interface{} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	stByClient := map[uint]interface{}{}
+	for _, it := range resp.Data.Items {
+		stByClient[uint(it["client_id"].(float64))] = it["status"]
+	}
+	if s := stByClient[1]; s != "reviewed" {
+		t.Errorf("簇 A（漂移代表+兄弟元数据）应为 reviewed, got %v", s)
+	}
+	if s := stByClient[2]; s != "unfetched" {
+		t.Errorf("簇 B（同名跨下载器无元数据）应为 unfetched——不得借用簇 A 数据, got %v", s)
+	}
+}
+
+// §59.316 附 D: 清除紧键域——删簇 A 代表 hash 只清 A 簇，同名簇 B 元数据保留。
+func TestDeleteSeedTightScope(t *testing.T) {
+	db := clusterTestDB(t)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	Zeros := func(n int) string { return strings.Repeat("0", n) }
+	db.Create(&model.TorrentSnapshot{Hash: "a" + "rep" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023"})
+	db.Create(&model.TorrentSnapshot{Hash: "a" + "sib" + Zeros(36), ClientUID: 1, SavePath: "/v", Name: "shared.name.2023"})
+	db.Create(&model.TorrentMetadata{InfoHash: "a" + "sib" + Zeros(36), SiteName: "A", Title: "T"})
+	db.Create(&model.TorrentSnapshot{Hash: "b" + "rep" + Zeros(36), ClientUID: 2, SavePath: "/w", Name: "shared.name.2023"})
+	db.Create(&model.TorrentMetadata{InfoHash: "b" + "rep" + Zeros(36), SiteName: "B", Title: "T"})
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/publish/seeds/"+"a"+"rep"+Zeros(36), nil)
+	rec := httptest.NewRecorder()
+	h.handleDeleteSeed(rec, req)
+
+	var n int64
+	db.Model(&model.TorrentMetadata{}).Where("info_hash = ?", "a"+"sib"+Zeros(36)).Count(&n)
+	if n != 0 {
+		t.Errorf("簇 A 兄弟元数据应被清除: %d", n)
+	}
+	db.Model(&model.TorrentMetadata{}).Where("info_hash = ?", "b"+"rep"+Zeros(36)).Count(&n)
+	if n != 1 {
+		t.Errorf("同名簇 B 元数据不应连坐清除: %d", n)
+	}
+}
