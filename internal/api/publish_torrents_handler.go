@@ -241,8 +241,6 @@ func (h *PublishTorrentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		h.handleUpdateGroupMapping(w, r)
 	case strings.Contains(path, "/publish/torrents/group-mappings/") && r.Method == http.MethodDelete:
 		h.handleDeleteGroupMapping(w, r)
-	case strings.HasSuffix(path, "/publish/cached-sites") && r.Method == http.MethodGet:
-		h.handleCachedSites(w, r)
 	case strings.HasSuffix(path, "/publish/seed-data") && r.Method == http.MethodGet:
 		h.handleListSeedData(w, r)
 	case strings.HasSuffix(path, "/publish/seed-data/batch-review") && r.Method == http.MethodPost:
@@ -1605,49 +1603,6 @@ func inferTypeFromName(name string) string {
 
 	// 默认电影
 	return "category.movie"
-}
-
-// handleCachedSites §56.37: 查询 info_hash 在 torrent_metadata 中已缓存的源站列表。
-// 用于 CrossSeedPanel 的源站选择器（遗漏 E：源站切换）。
-func (h *PublishTorrentsHandler) handleCachedSites(w http.ResponseWriter, r *http.Request) {
-	infoHash := r.URL.Query().Get("info_hash")
-	if infoHash == "" {
-		Error(w, http.StatusBadRequest, 40001, "info_hash 必填")
-		return
-	}
-
-	var metas []model.TorrentMetadata
-	h.db.WithContext(r.Context()).
-		Where("info_hash = ?", infoHash).
-		Select("id", "site_name", "torrent_id", "reviewed", "fetched_at", "subtitle", "title").
-		Find(&metas)
-
-	type cachedSite struct {
-		ID        uint   `json:"id"`
-		SiteName  string `json:"siteName"`
-		TorrentID string `json:"torrentId"`
-		Reviewed  bool   `json:"reviewed"`
-		FetchedAt string `json:"fetchedAt"`
-		Title     string `json:"title"`
-		Subtitle  string `json:"subtitle"`
-	}
-	sites := make([]cachedSite, 0, len(metas))
-	for _, m := range metas {
-		sites = append(sites, cachedSite{
-			ID:        m.ID,
-			SiteName:  m.SiteName,
-			TorrentID: m.TorrentID,
-			Reviewed:  m.Reviewed,
-			FetchedAt: m.FetchedAt.Format("2006-01-02 15:04"),
-			Title:     m.Title,
-			Subtitle:  m.Subtitle,
-		})
-	}
-
-	Success(w, map[string]interface{}{
-		"info_hash": infoHash,
-		"sites":     sites,
-	})
 }
 
 // handleListSeedData §56.37: /publish/seed-data 列表（torrent_metadata 已 review 的记录）。
@@ -4849,13 +4804,8 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 				case <-time.After(time.Duration(interval) * time.Second):
 				}
 			}
-			// 当前种标题（进度显示——DB 快查，失败留空）
-			curTitle := ""
-			var m model.TorrentMetadata
-			if err := h.db.WithContext(ctx).Select("title").
-				Where("info_hash = ?", hash).First(&m).Error; err == nil {
-				curTitle = m.Title
-			}
+			// 当前种标题（进度显示——§59.316 附 A: 簇口径解析，失败留空）
+			curTitle := h.siteBatchCurTitle(ctx, hash)
 			h.siteBatch.mu.Lock()
 			task.CurrentTitle = curTitle
 			h.siteBatch.mu.Unlock()
@@ -4925,6 +4875,24 @@ func (h *PublishTorrentsHandler) handleExecuteSiteBatch(w http.ResponseWriter, r
 	}()
 
 	Success(w, map[string]any{"task_id": taskID, "total": len(req.InfoHashes), "interval_seconds": interval})
+}
+
+// siteBatchCurTitle §59.316 附 A: 批量发布进度标题——簇口径解析（ResourceResolver
+// 紧键 (client,path,name)+hidden 兜底）。原直查 info_hash 在簇代表换站后失配→
+// 漂移簇进度标题恒空（243 八连案同族残留）。resolver 未注入（测试）回退直查。
+func (h *PublishTorrentsHandler) siteBatchCurTitle(ctx context.Context, hash string) string {
+	if h.resourceResolver != nil {
+		if rv := h.resourceResolver.ResolveResource(ctx, hash); rv != nil && rv.Meta != nil {
+			return rv.Meta.Title
+		}
+		return ""
+	}
+	var m model.TorrentMetadata
+	if err := h.db.WithContext(ctx).Select("title").
+		Where("info_hash = ?", hash).First(&m).Error; err == nil {
+		return m.Title
+	}
+	return ""
 }
 
 // finishSiteBatch 收尾（解锁同站互斥+终态时间戳）。

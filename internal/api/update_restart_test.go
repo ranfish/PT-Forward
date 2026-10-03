@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ranfish/pt-forward/internal/model"
+	"github.com/ranfish/pt-forward/internal/publish"
 	"go.uber.org/zap"
 )
 
@@ -139,5 +140,29 @@ func TestBatchReviewClusterResolution(t *testing.T) {
 	db.Model(&model.TorrentMetadata{}).Where("info_hash = ? AND reviewed = 1", "othhash000000000000000000000000000000000").Count(&n)
 	if n != 0 {
 		t.Errorf("无关簇不应受牵连: %d", n)
+	}
+}
+
+// §59.316 附 A: 批量发布进度标题簇口径解析——代表 hash 直查在漂移簇失配（标题空），
+// ResourceResolver 紧键圈簇后命中兄弟 hash 元数据。
+func TestSiteBatchCurTitleClusterResolution(t *testing.T) {
+	db := clusterTestDB(t)
+	rep := "rep" + strings.Repeat("0", 37)
+	sib := "sib" + strings.Repeat("0", 37)
+	h := &PublishTorrentsHandler{db: db, logger: zap.NewNop(),
+		resourceResolver: publish.NewResourceResolver(db)}
+	db.Create(&model.TorrentSnapshot{Hash: rep, ClientUID: 1, SavePath: "/v", Name: "n"})
+	db.Create(&model.TorrentSnapshot{Hash: sib, ClientUID: 1, SavePath: "/v", Name: "n"})
+	db.Create(&model.TorrentMetadata{InfoHash: sib, SiteName: "A", Title: "漂移簇标题", Reviewed: false})
+	if got := h.siteBatchCurTitle(context.Background(), rep); got != "漂移簇标题" {
+		t.Errorf("漂移簇代表 hash 应解析到标题, got %q", got)
+	}
+	if got := h.siteBatchCurTitle(context.Background(), "noexist"+strings.Repeat("0", 33)); got != "" {
+		t.Errorf("无快照无元数据应留空, got %q", got)
+	}
+	// resolver 未注入（测试/降级）→ 回退直查仍可用
+	h2 := &PublishTorrentsHandler{db: db, logger: zap.NewNop()}
+	if got := h2.siteBatchCurTitle(context.Background(), sib); got != "漂移簇标题" {
+		t.Errorf("回退直查应命中, got %q", got)
 	}
 }
