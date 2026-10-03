@@ -1791,7 +1791,22 @@ func (h *PublishTorrentsHandler) handleBatchReview(w http.ResponseWriter, r *htt
 	}
 	ids := req.IDs
 	if len(req.InfoHashes) > 0 {
-		// §59.288: hash→id 解析（簇代表 hash 与全部同 hash 行均审——簇同步再扩散兄弟 hash）
+		// §59.288→§59.316 修订: hash→id 解析走【簇口径】——输入是列表行簇代表 hash，
+		// 元数据可能在兄弟 hash 下（列表状态机按 name join 命中=显示待审核；直连
+		// info_hash 解析在簇代表换站后失配→空→"ids required"误拒，243 八连案：
+		// 簇 9 hash 元数据 1 行在兄弟站）。hash → 快照簇键 → 全簇 hash → ids，
+		// 与列表状态机/簇同步 §59.94 同口径。
+		clusterSub := h.db.WithContext(r.Context()).
+			Table("torrent_snapshots").
+			Select("DISTINCT client_uid, save_path, name").
+			Where("hash IN ? AND is_hidden = 0 AND name != ''", req.InfoHashes)
+		var clusterHashes []string
+		if err := h.db.WithContext(r.Context()).
+			Table("torrent_snapshots").
+			Where("is_hidden = 0 AND name != '' AND (client_uid, save_path, name) IN (?)", clusterSub).
+			Pluck("hash", &clusterHashes).Error; err == nil && len(clusterHashes) > 0 {
+			req.InfoHashes = clusterHashes
+		}
 		var resolved []uint
 		if err := h.db.WithContext(r.Context()).
 			Model(&model.TorrentMetadata{}).
