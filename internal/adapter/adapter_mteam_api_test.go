@@ -401,3 +401,57 @@ func TestMTeamCategoryDynamicFallback(t *testing.T) {
 		t.Errorf("退避防风暴失效: hits=%d, want 1", hits)
 	}
 }
+
+// TestMTeamCategoryDynamicMatchesStatic §59.317 P3 回归审核补锚：
+// 用权威树全量快照跑动态生成算法，结果必须与静态 mteamCategoryMap 逐 ID 一致
+// ——防 parentCanonical/leafOverride 两张小表与静态表漂移（谁改谁忘了另一方）。
+func TestMTeamCategoryDynamicMatchesStatic(t *testing.T) {
+	defer mteamCatCache.reset()
+	mteamCatCache.reset()
+	// 权威树快照（categoryList 2026-10-03 实测，成人区简化为代表性分组）
+	tree := `{"code":"0","data":{"list":[` +
+		`{"id":"100","parent":null},{"id":"105","parent":null},{"id":"444","parent":null},` +
+		`{"id":"449","parent":null},{"id":"110","parent":null},{"id":"447","parent":null},{"id":"450","parent":null},` +
+		`{"id":"401","parent":"100"},{"id":"419","parent":"100"},{"id":"420","parent":"100"},` +
+		`{"id":"421","parent":"100"},{"id":"439","parent":"100"},` +
+		`{"id":"402","parent":"105"},{"id":"403","parent":"105"},{"id":"435","parent":"105"},{"id":"438","parent":"105"},` +
+		`{"id":"404","parent":"444"},` +
+		`{"id":"405","parent":"449"},{"id":"453","parent":"449"},` +
+		`{"id":"406","parent":"110"},{"id":"434","parent":"110"},` +
+		`{"id":"423","parent":"447"},{"id":"448","parent":"447"},` +
+		`{"id":"407","parent":"450"},{"id":"409","parent":"450"},{"id":"422","parent":"450"},` +
+		`{"id":"427","parent":"450"},{"id":"442","parent":"450"},{"id":"451","parent":"450"}` +
+		`],"adult":["410","429"]}}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(tree))
+	}))
+	defer srv.Close()
+	a := NewMTeamAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	if err := a.fetchCategoryList(context.Background(), &model.SiteConfig{Domain: srv.URL, APIKey: "k"}); err != nil {
+		t.Fatal(err)
+	}
+	mteamCatCache.mu.RLock()
+	dyn := mteamCatCache.idMap
+	mismatch := 0
+	for id, want := range mteamCategoryMap {
+		got, ok := dyn[id]
+		if !ok {
+			t.Errorf("动态映射缺失静态项 %s（静态=%s）——小表与静态表漂移", id, want)
+			mismatch++
+		} else if got != want {
+			t.Errorf("映射不一致 id=%s: 动态=%s 静态=%s", id, got, want)
+			mismatch++
+		}
+	}
+	for id := range dyn {
+		if _, ok := mteamCategoryMap[id]; !ok {
+			t.Errorf("动态映射多出静态没有的 id=%s（%s）", id, dyn[id])
+			mismatch++
+		}
+	}
+	mteamCatCache.mu.RUnlock()
+	if mismatch == 0 {
+		t.Logf("全量一致：%d 项（含 7 主类）", len(mteamCategoryMap))
+	}
+}
