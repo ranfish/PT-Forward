@@ -323,41 +323,74 @@ func (a *MTeamAdapter) GetTorrentDetail(ctx context.Context, config *model.SiteC
 }
 
 // mteamAdultCategories 馒头成人区 category 编码（mode=adult）。
-// 常规区与成人区 category 完全隔离，命中以下编码即为成人内容。
+// §59.317 修订：按 categoryList 权威树补全——AV(无码)含 AV(网站)/0Day(436) 与
+// AV(Gay)/HD(440)；主类 ID（115 AV有码/120 AV无码/445 IV/446 H-ACG）保险入集。
 var mteamAdultCategories = map[string]bool{
 	"410": true, "411": true, "412": true, "413": true,
 	"424": true, "425": true, "426": true,
 	"429": true, "430": true, "431": true, "432": true, "433": true,
-	"437": true,
+	"436": true, "437": true, "440": true,
+	"115": true, "120": true, "445": true, "446": true,
 }
 
-// mteamCategoryMap MTeam API category ID → 标准 code（v0.0.255）。
-// 数据源：site/data/sites.json 馒头 form.category。
-// MTeam API 返回纯数字 category（如 "407"），NormalizeCategory 无法匹配。
+// mteamCategoryMap MTeam API category ID → 标准 canonical（§59.317 权威重建）。
+// 数据源：/api/torrent/categoryList 实测两级树（2026-10-03 经系统解密链拉取）。
+// 【历史教训】v0.0.255 版误用 sites.json 发布表单 ID 快照——馒头 2024-03 重建
+// 分类树为两级结构（主类>媒介子类）后 ID 全部错位：421 实为电影/BluRay 而旧表
+// 译 category.cartoon（243 全库 456 行 HDT 原盘电影全标"动漫"案）。
+// 映射原则：①主类级 canonical（媒介子类 BluRay/HD 与 medium 资产重叠，不入
+// category）②键对齐 dict canonical 键族（documentary 单数/comic/education 等）
+// ③主类 ID（100/105/110/447/449/450）一并映射（防御 detail 返回主类形态）。
 var mteamCategoryMap = map[string]string{
+	// 电影（100 主类 + SD/HD/DVDiSo/BluRay/Remux 子类）
+	"100": "category.movie",
 	"401": "category.movie",
+	"419": "category.movie",
+	"420": "category.movie",
+	"421": "category.movie",
+	"439": "category.movie",
+	// 影剧/综艺（105 主类 + HD/SD/DVDiSo/BluRay 子类）
+	"105": "category.tv_series",
 	"402": "category.tv_series",
-	"403": "category.documentaries",
-	"404": "category.animation",
-	"405": "category.tv_shows",
-	"406": "category.music",
+	"403": "category.tv_series",
+	"435": "category.tv_series",
+	"438": "category.tv_series",
+	// 紀錄（444 主类 + 纪录子类）
+	"444": "category.documentary",
+	"404": "category.documentary",
+	// 動漫（449 主类 + 动画/动画BluRay 子类——453 为 2026-07 新增）
+	"449": "category.animation",
+	"405": "category.animation",
+	"453": "category.animation",
+	// Music（110 主类：演唱 406→演唱会；Music(无损) 434→无损音乐）
+	"110": "category.music",
+	"406": "category.concert",
+	"434": "category.lossless_music",
+	// 遊戲（447 主类 + PC游戏/TV遊戲）
+	"447": "category.game",
+	"423": "category.game",
+	"448": "category.game",
+	// 其他（450 主类）
+	"450": "category.other",
 	"407": "category.sports",
-	"408": "category.other",
-	"409": "category.game",
-	"419": "category.audiobook",
-	"420": "category.ebook",
-	"421": "category.cartoon",
-	"422": "category.magazine",
-	"423": "category.study",
-	"427": "category.mv",
-	"434": "category.other",
-	"435": "category.mv",
-	"438": "category.software",
-	"439": "category.other",
-	"441": "category.stage",
-	"442": "category.sports",
-	"448": "category.playlet",
-	"449": "category.other",
+	"409": "category.other",
+	"422": "category.software",
+	"427": "category.ebook",
+	"442": "category.audiobook",
+	"451": "category.education", // 2025-05 新增：教育影片
+}
+
+// normalizeMTeamCategoryID §59.317: 馒头 API 原始分类 ID → 标准 canonical 单点。
+// 成人区命中 → category.adult；map 命中 → canonical；未收录 → ""（调用方回退）。
+// detail 与 RSS（FetchItemsByAPI）两链统一走此口径。
+func normalizeMTeamCategoryID(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	if mteamAdultCategories[raw] {
+		return "category.adult"
+	}
+	return mteamCategoryMap[raw]
 }
 
 func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfig, torrentID string) (*model.TorrentDetail, error) {
@@ -418,6 +451,14 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 	}
 
 	d := result.Data
+	// §59.317: detail 响应可观测——raw category 原始值落日志（对齐 §59.223 search
+	// req/resp Debug 模式；243 全库 cartoon 案因 detail 无日志成盲区，原始值不可考）。
+	if a.logger != nil {
+		a.logger.Debug("mteam detail resp",
+			zap.String("tid", torrentID),
+			zap.String("raw_category", d.Category),
+			zap.Int("body_bytes", len(body)))
+	}
 	detail := &model.TorrentDetail{
 		Title:        d.Name,
 		Subtitle:     d.SmallDescr,
@@ -448,16 +489,22 @@ func (a *MTeamAdapter) detailViaAPI(ctx context.Context, config *model.SiteConfi
 			detail.Screenshots = detail.Screenshots[1:]
 		}
 	}
-	// v0.0.255: MTeam API 返回纯数字 category ID（如 "407"），先转标准 code
-	// 成人区 category 检测：命中则在 flags 标记 adult（§56.40 合规增强）
-	if mteamAdultCategories[detail.Category] {
-		detail.Category = "category.adult"
-		detail.Flags = []string{"adult"}
-		return detail, nil
-	}
-	if stdCode, ok := mteamCategoryMap[detail.Category]; ok {
-		detail.Category = stdCode
+	// §59.317: 分类归一走 normalizeMTeamCategoryID 单点（成人集+权威树 map）。
+	// 成人区命中：flags 标记 adult（§56.40 合规增强）+ category.adult。
+	if nc := normalizeMTeamCategoryID(detail.Category); nc != "" {
+		detail.Category = nc
+		if nc == "category.adult" {
+			detail.Flags = []string{"adult"}
+			return detail, nil
+		}
 	} else {
+		// map miss：站方新增分类早知道（Warn 可观测——本案若有此告警 09-30
+		// 当天即暴露，无需等用户肉眼发现错标）
+		if a.logger != nil && detail.Category != "" {
+			a.logger.Warn("mteam category id unmapped",
+				zap.String("tid", torrentID),
+				zap.String("raw_category", detail.Category))
+		}
 		detail.Category = NormalizeCategory(detail.Category)
 	}
 	// 从结构化字段提取禁转标记（§56.37 合规修复）
@@ -656,8 +703,11 @@ func (a *MTeamAdapter) FetchItemsByAPI(ctx context.Context, config *model.SiteCo
 			IsFree:        dr.Level == model.DiscountFree || dr.Level == model.Discount2xFree || dr.Level == model.Discount2x50,
 			DiscountLevel: dr.Level,
 			FreeEndAt:     dr.FreeEndAt,
-			Category:      item.Category,
-			Metadata:      map[string]any{},
+			// §59.317: RSS 链同口径归一——原透传原始 ID（如 "421"）落
+			// rss_torrent_seen.source_category，消费端（normalizeCategorySimple/
+			// compliance lookupSourceCategory）均无法归一（回归审查遗漏 A）。
+			Category: normalizeMTeamCategoryID(item.Category),
+			Metadata: map[string]any{},
 		}
 		events = append(events, ev)
 	}

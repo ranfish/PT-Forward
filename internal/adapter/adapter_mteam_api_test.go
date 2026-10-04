@@ -229,3 +229,95 @@ func TestGetTorrentDetail_APIError_MustFail(t *testing.T) {
 		t.Fatalf("错误时不应返回 detail, got %+v", detail)
 	}
 }
+
+// TestMTeamCategoryMapAuthoritative §59.317: 权威树映射——categoryList 实测两级树
+// （2026-10-03）逐 ID 断言。旧表 421→cartoon（实为电影/BluRay）等全错位修正。
+func TestMTeamCategoryMapAuthoritative(t *testing.T) {
+	cases := map[string]string{
+		// 电影（主类+子类）
+		"100": "category.movie", "401": "category.movie", "419": "category.movie",
+		"420": "category.movie", "421": "category.movie", "439": "category.movie",
+		// 影剧/综艺
+		"105": "category.tv_series", "402": "category.tv_series", "403": "category.tv_series",
+		"435": "category.tv_series", "438": "category.tv_series",
+		// 紀錄
+		"444": "category.documentary", "404": "category.documentary",
+		// 動漫（453=2026-07 新增）
+		"449": "category.animation", "405": "category.animation", "453": "category.animation",
+		// Music
+		"406": "category.concert", "434": "category.lossless_music",
+		// 遊戲/其他
+		"447": "category.game", "423": "category.game", "448": "category.game",
+		"407": "category.sports", "409": "category.other", "422": "category.software",
+		"427": "category.ebook", "442": "category.audiobook", "451": "category.education",
+	}
+	for raw, want := range cases {
+		if got := mteamCategoryMap[raw]; got != want {
+			t.Errorf("map[%s] = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+// TestNormalizeMTeamCategoryIDAdult §59.317: 成人集补缺（436 AV网站/440 AV Gay/
+// 主类 115/120/445/446）+ 未知 ID 返回空（miss 告警路径）。
+func TestNormalizeMTeamCategoryIDAdult(t *testing.T) {
+	for _, raw := range []string{"436", "440", "115", "120", "445", "446", "429", "413"} {
+		if got := normalizeMTeamCategoryID(raw); got != "category.adult" {
+			t.Errorf("normalizeMTeamCategoryID(%s) = %q, want category.adult", raw, got)
+		}
+	}
+	if got := normalizeMTeamCategoryID("421"); got != "category.movie" {
+		t.Errorf("421 应为电影/BluRay→movie, got %q", got)
+	}
+	if got := normalizeMTeamCategoryID("999"); got != "" {
+		t.Errorf("未知 ID 应返回空, got %q", got)
+	}
+	if got := normalizeMTeamCategoryID(""); got != "" {
+		t.Errorf("空输入应返回空, got %q", got)
+	}
+}
+
+// TestFetchItemsByAPI_CategoryMapped §59.317: RSS 链分类归一——原始 ID 不再透传
+// 落 rss_torrent_seen.source_category（回归审查遗漏 A）。
+func TestFetchItemsByAPI_CategoryMapped(t *testing.T) {
+	apiResp := map[string]interface{}{
+		"code": "0",
+		"data": map[string]interface{}{
+			"data": []map[string]interface{}{
+				{
+					"id": "1", "name": "Movie BluRay", "size": 1, "category": "421",
+					"status": map[string]interface{}{"discount": "FREE"},
+				},
+				{
+					"id": "2", "name": "Anime", "size": 1, "category": "405",
+					"status": map[string]interface{}{"discount": "FREE"},
+				},
+				{
+					"id": "3", "name": "AV", "size": 1, "category": "429",
+					"status": map[string]interface{}{"discount": "FREE"},
+				},
+			},
+		},
+	}
+	body, _ := json.Marshal(apiResp)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+	a := NewMTeamAdapter(&HTTPDoer{Client: srv.Client()}, zap.NewNop())
+	events, err := a.FetchItemsByAPI(context.Background(),
+		&model.SiteConfig{Domain: srv.URL, APIKey: "k"}, srv.URL+"/api/torrent/search?discounts=FREE", "馒头")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d", len(events))
+	}
+	want := map[string]string{"Movie BluRay": "category.movie", "Anime": "category.animation", "AV": "category.adult"}
+	for _, ev := range events {
+		if ev.Category != want[ev.Title] {
+			t.Errorf("%s: category = %q, want %q", ev.Title, ev.Category, want[ev.Title])
+		}
+	}
+}
