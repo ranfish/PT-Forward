@@ -30006,95 +30006,91 @@
         "category": [
           {
             "value": "401",
-            "label": "电影"
-          },
-          {
-            "value": "402",
-            "label": "剧集"
-          },
-          {
-            "value": "403",
-            "label": "纪录片"
-          },
-          {
-            "value": "404",
-            "label": "动漫"
-          },
-          {
-            "value": "405",
-            "label": "综艺"
-          },
-          {
-            "value": "406",
-            "label": "音乐"
-          },
-          {
-            "value": "407",
-            "label": "体育"
-          },
-          {
-            "value": "408",
-            "label": "其他"
-          },
-          {
-            "value": "409",
-            "label": "游戏"
+            "label": "电影/SD"
           },
           {
             "value": "419",
-            "label": "有声书"
+            "label": "电影/HD"
           },
           {
             "value": "420",
-            "label": "电子书"
+            "label": "电影/DVDiSo"
           },
           {
             "value": "421",
-            "label": "漫画"
-          },
-          {
-            "value": "422",
-            "label": "杂志"
-          },
-          {
-            "value": "423",
-            "label": "学习"
-          },
-          {
-            "value": "427",
-            "label": "演唱会"
-          },
-          {
-            "value": "434",
-            "label": "微卫星"
-          },
-          {
-            "value": "435",
-            "label": "音乐MV"
-          },
-          {
-            "value": "438",
-            "label": "软件"
+            "label": "电影/BluRay"
           },
           {
             "value": "439",
-            "label": "资讯"
+            "label": "电影/Remux"
           },
           {
-            "value": "441",
-            "label": "戏剧"
+            "value": "402",
+            "label": "影剧/综艺/HD"
           },
           {
-            "value": "442",
-            "label": "体育赛事"
+            "value": "403",
+            "label": "影剧/综艺/SD"
+          },
+          {
+            "value": "435",
+            "label": "影剧/综艺/DVDiSo"
+          },
+          {
+            "value": "438",
+            "label": "影剧/综艺/BluRay"
+          },
+          {
+            "value": "404",
+            "label": "纪录"
+          },
+          {
+            "value": "405",
+            "label": "动画"
+          },
+          {
+            "value": "453",
+            "label": "动画/BluRay"
+          },
+          {
+            "value": "406",
+            "label": "演唱"
+          },
+          {
+            "value": "434",
+            "label": "Music(无损)"
+          },
+          {
+            "value": "423",
+            "label": "PC游戏"
           },
           {
             "value": "448",
-            "label": "短剧"
+            "label": "TV遊戲"
           },
           {
-            "value": "449",
-            "label": "AI"
+            "value": "407",
+            "label": "运动"
+          },
+          {
+            "value": "409",
+            "label": "Misc(其他)"
+          },
+          {
+            "value": "422",
+            "label": "软件"
+          },
+          {
+            "value": "427",
+            "label": "電子書"
+          },
+          {
+            "value": "442",
+            "label": "有聲書"
+          },
+          {
+            "value": "451",
+            "label": "教育影片"
           }
         ],
         "medium_sel": [
